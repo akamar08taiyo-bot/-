@@ -45,6 +45,30 @@ firebase deploy --only functions,firestore:rules
 
 `functions/src/index.ts` の `LLM_API_BASE_URL` / `LLM_MODEL` 環境変数で利用するLLMプロバイダを切り替え可能（既定はOpenAI互換のchat completions）。
 
+## 自動デプロイ（GitHub Actions）
+
+`main` ブランチへのpush時に `.github/workflows/deploy.yml` がHosting・Firestoreルール・Cloud Functionsを自動デプロイする。
+初回のみ、以下を手動でセットアップする。
+
+1. **Firebaseプロジェクトを作成**（未作成の場合）
+   [Firebase Console](https://console.firebase.google.com/) → プロジェクトを追加 → Firestore・Authentication（匿名認証を有効化）を設定
+2. **サービスアカウントキーを発行**
+   [Google Cloud Console](https://console.cloud.google.com/iam-admin/serviceaccounts) → 対象プロジェクト → サービスアカウントを作成
+   → ロールに `Firebase 管理者`（`roles/firebase.admin`）付与 → キーを作成（JSON）してダウンロード
+3. **GitHubリポジトリにSecretsを登録**
+   リポジトリの Settings → Secrets and variables → Actions → New repository secret
+   - `FIREBASE_SERVICE_ACCOUNT`: 手順2でダウンロードしたJSONファイルの中身をそのまま貼り付け
+   - `FIREBASE_PROJECT_ID`: FirebaseプロジェクトID
+4. **LLM APIキーをCloud Functions側に登録**（一度だけ、ローカルから）
+   ```
+   npm install -g firebase-tools
+   firebase login
+   firebase use --add                          # 手順1のプロジェクトを選択
+   firebase functions:secrets:set LLM_API_KEY
+   ```
+
+以降は `main` へのpush、または GitHub の Actions タブから `workflow_dispatch` で手動実行することでデプロイされる。
+
 ## 実装範囲（MVP）
 
 含む: 体重・体組成記録+推移グラフ、食事記録（テキスト入力+AI分解+確認画面）、よく食べるメニュー、間食管理、筋トレ記録、サプリ管理+重複警告、健診データ入力+前年比、ホームサマリ+改善提案（最大3件）。
