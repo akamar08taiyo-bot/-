@@ -1,7 +1,4 @@
 {
-  "name": "Price Quote & Proposal Creator",
-  "description": "A professional tool for creating price quotations and proposals with AI-powered image recognition and cost simulation.",
-  "requestFramePermissions": [
-    "camera"
-  ]
+  "name": "健康管理アプリ",
+  "description": "食事・健診数値・筋トレ・サプリ・体重を一元管理する本人専用アプリ。"
 }
