@@ -7,9 +7,11 @@
     --ink:#16201D; --muted:#66756F; --line:#D8E0DA; --line2:#E9EEEA;
     --accent:#14635A; --accent-ink:#0E4A43; --accent-soft:#DAEAE6;
     --warm:#B45F1E; --warm-soft:#F5E5D5;
-    --goal:#9C3B3B; --danger:#A32F2F;
+    --up:#9C3B3B; --danger:#A32F2F;
     --shadow:0 1px 2px rgba(22,32,29,.06), 0 6px 16px -10px rgba(22,32,29,.22);
+    --lift:0 2px 6px rgba(22,32,29,.10), 0 12px 24px -14px rgba(22,32,29,.32);
     --r:14px;
+    --ease:cubic-bezier(.2,.9,.3,1);
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
@@ -17,8 +19,9 @@
       --ink:#E7EEE9; --muted:#94A49E; --line:#2C3835; --line2:#232E2B;
       --accent:#45A99B; --accent-ink:#8FD3C8; --accent-soft:#1C3733;
       --warm:#D9924E; --warm-soft:#38291B;
-      --goal:#DB7070; --danger:#E07A7A;
+      --up:#DB7070; --danger:#E07A7A;
       --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 20px -12px rgba(0,0,0,.6);
+      --lift:0 2px 8px rgba(0,0,0,.5), 0 14px 26px -14px rgba(0,0,0,.8);
     }
   }
   :root[data-theme="dark"]{
@@ -26,8 +29,9 @@
     --ink:#E7EEE9; --muted:#94A49E; --line:#2C3835; --line2:#232E2B;
     --accent:#45A99B; --accent-ink:#8FD3C8; --accent-soft:#1C3733;
     --warm:#D9924E; --warm-soft:#38291B;
-    --goal:#DB7070; --danger:#E07A7A;
+    --up:#DB7070; --danger:#E07A7A;
     --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 20px -12px rgba(0,0,0,.6);
+    --lift:0 2px 8px rgba(0,0,0,.5), 0 14px 26px -14px rgba(0,0,0,.8);
   }
 
   *{box-sizing:border-box}
@@ -36,11 +40,24 @@
     background:var(--ground); color:var(--ink);
     font-family:'Zen Kaku Gothic New', -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', Meiryo, sans-serif;
     font-size:15px; line-height:1.6; -webkit-text-size-adjust:100%;
+    -webkit-tap-highlight-color:transparent;
   }
   .num{font-family:'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric:tabular-nums;}
   .wrap{max-width:560px; margin:0 auto; padding-inline:16px; padding-block:0 96px;}
 
-  /* header */
+  /* ---- motion ---- */
+  @keyframes viewIn{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+  @keyframes pop{0%{transform:scale(1)} 40%{transform:scale(1.11)} 100%{transform:scale(1)}}
+  @keyframes bump{0%{transform:scale(1)} 35%{transform:scale(1.07)} 100%{transform:scale(1)}}
+  @keyframes ring{from{box-shadow:0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent)} to{box-shadow:0 0 0 14px transparent}}
+  @keyframes toastIn{from{opacity:0; transform:translate(-50%, 12px)} to{opacity:.96; transform:translate(-50%,0)}}
+  @keyframes drawIn{from{stroke-dashoffset:var(--len)} to{stroke-dashoffset:0}}
+  @keyframes growUp{from{transform:scaleY(0)} to{transform:scaleY(1)}}
+  #app{animation:viewIn .28s var(--ease) both;}
+  .drawline{stroke-dasharray:var(--len); animation:drawIn .9s var(--ease) both;}
+  .growbar{transform-origin:var(--org, bottom); animation:growUp .5s var(--ease) both;}
+
+  /* ---- header ---- */
   header{
     position:sticky; top:env(safe-area-inset-top, 0px); z-index:20;
     background:color-mix(in srgb, var(--ground) 88%, transparent);
@@ -55,9 +72,8 @@
   .datebar .d{flex:1; text-align:center; font-weight:700; font-size:16px;}
   .datebar .d small{font-weight:400; color:var(--muted); font-size:12px; margin-left:4px;}
 
-  /* generic */
+  /* ---- shared ---- */
   .card{background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:14px; margin-top:12px; box-shadow:var(--shadow);}
-  .card.flat{box-shadow:none;}
   .ct{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;}
   .ct h2{margin:0; font-size:12px; font-weight:700; letter-spacing:.12em; color:var(--muted);}
   .ct .r{font-size:12px; color:var(--muted);}
@@ -66,116 +82,133 @@
   .sep{height:1px; background:var(--line2); margin:12px -14px;}
 
   button{font:inherit; color:inherit; cursor:pointer;}
-  .btn{
-    border:1px solid var(--line); background:var(--surface2); border-radius:10px;
-    padding:8px 12px; font-size:13px; font-weight:500; min-height:40px;
+  .btn, .chip, .stepper, .icon-btn, .seg button, nav.tabs button, .cell{
+    transition:transform .13s var(--ease), background-color .2s var(--ease), border-color .2s var(--ease),
+               box-shadow .2s var(--ease), color .2s var(--ease);
   }
-  .btn:active{transform:translateY(1px);}
+  .btn{border:1px solid var(--line); background:var(--surface2); border-radius:10px; padding:8px 12px; font-size:13px; font-weight:500; min-height:40px;}
+  .btn:hover{box-shadow:var(--shadow);}
+  .btn:active{transform:scale(.95);}
   .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff;}
   .btn.ghost{background:transparent;}
   .btn.danger{color:var(--danger); border-color:color-mix(in srgb, var(--danger) 35%, var(--line));}
   .btn.sm{min-height:32px; padding:4px 10px; font-size:12px;}
-  .icon-btn{
-    border:1px solid var(--line); background:var(--surface); border-radius:10px;
-    width:40px; height:40px; display:grid; place-items:center; font-size:16px;
-  }
+  .icon-btn{border:1px solid var(--line); background:var(--surface); border-radius:10px; width:40px; height:40px; display:grid; place-items:center; font-size:16px;}
+  .icon-btn:active{transform:scale(.9);}
   .icon-btn[disabled]{opacity:.35; cursor:default;}
   :focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 
   input, select, textarea{
     font:inherit; color:var(--ink); background:var(--surface);
     border:1px solid var(--line); border-radius:10px; padding:8px 10px; min-height:40px; width:100%;
+    transition:border-color .2s var(--ease), box-shadow .2s var(--ease);
   }
-  textarea{min-height:110px; line-height:1.45;}
+  input:focus, textarea:focus{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); outline:none;}
   label.fl{display:block; font-size:12px; color:var(--muted); margin-bottom:4px;}
   .field{flex:1 1 140px; min-width:0;}
 
-  /* weight input */
+  /* ---- weight ---- */
+  .lastlog{
+    display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap;
+    background:var(--surface2); border-radius:10px; padding:7px 10px; font-size:12.5px; color:var(--muted); margin-bottom:12px;
+  }
+  .lastlog b{color:var(--ink); font-family:'IBM Plex Mono',monospace;}
+  .lastlog .ago{background:var(--accent-soft); color:var(--accent-ink); border-radius:999px; padding:1px 8px; font-size:11px; font-weight:700;}
   .weigh{display:flex; align-items:center; gap:10px; justify-content:center;}
   .weigh .stepper{
-    width:52px; height:52px; border-radius:14px; border:1px solid var(--line);
-    background:var(--surface2); font-size:20px; display:grid; place-items:center;
+    width:54px; height:54px; border-radius:16px; border:1px solid var(--line);
+    background:var(--surface2); font-size:22px; display:grid; place-items:center; user-select:none;
   }
+  .weigh .stepper:active{transform:scale(.88); background:var(--accent-soft); border-color:var(--accent);}
   .weigh .big{position:relative; flex:0 1 190px;}
   .weigh input{
     font-family:'IBM Plex Mono', ui-monospace, monospace; font-variant-numeric:tabular-nums;
     font-size:38px; font-weight:600; text-align:center; padding:4px 34px 4px 8px;
     height:64px; letter-spacing:-.02em; background:transparent; border:none;
-    border-bottom:2px solid var(--accent-soft); border-radius:0;
+    border-bottom:2px solid var(--accent-soft); border-radius:0; box-shadow:none;
   }
+  .weigh input:focus{box-shadow:none; border-bottom-color:var(--accent);}
+  .weigh input.bump{animation:bump .3s var(--ease);}
   .weigh input::-webkit-outer-spin-button,.weigh input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
   .weigh input[type=number]{-moz-appearance:textfield;}
   .weigh .unit{position:absolute; right:6px; bottom:14px; font-size:14px; color:var(--muted);}
   .wstat{display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin-top:10px; font-size:13px;}
   .wstat b{font-family:'IBM Plex Mono', monospace; font-variant-numeric:tabular-nums;}
-  .down{color:var(--accent);} .up{color:var(--goal);}
+  .down{color:var(--accent);} .up{color:var(--up);}
 
-  /* segmented + chips */
+  /* ---- chips ---- */
+  .chip{border:1px solid var(--line); background:var(--surface); border-radius:999px; padding:6px 12px; font-size:13px; min-height:36px;}
+  .chip:active{transform:scale(.92);}
+  .chip[aria-pressed="true"]{background:var(--warm-soft); border-color:color-mix(in srgb, var(--warm) 45%, var(--line)); color:var(--warm); font-weight:700;}
+  .chip.justOn{animation:pop .3s var(--ease);}
+  .chip.mini{padding:5px 10px; font-size:12px; min-height:32px;}
+  .chip.mini .k{color:var(--muted); font-size:11px; margin-left:5px;}
+  .chip.mini:active{transform:scale(.9);}
+  .parts{display:grid; grid-template-columns:repeat(3,1fr); gap:7px;}
+  .parts .chip{width:100%; min-height:44px; font-size:14px;}
   .seg{display:inline-flex; background:var(--surface2); border:1px solid var(--line); border-radius:10px; padding:3px; gap:3px;}
   .seg button{border:none; background:transparent; border-radius:8px; padding:6px 14px; font-size:13px; min-height:34px; color:var(--muted);}
   .seg button[aria-pressed="true"]{background:var(--surface); color:var(--ink); font-weight:700; box-shadow:0 1px 2px rgba(0,0,0,.10);}
-  .chip{
-    border:1px solid var(--line); background:var(--surface); border-radius:999px;
-    padding:6px 12px; font-size:13px; min-height:36px;
-  }
-  .chip[aria-pressed="true"]{background:var(--warm-soft); border-color:color-mix(in srgb, var(--warm) 45%, var(--line)); color:var(--warm); font-weight:700;}
-  .chip.mini{padding:5px 10px; font-size:12px; min-height:32px;}
-  .chip.mini .k{color:var(--muted); font-size:11px; margin-left:5px;}
-  .parts{display:grid; grid-template-columns:repeat(3,1fr); gap:6px;}
-  .parts .chip{width:100%;}
+  .seg button:active{transform:scale(.94);}
 
-  /* meals */
+  /* ---- meals ---- */
   .mlist{list-style:none; margin:8px 0 0; padding:0;}
   .mlist li{display:flex; align-items:center; gap:8px; padding:7px 0; border-top:1px solid var(--line2); font-size:14px;}
   .mlist li .n{flex:1; min-width:0; overflow-wrap:anywhere;}
   .mlist li .k{color:var(--muted); font-size:13px;}
-  .x{border:none; background:transparent; color:var(--muted); font-size:18px; line-height:1; padding:4px 6px;}
-  .total{font-size:13px;}
+  .x{border:none; background:transparent; color:var(--muted); font-size:18px; line-height:1; padding:4px 6px; transition:transform .13s var(--ease), color .2s;}
+  .x:active{transform:scale(.8); color:var(--danger);}
   .total b{font-size:20px; font-family:'IBM Plex Mono',monospace;}
 
-  /* tiles */
-  .tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+  /* ---- tiles ---- */
+  .tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:12px;}
   .tile{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px 8px; text-align:center;}
   .tile .l{font-size:11px; color:var(--muted); letter-spacing:.06em;}
   .tile .v{font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; font-size:21px; font-weight:600; line-height:1.25;}
   .tile .u{font-size:11px; color:var(--muted);}
 
-  /* charts */
-  .chart{width:100%; overflow:hidden;}
-  .legend{display:flex; gap:12px; flex-wrap:wrap; font-size:11px; color:var(--muted); margin-top:6px;}
-  .legend i{display:inline-block; width:14px; height:3px; border-radius:2px; vertical-align:middle; margin-right:5px;}
-  .cal{display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-top:8px;}
+  /* ---- calendar ---- */
+  .cal{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-top:8px;}
   .cal .dow{text-align:center; font-size:10px; color:var(--muted); padding-bottom:2px;}
-  .cal .cell{aspect-ratio:1/1; border-radius:8px; background:var(--surface2); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; font-size:11px;}
-  .cal .cell.void{background:transparent;}
-  .cal .cell.today{outline:1.5px solid var(--accent);}
-  .cal .cell .dn{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted);}
+  .cal .cell{
+    aspect-ratio:1/1.12; border:1px solid transparent; border-radius:9px; background:var(--surface2);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; padding:2px 0 3px;
+  }
+  .cal .cell:active{transform:scale(.9);}
+  .cal .cell.void{background:transparent; pointer-events:none;}
+  .cal .cell.today{border-color:var(--accent);}
+  .cal .cell .dn{font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--muted); line-height:1;}
+  .cal .cell.today .dn{color:var(--accent); font-weight:600;}
+  .cal .cell .cw{font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; font-size:12px; font-weight:600; line-height:1.15;}
+  .cal .cell .cw.d{color:var(--accent);} .cal .cell .cw.u{color:var(--up);}
+  .cal .cell .cw.none{color:var(--line); font-weight:400;}
+  .cal .cell .cp{font-size:9px; line-height:1.1; color:var(--warm); font-weight:700; letter-spacing:.02em;}
   .cal .cell.did{background:var(--warm-soft);}
-  .cal .cell.did .dn{color:var(--warm); font-weight:600;}
-  .cal .cell .mn{font-size:9px; color:var(--warm);}
-  .cal .cell .wd{width:4px; height:4px; border-radius:50%; background:var(--accent); opacity:.55;}
+  .legend{display:flex; gap:12px; flex-wrap:wrap; font-size:11px; color:var(--muted); margin-top:8px;}
+  .legend i{display:inline-block; width:14px; height:3px; border-radius:2px; vertical-align:middle; margin-right:5px;}
+
+  /* ---- bars ---- */
   .bars{display:grid; gap:6px; margin-top:4px;}
   .bar{display:grid; grid-template-columns:44px 1fr 38px; align-items:center; gap:8px; font-size:12px;}
   .bar .track{display:block; background:var(--surface2); border-radius:5px; height:16px; overflow:hidden;}
-  .bar .fill{display:block; height:100%; min-width:3px; background:var(--warm); opacity:.85; border-radius:5px;}
+  .bar .fill{display:block; height:100%; min-width:3px; background:var(--warm); opacity:.85; border-radius:5px; transform-origin:left; animation:growUp .5s var(--ease) both; }
   .bar .v{text-align:right; color:var(--muted); font-family:'IBM Plex Mono',monospace;}
+  .chart{width:100%; overflow:hidden;}
 
-  /* banner / toast */
+  /* ---- banner / toast ---- */
   .banner{
     display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap;
     background:var(--accent-soft); border:1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
     color:var(--accent-ink); border-radius:12px; padding:10px 12px; margin-top:12px; font-size:12.5px;
   }
-  :root[data-theme="dark"] .banner, :root:not([data-theme="light"]) .banner{color:var(--accent-ink);}
   .toast{
     position:fixed; left:50%; transform:translateX(-50%); bottom:calc(84px + env(safe-area-inset-bottom, 0px));
     background:var(--ink); color:var(--ground); padding:8px 16px; border-radius:999px; font-size:13px;
-    opacity:0; pointer-events:none; transition:opacity .18s ease; z-index:40;
+    opacity:0; pointer-events:none; z-index:40;
   }
-  .toast.on{opacity:.95;}
-  @media (prefers-reduced-motion: reduce){ .toast{transition:none;} }
+  .toast.on{animation:toastIn .22s var(--ease) forwards;}
 
-  /* tabbar */
+  /* ---- tabs ---- */
   nav.tabs{
     position:fixed; left:0; right:0; bottom:0; z-index:30;
     background:color-mix(in srgb, var(--surface) 92%, transparent);
@@ -184,12 +217,17 @@
     padding-bottom:env(safe-area-inset-bottom, 0px);
   }
   nav.tabs .in{max-width:560px; margin:0 auto; display:grid; grid-template-columns:repeat(3,1fr);}
-  nav.tabs button{
-    background:none; border:none; padding:9px 0 10px; display:grid; justify-items:center; gap:3px;
-    font-size:11px; color:var(--muted); letter-spacing:.06em;
-  }
+  nav.tabs button{background:none; border:none; padding:9px 0 10px; display:grid; justify-items:center; gap:3px; font-size:11px; color:var(--muted); letter-spacing:.06em;}
   nav.tabs button[aria-current="true"]{color:var(--accent); font-weight:700;}
-  nav.tabs svg{width:21px; height:21px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round;}
+  nav.tabs button[aria-current="true"] svg{transform:translateY(-1px) scale(1.06);}
+  nav.tabs button:active{transform:scale(.93);}
+  nav.tabs svg{width:21px; height:21px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; transition:transform .2s var(--ease);}
+
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{animation:none !important; transition:none !important;}
+    .toast.on{opacity:.96;}
+    .drawline{stroke-dasharray:none;}
+  }
 </style>
 
 <header>
@@ -230,6 +268,7 @@
   'use strict';
   const KEY = 'genryo-note-v1';
   const PARTS = ['肩','背中','胸','足','二頭','三頭'];
+  const SHORT = {'肩':'肩','背中':'背','胸':'胸','足':'足','二頭':'二','三頭':'三'};
   const DOW = ['日','月','火','水','木','金','土'];
   const DEFAULT_PRESETS = [
     ['白米 150g',234],['食パン 6枚切1枚',149],['卵 1個',76],['納豆 1パック',100],
@@ -238,7 +277,7 @@
     ['味噌汁 1杯',40],['サラダ 1皿',30]
   ].map((p,i)=>({id:'p'+i, n:p[0], k:p[1]}));
 
-  /* ---------- date helpers ---------- */
+  /* ---------- 日付 ---------- */
   const pad = n => String(n).padStart(2,'0');
   const key = d => d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
   const parse = k => { const a=k.split('-').map(Number); return new Date(a[0],a[1]-1,a[2]); };
@@ -246,21 +285,36 @@
   const shift = (k,n) => { const d=parse(k); d.setDate(d.getDate()+n); return key(d); };
   const label = k => { const d=parse(k); return (d.getMonth()+1)+'月'+d.getDate()+'日 <small>('+DOW[d.getDay()]+')</small>'; };
   const diffDays = (a,b) => Math.round((parse(a)-parse(b))/86400000);
+  const ago = k => { const n = diffDays(todayKey(), k); return n===0?'今日':n===1?'きのう':n+'日前'; };
 
-  /* ---------- state ---------- */
-  let S, view='today', cursor=todayKey(), range=30, calCursor=todayKey();
+  /* ---------- 状態 ---------- */
+  let S, view='today', cursor=todayKey(), range=30, calCursor=todayKey(), justOn=null;
 
-  function blankDay(){ return {w:null, t:null, meals:[]}; }
-  function getDay(k){ return S.days[k] || blankDay(); }
+  const blankDay = () => ({w:null, t:null, meals:[]});
+  const getDay = k => S.days[k] || blankDay();
   function editDay(k){ if(!S.days[k]) S.days[k]=blankDay(); return S.days[k]; }
-  function isEmptyDay(d){ return d.w==null && !d.t && (!d.meals || d.meals.length===0); }
+  const isEmptyDay = d => d.w==null && !d.t && (!d.meals || d.meals.length===0);
 
+  function migrate(p){
+    /* v1 → v2: 目標体重をやめ、筋トレは「行った日に部位を記録する」だけにする */
+    for(const k in p.days){
+      const t = p.days[k].t;
+      if(!t){ continue; }
+      if(t.done === false){ p.days[k].t = null; continue; }
+      delete t.done;
+      if(!t.parts) t.parts = [];
+      if(!t.parts.length && !t.min) p.days[k].t = null;
+    }
+    if(p.settings){ delete p.settings.goal; delete p.settings.goalDate; }
+    p.v = 2;
+    return p;
+  }
   function load(){
     try{
       const raw = localStorage.getItem(KEY);
       if(raw){
         const p = JSON.parse(raw);
-        if(p && p.v===1 && p.days && p.settings) return p;
+        if(p && p.days && p.settings) return p.v===2 ? p : migrate(p);
       }
     }catch(e){}
     return seed();
@@ -269,12 +323,10 @@
     for(const k in S.days){ if(isEmptyDay(S.days[k])) delete S.days[k]; }
     try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){}
   }
-  function clearDemo(){
-    if(!S.demo) return;
-    S.demo = false; S.days = {};
-  }
+  function clearDemo(){ if(S.demo){ S.demo=false; S.days={}; } }
+  function buzz(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms||8); }catch(e){} }
 
-  /* サンプル（初回だけ表示。最初の記録を保存した時点で消える） */
+  /* サンプル（最初の記録を保存すると消える） */
   function seed(){
     const days = {}, start = 78.4;
     const plan = { 0:['胸','三頭'], 2:['背中','二頭'], 4:['足','肩'] };
@@ -283,51 +335,44 @@
       const w = start - (20-i)*0.085 + (((i*37)%7)-3)*0.08;
       const day = {w: Math.round(w*10)/10, t:null, meals:[]};
       const parts = plan[d.getDay()];
-      if(parts && i!==1){ day.t = {done:true, min:[45,60,60,75][i%4], parts:parts.slice()}; }
-      else if(i%6===1){ day.t = {done:false, min:0, parts:[]}; }
+      if(parts && i!==1) day.t = {min:[45,60,60,75][i%4], parts:parts.slice()};
       days[k] = day;
     }
     const t = days[todayKey()];
     if(t) t.meals = [{n:'白米 150g',k:234},{n:'卵 1個',k:76},{n:'納豆 1パック',k:100},{n:'鶏むね皮なし 100g',k:105}];
-    return {
-      v:1, demo:true,
-      settings:{goal:72, goalDate:'', kcal:1800},
-      days, presets: DEFAULT_PRESETS.map(p=>({...p}))
-    };
+    return { v:2, demo:true, settings:{kcal:1800}, days, presets: DEFAULT_PRESETS.map(p=>({...p})) };
   }
 
-  /* ---------- stats ---------- */
-  function weightSeries(){
-    return Object.keys(S.days).filter(k=>S.days[k].w!=null).sort()
-      .map(k=>({k, d:parse(k), w:S.days[k].w}));
-  }
-  function avgWindow(series, endKey, n){
+  /* ---------- 計算 ---------- */
+  const series = () => Object.keys(S.days).filter(k=>S.days[k].w!=null).sort().map(k=>({k, d:parse(k), w:S.days[k].w}));
+  function avgWindow(s, endKey, n){
     const from = shift(endKey, -(n-1));
-    const v = series.filter(e=>e.k>=from && e.k<=endKey);
-    if(!v.length) return null;
-    return v.reduce((s,e)=>s+e.w,0)/v.length;
+    const v = s.filter(e=>e.k>=from && e.k<=endKey);
+    return v.length ? v.reduce((a,e)=>a+e.w,0)/v.length : null;
   }
   const r1 = x => Math.round(x*10)/10;
   const sign = x => (x>0?'+':'') + r1(x).toFixed(1);
+  const cls = x => x>0 ? 'up' : x<0 ? 'down' : '';
 
-  /* ---------- render ---------- */
+  /* ---------- 描画 ---------- */
   const app = document.getElementById('app');
   const dateBar = document.getElementById('datebar');
 
   function render(keepFocus){
-    const active = document.activeElement;
-    const fid = keepFocus && active && active.id ? active.id : null;
-    const pos = fid && active.setSelectionRange ? active.selectionStart : null;
+    const a = document.activeElement;
+    const fid = keepFocus && a && a.id ? a.id : null;
+    const pos = fid && a.setSelectionRange ? a.selectionStart : null;
 
     document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-current', String(b.dataset.tab===view)));
     dateBar.hidden = view!=='today';
-    if(view==='today') document.getElementById('dateLabel').innerHTML = label(cursor) + (cursor===todayKey()?'':'');
-    document.getElementById('brandSub').textContent = view==='today' ? '' : (view==='chart'?'記録のふりかえり':'目標とデータ');
+    if(view==='today') document.getElementById('dateLabel').innerHTML = label(cursor);
+    document.getElementById('brandSub').textContent = view==='chart' ? 'ふりかえり' : view==='settings' ? 'データと設定' : '';
 
     app.innerHTML = view==='today' ? viewToday() : view==='chart' ? viewChart() : viewSettings();
     if(view==='chart') drawCharts();
     const nx = document.querySelector('[data-act="nextDay"]');
     if(nx) nx.disabled = cursor>=todayKey();
+    justOn = null;
 
     if(fid){
       const el = document.getElementById(fid);
@@ -337,39 +382,38 @@
 
   /* ---------- 今日 ---------- */
   function viewToday(){
-    const d = getDay(cursor), st = S.settings;
-    const series = weightSeries();
-    const prev = series.filter(e=>e.k<cursor).pop();
+    const d = getDay(cursor), s = series();
+    const prev = s.filter(e=>e.k<cursor).pop();
     const dd = (d.w!=null && prev) ? d.w - prev.w : null;
-    const toGoal = (d.w!=null && st.goal) ? d.w - st.goal : null;
 
     let h = '';
     if(S.demo) h += '<div class="banner"><span>サンプルの記録を表示中です。体重などを保存すると、サンプルは消えて自分の記録が始まります。</span><button class="btn sm" data-act="wipeDemo">サンプルを消す</button></div>';
 
     /* 体重 */
-    h += '<section class="card"><div class="ct"><h2>体重</h2><span class="r">'+(d.w!=null?'保存済み':'未入力')+'</span></div>'
-      + '<div class="weigh">'
+    h += '<section class="card"><div class="ct"><h2>体重</h2><span class="r">'+(d.w!=null?'記録ずみ':'まだ')+'</span></div>';
+    h += prev
+      ? '<div class="lastlog"><span class="ago">'+ago(prev.k)+'</span><span>前回の記録 '+(parse(prev.k).getMonth()+1)+'/'+parse(prev.k).getDate()+'　<b>'+prev.w.toFixed(1)+'</b> kg</span></div>'
+      : '<div class="lastlog"><span>まだ記録がありません。今日の体重から始めましょう。</span></div>';
+    h += '<div class="weigh">'
       + '<button class="stepper" data-act="w-" aria-label="0.1減らす">−</button>'
       + '<div class="big"><label class="fl" for="wInput" style="position:absolute;left:-9999px">体重(kg)</label>'
       + '<input id="wInput" type="number" step="0.1" min="20" max="250" inputmode="decimal" placeholder="--.-" value="'+(d.w!=null?d.w.toFixed(1):'')+'"><span class="unit">kg</span></div>'
-      + '<button class="stepper" data-act="w+" aria-label="0.1増やす">＋</button>'
-      + '</div><div class="wstat">'
-      + (dd!=null ? '<span>前回比 <b class="'+(dd<=0?'down':'up')+'">'+sign(dd)+'</b> kg</span>' : '<span class="hint">前回の記録なし</span>')
-      + (toGoal!=null ? '<span>目標まで <b>'+(toGoal>0?r1(toGoal).toFixed(1):'達成')+'</b>'+(toGoal>0?' kg':'')+'</span>' : '')
+      + '<button class="stepper" data-act="w+" aria-label="0.1増やす">＋</button></div>'
+      + '<div class="wstat">'
+      + (dd!=null ? '<span>前回から <b class="'+cls(dd)+'">'+sign(dd)+'</b> kg</span>' : '<span class="hint">記録すると前回との差が出ます</span>')
       + '</div></section>';
 
-    /* 筋トレ */
-    const t = d.t, done = !!(t && t.done);
-    h += '<section class="card"><div class="ct"><h2>筋トレ</h2><span class="r">'+(t? (done? (t.min||0)+'分' : '休み') : '未入力')+'</span></div>'
-      + '<div class="seg" role="group" aria-label="筋トレの有無">'
-      + '<button data-act="t-done" aria-pressed="'+done+'">行った</button>'
-      + '<button data-act="t-rest" aria-pressed="'+(!!t && !done)+'">休み</button></div>';
-    if(done){
-      h += '<div class="sep"></div><div class="hint" style="margin-bottom:6px">時間</div><div class="row">'
-        + [30,45,60,75,90].map(m=>'<button class="chip'+'" data-act="t-min" data-v="'+m+'" aria-pressed="'+(t.min===m)+'">'+m+'分</button>').join('')
-        + '<div class="field" style="flex:0 0 96px"><input id="minInput" type="number" min="1" max="600" inputmode="numeric" placeholder="自由" value="'+([30,45,60,75,90].includes(t.min)?'':(t.min||''))+'" aria-label="トレーニング時間(分)"></div></div>'
-        + '<div class="sep"></div><div class="hint" style="margin-bottom:6px">部位（複数えらべます）</div><div class="parts">'
-        + PARTS.map(p=>'<button class="chip" data-act="t-part" data-v="'+p+'" aria-pressed="'+(t.parts.includes(p))+'">'+p+'</button>').join('')
+    /* 筋トレ（部位だけ） */
+    const t = d.t;
+    h += '<section class="card"><div class="ct"><h2>筋トレ</h2><span class="r">'+(t&&t.parts.length ? t.parts.join('・')+(t.min?'／'+t.min+'分':'') : 'なし')+'</span></div>'
+      + '<div class="hint" style="margin-bottom:8px">やった部位をタップ（やらない日はそのままでOK）</div>'
+      + '<div class="parts">'
+      + PARTS.map(p=>'<button class="chip'+(justOn===p?' justOn':'')+'" data-act="part" data-v="'+p+'" aria-pressed="'+(!!t && t.parts.includes(p))+'">'+p+'</button>').join('')
+      + '</div>';
+    if(t && t.parts.length){
+      h += '<div class="sep"></div><div class="hint" style="margin-bottom:6px">時間（任意）</div><div class="parts">'
+        + [30,45,60,75,90].map(m=>'<button class="chip" data-act="min" data-v="'+m+'" aria-pressed="'+(t.min===m)+'">'+m+'分</button>').join('')
+        + '<input id="minInput" type="number" min="0" max="600" inputmode="numeric" placeholder="自由" value="'+([30,45,60,75,90].includes(t.min)?'':(t.min||''))+'" aria-label="トレーニング時間(分)" style="min-height:44px; text-align:center; border-radius:999px">'
         + '</div>';
     }
     h += '</section>';
@@ -377,11 +421,11 @@
     /* 食事 */
     const meals = d.meals||[];
     const known = meals.filter(m=>m.k!=null);
-    const sum = known.reduce((s,m)=>s+m.k,0);
+    const sum = known.reduce((a,m)=>a+m.k,0);
     const unk = meals.length - known.length;
     const over = S.settings.kcal ? sum - S.settings.kcal : null;
     h += '<section class="card"><div class="ct"><h2>食事</h2><span class="r total">'
-      + (meals.length ? '<b>'+sum.toLocaleString()+'</b> kcal' : '<span class="hint">未入力</span>') + '</span></div>'
+      + (meals.length ? '<b>'+sum.toLocaleString()+'</b> kcal' : '<span class="hint">なし</span>') + '</span></div>'
       + '<div class="hint" style="margin-bottom:6px">よく食べるもの（タップで追加）</div><div class="row">'
       + S.presets.map(p=>'<button class="chip mini" data-act="add-preset" data-v="'+p.id+'">'+esc(p.n)+(p.k!=null?'<span class="k">'+p.k+'</span>':'')+'</button>').join('')
       + '</div>';
@@ -389,7 +433,7 @@
       h += '<ul class="mlist">' + meals.map((m,i)=>'<li><span class="n">'+esc(m.n)+'</span><span class="k num">'+(m.k!=null?m.k+' kcal':'—')+'</span><button class="x" data-act="del-meal" data-v="'+i+'" aria-label="削除">×</button></li>').join('') + '</ul>'
         + '<div class="hint" style="margin-top:8px">'
         + (unk? unk+'件はカロリー未設定（合計に含みません）。' : '')
-        + (over!=null ? ' 目安 '+S.settings.kcal.toLocaleString()+' kcal に対して <b class="'+(over>0?'up':'down')+'">'+(over>0?'+':'')+over.toLocaleString()+'</b>' : '')
+        + (over!=null ? ' 目安 '+S.settings.kcal.toLocaleString()+' kcal に対して <b class="'+cls(over)+'">'+(over>0?'+':'')+over.toLocaleString()+'</b>' : '')
         + '</div>';
     }
     h += '<div class="sep"></div><div class="row">'
@@ -403,142 +447,175 @@
 
   /* ---------- グラフ ---------- */
   function viewChart(){
-    const series = weightSeries(), st = S.settings;
+    const s = series();
     let h = '';
     if(S.demo) h += '<div class="banner"><span>サンプルの記録です。自分の記録を保存すると入れ替わります。</span><button class="btn sm" data-act="wipeDemo">サンプルを消す</button></div>';
-
-    if(!series.length){
-      h += '<section class="card"><div class="ct"><h2>体重の推移</h2></div><p class="hint">まだ体重の記録がありません。「今日」タブで体重を入れると、ここにグラフが出ます。</p></section>';
-      return h;
+    if(!s.length){
+      return h + '<section class="card"><div class="ct"><h2>体重の推移</h2></div><p class="hint">まだ体重の記録がありません。「今日」タブで体重を入れると、ここにカレンダーとグラフが出ます。</p></section>';
     }
-    const first = series[0], last = series[series.length-1];
-    const avg7 = avgWindow(series, last.k, 7), prev7 = avgWindow(series, shift(last.k,-7), 7);
+    const last = s[s.length-1], first = s[0];
+    const prev = s.length>1 ? s[s.length-2] : null;
+    const avg7 = avgWindow(s, last.k, 7), prev7 = avgWindow(s, shift(last.k,-7), 7);
     const pace = (avg7!=null && prev7!=null) ? avg7-prev7 : null;
-    const toGoal = st.goal ? last.w - st.goal : null;
 
-    h += '<div class="tiles" style="margin-top:12px">'
+    h += '<div class="tiles">'
       + tile('いま', last.w.toFixed(1), 'kg')
-      + tile('開始から', sign(last.w-first.w), 'kg')
-      + tile('目標まで', toGoal!=null ? (toGoal>0? toGoal.toFixed(1):'達成') : '—', toGoal!=null&&toGoal>0?'kg':'')
+      + tile('前回から', prev? sign(last.w-prev.w) : '—', 'kg', prev? cls(last.w-prev.w):'')
+      + tile('7日平均の増減', pace!=null? sign(pace) : '—', 'kg', pace!=null? cls(pace):'')
       + '</div>';
 
-    h += '<section class="card"><div class="ct"><h2>体重の推移</h2>'
-      + '<div class="seg" role="group" aria-label="表示期間">'
-      + [[30,'30日'],[90,'90日'],[0,'全部']].map(r=>'<button data-act="range" data-v="'+r[0]+'" aria-pressed="'+(range===r[0])+'">'+r[1]+'</button>').join('')
-      + '</div></div>'
-      + '<div class="chart" id="wChart"></div>'
-      + '<div class="legend"><span><i style="background:var(--accent)"></i>7日平均</span>'
-      + '<span><i style="background:var(--muted);opacity:.5"></i>毎日の記録</span>'
-      + (st.goal?'<span><i style="background:var(--goal)"></i>目標 '+st.goal+'kg</span>':'')
-      + '</div>'
-      + '<div class="hint" style="margin-top:8px">'
-      + (avg7!=null? '直近7日平均 <b class="num">'+avg7.toFixed(1)+'</b> kg' : '')
-      + (pace!=null? '／前の7日から <b class="num '+(pace<=0?'down':'up')+'">'+sign(pace)+'</b> kg' : '')
-      + '</div></section>';
-
-    /* カレンダー */
+    /* カレンダー（主役：日ごとの体重） */
     const cd = parse(calCursor), y=cd.getFullYear(), m=cd.getMonth();
     const firstDow = new Date(y,m,1).getDay(), dim = new Date(y,m+1,0).getDate();
     let cells = '';
     for(let i=0;i<firstDow;i++) cells += '<div class="cell void"></div>';
+    let mSum=0, mCnt=0, mMin=0, mW=[];
     for(let dn=1; dn<=dim; dn++){
       const k = y+'-'+pad(m+1)+'-'+pad(dn), day = S.days[k];
-      const did = day && day.t && day.t.done;
-      cells += '<div class="cell'+(did?' did':'')+(k===todayKey()?' today':'')+'">'
+      const w = day && day.w!=null ? day.w : null;
+      const t = day && day.t && day.t.parts.length ? day.t : null;
+      let dcls='none', wtxt='·';
+      if(w!=null){
+        mW.push({k,w});
+        const p = s.filter(e=>e.k<k).pop();
+        const diff = p ? w-p.w : 0;
+        dcls = diff<0?'d':diff>0?'u':'';
+        wtxt = w.toFixed(1);
+      }
+      if(t){ mCnt++; mMin += t.min||0; }
+      const future = k>todayKey();
+      cells += '<button class="cell'+(t?' did':'')+(k===todayKey()?' today':'')+'" data-act="jump" data-v="'+k+'"'+(future?' disabled style="opacity:.45"':'')+' aria-label="'+k+(w!=null?' '+w+'キロ':'')+'">'
         + '<span class="dn">'+dn+'</span>'
-        + (did? '<span class="mn">'+(day.t.min||0)+'</span>' : (day&&day.w!=null?'<span class="wd"></span>':''))
-        + '</div>';
+        + '<span class="cw '+dcls+'">'+wtxt+'</span>'
+        + '<span class="cp">'+(t? t.parts.map(p=>SHORT[p]).join('') : '')+'</span>'
+        + '</button>';
     }
-    const monthDays = Object.keys(S.days).filter(k=>k.startsWith(y+'-'+pad(m+1)));
-    const cnt = monthDays.filter(k=>S.days[k].t&&S.days[k].t.done).length;
-    const mins = monthDays.reduce((s,k)=> s + (S.days[k].t&&S.days[k].t.done? (S.days[k].t.min||0):0), 0);
-    h += '<section class="card"><div class="ct"><h2>筋トレに行った日</h2>'
+    const mFirst = mW[0], mLast = mW[mW.length-1];
+    h += '<section class="card"><div class="ct"><h2>カレンダー</h2>'
       + '<span class="r"><button class="btn sm ghost" data-act="cal-" aria-label="前の月">‹</button> '+y+'年'+(m+1)+'月 <button class="btn sm ghost" data-act="cal+" aria-label="次の月">›</button></span></div>'
       + '<div class="cal">'+DOW.map(d=>'<div class="dow">'+d+'</div>').join('')+cells+'</div>'
-      + '<div class="hint" style="margin-top:8px">この月 <b class="num">'+cnt+'</b> 回 / 合計 <b class="num">'+Math.floor(mins/60)+'</b>時間'+(mins%60?'<b class="num">'+(mins%60)+'</b>分':'')+'</div>'
-      + '<div class="legend"><span><i style="background:var(--warm);height:8px;width:8px;border-radius:50%"></i>筋トレ（数字は分）</span><span><i style="background:var(--accent);height:6px;width:6px;border-radius:50%;opacity:.55"></i>体重だけ記録</span></div>'
+      + '<div class="hint" style="margin-top:10px">'
+      + (mW.length>1 ? 'この月 <b class="num '+cls(mLast.w-mFirst.w)+'">'+sign(mLast.w-mFirst.w)+'</b> kg（'+mFirst.w.toFixed(1)+' → '+mLast.w.toFixed(1)+'）・' : '')
+      + '筋トレ <b class="num">'+mCnt+'</b> 回'+(mMin?'／'+Math.floor(mMin/60)+'時間'+(mMin%60?(mMin%60)+'分':''):'')
+      + '</div>'
+      + '<div class="legend"><span><i style="background:var(--accent)"></i>前日より減った</span><span><i style="background:var(--up)"></i>増えた</span>'
+      + '<span><i style="background:var(--warm-soft);height:10px;width:10px;border-radius:3px"></i>筋トレ（肩背胸足二三）</span></div>'
+      + '<div class="hint" style="margin-top:6px">日付をタップすると、その日の入力画面に移動します。</div>'
       + '</section>';
 
-    /* 週別の時間 */
+    /* 推移 */
+    h += '<section class="card"><div class="ct"><h2>体重の推移</h2>'
+      + '<div class="seg" role="group" aria-label="表示期間">'
+      + [[30,'30日'],[90,'90日'],[0,'全部']].map(r=>'<button data-act="range" data-v="'+r[0]+'" aria-pressed="'+(range===r[0])+'">'+r[1]+'</button>').join('')
+      + '</div></div><div class="chart" id="wChart"></div>'
+      + '<div class="legend"><span><i style="background:var(--accent)"></i>7日平均</span><span><i style="background:var(--muted);opacity:.5"></i>毎日の記録</span></div>'
+      + '<div class="hint" style="margin-top:8px">開始 '+first.w.toFixed(1)+' kg から <b class="num '+cls(last.w-first.w)+'">'+sign(last.w-first.w)+'</b> kg'
+      + (avg7!=null? '／直近7日平均 <b class="num">'+avg7.toFixed(1)+'</b> kg' : '')+'</div></section>';
+
+    /* 増減 */
+    h += '<section class="card"><div class="ct"><h2>前日からの増減</h2><span class="r">'+(range?range+'日':'全期間')+'</span></div>'
+      + '<div class="chart" id="dChart"></div>'
+      + '<div class="legend"><span><i style="background:var(--accent)"></i>減った日（下）</span><span><i style="background:var(--up)"></i>増えた日（上）</span></div></section>';
+
+    /* 週ごとの時間 */
     const weeks = [];
     let mon = parse(todayKey()); mon.setDate(mon.getDate() - ((mon.getDay()+6)%7));
     for(let i=7;i>=0;i--){
-      const s = new Date(mon); s.setDate(s.getDate()-i*7);
-      let t=0; for(let j=0;j<7;j++){ const k=key(new Date(s.getFullYear(),s.getMonth(),s.getDate()+j)); const dd=S.days[k]; if(dd&&dd.t&&dd.t.done) t+=dd.t.min||0; }
-      weeks.push({label:(s.getMonth()+1)+'/'+s.getDate(), v:t});
+      const st = new Date(mon); st.setDate(st.getDate()-i*7);
+      let tot=0;
+      for(let j=0;j<7;j++){ const k=key(new Date(st.getFullYear(),st.getMonth(),st.getDate()+j)); const dd=S.days[k]; if(dd&&dd.t) tot+=dd.t.min||0; }
+      weeks.push({label:(st.getMonth()+1)+'/'+st.getDate(), v:tot});
     }
-    h += '<section class="card"><div class="ct"><h2>週ごとのトレーニング時間</h2><span class="r">直近8週</span></div>'
-      + '<div class="chart" id="tChart"></div></section>';
     S._weeks = weeks;
+    h += '<section class="card"><div class="ct"><h2>週ごとのトレーニング時間</h2><span class="r">直近8週</span></div><div class="chart" id="tChart"></div></section>';
 
     /* 部位別 */
     const since = shift(todayKey(), -29);
     const counts = {}; PARTS.forEach(p=>counts[p]=0);
-    Object.keys(S.days).forEach(k=>{ if(k>=since){ const t=S.days[k].t; if(t&&t.done) t.parts.forEach(p=>{ if(counts[p]!=null) counts[p]++; }); } });
+    Object.keys(S.days).forEach(k=>{ if(k>=since){ const t=S.days[k].t; if(t) t.parts.forEach(p=>{ if(counts[p]!=null) counts[p]++; }); } });
     const mx = Math.max(1, ...PARTS.map(p=>counts[p]));
     h += '<section class="card"><div class="ct"><h2>部位別の回数</h2><span class="r">直近30日</span></div><div class="bars">'
-      + PARTS.map(p=>'<div class="bar"><span>'+p+'</span><span class="track"><span class="fill" style="width:'+(counts[p]/mx*100)+'%"></span></span><span class="v">'+counts[p]+'回</span></div>').join('')
+      + PARTS.map((p,i)=>'<div class="bar"><span>'+p+'</span><span class="track"><span class="fill" style="width:'+(counts[p]/mx*100)+'%; animation-delay:'+(i*45)+'ms; transform-origin:left; animation-name:growX"></span></span><span class="v">'+counts[p]+'回</span></div>').join('')
       + '</div></section>';
     return h;
   }
-  function tile(l,v,u){ return '<div class="tile"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="u">'+u+'</div></div>'; }
+  function tile(l,v,u,c){ return '<div class="tile"><div class="l">'+l+'</div><div class="v '+(c||'')+'">'+v+'</div><div class="u">'+u+'</div></div>'; }
 
-  /* ---------- SVG charts ---------- */
+  /* ---------- SVG ---------- */
   function drawCharts(){
-    const box = document.getElementById('wChart');
-    if(box) box.innerHTML = weightSVG(box.clientWidth||320);
-    const tb = document.getElementById('tChart');
-    if(tb && S._weeks) tb.innerHTML = weeksSVG(tb.clientWidth||320, S._weeks);
+    const w = document.getElementById('wChart');
+    if(w) w.innerHTML = weightSVG(w.clientWidth||320);
+    const d = document.getElementById('dChart');
+    if(d) d.innerHTML = deltaSVG(d.clientWidth||320);
+    const t = document.getElementById('tChart');
+    if(t && S._weeks) t.innerHTML = weeksSVG(t.clientWidth||320, S._weeks);
+  }
+  function inRange(s){
+    if(!range) return s;
+    const from = shift(todayKey(), -(range-1));
+    return s.filter(e=>e.k>=from);
   }
   function weightSVG(W){
-    let s = weightSeries();
-    if(range) { const from = shift(todayKey(), -(range-1)); s = s.filter(e=>e.k>=from); }
-    if(s.length===0) return '<p class="hint">この期間の記録はありません。</p>';
-    const H = 210, P = {t:16, r:14, b:26, l:38};
-    const goal = S.settings.goal || null;
-    const all = s.map(e=>e.w).concat(goal? [goal] : []);
-    let lo = Math.min(...all), hi = Math.max(...all);
-    if(hi-lo < 1.5){ const c=(hi+lo)/2; lo=c-0.9; hi=c+0.9; }
-    const padY = (hi-lo)*0.12; lo-=padY; hi+=padY;
-    const x0 = parse(s[0].k), x1 = parse(s[s.length-1].k);
-    const span = Math.max(1, (x1-x0)/86400000);
-    const X = d => P.l + ((d-x0)/86400000)/span * (W-P.l-P.r);
-    const Y = w => P.t + (hi-w)/(hi-lo) * (H-P.t-P.b);
-
-    /* grid */
-    const step = (hi-lo)>8 ? 2 : (hi-lo)>4 ? 1 : 0.5;
-    let g='', ticks=[];
-    for(let v=Math.ceil(lo/step)*step; v<=hi; v+=step){ ticks.push(Math.round(v*10)/10); }
-    ticks.forEach(v=>{
-      g += '<line x1="'+P.l+'" y1="'+Y(v).toFixed(1)+'" x2="'+(W-P.r)+'" y2="'+Y(v).toFixed(1)+'" stroke="var(--line2)" stroke-width="1"/>'
-        + '<text x="'+(P.l-6)+'" y="'+(Y(v)+3.5).toFixed(1)+'" text-anchor="end" font-size="10" fill="var(--muted)" font-family="IBM Plex Mono, monospace">'+v.toFixed(step<1?1:0)+'</text>';
-    });
-    /* x labels */
-    const n = s.length, idx = n<=1?[0]:[0, Math.floor((n-1)/2), n-1];
-    let xl='';
-    [...new Set(idx)].forEach(i=>{ const d=parse(s[i].k);
-      xl += '<text x="'+X(d).toFixed(1)+'" y="'+(H-8)+'" text-anchor="'+(i===0?'start':i===n-1?'end':'middle')+'" font-size="10" fill="var(--muted)" font-family="IBM Plex Mono, monospace">'+(d.getMonth()+1)+'/'+d.getDate()+'</text>'; });
-
-    /* goal line */
-    let gl='';
-    if(goal && goal>=lo && goal<=hi){
-      gl = '<line x1="'+P.l+'" y1="'+Y(goal).toFixed(1)+'" x2="'+(W-P.r)+'" y2="'+Y(goal).toFixed(1)+'" stroke="var(--goal)" stroke-width="1.5" stroke-dasharray="5 4"/>'
-        + '<text x="'+(W-P.r)+'" y="'+(Y(goal)-5).toFixed(1)+'" text-anchor="end" font-size="10" fill="var(--goal)" font-family="IBM Plex Mono, monospace">目標 '+goal+'</text>';
+    const s = inRange(series());
+    if(!s.length) return '<p class="hint">この期間の記録はありません。</p>';
+    const H=210, P={t:16,r:14,b:26,l:38};
+    let lo=Math.min(...s.map(e=>e.w)), hi=Math.max(...s.map(e=>e.w));
+    if(hi-lo<1.5){ const c=(hi+lo)/2; lo=c-0.9; hi=c+0.9; }
+    const py=(hi-lo)*0.14; lo-=py; hi+=py;
+    const x0=parse(s[0].k), x1=parse(s[s.length-1].k), span=Math.max(1,(x1-x0)/86400000);
+    const X = d => P.l + ((d-x0)/86400000)/span*(W-P.l-P.r);
+    const Y = w => P.t + (hi-w)/(hi-lo)*(H-P.t-P.b);
+    const step = (hi-lo)>8?2:(hi-lo)>4?1:0.5;
+    let g='';
+    for(let v=Math.ceil(lo/step)*step; v<=hi; v+=step){
+      const vv=Math.round(v*10)/10;
+      g += '<line x1="'+P.l+'" y1="'+Y(vv).toFixed(1)+'" x2="'+(W-P.r)+'" y2="'+Y(vv).toFixed(1)+'" stroke="var(--line2)" stroke-width="1"/>'
+        + '<text x="'+(P.l-6)+'" y="'+(Y(vv)+3.5).toFixed(1)+'" text-anchor="end" font-size="10" fill="var(--muted)" font-family="IBM Plex Mono, monospace">'+vv.toFixed(step<1?1:0)+'</text>';
     }
-    /* raw dots */
-    let dots = s.map(e=>'<circle cx="'+X(e.d).toFixed(1)+'" cy="'+Y(e.w).toFixed(1)+'" r="2" fill="var(--muted)" opacity="0.45"/>').join('');
-    /* moving average */
+    const n=s.length, idx=[...new Set([0, Math.floor((n-1)/2), n-1])];
+    let xl='';
+    idx.forEach(i=>{ const d=parse(s[i].k);
+      xl += '<text x="'+X(d).toFixed(1)+'" y="'+(H-8)+'" text-anchor="'+(i===0?'start':i===n-1?'end':'middle')+'" font-size="10" fill="var(--muted)" font-family="IBM Plex Mono, monospace">'+(d.getMonth()+1)+'/'+d.getDate()+'</text>'; });
+    const dots = s.map(e=>'<circle cx="'+X(e.d).toFixed(1)+'" cy="'+Y(e.w).toFixed(1)+'" r="2" fill="var(--muted)" opacity="0.45"/>').join('');
     const ma = s.map(e=>({d:e.d, w:avgWindow(s, e.k, 7)})).filter(p=>p.w!=null);
     const path = ma.map((p,i)=>(i?'L':'M')+X(p.d).toFixed(1)+' '+Y(p.w).toFixed(1)).join(' ');
-    const area = path + ' L'+X(ma[ma.length-1].d).toFixed(1)+' '+(H-P.b)+' L'+X(ma[0].d).toFixed(1)+' '+(H-P.b)+' Z';
-    const lastP = ma[ma.length-1];
-    const end = '<circle cx="'+X(lastP.d).toFixed(1)+'" cy="'+Y(lastP.w).toFixed(1)+'" r="4" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>';
-
-    return '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="体重の推移グラフ">'
-      + g + gl
+    const area = path+' L'+X(ma[ma.length-1].d).toFixed(1)+' '+(H-P.b)+' L'+X(ma[0].d).toFixed(1)+' '+(H-P.b)+' Z';
+    const lp = ma[ma.length-1];
+    const len = Math.round((W-P.l-P.r)*1.6);
+    return '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="体重の推移">'
+      + g
       + '<path d="'+area+'" fill="var(--accent)" opacity="0.08"/>'
-      + '<path d="'+path+'" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>'
-      + dots + end + xl + '</svg>';
+      + '<path class="drawline" style="--len:'+len+'" d="'+path+'" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>'
+      + dots
+      + '<circle cx="'+X(lp.d).toFixed(1)+'" cy="'+Y(lp.w).toFixed(1)+'" r="4" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>'
+      + xl + '</svg>';
+  }
+  function deltaSVG(W){
+    const s = inRange(series());
+    const all = series();
+    const d = s.map(e=>{ const p = all.filter(x=>x.k<e.k).pop(); return p? {k:e.k, v:e.w-p.w} : null; }).filter(Boolean);
+    if(!d.length) return '<p class="hint">2日以上記録すると、増減が出ます。</p>';
+    const H=150, P={t:14,r:8,b:20,l:34};
+    const mx = Math.max(0.3, ...d.map(x=>Math.abs(x.v)));
+    const mid = P.t + (H-P.t-P.b)/2;
+    const half = (H-P.t-P.b)/2;
+    const bw = (W-P.l-P.r)/d.length;
+    let bars='';
+    d.forEach((x,i)=>{
+      const hgt = Math.max(1.5, Math.abs(x.v)/mx*half*0.92);
+      const wpx = Math.max(2, bw*0.62);
+      const cx = P.l + i*bw + bw/2;
+      const y = x.v<0 ? mid : mid-hgt;
+      const col = x.v<0 ? 'var(--accent)' : x.v>0 ? 'var(--up)' : 'var(--muted)';
+      bars += '<rect class="growbar" style="--org:'+(x.v<0?'top':'bottom')+'; animation-delay:'+Math.min(i*18,400)+'ms; transform-box:fill-box" x="'+(cx-wpx/2).toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+wpx.toFixed(1)+'" height="'+hgt.toFixed(1)+'" rx="1.5" fill="'+col+'" opacity="'+(i===d.length-1?'1':'0.75')+'"/>';
+    });
+    const lbl = v => '<text x="'+(P.l-5)+'" y="'+(v.y+3.5)+'" text-anchor="end" font-size="9.5" fill="var(--muted)" font-family="IBM Plex Mono, monospace">'+v.t+'</text>';
+    const axes = '<line x1="'+P.l+'" y1="'+mid+'" x2="'+(W-P.r)+'" y2="'+mid+'" stroke="var(--line)" stroke-width="1"/>'
+      + lbl({y:mid-half+4, t:'+'+mx.toFixed(1)}) + lbl({y:mid, t:'0'}) + lbl({y:mid+half-4, t:'-'+mx.toFixed(1)});
+    const first = d[0].k, lastk = d[d.length-1].k;
+    const xl = '<text x="'+P.l+'" y="'+(H-6)+'" font-size="9.5" fill="var(--muted)" font-family="IBM Plex Mono, monospace">'+(parse(first).getMonth()+1)+'/'+parse(first).getDate()+'</text>'
+      + '<text x="'+(W-P.r)+'" y="'+(H-6)+'" text-anchor="end" font-size="9.5" fill="var(--muted)" font-family="IBM Plex Mono, monospace">'+(parse(lastk).getMonth()+1)+'/'+parse(lastk).getDate()+'</text>';
+    return '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="前日からの増減">'+axes+bars+xl+'</svg>';
   }
   function weeksSVG(W, weeks){
     const H=150, P={t:18,r:6,b:22,l:26};
@@ -546,35 +623,24 @@
     const bw = (W-P.l-P.r)/weeks.length;
     let bars='';
     weeks.forEach((w,i)=>{
-      const h = (w.v/mx)*(H-P.t-P.b);
-      const x = P.l + i*bw + bw*0.18, y = H-P.b-h, ww = bw*0.64;
-      bars += '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+ww.toFixed(1)+'" height="'+Math.max(h,1).toFixed(1)+'" rx="3" fill="var(--warm)" opacity="'+(i===weeks.length-1?'0.95':'0.6')+'"/>'
-        + (w.v? '<text x="'+(x+ww/2).toFixed(1)+'" y="'+(y-5).toFixed(1)+'" text-anchor="middle" font-size="9.5" fill="var(--muted)" font-family="IBM Plex Mono, monospace">'+w.v+'</text>' : '')
+      const h=(w.v/mx)*(H-P.t-P.b), x=P.l+i*bw+bw*0.18, y=H-P.b-h, ww=bw*0.64;
+      bars += '<rect class="growbar" style="animation-delay:'+(i*45)+'ms; transform-box:fill-box; --org:bottom" x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+ww.toFixed(1)+'" height="'+Math.max(h,1).toFixed(1)+'" rx="3" fill="var(--warm)" opacity="'+(i===weeks.length-1?'0.95':'0.6')+'"/>'
+        + (w.v? '<text x="'+(x+ww/2).toFixed(1)+'" y="'+(y-5).toFixed(1)+'" text-anchor="middle" font-size="9.5" fill="var(--muted)" font-family="IBM Plex Mono, monospace">'+w.v+'</text>':'')
         + '<text x="'+(x+ww/2).toFixed(1)+'" y="'+(H-7)+'" text-anchor="middle" font-size="9" fill="var(--muted)" font-family="IBM Plex Mono, monospace">'+w.label+'</text>';
     });
-    const base = '<line x1="'+P.l+'" y1="'+(H-P.b)+'" x2="'+(W-P.r)+'" y2="'+(H-P.b)+'" stroke="var(--line)" stroke-width="1"/>';
-    const yl = '<text x="'+(P.l-4)+'" y="'+(P.t+4)+'" text-anchor="end" font-size="9" fill="var(--muted)" font-family="IBM Plex Mono, monospace">'+mx+'</text><text x="'+(P.l-4)+'" y="'+(H-P.b)+'" text-anchor="end" font-size="9" fill="var(--muted)" font-family="IBM Plex Mono, monospace">0</text>';
-    return '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="週ごとのトレーニング時間（分）">'+base+yl+bars+'</svg>';
+    return '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="週ごとのトレーニング時間">'
+      + '<line x1="'+P.l+'" y1="'+(H-P.b)+'" x2="'+(W-P.r)+'" y2="'+(H-P.b)+'" stroke="var(--line)" stroke-width="1"/>'
+      + '<text x="'+(P.l-4)+'" y="'+(P.t+4)+'" text-anchor="end" font-size="9" fill="var(--muted)" font-family="IBM Plex Mono, monospace">'+mx+'</text>'
+      + '<text x="'+(P.l-4)+'" y="'+(H-P.b)+'" text-anchor="end" font-size="9" fill="var(--muted)" font-family="IBM Plex Mono, monospace">0</text>'
+      + bars + '</svg>';
   }
 
   /* ---------- 設定 ---------- */
   function viewSettings(){
-    const st = S.settings, series = weightSeries();
-    let h = '<section class="card"><div class="ct"><h2>目標</h2></div><div class="row">'
-      + '<div class="field"><label class="fl" for="sGoal">目標体重 (kg)</label><input id="sGoal" type="number" step="0.1" inputmode="decimal" value="'+(st.goal??'')+'"></div>'
-      + '<div class="field"><label class="fl" for="sGoalDate">いつまでに（任意）</label><input id="sGoalDate" type="date" value="'+(st.goalDate||'')+'"></div>'
-      + '</div><div class="row" style="margin-top:10px">'
-      + '<div class="field"><label class="fl" for="sKcal">1日の目安カロリー（任意）</label><input id="sKcal" type="number" inputmode="numeric" value="'+(st.kcal??'')+'"></div>'
-      + '</div>';
-    if(st.goal && st.goalDate && series.length){
-      const last = series[series.length-1], left = diffDays(st.goalDate, todayKey());
-      const need = last.w - st.goal;
-      h += '<div class="hint" style="margin-top:10px">'
-        + (left>0 ? '残り <b class="num">'+left+'</b> 日で <b class="num">'+r1(need).toFixed(1)+'</b> kg → 週あたり <b class="num">'+r1(need/(left/7)).toFixed(2)+'</b> kg のペースが必要です。'
-                  : '目標日は過ぎています。新しい目標日を設定してください。')
-        + '</div>';
-    }
-    h += '</section>';
+    const st = S.settings;
+    let h = '<section class="card"><div class="ct"><h2>食事の目安</h2></div><div class="row">'
+      + '<div class="field"><label class="fl" for="sKcal">1日の目安カロリー（任意・空欄可）</label><input id="sKcal" type="number" inputmode="numeric" value="'+(st.kcal??'')+'"></div>'
+      + '</div><p class="hint" style="margin:8px 0 0">入れておくと、今日の合計との差が出ます。</p></section>';
 
     h += '<section class="card"><div class="ct"><h2>よく食べるもの</h2><span class="r">'+S.presets.length+'件</span></div>'
       + '<p class="hint" style="margin:0 0 8px">カロリーは一般的な目安です。自分の食べる量に合わせて書きかえてください。空欄でもかまいません。</p>'
@@ -587,37 +653,39 @@
       + '<div class="field" style="flex:0 0 90px"><input id="npKcal" type="number" placeholder="kcal" inputmode="numeric" aria-label="kcal"></div>'
       + '<button class="btn primary" data-act="pre-add">追加</button></div></section>';
 
-    const dayCount = Object.keys(S.days).length;
-    h += '<section class="card"><div class="ct"><h2>データ</h2><span class="r">'+dayCount+'日分</span></div>'
+    h += '<section class="card"><div class="ct"><h2>データ</h2><span class="r">'+Object.keys(S.days).length+'日分</span></div>'
       + '<p class="hint" style="margin:0 0 10px">記録はこの端末のブラウザの中だけに保存されます。機種変更やデータ消去にそなえて、ときどき控えをとってください。</p>'
       + '<div class="row"><button class="btn" data-act="export">バックアップを表示・コピー</button>'
-      + '<button class="btn" data-act="showImport">控えから復元</button></div>'
-      + '<div id="ioBox"></div>'
-      + '<div class="sep"></div>'
-      + '<button class="btn danger" data-act="wipe">すべての記録を消す</button></section>';
+      + '<button class="btn" data-act="showImport">控えから復元</button></div><div id="ioBox"></div>'
+      + '<div class="sep"></div><button class="btn danger" data-act="wipe">すべての記録を消す</button></section>';
     return h;
   }
 
-  /* ---------- actions ---------- */
+  /* ---------- 操作 ---------- */
   function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   let toastT;
   function toast(msg){
     const el = document.getElementById('toast');
-    el.textContent = msg; el.classList.add('on');
-    clearTimeout(toastT); toastT = setTimeout(()=>el.classList.remove('on'), 1400);
+    el.textContent = msg; el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+    clearTimeout(toastT); toastT = setTimeout(()=>el.classList.remove('on'), 1500);
   }
-  function setWeight(v){
+  function setWeight(v, quiet){
     clearDemo();
     const d = editDay(cursor);
     d.w = (v===''||v==null||isNaN(v)) ? null : Math.round(Math.min(250, Math.max(20, v))*10)/10;
-    save(); render(); if(d.w!=null) toast('保存しました');
+    save(); render();
+    if(d.w!=null){
+      const inp = document.getElementById('wInput');
+      if(inp){ inp.classList.add('bump'); setTimeout(()=>inp.classList.remove('bump'), 320); }
+      if(!quiet) toast('記録しました');
+    }
   }
 
   document.addEventListener('click', e=>{
     const tab = e.target.closest('nav.tabs button');
-    if(tab){ view = tab.dataset.tab; window.scrollTo(0,0); render(); return; }
+    if(tab){ if(view!==tab.dataset.tab){ view=tab.dataset.tab; buzz(6); window.scrollTo({top:0, behavior:'instant'}); render(); } return; }
     const b = e.target.closest('[data-act]');
-    if(!b) return;
+    if(!b || b.disabled) return;
     const act = b.dataset.act, v = b.dataset.v;
     const d = () => editDay(cursor);
 
@@ -625,33 +693,40 @@
       case 'prevDay': cursor = shift(cursor,-1); render(); break;
       case 'nextDay': if(cursor<todayKey()){ cursor = shift(cursor,1); render(); } break;
       case 'goToday': cursor = todayKey(); render(); break;
+      case 'jump': cursor = v; view='today'; buzz(6); window.scrollTo({top:0, behavior:'instant'}); render(); break;
       case 'wipeDemo': S.demo=false; S.days={}; save(); render(); toast('サンプルを消しました'); break;
 
       case 'w-': case 'w+': {
         const cur = getDay(cursor).w;
-        const base = cur!=null ? cur : (weightSeries().slice(-1)[0]?.w ?? 70);
-        setWeight(Math.round((base + (act==='w+'?0.1:-0.1))*10)/10);
+        const base = cur!=null ? cur : (series().slice(-1)[0]?.w ?? 70);
+        buzz(6);
+        setWeight(Math.round((base + (act==='w+'?0.1:-0.1))*10)/10, true);
         break;
       }
-      case 't-done': { clearDemo(); const dd=d(); dd.t = dd.t&&dd.t.done ? null : {done:true, min:(dd.t&&dd.t.min)||60, parts:(dd.t&&dd.t.parts)||[]}; save(); render(); break; }
-      case 't-rest': { clearDemo(); const dd=d(); dd.t = (dd.t&&!dd.t.done) ? null : {done:false, min:0, parts:[]}; save(); render(); break; }
-      case 't-min': { clearDemo(); const dd=d(); if(dd.t&&dd.t.done){ dd.t.min = Number(v); save(); render(); } break; }
-      case 't-part': { clearDemo(); const dd=d(); if(dd.t&&dd.t.done){ const i=dd.t.parts.indexOf(v); i<0?dd.t.parts.push(v):dd.t.parts.splice(i,1); save(); render(); } break; }
+      case 'part': {
+        clearDemo();
+        const dd = d();
+        if(!dd.t) dd.t = {min:0, parts:[]};
+        const i = dd.t.parts.indexOf(v);
+        if(i<0){ dd.t.parts.push(v); justOn = v; buzz(10); } else { dd.t.parts.splice(i,1); buzz(4); }
+        if(!dd.t.parts.length && !dd.t.min) dd.t = null;
+        save(); render(); break;
+      }
+      case 'min': { clearDemo(); const dd=d(); if(dd.t){ dd.t.min = dd.t.min===Number(v) ? 0 : Number(v); buzz(6); save(); render(); } break; }
 
-      case 'add-preset': { clearDemo(); const p=S.presets.find(x=>x.id===v); if(p){ d().meals.push({n:p.n,k:p.k??null}); save(); render(); toast(p.n+' を追加'); } break; }
-      case 'del-meal': { const dd=d(); dd.meals.splice(Number(v),1); save(); render(); break; }
+      case 'add-preset': { clearDemo(); const p=S.presets.find(x=>x.id===v); if(p){ d().meals.push({n:p.n,k:p.k??null}); buzz(8); save(); render(); toast(p.n+' を追加'); } break; }
+      case 'del-meal': { d().meals.splice(Number(v),1); save(); render(); break; }
       case 'add-meal': {
         const n = document.getElementById('mName').value.trim();
         if(!n){ toast('食べものの名前を入れてください'); break; }
-        const kRaw = document.getElementById('mKcal').value;
-        const k = kRaw==='' ? null : Number(kRaw);
-        clearDemo(); d().meals.push({n, k});
-        if(document.getElementById('mSave').checked && !S.presets.some(p=>p.n===n)) S.presets.push({id:'u'+Date.now(), n, k});
-        save(); render(); toast('追加しました'); break;
+        const kR = document.getElementById('mKcal').value;
+        clearDemo(); d().meals.push({n, k: kR===''?null:Number(kR)});
+        if(document.getElementById('mSave').checked && !S.presets.some(p=>p.n===n)) S.presets.push({id:'u'+Date.now(), n, k: kR===''?null:Number(kR)});
+        buzz(8); save(); render(); toast('追加しました'); break;
       }
       case 'range': range = Number(v); render(); break;
-      case 'cal-': calCursor = key(new Date(parse(calCursor).getFullYear(), parse(calCursor).getMonth()-1, 1)); render(); break;
-      case 'cal+': calCursor = key(new Date(parse(calCursor).getFullYear(), parse(calCursor).getMonth()+1, 1)); render(); break;
+      case 'cal-': { const c=parse(calCursor); calCursor = key(new Date(c.getFullYear(), c.getMonth()-1, 1)); render(); break; }
+      case 'cal+': { const c=parse(calCursor); calCursor = key(new Date(c.getFullYear(), c.getMonth()+1, 1)); render(); break; }
 
       case 'pre-del': S.presets = S.presets.filter(p=>p.id!==v); save(); render(); break;
       case 'pre-add': {
@@ -661,52 +736,45 @@
         S.presets.push({id:'u'+Date.now(), n, k: kR===''?null:Number(kR)});
         save(); render(); toast('登録しました'); break;
       }
-      case 'export': {
-        const json = JSON.stringify(S);
+      case 'export':
         document.getElementById('ioBox').innerHTML =
           '<p class="hint" style="margin:10px 0 6px">この文字列をメモアプリやメールに貼って保管してください。</p>'
-          + '<textarea id="ioText" readonly>'+esc(json)+'</textarea>'
+          + '<textarea id="ioText" readonly>'+esc(JSON.stringify(S))+'</textarea>'
           + '<div class="row" style="margin-top:8px"><button class="btn primary" data-act="copy">コピー</button></div>';
         break;
-      }
       case 'copy': {
-        const ta = document.getElementById('ioText');
-        ta.select();
+        const ta = document.getElementById('ioText'); ta.select();
         try{ navigator.clipboard.writeText(ta.value).then(()=>toast('コピーしました'), ()=>toast('長押しでコピーしてください')); }
         catch(err){ toast('長押しでコピーしてください'); }
         break;
       }
-      case 'showImport': {
+      case 'showImport':
         document.getElementById('ioBox').innerHTML =
           '<p class="hint" style="margin:10px 0 6px">控えの文字列を貼りつけて「復元」を押すと、いまの記録は置きかえられます。</p>'
           + '<textarea id="ioText" placeholder="ここに貼りつけ"></textarea>'
           + '<div class="row" style="margin-top:8px"><button class="btn primary" data-act="import">復元する</button></div>';
         break;
-      }
       case 'import': {
         try{
           const p = JSON.parse(document.getElementById('ioText').value);
-          if(!p || p.v!==1 || !p.days) throw new Error('形式が違います');
-          S = p; S.demo = false; save(); render(); toast('復元しました');
+          if(!p || !p.days || !p.settings) throw new Error('形式が違います');
+          S = p.v===2 ? p : migrate(p); S.demo=false; save(); render(); toast('復元しました');
         }catch(err){ toast('読みこめませんでした。文字列を確認してください'); }
         break;
       }
-      case 'wipe': {
+      case 'wipe':
         if(confirm('すべての記録を消します。元に戻せません。よろしいですか？')){
-          S = {v:1, demo:false, settings:S.settings, days:{}, presets:S.presets};
+          S = {v:2, demo:false, settings:S.settings, days:{}, presets:S.presets};
           save(); render(); toast('消しました');
         }
         break;
-      }
     }
   });
 
   document.addEventListener('change', e=>{
     const el = e.target;
     if(el.id==='wInput'){ setWeight(el.value===''?null:Number(el.value)); return; }
-    if(el.id==='minInput'){ clearDemo(); const dd=editDay(cursor); if(dd.t&&dd.t.done){ dd.t.min = Math.max(0, Number(el.value)||0); save(); render(); } return; }
-    if(el.id==='sGoal'){ S.settings.goal = el.value===''?null:Number(el.value); save(); render(true); return; }
-    if(el.id==='sGoalDate'){ S.settings.goalDate = el.value; save(); render(true); return; }
+    if(el.id==='minInput'){ clearDemo(); const dd=editDay(cursor); if(dd.t){ dd.t.min = Math.max(0, Number(el.value)||0); save(); render(); } return; }
     if(el.id==='sKcal'){ S.settings.kcal = el.value===''?null:Number(el.value); save(); render(true); return; }
     const act = el.dataset && el.dataset.act;
     if(act==='pre-n' || act==='pre-k'){
@@ -727,3 +795,4 @@
   render();
 })();
 </script>
+<style>@keyframes growX{from{transform:scaleX(0)} to{transform:scaleX(1)}}</style>
