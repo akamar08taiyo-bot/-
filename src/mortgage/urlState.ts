@@ -20,8 +20,13 @@ const num = (params: URLSearchParams, key: string, fallback: number, min: number
   return Math.min(max, Math.max(min, value));
 };
 
-export function readScenarioFromUrl(defaults: ScenarioInput, search = window.location.search): ScenarioInput {
-  const params = new URLSearchParams(search);
+export function readScenarioFromUrl(defaults: ScenarioInput, search?: string): ScenarioInput {
+  let params: URLSearchParams;
+  try {
+    params = new URLSearchParams(search ?? window.location.search);
+  } catch {
+    return defaults;
+  }
   return {
     principal: num(params, KEYS.principal, defaults.principal / 10000, 100, 20000) * 10000,
     years: Math.round(num(params, KEYS.years, defaults.years, 5, 50)),

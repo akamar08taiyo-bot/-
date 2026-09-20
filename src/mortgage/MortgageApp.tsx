@@ -63,8 +63,13 @@ export function MortgageApp() {
   );
 
   // 条件を変えるたびにURLへ反映する（履歴は汚さない）
+  // サンドボックス内などURL書き換えが許可されない環境でも動作を止めない
   useEffect(() => {
-    window.history.replaceState(null, '', `${window.location.pathname}${scenarioToQuery(input)}`);
+    try {
+      window.history.replaceState(null, '', `${window.location.pathname}${scenarioToQuery(input)}`);
+    } catch {
+      /* URLを更新できない環境では何もしない */
+    }
   }, [input]);
 
   const result = useMemo(() => simulate(input), [input]);
