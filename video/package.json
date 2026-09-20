@@ -6,6 +6,7 @@
   "description": "縦型ショート動画（1080x1920）を台本JSONから書き出すレンダリングパイプライン",
   "scripts": {
     "render": "node render.mjs",
+    "render:all": "node render-all.mjs --landscape",
     "preview": "node render.mjs --preview"
   },
   "dependencies": {

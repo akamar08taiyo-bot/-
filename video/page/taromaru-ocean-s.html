@@ -1,0 +1,436 @@
+<title>たろうまる競馬 オーシャンS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@700;900&family=Noto+Sans+JP:wght@400;500;700&family=Roboto+Mono:wght@500;700&display=swap">
+<style>
+  :root {
+    --paper: #f3f6f1;
+    --surface: #ffffff;
+    --surface-2: #eaf0e8;
+    --ink: #10201a;
+    --muted: #5b6f64;
+    --line: #d6e0d6;
+    --turf: #17713f;
+    --turf-soft: #e0efe4;
+    --gold: #9a6d10;
+    --gold-soft: #f6ecd2;
+    --mark: #bb2438;
+    --shadow: 0 1px 2px rgba(16, 32, 26, .06), 0 12px 28px rgba(16, 32, 26, .07);
+    --display: 'Zen Kaku Gothic New', 'Hiragino Kaku Gothic ProN', sans-serif;
+    --body: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', sans-serif;
+    --mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+    --paper: #08110c;
+    --surface: #0f1a13;
+    --surface-2: #14231a;
+    --ink: #eef5ee;
+    --muted: #9ab0a2;
+    --line: #1e3025;
+    --turf: #3ed07c;
+    --turf-soft: #12291b;
+    --gold: #f2c552;
+    --gold-soft: #2a2312;
+    --mark: #ff6072;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 16px 40px rgba(0, 0, 0, .45);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #08110c;
+    --surface: #0f1a13;
+    --surface-2: #14231a;
+    --ink: #eef5ee;
+    --muted: #9ab0a2;
+    --line: #1e3025;
+    --turf: #3ed07c;
+    --turf-soft: #12291b;
+    --gold: #f2c552;
+    --gold-soft: #2a2312;
+    --mark: #ff6072;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 16px 40px rgba(0, 0, 0, .45);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 72px; }
+
+  h1, h2, h3 { font-family: var(--display); font-weight: 900; text-wrap: balance; margin: 0; letter-spacing: -.01em; }
+  p { margin: 0; }
+  a { color: var(--turf); }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; font-weight: 700;
+    letter-spacing: .18em; text-transform: uppercase; color: var(--muted);
+  }
+
+  /* ---- 見出し ---- */
+  .masthead { display: flex; flex-direction: column; gap: 18px; }
+  .channel {
+    display: inline-flex; align-items: center; gap: 10px; align-self: flex-start;
+    padding: 7px 16px 7px 12px; border-radius: 999px;
+    background: var(--turf-soft); color: var(--turf);
+    font-weight: 700; font-size: 13px; letter-spacing: .04em;
+  }
+  .channel::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--turf); }
+  .masthead h1 { font-size: clamp(34px, 7vw, 54px); line-height: 1.12; }
+  .masthead .lede { color: var(--muted); max-width: 60ch; }
+  .facts { display: flex; flex-wrap: wrap; gap: 8px 10px; }
+  .fact {
+    font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; background: var(--surface);
+  }
+
+  section { margin-top: 56px; }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+  .sec-head h2 { font-size: clamp(20px, 3.4vw, 26px); }
+  .sec-head .hint { color: var(--muted); font-size: 13px; }
+
+  /* ---- 動画 ---- */
+  .films { display: grid; grid-template-columns: 1fr; gap: 22px; }
+  @media (min-width: 760px) { .films { grid-template-columns: 340px 1fr; align-items: start; } }
+  .film {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+    overflow: hidden; box-shadow: var(--shadow);
+  }
+  .film video { display: block; width: 100%; max-width: 100%; background: #060d09; }
+  .film .meta { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .film .meta strong { font-family: var(--display); font-size: 15px; }
+  .film .meta span { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .film .use { font-size: 13px; color: var(--muted); }
+  .pending {
+    display: grid; place-items: center; aspect-ratio: 9 / 16;
+    background: var(--surface-2); color: var(--muted); font-size: 13px; padding: 20px; text-align: center;
+  }
+  .film.wide .pending { aspect-ratio: 16 / 9; }
+
+  /* ---- 本命馬（出馬表風） ---- */
+  .pick {
+    display: grid; grid-template-columns: auto 1fr; gap: 18px 20px; align-items: center;
+    background: var(--surface); border: 1px solid var(--line); border-left: 6px solid var(--mark);
+    border-radius: 14px; padding: 22px; box-shadow: var(--shadow);
+  }
+  .no {
+    width: 76px; height: 76px; border-radius: 12px; display: grid; place-items: center;
+    background: var(--ink); color: var(--paper);
+    font-family: var(--mono); font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums;
+  }
+  .pick .who { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .pick .mark { color: var(--mark); font-weight: 700; font-size: 13px; letter-spacing: .12em; }
+  .pick .name { font-family: var(--display); font-size: clamp(24px, 5vw, 34px); line-height: 1.2; }
+  .pick .jockey { color: var(--muted); font-size: 14px; }
+
+  /* ---- 理由 ---- */
+  .reasons { display: flex; flex-direction: column; gap: 2px; border-top: 1px solid var(--line); }
+  .reason {
+    display: grid; grid-template-columns: 44px 1fr; gap: 6px 16px; align-items: baseline;
+    padding: 18px 4px; border-bottom: 1px solid var(--line);
+  }
+  .reason .n {
+    font-family: var(--mono); font-weight: 700; font-size: 13px; color: var(--gold);
+    letter-spacing: .1em;
+  }
+  .reason h3 { font-size: 18px; line-height: 1.5; }
+  .reason p { grid-column: 2; color: var(--muted); font-size: 14px; }
+
+  /* ---- オチ ---- */
+  .hook { display: grid; gap: 14px; }
+  .line {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    padding: 20px 22px; font-family: var(--display); font-weight: 700;
+    font-size: clamp(19px, 3.8vw, 26px); line-height: 1.5;
+  }
+  .line.lead { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .line.lead em { font-style: normal; color: var(--gold); }
+  .line small { display: block; margin-top: 8px; font-family: var(--body); font-size: 14px; font-weight: 500; opacity: .75; }
+
+  /* ---- シーン表 ---- */
+  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14px; }
+  th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.t { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  td.k { white-space: nowrap; }
+  td.k span {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+    padding: 3px 8px; border-radius: 6px; background: var(--surface-2); color: var(--muted);
+  }
+
+  /* ---- 投稿セット ---- */
+  .block { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .block + .block { margin-top: 16px; }
+  .block header {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 12px 14px 12px 18px; border-bottom: 1px solid var(--line); background: var(--surface-2);
+  }
+  .block header h3 { font-size: 14px; }
+  .block pre {
+    margin: 0; padding: 18px; white-space: pre-wrap; word-break: break-word;
+    font-family: var(--body); font-size: 14px; line-height: 1.8;
+  }
+  .block pre.mono { font-family: var(--mono); font-size: 13px; }
+  .copy {
+    font-family: var(--body); font-size: 12px; font-weight: 700; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+    border-radius: 8px; padding: 6px 12px; white-space: nowrap;
+  }
+  .copy:hover { border-color: var(--turf); color: var(--turf); }
+  .copy:focus-visible { outline: 2px solid var(--turf); outline-offset: 2px; }
+  .copy[data-done="1"] { color: var(--turf); border-color: var(--turf); }
+  .titles { display: flex; flex-direction: column; gap: 10px; list-style: none; margin: 0; padding: 18px; }
+  .titles li { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; line-height: 1.6; }
+  .titles .n { font-family: var(--mono); font-size: 12px; color: var(--muted); padding-top: 3px; }
+
+  /* ---- メモ ---- */
+  .notes { display: grid; gap: 14px; }
+  .note { border-left: 3px solid var(--line); padding-left: 16px; color: var(--muted); font-size: 14px; }
+  .note strong { color: var(--ink); font-weight: 700; }
+  code {
+    font-family: var(--mono); font-size: 12.5px;
+    background: var(--surface-2); border-radius: 6px; padding: 2px 6px;
+  }
+  .cmd { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; overflow-x: auto; }
+  .cmd code { background: none; padding: 0; white-space: pre; }
+  footer { margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <span class="channel">たろうまる競馬</span>
+    <h1>オーシャンS 予想<br>公開素材一式</h1>
+    <p class="lede">本命「◎15 フリッカージャブ」の予想動画。縦型（Shorts）と横型（通常のYouTube）を同じ台本から書き出したものと、投稿にそのまま貼れるタイトル・概要欄・タグをまとめています。</p>
+    <div class="facts">
+      <span class="fact">38.0 sec</span>
+      <span class="fact">1080×1920 / 1920×1080</span>
+      <span class="fact">H.264 + AAC</span>
+      <span class="fact">字幕 SRT 付き</span>
+    </div>
+  </header>
+
+  <section>
+    <div class="sec-head">
+      <h2>動画</h2>
+      <span class="hint">同じ台本から2フォーマット。音は控えめのBGMのみなので、ナレーションは後載せできます。</span>
+    </div>
+    <div class="films" id="films"></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>本命</h2></div>
+    <div class="pick">
+      <div class="no">15</div>
+      <div class="who">
+        <span class="mark">◎ 本命</span>
+        <span class="name">フリッカージャブ</span>
+        <span class="jockey">鞍上：松山騎手</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>本命に推す3つの理由</h2>
+      <span class="hint">動画では1つずつ、5秒ごとに提示されます。</span>
+    </div>
+    <div class="reasons">
+      <div class="reason">
+        <span class="n">理由 ①</span>
+        <h3>松山騎手とのコンビは［3-0-0-0］</h3>
+        <p>このコンビ、まだ一度も崩れとらん。相性は文句なし。</p>
+      </div>
+      <div class="reason">
+        <span class="n">理由 ②</span>
+        <h3>中山は開幕週</h3>
+        <p>ハナさえ取れれば、そのまま押し切る形がある。</p>
+      </div>
+      <div class="reason">
+        <span class="n">理由 ③</span>
+        <h3>栗東坂路で連日の超抜時計</h3>
+        <p>陣営の気合が、そのまま時計に出とる。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>締め</h2></div>
+    <div class="hook">
+      <p class="line lead">俺の◎は<em>消せ</em>！！<small>それが的中への近道やけん。</small></p>
+      <p class="line">でもホントは勝ちたかとばい。</p>
+      <p class="line">君の本命馬も教えちゃらんね👴<small>チャンネル登録・フォロー・いいね、よろしく！！</small></p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>シーン割り</h2>
+      <span class="hint">字幕は画面に焼き込み済み。同じ文面が SRT にも入っています。</span>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>時間</th><th>シーン</th><th>字幕</th></tr></thead>
+        <tbody id="cuts"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>投稿セット</h2><span class="hint">ボタンでコピーして、YouTubeにそのまま貼れます。</span></div>
+
+    <div class="block">
+      <header><h3>タイトル案</h3></header>
+      <ul class="titles">
+        <li><span class="n">01</span><span>【オーシャンS 2026】回収率79%“逆神”の本命は15番フリッカージャブ【たろうまる競馬】</span></li>
+        <li><span class="n">02</span><span>【逆神の本命】オーシャンステークス予想｜俺の◎は消せ！！ #Shorts</span></li>
+        <li><span class="n">03</span><span>【オーシャンS予想】松山［3-0-0-0］＋開幕週＋坂路超抜＝本命15フリッカージャブ</span></li>
+      </ul>
+    </div>
+
+    <div class="block">
+      <header><h3>概要欄</h3><button class="copy" type="button" data-copy="desc">コピー</button></header>
+      <pre id="desc">たろうまる競馬、今週はオーシャンステークス。
+2026年回収率79%、"逆神"の本命はこの馬ばい。
+
+◎15 フリッカージャブ（鞍上：松山騎手）
+
+▼本命に推す3つの理由
+① 松山騎手とのコンビ成績が［3-0-0-0］。相性は文句なし
+② 中山の開幕週。ハナさえ取れれば、そのまま押し切る形がある
+③ 栗東坂路で連日の超抜時計。陣営の気合が時計に出とる
+
+俺の◎は消せ！！　それが的中への近道やけん。
+……でもホントは勝ちたかとばい。
+
+君の本命馬もコメントで教えちゃらんね👴
+チャンネル登録・高評価・フォロー、よろしくお願いします！
+
+#オーシャンS #競馬予想 #たろうまる競馬 #中山競馬場 #フリッカージャブ #松山騎手
+
+※馬券の購入は自己責任でお願いします。20歳未満の方は購入できません。</pre>
+    </div>
+
+    <div class="block">
+      <header><h3>タグ</h3><button class="copy" type="button" data-copy="tags">コピー</button></header>
+      <pre class="mono" id="tags">オーシャンS,オーシャンステークス,競馬予想,中山競馬場,フリッカージャブ,松山騎手,たろうまる競馬,重賞予想,本命馬,スプリント</pre>
+    </div>
+
+    <div class="block">
+      <header><h3>固定コメント</h3><button class="copy" type="button" data-copy="pinned">コピー</button></header>
+      <pre id="pinned">◎15 フリッカージャブ から！
+でも俺は逆神やけん、消すのもアリばい🐴
+君の本命馬、コメントで教えちゃらんね👴</pre>
+    </div>
+
+    <div class="block">
+      <header><h3>サムネイル文言（横型用）</h3><button class="copy" type="button" data-copy="thumb">コピー</button></header>
+      <pre id="thumb">回収率79%
+逆神の本命
+◎15 フリッカージャブ</pre>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>作り直すとき</h2></div>
+    <div class="notes">
+      <p class="note"><strong>台本を直す:</strong> <code>video/scripts/keiba-ocean-s.json</code> の文言と <code>dur</code>（秒）を書き換えるだけ。シーンの種類は intro / horse / reason / punch / cta。</p>
+      <p class="note"><strong>別のレースを作る:</strong> 同じJSONをコピーして、レース名・馬番・馬名・理由を差し替え。<code>npm run render:all</code> で全部まとめて書き出します。</p>
+      <div class="cmd"><code>cd video
+npm install
+node render.mjs --script scripts/keiba-ocean-s.json --landscape   # 縦型と横型を書き出し
+node render.mjs --script scripts/keiba-ocean-s.json --preview 7,12,26   # 静止画だけ確認（数秒）</code></div>
+      <p class="note"><strong>ナレーションを載せる場合:</strong> <code>--no-audio</code> で書き出して、SRTを読み上げ原稿にして収録 → 音声に合わせて各シーンの <code>dur</code> を微調整。</p>
+    </div>
+  </section>
+
+  <footer>
+    予想の内容は台本に書かれたものをそのまま映像化したものです。馬券の購入は自己責任でお願いします。20歳未満の方は購入できません。
+  </footer>
+</div>
+
+<script>
+  // 公開後にアップロードした動画のURLがここに入る
+  const ASSETS = {
+    vertical: '/_blob/88b2f96426583a0af6fd4fd3d2341846',
+    verticalPoster: '/_blob/0b2c824fd05a62b6bdbba0bab6e0023c',
+    wide: '/_blob/814bf1884a29b13f9ff012c54f471b9e',
+    widePoster: '/_blob/acd6b049ed5c8afe4f92eee12cb58f79',
+  };
+
+  const FILMS = [
+    {
+      key: 'vertical',
+      label: '縦型 1080×1920',
+      use: 'YouTube Shorts / TikTok / Instagram Reels',
+      file: 'keiba-ocean-s.mp4',
+    },
+    {
+      key: 'wide',
+      label: '横型 1920×1080',
+      use: '通常のYouTube動画',
+      file: 'keiba-ocean-s-16x9.mp4',
+    },
+  ];
+
+  const CUTS = [
+    ['0:00', 'intro', 'たろうまる競馬。2026年の回収率79%、逆神がオーシャンステークスを予想するばい。'],
+    ['0:04', 'horse', '本命は15番、フリッカージャブ。鞍上は松山騎手。'],
+    ['0:09', 'reason', '理由の1つ目。松山騎手とのコンビ成績は［3-0-0-0］。相性は抜群たい。'],
+    ['0:14', 'reason', '2つ目。中山の開幕週。ハナさえ取れれば、そのまま押し切る可能性がある。'],
+    ['0:19', 'reason', '3つ目。栗東坂路で連日の超抜時計。陣営の気合が感じられるばい。'],
+    ['0:24', 'punch', 'ただし一つだけ。俺の本命は消せ。それが的中への近道やけん。'],
+    ['0:29', 'punch', 'でもホントは、勝ちたかとばい。'],
+    ['0:32', 'cta', '応援してくれる人はチャンネル登録・フォロー・いいねをよろしく！君の本命馬も教えちゃらんね。'],
+  ];
+
+  const films = document.getElementById('films');
+  films.innerHTML = FILMS.map(f => {
+    const src = ASSETS[f.key];
+    const media = src
+      ? `<video src="${src}" controls preload="metadata" playsinline${ASSETS[f.key + 'Poster'] ? ` poster="${ASSETS[f.key + 'Poster']}"` : ''}></video>`
+      : `<div class="pending">この端末ではまだ動画を読み込めていません。<br>リポジトリの <code>video/out/${f.file}</code> を開いてください。</div>`;
+    return `<div class="film ${f.key === 'wide' ? 'wide' : ''}">${media}
+      <div class="meta">
+        <strong>${f.label}</strong>
+        <span>${f.file} · 38.0s</span>
+        <span class="use">${f.use}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('cuts').innerHTML = CUTS.map(
+    ([t, kind, caption]) => `<tr><td class="t">${t}</td><td class="k"><span>${kind}</span></td><td>${caption}</td></tr>`,
+  ).join('');
+
+  document.querySelectorAll('.copy').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const text = document.getElementById(btn.dataset.copy).textContent;
+      let ok = false;
+      try {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      } catch (e) {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+        } catch (e2) { ok = false; }
+      }
+      btn.textContent = ok ? 'コピーしました' : '選択してコピーしてください';
+      btn.dataset.done = ok ? '1' : '0';
+      setTimeout(() => { btn.textContent = 'コピー'; btn.dataset.done = '0'; }, 2400);
+    });
+  });
+</script>

@@ -39,6 +39,7 @@ const height = Number(spec.height || 1920);
 const quality = Number(args.quality || 96);
 const withAudio = args['no-audio'] !== true;
 const outFile = path.resolve(HERE, args.out || `out/${spec.id || 'short'}.mp4`);
+const wantLandscape = args.landscape === true || spec.landscape != null;
 const workDir = path.join(HERE, 'out', '.work', spec.id || 'short');
 const duration = spec.scenes.reduce((sum, s) => sum + s.dur, 0);
 
@@ -62,6 +63,44 @@ function fontFaces() {
     }
   }
   return css.join('\n');
+}
+
+/* ---------- テーマ（台本の theme を :root の CSS変数として上書きする） ---------- */
+function themeVars(theme) {
+  if (!theme) return '';
+  const body = Object.entries(theme)
+    .map(([k, v]) => `--${k}: ${v};`)
+    .join(' ');
+  return `:root { ${body} }`;
+}
+
+/* ---------- 16:9（通常のYouTube用）の左右パネル ---------- */
+function landscapeFrameHtml(fonts) {
+  const side = spec.landscape || {};
+  const left = side.left || [spec.brand.chip, spec.title];
+  const right = side.right || [spec.brand.handle];
+  const col = lines => lines
+    .map((t, i) => `<div class="${i === 0 ? 'lead' : 'row'}">${t}</div>`)
+    .join('');
+  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><style>
+${fonts}
+${themeVars(spec.theme)}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { width: 1920px; height: 1080px; overflow: hidden;
+  font-family: 'Noto Sans JP', 'Noto Color Emoji', sans-serif; color: #fff; background: transparent; }
+.panel { position: absolute; top: 0; bottom: 0; width: 656px; padding: 96px 72px;
+  display: flex; flex-direction: column; justify-content: center; gap: 22px; }
+.left { left: 0; align-items: flex-start; text-align: left; }
+.right { right: 0; align-items: flex-end; text-align: right; }
+.lead { font-size: 54px; font-weight: 900; line-height: 1.25; letter-spacing: -0.01em;
+  text-shadow: 0 6px 40px rgba(0,0,0,.7); }
+.row { font-size: 34px; font-weight: 700; line-height: 1.5; color: #d7e2dc;
+  text-shadow: 0 4px 30px rgba(0,0,0,.7); }
+.rule { width: 96px; height: 8px; border-radius: 4px; background: var(--accent, #3ee6a8); margin: 14px 0; }
+</style></head><body>
+<div class="panel left">${col(left).replace('</div>', '</div><div class="rule"></div>')}</div>
+<div class="panel right">${col(right)}</div>
+</body></html>`;
 }
 
 /* ---------- Chromium の実体を探す ---------- */
@@ -139,7 +178,8 @@ function buildAudio(ffmpeg, target) {
 const html = fs
   .readFileSync(path.join(HERE, 'src', 'template.html'), 'utf8')
   .replace('__FONT_FACES__', fontFaces())
-  .replace('__SCRIPT_JSON__', JSON.stringify(spec));
+  .replace('__SCRIPT_JSON__', JSON.stringify(spec))
+  .replace('__THEME_VARS__', themeVars(spec.theme));
 
 const browser = await chromium.launch({
   executablePath: chromiumPath(),
@@ -183,6 +223,14 @@ for (let f = 0; f < totalFrames; f++) {
     console.log(`  ${done}/${totalFrames} (${((done / totalFrames) * 100).toFixed(0)}%) 残り約${eta.toFixed(0)}s`);
   }
 }
+let landscapeFrame = null;
+if (wantLandscape) {
+  landscapeFrame = path.join(workDir, 'landscape-frame.png');
+  await page.setViewportSize({width: 1920, height: 1080});
+  await page.setContent(landscapeFrameHtml(fontFaces()), {waitUntil: 'load'});
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({path: landscapeFrame, type: 'png', omitBackground: true});
+}
 await browser.close();
 
 const ffmpeg = ffmpegInstaller.path;
@@ -203,6 +251,27 @@ videoArgs.push(
 if (withAudio) videoArgs.push('-c:a', 'aac', '-b:a', '160k', '-shortest');
 videoArgs.push(outFile);
 run(ffmpeg, videoArgs, 'MP4のエンコード');
+
+if (wantLandscape) {
+  const wide = outFile.replace(/\.mp4$/, '-16x9.mp4');
+  console.log('[render] 16:9版を合成中…');
+  run(ffmpeg, [
+    '-y', '-i', outFile, '-i', landscapeFrame,
+    '-filter_complex', [
+      '[0:v]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,' +
+        'gblur=sigma=48,eq=brightness=-0.34:saturation=0.65[bg]',
+      '[0:v]scale=-2:1080[fg]',
+      '[bg][fg]overlay=(W-w)/2:0[v0]',
+      '[v0][1:v]overlay=0:0[v]',
+    ].join(';'),
+    '-map', '[v]', ...(withAudio ? ['-map', '0:a'] : []),
+    '-c:v', 'libx264', '-preset', 'slow', '-crf', '19',
+    '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-level', '4.2',
+    '-movflags', '+faststart', ...(withAudio ? ['-c:a', 'copy'] : []),
+    wide,
+  ], '16:9版のエンコード');
+  console.log(`[done] ${path.relative(HERE, wide)} (${(fs.statSync(wide).size / 1024 / 1024).toFixed(2)}MB)`);
+}
 
 const srtFile = outFile.replace(/\.mp4$/, '.srt');
 writeSrt(srtFile);
