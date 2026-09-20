@@ -7,7 +7,7 @@
 
 ## 技術スタック
 
-- フロントエンド: React 19 + TypeScript + Vite + Tailwind CSS 4
+- フロントエンド: React 19 + TypeScript + Vite + Tailwind CSS 4（GitHub Pagesでホスティング）
 - グラフ: Recharts
 - バックエンド: Firebase（Firestore, Anonymous Auth, Cloud Functions）
 - AI連携: クライアント → Cloud Function（APIキーはサーバー側env） → LLM API
@@ -47,27 +47,37 @@ firebase deploy --only functions,firestore:rules
 
 ## 自動デプロイ（GitHub Actions）
 
-`main` ブランチへのpush時に `.github/workflows/deploy.yml` がHosting・Firestoreルール・Cloud Functionsを自動デプロイする。
+`main` ブランチへのpush時に `.github/workflows/deploy.yml` が2つのジョブを実行する。
+
+- `deploy-pages`: フロントエンドをビルドし **GitHub Pages** に公開
+- `deploy-firebase-backend`: Firestoreルールと Cloud Functions を **Firebase** にデプロイ
+
 初回のみ、以下を手動でセットアップする。
 
-1. **Firebaseプロジェクトを作成**（未作成の場合）
+1. **GitHub Pagesを有効化**
+   リポジトリの Settings → Pages → Build and deployment → Source を **GitHub Actions** に変更
+2. **Firebaseプロジェクトを作成**（未作成の場合）
    [Firebase Console](https://console.firebase.google.com/) → プロジェクトを追加 → Firestore・Authentication（匿名認証を有効化）を設定
-2. **サービスアカウントキーを発行**
+3. **サービスアカウントキーを発行**（バックエンドデプロイ用）
    [Google Cloud Console](https://console.cloud.google.com/iam-admin/serviceaccounts) → 対象プロジェクト → サービスアカウントを作成
    → ロールに `Firebase 管理者`（`roles/firebase.admin`）付与 → キーを作成（JSON）してダウンロード
-3. **GitHubリポジトリにSecretsを登録**
+4. **GitHubリポジトリにSecretsを登録**
    リポジトリの Settings → Secrets and variables → Actions → New repository secret
-   - `FIREBASE_SERVICE_ACCOUNT`: 手順2でダウンロードしたJSONファイルの中身をそのまま貼り付け
+   - `FIREBASE_SERVICE_ACCOUNT`: 手順3でダウンロードしたJSONファイルの中身をそのまま貼り付け
    - `FIREBASE_PROJECT_ID`: FirebaseプロジェクトID
-4. **LLM APIキーをCloud Functions側に登録**（一度だけ、ローカルから）
+   - `VITE_FIREBASE_API_KEY` / `VITE_FIREBASE_AUTH_DOMAIN` / `VITE_FIREBASE_PROJECT_ID` / `VITE_FIREBASE_STORAGE_BUCKET` / `VITE_FIREBASE_MESSAGING_SENDER_ID` / `VITE_FIREBASE_APP_ID`: `.env.example` と同じ値（GitHub Pagesの静的ビルドに埋め込むため）
+5. **LLM APIキーをCloud Functions側に登録**（一度だけ、ローカルから）
    ```
    npm install -g firebase-tools
    firebase login
-   firebase use --add                          # 手順1のプロジェクトを選択
+   firebase use --add                          # 手順2のプロジェクトを選択
    firebase functions:secrets:set LLM_API_KEY
    ```
 
 以降は `main` へのpush、または GitHub の Actions タブから `workflow_dispatch` で手動実行することでデプロイされる。
+公開URLは `https://<GitHubユーザー名>.github.io/<リポジトリ名>/`。
+
+Firebase Web SDKの設定値（`VITE_FIREBASE_*`）はクライアント側に埋め込まれるが、アクセス制御は `firestore.rules` で行っているため、これらの値自体を秘匿する必要はない。
 
 ## 実装範囲（MVP）
 

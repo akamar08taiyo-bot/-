@@ -1,12 +1,56 @@
-name: Deploy to Firebase
+name: Deploy
 
 on:
   push:
     branches: [main]
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+
 jobs:
-  deploy:
+  # フロントエンド（React/Vite）は GitHub Pages でホスティングする。
+  # データ保存・認証・AI連携は引き続き Firebase（Firestore / Anonymous Auth / Cloud Functions）を使う。
+  deploy-pages:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build client
+        run: npx vite build --base="/${{ github.event.repository.name }}/"
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  # Firestore ルールと Cloud Functions（AI連携）はサービスアカウント経由で Firebase にデプロイする。
+  deploy-firebase-backend:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -16,11 +60,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Install and build client
-        run: |
-          npm ci
-          npm run build
 
       - name: Install and build functions
         run: |
@@ -33,5 +72,5 @@ jobs:
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
-      - name: Deploy to Firebase
-        run: npx firebase-tools@13 deploy --project "${{ secrets.FIREBASE_PROJECT_ID }}" --non-interactive
+      - name: Deploy Firestore rules and Cloud Functions
+        run: npx firebase-tools@13 deploy --only functions,firestore:rules --project "${{ secrets.FIREBASE_PROJECT_ID }}" --non-interactive
