@@ -1,0 +1,6 @@
+# 減量ノート（weight-tracker/）を公開するための設定。
+# publish で指定したフォルダの中身だけが公開される。
+# ルートの見積アプリ（src/, index.html）は公開対象に含まれない。
+[build]
+  publish = "weight-tracker"
+  command = ""

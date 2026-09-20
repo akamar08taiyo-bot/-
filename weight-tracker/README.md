@@ -5,7 +5,19 @@
 ## 使い方
 
 `index.html` をブラウザで開くだけ。ビルドもインストールも不要で、オフラインでも動く。
-スマホでは、開いたページを「ホーム画面に追加」しておくとアプリのように使える。
+スマホでは、開いたページを「ホーム画面に追加」しておくとアプリのように使える（全画面で開く）。
+
+## ファイル構成
+
+| ファイル | 役割 |
+| --- | --- |
+| `app.html` | 本体（中身だけのHTML断片）。Claude Artifact はここを公開する |
+| `head.html` | 単体配信用の `<head>`（charset・viewport・テーマカラー・マニフェスト） |
+| `index.html` | `head.html` + `app.html` を結合した**生成物**。Netlify等はこれを配信する |
+| `build.sh` | 上の結合を行う。`sh weight-tracker/build.sh` |
+
+`index.html` は生成物なので直接編集しない。**本体を直したら `app.html` を編集して `build.sh` を実行する。**
+Artifact を更新するときは `app.html` を、既存URL（`url` パラメータ）を指定して publish する。
 
 ## 画面
 
