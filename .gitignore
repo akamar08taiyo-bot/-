@@ -9,3 +9,6 @@ coverage/
 functions/lib/
 firebase-debug.log
 .firebase/
+video/out/.work/
+video/out/preview/
+video/out/check/

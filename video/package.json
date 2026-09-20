@@ -1,0 +1,16 @@
+{
+  "name": "taiyo-health-shorts",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "縦型ショート動画（1080x1920）を台本JSONから書き出すレンダリングパイプライン",
+  "scripts": {
+    "render": "node render.mjs",
+    "preview": "node render.mjs --preview"
+  },
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@fontsource/noto-sans-jp": "^5.2.5",
+    "playwright-core": "^1.56.0"
+  }
+}

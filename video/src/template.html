@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<title>short video stage</title>
+<style>
+/* @font-face は render.mjs が data URI として下の行に注入する */
+__FONT_FACES__
+
+:root {
+  --bg: #070b10;
+  --ink: #eef6f2;
+  --muted: #94a9a1;
+  --mint: #3ee6a8;
+  --amber: #ffc75a;
+  --line: rgba(255, 255, 255, 0.09);
+  --panel: rgba(255, 255, 255, 0.05);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 1080px;
+  height: 1920px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+body {
+  font-family: 'Noto Sans JP', sans-serif;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+#stage { position: relative; width: 1080px; height: 1920px; overflow: hidden; }
+
+/* ---------- 背景 ---------- */
+.bg {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(1100px 820px at 18% 10%, #10231e 0%, transparent 62%),
+    radial-gradient(900px 900px at 88% 82%, #121a2b 0%, transparent 60%),
+    var(--bg);
+}
+.blob { position: absolute; border-radius: 50%; filter: blur(150px); will-change: transform; }
+.blob-a { width: 760px; height: 760px; left: -180px; top: 120px; background: rgba(62, 230, 168, 0.16); }
+.blob-b { width: 680px; height: 680px; right: -200px; top: 980px; background: rgba(90, 140, 255, 0.14); }
+.grid {
+  position: absolute; inset: 0; opacity: 0.05;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.7) 0 1px, transparent 1px 90px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.7) 0 1px, transparent 1px 90px);
+  mask-image: radial-gradient(760px 900px at 50% 45%, #000 0%, transparent 78%);
+}
+.vignette {
+  position: absolute; inset: 0;
+  background: radial-gradient(760px 1100px at 50% 44%, transparent 0%, rgba(0,0,0,.62) 100%);
+}
+
+/* ---------- 固定UI ---------- */
+.progress-track { position: absolute; top: 0; left: 0; right: 0; height: 6px; background: rgba(255,255,255,.08); }
+.progress-bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--mint), #9df5d0); }
+
+.header {
+  position: absolute; top: 66px; left: 88px; right: 88px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.chip {
+  display: inline-flex; align-items: center; gap: 16px;
+  padding: 14px 28px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--panel);
+  font-size: 28px; font-weight: 700; letter-spacing: 0.22em; color: #cfe3da;
+}
+.chip .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 22px rgba(62,230,168,.9); }
+.handle { font-size: 28px; font-weight: 500; color: var(--muted); letter-spacing: 0.04em; }
+
+.caption-wrap { position: absolute; left: 72px; right: 72px; bottom: 292px; }
+.caption {
+  border: 1px solid var(--line); background: rgba(10, 16, 21, 0.62);
+  border-radius: 30px; padding: 34px 38px;
+  font-size: 39px; line-height: 1.52; font-weight: 500; color: #dcebe4;
+  letter-spacing: 0.01em;
+}
+.caption b { color: var(--mint); font-weight: 700; }
+
+.footer {
+  position: absolute; left: 88px; right: 88px; bottom: 208px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 26px; color: rgba(148,169,161,.72); letter-spacing: 0.06em;
+}
+
+/* ---------- シーン共通 ---------- */
+.scene {
+  position: absolute; left: 0; right: 0; top: 196px; bottom: 600px;
+  padding: 0 88px;
+  display: flex; flex-direction: column; justify-content: center;
+  will-change: transform, opacity;
+}
+.ch { display: inline-block; white-space: pre; will-change: transform, opacity, filter; }
+
+.kicker {
+  font-size: 34px; font-weight: 700; letter-spacing: 0.2em; color: var(--mint);
+  margin-bottom: 34px;
+}
+
+/* hook */
+.hook-line { font-size: 62px; font-weight: 700; color: #c7dbd3; }
+.hook-big { display: flex; align-items: baseline; gap: 18px; margin: 10px 0 26px; }
+.hook-big .num {
+  font-size: 236px; font-weight: 900; line-height: 1; letter-spacing: -0.03em;
+  color: var(--amber); text-shadow: 0 0 80px rgba(255,199,90,.28);
+}
+.hook-big .unit { font-size: 92px; font-weight: 900; color: var(--amber); }
+.hook-sub { font-size: 46px; font-weight: 500; color: var(--muted); }
+
+/* punch */
+.punch { font-size: 90px; font-weight: 900; line-height: 1.42; letter-spacing: -0.01em; }
+.hl { position: relative; display: inline-block; }
+.hl-bg {
+  position: absolute; left: -10px; right: -10px; bottom: 0.06em; height: 0.34em;
+  background: linear-gradient(90deg, rgba(62,230,168,.55), rgba(62,230,168,.22));
+  border-radius: 6px; transform-origin: left center; transform: scaleX(0);
+}
+.hl-tx { position: relative; }
+
+/* fact */
+.fact-headline { font-size: 88px; font-weight: 900; line-height: 1.32; letter-spacing: -0.01em; }
+.chips { display: flex; flex-wrap: wrap; gap: 22px; margin-top: 52px; }
+.pill {
+  padding: 22px 34px; border-radius: 22px;
+  border: 1px solid rgba(62,230,168,.28); background: rgba(62,230,168,.08);
+  font-size: 42px; font-weight: 700; color: #d6f5e8;
+  will-change: transform, opacity;
+}
+
+/* number */
+.num-row { display: flex; align-items: baseline; gap: 20px; }
+.num-value {
+  font-size: 250px; font-weight: 900; line-height: 1; letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums; color: var(--ink);
+  text-shadow: 0 0 90px rgba(62,230,168,.22);
+}
+.num-unit { font-size: 84px; font-weight: 900; color: var(--mint); }
+.num-label { margin-top: 36px; font-size: 48px; font-weight: 700; line-height: 1.45; color: #cfe1da; white-space: pre-line; }
+.num-foot {
+  margin-top: 34px; padding-left: 26px; border-left: 5px solid rgba(62,230,168,.5);
+  font-size: 36px; font-weight: 500; color: var(--muted); line-height: 1.5;
+}
+
+/* chart */
+.chart-headline { font-size: 68px; font-weight: 900; line-height: 1.32; letter-spacing: -0.01em; }
+.legend { display: flex; gap: 40px; margin: 28px 0 18px; font-size: 34px; font-weight: 700; }
+.legend span { display: inline-flex; align-items: center; gap: 14px; color: #b9cdc5; }
+.legend i { display: inline-block; width: 44px; height: 8px; border-radius: 4px; }
+.chart-note {
+  margin-top: 26px; font-size: 44px; font-weight: 700; line-height: 1.45;
+  color: #d9ece4; white-space: pre-line;
+}
+
+/* steps */
+.steps-headline { font-size: 72px; font-weight: 900; margin-bottom: 44px; letter-spacing: -0.01em; }
+.step {
+  display: flex; align-items: center; gap: 30px; margin-bottom: 26px;
+  padding: 32px 36px; border-radius: 28px;
+  border: 1px solid var(--line); background: rgba(255,255,255,.045);
+  will-change: transform, opacity;
+}
+.step .badge {
+  flex: 0 0 auto; width: 78px; height: 78px; border-radius: 50%;
+  background: var(--mint); color: #062018;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 42px; font-weight: 900;
+}
+.step .txt { font-size: 42px; font-weight: 700; line-height: 1.38; color: #e6f3ee; }
+
+/* cta */
+.cta-text { font-size: 88px; font-weight: 900; line-height: 1.42; letter-spacing: -0.01em; }
+.cta-sub { margin-top: 40px; font-size: 56px; font-weight: 900; color: var(--mint); }
+.cta-foot { margin-top: 44px; font-size: 30px; font-weight: 500; color: rgba(174,193,185,.92); line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="bg"></div>
+  <div class="blob blob-a" id="blobA"></div>
+  <div class="blob blob-b" id="blobB"></div>
+  <div class="grid"></div>
+  <div class="vignette"></div>
+
+  <div class="progress-track"><div class="progress-bar" id="progress"></div></div>
+  <div class="header">
+    <div class="chip"><span class="dot"></span><span id="brandChip"></span></div>
+    <div class="handle" id="brandHandle"></div>
+  </div>
+
+  <div id="scenes"></div>
+
+  <div class="caption-wrap"><div class="caption" id="caption"></div></div>
+  <div class="footer"><span id="footLeft"></span><span id="footRight"></span></div>
+</div>
+
+<script>window.__SCRIPT__ = __SCRIPT_JSON__;</script>
+<script>
+(() => {
+  const S = window.__SCRIPT__;
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const easeOutCubic = p => 1 - Math.pow(1 - p, 3);
+  const easeOutQuint = p => 1 - Math.pow(1 - p, 5);
+  const easeOutBack = p => { const c = 1.7; return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); };
+  const easeInOut = p => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+  /** 0→1 の進捗。delay 秒待って dur 秒かけて進む */
+  const tw = (local, delay, dur, ease = easeOutCubic) => ease(clamp((local - delay) / dur, 0, 1));
+
+  /* テキストを1文字ずつ span に割り、順番に立ち上げられるようにする */
+  function splitChars(el, text) {
+    const spans = [];
+    el.textContent = '';
+    for (const line of String(text).split('\n')) {
+      for (const c of line) {
+        const s = document.createElement('span');
+        s.className = 'ch';
+        s.textContent = c;
+        el.appendChild(s);
+        spans.push(s);
+      }
+      el.appendChild(document.createElement('br'));
+    }
+    if (el.lastChild) el.removeChild(el.lastChild);
+    return spans;
+  }
+  function revealChars(spans, local, delay, step = 0.016, dur = 0.42) {
+    spans.forEach((s, i) => {
+      const p = tw(local, delay + i * step, dur, easeOutQuint);
+      s.style.opacity = p;
+      s.style.transform = 'translateY(' + ((1 - p) * 26).toFixed(2) + 'px)';
+      s.style.filter = p < 1 ? 'blur(' + ((1 - p) * 7).toFixed(2) + 'px)' : 'none';
+    });
+  }
+  const el = (tag, cls, parent) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (parent) parent.appendChild(n);
+    return n;
+  };
+
+  /* ---------- シーンごとの組み立て ---------- */
+  const builders = {
+    hook(s, root) {
+      const kicker = el('div', 'kicker', root);
+      const kickerCh = splitChars(kicker, s.kicker);
+      const line = el('div', 'hook-line', root);
+      const lineCh = splitChars(line, s.line);
+      const big = el('div', 'hook-big', root);
+      const num = el('div', 'num', big);
+      const unit = el('div', 'unit', big);
+      unit.textContent = s.unit;
+      const sub = el('div', 'hook-sub', root);
+      const subCh = splitChars(sub, s.sub);
+      const target = parseFloat(s.big);
+      return local => {
+        revealChars(kickerCh, local, 0.05, 0.012);
+        revealChars(lineCh, local, 0.35, 0.03);
+        const p = tw(local, 0.75, 0.9, easeOutQuint);
+        const v = target * p;
+        num.textContent = (target > 0 ? '+' : '') + v.toFixed(1);
+        const pop = tw(local, 0.75, 0.75, easeOutBack);
+        num.style.transform = 'scale(' + (0.82 + 0.18 * pop).toFixed(3) + ')';
+        num.style.transformOrigin = 'left bottom';
+        num.style.opacity = tw(local, 0.75, 0.3);
+        unit.style.opacity = tw(local, 1.15, 0.35);
+        revealChars(subCh, local, 1.9, 0.014);
+      };
+    },
+
+    punch(s, root) {
+      const box = el('div', 'punch', root);
+      /* **強調** をハイライト付きで組む */
+      const parts = String(s.text).split(/(\*\*[^*]+\*\*)/).filter(Boolean);
+      const plain = [];
+      const hls = [];
+      for (const part of parts) {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          const wrap = el('span', 'hl', box);
+          const bg = el('span', 'hl-bg', wrap);
+          const tx = el('span', 'hl-tx', wrap);
+          const chars = splitChars(tx, part.slice(2, -2));
+          hls.push({ bg, chars, offset: plain.length });
+          plain.push(...chars);
+        } else {
+          const tx = el('span', null, box);
+          plain.push(...splitChars(tx, part));
+        }
+      }
+      return local => {
+        revealChars(plain, local, 0.1, 0.028, 0.5);
+        for (const h of hls) {
+          const start = 0.1 + (h.offset + h.chars.length) * 0.028;
+          const p = tw(local, start, 0.5, easeOutQuint);
+          h.bg.style.transform = 'scaleX(' + p.toFixed(3) + ')';
+        }
+      };
+    },
+
+    fact(s, root) {
+      const head = el('div', 'fact-headline', root);
+      const headCh = splitChars(head, s.headline);
+      const chips = el('div', 'chips', root);
+      const pills = s.chips.map(text => {
+        const p = el('div', 'pill', chips);
+        p.textContent = text;
+        return p;
+      });
+      return local => {
+        revealChars(headCh, local, 0.1, 0.03);
+        pills.forEach((p, i) => {
+          const t = tw(local, 1.2 + i * 0.22, 0.55, easeOutBack);
+          p.style.opacity = clamp(t * 1.6, 0, 1);
+          p.style.transform = 'translateY(' + ((1 - t) * 30).toFixed(2) + 'px) scale(' + (0.92 + 0.08 * t).toFixed(3) + ')';
+        });
+      };
+    },
+
+    number(s, root) {
+      const row = el('div', 'num-row', root);
+      const value = el('div', 'num-value', row);
+      const unit = el('div', 'num-unit', row);
+      unit.textContent = s.unit;
+      const label = el('div', 'num-label', root);
+      const labelCh = splitChars(label, s.label);
+      const foot = el('div', 'num-foot', root);
+      const footCh = splitChars(foot, s.footnote);
+      return local => {
+        const p = tw(local, 0.15, 1.5, easeOutQuint);
+        value.textContent = Math.round(s.value * p).toLocaleString('en-US');
+        value.style.opacity = tw(local, 0.15, 0.3);
+        unit.style.opacity = tw(local, 1.0, 0.4);
+        revealChars(labelCh, local, 1.35, 0.012);
+        revealChars(footCh, local, 2.5, 0.008);
+      };
+    },
+
+    chart(s, root) {
+      const head = el('div', 'chart-headline', root);
+      const headCh = splitChars(head, s.headline);
+
+      const legend = el('div', 'legend', root);
+      const mk = (color, text) => {
+        const w = el('span', null, legend);
+        const i = el('i', null, w);
+        i.style.background = color;
+        const t = el('span', null, w);
+        t.textContent = text;
+        t.style.color = 'inherit';
+        return w;
+      };
+      const legA = mk('#7f9fc4', s.legendA);
+      const legB = mk('#3ee6a8', s.legendB);
+
+      /* 3週間ぶんの実測値（日々はギザギザ、平均はなだらか）*/
+      const daily = [72.4, 73.1, 72.6, 72.9, 72.2, 72.8, 72.5, 72.9, 72.1, 72.6, 72.3,
+                     71.9, 72.5, 72.0, 72.3, 71.8, 72.2, 71.7, 72.0, 71.6, 71.9];
+      const avg = daily.map((_, i) => {
+        if (i < 6) return null;
+        const w = daily.slice(i - 6, i + 1);
+        return w.reduce((a, b) => a + b, 0) / w.length;
+      });
+
+      const W = 904, H = 660, PAD = { l: 26, r: 26, t: 40, b: 64 };
+      const lo = 71.3, hi = 73.4;
+      const x = i => PAD.l + (i / (daily.length - 1)) * (W - PAD.l - PAD.r);
+      const y = v => PAD.t + (1 - (v - lo) / (hi - lo)) * (H - PAD.t - PAD.b);
+
+      const NS = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('width', W);
+      svg.setAttribute('height', H);
+      svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+      root.appendChild(svg);
+
+      const defs = document.createElementNS(NS, 'defs');
+      defs.innerHTML =
+        '<linearGradient id="avgFill" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0%" stop-color="#3ee6a8" stop-opacity="0.30"/>' +
+        '<stop offset="100%" stop-color="#3ee6a8" stop-opacity="0"/></linearGradient>' +
+        '<filter id="glow" x="-30%" y="-60%" width="160%" height="260%">' +
+        '<feGaussianBlur stdDeviation="9" result="b"/><feMerge>' +
+        '<feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+      svg.appendChild(defs);
+
+      for (let g = 0; g <= 4; g++) {
+        const gy = PAD.t + (g / 4) * (H - PAD.t - PAD.b);
+        const ln = document.createElementNS(NS, 'line');
+        ln.setAttribute('x1', PAD.l); ln.setAttribute('x2', W - PAD.r);
+        ln.setAttribute('y1', gy); ln.setAttribute('y2', gy);
+        ln.setAttribute('stroke', 'rgba(255,255,255,0.08)');
+        ln.setAttribute('stroke-width', '2');
+        svg.appendChild(ln);
+      }
+
+      const dailyPath = document.createElementNS(NS, 'path');
+      dailyPath.setAttribute('d', daily.map((v, i) => (i ? 'L' : 'M') + x(i) + ' ' + y(v)).join(' '));
+      dailyPath.setAttribute('fill', 'none');
+      dailyPath.setAttribute('stroke', '#7f9fc4');
+      dailyPath.setAttribute('stroke-width', '5');
+      dailyPath.setAttribute('stroke-linejoin', 'round');
+      dailyPath.setAttribute('stroke-linecap', 'round');
+      svg.appendChild(dailyPath);
+      const dailyLen = 4200;
+      dailyPath.style.strokeDasharray = dailyLen;
+
+      const dots = daily.map((v, i) => {
+        const c = document.createElementNS(NS, 'circle');
+        c.setAttribute('cx', x(i)); c.setAttribute('cy', y(v)); c.setAttribute('r', '7');
+        c.setAttribute('fill', '#0b1219');
+        c.setAttribute('stroke', '#7f9fc4');
+        c.setAttribute('stroke-width', '4');
+        svg.appendChild(c);
+        return c;
+      });
+
+      const avgPts = avg.map((v, i) => (v == null ? null : [x(i), y(v)])).filter(Boolean);
+      const avgD = avgPts.map((p, i) => (i ? 'L' : 'M') + p[0] + ' ' + p[1]).join(' ');
+      const area = document.createElementNS(NS, 'path');
+      area.setAttribute('d', avgD + ' L' + avgPts[avgPts.length - 1][0] + ' ' + (H - PAD.b) + ' L' + avgPts[0][0] + ' ' + (H - PAD.b) + ' Z');
+      area.setAttribute('fill', 'url(#avgFill)');
+      svg.appendChild(area);
+
+      const avgPath = document.createElementNS(NS, 'path');
+      avgPath.setAttribute('d', avgD);
+      avgPath.setAttribute('fill', 'none');
+      avgPath.setAttribute('stroke', '#3ee6a8');
+      avgPath.setAttribute('stroke-width', '10');
+      avgPath.setAttribute('stroke-linecap', 'round');
+      avgPath.setAttribute('stroke-linejoin', 'round');
+      avgPath.setAttribute('filter', 'url(#glow)');
+      svg.appendChild(avgPath);
+      const avgLen = 2400;
+      avgPath.style.strokeDasharray = avgLen;
+
+      const head2 = document.createElementNS(NS, 'circle');
+      head2.setAttribute('r', '14');
+      head2.setAttribute('fill', '#3ee6a8');
+      svg.appendChild(head2);
+
+      const mkText = (tx, anchor, xx) => {
+        const t = document.createElementNS(NS, 'text');
+        t.setAttribute('x', xx); t.setAttribute('y', H - 16);
+        t.setAttribute('fill', 'rgba(148,169,161,.85)');
+        t.setAttribute('font-size', '30');
+        t.setAttribute('font-weight', '500');
+        t.setAttribute('text-anchor', anchor);
+        t.textContent = tx;
+        svg.appendChild(t);
+        return t;
+      };
+      const axisL = mkText('3週間前', 'start', PAD.l);
+      const axisR = mkText('今日', 'end', W - PAD.r);
+
+      const note = el('div', 'chart-note', root);
+      const noteCh = splitChars(note, s.note);
+
+      return local => {
+        revealChars(headCh, local, 0.05, 0.028);
+        legA.style.opacity = tw(local, 0.5, 0.3);
+        legB.style.opacity = tw(local, 2.6, 0.3);
+
+        const pd = tw(local, 0.55, 1.7, easeInOut);
+        dailyPath.style.strokeDashoffset = dailyLen * (1 - pd);
+        const fade = tw(local, 2.9, 0.8);
+        dailyPath.style.opacity = (1 - 0.68 * fade).toFixed(3);
+        dots.forEach((c, i) => {
+          const p = tw(local, 0.6 + (i / dots.length) * 1.5, 0.3);
+          c.style.opacity = (p * (1 - 0.75 * fade)).toFixed(3);
+        });
+
+        const pa = tw(local, 2.7, 1.9, easeInOut);
+        avgPath.style.strokeDashoffset = avgLen * (1 - pa);
+        avgPath.style.opacity = tw(local, 2.7, 0.2);
+        area.style.opacity = tw(local, 3.6, 1.2);
+        const idx = pa * (avgPts.length - 1);
+        const i0 = Math.floor(idx), i1 = Math.min(avgPts.length - 1, i0 + 1), f = idx - i0;
+        head2.setAttribute('cx', avgPts[i0][0] + (avgPts[i1][0] - avgPts[i0][0]) * f);
+        head2.setAttribute('cy', avgPts[i0][1] + (avgPts[i1][1] - avgPts[i0][1]) * f);
+        head2.style.opacity = tw(local, 2.7, 0.2) * (1 - tw(local, 4.8, 0.5));
+        axisL.style.opacity = axisR.style.opacity = tw(local, 1.2, 0.5);
+
+        revealChars(noteCh, local, 5.0, 0.018);
+      };
+    },
+
+    steps(s, root) {
+      const head = el('div', 'steps-headline', root);
+      const headCh = splitChars(head, s.headline);
+      const cards = s.steps.map((text, i) => {
+        const card = el('div', 'step', root);
+        const badge = el('div', 'badge', card);
+        badge.textContent = String(i + 1);
+        const txt = el('div', 'txt', card);
+        txt.textContent = text;
+        return card;
+      });
+      return local => {
+        revealChars(headCh, local, 0.05, 0.03);
+        cards.forEach((c, i) => {
+          const p = tw(local, 0.75 + i * 0.6, 0.65, easeOutQuint);
+          c.style.opacity = clamp(p * 1.4, 0, 1);
+          c.style.transform = 'translateX(' + ((1 - p) * -60).toFixed(2) + 'px)';
+        });
+      };
+    },
+
+    cta(s, root) {
+      const text = el('div', 'cta-text', root);
+      const textCh = splitChars(text, s.text);
+      const sub = el('div', 'cta-sub', root);
+      const subCh = splitChars(sub, s.sub);
+      const foot = el('div', 'cta-foot', root);
+      foot.textContent = s.footnote;
+      return local => {
+        revealChars(textCh, local, 0.1, 0.03, 0.5);
+        revealChars(subCh, local, 2.0, 0.05);
+        foot.style.opacity = tw(local, 2.9, 0.6);
+      };
+    },
+  };
+
+  /* ---------- 組み立て ---------- */
+  document.getElementById('brandChip').textContent = S.brand.chip;
+  document.getElementById('brandHandle').textContent = S.brand.handle;
+  document.getElementById('footLeft').textContent = S.brand.chip;
+  document.getElementById('footRight').textContent = S.title;
+
+  const scenesRoot = document.getElementById('scenes');
+  const captionEl = document.getElementById('caption');
+  const progressEl = document.getElementById('progress');
+  const blobA = document.getElementById('blobA');
+  const blobB = document.getElementById('blobB');
+
+  let clock = 0;
+  const scenes = S.scenes.map(s => {
+    const root = el('div', 'scene', scenesRoot);
+    const update = builders[s.type](s, root);
+    const entry = { spec: s, root, update, start: clock, end: clock + s.dur };
+    clock += s.dur;
+    return entry;
+  });
+  const total = clock;
+  window.__duration = total;
+
+  const IN = 0.5, OUT = 0.38;
+  let lastCaption = null;
+
+  window.__render = t => {
+    progressEl.style.width = (clamp(t / total, 0, 1) * 100).toFixed(3) + '%';
+    blobA.style.transform = 'translate(' + (Math.sin(t * 0.18) * 40).toFixed(1) + 'px,' + (Math.cos(t * 0.13) * 50).toFixed(1) + 'px)';
+    blobB.style.transform = 'translate(' + (Math.cos(t * 0.15) * 46).toFixed(1) + 'px,' + (Math.sin(t * 0.11) * 40).toFixed(1) + 'px)';
+
+    let active = scenes[scenes.length - 1];
+    for (const sc of scenes) {
+      const on = t >= sc.start && t < sc.end;
+      if (on) active = sc;
+      if (!on) { sc.root.style.display = 'none'; continue; }
+      sc.root.style.display = 'flex';
+      const local = t - sc.start;
+      const inP = tw(local, 0, IN, easeOutQuint);
+      const outP = tw(local, sc.spec.dur - OUT, OUT, easeInOut);
+      sc.root.style.opacity = (inP * (1 - outP)).toFixed(3);
+      sc.root.style.transform =
+        'translateY(' + ((1 - inP) * 46 - outP * 34).toFixed(2) + 'px) scale(' + (1 - outP * 0.018).toFixed(4) + ')';
+      sc.update(local);
+    }
+
+    if (active.spec.caption !== lastCaption) {
+      captionEl.textContent = active.spec.caption;
+      lastCaption = active.spec.caption;
+    }
+    const cl = t - active.start;
+    const cIn = tw(cl, 0.12, 0.35);
+    const cOut = tw(cl, active.spec.dur - 0.3, 0.3);
+    captionEl.style.opacity = (cIn * (1 - cOut)).toFixed(3);
+    captionEl.style.transform = 'translateY(' + ((1 - cIn) * 18).toFixed(2) + 'px)';
+  };
+
+  window.__render(0);
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>
