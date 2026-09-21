@@ -1,3 +1,4 @@
+import {useId, useState} from 'react';
 import type {ReactNode} from 'react';
 
 export function Card({children, className = ''}: {children: ReactNode; className?: string}) {
@@ -41,7 +42,13 @@ export function StatTile({
   );
 }
 
-/** スライダーと数値入力を組にしたフィールド */
+/**
+ * スライダーと数値入力を組にしたフィールド。
+ *
+ * 数値欄は入力中の文字列をそのまま保持し、範囲内の値になったときだけ親へ通知する。
+ * 1文字ごとに最小値・最大値へ丸めると、打っている途中で勝手に値が跳ね上がってしまうため、
+ * 範囲外のまま確定した場合（フォーカスが外れた / Enter）にだけ丸める。
+ */
 export function SliderField({
   label,
   value,
@@ -64,24 +71,49 @@ export function SliderField({
   hint?: string;
 }) {
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
+  // 入力途中の文字列（未確定）。null なら親の値をそのまま表示する
+  const [draft, setDraft] = useState<string | null>(null);
+  const inputId = useId();
+
+  const commitDraft = () => {
+    if (draft === null) return;
+    const parsed = Number(draft);
+    if (draft.trim() !== '' && Number.isFinite(parsed)) onChange(clamp(parsed));
+    setDraft(null);
+  };
+
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-2">
-        <label className="text-sm font-medium text-slate-700" htmlFor={`f-${label}`}>
+        <label className="text-sm font-medium text-slate-700" htmlFor={inputId}>
           {label}
         </label>
         <div className="flex items-baseline gap-1">
           <input
-            id={`f-${label}`}
+            id={inputId}
             type="number"
             inputMode="decimal"
-            value={value}
+            value={draft ?? String(value)}
             min={min}
             max={max}
             step={step}
+            // タップしてすぐ打ち直せるよう、フォーカス時に全選択する
+            onFocus={(e) => e.currentTarget.select()}
             onChange={(e) => {
-              const next = Number(e.target.value);
-              if (!Number.isNaN(next)) onChange(clamp(next));
+              const raw = e.target.value;
+              setDraft(raw);
+              const parsed = Number(raw);
+              // 範囲内になった時点だけ反映する（範囲外は確定時に丸める）
+              if (raw.trim() !== '' && Number.isFinite(parsed) && parsed >= min && parsed <= max) {
+                onChange(parsed);
+              }
+            }}
+            onBlur={commitDraft}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                e.currentTarget.blur();
+              }
             }}
             className="w-24 rounded-lg border border-slate-300 px-2 py-1 text-right text-sm font-semibold text-slate-900 tabular-nums focus:border-sky-500 focus:outline-none"
           />
@@ -95,7 +127,10 @@ export function SliderField({
         min={min}
         max={max}
         step={step}
-        onChange={(e) => onChange(clamp(Number(e.target.value)))}
+        onChange={(e) => {
+          setDraft(null);
+          onChange(clamp(Number(e.target.value)));
+        }}
         className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-sky-600"
       />
       <div className="flex justify-between text-[11px] text-slate-400 tabular-nums">
