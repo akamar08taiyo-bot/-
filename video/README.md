@@ -38,13 +38,17 @@ sudo apt-get install -y fonts-noto-cjk fonts-noto-cjk-extra   # 極太ゴシッ�
 
 python3 render_shorts.py                   # 6本すべて
 python3 render_shorts.py 01_sleep          # 1本だけ
-python3 render_shorts.py --overlay         # 背景透過の合成用（WebM / VP9 alpha）
+python3 render_shorts.py --overlay         # 背景透過の合成用（MOV / QuickTime Animation）
 python3 render_shorts.py --fps 60 --out /path/to/dir
 ```
 
-`--overlay` は背景を透明にしたWebMを書き出します。台本集にある
-「背景は無地かグリーンバック合成」の運用で、自分で撮った実写の上にデータ部分だけを
-重ねたいときに使います（Premiere / DaVinci / CapCut などにそのまま読み込めます）。
+`--overlay` は背景を透明にしたMOV（QuickTime Animation / RLE・可逆）を書き出します。
+台本集にある「背景は無地かグリーンバック合成」の運用で、自分で撮った実写の上に
+データ部分だけを重ねたいときに使います（Premiere / DaVinci / CapCut などにそのまま
+読み込めます）。可逆圧縮なので20秒強で約28MBと大きく、Gitには含めていません。
+
+> アルファ付きWebM（VP9）も試しましたが、同梱ffmpegのlibvpxではアルファプレーンが
+> 落ちて不透明になったため採用していません。
 
 ## 投稿時の仕上げ
 

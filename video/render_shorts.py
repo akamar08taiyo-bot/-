@@ -456,9 +456,10 @@ def render(script, out_dir: str, fps: int, overlay: bool) -> str:
     os.makedirs(out_dir, exist_ok=True)
 
     if overlay:
-        path = os.path.join(out_dir, f"{script['id']}_overlay.webm")
-        vcodec = ["-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0",
-                  "-crf", "32", "-row-mt", "1", "-cpu-used", "5", "-auto-alt-ref", "0"]
+        # QuickTime Animation (RLE)。可逆でアルファを確実に保持し、主要な編集ソフトが読める。
+        # VP9 のアルファ付きWebMは ffmpeg のビルドによってアルファが落ちるため使わない。
+        path = os.path.join(out_dir, f"{script['id']}_overlay.mov")
+        vcodec = ["-c:v", "qtrle", "-pix_fmt", "argb"]
         pix_in, mode = "rgba", "RGBA"
         audio_in, audio_enc = [], []
     else:
