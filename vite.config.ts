@@ -17,6 +17,8 @@ export default defineConfig({
         main: path.resolve(__dirname, 'index.html'),
         // 住宅ローン 金利シナリオ・シミュレーター
         mortgage: path.resolve(__dirname, 'mortgage.html'),
+        // 動画メーカー（画像・テロップ・BGM から動画を書き出す）
+        video: path.resolve(__dirname, 'video.html'),
       },
     },
   },
