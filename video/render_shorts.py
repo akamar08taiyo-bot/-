@@ -1,7 +1,15 @@
 # -*- coding: utf-8 -*-
-"""日本×世界 データ比較ショート動画レンダラー.
+"""日本×世界 データ比較ショート動画レンダラー（カウントダウン構成）.
 
 台本集（scripts_data.py）から 1080x1920 / 9:16 の縦型ショート動画を書き出す。
+
+視聴維持率のための構成:
+  1. フック        : 答えを言わずに問いかけるだけ（「日本は何位だと思う？」）
+  2. カウントダウン : 15→1 と数字が減っていく。1が来るまで終わらないと分かる形
+  3. 伏せ札        : 日本（台本⑤は全国最長の県）の行は「？？？」のまま置いておく
+  4. 進捗バー      : 残りがどれだけかを常に見せて離脱を抑える
+  5. 答え合わせ    : 最後に伏せ札をその場でめくる
+  6. クロージング  : 順位・出典・次への誘導
 
 台本集の「共通仕様」に合わせた設計:
   - 解像度・比率  : 1080x1920（9:16）
@@ -13,7 +21,7 @@
 使い方:
     python3 render_shorts.py                 # 6本すべて書き出し
     python3 render_shorts.py 01_sleep        # ID を指定して1本だけ
-    python3 render_shorts.py --overlay       # 背景透過の合成用オーバーレイ（WebM/VP9）
+    python3 render_shorts.py --overlay       # 背景透過の合成用（MOV / QuickTime Animation）
     python3 render_shorts.py --fps 30 --out out
 
 必要なもの: Pillow, imageio-ffmpeg（同梱の ffmpeg を使用）, Noto Sans CJK JP Black
@@ -43,8 +51,9 @@ MARGIN_X = 70
 PANEL_X0 = MARGIN_X
 PANEL_X1 = W - SAFE_RIGHT - 10          # 950
 PANEL_W = PANEL_X1 - PANEL_X0           # 880
+CX = (W - SAFE_RIGHT) // 2              # テロップの中心（右のUI列を避ける）
 
-ROWS_TOP = 520
+ROWS_TOP = 470
 ROWS_BOTTOM = 1500
 ROW_MAX_H = 180
 ROW_GAP = 18
@@ -72,11 +81,12 @@ ACCENTS = {
 ACCENT_DEFAULT = (129, 140, 248)
 
 # タイミング（秒）
-T_HOOK = 2.4
+T_HOOK = 2.5
 T_CHANT = 0.95             # ゾーン頭のチャント（「短い、短い、短い！」）
-T_ROW = 1.15               # 1行あたりの表示間隔
-T_ZONE_HOLD = 1.25         # ゾーン最後の余韻
-T_OUTRO = 3.2
+T_ROW = 1.0                # 1行あたりの表示間隔
+T_ZONE_HOLD = 0.9          # ゾーン最後の余韻
+T_REVEAL = 2.2             # 伏せ札をめくる答え合わせ
+T_OUTRO = 3.0
 T_FLASH = 0.26             # セクション切り替えのフラッシュ
 
 _font_cache: dict[int, ImageFont.FreeTypeFont] = {}
@@ -108,6 +118,11 @@ def mix(a, b, t: float):
     return tuple(int(round(a[i] + (b[i] - a[i]) * t)) for i in range(3))
 
 
+def pulse(t: float, period: float = 0.9) -> float:
+    """0→1→0 を繰り返す。伏せ札の点滅用。"""
+    return 0.5 - 0.5 * math.cos(2 * math.pi * (t % period) / period)
+
+
 def fmt_value(unit: str, v: float) -> str:
     v = int(round(v))
     if unit == "hm":
@@ -128,16 +143,57 @@ def text(draw, xy, s, size, fill=TEXT, anchor="mm", stroke=6, stroke_fill=STROKE
               stroke_width=stroke, stroke_fill=stroke_fill)
 
 
-def text_w(s, size, stroke=0) -> float:
-    f = font(size)
-    return f.getlength(s) + stroke * 2
-
-
 def fit_size(s: str, max_w: int, size: int, min_size: int = 24) -> int:
     """max_w に収まるまでフォントサイズを落とす。"""
     while size > min_size and font(size).getlength(s) > max_w:
         size -= 2
     return size
+
+
+# ---------------------------------------------------------------- 構成の組み立て
+
+def build_sequence(script):
+    """ゾーンと行をカウントダウン順に並べ替え、各行に残り番号を振る。
+
+    countdown_reverse=True の台本はゾーン順・行順を反転させ、
+    「1」が来る位置＝一番言いたい極端値になるようにする。
+    """
+    zones = script["zones"]
+    rev = script.get("countdown_reverse", False)
+    ordered = list(reversed(zones)) if rev else list(zones)
+    total = sum(len(z["rows"]) for z in zones)
+
+    seq, k = [], 0
+    for z in ordered:
+        rows = list(reversed(z["rows"])) if rev else list(z["rows"])
+        items = []
+        for name, v, note in rows:
+            k += 1
+            items.append({"name": name, "v": v, "note": note, "num": total - k + 1,
+                          "index": k})
+        seq.append({"word": z["word"], "caption": z["caption"], "items": items})
+    return seq, total
+
+
+def answer_position(script, seq):
+    """伏せ札（日本＝答え）がどのゾーンの何行目か。"""
+    target = script["answer_name"]
+    for zi, z in enumerate(seq):
+        for ri, it in enumerate(z["items"]):
+            if it["name"] == target:
+                return zi, ri
+    return len(seq) - 1, len(seq[-1]["items"]) - 1
+
+
+def build_timeline(script):
+    """[(種別, index, 長さ)] とトータル秒を返す。"""
+    seq, _ = build_sequence(script)
+    seg = [("hook", -1, T_HOOK)]
+    for i, z in enumerate(seq):
+        seg.append(("zone", i, T_CHANT + len(z["items"]) * T_ROW + T_ZONE_HOLD))
+    seg.append(("reveal", -1, T_REVEAL))
+    seg.append(("outro", -1, T_OUTRO))
+    return seg, sum(s[2] for s in seg)
 
 
 # ---------------------------------------------------------------- 背景
@@ -162,7 +218,6 @@ def background(accent, overlay: bool) -> Image.Image:
         for x in range(W):
             px[x, y] = c
 
-    # 上部中央のソフトグロー（小さく作って拡大）
     gw, gh = 108, 192
     glow = Image.new("L", (gw, gh), 0)
     gp = glow.load()
@@ -174,7 +229,6 @@ def background(accent, overlay: bool) -> Image.Image:
     glow = glow.resize((W, H), Image.LANCZOS)
     base.paste(Image.new("RGB", (W, H), tuple(accent)), (0, 0), glow)
 
-    # 下部のビネット
     vign = Image.new("L", (108, 192), 0)
     vp = vign.load()
     for y in range(192):
@@ -192,44 +246,71 @@ def background(accent, overlay: bool) -> Image.Image:
 
 def draw_footer(draw, script, accent):
     """出典と注記。セーフゾーン（下250px）より上に必ず収める。"""
-    src = script["source"]
-    cav = script["caveat"]
-    s1 = fit_size(src, PANEL_W, 27, 18)
-    s2 = fit_size(cav, PANEL_W, 27, 18)
+    src, cav = script["source"], script["caveat"]
     draw.line([(PANEL_X0, 1535), (PANEL_X0 + 90, 1535)], fill=accent, width=5)
-    text(draw, (PANEL_X0, 1578), src, s1, fill=TEXT_DIM, anchor="lm", stroke=4)
-    text(draw, (PANEL_X0, 1624), cav, s2, fill=TEXT_DIM, anchor="lm", stroke=4)
+    text(draw, (PANEL_X0, 1578), src, fit_size(src, PANEL_W, 27, 18),
+         fill=TEXT_DIM, anchor="lm", stroke=4)
+    text(draw, (PANEL_X0, 1624), cav, fit_size(cav, PANEL_W, 27, 18),
+         fill=TEXT_DIM, anchor="lm", stroke=4)
 
 
-def draw_title_bar(draw, script, accent, alpha=1.0):
-    t = script["title"]
-    size = fit_size(t, PANEL_W - 170, 46, 24)
-    col = mix(BG_BOTTOM, TEXT, alpha)
-    text(draw, (W // 2 - SAFE_RIGHT // 2, 150), t, size, fill=col, anchor="mm", stroke=5)
-    bw = int(text_w(t, size) * 0.5) + 20
-    cx = W // 2 - SAFE_RIGHT // 2
-    draw.line([(cx - bw, 190), (cx + bw, 190)], fill=mix(BG_BOTTOM, accent, alpha), width=5)
+def draw_topbar(draw, script, accent, progress, revealed, answer_value, t,
+                total_rows=0, alpha=1.0):
+    """タイトル・伏せ札ティザー・進捗バー。カウントダウン中ずっと出しておく。"""
+    title = script["title"]
+    size = fit_size(title, PANEL_W, 42, 22)
+    text(draw, (CX, 110), title, size, fill=mix(BG_BOTTOM, TEXT_DIM, alpha),
+         anchor="mm", stroke=5)
+
+    # 「日本は ？？？」＝最後まで残る引っかかり
+    label = script["teaser_label"]
+    val = answer_value if revealed else "？？？"
+    lsz = fit_size(label, 360, 40, 24)
+    vsz = fit_size(val, 330, 44, 24)
+    gap = 18
+    tw = font(lsz).getlength(label) + gap + font(vsz).getlength(val)
+    bx0, bx1 = CX - tw / 2 - 34, CX + tw / 2 + 34
+    chip = mix(BG_BOTTOM, JAPAN if revealed else accent, (0.30 if revealed else 0.16) * alpha)
+    draw.rounded_rectangle([bx0, 150, bx1, 218], radius=26, fill=chip,
+                           outline=mix(BG_BOTTOM, JAPAN if revealed else accent, alpha),
+                           width=4 if revealed else 3)
+    x = CX - tw / 2
+    text(draw, (x, 184), label, lsz, fill=mix(BG_BOTTOM, TEXT, alpha), anchor="lm", stroke=5)
+    x += font(lsz).getlength(label) + gap
+    vcol = JAPAN if revealed else mix(accent, TEXT, 0.25 + 0.55 * pulse(t, 0.8))
+    text(draw, (x, 184), val, vsz, fill=mix(BG_BOTTOM, vcol, alpha), anchor="lm", stroke=5)
+
+    # 進捗バー（残りがどれだけかを見せて離脱を抑える）
+    draw.rounded_rectangle([PANEL_X0, 246, PANEL_X1, 256], radius=5,
+                           fill=mix(BG_BOTTOM, (60, 74, 110), alpha))
+    fw = int(PANEL_W * max(0.0, min(1.0, progress)))
+    if fw > 10:
+        draw.rounded_rectangle([PANEL_X0, 246, PANEL_X0 + fw, 256], radius=5,
+                               fill=mix(BG_BOTTOM, accent, alpha))
+
+    # 数字が世界順位ではなく「この動画のカウントダウン」だと分かるようにしておく
+    if total_rows:
+        line = (f"全{total_rows}{script['count_noun']}カウントダウン"
+                f"｜{script['countdown_label']}")
+        text(draw, (CX, 286), line, fit_size(line, PANEL_W, 29, 18),
+             fill=mix(BG_BOTTOM, TEXT_DIM, alpha), anchor="mm", stroke=4)
 
 
 def draw_chant(draw, word: str, accent, tl: float):
     """「短い、短い、短い！」を3拍で出す。"""
-    parts = [word, word, word + "！"]
-    seps = ["、", "、", ""]
-    size = 84
+    parts, seps = [word, word, word + "！"], ["、", "、", ""]
+    size = 80
     widths = [font(size).getlength(p + s) for p, s in zip(parts, seps)]
-    total = sum(widths)
-    x = (W - SAFE_RIGHT) / 2 - total / 2
-    y = 380
+    x = CX - sum(widths) / 2
+    y = 376
     for i, (p, s) in enumerate(zip(parts, seps)):
         t0 = i * 0.22
         k = ease_out_back((tl - t0) / 0.30) if tl >= t0 else 0.0
         if k <= 0.01:
             x += widths[i]
             continue
-        k = min(k, 1.15)
-        sz = max(12, int(size * min(1.0, k)))
-        col = accent if i == 2 else TEXT
-        draw.text((x, y), p + s, font=font(sz), fill=col, anchor="lm",
+        draw.text((x, y), p + s, font=font(max(12, int(size * min(1.0, k)))),
+                  fill=accent if i == 2 else TEXT, anchor="lm",
                   stroke_width=8, stroke_fill=STROKE)
         x += widths[i]
 
@@ -241,179 +322,235 @@ def row_geometry(n: int):
     return top, h
 
 
-def draw_row(draw, y, h, name, value_str, note, frac, accent, is_jp, appear, unit_pad):
-    """1行（国名・値・バー）。appear は 0→1 のスライドイン進捗。"""
+def draw_row(draw, y, h, num, name, value_str, note, frac, accent,
+             is_answer, masked, appear, unit_pad, t, pop=0.0):
+    """1行＝カウントダウン番号・名前・値・バー。masked のあいだは「？？？」。"""
     e = ease_out(appear)
     dx = int((1.0 - e) * -140)
     x0, x1 = PANEL_X0 + dx, PANEL_X1 + dx
     fade = e
+    r = 28 if h >= 84 else max(12, h // 3)
 
-    base = mix(BG_BOTTOM, PANEL_BG_JP if is_jp else PANEL_BG, fade)
-    r = min(28, h // 3)
+    base = mix(BG_BOTTOM, PANEL_BG_JP if (is_answer and not masked) else PANEL_BG, fade)
     draw.rounded_rectangle([x0, y, x1, y + h], radius=r, fill=base)
 
-    # 値に比例したバー
-    bw = int((x1 - x0) * max(0.07, min(1.0, frac)) * e)
-    if bw > r * 2:
-        bar_col = mix(base, JAPAN if is_jp else accent, 0.46 if is_jp else 0.34)
-        draw.rounded_rectangle([x0, y, x0 + bw, y + h], radius=r, fill=bar_col)
-    draw.rounded_rectangle([x0, y, x0 + 8, y + h], radius=4,
-                           fill=mix(base, JAPAN if is_jp else accent, fade))
-
-    if is_jp:
+    if masked:
+        # 値が分かると意味がないので、バーは出さずに点滅する枠だけ
+        p = pulse(t, 0.9)
         draw.rounded_rectangle([x0, y, x1, y + h], radius=r,
-                               outline=mix(base, TEXT, fade), width=5)
-
-    name_col = mix(base, TEXT, fade)
-    val_col = mix(base, JAPAN if is_jp else accent, fade)
-
-    name_size = fit_size(name, (x1 - x0) - unit_pad - 68, 60, 26)
-    if note:
-        text(draw, (x0 + 34, y + h * 0.40), name, name_size, fill=name_col, anchor="lm", stroke=6)
-        nsz = fit_size(note, (x1 - x0) - unit_pad - 68, 30, 18)
-        text(draw, (x0 + 36, y + h * 0.72), note, nsz,
-             fill=mix(base, JAPAN if is_jp else accent, fade * 0.95), anchor="lm", stroke=4)
+                               outline=mix(base, accent, (0.45 + 0.55 * p) * fade), width=5)
     else:
-        text(draw, (x0 + 34, y + h * 0.52), name, name_size, fill=name_col, anchor="lm", stroke=6)
+        bw = int((x1 - x0) * max(0.07, min(1.0, frac)) * e)
+        if bw > r * 2:
+            draw.rounded_rectangle(
+                [x0, y, x0 + bw, y + h], radius=r,
+                fill=mix(base, JAPAN if is_answer else accent, 0.46 if is_answer else 0.34))
+        if is_answer:
+            glow = mix(base, TEXT, fade * (1.0 if pop <= 0 else 0.6 + 0.4 * pulse(t, 0.5)))
+            draw.rounded_rectangle([x0, y, x1, y + h], radius=r, outline=glow, width=6)
 
-    vsz = fit_size(value_str, unit_pad - 12, 56, 28)
-    text(draw, (x1 - 34, y + h * 0.52), value_str, vsz, fill=val_col, anchor="rm", stroke=6)
+    # カウントダウン番号
+    nb_w = 96
+    nb = [x0 + 14, y + 12, x0 + 14 + nb_w, y + h - 12]
+    draw.rounded_rectangle(nb, radius=20,
+                           fill=mix(base, accent, 0.22 * fade))
+    text(draw, ((nb[0] + nb[2]) / 2, (nb[1] + nb[3]) / 2), str(num),
+         fit_size(str(num), nb_w - 16, 54, 28),
+         fill=mix(base, accent, fade), anchor="mm", stroke=5)
+
+    name_x = x0 + 14 + nb_w + 26
+    avail = x1 - name_x - unit_pad
+    name_col = mix(base, TEXT, fade)
+    val_col = mix(base, JAPAN if is_answer else accent, fade)
+
+    if masked:
+        text(draw, (name_x, y + h * 0.52), "？？？", fit_size("？？？", avail, 58, 26),
+             fill=mix(base, TEXT, 0.55 * fade), anchor="lm", stroke=6)
+        text(draw, (x1 - 34, y + h * 0.52), "？？？",
+             fit_size("？？？", unit_pad - 12, 52, 26),
+             fill=mix(base, accent, (0.5 + 0.5 * pulse(t, 0.9)) * fade), anchor="rm", stroke=6)
+        return
+
+    nsz = fit_size(name, avail, 58, 24)
+    if note:
+        text(draw, (name_x, y + h * 0.40), name, nsz, fill=name_col, anchor="lm", stroke=6)
+        text(draw, (name_x + 2, y + h * 0.72), note, fit_size(note, avail, 30, 18),
+             fill=mix(base, JAPAN if is_answer else accent, fade * 0.95), anchor="lm", stroke=4)
+    else:
+        text(draw, (name_x, y + h * 0.52), name, nsz, fill=name_col, anchor="lm", stroke=6)
+
+    text(draw, (x1 - 34, y + h * 0.52), value_str,
+         fit_size(value_str, unit_pad - 12, 56, 26), fill=val_col, anchor="rm", stroke=6)
 
 
-# ---------------------------------------------------------------- タイムライン
-
-def build_timeline(script):
-    """[(種別, ゾーンindex, 長さ)] とトータル秒を返す。"""
-    seg = [("hook", -1, T_HOOK)]
-    for i, z in enumerate(script["zones"]):
-        d = T_CHANT + len(z["rows"]) * T_ROW + T_ZONE_HOLD
-        seg.append(("zone", i, d))
-    seg.append(("outro", -1, T_OUTRO))
-    return seg, sum(s[2] for s in seg)
+def zone_unit_pad(script, items):
+    longest = max(font(56).getlength(fmt_value(script["unit"], it["v"])) for it in items)
+    return int(min(longest, PANEL_W * 0.46)) + 52
 
 
-def draw_hook(img, draw, script, accent, tl):
+def draw_zone_rows(draw, script, zone, accent, shown, t,
+                   answer_ri=-1, reveal_pop=-1.0, count_up_from=None):
+    """ゾーン1画面分の行。shown は「何行目まで出ているか（小数で進行中）」。"""
+    items = zone["items"]
+    unit = script["unit"]
+    bmin, bmax = script["bar_min"], script["bar_max"]
+    top, h = row_geometry(len(items))
+    unit_pad = zone_unit_pad(script, items)
+
+    for i, it in enumerate(items):
+        t0 = i * T_ROW
+        if count_up_from is None:
+            local = shown - t0
+        else:
+            local = 99.0
+        if local <= 0:
+            break
+        appear = min(1.0, local / 0.42)
+        cu = min(1.0, local / 0.50)
+        start = max(bmin * 0.9, it["v"] * 0.82)
+        shown_v = start + (it["v"] - start) * ease_out(cu)
+        frac = (it["v"] - bmin) / float(bmax - bmin) if bmax > bmin else 1.0
+        is_answer = (i == answer_ri)
+        masked = is_answer and (reveal_pop < 0.0)
+        draw_row(draw, top + i * (h + ROW_GAP), h, it["num"], it["name"],
+                 fmt_value(unit, shown_v), it["note"] if cu >= 1.0 else "",
+                 frac, accent, is_answer, masked, appear, unit_pad, t,
+                 pop=reveal_pop if is_answer else 0.0)
+
+
+# ---------------------------------------------------------------- セクション
+
+def draw_hook(draw, script, accent, tl):
     k = ease_out(tl / 0.40)
     main = script["hook_main"]
-    ms = fit_size(main, PANEL_W, 104, 46)
-    ms = max(20, int(ms * (0.86 + 0.14 * k)))
-    cx = (W - SAFE_RIGHT) // 2
-    text(draw, (cx, 700), main, ms, fill=mix(BG_TOP, TEXT, k), anchor="mm", stroke=10)
+    ms = max(20, int(fit_size(main, PANEL_W, 104, 46) * (0.86 + 0.14 * k)))
+    text(draw, (CX, 690), main, ms, fill=mix(BG_TOP, TEXT, k), anchor="mm", stroke=10)
 
     k2 = ease_out((tl - 0.32) / 0.40)
     if k2 > 0:
         sub = script["hook_sub"]
-        ss = fit_size(sub, PANEL_W, 58, 30)
-        text(draw, (cx, 840), sub, ss, fill=mix(BG_TOP, TEXT_DIM, k2), anchor="mm", stroke=7)
+        text(draw, (CX, 830), sub, fit_size(sub, PANEL_W, 56, 28),
+             fill=mix(BG_TOP, TEXT_DIM, k2), anchor="mm", stroke=7)
 
-    k3 = ease_out_back((tl - 0.75) / 0.45)
+    k3 = ease_out_back((tl - 0.72) / 0.45) if tl > 0.72 else 0.0
     if k3 > 0:
-        k3 = min(k3, 1.12)
         teaser = script["hook_teaser"]
-        ts = fit_size(teaser, PANEL_W - 120, 72, 34)
+        ts = fit_size(teaser, PANEL_W - 110, 66, 30)
         tw = font(ts).getlength(teaser)
-        pad, hgt = 46, 130
-        bx0 = cx - (tw / 2 + pad) * min(1.0, k3)
-        bx1 = cx + (tw / 2 + pad) * min(1.0, k3)
-        draw.rounded_rectangle([bx0, 1000 - hgt / 2, bx1, 1000 + hgt / 2], radius=28,
-                               fill=mix(BG_TOP, accent, 0.90))
+        f = min(1.0, k3)
+        draw.rounded_rectangle([CX - (tw / 2 + 44) * f, 985, CX + (tw / 2 + 44) * f, 1105],
+                               radius=28, fill=mix(BG_TOP, accent, 0.90))
         if k3 > 0.55:
-            text(draw, (cx, 1000), teaser, ts, fill=(12, 16, 30), anchor="mm", stroke=0)
+            text(draw, (CX, 1045), teaser, ts, fill=(12, 16, 30), anchor="mm", stroke=0)
 
-    draw_footer(draw, script, accent)
+    k4 = ease_out((tl - 1.25) / 0.45) if tl > 1.25 else 0.0
+    if k4 > 0:
+        note = "答えは最後に発表"
+        text(draw, (CX, 1210), note, 44, fill=mix(BG_TOP, TEXT, 0.85 * k4),
+             anchor="mm", stroke=7)
 
 
-def draw_zone(img, draw, script, zi, accent, tl):
-    z = script["zones"][zi]
-    rows = z["rows"]
-    unit = script["unit"]
-    bmin, bmax = script["bar_min"], script["bar_max"]
+def draw_zone(draw, script, seq, zi, accent, tl, total_rows, answer_zi, answer_ri):
+    zone = seq[zi]
+    done_before = sum(len(z["items"]) for z in seq[:zi])
+    shown_rows = max(0.0, min(len(zone["items"]), (tl - T_CHANT) / T_ROW + 1.0))
+    progress = (done_before + shown_rows) / total_rows
 
-    draw_title_bar(draw, script, accent, alpha=min(1.0, tl / 0.3))
-    draw_chant(draw, z["word"], accent, tl)
+    draw_topbar(draw, script, accent, progress, False, "", tl,
+                total_rows=total_rows, alpha=min(1.0, tl / 0.3))
+    draw_chant(draw, zone["word"], accent, tl)
+    draw_zone_rows(draw, script, zone, accent, tl - T_CHANT, tl,
+                   answer_ri=answer_ri if zi == answer_zi else -1)
 
-    # 「1 / 3」のゾーン表示
-    text(draw, (PANEL_X1, 150), f"{zi + 1} / 3", 40, fill=mix(BG_BOTTOM, accent, min(1.0, tl / 0.3)),
-         anchor="rm", stroke=5)
-
-    top, h = row_geometry(len(rows))
-    longest = max(font(56).getlength(fmt_value(unit, v)) for _, v, _ in rows)
-    unit_pad = int(min(longest, PANEL_W * 0.52)) + 52
-
-    for i, (name, v, note) in enumerate(rows):
-        t0 = T_CHANT + i * T_ROW
-        if tl < t0:
-            break
-        appear = min(1.0, (tl - t0) / 0.42)
-        # カウントアップ
-        cu = min(1.0, (tl - t0) / 0.50)
-        start = max(bmin * 0.9, v * 0.82)
-        shown = start + (v - start) * ease_out(cu)
-        vs = fmt_value(unit, shown)
-        frac = (v - bmin) / float(bmax - bmin) if bmax > bmin else 1.0
-        y = top + i * (h + ROW_GAP)
-        draw_row(draw, y, h, name, vs, note if cu >= 1.0 else "",
-                 frac, accent, name == "日本", appear, unit_pad)
-
-    if z["caption"]:
-        t0 = T_CHANT + len(rows) * T_ROW - 0.2
+    if zone["caption"]:
+        t0 = T_CHANT + len(zone["items"]) * T_ROW - 0.2
         k = min(1.0, max(0.0, (tl - t0) / 0.35))
         if k > 0:
-            cap = z["caption"]
-            cs = fit_size(cap, PANEL_W, 38, 22)
-            text(draw, ((W - SAFE_RIGHT) // 2, ROWS_BOTTOM - 8), cap, cs,
+            cap = zone["caption"]
+            text(draw, (CX, ROWS_BOTTOM - 8), cap, fit_size(cap, PANEL_W, 38, 22),
                  fill=mix(BG_BOTTOM, accent, k), anchor="mm", stroke=5)
 
     draw_footer(draw, script, accent)
 
 
-def draw_outro(img, draw, script, accent, tl):
-    cx = (W - SAFE_RIGHT) // 2
+def draw_reveal(draw, script, seq, accent, tl, answer_zi, answer_ri, answer_value,
+                total_rows):
+    """伏せ札をその場でめくる。前半は「答えは…」、0.5秒でひっくり返す。"""
+    zone = seq[answer_zi]
+    opened = tl >= 0.5
+    draw_topbar(draw, script, accent, 1.0, opened, answer_value, tl,
+                total_rows=total_rows)
+
+    if not opened:
+        head = "答えは…"
+        sz = int(80 * (0.9 + 0.1 * pulse(tl, 0.5)))
+        text(draw, (CX, 376), head, sz, fill=mix(TEXT, accent, pulse(tl, 0.6)),
+             anchor="mm", stroke=8)
+    else:
+        line = f"{script['outro_lead']} {script['outro_big']}"
+        k = ease_out_back(min(1.0, (tl - 0.5) / 0.35))
+        sz = max(20, int(fit_size(line, PANEL_W, 74, 32) * min(1.0, k)))
+        text(draw, (CX, 376), line, sz, fill=JAPAN, anchor="mm", stroke=9)
+
+    draw_zone_rows(draw, script, zone, accent, 99.0, tl,
+                   answer_ri=answer_ri,
+                   reveal_pop=(tl - 0.5) if opened else -1.0,
+                   count_up_from=0)
+    draw_footer(draw, script, accent)
+
+
+def draw_outro(draw, script, accent, tl):
     k = ease_out(tl / 0.35)
-    text(draw, (cx, 640), script["outro_lead"], fit_size(script["outro_lead"], PANEL_W, 52, 28),
+    lead = script["outro_lead"]
+    text(draw, (CX, 640), lead, fit_size(lead, PANEL_W, 52, 28),
          fill=mix(BG_TOP, TEXT_DIM, k), anchor="mm", stroke=7)
 
     k2 = ease_out_back(min(1.0, (tl - 0.20) / 0.45)) if tl > 0.20 else 0.0
     if k2 > 0:
         big = script["outro_big"]
-        bs = fit_size(big, PANEL_W, 126, 54)
-        bs = max(20, int(bs * min(1.0, k2)))
-        text(draw, (cx, 770), big, bs, fill=JAPAN, anchor="mm", stroke=11)
+        sz = max(20, int(fit_size(big, PANEL_W, 126, 54) * min(1.0, k2)))
+        text(draw, (CX, 770), big, sz, fill=JAPAN, anchor="mm", stroke=11)
 
     k3 = ease_out(min(1.0, (tl - 0.55) / 0.40)) if tl > 0.55 else 0.0
     if k3 > 0:
         sub = script["outro_sub"]
-        ss = fit_size(sub, PANEL_W, 62, 30)
-        text(draw, (cx, 920), sub, ss, fill=mix(BG_TOP, TEXT, k3), anchor="mm", stroke=8)
+        text(draw, (CX, 920), sub, fit_size(sub, PANEL_W, 62, 30),
+             fill=mix(BG_TOP, TEXT, k3), anchor="mm", stroke=8)
 
     k4 = ease_out(min(1.0, (tl - 0.95) / 0.40)) if tl > 0.95 else 0.0
     if k4 > 0:
         cta = "他の国・他のデータも投稿中"
         cs = fit_size(cta, PANEL_W - 120, 46, 26)
         tw = font(cs).getlength(cta)
-        draw.rounded_rectangle([cx - tw / 2 - 40, 1330, cx + tw / 2 + 40, 1440], radius=26,
-                               fill=mix(BG_TOP, accent, 0.85 * k4))
-        text(draw, (cx, 1385), cta, cs, fill=(12, 16, 30), anchor="mm", stroke=0)
+        draw.rounded_rectangle([CX - tw / 2 - 40, 1330, CX + tw / 2 + 40, 1440],
+                               radius=26, fill=mix(BG_TOP, accent, 0.85 * k4))
+        text(draw, (CX, 1385), cta, cs, fill=(12, 16, 30), anchor="mm", stroke=0)
 
     draw_footer(draw, script, accent)
 
 
 # ---------------------------------------------------------------- フレーム生成
 
-def render_frame(script, segments, t, overlay: bool) -> Image.Image:
+def render_frame(script, ctx, t, overlay: bool) -> Image.Image:
+    seq, total_rows, segments, answer_zi, answer_ri, answer_value = ctx
+
     acc = 0.0
-    kind, zi, dur, tl = "outro", -1, T_OUTRO, 0.0
+    kind, idx, dur, tl = segments[-1][0], segments[-1][1], segments[-1][2], 0.0
     for k, i, d in segments:
-        if t < acc + d or (k, i) == segments[-1][:2]:
-            kind, zi, dur, tl = k, i, d, t - acc
+        if t < acc + d:
+            kind, idx, dur, tl = k, i, d, t - acc
             break
         acc += d
+    else:
+        tl = t - (acc - segments[-1][2])
     tl = max(0.0, min(dur, tl))
 
     if kind == "zone":
-        accent = ACCENTS.get(script["zones"][zi]["word"], ACCENT_DEFAULT)
+        accent = ACCENTS.get(seq[idx]["word"], ACCENT_DEFAULT)
     elif kind == "hook":
-        accent = ACCENTS.get(script["zones"][0]["word"], ACCENT_DEFAULT)
+        accent = ACCENTS.get(seq[0]["word"], ACCENT_DEFAULT)
+    elif kind == "reveal":
+        accent = ACCENTS.get(seq[answer_zi]["word"], ACCENT_DEFAULT)
     else:
         accent = JAPAN
 
@@ -421,23 +558,38 @@ def render_frame(script, segments, t, overlay: bool) -> Image.Image:
     draw = ImageDraw.Draw(img)
 
     if kind == "hook":
-        draw_hook(img, draw, script, accent, tl)
+        draw_hook(draw, script, accent, tl)
     elif kind == "zone":
-        draw_zone(img, draw, script, zi, accent, tl)
+        draw_zone(draw, script, seq, idx, accent, tl, total_rows, answer_zi, answer_ri)
+    elif kind == "reveal":
+        draw_reveal(draw, script, seq, accent, tl, answer_zi, answer_ri, answer_value,
+                    total_rows)
     else:
-        draw_outro(img, draw, script, accent, tl)
+        draw_outro(draw, script, accent, tl)
 
-    # セクション切り替えのフラッシュ
-    if tl < T_FLASH and not (kind == "hook" and zi == -1 and t < 0.001):
-        a = (1.0 - tl / T_FLASH) ** 2 * 0.42
-        if a > 0.002:
-            if overlay:
-                flash = Image.new("RGBA", (W, H), tuple(accent) + (int(a * 210),))
-                img = Image.alpha_composite(img, flash)
-            else:
-                img = Image.blend(img, Image.new("RGB", (W, H), tuple(accent)), a)
-
+    # セクション切り替えのフラッシュ＋答え合わせの一発
+    flash = 0.0
+    if tl < T_FLASH and t > 0.001:
+        flash = (1.0 - tl / T_FLASH) ** 2 * 0.42
+    if kind == "reveal" and 0.5 <= tl < 0.5 + T_FLASH:
+        flash = max(flash, (1.0 - (tl - 0.5) / T_FLASH) ** 2 * 0.55)
+    if flash > 0.002:
+        if overlay:
+            img = Image.alpha_composite(
+                img, Image.new("RGBA", (W, H), tuple(accent) + (int(flash * 210),)))
+        else:
+            img = Image.blend(img, Image.new("RGB", (W, H), tuple(accent)), flash)
     return img
+
+
+def build_context(script):
+    seq, total_rows = build_sequence(script)
+    segments, _ = build_timeline(script)
+    azi, ari = answer_position(script, seq)
+    answer_value = fmt_value(script["unit"], seq[azi]["items"][ari]["v"])
+    if script["answer_name"] != "日本":
+        answer_value = f"{script['answer_name']} {answer_value}"
+    return seq, total_rows, segments, azi, ari, answer_value
 
 
 # ---------------------------------------------------------------- 書き出し
@@ -451,7 +603,8 @@ def ffmpeg_exe() -> str:
 
 
 def render(script, out_dir: str, fps: int, overlay: bool) -> str:
-    segments, total = build_timeline(script)
+    ctx = build_context(script)
+    _, total = build_timeline(script)
     n_frames = int(round(total * fps))
     os.makedirs(out_dir, exist_ok=True)
 
@@ -478,14 +631,12 @@ def render(script, out_dir: str, fps: int, overlay: bool) -> str:
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
     try:
         for f in range(n_frames):
-            t = f / fps
-            img = render_frame(script, segments, t, overlay)
+            img = render_frame(script, ctx, f / fps, overlay)
             if img.mode != mode:
                 img = img.convert(mode)
             proc.stdin.write(img.tobytes())
-            if f % 60 == 0:
-                pct = 100.0 * f / n_frames
-                print(f"  {script['id']}: {pct:5.1f}%  ({f}/{n_frames})", flush=True)
+            if f % 120 == 0:
+                print(f"  {script['id']}: {100.0 * f / n_frames:5.1f}%", flush=True)
     finally:
         proc.stdin.close()
         rc = proc.wait()
@@ -501,7 +652,7 @@ def main():
     ap.add_argument("--out", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "out"))
     ap.add_argument("--fps", type=int, default=FPS)
     ap.add_argument("--overlay", action="store_true",
-                    help="背景透過のオーバーレイ（WebM/VP9・実写に重ねる用）を書き出す")
+                    help="背景透過のオーバーレイ（MOV / QuickTime Animation）を書き出す")
     args = ap.parse_args()
 
     targets = [s for s in SCRIPTS if not args.ids or s["id"] in args.ids]
