@@ -9,3 +9,5 @@ coverage/
 functions/lib/
 firebase-debug.log
 .firebase/
+__pycache__/
+*.pyc
