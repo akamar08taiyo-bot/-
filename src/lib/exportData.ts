@@ -1,5 +1,5 @@
 // 設定画面の「データをエクスポート（JSON/CSV）」用ユーティリティ（10-6）。
-// 匿名認証のuid喪失リスクへの当面の対策として、手動バックアップを可能にする。
+// データは端末のlocalStorageにのみ保存されるため、消去・機種変更に備えた手動バックアップを可能にする。
 
 function download(filename: string, content: string, mime: string) {
   const blob = new Blob([content], {type: mime});

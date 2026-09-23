@@ -1,5 +1,5 @@
-// Firestore data model — mirrors handoff doc section 5 (users/{uid}/...).
-// Unconfirmed/unmeasured numeric fields are `null`, never fabricated.
+// Local data model — persisted to this browser's localStorage (see lib/localDb.ts).
+// Structure mirrors handoff doc section 5. Unconfirmed/unmeasured numeric fields are `null`, never fabricated.
 
 // snacks_log は別コレクションのため、ここでは主食事の3区分のみを扱う。
 export type MealType = '朝' | '昼' | '夕';
@@ -73,7 +73,7 @@ export interface Meal extends MealItem {
   id: string;
   datetime: string; // ISO
   meal_type: MealType;
-  source: 'ai' | 'manual' | 'preset';
+  source: 'manual' | 'preset';
   notes: string;
 }
 

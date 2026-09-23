@@ -1,7 +1,8 @@
 import {useEffect, useState} from 'react';
-import {doc, onSnapshot, setDoc} from 'firebase/firestore';
-import {db} from './firebase';
+import {getDocValue, setDocValue, subscribe} from './localDb';
 import type {Profile} from '../types';
+
+const PATH = 'profile';
 
 const EMPTY_PROFILE: Profile = {
   height: null,
@@ -10,25 +11,17 @@ const EMPTY_PROFILE: Profile = {
   notes: '',
 };
 
-export function useProfile(uid: string | null) {
-  const [profile, setProfile] = useState<Profile>(EMPTY_PROFILE);
-  const [loading, setLoading] = useState(true);
+export function useProfile() {
+  const [profile, setProfile] = useState<Profile>(() => getDocValue(PATH, EMPTY_PROFILE));
 
   useEffect(() => {
-    if (!uid) return;
-    const ref = doc(db, 'users', uid, 'profile', 'main');
-    const unsubscribe = onSnapshot(ref, (snap) => {
-      setProfile(snap.exists() ? {...EMPTY_PROFILE, ...snap.data() as Profile} : EMPTY_PROFILE);
-      setLoading(false);
-    });
-    return unsubscribe;
-  }, [uid]);
+    setProfile(getDocValue(PATH, EMPTY_PROFILE));
+    return subscribe(PATH, () => setProfile(getDocValue(PATH, EMPTY_PROFILE)));
+  }, []);
 
-  async function updateProfile(patch: Partial<Profile>) {
-    if (!uid) return;
-    const ref = doc(db, 'users', uid, 'profile', 'main');
-    await setDoc(ref, {...profile, ...patch}, {merge: true});
+  function updateProfile(patch: Partial<Profile>) {
+    setDocValue(PATH, {...getDocValue(PATH, EMPTY_PROFILE), ...patch});
   }
 
-  return {profile, loading, updateProfile};
+  return {profile, loading: false, updateProfile};
 }

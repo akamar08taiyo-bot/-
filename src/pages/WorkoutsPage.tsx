@@ -1,6 +1,5 @@
 import {useState} from 'react';
-import {addDoc, collection, deleteDoc, doc} from 'firebase/firestore';
-import {db} from '../lib/firebase';
+import {addItem, removeItem} from '../lib/localDb';
 import {useCollection} from '../lib/useCollection';
 import {todayStr} from '../lib/date';
 import {Button, Card, NumberField, SectionTitle, TextField} from '../components/ui';
@@ -16,18 +15,18 @@ const EMPTY: Omit<Workout, 'id' | 'date'> = {
   duration: null,
 };
 
-export function WorkoutsPage({uid}: {uid: string}) {
-  const {data: workouts} = useCollection<Workout>(uid, 'workouts');
+export function WorkoutsPage() {
+  const {data: workouts} = useCollection<Workout>('workouts');
   const [draft, setDraft] = useState(EMPTY);
 
   const today = todayStr();
   const todayWorkouts = workouts.filter((w) => w.date === today);
   const lastWorkout = [...workouts].sort((a, b) => (a.date < b.date ? 1 : -1))[0];
 
-  async function save() {
+  function save() {
     if (!draft.exercise.trim()) return;
     const workout: Omit<Workout, 'id'> = {...draft, date: today};
-    await addDoc(collection(db, 'users', uid, 'workouts'), workout);
+    addItem('workouts', workout);
     setDraft(EMPTY);
   }
 
@@ -37,8 +36,8 @@ export function WorkoutsPage({uid}: {uid: string}) {
     setDraft({exercise, weight, reps, sets, rpe, body_part, duration});
   }
 
-  async function remove(id: string) {
-    await deleteDoc(doc(db, 'users', uid, 'workouts', id));
+  function remove(id: string) {
+    removeItem('workouts', id);
   }
 
   return (

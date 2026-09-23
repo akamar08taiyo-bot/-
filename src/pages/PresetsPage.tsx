@@ -1,20 +1,19 @@
 import {useState} from 'react';
-import {addDoc, collection, deleteDoc, doc} from 'firebase/firestore';
-import {db} from '../lib/firebase';
+import {addItem, removeItem} from '../lib/localDb';
 import {useCollection} from '../lib/useCollection';
 import {Button, Card, SectionTitle, TextField} from '../components/ui';
 import type {Meal, MealPreset, MealType} from '../types';
 
 const MEAL_TYPES: MealType[] = ['朝', '昼', '夕'];
 
-export function PresetsPage({uid}: {uid: string}) {
-  const {data: presets} = useCollection<MealPreset>(uid, 'meal_presets');
+export function PresetsPage() {
+  const {data: presets} = useCollection<MealPreset>('meal_presets');
   const [name, setName] = useState('');
   const [itemsText, setItemsText] = useState('');
   const [mealType, setMealType] = useState<MealType>('朝');
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
-  async function createPreset() {
+  function createPreset() {
     if (!name.trim() || !itemsText.trim()) return;
     const items = itemsText
       .split(/[、,\n]/)
@@ -34,12 +33,12 @@ export function PresetsPage({uid}: {uid: string}) {
         sodium: null,
       }));
     const preset: Omit<MealPreset, 'id'> = {name, meal_type: mealType, items};
-    await addDoc(collection(db, 'users', uid, 'meal_presets'), preset);
+    addItem('meal_presets', preset);
     setName('');
     setItemsText('');
   }
 
-  async function usePreset(preset: MealPreset) {
+  function usePreset(preset: MealPreset) {
     const now = new Date().toISOString();
     for (const item of preset.items) {
       const meal: Omit<Meal, 'id'> = {
@@ -49,14 +48,14 @@ export function PresetsPage({uid}: {uid: string}) {
         source: 'preset',
         notes: '',
       };
-      await addDoc(collection(db, 'users', uid, 'meals'), meal);
+      addItem('meals', meal);
     }
     setSavedMsg(`「${preset.name}」を本日の食事記録に追加しました`);
     setTimeout(() => setSavedMsg(null), 3000);
   }
 
-  async function removePreset(id: string) {
-    await deleteDoc(doc(db, 'users', uid, 'meal_presets', id));
+  function removePreset(id: string) {
+    removeItem('meal_presets', id);
   }
 
   return (

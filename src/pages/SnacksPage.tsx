@@ -1,14 +1,13 @@
 import {useState} from 'react';
-import {addDoc, collection, doc, setDoc} from 'firebase/firestore';
-import {db} from '../lib/firebase';
+import {addItem, setItemWithId} from '../lib/localDb';
 import {useCollection} from '../lib/useCollection';
 import {todayStr} from '../lib/date';
 import {Button, Card, NumberField, SectionTitle, TextField} from '../components/ui';
 import type {AlcoholLog, SnackLog} from '../types';
 
-export function SnacksPage({uid}: {uid: string}) {
-  const {data: snacks} = useCollection<SnackLog>(uid, 'snacks_log');
-  const {data: alcoholLogs} = useCollection<AlcoholLog>(uid, 'alcohol_log');
+export function SnacksPage() {
+  const {data: snacks} = useCollection<SnackLog>('snacks_log');
+  const {data: alcoholLogs} = useCollection<AlcoholLog>('alcohol_log');
 
   const [itemName, setItemName] = useState('');
   const [amount, setAmount] = useState('');
@@ -20,7 +19,7 @@ export function SnacksPage({uid}: {uid: string}) {
     .filter((s) => s.datetime.startsWith(today))
     .sort((a, b) => (a.datetime < b.datetime ? 1 : -1));
 
-  async function addSnack() {
+  function addSnack() {
     if (!itemName.trim()) return;
     const snack: Omit<SnackLog, 'id'> = {
       datetime: new Date().toISOString(),
@@ -30,18 +29,21 @@ export function SnacksPage({uid}: {uid: string}) {
       estimated_sat_fat: null,
       notes: '',
     };
-    await addDoc(collection(db, 'users', uid, 'snacks_log'), snack);
+    addItem('snacks_log', snack);
     setItemName('');
     setAmount('');
     setSugar(null);
   }
 
-  async function setAlcohol(drank: boolean) {
-    await setDoc(
-      doc(db, 'users', uid, 'alcohol_log', today),
-      {date: today, drank, beer_amount: null, non_alcohol_items: null, notes: ''},
-      {merge: true},
-    );
+  function setAlcohol(drank: boolean) {
+    setItemWithId<AlcoholLog>('alcohol_log', today, {
+      id: today,
+      date: today,
+      drank,
+      beer_amount: null,
+      non_alcohol_items: null,
+      notes: '',
+    });
   }
 
   return (
