@@ -190,7 +190,7 @@ export function SegmentedControl<T extends string>({
           role="radio"
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
-          className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+          className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
             value === o.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
           }`}
         >

@@ -17,6 +17,20 @@ import {
 } from '../src/slot/analyze';
 import {generateDemo} from '../src/slot/demo';
 import {detectMeta, parseInput, parseNumber, toCsv} from '../src/slot/parse';
+import {
+  dayPostLong,
+  dayPostX,
+  DISCLAIMER,
+  evaluatePrediction,
+  makePrediction,
+  monthlyArticle,
+  PAYWALL_MARK,
+  predictionPostX,
+  resultPostX,
+  trackRecord,
+  X_LIMIT,
+  xLength,
+} from '../src/slot/publish';
 import {wilsonLower} from '../src/slot/stats';
 import type {SlotRow} from '../src/slot/types';
 
@@ -262,6 +276,80 @@ check('バックテストは未来のデータを使わない', () => {
   const a = backtest(demo, 'model').days.at(-1)!.picks.map((p) => p.unit);
   const b = backtest(tampered, 'model').days.at(-1)!.picks.map((p) => p.unit);
   assert.deepEqual(a, b);
+});
+
+console.log('■ 発信・販売用の出力');
+
+const postOpts = {store: 'デモ店舗（架空）', source: 'みんレポ', hashtags: ['スロット', 'データ']};
+
+check('Xの文字数の数え方（全角2・半角1・URL23）', () => {
+  assert.equal(xLength('abc'), 3);
+  assert.equal(xLength('あいう'), 6);
+  assert.equal(xLength('見て https://example.com/very/long/path'), 4 + 1 + 23);
+});
+
+check('X用の日別まとめは全日280以内で、店トータルを必ず含む', () => {
+  for (const d of period.dates) {
+    const t = dayPostX(demo, d, postOpts);
+    assert.ok(xLength(t) <= X_LIMIT, `${d}: ${xLength(t)}`);
+    const total = demo.filter((r) => r.date === d).reduce((s, r) => s + r.diff, 0);
+    assert.ok(t.includes('店トータル'));
+    assert.ok(t.includes(Math.abs(total).toLocaleString('ja-JP')));
+    assert.ok(t.includes('#スロット'));
+  }
+});
+
+check('機種名がとても長くてもXの上限を超えない', () => {
+  const long = demo.filter((r) => r.date === '2026-09-22').map((r) => ({...r, machine: `パチスロとても長い機種名シリーズ${r.machine}～超特別仕様バージョン`}));
+  assert.ok(xLength(dayPostX(long, '2026-09-22', postOpts)) <= X_LIMIT);
+});
+
+check('長文・月間記事には出典と免責が入り、全台一覧は載せない', () => {
+  const long = dayPostLong(demo, '2026-09-22', postOpts);
+  assert.ok(long.includes('データ出典：みんレポ') && long.includes(DISCLAIMER));
+  // 台番ごとの行（全台一覧）は出さない
+  assert.ok(!/\| 1 \| デモ機A \| .* \| .* \|\n\| 2 \|/.test(long));
+  const art = monthlyArticle(demo, '2026-09', postOpts);
+  assert.ok(art.includes(PAYWALL_MARK));
+  assert.ok(art.indexOf('今月のまとめ') < art.indexOf(PAYWALL_MARK));
+  assert.ok(art.indexOf('## 機種ランキング') > art.indexOf(PAYWALL_MARK), 'ランキングは有料部分');
+  assert.ok(art.includes(DISCLAIMER));
+  const monthTotal = demo.reduce((s, r) => s + r.diff, 0);
+  assert.ok(art.includes(Math.abs(monthTotal).toLocaleString('ja-JP')));
+});
+
+check('予想の答え合わせ：結果待ち・的中数・機種入替', () => {
+  const train = demo.filter((r) => r.date < '2026-09-26');
+  const today = demo.filter((r) => r.date === '2026-09-26');
+  const rec = recommend(train, today, {filter: {kind: 'dateTail', value: 6}});
+  const p = makePrediction(postOpts.store, '2026-09-26', rec.basis, rec.picks, 5);
+  assert.equal(p.picks.length, 5);
+  // 対象日のデータがなければ結果待ち
+  assert.equal(evaluatePrediction(p, train).result, null);
+  const r = evaluatePrediction(p, demo)!.result!;
+  const actual = p.picks.map((pk) => today.find((x) => x.unit === pk.unit)!.diff);
+  assert.equal(r.hits, actual.filter((x) => x > 0).length);
+  assert.equal(r.pickAvgDiff, actual.reduce((a, b) => a + b, 0) / 5);
+  // 1台が機種入替になった場合は評価から外す
+  const swapped = demo.map((x) => (x.date === '2026-09-26' && x.unit === p.picks[0].unit ? {...x, machine: '新台'} : x));
+  const r2 = evaluatePrediction(p, swapped).result!;
+  assert.equal(r2.evaluated, 4);
+  assert.equal(r2.picks[0].diff, null);
+});
+
+check('通算実績は台数で重み付けして集計', () => {
+  const mk = (date: string) => makePrediction(postOpts.store, date, '全日', recommend(demo.filter((r) => r.date < date), demo.filter((r) => r.date === date), {filter: {kind: 'all'}}).picks, 3);
+  const res = ['2026-09-10', '2026-09-20', '2026-10-01'].map((d) => evaluatePrediction(mk(d), demo));
+  const t = trackRecord(res);
+  assert.equal(t.days, 2); // 10/1はデータがないので結果待ち
+  assert.equal(t.picks, 6);
+  const all = res.slice(0, 2).flatMap((x) => x.result!.picks.map((p) => p.diff!));
+  assert.equal(t.hits, all.filter((x) => x > 0).length);
+  assert.ok(Math.abs(t.pickAvgDiff - all.reduce((a, b) => a + b, 0) / 6) < 1e-9);
+  const post = resultPostX(res[0], postOpts, t)!;
+  assert.ok(xLength(post) <= X_LIMIT && post.includes('答え合わせ'));
+  assert.ok(xLength(predictionPostX(res[2].prediction, postOpts, t)) <= X_LIMIT);
+  assert.equal(resultPostX(res[2], postOpts, t), null);
 });
 
 console.log(`\n${passed} 件すべて合格`);

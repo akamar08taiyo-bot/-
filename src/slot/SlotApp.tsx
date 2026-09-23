@@ -19,12 +19,15 @@ import type {DayFilter, GroupSummary, HotRule, PeriodReport, Pick, Strategy} fro
 import {generateDemo} from './demo';
 import {diffClass, int, pct, shortDate, signed} from './format';
 import {parseInput, toCsv} from './parse';
-import {loadRows, mergeRows, saveRows} from './storage';
+import {makePrediction} from './publish';
+import type {Prediction} from './publish';
+import {PublishView} from './PublishView';
+import {loadPredictions, loadRows, mergeRows, savePredictions, saveRows, upsertPrediction} from './storage';
 import {DataTable} from './Table';
 import type {Column} from './Table';
 import type {SlotRow} from './types';
 
-type Tab = 'import' | 'day' | 'period' | 'pick' | 'verify';
+type Tab = 'import' | 'day' | 'period' | 'pick' | 'verify' | 'publish';
 
 const TABS: {value: Tab; label: string}[] = [
   {value: 'import', label: '取り込み'},
@@ -32,6 +35,7 @@ const TABS: {value: Tab; label: string}[] = [
   {value: 'period', label: '期間・月間'},
   {value: 'pick', label: '狙い目'},
   {value: 'verify', label: '検証'},
+  {value: 'publish', label: '発信'},
 ];
 
 export function SlotApp() {
@@ -40,7 +44,11 @@ export function SlotApp() {
   const [store, setStore] = useState<string>('');
   const [hotRule, setHotRule] = useState<HotRule>(DEFAULT_HOT_RULE);
 
+  const [predictions, setPredictions] = useState<Prediction[]>(() => loadPredictions());
+
   useEffect(() => saveRows(rows), [rows]);
+  useEffect(() => savePredictions(predictions), [predictions]);
+  const recordPrediction = (p: Prediction) => setPredictions((list) => upsertPrediction(list, p));
 
   const stores = useMemo(() => [...new Set(rows.map((r) => r.store))].sort(), [rows]);
   const activeStore = stores.includes(store) ? store : (stores[0] ?? '');
@@ -56,7 +64,9 @@ export function SlotApp() {
             みんレポ等の差枚データを貼り付けるだけで、店トータル・機種別・末尾別・狙い目・検証までを一括で出す。
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <SegmentedControl<Tab> options={TABS} value={tab} onChange={setTab} ariaLabel="表示する分析" />
+            <div className="-mx-4 max-w-[100vw] overflow-x-auto px-4 sm:mx-0 sm:px-0">
+              <SegmentedControl<Tab> options={TABS} value={tab} onChange={setTab} ariaLabel="表示する分析" />
+            </div>
             {stores.length > 0 && (
               <label className="flex items-center gap-2 text-sm text-slate-600">
                 店舗
@@ -90,8 +100,19 @@ export function SlotApp() {
         {tab === 'period' && storeRows.length > 0 && (
           <PeriodView rows={storeRows} dates={dates} hotRule={hotRule} setHotRule={setHotRule} />
         )}
-        {tab === 'pick' && storeRows.length > 0 && <PickView rows={storeRows} dates={dates} />}
+        {tab === 'pick' && storeRows.length > 0 && (
+          <PickView rows={storeRows} dates={dates} store={activeStore} predictions={predictions} onRecord={recordPrediction} />
+        )}
         {tab === 'verify' && storeRows.length > 0 && <VerifyView rows={storeRows} dates={dates} />}
+        {tab === 'publish' && storeRows.length > 0 && (
+          <PublishView
+            rows={storeRows}
+            dates={dates}
+            store={activeStore}
+            predictions={predictions.filter((p) => p.store === activeStore)}
+            onDelete={(id) => setPredictions((list) => list.filter((p) => p.id !== id))}
+          />
+        )}
       </main>
     </div>
   );
@@ -596,7 +617,19 @@ function PeriodView({
 
 // ================================================================ 狙い目
 
-function PickView({rows, dates}: {rows: SlotRow[]; dates: string[]}) {
+function PickView({
+  rows,
+  dates,
+  store,
+  predictions,
+  onRecord,
+}: {
+  rows: SlotRow[];
+  dates: string[];
+  store: string;
+  predictions: Prediction[];
+  onRecord: (p: Prediction) => void;
+}) {
   const last = dates[dates.length - 1];
   // 既定では「最終日の翌日」を予測する
   const nextDay = useMemo(() => {
@@ -673,6 +706,20 @@ function PickView({rows, dates}: {rows: SlotRow[]; dates: string[]}) {
             <span className="text-rose-700">　※{describeFilter(filter)}の過去データが2日未満のため全日で推定</span>
           )}
         </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => onRecord(makePrediction(store, target, rec.basis, rec.picks, 5))}
+            className="rounded-lg bg-sky-700 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-800"
+          >
+            上位5台を{shortDate(target)}の予想として記録
+          </button>
+          <span className="text-xs text-slate-500">
+            {predictions.some((p) => p.id === `${store}|${target}`)
+              ? '記録済み（押すと上書き）。対象日のデータを取り込むと「発信」タブで自動で答え合わせされる。'
+              : '記録した予想は、対象日のデータを取り込むと「発信」タブで自動で答え合わせされる。'}
+          </span>
+        </div>
       </Card>
 
       <Card>
