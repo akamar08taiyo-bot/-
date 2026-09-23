@@ -10,6 +10,16 @@ export default defineConfig({
       '@': path.resolve(__dirname, '.'),
     },
   },
+  build: {
+    rollupOptions: {
+      input: {
+        // 健康管理アプリ（既存）
+        main: path.resolve(__dirname, 'index.html'),
+        // 住宅ローン 金利シナリオ・シミュレーター
+        mortgage: path.resolve(__dirname, 'mortgage.html'),
+      },
+    },
+  },
   server: {
     hmr: process.env.DISABLE_HMR !== 'true',
   },
