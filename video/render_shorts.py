@@ -155,17 +155,24 @@ def fit_size(s: str, max_w: int, size: int, min_size: int = 24) -> int:
 def build_sequence(script):
     """ゾーンと行をカウントダウン順に並べ替え、各行に残り番号を振る。
 
-    countdown_reverse=True の台本はゾーン順・行順を反転させ、
-    「1」が来る位置＝一番言いたい極端値になるようにする。
+    - zone_order で、答え（日本／台本⑤は全国最長の県）が入るゾーンを必ず最後に回す
+    - そのうえで答えの行をゾーンの末尾へ移す
+    この2つで、どの台本でもカウントダウンの「1」が日本に重なる。
+    countdown_reverse=True の台本はゾーン内の行順も反転させる。
     """
     zones = script["zones"]
+    order = script.get("zone_order") or list(range(len(zones)))
     rev = script.get("countdown_reverse", False)
-    ordered = list(reversed(zones)) if rev else list(zones)
+    answer = script["answer_name"]
     total = sum(len(z["rows"]) for z in zones)
 
     seq, k = [], 0
-    for z in ordered:
+    for zi in order:
+        z = zones[zi]
         rows = list(reversed(z["rows"])) if rev else list(z["rows"])
+        tail = [r for r in rows if r[0] == answer]
+        if tail:
+            rows = [r for r in rows if r[0] != answer] + tail
         items = []
         for name, v, note in rows:
             k += 1
@@ -529,6 +536,50 @@ def draw_outro(draw, script, accent, tl):
     draw_footer(draw, script, accent)
 
 
+def draw_cover(draw, script, accent, total_rows):
+    """フィードに出るサムネイル。中身は見せず「？？？」で引っかける。"""
+    title = script["title"]
+    text(draw, (CX, 300), title, fit_size(title, PANEL_W, 52, 26),
+         fill=TEXT_DIM, anchor="mm", stroke=6)
+    draw.line([(CX - 130, 356), (CX + 130, 356)], fill=accent, width=6)
+
+    main = script["hook_main"]
+    text(draw, (CX, 560), main, fit_size(main, PANEL_W, 118, 48),
+         fill=TEXT, anchor="mm", stroke=12)
+
+    q = "？？？"
+    qs = fit_size(q, PANEL_W - 120, 210, 80)
+    qw = font(qs).getlength(q)
+    draw.rounded_rectangle([CX - qw / 2 - 60, 760, CX + qw / 2 + 60, 1030],
+                           radius=44, fill=mix(BG_BOTTOM, accent, 0.22),
+                           outline=accent, width=8)
+    text(draw, (CX, 900), q, qs, fill=accent, anchor="mm", stroke=10)
+
+    line = f"全{total_rows}{script['count_noun']}カウントダウン"
+    text(draw, (CX, 1160), line, fit_size(line, PANEL_W, 52, 26),
+         fill=TEXT, anchor="mm", stroke=8)
+    tail = script["countdown_label"]
+    ts = fit_size(tail, PANEL_W - 110, 54, 26)
+    tw = font(ts).getlength(tail)
+    draw.rounded_rectangle([CX - tw / 2 - 42, 1250, CX + tw / 2 + 42, 1360],
+                           radius=26, fill=accent)
+    text(draw, (CX, 1305), tail, ts, fill=(12, 16, 30), anchor="mm", stroke=0)
+
+    draw_footer(draw, script, accent)
+
+
+def render_cover(script, out_dir: str) -> str:
+    seq, total_rows = build_sequence(script)
+    accent = ACCENTS.get(seq[0]["word"], ACCENT_DEFAULT)
+    img = background(accent, False).copy()
+    draw_cover(ImageDraw.Draw(img), script, accent, total_rows)
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, f"{script['id']}_cover.png")
+    img.save(path)
+    print(f"  {script['id']}: サムネイル -> {path}", flush=True)
+    return path
+
+
 # ---------------------------------------------------------------- フレーム生成
 
 def render_frame(script, ctx, t, overlay: bool) -> Image.Image:
@@ -586,6 +637,10 @@ def build_context(script):
     seq, total_rows = build_sequence(script)
     segments, _ = build_timeline(script)
     azi, ari = answer_position(script, seq)
+    # カウントダウンの「1」は必ず答え（日本）に重なっている前提で作っている
+    assert seq[azi]["items"][ari]["num"] == 1, (
+        f"{script['id']}: 答えがカウント1に来ていない "
+        f"（num={seq[azi]['items'][ari]['num']}）")
     answer_value = fmt_value(script["unit"], seq[azi]["items"][ari]["v"])
     if script["answer_name"] != "日本":
         answer_value = f"{script['answer_name']} {answer_value}"
@@ -653,6 +708,8 @@ def main():
     ap.add_argument("--fps", type=int, default=FPS)
     ap.add_argument("--overlay", action="store_true",
                     help="背景透過のオーバーレイ（MOV / QuickTime Animation）を書き出す")
+    ap.add_argument("--cover", action="store_true",
+                    help="サムネイル用のPNGだけ書き出す（動画は作らない）")
     args = ap.parse_args()
 
     targets = [s for s in SCRIPTS if not args.ids or s["id"] in args.ids]
@@ -660,6 +717,9 @@ def main():
         sys.exit(f"該当する台本IDがありません: {args.ids}")
 
     for s in targets:
+        if args.cover:
+            render_cover(s, args.out)
+            continue
         _, total = build_timeline(s)
         print(f"[{s['id']}] {s['title']}  想定尺 {total:.1f}秒", flush=True)
         render(s, args.out, args.fps, args.overlay)

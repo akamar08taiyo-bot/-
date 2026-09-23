@@ -20,9 +20,10 @@ SCRIPTS = [
     {
         "id": "01_sleep",
         # カウントダウン演出：日本（＝答え）は最後まで「？？？」で伏せる
+        "zone_order": [2, 1, 0],
         "countdown_reverse": True,
         "count_noun": "か国",
-        "countdown_label": "一番短いのはどこ？",
+        "countdown_label": "1に出てくるのが日本",
         "answer_name": "日本",
         "teaser_label": "日本は",
         "slug": "睡眠時間",
@@ -77,9 +78,10 @@ SCRIPTS = [
     {
         "id": "02_income",
         # カウントダウン演出：日本（＝答え）は最後まで「？？？」で伏せる
+        "zone_order": [0, 2, 1],
         "countdown_reverse": False,
         "count_noun": "か国",
-        "countdown_label": "一番高いのはどこ？",
+        "countdown_label": "1に出てくるのが日本",
         "answer_name": "日本",
         "teaser_label": "日本は",
         "slug": "年収",
@@ -134,9 +136,10 @@ SCRIPTS = [
     {
         "id": "03_worktime",
         # カウントダウン演出：日本（＝答え）は最後まで「？？？」で伏せる
+        "zone_order": [0, 2, 1],
         "countdown_reverse": False,
         "count_noun": "か国",
-        "countdown_label": "一番短いのはどこ？",
+        "countdown_label": "1に出てくるのが日本",
         "answer_name": "日本",
         "teaser_label": "日本は",
         "slug": "労働時間",
@@ -191,9 +194,10 @@ SCRIPTS = [
     {
         "id": "04_commute_world",
         # カウントダウン演出：日本（＝答え）は最後まで「？？？」で伏せる
+        "zone_order": [0, 2, 1],
         "countdown_reverse": False,
         "count_noun": "か国",
-        "countdown_label": "一番長いのはどこ？",
+        "countdown_label": "1に出てくるのが日本",
         "answer_name": "日本",
         "teaser_label": "日本は",
         "slug": "通勤時間（国際比較）",
@@ -242,9 +246,10 @@ SCRIPTS = [
     {
         "id": "05_commute_japan",
         # カウントダウン演出：日本（＝答え）は最後まで「？？？」で伏せる
+        "zone_order": [0, 1, 2],
         "countdown_reverse": False,
         "count_noun": "都道府県",
-        "countdown_label": "全国で一番長いのは？",
+        "countdown_label": "1に出てくるのが全国最長",
         "answer_name": "神奈川県",
         "teaser_label": "全国最長は",
         "slug": "通勤時間（47都道府県）",
@@ -297,9 +302,10 @@ SCRIPTS = [
     {
         "id": "06_bigmac",
         # カウントダウン演出：日本（＝答え）は最後まで「？？？」で伏せる
+        "zone_order": [2, 1, 0],
         "countdown_reverse": False,
         "count_noun": "か国",
-        "countdown_label": "一番高いのはどこ？",
+        "countdown_label": "1に出てくるのが日本",
         "answer_name": "日本",
         "teaser_label": "日本は",
         "slug": "ビッグマック指数",
