@@ -17,6 +17,8 @@ export default defineConfig({
         main: path.resolve(__dirname, 'index.html'),
         // 住宅ローン 金利シナリオ・シミュレーター
         mortgage: path.resolve(__dirname, 'mortgage.html'),
+        // スロット差枚アナライザー
+        slot: path.resolve(__dirname, 'slot.html'),
       },
     },
   },
