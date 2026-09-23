@@ -15,26 +15,26 @@ import type {
   Workout,
 } from '../types';
 
-export function SettingsPage({uid}: {uid: string}) {
-  const {profile, updateProfile} = useProfile(uid);
+export function SettingsPage() {
+  const {profile, updateProfile} = useProfile();
   const [height, setHeight] = useState<number | null>(profile.height);
   const [targetWeight, setTargetWeight] = useState<number | null>(profile.goals.target_weight);
   const [targetBodyFat, setTargetBodyFat] = useState<number | null>(profile.goals.target_body_fat);
   const [notes, setNotes] = useState(profile.notes);
   const [savedMsg, setSavedMsg] = useState(false);
 
-  const {data: healthChecks} = useCollection<HealthCheck>(uid, 'health_checks');
-  const {data: bodyLogs} = useCollection<BodyLog>(uid, 'body_logs');
-  const {data: meals} = useCollection<Meal>(uid, 'meals');
-  const {data: presets} = useCollection<MealPreset>(uid, 'meal_presets');
-  const {data: snacks} = useCollection<SnackLog>(uid, 'snacks_log');
-  const {data: alcoholLogs} = useCollection<AlcoholLog>(uid, 'alcohol_log');
-  const {data: supplements} = useCollection<Supplement>(uid, 'supplements');
-  const {data: supplementLogs} = useCollection<SupplementLog>(uid, 'supplement_logs');
-  const {data: workouts} = useCollection<Workout>(uid, 'workouts');
+  const {data: healthChecks} = useCollection<HealthCheck>('health_checks');
+  const {data: bodyLogs} = useCollection<BodyLog>('body_logs');
+  const {data: meals} = useCollection<Meal>('meals');
+  const {data: presets} = useCollection<MealPreset>('meal_presets');
+  const {data: snacks} = useCollection<SnackLog>('snacks_log');
+  const {data: alcoholLogs} = useCollection<AlcoholLog>('alcohol_log');
+  const {data: supplements} = useCollection<Supplement>('supplements');
+  const {data: supplementLogs} = useCollection<SupplementLog>('supplement_logs');
+  const {data: workouts} = useCollection<Workout>('workouts');
 
-  async function save() {
-    await updateProfile({
+  function save() {
+    updateProfile({
       height,
       goals: {target_weight: targetWeight, target_body_fat: targetBodyFat},
       notes,
@@ -75,7 +75,7 @@ export function SettingsPage({uid}: {uid: string}) {
       <Card>
         <SectionTitle>データのエクスポート</SectionTitle>
         <p className="mb-3 text-xs text-slate-400">
-          匿名認証のためuidを喪失するとデータ復元ができません。週1回程度の手動バックアップを推奨します。
+          データはこの端末のブラウザにのみ保存されています。ブラウザのデータを消去したり別の端末で開いたりすると復元できないため、週1回程度の手動バックアップを推奨します。
         </p>
         <div className="flex flex-wrap gap-2">
           <Button onClick={exportJson}>すべてJSONでエクスポート</Button>

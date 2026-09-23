@@ -1,7 +1,5 @@
 import {useState} from 'react';
-import {addDoc, collection} from 'firebase/firestore';
-import {db} from '../lib/firebase';
-import {parseMealText} from '../lib/parseMeal';
+import {addItem} from '../lib/localDb';
 import {useCollection} from '../lib/useCollection';
 import {Button, Card, NumberField, SectionTitle, TextField} from '../components/ui';
 import type {Meal, MealItem, MealType} from '../types';
@@ -22,35 +20,27 @@ const EMPTY_ITEM: MealItem = {
   sodium: null,
 };
 
-export function MealsPage({uid}: {uid: string}) {
-  const {data: meals} = useCollection<Meal>(uid, 'meals');
+export function MealsPage() {
+  const {data: meals} = useCollection<Meal>('meals');
   const [mealType, setMealType] = useState<MealType>('朝');
   const [text, setText] = useState('');
   const [items, setItems] = useState<MealItem[] | null>(null);
-  const [source, setSource] = useState<'ai' | 'manual'>('ai');
-  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
 
-  async function handleAiParse() {
+  function splitIntoItems() {
     if (!text.trim()) return;
-    setStatus('loading');
-    try {
-      const parsed = await parseMealText(text);
-      setItems(parsed);
-      setSource('ai');
-      setStatus('idle');
-    } catch (err) {
-      console.error('AI分解に失敗しました', err);
-      // 10-7: AI分解失敗／タイムアウト → 手動入力フォームへフォールバック
-      setItems([{...EMPTY_ITEM, food_name: text}]);
-      setSource('manual');
-      setStatus('error');
-    }
+    const names = text
+      .split(/[、,\n]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    setItems(
+      names.length > 0
+        ? names.map((food_name) => ({...EMPTY_ITEM, food_name}))
+        : [{...EMPTY_ITEM}],
+    );
   }
 
   function startManualEntry() {
     setItems([{...EMPTY_ITEM}]);
-    setSource('manual');
-    setStatus('idle');
   }
 
   function updateItem(index: number, patch: Partial<MealItem>) {
@@ -62,7 +52,7 @@ export function MealsPage({uid}: {uid: string}) {
     setItems([...(items ?? []), {...EMPTY_ITEM}]);
   }
 
-  async function confirmSave() {
+  function confirmSave() {
     if (!items) return;
     const now = new Date().toISOString();
     for (const item of items) {
@@ -71,10 +61,10 @@ export function MealsPage({uid}: {uid: string}) {
         ...item,
         datetime: now,
         meal_type: mealType,
-        source,
+        source: 'manual',
         notes: '',
       };
-      await addDoc(collection(db, 'users', uid, 'meals'), meal);
+      addItem('meals', meal);
     }
     setItems(null);
     setText('');
@@ -110,8 +100,8 @@ export function MealsPage({uid}: {uid: string}) {
               onChange={setText}
             />
             <div className="flex gap-2">
-              <Button onClick={handleAiParse} disabled={status === 'loading' || !text.trim()}>
-                {status === 'loading' ? 'AI分解中…' : 'AIで分解'}
+              <Button onClick={splitIntoItems} disabled={!text.trim()}>
+                項目に分割
               </Button>
               <Button variant="secondary" onClick={startManualEntry}>
                 手動で入力
@@ -122,11 +112,6 @@ export function MealsPage({uid}: {uid: string}) {
 
         {items != null && (
           <div className="flex flex-col gap-3">
-            {status === 'error' && (
-              <p className="text-sm text-rose-600">
-                AI分解に失敗しました（タイムアウトまたはエラー）。手動で入力してください。
-              </p>
-            )}
             <p className="text-xs text-slate-400">量が不明な項目は空欄のままで構いません（自動で埋めません）。</p>
             {items.map((item, i) => (
               <div key={i} className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-3">

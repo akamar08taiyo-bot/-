@@ -1,5 +1,4 @@
 import {useMemo, useState} from 'react';
-import {doc, setDoc} from 'firebase/firestore';
 import {
   CartesianGrid,
   Legend,
@@ -10,17 +9,17 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import {db} from '../lib/firebase';
+import {setItemWithId} from '../lib/localDb';
 import {useCollection} from '../lib/useCollection';
 import {useProfile} from '../lib/useProfile';
 import {formatDateJa} from '../lib/date';
 import {Button, Card, NumberField, SectionTitle} from '../components/ui';
 import type {BodyLog, HealthCheck} from '../types';
 
-export function WeightPage({uid}: {uid: string}) {
-  const {data: bodyLogs} = useCollection<BodyLog>(uid, 'body_logs');
-  const {data: healthChecks} = useCollection<HealthCheck>(uid, 'health_checks');
-  const {profile, updateProfile} = useProfile(uid);
+export function WeightPage() {
+  const {data: bodyLogs} = useCollection<BodyLog>('body_logs');
+  const {data: healthChecks} = useCollection<HealthCheck>('health_checks');
+  const {profile, updateProfile} = useProfile();
 
   const [targetWeight, setTargetWeight] = useState<number | null>(profile.goals.target_weight);
   const [targetBodyFat, setTargetBodyFat] = useState<number | null>(profile.goals.target_body_fat);
@@ -43,14 +42,14 @@ export function WeightPage({uid}: {uid: string}) {
 
   const latestWaist = [...bodyLogs].sort((a, b) => (a.date < b.date ? 1 : -1)).find((b) => b.waist != null)?.waist;
 
-  async function saveGoals() {
-    await updateProfile({goals: {target_weight: targetWeight, target_body_fat: targetBodyFat}});
+  function saveGoals() {
+    updateProfile({goals: {target_weight: targetWeight, target_body_fat: targetBodyFat}});
   }
 
-  async function saveWaist() {
+  function saveWaist() {
     if (waist == null) return;
     const today = new Date().toISOString().slice(0, 10);
-    await setDoc(doc(db, 'users', uid, 'body_logs', today), {date: today, waist}, {merge: true});
+    setItemWithId<BodyLog>('body_logs', today, {id: today, date: today, waist} as BodyLog);
     setWaist(null);
   }
 

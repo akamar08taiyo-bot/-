@@ -1,6 +1,5 @@
 import {useMemo, useState} from 'react';
-import {collection, doc, setDoc} from 'firebase/firestore';
-import {db} from '../lib/firebase';
+import {setItemWithId} from '../lib/localDb';
 import {useCollection} from '../lib/useCollection';
 import {useProfile} from '../lib/useProfile';
 import {todayStr} from '../lib/date';
@@ -21,18 +20,17 @@ import type {ScreenKey} from '../App';
 
 const SNACK_SUGAR_CAUTION_G = 25;
 
-export function HomePage({uid, onNavigate}: {uid: string; onNavigate: (key: ScreenKey) => void}) {
-  const {profile} = useProfile(uid);
-  const {data: bodyLogs} = useCollection<BodyLog>(uid, 'body_logs');
-  const {data: meals} = useCollection<Meal>(uid, 'meals');
-  const {data: workouts} = useCollection<Workout>(uid, 'workouts');
-  const {data: snacks} = useCollection<SnackLog>(uid, 'snacks_log');
-  const {data: alcoholLogs} = useCollection<AlcoholLog>(uid, 'alcohol_log');
-  const {data: supplements} = useCollection<Supplement>(uid, 'supplements');
-  const {data: supplementLogs} = useCollection<SupplementLog>(uid, 'supplement_logs');
+export function HomePage({onNavigate}: {onNavigate: (key: ScreenKey) => void}) {
+  const {profile, updateProfile} = useProfile();
+  const {data: bodyLogs} = useCollection<BodyLog>('body_logs');
+  const {data: meals} = useCollection<Meal>('meals');
+  const {data: workouts} = useCollection<Workout>('workouts');
+  const {data: snacks} = useCollection<SnackLog>('snacks_log');
+  const {data: alcoholLogs} = useCollection<AlcoholLog>('alcohol_log');
+  const {data: supplements} = useCollection<Supplement>('supplements');
+  const {data: supplementLogs} = useCollection<SupplementLog>('supplement_logs');
 
   const [weightInput, setWeightInput] = useState<number | null>(null);
-  const [saving, setSaving] = useState(false);
 
   const today = todayStr();
 
@@ -73,24 +71,19 @@ export function HomePage({uid, onNavigate}: {uid: string; onNavigate: (key: Scre
     improvements.push(`サプリ成分「${w.ingredient}」が本日${w.total}${''}摂取されています。${w.note}`);
   }
 
-  async function saveWeight() {
+  function saveWeight() {
     if (weightInput == null) return;
-    setSaving(true);
-    try {
-      await setDoc(
-        doc(collection(db, 'users', uid, 'body_logs'), today),
-        {date: today, weight: weightInput, waist: null, body_fat: null, sleep: null, fatigue: null},
-        {merge: true},
-      );
-      await setDoc(
-        doc(db, 'users', uid, 'profile', 'main'),
-        {current_weight: weightInput},
-        {merge: true},
-      );
-      setWeightInput(null);
-    } finally {
-      setSaving(false);
-    }
+    setItemWithId<BodyLog>('body_logs', today, {
+      id: today,
+      date: today,
+      weight: weightInput,
+      waist: null,
+      body_fat: null,
+      sleep: null,
+      fatigue: null,
+    });
+    updateProfile({current_weight: weightInput});
+    setWeightInput(null);
   }
 
   return (
@@ -110,7 +103,7 @@ export function HomePage({uid, onNavigate}: {uid: string; onNavigate: (key: Scre
           </div>
           <div className="flex items-end gap-2">
             <NumberField label="" value={weightInput} onChange={setWeightInput} unit="kg" />
-            <Button onClick={saveWeight} disabled={saving || weightInput == null}>
+            <Button onClick={saveWeight} disabled={weightInput == null}>
               ワンタップ更新
             </Button>
           </div>

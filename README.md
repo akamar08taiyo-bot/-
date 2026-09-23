@@ -35,8 +35,10 @@
 
 - フロントエンド: React 19 + TypeScript + Vite（マルチページ）+ Tailwind CSS 4（GitHub Pagesでホスティング）
 - グラフ: Recharts
-- バックエンド: Firebase（Firestore, Anonymous Auth, Cloud Functions）
-- AI連携: クライアント → Cloud Function（APIキーはサーバー側env） → LLM API
+- データ保存: **この端末のブラウザのlocalStorageにのみ保存**（サーバー・アカウント不要）
+- ホスティング: GitHub Pages（静的サイトとしてビルドして配信）
+
+サーバー・データベース・APIキーは一切使用しない。アカウント登録やログインも不要で、開いた瞬間から使える。
 
 ## セットアップ
 
@@ -46,70 +48,38 @@
    ```
    npm install
    ```
-2. `.env.example` を `.env.local` にコピーし、Firebase プロジェクトの Web SDK 設定値を入力
-   ```
-   cp .env.example .env.local
-   ```
-3. 開発サーバーを起動
+2. 開発サーバーを起動
    ```
    npm run dev
    ```
 
-## Firebase バックエンド
+環境変数の設定は不要（Firebase等の外部サービスを使わないため）。
 
-- `firestore.rules` — `users/{uid}` 配下は本人（`request.auth.uid == uid`）のみ read/write 可能
-- `functions/` — 食事テキストのAI分解を行う Cloud Function（`parseMeal`）。LLM APIキーはクライアントに一切含めない
-- Firestore データ構造は `src/types.ts` を参照（引継ぎ資料 5章と対応）
+## データの保存場所と制約
 
-Cloud Functions をデプロイする場合:
-```
-firebase use --add                          # 初回のみ：Firebaseプロジェクトを紐付け
-firebase functions:secrets:set LLM_API_KEY  # LLM APIキーをサーバー側に登録（クライアントには含めない）
-cd functions && npm install && cd ..
-firebase deploy --only functions,firestore:rules
-```
+- すべてのデータ（体重・食事・サプリ・健診記録など）は、開いているブラウザの `localStorage` に保存される
+- **別の端末・別のブラウザ・シークレットウィンドウでは、記録したデータは見えない**（この端末のこのブラウザだけのデータ）
+- ブラウザの「閲覧データを削除」操作や、ブラウザの再インストールでデータは消える
+- 設定画面の「データをエクスポート」でJSON/CSVとしてバックアップ可能。週1回程度のエクスポートを推奨
 
-`functions/src/index.ts` の `LLM_API_BASE_URL` / `LLM_MODEL` 環境変数で利用するLLMプロバイダを切り替え可能（既定はOpenAI互換のchat completions）。
+複数端末での同期や、AIによる食事テキストの自動解析（栄養素の自動入力）を使いたい場合は、Firebase等のバックエンドを別途用意する構成に戻すことも可能（過去のコミット参照）。
 
 ## 自動デプロイ（GitHub Actions）
 
-`main` ブランチへのpush時に `.github/workflows/deploy.yml` が2つのジョブを実行する。
-
-- `deploy-pages`: フロントエンドをビルドし **GitHub Pages** に公開
-- `deploy-firebase-backend`: Firestoreルールと Cloud Functions を **Firebase** にデプロイ
+`main` ブランチへのpush時に `.github/workflows/deploy.yml` がビルドしてGitHub Pagesに公開する。
 
 初回のみ、以下を手動でセットアップする。
 
-1. **GitHub Pagesを有効化**
-   リポジトリの Settings → Pages → Build and deployment → Source を **GitHub Actions** に変更
-2. **Firebaseプロジェクトを作成**（未作成の場合）
-   [Firebase Console](https://console.firebase.google.com/) → プロジェクトを追加 → Firestore・Authentication（匿名認証を有効化）を設定
-3. **サービスアカウントキーを発行**（バックエンドデプロイ用）
-   [Google Cloud Console](https://console.cloud.google.com/iam-admin/serviceaccounts) → 対象プロジェクト → サービスアカウントを作成
-   → ロールに `Firebase 管理者`（`roles/firebase.admin`）付与 → キーを作成（JSON）してダウンロード
-4. **GitHubリポジトリにSecretsを登録**
-   リポジトリの Settings → Secrets and variables → Actions → New repository secret
-   - `FIREBASE_SERVICE_ACCOUNT`: 手順3でダウンロードしたJSONファイルの中身をそのまま貼り付け
-   - `FIREBASE_PROJECT_ID`: FirebaseプロジェクトID
-   - `VITE_FIREBASE_API_KEY` / `VITE_FIREBASE_AUTH_DOMAIN` / `VITE_FIREBASE_PROJECT_ID` / `VITE_FIREBASE_STORAGE_BUCKET` / `VITE_FIREBASE_MESSAGING_SENDER_ID` / `VITE_FIREBASE_APP_ID`: `.env.example` と同じ値（GitHub Pagesの静的ビルドに埋め込むため）
-5. **LLM APIキーをCloud Functions側に登録**（一度だけ、ローカルから）
-   ```
-   npm install -g firebase-tools
-   firebase login
-   firebase use --add                          # 手順2のプロジェクトを選択
-   firebase functions:secrets:set LLM_API_KEY
-   ```
+1. リポジトリの **Settings → Pages → Build and deployment → Source** を **GitHub Actions** に変更
 
-以降は `main` へのpush、または GitHub の Actions タブから `workflow_dispatch` で手動実行することでデプロイされる。
+これだけで、以降は `main` へのpush、または GitHub の Actions タブから `workflow_dispatch` で手動実行するとデプロイされる。
 公開URLは `https://<GitHubユーザー名>.github.io/<リポジトリ名>/`。
-
-Firebase Web SDKの設定値（`VITE_FIREBASE_*`）はクライアント側に埋め込まれるが、アクセス制御は `firestore.rules` で行っているため、これらの値自体を秘匿する必要はない。
 
 ## 実装範囲（MVP）
 
-含む: 体重・体組成記録+推移グラフ、食事記録（テキスト入力+AI分解+確認画面）、よく食べるメニュー、間食管理、筋トレ記録、サプリ管理+重複警告、健診データ入力+前年比、ホームサマリ+改善提案（最大3件）。
+含む: 体重・体組成記録+推移グラフ、食事記録（テキスト入力→項目分割→手動確認）、よく食べるメニュー、間食管理、筋トレ記録、サプリ管理+重複警告、健診データ入力+前年比、ホームサマリ+改善提案（最大3件）、JSON/CSVエクスポート。
 
-見送り（次フェーズ）: AIアシスタント自由対話、献立提案の高度化、週次レポート自動生成、健診前モード、音声/写真入力、目標体重に基づく自動ペース計算。
+見送り（次フェーズ）: 食事内容のAI自動解析（栄養素の自動推定）、AIアシスタント自由対話、献立提案の高度化、週次レポート自動生成、健診前モード、音声/写真入力、目標体重に基づく自動ペース計算、複数端末間の同期。
 
 ## 医療安全上の注意
 

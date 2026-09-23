@@ -1,6 +1,5 @@
 import {useMemo, useState} from 'react';
-import {addDoc, collection, deleteDoc, doc, updateDoc} from 'firebase/firestore';
-import {db} from '../lib/firebase';
+import {addItem, removeItem, updateItem} from '../lib/localDb';
 import {useCollection} from '../lib/useCollection';
 import {todayStr} from '../lib/date';
 import {Button, Card, ConfirmDialog, NumberField, SectionTitle, TextField} from '../components/ui';
@@ -62,8 +61,8 @@ const emptyCheck = (date: string): Omit<HealthCheck, 'id'> => ({
   notes: '',
 });
 
-export function HealthChecksPage({uid}: {uid: string}) {
-  const {data: checks} = useCollection<HealthCheck>(uid, 'health_checks');
+export function HealthChecksPage() {
+  const {data: checks} = useCollection<HealthCheck>('health_checks');
   const [draft, setDraft] = useState(emptyCheck(todayStr()));
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -75,18 +74,18 @@ export function HealthChecksPage({uid}: {uid: string}) {
   }, [visible]);
   const latest = visible[0];
 
-  async function save() {
-    await addDoc(collection(db, 'users', uid, 'health_checks'), draft);
+  function save() {
+    addItem('health_checks', draft);
     setDraft(emptyCheck(todayStr()));
   }
 
-  async function archive(id: string) {
-    await updateDoc(doc(db, 'users', uid, 'health_checks', id), {archived: true});
+  function archive(id: string) {
+    updateItem<HealthCheck>('health_checks', id, {archived: true});
   }
 
-  async function permanentlyDelete() {
+  function permanentlyDelete() {
     if (!confirmDeleteId) return;
-    await deleteDoc(doc(db, 'users', uid, 'health_checks', confirmDeleteId));
+    removeItem('health_checks', confirmDeleteId);
     setConfirmDeleteId(null);
   }
 

@@ -1,6 +1,5 @@
 import {useMemo, useState} from 'react';
-import {addDoc, collection, deleteDoc, doc} from 'firebase/firestore';
-import {db} from '../lib/firebase';
+import {addItem, removeItem} from '../lib/localDb';
 import {useCollection} from '../lib/useCollection';
 import {todayStr} from '../lib/date';
 import {checkDuplicates, type DuplicateWarning} from '../lib/supplementDuplicates';
@@ -17,9 +16,9 @@ const EMPTY: Omit<Supplement, 'id'> = {
   caution: null,
 };
 
-export function SupplementsPage({uid}: {uid: string}) {
-  const {data: supplements} = useCollection<Supplement>(uid, 'supplements');
-  const {data: logs} = useCollection<SupplementLog>(uid, 'supplement_logs');
+export function SupplementsPage() {
+  const {data: supplements} = useCollection<Supplement>('supplements');
+  const {data: logs} = useCollection<SupplementLog>('supplement_logs');
   const [draft, setDraft] = useState(EMPTY);
   const [cautionThreshold, setCautionThreshold] = useState<number | null>(null);
   const [cautionText, setCautionText] = useState('');
@@ -31,20 +30,20 @@ export function SupplementsPage({uid}: {uid: string}) {
 
   const alreadyTakenIds = new Set(todayLogs.map((l) => l.supplement_id));
 
-  async function addSupplement() {
+  function addSupplement() {
     if (!draft.product_name.trim() || !draft.ingredient.trim()) return;
     const supplement: Omit<Supplement, 'id'> = {
       ...draft,
       caution: cautionThreshold != null ? {threshold: cautionThreshold, text: cautionText} : null,
     };
-    await addDoc(collection(db, 'users', uid, 'supplements'), supplement);
+    addItem('supplements', supplement);
     setDraft(EMPTY);
     setCautionThreshold(null);
     setCautionText('');
   }
 
-  async function removeSupplement(id: string) {
-    await deleteDoc(doc(db, 'users', uid, 'supplements', id));
+  function removeSupplement(id: string) {
+    removeItem('supplements', id);
   }
 
   const pendingTodayIntake = useMemo(
@@ -56,9 +55,9 @@ export function SupplementsPage({uid}: {uid: string}) {
     [activeSupplements, todayLogs],
   );
 
-  async function commitTodayIntake(logsToWrite: {supplement_id: string; quantity: number; datetime: string}[]) {
+  function commitTodayIntake(logsToWrite: {supplement_id: string; quantity: number; datetime: string}[]) {
     for (const log of logsToWrite) {
-      await addDoc(collection(db, 'users', uid, 'supplement_logs'), log);
+      addItem('supplement_logs', log);
     }
   }
 
