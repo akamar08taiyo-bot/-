@@ -83,3 +83,43 @@
 - 数字には一次情報の出典URLの候補を添える（最終確認は money-shorts 側で行う）。
 - アフィリエイトにつなぐか（PR）と、TikTok版で外す誘導があるかを書く。
 - TikTokの収益化（Creator Rewards）は1分を超える動画が対象とされる（要確認）。TikTok版を61〜75秒に延ばす余地があるなら、足す1〜2行の候補も書く。
+
+## コピー用ページ（ワンタップでコピー）
+
+ユーザーは企画をスマホで見ながら、タイトルや台本をコピーして使う。レポートとは別に、企画をJSONにまとめ、`scripts/make_copy_page.py` でコピーボタン付きのページにする。
+
+```bash
+python3 <スキルのフォルダ>/scripts/make_copy_page.py plans.json out.html
+```
+
+JSONの形（文章の中の `[ラベル](URL)` は、画面ではリンク、コピーでは「ラベル URL」になる）:
+
+```json
+{
+  "title": "お金動画 企画コピー帳",
+  "eyebrow": "2026年10月版 ・ バズ動画リサーチより",
+  "lead": "ボタンを押すと、その部分がコピーされます。",
+  "now": [{"id": "plan1", "when": "10月中", "label": "すぐ作る企画の名前"}],
+  "sections": [
+    {"id": "long", "heading": "長尺", "plans": [
+      {"id": "plan1", "kind": "long", "no": "企画1", "when": "10月中", "name": "企画をひと言で",
+       "titles": ["案1", "案2", "案3"], "title_types": "型：1＝…／2＝…／3＝…",
+       "thumb": {"left": "左の文字", "right": "右の文字"},
+       "op": "…", "body": ["①…", "②…"], "ed": "…",
+       "caution": "…", "why": {"evidence": ["…"], "now": "…"}}
+    ]},
+    {"id": "short", "heading": "ショート", "plans": [
+      {"id": "short1", "kind": "short", "no": "ショート1", "when": "11月中", "badge": "money-shorts向け", "seconds": 60,
+       "name": "…", "title": "タイトル #shorts #タグ", "telop": "…",
+       "script": [{"time": "0:00〜0:06", "label": "フック", "text": "…", "visual": "hook"}],
+       "ms_notes": ["…"], "caution": "…", "why": {"evidence": ["…"], "now": "…"}}
+    ]}
+  ],
+  "footer": ["数字は◯年◯月時点。制作前に一次情報で確かめる、など"]
+}
+```
+
+- `id` は英数字だけにする（ページ内リンクに使うため）。
+- コピーボタンは、企画まるごと／タイトル1案ずつ／サムネ文字／構成・台本の単位で付く。ショートには「money-shorts に頼む文でコピー」も付く（頼む文の頭は `money_shorts_prefix` で変えられる）。
+- 「根拠」「今出す理由」は採るかどうかの判断材料なので、画面には出すがコピーには含めない。
+- JSONは `reports/<タイトル>.plans.json` に保存しておく。あとで直して作り直せる。
