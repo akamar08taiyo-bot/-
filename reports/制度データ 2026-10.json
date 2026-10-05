@@ -1,0 +1,339 @@
+{
+  "title": "制度データ（無料プレゼント・動画の共通データ）",
+  "checked": "2026-10-05",
+  "note": "検索結果の要約で確かめた時点の内容。status は「決定」「法案」「検討中」「要確認」。作る前・公開する前に sources で確かめ直す。who は診断アプリの条件に使う目安（正式な要件は sources を見る）。",
+  "who_tags": {
+    "kaishain": "会社員・公務員",
+    "part": "パート・アルバイト",
+    "jieigyo": "自営業・フリーランス",
+    "nenkin": "年金を受け取っている",
+    "kosodate": "子どもがいる（0〜17歳）",
+    "gakusei_ko": "大学生などの子がいる（19〜22歳）",
+    "kaigo": "親の介護をしている・しそう",
+    "iryo": "通院している・薬を使う",
+    "all": "ほとんどの人"
+  },
+  "items": [
+    {
+      "id": "nencho2026",
+      "name": "12月に所得税をまとめて精算（178万円の壁）",
+      "category": "税金",
+      "start": "2026-12",
+      "status": "決定",
+      "who": ["kaishain", "part", "nenkin"],
+      "amount": "基礎控除は最大104万円（合計所得489万円以下）。給与だけなら年収178万円まで所得税がかからない",
+      "action": "年末調整の書類を出す。年の途中で辞めて12月に勤め先がない人は確定申告。年金の人は12月の支払いで精算",
+      "loss": "書類を出さない・確定申告しないと、引かれすぎた税金が戻らない",
+      "sources": [
+        "https://www.nta.go.jp/publication/pamph/gensen/nencho2026/01.htm",
+        "https://www.nta.go.jp/users/gensen/2026kiso/pdf/0026005-024.pdf",
+        "https://www.nenkin.go.jp/oshirase/taisetu/kojin/2026/202606/0617.html"
+      ],
+      "video": "改正編1・1位／制度編5"
+    },
+    {
+      "id": "zeigakuhyo2027",
+      "name": "給料から引かれる所得税の表が新しくなる",
+      "category": "税金",
+      "start": "2027-01",
+      "status": "決定",
+      "who": ["kaishain", "part"],
+      "amount": "基礎控除などの引き上げが毎月の天引きにも反映",
+      "action": "1月の給与明細で所得税の額を見る",
+      "loss": "",
+      "sources": ["https://www.nta.go.jp/publication/pamph/gensen/zeigakuhyo2027/data/all.pdf"],
+      "video": "改正編1（注記）"
+    },
+    {
+      "id": "fuyou136",
+      "name": "家族を扶養に入れられる収入の目安が上がった（給与なら136万円）",
+      "category": "税金",
+      "start": "2026-01",
+      "status": "決定",
+      "who": ["kaishain", "kosodate", "gakusei_ko", "nenkin"],
+      "amount": "扶養親族の合計所得の要件 58万円→62万円（給与だけなら年収136万円まで）。2026・2027年分の特例あり",
+      "action": "年末調整・確定申告で家族の所得を今年の基準で書く。年金の人で新しく扶養に入れる家族がいるときは原則確定申告",
+      "loss": "去年の基準のままだと、使える控除を使わずに税金を多く払う",
+      "sources": [
+        "https://www.nta.go.jp/publication/pamph/gensen/zeigakuhyo2027/data/all.pdf",
+        "https://www.nenkin.go.jp/oshirase/taisetu/kojin/2026/202606/0617.html"
+      ],
+      "video": "制度編5"
+    },
+    {
+      "id": "seiho_kosodate",
+      "name": "生命保険料控除の子育て世帯の特例",
+      "category": "税金",
+      "start": "2026-01",
+      "status": "決定",
+      "who": ["kosodate", "gakusei_ko"],
+      "amount": "23歳未満の扶養親族がいると、一般生命保険料控除の上限が4万円→6万円（2026年分・2027年分）",
+      "action": "年末調整の保険料控除申告書に書く",
+      "loss": "書かないと控除が増えない",
+      "sources": ["https://www.fosterlink.co.jp/blog/payroll/legal-corrections2027"],
+      "video": ""
+    },
+    {
+      "id": "boei_tax",
+      "name": "防衛特別所得税（復興特別所得税は1%下がる）",
+      "category": "税金",
+      "start": "2027-01",
+      "status": "決定",
+      "who": ["all"],
+      "amount": "所得税額の1%。復興特別所得税が2.1%→1.1%に下がるので、合計は今と同じ。復興特別所得税は2047年まで続く",
+      "action": "なし（知っておくだけ）",
+      "loss": "",
+      "sources": [
+        "https://www.mof.go.jp/tax_policy/tax_reform/outline/fy2026/20251226taikou.pdf",
+        "https://www.tokyo-np.co.jp/article/457253"
+      ],
+      "video": "改正編1・5位"
+    },
+    {
+      "id": "ideco_limit",
+      "name": "iDeCoの掛金の上限が上がる",
+      "category": "老後・投資",
+      "start": "2026-12",
+      "status": "決定",
+      "who": ["kaishain", "jieigyo"],
+      "amount": "企業年金のない会社員 月2.3万円→6.2万円、自営業など 月6.8万円→7.5万円（企業年金がある人は6.2万円から企業年金の掛金を引いた額、第3号は2.3万円のまま）",
+      "action": "掛金を上げたい人は自分で変更の手続き（12月分からの受付時期は金融機関で違う）",
+      "loss": "手続きしないと、今の掛金のまま",
+      "sources": [
+        "https://info.monex.co.jp/news/2026/20260514_01.html",
+        "https://info.monex.co.jp/news/2026/20260901_04.html",
+        "https://www.resonabank.co.jp/nenkin/ideco/qa/faq8540.html"
+      ],
+      "video": "改正編1・3位"
+    },
+    {
+      "id": "ideco_age",
+      "name": "iDeCoに70歳になるまで入れるようになる",
+      "category": "老後・投資",
+      "start": "2026-12",
+      "status": "決定",
+      "who": ["kaishain", "jieigyo"],
+      "amount": "加入できる年齢の上限が70歳未満に（老齢年金を受け取っていないなどの条件あり）",
+      "action": "60代で働く人は条件を金融機関で確かめる",
+      "loss": "",
+      "sources": ["https://dc.rakuten-sec.co.jp/about/revised/202505/"],
+      "video": ""
+    },
+    {
+      "id": "kodomo_nisa",
+      "name": "こどもNISA（0〜17歳もつみたて投資枠）",
+      "category": "子育て・投資",
+      "start": "2027-01",
+      "status": "決定",
+      "who": ["kosodate"],
+      "amount": "年60万円・総額600万円まで。12歳から本人のための費用に条件つきで引き出せる",
+      "action": "口座の受付は2026年10月から順に始まっている（金融機関で違う）",
+      "loss": "",
+      "sources": [
+        "https://www.fsa.go.jp/news/r7/sonota/20251226-2/01.pdf",
+        "https://www.nikkei.com/article/DGXZQOUB098MD0Z00C26A9000000/"
+      ],
+      "video": "改正編1・4位"
+    },
+    {
+      "id": "nisa_bond",
+      "name": "NISAのつみたて投資枠で買える投資信託が増える（債券など）",
+      "category": "投資",
+      "start": "2027-01",
+      "status": "決定",
+      "who": ["all"],
+      "amount": "主に株式に投資するもの→株式または公社債に投資するものまで",
+      "action": "なし（選べる商品が増える）",
+      "loss": "",
+      "sources": ["https://www.fsa.go.jp/news/r7/sonota/20251226-2/01.pdf"],
+      "video": ""
+    },
+    {
+      "id": "otc_ruiji",
+      "name": "市販薬に似た薬（OTC類似薬）の負担が増える",
+      "category": "医療",
+      "start": "2027-03",
+      "status": "決定",
+      "who": ["iryo"],
+      "amount": "77成分・1,042品目の薬代の4分の1を上乗せ（3割負担なら約1.6倍）。子ども（18歳になった年度末まで）・入院中・医師が必要と認めた場合などは対象外",
+      "action": "よく使う薬が対象か、薬局や医師に聞く",
+      "loss": "",
+      "sources": [
+        "https://www.nikkei.com/article/DGXZQOUA241WS0U6A920C2000000/",
+        "https://www.mixonline.jp/tabid55.html?artid=79544",
+        "https://news.yahoo.co.jp/articles/1a2f1684fce68652c8ad2b0b5eddc911b2a8b375"
+      ],
+      "video": "改正編1・2位"
+    },
+    {
+      "id": "kougaku_nenkan",
+      "name": "高額療養費に「年間上限」ができた",
+      "category": "医療",
+      "start": "2026-08",
+      "status": "決定",
+      "who": ["iryo"],
+      "amount": "年収約770万円以下は年53万円、住民税非課税は年29万円（8月〜翌年7月）。月の上限は引き上げ（例：年収約370〜770万円は80,100円→85,800円）",
+      "action": "マイナ保険証や限度額適用認定証で、窓口の支払いを上限までにする",
+      "loss": "",
+      "sources": [
+        "https://www.mhlw.go.jp/content/12400000/001661792.pdf",
+        "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kenkou_iryou/iryouhoken/juuyou/kougakuiryou/index.html"
+      ],
+      "video": "制度編7"
+    },
+    {
+      "id": "kougaku_2027",
+      "name": "高額療養費の区分が細かくなる",
+      "category": "医療",
+      "start": "2027-08",
+      "status": "決定",
+      "who": ["iryo"],
+      "amount": "年収約370万円以上の区分が3つずつに分かれ、収入が高いほど上限が上がる（例：70歳未満・年収約650〜770万円は月85,800円→110,400円）。年収約200万円未満の多数回該当は引き下げ",
+      "action": "自分の区分を確かめる",
+      "loss": "",
+      "sources": [
+        "https://www.mhlw.go.jp/content/12400000/001661792.pdf",
+        "https://www.nikkei.com/article/DGXZQOUA245ER0U5A221C2000000/"
+      ],
+      "video": "改正編2・3位"
+    },
+    {
+      "id": "shokuhin_1pct",
+      "name": "食料品の消費税が8%→1%（2年間）",
+      "category": "暮らし",
+      "start": "2027-04",
+      "end": "2029-03",
+      "status": "法案",
+      "who": ["all"],
+      "amount": "軽減税率の飲食料品が1%に。店内飲食（外食）とお酒は10%のまま",
+      "action": "法律が成立したかを確かめる",
+      "loss": "",
+      "sources": [
+        "https://www.jiji.com/jc/article?k=2026080500718&g=pol",
+        "https://www.nikkei.com/article/DGXZQOUA011O20R00C26A8000000/",
+        "https://www.nikkei.com/article/DGXZQOUC054CE0V00C26A8000000/"
+      ],
+      "video": "改正編2・1位"
+    },
+    {
+      "id": "shugyosha_shien",
+      "name": "就業者負担軽減支援金（働く中低所得の人への新しい給付）",
+      "category": "給付金",
+      "start": "2027-04",
+      "status": "法案",
+      "who": ["kaishain", "part", "jieigyo"],
+      "amount": "金額は未定。年1回・個人ごと・基準日は1月1日・15歳以下の子の加算あり（大綱）",
+      "action": "公金受取口座を登録しておくと申請なしで受け取れる仕組み（未登録なら自分で請求）",
+      "loss": "口座がないと請求の手間がかかる",
+      "sources": [
+        "https://news.yahoo.co.jp/articles/8dda959e02c0f7bac5d90684c87290fff8155956",
+        "https://hojyokin-portal.jp/columns/shugyosha_futan_keigen"
+      ],
+      "video": "改正編2・2位"
+    },
+    {
+      "id": "kosodate_shienkin",
+      "name": "子ども・子育て支援金が上がる",
+      "category": "社会保険",
+      "start": "2027-04",
+      "status": "決定",
+      "who": ["all"],
+      "amount": "医療保険と一緒に払う。全加入者1人あたりの平均で月250円（2026年度）→350円（2027年度）→450円（2028年度）程度",
+      "action": "給与明細の項目を見る",
+      "loss": "",
+      "sources": ["https://www.cfa.go.jp/assets/contents/node/basic_page/field_ref_resources/91882196-4d61-4b6b-93dd-d1596e4b74c8/03d34a0a/20250130-councils-kodomoseisaku-bukyokuchokaigi-91882196-04.pdf"],
+      "video": "改正編2・4位"
+    },
+    {
+      "id": "kabe106",
+      "name": "社会保険の「106万円の壁」（月8.8万円の要件）がなくなった",
+      "category": "社会保険",
+      "start": "2026-10",
+      "status": "決定",
+      "who": ["part"],
+      "amount": "従業員51人以上の会社で、週20時間以上などの条件を満たせば収入に関係なく加入",
+      "action": "働く時間を決める前に、手取りと将来の年金を比べる",
+      "loss": "",
+      "sources": ["https://hojyokin-portal.jp/columns/syakaihoken_jyoken"],
+      "video": ""
+    },
+    {
+      "id": "tekiyo36",
+      "name": "パートの社会保険が従業員36人以上の会社にも",
+      "category": "社会保険",
+      "start": "2027-10",
+      "status": "決定",
+      "who": ["part"],
+      "amount": "企業規模の要件 51人以上→36人以上（2029年10月21人以上、2032年10月11人以上、2035年10月なくなる）",
+      "action": "勤め先の人数と自分の働く時間を確かめる",
+      "loss": "",
+      "sources": ["https://brighten.jp/blog/12469/"],
+      "video": "改正編2・5位"
+    },
+    {
+      "id": "juminzei119",
+      "name": "住民税がかからない年収が上がる（給与なら119万円など）",
+      "category": "税金",
+      "start": "2027-06",
+      "status": "決定",
+      "who": ["part", "gakusei_ko"],
+      "amount": "2026年・2027年の給与が119万円以下なら、2027・2028年度の住民税がかからない（1級地の例。地域で少し違う）",
+      "action": "お住まいの市区町村のページで確かめる",
+      "loss": "",
+      "sources": ["https://www.city.nagoya.jp/kurashi/zeikin/1037356/1011880/1011899/1045304.html"],
+      "video": ""
+    },
+    {
+      "id": "hyoho68",
+      "name": "厚生年金の標準報酬月額の上限が上がる",
+      "category": "社会保険",
+      "start": "2027-09",
+      "status": "決定",
+      "who": ["kaishain"],
+      "amount": "上限 65万円→68万円（2028年9月71万円、2029年9月75万円）。月収が高い人だけ",
+      "action": "なし（保険料と将来の年金がともに増える）",
+      "loss": "",
+      "sources": ["https://www.fosterlink.co.jp/blog/payroll/legal-corrections2027"],
+      "video": ""
+    },
+    {
+      "id": "kaigo2wari",
+      "name": "介護保険の2割負担の対象を広げる案",
+      "category": "介護",
+      "start": "2027年度（予定）",
+      "status": "検討中",
+      "who": ["nenkin", "kaigo"],
+      "amount": "今は単身で年金など280万円以上。260万・250万・240万・230万円の4案を検討（2026年9月）",
+      "action": "年末の結論を待つ",
+      "loss": "",
+      "sources": ["https://min-taxes.com/column/kaigo-hoken-2wari-futan-kakudai-2027/"],
+      "video": ""
+    },
+    {
+      "id": "nenkin_shienkyufu",
+      "name": "年金生活者支援給付金",
+      "category": "給付金",
+      "start": "毎年",
+      "status": "決定",
+      "who": ["nenkin"],
+      "amount": "基準額 月5,620円（2026年度。保険料を納めた期間などで変わる）",
+      "action": "届いたはがき（請求書）を出す",
+      "loss": "期限を過ぎると、さかのぼれない月が出る",
+      "sources": ["https://www.nenkin.go.jp/oshirase/taisetu/kojin/2026/202604/0401.html"],
+      "video": "制度編2・1位／制度編4"
+    },
+    {
+      "id": "kaigo_jutaku",
+      "name": "介護保険の住宅改修（手すり・段差など）",
+      "category": "介護",
+      "start": "いつでも",
+      "status": "決定",
+      "who": ["kaigo"],
+      "amount": "原則20万円まで、その9割（1割負担なら最大18万円）",
+      "action": "工事の前に市区町村へ申請",
+      "loss": "申請前の工事は対象外",
+      "sources": ["https://www.mhlw.go.jp/general/seido/toukatsu/suishin/dl/07.pdf"],
+      "video": "制度編3"
+    }
+  ]
+}
