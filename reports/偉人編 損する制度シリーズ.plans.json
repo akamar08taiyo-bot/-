@@ -40,7 +40,7 @@
         "ms_notes": [
           "配役：L＝mitsunari（石田三成）／R＝nobunaga（織田信長）／C＝ieyasu（徳川家康）／G＝hideyoshi（豊臣秀吉）／J＝nohime（濃姫）／I＝yoshimoto（今川義元）。声が同じ・似た組は入っていない。",
           "登場の型：1回目 kabuki 定式幕「参上！」、2回目 yabumi 矢文「物申す！」（音は entrance.SOUND_OF に合わせる）。直前に作った回と同じ型が続くなら入れ替える。",
-          "演出（7個）：makimono・gaan・soroban・drumroll・tokiyo・harisen。同じ回でくり返さない。",
+          "演出（6個）：makimono・gaan・soroban・drumroll・tokiyo・harisen。同じ回でくり返さない。",
           "上の注記：「仮の計算例です。税金・保険料は考えていません」。場面2の下に小さく「0.4%は1962年4月2日以降生まれ、75歳まで繰下げできるのは1952年4月2日以降生まれ」。",
           "名前札の下の解説：人間五十年＝信長が好んだ舞「敦盛」の一節／鳴くまで待とう＝家康のしんぼう強さをたとえた、のちの時代の句／加給年金＝条件を満たす配偶者などがいると上乗せされる年金／数え年75歳（満73歳）で亡くなったとされる。",
           "計算：月15万円×0.76＝11.4万円、×1.84＝27.6万円。合計が並ぶ年齢は、0.76×(年齢−60)＝(年齢−65) → 約80歳10か月、1.84×(年齢−75)＝(年齢−65) → 約86歳11か月（日本年金機構などで広く使われる目安と同じ）。",
@@ -87,7 +87,7 @@
         "ms_notes": [
           "配役：L＝oichi（お市）／R＝toshiie（前田利家）／C＝kagekatsu（上杉景勝・無口）／G＝kaihime（甲斐姫）／J＝naotora（井伊直虎）／I＝yoshihiro（島津義弘）。氏康（利家と同じ声）・清正（景勝と同じ声）は入れない。",
           "登場の型：1回目 kaminari 稲妻「推参！」、2回目 glass ガラス「割り込み御免！」。",
-          "演出（7個）：shojo・nidomi・kokoro・drumroll・harisen ほか。景勝の「心の声」は点線の吹き出し。",
+          "演出（5個）：shojo・nidomi・kokoro・drumroll・harisen。景勝の「心の声」は点線の吹き出し。",
           "上の注記：「順位はこのチャンネルの判断です／制度は2026年10月時点」。",
           "名前札の下の解説：加賀百万石＝前田家の領地の大きさ（石高はお米のとれる量）。",
           "出典：[日本年金機構 年金額改定通知書の送付（令和8年は6月3日〜10日）](https://www.nenkin.go.jp/oshirase/taisetu/kojin/2026/202606/060302.html)、[日本年金機構 源泉徴収票の送付（1月）](https://www.nenkin.go.jp/oshirase/topics/2023/1228.html)、[日本年金機構 意向確認書（45日）](https://www.nenkin.go.jp/oshirase/taisetu/kojin/2026/202608/080403.html)、[日本年金機構 扶養親族等申告書（令和9年分・期限）](https://www.nenkin.go.jp/service/jukyu/tetsuduki/rourei/jukyu/fuyo/2027fuyoukami.html)、[日本年金機構FAQ（出さないと多く引かれ、確定申告で還付）](https://www.nenkin.go.jp/section/faq/jukyu/jukyushatodoke/rourei/fuyoushinkoku/teishutsu/fuyokakuteishinkoku.html)、[日本年金機構 令和8年度の給付金の額（5,620円）](https://www.nenkin.go.jp/oshirase/taisetu/kojin/2026/202604/0401.html)、[日本年金機構FAQ（遅れると請求月の翌月分から）](https://www.nenkin.go.jp/section/faq/jukyu/seido/sonota-kyufu/shienkyufukin/hagaki/kigen.html)。",
@@ -130,7 +130,7 @@
         "ms_notes": [
           "配役：L＝kiyomasa（加藤清正）／R＝hideyoshi（豊臣秀吉）／C＝shingen（武田信玄）／G＝tadakatsu（本多忠勝）／J＝ginchiyo（立花誾千代）／I＝motochika（長宗我部元親）。景勝（清正と同じ声）・謙信（忠勝と同じ声）は入れない。忠勝は演技の指示を読み上げることがあるので、聞き取りで必ず確かめる。",
           "登場の型：1回目 jinmaku 陣幕「出陣！」、2回目 spot スポットライト「見参！」。",
-          "演出（6個）：soroban・gaan・sokuho・harisen ほか。",
+          "演出（5個）：makimono（熊本城の解説）・soroban・gaan・sokuho・harisen。",
           "上の注記：「介護保険の要支援・要介護の認定を受けた人の住まいが対象です／制度は2026年10月時点」。",
           "名前札の下の解説：大政所＝秀吉の母。秀吉は母を大切にしたといわれる（言い伝え）／清正は熊本城を築いた築城の名手として知られる／岡豊城＝長宗我部氏の城。",
           "計算：支給の上限は20万円の9割＝18万円（1割負担のとき）。2割負担なら16万円、3割負担なら14万円。",
