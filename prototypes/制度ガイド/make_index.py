@@ -46,6 +46,7 @@ NEW_CSS = """
 .state::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
 .state.is-making{color:var(--accent-ink)}
 .state.is-ready{color:var(--ink)}
+.state.is-done{color:var(--btn-fg);background:var(--btn-bg);border-color:var(--btn-bg)}
 .ep-close{font-size:14px;line-height:1.7;background:var(--pale);border-radius:6px;padding:6px 10px}
 .ep a{font-size:14px;font-weight:700}
 .more{display:flex;flex-wrap:wrap;gap:10px}
@@ -66,11 +67,11 @@ NEW_CSS = """
 """
 
 EPISODES = [
-    ("制度編1", "三英傑の年金：60歳・65歳・75歳、いちばん損するのは？", "making", "画面とサムネまで完成。声を作る前で止まっています（Geminiのチャージ待ち）",
+    ("制度編1", "三英傑の年金：60歳・65歳・75歳、いちばん損するのは？", "done", "69秒。動画一覧の「偉人版」で見られます",
      "待てるのは75歳まで！準備はプロフィールのリンクから！", "改正まとめ・診断", "ep1"),
-    ("制度編2", "年金生活、捨てたら損する封筒ベスト5", "ready", "制作待ち",
+    ("制度編2", "年金生活、捨てたら損する封筒ベスト5", "making", "声ができて、書き出しの仕上げ中",
      "中身を出して！準備はプロフィールのリンクから！", "給付金の一覧（年金生活）", "ep2"),
-    ("制度編3", "親の家の手すり、工事の前に申請しないと損", "ready", "制作待ち",
+    ("制度編3", "親の家の手すり、工事の前に申請しないと損", "making", "画面とサムネができて、次に声づくり",
      "お城は対象外です！備えはプロフィールのリンクから！", "給付金の一覧（介護）", "ep3"),
     ("改正編1", "11月以降に変わるお金のルールTOP5", "ready", "制作待ち",
      "城は建ちません！使い道はプロフィールのリンクから！", "改正まとめ・診断", "kaisei1"),
@@ -87,15 +88,15 @@ def main():
 
     eps = []
     for k, (no, title, state, state_text, close, gift, anchor) in enumerate(EPISODES, 1):
-        cls = "is-making" if state == "making" else "is-ready"
-        label = "制作中" if state == "making" else "台本完成"
-        eps.append(f"""<li class="ep{' is-now' if state == 'making' else ''}">
+        cls = {"making": "is-making", "done": "is-done"}.get(state, "is-ready")
+        label = {"making": "制作中", "done": "完成"}.get(state, "台本完成")
+        eps.append(f"""<li class="ep{' is-now' if state == 'done' else ''}">
 <span class="ep-no" aria-hidden="true">{k}</span>
 <p class="ep-kicker">{no}</p>
 <h3>{title}</h3>
 <p class="ep-meta"><span class="state {cls}">{label}</span>{state_text}</p>
 <p class="ep-close">最後のひと言：「{close}」<br>→ つながるプレゼント：{gift}</p>
-<a href="{SCRIPTS}#{anchor}" target="_blank" rel="noopener">台本を見る {OUT}</a>
+<a href="{GALLERY if state == 'done' else SCRIPTS + '#' + anchor}" target="_blank" rel="noopener">{'動画を見る' if state == 'done' else '台本を見る'} {OUT}</a>
 </li>""")
 
     docs = [
@@ -196,7 +197,7 @@ def main():
   <section class="videos" aria-labelledby="videos-title">
     <div class="sec-head">
       <h2 id="videos-title">このプレゼントにつながる動画</h2>
-      <p>偉人編「知らないと損する制度」の5本です。どれも最後に、このプレゼントへ案内します。制作は「お金の動画制作」のセッションで進んでいます（10月5日時点）。</p>
+      <p>偉人編「知らないと損する制度」の5本です。どれも最後に、このプレゼントへ案内します。制作は「お金の動画制作」のセッションで進んでいます（10月5日 夜の時点）。</p>
     </div>
     <ol class="ep-list">
 {chr(10).join(eps)}
