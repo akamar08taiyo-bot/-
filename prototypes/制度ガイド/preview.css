@@ -1,0 +1,6 @@
+/* プレビュー専用のファイルです。実際のサイトには入れません。 */
+.preview-back{position:fixed;left:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:60;display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:999px;background:var(--green);color:var(--cream);font-size:15px;font-weight:700;line-height:1.2;text-decoration:none;box-shadow:0 6px 18px #143e3540}
+.preview-back:focus-visible{outline:3px solid var(--orange);outline-offset:3px}
+.preview-toast{position:fixed;left:50%;bottom:calc(68px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:61;width:min(92vw,420px);margin:0;padding:12px 16px;border-radius:8px;background:#10241f;color:#f7f5ef;font-size:14px;line-height:1.6;text-align:center;box-shadow:0 8px 24px #00000044}
+.preview-toast:empty{display:none}
+body{padding-bottom:72px}
