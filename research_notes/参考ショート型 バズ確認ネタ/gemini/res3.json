@@ -1,0 +1,86 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "提供された2つのURL（YouTube動画ページ）の読み込みを試みましたが、JavaScript実行前の初期スクリプトコードのみが返され、動画のメタデータや表示要素（タイトル、チャンネル情報、説明文、統計情報など）が含まれるDOMおよびコンテンツデータを取得・展開できませんでした。\n\n「推測で埋めず、読めない項目は『読めない』と書く」という指示に従い、各項目について以下のとおり回答します。\n\n- **動画タイトル（原文のまま）**: 読めない\n- **チャンネル名と@ハンドル、チャンネル登録者数**: 読めない\n- **再生回数（表示どおり）**: 読めない\n- **高評価数**: 読めない\n- **公開日（または「◯日前」などの表示）**: 読めない\n- **説明文の冒頭5行とハッシュタグ**: 読めない\n- **説明文にある本編動画やWebツールのURL**: 読めない",
+            "thoughtSignature": "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"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "index": 0,
+      "groundingMetadata": {
+        "groundingChunks": [
+          {
+            "web": {
+              "uri": "https://www.youtube.com/watch?v=1O2xDcBzPrg",
+              "title": " - YouTube"
+            }
+          },
+          {
+            "web": {
+              "uri": "https://www.youtube.com/shorts/1O2xDcBzPrg",
+              "title": " - YouTube"
+            }
+          }
+        ],
+        "groundingSupports": [
+          {
+            "segment": {
+              "endIndex": 372,
+              "text": "提供された2つのURL（YouTube動画ページ）の読み込みを試みましたが、JavaScript実行前の初期スクリプトコードのみが返され、動画のメタデータや表示要素（タイトル、チャンネル情報、説明文、統計情報など）が含まれるDOMおよびコンテンツデータを取得・展開できませんでした"
+            },
+            "groundingChunkIndices": [
+              0,
+              1
+            ]
+          }
+        ]
+      },
+      "urlContextMetadata": {
+        "urlMetadata": [
+          {
+            "retrievedUrl": "https://www.youtube.com/watch?v=1O2xDcBzPrg",
+            "urlRetrievalStatus": "URL_RETRIEVAL_STATUS_SUCCESS"
+          },
+          {
+            "retrievedUrl": "https://www.youtube.com/shorts/1O2xDcBzPrg",
+            "urlRetrievalStatus": "URL_RETRIEVAL_STATUS_SUCCESS"
+          }
+        ]
+      }
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 437,
+    "candidatesTokenCount": 325,
+    "totalTokenCount": 71562,
+    "cachedContentTokenCount": 32620,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 437
+      }
+    ],
+    "cacheTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 32620
+      }
+    ],
+    "toolUsePromptTokenCount": 69512,
+    "toolUsePromptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 69512
+      }
+    ],
+    "thoughtsTokenCount": 1288,
+    "serviceTier": "standard"
+  },
+  "modelVersion": "gemini-3.8-flash",
+  "responseId": "XUDDapKUGeTX-8YPlPOhkQc"
+}
