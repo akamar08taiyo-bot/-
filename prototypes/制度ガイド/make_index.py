@@ -1,5 +1,6 @@
 """プレビューの入口（index.html）を作る。見た目は前の特典プレビュー（NISAのはじめ方）と同じ部品を使う。"""
 import html as H
+import importlib.util
 import json
 import pathlib
 import subprocess
@@ -191,6 +192,35 @@ def rank_label(c):
     return c["rank"] if "位" in c["rank"] else "その" + c["rank"]
 
 
+# 制度ガイドの動画（1本1制度・制作セッションで作る）。「いつの制度」ごとに全部そろったら、切り出し動画と入れ替える
+GUIDE_FILE = VIDEO_DIR / "台本" / "gift_eps.py"
+GUIDE_READY = VIDEO_DIR / "guide_ready.json"  # 取りこんだ動画の長さ {"g01": 秒, ...}
+GUIDE_LINK = {
+    "g11": ("あなたに合う制度を診断する", "shindan.html"), "g12": ("あなたに合う制度を診断する", "shindan.html"),
+    "g13": ("給付金・手当の一覧（年金）を見る", "kyufu.html#nenkin"), "g14": ("給付金・手当の一覧（年金）を見る", "kyufu.html#nenkin"),
+    "g15": ("給付金・手当の一覧（介護）を見る", "kyufu.html#kaigo"), "g16": ("給付金・手当の一覧（介護）を見る", "kyufu.html#kaigo"),
+}
+
+
+def load_guide():
+    if not GUIDE_FILE.exists():
+        return [], {}
+    spec = importlib.util.spec_from_file_location("gift_eps", GUIDE_FILE)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    ready = json.loads(GUIDE_READY.read_text(encoding="utf-8")) if GUIDE_READY.exists() else {}
+    return mod.EPISODES, ready
+
+
+def guide_entry(ep, dur):
+    tags = [t for t in ep["who"] if t != "all"]
+    link = GUIDE_LINK.get(ep["id"]) or ("制度改正まとめで、条件までくわしく見る", "kaisei.html" + ("#" + tags[0] if tags else ""))
+    return {"id": ep["id"], "src": ep["id"], "group": ep["group"], "no": "", "rank": "", "rankLabel": "",
+            "title": ep["name"], "when": ep["when"].replace("（法案）", ""), "who": ep["who"], "status": ep["status"],
+            "point": ep["point"], "todo": ep["todo"], "at": 0, "dur": dur, "guide": True,
+            "video": f"video/guide/{ep['id']}.mp4", "poster": f"video/posters/{ep['id']}.webp", "link": list(link)}
+
+
 def video_section():
     groups = [{"key": k, "label": label, "sub": sub} for k, label, sub in GROUPS]
     group_label = {k: label for k, label, _ in GROUPS}
@@ -224,7 +254,17 @@ def video_section():
                      "dur": duration(VIDEO_DIR / "src" / "videos" / f"{key}_duo.mp4", secs, key),
                      "video": f"video/full/{key}.mp4", "poster": f"video/posters/{key}.webp",
                      "chapters": chapters, "link": list(GIFT_LINK[key])})
-    data = {"groups": groups, "groupLabel": group_label, "tagLabel": SHORT, "clips": clips, "full": full}
+    guide, ready = load_guide()
+    use_guide = [g["key"] for g in groups
+                 if any(ep["group"] == g["key"] for ep in guide) and all(ep["id"] in ready for ep in guide if ep["group"] == g["key"])]
+    entries = []
+    for g in groups:
+        if g["key"] in use_guide:
+            entries += [guide_entry(ep, ready[ep["id"]]) for ep in guide if ep["group"] == g["key"]]
+        else:
+            entries += [c for c in clips if c["group"] == g["key"]]
+    n_guide = sum(1 for c in entries if c.get("guide"))
+    data = {"groups": groups, "groupLabel": group_label, "tagLabel": SHORT, "clips": entries, "full": full}
 
     def esc(t):
         return H.escape(t, quote=True)
@@ -234,14 +274,16 @@ def video_section():
         return f"{sec // 60}:{sec % 60:02d}"
 
     cards = []
-    for c in clips:
+    for c in entries:
         tags = "".join(f'<span class="vtag" data-tag="{t}">{esc(SHORT[t])}</span>' for t in c["who"])
         status = '<span class="vstatus">法案（まだ決まっていない）</span>' if c["status"] == "法案" else ""
+        rank = f'<span class="vrank">{esc(c["rankLabel"])}</span>' if c["rankLabel"] else ""
+        sr = esc(group_label[c["group"]]) if c.get("guide") else f"{c['no']}・{esc(c['rankLabel'])}"
         cards.append(f"""<li class="vcard" data-id="{c['id']}">
-<div class="vthumb" aria-hidden="true"><img src="{c['poster']}" alt="" width="360" height="640" loading="lazy"><span class="vrank">{esc(c['rankLabel'])}</span><span class="vdur">{clock(c['dur'])}</span><span class="vbtn">{PLAY}</span></div>
+<div class="vthumb" aria-hidden="true"><img src="{c['poster']}" alt="" width="360" height="640" loading="lazy">{rank}<span class="vdur">{clock(c['dur'])}</span><span class="vbtn">{PLAY}</span></div>
 <div class="vbody">
 <p class="vfor">{tags}向け</p>
-<h3><button type="button" class="vopen" data-play="{c['id']}">{esc(c['title'])}<span class="sr-only">（{c['no']}・{esc(c['rankLabel'])}、{round(c['dur'])}秒の動画を再生）</span></button></h3>
+<h3><button type="button" class="vopen" data-play="{c['id']}">{esc(c['title'])}<span class="sr-only">（{sr}、{round(c['dur'])}秒の動画を再生）</span></button></h3>
 <p class="vwhen">{esc(c['when'])}{status}</p>
 <p class="vpoint">{esc(c['point'])}</p>
 </div>
@@ -251,17 +293,26 @@ def video_section():
     btn = {"always": ("いつでも役立つ", "年金・介護の制度")}
     seg = "".join(f'<button type="button" data-group="{g["key"]}" aria-pressed="false"><span>{btn.get(g["key"], (g["label"],))[0]}</span>'
                   f'<small>{btn.get(g["key"], (None, g["sub"]))[1]}</small></button>' for g in groups)
-    seg += f'<button type="button" data-group="all" aria-pressed="false"><span>ぜんぶ</span><small>{len(clips)}本すべて</small></button>'
+    seg += f'<button type="button" data-group="all" aria-pressed="false"><span>ぜんぶ</span><small>{len(entries)}本すべて</small></button>'
     chips = '<button type="button" data-who="any" aria-pressed="true">すべて</button>' + "".join(
         f'<button type="button" data-who="{t}" aria-pressed="false">{SHORT[t]}</button>' for t in WHO_CHIPS)
     fulls = "".join(f"""<li><button type="button" class="vfull-card" data-full="{f['id']}"><img src="{f['poster']}" alt="" width="360" height="640" loading="lazy"><small>{f['no']}・{round(f['dur'])}秒</small><b>{esc(f['title'])}</b></button></li>"""
                     for f in full)
 
+    if n_guide == len(entries):
+        lead = f"制度ごとに1本ずつ、条件と「やること」まで説明する動画{len(entries)}本です。"
+    elif n_guide:
+        lead = f"制度ごとに条件と「やること」まで説明する動画（{n_guide}本）と、偉人編のショートを制度ごとに切り分けた動画を合わせた{len(entries)}本です。"
+    else:
+        lead = f"偉人編の5本を、制度ごとの短い動画{len(entries)}本に分けました。"
+    full_head = "ショート版（5本）を通しで見る" if n_guide else "元の5本を通しで見る"
+    full_lead = ("YouTube・Instagram向けに作った短い版です。再生中に、どこから見るかを選べます。" if n_guide
+                 else "短く分ける前の動画です。再生中に、どこから見るかを選べます。")
     section = f"""<section class="vids" id="videos" aria-labelledby="vids-title">
     <div class="sec-head">
       <p class="kicker">動画で見る</p>
       <h2 id="vids-title"><span class="nb">知らないと損する制度を、</span><span class="nb">短い動画で</span></h2>
-      <p>偉人編の5本を、制度ごとの短い動画{len(clips)}本に分けました。「いつの制度か」と「だれ向けか」を選ぶと、当てはまる動画だけが出ます。押すと、このページの中で再生します。</p>
+      <p>{lead}「いつの制度か」と「だれ向けか」を選ぶと、当てはまる動画だけが出ます。押すと、このページの中で再生します。</p>
     </div>
     <div class="vpick">
       <div class="vstep" role="group" aria-labelledby="vstep1">
@@ -287,8 +338,8 @@ def video_section():
       <div class="vempty" id="v-empty" hidden><p id="v-empty-msg"></p><div class="vempty-actions" id="v-empty-actions"></div></div>
     </div>
     <div class="vfull">
-      <h3>元の5本を通しで見る</h3>
-      <p>短く分ける前の動画です。再生中に、どこから見るかを選べます。</p>
+      <h3>{full_head}</h3>
+      <p>{full_lead}</p>
       <ul class="vfull-list">{fulls}</ul>
     </div>
   </section>"""
@@ -312,7 +363,7 @@ def video_section():
   </div>
 </dialog>"""
     blob = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
-    return section + "\n" + player + f'\n<script type="application/json" id="video-data">{blob}</script>', blob, len(clips)
+    return section + "\n" + player + f'\n<script type="application/json" id="video-data">{blob}</script>', blob, len(entries), n_guide
 
 def main():
     d = json.loads(DATA.read_text(encoding="utf-8"))
@@ -320,7 +371,13 @@ def main():
     n_benefit = len(d["benefits"])
     n_tabs = len(d["benefit_tabs"])
 
-    video_html, video_json, n_clips = video_section()
+    video_html, video_json, n_clips, n_guide = video_section()
+    if n_guide == n_clips:
+        clip_note = "動画は「お金の動画制作」のセッションで、1本1制度で作りました（声と絵はAI）。制度の数字は2026年10月時点です。"
+    elif n_guide:
+        clip_note = f"動画のうち{n_guide}本は1本1制度で作ったもの、ほかは完成した5本を字幕と音の切れ目で切り分けたものです（残りも1本1制度の動画に入れ替えます）。"
+    else:
+        clip_note = "短い動画は、完成した5本を字幕と音の切れ目で切り分けたものです（声や絵は作り直していません）。TOP5の動画は、4位が短い（1〜2文）ので、5位と1本にまとめました。"
 
     docs = [
         (SCRIPTS, "台本帳", "偉人編 損する制度シリーズ", "制度編3本と改正TOP5の2本。配役・乱入・演出・出典まで、制作セッションに頼む文ごとワンタップでコピーできます。"),
@@ -434,7 +491,7 @@ def main():
     <ul>
       <li>3つとも試作です。制度の内容は2026年10月5日時点で、国税庁・日本年金機構・厚生労働省などの資料と報道で確かめました。「法案」「検討中」は決まったら直します。</li>
       <li>診断の答えとチェックは、見ている端末の中だけに残ります（どこにも送りません）。</li>
-      <li>短い動画は、完成した5本を字幕と音の切れ目で切り分けたものです（声や絵は作り直していません）。TOP5の動画は、4位が短い（1〜2文）ので、5位と1本にまとめました。</li>
+      <li>{clip_note}</li>
       <li>選んだ時期・だれ向けと「続けて再生」の設定は、見ている端末の中だけに残ります。</li>
       <li>ページの上のメニューや、ほかのページへのリンクは、プレビューでは開きません。実際のサイトでは開きます。</li>
       <li>広告（アフィリエイト）は入れていません。実際のサイトに入れるときは、データの <code>制度データ 2026-10.json</code> を直せば3ページとも変わります。</li>

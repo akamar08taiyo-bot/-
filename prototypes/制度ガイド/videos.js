@@ -143,7 +143,8 @@
 
   function render() {
     var c = list[cur], full = !!c.chapters;
-    $('vp-kicker').textContent = full ? c.no + '・通し（' + total(c.dur) + '）' : c.no + '・' + c.rankLabel + ' ／ ' + V.groupLabel[c.group];
+    $('vp-kicker').textContent = full ? c.no + '・通し（' + total(c.dur) + '）'
+      : c.rankLabel ? c.no + '・' + c.rankLabel + ' ／ ' + V.groupLabel[c.group] : V.groupLabel[c.group];
     $('vp-title').textContent = c.title;
     var forEl = $('vp-for');
     forEl.hidden = full;
