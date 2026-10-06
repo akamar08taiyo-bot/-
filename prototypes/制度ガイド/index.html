@@ -144,6 +144,7 @@ h1{font-size:clamp(30px,6.2vw,46px);line-height:1.35;letter-spacing:-.035em;font
 .vtag{border:1px solid var(--line);border-radius:4px;padding:0 6px;background:var(--bg);color:var(--ink)}
 .vtag.is-hit{background:var(--accent);border-color:var(--accent);color:#fff}
 .vcard h3{margin-top:2px;font-size:16px;line-height:1.5;font-weight:800}
+.vsub{display:block;margin-top:1px;font-size:13px;font-weight:700;color:var(--muted)}
 .vopen{margin:0;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
 .vopen::after{content:"";position:absolute;inset:0;border-radius:10px}
 .vopen:focus-visible{outline:none}
@@ -178,6 +179,7 @@ html.v-open{overflow:hidden}
 .vp-close{position:absolute;top:10px;right:10px;z-index:2;display:grid;place-items:center;width:44px;height:44px;border-radius:50%;border:1px solid #ffffff4d;background:#000000a6;color:#fff;font-size:22px;line-height:1}
 .vp-kicker{padding-right:44px;font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--v-accent)}
 .vplayer h2{font-size:20px;line-height:1.45;font-weight:800;text-wrap:balance}
+.vp-sub{display:block;margin-top:2px;font-size:15px;font-weight:700;color:var(--v-muted)}
 .vplayer .vfor{color:var(--v-muted)}
 .vplayer .vtag{background:transparent;color:var(--v-ink);border-color:var(--v-line)}
 .vp-facts{display:grid;grid-template-columns:4.6em minmax(0,1fr);gap:6px 10px;margin:0;font-size:14px;line-height:1.7}
@@ -225,14 +227,14 @@ html.v-open{overflow:hidden}
   <header class="intro">
     <p class="brand"><img src="files/mascot.webp" alt="" width="44" height="44">おかねの地図<span class="pill">試作プレビュー</span></p>
     <h1><span class="nb">知らないと損する</span> <span class="nb">制度ガイド</span></h1>
-    <p class="lead">偉人編「知らないと損する制度」の動画と、動画の最後で配る3つの無料プレゼントの試作です。動画は制度ごとに短く分けて、いつの制度か・だれ向けかで選べるようにしました。アプリはそのまま押して試せます。</p>
+    <p class="lead">偉人編「知らないと損する制度」の動画と、動画の最後で配る3つの無料プレゼントの試作です。動画は1本1制度で、いつの制度か・だれ向けかで選べるようにしました。アプリはそのまま押して試せます。</p>
   </header>
 
   <section class="vids" id="videos" aria-labelledby="vids-title">
     <div class="sec-head">
       <p class="kicker">動画で見る</p>
-      <h2 id="vids-title"><span class="nb">知らないと損する制度を、</span><span class="nb">短い動画で</span></h2>
-      <p>制度ごとに条件と「やること」まで説明する動画（9本）と、偉人編のショートを制度ごとに切り分けた動画を合わせた16本です。「いつの制度か」と「だれ向けか」を選ぶと、当てはまる動画だけが出ます。押すと、このページの中で再生します。</p>
+      <h2 id="vids-title"><span class="nb">知らないと損する制度を、</span><span class="nb">動画でわかりやすく</span></h2>
+      <p>制度ごとに1本ずつ、条件と「やること」まで説明する動画16本です。「いつの制度か」と「だれ向けか」を選ぶと、当てはまる動画だけが出ます。押すと、このページの中で再生します。</p>
     </div>
     <div class="vpick">
       <div class="vstep" role="group" aria-labelledby="vstep1">
@@ -251,29 +253,29 @@ html.v-open{overflow:hidden}
     <div class="vlists">
       <h3 class="vlist-head" id="v-head-direct" hidden></h3>
       <ol class="vgrid" id="v-grid">
-<li class="vcard" data-id="k1-4">
-<div class="vthumb" aria-hidden="true"><img src="video/posters/k1-4.webp" alt="" width="360" height="640" loading="lazy"><span class="vrank">1位</span><span class="vdur">0:13</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
+<li class="vcard" data-id="g01">
+<div class="vthumb" aria-hidden="true"><img src="video/posters/g01.webp" alt="" width="360" height="640" loading="lazy"><span class="vdur">1:32</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
 <div class="vbody">
 <p class="vfor"><span class="vtag" data-tag="kaishain">会社員</span><span class="vtag" data-tag="part">パート</span><span class="vtag" data-tag="nenkin">年金</span>向け</p>
-<h3><button type="button" class="vopen" data-play="k1-4">12月に税金が戻る（精算）<span class="sr-only">（改正編1・1位、13秒の動画を再生）</span></button></h3>
+<h3><button type="button" class="vopen" data-play="g01">12月に戻る税金<span class="vsub">今年の年末調整で知っておくこと</span><span class="sr-only">（2026年度の改正、92秒の動画を再生）</span></button></h3>
 <p class="vwhen">2026年12月</p>
-<p class="vpoint">11月まで古い基準で引いた所得税を、12月にまとめて精算。会社員は年末調整、年金は12月の支払いで。</p>
+<p class="vpoint">11月まで古い基準で引いた所得税を、12月にまとめて精算。給与だけなら年収178万円まで所得税がかかりません。</p>
 </div>
 </li>
-<li class="vcard" data-id="k1-2">
-<div class="vthumb" aria-hidden="true"><img src="video/posters/k1-2.webp" alt="" width="360" height="640" loading="lazy"><span class="vrank">3位</span><span class="vdur">0:09</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
+<li class="vcard" data-id="g02">
+<div class="vthumb" aria-hidden="true"><img src="video/posters/g02.webp" alt="" width="360" height="640" loading="lazy"><span class="vdur">1:15</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
 <div class="vbody">
 <p class="vfor"><span class="vtag" data-tag="kaishain">会社員</span><span class="vtag" data-tag="jieigyo">自営業</span>向け</p>
-<h3><button type="button" class="vopen" data-play="k1-2">iDeCoの上限アップ<span class="sr-only">（改正編1・3位、9秒の動画を再生）</span></button></h3>
+<h3><button type="button" class="vopen" data-play="g02">iDeCoの掛金の上限が上がる<span class="vsub">12月分から</span><span class="sr-only">（2026年度の改正、75秒の動画を再生）</span></button></h3>
 <p class="vwhen">2026年12月分から</p>
-<p class="vpoint">企業年金のない会社員は月2.3万円→6.2万円。自営業などは月6.8万円→7.5万円。</p>
+<p class="vpoint">企業年金のない会社員は月2.3万円→6.2万円、自営業などは6.8万円→7.5万円に。60歳以上も70歳まで入れます。</p>
 </div>
 </li>
 <li class="vcard" data-id="g03">
 <div class="vthumb" aria-hidden="true"><img src="video/posters/g03.webp" alt="" width="360" height="640" loading="lazy"><span class="vdur">0:59</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
 <div class="vbody">
 <p class="vfor"><span class="vtag" data-tag="all">ほとんどの人</span>向け</p>
-<h3><button type="button" class="vopen" data-play="g03">防衛特別所得税　2027年1月から始まる新しい税<span class="sr-only">（2026年度の改正、59秒の動画を再生）</span></button></h3>
+<h3><button type="button" class="vopen" data-play="g03">防衛特別所得税<span class="vsub">2027年1月から始まる新しい税</span><span class="sr-only">（2026年度の改正、59秒の動画を再生）</span></button></h3>
 <p class="vwhen">2027年1月から</p>
 <p class="vpoint">所得税に1%上乗せ。ただし復興特別所得税が1%下がるので、合計は今と同じ（そのぶん長く続く）。</p>
 </div>
@@ -282,63 +284,63 @@ html.v-open{overflow:hidden}
 <div class="vthumb" aria-hidden="true"><img src="video/posters/g04.webp" alt="" width="360" height="640" loading="lazy"><span class="vdur">1:09</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
 <div class="vbody">
 <p class="vfor"><span class="vtag" data-tag="kosodate">子育て</span>向け</p>
-<h3><button type="button" class="vopen" data-play="g04">こどもNISA　0〜17歳も年60万円まで非課税<span class="sr-only">（2026年度の改正、69秒の動画を再生）</span></button></h3>
+<h3><button type="button" class="vopen" data-play="g04">こどもNISA<span class="vsub">0〜17歳も年60万円まで非課税</span><span class="sr-only">（2026年度の改正、69秒の動画を再生）</span></button></h3>
 <p class="vwhen">2027年1月から</p>
 <p class="vpoint">0〜17歳も年60万円・合計600万円まで非課税で積み立て。12歳からは子どものための費用なら引き出せます。</p>
 </div>
 </li>
-<li class="vcard" data-id="k1-3">
-<div class="vthumb" aria-hidden="true"><img src="video/posters/k1-3.webp" alt="" width="360" height="640" loading="lazy"><span class="vrank">2位</span><span class="vdur">0:12</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
+<li class="vcard" data-id="g05">
+<div class="vthumb" aria-hidden="true"><img src="video/posters/g05.webp" alt="" width="360" height="640" loading="lazy"><span class="vdur">1:11</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
 <div class="vbody">
 <p class="vfor"><span class="vtag" data-tag="iryo">通院・薬</span>向け</p>
-<h3><button type="button" class="vopen" data-play="k1-3">市販薬に似た薬の負担増<span class="sr-only">（改正編1・2位、12秒の動画を再生）</span></button></h3>
+<h3><button type="button" class="vopen" data-play="g05">市販薬に似た薬の負担が増える<span class="vsub">2027年3月から</span><span class="sr-only">（2026年度の改正、71秒の動画を再生）</span></button></h3>
 <p class="vwhen">2027年3月から</p>
-<p class="vpoint">湿布・保湿剤・花粉症の薬など77成分。薬代の4分の1が上乗せで、3割負担なら約1.6倍。子どもや入院中の人などは対象外。</p>
+<p class="vpoint">湿布や保湿剤など77成分は、薬代の4分の1が上乗せ。3割負担なら約1.6倍。市販薬の控除は2027年からも続きます。</p>
 </div>
 </li>
 <li class="vcard" data-id="g06">
 <div class="vthumb" aria-hidden="true"><img src="video/posters/g06.webp" alt="" width="360" height="640" loading="lazy"><span class="vdur">0:55</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
 <div class="vbody">
 <p class="vfor"><span class="vtag" data-tag="all">ほとんどの人</span>向け</p>
-<h3><button type="button" class="vopen" data-play="g06">子ども・子育て支援金　2027年度は月350円ほどに<span class="sr-only">（2027年度の改正、55秒の動画を再生）</span></button></h3>
+<h3><button type="button" class="vopen" data-play="g06">子ども・子育て支援金<span class="vsub">2027年度は月350円ほどに</span><span class="sr-only">（2027年度の改正、55秒の動画を再生）</span></button></h3>
 <p class="vwhen">2027年4月から</p>
 <p class="vpoint">健康保険料と一緒に払う支援金。加入者1人あたり平均で月250円→350円（2027年度）→450円ほど。</p>
 </div>
 </li>
-<li class="vcard" data-id="k2-4">
-<div class="vthumb" aria-hidden="true"><img src="video/posters/k2-4.webp" alt="" width="360" height="640" loading="lazy"><span class="vrank">1位</span><span class="vdur">0:12</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
+<li class="vcard" data-id="g07">
+<div class="vthumb" aria-hidden="true"><img src="video/posters/g07.webp" alt="" width="360" height="640" loading="lazy"><span class="vdur">0:56</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
 <div class="vbody">
 <p class="vfor"><span class="vtag" data-tag="all">ほとんどの人</span>向け</p>
-<h3><button type="button" class="vopen" data-play="k2-4">食料品の消費税が1%に<span class="sr-only">（改正編2・1位、12秒の動画を再生）</span></button></h3>
+<h3><button type="button" class="vopen" data-play="g07">食料品の消費税1%<span class="vsub">決まったこと・まだのこと</span><span class="sr-only">（2027年度の改正、56秒の動画を再生）</span></button></h3>
 <p class="vwhen">2027年4月から2年間<span class="vstatus">法案（まだ決まっていない）</span></p>
-<p class="vpoint">食料品の消費税が8%→1%に。ただし店内で食べると10%のまま。お酒も対象外です。</p>
+<p class="vpoint">2027年4月から2年間、食料品の消費税を8%→1%にする案。店内で食べるとき・お酒は10%のまま。</p>
 </div>
 </li>
-<li class="vcard" data-id="k2-3">
-<div class="vthumb" aria-hidden="true"><img src="video/posters/k2-3.webp" alt="" width="360" height="640" loading="lazy"><span class="vrank">2位</span><span class="vdur">0:08</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
+<li class="vcard" data-id="g08">
+<div class="vthumb" aria-hidden="true"><img src="video/posters/g08.webp" alt="" width="360" height="640" loading="lazy"><span class="vdur">0:54</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
 <div class="vbody">
 <p class="vfor"><span class="vtag" data-tag="kaishain">会社員</span><span class="vtag" data-tag="part">パート</span><span class="vtag" data-tag="jieigyo">自営業</span>向け</p>
-<h3><button type="button" class="vopen" data-play="k2-3">働く人への新しい給付金<span class="sr-only">（改正編2・2位、8秒の動画を再生）</span></button></h3>
+<h3><button type="button" class="vopen" data-play="g08">働く人への新しい給付金<span class="vsub">受け取り方の準備</span><span class="sr-only">（2027年度の改正、54秒の動画を再生）</span></button></h3>
 <p class="vwhen">2027年度<span class="vstatus">法案（まだ決まっていない）</span></p>
-<p class="vpoint">働く中低所得の人に年1回。金額はまだ決まっていません。公金受取口座があれば申請なしで受け取れる仕組みです。</p>
+<p class="vpoint">働く中低所得の人に年1回配る案。額は未定。公金受取口座があれば申請なしで振り込まれる仕組みです。</p>
 </div>
 </li>
-<li class="vcard" data-id="k2-2">
-<div class="vthumb" aria-hidden="true"><img src="video/posters/k2-2.webp" alt="" width="360" height="640" loading="lazy"><span class="vrank">3位</span><span class="vdur">0:11</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
+<li class="vcard" data-id="g09">
+<div class="vthumb" aria-hidden="true"><img src="video/posters/g09.webp" alt="" width="360" height="640" loading="lazy"><span class="vdur">1:05</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
 <div class="vbody">
 <p class="vfor"><span class="vtag" data-tag="iryo">通院・薬</span>向け</p>
-<h3><button type="button" class="vopen" data-play="k2-2">高額療養費の上限<span class="sr-only">（改正編2・3位、11秒の動画を再生）</span></button></h3>
-<p class="vwhen">2027年8月から</p>
-<p class="vpoint">区分が細かくなり、収入が高いほど上限が上がります。70歳未満・年収約650〜770万円なら月約8.6万円→約11万円。</p>
+<h3><button type="button" class="vopen" data-play="g09">高額療養費の上限が変わる<span class="vsub">2026年8月と2027年8月</span><span class="sr-only">（2027年度の改正、65秒の動画を再生）</span></button></h3>
+<p class="vwhen">2026年8月・2027年8月</p>
+<p class="vpoint">2026年8月に年間の上限ができ、2027年8月から区分が細かく。年収650〜770万円なら月約8.6万円→約11万円に。</p>
 </div>
 </li>
-<li class="vcard" data-id="k2-1">
-<div class="vthumb" aria-hidden="true"><img src="video/posters/k2-1.webp" alt="" width="360" height="640" loading="lazy"><span class="vrank">5位・4位</span><span class="vdur">0:18</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
+<li class="vcard" data-id="g10">
+<div class="vthumb" aria-hidden="true"><img src="video/posters/g10.webp" alt="" width="360" height="640" loading="lazy"><span class="vdur">0:55</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
 <div class="vbody">
-<p class="vfor"><span class="vtag" data-tag="part">パート</span><span class="vtag" data-tag="all">ほとんどの人</span>向け</p>
-<h3><button type="button" class="vopen" data-play="k2-1">パートの社会保険・子育て支援金<span class="sr-only">（改正編2・5位・4位、18秒の動画を再生）</span></button></h3>
-<p class="vwhen">2027年10月から・4月から</p>
-<p class="vpoint">週20時間以上なら、36人以上の会社でも年収に関係なく社会保険に入ります。子育て支援金は平均で月100円ほど上がります。</p>
+<p class="vfor"><span class="vtag" data-tag="part">パート</span>向け</p>
+<h3><button type="button" class="vopen" data-play="g10">パートの社会保険<span class="vsub">106万円の壁がなくなった</span><span class="sr-only">（2027年度の改正、55秒の動画を再生）</span></button></h3>
+<p class="vwhen">2026年10月・2027年10月</p>
+<p class="vpoint">106万円の壁がなくなり、週20時間以上なら加入。2027年10月からは36人以上の会社にも広がります。</p>
 </div>
 </li>
 <li class="vcard" data-id="g11">
@@ -363,7 +365,7 @@ html.v-open{overflow:hidden}
 <div class="vthumb" aria-hidden="true"><img src="video/posters/g13.webp" alt="" width="360" height="640" loading="lazy"><span class="vdur">1:02</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
 <div class="vbody">
 <p class="vfor"><span class="vtag" data-tag="nenkin">年金</span>向け</p>
-<h3><button type="button" class="vopen" data-play="g13">年金の封筒①　税金にかかわる3通<span class="sr-only">（いつでも役立つ制度、62秒の動画を再生）</span></button></h3>
+<h3><button type="button" class="vopen" data-play="g13">年金の封筒①<span class="vsub">税金にかかわる3通</span><span class="sr-only">（いつでも役立つ制度、62秒の動画を再生）</span></button></h3>
 <p class="vwhen">6月・1月・秋に届く</p>
 <p class="vpoint">6月の年金額改定通知書、1月の源泉徴収票、秋の扶養親族等申告書。出さないと税金が多く引かれることも。</p>
 </div>
@@ -372,7 +374,7 @@ html.v-open{overflow:hidden}
 <div class="vthumb" aria-hidden="true"><img src="video/posters/g14.webp" alt="" width="360" height="640" loading="lazy"><span class="vdur">0:57</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
 <div class="vbody">
 <p class="vfor"><span class="vtag" data-tag="nenkin">年金</span>向け</p>
-<h3><button type="button" class="vopen" data-play="g14">年金の封筒②　返事が要る2通<span class="sr-only">（いつでも役立つ制度、57秒の動画を再生）</span></button></h3>
+<h3><button type="button" class="vopen" data-play="g14">年金の封筒②<span class="vsub">返事が要る2通</span><span class="sr-only">（いつでも役立つ制度、57秒の動画を再生）</span></button></h3>
 <p class="vwhen">届いたらすぐ</p>
 <p class="vpoint">公金受取口座の意向確認書は45日で同意のあつかい。年金生活者支援給付金のはがきは、出さないともらえません。</p>
 </div>
@@ -381,7 +383,7 @@ html.v-open{overflow:hidden}
 <div class="vthumb" aria-hidden="true"><img src="video/posters/g15.webp" alt="" width="360" height="640" loading="lazy"><span class="vdur">1:13</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
 <div class="vbody">
 <p class="vfor"><span class="vtag" data-tag="kaigo">介護</span>向け</p>
-<h3><button type="button" class="vopen" data-play="g15">親の家の手すり　介護保険の住宅改修<span class="sr-only">（いつでも役立つ制度、73秒の動画を再生）</span></button></h3>
+<h3><button type="button" class="vopen" data-play="g15">親の家の手すり<span class="vsub">介護保険の住宅改修</span><span class="sr-only">（いつでも役立つ制度、73秒の動画を再生）</span></button></h3>
 <p class="vwhen">工事の前に</p>
 <p class="vpoint">手すりや段差の工事は原則20万円まで、1割負担なら最大18万円が戻ります。工事の前の申請が必要です。</p>
 </div>
@@ -390,7 +392,7 @@ html.v-open{overflow:hidden}
 <div class="vthumb" aria-hidden="true"><img src="video/posters/g16.webp" alt="" width="360" height="640" loading="lazy"><span class="vdur">1:05</span><span class="vbtn"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></span></div>
 <div class="vbody">
 <p class="vfor"><span class="vtag" data-tag="kaigo">介護</span>向け</p>
-<h3><button type="button" class="vopen" data-play="g16">福祉用具を買うと費用が戻る　介護保険の購入費<span class="sr-only">（いつでも役立つ制度、65秒の動画を再生）</span></button></h3>
+<h3><button type="button" class="vopen" data-play="g16">福祉用具を買うと費用が戻る<span class="vsub">介護保険の購入費</span><span class="sr-only">（いつでも役立つ制度、65秒の動画を再生）</span></button></h3>
 <p class="vwhen">買う前に</p>
 <p class="vpoint">ポータブルトイレや入浴用のいすなどは、1年度に10万円まで。指定を受けたお店で買わないと戻りません。</p>
 </div>
@@ -424,7 +426,7 @@ html.v-open{overflow:hidden}
     <button type="button" class="vp-close" id="vp-close" aria-label="閉じる" autofocus>×</button>
   </div>
 </dialog>
-<script type="application/json" id="video-data">{"groups":[{"key":"fy2026","label":"2026年度の改正","sub":"この冬〜3月"},{"key":"fy2027","label":"2027年度の改正","sub":"2027年4月〜"},{"key":"always","label":"いつでも役立つ制度","sub":"年金・介護"}],"groupLabel":{"fy2026":"2026年度の改正","fy2027":"2027年度の改正","always":"いつでも役立つ制度","all":"ぜんぶの時期"},"tagLabel":{"all":"ほとんどの人","kaishain":"会社員","part":"パート","jieigyo":"自営業","nenkin":"年金","kosodate":"子育て","iryo":"通院・薬","kaigo":"介護"},"clips":[{"id":"k1-4","src":"kaisei1p","group":"fy2026","no":"改正編1","rank":"1位","rankLabel":"1位","title":"12月に税金が戻る（精算）","when":"2026年12月","who":["kaishain","part","nenkin"],"status":"決定","point":"11月まで古い基準で引いた所得税を、12月にまとめて精算。会社員は年末調整、年金は12月の支払いで。","todo":"年末調整の書類を出す。年の途中で辞めた人は確定申告","at":42.8,"dur":13.3,"video":"video/clips/k1-4.mp4","poster":"video/posters/k1-4.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html#kaishain"]},{"id":"k1-2","src":"kaisei1p","group":"fy2026","no":"改正編1","rank":"3位","rankLabel":"3位","title":"iDeCoの上限アップ","when":"2026年12月分から","who":["kaishain","jieigyo"],"status":"決定","point":"企業年金のない会社員は月2.3万円→6.2万円。自営業などは月6.8万円→7.5万円。","todo":"掛金を上げたい人は自分で手続き（自動では変わりません）","at":21.5,"dur":9.3,"video":"video/clips/k1-2.mp4","poster":"video/posters/k1-2.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html#kaishain"]},{"id":"g03","src":"g03","group":"fy2026","no":"","rank":"","rankLabel":"","title":"防衛特別所得税　2027年1月から始まる新しい税","when":"2027年1月から","who":["all"],"status":"決定","point":"所得税に1%上乗せ。ただし復興特別所得税が1%下がるので、合計は今と同じ（そのぶん長く続く）。","todo":"手続きは要りません","at":0,"dur":59.4,"guide":true,"video":"video/guide/g03.mp4","poster":"video/posters/g03.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html"]},{"id":"g04","src":"g04","group":"fy2026","no":"","rank":"","rankLabel":"","title":"こどもNISA　0〜17歳も年60万円まで非課税","when":"2027年1月から","who":["kosodate"],"status":"決定","point":"0〜17歳も年60万円・合計600万円まで非課税で積み立て。12歳からは子どものための費用なら引き出せます。","todo":"金融機関の受付時期を確かめる","at":0,"dur":69.0,"guide":true,"video":"video/guide/g04.mp4","poster":"video/posters/g04.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html#kosodate"]},{"id":"k1-3","src":"kaisei1p","group":"fy2026","no":"改正編1","rank":"2位","rankLabel":"2位","title":"市販薬に似た薬の負担増","when":"2027年3月から","who":["iryo"],"status":"決定","point":"湿布・保湿剤・花粉症の薬など77成分。薬代の4分の1が上乗せで、3割負担なら約1.6倍。子どもや入院中の人などは対象外。","todo":"よく使う薬が対象か、薬局や医師に聞く","at":30.95,"dur":11.9,"video":"video/clips/k1-3.mp4","poster":"video/posters/k1-3.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html#iryo"]},{"id":"g06","src":"g06","group":"fy2027","no":"","rank":"","rankLabel":"","title":"子ども・子育て支援金　2027年度は月350円ほどに","when":"2027年4月から","who":["all"],"status":"決定","point":"健康保険料と一緒に払う支援金。加入者1人あたり平均で月250円→350円（2027年度）→450円ほど。","todo":"手続きは要りません。給与明細で額を見る","at":0,"dur":55.1,"guide":true,"video":"video/guide/g06.mp4","poster":"video/posters/g06.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html"]},{"id":"k2-4","src":"kaisei2p","group":"fy2027","no":"改正編2","rank":"1位","rankLabel":"1位","title":"食料品の消費税が1%に","when":"2027年4月から2年間","who":["all"],"status":"法案","point":"食料品の消費税が8%→1%に。ただし店内で食べると10%のまま。お酒も対象外です。","todo":"法律が成立したかを確かめる","at":38.5,"dur":12.4,"video":"video/clips/k2-4.mp4","poster":"video/posters/k2-4.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html"]},{"id":"k2-3","src":"kaisei2p","group":"fy2027","no":"改正編2","rank":"2位","rankLabel":"2位","title":"働く人への新しい給付金","when":"2027年度","who":["kaishain","part","jieigyo"],"status":"法案","point":"働く中低所得の人に年1回。金額はまだ決まっていません。公金受取口座があれば申請なしで受け取れる仕組みです。","todo":"公金受取口座を登録しておく","at":31.05,"dur":7.5,"video":"video/clips/k2-3.mp4","poster":"video/posters/k2-3.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html#kaishain"]},{"id":"k2-2","src":"kaisei2p","group":"fy2027","no":"改正編2","rank":"3位","rankLabel":"3位","title":"高額療養費の上限","when":"2027年8月から","who":["iryo"],"status":"決定","point":"区分が細かくなり、収入が高いほど上限が上がります。70歳未満・年収約650〜770万円なら月約8.6万円→約11万円。","todo":"自分の区分を確かめる","at":19.85,"dur":11.0,"video":"video/clips/k2-2.mp4","poster":"video/posters/k2-2.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html#iryo"]},{"id":"k2-1","src":"kaisei2p","group":"fy2027","no":"改正編2","rank":"5位・4位","rankLabel":"5位・4位","title":"パートの社会保険・子育て支援金","when":"2027年10月から・4月から","who":["part","all"],"status":"決定","point":"週20時間以上なら、36人以上の会社でも年収に関係なく社会保険に入ります。子育て支援金は平均で月100円ほど上がります。","todo":"勤め先の人数と、自分の働く時間を確かめる","at":0.0,"dur":18.5,"video":"video/clips/k2-1.mp4","poster":"video/posters/k2-1.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html#part"]},{"id":"g11","src":"g11","group":"always","no":"","rank":"","rankLabel":"","title":"年金は何歳から？早めると減る・遅らせると増える","when":"年金をもらい始めるとき","who":["nenkin"],"status":"決定","point":"60〜75歳で選べ、1か月早めると0.4%減・遅らせると0.7%増。合計で比べた分かれ目は約80歳10か月・86歳11か月。","todo":"健康・貯金・働き方で決める","at":0,"dur":68.9,"guide":true,"video":"video/guide/g11.mp4","poster":"video/posters/g11.webp","link":["あなたに合う制度を診断する","shindan.html"]},{"id":"g12","src":"g12","group":"always","no":"","rank":"","rankLabel":"","title":"年金を早める・遅らせる前に気をつけたい4つ","when":"年金をもらい始めるとき","who":["nenkin"],"status":"決定","point":"早めた請求は取り消せない、待つ間は加給年金ももらえない、働いて止まる分は増えない。基礎年金だけ遅らせる手も。","todo":"ねんきんネットで見込み額を見てから決める","at":0,"dur":55.6,"guide":true,"video":"video/guide/g12.mp4","poster":"video/posters/g12.webp","link":["あなたに合う制度を診断する","shindan.html"]},{"id":"g13","src":"g13","group":"always","no":"","rank":"","rankLabel":"","title":"年金の封筒①　税金にかかわる3通","when":"6月・1月・秋に届く","who":["nenkin"],"status":"決定","point":"6月の年金額改定通知書、1月の源泉徴収票、秋の扶養親族等申告書。出さないと税金が多く引かれることも。","todo":"届いたら開けて、期限のある書類を出す","at":0,"dur":62.4,"guide":true,"video":"video/guide/g13.mp4","poster":"video/posters/g13.webp","link":["給付金・手当の一覧（年金）を見る","kyufu.html#nenkin"]},{"id":"g14","src":"g14","group":"always","no":"","rank":"","rankLabel":"","title":"年金の封筒②　返事が要る2通","when":"届いたらすぐ","who":["nenkin"],"status":"決定","point":"公金受取口座の意向確認書は45日で同意のあつかい。年金生活者支援給付金のはがきは、出さないともらえません。","todo":"見つけたら、すぐ中身を確かめる","at":0,"dur":57.4,"guide":true,"video":"video/guide/g14.mp4","poster":"video/posters/g14.webp","link":["給付金・手当の一覧（年金）を見る","kyufu.html#nenkin"]},{"id":"g15","src":"g15","group":"always","no":"","rank":"","rankLabel":"","title":"親の家の手すり　介護保険の住宅改修","when":"工事の前に","who":["kaigo"],"status":"決定","point":"手すりや段差の工事は原則20万円まで、1割負担なら最大18万円が戻ります。工事の前の申請が必要です。","todo":"工事の前にケアマネジャーへ相談","at":0,"dur":72.6,"guide":true,"video":"video/guide/g15.mp4","poster":"video/posters/g15.webp","link":["給付金・手当の一覧（介護）を見る","kyufu.html#kaigo"]},{"id":"g16","src":"g16","group":"always","no":"","rank":"","rankLabel":"","title":"福祉用具を買うと費用が戻る　介護保険の購入費","when":"買う前に","who":["kaigo"],"status":"決定","point":"ポータブルトイレや入浴用のいすなどは、1年度に10万円まで。指定を受けたお店で買わないと戻りません。","todo":"買う前にケアマネジャーに相談","at":0,"dur":65.3,"guide":true,"video":"video/guide/g16.mp4","poster":"video/posters/g16.webp","link":["給付金・手当の一覧（介護）を見る","kyufu.html#kaigo"]}],"full":[{"id":"kaisei1p","src":"kaisei1p","group":"fy2026","no":"改正編1","title":"11月以降に変わるお金のルールTOP5","dur":72.6,"video":"video/full/kaisei1p.mp4","poster":"video/posters/kaisei1p.webp","chapters":[{"at":0.0,"label":"5位・4位　防衛特別所得税・こどもNISA"},{"at":20.07,"label":"3位　iDeCoの上限アップ"},{"at":30.77,"label":"2位　市販薬に似た薬の負担増"},{"at":42.8,"label":"1位　12月に税金が戻る（精算）"}],"link":["制度改正まとめで、条件までくわしく見る","kaisei.html"]},{"id":"kaisei2p","src":"kaisei2p","group":"fy2027","no":"改正編2","title":"知らないと損する 2027年度の制度改正TOP5","dur":66.9,"video":"video/full/kaisei2p.mp4","poster":"video/posters/kaisei2p.webp","chapters":[{"at":0.0,"label":"5位・4位　パートの社会保険・子育て支援金"},{"at":18.46,"label":"3位　高額療養費の上限"},{"at":30.87,"label":"2位　働く人への新しい給付金"},{"at":38.5,"label":"1位　食料品の消費税が1%に"}],"link":["制度改正まとめで、条件までくわしく見る","kaisei.html"]},{"id":"seido1p","src":"seido1p","group":"always","no":"制度編1","title":"三英傑の年金：60歳・65歳・75歳、いちばん損するのは？","dur":69.1,"video":"video/full/seido1p.mp4","poster":"video/posters/seido1p.webp","chapters":[{"at":0.0,"label":"その1　早めると減る・遅らせると増える"},{"at":22.9,"label":"その2　65歳で月15万円なら、いくら？"},{"at":31.7,"label":"その3　もらった合計で比べると"},{"at":46.47,"label":"その4　決める前に気をつけたいこと"}],"link":["あなたに合う制度を診断する","shindan.html"]},{"id":"seido2p","src":"seido2p","group":"always","no":"制度編2","title":"年金生活、捨てたら損する封筒ベスト5","dur":72.1,"video":"video/full/seido2p.mp4","poster":"video/posters/seido2p.webp","chapters":[{"at":0.0,"label":"5位・4位　年金額改定通知書・源泉徴収票"},{"at":14.9,"label":"3位　公金受取口座の意向確認書"},{"at":33.14,"label":"2位　扶養親族等申告書"},{"at":44.34,"label":"1位　年金生活者支援給付金のはがき"}],"link":["給付金・手当の一覧（年金）を見る","kyufu.html#nenkin"]},{"id":"seido3p","src":"seido3p","group":"always","no":"制度編3","title":"親の家の手すり、工事の前に申請しないと損","dur":66.4,"video":"video/full/seido3p.mp4","poster":"video/posters/seido3p.webp","chapters":[{"at":0.0,"label":"その1　9割戻る？介護保険の住宅改修"},{"at":18.58,"label":"その2　工事の前に申請する"},{"at":35.5,"label":"その3　対象の工事と自己負担"}],"link":["給付金・手当の一覧（介護）を見る","kyufu.html#kaigo"]}]}</script>
+<script type="application/json" id="video-data">{"groups":[{"key":"fy2026","label":"2026年度の改正","sub":"この冬〜3月"},{"key":"fy2027","label":"2027年度の改正","sub":"2027年4月〜"},{"key":"always","label":"いつでも役立つ制度","sub":"年金・介護"}],"groupLabel":{"fy2026":"2026年度の改正","fy2027":"2027年度の改正","always":"いつでも役立つ制度","all":"ぜんぶの時期"},"tagLabel":{"all":"ほとんどの人","kaishain":"会社員","part":"パート","jieigyo":"自営業","nenkin":"年金","kosodate":"子育て","iryo":"通院・薬","kaigo":"介護"},"clips":[{"id":"g01","src":"g01","group":"fy2026","no":"","rank":"","rankLabel":"","title":"12月に戻る税金","sub":"今年の年末調整で知っておくこと","when":"2026年12月","who":["kaishain","part","nenkin"],"status":"決定","point":"11月まで古い基準で引いた所得税を、12月にまとめて精算。給与だけなら年収178万円まで所得税がかかりません。","todo":"年末調整の書類を出す。年の途中で辞めた人は確定申告","at":0,"dur":92.1,"guide":true,"video":"video/guide/g01.mp4","poster":"video/posters/g01.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html#kaishain"]},{"id":"g02","src":"g02","group":"fy2026","no":"","rank":"","rankLabel":"","title":"iDeCoの掛金の上限が上がる","sub":"12月分から","when":"2026年12月分から","who":["kaishain","jieigyo"],"status":"決定","point":"企業年金のない会社員は月2.3万円→6.2万円、自営業などは6.8万円→7.5万円に。60歳以上も70歳まで入れます。","todo":"上限を確かめて、金融機関で掛金の変更を申し込む（自動では増えない）","at":0,"dur":75.4,"guide":true,"video":"video/guide/g02.mp4","poster":"video/posters/g02.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html#kaishain"]},{"id":"g03","src":"g03","group":"fy2026","no":"","rank":"","rankLabel":"","title":"防衛特別所得税","sub":"2027年1月から始まる新しい税","when":"2027年1月から","who":["all"],"status":"決定","point":"所得税に1%上乗せ。ただし復興特別所得税が1%下がるので、合計は今と同じ（そのぶん長く続く）。","todo":"手続きは要りません","at":0,"dur":59.4,"guide":true,"video":"video/guide/g03.mp4","poster":"video/posters/g03.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html"]},{"id":"g04","src":"g04","group":"fy2026","no":"","rank":"","rankLabel":"","title":"こどもNISA","sub":"0〜17歳も年60万円まで非課税","when":"2027年1月から","who":["kosodate"],"status":"決定","point":"0〜17歳も年60万円・合計600万円まで非課税で積み立て。12歳からは子どものための費用なら引き出せます。","todo":"金融機関の受付時期を確かめる","at":0,"dur":69.0,"guide":true,"video":"video/guide/g04.mp4","poster":"video/posters/g04.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html#kosodate"]},{"id":"g05","src":"g05","group":"fy2026","no":"","rank":"","rankLabel":"","title":"市販薬に似た薬の負担が増える","sub":"2027年3月から","when":"2027年3月から","who":["iryo"],"status":"決定","point":"湿布や保湿剤など77成分は、薬代の4分の1が上乗せ。3割負担なら約1.6倍。市販薬の控除は2027年からも続きます。","todo":"よく使う薬が対象か薬局で聞く。レシートは取っておく","at":0,"dur":70.7,"guide":true,"video":"video/guide/g05.mp4","poster":"video/posters/g05.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html#iryo"]},{"id":"g06","src":"g06","group":"fy2027","no":"","rank":"","rankLabel":"","title":"子ども・子育て支援金","sub":"2027年度は月350円ほどに","when":"2027年4月から","who":["all"],"status":"決定","point":"健康保険料と一緒に払う支援金。加入者1人あたり平均で月250円→350円（2027年度）→450円ほど。","todo":"手続きは要りません。給与明細で額を見る","at":0,"dur":55.1,"guide":true,"video":"video/guide/g06.mp4","poster":"video/posters/g06.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html"]},{"id":"g07","src":"g07","group":"fy2027","no":"","rank":"","rankLabel":"","title":"食料品の消費税1%","sub":"決まったこと・まだのこと","when":"2027年4月から2年間","who":["all"],"status":"法案","point":"2027年4月から2年間、食料品の消費税を8%→1%にする案。店内で食べるとき・お酒は10%のまま。","todo":"法律が成立したかを確かめる","at":0,"dur":55.5,"guide":true,"video":"video/guide/g07.mp4","poster":"video/posters/g07.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html"]},{"id":"g08","src":"g08","group":"fy2027","no":"","rank":"","rankLabel":"","title":"働く人への新しい給付金","sub":"受け取り方の準備","when":"2027年度","who":["kaishain","part","jieigyo"],"status":"法案","point":"働く中低所得の人に年1回配る案。額は未定。公金受取口座があれば申請なしで振り込まれる仕組みです。","todo":"公金受取口座を確かめておく","at":0,"dur":54.3,"guide":true,"video":"video/guide/g08.mp4","poster":"video/posters/g08.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html#kaishain"]},{"id":"g09","src":"g09","group":"fy2027","no":"","rank":"","rankLabel":"","title":"高額療養費の上限が変わる","sub":"2026年8月と2027年8月","when":"2026年8月・2027年8月","who":["iryo"],"status":"決定","point":"2026年8月に年間の上限ができ、2027年8月から区分が細かく。年収650〜770万円なら月約8.6万円→約11万円に。","todo":"自分の区分を確かめる。マイナ保険証を使う","at":0,"dur":64.7,"guide":true,"video":"video/guide/g09.mp4","poster":"video/posters/g09.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html#iryo"]},{"id":"g10","src":"g10","group":"fy2027","no":"","rank":"","rankLabel":"","title":"パートの社会保険","sub":"106万円の壁がなくなった","when":"2026年10月・2027年10月","who":["part"],"status":"決定","point":"106万円の壁がなくなり、週20時間以上なら加入。2027年10月からは36人以上の会社にも広がります。","todo":"勤め先の人数と、自分の働く時間を確かめる","at":0,"dur":55.0,"guide":true,"video":"video/guide/g10.mp4","poster":"video/posters/g10.webp","link":["制度改正まとめで、条件までくわしく見る","kaisei.html#part"]},{"id":"g11","src":"g11","group":"always","no":"","rank":"","rankLabel":"","title":"年金は何歳から？早めると減る・遅らせると増える","sub":"","when":"年金をもらい始めるとき","who":["nenkin"],"status":"決定","point":"60〜75歳で選べ、1か月早めると0.4%減・遅らせると0.7%増。合計で比べた分かれ目は約80歳10か月・86歳11か月。","todo":"健康・貯金・働き方で決める","at":0,"dur":68.9,"guide":true,"video":"video/guide/g11.mp4","poster":"video/posters/g11.webp","link":["あなたに合う制度を診断する","shindan.html"]},{"id":"g12","src":"g12","group":"always","no":"","rank":"","rankLabel":"","title":"年金を早める・遅らせる前に気をつけたい4つ","sub":"","when":"年金をもらい始めるとき","who":["nenkin"],"status":"決定","point":"早めた請求は取り消せない、待つ間は加給年金ももらえない、働いて止まる分は増えない。基礎年金だけ遅らせる手も。","todo":"ねんきんネットで見込み額を見てから決める","at":0,"dur":55.6,"guide":true,"video":"video/guide/g12.mp4","poster":"video/posters/g12.webp","link":["あなたに合う制度を診断する","shindan.html"]},{"id":"g13","src":"g13","group":"always","no":"","rank":"","rankLabel":"","title":"年金の封筒①","sub":"税金にかかわる3通","when":"6月・1月・秋に届く","who":["nenkin"],"status":"決定","point":"6月の年金額改定通知書、1月の源泉徴収票、秋の扶養親族等申告書。出さないと税金が多く引かれることも。","todo":"届いたら開けて、期限のある書類を出す","at":0,"dur":62.4,"guide":true,"video":"video/guide/g13.mp4","poster":"video/posters/g13.webp","link":["給付金・手当の一覧（年金）を見る","kyufu.html#nenkin"]},{"id":"g14","src":"g14","group":"always","no":"","rank":"","rankLabel":"","title":"年金の封筒②","sub":"返事が要る2通","when":"届いたらすぐ","who":["nenkin"],"status":"決定","point":"公金受取口座の意向確認書は45日で同意のあつかい。年金生活者支援給付金のはがきは、出さないともらえません。","todo":"見つけたら、すぐ中身を確かめる","at":0,"dur":57.4,"guide":true,"video":"video/guide/g14.mp4","poster":"video/posters/g14.webp","link":["給付金・手当の一覧（年金）を見る","kyufu.html#nenkin"]},{"id":"g15","src":"g15","group":"always","no":"","rank":"","rankLabel":"","title":"親の家の手すり","sub":"介護保険の住宅改修","when":"工事の前に","who":["kaigo"],"status":"決定","point":"手すりや段差の工事は原則20万円まで、1割負担なら最大18万円が戻ります。工事の前の申請が必要です。","todo":"工事の前にケアマネジャーへ相談","at":0,"dur":72.6,"guide":true,"video":"video/guide/g15.mp4","poster":"video/posters/g15.webp","link":["給付金・手当の一覧（介護）を見る","kyufu.html#kaigo"]},{"id":"g16","src":"g16","group":"always","no":"","rank":"","rankLabel":"","title":"福祉用具を買うと費用が戻る","sub":"介護保険の購入費","when":"買う前に","who":["kaigo"],"status":"決定","point":"ポータブルトイレや入浴用のいすなどは、1年度に10万円まで。指定を受けたお店で買わないと戻りません。","todo":"買う前にケアマネジャーに相談","at":0,"dur":65.3,"guide":true,"video":"video/guide/g16.mp4","poster":"video/posters/g16.webp","link":["給付金・手当の一覧（介護）を見る","kyufu.html#kaigo"]}],"full":[{"id":"kaisei1p","src":"kaisei1p","group":"fy2026","no":"改正編1","title":"11月以降に変わるお金のルールTOP5","dur":72.6,"video":"video/full/kaisei1p.mp4","poster":"video/posters/kaisei1p.webp","chapters":[{"at":0.0,"label":"5位・4位　防衛特別所得税・こどもNISA"},{"at":20.07,"label":"3位　iDeCoの上限アップ"},{"at":30.77,"label":"2位　市販薬に似た薬の負担増"},{"at":42.8,"label":"1位　12月に税金が戻る（精算）"}],"link":["制度改正まとめで、条件までくわしく見る","kaisei.html"]},{"id":"kaisei2p","src":"kaisei2p","group":"fy2027","no":"改正編2","title":"知らないと損する 2027年度の制度改正TOP5","dur":66.9,"video":"video/full/kaisei2p.mp4","poster":"video/posters/kaisei2p.webp","chapters":[{"at":0.0,"label":"5位・4位　パートの社会保険・子育て支援金"},{"at":18.46,"label":"3位　高額療養費の上限"},{"at":30.87,"label":"2位　働く人への新しい給付金"},{"at":38.5,"label":"1位　食料品の消費税が1%に"}],"link":["制度改正まとめで、条件までくわしく見る","kaisei.html"]},{"id":"seido1p","src":"seido1p","group":"always","no":"制度編1","title":"三英傑の年金：60歳・65歳・75歳、いちばん損するのは？","dur":69.1,"video":"video/full/seido1p.mp4","poster":"video/posters/seido1p.webp","chapters":[{"at":0.0,"label":"その1　早めると減る・遅らせると増える"},{"at":22.9,"label":"その2　65歳で月15万円なら、いくら？"},{"at":31.7,"label":"その3　もらった合計で比べると"},{"at":46.47,"label":"その4　決める前に気をつけたいこと"}],"link":["あなたに合う制度を診断する","shindan.html"]},{"id":"seido2p","src":"seido2p","group":"always","no":"制度編2","title":"年金生活、捨てたら損する封筒ベスト5","dur":72.1,"video":"video/full/seido2p.mp4","poster":"video/posters/seido2p.webp","chapters":[{"at":0.0,"label":"5位・4位　年金額改定通知書・源泉徴収票"},{"at":14.9,"label":"3位　公金受取口座の意向確認書"},{"at":33.14,"label":"2位　扶養親族等申告書"},{"at":44.34,"label":"1位　年金生活者支援給付金のはがき"}],"link":["給付金・手当の一覧（年金）を見る","kyufu.html#nenkin"]},{"id":"seido3p","src":"seido3p","group":"always","no":"制度編3","title":"親の家の手すり、工事の前に申請しないと損","dur":66.4,"video":"video/full/seido3p.mp4","poster":"video/posters/seido3p.webp","chapters":[{"at":0.0,"label":"その1　9割戻る？介護保険の住宅改修"},{"at":18.58,"label":"その2　工事の前に申請する"},{"at":35.5,"label":"その3　対象の工事と自己負担"}],"link":["給付金・手当の一覧（介護）を見る","kyufu.html#kaigo"]}]}</script>
 
   <section class="path" aria-labelledby="path-title">
     <h2 id="path-title">視聴者がたどる道</h2>
@@ -506,7 +508,8 @@ html.v-open{overflow:hidden}
     </div>
     <ul class="doc-list">
 <li><a class="doc" href="https://claude.ai/artifact/393v7w1BTGuUvnP3rHmDCV" target="_blank" rel="noopener"><small>台本帳</small><b>偉人編 損する制度シリーズ <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5"/></svg></b><span>制度編3本と改正TOP5の2本。配役・乱入・演出・出典まで、制作セッションに頼む文ごとワンタップでコピーできます。</span></a></li>
-<li><a class="doc" href="https://claude.ai/artifact/88Bki2FczPnw7y4fV4iZnx" target="_blank" rel="noopener"><small>動画</small><b>できあがった動画の一覧 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5"/></svg></b><span>偉人版の39本（このシリーズの5本も入っています）。上の短い動画は、ここの5本を制度ごとに切り分けたものです。</span></a></li>
+<li><a class="doc" href="https://claude.ai/artifact/TWWMBaps9ctGS1dLxPDtBp" target="_blank" rel="noopener"><small>動画</small><b>制度ガイドの動画の一覧 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5"/></svg></b><span>1本1制度の動画を、時期ごとに並べた一覧。1本ずつリンクをコピーして送れます。</span></a></li>
+<li><a class="doc" href="https://claude.ai/artifact/88Bki2FczPnw7y4fV4iZnx" target="_blank" rel="noopener"><small>動画</small><b>できあがった動画の一覧 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5"/></svg></b><span>偉人版の39本（このシリーズのショート版5本も入っています）。</span></a></li>
 <li><a class="doc" href="https://github.com/akamar08taiyo-bot/-/blob/claude/money-youtube-viral-research/reports/%E7%84%A1%E6%96%99%E3%83%97%E3%83%AC%E3%82%BC%E3%83%B3%E3%83%88%20%E5%88%B6%E5%BA%A6%E3%82%AC%E3%82%A4%E3%83%89%E3%81%AE%E8%A8%88%E7%94%BB.md" target="_blank" rel="noopener"><small>計画書</small><b>無料プレゼント「制度ガイド」の計画 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5"/></svg></b><span>3つのプレゼントの中身、作る順番、直すタイミング。</span></a></li>
 <li><a class="doc" href="https://github.com/akamar08taiyo-bot/-/blob/claude/money-youtube-viral-research/reports/%E5%88%B6%E5%BA%A6%E3%83%87%E3%83%BC%E3%82%BF%202026-10.json" target="_blank" rel="noopener"><small>データ</small><b>制度データ（2026年10月5日時点） <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5"/></svg></b><span>改正23件と給付金・手当18件。3つのプレゼントと動画の数字は、すべてここから。</span></a></li>
 <li><a class="doc" href="https://github.com/akamar08taiyo-bot/-/blob/claude/money-youtube-viral-research/reports/%E5%81%89%E4%BA%BA%E7%B7%A8%20%E6%90%8D%E3%81%99%E3%82%8B%E5%88%B6%E5%BA%A6%E3%82%B7%E3%83%AA%E3%83%BC%E3%82%BA.md" target="_blank" rel="noopener"><small>レポート</small><b>偉人編「知らないと損する制度」シリーズ <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5"/></svg></b><span>シリーズの決まり、5本の台本、このあとの8本の骨組み。</span></a></li>
@@ -519,7 +522,7 @@ html.v-open{overflow:hidden}
     <ul>
       <li>3つとも試作です。制度の内容は2026年10月5日時点で、国税庁・日本年金機構・厚生労働省などの資料と報道で確かめました。「法案」「検討中」は決まったら直します。</li>
       <li>診断の答えとチェックは、見ている端末の中だけに残ります（どこにも送りません）。</li>
-      <li>動画のうち9本は1本1制度で作ったもの、ほかは完成した5本を字幕と音の切れ目で切り分けたものです（残りも1本1制度の動画に入れ替えます）。</li>
+      <li>動画は「お金の動画制作」のセッションで、1本1制度で作りました（声と絵はAI）。制度の数字は2026年10月時点です。</li>
       <li>選んだ時期・だれ向けと「続けて再生」の設定は、見ている端末の中だけに残ります。</li>
       <li>ページの上のメニューや、ほかのページへのリンクは、プレビューでは開きません。実際のサイトでは開きます。</li>
       <li>広告（アフィリエイト）は入れていません。実際のサイトに入れるときは、データの <code>制度データ 2026-10.json</code> を直せば3ページとも変わります。</li>

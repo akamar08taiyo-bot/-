@@ -18,6 +18,7 @@ REPO = "https://github.com/akamar08taiyo-bot/-/blob/claude/money-youtube-viral-r
 SCRIPTS = "https://claude.ai/artifact/393v7w1BTGuUvnP3rHmDCV"
 GALLERY = "https://claude.ai/artifact/88Bki2FczPnw7y4fV4iZnx"
 NISA = "https://claude.ai/artifact/UhvRPzh38U6Uq7igZjmEH4"
+GUIDE_LIST = "https://claude.ai/artifact/TWWMBaps9ctGS1dLxPDtBp"  # 制作セッションが作った「制度ガイドの動画」の一覧
 ARROW = ('<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
          'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg>')
 OUT = ('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
@@ -82,6 +83,7 @@ NEW_CSS = """
 .vtag{border:1px solid var(--line);border-radius:4px;padding:0 6px;background:var(--bg);color:var(--ink)}
 .vtag.is-hit{background:var(--accent);border-color:var(--accent);color:#fff}
 .vcard h3{margin-top:2px;font-size:16px;line-height:1.5;font-weight:800}
+.vsub{display:block;margin-top:1px;font-size:13px;font-weight:700;color:var(--muted)}
 .vopen{margin:0;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
 .vopen::after{content:"";position:absolute;inset:0;border-radius:10px}
 .vopen:focus-visible{outline:none}
@@ -116,6 +118,7 @@ html.v-open{overflow:hidden}
 .vp-close{position:absolute;top:10px;right:10px;z-index:2;display:grid;place-items:center;width:44px;height:44px;border-radius:50%;border:1px solid #ffffff4d;background:#000000a6;color:#fff;font-size:22px;line-height:1}
 .vp-kicker{padding-right:44px;font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--v-accent)}
 .vplayer h2{font-size:20px;line-height:1.45;font-weight:800;text-wrap:balance}
+.vp-sub{display:block;margin-top:2px;font-size:15px;font-weight:700;color:var(--v-muted)}
 .vplayer .vfor{color:var(--v-muted)}
 .vplayer .vtag{background:transparent;color:var(--v-ink);border-color:var(--v-line)}
 .vp-facts{display:grid;grid-template-columns:4.6em minmax(0,1fr);gap:6px 10px;margin:0;font-size:14px;line-height:1.7}
@@ -225,8 +228,9 @@ def load_guide():
 def guide_entry(ep, dur):
     tags = [t for t in ep["who"] if t != "all"]
     link = GUIDE_LINK.get(ep["id"]) or ("制度改正まとめで、条件までくわしく見る", "kaisei.html" + ("#" + tags[0] if tags else ""))
+    title, _, sub = ep["name"].partition("　")  # 「12月に戻る税金　今年の年末調整で知っておくこと」は2行に分けて見せる
     return {"id": ep["id"], "src": ep["id"], "group": ep["group"], "no": "", "rank": "", "rankLabel": "",
-            "title": ep["name"], "when": ep["when"].replace("（法案）", ""), "who": ep["who"], "status": ep["status"],
+            "title": title, "sub": sub, "when": ep["when"].replace("（法案）", ""), "who": ep["who"], "status": ep["status"],
             "point": ep["point"], "todo": ep["todo"], "at": 0, "dur": dur, "guide": True,
             "video": f"video/guide/{ep['id']}.mp4", "poster": f"video/posters/{ep['id']}.webp", "link": list(link)}
 
@@ -298,11 +302,12 @@ def video_section():
         status = '<span class="vstatus">法案（まだ決まっていない）</span>' if c["status"] == "法案" else ""
         rank = f'<span class="vrank">{esc(c["rankLabel"])}</span>' if c["rankLabel"] else ""
         sr = esc(group_label[c["group"]]) if c.get("guide") else f"{c['no']}・{esc(c['rankLabel'])}"
+        sub = f'<span class="vsub">{esc(c["sub"])}</span>' if c.get("sub") else ""
         cards.append(f"""<li class="vcard" data-id="{c['id']}">
 <div class="vthumb" aria-hidden="true"><img src="{c['poster']}" alt="" width="360" height="640" loading="lazy">{rank}<span class="vdur">{clock(c['dur'])}</span><span class="vbtn">{PLAY}</span></div>
 <div class="vbody">
 <p class="vfor">{tags}向け</p>
-<h3><button type="button" class="vopen" data-play="{c['id']}">{esc(c['title'])}<span class="sr-only">（{sr}、{round(c['dur'])}秒の動画を再生）</span></button></h3>
+<h3><button type="button" class="vopen" data-play="{c['id']}">{esc(c['title'])}{sub}<span class="sr-only">（{sr}、{round(c['dur'])}秒の動画を再生）</span></button></h3>
 <p class="vwhen">{esc(c['when'])}{status}</p>
 <p class="vpoint">{esc(c['point'])}</p>
 </div>
@@ -324,13 +329,14 @@ def video_section():
         lead = f"制度ごとに条件と「やること」まで説明する動画（{n_guide}本）と、偉人編のショートを制度ごとに切り分けた動画を合わせた{len(entries)}本です。"
     else:
         lead = f"偉人編の5本を、制度ごとの短い動画{len(entries)}本に分けました。"
+    vids_tail = "動画でわかりやすく" if n_guide == len(entries) else "短い動画で"
     full_head = "ショート版（5本）を通しで見る" if n_guide else "元の5本を通しで見る"
     full_lead = ("YouTube・Instagram向けに作った短い版です。再生中に、どこから見るかを選べます。" if n_guide
                  else "短く分ける前の動画です。再生中に、どこから見るかを選べます。")
     section = f"""<section class="vids" id="videos" aria-labelledby="vids-title">
     <div class="sec-head">
       <p class="kicker">動画で見る</p>
-      <h2 id="vids-title"><span class="nb">知らないと損する制度を、</span><span class="nb">短い動画で</span></h2>
+      <h2 id="vids-title"><span class="nb">知らないと損する制度を、</span><span class="nb">{vids_tail}</span></h2>
       <p>{lead}「いつの制度か」と「だれ向けか」を選ぶと、当てはまる動画だけが出ます。押すと、このページの中で再生します。</p>
     </div>
     <div class="vpick">
@@ -400,16 +406,21 @@ def main():
 
     docs = [
         (SCRIPTS, "台本帳", "偉人編 損する制度シリーズ", "制度編3本と改正TOP5の2本。配役・乱入・演出・出典まで、制作セッションに頼む文ごとワンタップでコピーできます。"),
-        (GALLERY, "動画", "できあがった動画の一覧", "偉人版の39本（このシリーズの5本も入っています）。上の短い動画は、ここの5本を制度ごとに切り分けたものです。"),
+        (GALLERY, "動画", "できあがった動画の一覧", "偉人版の39本（このシリーズのショート版5本も入っています）。" if n_guide == n_clips
+         else "偉人版の39本（このシリーズの5本も入っています）。上の短い動画は、ここの5本を制度ごとに切り分けたものです。"),
         (repo("無料プレゼント 制度ガイドの計画.md"), "計画書", "無料プレゼント「制度ガイド」の計画", "3つのプレゼントの中身、作る順番、直すタイミング。"),
         (repo("制度データ 2026-10.json"), "データ", "制度データ（2026年10月5日時点）", f"改正{n_kaisei}件と給付金・手当{n_benefit}件。3つのプレゼントと動画の数字は、すべてここから。"),
         (repo("偉人編 損する制度シリーズ.md"), "レポート", "偉人編「知らないと損する制度」シリーズ", "シリーズの決まり、5本の台本、このあとの8本の骨組み。"),
         (NISA, "前に作った特典", "NISAのはじめ方 3つの特典", "ガイドPDF・逆算アプリ・証券会社えらび。同じサイトの無料特典です。"),
     ]
+    if n_guide:
+        docs.insert(1, (GUIDE_LIST, "動画", "制度ガイドの動画の一覧", "1本1制度の動画を、時期ごとに並べた一覧。1本ずつリンクをコピーして送れます。"))
     doc_html = "\n".join(
         f'<li><a class="doc" href="{u}" target="_blank" rel="noopener"><small>{k}</small><b>{t} {OUT}</b><span>{s}</span></a></li>'
         for u, k, t, s in docs)
 
+    intro_video = ("動画は1本1制度で、いつの制度か・だれ向けかで選べるようにしました。" if n_guide == n_clips
+                   else "動画は制度ごとに短く分けて、いつの制度か・だれ向けかで選べるようにしました。")
     html = f"""<title>制度ガイド プレビュー</title>
 <style>{old_css()}{NEW_CSS}</style>
 
@@ -417,7 +428,7 @@ def main():
   <header class="intro">
     <p class="brand"><img src="files/mascot.webp" alt="" width="44" height="44">おかねの地図<span class="pill">試作プレビュー</span></p>
     <h1><span class="nb">知らないと損する</span> <span class="nb">制度ガイド</span></h1>
-    <p class="lead">偉人編「知らないと損する制度」の動画と、動画の最後で配る3つの無料プレゼントの試作です。動画は制度ごとに短く分けて、いつの制度か・だれ向けかで選べるようにしました。アプリはそのまま押して試せます。</p>
+    <p class="lead">偉人編「知らないと損する制度」の動画と、動画の最後で配る3つの無料プレゼントの試作です。{intro_video}アプリはそのまま押して試せます。</p>
   </header>
 
   {video_html}

@@ -146,6 +146,7 @@
     $('vp-kicker').textContent = full ? c.no + '・通し（' + total(c.dur) + '）'
       : c.rankLabel ? c.no + '・' + c.rankLabel + ' ／ ' + V.groupLabel[c.group] : V.groupLabel[c.group];
     $('vp-title').textContent = c.title;
+    if (c.sub) $('vp-title').appendChild(el('span', 'vp-sub', c.sub));
     var forEl = $('vp-for');
     forEl.hidden = full;
     if (!full) tagsEl(c, forEl);
