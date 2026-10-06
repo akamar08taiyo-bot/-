@@ -136,6 +136,8 @@
 .sim-chart svg{display:block;max-width:none;overflow:visible;touch-action:pan-y;cursor:ew-resize;user-select:none;-webkit-user-select:none}
 .sim-chart text{font-family:var(--sans);font-size:12px;fill:var(--muted)}
 .sim-chart .t-age{font-size:11px}
+.sim-chart .t-age-main{font-weight:700;fill:#3d4d47}
+.sim-input-age input{flex:0 1 150px}
 .sim-chart .t-goal,.sim-chart .t-reach,.sim-chart .t-band{font-weight:700;fill:var(--green);paint-order:stroke;stroke:#fcfbf8;stroke-width:4px;stroke-linejoin:round}
 .sim-chart .t-goal{font-size:13px}
 .sim-chart .t-tick{paint-order:stroke;stroke:#fcfbf8;stroke-width:3px;stroke-linejoin:round}

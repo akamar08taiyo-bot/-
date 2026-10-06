@@ -59,9 +59,9 @@ START = f"""<div class="narrow">
 <span class="gift-number">1</span>
 <p class="gift-label">特典1・資産推移アプリ・約1分</p>
 <h2>毎月の積立で、資産はどう育つ？</h2>
-<p>目標の金額と毎月の積立額を入れて、期間のつまみを動かすだけ。自分で積み立てたお金と、投資で増えた分が、グラフでその場でわかります。再生ボタンで、0年から資産が育つ様子も見られます。入力した数字は、この端末の中だけで使われます。</p>
-<p class="example-line">例：毎月3万円を30年 → 仮に年5%なら約2,497万円（元本1,080万円＋増えた分1,417万円）</p>
-<p class="example-line">例：目標2,000万円 → 毎月3万円・年5%なら、26年8か月で届く計算</p>
+<p>目標の金額・毎月の積立額・今の年齢を入れて、何歳まで続けるかのつまみを動かすだけ。何歳のときにいくらになるか、自分で積み立てたお金と投資で増えた分が、グラフでその場でわかります。再生ボタンで、今から資産が育つ様子も見られます。入力した数字は、この端末の中だけで使われます。</p>
+<p class="example-line">例：35歳から65歳まで毎月3万円 → 仮に年5%なら約2,497万円（元本1,080万円＋増えた分1,417万円）</p>
+<p class="example-line">例：目標2,000万円 → 35歳から毎月3万円・年5%なら、61歳ごろに届く計算</p>
 <div class="gift-actions">
 <a class="button" href="goal.html">資産推移アプリを開く {ARROW}</a>
 <a class="button button-secondary" href="planner.html">くわしい家計プラン {ARROW}</a>
@@ -195,7 +195,7 @@ GOAL = f"""<div class="content-wide">
 </div>
 <header class="page-heading">
 <h1>毎月の積立で、<br>資産はどう育つ？</h1>
-<p>目標の金額と毎月の積立額を入れて、期間のつまみを横に動かすだけ。自分で積み立てたお金と、投資で増えた分が、その場でグラフになります。入力した数字は、この端末の中だけで使われ、どこにも送られません。</p>
+<p>目標の金額・毎月の積立額・今の年齢を入れて、何歳まで続けるかのつまみを横に動かすだけ。何歳のときにいくらになるか、自分で積み立てたお金と投資で増えた分が、その場でグラフになります。入力した数字は、この端末の中だけで使われ、どこにも送られません。</p>
 </header>
 
 <div class="sim" id="sim">
@@ -214,6 +214,11 @@ GOAL = f"""<div class="content-wide">
 <small id="s-monthly-hint">毎月、むりなく投資に回せる金額。わからなければ、下の<a href="#budget">「いまの家計から」</a>で出せます。</small>
 </div>
 <div class="sim-field">
+<label class="sim-label" for="s-age"><b class="sim-step" aria-hidden="true">3</b>今の年齢</label>
+<div class="sim-input sim-input-age"><input id="s-age" inputmode="numeric" autocomplete="off" value="35" aria-describedby="s-age-hint"><span>歳</span></div>
+<small id="s-age-hint">今の年齢から、何歳のときにいくらになるか、何歳で目標に届くかを計算します。</small>
+</div>
+<div class="sim-field">
 <p class="sim-label" id="s-rate-label">増える割合（1年あたり・仮）</p>
 <div class="sim-chips" role="group" aria-labelledby="s-rate-label">
 <button type="button" data-rate-main="3" aria-pressed="false">年3%</button>
@@ -223,10 +228,9 @@ GOAL = f"""<div class="content-wide">
 <small>利回りは約束ではありません。低めの3%でも試してみましょう。</small>
 </div>
 <details class="sim-more">
-<summary>くわしく設定する（今ある資産・年齢・割合）</summary>
+<summary>くわしく設定する（今ある資産・割合）</summary>
 <div class="sim-fields">
 {helper_field('s-now', '今ある資産', '万円', '0')}<small>はじめに入れるお金や、すでに持っている投資の額</small>
-{helper_field('s-age', '今の年齢', '歳', '35', mode='numeric')}<small>入れると、何歳のときかも出ます（空にすると出ません）</small>
 {helper_field('s-rate', '増える割合（1年あたり）', '%', '5')}<small>0〜15%の間で入れられます</small>
 </div>
 </details>
@@ -258,9 +262,9 @@ GOAL = f"""<div class="content-wide">
 <div class="sim-tip" id="s-tip" hidden></div>
 </div>
 <div class="sim-period">
-<input type="range" id="s-years" min="1" max="40" step="1" value="30" aria-describedby="s-years-hint">
-<p class="sim-period-row"><label for="s-years"><b class="sim-step" aria-hidden="true">3</b>投資する期間</label><output id="s-years-out" for="s-years">30年</output></p>
-<button type="button" class="sim-play" id="s-play" aria-pressed="false"><svg class="sim-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path class="i-play" d="M7 4.5v15l13-7.5z" fill="currentColor"/><path class="i-stop" d="M6 6h12v12H6z" fill="currentColor"/></svg><span id="s-play-label">0年から育つ様子を再生</span></button>
+<input type="range" id="s-years" min="1" max="45" step="1" value="30" aria-describedby="s-years-hint">
+<p class="sim-period-row"><label for="s-years"><b class="sim-step" aria-hidden="true">4</b>何歳まで積み立てる？</label><output id="s-years-out" for="s-years">65歳まで（30年）</output></p>
+<button type="button" class="sim-play" id="s-play" aria-pressed="false"><svg class="sim-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path class="i-play" d="M7 4.5v15l13-7.5z" fill="currentColor"/><path class="i-stop" d="M6 6h12v12H6z" fill="currentColor"/></svg><span id="s-play-label">今から育つ様子を再生</span></button>
 <p class="sim-hint" id="s-years-hint">つまみを左右に動かすと、グラフと金額がその場で変わります。グラフを横になぞっても動かせます。</p>
 </div>
 <div class="sim-checks">

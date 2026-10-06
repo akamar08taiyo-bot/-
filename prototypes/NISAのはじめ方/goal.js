@@ -4,7 +4,7 @@
   var root = document.getElementById('sim');
   if (!root) return;
 
-  var MAX_YEARS = 40;
+  var MAX_END_AGE = 80;  // つまみの右の端は80歳（期間にすると10〜60年の間）
   var THUMB = 28;        // 期間のつまみの幅（start.css の .sim-period と同じ）
   var EDGE = 8;          // グラフの左の余白
   var COLOR = { principal: '#2a7aa8', gain: '#ca743a', ink: '#143e35', grid: '#e2e5de', surface: '#fcfbf8', compare: '#5f6f69' };
@@ -63,10 +63,12 @@
     var y = Math.floor(months / 12), m = months % 12;
     return (y ? y + '年' : '') + (m ? m + 'か月' : '') || '0か月';
   }
-  function ageAt(age, years) {
-    if (age === null) return '';
-    var exact = Math.abs(years - Math.round(years)) < 1e-9;
-    return '（' + Math.floor(age + years + 1e-9) + '歳' + (exact ? '' : 'ごろ') + '）';
+  function ageLabel(age, months) { // 今の年齢から数えた、そのときの年齢（年の途中なら「ごろ」）
+    months = Math.round(months);
+    return Math.floor(age + months / 12 + 1e-9) + '歳' + (months % 12 ? 'ごろ' : '');
+  }
+  function when(age, months) { // 「61歳ごろ（26年8か月後）」
+    return Math.round(months) === 0 ? '今（' + age + '歳）' : ageLabel(age, months) + '（' + span(months) + '後）';
   }
 
   function $(id) { return document.getElementById(id); }
@@ -91,22 +93,31 @@
   var inputs = { target: $('s-target'), monthly: $('s-monthly'), now: $('s-now'), age: $('s-age'), rate: $('s-rate') };
   var slider = $('s-years'), out = $('s-years-out');
   var state = null;      // いま正しく入っている数字（期間はつまみの値）
+  var maxYears = 45;     // つまみの右の端（今の年齢から80歳まで）
+  var endAge = null;     // 「何歳まで積み立てる？」。年齢を変えても、この年齢までの期間に合わせる
   var compare = null;    // くらべる線：null・'plus'（毎月あと1万円）・'range'（年3%〜7%）
 
   function read() {
     var target = readNum(inputs.target), pmt = readNum(inputs.monthly), now = readNum(inputs.now), rate = readNum(inputs.rate);
-    var ageRaw = String(inputs.age.value).trim(), age = ageRaw === '' ? null : readNum(inputs.age);
+    var age = readNum(inputs.age);
     var errors = [];
     if (!check(inputs.target, target > 0 && target <= 100000)) errors.push('目標の金額は、1〜100,000万円の間で入れてください。');
     if (!check(inputs.monthly, pmt >= 0 && pmt <= 1000)) errors.push('毎月の積立額は、0〜1,000万円の間で入れてください。');
     if (!check(inputs.now, now >= 0 && now <= 100000)) errors.push('今ある資産は、0〜100,000万円の間で入れてください。');
     if (!check(inputs.rate, rate >= 0 && rate <= 15)) errors.push('増える割合は、0〜15%の間で入れてください。');
-    if (!check(inputs.age, age === null || (age >= 0 && age <= 100 && age % 1 === 0))) errors.push('年齢は、0〜100の数字で入れてください（空でもかまいません）。');
+    if (!check(inputs.age, age >= 0 && age <= 99 && age % 1 === 0)) errors.push('今の年齢は、0〜99の数字で入れてください。');
     var err = $('s-error');
     err.textContent = errors.join(' ');
     err.hidden = !errors.length;
     if (errors.length) return null;
-    return { target: target, pmt: pmt, now: now, rate: rate, age: age, years: Number(slider.value) };
+    // 今の年齢から、つまみの右の端と、「何歳まで」にあたる期間を決める
+    maxYears = Math.max(10, Math.min(60, MAX_END_AGE - age));
+    slider.max = String(maxYears);
+    if (endAge === null) endAge = age + Number(slider.value);
+    var years = endAge - age >= 1 ? endAge - age : Math.min(10, maxYears);
+    years = Math.max(1, Math.min(maxYears, years));
+    slider.value = String(years);
+    return { target: target, pmt: pmt, now: now, rate: rate, age: age, years: years };
   }
 
   // チェックポイント（100万・500万・1,000万円…）に届く時期。期間の中で届くものだけ。目標は別に出す
@@ -131,15 +142,14 @@
   function layout() {
     var W = Math.max(240, Math.round(box.clientWidth));
     var right = THUMB / 2;
-    var step = (W - EDGE - right) / MAX_YEARS;          // 1年ぶんの横の長さ
+    var step = (W - EDGE - right) / maxYears;           // 1年ぶんの横の長さ
     var left = EDGE;
-    if (left + step < THUMB / 2) { step = (W - THUMB) / (MAX_YEARS - 1); left = THUMB / 2 - step; }
+    if (left + step < THUMB / 2) { step = (W - THUMB) / (maxYears - 1); left = THUMB / 2 - step; }
     var sliderLeft = left + step - THUMB / 2;
     slider.style.marginLeft = sliderLeft.toFixed(2) + 'px';
-    slider.style.width = ((MAX_YEARS - 1) * step + THUMB).toFixed(2) + 'px';
+    slider.style.width = ((maxYears - 1) * step + THUMB).toFixed(2) + 'px';
     var H = W < 520 ? 236 : 300;
-    var withAge = state && state.age !== null;
-    geo = { W: W, H: H, left: left, step: step, top: 26, bottom: H - (withAge ? 36 : 22) };
+    geo = { W: W, H: H, left: left, step: step, top: 26, bottom: H - 36 };
     svg.setAttribute('width', W);
     svg.setAttribute('height', H);
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
@@ -185,13 +195,14 @@
     }
     svg.appendChild(el('line', { x1: 0, x2: geo.W, y1: y0, y2: y0, stroke: '#c9cec6', 'stroke-width': 1 }));
 
-    // 横の目盛り（年。年齢を入れていれば、その下に年齢）
-    [0, 10, 20, 30, 40].forEach(function (t) {
-      var x = xOf(t), anchor = t === 0 ? 'start' : t === MAX_YEARS ? 'end' : 'middle';
-      var dx = t === 0 ? -geo.left + 2 : t === MAX_YEARS ? 2 : 0;
-      svg.appendChild(el('text', { x: x + dx, y: y0 + 16, 'text-anchor': anchor, class: 't-tick' }, t === 0 ? '今' : t + '年'));
-      if (s.age !== null) svg.appendChild(el('text', { x: x + dx, y: y0 + 30, 'text-anchor': anchor, class: 't-age' }, (s.age + t) + '歳'));
-    });
+    // 横の目盛り（年齢。その下に、今から何年後か）
+    var tickStep = maxYears <= 20 ? 5 : 10;
+    for (var tk = 0; tk <= maxYears; tk += tickStep) {
+      var xt = xOf(tk), anchor = tk === 0 ? 'start' : tk === maxYears ? 'end' : 'middle';
+      var dx = tk === 0 ? -geo.left + 2 : tk === maxYears ? 2 : 0;
+      svg.appendChild(el('text', { x: xt + dx, y: y0 + 16, 'text-anchor': anchor, class: 't-tick t-age-main' }, (s.age + tk) + '歳'));
+      svg.appendChild(el('text', { x: xt + dx, y: y0 + 30, 'text-anchor': anchor, class: 't-age' }, tk === 0 ? '今' : tk + '年後'));
+    }
 
     // 年3%〜7%の幅（いちばん下に、うすく）
     var pts = series(s.now, s.pmt, s.rate, months);
@@ -253,11 +264,11 @@
     }
     // 目標に届いたところ：線の上・点の左が空いている（そこでは資産の線は目標より下）
     if (reached) {
-      var rl = el('text', { class: 't-reach' }, span(reach) + 'で到達');
+      var rl = el('text', { class: 't-reach' }, ageLabel(s.age, reach) + 'に到達');
       svg.appendChild(rl);
       var ok = tryAt(rl, [[xr - 12 - width(rl), yGoal - 9]]);
-      if (!ok) { rl.textContent = span(reach); ok = tryAt(rl, [[xr - 12 - width(rl), yGoal - 9]]); }
-      if (!ok) { rl.textContent = span(reach) + 'で到達'; ok = tryAt(rl, [[xr + 10, yGoal + 19], [xr + 10, yGoal - 8]]); }
+      if (!ok) { rl.textContent = ageLabel(s.age, reach); ok = tryAt(rl, [[xr - 12 - width(rl), yGoal - 9]]); }
+      if (!ok) { rl.textContent = ageLabel(s.age, reach) + 'に到達'; ok = tryAt(rl, [[xr + 10, yGoal + 19], [xr + 10, yGoal - 8]]); }
       if (!ok) svg.removeChild(rl);
     }
     // 目標の名前：右の端（つまみより右は空いている）→ 左の端 → 線の下
@@ -307,18 +318,18 @@
     svg.appendChild(hover);
     geo.pts = pts;
     geo.reach = reached ? { x: xr, y: yGoal } : null;
-    $('s-chart-desc').textContent = span(months) + '後の資産は' + man(total) + '。元本' + man(last.p) + '、増えた分' + man(Math.max(0, total - last.p)) + '。目標は' + man(s.target) + '。';
+    $('s-chart-desc').textContent = when(s.age, months) + 'の資産は' + man(total) + '。元本' + man(last.p) + '、増えた分' + man(Math.max(0, total - last.p)) + '。目標は' + man(s.target) + '。';
   }
 
   // ---- 数字・チェックポイント・積み木（final が false のとき＝再生中は、表などは変えない） ----
   function paint(s, months, final) {
     var years = months / 12;
     var total = grow(s.now, s.pmt, months, s.rate), principal = s.now + s.pmt * months, gain = Math.max(0, total - principal);
-    setText('s-when', span(months) + '後' + ageAt(s.age, years) + 'の資産');
+    setText('s-when', when(s.age, months) + 'の資産');
     setText('s-total', man(total));
     setText('s-gain', man(gain));
     setText('s-principal', man(principal));
-    out.textContent = span(months) + (s.age !== null ? '（' + s.age + '→' + Math.floor(s.age + years + 1e-9) + '歳）' : '');
+    out.textContent = ageLabel(s.age, months) + 'まで（' + span(months) + '）';
 
     // 目標まで
     setText('s-goal', man(s.target));
@@ -332,15 +343,15 @@
     if (reach === 0) {
       setText('s-goal-msg', '今ある資産で、もう目標に届いています。');
     } else if (reachedNow) {
-      setText('s-goal-msg', span(reach) + '後' + ageAt(s.age, reach / 12) + 'に、目標の' + man(s.target) + 'に届きます。');
+      setText('s-goal-msg', when(s.age, reach) + 'に、目標の' + man(s.target) + 'に届きます。');
     } else {
       var msg = '目標まで、あと' + man(s.target - total) + '。';
-      msg += reach === null ? 'このままでは届きません。' : 'このペースなら' + span(reach) + '後' + ageAt(s.age, reach / 12) + 'に届きます。';
+      msg += reach === null ? 'このままでは届きません。' : 'このペースなら' + when(s.age, reach) + 'に届きます。';
       setText('s-goal-msg', msg);
       var need = monthlyFor(s.target, s.now, months, s.rate);
       if (final && need > 0 && need <= 1000) {
         var rounded = need >= 10 ? Math.ceil(need) : Math.ceil(need * 10) / 10;  // 表示（10万円以上は1万円単位）と入れる値をそろえる
-        setText('s-goal-fix-text', span(months) + 'で届かせるなら、毎月' + monthly(rounded) + '。');
+        setText('s-goal-fix-text', ageLabel(s.age, months) + 'までに届かせるなら、毎月' + monthly(rounded) + '。');
         var btn = $('s-goal-fix-btn');
         btn.textContent = '毎月' + monthly(rounded) + 'にしてみる';
         btn.dataset.value = String(rounded);
@@ -355,7 +366,7 @@
     var ct = $('s-compare-text');
     if (compare === 'plus') {
       var plus = grow(s.now, s.pmt + 1, months, s.rate);
-      ct.textContent = '毎月あと1万円（毎月' + monthly(s.pmt + 1) + '）なら、' + span(months) + '後は' + man(plus) + '。いまより＋' + man(plus - total) + 'です。';
+      ct.textContent = '毎月あと1万円（毎月' + monthly(s.pmt + 1) + '）なら、' + ageLabel(s.age, months) + 'のときに' + man(plus) + '。いまより＋' + man(plus - total) + 'です。';
       ct.hidden = false;
     } else if (compare === 'range') {
       ct.textContent = '年3%なら' + man(grow(s.now, s.pmt, months, 3)) + '、年7%なら' + man(grow(s.now, s.pmt, months, 7)) + '。いまの年' + s.rate + '%では' + man(total) + 'です。利回りは毎年ちがい、約束されたものではありません。';
@@ -428,7 +439,7 @@
     if (years > 5 && (s.pmt > 0 || s.now > 0)) {
       var later = grow(s.now, s.pmt, months - 60, s.rate);
       late.textContent = '';
-      late.appendChild(document.createTextNode('同じ' + (s.age !== null ? Math.floor(s.age + years) + '歳' : '時期') + 'まで続けても、はじめるのが5年おそいと約' + man(later) + '。今はじめるより'));
+      late.appendChild(document.createTextNode('同じ' + ageLabel(s.age, months) + 'まで続けても、はじめるのが5年おそい（' + (s.age + 5) + '歳から）と約' + man(later) + '。今はじめるより'));
       var lb = document.createElement('b'); lb.textContent = '約' + man(total - later) + '少なく'; late.appendChild(lb);
       late.appendChild(document.createTextNode('なります。'));
       late.hidden = false;
@@ -453,7 +464,7 @@
     tableYears.forEach(function (yy) {
       var vv = grow(s.now, s.pmt, yy * 12, s.rate), pp = s.now + s.pmt * 12 * yy;
       var tr = document.createElement('tr');
-      [yy + '年後' + ageAt(s.age, yy), man(pp), man(Math.max(0, vv - pp)), man(vv)].forEach(function (t, k2) {
+      [ageLabel(s.age, yy * 12) + '（' + yy + '年後）', man(pp), man(Math.max(0, vv - pp)), man(vv)].forEach(function (t, k2) {
         var cell = document.createElement(k2 === 0 ? 'th' : 'td');
         if (k2 === 0) cell.setAttribute('scope', 'row');
         cell.textContent = t;
@@ -470,7 +481,7 @@
     var when = document.createElement('span'); when.className = 'sim-when-at';
     // 「2年8か月」と「（37歳ごろ）」は、それぞれの途中では折り返さない
     var parts = m === 0 ? ['届いています'] : m === null ? ['このままでは届きません']
-      : [(cls === 'is-pending' ? 'このペースなら ' : '') + span(m), ageAt(s.age, m / 12)];
+      : [(cls === 'is-pending' ? 'このペースなら ' : '') + ageLabel(s.age, m), '（' + span(m) + '）'];
     parts.forEach(function (t) { if (!t) return; var w = document.createElement('span'); w.textContent = t; when.appendChild(w); });
     li.appendChild(dot); li.appendChild(amount); li.appendChild(when);
     return li;
@@ -486,7 +497,7 @@
     setFill();
     draw(s, s.years * 12);
     paint(s, s.years * 12, true);
-    slider.setAttribute('aria-valuetext', s.years + '年' + (s.age !== null ? '（' + (s.age + s.years) + '歳まで）' : '') + '、資産 ' + $('s-total').textContent);
+    slider.setAttribute('aria-valuetext', (s.age + s.years) + '歳まで（' + s.years + '年）、資産 ' + $('s-total').textContent);
   }
   function announce() {
     if (!state) return;
@@ -495,7 +506,7 @@
   // つまみの左側を色でぬる
   function setFill(value) {
     var w = slider.getBoundingClientRect().width || 1;
-    var f = ((value == null ? Number(slider.value) : value) - 1) / (MAX_YEARS - 1);
+    var f = ((value == null ? Number(slider.value) : value) - 1) / (maxYears - 1);
     f = Math.max(0, Math.min(1, f));
     slider.style.setProperty('--fill', ((THUMB / 2 + f * (w - THUMB)) / w * 100).toFixed(2) + '%');
   }
@@ -510,7 +521,7 @@
     anim = null;
     root.classList.remove('is-playing');
     playBtn.setAttribute('aria-pressed', 'false');
-    playLabel.textContent = '0年から育つ様子を再生';
+    playLabel.textContent = '今から育つ様子を再生';
   }
   function burst() { // 目標に届いた瞬間の「到達！」
     if (!geo || !geo.reach) return;
@@ -573,7 +584,12 @@
   });
 
   // ---- つまみ・グラフをなぞる ----
-  slider.addEventListener('input', function () { if (anim) anim.keep = true; render(); playLabel.textContent = '0年から育つ様子を再生'; });
+  slider.addEventListener('input', function () {
+    if (anim) anim.keep = true;
+    if (state) endAge = state.age + Number(slider.value);  // 「何歳まで」を覚えておく
+    render();
+    playLabel.textContent = '今から育つ様子を再生';
+  });
   slider.addEventListener('change', announce);
   function yearAt(clientX) {
     var r = svg.getBoundingClientRect();
@@ -600,10 +616,11 @@
   svg.addEventListener('pointercancel', endDrag);
   svg.addEventListener('pointerleave', hideTip);
   function setYears(t) {
-    var y = Math.max(1, Math.min(MAX_YEARS, Math.round(t)));
+    var y = Math.max(1, Math.min(maxYears, Math.round(t)));
     if (String(y) === slider.value && !anim) return;
     if (anim) anim.keep = true;
     slider.value = String(y);
+    if (state) endAge = state.age + y;
     render();
   }
 
@@ -616,7 +633,7 @@
     var x = xOf(k);
     hover.setAttribute('x1', x); hover.setAttribute('x2', x); hover.setAttribute('visibility', 'visible');
     tip.textContent = '';
-    var head = document.createElement('p'); head.className = 'sim-tip-head'; head.textContent = (k ? k + '年後' : '今') + ageAt(state.age, k);
+    var head = document.createElement('p'); head.className = 'sim-tip-head'; head.textContent = when(state.age, k * 12);
     tip.appendChild(head);
     [['資産', q.v, COLOR.gain, true], ['増えた分', Math.max(0, q.v - q.p), COLOR.gain, false], ['元本', q.p, COLOR.principal, false]].forEach(function (row) {
       var p = document.createElement('p'); p.className = row[3] ? 'sim-tip-main' : 'sim-tip-row';
