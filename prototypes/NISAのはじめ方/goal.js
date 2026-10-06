@@ -3,7 +3,7 @@
   // 開いたときは、いつもページのいちばん上から（読み込み直したときや戻ったときも、前に見ていた位置を戻さない）。#の付いたリンクで来たときは、その場所へ
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   window.addEventListener('pageshow', function () { if (!location.hash) window.scrollTo(0, 0); });
-  // 資産推移アプリ：目標の金額 → 毎月の積立額 → 期間のつまみ で、元本と増えた分の推移をその場でグラフにする
+  // 資産推移アプリ：目標の金額 → 毎月の積立額 → 今の年齢（→ はじめにあるお金）→ 期間のつまみ で、元本と増えた分の推移をその場でグラフにする
   var root = document.getElementById('sim');
   if (!root) return;
 
@@ -13,6 +13,9 @@
   var COLOR = { principal: '#2a7aa8', gain: '#ca743a', ink: '#143e35', grid: '#e2e5de', surface: '#fcfbf8', compare: '#5f6f69' };
   var TAX = 0.20315;     // ふつうの口座で、売って利益が出たときの税金（所得税・復興特別所得税・住民税）
   var LIVING = 20;       // 「生活費の何年分」に置きかえるときの、ひと月の生活費（万円）
+  var NISA_LIFE = 1800;  // NISAで非課税にできる元本の合計（すでにNISAで投資している分もふくむ）
+  var NISA_YEAR = 360;   // NISAで1年に入れられる金額（つみたて投資枠120万円＋成長投資枠240万円）
+  var NISA_LUMP = 240;   // まとめて入れられるのは成長投資枠だけ（1年に240万円まで）
   var MILESTONES = [100, 500, 1000, 2000, 3000, 5000, 10000, 20000, 30000, 50000];
   var SVG = 'http://www.w3.org/2000/svg';
 
@@ -82,6 +85,8 @@
     if (t === '') return NaN;
     return Number(t);
   }
+  // 入れなくてもよい欄（はじめにあるお金）は、空なら0円
+  function readOpt(input) { return String(input.value).trim() === '' ? 0 : readNum(input); }
   function check(input, ok) { input.setAttribute('aria-invalid', String(!ok)); return ok; }
   function setText(id, text) { var e = $(id); if (e) e.textContent = text; }
   function el(tag, attrs, text) {
@@ -93,7 +98,7 @@
   function reducedMotion() { return !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); }
 
   // ---- 入力 ----
-  var inputs = { target: $('s-target'), monthly: $('s-monthly'), now: $('s-now'), age: $('s-age'), rate: $('s-rate') };
+  var inputs = { target: $('s-target'), monthly: $('s-monthly'), age: $('s-age'), start: $('s-start'), nisa: $('s-nisa'), rate: $('s-rate') };
   var slider = $('s-years'), out = $('s-years-out');
   var state = null;      // いま正しく入っている数字（期間はつまみの値）
   var maxYears = 45;     // つまみの右の端（今の年齢から80歳まで）
@@ -101,14 +106,15 @@
   var compare = null;    // くらべる線：null・'plus'（毎月あと1万円）・'range'（年3%〜7%）
 
   function read() {
-    var target = readNum(inputs.target), pmt = readNum(inputs.monthly), now = readNum(inputs.now), rate = readNum(inputs.rate);
-    var age = readNum(inputs.age);
+    var target = readNum(inputs.target), pmt = readNum(inputs.monthly), rate = readNum(inputs.rate);
+    var age = readNum(inputs.age), start = readOpt(inputs.start), nisa = readOpt(inputs.nisa);
     var errors = [];
     if (!check(inputs.target, target > 0 && target <= 100000)) errors.push('目標の金額は、1〜100,000万円の間で入れてください。');
     if (!check(inputs.monthly, pmt >= 0 && pmt <= 1000)) errors.push('毎月の積立額は、0〜1,000万円の間で入れてください。');
-    if (!check(inputs.now, now >= 0 && now <= 100000)) errors.push('今ある資産は、0〜100,000万円の間で入れてください。');
-    if (!check(inputs.rate, rate >= 0 && rate <= 15)) errors.push('増える割合は、0〜15%の間で入れてください。');
     if (!check(inputs.age, age >= 0 && age <= 99 && age % 1 === 0)) errors.push('今の年齢は、0〜99の数字で入れてください。');
+    if (!check(inputs.start, start >= 0 && start <= 100000)) errors.push('スタート時の元金は、0〜100,000万円の間で入れてください。');
+    if (!check(inputs.nisa, nisa >= 0 && nisa <= 100000)) errors.push('すでにNISAで投資している金額は、0〜100,000万円の間で入れてください。');
+    if (!check(inputs.rate, rate >= 0 && rate <= 15)) errors.push('増える割合は、0〜15%の間で入れてください。');
     var err = $('s-error');
     err.textContent = errors.join(' ');
     err.hidden = !errors.length;
@@ -120,7 +126,8 @@
     var years = endAge - age >= 1 ? endAge - age : Math.min(10, maxYears);
     years = Math.max(1, Math.min(maxYears, years));
     slider.value = String(years);
-    return { target: target, pmt: pmt, now: now, rate: rate, age: age, years: years };
+    // now＝はじめにあるお金の合計（スタート時の元金＋すでにNISAで投資している金額）。どちらも元本として、今から一緒に増えていく
+    return { target: target, pmt: pmt, now: start + nisa, start: start, nisa: nisa, rate: rate, age: age, years: years };
   }
 
   // チェックポイント（100万・500万・1,000万円…）に届く時期。期間の中で届くものだけ。目標は別に出す
@@ -241,6 +248,8 @@
     });
     var boxes = [{ x: xEnd - 8, y: yEndV - 8, w: 16, h: 16 }, { x: xEnd - 7, y: yEndP - 7, w: 14, h: 14 }, { x: 0, y: y0 + 1, w: geo.W, h: geo.H - y0 }];
     if (reached) boxes.push({ x: xr - 6, y: yGoal - 6, w: 12, h: 12 });
+    var x0 = xOf(0), yNow = yOf(s.now);
+    if (s.now > 0) boxes.push({ x: x0 - 6, y: yNow - 6, w: 12, h: 12 });
     shown.forEach(function (q) { boxes.push({ x: xOf(q.m / 12) - 6, y: yOf(q.v) - 6, w: 12, h: 12 }); });
     function bbox(t) {
       try { var b = t.getBBox(); return { x: b.x - 2, y: b.y - 1, w: b.width + 4, h: b.height + 2 }; }
@@ -296,6 +305,11 @@
         label(bnd[0], 't-band', function (w) { return [0.5, 0.68, 0.32].map(function (f) { return [xEnd - 8 - w, bnd[1] + h * f + 4]; }); });
       });
     }
+    // はじめにあるお金（点の右下・右上・上の、空いている所。入らなければ金額だけ）
+    if (s.now > 0) {
+      var startSpots = function () { return [[x0 + 10, yNow + 16], [x0 + 10, yNow - 8], [x0 - 2, yNow - 11]]; };
+      if (!label('はじめ ' + manShort(s.now), 't-start', startSpots)) label(manShort(s.now), 't-start', startSpots);
+    }
     // チェックポイントの名前（点の左上・右下など、空いている所）
     shown.forEach(function (q) {
       var x = xOf(q.m / 12), y = yOf(q.v);
@@ -312,6 +326,7 @@
     shown.forEach(function (q) {
       svg.appendChild(el('circle', { cx: xOf(q.m / 12), cy: yOf(q.v), r: 4, fill: COLOR.surface, stroke: COLOR.gain, 'stroke-width': 2 }));
     });
+    if (s.now > 0) svg.appendChild(el('circle', { cx: x0, cy: yNow, r: 4, fill: COLOR.surface, stroke: COLOR.principal, 'stroke-width': 2 }));
     if (reached) svg.appendChild(el('circle', { cx: xr, cy: yGoal, r: 6, fill: COLOR.ink, stroke: COLOR.surface, 'stroke-width': 2 }));
     svg.appendChild(el('circle', { cx: xEnd, cy: yEndP, r: 4.5, fill: COLOR.principal, stroke: COLOR.surface, 'stroke-width': 2 }));
     svg.appendChild(el('circle', { cx: xEnd, cy: yEndV, r: 5.5, fill: COLOR.gain, stroke: COLOR.surface, 'stroke-width': 2 }));
@@ -332,6 +347,11 @@
     setText('s-total', man(total));
     setText('s-gain', man(gain));
     setText('s-principal', man(principal));
+    setText('s-principal-label', s.now > 0 ? '自分で入れた元本' : '自分で積み立てた元本');
+    var sub = $('s-principal-sub');
+    sub.hidden = !(s.now > 0 && s.pmt > 0);
+    if (!sub.hidden) sub.textContent = 'はじめの' + man(s.now) + ' ＋ 毎月の積立' + man(s.pmt * months);
+    setText('s-start-sum', s.start > 0 && s.nisa > 0 ? '＝ あわせて' + man(s.now) + 'からスタート' : '');
     out.textContent = ageLabel(s.age, months) + 'まで（' + span(months) + '）';
 
     // 目標まで
@@ -344,7 +364,7 @@
     var fix = $('s-goal-fix');
     fix.hidden = true;
     if (reach === 0) {
-      setText('s-goal-msg', '今ある資産で、もう目標に届いています。');
+      setText('s-goal-msg', 'はじめにあるお金で、もう目標に届いています。');
     } else if (reachedNow) {
       setText('s-goal-msg', when(s.age, reach) + 'に、目標の' + man(s.target) + 'に届きます。');
     } else {
@@ -394,7 +414,7 @@
         if (u <= s.now) continue;
         var m1 = monthsToReach(u, s.now, s.pmt, s.rate), m2 = monthsToReach(u * 2, s.now, s.pmt, s.rate);
         if (m1 && m2 && m2 <= months + 1e-9 && m2 - m1 < m1) {
-          speed.textContent = '最初の' + man(u) + 'までは' + span(m1) + '、次の' + man(u) + 'は' + span(m2 - m1) + '。あとになるほど早く増えます。';
+          speed.textContent = (s.now > 0 ? man(u) : '最初の' + man(u)) + 'までは' + span(m1) + '、次の' + man(u) + 'は' + span(m2 - m1) + '。あとになるほど早く増えます。';
           speed.hidden = false;
           break;
         }
@@ -419,7 +439,7 @@
     setText('s-blocks-unit', '1個＝' + man(unit));
     var note = '';
     if (nTotal === 0) note = 'まだ積み木1個（' + man(unit) + '）に届きません。';
-    else if (gain > principal) note = '増えた分のほうが、自分で積み立てた元本より多くなっています。';
+    else if (gain > principal) note = '増えた分のほうが、' + (s.now > 0 ? '自分で入れた元本' : '自分で積み立てた元本') + 'より多くなっています。';
     else if (gain >= 1) note = '続けるほど、橙の積み木（増えた分）がふえていきます。';
     if (gain >= LIVING) note += '増えた分の' + man(gain) + 'は、生活費（月' + LIVING + '万円）の約' + span(gain / LIVING) + '分です。';
     setText('s-blocks-note', note);
@@ -427,7 +447,8 @@
     if (!final) return;
 
     // NISAで増えた分に税金がかからないこと・はじめる時期
-    var inNisa = s.pmt <= 30 && principal <= 1800;
+    var firstYear = s.start + s.pmt * 12;  // 1年目にNISAに入れる金額（スタート時の元金＋12か月分の積立）
+    var inNisa = s.pmt <= 30 && s.start <= NISA_LUMP && firstYear <= NISA_YEAR && principal <= NISA_LIFE;
     var tax = $('s-tax');
     if (gain >= 1 && inNisa) {
       tax.textContent = '';
@@ -439,8 +460,9 @@
       tax.hidden = true;
     }
     var late = $('s-late');
-    if (years > 5 && (s.pmt > 0 || s.now > 0)) {
-      var later = grow(s.now, s.pmt, months - 60, s.rate);
+    if (years > 5 && (s.pmt > 0 || s.start > 0)) {
+      // すでにNISAで投資している分は、そのまま増え続ける。おくれるのは、これから入れるお金
+      var later = grow(s.nisa, 0, months, s.rate) + grow(s.start, s.pmt, months - 60, s.rate);
       late.textContent = '';
       late.appendChild(document.createTextNode('同じ' + ageLabel(s.age, months) + 'まで続けても、はじめるのが5年おそい（' + (s.age + 5) + '歳から）と約' + man(later) + '。今はじめるより'));
       var lb = document.createElement('b'); lb.textContent = '約' + man(total - later) + '少なく'; late.appendChild(lb);
@@ -452,7 +474,12 @@
     var notes = [];
     if (s.pmt > 10 && s.pmt <= 30) notes.push('つみたて投資枠は年120万円（毎月10万円）まで。それをこえる分は、成長投資枠もあわせて年360万円まで使えます。');
     if (s.pmt > 30) notes.push('毎月30万円（年360万円）をこえる分は、NISAの年間の枠の外（ふつうの口座）になります。');
-    if (principal > 1800) notes.push('元本の合計が1,800万円をこえます。NISAで非課税にできるのは、元本で1,800万円までです。');
+    if (s.start > 0 && (s.start > NISA_LUMP || firstYear > NISA_YEAR)) notes.push('NISAでまとめて入れられるのは、1年に240万円まで（成長投資枠。毎月の積立とあわせて年360万円まで）。こえる分は、次の年以降に分けて入れるか、ふつうの口座になります。');
+    if (principal > NISA_LIFE) {
+      var room = NISA_LIFE - s.now;  // 毎月の積立に残っているNISAの枠
+      if (room <= 0) notes.push('はじめにあるお金だけで、NISAの枠（元本1,800万円）をこえています。こえる分は、ふつうの口座になります。');
+      else notes.push((s.nisa > 0 ? 'すでにNISAで投資している分もふくめると、' : '') + '元本の合計が1,800万円をこえます。NISAの枠（元本1,800万円）は' + ageLabel(s.age, Math.ceil(room / s.pmt - 1e-9)) + 'でいっぱいになり、そのあとの積立は、ふつうの口座になります。');
+    }
     if (s.rate === 0) notes.push('増える割合が0%なので、増えた分はありません。');
     var ul = $('s-notes');
     ul.textContent = '';

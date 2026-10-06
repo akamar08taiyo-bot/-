@@ -88,7 +88,7 @@
 }
 
 /* 資産推移アプリ（goal.html）：入力 → 数字 → グラフ → 期間のつまみ。グラフの色は 元本＝青 #2a7aa8・増えた分＝橙 #ca743a（色覚の見え方の差でも区別できる組み合わせ） */
-.sim{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-items:start;margin:0 0 30px}
+.sim{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-items:start;margin:20px 0 30px}
 .sim-form{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;padding:22px;background:var(--pale);border-radius:10px;min-width:0}
 .sim-field{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;min-width:0}
 .sim-label{display:flex;align-items:center;gap:10px;margin:0;font-size:17px;font-weight:700;line-height:1.5}
@@ -138,6 +138,15 @@
 .sim-chart .t-age{font-size:11px}
 .sim-chart .t-age-main{font-weight:700;fill:#3d4d47}
 .sim-input-age input{flex:0 1 150px}
+/* はじめにあるお金（スタート時の元金・すでにNISAで投資している金額）。入れなくてもよいので、少し小さく */
+.sim-start{gap:12px}
+.sim-start .sim-label{flex-wrap:wrap;gap:2px 10px}
+.sim-opt{padding:0 10px;border-radius:999px;background:var(--cream);font-size:13px;font-weight:700;line-height:1.9;color:var(--muted)}
+.sim-subfield{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;min-width:0}
+.sim-subfield label{font-size:15px;font-weight:700;line-height:1.5}
+.sim-input-sm input{height:48px;font-size:22px}
+.sim-parts .sim-parts-note{display:block;margin:-2px 0 0;padding-left:22px;font-size:13px;line-height:1.6;color:var(--muted)}
+.sim-chart .t-start{font-size:11px;font-weight:700;fill:#1d5c80;paint-order:stroke;stroke:#fcfbf8;stroke-width:3px;stroke-linejoin:round}
 .sim-chart .t-goal,.sim-chart .t-reach,.sim-chart .t-band{font-weight:700;fill:var(--green);paint-order:stroke;stroke:#fcfbf8;stroke-width:4px;stroke-linejoin:round}
 .sim-chart .t-goal{font-size:13px}
 .sim-chart .t-tick{paint-order:stroke;stroke:#fcfbf8;stroke-width:3px;stroke-linejoin:round}
@@ -226,7 +235,7 @@
 .is-playing .sim-goal-fix,.is-playing .sim-compare-text{visibility:hidden}
 @media(prefers-reduced-motion:reduce){.sim-burst{animation:none;opacity:1}}
 @media(min-width:900px){.sim{grid-template-columns:minmax(300px,360px) minmax(0,1fr);gap:36px}.sim-card{padding:22px 24px 20px}}
-@media(max-width:600px){.sim-form{padding:18px}.sim-card{padding:16px 14px 14px}.sim-next{padding:18px}.sim-next .button{width:100%}.sim-table .table-scroll th,.sim-table .table-scroll td{padding:8px 8px;font-size:14px}}
+@media(max-width:600px){.sim{margin-top:14px}.sim-form{padding:18px}.sim-card{padding:16px 14px 14px}.sim-next{padding:18px}.sim-next .button{width:100%}.sim-table .table-scroll th,.sim-table .table-scroll td{padding:8px 8px;font-size:14px}}
 .goal-list,.goal-notes{margin:0 0 14px;padding-left:1.2em;font-size:15px;line-height:1.8}
 .goal-notes{color:#945323}
 .goal-notes:empty,.goal-list:empty{display:none}

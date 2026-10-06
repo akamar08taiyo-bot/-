@@ -59,7 +59,7 @@ START = f"""<div class="narrow">
 <span class="gift-number">1</span>
 <p class="gift-label">特典1・資産推移アプリ・約1分</p>
 <h2>毎月の積立で、資産はどう育つ？</h2>
-<p>目標の金額・毎月の積立額・今の年齢を入れて、何歳まで続けるかのつまみを動かすだけ。何歳のときにいくらになるか、自分で積み立てたお金と投資で増えた分が、グラフでその場でわかります。再生ボタンで、今から資産が育つ様子も見られます。入力した数字は、この端末の中だけで使われます。</p>
+<p>目標の金額・毎月の積立額・今の年齢を入れて、何歳まで続けるかのつまみを動かすだけ。スタート時の元金や、すでにNISAで投資している金額も入れられます。何歳のときにいくらになるか、自分で入れたお金と投資で増えた分が、グラフでその場でわかります。再生ボタンで、今から資産が育つ様子も見られます。入力した数字は、この端末の中だけで使われます。</p>
 <p class="example-line">例：35歳から65歳まで毎月3万円 → 仮に年5%なら約2,497万円（元本1,080万円＋増えた分1,417万円）</p>
 <p class="example-line">例：目標2,000万円 → 35歳から毎月3万円・年5%なら、61歳ごろに届く計算</p>
 <div class="gift-actions">
@@ -193,10 +193,7 @@ GOAL = f"""<div class="content-wide">
 <span aria-hidden="true">/</span>
 <span>資産推移アプリ</span>
 </div>
-<header class="page-heading">
-<h1>毎月の積立で、<br>資産はどう育つ？</h1>
-<p>目標の金額・毎月の積立額・今の年齢を入れて、何歳まで続けるかのつまみを横に動かすだけ。何歳のときにいくらになるか、自分で積み立てたお金と投資で増えた分が、その場でグラフになります。入力した数字は、この端末の中だけで使われ、どこにも送られません。</p>
-</header>
+<h1 class="visually-hidden">資産推移アプリ</h1>
 
 <div class="sim" id="sim">
 <form class="sim-form" id="sim-form" novalidate>
@@ -218,6 +215,20 @@ GOAL = f"""<div class="content-wide">
 <div class="sim-input sim-input-age"><input id="s-age" inputmode="numeric" autocomplete="off" value="35" aria-describedby="s-age-hint"><span>歳</span></div>
 <small id="s-age-hint">今の年齢から、何歳のときにいくらになるか、何歳で目標に届くかを計算します。</small>
 </div>
+<div class="sim-field sim-start" role="group" aria-labelledby="s-start-title">
+<p class="sim-label" id="s-start-title">はじめにあるお金<span class="sim-opt">なければ0円のまま</span></p>
+<div class="sim-subfield">
+<label for="s-start">スタート時の元金</label>
+<div class="sim-input sim-input-sm"><input id="s-start" inputmode="decimal" autocomplete="off" value="0" aria-describedby="s-start-hint"><span>万円</span></div>
+<small id="s-start-hint">はじめに、まとめて投資するお金</small>
+</div>
+<div class="sim-subfield">
+<label for="s-nisa">すでにNISAで投資している金額</label>
+<div class="sim-input sim-input-sm"><input id="s-nisa" inputmode="decimal" autocomplete="off" value="0" aria-describedby="s-nisa-hint s-start-sum"><span>万円</span></div>
+<small id="s-nisa-hint">これまでにNISAで買った金額（だいたいでOK）</small>
+</div>
+<p class="sim-perday" id="s-start-sum"></p>
+</div>
 <div class="sim-field">
 <p class="sim-label" id="s-rate-label">増える割合（1年あたり・仮）</p>
 <div class="sim-chips" role="group" aria-labelledby="s-rate-label">
@@ -228,9 +239,8 @@ GOAL = f"""<div class="content-wide">
 <small>利回りは約束ではありません。低めの3%でも試してみましょう。</small>
 </div>
 <details class="sim-more">
-<summary>くわしく設定する（今ある資産・割合）</summary>
+<summary>増える割合を自分で入れる</summary>
 <div class="sim-fields">
-{helper_field('s-now', '今ある資産', '万円', '0')}<small>はじめに入れるお金や、すでに持っている投資の額</small>
 {helper_field('s-rate', '増える割合（1年あたり）', '%', '5')}<small>0〜15%の間で入れられます</small>
 </div>
 </details>
@@ -243,7 +253,8 @@ GOAL = f"""<div class="content-wide">
 <p class="sim-total" id="s-total">―</p>
 <ul class="sim-parts">
 <li class="is-gain"><span class="sim-key" aria-hidden="true"></span><span>投資で増えた分（仮）</span><b id="s-gain">―</b></li>
-<li class="is-principal"><span class="sim-key" aria-hidden="true"></span><span>自分で積み立てた元本</span><b id="s-principal">―</b></li>
+<li class="is-principal"><span class="sim-key" aria-hidden="true"></span><span id="s-principal-label">自分で積み立てた元本</span><b id="s-principal">―</b></li>
+<li class="sim-parts-note" id="s-principal-sub" hidden></li>
 </ul>
 <div class="sim-goal" id="s-goal-box">
 <p class="sim-goal-row"><span>目標 <b id="s-goal">―</b></span><span class="sim-goal-pct" id="s-goal-pct"></span></p>
