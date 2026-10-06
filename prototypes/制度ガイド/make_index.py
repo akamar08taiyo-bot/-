@@ -202,6 +202,16 @@ GUIDE_LINK = {
 }
 
 
+# 切り出し動画を置きかえる新しい動画（ぜんぶそろったら、その切り出し動画は出さない）
+SUPERSEDE = {
+    "k1-1": ["g03", "g04"], "k1-2": ["g02"], "k1-3": ["g05"], "k1-4": ["g01"],
+    "k2-1": ["g10", "g06"], "k2-2": ["g09"], "k2-3": ["g08"], "k2-4": ["g07"],
+    "s1-1": ["g11"], "s1-2": ["g11"], "s1-3": ["g11"], "s1-4": ["g12"],
+    "s2-1": ["g13"], "s2-2": ["g14"], "s2-3": ["g13"], "s2-4": ["g14"],
+    "s3-1": ["g15"], "s3-2": ["g15"], "s3-3": ["g15"],
+}
+
+
 def load_guide():
     if not GUIDE_FILE.exists():
         return [], {}
@@ -255,14 +265,23 @@ def video_section():
                      "video": f"video/full/{key}.mp4", "poster": f"video/posters/{key}.webp",
                      "chapters": chapters, "link": list(GIFT_LINK[key])})
     guide, ready = load_guide()
-    use_guide = [g["key"] for g in groups
-                 if any(ep["group"] == g["key"] for ep in guide) and all(ep["id"] in ready for ep in guide if ep["group"] == g["key"])]
     entries = []
     for g in groups:
-        if g["key"] in use_guide:
-            entries += [guide_entry(ep, ready[ep["id"]]) for ep in guide if ep["group"] == g["key"]]
-        else:
-            entries += [c for c in clips if c["group"] == g["key"]]
+        g_clips = [c for c in clips if c["group"] == g["key"]]
+        g_guide = [ep for ep in guide if ep["group"] == g["key"]]
+        if not any(ep["id"] in ready for ep in g_guide):
+            entries += g_clips  # まだ1本もない時期は、今までの並びのまま
+            continue
+        still = [c for c in g_clips if not all(x in ready for x in SUPERSEDE.get(c["id"], ["-"]))]
+        placed = set()
+        for ep in g_guide:  # 新しい動画の順に並べ、まだ置きかわらない切り出し動画をその位置に入れる
+            if ep["id"] in ready:
+                entries.append(guide_entry(ep, ready[ep["id"]]))
+            for c in still:
+                if c["id"] not in placed and SUPERSEDE.get(c["id"], [None])[0] == ep["id"]:
+                    entries.append(c)
+                    placed.add(c["id"])
+        entries += [c for c in still if c["id"] not in placed]
     n_guide = sum(1 for c in entries if c.get("guide"))
     data = {"groups": groups, "groupLabel": group_label, "tagLabel": SHORT, "clips": entries, "full": full}
 
