@@ -59,7 +59,7 @@ START = f"""<div class="narrow">
 <span class="gift-number">1</span>
 <p class="gift-label">特典1・資産推移アプリ・約1分</p>
 <h2>毎月の積立で、資産はどう育つ？</h2>
-<p>目標の金額と毎月の積立額を入れて、期間のつまみを動かすだけ。自分で積み立てたお金と、投資で増えた分が、グラフでその場でわかります。入力した数字は、この端末の中だけで使われます。</p>
+<p>目標の金額と毎月の積立額を入れて、期間のつまみを動かすだけ。自分で積み立てたお金と、投資で増えた分が、グラフでその場でわかります。再生ボタンで、0年から資産が育つ様子も見られます。入力した数字は、この端末の中だけで使われます。</p>
 <p class="example-line">例：毎月3万円を30年 → 仮に年5%なら約2,497万円（元本1,080万円＋増えた分1,417万円）</p>
 <p class="example-line">例：目標2,000万円 → 毎月3万円・年5%なら、26年8か月で届く計算</p>
 <div class="gift-actions">
@@ -208,7 +208,8 @@ GOAL = f"""<div class="content-wide">
 </div>
 <div class="sim-field">
 <label class="sim-label" for="s-monthly"><b class="sim-step" aria-hidden="true">2</b>毎月の積立額</label>
-<div class="sim-input"><input id="s-monthly" inputmode="decimal" autocomplete="off" value="3" aria-describedby="s-monthly-hint"><span>万円</span></div>
+<div class="sim-input"><input id="s-monthly" inputmode="decimal" autocomplete="off" value="3" aria-describedby="s-monthly-hint s-perday"><span>万円</span></div>
+<p class="sim-perday" id="s-perday"></p>
 {chips('s-monthly', [1, 3, 5, 10])}
 <small id="s-monthly-hint">毎月、むりなく投資に回せる金額。わからなければ、下の<a href="#budget">「いまの家計から」</a>で出せます。</small>
 </div>
@@ -246,6 +247,12 @@ GOAL = f"""<div class="content-wide">
 <p class="sim-goal-msg" id="s-goal-msg"></p>
 <p class="sim-goal-fix" id="s-goal-fix" hidden><span id="s-goal-fix-text"></span><button type="button" class="sim-mini" id="s-goal-fix-btn"></button></p>
 </div>
+<div class="sim-compare" role="group" aria-labelledby="s-compare-label">
+<span id="s-compare-label">くらべる</span>
+<button type="button" data-compare="plus" aria-pressed="false">毎月あと1万円</button>
+<button type="button" data-compare="range" aria-pressed="false">年3%〜7%</button>
+</div>
+<p class="sim-compare-text" id="s-compare-text" hidden></p>
 <div class="sim-chart" id="s-chart-box">
 <svg id="s-chart" height="240" role="img" aria-labelledby="s-chart-title s-chart-desc"><title id="s-chart-title">資産の推移のグラフ</title><desc id="s-chart-desc"></desc></svg>
 <div class="sim-tip" id="s-tip" hidden></div>
@@ -253,12 +260,24 @@ GOAL = f"""<div class="content-wide">
 <div class="sim-period">
 <input type="range" id="s-years" min="1" max="40" step="1" value="30" aria-describedby="s-years-hint">
 <p class="sim-period-row"><label for="s-years"><b class="sim-step" aria-hidden="true">3</b>投資する期間</label><output id="s-years-out" for="s-years">30年</output></p>
+<button type="button" class="sim-play" id="s-play" aria-pressed="false"><svg class="sim-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path class="i-play" d="M7 4.5v15l13-7.5z" fill="currentColor"/><path class="i-stop" d="M6 6h12v12H6z" fill="currentColor"/></svg><span id="s-play-label">0年から育つ様子を再生</span></button>
 <p class="sim-hint" id="s-years-hint">つまみを左右に動かすと、グラフと金額がその場で変わります。グラフを横になぞっても動かせます。</p>
+</div>
+<div class="sim-checks">
+<p class="sim-sub">チェックポイント</p>
+<ol class="sim-checks-list" id="s-checks"></ol>
+<p class="sim-speed" id="s-speed" hidden></p>
 </div>
 <p class="visually-hidden" id="s-live" aria-live="polite"></p>
 </section>
 
 <div class="sim-insights">
+<section class="sim-blocks-card" aria-labelledby="s-blocks-title">
+<h2 id="s-blocks-title">積み木で見ると</h2>
+<p class="sim-blocks-legend"><span class="is-principal"><span class="sim-key" aria-hidden="true"></span>元本 <b id="s-blocks-p">―</b></span><span class="is-gain"><span class="sim-key" aria-hidden="true"></span>増えた分 <b id="s-blocks-g">―</b></span><span class="sim-blocks-unit" id="s-blocks-unit"></span></p>
+<div class="sim-blocks" id="s-blocks" role="img" aria-label=""></div>
+<p class="sim-blocks-note" id="s-blocks-note"></p>
+</section>
 <p class="sim-insight is-tax" id="s-tax" hidden></p>
 <p class="sim-insight" id="s-late" hidden></p>
 <ul class="goal-notes" id="s-notes"></ul>
