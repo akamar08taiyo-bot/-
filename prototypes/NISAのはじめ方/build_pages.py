@@ -37,58 +37,29 @@ PR_NOTE = """<div class="pr-note">
 START = f"""<div class="narrow">
 <header class="start-hero">
 <h1>小学生でも分かる<br>NISAのはじめ方</h1>
-<p>3つの無料特典で、お金の育ち方を見るところから、口座えらび・はじめての積立まで。<br>登録なしで、すぐに使えます。</p>
+<p>無料特典3つ。登録なしで、すぐ使えます。</p>
 </header>
-{PR_NOTE.format(text='証券会社えらびの結果は、このサイトで紹介している会社の中から、あなたの回答に合う会社を表示します。投資には元本割れの可能性があります。')}
+<p class="pr-line">【PR】このページには広告（アフィリエイト）を含みます。投資には元本割れの可能性があります。</p>
 <div class="resume-banner" id="resume" hidden>
 <p id="resume-text"></p>
 <a class="button" id="resume-link" href="support.html">続きから進める {ARROW}</a>
 </div>
-<ul class="prep-strip" aria-label="口座の申し込みに用意するもの">
-<li>マイナンバーカード</li>
-<li>スマホ</li>
-<li>だいたい10分</li>
-</ul>
-<ol class="start-steps" aria-label="おすすめの順番">
-<li>特典1で、毎月の積立で資産がどう育つかを見る</li>
-<li>特典2で、NISAのしくみと始め方を知る</li>
-<li>特典3で、証券会社を決めて申し込む</li>
+<h2 class="visually-hidden">3つの無料特典</h2>
+<ol class="gift-rows">
+<li id="gift-app"><a class="gift-row" href="goal.html"><span class="gift-no" aria-hidden="true">1</span><span class="gift-text"><b>資産推移アプリ</b><span class="gift-desc">月3万円なら、65歳でいくら？ 目標の2,000万円には何歳で届く？</span></span>{ARROW}</a></li>
+<li id="gift-guide"><a class="gift-row" href="downloads/NISA-complete-guide.pdf"><span class="gift-no" aria-hidden="true">2</span><span class="gift-text"><b>NISAはじめての完全ガイド</b><span class="gift-desc">しくみから口座づくり・積立の始め方まで（PDF 45ページ）</span></span>{ARROW}</a><a class="gift-alt" href="guide.html">Webで読む</a></li>
+<li id="gift-broker"><a class="gift-row" href="choose.html"><span class="gift-no" aria-hidden="true">3</span><span class="gift-text"><b>証券会社えらび</b><span class="gift-desc">3つの質問で、あなたに合う証券会社が30秒でわかる</span></span>{ARROW}</a></li>
 </ol>
-<div class="gift-list">
-<article class="gift-card" id="gift-app">
-<span class="gift-number">1</span>
-<p class="gift-label">特典1・資産推移アプリ・約1分</p>
-<h2>毎月の積立で、資産はどう育つ？</h2>
-<p>目標の金額・毎月の積立額・今の年齢を入れて、何歳まで続けるかのつまみを動かすだけ。スタート時の元金や、すでにNISAで投資している金額も入れられます。何歳のときにいくらになるか、自分で入れたお金と投資で増えた分が、グラフでその場でわかります。再生ボタンで、今から資産が育つ様子も見られます。入力した数字は、この端末の中だけで使われます。</p>
-<p class="example-line">例：35歳から65歳まで毎月3万円 → 仮に年5%なら約2,497万円（元本1,080万円＋増えた分1,417万円）</p>
-<p class="example-line">例：目標2,000万円 → 35歳から毎月3万円・年5%なら、61歳ごろに届く計算</p>
-<div class="gift-actions">
-<a class="button" href="goal.html">資産推移アプリを開く {ARROW}</a>
-<a class="button button-secondary" href="planner.html">くわしい家計プラン {ARROW}</a>
-</div>
-</article>
-<article class="gift-card" id="gift-guide">
-<span class="gift-number">2</span>
-<p class="gift-label">特典2・NISAのはじめ方・45ページ</p>
-<h2>NISAはじめての完全ガイド</h2>
-<p>しくみ・口座の選び方・積立の始め方・下がった日の考え方・売るときまで、38の章にまとめました。むずかしい言葉は、最後の用語の辞典で引けます。</p>
-<p class="example-line">まず読むならここ：「最初の30分でやること」→「口座開設から初回の積立まで」</p>
-<div class="gift-actions">
-<a class="button" href="downloads/NISA-complete-guide.pdf">PDFを開く {ARROW}</a>
-<a class="button button-secondary" href="guide.html">Webで読む {ARROW}</a>
-</div>
-</article>
-<article class="gift-card is-main" id="gift-broker">
-<span class="gift-number">3</span>
-<p class="gift-label">特典3・質問30秒＋申し込み約10分</p>
-<h2>3つの質問で、証券会社が決まる</h2>
-<p>使っているカード・よく買い物をする場所・大事にしたいことを答えるだけ。決まったら、申し込みが終わるまでチェックリストで一緒に進めます。</p>
-<p class="example-line">例：楽天カード＋楽天市場をよく使う → 楽天カードでクレカ積立ができる楽天証券</p>
-<div class="gift-actions">
-<a class="button" href="choose.html">3つの質問に答える {ARROW}</a>
-</div>
-</article>
-</div>
+<section class="open-now" id="open" aria-labelledby="open-title">
+<h2 id="open-title">NISA口座の申し込みは、スマホで約10分</h2>
+<p class="open-lead">今日の10分が、老後のお金の不安を小さくする最初の一歩に。</p>
+<p class="open-q" id="picks-label">よく使うカードで選ぶ<span>クレカ積立で、ポイントもたまります</span></p>
+<ul class="picks" id="picks" aria-labelledby="picks-label">
+<li><a class="pick is-quiz" href="choose.html"><span class="pick-card">持っていない・迷う</span><b class="pick-name">3つの質問で選ぶ</b></a></li>
+</ul>
+<p class="open-note">押すと、その証券会社の申し込みページが開きます。用意するもの：マイナンバーカード・スマホ</p>
+<a class="text-link" href="support.html">手順を見ながら申し込む {ARROW}</a>
+</section>
 <p class="fine-print">このサイトは、特定の銘柄や商品をすすめるものではありません。試算は仮定にもとづくもので、将来の成果を約束しません。出典と編集方針は<a href="sources.html">出典・編集方針</a>、広告の考え方は<a href="about.html">このサイトについて</a>にあります。</p>
 </div>"""
 

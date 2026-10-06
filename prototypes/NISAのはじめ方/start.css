@@ -5,24 +5,41 @@
 .pr-note{background:var(--peach);border-radius:6px;padding:14px 18px;font-size:14px;line-height:1.8;margin:0 0 22px}
 .pr-note strong{display:block;font-size:15px}
 .pr-note p{margin:4px 0 0}
-.prep-strip{display:flex;flex-wrap:wrap;gap:8px 10px;margin:0 0 26px;padding:0;list-style:none}
-.prep-strip li{background:var(--white);border:1px solid var(--border);border-radius:999px;padding:5px 14px;font-size:15px;font-weight:700}
 .resume-banner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;background:var(--pale);border-radius:8px;padding:16px 18px;margin:0 0 22px}
 .resume-banner p{margin:0;font-weight:700}
 .resume-banner .button{font-size:16px;padding:10px 18px;min-height:48px;gap:12px}
-.gift-list{display:grid;gap:16px;margin:0 0 36px}
-.gift-card{display:grid;grid-template-columns:62px minmax(0,1fr);gap:4px 18px;background:var(--white);border:1px solid var(--border);border-radius:10px;padding:22px}
-.gift-card.is-main{border:2px solid var(--green)}
-.gift-number{grid-column:1;grid-row:1/span 8;font:400 44px/1 Georgia,serif;color:var(--orange)}
-.gift-card>:not(.gift-number){grid-column:2;min-width:0}
-.gift-label{font-size:13px;font-weight:700;letter-spacing:.08em;color:#945323;margin:0}
-.gift-card h2{font-size:24px;margin:0}
-.gift-card p{font-size:16px;margin:0}
-.gift-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
-.gift-actions .button{font-size:16px;padding:12px 18px;min-height:50px;gap:12px}
-.start-steps{margin:0 0 30px;padding:0;list-style:none;display:grid;gap:8px;counter-reset:s}
-.start-steps li{display:flex;gap:12px;align-items:baseline;font-size:16px}
-.start-steps li::before{counter-increment:s;content:counter(s);font:400 22px/1 Georgia,serif;color:var(--orange);min-width:18px}
+/* 入口：特典1〜3をぎゅっと並べ、すぐ下に口座の申し込み */
+.pr-line{margin:0 0 16px;padding:6px 12px;border-radius:6px;background:var(--peach);font-size:13px;line-height:1.7}
+.gift-rows{list-style:none;margin:0 0 22px;padding:0;display:grid;gap:10px}
+.gift-rows li{min-width:0}
+.gift-row{display:grid;grid-template-columns:30px minmax(0,1fr) 22px;align-items:center;gap:12px;padding:14px 14px 14px 16px;background:var(--white);border:1px solid var(--border);border-radius:10px;text-decoration:none;color:var(--green)}
+.gift-row:hover{border-color:var(--green)}
+.gift-no{align-self:start;font:400 30px/1.1 Georgia,serif;color:var(--orange)}
+.gift-text{min-width:0}
+.gift-text b{display:block;font-size:18px;line-height:1.5}
+.gift-desc{display:block;font-size:14px;line-height:1.7;color:#4c5a55}
+.gift-row .icon{width:22px;height:22px;color:var(--orange)}
+.gift-alt{display:inline-block;margin:6px 0 0 58px;font-size:14px;font-weight:700}
+.open-now{margin:0 0 28px;padding:20px 18px;background:var(--white);border:2px solid var(--green);border-radius:12px}
+.open-now h2{margin:0 0 6px;font-size:23px;line-height:1.45}
+.open-lead{margin:0 0 16px;font-size:16px;font-weight:700;line-height:1.7}
+.open-q{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 10px;margin:0 0 8px;font-size:15px;font-weight:700}
+.open-q span{font-size:13px;font-weight:400;color:var(--muted)}
+.picks{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.picks li{min-width:0}
+.pick{position:relative;display:flex;flex-direction:column;justify-content:center;height:100%;min-height:62px;padding:8px 22px 8px 10px;border:1.5px solid #92a494;border-radius:8px;background:var(--cream);color:var(--green);text-decoration:none;line-height:1.45}
+.pick:hover{border-color:var(--green);background:var(--pale)}
+.pick-card{font-size:12px;color:var(--muted)}
+.pick-name{font-size:15px}
+.pick::after{content:"›";position:absolute;right:9px;top:50%;transform:translateY(-52%);font-size:20px;font-weight:700;color:var(--orange)}
+.pick .pr-tag{margin-left:4px;vertical-align:1px}
+.pick.is-quiz{background:var(--white);border-style:dashed}
+.open-note{margin:10px 0 8px;font-size:13px;line-height:1.7;color:var(--muted)}
+.open-now .text-link{font-size:15px;gap:10px}
+.open-now .text-link .icon{width:20px;height:20px}
+@media(min-width:720px){.picks{grid-template-columns:repeat(4,minmax(0,1fr))}.open-now{padding:24px 26px}}
+/* とても狭い画面では、カード → 証券会社 を1行ずつ */
+@media(max-width:359px){.open-now{padding:18px 14px}.picks{grid-template-columns:minmax(0,1fr)}.pick{flex-direction:row;align-items:center;justify-content:space-between;gap:8px;min-height:50px}.pick-card{min-width:0}.pick-name{flex:none;text-align:right}}
 
 /* 証券会社えらび */
 .quiz{max-width:720px}
@@ -78,9 +95,8 @@
 .reset-confirm .button{font-size:15px;padding:10px 16px;min-height:44px}
 
 @media(max-width:600px){
-.start-hero{padding:28px 0 20px}.start-hero h1{font-size:31px}.start-hero p{font-size:16px}
-.gift-card{grid-template-columns:38px minmax(0,1fr);padding:18px;gap:4px 12px}.gift-number{font-size:30px}.gift-card h2{font-size:20px}
-.gift-card>.gift-actions{grid-column:1/-1}.gift-actions .button{width:100%}
+.start-hero{padding:18px 0 14px}.start-hero h1{font-size:31px;margin-bottom:10px}.start-hero p{font-size:16px}
+.open-now h2{font-size:21px}
 .option-grid{grid-template-columns:1fr}.quiz-card{padding:20px}.quiz-card h2{font-size:22px}.option-button{font-size:16px;min-height:56px}
 .result-card{padding:20px}.result-name{font-size:31px}
 .check-body{margin-left:0}.check-row label{font-size:17px}.check-step{padding:14px}
