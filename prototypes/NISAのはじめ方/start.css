@@ -25,21 +25,38 @@
 .open-lead{margin:0 0 16px;font-size:16px;font-weight:700;line-height:1.7}
 .open-q{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 10px;margin:0 0 8px;font-size:15px;font-weight:700}
 .open-q span{font-size:13px;font-weight:400;color:var(--muted)}
-.picks{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-.picks li{min-width:0}
-.pick{position:relative;display:flex;flex-direction:column;justify-content:center;height:100%;min-height:62px;padding:8px 22px 8px 10px;border:1.5px solid #92a494;border-radius:8px;background:var(--cream);color:var(--green);text-decoration:none;line-height:1.45}
-.pick:hover{border-color:var(--green);background:var(--pale)}
-.pick-card{font-size:12px;color:var(--muted)}
-.pick-name{font-size:15px}
-.pick::after{content:"›";position:absolute;right:9px;top:50%;transform:translateY(-52%);font-size:20px;font-weight:700;color:var(--orange)}
-.pick .pr-tag{margin-left:4px;vertical-align:1px}
-.pick.is-quiz{background:var(--white);border-style:dashed}
+.open-order{margin:-4px 0 8px;font-size:12px;line-height:1.6;color:var(--muted)}
+.brokers{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.broker-row{display:flex;align-items:center;gap:10px;min-height:64px;padding:10px 10px 10px 14px;border:1.5px solid #92a494;border-radius:8px;background:var(--cream)}
+.broker-info{flex:1 1 auto;min-width:0}
+.broker-info b{display:block;font-size:16px;line-height:1.45}
+.broker-info span{display:block;font-size:12px;line-height:1.6;color:var(--muted)}
+.broker-apply{flex:none;display:inline-flex;align-items:center;gap:4px;min-height:44px;padding:6px 14px;border-radius:999px;background:var(--green);color:var(--cream);font-size:14px;font-weight:700;text-decoration:none;white-space:nowrap}
+.broker-apply:hover{background:#23574a}
+.broker-apply .pr-tag{margin-left:2px;border-color:#f7f5ef}
+.more-brokers{margin:8px 0 0}
+.more-brokers summary{display:inline-block;cursor:pointer;padding:4px 0;font-size:14px;font-weight:700;text-decoration:underline;text-underline-offset:4px}
+.more-brokers[open] summary{margin-bottom:8px}
+.quiz-tab{margin:16px 0 0;border:1.5px dashed #92a494;border-radius:10px;background:var(--white)}
+.quiz-tab summary{display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 14px;font-size:14px;font-weight:700;line-height:1.5;list-style:none}
+.quiz-tab summary::-webkit-details-marker{display:none}
+.quiz-tab summary::before{content:"?";flex:none;display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--orange);color:var(--white);font-size:13px}
+.quiz-tab summary::after{content:"＋";margin-left:auto;color:var(--muted)}
+.quiz-tab[open] summary::after{content:"－"}
+.quiz-tab[open]{border-style:solid;border-color:var(--green)}
+.quiz-tab-body{padding:0 12px 12px}
+.quiz-tab-lead{margin:0 0 10px;font-size:13px;line-height:1.7;color:var(--muted)}
+.quiz-tab .quiz-card{padding:16px}
+.quiz-tab .quiz-card h3{margin:0 0 4px;font-size:19px;line-height:1.5}
+.quiz-tab .quiz-hint{margin-bottom:12px}
+.quiz-tab .option-button{min-height:52px;font-size:15px}
+.quiz-tab .result-card{padding:18px}
+.quiz-tab .result-name{font-size:28px;margin:2px 0 10px}
 .open-note{margin:10px 0 8px;font-size:13px;line-height:1.7;color:var(--muted)}
 .open-now .text-link{font-size:15px;gap:10px}
 .open-now .text-link .icon{width:20px;height:20px}
-@media(min-width:720px){.picks{grid-template-columns:repeat(4,minmax(0,1fr))}.open-now{padding:24px 26px}}
-/* とても狭い画面では、カード → 証券会社 を1行ずつ */
-@media(max-width:359px){.open-now{padding:18px 14px}.picks{grid-template-columns:minmax(0,1fr)}.pick{flex-direction:row;align-items:center;justify-content:space-between;gap:8px;min-height:50px}.pick-card{min-width:0}.pick-name{flex:none;text-align:right}}
+@media(min-width:720px){.open-now{padding:24px 26px}.quiz-tab .option-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:359px){.open-now{padding:18px 14px}.broker-row{padding-left:10px}.broker-apply{padding:6px 10px}}
 
 /* 証券会社えらび */
 .quiz{max-width:720px}

@@ -9,6 +9,7 @@
   if (!cfg || !root) return;
 
   var brokers = cfg.brokers.filter(function (b) { return b.active; });
+  var H = root.getAttribute('data-heading') || 'h2';  // 入口のタブの中では h3（そのページの見出しの下に入るため）
   var questions = [
     { key: 'card', title: 'いちばんよく使うクレジットカードは？', hint: '持っていなくても大丈夫です。', options: cfg.cards },
     { key: 'point', title: 'ふだんの買い物で、よく使うのは？', hint: 'ポイントがたまる場所を思い出してみてください。', options: cfg.points },
@@ -95,7 +96,7 @@
     root.textContent = '';
     root.appendChild(progress(step + 1, questions.length + 1, '質問 ' + (step + 1) + ' / ' + questions.length));
     var card = el('div', { class: 'quiz-card' });
-    var h = el('h2', { tabindex: '-1', id: 'quiz-heading' }, q.title);
+    var h = el(H, { tabindex: '-1', id: 'quiz-heading' }, q.title);
     card.appendChild(h);
     card.appendChild(el('p', { class: 'quiz-hint' }, q.hint));
     var grid = el('div', { class: 'option-grid', role: 'group', 'aria-labelledby': 'quiz-heading' });
@@ -129,7 +130,7 @@
     root.appendChild(progress(questions.length + 1, questions.length + 1, '診断の結果'));
     var card = el('div', { class: 'result-card' });
     card.appendChild(el('p', { class: 'result-eyebrow' }, 'あなたに合いそうなのは'));
-    var h = el('h2', { class: 'result-name', tabindex: '-1' }, b.name);
+    var h = el(H, { class: 'result-name', tabindex: '-1' }, b.name);
     card.appendChild(h);
     var ul = el('ul', { class: 'reason-list' });
     top.reasons.forEach(function (r) { ul.appendChild(el('li', null, r)); });

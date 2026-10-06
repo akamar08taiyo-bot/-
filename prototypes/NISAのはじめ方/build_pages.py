@@ -24,7 +24,7 @@ HEAD = """<!doctype html>
 <link rel="stylesheet" href="start.css">
 <script defer src="app.js"></script>
 <script defer src="broker-config.js"></script>
-<script defer src="{script}"></script>
+{scripts}
 </head>
 <body>
 """
@@ -48,16 +48,27 @@ START = f"""<div class="narrow">
 <ol class="gift-rows">
 <li id="gift-app"><a class="gift-row" href="goal.html"><span class="gift-no" aria-hidden="true">1</span><span class="gift-text"><b>資産推移アプリ</b><span class="gift-desc">月3万円なら、65歳でいくら？ 目標の2,000万円には何歳で届く？</span></span>{ARROW}</a></li>
 <li id="gift-guide"><a class="gift-row" href="downloads/NISA-complete-guide.pdf"><span class="gift-no" aria-hidden="true">2</span><span class="gift-text"><b>NISAはじめての完全ガイド</b><span class="gift-desc">しくみから口座づくり・積立の始め方まで（PDF 45ページ）</span></span>{ARROW}</a><a class="gift-alt" href="guide.html">Webで読む</a></li>
-<li id="gift-broker"><a class="gift-row" href="choose.html"><span class="gift-no" aria-hidden="true">3</span><span class="gift-text"><b>証券会社えらび</b><span class="gift-desc">3つの質問で、あなたに合う証券会社が30秒でわかる</span></span>{ARROW}</a></li>
+<li id="gift-broker"><a class="gift-row" href="#quiz-tab"><span class="gift-no" aria-hidden="true">3</span><span class="gift-text"><b>証券会社えらび</b><span class="gift-desc">3つの質問で、あなたに合う証券会社が30秒でわかる</span></span>{ARROW}</a></li>
 </ol>
 <section class="open-now" id="open" aria-labelledby="open-title">
 <h2 id="open-title">NISA口座の申し込みは、スマホで約10分</h2>
 <p class="open-lead">今日の10分が、老後のお金の不安を小さくする最初の一歩に。</p>
-<p class="open-q" id="picks-label">よく使うカードで選ぶ<span>クレカ積立で、ポイントもたまります</span></p>
-<ul class="picks" id="picks" aria-labelledby="picks-label">
-<li><a class="pick is-quiz" href="choose.html"><span class="pick-card">持っていない・迷う</span><b class="pick-name">3つの質問で選ぶ</b></a></li>
-</ul>
-<p class="open-note">押すと、その証券会社の申し込みページが開きます。用意するもの：マイナンバーカード・スマホ</p>
+<p class="open-q" id="brokers-label">おすすめの証券会社</p>
+<p class="open-order">並びは、広告の条件や使いやすさなどをもとに、このサイトが決めています。</p>
+<ol class="brokers" id="brokers" aria-labelledby="brokers-label"></ol>
+<details class="more-brokers" id="more-brokers" hidden>
+<summary>ほかの<span id="more-count"></span>社も見る</summary>
+<ol class="brokers" id="brokers-more" aria-label="ほかの証券会社"></ol>
+</details>
+<noscript><p><a href="choose.html">紹介している証券会社の一覧を見る</a></p></noscript>
+<details class="quiz-tab" id="quiz-tab">
+<summary>どの証券口座がおすすめかわからない場合</summary>
+<div class="quiz-tab-body">
+<p class="quiz-tab-lead">3つの質問に答えると、あなたに合いそうな証券会社がわかります（30秒）。</p>
+<section class="quiz" id="chooser" data-heading="h3" aria-label="3つの質問で証券会社を選ぶ"></section>
+</div>
+</details>
+<p class="open-note">「申し込む」を押すと、その証券会社の申し込みページが開きます。用意するもの：マイナンバーカード・スマホ</p>
 <a class="text-link" href="support.html">手順を見ながら申し込む {ARROW}</a>
 </section>
 <p class="fine-print">このサイトは、特定の銘柄や商品をすすめるものではありません。試算は仮定にもとづくもので、将来の成果を約束しません。出典と編集方針は<a href="sources.html">出典・編集方針</a>、広告の考え方は<a href="about.html">このサイトについて</a>にあります。</p>
@@ -73,7 +84,7 @@ CHOOSE = f"""<div class="content-wide">
 <h1>3つの質問で、<br>証券会社が決まる。</h1>
 <p>答えるのは、使っているカード・よく買い物をする場所・大事にしたいことだけ。30秒ほどで終わります。</p>
 </header>
-{PR_NOTE.format(text='結果は、このサイトで紹介している証券会社の中から、回答に合う会社を表示します。掲載順はおすすめ順位ではありません。')}
+{PR_NOTE.format(text='結果は、このサイトで紹介している証券会社の中から、回答に合う会社を表示します。一覧の並びは、広告の条件や使いやすさなどをもとに、このサイトが決めています。')}
 <section class="quiz" id="chooser">
 <noscript><p>この診断はJavaScriptを使います。<a href="brokers.html">口座の比較</a>から選ぶこともできます。</p></noscript>
 </section>
@@ -332,7 +343,7 @@ GOAL = f"""<div class="content-wide">
 
 PAGES = {
     "goal.html": ("資産推移アプリ", "目標の金額と毎月の積立額を入れて、期間のつまみを動かすだけ。自分で積み立てたお金と、投資で増えた分の推移がグラフでわかります。入力はこの端末の中だけで使われます。", "goal.js", GOAL),
-    "start.html": ("小学生でも分かる NISAのはじめ方", "3つの無料特典で、NISAの口座えらびから、はじめての積立まで。登録なしで使えます。", "start.js", START),
+    "start.html": ("小学生でも分かる NISAのはじめ方", "3つの無料特典で、NISAの口座えらびから、はじめての積立まで。登録なしで使えます。", "choose.js start.js", START),
     "choose.html": ("3つの質問で決まる 証券会社えらび", "使っているカードや買い物の場所に答えるだけで、合いそうな証券会社がわかります。", "choose.js", CHOOSE),
     "support.html": ("NISA口座の申し込みサポート", "NISA口座の申し込みを、チェックリストで最後まで一緒に進めます。", "support.js", SUPPORT),
 }
@@ -341,7 +352,8 @@ PAGES = {
 def build(out_dir):
     out = pathlib.Path(out_dir)
     for name, (title, desc, script, body) in PAGES.items():
-        html = HEAD.format(title=title, desc=desc, script=script) + HEADER + '<main id="main">\n' + body + "\n</main>\n" + FOOTER + "\n</body>\n</html>\n"
+        scripts = "\n".join(f'<script defer src="{name}"></script>' for name in script.split())
+        html = HEAD.format(title=title, desc=desc, scripts=scripts) + HEADER + '<main id="main">\n' + body + "\n</main>\n" + FOOTER + "\n</body>\n</html>\n"
         (out / name).write_text(html, encoding="utf-8")
         print("wrote", out / name)
 

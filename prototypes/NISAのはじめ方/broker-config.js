@@ -5,7 +5,8 @@
   ・active   … 紹介する会社だけ true にします（ASPで提携が承認された会社）。
   ・applyUrl … ASPで発行された広告リンクを、そのまま貼ります（短縮・改変しない）。
                空のときは officialUrl（公式サイト）に飛び、「PR」の表示も出ません。
-  ・並び順    … 点数が同じときは、上にある会社を表示します。
+  ・並び順    … 入口の「おすすめの証券会社」の順番です（上から3社を出し、残りは「ほかの◯社」にまとめます）。
+               証券会社えらびで点数が同じときも、上にある会社を表示します。決め方は README にあります。
   ・cards / points / styles … 下の一覧の id から選びます。
   ・notes    … 申し込みサポートの「この会社のポイント」に出す短いメモ（任意）。公式の案内を見て書いてください。
 
@@ -40,10 +41,17 @@ window.OKANE_CHOOSER = {
   ],
   brokers: [
     {
-      id: 'sbi', name: 'SBI証券', active: true,
-      applyUrl: '', officialUrl: 'https://www.sbisec.co.jp/',
-      cards: ['smbc', 'jcb'], points: ['v'], styles: ['lineup'],
-      cardText: '三井住友カード・JCBカードなど', pointText: 'Vポイントなど',
+      id: 'esmart', name: '三菱UFJ eスマート証券', active: true,
+      applyUrl: '', officialUrl: 'https://kabu.com/',
+      cards: ['aupay'], points: ['ponta'], styles: [],
+      cardText: 'au PAYカード・三菱UFJカード', pointText: 'Pontaポイントなど',
+      notes: []
+    },
+    {
+      id: 'matsui', name: '松井証券', active: true,
+      applyUrl: '', officialUrl: 'https://www.matsui.co.jp/',
+      cards: ['jcb'], points: [], styles: [],
+      cardText: 'JCBカード', pointText: '',
       notes: []
     },
     {
@@ -54,17 +62,17 @@ window.OKANE_CHOOSER = {
       notes: []
     },
     {
+      id: 'sbi', name: 'SBI証券', active: true,
+      applyUrl: '', officialUrl: 'https://www.sbisec.co.jp/',
+      cards: ['smbc', 'jcb'], points: ['v'], styles: ['lineup'],
+      cardText: '三井住友カード・JCBカードなど', pointText: 'Vポイントなど',
+      notes: []
+    },
+    {
       id: 'monex', name: 'マネックス証券', active: true,
       applyUrl: '', officialUrl: 'https://www.monex.co.jp/',
       cards: ['d', 'jcb'], points: ['d'], styles: ['lineup'],
       cardText: 'dカード・マネックスカード・JCBカードなど', pointText: 'dポイントなど',
-      notes: []
-    },
-    {
-      id: 'esmart', name: '三菱UFJ eスマート証券', active: true,
-      applyUrl: '', officialUrl: 'https://kabu.com/',
-      cards: ['aupay'], points: ['ponta'], styles: [],
-      cardText: 'au PAYカード・三菱UFJカード', pointText: 'Pontaポイントなど',
       notes: []
     },
     {
@@ -79,13 +87,6 @@ window.OKANE_CHOOSER = {
       applyUrl: '', officialUrl: 'https://www.tsumiki-sec.com/',
       cards: ['epos'], points: ['epos'], styles: ['simple'],
       cardText: 'エポスカード', pointText: 'エポスポイント',
-      notes: []
-    },
-    {
-      id: 'matsui', name: '松井証券', active: true,
-      applyUrl: '', officialUrl: 'https://www.matsui.co.jp/',
-      cards: ['jcb'], points: [], styles: [],
-      cardText: 'JCBカード', pointText: '',
       notes: []
     }
   ]

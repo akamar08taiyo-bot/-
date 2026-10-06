@@ -6,42 +6,63 @@
   var cfg = window.OKANE_CHOOSER;
   if (!cfg) return;
   var active = cfg.brokers.filter(function (b) { return b.active; });
+  var TOP = 3;  // はじめから見せるのは上から3社。残りは「ほかの◯社も見る」の中
 
-  // ---- よく使うカードで選ぶ：押すと、その証券会社の申し込みページが開く（会社は broker-config.js の並び順で、そのカードでクレカ積立ができる最初の会社） ----
-  var picks = document.getElementById('picks');
-  if (picks) {
-    var last = picks.lastElementChild;  // 「持っていない・迷う」は、いちばん最後のまま
-    cfg.cards.forEach(function (c) {
-      if (c.id === 'none') return;
-      var b = active.filter(function (x) { return x.cards.indexOf(c.id) >= 0; })[0];
-      if (!b) return;
-      var a = document.createElement('a');
-      a.className = 'pick';
-      a.href = b.applyUrl || b.officialUrl;
-      a.target = '_blank';
-      a.rel = b.applyUrl ? 'sponsored noopener' : 'noopener noreferrer';
-      var card = document.createElement('span');
-      card.className = 'pick-card';
-      card.textContent = c.label.replace(/（.*）/, '');
-      var name = document.createElement('b');
-      name.className = 'pick-name';
-      name.textContent = b.name;
-      if (b.applyUrl) {
-        var pr = document.createElement('span');
-        pr.className = 'pr-tag';
-        pr.textContent = 'PR';
-        name.appendChild(pr);
-      }
-      a.appendChild(card);
-      a.appendChild(name);
-      a.addEventListener('click', function () {
-        try { localStorage.setItem('okane-map:apply:pick', b.id); } catch (_) { /* 保存できなくても申し込みページは開く */ }
-      });
-      var li = document.createElement('li');
-      li.appendChild(a);
-      picks.insertBefore(li, last);
-    });
+  function el(tag, cls, text) {
+    var node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = text;
+    return node;
   }
+
+  // ---- おすすめの証券会社（broker-config.js の並び順）。「申し込む」で、その会社の申し込みページが開く ----
+  function row(b) {
+    var li = el('li', 'broker-row');
+    var info = el('div', 'broker-info');
+    info.appendChild(el('b', null, b.name));
+    var point = [b.cardText ? b.cardText + 'でクレカ積立' : '', b.pointText].filter(Boolean).join('・');
+    if (point) info.appendChild(el('span', null, point));
+    var a = el('a', 'broker-apply', '申し込む');
+    a.href = b.applyUrl || b.officialUrl;
+    a.target = '_blank';
+    a.rel = b.applyUrl ? 'sponsored noopener' : 'noopener noreferrer';
+    a.setAttribute('aria-label', b.name + 'の申し込みページを開く（新しいタブ）' + (b.applyUrl ? '・PR' : ''));
+    if (b.applyUrl) a.appendChild(el('span', 'pr-tag', 'PR'));
+    a.addEventListener('click', function () {
+      // 「手順を見ながら申し込む」を開いたとき、この会社のチェックリストにする
+      try { localStorage.setItem('okane-map:apply:pick', b.id); } catch (_) { /* 保存できなくても申し込みページは開く */ }
+    });
+    li.appendChild(info);
+    li.appendChild(a);
+    return li;
+  }
+  var list = document.getElementById('brokers');
+  if (list) {
+    active.slice(0, TOP).forEach(function (b) { list.appendChild(row(b)); });
+    var rest = active.slice(TOP);
+    var more = document.getElementById('more-brokers');
+    if (more && rest.length) {
+      var moreList = document.getElementById('brokers-more');
+      rest.forEach(function (b) { moreList.appendChild(row(b)); });
+      document.getElementById('more-count').textContent = String(rest.length);
+      more.hidden = false;
+    }
+  }
+
+  // ---- 「どの証券口座がおすすめかわからない場合」のタブ（中身の3つの質問は choose.js） ----
+  var tab = document.getElementById('quiz-tab');
+  function openTab(scroll) {
+    if (!tab) return;
+    tab.open = true;
+    if (scroll) tab.scrollIntoView({ block: 'start', behavior: window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href="#quiz-tab"]');
+    if (!a) return;
+    e.preventDefault();
+    openTab(true);
+  });
+  if (location.hash === '#quiz-tab') openTab(false);
 
   // ---- 申し込みの途中なら、続きから ----
   var banner = document.getElementById('resume');
