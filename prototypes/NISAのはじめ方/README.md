@@ -30,7 +30,7 @@
 ## 作り直し方
 
 1. 文と並びを変えるときは `build_pages.py`、動きは `goal.js` などの JS、見た目は `start.css` を直す。ヘッダーとフッターは、サイトの既存ページから抜き出した `_header.html`・`_footer.html`。
-2. `python3 build_all.py サイトのフォルダ プレビューのフォルダ` で、4ページを書き出し、JS・CSS を写す。サイトのフォルダは、サイト一式（`okane-no-chizu-website-v7.zip` を展開したもの）。プレビューのフォルダには、プレビュー専用の `preview.css`・`preview.js` を足したページができる（実際のサイトには入れない）。
+2. `python3 build_all.py サイトのフォルダ プレビューのフォルダ` で、4ページを書き出し、JS・CSS を写す。サイトのフォルダは、サイト一式（`okane-no-chizu-website-v8.zip` を展開したもの）。プレビューのフォルダには、プレビュー専用の `preview.css`・`preview.js` を足したページができる（実際のサイトには入れない）。
 3. サイトに上げるのは、サイトのフォルダの中身（zip に入っている一式）。
 
 スマホで試せるプレビュー：https://claude.ai/artifact/UhvRPzh38U6Uq7igZjmEH4

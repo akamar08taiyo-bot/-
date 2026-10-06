@@ -1,5 +1,8 @@
 (function () {
   'use strict';
+  // 開いたときは、いつもページのいちばん上から（読み込み直したときや戻ったときも、前に見ていた位置を戻さない）。#の付いたリンクで来たときは、その場所へ
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  window.addEventListener('pageshow', function () { if (!location.hash) window.scrollTo(0, 0); });
   var cfg = window.OKANE_CHOOSER;
   var root = document.getElementById('apply');
   if (!cfg || !root) return;
