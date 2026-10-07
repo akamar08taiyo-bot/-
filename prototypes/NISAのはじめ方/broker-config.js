@@ -9,6 +9,9 @@
                証券会社えらびで点数が同じときも、上にある会社を表示します。決め方は README にあります。
   ・cards / points / styles … 下の一覧の id から選びます。
   ・notes    … 申し込みサポートの「この会社のポイント」に出す短いメモ（任意）。公式の案内を見て書いてください。
+  ・video    … 口座の作り方（申し込み方法）の動画の URL（YouTube など）。入れると、入口の一覧・診断の結果・申し込みサポートに
+               「口座の作り方を動画で見る」が出ます。空のあいだは出ません。videoLength は「6分19秒」のような長さ（なくてもよい）。
+               ショート動画作成のセッションで作った 楽天証券編・SBI証券編・三菱UFJ eスマート証券編 があります（投稿したら URL を入れる）。
 
   クレカ積立の組み合わせは 2026年10月5日時点の解説記事で確認したものです。
   公開する前に、各社の公式サイトで最新の条件を確かめてください。
@@ -45,49 +48,56 @@ window.OKANE_CHOOSER = {
       applyUrl: '', officialUrl: 'https://kabu.com/',
       cards: ['aupay'], points: ['ponta'], styles: [],
       cardText: 'au PAYカード・三菱UFJカード', pointText: 'Pontaポイントなど',
-      notes: []
+      notes: [],
+      video: '', videoLength: '6分4秒'
     },
     {
       id: 'matsui', name: '松井証券', active: true,
       applyUrl: '', officialUrl: 'https://www.matsui.co.jp/',
       cards: ['jcb'], points: [], styles: [],
       cardText: 'JCBカード', pointText: '',
-      notes: []
+      notes: [],
+      video: '', videoLength: ''
     },
     {
       id: 'rakuten', name: '楽天証券', active: true,
       applyUrl: '', officialUrl: 'https://www.rakuten-sec.co.jp/',
       cards: ['rakuten'], points: ['rakuten'], styles: ['lineup'],
       cardText: '楽天カード', pointText: '楽天ポイント',
-      notes: []
+      notes: [],
+      video: '', videoLength: ''
     },
     {
       id: 'sbi', name: 'SBI証券', active: true,
       applyUrl: '', officialUrl: 'https://www.sbisec.co.jp/',
       cards: ['smbc', 'jcb'], points: ['v'], styles: ['lineup'],
       cardText: '三井住友カード・JCBカードなど', pointText: 'Vポイントなど',
-      notes: []
+      notes: [],
+      video: '', videoLength: '6分19秒'
     },
     {
       id: 'monex', name: 'マネックス証券', active: true,
       applyUrl: '', officialUrl: 'https://www.monex.co.jp/',
       cards: ['d', 'jcb'], points: ['d'], styles: ['lineup'],
       cardText: 'dカード・マネックスカード・JCBカードなど', pointText: 'dポイントなど',
-      notes: []
+      notes: [],
+      video: '', videoLength: ''
     },
     {
       id: 'paypay', name: 'PayPay証券', active: true,
       applyUrl: '', officialUrl: 'https://www.paypay-sec.co.jp/',
       cards: ['paypay'], points: ['paypay'], styles: ['simple'],
       cardText: 'PayPayカード', pointText: 'PayPayポイント',
-      notes: []
+      notes: [],
+      video: '', videoLength: ''
     },
     {
       id: 'tsumiki', name: 'tsumiki証券', active: true,
       applyUrl: '', officialUrl: 'https://www.tsumiki-sec.com/',
       cards: ['epos'], points: ['epos'], styles: ['simple'],
       cardText: 'エポスカード', pointText: 'エポスポイント',
-      notes: []
+      notes: [],
+      video: '', videoLength: ''
     }
   ]
 };

@@ -22,6 +22,18 @@
     info.appendChild(el('b', null, b.name));
     var point = [b.cardText ? b.cardText + 'でクレカ積立' : '', b.pointText].filter(Boolean).join('・');
     if (point) info.appendChild(el('span', null, point));
+    if (b.video) {
+      // 口座の作り方の動画（ショート動画作成で作ったもの）
+      var v = el('a', 'broker-video');
+      v.href = b.video;
+      v.target = '_blank';
+      v.rel = 'noopener';
+      var icon = el('span', null, '▶ ');
+      icon.setAttribute('aria-hidden', 'true');
+      v.appendChild(icon);
+      v.appendChild(document.createTextNode('口座の作り方を動画で見る' + (b.videoLength ? '（' + b.videoLength + '）' : '')));
+      info.appendChild(v);
+    }
     var a = el('a', 'broker-apply', '申し込む');
     a.href = b.applyUrl || b.officialUrl;
     a.target = '_blank';
@@ -47,6 +59,16 @@
       document.getElementById('more-count').textContent = String(rest.length);
       more.hidden = false;
     }
+  }
+
+  // 動画のある会社があれば、特典3の下に「口座の作り方の動画」（会社の一覧へ）
+  var giftBroker = document.getElementById('gift-broker');
+  if (giftBroker && active.some(function (b) { return b.video; })) {
+    var alts = el('p', 'gift-alts');
+    var go = el('a', 'gift-alt', '口座の作り方の動画（会社ごと）');
+    go.href = '#open';
+    alts.appendChild(go);
+    giftBroker.appendChild(alts);
   }
 
   // ---- 「どの証券口座がおすすめかわからない場合」のタブ（中身の3つの質問は choose.js） ----

@@ -93,6 +93,14 @@
 
   var title = document.getElementById('apply-title');
   if (title && broker) title.textContent = broker.name + 'の申し込みを、最後まで一緒に。';
+  var videoBox = document.getElementById('broker-video');
+  if (videoBox && broker && broker.video) {
+    videoBox.appendChild(el('strong', null, '動画を見ながら進められます'));
+    var va = el('a', { class: 'text-link', href: broker.video, target: '_blank', rel: 'noopener' },
+      broker.name + 'の口座の作り方を動画で見る' + (broker.videoLength ? '（' + broker.videoLength + '）' : ''));
+    videoBox.appendChild(el('p', null).appendChild(va).parentNode);
+    videoBox.hidden = false;
+  }
   var notesBox = document.getElementById('broker-notes');
   if (notesBox && broker && broker.notes && broker.notes.length) {
     notesBox.appendChild(el('strong', null, broker.name + 'のポイント'));

@@ -143,6 +143,14 @@
     support.appendChild(arrow());
     actions.appendChild(support);
     card.appendChild(actions);
+    if (b.video) {
+      var vp = el('p', { class: 'result-video' });
+      var va = el('a', { class: 'text-link', href: b.video, target: '_blank', rel: 'noopener' });
+      va.appendChild(document.createTextNode(b.name + 'の口座の作り方を動画で見る' + (b.videoLength ? '（' + b.videoLength + '）' : '')));
+      va.appendChild(arrow());
+      vp.appendChild(va);
+      card.appendChild(vp);
+    }
     var cardMatched = answers.card !== 'none' && b.cards.indexOf(answers.card) >= 0;
     var note = (cardMatched ? '' : 'カードを持っていなくても口座は作れます。クレカ積立は、あとからカードを作って設定することもできます。') +
       '診断は、このサイトで紹介している証券会社の中から、回答に合う会社を表示しています。';
