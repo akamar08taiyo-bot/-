@@ -34,7 +34,11 @@ PDF（`downloads/NISA-complete-guide.pdf`）も「ゼロからわかる NISA完�
 - サイトの `downloads/free-resources.zip` の中のPDFも差し替えた。
 - Web版（`guide.html`）の題と見出し、`library.html` の見出し、トップページの本へのリンクの読み上げ名も新しい名前に。
 - プレビューの一覧ページで開くPDFのページ画像（`files/pdf`）と、特典2の表紙の小さい画像も作り直した。
-- トップページの本の絵（`assets/book-cover.png`）は、絵の中に旧題が描かれているので、まだ前のまま（画像の作り直しが必要）。
+- トップページの本の絵（`assets/book-cover.png`）も新しい名前にした（2026年10月7日）。画像を作るAIは使わず、元の絵を直した。
+  - `book_cover_clean.py`：旧題の2行（はじめての／完全ガイド）の文字とふちだけを、まわりの緑からなめらかに埋め、表紙のほかの所（おかねの地図とNISAの間の帯）の紙のざらつきを写して消す。
+  - `book_cover_render.py`：消した絵に「ゼロからわかる」（NISAの上・夕日と同じ橙）と「完全攻略／ガイド」（元の2行の位置・高さ・クリーム色）を、明朝体（Noto Serif JP SemiBold）で入れる。1行ずつ文字の上端と高さを測って合わせる。`npm i @fontsource/noto-serif-jp` しておく。
+  - 使い方：`python3 book_cover_clean.py 元の絵 消した絵` → `python3 book_cover_render.py 消した絵 新しい絵`。トップページの画像の説明（alt）も新しい名前に。
+- 特典2の動画の中の題（前の名前）は、「ショート動画作成」のセッションに書き出し直しを頼んだ（2026年10月7日）。届いたら `videos/` の3本を差し替える。
 
 ### 特典の動画の方針（2026年10月7日）
 
@@ -45,7 +49,7 @@ PDF（`downloads/NISA-complete-guide.pdf`）も「ゼロからわかる NISA完�
   - 「動画で見る」（入口の特典2・特典の一覧）を押すと、ページの上に再生画面が開く（`video.js`・見た目は `video.css`）。下の章ボタンで切り替え、1章が終わると次の章へ進む。
   - 動画の一覧は `gift-videos.js`。サイトには `videos/nisa_ch1_720.mp4`・`nisa_ch2_720.mp4`・`nisa_ch3_720.mp4`（届いた3本をそのままの名前で）と表紙の `videos/nisa_ch1〜3.jpg` を置く。動画をやめるときは `build_pages.py` の `GUIDE_VIDEO` を False にする（「準備中」に戻る）。
   - プレビューは1ファイル15MBまでなので、`guide_split.py` で1章を3つに分け（作り直さずにキーフレームの所で。声の途切れている所を選ぶ）、`gift-videos.preview.js`（`build_all.py` がプレビューにだけ `gift-videos.js` として置く）で続けて再生する。
-  - 動画の中の題は、まだ前の名前（「NISA はじめての完全ガイド」）のまま。
+  - 動画の中の題は、まだ前の名前（「NISA はじめての完全ガイド」）のまま。書き出し直しを頼んである（下の「PDFの名前」の節）。
 - 特典3「30秒で選べる 証券会社診断」：3つの質問の診断 ＋ 証券会社ごとの「口座の作り方」の動画。今は 楽天証券編（6分23秒）・SBI証券編（6分15秒）・三菱UFJ eスマート証券編（6分）を `videos/` に置き、`broker-config.js` のその会社の `video`・`videoPoster` に入れている。動画のある会社は、次の3か所に「口座の作り方を動画で見る」が出る。
   - 入口の「おすすめの証券会社」のその会社の欄（動画のある会社が1つでもあれば、特典3の下に「口座の作り方の動画（会社ごと）」も出る）
   - 3つの質問の診断の結果（「動画のとおりに進めるだけ」の枠。サイトに置いた動画ファイルならその場で再生、YouTube なら新しいタブで開く。動画ができていてまだ URL がない会社は `videoSoon: true` で「準備中」と出す。診断の結果からは「申し込みを最後まで一緒に進める」のボタンを外し、動画で見せる形にした）
@@ -109,7 +113,7 @@ PDF（`downloads/NISA-complete-guide.pdf`）も「ゼロからわかる NISA完�
 ## 作り直し方
 
 1. 文と並びを変えるときは `build_pages.py`、動きは `goal.js` などの JS、見た目は `start.css` を直す。ヘッダーとフッターは、サイトの既存ページから抜き出した `_header.html`・`_footer.html`。
-2. `python3 build_all.py サイトのフォルダ プレビューのフォルダ` で、4ページを書き出し、JS・CSS を写す。サイトのフォルダは、サイト一式（`okane-no-chizu-website-v26.zip` を展開したもの。動画は `okane-no-chizu-videos-1.zip`・`-2.zip` を同じ所に展開し、特典2の動画3本を `videos/` に置く）。プレビューのフォルダには、プレビュー専用の `preview.css`・`preview.js` を足したページができる（実際のサイトには入れない）。
+2. `python3 build_all.py サイトのフォルダ プレビューのフォルダ` で、4ページを書き出し、JS・CSS を写す。サイトのフォルダは、サイト一式（`okane-no-chizu-website-v27.zip` を展開したもの。動画は `okane-no-chizu-videos-1.zip`・`-2.zip` を同じ所に展開し、特典2の動画3本を `videos/` に置く）。プレビューのフォルダには、プレビュー専用の `preview.css`・`preview.js` を足したページができる（実際のサイトには入れない）。
 3. サイトに上げるのは、サイトのフォルダの中身（zip に入っている一式）。
 
 スマホで試せるプレビュー：https://claude.ai/artifact/UhvRPzh38U6Uq7igZjmEH4
