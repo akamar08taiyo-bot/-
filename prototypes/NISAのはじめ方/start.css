@@ -241,7 +241,7 @@
 .sim-play .i-stop,.sim-play[aria-pressed=true] .i-play{display:none}
 .sim-play[aria-pressed=true] .i-stop{display:inline}
 .sim-icon{flex:none}
-.sim-burst{position:absolute;z-index:3;padding:3px 12px;border-radius:999px;background:var(--green);color:var(--cream);font-size:14px;font-weight:700;white-space:nowrap;pointer-events:none;transform:translate(-50%,-150%);animation:sim-pop 1.6s ease-out forwards}
+.sim-burst{position:absolute;z-index:3;padding:3px 12px;border-radius:999px;background:var(--green);color:var(--cream);font-size:14px;font-weight:700;white-space:nowrap;pointer-events:none;transform:translate(-50%,-150%);animation:sim-pop 2.4s ease-out forwards}
 @keyframes sim-pop{0%{opacity:0;transform:translate(-50%,-90%) scale(.8)}18%{opacity:1;transform:translate(-50%,-150%) scale(1.06)}75%{opacity:1;transform:translate(-50%,-150%) scale(1)}100%{opacity:0;transform:translate(-50%,-185%)}}
 .sim-checks{margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
 .sim-sub{margin:0 0 6px;font-size:15px;font-weight:700}

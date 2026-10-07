@@ -582,7 +582,7 @@
     b.style.left = geo.reach.x + 'px';
     b.style.top = geo.reach.y + 'px';
     box.appendChild(b);
-    setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 1700);
+    setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 2500);
   }
   function play() {
     if (anim) { render(); return; }  // 再生中に押したら、とめて元の期間にもどす（render が stopPlay を呼ぶ）
@@ -591,7 +591,7 @@
     state = s;
     hideTip();
     var target = s.years * 12;
-    var dur = Math.min(6000, Math.max(2500, s.years * 170));
+    var dur = Math.min(16000, Math.max(5000, s.years * 400));  // ゆっくり：1年あたり0.4秒（30年なら12秒。5〜16秒の間）
     var reduce = reducedMotion();
     var reach = monthsToReach(s.target, s.now, s.pmt, s.rate);
     var t0 = null, prev = 0;
