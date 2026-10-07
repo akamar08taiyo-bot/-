@@ -21,7 +21,20 @@
 - 特典2：ゼロからわかる NISA完全攻略ガイド
 - 特典3：30秒で選べる 証券会社診断
 
-名前は前半と後半の間で改行する（`word-break: keep-all`。入らないときだけ言葉の途中でも折り返す）。資産シミュレーターのページの下のボタンは、長すぎるので短い名前（「NISA完全攻略ガイド」「証券会社診断」）。PDFの表紙は「NISAはじめての完全ガイド」のまま（変えるかは未定）。
+名前は前半と後半の間で改行する（`word-break: keep-all`。入らないときだけ言葉の途中でも折り返す）。資産シミュレーターのページの下のボタンは、長すぎるので短い名前（「NISA完全攻略ガイド」「証券会社診断」）。PDFも新しい名前にした（下）。
+
+### PDFの名前（2026年10月7日）
+
+PDF（`downloads/NISA-complete-guide.pdf`）も「ゼロからわかる NISA完全攻略ガイド」にした。
+
+- `pdf_rename.py` で、表紙の旧題の2行と、4〜41ページ上の帯の旧題を、四角でかくすのではなく PDF の中から消し、同じ位置・大きさ・色で新しい名前を入れた。文字検索でも古い名前は出ない。文書の題（メタデータ）も変えた。
+  - 表紙：「ゼロからわかる」を NISA の上にオレンジで、「完全攻略」「ガイド」を旧題の2行の位置に。NISA はそのまま。
+  - 28〜31ページは以前に作り直したページなので、元の HTML（`pdf_pages.html`）の帯の文字を変えて作り直した。
+  - 使い方：`python3 pdf_rename.py 元のPDF 書き出すPDF pdf_pages.html`（`pdf_pages.html` と同じフォルダで `npm i @fontsource/noto-sans-jp` しておく）。もう新しい名前になっているPDFには使わない。
+- サイトの `downloads/free-resources.zip` の中のPDFも差し替えた。
+- Web版（`guide.html`）の題と見出し、`library.html` の見出し、トップページの本へのリンクの読み上げ名も新しい名前に。
+- プレビューの一覧ページで開くPDFのページ画像（`files/pdf`）と、特典2の表紙の小さい画像も作り直した。
+- トップページの本の絵（`assets/book-cover.png`）は、絵の中に旧題が描かれているので、まだ前のまま（画像の作り直しが必要）。
 
 ### 特典の動画の方針（2026年10月7日）
 
@@ -91,7 +104,7 @@
 ## 作り直し方
 
 1. 文と並びを変えるときは `build_pages.py`、動きは `goal.js` などの JS、見た目は `start.css` を直す。ヘッダーとフッターは、サイトの既存ページから抜き出した `_header.html`・`_footer.html`。
-2. `python3 build_all.py サイトのフォルダ プレビューのフォルダ` で、4ページを書き出し、JS・CSS を写す。サイトのフォルダは、サイト一式（`okane-no-chizu-website-v24.zip` を展開したもの。動画は `okane-no-chizu-videos-1.zip`・`-2.zip` を同じ所に展開）。プレビューのフォルダには、プレビュー専用の `preview.css`・`preview.js` を足したページができる（実際のサイトには入れない）。
+2. `python3 build_all.py サイトのフォルダ プレビューのフォルダ` で、4ページを書き出し、JS・CSS を写す。サイトのフォルダは、サイト一式（`okane-no-chizu-website-v25.zip` を展開したもの。動画は `okane-no-chizu-videos-1.zip`・`-2.zip` を同じ所に展開）。プレビューのフォルダには、プレビュー専用の `preview.css`・`preview.js` を足したページができる（実際のサイトには入れない）。
 3. サイトに上げるのは、サイトのフォルダの中身（zip に入っている一式）。
 
 スマホで試せるプレビュー：https://claude.ai/artifact/UhvRPzh38U6Uq7igZjmEH4
