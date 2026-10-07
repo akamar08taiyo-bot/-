@@ -190,7 +190,7 @@
     var next = el('div', { class: 'point-example' });
     next.appendChild(el('strong', null, 'このあとの流れ'));
     var ol = el('ol', { class: 'next-list' });
-    ['今日：公式サイトで口座を申し込む（約10分・マイナンバーカードとスマホ）', '数日後：ログインの案内が届いたら、パスワードと二段階認証の設定', 'そのあと：毎月の積立額を決めて設定（特典1の資産推移アプリで決められます）'].forEach(function (t) { ol.appendChild(el('li', null, t)); });
+    ['今日：公式サイトで口座を申し込む（約10分・マイナンバーカードとスマホ）', '数日後：ログインの案内が届いたら、パスワードと二段階認証の設定', 'そのあと：毎月の積立額を決めて設定（特典1の資産シミュレーターで決められます）'].forEach(function (t) { ol.appendChild(el('li', null, t)); });
     next.appendChild(ol);
     card.appendChild(next);
     root.appendChild(card);

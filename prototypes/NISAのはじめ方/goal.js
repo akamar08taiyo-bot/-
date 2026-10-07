@@ -3,7 +3,7 @@
   // 開いたときは、いつもページのいちばん上から（読み込み直したときや戻ったときも、前に見ていた位置を戻さない）。#の付いたリンクで来たときは、その場所へ
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   window.addEventListener('pageshow', function () { if (!location.hash) window.scrollTo(0, 0); });
-  // 資産推移アプリ：目標の金額 → 毎月の積立額 → 今の年齢（→ はじめにあるお金）→ 期間のつまみ で、元本と増えた分の推移をその場でグラフにする
+  // 資産シミュレーター（特典1）：目標の金額 → 毎月の積立額 → 今の年齢（→ はじめにあるお金）→ 期間のつまみ で、元本と増えた分の推移をその場でグラフにする
   var root = document.getElementById('sim');
   if (!root) return;
 

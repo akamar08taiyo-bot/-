@@ -1,4 +1,4 @@
-"""おかねの地図に、入口・証券会社えらび・申し込みサポートの3ページを組み立てる。
+"""おかねの地図に、入口・資産シミュレーター・証券会社診断・申し込みサポートのページを組み立てる。
 ヘッダーとフッターは既存ページ（brokers.html）から抜き出したものをそのまま使う。"""
 import pathlib
 
@@ -46,7 +46,7 @@ def video_link(key, label, cls="gift-alt"):
     return f'<a class="{cls}" href="{url}"{attrs}>{label}</a>'
 
 
-BROKER_DESC = "3つの質問で、あなたに合う証券会社が30秒でわかる"
+BROKER_DESC = "3つの質問で、あなたに合う証券会社がわかる"
 # 特典2は「動画で見る」「資料で見る」の2つから選ぶ。動画は、URL が入るまで「準備中」
 PLAY = '<span class="gift-btn-icon" aria-hidden="true">▶</span>'
 DOC = ('<svg class="gift-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
@@ -68,9 +68,9 @@ START = f"""<div class="narrow">
 </div>
 <h2 class="visually-hidden">3つの無料特典</h2>
 <ol class="gift-rows">
-<li id="gift-app"><a class="gift-row" href="goal.html"><span class="gift-no" aria-hidden="true">1</span><span class="gift-text"><b>資産推移アプリ</b><span class="gift-desc">月3万円なら、65歳でいくら？ 目標の2,000万円には何歳で届く？</span></span>{ARROW}</a></li>
-<li id="gift-guide"><div class="gift-row is-split"><span class="gift-no" aria-hidden="true">2</span><span class="gift-text"><b>NISA完全攻略ガイド</b><span class="gift-desc">しくみから口座づくり・積立の始め方まで</span></span>{GUIDE_CHOICES}</div></li>
-<li id="gift-broker"><a class="gift-row" href="#quiz-tab"><span class="gift-no" aria-hidden="true">3</span><span class="gift-text"><b>証券会社えらび</b><span class="gift-desc">{BROKER_DESC}</span></span>{ARROW}</a></li>
+<li id="gift-app"><a class="gift-row" href="goal.html"><span class="gift-no" aria-hidden="true">1</span><span class="gift-text"><b>未来が見える 資産シミュレーター</b><span class="gift-desc">月3万円なら、65歳でいくら？ 目標の2,000万円には何歳で届く？</span></span>{ARROW}</a></li>
+<li id="gift-guide"><div class="gift-row is-split"><span class="gift-no" aria-hidden="true">2</span><span class="gift-text"><b>ゼロからわかる NISA完全攻略ガイド</b><span class="gift-desc">しくみから口座づくり・積立の始め方まで</span></span>{GUIDE_CHOICES}</div></li>
+<li id="gift-broker"><a class="gift-row" href="#quiz-tab"><span class="gift-no" aria-hidden="true">3</span><span class="gift-text"><b>30秒で選べる 証券会社診断</b><span class="gift-desc">{BROKER_DESC}</span></span>{ARROW}</a></li>
 </ol>
 <section class="open-now" id="open" aria-labelledby="open-title">
 <h2 id="open-title">NISA口座の申し込みは、スマホで約10分</h2>
@@ -99,9 +99,9 @@ CHOOSE = f"""<div class="content-wide">
 <div class="breadcrumb">
 <a href="start.html">NISAのはじめ方</a>
 <span aria-hidden="true">/</span>
-<span>証券会社えらび</span>
+<span>証券会社診断</span>
 </div>
-<h1 class="visually-hidden">3つの質問で、証券会社を決める</h1>
+<h1 class="visually-hidden">30秒で選べる 証券会社診断</h1>
 {PR_NOTE.format(text='')}
 <section class="quiz" id="chooser">
 <noscript><p>この診断はJavaScriptを使います。<a href="brokers.html">口座の比較</a>から選ぶこともできます。</p></noscript>
@@ -124,7 +124,7 @@ SUPPORT = f"""<div class="narrow">
 <div class="breadcrumb">
 <a href="start.html">NISAのはじめ方</a>
 <span aria-hidden="true">/</span>
-<a href="choose.html">証券会社えらび</a>
+<a href="choose.html">証券会社診断</a>
 <span aria-hidden="true">/</span>
 <span>申し込みサポート</span>
 </div>
@@ -193,9 +193,9 @@ GOAL = f"""<div class="content-wide">
 <div class="breadcrumb">
 <a href="start.html">NISAのはじめ方</a>
 <span aria-hidden="true">/</span>
-<span>資産推移アプリ</span>
+<span>資産シミュレーター</span>
 </div>
-<h1 class="visually-hidden">資産推移アプリ</h1>
+<h1 class="visually-hidden">未来が見える 資産シミュレーター</h1>
 
 <div class="sim" id="sim">
 <form class="sim-form" id="sim-form" novalidate>
@@ -311,10 +311,10 @@ GOAL = f"""<div class="content-wide">
 
 <section class="sim-next" aria-labelledby="next-title">
 <h2 id="next-title">次は、NISAのはじめ方へ</h2>
-<p>NISAの口座で積み立てると、投資で増えた分に税金がかかりません。しくみと始め方は特典2、証券会社えらびと申し込みは特典3で、順番に案内します。</p>
+<p>NISAの口座で積み立てると、投資で増えた分に税金がかかりません。しくみと始め方は特典2、証券会社の診断と申し込みは特典3で、順番に案内します。</p>
 <div class="inline-actions">
 <a class="button" href="start.html#gift-guide">特典2　NISA完全攻略ガイドを見る {ARROW}</a>
-<a class="button button-secondary" href="choose.html">特典3　証券会社を選ぶ {ARROW}</a>
+<a class="button button-secondary" href="choose.html">特典3　証券会社診断を受ける {ARROW}</a>
 </div>
 </section>
 
@@ -362,9 +362,9 @@ GOAL = f"""<div class="content-wide">
 </div>"""
 
 PAGES = {
-    "goal.html": ("資産推移アプリ", "目標の金額と毎月の積立額を入れて、期間のつまみを動かすだけ。自分で積み立てたお金と、投資で増えた分の推移がグラフでわかります。入力はこの端末の中だけで使われます。", "goal.js", GOAL),
+    "goal.html": ("未来が見える 資産シミュレーター", "目標の金額と毎月の積立額を入れて、期間のつまみを動かすだけ。自分で積み立てたお金と、投資で増えた分の推移がグラフでわかります。入力はこの端末の中だけで使われます。", "goal.js", GOAL),
     "start.html": ("小学生でも分かる NISAのはじめ方", "3つの無料特典で、NISAの口座えらびから、はじめての積立まで。登録なしで使えます。", "video.js choose.js start.js", START),
-    "choose.html": ("3つの質問で決まる 証券会社えらび", "使っているカードや買い物の場所に答えるだけで、合いそうな証券会社がわかります。", "choose.js", CHOOSE),
+    "choose.html": ("30秒で選べる 証券会社診断", "使っているカードや買い物の場所に答えるだけで、合いそうな証券会社がわかります。", "choose.js", CHOOSE),
     "support.html": ("NISA口座の申し込みサポート", "NISA口座の申し込みを、チェックリストで最後まで一緒に進めます。", "video.js support.js", SUPPORT),
 }
 

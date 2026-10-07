@@ -1,4 +1,4 @@
-/* はじめ方アプリ（入口・証券会社えらび・申し込みサポート）。色と文字は styles.css の変数を使う */
+/* はじめ方アプリ（入口・証券会社診断・申し込みサポート）。色と文字は styles.css の変数を使う */
 .start-hero{padding:40px 0 26px}
 .start-hero h1{font-size:44px;line-height:1.45;letter-spacing:-.04em;margin-bottom:16px}
 .start-hero p{font-size:18px;margin-bottom:0}
@@ -14,7 +14,7 @@
 .gift-row:hover{border-color:var(--green)}
 .gift-no{align-self:start;font:400 30px/1.1 Georgia,serif;color:var(--orange)}
 .gift-text{min-width:0}
-.gift-text b{display:block;font-size:18px;line-height:1.5}
+.gift-text b{display:block;font-size:18px;line-height:1.5;word-break:keep-all;overflow-wrap:anywhere}
 .gift-desc{display:block;font-size:14px;line-height:1.7;color:#4c5a55}
 .gift-row .icon{width:22px;height:22px;color:var(--orange)}
 .gift-alts{display:flex;flex-wrap:wrap;gap:4px 18px;margin:6px 0 0 58px}
@@ -94,7 +94,7 @@ html:has(.video-dialog[open]){overflow:hidden}
 @media(min-width:720px){.open-now{padding:24px 26px}.quiz-tab .option-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:359px){.open-now{padding:18px 14px}.broker-row{padding-left:10px}.broker-apply{padding:6px 10px}}
 
-/* 証券会社えらび */
+/* 証券会社診断 */
 .quiz{max-width:720px}
 .quiz-progress{display:flex;align-items:center;gap:12px;font-size:14px;font-weight:700;color:var(--muted);margin:0 0 12px;font-variant-numeric:tabular-nums}
 .quiz-progress progress,.apply-progress progress{flex:1;min-width:0;height:10px;accent-color:var(--green)}
@@ -161,7 +161,7 @@ html:has(.video-dialog[open]){overflow:hidden}
 .phase h2{font-size:21px}
 }
 
-/* 資産推移アプリ（goal.html）：入力 → 数字 → グラフ → 期間のつまみ。グラフの色は 元本＝青 #2a7aa8・増えた分＝橙 #ca743a（色覚の見え方の差でも区別できる組み合わせ） */
+/* 資産シミュレーター（goal.html）：入力 → 数字 → グラフ → 期間のつまみ。グラフの色は 元本＝青 #2a7aa8・増えた分＝橙 #ca743a（色覚の見え方の差でも区別できる組み合わせ） */
 .sim{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-items:start;margin:20px 0 30px}
 .sim-form{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;padding:22px;background:var(--pale);border-radius:10px;min-width:0}
 .sim-field{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;min-width:0}
