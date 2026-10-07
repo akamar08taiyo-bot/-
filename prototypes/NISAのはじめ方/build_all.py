@@ -11,7 +11,7 @@ HERE = pathlib.Path(__file__).parent
 SITE = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else HERE.parent / "okane-site-out"
 PREVIEW = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 else HERE.parent / "okane-preview"
 PAGES = ["start.html", "goal.html", "choose.html", "support.html"]
-ASSETS = ["goal.js", "start.css", "start.js", "choose.js", "support.js", "broker-config.js"]
+ASSETS = ["goal.js", "start.css", "start.js", "choose.js", "support.js", "broker-config.js", "video.js"]
 
 
 def main():

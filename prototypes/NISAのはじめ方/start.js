@@ -30,15 +30,16 @@
     var point = [b.cardText ? b.cardText + 'でクレカ積立' : '', b.pointText].filter(Boolean).join('・');
     if (point) info.appendChild(el('span', null, point));
     if (b.video) {
-      // 口座の作り方の動画（ショート動画作成で作ったもの）
+      // 口座の作り方の動画（ショート動画作成で作ったもの）。動画ファイルなら、このページの中で再生する（video.js）
       var v = el('a', 'broker-video');
       v.href = b.video;
-      v.target = '_blank';
-      v.rel = 'noopener';
-      var icon = el('span', null, '▶ ');
+      var icon = el('span', 'video-icon', '▶ ');
       icon.setAttribute('aria-hidden', 'true');
       v.appendChild(icon);
-      v.appendChild(document.createTextNode('口座の作り方を動画で見る' + (b.videoLength ? '（' + b.videoLength + '）' : '')));
+      v.appendChild(document.createTextNode('口座の作り方を動画で見る'));
+      if (b.videoLength) v.appendChild(el('span', 'video-len', '（' + b.videoLength + '）'));  // 長さは途中で改行しない
+      if (window.OKANE_VIDEO) window.OKANE_VIDEO.bind(v, b.name + 'の口座の作り方', b.videoPoster);
+      else { v.target = '_blank'; v.rel = 'noopener'; }
       info.appendChild(v);
     }
     var a = el('a', 'broker-apply', '申し込む');

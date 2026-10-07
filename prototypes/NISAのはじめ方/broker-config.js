@@ -9,11 +9,13 @@
                証券会社えらびで点数が同じときも、上にある会社を表示します。決め方は README にあります。
   ・cards / points / styles … 下の一覧の id から選びます。
   ・notes    … 申し込みサポートの「この会社のポイント」に出す短いメモ（任意）。公式の案内を見て書いてください。
-  ・video    … 口座の作り方（申し込み方法）の動画の URL（YouTube など）。入れると、入口の一覧・診断の結果・申し込みサポートに
-               「口座の作り方を動画で見る」が出ます。空のあいだは出ません。videoLength は「6分19秒」のような長さ（なくてもよい）。
-               ショート動画作成のセッションで作った 楽天証券編・SBI証券編・三菱UFJ eスマート証券編 があります（投稿したら URL を入れる）。
-               サイトに動画ファイル（例：videos/sbi.mp4）を置いて、その場所を入れると、診断の結果の中でそのまま再生できます。
+  ・video    … 口座の作り方（申し込み方法）の動画。入れると、入口の一覧・診断の結果・申し込みサポートに
+               「口座の作り方を動画で見る」が出ます。空のあいだは出ません。videoLength は「6分15秒」のような長さ（なくてもよい）。
+               サイトに置いた動画ファイル（例：videos/sbi.mp4）なら、ページの中で再生します（診断の結果ではその場で、
+               入口と申し込みサポートでは押すと再生画面が開く）。videoPoster は再生前に見せる表紙の画像。
                YouTube の URL を入れたときは、YouTube が新しいタブで開きます（サイトの決まりで、ページの中には埋め込めないため）。
+               今の videos/ の3本は、ショート動画作成のセッションで作った 楽天証券編・SBI証券編・三菱UFJ eスマート証券編 です。
+               サイト用に、YouTube向けの「口座を開くページは、概要欄のリンクから」の場面（3〜4秒）だけを抜いてあります。
   ・videoSoon … 動画はできているが、まだ video を入れていない会社は true。診断の結果に「動画は準備中」と出ます。
 
   クレカ積立の組み合わせは 2026年10月5日時点の解説記事で確認したものです。
@@ -52,7 +54,7 @@ window.OKANE_CHOOSER = {
       cards: ['aupay'], points: ['ponta'], styles: [],
       cardText: 'au PAYカード・三菱UFJカード', pointText: 'Pontaポイントなど',
       notes: [],
-      video: '', videoLength: '6分4秒', videoSoon: true
+      video: 'videos/esmart.mp4', videoPoster: 'videos/esmart.jpg', videoLength: '6分'
     },
     {
       id: 'matsui', name: '松井証券', active: true,
@@ -68,7 +70,7 @@ window.OKANE_CHOOSER = {
       cards: ['rakuten'], points: ['rakuten'], styles: ['lineup'],
       cardText: '楽天カード', pointText: '楽天ポイント',
       notes: [],
-      video: '', videoLength: '', videoSoon: true
+      video: 'videos/rakuten.mp4', videoPoster: 'videos/rakuten.jpg', videoLength: '6分23秒'
     },
     {
       id: 'sbi', name: 'SBI証券', active: true,
@@ -76,7 +78,7 @@ window.OKANE_CHOOSER = {
       cards: ['smbc', 'jcb'], points: ['v'], styles: ['lineup'],
       cardText: '三井住友カード・JCBカードなど', pointText: 'Vポイントなど',
       notes: [],
-      video: '', videoLength: '6分19秒', videoSoon: true
+      video: 'videos/sbi.mp4', videoPoster: 'videos/sbi.jpg', videoLength: '6分15秒'
     },
     {
       id: 'monex', name: 'マネックス証券', active: true,

@@ -43,7 +43,9 @@
 .broker-info b{display:block;font-size:16px;line-height:1.45}
 .broker-info span{display:block;font-size:12px;line-height:1.6;color:var(--muted)}
 .broker-video{display:inline-block;margin-top:3px;font-size:12px;font-weight:700;line-height:1.6;color:var(--green);text-underline-offset:3px}
-.broker-info .broker-video span{display:inline;font-size:inherit;color:var(--orange)}
+.broker-info .broker-video span{display:inline;font-size:inherit;color:inherit}
+.broker-info .broker-video .video-icon{color:var(--orange)}
+.broker-info .broker-video .video-len{white-space:nowrap}
 .result-howto{margin:16px 0 0;padding:14px 16px 16px;background:var(--pale);border-radius:10px}
 .howto-title{display:block;font-size:18px;line-height:1.5}
 .howto-lead{margin:4px 0 12px;font-size:14px;line-height:1.7}
@@ -53,6 +55,18 @@
 .howto-player{display:block;width:100%;max-width:340px;max-height:70vh;aspect-ratio:9/16;margin:0 auto;border-radius:10px;background:#0b1512}
 .howto-open{width:100%;gap:10px}
 .video-note p{margin:6px 0 0}
+.video-note .video-icon{color:var(--orange)}
+.video-note .video-len{white-space:nowrap}
+/* 口座の作り方の動画を、ページの上で再生する画面（video.js） */
+.video-dialog{width:min(420px,calc(100vw - 24px));max-width:none;max-height:none;margin:auto;padding:0;border:0;border-radius:14px;background:#0b1512;color:var(--white);overflow:hidden}
+@supports (height:100dvh){.video-dialog{width:min(420px,calc(100vw - 24px),calc((100dvh - 92px) * .5625))}}
+.video-dialog::backdrop{background:rgba(6,12,10,.86)}
+html:has(.video-dialog[open]){overflow:hidden}
+.video-dialog-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 8px 8px 14px}
+.video-dialog-bar strong{min-width:0;overflow:hidden;font-size:14px;line-height:1.4;white-space:nowrap;text-overflow:ellipsis}
+.video-dialog-close{flex:none;min-height:40px;padding:0 16px;border:0;border-radius:999px;background:rgba(255,255,255,.16);color:var(--white);font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.video-dialog-close:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
+.video-dialog-player{display:block;width:100%;height:auto;aspect-ratio:9/16;background:#000;object-fit:contain}
 .broker-apply{flex:none;display:inline-flex;align-items:center;gap:4px;min-height:44px;padding:6px 14px;border-radius:999px;background:var(--green);color:var(--cream);font-size:14px;font-weight:700;text-decoration:none;white-space:nowrap}
 .broker-apply:hover{background:#23574a}
 .broker-apply .pr-tag{margin-left:2px;border-color:#f7f5ef}

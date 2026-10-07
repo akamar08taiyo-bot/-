@@ -96,8 +96,14 @@
   var videoBox = document.getElementById('broker-video');
   if (videoBox && broker && broker.video) {
     videoBox.appendChild(el('strong', null, '動画を見ながら進められます'));
-    var va = el('a', { class: 'text-link', href: broker.video, target: '_blank', rel: 'noopener' },
-      broker.name + 'の口座の作り方を動画で見る' + (broker.videoLength ? '（' + broker.videoLength + '）' : ''));
+    var va = el('a', { class: 'text-link', href: broker.video });
+    va.appendChild(el('span', { class: 'video-icon', 'aria-hidden': 'true' }, '▶'));
+    var vt = el('span', null, broker.name + 'の口座の作り方を動画で見る');
+    if (broker.videoLength) vt.appendChild(el('span', { class: 'video-len' }, '（' + broker.videoLength + '）'));  // 長さは途中で改行しない
+    va.appendChild(vt);
+    // 動画ファイルなら、このページの中で再生する（video.js）。YouTube などは新しいタブ
+    if (window.OKANE_VIDEO) window.OKANE_VIDEO.bind(va, broker.name + 'の口座の作り方', broker.videoPoster);
+    else { va.setAttribute('target', '_blank'); va.setAttribute('rel', 'noopener'); }
     videoBox.appendChild(el('p', null).appendChild(va).parentNode);
     videoBox.hidden = false;
   }
