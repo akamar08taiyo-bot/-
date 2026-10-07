@@ -44,7 +44,14 @@
 .broker-info span{display:block;font-size:12px;line-height:1.6;color:var(--muted)}
 .broker-video{display:inline-block;margin-top:3px;font-size:12px;font-weight:700;line-height:1.6;color:var(--green);text-underline-offset:3px}
 .broker-info .broker-video span{display:inline;font-size:inherit;color:var(--orange)}
-.result-video{margin:12px 0 0}
+.result-howto{margin:16px 0 0;padding:14px 16px 16px;background:var(--pale);border-radius:10px}
+.howto-title{display:block;font-size:18px;line-height:1.5}
+.howto-lead{margin:4px 0 12px;font-size:14px;line-height:1.7}
+.howto-play{display:inline-grid;place-items:center;flex:none;width:28px;height:28px;border-radius:50%;background:var(--orange);color:var(--white);font-size:12px}
+.howto-soon{display:flex;align-items:center;gap:10px;margin:0;padding:12px 14px;border:1.5px dashed #92a494;border-radius:8px;background:var(--white);font-size:14px;font-weight:700;color:var(--muted)}
+.howto-soon .howto-play{background:#b9c0bb}
+.howto-player{display:block;width:100%;max-width:340px;max-height:70vh;aspect-ratio:9/16;margin:0 auto;border-radius:10px;background:#0b1512}
+.howto-open{width:100%;gap:10px}
 .video-note p{margin:6px 0 0}
 .broker-apply{flex:none;display:inline-flex;align-items:center;gap:4px;min-height:44px;padding:6px 14px;border-radius:999px;background:var(--green);color:var(--cream);font-size:14px;font-weight:700;text-decoration:none;white-space:nowrap}
 .broker-apply:hover{background:#23574a}

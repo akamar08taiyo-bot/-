@@ -12,6 +12,9 @@
   ・video    … 口座の作り方（申し込み方法）の動画の URL（YouTube など）。入れると、入口の一覧・診断の結果・申し込みサポートに
                「口座の作り方を動画で見る」が出ます。空のあいだは出ません。videoLength は「6分19秒」のような長さ（なくてもよい）。
                ショート動画作成のセッションで作った 楽天証券編・SBI証券編・三菱UFJ eスマート証券編 があります（投稿したら URL を入れる）。
+               サイトに動画ファイル（例：videos/sbi.mp4）を置いて、その場所を入れると、診断の結果の中でそのまま再生できます。
+               YouTube の URL を入れたときは、YouTube が新しいタブで開きます（サイトの決まりで、ページの中には埋め込めないため）。
+  ・videoSoon … 動画はできているが、まだ video を入れていない会社は true。診断の結果に「動画は準備中」と出ます。
 
   クレカ積立の組み合わせは 2026年10月5日時点の解説記事で確認したものです。
   公開する前に、各社の公式サイトで最新の条件を確かめてください。
@@ -49,7 +52,7 @@ window.OKANE_CHOOSER = {
       cards: ['aupay'], points: ['ponta'], styles: [],
       cardText: 'au PAYカード・三菱UFJカード', pointText: 'Pontaポイントなど',
       notes: [],
-      video: '', videoLength: '6分4秒'
+      video: '', videoLength: '6分4秒', videoSoon: true
     },
     {
       id: 'matsui', name: '松井証券', active: true,
@@ -65,7 +68,7 @@ window.OKANE_CHOOSER = {
       cards: ['rakuten'], points: ['rakuten'], styles: ['lineup'],
       cardText: '楽天カード', pointText: '楽天ポイント',
       notes: [],
-      video: '', videoLength: ''
+      video: '', videoLength: '', videoSoon: true
     },
     {
       id: 'sbi', name: 'SBI証券', active: true,
@@ -73,7 +76,7 @@ window.OKANE_CHOOSER = {
       cards: ['smbc', 'jcb'], points: ['v'], styles: ['lineup'],
       cardText: '三井住友カード・JCBカードなど', pointText: 'Vポイントなど',
       notes: [],
-      video: '', videoLength: '6分19秒'
+      video: '', videoLength: '6分19秒', videoSoon: true
     },
     {
       id: 'monex', name: 'マネックス証券', active: true,

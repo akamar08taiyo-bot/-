@@ -57,6 +57,36 @@
     return a;
   }
 
+  // その会社の口座の作り方の動画（ショート動画作成で作ったもの）。動画を見ながらなら、かんたんに申し込めることを見せる
+  function videoBlock(b) {
+    if (!b.video && !b.videoSoon) return null;
+    var box = el('div', { class: 'result-howto' + (b.video ? '' : ' is-soon') });
+    box.appendChild(el('strong', { class: 'howto-title' }, '動画のとおりに進めるだけ'));
+    box.appendChild(el('p', { class: 'howto-lead' }, b.name + 'の口座の作り方（登録方法）を、申し込み画面の順に動画で見せます' + (b.videoLength ? '（' + b.videoLength + '）' : '') + '。'));
+    if (!b.video) {
+      var soon = el('p', { class: 'howto-soon' });
+      var icon = el('span', { class: 'howto-play', 'aria-hidden': 'true' }, '▶');
+      soon.appendChild(icon);
+      soon.appendChild(document.createTextNode('動画は準備中です'));
+      box.appendChild(soon);
+      return box;
+    }
+    if (/\.(mp4|webm|m4v)(\?|#|$)/i.test(b.video)) {
+      // サイトに置いた動画ファイル：この場でそのまま再生
+      var player = el('video', { class: 'howto-player', src: b.video, controls: '', playsinline: '', preload: 'metadata' });
+      if (b.videoPoster) player.setAttribute('poster', b.videoPoster);
+      player.setAttribute('aria-label', b.name + 'の口座の作り方の動画');
+      box.appendChild(player);
+    } else {
+      // YouTube など：新しいタブで開く
+      var link = el('a', { class: 'button howto-open', href: b.video, target: '_blank', rel: 'noopener' });
+      link.appendChild(el('span', { class: 'howto-play', 'aria-hidden': 'true' }, '▶'));
+      link.appendChild(document.createTextNode('動画を見る' + (b.videoLength ? '（' + b.videoLength + '）' : '')));
+      box.appendChild(link);
+    }
+    return box;
+  }
+
   function score(b) {
     var s = 0, reasons = [];
     var weight = answers.style === 'points' ? 2 : 1;
@@ -143,19 +173,9 @@
     var actions = el('div', { class: 'result-actions' });
     actions.appendChild(applyLink(b, 'button', b.name + 'の申し込みページを開く'));
     try { localStorage.setItem('okane-map:apply:pick', b.id); } catch (_) { /* なくても ?b= で渡せる */ }
-    var support = el('a', { class: 'button button-secondary', href: 'support.html?b=' + encodeURIComponent(b.id) });
-    support.appendChild(document.createTextNode('申し込みを最後まで一緒に進める'));
-    support.appendChild(arrow());
-    actions.appendChild(support);
     card.appendChild(actions);
-    if (b.video) {
-      var vp = el('p', { class: 'result-video' });
-      var va = el('a', { class: 'text-link', href: b.video, target: '_blank', rel: 'noopener' });
-      va.appendChild(document.createTextNode(b.name + 'の口座の作り方を動画で見る' + (b.videoLength ? '（' + b.videoLength + '）' : '')));
-      va.appendChild(arrow());
-      vp.appendChild(va);
-      card.appendChild(vp);
-    }
+    var howto = videoBlock(b);
+    if (howto) card.appendChild(howto);
     var cardMatched = answers.card !== 'none' && b.cards.indexOf(answers.card) >= 0;
     var note = (cardMatched ? '' : 'カードを持っていなくても口座は作れます。クレカ積立は、あとからカードを作って設定することもできます。') +
       '診断は、このサイトで紹介している証券会社の中から、回答に合う会社を表示しています。';
@@ -178,8 +198,8 @@
     var second = list[1];
     if (second) {
       var more = el('p', { class: 'result-more' });
-      more.appendChild(document.createTextNode('ほかの候補：' + second.broker.name + ' '));
-      more.appendChild(el('a', { href: 'support.html?b=' + encodeURIComponent(second.broker.id) }, 'こちらで進める'));
+      more.appendChild(document.createTextNode('ほかの候補：'));
+      more.appendChild(remember(second.broker, applyLink(second.broker, 'text-link', second.broker.name + 'の申し込みページ')));
       root.appendChild(more);
     }
     var nav = el('div', { class: 'quiz-nav' });
