@@ -57,16 +57,6 @@
 .video-note p{margin:6px 0 0}
 .video-note .video-icon{color:var(--orange)}
 .video-note .video-len{white-space:nowrap}
-/* 口座の作り方の動画を、ページの上で再生する画面（video.js） */
-.video-dialog{width:min(420px,calc(100vw - 24px));max-width:none;max-height:none;margin:auto;padding:0;border:0;border-radius:14px;background:#0b1512;color:var(--white);overflow:hidden}
-@supports (height:100dvh){.video-dialog{width:min(420px,calc(100vw - 24px),calc((100dvh - 92px) * .5625))}}
-.video-dialog::backdrop{background:rgba(6,12,10,.86)}
-html:has(.video-dialog[open]){overflow:hidden}
-.video-dialog-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 8px 8px 14px}
-.video-dialog-bar strong{min-width:0;overflow:hidden;font-size:14px;line-height:1.4;white-space:nowrap;text-overflow:ellipsis}
-.video-dialog-close{flex:none;min-height:40px;padding:0 16px;border:0;border-radius:999px;background:rgba(255,255,255,.16);color:var(--white);font:inherit;font-size:14px;font-weight:700;cursor:pointer}
-.video-dialog-close:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
-.video-dialog-player{display:block;width:100%;height:auto;aspect-ratio:9/16;background:#000;object-fit:contain}
 .broker-apply{flex:none;display:inline-flex;align-items:center;gap:4px;min-height:44px;padding:6px 14px;border-radius:999px;background:var(--green);color:var(--cream);font-size:14px;font-weight:700;text-decoration:none;white-space:nowrap}
 .broker-apply:hover{background:#23574a}
 .broker-apply .pr-tag{margin-left:2px;border-color:#f7f5ef}

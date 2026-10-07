@@ -22,6 +22,7 @@ HEAD = """<!doctype html>
 <link rel="icon" href="assets/profile-icon.png">
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="start.css">
+<link rel="stylesheet" href="video.css">
 <script defer src="app.js"></script>
 <script defer src="broker-config.js"></script>
 {scripts}
@@ -31,27 +32,17 @@ HEAD = """<!doctype html>
 
 PR_NOTE = """<p class="pr-line">このページはPRを含みます。{text}</p>"""
 
-# 特典の動画（できたら、YouTube などの URL か、サイトに置く動画ファイルの場所を入れる。空のあいだは、ページに出さない）
-# 特典3の「口座の作り方」の動画は、証券会社ごとに broker-config.js の video に入れる
-GIFT_VIDEOS = {
-    "guide": "",  # 特典2：NISA完全攻略ガイドの動画
-}
-
-
-def video_link(key, label, cls="gift-alt"):
-    url = GIFT_VIDEOS[key]
-    if not url:
-        return ""
-    attrs = ' target="_blank" rel="noopener"' if url.startswith("http") else ""
-    return f'<a class="{cls}" href="{url}"{attrs}>{label}</a>'
+# 特典2の動画（3章）がサイトにあるとき True。動画の一覧は gift-videos.js（「動画で見る」で、章を切り替えられる再生画面が開く）
+# False にすると「動画で見る」が「準備中」になる。特典3の「口座の作り方」の動画は、証券会社ごとに broker-config.js の video に入れる
+GUIDE_VIDEO = True
 
 
 BROKER_DESC = "3つの質問で、あなたに合う証券会社がわかる"
-# 特典2は「動画で見る」「資料で見る」の2つから選ぶ。動画は、URL が入るまで「準備中」
+# 特典2は「動画で見る」「資料で見る」の2つから選ぶ
 PLAY = '<span class="gift-btn-icon" aria-hidden="true">▶</span>'
 DOC = ('<svg class="gift-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>')
-GUIDE_VIDEO_BTN = (f'<a class="gift-btn" href="{GIFT_VIDEOS["guide"]}" target="_blank" rel="noopener">{PLAY}動画で見る</a>' if GIFT_VIDEOS["guide"]
+GUIDE_VIDEO_BTN = (f'<button class="gift-btn" type="button" data-guide-video>{PLAY}動画で見る</button>' if GUIDE_VIDEO
                    else f'<span class="gift-btn is-soon" aria-disabled="true">{PLAY}動画で見る<small>準備中</small></span>')
 GUIDE_CHOICES = (f'<div class="gift-choices">{GUIDE_VIDEO_BTN}'
                  f'<a class="gift-btn" href="downloads/NISA-complete-guide.pdf">{DOC}資料で見る</a></div>')
@@ -363,7 +354,7 @@ GOAL = f"""<div class="content-wide">
 
 PAGES = {
     "goal.html": ("未来が見える 資産シミュレーター", "目標の金額と毎月の積立額を入れて、期間のつまみを動かすだけ。自分で積み立てたお金と、投資で増えた分の推移がグラフでわかります。入力はこの端末の中だけで使われます。", "goal.js", GOAL),
-    "start.html": ("小学生でも分かる NISAのはじめ方", "3つの無料特典で、NISAの口座えらびから、はじめての積立まで。登録なしで使えます。", "video.js choose.js start.js", START),
+    "start.html": ("小学生でも分かる NISAのはじめ方", "3つの無料特典で、NISAの口座えらびから、はじめての積立まで。登録なしで使えます。", "video.js gift-videos.js choose.js start.js", START),
     "choose.html": ("30秒で選べる 証券会社診断", "使っているカードや買い物の場所に答えるだけで、合いそうな証券会社がわかります。", "choose.js", CHOOSE),
     "support.html": ("NISA口座の申し込みサポート", "NISA口座の申し込みを、チェックリストで最後まで一緒に進めます。", "video.js support.js", SUPPORT),
 }

@@ -81,6 +81,13 @@
     giftBroker.appendChild(alts);
   }
 
+  // ---- 特典2「動画で見る」：章を切り替えられる再生画面（動画の一覧は gift-videos.js、画面は video.js） ----
+  var guide = window.OKANE_GUIDE_VIDEOS;
+  Array.prototype.forEach.call(document.querySelectorAll('[data-guide-video]'), function (b) {
+    if (!guide || !guide.chapters.length || !window.OKANE_VIDEO) { b.hidden = true; return; }
+    b.addEventListener('click', function () { window.OKANE_VIDEO.openList(guide.chapters, 0, guide.title, b); });
+  });
+
   // ---- 「どの証券口座がおすすめかわからない場合」のタブ（中身の3つの質問は choose.js） ----
   var tab = document.getElementById('quiz-tab');
   function openTab(scroll) {

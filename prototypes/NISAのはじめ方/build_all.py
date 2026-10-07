@@ -11,7 +11,7 @@ HERE = pathlib.Path(__file__).parent
 SITE = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else HERE.parent / "okane-site-out"
 PREVIEW = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 else HERE.parent / "okane-preview"
 PAGES = ["start.html", "goal.html", "choose.html", "support.html"]
-ASSETS = ["goal.js", "start.css", "start.js", "choose.js", "support.js", "broker-config.js", "video.js"]
+ASSETS = ["goal.js", "start.css", "start.js", "choose.js", "support.js", "broker-config.js", "video.js", "video.css", "gift-videos.js"]
 
 
 def main():
@@ -23,6 +23,8 @@ def main():
         return
     for name in ASSETS:
         shutil.copyfile(HERE / name, PREVIEW / name)
+    # プレビューは1ファイル15MBまでなので、特典2の動画は1章を3つに分けたファイルの一覧を使う
+    shutil.copyfile(HERE / "gift-videos.preview.js", PREVIEW / "gift-videos.js")
     for page in PAGES:
         html = (SITE / page).read_text(encoding="utf-8")
         html = html.replace('<link rel="stylesheet" href="start.css">\n',
