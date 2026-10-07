@@ -19,7 +19,14 @@
   function row(b) {
     var li = el('li', 'broker-row');
     var info = el('div', 'broker-info');
-    info.appendChild(el('b', null, b.name));
+    var href = b.applyUrl || b.officialUrl;
+    var rel = b.applyUrl ? 'sponsored noopener' : 'noopener noreferrer';
+    var nameLink = el('a', 'broker-name');  // 会社名を押しても、その会社のページが開く
+    nameLink.href = href;
+    nameLink.target = '_blank';
+    nameLink.rel = rel;
+    nameLink.appendChild(el('b', null, b.name));
+    info.appendChild(nameLink);
     var point = [b.cardText ? b.cardText + 'でクレカ積立' : '', b.pointText].filter(Boolean).join('・');
     if (point) info.appendChild(el('span', null, point));
     if (b.video) {
@@ -35,14 +42,16 @@
       info.appendChild(v);
     }
     var a = el('a', 'broker-apply', '申し込む');
-    a.href = b.applyUrl || b.officialUrl;
+    a.href = href;
     a.target = '_blank';
-    a.rel = b.applyUrl ? 'sponsored noopener' : 'noopener noreferrer';
+    a.rel = rel;
     a.setAttribute('aria-label', b.name + 'の申し込みページを開く（新しいタブ）' + (b.applyUrl ? '・PR' : ''));
     if (b.applyUrl) a.appendChild(el('span', 'pr-tag', 'PR'));
-    a.addEventListener('click', function () {
-      // 「手順を見ながら申し込む」を開いたとき、この会社のチェックリストにする
-      try { localStorage.setItem('okane-map:apply:pick', b.id); } catch (_) { /* 保存できなくても申し込みページは開く */ }
+    [a, nameLink].forEach(function (link) {
+      link.addEventListener('click', function () {
+        // 「手順を見ながら申し込む」を開いたとき、この会社のチェックリストにする
+        try { localStorage.setItem('okane-map:apply:pick', b.id); } catch (_) { /* 保存できなくても申し込みページは開く */ }
+      });
     });
     li.appendChild(info);
     li.appendChild(a);

@@ -45,6 +45,10 @@
     svg.appendChild(path);
     return svg;
   }
+  function remember(b, a) {
+    a.addEventListener('click', function () { try { localStorage.setItem('okane-map:apply:pick', b.id); } catch (_) { /* なくても開ける */ } });
+    return a;
+  }
   function applyLink(b, cls, text) {
     var a = el('a', { class: cls, href: linkFor(b), target: '_blank', rel: b.applyUrl ? 'sponsored noopener' : 'noopener noreferrer' });
     a.appendChild(document.createTextNode(text));
@@ -130,7 +134,8 @@
     root.appendChild(progress(questions.length + 1, questions.length + 1, '診断の結果'));
     var card = el('div', { class: 'result-card' });
     card.appendChild(el('p', { class: 'result-eyebrow' }, 'あなたに合いそうなのは'));
-    var h = el(H, { class: 'result-name', tabindex: '-1' }, b.name);
+    var h = el(H, { class: 'result-name', tabindex: '-1' });
+    h.appendChild(el('a', { href: linkFor(b), target: '_blank', rel: b.applyUrl ? 'sponsored noopener' : 'noopener noreferrer' }, b.name));
     card.appendChild(h);
     var ul = el('ul', { class: 'reason-list' });
     top.reasons.forEach(function (r) { ul.appendChild(el('li', null, r)); });
@@ -191,12 +196,11 @@
     var tbody = table.querySelector('tbody');
     brokers.forEach(function (b) {
       var tr = el('tr');
-      tr.appendChild(el('th', { scope: 'row' }, b.name));
+      var th = el('th', { scope: 'row' });
+      th.appendChild(remember(b, applyLink(b, 'table-link', b.name)));  // 会社名を押すと、その会社のページが開く
+      tr.appendChild(th);
       tr.appendChild(el('td', null, b.cardText || '―'));
       tr.appendChild(el('td', null, b.pointText || '―'));
-      var td = el('td');
-      td.appendChild(applyLink(b, 'text-link', '公式サイト'));
-      tr.appendChild(td);
       tbody.appendChild(tr);
     });
     var date = document.getElementById('checked-at');

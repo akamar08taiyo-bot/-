@@ -97,6 +97,11 @@
 .result-more{margin-top:16px;font-size:15px}
 .compare-mini{margin-top:36px}
 .compare-mini h2{font-size:22px;margin-bottom:6px}
+.compare-mini .table-scroll table{min-width:0}
+.table-link{display:inline-flex;flex-wrap:wrap;align-items:center;gap:2px 4px;font-weight:700;color:var(--green);text-decoration:underline;text-underline-offset:4px}
+.table-link .icon{width:16px;height:16px;color:var(--orange)}
+.result-name a{color:inherit;text-decoration:none}
+.broker-name{display:block;color:inherit;text-decoration:none}
 
 /* 申し込みサポート */
 .apply-top{position:sticky;top:0;z-index:5;background:var(--cream);padding:12px 0 10px;border-bottom:1px solid var(--border);margin-bottom:8px}

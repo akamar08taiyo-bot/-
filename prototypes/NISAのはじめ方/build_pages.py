@@ -114,7 +114,7 @@ CHOOSE = f"""<div class="content-wide">
 <p class="fine-print"><span id="checked-at"></span>時点の確認です。最新の条件は、各社の公式サイトで確かめてください。</p>
 <div class="table-scroll" tabindex="0" role="region" aria-labelledby="compare-title">
 <table id="broker-table">
-<thead><tr><th scope="col">証券会社</th><th scope="col">クレカ積立できる主なカード</th><th scope="col">たまる主なポイント</th><th scope="col">リンク</th></tr></thead>
+<thead><tr><th scope="col">証券会社</th><th scope="col">クレカ積立できる主なカード</th><th scope="col">たまる主なポイント</th></tr></thead>
 <tbody></tbody>
 </table>
 </div>
