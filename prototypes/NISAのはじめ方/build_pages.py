@@ -49,7 +49,6 @@ START = f"""<div class="narrow">
 </ol>
 <section class="open-now" id="open" aria-labelledby="open-title">
 <h2 id="open-title">NISA口座の申し込みは、スマホで約10分</h2>
-<p class="open-lead">今日の10分が、老後のお金の不安を小さくする最初の一歩に。</p>
 <p class="open-q" id="brokers-label">おすすめの証券会社</p>
 <p class="open-order">並びは、広告の条件や使いやすさなどをもとに、このサイトが決めています。</p>
 <ol class="brokers" id="brokers" aria-labelledby="brokers-label"></ol>
