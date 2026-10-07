@@ -101,17 +101,15 @@ CHOOSE = f"""<div class="content-wide">
 <span aria-hidden="true">/</span>
 <span>証券会社えらび</span>
 </div>
-<header class="page-heading">
-<h1>3つの質問で、<br>証券会社が決まる。</h1>
-<p>答えるのは、使っているカード・よく買い物をする場所・大事にしたいことだけ。30秒ほどで終わります。</p>
-</header>
-{PR_NOTE.format(text='診断の結果は、紹介している証券会社の中から回答に合う会社を出します。一覧の並びは、広告の条件や使いやすさなどをもとに決めています。')}
+<h1 class="visually-hidden">3つの質問で、証券会社を決める</h1>
+{PR_NOTE.format(text='')}
 <section class="quiz" id="chooser">
 <noscript><p>この診断はJavaScriptを使います。<a href="brokers.html">口座の比較</a>から選ぶこともできます。</p></noscript>
 </section>
 <section class="compare-mini" aria-labelledby="compare-title">
 <h2 id="compare-title">紹介している証券会社</h2>
 <p class="fine-print"><span id="checked-at"></span>時点の確認です。最新の条件は、各社の公式サイトで確かめてください。</p>
+<p class="fine-print">診断の結果は、紹介している証券会社の中から回答に合う会社を出します。表の並びは、広告の条件や使いやすさなどをもとに決めています。</p>
 <div class="table-scroll" tabindex="0" role="region" aria-labelledby="compare-title">
 <table id="broker-table">
 <thead><tr><th scope="col">証券会社</th><th scope="col">クレカ積立できる主なカード</th><th scope="col">たまる主なポイント</th></tr></thead>
