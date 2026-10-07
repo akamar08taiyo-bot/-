@@ -80,6 +80,10 @@
     { phase: 'later', id: 'done', title: 'はじめての積立を設定できたら完了！', time: '約1分',
       body: [p('あとは、毎日の値動きを見なくても大丈夫。見直しは年に1回、誕生日の月など覚えやすい月に決めておきましょう。'), link('library.html#bonus-10', '年1回のNISA点検シートを見る')] }
   ];
+  // 「お金の入れ方を決める」に、この会社とあわせて作ると便利なカード・銀行（ASPのリンクがあるときだけ。partners.js）
+  var offers = window.OKANE_PARTNERS && broker ? window.OKANE_PARTNERS.block(broker, false) : null;
+  if (offers) steps.filter(function (s) { return s.id === 'funding'; })[0].body.push(offers);
+
   var phases = {
     today: ['今日やること', 'だいたい10分。7つ終われば、今日はおしまいです。'],
     later: ['届いてからやること', 'ログインの案内が届いたら（数日後）、続きをやります。']

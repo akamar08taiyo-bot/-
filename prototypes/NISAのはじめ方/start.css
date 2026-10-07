@@ -309,6 +309,13 @@
 .point-example{margin:16px 0 0;padding:14px 16px;background:var(--cream);border-radius:8px;font-size:15px}
 .point-example strong{display:block}
 .point-example p{margin:4px 0 0}
+/* あわせて作ると便利なカード・銀行（partners.js） */
+.partner-offers{margin:16px 0 0;padding:14px 16px;border:1px solid var(--border);border-radius:8px;background:var(--white);font-size:15px}
+.partner-offers strong{display:block}
+.partner-offers .partner-list{margin:6px 0 0;padding:0;list-style:none;display:grid;gap:10px}
+.partner-offers .partner-list li{margin:0;padding:0}
+.partner-why{display:block;font-size:13px;line-height:1.5;color:var(--muted)}
+.partner-link{font-size:16px}
 .timeline{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 20px;padding:0;list-style:none}
 .timeline li{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;line-height:1.6}
 .timeline b{display:block;font-size:15px}

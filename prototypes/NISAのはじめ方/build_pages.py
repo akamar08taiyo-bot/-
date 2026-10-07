@@ -354,9 +354,9 @@ GOAL = f"""<div class="content-wide">
 
 PAGES = {
     "goal.html": ("未来が見える 資産シミュレーター", "目標の金額と毎月の積立額を入れて、期間のつまみを動かすだけ。自分で積み立てたお金と、投資で増えた分の推移がグラフでわかります。入力はこの端末の中だけで使われます。", "goal.js", GOAL),
-    "start.html": ("小学生でも分かる NISAのはじめ方", "3つの無料特典で、NISAの口座えらびから、はじめての積立まで。登録なしで使えます。", "video.js gift-videos.js choose.js start.js", START),
-    "choose.html": ("30秒で選べる 証券会社診断", "使っているカードや買い物の場所に答えるだけで、合いそうな証券会社がわかります。", "choose.js", CHOOSE),
-    "support.html": ("NISA口座の申し込みサポート", "NISA口座の申し込みを、チェックリストで最後まで一緒に進めます。", "video.js support.js", SUPPORT),
+    "start.html": ("小学生でも分かる NISAのはじめ方", "3つの無料特典で、NISAの口座えらびから、はじめての積立まで。登録なしで使えます。", "video.js gift-videos.js partners.js choose.js start.js", START),
+    "choose.html": ("30秒で選べる 証券会社診断", "使っているカードや買い物の場所に答えるだけで、合いそうな証券会社がわかります。", "partners.js choose.js", CHOOSE),
+    "support.html": ("NISA口座の申し込みサポート", "NISA口座の申し込みを、チェックリストで最後まで一緒に進めます。", "video.js partners.js support.js", SUPPORT),
 }
 
 

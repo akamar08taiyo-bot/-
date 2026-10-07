@@ -17,6 +17,10 @@
                今の videos/ の3本は、ショート動画作成のセッションで作った 楽天証券編・SBI証券編・三菱UFJ eスマート証券編 です。
                サイト用に、YouTube向けの「口座を開くページは、概要欄のリンクから」の場面（3〜4秒）だけを抜いてあります。
   ・videoSoon … 動画はできているが、まだ video を入れていない会社は true。診断の結果に「動画は準備中」と出ます。
+  ・card / bank … その会社とあわせて作ると便利なカード（クレカ積立に使う）と銀行（証券口座とつなげる）。
+               applyUrl にASPの広告リンクを入れると、診断の結果と申し込みサポートの「お金の入れ方」に「あわせて作ると便利」として出ます（PRの印つき）。
+               空のあいだは出ません。カードは、診断で「そのカードを使っている」と答えた人には出しません。
+               どのカード・銀行が対応しているかは変わることがあるので、載せる前に各社の公式サイトで確かめてください。
 
   クレカ積立の組み合わせは 2026年10月5日時点の解説記事で確認したものです。
   公開する前に、各社の公式サイトで最新の条件を確かめてください。
@@ -54,7 +58,9 @@ window.OKANE_CHOOSER = {
       cards: ['aupay'], points: ['ponta'], styles: [],
       cardText: 'au PAYカード・三菱UFJカード', pointText: 'Pontaポイントなど',
       notes: [],
-      video: 'videos/esmart.mp4', videoPoster: 'videos/esmart.jpg', videoLength: '6分'
+      video: 'videos/esmart.mp4', videoPoster: 'videos/esmart.jpg', videoLength: '6分',
+      card: { name: '三菱UFJカード', applyUrl: '' },
+      bank: { name: 'auじぶん銀行', why: '口座をつなぐと、入金の手間がへる（auマネーコネクト）', applyUrl: '' }
     },
     {
       id: 'matsui', name: '松井証券', active: true,
@@ -62,7 +68,8 @@ window.OKANE_CHOOSER = {
       cards: ['jcb'], points: [], styles: [],
       cardText: 'JCBカード', pointText: '',
       notes: [],
-      video: '', videoLength: ''
+      video: '', videoLength: '',
+      card: { name: 'JCBカード W', applyUrl: '' }
     },
     {
       id: 'rakuten', name: '楽天証券', active: true,
@@ -70,7 +77,9 @@ window.OKANE_CHOOSER = {
       cards: ['rakuten'], points: ['rakuten'], styles: ['lineup'],
       cardText: '楽天カード', pointText: '楽天ポイント',
       notes: [],
-      video: 'videos/rakuten.mp4', videoPoster: 'videos/rakuten.jpg', videoLength: '6分23秒'
+      video: 'videos/rakuten.mp4', videoPoster: 'videos/rakuten.jpg', videoLength: '6分23秒',
+      card: { name: '楽天カード', applyUrl: '' },
+      bank: { name: '楽天銀行', why: '口座をつなぐと、入金の手間がへる（マネーブリッジ）', applyUrl: '' }
     },
     {
       id: 'sbi', name: 'SBI証券', active: true,
@@ -78,7 +87,8 @@ window.OKANE_CHOOSER = {
       cards: ['smbc', 'jcb'], points: ['v'], styles: ['lineup'],
       cardText: '三井住友カード・JCBカードなど', pointText: 'Vポイントなど',
       notes: [],
-      video: 'videos/sbi.mp4', videoPoster: 'videos/sbi.jpg', videoLength: '6分15秒'
+      video: 'videos/sbi.mp4', videoPoster: 'videos/sbi.jpg', videoLength: '6分15秒',
+      card: { name: '三井住友カード（NL）', applyUrl: '' }
     },
     {
       id: 'monex', name: 'マネックス証券', active: true,
@@ -86,7 +96,8 @@ window.OKANE_CHOOSER = {
       cards: ['d', 'jcb'], points: ['d'], styles: ['lineup'],
       cardText: 'dカード・マネックスカード・JCBカードなど', pointText: 'dポイントなど',
       notes: [],
-      video: '', videoLength: ''
+      video: '', videoLength: '',
+      card: { name: 'マネックスカード', applyUrl: '' }
     },
     {
       id: 'paypay', name: 'PayPay証券', active: true,
@@ -102,7 +113,8 @@ window.OKANE_CHOOSER = {
       cards: ['epos'], points: ['epos'], styles: ['simple'],
       cardText: 'エポスカード', pointText: 'エポスポイント',
       notes: [],
-      video: '', videoLength: ''
+      video: '', videoLength: '',
+      card: { name: 'エポスカード', applyUrl: '' }
     }
   ]
 };

@@ -187,6 +187,9 @@
       ex.appendChild(el('p', null, '還元率は、カードの種類や使った金額などの条件で変わります。クレカ積立は毎月10万円までです。'));
       card.appendChild(ex);
     }
+    // あわせて作ると便利なカード・銀行（ASPのリンクがあるときだけ。partners.js）
+    var offers = window.OKANE_PARTNERS && window.OKANE_PARTNERS.block(b, cardMatched);
+    if (offers) card.appendChild(offers);
     var next = el('div', { class: 'point-example' });
     next.appendChild(el('strong', null, 'このあとの流れ'));
     var ol = el('ol', { class: 'next-list' });
