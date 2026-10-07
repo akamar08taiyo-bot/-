@@ -517,12 +517,33 @@
     return li;
   }
 
+  // ---- 入れた数字と「何歳まで」を覚えておく（このタブを開いているあいだだけ。読み込み直しても、つまみや数字が元に戻らない） ----
+  var SAVE_KEY = 'okane-map:sim';
+  var SAVED = ['target', 'monthly', 'age', 'start', 'nisa', 'rate'];
+  function save() {
+    try {
+      var data = { endAge: endAge, compare: compare };
+      SAVED.forEach(function (k) { data[k] = inputs[k].value; });
+      sessionStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    } catch (err) { /* 保存できなくても使える */ }
+  }
+  function restore() {
+    try {
+      var data = JSON.parse(sessionStorage.getItem(SAVE_KEY) || 'null');
+      if (!data) return;
+      SAVED.forEach(function (k) { if (typeof data[k] === 'string') inputs[k].value = data[k]; });
+      if (typeof data.endAge === 'number' && isFinite(data.endAge)) endAge = data.endAge;
+      if (data.compare === 'plus' || data.compare === 'range') compare = data.compare;
+    } catch (err) { /* 読めなければ、最初の数字のまま */ }
+  }
+
   function render() {
     stopPlay();
     var s = read();
     out.textContent = slider.value + '年';
     if (!s) { setFill(); return; }
     state = s;
+    save();
     layout();
     setFill();
     draw(s, s.years * 12);
@@ -625,19 +646,32 @@
     var r = svg.getBoundingClientRect();
     return (clientX - r.left - geo.left) / geo.step;
   }
-  var dragging = null;
-  svg.addEventListener('pointerdown', function (e) {
-    if (!geo || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  // マウスは、押した所・なぞった所の年に。指は、はっきり横になぞったときだけ（ふれただけ・縦のスクロールでは変えない）
+  var dragging = null, touch = null;
+  var SWIPE = 10;  // 横にこれだけ（px）動いたら、なぞったとみなす
+  function startDrag(e) {
     dragging = e.pointerId;
     try { svg.setPointerCapture(e.pointerId); } catch (err) { /* できなくても動く */ }
     setYears(yearAt(e.clientX));
+  }
+  svg.addEventListener('pointerdown', function (e) {
+    if (!geo) return;
+    if (e.pointerType === 'mouse') { if (e.button === 0) startDrag(e); return; }
+    touch = { id: e.pointerId, x: e.clientX, y: e.clientY };
   });
   svg.addEventListener('pointermove', function (e) {
-    if (!geo || anim) return;
+    if (!geo) return;
+    if (touch && touch.id === e.pointerId) {
+      var dx = Math.abs(e.clientX - touch.x), dy = Math.abs(e.clientY - touch.y);
+      if (dx >= SWIPE && dx > dy * 1.5) { touch = null; startDrag(e); }
+      else if (dy >= SWIPE) touch = null;  // 縦のスクロール
+      return;
+    }
     if (dragging === e.pointerId) { setYears(yearAt(e.clientX)); hideTip(); return; }
-    if (e.pointerType === 'mouse') showTip(yearAt(e.clientX));
+    if (!anim && e.pointerType === 'mouse') showTip(yearAt(e.clientX));
   });
   function endDrag(e) {
+    if (touch && touch.id === e.pointerId) touch = null;
     if (dragging !== e.pointerId) return;
     dragging = null;
     announce();
@@ -802,6 +836,8 @@
     resizeTimer = setTimeout(function () { if (box.clientWidth !== lastWidth) { lastWidth = box.clientWidth; render(); } }, 80);
   });
 
+  restore();
+  cmpBtns.forEach(function (o) { o.setAttribute('aria-pressed', String(o.getAttribute('data-compare') === compare)); });
   syncRate();
   render();
   fire();
