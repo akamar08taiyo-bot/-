@@ -31,6 +31,28 @@ HEAD = """<!doctype html>
 
 PR_NOTE = """<p class="pr-line">このページはPRを含みます。{text}</p>"""
 
+# 特典の動画（できたら、YouTube などの URL か、サイトに置く動画ファイルの場所を入れる。空のあいだは、ページに出さない）
+GIFT_VIDEOS = {
+    "guide": "",  # 特典2：NISA完全攻略ガイドの動画
+    "apply": "",  # 特典3：証券会社の口座の作り方（申し込み方法）の動画
+}
+
+
+def video_link(key, label, cls="gift-alt"):
+    url = GIFT_VIDEOS[key]
+    if not url:
+        return ""
+    attrs = ' target="_blank" rel="noopener"' if url.startswith("http") else ""
+    return f'<a class="{cls}" href="{url}"{attrs}>{label}</a>'
+
+
+GUIDE_DESC = ("動画とPDF（45ページ）で、しくみから口座づくり・積立の始め方まで" if GIFT_VIDEOS["guide"]
+              else "しくみから口座づくり・積立の始め方まで（PDF 45ページ）")
+BROKER_DESC = "3つの質問で、あなたに合う証券会社が30秒でわかる"
+GUIDE_ALTS = f'<p class="gift-alts">{video_link("guide", "動画で見る")}<a class="gift-alt" href="guide.html">Webで読む</a></p>'
+BROKER_ALTS = f'<p class="gift-alts">{video_link("apply", "口座の作り方を動画で見る")}</p>' if GIFT_VIDEOS["apply"] else ""
+APPLY_VIDEO = (video_link("apply", f"口座の作り方を動画で見る {ARROW}", "text-link") + "\n") if GIFT_VIDEOS["apply"] else ""
+
 START = f"""<div class="narrow">
 <header class="start-hero">
 <h1>小学生でも分かる<br>NISAのはじめ方</h1>
@@ -44,8 +66,8 @@ START = f"""<div class="narrow">
 <h2 class="visually-hidden">3つの無料特典</h2>
 <ol class="gift-rows">
 <li id="gift-app"><a class="gift-row" href="goal.html"><span class="gift-no" aria-hidden="true">1</span><span class="gift-text"><b>資産推移アプリ</b><span class="gift-desc">月3万円なら、65歳でいくら？ 目標の2,000万円には何歳で届く？</span></span>{ARROW}</a></li>
-<li id="gift-guide"><a class="gift-row" href="downloads/NISA-complete-guide.pdf"><span class="gift-no" aria-hidden="true">2</span><span class="gift-text"><b>NISAはじめての完全ガイド</b><span class="gift-desc">しくみから口座づくり・積立の始め方まで（PDF 45ページ）</span></span>{ARROW}</a><a class="gift-alt" href="guide.html">Webで読む</a></li>
-<li id="gift-broker"><a class="gift-row" href="#quiz-tab"><span class="gift-no" aria-hidden="true">3</span><span class="gift-text"><b>証券会社えらび</b><span class="gift-desc">3つの質問で、あなたに合う証券会社が30秒でわかる</span></span>{ARROW}</a></li>
+<li id="gift-guide"><a class="gift-row" href="downloads/NISA-complete-guide.pdf"><span class="gift-no" aria-hidden="true">2</span><span class="gift-text"><b>NISA完全攻略ガイド</b><span class="gift-desc">{GUIDE_DESC}</span></span>{ARROW}</a>{GUIDE_ALTS}</li>
+<li id="gift-broker"><a class="gift-row" href="#quiz-tab"><span class="gift-no" aria-hidden="true">3</span><span class="gift-text"><b>証券会社えらび</b><span class="gift-desc">{BROKER_DESC}</span></span>{ARROW}</a>{BROKER_ALTS}</li>
 </ol>
 <section class="open-now" id="open" aria-labelledby="open-title">
 <h2 id="open-title">NISA口座の申し込みは、スマホで約10分</h2>
@@ -65,7 +87,7 @@ START = f"""<div class="narrow">
 </div>
 </details>
 <p class="open-note">「申し込む」を押すと、その証券会社の申し込みページが開きます。用意するもの：マイナンバーカード・スマホ</p>
-<a class="text-link" href="support.html">手順を見ながら申し込む {ARROW}</a>
+{APPLY_VIDEO}<a class="text-link" href="support.html">手順を見ながら申し込む {ARROW}</a>
 </section>
 <p class="fine-print">このサイトは、特定の銘柄や商品をすすめるものではありません。試算は仮定にもとづくもので、将来の成果を約束しません。出典と編集方針は<a href="sources.html">出典・編集方針</a>、広告の考え方は<a href="about.html">このサイトについて</a>にあります。</p>
 </div>"""
@@ -289,7 +311,7 @@ GOAL = f"""<div class="content-wide">
 <h2 id="next-title">次は、NISAのはじめ方へ</h2>
 <p>NISAの口座で積み立てると、投資で増えた分に税金がかかりません。しくみと始め方は特典2、証券会社えらびと申し込みは特典3で、順番に案内します。</p>
 <div class="inline-actions">
-<a class="button" href="start.html#gift-guide">特典2　NISAのはじめ方を見る {ARROW}</a>
+<a class="button" href="start.html#gift-guide">特典2　NISA完全攻略ガイドを見る {ARROW}</a>
 <a class="button button-secondary" href="choose.html">特典3　証券会社を選ぶ {ARROW}</a>
 </div>
 </section>
