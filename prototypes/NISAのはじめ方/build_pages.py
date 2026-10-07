@@ -46,10 +46,15 @@ def video_link(key, label, cls="gift-alt"):
     return f'<a class="{cls}" href="{url}"{attrs}>{label}</a>'
 
 
-GUIDE_DESC = ("動画とPDF（45ページ）で、しくみから口座づくり・積立の始め方まで" if GIFT_VIDEOS["guide"]
-              else "しくみから口座づくり・積立の始め方まで（PDF 45ページ）")
 BROKER_DESC = "3つの質問で、あなたに合う証券会社が30秒でわかる"
-GUIDE_ALTS = f'<p class="gift-alts">{video_link("guide", "動画で見る")}<a class="gift-alt" href="guide.html">Webで読む</a></p>'
+# 特典2は「動画で見る」「資料で見る」の2つから選ぶ。動画は、URL が入るまで「準備中」
+PLAY = '<span class="gift-btn-icon" aria-hidden="true">▶</span>'
+DOC = ('<svg class="gift-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
+       'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>')
+GUIDE_VIDEO_BTN = (f'<a class="gift-btn" href="{GIFT_VIDEOS["guide"]}" target="_blank" rel="noopener">{PLAY}動画で見る</a>' if GIFT_VIDEOS["guide"]
+                   else f'<span class="gift-btn is-soon" aria-disabled="true">{PLAY}動画で見る<small>準備中</small></span>')
+GUIDE_CHOICES = (f'<div class="gift-choices">{GUIDE_VIDEO_BTN}'
+                 f'<a class="gift-btn" href="downloads/NISA-complete-guide.pdf">{DOC}資料で見る</a></div>')
 
 START = f"""<div class="narrow">
 <header class="start-hero">
@@ -64,7 +69,7 @@ START = f"""<div class="narrow">
 <h2 class="visually-hidden">3つの無料特典</h2>
 <ol class="gift-rows">
 <li id="gift-app"><a class="gift-row" href="goal.html"><span class="gift-no" aria-hidden="true">1</span><span class="gift-text"><b>資産推移アプリ</b><span class="gift-desc">月3万円なら、65歳でいくら？ 目標の2,000万円には何歳で届く？</span></span>{ARROW}</a></li>
-<li id="gift-guide"><a class="gift-row" href="downloads/NISA-complete-guide.pdf"><span class="gift-no" aria-hidden="true">2</span><span class="gift-text"><b>NISA完全攻略ガイド</b><span class="gift-desc">{GUIDE_DESC}</span></span>{ARROW}</a>{GUIDE_ALTS}</li>
+<li id="gift-guide"><div class="gift-row is-split"><span class="gift-no" aria-hidden="true">2</span><span class="gift-text"><b>NISA完全攻略ガイド</b><span class="gift-desc">しくみから口座づくり・積立の始め方まで</span></span>{GUIDE_CHOICES}</div></li>
 <li id="gift-broker"><a class="gift-row" href="#quiz-tab"><span class="gift-no" aria-hidden="true">3</span><span class="gift-text"><b>証券会社えらび</b><span class="gift-desc">{BROKER_DESC}</span></span>{ARROW}</a></li>
 </ol>
 <section class="open-now" id="open" aria-labelledby="open-title">
