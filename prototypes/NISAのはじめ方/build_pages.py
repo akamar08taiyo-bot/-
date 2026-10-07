@@ -29,14 +29,14 @@ HEAD = """<!doctype html>
 <body>
 """
 
-PR_NOTE = """<p class="pr-line"><span class="pr-tag">PR</span>このページには広告が含まれます。{text}</p>"""
+PR_NOTE = """<p class="pr-line">このページはPRを含みます。{text}</p>"""
 
 START = f"""<div class="narrow">
 <header class="start-hero">
 <h1>小学生でも分かる<br>NISAのはじめ方</h1>
 <p>無料特典3つ。登録なしで、すぐ使えます。</p>
 </header>
-<p class="pr-line"><span class="pr-tag">PR</span>このページには広告が含まれます</p>
+<p class="pr-line">このページはPRを含みます。</p>
 <div class="resume-banner" id="resume" hidden>
 <p id="resume-text"></p>
 <a class="button" id="resume-link" href="support.html">続きから進める {ARROW}</a>
@@ -68,7 +68,7 @@ START = f"""<div class="narrow">
 <p class="open-note">「申し込む」を押すと、その証券会社の申し込みページが開きます。用意するもの：マイナンバーカード・スマホ</p>
 <a class="text-link" href="support.html">手順を見ながら申し込む {ARROW}</a>
 </section>
-<p class="fine-print">投資には元本割れの可能性があります。このサイトは、特定の銘柄や商品をすすめるものではありません。試算は仮定にもとづくもので、将来の成果を約束しません。出典と編集方針は<a href="sources.html">出典・編集方針</a>、広告の考え方は<a href="about.html">このサイトについて</a>にあります。</p>
+<p class="fine-print">このサイトは、特定の銘柄や商品をすすめるものではありません。試算は仮定にもとづくもので、将来の成果を約束しません。出典と編集方針は<a href="sources.html">出典・編集方針</a>、広告の考え方は<a href="about.html">このサイトについて</a>にあります。</p>
 </div>"""
 
 CHOOSE = f"""<div class="content-wide">
@@ -110,7 +110,7 @@ SUPPORT = f"""<div class="narrow">
 <h1 id="apply-title">NISA口座の申し込みを、最後まで一緒に。</h1>
 <p>終わったらチェックを入れるだけ。途中でやめても、この端末に保存されるので、次に開くと続きからできます。</p>
 </header>
-{PR_NOTE.format(text='申し込みページへのボタンは、広告のリンクの場合があります。')}
+{PR_NOTE.format(text='')}
 <div class="notice" id="pick-first" hidden>
 <strong>まだ証券会社を決めていない人へ</strong>
 <p><a href="choose.html">3つの質問で証券会社を決める</a>と、その会社の申し込みページのボタンが出ます。</p>
