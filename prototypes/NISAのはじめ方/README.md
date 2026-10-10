@@ -161,7 +161,16 @@ ASPへの登録と提携の申請は、本人の情報（名前・住所・振�
 ## 作り直し方
 
 1. 文と並びを変えるときは `build_pages.py`、動きは `goal.js` などの JS、見た目は `start.css` を直す。ヘッダーとフッターは、サイトの既存ページから抜き出した `_header.html`・`_footer.html`。
-2. `python3 build_all.py サイトのフォルダ プレビューのフォルダ` で、4ページを書き出し、JS・CSS を写す。サイトのフォルダは、サイト一式（`okane-no-chizu-website-v29.zip` を展開したもの。動画は `okane-no-chizu-videos-1.zip`・`-2.zip` を同じ所に展開し、特典2の動画3本を `videos/` に置く）。プレビューのフォルダには、プレビュー専用の `preview.css`・`preview.js` を足したページができる（実際のサイトには入れない）。
-3. サイトに上げるのは、サイトのフォルダの中身（zip に入っている一式）。
+2. `python3 build_all.py サイトのフォルダ プレビューのフォルダ` で、4ページを書き出し、JS・CSS を写す。サイトのフォルダは、リポジトリのいちばん上の `okane-no-chizu-site/`（サイト一式。動画もここに入っている）。プレビューのフォルダには、プレビュー専用の `preview.css`・`preview.js` を足したページができる（実際のサイトには入れない）。
+3. `okane-no-chizu-site/` を直してブランチ `claude/money-youtube-viral-research` に push すると、Netlify が自動で公開する（下の「サイトの公開」）。
+
+### サイトの公開（2026年10月10日〜）
+
+- 公開先：https://okane-no-chizu-akama.netlify.app （Netlify のプロジェクト okane-no-chizu-akama）
+- この作業環境からは Netlify に直接つながらない（ネットワークの設定で止められている）ので、GitHub 経由にした。Netlify でこのリポジトリとブランチ `claude/money-youtube-viral-research` をつなぎ、push のたびに自動で公開される。
+- 設定はリポジトリのいちばん上の `netlify.toml`：`base = "okane-no-chizu-site"`・`publish = "."`・何もしない `command`。リポジトリのいちばん上にある別のアプリ（package.json・vite）は作らない。
+- このリポジトリは公開なので、サイトのファイル（動画・PDFをふくむ）は GitHub でも見られる。サイト自体も公開なので、ファイルを見られることは同じ。
+- ブランチ `claude/money-youtube-viral-research` を消すと公開が止まる。別のブランチに移すときは、Netlify の設定も変える。
+- 今は検索エンジンに出さない設定（`robots.txt` が `Disallow: /`、全ページ noindex）。SNS やASPの審査で見てもらうのには困らない。検索に出すときは、この2つを外す。
 
 スマホで試せるプレビュー：https://claude.ai/artifact/UhvRPzh38U6Uq7igZjmEH4

@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="robots" content="noindex,nofollow">
+<title>未来が見える 資産シミュレーター｜おかねの地図</title>
+<meta name="description" content="目標の金額と毎月の積立額を入れて、期間のつまみを動かすだけ。自分で積み立てたお金と、投資で増えた分の推移がグラフでわかります。入力はこの端末の中だけで使われます。">
+<meta name="theme-color" content="#143E35">
+<link rel="icon" href="assets/profile-icon.png">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="start.css">
+<link rel="stylesheet" href="video.css">
+<script defer src="app.js"></script>
+<script defer src="broker-config.js"></script>
+<script defer src="goal.js"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">本文へ移動</a><header class="site-header"><div class="header-inner"><a class="brand" href="index.html"><svg class="brand-mark" width="62" height="52" viewBox="0 0 62 52" aria-hidden="true"><circle cx="32" cy="10" r="9" fill="#CA743A"/><path d="M5 19c10-1 17 3 26 8 8-5 17-9 26-7v28c-11-1-19 0-26 4-9-6-17-8-26-6Z" fill="#143E35"/><path d="M8 22c8 0 15 3 21 7v18c-7-4-14-5-21-4Z" fill="#F7F5EF"/><path d="M34 30c7-4 12-6 20-6v5c-5-1-8 0-10 4Z" fill="#B5C5AE"/></svg><span>おかねの地図</span></a><button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="メニューを開く"><svg class="icon " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><nav id="site-nav" aria-label="メインナビゲーション"><a href="planner.html">家計プラン</a><a href="library.html">無料特典</a><a href="compare.html">20年の比較</a><a href="guide.html#chapter-02">はじめ方</a></nav></div></header><main id="main">
+<div class="content-wide">
+<div class="breadcrumb">
+<a href="start.html">NISAのはじめ方</a>
+<span aria-hidden="true">/</span>
+<span>資産シミュレーター</span>
+</div>
+<h1 class="visually-hidden">未来が見える 資産シミュレーター</h1>
+
+<div class="sim" id="sim">
+<form class="sim-form" id="sim-form" novalidate>
+<div class="sim-field">
+<label class="sim-label" for="s-target"><b class="sim-step" aria-hidden="true">1</b>目標の金額</label>
+<div class="sim-input"><input id="s-target" inputmode="decimal" autocomplete="off" value="2000" aria-describedby="s-target-hint"><span>万円</span></div>
+<div class="sim-chips" role="group" aria-label="よく使う金額"><button type="button" data-set="s-target" data-value="1000">1,000万円</button><button type="button" data-set="s-target" data-value="2000">2,000万円</button><button type="button" data-set="s-target" data-value="3000">3,000万円</button></div>
+<small id="s-target-hint">例：老後のために2,000万円。決まっていなければ、下の<a href="#fire">「FIREに必要な金額」</a>で計算できます。</small>
+</div>
+<div class="sim-field">
+<label class="sim-label" for="s-monthly"><b class="sim-step" aria-hidden="true">2</b>毎月の積立額</label>
+<div class="sim-input"><input id="s-monthly" inputmode="decimal" autocomplete="off" value="3" aria-describedby="s-monthly-hint s-perday"><span>万円</span></div>
+<p class="sim-perday" id="s-perday"></p>
+<div class="sim-chips" role="group" aria-label="よく使う金額"><button type="button" data-set="s-monthly" data-value="1">1万円</button><button type="button" data-set="s-monthly" data-value="3">3万円</button><button type="button" data-set="s-monthly" data-value="5">5万円</button><button type="button" data-set="s-monthly" data-value="10">10万円</button></div>
+<small id="s-monthly-hint">毎月、むりなく投資に回せる金額。わからなければ、下の<a href="#budget">「いまの家計から」</a>で出せます。</small>
+</div>
+<div class="sim-field">
+<label class="sim-label" for="s-age"><b class="sim-step" aria-hidden="true">3</b>今の年齢</label>
+<div class="sim-input sim-input-age"><input id="s-age" inputmode="numeric" autocomplete="off" value="35" aria-describedby="s-age-hint"><span>歳</span></div>
+<small id="s-age-hint">今の年齢から、何歳のときにいくらになるか、何歳で目標に届くかを計算します。</small>
+</div>
+<div class="sim-field sim-start" role="group" aria-labelledby="s-start-title">
+<p class="sim-label" id="s-start-title">はじめにあるお金<span class="sim-opt">なければ0円のまま</span></p>
+<div class="sim-subfield">
+<label for="s-start">スタート時の元金</label>
+<div class="sim-input sim-input-sm"><input id="s-start" inputmode="decimal" autocomplete="off" value="0" aria-describedby="s-start-hint"><span>万円</span></div>
+<small id="s-start-hint">はじめに、まとめて投資するお金</small>
+</div>
+<div class="sim-subfield">
+<label for="s-nisa">すでにNISAで投資している金額</label>
+<div class="sim-input sim-input-sm"><input id="s-nisa" inputmode="decimal" autocomplete="off" value="0" aria-describedby="s-nisa-hint s-start-sum"><span>万円</span></div>
+<small id="s-nisa-hint">これまでにNISAで買った金額（だいたいでOK）</small>
+</div>
+<p class="sim-perday" id="s-start-sum"></p>
+</div>
+<div class="sim-field">
+<p class="sim-label" id="s-rate-label">増える割合（1年あたり・仮）</p>
+<div class="sim-chips" role="group" aria-labelledby="s-rate-label">
+<button type="button" data-rate-main="3" aria-pressed="false">年3%</button>
+<button type="button" data-rate-main="5" aria-pressed="true">年5%</button>
+<button type="button" data-rate-main="7" aria-pressed="false">年7%</button>
+</div>
+<small>利回りは約束ではありません。低めの3%でも試してみましょう。</small>
+</div>
+<details class="sim-more">
+<summary>増える割合を自分で入れる</summary>
+<div class="sim-fields">
+<label for="s-rate">増える割合（1年あたり） <span>%</span></label><input id="s-rate" inputmode="decimal" autocomplete="off" value="5"><small>0〜15%の間で入れられます</small>
+</div>
+</details>
+<p class="form-errors" id="s-error" role="alert" hidden></p>
+</form>
+
+<div class="sim-side">
+<section class="sim-card" aria-labelledby="s-when">
+<p class="sim-when" id="s-when">―</p>
+<p class="sim-total" id="s-total">―</p>
+<ul class="sim-parts">
+<li class="is-gain"><span class="sim-key" aria-hidden="true"></span><span>投資で増えた分（仮）</span><b id="s-gain">―</b></li>
+<li class="is-principal"><span class="sim-key" aria-hidden="true"></span><span id="s-principal-label">自分で積み立てた元本</span><b id="s-principal">―</b></li>
+<li class="sim-parts-note" id="s-principal-sub" hidden></li>
+</ul>
+<div class="sim-goal" id="s-goal-box">
+<p class="sim-goal-row"><span>目標 <b id="s-goal">―</b></span><span class="sim-goal-pct" id="s-goal-pct"></span></p>
+<div class="sim-meter" aria-hidden="true"><span class="sim-meter-fill" id="s-meter"></span></div>
+<p class="sim-goal-msg" id="s-goal-msg"></p>
+<p class="sim-goal-fix" id="s-goal-fix" hidden><span id="s-goal-fix-text"></span><button type="button" class="sim-mini" id="s-goal-fix-btn"></button></p>
+</div>
+<div class="sim-compare" role="group" aria-labelledby="s-compare-label">
+<span id="s-compare-label">くらべる</span>
+<button type="button" data-compare="plus" aria-pressed="false">毎月あと1万円</button>
+<button type="button" data-compare="range" aria-pressed="false">年3%〜7%</button>
+</div>
+<p class="sim-compare-text" id="s-compare-text" hidden></p>
+<div class="sim-chart" id="s-chart-box">
+<svg id="s-chart" height="240" role="img" aria-labelledby="s-chart-title s-chart-desc"><title id="s-chart-title">資産の推移のグラフ</title><desc id="s-chart-desc"></desc></svg>
+<div class="sim-tip" id="s-tip" hidden></div>
+</div>
+<div class="sim-period">
+<input type="range" id="s-years" min="1" max="45" step="1" value="30" aria-describedby="s-years-hint">
+<p class="sim-period-row"><label for="s-years"><b class="sim-step" aria-hidden="true">4</b>何歳まで積み立てる？</label><output id="s-years-out" for="s-years">65歳まで（30年）</output></p>
+<button type="button" class="sim-play" id="s-play" aria-pressed="false"><svg class="sim-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path class="i-play" d="M7 4.5v15l13-7.5z" fill="currentColor"/><path class="i-stop" d="M6 6h12v12H6z" fill="currentColor"/></svg><span id="s-play-label">今から育つ様子を再生</span></button>
+<p class="sim-hint" id="s-years-hint">つまみを左右に動かすと、グラフと金額がその場で変わります。グラフを横になぞっても動かせます。</p>
+</div>
+<div class="sim-checks">
+<p class="sim-sub">チェックポイント</p>
+<ol class="sim-checks-list" id="s-checks"></ol>
+<p class="sim-speed" id="s-speed" hidden></p>
+</div>
+<p class="visually-hidden" id="s-live" aria-live="polite"></p>
+</section>
+
+<div class="sim-insights">
+<section class="sim-blocks-card" aria-labelledby="s-blocks-title">
+<h2 id="s-blocks-title">積み木で見ると</h2>
+<p class="sim-blocks-legend"><span class="is-principal"><span class="sim-key" aria-hidden="true"></span>元本 <b id="s-blocks-p">―</b></span><span class="is-gain"><span class="sim-key" aria-hidden="true"></span>増えた分 <b id="s-blocks-g">―</b></span><span class="sim-blocks-unit" id="s-blocks-unit"></span></p>
+<div class="sim-blocks" id="s-blocks" role="img" aria-label=""></div>
+<p class="sim-blocks-note" id="s-blocks-note"></p>
+</section>
+<p class="sim-insight is-tax" id="s-tax" hidden></p>
+<p class="sim-insight" id="s-late" hidden></p>
+<ul class="goal-notes" id="s-notes"></ul>
+</div>
+
+<details class="sim-table">
+<summary>表で見る（5年ごと）</summary>
+<div class="table-scroll" tabindex="0" role="region" aria-label="5年ごとの資産の推移">
+<table><thead><tr><th scope="col">時期</th><th scope="col">元本</th><th scope="col">増えた分</th><th scope="col">資産</th></tr></thead><tbody id="s-rows"></tbody></table>
+</div>
+</details>
+</div>
+</div>
+
+<section class="sim-next" aria-labelledby="next-title">
+<h2 id="next-title">次は、NISAのはじめ方へ</h2>
+<p>NISAの口座で積み立てると、投資で増えた分に税金がかかりません。しくみと始め方は特典2、証券会社の診断と申し込みは特典3で、順番に案内します。</p>
+<div class="inline-actions">
+<a class="button" href="start.html#gift-guide">特典2　NISA完全攻略ガイドを見る <svg class="icon " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a>
+<a class="button button-secondary" href="choose.html">特典3　証券会社診断を受ける <svg class="icon " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a>
+</div>
+</section>
+
+<section class="sim-helpers" aria-labelledby="helpers-title">
+<h2 id="helpers-title">金額を決める手がかり</h2>
+<details class="sim-helper" id="fire">
+<summary>目標の金額：FIRE（働かなくても暮らせる）に必要な金額は？</summary>
+<div class="sim-helper-body">
+<div class="sim-fields">
+<label for="f-cost">FIRE後の毎月の生活費 <span>万円</span></label><input id="f-cost" inputmode="decimal" autocomplete="off" value="20"><small>家賃・食費・保険など、ひと月に使うお金</small>
+<label for="f-wd">毎年取り崩す割合 <span>%</span></label><input id="f-wd" inputmode="decimal" autocomplete="off" value="4"><small>4%なら、必要な金額は年間の生活費の25倍</small>
+<div class="rate-presets"><button type="button" data-rate-for="f-wd" data-rate="3">3%</button><button type="button" data-rate-for="f-wd" data-rate="3.5">3.5%</button><button type="button" data-rate-for="f-wd" data-rate="4">4%</button></div>
+</div>
+<p class="sim-helper-result">必要な金額<b id="f-need">―</b></p>
+<p class="result-caption" id="f-caption"></p>
+<button type="button" class="button button-secondary sim-use" id="f-use">この金額を目標にする</button>
+<p class="sim-help-note">「4%」は、資産の4%を毎年取り崩しても長持ちしやすいという、アメリカの過去のデータから生まれた目安です。日本の税金・物価・寿命では結果が変わるので、心配なら3〜3.5%で試してください。年金は入れていません。</p>
+</div>
+</details>
+<details class="sim-helper" id="budget">
+<summary>毎月の積立額：いまの家計から、毎月いくら回せる？</summary>
+<div class="sim-helper-body">
+<div class="sim-fields">
+<label for="b-income">手取りの月収 <span>万円</span></label><input id="b-income" inputmode="decimal" autocomplete="off" value="25"><small>税金や社会保険料が引かれたあとの金額</small>
+<label for="b-cost">毎月の支出 <span>万円</span></label><input id="b-cost" inputmode="decimal" autocomplete="off" value="20"><small>家賃・食費・通信費・保険・こづかいなどの合計</small>
+<label for="b-saved">今の貯金 <span>万円</span></label><input id="b-saved" inputmode="decimal" autocomplete="off" value="50">
+<label for="b-guard">生活防衛資金（生活費の何か月分） <span>か月</span></label><input id="b-guard" inputmode="numeric" autocomplete="off" value="6"><small>病気や失業に備えて、投資とは別に置いておくお金</small>
+<div class="rate-presets"><button type="button" data-rate-for="b-guard" data-rate="3">3か月</button><button type="button" data-rate-for="b-guard" data-rate="6">6か月</button><button type="button" data-rate-for="b-guard" data-rate="12">12か月</button></div>
+</div>
+<p class="sim-helper-result">投資に回せるのは<b id="b-can">―</b></p>
+<p class="result-caption" id="b-plan"></p>
+<button type="button" class="button button-secondary sim-use" id="b-use" hidden></button>
+<ul class="goal-list" id="b-tips"></ul>
+</div>
+</details>
+</section>
+
+<section class="text-section">
+<h2>計算の前提</h2>
+<p>毎月の積立は月末に入れ、増える割合は毎月の複利（年5%なら、毎月5÷12%）で計算しています。税金・手数料・物価の上昇は入れていません。実際の値動きは毎年ちがい、元本を下回る年もあります。このアプリは、特定の商品をすすめるものではありません。</p>
+<div class="inline-actions">
+<a class="text-link" href="planner.html">家計をくわしく分けて考える（家計プラン） <svg class="icon " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a>
+</div>
+</section>
+</div>
+</main>
+<footer class="site-footer"><div class="footer-inner"><a class="brand footer-brand" href="index.html"><svg class="brand-mark" width="62" height="52" viewBox="0 0 62 52" aria-hidden="true"><circle cx="32" cy="10" r="9" fill="#CA743A"/><path d="M5 19c10-1 17 3 26 8 8-5 17-9 26-7v28c-11-1-19 0-26 4-9-6-17-8-26-6Z" fill="#143E35"/><path d="M8 22c8 0 15 3 21 7v18c-7-4-14-5-21-4Z" fill="#F7F5EF"/><path d="M34 30c7-4 12-6 20-6v5c-5-1-8 0-10 4Z" fill="#B5C5AE"/></svg><span>おかねの地図</span></a><p>NISAの「わからない」を、ひとつずつ。</p><nav aria-label="フッターナビ"><a href="guide.html">無料ガイド</a><a href="library.html">特典12点</a><a href="brokers.html">口座の比較</a><a href="sources.html">出典・編集方針</a><a href="about.html">このサイトについて</a></nav><p class="fine-print">制度確認日：2026年10月3日。投資には元本割れの可能性があります。<br>過去の実績・仮定の試算は、将来の成果を保証しません。</p><small>© 2026 おかねの地図</small></div></footer>
+</body>
+</html>

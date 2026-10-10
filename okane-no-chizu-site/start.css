@@ -1,0 +1,323 @@
+/* はじめ方アプリ（入口・証券会社診断・申し込みサポート）。色と文字は styles.css の変数を使う */
+.start-hero{padding:40px 0 26px}
+.start-hero h1{font-size:44px;line-height:1.45;letter-spacing:-.04em;margin-bottom:16px}
+.start-hero p{font-size:18px;margin-bottom:0}
+.resume-banner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;background:var(--pale);border-radius:8px;padding:16px 18px;margin:0 0 22px}
+.resume-banner p{margin:0;font-weight:700}
+.resume-banner .button{font-size:16px;padding:10px 18px;min-height:48px;gap:12px}
+/* 入口：特典1〜3をぎゅっと並べ、すぐ下に口座の申し込み */
+.pr-line{margin:0 0 14px;font-size:12px;line-height:1.7;color:var(--muted)}
+.content-wide>.pr-line{margin-top:14px}
+.gift-rows{list-style:none;margin:0 0 22px;padding:0;display:grid;gap:10px}
+.gift-rows li{min-width:0}
+.gift-row{display:grid;grid-template-columns:30px minmax(0,1fr) 22px;align-items:center;gap:12px;padding:14px 14px 14px 16px;background:var(--white);border:1px solid var(--border);border-radius:10px;text-decoration:none;color:var(--green)}
+.gift-row:hover{border-color:var(--green)}
+.gift-no{align-self:start;font:400 30px/1.1 Georgia,serif;color:var(--orange)}
+.gift-text{min-width:0}
+.gift-text b{display:block;font-size:18px;line-height:1.5;word-break:keep-all;overflow-wrap:anywhere}
+.gift-desc{display:block;font-size:14px;line-height:1.7;color:#4c5a55}
+.gift-row .icon{width:22px;height:22px;color:var(--orange)}
+.gift-alts{display:flex;flex-wrap:wrap;gap:4px 18px;margin:6px 0 0 58px}
+/* 特典2：動画で見る・資料で見る の2つから選ぶ */
+.gift-row.is-split{grid-template-columns:30px minmax(0,1fr)}
+.gift-row.is-split:hover{border-color:var(--border)}
+.gift-choices{grid-column:2;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:2px}
+.gift-btn{display:flex;align-items:center;justify-content:center;gap:6px;min-height:48px;padding:6px 8px;border:1.5px solid var(--green);border-radius:8px;background:var(--white);color:var(--green);font-size:15px;font-weight:700;line-height:1.3;text-decoration:none;text-align:center}
+.gift-btn:hover{background:var(--pale)}
+.gift-btn-icon{flex:none;color:var(--orange);font-size:13px}
+.gift-btn.is-soon{flex-wrap:wrap;column-gap:6px;row-gap:0;border-style:dashed;border-color:#92a494;color:var(--muted);cursor:default}
+.gift-btn.is-soon:hover{background:var(--white)}
+.gift-btn.is-soon .gift-btn-icon{color:#b9c0bb}
+.gift-btn small{width:100%;font-size:11px;font-weight:700;line-height:1.4}
+.gift-alt{display:inline-block;font-size:14px;font-weight:700}
+.open-now .text-link{display:flex;width:fit-content}
+.open-now .text-link+.text-link{margin-top:12px}
+.open-now{margin:0 0 28px;padding:20px 18px;background:var(--white);border:2px solid var(--green);border-radius:12px}
+.open-now h2{margin:0 0 14px;font-size:23px;line-height:1.45}
+.open-q{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 10px;margin:0 0 8px;font-size:15px;font-weight:700}
+.open-q span{font-size:13px;font-weight:400;color:var(--muted)}
+.open-order{margin:-4px 0 8px;font-size:12px;line-height:1.6;color:var(--muted)}
+.brokers{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.broker-row{display:flex;align-items:center;gap:10px;min-height:64px;padding:10px 10px 10px 14px;border:1.5px solid #92a494;border-radius:8px;background:var(--cream)}
+.broker-info{flex:1 1 auto;min-width:0}
+.broker-info b{display:block;font-size:16px;line-height:1.45}
+.broker-info span{display:block;font-size:12px;line-height:1.6;color:var(--muted)}
+.broker-video{display:inline-block;margin-top:3px;font-size:12px;font-weight:700;line-height:1.6;color:var(--green);text-underline-offset:3px}
+.broker-info .broker-video span{display:inline;font-size:inherit;color:inherit}
+.broker-info .broker-video .video-icon{color:var(--orange)}
+.broker-info .broker-video .video-len{white-space:nowrap}
+.result-howto{margin:16px 0 0;padding:14px 16px 16px;background:var(--pale);border-radius:10px}
+.howto-title{display:block;font-size:18px;line-height:1.5}
+.howto-lead{margin:4px 0 12px;font-size:14px;line-height:1.7}
+.howto-play{display:inline-grid;place-items:center;flex:none;width:28px;height:28px;border-radius:50%;background:var(--orange);color:var(--white);font-size:12px}
+.howto-soon{display:flex;align-items:center;gap:10px;margin:0;padding:12px 14px;border:1.5px dashed #92a494;border-radius:8px;background:var(--white);font-size:14px;font-weight:700;color:var(--muted)}
+.howto-soon .howto-play{background:#b9c0bb}
+.howto-player{display:block;width:100%;max-width:340px;max-height:70vh;aspect-ratio:9/16;margin:0 auto;border-radius:10px;background:#0b1512}
+.howto-open{width:100%;gap:10px}
+.video-note p{margin:6px 0 0}
+.video-note .video-icon{color:var(--orange)}
+.video-note .video-len{white-space:nowrap}
+.broker-apply{flex:none;display:inline-flex;align-items:center;gap:4px;min-height:44px;padding:6px 14px;border-radius:999px;background:var(--green);color:var(--cream);font-size:14px;font-weight:700;text-decoration:none;white-space:nowrap}
+.broker-apply:hover{background:#23574a}
+.broker-apply .pr-tag{margin-left:2px;border-color:#f7f5ef}
+.more-brokers{margin:8px 0 0}
+.more-brokers summary{display:inline-block;cursor:pointer;padding:4px 0;font-size:14px;font-weight:700;text-decoration:underline;text-underline-offset:4px}
+.more-brokers[open] summary{margin-bottom:8px}
+.quiz-tab{margin:16px 0 0;border:1.5px dashed #92a494;border-radius:10px;background:var(--white)}
+.quiz-tab summary{display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 14px;font-size:14px;font-weight:700;line-height:1.5;list-style:none}
+.quiz-tab summary::-webkit-details-marker{display:none}
+.quiz-tab summary::before{content:"?";flex:none;display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--orange);color:var(--white);font-size:13px}
+.quiz-tab summary::after{content:"＋";margin-left:auto;color:var(--muted)}
+.quiz-tab[open] summary::after{content:"－"}
+.quiz-tab[open]{border-style:solid;border-color:var(--green)}
+.quiz-tab-body{padding:0 12px 12px}
+.quiz-tab-lead{margin:0 0 10px;font-size:13px;line-height:1.7;color:var(--muted)}
+.quiz-tab .quiz-card{padding:16px}
+.quiz-tab .quiz-card h3{margin:0 0 4px;font-size:19px;line-height:1.5}
+.quiz-tab .quiz-hint{margin-bottom:12px}
+.quiz-tab .option-button{min-height:52px;font-size:15px}
+.quiz-tab .result-card{padding:18px}
+.quiz-tab .result-name{font-size:28px;margin:2px 0 10px}
+.open-note{margin:10px 0 8px;font-size:13px;line-height:1.7;color:var(--muted)}
+.open-now .text-link{font-size:15px;gap:10px}
+.open-now .text-link .icon{width:20px;height:20px}
+@media(min-width:720px){.open-now{padding:24px 26px}.quiz-tab .option-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:359px){.open-now{padding:18px 14px}.broker-row{padding-left:10px}.broker-apply{padding:6px 10px}}
+
+/* 証券会社診断 */
+.quiz{max-width:720px}
+.quiz-progress{display:flex;align-items:center;gap:12px;font-size:14px;font-weight:700;color:var(--muted);margin:0 0 12px;font-variant-numeric:tabular-nums}
+.quiz-progress progress,.apply-progress progress{flex:1;min-width:0;height:10px;accent-color:var(--green)}
+.quiz-card{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:24px}
+.quiz-card h2{font-size:26px;margin:0 0 6px}
+.quiz-hint{font-size:15px;color:var(--muted);margin:0 0 18px}
+.option-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.option-button{display:flex;align-items:center;min-height:60px;padding:12px 16px;text-align:left;background:var(--cream);border:1.5px solid var(--border);border-radius:8px;color:var(--green);font-size:17px;font-weight:700;line-height:1.5}
+.option-button:hover,.option-button[aria-pressed=true]{border-color:var(--green);background:var(--pale)}
+.quiz-nav{display:flex;justify-content:space-between;gap:12px;margin-top:14px;min-height:40px}
+.link-button{background:none;border:0;padding:8px 0;color:var(--green);text-decoration:underline;text-underline-offset:5px;font-size:15px}
+.result-card{background:var(--white);border:2px solid var(--green);border-radius:12px;padding:26px}
+.result-eyebrow{font-size:14px;font-weight:700;color:#945323;margin:0}
+.result-name{font-size:40px;line-height:1.3;margin:4px 0 14px}
+.reason-list{margin:0 0 18px;padding:0;list-style:none;display:grid;gap:8px}
+.reason-list li{position:relative;padding-left:26px;font-size:16px}
+.reason-list li::before{content:"";position:absolute;left:3px;top:.6em;width:11px;height:11px;border-radius:50%;background:var(--orange)}
+.result-actions{display:grid;gap:10px}
+.result-actions .button{width:100%;gap:12px}
+.pr-tag{display:inline-block;font-size:12px;font-weight:700;border:1px solid currentColor;border-radius:4px;padding:0 6px;line-height:1.6;margin-left:6px}
+.result-note{font-size:14px;color:var(--muted);margin:14px 0 0}
+.result-more{margin-top:16px;font-size:15px}
+.compare-mini{margin-top:36px}
+.compare-mini h2{font-size:22px;margin-bottom:6px}
+.compare-mini .table-scroll table{min-width:0}
+.table-link{display:inline-flex;flex-wrap:wrap;align-items:center;gap:2px 4px;font-weight:700;color:var(--green);text-decoration:underline;text-underline-offset:4px}
+.table-link .icon{width:16px;height:16px;color:var(--orange)}
+.result-name a{color:inherit;text-decoration:none}
+.broker-name{display:block;color:inherit;text-decoration:none}
+
+/* 申し込みサポート */
+.apply-top{position:sticky;top:0;z-index:5;background:var(--cream);padding:12px 0 10px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.apply-progress{display:flex;align-items:center;gap:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.next-step{margin:4px 0 0;font-size:15px;color:var(--muted)}
+.next-step a{font-weight:700;color:var(--green)}
+.phase{margin:28px 0 10px}
+.phase h2{font-size:24px;margin:0}
+.phase p{font-size:15px;color:var(--muted);margin:2px 0 0}
+.checklist{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.check-step{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:16px 18px;scroll-margin-top:110px}
+.check-step.is-done{background:var(--pale)}
+.check-row{display:flex;gap:14px;align-items:flex-start}
+.check-row input{width:28px;height:28px;margin:2px 0 0;accent-color:var(--green);flex:none;cursor:pointer}
+.check-row label{font-weight:700;font-size:18px;line-height:1.5;cursor:pointer}
+.check-body{margin:8px 0 0 42px;font-size:16px;line-height:1.8}
+.check-body p{margin:0 0 8px}
+.check-body ul{margin:0 0 8px;padding-left:1.2em}
+.check-body .button{font-size:16px;padding:12px 18px;min-height:50px;gap:12px;margin-top:2px}
+.check-step details{margin-top:6px}
+.check-step summary{cursor:pointer;font-size:15px;font-weight:700;color:#945323}
+.check-step details p{font-size:15px;margin:8px 0 0}
+.done-card{background:var(--pale);border-radius:12px;padding:24px;margin-top:24px}
+.done-card h2{font-size:24px}
+.reset-area{margin-top:30px;font-size:14px;color:var(--muted)}
+.reset-confirm{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:8px}
+.reset-confirm .button{font-size:15px;padding:10px 16px;min-height:44px}
+
+@media(max-width:600px){
+.start-hero{padding:18px 0 14px}.start-hero h1{font-size:31px;margin-bottom:10px}.start-hero p{font-size:16px}
+.open-now h2{font-size:21px}
+.option-grid{grid-template-columns:1fr}.quiz-card{padding:20px}.quiz-card h2{font-size:22px}.option-button{font-size:16px;min-height:56px}
+.result-card{padding:20px}.result-name{font-size:31px}
+.check-body{margin-left:0}.check-row label{font-size:17px}.check-step{padding:14px}
+.phase h2{font-size:21px}
+}
+
+/* 資産シミュレーター（goal.html）：入力 → 数字 → グラフ → 期間のつまみ。グラフの色は 元本＝青 #2a7aa8・増えた分＝橙 #ca743a（色覚の見え方の差でも区別できる組み合わせ） */
+.sim{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-items:start;margin:20px 0 30px}
+.sim-form{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;padding:22px;background:var(--pale);border-radius:10px;min-width:0}
+.sim-field{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;min-width:0}
+.sim-label{display:flex;align-items:center;gap:10px;margin:0;font-size:17px;font-weight:700;line-height:1.5}
+.sim-step{display:inline-grid;place-items:center;flex:none;width:28px;height:28px;border-radius:50%;background:var(--green);color:var(--cream);font:700 15px/1 var(--sans)}
+.sim-input{display:flex;align-items:center;gap:10px}
+.sim-input input{flex:1 1 auto;width:0;min-width:0;height:56px;background:var(--white);border:1px solid #92a494;border-radius:6px;padding:8px 12px;font-size:26px;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums}
+.sim-input input[aria-invalid=true],.sim-fields input[aria-invalid=true]{border:2px solid #a5302d}
+.sim-input span{font-size:17px;font-weight:700;color:var(--muted)}
+.sim-chips{display:flex;flex-wrap:wrap;gap:8px}
+.sim-chips button{min-height:40px;padding:4px 14px;border:1px solid #92a494;border-radius:999px;background:var(--cream);color:var(--green);font-size:15px;font-weight:700;line-height:1.4}
+.sim-chips button:hover{background:var(--white)}
+.sim-chips button[aria-pressed=true]{background:var(--green);border-color:var(--green);color:var(--cream)}
+.sim-field small,.sim-fields small{display:block;font-size:13px;line-height:1.7;color:var(--muted)}
+.sim-field small a{font-weight:700}
+.sim-more summary{cursor:pointer;font-size:15px;font-weight:700;line-height:1.6}
+.sim-fields{min-width:0}
+.sim-fields label{display:flex;justify-content:space-between;gap:10px;margin:16px 0 6px;font-size:15px;font-weight:700;line-height:1.5}
+.sim-fields label span{font-weight:400;color:var(--muted)}
+.sim-fields input{width:100%;height:48px;background:var(--white);border:1px solid #92a494;border-radius:5px;padding:8px 12px;font-size:20px;color:var(--green);font-variant-numeric:tabular-nums}
+.sim-fields small{margin-top:4px}
+.sim-fields .rate-presets{margin-top:10px}
+.sim-side{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;min-width:0}
+.sim-card{min-width:0;background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 18px 16px}
+.sim-when{margin:0;font-size:15px;font-weight:700;color:var(--muted)}
+.sim-total{margin:0 0 8px;font-family:Arial,var(--sans);font-size:clamp(40px,10vw,58px);font-weight:700;line-height:1.15;letter-spacing:-.02em}
+.sim-parts{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:4px}
+.sim-parts li{display:flex;align-items:center;gap:8px;font-size:15px;line-height:1.6}
+.sim-parts b{margin-left:auto;font-size:19px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sim-key{flex:none;width:14px;height:14px;border-radius:3px}
+.is-gain .sim-key{background:#ca743a}
+.is-principal .sim-key{background:#2a7aa8}
+.sim-goal{margin:0 0 12px;padding:12px 14px;background:var(--cream);border-radius:8px}
+.sim-goal-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:0;font-size:15px}
+.sim-goal-row b{font-size:17px}
+.sim-goal-pct{font-weight:700;font-variant-numeric:tabular-nums}
+.sim-goal.is-reached .sim-goal-pct{color:var(--cream);background:var(--green);border-radius:999px;padding:0 10px}
+.sim-goal.is-reached .sim-goal-pct::before{content:"✓ "}
+.sim-meter{height:10px;margin:8px 0;border-radius:5px;background:#e2e0d6;overflow:hidden}
+.sim-meter-fill{display:block;width:0;height:100%;border-radius:5px;background:var(--green)}
+.sim-goal-msg{margin:0;font-size:15px;line-height:1.7}
+.sim-goal-fix{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:8px 0 0;font-size:15px;line-height:1.7}
+.sim-mini{min-height:40px;padding:4px 14px;border:1.5px solid var(--green);border-radius:8px;background:var(--white);color:var(--green);font-size:15px;font-weight:700}
+.sim-mini:hover{background:var(--pale)}
+.sim-chart{position:relative;margin:2px 0 0}
+.sim-chart svg{display:block;max-width:none;overflow:visible;touch-action:pan-y;cursor:ew-resize;user-select:none;-webkit-user-select:none}
+.sim-chart text{font-family:var(--sans);font-size:12px;fill:var(--muted)}
+.sim-chart .t-age{font-size:11px}
+.sim-chart .t-age-main{font-weight:700;fill:#3d4d47}
+.sim-input-age input{flex:0 1 150px}
+/* はじめにあるお金（スタート時の元金・すでにNISAで投資している金額）。入れなくてもよいので、少し小さく */
+.sim-start{gap:12px}
+.sim-start .sim-label{flex-wrap:wrap;gap:2px 10px}
+.sim-opt{padding:0 10px;border-radius:999px;background:var(--cream);font-size:13px;font-weight:700;line-height:1.9;color:var(--muted)}
+.sim-subfield{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;min-width:0}
+.sim-subfield label{font-size:15px;font-weight:700;line-height:1.5}
+.sim-input-sm input{height:48px;font-size:22px}
+.sim-parts .sim-parts-note{display:block;margin:-2px 0 0;padding-left:22px;font-size:13px;line-height:1.6;color:var(--muted)}
+.sim-chart .t-start{font-size:11px;font-weight:700;fill:#1d5c80;paint-order:stroke;stroke:#fcfbf8;stroke-width:3px;stroke-linejoin:round}
+.sim-chart .t-goal,.sim-chart .t-reach,.sim-chart .t-band{font-weight:700;fill:var(--green);paint-order:stroke;stroke:#fcfbf8;stroke-width:4px;stroke-linejoin:round}
+.sim-chart .t-goal{font-size:13px}
+.sim-chart .t-tick{paint-order:stroke;stroke:#fcfbf8;stroke-width:3px;stroke-linejoin:round}
+.sim-tip{position:absolute;z-index:2;min-width:160px;margin:0;padding:8px 10px;background:var(--white);border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 18px #143e3524;font-size:13px;line-height:1.6;pointer-events:none}
+.sim-tip p{display:flex;align-items:center;gap:6px;margin:0}
+.sim-tip b{margin-left:auto;padding-left:12px;font-variant-numeric:tabular-nums}
+.sim-tip-head{font-weight:700;color:var(--muted)}
+.sim-tip-main b{font-size:16px}
+.sim-tip-key{flex:none;width:12px;height:3px;border-radius:2px}
+.sim-period{margin-top:2px}
+.sim-period input[type=range]{display:block;max-width:none;height:34px;margin:0;padding:0;background:transparent;-webkit-appearance:none;appearance:none;cursor:pointer}
+.sim-period input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:linear-gradient(to right,var(--green) var(--fill,50%),#dcdbd1 var(--fill,50%))}
+.sim-period input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;box-sizing:border-box;width:28px;height:28px;margin-top:-10px;border-radius:50%;background:var(--white);border:4px solid var(--green);box-shadow:0 2px 6px #143e3540}
+.sim-period input[type=range]::-moz-range-track{height:8px;border-radius:4px;background:#dcdbd1}
+.sim-period input[type=range]::-moz-range-progress{height:8px;border-radius:4px;background:var(--green)}
+.sim-period input[type=range]::-moz-range-thumb{box-sizing:border-box;width:28px;height:28px;border-radius:50%;background:var(--white);border:4px solid var(--green);box-shadow:0 2px 6px #143e3540}
+.sim-period input[type=range]:focus-visible{outline:3px solid var(--orange);outline-offset:4px;border-radius:6px}
+.sim-period-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 10px;margin:6px 0 0}
+.sim-period-row label{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700}
+.sim-period-row output{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.sim-hint{margin:2px 0 0;font-size:13px;line-height:1.7;color:var(--muted)}
+.sim-insights{display:grid;gap:10px;min-width:0}
+.sim-insight{margin:0;padding:12px 14px;background:var(--white);border:1px solid var(--border);border-radius:8px;font-size:15px;line-height:1.8}
+.sim-insight b{font-size:17px}
+.sim-insight.is-tax{background:var(--peach);border-color:var(--peach)}
+.sim-insights .goal-notes{margin:0}
+.sim-table summary{cursor:pointer;font-size:15px;font-weight:700}
+.sim-table .table-scroll{margin:10px 0 0}
+.sim-table .table-scroll table{min-width:0;font-variant-numeric:tabular-nums}
+.sim-table .table-scroll th,.sim-table .table-scroll td{padding:10px 12px}.sim-table .table-scroll td{white-space:nowrap}
+.sim-next{margin:0 0 30px;padding:22px;background:var(--white);border:2px solid var(--green);border-radius:12px}
+.sim-next h2{font-size:24px;margin:0 0 8px}
+.sim-next p{font-size:16px;margin:0}
+.sim-next .inline-actions{margin-top:16px}
+.sim-helpers{max-width:920px;margin:0 0 10px}
+.sim-helpers>h2{font-size:22px;margin:0 0 10px}
+.sim-helper{margin:0 0 10px;background:var(--white);border:1px solid var(--border);border-radius:10px}
+.sim-helper summary{cursor:pointer;padding:14px 16px;font-size:16px;font-weight:700;line-height:1.6}
+.sim-helper-body{padding:0 16px 18px}
+.sim-helper-result{margin:18px 0 2px;font-size:15px;font-weight:700}
+.sim-helper-result b{display:block;font-family:Arial,var(--sans);font-size:30px;line-height:1.3}
+.sim-use{margin-top:12px;font-size:16px;min-height:48px;padding:10px 18px}
+.sim-help-note{margin:14px 0 0;font-size:14px;line-height:1.8;color:var(--muted)}
+.sim-perday{margin:-2px 0 0;font-size:14px;font-weight:700;color:var(--green)}
+.sim-perday:empty{display:none}
+.sim-compare{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:2px 0 6px}
+.sim-compare>span{font-size:13px;font-weight:700;color:var(--muted);margin-right:2px}
+.sim-compare button{min-height:38px;padding:2px 12px;border:1px solid #92a494;border-radius:999px;background:var(--cream);color:var(--green);font-size:14px;font-weight:700;line-height:1.4}
+.sim-compare button[aria-pressed=true]{background:#5f6f69;border-color:#5f6f69;color:var(--cream)}
+.sim-compare-text{margin:0 0 6px;padding:8px 10px;background:var(--cream);border-radius:6px;font-size:14px;line-height:1.7}
+.sim-chart .t-cmp{font-size:12px;font-weight:700;fill:#4c5a55;paint-order:stroke;stroke:#fcfbf8;stroke-width:4px;stroke-linejoin:round}
+.sim-chart .t-mile{font-size:11px;font-weight:700;fill:#945323;paint-order:stroke;stroke:#fcfbf8;stroke-width:3px;stroke-linejoin:round}
+.sim-play{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;margin:10px 0 0;padding:6px 18px;border:1.5px solid var(--green);border-radius:999px;background:var(--green);color:var(--cream);font-size:15px;font-weight:700;line-height:1.3}
+.sim-play:hover{background:#23574a}
+.sim-play[aria-pressed=true]{background:var(--white);color:var(--green)}
+.sim-play .i-stop,.sim-play[aria-pressed=true] .i-play{display:none}
+.sim-play[aria-pressed=true] .i-stop{display:inline}
+.sim-icon{flex:none}
+.sim-burst{position:absolute;z-index:3;padding:3px 12px;border-radius:999px;background:var(--green);color:var(--cream);font-size:14px;font-weight:700;white-space:nowrap;pointer-events:none;transform:translate(-50%,-150%);animation:sim-pop 2.4s ease-out forwards}
+@keyframes sim-pop{0%{opacity:0;transform:translate(-50%,-90%) scale(.8)}18%{opacity:1;transform:translate(-50%,-150%) scale(1.06)}75%{opacity:1;transform:translate(-50%,-150%) scale(1)}100%{opacity:0;transform:translate(-50%,-185%)}}
+.sim-checks{margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
+.sim-sub{margin:0 0 6px;font-size:15px;font-weight:700}
+.sim-checks-list{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.sim-checks-list li{display:grid;grid-template-columns:14px auto minmax(0,1fr);align-items:center;gap:8px;font-size:14px;line-height:1.8}
+.sim-checks-list b{font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sim-when-at{justify-self:end;text-align:right;font-variant-numeric:tabular-nums}
+.sim-when-at span{display:inline-block;white-space:nowrap}
+.sim-dot{width:12px;height:12px;border-radius:50%;border:2px solid #ca743a;background:var(--white)}
+.sim-checks-list .is-goal .sim-dot{border-color:var(--green);background:var(--green)}
+.sim-checks-list .is-goal b{color:var(--green)}
+.sim-checks-list .is-pending{color:var(--muted)}
+.sim-checks-list .is-pending .sim-dot{border-color:#b9c0bb;background:transparent}
+.sim-speed{margin:8px 0 0;padding:8px 10px;background:var(--peach);border-radius:6px;font-size:14px;line-height:1.7}
+.sim-blocks-card{padding:14px 14px 12px;background:var(--white);border:1px solid var(--border);border-radius:8px}
+.sim-blocks-card h2{margin:0 0 4px;font-size:17px}
+.sim-blocks-legend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;margin:0;font-size:14px}
+.sim-blocks-legend>span{display:inline-flex;align-items:center;gap:6px}
+.sim-blocks-legend b{font-variant-numeric:tabular-nums}
+.sim-blocks-unit{color:var(--muted);font-size:13px}
+.sim-blocks{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px;max-width:330px;margin:10px 0 8px}
+.sim-blocks span{aspect-ratio:1/1;border-radius:3px}
+.sim-blocks .b-p{background:#2a7aa8}
+.sim-blocks .b-g{background:#ca743a}
+.sim-blocks-note{margin:0;font-size:14px;line-height:1.8}
+.sim-blocks-note:empty{display:none}
+.is-playing .sim-goal-fix,.is-playing .sim-compare-text{visibility:hidden}
+@media(prefers-reduced-motion:reduce){.sim-burst{animation:none;opacity:1}}
+@media(min-width:900px){.sim{grid-template-columns:minmax(300px,360px) minmax(0,1fr);gap:36px}.sim-card{padding:22px 24px 20px}}
+@media(max-width:600px){.sim{margin-top:14px}.sim-form{padding:18px}.sim-card{padding:16px 14px 14px}.sim-next{padding:18px}.sim-next .button{width:100%}.sim-table .table-scroll th,.sim-table .table-scroll td{padding:8px 8px;font-size:14px}}
+.goal-list,.goal-notes{margin:0 0 14px;padding-left:1.2em;font-size:15px;line-height:1.8}
+.goal-notes{color:#945323}
+.goal-notes:empty,.goal-list:empty{display:none}
+.goal-sub{font-size:17px;margin:20px 0 6px}
+.example-line{margin:6px 0 0;font-size:15px;background:var(--cream);border-radius:6px;padding:8px 12px}
+.next-list{margin:0 0 6px;padding-left:1.3em;font-size:15px;line-height:1.8}
+.point-example{margin:16px 0 0;padding:14px 16px;background:var(--cream);border-radius:8px;font-size:15px}
+.point-example strong{display:block}
+.point-example p{margin:4px 0 0}
+/* あわせて作ると便利なカード・銀行（partners.js） */
+.partner-offers{margin:16px 0 0;padding:14px 16px;border:1px solid var(--border);border-radius:8px;background:var(--white);font-size:15px}
+.partner-offers strong{display:block}
+.partner-offers .partner-list{margin:6px 0 0;padding:0;list-style:none;display:grid;gap:10px}
+.partner-offers .partner-list li{margin:0;padding:0}
+.partner-why{display:block;font-size:13px;line-height:1.5;color:var(--muted)}
+.partner-link{font-size:16px}
+.timeline{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 20px;padding:0;list-style:none}
+.timeline li{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;line-height:1.6}
+.timeline b{display:block;font-size:15px}
+.step-time{font-weight:400;font-size:14px;color:var(--muted);margin-left:6px;white-space:nowrap}
+@media(max-width:600px){.timeline{grid-template-columns:1fr 1fr}}

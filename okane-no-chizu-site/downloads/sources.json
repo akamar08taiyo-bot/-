@@ -1,0 +1,237 @@
+[
+  {
+    "id": "F01",
+    "title": "NISAを知る",
+    "publisher": "金融庁",
+    "url": "https://www.fsa.go.jp/policy/nisa2/know/index.html",
+    "checked": "2026-10-03",
+    "supports": "成人NISAの対象年齢・年間枠・総枠・翌年の簿価再利用",
+    "status": "本文確認"
+  },
+  {
+    "id": "F02",
+    "title": "NISA よくある質問",
+    "publisher": "金融庁",
+    "url": "https://www.fsa.go.jp/policy/nisa2/question/index.html",
+    "checked": "2026-10-03",
+    "supports": "金融機関変更・旧制度・ジュニアNISA",
+    "status": "本文確認"
+  },
+  {
+    "id": "F03",
+    "title": "No.1535 NISA制度",
+    "publisher": "国税庁",
+    "url": "https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/1535.htm",
+    "checked": "2026-10-03",
+    "supports": "非課税対象・損益通算等の制限",
+    "status": "本文確認"
+  },
+  {
+    "id": "F04",
+    "title": "令和8年度 税制改正（国税）等について",
+    "publisher": "財務省",
+    "url": "https://www.mof.go.jp/public_relations/finance/202604/202604c.html",
+    "checked": "2026-10-03",
+    "supports": "2026年3月31日成立・2027年からの0〜17歳向けつみたて枠拡充",
+    "status": "本文確認"
+  },
+  {
+    "id": "F05",
+    "title": "令和8年度 税制改正 資料7",
+    "publisher": "財務省",
+    "url": "https://www.mof.go.jp/public_relations/finance/202604/202604c.pdf",
+    "checked": "2026-10-03",
+    "supports": "年60万円・保有限度600万円・12歳以降の払出条件の概要",
+    "status": "公表資料確認"
+  },
+  {
+    "id": "F06",
+    "title": "NISAを知る（制度説明資料）",
+    "publisher": "金融庁",
+    "url": "https://www.fsa.go.jp/policy/nisa2/about/nisa2024/slide_202406.pdf",
+    "checked": "2026-10-03",
+    "supports": "長期積立分散・制度の基礎。2024年資料のため未成年拡充はF04を優先",
+    "status": "本文確認"
+  },
+  {
+    "id": "A01",
+    "title": "ステルスマーケティングに関するQ&A",
+    "publisher": "消費者庁",
+    "url": "https://www.caa.go.jp/policies/policy/representation/fair_labeling/faq/stealth_marketing/",
+    "checked": "2026-10-03",
+    "supports": "広告表示の明瞭性・動画やSNSでの表示",
+    "status": "本文確認"
+  },
+  {
+    "id": "B01",
+    "title": "SBI証券 NISA売買手数料",
+    "publisher": "SBI証券",
+    "url": "https://www.sbisec.co.jp/ETGate/WPLETmgR001Control?OutSide=on&burl=search_nisa&cat1=nisa&cat2=info&dir=info&file=nisa_price_231118.html&getFlg=on",
+    "checked": "2026-10-03",
+    "supports": "NISAサービス確認窓口・配当受取方式。手数料は取引条件別に確認",
+    "status": "公式掲載内容確認"
+  },
+  {
+    "id": "B02",
+    "title": "NISA 取引・ルール",
+    "publisher": "楽天証券",
+    "url": "https://www.rakuten-sec.co.jp/smartphone/nisa/rule/",
+    "checked": "2026-10-03",
+    "supports": "取扱商品・売買手数料・スプレッド等の例外",
+    "status": "本文確認"
+  },
+  {
+    "id": "B03",
+    "title": "NISA 手数料と費用",
+    "publisher": "マネックス証券",
+    "url": "https://info.monex.co.jp/nisa/fee.html",
+    "checked": "2026-10-03",
+    "supports": "国内・米国・中国株の費用と例外",
+    "status": "本文確認"
+  },
+  {
+    "id": "B04",
+    "title": "NISA口座のワン株・米国株手数料の更新",
+    "publisher": "マネックス証券",
+    "url": "https://info.monex.co.jp/news/2026/20260324_01.html",
+    "checked": "2026-10-03",
+    "supports": "2026年の手数料更新。古いキャッシュバック表記との区別",
+    "status": "公式掲載内容確認"
+  },
+  {
+    "id": "C01",
+    "title": "暗号資産交換業者登録一覧",
+    "publisher": "金融庁",
+    "url": "https://www.fsa.go.jp/menkyo/menkyoj/kasoutuka.pdf",
+    "checked": "2026-10-03",
+    "supports": "登録確認・登録は価値保証や推奨ではない。再確認した資料は2026年9月1日現在",
+    "status": "本文確認",
+    "document_date": "2026-09-01"
+  },
+  {
+    "id": "C02",
+    "title": "暗号資産取引にかかるコスト",
+    "publisher": "SBI VCトレード",
+    "url": "https://www.sbivc.co.jp/columns/content/r1k9acqdf",
+    "checked": "2026-10-03",
+    "supports": "販売所のスプレッド・コスト項目",
+    "status": "公式掲載内容確認"
+  },
+  {
+    "id": "C03",
+    "title": "SBI VCトレードの取引所",
+    "publisher": "SBI VCトレード",
+    "url": "https://www.sbivc.co.jp/auction",
+    "checked": "2026-10-03",
+    "supports": "取引所と販売所の方式の相違",
+    "status": "公式掲載内容確認"
+  },
+  {
+    "id": "P01",
+    "title": "eMAXIS Slim 全世界株式の組入国・地域の確認方法",
+    "publisher": "三菱UFJアセットマネジメント",
+    "url": "https://faq1.am.mufg.jp/answer/6951e6ee59ee7b29cb60073b/",
+    "checked": "2026-10-03",
+    "supports": "正式商品名・最新月報で構成を確認する方法",
+    "status": "本文確認。商品ページ本体は403で未取得"
+  },
+  {
+    "id": "P02",
+    "title": "eMAXIS Slim 米国株式（S&P500）",
+    "publisher": "三菱UFJ銀行",
+    "url": "https://fs.bk.mufg.jp/webasp/mufg/fund/detail/m00355320.html",
+    "checked": "2026-10-03",
+    "supports": "商品例の正式名称。最新費用は目論見書で要再確認",
+    "status": "公式掲載確認。費用数値は未採用"
+  },
+  {
+    "id": "P03",
+    "title": "ニッセイNASDAQ100インデックスファンド",
+    "publisher": "ニッセイアセットマネジメント",
+    "url": "https://www.nam.co.jp/fundinfo/nn100if/main.html",
+    "checked": "2026-10-03",
+    "supports": "NASDAQ100配当込み円換算への連動目標・成長投資枠表示",
+    "status": "本文確認"
+  },
+  {
+    "id": "P04",
+    "title": "ニッセイNASDAQ100 ファンドの特色",
+    "publisher": "ニッセイアセットマネジメント",
+    "url": "https://www.nam.co.jp/fundinfo/nn100if/outline.html",
+    "checked": "2026-10-03",
+    "supports": "原則為替ヘッジなし・指数とファンドの乖離",
+    "status": "本文確認"
+  },
+  {
+    "id": "P05",
+    "title": "NASDAQ100とSOX等の比較資料",
+    "publisher": "ニッセイアセットマネジメント",
+    "url": "https://www.nam.co.jp/news/fpdf/260327_rc01.pdf",
+    "checked": "2026-10-03",
+    "supports": "ニッセイSOX指数インデックスファンドという商品例",
+    "status": "公式公表資料確認。SOXXと同一指数とはしない"
+  },
+  {
+    "id": "P06",
+    "title": "上場NASDAQ100米国株（為替ヘッジなし）2568",
+    "publisher": "アモーヴァ・アセットマネジメント",
+    "url": "https://www.amova-am.com/products/etf/lineup/nasdaq100-nohedge",
+    "checked": "2026-10-03",
+    "supports": "国内上場ETFという購入方法の例",
+    "status": "本文確認"
+  },
+  {
+    "id": "M01",
+    "title": "Historical Data / Chart API",
+    "publisher": "Yahoo Finance",
+    "url": "https://finance.yahoo.com/quote/SOXX/history/",
+    "checked": "2026-10-03",
+    "supports": "SOXX・QQQ・SPY・IWM・EFA・EEM・AGGの調整後終値。API原本を銘柄別保存",
+    "status": "日次データ取得・欠損／期間／重複確認。一次運用会社データではない"
+  },
+  {
+    "id": "M02",
+    "title": "iShares Semiconductor ETF",
+    "publisher": "BlackRock iShares",
+    "url": "https://www.ishares.com/us/products/239705/ishares-phlx-semiconductor-etf",
+    "checked": "2026-10-03",
+    "supports": "SOXXの投資対象と指数連動。商品名称・指数履歴の注意",
+    "status": "本文確認"
+  },
+  {
+    "id": "M03",
+    "title": "Invesco QQQ ETF",
+    "publisher": "Invesco",
+    "url": "https://www.invesco.com/qqq-etf/en/home.html",
+    "checked": "2026-10-03",
+    "supports": "QQQとNASDAQ100の関係",
+    "status": "本文確認"
+  },
+  {
+    "id": "M04",
+    "title": "State Street SPDR S&P 500 ETF Trust",
+    "publisher": "State Street",
+    "url": "https://www.ssga.com/us/en/individual/etfs/state-street-spdr-sp-500-etf-trust-spy",
+    "checked": "2026-10-03",
+    "supports": "SPYの連動対象・ETF市場価格とNAVの違い",
+    "status": "本文確認"
+  },
+  {
+    "id": "F07",
+    "title": "源泉所得税の改正のあらまし（令和8年4月）",
+    "publisher": "国税庁",
+    "url": "https://www.nta.go.jp/publication/pamph/gensen/2026kaisei.pdf",
+    "checked": "2026-10-03",
+    "supports": "PDF6ページ：2027年からの未成年つみたて枠・払出しの用途と書類等の条件",
+    "status": "公表資料確認"
+  },
+  {
+    "id": "M05",
+    "title": "SOXX Index change supplement (2021)",
+    "publisher": "iShares / SEC EDGAR",
+    "url": "https://www.sec.gov/Archives/edgar/data/1100663/000119312521126827/d82642d497.htm",
+    "checked": "2026-10-03",
+    "supports": "SOXXの2021年連動指数変更。20年間同一の指数ではない",
+    "status": "届出本文確認"
+  }
+]

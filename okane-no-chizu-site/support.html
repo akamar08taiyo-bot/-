@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="robots" content="noindex,nofollow">
+<title>NISA口座の申し込みサポート｜おかねの地図</title>
+<meta name="description" content="NISA口座の申し込みを、チェックリストで最後まで一緒に進めます。">
+<meta name="theme-color" content="#143E35">
+<link rel="icon" href="assets/profile-icon.png">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="start.css">
+<link rel="stylesheet" href="video.css">
+<script defer src="app.js"></script>
+<script defer src="broker-config.js"></script>
+<script defer src="video.js"></script>
+<script defer src="partners.js"></script>
+<script defer src="support.js"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">本文へ移動</a><header class="site-header"><div class="header-inner"><a class="brand" href="index.html"><svg class="brand-mark" width="62" height="52" viewBox="0 0 62 52" aria-hidden="true"><circle cx="32" cy="10" r="9" fill="#CA743A"/><path d="M5 19c10-1 17 3 26 8 8-5 17-9 26-7v28c-11-1-19 0-26 4-9-6-17-8-26-6Z" fill="#143E35"/><path d="M8 22c8 0 15 3 21 7v18c-7-4-14-5-21-4Z" fill="#F7F5EF"/><path d="M34 30c7-4 12-6 20-6v5c-5-1-8 0-10 4Z" fill="#B5C5AE"/></svg><span>おかねの地図</span></a><button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="メニューを開く"><svg class="icon " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><nav id="site-nav" aria-label="メインナビゲーション"><a href="planner.html">家計プラン</a><a href="library.html">無料特典</a><a href="compare.html">20年の比較</a><a href="guide.html#chapter-02">はじめ方</a></nav></div></header><main id="main">
+<div class="narrow">
+<div class="breadcrumb">
+<a href="start.html">NISAのはじめ方</a>
+<span aria-hidden="true">/</span>
+<a href="choose.html">証券会社診断</a>
+<span aria-hidden="true">/</span>
+<span>申し込みサポート</span>
+</div>
+<header class="page-heading">
+<h1 id="apply-title">NISA口座の申し込みを、最後まで一緒に。</h1>
+<p>終わったらチェックを入れるだけ。途中でやめても、この端末に保存されるので、次に開くと続きからできます。</p>
+</header>
+<p class="pr-line">このページはPRを含みます。</p>
+<div class="notice" id="pick-first" hidden>
+<strong>まだ証券会社を決めていない人へ</strong>
+<p><a href="choose.html">3つの質問で証券会社を決める</a>と、その会社の申し込みページのボタンが出ます。</p>
+</div>
+<div class="notice video-note" id="broker-video" hidden></div>
+<div class="notice" id="broker-notes" hidden></div>
+<ol class="timeline" aria-label="全体の流れ">
+<li><b>今日</b>申し込み（約10分）</li>
+<li><b>数日</b>審査を待つ</li>
+<li><b>届いたら</b>ログインと設定（約15分）</li>
+<li><b>完了</b>積立がスタート</li>
+</ol>
+<div class="apply-top">
+<div class="apply-progress"><span id="apply-count">0 / 12 できた</span><progress id="apply-bar" max="12" value="0" aria-label="進み具合"></progress></div>
+<p class="next-step" id="apply-next"></p>
+</div>
+<div id="apply">
+<noscript><p>このチェックリストはJavaScriptを使います。<a href="guide.html#chapter-11">ガイドの「口座開設から初回の積立まで」</a>でも、同じ流れを読めます。</p></noscript>
+</div>
+<div class="done-card" id="apply-done" hidden>
+<h2>おつかれさまでした！</h2>
+<p>これで、NISAの積立がスタートです。毎日の値動きは見なくて大丈夫。年に1回だけ見直しましょう。</p>
+<a class="button" href="library.html#bonus-10">年1回のNISA点検シート <svg class="icon " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"/></svg></a>
+</div>
+<div class="reset-area">
+<button class="link-button" type="button" id="reset-open">進み具合を消す</button>
+<div class="reset-confirm" id="reset-confirm" hidden>
+<span>本当に消しますか？</span>
+<button class="button" type="button" id="reset-yes">消す</button>
+<button class="button button-secondary" type="button" id="reset-no">やめる</button>
+</div>
+</div>
+<p class="fine-print">申し込みの画面や必要な書類は、証券会社によって違います。わからないときは、各社の公式サイトのヘルプやお問い合わせ窓口で確かめてください。このページでは、特定の銘柄や商品はすすめていません。</p>
+</div>
+</main>
+<footer class="site-footer"><div class="footer-inner"><a class="brand footer-brand" href="index.html"><svg class="brand-mark" width="62" height="52" viewBox="0 0 62 52" aria-hidden="true"><circle cx="32" cy="10" r="9" fill="#CA743A"/><path d="M5 19c10-1 17 3 26 8 8-5 17-9 26-7v28c-11-1-19 0-26 4-9-6-17-8-26-6Z" fill="#143E35"/><path d="M8 22c8 0 15 3 21 7v18c-7-4-14-5-21-4Z" fill="#F7F5EF"/><path d="M34 30c7-4 12-6 20-6v5c-5-1-8 0-10 4Z" fill="#B5C5AE"/></svg><span>おかねの地図</span></a><p>NISAの「わからない」を、ひとつずつ。</p><nav aria-label="フッターナビ"><a href="guide.html">無料ガイド</a><a href="library.html">特典12点</a><a href="brokers.html">口座の比較</a><a href="sources.html">出典・編集方針</a><a href="about.html">このサイトについて</a></nav><p class="fine-print">制度確認日：2026年10月3日。投資には元本割れの可能性があります。<br>過去の実績・仮定の試算は、将来の成果を保証しません。</p><small>© 2026 おかねの地図</small></div></footer>
+</body>
+</html>

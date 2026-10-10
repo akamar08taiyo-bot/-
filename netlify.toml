@@ -1,0 +1,8 @@
+# Netlify の設定（「おかねの地図」のサイト okane-no-chizu-akama.netlify.app）
+# GitHub のこのリポジトリ（ブランチ claude/money-youtube-viral-research）をつなぐと、
+# okane-no-chizu-site の中身が、そのまま公開される。サイトは作り直し（ビルド）のいらない静的なページなので、
+# 何もしない command を入れて、リポジトリのいちばん上にある別のアプリ（package.json）を作らないようにしている。
+[build]
+  base = "okane-no-chizu-site"
+  publish = "."
+  command = "echo no build"
