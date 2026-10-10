@@ -580,12 +580,21 @@ def clip_frame(s, t, span):
     if w > 0.02 and i + 1 < rd.n:
         a = a * (1 - w) + rd.get(i + 1).astype(np.float32) * w
     arr = a / 255
-    blurs = FIX.get(s.get("img") or s["id"], {}).get("blur")
+    src = s.get("img") or s["id"]
+    blurs = FIX.get(src, {}).get("blur")
     if blurs:   # 静止画と同じ所をぼかす（動画AIは、ぼかした入力からでも文字を描き直すことがある）
-        arr = blur_regions(arr, blurs)
+        arr = blur_regions(arr, blurs, src_width(src))
     arr = grade(arr, s["era"])
     arr = bloom(arr)
     return np.clip(arr, 0, 1)
+
+_SRCW = {}
+def src_width(sid):
+    """元の画像の幅（ぼかしの半径は元の画像の画素で書くので、動画のコマに当てるときに換算する）"""
+    if sid not in _SRCW:
+        p = os.path.join(ROOT, "assets/img", sid + ".png")
+        _SRCW[sid] = Image.open(p).size[0] if os.path.exists(p) else OW
+    return _SRCW[sid]
 
 def blur_regions(arr, blurs, src_w=2752):
     """fixes.json の blur（画像に対する割合、半径は元画像の画素）を、出力の大きさのコマに当てる"""
@@ -716,6 +725,7 @@ def test_sheet(picks, out):
         x = (k % 3) * (W + 10); y = (k // 3) * (H + 8)
         sheet.paste(im, (x, y)); ImageDraw.Draw(sheet).text((x + 6, y + 4), f"{sid} t={t:g}", fill=(255, 255, 0), font=font)
         print(sid, t, flush=True)
+    sheet = sheet.crop((0, 0, min(len(picks), 3) * (W + 10) - 10, sheet.height))   # 余った黒い枠を切る
     sheet.save(out, quality=85)
     print(out)
 

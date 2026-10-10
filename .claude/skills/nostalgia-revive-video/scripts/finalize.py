@@ -76,6 +76,8 @@ def srt():
     ag = by_text("afterglow")
     if ag and META.get("afterglow_title"): items.append((ag["start"] + 0.8, ag["start"] + 5.4, f"{META['afterglow_title']}\n{META.get('afterglow_sub', '')}".strip()))
     items.sort()
+    # 次の字幕が始まる前に終える（重なると2行が同時に出る）
+    items = [(a, min(b, items[k + 1][0] - 0.05) if k + 1 < len(items) else b, t) for k, (a, b, t) in enumerate(items)]
     with open(SRT, "w", encoding="utf-8") as f:
         for k, (a, b, t) in enumerate(items, 1):
             f.write(f"{k}\n{ts(a)} --> {ts(b)}\n{t}\n\n")

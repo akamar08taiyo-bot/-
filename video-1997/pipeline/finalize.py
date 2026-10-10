@@ -59,6 +59,8 @@ def srt():
     end = scene("END"); items.append((end["start"] + 3.2, end["start"] + 8.6, META.get("end_question", "あなたの1997年の夏は、どんな夏でしたか。")))
     a0 = scene("A00"); items.append((a0["start"] + 0.8, a0["start"] + 5.4, f"{META.get('afterglow_title', 'あの夏の音')}\n{META.get('afterglow_sub', '')}"))
     items.sort()
+    # 次の字幕が始まる前に終える（重なると2行が同時に出る）
+    items = [(a, min(b, items[k + 1][0] - 0.05) if k + 1 < len(items) else b, t) for k, (a, b, t) in enumerate(items)]
     with open(SRT, "w", encoding="utf-8") as f:
         for k, (a, b, t) in enumerate(items, 1):
             f.write(f"{k}\n{ts(a)} --> {ts(b)}\n{t}\n\n")
@@ -67,8 +69,9 @@ def srt():
 # ───────── 概要欄 ─────────
 def description():
     chap = []; seen = None
-    names = {"プロローグ": "プロローグ（2026年・実家の片付け）", "朝": "1997年 夏・朝（模型店、駄菓子屋）", "午後": "午後（縁側で改造、夕立、虹）",
-             "夕方": "夕方（5時のチャイム、告白）", "夜": "夜（夏祭り、花火）", "晩夏": "晩夏（大会、赤とんぼ、8月31日）",
+    names = {"プロローグ": "プロローグ（2026年・実家の片付け）", "朝": "1997年 夏・朝（ブラウン管テレビと柴犬、おばあちゃんのお小遣い、駄菓子屋、模型店）",
+             "午後": "午後（縁側で改造、公園で野球、夕立、虹）",
+             "夕方": "夕方（5時のチャイム、告白、夕飯のナイター）", "夜": "夜（夏祭り、花火）", "晩夏": "晩夏（大会、赤とんぼ、8月31日）",
              "別れ": "別れ", "エピローグ": "エピローグ（2026年）", "余韻": "あの夏の音（環境音とピアノ・約5分）"}
     for s in SC:
         if s["part"] != seen:
