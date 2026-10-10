@@ -1,0 +1,565 @@
+#!/usr/bin/env python3
+"""映像を1コマずつ描いて ffmpeg に流す。
+
+  python3 pipeline/render.py --stills          # 各カットの中間コマを work/stills/ に保存（確認用）
+  python3 pipeline/render.py --frames 0 900    # 指定範囲だけ（テスト）
+  python3 pipeline/render.py --workers 4       # 全編 → work/video.mp4
+
+時刻はすべて scenes.json の行（カット）基準。乱数はシード固定、時計・CSSアニメは使わない。
+"""
+import json, os, sys, math, argparse, subprocess
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+D = json.load(open(os.path.join(ROOT, "scenes.json"), encoding="utf-8"))
+FIX = json.load(open(os.path.join(ROOT, "fixes.json"), encoding="utf-8"))
+LCD = json.load(open(os.path.join(ROOT, "assets/overlay/lcd.json"), encoding="utf-8"))
+FPS = D["fps"]; OW, OH = D["size"]
+SC = D["scenes"]
+TOTAL = D["total"]
+NFR = int(round(TOTAL * FPS))
+FONT_TITLE = os.path.join(ROOT, "assets/fonts/ShipporiMincho_500Medium.ttf")
+FONT_BODY = os.path.join(ROOT, "assets/fonts/ShipporiMincho_400Regular.ttf")
+
+def ease(p):
+    p = min(1.0, max(0.0, p))
+    return 0.5 - 0.5 * math.cos(math.pi * p)
+
+def smooth(a, b, x):
+    if x <= a: return 0.0
+    if x >= b: return 1.0
+    t = (x - a) / (b - a)
+    return t * t * (3 - 2 * t)
+
+# ───────── ドット絵（オリジナルの電子ペット「ぴこ」） ─────────
+SPR = {
+ "idle": ["................", "................", ".....######.....", "....#......#....", "...#........#...", "..#..##..##..#..",
+          "..#..##..##..#..", "..#..........#..", "..#...#..#...#..", "..#....##....#..", "...#........#...", "....########....",
+          "....#.#..#.#....", "................", "................", "................"],
+ "eat1": ["................", "................", ".....######.....", "....#......#....", "...#........#...", "..#..##..##..#..",
+          "..#..##..##..#..", "..#..........#.#", "..#...####...###", "..#...#..#...###", "...#...##...#...", "....########....",
+          "....#.#..#.#....", "................", "................", "................"],
+ "eat2": ["................", "................", "................", ".....######.....", "....#......#....", "...#........#...",
+          "..#..##..##..#..", "..#..........#..", "..#...####...#..", "..#....##....#..", "...#........#...", "....########....",
+          "....#.#..#.#....", "................", "................", "................"],
+ "heart": ["................", "................", ".....######.....", "....#......#....", "...#........#...", "..#..#....#..#..",
+           "..#.#.#..#.#.#..", "..#..........#..", "..#...#..#...#..", "..#....##....#..", "...#........#...", "....########....",
+           "....#.#..#.#....", "..##.##.........", "..#####.........", "...###.........."],
+ "ghost1": ["......####......", ".....#....#.....", "......####......", ".....######.....", "....#......#....", "...#........#...",
+            "..#..........#..", "..#..##..##..#..", "..#..........#..", "..#....##....#..", "..#..........#..", "..#..........#..",
+            "..#.##.##.##.#..", "..##..#..#..##..", "................", "................"],
+ "ghost2": ["................", "......####......", ".....#....#.....", "......####......", ".....######.....", "....#......#....",
+            "...#........#...", "..#..........#..", "..#..##..##..#..", "..#..........#..", "..#....##....#..", "..#..........#..",
+            "..#..........#..", "..#.##.##.##.#..", "..##..#..#..##..", "................"],
+ "egg1": ["................", "................", "......####......", ".....#....#.....", "....#......#....", "....#..##..#....",
+          "...#..####..#...", "...#........#...", "...#.##..##.#...", "...#.##..##.#...", "...#........#...", "....#......#....",
+          ".....######.....", "................", "................", "................"],
+ "egg2": ["................", "................", ".....####.......", "....#....#......", "...#......#.....", "...#..##..#.....",
+          "..#..####..#....", "..#........#....", "..#.##..##.#....", "..#.##..##.#....", "..#........#....", "...#......#.....",
+          "....######......", "................", "................", "................"],
+ "egg3": ["................", "................", ".......####.....", "......#....#....", ".....#......#...", ".....#..##..#...",
+          "....#..####..#..", "....#........#..", "....#.##..##.#..", "....#.##..##.#..", "....#........#..", ".....#......#...",
+          "......######....", "................", "................", "................"],
+}
+ANIM = {
+    "pet_eat":   [(0.0, "idle"), (1.6, "eat1"), (2.1, "eat2"), (2.6, "eat1"), (3.1, "eat2"), (3.6, "eat1"), (4.1, "heart"), (5.6, "idle")],
+    "pet_ghost": [(0.0, "ghost1"), (0.7, "ghost2"), (1.4, "ghost1"), (2.1, "ghost2"), (2.8, "ghost1"), (3.5, "ghost2"), (4.2, "ghost1"), (4.9, "ghost2"), (5.6, "ghost1"), (6.3, "ghost2"), (7.0, "ghost1"), (7.7, "ghost2"), (8.4, "ghost1")],
+    "pet_egg":   [(0.0, None), (2.2, "egg1"), (3.2, "egg2"), (3.7, "egg1"), (4.2, "egg3"), (4.7, "egg1"), (5.7, "egg2"), (6.2, "egg1"), (6.7, "egg3"), (7.2, "egg1")],
+}
+LCD_ANGLE = {"S03": 0.0, "E03": -13.0, "S28": -10.0}  # PILの回転（＋で反時計回り）。目視で決めた液晶の傾き
+
+def sprite_img(name, px, alpha=235):
+    rows = SPR[name]
+    n = len(rows)
+    im = Image.new("RGBA", (n * px + 4 * px, n * px + 4 * px), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    ink = (38, 46, 38)
+    for y, row in enumerate(rows):
+        for x, c in enumerate(row):
+            if c == "#":
+                # LCDの残像（右下に薄い影）
+                d.rectangle([x * px + 2 * px + px // 3, y * px + 2 * px + px // 3, x * px + 2 * px + px - 1 + px // 3, y * px + 2 * px + px - 1 + px // 3], fill=ink + (40,))
+    for y, row in enumerate(rows):
+        for x, c in enumerate(row):
+            if c == "#":
+                g = max(1, px // 10)
+                d.rectangle([x * px + 2 * px, y * px + 2 * px, x * px + 2 * px + px - 1 - g, y * px + 2 * px + px - 1 - g], fill=ink + (alpha,))
+    return im
+
+def pet_frame(kind, t):
+    seq = ANIM[kind]
+    cur = None
+    for (ts, name) in seq:
+        if t >= ts: cur = name
+    return cur
+
+def apply_lcd(base, sid, kind, t):
+    info = LCD.get(sid)
+    if not info: return base
+    name = pet_frame(kind, t)
+    if name is None: return base
+    W, H = base.size
+    cx, cy = info["center"][0] * W, info["center"][1] * H
+    sw = info["size"][0] * W if info["size"][0] == info["size"][0] else 100
+    sh = info["size"][1] * H if info["size"][1] == info["size"][1] else 100
+    side = min(sw, sh) * 0.80
+    px = max(2, int(side / 16))
+    spr = sprite_img(name, px)
+    # 液晶の地色に合わせて少しだけ暗く
+    spr = spr.rotate(LCD_ANGLE.get(sid, 0.0), resample=Image.BICUBIC, expand=True)
+    bob = 0
+    out = base.copy()
+    out.paste(spr, (int(cx - spr.width / 2), int(cy - spr.height / 2 + bob)), spr)
+    return out
+
+# ───────── 写真の日付（フィルムカメラ風のオレンジの数字） ─────────
+SEG = {"0": "abcdef", "1": "bc", "2": "abged", "3": "abgcd", "4": "fgbc", "5": "afgcd", "6": "afgedc", "7": "abc", "8": "abcdefg", "9": "abcfgd"}
+
+def seg_poly(x0, y0, x1, y1, th):
+    """太さ th の線分を、端を斜めに切った六角形で"""
+    if abs(x1 - x0) > abs(y1 - y0):  # 横
+        y = (y0 + y1) / 2; h = th / 2
+        return [(x0, y), (x0 + h, y - h), (x1 - h, y - h), (x1, y), (x1 - h, y + h), (x0 + h, y + h)]
+    x = (x0 + x1) / 2; h = th / 2
+    return [(x, y0), (x + h, y0 + h), (x + h, y1 - h), (x, y1), (x - h, y1 - h), (x - h, y0 + h)]
+
+def seg_digit(d, x, y, w, h, ch, col, th):
+    g = th * 0.35
+    P = {"a": (x + g, y, x + w - g, y), "b": (x + w, y + g, x + w, y + h / 2 - g), "c": (x + w, y + h / 2 + g, x + w, y + h - g),
+         "d": (x + g, y + h, x + w - g, y + h), "e": (x, y + h / 2 + g, x, y + h - g), "f": (x, y + g, x, y + h / 2 - g),
+         "g": (x + g, y + h / 2, x + w - g, y + h / 2)}
+    for sname in SEG.get(ch, ""):
+        d.polygon(seg_poly(*P[sname], th), fill=col)
+
+def datestamp(text="'97 8 3", scale=1.0):
+    h = 70 * scale; w = 38 * scale; th = 10 * scale; gap = 18 * scale
+    W = int((len(text) + 2) * (w + gap) + 60 * scale); Hh = int(h + 60 * scale)
+    im = Image.new("RGBA", (W, Hh), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    col = (255, 146, 38, 255)
+    x = 30 * scale; y = 30 * scale
+    for ch in text:
+        if ch == "'":
+            d.polygon(seg_poly(x + w * 0.35, y, x + w * 0.35, y + h * 0.28, th * 0.9), fill=col)
+            x += w * 0.75; continue
+        if ch == " ":
+            x += w * 1.25; continue
+        # 少し斜体（フィルム写真の日付っぽく）
+        seg_digit(d, x, y, w, h, ch, col, th)
+        x += w + gap
+    im = im.transform(im.size, Image.AFFINE, (1, 0.08, -0.08 * Hh / 2, 0, 1, 0), resample=Image.BICUBIC)
+    core = im.filter(ImageFilter.GaussianBlur(0.9 * scale))
+    glow = im.filter(ImageFilter.GaussianBlur(7 * scale))
+    ga = np.asarray(glow).astype(np.float32); ga[..., 0] = 255; ga[..., 1] *= 0.55; ga[..., 2] *= 0.3; ga[..., 3] *= 0.9
+    glow = Image.fromarray(ga.clip(0, 255).astype(np.uint8))
+    out = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    out.alpha_composite(glow); out.alpha_composite(core)
+    return out
+
+def prepare_P04(img):
+    """写真の右下の白い四角を、左どなりの床の色をのばして埋めてから日付を入れる"""
+    W, H = img.size
+    x0, y0, x1, y1 = int(0.668 * W), int(0.742 * H), int(0.858 * W), int(0.878 * H)
+    arr = np.asarray(img.convert("RGB")).astype(np.float32)
+    reg = arr[y0:y1, x0:x1].copy()
+    left = arr[y0:y1, x0 - 24:x0 - 4].mean(axis=1)  # 行ごとの左側の色
+    k = np.hanning(41); k /= k.sum()
+    left = np.stack([np.convolve(np.pad(left[:, c], 20, mode="edge"), k, mode="valid") for c in range(3)], axis=1)
+    fill = np.repeat(left[:, None, :], x1 - x0, axis=1)
+    fade = np.linspace(0, 1, x1 - x0)[None, :, None]
+    fill = fill * (1 - 0.18 * fade) + 6 * np.random.default_rng(3).normal(0, 1, fill.shape)
+    whiteness = np.clip((reg.min(axis=2) - 175) / 45.0, 0, 1)[..., None]
+    wm = np.asarray(Image.fromarray((whiteness[..., 0] * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(4))).astype(np.float32)[..., None] / 255
+    out = reg * (1 - wm) + fill * wm
+    arr[y0:y1, x0:x1] = out
+    img = Image.fromarray(arr.clip(0, 255).astype(np.uint8)).convert("RGBA")
+    st = datestamp(scale=1.25).rotate(4.2, resample=Image.BICUBIC, expand=True)
+    img.alpha_composite(st, (int(0.772 * W - st.width / 2), int(0.812 * H - st.height / 2)))
+    return img
+
+# ───────── 画像の読み込みと修正 ─────────
+_cache = {}
+def load_scene_image(sid, raw=False):
+    """修正済み・色調整済み・にじみ焼き込み済みのRGB画像（raw=True で色調整前のRGBA）"""
+    key = (sid, raw)
+    if key in _cache: return _cache[key]
+    p = os.path.join(ROOT, "assets/img", sid + ".png")
+    img = Image.open(p).convert("RGBA")
+    W, H = img.size
+    fx = FIX.get(sid, {})
+    for (a, b, c, d, rad) in fx.get("blur", []):
+        box = (int(a * W), int(b * H), int(c * W), int(d * H))
+        reg = img.crop(box)
+        bl = reg.filter(ImageFilter.GaussianBlur(rad))
+        m = Image.new("L", reg.size, 0)
+        ImageDraw.Draw(m).rectangle([6, 6, reg.size[0] - 6, reg.size[1] - 6], fill=255)
+        m = m.filter(ImageFilter.GaussianBlur(5))
+        img.paste(bl, box[:2], m)
+    if sid == "P04":
+        img = prepare_P04(img)
+    if raw:
+        _cache[key] = img
+        return img
+    # カメラ窓が出力の1.12倍になるよう、先に高品質で縮小（動かしたときのチラつき防止と高速化）
+    cx, cy, bw, bh = base_window(sid, W, H)
+    f = min(1.0, OW * 1.12 / bw)
+    rgb = img.convert("RGB")
+    if f < 0.98:
+        rgb = rgb.resize((int(W * f), int(H * f)), Image.LANCZOS)
+    era = next((sc_["era"] for sc_ in SC if sc_["id"] == sid), "1997")
+    arr = np.asarray(rgb).astype(np.float32) / 255
+    arr = grade(arr, era)
+    arr = bloom_src(arr)
+    rgb = Image.fromarray((np.clip(arr, 0, 1) * 255 + 0.5).astype(np.uint8))
+    _cache[key] = rgb
+    return rgb
+
+def base_window(sid, W, H):
+    """カメラが動ける範囲（16:9に合わせる）"""
+    x0, y0, x1, y1 = FIX.get(sid, {}).get("crop", [0, 0, 1, 1])
+    x0 *= W; x1 *= W; y0 *= H; y1 *= H
+    w, h = x1 - x0, y1 - y0
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    if w / h > 16 / 9: w = h * 16 / 9
+    else: h = w * 9 / 16
+    return cx, cy, w, h
+
+MOVES = {
+    #        z0    z1    dx0    dx1   dy0   dy1   （dx,dyは窓幅に対する割合）
+    "in":   (1.00, 1.075, 0, 0, 0, 0),
+    "out":  (1.075, 1.00, 0, 0, 0, 0),
+    "in_slow": (1.00, 1.06, 0, 0, 0, 0),
+    "out_slow": (1.06, 1.00, 0, 0, 0, 0),
+    "up":   (1.08, 1.08, 0, 0, 0.032, -0.032),
+    "pan_r": (1.09, 1.09, -0.035, 0.035, 0, 0),
+    "pan_l": (1.09, 1.09, 0.035, -0.035, 0, 0),
+    "pan_r_slow": (1.08, 1.08, -0.03, 0.03, 0, 0),
+    "pan_l_slow": (1.08, 1.08, 0.03, -0.03, 0, 0),
+    "none": (1.0, 1.0, 0, 0, 0, 0),
+}
+
+def camera_frame(img, sid, move, p):
+    W, H = img.size
+    cx, cy, bw, bh = base_window(sid, W, H)
+    z0, z1, dx0, dx1, dy0, dy1 = MOVES.get(move, MOVES["in"])
+    e = ease(p)
+    z = z0 + (z1 - z0) * e
+    w, h = bw / z, bh / z
+    ccx = cx + (dx0 + (dx1 - dx0) * e) * bw
+    ccy = cy + (dy0 + (dy1 - dy0) * e) * bh
+    # はみ出さないように
+    x0, _ = FIX.get(sid, {}).get("crop", [0, 0, 1, 1])[0:2]
+    ccx = min(max(ccx, w / 2), W - w / 2); ccy = min(max(ccy, h / 2), H - h / 2)
+    # 拡大・平行移動だけなので resize(box=...) が速くて正確（小数座標OK、縮小時はエイリアスも抑える）
+    return img.resize((OW, OH), Image.BILINEAR, box=(ccx - w / 2, ccy - h / 2, ccx + w / 2, ccy + h / 2))
+
+# ───────── 効果（光の粒・光の筋・雨・ゆらぎ） ─────────
+def sprite_dot(r):
+    s = int(r * 4) + 1
+    y, x = np.mgrid[-s:s + 1, -s:s + 1]
+    return np.exp(-(x * x + y * y) / (2 * r * r)).astype(np.float32)
+
+DOTS = [sprite_dot(r) for r in (1.2, 1.8, 2.6, 3.6)]
+
+def fx_dust(frame, t, seed, warm=(1.0, 0.95, 0.82), n=46, strength=0.55):
+    r = np.random.default_rng(seed)
+    xs = r.uniform(0, OW, n); ys = r.uniform(0, OH, n)
+    vx = r.uniform(-6, 10, n); vy = r.uniform(-14, -3, n)
+    ph = r.uniform(0, 6.28, n); sz = r.integers(0, len(DOTS), n); br = r.uniform(0.25, 1.0, n)
+    col = np.array(warm, np.float32) * strength
+    for i in range(n):
+        x = (xs[i] + vx[i] * t + 18 * math.sin(t * 0.4 + ph[i])) % OW
+        y = (ys[i] + vy[i] * t + 10 * math.sin(t * 0.3 + ph[i] * 2)) % OH
+        tw = 0.55 + 0.45 * math.sin(t * 1.3 + ph[i] * 3)
+        spr = DOTS[sz[i]]; k = spr.shape[0] // 2
+        xi, yi = int(x), int(y)
+        x0, x1 = max(0, xi - k), min(OW, xi + k + 1); y0, y1 = max(0, yi - k), min(OH, yi + k + 1)
+        if x1 <= x0 or y1 <= y0: continue
+        a = (spr[y0 - yi + k:y1 - yi + k, x0 - xi + k:x1 - xi + k] * float(br[i] * tw))[..., None] * col
+        reg = frame[y0:y1, x0:x1]
+        reg += a * (1.0 - reg)
+    return frame
+
+_RAYS = {}
+def ray_tex(seed):
+    if seed in _RAYS: return _RAYS[seed]
+    r = np.random.default_rng(seed)
+    y, x = np.mgrid[0:OH // 4, 0:OW // 4].astype(np.float32)
+    sx, sy = (-0.1 * OW / 4, -0.25 * OH / 4) if r.random() < 0.5 else (1.1 * OW / 4, -0.25 * OH / 4)
+    ang = np.arctan2(y - sy, x - sx)
+    v = np.zeros_like(ang)
+    for k in range(7):
+        v += r.uniform(0.3, 1.0) * np.cos(ang * r.uniform(18, 42) + r.uniform(0, 6)) ** 8
+    dist = np.sqrt((x - sx) ** 2 + (y - sy) ** 2)
+    v *= np.exp(-dist / (OW / 4 * 0.9))
+    v = v / (v.max() + 1e-6)
+    im = Image.fromarray((v * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(3)).resize((OW, OH), Image.BILINEAR)
+    _RAYS[seed] = np.asarray(im).astype(np.float32) / 255
+    return _RAYS[seed]
+
+_RAYC = {}
+def fx_rays(frame, t, seed, strength=0.11):
+    key = seed % 7
+    if key not in _RAYC:
+        _RAYC[key] = (ray_tex(key)[..., None] * np.array([1.0, 0.93, 0.78], np.float32)).astype(np.float32)
+    k = strength * (0.75 + 0.25 * math.sin(t * 0.5 + seed))
+    tmp = 1.0 - frame
+    tmp *= _RAYC[key]
+    tmp *= k
+    frame += tmp
+    return frame
+
+_RAIN = {}
+def rain_tex(seed):
+    if seed in _RAIN: return _RAIN[seed]
+    r = np.random.default_rng(seed)
+    im = Image.new("L", (OW, OH * 2), 0); d = ImageDraw.Draw(im)
+    for i in range(1400):
+        x = r.uniform(0, OW); y = r.uniform(0, OH * 2); L = r.uniform(25, 70); a = int(r.uniform(40, 140))
+        d.line([(x, y), (x - L * 0.12, y + L)], fill=a, width=1)
+    im = im.filter(ImageFilter.GaussianBlur(0.8))
+    _RAIN[seed] = np.asarray(im).astype(np.float32) / 255
+    return _RAIN[seed]
+
+def fx_rain(frame, t, seed):
+    out = frame
+    for k, (sp, al) in enumerate(((1900, 0.22), (1250, 0.14))):
+        tex = rain_tex(seed + k)
+        off = int(t * sp) % OH
+        layer = tex[OH - off:2 * OH - off] if off > 0 else tex[OH:2 * OH]
+        if layer.shape[0] != OH: layer = tex[:OH]
+        tmp = 0.85 - out
+        tmp *= (layer * al)[..., None]
+        out += tmp
+    return out
+
+def fx_flicker(frame, t, seed):
+    r = np.random.default_rng(seed)
+    bursts = r.uniform(0, 10, 7)
+    cols = [np.array(c, np.float32) for c in ((1.0, 0.6, 0.4), (0.5, 0.9, 0.6), (0.6, 0.7, 1.0), (1.0, 0.9, 0.5))]
+    g = np.zeros(3, np.float32)
+    for i, b in enumerate(bursts):
+        dt = t - b
+        if 0 <= dt < 1.6: g += cols[i % 4] * 0.09 * math.exp(-dt * 2.2)
+    return frame + g[None, None, :] * (1.0 - frame)
+
+# ───────── 仕上げ（色・にじみ・周辺減光・粒子） ─────────
+def vignette():
+    y, x = np.mgrid[0:OH, 0:OW].astype(np.float32)
+    r = np.sqrt(((x - OW / 2) / (OW / 2)) ** 2 + ((y - OH / 2) / (OH / 2)) ** 2)
+    return (1 - 0.20 * np.clip(r - 0.45, 0, None) ** 1.6).astype(np.float32)[..., None]
+
+VIG = vignette()
+GRAIN = [np.random.default_rng(100 + i).normal(0, 1, (OH // 2, OW // 2)).astype(np.float32) for i in range(6)]
+GRAIN_FULL = [(np.repeat(np.repeat(g, 2, axis=0), 2, axis=1)[..., None] * 0.012).astype(np.float32) for g in GRAIN]
+
+def grade(frame, era):
+    if era == "2026":
+        # 現在：少し冷たく、落ち着いた色
+        lum = frame.mean(axis=2, keepdims=True)
+        frame = lum + (frame - lum) * 0.86
+        frame = frame * np.array([0.98, 1.0, 1.03], np.float32)
+    else:
+        # 1997年：ほんのり暖かく、黒を少し持ち上げる
+        frame = frame * np.array([1.03, 1.0, 0.95], np.float32)
+    return 0.035 + frame * 0.95
+
+def bloom_src(arr, k=0.16):
+    h, w = arr.shape[:2]
+    small = Image.fromarray((np.clip(arr, 0, 1) * 255).astype(np.uint8)).resize((max(8, w // 8), max(8, h // 8)), Image.BILINEAR)
+    small = small.filter(ImageFilter.GaussianBlur(6)).resize((w, h), Image.BILINEAR)
+    b = np.asarray(small).astype(np.float32) / 255
+    b = np.clip(b - 0.55, 0, 1) / 0.45
+    return arr + b * k * (1 - arr)
+
+def bloom(frame, k=0.16):
+    small = Image.fromarray((np.clip(frame, 0, 1) * 255).astype(np.uint8)).resize((OW // 6, OH // 6), Image.BILINEAR)
+    small = small.filter(ImageFilter.GaussianBlur(7)).resize((OW, OH), Image.BILINEAR)
+    b = np.asarray(small).astype(np.float32) / 255
+    b = np.clip(b - 0.55, 0, 1) / 0.45
+    return frame + b * k * (1 - frame)
+
+def finish(frame, fi, era):
+    frame = frame * VIG
+    frame += GRAIN_FULL[fi % len(GRAIN_FULL)]
+    np.clip(frame, 0, 1, out=frame)
+    return frame
+
+# ───────── 文字 ─────────
+def text_layer(lines, alpha):
+    """lines: [(text, size, y(0..1), font, spacing)] → RGBA（白文字＋やわらかい影）"""
+    im = Image.new("RGBA", (OW, OH), (0, 0, 0, 0))
+    sh = Image.new("RGBA", (OW, OH), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im); ds = ImageDraw.Draw(sh)
+    for (txt, size, y, fontp, sp, a) in lines:
+        f = ImageFont.truetype(fontp, size)
+        widths = [f.getbbox(ch)[2] - f.getbbox(ch)[0] if ch != " " else size * 0.35 for ch in txt]
+        tw = sum(widths) + sp * (len(txt) - 1)
+        x = (OW - tw) / 2
+        for ch, w in zip(txt, widths):
+            bb = f.getbbox(ch)
+            d.text((x - bb[0], y * OH - size * 0.55), ch, font=f, fill=(255, 252, 244, int(255 * a)))
+            ds.text((x - bb[0], y * OH - size * 0.55 + 2), ch, font=f, fill=(20, 18, 14, int(150 * a)))
+            x += w + sp
+    sh = sh.filter(ImageFilter.GaussianBlur(5))
+    out = Image.new("RGBA", (OW, OH), (0, 0, 0, 0))
+    out.alpha_composite(sh); out.alpha_composite(im)
+    arr = np.asarray(out).astype(np.float32) / 255
+    arr[..., 3] *= alpha
+    return arr
+
+_TXT = {}
+def cached_text(key, lines):
+    if key not in _TXT: _TXT[key] = text_layer(lines, 1.0)
+    return _TXT[key]
+
+def over(frame, layer, alpha):
+    a = layer[..., 3:4] * alpha
+    return frame * (1 - a) + layer[..., :3] * a
+
+def draw_text(frame, s, tl):
+    kind = s.get("text")
+    if kind == "title":
+        a = smooth(1.6, 3.2, tl) * (1 - smooth(7.6, 9.4, tl))
+        if a > 0:
+            L = cached_text("title", [("1997", 40, 0.39, FONT_BODY, 18, 0.95), ("電池の夏", 112, 0.50, FONT_TITLE, 26, 1.0)])
+            frame = over(frame, L, a)
+    elif kind == "end":
+        a1 = smooth(0.8, 2.4, tl) * (1 - smooth(7.4, 8.9, tl))
+        a2 = smooth(3.0, 4.6, tl) * (1 - smooth(7.4, 8.9, tl))
+        if a1 > 0:
+            frame = over(frame, cached_text("end1", [("電池の夏", 96, 0.42, FONT_TITLE, 22, 1.0), ("1997", 34, 0.53, FONT_BODY, 16, 0.9)]), a1)
+        if a2 > 0:
+            frame = over(frame, cached_text("end2", [("あなたの1997年の夏は、どんな夏でしたか。", 38, 0.68, FONT_BODY, 6, 0.95)]), a2)
+    elif kind == "afterglow":
+        a = smooth(0.6, 2.0, tl) * (1 - smooth(4.2, 5.8, tl))
+        if a > 0:
+            frame = over(frame, cached_text("ag", [("あの夏の音", 64, 0.47, FONT_TITLE, 18, 1.0), ("環境音とピアノだけの、ゆっくりした時間", 30, 0.58, FONT_BODY, 6, 0.85)]), a)
+    return frame
+
+# ───────── 1カットの描画 ─────────
+_BG = {}
+def card_background(s):
+    """END と A00 は前後のカットをぼかした背景"""
+    key = s["id"]
+    if key in _BG: return _BG[key]
+    src = "E05" if key == "END" else "A01"
+    img = load_scene_image(src)
+    fr = camera_frame(img, src, "none", 1.0)
+    fr = fr.filter(ImageFilter.GaussianBlur(18))
+    arr = np.asarray(fr).astype(np.float32) / 255
+    arr = arr * (0.72 if key == "A00" else 0.82) + (0.06 if key == "A00" else 0.12)
+    _BG[key] = arr
+    return arr
+
+def render_scene(i, t):
+    """カット i の、カット開始からの経過 t 秒のコマ（効果込み、仕上げ前）"""
+    s = SC[i]
+    nxt = SC[i + 1]["xfade"] if i + 1 < len(SC) else 0
+    span = s["dur"] + nxt
+    p = t / span if span > 0 else 0
+    if not s["prompt"]:
+        frame = card_background(s).copy()
+    else:
+        img = load_scene_image(s["id"])
+        if s.get("overlay") in ANIM:
+            img = apply_lcd(img, s["id"], s["overlay"], t)
+        fr = camera_frame(img, s["id"], s["move"], p)
+        frame = np.asarray(fr).astype(np.float32) / 255
+    seed = 1000 + i * 17
+    for f in s["fx"]:
+        if f == "dust": frame = fx_dust(frame, t, seed, warm=(0.85, 0.9, 1.0) if s["era"] == "2026" else (1.0, 0.95, 0.82))
+        elif f == "rays": frame = fx_rays(frame, t, seed)
+        elif f == "rain": frame = fx_rain(frame, t, seed)
+        elif f == "flicker": frame = fx_flicker(frame, t, seed)
+    frame = draw_text(frame, s, t)
+    return frame
+
+def scene_at(T):
+    """時刻 T に見えているカット（前のカットとのクロスフェード込み）"""
+    idx = 0
+    for k, s in enumerate(SC):
+        if s["start"] <= T + 1e-9: idx = k
+    return idx
+
+def render_frame(fi):
+    T = fi / FPS
+    i = scene_at(T)
+    s = SC[i]
+    tl = T - s["start"]
+    cur = render_scene(i, tl)
+    xf = s["xfade"]
+    if i > 0 and tl < xf:
+        prev = render_scene(i - 1, T - SC[i - 1]["start"])
+        a = ease(tl / xf)
+        # 白に抜ける転換：プロローグ→1997年
+        if s["id"] == "S01":
+            wpk = math.sin(math.pi * min(1, tl / xf)) * 0.55
+            mix = prev * (1 - a) + cur * a
+            frame = mix + (1 - mix) * wpk
+        else:
+            frame = prev * (1 - a) + cur * a
+    else:
+        frame = cur
+    # 冒頭は黒から、最後は黒へ
+    if T < 1.5: frame = frame * ease(T / 1.5)
+    if T > TOTAL - 4.0: frame = frame * ease((TOTAL - T) / 4.0)
+    era = s["era"]
+    return finish(frame, fi, era)
+
+def to_bytes(frame):
+    return (frame * 255 + 0.5).astype(np.uint8).tobytes()
+
+def encode(f0, f1, out):
+    cmd = ["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{OW}x{OH}", "-r", str(FPS), "-i", "-",
+           "-c:v", "libx264", "-preset", "fast", "-crf", "17", "-pix_fmt", "yuv420p", "-g", str(FPS * 2), "-bf", "2",
+           "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-movflags", "+faststart", out]
+    p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+    for fi in range(f0, f1):
+        p.stdin.write(to_bytes(render_frame(fi)))
+        if (fi - f0) % 300 == 0:
+            print(f"[{os.getpid()}] {fi}/{f1}", flush=True)
+    p.stdin.close(); p.wait()
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--stills", action="store_true")
+    ap.add_argument("--frames", nargs=2, type=int)
+    ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--chunk", type=int, help="（内部用）担当チャンク番号")
+    ap.add_argument("--only", nargs="*", help="--stills で特定カットだけ")
+    a = ap.parse_args()
+    work = os.path.join(ROOT, "work")
+    if a.stills:
+        os.makedirs(os.path.join(work, "stills"), exist_ok=True)
+        for i, s in enumerate(SC):
+            if a.only and s["id"] not in a.only: continue
+            T = s["start"] + min(s["dur"] * 0.55, s["dur"] - 0.2)
+            if s.get("text") == "title": T = s["start"] + 4.5
+            if s.get("text") == "end": T = s["start"] + 5.0
+            if s.get("text") == "afterglow": T = s["start"] + 3.0
+            if s.get("overlay") == "pet_egg": T = s["start"] + 4.4
+            if s.get("overlay") == "pet_eat": T = s["start"] + 2.2
+            fi = int(T * FPS)
+            Image.fromarray((render_frame(fi) * 255).astype(np.uint8)).save(os.path.join(work, "stills", f"{s['id']}.jpg"), quality=90)
+            print(s["id"], fi, flush=True)
+        return
+    if a.frames:
+        encode(a.frames[0], a.frames[1], os.path.join(work, f"test_{a.frames[0]}_{a.frames[1]}.mp4"))
+        return
+    if a.chunk is not None:
+        n = a.workers
+        bounds = [round(NFR * k / n) for k in range(n + 1)]
+        encode(bounds[a.chunk], bounds[a.chunk + 1], os.path.join(work, f"part_{a.chunk}.mp4"))
+        return
+    procs = [subprocess.Popen([sys.executable, __file__, "--workers", str(a.workers), "--chunk", str(k)]) for k in range(a.workers)]
+    rc = [p.wait() for p in procs]
+    if any(rc): sys.exit("worker failed")
+    lst = os.path.join(work, "parts.txt")
+    open(lst, "w").write("".join(f"file 'part_{k}.mp4'\n" for k in range(a.workers)))
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", os.path.join(work, "video.mp4")], check=True)
+    print("video ->", os.path.join(work, "video.mp4"), NFR, "frames")
+
+if __name__ == "__main__":
+    main()
