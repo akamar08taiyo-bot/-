@@ -464,10 +464,12 @@ def proj_audio_set(prefix):
     if not d or not os.path.isdir(d): return []
     return [x for x in (proj_audio(f[:-4]) for f in sorted(os.listdir(d)) if f.startswith(prefix + "_") and f.endswith(".wav")) if x is not None]
 
-def crowd_voices(n, r, prefix, every=6.0, far=0.6, level=-40):
+def crowd_voices(n, r, prefix, every=6.0, far=0.6, level=-40, room=None):
     """TTS で作った短い声（歓声・呼び込み。assets/sfx/<prefix>_*.wav）を、ざわめきの中に遠く・小さく散らす。
     合成のざわめきだけだと「機械の声」「ダミ声」に聞こえるので、本物の言葉を少し混ぜて人の気配にする。
-    every: 平均の間隔（秒）、far: 0=近い〜1=遠い（遠いほどこもって響く）、level: 全体の大きさ（dB RMS）"""
+    every: 平均の間隔（秒）、far: 0=近い〜1=遠い（遠いほどこもる）、level: 全体の大きさ（dB RMS）
+    room: 響き (大きさ, 混ぜる量)。屋外は OUTDOOR（ほぼ響かせない）。響かせすぎると、目隠しテストで
+          公園の子どもの声が「構内アナウンス」、屋上の大会が「アニメの戦闘シーン」に聞こえた"""
     clips = proj_audio_set(prefix)
     out = np.zeros((n, 2))
     if not clips: return out
@@ -479,8 +481,12 @@ def crowd_voices(n, r, prefix, every=6.0, far=0.6, level=-40):
         place(out, pan(x, r.uniform(-0.8, 0.8)), t)
         t += len(x) // 2 + int(r.exponential(every) * SR)
     if not out.any(): return out
-    out = reverb(out, 1.0 + 1.2 * far, 0.25 + 0.25 * far)
+    size, mix = room if room else (1.0 + 1.2 * far, 0.25 + 0.25 * far)
+    out = reverb(out, size, mix)
     return norm_rms(out, level)
+
+OUTDOOR = (0.4, 0.07)    # 屋外の声：建物の反射が少しだけ
+SMALL_ROOM = (0.6, 0.18) # 小さな店の中
 
 def tv_speaker(x):
     return bp(x, 250, 3800, 2)
@@ -846,7 +852,7 @@ def tv_morning(n, r):
 def park(n, r):
     """午後の公園：セミ、遠くの子どもの声、鳥"""
     kids = lp(murmur(n, r, 6, 1.0, 2.5, -40), 2500)
-    far_kids = crowd_voices(n, rng(r.integers(1 << 30)), "crowd_kids", 8.0, 0.9, -46)   # 遠くで遊ぶ子どもの声（TTS があれば）
+    far_kids = crowd_voices(n, rng(r.integers(1 << 30)), "crowd_kids", 8.0, 0.7, -46, OUTDOOR)   # 遠くで遊ぶ子どもの声（TTS があれば）
     return cicada_day(n, rng(r.integers(1 << 30)), 2, 0.4) * db(-2) + kids + far_kids + wind(n, rng(r.integers(1 << 30)), 0.6) * db(-8)
 
 def one_dog_bell(r):
@@ -925,7 +931,7 @@ AMB = {
     "bike": mk((bike, 0), (lambda n, r: wind(n, r, 0.9), -6)),
     # 声の数が少ないと1人ずつの合成声が聞き分けられて不自然（目隠しテストで「ダミ声」）→ 人数を増やして小さく
     "shop": mk((fan, -2), (lambda n, r: murmur(n, r, 8, 0.9, 1.0, -43), 0), (_lpf(lambda n, r: cicada_day(n, r, 2, 0.4), 2500), -10),
-               (lambda n, r: crowd_voices(n, r, "crowd_kids", 6.0, 0.45, -42), 0)),
+               (lambda n, r: crowd_voices(n, r, "crowd_kids", 6.0, 0.45, -45, SMALL_ROOM), 0)),
     "shop_quiet": mk((room_tone, 0), (clock_tick, 0), (_lpf(lambda n, r: cicada_day(n, r, 2, 0.4), 2500), -9), (fan, -6)),
     "shop_closed": mk((room_tone, 0), (clock_tick, -2), (_lpf(lambda n, r: higurashi(n, r, 2, 0.5), 3000), -8)),
     "track": mk((lambda n, r: track(n, r, 3), -2)),
@@ -942,12 +948,12 @@ AMB = {
     "sea": mk((sea, 0)),
     "dinner": mk((tv_baseball, 0), (dishes, 0), (room_tone, 0), (lambda n, r: crickets(n, r, 0.5), -10)),
     "festival": mk((lambda n, r: murmur(n, r, 16, 0.5, 2.0, -36), 0), (taiko, 0), (lambda n, r: crickets(n, r, 0.6), -8),
-                   (lambda n, r: crowd_voices(n, r, "crowd_fest", 3.0, 0.55, -37), 0)),
+                   (lambda n, r: crowd_voices(n, r, "crowd_fest", 3.0, 0.55, -37, OUTDOOR), 0)),
     "fireworks": mk((fireworks, 0), (lambda n, r: murmur(n, r, 10, 0.4, 2.5, -40), 0), (lambda n, r: crickets(n, r, 0.5), -10)),
     "night": mk((lambda n, r: crickets(n, r, 1.0), 0), (room_tone, 0)),
     "night_wind": mk((lambda n, r: crickets(n, r, 0.8), 0), (lambda n, r: wind(n, r, 0.7), -6)),
     "event": mk((lambda n, r: murmur(n, r, 14, 0.8, 1.6, -35), 0), (lambda n, r: track(n, r, 4), -3), (lambda n, r: cicada_day(n, r, 2, 0.3), -10),
-                (lambda n, r: crowd_voices(n, r, "crowd_kids", 3.0, 0.5, -37), 0)),
+                (lambda n, r: crowd_voices(n, r, "crowd_kids", 3.0, 0.5, -39, OUTDOOR), 0)),   # デパートの屋上＝屋外
     "event_far": mk((_lpf(lambda n, r: murmur(n, r, 12, 0.8, 1.6, -33), 2000), -4), (_lpf(lambda n, r: track(n, r, 3), 2500), -8)),
     "truck_idle": mk((truck_idle, 0)),
     "truck_away": mk((truck_away, 0)),

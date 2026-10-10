@@ -40,6 +40,7 @@
 | afterglow_part | "余韻" | 環境音パートの part 名（音の平準化・検査の区切り） |
 | music_gain / music_preroll / music_fade_in | {"M5": -6} / {"M1": 1.2} / {"M1": 4} | 曲ごとの音量・先行・フェード（mix.py） |
 | amb_gain_story / amb_gain_after | -1 / +4 | 環境音の音量（dB） |
+| amb_gain | {} | 環境音の名前、またはその音が始まるカットIDごとの音量（dB）。例 {"A03": -4}（余韻パートの雨だけ大きかった） |
 | sfx_captions | {"chime5": "♪（夕方5時のチャイム「夕焼け小焼け」）"} | 効果音に付ける字幕 |
 | motion_style / motion_style_present | "Realistic 1990s 35mm color film look, ..." | Veo の様式の指示（gen_clips.py） |
 

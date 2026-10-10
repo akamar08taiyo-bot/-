@@ -570,9 +570,11 @@ def clip_frame(s, t, span):
     if rd is None:
         rd = _CLIPS[s["id"]] = ClipReader(clip_path(s))
     hold = s["reveal"].get("hold", 0) if s.get("reveal") else 0.0
-    # fixes.json の "clip": {"start": 秒} … クリップの先頭を使わない（実例：最初の1秒でグローブが突然現れた）
-    c0 = FIX.get(s["id"], {}).get("clip", {}).get("start", 0.0) if not s.get("reveal") else 0.0
-    usable = max(0.5, rd.dur - c0)
+    # fixes.json の "clip": {"start": 秒, "end": 秒} … クリップの先頭・後ろを使わない（使う範囲をカットの長さに合わせてスローにする）
+    # 実例：最初の1秒でグローブが突然現れた（start）／後半で花火が消えて空が真っ暗・手の中のおもちゃが形を変えた（end）
+    cl = FIX.get(s["id"], {}).get("clip", {}) if not s.get("reveal") else {}
+    c0 = cl.get("start", 0.0)
+    usable = max(0.5, min(rd.dur, cl.get("end", rd.dur)) - c0)
     if t <= hold:
         f = c0 * rd.fps
     else:

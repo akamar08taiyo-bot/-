@@ -9,6 +9,8 @@ scenes.json の meta で調整できるもの（すべて省略可）：
   music_fade_in  {"M1": 4, "M5": 4} 入りのフェード秒（既定 3）
   afterglow_part "余韻"             環境音パートの part 名（ここから先は平準化の目標を2dB下げ、環境音を上げる）
   amb_gain_story / amb_gain_after   環境音の音量（dB、既定 -1 / +4）
+  amb_gain       {"A03": -4, "fan": -2}  環境音の名前、またはその音が始まるカットIDごとの音量（dB）。
+                                         loudgraph.py で1場面だけ大きい・小さいときに使う
 セリフ（lines）の far=True は遠くからの声（こもらせて小さく、周りを下げない）、room=[秒, 量] で響きを変える。
 """
 import json, os, sys, subprocess, wave, re, hashlib
@@ -50,6 +52,7 @@ PREROLL = META.get("music_preroll", {})
 FADE_IN = META.get("music_fade_in", {})
 AMB_GAIN_STORY = META.get("amb_gain_story", -1.0)
 AMB_GAIN_AFTER = META.get("amb_gain_after", +4.0)
+AMB_GAIN_EXTRA = META.get("amb_gain", {})
 
 def db(x): return 10 ** (x / 20)
 
@@ -137,7 +140,7 @@ def amb_bus():
             dur = (t1 - t0) + fout + 0.2
             if name not in sfx.AMB: sys.exit(f"環境音 {name!r} は sfx.AMB にありません（{', '.join(sorted(sfx.AMB))}）")
             x = sfx.AMB[name](dur, seed_of(name, SC[i]["id"]))
-            g = AMB_GAIN_AFTER if is_after(i) else AMB_GAIN_STORY
+            g = (AMB_GAIN_AFTER if is_after(i) else AMB_GAIN_STORY) + AMB_GAIN_EXTRA.get(name, 0.0) + AMB_GAIN_EXTRA.get(SC[i]["id"], 0.0)
             x = fade(x.astype(np.float64), fin, fout) * db(g)
             place(bus, x, int(t0 * SR))
             count += 1
@@ -271,7 +274,7 @@ def cached(name, fn, key):
 def main():
     os.makedirs(os.path.join(ROOT, "out"), exist_ok=True); os.makedirs(os.path.join(ROOT, "work"), exist_ok=True)
     mus, mrep = music_bus(); print("music runs:", [(k, round(a, 1), round(b, 1)) for k, a, b in mrep])
-    amb, na = cached("amb", amb_bus, [(s["id"], s["start"], s["dur"], s["xfade"], s["amb"], s["part"]) for s in SC] + [AMB_GAIN_STORY, AMB_GAIN_AFTER]); print("ambience segments:", na)
+    amb, na = cached("amb", amb_bus, [(s["id"], s["start"], s["dur"], s["xfade"], s["amb"], s["part"]) for s in SC] + [AMB_GAIN_STORY, AMB_GAIN_AFTER, sorted(AMB_GAIN_EXTRA.items())]); print("ambience segments:", na)
     fxb, nf = cached("sfx", sfx_bus, [(s["id"], s["start"], s["sfx"]) for s in SC]); print("one-shots:", nf)
     voc, spans = voice_bus(); print("lines:", [(l, round(a, 2), round(b, 2)) for l, a, b, *_ in spans])
     near = [x for x in spans if not D["lines"].get(x[0], {}).get("far")]  # 遠くの呼び声では周りを下げない

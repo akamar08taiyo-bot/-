@@ -23,6 +23,7 @@ META = dict(
     setting="a small seaside town in Japan in summer 1997",
     stamp_text="'97 7 26",
     music_gain={"M0": -1.0, "M2": -1.5, "M5": -6.0},
+    amb_gain={"A03": -4.0},   # 余韻パートの雨（8:04〜）だけ大きかった（loudgraph で -12.5 LUFS 前後）
     music_preroll={"M1": 1.2},
     music_fade_in={"M1": 4.0, "M5": 4.0},
     afterglow_part="余韻",
