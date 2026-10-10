@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Lyria で作れなかった区間の BGM をコードで作曲・合成する（オリジナル曲）。
+"""Lyria で作れなかった区間の BGM を、コードで作曲・合成する（オリジナル曲。権利の心配がない）。
 
-  M2_box.wav : 午後（縁側で改造〜夕方の公園）用のオルゴール。ト長調・84BPM・16小節×2
-  M5_amb.wav : 余韻パート用のアンビエントピアノ。ヘ長調・8秒ごとの和音・まばらな旋律
+  PROJ=作品フォルダ python3 synth_music.py --box M2 --amb M5 [--amb-len 320]
+    → assets/music/M2_box.wav（オルゴール。ト長調・84BPM・16小節×2）
+    → assets/music/M5_amb.wav（アンビエントピアノ。ヘ長調・8秒ごとの和音・まばらな旋律）
+mix.py は、その区間の Lyria の曲（M2.mp3 など）がなければ <キー>_*.wav を使う。
 """
 import os, sys, wave
 import numpy as np
@@ -11,7 +13,7 @@ from sfx import SR, reverb, lp, hp, rng, place, norm_rms, fade
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # 作品フォルダ（scenes.json・assets・out・work がある所）。環境変数 PROJ で切り替え
-ROOT = os.environ.get("PROJ") or os.path.dirname(HERE)
+ROOT = os.environ.get("PROJ") or os.getcwd()
 NOTE = {"C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5, "F#": 6, "Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11}
 
 def hz(name):
@@ -134,10 +136,17 @@ def ambient(total=320.0, chord_len=8.0, seed=11):
     return norm_rms(fade(out, 2.0, 8.0), -26)
 
 if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser(); ap.add_argument("--box", help="オルゴールを使う区間のキー（例 M2）"); ap.add_argument("--amb", help="アンビエントピアノの区間のキー（例 M5）")
+    ap.add_argument("--amb-len", type=float, default=320.0, help="アンビエントの長さ（秒）")
+    a = ap.parse_args()
+    if not (a.box or a.amb): ap.error("--box か --amb を指定してください")
     os.makedirs(os.path.join(ROOT, "assets/music"), exist_ok=True)
-    m2 = music_box()
-    wr(os.path.join(ROOT, "assets/music/M2_box.wav"), m2)
-    print("M2_box", len(m2) / SR, "s")
-    m5 = ambient()
-    wr(os.path.join(ROOT, "assets/music/M5_amb.wav"), m5)
-    print("M5_amb", len(m5) / SR, "s")
+    if a.box:
+        m2 = music_box()
+        wr(os.path.join(ROOT, f"assets/music/{a.box}_box.wav"), m2)
+        print(f"{a.box}_box", len(m2) / SR, "s")
+    if a.amb:
+        m5 = ambient(total=a.amb_len)
+        wr(os.path.join(ROOT, f"assets/music/{a.amb}_amb.wav"), m5)
+        print(f"{a.amb}_amb", len(m5) / SR, "s")

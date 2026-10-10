@@ -1,0 +1,962 @@
+[
+ {
+  "searchEntryPoint": {
+   "renderedContent": "<style>\n.container {\n  align-items: center;\n  border-radius: 8px;\n  display: flex;\n  font-family: Google Sans, Roboto, sans-serif;\n  font-size: 14px;\n  line-height: 20px;\n  padding: 8px 12px;\n}\n.chip {\n  display: inline-block;\n  border: solid 1px;\n  border-radius: 16px;\n  min-width: 14px;\n  padding: 5px 16px;\n  text-align: center;\n  user-select: none;\n  margin: 0 8px;\n  -webkit-tap-highlight-color: transparent;\n}\n.carousel {\n  overflow: auto;\n  scrollbar-width: none;\n  white-space: nowrap;\n  margin-right: -12px;\n}\n.headline {\n  display: flex;\n  margin-right: 4px;\n}\n.gradient-container {\n  position: relative;\n}\n.gradient {\n  position: absolute;\n  transform: translate(3px, -9px);\n  height: 36px;\n  width: 9px;\n}\n@media (prefers-color-scheme: light) {\n  .container {\n    background-color: #fafafa;\n    box-shadow: 0 0 0 1px #0000000f;\n  }\n  .headline-label {\n    color: #1f1f1f;\n  }\n  .chip {\n    background-color: #ffffff;\n    border-color: #d2d2d2;\n    color: #5e5e5e;\n    text-decoration: none;\n  }\n  .chip:hover {\n    background-color: #f2f2f2;\n  }\n  .chip:focus {\n    background-color: #f2f2f2;\n  }\n  .chip:active {\n    background-color: #d8d8d8;\n    border-color: #b6b6b6;\n  }\n  .logo-dark {\n    display: none;\n  }\n  .gradient {\n    background: linear-gradient(90deg, #fafafa 15%, #fafafa00 100%);\n  }\n}\n@media (prefers-color-scheme: dark) {\n  .container {\n    background-color: #1f1f1f;\n    box-shadow: 0 0 0 1px #ffffff26;\n  }\n  .headline-label {\n    color: #fff;\n  }\n  .chip {\n    background-color: #2c2c2c;\n    border-color: #3c4043;\n    color: #fff;\n    text-decoration: none;\n  }\n  .chip:hover {\n    background-color: #353536;\n  }\n  .chip:focus {\n    background-color: #353536;\n  }\n  .chip:active {\n    background-color: #464849;\n    border-color: #53575b;\n  }\n  .logo-light {\n    display: none;\n  }\n  .gradient {\n    background: linear-gradient(90deg, #1f1f1f 15%, #1f1f1f00 100%);\n  }\n}\n</style>\n<div class=\"container\">\n  <div class=\"headline\">\n    <svg class=\"logo-light\" width=\"18\" height=\"18\" viewBox=\"9 9 35 35\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n      <path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M42.8622 27.0064C42.8622 25.7839 42.7525 24.6084 42.5487 23.4799H26.3109V30.1568H35.5897C35.1821 32.3041 33.9596 34.1222 32.1258 35.3448V39.6864H37.7213C40.9814 36.677 42.8622 32.2571 42.8622 27.0064V27.0064Z\" fill=\"#4285F4\"/>\n      <path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M26.3109 43.8555C30.9659 43.8555 34.8687 42.3195 37.7213 39.6863L32.1258 35.3447C30.5898 36.3792 28.6306 37.0061 26.3109 37.0061C21.8282 37.0061 18.0195 33.9811 16.6559 29.906H10.9194V34.3573C13.7563 39.9841 19.5712 43.8555 26.3109 43.8555V43.8555Z\" fill=\"#34A853\"/>\n      <path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M16.6559 29.8904C16.3111 28.8559 16.1074 27.7588 16.1074 26.6146C16.1074 25.4704 16.3111 24.3733 16.6559 23.3388V18.8875H10.9194C9.74388 21.2072 9.06992 23.8247 9.06992 26.6146C9.06992 29.4045 9.74388 32.022 10.9194 34.3417L15.3864 30.8621L16.6559 29.8904V29.8904Z\" fill=\"#FBBC05\"/>\n      <path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M26.3109 16.2386C28.85 16.2386 31.107 17.1164 32.9095 18.8091L37.8466 13.8719C34.853 11.082 30.9659 9.3736 26.3109 9.3736C19.5712 9.3736 13.7563 13.245 10.9194 18.8875L16.6559 23.3388C18.0195 19.2636 21.8282 16.2386 26.3109 16.2386V16.2386Z\" fill=\"#EA4335\"/>\n    </svg>\n    <svg class=\"logo-dark\" width=\"18\" height=\"18\" viewBox=\"0 0 48 48\" xmlns=\"http://www.w3.org/2000/svg\">\n      <circle cx=\"24\" cy=\"23\" fill=\"#FFF\" r=\"22\"/>\n      <path d=\"M33.76 34.26c2.75-2.56 4.49-6.37 4.49-11.26 0-.89-.08-1.84-.29-3H24.01v5.99h8.03c-.4 2.02-1.5 3.56-3.07 4.56v.75l3.91 2.97h.88z\" fill=\"#4285F4\"/>\n      <path d=\"M15.58 25.77A8.845 8.845 0 0 0 24 31.86c1.92 0 3.62-.46 4.97-1.31l4.79 3.71C31.14 36.7 27.65 38 24 38c-5.93 0-11.01-3.4-13.45-8.36l.17-1.01 4.06-2.85h.8z\" fill=\"#34A853\"/>\n      <path d=\"M15.59 20.21a8.864 8.864 0 0 0 0 5.58l-5.03 3.86c-.98-2-1.53-4.25-1.53-6.64 0-2.39.55-4.64 1.53-6.64l1-.22 3.81 2.98.22 1.08z\" fill=\"#FBBC05\"/>\n      <path d=\"M24 14.14c2.11 0 4.02.75 5.52 1.98l4.36-4.36C31.22 9.43 27.81 8 24 8c-5.93 0-11.01 3.4-13.45 8.36l5.03 3.85A8.86 8.86 0 0 1 24 14.14z\" fill=\"#EA4335\"/>\n    </svg>\n    <div class=\"gradient-container\"><div class=\"gradient\"></div></div>\n  </div>\n  <div class=\"carousel\">\n<a class=\"chip\" href=\"https://www.google.com/search?q=site:yutura.net+%22Unknown+World%22&client=app-vertex-grounding&safesearch=active\">site:yutura.net &quot;Unknown World&quot;</a>\n<a class=\"chip\" href=\"https://www.google.com/search?q=%22UnknownWorld%22+AI+%E8%98%87%E3%82%89%E3%81%9B%E3%81%9F&client=app-vertex-grounding&safesearch=active\">&quot;UnknownWorld&quot; AI 蘇らせた</a>\n<a class=\"chip\" href=\"https://www.google.com/search?q=%22UnknownWorld%22+%22%E6%98%AD%E5%92%8C%22+AI+youtube&client=app-vertex-grounding&safesearch=active\">&quot;UnknownWorld&quot; &quot;昭和&quot; AI youtube</a>\n<a class=\"chip\" href=\"https://www.google.com/search?q=%22Unknown+World%22+%E6%98%AD%E5%92%8C+AI+%E8%98%87%E3%82%89%E3%81%9B%E3%81%9F+youtube&client=app-vertex-grounding&safesearch=active\">&quot;Unknown World&quot; 昭和 AI 蘇らせた youtube</a>\n<a class=\"chip\" href=\"https://www.google.com/search?q=%22yutura.net%22+%22Unknown+World%22+%22AI%22&client=app-vertex-grounding&safesearch=active\">&quot;yutura.net&quot; &quot;Unknown World&quot; &quot;AI&quot;</a>\n<a class=\"chip\" href=\"https://www.google.com/search?q=%22Unknown+World%22+%22%E4%BA%BA%E6%B0%97%E5%8B%95%E7%94%BB%22+site:yutura.net&client=app-vertex-grounding&safesearch=active\">&quot;Unknown World&quot; &quot;人気動画&quot; site:yutura.net</a>\n  </div>\n</div>"
+  },
+  "groundingChunks": [
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFvujpRoLF5yy0yX2D1Z7hfEmYanmIx-dvxQv2Ru1G0Z1wGg6WzNzF7Y2v_PG3MmB2HpMKrj8RI1zn2id6bXHdafDRLfVdr3gtQk_GCT_2LxuUGDfKvboOFwt6ueQUdKywT",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGrOHf7RePPETmBfUkQzbqERYN8oPjUix6GwHB-NehS_eBQEXH02oCbLZ77-z17CPPbIyGuIXJ_ys8-YcTo9mKPiH05frBFrj-z83tQAZiTDXMZpx4P846qQIaow3aUbIZF",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHX3eIIqQHQSCRleT7qupwN6AsjmEb_2sPCRpCm1UnFjZBBV8dm_gJsc86iYoGRydrda91POf-SvA8HpTHhyWtSlFStnf86XtN1BD9D9iZOG17_xeSvUX9nCaTmEw2WUw==",
+     "title": "yutura.net"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGpmotcNKx8NFUPNpy_lQOL5M9E2YUyDcqoADpvKi4xpklb8Y-M2Bcl3bCKDTjkeB3nlD0o1yNKAJNvRURb6TUpMm5ShUc5592SZydmR6wNelAIAJdbtVTtJXHOYe9fw_AY",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFyMRmJrKhNGDl2R5e6g5EqIVYlzlhbzDQWVpLBg21wrx_IzXNtGWEZaIKgnTsUxxfhlvohVLJ2v2viZ8nkR5XXHvgJew3KtU7a7utfCp-GlTwjGCVVMYmCwlmSBTv00og1TCUYMAQqGXFGMmeGncc=",
+     "title": "yutura.net"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHVveUWbnN11ejJqQsxbn_S-dFWGPLJ_2vfC4HZhto2aN6PttYFUceZUf6EvDqIxIieqnSui2SKunCo-N6xxDcaA_M5BDeg791Cdr0FVduJ0nvhDWg3tvxGvq8POi8CPB1qn7Va4IVJG8J1GRc=",
+     "title": "yutura.net"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFzl9YVkCJx6ZLwYRfo3wtBqkd_FThLP9yswLSiiv2sVEmpyu_YPDRM4Kn2ZKhPs5zOFpMDZlD4qeZuubumnAWaW-LDIH_kPv6OK4QXMw-Zl_-1nyhuAsaTmPaZmg6nDKWHoWL6yjYYqUQt9A==",
+     "title": "yutura.net"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHVveUWbnN11ejJqQsxbn_S-dFWGPLJ_2vfC4HZhto2aN6PttYFUceZUf6EvDqIxIieqnSui2SKunCo-N6xxDcaA_M5BDeg791Cdr0FVduJ0nvhDWg3tvxGvq8POi8CPB1qn7Va4IVJG8J1GRc=",
+     "title": "yutura.net"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFszey2GtEgPZKbn2p1souIvqCPgzuT4uX3eV8GXKkQ4SqcCBskCilTPXiTsVDWN704kW4WTjgJio7zuaKP1Pgu21xhXFXd4EFoOtfnaxoKYsDqZ_DRaj7WezUY4ehV0PPO",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQH6BNNBqt-0l0xPbLFCHShRt8PVQfqEXzLwfHZvXUpvrftYHFWkqPfeNI4H0ybFpuKqXLyVBvspwcpDRaFg9v39cIYPqRug9CzoOe_QMpAiFb22datN97DrZdmQ1g7R4ZaPs1h66Ie7hYFwnYz7Aek=",
+     "title": "yutura.net"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQG87P_HhYDFpbd42G0E-YLNa7OUznrPmxap3lPf5lwmgZOhUb-QEeKWfsEYLoVygkIOHrqBf9_PXD5bTAjJvvQXvwGKh-ltdG6vaSSk2-DxJ-MLQyS05rUgVxJTQ8MZGzdXJuChrpdS4dkhROQyf-jhyxC2c_VsQkc7yg==",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHxnEpNujmcV2PO3EMiZhwnmR7WXQ52kXzdx_D-G_sCGHUDGF4duQLKV8pm1u0-gF-D-eb-f-fWcvoT2D8d2oJj1JHG7M2VUBbfiV5J-_am7M-k0p1BiFoQDyD-3ok3kyDw",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQErpz8CwWqb__0WRzpEpc0xA7cdOLrc4OM3OUl4a-y-L8aSriY1-OFzc3aBGUM5qNBIoZjK70YmAH-Dh_Qw5Uc7BI_ioWfnn7UCQrAhsc8jU79j-8y8q0nWKp34p0tls_f1",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGh8qFNlbDzrs_gpH6PTnsjDVnR-MpV0TJNoAccUeX_qTHMZ4fNsZeIZBpr7UeSO9U-235jn9Q7gj12QC_DAr7k3f6X6DSe50bCwTo63-tC31cd-OnyQoc6NVBHu-4AVOG1XA5D7kW-In7q",
+     "title": "yutura.net"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQF7ybP2-7Nhv9MJiEHKjRcqy5Oyvbg6gaVSi4O8DiSvSCbxRzcNRdBYFrAVrBP5D1PULV1OqcJihGwkbjDRqBdjU61dl5FFJINbg4PPOFtSUKsHFypGivGsbRRrpnFc0U_X",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHnu3lH_16mtl7bLDmwUofh__qmepNtXAv3CECu53bKUjksxtb90wdmzZgjWCGg00iHnCsgd7DZWQl4u3OhVrsw2T1D7DswYNObbxyCOq1v4tIvpN-Q7f1uv9gHjdQC0Q==",
+     "title": "yutura.net"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQH_Db2vf9yiH4M_Ujd4P7FqLBDEMs3FWLoUgDUHW8UYzmN6UL81BfWMJnsJh-gwQHPm2yaZKEv34VgP5Aes9lzp23W-Zlj4gslPOCCmEAqv4mRsdX_dvqCidVCwVgGrcZ494ehx2ZOXQ4dT36yP",
+     "title": "yutura.net"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQF8SIL5teCV0HbNNwZcNV9ExIjgTAZ9a0TRXpTkxnnzBpLPCbgIIObAJpKZjl4LGlJPUTZYn2xKgeWLnMF_34UtJYTypcX0Y-Jr0AcPq36Yaa94s3yMXFDGJY2hW5SunpJY",
+     "title": "youtube.com"
+    }
+   }
+  ],
+  "groundingSupports": [
+   {
+    "segment": {
+     "endIndex": 139,
+     "text": "YouTubeチャンネル「Unknown World」（チャンネルID：`UCGiEbq79rlnmyUiE0rdk3Sg` / ハンドル：`@Unknown_World_2xxx` ほか）"
+    },
+    "groundingChunkIndices": [
+     0,
+     1
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 322,
+     "endIndex": 390,
+     "text": "**タイトル**: 100年以上前の人々をAIで蘇らせてみた"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 322,
+     "endIndex": 423,
+     "text": "**タイトル**: 100年以上前の人々をAIで蘇らせてみた\n   - **動画ID**: `3Eke3c2nKic`"
+    },
+    "groundingChunkIndices": [
+     3
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 322,
+     "endIndex": 459,
+     "text": "**タイトル**: 100年以上前の人々をAIで蘇らせてみた\n   - **動画ID**: `3Eke3c2nKic`\n   - **公開日**: 2024年9月9日"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 322,
+     "endIndex": 530,
+     "text": "**タイトル**: 100年以上前の人々をAIで蘇らせてみた\n   - **動画ID**: `3Eke3c2nKic`\n   - **公開日**: 2024年9月9日\n   - **再生回数**: 約210万5,862回（ユーチュラ確認値）"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 322,
+     "endIndex": 706,
+     "text": "**タイトル**: 100年以上前の人々をAIで蘇らせてみた\n   - **動画ID**: `3Eke3c2nKic`\n   - **公開日**: 2024年9月9日\n   - **再生回数**: 約210万5,862回（ユーチュラ確認値）\n   - **長さ**: 不明\n   - **出典**: [ユーチュラ「Unknown Worldの最新動画」](https://yutura.net/channel/89311/video/) / [YouTube](https://youtu.be/3Eke3c2nKic)"
+    },
+    "groundingChunkIndices": [
+     2,
+     3
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 711,
+     "endIndex": 919,
+     "text": "**タイトル**: 千と千尋の神隠しの世界をAIで実写風にしてみた / AI Recreates the World of Spirited Away in Live-Action Style（英題：Spirited Away Reimagined in Live Action with AI）"
+    },
+    "groundingChunkIndices": [
+     4,
+     5
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 711,
+     "endIndex": 1017,
+     "text": "**タイトル**: 千と千尋の神隠しの世界をAIで実写風にしてみた / AI Recreates the World of Spirited Away in Live-Action Style（英題：Spirited Away Reimagined in Live Action with AI）\n   - **動画ID**: 不明（関連リンクより同系統動画: `tYxRPkmdElI`, `Kj1yM2rQoEc`）"
+    },
+    "groundingChunkIndices": [
+     4
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 711,
+     "endIndex": 1059,
+     "text": "**タイトル**: 千と千尋の神隠しの世界をAIで実写風にしてみた / AI Recreates the World of Spirited Away in Live-Action Style（英題：Spirited Away Reimagined in Live Action with AI）\n   - **動画ID**: 不明（関連リンクより同系統動画: `tYxRPkmdElI`, `Kj1yM2rQoEc`）\n   - **公開日**: 2024年2月7日前後"
+    },
+    "groundingChunkIndices": [
+     4,
+     5
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 711,
+     "endIndex": 1099,
+     "text": "**タイトル**: 千と千尋の神隠しの世界をAIで実写風にしてみた / AI Recreates the World of Spirited Away in Live-Action Style（英題：Spirited Away Reimagined in Live Action with AI）\n   - **動画ID**: 不明（関連リンクより同系統動画: `tYxRPkmdElI`, `Kj1yM2rQoEc`）\n   - **公開日**: 2024年2月7日前後\n   - **再生回数**: 約63万3,000回"
+    },
+    "groundingChunkIndices": [
+     6
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 711,
+     "endIndex": 1304,
+     "text": "**タイトル**: 千と千尋の神隠しの世界をAIで実写風にしてみた / AI Recreates the World of Spirited Away in Live-Action Style（英題：Spirited Away Reimagined in Live Action with AI）\n   - **動画ID**: 不明（関連リンクより同系統動画: `tYxRPkmdElI`, `Kj1yM2rQoEc`）\n   - **公開日**: 2024年2月7日前後\n   - **再生回数**: 約63万3,000回\n   - **長さ**: 不明\n   - **出典**: [ユーチュラ「Unknown Worldの人気動画」](https://yutura.net/channel/89311/video/805175/) / [YouTube](https://www.youtube.com/watch?v=5H7qWmsQxeg ほか)"
+    },
+    "groundingChunkIndices": [
+     6,
+     7
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1309,
+     "endIndex": 1386,
+     "text": "**タイトル**: 100年以上前の日本の偉人をAIで蘇らせてみた"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1309,
+     "endIndex": 1419,
+     "text": "**タイトル**: 100年以上前の日本の偉人をAIで蘇らせてみた\n   - **動画ID**: `HJ8nTYvmNeg`"
+    },
+    "groundingChunkIndices": [
+     8
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1309,
+     "endIndex": 1456,
+     "text": "**タイトル**: 100年以上前の日本の偉人をAIで蘇らせてみた\n   - **動画ID**: `HJ8nTYvmNeg`\n   - **公開日**: 2024年9月20日"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1309,
+     "endIndex": 1526,
+     "text": "**タイトル**: 100年以上前の日本の偉人をAIで蘇らせてみた\n   - **動画ID**: `HJ8nTYvmNeg`\n   - **公開日**: 2024年9月20日\n   - **再生回数**: 約44万5,167回（ユーチュラ確認値）"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1309,
+     "endIndex": 1702,
+     "text": "**タイトル**: 100年以上前の日本の偉人をAIで蘇らせてみた\n   - **動画ID**: `HJ8nTYvmNeg`\n   - **公開日**: 2024年9月20日\n   - **再生回数**: 約44万5,167回（ユーチュラ確認値）\n   - **長さ**: 不明\n   - **出典**: [ユーチュラ「Unknown Worldの最新動画」](https://yutura.net/channel/89311/video/) / [YouTube](https://youtu.be/HJ8nTYvmNeg)"
+    },
+    "groundingChunkIndices": [
+     2,
+     8
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1707,
+     "endIndex": 1776,
+     "text": "**タイトル**: Princess Mononoke Reimagined in Live Action with AI"
+    },
+    "groundingChunkIndices": [
+     9
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1707,
+     "endIndex": 1837,
+     "text": "**タイトル**: Princess Mononoke Reimagined in Live Action with AI\n   - **動画ID**: 不明\n   - **公開日**: 2024年2月頃"
+    },
+    "groundingChunkIndices": [
+     9
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1707,
+     "endIndex": 1877,
+     "text": "**タイトル**: Princess Mononoke Reimagined in Live Action with AI\n   - **動画ID**: 不明\n   - **公開日**: 2024年2月頃\n   - **再生回数**: 約40万6,000回"
+    },
+    "groundingChunkIndices": [
+     9
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1707,
+     "endIndex": 1904,
+     "text": "**タイトル**: Princess Mononoke Reimagined in Live Action with AI\n   - **動画ID**: 不明\n   - **公開日**: 2024年2月頃\n   - **再生回数**: 約40万6,000回\n   - **長さ**: 3分46秒"
+    },
+    "groundingChunkIndices": [
+     9
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1707,
+     "endIndex": 1957,
+     "text": "**タイトル**: Princess Mononoke Reimagined in Live Action with AI\n   - **動画ID**: 不明\n   - **公開日**: 2024年2月頃\n   - **再生回数**: 約40万6,000回\n   - **長さ**: 3分46秒\n   - **出典**: [YouTube](https://www.youtube.com/)"
+    },
+    "groundingChunkIndices": [
+     9
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1962,
+     "endIndex": 2117,
+     "text": "**タイトル**: 約90年前の昭和初期の日本をAIで蘇らせてみた（英題：AI Brings Early Showa-Era Japan Back to Life — 90 Years Ago）"
+    },
+    "groundingChunkIndices": [
+     0,
+     10
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1962,
+     "endIndex": 2150,
+     "text": "**タイトル**: 約90年前の昭和初期の日本をAIで蘇らせてみた（英題：AI Brings Early Showa-Era Japan Back to Life — 90 Years Ago）\n   - **動画ID**: `CK6GnJ0Yk4E`"
+    },
+    "groundingChunkIndices": [
+     11
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1962,
+     "endIndex": 2187,
+     "text": "**タイトル**: 約90年前の昭和初期の日本をAIで蘇らせてみた（英題：AI Brings Early Showa-Era Japan Back to Life — 90 Years Ago）\n   - **動画ID**: `CK6GnJ0Yk4E`\n   - **公開日**: 2024年3月18日"
+    },
+    "groundingChunkIndices": [
+     0
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1962,
+     "endIndex": 2227,
+     "text": "**タイトル**: 約90年前の昭和初期の日本をAIで蘇らせてみた（英題：AI Brings Early Showa-Era Japan Back to Life — 90 Years Ago）\n   - **動画ID**: `CK6GnJ0Yk4E`\n   - **公開日**: 2024年3月18日\n   - **再生回数**: 約33万2,000回"
+    },
+    "groundingChunkIndices": [
+     10
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1962,
+     "endIndex": 2254,
+     "text": "**タイトル**: 約90年前の昭和初期の日本をAIで蘇らせてみた（英題：AI Brings Early Showa-Era Japan Back to Life — 90 Years Ago）\n   - **動画ID**: `CK6GnJ0Yk4E`\n   - **公開日**: 2024年3月18日\n   - **再生回数**: 約33万2,000回\n   - **長さ**: 3分27秒"
+    },
+    "groundingChunkIndices": [
+     10
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1962,
+     "endIndex": 2325,
+     "text": "**タイトル**: 約90年前の昭和初期の日本をAIで蘇らせてみた（英題：AI Brings Early Showa-Era Japan Back to Life — 90 Years Ago）\n   - **動画ID**: `CK6GnJ0Yk4E`\n   - **公開日**: 2024年3月18日\n   - **再生回数**: 約33万2,000回\n   - **長さ**: 3分27秒\n   - **出典**: [YouTube (CK6GnJ0Yk4E)](https://youtu.be/CK6GnJ0Yk4E)"
+    },
+    "groundingChunkIndices": [
+     11
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2330,
+     "endIndex": 2517,
+     "text": "**タイトル**: 40年前の昭和の夏をAIで蘇らせた｜1986年、最後の夏休み（英題：AI Revives a Showa-Era Summer from 40 Years Ago | 1986, The Last Summer Vacation）"
+    },
+    "groundingChunkIndices": [
+     2,
+     12
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2330,
+     "endIndex": 2637,
+     "text": "**タイトル**: 40年前の昭和の夏をAIで蘇らせた｜1986年、最後の夏休み（英題：AI Revives a Showa-Era Summer from 40 Years Ago | 1986, The Last Summer Vacation）\n   - **動画ID**: 不明（概要欄内リンクURL等からの特定は不明）\n   - **公開日**: 2024年9月15日"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2330,
+     "endIndex": 2707,
+     "text": "**タイトル**: 40年前の昭和の夏をAIで蘇らせた｜1986年、最後の夏休み（英題：AI Revives a Showa-Era Summer from 40 Years Ago | 1986, The Last Summer Vacation）\n   - **動画ID**: 不明（概要欄内リンクURL等からの特定は不明）\n   - **公開日**: 2024年9月15日\n   - **再生回数**: 約22万7,535回（ユーチュラ確認値）"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2330,
+     "endIndex": 2879,
+     "text": "**タイトル**: 40年前の昭和の夏をAIで蘇らせた｜1986年、最後の夏休み（英題：AI Revives a Showa-Era Summer from 40 Years Ago | 1986, The Last Summer Vacation）\n   - **動画ID**: 不明（概要欄内リンクURL等からの特定は不明）\n   - **公開日**: 2024年9月15日\n   - **再生回数**: 約22万7,535回（ユーチュラ確認値）\n   - **長さ**: 不明\n   - **出典**: [ユーチュラ「Unknown Worldの最新動画」](https://yutura.net/channel/89311/video/) / [YouTube](https://www.youtube.com/)"
+    },
+    "groundingChunkIndices": [
+     2,
+     12
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2884,
+     "endIndex": 3030,
+     "text": "**タイトル**: 約500年前の戦国時代の日本をAIで蘇らせてみた（英題：I Recreated Sengoku-Era Japan 500 Years Ago with AI）"
+    },
+    "groundingChunkIndices": [
+     1,
+     13
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2884,
+     "endIndex": 3099,
+     "text": "**タイトル**: 約500年前の戦国時代の日本をAIで蘇らせてみた（英題：I Recreated Sengoku-Era Japan 500 Years Ago with AI）\n   - **動画ID**: 不明\n   - **公開日**: 2024年8月11日前後"
+    },
+    "groundingChunkIndices": [
+     13
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2884,
+     "endIndex": 3139,
+     "text": "**タイトル**: 約500年前の戦国時代の日本をAIで蘇らせてみた（英題：I Recreated Sengoku-Era Japan 500 Years Ago with AI）\n   - **動画ID**: 不明\n   - **公開日**: 2024年8月11日前後\n   - **再生回数**: 約17万3,000回"
+    },
+    "groundingChunkIndices": [
+     1
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2884,
+     "endIndex": 3166,
+     "text": "**タイトル**: 約500年前の戦国時代の日本をAIで蘇らせてみた（英題：I Recreated Sengoku-Era Japan 500 Years Ago with AI）\n   - **動画ID**: 不明\n   - **公開日**: 2024年8月11日前後\n   - **再生回数**: 約17万3,000回\n   - **長さ**: 4分18秒"
+    },
+    "groundingChunkIndices": [
+     1
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2884,
+     "endIndex": 3260,
+     "text": "**タイトル**: 約500年前の戦国時代の日本をAIで蘇らせてみた（英題：I Recreated Sengoku-Era Japan 500 Years Ago with AI）\n   - **動画ID**: 不明\n   - **公開日**: 2024年8月11日前後\n   - **再生回数**: 約17万3,000回\n   - **長さ**: 4分18秒\n   - **出典**: [ユーチュラ](https://yutura.net/) / [YouTube](https://www.youtube.com/)"
+    },
+    "groundingChunkIndices": [
+     1,
+     13
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 3307,
+     "endIndex": 3412,
+     "text": "1990年の日本をAIで再現（英題：Japan in 1990: From Showa to Heisei | AI-Recreated Nostalgia）"
+    },
+    "groundingChunkIndices": [
+     12,
+     14
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 3307,
+     "endIndex": 3445,
+     "text": "1990年の日本をAIで再現（英題：Japan in 1990: From Showa to Heisei | AI-Recreated Nostalgia）\n   - **動画ID**: `dQYrPlt52Uc`"
+    },
+    "groundingChunkIndices": [
+     12
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 3307,
+     "endIndex": 3480,
+     "text": "1990年の日本をAIで再現（英題：Japan in 1990: From Showa to Heisei | AI-Recreated Nostalgia）\n   - **動画ID**: `dQYrPlt52Uc`\n   - **公開日**: 2024年3月頃"
+    },
+    "groundingChunkIndices": [
+     14
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 3307,
+     "endIndex": 3519,
+     "text": "1990年の日本をAIで再現（英題：Japan in 1990: From Showa to Heisei | AI-Recreated Nostalgia）\n   - **動画ID**: `dQYrPlt52Uc`\n   - **公開日**: 2024年3月頃\n   - **再生回数**: 約7万2,000回"
+    },
+    "groundingChunkIndices": [
+     14
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 3307,
+     "endIndex": 3546,
+     "text": "1990年の日本をAIで再現（英題：Japan in 1990: From Showa to Heisei | AI-Recreated Nostalgia）\n   - **動画ID**: `dQYrPlt52Uc`\n   - **公開日**: 2024年3月頃\n   - **再生回数**: 約7万2,000回\n   - **長さ**: 4分45秒"
+    },
+    "groundingChunkIndices": [
+     14
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 3307,
+     "endIndex": 3617,
+     "text": "1990年の日本をAIで再現（英題：Japan in 1990: From Showa to Heisei | AI-Recreated Nostalgia）\n   - **動画ID**: `dQYrPlt52Uc`\n   - **公開日**: 2024年3月頃\n   - **再生回数**: 約7万2,000回\n   - **長さ**: 4分45秒\n   - **出典**: [YouTube (dQYrPlt52Uc)](https://youtu.be/dQYrPlt52Uc)"
+    },
+    "groundingChunkIndices": [
+     12
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 3622,
+     "endIndex": 3708,
+     "text": "**タイトル**: ロマンあふれる100年前の人々を、AIで蘇らせてみた"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 3622,
+     "endIndex": 3741,
+     "text": "**タイトル**: ロマンあふれる100年前の人々を、AIで蘇らせてみた\n   - **動画ID**: `w07RYg4qJKY`"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 3622,
+     "endIndex": 3778,
+     "text": "**タイトル**: ロマンあふれる100年前の人々を、AIで蘇らせてみた\n   - **動画ID**: `w07RYg4qJKY`\n   - **公開日**: 2024年10月2日"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 3622,
+     "endIndex": 3881,
+     "text": "**タイトル**: ロマンあふれる100年前の人々を、AIで蘇らせてみた\n   - **動画ID**: `w07RYg4qJKY`\n   - **公開日**: 2024年10月2日\n   - **再生回数**: 約2万4,890回（ユーチュラ確認値）〜約3万4,000回（YouTube上）"
+    },
+    "groundingChunkIndices": [
+     2,
+     1
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 3622,
+     "endIndex": 3908,
+     "text": "**タイトル**: ロマンあふれる100年前の人々を、AIで蘇らせてみた\n   - **動画ID**: `w07RYg4qJKY`\n   - **公開日**: 2024年10月2日\n   - **再生回数**: 約2万4,890回（ユーチュラ確認値）〜約3万4,000回（YouTube上）\n   - **長さ**: 3分10秒"
+    },
+    "groundingChunkIndices": [
+     1
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 3622,
+     "endIndex": 4108,
+     "text": "**タイトル**: ロマンあふれる100年前の人々を、AIで蘇らせてみた\n   - **動画ID**: `w07RYg4qJKY`\n   - **公開日**: 2024年10月2日\n   - **再生回数**: 約2万4,890回（ユーチュラ確認値）〜約3万4,000回（YouTube上）\n   - **長さ**: 3分10秒\n   - **出典**: [ユーチュラ「ロマンあふれる100年前の人々を、AIで蘇らせてみた」](https://yutura.net/channel/89311/video/1000858/) / [YouTube](https://youtu.be/w07RYg4qJKY)"
+    },
+    "groundingChunkIndices": [
+     3,
+     15
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4114,
+     "endIndex": 4185,
+     "text": "**タイトル**: 歴史上の偉人たちを、AIで蘇らせてみた"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4114,
+     "endIndex": 4250,
+     "text": "**タイトル**: 歴史上の偉人たちを、AIで蘇らせてみた\n    - **動画ID**: 不明\n    - **公開日**: 2024年9月26日"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4114,
+     "endIndex": 4320,
+     "text": "**タイトル**: 歴史上の偉人たちを、AIで蘇らせてみた\n    - **動画ID**: 不明\n    - **公開日**: 2024年9月26日\n    - **再生回数**: 約2万9,853回（ユーチュラ確認値）"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4114,
+     "endIndex": 4456,
+     "text": "**タイトル**: 歴史上の偉人たちを、AIで蘇らせてみた\n    - **動画ID**: 不明\n    - **公開日**: 2024年9月26日\n    - **再生回数**: 約2万9,853回（ユーチュラ確認値）\n    - **長さ**: 不明\n    - **出典**: [ユーチュラ「Unknown Worldの最新動画」](https://yutura.net/channel/89311/video/)"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4462,
+     "endIndex": 4644,
+     "text": "**タイトル**: 約200年前の江戸時代の日本を再現 | 浮世絵をAIで実写化してみた（英題：I Recreated Edo Japan from Ukiyo-e Art Using AI | 200 Years Ago）"
+    },
+    "groundingChunkIndices": [
+     1,
+     16
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4462,
+     "endIndex": 4709,
+     "text": "**タイトル**: 約200年前の江戸時代の日本を再現 | 浮世絵をAIで実写化してみた（英題：I Recreated Edo Japan from Ukiyo-e Art Using AI | 200 Years Ago）\n    - **動画ID**: 不明\n    - **公開日**: 2024年8月21日"
+    },
+    "groundingChunkIndices": [
+     1
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4462,
+     "endIndex": 4749,
+     "text": "**タイトル**: 約200年前の江戸時代の日本を再現 | 浮世絵をAIで実写化してみた（英題：I Recreated Edo Japan from Ukiyo-e Art Using AI | 200 Years Ago）\n    - **動画ID**: 不明\n    - **公開日**: 2024年8月21日\n    - **再生回数**: 約2万2,000回"
+    },
+    "groundingChunkIndices": [
+     1
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4462,
+     "endIndex": 4869,
+     "text": "**タイトル**: 約200年前の江戸時代の日本を再現 | 浮世絵をAIで実写化してみた（英題：I Recreated Edo Japan from Ukiyo-e Art Using AI | 200 Years Ago）\n    - **動画ID**: 不明\n    - **公開日**: 2024年8月21日\n    - **再生回数**: 約2万2,000回\n    - **長さ**: 不明\n    - **出典**: [ユーチュラ](https://yutura.net/) / [YouTube](https://www.youtube.com/)"
+    },
+    "groundingChunkIndices": [
+     1,
+     16
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4875,
+     "endIndex": 5035,
+     "text": "**タイトル**: 100年以上前の大正時代の日本をAIで蘇らせてみた（英題：AI Brings Taisho-Era Japan Back to Life — Over 100 Years Ago）"
+    },
+    "groundingChunkIndices": [
+     11
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4875,
+     "endIndex": 5069,
+     "text": "**タイトル**: 100年以上前の大正時代の日本をAIで蘇らせてみた（英題：AI Brings Taisho-Era Japan Back to Life — Over 100 Years Ago）\n    - **動画ID**: `gb9tCxVOYRM`"
+    },
+    "groundingChunkIndices": [
+     11
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4875,
+     "endIndex": 5107,
+     "text": "**タイトル**: 100年以上前の大正時代の日本をAIで蘇らせてみた（英題：AI Brings Taisho-Era Japan Back to Life — Over 100 Years Ago）\n    - **動画ID**: `gb9tCxVOYRM`\n    - **公開日**: 2024年3月13日"
+    },
+    "groundingChunkIndices": [
+     11
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4875,
+     "endIndex": 5235,
+     "text": "**タイトル**: 100年以上前の大正時代の日本をAIで蘇らせてみた（英題：AI Brings Taisho-Era Japan Back to Life — Over 100 Years Ago）\n    - **動画ID**: `gb9tCxVOYRM`\n    - **公開日**: 2024年3月13日\n    - **再生回数**: 不明\n    - **長さ**: 不明\n    - **出典**: [YouTube (gb9tCxVOYRM)](https://youtu.be/gb9tCxVOYRM)"
+    },
+    "groundingChunkIndices": [
+     11
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 5241,
+     "endIndex": 5392,
+     "text": "**タイトル**: 約150年前の明治時代の日本をAIで蘇らせてみた（英題：AI Brings Meiji-Era Japan Back to Life — 150 Years Ago）"
+    },
+    "groundingChunkIndices": [
+     0
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 5241,
+     "endIndex": 5426,
+     "text": "**タイトル**: 約150年前の明治時代の日本をAIで蘇らせてみた（英題：AI Brings Meiji-Era Japan Back to Life — 150 Years Ago）\n    - **動画ID**: `DKJdpKY9E4Q`"
+    },
+    "groundingChunkIndices": [
+     0
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 5241,
+     "endIndex": 5463,
+     "text": "**タイトル**: 約150年前の明治時代の日本をAIで蘇らせてみた（英題：AI Brings Meiji-Era Japan Back to Life — 150 Years Ago）\n    - **動画ID**: `DKJdpKY9E4Q`\n    - **公開日**: 2024年3月7日"
+    },
+    "groundingChunkIndices": [
+     17
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 5241,
+     "endIndex": 5591,
+     "text": "**タイトル**: 約150年前の明治時代の日本をAIで蘇らせてみた（英題：AI Brings Meiji-Era Japan Back to Life — 150 Years Ago）\n    - **動画ID**: `DKJdpKY9E4Q`\n    - **公開日**: 2024年3月7日\n    - **再生回数**: 不明\n    - **長さ**: 不明\n    - **出典**: [YouTube (DKJdpKY9E4Q)](https://youtu.be/DKJdpKY9E4Q)"
+    },
+    "groundingChunkIndices": [
+     0
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 5662,
+     "endIndex": 5716,
+     "text": "**100年以上前の人々をAIで蘇らせてみた**"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 5662,
+     "endIndex": 5755,
+     "text": "**100年以上前の人々をAIで蘇らせてみた**\n   - 再生回数: **約2,105,862回**"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 5662,
+     "endIndex": 5787,
+     "text": "**100年以上前の人々をAIで蘇らせてみた**\n   - 再生回数: **約2,105,862回**\n   - 公開日: 2024年9月9日"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 5662,
+     "endIndex": 5816,
+     "text": "**100年以上前の人々をAIで蘇らせてみた**\n   - 再生回数: **約2,105,862回**\n   - 公開日: 2024年9月9日\n   - 動画ID: `3Eke3c2nKic`"
+    },
+    "groundingChunkIndices": [
+     3
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 5820,
+     "endIndex": 5889,
+     "text": "**千と千尋の神隠しの世界をAIで実写風にしてみた**"
+    },
+    "groundingChunkIndices": [
+     5
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 5820,
+     "endIndex": 5926,
+     "text": "**千と千尋の神隠しの世界をAIで実写風にしてみた**\n   - 再生回数: **約633,000回**"
+    },
+    "groundingChunkIndices": [
+     6
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 5820,
+     "endIndex": 5958,
+     "text": "**千と千尋の神隠しの世界をAIで実写風にしてみた**\n   - 再生回数: **約633,000回**\n   - 公開日: 2024年2月7日"
+    },
+    "groundingChunkIndices": [
+     5
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 5984,
+     "endIndex": 6047,
+     "text": "**100年以上前の日本の偉人をAIで蘇らせてみた**"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 5984,
+     "endIndex": 6084,
+     "text": "**100年以上前の日本の偉人をAIで蘇らせてみた**\n   - 再生回数: **約445,167回**"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 5984,
+     "endIndex": 6117,
+     "text": "**100年以上前の日本の偉人をAIで蘇らせてみた**\n   - 再生回数: **約445,167回**\n   - 公開日: 2024年9月20日"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 5984,
+     "endIndex": 6146,
+     "text": "**100年以上前の日本の偉人をAIで蘇らせてみた**\n   - 再生回数: **約445,167回**\n   - 公開日: 2024年9月20日\n   - 動画ID: `HJ8nTYvmNeg`"
+    },
+    "groundingChunkIndices": [
+     8
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 6150,
+     "endIndex": 6205,
+     "text": "**Princess Mononoke Reimagined in Live Action with AI**"
+    },
+    "groundingChunkIndices": [
+     9
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 6150,
+     "endIndex": 6242,
+     "text": "**Princess Mononoke Reimagined in Live Action with AI**\n   - 再生回数: **約406,000回**"
+    },
+    "groundingChunkIndices": [
+     9
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 6150,
+     "endIndex": 6273,
+     "text": "**Princess Mononoke Reimagined in Live Action with AI**\n   - 再生回数: **約406,000回**\n   - 公開日: 2024年2月頃"
+    },
+    "groundingChunkIndices": [
+     9
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 6299,
+     "endIndex": 6364,
+     "text": "**約90年前の昭和初期の日本をAIで蘇らせてみた**"
+    },
+    "groundingChunkIndices": [
+     10
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 6299,
+     "endIndex": 6401,
+     "text": "**約90年前の昭和初期の日本をAIで蘇らせてみた**\n   - 再生回数: **約332,000回**"
+    },
+    "groundingChunkIndices": [
+     10
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 6299,
+     "endIndex": 6434,
+     "text": "**約90年前の昭和初期の日本をAIで蘇らせてみた**\n   - 再生回数: **約332,000回**\n   - 公開日: 2024年3月18日"
+    },
+    "groundingChunkIndices": [
+     0
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 6299,
+     "endIndex": 6463,
+     "text": "**約90年前の昭和初期の日本をAIで蘇らせてみた**\n   - 再生回数: **約332,000回**\n   - 公開日: 2024年3月18日\n   - 動画ID: `CK6GnJ0Yk4E`"
+    },
+    "groundingChunkIndices": [
+     11
+    ]
+   }
+  ],
+  "webSearchQueries": [
+   "site:yutura.net \"Unknown World\"",
+   "\"UnknownWorld\" AI 蘇らせた",
+   "\"UnknownWorld\" \"昭和\" AI youtube",
+   "\"Unknown World\" 昭和 AI 蘇らせた youtube",
+   "\"yutura.net\" \"Unknown World\" \"AI\"",
+   "\"Unknown World\" \"人気動画\" site:yutura.net"
+  ]
+ }
+]

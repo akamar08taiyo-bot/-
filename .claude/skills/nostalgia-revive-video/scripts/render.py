@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """映像を1コマずつ描いて ffmpeg に流す。
 
-  python3 pipeline/render.py --stills          # 各カットの中間コマを work/stills/ に保存（確認用）
-  python3 pipeline/render.py --frames 0 900    # 指定範囲だけ（テスト）
-  python3 pipeline/render.py --workers 4       # 全編 → work/video.mp4
+  PROJ=作品フォルダ python3 render.py --stills [--only S01 S02]   # 各カットの中間コマを work/stills/ に（確認用）
+  PROJ=作品フォルダ python3 render.py --at P02:1.2 P02:4.0 S12:7   # 指定カットの指定秒を一覧に → work/test_frames.jpg
+  PROJ=作品フォルダ python3 render.py --frames 0 900               # 指定範囲だけ動画に（テスト）
+  PROJ=作品フォルダ python3 render.py --workers 4                  # 全編 → work/video.mp4（細かく分けて並列）
 
 時刻はすべて scenes.json の行（カット）基準。乱数はシード固定、時計・CSSアニメは使わない。
 """
@@ -12,20 +13,27 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-# 作品フォルダ（scenes.json・assets・out・work がある所）。環境変数 PROJ で切り替え
-ROOT = os.environ.get("PROJ") or os.path.dirname(HERE)
+# 作品フォルダ（scenes.json・assets・out・work がある所）。環境変数 PROJ（なければ今のフォルダ）
+ROOT = os.environ.get("PROJ") or os.getcwd()
 D = json.load(open(os.path.join(ROOT, "scenes.json"), encoding="utf-8"))
-FIX = json.load(open(os.path.join(ROOT, "fixes.json"), encoding="utf-8"))
-LCD = json.load(open(os.path.join(ROOT, "assets/overlay/lcd.json"), encoding="utf-8"))
+def _load(rel):
+    p = os.path.join(ROOT, rel)
+    return json.load(open(p, encoding="utf-8")) if os.path.exists(p) else {}
+FIX = _load("fixes.json")                 # 画像の修正（ぼかし・切り取り・日付の描き込み）
+LCD = _load("assets/overlay/lcd.json")    # 小さな画面の位置（detect_lcd.py）
 FPS = D["fps"]; OW, OH = D["size"]
 SC = D["scenes"]
 TOTAL = D["total"]
 NFR = int(round(TOTAL * FPS))
-META = dict(title="電池の夏", subtitle="1997", end_question="あなたの1997年の夏は、どんな夏でしたか。",
-            afterglow_title="あの夏の音", afterglow_sub="環境音とピアノだけの、ゆっくりした時間")
+U = OW / 1920.0   # 文字・粒・雨などの大きさは 1920×1080 基準で書き、この倍率で合わせる
+META = dict(title="", subtitle="", end_question="", afterglow_title="", afterglow_sub="", present_era="2026", past_era="1997")
 META.update(D.get("meta", {}))
+PRESENT = str(META["present_era"])   # この era のカットは「現在」の色（少し冷たく落ち着いた色）
 FONT_TITLE = os.path.join(ROOT, "assets/fonts/ShipporiMincho_500Medium.ttf")
 FONT_BODY = os.path.join(ROOT, "assets/fonts/ShipporiMincho_400Regular.ttf")
+for _f in (FONT_TITLE, FONT_BODY):
+    if not os.path.exists(_f):
+        sys.exit(f"フォントがありません: {_f}\n  bash scripts/setup_fonts.sh {os.path.join(ROOT, 'assets/fonts')} を先に実行してください")
 
 def ease(p):
     p = min(1.0, max(0.0, p))
@@ -37,7 +45,8 @@ def smooth(a, b, x):
     t = (x - a) / (b - a)
     return t * t * (3 - 2 * t)
 
-# ───────── ドット絵（オリジナルの電子ペット「ぴこ」） ─────────
+# ───────── ドット絵（オリジナルの電子ペット「ぴこ」。16×16、#=点） ─────────
+# 新しい絵は SPR に16行の文字列で足し、ANIM に（秒, 絵の名前）の並びを足す。カットの overlay にその名前を書く。
 SPR = {
  "idle": ["................", "................", ".....######.....", "....#......#....", "...#........#...", "..#..##..##..#..",
           "..#..##..##..#..", "..#..........#..", "..#...#..#...#..", "..#....##....#..", "...#........#...", "....########....",
@@ -72,7 +81,6 @@ ANIM = {
     "pet_ghost": [(0.0, "ghost1"), (0.7, "ghost2"), (1.4, "ghost1"), (2.1, "ghost2"), (2.8, "ghost1"), (3.5, "ghost2"), (4.2, "ghost1"), (4.9, "ghost2"), (5.6, "ghost1"), (6.3, "ghost2"), (7.0, "ghost1"), (7.7, "ghost2"), (8.4, "ghost1")],
     "pet_egg":   [(0.0, None), (2.2, "egg1"), (3.2, "egg2"), (3.7, "egg1"), (4.2, "egg3"), (4.7, "egg1"), (5.7, "egg2"), (6.2, "egg1"), (6.7, "egg3"), (7.2, "egg1")],
 }
-LCD_ANGLE = {"S03": 0.0, "E03": -13.0, "S28": -10.0}  # PILの回転（＋で反時計回り）。目視で決めた液晶の傾き
 
 def sprite_img(name, px, alpha=235):
     rows = SPR[name]
@@ -112,7 +120,7 @@ def apply_lcd(base, sid, kind, t):
     px = max(2, int(side / 16))
     spr = sprite_img(name, px)
     # 液晶の地色に合わせて少しだけ暗く
-    spr = spr.rotate(info.get("rot", LCD_ANGLE.get(sid, 0.0)), resample=Image.BICUBIC, expand=True)
+    spr = spr.rotate(info.get("rot", 0.0), resample=Image.BICUBIC, expand=True)   # ＋で反時計回り
     bob = 0
     out = base.copy()
     out.paste(spr, (int(cx - spr.width / 2), int(cy - spr.height / 2 + bob)), spr)
@@ -162,25 +170,12 @@ def datestamp(text="'97 8 3", scale=1.0):
     out.alpha_composite(glow); out.alpha_composite(core)
     return out
 
-def prepare_P04(img):
-    """写真の右下の白い四角を、左どなりの床の色をのばして埋めてから日付を入れる"""
+def draw_stamp(img, st):
+    """画像の中の写真（手に持ったプリントなど）に日付を描き込む。fixes.json の "stamp"：
+    {"text": "'97 8 3", "x": 0.77, "y": 0.81, "rot": 4.2, "scale": 1.25}（x,y は日付の中心、画像に対する割合）"""
     W, H = img.size
-    x0, y0, x1, y1 = int(0.668 * W), int(0.742 * H), int(0.858 * W), int(0.878 * H)
-    arr = np.asarray(img.convert("RGB")).astype(np.float32)
-    reg = arr[y0:y1, x0:x1].copy()
-    left = arr[y0:y1, x0 - 24:x0 - 4].mean(axis=1)  # 行ごとの左側の色
-    k = np.hanning(41); k /= k.sum()
-    left = np.stack([np.convolve(np.pad(left[:, c], 20, mode="edge"), k, mode="valid") for c in range(3)], axis=1)
-    fill = np.repeat(left[:, None, :], x1 - x0, axis=1)
-    fade = np.linspace(0, 1, x1 - x0)[None, :, None]
-    fill = fill * (1 - 0.18 * fade) + 6 * np.random.default_rng(3).normal(0, 1, fill.shape)
-    whiteness = np.clip((reg.min(axis=2) - 175) / 45.0, 0, 1)[..., None]
-    wm = np.asarray(Image.fromarray((whiteness[..., 0] * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(4))).astype(np.float32)[..., None] / 255
-    out = reg * (1 - wm) + fill * wm
-    arr[y0:y1, x0:x1] = out
-    img = Image.fromarray(arr.clip(0, 255).astype(np.uint8)).convert("RGBA")
-    st = datestamp(scale=1.25).rotate(4.2, resample=Image.BICUBIC, expand=True)
-    img.alpha_composite(st, (int(0.772 * W - st.width / 2), int(0.812 * H - st.height / 2)))
+    im = datestamp(st.get("text", "'97 8 3"), scale=st.get("scale", 1.0) * W / 2752).rotate(st.get("rot", 0.0), resample=Image.BICUBIC, expand=True)
+    img.alpha_composite(im, (int(st.get("x", 0.8) * W - im.width / 2), int(st.get("y", 0.85) * H - im.height / 2)))
     return img
 
 # ───────── 画像の読み込みと修正 ─────────
@@ -201,8 +196,8 @@ def load_scene_image(sid, raw=False):
         ImageDraw.Draw(m).rectangle([6, 6, reg.size[0] - 6, reg.size[1] - 6], fill=255)
         m = m.filter(ImageFilter.GaussianBlur(5))
         img.paste(bl, box[:2], m)
-    if sid == "P04":
-        img = prepare_P04(img)
+    if fx.get("stamp"):
+        img = draw_stamp(img, fx["stamp"])
     if raw:
         _cache[key] = img
         return img
@@ -212,7 +207,7 @@ def load_scene_image(sid, raw=False):
     rgb = img.convert("RGB")
     if f < 0.98:
         rgb = rgb.resize((int(W * f), int(H * f)), Image.LANCZOS)
-    era = next((sc_["era"] for sc_ in SC if sc_["id"] == sid), "1997")
+    era = next((sc_["era"] for sc_ in SC if sc_["id"] == sid), META["past_era"])
     arr = np.asarray(rgb).astype(np.float32) / 255
     arr = grade(arr, era)
     arr = bloom_src(arr)
@@ -265,17 +260,17 @@ def sprite_dot(r):
     y, x = np.mgrid[-s:s + 1, -s:s + 1]
     return np.exp(-(x * x + y * y) / (2 * r * r)).astype(np.float32)
 
-DOTS = [sprite_dot(r) for r in (1.2, 1.8, 2.6, 3.6)]
+DOTS = [sprite_dot(max(0.6, r * U)) for r in (1.2, 1.8, 2.6, 3.6)]
 
 def fx_dust(frame, t, seed, warm=(1.0, 0.95, 0.82), n=46, strength=0.55):
     r = np.random.default_rng(seed)
     xs = r.uniform(0, OW, n); ys = r.uniform(0, OH, n)
-    vx = r.uniform(-6, 10, n); vy = r.uniform(-14, -3, n)
+    vx = r.uniform(-6, 10, n) * U; vy = r.uniform(-14, -3, n) * U
     ph = r.uniform(0, 6.28, n); sz = r.integers(0, len(DOTS), n); br = r.uniform(0.25, 1.0, n)
     col = np.array(warm, np.float32) * strength
     for i in range(n):
-        x = (xs[i] + vx[i] * t + 18 * math.sin(t * 0.4 + ph[i])) % OW
-        y = (ys[i] + vy[i] * t + 10 * math.sin(t * 0.3 + ph[i] * 2)) % OH
+        x = (xs[i] + vx[i] * t + 18 * U * math.sin(t * 0.4 + ph[i])) % OW
+        y = (ys[i] + vy[i] * t + 10 * U * math.sin(t * 0.3 + ph[i] * 2)) % OH
         tw = 0.55 + 0.45 * math.sin(t * 1.3 + ph[i] * 3)
         spr = DOTS[sz[i]]; k = spr.shape[0] // 2
         xi, yi = int(x), int(y)
@@ -321,7 +316,7 @@ def rain_tex(seed):
     r = np.random.default_rng(seed)
     im = Image.new("L", (OW, OH * 2), 0); d = ImageDraw.Draw(im)
     for i in range(1400):
-        x = r.uniform(0, OW); y = r.uniform(0, OH * 2); L = r.uniform(25, 70); a = int(r.uniform(40, 140))
+        x = r.uniform(0, OW); y = r.uniform(0, OH * 2); L = r.uniform(25, 70) * U; a = int(r.uniform(40, 140))
         d.line([(x, y), (x - L * 0.12, y + L)], fill=a, width=1)
     im = im.filter(ImageFilter.GaussianBlur(0.8))
     _RAIN[seed] = np.asarray(im).astype(np.float32) / 255
@@ -331,7 +326,7 @@ def fx_rain(frame, t, seed):
     out = frame
     for k, (sp, al) in enumerate(((1900, 0.22), (1250, 0.14))):
         tex = rain_tex(seed + k)
-        off = int(t * sp) % OH
+        off = int(t * sp * U) % OH
         layer = tex[OH - off:2 * OH - off] if off > 0 else tex[OH:2 * OH]
         if layer.shape[0] != OH: layer = tex[:OH]
         tmp = 0.85 - out
@@ -360,13 +355,13 @@ GRAIN = [np.random.default_rng(100 + i).normal(0, 1, (OH // 2, OW // 2)).astype(
 GRAIN_FULL = [(np.repeat(np.repeat(g, 2, axis=0), 2, axis=1)[..., None] * 0.012).astype(np.float32) for g in GRAIN]
 
 def grade(frame, era):
-    if era == "2026":
+    if str(era) == PRESENT:
         # 現在：少し冷たく、落ち着いた色
         lum = frame.mean(axis=2, keepdims=True)
         frame = lum + (frame - lum) * 0.86
         frame = frame * np.array([0.98, 1.0, 1.03], np.float32)
     else:
-        # 1997年：ほんのり暖かく、黒を少し持ち上げる
+        # 過去：ほんのり暖かく、黒を少し持ち上げる
         frame = frame * np.array([1.03, 1.0, 0.95], np.float32)
     return 0.035 + frame * 0.95
 
@@ -398,6 +393,7 @@ def text_layer(lines, alpha):
     sh = Image.new("RGBA", (OW, OH), (0, 0, 0, 0))
     d = ImageDraw.Draw(im); ds = ImageDraw.Draw(sh)
     for (txt, size, y, fontp, sp, a) in lines:
+        size = max(8, int(round(size * U))); sp = sp * U
         f = ImageFont.truetype(fontp, size)
         widths = [f.getbbox(ch)[2] - f.getbbox(ch)[0] if ch != " " else size * 0.35 for ch in txt]
         tw = sum(widths) + sp * (len(txt) - 1)
@@ -405,9 +401,9 @@ def text_layer(lines, alpha):
         for ch, w in zip(txt, widths):
             bb = f.getbbox(ch)
             d.text((x - bb[0], y * OH - size * 0.55), ch, font=f, fill=(255, 252, 244, int(255 * a)))
-            ds.text((x - bb[0], y * OH - size * 0.55 + 2), ch, font=f, fill=(20, 18, 14, int(150 * a)))
+            ds.text((x - bb[0], y * OH - size * 0.55 + 2 * U), ch, font=f, fill=(20, 18, 14, int(150 * a)))
             x += w + sp
-    sh = sh.filter(ImageFilter.GaussianBlur(5))
+    sh = sh.filter(ImageFilter.GaussianBlur(5 * U))
     out = Image.new("RGBA", (OW, OH), (0, 0, 0, 0))
     out.alpha_composite(sh); out.alpha_composite(im)
     arr = np.asarray(out).astype(np.float32) / 255
@@ -451,11 +447,11 @@ def specks(seed):
     r = np.random.default_rng(seed)
     im = Image.new("L", (OW, OH), 0); d = ImageDraw.Draw(im)
     for _ in range(140):
-        x, y = r.uniform(0, OW), r.uniform(0, OH); rr = r.uniform(0.6, 2.2)
+        x, y = r.uniform(0, OW), r.uniform(0, OH); rr = r.uniform(0.6, 2.2) * U
         d.ellipse([x - rr, y - rr, x + rr, y + rr], fill=int(r.uniform(60, 200)))
     for _ in range(6):
-        x = r.uniform(0, OW); y0 = r.uniform(0, OH * 0.5); L = r.uniform(80, 400)
-        d.line([(x, y0), (x + r.uniform(-20, 20), y0 + L)], fill=int(r.uniform(40, 110)), width=1)
+        x = r.uniform(0, OW); y0 = r.uniform(0, OH * 0.5); L = r.uniform(80, 400) * U
+        d.line([(x, y0), (x + r.uniform(-20, 20) * U, y0 + L)], fill=int(r.uniform(40, 110)), width=1)
     _SPECK[seed] = np.asarray(im.filter(ImageFilter.GaussianBlur(0.6))).astype(np.float32)[..., None] / 255
     return _SPECK[seed]
 
@@ -472,7 +468,7 @@ def print_look(frame, seed):
 _STAMP = {}
 def stamp_rgba(text):
     if text not in _STAMP:
-        st = datestamp(text, scale=1.05)
+        st = datestamp(text, scale=1.05 * U)
         _STAMP[text] = st
     return _STAMP[text]
 
@@ -505,9 +501,9 @@ def reveal_frame(vivid, s, t, seed):
     wa = np.asarray(warped).astype(np.float32) / 255
     # 背景：暗い木の机のような色＋やわらかい影
     bg = np.empty((OH, OW, 3), np.float32); bg[:] = np.array([0.16, 0.12, 0.09], np.float32)
-    sh = Image.fromarray((wa[..., 3] * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(14))
+    sh = Image.fromarray((wa[..., 3] * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(14 * U))
     sha = np.asarray(sh).astype(np.float32)[..., None] / 255
-    bg = bg * (1 - 0.55 * np.roll(np.roll(sha, 10, 0), 8, 1))
+    bg = bg * (1 - 0.55 * np.roll(np.roll(sha, int(10 * U), 0), int(8 * U), 1))
     out = bg * (1 - wa[..., 3:4]) + wa[..., :3] * wa[..., 3:4]
     return out
 
@@ -522,11 +518,11 @@ def draw_caption(frame, s, t):
     if key not in _TXT:
         im = Image.new("RGBA", (OW, OH), (0, 0, 0, 0)); shd = Image.new("RGBA", (OW, OH), (0, 0, 0, 0))
         d = ImageDraw.Draw(im); ds = ImageDraw.Draw(shd)
-        fj = ImageFont.truetype(FONT_BODY, 34); fe = ImageFont.truetype(FONT_BODY, 22)
+        fj = ImageFont.truetype(FONT_BODY, max(8, int(34 * U))); fe = ImageFont.truetype(FONT_BODY, max(8, int(22 * U)))
         x, y = int(OW * 0.055), int(OH * 0.84)
-        for (txt, f, yy) in ((cap[0], fj, y), (cap[1], fe, y + 48)):
-            ds.text((x + 2, yy + 2), txt, font=f, fill=(0, 0, 0, 170)); d.text((x, yy), txt, font=f, fill=(255, 250, 240, 235))
-        shd = shd.filter(ImageFilter.GaussianBlur(4))
+        for (txt, f, yy) in ((cap[0], fj, y), (cap[1], fe, y + int(48 * U))):
+            ds.text((x + 2 * U, yy + 2 * U), txt, font=f, fill=(0, 0, 0, 170)); d.text((x, yy), txt, font=f, fill=(255, 250, 240, 235))
+        shd = shd.filter(ImageFilter.GaussianBlur(4 * U))
         o = Image.new("RGBA", (OW, OH), (0, 0, 0, 0)); o.alpha_composite(shd); o.alpha_composite(im)
         _TXT[key] = np.asarray(o).astype(np.float32) / 255
     return over(frame, _TXT[key], a)
@@ -608,15 +604,24 @@ def blur_regions(arr, blurs, src_w=2752):
 # ───────── 1カットの描画 ─────────
 _BG = {}
 def card_background(s):
-    """END と A00 は前後のカットをぼかした背景"""
+    """画像のないカット（エンドカード・余韻の題字など）は、近くのカットをぼかした背景。
+    bg に画像のカットIDを書けばそれを使う。なければ end は直前、それ以外は直後の画像つきカット"""
     key = s["id"]
     if key in _BG: return _BG[key]
-    src = "E05" if key == "END" else "A01"
+    i = next(k for k, x in enumerate(SC) if x["id"] == key)
+    src = s.get("bg")
+    if not src:
+        order = list(range(i - 1, -1, -1)) + list(range(i + 1, len(SC))) if s.get("text") == "end" else list(range(i + 1, len(SC))) + list(range(i - 1, -1, -1))
+        k = next((k for k in order if SC[k]["prompt"]), None)
+        if k is None:
+            _BG[key] = np.zeros((OH, OW, 3), np.float32); return _BG[key]
+        src = SC[k].get("img") or SC[k]["id"]
     img = load_scene_image(src)
     fr = camera_frame(img, src, "none", 1.0)
     fr = fr.filter(ImageFilter.GaussianBlur(18))
     arr = np.asarray(fr).astype(np.float32) / 255
-    arr = arr * (0.72 if key == "A00" else 0.82) + (0.06 if key == "A00" else 0.12)
+    dark = s.get("text") == "afterglow"
+    arr = arr * (0.72 if dark else 0.82) + (0.06 if dark else 0.12)
     _BG[key] = arr
     return arr
 
@@ -639,7 +644,7 @@ def render_scene(i, t):
         frame = np.asarray(fr).astype(np.float32) / 255
     seed = 1000 + i * 17
     for f in s["fx"]:
-        if f == "dust": frame = fx_dust(frame, t, seed, warm=(0.85, 0.9, 1.0) if s["era"] == "2026" else (1.0, 0.95, 0.82))
+        if f == "dust": frame = fx_dust(frame, t, seed, warm=(0.85, 0.9, 1.0) if str(s["era"]) == PRESENT else (1.0, 0.95, 0.82))
         elif f == "rays": frame = fx_rays(frame, t, seed)
         elif f == "rain": frame = fx_rain(frame, t, seed)
         elif f == "flicker": frame = fx_flicker(frame, t, seed)
@@ -666,8 +671,8 @@ def render_frame(fi):
     if i > 0 and tl < xf:
         prev = render_scene(i - 1, T - SC[i - 1]["start"])
         a = ease(tl / xf)
-        # 白に抜ける転換：プロローグ→1997年
-        if s.get("transition") == "white" or (s["id"] == "S01" and "meta" not in D):
+        # 白に抜ける転換（現在→過去など）：カットに transition="white"
+        if s.get("transition") == "white":
             wpk = math.sin(math.pi * min(1, tl / xf)) * 0.55
             mix = prev * (1 - a) + cur * a
             frame = mix + (1 - mix) * wpk
@@ -695,15 +700,40 @@ def encode(f0, f1, out):
             print(f"[{os.getpid()}] {fi}/{f1}", flush=True)
     p.stdin.close(); p.wait()
 
+def test_sheet(picks, out):
+    """picks: ["P02:1.2", "S12:7", ...]（カットID:カット内の秒）→ 3列の一覧画像"""
+    sc = {x["id"]: x for x in SC}
+    font = ImageFont.truetype(FONT_BODY, 22)
+    W, H = 640, 360
+    rows = (len(picks) + 2) // 3
+    sheet = Image.new("RGB", (W * 3 + 20, (H + 8) * rows), (0, 0, 0))
+    for k, pk in enumerate(picks):
+        sid, t = pk.split(":") if ":" in pk else (pk, None)
+        s = sc[sid]
+        t = float(t) if t is not None else s["dur"] * 0.55
+        fr = render_frame(int((s["start"] + t) * FPS))
+        im = Image.fromarray((fr * 255).astype(np.uint8)).resize((W, H), Image.LANCZOS)
+        x = (k % 3) * (W + 10); y = (k // 3) * (H + 8)
+        sheet.paste(im, (x, y)); ImageDraw.Draw(sheet).text((x + 6, y + 4), f"{sid} t={t:g}", fill=(255, 255, 0), font=font)
+        print(sid, t, flush=True)
+    sheet.save(out, quality=85)
+    print(out)
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--stills", action="store_true")
+    ap.add_argument("--at", nargs="+", help="カットID:秒 を一覧画像に（例 P02:1.2 P02:4 S12:7）")
     ap.add_argument("--frames", nargs=2, type=int)
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--chunks", type=int, help="分割数（既定は workers×3。重い区間があっても全員が最後まで働くように細かく分ける）")
     ap.add_argument("--chunk", type=int, help="（内部用）担当チャンク番号")
     ap.add_argument("--only", nargs="*", help="--stills で特定カットだけ")
     a = ap.parse_args()
     work = os.path.join(ROOT, "work")
+    os.makedirs(work, exist_ok=True)
+    if a.at:
+        test_sheet(a.at, os.path.join(work, "test_frames.jpg"))
+        return
     if a.stills:
         os.makedirs(os.path.join(work, "stills"), exist_ok=True)
         for i, s in enumerate(SC):
@@ -712,6 +742,7 @@ def main():
             if s.get("text") == "title": T = s["start"] + 4.5
             if s.get("text") == "end": T = s["start"] + 5.0
             if s.get("text") == "afterglow": T = s["start"] + 3.0
+            if s.get("reveal"): T = s["start"] + min(s["dur"] - 0.2, s["reveal"].get("hold", 2.4) + s["reveal"].get("trans", 2.0) + 1.5)
             if s.get("overlay") == "pet_egg": T = s["start"] + 4.4
             if s.get("overlay") == "pet_eat": T = s["start"] + 2.2
             fi = int(T * FPS)
@@ -721,16 +752,20 @@ def main():
     if a.frames:
         encode(a.frames[0], a.frames[1], os.path.join(work, f"test_{a.frames[0]}_{a.frames[1]}.mp4"))
         return
+    n = a.chunks or a.workers * 3
+    bounds = [round(NFR * k / n) for k in range(n + 1)]
     if a.chunk is not None:
-        n = a.workers
-        bounds = [round(NFR * k / n) for k in range(n + 1)]
-        encode(bounds[a.chunk], bounds[a.chunk + 1], os.path.join(work, f"part_{a.chunk}.mp4"))
+        encode(bounds[a.chunk], bounds[a.chunk + 1], os.path.join(work, f"part_{a.chunk:03d}.mp4"))
         return
-    procs = [subprocess.Popen([sys.executable, __file__, "--workers", str(a.workers), "--chunk", str(k)]) for k in range(a.workers)]
-    rc = [p.wait() for p in procs]
-    if any(rc): sys.exit("worker failed")
+    from concurrent.futures import ThreadPoolExecutor
+    def run_chunk(k):
+        out = os.path.join(work, f"part_{k:03d}.mp4")
+        return subprocess.run([sys.executable, os.path.abspath(__file__), "--chunks", str(n), "--chunk", str(k)]).returncode
+    with ThreadPoolExecutor(a.workers) as ex:
+        rc = list(ex.map(run_chunk, range(n)))
+    if any(rc): sys.exit(f"chunk failed: {[k for k, r in enumerate(rc) if r]}")
     lst = os.path.join(work, "parts.txt")
-    open(lst, "w").write("".join(f"file 'part_{k}.mp4'\n" for k in range(a.workers)))
+    open(lst, "w").write("".join(f"file 'part_{k:03d}.mp4'\n" for k in range(n)))
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", os.path.join(work, "video.mp4")], check=True)
     print("video ->", os.path.join(work, "video.mp4"), NFR, "frames")
 

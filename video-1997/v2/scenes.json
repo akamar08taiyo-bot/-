@@ -1,0 +1,2161 @@
+{
+ "fps": 30,
+ "size": [
+  1920,
+  1080
+ ],
+ "total": 724.5,
+ "meta": {
+  "title": "電池の夏",
+  "subtitle": "1997",
+  "end_question": "あなたの1997年の夏は、どんな夏でしたか。",
+  "afterglow_title": "あの夏の音",
+  "afterglow_sub": "環境音とピアノだけの、ゆっくりした時間",
+  "out_name": "電池の夏_1997_v2",
+  "thumbs": [
+   {
+    "scene": "P02",
+    "name": "サムネA_写真が動き出す",
+    "stamp": true
+   },
+   {
+    "scene": "S23",
+    "name": "サムネB_告白の夕暮れ",
+    "text": "1997年、夏。",
+    "sub": "電池の夏"
+   },
+   {
+    "scene": "S25",
+    "name": "サムネC_ブラウン管と柴犬",
+    "text": "あの夏の夕飯",
+    "sub": "1997"
+   }
+  ]
+ },
+ "chars": {
+  "haruto": {
+   "file": "assets/chars/haruto.png",
+   "desc": "HARUTO: a 10-year-old Japanese boy with short slightly messy black hair and a small cowlick on top, round friendly face, sun-tanned skin; wearing a faded sky-blue T-shirt with one thin white horizontal stripe across the chest, navy blue knee-length shorts, white socks and white-and-blue sneakers; a small white egg-shaped keychain virtual pet toy hangs from his belt loop on a short ball chain."
+  },
+  "yusuke": {
+   "file": "assets/chars/yusuke.png",
+   "desc": "YUSUKE: a 10-year-old Japanese boy, slightly taller and lanky, very short buzz-cut black hair, tanned skin, a small adhesive bandage on his left cheek, mischievous cheerful grin; wearing a white T-shirt with red raglan sleeves, khaki cargo shorts and black sneakers."
+  },
+  "natsumi": {
+   "file": "assets/chars/natsumi.png",
+   "desc": "NATSUMI: a 10-year-old Japanese girl with shoulder-length straight black hair with bangs held by a small yellow hair clip, light tan, gentle shy smile; wearing a light yellow short-sleeve T-shirt, light blue denim culottes and white sneakers; a small pink egg-shaped keychain virtual pet toy hangs from her bag strap."
+  },
+  "grandma": {
+   "file": "assets/chars/grandma.png",
+   "desc": "GRANDMA: a kind Japanese grandmother in her early 70s, short grey permed hair, round thin-framed glasses, small and slightly stooped, wearing a light beige blouse under a white kappogi apron."
+  },
+  "adult": {
+   "file": "assets/chars/adult.png",
+   "desc": "ADULT HARUTO in 2026: a 39-year-old Japanese man, the grown-up HARUTO with the same small cowlick; short black hair with a few grey strands, gentle eyes, light stubble, slim; wearing a plain charcoal-grey knit sweater over a white T-shirt and dark blue jeans."
+  },
+  "shiba": {
+   "file": "assets/chars/shiba.png",
+   "desc": "SHIBA: the family's red (aka) Shiba Inu dog, medium size, curled tail, cream cheeks, wearing a red collar with a small brass bell."
+  }
+ },
+ "scenes": [
+  {
+   "id": "P01",
+   "part": "プロローグ",
+   "dur": 5.5,
+   "jp": "2026年。古いお菓子の缶を開ける手。中に写真とおもちゃ。",
+   "prompt": "Close-up of a man's hands lifting the lid of an old faded blue square metal cookie tin with a flower pattern on a tatami floor in an emptied room; inside: a small toy 4WD race car with a translucent blue body and a black chassis full of drilled holes, a white egg-shaped keychain virtual pet, old AA batteries, glass marbles and a small stack of faded color photo prints lying face down. Afternoon window light, dust in the air, shallow depth of field.",
+   "refs": [
+    "adult"
+   ],
+   "move": "in",
+   "fx": [
+    "dust"
+   ],
+   "amb": [
+    "room_2026"
+   ],
+   "sfx": [
+    [
+     "tin_lid",
+     0.8,
+     -14
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M0",
+   "era": "2026",
+   "xfade": 1.2,
+   "reveal": null,
+   "caption": null,
+   "motion": "The man's hands slowly lift the tin lid fully open, dust drifts in the window light, steady close-up.",
+   "img": null,
+   "start": 0.0,
+   "full_prompt": "Close-up of a man's hands lifting the lid of an old faded blue square metal cookie tin with a flower pattern on a tatami floor in an emptied room; inside: a small toy 4WD race car with a translucent blue body and a black chassis full of drilled holes, a white egg-shaped keychain virtual pet, old AA batteries, glass marbles and a small stack of faded color photo prints lying face down. Afternoon window light, dust in the air, shallow depth of field. Characters: the man is ADULT HARUTO from the attached reference photos (39 years old, charcoal sweater; keep his face and cowlick). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: Japan, autumn 2026 (present day). Photorealistic modern digital photograph, natural window light, slightly cool and calm tones, shallow depth of field. Not an illustration. Absolutely no text, letters, numbers, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "P02",
+   "part": "プロローグ",
+   "dur": 10.0,
+   "jp": "【写真が動き出す】'97 7 26 模型店のコースの前で笑うハルトとユウスケ。",
+   "prompt": "Inside a small 1990s Japanese hobby shop: HARUTO and YUSUKE stand side by side grinning at the camera, each holding up a small toy race car, in front of a white plastic three-lane toy race track on a table; shelves of colorful model kit boxes behind them; snapshot taken with a compact film camera with on-camera flash, slightly overexposed foreground.",
+   "refs": [
+    "haruto",
+    "yusuke"
+   ],
+   "move": "in",
+   "fx": [
+    "dust"
+   ],
+   "amb": [
+    "shop_quiet"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M0",
+   "era": "1997",
+   "xfade": 1.8,
+   "reveal": {
+    "date": "'97 7 26",
+    "hold": 2.6,
+    "trans": 2.2
+   },
+   "caption": null,
+   "motion": "The two boys laugh and proudly raise their toy race cars toward the camera, small natural movements, a toy car speeds by on the track behind them.",
+   "img": null,
+   "start": 5.5,
+   "full_prompt": "Inside a small 1990s Japanese hobby shop: HARUTO and YUSUKE stand side by side grinning at the camera, each holding up a small toy race car, in front of a white plastic three-lane toy race track on a table; shelves of colorful model kit boxes behind them; snapshot taken with a compact film camera with on-camera flash, slightly overexposed foreground. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S01",
+   "part": "朝",
+   "dur": 9.0,
+   "jp": "入道雲と海辺の町。タイトル「電池の夏」。",
+   "prompt": "A vast deep-blue summer sky with towering white cumulonimbus clouds above a small Japanese seaside town of grey tiled roofs, bright green rice fields and a sparkling sea, utility poles and wires in the foreground, morning light. No people.",
+   "refs": [],
+   "move": "up",
+   "fx": [
+    "rays",
+    "dust"
+   ],
+   "amb": [
+    "morning"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": "title",
+   "overlay": null,
+   "bgm": "M1",
+   "era": "1997",
+   "xfade": 2.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "Clouds drift slowly across the summer sky, a gentle breeze moves the trees, the sea sparkles, very slow steady camera.",
+   "img": null,
+   "start": 15.5,
+   "full_prompt": "A vast deep-blue summer sky with towering white cumulonimbus clouds above a small Japanese seaside town of grey tiled roofs, bright green rice fields and a sparkling sea, utility poles and wires in the foreground, morning light. No people. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S02",
+   "part": "朝",
+   "dur": 8.0,
+   "jp": "朝。枕元で電子ペットが鳴る。",
+   "prompt": "Early morning in a 1990s Japanese boy's tatami bedroom: HARUTO sleeps under a thin striped towel blanket on a futon; on the pillow beside his face lies the white egg-shaped virtual pet toy; an electric fan by the window, a low wooden desk with a red school backpack and a summer homework workbook, soft morning sun through the window, a glass wind chime hanging outside.",
+   "refs": [
+    "haruto"
+   ],
+   "move": "in",
+   "fx": [
+    "rays",
+    "dust"
+   ],
+   "amb": [
+    "morning",
+    "fan"
+   ],
+   "sfx": [
+    [
+     "pet_alarm",
+     1.2,
+     -14
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M1",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The boy stirs in his sleep and slowly opens his eyes, the electric fan turns, the curtain sways gently in the morning breeze.",
+   "img": null,
+   "start": 24.5,
+   "full_prompt": "Early morning in a 1990s Japanese boy's tatami bedroom: HARUTO sleeps under a thin striped towel blanket on a futon; on the pillow beside his face lies the white egg-shaped virtual pet toy; an electric fan by the window, a low wooden desk with a red school backpack and a summer homework workbook, soft morning sun through the window, a glass wind chime hanging outside. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S03",
+   "part": "朝",
+   "dur": 8.0,
+   "jp": "電子ペットのアップ。ボタンを押してごはん。",
+   "prompt": "Extreme close-up photo of a 10-year-old boy's fingertips holding a white egg-shaped keychain virtual pet toy and pressing one of its three small round buttons; the small rectangular LCD screen faces the camera directly and is completely blank, plain pale grey-green with nothing on it; soft morning window light, shallow depth of field, futon blurred behind.",
+   "refs": [],
+   "move": "in",
+   "fx": [
+    "dust"
+   ],
+   "amb": [
+    "morning",
+    "fan"
+   ],
+   "sfx": [
+    [
+     "pet_btn",
+     1.6,
+     -16
+    ],
+    [
+     "pet_btn",
+     2.4,
+     -16
+    ],
+    [
+     "pet_eat",
+     3.2,
+     -18
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": "pet_eat",
+   "bgm": "M1",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": null,
+   "img": null,
+   "start": 32.5,
+   "full_prompt": "Extreme close-up photo of a 10-year-old boy's fingertips holding a white egg-shaped keychain virtual pet toy and pressing one of its three small round buttons; the small rectangular LCD screen faces the camera directly and is completely blank, plain pale grey-green with nothing on it; soft morning window light, shallow depth of field, futon blurred behind. Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S04",
+   "part": "朝",
+   "dur": 9.0,
+   "jp": "居間のブラウン管テレビ。開けた縁側の外には柴犬。",
+   "prompt": "A 1990s Japanese living room in the morning: a bulky CRT television on a low wooden TV stand showing a blurry morning program, a low table with breakfast (rice, miso soup, grilled fish); HARUTO sits at the table eating and watching TV; the sliding glass doors are open to the sunny garden where the family's red Shiba Inu with a red collar lies on the stepping stone looking in; summer morning light, lace curtain moving.",
+   "refs": [
+    "haruto",
+    "shiba"
+   ],
+   "move": "pan_r",
+   "fx": [
+    "rays"
+   ],
+   "amb": [
+    "tv_morning",
+    "morning"
+   ],
+   "sfx": [
+    [
+     "dog_bell",
+     5.0,
+     -18
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M1",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The boy eats breakfast while watching TV, the lace curtain moves in the breeze, the Shiba Inu outside lifts its head and wags its tail.",
+   "img": null,
+   "start": 40.5,
+   "full_prompt": "A 1990s Japanese living room in the morning: a bulky CRT television on a low wooden TV stand showing a blurry morning program, a low table with breakfast (rice, miso soup, grilled fish); HARUTO sits at the table eating and watching TV; the sliding glass doors are open to the sunny garden where the family's red Shiba Inu with a red collar lies on the stepping stone looking in; summer morning light, lace curtain moving. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); the dog is the red Shiba Inu from the attached reference photo (same face, coat and red collar with a small brass bell). Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S05",
+   "part": "朝",
+   "dur": 9.0,
+   "jp": "縁側で、おばあちゃんが がま口から100円玉。「はい、お小遣い。むだづかいしちゃだめよ」",
+   "prompt": "On the wooden engawa veranda of an old Japanese house: GRANDMA kneels and smiles as she takes two shiny 100-yen coins out of a small old-fashioned clasp coin purse (gamaguchi) and places them in HARUTO's open cupped hands; HARUTO bows his head happily; the red Shiba Inu sits beside them wagging its tail; morning glories and green garden behind, warm summer light.",
+   "refs": [
+    "grandma",
+    "haruto",
+    "shiba"
+   ],
+   "move": "in",
+   "fx": [
+    "rays",
+    "dust"
+   ],
+   "amb": [
+    "engawa_soft"
+   ],
+   "sfx": [
+    [
+     "gamaguchi",
+     1.0,
+     -16
+    ],
+    [
+     "coins",
+     1.8,
+     -16
+    ]
+   ],
+   "line": "G1",
+   "text": null,
+   "overlay": null,
+   "bgm": "M1",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The grandmother gently drops two coins into the boy's cupped hands and smiles, the boy bows happily, the dog wags its tail.",
+   "img": null,
+   "start": 49.5,
+   "full_prompt": "On the wooden engawa veranda of an old Japanese house: GRANDMA kneels and smiles as she takes two shiny 100-yen coins out of a small old-fashioned clasp coin purse (gamaguchi) and places them in HARUTO's open cupped hands; HARUTO bows his head happily; the red Shiba Inu sits beside them wagging its tail; morning glories and green garden behind, warm summer light. Characters: GRANDMA is the elderly woman in the attached reference photos (keep her face, grey permed hair, glasses and apron exactly); HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); the dog is the red Shiba Inu from the attached reference photo (same face, coat and red collar with a small brass bell). Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S06",
+   "part": "朝",
+   "dur": 8.0,
+   "jp": "玄関でスニーカー。レーサーのケース、腰に電子ペット。",
+   "prompt": "At the genkan entrance of a 1990s Japanese house: HARUTO sits on the wooden step tying his sneakers, beside him a clear plastic carrying case holding a small toy race car, the egg-shaped virtual pet hanging from his belt loop; the sliding front door is open to bright summer light.",
+   "refs": [
+    "haruto"
+   ],
+   "move": "in",
+   "fx": [
+    "rays"
+   ],
+   "amb": [
+    "morning"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M1",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The boy finishes tying his sneaker laces and picks up the toy car case, summer light from the open door.",
+   "img": null,
+   "start": 58.5,
+   "full_prompt": "At the genkan entrance of a 1990s Japanese house: HARUTO sits on the wooden step tying his sneakers, beside him a clear plastic carrying case holding a small toy race car, the egg-shaped virtual pet hanging from his belt loop; the sliding front door is open to bright summer light. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S07",
+   "part": "朝",
+   "dur": 8.5,
+   "jp": "ふたりで自転車。田んぼの坂を下る。",
+   "prompt": "HARUTO and YUSUKE ride their bicycles side by side down a gentle sloping country road between bright green rice fields toward a small seaside town, huge blue sky with cumulonimbus clouds, small plastic cases holding toy race cars in their front baskets, summer morning wind in their hair, seen from a low angle in front.",
+   "refs": [
+    "haruto",
+    "yusuke"
+   ],
+   "move": "in",
+   "fx": [
+    "rays"
+   ],
+   "amb": [
+    "day",
+    "bike"
+   ],
+   "sfx": [
+    [
+     "bike_bell",
+     1.0,
+     -18
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M1",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The two boys ride their bicycles down the gentle slope toward the camera, wind in their hair, natural subtle motion, steady camera.",
+   "img": null,
+   "start": 66.5,
+   "full_prompt": "HARUTO and YUSUKE ride their bicycles side by side down a gentle sloping country road between bright green rice fields toward a small seaside town, huge blue sky with cumulonimbus clouds, small plastic cases holding toy race cars in their front baskets, summer morning wind in their hair, seen from a low angle in front. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S08",
+   "part": "朝",
+   "dur": 8.5,
+   "jp": "駄菓子屋の軒先。お小遣いでラムネ、10円ゲーム。",
+   "prompt": "Outside a tiny old dagashiya penny candy shop on a quiet Japanese back street on a hot summer day: HARUTO and YUSUKE sit on a wooden bench in the shade drinking from glass ramune soda bottles with marbles inside, a small old coin-operated arcade game cabinet next to the bench, an ice cream freezer chest, hanging snack bags with no readable text, a cat sleeping in the shade.",
+   "refs": [
+    "haruto",
+    "yusuke"
+   ],
+   "move": "in",
+   "fx": [
+    "rays"
+   ],
+   "amb": [
+    "day"
+   ],
+   "sfx": [
+    [
+     "ramune",
+     1.4,
+     -12
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M1",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The two boys drink ramune from glass bottles and laugh, the cat in the shade flicks its tail, heat shimmer.",
+   "img": null,
+   "start": 75.0,
+   "full_prompt": "Outside a tiny old dagashiya penny candy shop on a quiet Japanese back street on a hot summer day: HARUTO and YUSUKE sit on a wooden bench in the shade drinking from glass ramune soda bottles with marbles inside, a small old coin-operated arcade game cabinet next to the bench, an ice cream freezer chest, hanging snack bags with no readable text, a cat sleeping in the shade. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly). Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S09",
+   "part": "朝",
+   "dur": 8.0,
+   "jp": "駄菓子屋の中。100円玉で、どれにしようか。",
+   "prompt": "Inside a cozy cluttered dagashiya: rows of small colorful cheap snacks and candies in boxes and glass jars with no readable text or logos, an elderly woman shopkeeper sitting on a raised tatami platform, HARUTO pointing at candies while holding a 100-yen coin, YUSUKE beside him, warm afternoon light.",
+   "refs": [
+    "haruto",
+    "yusuke"
+   ],
+   "move": "in",
+   "fx": [
+    "dust"
+   ],
+   "amb": [
+    "shop_quiet"
+   ],
+   "sfx": [
+    [
+     "coins",
+     2.0,
+     -16
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M1",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The boy points at candies and shows his coin to the shopkeeper, his friend leans in, gentle natural motion.",
+   "img": null,
+   "start": 83.5,
+   "full_prompt": "Inside a cozy cluttered dagashiya: rows of small colorful cheap snacks and candies in boxes and glass jars with no readable text or logos, an elderly woman shopkeeper sitting on a raised tatami platform, HARUTO pointing at candies while holding a 100-yen coin, YUSUKE beside him, warm afternoon light. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly). Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S10",
+   "part": "朝",
+   "dur": 8.5,
+   "jp": "模型店の3レーンのコース。身を乗り出す子どもたち。",
+   "prompt": "Inside a small 1990s hobby shop: a white plastic three-lane toy race circuit with a lane-change bridge set on a big table; several excited kids including HARUTO and YUSUKE lean over the side rails; small toy race cars speed along the lanes with motion blur; daylight from the shop window; shelves of plain kit boxes.",
+   "refs": [
+    "haruto",
+    "yusuke"
+   ],
+   "move": "pan_r",
+   "fx": [
+    "dust"
+   ],
+   "amb": [
+    "shop",
+    "track"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M1",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "Small toy race cars speed around the lanes of the track, the kids lean over and cheer, natural motion.",
+   "img": null,
+   "start": 91.5,
+   "full_prompt": "Inside a small 1990s hobby shop: a white plastic three-lane toy race circuit with a lane-change bridge set on a big table; several excited kids including HARUTO and YUSUKE lean over the side rails; small toy race cars speed along the lanes with motion blur; daylight from the shop window; shelves of plain kit boxes. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S11",
+   "part": "朝",
+   "dur": 8.0,
+   "jp": "スタート直前。白赤のハルト号と青いユウスケ号。",
+   "prompt": "Low-angle close-up photo at the start line of a white plastic toy race track: two small toy 4WD race cars side by side, one with a white and red body and one with a translucent blue body, held by two boys' fingertips, wheels about to spin; shallow depth of field, the boys' faces out of focus in the background.",
+   "refs": [],
+   "move": "in",
+   "fx": [
+    "dust"
+   ],
+   "amb": [
+    "shop"
+   ],
+   "sfx": [
+    [
+     "motor_rev",
+     2.0,
+     -14
+    ],
+    [
+     "motor_pass",
+     5.6,
+     -14
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M1",
+   "era": "1997",
+   "xfade": 2.2,
+   "reveal": null,
+   "caption": null,
+   "motion": "The boys' fingers release the two toy cars, the wheels spin and the cars start to move forward on the track.",
+   "img": null,
+   "start": 100.0,
+   "full_prompt": "Low-angle close-up photo at the start line of a white plastic toy race track: two small toy 4WD race cars side by side, one with a white and red body and one with a translucent blue body, held by two boys' fingertips, wheels about to spin; shallow depth of field, the boys' faces out of focus in the background. Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S12",
+   "part": "午後",
+   "dur": 10.5,
+   "jp": "【写真が動き出す】'97 8 2 縁側で改造。柴犬が踏み石で寝ている。",
+   "prompt": "On the wooden engawa veranda of an old Japanese house on a summer afternoon: HARUTO and YUSUKE sit cross-legged on spread newspaper, carefully modifying small toy race cars with tiny screwdrivers and a hand pin-vise drill; plastic parts runners, tiny motors, AA batteries and a parts tray around them; an electric fan, a glass wind chime, a pig-shaped ceramic mosquito coil holder with rising smoke; the red Shiba Inu sleeps on the stepping stone below; green garden, dappled sunlight.",
+   "refs": [
+    "haruto",
+    "yusuke",
+    "shiba"
+   ],
+   "move": "in",
+   "fx": [
+    "rays",
+    "dust"
+   ],
+   "amb": [
+    "engawa"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M2",
+   "era": "1997",
+   "xfade": 2.2,
+   "reveal": {
+    "date": "'97 8 2",
+    "hold": 2.4,
+    "trans": 2.0
+   },
+   "caption": [
+    "1997年8月　縁側",
+    "August 1997, on the veranda"
+   ],
+   "motion": "The two boys keep working on their toy cars with small careful hand movements, one glances up and smiles, the wind chime sways gently, thin smoke rises from the mosquito coil, the dog breathes slowly while sleeping. Keep every person and object exactly as in the photo; do not add, remove or duplicate any objects. Very subtle, natural, slow motion. The camera does not move.",
+   "img": null,
+   "start": 108.0,
+   "full_prompt": "On the wooden engawa veranda of an old Japanese house on a summer afternoon: HARUTO and YUSUKE sit cross-legged on spread newspaper, carefully modifying small toy race cars with tiny screwdrivers and a hand pin-vise drill; plastic parts runners, tiny motors, AA batteries and a parts tray around them; an electric fan, a glass wind chime, a pig-shaped ceramic mosquito coil holder with rising smoke; the red Shiba Inu sleeps on the stepping stone below; green garden, dappled sunlight. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly); the dog is the red Shiba Inu from the attached reference photo (same face, coat and red collar with a small brass bell). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S13",
+   "part": "午後",
+   "dur": 8.0,
+   "jp": "手のアップ。電池をこすって温める／穴だらけのシャーシ。",
+   "prompt": "Close-up photo of two boys' hands on the veranda: one boy rubs two AA batteries between his palms to warm them up, the other holds a black toy race car chassis with many small drilled holes for lightness; tiny plastic shavings on the newspaper; bright afternoon sun and soft shadows.",
+   "refs": [],
+   "move": "in",
+   "fx": [
+    "dust"
+   ],
+   "amb": [
+    "engawa"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M2",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "One boy rubs the two AA batteries between his palms, the other turns the drilled chassis in his fingers.",
+   "img": null,
+   "start": 118.5,
+   "full_prompt": "Close-up photo of two boys' hands on the veranda: one boy rubs two AA batteries between his palms to warm them up, the other holds a black toy race car chassis with many small drilled holes for lightness; tiny plastic shavings on the newspaper; bright afternoon sun and soft shadows. Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S14",
+   "part": "午後",
+   "dur": 8.0,
+   "jp": "家の前の道。陽炎の中を走るレーサーを追いかける。",
+   "prompt": "A sun-baked asphalt residential street in a quiet 1990s Japanese town with heat haze: a small toy race car with a white and red body speeds along the curb, HARUTO runs after it laughing, YUSUKE watching from the side, concrete block walls, utility poles, blue sky with cumulonimbus clouds.",
+   "refs": [
+    "haruto",
+    "yusuke"
+   ],
+   "move": "pan_l",
+   "fx": [
+    "rays"
+   ],
+   "amb": [
+    "day"
+   ],
+   "sfx": [
+    [
+     "motor_pass",
+     0.8,
+     -12
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M2",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The toy race car speeds along the curb and the boy runs after it laughing, heat haze shimmers above the asphalt.",
+   "img": null,
+   "start": 126.5,
+   "full_prompt": "A sun-baked asphalt residential street in a quiet 1990s Japanese town with heat haze: a small toy race car with a white and red body speeds along the curb, HARUTO runs after it laughing, YUSUKE watching from the side, concrete block walls, utility poles, blue sky with cumulonimbus clouds. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S15",
+   "part": "午後",
+   "dur": 8.0,
+   "jp": "小石でひっくり返ったレーサー。笑うユウスケ。",
+   "prompt": "On the same hot asphalt street: the small white and red toy race car lies flipped upside down after hitting a pebble, its wheels still spinning; HARUTO crouches to pick it up while YUSUKE laughs, bending over; long afternoon shadows.",
+   "refs": [
+    "haruto",
+    "yusuke"
+   ],
+   "move": "in",
+   "fx": [],
+   "amb": [
+    "day"
+   ],
+   "sfx": [
+    [
+     "flip",
+     0.6,
+     -14
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M2",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The flipped toy car's wheels keep spinning, the boy reaches to pick it up, his friend laughs.",
+   "img": null,
+   "start": 134.5,
+   "full_prompt": "On the same hot asphalt street: the small white and red toy race car lies flipped upside down after hitting a pebble, its wheels still spinning; HARUTO crouches to pick it up while YUSUKE laughs, bending over; long afternoon shadows. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S16",
+   "part": "午後",
+   "dur": 9.0,
+   "jp": "近所の公園で野球。ブランコのナツミが見ている。",
+   "prompt": "A small neighborhood park in 1990s Japan on a summer afternoon: YUSUKE winds up to pitch a white rubber baseball while HARUTO stands ready with a dented aluminum bat; a few trees, a slide and a sandbox; NATSUMI sits on a swing in the background watching them; long grass shadows, cicada-filled summer air.",
+   "refs": [
+    "haruto",
+    "yusuke",
+    "natsumi"
+   ],
+   "move": "pan_r",
+   "fx": [
+    "rays",
+    "dust"
+   ],
+   "amb": [
+    "park"
+   ],
+   "sfx": [
+    [
+     "glove",
+     2.4,
+     -16
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M2",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The buzz-cut boy throws the rubber ball, the batter gets ready to swing, the girl swings gently on the swing in the background.",
+   "img": null,
+   "start": 142.5,
+   "full_prompt": "A small neighborhood park in 1990s Japan on a summer afternoon: YUSUKE winds up to pitch a white rubber baseball while HARUTO stands ready with a dented aluminum bat; a few trees, a slide and a sandbox; NATSUMI sits on a swing in the background watching them; long grass shadows, cicada-filled summer air. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly); NATSUMI is the girl in the attached reference photos with the yellow hair clip and light yellow T-shirt (keep her face, hair and clothes exactly). Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S17",
+   "part": "午後",
+   "dur": 8.0,
+   "jp": "カキーン。打球を見上げるふたり。拍手するナツミ。",
+   "prompt": "Action snapshot in the park: HARUTO has just hit the rubber ball with the aluminum bat, the ball flying high against the blue summer sky, YUSUKE turning to watch it with his mouth open, NATSUMI clapping on the swing in the background; slight motion blur.",
+   "refs": [
+    "haruto",
+    "yusuke",
+    "natsumi"
+   ],
+   "move": "up",
+   "fx": [
+    "rays"
+   ],
+   "amb": [
+    "park"
+   ],
+   "sfx": [
+    [
+     "bat_hit",
+     0.5,
+     -12
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M2",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The ball flies up into the blue sky, the boys turn their heads to follow it, the girl claps.",
+   "img": null,
+   "start": 151.5,
+   "full_prompt": "Action snapshot in the park: HARUTO has just hit the rubber ball with the aluminum bat, the ball flying high against the blue summer sky, YUSUKE turning to watch it with his mouth open, NATSUMI clapping on the swing in the background; slight motion blur. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly); NATSUMI is the girl in the attached reference photos with the yellow hair clip and light yellow T-shirt (keep her face, hair and clothes exactly). Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S18",
+   "part": "午後",
+   "dur": 8.0,
+   "jp": "田んぼの上に急に黒い雲。",
+   "prompt": "Late afternoon over vast green rice fields in the Japanese countryside: dark heavy storm clouds rapidly gathering, wind bending the rice plants in waves, dramatic light; three small kids with bicycles on a farm road look up at the sky, seen from far away.",
+   "refs": [
+    "haruto",
+    "yusuke",
+    "natsumi"
+   ],
+   "move": "up",
+   "fx": [],
+   "amb": [
+    "storm"
+   ],
+   "sfx": [
+    [
+     "thunder_far",
+     3.0,
+     -16
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M2",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "Dark storm clouds roll in over the rice fields, wind makes waves in the green rice, the kids look up.",
+   "img": null,
+   "start": 159.5,
+   "full_prompt": "Late afternoon over vast green rice fields in the Japanese countryside: dark heavy storm clouds rapidly gathering, wind bending the rice plants in waves, dramatic light; three small kids with bicycles on a farm road look up at the sky, seen from far away. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly); NATSUMI is the girl in the attached reference photos with the yellow hair clip and light yellow T-shirt (keep her face, hair and clothes exactly). Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S19",
+   "part": "午後",
+   "dur": 10.5,
+   "jp": "夕立。店の軒下で3人雨やどり。",
+   "prompt": "A sudden heavy summer downpour: HARUTO, YUSUKE and NATSUMI shelter under the narrow eaves of a closed old shop with their bicycles, rain pouring in sheets, splashes on the asphalt, steam rising from the hot road, grey light.",
+   "refs": [
+    "haruto",
+    "yusuke",
+    "natsumi"
+   ],
+   "move": "in",
+   "fx": [
+    "rain"
+   ],
+   "amb": [
+    "rain_heavy"
+   ],
+   "sfx": [
+    [
+     "thunder",
+     2.0,
+     -12
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M2",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "Heavy rain pours down, splashes on the asphalt, steam rises, the kids huddle under the eaves.",
+   "img": null,
+   "start": 167.5,
+   "full_prompt": "A sudden heavy summer downpour: HARUTO, YUSUKE and NATSUMI shelter under the narrow eaves of a closed old shop with their bicycles, rain pouring in sheets, splashes on the asphalt, steam rising from the hot road, grey light. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly); NATSUMI is the girl in the attached reference photos with the yellow hair clip and light yellow T-shirt (keep her face, hair and clothes exactly). Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S21",
+   "part": "午後",
+   "dur": 8.0,
+   "jp": "雨上がり。水たまりに夕空、うっすら虹。",
+   "prompt": "After the rain: puddles on a country road reflect a glowing orange and pink evening sky, a faint rainbow over the small town and rice fields, wet utility poles and wires sparkling, HARUTO and YUSUKE ride their bicycles through the puddles splashing water.",
+   "refs": [
+    "haruto",
+    "yusuke"
+   ],
+   "move": "pan_r",
+   "fx": [
+    "rays"
+   ],
+   "amb": [
+    "after_rain"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M2",
+   "era": "1997",
+   "xfade": 2.4,
+   "reveal": null,
+   "caption": null,
+   "motion": "The boys ride their bicycles through the puddles, water splashes, the evening sky glows.",
+   "img": null,
+   "start": 178.0,
+   "full_prompt": "After the rain: puddles on a country road reflect a glowing orange and pink evening sky, a faint rainbow over the small town and rice fields, wet utility poles and wires sparkling, HARUTO and YUSUKE ride their bicycles through the puddles splashing water. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly). Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S22",
+   "part": "夕方",
+   "dur": 10.0,
+   "jp": "高台から町。防災スピーカーから5時のチャイム「夕焼け小焼け」。",
+   "prompt": "Dusk view of a small Japanese seaside town from a hillside: rooftops, rice fields and the sea glowing in the sunset, a concrete utility pole with an outdoor public-address loudspeaker horn in the foreground, a few tiny children walking home along a road far below, first lights in the windows.",
+   "refs": [],
+   "move": "in",
+   "fx": [
+    "rays"
+   ],
+   "amb": [
+    "dusk"
+   ],
+   "sfx": [
+    [
+     "chime5",
+     0.6,
+     -15
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": null,
+   "era": "1997",
+   "xfade": 2.4,
+   "reveal": null,
+   "caption": null,
+   "motion": "The sunset light slowly shifts over the town, a few children walk home far below, gentle breeze.",
+   "img": null,
+   "start": 186.0,
+   "full_prompt": "Dusk view of a small Japanese seaside town from a hillside: rooftops, rice fields and the sea glowing in the sunset, a concrete utility pole with an outdoor public-address loudspeaker horn in the foreground, a few tiny children walking home along a road far below, first lights in the windows. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S23",
+   "part": "夕方",
+   "dur": 11.0,
+   "jp": "夕暮れの公園。照れながら告白するハルト。「あのさ……おれ、なつみのこと……すき、かも」「……しってたよ」",
+   "prompt": "Dusk in the small neighborhood park: HARUTO stands facing NATSUMI by the swings, looking down shyly and rubbing the back of his neck, his cheeks red; NATSUMI holds her bag strap with both hands, surprised and smiling softly; long orange sunset shadows; in the far background YUSUKE peeks out from behind the slide, grinning.",
+   "refs": [
+    "haruto",
+    "natsumi",
+    "yusuke"
+   ],
+   "move": "in",
+   "fx": [
+    "rays",
+    "dust"
+   ],
+   "amb": [
+    "dusk"
+   ],
+   "sfx": [],
+   "line": [
+    "C1",
+    "C2"
+   ],
+   "text": null,
+   "overlay": null,
+   "bgm": null,
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The boy shyly rubs the back of his neck and looks down, the girl smiles and looks away embarrassed, their friend peeks from behind the slide, gentle natural motion.",
+   "img": null,
+   "start": 196.0,
+   "full_prompt": "Dusk in the small neighborhood park: HARUTO stands facing NATSUMI by the swings, looking down shyly and rubbing the back of his neck, his cheeks red; NATSUMI holds her bag strap with both hands, surprised and smiling softly; long orange sunset shadows; in the far background YUSUKE peeks out from behind the slide, grinning. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); NATSUMI is the girl in the attached reference photos with the yellow hair clip and light yellow T-shirt (keep her face, hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly). Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S24",
+   "part": "夕方",
+   "dur": 9.0,
+   "jp": "堤防を自転車を押して帰る。ユウスケ「なあ、あしたも走らせに行こうぜ」",
+   "prompt": "Dusk: HARUTO and YUSUKE walk home side by side pushing their bicycles along a riverside embankment path, silhouetted against a deep orange and purple sky, the river reflecting the light, YUSUKE turning his head to talk to HARUTO.",
+   "refs": [
+    "haruto",
+    "yusuke"
+   ],
+   "move": "pan_r",
+   "fx": [
+    "rays"
+   ],
+   "amb": [
+    "dusk",
+    "river"
+   ],
+   "sfx": [],
+   "line": "L1",
+   "text": null,
+   "overlay": null,
+   "bgm": null,
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The two boys walk slowly pushing their bicycles along the embankment, one turns to talk to the other, the river shimmers.",
+   "img": null,
+   "start": 207.0,
+   "full_prompt": "Dusk: HARUTO and YUSUKE walk home side by side pushing their bicycles along a riverside embankment path, silhouetted against a deep orange and purple sky, the river reflecting the light, YUSUKE turning his head to talk to HARUTO. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly). Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S25",
+   "part": "夕方",
+   "dur": 9.0,
+   "jp": "夕飯。ブラウン管でナイター。窓の外の犬小屋に柴犬。",
+   "prompt": "Evening in a 1990s Japanese family dining room: a low table with dinner (rice, grilled fish, miso soup, cold tofu, sliced watermelon), a bulky CRT television on a wooden stand showing a night baseball game, a round ceiling light with a pull string; HARUTO eating with GRANDMA beside him, the white egg-shaped virtual pet next to his rice bowl, his mother's hand pointing at it; through the window the red Shiba Inu lies by its wooden doghouse in the dark garden; warm lamp light.",
+   "refs": [
+    "haruto",
+    "grandma",
+    "shiba"
+   ],
+   "move": "in",
+   "fx": [],
+   "amb": [
+    "dinner"
+   ],
+   "sfx": [],
+   "line": [
+    "M1"
+   ],
+   "text": null,
+   "overlay": null,
+   "bgm": null,
+   "era": "1997",
+   "xfade": 2.2,
+   "reveal": null,
+   "caption": null,
+   "motion": "The family eats dinner, the TV flickers with the baseball game, the mother's hand points at the virtual pet, the dog outside lies by the doghouse.",
+   "img": null,
+   "start": 216.0,
+   "full_prompt": "Evening in a 1990s Japanese family dining room: a low table with dinner (rice, grilled fish, miso soup, cold tofu, sliced watermelon), a bulky CRT television on a wooden stand showing a night baseball game, a round ceiling light with a pull string; HARUTO eating with GRANDMA beside him, the white egg-shaped virtual pet next to his rice bowl, his mother's hand pointing at it; through the window the red Shiba Inu lies by its wooden doghouse in the dark garden; warm lamp light. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); GRANDMA is the elderly woman in the attached reference photos (keep her face, grey permed hair, glasses and apron exactly); the dog is the red Shiba Inu from the attached reference photo (same face, coat and red collar with a small brass bell). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S26",
+   "part": "夜",
+   "dur": 10.5,
+   "jp": "【写真が動き出す】'97 8 15 神社の夏祭り。浴衣のナツミも。",
+   "prompt": "Night at a small Japanese summer festival at a shrine: rows of glowing red-and-white paper lanterns, food stalls, water balloon yo-yos floating in a little pool; HARUTO and YUSUKE in jinbei and NATSUMI in a light blue yukata holding cotton candy and water balloons, warm lantern light, crowds softly blurred.",
+   "refs": [
+    "haruto",
+    "yusuke",
+    "natsumi"
+   ],
+   "move": "pan_l",
+   "fx": [
+    "dust"
+   ],
+   "amb": [
+    "festival"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M3",
+   "era": "1997",
+   "xfade": 2.4,
+   "reveal": {
+    "date": "'97 8 15",
+    "hold": 2.4,
+    "trans": 2.0
+   },
+   "caption": [
+    "1997年8月　夏祭り",
+    "Summer festival, August 1997"
+   ],
+   "motion": "The kids walk slowly through the festival smiling and looking at the stalls, paper lanterns sway gently, people move softly in the background. Keep every person and object exactly as in the photo; do not add, remove or duplicate any objects. Very subtle, natural, slow motion. The camera does not move.",
+   "img": null,
+   "start": 225.0,
+   "full_prompt": "Night at a small Japanese summer festival at a shrine: rows of glowing red-and-white paper lanterns, food stalls, water balloon yo-yos floating in a little pool; HARUTO and YUSUKE in jinbei and NATSUMI in a light blue yukata holding cotton candy and water balloons, warm lantern light, crowds softly blurred. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly); NATSUMI is the girl in the attached reference photos with the yellow hair clip and light yellow T-shirt (keep her face, hair and clothes exactly). Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S27",
+   "part": "夜",
+   "dur": 9.0,
+   "jp": "川の花火。土手に並んで座る3人の後ろ姿。",
+   "prompt": "Night: big colorful fireworks bloom over a wide river and are reflected on the water; HARUTO, NATSUMI and YUSUKE sit side by side on the grassy embankment seen from behind, their faces lit by the fireworks, silhouettes of other people along the riverbank.",
+   "refs": [
+    "haruto",
+    "natsumi",
+    "yusuke"
+   ],
+   "move": "up",
+   "fx": [
+    "flicker"
+   ],
+   "amb": [
+    "fireworks"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M3",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "Fireworks bloom and fade over the river, light flickers on the kids' faces as they watch.",
+   "img": null,
+   "start": 235.5,
+   "full_prompt": "Night: big colorful fireworks bloom over a wide river and are reflected on the water; HARUTO, NATSUMI and YUSUKE sit side by side on the grassy embankment seen from behind, their faces lit by the fireworks, silhouettes of other people along the riverbank. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); NATSUMI is the girl in the attached reference photos with the yellow hair clip and light yellow T-shirt (keep her face, hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly). Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S28",
+   "part": "夜",
+   "dur": 8.0,
+   "jp": "深夜の部屋。月明かり、扇風機、枕元で光る電子ペット。",
+   "prompt": "Late night in HARUTO's tatami bedroom: HARUTO sleeps on his futon in blue moonlight from the open window, the egg-shaped virtual pet beside his pillow with its tiny screen faintly glowing, an electric fan slowly turning, a glass wind chime at the window.",
+   "refs": [
+    "haruto"
+   ],
+   "move": "in",
+   "fx": [],
+   "amb": [
+    "night",
+    "fan"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M3",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The boy sleeps peacefully, the fan slowly turns, the curtain moves, the tiny screen glows faintly.",
+   "img": null,
+   "start": 244.5,
+   "full_prompt": "Late night in HARUTO's tatami bedroom: HARUTO sleeps on his futon in blue moonlight from the open window, the egg-shaped virtual pet beside his pillow with its tiny screen faintly glowing, an electric fan slowly turning, a glass wind chime at the window. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S29",
+   "part": "夜",
+   "dur": 8.5,
+   "jp": "朝。電子ペットが“おばけ”に。",
+   "prompt": "Morning, close-up: HARUTO sits on his futon holding the white egg-shaped virtual pet in both hands, looking at it with a sad quiet expression; the toy's small rectangular LCD screen faces the camera directly and is completely blank, plain pale grey-green; soft grey morning light.",
+   "refs": [
+    "haruto"
+   ],
+   "move": "in",
+   "fx": [],
+   "amb": [
+    "morning_quiet"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M3",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": null,
+   "img": null,
+   "start": 252.5,
+   "full_prompt": "Morning, close-up: HARUTO sits on his futon holding the white egg-shaped virtual pet in both hands, looking at it with a sad quiet expression; the toy's small rectangular LCD screen faces the camera directly and is completely blank, plain pale grey-green; soft grey morning light. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S29b",
+   "part": "夜",
+   "dur": 5.5,
+   "jp": "（差し込み）電子ペットの画面には“おばけ”。",
+   "prompt": "INSERT",
+   "refs": [],
+   "move": "in",
+   "fx": [
+    "dust"
+   ],
+   "amb": [
+    "morning_quiet"
+   ],
+   "sfx": [
+    [
+     "pet_flat",
+     0.8,
+     -20
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": "pet_ghost",
+   "bgm": "M3",
+   "era": "1997",
+   "xfade": 1.0,
+   "reveal": null,
+   "caption": null,
+   "motion": null,
+   "img": "S03",
+   "start": 261.0,
+   "full_prompt": null
+  },
+  {
+   "id": "S30",
+   "part": "晩夏",
+   "dur": 10.5,
+   "jp": "【写真が動き出す】'97 8 24 デパート屋上の大会。",
+   "prompt": "Late August: a big toy race car tournament on the rooftop of a 1990s Japanese department store: a large multi-lane white plastic race circuit with lane-change bridges, crowds of kids and parents, plain colorful banners with no text, a white event tent, bright summer sky; HARUTO and YUSUKE at the edge of the track.",
+   "refs": [
+    "haruto",
+    "yusuke"
+   ],
+   "move": "pan_r",
+   "fx": [
+    "rays"
+   ],
+   "amb": [
+    "event"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M3",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": {
+    "date": "'97 8 24",
+    "hold": 2.4,
+    "trans": 2.0
+   },
+   "caption": [
+    "1997年8月　屋上の大会",
+    "Rooftop race, August 1997"
+   ],
+   "motion": "Toy race cars speed around the big circuit, kids and parents cheer, banners flutter in the wind.",
+   "img": null,
+   "start": 266.5,
+   "full_prompt": "Late August: a big toy race car tournament on the rooftop of a 1990s Japanese department store: a large multi-lane white plastic race circuit with lane-change bridges, crowds of kids and parents, plain colorful banners with no text, a white event tent, bright summer sky; HARUTO and YUSUKE at the edge of the track. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S31",
+   "part": "晩夏",
+   "dur": 8.0,
+   "jp": "レーンチェンジで宙に浮く白赤のレーサー。",
+   "prompt": "Dramatic snapshot at the rooftop tournament: a small white and red toy race car flies off the track in mid-air at a lane-change bridge, frozen moment, kids' surprised faces in the background, sunlight glinting off the plastic.",
+   "refs": [
+    "haruto"
+   ],
+   "move": "in",
+   "fx": [
+    "rays"
+   ],
+   "amb": [
+    "event"
+   ],
+   "sfx": [
+    [
+     "flip",
+     1.2,
+     -12
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M3",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The toy car flies off the track in slow motion and tumbles through the air, the kids gasp.",
+   "img": null,
+   "start": 277.0,
+   "full_prompt": "Dramatic snapshot at the rooftop tournament: a small white and red toy race car flies off the track in mid-air at a lane-change bridge, frozen moment, kids' surprised faces in the background, sunlight glinting off the plastic. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S32",
+   "part": "晩夏",
+   "dur": 8.0,
+   "jp": "がっかりするハルトの肩に、ユウスケの手。",
+   "prompt": "HARUTO stands holding his small white and red toy race car with a disappointed face at the edge of the rooftop race circuit; YUSUKE puts a hand on his shoulder with a warm cheerful grin; crowds and the bright track behind them.",
+   "refs": [
+    "haruto",
+    "yusuke"
+   ],
+   "move": "in",
+   "fx": [
+    "rays"
+   ],
+   "amb": [
+    "event_far"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M3",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The disappointed boy looks at his toy car, his friend pats his shoulder and grins, the crowd moves behind them.",
+   "img": null,
+   "start": 285.0,
+   "full_prompt": "HARUTO stands holding his small white and red toy race car with a disappointed face at the edge of the rooftop race circuit; YUSUKE puts a hand on his shoulder with a warm cheerful grin; crowds and the bright track behind them. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S33",
+   "part": "晩夏",
+   "dur": 9.5,
+   "jp": "夕暮れの土手、赤とんぼ。ユウスケ「……おれ、ひっこすんだ」",
+   "prompt": "Evening: HARUTO and YUSUKE sit on a riverside embankment covered with tall summer grass, red dragonflies flying around them in golden sunset light, YUSUKE looking down quietly with his arms around his knees, HARUTO turning to look at him.",
+   "refs": [
+    "haruto",
+    "yusuke"
+   ],
+   "move": "in",
+   "fx": [
+    "rays",
+    "dust"
+   ],
+   "amb": [
+    "dusk_late"
+   ],
+   "sfx": [],
+   "line": "L2",
+   "text": null,
+   "overlay": null,
+   "bgm": "M3",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "Red dragonflies fly around, the tall grass sways in the evening breeze, the buzz-cut boy looks down quietly.",
+   "img": null,
+   "start": 293.0,
+   "full_prompt": "Evening: HARUTO and YUSUKE sit on a riverside embankment covered with tall summer grass, red dragonflies flying around them in golden sunset light, YUSUKE looking down quietly with his arms around his knees, HARUTO turning to look at him. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly). Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S34",
+   "part": "晩夏",
+   "dur": 8.0,
+   "jp": "8月31日の夜。終わらない宿題。",
+   "prompt": "Night at the end of summer vacation: HARUTO sits at his wooden desk under a desk lamp with an unfinished summer homework workbook and a diary, an electric fan, the white egg-shaped virtual pet lying on the desk, the window open to the dark night.",
+   "refs": [
+    "haruto"
+   ],
+   "move": "in",
+   "fx": [],
+   "amb": [
+    "night"
+   ],
+   "sfx": [
+    [
+     "pencil",
+     1.0,
+     -22
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M3",
+   "era": "1997",
+   "xfade": 2.2,
+   "reveal": null,
+   "caption": null,
+   "motion": "The boy writes in his workbook, then stops and rests his chin on his hand, the fan turns.",
+   "img": null,
+   "start": 302.5,
+   "full_prompt": "Night at the end of summer vacation: HARUTO sits at his wooden desk under a desk lamp with an unfinished summer homework workbook and a diary, an electric fan, the white egg-shaped virtual pet lying on the desk, the window open to the dark night. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S35",
+   "part": "別れ",
+   "dur": 10.5,
+   "jp": "【写真が動き出す】'97 8 30 引っ越しの朝。",
+   "prompt": "Early morning at the end of summer: a small moving truck with no markings parked in front of a modest Japanese house, cardboard boxes being loaded, YUSUKE standing by the truck with his family; HARUTO stands at the roadside holding his bicycle.",
+   "refs": [
+    "haruto",
+    "yusuke"
+   ],
+   "move": "in",
+   "fx": [
+    "rays"
+   ],
+   "amb": [
+    "morning_end",
+    "truck_idle"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M4",
+   "era": "1997",
+   "xfade": 2.2,
+   "reveal": {
+    "date": "'97 8 30",
+    "hold": 2.4,
+    "trans": 2.0
+   },
+   "caption": [
+    "1997年8月30日",
+    "August 30, 1997"
+   ],
+   "motion": "Two movers carry a cardboard box toward the truck, the adults talk quietly, the boy stands still holding his bicycle and looks down, a gentle breeze moves the trees. Keep every person and object exactly as in the photo; do not add, remove or duplicate any objects. Very subtle, natural, slow motion. The camera does not move.",
+   "img": null,
+   "start": 310.5,
+   "full_prompt": "Early morning at the end of summer: a small moving truck with no markings parked in front of a modest Japanese house, cardboard boxes being loaded, YUSUKE standing by the truck with his family; HARUTO stands at the roadside holding his bicycle. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly). Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S36",
+   "part": "別れ",
+   "dur": 10.0,
+   "jp": "青いレーサーを差し出すユウスケ。「これ、あずかっといて。……また、勝負しような」",
+   "prompt": "Close-up by the moving truck: YUSUKE holds out his translucent blue toy race car to HARUTO with both hands, looking down, trying not to cry; HARUTO reaching out to take it; soft morning light.",
+   "refs": [
+    "haruto",
+    "yusuke"
+   ],
+   "move": "in",
+   "fx": [
+    "dust"
+   ],
+   "amb": [
+    "morning_end"
+   ],
+   "sfx": [],
+   "line": "L3",
+   "text": null,
+   "overlay": null,
+   "bgm": "M4",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The buzz-cut boy holds out the blue toy car, the other boy slowly takes it, both look down holding back tears.",
+   "img": null,
+   "start": 321.0,
+   "full_prompt": "Close-up by the moving truck: YUSUKE holds out his translucent blue toy race car to HARUTO with both hands, looking down, trying not to cry; HARUTO reaching out to take it; soft morning light. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S37",
+   "part": "別れ",
+   "dur": 9.0,
+   "jp": "田んぼの一本道を去るトラック。立ち止まるハルトの後ろ姿。",
+   "prompt": "Wide shot: the small moving truck drives away down a long straight road between golden rice fields; HARUTO has stopped running in the middle of the road, seen from behind, holding the blue toy race car; vast sky.",
+   "refs": [
+    "haruto"
+   ],
+   "move": "out",
+   "fx": [
+    "rays"
+   ],
+   "amb": [
+    "truck_away",
+    "dusk"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M4",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The moving truck drives away down the long road, the boy stands still watching it go, the rice sways in the wind.",
+   "img": null,
+   "start": 331.0,
+   "full_prompt": "Wide shot: the small moving truck drives away down a long straight road between golden rice fields; HARUTO has stopped running in the middle of the road, seen from behind, holding the blue toy race car; vast sky. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S38",
+   "part": "別れ",
+   "dur": 8.5,
+   "jp": "秋。すすきの土手。青いレーサーと、寄りそう柴犬。",
+   "prompt": "Early autumn: HARUTO sits alone on a riverbank covered with silver pampas grass swaying in the wind, holding the blue toy race car, the red Shiba Inu sitting close beside him leaning on his arm, red dragonflies, clear high autumn sky, melancholic but peaceful.",
+   "refs": [
+    "haruto",
+    "shiba"
+   ],
+   "move": "pan_l",
+   "fx": [
+    "dust"
+   ],
+   "amb": [
+    "autumn_wind"
+   ],
+   "sfx": [
+    [
+     "dog_bell",
+     3.0,
+     -20
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M4",
+   "era": "1997",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The silver pampas grass sways in the wind, the dog leans against the boy, red dragonflies drift by.",
+   "img": null,
+   "start": 340.0,
+   "full_prompt": "Early autumn: HARUTO sits alone on a riverbank covered with silver pampas grass swaying in the wind, holding the blue toy race car, the red Shiba Inu sitting close beside him leaning on his arm, red dragonflies, clear high autumn sky, melancholic but peaceful. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); the dog is the red Shiba Inu from the attached reference photo (same face, coat and red collar with a small brass bell). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "S39",
+   "part": "別れ",
+   "dur": 8.5,
+   "jp": "青いレーサー、電子ペット、写真を缶にしまう手。",
+   "prompt": "Close-up photo: a boy's hands placing a translucent blue toy race car, a white egg-shaped virtual pet toy and a few photo prints into a blue square metal cookie tin with a flower pattern, on a tatami floor, soft autumn light.",
+   "refs": [],
+   "move": "in",
+   "fx": [
+    "dust"
+   ],
+   "amb": [
+    "room_1997"
+   ],
+   "sfx": [
+    [
+     "tin_lid",
+     6.0,
+     -12
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M4",
+   "era": "1997",
+   "xfade": 2.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The boy's hands gently place the toy car, the virtual pet and the photos into the tin.",
+   "img": null,
+   "start": 348.5,
+   "full_prompt": "Close-up photo: a boy's hands placing a translucent blue toy race car, a white egg-shaped virtual pet toy and a few photo prints into a blue square metal cookie tin with a flower pattern, on a tatami floor, soft autumn light. Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "E00",
+   "part": "エピローグ",
+   "dur": 7.0,
+   "jp": "2026年秋。片付け中の実家の外観。",
+   "prompt": "An old two-story wooden Japanese family house with a grey tiled roof in a quiet seaside town on an autumn afternoon; its sliding front door is open and several cardboard moving boxes are stacked by the entrance; a small white kei truck with no markings parked in front; a persimmon tree with orange fruit; long soft golden shadows. No people.",
+   "refs": [],
+   "move": "in",
+   "fx": [
+    "dust"
+   ],
+   "amb": [
+    "autumn_day"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M4",
+   "era": "2026",
+   "xfade": 2.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "Autumn leaves fall slowly, the persimmon tree sways gently, long soft shadows, steady camera.",
+   "img": null,
+   "start": 357.0,
+   "full_prompt": "An old two-story wooden Japanese family house with a grey tiled roof in a quiet seaside town on an autumn afternoon; its sliding front door is open and several cardboard moving boxes are stacked by the entrance; a small white kei truck with no markings parked in front; a persimmon tree with orange fruit; long soft golden shadows. No people. Setting: Japan, autumn 2026 (present day). Photorealistic modern digital photograph, natural window light, slightly cool and calm tones, shallow depth of field. Not an illustration. Absolutely no text, letters, numbers, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "E01",
+   "part": "エピローグ",
+   "dur": 8.5,
+   "jp": "青いレーサーを手のひらにのせて微笑むハルト（39歳）。",
+   "prompt": "The man sits on the tatami floor of an emptied room among cardboard boxes, holding the small translucent blue toy race car in his palm and looking at it with a gentle smile, warm autumn afternoon light through the window.",
+   "refs": [
+    "adult"
+   ],
+   "move": "in",
+   "fx": [
+    "dust"
+   ],
+   "amb": [
+    "room_2026"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M4",
+   "era": "2026",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The man turns the small blue toy car in his palm and smiles gently, dust drifts in the window light.",
+   "img": null,
+   "start": 364.0,
+   "full_prompt": "The man sits on the tatami floor of an emptied room among cardboard boxes, holding the small translucent blue toy race car in his palm and looking at it with a gentle smile, warm autumn afternoon light through the window. Characters: the man is ADULT HARUTO from the attached reference photos (39 years old, charcoal sweater; keep his face and cowlick). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: Japan, autumn 2026 (present day). Photorealistic modern digital photograph, natural window light, slightly cool and calm tones, shallow depth of field. Not an illustration. Absolutely no text, letters, numbers, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "E02",
+   "part": "エピローグ",
+   "dur": 9.5,
+   "jp": "新しい単三電池でモーターが回る。「……まだ、走るじゃん」",
+   "prompt": "Close-up photo of the man's hands inserting two new AA batteries into the black chassis of the small translucent blue toy race car on the tatami, a torn plain battery blister pack nearby, shallow depth of field, warm light.",
+   "refs": [],
+   "move": "in",
+   "fx": [
+    "dust"
+   ],
+   "amb": [
+    "room_2026"
+   ],
+   "sfx": [
+    [
+     "battery",
+     1.0,
+     -12
+    ],
+    [
+     "battery",
+     1.7,
+     -12
+    ],
+    [
+     "switch",
+     3.0,
+     -12
+    ],
+    [
+     "motor_whir",
+     3.1,
+     -12
+    ]
+   ],
+   "line": "L4",
+   "text": null,
+   "overlay": null,
+   "bgm": "M4",
+   "era": "2026",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The man's fingers press two new AA batteries into the toy car chassis and flip the switch, the wheels begin to spin.",
+   "img": null,
+   "start": 372.5,
+   "full_prompt": "Close-up photo of the man's hands inserting two new AA batteries into the black chassis of the small translucent blue toy race car on the tatami, a torn plain battery blister pack nearby, shallow depth of field, warm light. Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: Japan, autumn 2026 (present day). Photorealistic modern digital photograph, natural window light, slightly cool and calm tones, shallow depth of field. Not an illustration. Absolutely no text, letters, numbers, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "E03",
+   "part": "エピローグ",
+   "dur": 8.5,
+   "jp": "電子ペットにも電池。ピッ――たまごが現れる。",
+   "prompt": "Close-up photo of a man's hand holding the old white egg-shaped virtual pet toy, its small rectangular LCD screen facing the camera directly and completely blank, plain pale grey-green; a small coin battery and a tiny screwdriver beside it on the tatami; warm afternoon light.",
+   "refs": [],
+   "move": "in",
+   "fx": [
+    "dust"
+   ],
+   "amb": [
+    "room_2026"
+   ],
+   "sfx": [
+    [
+     "pet_birth",
+     2.2,
+     -14
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": "pet_egg",
+   "bgm": "M4",
+   "era": "2026",
+   "xfade": 1.6,
+   "reveal": null,
+   "caption": null,
+   "motion": null,
+   "img": null,
+   "start": 382.0,
+   "full_prompt": "Close-up photo of a man's hand holding the old white egg-shaped virtual pet toy, its small rectangular LCD screen facing the camera directly and completely blank, plain pale grey-green; a small coin battery and a tiny screwdriver beside it on the tatami; warm afternoon light. Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: Japan, autumn 2026 (present day). Photorealistic modern digital photograph, natural window light, slightly cool and calm tones, shallow depth of field. Not an illustration. Absolutely no text, letters, numbers, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "E04",
+   "part": "エピローグ",
+   "dur": 8.0,
+   "jp": "窓辺で秋の空を見るハルト。窓辺に1997年の3人の写真。",
+   "prompt": "The man stands by the open window of the emptied room looking out at the autumn sky over the seaside town, holding the blue toy race car; on the windowsill an old photo print leans against the glass; curtains moving in the breeze; seen from behind, warm light.",
+   "refs": [
+    "adult"
+   ],
+   "move": "in",
+   "fx": [
+    "rays",
+    "dust"
+   ],
+   "amb": [
+    "room_2026",
+    "autumn_day"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M4",
+   "era": "2026",
+   "xfade": 2.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The man looks out of the window, the curtain moves in the breeze, the autumn light glows.",
+   "img": null,
+   "start": 390.5,
+   "full_prompt": "The man stands by the open window of the emptied room looking out at the autumn sky over the seaside town, holding the blue toy race car; on the windowsill an old photo print leans against the glass; curtains moving in the breeze; seen from behind, warm light. Characters: the man is ADULT HARUTO from the attached reference photos (39 years old, charcoal sweater; keep his face and cowlick). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: Japan, autumn 2026 (present day). Photorealistic modern digital photograph, natural window light, slightly cool and calm tones, shallow depth of field. Not an illustration. Absolutely no text, letters, numbers, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "E05",
+   "part": "エピローグ",
+   "dur": 11.0,
+   "jp": "1997年の夏へ。入道雲の下、レーサーを追いかけて走るふたり。",
+   "prompt": "A summer 1997 memory: HARUTO and YUSUKE run side by side along a long road between bright green rice fields, chasing their two small toy race cars racing ahead of them on the road, the red Shiba Inu running with them, under a gigantic white cumulonimbus cloud and deep blue sky, glowing sunlight, seen from behind.",
+   "refs": [
+    "haruto",
+    "yusuke",
+    "shiba"
+   ],
+   "move": "in",
+   "fx": [
+    "rays",
+    "dust"
+   ],
+   "amb": [
+    "day"
+   ],
+   "sfx": [
+    [
+     "motor_pass",
+     1.5,
+     -16
+    ]
+   ],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M4",
+   "era": "1997",
+   "xfade": 2.6,
+   "reveal": null,
+   "caption": null,
+   "motion": "The two boys and the dog run along the road chasing the toy cars, under the huge summer cloud, joyful natural motion.",
+   "img": null,
+   "start": 398.5,
+   "full_prompt": "A summer 1997 memory: HARUTO and YUSUKE run side by side along a long road between bright green rice fields, chasing their two small toy race cars racing ahead of them on the road, the red Shiba Inu running with them, under a gigantic white cumulonimbus cloud and deep blue sky, glowing sunlight, seen from behind. Characters: HARUTO is the boy in the attached reference photos with the faded sky-blue T-shirt with one thin white stripe (keep his face, cowlick hair and clothes exactly); YUSUKE is the buzz-cut boy in the attached reference photos with the white T-shirt with red raglan sleeves and a bandage on his left cheek (keep his face, hair and clothes exactly); the dog is the red Shiba Inu from the attached reference photo (same face, coat and red collar with a small brass bell). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "END",
+   "part": "エピローグ",
+   "dur": 9.0,
+   "jp": "エンドカード",
+   "prompt": null,
+   "refs": [],
+   "move": "none",
+   "fx": [],
+   "amb": [
+    "day_far"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": "end",
+   "overlay": null,
+   "bgm": "M4",
+   "era": "1997",
+   "xfade": 3.0,
+   "reveal": null,
+   "caption": null,
+   "motion": null,
+   "img": null,
+   "start": 409.5,
+   "full_prompt": null
+  },
+  {
+   "id": "A00",
+   "part": "余韻",
+   "dur": 6.0,
+   "jp": "見出し「あの夏の音」",
+   "prompt": null,
+   "refs": [],
+   "move": "none",
+   "fx": [],
+   "amb": [
+    "engawa_soft"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": "afterglow",
+   "overlay": null,
+   "bgm": "M5",
+   "era": "1997",
+   "xfade": 3.0,
+   "reveal": null,
+   "caption": null,
+   "motion": null,
+   "img": null,
+   "start": 418.5,
+   "full_prompt": null
+  },
+  {
+   "id": "A01",
+   "part": "余韻",
+   "dur": 30.0,
+   "jp": "無人の縁側。風鈴、扇風機、蚊取り線香、踏み石の上の柴犬。",
+   "prompt": "The quiet wooden engawa veranda of an old Japanese house at noon in summer 1997: a glass wind chime gently swaying, an electric fan, a pig-shaped mosquito coil holder with a thin line of smoke, a few toy car parts left on newspaper, the red Shiba Inu asleep on the stepping stone, bright green garden, dappled sunlight. No people.",
+   "refs": [
+    "shiba"
+   ],
+   "move": "in_slow",
+   "fx": [
+    "rays",
+    "dust"
+   ],
+   "amb": [
+    "engawa"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M5",
+   "era": "1997",
+   "xfade": 3.5,
+   "reveal": null,
+   "caption": null,
+   "motion": null,
+   "img": null,
+   "start": 424.5,
+   "full_prompt": "The quiet wooden engawa veranda of an old Japanese house at noon in summer 1997: a glass wind chime gently swaying, an electric fan, a pig-shaped mosquito coil holder with a thin line of smoke, a few toy car parts left on newspaper, the red Shiba Inu asleep on the stepping stone, bright green garden, dappled sunlight. No people. Characters: the dog is the red Shiba Inu from the attached reference photo (same face, coat and red collar with a small brass bell). Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "A02",
+   "part": "余韻",
+   "dur": 30.0,
+   "jp": "閉店後の模型店。夕日のコース。",
+   "prompt": "The empty small hobby shop at dusk after closing: the white three-lane toy race track on a big table bathed in orange sunset light from the window, dust floating in the light beams, plain kit boxes on shelves. No people.",
+   "refs": [],
+   "move": "pan_r_slow",
+   "fx": [
+    "dust"
+   ],
+   "amb": [
+    "shop_closed"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M5",
+   "era": "1997",
+   "xfade": 3.5,
+   "reveal": null,
+   "caption": null,
+   "motion": null,
+   "img": null,
+   "start": 454.5,
+   "full_prompt": "The empty small hobby shop at dusk after closing: the white three-lane toy race track on a big table bathed in orange sunset light from the window, dust floating in the light beams, plain kit boxes on shelves. No people. Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. The virtual pet is a small egg-shaped keychain toy with three round buttons and a small rectangular LCD screen, no logo. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "A03",
+   "part": "余韻",
+   "dur": 30.0,
+   "jp": "雨の木造バス停。",
+   "prompt": "A small wooden rural bus stop shelter in steady summer rain, a wooden bench inside, rice fields and misty green mountains beyond, rain dripping from the eaves, puddles rippling. No people.",
+   "refs": [],
+   "move": "in_slow",
+   "fx": [
+    "rain"
+   ],
+   "amb": [
+    "rain_soft",
+    "thunder_bed"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M5",
+   "era": "1997",
+   "xfade": 3.5,
+   "reveal": null,
+   "caption": null,
+   "motion": null,
+   "img": null,
+   "start": 484.5,
+   "full_prompt": "A small wooden rural bus stop shelter in steady summer rain, a wooden bench inside, rice fields and misty green mountains beyond, rain dripping from the eaves, puddles rippling. No people. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "A04",
+   "part": "余韻",
+   "dur": 30.0,
+   "jp": "夕焼けの田んぼと小さな鳥居。",
+   "prompt": "Golden rice fields at sunset with a small red shrine gate and a line of wooden utility poles, dragonflies in the air, glowing pink and orange clouds. No people.",
+   "refs": [],
+   "move": "pan_l_slow",
+   "fx": [
+    "rays",
+    "dust"
+   ],
+   "amb": [
+    "dusk"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M5",
+   "era": "1997",
+   "xfade": 3.5,
+   "reveal": null,
+   "caption": null,
+   "motion": null,
+   "img": null,
+   "start": 514.5,
+   "full_prompt": "Golden rice fields at sunset with a small red shrine gate and a line of wooden utility poles, dragonflies in the air, glowing pink and orange clouds. No people. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "A05",
+   "part": "余韻",
+   "dur": 30.0,
+   "jp": "夏の夜の町角。自販機の明かり。",
+   "prompt": "A summer night street corner in a small 1990s Japanese town: a glowing drink vending machine with no readable text or logos, moths around a street light, a parked bicycle, a starry sky above the roofs. No people.",
+   "refs": [],
+   "move": "in_slow",
+   "fx": [],
+   "amb": [
+    "night",
+    "distant_train"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M5",
+   "era": "1997",
+   "xfade": 3.5,
+   "reveal": null,
+   "caption": null,
+   "motion": null,
+   "img": null,
+   "start": 544.5,
+   "full_prompt": "A summer night street corner in a small 1990s Japanese town: a glowing drink vending machine with no readable text or logos, moths around a street light, a parked bicycle, a starry sky above the roofs. No people. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "A06",
+   "part": "余韻",
+   "dur": 30.0,
+   "jp": "祭りのあとの神社。",
+   "prompt": "A small shrine after the summer festival late at night: paper lanterns still glowing softly, empty food stalls covered with cloth, a forgotten water balloon on the stone path. No people.",
+   "refs": [],
+   "move": "pan_r_slow",
+   "fx": [
+    "dust"
+   ],
+   "amb": [
+    "night_wind"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M5",
+   "era": "1997",
+   "xfade": 3.5,
+   "reveal": null,
+   "caption": null,
+   "motion": null,
+   "img": null,
+   "start": 574.5,
+   "full_prompt": "A small shrine after the summer festival late at night: paper lanterns still glowing softly, empty food stalls covered with cloth, a forgotten water balloon on the stone path. No people. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "A07",
+   "part": "余韻",
+   "dur": 30.0,
+   "jp": "居間のブラウン管テレビ（消えている）と、網戸の外の夜の庭。",
+   "prompt": "A dark 1990s Japanese living room late at night: a bulky CRT television switched off on a low wooden stand reflecting a little moonlight, a low table, an electric fan, the screen door open to the night garden where a wooden doghouse stands under the moon, fireflies of light from distant houses. No people.",
+   "refs": [],
+   "move": "in_slow",
+   "fx": [],
+   "amb": [
+    "night",
+    "fan"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M5",
+   "era": "1997",
+   "xfade": 3.5,
+   "reveal": null,
+   "caption": null,
+   "motion": null,
+   "img": null,
+   "start": 604.5,
+   "full_prompt": "A dark 1990s Japanese living room late at night: a bulky CRT television switched off on a low wooden stand reflecting a little moonlight, a low table, an electric fan, the screen door open to the night garden where a wooden doghouse stands under the moon, fireflies of light from distant houses. No people. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "A08",
+   "part": "余韻",
+   "dur": 30.0,
+   "jp": "海と町の上の入道雲。",
+   "prompt": "A vast summer afternoon sky with towering cumulonimbus clouds over the sea and a small Japanese seaside town, sunlight glittering on the water. No people.",
+   "refs": [],
+   "move": "pan_r_slow",
+   "fx": [
+    "rays"
+   ],
+   "amb": [
+    "day",
+    "sea"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M5",
+   "era": "1997",
+   "xfade": 3.5,
+   "reveal": null,
+   "caption": null,
+   "motion": null,
+   "img": null,
+   "start": 634.5,
+   "full_prompt": "A vast summer afternoon sky with towering cumulonimbus clouds over the sea and a small Japanese seaside town, sunlight glittering on the water. No people. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "A09",
+   "part": "余韻",
+   "dur": 30.0,
+   "jp": "夕暮れの踏切と2両の電車。",
+   "prompt": "A countryside railway crossing at dusk with its warning lights, a small two-car local train passing, rice fields, the sky deep orange and violet. No people.",
+   "refs": [],
+   "move": "in_slow",
+   "fx": [
+    "rays"
+   ],
+   "amb": [
+    "crossing"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M5",
+   "era": "1997",
+   "xfade": 3.5,
+   "reveal": null,
+   "caption": null,
+   "motion": null,
+   "img": null,
+   "start": 664.5,
+   "full_prompt": "A countryside railway crossing at dusk with its warning lights, a small two-car local train passing, rice fields, the sky deep orange and violet. No people. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  },
+  {
+   "id": "A10",
+   "part": "余韻",
+   "dur": 30.0,
+   "jp": "夏の終わりの朝もや。川と土手の道。",
+   "prompt": "Morning mist over a river and a small town at the end of summer, an empty embankment path, dew on the grass, soft pale golden light. No people.",
+   "refs": [],
+   "move": "out_slow",
+   "fx": [
+    "rays",
+    "dust"
+   ],
+   "amb": [
+    "morning_end",
+    "river"
+   ],
+   "sfx": [],
+   "line": null,
+   "text": null,
+   "overlay": null,
+   "bgm": "M5",
+   "era": "1997",
+   "xfade": 3.5,
+   "reveal": null,
+   "caption": null,
+   "motion": null,
+   "img": null,
+   "start": 694.5,
+   "full_prompt": "Morning mist over a river and a small town at the end of summer, an empty embankment path, dew on the grass, soft pale golden light. No people. Setting: a small seaside town in Japan, summer 1997. Everything must be period-accurate for 1997 Japan (no smartphones, no flat-screen TVs, no modern cars, no modern signage). Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere."
+  }
+ ],
+ "lines": {
+  "G1": {
+   "who": "おばあちゃん",
+   "text": "はい、お小遣い。むだづかいしちゃ、だめよ。",
+   "voice": "Vindemiatrix",
+   "at": 2.2,
+   "profile": "A very old Japanese grandmother in her late 70s with a thin, slightly hoarse and gentle elderly voice.",
+   "scene": "On the veranda on a summer morning, giving her grandson two 100-yen coins of pocket money.",
+   "notes": "Speak slowly and softly like an elderly woman, warm, with a little tremble of age."
+  },
+  "C1": {
+   "who": "ハルト（10歳）",
+   "text": "あのさ……おれ、なつみのこと……すき、かも。",
+   "voice": "Puck",
+   "at": 1.2,
+   "profile": "A 10-year-old Japanese boy.",
+   "scene": "At dusk in a small park, shyly confessing to a girl in his class.",
+   "notes": "Speak very shyly and quietly, hesitating, with small pauses, embarrassed but sincere."
+  },
+  "C2": {
+   "who": "ナツミ（10歳）",
+   "text": "……しってたよ。",
+   "voice": "Leda",
+   "at": 8.8,
+   "profile": "A 10-year-old Japanese girl.",
+   "scene": "A boy just shyly confessed that he likes her, at dusk in a park.",
+   "notes": "Speak softly with a small embarrassed giggle, warm and kind."
+  },
+  "L1": {
+   "who": "ユウスケ",
+   "text": "なあ、あしたも走らせに行こうぜ。",
+   "voice": "Fenrir",
+   "at": 2.2,
+   "profile": "A 10-year-old Japanese boy.",
+   "scene": "Summer dusk in 1997, walking home with his best friend, pushing bicycles along a river.",
+   "notes": "Speak casually and cheerfully, a little teasing, warm."
+  },
+  "L2": {
+   "who": "ユウスケ",
+   "text": "……おれ、ひっこすんだ。",
+   "voice": "Fenrir",
+   "at": 3.0,
+   "profile": "A 10-year-old Japanese boy.",
+   "scene": "Sitting on a riverbank at sunset, telling his best friend that his family is moving away.",
+   "notes": "Speak very quietly and slowly, looking down, trying to sound casual but sad."
+  },
+  "L3": {
+   "who": "ユウスケ",
+   "text": "これ、あずかっといて。……また、勝負しような。",
+   "voice": "Fenrir",
+   "at": 2.0,
+   "profile": "A 10-year-old Japanese boy.",
+   "scene": "The morning he moves away, handing his favorite toy race car to his best friend.",
+   "notes": "Speak slowly and quietly, holding back tears, with a brave small smile at the end. Pause between the two sentences. Say the last word exactly as written: shiyou-na."
+  },
+  "L4": {
+   "who": "大人のハルト",
+   "text": "……まだ、走るじゃん。",
+   "voice": "Charon",
+   "at": 4.6,
+   "profile": "A Japanese man around 40 years old.",
+   "scene": "Alone in his childhood room, he just put new batteries into his old toy race car and the motor started spinning.",
+   "notes": "Speak very quietly to himself, with a small warm laugh before the words."
+  },
+  "M1": {
+   "who": "母（声のみ）",
+   "text": "ハルトー、ごはんよー。",
+   "voice": "Kore",
+   "at": -1.6,
+   "far": true,
+   "profile": "A Japanese mother in her late 30s.",
+   "scene": "Calling her son for dinner from the kitchen window at dusk in 1997.",
+   "notes": "Call out warmly from a distance, relaxed and natural."
+  }
+ },
+ "music": {
+  "M0": {
+   "model": "lyria-3-clip-preview",
+   "prompt": "existing"
+  },
+  "M1": {
+   "model": "lyria-3.5",
+   "prompt": "existing"
+  },
+  "M3": {
+   "model": "lyria-3.5",
+   "prompt": "existing"
+  },
+  "M4": {
+   "model": "lyria-3.5",
+   "prompt": "existing"
+  },
+  "M2": {
+   "model": "lyria-3.5",
+   "prompt": "Instrumental only, no vocals, no drums. Light, warm and playful but calm Japanese film score for kids spending a lazy summer afternoon tinkering with toy race cars and playing baseball in a park in the 1990s: acoustic piano, pizzicato strings, soft nylon guitar, a little celesta, 88 BPM, G major, cozy, never loud, smooth ending."
+  },
+  "M5a": {
+   "model": "lyria-3.5",
+   "prompt": "Instrumental only, no vocals, no drums, no percussion. Very calm ambient piano for relaxing, studying and sleeping, evoking a quiet summer evening in rural Japan in the 1990s: soft felt piano with long pauses, a faint warm string pad, slow 60 BPM, F major, minimal, peaceful and steady with no sudden changes."
+  },
+  "M5b": {
+   "model": "lyria-3.5",
+   "prompt": "Instrumental only, no vocals, no drums, no percussion. Very calm ambient piano for relaxing and studying, evoking a quiet late-summer night in a small Japanese seaside town in the 1990s: soft felt piano, sparse gentle melody, a faint warm pad, slow 58 BPM, D major, peaceful and steady with no sudden changes."
+  }
+ },
+ "style": {
+  "y1997": "Photorealistic candid snapshot taken in Japan in 1997 on 35mm color negative film: natural light, soft warm colors, mild film grain, slight lens vignetting, realistic skin, hair and fabric textures, authentic everyday details. It must look like a real photograph from a family album — not an illustration, not anime, not a 3D render, not a glossy modern photo. Ordinary-looking people, no celebrities. Absolutely no text, letters, numbers, readable signs, logos, brand names or watermark anywhere.",
+  "y2026": "Photorealistic modern digital photograph, natural window light, slightly cool and calm tones, shallow depth of field. Not an illustration. Absolutely no text, letters, numbers, logos, brand names or watermark anywhere."
+ }
+}

@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
 """音のミックス：BGM・環境音・効果音・セリフを scenes.json の時刻どおりに並べ、-14 LUFS に整える。
 
-  python3 pipeline/mix.py            → work/mix_raw.wav, out/電池の夏_audio.wav
+  PROJ=作品フォルダ python3 mix.py   → out/<out_name>_audio.wav, work/mix_report.json
+
+scenes.json の meta で調整できるもの（すべて省略可）：
+  music_gain     {"M5": -6}        曲ごとの音量（dB）
+  music_preroll  {"M1": 1.2}       区間の何秒前から鳴らし始めるか（転換の無音の谷を浅くする）
+  music_fade_in  {"M1": 4, "M5": 4} 入りのフェード秒（既定 3）
+  afterglow_part "余韻"             環境音パートの part 名（ここから先は平準化の目標を2dB下げ、環境音を上げる）
+  amb_gain_story / amb_gain_after   環境音の音量（dB、既定 -1 / +4）
+セリフ（lines）の far=True は遠くからの声（こもらせて小さく、周りを下げない）、room=[秒, 量] で響きを変える。
 """
 import json, os, sys, subprocess, wave, re, hashlib
 import numpy as np
@@ -10,23 +18,25 @@ import sfx
 from sfx import SR, rng, fade, place, reverb, lp, hp
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-# 作品フォルダ（scenes.json・assets・out・work がある所）。環境変数 PROJ で切り替え
-ROOT = os.environ.get("PROJ") or os.path.dirname(HERE)
+# 作品フォルダ（scenes.json・assets・out・work がある所）。環境変数 PROJ（なければ今のフォルダ）
+ROOT = os.environ.get("PROJ") or os.getcwd()
 D = json.load(open(os.path.join(ROOT, "scenes.json"), encoding="utf-8"))
 SC = D["scenes"]; TOTAL = D["total"]
+META = D.get("meta", {})
 N = int((TOTAL + 1.0) * SR)
+NAME = META.get("out_name", "video")
+AFTER = META.get("afterglow_part", "余韻")
 
 import glob
-FALLBACK = {"M2": ["M2_box.wav"], "M5": ["M5_amb.wav"]}
 
 def music_files(k):
-    """assets/music/{k}.* → なければ {k}a, {k}b …（順につなぐ）→ なければ合成版"""
+    """assets/music/{k}.mp3|wav → なければ {k}a, {k}b …（順につなぐ）→ なければ合成版 {k}_*.wav（synth_music.py）"""
     d = os.path.join(ROOT, "assets/music")
     fs = sorted(glob.glob(os.path.join(d, f"{k}.mp3")) + glob.glob(os.path.join(d, f"{k}.wav")))
     if not fs:
         fs = sorted(f for f in glob.glob(os.path.join(d, f"{k}[a-z].*")) if f.endswith((".mp3", ".wav")))
     if not fs:
-        fs = [os.path.join(d, f) for f in FALLBACK.get(k, []) if os.path.exists(os.path.join(d, f))]
+        fs = sorted(glob.glob(os.path.join(d, f"{k}_*.wav")))
     return fs
 
 def voice_file(lid):
@@ -35,9 +45,11 @@ def voice_file(lid):
         if os.path.exists(p): return p
     return None
 # 区間ごとの音量（dB, 基準に対して）
-MUSIC_GAIN = {"M0": -1.0, "M1": 0.0, "M2": -1.5, "M3": 0.0, "M4": 0.0, "M5": -6.0}
-AMB_GAIN_STORY = -1.0
-AMB_GAIN_AFTER = +4.0
+MUSIC_GAIN = META.get("music_gain", {})
+PREROLL = META.get("music_preroll", {})
+FADE_IN = META.get("music_fade_in", {})
+AMB_GAIN_STORY = META.get("amb_gain_story", -1.0)
+AMB_GAIN_AFTER = META.get("amb_gain_after", +4.0)
 
 def db(x): return 10 ** (x / 20)
 
@@ -61,7 +73,7 @@ def xfade_after(i):
     return SC[i + 1]["xfade"] if i + 1 < len(SC) else 2.0
 
 def is_after(i):
-    return SC[i]["part"] == "余韻"
+    return SC[i]["part"] == AFTER
 
 # ───────── BGM ─────────
 def music_bus():
@@ -91,8 +103,7 @@ def music_bus():
             seg = fade(x, 0.4, 2.5)
             place(bus, seg, int((t0 + 0.6) * SR))
             report.append((k, t0 + 0.6, t0 + 0.6 + len(seg) / SR)); continue
-        if k == "M1":  # タイトルの白い転換の手前から重ねて、無音の谷を浅く
-            t0 -= 1.2
+        t0 -= PREROLL.get(k, 0.0)   # 転換の手前から重ねて、無音の谷を浅く
         need = int((t1 - t0 + tail) * SR)
         if len(x) < need:  # 足りなければ4秒のクロスフェードでつなぐ
             reps = [x]
@@ -103,7 +114,7 @@ def music_bus():
                 y = np.concatenate([y[:-c], y[-c:] * np.linspace(1, 0, c)[:, None] + r[:c] * np.linspace(0, 1, c)[:, None], r[c:]])
             x = y
         seg = x[:need]
-        fi = 4.0 if k in ("M1", "M5") else 3.0
+        fi = FADE_IN.get(k, 3.0)
         seg = fade(seg, fi, 4.0)
         place(bus, seg, int(t0 * SR))
         report.append((k, t0, t1 + tail))
@@ -124,6 +135,7 @@ def amb_bus():
             fin = SC[i]["xfade"] if i > 0 else 1.5
             fout = xfade_after(j)
             dur = (t1 - t0) + fout + 0.2
+            if name not in sfx.AMB: sys.exit(f"環境音 {name!r} は sfx.AMB にありません（{', '.join(sorted(sfx.AMB))}）")
             x = sfx.AMB[name](dur, seed_of(name, SC[i]["id"]))
             g = AMB_GAIN_AFTER if is_after(i) else AMB_GAIN_STORY
             x = fade(x.astype(np.float64), fin, fout) * db(g)
@@ -138,6 +150,7 @@ def sfx_bus():
     n = 0
     for s in SC:
         for (name, off, g) in s["sfx"]:
+            if name not in sfx.ONE: sys.exit(f"効果音 {name!r} は sfx.ONE にありません（{', '.join(sorted(sfx.ONE))}）")
             x = sfx.ONE[name](rng(seed_of(name, s["id"], off)))
             x = x.astype(np.float64) * db(g + 12)
             place(bus, x, int((s["start"] + off) * SR))
@@ -170,7 +183,8 @@ def voice_bus():
                 st = lp(st, 2600, 2) * db(-9)
                 st = reverb(st, 1.6, 0.4, damp=4000)
             else:
-                st = reverb(st, 0.6 if lid == "L4" else 0.9, 0.12 if lid == "L4" else 0.16, damp=6000)
+                rt, wet = info.get("room", [0.9, 0.16])   # 部屋の響き（秒, 量）。狭い部屋なら [0.6, 0.12]
+                st = reverb(st, rt, wet, damp=6000)
             t = s["start"] + (info["at"] or 0)
             place(bus, st, int(t * SR))
             spans.append((lid, t, t + len(v) / SR, info["who"], info["text"]))
@@ -252,7 +266,7 @@ def cached(name, fn, key):
     return x, info
 
 def main():
-    os.makedirs(os.path.join(ROOT, "out"), exist_ok=True)
+    os.makedirs(os.path.join(ROOT, "out"), exist_ok=True); os.makedirs(os.path.join(ROOT, "work"), exist_ok=True)
     mus, mrep = music_bus(); print("music runs:", [(k, round(a, 1), round(b, 1)) for k, a, b in mrep])
     amb, na = cached("amb", amb_bus, [(s["id"], s["start"], s["dur"], s["xfade"], s["amb"], s["part"]) for s in SC] + [AMB_GAIN_STORY, AMB_GAIN_AFTER]); print("ambience segments:", na)
     fxb, nf = cached("sfx", sfx_bus, [(s["id"], s["start"], s["sfx"]) for s in SC]); print("one-shots:", nf)
@@ -260,7 +274,7 @@ def main():
     near = [x for x in spans if not D["lines"].get(x[0], {}).get("far")]  # 遠くの呼び声では周りを下げない
     mix = mus * duck_env(near, -7) + amb * duck_env(near, -4) + fxb * duck_env(near, -5) + voc
     mix = hp(mix, 28, 2)
-    t_after = next(s_["start"] for s_ in SC if s_["part"] == "余韻")
+    t_after = next((s_["start"] for s_ in SC if s_["part"] == AFTER), TOTAL)
     mix, linfo = leveler(mix, t_after); print("leveler (target, min gain, max gain):", linfo)
     raw = os.path.join(ROOT, "work/mix_raw.wav")
     pk = np.max(np.abs(mix)); pre = 0.5 / pk if pk > 0.5 else 1.0
@@ -269,11 +283,11 @@ def main():
     print(f"raw: I={I} LUFS LRA={LRA} TP={TP}")
     gain = db(-14.0 - I) * pre
     out = limiter(mix * gain, -4.0)
-    final = os.path.join(ROOT, "out/電池の夏_audio.wav")
+    final = os.path.join(ROOT, "out", f"{NAME}_audio.wav")
     write_wav(final, out)
     I2, LRA2, TP2 = ebur128(final)
     print(f"final: I={I2} LUFS LRA={LRA2} TP={TP2}")
-    json.dump(dict(music=mrep, lines=spans, loud=dict(I=I2, LRA=LRA2, TP=TP2)), open(os.path.join(ROOT, "work/mix_report.json"), "w"), ensure_ascii=False, indent=1)
+    json.dump(dict(audio=final, music=mrep, lines=spans, loud=dict(I=I2, LRA=LRA2, TP=TP2)), open(os.path.join(ROOT, "work/mix_report.json"), "w"), ensure_ascii=False, indent=1)
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,10 @@
+# 生成メディアは容量が大きいのでコミットしない（画像・音楽・声・フォント・中間ファイル）
+assets/*
+# 液晶の位置データは再現に必要なので残す
+!assets/overlay/
+work/
+out/*.mp4
+out/*.wav
+out/*.png
+out/*.jpg
+__pycache__/

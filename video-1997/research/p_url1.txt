@@ -1,0 +1,3 @@
+次のURLの内容を取得して、ページに含まれる「動画タイトル」「チャンネル名」「概要欄（説明文）全文」「公開日」「再生回数」「ハイライト表示されているコメント（lc パラメータで指定されたコメント）の本文」「その他取得できたコメント本文（原文のまま）」を書き出してください。取得できなかった項目は「取得できず」と書き、推測で埋めないでください。
+https://www.youtube.com/watch?v=HvmRCguoUAA&lc=UgwWz7u8raKGo7HTt2R4AaABAg
+https://www.youtube.com/watch?v=HvmRCguoUAA&lc=UgxZJkfbGNNlht7OdS94AaABAg

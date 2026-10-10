@@ -1,0 +1,381 @@
+[
+ {
+  "searchEntryPoint": {
+   "renderedContent": "<style>\n.container {\n  align-items: center;\n  border-radius: 8px;\n  display: flex;\n  font-family: Google Sans, Roboto, sans-serif;\n  font-size: 14px;\n  line-height: 20px;\n  padding: 8px 12px;\n}\n.chip {\n  display: inline-block;\n  border: solid 1px;\n  border-radius: 16px;\n  min-width: 14px;\n  padding: 5px 16px;\n  text-align: center;\n  user-select: none;\n  margin: 0 8px;\n  -webkit-tap-highlight-color: transparent;\n}\n.carousel {\n  overflow: auto;\n  scrollbar-width: none;\n  white-space: nowrap;\n  margin-right: -12px;\n}\n.headline {\n  display: flex;\n  margin-right: 4px;\n}\n.gradient-container {\n  position: relative;\n}\n.gradient {\n  position: absolute;\n  transform: translate(3px, -9px);\n  height: 36px;\n  width: 9px;\n}\n@media (prefers-color-scheme: light) {\n  .container {\n    background-color: #fafafa;\n    box-shadow: 0 0 0 1px #0000000f;\n  }\n  .headline-label {\n    color: #1f1f1f;\n  }\n  .chip {\n    background-color: #ffffff;\n    border-color: #d2d2d2;\n    color: #5e5e5e;\n    text-decoration: none;\n  }\n  .chip:hover {\n    background-color: #f2f2f2;\n  }\n  .chip:focus {\n    background-color: #f2f2f2;\n  }\n  .chip:active {\n    background-color: #d8d8d8;\n    border-color: #b6b6b6;\n  }\n  .logo-dark {\n    display: none;\n  }\n  .gradient {\n    background: linear-gradient(90deg, #fafafa 15%, #fafafa00 100%);\n  }\n}\n@media (prefers-color-scheme: dark) {\n  .container {\n    background-color: #1f1f1f;\n    box-shadow: 0 0 0 1px #ffffff26;\n  }\n  .headline-label {\n    color: #fff;\n  }\n  .chip {\n    background-color: #2c2c2c;\n    border-color: #3c4043;\n    color: #fff;\n    text-decoration: none;\n  }\n  .chip:hover {\n    background-color: #353536;\n  }\n  .chip:focus {\n    background-color: #353536;\n  }\n  .chip:active {\n    background-color: #464849;\n    border-color: #53575b;\n  }\n  .logo-light {\n    display: none;\n  }\n  .gradient {\n    background: linear-gradient(90deg, #1f1f1f 15%, #1f1f1f00 100%);\n  }\n}\n</style>\n<div class=\"container\">\n  <div class=\"headline\">\n    <svg class=\"logo-light\" width=\"18\" height=\"18\" viewBox=\"9 9 35 35\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n      <path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M42.8622 27.0064C42.8622 25.7839 42.7525 24.6084 42.5487 23.4799H26.3109V30.1568H35.5897C35.1821 32.3041 33.9596 34.1222 32.1258 35.3448V39.6864H37.7213C40.9814 36.677 42.8622 32.2571 42.8622 27.0064V27.0064Z\" fill=\"#4285F4\"/>\n      <path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M26.3109 43.8555C30.9659 43.8555 34.8687 42.3195 37.7213 39.6863L32.1258 35.3447C30.5898 36.3792 28.6306 37.0061 26.3109 37.0061C21.8282 37.0061 18.0195 33.9811 16.6559 29.906H10.9194V34.3573C13.7563 39.9841 19.5712 43.8555 26.3109 43.8555V43.8555Z\" fill=\"#34A853\"/>\n      <path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M16.6559 29.8904C16.3111 28.8559 16.1074 27.7588 16.1074 26.6146C16.1074 25.4704 16.3111 24.3733 16.6559 23.3388V18.8875H10.9194C9.74388 21.2072 9.06992 23.8247 9.06992 26.6146C9.06992 29.4045 9.74388 32.022 10.9194 34.3417L15.3864 30.8621L16.6559 29.8904V29.8904Z\" fill=\"#FBBC05\"/>\n      <path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M26.3109 16.2386C28.85 16.2386 31.107 17.1164 32.9095 18.8091L37.8466 13.8719C34.853 11.082 30.9659 9.3736 26.3109 9.3736C19.5712 9.3736 13.7563 13.245 10.9194 18.8875L16.6559 23.3388C18.0195 19.2636 21.8282 16.2386 26.3109 16.2386V16.2386Z\" fill=\"#EA4335\"/>\n    </svg>\n    <svg class=\"logo-dark\" width=\"18\" height=\"18\" viewBox=\"0 0 48 48\" xmlns=\"http://www.w3.org/2000/svg\">\n      <circle cx=\"24\" cy=\"23\" fill=\"#FFF\" r=\"22\"/>\n      <path d=\"M33.76 34.26c2.75-2.56 4.49-6.37 4.49-11.26 0-.89-.08-1.84-.29-3H24.01v5.99h8.03c-.4 2.02-1.5 3.56-3.07 4.56v.75l3.91 2.97h.88z\" fill=\"#4285F4\"/>\n      <path d=\"M15.58 25.77A8.845 8.845 0 0 0 24 31.86c1.92 0 3.62-.46 4.97-1.31l4.79 3.71C31.14 36.7 27.65 38 24 38c-5.93 0-11.01-3.4-13.45-8.36l.17-1.01 4.06-2.85h.8z\" fill=\"#34A853\"/>\n      <path d=\"M15.59 20.21a8.864 8.864 0 0 0 0 5.58l-5.03 3.86c-.98-2-1.53-4.25-1.53-6.64 0-2.39.55-4.64 1.53-6.64l1-.22 3.81 2.98.22 1.08z\" fill=\"#FBBC05\"/>\n      <path d=\"M24 14.14c2.11 0 4.02.75 5.52 1.98l4.36-4.36C31.22 9.43 27.81 8 24 8c-5.93 0-11.01 3.4-13.45 8.36l5.03 3.85A8.86 8.86 0 0 1 24 14.14z\" fill=\"#EA4335\"/>\n    </svg>\n    <div class=\"gradient-container\"><div class=\"gradient\"></div></div>\n  </div>\n  <div class=\"carousel\">\n<a class=\"chip\" href=\"https://www.google.com/search?q=%22dQYrPlt52Uc%22&client=app-vertex-grounding&safesearch=active\">&quot;dQYrPlt52Uc&quot;</a>\n<a class=\"chip\" href=\"https://www.google.com/search?q=%22Unknown+World%22+%22%E9%81%95%E5%92%8C%E6%84%9F%E3%81%AE%E3%81%82%E3%82%8B%E6%98%AD%E5%92%8C%E3%81%AE%E9%A2%A8%E6%99%AF%22+site:youtube.com&client=app-vertex-grounding&safesearch=active\">&quot;Unknown World&quot; &quot;違和感のある昭和の風景&quot; site:youtube.com</a>\n<a class=\"chip\" href=\"https://www.google.com/search?q=%22Unknown+World%22+%22100%E5%B9%B4%E4%BB%A5%E4%B8%8A%E5%89%8D%22+site:youtube.com&client=app-vertex-grounding&safesearch=active\">&quot;Unknown World&quot; &quot;100年以上前&quot; site:youtube.com</a>\n<a class=\"chip\" href=\"https://www.google.com/search?q=%22Unknown+World%22+%22%E6%98%AD%E5%92%8C%E3%81%8C%E7%B5%82%E3%82%8F%E3%82%89%E3%81%AA%E3%81%8B%E3%81%A3%E3%81%9F%E4%B8%96%E7%95%8C%22+site:youtube.com&client=app-vertex-grounding&safesearch=active\">&quot;Unknown World&quot; &quot;昭和が終わらなかった世界&quot; site:youtube.com</a>\n<a class=\"chip\" href=\"https://www.google.com/search?q=%22HvmRCguoUAA%22&client=app-vertex-grounding&safesearch=active\">&quot;HvmRCguoUAA&quot;</a>\n<a class=\"chip\" href=\"https://www.google.com/search?q=%22Unknown+World%22+%22HvmRCguoUAA%22+site:youtube.com&client=app-vertex-grounding&safesearch=active\">&quot;Unknown World&quot; &quot;HvmRCguoUAA&quot; site:youtube.com</a>\n<a class=\"chip\" href=\"https://www.google.com/search?q=%22Unknown+World%22+%22%E6%98%AD%E5%92%8C50%22&client=app-vertex-grounding&safesearch=active\">&quot;Unknown World&quot; &quot;昭和50&quot;</a>\n<a class=\"chip\" href=\"https://www.google.com/search?q=%22Unknown+World%22+%221990%E5%B9%B4%22+site:youtube.com&client=app-vertex-grounding&safesearch=active\">&quot;Unknown World&quot; &quot;1990年&quot; site:youtube.com</a>\n  </div>\n</div>"
+  },
+  "groundingChunks": [
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQF74FqI-uDCpOG8zj6wjCwsrVa__gZki9c80cCKqqDWif2vQ4mQk-k_tLU74GKfnV74R7lt2bTJW6VSsU9suxftY23rYJCfkfCk1Q5rrBo6DaGicDqPXdioOCYyhxjBCvs=",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHrREIaMLtssxYjTVHKWcY4Ys-3tVymGuSJxkjHMX2-vyUD57fW7_ujEN5yejLN2oFoxQgYfR5Wk9lVY_tJ0Bhs8qreBt6zh8gt5tL7iv_lcik0UonsNoHn0GPuGXYx3vYl",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFXYBrFOL-Nv86Gz3F61z1wj4Tu9bOKlNuKmpCblQU-CIVf146XO1gbQ1-NapVdCc_AzzOBqjqQZ8aBNDICvYlAFQgGVK8PJ1OSB4ygu94lkb0XGS5nLErr2XySXJb2_pKl",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQH9rKdiirMLMjpFjZ27vlrPC7r54TsyilHS_zmhe1yy4N15pkT_JCSXVnbM5bckxbrW-dDOYSaVYZxMVuT76VfbO9oLxCogeSGumdoeIqwo-XRAJ60g3DzHS63huLpoZk6P",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGVYE72xVPGGM1hss-yHnQ4NckimxFK5httlsg2pUxtf8bcSp3uRGR_XjZM05F5HpVzdn2jRCOO2NUzl_Hn8ZPUcg6ifQKeQunDJ4BO8z5HLQsWfCOJaF6JkeyyPOhvyZ5A",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGSH6n0lYvJLMcSBiZjfAxz_UcxTgH1YZ8T4twAiMkkVgtcACGO0SdWtfivnmV78kqmKM7PdKvQeCXqJhbNYEyCCI5RKRJHcjGK_CicReX1sMpm7v45i8zsAKal2A123wCGokiBTMyWbvMLrD9kBrGnXI3wSX-DrUmAdwfET5lTypHHDT86rLlRPwek2PubGhqM1yGOMVxgKr5wHmERz1XU0JDjRHT4IWWxKkLvcWekIVf2uCQ=",
+     "title": "yahoo.co.jp"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGDoiWhQITeJxq_Kj5kUAvvQFMUL5lJR0_RnxWMrIoBsTXuIkt2P0tFZX2LQhELja93xEnYaCOUf-92gglrlesNWEyrBz-PPTDppNM2cVopqmBd1Klj2pgtubD3mNn2exxpR31eosGn",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHRlhFCrlcUhSjWK-TjJ7jKB72qRYA1iANIqFHjOLwMsYRymGaLT_2yz8LpeDdamhbVKO3gPAKMRm5UKa-OILBCwoR967JAbhG198BtOaXdQnlKBNTcwnhJJaMvXuIae54=",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHU0UPKKFofSCY1t_4T1lrJHdJBLAoL5UQ6-R4hRz2Nn94Q2R-rYxMu8raRqJdjDc54y8hgQisN3x0SUKWX9vpTAPa86wk6gZz4ytuUSk7nv-BBAhZVTchNGx7KkBYsAAc=",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQE37Zdc2Zvapgj1iFuYTEbjLxOQSKD82w0wWioHPqSKGfnmvAth16WWCFbZMVWynXsS22tr2Ybcr_6N4MWSGLS1Cryt1rUmClEqZBRRqyF5h2PyiSpjWM27A1GVxWeWV56l",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEyAdGQOiQWDcVYNM_EHtq-eybG6_JQr3T4ielZ3dzR56JLlmSo2srH8wpao9vKb-njvmpSiMlQcwPzw7GdZ5yRmOwXIw-lAR5sKIEjmKI99IyrN688-1mpfcvRPpOk1HGKPIdrv0kdPkiHHKf_lNclNOSJh-dz38P4ArnZRlso04saZFCQxakjVVILtIRGQN1eYW31p7xdt1ovbq0Isd4jkyqBzDzkiYltlnlbpCITkhxIhEYfAAkcFzhfzUD5M4W1YC5G0CW9Au9fUs3G6kILEDsh9XwzDvKS7g-Kpl_TwYsjfx9FZ7Bs49aM7sgeprGXfNTu990CNQBzwSzeFZczT2sdRzlJLIIG89TX0xO8chsd2BJWjH4G0fEFGIJJUHKo5pyV_eGte3Mnk6JggSRa9XajSdLnvNefFYRYUx6rW7SN8qqw8aOhUv0DJf1Fk2Pobjz9GouBFwXyuXS8t6HdV7dDRc51tKWYnJjtYw8_turJU3nwaXRpa_ZBqw9kPeWp6Ggf78ziop2a8w8GV_S8FZEvP83ZNfEBdNTU6Ghxl_GH80VNkHBlOpE3_hY6MxwXFbxf9UwWH2N4-4wEGTeuAhtyayaUb0qsRFl0uKGQ6f34YHYHJBjXqAjAfOoqG6ofvbwcsacuuZvc9N20EJlvxXMWL3OQvjs5BPT9DuBhyQgvTfdRTWBrxJYtVSSMkKx_I-Qm01Wn0it7kgNuYgi565Lu9EnRYetNhq2jA7Ijg4NrbnRH0dSYPURSEMcHg7c7dtagourAm-2jvkc4DcjF5f8MeSJWda7p8t3Mp3bDQ4hxr5TJACBpnmpTKa3GHW4a8_CsUnoWPPjLL1gPl8LN9nX2BHQgXMHSSccP8t5QUazwqCB6U486vITLobwIOJyeXfK-fTsp8dxUxhbJTcqhbFjbjkYyUAUFAynqa50HEcGiE-pdVC1WquZQ4aLef__pnGZZmK-Yjk29gueEXlUJdWEIyFK-x-ojDSeQXvasSZVOLnGA2fr8znTVWs_kqN5m_d1dKi4g_qEgUMsmS9nONv9se87VjJmbp-1MljdtOLg=",
+     "title": "facebook.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFKpyUikPrnvWt1Qc0HZsRtCIf9QrcEyNIT9fBjoOoazXPj9JGf8KrgvXYlGZ6Fhy-SFmZtxMHXXUHfDLnq0dqUedqrKvlKQvtIsnplrtU_ZGAhkA5hdIemqSOKGCBVVqM=",
+     "title": "youtube.com"
+    }
+   }
+  ],
+  "groundingSupports": [
+   {
+    "segment": {
+     "endIndex": 162,
+     "text": "YouTubeチャンネル「Unknown World」（@Unknown_World_2xxx）および関連動画について、Google検索で確認できた結果は以下の通りです"
+    },
+    "groundingChunkIndices": [
+     0
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 541,
+     "endIndex": 920,
+     "text": "昭和が終わらなかった世界（サイバーパンクな異世界の日常）\n* **該当性**: 「Unknown World」ではなく、別チャンネル**「存在しない街の記憶」**（@存在しない街の記憶）による作品です（タイトル：『昭和が終わらなかった世界｜サイバーパンクな異世界の日常【AIアニメ｜60fps】』）"
+    },
+    "groundingChunkIndices": [
+     1
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 924,
+     "endIndex": 1069,
+     "text": "* **動画ID**: **不明**（Unknown Worldの動画ではないため）\n* **公開日**: 2026年5月16日頃（存在しない街の記憶 ch）"
+    },
+    "groundingChunkIndices": [
+     1
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 924,
+     "endIndex": 1119,
+     "text": "* **動画ID**: **不明**（Unknown Worldの動画ではないため）\n* **公開日**: 2026年5月16日頃（存在しない街の記憶 ch）\n* **再生回数**: 約17万回（確認時点）"
+    },
+    "groundingChunkIndices": [
+     1
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 924,
+     "endIndex": 1190,
+     "text": "* **動画ID**: **不明**（Unknown Worldの動画ではないため）\n* **公開日**: 2026年5月16日頃（存在しない街の記憶 ch）\n* **再生回数**: 約17万回（確認時点）\n* **長さ**: 不明（関連動画一覧上の表示枠では12:10）"
+    },
+    "groundingChunkIndices": [
+     1
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 924,
+     "endIndex": 1280,
+     "text": "* **動画ID**: **不明**（Unknown Worldの動画ではないため）\n* **公開日**: 2026年5月16日頃（存在しない街の記憶 ch）\n* **再生回数**: 約17万回（確認時点）\n* **長さ**: 不明（関連動画一覧上の表示枠では12:10）\n* **出典URL**: https://www.youtube.com/（※「存在しない街の記憶」動画）"
+    },
+    "groundingChunkIndices": [
+     1
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1295,
+     "endIndex": 1480,
+     "text": "違和感のある昭和の風景\n* **該当性**: 「Unknown World」ではなく、別チャンネル**「たなかのAI幻想ch」**（@たなかのAI幻想ch）による作品です"
+    },
+    "groundingChunkIndices": [
+     2,
+     3
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1484,
+     "endIndex": 1622,
+     "text": "* **動画ID**: **不明**（Unknown Worldの動画ではないため）\n* **公開日**: 2025年12月19日頃（たなかのAI幻想ch）"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1484,
+     "endIndex": 1672,
+     "text": "* **動画ID**: **不明**（Unknown Worldの動画ではないため）\n* **公開日**: 2025年12月19日頃（たなかのAI幻想ch）\n* **再生回数**: 約33万回（確認時点）"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1484,
+     "endIndex": 1778,
+     "text": "* **動画ID**: **不明**（Unknown Worldの動画ではないため）\n* **公開日**: 2025年12月19日頃（たなかのAI幻想ch）\n* **再生回数**: 約33万回（確認時点）\n* **長さ**: 不明\n* **出典URL**: https://www.youtube.com/（※「たなかのAI幻想ch」動画）"
+    },
+    "groundingChunkIndices": [
+     2
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1793,
+     "endIndex": 1933,
+     "text": "40年前の昭和の夏をAIで蘇らせた｜1986年、最後の夏休み\n* **動画IDの確認**: **HvmRCguoUAA** で一致しています"
+    },
+    "groundingChunkIndices": [
+     4,
+     5
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1793,
+     "endIndex": 1965,
+     "text": "40年前の昭和の夏をAIで蘇らせた｜1986年、最後の夏休み\n* **動画IDの確認**: **HvmRCguoUAA** で一致しています\n* **動画ID**: **HvmRCguoUAA**"
+    },
+    "groundingChunkIndices": [
+     4,
+     5
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1793,
+     "endIndex": 1999,
+     "text": "40年前の昭和の夏をAIで蘇らせた｜1986年、最後の夏休み\n* **動画IDの確認**: **HvmRCguoUAA** で一致しています\n* **動画ID**: **HvmRCguoUAA**\n* **公開日**: 2026年9月15日"
+    },
+    "groundingChunkIndices": [
+     4
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1793,
+     "endIndex": 2049,
+     "text": "40年前の昭和の夏をAIで蘇らせた｜1986年、最後の夏休み\n* **動画IDの確認**: **HvmRCguoUAA** で一致しています\n* **動画ID**: **HvmRCguoUAA**\n* **公開日**: 2026年9月15日\n* **再生回数**: 約28万回（確認時点）"
+    },
+    "groundingChunkIndices": [
+     6
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1793,
+     "endIndex": 2084,
+     "text": "40年前の昭和の夏をAIで蘇らせた｜1986年、最後の夏休み\n* **動画IDの確認**: **HvmRCguoUAA** で一致しています\n* **動画ID**: **HvmRCguoUAA**\n* **公開日**: 2026年9月15日\n* **再生回数**: 約28万回（確認時点）\n* **長さ**: 5分06秒（05:06）"
+    },
+    "groundingChunkIndices": [
+     6
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1793,
+     "endIndex": 2147,
+     "text": "40年前の昭和の夏をAIで蘇らせた｜1986年、最後の夏休み\n* **動画IDの確認**: **HvmRCguoUAA** で一致しています\n* **動画ID**: **HvmRCguoUAA**\n* **公開日**: 2026年9月15日\n* **再生回数**: 約28万回（確認時点）\n* **長さ**: 5分06秒（05:06）\n* **出典URL**: `https://www.youtube.com/watch?v=HvmRCguoUAA`"
+    },
+    "groundingChunkIndices": [
+     5
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2162,
+     "endIndex": 2353,
+     "text": "100年以上前の人々をAIで蘇らせてみた\n* **動画IDの確認**: **3Eke3c2nKic** で一致しています（同チャンネルの関連動画説明欄で紹介されています）"
+    },
+    "groundingChunkIndices": [
+     7,
+     8
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2162,
+     "endIndex": 2385,
+     "text": "100年以上前の人々をAIで蘇らせてみた\n* **動画IDの確認**: **3Eke3c2nKic** で一致しています（同チャンネルの関連動画説明欄で紹介されています）\n* **動画ID**: **3Eke3c2nKic**"
+    },
+    "groundingChunkIndices": [
+     7,
+     8
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2162,
+     "endIndex": 2443,
+     "text": "100年以上前の人々をAIで蘇らせてみた\n* **動画IDの確認**: **3Eke3c2nKic** で一致しています（同チャンネルの関連動画説明欄で紹介されています）\n* **動画ID**: **3Eke3c2nKic**\n* **公開日**: 不明（約1か月前の公開表示）"
+    },
+    "groundingChunkIndices": [
+     6
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2162,
+     "endIndex": 2494,
+     "text": "100年以上前の人々をAIで蘇らせてみた\n* **動画IDの確認**: **3Eke3c2nKic** で一致しています（同チャンネルの関連動画説明欄で紹介されています）\n* **動画ID**: **3Eke3c2nKic**\n* **公開日**: 不明（約1か月前の公開表示）\n* **再生回数**: 約220万回（確認時点）"
+    },
+    "groundingChunkIndices": [
+     6
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2162,
+     "endIndex": 2529,
+     "text": "100年以上前の人々をAIで蘇らせてみた\n* **動画IDの確認**: **3Eke3c2nKic** で一致しています（同チャンネルの関連動画説明欄で紹介されています）\n* **動画ID**: **3Eke3c2nKic**\n* **公開日**: 不明（約1か月前の公開表示）\n* **再生回数**: 約220万回（確認時点）\n* **長さ**: 3分37秒（03:37）"
+    },
+    "groundingChunkIndices": [
+     6
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2162,
+     "endIndex": 2592,
+     "text": "100年以上前の人々をAIで蘇らせてみた\n* **動画IDの確認**: **3Eke3c2nKic** で一致しています（同チャンネルの関連動画説明欄で紹介されています）\n* **動画ID**: **3Eke3c2nKic**\n* **公開日**: 不明（約1か月前の公開表示）\n* **再生回数**: 約220万回（確認時点）\n* **長さ**: 3分37秒（03:37）\n* **出典URL**: `https://www.youtube.com/watch?v=3Eke3c2nKic`"
+    },
+    "groundingChunkIndices": [
+     7,
+     8
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2713,
+     "endIndex": 2828,
+     "text": "1990年の日本をAIで再現**（英語表記：*Japan in 1990: From Showa to Heisei | AI-Recreated Nostalgia*）"
+    },
+    "groundingChunkIndices": [
+     9,
+     6
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2713,
+     "endIndex": 2862,
+     "text": "1990年の日本をAIで再現**（英語表記：*Japan in 1990: From Showa to Heisei | AI-Recreated Nostalgia*）\n  * **動画ID**: **dQYrPlt52Uc**"
+    },
+    "groundingChunkIndices": [
+     9,
+     10
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2713,
+     "endIndex": 2899,
+     "text": "1990年の日本をAIで再現**（英語表記：*Japan in 1990: From Showa to Heisei | AI-Recreated Nostalgia*）\n  * **動画ID**: **dQYrPlt52Uc**\n  * **長さ**: 4分45秒（04:45）"
+    },
+    "groundingChunkIndices": [
+     6
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2713,
+     "endIndex": 2952,
+     "text": "1990年の日本をAIで再現**（英語表記：*Japan in 1990: From Showa to Heisei | AI-Recreated Nostalgia*）\n  * **動画ID**: **dQYrPlt52Uc**\n  * **長さ**: 4分45秒（04:45）\n  * **再生回数**: 約8.1万回（確認時点）"
+    },
+    "groundingChunkIndices": [
+     6
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2713,
+     "endIndex": 3011,
+     "text": "1990年の日本をAIで再現**（英語表記：*Japan in 1990: From Showa to Heisei | AI-Recreated Nostalgia*）\n  * **動画ID**: **dQYrPlt52Uc**\n  * **長さ**: 4分45秒（04:45）\n  * **再生回数**: 約8.1万回（確認時点）\n  * **URL**: `https://www.youtube.com/watch?v=dQYrPlt52Uc`"
+    },
+    "groundingChunkIndices": [
+     9,
+     10
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2713,
+     "endIndex": 3185,
+     "text": "1990年の日本をAIで再現**（英語表記：*Japan in 1990: From Showa to Heisei | AI-Recreated Nostalgia*）\n  * **動画ID**: **dQYrPlt52Uc**\n  * **長さ**: 4分45秒（04:45）\n  * **再生回数**: 約8.1万回（確認時点）\n  * **URL**: `https://www.youtube.com/watch?v=dQYrPlt52Uc`\n  * ※この作品の関連として、未公開・NGカット集（『Unreleased & Outtakes — Cut Scenes from AI-Recreated Japan in 1990』）も公開されています"
+    },
+    "groundingChunkIndices": [
+     11
+    ]
+   }
+  ],
+  "webSearchQueries": [
+   "\"dQYrPlt52Uc\"",
+   "\"Unknown World\" \"違和感のある昭和の風景\" site:youtube.com",
+   "\"Unknown World\" \"100年以上前\" site:youtube.com",
+   "\"Unknown World\" \"昭和が終わらなかった世界\" site:youtube.com",
+   "\"HvmRCguoUAA\"",
+   "\"Unknown World\" \"HvmRCguoUAA\" site:youtube.com",
+   "\"Unknown World\" \"昭和50\"",
+   "\"Unknown World\" \"1990年\" site:youtube.com"
+  ]
+ }
+]

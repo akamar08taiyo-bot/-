@@ -1,0 +1,476 @@
+[
+ {
+  "searchEntryPoint": {
+   "renderedContent": "<style>\n.container {\n  align-items: center;\n  border-radius: 8px;\n  display: flex;\n  font-family: Google Sans, Roboto, sans-serif;\n  font-size: 14px;\n  line-height: 20px;\n  padding: 8px 12px;\n}\n.chip {\n  display: inline-block;\n  border: solid 1px;\n  border-radius: 16px;\n  min-width: 14px;\n  padding: 5px 16px;\n  text-align: center;\n  user-select: none;\n  margin: 0 8px;\n  -webkit-tap-highlight-color: transparent;\n}\n.carousel {\n  overflow: auto;\n  scrollbar-width: none;\n  white-space: nowrap;\n  margin-right: -12px;\n}\n.headline {\n  display: flex;\n  margin-right: 4px;\n}\n.gradient-container {\n  position: relative;\n}\n.gradient {\n  position: absolute;\n  transform: translate(3px, -9px);\n  height: 36px;\n  width: 9px;\n}\n@media (prefers-color-scheme: light) {\n  .container {\n    background-color: #fafafa;\n    box-shadow: 0 0 0 1px #0000000f;\n  }\n  .headline-label {\n    color: #1f1f1f;\n  }\n  .chip {\n    background-color: #ffffff;\n    border-color: #d2d2d2;\n    color: #5e5e5e;\n    text-decoration: none;\n  }\n  .chip:hover {\n    background-color: #f2f2f2;\n  }\n  .chip:focus {\n    background-color: #f2f2f2;\n  }\n  .chip:active {\n    background-color: #d8d8d8;\n    border-color: #b6b6b6;\n  }\n  .logo-dark {\n    display: none;\n  }\n  .gradient {\n    background: linear-gradient(90deg, #fafafa 15%, #fafafa00 100%);\n  }\n}\n@media (prefers-color-scheme: dark) {\n  .container {\n    background-color: #1f1f1f;\n    box-shadow: 0 0 0 1px #ffffff26;\n  }\n  .headline-label {\n    color: #fff;\n  }\n  .chip {\n    background-color: #2c2c2c;\n    border-color: #3c4043;\n    color: #fff;\n    text-decoration: none;\n  }\n  .chip:hover {\n    background-color: #353536;\n  }\n  .chip:focus {\n    background-color: #353536;\n  }\n  .chip:active {\n    background-color: #464849;\n    border-color: #53575b;\n  }\n  .logo-light {\n    display: none;\n  }\n  .gradient {\n    background: linear-gradient(90deg, #1f1f1f 15%, #1f1f1f00 100%);\n  }\n}\n</style>\n<div class=\"container\">\n  <div class=\"headline\">\n    <svg class=\"logo-light\" width=\"18\" height=\"18\" viewBox=\"9 9 35 35\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n      <path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M42.8622 27.0064C42.8622 25.7839 42.7525 24.6084 42.5487 23.4799H26.3109V30.1568H35.5897C35.1821 32.3041 33.9596 34.1222 32.1258 35.3448V39.6864H37.7213C40.9814 36.677 42.8622 32.2571 42.8622 27.0064V27.0064Z\" fill=\"#4285F4\"/>\n      <path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M26.3109 43.8555C30.9659 43.8555 34.8687 42.3195 37.7213 39.6863L32.1258 35.3447C30.5898 36.3792 28.6306 37.0061 26.3109 37.0061C21.8282 37.0061 18.0195 33.9811 16.6559 29.906H10.9194V34.3573C13.7563 39.9841 19.5712 43.8555 26.3109 43.8555V43.8555Z\" fill=\"#34A853\"/>\n      <path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M16.6559 29.8904C16.3111 28.8559 16.1074 27.7588 16.1074 26.6146C16.1074 25.4704 16.3111 24.3733 16.6559 23.3388V18.8875H10.9194C9.74388 21.2072 9.06992 23.8247 9.06992 26.6146C9.06992 29.4045 9.74388 32.022 10.9194 34.3417L15.3864 30.8621L16.6559 29.8904V29.8904Z\" fill=\"#FBBC05\"/>\n      <path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M26.3109 16.2386C28.85 16.2386 31.107 17.1164 32.9095 18.8091L37.8466 13.8719C34.853 11.082 30.9659 9.3736 26.3109 9.3736C19.5712 9.3736 13.7563 13.245 10.9194 18.8875L16.6559 23.3388C18.0195 19.2636 21.8282 16.2386 26.3109 16.2386V16.2386Z\" fill=\"#EA4335\"/>\n    </svg>\n    <svg class=\"logo-dark\" width=\"18\" height=\"18\" viewBox=\"0 0 48 48\" xmlns=\"http://www.w3.org/2000/svg\">\n      <circle cx=\"24\" cy=\"23\" fill=\"#FFF\" r=\"22\"/>\n      <path d=\"M33.76 34.26c2.75-2.56 4.49-6.37 4.49-11.26 0-.89-.08-1.84-.29-3H24.01v5.99h8.03c-.4 2.02-1.5 3.56-3.07 4.56v.75l3.91 2.97h.88z\" fill=\"#4285F4\"/>\n      <path d=\"M15.58 25.77A8.845 8.845 0 0 0 24 31.86c1.92 0 3.62-.46 4.97-1.31l4.79 3.71C31.14 36.7 27.65 38 24 38c-5.93 0-11.01-3.4-13.45-8.36l.17-1.01 4.06-2.85h.8z\" fill=\"#34A853\"/>\n      <path d=\"M15.59 20.21a8.864 8.864 0 0 0 0 5.58l-5.03 3.86c-.98-2-1.53-4.25-1.53-6.64 0-2.39.55-4.64 1.53-6.64l1-.22 3.81 2.98.22 1.08z\" fill=\"#FBBC05\"/>\n      <path d=\"M24 14.14c2.11 0 4.02.75 5.52 1.98l4.36-4.36C31.22 9.43 27.81 8 24 8c-5.93 0-11.01 3.4-13.45 8.36l5.03 3.85A8.86 8.86 0 0 1 24 14.14z\" fill=\"#EA4335\"/>\n    </svg>\n    <div class=\"gradient-container\"><div class=\"gradient\"></div></div>\n  </div>\n  <div class=\"carousel\">\n<a class=\"chip\" href=\"https://www.google.com/search?q=AI+%E6%98%AD%E5%92%8C+%E6%98%A0%E5%83%8F+%E5%AD%98%E5%9C%A8%E3%81%97%E3%81%AA%E3%81%84%E8%A8%98%E6%86%B6+Midjourney+Kling&client=app-vertex-grounding&safesearch=active\">AI 昭和 映像 存在しない記憶 Midjourney Kling</a>\n<a class=\"chip\" href=\"https://www.google.com/search?q=AI+%E6%98%AD%E5%92%8C+%E5%86%8D%E7%8F%BE+%E5%8B%95%E7%94%BB+%E8%A9%B1%E9%A1%8C&client=app-vertex-grounding&safesearch=active\">AI 昭和 再現 動画 話題</a>\n<a class=\"chip\" href=\"https://www.google.com/search?q=%22AI%22+%22%E6%98%AD%E5%92%8C%22+%22%E5%AD%98%E5%9C%A8%E3%81%97%E3%81%AA%E3%81%84%E8%A8%98%E6%86%B6%22+site:note.com&client=app-vertex-grounding&safesearch=active\">&quot;AI&quot; &quot;昭和&quot; &quot;存在しない記憶&quot; site:note.com</a>\n<a class=\"chip\" href=\"https://www.google.com/search?q=AI+%E6%98%AD%E5%92%8C+%E5%B9%B3%E6%88%90+%E5%86%8D%E7%8F%BE+%E5%8B%95%E7%94%BB+%E6%87%90%E3%81%8B%E3%81%97%E3%81%84+%E6%89%B9%E5%88%A4&client=app-vertex-grounding&safesearch=active\">AI 昭和 平成 再現 動画 懐かしい 批判</a>\n<a class=\"chip\" href=\"https://www.google.com/search?q=AI+%E6%98%AD%E5%92%8C%E3%83%AC%E3%83%88%E3%83%AD+%E5%8B%95%E7%94%BB+%E7%94%9F%E6%88%90+%E3%83%84%E3%83%BC%E3%83%AB&client=app-vertex-grounding&safesearch=active\">AI 昭和レトロ 動画 生成 ツール</a>\n<a class=\"chip\" href=\"https://www.google.com/search?q=%22AI%22+%22%E6%98%AD%E5%92%8C%22+%22%E4%B8%8D%E6%B0%97%E5%91%B3%E3%81%AE%E8%B0%B7%22+%E5%8B%95%E7%94%BB&client=app-vertex-grounding&safesearch=active\">&quot;AI&quot; &quot;昭和&quot; &quot;不気味の谷&quot; 動画</a>\n  </div>\n</div>"
+  },
+  "groundingChunks": [
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQH8KiP94B-17BYZ0WIdUbk9sMHbRC-5nKCbj8emK7Z2vO7-zucM36pw7nlPdC3jFyV4JFsEtQXIipDLg_i2mk7k_dtwyNp6hja7fONZB9ZCG-fe-V3G1JUuNZ0_C3PFF0n8",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHpLg3xoUcXWj5lSgie6SK3N49k7mn_WOL9e_RH-4sL9jf83Jekk6p6I0HqfFEGHe_TmMS0oqg5rA0SsenQnqWocC4yCsoMipOF8_-M4a1nD2eEoDbOLG0D5Z9BCD1Bg9GN",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFseYaXmBpPJ7liz15Ig3RRXaoWrbDd1UEnNg-08BHj2_v5X3iOIMl3z-GuwgYmgafmOdd-zLAFcQHmZ67yNwrCZyPXF9gQzjU4WX11svsq22aQel3WnNe2Vuagb26QlXFc",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGlKxxrFRPRLXx1Z9-lYeiLTUNju8OuiMZF4Bb8a31OrwjysWp71xhu6opuq-rhFUw6fSHnvC87S_aBg-rV5BKxXRmuZwpaWOdIRBM6GhDoEzvhlbp_ZxfkpWXoPfmUy3C-",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEpl6pn9a2_gbg0UDE49g6hkjLmPFL6oT_uilNPDdh2vYFhBI2EKW8CZ0YFpEFPSnOGZKZwUNHHBZYT-qdHsf-qgDHW39wxyLbyz1BMmmpduBSL9UQHwC5rQelwojtRLRx4",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQH_tbBT_7n7Wu4qkA8AR1TTnugpIPM9ZnciiNv0yobkia2x4iiWtJtC13_TaaUbbto2XRQevI6MQOoLBQckRws0UbtTdi44LbwmcwvfrdGbHbjxPkNOaZgttyxFFofKUb6fyFu7dJ89c-5rHKKtGoHB6_FswOUzFqJYvq_Xi02j3eR9bkDwpTpJ_cqmQB4=",
+     "title": "lemon8-app.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFthJXfLZ-R8wFf36PQl4g7QjprCqEMTeGmRCQHHXGj0RK1SpPss_eANE8WlIglTnDrvfuiRJdAFUcdpgHeF0cufhcXI2S5qikSfHRh4VTpGUC_YUSwxdIoKUiNXKV1NQXC",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGWjAQ6JpsxPAyHqGp_TXL4MSFnOgeVoHiso1ArTC7MxOkdAWqa5B258uqhWOTbrxvAfOQowtRhcOoOi-NdcBs1cHAmuAjHiet8vnQoToiZgPadxCI_oUsLEsAMRuYQJVsPm1Y=",
+     "title": "denfaminicogamer.jp"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEico5JgzOvH3_cBapQs1BS8FKmtTrTWCqVNghTcPV155Hf2CkqyAZYRHMYqjbFh4WmDwUIllJ7xmWfDAEse314mkEMzdJHh0yOh4e9T1XYZbTZDoMisOM_4nsWZI4gyw==",
+     "title": "note.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHjVJ968A6u6gmuPlnALUqK0MWyZ4W0BLSTObzhPuUqqt1uLGWodSy6DF1jTXD8Ken-a9HN7qHIOwukvmM538FfHXPp1PQJNzo2wgTM19V5JdfhEXvik9hRWNznpwomFWJV7b97",
+     "title": "note.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFthJXfLZ-R8wFf36PQl4g7QjprCqEMTeGmRCQHHXGj0RK1SpPss_eANE8WlIglTnDrvfuiRJdAFUcdpgHeF0cufhcXI2S5qikSfHRh4VTpGUC_YUSwxdIoKUiNXKV1NQXC",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFyV_cpf3f13ITtzVO7Tbyv27eba8CCex3Y6hVCabXajetRangnSc9y4CzwF75TXX4bCDM8EhiX5uJGAFYAWNAs21agwAstySIjoenv6By-r9GcHDQJAsib7J0E6t1ZTXkJ5mlACQU=",
+     "title": "youtu.be"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGbH3gnbKNhDPDJgW4112c31d2eB2TWF_QzmYxOLTnQMVnn-3StCLy8FoASXNP8lwBBMlokM5EjRhGe3-IPQKxTw-3Ice_WVsSnOiJA_hIoZsp69j_oVXAhUX1htmY_ODUf9QPj_lWF",
+     "title": "note.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQG7JkEmQ7I1hkkKRQ3Y_j4Y2Aw-fH868vQarAYPaMn97h3fBBi4fjbepfpmPek-Gk_FlWfaXxLN6T0NHKGJZUBha7-pqr8jn7L9Z-e14Buu02TjilfxjT1912ft5SgtvTA9",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHXFjTZR7NjPFx4zk_hOKJ2Y9VIzOUQ-r0u5iJApe9uVlcENaNCkUejjQhk5Wtowv3dT9smRZbHJZxyP8wn4DzwvZFTpMashpnrfU_ClSylzE5dvfFp8yxg",
+     "title": "shift-ai.co.jp"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHJUeIvjG5sjqIRuUogGQ-pu0wlKOVhrAKhL4yaVRGq7M3ELbPceS5PRknir9nLO30RKJCc42hKT9ne_UWssbUoJuHsyUZqWCVOdj8137lEM1vhMygjytj8he25RA_Cwe0=",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFEwT198JEK8b_GMXywsnYONK6f3itU5_cDuqEmXP7d2kNObRRJohlZjxXGt1LDMCWqumwuqWJJimySnUrwXCU6tVguZIfw_I2F8_NXw5e0GwyEwVr9-1Jr_ae0oOU67RZb",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHGdvzzu-1hqp4ymnfKVw6-em2a-JvjYFe4iWZGDAaE7baqMpYn9pWx_-Yw1Anl3dKSZFEf2mQC18yswrbmEEXhX98DCbXliZ7-5ozf5B1Qhgn1sW7BDYh1YJIsyg==",
+     "title": "note.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEZ0hK6LQwsKiyVp0RRf3WFe7_20PbERvlclQD5Pav1295qNfBViS2cMQyYNwmrkjZkoIiAeeJMPwtdHmxcd3X-FXt6_ZPRvsxV7XQTAdigpP3erzXLymBA9xnJ6mYSAiRp",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHEpDbbqlm9Ss2yc1h-p22uHRD2Kn5DBTQ-7gv5f8Q-zF_Vvaqw2NB68Zee4M-hkZWFu1cTx4Zx6os0qkEvkR-m4RkHYfJKcDMSNMrYl__ggXrtfIQuPg0VcvUnsdwkVYr4",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQH4tQO8K9GfvJ3FBcASWe8FqAX2POVJCMg-nksxzeCVUM3uF2N9X7M0094fi2vZgDVtCVZYvkaJsqaRhjGKCwoBOaGhkZaJ-O3qFkMrF6jIXUpR4jaBS4Zi-Y42_06NT3Ws",
+     "title": "note.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHK24CMQOBB1ptnZtyQMtN_EMjmW4uR-xZ7epBjaZ1GA2-GLCWKqc6JOhWxZ9l6rxuHHwKtwN7x_gQ7pr5CoRPv4LJI9rsGOvj1T_EovK_s0QQ6zpLrlZYKq6ohw7qVQbpxuWDFUtyE",
+     "title": "note.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFuSx4_VdHLuQ9RzdQvjwUi1KHDiIjT9w7ML6CPx5yAbFdGg4lo0654lW6Tuh3f4bL5-DlJIRt58NjbbVHRD1hCihk31_dvzXm4Peb0kupq_sRZzFsHwR1B-Dh4hH4YKjo_",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEwA-70LwLjuZCAnDIn3hCrDVSmeAx0YWrhKXXIBJLgyrFtGUH8n3_z96L6b1Oaez9ddDNXy7fq-t40-2gpbmsRmcf3JQNt18iad5QnPHTfk_NzHWzQFNg3SbyzwzNsOFAC",
+     "title": "youtube.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGlrRY69thqDwzxfJ6GN1WEU_ibZn6U6AWC-ku3bMOLF3P9VMFMWKS5t7aYR5OXpR02HdvIUWKLUJk2eQ13htoGAZUT9KPP_qSesUesvydNnML5TN0yfp8bv-oZi1drqQ==",
+     "title": "note.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFlk-BHnHbLW4Kqw2xbNSDbgzxE8FJrzsVzkJSkQajw-kKNh4rA7IUGCZz9uewFRaTwPakFi8lqxVehRsR8bj1D5lj9VfNxmn_L2lW8LvX-avyYSlZQCCMyVfMpC35XVE53ASbfHTgFpoP59i9Zqn6_6rey_G6EceMmFFTXeUhzF28BaUGuenJk-65Aa6pFIw-ErSE0dyys6TY1w_VIIU8WNQhvrpRv1p-NEuPYuLojFg==",
+     "title": "lancers.jp"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQE1OoWbl9vLIOgUGI6oCCIvFejiPBSaQCrpap0cML0Sd2bgOHyXYyD5XgLo6L-p5Qj-40CFwrq2NDEfSCyoLJd4N4-d9Dj99j91zRlHq6G9feJfgiDT7r-g3_ARdtZJa7kNJT57GOinwkB_aLeXXDG4KA==",
+     "title": "glbgpt.com"
+    }
+   },
+   {
+    "web": {
+     "uri": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGPO2L_vKXkPbj1mzJR3FSmNwAmvAmMpT2UzVwOc-9YAt7W9zDIpytFwHSygnb8dGBac8IoZZVbSdhn90CRDTYGQCC_HTW1runNIOncjfr4tPU597_KB2diQ2OuLWDOZb__iAEKP30_mLm0jg==",
+     "title": "flexclip.com"
+    }
+   }
+  ],
+  "groundingSupports": [
+   {
+    "segment": {
+     "startIndex": 247,
+     "endIndex": 685,
+     "text": "### 1) なぜ人気なのか（分析・背景）\n* **「ノスタルジー」と最新AI技術の融合**  \n  当時の白黒写真や褪せたカラーフィルムの質感、ブラウン管特有のにじみ・走査線、街並みの生活感を高精細かつ自然な動きで再現できるようになったことで、タイムスリップしたような没入感（POV体験など）が得られる点が評価されています"
+    },
+    "groundingChunkIndices": [
+     0,
+     1
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 689,
+     "endIndex": 1117,
+     "text": "* **「実在と架空の曖昧さ」によるロマン・情緒**  \n  単なる歴史再現にとどまらず、「存在しないのに、どこか懐かしい」というレトロフューチャーや架空の昭和都市（ソーラーパンクやメタボリズム建築を織り交ぜた日常）を描く世界観が、現代の視聴者の情緒や睡眠・作業用BGM動画としての需要とも合致しています"
+    },
+    "groundingChunkIndices": [
+     2,
+     3,
+     4
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1121,
+     "endIndex": 1384,
+     "text": "* **世代間ギャップと共有体験**  \n  当時を知らない若い世代には「レトロカルチャーの新鮮な体験」として、当時を知るシニア層には「懐かしい思い出の呼び起こし」として受け入れられています"
+    },
+    "groundingChunkIndices": [
+     5,
+     6
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1680,
+     "endIndex": 1773,
+     "text": "よく今スマホ使ってライン送ってくるな…この動画今度見せてみよ」"
+    },
+    "groundingChunkIndices": [
+     6
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1737,
+     "endIndex": 1884,
+     "text": "この動画今度見せてみよ」\n* **架空の風景に対するノスタルジー：**\n  > 「存在しないのに、なぜか懐かしい」"
+    },
+    "groundingChunkIndices": [
+     6,
+     3
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1737,
+     "endIndex": 2062,
+     "text": "この動画今度見せてみよ」\n* **架空の風景に対するノスタルジー：**\n  > 「存在しないのに、なぜか懐かしい」\n* **AIの粗さや特有の違和感への反応（アナログホラー・怪異系動画の視聴者）：**\n  > 「AI生成ながらその粗さを巧みに使っている」"
+    },
+    "groundingChunkIndices": [
+     7
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 1737,
+     "endIndex": 2162,
+     "text": "この動画今度見せてみよ」\n* **架空の風景に対するノスタルジー：**\n  > 「存在しないのに、なぜか懐かしい」\n* **AIの粗さや特有の違和感への反応（アナログホラー・怪異系動画の視聴者）：**\n  > 「AI生成ながらその粗さを巧みに使っている」  \n  > 「佐藤のメンタルが強すぎる」「ホラー苦手だけど安心して見れる」"
+    },
+    "groundingChunkIndices": [
+     7
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2169,
+     "endIndex": 2613,
+     "text": "### 3) 批判や懸念（「存在しない記憶」「不気味の谷」など）\n* **「存在しない記憶」と歴史の歪曲・誤認**  \n  ブログ等では、AIが当時の生活様式や時代考証に反したアイテム・描写（例：時代背景と合わない違和感の強い昭和像）を出力してしまい、事実と異なる「存在しない記憶」を定着させてしまうリスクが指摘されています"
+    },
+    "groundingChunkIndices": [
+     8,
+     9
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2616,
+     "endIndex": 2882,
+     "text": "そのため、制作者側が注意書きとして「実在の人物・出来事・歴史を正確に再現するものではなく、AIによる解釈と表現によって描かれた映像作品」と明記してトラブルを防ぐケースが増えています"
+    },
+    "groundingChunkIndices": [
+     10,
+     11
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 2886,
+     "endIndex": 3218,
+     "text": "* **「不気味の谷」現象とAI特有の不自然さ**  \n  人物の顔つきや視線の動き、群衆の挙動（真顔で踊る動きなど）にAI特有の歪みが生じやすく、「不気味の谷（Uncanny Valley）に陥ってしまう」という技術的な課題がクリエイターから挙げられています"
+    },
+    "groundingChunkIndices": [
+     12,
+     13,
+     14
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 3222,
+     "endIndex": 3482,
+     "text": "* **捏造・フェイク情報への懸念**  \n  「本物の記録映像」と見分けがつかないレベルに達した際、歴史的証拠の改ざんやフェイクドキュメンタリーによる誤情報拡散への懸念も指摘されています"
+    },
+    "groundingChunkIndices": [
+     15,
+     16
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 3665,
+     "endIndex": 3817,
+     "text": "* **画像生成（キーフレーム・ベース画像の作成）：**\n  * **Midjourney** / **ChatGPT (DALL-E / ChatGPT Images)** / **Google ImageFX**"
+    },
+    "groundingChunkIndices": [
+     17,
+     18,
+     19
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 3665,
+     "endIndex": 4008,
+     "text": "* **画像生成（キーフレーム・ベース画像の作成）：**\n  * **Midjourney** / **ChatGPT (DALL-E / ChatGPT Images)** / **Google ImageFX**  \n    ※「1970年代の日本」「フィルム粒子」「四隅の減光（ビネット）」などのプロンプトを指定し、まずベースとなるレトロな静止画を作成"
+    },
+    "groundingChunkIndices": [
+     20
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4012,
+     "endIndex": 4101,
+     "text": "* **動画生成（静止画の動的化／Text-to-Video）：**\n  * **Kling (Kling AI)**"
+    },
+    "groundingChunkIndices": [
+     21,
+     19
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4012,
+     "endIndex": 4142,
+     "text": "* **動画生成（静止画の動的化／Text-to-Video）：**\n  * **Kling (Kling AI)**  \n  * **Runway (Gen-2 / Gen-3 / Gen-4)**"
+    },
+    "groundingChunkIndices": [
+     22,
+     23
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4012,
+     "endIndex": 4172,
+     "text": "* **動画生成（静止画の動的化／Text-to-Video）：**\n  * **Kling (Kling AI)**  \n  * **Runway (Gen-2 / Gen-3 / Gen-4)**  \n  * **Hailuo AI (MiniMax)**"
+    },
+    "groundingChunkIndices": [
+     22,
+     24
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4012,
+     "endIndex": 4193,
+     "text": "* **動画生成（静止画の動的化／Text-to-Video）：**\n  * **Kling (Kling AI)**  \n  * **Runway (Gen-2 / Gen-3 / Gen-4)**  \n  * **Hailuo AI (MiniMax)**  \n  * **Sora / Veo**"
+    },
+    "groundingChunkIndices": [
+     25,
+     26
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4012,
+     "endIndex": 4311,
+     "text": "* **動画生成（静止画の動的化／Text-to-Video）：**\n  * **Kling (Kling AI)**  \n  * **Runway (Gen-2 / Gen-3 / Gen-4)**  \n  * **Hailuo AI (MiniMax)**  \n  * **Sora / Veo**  \n    ※カメラワーク（パン・チルト・ドリー）や人物のわずかな仕草を指示して動画化"
+    },
+    "groundingChunkIndices": [
+     18
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4315,
+     "endIndex": 4448,
+     "text": "* **音声・ナレーション生成：**\n  * **ElevenLabs**（昭和の白黒ニュースやアナウンサー風の声を作成）"
+    },
+    "groundingChunkIndices": [
+     17
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4315,
+     "endIndex": 4631,
+     "text": "* **音声・ナレーション生成：**\n  * **ElevenLabs**（昭和の白黒ニュースやアナウンサー風の声を作成）\n* **レトロエフェクト・編集：**\n  * **CapCut** や **FlexClip**、各種ヴィンテージ加工ツール（VHSグリッチ、ノイズ付加、色温度の調整など）"
+    },
+    "groundingChunkIndices": [
+     26,
+     27,
+     24
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4641,
+     "endIndex": 4795,
+     "text": "### 出典URL（参照元）\n* note「AIは「存在しない記憶」を作ることができる」:  \n  https://note.com/hinata_nagasaki/n/n4a6214811aeb"
+    },
+    "groundingChunkIndices": [
+     8
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4844,
+     "endIndex": 4952,
+     "text": "最新AIが描き出す90年代日本のノスタルジー」:  \n  https://note.com/litmedia/n/n6dfc8e1e7040"
+    },
+    "groundingChunkIndices": [
+     20
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4844,
+     "endIndex": 5104,
+     "text": "最新AIが描き出す90年代日本のノスタルジー」:  \n  https://note.com/litmedia/n/n6dfc8e1e7040\n* note「AIに昭和特撮を説明したら、全く通じなかった【64歳AI挑戦録 #016】」:  \n  https://note.com/gg_archives/n/nbdb701c9b68a"
+    },
+    "groundingChunkIndices": [
+     21
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4844,
+     "endIndex": 5253,
+     "text": "最新AIが描き出す90年代日本のノスタルジー」:  \n  https://note.com/litmedia/n/n6dfc8e1e7040\n* note「AIに昭和特撮を説明したら、全く通じなかった【64歳AI挑戦録 #016】」:  \n  https://note.com/gg_archives/n/nbdb701c9b68a\n* note「ChatGPT Images 2.0 × ElevenLabsで作る、昭和の白黒テレビ風動画の作り方」:  \n  https://note.com/genel_ai/n/n0f3cf0d9a6ca"
+    },
+    "groundingChunkIndices": [
+     17
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4844,
+     "endIndex": 5402,
+     "text": "最新AIが描き出す90年代日本のノスタルジー」:  \n  https://note.com/litmedia/n/n6dfc8e1e7040\n* note「AIに昭和特撮を説明したら、全く通じなかった【64歳AI挑戦録 #016】」:  \n  https://note.com/gg_archives/n/nbdb701c9b68a\n* note「ChatGPT Images 2.0 × ElevenLabsで作る、昭和の白黒テレビ風動画の作り方」:  \n  https://note.com/genel_ai/n/n0f3cf0d9a6ca\n* note「AI×昭和写真：無償ツールだけでノスタルジー動画を作成してみた」:  \n  https://note.com/hides_lab/n/n8ab531e21b21"
+    },
+    "groundingChunkIndices": [
+     24
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4844,
+     "endIndex": 5528,
+     "text": "最新AIが描き出す90年代日本のノスタルジー」:  \n  https://note.com/litmedia/n/n6dfc8e1e7040\n* note「AIに昭和特撮を説明したら、全く通じなかった【64歳AI挑戦録 #016】」:  \n  https://note.com/gg_archives/n/nbdb701c9b68a\n* note「ChatGPT Images 2.0 × ElevenLabsで作る、昭和の白黒テレビ風動画の作り方」:  \n  https://note.com/genel_ai/n/n0f3cf0d9a6ca\n* note「AI×昭和写真：無償ツールだけでノスタルジー動画を作成してみた」:  \n  https://note.com/hides_lab/n/n8ab531e21b21\n* YouTube「AI Brings Early Showa-Era Japan Back to Life — 90 Years Ago」:  \n  https://www.youtube.com/watch?v=CK6GnJ0Yk4E"
+    },
+    "groundingChunkIndices": [
+     10,
+     6
+    ]
+   },
+   {
+    "segment": {
+     "startIndex": 4844,
+     "endIndex": 5723,
+     "text": "最新AIが描き出す90年代日本のノスタルジー」:  \n  https://note.com/litmedia/n/n6dfc8e1e7040\n* note「AIに昭和特撮を説明したら、全く通じなかった【64歳AI挑戦録 #016】」:  \n  https://note.com/gg_archives/n/nbdb701c9b68a\n* note「ChatGPT Images 2.0 × ElevenLabsで作る、昭和の白黒テレビ風動画の作り方」:  \n  https://note.com/genel_ai/n/n0f3cf0d9a6ca\n* note「AI×昭和写真：無償ツールだけでノスタルジー動画を作成してみた」:  \n  https://note.com/hides_lab/n/n8ab531e21b21\n* YouTube「AI Brings Early Showa-Era Japan Back to Life — 90 Years Ago」:  \n  https://www.youtube.com/watch?v=CK6GnJ0Yk4E\n* 電ファミニコゲーマー「怪異をすべて“物理”でぶっ飛ばすホラー映像作品『現地確認記録』が話題に」:  \n  https://news.denfaminicogamer.jp/news/261001u"
+    },
+    "groundingChunkIndices": [
+     7
+    ]
+   }
+  ],
+  "webSearchQueries": [
+   "AI 昭和 映像 存在しない記憶 Midjourney Kling",
+   "AI 昭和 再現 動画 話題",
+   "\"AI\" \"昭和\" \"存在しない記憶\" site:note.com",
+   "AI 昭和 平成 再現 動画 懐かしい 批判",
+   "AI 昭和レトロ 動画 生成 ツール",
+   "\"AI\" \"昭和\" \"不気味の谷\" 動画"
+  ]
+ }
+]
