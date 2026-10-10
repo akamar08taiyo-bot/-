@@ -8,3 +8,6 @@ out/*.wav
 out/*.png
 out/*.jpg
 __pycache__/
+out/**/*.jpg
+out/**/*.png
+out/**/*.mp4

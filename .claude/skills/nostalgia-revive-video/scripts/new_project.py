@@ -24,7 +24,7 @@ for rel, obj in (("fixes.json", {"_説明": "画像の修正。crop=[x0,y0,x1,y1
         json.dump(obj, open(p, "w", encoding="utf-8"), ensure_ascii=False, indent=1); print("new ", p)
 gi = os.path.join(P, ".gitignore")
 if not os.path.exists(gi):
-    open(gi, "w").write("# 生成メディアは大きいのでコミットしない\nassets/*\n!assets/overlay/\nwork/\nout/*.mp4\nout/*.wav\nout/*.png\nout/*.jpg\n__pycache__/\n")
+    open(gi, "w").write("# 生成メディアは大きいのでコミットしない\nassets/*\n!assets/overlay/\nwork/\nout/*.mp4\nout/*.wav\nout/*.png\nout/*.jpg\nout/**/*.jpg\nout/**/*.png\nout/**/*.mp4\n__pycache__/\n")
 print(f"""
 次にやること：
   bash {HERE}/setup_fonts.sh {P}/assets/fonts
