@@ -1,23 +1,30 @@
 #!/usr/bin/env node
 // エピソード設計（episode.json）から動画を書き出す。ffmpeg だけで動く。
-//   画像をゆっくり動かす（寄る・引く・横や縦に流す）→ ディゾルブなどでつなぐ →
-//   色・粒子・周辺減光・ゆらぎ・黒帯 → テロップ・日付スタンプ → 音（BGM・環境音・声・効果音、声の間は自動で下げる）
-//   → 音量を -14 LUFS にそろえる → 確認用のコマ一覧と検査結果
+//   画像をゆっくり動かす（寄る・引く・横や縦に流す）／動画素材（AI 動画など）を入れる → カット・ディゾルブでつなぐ →
+//   色・粒子・周辺減光・ゆらぎ・黒帯 → テロップ・日付スタンプ → 音（動画素材の音・環境音・BGM・声・効果音。
+//   声の間は自動で下げる）→ 音量をそろえる（既定 -14 LUFS）→ 確認用のコマ一覧と検査結果
 //
 // 使い方:
-//   node render-town.mjs <episode.json> [--draft] [--out <mp4>] [--stills 0,12.5,40] [--keep-temp]
+//   node render-town.mjs <episode.json> [--draft] [--out <mp4>] [--stills 0,12.5,40] [--sheet 24] [--keep-temp] [--no-audio]
 //   --draft   半分の解像度で速く書き出す（確認用）
-//   --stills  指定の秒のコマを PNG で書き出す（いつでも check/sheet.jpg に全体の 12 コマを並べる）
+//   --stills  指定の秒のコマを PNG で書き出す
+//   --sheet   確認用に全体から抜くコマ数（既定 12。12 枚ごとに 1 枚のシート）
 //
 // episode.json の書き方は references/episode-schema.md
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseArgs, writeText, writeJson, ensureDir, fmtTime, run } from './lib/common.mjs';
+import { parseArgs, parseTime, writeText, writeJson, ensureDir, fmtTime, run } from './lib/common.mjs';
 import { findFont, escPath, ffmpeg, probe, measureLoudness } from './lib/media.mjs';
+
+// 想定内のエラーは、内部の情報を出さずにメッセージだけ表示する
+process.on('uncaughtException', (e) => {
+  console.error(`エラー：${e?.message || e}`);
+  process.exit(1);
+});
 
 const args = parseArgs(process.argv.slice(2), { flags: ['draft', 'keep-temp', 'help', 'no-audio'] });
 if (args.help || !args._[0]) {
-  console.log('node render-town.mjs <episode.json> [--draft] [--out <mp4>] [--stills 0,12.5] [--keep-temp]');
+  console.log('node render-town.mjs <episode.json> [--draft] [--out <mp4>] [--stills 0,12.5] [--sheet 24] [--keep-temp] [--no-audio]');
   process.exit(args.help ? 0 : 1);
 }
 
@@ -37,7 +44,7 @@ const K = DRAFT ? 2 : 3; // 動きをなめらかにするため、元の画像�
 const look = { grade: 'faded-warm', grain: 0.25, vignette: 0.3, flicker: 0.15, letterbox: 0, blur: 0, glow: 0, ...(ep.look || {}) };
 const text = { font: 'mincho', color: '#F3EEE6', size: 0.042, position: 'bl', fade: 0.8, shadow: 0.6, box: 0, ...(ep.text || {}) };
 const defaults = { dur: 7, move: 'auto', zoom: 0.1, transition: 'fade', transitionDur: 1.5, fit: 'cover', ...(ep.defaults || {}) };
-const audio = { duck: 8, loudness: -14, ...(ep.audio || {}) };
+const audio = { duck: 8, loudness: -14, clipGain: -3, ...(ep.audio || {}) };
 const endFade = ep.endFade ?? 2.0;
 const startFade = ep.startFade ?? 0.8;
 
@@ -71,26 +78,45 @@ const TRANS = {
   slideleft: 'smoothleft',
   slideright: 'smoothright',
   circle: 'circleopen',
-  cut: 'fade', // 1 コマで切り替え
+  cut: 'fade', // 1 コマで切り替え（ふつうのカット）
 };
 const PAD = 2; // 各場面の後ろに足すコマ数（つなぎの途中で前の場面が尽きて映像が切れるのを防ぐ）
+const CHUNK = 16; // 一度につなぐ場面の数（多いと ffmpeg のメモリが足りなくなる）
 const shots = (ep.shots || []).map((s, i) => ({ ...defaults, ...s, i }));
 if (!shots.length) throw new Error('shots が空です');
 const AUTO = ['in', 'right', 'out', 'left', 'in', 'down', 'out', 'up'];
 let tline = 0;
 shots.forEach((s, i) => {
   s.dur = Number(s.dur);
+  if (!(s.dur > 0)) throw new Error(`場面 ${i + 1} の dur（秒）がありません`);
   if (s.move === 'auto') s.move = s.card ? 'still' : AUTO[i % AUTO.length];
   const tname = i === 0 ? null : s.transition || defaults.transition;
+  if (tname && !TRANS[tname]) throw new Error(`場面 ${i + 1} の transition「${tname}」は使えません（${Object.keys(TRANS).join(' / ')}）`);
   let td = i === 0 ? 0 : tname === 'cut' ? 1 / FPS : Number(s.transitionDur ?? defaults.transitionDur);
   if (i > 0) td = Math.min(td, shots[i - 1].dur * 0.45, s.dur * 0.45);
   s.tIn = td;
   s.tName = tname;
   s.start = i === 0 ? 0 : tline - td;
   s.end = s.start + s.dur;
+  s.head = s.start + td / 2; // 「場面の頭」＝前の場面とのつなぎの真ん中（テロップも音もここを基準にする）
   tline = s.end;
 });
 const TOTAL = tline;
+
+/** 秒数・"1:30"・"shot:3+0.5"（3 番目の場面の頭から 0.5 秒） → 秒。読めなければエラー */
+function atTime(v, what = '時刻') {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const str = String(v ?? '').trim();
+  const m = str.match(/^shot:(\d+)\s*(?:([+-])\s*([\d.]+)\s*(?:s|秒)?)?$/i);
+  if (m) {
+    const s = shots[Number(m[1]) - 1];
+    if (!s) throw new Error(`${what}「${str}」：場面 ${m[1]} がありません（全 ${shots.length} 場面）`);
+    return s.head + (m[2] === '-' ? -1 : 1) * Number(m[3] || 0);
+  }
+  const t = parseTime(str);
+  if (t == null) throw new Error(`${what}「${str}」が読めません（秒の数字・"1:30"・"shot:3+0.8" のどれか）`);
+  return t;
+}
 
 // ───────────────────────── 2. 場面ごとの映像 ─────────────────────────
 function moveExpr(s, N) {
@@ -126,11 +152,15 @@ function textFile(name, content) {
   return escPath(f);
 }
 
+const segEnc = (frames) => [
+  '-an', '-c:v', 'libx264', '-preset', DRAFT ? 'ultrafast' : 'veryfast', '-crf', DRAFT ? '23' : '15',
+  '-pix_fmt', 'yuv420p', '-r', String(FPS), '-frames:v', String(frames),
+];
+
 function renderShot(s) {
   const seg = path.join(TMP, `seg_${String(s.i).padStart(3, '0')}.mp4`);
   const N = Math.max(1, Math.round(s.dur * FPS));
   const NP = N + PAD;
-  const enc = ['-an', '-c:v', 'libx264', '-preset', DRAFT ? 'ultrafast' : 'veryfast', '-crf', DRAFT ? '23' : '14', '-pix_fmt', 'yuv420p', '-r', String(FPS), '-frames:v', String(NP)];
   const bigW = W * K;
   const bigH = H * K;
 
@@ -152,16 +182,18 @@ function renderShot(s) {
       );
     }
     const vf = [`format=yuv420p`, ...parts].join(',');
-    ffmpeg(['-f', 'lavfi', '-i', `color=c=${hex(c.bg || '#0b0b0d')}:s=${W}x${H}:r=${FPS}:d=${num(s.dur + PAD / FPS)}`, '-vf', vf, ...enc, seg], { label: `場面 ${s.i + 1}（タイトル）` });
+    ffmpeg(['-f', 'lavfi', '-i', `color=c=${hex(c.bg || '#0b0b0d')}:s=${W}x${H}:r=${FPS}:d=${num(s.dur + PAD / FPS)}`, '-vf', vf, ...segEnc(NP), seg], { label: `場面 ${s.i + 1}（タイトル）` });
     return seg;
   }
 
-  if (s.video) {
+  if (s.video && !fs.existsSync(rel(s.video)) && s.image) {
+    console.log(`\n（場面 ${s.i + 1}：${s.video} がまだ無いので画像 ${s.image} で作ります）`);
+  } else if (s.video) {
     const src = rel(s.video);
     if (!fs.existsSync(src)) throw new Error(`動画が見つかりません：${s.video}`);
     const speed = Number(s.speed || 1);
-    const vf = [`setpts=PTS/${speed}`, `fps=${FPS}`, `scale=${W}:${H}:force_original_aspect_ratio=increase`, `crop=${W}:${H}`, 'setsar=1', 'format=yuv420p'].join(',');
-    ffmpeg(['-stream_loop', '-1', '-ss', String(s.start_at ?? s.from ?? 0), '-i', src, '-vf', vf, ...enc, seg], { label: `場面 ${s.i + 1}（動画）` });
+    const vf = [`setpts=PTS/${speed}`, `fps=${FPS}`, `scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos`, `crop=${W}:${H}`, 'setsar=1', 'format=yuv420p'].join(',');
+    ffmpeg(['-stream_loop', '-1', '-ss', num(Number(s.from ?? 0)), '-i', src, '-vf', vf, ...segEnc(NP), seg], { label: `場面 ${s.i + 1}（動画）` });
     return seg;
   }
 
@@ -189,16 +221,76 @@ function renderShot(s) {
     'setsar=1',
     'format=yuv420p',
   ].join(',');
-  ffmpeg(['-i', srcImg, '-vf', vf, ...enc, seg], { label: `場面 ${s.i + 1}（画像）` });
+  ffmpeg(['-i', srcImg, '-vf', vf, ...segEnc(NP), seg], { label: `場面 ${s.i + 1}（画像）` });
   return seg;
 }
 
-// ───────────────────────── 3. つなぎ・質感・文字 ─────────────────────────
+// ───────────────────────── 3. つなぐ（質感をかける前の素の映像） ─────────────────────────
+/**
+ * items = [{ file, start }]（start は全体の時間軸での開始秒）、joins[k] = items[k+1] に入るときのつなぎ。
+ * xfade の offset は「次の素材の開始秒 − 最初の素材の開始秒」になる。
+ */
+function xfadeJoin(items, joins, out, label) {
+  if (items.length === 1) {
+    fs.copyFileSync(items[0].file, out);
+    return out;
+  }
+  const t0 = items[0].start;
+  const lines = [];
+  let last = '0:v';
+  for (let k = 1; k < items.length; k++) {
+    const j = joins[k - 1];
+    lines.push(`[${last}][${k}:v]xfade=transition=${TRANS[j.name] || 'fade'}:duration=${num(j.dur)}:offset=${num(items[k].start - t0)}[x${k}]`);
+    last = `x${k}`;
+  }
+  lines.push(`[${last}]format=yuv420p[vout]`);
+  ffmpeg(
+    [
+      ...items.flatMap((it) => ['-i', it.file]),
+      ...graphArgs(lines.join(';\n'), `join_${path.parse(out).name}`),
+      '-map', '[vout]', '-an',
+      '-c:v', 'libx264', '-preset', DRAFT ? 'ultrafast' : 'veryfast', '-crf', DRAFT ? '20' : '14', '-pix_fmt', 'yuv420p', '-r', String(FPS),
+      out,
+    ],
+    { label },
+  );
+  return out;
+}
+
+function renderTimeline(segs) {
+  // 16 場面ずつのかたまりにつないでから、かたまりどうしをつなぐ
+  const chunks = [];
+  for (let a = 0; a < shots.length; a += CHUNK) {
+    const idx = [...Array(Math.min(CHUNK, shots.length - a)).keys()].map((k) => a + k);
+    const file = path.join(TMP, `chunk_${String(chunks.length).padStart(3, '0')}.mp4`);
+    xfadeJoin(
+      idx.map((i) => ({ file: segs[i], start: shots[i].start })),
+      idx.slice(1).map((i) => ({ name: shots[i].tName, dur: shots[i].tIn })),
+      file,
+      `場面のつなぎ（${idx[0] + 1}〜${idx[idx.length - 1] + 1}）`,
+    );
+    chunks.push({ file, start: shots[a].start, first: a });
+    // 長い回は一時ファイルが数 GB になるので、使い終わった場面はすぐ消す
+    if (!args['keep-temp']) for (const i of idx) fs.rmSync(segs[i], { force: true });
+  }
+  const timeline = path.join(TMP, 'timeline.mp4');
+  xfadeJoin(
+    chunks,
+    chunks.slice(1).map((c) => ({ name: shots[c.first].tName, dur: shots[c.first].tIn })),
+    timeline,
+    'かたまりのつなぎ',
+  );
+  if (!args['keep-temp'] && chunks.length > 1) for (const c of chunks) fs.rmSync(c.file, { force: true });
+  return timeline;
+}
+
+// ───────────────────────── 4. 質感・文字 ─────────────────────────
 function gradeFilters() {
   const g = look.grade;
   const lift = (b, w) => `curves=all='0/${b} 0.5/0.5 1/${w}'`;
   const presets = {
     none: [],
+    cinema: [lift(0.03, 0.97), 'colorbalance=rs=-0.02:bs=0.03:rm=0.01:rh=0.03:bh=-0.03', 'eq=contrast=1.04:saturation=0.95'],
     'faded-warm': [lift(0.07, 0.93), 'colorbalance=rs=0.05:bs=-0.05:rm=0.03:bm=-0.03:rh=0.03:bh=-0.04', 'eq=saturation=0.85:contrast=0.96'],
     'faded-cool': [lift(0.07, 0.94), 'colorbalance=rs=-0.03:bs=0.05:rm=-0.02:bm=0.02:rh=-0.01:bh=0.03', 'eq=saturation=0.8:contrast=0.96'],
     dusk: [lift(0.05, 0.95), 'colorbalance=rs=0.04:bs=0.07:rm=0.05:bm=-0.02:rh=0.07:bh=-0.07', 'eq=saturation=0.92:gamma=0.97'],
@@ -226,7 +318,12 @@ function lookChain(input) {
   const lines = [];
   let cur = input;
   if (look.glow > 0) {
-    lines.push(`[${cur}]split[g0][g1]`, `[g1]gblur=sigma=${Math.round(18 * (W / 1920))}[g2]`, `[g0][g2]blend=all_mode=screen:all_opacity=${num(look.glow * 0.35)}[glowed]`);
+    // 明るさ（Y）だけをにじませる。色の成分まで screen で重ねると全体が赤紫にかぶる
+    lines.push(
+      `[${cur}]split[g0][g1]`,
+      `[g1]gblur=sigma=${Math.round(18 * (W / 1920))}[g2]`,
+      `[g0][g2]blend=c0_mode=screen:c0_opacity=${num(look.glow * 0.35)}[glowed]`,
+    );
     cur = 'glowed';
   }
   lines.push(`[${cur}]${f.join(',') || 'null'}[looked]`);
@@ -254,8 +351,11 @@ function captionFilters() {
   for (const s of shots) {
     if (!s.caption) continue;
     if (!font) throw new Error('日本語の書体が見つかりません（references/episode-schema.md の「書体」）');
-    const A = s.start + (s.captionStart ?? Math.max(s.tIn, 0.6));
-    const B = s.start + (s.captionEnd ?? s.dur - 0.6);
+    const next = shots[s.i + 1];
+    // 既定：つなぎが終わってから出し、次のつなぎが始まる前に消す。captionStart/End は「場面の頭」からの秒
+    const A = s.captionStart != null ? s.head + Number(s.captionStart) : s.head + Math.max(0.6, s.tIn / 2);
+    const B = s.captionEnd != null ? s.head + Number(s.captionEnd) : s.end - (next ? next.tIn : 0) - 0.3;
+    if (!(B - A > 0.5)) throw new Error(`場面 ${s.i + 1} のテロップを出す時間がありません（dur を長くするか captionStart/End を見直す）`);
     const F = Math.min(text.fade, (B - A) / 3);
     const p = posXY(s.captionPos || text.position, bar);
     const alpha = `'if(lt(t,${num(A)}),0,if(lt(t,${num(A + F)}),(t-${num(A)})/${num(F)},if(lt(t,${num(B - F)}),1,max(0,(${num(B)}-t)/${num(F)}))))'`;
@@ -285,68 +385,43 @@ function captionFilters() {
   return out;
 }
 
-function renderVideo(segs) {
-  const lines = [];
-  let last = '0:v';
-  let len = shots[0].dur;
-  for (let k = 1; k < segs.length; k++) {
-    const s = shots[k];
-    const offset = len - s.tIn;
-    lines.push(`[${last}][${k}:v]xfade=transition=${TRANS[s.tName] || 'fade'}:duration=${num(s.tIn)}:offset=${num(offset)}[x${k}]`);
-    last = `x${k}`;
-    len = offset + s.dur;
-  }
-  if (segs.length === 1) {
-    lines.push('[0:v]null[x0]');
-    last = 'x0';
-  }
-  lines.push(...lookChain(last));
+function renderLook(timeline) {
+  const lines = [...lookChain('0:v')];
   const caps = captionFilters();
   lines.push(`[looked]${caps.length ? caps.join(',') : 'null'},format=yuv420p[vout]`);
   const video = path.join(TMP, 'video.mp4');
   ffmpeg(
     [
-      ...segs.flatMap((s) => ['-i', s]),
-      ...graphArgs(lines.join(';\n'), 'video_graph'),
+      '-i', timeline,
+      ...graphArgs(lines.join(';\n'), 'look_graph'),
       '-map', '[vout]', '-an',
       '-c:v', 'libx264', '-preset', DRAFT ? 'veryfast' : 'medium', '-crf', DRAFT ? '24' : '18', '-pix_fmt', 'yuv420p', '-r', String(FPS),
       '-t', num(TOTAL), video,
     ],
-    { label: 'つなぎ・質感・文字' },
+    { label: '質感・文字' },
   );
   return video;
 }
 
-// ───────────────────────── 4. 音 ─────────────────────────
-/** "shot:3+0.5"（3 番目の場面の頭から 0.5 秒）や秒数 → 秒 */
-function atTime(v) {
-  if (typeof v === 'number') return v;
-  const m = String(v).match(/^shot:(\d+)\s*([+-]\s*[\d.]+)?$/);
-  if (m) {
-    const s = shots[Number(m[1]) - 1];
-    if (!s) throw new Error(`audio の at：場面 ${m[1]} がありません`);
-    return s.start + s.tIn * 0.5 + Number((m[2] || '0').replace(/\s/g, ''));
-  }
-  return Number(v) || 0;
-}
-
+// ───────────────────────── 5. 音 ─────────────────────────
 function renderAudio() {
   const inputs = [];
   const lines = [];
   const bus = [];
-  const add = (file, loop) => {
+  let nIn = 0;
+  const add = (file, loop, pre = []) => {
     const f = rel(file);
     if (!fs.existsSync(f)) throw new Error(`音のファイルが見つかりません：${file}`);
-    inputs.push(...(loop ? ['-stream_loop', '-1'] : []), '-i', f);
-    return inputs.filter((x) => x === '-i').length - 1;
+    inputs.push(...(loop ? ['-stream_loop', '-1'] : []), ...pre, '-i', f);
+    return nIn++;
   };
   const fmt = 'aformat=sample_rates=48000:channel_layouts=stereo';
-  // 声（区間を記録して、BGM・環境音を下げる）
+  // 声（区間を記録して、ほかの音を下げる）
   const voiceWins = [];
   const voices = [];
   for (const [j, v] of (audio.voice || []).entries()) {
+    const at = atTime(v.at, `audio.voice[${j}].at`);
     const idx = add(v.file);
-    const at = atTime(v.at);
     const d = probe(rel(v.file)).duration;
     voiceWins.push([at, at + d]);
     lines.push(`[${idx}:a]${fmt},volume=${v.gain ?? 0}dB,adelay=${Math.round(at * 1000)}:all=1[v${j}]`);
@@ -359,47 +434,67 @@ function renderAudio() {
     const wmax = w.reduce((acc, x) => (acc ? `max(${acc},${x})` : x), '');
     return `volume='1-${num(1 - g, 4)}*${wmax}':eval=frame`;
   };
+  const bed = []; // 声の間に下げる層（動画素材の音・環境音・BGM）
+  // 動画素材の音（AI 動画の環境音など）。場面の長さに切り、つなぎに合わせてフェード
+  for (const s of shots) {
+    if (!s.video || s.audio === false) continue;
+    const src = rel(s.video);
+    if (!fs.existsSync(src) || !probe(src).hasAudio) continue;
+    const speed = Number(s.speed || 1);
+    if (speed < 0.5 || speed > 2) continue; // 極端な速度変更では音を使わない
+    const next = shots[s.i + 1];
+    const len = s.dur;
+    const fin = Math.max(0.05, s.tIn);
+    const fout = Math.max(0.05, next ? next.tIn : endFade || 0.3);
+    const idx = add(s.video, true, ['-ss', num(Number(s.from ?? 0))]);
+    lines.push(
+      `[${idx}:a]${fmt}${speed !== 1 ? `,atempo=${speed}` : ''},atrim=0:${num(len)},asetpts=PTS-STARTPTS,` +
+        `afade=t=in:st=0:d=${num(fin)},afade=t=out:st=${num(Math.max(0, len - fout))}:d=${num(fout)},` +
+        `volume=${s.audioGain ?? audio.clipGain}dB,adelay=${Math.round(s.start * 1000)}:all=1[clip${s.i}]`,
+    );
+    bed.push(`[clip${s.i}]`);
+  }
   // BGM
-  const music = [];
   if (audio.bgm?.file) {
     const b = audio.bgm;
     const idx = add(b.file, b.loop !== false);
-    const st = Number(b.start || 0);
+    const st = atTime(b.start ?? 0, 'audio.bgm.start');
     const len = Math.max(0.1, TOTAL - st);
     lines.push(
       `[${idx}:a]${fmt},atrim=0:${num(len)},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=${num(b.fadeIn ?? 2)},afade=t=out:st=${num(Math.max(0, len - (b.fadeOut ?? 5)))}:d=${num(b.fadeOut ?? 5)},volume=${b.gain ?? -6}dB,adelay=${Math.round(st * 1000)}:all=1[bgm]`,
     );
-    music.push('[bgm]');
+    bed.push('[bgm]');
   }
   // 環境音
   for (const [j, a] of (audio.ambience || []).entries()) {
     const idx = add(a.file, a.loop !== false);
-    const from = atTime(a.from ?? 0);
-    const to = a.to != null ? atTime(a.to) : TOTAL;
+    const from = atTime(a.from ?? 0, `audio.ambience[${j}].from`);
+    const to = a.to != null ? atTime(a.to, `audio.ambience[${j}].to`) : TOTAL;
     const len = Math.max(0.1, Math.min(TOTAL, to) - from);
     lines.push(
       `[${idx}:a]${fmt},atrim=0:${num(len)},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=${num(a.fadeIn ?? 2)},afade=t=out:st=${num(Math.max(0, len - (a.fadeOut ?? 2)))}:d=${num(a.fadeOut ?? 2)},volume=${a.gain ?? -12}dB,adelay=${Math.round(from * 1000)}:all=1[amb${j}]`,
     );
-    music.push(`[amb${j}]`);
+    bed.push(`[amb${j}]`);
   }
-  if (music.length) {
+  if (bed.length) {
     const dx = duckExpr();
-    lines.push(`${music.join('')}amix=inputs=${music.length}:normalize=0:duration=longest${dx ? `,${dx}` : ''}[mus]`);
-    bus.push('[mus]');
+    lines.push(`${bed.join('')}amix=inputs=${bed.length}:normalize=0:duration=longest${dx ? `,${dx}` : ''}[bed]`);
+    bus.push('[bed]');
   }
   if (voices.length) {
     lines.push(`${voices.join('')}amix=inputs=${voices.length}:normalize=0:duration=longest[vox]`);
     bus.push('[vox]');
   }
   for (const [j, s] of (audio.sfx || []).entries()) {
+    const at = atTime(s.at, `audio.sfx[${j}].at`);
     const idx = add(s.file);
-    lines.push(`[${idx}:a]${fmt},volume=${s.gain ?? -6}dB,adelay=${Math.round(atTime(s.at) * 1000)}:all=1[sfx${j}]`);
+    lines.push(`[${idx}:a]${fmt},volume=${s.gain ?? -6}dB,adelay=${Math.round(at * 1000)}:all=1[sfx${j}]`);
     bus.push(`[sfx${j}]`);
   }
   const mix = path.join(TMP, 'mix.wav');
   if (!bus.length) {
     ffmpeg(['-f', 'lavfi', '-i', `anullsrc=r=48000:cl=stereo`, '-t', num(TOTAL), mix], { label: '無音トラック' });
-    return { file: mix, silent: true };
+    return { file: mix, silent: true, voiceWins };
   }
   lines.push(
     `${bus.join('')}amix=inputs=${bus.length}:normalize=0:duration=longest,apad,atrim=0:${num(TOTAL)}` +
@@ -407,7 +502,7 @@ function renderAudio() {
   );
   ffmpeg([...inputs, ...graphArgs(lines.join(';\n'), 'audio_graph'), '-map', '[aout]', '-ar', '48000', '-c:a', 'pcm_s16le', mix], { label: '音のミックス' });
 
-  // 2 回で測ってから -14 LUFS（既定）にそろえる。ピークは -1.5 dBTP 以下
+  // 2 回で測ってから目標の大きさ（既定 -14 LUFS）にそろえる。ピークは -1.5 dBTP 以下
   const target = Number(audio.loudness ?? -14);
   const p1 = run('ffmpeg', ['-hide_banner', '-nostats', '-i', mix, '-af', `loudnorm=I=${target}:TP=-1.5:LRA=11:print_format=json`, '-f', 'null', '-']);
   const j = JSON.parse((p1.stderr.match(/\{[\s\S]*?\}/g) || ['{}']).pop());
@@ -427,7 +522,7 @@ function renderAudio() {
   return { file: mix, silent: true, voiceWins };
 }
 
-// ───────────────────────── 5. 字幕（声に text があるとき） ─────────────────────────
+// ───────────────────────── 6. 字幕（声に text があるとき） ─────────────────────────
 function writeSrt(voiceWins) {
   const items = (audio.voice || []).map((v, j) => ({ text: v.text, win: voiceWins?.[j] })).filter((x) => x.text && x.win);
   if (!items.length) return null;
@@ -444,25 +539,32 @@ function writeSrt(voiceWins) {
   return f;
 }
 
-// ───────────────────────── 6. 確認・検査 ─────────────────────────
-function checkSheet() {
-  const n = 12;
-  const files = [];
+// ───────────────────────── 7. 確認・検査 ─────────────────────────
+function checkSheets() {
+  const n = Math.max(4, Number(args.sheet) || 12);
+  const frames = [];
   for (let k = 0; k < n; k++) {
     const t = Math.min(TOTAL - 0.1, (TOTAL * (k + 0.5)) / n);
-    const f = path.join(TMP, `chk_${String(files.length).padStart(2, '0')}.png`);
+    const f = path.join(TMP, `chk_${String(frames.length).padStart(3, '0')}.png`);
     ffmpeg(['-ss', num(t), '-i', OUT, '-frames:v', '1', '-vf', `scale=480:-2`, f], { label: '確認用のコマ' });
-    if (fs.existsSync(f)) files.push(f);
+    if (fs.existsSync(f)) frames.push({ f, t });
   }
-  const sheet = path.join(CHECK, 'sheet.jpg');
-  ffmpeg(['-i', path.join(TMP, 'chk_%02d.png'), '-vf', 'tile=4x3:padding=4:margin=4:color=black', '-frames:v', '1', '-q:v', '3', sheet], { label: 'コマ一覧' });
-  const times = [...Array(n).keys()].map((k) => fmtTime((TOTAL * (k + 0.5)) / n));
+  for (const f of fs.readdirSync(CHECK)) if (/^sheet(_\d+)?\.jpg$/.test(f)) fs.unlinkSync(path.join(CHECK, f));
+  const sheets = [];
+  for (let s = 0; s * 12 < frames.length; s++) {
+    const group = frames.slice(s * 12, s * 12 + 12);
+    const name = frames.length > 12 ? `sheet_${String(s + 1).padStart(2, '0')}.jpg` : 'sheet.jpg';
+    const listDir = ensureDir(path.join(TMP, `sheet_${s}`));
+    group.forEach((g, k) => fs.copyFileSync(g.f, path.join(listDir, `${String(k).padStart(2, '0')}.png`)));
+    ffmpeg(['-i', path.join(listDir, '%02d.png'), '-vf', 'tile=4x3:padding=4:margin=4:color=black', '-frames:v', '1', '-q:v', '3', path.join(CHECK, name)], { label: 'コマ一覧' });
+    sheets.push({ file: path.join(CHECK, name), times: group.map((g) => fmtTime(g.t)) });
+  }
   if (args.stills) {
     for (const t of String(args.stills).split(',').map(Number).filter((x) => Number.isFinite(x))) {
       ffmpeg(['-ss', num(Math.min(t, TOTAL - 0.05)), '-i', OUT, '-frames:v', '1', path.join(CHECK, `still_${String(t).replace('.', '_')}.png`)], { label: 'コマ' });
     }
   }
-  return { sheet, times };
+  return sheets;
 }
 
 function verify(silent) {
@@ -479,19 +581,29 @@ function verify(silent) {
   if (loud) {
     rows.push([loud.lufs != null && Math.abs(loud.lufs - target) <= 1.0, `平均の大きさ ${loud.lufs} LUFS（目標 ${target}）`]);
     rows.push([loud.truePeak != null && loud.truePeak <= -1.0, `ピーク ${loud.truePeak} dBTP（-1.0 以下）`]);
-  } else rows.push([true, '音：無音（BGM・環境音・声が未指定）']);
+  } else rows.push([true, '音：無音（BGM・環境音・声・動画素材の音が無い）']);
   return rows.map(([ok, t]) => `${ok ? '✓' : '✗'} ${t}`);
 }
 
 // ───────────────────────── 本体 ─────────────────────────
 const t0 = Date.now();
+// 時刻の書き間違いは、時間のかかる書き出しの前に見つける
+for (const [j, v] of (audio.voice || []).entries()) atTime(v.at, `audio.voice[${j}].at`);
+for (const [j, s] of (audio.sfx || []).entries()) atTime(s.at, `audio.sfx[${j}].at`);
+for (const [j, a] of (audio.ambience || []).entries()) {
+  if (a.from != null) atTime(a.from, `audio.ambience[${j}].from`);
+  if (a.to != null) atTime(a.to, `audio.ambience[${j}].to`);
+}
+
 console.log(`「${ep.title || id}」 ${shots.length} 場面・${fmtTime(TOTAL)}（${TOTAL.toFixed(1)}秒）・${W}×${H}・${FPS}fps${DRAFT ? '（下書き）' : ''}`);
 const segs = shots.map((s) => {
   process.stdout.write(`\r場面 ${s.i + 1}/${shots.length} を作成中…`);
   return renderShot(s);
 });
-console.log('\nつなぎ・質感・文字を合成中…');
-const video = renderVideo(segs);
+console.log('\n場面をつないでいます…');
+const timeline = renderTimeline(segs);
+console.log('質感・文字を合成中…');
+const video = renderLook(timeline);
 console.log('音を合成中…');
 const mixed = args['no-audio'] ? { file: null, silent: true } : renderAudio();
 if (mixed.file) {
@@ -500,13 +612,25 @@ if (mixed.file) {
   fs.copyFileSync(video, OUT);
 }
 const srt = writeSrt(mixed.voiceWins);
-const chk = checkSheet();
+const sheets = checkSheets();
 const report = verify(mixed.silent);
-writeJson(path.join(CHECK, 'timeline.json'), shots.map((s) => ({ no: s.i + 1, start: +s.start.toFixed(2), end: +s.end.toFixed(2), move: s.move, transition: s.tName, caption: s.caption || null, image: s.image || s.video || 'card' })));
+writeJson(
+  path.join(CHECK, 'timeline.json'),
+  shots.map((s) => ({
+    no: s.i + 1,
+    start: +s.start.toFixed(2),
+    head: +s.head.toFixed(2),
+    end: +s.end.toFixed(2),
+    move: s.move,
+    transition: s.tName,
+    caption: s.caption || null,
+    src: s.card ? 'card' : s.video && fs.existsSync(rel(s.video)) ? s.video : s.image,
+  })),
+);
 if (!args['keep-temp']) fs.rmSync(TMP, { recursive: true, force: true });
 
 console.log(`\n完成：${OUT}${srt ? `\n字幕：${srt}` : ''}`);
-console.log(`確認用：${chk.sheet}（左上から右へ ${chk.times.join(' / ')}）`);
+for (const s of sheets) console.log(`確認用：${s.file}（左上から右へ ${s.times.join(' / ')}）`);
 console.log(report.join('\n'));
 console.log(`所要 ${Math.round((Date.now() - t0) / 1000)}秒`);
 if (report.some((r) => r.startsWith('✗'))) process.exitCode = 2;

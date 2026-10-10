@@ -14,6 +14,10 @@ import path from 'node:path';
 export function ensureProxy() {
   const proxy = process.env.HTTPS_PROXY || process.env.https_proxy;
   if (!proxy || process.env.NODE_USE_ENV_PROXY === '1') return;
+  const [maj, min] = process.versions.node.split('.').map(Number);
+  if (maj < 22 || (maj === 22 && min < 21)) {
+    console.error(`注意：Node ${process.version} はプロキシ設定（NODE_USE_ENV_PROXY）に対応していない可能性があります。通信に失敗したら Node 22.21 以上か 24 以上で実行してください。`);
+  }
   const r = spawnSync(process.execPath, ['--no-warnings', process.argv[1], ...process.argv.slice(2)], {
     stdio: 'inherit',
     env: { ...process.env, NODE_USE_ENV_PROXY: '1' },
@@ -138,6 +142,99 @@ export async function httpPostJson(url, payload, { headers = {}, timeoutMs = 600
     return { ok: false, status: 0, error: netErrorText(e) };
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/**
+ * Gemini の streamGenerateContent（?alt=sse）を受け取り、ふつうの generateContent と同じ形の json にまとめる。
+ * 長い生成でも少しずつ届くので、途中のプロキシに「応答が遅い」と切られにくい。
+ * 音声の断片（inlineData audio/*）は 1 つにつなぎ、文字は連結する（思考の部分は除く）。
+ */
+export async function httpPostSSE(url, payload, { headers = {}, timeoutMs = 900000, idleMs = 300000 } = {}) {
+  const ctrl = new AbortController();
+  const total = setTimeout(() => ctrl.abort(), timeoutMs);
+  let idle = setTimeout(() => ctrl.abort(), idleMs);
+  const bump = () => {
+    clearTimeout(idle);
+    idle = setTimeout(() => ctrl.abort(), idleMs);
+  };
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(payload),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      let json = null;
+      try {
+        json = JSON.parse(text);
+        if (Array.isArray(json)) json = json[0];
+      } catch {
+        /* JSON でない応答 */
+      }
+      return { ok: false, status: res.status, json, text };
+    }
+    const dec = new TextDecoder();
+    let buf = '';
+    let text = '';
+    const audio = [];
+    let audioMime = '';
+    const images = [];
+    const last = {};
+    const handle = (line) => {
+      if (!line.startsWith('data:')) return;
+      const data = line.slice(5).trim();
+      if (!data || data === '[DONE]') return;
+      const ev = JSON.parse(data);
+      if (ev.error) throw Object.assign(new Error(ev.error.message || 'stream error'), { apiError: ev });
+      const cand = ev.candidates?.[0];
+      for (const p of cand?.content?.parts || []) {
+        if (p.thought) continue;
+        if (typeof p.text === 'string') text += p.text;
+        const d = p.inlineData || p.inline_data;
+        if (d?.data) {
+          const mime = d.mimeType || d.mime_type || '';
+          if (/^audio\//.test(mime)) {
+            audio.push(Buffer.from(d.data, 'base64'));
+            audioMime = audioMime || mime;
+          } else images.push({ inlineData: { mimeType: mime, data: d.data } });
+        }
+      }
+      if (cand?.finishReason) last.finishReason = cand.finishReason;
+      if (ev.usageMetadata) last.usageMetadata = ev.usageMetadata;
+      if (ev.modelVersion) last.modelVersion = ev.modelVersion;
+      if (ev.promptFeedback) last.promptFeedback = ev.promptFeedback;
+    };
+    for await (const chunk of res.body) {
+      bump();
+      buf += dec.decode(chunk, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl).replace(/\r$/, '');
+        buf = buf.slice(nl + 1);
+        handle(line);
+      }
+    }
+    if (buf.trim()) handle(buf.trim());
+    const parts = [];
+    if (text) parts.push({ text });
+    parts.push(...images);
+    if (audio.length) parts.push({ inlineData: { mimeType: audioMime, data: Buffer.concat(audio).toString('base64') } });
+    const json = {
+      candidates: [{ content: { parts }, finishReason: last.finishReason }],
+      usageMetadata: last.usageMetadata,
+      modelVersion: last.modelVersion,
+      promptFeedback: last.promptFeedback,
+    };
+    return { ok: true, status: 200, json };
+  } catch (e) {
+    if (e.apiError) return { ok: false, status: e.apiError.error?.code || 500, json: e.apiError, text: e.message };
+    return { ok: false, status: 0, error: netErrorText(e) };
+  } finally {
+    clearTimeout(total);
+    clearTimeout(idle);
   }
 }
 

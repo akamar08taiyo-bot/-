@@ -3,7 +3,7 @@
 //
 // 使い方:
 //   node town-seed.mjs [--count 3] [--seed 123] [--registry <シリーズ>/towns.json] [--out <エピソードのフォルダ>]
-//     → 候補のカードを出す。--out を付けると 1 枚目を <out>/town.json に保存
+//     → 候補のカードを出す。--out を付けると 1 枚目を <out>/town.json に保存（既にあれば --force が要る）
 //   node town-seed.mjs --register <エピソードのフォルダ>/town.json --registry <シリーズ>/towns.json [--no 3] [--title "…"] [--url "…"]
 //     → 完成した回を台帳に記録（次から名前・要素がかぶらないようにする）
 //
@@ -16,7 +16,13 @@ import { parseArgs, writeJson, ensureDir } from './lib/common.mjs';
 
 const SKILL_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const EL = JSON.parse(fs.readFileSync(path.join(SKILL_DIR, 'references', 'town-elements.json'), 'utf8'));
-const args = parseArgs(process.argv.slice(2), { flags: ['help', 'json'] });
+// 想定内のエラーは、内部の情報を出さずにメッセージだけ表示する
+process.on('uncaughtException', (e) => {
+  console.error(`エラー：${e?.message || e}`);
+  process.exit(1);
+});
+
+const args = parseArgs(process.argv.slice(2), { flags: ['help', 'json', 'force'] });
 
 if (args.help) {
   console.log('node town-seed.mjs [--count 3] [--seed N] [--registry towns.json] [--out DIR]\nnode town-seed.mjs --register DIR/town.json --registry towns.json [--no N] [--title T] [--url U]');
@@ -185,7 +191,12 @@ for (let k = 0; k < count; k++) {
 
 if (args.out) {
   const dir = ensureDir(path.resolve(args.out));
-  writeJson(path.join(dir, 'town.json'), cards[0]);
+  const file = path.join(dir, 'town.json');
+  if (fs.existsSync(file) && !args.force) {
+    console.error(`もうあります：${file}（作り直すなら --force。手で直した内容は消えます）`);
+    process.exit(1);
+  }
+  writeJson(file, cards[0]);
 }
 if (args.json) console.log(JSON.stringify(cards, null, 2));
 else {

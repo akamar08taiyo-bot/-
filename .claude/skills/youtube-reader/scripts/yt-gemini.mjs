@@ -6,7 +6,9 @@
 // 使い方:
 //   node yt-gemini.mjs <URL> [--mode summary|transcript|scenes|breakdown|ask] [--q "質問"]
 //                      [--out <フォルダ>] [--model gemini-flash-latest] [--res low|medium|high]
-//                      [--start 1:20] [--end 3:00] [--fps 1] [--prompt <プロンプトのファイル>]
+//                      [--start 1:20] [--end 3:00] [--fps 1] [--prompt <プロンプトのファイル>] [--no-stream]
+//
+// 既定は streamGenerateContent（少しずつ受け取る）。長い分析でも途中のプロキシに切られにくい。
 //
 //   summary    … 何の動画か・流れ・要点・雰囲気（既定）
 //   transcript … 声の書き起こし（時刻・話者付き）＋画面の文字
@@ -26,6 +28,7 @@ import {
   parseTime,
   fmtTime,
   httpPostJson,
+  httpPostSSE,
   writeText,
   ensureDir,
   findGeminiKey,
@@ -35,7 +38,7 @@ import {
 ensureProxy();
 
 const SKILL_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const args = parseArgs(process.argv.slice(2), { flags: ['help', 'dry-run'] });
+const args = parseArgs(process.argv.slice(2), { flags: ['help', 'dry-run', 'no-stream'] });
 const MODES = ['summary', 'transcript', 'scenes', 'breakdown', 'ask'];
 const RES = { low: 'MEDIA_RESOLUTION_LOW', medium: 'MEDIA_RESOLUTION_MEDIUM', high: 'MEDIA_RESOLUTION_HIGH' };
 
@@ -150,13 +153,15 @@ async function main() {
     process.exit(2);
   }
   const headers = key ? { 'x-goog-api-key': key.key } : {};
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+  const stream = !args['no-stream'];
+  const base = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}`;
+  const url = stream ? `${base}:streamGenerateContent?alt=sse` : `${base}:generateContent`;
   const range = start != null || end != null ? `${fmtTime(start || 0)}〜${end != null ? fmtTime(end) : '最後'}` : '全体';
   console.error(`Gemini（${model}・${res.replace('MEDIA_RESOLUTION_', '').toLowerCase()}）で ${mode} を実行中… 範囲：${range}`);
 
   let r;
   for (let attempt = 0; attempt < 3; attempt++) {
-    r = await httpPostJson(url, body, { headers });
+    r = stream ? await httpPostSSE(url, body, { headers }) : await httpPostJson(url, body, { headers });
     if (r.ok) break;
     const retryable = r.status === 0 || r.status === 500 || r.status === 502 || r.status === 503 || r.status === 504 || (r.status === 429 && attempt === 0);
     if (!retryable || attempt === 2) break;

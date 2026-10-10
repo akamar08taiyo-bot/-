@@ -11,7 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs, ensureDir, ensureProxy, writeText } from './lib/common.mjs';
-import { API, geminiPost, readParts, extOf } from './lib/gemini.mjs';
+import { API, geminiPost, readParts, extOf, isRawPcm, pcmToWav, rateFromMime, isFatal } from './lib/gemini.mjs';
 import { ffmpeg, probe } from './lib/media.mjs';
 
 ensureProxy();
@@ -30,7 +30,7 @@ if (args._[0]) {
   prompt = prompt || ep.music?.prompt;
   model = model || ep.music?.model;
   out = out || (ep.audio?.bgm?.file ? path.resolve(path.dirname(EP_FILE), ep.audio.bgm.file) : null);
-  if (!prompt) throw new Error('episode.json に music.prompt がありません');
+  if (!prompt || /^TODO/.test(prompt)) throw new Error('episode.json の music.prompt が空か TODO のままです');
   if (!out) throw new Error('episode.json に audio.bgm.file（保存先）がありません');
 }
 out = path.resolve(out || 'bgm.mp3');
@@ -54,13 +54,14 @@ async function main() {
   let last = null;
   for (const m of [model, ...(model === 'lyria-3.5' ? ['lyria-3-pro-preview'] : [])]) {
     for (const body of bodies) {
-      const r = await geminiPost(`${API}/models/${encodeURIComponent(m)}:generateContent`, body, { timeoutMs: 600000 });
+      const r = await geminiPost(`${API}/models/${encodeURIComponent(m)}:generateContent`, body, { timeoutMs: 600000, stream: true });
       if (r.ok) {
         const p = readParts(r.json);
         const a = p.media.find((x) => /^audio\//.test(x.mimeType));
         if (a) {
           ensureDir(path.dirname(out));
           const ext = extOf(a.mimeType);
+          if (isRawPcm(a.mimeType)) a.data = pcmToWav(a.data, rateFromMime(a.mimeType, 48000), /channels=2|stereo/i.test(a.mimeType) ? 2 : 1);
           if (path.extname(out).toLowerCase() === ext) fs.writeFileSync(out, a.data);
           else {
             const tmp = `${out}.tmp${ext}`;
@@ -78,6 +79,10 @@ async function main() {
         continue;
       }
       last = r.error;
+      if (isFatal(r)) {
+        console.error(last);
+        process.exit(3);
+      }
       if (r.status === 404) break; // 次のモデルへ
       if (!(r.status === 400 && /modalit|Unknown name|Invalid JSON|not supported/i.test(r.error))) {
         console.error(last);

@@ -16,7 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs, ensureDir, ensureProxy } from './lib/common.mjs';
-import { API, geminiPost, readParts, pcmToWav, rateFromMime } from './lib/gemini.mjs';
+import { API, geminiPost, readParts, pcmToWav, rateFromMime, isFatal } from './lib/gemini.mjs';
 import { ffmpeg, probe } from './lib/media.mjs';
 
 ensureProxy();
@@ -53,7 +53,7 @@ async function synth(line) {
   const url = `${API}/models/${encodeURIComponent(model)}:generateContent`;
   let last = null;
   for (const mode of ['prebuilt', 'prebuilt-nolang', 'voice']) {
-    const r = await geminiPost(url, buildBody(line, mode), { timeoutMs: 180000 });
+    const r = await geminiPost(url, buildBody(line, mode), { timeoutMs: 180000, stream: true });
     if (r.ok) {
       const p = readParts(r.json);
       const a = p.media.find((m) => /^audio\//.test(m.mimeType));
@@ -61,10 +61,11 @@ async function synth(line) {
       last = `音声が返ってこなかった（${p.finishReason}）`;
       continue;
     }
+    if (isFatal(r)) return { error: r.error, fatal: true };
     last = r.error;
     if (!(r.status === 400 && /voice|language|speech_?config|Unknown name|Invalid JSON|not supported/i.test(r.error))) break;
   }
-  throw new Error(last || '不明なエラー');
+  return { error: last || '不明なエラー' };
 }
 
 async function main() {
@@ -73,6 +74,11 @@ async function main() {
   if (!todo.length) {
     console.log('作る声はありません（全部そろっています。作り直すなら --force か --only）');
     return;
+  }
+  const todoText = todo.filter((v) => /^TODO/.test(String(v.speak || v.text)));
+  if (todoText.length) {
+    console.error(`text が TODO のままです：${todoText.map((v) => v.id).join(', ')}`);
+    process.exit(1);
   }
   console.log(`${todo.length} 行を合成します（${model}・声 ${voice}）`);
   if (args['dry-run']) {
@@ -85,9 +91,18 @@ async function main() {
     ensureDir(path.dirname(dest));
     process.stdout.write(`${v.id}：${(v.text || v.speak).slice(0, 24)}… `);
     try {
-      const { audio } = await synth(v);
+      const res = await synth(v);
+      if (!res.audio) {
+        console.log(`✗ ${String(res.error).split('\n')[0]}`);
+        if (res.fatal) {
+          console.error(String(res.error));
+          process.exit(3);
+        }
+        continue;
+      }
+      const { audio } = res;
       const raw = `${dest}.raw.wav`;
-      const isWav = /wav/.test(audio.mimeType);
+      const isWav = /wav/i.test(audio.mimeType) && !/l16|pcm/i.test(audio.mimeType);
       fs.writeFileSync(raw, isWav ? audio.data : pcmToWav(audio.data, rateFromMime(audio.mimeType)));
       // 頭とお尻の無音を削る（間は台本の at で作る）
       ffmpeg(
@@ -103,10 +118,6 @@ async function main() {
       ok++;
     } catch (e) {
       console.log(`✗ ${String(e.message || e).split('\n')[0]}`);
-      if (/クレジット|キー|届きません/.test(String(e.message))) {
-        console.error(String(e.message));
-        process.exit(3);
-      }
     }
   }
   console.log(`\n${ok} 行できました。読み間違い（地名・数字）は耳で確認してもらう。直すときは speak をかなにして --only <id>`);

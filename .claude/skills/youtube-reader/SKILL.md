@@ -52,10 +52,11 @@ YouTube・サムネイル用のドメイン・Gemini（動画の最初の 1 秒�
 |---|---|---|
 | `yt-read.mjs <URL>` | oEmbed・視聴ページ・字幕・サムネイル・ストーリーボード。動画はダウンロードしない | `--out` `--lang ja,en` `--tlang ja`（字幕を日本語に自動翻訳）`--sb-max 40` `--no-storyboard` |
 | `yt-frames.mjs <URL｜動画ファイル>` | 時刻入りのコマのシート、カットの切り替わりと 1 カットの長さ、ラウドネス（LUFS）、無音の割合、文字起こし用の音声 | `--every 5` `--grid 4x4` `--scene 0.3` `--audio` `--subs` `--start 1:00 --end 3:00` `--keep` |
-| `yt-gemini.mjs <URL>` | Gemini が映像と音声を見て答える | `--mode summary｜transcript｜scenes｜breakdown｜ask` `--q "質問"` `--out` `--start/--end` `--res low｜medium｜high` `--fps` `--model` |
+| `yt-gemini.mjs <URL>` | Gemini が映像と音声を見て答える（少しずつ受け取るストリーミングが既定。長い分析でも途中で切れにくい） | `--mode summary｜transcript｜scenes｜breakdown｜ask` `--q "質問"` `--out` `--start/--end` `--res low｜medium｜high` `--fps` `--model` `--no-stream` |
 
 - `yt-gemini.mjs` の `--out` に `yt-read.mjs` の出力フォルダを渡すと、タイトル・概要欄・チャプターを前提情報として添える。結果は `gemini-<mode>.md`
-- Gemini の費用の目安は、低解像度（既定）で 1 秒あたり約 100 トークン（10 分で約 6 万）。長い動画は先に summary で全体をつかみ、必要な区間だけ `--start/--end` で細かく見る
+- Gemini の費用の目安は、低解像度（既定）で 1 秒あたり約 100 トークン（10 分で約 6 万、27 分で約 15 万）。1 回の分析ごとに動画全体を読むので、同じ動画に何度も聞くと費用が重なる。聞きたいことは 1 回にまとめ、細部は `--start/--end` で区間を絞る
+- 要約（summary）と分解（breakdown）で答えが食い違うことがある（例：BGM の有無）。食い違いは「要確認」として残し、区間を絞った ask か、yt-frames の実測で決める
 - Gemini に渡す指示文は `references/prompts/` にある（目的に合わせて直してよい）
 
 ## 3. 制作分析（同じような動画を作りたいとき）

@@ -118,6 +118,7 @@ yt-dlp --js-runtimes node "<URL>" ...
 | Gemini 400（private・unavailable など） | 非公開・限定公開・年齢制限・地域制限 | 公開動画のみ対応。ユーザーに頼む |
 | Gemini 429 | 上限（無料枠は 1 日 8 時間） | 時間をおく・課金を有効に |
 | Gemini が `RECITATION` で止まる | 書き写しと判断された | summary／scenes／breakdown に切り替える、範囲を短くする |
+| Gemini で HTTP 502「upstream request failed」（長い分析だけ） | クラウドの作業環境のプロキシが、応答の遅い通信を切った | 既定のストリーミング（`--no-stream` を付けない）で実行する |
 | カットがほとんど検出されない | ゆっくりしたディゾルブ・長回し・静止画の連続 | `--scene 0.15` で再実行、シートで目視 |
 | シートに時刻が入らない | ffmpeg に drawtext が無い・書体が無い | index.md の表で時刻を読む |
 

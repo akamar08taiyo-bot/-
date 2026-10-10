@@ -12,6 +12,12 @@ import path from 'node:path';
 import { parseArgs, ensureDir } from './lib/common.mjs';
 import { findFont, escPath, ffmpeg } from './lib/media.mjs';
 
+// 想定内のエラーは、内部の情報を出さずにメッセージだけ表示する
+process.on('uncaughtException', (e) => {
+  console.error(`エラー：${e?.message || e}`);
+  process.exit(1);
+});
+
 const args = parseArgs(process.argv.slice(2), { flags: ['help'] });
 if (args.help || !args.image || !args.title) {
   console.log('node make-thumb.mjs --image <画像> --title "町名" [--sub "…"] [--stamp "…"] [--pos bl] [--grade faded-warm] [--out thumb.jpg]');
@@ -23,7 +29,8 @@ const img = path.resolve(args.image);
 if (!fs.existsSync(img)) throw new Error(`画像が見つかりません：${args.image}`);
 const out = path.resolve(args.out || 'thumb.jpg');
 ensureDir(path.dirname(out));
-const workDir = path.dirname(img);
+// 書体の fonts/ はエピソードのフォルダに置く約束。画像が images/ の中なら、その 1 つ上がエピソードのフォルダ
+const workDir = path.basename(path.dirname(img)) === 'images' ? path.dirname(path.dirname(img)) : path.dirname(img);
 const font = findFont(args.font || 'mincho', workDir);
 if (!font) throw new Error('日本語の書体が見つかりません');
 const tmpDir = ensureDir(path.join(path.dirname(out), '.thumb_tmp'));
@@ -39,6 +46,8 @@ const zoom = Math.max(1, Number(args.zoom) || 1);
 
 const GRADES = {
   none: '',
+  cinema: "curves=all='0/0.03 0.5/0.5 1/0.97',colorbalance=rs=-0.02:bs=0.03:rh=0.03:bh=-0.03,eq=contrast=1.04:saturation=0.95",
+  vhs: "curves=all='0/0.06 0.5/0.5 1/0.92',eq=saturation=1.12:contrast=0.9",
   'faded-warm': "curves=all='0/0.06 0.5/0.5 1/0.94',colorbalance=rs=0.05:bs=-0.05:rh=0.03:bh=-0.04,eq=saturation=0.9:contrast=1.02",
   'faded-cool': "curves=all='0/0.06 0.5/0.5 1/0.95',colorbalance=rs=-0.03:bs=0.05:bh=0.03,eq=saturation=0.85",
   dusk: "colorbalance=rs=0.04:bs=0.07:rh=0.07:bh=-0.07,eq=saturation=0.95",
@@ -46,7 +55,11 @@ const GRADES = {
   night: "colorbalance=bs=0.07:rh=0.08:bh=-0.08,eq=brightness=-0.02:saturation=0.9",
   mono: "hue=s=0,eq=contrast=1.08",
 };
-const grade = GRADES[args.grade || 'faded-warm'] ?? GRADES['faded-warm'];
+if (args.grade && !(args.grade in GRADES)) {
+  console.error(`--grade は ${Object.keys(GRADES).join(' / ')} のどれか`);
+  process.exit(1);
+}
+const grade = GRADES[args.grade || 'faded-warm'];
 const big = Math.round(H * (Number(args.size) || 0.14));
 const sub = Math.round(H * 0.045);
 const m = Math.round(W * 0.055);

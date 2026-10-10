@@ -58,9 +58,12 @@ export function findFont(kind, workDir) {
   return list.find((f) => fs.existsSync(f)) || (kind === 'mono' ? findFont('gothic', workDir) : kind === 'mincho' ? findFont('gothic', workDir) : null);
 }
 
-/** ffmpeg のフィルタ引数に入れるパス（Windows の C: などをエスケープ） */
+/**
+ * ffmpeg のフィルタで '…' の中に入れるパス。Windows の \ は / に、: は \: に。
+ * ' はフィルタグラフと値の 2 段階で解釈されるので、引用を閉じて \\\' を置き、開き直す（'O'\\\''Neil'）。
+ */
 export function escPath(p) {
-  return String(p).replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'");
+  return String(p).replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "'\\\\\\''");
 }
 
 /** ffmpeg を実行し、失敗したら最後のエラーを添えて例外にする */

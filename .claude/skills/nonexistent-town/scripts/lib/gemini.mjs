@@ -1,7 +1,7 @@
 // Gemini API の呼び出し（画像・音声・音楽・動画）。キーの扱い・再試行・エラーの説明をまとめる。
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { httpPostJson, httpGet, findGeminiKey, viaProxy } from './common.mjs';
+import { httpPostJson, httpPostSSE, httpGet, findGeminiKey, viaProxy } from './common.mjs';
 
 export const API = 'https://generativelanguage.googleapis.com/v1beta';
 const SKILL_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -15,10 +15,13 @@ export function authHeaders() {
   return null;
 }
 
+/** HTTP の状態と応答から、日本語の説明を作る。致命的なもの（続けても無駄）は 1 行目に「クレジット」「キー」を含める */
 export function explainError(status, json, text) {
   const msg = json?.error?.message || text?.slice?.(0, 300) || '';
+  const keyBad = /API[ _]?key not valid|API_KEY_INVALID|API key expired|invalid api key/i.test(`${msg} ${JSON.stringify(json?.error?.details || '')}`);
   if (status === 402) return `Gemini のクレジットが切れています。AI Studio（https://aistudio.google.com）でチャージしてください。\n${msg}`;
-  if (status === 401 || status === 403) return `API キーが無効か、この機能が使えない設定です。\n${msg}`;
+  if (keyBad) return `Gemini の API キーが無効です（貼り間違い・期限切れ・削除済み）。.env の GEMINI_API_KEY を確かめてもらってください。\n${msg}`;
+  if (status === 401 || status === 403) return `Gemini の API キーが使えない設定です（制限付きキー・API が無効）。\n${msg}`;
   if (status === 404) return `モデルが見つかりません（--model で指定し直す）。\n${msg}`;
   if (status === 429) return `使用量の上限です。時間をおくか、課金の設定を確認してください。\n${msg}`;
   if (status === 400) return `リクエストが受け付けられませんでした。\n${msg}`;
@@ -26,24 +29,37 @@ export function explainError(status, json, text) {
   return `HTTP ${status}\n${msg}`;
 }
 
+/** 続けても無駄なエラーか（クレジット切れ・キーの問題・接続できない） */
+export const isFatal = (r) => r && !r.ok && (r.status === 402 || r.status === 401 || r.status === 403 || r.status === -1 || r.status === 0 || /キー/.test(r.error || ''));
+
 /**
  * POST（再試行つき）。成功なら { ok: true, json }、失敗なら { ok: false, error, status }（例外は投げない）。
- * @param {string} url  例：`${API}/models/<model>:generateContent`
+ * stream: true なら streamGenerateContent で少しずつ受け取る（長い生成でも途中のプロキシに切られにくい）。
+ * ストリーミングに対応しないモデルなら、ふつうの呼び出しに切り替える。
  */
-export async function geminiPost(url, body, { timeoutMs = 600000, tries = 3 } = {}) {
+export async function geminiPost(url, body, { timeoutMs = 600000, tries = 3, stream = false } = {}) {
   const auth = authHeaders();
   if (!auth) {
     return {
+      ok: false,
+      status: -1,
       error:
         'Gemini の API キーが見つかりません。https://aistudio.google.com/apikey で発行し、作業フォルダの .env に GEMINI_API_KEY=… と書いてもらう（チャットには貼らせない）。ai-video-studio / motion-vault の .env にあれば自動で使う。',
-      status: -1,
-      ok: false,
     };
   }
+  let useStream = stream && /:generateContent$/.test(url);
   let r;
   for (let i = 0; i < tries; i++) {
-    r = await httpPostJson(url, body, { headers: auth.headers, timeoutMs });
+    r = useStream
+      ? await httpPostSSE(url.replace(/:generateContent$/, ':streamGenerateContent?alt=sse'), body, { headers: auth.headers, timeoutMs })
+      : await httpPostJson(url, body, { headers: auth.headers, timeoutMs });
     if (r.ok) return { ok: true, json: r.json };
+    const msg = r.json?.error?.message || r.text || '';
+    if (useStream && (r.status === 404 || (r.status === 400 && /stream/i.test(msg)))) {
+      useStream = false; // このモデルはストリーミング非対応
+      i--;
+      continue;
+    }
     const retry = [0, 500, 502, 503, 504].includes(r.status) || (r.status === 429 && i === 0);
     if (!retry || i === tries - 1) break;
     await sleep(r.status === 429 ? 30000 : 6000 * (i + 1));
@@ -88,6 +104,9 @@ export function rateFromMime(mime, fallback = 24000) {
   return m ? Number(m[1]) : fallback;
 }
 
+/** 生の PCM（audio/L16・audio/pcm）か */
+export const isRawPcm = (mime) => /audio\/(l16|pcm)/i.test(String(mime));
+
 /** 16bit リニア PCM（リトルエンディアン）に WAV のヘッダーを付ける */
 export function pcmToWav(pcm, sampleRate = 24000, channels = 1) {
   const header = Buffer.alloc(44);
@@ -108,13 +127,13 @@ export function pcmToWav(pcm, sampleRate = 24000, channels = 1) {
   return Buffer.concat([header, pcm]);
 }
 
-/** 画像の MIME と拡張子 */
+/** MIME → 拡張子 */
 export function extOf(mime) {
   if (/png/.test(mime)) return '.png';
   if (/jpe?g/.test(mime)) return '.jpg';
   if (/webp/.test(mime)) return '.webp';
   if (/mpeg|mp3/.test(mime)) return '.mp3';
-  if (/wav/.test(mime)) return '.wav';
+  if (/wav/.test(mime) || isRawPcm(mime)) return '.wav';
   if (/mp4/.test(mime)) return '.mp4';
   return '.bin';
 }
