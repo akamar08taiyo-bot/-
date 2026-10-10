@@ -570,11 +570,14 @@ def clip_frame(s, t, span):
     if rd is None:
         rd = _CLIPS[s["id"]] = ClipReader(clip_path(s))
     hold = s["reveal"].get("hold", 0) if s.get("reveal") else 0.0
+    # fixes.json の "clip": {"start": 秒} … クリップの先頭を使わない（実例：最初の1秒でグローブが突然現れた）
+    c0 = FIX.get(s["id"], {}).get("clip", {}).get("start", 0.0) if not s.get("reveal") else 0.0
+    usable = max(0.5, rd.dur - c0)
     if t <= hold:
-        f = 0.0
+        f = c0 * rd.fps
     else:
-        speed = min(1.0, rd.dur / max(0.1, span - hold))
-        f = (t - hold) * speed * rd.fps
+        speed = min(1.0, usable / max(0.1, span - hold))
+        f = (c0 + (t - hold) * speed) * rd.fps
     i = int(f); w = f - i
     a = rd.get(i).astype(np.float32)
     if w > 0.02 and i + 1 < rd.n:

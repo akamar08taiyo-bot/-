@@ -2097,45 +2097,45 @@
    "text": "あのさ……おれ、なつみのこと……すき、かも。",
    "voice": "Puck",
    "at": 1.2,
-   "profile": "A 10-year-old Japanese boy.",
+   "profile": "A 10-year-old Japanese boy with a light, high, childlike voice.",
    "scene": "At dusk in a small park, shyly confessing to a girl in his class.",
-   "notes": "Speak very shyly and quietly, hesitating, with small pauses, embarrassed but sincere."
+   "notes": "He is shy and nervous: a soft voice (not whispering), small hesitant pauses at each ellipsis, a tiny embarrassed breath before the word suki, trailing off at the end. Natural like a real elementary school kid talking, not theatrical, not like an anime voice actor, not like a teenager or an adult. Keep the voice high, light and young throughout, even when quiet, shy or sad: a child's voice before puberty."
   },
   "C2": {
    "who": "ナツミ（10歳）",
    "text": "……しってたよ。",
    "voice": "Leda",
    "at": 8.8,
-   "profile": "A 10-year-old Japanese girl.",
+   "profile": "A 10-year-old Japanese girl with a light, high, childlike voice.",
    "scene": "A boy just shyly confessed that he likes her, at dusk in a park.",
-   "notes": "Speak softly with a small embarrassed giggle, warm and kind."
+   "notes": "After a short pause, soft and a little shy, with a gentle small smile in the voice. Natural like a real elementary school kid talking, not theatrical, not like an anime voice actor, not like a teenager or an adult."
   },
   "L1": {
    "who": "ユウスケ",
    "text": "なあ、あしたも走らせに行こうぜ。",
    "voice": "Fenrir",
    "at": 2.2,
-   "profile": "A 10-year-old Japanese boy.",
+   "profile": "A 10-year-old Japanese boy with a light, high, childlike voice.",
    "scene": "Summer dusk in 1997, walking home with his best friend, pushing bicycles along a river.",
-   "notes": "Speak casually and cheerfully, a little teasing, warm."
+   "notes": "Speak casually and cheerfully, a little teasing, warm. Natural like a real elementary school kid talking, not theatrical, not like an anime voice actor, not like a teenager or an adult."
   },
   "L2": {
    "who": "ユウスケ",
    "text": "……おれ、ひっこすんだ。",
    "voice": "Fenrir",
    "at": 3.0,
-   "profile": "A 10-year-old Japanese boy.",
+   "profile": "A 10-year-old Japanese boy with a light, high, childlike voice.",
    "scene": "Sitting on a riverbank at sunset, telling his best friend that his family is moving away.",
-   "notes": "Speak very quietly and slowly, looking down, trying to sound casual but sad."
+   "notes": "Quiet and slow, looking down; he tries to sound casual, but he is sad. Natural like a real elementary school kid talking, not theatrical, not like an anime voice actor, not like a teenager or an adult. Keep the voice high, light and young throughout, even when quiet, shy or sad: a child's voice before puberty."
   },
   "L3": {
    "who": "ユウスケ",
    "text": "これ、あずかっといて。……また、勝負しような。",
    "voice": "Fenrir",
    "at": 2.0,
-   "profile": "A 10-year-old Japanese boy.",
+   "profile": "A 10-year-old Japanese boy with a light, high, childlike voice.",
    "scene": "The morning he moves away, handing his favorite toy race car to his best friend.",
-   "notes": "Speak slowly and quietly, holding back tears, with a brave small smile at the end. Pause between the two sentences. Say the last word exactly as written: shiyou-na."
+   "notes": "Slow and quiet, holding back tears, with a brave small smile at the end. Pause between the two sentences. Say the last word exactly as written: shiyou-na. Natural like a real elementary school kid talking, not theatrical, not like an anime voice actor, not like a teenager or an adult. Keep the voice high, light and young throughout, even when quiet, shy or sad: a child's voice before puberty."
   },
   "L4": {
    "who": "大人のハルト",

@@ -84,6 +84,8 @@ Clouds drift slowly across the summer sky, a gentle breeze moves the trees, the 
   `Keep every person and object exactly as in the photo; do not add, remove or duplicate any objects. Very subtle, natural, slow motion. The camera does not move.`
   - 採用できた例：縁側で改造する2人（手元の小さな動き・蚊取り線香の煙・眠る犬の呼吸）、夏祭りを歩く3人（笑顔・提灯の揺れ）、引っ越しの朝（荷物を運ぶ大人・立ち尽くす少年）。
   - 使えなかった例：おもちゃを掲げて笑う2人 → **手の中の車が0.6秒で増えた**（「増やさない」と書いても起きる）。大会の群衆 → 顔が崩れ、カメラも動いた。こういうカットは静止画＋カメラ移動のまま。
+  - 同じ「おもちゃを掲げて笑う2人」も、**「顔だけが動く：まばたき・笑顔が広がる・小さく笑う。手と車はまったく動かさない」**と書き直したら、車は増えずに2人が笑い出した（冒頭のフックに採用）。
+  - 2回目の結果（20本中18本採用）：起きる・食べる・犬が歩く・硬貨を受け取る・泣きながら車を受け取る・雨宿り・自転車で水たまり・雲が流れる、は自然。子どもが何人も並ぶカット（模型店のコース）は、途中で並びや服の柄が変わって不採用。「陽炎（heat haze）」と書いたカットは煙が出て、人が現れたり消えたりして不採用。ピッチャーの手にグローブが0.6秒で現れたカットは、先頭1.3秒を使わずに採用（fixes.json の clip.start）。
 - カメラは `steady camera` / `The camera does not move`。8秒の動画を、カットの長さに合わせてゆっくり再生する（render.py が前後のコマを混ぜる）。
 - Veo には fixes.json のぼかしを当てた画像を渡す（gen_clips.py が自動で）。それでも動画AIはぼかした文字を描き直すことがあるので、render.py は動画のコマにも同じ所のぼかしを当てる。
 - 子どもが写る画像でも動かせた例がある（personGeneration=allow_adult で S07 の自転車の2人が通った）。通らないこともあるので**まず1本試してから**まとめて作る。
@@ -112,4 +114,7 @@ Instrumental only, no vocals, no drums. <どんな場面の曲か> : <楽器>, <
 - 指示は英語、セリフだけ日本語。日本語で指示を書くと**指示文まで読み上げる**ことがある。
 - 台本は**ひらがな多め**（読み間違いを減らす）。間は「……」、語尾は「、」で区切る。
 - 語尾が変わることがある（「しような」→「しようぜ」）。notes に `Say the last word exactly as written: shiyou-na.` のように書いて撮り直す。
-- 子どもの役は profile に年齢を（`A 10-year-old Japanese boy.`）、場面に気持ちを（`shyly confessing ... embarrassed but sincere`）。
+- **子どもの役は AUDIO PROFILE に「軽く高い、子どもらしい声」まで書く**：`A 10-year-old Japanese boy with a light, high, childlike voice.`。年齢だけ（`A 10-year-old Japanese boy.`）だと、同じ声でも1つずつ判定させると18〜30歳に聞こえた（実例：Fenrir）。書き足すと同じ声が「推定10歳・満点」になった。
+- notes の最後に `Natural like a real elementary school kid talking, not theatrical, not like an anime voice actor, not like a teenager or an adult.` を足す。
+- **悲しい・照れたセリフほど声が低く大人びる**（ささやく、うつむく、泣きそう、と書くと16〜28歳に聞こえた）。「平気なふりをして少し明るく言う（a small, bright childlike voice, trying to sound cheerful and brave）」と書くと子どもらしさが残る（実例：別れのセリフが推定11歳に）。それでも大人びるテイクは、声の高さと響きを少し上げる（ffmpeg の `asetrate=元のレート×1.22,aresample=元のレート,atempo=0.82` で約3.5半音）。加工感が出るので最後の手段。
+- 撮り直しは `voice_takes.py`（何テイクか撮り、今の声もテイク0として、1つずつ独立に採点させて選ぶ）。並べて比べさせると、互いに引きずられて年齢の判定がぶれた。
