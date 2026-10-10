@@ -1,0 +1,193 @@
+{
+  "_note": "動画の型（尺・場面数・つなぎ・質感・音）。参考動画を分析するまでは「仮の型」。シリーズの作業フォルダに formats.json を置くと、そちらが優先される（分析結果で数値を上書きして育てる）",
+  "_status": "provisional",
+  "imageStyle": "Japanese small-town scenery as a 35mm film photograph taken in the {era}; soft natural light, slightly faded colors, gentle film grain, quiet and nostalgic, no people in the foreground",
+  "imageStyleNote": "仮の画風（参考動画を分析したら、style-bible.md の結論に合わせて書き換える）。{era} は町の時代に置き換わる",
+  "long": {
+    "label": "横長・3〜6 分（標準回）",
+    "format": {
+      "width": 1920,
+      "height": 1080,
+      "fps": 30
+    },
+    "shots": 32,
+    "dur": [
+      6,
+      9
+    ],
+    "titleCard": {
+      "dur": 5,
+      "at": "start"
+    },
+    "endCard": {
+      "dur": 5
+    },
+    "transitions": [
+      "fade",
+      "fade",
+      "fade",
+      "fadeblack",
+      "fade",
+      "fadegrays",
+      "fade",
+      "fadewhite"
+    ],
+    "transitionDur": 1.6,
+    "moves": [
+      "in",
+      "right",
+      "out",
+      "left",
+      "in",
+      "down",
+      "still",
+      "up"
+    ],
+    "zoom": 0.1,
+    "look": {
+      "grain": 0.28,
+      "vignette": 0.35,
+      "flicker": 0.15,
+      "glow": 0.2,
+      "letterbox": 0,
+      "blur": 0
+    },
+    "text": {
+      "font": "mincho",
+      "position": "bl",
+      "size": 0.04,
+      "box": 0
+    },
+    "captionsEvery": 4,
+    "stamp": true,
+    "narration": "optional",
+    "audio": {
+      "bgmGain": -8,
+      "ambienceGain": 4,
+      "duck": 8,
+      "loudness": -14
+    }
+  },
+  "short": {
+    "label": "縦長・30〜50 秒（ショート）",
+    "format": {
+      "width": 1080,
+      "height": 1920,
+      "fps": 30
+    },
+    "shots": 9,
+    "dur": [
+      3.5,
+      5
+    ],
+    "titleCard": null,
+    "endCard": null,
+    "transitions": [
+      "fade",
+      "fade",
+      "fadewhite",
+      "fade",
+      "fadegrays"
+    ],
+    "transitionDur": 0.8,
+    "moves": [
+      "in",
+      "up",
+      "out",
+      "down",
+      "in"
+    ],
+    "zoom": 0.12,
+    "look": {
+      "grain": 0.25,
+      "vignette": 0.3,
+      "flicker": 0.12,
+      "glow": 0.2,
+      "letterbox": 0,
+      "blur": 0
+    },
+    "text": {
+      "font": "mincho",
+      "position": "tc",
+      "size": 0.034,
+      "box": 0.25
+    },
+    "captionsEvery": 2,
+    "stamp": true,
+    "narration": "optional",
+    "audio": {
+      "bgmGain": -6,
+      "ambienceGain": 4,
+      "duck": 8,
+      "loudness": -14
+    }
+  },
+  "ambient": {
+    "label": "横長・20〜60 分（作業用・眠る前）",
+    "format": {
+      "width": 1920,
+      "height": 1080,
+      "fps": 24
+    },
+    "shots": 40,
+    "dur": [
+      40,
+      60
+    ],
+    "titleCard": {
+      "dur": 8,
+      "at": "start"
+    },
+    "endCard": null,
+    "transitions": [
+      "fade"
+    ],
+    "transitionDur": 4,
+    "moves": [
+      "in",
+      "right",
+      "out",
+      "left"
+    ],
+    "zoom": 0.08,
+    "look": {
+      "grain": 0.22,
+      "vignette": 0.3,
+      "flicker": 0.08,
+      "glow": 0.15,
+      "letterbox": 0,
+      "blur": 0
+    },
+    "text": {
+      "font": "mincho",
+      "position": "bl",
+      "size": 0.034,
+      "box": 0
+    },
+    "captionsEvery": 0,
+    "stamp": false,
+    "narration": "none",
+    "audio": {
+      "bgmGain": -10,
+      "ambienceGain": 6,
+      "duck": 0,
+      "loudness": -18
+    }
+  },
+  "soundPresets": {
+    "_note": "街のカードの「音」→ gen-ambience.mjs の種類。無いものは Lyria で作るか、使わない",
+    "雨どいを伝う雨": "rain",
+    "雨の日のバスの走行音": "rain",
+    "寄せては返す波": "waves",
+    "風に鳴る電線": "wind",
+    "秋の虫の声": "crickets",
+    "蝉しぐれ": "cicada",
+    "ひぐらし": "cicada",
+    "踏切の警報音": "crossing",
+    "風鈴": "chime",
+    "柱時計の振り子": "clock",
+    "製氷機のうなり": "hum",
+    "漁船のエンジン": "hum",
+    "扇風機の首振り": "room"
+  }
+}
