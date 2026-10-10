@@ -49,10 +49,10 @@ API キー：クラウド環境で generativelanguage.googleapis.com にキー�
 3. **絵コンテ**：`storyboard.py` を書き換えて `python3 storyboard.py`（項目は references/storyboard.md、指示文の型は references/prompts.md）。`絵コンテ.md` で流れと尺を確かめる。
 4. **人物の設定画**：`gen_chars.py`（3方向の写真シート。大人の姿は子どもの設定画を参照）。並べて見て、顔・髪・服の目印がそろっているか。
 5. **全カットの画像**：`gen_scenes.py --workers 5` → `img_sheet.py` の一覧を**全部 Read で見る**（店・箱・看板が写るカットは `zoom_grid.py` で元の解像度でも）→ `check_images.py`（Gemini に文字・ロゴ・ブランド・時代違い・縁・破綻を検査させる）。直し方は `gen_scenes.py --only ID --extra "..."`、または fixes.json のぼかし・切り取り（references/quality.md）。
-6. **動き（任意・費用あり）**：`gen_clips.py --dry` で本数と見積もり → 了承後 `gen_clips.py`。まず1本で試す。
+6. **動き（任意・費用あり）**：`gen_clips.py --dry` で本数と見積もり → 了承後、まず1本で試す → `gen_clips.py --outdir work/clips_try` でまとめて作り、`clip_check.py work/clips_try/*.mp4`（Gemini の検査＋前半を細かく抜いた一覧画像）で確かめ、良いものだけ `assets/clips/` に写す。手で小物を持つカット・群衆・液晶にドット絵を描くカットは動かさない。
 7. **BGM**：`gen_music.py`（Lyria）。作れないときは `synth_music.py --box M2 --amb M5`（オルゴール・アンビエントピアノを作曲）。
 8. **声**：`gen_voices.py`（英語の構造化プロンプト＋文字起こしで台本どおりか自動確認）→ `gen_voices.py --age-check`（年齢・性別の印象と役の合い方）。合わない声は候補を作って聞き比べ、人物ごと替える。
-9. **小物と音の確かめ（任意）**：電子ペットの液晶などは `detect_lcd.py ID --seed x y` で位置を取り、ドット絵（オリジナル）を overlay で描く。合成した環境音は `sfx_test.py --blind ...` で Gemini に1つずつ目隠しで聞かせ、何の音に聞こえるかを確かめる（合成の虫・人の声は電子音に聞こえやすい）。テレビ・ラジオなど**言葉が聞こえる音は TTS で作って** `assets/sfx/` に置く（references/storyboard.md の 7.）。
+9. **小物と音の確かめ（任意）**：電子ペットの液晶などは `detect_lcd.py ID --seed x y` で位置を取り、ドット絵（オリジナル）を overlay で描く。合成した環境音は `sfx_test.py --blind ...` で Gemini に1つずつ目隠しで聞かせ、何の音に聞こえるかを確かめる（合成の虫・人の声は電子音に聞こえやすい）。テレビ・ラジオの声や店・祭りの歓声など**言葉が聞こえる音は TTS で作る**：絵コンテの SFX_VOICES に書いて `gen_sfx_voices.py`（references/storyboard.md の 7.）。
 10. **確認用の静止画**：`render.py --stills` と `render.py --at P02:1.2 P02:4 S12:7 ...` を Read で見て直す。何周でも。
 11. **映像**：`render.py --workers 4`（細かく分けて並列。4コアで12分の1080p に約45〜60分）。あとから数カットだけ直すときは、そのカットの範囲を `render.py --frames a b` で描き、`splice.py` でコマ単位に差し替える（全編を描き直さない）。
 12. **音**：`mix.py`（BGM・環境音・効果音・セリフを時刻どおりに並べ、セリフ中は周りを下げ、ゆっくり効く平準化で -14 LUFS／-2 dBTP 前後に）→ `loudgraph.py` で赤丸（急な上昇）ゼロ、`spectro.py` で中身を確認。
@@ -85,9 +85,9 @@ API キー：クラウド環境で generativelanguage.googleapis.com にキー�
 | gem.py / gsearch.sh / gapi.py | Gemini 呼び出し（YouTube 解析・画像/音声の添付・検索・URL 読み込み・JSON）／検索の再試行／API 設定 |
 | genimg.py / gen_chars.py / gen_scenes.py | 画像1枚（参照画像つき）／設定画／全カット |
 | img_sheet.py / zoom_grid.py / check_images.py | 画像の一覧（目で見る用）／元の解像度の拡大と1%目盛り（ロゴ探し・ぼかし範囲）／Gemini による検査 |
-| veo.py / gen_clips.py | 画像→動画（Veo）。--dry で見積もり |
+| veo.py / gen_clips.py / clip_check.py | 画像→動画（Veo）。--dry で見積もり、--outdir でお試し保存 ／ 動画の破綻の検査 |
 | lyria.py / gen_music.py / synth_music.py | BGM（Lyria／コードで作曲） |
-| tts.py / gen_voices.py | 声（構造化プロンプト＋文字起こし確認、--age-check） |
+| tts.py / gen_voices.py / gen_sfx_voices.py | 声（構造化プロンプト＋文字起こし確認、--age-check）／環境音に混ぜる声（テレビ・歓声） |
 | sfx.py / sfx_test.py | 環境音・効果音の合成ライブラリ（名前は references/storyboard.md）／試聴・目隠しテスト |
 | detect_lcd.py | 画像の中の小さな画面の位置 |
 | render.py / splice.py | 映像（カメラ・効果・写真が動き出す・キャプション・題字・ドット絵・クリップ）。--stills / --at / --frames ／ 一部のコマだけ差し替え |

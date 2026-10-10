@@ -12,6 +12,7 @@ python3 storyboard.py で scenes.json（全スクリプトが読む）と 絵コ
            text=title/end/afterglow、overlay=画面のドット絵、bgm=曲のキー、era=時代、xfade=前のカットからの転換秒、
            reveal=写真が動き出す演出、caption=日英キャプション、img=別カットの画像を流用
   LINES  … セリフ（英語の演技指示つき）、MUSIC … 曲（Lyria の指示。手元にある曲は "existing"）
+  SFX_VOICES … 環境音に混ぜる「言葉が聞こえる音」（テレビの声・店や祭りの歓声。gen_sfx_voices.py が TTS で作る）
 
 教訓：「ブラウン管テレビ」のような時代の小物は、全カット共通の指示に入れない（バス停や屋台にまでテレビが出る）。室内の場面でだけ書く。
 """
@@ -24,17 +25,19 @@ META = dict(
     end_question="あなたの1997年の夏は、どんな夏でしたか。",
     afterglow_title="あの夏の音", afterglow_sub="環境音とピアノだけの、ゆっくりした時間",
     out_name="電池の夏_1997_v2",
-    look="photo", past_era="1997", present_era="2026",            # look=photo（写実）/ anime。era の値で色調整が変わる
-    setting="a small seaside town in Japan in summer 1997",        # check_images.py の指示文に使う
-    stamp_text="'97 7 26",                                         # サムネの日付（stamp=True のとき）
-    music_gain={"M0": -1.0, "M2": -1.5, "M5": -6.0},               # 曲ごとの音量（dB）
-    music_preroll={"M1": 1.2},                                     # タイトル曲は転換の1.2秒前から
+    look="photo", past_era="1997", present_era="2026",
+    setting="a small seaside town in Japan in summer 1997",
+    stamp_text="'97 7 26",
+    music_gain={"M0": -1.0, "M2": -1.5, "M5": -6.0},
+    music_preroll={"M1": 1.2},
     music_fade_in={"M1": 4.0, "M5": 4.0},
-    afterglow_part="余韻",                                          # 環境音パートの part 名
+    afterglow_part="余韻",
     sfx_captions={"chime5": "♪（夕方5時のチャイム「夕焼け小焼け」）"},
-    chapters={"プロローグ": "プロローグ（2026年・実家の片付け）", "朝": "1997年 夏・朝（お小遣い、駄菓子屋、模型店）",
-              "午後": "午後（縁側で改造、公園で野球、夕立）", "夕方": "夕方（5時のチャイム、告白、夕飯）", "夜": "夜（夏祭り、花火）",
-              "晩夏": "晩夏（大会、赤とんぼ、8月31日）", "別れ": "別れ", "エピローグ": "エピローグ（2026年）", "余韻": "あの夏の音（環境音とピアノ）"},
+    chapters={"プロローグ": "プロローグ（2026年・実家の片付け）",
+              "朝": "1997年 夏・朝（ブラウン管テレビと柴犬、おばあちゃんのお小遣い、駄菓子屋、模型店）",
+              "午後": "午後（縁側で改造、公園で野球、夕立、虹）", "夕方": "夕方（5時のチャイム、告白、夕飯のナイター）",
+              "夜": "夜（夏祭り、花火）", "晩夏": "晩夏（大会、赤とんぼ、8月31日）", "別れ": "別れ",
+              "エピローグ": "エピローグ（2026年）", "余韻": "あの夏の音（環境音とピアノ・約5分）"},
     motion_style="Realistic 1990s 35mm color film look, natural subtle motion, no text, no subtitles, no logos.",
     thumbs=[dict(scene="P02", name="サムネA_写真が動き出す", stamp=True),
             dict(scene="S23", name="サムネB_告白の夕暮れ", text="1997年、夏。", sub="電池の夏"),
@@ -61,9 +64,8 @@ CHARS = {
     "grandma": dict(file="assets/chars/grandma.png", ref="GRANDMA is the elderly woman in the attached reference photos (keep her face, grey permed hair, glasses and apron exactly)",
                     desc="GRANDMA: a kind Japanese grandmother in her early 70s, short grey permed hair, round thin-framed glasses, small and slightly stooped, wearing a light beige blouse under a white kappogi apron."),
     "adult": dict(file="assets/chars/adult.png", ref="the man is ADULT HARUTO from the attached reference photos (39 years old, charcoal sweater; keep his face and cowlick)",
-                  base="haruto", base_note="The attached photos show HARUTO as a 10-year-old boy; make the SAME person grown up at age 39 in 2026, clearly recognizable as him (same face shape, eyes and cowlick).",
                   desc="ADULT HARUTO in 2026: a 39-year-old Japanese man, the grown-up HARUTO with the same small cowlick; short black hair with a few grey strands, gentle eyes, light stubble, slim; wearing a plain charcoal-grey knit sweater over a white T-shirt and dark blue jeans."),
-    "shiba": dict(file="assets/chars/shiba.png", kind="animal", ref="the dog is the red Shiba Inu from the attached reference photo (same face, coat and red collar with a small brass bell)",
+    "shiba": dict(file="assets/chars/shiba.png", ref="the dog is the red Shiba Inu from the attached reference photo (same face, coat and red collar with a small brass bell)",
                   desc="SHIBA: the family's red (aka) Shiba Inu dog, medium size, curled tail, cream cheeks, wearing a red collar with a small brass bell."),
 }
 TOY_RULES = ("Toy race cars are small generic motorized 4WD plastic model cars of original design with small side guide rollers, no logos or stickers with text. "
@@ -71,12 +73,53 @@ TOY_RULES = ("Toy race cars are small generic motorized 4WD plastic model cars o
 
 MOTION = {'P01': "The man's hands slowly lift the tin lid fully open, dust drifts in the window light, steady close-up.", 'P02': 'The two boys laugh and proudly raise their toy race cars toward the camera, small natural movements, a toy car speeds by on the track behind them.', 'S01': 'Clouds drift slowly across the summer sky, a gentle breeze moves the trees, the sea sparkles, very slow steady camera.', 'S02': 'The boy stirs in his sleep and slowly opens his eyes, the electric fan turns, the curtain sways gently in the morning breeze.', 'S04': 'The boy eats breakfast while watching TV, the lace curtain moves in the breeze, the Shiba Inu outside lifts its head and wags its tail.', 'S05': "The grandmother gently drops two coins into the boy's cupped hands and smiles, the boy bows happily, the dog wags its tail.", 'S06': 'The boy finishes tying his sneaker laces and picks up the toy car case, summer light from the open door.', 'S07': 'The two boys ride their bicycles down the gentle slope toward the camera, wind in their hair, natural subtle motion, steady camera.', 'S08': 'The two boys drink ramune from glass bottles and laugh, the cat in the shade flicks its tail, heat shimmer.', 'S09': 'The boy points at candies and shows his coin to the shopkeeper, his friend leans in, gentle natural motion.', 'S10': 'Small toy race cars speed around the lanes of the track, the kids lean over and cheer, natural motion.', 'S11': "The boys' fingers release the two toy cars, the wheels spin and the cars start to move forward on the track.", 'S12': "The two boys keep working on their toy cars with small careful hand movements, one glances up and smiles, the wind chime sways gently, thin smoke rises from the mosquito coil, the dog breathes slowly while sleeping. Keep every person and object exactly as in the photo; do not add, remove or duplicate any objects. Very subtle, natural, slow motion. The camera does not move.", 'S13': 'One boy rubs the two AA batteries between his palms, the other turns the drilled chassis in his fingers.', 'S14': 'The toy race car speeds along the curb and the boy runs after it laughing, heat haze shimmers above the asphalt.', 'S15': "The flipped toy car's wheels keep spinning, the boy reaches to pick it up, his friend laughs.", 'S16': 'The buzz-cut boy throws the rubber ball, the batter gets ready to swing, the girl swings gently on the swing in the background.', 'S17': 'The ball flies up into the blue sky, the boys turn their heads to follow it, the girl claps.', 'S18': 'Dark storm clouds roll in over the rice fields, wind makes waves in the green rice, the kids look up.', 'S19': 'Heavy rain pours down, splashes on the asphalt, steam rises, the kids huddle under the eaves.', 'S20': 'The boys press buttons on their handheld games, the girl watches her virtual pet, rain falls softly behind them.', 'S21': 'The boys ride their bicycles through the puddles, water splashes, the evening sky glows.', 'S22': 'The sunset light slowly shifts over the town, a few children walk home far below, gentle breeze.', 'S23': 'The boy shyly rubs the back of his neck and looks down, the girl smiles and looks away embarrassed, their friend peeks from behind the slide, gentle natural motion.', 'S24': 'The two boys walk slowly pushing their bicycles along the embankment, one turns to talk to the other, the river shimmers.', 'S25': "The family eats dinner, the TV flickers with the baseball game, the mother's hand points at the virtual pet, the dog outside lies by the doghouse.", 'S26': "The kids walk slowly through the festival smiling and looking at the stalls, paper lanterns sway gently, people move softly in the background. Keep every person and object exactly as in the photo; do not add, remove or duplicate any objects. Very subtle, natural, slow motion. The camera does not move.", 'S27': "Fireworks bloom and fade over the river, light flickers on the kids' faces as they watch.", 'S28': 'The boy sleeps peacefully, the fan slowly turns, the curtain moves, the tiny screen glows faintly.', 'S30': 'Toy race cars speed around the big circuit, kids and parents cheer, banners flutter in the wind.', 'S31': 'The toy car flies off the track in slow motion and tumbles through the air, the kids gasp.', 'S32': 'The disappointed boy looks at his toy car, his friend pats his shoulder and grins, the crowd moves behind them.', 'S33': 'Red dragonflies fly around, the tall grass sways in the evening breeze, the buzz-cut boy looks down quietly.', 'S34': 'The boy writes in his workbook, then stops and rests his chin on his hand, the fan turns.', 'S35': "Two movers carry a cardboard box toward the truck, the adults talk quietly, the boy stands still holding his bicycle and looks down, a gentle breeze moves the trees. Keep every person and object exactly as in the photo; do not add, remove or duplicate any objects. Very subtle, natural, slow motion. The camera does not move.", 'S36': 'The buzz-cut boy holds out the blue toy car, the other boy slowly takes it, both look down holding back tears.', 'S37': 'The moving truck drives away down the long road, the boy stands still watching it go, the rice sways in the wind.', 'S38': 'The silver pampas grass sways in the wind, the dog leans against the boy, red dragonflies drift by.', 'S39': "The boy's hands gently place the toy car, the virtual pet and the photos into the tin.", 'E00': 'Autumn leaves fall slowly, the persimmon tree sways gently, long soft shadows, steady camera.', 'E01': 'The man turns the small blue toy car in his palm and smiles gently, dust drifts in the window light.', 'E02': "The man's fingers press two new AA batteries into the toy car chassis and flip the switch, the wheels begin to spin.", 'E04': 'The man looks out of the window, the curtain moves in the breeze, the autumn light glows.', 'E05': 'The two boys and the dog run along the road chasing the toy cars, under the huge summer cloud, joyful natural motion.'}
 
+
+# ───────── 仕上げ（クレジット補充後）：人物カットを Veo で動かすための控えめな指示 ─────────
+# P02（手の中の車が増えた）・S30（群衆が崩れた）の失敗から：動きを1〜2個に絞り、「物を増やさない・カメラ固定」を必ず付ける
+KEEP = (" Keep every person and object exactly as in the photo; do not add, remove or duplicate any objects. "
+        "Very subtle, natural, slow motion. The camera does not move.")
+KEEP_MOVE = (" Keep every person and object as in the photo; do not add, remove or duplicate any objects. "
+             "Natural motion. The camera does not move.")
+MOTION.update({k: v + KEEP for k, v in {
+    "P02": "Only the two boys' faces move: they blink, their smiles widen and they laugh softly. Their hands and the two toy cars they hold stay completely still and unchanged.",
+    "S02": "The boy stirs in his sleep and slowly opens his eyes; the electric fan turns; the curtain sways gently in the morning breeze.",
+    "S04": "The boy keeps eating his breakfast and glances at the TV; the lace curtain moves gently in the breeze; outside, the Shiba Inu slowly lifts its head and wags its tail.",
+    "S05": "The grandmother smiles warmly and gently places the coins into the boy's cupped hands; the boy looks down at the coins and smiles; the Shiba Inu slowly wags its tail.",
+    "S08": "The two boys sip ramune from their glass bottles and laugh softly; the cat in the shade flicks its tail.",
+    "S09": "The boy points at the candies and smiles; his friend leans in to look; the elderly shopkeeper smiles and nods.",
+    "S10": "Small toy race cars run around the white track; the kids lean over the rail, smile and cheer.",
+    "S15": "The boy crouches and reaches for the flipped toy car whose wheels keep spinning; his friend laughs.",
+    "S16": "The buzz-cut boy slowly winds up to throw the rubber ball; the boy with the bat gets ready; in the background the girl swings gently on the swing.",
+    "S17": "The boys look up, following the ball high in the sky; the girl claps her hands; leaves sway in the breeze.",
+    "S18": "Dark storm clouds roll in over the rice fields; the wind makes waves in the green rice; the kids look up at the sky.",
+    "S19": "Heavy rain pours down and splashes on the street; the three kids huddle under the shop eaves and look out at the rain.",
+    "S23": "The boy shyly rubs the back of his neck and looks down; the girl smiles softly and glances away, embarrassed; far behind, the friend peeks out from behind the slide and grins.",
+    "S24": "The two boys stand with their bicycles on the riverbank and talk with small natural gestures; the river shimmers in the sunset light; clouds drift slowly.",
+    "S25": "The boy and his grandmother keep eating dinner and smile; the TV screen flickers softly with the night baseball game; the Shiba Inu sleeps by its doghouse, breathing slowly.",
+    "S27": "Fireworks bloom and slowly fade over the river; their light flickers on the three kids sitting on the bank, seen from behind.",
+    "S28": "The boy sleeps peacefully, breathing slowly; the electric fan slowly turns; the curtain moves softly in the moonlight.",
+    "S32": "The disappointed boy looks down at his toy car; his friend pats his shoulder and grins; the people in the background stay mostly still.",
+    "S33": "Red dragonflies fly around; the tall grass sways in the evening breeze; the two boys sit quietly on the bank.",
+    "S34": "The boy rests his chin on his hand and gazes out of the window; the electric fan turns; the desk lamp glows.",
+    "S36": "The buzz-cut boy holds out the blue toy car and the other boy slowly reaches out and takes it; both look down, holding back tears.",
+    "S37": "The truck in the distance stays parked; the boy stands still holding the toy car; the golden rice sways in the wind; clouds drift slowly.",
+    "S38": "The silver pampas grass sways in the wind; the Shiba Inu leans against the boy; red dragonflies drift by.",
+    "E01": "The man slowly turns the small blue toy car in his palm and smiles gently; dust drifts in the window light.",
+    "E04": "The man gazes out of the window; the curtain moves softly in the breeze; the autumn light glows.",
+}.items()})
+MOTION.update({k: v + KEEP_MOVE for k, v in {
+    "S14": "The toy race car runs along the street and the boy runs after it, laughing; heat haze shimmers above the asphalt; his friend watches.",
+    "S21": "The two boys ride their bicycles slowly through the puddles; water splashes softly; the evening sky glows.",
+    "S31": "The toy race car tumbles slowly through the air above the track; the kids watch with open mouths.",
+    "E05": "The two boys and the Shiba Inu run along the road away from the camera toward the huge summer clouds.",
+}.items()})
+
 S = []
 def sc(id, part, dur, jp, prompt, refs=(), move="in", fx=(), amb=(), sfx=(), line=None, text=None, overlay=None,
-       bgm=None, era="1997", xfade=1.6, reveal=None, caption=None, img=None, transition=None, bg=None):
+       bgm=None, era="1997", xfade=1.6, reveal=None, caption=None, img=None):
     S.append(dict(id=id, part=part, dur=dur, jp=jp, prompt=prompt, refs=list(refs), move=move, fx=list(fx), amb=list(amb),
                   sfx=[list(x) for x in sfx], line=line, text=text, overlay=overlay, bgm=bgm, era=era, xfade=xfade,
-                  reveal=reveal, caption=caption, motion=MOTION.get(id), img=img, transition=transition, bg=bg))
+                  reveal=reveal, caption=caption, motion=MOTION.get(id), img=img))
 
 # ───────── 冒頭（2026 → 写真が動き出す） ─────────
 sc("P01", "プロローグ", 5.5, "2026年。古いお菓子の缶を開ける手。中に写真とおもちゃ。",
@@ -312,6 +355,32 @@ MUSIC = {
     "M5b": ("lyria-3.5", "Instrumental only, no vocals, no drums, no percussion. Very calm ambient piano for relaxing and studying, evoking a quiet late-summer night in a small Japanese seaside town in the 1990s: soft felt piano, sparse gentle melody, a faint warm pad, slow 58 BPM, D major, peaceful and steady with no sudden changes."),
 }
 
+
+# 環境音に混ぜる「言葉が聞こえる音」（TTS。gen_sfx_voices.py → assets/sfx/<名前>.wav）
+# 登場人物の声（Puck・Fenrir・Leda・Vindemiatrix・Charon・Kore）はざわめきに使わない（同じ声＝同じ人物に聞こえるため）
+KID = dict(profile="A Japanese child around 10 years old.", scene="Excitedly watching small toy race cars run around a track in Japan in the 1990s, in a crowd of kids.",
+           notes="Say it naturally and briefly like a real kid in a crowd, lively but not shouting into the microphone.")
+FES = dict(profile="A Japanese person at a summer festival.", scene="A crowded night summer festival with food stalls at a small shrine in a Japanese town in the 1990s.",
+           notes="Say it naturally and casually like a passerby in a crowd, not too loud.")
+SFX_VOICES = {
+    "tv_morning_voice": dict(voice="Aoede", profile="A cheerful Japanese female TV announcer in her late 20s on a 1990s morning news show.",
+                             scene="A live morning broadcast on a Saturday in late July 1997, reading the weather forecast.",
+                             notes="Speak brightly and clearly at a natural broadcast pace, friendly and warm.",
+                             text="おはようございます。七月二十六日、土曜日の朝です。今日も全国的に晴れて、厳しい暑さになりそうです。お出かけの際は、帽子をかぶって、こまめに水分をとってくださいね。それでは、各地のお天気です。"),
+    "tv_baseball_voice": dict(voice="Orus", profile="An experienced Japanese male baseball play-by-play announcer on 1990s TV.",
+                              scene="A night professional baseball game, bottom of the ninth inning, bases loaded, broadcast live on television.",
+                              notes="Start calm and tense, then get excited with the hit and shout with joy at the home run, like a real live sports broadcast.",
+                              text="さあ、九回の裏、ツーアウト満塁。カウントは、スリーボール、ツーストライク。ピッチャー、セットポジションから、投げました！打った！大きい、大きい！入るか、入るか、入ったー！サヨナラ満塁ホームラン！"),
+}
+for k, (v, t) in enumerate([("Zephyr", "はやーい！"), ("Achird", "いけいけー！"), ("Sadachbia", "抜いた、抜いた！"), ("Laomedeia", "あー、コースアウトだ！"),
+                            ("Zephyr", "次、おれの番な！"), ("Achird", "すげー、速いじゃん！"), ("Laomedeia", "がんばれー！"), ("Sadachbia", "もう一回やろうぜ！"),
+                            ("Despina", "わあ、すごーい！"), ("Umbriel", "よっしゃー！")], 1):
+    SFX_VOICES[f"crowd_kids_{k:02d}"] = dict(voice=v, text=t, **KID)
+for k, (v, t) in enumerate([("Callirrhoe", "わたあめ、買おうよ！"), ("Rasalgethi", "いらっしゃい、いらっしゃい！"), ("Despina", "金魚すくい、やってく？"),
+                            ("Iapetus", "おいしいよー、焼きそば！"), ("Laomedeia", "見て見て、あれ！"), ("Achird", "ヨーヨー、取れた！"),
+                            ("Erinome", "はぐれないでね。"), ("Algenib", "はい、まいど！")], 1):
+    SFX_VOICES[f"crowd_fest_{k:02d}"] = dict(voice=v, text=t, **FES)
+
 def build_prompt(s):
     if not s["prompt"] or s.get("img"):
         return None
@@ -331,7 +400,7 @@ def main():
         s["full_prompt"] = build_prompt(s)
         t += s["dur"]
     data = dict(fps=30, size=[1920, 1080], total=round(t, 3), meta=META, chars={k: {kk: vv for kk, vv in v.items() if kk != "ref"} for k, v in CHARS.items()},
-                scenes=S, lines=LINES, music={k: dict(model=m, prompt=p) for k, (m, p) in MUSIC.items()},
+                scenes=S, lines=LINES, music={k: dict(model=m, prompt=p) for k, (m, p) in MUSIC.items()}, sfx_voices=SFX_VOICES,
                 style=dict(y1997=STYLE_1997, y2026=STYLE_2026))
     json.dump(data, open(os.path.join(HERE, "scenes.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     def mmss(x): return f"{int(x//60)}:{x%60:04.1f}"

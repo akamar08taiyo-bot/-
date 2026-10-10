@@ -133,7 +133,7 @@ caption=("1997年7月　模型店", "July 1997, the hobby shop")   # 色が戻�
 
 新しい音は sfx.py に関数を足して AMB / ONE に登録する（雑音の帯域・揺れ・残響の組み合わせで作る。既存の関数が見本）。
 
-**言葉が聞こえる音は TTS で**：テレビ・ラジオ・店の呼び込みなど。`assets/sfx/tv_morning_voice.wav`（朝の番組のアナウンサー）、`assets/sfx/tv_baseball_voice.wav`（野球の実況）があれば、tv_morning・dinner の環境音がそれをテレビのスピーカー越しの音にして使う（なければ合成の声。機械っぽく聞こえる）。TTS は tts.py に英語の構造化プロンプトで。時代に合わせた内容に（例：「七月二十六日、土曜日の朝です。今日も全国的に晴れて…」）。実在のチーム名・選手名は入れない。
+**言葉が聞こえる音は TTS で**：テレビ・ラジオ・店の呼び込み・子どもの歓声など。絵コンテの `SFX_VOICES`（scenes.json の sfx_voices）に書き、`gen_sfx_voices.py` で `assets/sfx/<名前>.wav` を作る。sfx.py が決まった名前を読む：`tv_morning_voice`（朝の番組。tv_morning がスピーカー越しの音にする）、`tv_baseball_voice`（野球の実況。dinner）、`crowd_kids_01…`（子どもの歓声。shop・event・park のざわめきに遠く小さく散らす）、`crowd_fest_01…`（祭りの呼び込み・話し声。festival）。なければ合成の声だけになる（機械っぽく聞こえる）。台本は時代に合わせ、実在のチーム名・商品名は入れない。登場人物の声（同じプリセット）はざわめきに使わない。
 
 ## 8. セリフ（lines）
 ```python

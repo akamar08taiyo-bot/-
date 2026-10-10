@@ -243,7 +243,10 @@ def limiter(x, ceiling_db=-1.5, release=0.08):
     return x * out[:, None]
 
 def cached(name, fn, key):
-    h = hashlib.md5(json.dumps(key, sort_keys=True).encode() + open(os.path.join(HERE, "sfx.py"), "rb").read()).hexdigest()[:12]
+    # 鍵：場面の設定＋sfx.py の中身＋assets/sfx の素材（TTS の声などを足したら作り直す）
+    sd = os.path.join(ROOT, "assets", "sfx")
+    files = sorted((f, os.path.getsize(os.path.join(sd, f)), int(os.path.getmtime(os.path.join(sd, f)))) for f in os.listdir(sd)) if os.path.isdir(sd) else []
+    h = hashlib.md5(json.dumps([key, files], sort_keys=True).encode() + open(os.path.join(HERE, "sfx.py"), "rb").read()).hexdigest()[:12]
     p = os.path.join(ROOT, "work", f"bus_{name}_{h}.npy")
     if os.path.exists(p):
         return np.load(p), "cache"
