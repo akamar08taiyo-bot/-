@@ -6,13 +6,14 @@
 - 分析：[docs/analysis.md](docs/analysis.md)（参照動画の全カット表は [docs/ref_tGJRlrAXIoE/](docs/ref_tGJRlrAXIoE/)）
 - テーマ・構成・音の設計：[docs/theme.md](docs/theme.md)
 - 概要欄（貼り付け用）：[docs/youtube_description.txt](docs/youtube_description.txt)
+- 第二章「砂の向こうから来た男」の台本：[docs/chapter2_script.md](docs/chapter2_script.md)
 
 ## 作り方（上から順に）
 
 | 工程 | 使うもの | 出力 |
 |---|---|---|
 | 原画 | `scripts/gen_image.py`・`scripts/edit_image.py`（Gemini 画像生成）、N04 の採用原画（`assets/n04_pdf`） | `assets/gen/*.jpg`、対応表 `assets/sources.json` |
-| 動き | `scripts/veo_batch.py`（Veo 3.1 Lite、1080p・8秒） | `assets/veo/*.mp4`（git には入れない） |
+| 動き | `scripts/veo_batch.py`（Veo 3.1 Lite、1080p・8秒） | `assets/veo/*.mp4`（有料で生成した元動画なので git に保存） |
 | 半速スロー | `scripts/slowmo.sh <ID> <元動画>`（動き補間で60fps→半速30fps、音は rubberband で半速） | `public/clips/<ID>.mp4`、`work/veoaudio/<ID>.wav` |
 | 電子版の追跡 | `python3 -I scripts/track.py A1 B2 B3 C5 E1`（確認は `scripts/track_check.py`） | `src/track.json` |
 | テーマ曲 | `python3 -I audio/src/compose.py`（作曲→FluidSynth） | `audio/out/music.wav` |
