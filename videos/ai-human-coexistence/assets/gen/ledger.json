@@ -1,0 +1,891 @@
+{
+ "project": "AIと人間の共存（継町2080・写真風）",
+ "records": [
+  {
+   "id": "N01_v1",
+   "file": "N01_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "505ae639484433203f34e8b668e487bccad815442ca725adeded64f4ac5df003",
+   "bytes": 2327451,
+   "reference_files": [
+    "S03_bath_lane_rain_v1.webp",
+    "S05_home_cards_v1.webp"
+   ],
+   "extra": "",
+   "tag": "",
+   "seconds": 20.8,
+   "created_utc": "2026-10-11T05:40:14.926837+00:00",
+   "usage": {
+    "promptTokenCount": 1379,
+    "candidatesTokenCount": 1402,
+    "totalTokenCount": 3064,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 863
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 516
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 283,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The supplied images are style references from the same fictional world. Match their photographic quality, light and materials; do not copy their composition, objects or camera position.\n\nUse case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles with a dark curved windshield, rounded white ceramic-metal bodies and integrated shrouded lift units travel quietly along air corridors. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer day (24 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.\n\nSpecific scene (04:55):\nBlue hour before sunrise. Low camera on an old wooden pier at the edge of Tsugimachi, looking out across mirror-calm water to Tsugishima island on the horizon: its long high seawall and crowded silhouettes of concrete apartment blocks, a few warm windows lit, the small white lighthouse with its lamp still glowing. Behind the island two slender curved-glass towers with pale ceramic ribs show soft red aviation lights. Far above the horizon a single flying passenger car with tiny navigation lights crosses. Foreground: weathered pier planks, a coiled rope, an old enamel bucket, and a moored wooden fishing boat with a small lit lantern. Deep blue-violet sky with a thin peach glow along the horizon, gentle ripples reflecting the lights. Quiet, cool, expectant. No readable text anywhere."
+  },
+  {
+   "id": "N02_v1",
+   "file": "N02_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "997326551e3654408132faa2ea1025da04c0d75b396b3bd72d19a4baa1811509",
+   "bytes": 2911228,
+   "reference_files": [
+    "S03_bath_lane_rain_v1.webp",
+    "S05_home_cards_v1.webp",
+    "N01_v1.jpg"
+   ],
+   "extra": "",
+   "tag": "",
+   "seconds": 21.7,
+   "created_utc": "2026-10-11T05:40:49.831706+00:00",
+   "usage": {
+    "promptTokenCount": 1643,
+    "candidatesTokenCount": 1407,
+    "totalTokenCount": 3294,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 869
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 774
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 244,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The supplied images are style references from the same fictional world. Match their photographic quality, light and materials; do not copy their composition, objects or camera position.\n\nUse case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles with a dark curved windshield, rounded white ceramic-metal bodies and integrated shrouded lift units travel quietly along air corridors. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer day (24 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.\n\nSpecific scene (05:40):\nSunrise at Tsugimachi's small fishing harbor. Camera at standing height on the concrete quay beside stacked wooden fish crates. A weathered wooden fishing boat has just returned; two fishermen in rubber boots, seen from behind and from the side at a distance, hand crates of silver fish on ice to one helper robot who carries a crate onto the quay. Nets, buoys, coiled ropes, puddles reflecting the dawn. A few gulls stand on bollards. Across the harbor the hillside town of old inns and the new curved-glass buildings catches the first warm light; a flying passenger car slowly descends toward a rooftop pad far away. Low warm sunlight from the right, long shadows, cool shaded water, light mist on the sea. One small painted sign on a wooden shed reads exactly \"継町漁港\"."
+  },
+  {
+   "id": "N04_v1",
+   "file": "N04_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "272e62e99829b6d447a1bf60ea0a639d189547468ff72eaa9aaae7effb6ac0fb",
+   "bytes": 3370506,
+   "reference_files": [
+    "N02_v1.jpg",
+    "N01_v1.jpg"
+   ],
+   "extra": "",
+   "tag": "",
+   "seconds": 21.3,
+   "created_utc": "2026-10-11T05:41:27.985508+00:00",
+   "usage": {
+    "promptTokenCount": 1380,
+    "candidatesTokenCount": 1390,
+    "totalTokenCount": 2964,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 864
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 516
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 194,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The supplied images are style references from the same fictional world. Match their photographic quality, light and materials; do not copy their composition, objects or camera position.\n\nUse case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles travel quietly along air corridors: rounded white ceramic-metal car bodies with a dark curved windshield and four clearly visible shrouded ring-shaped lift fans (ducted rotors) at the corners, no wheels, small navigation lights. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer day (24 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.\n\nSpecific scene (07:40):\nMorning commute across the bay. Camera on the deck of a small old wooden ferry boat with a canvas sunshade roof, worn benches and life rings, looking forward across sparkling water toward Tsugishima island: its high seawall, dense apartment blocks and lighthouse, with curved-glass towers rising behind. Several commuters seen from behind with bicycles and shopping baskets; at the open wheelhouse a helper robot steers with an old brass ship's wheel. Gulls fly alongside. Above the island, two flying passenger cars glide along an air corridor. Bright clear morning, blue sky with white clouds, saturated blue-green sea. A small enamel sign on the ferry's rail reads exactly \"渡し船\"."
+  },
+  {
+   "id": "N03_v1",
+   "file": "N03_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "25b23feb79db7c40db402820240ea42920c49cc80ce62da8b6789f296b20e57b",
+   "bytes": 3280349,
+   "reference_files": [
+    "N02_v1.jpg",
+    "S03_bath_lane_rain_v1.webp"
+   ],
+   "extra": "",
+   "tag": "",
+   "seconds": 21.6,
+   "created_utc": "2026-10-11T05:41:28.349396+00:00",
+   "usage": {
+    "promptTokenCount": 1382,
+    "candidatesTokenCount": 1371,
+    "totalTokenCount": 2987,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 866
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 516
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 234,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The supplied images are style references from the same fictional world. Match their photographic quality, light and materials; do not copy their composition, objects or camera position.\n\nUse case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles travel quietly along air corridors: rounded white ceramic-metal car bodies with a dark curved windshield and four clearly visible shrouded ring-shaped lift fans (ducted rotors) at the corners, no wheels, small navigation lights. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer day (24 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.\n\nSpecific scene (06:30):\nInside Tsugishima island town in early morning. A steep, narrow concrete stairway climbs between tall weathered 1960s apartment blocks with balconies, hanging laundry, potted plants, old mailboxes and exposed wall pipes. One helper robot climbs the stairs carrying a small wire crate of glass milk bottles; at a landing above, a resident seen from behind opens a door to receive them. At the very top of the stairway a narrow slice of bright sea and sky. Soft first sunlight grazes the upper walls; the lower stairway is in cool shadow. Concrete texture, rust streaks only where water runs, cared-for plants. A small enamel plate on the wall reads exactly \"継島 三号棟\"."
+  },
+  {
+   "id": "N05_v1",
+   "file": "N05_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "1b55473169d71edff7add96e41f3179891bde5f6c41dda32dcf29d2380821a7f",
+   "bytes": 3365800,
+   "reference_files": [
+    "N02_v1.jpg",
+    "S03_bath_lane_rain_v1.webp",
+    "S05_home_cards_v1.webp"
+   ],
+   "extra": "",
+   "tag": "",
+   "seconds": 21.7,
+   "created_utc": "2026-10-11T05:41:28.408506+00:00",
+   "usage": {
+    "promptTokenCount": 1688,
+    "candidatesTokenCount": 1435,
+    "totalTokenCount": 3407,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 914
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 774
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 284,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The supplied images are style references from the same fictional world. Match their photographic quality, light and materials; do not copy their composition, objects or camera position.\n\nUse case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles travel quietly along air corridors: rounded white ceramic-metal car bodies with a dark curved windshield and four clearly visible shrouded ring-shaped lift fans (ducted rotors) at the corners, no wheels, small navigation lights. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer day (24 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.\n\nSpecific scene (09:30):\nA steep hot-spring town street climbing a green hillside above the bay, like a Showa-era seaside resort town. Camera near the bottom of the slope looking up the street: old wooden inns and small shops on both sides with hanging signs, cloth noren and potted plants; white steam rising from street vents and from a wooden steamer of hot-spring buns at a shop front; stone steps with a metal handrail. A resident in a light summer yukata, seen from behind, walks up; beside an elderly woman (seen from behind), a helper robot carries her travel bag up the slope. At the top of the slope, an advanced curved-glass building with planted terraces stands on the hillside, and a flying passenger car crosses the blue sky. Summer morning light, glossy green trees, cumulus clouds. One shop sign reads exactly \"湯の花まんじゅう\" and a vertical wooden inn sign reads exactly \"汐見館\"."
+  },
+  {
+   "id": "N06_v1",
+   "file": "N06_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "5a0cf89333452a842ff6ac0020392494b15b82efd4bee77e362c683748f53175",
+   "bytes": 3263378,
+   "reference_files": [
+    "N02_v1.jpg",
+    "N01_v1.jpg"
+   ],
+   "extra": "",
+   "tag": "",
+   "seconds": 25.3,
+   "created_utc": "2026-10-11T05:41:31.934379+00:00",
+   "usage": {
+    "promptTokenCount": 1397,
+    "candidatesTokenCount": 1658,
+    "totalTokenCount": 3633,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 881
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 516
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 578,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The supplied images are style references from the same fictional world. Match their photographic quality, light and materials; do not copy their composition, objects or camera position.\n\nUse case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles travel quietly along air corridors: rounded white ceramic-metal car bodies with a dark curved windshield and four clearly visible shrouded ring-shaped lift fans (ducted rotors) at the corners, no wheels, small navigation lights. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer day (24 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.\n\nSpecific scene (13:20):\nMidsummer afternoon at a small swimming pier. Camera standing on the wooden pier near the shore, looking out to sea under a towering bright cumulonimbus cloud. Small children far away at the end of the pier jump into deep clear blue-green water with white splashes, seen from behind and at a distance. A helper robot wearing a simple straw hat sits on a tall wooden lifeguard chair beside the pier, watching them. Near the pier a small wooden beach hut with a reed screen flies a classic white shaved-ice flag with a red wave pattern showing the single character \"氷\". Tsugishima island with its lighthouse and one curved-glass tower in the distance; a flying passenger car far in the sky. Intense summer sun, deep cobalt sky, sparkling water, hot dry wood."
+  },
+  {
+   "id": "N07_v1",
+   "file": "N07_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "dd42705bbf80853e08105c2cc47e758de833241e282f067a2d04b7f3ca7ec8b6",
+   "bytes": 2839648,
+   "reference_files": [
+    "N02_v1.jpg",
+    "S05_home_cards_v1.webp"
+   ],
+   "extra": "",
+   "tag": "",
+   "seconds": 21.7,
+   "created_utc": "2026-10-11T05:41:49.951750+00:00",
+   "usage": {
+    "promptTokenCount": 1383,
+    "candidatesTokenCount": 1415,
+    "totalTokenCount": 3107,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 867
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 516
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 309,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The supplied images are style references from the same fictional world. Match their photographic quality, light and materials; do not copy their composition, objects or camera position.\n\nUse case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles travel quietly along air corridors: rounded white ceramic-metal car bodies with a dark curved windshield and four clearly visible shrouded ring-shaped lift fans (ducted rotors) at the corners, no wheels, small navigation lights. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer day (24 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.\n\nSpecific scene (12:10):\nInside a tiny old ramen counter shop beside the harbor at lunchtime. Camera seated at the worn wooden counter: in the foreground a finished bowl of clear shoyu ramen with chashu, a naruto slice and nori; behind the counter steam rises from big aluminium pots; an elderly cook in a white headband, seen from the side, shakes a traditional noodle strainer basket; beside him one helper robot neatly slices green onions on a wooden board. Handwritten wooden menu tags hang on the wall (indistinct). Through the open doorway with a faded cloth noren: the bright harbor, boats and blue sky. Warm interior light, bright cool exterior. A small wooden board above the kitchen reads exactly \"中華そば\"."
+  },
+  {
+   "id": "N08_v1",
+   "file": "N08_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "c1d5c1b55bedff4ecb034fc8d7eb33efe517d8dc8a0642a18fbc655d592c825b",
+   "bytes": 3620285,
+   "reference_files": [
+    "N02_v1.jpg",
+    "N01_v1.jpg"
+   ],
+   "extra": "",
+   "tag": "",
+   "seconds": 22.5,
+   "created_utc": "2026-10-11T05:41:51.099218+00:00",
+   "usage": {
+    "promptTokenCount": 1369,
+    "candidatesTokenCount": 1435,
+    "totalTokenCount": 3040,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 853
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 516
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 236,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The supplied images are style references from the same fictional world. Match their photographic quality, light and materials; do not copy their composition, objects or camera position.\n\nUse case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles travel quietly along air corridors: rounded white ceramic-metal car bodies with a dark curved windshield and four clearly visible shrouded ring-shaped lift fans (ducted rotors) at the corners, no wheels, small navigation lights. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer day (24 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.\n\nSpecific scene (14:30):\nThe rooftop of a tall old apartment block on Tsugishima island in the afternoon: a small red torii and shrine, a children's play corner with an old metal slide, potted plants and vegetable planters, laundry lines, water tanks, and a waist-high safety railing. Two children seen from behind lean on the railing looking out over the sea toward the hillside town across the bay, where curved-glass towers stand among old inns; a flying passenger car passes at middle distance over the water. One helper robot waters the plants with an old tin watering can. Bright blue sky with summer clouds, crisp shadows, glinting sea."
+  },
+  {
+   "id": "N09_v1",
+   "file": "N09_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "0a3b37386afce88c9f45b488436c94d1eb363a679926a6438b3f01a83a203f38",
+   "bytes": 3423624,
+   "reference_files": [
+    "N02_v1.jpg",
+    "N01_v1.jpg"
+   ],
+   "extra": "",
+   "tag": "",
+   "seconds": 23.8,
+   "created_utc": "2026-10-11T05:41:52.456537+00:00",
+   "usage": {
+    "promptTokenCount": 1361,
+    "candidatesTokenCount": 1328,
+    "totalTokenCount": 2914,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 845
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 516
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 225,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The supplied images are style references from the same fictional world. Match their photographic quality, light and materials; do not copy their composition, objects or camera position.\n\nUse case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles travel quietly along air corridors: rounded white ceramic-metal car bodies with a dark curved windshield and four clearly visible shrouded ring-shaped lift fans (ducted rotors) at the corners, no wheels, small navigation lights. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer day (24 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.\n\nSpecific scene (17:20):\nSunset on a long concrete breakwater. Camera low on the breakwater looking along it toward the setting sun: an elderly fisherman sits with a bamboo fishing rod; beside him a helper robot holds a bucket and a folded umbrella; two children run home along the breakwater carrying their sandals, seen from behind. A slim loudspeaker pole for the town's evening chime stands on the breakwater. Tsugishima island with its lighthouse is silhouetted against a golden-orange sky; a flying passenger car with small lights crosses. Warm glowing sea, gentle waves splashing against the breakwater blocks, long shadows."
+  },
+  {
+   "id": "N10_v1",
+   "file": "N10_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "fefa536f881fe7d503dbbe9b7e7e8188ceece143dc3d4fe412f52610cef446f8",
+   "bytes": 2918364,
+   "reference_files": [
+    "N01_v1.jpg",
+    "S03_bath_lane_rain_v1.webp"
+   ],
+   "extra": "",
+   "tag": "",
+   "seconds": 22.1,
+   "created_utc": "2026-10-11T05:41:54.186026+00:00",
+   "usage": {
+    "promptTokenCount": 1359,
+    "candidatesTokenCount": 1434,
+    "totalTokenCount": 3040,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 843
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 516
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 247,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The supplied images are style references from the same fictional world. Match their photographic quality, light and materials; do not copy their composition, objects or camera position.\n\nUse case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles travel quietly along air corridors: rounded white ceramic-metal car bodies with a dark curved windshield and four clearly visible shrouded ring-shaped lift fans (ducted rotors) at the corners, no wheels, small navigation lights. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer day (24 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.\n\nSpecific scene (19:00):\nBlue hour over the bay seen from a hillside viewpoint above the hot-spring town: below, old inns and shops with warm windows and a few modest vertical lit inn signs; the curved-glass towers glow softly; across the water Tsugishima island shows hundreds of small warm windows and its lighthouse beam; a small ferry with lights crosses the bay; flying passenger cars with navigation lights move along an air corridor. Deep blue sky with a last band of orange on the horizon. Foreground: an old stone wall with potted morning glories and a weathered wooden bench. Calm and nostalgic. No readable text."
+  },
+  {
+   "id": "N11_v1",
+   "file": "N11_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "e78dc4506bf5838629e95a12a091dcc33b0b19c341f8faef7f3ea4eae0c8f470",
+   "bytes": 3044569,
+   "reference_files": [
+    "N02_v1.jpg",
+    "S03_bath_lane_rain_v1.webp"
+   ],
+   "extra": "",
+   "tag": "",
+   "seconds": 22.4,
+   "created_utc": "2026-10-11T05:42:12.494218+00:00",
+   "usage": {
+    "promptTokenCount": 1344,
+    "candidatesTokenCount": 1392,
+    "totalTokenCount": 3042,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 828
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 516
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 306,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The supplied images are style references from the same fictional world. Match their photographic quality, light and materials; do not copy their composition, objects or camera position.\n\nUse case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles travel quietly along air corridors: rounded white ceramic-metal car bodies with a dark curved windshield and four clearly visible shrouded ring-shaped lift fans (ducted rotors) at the corners, no wheels, small navigation lights. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer day (24 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.\n\nSpecific scene (19:40):\nA summer festival night in a Tsugimachi street: strings of paper lanterns overhead, food stalls with a goldfish scooping tank, shaved ice and cotton candy, warm bulbs; residents in yukata seen from behind or at a distance; a helper robot in a simple indigo festival happi coat helps a child hold a goldfish bag at the goldfish stall. Dark blue night sky, a curved-glass tower glowing softly beyond the rooftops. Two stall banners read exactly \"金魚すくい\" and \"かき氷\"."
+  },
+  {
+   "id": "N12_v0",
+   "file": "N12_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "ca58b8da09ea7c20fc26f12fbf47627a97ce389b7a4b0cbe84c919fd0b933716",
+   "bytes": 2992059,
+   "reference_files": [
+    "N02_v1.jpg",
+    "S03_bath_lane_rain_v1.webp"
+   ],
+   "extra": "",
+   "tag": "",
+   "seconds": 23.3,
+   "created_utc": "2026-10-11T05:42:14.638977+00:00",
+   "usage": {
+    "promptTokenCount": 1349,
+    "candidatesTokenCount": 1481,
+    "totalTokenCount": 3200,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 833
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 516
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 370,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The supplied images are style references from the same fictional world. Match their photographic quality, light and materials; do not copy their composition, objects or camera position.\n\nUse case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles travel quietly along air corridors: rounded white ceramic-metal car bodies with a dark curved windshield and four clearly visible shrouded ring-shaped lift fans (ducted rotors) at the corners, no wheels, small navigation lights. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer day (24 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.\n\nSpecific scene (20:10):\nA bon-odori dance in a harbor-side plaza at night: a wooden yagura tower draped with red-and-white striped cloth and paper lanterns; on top, a helper robot and an elderly drummer play a large taiko drum together; residents in yukata dance in a wide circle around the tower, seen from behind and at a distance; strings of lanterns radiate from the top of the tower. Beyond the plaza, the dark sea and the lit windows of Tsugishima island. Warm lantern light against deep blue night.",
+   "note": "file overwritten by the next N12_v1 generation (version-number bug, fixed); image not retained"
+  },
+  {
+   "id": "N13_v1",
+   "file": "N13_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "302ceaf62cadafa587646c569a50c87acd6a2308fd7150a6f8c908122cab8f4c",
+   "bytes": 3009825,
+   "reference_files": [
+    "N01_v1.jpg",
+    "S03_bath_lane_rain_v1.webp"
+   ],
+   "extra": "",
+   "tag": "",
+   "seconds": 23.5,
+   "created_utc": "2026-10-11T05:42:16.116128+00:00",
+   "usage": {
+    "promptTokenCount": 1339,
+    "candidatesTokenCount": 1437,
+    "totalTokenCount": 3231,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 823
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 516
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 455,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The supplied images are style references from the same fictional world. Match their photographic quality, light and materials; do not copy their composition, objects or camera position.\n\nUse case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles travel quietly along air corridors: rounded white ceramic-metal car bodies with a dark curved windshield and four clearly visible shrouded ring-shaped lift fans (ducted rotors) at the corners, no wheels, small navigation lights. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer day (24 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.\n\nSpecific scene (20:40):\nFireworks over the bay at night: several large colorful firework bursts high above the water, reflected on the calm sea; small boats with lanterns float on the water; residents watch from the seawall in the foreground, seen from behind; Tsugishima island's lit windows and the curved-glass towers are silhouetted; two flying passenger cars hover far away with soft lights, at a respectful distance. Light smoke drifts. Natural photographic exposure, not overexposed, no lens flare spectacle."
+  },
+  {
+   "id": "N14_v1",
+   "file": "N14_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "7ac9330f77047f9cee713b1307e2be85193d5f68a2f42ce50f5d9f3b6d824b1b",
+   "bytes": 2873011,
+   "reference_files": [
+    "N02_v1.jpg",
+    "N01_v1.jpg"
+   ],
+   "extra": "",
+   "tag": "",
+   "seconds": 23.5,
+   "created_utc": "2026-10-11T05:42:17.898886+00:00",
+   "usage": {
+    "promptTokenCount": 1345,
+    "candidatesTokenCount": 1449,
+    "totalTokenCount": 3302,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 829
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 516
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 508,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The supplied images are style references from the same fictional world. Match their photographic quality, light and materials; do not copy their composition, objects or camera position.\n\nUse case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles travel quietly along air corridors: rounded white ceramic-metal car bodies with a dark curved windshield and four clearly visible shrouded ring-shaped lift fans (ducted rotors) at the corners, no wheels, small navigation lights. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer day (24 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.\n\nSpecific scene (21:00):\nRooftop of an old apartment block at night: a child in a light summer yukata and one helper robot sit side by side on a low wooden bench, seen from behind, watching a few distant fireworks over the sea; the child leans slightly against the robot's shoulder; the robot's amber light strip glows softly. Potted plants, a laundry pole, a thin curl of mosquito-coil smoke, a starry sky, and the lights of Tsugishima island across the dark water. Tender, quiet."
+  },
+  {
+   "id": "N15_v1",
+   "file": "N15_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "e55b8f32d26220a02829473e6cdad33ccba384089251982941b3e862730e2a51",
+   "bytes": 2112275,
+   "reference_files": [
+    "N01_v1.jpg",
+    "S03_bath_lane_rain_v1.webp"
+   ],
+   "extra": "",
+   "tag": "",
+   "seconds": 23.3,
+   "created_utc": "2026-10-11T05:42:35.972441+00:00",
+   "usage": {
+    "promptTokenCount": 1320,
+    "candidatesTokenCount": 1366,
+    "totalTokenCount": 2901,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 804
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 516
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 215,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The supplied images are style references from the same fictional world. Match their photographic quality, light and materials; do not copy their composition, objects or camera position.\n\nUse case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles travel quietly along air corridors: rounded white ceramic-metal car bodies with a dark curved windshield and four clearly visible shrouded ring-shaped lift fans (ducted rotors) at the corners, no wheels, small navigation lights. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer day (24 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.\n\nSpecific scene (23:30):\nLate night at the bay: calm sea with a long silver moonlight path leading toward Tsugishima island; most windows dark, a few warm lights; the lighthouse beam; the curved-glass towers dimmed; one flying car's tiny lights far away. Foreground: the old wooden pier with a moored wooden boat and a lantern turned low. Quiet, peaceful end of the day. No readable text."
+  },
+  {
+   "id": "N07_v2",
+   "file": "N07_v2.jpg",
+   "operation": "edit",
+   "source": "N07_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "5582d312465547257d824d976fe7e50fb7d27848c4d06d8e0d4657725b7536d7",
+   "bytes": 2806790,
+   "reference_files": [],
+   "seconds": 20.5,
+   "created_utc": "2026-10-11T05:44:04.219523+00:00",
+   "usage": {
+    "promptTokenCount": 398,
+    "candidatesTokenCount": 1283,
+    "totalTokenCount": 1874,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 140
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 193,
+    "serviceTier": "standard"
+   },
+   "prompt": "Edit the FIRST supplied photograph narrowly. Keep the exact camera framing, composition, lighting, colors, people, materials and every other object unchanged, and keep it photorealistic. Change ONLY text details: make the handwritten wooden menu tags on the back wall show short correct Japanese menu names written in black brush ink, from left to right exactly: らーめん, ラーメン, 塩ラーメン, 焼そば, ワンタン, 餃子, 大盛 — or, if unsure, make the writing small and indistinct; remove the small white paper tags with price numbers; make the indigo cloth noren at the doorway plain indigo with no characters. Keep the 中華そば board exactly as it is."
+  },
+  {
+   "id": "N02_v2",
+   "file": "N02_v2.jpg",
+   "operation": "edit",
+   "source": "N02_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "ab654fdcd71955a0c56eba1ffbd0713f9b1eebcca305d0fefa3014741506a653",
+   "bytes": 2770906,
+   "reference_files": [],
+   "seconds": 20.8,
+   "created_utc": "2026-10-11T05:44:04.541712+00:00",
+   "usage": {
+    "promptTokenCount": 341,
+    "candidatesTokenCount": 1243,
+    "totalTokenCount": 1771,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 83
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 187,
+    "serviceTier": "standard"
+   },
+   "prompt": "Edit the FIRST supplied photograph narrowly. Keep the exact camera framing, composition, lighting, colors, people, materials and every other object unchanged, and keep it photorealistic. Change ONLY the front faces of the wooden fish crates in the bottom-left corner: remove the stenciled marks so the crate wood is plain and weathered, with no letters or symbols. Keep the sign 継町漁港 unchanged."
+  },
+  {
+   "id": "N12_v1",
+   "file": "N12_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "f1bee35b104ef67b8c3b133ef20bd039567d689893ec6856462c95dc93a9062d",
+   "bytes": 3175817,
+   "reference_files": [
+    "N13_v1.jpg",
+    "N02_v1.jpg",
+    "S03_bath_lane_rain_v1.webp"
+   ],
+   "extra": "Make it look like a real night photograph taken with a full-frame camera at ISO 3200: natural skin, real cloth folds, slight motion blur on the dancers' hands, real film grain, no CGI or 3D-render look, no plastic skin. Dancers mostly seen from behind or in profile at a distance. Any flying cars must be the car-like vehicles with ring-shaped lift fans, small and far away. Optional small wooden sign may read exactly 継町港祭り.",
+   "tag": "",
+   "seconds": 21.1,
+   "created_utc": "2026-10-11T05:44:04.874670+00:00",
+   "usage": {
+    "promptTokenCount": 1717,
+    "candidatesTokenCount": 1365,
+    "totalTokenCount": 3276,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 943
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 774
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 194,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The supplied images are style references from the same fictional world. Match their photographic quality, light and materials; do not copy their composition, objects or camera position.\n\nUse case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles travel quietly along air corridors: rounded white ceramic-metal car bodies with a dark curved windshield and four clearly visible shrouded ring-shaped lift fans (ducted rotors) at the corners, no wheels, small navigation lights. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer day (24 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.\n\nSpecific scene (20:10):\nA bon-odori dance in a harbor-side plaza at night: a wooden yagura tower draped with red-and-white striped cloth and paper lanterns; on top, a helper robot and an elderly drummer play a large taiko drum together; residents in yukata dance in a wide circle around the tower, seen from behind and at a distance; strings of lanterns radiate from the top of the tower. Beyond the plaza, the dark sea and the lit windows of Tsugishima island. Warm lantern light against deep blue night.\n\nRevision notes:\nMake it look like a real night photograph taken with a full-frame camera at ISO 3200: natural skin, real cloth folds, slight motion blur on the dancers' hands, real film grain, no CGI or 3D-render look, no plastic skin. Dancers mostly seen from behind or in profile at a distance. Any flying cars must be the car-like vehicles with ring-shaped lift fans, small and far away. Optional small wooden sign may read exactly 継町港祭り."
+  },
+  {
+   "id": "N09_v2",
+   "file": "N09_v2.jpg",
+   "operation": "edit",
+   "source": "N09_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "16ef923ee287dac1d6e786e639a625c05fe70e450d8952562b0c5f8b57e08dd6",
+   "bytes": 3212542,
+   "reference_files": [
+    "N10_v1.jpg"
+   ],
+   "seconds": 22.4,
+   "created_utc": "2026-10-11T05:44:06.099375+00:00",
+   "usage": {
+    "promptTokenCount": 647,
+    "candidatesTokenCount": 1303,
+    "totalTokenCount": 2178,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 131
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 516
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 228,
+    "serviceTier": "standard"
+   },
+   "prompt": "Edit the FIRST supplied photograph narrowly. Keep the exact camera framing, composition, lighting, colors, people, materials and every other object unchanged, and keep it photorealistic. Change ONLY the flying vehicle in the upper-left sky: replace the open-top cart with a closed white car-like four-seat flying passenger vehicle with a dark curved windshield, rounded white body, four shrouded ring-shaped lift fans at its corners, small red and green navigation lights, no wheels, no open seats, about the same size and position, lit warmly by the sunset. Use the other supplied image(s) only as a design reference for that change."
+  },
+  {
+   "id": "N12_v2",
+   "file": "N12_v2.jpg",
+   "operation": "edit",
+   "source": "N12_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "be61243cda95d7267aaf71e0286d7ad19f26c7d37445e9e44b7fbc5fab7f27c3",
+   "bytes": 3091552,
+   "reference_files": [],
+   "seconds": 22.2,
+   "created_utc": "2026-10-11T07:09:16.072342+00:00",
+   "usage": {
+    "promptTokenCount": 394,
+    "candidatesTokenCount": 1291,
+    "totalTokenCount": 1891,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 136
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 206,
+    "serviceTier": "standard"
+   },
+   "prompt": "Edit the FIRST supplied photograph narrowly. Keep the exact camera framing, composition, lighting, colors, people, materials and every other object unchanged, and keep it photorealistic. Change ONLY the robot standing on the tower next to the elderly drummer: redesign it as this town's own original helper robot — smooth ivory ceramic shell with matte warm-grey joints, a rounded head with one narrow horizontal amber light strip instead of a face (no eyes, no visor, no mouth), wearing an indigo festival happi coat and a white twisted headband, holding drumsticks and striking the drum. It must not resemble any existing robot, product or character. Keep everything else exactly the same."
+  }
+ ]
+}

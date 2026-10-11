@@ -1,0 +1,21 @@
+{
+  "name": "ai-human-coexistence",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AIと人間の共存 — まだ来ない未来なのに懐かしい、昭和を残した2080年の海辺の町（AI生成の写真風映像＋Remotionで合成）",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "node scripts/render.mjs out/video_silent.mp4",
+    "finish": "bash scripts/finish.sh"
+  },
+  "dependencies": {
+    "@remotion/bundler": "^4.0.355",
+    "@remotion/cli": "^4.0.355",
+    "@remotion/renderer": "^4.0.355",
+    "@types/react": "^18.3.12",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.355",
+    "typescript": "^5.6.3"
+  }
+}

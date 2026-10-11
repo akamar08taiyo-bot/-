@@ -1,0 +1,17 @@
+node_modules/
+out/
+work/
+audio/out/
+public/clips/
+public/photos/
+assets/veo/*.mp4
+# 作り直せる・使っていない大きなファイル
+audio/qa/
+assets/n04_pdf/*.pdf
+assets/n04_pdf/p*_x*.png
+assets/n04_repro/
+public/fonts/*.ttf
+!public/fonts/ZenOldMincho-Regular.ttf
+!public/fonts/ZenOldMincho-Bold.ttf
+!public/fonts/ZenMaruGothic-Bold.ttf
+!public/fonts/ZenMaruGothic-Black.ttf

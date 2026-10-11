@@ -1,0 +1,278 @@
+{
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "crossfade": 1.2,
+  "festival": {"t0_global": 0, "bpm": 96, "note": "t0_global は timeline.ts で S18(E2) の開始に合わせて計算する"},
+  "shots": [
+    {
+      "id": "P0", "photo": "N01", "chapter": "序", "name": "夜明け前の海と継島", "dur": 26,
+      "cam": {"from": [0.5, 0.5, 1.0], "to": [0.52, 0.46, 1.09]},
+      "fx": [
+        {"type": "glow", "x": 0.2, "y": 0.474, "r": 0.03, "color": "#fff1c8", "pulse": 0.55, "speed": 0.5},
+        {"type": "glow", "x": 0.738, "y": 0.708, "r": 0.025, "color": "#ffc068", "flicker": 0.25},
+        {"type": "glints", "x0": 0.0, "x1": 1.0, "y0": 0.6, "y1": 0.83, "count": 140, "color": "#ffe6d0", "opacity": 0.35, "size": 0.6}
+      ],
+      "ambience": ["night_sea_calm", "pier_lapping", "wind_soft"],
+      "events": [{"t": 4.0, "type": "foghorn"}, {"t": 16.0, "type": "foghorn", "gain": -4}],
+      "captions": [
+        {"t0": 2.5, "t1": 7.6, "text": "2080年8月24日、土曜日。"},
+        {"t0": 8.0, "t1": 13.1, "text": "海辺の町、継町（つぎまち）。"},
+        {"t0": 13.5, "t1": 18.8, "text": "古いものを直しながら、人とAIが暮らす町。"}
+      ],
+      "title": {"t0": 19.2, "t1": 25.6, "text": "AIと人間の共存", "sub": "存在しないのに懐かしい、昭和を残した2080年の海辺の町"}
+    },
+    {
+      "id": "A1", "photo": "N02", "chapter": "一", "name": "朝焼けの漁港", "dur": 19,
+      "cam": {"from": [0.47, 0.52, 1.1], "to": [0.55, 0.5, 1.03]},
+      "fx": [
+        {"type": "gulls", "t0": 3, "t1": 17, "x0": 1.05, "x1": 0.35, "y": 0.2, "n": 2, "size": 0.012, "color": "#f4f1ea"},
+        {"type": "glints", "x0": 0.1, "x1": 0.85, "y0": 0.38, "y1": 0.62, "count": 120, "color": "#ffe9c8", "opacity": 0.4, "size": 0.7},
+        {"type": "mist", "y": 0.36, "h": 0.12, "color": "#e8eef4", "opacity": 0.22}
+      ],
+      "holo": [{"x": 0.63, "y": 0.27, "w": 0.2, "lines": ["本日の水揚げ", "あじ・さば・いわし"], "t0": 4.0, "tilt": -8}],
+      "ambience": ["harbor_morning", "gulls", "water_lapping"],
+      "events": [{"t": 2.5, "type": "gull"}, {"t": 6.0, "type": "crate_set"}, {"t": 9.5, "type": "gull"}, {"t": 12.0, "type": "robot_step_soft", "t_end": 16.0, "every": 0.6}, {"t": 4.0, "type": "holo_on"}],
+      "chapterCard": {"t0": 1.5, "t1": 7.5, "num": "一", "title": "夜明け", "time": "午前五時四十分"}
+    },
+    {
+      "id": "A2", "photo": "N03", "chapter": "一", "name": "継島の階段路地", "dur": 19,
+      "cam": {"from": [0.5, 0.56, 1.08], "to": [0.47, 0.44, 1.12]},
+      "fx": [
+        {"type": "dust", "x0": 0.28, "x1": 0.72, "y0": 0.05, "y1": 0.6, "count": 70, "color": "#fff3dc", "opacity": 0.5}
+      ],
+      "ambience": ["morning_birds", "distant_sea", "stairwell"],
+      "events": [{"t": 1.0, "t_end": 12.0, "every": 0.65, "type": "robot_step"}, {"t": 13.5, "type": "bottle_clink"}, {"t": 15.0, "type": "door_creak"}],
+      "captions": [{"t0": 5.0, "t1": 11.5, "text": "牛乳は、今も瓶で届く。"}]
+    },
+    {
+      "id": "B1", "photo": "N04", "chapter": "二", "name": "朝の渡し船", "dur": 19,
+      "cam": {"from": [0.5, 0.5, 1.05], "to": [0.46, 0.48, 1.12]},
+      "fx": [
+        {"type": "gulls", "t0": 1, "t1": 15, "x0": -0.05, "x1": 0.6, "y": 0.3, "n": 2, "size": 0.014, "color": "#ffffff"},
+        {"type": "glints", "x0": 0.0, "x1": 0.62, "y0": 0.56, "y1": 0.8, "count": 160, "color": "#ffffff", "opacity": 0.55, "size": 0.8}
+      ],
+      "ambience": ["ferry_deck", "boat_engine", "gulls", "wind_sea"],
+      "events": [{"t": 3.0, "type": "gull"}, {"t": 8.0, "type": "aircar_pass", "dir": "L2R", "dist": "mid"}, {"t": 12.5, "type": "gull"}, {"t": 15.0, "type": "bicycle_bell"}],
+      "chapterCard": {"t0": 1.5, "t1": 7.5, "num": "二", "title": "朝", "time": "午前七時四十分"},
+      "captions": [{"t0": 9.0, "t1": 15.0, "text": "島から町へ、渡し船で通う。"}]
+    },
+    {
+      "id": "B2", "photo": "N05", "chapter": "二", "name": "湯けむりの坂道", "dur": 19,
+      "cam": {"from": [0.5, 0.55, 1.1], "to": [0.5, 0.45, 1.04]},
+      "fx": [
+        {"type": "steam", "x": 0.2, "y": 0.6, "scale": 1.2, "rate": 0.35},
+        {"type": "steam", "x": 0.29, "y": 0.47, "scale": 1.0, "rate": 0.4},
+        {"type": "steam", "x": 0.56, "y": 0.44, "scale": 0.8, "rate": 0.45},
+        {"type": "steam", "x": 0.62, "y": 0.57, "scale": 0.9, "rate": 0.45}
+      ],
+      "holo": [{"x": 0.36, "y": 0.42, "w": 0.13, "lines": ["↑ 汐見館 120m", "足湯 ここから2分"], "t0": 6.0, "tilt": 10, "small": true}],
+      "ambience": ["onsen_steam", "town_morning", "morning_birds"],
+      "events": [{"t": 2.0, "t_end": 14.0, "every": 0.5, "type": "geta_step"}, {"t": 6.0, "type": "holo_on"}, {"t": 10.0, "type": "aircar_pass", "dir": "L2R", "dist": "far"}]
+    },
+    {
+      "id": "B3", "photo": "S01", "chapter": "二", "name": "継町商店街", "dur": 20,
+      "cam": {"from": [0.45, 0.55, 1.08], "to": [0.55, 0.48, 1.02]},
+      "fx": [
+        {"type": "dapple", "x0": 0.3, "x1": 0.9, "y0": 0.62, "y1": 1.0, "opacity": 0.12}
+      ],
+      "holo": [{"x": 0.46, "y": 0.2, "w": 0.2, "lines": ["継町商店街", "8月24日（土）晴れ 32℃"], "t0": 3.5, "tilt": -6}],
+      "ambience": ["shop_street_day", "cicadas_far"],
+      "events": [{"t": 3.5, "type": "holo_on"}, {"t": 7.0, "type": "aircar_pass", "dir": "R2L", "dist": "near"}, {"t": 12.0, "type": "cart_motor"}, {"t": 15.5, "type": "shop_bell"}]
+    },
+    {
+      "id": "B4", "photo": "S02", "chapter": "二", "name": "電器店の修理", "dur": 19,
+      "cam": {"from": [0.42, 0.5, 1.06], "to": [0.5, 0.48, 1.0]},
+      "fx": [
+        {"type": "dust", "x0": 0.0, "x1": 0.45, "y0": 0.0, "y1": 0.75, "count": 80, "color": "#fff4dc", "opacity": 0.55},
+        {"type": "glow", "x": 0.583, "y": 0.592, "r": 0.012, "color": "#ffb340", "pulse": 0.5, "speed": 1.2}
+      ],
+      "ambience": ["workshop", "street_distant"],
+      "events": [{"t": 3.0, "type": "servo_whir"}, {"t": 6.5, "type": "metal_clink"}, {"t": 9.0, "type": "servo_whir"}, {"t": 12.0, "type": "solder_hiss"}, {"t": 15.0, "type": "metal_clink"}],
+      "captions": [{"t0": 5.0, "t1": 12.0, "text": "古い扇風機は、捨てずに直す。"}]
+    },
+    {
+      "id": "C1", "photo": "N07", "chapter": "三", "name": "港の中華そば", "dur": 19,
+      "cam": {"from": [0.5, 0.52, 1.04], "to": [0.55, 0.55, 1.1]},
+      "fx": [
+        {"type": "steam", "x": 0.26, "y": 0.62, "scale": 1.3, "rate": 0.3},
+        {"type": "steam", "x": 0.33, "y": 0.66, "scale": 1.1, "rate": 0.35},
+        {"type": "steam", "x": 0.5, "y": 0.82, "scale": 0.55, "rate": 0.5, "opacity": 0.35}
+      ],
+      "ambience": ["ramen_kitchen", "harbor_outside"],
+      "events": [{"t": 2.0, "t_end": 7.5, "every": 0.26, "type": "chop"}, {"t": 9.5, "type": "noodle_drain"}, {"t": 13.0, "type": "bowl_set"}],
+      "chapterCard": {"t0": 1.5, "t1": 7.5, "num": "三", "title": "昼さがり", "time": "午後零時十分"},
+      "captions": [{"t0": 8.5, "t1": 14.5, "text": "味は、親方から教わったもの。"}]
+    },
+    {
+      "id": "C2", "photo": "N06", "chapter": "三", "name": "入道雲と桟橋", "dur": 19,
+      "cam": {"from": [0.5, 0.48, 1.08], "to": [0.5, 0.55, 1.0]},
+      "fx": [
+        {"type": "glints", "x0": 0.27, "x1": 1.0, "y0": 0.57, "y1": 0.85, "count": 180, "color": "#ffffff", "opacity": 0.6, "size": 0.8},
+        {"type": "gulls", "t0": 5, "t1": 18, "x0": 0.9, "x1": 0.4, "y": 0.16, "n": 1, "size": 0.012, "color": "#ffffff"}
+      ],
+      "ambience": ["cicadas_strong", "waves_beach", "wind_sea"],
+      "events": [{"t": 3.0, "type": "splash"}, {"t": 7.5, "type": "splash"}, {"t": 12.0, "type": "splash"}, {"t": 15.0, "type": "gull"}]
+    },
+    {
+      "id": "C3", "photo": "N08", "chapter": "三", "name": "継島の屋上", "dur": 19,
+      "cam": {"from": [0.55, 0.5, 1.08], "to": [0.46, 0.52, 1.02]},
+      "fx": [
+        {"type": "glints", "x0": 0.42, "x1": 1.0, "y0": 0.48, "y1": 0.9, "count": 140, "color": "#ffffff", "opacity": 0.45, "size": 0.7}
+      ],
+      "ambience": ["rooftop_wind", "cicadas_far", "distant_sea"],
+      "events": [{"t": 4.0, "t_end": 9.0, "type": "watering"}, {"t": 11.0, "type": "aircar_pass", "dir": "L2R", "dist": "mid"}],
+      "captions": [{"t0": 6.0, "t1": 12.0, "text": "島の屋上は、子どもたちの庭。"}]
+    },
+    {
+      "id": "C4", "photo": "S04", "chapter": "三", "name": "屋上菜園", "dur": 19,
+      "cam": {"from": [0.48, 0.5, 1.07], "to": [0.55, 0.47, 1.0]},
+      "fx": [
+        {"type": "dapple", "x0": 0.3, "x1": 0.95, "y0": 0.62, "y1": 1.0, "opacity": 0.14}
+      ],
+      "ambience": ["rooftop_wind", "cicadas", "crawler_rail"],
+      "events": [{"t": 5.0, "type": "servo_whir"}, {"t": 10.0, "type": "aircar_pass", "dir": "R2L", "dist": "far"}]
+    },
+    {
+      "id": "C5", "photo": "S07", "chapter": "三", "name": "空のりば", "dur": 19,
+      "video": {"src": "S07door", "at": 4.0, "len": 8.0},
+      "cam": {"from": [0.5, 0.5, 1.0], "to": [0.5, 0.5, 1.0]},
+      "holo": [{"x": 0.67, "y": 0.3, "w": 0.17, "lines": ["空のりば  16:20", "継島行き  まもなく"], "t0": 1.5, "tilt": -4}],
+      "ambience": ["pavilion_afternoon", "cicadas_far", "aircar_idle"],
+      "events": [{"t": 1.5, "type": "holo_on"}, {"t": 5.0, "type": "gate_open"}, {"t": 8.0, "type": "car_door_open"}],
+      "captions": [{"t0": 13.0, "t1": 18.2, "text": "扉は、何もしなくても開く。"}]
+    },
+    {
+      "id": "C6", "photo": "S05", "chapter": "三", "name": "畳の居間", "dur": 19,
+      "cam": {"from": [0.45, 0.52, 1.06], "to": [0.55, 0.5, 1.0]},
+      "fx": [
+        {"type": "dust", "x0": 0.4, "x1": 0.85, "y0": 0.1, "y1": 0.8, "count": 90, "color": "#fff1d6", "opacity": 0.55}
+      ],
+      "ambience": ["room_quiet", "clock_tick", "cicadas_outside", "furin"],
+      "events": [{"t": 6.0, "type": "ice_clink"}, {"t": 12.0, "type": "furin_gust"}],
+      "captions": [{"t0": 6.0, "t1": 12.5, "text": "誰かが、さっきまでここにいた。"}]
+    },
+    {
+      "id": "D1", "photo": "N09", "chapter": "四", "name": "夕焼けの防波堤", "dur": 19,
+      "cam": {"from": [0.5, 0.5, 1.04], "to": [0.47, 0.52, 1.1]},
+      "fx": [
+        {"type": "glints", "x0": 0.0, "x1": 0.6, "y0": 0.5, "y1": 0.85, "count": 170, "color": "#ffd9a0", "opacity": 0.6, "size": 0.8},
+        {"type": "gulls", "t0": 2, "t1": 16, "x0": 0.1, "x1": 0.7, "y": 0.33, "n": 2, "size": 0.012, "color": "#3a2a2a"}
+      ],
+      "ambience": ["higurashi", "breakwater_waves", "wind_sea"],
+      "events": [{"t": 3.0, "t_end": 16.0, "type": "town_chime"}, {"t": 9.0, "type": "gull"}],
+      "chapterCard": {"t0": 1.5, "t1": 7.5, "num": "四", "title": "夕暮れ", "time": "午後五時"},
+      "captions": [{"t0": 8.5, "t1": 15.0, "text": "五時のチャイムが、海の向こうまで響く。"}]
+    },
+    {
+      "id": "D2", "photo": "S06", "chapter": "四", "name": "修理品の返却", "dur": 19,
+      "cam": {"from": [0.5, 0.5, 1.07], "to": [0.47, 0.5, 1.0]},
+      "fx": [
+        {"type": "glow", "x": 0.462, "y": 0.123, "r": 0.03, "color": "#ffd28a", "flicker": 0.08}
+      ],
+      "ambience": ["evening_lane", "insects_start"],
+      "events": [{"t": 2.0, "type": "cart_motor"}, {"t": 5.0, "type": "cart_stop_beep"}, {"t": 9.0, "type": "basket_creak"}],
+      "captions": [{"t0": 6.0, "t1": 12.5, "text": "直った扇風機が、家に帰ってくる。"}]
+    },
+    {
+      "id": "D3", "photo": "S03", "chapter": "四", "name": "雨上がりの銭湯脇", "dur": 19,
+      "cam": {"from": [0.55, 0.5, 1.07], "to": [0.5, 0.52, 1.0]},
+      "fx": [
+        {"type": "drips", "x0": 0.04, "x1": 0.36, "y": 0.12, "y1": 0.85, "count": 7},
+        {"type": "ripples", "points": [[0.25, 0.86], [0.38, 0.9], [0.18, 0.95], [0.45, 0.82]]},
+        {"type": "steam", "x": 0.66, "y": 0.3, "scale": 0.5, "rate": 0.6, "opacity": 0.3},
+        {"type": "glow", "x": 0.6, "y": 0.255, "r": 0.03, "color": "#ffcf88", "flicker": 0.06}
+      ],
+      "ambience": ["rain_after", "bath_inside_muffled"],
+      "events": [{"t": 6.0, "type": "bucket_echo"}, {"t": 13.0, "type": "bucket_echo", "gain": -3}]
+    },
+    {
+      "id": "D4", "photo": "N10", "chapter": "四", "name": "灯りがともる湾", "dur": 19,
+      "cam": {"from": [0.52, 0.5, 1.02], "to": [0.55, 0.45, 1.1]},
+      "fx": [
+        {"type": "beam", "x": 0.548, "y": 0.355, "len": 0.25, "color": "#fff3cc", "speed": 0.12},
+        {"type": "smoke", "x": 0.462, "y": 0.47, "scale": 0.6},
+        {"type": "glints", "x0": 0.36, "x1": 1.0, "y0": 0.45, "y1": 0.7, "count": 120, "color": "#ffd59a", "opacity": 0.5, "size": 0.6}
+      ],
+      "ambience": ["dusk_bay", "crickets", "town_murmur_far"],
+      "events": [{"t": 6.0, "type": "ferry_horn"}, {"t": 12.0, "type": "aircar_pass", "dir": "L2R", "dist": "far"}],
+      "captions": [{"t0": 6.0, "t1": 12.5, "text": "ひとつ、またひとつ、窓に灯りがともる。"}]
+    },
+    {
+      "id": "E1", "photo": "N11", "chapter": "五", "name": "夏祭りの夜店", "dur": 19,
+      "cam": {"from": [0.5, 0.5, 1.08], "to": [0.52, 0.52, 1.0]},
+      "fx": [
+        {"type": "lanternFlicker", "opacity": 0.05}
+      ],
+      "holo": [{"x": 0.27, "y": 0.13, "w": 0.18, "lines": ["継町港祭り", "海上花火  20:40〜"], "t0": 3.0, "tilt": 6}],
+      "ambience": ["festival_stalls", "festival_music_far", "crickets"],
+      "events": [{"t": 3.0, "type": "holo_on"}, {"t": 8.0, "type": "water_splash_small"}, {"t": 11.0, "t_end": 14.0, "type": "shaved_ice"}],
+      "chapterCard": {"t0": 1.5, "t1": 7.5, "num": "五", "title": "夏祭り", "time": "午後七時四十分"}
+    },
+    {
+      "id": "E2", "photo": "N12", "chapter": "五", "name": "盆踊り", "dur": 20,
+      "cam": {"from": [0.5, 0.48, 1.04], "to": [0.5, 0.52, 1.1]},
+      "fx": [
+        {"type": "lanternFlicker", "opacity": 0.05}
+      ],
+      "ambience": ["festival_music_near", "crowd_clap"],
+      "events": [],
+      "captions": [{"t0": 7.0, "t1": 14.0, "text": "年に一度、町じゅうがひとつの輪になる。"}]
+    },
+    {
+      "id": "E3", "photo": "N13", "chapter": "五", "name": "海上花火", "dur": 24,
+      "cam": {"from": [0.48, 0.5, 1.1], "to": [0.5, 0.5, 1.0]},
+      "fx": [
+        {"type": "fireworks"},
+        {"type": "glints", "x0": 0.0, "x1": 0.65, "y0": 0.6, "y1": 0.95, "count": 120, "color": "#ffd0a0", "opacity": 0.35, "size": 0.7}
+      ],
+      "fireworks": {
+        "launch_lead": 1.4, "sound_delay": 0.6,
+        "bursts": [
+          {"t": 2.0, "kind": "peony", "x": 0.22, "y": 0.2}, {"t": 4.0, "kind": "chrysanthemum", "x": 0.4, "y": 0.14},
+          {"t": 5.6, "kind": "willow", "x": 0.3, "y": 0.18}, {"t": 7.6, "kind": "ring", "x": 0.15, "y": 0.24},
+          {"t": 9.0, "kind": "peony", "x": 0.45, "y": 0.22}, {"t": 10.4, "kind": "willow", "x": 0.25, "y": 0.12},
+          {"t": 12.2, "kind": "chrysanthemum", "x": 0.36, "y": 0.26}, {"t": 13.4, "kind": "peony", "x": 0.12, "y": 0.16},
+          {"t": 14.8, "kind": "ring", "x": 0.5, "y": 0.16}, {"t": 16.2, "kind": "willow", "x": 0.33, "y": 0.1},
+          {"t": 17.0, "kind": "peony", "x": 0.2, "y": 0.22}, {"t": 17.6, "kind": "chrysanthemum", "x": 0.44, "y": 0.2},
+          {"t": 18.2, "kind": "peony", "x": 0.28, "y": 0.15}, {"t": 18.7, "kind": "ring", "x": 0.38, "y": 0.12},
+          {"t": 19.2, "kind": "willow", "x": 0.16, "y": 0.13}, {"t": 19.7, "kind": "willow", "x": 0.46, "y": 0.13}
+        ]
+      },
+      "ambience": ["night_sea", "crowd_far_soft", "insects_soft"],
+      "events": []
+    },
+    {
+      "id": "E4", "photo": "N14", "chapter": "五", "name": "屋上の二人", "dur": 21,
+      "cam": {"from": [0.5, 0.5, 1.04], "to": [0.5, 0.55, 1.12]},
+      "fx": [
+        {"type": "glow", "x": 0.548, "y": 0.537, "r": 0.03, "color": "#ffb54a", "pulse": 0.35, "speed": 0.25},
+        {"type": "steam", "x": 0.733, "y": 0.83, "scale": 0.35, "rate": 0.8, "opacity": 0.35, "wind": 4},
+        {"type": "fireworksSmall", "x0": 0.38, "x1": 0.52, "y": 0.2, "times": [2.0, 6.0, 10.5]}
+      ],
+      "ambience": ["rooftop_night", "insects", "distant_sea"],
+      "events": [{"t": 2.6, "type": "firework_distant"}, {"t": 6.6, "type": "firework_distant"}, {"t": 11.1, "type": "firework_distant"}, {"t": 15.5, "type": "robot_pi"}],
+      "captions": [
+        {"t0": 5.5, "t1": 12.0, "text": "来年も、いっしょに見ようね。"},
+        {"t0": 15.5, "t1": 19.2, "text": "ピ。"}
+      ]
+    },
+    {
+      "id": "F0", "photo": "N15", "chapter": "結", "name": "深夜の継島と月の道", "dur": 28,
+      "cam": {"from": [0.5, 0.5, 1.08], "to": [0.5, 0.48, 1.0]},
+      "fx": [
+        {"type": "beam", "x": 0.266, "y": 0.307, "len": 0.2, "color": "#fff3cc", "speed": 0.1},
+        {"type": "glints", "x0": 0.3, "x1": 0.7, "y0": 0.42, "y1": 0.75, "count": 150, "color": "#e8eeff", "opacity": 0.55, "size": 0.7},
+        {"type": "glow", "x": 0.662, "y": 0.6, "r": 0.03, "color": "#ffc068", "flicker": 0.2}
+      ],
+      "ambience": ["night_sea_calm", "pier_lapping", "insects_fade"],
+      "events": [{"t": 6.0, "type": "foghorn", "gain": -8}],
+      "captions": [
+        {"t0": 2.0, "t1": 7.8, "text": "この町は、どこにも存在しない。"},
+        {"t0": 8.3, "t1": 14.3, "text": "けれど、新しいものと古いもの、人とAIが"},
+        {"t0": 14.3, "t1": 20.3, "text": "同じ明日を待つ町は、きっと懐かしい。"}
+      ],
+      "endCard": {"t0": 20.8, "t1": 28.0, "text": "AIと人間の共存", "sub": "第一章　了", "note": "この映像の街・人物・出来事はすべて架空です"}
+    }
+  ]
+}

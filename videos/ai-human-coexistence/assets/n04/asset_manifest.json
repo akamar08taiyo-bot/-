@@ -1,0 +1,210 @@
+{
+  "project": "N04_showa2080",
+  "verified_at_utc": "2026-10-11T04:53:06.433589+00:00",
+  "original_image_count": 11,
+  "selected_count": 7,
+  "records": [
+    {
+      "id": "S01_v1",
+      "path": "assets/S01_market_day_v1.png",
+      "status": "superseded",
+      "dimensions_px": [
+        1672,
+        941
+      ],
+      "format": "PNG",
+      "mode": "RGB",
+      "bytes": 3146801,
+      "sha256": "e80aef3f6a953ec8fc9b29d766d65a41c4a19a0fe95f362d111f5777fcb027ea",
+      "generation_sequence": 1,
+      "prompt_source": "generation_ledger.json",
+      "source_default_path": "C:/Users/akama/.codex/generated_images/01a124b0-41e6-7af1-90d9-848df966334e/exec-ad8f623a-7846-4bdf-b834-fb99d9519cba.png",
+      "reference_assets": []
+    },
+    {
+      "id": "S02_v1",
+      "path": "assets/S02_repair_workshop_v1.png",
+      "status": "superseded",
+      "dimensions_px": [
+        1672,
+        941
+      ],
+      "format": "PNG",
+      "mode": "RGB",
+      "bytes": 2886572,
+      "sha256": "ba29247015f224910dc7c7089fb0c4b83c1505fa2f50648f0da56329dc0b31b9",
+      "generation_sequence": 2,
+      "prompt_source": "generation_ledger.json",
+      "source_default_path": "C:/Users/akama/.codex/generated_images/01a124b0-41e6-7af1-90d9-848df966334e/exec-627f5f0c-5d69-4176-89a8-ebc8914b56a1.png",
+      "reference_assets": []
+    },
+    {
+      "id": "S03_v1",
+      "path": "assets/S03_bath_lane_rain_v1.png",
+      "status": "selected",
+      "dimensions_px": [
+        1672,
+        941
+      ],
+      "format": "PNG",
+      "mode": "RGB",
+      "bytes": 3078460,
+      "sha256": "cd435bb8b8cdd9cc21610a46720cc211232af05db8190fd65f13a532b17ca187",
+      "generation_sequence": 3,
+      "prompt_source": "generation_ledger.json",
+      "source_default_path": "C:/Users/akama/.codex/generated_images/01a124b0-41e6-7af1-90d9-848df966334e/exec-fa822c51-3a30-4363-89e5-e4b73812c4a1.png",
+      "reference_assets": []
+    },
+    {
+      "id": "S04_v1",
+      "path": "assets/S04_rooftop_garden_v1.png",
+      "status": "superseded",
+      "dimensions_px": [
+        1672,
+        941
+      ],
+      "format": "PNG",
+      "mode": "RGB",
+      "bytes": 3105769,
+      "sha256": "cee267f8f0510f353aa790164ae6fc465b8af27306db24e8901501ebcceb5e89",
+      "generation_sequence": 4,
+      "prompt_source": "generation_ledger.json",
+      "source_default_path": "C:/Users/akama/.codex/generated_images/01a124b0-41e6-7af1-90d9-848df966334e/exec-549bde85-97ed-48ee-94b3-84875eeed534.png",
+      "reference_assets": []
+    },
+    {
+      "id": "S05_v1",
+      "path": "assets/S05_home_cards_v1.png",
+      "status": "selected",
+      "dimensions_px": [
+        1672,
+        941
+      ],
+      "format": "PNG",
+      "mode": "RGB",
+      "bytes": 2801432,
+      "sha256": "30b999bb372d60cf52c41d01ba82b90fb8d2feb447440cf67a6a18d8f86f34e1",
+      "generation_sequence": 5,
+      "prompt_source": "generation_ledger.json",
+      "source_default_path": "C:/Users/akama/.codex/generated_images/01a124b0-41e6-7af1-90d9-848df966334e/exec-d424e5f2-fe97-4b81-9536-a84a78318548.png",
+      "reference_assets": []
+    },
+    {
+      "id": "S02_v2",
+      "path": "assets/S02_repair_workshop_v2.png",
+      "status": "selected",
+      "dimensions_px": [
+        1672,
+        941
+      ],
+      "format": "PNG",
+      "mode": "RGB",
+      "bytes": 2683539,
+      "sha256": "8768e2f122a4b233bb864e32e436b6f06712d950dfd984267797d42767c2e508",
+      "generation_sequence": 6,
+      "prompt_source": "generation_ledger.json",
+      "source_default_path": "C:/Users/akama/.codex/generated_images/01a124b0-41e6-7af1-90d9-848df966334e/exec-0bbb83fe-2ae0-486c-a85e-e1fb2ac3121e.png",
+      "reference_assets": [
+        "assets/S02_repair_workshop_v1.png"
+      ]
+    },
+    {
+      "id": "S04_v2",
+      "path": "assets/S04_rooftop_garden_v2.png",
+      "status": "superseded",
+      "dimensions_px": [
+        1672,
+        941
+      ],
+      "format": "PNG",
+      "mode": "RGB",
+      "bytes": 2883015,
+      "sha256": "2745644290ba021c6dabe74c57e74b12e27b0c23fc2c2f04c0bb7f114a3aae84",
+      "generation_sequence": 7,
+      "prompt_source": "generation_ledger.json",
+      "source_default_path": "C:/Users/akama/.codex/generated_images/01a124b0-41e6-7af1-90d9-848df966334e/exec-22c51717-2f59-456b-b47c-383895f1d29d.png",
+      "reference_assets": [
+        "assets/S04_rooftop_garden_v1.png"
+      ]
+    },
+    {
+      "id": "S06_v1",
+      "path": "assets/S06_evening_return_v1.png",
+      "status": "selected",
+      "dimensions_px": [
+        1672,
+        941
+      ],
+      "format": "PNG",
+      "mode": "RGB",
+      "bytes": 2718912,
+      "sha256": "3399e50dcc6fbf9385c54e1cae096f844ef0216d7b3d76743edb4f7cbd36f656",
+      "generation_sequence": 8,
+      "prompt_source": "generation_ledger.json",
+      "source_default_path": "C:/Users/akama/.codex/generated_images/01a124b0-41e6-7af1-90d9-848df966334e/exec-00f67a54-221d-4f1a-a1cf-4a2788aef93f.png",
+      "reference_assets": [
+        "assets/S02_repair_workshop_v2.png",
+        "assets/S01_market_day_v1.png"
+      ]
+    },
+    {
+      "id": "S01_v2",
+      "path": "assets/S01_market_day_v2.png",
+      "status": "selected",
+      "dimensions_px": [
+        1672,
+        941
+      ],
+      "format": "PNG",
+      "mode": "RGB",
+      "bytes": 3033327,
+      "sha256": "03daa8f2d48f6f1a5a1800625ddb24516c22c77e4136c09af0e0885ebbc49e87",
+      "generation_sequence": 9,
+      "prompt_source": "generation_ledger.json",
+      "source_default_path": "C:/Users/akama/.codex/generated_images/01a124b0-41e6-7af1-90d9-848df966334e/exec-e2ddfb86-019f-4610-81c2-f2c3833555a1.png",
+      "reference_assets": [
+        "assets/S01_market_day_v1.png"
+      ]
+    },
+    {
+      "id": "S04_v3",
+      "path": "assets/S04_rooftop_garden_v3.png",
+      "status": "selected",
+      "dimensions_px": [
+        1672,
+        941
+      ],
+      "format": "PNG",
+      "mode": "RGB",
+      "bytes": 2857785,
+      "sha256": "4d3dbcf9176d29ed0008bbb3312d0d8907bf6a76e816590949cf099dae34c67f",
+      "generation_sequence": 10,
+      "prompt_source": "generation_ledger.json",
+      "source_default_path": "C:/Users/akama/.codex/generated_images/01a124b0-41e6-7af1-90d9-848df966334e/exec-65294535-b6d1-4d1a-b0d8-242c5bf207d0.png",
+      "reference_assets": [
+        "assets/S04_rooftop_garden_v2.png",
+        "assets/S01_market_day_v2.png"
+      ]
+    },
+    {
+      "id": "S07_v1",
+      "path": "assets/S07_aircar_stop_v1.png",
+      "status": "selected",
+      "dimensions_px": [
+        1672,
+        941
+      ],
+      "format": "PNG",
+      "mode": "RGB",
+      "bytes": 2792783,
+      "sha256": "ed864c94a0cdec7d5da10f425fed111a5d188c85f8ac8b96f974593ccbc7bccc",
+      "generation_sequence": 11,
+      "prompt_source": "generation_ledger.json",
+      "source_default_path": "C:/Users/akama/.codex/generated_images/01a124b0-41e6-7af1-90d9-848df966334e/exec-6a4cd309-65c1-4b57-923f-16898c84cc85.png",
+      "reference_assets": [
+        "assets/S01_market_day_v2.png",
+        "assets/S04_rooftop_garden_v3.png"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+ "note": "動画で使う原画の対応表。S01〜S07 は N04 画像提案書 PDF から取り出した採用原画。",
+ "photos": {
+  "N01": {
+   "path": "assets/gen/N01_v1.jpg",
+   "origin": "Claude+Gemini 新規"
+  },
+  "N02": {
+   "path": "assets/gen/N02_v2.jpg",
+   "origin": "Claude+Gemini 新規（木箱の文字を消す修正）"
+  },
+  "N03": {
+   "path": "assets/gen/N03_v1.jpg",
+   "origin": "Claude+Gemini 新規"
+  },
+  "N04": {
+   "path": "assets/gen/N04_v1.jpg",
+   "origin": "Claude+Gemini 新規"
+  },
+  "N05": {
+   "path": "assets/gen/N05_v1.jpg",
+   "origin": "Claude+Gemini 新規"
+  },
+  "N06": {
+   "path": "assets/gen/N06_v1.jpg",
+   "origin": "Claude+Gemini 新規"
+  },
+  "N07": {
+   "path": "assets/gen/N07_v2.jpg",
+   "origin": "Claude+Gemini 新規（品書きの文字修正）"
+  },
+  "N08": {
+   "path": "assets/gen/N08_v1.jpg",
+   "origin": "Claude+Gemini 新規"
+  },
+  "N09": {
+   "path": "assets/gen/N09_v2.jpg",
+   "origin": "Claude+Gemini 新規（飛行車の修正）"
+  },
+  "N10": {
+   "path": "assets/gen/N10_v1.jpg",
+   "origin": "Claude+Gemini 新規"
+  },
+  "N11": {
+   "path": "assets/gen/N11_v1.jpg",
+   "origin": "Claude+Gemini 新規"
+  },
+  "N12": {
+   "path": "assets/gen/N12_v2.jpg",
+   "origin": "Claude+Gemini 新規（ロボットを町の標準デザインに描き替え）"
+  },
+  "N13": {
+   "path": "assets/gen/N13_v1.jpg",
+   "origin": "Claude+Gemini 新規"
+  },
+  "N14": {
+   "path": "assets/gen/N14_v1.jpg",
+   "origin": "Claude+Gemini 新規"
+  },
+  "N15": {
+   "path": "assets/gen/N15_v1.jpg",
+   "origin": "Claude+Gemini 新規"
+  },
+  "S01": {
+   "path": "assets/n04_pdf/S01_v2.png",
+   "origin": "N04 採用原画 S01_v2（画像提案書PDFに埋め込まれたPNGを抽出）"
+  },
+  "S02": {
+   "path": "assets/n04_pdf/S02_v2.png",
+   "origin": "N04 採用原画 S02_v2（画像提案書PDFに埋め込まれたPNGを抽出）"
+  },
+  "S03": {
+   "path": "assets/n04_pdf/S03_v1.png",
+   "origin": "N04 採用原画 S03_v1（画像提案書PDFに埋め込まれたPNGを抽出）"
+  },
+  "S04": {
+   "path": "assets/n04_pdf/S04_v3.png",
+   "origin": "N04 採用原画 S04_v3（画像提案書PDFに埋め込まれたPNGを抽出）"
+  },
+  "S05": {
+   "path": "assets/n04_pdf/S05_v1.png",
+   "origin": "N04 採用原画 S05_v1（画像提案書PDFに埋め込まれたPNGを抽出）"
+  },
+  "S06": {
+   "path": "assets/n04_pdf/S06_v1.png",
+   "origin": "N04 採用原画 S06_v1（画像提案書PDFに埋め込まれたPNGを抽出）"
+  },
+  "S07": {
+   "path": "assets/n04_pdf/S07_v1.png",
+   "origin": "N04 採用原画 S07_v1（画像提案書PDFに埋め込まれたPNGを抽出）"
+  }
+ }
+}
