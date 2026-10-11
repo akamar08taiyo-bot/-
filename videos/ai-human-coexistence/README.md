@@ -5,7 +5,8 @@
 
 - 分析：[docs/analysis.md](docs/analysis.md)（参照動画の全カット表は [docs/ref_tGJRlrAXIoE/](docs/ref_tGJRlrAXIoE/)）
 - テーマ・構成・音の設計：[docs/theme.md](docs/theme.md)
-- 概要欄（貼り付け用）：[docs/youtube_description.txt](docs/youtube_description.txt)
+- YouTube 用（タイトル・概要欄・紹介文・タグ・設定）：第一章 [docs/youtube_description.txt](docs/youtube_description.txt)、第二章 [docs/youtube_ch2.txt](docs/youtube_ch2.txt)
+- サムネイル：[thumbnails/](thumbnails/)（各章 A・B の2案。`python3 -I scripts/make_thumbnail.py` で作り直せる。第二章の元絵は `thumbnails/src/`）
 - 第二章「砂の向こうから来た男」の台本：[docs/chapter2_script.md](docs/chapter2_script.md)
 
 ## 作り方（上から順に）

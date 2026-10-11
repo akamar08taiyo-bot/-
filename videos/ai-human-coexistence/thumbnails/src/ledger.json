@@ -1,0 +1,116 @@
+{
+ "project": "第二章キービジュアル・サムネイル",
+ "records": [
+  {
+   "id": "K2B_v1",
+   "file": "K2B_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "refs": [
+    "assets/gen/N14_v1.jpg"
+   ],
+   "seconds": 21.6,
+   "sha256": "bc3afeeb315a7b1cf84a9819329e18c0fd96684f112e22a2c98f358b89dbc46b",
+   "created_utc": "2026-10-11T22:55:18.089215+00:00",
+   "usage": {
+    "promptTokenCount": 592,
+    "candidatesTokenCount": 1344,
+    "totalTokenCount": 2170,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 334
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 234,
+    "serviceTier": "standard"
+   },
+   "prompt": "Use case: photorealistic-natural. A single 16:9 landscape image, no borders, no text overlay.\nEra: August 1986 (late Showa), Japan. Look of a real 1980s amateur color photograph: warm, slightly faded and magenta-shifted color, soft film grain, gentle vignette. Absolutely no modern or futuristic elements: no towers, no flying vehicles, no robots, no solar panels, no LED lights, no smartphones.\nHumans are incidental: seen only from behind, no faces visible. No captions, logos, watermarks or readable text.\n\nThe supplied image is a COMPOSITION reference only: keep the same rooftop viewpoint, framing and bench position, but move everything back to 1986.\n\nSpecific scene (summer night, 24 August 1986): the flat concrete rooftop of an old 1960s apartment block on a crowded coal-mining island. A simple wooden bench in the middle ground, potted plants and a laundry pole with a towel on the left, a mosquito coil smoking on the floor. On the bench two ten-year-old children sit close together, seen from behind: a boy in a dark-blue jinbei with short hair, and a girl in a light summer yukata with a bob haircut and a small RED hair ribbon (the only red thing in the picture). Beyond the parapet: the dark sea, a few small modest fireworks blooming low over the water, and across the bay a small Showa-era harbor town with scattered warm windows and a lighthouse. Quiet, nostalgic, bittersweet.",
+   "rejected": "イラスト調になったため不採用（写真調で K2B_v2 を作り直し）。ファイルは削除"
+  },
+  {
+   "id": "K2A_v1",
+   "file": "K2A_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "refs": [
+    "assets/gen/N19_v1.jpg",
+    "assets/gen/N13_v1.jpg"
+   ],
+   "seconds": 22.2,
+   "sha256": "537e0871767782298a33974dfe264a431bc17a5a54e46d7d8a7f87e6bd17781c",
+   "created_utc": "2026-10-11T22:55:18.830044+00:00",
+   "usage": {
+    "promptTokenCount": 1453,
+    "candidatesTokenCount": 1361,
+    "totalTokenCount": 3004,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 937
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 516
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 190,
+    "serviceTier": "standard"
+   },
+   "prompt": "The supplied images are style references from the same fictional world. Match their photographic quality, light and materials; do not copy their composition, objects or camera position.\n\nUse case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles travel quietly along air corridors: rounded white ceramic-metal car bodies with a dark curved windshield and four clearly visible shrouded ring-shaped lift fans (ducted rotors) at the corners, no wheels, small navigation lights. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer day (24 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.\n\nSpecific scene (night, about 9 pm, 24 August 2080):\nA wide, quiet sand-dune field at the edge of the town under a deep blue night sky with a few stars. In the middle ground a small vintage mint-green kei truck is parked on the sand, its round headlights glowing softly and a small amber light in the cab; a small ivory helper robot of the standard town design sits at the wheel, tiny in the frame. Beside the truck a man in a dark navy business suit sits alone on the sand, seen from behind, short graying hair, a dark-brown leather briefcase beside him, looking out across the dark water. Far away across the sea, the island town of dense concrete apartment blocks glows with many warm lit windows and a white lighthouse, two slender curved glass towers rise among the blocks, and small fireworks bloom above the island, faintly reflected on the water. Tiny navigation lights of a white flying car cross the sky. Calm, mysterious, nostalgic mood. Photorealistic night photography with natural low light. No readable text anywhere."
+  },
+  {
+   "id": "K2B_v2",
+   "file": "K2B_v2.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "refs": [
+    "assets/gen/N14_v1.jpg",
+    "assets/gen/N08_v1.jpg"
+   ],
+   "seconds": 24.9,
+   "sha256": "2f91a46bc49d5b4b29f6313aa6356ccd49e0ea599dd79e47f916a529080de7ef",
+   "created_utc": "2026-10-11T22:56:05.241174+00:00",
+   "usage": {
+    "promptTokenCount": 911,
+    "candidatesTokenCount": 1372,
+    "totalTokenCount": 2759,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 395
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 516
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 476,
+    "serviceTier": "standard"
+   },
+   "prompt": "Use case: photorealistic-natural. A REAL PHOTOGRAPH, not an illustration: no anime, no cel shading, no drawn outlines, no painterly look. Full-bleed single 16:9 landscape image: no border, no white frame, no rounded corners, no text overlay.\nEra: August 1986 (late Showa), Japan. Look of a real 1980s amateur color photograph: warm, slightly faded and magenta-shifted color, soft film grain, gentle vignette. Absolutely no modern or futuristic elements: no towers, no flying vehicles, no robots, no solar panels, no LED lights, no smartphones.\nHumans are incidental: seen only from behind, no faces visible. No captions, logos, watermarks or readable text.\n\nThe FIRST supplied image is the composition reference: keep the same rooftop viewpoint, framing and bench position, but move everything back to 1986. The SECOND supplied image shows the required photographic realism (real camera photo of a concrete rooftop) — match that realism, not its content.\n\nSpecific scene (summer night, 24 August 1986): the flat concrete rooftop of an old 1960s apartment block on a crowded coal-mining island. A simple wooden bench in the middle ground, potted plants and a laundry pole with a towel on the left, a mosquito coil smoking on the floor. On the bench two ten-year-old children sit close together, seen from behind: a boy in a dark-blue jinbei with short hair, and a girl in a light summer yukata with a bob haircut and a small RED hair ribbon (the only red thing in the picture). Beyond the parapet: the dark sea, a few small modest fireworks blooming low over the water, and across the bay a small Showa-era harbor town with scattered warm windows and a lighthouse. Quiet, nostalgic, bittersweet."
+  }
+ ]
+}
