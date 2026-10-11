@@ -1,6 +1,6 @@
 # episode.json の書き方
 
-1 本分の設計図。`new-episode.mjs` が骨組みを作り、`gen-images.mjs`・`gen-clips.mjs`・`gen-music.mjs`・`gen-voice.mjs`・`render-town.mjs` が読む。パスはすべて episode.json のフォルダからの相対パス。
+1 本分の設計図。`new-episode.mjs` が骨組みを作り、`gen-images.mjs`・`gen-clips.mjs`・`gen-music.mjs`・`gen-voice.mjs`・`render-town.mjs`・`make-publish-kit.mjs` が読む。パスはすべて episode.json のフォルダからの相対パス。
 
 ## 目次
 1. 全体の例（標準の型 cinematic）
@@ -9,6 +9,7 @@
 4. 音（audio）と時刻の書き方
 5. 書体
 6. 速さ・容量の目安とコツ
+7. 投稿セット（publish）と channel.json
 
 ## 1. 全体の例
 
@@ -23,7 +24,7 @@
   "imageStyle": "Cinematic still from a live-action Japanese film set in a fictional small town in the 1980s; …",
   "imageRefs": ["images/c01_01.png"],
   "clipStyle": "Subtle natural motion only, slow and calm; …",
-  "chapters": [ { "no": 1, "theme": "町に入る", "season": "春", "time": "朝", "place": "無人駅", "shots": [1, 18] } ],
+  "chapters": [ { "no": 1, "theme": "町に入る", "title": "坂の上の朝", "season": "春", "time": "朝", "place": "無人駅", "shots": [1, 18] } ],
   "shots": [
     { "image": "images/c01_01.png", "prompt": "A small harbor town along a curved bay seen from a hillside road, early spring morning mist, wide shot", "dur": 8.5, "move": "in", "caption": "凪ヶ浦町\n1989年", "captionStart": 1.5 },
     { "image": "images/c01_02.png", "prompt": "…", "dur": 7, "move": "still", "transition": "cut" },
@@ -46,7 +47,13 @@
     "loudness": -14
   },
   "startFade": 2,
-  "endFade": 4
+  "endFade": 4,
+  "publish": {
+    "titles": ["存在しない町「凪ヶ浦町」の四季｜環境音・作業用", "【存在しない街の記憶】凪ヶ浦町 ― 坂と港のある町の一年", "知らないのに懐かしい町、凪ヶ浦町で過ごす 20 分"],
+    "summary": "坂と港のある小さな町「凪ヶ浦町（なぎがうらちょう）」の、春から冬まで。\n誰かの記憶の中にだけある町を、ゆっくり歩きます。",
+    "pinnedComment": null,
+    "credits": []
+  }
 }
 ```
 
@@ -68,11 +75,12 @@
 | `defaults` | 場面の既定（`dur` `move` `zoom` `transition` `transitionDur` `fit`） | 7・auto・0.1・fade・1.5 |
 | `imageStyle` `imageRefs` `imageModel` `imageAspect` `imageSize` | 画像の生成（gen-images.mjs） | Nano Banana 2・16:9・2K |
 | `clipStyle` `clipModel` `clipSeconds` `clipResolution` | AI 動画の生成（gen-clips.mjs） | veo-3.1-fast-generate-preview・6 秒・720p |
-| `chapters` | 章の一覧（覚え書き。書き出しには使わない） | — |
+| `chapters` | 章の一覧。`shots`（最初と最後の場面の番号）と `title`（概要欄のチャプターの名前。無ければ `theme`）を投稿セットが使う。書き出しには使わない | — |
 | `music` | BGM の生成（`prompt` `model`） | lyria-3.5 |
 | `narration` | 語りの生成（語りを入れる回だけ） | — |
 | `audio` | 4 章 | — |
 | `startFade` `endFade` | 最初と最後の黒からのフェード（秒） | 0.8・2 |
+| `publish` | 投稿セットの中身（7 章） | TODO |
 
 ## 3. 場面（shots）
 
@@ -122,3 +130,30 @@
 - 画像は出力の 3 倍に広げてから動かすので、元の画像は 1920px 以上（2K 推奨）
 - 同じ `move`・同じ距離を続けない。各章の最初は遠景で場所を見せる
 - AI 動画は各章 2〜3 本が目安（費用と、静止画との見分けがつかないくらいの自然さのバランス）
+
+## 7. 投稿セット（publish）と channel.json
+
+`make-publish-kit.mjs` が、episode.json の `publish` と `<シリーズ>/channel.json` から投稿セット（`out/<id>_概要欄.txt`・`out/<id>_投稿セット.md`・`out/thumb_preview.jpg`）を作る。チャプター・終了画面・カードの時刻は、書き出しと同じ計算（`scripts/lib/timeline.mjs`）で出す。
+
+`publish`（回ごと）：
+| 項目 | 意味 |
+|---|---|
+| `titles` | タイトル案 3 つ（必須。TODO のままだと止まる） |
+| `summary` | 概要欄の最初の 1〜2 行（必須。改行は `\n`） |
+| `pinnedComment` | 固定コメントの文。`null` なら回の番号で問いを選ぶ |
+| `credits` | 外部の効果音・音楽・素材のクレジット（1 つ 1 行） |
+| `aiTools` | 開示の「AI（…）」の中身を自分で書くとき。省くと、実際にあるファイルから自動（画像：Gemini、動画：Veo、音楽：Lyria、声：Gemini TTS） |
+| `hashtags` `tags` | この回だけ変えるとき（省くと channel.json） |
+| `mainVideoUrl` | ショートだけ：本編の URL（概要欄に入る） |
+
+`channel.json`（シリーズに 1 つ。無ければ最初の実行でひな形ができる）：
+| 項目 | 意味 |
+|---|---|
+| `name` `handle` | チャンネル名とハンドル |
+| `playlists.main` `playlists.shorts` | 再生リスト「本編」「ショート」の URL（作ったら貼る。空だと概要欄に「URL を貼る」と出る） |
+| `schedule` | 投稿の曜日と時間（例 `毎週土曜 20:00`） |
+| `hashtags` | 概要欄の最後のハッシュタグ（5 個まで使う） |
+| `tags` | アップロード画面の「タグ」 |
+| `keywords` | チャンネルのキーワード（初期設定の節に出る） |
+| `setupDone` | チャンネルの初期設定が済んだら `true`（投稿セットから初期設定の節が消える） |
+

@@ -76,6 +76,8 @@ const pickThemes = (n) => {
   if (n >= themes.length) return [...Array(n).keys()].map((k) => themes[k % themes.length]);
   return [...Array(n).keys()].map((k) => themes[Math.round((k * (themes.length - 1)) / (n - 1))]);
 };
+// 町名の終わりで呼び方を変える（〇〇村 →「この村は実在しません」）
+const KIND = /村$/.test(town.name) ? '村' : /[市街]$/.test(town.name) ? '街' : '町';
 const chapters = pickThemes(nCh).map((t, c) => ({ ...t, no: c + 1, place: town.places[c % town.places.length] }));
 
 // 距離の配分（遠景・中景・寄り・物のアップ）。各章の最初は遠景
@@ -126,7 +128,7 @@ if (fmt.titleCard) shots.unshift({ card: { title: town.name, subtitle: `存在�
 if (fmt.endCard) {
   const lastImage = [...shots].reverse().find((s) => s.image)?.image;
   shots.push({
-    card: { title: town.name, subtitle: fmt.endCard.subtitle, layout: fmt.endCard.layout || 'center', ...(lastImage ? { image: lastImage } : {}) },
+    card: { title: town.name, subtitle: String(fmt.endCard.subtitle || '').replace('この町', `この${KIND}`), layout: fmt.endCard.layout || 'center', ...(lastImage ? { image: lastImage } : {}) },
     dur: fmt.endCard.dur,
     transition: 'fade',
     transitionDur: 2,
@@ -210,6 +212,14 @@ const ep = {
   },
   startFade: fmt.startFade,
   endFade: fmt.endFade,
+  // 投稿セット（make-publish-kit.mjs）に使う中身。references/publish.md の型で書く
+  publish: {
+    titles: [`TODO（案 1：例 存在しない${KIND}「${town.name}」の四季｜環境音・作業用）`, 'TODO（案 2）', 'TODO（案 3）'],
+    summary: 'TODO（概要欄の最初の 1〜2 行。この回の芯を、ネタばらしせずに）',
+    pinnedComment: null,
+    credits: [],
+    ...(fmtName === 'short' ? { mainVideoUrl: '' } : {}),
+  },
 };
 writeJson(epFile, ep);
 
@@ -256,4 +266,4 @@ ${chapterRanges.map((c) => `| ${c.no} | ${c.theme} | ${c.season}・${c.time} | $
 writeText(path.join(EP_DIR, 'plan.md'), plan);
 console.log(`✓ ${epFile}\n✓ ${path.join(EP_DIR, 'plan.md')}`);
 console.log(`型 ${fmtName}：${nCh} 章 × ${perCh} 場面 ＝ 画像 ${nImages} 枚（うち AI 動画の候補 ${nClips}）・約 ${fmtMin(totalSec)}`);
-console.log('次：plan.md を埋める → episode.json の TODO（prompt・motion・title・music.prompt）を埋める');
+console.log('次：plan.md を埋める → episode.json の TODO（prompt・motion・title・music.prompt・publish）を埋める');

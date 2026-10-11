@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs, parseTime, writeText, writeJson, ensureDir, fmtTime, run } from './lib/common.mjs';
 import { findFont, escPath, ffmpeg, probe, measureLoudness } from './lib/media.mjs';
+import { buildTimeline, TRANS } from './lib/timeline.mjs';
 
 // 想定内のエラーは、内部の情報を出さずにメッセージだけ表示する
 process.on('uncaughtException', (e) => {
@@ -36,14 +37,13 @@ const id = ep.id || path.parse(EP_FILE).name;
 
 const fullW = ep.format?.width || 1920;
 const fullH = ep.format?.height || 1080;
-const FPS = ep.format?.fps || 30;
+const { shots, TOTAL, FPS, defaults } = buildTimeline(ep);
 const W = DRAFT ? Math.round(fullW / 4) * 2 : fullW;
 const H = DRAFT ? Math.round(fullH / 4) * 2 : fullH;
 const K = DRAFT ? 2 : 3; // 動きをなめらかにするため、元の画像を出力の K 倍に広げてから切り出す
 
 const look = { grade: 'faded-warm', grain: 0.25, vignette: 0.3, flicker: 0.15, letterbox: 0, blur: 0, glow: 0, ...(ep.look || {}) };
 const text = { font: 'mincho', color: '#F3EEE6', size: 0.042, position: 'bl', fade: 0.8, shadow: 0.6, box: 0, ...(ep.text || {}) };
-const defaults = { dur: 7, move: 'auto', zoom: 0.1, transition: 'fade', transitionDur: 1.5, fit: 'cover', ...(ep.defaults || {}) };
 const audio = { duck: 8, loudness: -14, clipGain: -3, ...(ep.audio || {}) };
 const endFade = ep.endFade ?? 2.0;
 const startFade = ep.startFade ?? 0.8;
@@ -67,41 +67,9 @@ const rel = (p) => (p ? path.resolve(EP_DIR, p) : null);
 const hex = (c, a = 1) => `${String(c || '#ffffff').replace('#', '0x')}@${a}`;
 const num = (x, d = 3) => Number(x).toFixed(d);
 
-// ───────────────────────── 1. タイミング ─────────────────────────
-const TRANS = {
-  fade: 'fade', // なめらかに重ねる（ディゾルブ）
-  dissolve: 'fade',
-  fadeblack: 'fadeblack', // いったん黒へ
-  fadewhite: 'fadewhite', // いったん白へ（光・夏・回想）
-  fadegrays: 'fadegrays', // 色が抜けながら変わる（記憶が薄れる感じ）
-  blur: 'hblur', // にじみながら変わる
-  slideleft: 'smoothleft',
-  slideright: 'smoothright',
-  circle: 'circleopen',
-  cut: 'fade', // 1 コマで切り替え（ふつうのカット）
-};
+// ───────────────────────── 1. タイミング（lib/timeline.mjs で計算済み） ─────────────────────────
 const PAD = 2; // 各場面の後ろに足すコマ数（つなぎの途中で前の場面が尽きて映像が切れるのを防ぐ）
 const CHUNK = 16; // 一度につなぐ場面の数（多いと ffmpeg のメモリが足りなくなる）
-const shots = (ep.shots || []).map((s, i) => ({ ...defaults, ...s, i }));
-if (!shots.length) throw new Error('shots が空です');
-const AUTO = ['in', 'right', 'out', 'left', 'in', 'down', 'out', 'up'];
-let tline = 0;
-shots.forEach((s, i) => {
-  s.dur = Number(s.dur);
-  if (!(s.dur > 0)) throw new Error(`場面 ${i + 1} の dur（秒）がありません`);
-  if (s.move === 'auto') s.move = s.card ? 'still' : AUTO[i % AUTO.length];
-  const tname = i === 0 ? null : s.transition || defaults.transition;
-  if (tname && !TRANS[tname]) throw new Error(`場面 ${i + 1} の transition「${tname}」は使えません（${Object.keys(TRANS).join(' / ')}）`);
-  let td = i === 0 ? 0 : tname === 'cut' ? 1 / FPS : Number(s.transitionDur ?? defaults.transitionDur);
-  if (i > 0) td = Math.min(td, shots[i - 1].dur * 0.45, s.dur * 0.45);
-  s.tIn = td;
-  s.tName = tname;
-  s.start = i === 0 ? 0 : tline - td;
-  s.end = s.start + s.dur;
-  s.head = s.start + td / 2; // 「場面の頭」＝前の場面とのつなぎの真ん中（テロップも音もここを基準にする）
-  tline = s.end;
-});
-const TOTAL = tline;
 
 /** 秒数・"1:30"・"shot:3+0.5"（3 番目の場面の頭から 0.5 秒） → 秒。読めなければエラー */
 function atTime(v, what = '時刻') {
@@ -521,9 +489,9 @@ function renderAudio() {
   );
   ffmpeg([...inputs, ...graphArgs(lines.join(';\n'), 'audio_graph'), '-map', '[aout]', '-ar', '48000', '-c:a', 'pcm_s16le', mix], { label: '音のミックス' });
 
-  // 2 回で測ってから目標の大きさ（既定 -14 LUFS）にそろえる。ピークは -1.5 dBTP 以下
+  // 2 回で測ってから目標の大きさ（既定 -14 LUFS）にそろえる。ピークは -2 dBTP 以下（AAC にしたときの上がり分を見込む）
   const target = Number(audio.loudness ?? -14);
-  const p1 = run('ffmpeg', ['-hide_banner', '-nostats', '-i', mix, '-af', `loudnorm=I=${target}:TP=-1.5:LRA=11:print_format=json`, '-f', 'null', '-']);
+  const p1 = run('ffmpeg', ['-hide_banner', '-nostats', '-i', mix, '-af', `loudnorm=I=${target}:TP=-2:LRA=11:print_format=json`, '-f', 'null', '-']);
   const j = JSON.parse((p1.stderr.match(/\{[\s\S]*?\}/g) || ['{}']).pop());
   const norm = path.join(TMP, 'mix_norm.wav');
   if (j.input_i && Number.isFinite(Number(j.input_i)) && Number(j.input_i) > -70) {
@@ -531,7 +499,7 @@ function renderAudio() {
       [
         '-i', mix,
         '-af',
-        `loudnorm=I=${target}:TP=-1.5:LRA=11:measured_I=${j.input_i}:measured_TP=${j.input_tp}:measured_LRA=${j.input_lra}:measured_thresh=${j.input_thresh}:offset=${j.target_offset}:linear=true`,
+        `loudnorm=I=${target}:TP=-2:LRA=11:measured_I=${j.input_i}:measured_TP=${j.input_tp}:measured_LRA=${j.input_lra}:measured_thresh=${j.input_thresh}:offset=${j.target_offset}:linear=true`,
         '-ar', '48000', '-c:a', 'pcm_s16le', norm,
       ],
       { label: '音量をそろえる' },
@@ -586,9 +554,9 @@ function checkSheets() {
   return sheets;
 }
 
-function verify(silent) {
+function verify(silent, measured) {
   const p = probe(OUT);
-  const loud = silent ? null : measureLoudness(OUT);
+  const loud = silent ? null : measured || measureLoudness(OUT);
   const target = Number(audio.loudness ?? -14);
   const rows = [
     [p.width === W && p.height === H, `解像度 ${p.width}×${p.height}（期待 ${W}×${H}）`],
@@ -625,14 +593,32 @@ console.log('質感・文字を合成中…');
 const video = renderLook(timeline);
 console.log('音を合成中…');
 const mixed = args['no-audio'] ? { file: null, silent: true } : renderAudio();
+let loud = null;
 if (mixed.file) {
-  ffmpeg(['-i', video, '-i', mixed.file, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-t', num(TOTAL), '-movflags', '+faststart', OUT], { label: '書き出し' });
+  // 音は AAC。本番は YouTube のおすすめ（ステレオ 384kbps）、下書きは軽く
+  const mux = (wav) =>
+    ffmpeg(['-i', video, '-i', wav, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', DRAFT ? '192k' : '384k', '-t', num(TOTAL), '-movflags', '+faststart', OUT], { label: '書き出し' });
+  mux(mixed.file);
+  // AAC にするとピークが上がることがある（雨・風のようなザーッという音が多いと 1dB ほど）。
+  // -1.0 dBTP を超えたら、超えた分だけ全体を下げて音を入れ直す（下げる量はふつう 1dB 未満。平均の大きさの検査は ±1 LU）
+  if (!mixed.silent) {
+    loud = measureLoudness(OUT);
+    let cut = 0;
+    for (let k = 0; k < 3 && loud.truePeak != null && loud.truePeak > -1.0; k++) {
+      cut += loud.truePeak + 1.0 + 0.2;
+      const safe = path.join(TMP, 'mix_safe.wav');
+      ffmpeg(['-i', mixed.file, '-af', `volume=-${cut.toFixed(2)}dB`, '-c:a', 'pcm_s16le', safe], { label: 'ピークを下げる' });
+      mux(safe);
+      loud = measureLoudness(OUT);
+      console.log(`（AAC でピークが上がったので、全体を ${cut.toFixed(1)}dB 下げて入れ直しました）`);
+    }
+  }
 } else {
   fs.copyFileSync(video, OUT);
 }
 const srt = writeSrt(mixed.voiceWins);
 const sheets = checkSheets();
-const report = verify(mixed.silent);
+const report = verify(mixed.silent, loud);
 writeJson(
   path.join(CHECK, 'timeline.json'),
   shots.map((s) => ({

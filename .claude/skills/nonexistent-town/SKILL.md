@@ -1,6 +1,6 @@
 ---
 name: nonexistent-town
-description: "YouTube チャンネル「存在しない街の記憶」系の動画（実在しない町の、季節をまたいだ暮らしと景色を、語りもテロップもなく映像と環境音だけで見せる約 20 分の映画のような環境映像）を 1 本ずつ作る。参考動画を分析したスタイル設計書に沿って、毎回オリジナルの町を設定から作り、章立て・画像（Gemini）・一部を動かす AI 動画（Veo）・環境音・BGM を用意し、ffmpeg で質感・つなぎ・音量調整まで仕上げ、サムネイル・タイトル・概要欄（架空と AI 生成の開示つき）まで出す。「存在しない街の動画を作って」「次の町」「架空の町の環境映像」「#〇〇 の回」「ショート版も」「参考動画みたいな町の動画」などで必ず使う。"
+description: "YouTube チャンネル「存在しない街の記憶」系の動画（実在しない町の、季節をまたいだ暮らしと景色を、語りもテロップもなく映像と環境音だけで見せる約 20 分の映画のような環境映像）を 1 本ずつ作る。参考動画を分析したスタイル設計書に沿って、毎回オリジナルの町を設定から作り、章立て・画像（Gemini）・一部を動かす AI 動画（Veo）・環境音・BGM を用意し、ffmpeg で質感・つなぎ・音量調整まで仕上げ、完成したら必ず「投稿セット」（動画・サムネイル・概要欄・YouTube Studio に入れる値・終了画面とカードの時刻・固定コメント）をまとめて渡す。「存在しない街の動画を作って」「次の町」「架空の町の環境映像」「#〇〇 の回」「ショート版も」「参考動画みたいな町の動画」「投稿セットを出して」「概要欄・サムネを作り直して」などで必ず使う。"
 ---
 
 # 存在しない街の記憶：1 本作る
@@ -18,7 +18,7 @@ description: "YouTube チャンネル「存在しない街の記憶」系の動�
 | `references/episode-schema.md` | episode.json を書くとき |
 | `references/image-prompts.md` | 画像・動きの指示を書く／できた画像と動画を確かめるとき |
 | `references/sound.md` | 環境音・BGM・音量を決めるとき |
-| `references/publish.md` | チャンネルの初期設定・タイトル・概要欄・投稿の入力・公開後の運用 |
+| `references/publish.md` | 投稿セットの中身（タイトル・概要欄・入力の値）の根拠、チャンネルの初期設定、公開後の運用 |
 | `references/qa.md` | 検品のエージェントに渡す |
 | `references/narration.md` | 語りを入れる特別な回だけ（標準の型には語りは無い） |
 
@@ -30,6 +30,7 @@ description: "YouTube チャンネル「存在しない街の記憶」系の動�
      style-bible.md   … このチャンネルの型（無ければ <SKILL>/references/style-bible.md をコピー）
      formats.json     … 尺・章・質感・音の数値（無ければ <SKILL>/references/formats.json をコピー）
      towns.json       … 作った町の台帳（town-seed.mjs が書く）
+     channel.json     … チャンネル共通の値：再生リストの URL・投稿の曜日と時間・ハッシュタグ・タグ（make-publish-kit.mjs が最初にひな形を作る）
      ep001/ …         … 1 本ごとのフォルダ（town.json・plan.md・episode.json・images/・clips/・audio/・out/）
    ```
    既存のエピソードのフォルダは上書き・削除しない。
@@ -64,6 +65,7 @@ node <SKILL>/scripts/new-episode.mjs --town <ep>/town.json --series <シリー�
    - `shots[].prompt`：何が・どこに・時間帯・天気・構図（`references/image-prompts.md`）。同じ構図・距離を続けない
    - `shots[].motion`：AI 動画にする場面の動き（ゆっくり・少しだけ）。動かさない場面からは `video` と `motion` を消してよい
    - `title`、`music.prompt`（BGM を入れるとき。入れないなら `audio.bgm` を消す）
+   - `publish`（投稿セットの中身）は 6 章で書く。ここでは TODO のままでよい
 3. ユーザーがいれば plan.md の要点（章立てと見積もり）を見せる。急いでいる様子なら返事を待たずに進める
 
 ## 4. 素材を作る
@@ -81,26 +83,48 @@ node <SKILL>/scripts/new-episode.mjs --town <ep>/town.json --series <シリー�
    - 直して下書きをもう一度（3 回以内に形にする）
 2. 本番：`node <SKILL>/scripts/render-town.mjs <ep>/episode.json --sheet 48` → 検査がすべて ✓（解像度・fps・映像と音の長さ・-14 LUFS・ピーク）。20 分の回は 1 時間以上かかるので裏で動かす
 
-## 6. サムネイル・タイトル・概要欄
+## 6. 投稿セットを作る（サムネイル・タイトル・概要欄・YouTube の入力）
 
-1. `node <SKILL>/scripts/make-thumb.mjs --image <いちばん強い画像> --title "<町名>" [--sub "…"] --grade cinema --out <ep>/out/thumb.jpg` → Read で縮小しても読めるか確かめる
-2. タイトル案 3 つと概要欄（章をチャプターに）を `references/publish.md` の型で書き、`out/<id>_概要欄.txt` に保存。「この町は実在しない」「AI で生成」を必ず入れる
-3. 投稿の手順（アップロード画面で選ぶ値・終了画面・カード・固定コメント・再生リスト）は `references/publish.md` の 2〜3 章。チャンネルの初期設定がまだなら 1 章も伝える
+動画だけで終わらせない。本番の書き出しが ✓ になったら、ここまでを毎回やる。
+1. **サムネイル**：`node <SKILL>/scripts/make-thumb.mjs --image <いちばん強い画像> --title "<町名>" [--sub "…"] --grade cinema --out <ep>/out/thumb.jpg`
+2. **episode.json の `publish`** を `references/publish.md` の型で書く（書き方は `references/episode-schema.md` の 7 章）
+   - `titles`：タイトル案 3 つ（町名を入れる。煽り・実在と誤解させる言い方なし）
+   - `summary`：概要欄の最初の 1〜2 行（この回の芯を、ネタばらしせずに）
+   - `pinnedComment`（無ければ回ごとに問いを選ぶ）、`credits`（外部の音や素材を使ったときだけ）
+   - チャプターの名前は `chapters[].title`（無ければ章のテーマ）。この町に合う言葉にする
+3. **まとめて作る**：`node <SKILL>/scripts/make-publish-kit.mjs <ep>/episode.json --series <シリーズ>`
+   - できるもの：`out/<id>_概要欄.txt`（そのまま貼れる。チャプターの時刻は書き出しと同じ計算）、`out/<id>_投稿セット.md`（渡すファイル・タイトル案・概要欄・YouTube Studio の入力の表・終了画面とカードの時刻・固定コメント・チェック）、`out/thumb_preview.jpg`
+   - TODO が残っていると止まる。動画・サムネイルが無いとき、動画が下書き（解像度が小さい）のときは ✗ を出して終わる（終了コード 2）。直してもう一度
+   - `out/thumb_preview.jpg`（320×180）を Read で見て、町名が読めるか確かめる
+4. 初めての回は `<シリーズ>/channel.json` ができる。ユーザーが再生リストを作ったら URL を `playlists` に、投稿の曜日と時間を `schedule` に入れ、チャンネルの初期設定が済んだら `setupDone: true`（投稿セットの「チャンネルの初期設定」の節が消える）
 
 ## 7. 検品（別のエージェント 2 人を並列で）
 
-`references/qa.md` の「品質」と「オリジナリティ・安全」を、general-purpose エージェントにそれぞれ渡して並列で頼む（動画・サムネイル・episode.json・plan.md・style-bible.md・towns.json のパスを渡す）。指摘は直して書き出し直す。
+`references/qa.md` の「品質」と「オリジナリティ・安全」を、general-purpose エージェントにそれぞれ渡して並列で頼む（動画・サムネイル・`out/<id>_投稿セット.md`・episode.json・plan.md・style-bible.md・towns.json のパスを渡す）。指摘は直して書き出し直し、投稿セットも作り直す。
 
-## 8. 納品と記録
+## 8. 納品：必ず「投稿セット」で渡す
 
-1. 渡すもの：`out/<id>.mp4`・`out/thumb.jpg`・`out/<id>_概要欄.txt`。クラウドの作業環境なら会話にファイルとして送る（コンテナは消える。動画はリポジトリにコミットしない）
-2. 台帳に記録（本編のときだけ）：`node <SKILL>/scripts/town-seed.mjs --register <ep>/town.json --registry <シリーズ>/towns.json --title "<タイトル>"`
-3. 報告は短く：完成ファイル、作った素材の数（画像・AI 動画・BGM）、人の目と耳で確かめてほしい所（AI 動画の崩れ・音の違和感）、投稿時の設定（`references/publish.md`）
+検品で直して書き出し直したら、**6 の 3 をもう一度実行**してから渡す（チャプターや終了画面の時刻が変わるため）。
+1. **ファイルを 1 回でまとめて渡す**：`out/<id>.mp4`・`out/thumb.jpg`・`out/<id>_概要欄.txt`・`out/<id>_投稿セット.md`（声があれば `out/<id>.srt` も）。クラウドの作業環境なら SendUserFile の 1 回の呼び出しで 4 つとも送る（コンテナは消える。動画はリポジトリにコミットしない）。PC ならフォルダの場所を伝える。動画が大きくて送れなかったときは、ほかの 3 つを必ず送り、動画の場所と大きさを伝える（分けたり画質を落としたりするのはユーザーに聞いてから）
+2. **会話にも中身を書く**（ファイルを開かなくても、その場で YouTube Studio に入れられるように）。順番はいつも同じ：
+   1. 完成ファイル（動画の長さ・大きさ、サムネイル）
+   2. タイトル案 3 つ（おすすめに ◎）
+   3. 概要欄（そのまま貼れるようにコードブロックで）
+   4. YouTube Studio の入力（`投稿セット.md` の 4 の表。改変または合成されたコンテンツ「はい」・子ども向け「いいえ」・終了画面とカードの時刻は必ず）
+   5. 公開後：固定コメントの文
+   6. 人の目と耳で確かめてほしい所（AI 動画の崩れ・音の違和感）と、作った素材の数（画像・AI 動画・BGM）
+   7. チャンネルの初期設定がまだなら、その節も
+3. 台帳に記録（本編のときだけ）：`node <SKILL>/scripts/town-seed.mjs --register <ep>/town.json --registry <シリーズ>/towns.json --title "<選ばれたタイトル（まだ決まっていなければ案 1）>"`
+
+## 投稿セットだけ作り直すとき
+
+「タイトルを変えたい」「再生リストの URL ができた」「概要欄を直して」など：episode.json の `publish` か `channel.json` を直して `make-publish-kit.mjs` をもう一度 → 8 と同じ形で、変わったファイルと中身を渡す。動画は書き出し直さない。
 
 ## ショート版を作るとき
 
 同じ町で縦 1080×1920・30〜45 秒。本編のフォルダとは別に作る（例 `ep003_short`）。town.json をコピーし、**本編と同じ番号を `--no` で渡す**：`new-episode.mjs --town <ep003_short>/town.json --format short --no 3 --series <シリーズ>`。台帳には記録しない（本編で記録済み）。
 - 画像は 9:16 で作り直すのが一番きれい。横長の画像を使い回すなら場面に `"fit": "contain-blur"`
+- ショートも投稿セットで渡す。`publish.mainVideoUrl` に本編の URL を入れて `make-publish-kit.mjs`（関連動画に本編、再生リストは「ショート」になる）
 
 ## いつも守ること
 
@@ -108,4 +132,5 @@ node <SKILL>/scripts/new-episode.mjs --town <ep>/town.json --series <シリー�
 - **実在に寄せない**：実在の地名・駅名・店名・ブランド・ロゴ、実在の人物の顔や声を出さない。画像に読める文字を入れない
 - **架空であることを隠さない**：最後のカードと概要欄で「実在しない町」「AI 生成」を明記し、本物らしい映像なので YouTube の「改変または合成されたコンテンツ」を「はい」にするよう伝える
 - **量産に見せない**：毎回、町・章の並び・色・最初と最後の画・サムネイルを変える。画像や動画を別の回に使い回さない（YouTube の収益化ルール）
+- **完成したら必ず投稿セットで**：動画だけ・サムネイルだけで終わらせない。動画・サムネイル・概要欄・YouTube Studio の入力（終了画面とカードの時刻、固定コメントまで）を 1 回でまとめて渡し、会話にも中身を書く（8 章）
 - **費用は先に了承**：画像・AI 動画・BGM の数を伝えてから作る。作業ファイルはエピソードのフォルダの中だけ。既存の回を上書き・削除しない
