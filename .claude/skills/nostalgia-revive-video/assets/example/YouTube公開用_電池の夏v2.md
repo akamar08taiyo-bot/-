@@ -13,7 +13,6 @@
 | 候補5 | 電池が切れるまで遊んだ夏｜1997年をAIで蘇らせた | ミニ四駆と電子ペットの夏を、商品名を出さずに伝える |
 
 - 「ミニ四駆」「たまごっち」は登録商標なので、タイトルには入れていない（概要欄とハッシュタグで伝え、商標の表記を入れている）。
-- 海外向けの英語タイトル（YouTube の「翻訳」に入れる）：`This Was Happiness | Summer 1997 in a Japanese Seaside Town, Revived with AI`
 
 ## 2. サムネイル（`out/サムネ案/`）
 
@@ -64,28 +63,15 @@
 ・夕方5時のチャイムは童謡「夕焼け小焼け」（作曲：草川信）の旋律です。著作権の保護期間が終了した曲で、歌詞は使用していません。
 ・作中のおもちゃは当時の流行をイメージした架空のデザインで、実在の商品・企業とは関係ありません。「ミニ四駆」は株式会社タミヤ、「たまごっち」は株式会社バンダイの登録商標です。
 
-▼このチャンネルについて
-一枚の古い写真から、あの頃の町と夏休みをAIで蘇らせています。チャンネル登録で、次の「あの頃」もお届けします。
+▼チャンネル「記憶の路地裏」について
+細い路地を一本入ると、あの頃の町がまだそこにある気がする。
+一枚の古い写真から、昭和・平成の町と夏休みをAIで蘇らせています。
+チャンネル登録で、次の「あの頃」もお届けします。
 
 #AIで蘇らせた #平成レトロ #1997年 #90年代 #夏休み #ノスタルジー #ミニ四駆 #たまごっち #環境音 #作業用
 ```
 - 最初の2行が、検索結果や「もっと見る」の前に出る。
 - チャプターは、この時刻から自動で作られる（0:00 から始まり、3つ以上・各10秒以上）。
-
-海外向けの英語の概要（YouTube の「翻訳」に入れる。チャプターは日本語版と同じ時刻で書き直す）：
-```
-Nothing special happened — and yet I will never forget that summer.
-
-Japan, summer 1997 (Heisei 9). A small seaside town.
-A 100-yen coin from grandma, the old candy shop, tuning toy race cars on the veranda,
-baseball in the park, evening showers, the 5 o'clock chime, a shy confession, festival fireworks —
-and saying goodbye to a best friend.
-Revived with AI from a single old photograph.
-
-From 6:58: ambient sounds and piano only — for work, study or sleep.
-
-This is fiction created with AI. The people, shops and events are not real.
-```
 
 ## 4. タグ（「タグ」欄にコピー）
 ```
@@ -108,8 +94,7 @@ AIで蘇らせた,平成レトロ,1997年,平成9年,90年代,夏休み,ノス�
 
 **チャンネル名：記憶の路地裏（きおくのろじうら）**
 - 細い路地を一本入ると、あの頃の町がまだそこにある気がする、という名前。実在の時代の町にも、架空の街を歩く動画にも合う。
-- @ハンドルの例：`@kioku_no_rojiura`（日本語の `@記憶の路地裏` も使える）
-- 英語名（翻訳用）：Back Alleys of Memory
+- @ハンドル：`@記憶の路地裏`（日本語のまま使える。英数字にするなら `@kioku_no_rojiura`）
 - バナーの一言：「路地を一本入ると、あの頃の町がある。」
 
 **プロフィール画像**（`out/アイコン/`、800×800、円に切り抜かれる）
