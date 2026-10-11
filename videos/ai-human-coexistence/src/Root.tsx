@@ -32,10 +32,11 @@ export const Main: React.FC<{filmLook?: boolean}> = ({filmLook = true}) => (
   </AbsoluteFill>
 );
 
-const Single: React.FC<{id: string}> = ({id}) => (
+// カット単体（確認用の静止画と、カットごとの書き出しに使う）。書き出しでは filmLook=false にして ffmpeg でかける
+const Single: React.FC<{id: string; filmLook?: boolean}> = ({id, filmLook = true}) => (
   <AbsoluteFill style={{background: '#000'}}>
     <VShot id={id} />
-    <FilmLook grain={0.1} vignette={0.32} lift={0.04} />
+    {filmLook ? <FilmLook grain={0.1} vignette={0.32} lift={0.04} /> : null}
   </AbsoluteFill>
 );
 
@@ -43,7 +44,7 @@ export const RemotionRoot: React.FC = () => (
   <>
     <Composition id="Main" component={Main} defaultProps={{filmLook: true}} durationInFrames={TOTAL_FRAMES} fps={FPS} width={W} height={H} />
     {SHOTS.map((s) => (
-      <Composition key={s.id} id={s.id} component={Single} defaultProps={{id: s.id}} durationInFrames={s.durFrames} fps={FPS} width={W} height={H} />
+      <Composition key={s.id} id={s.id} component={Single} defaultProps={{id: s.id, filmLook: true}} durationInFrames={s.durFrames} fps={FPS} width={W} height={H} />
     ))}
   </>
 );

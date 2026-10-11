@@ -1,96 +1,751 @@
 {
-  "fps": 30,
-  "width": 1920,
-  "height": 1080,
-  "crossfade": 1.2,
-  "clipLen": 15.9,
-  "shots": [
-    {"id": "P0", "chapter": "序", "name": "夜明け前の海と継島", "dur": 25, "clipAt": 3.0, "hold": "reverse", "push": [1.0, 1.06],
-     "audio": {"veo": 0.35, "beds": ["night_sea_calm", "pier_lapping"]},
-     "events": [{"t": 5.0, "type": "foghorn"}, {"t": 17.0, "type": "foghorn", "gain": -5}],
-     "captions": [
-       {"t0": 3.0, "t1": 8.0, "text": "2080年8月24日、土曜日。"},
-       {"t0": 8.4, "t1": 13.4, "text": "海辺の町、継町（つぎまち）。"},
-       {"t0": 13.8, "t1": 18.9, "text": "古いものを直しながら、人とAIが暮らす町。"}
+ "fps": 30,
+ "width": 1920,
+ "height": 1080,
+ "crossfade": 1.2,
+ "clipLen": 15.9,
+ "shots": [
+  {
+   "id": "P0",
+   "chapter": "序",
+   "name": "夜明け前の海と継島",
+   "dur": 25,
+   "clipAt": 3.0,
+   "hold": "reverse",
+   "push": [
+    1.0,
+    1.06
+   ],
+   "audio": {
+    "veo": 0.35,
+    "beds": [
+     "night_sea_calm",
+     "pier_lapping"
+    ]
+   },
+   "events": [
+    {
+     "t": 5.0,
+     "type": "foghorn"
+    },
+    {
+     "t": 17.0,
+     "type": "foghorn",
+     "gain": -5
+    }
+   ],
+   "captions": [
+    {
+     "t0": 3.0,
+     "t1": 8.0,
+     "text": "2080年8月24日、土曜日。"
+    },
+    {
+     "t0": 8.4,
+     "t1": 13.4,
+     "text": "海辺の町、継町（つぎまち）。"
+    },
+    {
+     "t0": 13.8,
+     "t1": 18.9,
+     "text": "古いものを直しながら、人とAIが暮らす町。"
+    }
+   ],
+   "title": {
+    "t0": 19.2,
+    "t1": 24.9,
+    "text": "AIと人間の共存",
+    "sub": "まだ来ない未来なのに、懐かしい。昭和を残した2080年の海辺の町"
+   }
+  },
+  {
+   "id": "A1",
+   "chapter": "一",
+   "name": "朝焼けの漁港",
+   "dur": 16,
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "harbor_morning"
+    ]
+   },
+   "holo": [
+    {
+     "x": 0.24,
+     "y": 0.15,
+     "w": 0.19,
+     "lines": [
+      "本日の水揚げ",
+      "あじ・さば・いわし"
      ],
-     "title": {"t0": 19.2, "t1": 24.9, "text": "AIと人間の共存", "sub": "まだ来ない未来なのに、懐かしい。昭和を残した2080年の海辺の町"}},
-    {"id": "A1", "chapter": "一", "name": "朝焼けの漁港", "dur": 16,
-     "audio": {"veo": 1.0, "beds": ["harbor_morning"]},
-     "holo": [{"x": 0.24, "y": 0.15, "w": 0.19, "lines": ["本日の水揚げ", "あじ・さば・いわし"], "t0": 7.0, "tilt": 8}],
-     "chapterCard": {"t0": 1.3, "t1": 6.8, "num": "一", "title": "夜明け", "time": "午前五時四十分", "right": 1500}},
-    {"id": "A2", "chapter": "一", "name": "継島の階段路地", "dur": 16,
-     "audio": {"veo": 1.0, "beds": ["morning_birds"]},
-     "captions": [{"t0": 4.5, "t1": 11.0, "text": "牛乳は、今も瓶で届く。"}]},
-    {"id": "B1", "chapter": "二", "name": "朝の渡し船", "dur": 16,
-     "audio": {"veo": 0.35, "beds": ["ferry_deck", "wind_sea"]},
-     "chapterCard": {"t0": 1.3, "t1": 6.8, "num": "二", "title": "朝", "time": "午前七時四十分"},
-     "captions": [{"t0": 7.6, "t1": 13.6, "text": "島から町へ、渡し船で通う。"}]},
-    {"id": "B2", "chapter": "二", "name": "湯けむりの坂道", "dur": 16,
-     "audio": {"veo": 1.0, "beds": ["onsen_steam"]},
-     "holo": [{"x": 0.47, "y": 0.335, "w": 0.13, "lines": ["↑ 汐見館 120m", "足湯 ここから2分"], "t0": 3.5, "tilt": 6, "small": true}]},
-    {"id": "B3", "chapter": "二", "name": "継町商店街", "dur": 16,
-     "audio": {"veo": 1.0, "beds": ["shop_street_day"]},
-     "holo": [{"x": 0.40, "y": 0.43, "w": 0.16, "lines": ["8月24日（土）", "晴れ のち 雨"], "t0": 2.5, "tilt": 8, "small": true}]},
-    {"id": "B4", "chapter": "二", "name": "電器店の修理", "dur": 16,
-     "audio": {"veo": 0.8, "beds": ["workshop"]},
-     "captions": [{"t0": 4.5, "t1": 11.0, "text": "古い扇風機は、捨てずに直す。"}]},
-    {"id": "C1", "chapter": "三", "name": "港の中華そば", "dur": 16,
-     "audio": {"veo": 0.75, "beds": ["onsen_steam", "distant_sea"]},
-     "chapterCard": {"t0": 1.3, "t1": 6.8, "num": "三", "title": "昼さがり", "time": "午後零時十分"},
-     "captions": [{"t0": 7.6, "t1": 13.6, "text": "味は、親方から教わったもの。"}]},
-    {"id": "C2", "chapter": "三", "name": "入道雲と桟橋", "dur": 16,
-     "audio": {"veo": 1.0, "beds": ["cicadas_strong"]}},
-    {"id": "C3", "chapter": "三", "name": "継島の屋上", "dur": 16,
-     "audio": {"veo": 0.0, "beds": ["rooftop_wind", "cicadas_far", "distant_sea"]},
-     "events": [{"t": 3.0, "t_end": 10.0, "type": "watering"}],
-     "captions": [{"t0": 5.0, "t1": 11.0, "text": "島の屋上は、子どもたちの庭。"}]},
-    {"id": "C4", "chapter": "三", "name": "屋上菜園", "dur": 16,
-     "audio": {"veo": 1.0, "beds": ["cicadas_far"]}},
-    {"id": "C5", "chapter": "三", "name": "空のりば", "dur": 16,
-     "audio": {"veo": 1.0, "veo_lp": 7000, "beds": ["cicadas_far"]},
-     "holo": [{"x": 0.64, "y": 0.105, "w": 0.17, "lines": ["空のりば  16:20", "継島行き  まもなく"], "t0": 1.0, "tilt": -4}],
-     "captions": [{"t0": 10.4, "t1": 15.4, "text": "扉は、何もしなくても開く。"}]},
-    {"id": "C6", "chapter": "三", "name": "畳の居間", "dur": 16,
-     "audio": {"veo": 1.0, "beds": ["cicadas_outside", "clock_tick"]},
-     "captions": [{"t0": 4.5, "t1": 11.0, "text": "誰かが、さっきまでここにいた。"}]},
-    {"id": "D1", "chapter": "四", "name": "夕焼けの防波堤", "dur": 16,
-     "audio": {"veo": 1.0, "beds": ["higurashi"]},
-     "events": [{"t": 2.0, "t_end": 15.0, "type": "town_chime"}],
-     "chapterCard": {"t0": 1.3, "t1": 6.8, "num": "四", "title": "夕暮れ", "time": "午後五時"},
-     "captions": [{"t0": 7.6, "t1": 14.0, "text": "五時のチャイムが、海の向こうまで響く。"}]},
-    {"id": "D2", "chapter": "四", "name": "修理品の返却", "dur": 16,
-     "audio": {"veo": 1.0, "beds": ["insects_start"]},
-     "captions": [{"t0": 4.5, "t1": 11.0, "text": "直った扇風機が、家に帰ってくる。"}]},
-    {"id": "D3", "chapter": "四", "name": "雨上がりの銭湯脇", "dur": 16,
-     "audio": {"veo": 1.0, "beds": ["rain_after"]}},
-    {"id": "D4", "chapter": "四", "name": "灯りがともる湾", "dur": 16,
-     "audio": {"veo": 0.0, "beds": ["dusk_bay", "crickets", "town_murmur_far"]},
-     "events": [{"t": 7.0, "type": "ferry_horn"}],
-     "captions": [{"t0": 4.5, "t1": 11.0, "text": "ひとつ、またひとつ、窓に灯りがともる。"}]},
-    {"id": "E1", "chapter": "五", "name": "夏祭りの夜店", "dur": 16,
-     "audio": {"veo": 0.0, "beds": ["festival_stalls", "festival_music_far", "crickets"]},
-     "holo": [{"x": 0.3, "y": 0.22, "w": 0.18, "lines": ["継町港祭り", "海上花火  20:40〜"], "t0": 7.4, "tilt": 6}],
-     "chapterCard": {"t0": 1.3, "t1": 6.8, "num": "五", "title": "夏祭り", "time": "午後七時四十分"}},
-    {"id": "E2", "chapter": "五", "name": "盆踊り", "dur": 16,
-     "audio": {"veo": 1.0, "beds": ["festival_crowd_soft"]},
-     "captions": [{"t0": 4.5, "t1": 11.0, "text": "年に一度、町じゅうがひとつの輪になる。"}]},
-    {"id": "E3", "chapter": "五", "name": "海上花火", "dur": 16,
-     "audio": {"veo": 1.0, "beds": ["night_sea"]}},
-    {"id": "E4", "chapter": "五", "name": "屋上の二人", "dur": 16,
-     "audio": {"veo": 1.0, "beds": ["insects"]},
-     "events": [{"t": 11.5, "type": "robot_pi"}],
-     "captions": [
-       {"t0": 4.0, "t1": 10.4, "text": "来年も、いっしょに見ようね。"},
-       {"t0": 11.5, "t1": 14.6, "text": "ピ。"}
-     ]},
-    {"id": "F0", "chapter": "結", "name": "深夜の継島と月の道", "dur": 32, "hold": "reverse", "push": [1.0, 1.05],
-     "audio": {"veo": 1.0, "beds": ["night_sea_calm", "insects_fade"]},
-     "events": [{"t": 6.0, "type": "foghorn", "gain": -9}, {"t": 19.6, "type": "outro_voice"}],
-     "captions": [
-       {"t0": 2.0, "t1": 7.0, "text": "この町は、どこにも存在しない。"},
-       {"t0": 7.4, "t1": 12.4, "text": "けれど、新しいものと古いもの、人とAIが"},
-       {"t0": 12.4, "t1": 17.4, "text": "同じ明日を待つ町は、きっと懐かしい。"}
+     "t0": 7.0,
+     "tilt": 8
+    }
+   ],
+   "chapterCard": {
+    "t0": 1.3,
+    "t1": 6.8,
+    "num": "一",
+    "title": "夜明け",
+    "time": "午前五時四十分",
+    "right": 1500
+   }
+  },
+  {
+   "id": "A2",
+   "chapter": "一",
+   "name": "継島の階段路地",
+   "dur": 16,
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "morning_birds"
+    ]
+   },
+   "captions": [
+    {
+     "t0": 4.5,
+     "t1": 11.0,
+     "text": "牛乳は、今も瓶で届く。"
+    }
+   ]
+  },
+  {
+   "id": "B1",
+   "chapter": "二",
+   "name": "朝の渡し船",
+   "dur": 16,
+   "audio": {
+    "veo": 0.35,
+    "beds": [
+     "ferry_deck",
+     "wind_sea"
+    ]
+   },
+   "chapterCard": {
+    "t0": 1.3,
+    "t1": 6.8,
+    "num": "二",
+    "title": "朝",
+    "time": "午前七時四十分"
+   },
+   "captions": [
+    {
+     "t0": 7.6,
+     "t1": 13.6,
+     "text": "島から町へ、渡し船で通う。"
+    }
+   ]
+  },
+  {
+   "id": "G2",
+   "chapter": "二",
+   "name": "ロボットが運転するトラック",
+   "dur": 16,
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "distant_sea",
+     "morning_birds"
+    ]
+   },
+   "captions": [
+    {
+     "t0": 4.5,
+     "t1": 11.0,
+     "text": "町のトラックは、ロボットが運転する。"
+    }
+   ]
+  },
+  {
+   "id": "B2",
+   "chapter": "二",
+   "name": "湯けむりの坂道",
+   "dur": 16,
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "onsen_steam"
+    ]
+   },
+   "holo": [
+    {
+     "x": 0.47,
+     "y": 0.335,
+     "w": 0.13,
+     "lines": [
+      "↑ 汐見館 120m",
+      "足湯 ここから2分"
      ],
-     "endCard": {"t0": 18.0, "t1": 31.4, "text": "AIと人間の共存", "sub": "第一章　了", "note": "この映像の街・人物・出来事はすべて架空です"}}
-  ]
+     "t0": 3.5,
+     "tilt": 6,
+     "small": true
+    }
+   ]
+  },
+  {
+   "id": "B3",
+   "chapter": "二",
+   "name": "継町商店街",
+   "dur": 16,
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "shop_street_day"
+    ]
+   },
+   "holo": [
+    {
+     "x": 0.4,
+     "y": 0.43,
+     "w": 0.16,
+     "lines": [
+      "8月24日（土）",
+      "晴れ のち 雨"
+     ],
+     "t0": 2.5,
+     "tilt": 8,
+     "small": true
+    }
+   ]
+  },
+  {
+   "id": "G1",
+   "chapter": "二",
+   "name": "町内の電子掲示板（回覧板）",
+   "dur": 16,
+   "audio": {
+    "veo": 0.0,
+    "beds": [
+     "morning_birds",
+     "broom_sweep",
+     "town_murmur_far"
+    ]
+   },
+   "holo": [
+    {
+     "x": 0.395,
+     "y": 0.47,
+     "w": 0.105,
+     "lines": [
+      "回覧板",
+      "海岸のごみ拾い",
+      "8月25日（日）朝6時"
+     ],
+     "t0": 0.8,
+     "stamp": {
+      "t": 4.4,
+      "text": "済"
+     }
+    },
+    {
+     "x": 0.505,
+     "y": 0.4,
+     "w": 0.1,
+     "lines": [
+      "▶ 既読にする"
+     ],
+     "t0": 2.9,
+     "t1": 4.9,
+     "small": true
+    }
+   ],
+   "events": [
+    {
+     "t": 4.4,
+     "type": "stamp"
+    }
+   ],
+   "captions": [
+    {
+     "t0": 7.0,
+     "t1": 13.4,
+     "text": "回覧板は電子になっても、はんこは押す。"
+    }
+   ]
+  },
+  {
+   "id": "B4",
+   "chapter": "二",
+   "name": "電器店の修理",
+   "dur": 16,
+   "audio": {
+    "veo": 0.8,
+    "beds": [
+     "workshop"
+    ]
+   },
+   "captions": [
+    {
+     "t0": 4.5,
+     "t1": 11.0,
+     "text": "古い扇風機は、捨てずに直す。"
+    }
+   ]
+  },
+  {
+   "id": "G3",
+   "chapter": "二",
+   "name": "透明な電子黒板とロボットの先生",
+   "dur": 16,
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "cicadas_far"
+    ]
+   },
+   "holo": [
+    {
+     "x": 0.6,
+     "y": 0.335,
+     "w": 0.1,
+     "lines": [
+      "8月24日（土）"
+     ],
+     "t0": 0.4,
+     "variant": "chalk"
+    },
+    {
+     "x": 0.395,
+     "y": 0.42,
+     "w": 0.16,
+     "lines": [
+      "自由研究",
+      "町の古い道具を",
+      "しらべよう"
+     ],
+     "t0": 1.6,
+     "variant": "chalk"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.7,
+     "type": "chalk",
+     "n": 7
+    },
+    {
+     "t": 1.9,
+     "type": "chalk",
+     "n": 4
+    },
+    {
+     "t": 2.84,
+     "type": "chalk",
+     "n": 7
+    },
+    {
+     "t": 4.11,
+     "type": "chalk",
+     "n": 5
+    }
+   ],
+   "captions": [
+    {
+     "t0": 6.4,
+     "t1": 13.4,
+     "text": "黒板は透明になった。先生は、ロボットになった。"
+    }
+   ]
+  },
+  {
+   "id": "C1",
+   "chapter": "三",
+   "name": "港の中華そば",
+   "dur": 16,
+   "audio": {
+    "veo": 0.75,
+    "beds": [
+     "onsen_steam",
+     "distant_sea"
+    ]
+   },
+   "chapterCard": {
+    "t0": 1.3,
+    "t1": 6.8,
+    "num": "三",
+    "title": "昼さがり",
+    "time": "午後零時十分"
+   },
+   "captions": [
+    {
+     "t0": 7.6,
+     "t1": 13.6,
+     "text": "味は、親方から教わったもの。"
+    }
+   ]
+  },
+  {
+   "id": "C2",
+   "chapter": "三",
+   "name": "入道雲と桟橋",
+   "dur": 16,
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "cicadas_strong"
+    ]
+   }
+  },
+  {
+   "id": "C3",
+   "chapter": "三",
+   "name": "継島の屋上",
+   "dur": 16,
+   "audio": {
+    "veo": 0.0,
+    "beds": [
+     "rooftop_wind",
+     "cicadas_far",
+     "distant_sea"
+    ]
+   },
+   "events": [
+    {
+     "t": 3.0,
+     "t_end": 10.0,
+     "type": "watering"
+    }
+   ],
+   "captions": [
+    {
+     "t0": 5.0,
+     "t1": 11.0,
+     "text": "島の屋上は、子どもたちの庭。"
+    }
+   ]
+  },
+  {
+   "id": "C4",
+   "chapter": "三",
+   "name": "屋上菜園",
+   "dur": 16,
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "cicadas_far"
+    ]
+   }
+  },
+  {
+   "id": "C5",
+   "chapter": "三",
+   "name": "空のりば",
+   "dur": 16,
+   "audio": {
+    "veo": 1.0,
+    "veo_lp": 7000,
+    "beds": [
+     "cicadas_far"
+    ]
+   },
+   "holo": [
+    {
+     "x": 0.64,
+     "y": 0.105,
+     "w": 0.17,
+     "lines": [
+      "空のりば  16:20",
+      "継島行き  まもなく"
+     ],
+     "t0": 1.0,
+     "tilt": -4
+    }
+   ],
+   "captions": [
+    {
+     "t0": 10.4,
+     "t1": 15.4,
+     "text": "扉は、何もしなくても開く。"
+    }
+   ]
+  },
+  {
+   "id": "C6",
+   "chapter": "三",
+   "name": "畳の居間",
+   "dur": 16,
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "cicadas_outside",
+     "clock_tick"
+    ]
+   },
+   "captions": [
+    {
+     "t0": 4.5,
+     "t1": 11.0,
+     "text": "誰かが、さっきまでここにいた。"
+    }
+   ]
+  },
+  {
+   "id": "D1",
+   "chapter": "四",
+   "name": "夕焼けの防波堤",
+   "dur": 16,
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "higurashi"
+    ]
+   },
+   "events": [
+    {
+     "t": 2.0,
+     "t_end": 15.0,
+     "type": "town_chime"
+    }
+   ],
+   "chapterCard": {
+    "t0": 1.3,
+    "t1": 6.8,
+    "num": "四",
+    "title": "夕暮れ",
+    "time": "午後五時"
+   },
+   "captions": [
+    {
+     "t0": 7.6,
+     "t1": 14.0,
+     "text": "五時のチャイムが、海の向こうまで響く。"
+    }
+   ]
+  },
+  {
+   "id": "D2",
+   "chapter": "四",
+   "name": "修理品の返却",
+   "dur": 16,
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "insects_start"
+    ]
+   },
+   "captions": [
+    {
+     "t0": 4.5,
+     "t1": 11.0,
+     "text": "直った扇風機が、家に帰ってくる。"
+    }
+   ]
+  },
+  {
+   "id": "D3",
+   "chapter": "四",
+   "name": "雨上がりの銭湯脇",
+   "dur": 16,
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "rain_after"
+    ]
+   }
+  },
+  {
+   "id": "D4",
+   "chapter": "四",
+   "name": "灯りがともる湾",
+   "dur": 16,
+   "audio": {
+    "veo": 0.0,
+    "beds": [
+     "dusk_bay",
+     "crickets",
+     "town_murmur_far"
+    ]
+   },
+   "events": [
+    {
+     "t": 7.0,
+     "type": "ferry_horn"
+    }
+   ],
+   "captions": [
+    {
+     "t0": 4.5,
+     "t1": 11.0,
+     "text": "ひとつ、またひとつ、窓に灯りがともる。"
+    }
+   ]
+  },
+  {
+   "id": "E1",
+   "chapter": "五",
+   "name": "夏祭りの夜店",
+   "dur": 16,
+   "audio": {
+    "veo": 0.0,
+    "beds": [
+     "festival_stalls",
+     "festival_music_far",
+     "crickets"
+    ]
+   },
+   "holo": [
+    {
+     "x": 0.3,
+     "y": 0.22,
+     "w": 0.18,
+     "lines": [
+      "継町港祭り",
+      "海上花火  20:40〜"
+     ],
+     "t0": 7.4,
+     "tilt": 6
+    }
+   ],
+   "chapterCard": {
+    "t0": 1.3,
+    "t1": 6.8,
+    "num": "五",
+    "title": "夏祭り",
+    "time": "午後七時四十分"
+   }
+  },
+  {
+   "id": "E2",
+   "chapter": "五",
+   "name": "盆踊り",
+   "dur": 16,
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "festival_crowd_soft"
+    ]
+   },
+   "captions": [
+    {
+     "t0": 4.5,
+     "t1": 11.0,
+     "text": "年に一度、町じゅうがひとつの輪になる。"
+    }
+   ]
+  },
+  {
+   "id": "E3",
+   "chapter": "五",
+   "name": "海上花火",
+   "dur": 16,
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "night_sea"
+    ]
+   }
+  },
+  {
+   "id": "E4",
+   "chapter": "五",
+   "name": "屋上の二人",
+   "dur": 16,
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "insects"
+    ]
+   },
+   "events": [
+    {
+     "t": 11.5,
+     "type": "robot_pi"
+    }
+   ],
+   "captions": [
+    {
+     "t0": 4.0,
+     "t1": 10.4,
+     "text": "来年も、いっしょに見ようね。"
+    },
+    {
+     "t0": 11.5,
+     "t1": 14.6,
+     "text": "ピ。"
+    }
+   ]
+  },
+  {
+   "id": "F0",
+   "chapter": "結",
+   "name": "深夜の継島と月の道",
+   "dur": 32,
+   "hold": "reverse",
+   "push": [
+    1.0,
+    1.05
+   ],
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "night_sea_calm",
+     "insects_fade"
+    ]
+   },
+   "events": [
+    {
+     "t": 6.0,
+     "type": "foghorn",
+     "gain": -9
+    },
+    {
+     "t": 19.6,
+     "type": "outro_voice"
+    }
+   ],
+   "captions": [
+    {
+     "t0": 2.0,
+     "t1": 7.0,
+     "text": "この町は、どこにも存在しない。"
+    },
+    {
+     "t0": 7.4,
+     "t1": 12.4,
+     "text": "けれど、新しいものと古いもの、人とAIが"
+    },
+    {
+     "t0": 12.4,
+     "t1": 17.4,
+     "text": "同じ明日を待つ町は、きっと懐かしい。"
+    }
+   ],
+   "endCard": {
+    "t0": 18.0,
+    "t1": 31.4,
+    "text": "AIと人間の共存",
+    "sub": "第一章　了",
+    "note": "この映像の街・人物・出来事はすべて架空です"
+   }
+  },
+  {
+   "id": "T0",
+   "chapter": "予告",
+   "name": "第二章 予告（砂丘の男）",
+   "dur": 16,
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "wind_sea"
+    ]
+   },
+   "captions": [
+    {
+     "t0": 1.2,
+     "t1": 5.8,
+     "text": "同じころ、町はずれの砂丘で。"
+    }
+   ],
+   "title": {
+    "t0": 6.4,
+    "t1": 15.2,
+    "text": "砂の向こうから来た男",
+    "sub": "次回　第二章",
+    "top": 0.24,
+    "size": 92,
+    "subFirst": true
+   }
+  }
+ ]
 }

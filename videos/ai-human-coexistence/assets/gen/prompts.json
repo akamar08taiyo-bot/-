@@ -90,6 +90,30 @@
    "time": "23:30",
    "title": "深夜の継島と月の道",
    "prompt": "Late night at the bay: calm sea with a long silver moonlight path leading toward Tsugishima island; most windows dark, a few warm lights; the lighthouse beam; the curved-glass towers dimmed; one flying car's tiny lights far away. Foreground: the old wooden pier with a moored wooden boat and a lantern turned low. Quiet, peaceful end of the day. No readable text."
+  },
+  {
+   "id": "N16",
+   "time": "07:50",
+   "title": "町内の電子掲示板（デジタル回覧板）",
+   "prompt": "Morning at a quiet corner of the Tsugimachi shopping lane beside an old public bathhouse with a tiled entrance. The neighborhood notice board is the traditional Showa-era kind — a dark wooden frame on two posts with a small tiled roof — but its whole face is now a single large, completely transparent glass display panel. The glass is blank: no text, no images, no icons on it, only faint reflections and a thin warm-white light along its edges, so the lane, the shopfronts and the green hillside behind are clearly seen through it. An elderly man in a short-sleeved shirt and straw hat, seen from the side at a short distance, raises one open hand toward the glass as if giving it a gesture command. A helper robot sweeps the stone lane nearby with a traditional bamboo broom. Potted morning glories, a round red postbox, a parked old bicycle, cream plaster walls, a noren curtain without lettering. Above on the hillside, curved-glass buildings with planted terraces and one flying passenger car. Low morning sun from the left, long soft shadows, fresh air. No readable text anywhere in the image."
+  },
+  {
+   "id": "N17",
+   "time": "07:55",
+   "title": "ロボットが運転する昭和のトラック",
+   "prompt": "A coastal road along the bay below Tsugimachi on a clear morning. A small rounded 1960s-style cab-over light truck, two-tone cream and faded celadon green, lovingly repaired (one replaced door panel in a slightly different cream, round chrome headlights, a wooden-slat cargo bed) drives slowly along the road toward the camera at a three-quarter angle. Clearly visible behind the windshield, a helper robot sits at the steering wheel driving, its amber light strip glowing; no human is in the cab. The cargo bed carries wooden crates of vegetables and a crate of glass milk bottles tied with rope. On one side a low stone seawall and wind-bent pine trees, on the other the hillside town; beyond the seawall the calm sparkling sea and Tsugishima island on the horizon with its high seawall, white lighthouse and two slender curved-glass towers. One flying passenger car crosses the sky. No text, numbers or logos anywhere on the truck; no readable text anywhere in the image."
+  },
+  {
+   "id": "N18",
+   "time": "10:00",
+   "title": "木造校舎の教室（透明な電子黒板とロボットの先生）",
+   "prompt": "Inside a classroom of an old wooden schoolhouse on the hill of Tsugimachi, during a summer-holiday morning class. Camera at the back of the room at child eye height, looking toward the front. Rows of small honey-brown wooden desks and chairs with worn edges; five children seen only from behind, two of them raising a hand. The whole front of the classroom is a row of tall old wooden-framed windows facing the sea. Where the blackboard would be, a large completely transparent glass electronic board stands in the original dark wooden blackboard frame, with the old wooden chalk tray still attached below it holding a few short sticks of white chalk and a felt eraser. The glass is blank — no writing, no images — only faint reflections and a thin warm-white edge light, so the bright sea, the sky and Tsugishima island with its lighthouse are seen straight through the board. A helper robot teacher stands beside the board holding a slender wooden pointer, pointing at the glass. Teacher's wooden desk with a small vase of summer flowers, an old round wall clock, cotton curtains moving in the breeze, a ceiling fan. Bright summer morning light, clean and calm. No readable text anywhere in the image."
+  },
+  {
+   "id": "N19",
+   "time": "18:40",
+   "title": "砂丘の道（第二章 予告）",
+   "prompt": "Dusk on the vast coastal sand dunes beyond Tsugimachi: rippled dunes glowing amber and rose under a deep orange-to-violet sky, long blue shadows, fine sand lifted by the wind. A narrow old road crosses the dunes; the same small two-tone cream and celadon cab-over truck, driven by a helper robot whose amber light strip glows behind the windshield, has stopped on the road with its round headlights on. Far away on a dune ridge, a lone man in a dark suit carrying a briefcase walks toward the truck, very small in the frame, seen as a silhouette from the side and behind, face not visible. On the horizon a strip of sea and the faint white lighthouse of Tsugishima; one flying passenger car with small navigation lights crosses the evening sky. Mysterious, cinematic, quiet, wide. No readable text anywhere in the image."
   }
  ]
 }

@@ -407,3 +407,48 @@ def drums_far(dur, src_wav, seed=35, level=1.0):
     out = lowpass(out, 4800, 2)
     out = convolve_st(out, reverb_ir(2.0, 0.7, seed, lp=4500, pre=0.04), 0.35)
     return out * level * 0.35
+
+
+def stamp(seed=41):
+    # 回覧板の既読のはんこ：紙に押す「ポン」（低い胴鳴り＋紙と木の当たり）→ 小さな確認音
+    r = rng(seed); d = 1.2; out = np.zeros((int(d * SR), 2))
+    t = t_axis(0.25)
+    thump = np.sin(2 * np.pi * (95 + 40 * np.exp(-t / 0.02)) * t) * np.exp(-t / 0.05)
+    knock = bandpass(r.standard_normal(len(t)), 700, 3200, 2) * np.exp(-t / 0.012) * 0.6
+    body = fade(thump + knock, 0.001, 0.05)
+    out[:len(body)] += pan(body, 0.0)
+    for k, (f, at) in enumerate(((1318.5, 0.16), (1760.0, 0.24))):
+        tt = t_axis(0.6)
+        s = np.sin(2 * np.pi * f * tt) * np.clip(tt / 0.01, 0, 1) * np.exp(-tt / 0.18) * 0.25
+        i = int(at * SR); out[i:i + len(s)] += pan(s, 0.15 * (k * 2 - 1))
+    return convolve_st(lowpass(out, 6000, 2), reverb_ir(0.8, 0.3, seed, lp=5000), 0.25) * 0.5
+
+
+def chalk(n, stagger=0.11, seed=42):
+    # 透明な電子黒板が鳴らすチョークの音：1文字ごとに「カツ」、ときどき短い「スー」
+    r = rng(seed); d = n * stagger + 1.0; out = np.zeros((int(d * SR), 2))
+    for k in range(n):
+        at = k * stagger + r.uniform(-0.015, 0.015)
+        for j in range(r.integers(1, 3)):  # 1文字に1〜2画
+            L = int(r.uniform(0.012, 0.022) * SR)
+            click = bandpass(r.standard_normal(L), 1800, 6500, 2) * np.exp(-np.arange(L) / (0.004 * SR))
+            click += 0.5 * np.sin(2 * np.pi * r.uniform(1100, 1500) * np.arange(L) / SR) * np.exp(-np.arange(L) / (0.006 * SR))
+            i = int((at + j * 0.045) * SR); out[i:i + L] += pan(fade(click * r.uniform(0.6, 1.0), 0.001, 0.004), r.uniform(-0.1, 0.1))
+        if r.random() < 0.35:  # 横に引く音
+            L = int(r.uniform(0.05, 0.09) * SR)
+            scr = bandpass(r.standard_normal(L), 2500, 7000, 2) * np.hanning(L) * 0.25
+            i = int((at + 0.03) * SR); out[i:i + L] += pan(scr, 0.0)
+    return convolve_st(out, reverb_ir(0.9, 0.35, seed, lp=7000), 0.3) * 0.5
+
+
+def broom(dur, seed=43, every=(2.0, 2.8)):
+    # 竹ぼうきで石畳を掃く音：「サッ」という擦れ（高めの帯域の雑音に細かい穂先のざらつき）をゆっくり繰り返す
+    r = rng(seed); n = int(dur * SR); out = np.zeros((n, 2)); at = r.uniform(0.3, 1.2)
+    while at < dur - 0.6:
+        L = int(r.uniform(0.32, 0.5) * SR); tt = np.arange(L) / SR
+        env = np.clip(tt / 0.05, 0, 1) * np.clip((tt[-1] - tt) / 0.16, 0, 1)
+        grain = 0.6 + 0.4 * np.abs(r.standard_normal(L)) ** 0.5
+        s = bandpass(r.standard_normal(L), r.uniform(1400, 2200), 7500, 2) * env * grain * r.uniform(0.7, 1.0)
+        i = int(at * SR); j = min(n, i + L); out[i:j] += pan(s[:j - i], r.uniform(-0.15, 0.15))
+        at += r.uniform(*every)
+    return convolve_st(out, reverb_ir(0.7, 0.3, seed, lp=6000), 0.25)

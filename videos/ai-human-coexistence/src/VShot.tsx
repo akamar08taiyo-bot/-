@@ -50,7 +50,7 @@ export const VShot: React.FC<{id: string}> = ({id}) => {
           return (
             <div key={i} style={{position: 'absolute', left: 0, top: 0, width: 1920, height: 1080, transform: `translate(${x1 - x0}px, ${y1 - y0}px)`}}>
               <div style={{position: 'absolute', inset: 0, transform: `scale(${s})`, transformOrigin: `${x0}px ${y0}px`}}>
-                <HoloBoard t={t} t0={h.t0} t1={h.t1 ?? def.dur - 0.6} x={h.x} y={h.y} w={h.w} lines={h.lines} tilt={h.tilt} small={h.small} />
+                <HoloBoard t={t} t0={h.t0} t1={h.t1 ?? def.dur - 0.6} x={h.x} y={h.y} w={h.w} lines={h.lines} tilt={h.tilt} small={h.small} variant={h.variant} stamp={h.stamp} />
               </div>
             </div>
           );
@@ -60,7 +60,7 @@ export const VShot: React.FC<{id: string}> = ({id}) => {
       {(def.captions ?? []).map((c, i) => (
         <Caption key={i} t={t} t0={c.t0} t1={c.t1} text={c.text} />
       ))}
-      {def.title ? <TitleCard t={t} t0={def.title.t0} t1={def.title.t1} text={def.title.text} sub={def.title.sub} /> : null}
+      {def.title ? <TitleCard t={t} t0={def.title.t0} t1={def.title.t1} text={def.title.text} sub={def.title.sub} top={def.title.top} size={def.title.size} subFirst={def.title.subFirst} /> : null}
       {def.endCard ? (
         <>
           <AbsoluteFill style={{background: '#05040a', opacity: 0.55 * clamp((t - def.endCard.t0) / 2.5)}} />

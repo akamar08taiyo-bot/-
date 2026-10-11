@@ -275,6 +275,54 @@
    "bytes": 14413390,
    "seconds": 96.4,
    "created_utc": "2026-10-11T07:11:02.185446+00:00"
+  },
+  {
+   "id": "T0_v1",
+   "model": "veo-3.1-lite-generate-preview",
+   "resolution": "1080p",
+   "input_image": "N19_v1.jpg",
+   "prompt": "Locked-off static camera. Dusk on the vast sand dunes. The man in the dark suit walks slowly along the dune ridge toward the stopped truck, carrying his briefcase; fine sand streams off the dune crests in the wind; the truck's round headlights glow and its amber cab light pulses softly; the flying car's small navigation lights glide slowly across the violet sky; the last sunlight fades very slowly. Audio: wind over the dunes, distant waves, the truck engine idling softly. Keep every sign, text, building, vehicle design and person exactly as in the image; no new objects, no morphing, no camera shake, no cuts. Photorealistic, natural gentle motion, calm and quiet mood. No music, no speech, no singing.",
+   "negative": "camera movement, zoom, cuts, text, subtitles, watermark, morphing, distortion, extra people, flicker",
+   "sha256": "902db7200e032f32147506a3fe8c57034672d138aa30f023797d99da99cab173",
+   "bytes": 6540774,
+   "seconds": 83.3,
+   "created_utc": "2026-10-11T08:26:30.789406+00:00"
+  },
+  {
+   "id": "G2_v1",
+   "model": "veo-3.1-lite-generate-preview",
+   "resolution": "1080p",
+   "input_image": "N17_v1.jpg",
+   "prompt": "Very slow, smooth camera move. The small cream-and-celadon truck drives slowly forward along the coastal road toward the camera, coming a little closer and staying in frame; the helper robot at the steering wheel keeps both hands on the wheel and its amber light strip glows. The milk bottles and vegetable crates in the cargo bed jiggle slightly. The sea sparkles in the morning sun, pine branches sway in the breeze, the flying car glides slowly across the sky. Keep every sign, text, building, vehicle design and person exactly as in the image; no new objects, no morphing, no camera shake, no cuts. Photorealistic, natural gentle motion, calm and quiet mood. Audio: natural ambient sound of the place only, no music, no speech, no singing.",
+   "negative": "camera movement, zoom, cuts, text, subtitles, watermark, morphing, distortion, extra people, flicker",
+   "sha256": "d9539a6b1ae25a5ab45cbd2c1e12635551ccf6cbf255abdc331ca3a4d361f175",
+   "bytes": 19636929,
+   "seconds": 83.6,
+   "created_utc": "2026-10-11T08:26:30.994187+00:00"
+  },
+  {
+   "id": "G3_v1",
+   "model": "veo-3.1-lite-generate-preview",
+   "resolution": "1080p",
+   "input_image": "N18_v1.jpg",
+   "prompt": "Locked-off static camera. A calm summer classroom. The helper robot teacher slowly moves the wooden pointer across the transparent glass board as if explaining; two children raise their hands a little higher and one lowers it; the white cotton curtains billow softly in the sea breeze; the ceiling fan turns slowly; sunlight sparkles on the sea outside; the pendulum of the wall clock swings. Keep every sign, text, building, vehicle design and person exactly as in the image; no new objects, no morphing, no camera shake, no cuts. Photorealistic, natural gentle motion, calm and quiet mood. Audio: natural ambient sound of the place only, no music, no speech, no singing.",
+   "negative": "camera movement, zoom, cuts, text, subtitles, watermark, morphing, distortion, extra people, flicker",
+   "sha256": "25709d314202988147fa3b2235b89d29fd892efe25f4c059201f5d4286543ad2",
+   "bytes": 7301412,
+   "seconds": 84.0,
+   "created_utc": "2026-10-11T08:26:31.407225+00:00"
+  },
+  {
+   "id": "G1_v1",
+   "model": "veo-3.1-lite-generate-preview",
+   "resolution": "1080p",
+   "input_image": "N16_v1.jpg",
+   "prompt": "Locked-off static camera. A quiet morning lane. The elderly man in the straw hat slowly raises his open hand toward the transparent glass notice board, holds it there for a moment, then lowers it and nods gently. The thin edge light around the glass panel softly brightens. The helper robot sweeps the stone lane with the bamboo broom in a slow, steady rhythm. Morning glory flowers and leaves sway gently in the breeze; the flying car with ring fans glides slowly across the sky above the hillside. Keep every sign, text, building, vehicle design and person exactly as in the image; no new objects, no morphing, no camera shake, no cuts. Photorealistic, natural gentle motion, calm and quiet mood. Audio: natural ambient sound of the place only, no music, no speech, no singing.",
+   "negative": "camera movement, zoom, cuts, text, subtitles, watermark, morphing, distortion, extra people, flicker",
+   "sha256": "1a6de1bfa9c0fa26051a82223eb187a87b268c8e53e88d6758d0032c2efb46b4",
+   "bytes": 14840860,
+   "seconds": 84.3,
+   "created_utc": "2026-10-11T08:26:31.715714+00:00"
   }
  ]
 }

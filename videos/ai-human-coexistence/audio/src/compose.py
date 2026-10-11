@@ -79,8 +79,14 @@ arpeggio(piano, CHORDS_A, t1, beat, 46, seed=3)
 t2 = starts['B1'] + 0.3
 e = melody(piano, THEME_A, t2, beat, 70, human=0.008, seed=4)
 arpeggio(piano, CHORDS_A, t2, beat, 44, seed=5); pads(strings, CHORDS_A, t2, beat, 46); basses(bass, CHORDS_A, t2, beat, 52)
-melody(celesta, THEME_A, e, beat, 60, octave=1, seed=6); melody(piano, THEME_A, e, beat, 64, seed=7)
+melody(celesta, THEME_A, e, beat, 60, octave=1, seed=6); e2 = melody(piano, THEME_A, e, beat, 64, seed=7)
 arpeggio(piano, CHORDS_A, e, beat, 44, seed=8); pads(strings, CHORDS_A, e, beat, 50); basses(bass, CHORDS_A, e, beat, 52)
+# 二の後半（回覧板・電器店・教室）：軽くしたオルゴールで3巡目 → ピアノだけの半分の句で静かに閉じる
+e3 = melody(mbox, THEME_A, e2, beat, 58, octave=1, human=0.01, seed=31)
+arpeggio(piano, CHORDS_A, e2, beat, 38, seed=32); pads(strings, CHORDS_A, e2, beat, 38)
+if e3 + 16 * beat < starts['C1'] - 2.0:
+    melody(piano, THEME_A, e3, beat * 1.1, 56, bars=4, human=0.01, seed=33)
+    pads(strings, CHORDS_A[:4], e3, beat * 1.1, 34)
 # 三 昼さがり：明るい主題B（フルート）×2 ＋ 主題A（オルゴール）で締め
 t3 = starts['C1'] + 0.3
 e = melody(flute, THEME_B, t3, beat, 74, human=0.01, seed=9)

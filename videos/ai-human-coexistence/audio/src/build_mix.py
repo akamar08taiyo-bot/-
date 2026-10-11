@@ -41,6 +41,7 @@ BEDS = {  # 名前: (生成関数, 目標ラウドネス LUFS)
     'pier_lapping': (lambda d, k: S.waves(d, seed=k + 7, calm=True, period=(3.5, 5.5), bright=2600), -36),
     'harbor_morning': (lambda d, k: S.waves(d, seed=k, calm=True, period=(5, 8), bright=2400), -36),
     'morning_birds': (lambda d, k: S.birds(d, seed=k, density=0.45), -36),
+    'broom_sweep': (lambda d, k: S.broom(d, seed=k), -35),
     'ferry_deck': (lambda d, k: S.engine_putt(d, seed=k) + S.waves(d, seed=k + 3, period=(3, 5)), -28),
     'wind_sea': (lambda d, k: S.wind(d, seed=k, strength=1.0), -34),
     'onsen_steam': (lambda d, k: S.steam_hiss(d, seed=k), -38),
@@ -82,6 +83,7 @@ EVENTS = {  # 名前: (生成関数, 目標 LUFS)
     'robot_pi': (lambda: S.robot_pi(), -27),
     'watering': (lambda: S.watering(7.0), -33),
     'holo_on': (lambda: S.holo_on2(), -29),
+    'stamp': (lambda: S.stamp(), -27),
 }
 
 def env_eq(n, fin, fout):
@@ -139,6 +141,9 @@ for k, (sh, st) in enumerate(zip(T['shots'], starts)):
         log.append((sh['id'], name, target))
     # イベント
     for ev in sh.get('events', []):
+        if ev['type'] == 'chalk':  # 黒板のチョークの音（文字数ぶん）
+            put(amb, norm_to(S.chalk(ev.get('n', 10), seed=int(ev['t'] * 10)), -33 + ev.get('gain', 0)), st + ev['t'])
+            continue
         if ev['type'] not in EVENTS: continue
         fn, target = EVENTS[ev['type']]
         snd = norm_to(fn(), target + ev.get('gain', 0))
