@@ -1,0 +1,119 @@
+{
+ "common": "Use case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles travel quietly along air corridors: rounded white ceramic-metal car bodies with a dark curved windshield and four clearly visible shrouded ring-shaped lift fans (ducted rotors) at the corners, no wheels, small navigation lights. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer day (24 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.",
+ "scenes": [
+  {
+   "id": "N01",
+   "time": "04:55",
+   "title": "夜明け前の海と継島",
+   "prompt": "Blue hour before sunrise. Low camera on an old wooden pier at the edge of Tsugimachi, looking out across mirror-calm water to Tsugishima island on the horizon: its long high seawall and crowded silhouettes of concrete apartment blocks, a few warm windows lit, the small white lighthouse with its lamp still glowing. Behind the island two slender curved-glass towers with pale ceramic ribs show soft red aviation lights. Far above the horizon a single flying passenger car with tiny navigation lights crosses. Foreground: weathered pier planks, a coiled rope, an old enamel bucket, and a moored wooden fishing boat with a small lit lantern. Deep blue-violet sky with a thin peach glow along the horizon, gentle ripples reflecting the lights. Quiet, cool, expectant. No readable text anywhere."
+  },
+  {
+   "id": "N02",
+   "time": "05:40",
+   "title": "朝焼けの漁港",
+   "prompt": "Sunrise at Tsugimachi's small fishing harbor. Camera at standing height on the concrete quay beside stacked wooden fish crates. A weathered wooden fishing boat has just returned; two fishermen in rubber boots, seen from behind and from the side at a distance, hand crates of silver fish on ice to one helper robot who carries a crate onto the quay. Nets, buoys, coiled ropes, puddles reflecting the dawn. A few gulls stand on bollards. Across the harbor the hillside town of old inns and the new curved-glass buildings catches the first warm light; a flying passenger car slowly descends toward a rooftop pad far away. Low warm sunlight from the right, long shadows, cool shaded water, light mist on the sea. One small painted sign on a wooden shed reads exactly \"継町漁港\"."
+  },
+  {
+   "id": "N03",
+   "time": "06:30",
+   "title": "継島の階段路地",
+   "prompt": "Inside Tsugishima island town in early morning. A steep, narrow concrete stairway climbs between tall weathered 1960s apartment blocks with balconies, hanging laundry, potted plants, old mailboxes and exposed wall pipes. One helper robot climbs the stairs carrying a small wire crate of glass milk bottles; at a landing above, a resident seen from behind opens a door to receive them. At the very top of the stairway a narrow slice of bright sea and sky. Soft first sunlight grazes the upper walls; the lower stairway is in cool shadow. Concrete texture, rust streaks only where water runs, cared-for plants. A small enamel plate on the wall reads exactly \"継島 三号棟\"."
+  },
+  {
+   "id": "N04",
+   "time": "07:40",
+   "title": "朝の渡し船",
+   "prompt": "Morning commute across the bay. Camera on the deck of a small old wooden ferry boat with a canvas sunshade roof, worn benches and life rings, looking forward across sparkling water toward Tsugishima island: its high seawall, dense apartment blocks and lighthouse, with curved-glass towers rising behind. Several commuters seen from behind with bicycles and shopping baskets; at the open wheelhouse a helper robot steers with an old brass ship's wheel. Gulls fly alongside. Above the island, two flying passenger cars glide along an air corridor. Bright clear morning, blue sky with white clouds, saturated blue-green sea. A small enamel sign on the ferry's rail reads exactly \"渡し船\"."
+  },
+  {
+   "id": "N05",
+   "time": "09:30",
+   "title": "湯けむりの坂道",
+   "prompt": "A steep hot-spring town street climbing a green hillside above the bay, like a Showa-era seaside resort town. Camera near the bottom of the slope looking up the street: old wooden inns and small shops on both sides with hanging signs, cloth noren and potted plants; white steam rising from street vents and from a wooden steamer of hot-spring buns at a shop front; stone steps with a metal handrail. A resident in a light summer yukata, seen from behind, walks up; beside an elderly woman (seen from behind), a helper robot carries her travel bag up the slope. At the top of the slope, an advanced curved-glass building with planted terraces stands on the hillside, and a flying passenger car crosses the blue sky. Summer morning light, glossy green trees, cumulus clouds. One shop sign reads exactly \"湯の花まんじゅう\" and a vertical wooden inn sign reads exactly \"汐見館\"."
+  },
+  {
+   "id": "N06",
+   "time": "13:20",
+   "title": "入道雲と桟橋",
+   "prompt": "Midsummer afternoon at a small swimming pier. Camera standing on the wooden pier near the shore, looking out to sea under a towering bright cumulonimbus cloud. Small children far away at the end of the pier jump into deep clear blue-green water with white splashes, seen from behind and at a distance. A helper robot wearing a simple straw hat sits on a tall wooden lifeguard chair beside the pier, watching them. Near the pier a small wooden beach hut with a reed screen flies a classic white shaved-ice flag with a red wave pattern showing the single character \"氷\". Tsugishima island with its lighthouse and one curved-glass tower in the distance; a flying passenger car far in the sky. Intense summer sun, deep cobalt sky, sparkling water, hot dry wood."
+  },
+  {
+   "id": "N07",
+   "time": "12:10",
+   "title": "港の中華そば",
+   "prompt": "Inside a tiny old ramen counter shop beside the harbor at lunchtime. Camera seated at the worn wooden counter: in the foreground a finished bowl of clear shoyu ramen with chashu, a naruto slice and nori; behind the counter steam rises from big aluminium pots; an elderly cook in a white headband, seen from the side, shakes a traditional noodle strainer basket; beside him one helper robot neatly slices green onions on a wooden board. Handwritten wooden menu tags hang on the wall (indistinct). Through the open doorway with a faded cloth noren: the bright harbor, boats and blue sky. Warm interior light, bright cool exterior. A small wooden board above the kitchen reads exactly \"中華そば\"."
+  },
+  {
+   "id": "N08",
+   "time": "14:30",
+   "title": "継島の屋上",
+   "prompt": "The rooftop of a tall old apartment block on Tsugishima island in the afternoon: a small red torii and shrine, a children's play corner with an old metal slide, potted plants and vegetable planters, laundry lines, water tanks, and a waist-high safety railing. Two children seen from behind lean on the railing looking out over the sea toward the hillside town across the bay, where curved-glass towers stand among old inns; a flying passenger car passes at middle distance over the water. One helper robot waters the plants with an old tin watering can. Bright blue sky with summer clouds, crisp shadows, glinting sea."
+  },
+  {
+   "id": "N09",
+   "time": "17:20",
+   "title": "夕焼けの防波堤",
+   "prompt": "Sunset on a long concrete breakwater. Camera low on the breakwater looking along it toward the setting sun: an elderly fisherman sits with a bamboo fishing rod; beside him a helper robot holds a bucket and a folded umbrella; two children run home along the breakwater carrying their sandals, seen from behind. A slim loudspeaker pole for the town's evening chime stands on the breakwater. Tsugishima island with its lighthouse is silhouetted against a golden-orange sky; a flying passenger car with small lights crosses. Warm glowing sea, gentle waves splashing against the breakwater blocks, long shadows."
+  },
+  {
+   "id": "N10",
+   "time": "19:00",
+   "title": "灯りがともる湾",
+   "prompt": "Blue hour over the bay seen from a hillside viewpoint above the hot-spring town: below, old inns and shops with warm windows and a few modest vertical lit inn signs; the curved-glass towers glow softly; across the water Tsugishima island shows hundreds of small warm windows and its lighthouse beam; a small ferry with lights crosses the bay; flying passenger cars with navigation lights move along an air corridor. Deep blue sky with a last band of orange on the horizon. Foreground: an old stone wall with potted morning glories and a weathered wooden bench. Calm and nostalgic. No readable text."
+  },
+  {
+   "id": "N11",
+   "time": "19:40",
+   "title": "夏祭りの夜店",
+   "prompt": "A summer festival night in a Tsugimachi street: strings of paper lanterns overhead, food stalls with a goldfish scooping tank, shaved ice and cotton candy, warm bulbs; residents in yukata seen from behind or at a distance; a helper robot in a simple indigo festival happi coat helps a child hold a goldfish bag at the goldfish stall. Dark blue night sky, a curved-glass tower glowing softly beyond the rooftops. Two stall banners read exactly \"金魚すくい\" and \"かき氷\"."
+  },
+  {
+   "id": "N12",
+   "time": "20:10",
+   "title": "盆踊り",
+   "prompt": "A bon-odori dance in a harbor-side plaza at night: a wooden yagura tower draped with red-and-white striped cloth and paper lanterns; on top, a helper robot and an elderly drummer play a large taiko drum together; residents in yukata dance in a wide circle around the tower, seen from behind and at a distance; strings of lanterns radiate from the top of the tower. Beyond the plaza, the dark sea and the lit windows of Tsugishima island. Warm lantern light against deep blue night."
+  },
+  {
+   "id": "N13",
+   "time": "20:40",
+   "title": "海上花火",
+   "prompt": "Fireworks over the bay at night: several large colorful firework bursts high above the water, reflected on the calm sea; small boats with lanterns float on the water; residents watch from the seawall in the foreground, seen from behind; Tsugishima island's lit windows and the curved-glass towers are silhouetted; two flying passenger cars hover far away with soft lights, at a respectful distance. Light smoke drifts. Natural photographic exposure, not overexposed, no lens flare spectacle."
+  },
+  {
+   "id": "N14",
+   "time": "21:00",
+   "title": "屋上の二人",
+   "prompt": "Rooftop of an old apartment block at night: a child in a light summer yukata and one helper robot sit side by side on a low wooden bench, seen from behind, watching a few distant fireworks over the sea; the child leans slightly against the robot's shoulder; the robot's amber light strip glows softly. Potted plants, a laundry pole, a thin curl of mosquito-coil smoke, a starry sky, and the lights of Tsugishima island across the dark water. Tender, quiet."
+  },
+  {
+   "id": "N15",
+   "time": "23:30",
+   "title": "深夜の継島と月の道",
+   "prompt": "Late night at the bay: calm sea with a long silver moonlight path leading toward Tsugishima island; most windows dark, a few warm lights; the lighthouse beam; the curved-glass towers dimmed; one flying car's tiny lights far away. Foreground: the old wooden pier with a moored wooden boat and a lantern turned low. Quiet, peaceful end of the day. No readable text."
+  },
+  {
+   "id": "N16",
+   "time": "07:50",
+   "title": "町内の電子掲示板（デジタル回覧板）",
+   "prompt": "Morning at a quiet corner of the Tsugimachi shopping lane beside an old public bathhouse with a tiled entrance. The neighborhood notice board is the traditional Showa-era kind — a dark wooden frame on two posts with a small tiled roof — but its whole face is now a single large, completely transparent glass display panel. The glass is blank: no text, no images, no icons on it, only faint reflections and a thin warm-white light along its edges, so the lane, the shopfronts and the green hillside behind are clearly seen through it. An elderly man in a short-sleeved shirt and straw hat, seen from the side at a short distance, raises one open hand toward the glass as if giving it a gesture command. A helper robot sweeps the stone lane nearby with a traditional bamboo broom. Potted morning glories, a round red postbox, a parked old bicycle, cream plaster walls, a noren curtain without lettering. Above on the hillside, curved-glass buildings with planted terraces and one flying passenger car. Low morning sun from the left, long soft shadows, fresh air. No readable text anywhere in the image."
+  },
+  {
+   "id": "N17",
+   "time": "07:55",
+   "title": "ロボットが運転する昭和のトラック",
+   "prompt": "A coastal road along the bay below Tsugimachi on a clear morning. A small rounded 1960s-style cab-over light truck, two-tone cream and faded celadon green, lovingly repaired (one replaced door panel in a slightly different cream, round chrome headlights, a wooden-slat cargo bed) drives slowly along the road toward the camera at a three-quarter angle. Clearly visible behind the windshield, a helper robot sits at the steering wheel driving, its amber light strip glowing; no human is in the cab. The cargo bed carries wooden crates of vegetables and a crate of glass milk bottles tied with rope. On one side a low stone seawall and wind-bent pine trees, on the other the hillside town; beyond the seawall the calm sparkling sea and Tsugishima island on the horizon with its high seawall, white lighthouse and two slender curved-glass towers. One flying passenger car crosses the sky. No text, numbers or logos anywhere on the truck; no readable text anywhere in the image."
+  },
+  {
+   "id": "N18",
+   "time": "10:00",
+   "title": "木造校舎の教室（透明な電子黒板とロボットの先生）",
+   "prompt": "Inside a classroom of an old wooden schoolhouse on the hill of Tsugimachi, during a summer-holiday morning class. Camera at the back of the room at child eye height, looking toward the front. Rows of small honey-brown wooden desks and chairs with worn edges; five children seen only from behind, two of them raising a hand. The whole front of the classroom is a row of tall old wooden-framed windows facing the sea. Where the blackboard would be, a large completely transparent glass electronic board stands in the original dark wooden blackboard frame, with the old wooden chalk tray still attached below it holding a few short sticks of white chalk and a felt eraser. The glass is blank — no writing, no images — only faint reflections and a thin warm-white edge light, so the bright sea, the sky and Tsugishima island with its lighthouse are seen straight through the board. A helper robot teacher stands beside the board holding a slender wooden pointer, pointing at the glass. Teacher's wooden desk with a small vase of summer flowers, an old round wall clock, cotton curtains moving in the breeze, a ceiling fan. Bright summer morning light, clean and calm. No readable text anywhere in the image."
+  },
+  {
+   "id": "N19",
+   "time": "18:40",
+   "title": "砂丘の道（第二章 予告）",
+   "prompt": "Dusk on the vast coastal sand dunes beyond Tsugimachi: rippled dunes glowing amber and rose under a deep orange-to-violet sky, long blue shadows, fine sand lifted by the wind. A narrow old road crosses the dunes; the same small two-tone cream and celadon cab-over truck, driven by a helper robot whose amber light strip glows behind the windshield, has stopped on the road with its round headlights on. Far away on a dune ridge, a lone man in a dark suit carrying a briefcase walks toward the truck, very small in the frame, seen as a silhouette from the side and behind, face not visible. On the horizon a strip of sea and the faint white lighthouse of Tsugishima; one flying passenger car with small navigation lights crosses the evening sky. Mysterious, cinematic, quiet, wide. No readable text anywhere in the image."
+  }
+ ]
+}

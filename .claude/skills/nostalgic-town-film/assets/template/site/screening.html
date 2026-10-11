@@ -1,0 +1,210 @@
+<title>AIと人間の共存 第一章</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@400;700&display=swap">
+<style>
+  /* 夜の海辺の上映室：暗い一色に、ランタンの琥珀を一点だけ。題字は本編と同じ明朝、本文は角ゴシック */
+  :root {
+    --night: #0b0f17;      /* 背景：月のない夜の海 */
+    --deck: #131a26;       /* 一段明るい面：桟橋の板の影 */
+    --paper: #ece4d3;      /* 文字：古い紙 */
+    --mist: #98a1b3;       /* 補助の文字：朝もや */
+    --lantern: #e8a64c;    /* 強調：ロボットの光の帯とランタン */
+    --sea: #7ea6c8;        /* 二番目の色：昼の海 */
+    --line: rgba(236, 228, 211, 0.14);
+    --display: "Zen Old Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  html { background: var(--night); }
+  body {
+    background: var(--night);
+    color: var(--paper);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.8;
+    padding-inline: 16px;
+    padding-block: 28px 56px;
+  }
+  .wrap { max-width: 1080px; margin-inline: auto; display: grid; gap: 28px; }
+  header { display: grid; gap: 6px; }
+  .eyebrow { font-size: 12px; letter-spacing: 0.24em; color: var(--mist); font-variant-numeric: tabular-nums; }
+  h1 {
+    font-family: var(--display); font-weight: 700; margin: 0;
+    font-size: clamp(30px, 6vw, 54px); letter-spacing: 0.12em; line-height: 1.3; text-wrap: balance;
+  }
+  .sub { font-family: var(--display); color: var(--paper); opacity: 0.86; font-size: clamp(14px, 2.2vw, 18px); letter-spacing: 0.08em; margin: 0; text-wrap: balance; }
+
+  .screen { display: grid; gap: 14px; }
+  .frame { position: relative; width: 100%; max-width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 6px; overflow: hidden; box-shadow: 0 30px 80px -40px rgba(0, 0, 0, 0.9); }
+  video { width: 100%; height: 100%; display: block; background: #000; }
+  .bar { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; justify-content: space-between; }
+  .sound { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .sound-label { font-size: 12px; letter-spacing: 0.2em; color: var(--mist); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 3px; }
+  .seg button {
+    font: inherit; font-size: 14px; color: var(--mist); background: transparent; border: 0; border-radius: 999px;
+    padding: 6px 16px; cursor: pointer; letter-spacing: 0.06em;
+  }
+  .seg button[aria-pressed="true"] { background: var(--lantern); color: #1a1206; font-weight: 700; }
+  .seg button:focus-visible, .chapter:focus-visible { outline: 2px solid var(--lantern); outline-offset: 2px; }
+  .status { font-size: 13px; color: var(--mist); min-height: 1.4em; }
+
+  h2 { font-family: var(--display); font-weight: 700; font-size: 20px; letter-spacing: 0.14em; margin: 0 0 12px; }
+  .chapters { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .chapter {
+    width: 100%; height: 100%; text-align: left; font: inherit; color: inherit; background: var(--deck);
+    border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; cursor: pointer;
+    display: grid; grid-template-columns: auto 1fr; column-gap: 12px; row-gap: 2px; align-content: start;
+  }
+  .chapter:hover { border-color: rgba(232, 166, 76, 0.5); }
+  .chapter[aria-current="true"] { border-color: var(--lantern); box-shadow: inset 3px 0 0 var(--lantern); }
+  .num { grid-row: span 3; font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1.1; color: var(--lantern); min-width: 1.2em; }
+  .chapter[data-kind="teaser"] .num { font-size: 15px; letter-spacing: 0.1em; padding-top: 4px; }
+  .cname { font-family: var(--display); font-size: 16px; letter-spacing: 0.08em; }
+  .clock { font-size: 12px; color: var(--mist); letter-spacing: 0.06em; }
+  .stamp { font-size: 12px; color: var(--sea); font-variant-numeric: tabular-nums; letter-spacing: 0.06em; }
+  .scenes { grid-column: 1 / -1; margin-top: 8px; font-size: 13px; color: var(--mist); line-height: 1.7; min-width: 0; }
+
+  .about { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 28px; border-top: 1px solid var(--line); padding-top: 26px; }
+  .about p { margin: 0 0 12px; max-width: 38em; }
+  .facts { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: 13px; }
+  .facts dt { color: var(--mist); letter-spacing: 0.1em; white-space: nowrap; }
+  .facts dd { margin: 0; min-width: 0; }
+  .note { font-size: 12px; color: var(--mist); border-top: 1px solid var(--line); padding-top: 16px; line-height: 1.8; }
+
+  @media (max-width: 860px) { .chapters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .about { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 420px) { .chapters { grid-template-columns: minmax(0, 1fr); } }
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">第一章　6分51秒　2080年8月24日（土）</div>
+    <h1>AIと人間の共存</h1>
+    <p class="sub">まだ来ない未来なのに、懐かしい。昭和を残した2080年の海辺の町</p>
+  </header>
+
+  <section class="screen" aria-label="映像">
+    <div class="frame">
+      <video id="film" controls playsinline preload="metadata" poster="poster.jpg"></video>
+    </div>
+    <div class="bar">
+      <div class="sound" role="group" aria-labelledby="sound-label">
+        <span class="sound-label" id="sound-label">音</span>
+        <div class="seg">
+          <button type="button" id="audio-theme" data-audio="テーマ曲入り" aria-pressed="true">テーマ曲入り</button>
+          <button type="button" id="audio-asmr" data-audio="環境音のみ" aria-pressed="false">環境音のみ</button>
+        </div>
+      </div>
+      <div class="status" id="status" role="status"></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="ch-title">
+    <h2 id="ch-title">章</h2>
+    <ol class="chapters" id="chapters"></ol>
+  </section>
+
+  <section class="about" aria-label="この映像について">
+    <div>
+      <h2>継町の一日</h2>
+      <p>空を飛行車が行き交い、ガラスの塔が建ち並んでも、海辺の坂の町「継町（つぎまち）」の人たちは、古いものを直しながら暮らしています。沖には、団地が重なる島「継島（つぎしま）」。町とは渡し船と空のりばで結ばれています。</p>
+      <p>ロボットは“ご近所さん”。トラックの運転手も、学校の先生もロボットです。黒板は透明な電子黒板に、回覧板は透明な電子パネルになりました。それでも、はんこを押す回覧板や、チョークの音、瓶の牛乳は残っています。</p>
+      <p>夜明けの水揚げから、夏祭りの海上花火まで。説明はせず、短い言葉と暮らしの音だけで一日をたどります。</p>
+    </div>
+    <dl class="facts">
+      <dt>尺</dt><dd>6分51秒（26カット、1080p／30fps）</dd>
+      <dt>音</dt><dd>テーマ曲入り（-14 LUFS）と、音楽なしの環境音のみ（-16 LUFS）。上のボタンで切り替え</dd>
+      <dt>舞台</dt><dd>継町と継島（どちらも架空）</dd>
+      <dt>映像</dt><dd>画像は Gemini で生成・選別・修正、動きは Veo で生成し、半速のスローに</dd>
+      <dt>文字・音楽</dt><dd>空中の電子版、浮かび上がる文字、環境音の一部、テーマ曲はプログラムで制作したオリジナル。終わりのあいさつは AI 音声</dd>
+    </dl>
+  </section>
+
+  <p class="note">この映像の街・人物・出来事はすべて架空です。実在の場所・人物・団体とは関係ありません。第二章の予告は、ある連続ドラマの雰囲気へのオマージュとして作ったオリジナルの場面で、作品の名前・人物・音楽は使っていません。</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js"></script>
+<script>
+  // 章（本編の章題と同じ漢数字と時刻）
+  const CHAPTERS = [
+    {num: '序', name: '夜明け前', clock: '午前四時五十五分', t: 0, scenes: '桟橋から見る継島、灯台、空をゆく飛行車'},
+    {num: '一', name: '夜明け', clock: '午前五時四十分', t: 24, scenes: '漁港の水揚げ、瓶で届く牛乳'},
+    {num: '二', name: '朝', clock: '午前七時四十分', t: 53, scenes: '渡し船、ロボットが運転するトラック、湯けむりの坂、商店街、電子の回覧板、電器店の修理、透明な黒板の教室'},
+    {num: '三', name: '昼さがり', clock: '午後零時十分', t: 157, scenes: '港の中華そば、入道雲の桟橋、島の屋上と菜園、空のりば、畳の居間'},
+    {num: '四', name: '夕暮れ', clock: '午後五時', t: 246, scenes: '五時のチャイム、帰ってきた扇風機、雨上がりの路地、灯りがともる湾'},
+    {num: '五', name: '夏祭り', clock: '午後七時四十分', t: 305, scenes: '夜店、盆踊り、海上花火、屋上の二人'},
+    {num: '結', name: '月の道', clock: '深夜', t: 364, scenes: '月の道が光る海、終わりのあいさつ'},
+    {num: '予告', name: '第二章', clock: '砂の向こうから来た男', t: 395, kind: 'teaser', scenes: '夕暮れの砂丘、ロボットが運転するトラックと、スーツの男'},
+  ];
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  const video = document.getElementById('film');
+  const statusEl = document.getElementById('status');
+  const list = document.getElementById('chapters');
+  const chapterBtns = CHAPTERS.map((c, i) => {
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chapter'; b.id = `chapter-${i}`;
+    if (c.kind) b.dataset.kind = c.kind;
+    b.innerHTML = `<span class="num"></span><span class="cname"></span><span class="clock"></span><span class="stamp"></span><span class="scenes"></span>`;
+    b.querySelector('.num').textContent = c.num;
+    b.querySelector('.cname').textContent = c.name;
+    b.querySelector('.clock').textContent = c.clock;
+    b.querySelector('.stamp').textContent = fmt(c.t);
+    b.querySelector('.scenes').textContent = c.scenes;
+    b.setAttribute('aria-label', `${c.num} ${c.name}（${fmt(c.t)}）から再生`);
+    b.addEventListener('click', () => {
+      video.currentTime = c.t;
+      video.play().catch(() => {});
+    });
+    li.appendChild(b); list.appendChild(li);
+    return b;
+  });
+  video.addEventListener('timeupdate', () => {
+    let cur = 0;
+    CHAPTERS.forEach((c, i) => { if (video.currentTime >= c.t - 0.2) cur = i; });
+    chapterBtns.forEach((b, i) => b.setAttribute('aria-current', String(i === cur)));
+  });
+
+  // 音の切り替え（テーマ曲入り／環境音のみ）。映像は共通で、音だけ差し替える
+  const audioBtns = [...document.querySelectorAll('[data-audio]')];
+  let want = 'テーマ曲入り';
+  try { want = localStorage.getItem('screening-audio') || want; } catch (e) {}
+  let hls = null;
+  function applyAudio() {
+    if (hls && hls.audioTracks && hls.audioTracks.length) {
+      const i = hls.audioTracks.findIndex((t) => t.name === want);
+      if (i >= 0 && hls.audioTrack !== i) hls.audioTrack = i;
+    } else if (video.audioTracks && video.audioTracks.length) {
+      for (let k = 0; k < video.audioTracks.length; k++) {
+        const tr = video.audioTracks[k];
+        tr.enabled = tr.label === want;
+      }
+    }
+    audioBtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.audio === want)));
+  }
+  audioBtns.forEach((b) => b.addEventListener('click', () => {
+    want = b.dataset.audio;
+    try { localStorage.setItem('screening-audio', want); } catch (e) {}
+    applyAudio();
+    statusEl.textContent = `音：${want}`;
+  }));
+
+  // 再生のしくみ：hls.js（MSE、iPhone は iOS 17.1 以降の ManagedMediaSource）で、映像1本に音2種類をのせて流す
+  const SRC = 'hls/master.txt';
+  if (window.Hls && window.Hls.isSupported()) {
+    video.disableRemotePlayback = true; // iPhone の ManagedMediaSource で必要
+    hls = new window.Hls({maxBufferLength: 30});
+    hls.on(window.Hls.Events.AUDIO_TRACKS_UPDATED, applyAudio);
+    hls.on(window.Hls.Events.MANIFEST_PARSED, () => { statusEl.textContent = ''; });
+    hls.on(window.Hls.Events.ERROR, (e, d) => {
+      if (d && d.fatal) statusEl.textContent = '映像を読み込めませんでした。通信のよい所で、ページを開き直してください。';
+    });
+    hls.loadSource(SRC);
+    hls.attachMedia(video);
+  } else {
+    statusEl.textContent = 'この画面では再生できません。Safari（iOS 17.1 以降）か Chrome で開いてください。';
+  }
+  applyAudio();
+</script>

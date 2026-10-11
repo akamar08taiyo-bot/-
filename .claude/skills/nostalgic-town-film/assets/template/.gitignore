@@ -1,0 +1,11 @@
+node_modules/
+out/
+work/
+audio/out/
+audio/qa/
+public/clips/
+public/photos/
+# assets/veo/*.mp4 は有料で生成した元動画なので保存する（作り直しに必要。数百MBになるので、入れる前にユーザーに確認）
+# スロー化したクリップ・カットごとの書き出し・完成品は、元動画とコードから作り直せるので入れない
+__pycache__/
+*.pyc

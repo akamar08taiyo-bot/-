@@ -191,29 +191,20 @@
     statusEl.textContent = `音：${want}`;
   }));
 
-  // 再生のしくみ：iPhone・iPad・Mac の Safari は標準の HLS、それ以外は hls.js
-  const SRC = 'hls/master.m3u8';
-  const ua = navigator.userAgent;
-  const isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  const isDesktopSafari = /Safari/.test(ua) && !/Chrome|Chromium|CriOS|Edg|OPR|Firefox|FxiOS|Android/.test(ua);
-  const nativeHls = video.canPlayType('application/vnd.apple.mpegurl') !== '';
-  if (nativeHls && (isIOS || isDesktopSafari)) {
-    video.src = SRC;
-    video.addEventListener('loadedmetadata', applyAudio);
-    if (video.audioTracks && video.audioTracks.addEventListener) video.audioTracks.addEventListener('addtrack', applyAudio);
-  } else if (window.Hls && window.Hls.isSupported()) {
+  // 再生のしくみ：hls.js（MSE、iPhone は iOS 17.1 以降の ManagedMediaSource）で、映像1本に音2種類をのせて流す
+  const SRC = 'hls/master.txt';
+  if (window.Hls && window.Hls.isSupported()) {
+    video.disableRemotePlayback = true; // iPhone の ManagedMediaSource で必要
     hls = new window.Hls({maxBufferLength: 30});
     hls.on(window.Hls.Events.AUDIO_TRACKS_UPDATED, applyAudio);
+    hls.on(window.Hls.Events.MANIFEST_PARSED, () => { statusEl.textContent = ''; });
     hls.on(window.Hls.Events.ERROR, (e, d) => {
       if (d && d.fatal) statusEl.textContent = '映像を読み込めませんでした。通信のよい所で、ページを開き直してください。';
     });
     hls.loadSource(SRC);
     hls.attachMedia(video);
-  } else if (nativeHls) {
-    video.src = SRC;
-    video.addEventListener('loadedmetadata', applyAudio);
   } else {
-    statusEl.textContent = 'このブラウザでは再生できません。Safari か Chrome で開いてください。';
+    statusEl.textContent = 'この画面では再生できません。Safari（iOS 17.1 以降）か Chrome で開いてください。';
   }
   applyAudio();
 </script>

@@ -1,0 +1,106 @@
+{
+ "common_tail": "Keep every sign, text, building, vehicle design and person exactly as in the image; no new objects, no morphing, no camera shake, no cuts. Photorealistic, natural gentle motion, calm and quiet mood. Audio: natural ambient sound of the place only, no music, no speech, no singing.",
+ "shots": {
+  "P0": {
+   "photo": "N01_v1",
+   "prompt": "Locked-off static camera. Blue hour before sunrise at a wooden pier facing a walled island town. The calm sea ripples gently and the reflections of the island's lights shimmer on the water. The lighthouse lamp glows and its beam slowly sweeps. The small flying car with navigation lights glides slowly from left to right high in the sky. The moored wooden boat bobs very gently and its lantern flame flickers softly. One or two windows on the island light up."
+  },
+  "A1": {
+   "photo": "N02_v2",
+   "prompt": "Locked-off static camera. Sunrise at a small fishing harbor. The two fishermen lift and hand over wooden crates of fish; the ivory helper robot walks slowly forward on the wet quay carrying its crate. The gulls on the bollards turn their heads and one gull takes off. Thin morning mist drifts over the water, small ripples sparkle in the low sunlight, the flying car slowly descends toward the hillside town."
+  },
+  "A2": {
+   "photo": "N03_v1",
+   "prompt": "Very slow, smooth camera push-in up the stairway. The helper robot climbs the concrete stairs one step at a time carrying the wire crate of glass milk bottles. The elderly man at the door opens it a little wider and waits. Laundry and plant leaves move slightly in a light breeze, soft morning sunlight. The vehicle in the slice of sky glides slowly to the right."
+  },
+  "B1": {
+   "photo": "N04_v1",
+   "prompt": "Camera on the moving ferry, gentle natural sway as the old wooden ferry moves slowly toward the island. Sea water sparkles and flows past the hull, gulls glide alongside, the canvas roof flutters, the two flying cars glide slowly across the sky, the robot at the wheel turns the brass wheel slightly, commuters stand with their bicycles with small natural movements."
+  },
+  "B2": {
+   "photo": "N05_v1",
+   "prompt": "Locked-off static camera. Steam rises and drifts from the street vents and from the wooden bun steamer. The person in the yukata walks slowly down the stone steps; the elderly woman and the helper robot walk slowly side by side. Leaves sway, clouds drift slowly, the small flying car glides slowly across the blue sky."
+  },
+  "B3": {
+   "photo": "assets/n04_pdf/S01_v2.png",
+   "prompt": "Locked-off static camera. A sunny shopping lane. The two residents walk slowly down the lane away from the camera carrying baskets. The cream delivery cart's small amber light blinks. The flying passenger cars glide slowly along the air corridor between the curved-glass towers. The canvas awning flutters slightly, leaf shadows move on the street, hanging plants stir in the breeze."
+  },
+  "B4": {
+   "photo": "assets/n04_pdf/S02_v2.png",
+   "prompt": "Very slow camera push-in toward the old fan. The white robotic arm makes small precise movements, carefully bringing the tiny bearing to the fan's hub. The worker at the back moves slightly while working at the bench. Dust motes float in the window light, a thin wisp of solder smoke rises, outside the doorway a person walks by."
+  },
+  "C1": {
+   "photo": "N07_v2",
+   "prompt": "Very slow camera push-in. The old cook shakes the bamboo noodle strainer to drain the water with a firm traditional motion and steam bursts upward. The helper robot slices green onions with a knife in a steady gentle rhythm. Steam rises from the big pots and from the ramen bowl. The cloth noren at the door sways in the sea breeze, boats bob in the harbor outside."
+  },
+  "C2": {
+   "photo": "N06_v1",
+   "prompt": "Locked-off static camera. Midsummer afternoon. The children at the end of the pier land in the clear sea with bright splashes and swim, water sparkles. The robot lifeguard on the tall chair slowly turns its head, watching them. The shaved-ice flag flutters in the wind, the towering cumulonimbus cloud slowly billows, the flying car glides slowly to the right, gentle waves."
+  },
+  "C3": {
+   "photo": "N08_v1",
+   "prompt": "Slow lateral camera move to the right. The two children lean on the railing and look out to sea; one of them points at the flying car. The helper robot waters the plants, a thin stream of water pours from the can. Laundry flutters in the sea breeze, the flying car glides slowly to the right, the sea sparkles."
+  },
+  "C4": {
+   "photo": "assets/n04_pdf/S04_v3.png",
+   "prompt": "Very slow camera push-in. The translucent canopy strips slowly adjust their angle. The small maintenance crawler moves along its rail. The gardener in the straw hat tends the tomato plants. Laundry sways, leaf shadows flicker on the floor, the two flying cars glide slowly through the air corridor between the curved-glass towers."
+  },
+  "C6": {
+   "photo": "assets/n04_pdf/S05_v1.png",
+   "prompt": "Very slow camera push-in. A quiet living room in the late afternoon, no people. Warm sunlight shifts very gently across the tatami, dust motes float in the light, the bamboo blind sways slightly, leaves outside move in the breeze, condensation glistens on the tea glasses."
+  },
+  "D1": {
+   "photo": "N09_v2",
+   "prompt": "Locked-off static camera. Sunset on the breakwater. Gentle waves splash against the concrete blocks. The elderly fisherman holds his bamboo rod and the line moves slightly; the small helper robot tilts its head. The two children walk away along the breakwater. The flying car glides slowly to the left, the golden sunlight shimmers on the sea."
+  },
+  "D2": {
+   "photo": "assets/n04_pdf/S06_v1.png",
+   "prompt": "Locked-off static camera. Early evening at a house entrance. The elderly woman, seen from behind, gently rests her hand on the repaired green fan in the basket on the delivery cart. The cart's small amber light blinks softly. The warm lamp glows, and in the lane behind a few windows light up one by one."
+  },
+  "D3": {
+   "photo": "assets/n04_pdf/S03_v1.png",
+   "prompt": "Locked-off static camera. A back lane just after rain at blue hour. Raindrops drip from the eaves and fall into puddles, small ripples spread on the wet stones. With nobody touching it, the wooden sliding door of the bath entrance slides open by itself and warm light spills out. Water flows gently in the transparent purification columns with rising bubbles, a thin plume of steam drifts from a vent, the distant person with an umbrella walks slowly away."
+  },
+  "D4": {
+   "photo": "N10_v1",
+   "prompt": "Very slow camera push-in. Blue hour over the bay. Lights in the windows of the island and the hillside town turn on one by one, the lighthouse beam slowly sweeps, the small ferry moves slowly across the bay with smoke drifting from its funnel, the flying cars glide slowly along the air corridor with blinking navigation lights, the morning glories sway slightly."
+  },
+  "E1": {
+   "photo": "N11_v1",
+   "prompt": "Locked-off static camera. A summer festival night street. Paper lanterns sway gently, people in yukata stroll slowly, the robot in the indigo happi coat hands the goldfish bag to the child, goldfish swim in the tank, the banners flutter, the flying car glides slowly across the night sky."
+  },
+  "E2": {
+   "photo": "N12_v1",
+   "prompt": "Locked-off static camera. A bon-odori festival at night. The elderly drummer and the helper robot strike the big taiko drum in a slow steady rhythm. The dancers in yukata move slowly around the tower in a circle dance, raising their hands gracefully together. Lanterns sway gently, the flying cars hover far away."
+  },
+  "E3": {
+   "photo": "N13_v1",
+   "prompt": "Locked-off static camera. Fireworks over the bay at night: large fireworks keep bursting and blooming one after another, sparks fall and fade, smoke drifts slowly, colorful reflections shimmer on the water, small boats with lanterns bob gently, the people on the seawall watch with small natural movements, the two flying cars hover with blinking lights."
+  },
+  "E4": {
+   "photo": "N14_v1",
+   "prompt": "Locked-off static camera. A rooftop at night. Small fireworks bloom far away over the sea. The child leans gently against the robot's shoulder; the robot's amber light strip pulses softly. Mosquito-coil smoke curls upward, the laundry sways in the night breeze, tiny flying car lights move slowly across the sky, stars twinkle."
+  },
+  "F0": {
+   "photo": "N15_v1",
+   "prompt": "Locked-off static camera. Late night. The moonlight path shimmers on the calm sea with gentle ripples, the lighthouse beam slowly sweeps, the lantern in the moored boat flickers, the boat bobs very gently, a tiny flying car light drifts far away. Peaceful and still."
+  },
+  "G1": {
+   "photo": "N16_v1",
+   "prompt": "Locked-off static camera. A quiet morning lane. The elderly man in the straw hat slowly raises his open hand toward the transparent glass notice board, holds it there for a moment, then lowers it and nods gently. The thin edge light around the glass panel softly brightens. The helper robot sweeps the stone lane with the bamboo broom in a slow, steady rhythm. Morning glory flowers and leaves sway gently in the breeze; the flying car with ring fans glides slowly across the sky above the hillside."
+  },
+  "G2": {
+   "photo": "N17_v1",
+   "prompt": "Very slow, smooth camera move. The small cream-and-celadon truck drives slowly forward along the coastal road toward the camera, coming a little closer and staying in frame; the helper robot at the steering wheel keeps both hands on the wheel and its amber light strip glows. The milk bottles and vegetable crates in the cargo bed jiggle slightly. The sea sparkles in the morning sun, pine branches sway in the breeze, the flying car glides slowly across the sky."
+  },
+  "G3": {
+   "photo": "N18_v1",
+   "prompt": "Locked-off static camera. A calm summer classroom. The helper robot teacher slowly moves the wooden pointer across the transparent glass board as if explaining; two children raise their hands a little higher and one lowers it; the white cotton curtains billow softly in the sea breeze; the ceiling fan turns slowly; sunlight sparkles on the sea outside; the pendulum of the wall clock swings."
+  },
+  "T0": {
+   "photo": "N19_v1",
+   "prompt": "Locked-off static camera. Dusk on the vast sand dunes. The man in the dark suit walks slowly along the dune ridge toward the stopped truck, carrying his briefcase; fine sand streams off the dune crests in the wind; the truck's round headlights glow and its amber cab light pulses softly; the flying car's small navigation lights glide slowly across the violet sky; the last sunlight fades very slowly. Audio: wind over the dunes, distant waves, the truck engine idling softly.",
+   "tail": "Keep every sign, text, building, vehicle design and person exactly as in the image; no new objects, no morphing, no camera shake, no cuts. Photorealistic, natural gentle motion, calm and quiet mood. No music, no speech, no singing."
+  }
+ }
+}
