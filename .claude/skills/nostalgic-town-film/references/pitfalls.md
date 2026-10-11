@@ -8,6 +8,7 @@
 - **YouTube・help ページ・CDN に 403** → この環境の通信の制限。YouTube は Gemini 経由で見る。CDN（jsDelivr など）は公開ページを見る人のブラウザが直接読むので問題ない。手元の試験では npm から同じ版を取って使う
 - **`df` の Avail が 0、ブラウザが ERR_INSUFFICIENT_RESOURCES** → Remotion の bundle() が毎回 /tmp に public ごと（1GB超）複製していた。`/tmp/remotion-webpack-bundle-*` を消し、bundle の `outDir` を `work/bundle` に固定（ひな形は対応済み）
 - **`pkill -f <スクリプト名>` で自分のシェルまで終了（exit 144）** → コマンド文字列にも同じ名前が入っているため。`pgrep -f "^node scripts/..."` で PID を取って kill
+- **終わりを待つループがいつまでも終わらない** → `until ! pgrep -f build_theme.py; do …` のような条件は、待っている自分のシェルのコマンド文字列にも一致するので、ずっと「動いている」と判定される。`pgrep -f '^python3 -I audio/src/build_theme.py'` のように始まりを固定するか、ログの「all done」や出力ファイルで判定する
 - **`sleep` での待ちが拒否される** → 終わりを検知するループをバックグラウンドで動かし、終わったら通知を受ける。待ちの上限（30分）に達したら、仕事が終わっているかを直接確かめる
 
 ## 原画・Veo
