@@ -162,15 +162,16 @@ ASPへの登録と提携の申請は、本人の情報（名前・住所・振�
 
 1. 文と並びを変えるときは `build_pages.py`、動きは `goal.js` などの JS、見た目は `start.css` を直す。ヘッダーとフッターは、サイトの既存ページから抜き出した `_header.html`・`_footer.html`。
 2. `python3 build_all.py サイトのフォルダ プレビューのフォルダ` で、4ページを書き出し、JS・CSS を写す。サイトのフォルダは、リポジトリのいちばん上の `okane-no-chizu-site/`（サイト一式。動画もここに入っている）。プレビューのフォルダには、プレビュー専用の `preview.css`・`preview.js` を足したページができる（実際のサイトには入れない）。
-3. `okane-no-chizu-site/` を直してブランチ `claude/money-youtube-viral-research` に push すると、Netlify が自動で公開する（下の「サイトの公開」）。
+3. 書き出したサイトを `okane-no-chizu-site/` と公開用のリポジトリ `akamar08taiyo-bot.github.io` に写して push すると、GitHub Pages で公開される（下の「サイトの公開」）。
 
-### サイトの公開（2026年10月10日〜）
+### サイトの公開（2026年10月11日〜）
 
-- 公開先：https://okane-no-chizu-akama.netlify.app （Netlify のプロジェクト okane-no-chizu-akama）
-- この作業環境からは Netlify に直接つながらない（ネットワークの設定で止められている）ので、GitHub 経由にした。Netlify でこのリポジトリとブランチ `claude/money-youtube-viral-research` をつなぎ、push のたびに自動で公開される。
-- 設定はリポジトリのいちばん上の `netlify.toml`：`base = "okane-no-chizu-site"`・`publish = "."`・何もしない `command`。リポジトリのいちばん上にある別のアプリ（package.json・vite）は作らない。
-- このリポジトリは公開なので、サイトのファイル（動画・PDFをふくむ）は GitHub でも見られる。サイト自体も公開なので、ファイルを見られることは同じ。
-- ブランチ `claude/money-youtube-viral-research` を消すと公開が止まる。別のブランチに移すときは、Netlify の設定も変える。
+- 公開先：https://akamar08taiyo-bot.github.io/ （GitHub Pages。入口は https://akamar08taiyo-bot.github.io/start.html ）
+- 中身はリポジトリ `akamar08taiyo-bot/akamar08taiyo-bot.github.io` の `main` ブランチ。push すると GitHub が自動で公開する（「pages build and deployment」が数十秒で終わる）。`.nojekyll` で、GitHub Pages の作り直し（Jekyll）をしない。
+- 直したら：`python3 build_all.py` で書き出したサイトのフォルダを、このリポジトリの `okane-no-chizu-site/` と、`akamar08taiyo-bot.github.io` の両方に写して push する（2つは同じ中身にしておく）。
+- はじめは Netlify（okane-no-chizu-akama.netlify.app）で公開する予定だったが、この作業環境から Netlify に直接つながらず、Netlify の画面でリポジトリをつなぐ操作も難しかったので、GitHub Pages にした。`netlify.toml` は、あとで Netlify でつなぐときのために残している（Netlify のプロジェクトは空のまま）。
+- `_headers`（Netlify 用のセキュリティの設定）は、GitHub Pages では使われない。
+- どちらのリポジトリも公開なので、サイトのファイル（動画・PDFをふくむ）は GitHub でも見られる。サイト自体も公開なので、見られる範囲は同じ。
 - 今は検索エンジンに出さない設定（`robots.txt` が `Disallow: /`、全ページ noindex）。SNS やASPの審査で見てもらうのには困らない。検索に出すときは、この2つを外す。
 
 スマホで試せるプレビュー：https://claude.ai/artifact/UhvRPzh38U6Uq7igZjmEH4
