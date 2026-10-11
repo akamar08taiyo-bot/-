@@ -1,0 +1,6 @@
+[
+ {"name": "A_路地の夜", "scene": "A05", "center": [0.44, 0.5], "size": 1.0},
+ {"name": "B_路地の夜_名前入り", "scene": "A05", "center": [0.44, 0.5], "size": 1.0, "text": "記憶の路地裏", "text_dir": "h", "text_y": 0.80},
+ {"name": "C_自販機の明かり", "scene": "A05", "center": [0.30, 0.56], "size": 0.62},
+ {"name": "D_街灯と屋根", "scene": "A05", "center": [0.60, 0.30], "size": 0.60}
+]
