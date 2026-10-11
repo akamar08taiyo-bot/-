@@ -13,7 +13,9 @@ const force = args.includes('--force');
 const timeline = JSON.parse(fs.readFileSync(path.join(root, 'src', 'timeline.json'), 'utf8'));
 let ids = args.filter((a) => !a.startsWith('--'));
 if (!ids.length) ids = timeline.shots.map((s) => s.id);
-const serveUrl = await bundle({entryPoint: path.join(root, 'src', 'index.ts'), publicDir: path.join(root, 'public')});
+const serveUrl = await bundle({entryPoint: path.join(root, 'src', 'index.ts'), publicDir: path.join(root, 'public'),
+  // 毎回 /tmp に public ごと（1GB超）複製されてディスクを使い切ったため、置き場所を一つに固定して上書きする
+  outDir: path.join(root, 'work', 'bundle')});
 const browserExecutable = '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell';
 const chromiumOptions = {gl: 'swangle'};
 const open = () => openBrowser('chrome', {browserExecutable, chromiumOptions});

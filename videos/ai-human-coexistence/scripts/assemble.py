@@ -5,6 +5,7 @@ import argparse, json, subprocess
 from pathlib import Path
 root = Path(__file__).resolve().parent.parent
 ap = argparse.ArgumentParser(); ap.add_argument('--crf', default='20'); ap.add_argument('--maxrate', default='12M'); ap.add_argument('--preset', default='slow')
+ap.add_argument('--preview', action='store_true', help='スマホ確認用の軽い 720p 版も作る')
 a = ap.parse_args()
 T = json.loads((root / 'src' / 'timeline.json').read_text(encoding='utf-8'))
 XF = T['crossfade']; shots = T['shots']
@@ -37,4 +38,10 @@ for v in ('asmr', 'theme'):
     subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', str(video), '-i', str(root / 'audio' / 'out' / f'mix_{v}.wav'), '-map', '0:v', '-map', '1:a',
                     '-c:v', 'copy', '-c:a', 'aac', '-b:a', '256k', '-ar', '48000', '-shortest', '-movflags', '+faststart', str(out)], check=True)
     print(out.name, subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration,size', '-of', 'csv=p=0', str(out)], capture_output=True, text=True).stdout.strip())
+if a.preview:
+    for v in ('theme', 'asmr'):
+        src = root / 'out' / f'ai_human_coexistence_{v}.mp4'; dst = root / 'out' / f'preview_{v}_720p.mp4'
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', str(src), '-vf', 'scale=1280:720:flags=lanczos', '-c:v', 'libx264', '-preset', 'medium', '-crf', '25',
+                        '-maxrate', '3M', '-bufsize', '6M', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', str(dst)], check=True)
+        print(dst.name, subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration,size', '-of', 'csv=p=0', str(dst)], capture_output=True, text=True).stdout.strip())
 print('timeline total', round(total, 2), 's')

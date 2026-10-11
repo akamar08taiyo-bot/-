@@ -7,7 +7,9 @@ import {openBrowser, renderMedia, selectComposition} from '@remotion/renderer';
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const out = path.resolve(process.argv[2] ?? path.join(root, 'out', 'video_silent.mp4'));
 const range = process.argv[3] ? process.argv[3].split('-').map(Number) : null;
-const serveUrl = await bundle({entryPoint: path.join(root, 'src', 'index.ts'), publicDir: path.join(root, 'public')});
+const serveUrl = await bundle({entryPoint: path.join(root, 'src', 'index.ts'), publicDir: path.join(root, 'public'),
+  // 毎回 /tmp に public ごと（1GB超）複製されてディスクを使い切ったため、置き場所を一つに固定して上書きする
+  outDir: path.join(root, 'work', 'bundle')});
 const browser = await openBrowser('chrome', {
   browserExecutable: '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell',
   chromiumOptions: {gl: 'swangle'},
