@@ -1,0 +1,12 @@
+{
+ "name": "記憶の路地裏",
+ "bg": "work/banner/banner_src.png",
+ "erase": [[500, 222, 1185, 350, 5], [580, 352, 1105, 410, 9]],
+ "dark": 120,
+ "scale": 1.08, "offset": [102, 0],
+ "lines": [
+  {"text": "記憶の路地裏", "font": "ShipporiMincho_800ExtraBold.ttf", "size": 104, "track": 10, "top": 522, "cx": 1291},
+  {"text": "あの頃の記憶に、もう一度。", "font": "ShipporiMincho_700Bold.ttf", "size": 38, "track": 3, "top": 628, "cx": 1291}
+ ],
+ "color": [42, 21, 8], "glow": [255, 236, 196]
+}
