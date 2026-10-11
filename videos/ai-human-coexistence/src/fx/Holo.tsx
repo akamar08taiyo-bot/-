@@ -14,24 +14,27 @@ export const HoloBoard: React.FC<{
   tilt?: number;
   small?: boolean;
   variant?: 'holo' | 'chalk'; // chalk：透明な電子黒板に白い文字を書く（板そのものは画面の中にある）
-  stamp?: {t: number; text: string}; // 既読のはんこ（回覧板）
+  stamp?: {t: number; text: string; pos?: 'tr' | 'br'}; // 既読のはんこ（回覧板）。pos：右上／右下（既定）
+  h?: number; // 板の高さ（0..1、省略時は文字の量から決める）
+  opaque?: number; // 暗いガラスの濃さ（省略時 0.46）。画面の中の実物の板に重ねて、下の模様を隠すときに上げる
+  fixed?: boolean; // 実物の板に貼りつける表示：浮き沈み・ちらつきなし
   W?: number;
   H?: number;
-}> = ({t, t0, t1 = 999, x, y, w, lines, tilt = 0, small = false, variant = 'holo', stamp, W = 1920, H = 1080}) => {
+}> = ({t, t0, t1 = 999, x, y, w, lines, tilt = 0, small = false, variant = 'holo', stamp, h, opaque, fixed = false, W = 1920, H = 1080}) => {
   if (t < t0) return null;
   const chalk = variant === 'chalk';
   const u = t - t0;
   const line = easeOut(clamp(u / 0.45));
   const open = easeOut(clamp((u - 0.35) / 0.55));
   const out = clamp((t1 - t) / 0.8);
-  const fl = chalk ? 1 : 0.9 + 0.1 * hash(Math.floor(t * 24) * 1.37) * (u < 1.4 ? 2.5 : 0.5);
+  const fl = chalk || fixed ? 1 : 0.9 + 0.1 * hash(Math.floor(t * 24) * 1.37) * (u < 1.4 ? 2.5 : 0.5);
   const pw = w * W;
   // 文字数に合わせて大きさを決める（全角1.08em、半角0.6em、2行目以降は0.82倍）。枠の86%に収める
   const em = (s: string) => [...s].reduce((a, c) => a + (/[\x20-\x7e]/.test(c) ? 0.6 : 1.08), 0);
   const widest = Math.max(...lines.map((ln, i) => em(ln) * (i === 0 ? 1 : 0.82)));
   const fs = Math.round(Math.min(small ? pw / 8.2 : pw / 7.4, (pw * 0.86) / widest));
-  const ph = (fs * 1.55) * lines.length + fs * 0.9;
-  const bob = chalk ? 0 : Math.sin(t * 1.3 + x * 10) * 3;
+  const ph = h ? h * H : (fs * 1.55) * lines.length + fs * 0.9;
+  const bob = chalk || fixed ? 0 : Math.sin(t * 1.3 + x * 10) * 3;
   // 黒板は一行ずつ書いていく（前の行を書き終えてから次の行）
   const lineStart = (i: number) =>
     chalk ? t0 + 0.3 + lines.slice(0, i).reduce((a, ln) => a + [...ln].length * 0.11 + 0.5, 0) : t0 + 0.9 + i * 0.5;
@@ -48,7 +51,10 @@ export const HoloBoard: React.FC<{
         pointerEvents: 'none',
       }}
     >
-      {chalk ? null : (
+      {chalk ? (
+        // 透明な電子黒板：文字のある所だけガラスがうっすら曇って、明るい空の上でも読める
+        <div style={{position: 'absolute', inset: `-${fs * 0.5}px -${fs * 0.7}px`, background: 'radial-gradient(ellipse 60% 62% at 50% 50%, rgba(12,26,40,0.42), rgba(12,26,40,0.22) 55%, rgba(12,26,40,0) 80%)', opacity: easeOut(clamp(u / 0.6))}} />
+      ) : (
       <>
       {/* 暗いガラス（明るい背景でも文字が読めるように） */}
       <div
@@ -57,7 +63,7 @@ export const HoloBoard: React.FC<{
           inset: 0,
           transform: `scaleY(${open})`,
           borderRadius: 10,
-          background: 'linear-gradient(180deg, rgba(16,24,40,0.46), rgba(20,30,48,0.34))',
+          background: `linear-gradient(180deg, rgba(16,24,40,${opaque ?? 0.46}), rgba(20,30,48,${(opaque ?? 0.46) - 0.12}))`,
         }}
       />
       {/* 出現の光の線 */}
@@ -128,7 +134,7 @@ export const HoloBoard: React.FC<{
                     fontSize: i === 0 ? fs : fs * 0.82,
                     letterSpacing: '0.06em',
                     color: 'rgba(250,252,255,0.95)',
-                    textShadow: '0 0 1px rgba(20,40,60,0.9), 0 0 5px rgba(10,30,50,0.55), 0 0 14px rgba(200,230,255,0.4)',
+                    textShadow: '0 0 1px rgba(10,24,40,1), 0 0 2px rgba(10,24,40,0.9), 0 0 7px rgba(10,30,50,0.6), 0 0 16px rgba(200,230,255,0.35)',
                   }
                 : {
                     fontFamily: "'Zen Maru Gothic', sans-serif",
@@ -146,13 +152,13 @@ export const HoloBoard: React.FC<{
       {stamp && t >= stamp.t
         ? (() => {
             const k = easeOut(clamp((t - stamp.t) / 0.18));
-            const d = fs * 1.5;
+            const d = fs * 1.75;
             return (
               <div
                 style={{
                   position: 'absolute',
                   right: fs * 0.35,
-                  bottom: fs * 0.3,
+                  ...(stamp.pos === 'tr' ? {top: fs * 0.3} : {bottom: fs * 0.3}),
                   width: d,
                   height: d,
                   borderRadius: '50%',

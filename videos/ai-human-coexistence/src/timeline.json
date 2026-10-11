@@ -220,22 +220,27 @@
      "morning_birds",
      "broom_sweep",
      "town_murmur_far"
-    ]
+    ],
+    "bed_gain": 6
    },
    "holo": [
     {
-     "x": 0.395,
-     "y": 0.47,
-     "w": 0.105,
+     "x": 0.398,
+     "y": 0.414,
+     "w": 0.108,
+     "h": 0.153,
+     "opaque": 0.97,
+     "fixed": true,
      "lines": [
       "回覧板",
       "海岸のごみ拾い",
-      "8月25日（日）朝6時"
+      "8/25（日）朝6時"
      ],
      "t0": 0.8,
      "stamp": {
       "t": 4.4,
-      "text": "済"
+      "text": "済",
+      "pos": "tr"
      }
     },
     {
@@ -272,8 +277,10 @@
    "audio": {
     "veo": 0.8,
     "beds": [
-     "workshop"
-    ]
+     "workshop",
+     "cicadas_outside"
+    ],
+    "bed_gain": 6
    },
    "captions": [
     {
@@ -296,7 +303,7 @@
    },
    "holo": [
     {
-     "x": 0.6,
+     "x": 0.595,
      "y": 0.335,
      "w": 0.1,
      "lines": [
@@ -306,8 +313,8 @@
      "variant": "chalk"
     },
     {
-     "x": 0.395,
-     "y": 0.42,
+     "x": 0.4,
+     "y": 0.43,
      "w": 0.16,
      "lines": [
       "自由研究",

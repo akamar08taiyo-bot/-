@@ -134,7 +134,7 @@ for k, (sh, st) in enumerate(zip(T['shots'], starts)):
         pre = 0.0 if first else 1.0; post = 0.0 if last else 1.0
         L = dur + pre + post
         bed = fn(L + 0.5, 100 * k + b)[:int(L * SR)]
-        bed = norm_to(bed, target)
+        bed = norm_to(bed, target + sh.get('audio', {}).get('bed_gain', 0))  # bed_gain：そのカットだけ環境音を持ち上げる（dB）
         if name == 'insects_fade':
             bed *= np.clip(np.linspace(1.4, -0.2, len(bed)), 0, 1)[:, None]
         put(amb, bed * env_eq(len(bed), 2.5 if first else XF + 2 * pre, 3.0 if last else XF + 2 * post), st - pre)

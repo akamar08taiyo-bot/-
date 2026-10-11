@@ -428,7 +428,7 @@ def chalk(n, stagger=0.11, seed=42):
     # 透明な電子黒板が鳴らすチョークの音：1文字ごとに「カツ」、ときどき短い「スー」
     r = rng(seed); d = n * stagger + 1.0; out = np.zeros((int(d * SR), 2))
     for k in range(n):
-        at = k * stagger + r.uniform(-0.015, 0.015)
+        at = max(0.0, k * stagger + r.uniform(-0.015, 0.015))
         for j in range(r.integers(1, 3)):  # 1文字に1〜2画
             L = int(r.uniform(0.012, 0.022) * SR)
             click = bandpass(r.standard_normal(L), 1800, 6500, 2) * np.exp(-np.arange(L) / (0.004 * SR))

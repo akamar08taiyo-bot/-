@@ -1,7 +1,7 @@
 import data from './timeline.json';
 
 export type Caption = {t0: number; t1: number; text: string};
-export type Holo = {x: number; y: number; w: number; lines: string[]; t0: number; t1?: number; tilt?: number; small?: boolean; variant?: 'holo' | 'chalk'; stamp?: {t: number; text: string}};
+export type Holo = {x: number; y: number; w: number; lines: string[]; t0: number; t1?: number; tilt?: number; small?: boolean; variant?: 'holo' | 'chalk'; stamp?: {t: number; text: string; pos?: 'tr' | 'br'}; h?: number; opaque?: number; fixed?: boolean};
 export type ShotDef = {
   id: string;
   chapter: string;
@@ -16,7 +16,7 @@ export type ShotDef = {
   endCard?: {t0: number; t1: number; text: string; sub: string; note: string};
   holo?: Holo[];
   events?: {t: number; t_end?: number; type: string; gain?: number; n?: number}[];
-  audio?: {veo: number; veo_lp?: number; beds: string[]};
+  audio?: {veo: number; veo_lp?: number; bed_gain?: number; beds: string[]};
 };
 
 export const FPS: number = data.fps;

@@ -46,6 +46,23 @@ for sh in T['shots']:
             mus = mus * env[:, None]
     st += sh['dur'] - T['crossfade']
 
+# 曲の音量のならし：4秒ごとの音量を見て、大きすぎる区間だけ下げる（最大 -7 dB、上げるのは +2 dB まで）。章ごとの編成の差で、
+# 三章（フルート＋分散和音）だけ5 dB 以上大きかったため
+win = int(4.0 * SR); hopn = int(1.0 * SR)
+cent, lv = [], []
+for i in range(0, len(mus) - win, hopn):
+    seg = mus[i:i + win]
+    r = np.sqrt(np.mean(seg ** 2)) + 1e-9
+    cent.append(i + win // 2); lv.append(20 * np.log10(r))
+cent = np.array(cent); lv = np.array(lv)
+act = lv > -45
+if act.any():
+    ref = np.median(lv[act])
+    gdb = np.where(act, np.clip(ref - lv, -7.0, 2.0), 0.0)
+    gdb = np.convolve(gdb, np.ones(5) / 5, mode='same')  # 5秒でならす
+    curve = np.interp(np.arange(len(mus)), cent, gdb)
+    mus = mus * (10 ** (curve / 20))[:, None]
+
 mus_l = lufs(mus)
 amb_l = lufs(amb)
 mus = mus * 10 ** ((amb_l + 2.5 - mus_l) / 20)  # 曲を環境音より 2.5 dB 上に
