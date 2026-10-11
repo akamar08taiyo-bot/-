@@ -4,7 +4,7 @@ work/
 audio/out/
 public/clips/
 public/photos/
-assets/veo/*.mp4
+# assets/veo/*.mp4 は有料で生成した元動画なので保存する（作り直しに必要）
 # 作り直せる・使っていない大きなファイル
 audio/qa/
 assets/n04_pdf/*.pdf
