@@ -15,3 +15,5 @@ public/fonts/*.ttf
 !public/fonts/ZenOldMincho-Bold.ttf
 !public/fonts/ZenMaruGothic-Bold.ttf
 !public/fonts/ZenMaruGothic-Black.ttf
+__pycache__/
+*.pyc
