@@ -18,7 +18,7 @@ description: "YouTube チャンネル「存在しない街の記憶」系の動�
 | `references/episode-schema.md` | episode.json を書くとき |
 | `references/image-prompts.md` | 画像・動きの指示を書く／できた画像と動画を確かめるとき |
 | `references/sound.md` | 環境音・BGM・音量を決めるとき |
-| `references/publish.md` | タイトル・概要欄・投稿の設定 |
+| `references/publish.md` | チャンネルの初期設定・タイトル・概要欄・投稿の入力・公開後の運用 |
 | `references/qa.md` | 検品のエージェントに渡す |
 | `references/narration.md` | 語りを入れる特別な回だけ（標準の型には語りは無い） |
 
@@ -85,6 +85,7 @@ node <SKILL>/scripts/new-episode.mjs --town <ep>/town.json --series <シリー�
 
 1. `node <SKILL>/scripts/make-thumb.mjs --image <いちばん強い画像> --title "<町名>" [--sub "…"] --grade cinema --out <ep>/out/thumb.jpg` → Read で縮小しても読めるか確かめる
 2. タイトル案 3 つと概要欄（章をチャプターに）を `references/publish.md` の型で書き、`out/<id>_概要欄.txt` に保存。「この町は実在しない」「AI で生成」を必ず入れる
+3. 投稿の手順（アップロード画面で選ぶ値・終了画面・カード・固定コメント・再生リスト）は `references/publish.md` の 2〜3 章。チャンネルの初期設定がまだなら 1 章も伝える
 
 ## 7. 検品（別のエージェント 2 人を並列で）
 

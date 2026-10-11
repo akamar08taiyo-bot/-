@@ -121,7 +121,17 @@ if (fmt.openingCaption && shots[0]) {
   shots[0].captionStart = 1.5;
 }
 if (fmt.titleCard) shots.unshift({ card: { title: town.name, subtitle: `存在しない街の記憶 #${NNN}` }, dur: fmt.titleCard.dur });
-if (fmt.endCard) shots.push({ card: { title: town.name, subtitle: fmt.endCard.subtitle }, dur: fmt.endCard.dur, transition: 'fadeblack', transitionDur: 2 });
+// 最後のカード：最後の場面の画像をぼかした背景に、町名と「この町は実在しません」を上寄せで。
+// 下半分は YouTube の終了画面（次の動画・再生リスト・登録ボタン）を置く場所として空ける（終了画面は最後の 5〜20 秒）
+if (fmt.endCard) {
+  const lastImage = [...shots].reverse().find((s) => s.image)?.image;
+  shots.push({
+    card: { title: town.name, subtitle: fmt.endCard.subtitle, layout: fmt.endCard.layout || 'center', ...(lastImage ? { image: lastImage } : {}) },
+    dur: fmt.endCard.dur,
+    transition: 'fade',
+    transitionDur: 2,
+  });
+}
 const offset = fmt.titleCard ? 1 : 0; // タイトルカードがあると場面番号が 1 つずれる
 const lastShot = shots.length;
 

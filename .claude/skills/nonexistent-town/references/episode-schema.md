@@ -29,7 +29,7 @@
     { "image": "images/c01_02.png", "prompt": "…", "dur": 7, "move": "still", "transition": "cut" },
     { "image": "images/c01_03.png", "video": "clips/c01_03.mp4", "motion": "A few people walk slowly across the far end of the street; steam rises from a shop; the camera stays still", "dur": 6, "transition": "cut" },
     { "image": "images/c02_01.png", "prompt": "…", "dur": 9, "transition": "fade", "transitionDur": 1.2 },
-    { "card": { "title": "凪ヶ浦町", "subtitle": "この町は実在しません" }, "dur": 5, "transition": "fadeblack", "transitionDur": 2 }
+    { "card": { "title": "凪ヶ浦町", "subtitle": "この町は実在しません", "layout": "top", "image": "images/c08_18.png" }, "dur": 20, "transition": "fade", "transitionDur": 2 }
   ],
   "music": { "prompt": "Very soft ambient piano and acoustic guitar, sparse notes, calm and nostalgic, 60 BPM" },
   "audio": {
@@ -85,7 +85,10 @@
   - `fit`：`cover`（切り抜く）／`contain-blur`（全体を見せ、余白はぼかした同じ画像）
 - **AI 動画**：`video`（保存先）、`motion`（動きの指示）、`from`（元の動画の何秒目から）、`speed`、`audio`（false で動画の音を使わない）、`audioGain`（dB）
   - `image` と `video` を両方書いておくと、動画ができるまでは画像で、できたら動画で書き出す
-- **文字だけの場面**：`card: { title, subtitle, bg, color, font, size }`
+- **文字だけの場面**：`card: { title, subtitle, bg, color, font, size, layout, image, dim }`
+  - `layout`：`center`（真ん中）／`top`（上に寄せる。下半分を YouTube の終了画面の要素のために空ける）
+  - `image`：背景にする画像（ぼかして暗くする）。無ければ `bg` の色。`dim` は暗さ（既定 -0.22）
+  - 標準の型の最後は、最後の場面の画像を背景にした 20 秒のカード（終了画面は動画の最後の 5〜20 秒に置くため）
 - **テロップ**：`caption`（改行は `\n`）、`captionStart` `captionEnd`（**場面の頭**からの秒）、`captionPos`、`captionSize`、`captionFont`。省くと、つなぎが終わってから出て、次のつなぎの前に消える
 - **つなぎ** `transition`：`cut`（ふつうのカット）`fade`（ディゾルブ）`fadeblack`（黒へ）`fadewhite`（白へ）`fadegrays`（色が抜けながら）`blur`（にじみながら）`slideleft` `slideright` `circle`。長さは場面の 45% までに自動で縮む
 

@@ -6,84 +6,266 @@
   "clipStyle": "Subtle natural motion only, slow and calm; the camera is almost still or moves very slowly; keep the scene, lighting and composition of the input image; no text, no logos.",
   "cinematic": {
     "label": "横長・約 20 分の環境映像（標準回。参考動画と同じ型）",
-    "format": { "width": 1920, "height": 1080, "fps": 24 },
+    "format": {
+      "width": 1920,
+      "height": 1080,
+      "fps": 24
+    },
     "minutes": 20,
     "chapters": 8,
-    "dur": [6, 10],
-    "distance": { "wide": 2, "medium": 4, "close": 3, "detail": 1 },
-    "inChapter": { "transition": "cut" },
-    "betweenChapters": { "transition": "fade", "transitionDur": 1.2 },
-    "moves": ["still", "in", "right", "still", "left", "in", "still", "out", "hold"],
+    "dur": [
+      6,
+      10
+    ],
+    "distance": {
+      "wide": 2,
+      "medium": 4,
+      "close": 3,
+      "detail": 1
+    },
+    "inChapter": {
+      "transition": "cut"
+    },
+    "betweenChapters": {
+      "transition": "fade",
+      "transitionDur": 1.2
+    },
+    "moves": [
+      "still",
+      "in",
+      "right",
+      "still",
+      "left",
+      "in",
+      "still",
+      "out",
+      "hold"
+    ],
     "zoom": 0.05,
     "clipEvery": 5,
     "openingCaption": true,
     "titleCard": null,
-    "endCard": { "dur": 5, "subtitle": "この町は実在しません" },
-    "look": { "grade": "cinema", "grain": 0.18, "vignette": 0.15, "flicker": 0, "glow": 0.1, "letterbox": 0, "blur": 0 },
-    "text": { "font": "mincho", "position": "bl", "size": 0.034, "box": 0 },
+    "endCard": {
+      "dur": 20,
+      "subtitle": "この町は実在しません",
+      "layout": "top"
+    },
+    "look": {
+      "grade": "cinema",
+      "grain": 0.18,
+      "vignette": 0.15,
+      "flicker": 0,
+      "glow": 0.1,
+      "letterbox": 0,
+      "blur": 0
+    },
+    "text": {
+      "font": "mincho",
+      "position": "bl",
+      "size": 0.034,
+      "box": 0
+    },
     "stamp": false,
     "narration": "none",
-    "audio": { "bgmGain": -16, "ambienceGain": 6, "bedGain": 4, "clipGain": -2, "duck": 0, "loudness": -14 },
+    "audio": {
+      "bgmGain": -16,
+      "ambienceGain": 6,
+      "bedGain": 4,
+      "clipGain": -2,
+      "duck": 0,
+      "loudness": -14
+    },
     "startFade": 2,
     "endFade": 4
   },
   "short": {
     "label": "縦長・30〜45 秒（本編から切り出す紹介用）",
-    "format": { "width": 1080, "height": 1920, "fps": 24 },
+    "format": {
+      "width": 1080,
+      "height": 1920,
+      "fps": 24
+    },
     "minutes": 0.7,
     "chapters": 1,
-    "dur": [3.5, 5],
-    "distance": { "wide": 2, "medium": 3, "close": 2, "detail": 1 },
-    "inChapter": { "transition": "cut" },
-    "betweenChapters": { "transition": "fade", "transitionDur": 0.8 },
-    "moves": ["in", "still", "up", "in", "still", "out"],
+    "dur": [
+      3.5,
+      5
+    ],
+    "distance": {
+      "wide": 2,
+      "medium": 3,
+      "close": 2,
+      "detail": 1
+    },
+    "inChapter": {
+      "transition": "cut"
+    },
+    "betweenChapters": {
+      "transition": "fade",
+      "transitionDur": 0.8
+    },
+    "moves": [
+      "in",
+      "still",
+      "up",
+      "in",
+      "still",
+      "out"
+    ],
     "zoom": 0.07,
     "clipEvery": 3,
     "openingCaption": true,
     "titleCard": null,
     "endCard": null,
-    "look": { "grade": "cinema", "grain": 0.18, "vignette": 0.15, "flicker": 0, "glow": 0.1, "letterbox": 0, "blur": 0 },
-    "text": { "font": "mincho", "position": "tc", "size": 0.03, "box": 0.2 },
+    "look": {
+      "grade": "cinema",
+      "grain": 0.18,
+      "vignette": 0.15,
+      "flicker": 0,
+      "glow": 0.1,
+      "letterbox": 0,
+      "blur": 0
+    },
+    "text": {
+      "font": "mincho",
+      "position": "tc",
+      "size": 0.03,
+      "box": 0.2
+    },
     "stamp": false,
     "narration": "none",
-    "audio": { "bgmGain": -14, "ambienceGain": 6, "bedGain": 4, "clipGain": -2, "duck": 0, "loudness": -14 },
+    "audio": {
+      "bgmGain": -14,
+      "ambienceGain": 6,
+      "bedGain": 4,
+      "clipGain": -2,
+      "duck": 0,
+      "loudness": -14
+    },
     "startFade": 0.5,
     "endFade": 1.5
   },
   "slow": {
     "label": "横長・30〜60 分のゆっくりした作業用（参考動画の型ではない。長尺が欲しいときだけ）",
-    "format": { "width": 1920, "height": 1080, "fps": 24 },
+    "format": {
+      "width": 1920,
+      "height": 1080,
+      "fps": 24
+    },
     "minutes": 45,
     "chapters": 6,
-    "dur": [30, 50],
-    "distance": { "wide": 4, "medium": 4, "close": 2, "detail": 0 },
-    "inChapter": { "transition": "fade", "transitionDur": 3 },
-    "betweenChapters": { "transition": "fade", "transitionDur": 4 },
-    "moves": ["in", "right", "out", "left"],
+    "dur": [
+      30,
+      50
+    ],
+    "distance": {
+      "wide": 4,
+      "medium": 4,
+      "close": 2,
+      "detail": 0
+    },
+    "inChapter": {
+      "transition": "fade",
+      "transitionDur": 3
+    },
+    "betweenChapters": {
+      "transition": "fade",
+      "transitionDur": 4
+    },
+    "moves": [
+      "in",
+      "right",
+      "out",
+      "left"
+    ],
     "zoom": 0.08,
     "clipEvery": 0,
     "openingCaption": true,
     "titleCard": null,
-    "endCard": { "dur": 6, "subtitle": "この町は実在しません" },
-    "look": { "grade": "cinema", "grain": 0.18, "vignette": 0.2, "flicker": 0, "glow": 0.1, "letterbox": 0, "blur": 0 },
-    "text": { "font": "mincho", "position": "bl", "size": 0.034, "box": 0 },
+    "endCard": {
+      "dur": 20,
+      "subtitle": "この町は実在しません",
+      "layout": "top"
+    },
+    "look": {
+      "grade": "cinema",
+      "grain": 0.18,
+      "vignette": 0.2,
+      "flicker": 0,
+      "glow": 0.1,
+      "letterbox": 0,
+      "blur": 0
+    },
+    "text": {
+      "font": "mincho",
+      "position": "bl",
+      "size": 0.034,
+      "box": 0
+    },
     "stamp": false,
     "narration": "none",
-    "audio": { "bgmGain": -12, "ambienceGain": 6, "bedGain": 4, "clipGain": -2, "duck": 0, "loudness": -18 },
+    "audio": {
+      "bgmGain": -12,
+      "ambienceGain": 6,
+      "bedGain": 4,
+      "clipGain": -2,
+      "duck": 0,
+      "loudness": -18
+    },
     "startFade": 3,
     "endFade": 6
   },
   "chapterThemes": {
     "_note": "章の流れのひな形（季節と時間が一方向に進む）。{place} は街のカードの場所、{season} は季節に置き換わる。毎回この並びのままにしない（plan.md で入れ替える）",
     "list": [
-      { "theme": "町に入る", "season": "春", "time": "朝", "hint": "遠景から入り、{place} へ。町の全体の形と空気を見せる" },
-      { "theme": "通りと人の行き来", "season": "春", "time": "昼", "hint": "{place} のまわりの通学・通勤・買い物の行き来" },
-      { "theme": "暮らしの場所", "season": "夏", "time": "昼", "hint": "{place} の店先・台所・作業場。手元や道具の寄り" },
-      { "theme": "夕方の町", "season": "夏", "time": "夕方", "hint": "{place} に灯りがともる。長い影、帰り道" },
-      { "theme": "雨の日", "season": "秋", "time": "昼", "hint": "雨上がりの {place}。濡れた路面、軒下、湯気" },
-      { "theme": "仕事の場所", "season": "秋", "time": "朝", "hint": "{place} で働く人の後ろ姿・遠景。季節の物" },
-      { "theme": "冬の町", "season": "冬", "time": "夕方", "hint": "雪の {place}。窓の灯り、白い息、静けさ" },
-      { "theme": "夜と余韻", "season": "冬", "time": "夜", "hint": "灯りが一つずつ消えていく {place}。町を離れる" }
+      {
+        "theme": "町に入る",
+        "season": "春",
+        "time": "朝",
+        "hint": "遠景から入り、{place} へ。町の全体の形と空気を見せる"
+      },
+      {
+        "theme": "通りと人の行き来",
+        "season": "春",
+        "time": "昼",
+        "hint": "{place} のまわりの通学・通勤・買い物の行き来"
+      },
+      {
+        "theme": "暮らしの場所",
+        "season": "夏",
+        "time": "昼",
+        "hint": "{place} の店先・台所・作業場。手元や道具の寄り"
+      },
+      {
+        "theme": "夕方の町",
+        "season": "夏",
+        "time": "夕方",
+        "hint": "{place} に灯りがともる。長い影、帰り道"
+      },
+      {
+        "theme": "雨の日",
+        "season": "秋",
+        "time": "昼",
+        "hint": "雨上がりの {place}。濡れた路面、軒下、湯気"
+      },
+      {
+        "theme": "仕事の場所",
+        "season": "秋",
+        "time": "朝",
+        "hint": "{place} で働く人の後ろ姿・遠景。季節の物"
+      },
+      {
+        "theme": "冬の町",
+        "season": "冬",
+        "time": "夕方",
+        "hint": "雪の {place}。窓の灯り、白い息、静けさ"
+      },
+      {
+        "theme": "夜と余韻",
+        "season": "冬",
+        "time": "夜",
+        "hint": "灯りが一つずつ消えていく {place}。町を離れる"
+      }
     ]
   },
   "soundPresets": {
@@ -108,13 +290,29 @@
   },
   "themeSounds": {
     "_note": "章のテーマ → 足す環境音（街のカードの音とは別に）",
-    "町に入る": ["birds"],
-    "通りと人の行き来": ["crowd"],
-    "暮らしの場所": ["room"],
-    "夕方の町": ["crowd"],
-    "雨の日": ["rain"],
-    "仕事の場所": ["hum"],
-    "冬の町": ["wind"],
-    "夜と余韻": ["room"]
+    "町に入る": [
+      "birds"
+    ],
+    "通りと人の行き来": [
+      "crowd"
+    ],
+    "暮らしの場所": [
+      "room"
+    ],
+    "夕方の町": [
+      "crowd"
+    ],
+    "雨の日": [
+      "rain"
+    ],
+    "仕事の場所": [
+      "hum"
+    ],
+    "冬の町": [
+      "wind"
+    ],
+    "夜と余韻": [
+      "room"
+    ]
   }
 }

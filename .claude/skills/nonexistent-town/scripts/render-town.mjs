@@ -170,19 +170,38 @@ function renderShot(s) {
     if (!font) throw new Error('日本語の書体が見つかりません（references/episode-schema.md の「書体」）');
     const F = 0.7;
     const a = `'if(lt(t,${F}),t/${F},if(lt(t,${num(s.dur - F)}),1,max(0,(${num(s.dur)}-t)/${F})))'`;
+    const titleSize = Math.round(H * (c.size || (c.layout === 'top' ? 0.06 : 0.075)));
+    // layout: center（真ん中）／top（上に寄せる。下に YouTube の終了画面の要素を置く場所を空ける）
+    const titleY = c.layout === 'top' ? `${Math.round(H * 0.12)}` : `(h-th)/2-${Math.round(H * (c.subtitle ? 0.04 : 0))}`;
+    const subY = c.layout === 'top' ? `${Math.round(H * 0.12 + titleSize * 1.35)}` : `(h/2)+${Math.round(H * 0.045)}`;
     const parts = [];
     if (c.title) {
       parts.push(
-        `drawtext=fontfile='${escPath(font)}':textfile='${textFile(`card${s.i}_t`, c.title)}':expansion=none:fontsize=${Math.round(H * (c.size || 0.075))}:fontcolor=${hex(c.color || text.color)}:x=(w-tw)/2:y=(h-th)/2-${Math.round(H * (c.subtitle ? 0.04 : 0))}:alpha=${a}`,
+        `drawtext=fontfile='${escPath(font)}':textfile='${textFile(`card${s.i}_t`, c.title)}':expansion=none:fontsize=${titleSize}:fontcolor=${hex(c.color || text.color)}:x=(w-tw)/2:y=${titleY}:alpha=${a}`,
       );
     }
     if (c.subtitle) {
       parts.push(
-        `drawtext=fontfile='${escPath(font)}':textfile='${textFile(`card${s.i}_s`, c.subtitle)}':expansion=none:fontsize=${Math.round(H * 0.03)}:fontcolor=${hex(c.color || text.color, 0.8)}:x=(w-tw)/2:y=(h/2)+${Math.round(H * 0.045)}:alpha=${a}`,
+        `drawtext=fontfile='${escPath(font)}':textfile='${textFile(`card${s.i}_s`, c.subtitle)}':expansion=none:fontsize=${Math.round(H * 0.03)}:fontcolor=${hex(c.color || text.color, 0.8)}:x=(w-tw)/2:y=${subY}:alpha=${a}`,
       );
     }
-    const vf = [`format=yuv420p`, ...parts].join(',');
-    ffmpeg(['-f', 'lavfi', '-i', `color=c=${hex(c.bg || '#0b0b0d')}:s=${W}x${H}:r=${FPS}:d=${num(s.dur + PAD / FPS)}`, '-vf', vf, ...segEnc(NP), seg], { label: `場面 ${s.i + 1}（タイトル）` });
+    const bgImg = c.image && fs.existsSync(rel(c.image)) ? rel(c.image) : null;
+    if (bgImg) {
+      // 背景は画像をぼかして暗くしたもの（最後の場面の画像などを指定）
+      const vf = [
+        `scale=${W}:${H}:force_original_aspect_ratio=increase`,
+        `crop=${W}:${H}`,
+        `gblur=sigma=${Math.round(14 * (W / 1920)) + 2}`,
+        `eq=brightness=${c.dim ?? -0.22}:saturation=0.75`,
+        `fps=${FPS}`,
+        'format=yuv420p',
+        ...parts,
+      ].join(',');
+      ffmpeg(['-loop', '1', '-framerate', String(FPS), '-i', bgImg, '-vf', vf, ...segEnc(NP), seg], { label: `場面 ${s.i + 1}（文字だけの場面）` });
+    } else {
+      const vf = [`format=yuv420p`, ...parts].join(',');
+      ffmpeg(['-f', 'lavfi', '-i', `color=c=${hex(c.bg || '#0b0b0d')}:s=${W}x${H}:r=${FPS}:d=${num(s.dur + PAD / FPS)}`, '-vf', vf, ...segEnc(NP), seg], { label: `場面 ${s.i + 1}（文字だけの場面）` });
+    }
     return seg;
   }
 
