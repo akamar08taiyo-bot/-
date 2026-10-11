@@ -1,0 +1,189 @@
+<title>__TITLE__</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&display=swap">
+<style>
+/* 夕暮れの路地：街灯の琥珀色を一点だけ。紙焼き写真のような落ち着いた余白、1列 */
+:root {
+  --bg: #eef0f2;
+  --surface: #f8f8f7;
+  --ink: #1d2230;
+  --muted: #5d6474;
+  --line: #d5d9e0;
+  --amber: #b4661a;
+  --amber-ink: #ffffff;
+  --track: #dde1e7;
+  --ok: #2f7a4f;
+  --bad: #b23b2e;
+  --display: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --body: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151c; --surface: #1a1e27; --ink: #ece8df; --muted: #a3a7b2; --line: #2c3240;
+    --amber: #f0a94b; --amber-ink: #1a1206; --track: #2a303c; --ok: #6cc391; --bad: #f08a7c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151c; --surface: #1a1e27; --ink: #ece8df; --muted: #a3a7b2; --line: #2c3240;
+  --amber: #f0a94b; --amber-ink: #1a1206; --track: #2a303c; --ok: #6cc391; --bad: #f08a7c;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.7; }
+.wrap { max-width: 34rem; margin: 0 auto; padding-inline: 16px; padding-block: 24px 48px; display: grid; gap: 22px; }
+.wrap > * { min-width: 0; }
+p, li, dd, h1, h2 { overflow-wrap: anywhere; }
+.poster { width: 100%; max-width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 10px; display: block; background: var(--track); }
+.eyebrow { font-size: 12px; letter-spacing: 0.12em; color: var(--muted); margin: 0 0 4px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: 1.75rem; line-height: 1.35; margin: 0; text-wrap: balance; }
+.lead { margin: 6px 0 0; color: var(--muted); }
+dl.meta { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; padding-block: 14px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+dl.meta dt { color: var(--muted); font-size: 13px; }
+dl.meta dd { margin: 0; min-width: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.action { display: grid; gap: 10px; }
+button#save { appearance: none; border: 0; border-radius: 999px; background: var(--amber); color: var(--amber-ink); font: 600 16px/1 var(--body); padding: 16px 22px; cursor: pointer; width: 100%; }
+button#save:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+button#save:disabled { opacity: 0.55; cursor: default; }
+.bar { height: 8px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.bar > span { display: block; height: 100%; width: 0%; background: var(--amber); transition: width 0.2s linear; }
+@media (prefers-reduced-motion: reduce) { .bar > span { transition: none; } }
+.status { margin: 0; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 1.7em; }
+.status.ok { color: var(--ok); }
+.status.bad { color: var(--bad); }
+h2 { font-family: var(--display); font-weight: 500; font-size: 1.15rem; margin: 0 0 6px; }
+ol.steps { margin: 0; padding-left: 1.4em; display: grid; gap: 6px; }
+.note { margin: 0; font-size: 13px; color: var(--muted); }
+</style>
+
+<main class="wrap">
+  <img class="poster" src="thumb.jpg" alt="__NAME__ のサムネイル">
+  <header>
+    <p class="eyebrow">__EYEBROW__</p>
+    <h1>__NAME__</h1>
+    <p class="lead">YouTube にアップロードするための動画ファイルです。</p>
+  </header>
+
+  <dl class="meta">
+    <dt>ファイル名</dt><dd id="fname">__FILENAME__</dd>
+    <dt>大きさ</dt><dd id="fsize">約 __SIZE_MB__ MB</dd>
+    <dt>画質</dt><dd>__RES__</dd>
+    <dt>長さ</dt><dd>__DURATION__</dd>
+    <dt>音</dt><dd>−14 LUFS（YouTube の音量の基準）</dd>
+  </dl>
+
+  <section class="action" aria-live="polite">
+    <button id="save" type="button">動画を保存する（約 __SIZE_MB__ MB）</button>
+    <div class="bar" role="progressbar" aria-label="読み込みの進み具合" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="fill"></span></div>
+    <p class="status" id="status">Wi-Fi につないでから押してください。読み込みに数分かかります。</p>
+  </section>
+
+  <section>
+    <h2>保存のしかた</h2>
+    <ol class="steps">
+      <li>「動画を保存する」を押すと、動画の読み込みが始まります。終わるまでこの画面を開いたままにしてください。</li>
+      <li>読み込みが終わると、保存の確認が出ます。iPhone では共有メニューから「ビデオを保存」（写真アプリへ）か「"ファイル"に保存」を選びます。</li>
+      <li>YouTube アプリか YouTube Studio からアップロードします。タイトル・概要欄・タグは「YouTube公開用」の一覧からコピーしてください。</li>
+    </ol>
+  </section>
+
+  <p class="note">元の動画（約__ORIG__）を、画質を保ったまま小さくした版です。YouTube はアップロードされた動画をさらに圧縮して配信するため、見た目の差はほとんどありません。</p>
+</main>
+
+<script>
+const PARTS = __PARTS__;
+const TOTAL = PARTS.reduce((s, p) => s + p.size, 0);
+const FILENAME = "__FILENAME__";
+const btn = document.getElementById("save");
+const fill = document.getElementById("fill");
+const bar = fill.parentElement;
+const statusEl = document.getElementById("status");
+const MB = (n) => (n / 1e6).toFixed(0);
+
+let downloads;            // undefined = まだ分からない、null = この画面では使えない
+let assembled = null;     // 一度組み立てた動画（保存をやめても、読み込み直さずにもう一度保存できる）
+
+function say(text, kind) {
+  statusEl.textContent = text;
+  statusEl.className = "status" + (kind ? " " + kind : "");
+}
+function progress(done) {
+  const pct = Math.min(100, Math.round((done / TOTAL) * 100));
+  fill.style.width = pct + "%";
+  bar.setAttribute("aria-valuenow", String(pct));
+  return pct;
+}
+
+const ready = (window.claude && typeof window.claude.use === "function")
+  ? window.claude.use("downloads").then((ns) => { downloads = ns; return ns; }, () => { downloads = null; return null; })
+  : Promise.resolve(null).then(() => { downloads = null; return null; });
+
+async function fetchAll() {
+  const blobs = [];
+  let done = 0;
+  for (const part of PARTS) {
+    const res = await fetch(part.path, { cache: "no-store" });
+    if (!res.ok) throw new Error("part " + part.path + " " + res.status);
+    let got = 0;
+    if (res.body && res.body.getReader) {
+      const reader = res.body.getReader();
+      const pieces = [];
+      for (;;) {
+        const { done: end, value } = await reader.read();
+        if (end) break;
+        pieces.push(value);
+        got += value.byteLength;
+        const pct = progress(done + got);
+        say("読み込み中… " + pct + "%（" + MB(done + got) + " / " + MB(TOTAL) + " MB）");
+      }
+      blobs.push(new Blob(pieces));
+    } else {
+      const buf = await res.arrayBuffer();
+      got = buf.byteLength;
+      blobs.push(new Blob([buf]));
+    }
+    if (got !== part.size) throw new Error("size " + part.path + " " + got + "/" + part.size);
+    done += got;
+    const pct = progress(done);
+    say("読み込み中… " + pct + "%（" + MB(done) + " / " + MB(TOTAL) + " MB）");
+  }
+  const blob = new Blob(blobs, { type: "video/mp4" });
+  if (blob.size !== TOTAL) throw new Error("total " + blob.size + "/" + TOTAL);
+  return blob;
+}
+
+const MESSAGES = {
+  declined: ["保存をやめました。もう一度押すと、読み込み直さずに保存の確認が出ます。", ""],
+  too_large: ["このアプリでは200MBを超えるファイルを保存できません。Safari などのブラウザで claude.ai を開き、このページから保存してください。", "bad"],
+  rate_limited: ["別の確認画面が開いています。閉じてから、もう一度押してください。", "bad"],
+  unavailable: ["この画面では保存できません。ブラウザで claude.ai を開き、このページから保存してください。", "bad"],
+};
+
+btn.addEventListener("click", async () => {
+  btn.disabled = true;
+  try {
+    if (downloads === undefined) { say("準備しています…"); await ready; }
+    if (!downloads) { say(MESSAGES.unavailable[0], "bad"); return; }
+    if (!assembled) {
+      say("読み込み中… 0%");
+      assembled = await fetchAll();
+    }
+    say("保存の確認を待っています…");
+    const result = await downloads.save({ filename: FILENAME, data: assembled });
+    if (result && result.status === "saved") {
+      say("保存しました。写真アプリか「ファイル」アプリに「" + FILENAME + "」があるか確かめてください。", "ok");
+    } else {
+      say("保存の画面に渡しました。", "ok");
+    }
+  } catch (err) {
+    const code = err && err.code;
+    if (code && MESSAGES[code]) say(MESSAGES[code][0], MESSAGES[code][1]);
+    else if (code === "not_granted" || code === "capability_disabled" || code === "capability_removed") say(MESSAGES.unavailable[0], "bad");
+    else if (code) say("保存できませんでした（" + code + "）。もう一度押してください。", "bad");
+    else { assembled = null; progress(0); say("読み込みが途中で止まりました。通信の良い所で、もう一度押してください。", "bad"); }
+  } finally {
+    btn.disabled = false;
+  }
+});
+</script>
