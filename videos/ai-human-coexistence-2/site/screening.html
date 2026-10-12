@@ -1,9 +1,9 @@
-<title>AIと人間の共存 第一章</title>
+<title>砂の向こうから来た男</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@400;700&display=swap">
 <style>
-  /* 夜の海辺の上映室：暗い一色に、ランタンの琥珀を一点だけ。題字は本編と同じ明朝、本文は角ゴシック */
+  /* 夜の砂丘の上映室：暗い一色に、ランタンの琥珀を一点だけ。題字は本編と同じ明朝、本文は角ゴシック（第一章と同じ部屋） */
   :root {
     --night: #0b0f17;      /* 背景：月のない夜の海 */
     --deck: #131a26;       /* 一段明るい面：桟橋の板の影 */
@@ -51,7 +51,7 @@
   .status { font-size: 13px; color: var(--mist); min-height: 1.4em; }
 
   h2 { font-family: var(--display); font-weight: 700; font-size: 20px; letter-spacing: 0.14em; margin: 0 0 12px; }
-  .chapters { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .chapters { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   .chapter {
     width: 100%; height: 100%; text-align: left; font: inherit; color: inherit; background: var(--deck);
     border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; cursor: pointer;
@@ -60,7 +60,7 @@
   .chapter:hover { border-color: rgba(232, 166, 76, 0.5); }
   .chapter[aria-current="true"] { border-color: var(--lantern); box-shadow: inset 3px 0 0 var(--lantern); }
   .num { grid-row: span 3; font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1.1; color: var(--lantern); min-width: 1.2em; }
-  .chapter[data-kind="teaser"] .num { font-size: 15px; letter-spacing: 0.1em; padding-top: 4px; }
+  .chapter[data-kind="teaser"] .num, .chapter[data-kind="memory"] .num { font-size: 15px; letter-spacing: 0.1em; padding-top: 4px; }
   .cname { font-family: var(--display); font-size: 16px; letter-spacing: 0.08em; }
   .clock { font-size: 12px; color: var(--mist); letter-spacing: 0.06em; }
   .stamp { font-size: 12px; color: var(--sea); font-variant-numeric: tabular-nums; letter-spacing: 0.06em; }
@@ -80,9 +80,9 @@
 
 <div class="wrap">
   <header>
-    <div class="eyebrow">第一章　6分51秒　2080年8月24日（土）</div>
-    <h1>AIと人間の共存</h1>
-    <p class="sub">まだ来ない未来なのに、懐かしい。昭和を残した2080年の海辺の町</p>
+    <div class="eyebrow">AIと人間の共存　第二章　7分37秒　2080年8月25日（日）</div>
+    <h1>砂の向こうから来た男</h1>
+    <p class="sub">変わっていくものと、変わらないもの。僕の大好きなあの頃は、そのままに。</p>
   </header>
 
   <section class="screen" aria-label="映像">
@@ -108,35 +108,36 @@
 
   <section class="about" aria-label="この映像について">
     <div>
-      <h2>継町の一日</h2>
-      <p>空を飛行車が行き交い、ガラスの塔が建ち並んでも、海辺の坂の町「継町（つぎまち）」の人たちは、古いものを直しながら暮らしています。沖には、団地が重なる島「継島（つぎしま）」。町とは渡し船と空のりばで結ばれています。</p>
-      <p>ロボットは“ご近所さん”。トラックの運転手も、学校の先生もロボットです。黒板は透明な電子黒板に、回覧板は透明な電子パネルになりました。それでも、はんこを押す回覧板や、チョークの音、瓶の牛乳は残っています。</p>
-      <p>夜明けの水揚げから、夏祭りの海上花火まで。説明はせず、短い言葉と暮らしの音だけで一日をたどります。</p>
+      <h2>継島の日曜日</h2>
+      <p>2026年の夏の夕暮れ、ひとりの男が、人のいなくなった島の見える浜から砂丘を越えました。その先にあったのは、2080年の、昭和のままの島でした。</p>
+      <p>空中電車の下の喫茶店のモーニング、牛丼屋のオレンジの看板、ロボットに鏝の使い方を教える左官の親方。日曜の駄菓子屋では、電話を木の箱にあずけて遊びます。</p>
+      <p>せりふは、ほとんどありません。ラジオ体操のカード、交換日記の日付、柱の傷、一枚のお守り。画面のすみの小さな手がかりから、物語をたどってください。</p>
     </div>
     <dl class="facts">
-      <dt>尺</dt><dd>6分51秒（26カット、1080p／30fps）</dd>
+      <dt>尺</dt><dd>7分37秒（30カット、1080p／30fps）</dd>
       <dt>音</dt><dd>テーマ曲入り（-14 LUFS）と、音楽なしの環境音のみ（-16 LUFS）。上のボタンで切り替え</dd>
       <dt>舞台</dt><dd>継町と継島（どちらも架空）</dd>
-      <dt>映像</dt><dd>画像は Gemini で生成・選別・修正、動きは Veo で生成し、半速のスローに</dd>
-      <dt>文字・音楽</dt><dd>空中の電子版、浮かび上がる文字、環境音の一部、テーマ曲はプログラムで制作したオリジナル。終わりのあいさつは AI 音声</dd>
+      <dt>映像</dt><dd>画像は Gemini で生成・選別・修正、動きは Veo で生成し、スローに。喫茶店と境内の缶蹴りの2カットは、いまは静止画（あとで動画に差し替え）</dd>
+      <dt>文字・音楽</dt><dd>カード・日記・柱・お守りの手書きの字、空中の電子版とタブレット、環境音の一部、テーマ曲はプログラムで制作したオリジナル。終わりのあいさつは AI 音声</dd>
     </dl>
   </section>
 
-  <p class="note">この映像の街・人物・出来事はすべて架空です。実在の場所・人物・団体とは関係ありません。第二章の予告は、ある連続ドラマの雰囲気へのオマージュとして作ったオリジナルの場面で、作品の名前・人物・音楽は使っていません。</p>
+  <p class="note">この映像の街・人物・出来事はすべて架空です。実在の場所・人物・団体とは関係ありません。砂丘とスーツの男の場面は、ある連続ドラマの雰囲気へのオマージュとして作ったオリジナルの場面で、作品の名前・人物・音楽は使っていません。店の名前と看板も、この町のオリジナルです。</p>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js"></script>
 <script>
   // 章（本編の章題と同じ漢数字と時刻）
   const CHAPTERS = [
-    {num: '序', name: '夜明け前', clock: '午前四時五十五分', t: 0, scenes: '桟橋から見る継島、灯台、空をゆく飛行車'},
-    {num: '一', name: '夜明け', clock: '午前五時四十分', t: 24, scenes: '漁港の水揚げ、瓶で届く牛乳'},
-    {num: '二', name: '朝', clock: '午前七時四十分', t: 53, scenes: '渡し船、ロボットが運転するトラック、湯けむりの坂、商店街、電子の回覧板、電器店の修理、透明な黒板の教室'},
-    {num: '三', name: '昼さがり', clock: '午後零時十分', t: 157, scenes: '港の中華そば、入道雲の桟橋、島の屋上と菜園、空のりば、畳の居間'},
-    {num: '四', name: '夕暮れ', clock: '午後五時', t: 246, scenes: '五時のチャイム、帰ってきた扇風機、雨上がりの路地、灯りがともる湾'},
-    {num: '五', name: '夏祭り', clock: '午後七時四十分', t: 305, scenes: '夜店、盆踊り、海上花火、屋上の二人'},
-    {num: '結', name: '月の道', clock: '深夜', t: 364, scenes: '月の道が光る海、終わりのあいさつ'},
-    {num: '予告', name: '第二章', clock: '砂の向こうから来た男', t: 395, kind: 'teaser', scenes: '夕暮れの砂丘、ロボットが運転するトラックと、スーツの男'},
+    {num: '序', name: '砂の向こう', clock: '2026年8月24日', t: 0, scenes: '人のいない島の見える浜、舞い上がる砂、灯りの島と花火'},
+    {num: '一', name: '夜明け', clock: '午前五時四十分', t: 39, scenes: '海沿いの道をゆくトラック、浜のラジオ体操'},
+    {num: '二', name: '朝', clock: '午前八時十分', t: 69, scenes: '喫茶店のモーニングと空中のタブレット、左官と職人と差し入れ、電話をあずける駄菓子屋、小さな四駆、縁台のめんこと将棋'},
+    {num: '三', name: '昼さがり', clock: '午後零時十分', t: 152, scenes: '牛丼屋、島への船、麦茶、交換日記、柱の傷'},
+    {num: 'あの頃', name: '昭和六十一年', clock: '回想', t: 241, kind: 'memory', scenes: '神社の秋、雪の正月、授業参観、消えていく灯り、最後の花火、別れの朝'},
+    {num: '四', name: '夕暮れ', clock: '午後五時', t: 325, scenes: '高台の神社、五時のチャイム、境内の缶蹴り'},
+    {num: '五', name: '線香花火', clock: '午後七時五十分', t: 354, scenes: '灯りの島、線香花火、お守り、屋上の三人'},
+    {num: '結', name: '月の道', clock: '深夜', t: 414, scenes: '月の道と、宇宙へ向かう船の灯り、終わりのあいさつ'},
+    {num: '予告', name: '第三章', clock: '台風の夜', t: 440, kind: 'teaser', scenes: '黒い雲の迫る湾、雨戸を閉める男とロボット'},
   ];
   const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
   const video = document.getElementById('film');

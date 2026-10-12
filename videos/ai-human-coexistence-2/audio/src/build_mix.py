@@ -71,6 +71,7 @@ BEDS = {  # 名前: (生成関数, 目標ラウドネス LUFS)
     'siphon': (lambda d, k: S.siphon(d, seed=k), -40),
     'cafe_room': (lambda d, k: S.crowd(d, seed=k, far=True, density=0.35) + S.clock_tick(d, seed=k + 2) * 0.3, -41),
     'kids_far': (lambda d, k: S.kids(d, seed=k), -38),
+    'sparkler': (lambda d, k: S.sparkler(d, seed=k), -34),
 }
 # だんだん強く／弱くするベッド（カットの長さに対する割合で）
 RAMP = {'sand_rise': lambda u: np.clip(0.12 + 1.1 * u ** 1.6, 0, 1), 'sand_fall': lambda u: np.clip(1.0 - u * 4.5, 0.0, 1)}

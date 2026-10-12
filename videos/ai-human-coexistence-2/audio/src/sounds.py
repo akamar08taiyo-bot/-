@@ -577,3 +577,19 @@ def stamp_paper(seed=60):
     knock = bandpass(r.standard_normal(len(t)), 600, 3000, 2) * np.exp(-t / 0.01) * 0.7
     body = fade(thump + knock, 0.001, 0.05)
     return convolve_st(np.stack([body, body], 1), reverb_ir(0.8, 0.3, seed, lp=5000), 0.3) * 0.5
+
+
+def sparkler(dur, seed=61):
+    # 線香花火のパチパチ：ごく短い乾いた音が、2〜5個ずつ固まって鳴る＋細い火花のシュー
+    r = rng(seed); n = int(dur * SR); out = np.zeros((n, 2)); t = r.uniform(0, 0.1)
+    while t < dur:
+        for j in range(int(r.integers(1, 6))):
+            L = int(r.uniform(0.002, 0.006) * SR)
+            c = bandpass(r.standard_normal(L), 2500, 11000, 2) * np.exp(-np.arange(L) / (0.0012 * SR))
+            i = int((t + j * r.uniform(0.005, 0.03)) * SR)
+            if i + L < n:
+                out[i:i + L] += pan(c * r.uniform(0.3, 1.0), r.uniform(-0.3, 0.3))
+        t += r.exponential(1 / 14)
+    hiss = bandpass(pink(n, seed), 3000, 9000, 2) * 0.03 * smooth_noise(dur, 0.5, seed, 0.5, 1.0)
+    out += np.stack([hiss, hiss], 1)
+    return convolve_st(out, reverb_ir(0.5, 0.2, seed, lp=9000), 0.2) * 0.4

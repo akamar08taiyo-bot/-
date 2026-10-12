@@ -65,7 +65,8 @@ export const VShot: React.FC<{id: string}> = ({id}) => {
             <Img src={staticFile(`clips/${id}_last.jpg`)} style={{position: 'absolute', width: 1920, height: 1080}} />
           </Sequence>
         )}
-        {(def.ink ?? []).map((k, i) => (
+        {/* bake: true の字はクリップに焼き込み済み（scripts/bake_ink.py）なので、ここでは描かない */}
+        {(def.ink ?? []).filter((k) => !k.bake).map((k, i) => (
           <InkPlane key={`ink${i}`} def={k} t={t} corners={corners(k.quad, k.track)} />
         ))}
         {(def.holo ?? []).map((h, i) => (

@@ -22,6 +22,11 @@
 #     c0, c1：色の差のしきい値（既定 6, 12）、r_lo, r_hi：明るさの比の下限・上限（既定 0.45, 1.4）
 #     shadow（既定 true）：暗くなって青みがかった所（s_lo〜s_hi、s_db、s_da）は影とみなして隠さない
 #   t0, t1：全体の出る・消える時刻（クリップの時刻）
+#
+# カットの "shade": [{x, y, rx, ry, k, soft}] … 楕円の所を暗くする（夜の場面で、顔を暗がりに沈めてシルエットにする）。
+#   x, y は中心、rx, ry は半径（画面の割合）、k は明るさの倍率（0.2 なら 2割）、soft はぼかしの幅（半径に対する割合）
+#   skin: true なら、楕円の中の肌の色の所だけを暗くする（夜空に暗い輪が出ない）
+# カットの "grade": "<ffmpeg のフィルター>" … 焼き込みの最後にかける色の調整（例：夜を深くする curves）。memory の色より先にかかる
 import argparse, json, math, os, shutil, subprocess
 from pathlib import Path
 import cv2
@@ -190,6 +195,19 @@ def main():
     shot = next(s for s in tl['shots'] if s['id'] == cid)
     inks = [k for k in shot.get('ink', []) if k.get('bake')]
     memory = bool(shot.get('memory'))
+    shade = None
+    if shot.get('shade'):
+        # 楕円ごとに、重み（中心で 1、外で 0）と、囲む四角を用意する。skin:true の楕円は、コマごとに肌の色の所だけを暗くする
+        shade = []
+        for e in shot['shade']:
+            x0_ = max(0, int((e['x'] - e['rx'] * (1 + e.get('soft', 0.6))) * W)); x1_ = min(W, int((e['x'] + e['rx'] * (1 + e.get('soft', 0.6))) * W) + 1)
+            y0_ = max(0, int((e['y'] - e['ry'] * (1 + e.get('soft', 0.6))) * H)); y1_ = min(H, int((e['y'] + e['ry'] * (1 + e.get('soft', 0.6))) * H) + 1)
+            yy, xx = np.mgrid[y0_:y1_, x0_:x1_].astype(np.float32)
+            d = np.sqrt(((xx - e['x'] * W) / (e['rx'] * W)) ** 2 + ((yy - e['y'] * H) / (e['ry'] * H)) ** 2)
+            soft = e.get('soft', 0.6)
+            inside = np.clip((1 + soft - d) / soft, 0, 1)
+            inside = inside * inside * (3 - 2 * inside)
+            shade.append((e, (y0_, y1_, x0_, x1_), inside))
     raw = root / 'work' / 'raw' / f'{cid}.mp4'
     pub = root / 'public' / 'clips' / f'{cid}.mp4'
     if not raw.exists():
@@ -327,7 +345,8 @@ def main():
     out_tmp = pub.with_suffix('.tmp.mp4')
     enc = None
     if frames_needed is None:
-        vf = ['-vf', MEMORY_GRADE] if memory else []
+        chain = [f for f in (shot.get('grade'), MEMORY_GRADE if memory else None) if f]
+        vf = ['-vf', ','.join(chain)] if chain else []
         enc = subprocess.Popen(['ffmpeg', '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'bgr24', '-s', f'{W}x{H}', '-r', str(FPS), '-i', '-',
                                 *vf, '-c:v', 'libx264', '-preset', 'medium', '-crf', '15', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', str(out_tmp)],
                                stdin=subprocess.PIPE)
@@ -343,6 +362,18 @@ def main():
             continue
         t = fi / FPS
         out = fr.astype(np.float32) / 255
+        if shade is not None:
+            for e, (y0_, y1_, x0_, x1_), inside in shade:
+                w_ = inside
+                if e.get('skin'):
+                    # 肌の色（赤〜黄の色相、ほどほどの彩度と明るさ）の所だけ。夜空や服は暗くしない
+                    hsv = cv2.cvtColor(fr[y0_:y1_, x0_:x1_], cv2.COLOR_BGR2HSV).astype(np.float32)
+                    h_, s_, v_ = hsv[..., 0], hsv[..., 1] / 255, hsv[..., 2] / 255
+                    warm = np.clip(1 - np.minimum(np.abs(h_ - 12), 180 - np.abs(h_ - 12)) / 14, 0, 1)
+                    skin = warm * np.clip((s_ - 0.12) / 0.12, 0, 1) * np.clip((v_ - 0.10) / 0.12, 0, 1)
+                    skin = cv2.GaussianBlur(cv2.dilate(skin, np.ones((5, 5), np.uint8)), (0, 0), 2.5)
+                    w_ = inside * np.clip(skin * 1.4, 0, 1)
+                out[y0_:y1_, x0_:x1_] *= (1 - (1 - e.get('k', 0.25)) * w_)[..., None]
         for p in preps:
             ink = p['ink']; BW, BH = p['BW'], p['BH']
             vis = fade_window(t, ink.get('t0', -99), ink.get('t1', 999), 0.6, 0.6)
@@ -474,15 +505,16 @@ def main():
         else:
             pth = prev_dir / f'{cid}_{t:.1f}.jpg'
             cv2.imwrite(str(pth), img, [cv2.IMWRITE_JPEG_QUALITY, 90])
-            if memory:
-                subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', str(pth), '-vf', MEMORY_GRADE.replace(':c0f=t+u', ':c0f=u'), str(pth)], check=True)
+            chain = [f for f in (shot.get('grade'), MEMORY_GRADE.replace(':c0f=t+u', ':c0f=u') if memory else None) if f]
+            if chain:
+                subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', str(pth), '-vf', ','.join(chain), str(pth)], check=True)
             print('preview', pth.relative_to(root))
     if enc is not None:
         enc.stdin.close(); enc.wait()
         out_tmp.replace(pub)
         for name, args in (('first', ['-i', str(pub)]), ('last', ['-sseof', '-0.05', '-i', str(pub)])):
             subprocess.run(['ffmpeg', '-v', 'error', '-y', *args, '-frames:v', '1', '-q:v', '2', str(pub.with_name(f'{cid}_{name}.jpg'))], check=True)
-        print(cid, 'baked', len(inks), 'ink planes', 'memory grade' if memory else '', '->', pub.relative_to(root))
+        print(cid, 'baked', len(inks), 'ink planes', 'memory grade' if memory else '', 'shade' if shade is not None else '', 'grade' if shot.get('grade') else '', '->', pub.relative_to(root))
 
 
 main()

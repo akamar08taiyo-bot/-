@@ -7,6 +7,7 @@ import {clamp, easeOut, fadeWindow, hash} from '../lib/math';
 
 export type InkFont = 'maru' | 'pencil' | 'pen' | 'robot' | 'mincho' | 'print' | 'chalk' | 'scratch';
 export type InkItem = {
+  kind?: 'text' | 'line' | 'stamp' | 'glare'; // line・stamp・glare は焼き込み（scripts/bake_ink.py）だけで使う
   text: string;
   x: number; // 位置（箱に対する割合）。align の基準点
   y: number; // 文字の上端（箱に対する割合）
@@ -26,6 +27,8 @@ export type InkItem = {
 };
 export type InkPage = {t0: number; t1: number; items: InkItem[]};
 export type InkDef = {
+  bake?: boolean; // true：クリップに焼き込む（scripts/bake_ink.py）。Remotion では描かない
+  occlude?: Record<string, unknown>; // 焼き込みのときだけ使う（手や物の下に隠す）
   quad: number[]; // 最初のコマでの四隅（割合）：左上 x,y・右上 x,y・右下 x,y・左下 x,y
   track?: string; // track.json の平面追跡のキー（"<ID>@<名前>"）。省略時はカメラ全体の追跡
   aspect?: number; // 箱の縦横比（幅/高さ）
@@ -55,6 +58,7 @@ const FONT: Record<InkFont, {family: string; weight: number; color: string; opac
 };
 
 const InkText: React.FC<{it: InkItem; t: number; boxH: number}> = ({it, t, boxH}) => {
+  if (!it.text || (it.kind && it.kind !== 'text')) return null;
   const f = FONT[it.font ?? 'pen'];
   const vis = it.t0 === undefined && it.t1 === undefined ? 1 : fadeWindow(t, it.t0 ?? -99, it.t1 ?? 999, 0.5, 0.5);
   if (vis <= 0) return null;

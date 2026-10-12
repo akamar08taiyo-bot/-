@@ -22,6 +22,7 @@ export type ShotDef = {
   memory?: boolean; // 昭和の回想（色あせ・粒子は ffmpeg でクリップにかけ済み。メモ用）
   clip?: number; // クリップの長さ（秒）。半速の 15.9 秒と違うとき（頭や後ろを切った・倍率を変えた）。scripts/sync_cliplen.py が書く
   veil?: {t0: number; t1: number; from: number; to: number; color: string}[]; // 画面全体を色でおおう（砂が舞って次の場面へ、など）
+  shade?: {x: number; y: number; rx: number; ry: number; k?: number; soft?: number}[]; // 顔を暗がりに沈める（scripts/bake_ink.py が焼き込む）
   events?: {t: number; t_end?: number; type: string; gain?: number; n?: number}[];
   audio?: {veo: number; veo_lp?: number; bed_gain?: number; beds: string[]};
 };
