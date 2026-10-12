@@ -1,12 +1,13 @@
 # AIと人間の共存　第二章「砂の向こうから来た男」
 
-2026年の夕暮れに砂丘を越えた男が、2080年の、昭和のままの島で過ごす日曜日（7分37秒・30カット）。
+2026年の夕暮れに砂丘を越えた男が、2080年の、昭和のままの島で過ごす日曜日（7分51秒・31カット。頭の16秒は冒頭のつかみ）。
 台本は `../ai-human-coexistence/docs/chapter2_script.md`（第8版：制作で決めたことは文書のいちばん下）、
 概要欄・タイトル・サムネイルは `../ai-human-coexistence/docs/youtube_ch2.txt` と `../ai-human-coexistence/thumbnails/ch2_*.jpg`。
 作り方の全体は、スキル `.claude/skills/nostalgic-town-film` のとおり。
 
-- 高画質の上映ページ（非公開）：https://claude.ai/artifact/DpVabfvR6hJwZpkkhGouWc （テーマ曲入り／環境音のみの切り替え、章の移動つき）
-- 完成版：テーマ曲入り -14.0 LUFS（トゥルーピーク -1.4 dBTP）、環境音のみ -16.1 LUFS（-1.2 dBTP）、7分37秒・1080p／30fps
+- 投稿キット（非公開）：https://claude.ai/artifact/MwTV3wKkDXAHpeEJxLpw29#ep2 （元の画質の MP4 の保存、試写、タイトル・概要欄・タグ・サムネイル・台本）
+- 高画質の上映ページ（非公開、前の版 7分37秒）：https://claude.ai/artifact/DpVabfvR6hJwZpkkhGouWc
+- 完成版：テーマ曲入り -14.0 LUFS（トゥルーピーク -1.9 dBTP）、環境音のみ -16.0 LUFS（-1.2 dBTP）、7分51秒・1080p／30fps
 - 費用の目安：原画 44枚 約 $5.9、Veo Lite 1080p 28本 約 $17.9（合計 約 $24）
 
 ## この章で足した道具

@@ -19,16 +19,23 @@
       "ss": 0.3,
       "len": 3.9,
       "beds": [
-       "distant_sea",
-       "morning_birds"
+       {
+        "name": "distant_sea",
+        "gain": 3
+       },
+       {
+        "name": "morning_birds",
+        "gain": 3
+       }
       ],
       "events": [
        {
         "t": 0.4,
         "type": "aircar_pass",
-        "gain": -6
+        "gain": -2
        }
-      ]
+      ],
+      "veo": 1.6
      },
      {
       "src": "G3",

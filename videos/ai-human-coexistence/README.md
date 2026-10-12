@@ -1,7 +1,7 @@
 # AIと人間の共存（第一章）
 
 「存在しない街の記憶」のテーマ（架空なのに懐かしい街の日常）を手本に、映像・音楽をオリジナルで作った模擬動画。
-舞台は、昭和を残した2080年の海辺の町「継町」と、沖の島「継島」。尺は6分51秒（1920×1080／30fps、26カット）。
+舞台は、昭和を残した2080年の海辺の町「継町」と、沖の島「継島」。尺は7分05秒（1920×1080／30fps、27カット。頭の16秒は冒頭のつかみ）。投稿キット（非公開）：https://claude.ai/artifact/MwTV3wKkDXAHpeEJxLpw29#ep1
 
 - 分析：[docs/analysis.md](docs/analysis.md)（参照動画の全カット表は [docs/ref_tGJRlrAXIoE/](docs/ref_tGJRlrAXIoE/)）
 - テーマ・構成・音の設計：[docs/theme.md](docs/theme.md)
