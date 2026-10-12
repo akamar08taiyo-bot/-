@@ -457,10 +457,15 @@
    ]
   },
   {
-   "id": "B1",
+   "id": "B1s",
    "chapter": "一",
-   "name": "喫茶店のモーニング",
-   "dur": 11.6,
+   "name": "喫茶店の窓（止め絵：朝の通りとモノレール）",
+   "dur": 6.4,
+   "clip": 6.4,
+   "push": [
+    1.0,
+    1.04
+   ],
    "chapterCard": {
     "t0": 0.9,
     "t1": 5.4,
@@ -468,58 +473,27 @@
     "title": "朝",
     "time": "午前八時十分"
    },
-   "voice": [
-    {
-     "x": 0.8,
-     "y": 0.47,
-     "w": 0.2,
-     "tilt": -18,
-     "t0": 2.4,
-     "lines": [
-      "もし　雨がふったら",
-      "　洗濯物を　とりこむ",
-      "　「ピ。」と鳴らす"
-     ]
-    }
-   ],
-   "captions": [
-    {
-     "t0": 6.0,
-     "t1": 10.4,
-     "text": "町は、今日も少しずつ新しくなる。"
-    }
-   ],
    "audio": {
     "veo": 0.0,
-    "bed_gain": 7,
+    "bed_gain": 5,
     "beds": [
      "cafe_room",
-     "siphon"
+     "town_murmur_far"
     ]
    },
    "events": [
     {
      "t": 1.8,
      "type": "cup_clink"
-    },
-    {
-     "t": 9.2,
-     "type": "cup_clink",
-     "gain": -4
     }
-   ],
-   "clip": 11.6,
-   "push": [
-    1.0,
-    1.06
    ]
   },
   {
    "id": "B1v",
    "chapter": "一",
-   "name": "喫茶店の窓ぎわ（止め絵）",
-   "dur": 7.2,
-   "clip": 7.2,
+   "name": "喫茶店のカウンター（止め絵：サイフォンとモーニング）",
+   "dur": 5.2,
+   "clip": 5.2,
    "push": [
     1.0,
     1.04
@@ -534,11 +508,59 @@
    },
    "events": [
     {
-     "t": 2.4,
+     "t": 1.6,
      "type": "cup_clink",
      "gain": -3
     }
    ]
+  },
+  {
+   "id": "B1",
+   "chapter": "一",
+   "name": "喫茶店のモーニング",
+   "dur": 8.4,
+   "voice": [
+    {
+     "x": 0.8,
+     "y": 0.47,
+     "w": 0.2,
+     "tilt": -18,
+     "t0": 1.2,
+     "lines": [
+      "もし　雨がふったら",
+      "　洗濯物を　とりこむ",
+      "　「ピ。」と鳴らす"
+     ]
+    }
+   ],
+   "captions": [
+    {
+     "t0": 3.0,
+     "t1": 7.6,
+     "text": "町は、今日も少しずつ新しくなる。"
+    }
+   ],
+   "audio": {
+    "veo": 0.6,
+    "bed_gain": 3,
+    "beds": [
+     "cafe_room",
+     "siphon"
+    ]
+   },
+   "events": [
+    {
+     "t": 0.2,
+     "type": "monorail_pass",
+     "gain": -8
+    },
+    {
+     "t": 5.8,
+     "type": "cup_clink",
+     "gain": -4
+    }
+   ],
+   "clip": 8.0
   },
   {
    "id": "B2s",
@@ -692,8 +714,8 @@
    "chapter": "一",
    "name": "昭和のコース（思い出：写真から動き出す）",
    "dur": 11.0,
-   "clip": 7.1,
-   "clipAt": 3.0,
+   "clip": 4.2,
+   "clipAt": 5.6,
    "memory": true,
    "push": [
     1.0,
@@ -1509,7 +1531,7 @@
   {
    "id": "D2",
    "chapter": "三",
-   "name": "境内の缶蹴り（止め絵）",
+   "name": "境内の缶蹴り",
    "dur": 8.4,
    "captions": [
     {
@@ -1519,25 +1541,14 @@
     }
    ],
    "audio": {
-    "veo": 0.0,
-    "bed_gain": 6,
+    "veo": 1.0,
     "beds": [
      "higurashi",
      "kids_play"
     ]
    },
-   "events": [
-    {
-     "t": 0.9,
-     "type": "can_kick",
-     "gain": -3
-    }
-   ],
-   "clip": 8.4,
-   "push": [
-    1.0,
-    1.05
-   ]
+   "events": [],
+   "clip": 8.0
   },
   {
    "id": "E1",

@@ -335,6 +335,55 @@
    "bytes": 9330955,
    "seconds": 95.5,
    "created_utc": "2026-10-11T23:55:07.319713+00:00"
+  },
+  {
+   "id": "D2_v1",
+   "model": "veo-3.1-lite-generate-preview",
+   "resolution": "1080p",
+   "input_image": "D2_v3.jpg",
+   "prompt": "Locked-off static camera. Sunset at the hilltop shrine: the empty tin can rolls and bounces along the stone path with a light clang; the small figures on the stone steps keep climbing toward the torii; the man in the dark suit walks slowly along the path with his back to the camera; the ivory robot stands still and watches; on a distant balcony a woman waves; the warm sun glows through the torii and the ginkgo leaves stir. Audio: a tin can clanging on stone, higurashi cicadas, distant cheerful voices without words. Keep every sign, text, building, vehicle design, robot design and person exactly as in the image; no new objects, no morphing, no camera shake, no cuts. Photorealistic, natural gentle motion, calm and quiet mood. Audio: natural ambient sound of the place only, no music, no speech, no singing.",
+   "negative": "camera movement, zoom, cuts, text, subtitles, watermark, morphing, distortion, extra people, flicker",
+   "sha256": "a73295a87653d771bda6f5975c83f975af221e236d8691d94157f419c04a9333",
+   "bytes": 16327193,
+   "seconds": 77.2,
+   "created_utc": "2026-10-12T10:58:46.936989+00:00"
+  },
+  {
+   "id": "B1_v1",
+   "model": "veo-3.1-lite-generate-preview",
+   "resolution": "1080p",
+   "input_image": "B1_v6.jpg",
+   "prompt": "Locked-off static camera. Morning in the coffee shop: thin steam rises from the coffee cup and the toast; the siphon on the counter bubbles gently; the robot master stands still beside it, only its amber visor light glowing; outside the window the two rounded monorail cabins glide slowly along the overhead rail; a few people walk along the street in the distance; the man at the window seat and the woman at the far table sit still. Audio: siphon bubbling, a cup set on a saucer, faint street sounds, the soft hum of the monorail. Keep every sign, text, building, vehicle design, robot design and person exactly as in the image; no new objects, no morphing, no camera shake, no cuts. Photorealistic, natural gentle motion, calm and quiet mood. Audio: natural ambient sound of the place only, no music, no speech, no singing.",
+   "negative": "camera movement, zoom, cuts, text, subtitles, watermark, morphing, distortion, extra people, flicker",
+   "sha256": "10b4a14da47e7a863e55806b0dcb23104e1284954c1efe7edb00388014db5cab",
+   "bytes": 8972858,
+   "seconds": 87.1,
+   "created_utc": "2026-10-12T11:12:20.618878+00:00"
+  },
+  {
+   "id": "B5_v1",
+   "model": "veo-3.1-lite-generate-preview",
+   "resolution": "1080p",
+   "input_image": "B5_v3.jpg",
+   "prompt": "Locked-off static camera. A summer morning in 1985: the small toy cars race along the wooden lanes of the course and around the banked curve; the two children crouching in the foreground keep their backs to the camera, leaning forward a little to watch, and one of them lets a toy car go along the floor; the two children in the distance stand still watching; laundry stirs on the balconies. Audio: the whir of small toy motors and their rattle on the wooden lanes, cicadas, faint distant children's voices without words. Keep every sign, text, building, vehicle design, robot design and person exactly as in the image; no new objects, no morphing, no camera shake, no cuts. Photorealistic, natural gentle motion, calm and quiet mood. Audio: natural ambient sound of the place only, no music, no speech, no singing.",
+   "negative": "camera movement, zoom, cuts, text, subtitles, watermark, morphing, distortion, extra people, flicker",
+   "sha256": "3ef2c36f0dba4bead4e5e00f80a154a6e4fc9db5fa1c946d1052d4969902237b",
+   "bytes": 10300299,
+   "seconds": 97.8,
+   "created_utc": "2026-10-12T11:29:16.051491+00:00"
+  },
+  {
+   "id": "B5_v2",
+   "model": "veo-3.1-lite-generate-preview",
+   "resolution": "1080p",
+   "input_image": "B5_v3.jpg",
+   "prompt": "Locked-off static camera. A summer morning in 1985: the small toy cars race along the wooden lanes of the course and around the banked curve, one after another; the two children crouching in the foreground stay still with their backs to the camera, watching the cars, their heads do not turn; the two children in the distance stand still; laundry stirs gently on the balconies. Audio: the whir of small toy motors and their rattle on the wooden lanes, cicadas, faint distant children's voices without words. Keep every sign, text, building, vehicle design, robot design and person exactly as in the image; no new objects, no morphing, no camera shake, no cuts. Photorealistic, natural gentle motion, calm and quiet mood. Audio: natural ambient sound of the place only, no music, no speech, no singing.",
+   "negative": "camera movement, zoom, cuts, text, subtitles, watermark, morphing, distortion, extra people, flicker",
+   "sha256": "fdba3dd5e2aaade48ededa1bd431421cf7fc3b96f4c5f1c02eaf1c87154a1864",
+   "bytes": 13182063,
+   "seconds": 97.3,
+   "created_utc": "2026-10-12T11:32:06.136562+00:00",
+   "note": "scripts/veo.py に B5_v2 の名前で渡したため B5_v2_v1.mp4 に出た。B5_v2.mp4 に改名"
   }
  ]
 }

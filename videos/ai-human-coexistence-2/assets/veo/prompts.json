@@ -18,8 +18,9 @@
    "prompt": "Locked-off static camera. Morning on the beach. The children do radio calisthenics, swinging their arms in unison; the robot teacher at the front mirrors the movements; in the foreground the robot's hand presses the rubber stamp onto the last box of the card and lifts it; the man's hand holds the card still. Audio: waves, children's distant voices without words, the soft thump of a stamp."
   },
   "B1": {
-   "photo": "B1_v4",
-   "prompt": "Very slow camera push-in. Morning in the coffee shop. Steam rises from the coffee and the toast; the siphon bubbles as the robot master tends it; outside the window, the monorail cars glide slowly across; people walk in the street; the woman at the far window table sits still. Audio: siphon bubbling, cups on saucers, faint street sounds, the soft hum of the monorail."
+   "photo": "B1_v6",
+   "prompt": "Locked-off static camera. Morning in the coffee shop: thin steam rises from the coffee cup and the toast; the siphon on the counter bubbles gently; the robot master stands still beside it, only its amber visor light glowing; outside the window the two rounded monorail cabins glide slowly along the overhead rail; a few people walk along the street in the distance; the man at the window seat and the woman at the far table sit still. Audio: siphon bubbling, a cup set on a saucer, faint street sounds, the soft hum of the monorail.",
+   "note": "B1_v3・B1_v4（看板の色の塗り替え）・看板を無地にした版・電車を描き直した B1_v5 は、どれも他社のコンテンツと判定された。コンビニの店構え（実在のチェーンの店先に似ていた）を昭和の小さな商店「つぎマート」に描き直したのが B1_v6"
   },
   "B2": {
    "photo": "B2_v3",
@@ -34,8 +35,9 @@
    "prompt": "Locked-off static camera. The small toy cars speed around the banked track lanes; children cheer and lean in; the man's hands click the battery cover shut on the toy car; the robot watches; the monorail passes in the background. Audio: high-pitched whir of small motors, cars rattling along the track, children cheering in the distance."
   },
   "B5": {
-   "photo": "B5_v1",
-   "prompt": "Locked-off static camera. Summer 1985: the boy and the girl crouch and race small toy cars along the track; the cars whir around the curves; other children watch; leaves sway. Audio: whir of small motors, cars rattling, distant children, cicadas."
+   "photo": "B5_v3",
+   "prompt": "Locked-off static camera. A summer morning in 1985: the small toy cars race along the wooden lanes of the course and around the banked curve, one after another; the two children crouching in the foreground stay still with their backs to the camera, watching the cars, their heads do not turn; the two children in the distance stand still; laundry stirs gently on the balconies. Audio: the whir of small toy motors and their rattle on the wooden lanes, cicadas, faint distant children's voices without words.",
+   "note": "B5_v1 は少年の笑顔とあの子の横顔が映ったので、ふたりを手前の後ろ姿にした B5_v3 から作り直し。1本目（v1）は 3〜6 秒で少年が身を乗り出して横顔が出たので、ふたりは動かさず車だけを走らせる指示で2本目（v2）"
   },
   "B6": {
    "photo": "B6_v2",
@@ -94,8 +96,8 @@
    "prompt": "Locked-off static camera. The man stands with his hands together in prayer and slowly bows; the old robot beside him bows its head; the ginkgo leaves stir in the golden light. Audio: higurashi cicadas, a soft clap of hands, wind in the trees."
   },
   "D2": {
-   "photo": "D2_v1",
-   "prompt": "Locked-off static camera. Sunset in the shrine precinct during a game of kick-the-can: an empty tin can flies up in a high arc and clatters onto the stone path; the kids scatter and run across the precinct, laughing; the old robot stands still and watches; someone waves from an apartment window; the ginkgo leaves stir in the warm evening light. Audio: the clang of a tin can, higurashi cicadas, distant cheerful voices without words."
+   "photo": "D2_v3",
+   "prompt": "Locked-off static camera. Sunset at the hilltop shrine: the empty tin can rolls and bounces along the stone path with a light clang; the small figures on the stone steps keep climbing toward the torii; the man in the dark suit walks slowly along the path with his back to the camera; the ivory robot stands still and watches; on a distant balcony a woman waves; the warm sun glows through the torii and the ginkgo leaves stir. Audio: a tin can clanging on stone, higurashi cicadas, distant cheerful voices without words."
   },
   "E1": {
    "photo": "E1_v1",

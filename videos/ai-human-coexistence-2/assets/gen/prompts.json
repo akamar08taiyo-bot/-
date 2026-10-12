@@ -242,7 +242,8 @@
     "assets/gen/robot_ref.jpg"
    ],
    "ref_note": "The FIRST supplied image is the COMPOSITION reference: keep exactly the same viewpoint, framing, horizon and layout of the main shapes, but change the era, season, light and people as described. Any other supplied image is only a style reference for photographic quality. The reference is the same shrine precinct in 1985; now it is summer 2080 with a modern (not faded) photographic look. The LAST supplied image is the exact design reference for the helper robots (rounded ivory head with a single horizontal amber visor strip, no eyes); THE OLD ROBOT has chipped paint and a hand-painted number on its shoulder. IMPORTANT: this must look like a REAL PHOTOGRAPH taken with a camera — not an illustration, not anime, not a 3D render, no outlines. The robot design reference is a 3D render used for SHAPE ONLY; render the robots as real photographed objects in daylight.",
-   "prompt": "The shrine precinct at sunset in summer 2080: the ginkgo is green; children and THE MAN play kick-the-can — THE MAN kicks the can high into the air (from behind); an ivory helper robot stands by; beyond the torii, instead of the mine tower, the restored apartment blocks with lit windows and two slender curved glass towers; a woman waves from a distant window. Every person is seen from behind or far away: no face visible."
+   "prompt": "The shrine precinct at sunset in summer 2080: the ginkgo is green. A game of kick-the-can has just been broken up: THE MAN in his dark navy suit stands in the middle of the precinct on the stone path with his back to the camera, seen strictly from behind — only the back of his head, his shoulders and the back of his suit; no profile, no cheek, no ear in view — his right foot just set down after the kick. The empty tin can is high in the air above the path, catching the last sunlight. Five small children run off toward the stone steps and the torii, away from the camera: they are small in the frame and seen from behind, no faces. An ivory helper robot stands still at the side of the path, watching. Beyond the torii, instead of the mine tower, the restored apartment blocks with lit windows and two slender curved glass towers with the monorail; in one distant apartment window a woman waves, tiny and far away. Every person is seen from behind or far away: no face is visible on anyone.",
+   "note": "2026年10月 作り直し：D2_v1 は男の横顔と子どもの顔が映ったので、男は後ろ姿・子どもは遠く小さく後ろ向きに"
   },
   {
    "id": "B5",
@@ -252,7 +253,8 @@
     "assets/gen/B4_v2.jpg"
    ],
    "ref_note": "The FIRST supplied image is the COMPOSITION reference: keep exactly the same viewpoint, framing, horizon and layout of the main shapes, but change the era, season, light and people as described. Any other supplied image is only a style reference for photographic quality.",
-   "prompt": "In front of a Showa candy shop: a hand-made toy race course built from cardboard and plywood on the ground; THE BOY and THE GIRL (from behind) crouch and race small toy cars (plain original designs); other children watch. No robots, no futuristic objects."
+   "prompt": "In front of a Showa candy shop: the same hand-made toy race course built from plywood on the ground as in the reference. In the near foreground THE BOY and THE GIRL crouch side by side at the start of the course with their BACKS to the camera, each holding a small toy car (plain original designs, no logos) on a lane, ready to let it go: only the backs of their heads, their shoulders, backs and hands are visible — no face, no profile, no cheek. Two other children stand further along the course, small and seen from behind. No robots, no futuristic objects.",
+   "note": "2026年10月 作り直し：B5_v1 は少年の笑顔とあの子の横顔が映った（Veo でもこちらを向く）ので、ふたりを手前の後ろ姿に"
   },
   {
    "id": "R4",

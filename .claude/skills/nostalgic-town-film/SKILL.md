@@ -32,7 +32,7 @@ description: 「存在しない街の記憶」のような“架空なのに懐�
 | 6' | 画面の中の字（カード・日記・柱・お守り）、昭和の回想の色 | `scripts/track_plane.py`・`bake_ink.py` | references/in-frame-text.md |
 | 7 | 音（環境音・曲・あいさつ） | `audio/src/*.py`、`scripts/tts_outro.py` | references/sound.md |
 | 8 | 書き出し | `scripts/render_shots.mjs` → `scripts/assemble.py` | references/pipeline.md |
-| 9 | 点検 | `scripts/qa_final.py`、`audio_qa.py`、`review_video.py` | references/pipeline.md |
+| 9 | 点検 | `scripts/qa_final.py`、`qa_faces.py`、`audio_qa.py`、`review_video.py` | references/pipeline.md |
 | 10 | 納品・保存 | 軽量版、投稿キット（`assets/posting-kit/`）、git | references/delivery.md |
 
 各工程の途中で、ユーザーに見える進み具合を短く伝える（1本に数時間かかるため、黙っていると不安にさせる）。
@@ -136,6 +136,7 @@ YouTube では最初の数秒で見続けるかが決まる。本編はゆっく
 
 - `node scripts/render_shots.mjs`（カットごと、済んだものは飛ばす）→ `python3 -I scripts/assemble.py --crf 21 --maxrate 10M --preset medium --preview`（→ `out/<slug>_theme.mp4`・`out/<slug>_asmr.mp4`）。カットごとにしておくと、場面を足しても他を書き出し直さずに済む。
 - 点検：`qa_final.py`（形式、黒コマ・止まったコマ、8秒ごとの一覧画像を全部見る）、`ebur128` で音量とトゥルーピーク。
+  `qa_faces.py`（書き出した全カットを Gemini に見せ、顔と実在のブランドに似た物を挙げさせる）。挙がったコマは自分で拡大して、台本の約束（主人公は後ろ姿など）と照らす。止め絵を足した・差し替えた時ほど忘れやすい（第二章で、仮の止め絵に主人公の横顔と実在のコンビニに似た看板が残ったまま納品した）
 - 納品：
   - 会話への添付は **30MiB まで**。480p の2パス（映像 440k＋音声 96k）で 6〜7分が約27MB
   - 高画質は上映ページ：`make_screening.py` → 一覧を4回前後に分けて Artifact に公開（.m3u8/.ts は配信できないので分割 MP4 と .txt の目次、hls.js で再生）。詳しくは references/delivery.md

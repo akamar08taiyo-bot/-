@@ -26,14 +26,15 @@
 
 ## 作り直しが要るもの
 
-- B1（喫茶店）と D2（境内の缶蹴り）は、Veo が作れなかった（コンビニの看板が実在のチェーンに似ている／安全フィルター）。いまは原画の静止画にゆっくり寄るだけ。Gemini の残高を補充したら作り直す（手順は `docs/placeholder.md`）
+- B1（喫茶店）と D2（境内の缶蹴り）は、2026年10月12日に Veo で作り直した（いきさつは台本の「残高の補充後の作り直し」）。Veo が「他社のコンテンツ」で弾いた原因は、看板ではなく窓の外のコンビニの店構えだった
 - 終わりのあいさつは第一章と同じ声と言葉（「つぎまちの一日に、…」）。「日曜日に」の版にするなら、補充後に `scripts/tts_outro.py` で作り直す
 
 ## 書き出し
 
 ```bash
 node scripts/render_shots.mjs                      # カットごと（済んだものは飛ばす）
-python3 audio/src/build_mix.py && python3 audio/src/compose.py && python3 audio/src/build_theme.py
+python3 -I scripts/qa_faces.py                     # 全カットの点検：顔・実在のブランドに似た物（挙がったコマは目で確かめる）
+python3 audio/src/build_mix.py && python3 -I audio/src/suno_theme.py && python3 audio/src/build_theme.py   # 曲は作者の Suno の曲（compose.py は使わない）
 python3 -I scripts/assemble.py --crf 21 --maxrate 10M --preset medium --preview
 ```
 

@@ -2000,6 +2000,264 @@
    "bytes": 1579868,
    "created_utc": "2026-10-12T01:10:15.983118+00:00",
    "note": "横の面の青を茶に"
+  },
+  {
+   "id": "D2_v2",
+   "file": "D2_v2.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "c5e7671a43464cbd424dc875f2129927aeaea7fffdef9e24872cfc63c1e39964",
+   "bytes": 3103196,
+   "reference_files": [
+    "R1_v1.jpg",
+    "robot_ref.jpg"
+   ],
+   "extra": "",
+   "tag": "redo_back",
+   "seconds": 23.6,
+   "created_utc": "2026-10-12T10:53:46.420680+00:00",
+   "usage": {
+    "promptTokenCount": 1949,
+    "candidatesTokenCount": 1365,
+    "totalTokenCount": 3555,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 1433
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 516
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 241,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The FIRST supplied image is the COMPOSITION reference: keep exactly the same viewpoint, framing, horizon and layout of the main shapes, but change the era, season, light and people as described. Any other supplied image is only a style reference for photographic quality. The reference is the same shrine precinct in 1985; now it is summer 2080 with a modern (not faded) photographic look. The LAST supplied image is the exact design reference for the helper robots (rounded ivory head with a single horizontal amber visor strip, no eyes); THE OLD ROBOT has chipped paint and a hand-painted number on its shoulder. IMPORTANT: this must look like a REAL PHOTOGRAPH taken with a camera — not an illustration, not anime, not a 3D render, no outlines. The robot design reference is a 3D render used for SHAPE ONLY; render the robots as real photographed objects in daylight.\n\nUse case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles travel quietly along air corridors: rounded white ceramic-metal car bodies with a dark curved windshield and four clearly visible shrouded ring-shaped lift fans (ducted rotors) at the corners, no wheels, small navigation lights. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer Sunday (25 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.\nChapter-2 additions to the world: a slender suspended monorail (two rounded cars in white and fresh leaf-green hanging under a single thin elevated rail) glides between the glass towers and above the old tiled roofs. Familiar chain shops survive with their signboards, but only as this town's own invented shops: an orange-signed beef-bowl counter shop \"牛丼 つぎ家\", a convenience store \"つぎマート\" (white sign with colored stripes) and a classic coffee shop (純喫茶) — never any real brand name or logo. Craftsmen (plasterers, carpenters, scaffolders in helmets and baggy nikka-pokka trousers) work together with the helper robots and teach them their skills. The island has a small hilltop shrine with a weathered gray stone torii, stone lanterns and a huge ginkgo tree.\nRecurring people (always seen from behind, from the side at a distance, or as hands only — never a face): THE MAN is about 50, in a dark navy business suit and white shirt, short graying hair, with a dark-brown leather briefcase. THE OLD ROBOT is the town's oldest helper robot: exactly the standard design, but clearly older — chipped ivory paint, several replaced panels in slightly different ivory tones, a small hand-painted number on its left shoulder. THE CHILD is about 8, in a dark-blue jinbei with a small RED hair clip. Vivid red is reserved for the child's hair clip; other reds in the scene stay muted (dull vermilion, brick, rust).\n\nSpecific scene (sunset):\nThe shrine precinct at sunset in summer 2080: the ginkgo is green. A game of kick-the-can has just been broken up: THE MAN in his dark navy suit stands in the middle of the precinct on the stone path with his back to the camera, seen strictly from behind — only the back of his head, his shoulders and the back of his suit; no profile, no cheek, no ear in view — his right foot just set down after the kick. The empty tin can is high in the air above the path, catching the last sunlight. Five small children run off toward the stone steps and the torii, away from the camera: they are small in the frame and seen from behind, no faces. An ivory helper robot stands still at the side of the path, watching. Beyond the torii, instead of the mine tower, the restored apartment blocks with lit windows and two slender curved glass towers with the monorail; in one distant apartment window a woman waves, tiny and far away. Every person is seen from behind or far away: no face is visible on anyone."
+  },
+  {
+   "id": "D2_v3",
+   "file": "D2_v3.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "57c204dc110bda3128e56d262bb66d1fceadedefbc4824df3df9a85868bee192",
+   "bytes": 3313148,
+   "reference_files": [
+    "R1_v1.jpg",
+    "robot_ref.jpg"
+   ],
+   "extra": "",
+   "tag": "redo_back",
+   "seconds": 28.0,
+   "created_utc": "2026-10-12T10:53:48.544612+00:00",
+   "usage": {
+    "promptTokenCount": 1949,
+    "candidatesTokenCount": 1414,
+    "totalTokenCount": 4060,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 1433
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 516
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 697,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The FIRST supplied image is the COMPOSITION reference: keep exactly the same viewpoint, framing, horizon and layout of the main shapes, but change the era, season, light and people as described. Any other supplied image is only a style reference for photographic quality. The reference is the same shrine precinct in 1985; now it is summer 2080 with a modern (not faded) photographic look. The LAST supplied image is the exact design reference for the helper robots (rounded ivory head with a single horizontal amber visor strip, no eyes); THE OLD ROBOT has chipped paint and a hand-painted number on its shoulder. IMPORTANT: this must look like a REAL PHOTOGRAPH taken with a camera — not an illustration, not anime, not a 3D render, no outlines. The robot design reference is a 3D render used for SHAPE ONLY; render the robots as real photographed objects in daylight.\n\nUse case: photorealistic-natural.\nAsset type: a full-frame cinematic still for an original calm Japanese future-neighborhood film. Render a single 16:9 landscape image, no borders, no collage, no text overlay.\nWorld: Tsugimachi (継町), an invented Japanese seaside hill town in the year 2080 — the same world as the supplied reference photographs (match their photographic look, light, color and material quality, but NOT their compositions). Society kept advancing technologically and chose to keep repairing its much-loved Showa-era buildings, appliances and habits. Old shopping lanes and hot-spring inns climb steep green slopes above a calm bay, like a Showa-era seaside resort town. Offshore lies Tsugishima (継島), a small island town enclosed by a high concrete seawall and packed with weathered 1960s concrete apartment blocks of 6–10 stories, stairways, rooftop gardens, a small shrine and a white lighthouse — dense like an old coal-mining island town, but lived-in, repaired and cared for, never ruined. Advanced buildings rise among the old blocks: rounded blue-tinted curved glass, pale ceramic structural ribs, planted terraces and slender skybridges, all clearly grounded on structures. White car-like four-seat flying passenger vehicles travel quietly along air corridors: rounded white ceramic-metal car bodies with a dark curved windshield and four clearly visible shrouded ring-shaped lift fans (ducted rotors) at the corners, no wheels, small navigation lights. Helper robots work alongside residents; they all share ONE design: about 1.3 m tall, smooth ivory ceramic shell with matte warm-grey joints, a rounded head with a single narrow horizontal amber light strip instead of a face (no eyes, no mouth), slim arms with simple three-finger hands, short legs, a small amber status light on the chest, a few replaced panels showing careful maintenance. They never resemble any existing character, mascot or trademark. It is an optimistic, quiet, ordinary late-summer Sunday (25 August 2080), not a disaster, not an abandoned city.\nVisual language: a convincingly photographed location, cinematic naturalism. Pronounced foreground / middle ground / distance with an object or frame that partly occludes the foreground, a daily activity in the middle ground, and the next space continuing beyond. Realistic 28–35 mm perspective with straight structural lines, mostly in focus. Rich cobalt and cyan daylight, naturally saturated greens and sea blues, aged honey-brown wood, faded celadon enamel, cream plaster, restrained rusty ochre. Directional light and believable soft fill; protect highlights, keep shadow detail. Real wood grain, worn touch points, repaired paint, rippled old glass, woven cloth; old does not mean uniformly dirty. Fine photographic texture, no visible brushwork, no anime outlines, no waxy CGI, no oversharpened HDR, no cyberpunk neon.\nHumans are incidental: seen from behind, from the side at a distance, or small in the frame; never a presenting host or a central close-up face. No trademarked characters, brand logos, watermarks, captions or explanatory slogans. Only the short Japanese signs explicitly requested may be readable, and they must be physically part of the scene.\nChapter-2 additions to the world: a slender suspended monorail (two rounded cars in white and fresh leaf-green hanging under a single thin elevated rail) glides between the glass towers and above the old tiled roofs. Familiar chain shops survive with their signboards, but only as this town's own invented shops: an orange-signed beef-bowl counter shop \"牛丼 つぎ家\", a convenience store \"つぎマート\" (white sign with colored stripes) and a classic coffee shop (純喫茶) — never any real brand name or logo. Craftsmen (plasterers, carpenters, scaffolders in helmets and baggy nikka-pokka trousers) work together with the helper robots and teach them their skills. The island has a small hilltop shrine with a weathered gray stone torii, stone lanterns and a huge ginkgo tree.\nRecurring people (always seen from behind, from the side at a distance, or as hands only — never a face): THE MAN is about 50, in a dark navy business suit and white shirt, short graying hair, with a dark-brown leather briefcase. THE OLD ROBOT is the town's oldest helper robot: exactly the standard design, but clearly older — chipped ivory paint, several replaced panels in slightly different ivory tones, a small hand-painted number on its left shoulder. THE CHILD is about 8, in a dark-blue jinbei with a small RED hair clip. Vivid red is reserved for the child's hair clip; other reds in the scene stay muted (dull vermilion, brick, rust).\n\nSpecific scene (sunset):\nThe shrine precinct at sunset in summer 2080: the ginkgo is green. A game of kick-the-can has just been broken up: THE MAN in his dark navy suit stands in the middle of the precinct on the stone path with his back to the camera, seen strictly from behind — only the back of his head, his shoulders and the back of his suit; no profile, no cheek, no ear in view — his right foot just set down after the kick. The empty tin can is high in the air above the path, catching the last sunlight. Five small children run off toward the stone steps and the torii, away from the camera: they are small in the frame and seen from behind, no faces. An ivory helper robot stands still at the side of the path, watching. Beyond the torii, instead of the mine tower, the restored apartment blocks with lit windows and two slender curved glass towers with the monorail; in one distant apartment window a woman waves, tiny and far away. Every person is seen from behind or far away: no face is visible on anyone."
+  },
+  {
+   "id": "B1_v5",
+   "file": "B1_v5.jpg",
+   "operation": "edit",
+   "source": "B1_v4.jpg",
+   "model": "gemini-3-pro-image",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "68e7528b752e36737b9f734814c028bad58cd979af4cd361db8fe4ad9dc1b18f",
+   "bytes": 2849163,
+   "reference_files": [],
+   "seconds": 22.7,
+   "created_utc": "2026-10-12T11:06:45.399885+00:00",
+   "usage": {
+    "promptTokenCount": 403,
+    "candidatesTokenCount": 1297,
+    "totalTokenCount": 1890,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 145
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 190,
+    "serviceTier": "standard"
+   },
+   "prompt": "Edit the FIRST supplied photograph narrowly. Keep the exact camera framing, composition, lighting, colors, people, materials and every other object unchanged, and keep it photorealistic. Replace ONLY the commuter-style train that crosses above the street at the top of the big window with this town's own suspended monorail: two short, rounded, clearly futuristic white cars with a single soft leaf-green band and large panoramic windows, hanging below one slim overhead rail beam, unlike any real-world train or railway livery, with no numbers or logos on it. Keep it at about the same position and size. Do not change the coffee shop, the people, the robot, the signs, the street or anything else."
+  },
+  {
+   "id": "B1_v6",
+   "file": "B1_v6.jpg",
+   "operation": "edit",
+   "source": "B1_v5.jpg",
+   "model": "gemini-3-pro-image",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "f13dafb6637a85b596f61120cab00066427c505fed9da8f85e2ca5fdc45528b7",
+   "bytes": 2857017,
+   "reference_files": [],
+   "seconds": 21.4,
+   "created_utc": "2026-10-12T11:10:34.843054+00:00",
+   "usage": {
+    "promptTokenCount": 430,
+    "candidatesTokenCount": 1308,
+    "totalTokenCount": 1913,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 172
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 175,
+    "serviceTier": "standard"
+   },
+   "prompt": "Edit the FIRST supplied photograph narrowly. Keep the exact camera framing, composition, lighting, colors, people, materials and every other object unchanged, and keep it photorealistic. Change ONLY the convenience store across the street on the right side of the big window into a small, old Showa-era family-run corner shop: wooden window frames and a wooden sliding glass door, a faded cream canvas awning, one hand-painted cream signboard reading つぎマート in plain brown letters, wooden crates of fruit and vegetables and a small rack of daily goods out front. No modern chain-store look: no colored stripes, no posters, no logos, no illuminated sign. Keep the people and robots walking in front of it, the street, the monorail, the orange gyudon shop, the coffee shop interior and everything else exactly as they are."
+  },
+  {
+   "id": "B5_v2",
+   "file": "B5_v2.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "380e7496f07ffa9f3368cbc51ee3ade53b89f7dac1497dabefe6a37e9058835e",
+   "bytes": 3039851,
+   "reference_files": [
+    "B4_v2.jpg"
+   ],
+   "extra": "",
+   "tag": "redo_back",
+   "seconds": 25.9,
+   "created_utc": "2026-10-12T11:26:02.981521+00:00",
+   "usage": {
+    "promptTokenCount": 821,
+    "candidatesTokenCount": 1418,
+    "totalTokenCount": 2495,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 563
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 256,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The FIRST supplied image is the COMPOSITION reference: keep exactly the same viewpoint, framing, horizon and layout of the main shapes, but change the era, season, light and people as described. Any other supplied image is only a style reference for photographic quality.\n\nUse case: photorealistic-natural. A REAL PHOTOGRAPH, not an illustration: no anime, no cel shading, no drawn outlines, no painterly look, no waxy CGI. Full-bleed single 16:9 landscape image: no border, no white frame, no rounded corners, no text overlay.\nEra: 1985–1986 (late Showa), Japan. Tsugishima, a small coal-mining island town packed with weathered 1960s concrete apartment blocks of 6–10 stories behind a high seawall, with stairways, rooftop gardens, a small hilltop shrine (weathered gray stone torii, stone lanterns, a huge ginkgo tree), a white lighthouse and the coal mine's steel headframe tower; it is connected by ferry to a seaside hill town of tiled roofs. Crowded, lived-in, laundry everywhere. Look of a real 1980s amateur color film photograph: warm, slightly faded and magenta-shifted color, soft film grain, gentle vignette, believable natural light. Absolutely no modern or futuristic elements: no glass towers, no flying vehicles, no robots (except where a child's drawing is requested), no holograms, no solar panels, no LED lights, no smartphones.\nRecurring people (always seen from behind or far away — no faces visible): THE BOY is ten, short hair, white short-sleeve shirt, navy shorts and a baseball cap (in winter a hand-knitted sweater and a muffler). THE GIRL is ten, with a bob haircut and a small RED hair ribbon (in winter a red cardigan). Vivid red is reserved for the girl; other reds stay muted.\nNo captions, logos, watermarks or readable text unless explicitly requested.\n\nSpecific scene (a summer morning, 1985):\nIn front of a Showa candy shop: the same hand-made toy race course built from plywood on the ground as in the reference. In the near foreground THE BOY and THE GIRL crouch side by side at the start of the course with their BACKS to the camera, each holding a small toy car (plain original designs, no logos) on a lane, ready to let it go: only the backs of their heads, their shoulders, backs and hands are visible — no face, no profile, no cheek. Two other children stand further along the course, small and seen from behind. No robots, no futuristic objects."
+  },
+  {
+   "id": "B5_v3",
+   "file": "B5_v3.jpg",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "a0d8bbe420234c4d8ebd7d29951c25441a7fabd5349003a32ddce1b495086b4a",
+   "bytes": 3289545,
+   "reference_files": [
+    "B4_v2.jpg"
+   ],
+   "extra": "",
+   "tag": "redo_back",
+   "seconds": 25.1,
+   "created_utc": "2026-10-12T11:26:04.262509+00:00",
+   "usage": {
+    "promptTokenCount": 821,
+    "candidatesTokenCount": 1443,
+    "totalTokenCount": 2537,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 563
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 273,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "prompt": "The FIRST supplied image is the COMPOSITION reference: keep exactly the same viewpoint, framing, horizon and layout of the main shapes, but change the era, season, light and people as described. Any other supplied image is only a style reference for photographic quality.\n\nUse case: photorealistic-natural. A REAL PHOTOGRAPH, not an illustration: no anime, no cel shading, no drawn outlines, no painterly look, no waxy CGI. Full-bleed single 16:9 landscape image: no border, no white frame, no rounded corners, no text overlay.\nEra: 1985–1986 (late Showa), Japan. Tsugishima, a small coal-mining island town packed with weathered 1960s concrete apartment blocks of 6–10 stories behind a high seawall, with stairways, rooftop gardens, a small hilltop shrine (weathered gray stone torii, stone lanterns, a huge ginkgo tree), a white lighthouse and the coal mine's steel headframe tower; it is connected by ferry to a seaside hill town of tiled roofs. Crowded, lived-in, laundry everywhere. Look of a real 1980s amateur color film photograph: warm, slightly faded and magenta-shifted color, soft film grain, gentle vignette, believable natural light. Absolutely no modern or futuristic elements: no glass towers, no flying vehicles, no robots (except where a child's drawing is requested), no holograms, no solar panels, no LED lights, no smartphones.\nRecurring people (always seen from behind or far away — no faces visible): THE BOY is ten, short hair, white short-sleeve shirt, navy shorts and a baseball cap (in winter a hand-knitted sweater and a muffler). THE GIRL is ten, with a bob haircut and a small RED hair ribbon (in winter a red cardigan). Vivid red is reserved for the girl; other reds stay muted.\nNo captions, logos, watermarks or readable text unless explicitly requested.\n\nSpecific scene (a summer morning, 1985):\nIn front of a Showa candy shop: the same hand-made toy race course built from plywood on the ground as in the reference. In the near foreground THE BOY and THE GIRL crouch side by side at the start of the course with their BACKS to the camera, each holding a small toy car (plain original designs, no logos) on a lane, ready to let it go: only the backs of their heads, their shoulders, backs and hands are visible — no face, no profile, no cheek. Two other children stand further along the course, small and seen from behind. No robots, no futuristic objects."
   }
  ]
 }

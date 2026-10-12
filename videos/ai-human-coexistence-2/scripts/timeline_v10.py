@@ -99,14 +99,21 @@ S.append(shot('A2s', '一', 'ラジオ体操のカード（寄り）', 6.2, push
               captions=[cap(0.8, 5.6, '最後の日のハンコだけ、空いていた。')], audio=still_audio(['harbor_morning', 'kids_play'], 3)))
 S.append(shot('A2', '一', 'ラジオ体操のカード（はんこ）', 6.8, 6.2, ink=A2_INK,
               holo=[dict(V9['A2']['holo'][0], t0=0.6)], audio=audio('A2'), events=[{'t': 1.1, 'type': 'stamp_paper'}]))
-B1 = copy.deepcopy(V9['B1']); B1.update(dur=11.0, clip=11.0, chapter='一',
-                                       chapterCard=card(0.9, 5.4, '一', '朝', '午前八時十分'),
-                                       captions=[cap(6.0, 10.4, '町は、今日も少しずつ新しくなる。')],
-                                       events=[{'t': 1.8, 'type': 'cup_clink'}, {'t': 9.2, 'type': 'cup_clink', 'gain': -4}])
-B1['voice'][0]['t0'] = 2.4
+# 喫茶店：残高の補充後（2026年10月12日）、原画 B1_v6 から Veo を作り直し、止め絵2枚＋動きの3カットに（合わせた尺は前と同じ）。
+#   B1_v6 は、Veo が「他社のコンテンツ」と判定したコンビニの店構えを昭和の小さな商店に、実在の通勤電車に似た電車を丸い吊り下げ式に描き直したもの。
+#   前の B1v（別の原画）は女の人の顔が映り、コンビニの看板が実在のチェーンに似ていたので使わない。
+#   B1 の奥の女の人は 4.5 秒から横顔になるので、頭だけ 2 秒目のコマで止めてある（scripts/freeze_region.py の頭に作り直しの手順）
+S.append(shot('B1s', '一', '喫茶店の窓（止め絵：朝の通りとモノレール）', 5.8, push=[1.0, 1.04],
+              chapterCard=card(0.9, 5.4, '一', '朝', '午前八時十分'), audio=still_audio(['cafe_room', 'town_murmur_far'], 5),
+              events=[{'t': 1.8, 'type': 'cup_clink'}]))
+S.append(shot('B1v', '一', '喫茶店のカウンター（止め絵：サイフォンとモーニング）', 4.6, push=[1.0, 1.04],
+              audio=still_audio(['cafe_room', 'siphon'], 6), events=[{'t': 1.6, 'type': 'cup_clink', 'gain': -3}]))
+B1 = copy.deepcopy(V9['B1']); B1.pop('push', None); B1.pop('chapterCard', None)
+B1.update(dur=8.4, clip=8.0, chapter='一', name='喫茶店のモーニング', captions=[cap(3.0, 7.6, '町は、今日も少しずつ新しくなる。')],
+          audio={'veo': 0.6, 'bed_gain': 3, 'beds': ['cafe_room', 'siphon']},
+          events=[{'t': 0.2, 'type': 'monorail_pass', 'gain': -8}, {'t': 5.8, 'type': 'cup_clink', 'gain': -4}])
+B1['voice'][0]['t0'] = 1.2
 S.append(B1)
-S.append(shot('B1v', '一', '喫茶店の窓ぎわ（止め絵）', 6.6, push=[1.0, 1.04], audio=still_audio(['cafe_room', 'siphon'], 6),
-              events=[{'t': 2.4, 'type': 'cup_clink', 'gain': -3}]))
 S.append(shot('B2s', '一', '左官とおばちゃんの差し入れ（止め絵）', 6.4, push=[1.0, 1.04],
               captions=[cap(1.0, 5.8, '壁の塗り方は、人がロボットに教える。')],
               audio=still_audio(['cicadas_far', 'workers_chat'], 4),
@@ -121,7 +128,9 @@ S.append(shot('B6', '一', '路地の将棋（めんこを拾う子、駒を指�
               events=[{'t': 2.4, 'type': 'laugh', 'kind': 'man', 'far': True, 'seed': 23, 'gain': -3}]))
 S.append(shot('B4p', '一', '駄菓子屋の裏のコース（止め絵：男の手に小さな四駆）', 6.4, push=[1.0, 1.05],
               audio=still_audio(['cicadas_far', 'kids_near'], 4)))
-B5 = shot('B5', '一', '昭和のコース（思い出：写真から動き出す）', 11.0, 7.1, clipAt=3.0, memory=True, push=[1.0, 1.04],
+# B5：残高の補充後、少年とあの子を手前の後ろ姿にした原画 B5_v3 から作り直した Veo（B5_v2）の 3.8〜8.0 秒。写真のまま 5.6 秒→元の速さで 4.2 秒
+#   少年の頬と目元が少し見えるので、あの子とコースだけを切り抜いてある（natural_plan_v10.json の crop）
+B5 = shot('B5', '一', '昭和のコース（思い出：写真から動き出す）', 11.0, 4.2, clipAt=5.6, memory=True, push=[1.0, 1.04],
           captions=[cap(4.0, 9.4, '同じコースを、あの子と走った。')], audio=audio('B5'))
 S.append(B5)
 # ---------------- 二　昼さがり（島へ、島の家） ----------------
@@ -160,9 +169,11 @@ S.append(shot('D1', '三', '高台の神社（再生記念の額）', 9.0, 8.0, 
               chapterCard=card(0.8, 4.8, '三', '夕暮れ', '午後五時'),
               captions=[cap(5.0, 8.8, '島に灯りを戻したのは、あの子だった。')],
               audio=audio('D1'), events=[{'t': 1.0, 't_end': 9.0, 'type': 'town_chime'}]))
-D2 = copy.deepcopy(V9['D2']); D2.update(dur=7.8, clip=7.8, chapter='三', name='境内の缶蹴り（止め絵）', push=[1.0, 1.05],
-                                         captions=[cap(1.2, 6.8, '夕方5時の、帰りたくない気持ち。')],
-                                         events=[{'t': 0.9, 'type': 'can_kick', 'gain': -3}])
+# D2：残高の補充後（2026年10月12日）、男を後ろ姿にした原画 D2_v3 から Veo を作り直した。元の速さで 8 秒（最後の 0.4 秒は次のカットとの重なり）。
+#   缶の音とヒグラシは Veo の音（音楽・声なしを2回の試聴で確認）。子どもの遠い声は合成の環境音
+D2 = copy.deepcopy(V9['D2']); D2.pop('push', None)
+D2.update(dur=8.4, clip=8.0, chapter='三', name='境内の缶蹴り', captions=[cap(1.2, 6.8, '夕方5時の、帰りたくない気持ち。')],
+          events=[], audio={'veo': 1.0, 'beds': ['higurashi', 'kids_play']})
 S.append(D2)
 # ---------------- 四　夜 ----------------
 S.append(shot('E1', '四', '灯りの島', 8.4, 7.5, chapterCard=card(0.8, 4.6, '四', '夜', '午後七時五十分'),
