@@ -5,79 +5,64 @@
  "height": 1080,
  "crossfade": 1.2,
  "clipLen": 15.9,
+ "fadeIn": 0.25,
  "shots": [
   {
    "id": "H0",
    "chapter": "序",
-   "name": "冒頭のつかみ（この町の一日から、四つの場面を少しずつ）",
+   "name": "冒頭のつかみ（帰郷の一日から、四つの場面を少しずつ）",
    "dur": 16.0,
+   "clip": 16.0,
    "hook": {
     "xf": 0.5,
     "segs": [
      {
-      "src": "C1",
-      "ss": 0.2,
+      "src": "A1",
+      "ss": 0.6,
       "len": 3.9,
       "beds": [
-       "shop_voices"
-      ],
-      "events": [
        {
-        "t": 3.0,
-        "type": "robot_pi",
-        "gain": -5
+        "name": "morning_birds",
+        "gain": 3
+       },
+       {
+        "name": "distant_sea",
+        "gain": 2
        }
       ]
      },
      {
-      "src": "B2",
-      "ss": 0.8,
+      "src": "C2",
+      "ss": 0.4,
       "len": 3.9,
       "beds": [
-       "cicadas_far",
-       "workers_chat"
+       "ferry_deck"
+      ]
+     },
+     {
+      "src": "R5",
+      "ss": 1.0,
+      "len": 3.9,
+      "beds": [
+       "insects"
       ],
       "events": [
        {
-        "t": 1.2,
+        "t": 1.4,
         "type": "laugh",
-        "kind": "woman",
-        "far": false,
-        "soft": true,
-        "seed": 11
-       },
-       {
-        "t": 2.5,
-        "type": "laugh",
-        "kind": "man",
+        "kind": "kid",
         "far": true,
-        "seed": 12,
+        "seed": 31,
         "gain": -3
        }
       ]
      },
      {
-      "src": "B4",
-      "ss": 2.4,
-      "len": 3.9,
-      "beds": [
-       "cicadas_far",
-       "kids_near"
-      ]
-     },
-     {
-      "src": "E4",
-      "ss": 2.6,
+      "src": "D1",
+      "ss": 0.4,
       "len": 5.8,
       "beds": [
-       "insects",
-       "night_sea"
-      ],
-      "events": [
-       {
-        "t": 0.3,
-        "type": "aircar_pass"
-       }
+       "higurashi"
       ]
      }
     ]
@@ -97,34 +82,34 @@
      "to": 1,
      "color": "#000"
     }
-   ],
-   "clip": 16.0
+   ]
   },
   {
    "id": "P0",
    "chapter": "序",
-   "name": "2026年の浜",
-   "dur": 20,
+   "name": "2026年の浜（砂丘へ歩く男）",
+   "dur": 15.0,
+   "clip": 8.0,
    "push": [
     1.0,
     1.04
    ],
    "captions": [
     {
-     "t0": 3.0,
-     "t1": 8.6,
+     "t0": 1.0,
+     "t1": 5.6,
      "text": "2026年8月24日。"
     },
     {
-     "t0": 9.2,
-     "t1": 14.4,
-     "text": "いつから、夕焼けを見なくなったんだろう。"
+     "t0": 6.2,
+     "t1": 11.0,
+     "text": "あの島を出て、四十年。"
     }
    ],
    "veil": [
     {
-     "t0": 14.5,
-     "t1": 20.0,
+     "t0": 9.4,
+     "t1": 15.0,
      "from": 0,
      "to": 0.72,
      "color": "#cdbb9a"
@@ -141,37 +126,32 @@
    },
    "events": [
     {
-     "t": 2.2,
+     "t": 0.8,
      "type": "phone_notify"
     },
     {
-     "t": 5.6,
+     "t": 3.4,
      "type": "phone_notify",
      "gain": -2
     },
     {
-     "t": 8.4,
+     "t": 6.0,
      "type": "phone_notify",
-     "gain": -4
+     "gain": -5
     },
     {
-     "t": 11.0,
+     "t": 8.6,
      "type": "phone_notify",
-     "gain": -7
-    },
-    {
-     "t": 13.2,
-     "type": "phone_notify",
-     "gain": -11
+     "gain": -9
     }
-   ],
-   "clip": 19.75
+   ]
   },
   {
    "id": "P1",
    "chapter": "序",
-   "name": "砂の向こう",
-   "dur": 22,
+   "name": "砂の向こう（夜の砂丘、島の灯りと花火）",
+   "dur": 17.0,
+   "clip": 12.0,
    "push": [
     1.0,
     1.035
@@ -179,15 +159,15 @@
    "veil": [
     {
      "t0": 0.0,
-     "t1": 3.6,
+     "t1": 3.0,
      "from": 0.72,
      "to": 0,
      "color": "#cdbb9a"
     }
    ],
    "title": {
-    "t0": 7.6,
-    "t1": 21.2,
+    "t0": 4.2,
+    "t1": 16.2,
     "text": "砂の向こうから来た男",
     "sub": "AIと人間の共存　第二章",
     "top": 0.2,
@@ -200,62 +180,98 @@
      "sand_fall",
      "insects_start"
     ]
-   },
-   "clip": 21.75
+   }
+  },
+  {
+   "id": "A1s",
+   "chapter": "一",
+   "name": "夜明けの海沿いの道（止め絵：島へ向かう軽トラ）",
+   "dur": 7.2,
+   "clip": 7.2,
+   "push": [
+    1.0,
+    1.05
+   ],
+   "captions": [
+    {
+     "t0": 0.9,
+     "t1": 5.8,
+     "text": "2080年8月25日、日曜日。"
+    }
+   ],
+   "audio": {
+    "veo": 0.0,
+    "bed_gain": 2,
+    "beds": [
+     "morning_birds",
+     "distant_sea"
+    ]
+   }
   },
   {
    "id": "A1",
    "chapter": "一",
-   "name": "夜明けの海沿いの道",
-   "dur": 16,
-   "chapterCard": {
-    "t0": 1.3,
-    "t1": 6.8,
-    "num": "一",
-    "title": "夜明け",
-    "time": "午前五時四十分",
-    "right": 1500
-   },
-   "captions": [
-    {
-     "t0": 7.6,
-     "t1": 13.6,
-     "text": "2080年8月25日、日曜日。"
-    }
-   ],
+   "name": "夜明けの海沿いの道（荷台の男とロボット）",
+   "dur": 6.0,
+   "clip": 5.2,
    "audio": {
     "veo": 1.0,
     "beds": [
      "morning_birds"
     ]
-   },
-   "clip": 15.62
+   }
   },
   {
-   "id": "A2",
+   "id": "A2w",
    "chapter": "一",
-   "name": "ラジオ体操のカード",
-   "dur": 16,
-   "holo": [
-    {
-     "x": 0.36,
-     "y": 0.33,
-     "w": 0.13,
-     "lines": [
-      "ラジオ体操　6:30",
-      "夏休み　さいごの日"
-     ],
-     "t0": 1.2,
-     "tilt": 6
-    }
+   "name": "浜のラジオ体操（止め絵：引き）",
+   "dur": 7.2,
+   "clip": 7.2,
+   "push": [
+    1.0,
+    1.04
    ],
    "audio": {
-    "veo": 0.9,
+    "veo": 0.0,
+    "bed_gain": 2,
     "beds": [
      "harbor_morning",
      "kids_play"
     ]
-   },
+   }
+  },
+  {
+   "id": "A2s",
+   "chapter": "一",
+   "name": "ラジオ体操のカード（寄り）",
+   "dur": 6.8,
+   "clip": 6.8,
+   "push": [
+    1.0,
+    1.04
+   ],
+   "captions": [
+    {
+     "t0": 0.8,
+     "t1": 5.6,
+     "text": "最後の日のハンコだけ、空いていた。"
+    }
+   ],
+   "audio": {
+    "veo": 0.0,
+    "bed_gain": 1,
+    "beds": [
+     "harbor_morning",
+     "kids_play"
+    ]
+   }
+  },
+  {
+   "id": "A2",
+   "chapter": "一",
+   "name": "ラジオ体操のカード（はんこ）",
+   "dur": 6.8,
+   "clip": 6.2,
    "ink": [
     {
      "bake": true,
@@ -271,7 +287,7 @@
      ],
      "track": "A2@card",
      "aspect": 1.4,
-     "t1": 13.0,
+     "t1": 9.0,
      "soft": 0.7,
      "occlude": {
       "mode": "chroma",
@@ -280,19 +296,19 @@
       "grow": 1,
       "refs": [
        {
-        "until": 5.0,
+        "until": 2.49,
         "ref": [
-         1.6,
-         2.0,
-         2.4
+         0.79,
+         0.99,
+         1.19
         ]
        },
        {
         "ref": [
-         10.4,
-         10.8,
-         11.2,
-         11.6
+         5.19,
+         5.39,
+         5.59,
+         5.79
         ]
        }
       ]
@@ -300,10 +316,10 @@
      "patch": {
       "mode": "paper",
       "ref": [
-       10.4,
-       10.8,
-       11.2,
-       11.6
+       5.19,
+       5.39,
+       5.59,
+       5.79
       ],
       "rects": [
        [
@@ -399,7 +415,7 @@
       },
       {
        "kind": "stamp",
-       "t": 7.45,
+       "t": 3.72,
        "x": 0.512,
        "y": 0.51,
        "size": 0.165,
@@ -409,26 +425,46 @@
        "rot": -7
       }
      ],
-     "t0": 1.0
+     "t0": 0.0,
+     "fin": 0.0
     }
    ],
+   "holo": [
+    {
+     "x": 0.36,
+     "y": 0.33,
+     "w": 0.13,
+     "lines": [
+      "ラジオ体操　6:30",
+      "夏休み　さいごの日"
+     ],
+     "t0": 0.6,
+     "tilt": 6
+    }
+   ],
+   "audio": {
+    "veo": 0.9,
+    "beds": [
+     "harbor_morning",
+     "kids_play"
+    ]
+   },
    "events": [
     {
-     "t": 3.35,
+     "t": 1.1,
      "type": "stamp_paper"
     }
-   ],
-   "clip": 15.82
+   ]
   },
   {
    "id": "B1",
-   "chapter": "二",
+   "chapter": "一",
    "name": "喫茶店のモーニング",
-   "dur": 16,
+   "dur": 11.6,
    "chapterCard": {
-    "t0": 1.3,
-    "t1": 6.8,
-    "num": "二",
+    "t0": 0.9,
+    "t1": 5.4,
+    "num": "一",
     "title": "朝",
     "time": "午前八時十分"
    },
@@ -438,7 +474,7 @@
      "y": 0.47,
      "w": 0.2,
      "tilt": -18,
-     "t0": 3.4,
+     "t0": 2.4,
      "lines": [
       "もし　雨がふったら",
       "　洗濯物を　とりこむ",
@@ -448,8 +484,8 @@
    ],
    "captions": [
     {
-     "t0": 10.6,
-     "t1": 15.3,
+     "t0": 6.0,
+     "t1": 10.4,
      "text": "町は、今日も少しずつ新しくなる。"
     }
    ],
@@ -463,33 +499,89 @@
    },
    "events": [
     {
-     "t": 2.2,
+     "t": 1.8,
      "type": "cup_clink"
     },
     {
-     "t": 13.6,
+     "t": 9.2,
      "type": "cup_clink",
      "gain": -4
     }
    ],
-   "clip": 15.85,
+   "clip": 11.6,
    "push": [
     1.0,
     1.06
    ]
   },
   {
-   "id": "B2",
-   "chapter": "二",
-   "name": "左官と職人、おばちゃんの差し入れ",
-   "dur": 16,
+   "id": "B1v",
+   "chapter": "一",
+   "name": "喫茶店の窓ぎわ（止め絵）",
+   "dur": 7.2,
+   "clip": 7.2,
+   "push": [
+    1.0,
+    1.04
+   ],
+   "audio": {
+    "veo": 0.0,
+    "bed_gain": 6,
+    "beds": [
+     "cafe_room",
+     "siphon"
+    ]
+   },
+   "events": [
+    {
+     "t": 2.4,
+     "type": "cup_clink",
+     "gain": -3
+    }
+   ]
+  },
+  {
+   "id": "B2s",
+   "chapter": "一",
+   "name": "左官とおばちゃんの差し入れ（止め絵）",
+   "dur": 7.0,
+   "clip": 7.0,
+   "push": [
+    1.0,
+    1.04
+   ],
    "captions": [
     {
-     "t0": 6.4,
-     "t1": 13.4,
+     "t0": 1.0,
+     "t1": 5.8,
      "text": "壁の塗り方は、人がロボットに教える。"
     }
    ],
+   "audio": {
+    "veo": 0.0,
+    "bed_gain": 2,
+    "beds": [
+     "cicadas_far",
+     "workers_chat"
+    ]
+   },
+   "events": [
+    {
+     "t": 1.6,
+     "type": "laugh",
+     "kind": "woman",
+     "far": false,
+     "soft": true,
+     "seed": 21
+    }
+   ]
+  },
+  {
+   "id": "B2",
+   "chapter": "一",
+   "name": "左官とロボット",
+   "dur": 4.6,
+   "clip": 3.35,
    "audio": {
     "veo": 1.0,
     "beds": [
@@ -497,135 +589,66 @@
      "workers_chat"
     ]
    },
-   "clip": 15.82,
-   "events": [
-    {
-     "t": 2.0,
-     "type": "laugh",
-     "kind": "woman",
-     "far": false,
-     "soft": true,
-     "seed": 21
-    },
-    {
-     "t": 9.4,
-     "type": "laugh",
-     "kind": "man",
-     "far": true,
-     "seed": 22,
-     "gain": -2
-    }
-   ]
+   "events": []
   },
   {
-   "id": "B3",
-   "chapter": "二",
-   "name": "電話をあずける",
-   "dur": 10.6,
+   "id": "C1",
+   "chapter": "一",
+   "name": "牛丼屋（止め絵）",
+   "dur": 7.2,
+   "clip": 7.2,
+   "push": [
+    1.0,
+    1.04
+   ],
    "captions": [
     {
-     "t0": 3.4,
-     "t1": 9.6,
-     "text": "日曜の駄菓子屋では、電話を木の箱にあずける。"
+     "t0": 1.2,
+     "t1": 5.8,
+     "text": "牛丼は、今も早い。"
     }
    ],
    "audio": {
-    "veo": 1.0,
+    "veo": 0.0,
+    "bed_gain": 2,
     "beds": [
-     "cicadas_far",
-     "town_voices"
+     "town_murmur_far",
+     "shop_voices"
     ]
-   },
-   "ink": [
+   }
+  },
+  {
+   "id": "B6s",
+   "chapter": "一",
+   "name": "路地の将棋（止め絵）",
+   "dur": 7.0,
+   "clip": 7.0,
+   "push": [
+    1.0,
+    1.04
+   ],
+   "captions": [
     {
-     "quad": [
-      0.411,
-      0.3,
-      0.466,
-      0.303,
-      0.466,
-      0.35,
-      0.412,
-      0.349
-     ],
-     "aspect": 1.97,
-     "blend": "normal",
-     "patch": {
-      "color": "radial-gradient(ellipse 70% 75% at 52% 50%, #eedfc6 0%, #e6d4b8 60%, #d6c3a5 100%)",
-      "feather": 18,
-      "inset": 32
-     },
-     "items": [
-      {
-       "text": "でんわ",
-       "x": 0.5,
-       "y": 0.13,
-       "size": 0.4,
-       "font": "pen",
-       "align": "center",
-       "color": "#221c18",
-       "opacity": 0.9,
-       "spacing": 0.12
-      },
-      {
-       "text": "あずかり所",
-       "x": 0.5,
-       "y": 0.6,
-       "size": 0.25,
-       "font": "pen",
-       "align": "center",
-       "color": "#221c18",
-       "opacity": 0.88,
-       "spacing": 0.06
-      }
-     ],
-     "track": "B3@sign"
+     "t0": 1.0,
+     "t1": 5.8,
+     "text": "将棋のロボットは、ときどき負けてくれる。"
     }
    ],
-   "clip": 15.82
-  },
-  {
-   "id": "B4",
-   "chapter": "二",
-   "name": "小さな四駆のレース",
-   "dur": 16,
    "audio": {
-    "veo": 0.9,
-    "beds": [
-     "cicadas_far",
-     "kids_near"
-    ]
-   },
-   "clip": 15.82
-  },
-  {
-   "id": "B5",
-   "chapter": "二",
-   "name": "昭和のコース",
-   "dur": 16,
-   "memory": true,
-   "audio": {
-    "veo": 0.8,
-    "veo_lp": 2400,
+    "veo": 0.0,
+    "bed_gain": 3,
     "beds": [
      "cicadas_far",
      "kids_play"
     ]
-   },
-   "clip": 15.82
+   }
   },
   {
    "id": "B6",
-   "chapter": "二",
-   "name": "縁台の遊び",
-   "dur": 16,
-   "captions": [
-    {
-     "t0": 6.6,
-     "t1": 13.6,
-     "text": "将棋のロボットは、ときどき負けてくれる。"
-    }
-   ],
+   "chapter": "一",
+   "name": "路地の将棋（めんこを拾う子、駒を指すロボットの手）",
+   "dur": 5.6,
+   "clip": 4.5,
    "audio": {
     "veo": 1.3,
     "beds": [
@@ -634,10 +657,9 @@
     ],
     "bed_gain": 4
    },
-   "clip": 15.82,
    "events": [
     {
-     "t": 12.6,
+     "t": 2.4,
      "type": "laugh",
      "kind": "man",
      "far": true,
@@ -647,73 +669,109 @@
    ]
   },
   {
-   "id": "C1",
-   "chapter": "三",
-   "name": "牛丼屋",
-   "dur": 16,
-   "chapterCard": {
-    "t0": 1.3,
-    "t1": 6.8,
-    "num": "三",
-    "title": "昼さがり",
-    "time": "午後零時十分"
-   },
+   "id": "B4p",
+   "chapter": "一",
+   "name": "駄菓子屋の裏のコース（止め絵：男の手に小さな四駆）",
+   "dur": 7.0,
+   "clip": 7.0,
+   "push": [
+    1.0,
+    1.05
+   ],
+   "audio": {
+    "veo": 0.0,
+    "bed_gain": 1,
+    "beds": [
+     "cicadas_far",
+     "kids_near"
+    ]
+   }
+  },
+  {
+   "id": "B5",
+   "chapter": "一",
+   "name": "昭和のコース（思い出：写真から動き出す）",
+   "dur": 11.0,
+   "clip": 7.1,
+   "clipAt": 3.0,
+   "memory": true,
+   "push": [
+    1.0,
+    1.04
+   ],
    "captions": [
     {
-     "t0": 8.2,
-     "t1": 13.6,
-     "text": "牛丼は、今も早い。"
+     "t0": 4.0,
+     "t1": 9.4,
+     "text": "同じコースを、あの子と走った。"
     }
    ],
    "audio": {
-    "veo": 1.0,
+    "veo": 0.8,
+    "veo_lp": 2400,
     "beds": [
-     "town_murmur_far",
-     "shop_voices"
+     "cicadas_far",
+     "kids_play"
     ]
+   }
+  },
+  {
+   "id": "C2s",
+   "chapter": "二",
+   "name": "島への船（止め絵：近づく島）",
+   "dur": 7.2,
+   "clip": 7.2,
+   "push": [
+    1.0,
+    1.05
+   ],
+   "chapterCard": {
+    "t0": 0.8,
+    "t1": 5.6,
+    "num": "二",
+    "title": "昼さがり",
+    "time": "午後一時"
    },
-   "clip": 15.82
+   "audio": {
+    "veo": 0.0,
+    "bed_gain": 2,
+    "beds": [
+     "ferry_deck",
+     "distant_sea"
+    ]
+   }
   },
   {
    "id": "C2",
-   "chapter": "三",
-   "name": "島への船",
-   "dur": 16,
+   "chapter": "二",
+   "name": "島への船（男と古いロボット）",
+   "dur": 7.0,
+   "clip": 6.0,
+   "captions": [
+    {
+     "t0": 0.9,
+     "t1": 5.6,
+     "text": "生まれた島へ。"
+    }
+   ],
    "audio": {
     "veo": 0.9,
     "beds": [
      "ferry_deck",
      "town_voices"
     ]
-   },
-   "clip": 15.82
+   }
   },
   {
-   "id": "C3",
-   "chapter": "三",
-   "name": "麦茶",
-   "dur": 16,
-   "audio": {
-    "veo": 1.0,
-    "beds": [
-     "clock_tick",
-     "cicadas_outside"
-    ]
-   },
-   "clip": 15.82
-  },
-  {
-   "id": "C4",
-   "chapter": "三",
-   "name": "交換日記",
-   "dur": 16,
-   "audio": {
-    "veo": 1.0,
-    "beds": [
-     "clock_tick"
-    ],
-    "bed_gain": 3
-   },
+   "id": "C4a",
+   "chapter": "二",
+   "name": "交換日記（1986年のページ）",
+   "dur": 7.4,
+   "clip": 7.4,
+   "push": [
+    1.0,
+    1.04
+   ],
    "ink": [
     {
      "bake": true,
@@ -727,234 +785,152 @@
       0.229,
       0.608
      ],
-     "track": "C4@L",
      "aspect": 0.7,
-     "occlude": {
-      "d0": 14,
-      "d1": 26,
-      "grow": 1,
-      "ref": "median"
-     },
-     "fade": 0.8,
-     "pages": [
+     "items": [
       {
-       "t0": -1,
-       "t1": 4.4,
-       "items": [
-        {
-         "text": "1986.8.23（土）くもり",
-         "x": 0.17,
-         "y": 0.09,
-         "size": 0.042,
-         "font": "pencil"
-        },
-        {
-         "text": "あしたは　おまつり。　☆",
-         "x": 0.17,
-         "y": 0.13999999999999999,
-         "size": 0.04,
-         "font": "pencil"
-        },
-        {
-         "text": "1986.8.24（日）はれ",
-         "x": 0.17,
-         "y": 0.27,
-         "size": 0.04,
-         "font": "maru"
-        },
-        {
-         "text": "おまつり、たのしかったね。\nはなび、きれいだったね。\nらいねんも、いっしょに見ようね。\nやくそく　♡",
-         "x": 0.17,
-         "y": 0.34,
-         "size": 0.036,
-         "font": "maru",
-         "line": 1.65
-        }
-       ]
+       "text": "1986.8.24　はれ",
+       "x": 0.1,
+       "y": 0.07,
+       "size": 0.05,
+       "font": "maru",
+       "color": "#3d3a46",
+       "opacity": 0.8
       },
       {
-       "t0": 6.4,
-       "t1": 9.9,
-       "items": [
-        {
-         "text": "2026.8.25",
-         "x": 0.17,
-         "y": 0.09,
-         "size": 0.05,
-         "font": "pen",
-         "shaky": 0.0
-        },
-        {
-         "text": "浜で、日がしずむまで\n待ちました。\n来年も、いっしょに見ようね。",
-         "x": 0.17,
-         "y": 0.135,
-         "size": 0.04,
-         "font": "pen",
-         "shaky": 0.0,
-         "line": 1.6
-        }
-       ]
+       "text": "らいねんも　いっしょに\nはなび　みようね。",
+       "x": 0.1,
+       "y": 0.17,
+       "size": 0.058,
+       "font": "maru",
+       "line": 1.55,
+       "color": "#3d3a46",
+       "opacity": 0.82
       },
       {
-       "t0": 9.9,
-       "t1": 12.9,
-       "items": [
-        {
-         "text": "2034.8.24",
-         "x": 0.17,
-         "y": 0.09,
-         "size": 0.05,
-         "font": "pen",
-         "shaky": 0.1
-        },
-        {
-         "text": "島に灯りがもどりました。\nロボットも、いっしょです。\n来年も、いっしょに見ようね。",
-         "x": 0.17,
-         "y": 0.135,
-         "size": 0.04,
-         "font": "pen",
-         "shaky": 0.1,
-         "line": 1.6
-        }
-       ]
-      },
-      {
-       "t0": 12.9,
-       "t1": 17.0,
-       "items": [
-        {
-         "text": "2068.8.24",
-         "x": 0.17,
-         "y": 0.09,
-         "size": 0.05,
-         "font": "pen",
-         "shaky": 0.55,
-         "opacity": 0.74
-        },
-        {
-         "text": "今年も砂丘を\n見回ってもらいました。\n来年も、いっしょに見ようね。",
-         "x": 0.17,
-         "y": 0.135,
-         "size": 0.04,
-         "font": "pen",
-         "shaky": 0.55,
-         "line": 1.6,
-         "opacity": 0.74
-        }
-       ]
-      }
-     ]
-    },
-    {
-     "bake": true,
-     "quad": [
-      0.515,
-      0.368,
-      0.682,
-      0.472,
-      0.5,
-      0.81,
-      0.344,
-      0.703
-     ],
-     "track": "C4@R",
-     "aspect": 0.7,
-     "occlude": {
-      "d0": 14,
-      "d1": 26,
-      "grow": 1,
-      "ref": "median"
-     },
-     "fade": 0.8,
-     "pages": [
-      {
-       "t0": 6.4,
-       "t1": 9.9,
-       "items": [
-        {
-         "text": "2027.8.24",
-         "x": 0.08,
-         "y": 0.06,
-         "size": 0.05,
-         "font": "pen",
-         "shaky": 0.03
-        },
-        {
-         "text": "今年も、浜で待ちました。\n来年も、いっしょに見ようね。",
-         "x": 0.08,
-         "y": 0.135,
-         "size": 0.04,
-         "font": "pen",
-         "shaky": 0.03,
-         "line": 1.6
-        }
-       ]
-      },
-      {
-       "t0": 9.9,
-       "t1": 12.9,
-       "items": [
-        {
-         "text": "2035.8.24",
-         "x": 0.08,
-         "y": 0.06,
-         "size": 0.05,
-         "font": "pen",
-         "shaky": 0.12
-        },
-        {
-         "text": "麦茶は今日もふたつ。\n来年も、いっしょに見ようね。",
-         "x": 0.08,
-         "y": 0.135,
-         "size": 0.04,
-         "font": "pen",
-         "shaky": 0.12,
-         "line": 1.6
-        }
-       ]
-      },
-      {
-       "t0": 12.9,
-       "t1": 17.0,
-       "items": [
-        {
-         "text": "2069.8.24",
-         "x": 0.08,
-         "y": 0.06,
-         "size": 0.05,
-         "font": "pen",
-         "shaky": 1.25,
-         "opacity": 0.62
-        },
-        {
-         "text": "来年も、いっしょに見ようね。",
-         "x": 0.08,
-         "y": 0.135,
-         "size": 0.04,
-         "font": "pen",
-         "shaky": 1.25,
-         "line": 1.6,
-         "opacity": 0.62
-        }
-       ]
+       "text": "うん。やくそく。",
+       "x": 0.12,
+       "y": 0.4,
+       "size": 0.06,
+       "font": "pencil",
+       "color": "#3b3b42",
+       "opacity": 0.78,
+       "rot": -2
       }
      ]
     }
    ],
-   "clip": 15.82
+   "audio": {
+    "veo": 0.0,
+    "bed_gain": 3,
+    "beds": [
+     "clock_tick",
+     "cicadas_outside"
+    ]
+   }
+  },
+  {
+   "id": "C4b",
+   "chapter": "二",
+   "name": "交換日記（毎年の一行）",
+   "dur": 7.6,
+   "clip": 7.6,
+   "push": [
+    1.0,
+    1.035
+   ],
+   "ink": [
+    {
+     "bake": true,
+     "quad": [
+      0.445,
+      0.1803,
+      0.6083,
+      0.3605,
+      0.3233,
+      0.9145,
+      0.1317,
+      0.7574
+     ],
+     "aspect": 0.7,
+     "items": [
+      {
+       "text": "1987.8.24　来年も、いっしょに見ようね。",
+       "x": 0.08,
+       "y": 0.07,
+       "size": 0.04,
+       "font": "pen",
+       "color": "#2f3340",
+       "opacity": 0.8,
+       "shaky": 0.0
+      },
+      {
+       "text": "1993.8.24　来年も、いっしょに見ようね。",
+       "x": 0.08,
+       "y": 0.175,
+       "size": 0.04,
+       "font": "pen",
+       "color": "#2f3340",
+       "opacity": 0.8,
+       "shaky": 0.04
+      },
+      {
+       "text": "2001.8.24　来年も、いっしょに見ようね。",
+       "x": 0.08,
+       "y": 0.28,
+       "size": 0.04,
+       "font": "pen",
+       "color": "#2f3340",
+       "opacity": 0.8,
+       "shaky": 0.1
+      },
+      {
+       "text": "2012.8.24　来年も、いっしょに見ようね。",
+       "x": 0.08,
+       "y": 0.385,
+       "size": 0.04,
+       "font": "pen",
+       "color": "#2f3340",
+       "opacity": 0.8,
+       "shaky": 0.2
+      },
+      {
+       "text": "2024.8.24　来年も、いっしょに見ようね。",
+       "x": 0.08,
+       "y": 0.49,
+       "size": 0.04,
+       "font": "pen",
+       "color": "#2f3340",
+       "opacity": 0.8,
+       "shaky": 0.32
+      },
+      {
+       "text": "2033.8.24　来年も、いっしょに見ようね。",
+       "x": 0.08,
+       "y": 0.595,
+       "size": 0.04,
+       "font": "pen",
+       "color": "#2f3340",
+       "opacity": 0.8,
+       "shaky": 0.45
+      }
+     ]
+    }
+   ],
+   "audio": {
+    "veo": 0.0,
+    "bed_gain": 3,
+    "beds": [
+     "clock_tick",
+     "cicadas_outside"
+    ]
+   }
   },
   {
    "id": "C5",
-   "chapter": "三",
-   "name": "日記のつづき",
-   "dur": 16,
-   "audio": {
-    "veo": 1.0,
-    "beds": [
-     "clock_tick",
-     "distant_sea"
-    ]
-   },
+   "chapter": "二",
+   "name": "日記のつづき（ロボットの字と砂丘の絵）",
+   "dur": 4.8,
+   "clip": 4.0,
    "ink": [
     {
      "bake": true,
@@ -985,6 +961,17 @@
        "font": "robot",
        "color": "#3a3f47",
        "opacity": 0.72,
+       "spacing": 0.1
+      },
+      {
+       "text": "きょうも、だれも\nこなかった。",
+       "x": 0.12,
+       "y": 0.15,
+       "size": 0.042,
+       "font": "robot",
+       "line": 1.5,
+       "color": "#3a3f47",
+       "opacity": 0.7,
        "spacing": 0.1
       }
      ]
@@ -1023,22 +1010,46 @@
      ]
     }
    ],
-   "clip": 15.82
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "clock_tick",
+     "distant_sea"
+    ]
+   }
+  },
+  {
+   "id": "C5s",
+   "chapter": "二",
+   "name": "日記のつづき（ロボットの字、寄り）",
+   "dur": 7.2,
+   "clip": 7.2,
+   "push": [
+    1.0,
+    1.04
+   ],
+   "captions": [
+    {
+     "t0": 1.0,
+     "t1": 5.8,
+     "text": "ある年から、字が変わっていた。"
+    }
+   ],
+   "audio": {
+    "veo": 0.0,
+    "bed_gain": 3,
+    "beds": [
+     "clock_tick",
+     "distant_sea"
+    ]
+   }
   },
   {
    "id": "C6",
-   "chapter": "三",
-   "name": "柱の傷",
-   "dur": 16,
-   "audio": {
-    "veo": 0.0,
-    "bed_gain": 6,
-    "beds": [
-     "clock_tick",
-     "cicadas_outside",
-     "distant_sea"
-    ]
-   },
+   "chapter": "二",
+   "name": "柱の傷（背くらべ）",
+   "dur": 7.0,
+   "clip": 8.0,
    "ink": [
     {
      "bake": true,
@@ -1062,15 +1073,15 @@
       "wl": 0.45,
       "open": 7,
       "ref": [
-       15.6,
-       15.8
+       7.79,
+       7.89
       ]
      },
      "patch": {
       "mode": "clone",
       "ref": [
-       15.6,
-       15.8
+       7.79,
+       7.89
       ],
       "feather": 14,
       "match": 10,
@@ -1117,17 +1128,38 @@
      ]
     }
    ],
-   "clip": 15.82
+   "captions": [
+    {
+     "t0": 0.9,
+     "t1": 6.0,
+     "text": "背くらべは、あの夏で止まっている。"
+    }
+   ],
+   "audio": {
+    "veo": 0.0,
+    "bed_gain": 6,
+    "beds": [
+     "clock_tick",
+     "cicadas_outside",
+     "distant_sea"
+    ]
+   }
   },
   {
    "id": "R1",
    "chapter": "あの頃",
-   "name": "神社の境内の秋",
-   "dur": 11,
+   "name": "神社の境内の秋（写真から動き出す）",
+   "dur": 7.4,
+   "clip": 2.5,
+   "clipAt": 4.0,
    "memory": true,
+   "push": [
+    1.0,
+    1.05
+   ],
    "chapterCard": {
-    "t0": 1.3,
-    "t1": 6.8,
+    "t0": 0.8,
+    "t1": 5.6,
     "num": "あの頃",
     "title": "",
     "time": "昭和六十一年"
@@ -1139,15 +1171,20 @@
      "insects_start",
      "kids_play"
     ]
-   },
-   "clip": 9.98
+   }
   },
   {
    "id": "R2",
    "chapter": "あの頃",
    "name": "雪の正月",
-   "dur": 16,
+   "dur": 8.2,
+   "clip": 4.3,
+   "clipAt": 3.4,
    "memory": true,
+   "push": [
+    1.0,
+    1.04
+   ],
    "audio": {
     "veo": 0.8,
     "veo_lp": 2400,
@@ -1158,23 +1195,16 @@
       "gain": -4
      }
     ]
-   },
-   "clip": 15.82
+   }
   },
   {
    "id": "R3",
    "chapter": "あの頃",
    "name": "授業参観",
-   "dur": 16,
+   "dur": 11.6,
+   "clip": 8.0,
+   "clipAt": 3.2,
    "memory": true,
-   "audio": {
-    "veo": 0.8,
-    "veo_lp": 2400,
-    "beds": [
-     "cicadas_outside",
-     "classroom"
-    ]
-   },
    "ink": [
     {
      "bake": true,
@@ -1232,13 +1262,46 @@
      ]
     }
    ],
-   "clip": 15.82
+   "push": [
+    1.0,
+    1.03
+   ],
+   "audio": {
+    "veo": 0.8,
+    "veo_lp": 2400,
+    "beds": [
+     "cicadas_outside",
+     "classroom"
+    ]
+   }
+  },
+  {
+   "id": "R4p",
+   "chapter": "あの頃",
+   "name": "夜の桟橋（止め絵：島の灯りを見るふたり）",
+   "dur": 7.6,
+   "clip": 7.6,
+   "memory": true,
+   "push": [
+    1.0,
+    1.05
+   ],
+   "audio": {
+    "veo": 0.0,
+    "bed_gain": 0,
+    "beds": [
+     "night_sea",
+     "insects"
+    ]
+   }
   },
   {
    "id": "R4",
    "chapter": "あの頃",
    "name": "消えていく灯り",
-   "dur": 16,
+   "dur": 7.6,
+   "clip": 6.75,
+   "clipAt": 0.6,
    "memory": true,
    "audio": {
     "veo": 0.8,
@@ -1249,19 +1312,31 @@
    },
    "events": [
     {
-     "t": 6.0,
+     "t": 3.0,
      "type": "foghorn",
      "gain": -6
     }
-   ],
-   "clip": 15.82
+   ]
   },
   {
    "id": "R5",
    "chapter": "あの頃",
    "name": "最後の花火",
-   "dur": 16,
+   "dur": 11.8,
+   "clip": 8.0,
+   "clipAt": 3.2,
    "memory": true,
+   "push": [
+    1.0,
+    1.03
+   ],
+   "captions": [
+    {
+     "t0": 5.0,
+     "t1": 10.6,
+     "text": "来年も、いっしょに見ようね。"
+    }
+   ],
    "audio": {
     "veo": 1.3,
     "veo_lp": 2400,
@@ -1269,22 +1344,47 @@
      "insects"
     ]
    },
-   "clip": 15.82,
    "events": [
     {
-     "t": 5.0,
+     "t": 4.0,
      "type": "laugh",
      "kind": "kid",
      "far": true,
      "seed": 24,
      "gain": -2
-    },
+    }
+   ]
+  },
+  {
+   "id": "R6p",
+   "chapter": "あの頃",
+   "name": "別れの朝（写真：お守りの手渡し）",
+   "dur": 8.2,
+   "clip": 8.2,
+   "memory": true,
+   "push": [
+    1.0,
+    1.05
+   ],
+   "captions": [
     {
-     "t": 10.5,
-     "type": "laugh",
-     "kind": "kid",
-     "far": true,
-     "seed": 25,
+     "t0": 1.2,
+     "t1": 6.8,
+     "text": "あれが最後の夏だったなんて。"
+    }
+   ],
+   "audio": {
+    "veo": 0.0,
+    "bed_gain": 0,
+    "beds": [
+     "harbor_morning",
+     "pier_crowd"
+    ]
+   },
+   "events": [
+    {
+     "t": 1.0,
+     "type": "ferry_horn",
      "gain": -4
     }
    ]
@@ -1292,8 +1392,9 @@
   {
    "id": "R6",
    "chapter": "あの頃",
-   "name": "別れの朝",
-   "dur": 16,
+   "name": "別れの朝（桟橋を歩くふたり）",
+   "dur": 4.0,
+   "clip": 3.0,
    "memory": true,
    "audio": {
     "veo": 0.8,
@@ -1303,47 +1404,14 @@
      "pier_crowd"
     ]
    },
-   "events": [
-    {
-     "t": 3.0,
-     "type": "ferry_horn",
-     "gain": -2
-    }
-   ],
-   "clip": 15.82,
-   "captions": [
-    {
-     "t0": 7.0,
-     "t1": 13.4,
-     "text": "あれが最後の夏だったなんて。"
-    }
-   ]
+   "events": []
   },
   {
    "id": "D1",
-   "chapter": "四",
-   "name": "高台の神社",
-   "dur": 16,
-   "chapterCard": {
-    "t0": 1.3,
-    "t1": 6.8,
-    "num": "四",
-    "title": "夕暮れ",
-    "time": "午後五時"
-   },
-   "events": [
-    {
-     "t": 2.6,
-     "t_end": 15.0,
-     "type": "town_chime"
-    }
-   ],
-   "audio": {
-    "veo": 1.0,
-    "beds": [
-     "higurashi"
-    ]
-   },
+   "chapter": "三",
+   "name": "高台の神社（再生記念の額）",
+   "dur": 9.0,
+   "clip": 8.0,
    "ink": [
     {
      "bake": true,
@@ -1410,17 +1478,43 @@
      ]
     }
    ],
-   "clip": 15.82
+   "chapterCard": {
+    "t0": 0.8,
+    "t1": 4.8,
+    "num": "三",
+    "title": "夕暮れ",
+    "time": "午後五時"
+   },
+   "captions": [
+    {
+     "t0": 5.0,
+     "t1": 8.8,
+     "text": "島に灯りを戻したのは、あの子だった。"
+    }
+   ],
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "higurashi"
+    ]
+   },
+   "events": [
+    {
+     "t": 1.0,
+     "t_end": 9.0,
+     "type": "town_chime"
+    }
+   ]
   },
   {
    "id": "D2",
-   "chapter": "四",
-   "name": "境内の缶蹴り（仮：夕焼けの空と空中電車、音だけ）",
-   "dur": 16,
+   "chapter": "三",
+   "name": "境内の缶蹴り（止め絵）",
+   "dur": 8.4,
    "captions": [
     {
-     "t0": 6.6,
-     "t1": 13.6,
+     "t0": 1.2,
+     "t1": 6.8,
      "text": "夕方5時の、帰りたくない気持ち。"
     }
    ],
@@ -1434,38 +1528,34 @@
    },
    "events": [
     {
-     "t": 3.6,
+     "t": 0.9,
      "type": "can_kick",
      "gain": -3
-    },
-    {
-     "t": 11.2,
-     "type": "can_kick",
-     "gain": -8
     }
    ],
-   "clip": 15.85,
+   "clip": 8.4,
    "push": [
     1.0,
-    1.07
+    1.05
    ]
   },
   {
    "id": "E1",
-   "chapter": "五",
+   "chapter": "四",
    "name": "灯りの島",
-   "dur": 16,
+   "dur": 8.4,
+   "clip": 7.5,
    "chapterCard": {
-    "t0": 1.3,
-    "t1": 6.8,
-    "num": "五",
-    "title": "線香花火",
+    "t0": 0.8,
+    "t1": 4.6,
+    "num": "四",
+    "title": "夜",
     "time": "午後七時五十分"
    },
    "captions": [
     {
-     "t0": 7.8,
-     "t1": 13.8,
+     "t0": 4.8,
+     "t1": 8.2,
      "text": "消えた窓に、また灯りがともる。"
     }
    ],
@@ -1480,30 +1570,18 @@
       "gain": -2
      }
     ]
-   },
-   "clip": 15.82
+   }
   },
   {
    "id": "E2",
-   "chapter": "五",
-   "name": "線香花火",
-   "dur": 16,
-   "captions": [
-    {
-     "t0": 6.6,
-     "t1": 13.6,
-     "text": "線香花火は、今もぽとりと落ちる。"
-    }
+   "chapter": "四",
+   "name": "線香花火（止め絵）",
+   "dur": 8.0,
+   "clip": 8.0,
+   "push": [
+    1.0,
+    1.05
    ],
-   "audio": {
-    "veo": 0.0,
-    "bed_gain": 2,
-    "beds": [
-     "insects",
-     "sparkler"
-    ]
-   },
-   "clip": 15.45,
    "shade": [
     {
      "x": 0.423,
@@ -1523,9 +1601,24 @@
     }
    ],
    "grade": "curves=all='0/0 0.3/0.08 0.55/0.16 0.75/0.34 0.9/0.66 1/1'",
+   "captions": [
+    {
+     "t0": 1.2,
+     "t1": 6.6,
+     "text": "線香花火は、今もぽとりと落ちる。"
+    }
+   ],
+   "audio": {
+    "veo": 0.0,
+    "bed_gain": 2,
+    "beds": [
+     "insects",
+     "sparkler"
+    ]
+   },
    "events": [
     {
-     "t": 9.0,
+     "t": 3.6,
      "type": "laugh",
      "kind": "kid",
      "far": false,
@@ -1537,15 +1630,10 @@
   },
   {
    "id": "E3",
-   "chapter": "五",
-   "name": "お守り",
-   "dur": 16,
-   "audio": {
-    "veo": 1.0,
-    "beds": [
-     "insects"
-    ]
-   },
+   "chapter": "四",
+   "name": "お守り（紙を開く）",
+   "dur": 5.6,
+   "clip": 4.6,
    "ink": [
     {
      "bake": true,
@@ -1561,16 +1649,16 @@
      ],
      "track": "E3@paper",
      "aspect": 1.0,
-     "t0": 11.6,
+     "t0": 1.9,
      "t1": 99,
      "occlude": {
       "d0": 14,
       "d1": 26,
       "grow": 1,
       "ref": [
-       13.5,
-       14.5,
-       15.5
+       3.35,
+       3.85,
+       4.35
       ]
      },
      "items": [
@@ -1595,31 +1683,78 @@
        "color": "#3b3640",
        "opacity": 0.7
       }
-     ]
+     ],
+     "fin": 0.12
     }
    ],
-   "clip": 15.82
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "insects"
+    ]
+   }
   },
   {
-   "id": "E4",
-   "chapter": "五",
-   "name": "屋上の三人",
-   "dur": 16,
-   "events": [
-    {
-     "t": 11.6,
-     "type": "robot_pi"
-    }
+   "id": "E3s",
+   "chapter": "四",
+   "name": "お守り（寄り）",
+   "dur": 7.4,
+   "clip": 7.4,
+   "push": [
+    1.0,
+    1.04
    ],
    "captions": [
     {
-     "t0": 4.0,
-     "t1": 10.4,
-     "text": "来年も、いっしょに見ようね。"
-    },
+     "t0": 1.4,
+     "t1": 6.2,
+     "text": "あの子の字だった。"
+    }
+   ],
+   "audio": {
+    "veo": 0.0,
+    "bed_gain": 2,
+    "beds": [
+     "insects"
+    ]
+   }
+  },
+  {
+   "id": "E4s",
+   "chapter": "四",
+   "name": "屋上の三人（止め絵）",
+   "dur": 8.0,
+   "clip": 8.0,
+   "push": [
+    1.0,
+    1.05
+   ],
+   "captions": [
     {
-     "t0": 11.6,
-     "t1": 14.6,
+     "t0": 1.0,
+     "t1": 6.6,
+     "text": "来年も、いっしょに見ようね。"
+    }
+   ],
+   "audio": {
+    "veo": 0.0,
+    "bed_gain": 3,
+    "beds": [
+     "insects",
+     "night_sea"
+    ]
+   }
+  },
+  {
+   "id": "E4",
+   "chapter": "四",
+   "name": "屋上の三人（飛行車）",
+   "dur": 4.6,
+   "clip": 2.9,
+   "captions": [
+    {
+     "t0": 0.9,
+     "t1": 3.8,
      "text": "ピ。"
     }
    ],
@@ -1631,32 +1766,37 @@
      "night_sea"
     ]
    },
-   "clip": 15.82
+   "events": [
+    {
+     "t": 0.9,
+     "type": "robot_pi"
+    }
+   ]
   },
   {
    "id": "F0",
    "chapter": "結",
    "name": "深夜の継町と継島",
-   "dur": 28,
+   "dur": 32.0,
    "push": [
     1.0,
-    1.05
+    1.06
    ],
    "captions": [
     {
-     "t0": 2.4,
-     "t1": 8.0,
+     "t0": 2.0,
+     "t1": 7.6,
      "text": "変わっていくものと、変わらないもの。"
     },
     {
-     "t0": 8.6,
-     "t1": 14.2,
+     "t0": 8.2,
+     "t1": 13.8,
      "text": "僕の大好きなあの頃は、そのままに。"
     }
    ],
    "endCard": {
     "t0": 15.0,
-    "t1": 27.4,
+    "t1": 31.4,
     "text": "AIと人間の共存",
     "sub": "第二章　了",
     "note": "この映像の街・人物・出来事はすべて架空です"
@@ -1668,7 +1808,7 @@
      "gain": -9
     },
     {
-     "t": 16.8,
+     "t": 17.0,
      "type": "voice",
      "file": "outro/closing.wav"
     }
@@ -1680,27 +1820,41 @@
      "insects_fade"
     ]
    },
-   "clip": 27.68
+   "clip": 12.0
   },
   {
    "id": "T0",
    "chapter": "予告",
-   "name": "第三章 予告（台風の夜）",
-   "dur": 16,
+   "name": "第三章 予告（窓の外の嵐）",
+   "dur": 4.4,
+   "clip": 3.0,
+   "captions": [
+    {
+     "t0": 0.4,
+     "t1": 4.2,
+     "text": "九月。台風が、近づいていた。"
+    }
+   ],
+   "audio": {
+    "veo": 1.0,
+    "beds": [
+     "wind_sea"
+    ]
+   }
+  },
+  {
+   "id": "T0s",
+   "chapter": "予告",
+   "name": "第三章 予告（雨戸を閉める）",
+   "dur": 10.6,
+   "clip": 10.6,
    "push": [
     1.0,
     1.05
    ],
-   "captions": [
-    {
-     "t0": 1.2,
-     "t1": 6.0,
-     "text": "九月。台風が、近づいていた。"
-    }
-   ],
    "title": {
-    "t0": 6.6,
-    "t1": 15.2,
+    "t0": 1.0,
+    "t1": 9.4,
     "text": "台風の夜",
     "sub": "次回　第三章",
     "top": 0.24,
@@ -1708,13 +1862,12 @@
     "subFirst": true
    },
    "audio": {
-    "veo": 1.0,
+    "veo": 0.0,
+    "bed_gain": 3,
     "beds": [
      "wind_sea"
     ]
-   },
-   "clip": 15.45
+   }
   }
- ],
- "fadeIn": 0.25
+ ]
 }
