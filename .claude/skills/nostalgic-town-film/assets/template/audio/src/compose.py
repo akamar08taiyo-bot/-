@@ -77,12 +77,13 @@ def basses(ins, chords, t0, beat, vel):
     return t
 
 beat = 60 / 72  # 0.833 秒
-# 序：オルゴールの前奏（短い動機）＋ パッド
-t = 2.0
+# 序：オルゴールの前奏（短い動機）＋ パッド。冒頭のつかみ（H0）があれば、その次のカットから入る
+t0 = starts[T['shots'][1]['id']] if T['shots'][0].get('hook') else 0.0
+t = t0 + 2.0
 pads(pad, CHORDS_A[:4], t, beat * 1.4, 34)
-for k, (p, d) in enumerate([(C5, 1.5), (A4, .5), (C5, 1), (D5, 1), (C5, 3)]):
-    pass
-melody(mbox, THEME_A, 6.0, beat * 1.15, 62, octave=1, bars=4, human=0.01)
+melody(mbox, THEME_A, t0 + 6.0, beat * 1.15, 62, octave=1, bars=4, human=0.01)
+# 冒頭のつかみ：曲を入れるなら、最後の場面で主題の頭を2小節だけ（入れない作品もある。第一章は祭りの音のまま、第二章はオルゴール）
+# if T['shots'][0].get('hook'): th = 10.6; melody(mbox, THEME_A, th, beat * 0.95, 50, octave=1, bars=2, human=0.01, seed=41); pads(pad, CHORDS_A[:2], th, beat * 0.95, 24)
 # 一 夜明け：オルゴール＋ピアノ（主題A）
 t1 = SEC['一'] + 0.5
 melody(mbox, THEME_A, t1, beat, 66, octave=1, human=0.01, seed=2)

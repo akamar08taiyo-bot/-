@@ -593,3 +593,184 @@ def sparkler(dur, seed=61):
     hiss = bandpass(pink(n, seed), 3000, 9000, 2) * 0.03 * smooth_noise(dur, 0.5, seed, 0.5, 1.0)
     out += np.stack([hiss, hiss], 1)
     return convolve_st(out, reverb_ir(0.5, 0.2, seed, lp=9000), 0.2) * 0.4
+
+
+# ---------- 人の声（せりふにはしない）：遠くの話し声・子どもの声・笑い声 ----------
+# 素材は audio/src/crowd/ の短い会話（TTS）。前置きの指示の読み上げを避けて、最初の 0.4 秒以上の間より後ろ（日本語の部分）だけを使う。
+# 言葉として聞き取れないように、短く切って重ね、遠くの音にする
+_VOICE = None
+_KID_FILES = ('c00', 'c07', 'c08')  # 子どもの声（Leda・Zephyr）
+_LAUGH_FILE = 'c12'                 # 「ふふ」と笑ってから話す声
+
+
+def _segments(y, sr, gap=0.4, th_db=35):
+    hop = int(0.02 * sr)
+    e = np.array([np.sqrt(np.mean(y[i:i + hop] ** 2)) for i in range(0, len(y) - hop, hop)])
+    db_ = 20 * np.log10(e + 1e-9); act = db_ > db_.max() - th_db
+    segs, on = [], None
+    for i, a in enumerate(act):
+        if a and on is None: on = i
+        if not a and on is not None: segs.append([on, i]); on = None
+    if on is not None: segs.append([on, len(act)])
+    merged = []
+    for s in segs:
+        if merged and (s[0] - merged[-1][1]) * 0.02 < 0.2: merged[-1][1] = s[1]
+        else: merged.append(s)
+    return [(a * hop, b * hop) for a, b in merged], hop
+
+
+def _voice_bank():
+    # {'kid': [日本語の部分], 'adult': [...], 'kid_grains': [母音の粒], 'adult_grains': [...]}
+    global _VOICE
+    if _VOICE is not None:
+        return _VOICE
+    bank = {'kid': [], 'adult': [], 'kid_grains': [], 'adult_grains': []}
+    for p in sorted((_Path(__file__).parent / 'crowd').glob('c*.wav')):
+        y, sr = _sf.read(p)
+        if y.ndim > 1: y = y.mean(1)
+        y = _signal.resample_poly(y, SR // 1000, sr // 1000)
+        segs, hop = _segments(y, SR)
+        # 前置き（最初の塊）のあと、0.4 秒以上の間が空いた所から後ろ
+        start = None
+        for k in range(1, len(segs)):
+            if (segs[k][0] - segs[k - 1][1]) / SR >= 0.4:
+                start = segs[k][0]; break
+        if start is None:
+            continue
+        part = y[max(0, start - int(0.03 * SR)):]
+        part = fade(part / (np.max(np.abs(part)) + 1e-9), 0.01, 0.08)
+        kind = 'kid' if p.stem in _KID_FILES else 'adult'
+        bank[kind].append(part)
+        # 母音の粒：周期性が高く、音が大きい 90ms
+        fl = int(0.09 * SR); best = []
+        for i in range(0, len(part) - fl, int(0.03 * SR)):
+            f = part[i:i + fl]
+            en = np.sqrt(np.mean(f ** 2))
+            if en < 0.12: continue
+            f0 = f - f.mean(); ac = np.correlate(f0, f0, 'full')[fl - 1:]
+            if ac[0] <= 0: continue
+            ac = ac / ac[0]; lo, hi = SR // 900, SR // 120
+            per = ac[lo:hi].max()
+            if per > 0.7: best.append((per * en, i))
+        for _, i in sorted(best, reverse=True)[:6]:
+            bank[kind + '_grains'].append(part[i:i + fl].copy())
+    _VOICE = bank
+    return bank
+
+
+def _shift(y, ratio):
+    # 音程（と声の太さ）をまとめて変える：ratio > 1 で高く短く
+    n = max(16, int(len(y) / ratio))
+    return _signal.resample(y, n)
+
+
+def _glide(y, r0, r1):
+    # 音程をなめらかに動かしながら読む（r0 → r1、1 より大きいと高い）
+    rate = np.linspace(r0, r1, len(y))
+    pos = np.cumsum(rate); pos = pos[pos < len(y) - 1]
+    return np.interp(pos, np.arange(len(y)), y)
+
+
+_SOFT = None
+def _soft_laugh():
+    # 本物の「ふふ」：c12 の最初の 0.3〜1.55 秒（指示の代わりに笑ってから話している）
+    global _SOFT
+    if _SOFT is None:
+        y, sr = _sf.read(_Path(__file__).parent / 'crowd' / f'{_LAUGH_FILE}.wav')
+        if y.ndim > 1: y = y.mean(1)
+        y = _signal.resample_poly(y, SR // 1000, sr // 1000)
+        seg = y[int(0.26 * SR):int(1.56 * SR)]
+        _SOFT = fade(seg / (np.max(np.abs(seg)) + 1e-9), 0.01, 0.15)
+    return _SOFT
+
+
+def laugh(seed=70, kind='kid', n=None, far=True, soft=None):
+    # 笑い声。soft（既定は近い大人）：本物の「ふふ」を、声の高さだけ変えて使う
+    # それ以外：母音の粒から「は・は・は」（息の音で始めて、粒ごとに音程を下げながら揺らす）。遠くで聞こえる笑い声向け
+    r = rng(seed)
+    if soft is None:
+        soft = (not far) and kind != 'kid'
+    if soft:
+        ratio = {'kid': r.uniform(1.22, 1.32), 'woman': r.uniform(0.97, 1.05), 'man': r.uniform(0.78, 0.84)}[kind]
+        y = _shift(_soft_laugh(), ratio)
+        st = pan(y, r.uniform(-0.4, 0.4))
+        st = lowpass(highpass(st, 150, 2), 2600 if far else 6000, 2)
+        return convolve_st(st, reverb_ir(0.9, 0.3, seed, lp=5000), 0.45 if far else 0.2) * 0.5
+    bank = _voice_bank()
+    grains = bank['kid_grains'] if kind == 'kid' else bank['adult_grains']
+    base = {'kid': r.uniform(1.12, 1.28), 'woman': r.uniform(1.0, 1.1), 'man': r.uniform(0.76, 0.86)}[kind]
+    n = n or int(r.integers(3, 7))
+    out = np.zeros(int(2.2 * SR)); t = 0.0
+    g0 = int(r.integers(len(grains)))
+    for k in range(n):
+        g = grains[(g0 + int(r.integers(0, 3))) % len(grains)]
+        top = base * (1.08 - 0.05 * k) * r.uniform(0.97, 1.03)
+        s = _glide(g, top * r.uniform(1.02, 1.08), top * r.uniform(0.86, 0.93))  # 一つの「は」の中で下がる
+        L = min(len(s), int(r.uniform(0.06, 0.11) * SR)); s = s[:L]
+        env = np.minimum(1, np.arange(L) / (0.008 * SR)) * np.exp(-np.arange(L) / (r.uniform(0.04, 0.07) * SR))
+        noise = bandpass(r.standard_normal(L), 700, 4200, 2) * np.std(s) * 0.45
+        hlen = int(r.uniform(0.025, 0.045) * SR)
+        h = bandpass(r.standard_normal(hlen), 900, 5000, 2) * np.std(s) * np.linspace(0.2, 0.6, hlen)
+        syl = np.concatenate([h, (s + noise) * env])
+        a = (1.0 - 0.13 * k) * r.uniform(0.8, 1.0)
+        i = int(t * SR)
+        if i + len(syl) >= len(out): break
+        out[i:i + len(syl)] += syl * a
+        t += len(syl) / SR + r.uniform(0.05, 0.11)
+    out = fade(out[:int((t + 0.3) * SR)], 0.004, 0.1)
+    st = pan(out, r.uniform(-0.6, 0.6))
+    st = lowpass(highpass(st, 220, 2), 2400 if far else 4500, 2)
+    return convolve_st(st, reverb_ir(1.1, 0.35, seed, lp=4000, pre=0.02), 0.45 if far else 0.25) * 0.5
+
+
+def chatter(dur, seed=71, kind='adult', density=1.0, far=True, laughs=0.0):
+    # 話し声：会話を 0.4〜1.2 秒に切って重ねる（言葉として聞こえないように）。laughs：1分あたりの笑い声の数
+    r = rng(seed); bank = _voice_bank(); n = int(dur * SR); out = np.zeros((n, 2))
+    src = bank['kid'] + [_shift(a, 1.28) for a in bank['adult'][:4]] if kind == 'kids' else bank['adult'] + (bank['kid'] if kind == 'mixed' else [])
+    t = -r.uniform(0, 0.8)
+    while t < dur:
+        a = src[int(r.integers(len(src)))]
+        L = int(r.uniform(0.4, 1.2) * SR)
+        if len(a) <= L: frag = a
+        else:
+            i0 = int(r.integers(0, len(a) - L)); frag = a[i0:i0 + L]
+        frag = _shift(frag, r.uniform(0.94, 1.08) * (1.0 if kind != 'kids' else r.uniform(1.0, 1.1)))
+        frag = fade(frag, 0.04, 0.12)
+        s = pan(frag, r.uniform(-0.8, 0.8)) * db(r.uniform(-12, -2))
+        i = int(t * SR); a0 = max(0, -i); i = max(0, i); j = min(n, i + len(s) - a0)
+        if j > i: out[i:j] += s[a0:a0 + j - i]
+        t += r.exponential(1 / (1.6 * density)) + 0.15
+    if laughs > 0:
+        t = r.uniform(0.5, 3.0)
+        while t < dur - 1.0:
+            lk = 'kid' if kind == 'kids' else ('woman' if r.random() < 0.6 else 'man')
+            s = laugh(seed=int(r.integers(1, 10**6)), kind=lk, far=far) * db(r.uniform(-6, 0))
+            i = int(t * SR); j = min(n, i + len(s)); out[i:j] += s[:j - i] * 2.0
+            t += r.exponential(60.0 / laughs) + 1.5
+    out = highpass(out, 200, 2)
+    out = lowpass(out, 1700 if far else 3200, 4)
+    out = convolve_st(out, reverb_ir(1.6, 0.5, seed, lp=3500, pre=0.03), 0.55 if far else 0.35)
+    return out * 0.12
+
+
+def kids_play(dur, seed=72, density=1.2, laughs=6.0, far=True):
+    # 遊んでいる子どもたち：話し声＋はしゃぐ声＋笑い声
+    return chatter(dur, seed=seed, kind='kids', density=density, far=far, laughs=laughs)
+
+
+def aircar_pass(seed=73, dur=6.0, ltr=True):
+    # 空飛ぶ車が頭の上を渡る：いくつかのプロペラの柔らかいうなり（少しずつ違う高さ）＋空気を切る音。近づいて遠ざかる
+    r = rng(seed); t = t_axis(dur); c = dur * 0.45
+    env = np.exp(-((t - c) / (dur * 0.2)) ** 2)
+    dop = 1 + 0.035 * np.tanh((c - t) / 0.6)  # 近づくと高く、離れると低く
+    y = np.zeros(len(t))
+    for f0 in (r.uniform(105, 125), r.uniform(150, 170), r.uniform(205, 230)):
+        ph = 2 * np.pi * np.cumsum(f0 * dop) / SR
+        am = 1 + 0.25 * np.sin(2 * np.pi * r.uniform(9, 14) * t)  # 羽根の回転のゆらぎ
+        y += (np.sin(ph) + 0.4 * np.sin(2 * ph) + 0.15 * np.sin(3 * ph)) * am
+    whine = np.sin(2 * np.pi * np.cumsum(r.uniform(900, 1100) * dop) / SR) * 0.05
+    whoosh = bandpass(pink(len(t), seed), 300, 3000, 2) * 1.6
+    y = (y * 0.18 + whine) * env + whoosh * env ** 1.6
+    u = t / dur if ltr else 1 - t / dur
+    out = np.stack([y * np.clip(1.2 - u * 1.4, 0.15, 1), y * np.clip(u * 1.4 - 0.2, 0.15, 1)], 1)
+    return convolve_st(lowpass(out, 5000, 2), reverb_ir(1.8, 0.5, seed, lp=4500), 0.4) * 0.4

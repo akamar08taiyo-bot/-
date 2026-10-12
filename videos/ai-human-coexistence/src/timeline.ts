@@ -15,8 +15,11 @@ export type ShotDef = {
   title?: {t0: number; t1: number; text: string; sub: string; top?: number; size?: number; subFirst?: boolean};
   endCard?: {t0: number; t1: number; text: string; sub: string; note: string};
   holo?: Holo[];
-  events?: {t: number; t_end?: number; type: string; gain?: number; n?: number}[];
-  audio?: {veo: number; veo_lp?: number; bed_gain?: number; beds: string[]};
+  events?: {t: number; t_end?: number; type: string; gain?: number; n?: number; kind?: string; far?: boolean; soft?: boolean; seed?: number}[];
+  audio?: {veo: number; veo_lp?: number; bed_gain?: number; beds: (string | {name: string; t0?: number; t1?: number; gain?: number})[]};
+  clip?: number; // クリップの長さ（秒）。15.9 秒と違うとき（冒頭のつかみなど）
+  // 冒頭のつかみ：本編のクリップから数秒ずつ切り出してつなぐ（scripts/make_hook.py が映像、audio/src/build_mix.py が音を作る）
+  hook?: {xf: number; fadeOut?: number; segs: {src: string; ss: number; len: number; veo?: number; beds?: string[]; events?: {t: number; type: string}[]}[]};
 };
 
 export const FPS: number = data.fps;
@@ -27,7 +30,7 @@ export const CLIP_LEN: number = data.clipLen;
 
 export const SHOTS: (ShotDef & {start: number; startFrame: number; durFrames: number})[] = (() => {
   let s = 0;
-  return (data.shots as ShotDef[]).map((shot) => {
+  return (data.shots as unknown as ShotDef[]).map((shot) => {
     const out = {...shot, start: s, startFrame: Math.round(s * data.fps), durFrames: Math.round(shot.dur * data.fps)};
     s += shot.dur - data.crossfade;
     return out;

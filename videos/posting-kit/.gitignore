@@ -1,0 +1,5 @@
+# 大きな生成物（作り直せる）。動画の束は Artifact の保存場所にある
+out/media/
+out/preview/
+out/page*.html
+work/

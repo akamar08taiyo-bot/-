@@ -6,6 +6,91 @@
  "clipLen": 15.9,
  "shots": [
   {
+   "id": "H0",
+   "chapter": "序",
+   "name": "冒頭のつかみ（この町の一日から、四つの場面を少しずつ）",
+   "dur": 16.0,
+   "hook": {
+    "xf": 0.5,
+    "fadeOut": 1.7,
+    "segs": [
+     {
+      "src": "G2",
+      "ss": 0.3,
+      "len": 3.9,
+      "beds": [
+       "distant_sea",
+       "morning_birds"
+      ],
+      "events": [
+       {
+        "t": 0.4,
+        "type": "aircar_pass",
+        "gain": -6
+       }
+      ]
+     },
+     {
+      "src": "G3",
+      "ss": 2.0,
+      "len": 3.9,
+      "beds": [
+       "cicadas_far",
+       "classroom"
+      ],
+      "events": [
+       {
+        "t": 1.6,
+        "type": "laugh",
+        "kind": "kid",
+        "far": true,
+        "seed": 31,
+        "gain": -2
+       }
+      ]
+     },
+     {
+      "src": "C5",
+      "ss": 8.6,
+      "len": 3.9,
+      "beds": [
+       "cicadas_far"
+      ]
+     },
+     {
+      "src": "E1",
+      "ss": 2.6,
+      "len": 5.8,
+      "beds": [
+       "festival_stalls",
+       "festival_music_far",
+       "crickets",
+       "festival_voices"
+      ],
+      "events": [
+       {
+        "t": 1.4,
+        "type": "laugh",
+        "kind": "kid",
+        "far": false,
+        "soft": true,
+        "seed": 32,
+        "gain": -4
+       }
+      ]
+     }
+    ]
+   },
+   "captions": [
+    {
+     "t0": 11.0,
+     "t1": 14.9,
+     "text": "初めて見るのに、帰りたくなる場所。"
+    }
+   ],
+   "clip": 16.0
+  },
+  {
    "id": "P0",
    "chapter": "序",
    "name": "夜明け前の海と継島",
@@ -191,7 +276,8 @@
    "audio": {
     "veo": 1.0,
     "beds": [
-     "shop_street_day"
+     "shop_street_day",
+     "town_voices"
     ]
    },
    "holo": [
@@ -219,7 +305,11 @@
     "beds": [
      "morning_birds",
      "broom_sweep",
-     "town_murmur_far"
+     "town_murmur_far",
+     {
+      "name": "town_voices",
+      "gain": -2
+     }
     ],
     "bed_gain": 6
    },
@@ -298,7 +388,8 @@
    "audio": {
     "veo": 1.0,
     "beds": [
-     "cicadas_far"
+     "cicadas_far",
+     "classroom"
     ]
    },
    "holo": [
@@ -364,7 +455,8 @@
     "veo": 0.75,
     "beds": [
      "onsen_steam",
-     "distant_sea"
+     "distant_sea",
+     "shop_voices"
     ]
    },
    "chapterCard": {
@@ -404,7 +496,11 @@
     "beds": [
      "rooftop_wind",
      "cicadas_far",
-     "distant_sea"
+     "distant_sea",
+     {
+      "name": "kids_play",
+      "gain": -2
+     }
     ]
    },
    "events": [
@@ -537,6 +633,17 @@
      "t1": 11.0,
      "text": "直った扇風機が、家に帰ってくる。"
     }
+   ],
+   "events": [
+    {
+     "t": 7.0,
+     "type": "laugh",
+     "kind": "woman",
+     "far": false,
+     "soft": true,
+     "seed": 33,
+     "gain": -4
+    }
    ]
   },
   {
@@ -588,7 +695,8 @@
     "beds": [
      "festival_stalls",
      "festival_music_far",
-     "crickets"
+     "crickets",
+     "festival_voices"
     ]
    },
    "holo": [
@@ -620,7 +728,11 @@
    "audio": {
     "veo": 1.0,
     "beds": [
-     "festival_crowd_soft"
+     "festival_crowd_soft",
+     {
+      "name": "festival_voices",
+      "gain": -3
+     }
     ]
    },
    "captions": [
@@ -639,9 +751,23 @@
    "audio": {
     "veo": 1.0,
     "beds": [
-     "night_sea"
+     "night_sea",
+     {
+      "name": "town_voices",
+      "gain": 1
+     }
     ]
-   }
+   },
+   "events": [
+    {
+     "t": 6.0,
+     "type": "laugh",
+     "kind": "kid",
+     "far": true,
+     "seed": 34,
+     "gain": -3
+    }
+   ]
   },
   {
    "id": "E4",
@@ -754,5 +880,6 @@
     "subFirst": true
    }
   }
- ]
+ ],
+ "fadeIn": 0.25
 }

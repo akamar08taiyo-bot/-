@@ -10,6 +10,7 @@
   "fps": 30, "width": 1920, "height": 1080,
   "crossfade": 1.2,        // カット同士の重なり（秒）
   "clipLen": 15.9,         // スロー化したクリップの長さ（8秒×2）
+  "fadeIn": 0.25,          // 冒頭の黒からのフェード（秒、省略時 2.5）。冒頭のつかみがある作品は短く
   "shots": [ ... ]         // 並び順がそのまま本編の順
 }
 ```
@@ -38,6 +39,26 @@
 | `veil` | 画面全体を色でおおう `[{t0, t1, from, to, color}]`（砂が舞って場面が変わる、など） | `[{"t0": 14.5, "t1": 20, "from": 0, "to": 0.72, "color": "#cdbb9a"}]` |
 | `events` | 効果音・声（sound.md） | `[{"t": 6.0, "type": "foghorn", "gain": -9}]` |
 | `audio` | 音の割り当て `{veo, veo_lp?, bed_gain?, beds}`（sound.md） | `{"veo": 1.0, "beds": ["harbor_morning"]}` |
+| `hook` | 冒頭のつかみ：本編のクリップから数秒ずつ切り出してつなぐ（下の例）。`scripts/make_hook.py` が `public/clips/<id>.mp4` と `clip` を作る | |
+
+## hook（冒頭のつかみ）
+
+```json
+{"id": "H0", "chapter": "序", "name": "冒頭のつかみ", "dur": 16.0,
+ "hook": {"xf": 0.5, "fadeOut": 1.7, "segs": [
+   {"src": "C1", "ss": 0.2, "len": 3.9, "beds": ["shop_voices"], "events": [{"t": 3.0, "type": "robot_pi", "gain": -5}]},
+   {"src": "B2", "ss": 0.8, "len": 3.9, "beds": ["cicadas_far", "workers_chat"],
+    "events": [{"t": 1.2, "type": "laugh", "kind": "woman", "far": false, "soft": true, "seed": 11}]},
+   {"src": "B4", "ss": 2.4, "len": 3.9, "beds": ["cicadas_far", "kids_near"]},
+   {"src": "E4", "ss": 2.6, "len": 5.8, "beds": ["insects", "night_sea"], "events": [{"t": 0.3, "type": "aircar_pass"}]}]},
+ "captions": [{"t0": 11.0, "t1": 14.9, "text": "どこにもないのに、知っている景色。"}]}
+```
+
+- `src` は本編のカットの ID（文字を焼き込んだ後の `public/clips/<src>.mp4` から切る）、`ss` はその何秒目から、`len` は何秒。長さは Σlen − xf×(区間数−1)
+- `fadeOut`：最後を黒へ（秒）。VShot に `veil` がある作品は `"veil": [{"t0": 14.3, "t1": 16, "from": 0, "to": 1, "color": "#000"}]` でもよい（字幕は上に残る）
+- 空中電子版・タブレット・`ink` の焼き込みでない文字は Remotion が描くので、つかみのクリップには出ない。出したいときは、このカットの `holo`／`voice` に区間の時刻で書き直す
+- `beds`・`events` の時刻は区間の頭から。省略すると元のカットのベッドを使う
+- 字幕の位置は本編と同じ（下中央）。最後の区間の、見せ場が過ぎたあたりに置く
 
 ## holo（空中電子版・板の表示）
 

@@ -28,7 +28,8 @@ prev = 's0'
 for i in range(1, len(shots)):
     f.append(f'[{prev}][s{i}]xfade=transition=fade:duration={XF}:offset={starts[i]:.4f}[x{i}]')
     prev = f'x{i}'
-f.append(f'[{prev}]fade=t=in:st=0:d=2.5,fade=t=out:st={total - 2.5:.4f}:d=2.5,{look}[v]')
+fin = T.get('fadeIn', 2.5)  # 冒頭のつかみがある作品は短く（最初の一瞬から見せる）
+f.append(f'[{prev}]fade=t=in:st=0:d={fin},fade=t=out:st={total - 2.5:.4f}:d=2.5,{look}[v]')
 video = root / 'out' / 'video_look.mp4'
 cmd = ['ffmpeg', '-v', 'error', '-stats', '-y', *inputs, '-filter_complex', ';'.join(f), '-map', '[v]', '-t', f'{total:.4f}',
        '-c:v', 'libx264', '-preset', a.preset, '-crf', a.crf, '-maxrate', a.maxrate, '-bufsize', '24M', '-pix_fmt', 'yuv420p', '-r', '30', '-g', '60',

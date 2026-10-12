@@ -1,0 +1,450 @@
+<title>記憶の路地裏 投稿キット</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 夕暮れの路地裏の帳面：藍の夜空の帯、提灯の琥珀を一色だけ。本文は投稿の手順どおりに番号を振った一列 */
+:root {
+  --bg: #eceef2;
+  --surface: #f9f9fb;
+  --sunk: #e3e6ec;
+  --ink: #1d2130;
+  --muted: #5a6172;
+  --line: #d3d7e0;
+  --accent: #a85a08;
+  --accent-soft: #f3e2cc;
+  --on-accent: #ffffff;
+  --night: #222944;
+  --night-ink: #f1ede4;
+  --ok: #2c7655;
+  --warn: #9b3b2a;
+  --display: "Zen Old Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12141b; --surface: #1a1d27; --sunk: #232735; --ink: #e9e6df; --muted: #9ba2b2; --line: #2d3243;
+    --accent: #eda545; --accent-soft: #3a2a14; --on-accent: #1b1305; --night: #0c0e15; --night-ink: #efe9dc;
+    --ok: #5dbf91; --warn: #e48a76; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12141b; --surface: #1a1d27; --sunk: #232735; --ink: #e9e6df; --muted: #9ba2b2; --line: #2d3243;
+  --accent: #eda545; --accent-soft: #3a2a14; --on-accent: #1b1305; --night: #0c0e15; --night-ink: #efe9dc;
+  --ok: #5dbf91; --warn: #e48a76; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.75; }
+a { color: var(--accent); }
+button { font: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.mast { background: var(--night); color: var(--night-ink); padding-block: 28px 22px; padding-inline: 16px; }
+.mast-in { max-width: 920px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; }
+.mast h1 { margin: 0; font-family: var(--display); font-weight: 700; font-size: clamp(26px, 5vw, 34px); letter-spacing: 0.06em; }
+.mast h1 a { color: inherit; text-decoration: none; }
+.mast .kit { font-size: 13px; letter-spacing: 0.18em; opacity: 0.75; }
+.mast .phrase { flex-basis: 100%; margin: 4px 0 0; font-family: var(--display); font-size: 15px; letter-spacing: 0.12em; opacity: 0.85; }
+
+main { max-width: 920px; margin: 0 auto; padding-block: 24px 64px; padding-inline: 16px; display: grid; gap: 28px; }
+.eyebrow { margin: 0; font-size: 12.5px; letter-spacing: 0.16em; color: var(--muted); }
+h2, h3 { text-wrap: balance; }
+
+/* 一覧 */
+.lead { margin: 0; color: var(--muted); max-width: 60ch; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 20px; }
+.card { display: grid; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; text-decoration: none; color: inherit; }
+.card:hover { border-color: var(--accent); }
+.card img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; display: block; background: var(--sunk); }
+.card h2 { margin: 0; font-family: var(--display); font-size: 22px; line-height: 1.4; }
+.card .meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); }
+.card .meta .num { font-family: var(--mono); }
+.progress { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+.bar { flex: 1; height: 6px; border-radius: 3px; background: var(--sunk); overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .3s; }
+
+/* 各話 */
+.back { font-size: 14px; text-decoration: none; }
+.ep-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 22px; align-items: start; }
+.ep-head img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; display: block; background: var(--sunk); }
+.ep-head h2 { margin: 2px 0 6px; font-family: var(--display); font-size: clamp(24px, 4.2vw, 32px); line-height: 1.35; }
+.hookline { margin: 0 0 12px; font-family: var(--display); color: var(--accent); letter-spacing: 0.06em; }
+.facts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 14px; font-size: 13.5px; color: var(--muted); }
+.facts b { color: var(--ink); font-weight: 500; font-family: var(--mono); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--surface); }
+.seg button { border: 0; background: transparent; color: var(--muted); padding: 6px 14px; border-radius: 999px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.seg-note { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; counter-reset: step; }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: grid; gap: 12px; min-width: 0; }
+.step.done { border-color: color-mix(in srgb, var(--ok) 55%, var(--line)); }
+.step-h { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.step-h h3 { margin: 0; font-size: 17px; font-weight: 700; display: flex; align-items: baseline; gap: 10px; }
+.step-h h3 .n { font-family: var(--mono); font-size: 13px; color: var(--accent); border: 1px solid currentColor; border-radius: 999px; min-width: 26px; height: 26px; display: inline-grid; place-items: center; }
+.step-h .where { font-size: 12.5px; color: var(--muted); }
+.check { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; user-select: none; }
+.check input { width: 17px; height: 17px; accent-color: var(--ok); }
+
+.item { display: grid; gap: 8px; min-width: 0; }
+.item + .item { border-top: 1px dashed var(--line); padding-top: 12px; }
+.item-h { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.item-h .label { font-size: 13px; color: var(--muted); }
+.count { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.count.over { color: var(--warn); }
+.btns { margin-left: auto; display: inline-flex; flex-wrap: wrap; gap: 8px; }
+.btn { border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 6px 12px; border-radius: 7px; cursor: pointer; font-size: 13.5px; line-height: 1.3; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 500; }
+.btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+.btn.flash { border-color: var(--ok); color: var(--ok); }
+.btn.primary.flash { background: var(--ok); border-color: var(--ok); color: var(--on-accent); }
+.text { margin: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 10px 12px; white-space: pre-wrap; word-break: break-word; font-size: 14.5px; min-width: 0; }
+.text.title { font-weight: 500; }
+.text.long { max-height: 340px; overflow: auto; }
+.note { margin: 0; font-size: 13px; color: var(--muted); }
+.msg { font-size: 13px; color: var(--muted); min-height: 1em; }
+.msg.err { color: var(--warn); }
+
+.link-row { display: grid; gap: 4px; }
+.url { width: 100%; font: inherit; font-size: 14px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--ink); }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tags span { background: var(--sunk); border-radius: 999px; padding: 2px 10px; font-size: 13px; }
+
+.thumbs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 16px; }
+.thumb { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.thumb img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; display: block; background: var(--sunk); }
+.thumb .rec { font-size: 12px; color: var(--accent); }
+
+.player { display: grid; gap: 10px; }
+.player video { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; display: block; }
+.dl { display: grid; gap: 6px; }
+.dl .bar { height: 8px; }
+.dl .bar > i { background: var(--accent); }
+
+.toc { display: grid; grid-template-columns: max-content 1fr; gap: 2px 14px; margin: 0; font-size: 14px; }
+.toc dt { font-family: var(--mono); color: var(--muted); }
+.toc dd { margin: 0; }
+
+ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+
+.script { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: grid; gap: 12px; min-width: 0; }
+.md { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: 7px; padding: 6px 16px; background: var(--bg); font-size: 14.5px; min-width: 0; }
+.md h1 { font-family: var(--display); font-size: 22px; }
+.md h2 { font-family: var(--display); font-size: 19px; border-bottom: 1px solid var(--line); padding-bottom: 4px; margin-top: 1.6em; }
+.md h3 { font-size: 16px; }
+.md table { border-collapse: collapse; font-size: 13px; display: block; overflow-x: auto; max-width: 100%; }
+.md th, .md td { border: 1px solid var(--line); padding: 4px 8px; vertical-align: top; }
+.md th { background: var(--sunk); }
+.md code { font-family: var(--mono); font-size: 12.5px; background: var(--sunk); padding: 0 4px; border-radius: 4px; }
+.md pre { overflow-x: auto; background: var(--sunk); padding: 10px; border-radius: 6px; }
+.md blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--line); color: var(--muted); }
+
+.foot { text-align: center; padding-block: 8px 24px; font-family: var(--display); color: var(--muted); letter-spacing: 0.12em; }
+
+@media (max-width: 720px) {
+  .ep-head { grid-template-columns: minmax(0, 1fr); }
+  .btns { margin-left: 0; }
+  .step { padding: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="mast">
+  <div class="mast-in">
+    <h1><a href="#">記憶の路地裏</a></h1>
+    <span class="kit">投稿キット</span>
+    <p class="phrase" id="mast-phrase">いつでも、帰っておいで。</p>
+  </div>
+</header>
+<main id="app" aria-live="polite"></main>
+<p class="foot">帰れる場所があるから、また一歩、前へ進める。</p>
+
+<script type="application/json" id="kit-data">/*KIT_DATA*/</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+<script>
+(() => {
+  const KIT = JSON.parse(document.getElementById('kit-data').textContent);
+  const app = document.getElementById('app');
+  const LS = 'kioku-kit-v1';
+  let state = {};
+  try { state = JSON.parse(localStorage.getItem(LS) || '{}') || {}; } catch (e) { state = {}; }
+  const persist = () => { try { localStorage.setItem(LS, JSON.stringify(state)); } catch (e) { /* 保存できない環境でも動く */ } };
+
+  // 保存（downloads）：ビューアの外では null。そのときは保存ボタンを止めて理由を書く
+  let downloads = null, dlReady = false;
+  const dlPromise = (async () => {
+    try { downloads = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch (e) { downloads = null; }
+    dlReady = true; return downloads;
+  })();
+
+  const el = (tag, attrs = {}, ...kids) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
+      if (k === 'class') n.className = v;
+      else if (k === 'text') n.textContent = v;
+      else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+      else n.setAttribute(k, v === true ? '' : v);
+    }
+    for (const c of kids.flat(Infinity)) if (c != null) n.append(c.nodeType ? c : document.createTextNode(c));
+    return n;
+  };
+  const flash = (btn, label) => {
+    const old = btn.dataset.label || btn.textContent; btn.dataset.label = old;
+    btn.textContent = label; btn.classList.add('flash');
+    clearTimeout(btn._t); btn._t = setTimeout(() => { btn.textContent = old; btn.classList.remove('flash'); }, 1800);
+  };
+  const selectNode = (node) => { try { const r = document.createRange(); r.selectNodeContents(node); const s = getSelection(); s.removeAllRanges(); s.addRange(r); } catch (e) {} };
+
+  // コピー：クリックの中で直接 writeText を呼ぶ。断られたら文字を選んだ状態にする
+  const copyBtn = (getText, node, label = 'コピー') => el('button', {class: 'btn', type: 'button', onclick: (ev) => {
+    const btn = ev.currentTarget; const text = getText();
+    let p;
+    try { p = navigator.clipboard.writeText(text); } catch (e) { p = Promise.reject(e); }
+    p.then(() => flash(btn, 'コピーしました')).catch(() => { if (node) selectNode(node); flash(btn, '選択しました（長押し・Ctrl+C でコピー）'); });
+  }}, label);
+
+  const saveErr = (code) => ({
+    declined: '保存をやめました',
+    rate_limited: 'ほかの保存の確認が開いています。閉じてから、もう一度押してください',
+    too_large: 'このアプリでは大きすぎて保存できません。パソコンのブラウザで開いて保存してください',
+    rejected_extension: 'この形式は保存できません',
+    extension_not_enabled: 'この形式は、ここでは保存できません',
+  }[code] || 'ここでは保存できません。パソコンのブラウザで開いてください');
+
+  // 保存ボタン：getData は文字列か Blob を返す（非同期でもよい）
+  const saveBtn = (filename, getData, msg, label = '保存', primary = false) => {
+    const b = el('button', {class: 'btn' + (primary ? ' primary' : ''), type: 'button', onclick: async (ev) => {
+      const btn = ev.currentTarget;
+      await dlPromise;
+      if (!downloads) { if (msg) { msg.textContent = 'この画面では保存できません。claude.ai で開くと保存できます'; msg.className = 'msg err'; } return; }
+      btn.disabled = true;
+      try {
+        const data = await getData(msg);
+        await downloads.save({filename: typeof filename === 'function' ? filename() : filename, data});
+        flash(btn, '保存しました'); if (msg) { msg.textContent = ''; msg.className = 'msg'; }
+      } catch (e) {
+        const code = e && e.code;
+        if (msg) { msg.textContent = code ? saveErr(code) : ('読み込めませんでした（' + (e && e.message || e) + '）。もう一度押してください'); msg.className = code === 'declined' ? 'msg' : 'msg err'; }
+      } finally { btn.disabled = false; }
+    }}, label);
+    return b;
+  };
+  const fetchBlob = async (url) => { const r = await fetch(url); if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); };
+  const mb = (n) => (n / 1048576).toFixed(n > 104857600 ? 0 : 1) + ' MB';
+  const count = (text, max) => { const n = [...text].length; return el('span', {class: 'count' + (n > max ? ' over' : ''), text: `${n} / ${max} 文字`}); };
+
+  const doneKey = (ep, k) => `${ep.id}:${k}`;
+  const stepBox = (ep, k, n, title, where, ...body) => {
+    const done = !!state[doneKey(ep, k)];
+    const li = el('li', {class: 'step' + (done ? ' done' : ''), id: `${ep.id}-${k}`});
+    const cb = el('input', {type: 'checkbox', checked: done, onchange: (e) => { state[doneKey(ep, k)] = e.target.checked; persist(); li.classList.toggle('done', e.target.checked); }});
+    li.append(el('div', {class: 'step-h'}, el('h3', {}, el('span', {class: 'n', text: String(n)}), title), where ? el('span', {class: 'where', text: where}) : null,
+      el('label', {class: 'check'}, cb, '済')), ...body);
+    return li;
+  };
+
+  // 動画：分けて載せた束（映像は2つの版で共通、音は版ごと）を読み、元の順につないで一本の MP4 にする
+  const partCache = {}, videoCache = {}, listeners = {};
+  const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  const tell = (key, info) => { (listeners[key] || new Set()).forEach((fn) => fn(info)); };
+  const getPart = (part) => {
+    const url = part.url || part.path;
+    if (!partCache[url]) {
+      partCache[url] = fetchBlob(url).then((b) => { if (b.size !== part.size) throw new Error('大きさが合いません'); return b; });
+      partCache[url].catch(() => { delete partCache[url]; });
+    }
+    return partCache[url];
+  };
+  function loadVideo(ep, ver) {
+    const key = ep.id + ':' + ver;
+    if (videoCache[key]) return videoCache[key];
+    const v = ep.video;
+    const p = (async () => {
+      const need = [...new Set(v.slices[ver].map((x) => x[0]))];
+      const total = need.reduce((a, i) => a + v.parts[i].size, 0);
+      const got = {}; let done = 0, next = 0;
+      tell(key, {done, total});
+      const worker = async () => {
+        while (next < need.length) {
+          const i = need[next++];
+          got[i] = await getPart(v.parts[i]);
+          done += v.parts[i].size; tell(key, {done, total});
+        }
+      };
+      await Promise.all([worker(), worker(), worker()]);
+      const pieces = [b64(v.head[ver])];
+      for (const [i, off, len] of v.slices[ver]) pieces.push(got[i].slice(off, off + len));
+      if (v.tail[ver]) pieces.push(b64(v.tail[ver]));
+      const blob = new Blob(pieces, {type: 'video/mp4'});
+      if (blob.size !== v.size[ver]) throw new Error('組み立てた大きさが合いません');
+      tell(key, {done: total, total, blob});
+      return blob;
+    })();
+    videoCache[key] = p;
+    p.catch((e) => { delete videoCache[key]; tell(key, {error: e}); });
+    return p;
+  }
+
+  // 試写：軽い 480p を2つに分けて載せてある。つないで、このページで再生する
+  function loadPreview(ep, ver) {
+    const key = ep.id + ':' + ver + ':pv';
+    if (videoCache[key]) return videoCache[key];
+    const pv = ep.preview[ver];
+    const p = (async () => {
+      const total = pv.parts.reduce((a, x) => a + x.size, 0); let done = 0;
+      tell(key, {done, total});
+      const blobs = [];
+      for (const part of pv.parts) { blobs.push(await getPart(part)); done += part.size; tell(key, {done, total}); }
+      const blob = new Blob(blobs, {type: 'video/mp4'});
+      tell(key, {done: total, total, blob});
+      return blob;
+    })();
+    videoCache[key] = p;
+    p.catch((e) => { delete videoCache[key]; tell(key, {error: e}); });
+    return p;
+  }
+
+  function videoStep(ep, ver) {
+    const v = ep.video;
+    if (!v) return [el('p', {class: 'note', text: '動画ファイルは、このページに載せる準備中です。'})];
+    const key = ep.id + ':' + ver, pkey = key + ':pv';
+    const msg = el('div', {class: 'msg'});
+    const bar = el('i');
+    const box = el('div', {class: 'player'});
+    const fname = `${KIT.series}_${ep.num}_${ep.versions[ver].label}.mp4`;
+    const pv = ep.preview && ep.preview[ver];
+    const show = (blob) => {
+      if (box.firstChild) return;
+      const vid = el('video', {controls: true, playsinline: true, preload: 'metadata', src: URL.createObjectURL(blob)});
+      vid.addEventListener('error', () => { msg.textContent = 'この画面では再生できません。保存してから再生してください'; msg.className = 'msg'; });
+      box.append(vid);
+    };
+    const progress = (what) => (info) => {
+      if (!msg.isConnected) return;
+      if (info.error) { msg.textContent = '読み込めませんでした（' + (info.error.message || info.error) + '）。もう一度押してください'; msg.className = 'msg err'; return; }
+      bar.style.width = (100 * info.done / Math.max(1, info.total)).toFixed(1) + '%';
+      msg.className = 'msg';
+      if (info.blob) {
+        if (what === 'pv') { msg.textContent = '試写を再生できます（480p）'; show(info.blob); }
+        else msg.textContent = `読み込みました（${mb(info.blob.size)}）`;
+      } else msg.textContent = `${what === 'pv' ? '試写を' : '元の画質の動画を'}読み込み中… ${mb(info.done)} / ${mb(info.total)}`;
+    };
+    (listeners[key] = listeners[key] || new Set()).add(progress('full'));
+    (listeners[pkey] = listeners[pkey] || new Set()).add(progress('pv'));
+    if (videoCache[pkey]) videoCache[pkey].then((blob) => show(blob)).catch(() => {});
+    const pvBtn = pv ? el('button', {class: 'btn', type: 'button', onclick: () => { loadPreview(ep, ver).catch(() => {}); }}, `試写（480p・${mb(pv.size)}）`) : null;
+    const save = saveBtn(fname, () => loadVideo(ep, ver), msg, `${ep.versions[ver].label}版を保存`, true);
+    return [
+      el('div', {class: 'item'},
+        el('div', {class: 'item-h'}, el('span', {class: 'label', text: `MP4・1920×1080・30fps・${mb(v.size[ver])}`}), el('span', {class: 'btns'}, pvBtn, save)),
+        el('div', {class: 'dl'}, el('div', {class: 'bar'}, bar), msg),
+        box,
+        el('p', {class: 'note', text: v.note}))
+    ];
+  }
+
+  function renderIndex() {
+    document.title = '記憶の路地裏 投稿キット';
+    app.replaceChildren(
+      el('section', {}, el('p', {class: 'eyebrow', text: KIT.series}), el('p', {class: 'lead', text: KIT.lead})),
+      el('div', {class: 'cards'}, KIT.episodes.map((ep) => {
+        const keys = ['video', 'title', 'desc', 'thumb', 'audience', 'details', 'after'];
+        const n = keys.filter((k) => state[doneKey(ep, k)]).length;
+        const fill = el('i'); fill.style.width = (100 * n / keys.length) + '%';
+        return el('a', {class: 'card', href: '#' + ep.id},
+          el('img', {src: ep.thumbs[0].file, alt: `${ep.num}のサムネイル`, loading: 'lazy'}),
+          el('div', {}, el('p', {class: 'eyebrow', text: `${KIT.series}　${ep.num}`}), el('h2', {text: ep.title})),
+          el('div', {class: 'meta'}, el('span', {}, '長さ ', el('span', {class: 'num', text: ep.duration})), el('span', {text: ep.hook})),
+          el('div', {class: 'progress'}, el('span', {text: `投稿の手順 ${n} / ${keys.length}`}), el('span', {class: 'bar'}, fill)));
+      })),
+    );
+  }
+
+  function renderEp(ep) {
+    document.title = `${ep.num} ${ep.title}｜記憶の路地裏 投稿キット`;
+    let ver = state[ep.id + ':ver'] || 'theme';
+    const head = el('section', {class: 'ep-head'});
+    const steps = el('ol', {class: 'steps'});
+    const draw = () => {
+      const V = ep.versions[ver];
+      const seg = el('div', {class: 'seg', role: 'group', 'aria-label': '音の版'}, Object.entries(ep.versions).map(([k, x]) =>
+        el('button', {type: 'button', 'aria-pressed': String(k === ver), onclick: () => { ver = k; state[ep.id + ':ver'] = k; persist(); draw(); }}, x.label)));
+      head.replaceChildren(
+        el('img', {src: ep.thumbs[0].file, alt: `${ep.num}のサムネイル A`}),
+        el('div', {}, el('p', {class: 'eyebrow', text: `${KIT.series}　${ep.num}`}), el('h2', {text: ep.title}),
+          el('p', {class: 'hookline', text: ep.hook}),
+          el('div', {class: 'facts'}, el('span', {}, '長さ ', el('b', {text: ep.duration})), el('span', {}, '章 ', el('b', {text: String(ep.chapters.length)})), el('span', {text: 'セリフなし・町の音と声'})),
+          seg, el('p', {class: 'seg-note', text: V.note})));
+
+      const titleText = el('p', {class: 'text title', text: V.title});
+      const altText = el('p', {class: 'text title', text: ep.altTitle});
+      const linkKey = ep.id + ':link';
+      const descOf = () => { const u = (state[linkKey] || '').trim(); return u ? V.description.replace(ep.link.placeholder, u) : V.description; };
+      const descText = el('pre', {class: 'text long', text: descOf()});
+      const descMsg = el('div', {class: 'msg'});
+      const descCount = el('span', {}, count(descOf(), 5000));
+      const linkIn = el('input', {class: 'url', id: ep.id + '-link', type: 'url', inputmode: 'url', placeholder: 'https://youtu.be/…', value: state[linkKey] || '',
+        oninput: (e) => { state[linkKey] = e.target.value; persist(); descText.textContent = descOf(); descCount.replaceChildren(count(descOf(), 5000)); }});
+      const tagsLine = el('p', {class: 'text', text: ep.tags});
+      const shortText = el('p', {class: 'text', text: ep.short});
+
+      const thumbs = el('div', {class: 'thumbs'}, ep.thumbs.map((t) => {
+        const m = el('div', {class: 'msg'});
+        return el('figure', {class: 'thumb', style: 'margin:0'},
+          el('img', {src: t.file, alt: `サムネイル ${t.key}`, loading: 'lazy'}),
+          el('div', {class: 'item-h'}, el('b', {text: `案 ${t.key}`}), t.rec ? el('span', {class: 'rec', text: 'おすすめ'}) : null,
+            el('span', {class: 'btns'}, saveBtn(`${KIT.series}_${ep.num}_サムネイル${t.key}.jpg`, () => fetchBlob(t.file), m, '保存'))),
+          el('figcaption', {class: 'note', text: t.note}), m);
+      }));
+
+      steps.replaceChildren(
+        stepBox(ep, 'video', 1, '動画ファイル', 'YouTube Studio →「作成」→「動画をアップロード」', ...videoStep(ep, ver)),
+        stepBox(ep, 'title', 2, 'タイトル', '詳細 → タイトル（100文字まで）',
+          el('div', {class: 'item'}, el('div', {class: 'item-h'}, el('span', {class: 'label', text: `${V.label}版`}), count(V.title, 100), el('span', {class: 'btns'}, copyBtn(() => V.title, titleText))), titleText),
+          el('div', {class: 'item'}, el('div', {class: 'item-h'}, el('span', {class: 'label', text: '別案（スマホで最初に見える所に、この章だけのひと言）'}), count(ep.altTitle, 100), el('span', {class: 'btns'}, copyBtn(() => ep.altTitle, altText))), altText)),
+        stepBox(ep, 'desc', 3, '説明（概要欄）', '詳細 → 説明（5,000文字まで）。目次の時刻から章が自動で作られます',
+          el('div', {class: 'item'}, el('div', {class: 'item-h'}, el('span', {class: 'label', text: `${V.label}版`}), descCount,
+            el('span', {class: 'btns'}, copyBtn(() => descOf(), descText), saveBtn(`${KIT.series}_${ep.num}_概要欄_${V.label}.txt`, async () => descOf(), descMsg, 'テキストで保存'))), descText, descMsg,
+            el('label', {class: 'link-row', for: ep.id + '-link'}, el('span', {class: 'label', text: `${ep.link.label}（入れると「${ep.link.placeholder}」の所に入ります）`}), linkIn)),
+          el('div', {class: 'item'}, el('span', {class: 'label', text: '目次（チャプター）'}), el('dl', {class: 'toc'}, ep.chapters.map(([t, name]) => [el('dt', {text: t}), el('dd', {text: name})])))),
+        stepBox(ep, 'thumb', 4, 'サムネイル', '詳細 → サムネイル →「ファイルをアップロード」（1280×720・2MB未満）', thumbs),
+        stepBox(ep, 'audience', 5, '再生リスト・視聴者', '詳細 → 再生リスト／視聴者',
+          el('ul', {class: 'plain'}, ep.settings.audience.map((s) => el('li', {text: s})))),
+        stepBox(ep, 'details', 6, '改変コンテンツ・タグ', '詳細 →「すべて表示」',
+          el('ul', {class: 'plain'}, ep.settings.details.map((s) => el('li', {text: s}))),
+          el('div', {class: 'item'}, el('div', {class: 'item-h'}, el('span', {class: 'label', text: 'タグ（カンマ区切りのまま貼れます）'}), count(ep.tags, 500), el('span', {class: 'btns'}, copyBtn(() => ep.tags, tagsLine))),
+            el('div', {class: 'tags'}, ep.tags.split(',').map((t) => el('span', {text: t})))),
+          el('div', {class: 'item'}, el('span', {class: 'label', text: '気をつけること'}), el('ul', {class: 'plain'}, ep.settings.cautions.map((s) => el('li', {text: s}))))),
+        stepBox(ep, 'after', 7, '公開のあと', '固定コメント・終了画面・もう一つの章',
+          el('div', {class: 'item'}, el('div', {class: 'item-h'}, el('span', {class: 'label', text: '固定コメント・コミュニティ投稿・SNS 用の紹介文'}), el('span', {class: 'btns'}, copyBtn(() => ep.short, shortText))), shortText),
+          el('ul', {class: 'plain'}, ep.settings.after.map((s) => el('li', {text: s})))),
+      );
+    };
+    draw();
+
+    const mdBox = el('div', {class: 'md'});
+    const mdMsg = el('div', {class: 'msg'});
+    try { if (window.marked) mdBox.innerHTML = window.marked.parse(ep.script.text); else throw new Error('no marked'); }
+    catch (e) { mdBox.replaceChildren(el('pre', {style: 'white-space:pre-wrap', text: ep.script.text})); }
+    const script = el('section', {class: 'script', id: ep.id + '-script'},
+      el('div', {class: 'item-h'}, el('h3', {style: 'margin:0;font-size:17px', text: ep.script.name}),
+        el('span', {class: 'btns'}, copyBtn(() => ep.script.text, mdBox, '全文をコピー'), saveBtn(ep.script.file, async () => ep.script.text, mdMsg, 'Markdown で保存'))),
+      el('p', {class: 'note', text: ep.script.note}), mdBox, mdMsg);
+
+    app.replaceChildren(el('a', {class: 'back', href: '#'}, '← 一覧へ'), head, steps, script);
+    window.scrollTo(0, 0);
+  }
+
+  const route = () => {
+    const id = (location.hash || '').slice(1);
+    const ep = KIT.episodes.find((e) => e.id === id);
+    if (ep) renderEp(ep); else renderIndex();
+  };
+  window.addEventListener('hashchange', route);
+  route();
+})();
+</script>

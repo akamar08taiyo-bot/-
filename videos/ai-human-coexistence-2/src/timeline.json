@@ -7,6 +7,100 @@
  "clipLen": 15.9,
  "shots": [
   {
+   "id": "H0",
+   "chapter": "序",
+   "name": "冒頭のつかみ（この町の一日から、四つの場面を少しずつ）",
+   "dur": 16.0,
+   "hook": {
+    "xf": 0.5,
+    "segs": [
+     {
+      "src": "C1",
+      "ss": 0.2,
+      "len": 3.9,
+      "beds": [
+       "shop_voices"
+      ],
+      "events": [
+       {
+        "t": 3.0,
+        "type": "robot_pi",
+        "gain": -5
+       }
+      ]
+     },
+     {
+      "src": "B2",
+      "ss": 0.8,
+      "len": 3.9,
+      "beds": [
+       "cicadas_far",
+       "workers_chat"
+      ],
+      "events": [
+       {
+        "t": 1.2,
+        "type": "laugh",
+        "kind": "woman",
+        "far": false,
+        "soft": true,
+        "seed": 11
+       },
+       {
+        "t": 2.5,
+        "type": "laugh",
+        "kind": "man",
+        "far": true,
+        "seed": 12,
+        "gain": -3
+       }
+      ]
+     },
+     {
+      "src": "B4",
+      "ss": 2.4,
+      "len": 3.9,
+      "beds": [
+       "cicadas_far",
+       "kids_near"
+      ]
+     },
+     {
+      "src": "E4",
+      "ss": 2.6,
+      "len": 5.8,
+      "beds": [
+       "insects",
+       "night_sea"
+      ],
+      "events": [
+       {
+        "t": 0.3,
+        "type": "aircar_pass"
+       }
+      ]
+     }
+    ]
+   },
+   "captions": [
+    {
+     "t0": 11.0,
+     "t1": 14.9,
+     "text": "どこにもないのに、知っている景色。"
+    }
+   ],
+   "veil": [
+    {
+     "t0": 14.3,
+     "t1": 16.0,
+     "from": 0,
+     "to": 1,
+     "color": "#000"
+    }
+   ],
+   "clip": 16.0
+  },
+  {
    "id": "P0",
    "chapter": "序",
    "name": "2026年の浜",
@@ -154,7 +248,7 @@
     "veo": 0.9,
     "beds": [
      "harbor_morning",
-     "kids_far"
+     "kids_play"
     ]
    },
    "ink": [
@@ -394,10 +488,29 @@
    "audio": {
     "veo": 1.0,
     "beds": [
-     "cicadas_far"
+     "cicadas_far",
+     "workers_chat"
     ]
    },
-   "clip": 15.82
+   "clip": 15.82,
+   "events": [
+    {
+     "t": 2.0,
+     "type": "laugh",
+     "kind": "woman",
+     "far": false,
+     "soft": true,
+     "seed": 21
+    },
+    {
+     "t": 9.4,
+     "type": "laugh",
+     "kind": "man",
+     "far": true,
+     "seed": 22,
+     "gain": -2
+    }
+   ]
   },
   {
    "id": "B3",
@@ -414,7 +527,8 @@
    "audio": {
     "veo": 1.0,
     "beds": [
-     "cicadas_far"
+     "cicadas_far",
+     "town_voices"
     ]
    },
    "ink": [
@@ -473,7 +587,8 @@
    "audio": {
     "veo": 0.9,
     "beds": [
-     "cicadas_far"
+     "cicadas_far",
+     "kids_near"
     ]
    },
    "clip": 15.82
@@ -488,7 +603,8 @@
     "veo": 0.8,
     "veo_lp": 2400,
     "beds": [
-     "cicadas_far"
+     "cicadas_far",
+     "kids_play"
     ]
    },
    "clip": 15.82
@@ -508,11 +624,22 @@
    "audio": {
     "veo": 1.3,
     "beds": [
-     "cicadas_far"
+     "cicadas_far",
+     "kids_play"
     ],
     "bed_gain": 4
    },
-   "clip": 15.82
+   "clip": 15.82,
+   "events": [
+    {
+     "t": 12.6,
+     "type": "laugh",
+     "kind": "man",
+     "far": true,
+     "seed": 23,
+     "gain": -3
+    }
+   ]
   },
   {
    "id": "C1",
@@ -536,7 +663,8 @@
    "audio": {
     "veo": 1.0,
     "beds": [
-     "town_murmur_far"
+     "town_murmur_far",
+     "shop_voices"
     ]
    },
    "clip": 15.82
@@ -549,7 +677,8 @@
    "audio": {
     "veo": 0.9,
     "beds": [
-     "ferry_deck"
+     "ferry_deck",
+     "town_voices"
     ]
    },
    "clip": 15.82
@@ -1003,7 +1132,7 @@
     "veo_lp": 2400,
     "beds": [
      "insects_start",
-     "kids_far"
+     "kids_play"
     ]
    },
    "clip": 9.98
@@ -1018,7 +1147,11 @@
     "veo": 0.8,
     "veo_lp": 2400,
     "beds": [
-     "wind_sea"
+     "wind_sea",
+     {
+      "name": "kids_play",
+      "gain": -4
+     }
     ]
    },
    "clip": 15.82
@@ -1033,7 +1166,8 @@
     "veo": 0.8,
     "veo_lp": 2400,
     "beds": [
-     "cicadas_outside"
+     "cicadas_outside",
+     "classroom"
     ]
    },
    "ink": [
@@ -1130,7 +1264,25 @@
      "insects"
     ]
    },
-   "clip": 15.82
+   "clip": 15.82,
+   "events": [
+    {
+     "t": 5.0,
+     "type": "laugh",
+     "kind": "kid",
+     "far": true,
+     "seed": 24,
+     "gain": -2
+    },
+    {
+     "t": 10.5,
+     "type": "laugh",
+     "kind": "kid",
+     "far": true,
+     "seed": 25,
+     "gain": -4
+    }
+   ]
   },
   {
    "id": "R6",
@@ -1142,7 +1294,8 @@
     "veo": 0.8,
     "veo_lp": 2400,
     "beds": [
-     "harbor_morning"
+     "harbor_morning",
+     "pier_crowd"
     ]
    },
    "events": [
@@ -1256,7 +1409,7 @@
     {
      "t0": 6.6,
      "t1": 13.6,
-     "text": "缶蹴りは、夕焼けが消えるまで。"
+     "text": "夕方5時の、帰りたくない気持ち。"
     }
    ],
    "audio": {
@@ -1264,7 +1417,7 @@
     "bed_gain": 6,
     "beds": [
      "higurashi",
-     "kids_far"
+     "kids_play"
     ]
    },
    "events": [
@@ -1309,7 +1462,11 @@
     "beds": [
      "night_sea",
      "insects",
-     "town_murmur_far"
+     "town_murmur_far",
+     {
+      "name": "town_voices",
+      "gain": -2
+     }
     ]
    },
    "clip": 15.82
@@ -1353,7 +1510,18 @@
      "soft": 0.6
     }
    ],
-   "grade": "curves=all='0/0 0.3/0.08 0.55/0.16 0.75/0.34 0.9/0.66 1/1'"
+   "grade": "curves=all='0/0 0.3/0.08 0.55/0.16 0.75/0.34 0.9/0.66 1/1'",
+   "events": [
+    {
+     "t": 9.0,
+     "type": "laugh",
+     "kind": "kid",
+     "far": false,
+     "soft": true,
+     "seed": 26,
+     "gain": -6
+    }
+   ]
   },
   {
    "id": "E3",
@@ -1535,5 +1703,6 @@
    },
    "clip": 15.45
   }
- ]
+ ],
+ "fadeIn": 0.25
 }

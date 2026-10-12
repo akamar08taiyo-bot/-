@@ -23,8 +23,10 @@ export type ShotDef = {
   clip?: number; // クリップの長さ（秒）。半速の 15.9 秒と違うとき（頭や後ろを切った・倍率を変えた）。scripts/sync_cliplen.py が書く
   veil?: {t0: number; t1: number; from: number; to: number; color: string}[]; // 画面全体を色でおおう（砂が舞って次の場面へ、など）
   shade?: {x: number; y: number; rx: number; ry: number; k?: number; soft?: number}[]; // 顔を暗がりに沈める（scripts/bake_ink.py が焼き込む）
-  events?: {t: number; t_end?: number; type: string; gain?: number; n?: number}[];
-  audio?: {veo: number; veo_lp?: number; bed_gain?: number; beds: string[]};
+  events?: {t: number; t_end?: number; type: string; gain?: number; n?: number; kind?: string; far?: boolean; soft?: boolean; seed?: number; file?: string}[];
+  audio?: {veo: number; veo_lp?: number; bed_gain?: number; beds: (string | {name: string; t0?: number; t1?: number; gain?: number})[]};
+  // 冒頭のつかみ：本編のクリップから数秒ずつ切り出してつなぐ（scripts/make_hook.py が映像、audio/src/build_mix.py が音を作る）
+  hook?: {xf: number; fadeOut?: number; segs: {src: string; ss: number; len: number; veo?: number; beds?: string[]; events?: {t: number; type: string}[]}[]};
 };
 
 export const FPS: number = data.fps;

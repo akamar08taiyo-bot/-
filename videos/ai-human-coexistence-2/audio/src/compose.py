@@ -78,6 +78,11 @@ def basses(ins, chords, t0, beat, vel):
     return t
 
 beat = 60 / 72  # 0.833 秒
+# 冒頭のつかみ（H0、四つの場面）：夜の屋上の場面で、オルゴールが主題の頭を2小節だけ。そのあとの2026年の浜は曲なし
+if 'H0' in starts:
+    th = starts['H0'] + 10.6
+    melody(mbox, THEME_A, th, beat * 0.95, 50, octave=1, bars=2, human=0.01, seed=41)
+    pads(pad, CHORDS_A[:2], th, beat * 0.95, 24)
 # 序：2026年の浜は、曲なし（風と通知音だけ）。砂が晴れて題が出るところで、オルゴールの動機が入る
 t = SEC['P1'] + 4.5
 pads(pad, CHORDS_A[:4], t, beat * 1.4, 30)

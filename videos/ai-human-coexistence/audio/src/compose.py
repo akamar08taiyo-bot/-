@@ -65,12 +65,10 @@ def basses(ins, chords, t0, beat, vel):
     return t
 
 beat = 60 / 72  # 0.833 秒
-# 序：オルゴールの前奏（短い動機）＋ パッド
-t = 2.0
+# 序：オルゴールの前奏（短い動機）＋ パッド。冒頭のつかみ（H0、夏祭りで終わる）は曲なしで、夜明けの海（P0）から入る
+t = starts['P0'] + 2.0
 pads(pad, CHORDS_A[:4], t, beat * 1.4, 34)
-for k, (p, d) in enumerate([(C5, 1.5), (A4, .5), (C5, 1), (D5, 1), (C5, 3)]):
-    pass
-melody(mbox, THEME_A, 6.0, beat * 1.15, 62, octave=1, bars=4, human=0.01)
+melody(mbox, THEME_A, starts['P0'] + 6.0, beat * 1.15, 62, octave=1, bars=4, human=0.01)
 # 一 夜明け：オルゴール＋ピアノ（主題A）
 t1 = starts['A1'] + 0.5
 melody(mbox, THEME_A, t1, beat, 66, octave=1, human=0.01, seed=2)

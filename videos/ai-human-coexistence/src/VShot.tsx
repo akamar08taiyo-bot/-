@@ -15,7 +15,7 @@ export const VShot: React.FC<{id: string}> = ({id}) => {
   const t = frame / FPS;
   const def = shotById(id);
   const clipAt = def.clipAt ?? 0;
-  const clipFrames = Math.round(CLIP_LEN * FPS);
+  const clipFrames = Math.round((def.clip ?? CLIP_LEN) * FPS);
   const at = Math.round(clipAt * FPS);
   const push = def.push ?? [1.0, 1.0];
   const z = push[0] + (push[1] - push[0]) * easeInOut(t / def.dur);
