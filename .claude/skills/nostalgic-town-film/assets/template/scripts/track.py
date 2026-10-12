@@ -8,7 +8,7 @@ root = Path(__file__).resolve().parent.parent
 out_path = root / 'src' / 'track.json'
 tracks = json.loads(out_path.read_text()) if out_path.exists() else {}
 for cid in sys.argv[1:]:
-    cap = cv2.VideoCapture(str(root / 'public' / 'clips' / f'{cid}.mp4'))
+    cap = cv2.VideoCapture(str(next(c for c in (root / 'work' / 'raw' / f'{cid}.mp4', root / 'public' / 'clips' / f'{cid}.mp4') if c.exists())))
     ok, prev = cap.read()
     if not ok:
         print(cid, 'missing'); continue

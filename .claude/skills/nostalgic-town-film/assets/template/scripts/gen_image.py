@@ -18,7 +18,11 @@ a = ap.parse_args()
 
 P = json.loads((gen / 'prompts.json').read_text())
 scene = next(s for s in P['scenes'] if s['id'] == a.scene)
-text = P['common'] + '\n\nSpecific scene (' + scene['time'] + '):\n' + scene['prompt']
+# 共通ブロックは場面ごとに選べる（例：昭和の回想だけ別の共通ブロック）。指定がなければ common
+common = P.get('commons', {}).get(scene.get('common', ''), P['common'])
+text = common + '\n\nSpecific scene (' + scene['time'] + '):\n' + scene['prompt']
+if not a.refs and scene.get('refs'):  # 場面に参照画像が書いてあれば、それを使う
+    a.refs = ','.join(str((root / r).resolve()) for r in scene['refs'])
 if a.extra:
     text += '\n\nRevision notes:\n' + a.extra
 parts = []
@@ -28,7 +32,9 @@ for r in refs:
     mime = 'image/jpeg' if p.suffix.lower() in ('.jpg', '.jpeg') else 'image/png' if p.suffix.lower() == '.png' else 'image/webp'
     parts.append({'inlineData': {'mimeType': mime, 'data': base64.b64encode(p.read_bytes()).decode()}})
 if refs:
-    text = 'The supplied images are style references from the same fictional world. Match their photographic quality, light and materials; do not copy their composition, objects or camera position.\n\n' + text
+    # ref_note：参照画像の使い方を場面ごとに書き換える（同じ構図にしたい「対」のカットなど）
+    note = scene.get('ref_note') or 'The supplied images are style references from the same fictional world. Match their photographic quality, light and materials; do not copy their composition, objects or camera position.'
+    text = note + '\n\n' + text
 parts.append({'text': text})
 body = {
     'contents': [{'role': 'user', 'parts': parts}],

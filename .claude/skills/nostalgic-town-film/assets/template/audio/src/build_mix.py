@@ -65,7 +65,15 @@ BEDS = {  # 名前: (生成関数, 目標ラウドネス LUFS)
     'festival_music_far': (lambda d, k: S.drums_far(d, str(Path(__file__).parent / 'e2_taiko.wav'), seed=k), -30),
     'festival_crowd_soft': (lambda d, k: S.crowd(d, seed=k, far=True, density=1.0), -34),
     'night_sea': (lambda d, k: S.waves(d, seed=k, calm=True, period=(6, 9), bright=2200), -32),
+    # 第二章で足したもの
+    'sand_rise': (lambda d, k: S.sand(d, seed=k) + S.wind(d, seed=k + 1, strength=1.2), -30),  # 砂が舞い上がる（だんだん強く）
+    'sand_fall': (lambda d, k: S.sand(d, seed=k) + S.wind(d, seed=k + 1, strength=1.2), -30),  # 砂がおさまる（はじめだけ）
+    'siphon': (lambda d, k: S.siphon(d, seed=k), -40),
+    'cafe_room': (lambda d, k: S.crowd(d, seed=k, far=True, density=0.35) + S.clock_tick(d, seed=k + 2) * 0.3, -41),
+    'kids_far': (lambda d, k: S.kids(d, seed=k), -38),
 }
+# だんだん強く／弱くするベッド（カットの長さに対する割合で）
+RAMP = {'sand_rise': lambda u: np.clip(0.12 + 1.1 * u ** 1.6, 0, 1), 'sand_fall': lambda u: np.clip(1.0 - u * 4.5, 0.0, 1)}
 def load_wav(path):
     from math import gcd
     from scipy.signal import resample_poly
@@ -84,6 +92,11 @@ EVENTS = {  # 名前: (生成関数, 目標 LUFS)
     'watering': (lambda: S.watering(7.0), -33),
     'holo_on': (lambda: S.holo_on2(), -29),
     'stamp': (lambda: S.stamp(), -27),
+    'stamp_paper': (lambda: S.stamp_paper(), -28),
+    'phone_notify': (lambda: S.phone_notify(), -30),
+    'cup_clink': (lambda: S.cup_clink(), -33),
+    'monorail_pass': (lambda: S.monorail_pass(), -32),
+    'can_kick': (lambda: S.can_kick(), -27),
 }
 
 def env_eq(n, fin, fout):
@@ -137,6 +150,10 @@ for k, (sh, st) in enumerate(zip(T['shots'], starts)):
         bed = norm_to(bed, target + sh.get('audio', {}).get('bed_gain', 0))  # bed_gain：そのカットだけ環境音を持ち上げる（dB）
         if name == 'insects_fade':
             bed *= np.clip(np.linspace(1.4, -0.2, len(bed)), 0, 1)[:, None]
+        if name in RAMP:
+            bed *= RAMP[name](np.linspace(0, 1, len(bed)))[:, None]
+        if sh.get('memory'):
+            bed = lowpass(bed, 2600, 2)  # 昭和の回想：環境音も遠くこもらせる
         put(amb, bed * env_eq(len(bed), 2.5 if first else XF + 2 * pre, 3.0 if last else XF + 2 * post), st - pre)
         log.append((sh['id'], name, target))
     # イベント
@@ -158,6 +175,15 @@ for k, (sh, st) in enumerate(zip(T['shots'], starts)):
     for h in sh.get('holo', []):
         fn, target = EVENTS['holo_on']
         put(amb, norm_to(fn(), target), st + h['t0'] + 0.05)
+    for v in sh.get('voice', []):  # 話すだけで書けるタブレット：出る音、話す声（聞き取れない）、文字が刻まれる音（src/fx/Voice.tsx と同じ時刻）
+        fn, target = EVENTS['holo_on']
+        put(amb, norm_to(fn(), target), st + v['t0'] + 0.05)
+        rate = v.get('rate', 0.12); pause = v.get('pause', 0.7); t_ = v['t0'] + 1.3; t_first = t_
+        for ln in v['lines']:
+            n_ = len(ln.lstrip('　 '))
+            put(amb, norm_to(S.holo_ticks(n_, rate, seed=int(t_ * 10)), -40), st + t_)
+            t_ += n_ * rate + pause
+        put(amb, norm_to(S.murmur_voice(t_ - pause - t_first + 0.6, seed=int(v['t0'] * 7)), -37), st + t_first - 0.3)
 
 amb = highpass(amb, 25, 2)
 out_dir = root / 'audio' / 'out'; out_dir.mkdir(parents=True, exist_ok=True)

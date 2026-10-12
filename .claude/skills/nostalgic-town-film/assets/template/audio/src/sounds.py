@@ -452,3 +452,128 @@ def broom(dur, seed=43, every=(2.0, 2.8)):
         i = int(at * SR); j = min(n, i + L); out[i:j] += pan(s[:j - i], r.uniform(-0.15, 0.15))
         at += r.uniform(*every)
     return convolve_st(out, reverb_ir(0.7, 0.3, seed, lp=6000), 0.25)
+
+
+# ---------- 第二章で足した音 ----------
+
+def phone_notify(seed=51):
+    # 2026年のスマートフォンの通知：やわらかい二音（ロゴ音ではない、ありふれた形のオリジナル）
+    out = np.zeros((int(0.9 * SR), 2))
+    for k, (f, at) in enumerate(((1174.7, 0.0), (1568.0, 0.11))):
+        tt = t_axis(0.6)
+        s = (np.sin(2 * np.pi * f * tt) + 0.25 * np.sin(2 * np.pi * 4 * f * tt) * np.exp(-tt / 0.02)) * np.clip(tt / 0.004, 0, 1) * np.exp(-tt / 0.13)
+        i = int(at * SR); out[i:i + len(s)] += pan(s, 0.1)
+    return convolve_st(lowpass(out, 7000, 2), reverb_ir(0.5, 0.2, seed, lp=6000), 0.2) * 0.3
+
+
+def sand(dur, seed=52, strength=1.0):
+    # 風に舞う細かい砂：高い帯域のざらつきが、風の息に合わせて強まる
+    n = int(dur * SR); out = np.zeros((n, 2)); r = rng(seed)
+    for c in range(2):
+        g = smooth_noise(dur, 0.35, seed * 3 + c, 0.15, 1.0) ** 2.2
+        hiss = bandpass(pink(n, seed * 5 + c), 2600, 9500, 2) * g
+        grains = (r.random(n) < 0.004 * g) * r.uniform(-1, 1, n)  # 砂粒が当たる細かい音
+        out[:, c] = hiss + bandpass(grains, 3000, 10000, 2) * 0.6
+    return out * strength * 0.2
+
+
+def siphon(dur, seed=53):
+    # サイフォンのこぽこぽ：小さな泡の音（短く上がる音程）＋ 低い沸騰のゆらぎ
+    n = int(dur * SR); out = np.zeros((n, 2)); r = rng(seed)
+    at = r.uniform(0, 0.2)
+    while at < dur - 0.1:
+        L = int(r.uniform(0.02, 0.045) * SR); tt = np.arange(L) / SR
+        f0 = r.uniform(350, 950)
+        s = np.sin(2 * np.pi * f0 * (tt + 6 * tt ** 2)) * np.exp(-tt / r.uniform(0.008, 0.016))
+        i = int(at * SR); j = min(n, i + L); out[i:j] += pan(s[:j - i], r.uniform(-0.2, 0.2)) * r.uniform(0.3, 1.0)
+        at += r.exponential(1 / 9.0) * (0.4 if r.random() < 0.3 else 1.0)
+    boil = lowpass(brown(n, seed), 260, 2) * smooth_noise(dur, 0.8, seed, 0.5, 1.0) * 0.6
+    out += np.stack([boil, boil], 1)
+    return convolve_st(lowpass(out, 5000, 2), reverb_ir(0.6, 0.25, seed, lp=5000), 0.3) * 0.25
+
+
+def cup_clink(seed=54):
+    # カップと受け皿：陶器の短い「カチャ」（倍音が整数でない、すぐ消える音）を2回
+    r = rng(seed); out = np.zeros((int(0.8 * SR), 2))
+    for k, at in enumerate((0.0, r.uniform(0.09, 0.16))):
+        tt = t_axis(0.4); s = np.zeros_like(tt)
+        for f, a, d in ((2150, 1.0, 0.09), (3320, 0.6, 0.07), (5080, 0.35, 0.05), (7750, 0.2, 0.03)):
+            s += a * np.sin(2 * np.pi * f * r.uniform(0.97, 1.03) * tt) * np.exp(-tt / d)
+        s *= np.clip(tt / 0.0015, 0, 1) * (1.0 if k == 0 else 0.55)
+        i = int(at * SR); out[i:i + len(s)] += pan(s, 0.25)
+    return convolve_st(out, reverb_ir(0.7, 0.3, seed, lp=7000), 0.3) * 0.12
+
+
+def monorail_pass(seed=55, dur=7.0):
+    # 空中電車が瓦屋根の上を渡る：静かなモーターのうなり＋レールの風切り。左から右へ、近づいて遠ざかる
+    t = t_axis(dur); env = np.exp(-((t - dur * 0.5) / (dur * 0.22)) ** 2)
+    dop = 1 + 0.025 * np.tanh((dur * 0.5 - t) / 0.8)  # 近づくと少し高く、離れると低く
+    ph = 2 * np.pi * np.cumsum(140 * dop) / SR
+    hum = (np.sin(ph) + 0.5 * np.sin(2 * ph) + 0.25 * np.sin(3 * ph) + 0.08 * np.sin(6.4 * ph)) * env
+    whoosh = bandpass(pink(len(t), seed), 250, 2200, 2) * env ** 1.5 * 1.4
+    y = (hum * 0.35 + whoosh)
+    out = np.stack([y * np.clip(1.2 - t / dur * 1.4, 0.15, 1), y * np.clip(t / dur * 1.4 - 0.2, 0.15, 1)], 1)
+    return convolve_st(lowpass(out, 4000, 2), reverb_ir(1.6, 0.5, seed, lp=4000), 0.35) * 0.4
+
+
+def holo_ticks(n, stagger=0.12, seed=56):
+    # 空中のタブレットに文字が刻まれる、ごく小さな音（1文字ごと）
+    r = rng(seed); d = n * stagger + 0.6; out = np.zeros((int(d * SR), 2))
+    for k in range(n):
+        L = int(0.012 * SR); tt = np.arange(L) / SR
+        s = np.sin(2 * np.pi * r.uniform(2600, 3300) * tt) * np.exp(-tt / 0.003)
+        i = int((k * stagger + r.uniform(-0.01, 0.01)) * SR)
+        if i >= 0:
+            out[i:i + L] += pan(s * r.uniform(0.5, 1.0), r.uniform(-0.2, 0.2))
+    return convolve_st(out, reverb_ir(0.6, 0.25, seed, lp=8000), 0.3) * 0.15
+
+
+def murmur_voice(dur, seed=57):
+    # 窓ぎわの席で、タブレットに話しかける声（遠くて言葉は聞き取れない）
+    clips = _crowd_clips(); r = rng(seed); n = int(dur * SR); out = np.zeros((n, 2)); at = 0.0
+    while at < dur - 0.5:
+        c = clips[int(r.integers(len(clips)))]
+        i = int(at * SR); j = min(n, i + len(c)); out[i:j] += pan(c[:j - i], 0.35)
+        at += len(c) / SR + r.uniform(0.15, 0.4)
+    env = np.clip(t_axis(dur) / 0.2, 0, 1) * np.clip((dur - t_axis(dur)) / 0.4, 0, 1)
+    out = lowpass(highpass(out, 200, 2), 750, 4) * env[:, None]
+    return convolve_st(out, reverb_ir(0.9, 0.35, seed, lp=3000), 0.4) * 0.5
+
+
+def can_kick(seed=58):
+    # 缶蹴りの空き缶：蹴った「カーン」→ 石畳で2、3度はねて転がる
+    r = rng(seed); d = 2.6; out = np.zeros((int(d * SR), 2))
+    hits = [(0.0, 1.0, 0.5), (0.62, 0.45, 0.25), (0.95, 0.3, 0.18), (1.18, 0.2, 0.12)]
+    for k, (at, a, dec) in enumerate(hits):
+        tt = t_axis(dec * 3); s = np.zeros_like(tt)
+        for f, pa, pd in ((620, 1.0, 1.0), (1430, 0.7, 0.8), (2210, 0.5, 0.6), (3170, 0.35, 0.45), (4400, 0.2, 0.3)):
+            s += pa * np.sin(2 * np.pi * f * r.uniform(0.98, 1.02) * tt) * np.exp(-tt / (dec * pd))
+        s += bandpass(r.standard_normal(len(tt)), 1500, 8000, 2) * np.exp(-tt / 0.006) * 1.2
+        i = int(at * SR); out[i:i + len(s)] += pan(s * a, -0.2 + 0.15 * k)
+    roll = bandpass(r.standard_normal(int(0.9 * SR)), 1800, 6000, 2) * (0.5 + 0.5 * np.abs(np.sin(2 * np.pi * 13 * t_axis(0.9)))) * np.linspace(0.25, 0, int(0.9 * SR))
+    i = int(1.3 * SR); out[i:i + len(roll)] += pan(roll, 0.25)
+    return convolve_st(out, reverb_ir(1.0, 0.4, seed, lp=7000), 0.35) * 0.25
+
+
+def kids(dur, seed=59, density=1.4):
+    # 遠くで遊ぶ子どもたちの声：ざわめきの声を速く高くして、言葉にならない遠い声に
+    clips = _crowd_clips(); n = int(dur * SR); out = np.zeros((n, 2)); r = rng(seed)
+    tt = -r.uniform(0, 1.0)
+    while tt < dur:
+        c = clips[int(r.integers(len(clips)))]
+        c = _signal.resample_poly(c, 3, 4)  # 4/3 倍の速さと高さ
+        s = pan(c, r.uniform(-0.9, 0.9)) * db(r.uniform(-14, -2))
+        i = int(tt * SR); a = max(0, -i); j = min(n, i + len(s))
+        if j > max(i, 0): out[max(i, 0):j] += s[a:a + j - max(i, 0)]
+        tt += r.exponential(1 / density)
+    out = lowpass(highpass(out, 250, 2), 2400, 2)
+    return convolve_st(out, reverb_ir(1.6, 0.5, seed, lp=3500, pre=0.03), 0.6) * 0.06
+
+
+def stamp_paper(seed=60):
+    # 紙のカードにはんこを押す「ポン」（確認音なし）
+    r = rng(seed); t = t_axis(0.3)
+    thump = np.sin(2 * np.pi * (90 + 45 * np.exp(-t / 0.02)) * t) * np.exp(-t / 0.05)
+    knock = bandpass(r.standard_normal(len(t)), 600, 3000, 2) * np.exp(-t / 0.01) * 0.7
+    body = fade(thump + knock, 0.001, 0.05)
+    return convolve_st(np.stack([body, body], 1), reverb_ir(0.8, 0.3, seed, lp=5000), 0.3) * 0.5

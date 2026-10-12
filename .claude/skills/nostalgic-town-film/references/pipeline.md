@@ -37,14 +37,26 @@ python3 -I scripts/veo_batch.py P0 A1 A2 ...   # 1本 70〜110秒、4並列。�
 ## 5. 半速スロー
 
 ```bash
-# work/slowjobs.txt に「ID 元動画」を1行ずつ
-cat work/slowjobs.txt | xargs -P 4 -L 1 scripts/slowmo.sh   # 1本 7〜10分（4並列で 22本 約50分）
+# work/slowjobs.txt に「ID 元動画 [頭を切る秒] [倍率] [使う長さ]」を1行ずつ（例：A1 assets/veo/A1_v1.mp4 2.3 2.79）
+nohup scripts/slowqueue.sh work/slowjobs.txt > work/genlogs/slowmo.log 2>&1 &   # 1本 7〜10分（4並列で 30本 約70分）
+python3 scripts/sync_cliplen.py                               # 実際の長さを timeline.json の clip に（切ったカットがあるとき）
 ffmpeg -i public/clips/F0.mp4 -vf reverse -c:v libx264 -crf 15 -pix_fmt yuv420p public/clips/F0_rev.mp4   # hold: reverse のカット
 ```
 
 slowmo.sh：`minterpolate=fps=60:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1,setpts=2.0*PTS` → 30fps、CRF 15。最初と最後のコマ（`<ID>_first.jpg`、`<ID>_last.jpg`）と、半速の音（`work/veoaudio/<ID>.wav`）も作る。
 
-## 6. 合成の確認
+## 6. 画面の中の文字の焼き込み・昭和の色
+
+```bash
+python3 -I scripts/track_plane.py C4@L 0.417,0.259,0.515,0.368,0.344,0.703,0.229,0.608 --pad 0.6   # 紙の四隅を追う
+python3 -I scripts/plane_check.py C4@L work/check.jpg                                               # 確かめる
+BAKE_DEBUG=1 python3 -I scripts/bake_ink.py C4 --preview 1,7.5,11                                    # 試し焼き → work/bake/
+python3 -I scripts/bake_ink.py C4                                                                    # 焼き込み（1本 2〜5分）。memory: true のカットも通す
+```
+
+詳しくは references/in-frame-text.md。
+
+## 6b. 合成の確認
 
 ```bash
 python3 -I scripts/track.py A1 B2 B3 ...                         # 電子版のあるカット。1本 20〜40秒

@@ -28,6 +28,7 @@ description: 「存在しない街の記憶」のような“架空なのに懐�
 | 4 | 動き（Veo、8秒） | `scripts/veo_batch.py` | references/prompting.md |
 | 5 | 半速スロー（16秒） | `scripts/slowmo.sh` | references/pipeline.md |
 | 6 | 合成（文字・電子版・章題） | `src/timeline.json`、`scripts/track.py`、`stills.mjs` | references/timeline.md |
+| 6' | 画面の中の字（カード・日記・柱・お守り）、昭和の回想の色 | `scripts/track_plane.py`・`bake_ink.py` | references/in-frame-text.md |
 | 7 | 音（環境音・曲・あいさつ） | `audio/src/*.py`、`scripts/tts_outro.py` | references/sound.md |
 | 8 | 書き出し | `scripts/render_shots.mjs` → `scripts/assemble.py` | references/pipeline.md |
 | 9 | 点検 | `scripts/qa_final.py`、`audio_qa.py`、`review_video.py` | references/pipeline.md |
@@ -82,12 +83,14 @@ bash <このスキル>/scripts/new_project.sh <作業フォルダ> [slug]   # �
 - 原画は `assets/gen/prompts.json` に**共通ブロック**（世界・ロボットの統一デザイン・写真の質感・人物は小さく後ろ姿・指定した看板以外は文字なし）と**場面ごとの指示**を書き、`gen_image.py <ID> --refs 既存の採用画像2枚` で生成。参照画像を渡すと世界の見た目がそろう。
 - 生成したら必ず目で見る：看板の文字化け、ロボットのデザインの揺れ、余計な文字。直しは `edit_image.py`。
 - Veo は1カット8秒。`assets/veo/prompts.json` にカットごとの原画（採用した版まで、例 `N02_v2`）と指示文を書き、`veo_batch.py` で4並列。指示文は「Locked-off static camera.（または Very slow push-in）＋動くもの＋共通の締め（文字や形を変えない、音楽・声なし）」。Lite は negativePrompt を受け付けない。
-- 「他社のコンテンツ」で弾かれたら、似ていると判断されそうな要素（ロボットの形など）を原画の側で描き替えて再生成。
+- 「他社のコンテンツ」で弾かれたら、似ていると判断されそうな要素（ロボットの形、実在のチェーンに似た看板の配色）を原画の側で描き替えて再生成。看板の色は `recolor_region.py` で手元で塗り替えられる。
+- 物語を伝える紙（カード・日記・お守り）は、原画と Veo では**白紙のまま**にして、字は後から焼き込む（references/in-frame-text.md）。AI は日本語の字を正しく書けない。
+- 残高切れ（402）で作れなかったカットは、原画の静止画にゆっくり寄るクリップで仮に組み、動きに合わせる音（電車の通過など）は外しておく。補充したら作り直す。
 - 生成後は全カットを数コマずつ並べて確認：形の崩れ（ロボットの頭、飛行車）、人物の増殖、画面に現れる偽の文字。
 
 ## 5〜6. スローと合成
 
-- `slowmo.sh <ID> <元動画>`：動き補間で 24→60fps にしてから半速 30fps（16秒）。1本 7〜10分、4並列。音は rubberband（crisp 設定）で半速。
+- `slowmo.sh <ID> <元動画> [頭を切る秒] [倍率] [使う長さ]`：動き補間で 24→60fps にしてから半速 30fps（16秒）。1本 7〜10分、4並列（`scripts/slowqueue.sh`）。音は rubberband（crisp 設定）で半速。Veo の頭や後ろが崩れたカット（顔がこちらを向く、形が変わる）は、使える所だけを倍率を上げて伸ばし、`sync_cliplen.py` で timeline に長さを書く。
 - 合成は `src/timeline.json` だけで決まる（尺・字幕・章題・題・空中電子版・音の割り当て）。書式は references/timeline.md。
 - 空中電子版は `track.py` でカメラの動きを追跡して景色に貼りつける（Veo は「固定」と頼んでも動く）。置き場所は**見せ場（飛行車、開く扉）を隠さない空の部分**。`track_check.py` で確認。
 - 画面の中の実物の板（掲示板・黒板）に文字を出すときは、`fixed`（揺れない）＋`opaque`（下を隠す）で板に合わせる。Veo が板に偽の文字を描くことがあるので、その範囲を覆う。手が板に触れる場面では、手の位置を覆わない。

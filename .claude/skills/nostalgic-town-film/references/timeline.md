@@ -27,10 +27,15 @@
 | `hold` | クリップが終わった後：`"reverse"` で逆再生して尺を延ばす（`<id>_rev.mp4` が要る） | `"reverse"` |
 | `push` | 画面全体のゆっくりした寄り `[始め, 終わり]` の倍率 | `[1.0, 1.06]` |
 | `captions` | 下の字幕 `[{t0, t1, text}]`。1文字ずつ浮かび上がる | `[{"t0": 4.5, "t1": 11.0, "text": "牛乳は、今も瓶で届く。"}]` |
-| `chapterCard` | 右上の縦書きの章題 `{t0, t1, num, title, time, right?}`。`right` は右端からの px（看板に重なるとき左へ） | `{"t0":1.3,"t1":6.8,"num":"一","title":"夜明け","time":"午前五時四十分","right":1500}` |
+| `chapterCard` | 右上の縦書きの章題 `{t0, t1, num, title, time, right?}`。`right` は右端からの px（看板に重なるとき左へ）。`title` を空にすると `num` だけ（「あの頃」など） | `{"t0":1.3,"t1":6.8,"num":"一","title":"夜明け","time":"午前五時四十分","right":1500}` |
 | `title` | 中央の題 `{t0, t1, text, sub, top?, size?, subFirst?}`。`top` は縦位置（0..1）、`size` は px、`subFirst` で小見出しを上に | 予告：`{"text":"砂の向こうから来た男","sub":"次回　第二章","top":0.24,"size":92,"subFirst":true}` |
 | `endCard` | 終わりの題 `{t0, t1, text, sub, note}` | `{"text":"AIと人間の共存","sub":"第一章　了","note":"この映像の街・人物・出来事はすべて架空です"}` |
 | `holo` | 空中電子版・画面内の板の表示（下表） | |
+| `ink` | 画面の中の紙・カード・柱・板に書いてある字（`bake: true` は焼き込み。references/in-frame-text.md） | |
+| `voice` | 話すだけで書ける空中のタブレット `[{x, y, w, tilt, t0, lines, rate?, pause?}]`（in-frame-text.md の 7） | |
+| `memory` | `true` で昭和の回想：bake_ink.py が色あせ・粒子・周辺減光をかけ、build_mix.py が環境音をこもらせる | `true` |
+| `clip` | クリップの実際の長さ（秒）。頭や後ろを切ったカット。`scripts/sync_cliplen.py` が書く | `9.98` |
+| `veil` | 画面全体を色でおおう `[{t0, t1, from, to, color}]`（砂が舞って場面が変わる、など） | `[{"t0": 14.5, "t1": 20, "from": 0, "to": 0.72, "color": "#cdbb9a"}]` |
 | `events` | 効果音・声（sound.md） | `[{"t": 6.0, "type": "foghorn", "gain": -9}]` |
 | `audio` | 音の割り当て `{veo, veo_lp?, bed_gain?, beds}`（sound.md） | `{"veo": 1.0, "beds": ["harbor_morning"]}` |
 

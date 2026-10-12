@@ -1,0 +1,125 @@
+{
+ "common_tail": "Keep every sign, text, building, vehicle design, robot design and person exactly as in the image; no new objects, no morphing, no camera shake, no cuts. Photorealistic, natural gentle motion, calm and quiet mood. Audio: natural ambient sound of the place only, no music, no speech, no singing.",
+ "shots": {
+  "P0": {
+   "photo": "P0_v1",
+   "prompt": "Locked-off static camera. Dusk on the beach. The man in the navy suit keeps walking slowly away toward the dunes; the wind grows stronger and lifts streams of fine sand off the dune crests, drifting across the beach and gradually thickening into a veil of blowing sand; the sea ripples; the abandoned island stays dark. Audio: wind, waves, hissing sand, one faint smartphone notification chime."
+  },
+  "P1": {
+   "photo": "P1_v1",
+   "prompt": "Locked-off static camera. Night on the dunes. Small fireworks bloom far away above the island and their reflections shimmer on the sea; the truck's amber cab light pulses softly; fine sand drifts in the wind; the man sits still; a flying car's tiny lights glide across the sky. Audio: wind over the dunes, very distant soft booms of fireworks, insects."
+  },
+  "A1": {
+   "photo": "A1_v2",
+   "prompt": "Very slow, smooth camera following the truck. The truck drives slowly along the coastal road toward the town at dawn; the man and the old robot sit still in the cargo bed; the sea glitters; the flying car glides; the monorail moves far away. Audio: small truck engine, waves, morning birds, gulls."
+  },
+  "A2": {
+   "photo": "A2_v3",
+   "prompt": "Locked-off static camera. Morning on the beach. The children do radio calisthenics, swinging their arms in unison; the robot teacher at the front mirrors the movements; in the foreground the robot's hand presses the rubber stamp onto the last box of the card and lifts it; the man's hand holds the card still. Audio: waves, children's distant voices without words, the soft thump of a stamp."
+  },
+  "B1": {
+   "photo": "B1_v4",
+   "prompt": "Very slow camera push-in. Morning in the coffee shop. Steam rises from the coffee and the toast; the siphon bubbles as the robot master tends it; outside the window, the monorail cars glide slowly across; people walk in the street; the woman at the far window table sits still. Audio: siphon bubbling, cups on saucers, faint street sounds, the soft hum of the monorail."
+  },
+  "B2": {
+   "photo": "B2_v3",
+   "prompt": "Locked-off static camera. The plasterer sweeps his trowel across the white wall in a slow arc and the robot beside him copies the motion; the woman with the tray hands rice balls and barley tea to the resting workers; a worker hands a robot a wet towel; on the scaffolding in the background, robots and workers lift a beam; the monorail glides past. Audio: trowel scraping plaster, distant construction sounds, cicadas."
+  },
+  "B3": {
+   "photo": "B3_v2",
+   "prompt": "Locked-off static camera. Children drop their thin glass phones into the wooden box slots and take wooden tags; the man slowly lowers his black smartphone into the box; the robot shopkeeper tilts its head curiously; ramune bottles glisten in the water tub; the monorail passes far away. Audio: wooden tags clacking, cicadas, children's distant voices without words."
+  },
+  "B4": {
+   "photo": "B4_v2",
+   "prompt": "Locked-off static camera. The small toy cars speed around the banked track lanes; children cheer and lean in; the man's hands click the battery cover shut on the toy car; the robot watches; the monorail passes in the background. Audio: high-pitched whir of small motors, cars rattling along the track, children cheering in the distance."
+  },
+  "B5": {
+   "photo": "B5_v1",
+   "prompt": "Locked-off static camera. Summer 1985: the boy and the girl crouch and race small toy cars along the track; the cars whir around the curves; other children watch; leaves sway. Audio: whir of small motors, cars rattling, distant children, cicadas."
+  },
+  "B6": {
+   "photo": "B6_v2",
+   "prompt": "Locked-off static camera. Children slam menko cards onto the ground and flip others; the children on the bench lay down trading cards; the old man ponders and the robot slowly moves a shogi piece after a short hesitation; the glass wind chime sways; the man stands still far away. Audio: menko slaps, a shogi piece clicking, wind chime, cicadas."
+  },
+  "C1": {
+   "photo": "C1_v2",
+   "prompt": "Locked-off static camera. Steam rises from the pots and the bowls; the robot clerk sets the steaming bowl in front of the man; the workers eat; the orange noren sways in the breeze. Audio: simmering pots, bowls set down, chopsticks, a distant street."
+  },
+  "C2": {
+   "photo": "C2_v2",
+   "prompt": "Camera on the moving ferry, gentle natural sway. The ferry moves toward the island; gulls glide; light spray; the old robot stands at the bow; the man stands at the rail; children on the island rooftop wave. Audio: boat engine, waves, gulls."
+  },
+  "C3": {
+   "photo": "C3_v2",
+   "prompt": "Locked-off static camera. The old robot slowly pours barley tea into the second glass; the ice cubes shift; the man sits still; dust motes drift in the afternoon light; the pendulum of the clock swings; the bamboo blind sways a little. Audio: pouring tea, ice clinking, clock ticking, cicadas outside."
+  },
+  "C4": {
+   "photo": "C4_v1",
+   "prompt": "Very slow camera push-in. The man's hand rests on the open notebook and gently smooths the page; afternoon light shifts slightly; the ice in the glass shifts. Keep both pages completely blank. Audio: quiet room, clock ticking, a soft page rustle."
+  },
+  "C5": {
+   "photo": "C5_v1",
+   "prompt": "Very slow camera push-in. The man's fingertips slowly trace along the pencil sketch of the dunes and stop near the small figure; the light shifts slightly. Keep the pages free of any writing. Audio: quiet room, paper rustle."
+  },
+  "C6": {
+   "photo": "C6_v1",
+   "prompt": "Locked-off static camera. The man's hand slowly slides down along the pencil marks on the pillar and stops; afternoon light flickers through leaves outside. Audio: quiet room, distant cicadas, clock ticking."
+  },
+  "R1": {
+   "photo": "R1_v1",
+   "prompt": "Locked-off static camera. Autumn 1985 in the shrine precinct: children run and play kick-the-can and the can clatters; girls jump over the rubber band; boys slam menko cards; smoke rises from the fire of fallen leaves; ginkgo leaves fall; red dragonflies hover; the girl sticks a burr on the boy's back. Audio: children's distant voices without words, a can clattering, crackling fire, autumn insects, a faint distant siren."
+  },
+  "R2": {
+   "photo": "R2_v1",
+   "prompt": "Locked-off static camera. Snowy New Year 1986: children slide down the seawall slope on rice-sack sleds; a snowball flies; kites flutter over the gray sea; tops spin on the ground; the child in the snow hut peels a mandarin; light snow falls. Audio: muffled winter quiet, distant children's laughter, the hum of kites, sleds scraping the snow."
+  },
+  "R3": {
+   "photo": "R3_v1",
+   "prompt": "Very slow camera push-in toward the side wall with the children's drawings. The boy stands up holding his composition paper; the parents at the back watch quietly; the curtains sway; dust floats in the sunlight. Audio: cicadas outside, a quiet classroom, a child's voice very far away and unintelligible."
+  },
+  "R4": {
+   "photo": "R4_v2",
+   "prompt": "Locked-off static camera. Night on the island in 1986: one by one, the lit windows of the apartment blocks go dark; the lighthouse beam sweeps; the street lamp hums; calm reflections on the water. Audio: night waves, a distant foghorn, insects."
+  },
+  "R5": {
+   "photo": "R5_v1",
+   "prompt": "Locked-off static camera. Rooftop at night in 1986: small fireworks bloom low over the sea and reflect; the two children sit still on the bench and the girl leans slightly toward the boy; the mosquito coil smoke curls; the towel on the pole sways. Audio: distant fireworks booms, insects."
+  },
+  "R6": {
+   "photo": "R6_v2",
+   "prompt": "Locked-off static camera. The girl places the small pouch into the boy's hands and slowly lets go; the boy steps toward the ferry; people board with their luggage; gulls fly. Keep the orange date imprint in the corner unchanged. Audio: a long ferry horn, engine idling, gulls, waves."
+  },
+  "D1": {
+   "photo": "D1_v1",
+   "prompt": "Locked-off static camera. The man stands with his hands together in prayer and slowly bows; the old robot beside him bows its head; the ginkgo leaves stir in the golden light. Audio: higurashi cicadas, a soft clap of hands, wind in the trees."
+  },
+  "D2": {
+   "photo": "D2_v1",
+   "prompt": "Locked-off static camera. Sunset in the shrine precinct during a game of kick-the-can: an empty tin can flies up in a high arc and clatters onto the stone path; the kids scatter and run across the precinct, laughing; the old robot stands still and watches; someone waves from an apartment window; the ginkgo leaves stir in the warm evening light. Audio: the clang of a tin can, higurashi cicadas, distant cheerful voices without words."
+  },
+  "E1": {
+   "photo": "E1_v1",
+   "prompt": "Locked-off static camera. Night: the island's many windows glow and a few more windows light up one by one; the monorail cars glide between the towers; the lighthouse beam sweeps; reflections shimmer. Audio: night waves, distant laughter, insects."
+  },
+  "E2": {
+   "photo": "E2_v1",
+   "prompt": "Locked-off static camera. The sparklers' glowing balls crackle with tiny branching sparks; the glowing ball of the child's sparkler swells and finally drops; smoke curls; the robot's light strip glows. Audio: sparkler crackle, insects, distant sea."
+  },
+  "E3": {
+   "photo": "E3_v1",
+   "prompt": "Locked-off static camera. The man's hands slowly unfold the small paper fully and hold it still; the robot's amber light strip slowly brightens, warming the paper. Keep the paper completely blank. Audio: insects, a soft paper rustle."
+  },
+  "E4": {
+   "photo": "E4_v1",
+   "prompt": "Locked-off static camera. The three sit quietly on the bench; the robot's light strip glows softly; the child leans gently toward the robot; the mosquito coil smoke curls; distant lights twinkle; a flying car's lights cross the sky. Audio: night sea, insects."
+  },
+  "F0": {
+   "photo": "F0_v1",
+   "prompt": "Locked-off static camera. Midnight: the spacecraft's light rises slowly into the sky leaving a thin trail; the monorail cars glide between the towers; the moon path shimmers on the sea; the child stands still looking up; the amber-lit window glows. Audio: calm sea, a distant foghorn, faint insects."
+  },
+  "T0": {
+   "photo": "T0_v2",
+   "prompt": "Locked-off static camera. Dusk before the typhoon: the man and the robot slide the wooden storm shutters closed; outside, dark clouds race and trees bend in the wind; rain begins to streak the window. Audio: rising wind, rain, shutters rolling."
+  }
+ }
+}
