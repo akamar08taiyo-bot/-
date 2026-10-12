@@ -201,7 +201,7 @@
    ],
    "audio": {
     "veo": 0.0,
-    "bed_gain": 2,
+    "bed_gain": 5,
     "beds": [
      "morning_birds",
      "distant_sea"
@@ -233,7 +233,7 @@
    ],
    "audio": {
     "veo": 0.0,
-    "bed_gain": 2,
+    "bed_gain": 4,
     "beds": [
      "harbor_morning",
      "kids_play"
@@ -259,7 +259,7 @@
    ],
    "audio": {
     "veo": 0.0,
-    "bed_gain": 1,
+    "bed_gain": 3,
     "beds": [
      "harbor_morning",
      "kids_play"
@@ -559,7 +559,7 @@
    ],
    "audio": {
     "veo": 0.0,
-    "bed_gain": 2,
+    "bed_gain": 4,
     "beds": [
      "cicadas_far",
      "workers_chat"
@@ -610,7 +610,7 @@
    ],
    "audio": {
     "veo": 0.0,
-    "bed_gain": 2,
+    "bed_gain": 5,
     "beds": [
      "town_murmur_far",
      "shop_voices"
@@ -636,7 +636,7 @@
    ],
    "audio": {
     "veo": 0.0,
-    "bed_gain": 3,
+    "bed_gain": 4,
     "beds": [
      "cicadas_far",
      "kids_play"
@@ -680,7 +680,7 @@
    ],
    "audio": {
     "veo": 0.0,
-    "bed_gain": 1,
+    "bed_gain": 4,
     "beds": [
      "cicadas_far",
      "kids_near"
@@ -734,7 +734,7 @@
    },
    "audio": {
     "veo": 0.0,
-    "bed_gain": 2,
+    "bed_gain": 4,
     "beds": [
      "ferry_deck",
      "distant_sea"
@@ -1338,7 +1338,7 @@
     }
    ],
    "audio": {
-    "veo": 1.3,
+    "veo": 0.8,
     "veo_lp": 2400,
     "beds": [
      "insects"
@@ -1375,7 +1375,7 @@
    ],
    "audio": {
     "veo": 0.0,
-    "bed_gain": 0,
+    "bed_gain": -3,
     "beds": [
      "harbor_morning",
      "pier_crowd"
@@ -1385,7 +1385,7 @@
     {
      "t": 1.0,
      "type": "ferry_horn",
-     "gain": -4
+     "gain": -8
     }
    ]
   },
@@ -1713,7 +1713,7 @@
    ],
    "audio": {
     "veo": 0.0,
-    "bed_gain": 2,
+    "bed_gain": 4,
     "beds": [
      "insects"
     ]
@@ -1808,13 +1808,13 @@
      "gain": -9
     },
     {
-     "t": 17.0,
+     "t": 19.5,
      "type": "voice",
      "file": "outro/closing.wav"
     }
    ],
    "audio": {
-    "veo": 1.0,
+    "veo": 0.7,
     "beds": [
      "night_sea_calm",
      "insects_fade"

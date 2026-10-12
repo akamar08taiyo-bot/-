@@ -92,11 +92,11 @@ S.append(shot('P1', '序', '砂の向こう（夜の砂丘、島の灯りと花�
               title=dict(V9['P1']['title'], t0=4.2, t1=15.2), audio=audio('P1')))
 # ---------------- 一　朝（2080年、町） ----------------
 S.append(shot('A1s', '一', '夜明けの海沿いの道（止め絵：島へ向かう軽トラ）', 6.6, push=[1.0, 1.05],
-              captions=[cap(0.9, 5.8, '2080年8月25日、日曜日。')], audio=still_audio(['morning_birds', 'distant_sea'], 2)))
+              captions=[cap(0.9, 5.8, '2080年8月25日、日曜日。')], audio=still_audio(['morning_birds', 'distant_sea'], 5)))
 S.append(shot('A1', '一', '夜明けの海沿いの道（荷台の男とロボット）', 6.0, 5.2, audio=audio('A1')))
-S.append(shot('A2w', '一', '浜のラジオ体操（止め絵：引き）', 6.6, push=[1.0, 1.04], audio=still_audio(['harbor_morning', 'kids_play'], 2)))
+S.append(shot('A2w', '一', '浜のラジオ体操（止め絵：引き）', 6.6, push=[1.0, 1.04], audio=still_audio(['harbor_morning', 'kids_play'], 4)))
 S.append(shot('A2s', '一', 'ラジオ体操のカード（寄り）', 6.2, push=[1.0, 1.04],
-              captions=[cap(0.8, 5.6, '最後の日のハンコだけ、空いていた。')], audio=still_audio(['harbor_morning', 'kids_play'], 1)))
+              captions=[cap(0.8, 5.6, '最後の日のハンコだけ、空いていた。')], audio=still_audio(['harbor_morning', 'kids_play'], 3)))
 S.append(shot('A2', '一', 'ラジオ体操のカード（はんこ）', 6.8, 6.2, ink=A2_INK,
               holo=[dict(V9['A2']['holo'][0], t0=0.6)], audio=audio('A2'), events=[{'t': 1.1, 'type': 'stamp_paper'}]))
 B1 = copy.deepcopy(V9['B1']); B1.update(dur=11.0, clip=11.0, chapter='一',
@@ -109,24 +109,24 @@ S.append(shot('B1v', '一', '喫茶店の窓ぎわ（止め絵）', 6.6, push=[1
               events=[{'t': 2.4, 'type': 'cup_clink', 'gain': -3}]))
 S.append(shot('B2s', '一', '左官とおばちゃんの差し入れ（止め絵）', 6.4, push=[1.0, 1.04],
               captions=[cap(1.0, 5.8, '壁の塗り方は、人がロボットに教える。')],
-              audio=still_audio(['cicadas_far', 'workers_chat'], 2),
+              audio=still_audio(['cicadas_far', 'workers_chat'], 4),
               events=[{'t': 1.6, 'type': 'laugh', 'kind': 'woman', 'far': False, 'soft': True, 'seed': 21}]))
 S.append(shot('B2', '一', '左官とロボット', 4.6, 3.35, audio=audio('B2'), events=[]))
 S.append(shot('C1', '一', '牛丼屋（止め絵）', 6.6, push=[1.0, 1.04], captions=[cap(1.2, 5.8, '牛丼は、今も早い。')],
-              audio=still_audio(['town_murmur_far', 'shop_voices'], 2)))
+              audio=still_audio(['town_murmur_far', 'shop_voices'], 5)))
 S.append(shot('B6s', '一', '路地の将棋（止め絵）', 6.4, push=[1.0, 1.04],
               captions=[cap(1.0, 5.8, '将棋のロボットは、ときどき負けてくれる。')],
-              audio=still_audio(['cicadas_far', 'kids_play'], 3)))
+              audio=still_audio(['cicadas_far', 'kids_play'], 4)))
 S.append(shot('B6', '一', '路地の将棋（めんこを拾う子、駒を指すロボットの手）', 5.6, 4.5, audio=audio('B6'),
               events=[{'t': 2.4, 'type': 'laugh', 'kind': 'man', 'far': True, 'seed': 23, 'gain': -3}]))
 S.append(shot('B4p', '一', '駄菓子屋の裏のコース（止め絵：男の手に小さな四駆）', 6.4, push=[1.0, 1.05],
-              audio=still_audio(['cicadas_far', 'kids_near'], 1)))
+              audio=still_audio(['cicadas_far', 'kids_near'], 4)))
 B5 = shot('B5', '一', '昭和のコース（思い出：写真から動き出す）', 11.0, 7.1, clipAt=3.0, memory=True, push=[1.0, 1.04],
           captions=[cap(4.0, 9.4, '同じコースを、あの子と走った。')], audio=audio('B5'))
 S.append(B5)
 # ---------------- 二　昼さがり（島へ、島の家） ----------------
 S.append(shot('C2s', '二', '島への船（止め絵：近づく島）', 6.6, push=[1.0, 1.05],
-              chapterCard=card(0.8, 5.6, '二', '昼さがり', '午後一時'), audio=still_audio(['ferry_deck', 'distant_sea'], 2)))
+              chapterCard=card(0.8, 5.6, '二', '昼さがり', '午後一時'), audio=still_audio(['ferry_deck', 'distant_sea'], 4)))
 S.append(shot('C2', '二', '島への船（男と古いロボット）', 7.0, 6.0, captions=[cap(0.9, 5.6, '生まれた島へ。')], audio=audio('C2')))
 S.append(shot('C4a', '二', '交換日記（1986年のページ）', 6.8, push=[1.0, 1.04],
               ink=[{'bake': True, 'quad': C4_L, 'aspect': 0.7, 'items': KIDS_1986}], audio=still_audio(['clock_tick', 'cicadas_outside'], 3)))
@@ -149,11 +149,11 @@ S.append(shot('R4p', 'あの頃', '夜の桟橋（止め絵：島の灯りを見
 S.append(shot('R4', 'あの頃', '消えていく灯り', 7.6, 6.75, clipAt=0.6, memory=True, audio=audio('R4'),
               events=[{'t': 3.0, 'type': 'foghorn', 'gain': -6}]))
 S.append(shot('R5', 'あの頃', '最後の花火', 11.8, 8.0, clipAt=3.2, memory=True, push=[1.0, 1.03],
-              captions=[cap(5.0, 10.6, '来年も、いっしょに見ようね。')], audio=audio('R5'),
+              captions=[cap(5.0, 10.6, '来年も、いっしょに見ようね。')], audio=audio('R5', veo=0.8),
               events=[{'t': 4.0, 'type': 'laugh', 'kind': 'kid', 'far': True, 'seed': 24, 'gain': -2}]))
 S.append(shot('R6p', 'あの頃', '別れの朝（写真：お守りの手渡し）', 7.6, memory=True, push=[1.0, 1.05],
-              captions=[cap(1.2, 6.8, 'あれが最後の夏だったなんて。')], audio=still_audio(['harbor_morning', 'pier_crowd'], 0),
-              events=[{'t': 1.0, 'type': 'ferry_horn', 'gain': -4}]))
+              captions=[cap(1.2, 6.8, 'あれが最後の夏だったなんて。')], audio=still_audio(['harbor_morning', 'pier_crowd'], -3),
+              events=[{'t': 1.0, 'type': 'ferry_horn', 'gain': -8}]))
 S.append(shot('R6', 'あの頃', '別れの朝（桟橋を歩くふたり）', 4.0, 3.0, memory=True, audio=audio('R6'), events=[]))
 # ---------------- 三　夕暮れ ----------------
 S.append(shot('D1', '三', '高台の神社（再生記念の額）', 9.0, 8.0, ink=D1_INK,
@@ -172,16 +172,16 @@ S.append(shot('E2', '四', '線香花火（止め絵）', 7.4, push=[1.0, 1.05],
               events=[{'t': 3.6, 'type': 'laugh', 'kind': 'kid', 'far': False, 'soft': True, 'seed': 26, 'gain': -6}]))
 S.append(shot('E3', '四', 'お守り（紙を開く）', 5.6, 4.6, ink=E3_INK, audio=audio('E3')))
 S.append(shot('E3s', '四', 'お守り（寄り）', 6.8, push=[1.0, 1.04], captions=[cap(1.4, 6.2, 'あの子の字だった。')],
-              audio=still_audio(['insects'], 2)))
+              audio=still_audio(['insects'], 4)))
 S.append(shot('E4s', '四', '屋上の三人（止め絵）', 7.4, push=[1.0, 1.05], captions=[cap(1.0, 6.6, '来年も、いっしょに見ようね。')],
               audio=still_audio(['insects', 'night_sea'], 3)))
 S.append(shot('E4', '四', '屋上の三人（飛行車）', 4.6, 2.9, captions=[cap(0.9, 3.8, 'ピ。')], audio=audio('E4'),
               events=[{'t': 0.9, 'type': 'robot_pi'}]))
 # ---------------- 結・予告 ----------------
-F0 = copy.deepcopy(V9['F0']); F0.update(dur=30.0, clip=12.0, push=[1.0, 1.06],
+F0 = copy.deepcopy(V9['F0']); F0.update(dur=30.0, clip=12.0, push=[1.0, 1.06], audio=audio('F0', veo=0.7),
                                          captions=[cap(2.0, 7.6, '変わっていくものと、変わらないもの。'), cap(8.2, 13.8, '僕の大好きなあの頃は、そのままに。')],
                                          endCard=dict(V9['F0']['endCard'], t0=15.0, t1=29.4),
-                                         events=[{'t': 4.0, 'type': 'foghorn', 'gain': -9}, {'t': 17.0, 'type': 'voice', 'file': 'outro/closing.wav'}])
+                                         events=[{'t': 4.0, 'type': 'foghorn', 'gain': -9}, {'t': 19.5, 'type': 'voice', 'file': 'outro/closing.wav'}])  # 曲の最後の和音（18.5秒）のあとに
 S.append(F0)
 S.append(shot('T0', '予告', '第三章 予告（窓の外の嵐）', 4.4, 3.0, captions=[cap(0.4, 4.2, '九月。台風が、近づいていた。')], audio=audio('T0')))
 S.append(shot('T0s', '予告', '第三章 予告（雨戸を閉める）', 10.0, push=[1.0, 1.05],
