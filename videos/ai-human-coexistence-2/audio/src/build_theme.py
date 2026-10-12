@@ -66,6 +66,6 @@ if act.any():
 mus_l = lufs(mus)
 amb_l = lufs(amb)
 mus = mus * 10 ** ((amb_l + 2.5 - mus_l) / 20)  # 曲を環境音より 2.5 dB 上に
-mix = master(amb * g + mus)
+mix = master(amb * g + mus, ceiling_db=-3.2)  # AAC にした後のトゥルーピークが -1 dBTP を超えたため（第二章で -0.8）、上限を下げる
 sf.write(out_dir / 'mix_theme.wav', mix.astype(np.float32), SR, subtype='FLOAT')
 print('ambience', round(amb_l, 1), 'music', round(mus_l, 1), '-> theme mix', round(lufs(mix), 1), 'LUFS; peak', round(20 * np.log10(np.max(np.abs(mix))), 2), 'dBFS')
