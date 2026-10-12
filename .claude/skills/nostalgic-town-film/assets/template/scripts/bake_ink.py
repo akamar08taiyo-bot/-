@@ -21,7 +21,7 @@
 #   occlude.mode:"chroma"：明るさの比と、明るさでわった色の差で見分ける（影は隠さず、手やはんこの台だけを隠す）
 #     c0, c1：色の差のしきい値（既定 6, 12）、r_lo, r_hi：明るさの比の下限・上限（既定 0.45, 1.4）
 #     shadow（既定 true）：暗くなって青みがかった所（s_lo〜s_hi、s_db、s_da）は影とみなして隠さない
-#   t0, t1：全体の出る・消える時刻（クリップの時刻）
+#   t0, t1：全体の出る・消える時刻（クリップの時刻）。fin, fout：出る・消える時のフェードの秒（既定 0.6。0 なら t0 より前から出ている）
 #
 # カットの "shade": [{x, y, rx, ry, k, soft}] … 楕円の所を暗くする（夜の場面で、顔を暗がりに沈めてシルエットにする）。
 #   x, y は中心、rx, ry は半径（画面の割合）、k は明るさの倍率（0.2 なら 2割）、soft はぼかしの幅（半径に対する割合）
@@ -376,7 +376,7 @@ def main():
                 out[y0_:y1_, x0_:x1_] *= (1 - (1 - e.get('k', 0.25)) * w_)[..., None]
         for p in preps:
             ink = p['ink']; BW, BH = p['BW'], p['BH']
-            vis = fade_window(t, ink.get('t0', -99), ink.get('t1', 999), 0.6, 0.6)
+            vis = fade_window(t, ink.get('t0', -99), ink.get('t1', 999), ink.get('fin', 0.6), ink.get('fout', 0.6))
             if vis <= 0:
                 continue
             q = p['tr'][fi].astype(np.float32)
