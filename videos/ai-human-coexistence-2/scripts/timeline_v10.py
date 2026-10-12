@@ -91,8 +91,11 @@ S.append(shot('P1', '序', '砂の向こう（夜の砂丘、島の灯りと花�
               veil=[{'t0': 0.0, 't1': 3.0, 'from': 0.72, 'to': 0, 'color': '#cdbb9a'}],
               title=dict(V9['P1']['title'], t0=4.2, t1=15.2), audio=audio('P1')))
 # ---------------- 一　朝（2080年、町） ----------------
-S.append(shot('A1s', '一', '夜明けの海沿いの道（止め絵：島へ向かう軽トラ）', 6.6, push=[1.0, 1.05],
-              captions=[cap(0.9, 5.8, '2080年8月25日、日曜日。')], audio=still_audio(['morning_birds', 'distant_sea'], 5)))
+# 2026年10月12日、作者の希望で止め絵を Veo で動かした（A1s・B1s・B1v・B2s・B6s・B4p・C2s・E4s。natural_plan_v10.json）。
+#   残高が途中で切れて Gemini で試聴できなかったので、Veo の音は使わず、合成の環境音のまま（still_audio は veo: 0 の意味で使う）
+S.append(shot('A1s', '一', '夜明けの海沿いの道（走り去る軽トラ）', 6.6,
+              captions=[cap(0.9, 5.8, '2080年8月25日、日曜日。')], audio=still_audio(['morning_birds', 'distant_sea'], 5),
+              events=[{'t': 0.6, 'type': 'aircar_pass', 'gain': -9}]))
 S.append(shot('A1', '一', '夜明けの海沿いの道（荷台の男とロボット）', 6.0, 5.2, audio=audio('A1')))
 S.append(shot('A2w', '一', '浜のラジオ体操（止め絵：引き）', 6.6, push=[1.0, 1.04], audio=still_audio(['harbor_morning', 'kids_play'], 4)))
 S.append(shot('A2s', '一', 'ラジオ体操のカード（寄り）', 6.2, push=[1.0, 1.04],
@@ -103,10 +106,12 @@ S.append(shot('A2', '一', 'ラジオ体操のカード（はんこ）', 6.8, 6.
 #   B1_v6 は、Veo が「他社のコンテンツ」と判定したコンビニの店構えを昭和の小さな商店に、実在の通勤電車に似た電車を丸い吊り下げ式に描き直したもの。
 #   前の B1v（別の原画）は女の人の顔が映り、コンビニの看板が実在のチェーンに似ていたので使わない。
 #   B1 の奥の女の人は 4.5 秒から横顔になるので、頭だけ 2 秒目のコマで止めてある（scripts/freeze_region.py の頭に作り直しの手順）
-S.append(shot('B1s', '一', '喫茶店の窓（止め絵：朝の通りとモノレール）', 5.8, push=[1.0, 1.04],
+#   B1s はモノレールが途中で重なって増えるので、上の部分（空・モノレール・ビル）だけ最初のコマで止めた（freeze_region.py --poly）
+S.append(shot('B1s', '一', '喫茶店の窓（朝の通りとモノレール）', 5.8,
               chapterCard=card(0.9, 5.4, '一', '朝', '午前八時十分'), audio=still_audio(['cafe_room', 'town_murmur_far'], 5),
               events=[{'t': 1.8, 'type': 'cup_clink'}]))
-S.append(shot('B1v', '一', '喫茶店のカウンター（止め絵：サイフォンとモーニング）', 4.6, push=[1.0, 1.04],
+#   B1v は、左官（B2s）を 2 秒短くした分だけ長くして、カットの頭の時刻（曲とのつながり）を変えない
+S.append(shot('B1v', '一', '喫茶店のカウンター（サイフォンとモーニング）', 6.6,
               audio=still_audio(['cafe_room', 'siphon'], 6), events=[{'t': 1.6, 'type': 'cup_clink', 'gain': -3}]))
 B1 = copy.deepcopy(V9['B1']); B1.pop('push', None); B1.pop('chapterCard', None)
 B1.update(dur=8.4, clip=8.0, chapter='一', name='喫茶店のモーニング', captions=[cap(3.0, 7.6, '町は、今日も少しずつ新しくなる。')],
@@ -114,19 +119,21 @@ B1.update(dur=8.4, clip=8.0, chapter='一', name='喫茶店のモーニング', 
           events=[{'t': 0.2, 'type': 'monorail_pass', 'gain': -8}, {'t': 5.8, 'type': 'cup_clink', 'gain': -4}])
 B1['voice'][0]['t0'] = 1.2
 S.append(B1)
-S.append(shot('B2s', '一', '左官とおばちゃんの差し入れ（止め絵）', 6.4, push=[1.0, 1.04],
-              captions=[cap(1.0, 5.8, '壁の塗り方は、人がロボットに教える。')],
+#   B2s は 5.4 秒からこてが手から離れて浮くので、0〜5 秒だけ
+S.append(shot('B2s', '一', '左官とロボット（こてで塗る）', 4.4,
+              captions=[cap(0.6, 4.4, '壁の塗り方は、人がロボットに教える。')],
               audio=still_audio(['cicadas_far', 'workers_chat'], 4),
               events=[{'t': 1.6, 'type': 'laugh', 'kind': 'woman', 'far': False, 'soft': True, 'seed': 21}]))
 S.append(shot('B2', '一', '左官とロボット', 4.6, 3.35, audio=audio('B2'), events=[]))
 S.append(shot('C1', '一', '牛丼屋（止め絵）', 6.6, push=[1.0, 1.04], captions=[cap(1.2, 5.8, '牛丼は、今も早い。')],
               audio=still_audio(['town_murmur_far', 'shop_voices'], 5)))
-S.append(shot('B6s', '一', '路地の将棋（止め絵）', 6.4, push=[1.0, 1.04],
+S.append(shot('B6s', '一', '路地の将棋（盤と手元）', 6.4,
               captions=[cap(1.0, 5.8, '将棋のロボットは、ときどき負けてくれる。')],
               audio=still_audio(['cicadas_far', 'kids_play'], 4)))
 S.append(shot('B6', '一', '路地の将棋（めんこを拾う子、駒を指すロボットの手）', 5.6, 4.5, audio=audio('B6'),
               events=[{'t': 2.4, 'type': 'laugh', 'kind': 'man', 'far': True, 'seed': 23, 'gain': -3}]))
-S.append(shot('B4p', '一', '駄菓子屋の裏のコース（止め絵：男の手に小さな四駆）', 6.4, push=[1.0, 1.05],
+#   B4p は奥のコースの車が人の乗ったカートに化けるので、コースの所だけ最初のコマで止めた（freeze_region.py --poly --still）
+S.append(shot('B4p', '一', '駄菓子屋の裏のコース（男の手に小さな四駆）', 6.4,
               audio=still_audio(['cicadas_far', 'kids_near'], 4)))
 # B5：残高の補充後、少年とあの子を手前の後ろ姿にした原画 B5_v3 から作り直した Veo（B5_v2）の 3.8〜8.0 秒。写真のまま 5.6 秒→元の速さで 4.2 秒
 #   少年の頬と目元が少し見えるので、あの子とコースだけを切り抜いてある（natural_plan_v10.json の crop）
@@ -134,7 +141,8 @@ B5 = shot('B5', '一', '昭和のコース（思い出：写真から動き出�
           captions=[cap(4.0, 9.4, '同じコースを、あの子と走った。')], audio=audio('B5'))
 S.append(B5)
 # ---------------- 二　昼さがり（島へ、島の家） ----------------
-S.append(shot('C2s', '二', '島への船（止め絵：近づく島）', 6.6, push=[1.0, 1.05],
+#   C2s は、屋上の大きすぎる子どもを原画で消した C2_v3 から
+S.append(shot('C2s', '二', '島への船（近づく島）', 6.6,
               chapterCard=card(0.8, 5.6, '二', '昼さがり', '午後一時'), audio=still_audio(['ferry_deck', 'distant_sea'], 4)))
 S.append(shot('C2', '二', '島への船（男と古いロボット）', 7.0, 6.0, captions=[cap(0.9, 5.6, '生まれた島へ。')], audio=audio('C2')))
 S.append(shot('C4a', '二', '交換日記（1986年のページ）', 6.8, push=[1.0, 1.04],
@@ -184,7 +192,8 @@ S.append(shot('E2', '四', '線香花火（止め絵）', 7.4, push=[1.0, 1.05],
 S.append(shot('E3', '四', 'お守り（紙を開く）', 5.6, 4.6, ink=E3_INK, audio=audio('E3')))
 S.append(shot('E3s', '四', 'お守り（寄り）', 6.8, push=[1.0, 1.04], captions=[cap(1.4, 6.2, 'あの子の字だった。')],
               audio=still_audio(['insects'], 4)))
-S.append(shot('E4s', '四', '屋上の三人（止め絵）', 7.4, push=[1.0, 1.05], captions=[cap(1.0, 6.6, '来年も、いっしょに見ようね。')],
+#   E4s は2本目（E4s_v2）。1本目はロボットの頭の横に青い丸い光が出た
+S.append(shot('E4s', '四', '屋上の三人', 7.4, captions=[cap(1.0, 6.6, '来年も、いっしょに見ようね。')],
               audio=still_audio(['insects', 'night_sea'], 3)))
 S.append(shot('E4', '四', '屋上の三人（飛行車）', 4.6, 2.9, captions=[cap(0.9, 3.8, 'ピ。')], audio=audio('E4'),
               events=[{'t': 0.9, 'type': 'robot_pi'}]))

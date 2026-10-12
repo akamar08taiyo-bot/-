@@ -122,6 +122,56 @@
   "T0": {
    "photo": "T0_v2",
    "prompt": "Locked-off static camera. Dusk before the typhoon: the man and the robot slide the wooden storm shutters closed; outside, dark clouds race and trees bend in the wind; rain begins to streak the window. Audio: rising wind, rain, shutters rolling."
+  },
+  "A1s": {
+   "photo": "A1_v1",
+   "note": "2026年10月12日 止め絵を動く場面に（作者の希望）。人はほとんど動かさず、乗り物・海・湯気・灯り・雨風を動かす",
+   "prompt": "Locked-off static camera. Dawn on the seaside road: the mint-green kei truck drives slowly away along the road, the man and the robot sitting in its bed keep facing forward, away from the camera; the white flying car glides slowly across the pink sky; a thin morning mist drifts over the calm sea; small waves shimmer. Audio: a small engine moving away, gentle waves, early birds."
+  },
+  "B1s": {
+   "photo": "B1s_v1",
+   "note": "2026年10月12日 止め絵を動く場面に（作者の希望）。人はほとんど動かさず、乗り物・海・湯気・灯り・雨風を動かす",
+   "prompt": "Locked-off static camera. Morning seen through the coffee shop window: the two rounded monorail cabins wait, motionless, at their stop on the overhead rail; people and helper robots walk slowly along the old shopping street in the distance; the man in the foreground sits still with his back to the camera. Audio: a quiet coffee shop, faint street sounds."
+  },
+  "B1v": {
+   "photo": "B1v_v1",
+   "note": "2026年10月12日 止め絵を動く場面に（作者の希望）。人はほとんど動かさず、乗り物・海・湯気・灯り・雨風を動かす",
+   "prompt": "Locked-off static camera. Close view of the coffee counter in the morning: the siphon bubbles gently and a thin thread of steam rises from the cup of coffee; the robot master's hand stays still on the siphon; the man at the right stays still. Audio: siphon bubbling, a faint clink of china."
+  },
+  "C2s": {
+   "photo": "C2_v3",
+   "note": "2026年10月12日 止め絵を動く場面に（作者の希望）。人はほとんど動かさず、乗り物・海・湯気・灯り・雨風を動かす。C2_v1 の屋上の大きすぎる子どもを消したのが C2_v3",
+   "prompt": "Locked-off static camera on the bow of a small ferry: the island with its apartment blocks draws slowly nearer across the calm sea; seagulls glide; the white flying cars cross the sky slowly; the man and the old robot stand still at the bow with their backs to the camera; the boat rocks gently. Audio: a small boat engine, water lapping at the hull, seagulls."
+  },
+  "E4s": {
+   "photo": "E4s_v1",
+   "note": "2026年10月12日 止め絵を動く場面に（作者の希望）。人はほとんど動かさず、乗り物・海・湯気・灯り・雨風を動かす",
+   "prompt": "Locked-off static camera. Night on the rooftop and nothing on the bench moves: the child, the old robot and the man sit perfectly still with their backs to the camera; the robot's round head stays still and plain, with no lights on it. Only the background moves: the town and island lights twinkle and shimmer on the calm sea, and thin smoke rises straight up from the mosquito coil on the floor and fades. Audio: night insects, distant waves."
+  },
+  "T0s": {
+   "photo": "T0_v3",
+   "note": "2026年10月12日 止め絵を動く場面に（作者の希望）。人はほとんど動かさず、乗り物・海・湯気・灯り・雨風を動かす。T0_v1 は男の横顔が見えたので、後ろ姿に描き直したのが T0_v3",
+   "prompt": "Locked-off static camera. A typhoon night: outside the window the dark sea heaves and waves break, rain streaks past in the wind, the trees outside bend. Inside, the man and the robot hold the wooden storm shutter where it is and do not move; the shutter stays in place and in one piece; the lamp light flickers slightly. Audio: howling wind, heavy rain against the house, the shutter creaking."
+  },
+  "A2w": {
+   "photo": "A2w_v1",
+   "note": "2026年10月12日 止め絵を動く場面に（作者の希望）。人はほとんど動かさず、乗り物・海・湯気・灯り・雨風を動かす",
+   "prompt": "Locked-off static camera. Morning radio exercises on the beach: the children, all facing away from the camera toward the robot on the small stand, slowly raise and lower their arms together; the robot leads the movement; the man in the foreground holds the card still and keeps facing the children; small waves wash the shore. Audio: gentle waves and seagulls only."
+  },
+  "B2s": {
+   "photo": "B2s_v1",
+   "note": "2026年10月12日 止め絵を動く場面に（作者の希望）。人はほとんど動かさず、乗り物・海・湯気・灯り・雨風を動かす",
+   "prompt": "Locked-off static camera. The old plasterer, seen from behind with his face toward the wall, smooths the fresh white plaster with his trowel in one slow, long stroke; the helper robot beside him holds the plaster board still and watches, its head does not turn. Audio: the soft scrape of a trowel on plaster, distant cicadas."
+  },
+  "B6s": {
+   "photo": "B6s_v1",
+   "note": "2026年10月12日 止め絵を動く場面に（作者の希望）。人はほとんど動かさず、乗り物・海・湯気・灯り・雨風を動かす",
+   "prompt": "Locked-off static camera. On the wooden bench the robot slowly slides one shogi piece forward with its fingers and lifts its hand away; the old man in the white undershirt rests his hand beside the board; the board and the other pieces do not change. Audio: the soft click of a shogi piece on wood, distant cicadas, a glass wind chime."
+  },
+  "B4p": {
+   "photo": "B4p_v1",
+   "note": "2026年10月12日 止め絵を動く場面に（作者の希望）。人はほとんど動かさず、乗り物・海・湯気・灯り・雨風を動かす",
+   "prompt": "Locked-off static camera. Close view: the man's hands slowly turn the small screwdriver to tighten a screw on the underside of the yellow toy car; behind, small toy cars run along the wooden course. Audio: a tiny screw squeak, the whir of toy motors on wooden lanes, distant cicadas."
   }
  }
 }

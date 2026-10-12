@@ -2258,6 +2258,86 @@
    },
    "model_text": [],
    "prompt": "The FIRST supplied image is the COMPOSITION reference: keep exactly the same viewpoint, framing, horizon and layout of the main shapes, but change the era, season, light and people as described. Any other supplied image is only a style reference for photographic quality.\n\nUse case: photorealistic-natural. A REAL PHOTOGRAPH, not an illustration: no anime, no cel shading, no drawn outlines, no painterly look, no waxy CGI. Full-bleed single 16:9 landscape image: no border, no white frame, no rounded corners, no text overlay.\nEra: 1985–1986 (late Showa), Japan. Tsugishima, a small coal-mining island town packed with weathered 1960s concrete apartment blocks of 6–10 stories behind a high seawall, with stairways, rooftop gardens, a small hilltop shrine (weathered gray stone torii, stone lanterns, a huge ginkgo tree), a white lighthouse and the coal mine's steel headframe tower; it is connected by ferry to a seaside hill town of tiled roofs. Crowded, lived-in, laundry everywhere. Look of a real 1980s amateur color film photograph: warm, slightly faded and magenta-shifted color, soft film grain, gentle vignette, believable natural light. Absolutely no modern or futuristic elements: no glass towers, no flying vehicles, no robots (except where a child's drawing is requested), no holograms, no solar panels, no LED lights, no smartphones.\nRecurring people (always seen from behind or far away — no faces visible): THE BOY is ten, short hair, white short-sleeve shirt, navy shorts and a baseball cap (in winter a hand-knitted sweater and a muffler). THE GIRL is ten, with a bob haircut and a small RED hair ribbon (in winter a red cardigan). Vivid red is reserved for the girl; other reds stay muted.\nNo captions, logos, watermarks or readable text unless explicitly requested.\n\nSpecific scene (a summer morning, 1985):\nIn front of a Showa candy shop: the same hand-made toy race course built from plywood on the ground as in the reference. In the near foreground THE BOY and THE GIRL crouch side by side at the start of the course with their BACKS to the camera, each holding a small toy car (plain original designs, no logos) on a lane, ready to let it go: only the backs of their heads, their shoulders, backs and hands are visible — no face, no profile, no cheek. Two other children stand further along the course, small and seen from behind. No robots, no futuristic objects."
+  },
+  {
+   "id": "T0_v3",
+   "file": "T0_v3.jpg",
+   "operation": "edit",
+   "source": "T0_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "55700bf801eac25881dbdda567dae45148f8719fe4af8e29dcf0ac209e2c0692",
+   "bytes": 2407459,
+   "reference_files": [],
+   "seconds": 21.3,
+   "created_utc": "2026-10-12T12:32:35.882950+00:00",
+   "usage": {
+    "promptTokenCount": 383,
+    "candidatesTokenCount": 1272,
+    "totalTokenCount": 1826,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 125
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 171,
+    "serviceTier": "standard"
+   },
+   "prompt": "Edit the FIRST supplied photograph narrowly. Keep the exact camera framing, composition, lighting, colors, people, materials and every other object unchanged, and keep it photorealistic. Turn ONLY the man's head a little further toward the wooden storm shutter, so that he is seen strictly from behind: only the back of his head, his short graying hair and his ear are visible — no cheek, no eye, no nose, no beard in view. Keep his pose with both hands on the shutter, his dark navy suit, the robot, the room, the open window and the stormy sea exactly as they are."
+  },
+  {
+   "id": "C2_v3",
+   "file": "C2_v3.jpg",
+   "operation": "edit",
+   "source": "C2_v1.jpg",
+   "model": "gemini-3-pro-image",
+   "dimensions_px": [
+    2752,
+    1536
+   ],
+   "sha256": "4eca13fc2f092d331e657496d681b581769e2cb274622e0292cf4dd455203b0b",
+   "bytes": 3017709,
+   "reference_files": [],
+   "seconds": 24.5,
+   "created_utc": "2026-10-12T12:32:37.874934+00:00",
+   "usage": {
+    "promptTokenCount": 366,
+    "candidatesTokenCount": 1262,
+    "totalTokenCount": 1789,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 108
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 161,
+    "serviceTier": "standard"
+   },
+   "prompt": "Edit the FIRST supplied photograph narrowly. Keep the exact camera framing, composition, lighting, colors, people, materials and every other object unchanged, and keep it photorealistic. Remove ONLY the three children standing and waving on the rooftop of the apartment block on the island (upper right of the island): replace them with the empty rooftop railing and the plants behind, matching the surroundings. Do not change anything else: the island, the buildings, the flying cars, the seagulls, the boat, the robot and the man stay exactly the same."
   }
  ]
 }
