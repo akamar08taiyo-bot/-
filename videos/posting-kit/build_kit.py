@@ -19,7 +19,7 @@ EPISODES = [
          after=['第二章を公開したら、上の欄に第二章の URL を入れて概要欄をコピーし直し、YouTube Studio で差しかえる', '終了画面に第二章を置く（公開後）']),
     dict(id='ep2', num='第二章', title='砂の向こうから来た男', hook='どこにもないのに、知っている景色。',
          doc=CH1 / 'docs' / 'youtube_ch2.txt', timeline=CH2 / 'src' / 'timeline.json', project=CH2, slug='ai_human_coexistence_2', thumbs=('ch2_A', 'ch2_B'),
-         script=(CH1 / 'docs' / 'chapter2_script.md', '台本（第8版）', 'AIと人間の共存_第二章_台本.md',
+         script=(CH1 / 'docs' / 'chapter2_script.md', '台本（第10版）', 'AIと人間の共存_第二章_台本.md',
                  '見る人が推察する手がかり、画面では語らない裏設定、構成表、制作で決めたこと。'),
          link=dict(placeholder='（第一章の動画のURLを貼る）', label='第一章の URL'),
          after=['第一章の概要欄の「第二章はこちら」にも、この動画の URL を入れて差しかえる（第一章のページの欄に入れるとコピーできます）', '終了画面に第一章（第三章を公開したら第三章）を置く']),
