@@ -1,17 +1,18 @@
 import {useLayoutEffect, useRef} from 'react';
 import type {RecipientDisplay} from './recipient';
 import type {SenderInfo, SheetLayout} from './storage';
+import type {TextPart} from './templates';
 
 /** A4用紙に印字する内容（入力欄から組み立て済みのもの） */
 export interface SheetData {
   /** 例: 令和8年10月14日 */
   dateText: string;
   to: RecipientDisplay;
-  toFax: string;
   pages: number;
-  subject: string;
-  body: string;
-  /** 【ご利用者様名】など。空欄の項目は含めない */
+  /** 件名・文章は「〇〇」の部分（ご利用者様名など）を filled として区切ってある */
+  subject: TextPart[];
+  body: TextPart[];
+  /** 【商品名・品番】など。空欄の項目は含めない */
   details: {label: string; value: string}[];
   sender: SenderInfo;
 }
@@ -51,12 +52,36 @@ function useOverflowReport(onChange?: (overflowing: boolean) => void) {
   return ref;
 }
 
-function Body({text, preview}: {text: string; preview?: boolean}) {
-  if (!text && preview) {
-    return <p className="fx-body fx-ghost">送るFAXを選ぶと、ここに文章が自動で入ります。</p>;
-  }
-  return <p className="fx-body">{text}</p>;
+/**
+ * 件名・文章を印字する。「〇〇」に差し込む値が未入力のとき、
+ * プレビューでは薄い「〇〇」を、印刷では手書きできるよう空白を出す。
+ */
+function FilledText({parts, preview}: {parts: TextPart[]; preview?: boolean}) {
+  return parts.map((part, i) => {
+    if (!part.filled) return part.text;
+    if (part.text) return <span key={i}>{part.text}</span>;
+    return preview ? (
+      <span key={i} className="fx-ghost">
+        〇〇
+      </span>
+    ) : (
+      '\u3000\u3000\u3000\u3000'
+    );
+  });
 }
+
+function Body({parts, preview}: {parts: TextPart[]; preview?: boolean}) {
+  if (parts.length === 0) {
+    return preview ? <p className="fx-body fx-ghost">送るFAXを選ぶと、ここに文章が自動で入ります。</p> : null;
+  }
+  return (
+    <p className="fx-body">
+      <FilledText parts={parts} preview={preview} />
+    </p>
+  );
+}
+
+const hasText = (parts: TextPart[]) => parts.some((p) => p.text || p.filled);
 
 function Details({details}: {details: SheetData['details']}) {
   if (details.length === 0) return null;
@@ -88,7 +113,6 @@ function ClassicSheet({data, preview, onOverflowChange}: SheetProps) {
         ) : (
           preview && <span className="fx-c-to-line fx-ghost">〇〇〇〇　様</span>
         )}
-        {data.toFax && <span className="fx-c-to-fax">（FAX　{data.toFax}）</span>}
       </div>
       <p className="fx-c-pages">
         <span>本状を含み　{data.pages}枚</span>
@@ -98,8 +122,12 @@ function ClassicSheet({data, preview, onOverflowChange}: SheetProps) {
         <p>平素は格別のご高配を賜り、厚くお礼申し上げます。</p>
       </div>
       <div className="fx-c-box" ref={boxRef}>
-        {data.subject && <p className="fx-c-subject">件名　{data.subject}</p>}
-        <Body text={data.body} preview={preview} />
+        {hasText(data.subject) && (
+          <p className="fx-c-subject">
+            件名　<FilledText parts={data.subject} preview={preview} />
+          </p>
+        )}
+        <Body parts={data.body} preview={preview} />
         <Details details={data.details} />
       </div>
       <p className="fx-c-closing">敬具</p>
@@ -168,7 +196,11 @@ function TableSheet({data, preview, onOverflowChange}: SheetProps) {
     <div className="fx-sheet fx-table">
       <header className="fx-t-header">
         <h1 className="fx-t-title">FAX 送付状</h1>
-        {data.subject && <p className="fx-t-subtitle">{data.subject}</p>}
+        {hasText(data.subject) && (
+          <p className="fx-t-subtitle">
+            <FilledText parts={data.subject} preview={preview} />
+          </p>
+        )}
       </header>
       <table className="fx-t-info">
         <tbody>
@@ -187,16 +219,12 @@ function TableSheet({data, preview, onOverflowChange}: SheetProps) {
               {data.to.org || (preview && <span className="fx-ghost">〇〇〇〇</span>)}
             </td>
             <td>
-              <span className="fx-t-key">FAX：</span>
-              {data.toFax}
-            </td>
-          </tr>
-          <tr>
-            <td>
               <span className="fx-t-key">ご担当：</span>
               {data.to.person}
             </td>
-            <td>
+          </tr>
+          <tr>
+            <td colSpan={2}>
               <span className="fx-t-key">送信者：</span>
               {sender.person}
             </td>
@@ -204,8 +232,12 @@ function TableSheet({data, preview, onOverflowChange}: SheetProps) {
         </tbody>
       </table>
       <div className="fx-t-main" ref={mainRef}>
-        {data.subject && <p className="fx-t-subject">件名　{data.subject}</p>}
-        <Body text={data.body} preview={preview} />
+        {hasText(data.subject) && (
+          <p className="fx-t-subject">
+            件名　<FilledText parts={data.subject} preview={preview} />
+          </p>
+        )}
+        <Body parts={data.body} preview={preview} />
         <Details details={data.details} />
         <p className="fx-t-end">以上</p>
       </div>

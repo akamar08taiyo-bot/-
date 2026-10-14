@@ -26,7 +26,8 @@ export function describeRecipient(r: Recipient): RecipientDisplay {
     return {line: org ? `${org}　${p}` : p, org, person: p};
   }
   if (!org) return {line: '', org: '', person: ''};
-  const withHonorific = hasHonorific(org) ? org : `${org}　${r.honorific}`;
+  // 担当者名がなければ事業所名に「様」を付ける（「御中」にしたいときは自分で入力すれば二重にならない）
+  const withHonorific = hasHonorific(org) ? org : `${org}　様`;
   return {line: withHonorific, org: withHonorific, person: ''};
 }
 
@@ -40,7 +41,7 @@ const recipientKey = (r: Pick<Recipient, 'org' | 'person'>) => `${normalize(r.or
  * 印刷ボタンと Ctrl+P の両方から呼ばれても結果が同じになるよう、何度呼んでも1件のまま。
  */
 export function rememberRecipient(list: SavedRecipient[], r: Recipient, now: number): SavedRecipient[] {
-  const clean: Recipient = {org: r.org.trim(), person: r.person.trim(), honorific: r.honorific, fax: r.fax.trim()};
+  const clean: Recipient = {org: r.org.trim(), person: r.person.trim()};
   if (!clean.org && !clean.person) return list;
   const existing = list.find((x) => recipientKey(x) === recipientKey(clean));
   const entry: SavedRecipient = {...clean, id: existing?.id ?? newId(), lastUsed: now};

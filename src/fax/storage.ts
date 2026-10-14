@@ -99,14 +99,11 @@ export const sanitizeLayout = (raw: unknown): SheetLayout => (raw === 'table' ? 
 
 // ---- 宛先 ----
 
-export type Honorific = '様' | '御中';
-
 export interface Recipient {
+  /** 居宅名・会社名など */
   org: string;
+  /** ケアマネ名・ご担当者名 */
   person: string;
-  /** 担当者名が空のときに事業所名の後ろへ付ける敬称 */
-  honorific: Honorific;
-  fax: string;
 }
 
 export interface SavedRecipient extends Recipient {
@@ -114,7 +111,7 @@ export interface SavedRecipient extends Recipient {
   lastUsed: number;
 }
 
-export const EMPTY_RECIPIENT: Recipient = {org: '', person: '', honorific: '様', fax: ''};
+export const EMPTY_RECIPIENT: Recipient = {org: '', person: ''};
 
 export function sanitizeRecipients(raw: unknown): SavedRecipient[] {
   if (!Array.isArray(raw)) return [];
@@ -124,8 +121,6 @@ export function sanitizeRecipients(raw: unknown): SavedRecipient[] {
       id: str(r.id) || newId(),
       org: str(r.org),
       person: str(r.person),
-      honorific: (r.honorific === '御中' ? '御中' : '様') as Honorific,
-      fax: str(r.fax),
       lastUsed: typeof r.lastUsed === 'number' ? r.lastUsed : 0,
     }))
     .filter((r) => r.org.trim() !== '' || r.person.trim() !== '');

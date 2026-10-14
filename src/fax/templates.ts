@@ -1,32 +1,36 @@
 /**
  * FAX送付状の種類と、選んだときに自動で入る文面。
- * 文面は「FAX送付状テンプレート（5種）」の各Word文書の件名・本文・記入欄をそのまま使っている。
+ * 文面は「FAX送付状テンプレート（5種）」のWord文書をもとに、ご利用者様名などを文中に差し込む形にしたもの。
+ * 文章の中の「〇〇」の部分に、入力欄の値（ご利用者様名・製品名など）が自動で入る。
  */
 
-/** 種類をまたいで値を引き継ぐ差し込み項目（照会用紙→計画書と切り替えても、ご利用者様名は残る） */
-export type DetailKey = 'riyousha' | 'product' | 'quantity' | 'deadline' | 'note' | 'documents';
+/** 種類をまたいで値を引き継ぐ入力項目（照会用紙→計画書と切り替えても、ご利用者様名は残る） */
+export type DetailKey = 'riyousha' | 'product' | 'quantity' | 'documents';
 
 export interface DetailField {
   key: DetailKey;
-  /** 用紙には【】付きで印字する */
   label: string;
   placeholder: string;
-  /** 値の後ろに付ける敬称（例: 様） */
+  /** 入力欄の後ろに添える敬称（例: 様）。文面の「〇〇様」の「様」にあたる */
   suffix?: string;
-  multiline?: boolean;
 }
 
 export type FaxKindId = 'shokai' | 'tanisu' | 'keikaku' | 'mitsumori' | 'mitsumoriIrai' | 'other';
 
+/** 宛名欄の見出しの出し分け。ケアマネ宛ては「居宅名・ケアマネ名」、それ以外は「会社・施設名・ご担当者名」 */
+export type Audience = 'caremanager' | 'business';
+
 export interface FaxKind {
   id: FaxKindId;
-  /** 選択カードの見出し */
+  /** 選択欄の見出し */
   label: string;
-  /** 選択カードの補足（ほかに何を入れればよいか） */
-  hint: string;
   subject: string;
   body: string;
-  fields: DetailField[];
+  /** 文章中の「〇〇」に入れる項目 */
+  fill?: DetailField;
+  /** 文章の後に【】付きで1行ずつ印字する項目（空欄なら印字しない） */
+  lines: DetailField[];
+  audience: Audience;
   /** 送付枚数（本状を含む）の初期値。実際に送った枚数の例に合わせている */
   pages: number;
 }
@@ -34,99 +38,83 @@ export interface FaxKind {
 const GREETING = 'いつも大変お世話になっております。';
 const PLEASE_CHECK = 'お忙しいところ恐れ入りますが、ご確認くださいますようお願いいたします。';
 
-const RIYOUSHA: DetailField = {
-  key: 'riyousha',
-  label: 'ご利用者様名',
-  placeholder: '例）山田　花子',
-  suffix: '様',
-};
+export const RIYOUSHA: DetailField = {key: 'riyousha', label: 'ご利用者名', placeholder: '例）山田　花子', suffix: '様'};
 
 export const FAX_KINDS: FaxKind[] = [
   {
     id: 'shokai',
-    label: '照会用紙の送付',
-    hint: 'ご利用者様名を入れて送る',
+    label: '照会用紙',
     subject: '照会用紙の送付',
-    body: [GREETING, '下記ご利用者様の照会用紙を送付いたします。', PLEASE_CHECK].join('\n'),
-    fields: [RIYOUSHA],
+    body: [GREETING, '〇〇様の照会用紙を送付いたします。', PLEASE_CHECK].join('\n'),
+    fill: RIYOUSHA,
+    lines: [],
+    audience: 'caremanager',
     pages: 2,
   },
   {
     id: 'tanisu',
-    label: '単位数・TAISコードの送付',
-    hint: 'ご利用者様名を入れて送る',
+    label: '単位数・TAISコード',
     subject: '単位数・TAISコードの送付',
-    body: [
-      GREETING,
-      '下記ご利用者様に関する福祉用具の単位数およびTAISコードを送付いたします。',
-      PLEASE_CHECK,
-    ].join('\n'),
-    fields: [RIYOUSHA],
+    body: [GREETING, '〇〇様の単位数及びTAISコードを送付いたします。', PLEASE_CHECK].join('\n'),
+    fill: RIYOUSHA,
+    lines: [],
+    audience: 'caremanager',
     pages: 2,
   },
   {
     id: 'keikaku',
-    label: '計画書・モニタリング報告書の送付',
-    hint: 'ご利用者様名を入れて送る',
-    subject: '福祉用具サービス計画書・モニタリング実施報告書の送付',
-    body: [
-      GREETING,
-      '下記ご利用者様の福祉用具サービス計画書およびモニタリング実施報告書を送付いたします。',
-      PLEASE_CHECK,
-    ].join('\n'),
-    fields: [RIYOUSHA],
+    label: '計画書・モニタリング報告書',
+    subject: '計画書及び定期モニタリング報告書の送付',
+    body: [GREETING, '〇〇様の計画書及び定期モニタリング報告書を送付いたします。', PLEASE_CHECK].join('\n'),
+    fill: RIYOUSHA,
+    lines: [],
+    audience: 'caremanager',
     pages: 4,
   },
   {
     id: 'mitsumori',
     label: '御見積書の送付',
-    hint: '製品名を入れて送る',
     subject: '御見積書の送付',
     body: [
       GREETING,
-      '下記製品の御見積書を送付いたします。',
+      '〇〇の御見積書を送付いたします。',
       '内容をご確認いただき、ご発注いただける場合はお電話またはFAXにてご連絡くださいますようお願いいたします。',
     ].join('\n'),
-    fields: [
-      {key: 'product', label: '製品名・内容', placeholder: '例）プラッツ　電源コードプラグ'},
-      {key: 'note', label: '備考', placeholder: '空欄なら印字しません', multiline: true},
-    ],
+    fill: {key: 'product', label: '製品名', placeholder: '例）プラッツ　電源コードプラグ'},
+    lines: [],
+    audience: 'business',
     pages: 2,
   },
   {
     id: 'mitsumoriIrai',
-    label: 'メーカーへ御見積りのお願い',
-    hint: '商品名・数量を入れて依頼する',
+    label: 'メーカーへ見積依頼',
     subject: '御見積りのお願い',
     body: [
       GREETING,
       '下記製品について、御見積りをお願いいたします。',
       'お忙しいところ恐れ入りますが、価格・納期をご確認のうえ、ご回答くださいますようお願いいたします。',
     ].join('\n'),
-    fields: [
+    lines: [
       {key: 'product', label: '商品名・品番', placeholder: '例）NEO-1W'},
       {key: 'quantity', label: '数量', placeholder: '例）1台'},
-      {key: 'deadline', label: '希望納期・その他', placeholder: '空欄なら印字しません', multiline: true},
     ],
+    audience: 'business',
     pages: 1,
   },
   {
     id: 'other',
     label: 'その他',
-    hint: '件名と文章を自由に書く',
     subject: '書類の送付',
-    body: [GREETING, '下記の書類を送付いたします。', PLEASE_CHECK].join('\n'),
-    fields: [{key: 'documents', label: '送付書類', placeholder: '例）契約書（写し）', multiline: true}],
+    body: [GREETING, '〇〇を送付いたします。', PLEASE_CHECK].join('\n'),
+    fill: {key: 'documents', label: '送る書類', placeholder: '例）契約書の写し'},
+    lines: [],
+    audience: 'business',
     pages: 2,
   },
 ];
 
 export function findKind(id: FaxKindId): FaxKind {
   return FAX_KINDS.find((k) => k.id === id) ?? FAX_KINDS[0];
-}
-
-export function isFaxKindId(value: unknown): value is FaxKindId {
-  return FAX_KINDS.some((k) => k.id === value);
 }
 
 export interface TextTemplate {
@@ -139,4 +127,34 @@ export type CustomTemplates = Partial<Record<FaxKindId, TextTemplate>>;
 
 export function effectiveTemplate(kind: FaxKind, custom: CustomTemplates): TextTemplate {
   return custom[kind.id] ?? {subject: kind.subject, body: kind.body};
+}
+
+// ---- 「〇〇」への差し込み ----
+
+/** 差し込み位置の目印。打ち直したときに見た目の似た「○」「◯」になっても同じように扱う */
+const FILL_MARK = /[〇○◯]{2}/g;
+
+export const hasFillMark = (text: string) => new RegExp(FILL_MARK.source).test(text);
+
+/** 文章の一部分。filled なら入力欄から差し込んだ値（空なら未入力） */
+export interface TextPart {
+  text: string;
+  filled: boolean;
+}
+
+/** 文章を「〇〇」の前後で区切り、〇〇 に value を入れる */
+export function fillParts(text: string, value: string): TextPart[] {
+  const parts: TextPart[] = [];
+  let last = 0;
+  for (const match of text.matchAll(FILL_MARK)) {
+    const at = match.index ?? 0;
+    if (at > last) parts.push({text: text.slice(last, at), filled: false});
+    // 文面が「〇〇様」なのに「山田様」と入力されたときは「様」を重ねない
+    let v = value.trim();
+    if (text.startsWith('様', at + match[0].length)) v = v.replace(/[\s　]*(様|さま)$/, '');
+    parts.push({text: v, filled: true});
+    last = at + match[0].length;
+  }
+  if (last < text.length) parts.push({text: text.slice(last), filled: false});
+  return parts;
 }
