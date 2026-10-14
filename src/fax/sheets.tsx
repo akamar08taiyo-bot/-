@@ -31,9 +31,7 @@ interface SheetProps {
 }
 
 export function FaxSheet(props: SheetProps) {
-  if (props.layout === 'classic') return <ClassicSheet {...props} />;
-  if (props.layout === 'table') return <TableSheet {...props} />;
-  return <ModernSheet {...props} />;
+  return props.layout === 'table' ? <TableSheet {...props} /> : <ClassicSheet {...props} />;
 }
 
 /** 本文の入る枠が、文章の量に対して足りているかを測る */
@@ -65,12 +63,7 @@ function useOverflowReport(onChange?: (overflowing: boolean) => void) {
 function FilledText({parts, preview}: {parts: TextPart[]; preview?: boolean}) {
   return parts.map((part, i) => {
     if (!part.filled) return part.text;
-    if (part.text)
-      return (
-        <span key={i} className="fx-fill">
-          {part.text}
-        </span>
-      );
+    if (part.text) return <span key={i}>{part.text}</span>;
     return preview ? (
       <span key={i} className="fx-ghost">
         〇〇
@@ -100,140 +93,10 @@ function Details({details}: {details: SheetData['details']}) {
     <div className="fx-details">
       {details.map((d) => (
         <div key={d.label} className="fx-detail">
-          <span className="fx-detail-label">
-            <span className="fx-bracket">【</span>
-            {d.label}
-            <span className="fx-bracket">】</span>
-          </span>
+          <span className="fx-detail-label">【{d.label}】</span>
           <span className="fx-detail-value">{d.value}</span>
         </div>
       ))}
-    </div>
-  );
-}
-
-// ---- オリジナル：見やすさ重視のデザイン（標準） ----
-// 白黒のFAXでもくっきり読めるよう、黒い帯の見出し・太い文字・はっきりした罫線だけで組んでいる。
-// 見出しは「宛先 TO」「差出人 FROM」のように同じ形にそろえ、どこに何があるか一目でわかるようにしている。
-
-const HONORIFIC_AT_END = /^(.*?)[\s\u3000]*(様|さま|殿|御中|各位)$/;
-
-/** 「佐藤　様」を名前と敬称に分ける（敬称だけ少し小さく組むため） */
-function splitHonorific(text: string): {name: string; honorific: string} {
-  const match = HONORIFIC_AT_END.exec(text.trim());
-  return match ? {name: match[1], honorific: match[2]} : {name: text.trim(), honorific: ''};
-}
-
-function ModernLabel({ja, en}: {ja: string; en: string}) {
-  return (
-    <p className="fx-m-label">
-      {ja}
-      <span>{en}</span>
-    </p>
-  );
-}
-
-function ModernSheet({data, font, preview, onOverflowChange}: SheetProps) {
-  const mainRef = useOverflowReport(onOverflowChange);
-  const {sender, to} = data;
-  // 担当者名があれば「事業所名」を上に小さく、担当者名を大きく。なければ事業所名を大きく出す
-  const main = splitHonorific(to.person || to.org);
-  return (
-    <div className="fx-sheet fx-modern" style={sheetFontStyle(font)}>
-      <header className="fx-m-band">
-        {/* 背景の黒はSVGで描く（ブラウザの「背景のグラフィック」の設定に関係なく印刷される） */}
-        <svg className="fx-m-band-bg" viewBox="0 0 10 10" preserveAspectRatio="none" aria-hidden="true">
-          <rect width="10" height="10" />
-        </svg>
-        <h1 className="fx-m-fax">FAX</h1>
-        <p className="fx-m-title">送付状</p>
-        <p className="fx-m-en">FACSIMILE COVER SHEET</p>
-      </header>
-
-      <div className="fx-m-parties">
-        <section className="fx-m-to">
-          <ModernLabel ja="宛先" en="TO" />
-          {to.person && to.org && <p className="fx-m-org">{to.org}</p>}
-          <p className="fx-m-name">
-            {main.name ? (
-              <>
-                {main.name}
-                {main.honorific && <span className="fx-m-hon">{main.honorific}</span>}
-              </>
-            ) : (
-              preview && (
-                <span className="fx-ghost">
-                  〇〇〇〇<span className="fx-m-hon">様</span>
-                </span>
-              )
-            )}
-          </p>
-        </section>
-        <section className="fx-m-from">
-          <ModernLabel ja="差出人" en="FROM" />
-          {sender.company && <p className="fx-m-company">{sender.company}</p>}
-          {sender.office && <p className="fx-m-office">{sender.office}</p>}
-          {sender.person && <p className="fx-m-person">担当　{sender.person}</p>}
-          {(sender.tel || sender.fax) && (
-            <div className="fx-m-contact">
-              {sender.tel && (
-                <p>
-                  <span>TEL</span>
-                  {sender.tel}
-                </p>
-              )}
-              {sender.fax && (
-                <p>
-                  <span>FAX</span>
-                  {sender.fax}
-                </p>
-              )}
-            </div>
-          )}
-          {(sender.postal || sender.address) && (
-            <p className="fx-m-address">
-              {sender.postal && <span>〒{sender.postal}</span>}
-              {sender.address && <span>{sender.address}</span>}
-            </p>
-          )}
-        </section>
-      </div>
-
-      <div className="fx-m-meta">
-        <div>
-          <ModernLabel ja="送信日" en="DATE" />
-          <p className="fx-m-value">{data.dateText}</p>
-        </div>
-        <div>
-          <ModernLabel ja="送付枚数" en="PAGES" />
-          <p className="fx-m-value">
-            {data.pages}枚<small>（この送付状を含む）</small>
-          </p>
-        </div>
-      </div>
-
-      <div className="fx-m-main" ref={mainRef}>
-        {hasText(data.subject) && (
-          <>
-            <ModernLabel ja="件名" en="SUBJECT" />
-            <p className="fx-m-subject">
-              <FilledText parts={data.subject} preview={preview} />
-            </p>
-          </>
-        )}
-        <Body parts={data.body} preview={preview} />
-        <Details details={data.details} />
-        {data.body.length > 0 && <p className="fx-m-end">以上</p>}
-        {/* 手書きのメモにも使える欄。本文の下の余白を引き締める */}
-        <section className="fx-m-memo">
-          <ModernLabel ja="通信欄" en="MEMO" />
-          <div className="fx-m-memo-box" />
-        </section>
-      </div>
-
-      <footer className="fx-m-footer">
-        送付枚数に不足がある場合や、読み取りにくい箇所がある場合は、お手数ですが差出人までご連絡ください。
-      </footer>
     </div>
   );
 }
