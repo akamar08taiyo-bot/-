@@ -612,7 +612,7 @@ function KindPicker({
         return (
           <label
             key={k.id}
-            className={`flex cursor-pointer items-center gap-2 rounded-lg border-2 px-2.5 py-2 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 has-[:focus-visible]:ring-offset-1 ${
+            className={`flex cursor-pointer items-center gap-1.5 rounded-lg border-2 px-2 py-2 transition-colors sm:gap-2 sm:px-2.5 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 has-[:focus-visible]:ring-offset-1 ${
               checked ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
             }`}
           >
@@ -632,8 +632,8 @@ function KindPicker({
             >
               {checked && <Check className="h-3 w-3" strokeWidth={3.5} />}
             </span>
-            <span className="min-w-0 text-sm font-bold leading-snug text-slate-800 [word-break:auto-phrase]">
-              {k.label}
+            <span className="min-w-0 text-[13px] font-bold leading-snug text-slate-800 sm:text-sm">
+              <LabelText text={k.label} />
               {customTemplates[k.id] && (
                 <span className="ml-1 whitespace-nowrap text-[10px] font-medium text-amber-700">（保存した文面）</span>
               )}
@@ -643,6 +643,16 @@ function KindPicker({
       })}
     </div>
   );
+}
+
+/** 見出しを「・」「へ」の後ろでだけ折り返す（「見積依／頼」のような言葉の途中での改行を防ぐ） */
+function LabelText({text}: {text: string}) {
+  const phrases = text.match(/[^・へ]+[・へ]?/g) ?? [text];
+  return phrases.map((phrase, i) => (
+    <span key={i} className="inline-block">
+      {phrase}
+    </span>
+  ));
 }
 
 /** 印刷した宛先の一覧。押すと居宅名・ケアマネ名が入る。入力中の文字で絞り込む */

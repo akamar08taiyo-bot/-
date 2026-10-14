@@ -15,7 +15,15 @@ export interface DetailField {
   suffix?: string;
 }
 
-export type FaxKindId = 'shokai' | 'tanisu' | 'keikaku' | 'mitsumori' | 'mitsumoriIrai' | 'other';
+export type FaxKindId =
+  | 'shokai'
+  | 'tanisu'
+  | 'keikaku'
+  | 'keikakuOnly'
+  | 'monitoringOnly'
+  | 'mitsumori'
+  | 'mitsumoriIrai'
+  | 'other';
 
 /** 宛名欄の見出しの出し分け。ケアマネ宛ては「居宅名・ケアマネ名」、それ以外は「会社・施設名・ご担当者名」 */
 export type Audience = 'caremanager' | 'business';
@@ -63,13 +71,33 @@ export const FAX_KINDS: FaxKind[] = [
   },
   {
     id: 'keikaku',
-    label: '計画書・モニタリング報告書',
+    label: '計画書・モニタリング',
     subject: '計画書及び定期モニタリング報告書の送付',
     body: [GREETING, '〇〇様の計画書及び定期モニタリング報告書を送付いたします。', PLEASE_CHECK].join('\n'),
     fill: RIYOUSHA,
     lines: [],
     audience: 'caremanager',
     pages: 4,
+  },
+  {
+    id: 'keikakuOnly',
+    label: '計画書のみ',
+    subject: '計画書の送付',
+    body: [GREETING, '〇〇様の計画書を送付いたします。', PLEASE_CHECK].join('\n'),
+    fill: RIYOUSHA,
+    lines: [],
+    audience: 'caremanager',
+    pages: 3,
+  },
+  {
+    id: 'monitoringOnly',
+    label: 'モニタリングのみ',
+    subject: '定期モニタリング報告書の送付',
+    body: [GREETING, '〇〇様の定期モニタリング報告書を送付いたします。', PLEASE_CHECK].join('\n'),
+    fill: RIYOUSHA,
+    lines: [],
+    audience: 'caremanager',
+    pages: 2,
   },
   {
     id: 'mitsumori',
