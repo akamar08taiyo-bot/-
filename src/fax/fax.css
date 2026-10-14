@@ -13,6 +13,22 @@
   display: none;
 }
 
+/*
+ * 画面の印刷イメージの大きさ。横並びの画面では、ブラウザの高さに収まるよう高さから幅を決める
+ * （13インチのノートパソコンでも、上の見出し・切り替え・印刷ボタンと合わせてスクロールなしで見える）。
+ * 190px は見出しの帯・余白・デザイン切り替え・印刷ボタンの高さの合計。
+ */
+.fx-preview-size {
+  width: min(100%, 480px);
+  margin-inline: auto;
+}
+
+@media (min-width: 1024px) {
+  .fx-preview-size {
+    width: clamp(280px, calc((100vh - 190px) * 0.7071), 560px);
+  }
+}
+
 @media print {
   html,
   body {

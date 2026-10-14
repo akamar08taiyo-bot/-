@@ -47,10 +47,3 @@ export function rememberRecipient(list: SavedRecipient[], r: Recipient, now: num
   const entry: SavedRecipient = {...clean, id: existing?.id ?? newId(), lastUsed: now};
   return [entry, ...list.filter((x) => x !== existing)].slice(0, MAX_SAVED);
 }
-
-/** 宛先帳を、入力中の文字で絞り込む（読み仮名ではなく表記の部分一致） */
-export function filterRecipients(list: SavedRecipient[], query: string): SavedRecipient[] {
-  const q = normalize(query);
-  if (!q) return list;
-  return list.filter((r) => normalize(`${r.org}${r.person}`).includes(q));
-}

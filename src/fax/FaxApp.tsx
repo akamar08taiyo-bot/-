@@ -1,7 +1,7 @@
 import {useEffect, useId, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ReactNode, Ref} from 'react';
-import {AlertTriangle, Check, ChevronDown, Minus, Plus, Printer, RotateCcw, Save, Settings2, X} from 'lucide-react';
-import {describeRecipient, filterRecipients, rememberRecipient} from './recipient';
+import {AlertTriangle, Check, ChevronDown, Minus, Plus, Printer, RotateCcw, Save, Settings2, Trash2} from 'lucide-react';
+import {describeRecipient, rememberRecipient} from './recipient';
 import {FaxSheet} from './sheets';
 import type {SheetData} from './sheets';
 import {
@@ -18,6 +18,11 @@ import {FAX_KINDS, RIYOUSHA, effectiveTemplate, fillParts, findKind, hasFillMark
 import type {Audience, CustomTemplates, DetailField, DetailKey, FaxKindId, TextTemplate} from './templates';
 import {formatWareki, todayIso} from './wareki';
 
+/*
+ * 画面の大きさは、13インチのノートパソコン（フルHDを150%表示。ブラウザで使える広さは横1280×縦600前後）を基準にしている。
+ * この広さで、①種類・②宛名など・③文章・印刷イメージ・印刷ボタンがスクロールなしで見えるように詰めてある。
+ */
+
 type Details = Record<DetailKey, string>;
 
 const EMPTY_DETAILS: Details = {riyousha: '', product: '', quantity: '', documents: ''};
@@ -28,7 +33,7 @@ const DEFAULT_PAGES = 2;
 
 const LAYOUT_OPTIONS: {value: SheetLayout; label: string}[] = [
   {value: 'classic', label: '従来の送信票'},
-  {value: 'table', label: '表形式の送付状'},
+  {value: 'table', label: '表形式'},
 ];
 
 /** 宛名欄の見出し。ケアマネ宛ての書類は「居宅名・ケアマネ名」と出す */
@@ -77,6 +82,7 @@ export function FaxApp() {
   const orgInputRef = useRef<HTMLInputElement>(null);
   const fillInputRef = useRef<HTMLInputElement>(null);
   const kindSectionRef = useRef<HTMLElement>(null);
+  const savedListId = useId();
 
   const kind = kindId ? findKind(kindId) : null;
   const template = kind ? effectiveTemplate(kind, customTemplates) : null;
@@ -99,11 +105,17 @@ export function FaxApp() {
     setKindId(id);
     setDrafts((prev) => (prev[id] ? prev : {...prev, [id]: effectiveTemplate(next, customTemplates)}));
     if (!pagesTouched.current) setPages(next.pages);
-    // パソコンでマウスで選んだら、すぐ宛名を打てるようにする
-    // （スマホはキーボードが開いて邪魔、矢印キーで選び直している最中にフォーカスを奪うのも困るので、そのときはしない）
-    if (byPointer && !recipient.org && window.matchMedia('(pointer: fine)').matches) {
+    // マウスで選んだら、すぐ宛名を打てるようにする
+    // （矢印キーで選び直している最中にフォーカスを奪うと困るので、キーボードのときはしない）
+    if (byPointer && !recipient.org) {
       requestAnimationFrame(() => orgInputRef.current?.focus({preventScroll: true}));
     }
+  };
+
+  /** 居宅名の欄。保存した宛先の候補を選んだときは、ケアマネ名まで入れる */
+  const changeOrg = (value: string) => {
+    const picked = savedRecipients.find((r) => describeRecipient(r).line === value);
+    setRecipient(picked ? {org: picked.org, person: picked.person} : (prev) => ({...prev, org: value}));
   };
 
   const updateDraft = (patch: Partial<TextTemplate>) => {
@@ -217,19 +229,13 @@ export function FaxApp() {
     <>
       <div className="fx-screen min-h-screen bg-slate-50 text-slate-900">
         <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6">
-            <div>
-              <h1 className="text-lg font-bold tracking-tight sm:text-xl">FAX送付状 かんたん作成</h1>
-              <p className="text-xs text-slate-600 sm:text-sm">
-                送るFAXにチェックを入れると文章が自動で入ります。宛名を入れて印刷するだけ。
-              </p>
+          <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3 px-4 py-2">
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
+              <h1 className="text-lg font-bold tracking-tight">FAX送付状 かんたん作成</h1>
+              <p className="text-xs text-slate-500">送るFAXにチェックを入れ、宛名とご利用者名を入れて印刷するだけ</p>
             </div>
             {hasInput && (
-              <button
-                type="button"
-                onClick={handleReset}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
+              <button type="button" onClick={handleReset} className={`${secondaryButtonClass} shrink-0`}>
                 <RotateCcw className="h-4 w-4" aria-hidden />
                 新しいFAXを作る
               </button>
@@ -237,178 +243,179 @@ export function FaxApp() {
           </div>
         </header>
 
-        <main className="mx-auto grid max-w-7xl gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,460px)] lg:items-start xl:grid-cols-[minmax(0,1fr)_520px]">
-          <StepCard step={1} title="送るFAXを選ぶ" sectionRef={kindSectionRef}>
-            <KindPicker selected={kindId} onSelect={selectKind} customTemplates={customTemplates} />
-            {showErrors && !kind && <ErrorText>送るFAXを選んでください。</ErrorText>}
-          </StepCard>
+        <main className="mx-auto grid max-w-[1440px] gap-3 px-4 py-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+          <div className="min-w-0 space-y-3">
+            <StepCard step={1} title="送るFAXを選ぶ" sectionRef={kindSectionRef}>
+              <KindPicker selected={kindId} onSelect={selectKind} customTemplates={customTemplates} />
+              {showErrors && !kind && <ErrorText>送るFAXを選んでください。</ErrorText>}
+            </StepCard>
 
-          <StepCard step={2} title="宛名・ご利用者名・枚数">
-            {savedRecipients.length > 0 && (
-              <SavedRecipients
-                saved={savedRecipients}
-                query={recipient.org}
-                onPick={(r) => setRecipient({org: r.org, person: r.person})}
-                onForget={(id) => setSavedRecipients((list) => list.filter((r) => r.id !== id))}
-              />
-            )}
+            <StepCard step={2} title="宛名・ご利用者名・枚数">
+              <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
+                <div className="min-w-[13rem] flex-[1.6]">
+                  <Labeled label={labels.org} required>
+                    {(id) => (
+                      <input
+                        id={id}
+                        ref={orgInputRef}
+                        type="text"
+                        list={savedRecipients.length > 0 ? savedListId : undefined}
+                        value={recipient.org}
+                        onChange={(e) => changeOrg(e.target.value)}
+                        placeholder={
+                          savedRecipients.length > 0 ? '入力すると保存した宛先が候補に出ます' : labels.orgPlaceholder
+                        }
+                        autoComplete="off"
+                        aria-invalid={showErrors && recipientMissing}
+                        className={`w-full ${showErrors && recipientMissing ? fieldErrorClass : fieldClass}`}
+                      />
+                    )}
+                  </Labeled>
+                  <datalist id={savedListId}>
+                    {savedRecipients.map((r) => (
+                      <option key={r.id} value={describeRecipient(r).line} />
+                    ))}
+                  </datalist>
+                  {showErrors && recipientMissing && <ErrorText>{labels.org}を入力してください。</ErrorText>}
+                </div>
+                <div className="w-40">
+                  <Labeled label={labels.person}>
+                    {(id) => (
+                      <WithSuffix suffix="様">
+                        <input
+                          id={id}
+                          type="text"
+                          value={recipient.person}
+                          onChange={(e) => setRecipient((prev) => ({...prev, person: e.target.value}))}
+                          placeholder="例）佐藤"
+                          autoComplete="off"
+                          className={inputClass}
+                        />
+                      </WithSuffix>
+                    )}
+                  </Labeled>
+                </div>
+                {inputFields.map((f) => {
+                  const isFill = !!kind?.fill && f.key === kind.fill.key;
+                  const error = isFill && showErrors && fillMissing;
+                  return (
+                    <div key={f.key} className={f.key === 'quantity' ? 'w-24' : 'min-w-[11rem] flex-1'}>
+                      <Labeled label={f.label} required={isFill}>
+                        {(id) => (
+                          <WithSuffix suffix={f.suffix}>
+                            <input
+                              id={id}
+                              ref={isFill ? fillInputRef : undefined}
+                              type="text"
+                              value={details[f.key]}
+                              onChange={(e) => setDetails((prev) => ({...prev, [f.key]: e.target.value}))}
+                              placeholder={f.placeholder}
+                              autoComplete="off"
+                              aria-invalid={error}
+                              className={`w-full ${error ? fieldErrorClass : fieldClass}`}
+                            />
+                          </WithSuffix>
+                        )}
+                      </Labeled>
+                      {error && <ErrorText>{f.label}を入力してください。</ErrorText>}
+                    </div>
+                  );
+                })}
+                <Labeled label="枚数（本状含む）">
+                  {(id) => <PageCounter id={id} value={pages} onChange={changePages} />}
+                </Labeled>
+              </div>
+            </StepCard>
 
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,8.5rem)] gap-x-2 gap-y-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,11rem)]">
-              <Labeled label={labels.org} required>
-                {(id) => (
-                  <input
-                    id={id}
-                    ref={orgInputRef}
-                    type="text"
-                    value={recipient.org}
-                    onChange={(e) => setRecipient((prev) => ({...prev, org: e.target.value}))}
-                    placeholder={labels.orgPlaceholder}
-                    autoComplete="off"
-                    aria-invalid={showErrors && recipientMissing}
-                    className={`w-full ${showErrors && recipientMissing ? fieldErrorClass : fieldClass}`}
-                  />
-                )}
-              </Labeled>
-              <Labeled label={labels.person}>
-                {(id) => (
-                  <WithSuffix suffix="様">
-                    <input
-                      id={id}
-                      type="text"
-                      value={recipient.person}
-                      onChange={(e) => setRecipient((prev) => ({...prev, person: e.target.value}))}
-                      placeholder="例）佐藤"
-                      autoComplete="off"
-                      className={inputClass}
-                    />
-                  </WithSuffix>
-                )}
-              </Labeled>
-            </div>
-            {showErrors && recipientMissing && <ErrorText>{labels.org}を入力してください。</ErrorText>}
-
-            <div className="mt-3 flex flex-wrap items-start gap-x-3 gap-y-2">
-              {inputFields.map((f) => {
-                const isFill = !!kind?.fill && f.key === kind.fill.key;
-                const error = isFill && showErrors && fillMissing;
-                return (
-                  <div key={f.key} className={f.key === 'quantity' ? 'w-28' : 'min-w-[10rem] flex-1'}>
-                    <Labeled label={f.label} required={isFill}>
-                      {(id) => (
-                        <WithSuffix suffix={f.suffix}>
+            <StepCard step={3} title="文章（自動で入ります・編集可）">
+              {kind && draft && template ? (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
+                    <div className="min-w-[16rem] flex-1">
+                      <Labeled label="件名">
+                        {(id) => (
                           <input
                             id={id}
-                            ref={isFill ? fillInputRef : undefined}
                             type="text"
-                            value={details[f.key]}
-                            onChange={(e) => setDetails((prev) => ({...prev, [f.key]: e.target.value}))}
-                            placeholder={f.placeholder}
-                            autoComplete="off"
-                            aria-invalid={error}
-                            className={`w-full ${error ? fieldErrorClass : fieldClass}`}
+                            value={draft.subject}
+                            onChange={(e) => updateDraft({subject: e.target.value})}
+                            className={inputClass}
                           />
-                        </WithSuffix>
+                        )}
+                      </Labeled>
+                    </div>
+                    <Labeled label="送信日">
+                      {(id) => (
+                        <div className="flex items-center gap-2">
+                          <input
+                            id={id}
+                            type="date"
+                            value={date}
+                            onChange={(e) => setDate(e.target.value || todayIso())}
+                            className={fieldClass}
+                          />
+                          <span className="whitespace-nowrap text-xs text-slate-500">{formatWareki(date)}</span>
+                        </div>
                       )}
                     </Labeled>
-                    {error && <ErrorText>{f.label}を入力してください。</ErrorText>}
                   </div>
-                );
-              })}
-              <Labeled label="枚数（本状含む）">
-                {(id) => <PageCounter id={id} value={pages} onChange={changePages} />}
-              </Labeled>
-              <Labeled label="送信日">
-                {(id) => (
-                  <div className="flex items-center gap-2">
-                    <input
-                      id={id}
-                      type="date"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value || todayIso())}
-                      className={fieldClass}
-                    />
-                    <span className="whitespace-nowrap text-xs text-slate-500">{formatWareki(date)}</span>
-                  </div>
-                )}
-              </Labeled>
-            </div>
-          </StepCard>
-
-          <StepCard step={3} title="文章（自動で入ります・編集可）">
-            {kind && draft && template ? (
-              <div className="space-y-2">
-                <Labeled label="件名">
-                  {(id) => (
-                    <input
-                      id={id}
-                      type="text"
-                      value={draft.subject}
-                      onChange={(e) => updateDraft({subject: e.target.value})}
-                      className={inputClass}
-                    />
+                  <BodyEditor
+                    value={draft.body}
+                    onChange={(body) => updateDraft({body})}
+                    actions={
+                      <>
+                        <button
+                          type="button"
+                          disabled={!edited}
+                          onClick={() => updateDraft({subject: template.subject, body: template.body})}
+                          className={secondaryButtonClass}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+                          元の文面に戻す
+                        </button>
+                        <button type="button" disabled={!edited} onClick={saveTemplate} className={secondaryButtonClass}>
+                          <Save className="h-3.5 w-3.5" aria-hidden />
+                          この文面を次回も使う
+                        </button>
+                      </>
+                    }
+                  />
+                  {(kind.fill || usingCustom) && (
+                    <p className="text-xs text-slate-500">
+                      {kind.fill && `文章の「〇〇」の部分には、上で入力した${kind.fill.label}が自動で入ります。`}
+                      {usingCustom && (
+                        <>
+                          保存した文面を使用中（
+                          <button
+                            type="button"
+                            onClick={restoreBuiltinTemplate}
+                            className="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900"
+                          >
+                            最初の文面に戻す
+                          </button>
+                          ）
+                        </>
+                      )}
+                    </p>
                   )}
-                </Labeled>
-                <Labeled label="文章">
-                  {(id) => (
-                    <textarea
-                      id={id}
-                      value={draft.body}
-                      onChange={(e) => updateDraft({body: e.target.value})}
-                      rows={4}
-                      className={`${inputClass} field-sizing-content min-h-28 leading-relaxed`}
-                    />
-                  )}
-                </Labeled>
-                {kind.fill && (
-                  <p className="text-xs text-slate-500">
-                    文章の「〇〇」の部分には、上で入力した{kind.fill.label}が自動で入ります。
-                  </p>
-                )}
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    disabled={!edited}
-                    onClick={() => updateDraft({subject: template.subject, body: template.body})}
-                    className={secondaryButtonClass}
-                  >
-                    <RotateCcw className="h-4 w-4" aria-hidden />
-                    元の文面に戻す
-                  </button>
-                  <button type="button" disabled={!edited} onClick={saveTemplate} className={secondaryButtonClass}>
-                    <Save className="h-4 w-4" aria-hidden />
-                    この文面を次回も使う
-                  </button>
-                  {usingCustom && (
-                    <span className="text-xs text-slate-500">
-                      保存した文面を使用中（
-                      <button
-                        type="button"
-                        onClick={restoreBuiltinTemplate}
-                        className="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900"
-                      >
-                        最初の文面に戻す
-                      </button>
-                      ）
-                    </span>
+                  {notice && (
+                    <p role="status" className="rounded-lg bg-emerald-50 px-3 py-1.5 text-sm text-emerald-800">
+                      {notice}
+                    </p>
                   )}
                 </div>
-                {notice && (
-                  <p role="status" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                    {notice}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="rounded-xl border border-dashed border-slate-300 px-4 py-4 text-center text-sm text-slate-500">
-                ① で送るFAXを選ぶと、ここに件名と文章が入ります。
-              </p>
-            )}
-          </StepCard>
+              ) : (
+                <p className="rounded-xl border border-dashed border-slate-300 px-4 py-3 text-center text-sm text-slate-500">
+                  ① で送るFAXを選ぶと、ここに件名と文章が入ります。
+                </p>
+              )}
+            </StepCard>
+          </div>
 
-          <aside className="lg:sticky lg:top-4 lg:col-start-2 lg:row-span-5 lg:row-start-1" aria-label="印刷イメージ">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-base font-bold text-slate-800">印刷イメージ（A4）</h2>
+          <aside className="lg:sticky lg:top-3" aria-label="印刷イメージ">
+            <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 className="text-sm font-bold text-slate-800">印刷イメージ</h2>
                 <SegmentedControl<SheetLayout>
                   ariaLabel="印刷デザイン"
                   options={LAYOUT_OPTIONS}
@@ -416,42 +423,36 @@ export function FaxApp() {
                   onChange={(v) => setLayout(v)}
                 />
               </div>
-              {overflowing && (
-                <p className="mb-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-                  文章が長く、枠に収まりきっていません。文章を短くしてください。
-                </p>
-              )}
-              <ScaledPreview>
-                <FaxSheet data={sheetData} layout={layout} preview onOverflowChange={setOverflowing} />
-              </ScaledPreview>
-              {/* スマホでは直下の ④ に同じボタンがあるので、横並びの画面でだけ出す */}
-              <div className="mt-4 hidden lg:block">
-                <button type="button" onClick={handlePrint} className={`${primaryButtonClass} w-full`}>
+              <div className="fx-preview-size">
+                {overflowing && (
+                  <p className="mb-2 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                    文章が長く、枠に収まっていません。文章を短くしてください。
+                  </p>
+                )}
+                <ScaledPreview>
+                  <FaxSheet data={sheetData} layout={layout} preview onOverflowChange={setOverflowing} />
+                </ScaledPreview>
+                <button
+                  type="button"
+                  onClick={handlePrint}
+                  title="印刷画面でプリンター（PC-FAXならFAX用、PDFにするなら「PDFに保存」）を選びます。用紙はA4・縦、倍率は100%のままで。"
+                  className={`${primaryButtonClass} mt-3 w-full`}
+                >
                   <Printer className="h-5 w-5" aria-hidden />
                   印刷する
                 </button>
               </div>
             </div>
           </aside>
+        </main>
 
-          <StepCard step={4} title="印刷して送る">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <button type="button" onClick={handlePrint} className={`${primaryButtonClass} w-full sm:w-auto`}>
-                <Printer className="h-5 w-5" aria-hidden />
-                印刷する
-              </button>
-              <p className="min-w-0 flex-1 text-xs leading-relaxed text-slate-600">
-                印刷画面でプリンター（PC-FAXならFAX用、PDFにするなら「PDFに保存」）を選びます。用紙はA4・縦、倍率は100%のままで。
-              </p>
-            </div>
-          </StepCard>
-
-          <details className="group rounded-2xl border border-slate-200 bg-white shadow-sm lg:col-start-1">
-            <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 rounded-2xl px-4 py-3 [&::-webkit-details-marker]:hidden">
+        <div className="mx-auto max-w-[1440px] space-y-3 px-4 pb-8">
+          <details className="group rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 rounded-2xl px-4 py-2.5 [&::-webkit-details-marker]:hidden">
               <span className="flex items-center gap-2 text-sm font-bold text-slate-800">
-                <Settings2 className="h-5 w-5 text-slate-500" aria-hidden />
-                差出人（自社）の設定
+                <Settings2 className="h-4 w-4 text-slate-500" aria-hidden />
+                設定（差出人・保存した宛先）
               </span>
               <span className="flex items-center gap-2 text-xs text-slate-500">
                 {[sender.company, sender.office].filter(Boolean).join(' ')}
@@ -459,42 +460,48 @@ export function FaxApp() {
                 <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden />
               </span>
             </summary>
-            <div className="border-t border-slate-100 p-4">
-              <div className="grid gap-2 sm:grid-cols-2">
-                {SENDER_FIELDS.map((f) => (
-                  <Labeled key={f.key} label={f.label}>
-                    {(id) => (
-                      <input
-                        id={id}
-                        type="text"
-                        value={sender[f.key]}
-                        onChange={(e) => setSender((prev) => ({...prev, [f.key]: e.target.value}))}
-                        className={inputClass}
-                      />
-                    )}
-                  </Labeled>
-                ))}
-              </div>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs text-slate-500">変更はこのパソコン（ブラウザ）に自動で保存されます。</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (window.confirm('差出人の設定を最初の内容に戻しますか？')) setSender(DEFAULT_SENDER);
-                  }}
-                  className={secondaryButtonClass}
-                >
-                  <RotateCcw className="h-4 w-4" aria-hidden />
-                  最初の内容に戻す
-                </button>
-              </div>
+            <div className="grid gap-4 border-t border-slate-100 p-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+              <section>
+                <h3 className="mb-2 text-xs font-bold text-slate-700">差出人（自社）</h3>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {SENDER_FIELDS.map((f) => (
+                    <Labeled key={f.key} label={f.label}>
+                      {(id) => (
+                        <input
+                          id={id}
+                          type="text"
+                          value={sender[f.key]}
+                          onChange={(e) => setSender((prev) => ({...prev, [f.key]: e.target.value}))}
+                          className={inputClass}
+                        />
+                      )}
+                    </Labeled>
+                  ))}
+                </div>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-slate-500">変更はこのパソコン（ブラウザ）に自動で保存されます。</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('差出人の設定を最初の内容に戻しますか？')) setSender(DEFAULT_SENDER);
+                    }}
+                    className={secondaryButtonClass}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+                    最初の内容に戻す
+                  </button>
+                </div>
+              </section>
+              <SavedRecipientList
+                saved={savedRecipients}
+                onForget={(id) => setSavedRecipients((list) => list.filter((r) => r.id !== id))}
+              />
             </div>
           </details>
-        </main>
-
-        <footer className="mx-auto max-w-7xl px-4 pb-8 text-xs leading-relaxed text-slate-500 sm:px-6">
-          入力した内容はこのパソコン（ブラウザ）の中だけで使い、外部には送信しません。ご利用者名などの記入内容は保存されず、画面を閉じると消えます。
-        </footer>
+          <p className="text-xs leading-relaxed text-slate-500">
+            入力した内容はこのパソコン（ブラウザ）の中だけで使い、外部には送信しません。ご利用者名などの記入内容は保存されず、画面を閉じると消えます。
+          </p>
+        </div>
       </div>
 
       {/* 印刷するのはこの1枚だけ（画面の部品は印刷時に隠す） */}
@@ -508,18 +515,18 @@ export function FaxApp() {
 // ---- 部品 ----
 
 // 幅や枠線の色は呼び出し側で足す（同じ種類のクラスを重ねると、どちらが効くかが不定になるため）
-// 文字はスマホで16px（それより小さいとiPhoneが入力時に画面を拡大する）、パソコンでは14pxにして詰める
-const fieldBase =
-  'rounded-lg border bg-white px-2.5 py-1.5 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 sm:text-sm';
+const fieldCore =
+  'rounded-md border bg-white px-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2';
+const fieldBase = `h-8 ${fieldCore}`;
 const fieldClass = `${fieldBase} border-slate-300 focus:border-blue-500 focus:ring-blue-500/30`;
 const fieldErrorClass = `${fieldBase} border-red-500 ring-2 ring-red-500/20 focus:ring-red-500/30`;
 const inputClass = `w-full ${fieldClass}`;
 
 const primaryButtonClass =
-  'inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-base font-bold text-white shadow-sm hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2';
+  'inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-2 text-base font-bold text-white shadow-sm hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2';
 
 const secondaryButtonClass =
-  'inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white';
+  'inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white';
 
 function StepCard({
   step,
@@ -533,13 +540,10 @@ function StepCard({
   sectionRef?: Ref<HTMLElement>;
 }) {
   return (
-    <section
-      ref={sectionRef}
-      className="scroll-mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:col-start-1"
-    >
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800">
+    <section ref={sectionRef} className="scroll-mt-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+      <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-800">
         <span
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white"
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[11px] font-bold text-white"
           aria-hidden
         >
           {step}
@@ -584,6 +588,28 @@ function WithSuffix({suffix, children}: {suffix?: string; children: ReactNode}) 
   );
 }
 
+/** 文章の入力欄。見出しの横に「元の文面に戻す」などのボタンを並べて、縦の場所を取らないようにする */
+function BodyEditor({value, onChange, actions}: {value: string; onChange: (v: string) => void; actions: ReactNode}) {
+  const id = useId();
+  return (
+    <div>
+      <div className="mb-0.5 flex flex-wrap items-end justify-between gap-2">
+        <label htmlFor={id} className="text-xs font-medium text-slate-600">
+          文章
+        </label>
+        <div className="flex flex-wrap gap-1.5">{actions}</div>
+      </div>
+      <textarea
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={3}
+        className={`${fieldCore} block min-h-20 w-full border-slate-300 py-1.5 leading-relaxed field-sizing-content focus:border-blue-500 focus:ring-blue-500/30`}
+      />
+    </div>
+  );
+}
+
 function KindPicker({
   selected,
   onSelect,
@@ -593,7 +619,7 @@ function KindPicker({
   onSelect: (id: FaxKindId, byPointer: boolean) => void;
   customTemplates: CustomTemplates;
 }) {
-  // マウス・タッチで選んだのか、キーボードで選んだのかを覚えておく
+  // マウスで選んだのか、キーボードで選んだのかを覚えておく
   const byPointer = useRef(false);
   return (
     <div
@@ -605,14 +631,14 @@ function KindPicker({
       onKeyDown={() => {
         byPointer.current = false;
       }}
-      className="grid grid-cols-2 gap-1.5 sm:grid-cols-3"
+      className="grid grid-cols-2 gap-1.5 md:grid-cols-4"
     >
       {FAX_KINDS.map((k) => {
         const checked = selected === k.id;
         return (
           <label
             key={k.id}
-            className={`flex cursor-pointer items-center gap-1.5 rounded-lg border-2 px-2 py-2 transition-colors sm:gap-2 sm:px-2.5 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 has-[:focus-visible]:ring-offset-1 ${
+            className={`flex cursor-pointer items-center gap-2 rounded-lg border-2 px-2.5 py-1.5 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 has-[:focus-visible]:ring-offset-1 ${
               checked ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
             }`}
           >
@@ -632,7 +658,7 @@ function KindPicker({
             >
               {checked && <Check className="h-3 w-3" strokeWidth={3.5} />}
             </span>
-            <span className="min-w-0 text-[13px] font-bold leading-snug text-slate-800 sm:text-sm">
+            <span className="min-w-0 text-sm font-bold leading-snug text-slate-800">
               <LabelText text={k.label} />
               {customTemplates[k.id] && (
                 <span className="ml-1 whitespace-nowrap text-[10px] font-medium text-amber-700">（保存した文面）</span>
@@ -655,51 +681,38 @@ function LabelText({text}: {text: string}) {
   ));
 }
 
-/** 印刷した宛先の一覧。押すと居宅名・ケアマネ名が入る。入力中の文字で絞り込む */
-function SavedRecipients({
-  saved,
-  query,
-  onPick,
-  onForget,
-}: {
-  saved: SavedRecipient[];
-  query: string;
-  onPick: (r: SavedRecipient) => void;
-  onForget: (id: string) => void;
-}) {
-  const matches = filterRecipients(saved, query);
+/** 設定の中の、保存した宛先の一覧（消すときだけ使う。選ぶのは居宅名の候補から） */
+function SavedRecipientList({saved, onForget}: {saved: SavedRecipient[]; onForget: (id: string) => void}) {
   return (
-    <div className="mb-3">
-      <p className="mb-1 text-xs text-slate-500">保存した宛先（押すと入ります）</p>
-      {matches.length > 0 ? (
-        <ul className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
-          {matches.map((r) => {
+    <section>
+      <h3 className="mb-2 text-xs font-bold text-slate-700">保存した宛先（{saved.length}件）</h3>
+      {saved.length > 0 ? (
+        <ul className="max-h-60 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
+          {saved.map((r) => {
             const line = describeRecipient(r).line;
             return (
-              <li
-                key={r.id}
-                className="flex items-center rounded-full border border-slate-300 bg-white text-xs text-slate-700 hover:border-blue-400"
-              >
-                <button type="button" onClick={() => onPick(r)} className="rounded-l-full py-1 pl-2.5 pr-1 hover:text-blue-700">
-                  {line}
-                </button>
+              <li key={r.id} className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm text-slate-700">
+                <span className="min-w-0 truncate">{line}</span>
                 <button
                   type="button"
                   onClick={() => onForget(r.id)}
                   aria-label={`${line} を宛先帳から消す`}
                   title="宛先帳から消す"
-                  className="rounded-r-full py-1 pl-0.5 pr-2 text-slate-400 hover:text-red-600"
+                  className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
                 >
-                  <X className="h-3 w-3" aria-hidden />
+                  <Trash2 className="h-4 w-4" aria-hidden />
                 </button>
               </li>
             );
           })}
         </ul>
       ) : (
-        <p className="text-xs text-slate-400">一致する保存済みの宛先はありません（印刷すると保存されます）。</p>
+        <p className="text-xs text-slate-500">まだありません。印刷した宛先（居宅名・ケアマネ名）が自動で保存されます。</p>
       )}
-    </div>
+      <p className="mt-2 text-xs text-slate-500">
+        居宅名の欄に文字を入れると、保存した宛先が候補に出ます。選ぶとケアマネ名まで入ります。
+      </p>
+    </section>
   );
 }
 
@@ -711,7 +724,7 @@ function PageCounter({id, value, onChange}: {id: string; value: number; onChange
     onChange(Math.min(99, Math.max(1, n)));
   };
   const stepButtonClass =
-    'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40';
+    'flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40';
   return (
     <div className="flex items-center gap-1">
       <button type="button" onClick={() => set(value - 1)} disabled={value <= 1} aria-label="1枚減らす" className={stepButtonClass}>
@@ -729,7 +742,7 @@ function PageCounter({id, value, onChange}: {id: string; value: number; onChange
           if (digits && n >= 1 && n <= 99) onChange(n);
         }}
         onBlur={() => setText(null)}
-        className={`${fieldClass} w-12 text-center tabular-nums`}
+        className={`${fieldClass} w-11 text-center tabular-nums`}
       />
       <button type="button" onClick={() => set(value + 1)} disabled={value >= 99} aria-label="1枚増やす" className={stepButtonClass}>
         <Plus className="h-4 w-4" aria-hidden />
@@ -751,7 +764,7 @@ function SegmentedControl<T extends string>({
   ariaLabel: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={ariaLabel} className="inline-flex rounded-lg bg-slate-100 p-0.5">
+    <div role="radiogroup" aria-label={ariaLabel} className="inline-flex shrink-0 rounded-md bg-slate-100 p-0.5">
       {options.map((o) => (
         <button
           key={o.value}
@@ -759,7 +772,7 @@ function SegmentedControl<T extends string>({
           role="radio"
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
-          className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+          className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
             value === o.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
@@ -789,18 +802,16 @@ function ScaledPreview({children}: {children: ReactNode}) {
   }, []);
 
   return (
-    <div className="mx-auto lg:max-w-[calc((100vh-12rem)*0.7071)]">
+    <div
+      ref={frameRef}
+      className="relative w-full overflow-hidden rounded bg-white shadow-[0_0_0_1px_rgba(15,23,42,0.12),0_2px_8px_rgba(15,23,42,0.08)]"
+      style={{aspectRatio: '210 / 297'}}
+    >
       <div
-        ref={frameRef}
-        className="relative w-full overflow-hidden rounded bg-white shadow-[0_0_0_1px_rgba(15,23,42,0.12),0_2px_8px_rgba(15,23,42,0.08)]"
-        style={{aspectRatio: '210 / 297'}}
+        className="absolute left-0 top-0 origin-top-left"
+        style={{width: SHEET_WIDTH_PX, height: SHEET_HEIGHT_PX, transform: `scale(${scale})`}}
       >
-        <div
-          className="absolute left-0 top-0 origin-top-left"
-          style={{width: SHEET_WIDTH_PX, height: SHEET_HEIGHT_PX, transform: `scale(${scale})`}}
-        >
-          {children}
-        </div>
+        {children}
       </div>
     </div>
   );
