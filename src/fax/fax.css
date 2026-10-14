@@ -47,15 +47,26 @@
 /* ---- 共通 ---- */
 
 .fx-sheet {
+  /*
+   * 元のWord文書と同じ書体を使う。会社のパソコン（Word入り）にはどれも入っている。
+   * 入っていないパソコンでは、形の近い書体（同梱の Kosugi Maru・BIZ UD明朝）で代わりに表示する。
+   */
+  --fx-maru: 'HG丸ｺﾞｼｯｸM-PRO', 'HGMaruGothicMPRO', 'Kosugi Maru';
+  --fx-mincho: 'ＭＳ 明朝', 'MS Mincho', 'BIZ UDMincho';
+  /* Wordで日本語の書体だけを指定した部分の英数字は Century になる */
+  --fx-century: 'Century';
+  --fx-yu: 'Yu Gothic', 'YuGothic', '游ゴシック', '游ゴシック体', 'BIZ UDPGothic', 'Meiryo';
+
+  position: relative;
   width: 210mm;
   height: 297mm;
   box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
   overflow: hidden;
   background: #fff;
   color: #000;
   line-height: 1.5;
+  /* Wordと同じく、日本語と英数字の間を少しあける */
+  text-autospace: normal;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
   break-after: avoid;
@@ -70,16 +81,28 @@
   color: #a8a8a8;
 }
 
+/* Wordの「下線」と同じく、文字の下に細い線を引く（ｇやｙの下でも途切れさせない） */
+.fx-u {
+  text-decoration: underline;
+  text-decoration-thickness: 0.2mm;
+  text-underline-offset: 0.7mm;
+  text-decoration-skip-ink: none;
+}
+
+.fx-maru {
+  font-family: var(--fx-maru), sans-serif;
+}
+
 .fx-body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
 .fx-details {
-  margin-top: 1.1em;
+  margin-top: 1em;
   display: flex;
   flex-direction: column;
-  gap: 0.35em;
+  gap: 0.2em;
 }
 
 .fx-detail {
@@ -99,144 +122,179 @@
   overflow-wrap: anywhere;
 }
 
-/* ---- 従来の「FAX送信票」 ---- */
+/*
+ * ---- 従来の「FAX送信票」 ----
+ * 位置（上・左右からのmm）と書体・文字の大きさは、元のWord文書から測った値に合わせている。
+ * 明朝の部分（日付・「平素は…」・枠の中の文章）が既定で、丸ゴシックの部分はそれぞれ指定する。
+ */
 
 .fx-classic {
-  padding: 10mm 20mm;
-  font-family:
-    'HG丸ｺﾞｼｯｸM-PRO', 'HGMaruGothicMPRO', 'Hiragino Maru Gothic ProN', 'ヒラギノ丸ゴ ProN', 'BIZ UDPGothic',
-    'Meiryo', sans-serif;
+  font-family: var(--fx-century), var(--fx-mincho), serif;
   font-size: 10.5pt;
+}
+
+.fx-classic > * {
+  position: absolute;
+  margin: 0;
+  white-space: nowrap;
 }
 
 .fx-c-stripe {
-  display: block;
-  flex-shrink: 0;
-  width: 170mm;
-  height: 8mm;
+  height: 7mm;
   fill: #000;
 }
 
-.fx-c-stripe-bottom {
-  margin-top: 4mm;
+.fx-c-stripe-top {
+  top: 11.9mm;
+  left: 20mm;
+  width: 170mm;
 }
 
+.fx-c-stripe-bottom {
+  top: 268.8mm;
+  left: 14.5mm;
+  width: 176mm;
+}
+
+/* ワードアートのタイトル。枠（96.3×23.8mm）いっぱいに縦長に伸ばし、黒い縁取りを付ける */
 .fx-c-title {
-  margin: 2mm 0 0;
-  font-size: 20mm;
-  font-weight: 400;
-  line-height: 1.2;
-  letter-spacing: 0.03em;
+  top: 24.5mm;
+  left: 20mm;
+  width: 170mm;
+  font-family: var(--fx-maru), sans-serif;
+  font-size: 21.4mm;
+  font-weight: normal;
+  line-height: 1;
   text-align: center;
-  -webkit-text-stroke: 0.25mm #000;
+  transform: scaleY(1.21);
+  transform-origin: top center;
+  -webkit-text-stroke: 0.26mm #000;
 }
 
 .fx-c-date {
-  margin-top: 2mm;
-  padding-right: 10mm;
-  font-size: 12pt;
-  letter-spacing: 0.12em;
-  text-align: right;
+  top: 56.8mm;
+  right: 34.4mm;
+  font-size: 10pt;
+}
+
+/* 元のWordは文字グリッドで1文字ずつ間があいている */
+.fx-c-date span + span {
+  margin-left: 2.4mm;
 }
 
 .fx-c-to {
-  margin-top: 3mm;
+  top: 64.8mm;
+  left: 20mm;
+  max-width: 125mm;
+  white-space: normal;
+  font-family: var(--fx-century), var(--fx-maru), sans-serif;
   font-size: 16pt;
-  line-height: 1.6;
-}
-
-.fx-c-to-line {
-  padding: 0 1mm 0.4mm 0;
-  border-bottom: 0.3mm solid #000;
+  line-height: 1.45;
 }
 
 .fx-c-pages {
-  margin-top: 4mm;
-  padding-right: 10mm;
-  font-size: 11pt;
-  text-align: right;
+  top: 82.3mm;
+  right: 34.4mm;
+  font-family: var(--fx-century), var(--fx-maru), sans-serif;
 }
 
-.fx-c-pages span {
-  padding-bottom: 0.3mm;
-  border-bottom: 0.3mm solid #000;
+.fx-c-salutation {
+  top: 88.5mm;
+  left: 20mm;
+  font-family: var(--fx-century), var(--fx-maru), sans-serif;
 }
 
-.fx-c-greeting {
-  margin-top: 3mm;
-  font-size: 10.5pt;
-  line-height: 1.8;
+.fx-c-closing1 {
+  top: 101.2mm;
+  right: 20mm;
+  font-family: var(--fx-century), var(--fx-maru), sans-serif;
 }
 
+.fx-c-courtesy {
+  top: 113.7mm;
+  left: 20mm;
+}
+
+.fx-c-closing2 {
+  top: 120.1mm;
+  right: 38.1mm;
+}
+
+/* 文章の枠（170×81.8mm）。中の文章はＭＳ 明朝 12pt */
 .fx-c-box {
-  flex: 1 1 0;
-  min-height: 0;
+  top: 127.5mm;
+  left: 18mm;
+  width: 170.3mm;
+  height: 81.8mm;
+  box-sizing: border-box;
+  padding: 7mm 6mm 4mm 7mm;
+  border: 0.26mm solid #000;
   overflow: hidden;
-  margin-top: 3mm;
-  padding: 6mm 7mm;
-  border: 0.4mm solid #000;
+  white-space: normal;
+  font-family: var(--fx-mincho), serif;
   font-size: 12pt;
-  line-height: 1.8;
+  line-height: 1.33;
 }
 
-.fx-c-subject {
-  margin-bottom: 3mm;
-  padding-bottom: 1.5mm;
-  border-bottom: 0.25mm solid #000;
-  font-weight: 700;
-}
-
-.fx-c-closing {
-  margin-top: 2mm;
-  font-size: 11pt;
-  text-align: right;
-}
-
-.fx-c-sender {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  column-gap: 8mm;
-  align-items: end;
-  margin-top: 2mm;
-  font-size: 11pt;
-  line-height: 1.6;
-}
-
+/* ワードアートの社名。縁取り付きの丸ゴシックで、2行を枠（幅103.7mm）の中央にそろえる */
 .fx-c-company {
-  grid-column: 1 / -1;
-  font-size: 20pt;
-  font-weight: 700;
-  line-height: 1.3;
+  top: 218.5mm;
+  left: 20mm;
+  width: 103.7mm;
+  font-family: var(--fx-maru), sans-serif;
+  font-size: 26.5pt;
+  line-height: 0.95;
+  text-align: center;
+  -webkit-text-stroke: 0.26mm #000;
 }
 
-.fx-c-office {
-  padding-left: 2.6em;
-  font-size: 20pt;
-  font-weight: 700;
-  line-height: 1.3;
+/* 社名の半角カナの濁点（KanaText を参照） */
+.fx-kana-mark {
+  display: inline-block;
 }
 
-.fx-c-person span {
-  padding-bottom: 0.3mm;
-  border-bottom: 0.3mm solid #000;
+.fx-c-person {
+  top: 234.9mm;
+  left: 92mm;
 }
 
+.fx-c-postal,
 .fx-c-tel,
+.fx-c-address,
+.fx-c-fax {
+  font-family: var(--fx-maru), sans-serif;
+}
+
+.fx-c-postal {
+  top: 247.2mm;
+  left: 105mm;
+}
+
+.fx-c-tel {
+  top: 253.4mm;
+  left: 20mm;
+}
+
 .fx-c-address {
-  margin-top: 3mm;
+  top: 253.4mm;
+  left: 95mm;
 }
 
-.fx-c-address-line {
-  border-bottom: 0.3mm solid #000;
+.fx-c-fax {
+  top: 259.9mm;
+  left: 20mm;
 }
 
-/* ---- 表形式の「FAX 送付状」 ---- */
+/*
+ * ---- 表形式の「FAX 送付状」 ----
+ * テンプレート（5種）のWord文書と同じ游ゴシック・文字の大きさ・余白。
+ */
 
 .fx-table {
-  padding: 16mm 20mm 12mm;
-  font-family:
-    'BIZ UDPGothic', 'BIZ UDPゴシック', 'Yu Gothic', 'YuGothic', '游ゴシック', 'Hiragino Sans', 'Meiryo',
-    'Noto Sans JP', sans-serif;
+  display: flex;
+  flex-direction: column;
+  padding: 16.5mm 20.5mm 9.5mm;
+  font-family: var(--fx-yu), sans-serif;
   font-size: 11pt;
 }
 
@@ -246,10 +304,9 @@
 
 .fx-t-title {
   margin: 0;
-  font-size: 24pt;
+  font-size: 25pt;
   font-weight: 700;
   line-height: 1.3;
-  letter-spacing: 0.08em;
 }
 
 .fx-t-subtitle {
@@ -258,41 +315,42 @@
 }
 
 .fx-t-info {
-  width: 100%;
+  /* Wordの表と同じく、左の余白に少しはみ出させる */
+  width: calc(100% - 1.1mm);
   margin-top: 8mm;
+  margin-left: -1.8mm;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: 10.5pt;
+  font-size: 9.5pt;
 }
 
 .fx-t-info td {
-  padding: 2.4mm 1.5mm;
-  border-top: 0.25mm solid #000;
-  border-bottom: 0.25mm solid #000;
+  padding: 2mm 1.5mm;
+  border-bottom: 0.15mm solid #000;
   vertical-align: top;
   overflow-wrap: anywhere;
 }
 
 .fx-t-info td:first-child {
-  width: 58%;
+  width: 60%;
 }
 
 .fx-t-key {
-  font-weight: 700;
+  font-weight: normal;
 }
 
 .fx-t-main {
   flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
-  margin-top: 9mm;
-  font-size: 11.5pt;
-  line-height: 1.9;
+  margin-top: 8mm;
+  font-size: 11pt;
+  line-height: 2.35;
 }
 
 .fx-t-subject {
-  margin-bottom: 3mm;
-  font-size: 13pt;
+  margin-bottom: 0;
+  font-size: 12pt;
   font-weight: 700;
 }
 
@@ -302,22 +360,22 @@
 
 .fx-t-main .fx-details {
   margin-top: 6mm;
+  font-size: 10.5pt;
 }
 
 .fx-t-end {
   margin-top: 6mm;
+  font-size: 10.5pt;
   text-align: right;
 }
 
 .fx-t-footer {
-  padding-top: 3mm;
-  border-top: 0.25mm solid #000;
-  font-size: 9.5pt;
+  font-size: 8pt;
   line-height: 1.6;
   text-align: center;
 }
 
 .fx-t-footer-name {
-  font-size: 11.5pt;
+  font-size: 10pt;
   font-weight: 700;
 }

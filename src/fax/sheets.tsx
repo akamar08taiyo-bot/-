@@ -98,6 +98,48 @@ function Details({details}: {details: SheetData['details']}) {
 }
 
 // ---- 従来の「FAX送信票」：これまで使っていたWordの様式を再現したもの ----
+// 元のWordは文字や枠を位置指定で置いているので、各部品の位置（mm）も元の送信票に合わせて固定している。
+// 書体も元と同じ使い分け：見出し・宛名・社名・住所はHG丸ゴシックM-PRO、日付・「平素は…」・枠の中の文章はＭＳ 明朝。
+
+const KATAKANA_FULL = 'ァアィイゥウェエォオカキクケコサシスセソタチッツテトナニヌネノハヒフヘホマミムメモャヤュユョヨラリルレロワヲンー';
+const KATAKANA_HALF = 'ｧｱｨｲｩｳｪｴｫｵｶｷｸｹｺｻｼｽｾｿﾀﾁｯﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓｬﾔｭﾕｮﾖﾗﾘﾙﾚﾛﾜｦﾝｰ';
+
+/** 社名のカタカナを半角にする（元の送信票の社名は「太陽ｼﾙﾊﾞｰｻｰﾋﾞｽ株式会社」と半角カナで組んである） */
+function toHalfWidthKatakana(text: string): string {
+  return text.replace(/[\u30A1-\u30F4\u30FC]+/g, (run) =>
+    Array.from(run.normalize('NFD'))
+      .map((ch) => {
+        if (ch === '\u3099') return 'ﾞ';
+        if (ch === '\u309A') return 'ﾟ';
+        const i = KATAKANA_FULL.indexOf(ch);
+        return i >= 0 ? KATAKANA_HALF[i] : ch;
+      })
+      .join(''),
+  );
+}
+
+/**
+ * 半角カナの濁点・半濁点（ﾞﾟ）を前の文字と分けて描く。ブラウザは「ﾊﾞ」を1文字として扱うが、
+ * 同梱の代わりの書体は文字の範囲ごとにファイルが分かれていて「ﾊ」と「ﾞ」が別のファイルにあるため、
+ * まとめて描くと別の書体に切り替わってしまう。濁点だけを小さな箱に入れて別々に描かせる
+ */
+function KanaText({text}: {text: string}) {
+  return text.split(/([ﾞﾟ])/).map((part, i) =>
+    part === 'ﾞ' || part === 'ﾟ' ? (
+      <span key={i} className="fx-kana-mark">
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  );
+}
+
+/** 日付は元の送信票と同じく「令 和 8 年 10 月 14 日」と1文字（数字はひとまとまり）ずつ間をあける */
+const dateTokens = (text: string) => text.match(/\d+|./gu) ?? [];
+
+/** 枚数は1桁なら全角（元の送信票と同じ「４枚」）、2桁以上は半角 */
+const pagesText = (n: number) => (n < 10 ? String.fromCharCode(0xff10 + n) : String(n));
 
 function ClassicSheet({data, preview, onOverflowChange}: SheetProps) {
   const boxRef = useOverflowReport(onOverflowChange);
@@ -106,44 +148,54 @@ function ClassicSheet({data, preview, onOverflowChange}: SheetProps) {
     <div className="fx-sheet fx-classic">
       <StripeTop />
       <h1 className="fx-c-title">FAX送信票</h1>
-      <p className="fx-c-date">{data.dateText}</p>
-      <div className="fx-c-to">
-        {data.to.line ? (
-          <span className="fx-c-to-line">{data.to.line}</span>
-        ) : (
-          preview && <span className="fx-c-to-line fx-ghost">〇〇〇〇　様</span>
-        )}
-      </div>
-      <p className="fx-c-pages">
-        <span>本状を含み　{data.pages}枚</span>
+      <p className="fx-c-date">
+        {dateTokens(data.dateText).map((token, i) => (
+          <span key={i}>{token}</span>
+        ))}
       </p>
-      <div className="fx-c-greeting">
-        <p>拝啓　時下ますますご清祥の段、お喜び申し上げます。</p>
-        <p>平素は格別のご高配を賜り、厚くお礼申し上げます。</p>
-      </div>
-      <div className="fx-c-box" ref={boxRef}>
-        {hasText(data.subject) && (
-          <p className="fx-c-subject">
-            件名　<FilledText parts={data.subject} preview={preview} />
-          </p>
+      <p className="fx-c-to">
+        {data.to.line ? (
+          <span className="fx-u">{data.to.line}</span>
+        ) : (
+          preview && <span className="fx-u fx-ghost">〇〇〇〇　様</span>
         )}
+      </p>
+      <p className="fx-c-pages">
+        <span className="fx-u">本状を含み　{pagesText(data.pages)}枚</span>
+      </p>
+      <p className="fx-c-salutation">
+        <span className="fx-u">拝啓　時下ますますご清祥の段、お喜び申し上げます。</span>
+      </p>
+      <p className="fx-c-closing1">
+        <span className="fx-u">敬具</span>
+      </p>
+      <p className="fx-c-courtesy">平素は格別のご高配を賜り、厚くお礼申し上げます</p>
+      <p className="fx-c-closing2">敬具</p>
+      <div className="fx-c-box" ref={boxRef}>
         <Body parts={data.body} preview={preview} />
         <Details details={data.details} />
       </div>
-      <p className="fx-c-closing">敬具</p>
-      <div className="fx-c-sender">
-        <p className="fx-c-company">{sender.company}</p>
-        <p className="fx-c-office">{sender.office}</p>
-        <p className="fx-c-person">{sender.person && <span>担当：{sender.person}</span>}</p>
-        <div className="fx-c-tel">
-          {sender.tel && <p>TEL：{sender.tel}</p>}
-          {sender.fax && <p>FAX：{sender.fax}</p>}
-        </div>
-        <div className="fx-c-address">
-          {sender.postal && <p>〒{sender.postal}</p>}
-          {sender.address && <p className="fx-c-address-line">{sender.address}</p>}
-        </div>
+      <div className="fx-c-company">
+        <p>
+          <KanaText text={toHalfWidthKatakana(sender.company)} />
+        </p>
+        {sender.office && <p>{sender.office}</p>}
       </div>
+      {sender.person && (
+        <p className="fx-c-person">
+          <span className="fx-u">
+            <span className="fx-maru">担当</span>：　{sender.person}
+          </span>
+        </p>
+      )}
+      {sender.postal && <p className="fx-c-postal">〒{sender.postal}</p>}
+      {sender.tel && <p className="fx-c-tel">TEL ：{sender.tel}</p>}
+      {sender.address && (
+        <p className="fx-c-address">
+          <span className="fx-u">　{sender.address}</span>
+        </p>
+      )}
+      {sender.fax && <p className="fx-c-fax">FAX ：{sender.fax}</p>}
       <StripeBottom />
     </div>
   );
@@ -161,7 +213,7 @@ function starPoints(cx: number, cy: number, outer: number, inner: number): strin
 // 上下の黒い帯。背景色ではなくSVGで描くので、ブラウザの「背景のグラフィック」設定に関係なく印刷される
 function StripeTop() {
   return (
-    <svg className="fx-c-stripe" viewBox="0 0 170 8" aria-hidden="true">
+    <svg className="fx-c-stripe fx-c-stripe-top" viewBox="0 0 170 8" preserveAspectRatio="none" aria-hidden="true">
       <polygon points="0,0.5 123,0.5 119,7.5 0,7.5" />
       <polygon points="127,0.5 141,0.5 137,7.5 123,7.5" />
       <polygon points="145,0.5 159,0.5 155,7.5 141,7.5" />
@@ -172,11 +224,11 @@ function StripeTop() {
 
 function StripeBottom() {
   return (
-    <svg className="fx-c-stripe fx-c-stripe-bottom" viewBox="0 0 170 8" aria-hidden="true">
+    <svg className="fx-c-stripe fx-c-stripe-bottom" viewBox="0 0 176 8" preserveAspectRatio="none" aria-hidden="true">
       <polygon points="4,0.5 18,0.5 14,7.5 0,7.5" />
       <polygon points="22,0.5 36,0.5 32,7.5 18,7.5" />
       <polygon points="40,0.5 54,0.5 50,7.5 36,7.5" />
-      <polygon points="58,0.5 170,0.5 170,7.5 54,7.5" />
+      <polygon points="58,0.5 176,0.5 176,7.5 54,7.5" />
     </svg>
   );
 }

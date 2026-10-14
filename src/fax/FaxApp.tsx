@@ -331,19 +331,22 @@ export function FaxApp() {
               {kind && draft && template ? (
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
-                    <div className="min-w-[16rem] flex-1">
-                      <Labeled label="件名">
-                        {(id) => (
-                          <input
-                            id={id}
-                            type="text"
-                            value={draft.subject}
-                            onChange={(e) => updateDraft({subject: e.target.value})}
-                            className={inputClass}
-                          />
-                        )}
-                      </Labeled>
-                    </div>
+                    {/* 従来の送信票には件名の欄がない（元の様式どおり）ので、表形式のときだけ出す */}
+                    {layout === 'table' && (
+                      <div className="min-w-[16rem] flex-1">
+                        <Labeled label="件名">
+                          {(id) => (
+                            <input
+                              id={id}
+                              type="text"
+                              value={draft.subject}
+                              onChange={(e) => updateDraft({subject: e.target.value})}
+                              className={inputClass}
+                            />
+                          )}
+                        </Labeled>
+                      </div>
+                    )}
                     <Labeled label="送信日">
                       {(id) => (
                         <div className="flex items-center gap-2">
