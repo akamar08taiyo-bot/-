@@ -379,3 +379,91 @@
   font-size: 10pt;
   font-weight: 700;
 }
+
+/*
+ * ---- 文書形式の「FAX送付のご案内」 ----
+ * 一般的なビジネス文書と同じく明朝（英数字は Century）で組む。
+ * FAXで細い線がかすれないよう、本文は従来の送信票の枠の中と同じ12ptにしている。
+ * .fx-sheet p の余白の初期化より強くするため、部品の指定には .fx-letter を付ける。
+ */
+
+.fx-letter {
+  display: flex;
+  flex-direction: column;
+  padding: 22mm 24mm 18mm;
+  font-family: var(--fx-century), var(--fx-mincho), serif;
+  font-size: 12pt;
+  line-height: 1.85;
+}
+
+.fx-letter .fx-l-date {
+  text-align: right;
+}
+
+.fx-letter .fx-l-to {
+  margin-top: 5mm;
+  font-size: 14pt;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.fx-letter .fx-l-to-person {
+  padding-left: 1em;
+}
+
+/* 差出人は右に寄せ、行の頭はそろえる */
+.fx-letter .fx-l-from {
+  align-self: flex-end;
+  max-width: 100%;
+  margin-top: 5mm;
+  font-size: 11pt;
+  line-height: 1.65;
+}
+
+.fx-l-main {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 字間をあけた分だけ左にも余白を足して、見た目の中央にそろえる */
+.fx-letter .fx-l-title {
+  margin: 12mm 0 9mm;
+  padding-left: 0.25em;
+  font-size: 18pt;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.fx-letter .fx-l-right {
+  text-align: right;
+}
+
+.fx-letter .fx-l-ki {
+  margin-top: 6mm;
+  text-align: center;
+}
+
+.fx-letter .fx-l-items {
+  margin: 4mm 0 2mm 3em;
+}
+
+.fx-l-item {
+  display: flex;
+}
+
+/* 項目名は「数　　量」のように4字分の幅にそろえる（均等割り付け） */
+.fx-l-item dt {
+  flex-shrink: 0;
+  min-width: 4em;
+  margin-right: 2em;
+  text-align-last: justify;
+}
+
+.fx-l-item dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}

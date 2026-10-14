@@ -36,6 +36,7 @@ const DEFAULT_PAGES = 2;
 const LAYOUT_OPTIONS: {value: SheetLayout; label: string}[] = [
   {value: 'classic', label: '従来の送信票'},
   {value: 'table', label: '表形式'},
+  {value: 'letter', label: '文書形式'},
 ];
 
 /** 宛名欄の見出し。ケアマネ宛ての書類は「居宅名・ケアマネ名」と出す */
@@ -423,7 +424,7 @@ export function FaxApp() {
 
           <aside className="lg:sticky lg:top-3" aria-label="印刷イメージ">
             <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-              <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-bold text-slate-800">印刷イメージ</h2>
                 <SegmentedControl<SheetLayout>
                   ariaLabel="印刷デザイン"

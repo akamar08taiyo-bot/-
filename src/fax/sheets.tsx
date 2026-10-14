@@ -31,7 +31,9 @@ interface SheetProps {
 }
 
 export function FaxSheet(props: SheetProps) {
-  return props.layout === 'table' ? <TableSheet {...props} /> : <ClassicSheet {...props} />;
+  if (props.layout === 'table') return <TableSheet {...props} />;
+  if (props.layout === 'letter') return <LetterSheet {...props} />;
+  return <ClassicSheet {...props} />;
 }
 
 /** 本文の入る枠が、文章の量に対して足りているかを測る */
@@ -301,6 +303,60 @@ function TableSheet({data, font, preview, onOverflowChange}: SheetProps) {
         <p className="fx-t-footer-name">{[sender.company, sender.office].filter(Boolean).join('　')}</p>
         {contact && <p>{contact}</p>}
       </footer>
+    </div>
+  );
+}
+
+// ---- 文書形式の「FAX送付のご案内」：一般的なビジネス文書の形 ----
+// 日付（右上）・宛先（左）・差出人（右）・表題（中央）・拝啓〜敬具・記〜以上の順に並べる。
+
+function LetterSheet({data, font, preview, onOverflowChange}: SheetProps) {
+  const mainRef = useOverflowReport(onOverflowChange);
+  const {sender, to} = data;
+  const senderLines = [
+    sender.company,
+    sender.office,
+    [sender.postal && `〒${sender.postal}`, sender.address].filter(Boolean).join('　'),
+    [sender.tel && `TEL ${sender.tel}`, sender.fax && `FAX ${sender.fax}`].filter(Boolean).join('　'),
+    sender.person && `担当：${sender.person}`,
+  ].filter(Boolean);
+  // 「記」の下に並べる項目。数量などの項目のあとに送付枚数
+  const items = [...data.details, {label: '送付枚数', value: `本状を含め　${pagesText(data.pages)}枚`}];
+  return (
+    <div className="fx-sheet fx-letter" style={sheetFontStyle(font)}>
+      <p className="fx-l-date">{data.dateText}</p>
+      <div className="fx-l-to">
+        {to.org || to.person ? (
+          <>
+            {to.org && <p>{to.org}</p>}
+            {/* 事業所名の下の担当者名は1字下げる */}
+            {to.person && <p className={to.org ? 'fx-l-to-person' : undefined}>{to.person}</p>}
+          </>
+        ) : (
+          preview && <p className="fx-ghost">〇〇〇〇　様</p>
+        )}
+      </div>
+      <div className="fx-l-from">
+        {senderLines.map((line, i) => (
+          <p key={i}>{line}</p>
+        ))}
+      </div>
+      <div className="fx-l-main" ref={mainRef}>
+        <h1 className="fx-l-title">FAX送付のご案内</h1>
+        <p>拝啓　時下ますますご清祥のこととお喜び申し上げます。</p>
+        <Body parts={data.body} preview={preview} />
+        <p className="fx-l-right">敬具</p>
+        <p className="fx-l-ki">記</p>
+        <dl className="fx-l-items">
+          {items.map((d) => (
+            <div key={d.label} className="fx-l-item">
+              <dt>{d.label}</dt>
+              <dd>{d.value}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="fx-l-right">以上</p>
+      </div>
     </div>
   );
 }
