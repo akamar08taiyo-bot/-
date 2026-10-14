@@ -250,18 +250,12 @@
   font-family: var(--fx-century), var(--fx-maru), sans-serif;
 }
 
-.fx-c-closing1 {
-  top: 101.2mm;
-  right: 20mm;
-  font-family: var(--fx-century), var(--fx-maru), sans-serif;
-}
-
 .fx-c-courtesy {
   top: 113.7mm;
   left: 20mm;
 }
 
-.fx-c-closing2 {
+.fx-c-closing {
   top: 120.1mm;
   right: 38.1mm;
 }

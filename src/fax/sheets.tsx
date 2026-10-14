@@ -172,11 +172,9 @@ function ClassicSheet({data, font, preview, onOverflowChange}: SheetProps) {
       <p className="fx-c-salutation">
         <span className="fx-u">拝啓　時下ますますご清祥の段、お喜び申し上げます。</span>
       </p>
-      <p className="fx-c-closing1">
-        <span className="fx-u">敬具</span>
-      </p>
-      <p className="fx-c-courtesy">平素は格別のご高配を賜り、厚くお礼申し上げます</p>
-      <p className="fx-c-closing2">敬具</p>
+      {/* 元のWordには「敬具」が拝啓の行の後にもあったが、拝啓は敬具で1回だけ結ぶので、「平素は…」の後の1つにしている */}
+      <p className="fx-c-courtesy">平素は格別のご高配を賜り、厚くお礼申し上げます。</p>
+      <p className="fx-c-closing">敬具</p>
       <div className="fx-c-box" ref={boxRef}>
         <Body parts={data.body} preview={preview} />
         <Details details={data.details} />
