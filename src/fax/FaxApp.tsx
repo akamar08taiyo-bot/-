@@ -253,7 +253,12 @@ export function FaxApp() {
         <main className="mx-auto grid max-w-[1440px] gap-3 px-4 py-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
           <div className="min-w-0 space-y-3">
             <StepCard step={1} title="送るFAXを選ぶ" sectionRef={kindSectionRef}>
-              <KindPicker selected={kindId} onSelect={selectKind} customTemplates={customTemplates} />
+              <KindPicker
+                selected={kindId}
+                onSelect={selectKind}
+                onClear={() => setKindId(null)}
+                customTemplates={customTemplates}
+              />
               {showErrors && !kind && <ErrorText>送るFAXを選んでください。</ErrorText>}
             </StepCard>
 
@@ -364,7 +369,9 @@ export function FaxApp() {
                             onChange={(e) => setDate(e.target.value || todayIso())}
                             className={fieldClass}
                           />
-                          <span className="whitespace-nowrap text-xs text-slate-500">{formatWareki(date)}</span>
+                          <span className="whitespace-nowrap text-[length:var(--fx-label-text)] text-slate-500">
+                            {formatWareki(date)}
+                          </span>
                         </div>
                       )}
                     </Labeled>
@@ -525,9 +532,10 @@ export function FaxApp() {
 // ---- 部品 ----
 
 // 幅や枠線の色は呼び出し側で足す（同じ種類のクラスを重ねると、どちらが効くかが不定になるため）
+// 入力欄の高さと文字の大きさは、画面の縦の広さに合わせて fax.css の変数（--fx-field-h など）で変わる
 const fieldCore =
-  'rounded-md border bg-white px-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2';
-const fieldBase = `h-8 ${fieldCore}`;
+  'rounded-md border bg-white px-2 text-[length:var(--fx-field-text)] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2';
+const fieldBase = `h-[var(--fx-field-h)] ${fieldCore}`;
 const fieldClass = `${fieldBase} border-slate-300 focus:border-blue-500 focus:ring-blue-500/30`;
 const fieldErrorClass = `${fieldBase} border-red-500 ring-2 ring-red-500/20 focus:ring-red-500/30`;
 const inputClass = `w-full ${fieldClass}`;
@@ -578,7 +586,10 @@ function Labeled({label, required, children}: {label: string; required?: boolean
   const id = useId();
   return (
     <div className="min-w-0">
-      <label htmlFor={id} className="mb-0.5 flex items-center gap-1.5 text-xs font-medium text-slate-600">
+      <label
+        htmlFor={id}
+        className="mb-0.5 flex items-center gap-1.5 text-[length:var(--fx-label-text)] leading-[1.34] font-medium text-slate-600"
+      >
         {label}
         {required && <span className="rounded bg-red-50 px-1 text-[10px] font-bold text-red-600">必須</span>}
       </label>
@@ -593,7 +604,7 @@ function WithSuffix({suffix, children}: {suffix?: string; children: ReactNode}) 
   return (
     <div className="flex items-center gap-1">
       {children}
-      <span className="shrink-0 text-sm text-slate-600">{suffix}</span>
+      <span className="shrink-0 text-[length:var(--fx-field-text)] text-slate-600">{suffix}</span>
     </div>
   );
 }
@@ -604,7 +615,7 @@ function BodyEditor({value, onChange, actions}: {value: string; onChange: (v: st
   return (
     <div>
       <div className="mb-0.5 flex flex-wrap items-end justify-between gap-2">
-        <label htmlFor={id} className="text-xs font-medium text-slate-600">
+        <label htmlFor={id} className="text-[length:var(--fx-label-text)] leading-[1.34] font-medium text-slate-600">
           文章
         </label>
         <div className="flex flex-wrap gap-1.5">{actions}</div>
@@ -614,7 +625,7 @@ function BodyEditor({value, onChange, actions}: {value: string; onChange: (v: st
         value={value}
         onChange={(e) => onChange(e.target.value)}
         rows={3}
-        className={`${fieldCore} block min-h-20 w-full border-slate-300 py-1.5 leading-relaxed field-sizing-content focus:border-blue-500 focus:ring-blue-500/30`}
+        className={`${fieldCore} block min-h-[var(--fx-textarea-min)] w-full border-slate-300 py-1.5 leading-relaxed field-sizing-content focus:border-blue-500 focus:ring-blue-500/30`}
       />
     </div>
   );
@@ -633,7 +644,7 @@ function FontPicker({value, onChange}: {value: SheetFont; onChange: (v: SheetFon
         value={value}
         onChange={(e) => onChange(sanitizeFont(e.target.value))}
         style={fontPreviewStyle(value)}
-        className={`${fieldClass} min-w-[11rem] cursor-pointer pr-1`}
+        className="h-8 min-w-[11rem] cursor-pointer rounded-md border border-slate-300 bg-white px-2 pr-1 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
       >
         {SHEET_FONTS.map((f) => (
           <option key={f.id} value={f.id} style={fontPreviewStyle(f.id)}>
@@ -648,10 +659,13 @@ function FontPicker({value, onChange}: {value: SheetFont; onChange: (v: SheetFon
 function KindPicker({
   selected,
   onSelect,
+  onClear,
   customTemplates,
 }: {
   selected: FaxKindId | null;
   onSelect: (id: FaxKindId, byPointer: boolean) => void;
+  /** 選ばれている種類をもう一度押したとき（チェックを外す） */
+  onClear: () => void;
   customTemplates: CustomTemplates;
 }) {
   // マウスで選んだのか、キーボードで選んだのかを覚えておく
@@ -673,7 +687,7 @@ function KindPicker({
         return (
           <label
             key={k.id}
-            className={`flex cursor-pointer items-center gap-2 rounded-lg border-2 px-2.5 py-1.5 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 has-[:focus-visible]:ring-offset-1 ${
+            className={`flex cursor-pointer items-center gap-2 rounded-lg border-2 px-2.5 py-[var(--fx-kind-pad)] transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 has-[:focus-visible]:ring-offset-1 ${
               checked ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
             }`}
           >
@@ -683,6 +697,10 @@ function KindPicker({
               value={k.id}
               checked={checked}
               onChange={() => onSelect(k.id, byPointer.current)}
+              // 選ばれている項目を押しても change は起きないので、click で見分けてチェックを外す
+              onClick={() => {
+                if (checked) onClear();
+              }}
               className="sr-only"
             />
             <span
@@ -693,7 +711,7 @@ function KindPicker({
             >
               {checked && <Check className="h-3 w-3" strokeWidth={3.5} />}
             </span>
-            <span className="min-w-0 text-sm font-bold leading-snug text-slate-800">
+            <span className="min-w-0 text-[length:var(--fx-kind-text)] font-bold leading-snug text-slate-800">
               <LabelText text={k.label} />
               {customTemplates[k.id] && (
                 <span className="ml-1 whitespace-nowrap text-[10px] font-medium text-amber-700">（保存した文面）</span>
@@ -759,7 +777,7 @@ function PageCounter({id, value, onChange}: {id: string; value: number; onChange
     onChange(Math.min(99, Math.max(1, n)));
   };
   const stepButtonClass =
-    'flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40';
+    'flex h-[var(--fx-field-h)] w-[var(--fx-field-h)] shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40';
   return (
     <div className="flex items-center gap-1">
       <button type="button" onClick={() => set(value - 1)} disabled={value <= 1} aria-label="1枚減らす" className={stepButtonClass}>
@@ -777,12 +795,12 @@ function PageCounter({id, value, onChange}: {id: string; value: number; onChange
           if (digits && n >= 1 && n <= 99) onChange(n);
         }}
         onBlur={() => setText(null)}
-        className={`${fieldClass} w-11 text-center tabular-nums`}
+        className={`${fieldClass} w-12 text-center tabular-nums`}
       />
       <button type="button" onClick={() => set(value + 1)} disabled={value >= 99} aria-label="1枚増やす" className={stepButtonClass}>
         <Plus className="h-4 w-4" aria-hidden />
       </button>
-      <span className="text-sm text-slate-600">枚</span>
+      <span className="text-[length:var(--fx-field-text)] text-slate-600">枚</span>
     </div>
   );
 }

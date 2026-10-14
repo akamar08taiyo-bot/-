@@ -29,6 +29,52 @@
   }
 }
 
+/*
+ * 画面の入力欄（①のチェック欄・②③の入力欄）の大きさ。
+ * 13インチのノートパソコン（縦600前後）では詰めたままにし、縦に余裕のある画面では、その分だけ少しずつ大きくする。
+ * どの段階でも、①〜③と印刷ボタンがスクロールなしで1画面に収まる大きさにしてある。
+ */
+.fx-screen {
+  --fx-field-h: 2rem; /* 32px */
+  --fx-field-text: 0.875rem; /* 14px */
+  --fx-label-text: 0.75rem; /* 12px */
+  --fx-textarea-min: 5rem;
+  --fx-kind-pad: 0.375rem;
+  --fx-kind-text: 0.875rem;
+}
+
+@media (min-height: 650px) {
+  .fx-screen {
+    --fx-field-h: 2.375rem; /* 38px */
+    --fx-field-text: 0.9375rem; /* 15px */
+    --fx-label-text: 0.8125rem; /* 13px */
+    --fx-textarea-min: 5.5rem;
+  }
+}
+
+@media (min-height: 720px) {
+  .fx-screen {
+    --fx-field-h: 2.75rem; /* 44px */
+    --fx-field-text: 1rem; /* 16px */
+    --fx-label-text: 0.875rem; /* 14px */
+    --fx-textarea-min: 7rem;
+    --fx-kind-pad: 0.5rem;
+    --fx-kind-text: 0.9375rem;
+  }
+}
+
+@media (min-height: 860px) {
+  .fx-screen {
+    --fx-field-h: 3rem; /* 48px */
+    --fx-field-text: 1.0625rem; /* 17px */
+    --fx-label-text: 0.9375rem; /* 15px */
+    --fx-textarea-min: 9rem;
+    --fx-kind-pad: 0.625rem;
+    /* この高さの画面では印刷イメージが大きくなる分、左の列が狭くなるので、チェック欄の文字は1行に収まる14pxにする */
+    --fx-kind-text: 0.875rem;
+  }
+}
+
 @media print {
   html,
   body {
