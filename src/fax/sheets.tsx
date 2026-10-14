@@ -1,4 +1,6 @@
 import {useLayoutEffect, useRef} from 'react';
+import {sheetFontStyle} from './fonts';
+import type {SheetFont} from './fonts';
 import type {RecipientDisplay} from './recipient';
 import type {SenderInfo, SheetLayout} from './storage';
 import type {TextPart} from './templates';
@@ -20,6 +22,8 @@ export interface SheetData {
 interface SheetProps {
   data: SheetData;
   layout: SheetLayout;
+  /** 印刷の書体（元の書体のままか、用紙全体を1つの書体にそろえるか） */
+  font: SheetFont;
   /** 画面のプレビューでだけ、未入力の箇所に薄い見本を出す（印刷には出さない） */
   preview?: boolean;
   /** 文章が枠からはみ出したかどうかを知らせる */
@@ -141,11 +145,11 @@ const dateTokens = (text: string) => text.match(/\d+|./gu) ?? [];
 /** 枚数は1桁なら全角（元の送信票と同じ「４枚」）、2桁以上は半角 */
 const pagesText = (n: number) => (n < 10 ? String.fromCharCode(0xff10 + n) : String(n));
 
-function ClassicSheet({data, preview, onOverflowChange}: SheetProps) {
+function ClassicSheet({data, font, preview, onOverflowChange}: SheetProps) {
   const boxRef = useOverflowReport(onOverflowChange);
   const {sender} = data;
   return (
-    <div className="fx-sheet fx-classic">
+    <div className="fx-sheet fx-classic" style={sheetFontStyle(font)}>
       <StripeTop />
       <h1 className="fx-c-title">FAX送信票</h1>
       <p className="fx-c-date">
@@ -235,7 +239,7 @@ function StripeBottom() {
 
 // ---- 表形式の「FAX 送付状」：テンプレート（5種）のWord文書のレイアウト ----
 
-function TableSheet({data, preview, onOverflowChange}: SheetProps) {
+function TableSheet({data, font, preview, onOverflowChange}: SheetProps) {
   const mainRef = useOverflowReport(onOverflowChange);
   const {sender} = data;
   const contact = [
@@ -245,7 +249,7 @@ function TableSheet({data, preview, onOverflowChange}: SheetProps) {
     .filter(Boolean)
     .join('　｜　');
   return (
-    <div className="fx-sheet fx-table">
+    <div className="fx-sheet fx-table" style={sheetFontStyle(font)}>
       <header className="fx-t-header">
         <h1 className="fx-t-title">FAX 送付状</h1>
         {hasText(data.subject) && (

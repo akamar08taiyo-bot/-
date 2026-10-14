@@ -1,6 +1,8 @@
 import {useEffect, useId, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ReactNode, Ref} from 'react';
 import {AlertTriangle, Check, ChevronDown, Minus, Plus, Printer, RotateCcw, Save, Settings2, Trash2} from 'lucide-react';
+import {SHEET_FONTS, fontPreviewStyle, sanitizeFont} from './fonts';
+import type {SheetFont} from './fonts';
 import {describeRecipient, rememberRecipient} from './recipient';
 import {FaxSheet} from './sheets';
 import type {SheetData} from './sheets';
@@ -55,6 +57,7 @@ const SENDER_FIELDS: {key: keyof SenderInfo; label: string}[] = [
 export function FaxApp() {
   const [sender, setSender] = usePersistentState<SenderInfo>('sender', DEFAULT_SENDER, sanitizeSender);
   const [layout, setLayout] = usePersistentState<SheetLayout>('layout', 'classic', sanitizeLayout);
+  const [font, setFont] = usePersistentState<SheetFont>('font', 'original', sanitizeFont);
   const [customTemplates, setCustomTemplates] = usePersistentState<CustomTemplates>(
     'templates',
     NO_TEMPLATES,
@@ -229,17 +232,20 @@ export function FaxApp() {
     <>
       <div className="fx-screen min-h-screen bg-slate-50 text-slate-900">
         <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3 px-4 py-2">
+          <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2">
             <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
               <h1 className="text-lg font-bold tracking-tight">FAX送付状 かんたん作成</h1>
               <p className="text-xs text-slate-500">送るFAXにチェックを入れ、宛名とご利用者名を入れて印刷するだけ</p>
             </div>
-            {hasInput && (
-              <button type="button" onClick={handleReset} className={`${secondaryButtonClass} shrink-0`}>
-                <RotateCcw className="h-4 w-4" aria-hidden />
-                新しいFAXを作る
-              </button>
-            )}
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+              {hasInput && (
+                <button type="button" onClick={handleReset} className={secondaryButtonClass}>
+                  <RotateCcw className="h-4 w-4" aria-hidden />
+                  新しいFAXを作る
+                </button>
+              )}
+              <FontPicker value={font} onChange={setFont} />
+            </div>
           </div>
         </header>
 
@@ -434,7 +440,7 @@ export function FaxApp() {
                   </p>
                 )}
                 <ScaledPreview>
-                  <FaxSheet data={sheetData} layout={layout} preview onOverflowChange={setOverflowing} />
+                  <FaxSheet data={sheetData} layout={layout} font={font} preview onOverflowChange={setOverflowing} />
                 </ScaledPreview>
                 <button
                   type="button"
@@ -509,7 +515,7 @@ export function FaxApp() {
 
       {/* 印刷するのはこの1枚だけ（画面の部品は印刷時に隠す） */}
       <div className="fx-print-root">
-        <FaxSheet data={sheetData} layout={layout} />
+        <FaxSheet data={sheetData} layout={layout} font={font} />
       </div>
     </>
   );
@@ -609,6 +615,31 @@ function BodyEditor({value, onChange, actions}: {value: string; onChange: (v: st
         rows={3}
         className={`${fieldCore} block min-h-20 w-full border-slate-300 py-1.5 leading-relaxed field-sizing-content focus:border-blue-500 focus:ring-blue-500/30`}
       />
+    </div>
+  );
+}
+
+/** 画面右上の「印刷の書体」。各項目はその書体で表示する（入っていない書体は普通の文字で出る） */
+function FontPicker({value, onChange}: {value: SheetFont; onChange: (v: SheetFont) => void}) {
+  const id = useId();
+  return (
+    <div className="flex items-center gap-1.5">
+      <label htmlFor={id} className="whitespace-nowrap text-xs font-medium text-slate-600">
+        印刷の書体
+      </label>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(sanitizeFont(e.target.value))}
+        style={fontPreviewStyle(value)}
+        className={`${fieldClass} min-w-[11rem] cursor-pointer pr-1`}
+      >
+        {SHEET_FONTS.map((f) => (
+          <option key={f.id} value={f.id} style={fontPreviewStyle(f.id)}>
+            {f.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
