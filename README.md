@@ -50,8 +50,13 @@
 宛先帳・保存した文面・差出人の設定・印刷デザインは、このブラウザの `localStorage`（`fax-app:` で始まるキー）にだけ保存する。
 ご利用者様名などの記入内容は保存しない（画面を閉じると消える）。
 
-FAXアプリだけを単独サイトとして出す場合は `npm run build:fax` を実行する。`dist-fax/` に `index.html` として出力されるので、
-そのフォルダを Netlify などにそのまま置けばトップページがFAXアプリになる（`vite.fax.config.ts`）。
+#### FAX送付状アプリの公開（GitHub Pages）
+
+公開中のアプリ: https://akamar08taiyo-bot.github.io/-/fax.html （サイトの直下 https://akamar08taiyo-bot.github.io/-/ でも同じアプリが開く）
+
+- GitHub Pages は `gh-pages` ブランチを公開している。中身はFAXアプリのビルド結果だけ
+- `claude/fax-cover-sheet-app` ブランチに push すると、`.github/workflows/deploy-fax.yml` が `npm run build:fax` でビルドして `gh-pages` ブランチを丸ごと置き換え、公開中のページが新しいファイルに切り替わったかまで確かめる
+- `npm run build:fax` は `dist-fax/` に `index.html` として出力する。読み込むファイルは相対パスなので、`/-/` のような下の階層に置いても、Netlify などのサイト直下に置いても動く（`vite.fax.config.ts`）
 
 ## 技術スタック
 

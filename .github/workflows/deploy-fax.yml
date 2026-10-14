@@ -1,0 +1,63 @@
+name: FAX送付状アプリを公開（GitHub Pages）
+
+# FAX送付状アプリのブランチに push すると、アプリをビルドして gh-pages ブランチを丸ごと置き換える。
+# GitHub Pages は gh-pages ブランチを公開しているので、数分後に公開中のアプリも新しくなる。
+#   https://akamar08taiyo-bot.github.io/-/fax.html（サイトの直下 /-/ でも同じアプリが開く）
+on:
+  push:
+    branches: [claude/fax-cover-sheet-app]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+# 続けて push したときは、最後の push の内容だけを公開する
+concurrency:
+  group: deploy-fax-pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build FAX app
+        run: npm run build:fax
+
+      - name: Publish to gh-pages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd dist-fax
+          cp index.html fax.html
+          touch .nojekyll
+          git init -q -b gh-pages
+          git add -A
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -q -m "FAX送付状アプリを公開（${GITHUB_REF_NAME} ${GITHUB_SHA::7}）"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+
+      # 公開中のページが、今回ビルドしたファイルを読み込むようになったかを確かめる（最大10分待つ）
+      - name: Check the published app
+        run: |
+          js=$(grep -o 'assets/fax-[^"]*\.js' dist-fax/index.html)
+          url="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/"
+          for i in $(seq 1 40); do
+            if curl -fsS "${url}fax.html?check=${GITHUB_SHA}" | grep -q "$js" \
+              && curl -fsS -o /dev/null "${url}${js}?check=${GITHUB_SHA}"; then
+              echo "公開を確認しました: ${url}fax.html"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::10分待っても、公開中のページが新しいファイルに切り替わりませんでした: ${url}fax.html"
+          exit 1
