@@ -1,6 +1,8 @@
 node_modules/
 build/
 dist/
+dist-fax/
+.netlify
 coverage/
 .DS_Store
 *.log
