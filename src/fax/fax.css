@@ -16,7 +16,7 @@
 /*
  * 画面の印刷イメージの大きさ。横並びの画面では、ブラウザの高さに収まるよう高さから幅を決める
  * （13インチのノートパソコンでも、上の見出し・切り替え・印刷ボタンと合わせてスクロールなしで見える）。
- * 190px は見出しの帯・余白・デザイン切り替え・印刷ボタンの高さの合計。
+ * 150px は画面上部の見出しの帯・余白・印刷ボタンの高さの合計。
  */
 .fx-preview-size {
   width: min(100%, 480px);
@@ -25,7 +25,7 @@
 
 @media (min-width: 1024px) {
   .fx-preview-size {
-    width: clamp(280px, calc((100vh - 190px) * 0.7071), 560px);
+    width: clamp(280px, calc((100vh - 150px) * 0.7071), 560px);
   }
 }
 
@@ -72,7 +72,8 @@
   break-after: avoid;
 }
 
-.fx-sheet p {
+/* 段落の余白は0から始める。:where で優先度を0にして、部品ごとの余白の指定が必ず効くようにしている */
+:where(.fx-sheet) p {
   margin: 0;
 }
 
@@ -120,6 +121,274 @@
   min-width: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/*
+ * ---- オリジナル（標準） ----
+ * 見やすさ重視のデザイン。白黒2値のFAXでもつぶれないよう、灰色は使わず、黒の帯・太字・罫線だけで組む。
+ * 書体は読みやすさを重視して作られたUD書体（BIZ UDPゴシック）。
+ */
+
+.fx-modern {
+  --fx-ud: 'BIZ UDPゴシック', 'BIZ UDPGothic';
+
+  display: flex;
+  flex-direction: column;
+  padding: 13mm 15mm 11mm;
+  font-family: var(--fx-ud), sans-serif;
+  font-size: 11pt;
+  line-height: 1.6;
+}
+
+/* 見出しの黒い帯 */
+.fx-m-band {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 5mm;
+  padding: 5.5mm 7mm 5mm;
+  color: #fff;
+}
+
+.fx-m-band-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: #000;
+}
+
+.fx-m-band > :not(svg) {
+  position: relative;
+}
+
+.fx-m-fax {
+  margin: 0;
+  font-size: 42pt;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.06em;
+}
+
+.fx-m-title {
+  font-size: 21pt;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.3em;
+}
+
+.fx-m-en {
+  margin-left: auto;
+  font-size: 8.5pt;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+}
+
+/* 「宛先 TO」などの見出し。左に黒い縦線、日本語のあとに小さく英字 */
+.fx-m-label {
+  padding-left: 2.2mm;
+  border-left: 1.4mm solid #000;
+  font-size: 9pt;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.08em;
+}
+
+.fx-m-label span {
+  margin-left: 2mm;
+  font-size: 7.5pt;
+  letter-spacing: 0.22em;
+}
+
+/* 宛先（左・大きく）と差出人（右） */
+.fx-m-parties {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 66mm;
+  margin-top: 9mm;
+}
+
+.fx-m-to {
+  padding-right: 7mm;
+}
+
+.fx-m-org {
+  margin-top: 3mm;
+  font-size: 14pt;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.fx-m-name {
+  margin-top: 1.5mm;
+  padding-bottom: 2mm;
+  border-bottom: 0.6mm solid #000;
+  font-size: 23pt;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.fx-m-hon {
+  margin-left: 3mm;
+  font-size: 15pt;
+}
+
+.fx-m-from {
+  padding-left: 6mm;
+  border-left: 0.3mm solid #000;
+  font-size: 9.5pt;
+  line-height: 1.55;
+}
+
+.fx-m-company,
+.fx-m-office {
+  font-size: 11.5pt;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.fx-m-company {
+  margin-top: 3mm;
+}
+
+.fx-m-person {
+  margin-top: 1mm;
+  font-size: 10pt;
+}
+
+.fx-m-contact {
+  margin-top: 2mm;
+  font-size: 11pt;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.fx-m-contact span {
+  display: inline-block;
+  width: 9.5mm;
+  font-size: 8.5pt;
+  letter-spacing: 0.1em;
+}
+
+.fx-m-address {
+  margin-top: 1.5mm;
+  font-size: 8.5pt;
+  line-height: 1.5;
+}
+
+.fx-m-address span {
+  display: block;
+}
+
+/* 送信日・送付枚数 */
+.fx-m-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 8mm;
+  border-top: 0.3mm solid #000;
+  border-bottom: 0.3mm solid #000;
+}
+
+.fx-m-meta > div {
+  padding: 3mm 0;
+}
+
+.fx-m-meta > div + div {
+  padding-left: 6mm;
+  border-left: 0.3mm solid #000;
+}
+
+.fx-m-value {
+  margin-top: 1.5mm;
+  font-size: 14pt;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.fx-m-value small {
+  margin-left: 1.5mm;
+  font-size: 9.5pt;
+  font-weight: 400;
+}
+
+/* 件名と本文 */
+.fx-m-main {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  margin-top: 9mm;
+}
+
+.fx-m-subject {
+  margin-top: 2.5mm;
+  font-size: 16pt;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.fx-m-main .fx-body {
+  margin-top: 7mm;
+  font-size: 12.5pt;
+  line-height: 2;
+}
+
+/* 差し込んだご利用者名などは太字で目立たせる */
+.fx-modern .fx-fill {
+  font-weight: 700;
+}
+
+.fx-modern .fx-bracket {
+  display: none;
+}
+
+.fx-modern .fx-details {
+  margin-top: 6mm;
+  gap: 0;
+  border-top: 0.3mm solid #000;
+  font-size: 12pt;
+}
+
+.fx-modern .fx-detail {
+  padding: 2.2mm 0;
+  border-bottom: 0.3mm solid #000;
+}
+
+.fx-modern .fx-detail-label {
+  width: 40mm;
+  font-size: 10pt;
+}
+
+.fx-m-end {
+  margin-top: 4mm;
+  font-size: 12pt;
+  text-align: right;
+}
+
+/* 通信欄。本文の下の残りの高さいっぱいに広がる（本文が長いときは縮む） */
+.fx-m-memo {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 16mm;
+  margin-top: 6mm;
+}
+
+.fx-m-memo-box {
+  flex: 1 1 0;
+  margin-top: 2mm;
+  border: 0.3mm solid #000;
+}
+
+/* 下の一文 */
+.fx-m-footer {
+  margin-top: 4mm;
+  padding-top: 3mm;
+  border-top: 0.3mm solid #000;
+  font-size: 8.5pt;
+  text-align: center;
 }
 
 /*

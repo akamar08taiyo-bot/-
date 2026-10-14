@@ -2,8 +2,8 @@ import type {CSSProperties} from 'react';
 
 /**
  * 印刷の書体の選択肢。会社のWindowsパソコン（Office入り）に入っている主な書体。
- * 「元の書体」は元のWord文書と同じ使い分け（従来の送信票は丸ゴシック＋明朝、表形式は游ゴシック）。
- * それ以外を選ぶと、用紙全体をその書体にそろえる。
+ * 「標準」はデザインごとに決めた書体（オリジナルはBIZ UDPゴシック、従来の送信票は丸ゴシック＋明朝、
+ * 表形式は游ゴシック）。それ以外を選ぶと、用紙全体をその書体にそろえる。
  */
 export type SheetFont =
   | 'original'
@@ -25,7 +25,7 @@ interface SheetFontOption {
 }
 
 export const SHEET_FONTS: SheetFontOption[] = [
-  {id: 'original', label: '元の書体（Wordと同じ）', families: ''},
+  {id: 'original', label: '標準', families: ''},
   {id: 'maru', label: 'HG丸ゴシックM-PRO', families: "'HG丸ｺﾞｼｯｸM-PRO', 'HGMaruGothicMPRO', 'Kosugi Maru'"},
   {id: 'msMincho', label: 'ＭＳ 明朝', families: "'ＭＳ 明朝', 'MS Mincho', 'BIZ UDMincho'"},
   {id: 'msGothic', label: 'ＭＳ ゴシック', families: "'ＭＳ ゴシック', 'MS Gothic', 'IPAGothic'"},
@@ -41,14 +41,20 @@ export const sanitizeFont = (raw: unknown): SheetFont =>
   SHEET_FONTS.some((f) => f.id === raw) ? (raw as SheetFont) : 'original';
 
 /**
- * 用紙に付けるスタイル。用紙のCSSは部品ごとに --fx-maru（丸ゴシック）・--fx-mincho（明朝）・
- * --fx-century（英数字）・--fx-yu（游ゴシック）を使い分けているので、全部を選んだ書体に置き換える。
+ * 用紙に付けるスタイル。用紙のCSSは部品ごとに --fx-ud（UDゴシック）・--fx-maru（丸ゴシック）・
+ * --fx-mincho（明朝）・--fx-century（英数字）・--fx-yu（游ゴシック）を使い分けているので、全部を選んだ書体に置き換える。
  */
 export function sheetFontStyle(font: SheetFont): CSSProperties | undefined {
   const option = SHEET_FONTS.find((f) => f.id === font);
   if (!option?.families) return undefined;
   const families = option.families;
-  return {'--fx-maru': families, '--fx-mincho': families, '--fx-century': families, '--fx-yu': families} as CSSProperties;
+  return {
+    '--fx-ud': families,
+    '--fx-maru': families,
+    '--fx-mincho': families,
+    '--fx-century': families,
+    '--fx-yu': families,
+  } as CSSProperties;
 }
 
 /** 選択欄の各項目を、その書体で表示するためのスタイル */

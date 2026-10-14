@@ -92,10 +92,14 @@ export function sanitizeSender(raw: unknown): SenderInfo {
 
 // ---- 印刷デザイン ----
 
-/** classic: これまで使っていた「FAX送信票」 / table: 表形式の「FAX 送付状」 */
-export type SheetLayout = 'classic' | 'table';
+/**
+ * modern: 見やすさ重視のオリジナルデザイン（標準） / classic: これまで使っていた「FAX送信票」を再現したもの /
+ * table: テンプレート（5種）の表形式の「FAX 送付状」
+ */
+export type SheetLayout = 'modern' | 'classic' | 'table';
 
-export const sanitizeLayout = (raw: unknown): SheetLayout => (raw === 'table' ? 'table' : 'classic');
+export const sanitizeLayout = (raw: unknown): SheetLayout =>
+  raw === 'classic' || raw === 'table' ? raw : 'modern';
 
 // ---- 宛先 ----
 

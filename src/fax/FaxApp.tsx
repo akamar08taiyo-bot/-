@@ -34,6 +34,7 @@ const NO_RECIPIENTS: SavedRecipient[] = [];
 const DEFAULT_PAGES = 2;
 
 const LAYOUT_OPTIONS: {value: SheetLayout; label: string}[] = [
+  {value: 'modern', label: 'オリジナル'},
   {value: 'classic', label: '従来の送信票'},
   {value: 'table', label: '表形式'},
 ];
@@ -56,7 +57,7 @@ const SENDER_FIELDS: {key: keyof SenderInfo; label: string}[] = [
 
 export function FaxApp() {
   const [sender, setSender] = usePersistentState<SenderInfo>('sender', DEFAULT_SENDER, sanitizeSender);
-  const [layout, setLayout] = usePersistentState<SheetLayout>('layout', 'classic', sanitizeLayout);
+  const [layout, setLayout] = usePersistentState<SheetLayout>('layout', 'modern', sanitizeLayout);
   const [font, setFont] = usePersistentState<SheetFont>('font', 'original', sanitizeFont);
   const [customTemplates, setCustomTemplates] = usePersistentState<CustomTemplates>(
     'templates',
@@ -232,18 +233,28 @@ export function FaxApp() {
     <>
       <div className="fx-screen min-h-screen bg-slate-50 text-slate-900">
         <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2">
-            <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
-              <h1 className="text-lg font-bold tracking-tight">FAX送付状 かんたん作成</h1>
-              <p className="text-xs text-slate-500">送るFAXにチェックを入れ、宛名とご利用者名を入れて印刷するだけ</p>
+          {/* パソコンでは1行に収める（足りないときは説明文を「…」で省略）。狭い画面では右側が次の行に回る */}
+          <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2 lg:flex-nowrap">
+            <div className="flex min-w-0 items-baseline gap-x-3">
+              <h1 className="shrink-0 text-lg font-bold tracking-tight">FAX送付状 かんたん作成</h1>
+              <p className="min-w-0 truncate text-xs text-slate-500">
+                送るFAXにチェックを入れ、宛名とご利用者名を入れて印刷するだけ
+              </p>
             </div>
-            <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2 lg:shrink-0">
               {hasInput && (
                 <button type="button" onClick={handleReset} className={secondaryButtonClass}>
                   <RotateCcw className="h-4 w-4" aria-hidden />
                   新しいFAXを作る
                 </button>
               )}
+              <HeaderSelect<SheetLayout>
+                label="デザイン"
+                value={layout}
+                options={LAYOUT_OPTIONS}
+                onChange={setLayout}
+                normalize={sanitizeLayout}
+              />
               <FontPicker value={font} onChange={setFont} />
             </div>
           </div>
@@ -337,8 +348,8 @@ export function FaxApp() {
               {kind && draft && template ? (
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
-                    {/* 従来の送信票には件名の欄がない（元の様式どおり）ので、表形式のときだけ出す */}
-                    {layout === 'table' && (
+                    {/* 従来の送信票には件名の欄がない（元の様式どおり）ので、そのときは出さない */}
+                    {layout !== 'classic' && (
                       <div className="min-w-[16rem] flex-1">
                         <Labeled label="件名">
                           {(id) => (
@@ -423,15 +434,6 @@ export function FaxApp() {
 
           <aside className="lg:sticky lg:top-3" aria-label="印刷イメージ">
             <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <h2 className="text-sm font-bold text-slate-800">印刷イメージ</h2>
-                <SegmentedControl<SheetLayout>
-                  ariaLabel="印刷デザイン"
-                  options={LAYOUT_OPTIONS}
-                  value={layout}
-                  onChange={(v) => setLayout(v)}
-                />
-              </div>
               <div className="fx-preview-size">
                 {overflowing && (
                   <p className="mb-2 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
@@ -632,7 +634,7 @@ function FontPicker({value, onChange}: {value: SheetFont; onChange: (v: SheetFon
         value={value}
         onChange={(e) => onChange(sanitizeFont(e.target.value))}
         style={fontPreviewStyle(value)}
-        className={`${fieldClass} min-w-[11rem] cursor-pointer pr-1`}
+        className={`${fieldClass} cursor-pointer pr-1`}
       >
         {SHEET_FONTS.map((f) => (
           <option key={f.id} value={f.id} style={fontPreviewStyle(f.id)}>
@@ -786,33 +788,38 @@ function PageCounter({id, value, onChange}: {id: string; value: number; onChange
   );
 }
 
-function SegmentedControl<T extends string>({
-  options,
+/** 画面右上の選択欄（デザインなど） */
+function HeaderSelect<T extends string>({
+  label,
   value,
+  options,
   onChange,
-  ariaLabel,
+  normalize,
 }: {
-  options: {value: T; label: string}[];
+  label: string;
   value: T;
+  options: {value: T; label: string}[];
   onChange: (v: T) => void;
-  ariaLabel: string;
+  normalize: (raw: unknown) => T;
 }) {
+  const id = useId();
   return (
-    <div role="radiogroup" aria-label={ariaLabel} className="inline-flex shrink-0 rounded-md bg-slate-100 p-0.5">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          role="radio"
-          aria-checked={value === o.value}
-          onClick={() => onChange(o.value)}
-          className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-            value === o.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
+    <div className="flex items-center gap-1.5">
+      <label htmlFor={id} className="whitespace-nowrap text-xs font-medium text-slate-600">
+        {label}
+      </label>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(normalize(e.target.value))}
+        className={`${fieldClass} cursor-pointer pr-1`}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
