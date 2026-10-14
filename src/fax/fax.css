@@ -284,7 +284,7 @@
 
 /* ワードアートの社名。縁取り付きの丸ゴシックで、2行を枠（幅103.7mm）の中央にそろえる */
 .fx-c-company {
-  top: 218.5mm;
+  top: 220.2mm;
   left: 20mm;
   width: 103.7mm;
   font-family: var(--fx-maru), sans-serif;
@@ -299,9 +299,15 @@
   display: inline-block;
 }
 
+/*
+ * 差出人の部分は、元の文書の位置から少し動かして整えている。
+ * ・担当は営業所名（2行目）と重ならないよう右へ離し、文字の下の線（ベースライン）を営業所名とそろえる
+ * ・担当・〒・住所は左端を105mmにそろえ、TEL・FAXは〒・住所と同じ高さの2行にして左右2列にする
+ * ・上の枠・社名・担当・〒の行・下の帯のあいだの余白を、ほぼ同じ（約10mm）にする
+ */
 .fx-c-person {
-  top: 234.9mm;
-  left: 92mm;
+  top: 232.9mm;
+  left: 105mm;
 }
 
 .fx-c-postal,
@@ -317,17 +323,17 @@
 }
 
 .fx-c-tel {
-  top: 253.4mm;
+  top: 247.2mm;
   left: 20mm;
 }
 
 .fx-c-address {
-  top: 253.4mm;
-  left: 95mm;
+  top: 253.7mm;
+  left: 105mm;
 }
 
 .fx-c-fax {
-  top: 259.9mm;
+  top: 253.7mm;
   left: 20mm;
 }
 

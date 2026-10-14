@@ -198,7 +198,7 @@ function ClassicSheet({data, font, preview, onOverflowChange}: SheetProps) {
       {sender.tel && <p className="fx-c-tel">TEL ：{sender.tel}</p>}
       {sender.address && (
         <p className="fx-c-address">
-          <span className="fx-u">　{sender.address}</span>
+          <span className="fx-u">{sender.address}</span>
         </p>
       )}
       {sender.fax && <p className="fx-c-fax">FAX ：{sender.fax}</p>}
