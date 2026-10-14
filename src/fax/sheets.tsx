@@ -105,7 +105,7 @@ function Details({details}: {details: SheetData['details']}) {
 
 // ---- 従来の「FAX送信票」：これまで使っていたWordの様式を再現したもの ----
 // 元のWordは文字や枠を位置指定で置いているので、各部品の位置（mm）も元の送信票に合わせて固定している。
-// 書体も元と同じ使い分け：見出し・宛名・社名・住所はHG丸ゴシックM-PRO、日付・「平素は…」・枠の中の文章はＭＳ 明朝。
+// 書体も元と同じ使い分け：見出し・宛名・社名・住所はHG丸ゴシックM-PRO、日付・枠の中の文章はＭＳ 明朝。
 
 const KATAKANA_FULL = 'ァアィイゥウェエォオカキクケコサシスセソタチッツテトナニヌネノハヒフヘホマミムメモャヤュユョヨラリルレロワヲンー';
 const KATAKANA_HALF = 'ｧｱｨｲｩｳｪｴｫｵｶｷｸｹｺｻｼｽｾｿﾀﾁｯﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓｬﾔｭﾕｮﾖﾗﾘﾙﾚﾛﾜｦﾝｰ';
@@ -172,9 +172,12 @@ function ClassicSheet({data, font, preview, onOverflowChange}: SheetProps) {
       <p className="fx-c-salutation">
         <span className="fx-u">拝啓　時下ますますご清祥の段、お喜び申し上げます。</span>
       </p>
-      {/* 元のWordには「敬具」が拝啓の行の後にもあったが、拝啓は敬具で1回だけ結ぶので、「平素は…」の後の1つにしている */}
-      <p className="fx-c-courtesy">平素は格別のご高配を賜り、厚くお礼申し上げます。</p>
-      <p className="fx-c-closing">敬具</p>
+      {/* 元のWordには、この下に「平素は格別のご高配を賜り…」の行と2つ目の「敬具」もあったが、
+          「申し上げます」が続き、枠の中の「いつも大変お世話になっております。」ともお礼が重なるので外し、
+          拝啓とペアの「敬具」1つだけにしている */}
+      <p className="fx-c-closing">
+        <span className="fx-u">敬具</span>
+      </p>
       <div className="fx-c-box" ref={boxRef}>
         <Body parts={data.body} preview={preview} />
         <Details details={data.details} />

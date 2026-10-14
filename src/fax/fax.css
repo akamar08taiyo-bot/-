@@ -171,7 +171,7 @@
 /*
  * ---- 従来の「FAX送信票」 ----
  * 位置（上・左右からのmm）と書体・文字の大きさは、元のWord文書から測った値に合わせている。
- * 明朝の部分（日付・「平素は…」・枠の中の文章）が既定で、丸ゴシックの部分はそれぞれ指定する。
+ * 明朝の部分（日付・枠の中の文章）が既定で、丸ゴシックの部分はそれぞれ指定する。
  */
 
 .fx-classic {
@@ -250,14 +250,10 @@
   font-family: var(--fx-century), var(--fx-maru), sans-serif;
 }
 
-.fx-c-courtesy {
-  top: 113.7mm;
-  left: 20mm;
-}
-
 .fx-c-closing {
-  top: 120.1mm;
-  right: 38.1mm;
+  top: 101.2mm;
+  right: 20mm;
+  font-family: var(--fx-century), var(--fx-maru), sans-serif;
 }
 
 /* 文章の枠（170×81.8mm）。中の文章はＭＳ 明朝 12pt */
