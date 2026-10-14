@@ -256,7 +256,7 @@ export function FaxApp() {
               {showErrors && !kind && <ErrorText>送るFAXを選んでください。</ErrorText>}
             </StepCard>
 
-            <StepCard step={2} title="宛名・ご利用者名・枚数">
+            <StepCard step={2} title={`宛名・${(kind?.fill ?? RIYOUSHA).label}・枚数`}>
               <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
                 <div className="min-w-[13rem] flex-[1.6]">
                   <Labeled label={labels.org} required>
