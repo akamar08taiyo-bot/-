@@ -63,8 +63,8 @@ export const FAX_KINDS: FaxKind[] = [
   {
     id: 'tanisu',
     label: '単位数・TAISコード',
-    subject: '単位数・TAISコードの送付',
-    body: [GREETING, '〇〇様の単位数及びTAISコードを送付いたします。', PLEASE_CHECK].join('\n'),
+    subject: '単位数報告書及びTAISコードの送付',
+    body: [GREETING, '〇〇様の単位数報告書及びTAISコードを送付いたします。', PLEASE_CHECK].join('\n'),
     fill: RIYOUSHA,
     lines: [],
     audience: 'caremanager',

@@ -166,11 +166,13 @@ function ClassicSheet({data, font, preview, onOverflowChange}: SheetProps) {
           preview && <span className="fx-u fx-ghost">〇〇〇〇　様</span>
         )}
       </p>
+      {/* 元のWordは「本状を含み」「ご清祥の段、」だったが、FAXでよく使う「本状を含め」と、
+          事業所あてに合う「ご清栄のことと」にしている */}
       <p className="fx-c-pages">
-        <span className="fx-u">本状を含み　{pagesText(data.pages)}枚</span>
+        <span className="fx-u">本状を含め　{pagesText(data.pages)}枚</span>
       </p>
       <p className="fx-c-salutation">
-        <span className="fx-u">拝啓　時下ますますご清祥の段、お喜び申し上げます。</span>
+        <span className="fx-u">拝啓　時下ますますご清栄のこととお喜び申し上げます。</span>
       </p>
       {/* 元のWordには、この下に「平素は格別のご高配を賜り…」の行と2つ目の「敬具」もあったが、
           「申し上げます」が続き、枠の中の「いつも大変お世話になっております。」ともお礼が重なるので外し、
@@ -342,7 +344,7 @@ function LetterSheet({data, font, preview, onOverflowChange}: SheetProps) {
       </div>
       <div className="fx-l-main" ref={mainRef}>
         <h1 className="fx-l-title">FAX送付のご案内</h1>
-        <p>拝啓　時下ますますご清祥のこととお喜び申し上げます。</p>
+        <p>拝啓　時下ますますご清栄のこととお喜び申し上げます。</p>
         <Body parts={data.body} preview={preview} />
         <p className="fx-l-right">敬具</p>
         <p className="fx-l-ki">記</p>
