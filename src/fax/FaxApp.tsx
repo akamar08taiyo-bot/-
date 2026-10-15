@@ -680,14 +680,15 @@ function KindPicker({
       onKeyDown={() => {
         byPointer.current = false;
       }}
-      className="grid grid-cols-2 gap-1.5 md:grid-cols-4"
+      // 項目の幅は文字の長さに合わせ、1段に入るだけ並べて残りの幅は均等に広げる（9種類でも13インチで2段に収まる）
+      className="flex flex-wrap gap-1.5"
     >
       {FAX_KINDS.map((k) => {
         const checked = selected === k.id;
         return (
           <label
             key={k.id}
-            className={`flex cursor-pointer items-center gap-2 rounded-lg border-2 px-2.5 py-[var(--fx-kind-pad)] transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 has-[:focus-visible]:ring-offset-1 ${
+            className={`flex grow cursor-pointer items-center gap-2 rounded-lg border-2 px-2.5 py-[var(--fx-kind-pad)] transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 has-[:focus-visible]:ring-offset-1 ${
               checked ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
             }`}
           >

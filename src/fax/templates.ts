@@ -21,6 +21,7 @@ export type FaxKindId =
   | 'keikaku'
   | 'keikakuOnly'
   | 'monitoringOnly'
+  | 'rentalReport'
   | 'mitsumori'
   | 'mitsumoriIrai'
   | 'other';
@@ -94,6 +95,16 @@ export const FAX_KINDS: FaxKind[] = [
     label: 'モニタリングのみ',
     subject: '定期モニタリング報告書の送付',
     body: [GREETING, '〇〇様の定期モニタリング報告書を送付いたします。', PLEASE_CHECK].join('\n'),
+    fill: RIYOUSHA,
+    lines: [],
+    audience: 'caremanager',
+    pages: 2,
+  },
+  {
+    id: 'rentalReport',
+    label: '福祉用具貸与実績報告書',
+    subject: '福祉用具貸与実績報告書の送付',
+    body: [GREETING, '〇〇様の福祉用具貸与実績報告書を送付いたします。', PLEASE_CHECK].join('\n'),
     fill: RIYOUSHA,
     lines: [],
     audience: 'caremanager',
