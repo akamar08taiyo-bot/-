@@ -245,12 +245,9 @@ function StripeBottom() {
 function TableSheet({data, font, preview, onOverflowChange}: SheetProps) {
   const mainRef = useOverflowReport(onOverflowChange);
   const {sender} = data;
-  const contact = [
-    [sender.postal && `〒${sender.postal}`, sender.address].filter(Boolean).join('　'),
-    [sender.tel && `TEL ${sender.tel}`, sender.fax && `FAX ${sender.fax}`].filter(Boolean).join('　'),
-  ]
-    .filter(Boolean)
-    .join('　｜　');
+  // 下の差出人：会社名・営業所名、住所、TEL・FAX の3行
+  const address = [sender.postal && `〒${sender.postal}`, sender.address].filter(Boolean).join('　');
+  const phones = [sender.tel && `TEL ${sender.tel}`, sender.fax && `FAX ${sender.fax}`].filter(Boolean).join('　　');
   return (
     <div className="fx-sheet fx-table" style={sheetFontStyle(font)}>
       <header className="fx-t-header">
@@ -302,7 +299,8 @@ function TableSheet({data, font, preview, onOverflowChange}: SheetProps) {
       </div>
       <footer className="fx-t-footer">
         <p className="fx-t-footer-name">{[sender.company, sender.office].filter(Boolean).join('　')}</p>
-        {contact && <p>{contact}</p>}
+        {address && <p>{address}</p>}
+        {phones && <p>{phones}</p>}
       </footer>
     </div>
   );
