@@ -134,11 +134,11 @@ export const FAX_KINDS: FaxKind[] = [
     pages: 1,
   },
   {
-    // 商品名は文の中に入れず、「・NEO-1W」のように1行で別に書く
+    // 商品名は文の中に入れず、「商品名：NEO-1W」のように1行で別に書く
     id: 'demo',
     label: 'デモ機依頼',
     subject: 'デモ機貸出のお願い',
-    body: [GREETING, '下記商品のデモ機の貸出をお願いいたします。', '・〇〇', PLEASE_CHECK].join('\n'),
+    body: [GREETING, '下記商品のデモ機の貸出をお願いいたします。', '商品名：〇〇', PLEASE_CHECK].join('\n'),
     fill: SHOUHIN,
     lines: [],
     audience: 'business',
