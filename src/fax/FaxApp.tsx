@@ -110,6 +110,8 @@ export function FaxApp() {
   const labels = RECIPIENT_LABELS[audience];
   // 種類を選ぶ前は、いちばん使う「ご利用者名」の欄を出しておく
   const inputFields: DetailField[] = kind ? [...(kind.fill ? [kind.fill] : []), ...kind.lines] : [RIYOUSHA];
+  // 商品名・製品名（見積依頼・デモ機依頼・御見積書の送付）は長くなることがあるので、②でその欄を広くとる
+  const wideProduct = inputFields.some((f) => f.key === 'product');
   const fillValue = kind?.fill ? details[kind.fill.key] : '';
 
   const recipientMissing = !recipient.org.trim() && !recipient.person.trim();
@@ -277,7 +279,7 @@ export function FaxApp() {
             <StepCard step={2} title={`宛名・${(kind?.fill ?? RIYOUSHA).label}・枚数`}>
               <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
                 {/* 最小幅は文字の大きさに合わせる（どの画面でも居宅名が13文字ほど収まる） */}
-                <div className="min-w-[calc(var(--fx-field-text)*15)] flex-[1.6]">
+                <div className={`min-w-[calc(var(--fx-field-text)*15)] ${wideProduct ? 'flex-1' : 'flex-[1.6]'}`}>
                   <Labeled label={labels.org} required>
                     {(id) => (
                       <input
@@ -330,7 +332,17 @@ export function FaxApp() {
                   const isFill = !!kind?.fill && f.key === kind.fill.key;
                   const error = isFill && showErrors && fillMissing;
                   return (
-                    <div key={f.key} className={f.key === 'quantity' ? 'w-24' : 'min-w-[11rem] flex-1'}>
+                    <div
+                      key={f.key}
+                      className={
+                        f.key === 'quantity'
+                          ? 'w-24'
+                          : f.key === 'product'
+                            ? // スマホの幅では1行まるごと使う（最小幅は fax.css の --fx-product-min）
+                              'min-w-full flex-[1.8] sm:min-w-[var(--fx-product-min)]'
+                            : 'min-w-[11rem] flex-1'
+                      }
+                    >
                       <Labeled label={f.label} required={isFill}>
                         {(id) => (
                           <WithSuffix suffix={f.suffix}>
@@ -355,8 +367,9 @@ export function FaxApp() {
                 <Labeled label="枚数（本状含む）">
                   {(id) => <PageCounter id={id} value={pages} onChange={changePages} />}
                 </Labeled>
-                {/* 右端の余白。居宅名・ご利用者名などの欄が行いっぱいまで広がりすぎないよう、空いた幅の一部をここに回す */}
-                <div aria-hidden className="hidden flex-[0.45] lg:block" />
+                {/* 右端の余白。居宅名・ご利用者名などの欄が行いっぱいまで広がりすぎないよう、空いた幅の一部をここに回す
+                    （商品名・製品名の欄があるときは、その欄を広くとるため余白は作らない） */}
+                {!wideProduct && <div aria-hidden className="hidden flex-[0.45] lg:block" />}
               </div>
             </StepCard>
 

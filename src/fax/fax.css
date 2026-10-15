@@ -41,6 +41,8 @@
   --fx-textarea-min: 5rem;
   --fx-kind-pad: 0.375rem;
   --fx-kind-text: 0.875rem;
+  /* ②の商品名・製品名の欄の最小幅。これより狭くなるときは次の行に回って、行の幅いっぱいを使う */
+  --fx-product-min: 11rem;
 }
 
 @media (min-height: 650px) {
@@ -72,6 +74,8 @@
     --fx-kind-pad: 0.625rem;
     /* この高さの画面では印刷イメージが大きくなる分、左の列が狭くなるので、チェック欄の文字は1行に収まる14pxにする */
     --fx-kind-text: 0.875rem;
+    /* 縦に余裕があるので、商品名の欄は20文字分とれないときは次の行に回して広く使う */
+    --fx-product-min: calc(var(--fx-field-text) * 20);
   }
 }
 
