@@ -24,6 +24,7 @@ export type FaxKindId =
   | 'rentalReport'
   | 'mitsumori'
   | 'mitsumoriIrai'
+  | 'demo'
   | 'other';
 
 /** 宛名欄の見出しの出し分け。ケアマネ宛ては「居宅名・ケアマネ名」、それ以外は「会社・施設名・ご担当者名」 */
@@ -48,6 +49,8 @@ const GREETING = 'いつも大変お世話になっております。';
 const PLEASE_CHECK = 'お忙しいところ恐れ入りますが、ご確認くださいますようお願いいたします。';
 
 export const RIYOUSHA: DetailField = {key: 'riyousha', label: 'ご利用者名', placeholder: '例）山田　花子', suffix: '様'};
+/** メーカーへの見積依頼・デモ機依頼の商品名（種類を切り替えても引き継ぐ） */
+const SHOUHIN: DetailField = {key: 'product', label: '商品名', placeholder: '例）NEO-1W'};
 
 export const FAX_KINDS: FaxKind[] = [
   {
@@ -125,8 +128,19 @@ export const FAX_KINDS: FaxKind[] = [
     label: 'メーカーへ見積依頼',
     subject: '御見積りのお願い',
     body: [GREETING, '〇〇の御見積りをお願いいたします。', PLEASE_CHECK].join('\n'),
-    fill: {key: 'product', label: '商品名', placeholder: '例）NEO-1W'},
+    fill: SHOUHIN,
     lines: [{key: 'quantity', label: '数量', placeholder: '例）1台'}],
+    audience: 'business',
+    pages: 1,
+  },
+  {
+    // 商品名は文の中に入れず、「・NEO-1W」のように1行で別に書く
+    id: 'demo',
+    label: 'デモ機依頼',
+    subject: 'デモ機貸出のお願い',
+    body: [GREETING, '下記商品のデモ機の貸出をお願いいたします。', '・〇〇', PLEASE_CHECK].join('\n'),
+    fill: SHOUHIN,
+    lines: [],
     audience: 'business',
     pages: 1,
   },
