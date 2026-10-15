@@ -61,7 +61,11 @@ const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : 
 // ---- 差出人（自社）の情報 ----
 
 export interface SenderInfo {
+  /** グループ名（会社名の上に小さく入れる） */
+  group: string;
   company: string;
+  /** 営業部などの部署名（営業所名の前に入れる） */
+  department: string;
   office: string;
   person: string;
   postal: string;
@@ -70,9 +74,11 @@ export interface SenderInfo {
   fax: string;
 }
 
-/** 既存のFAX送信票に印字されている内容 */
+/** 既存のFAX送信票に印字されている内容（グループ名・営業部名は、あとから加えたもの） */
 export const DEFAULT_SENDER: SenderInfo = {
+  group: '太陽セランドグループ',
   company: '太陽シルバーサービス株式会社',
+  department: '東九州営業部',
   office: '行橋営業所',
   person: '久保　匠史',
   postal: '824-0043',

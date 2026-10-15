@@ -276,14 +276,27 @@
 .fx-c-sender {
   top: 209.3mm;
   left: 20mm;
+  box-sizing: border-box;
   height: 59.5mm;
+  /* 上はグループ名の文字が行の上いっぱいにあり、下は担当の行に行間が残るので、
+     見た目の上下の余白が同じになるよう、少しだけ下へずらす */
+  padding-top: 1.6mm;
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
 
+/* グループ名。社名の上に小さく入れる（.fx-sheet p の margin: 0 より強くするため .fx-classic を付ける） */
+.fx-classic .fx-c-group {
+  margin-bottom: 1.6mm;
+  font-family: var(--fx-maru), sans-serif;
+  font-size: 12pt;
+  line-height: 1;
+  letter-spacing: 0.1em;
+}
+
 /*
- * ワードアートの社名。縁取り付きの丸ゴシックで、営業所名（2行目）も左端をそろえる。
+ * ワードアートの社名。縁取り付きの丸ゴシックで、営業部名・営業所名（2行目）も左端をそろえる。
  * 元の文書（26.5pt・行間0.95）では2行がくっついて窮屈に見えるので、少し小さくして
  * 行のあいだと文字のあいだをあけ、縁取りも少し細くしている
  */
@@ -305,10 +318,10 @@
  * 「TEL」「FAX」「担当」の幅をそろえて、TELと担当の「：」の位置を合わせる
  */
 .fx-c-contact {
-  margin-top: 4.5mm;
+  margin-top: 3.5mm;
   font-family: var(--fx-maru), sans-serif;
   font-size: 11pt;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 .fx-c-contact:empty {
@@ -422,6 +435,11 @@
   font-size: 10.5pt;
   line-height: 1.6;
   text-align: center;
+}
+
+.fx-table .fx-t-footer-group {
+  font-size: 10pt;
+  letter-spacing: 0.1em;
 }
 
 .fx-table .fx-t-footer-name {

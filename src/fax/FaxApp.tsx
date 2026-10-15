@@ -55,7 +55,9 @@ const RECIPIENT_LABELS: Record<Audience, {org: string; orgPlaceholder: string; p
 };
 
 const SENDER_FIELDS: {key: keyof SenderInfo; label: string}[] = [
+  {key: 'group', label: 'グループ名'},
   {key: 'company', label: '会社名'},
+  {key: 'department', label: '営業部名'},
   {key: 'office', label: '営業所名'},
   {key: 'person', label: '担当者（送信者）'},
   {key: 'postal', label: '郵便番号'},
@@ -494,7 +496,7 @@ export function FaxApp() {
                 設定（差出人・保存した宛先）
               </span>
               <span className="flex items-center gap-2 text-xs text-slate-500">
-                {[sender.company, sender.office].filter(Boolean).join(' ')}
+                {[sender.company, sender.department, sender.office].filter(Boolean).join(' ')}
                 {sender.person && `／担当 ${sender.person}`}
                 <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden />
               </span>

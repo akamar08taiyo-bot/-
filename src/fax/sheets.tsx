@@ -147,6 +147,9 @@ const dateTokens = (text: string) => text.match(/\d+|./gu) ?? [];
 /** 枚数は1桁なら全角（元の送信票と同じ「４枚」）、2桁以上は半角 */
 const pagesText = (n: number) => (n < 10 ? String.fromCharCode(0xff10 + n) : String(n));
 
+/** 営業部名と営業所名を1行にする（例：東九州営業部　行橋営業所） */
+const officeLine = (sender: SenderInfo) => [sender.department, sender.office].filter(Boolean).join('　');
+
 function ClassicSheet({data, font, preview, onOverflowChange}: SheetProps) {
   const boxRef = useOverflowReport(onOverflowChange);
   const {sender} = data;
@@ -185,13 +188,14 @@ function ClassicSheet({data, font, preview, onOverflowChange}: SheetProps) {
         <Body parts={data.body} preview={preview} />
         <Details details={data.details} />
       </div>
-      {/* 差出人は上から 会社名 → 住所 → TEL・FAX（横並び） → 担当 の順に並べる */}
+      {/* 差出人は上から グループ名 → 会社名 → 営業部名・営業所名 → 住所 → TEL・FAX（横並び） → 担当 の順に並べる */}
       <div className="fx-c-sender">
+        {sender.group && <p className="fx-c-group">{sender.group}</p>}
         <div className="fx-c-company">
           <p>
             <KanaText text={toHalfWidthKatakana(sender.company)} />
           </p>
-          {sender.office && <p>{sender.office}</p>}
+          {officeLine(sender) && <p>{officeLine(sender)}</p>}
         </div>
         <div className="fx-c-contact">
           {address && <p className="fx-c-address">{address}</p>}
@@ -311,7 +315,8 @@ function TableSheet({data, font, preview, onOverflowChange}: SheetProps) {
         <p className="fx-t-end">以上</p>
       </div>
       <footer className="fx-t-footer">
-        <p className="fx-t-footer-name">{[sender.company, sender.office].filter(Boolean).join('　')}</p>
+        {sender.group && <p className="fx-t-footer-group">{sender.group}</p>}
+        <p className="fx-t-footer-name">{[sender.company, officeLine(sender)].filter(Boolean).join('　')}</p>
         {address && <p>{address}</p>}
         {phones && <p>{phones}</p>}
       </footer>
@@ -326,8 +331,9 @@ function LetterSheet({data, font, preview, onOverflowChange}: SheetProps) {
   const mainRef = useOverflowReport(onOverflowChange);
   const {sender, to} = data;
   const senderLines = [
+    sender.group,
     sender.company,
-    sender.office,
+    officeLine(sender),
     [sender.postal && `〒${sender.postal}`, sender.address].filter(Boolean).join('　'),
     [sender.tel && `TEL ${sender.tel}`, sender.fax && `FAX ${sender.fax}`].filter(Boolean).join('　'),
     sender.person && `担当：${sender.person}`,
