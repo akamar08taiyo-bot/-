@@ -282,12 +282,17 @@
   justify-content: center;
 }
 
-/* ワードアートの社名。縁取り付きの丸ゴシックで、営業所名（2行目）も左端をそろえる */
+/*
+ * ワードアートの社名。縁取り付きの丸ゴシックで、営業所名（2行目）も左端をそろえる。
+ * 元の文書（26.5pt・行間0.95）では2行がくっついて窮屈に見えるので、少し小さくして
+ * 行のあいだと文字のあいだをあけ、縁取りも少し細くしている
+ */
 .fx-c-company {
   font-family: var(--fx-maru), sans-serif;
-  font-size: 26.5pt;
-  line-height: 0.95;
-  -webkit-text-stroke: 0.26mm #000;
+  font-size: 24pt;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+  -webkit-text-stroke: 0.2mm #000;
 }
 
 /* 社名の半角カナの濁点（KanaText を参照） */
@@ -297,10 +302,10 @@
 
 /* 住所・TEL・FAX・担当。「TEL」「FAX」「担当」の幅をそろえて「：」の位置を合わせる */
 .fx-c-contact {
-  margin-top: 5mm;
+  margin-top: 4mm;
   font-family: var(--fx-maru), sans-serif;
   font-size: 11pt;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 .fx-c-contact:empty {
