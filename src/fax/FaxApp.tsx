@@ -3,7 +3,7 @@ import type {ReactNode, Ref} from 'react';
 import {AlertTriangle, Check, ChevronDown, Minus, Plus, Printer, RotateCcw, Save, Settings2, Trash2} from 'lucide-react';
 import {SHEET_FONTS, fontPreviewStyle, sanitizeFont} from './fonts';
 import type {SheetFont} from './fonts';
-import {describeRecipient, rememberRecipient} from './recipient';
+import {describeRecipient, recipientSuggestions, rememberRecipient} from './recipient';
 import {FaxSheet} from './sheets';
 import type {SheetData} from './sheets';
 import {
@@ -95,7 +95,8 @@ export function FaxApp() {
   const orgInputRef = useRef<HTMLInputElement>(null);
   const fillInputRef = useRef<HTMLInputElement>(null);
   const kindSectionRef = useRef<HTMLElement>(null);
-  const savedListId = useId();
+  const orgListId = useId();
+  const personListId = useId();
 
   const kind = kindId ? findKind(kindId) : null;
   const template = kind ? effectiveTemplate(kind, customTemplates) : null;
@@ -125,11 +126,11 @@ export function FaxApp() {
     }
   };
 
-  /** 居宅名の欄。保存した宛先の候補を選んだときは、ケアマネ名まで入れる */
-  const changeOrg = (value: string) => {
-    const picked = savedRecipients.find((r) => describeRecipient(r).line === value);
-    setRecipient(picked ? {org: picked.org, person: picked.person} : (prev) => ({...prev, org: value}));
-  };
+  // 居宅名の候補は居宅名だけ、ケアマネ名の候補はその居宅で使ったケアマネ名だけ
+  const suggestions = useMemo(
+    () => recipientSuggestions(savedRecipients, recipient.org),
+    [savedRecipients, recipient.org],
+  );
 
   const updateDraft = (patch: Partial<TextTemplate>) => {
     if (!kind || !template) return;
@@ -280,11 +281,11 @@ export function FaxApp() {
                         id={id}
                         ref={orgInputRef}
                         type="text"
-                        list={savedRecipients.length > 0 ? savedListId : undefined}
+                        list={suggestions.orgs.length > 0 ? orgListId : undefined}
                         value={recipient.org}
-                        onChange={(e) => changeOrg(e.target.value)}
+                        onChange={(e) => setRecipient((prev) => ({...prev, org: e.target.value}))}
                         placeholder={
-                          savedRecipients.length > 0 ? '入力すると保存した宛先が候補に出ます' : labels.orgPlaceholder
+                          suggestions.orgs.length > 0 ? '入力すると保存した宛先が候補に出ます' : labels.orgPlaceholder
                         }
                         autoComplete="off"
                         aria-invalid={showErrors && recipientMissing}
@@ -292,9 +293,9 @@ export function FaxApp() {
                       />
                     )}
                   </Labeled>
-                  <datalist id={savedListId}>
-                    {savedRecipients.map((r) => (
-                      <option key={r.id} value={describeRecipient(r).line} />
+                  <datalist id={orgListId}>
+                    {suggestions.orgs.map((org) => (
+                      <option key={org} value={org} />
                     ))}
                   </datalist>
                   {showErrors && recipientMissing && <ErrorText>{labels.org}を入力してください。</ErrorText>}
@@ -306,6 +307,7 @@ export function FaxApp() {
                         <input
                           id={id}
                           type="text"
+                          list={suggestions.persons.length > 0 ? personListId : undefined}
                           value={recipient.person}
                           onChange={(e) => setRecipient((prev) => ({...prev, person: e.target.value}))}
                           placeholder="例）佐藤"
@@ -315,6 +317,11 @@ export function FaxApp() {
                       </WithSuffix>
                     )}
                   </Labeled>
+                  <datalist id={personListId}>
+                    {suggestions.persons.map((person) => (
+                      <option key={person} value={person} />
+                    ))}
+                  </datalist>
                 </div>
                 {inputFields.map((f) => {
                   const isFill = !!kind?.fill && f.key === kind.fill.key;

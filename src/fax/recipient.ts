@@ -37,6 +37,29 @@ const normalize = (s: string) => s.normalize('NFKC').replace(/\s+/g, '').toLower
 const recipientKey = (r: Pick<Recipient, 'org' | 'person'>) => `${normalize(r.org)}|${normalize(r.person)}`;
 
 /**
+ * 居宅名の欄・ケアマネ名の欄それぞれの入力候補（新しく使った順）。
+ * 居宅名は事業所名だけを1つずつ。ケアマネ名は、入力中の居宅名で使ったことのある名前だけ
+ * （その居宅でまだ使っていなければ、保存したすべての名前）。
+ */
+export function recipientSuggestions(list: SavedRecipient[], currentOrg: string): {orgs: string[]; persons: string[]} {
+  const recent = [...list].sort((a, b) => b.lastUsed - a.lastUsed);
+  const unique = (values: string[]) => {
+    const seen = new Set<string>();
+    return values.filter((v) => {
+      const k = normalize(v);
+      if (!k || seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  };
+  const orgs = unique(recent.map((r) => r.org.trim()));
+  const orgKey = normalize(currentOrg);
+  const sameOrg = orgKey ? unique(recent.filter((r) => normalize(r.org) === orgKey).map((r) => r.person.trim())) : [];
+  const persons = sameOrg.length > 0 ? sameOrg : unique(recent.map((r) => r.person.trim()));
+  return {orgs, persons};
+}
+
+/**
  * 印刷した宛先を宛先帳の先頭に入れる（同じ宛先は上書きして1件にまとめる）。
  * 印刷ボタンと Ctrl+P の両方から呼ばれても結果が同じになるよう、何度呼んでも1件のまま。
  */
