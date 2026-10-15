@@ -274,7 +274,8 @@ export function FaxApp() {
 
             <StepCard step={2} title={`宛名・${(kind?.fill ?? RIYOUSHA).label}・枚数`}>
               <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
-                <div className="min-w-[13rem] flex-[1.6]">
+                {/* 最小幅は文字の大きさに合わせる（どの画面でも居宅名が13文字ほど収まる） */}
+                <div className="min-w-[calc(var(--fx-field-text)*15)] flex-[1.6]">
                   <Labeled label={labels.org} required>
                     {(id) => (
                       <input
@@ -300,7 +301,7 @@ export function FaxApp() {
                   </datalist>
                   {showErrors && recipientMissing && <ErrorText>{labels.org}を入力してください。</ErrorText>}
                 </div>
-                <div className="w-40">
+                <div className="w-36">
                   <Labeled label={labels.person}>
                     {(id) => (
                       <WithSuffix suffix="様">
@@ -352,6 +353,8 @@ export function FaxApp() {
                 <Labeled label="枚数（本状含む）">
                   {(id) => <PageCounter id={id} value={pages} onChange={changePages} />}
                 </Labeled>
+                {/* 右端の余白。居宅名・ご利用者名などの欄が行いっぱいまで広がりすぎないよう、空いた幅の一部をここに回す */}
+                <div aria-hidden className="hidden flex-[0.45] lg:block" />
               </div>
             </StepCard>
 
