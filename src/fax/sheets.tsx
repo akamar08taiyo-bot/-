@@ -150,6 +150,7 @@ const pagesText = (n: number) => (n < 10 ? String.fromCharCode(0xff10 + n) : Str
 function ClassicSheet({data, font, preview, onOverflowChange}: SheetProps) {
   const boxRef = useOverflowReport(onOverflowChange);
   const {sender} = data;
+  const address = [sender.postal && `〒${sender.postal}`, sender.address].filter(Boolean).join('　');
   return (
     <div className="fx-sheet fx-classic" style={sheetFontStyle(font)}>
       <StripeTop />
@@ -184,27 +185,33 @@ function ClassicSheet({data, font, preview, onOverflowChange}: SheetProps) {
         <Body parts={data.body} preview={preview} />
         <Details details={data.details} />
       </div>
-      <div className="fx-c-company">
-        <p>
-          <KanaText text={toHalfWidthKatakana(sender.company)} />
-        </p>
-        {sender.office && <p>{sender.office}</p>}
+      {/* 差出人は上から 会社名 → 住所 → TEL → FAX → 担当 の順に並べる */}
+      <div className="fx-c-sender">
+        <div className="fx-c-company">
+          <p>
+            <KanaText text={toHalfWidthKatakana(sender.company)} />
+          </p>
+          {sender.office && <p>{sender.office}</p>}
+        </div>
+        <div className="fx-c-contact">
+          {address && <p className="fx-c-address">{address}</p>}
+          {sender.tel && (
+            <p className="fx-c-tel">
+              <span className="fx-c-label">TEL</span>：{sender.tel}
+            </p>
+          )}
+          {sender.fax && (
+            <p className="fx-c-fax">
+              <span className="fx-c-label">FAX</span>：{sender.fax}
+            </p>
+          )}
+          {sender.person && (
+            <p className="fx-c-person">
+              <span className="fx-c-label">担当</span>：{sender.person}
+            </p>
+          )}
+        </div>
       </div>
-      {sender.person && (
-        <p className="fx-c-person">
-          <span className="fx-u">
-            <span className="fx-maru">担当</span>：　{sender.person}
-          </span>
-        </p>
-      )}
-      {sender.postal && <p className="fx-c-postal">〒{sender.postal}</p>}
-      {sender.tel && <p className="fx-c-tel">TEL ：{sender.tel}</p>}
-      {sender.address && (
-        <p className="fx-c-address">
-          <span className="fx-u">{sender.address}</span>
-        </p>
-      )}
-      {sender.fax && <p className="fx-c-fax">FAX ：{sender.fax}</p>}
       <StripeBottom />
     </div>
   );
