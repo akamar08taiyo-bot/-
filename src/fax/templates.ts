@@ -191,3 +191,62 @@ export function fillParts(text: string, value: string): TextPart[] {
   if (last < text.length) parts.push({text: text.slice(last), filled: false});
   return parts;
 }
+
+// ---- 画面の文章欄での「〇〇」の表示 ----
+
+/** 画面の文章欄に出す文字と、〇〇に値を入れた範囲 [始め, 終わり) */
+export interface FilledDisplay {
+  text: string;
+  spans: [number, number][];
+}
+
+/** 文章の「〇〇」に値を入れて、画面の文章欄に出す文字を作る（値が未入力なら〇〇のまま） */
+export function fillDisplay(text: string, value: string): FilledDisplay {
+  let out = '';
+  const spans: [number, number][] = [];
+  for (const part of fillParts(text, value)) {
+    if (!part.filled) {
+      out += part.text;
+      continue;
+    }
+    const shown = part.text || '〇〇';
+    spans.push([out.length, out.length + shown.length]);
+    out += shown;
+  }
+  return {text: out, spans};
+}
+
+/**
+ * 画面の文章欄で書き換えた文字（〇〇に値を入れたもの）を、〇〇入りの文面に戻す。
+ * 値の部分に触れない書き換えなら〇〇はそのまま残るので、あとで名前を変えても文章が連動する。
+ * 値の部分そのものを書き換えたときだけ、その部分は書き換えたとおりの文字になる（連動しなくなる）。
+ * 保存する文面も〇〇入りのままなので、次回は別の名前が入る。
+ */
+export function applyFilledEdit(template: string, value: string, edited: string): string {
+  const before = fillDisplay(template, value);
+  const old = before.text;
+  if (edited === old) return template;
+  // 前後の同じ部分を除いて、書き換えた範囲を求める
+  let start = 0;
+  const limit = Math.min(old.length, edited.length);
+  while (start < limit && old[start] === edited[start]) start++;
+  let endOld = old.length;
+  let endNew = edited.length;
+  while (endOld > start && endNew > start && old[endOld - 1] === edited[endNew - 1]) {
+    endOld--;
+    endNew--;
+  }
+  const delta = endNew - endOld;
+  const inserted = start === endOld;
+  let out = '';
+  let pos = 0;
+  for (const [s, e] of before.spans) {
+    // 値の文字の途中に打ち込んだ・値の文字を消したり書き換えたりしたものは、書き換えたとおりにする
+    const touched = inserted ? s < start && start < e : s < endOld && e > start;
+    if (touched) continue;
+    const [ns, ne] = e <= start ? [s, e] : [s + delta, e + delta];
+    out += edited.slice(pos, ns) + '〇〇';
+    pos = ne;
+  }
+  return out + edited.slice(pos);
+}

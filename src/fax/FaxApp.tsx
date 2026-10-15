@@ -16,7 +16,16 @@ import {
   usePersistentState,
 } from './storage';
 import type {Recipient, SavedRecipient, SenderInfo, SheetLayout} from './storage';
-import {FAX_KINDS, RIYOUSHA, effectiveTemplate, fillParts, findKind, hasFillMark} from './templates';
+import {
+  FAX_KINDS,
+  RIYOUSHA,
+  applyFilledEdit,
+  effectiveTemplate,
+  fillDisplay,
+  fillParts,
+  findKind,
+  hasFillMark,
+} from './templates';
 import type {Audience, CustomTemplates, DetailField, DetailKey, FaxKindId, TextTemplate} from './templates';
 import {formatWareki, todayIso} from './wareki';
 
@@ -351,8 +360,10 @@ export function FaxApp() {
                             <input
                               id={id}
                               type="text"
-                              value={draft.subject}
-                              onChange={(e) => updateDraft({subject: e.target.value})}
+                              value={fillDisplay(draft.subject, fillValue).text}
+                              onChange={(e) =>
+                                updateDraft({subject: applyFilledEdit(draft.subject, fillValue, e.target.value)})
+                              }
                               className={inputClass}
                             />
                           )}
@@ -377,8 +388,9 @@ export function FaxApp() {
                     </Labeled>
                   </div>
                   <BodyEditor
-                    value={draft.body}
-                    onChange={(body) => updateDraft({body})}
+                    // 文章の欄にも、〇〇に入力した名前を入れて見せる（保存するのは〇〇入りの文面）
+                    value={fillDisplay(draft.body, fillValue).text}
+                    onChange={(text) => updateDraft({body: applyFilledEdit(draft.body, fillValue, text)})}
                     actions={
                       <>
                         <button
