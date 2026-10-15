@@ -185,7 +185,7 @@ function ClassicSheet({data, font, preview, onOverflowChange}: SheetProps) {
         <Body parts={data.body} preview={preview} />
         <Details details={data.details} />
       </div>
-      {/* 差出人は上から 会社名 → 住所 → TEL → FAX → 担当 の順に並べる */}
+      {/* 差出人は上から 会社名 → 住所 → TEL・FAX（横並び） → 担当 の順に並べる */}
       <div className="fx-c-sender">
         <div className="fx-c-company">
           <p>
@@ -195,14 +195,18 @@ function ClassicSheet({data, font, preview, onOverflowChange}: SheetProps) {
         </div>
         <div className="fx-c-contact">
           {address && <p className="fx-c-address">{address}</p>}
-          {sender.tel && (
-            <p className="fx-c-tel">
-              <span className="fx-c-label">TEL</span>：{sender.tel}
-            </p>
-          )}
-          {sender.fax && (
-            <p className="fx-c-fax">
-              <span className="fx-c-label">FAX</span>：{sender.fax}
+          {(sender.tel || sender.fax) && (
+            <p>
+              {sender.tel && (
+                <span className="fx-c-tel">
+                  <span className="fx-c-label">TEL</span>：{sender.tel}
+                </span>
+              )}
+              {sender.fax && (
+                <span className="fx-c-fax">
+                  <span className="fx-c-label">FAX</span>：{sender.fax}
+                </span>
+              )}
             </p>
           )}
           {sender.person && (

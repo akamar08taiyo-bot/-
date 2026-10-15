@@ -300,12 +300,15 @@
   display: inline-block;
 }
 
-/* 住所・TEL・FAX・担当。「TEL」「FAX」「担当」の幅をそろえて「：」の位置を合わせる */
+/*
+ * 住所・TEL・FAX・担当。TELとFAXは1行に横並び。
+ * 「TEL」「FAX」「担当」の幅をそろえて、TELと担当の「：」の位置を合わせる
+ */
 .fx-c-contact {
-  margin-top: 4mm;
+  margin-top: 4.5mm;
   font-family: var(--fx-maru), sans-serif;
   font-size: 11pt;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 .fx-c-contact:empty {
@@ -315,6 +318,10 @@
 .fx-c-label {
   display: inline-block;
   width: 2em;
+}
+
+.fx-c-tel + .fx-c-fax {
+  margin-left: 2em;
 }
 
 /*
