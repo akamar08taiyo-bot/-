@@ -351,7 +351,7 @@
 .fx-table {
   display: flex;
   flex-direction: column;
-  padding: 16.5mm 20.5mm 9.5mm;
+  padding: 19mm 20.5mm 9.5mm;
   font-family: var(--fx-yu), sans-serif;
   font-size: 11pt;
 }
@@ -368,19 +368,19 @@
 }
 
 /*
- * 見出し・件名・表のあいだと、表の行の高さは、下の余っている場所を少し使ってゆったりさせている
- * （見出しと件名 0→3.5mm、件名と表 8→11mm、表の行の上下 2→3.2mm、表と本文 8→11mm）。
+ * 本文の場所は広く余るので、見出しのまわりと表（送信日・送信先など）はそこを使ってゆったりさせている
+ * （用紙の上 16.5→19mm、見出しと件名 0→5mm、件名と表 8→14mm、表の行の上下 2→4.2mm、表と本文 8→13mm）。
  * 件名は p なので、.fx-sheet p の margin: 0 より強くなるよう .fx-table を付ける
  */
 .fx-table .fx-t-subtitle {
-  margin-top: 3.5mm;
+  margin-top: 5mm;
   font-size: 12pt;
 }
 
 .fx-t-info {
   /* Wordの表と同じく、左の余白に少しはみ出させる */
   width: calc(100% - 1.1mm);
-  margin-top: 11mm;
+  margin-top: 14mm;
   margin-left: -1.8mm;
   border-collapse: collapse;
   table-layout: fixed;
@@ -388,7 +388,7 @@
 }
 
 .fx-t-info td {
-  padding: 3.2mm 1.5mm;
+  padding: 4.2mm 1.5mm;
   border-bottom: 0.15mm solid #000;
   vertical-align: top;
   overflow-wrap: anywhere;
@@ -406,7 +406,7 @@
   flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
-  margin-top: 11mm;
+  margin-top: 13mm;
   font-size: 11pt;
   line-height: 2.35;
 }
