@@ -269,28 +269,24 @@
 }
 
 /*
- * 差出人。上から 会社名 → 住所 → TEL → FAX → 担当 の順に並べる。
- * 上の枠の下（209.3mm）から下の帯（268.8mm）までのあいだで、上下も左右も枠のまん中に置く。
- * 上と下の余白はいつも同じになる（空欄の項目があれば、詰めてまん中に置き直す）。
- * 住所・TEL・FAX・担当は、左端をそろえたひとかたまりのまま、まん中に置く
+ * 差出人。上から 会社名 → 住所 → TEL → FAX → 担当 の順に、すべて左揃えで並べる。
+ * 左端は宛名・拝啓と同じ20mm。上下は、上の枠の下（209.3mm）から下の帯（268.8mm）までのあいだの
+ * まん中に置くので、上と下の余白はいつも同じになる（空欄の項目があれば、詰めてまん中に置き直す）
  */
 .fx-c-sender {
   top: 209.3mm;
-  left: 18mm;
-  width: 170.3mm;
+  left: 20mm;
   height: 59.5mm;
   display: flex;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
 }
 
-/* ワードアートの社名。縁取り付きの丸ゴシックで、営業所名（2行目）は社名の中央にそろえる */
+/* ワードアートの社名。縁取り付きの丸ゴシックで、営業所名（2行目）も左端をそろえる */
 .fx-c-company {
   font-family: var(--fx-maru), sans-serif;
   font-size: 26.5pt;
   line-height: 0.95;
-  text-align: center;
   -webkit-text-stroke: 0.26mm #000;
 }
 
