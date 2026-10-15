@@ -124,11 +124,7 @@ export const FAX_KINDS: FaxKind[] = [
     id: 'mitsumoriIrai',
     label: 'メーカーへ見積依頼',
     subject: '御見積りのお願い',
-    body: [
-      GREETING,
-      '〇〇の御見積りをお願いいたします。',
-      'お忙しいところ恐れ入りますが、価格・納期をご確認のうえ、ご回答くださいますようお願いいたします。',
-    ].join('\n'),
+    body: [GREETING, '〇〇の御見積りをお願いいたします。', PLEASE_CHECK].join('\n'),
     fill: {key: 'product', label: '商品名', placeholder: '例）NEO-1W'},
     lines: [{key: 'quantity', label: '数量', placeholder: '例）1台'}],
     audience: 'business',
