@@ -195,7 +195,7 @@ function ClassicSheet({data, font, preview, onOverflowChange}: SheetProps) {
           <p>
             <KanaText text={toHalfWidthKatakana(sender.company)} />
           </p>
-          {officeLine(sender) && <p>{officeLine(sender)}</p>}
+          {officeLine(sender) && <p className="fx-c-office">{officeLine(sender)}</p>}
         </div>
         <div className="fx-c-contact">
           {address && <p className="fx-c-address">{address}</p>}

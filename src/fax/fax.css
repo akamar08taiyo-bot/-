@@ -308,6 +308,12 @@
   -webkit-text-stroke: 0.2mm #000;
 }
 
+/* 営業部名・営業所名の行。社名より少し小さくし、縁取りも大きさに合わせて細くする */
+.fx-classic .fx-c-office {
+  font-size: 18pt;
+  -webkit-text-stroke: 0.15mm #000;
+}
+
 /* 社名の半角カナの濁点（KanaText を参照） */
 .fx-kana-mark {
   display: inline-block;
