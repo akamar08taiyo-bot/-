@@ -1,0 +1,342 @@
+/* このアプリのファイルだけを見て Tailwind のクラスを作る（同じリポジトリのほかのアプリの分は入れない） */
+@import 'tailwindcss' source(none);
+@source './';
+
+html,
+body {
+  margin: 0;
+  background: #f3f6fa;
+  font-family: 'Yu Gothic UI', 'Meiryo', 'BIZ UDPGothic', 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif;
+}
+
+/* ---------------------------------------------------------------- 印刷イメージ（画面） */
+.print-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow: auto;
+  background: #525659;
+}
+.print-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 10px 16px;
+  background: #0c315e;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+.print-root {
+  padding: 16px 8px 40px;
+}
+
+/* ---------------------------------------------------------------- 帳票（A4縦・明朝・ネイビー） */
+.sheet {
+  box-sizing: border-box;
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto 16px;
+  padding: 13mm 12mm;
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  color: #1f2937;
+  font-family: 'BIZ UDPMincho', 'BIZ UDP明朝 Medium', 'Yu Mincho', 'YuMincho', 'Hiragino Mincho ProN', 'Noto Serif JP', serif;
+  font-size: 9.5pt;
+  line-height: 1.6;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.sheet .doc-title {
+  margin-bottom: 5mm;
+  padding: 0 0 2mm 0.5em;
+  border-bottom: 1.5px solid #3b82f6;
+  color: #1e3a8a;
+  font-size: 22pt;
+  font-weight: 700;
+  letter-spacing: 0.5em;
+  text-align: center;
+}
+.sheet .doc-title.job-title {
+  font-size: 17pt;
+  letter-spacing: 0.15em;
+}
+.sheet .doc-head {
+  display: flex;
+  gap: 6mm;
+  align-items: flex-start;
+}
+.sheet .doc-head .left {
+  flex: 1;
+  min-width: 0;
+}
+.sheet .doc-head .right {
+  width: 72mm;
+  font-size: 8.5pt;
+}
+.sheet .to {
+  display: inline-block;
+  min-width: 78mm;
+  padding-bottom: 1mm;
+  border-bottom: 1px solid #1e3a8a;
+  font-size: 15pt;
+  font-weight: 700;
+}
+.sheet .to small {
+  margin-left: 3mm;
+  color: #2563eb;
+  font-size: 10.5pt;
+}
+.sheet .greeting {
+  margin: 3mm 0 0;
+  font-size: 8.5pt;
+}
+.sheet .subject {
+  margin: 1mm 0 0;
+}
+.sheet .amount-box {
+  display: flex;
+  width: 104mm;
+  margin-top: 4mm;
+  border: 1.5px solid #1e3a8a;
+}
+.sheet .amount-box .k {
+  display: flex;
+  align-items: center;
+  padding: 2mm 3mm;
+  background: #dbeafe;
+  color: #1e3a8a;
+  font-weight: 700;
+}
+.sheet .amount-box .v {
+  flex: 1;
+  padding: 1mm 4mm;
+  font-size: 17pt;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.sheet .due {
+  margin: 2mm 0 0;
+  font-size: 9pt;
+}
+.sheet .meta {
+  margin-bottom: 3mm;
+  text-align: right;
+}
+.sheet .issuer {
+  padding: 2mm 3mm;
+  border: 1px solid #bfdbfe;
+  background: #f0f7ff;
+  line-height: 1.55;
+}
+.sheet .issuer .company {
+  color: #1e3a8a;
+  font-size: 11pt;
+  font-weight: 700;
+}
+.sheet .issuer .office {
+  font-size: 9.5pt;
+  font-weight: 700;
+}
+
+.sheet table.items {
+  width: 100%;
+  margin-top: 5mm;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.sheet table.items th {
+  padding: 1.2mm 1.2mm;
+  border: 1px solid #93c5fd;
+  background: #dbeafe;
+  color: #1e3a8a;
+  font-size: 8.5pt;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+.sheet table.items td {
+  padding: 1.2mm 1.5mm;
+  border: 1px solid #bfdbfe;
+  font-size: 9pt;
+  vertical-align: middle;
+}
+.sheet table.items tbody tr:nth-child(even) td {
+  background: #f8fbff;
+}
+.sheet table.items td.num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.sheet table.items.invoice td.num {
+  font-size: 8.5pt;
+}
+.sheet table.items td.c {
+  text-align: center;
+}
+.sheet table.items td.r {
+  text-align: right;
+}
+.sheet table.items td.name {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.45;
+}
+.sheet table.items td.code {
+  font-size: 8pt;
+  overflow-wrap: anywhere;
+}
+.sheet table.items td.strong {
+  font-weight: 700;
+}
+.sheet table.items td.muted {
+  color: #9ca3af;
+}
+.sheet table.items tfoot td {
+  background: #eff6ff;
+  font-weight: 700;
+}
+/* 元の仕切り計算表の色（部材＝黄、施工費＝青）を薄くして使う */
+.sheet table.items td.kind.material {
+  background: #fff59d !important;
+  font-size: 8.5pt;
+  font-weight: 700;
+}
+.sheet table.items td.kind.labor {
+  background: #b3e5fc !important;
+  font-size: 8.5pt;
+  font-weight: 700;
+}
+.sheet .breakdown {
+  margin: 2mm 0 0;
+  font-size: 8.5pt;
+  text-align: right;
+}
+.sheet .bank {
+  margin-top: 5mm;
+  padding: 1.5mm 0;
+  border-bottom: 1px solid #93c5fd;
+}
+.sheet .bank .k {
+  display: inline-block;
+  width: 22mm;
+  color: #1e3a8a;
+  font-weight: 700;
+}
+.sheet .remarks {
+  margin-top: 4mm;
+  padding: 1mm 3mm;
+  border-left: 3px solid #93c5fd;
+  font-size: 8.5pt;
+  white-space: pre-wrap;
+}
+
+/* 様邸の明細 */
+.sheet .customer {
+  display: inline-block;
+  min-width: 70mm;
+  padding-bottom: 1mm;
+  border-bottom: 1px solid #1e3a8a;
+  font-size: 15pt;
+  font-weight: 700;
+}
+.sheet table.info {
+  margin-top: 2mm;
+  border-collapse: collapse;
+  font-size: 9pt;
+}
+.sheet table.info th {
+  padding: 0.5mm 3mm 0.5mm 0;
+  color: #1e3a8a;
+  font-weight: 700;
+  text-align: left;
+  white-space: nowrap;
+  vertical-align: top;
+}
+.sheet table.info td {
+  padding: 0.5mm 0;
+}
+.sheet .issuer-small {
+  margin-top: 2mm;
+  color: #4b5563;
+  font-size: 8.5pt;
+}
+.sheet table.summary {
+  width: 84mm;
+  border-collapse: collapse;
+  font-size: 9.5pt;
+}
+.sheet table.summary td {
+  padding: 1mm 2mm;
+  border: 1.5px solid #1f2937;
+}
+.sheet table.summary td.no {
+  width: 7mm;
+  text-align: center;
+}
+.sheet table.summary td.num {
+  width: 26mm;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sheet table.summary tr.strong td {
+  font-weight: 700;
+}
+.sheet table.summary tr.strong td.label {
+  background: #9dc3e6;
+}
+.sheet .place {
+  break-inside: avoid;
+  margin-top: 5mm;
+}
+.sheet .place-name {
+  color: #1e3a8a;
+  font-size: 11pt;
+  font-weight: 700;
+}
+.sheet .place table.items {
+  margin-top: 1mm;
+}
+
+/* ---------------------------------------------------------------- 印刷するとき */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 11mm 11mm 12mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-overlay {
+    position: static;
+    overflow: visible;
+    background: none;
+  }
+  .print-toolbar {
+    display: none !important;
+  }
+  .print-root {
+    padding: 0;
+  }
+  .sheet {
+    width: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+    break-after: page;
+  }
+  .sheet:last-child {
+    break-after: auto;
+  }
+}

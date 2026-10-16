@@ -1,0 +1,231 @@
+import {useState} from 'react';
+import type {ReactNode} from 'react';
+import {DEFAULT_PLACES, OFFICES, settingsForOffice} from '../defaults.ts';
+import {hasSamples, withoutSamples} from '../samples.ts';
+import {backupJson, masterJson, mergeById, parseBackup} from '../storage.ts';
+import type {AppData, InvoiceTaxMode, Settings, TaxMode} from '../types.ts';
+import type {Update} from '../useStore.ts';
+import {downloadBlob, todayIso} from '../util.ts';
+import {Btn, NumberInput, TextInput, useToast} from './ui.tsx';
+
+function Section({title, children, note}: {title: string; children: ReactNode; note?: ReactNode}) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 className="mb-3 text-base font-bold text-[#0c315e]">{title}</h2>
+      {note && <p className="-mt-1 mb-3 text-xs leading-5 text-slate-500">{note}</p>}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div>
+    </section>
+  );
+}
+
+function Field({label, children, wide = false}: {label: string; children: ReactNode; wide?: boolean}) {
+  return (
+    <label className={`grid gap-1 text-xs font-bold text-slate-600 ${wide ? 'sm:col-span-2' : ''}`}>
+      {label}
+      {children}
+    </label>
+  );
+}
+
+export function SettingsPage({data, update}: {data: AppData; update: Update}) {
+  const toast = useToast();
+  const s = data.settings;
+  const set = (patch: Partial<Settings>) => update('settings', (prev) => ({...prev, ...patch}));
+  const text = (key: keyof Settings, placeholder = '') => (
+    <TextInput value={String(s[key] ?? '')} onChange={(v) => set({[key]: v} as Partial<Settings>)} className="w-full" placeholder={placeholder} />
+  );
+  const [pending, setPending] = useState<{name: string; data: Partial<AppData>} | null>(null);
+
+  const exportAll = () =>
+    downloadBlob(new Blob([backupJson(data)], {type: 'application/json'}), `仕切り計算・請求書_バックアップ_${todayIso()}.json`);
+  const exportMaster = () =>
+    downloadBlob(new Blob([masterJson(data)], {type: 'application/json'}), `部材リスト・手間単価_${todayIso()}.json`);
+
+  const readBackup = async (f: File) => {
+    try {
+      const parsed = parseBackup(await f.text());
+      setPending({name: f.name, data: parsed});
+    } catch (e) {
+      toast(`読み込めませんでした：${e instanceof Error ? e.message : String(e)}`, 'error');
+    }
+  };
+  const applyBackup = (replace: boolean) => {
+    if (!pending) return;
+    const d = pending.data;
+    if (d.materials) update('materials', (cur) => (replace ? d.materials! : mergeById(cur, d.materials!)));
+    if (d.labor) update('labor', (cur) => (replace ? d.labor! : mergeById(cur, d.labor!)));
+    if (d.jobs && (replace || d.jobs.length > 0)) update('jobs', (cur) => (replace ? d.jobs! : mergeById(cur, d.jobs!)));
+    if (d.settings && replace) update('settings', () => d.settings!);
+    setPending(null);
+    toast(replace ? 'バックアップの内容に置き換えました' : 'バックアップの内容を足しました');
+  };
+
+  return (
+    <div className="max-w-5xl space-y-4">
+      <Section title="請求先">
+        <Field label="請求先（工務店）の名前　※請求書には「○○　御中」と出ます">{text('clientName', '笹岡工務店')}</Field>
+      </Section>
+
+      <Section title="発行元（請求書に載せる自社の情報）" note="営業所を選ぶと住所・電話番号が入ります。太陽ポータルから開くと、ポータルで選んだ営業所が最初から入ります。">
+        <Field label="営業所">
+          <select
+            value={OFFICES.some((o) => o.name === s.officeName) ? s.officeName : ''}
+            onChange={(e) => e.target.value && update('settings', (prev) => settingsForOffice(prev, e.target.value))}
+            className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
+          >
+            <option value="">（選んでください）</option>
+            {OFFICES.map((o) => (
+              <option key={o.name} value={o.name}>
+                {o.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="会社名">{text('company')}</Field>
+        <Field label="営業所名（請求書に出る名前）">{text('officeName')}</Field>
+        <Field label="郵便番号">{text('postal')}</Field>
+        <Field label="住所" wide>
+          {text('address')}
+        </Field>
+        <Field label="電話番号">{text('tel')}</Field>
+        <Field label="FAX番号">{text('fax')}</Field>
+        <Field label="担当者">{text('person', '例：山本')}</Field>
+        <Field label="登録番号（インボイス）">{text('regNo', 'T＋13桁')}</Field>
+      </Section>
+
+      <Section title="請求書">
+        <Field label="お振込先（1行で）" wide>
+          {text('bank', '例：○○銀行 ○○支店 普通 1234567 口座名義 ○○○○')}
+        </Field>
+        <Field label="件名（「○年○月分」のあとに付く言葉）">{text('subject', '工事代金')}</Field>
+        <Field label="備考（請求書の下に出ます）" wide>
+          <textarea
+            value={s.invoiceNote}
+            onChange={(e) => set({invoiceNote: e.target.value})}
+            rows={3}
+            className="w-full rounded-md border border-slate-300 p-2 text-sm font-normal"
+            placeholder="例：恐れ入りますが、振込手数料は貴社にてご負担ください。"
+          />
+        </Field>
+      </Section>
+
+      <Section
+        title="計算のしかた"
+        note={
+          <>
+            ①部材代・②取付手間・③部材上乗せ（①×率）・④諸経費（（①＋②＋③）×率）・⑦税抜合計（①〜④）・⑤消費税・⑥合計（⑦＋⑤）は、元の「仕切り計算表」と同じ式です。
+          </>
+        }
+      >
+        <Field label="③部材上乗せ・④諸経費の率（元の表は 0.07）">
+          <NumberInput value={s.rate} onChange={(rate) => set({rate})} className="w-28" min={0} ariaLabel="率" />
+        </Field>
+        <Field label="消費税率（0.1＝10%）">
+          <NumberInput value={s.taxRate} onChange={(taxRate) => set({taxRate})} className="w-28" min={0} ariaLabel="消費税率" />
+        </Field>
+        <Field label="⑤消費税の1円未満">
+          <select value={s.taxMode} onChange={(e) => set({taxMode: e.target.value as TaxMode})} className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal">
+            <option value="original">元の表と同じ（⑦×0.1－1円・四捨五入）</option>
+            <option value="floor">切り捨て</option>
+            <option value="round">四捨五入</option>
+            <option value="ceil">切り上げ</option>
+          </select>
+        </Field>
+        <Field label="請求書（1か月分）の消費税">
+          <select
+            value={s.invoiceTaxMode}
+            onChange={(e) => set({invoiceTaxMode: e.target.value as InvoiceTaxMode})}
+            className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
+          >
+            <option value="perJob">様邸ごとの⑤消費税を足す（一覧に様邸ごとの消費税・合計を出す）</option>
+            <option value="monthly">1か月の税抜合計に対して1回だけ計算する（インボイスの端数処理）</option>
+          </select>
+        </Field>
+      </Section>
+
+      <Section title="箇所の候補" note="様邸の画面の「＋ 箇所を追加」に並ぶ名前です。1行に1つずつ書きます。">
+        <Field label="箇所の名前" wide>
+          <textarea
+            value={s.placePresets.join('\n')}
+            onChange={(e) => set({placePresets: e.target.value.split('\n').map((x) => x.trim()).filter(Boolean)})}
+            rows={5}
+            className="w-full rounded-md border border-slate-300 p-2 text-sm font-normal"
+          />
+          <span>
+            <Btn small color="white" onClick={() => set({placePresets: DEFAULT_PLACES})}>
+              最初の候補に戻す
+            </Btn>
+          </span>
+        </Field>
+      </Section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="mb-1 text-base font-bold text-[#0c315e]">データ（この端末のブラウザに保存）</h2>
+        <p className="mb-3 text-xs leading-5 text-slate-500">
+          入力した内容は、このパソコンのこのブラウザにだけ保存されます（サーバーには送りません）。ほかのパソコンでは見えないので、ときどきバックアップを保存してください。
+          部材リスト・手間単価だけを保存したファイルは、ほかの人に渡して読み込んでもらえます。
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Btn color="blue" onClick={exportAll}>
+            バックアップを保存（すべて）
+          </Btn>
+          <Btn color="teal" onClick={exportMaster}>
+            部材リスト・手間単価だけ保存（ほかの人に渡す用）
+          </Btn>
+          <label className="inline-flex cursor-pointer items-center rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50">
+            保存したファイルを読み込む
+            <input
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) readBackup(f);
+                e.target.value = '';
+              }}
+            />
+          </label>
+          {hasSamples(data) && (
+            <Btn
+              color="white"
+              onClick={() => {
+                const r = withoutSamples(data);
+                update('materials', () => r.materials);
+                update('jobs', () => r.jobs);
+                toast('サンプルの部材と様邸を消しました');
+              }}
+            >
+              サンプルを消す
+            </Btn>
+          )}
+        </div>
+        {pending && (
+          <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
+            <p className="font-bold text-slate-800">「{pending.name}」の中身</p>
+            <p className="text-slate-600">
+              部材 {pending.data.materials?.length ?? 0}件・取付手間 {pending.data.labor?.length ?? 0}件・様邸 {pending.data.jobs?.length ?? 0}件
+              {pending.data.settings ? '・設定' : ''}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Btn small color="blue" onClick={() => applyBackup(false)}>
+                今のデータに足す（同じものは上書き）
+              </Btn>
+              <Btn
+                small
+                color="rose"
+                onClick={() => {
+                  if (confirm('今のデータを消して、読み込んだファイルの内容に置き換えます。よろしいですか？')) applyBackup(true);
+                }}
+              >
+                今のデータを置き換える
+              </Btn>
+              <Btn small color="white" onClick={() => setPending(null)}>
+                やめる
+              </Btn>
+            </div>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
