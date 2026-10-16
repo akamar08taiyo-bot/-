@@ -1,4 +1,4 @@
-import {useEffect, useId, useLayoutEffect, useMemo, useRef, useState} from 'react';
+import {Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ReactNode, Ref} from 'react';
 import {AlertTriangle, Check, ChevronDown, Minus, Plus, Printer, RotateCcw, Save, Settings2, Trash2} from 'lucide-react';
 import {SHEET_FONTS, fontPreviewStyle, sanitizeFont} from './fonts';
@@ -503,15 +503,44 @@ export function FaxApp() {
 
         <div className="mx-auto max-w-[1440px] space-y-3 px-4 pb-8">
           <details className="group rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 rounded-2xl px-4 py-2.5 [&::-webkit-details-marker]:hidden">
-              <span className="flex items-center gap-2 text-sm font-bold text-slate-800">
-                <Settings2 className="h-4 w-4 text-slate-500" aria-hidden />
-                設定（差出人・保存した宛先）
+            {/* 1行目に見出しと「変更する」ボタン、2行目にいまの設定（右端まで使う） */}
+            <summary className="grid cursor-pointer list-none grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 rounded-2xl px-4 py-3 hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+              <Settings2 className="mt-0.5 h-4 w-4 text-slate-500" aria-hidden />
+              {/* スマホで折り返すときは「設定」と「（差出人・保存した宛先）」のあいだで折り返す */}
+              <span className="text-sm font-bold text-slate-800">
+                設定<span className="inline-block">（差出人・保存した宛先）</span>
               </span>
-              <span className="flex items-center gap-2 text-xs text-slate-500">
-                {[sender.company, sender.department, sender.office].filter(Boolean).join(' ')}
-                {sender.person && `／担当 ${sender.person}`}
-                <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden />
+              {/* 押すと開くことがわかるよう、ボタンの形で「変更する／閉じる」と出す */}
+              <span className="flex items-center gap-1 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                <span className="group-open:hidden">変更する</span>
+                <span className="hidden group-open:inline">閉じる</span>
+                <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" aria-hidden />
+              </span>
+              {/* 閉じているときは、いまの設定を項目名つきで出す（開くと下の入力欄に同じ内容が出るので隠す） */}
+              <span className="col-span-2 col-start-2 mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-800 group-open:hidden">
+                <span>
+                  <span className="text-slate-500">差出人：</span>
+                  {/* 会社名と「営業部名 営業所名」は、それぞれの途中で折り返さない */}
+                  {[sender.company, [sender.department, sender.office].filter(Boolean).join(' ')]
+                    .filter(Boolean)
+                    .map((part, i) => (
+                      <Fragment key={i}>
+                        {i > 0 && ' '}
+                        <span className="inline-block">{part}</span>
+                      </Fragment>
+                    ))}
+                  {!sender.company && !sender.department && !sender.office && '未設定'}
+                </span>
+                {sender.person && (
+                  <span className="whitespace-nowrap">
+                    <span className="text-slate-500">担当：</span>
+                    {sender.person}
+                  </span>
+                )}
+                <span className="whitespace-nowrap">
+                  <span className="text-slate-500">保存した宛先：</span>
+                  {savedRecipients.length}件
+                </span>
               </span>
             </summary>
             <div className="grid gap-4 border-t border-slate-100 p-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
