@@ -58,6 +58,10 @@ npm run build:sasaoka    # dist-sasaoka/index.html に1ファイル（約2.8MB�
 
 1ファイルなので、太陽ポータル（taiyo-portal）の中のフォルダ（書類送付状の `soufujo/` と同じ形）に置き、`APPS` に1件足せば組み込める。サイト直下に置いても、パソコンに保存して開いても動く。
 
+公開中：太陽ポータル（taiyo-portal リポジトリの `sasaoka/index.html`、タイル名「仕切り計算・請求書作成」）。
+直したときは、このブランチで `npm run build:sasaoka` → `dist-sasaoka/index.html` を taiyo-portal の `sasaoka/index.html` に上書き → taiyo-portal の master に push（GitHub Pages が自動で公開する）。
+ポータルと同じサイトで開くので、ポータルで選んだ営業所（`localStorage` の `taiyo_portal_session`）を発行元に使う。データ（IndexedDB の `taiyo-sasaoka-shikiri`）もこのサイトのものになり、パソコンに保存したファイルで試したときのデータとは別になる（移すときはバックアップを使う）。
+
 #### テスト
 
 ```
