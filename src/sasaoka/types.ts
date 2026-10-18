@@ -7,6 +7,7 @@ export type Material = {
   name: string; // 商品名
   price: number; // 仕切り価格（円）
   listPrice: number; // 定価（税抜・円）。見積の単価のもと。分からなければ 0
+  pieceLengthM: number; // 1本の長さ（m）。手すりなど切って使う部材。0 なら長さでは数えない
   maker: string; // メーカー名
   code: string; // 品番
   unit: string; // 単位（本・個など。空でもよい）
@@ -42,8 +43,9 @@ export type Row = {
   qty: number; // 数量・箇所数
   // ---- 見積書だけに使う（部材の行）
   listPrice: number; // 定価（税抜）
-  lengthCm: number; // 長さ（cm）。0 なら長さでは計算しない
-  estPrice: number | null; // 見積の単価を手で入れたとき。null なら 定価×掛率（×長さ）
+  lengthCm: number; // 使う長さ（cm）。0 なら長さでは数えない（規格品そのまま）
+  pieceLengthM: number; // 1本の長さ（m）。見積の数量＝使う長さ÷1本の長さ（例：60cm÷4m＝0.15本）
+  estPrice: number | null; // 見積の単価を手で入れたとき。null なら 定価×掛率
 };
 
 /** 箇所（玄関・トイレなど） */

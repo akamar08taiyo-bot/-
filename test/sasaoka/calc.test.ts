@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  cutToLength,
   estimateAmount,
   estimatePlaceLines,
+  estimateQty,
   estimateTotals,
   estimateUnitPrice,
   jobName,
@@ -27,7 +29,7 @@ const S = {
 } as const satisfies Pick<Settings, 'rate' | 'taxRate' | 'taxMode' | 'invoiceTaxMode' | 'totalTaxRounding' | 'estimateRate'>;
 
 let seq = 0;
-const blank = {code: '', maker: '', unit: '', listPrice: 0, lengthCm: 0, estPrice: null};
+const blank = {code: '', maker: '', unit: '', listPrice: 0, lengthCm: 0, pieceLengthM: 0, estPrice: null};
 const mat = (price: number, qty: number, name = '部材', extra: Partial<Row> = {}): Row => ({
   ...blank, id: `r${++seq}`, kind: 'material', refId: null, name, price, qty, ...extra,
 });
@@ -119,11 +121,22 @@ test('monthSummary：すべての様邸の税抜合計に、最後に消費税�
   assert.equal(monthSummary([a, c], {...S, invoiceTaxMode: 'monthly', totalTaxRounding: 'ceil'}).invoice.tax, 4960);
 });
 
-test('見積：部材の単価は定価×0.8、長さを入れたら×長さ（定価2万円・60cm → 9,600円）', () => {
-  const rail = mat(10000, 1, '木製手すり 35φ 4m', {listPrice: 20000, lengthCm: 60});
-  assert.equal(estimateUnitPrice(rail, 0.8), 9600); // 20,000×0.8×0.6
-  assert.equal(estimateUnitPrice({...rail, lengthCm: 0}, 0.8), 16000); // 長さなし：20,000×0.8
-  assert.equal(estimateAmount({...rail, qty: 2}, 0.8), 19200);
+test('見積：単価は定価×0.8、切って使う部材の数量は 使う長さ÷1本の長さ（定価2万円・1本4mを60cm → 0.15本・2,400円）', () => {
+  const rail = mat(10000, 1, '木製手すり 35φ 4m', {listPrice: 20000, lengthCm: 60, pieceLengthM: 4});
+  assert.equal(estimateUnitPrice(rail, 0.8), 16000); // 20,000×0.8（長さで単価は変えない）
+  assert.equal(estimateQty(rail), 0.15); // 0.6m÷4m
+  assert.equal(estimateAmount(rail, 0.8), 2400); // 16,000×0.15
+  // 規格品をそのまま（長さを入れない）なら1本
+  assert.equal(estimateQty({...rail, lengthCm: 0}), 1);
+  assert.equal(estimateAmount({...rail, lengthCm: 0}, 0.8), 16000);
+  // 同じ長さを2本：0.3本
+  assert.equal(estimateAmount({...rail, qty: 2}, 0.8), 4800);
+  // 90cm÷4m＝0.225本 → 3,600円。1m÷3m は 0.333…本 → 金額は割り切れない数量のまま計算して 4,000円
+  assert.equal(estimateAmount({...rail, lengthCm: 90}, 0.8), 3600);
+  assert.equal(estimateAmount(mat(0, 1, '手すり 3m', {listPrice: 15000, lengthCm: 100, pieceLengthM: 3}), 0.8), 4000);
+  // 1本の長さが分からないときは長さで数えない（画面で「1本の長さを入れてください」と出す）
+  assert.equal(cutToLength({...rail, pieceLengthM: 0}), false);
+  assert.equal(estimateQty({...rail, pieceLengthM: 0}), 1);
   assert.equal(estimateUnitPrice(mat(0, 1, 'ブラケット', {listPrice: 333}), 0.8), 266); // 266.4 → 四捨五入
   // 手で入れた見積の単価がそのまま使われる（金額だけの行も）
   assert.equal(estimateUnitPrice({...rail, estPrice: 12000}, 0.8), 12000);
@@ -137,7 +150,7 @@ test('見積：部材の単価は定価×0.8、長さを入れたら×長さ（�
 test('見積：部材のすぐ下に続く手間の行を「同上施工費」1行にまとめる（手すり1本・木2箇所＝2,000円）', () => {
   const place = {
     rows: [
-      mat(10000, 1, '木製手すり', {listPrice: 20000, lengthCm: 60}),
+      mat(10000, 1, '木製手すり', {listPrice: 20000, lengthCm: 60, pieceLengthM: 4}),
       lab(1000, 2, '木'),
       mat(1500, 2, 'ブラケット', {listPrice: 2100}),
       lab(1500, 1, 'タイル'),
@@ -146,11 +159,13 @@ test('見積：部材のすぐ下に続く手間の行を「同上施工費」1�
   };
   const lines = estimatePlaceLines(place, 0.8);
   assert.deepEqual(
-    lines.map((l) => (l.kind === 'material' ? ['部材', l.row.name, l.unitPrice, l.amount] : ['施工費', l.rows.length, l.amount, l.afterMaterial])),
+    lines.map((l) =>
+      l.kind === 'material' ? ['部材', l.row.name, l.qty, l.unitPrice, l.amount] : ['施工費', l.rows.length, l.amount, l.afterMaterial],
+    ),
     [
-      ['部材', '木製手すり', 9600, 9600],
+      ['部材', '木製手すり', 0.15, 16000, 2400],
       ['施工費', 1, 2000, true],
-      ['部材', 'ブラケット', 1680, 3360],
+      ['部材', 'ブラケット', 2, 1680, 3360],
       ['施工費', 2, 3000, true],
     ],
   );
@@ -160,12 +175,12 @@ test('見積：部材のすぐ下に続く手間の行を「同上施工費」1�
 
 test('見積の合計：部材＋施工費に消費税（1円未満は切り捨て）', () => {
   const j = job([
-    [mat(10000, 1, '木製手すり', {listPrice: 20000, lengthCm: 60}), lab(1000, 2), mat(1500, 2, 'ブラケット', {listPrice: 2100})],
+    [mat(10000, 1, '木製手すり', {listPrice: 20000, lengthCm: 60, pieceLengthM: 4}), lab(1000, 2), mat(1500, 2, 'ブラケット', {listPrice: 2100})],
     [mat(7800, 1, 'L型手すり', {listPrice: 11000}), lab(1500, 2, 'タイル'), mat(300, 2, 'エンドキャップ', {listPrice: 450})],
   ]);
   const t = estimateTotals(j, S);
-  // 9,600＋3,360＋8,800＋720＝22,480／施工費 2,000＋3,000＝5,000
-  assert.deepEqual(t, {material: 22480, work: 5000, subtotal: 27480, tax: 2748, total: 30228});
+  // 2,400＋3,360＋8,800＋720＝15,280／施工費 2,000＋3,000＝5,000／税抜 20,280・消費税 2,028
+  assert.deepEqual(t, {material: 15280, work: 5000, subtotal: 20280, tax: 2028, total: 22308});
   // 仕切り計算表の金額は見積を入れても変わらない（部材は仕切り価格のまま）
   assert.equal(jobTotals(j, S).material, 10000 + 3000 + 7800 + 600);
 });

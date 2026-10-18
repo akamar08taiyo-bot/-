@@ -13,6 +13,7 @@ const BLANK: Omit<Row, 'id' | 'kind'> = {
   qty: 1,
   listPrice: 0,
   lengthCm: 0,
+  pieceLengthM: 0,
   estPrice: null,
 };
 
@@ -29,6 +30,7 @@ export function materialRow(m: Material, qty = 1): Row {
     unit: m.unit,
     price: m.price,
     listPrice: m.listPrice,
+    pieceLengthM: m.pieceLengthM,
     qty,
   };
 }
@@ -107,7 +109,7 @@ export function kitRows(kit: Kit, materials: Material[], labor: LaborItem[]): Ro
     if (!r.refId) return r;
     if (r.kind === 'material') {
       const m = mats.get(r.refId);
-      return m ? {...r, price: m.price, listPrice: m.listPrice} : r;
+      return m ? {...r, price: m.price, listPrice: m.listPrice, pieceLengthM: m.pieceLengthM || r.pieceLengthM} : r;
     }
     const l = labs.get(r.refId);
     return l ? {...r, price: l.price} : r;

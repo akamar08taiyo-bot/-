@@ -7,6 +7,7 @@ import {
   decodeText,
   detectListNth,
   detectMapping,
+  guessPieceLengthM,
   gridCandidates,
   lineCandidates,
   mergeMaterials,
@@ -182,8 +183,8 @@ test('PDF・貼り付けの「1行ずつ読む」：右から何番目の数字�
 
 test('mergeMaterials：同じ品番は価格だけ更新し、★は残す', () => {
   const existing: Material[] = [
-    {id: 'a', name: '手すり I型 600mm', price: 3200, listPrice: 4600, maker: 'マツ六', code: 'BP-600', unit: '本', favorite: true, updatedAt: 1},
-    {id: 'b', name: 'ブラケット', price: 1500, listPrice: 2000, maker: 'マツ六', code: '', unit: '', favorite: false, updatedAt: 1},
+    {id: 'a', name: '手すり I型 600mm', price: 3200, listPrice: 4600, pieceLengthM: 0, maker: 'マツ六', code: 'BP-600', unit: '本', favorite: true, updatedAt: 1},
+    {id: 'b', name: 'ブラケット', price: 1500, listPrice: 2000, pieceLengthM: 0, maker: 'マツ六', code: '', unit: '', favorite: false, updatedAt: 1},
   ];
   const base = {key: '', row: 1, unit: '', include: true, favorite: false, listPrice: null};
   const r = mergeMaterials(
@@ -198,12 +199,27 @@ test('mergeMaterials：同じ品番は価格だけ更新し、★は残す', () 
   );
   assert.deepEqual([r.added, r.updated, r.unchanged], [1, 1, 1]);
   assert.equal(r.list.length, 3);
-  assert.deepEqual(r.list[0], {...existing[0], price: 3360, listPrice: 4800, updatedAt: 99});
+  assert.deepEqual(r.list[0], {...existing[0], price: 3360, listPrice: 4800, pieceLengthM: 0.6, updatedAt: 99});
   assert.equal(r.list[1].updatedAt, 1); // 変わっていない
   assert.equal(r.list[1].listPrice, 2000); // 表に定価がなければ、前の定価のまま
   assert.equal(r.list[2].favorite, true);
   assert.equal(r.list[2].code, 'BP-800');
   assert.equal(r.list[2].listPrice, 0);
+  assert.equal(r.list[2].pieceLengthM, 0.8); // 「800mm」から
+});
+
+test('商品名から1本の長さ（m）を読む', () => {
+  assert.equal(guessPieceLengthM('木製手すり 35φ 4m'), 4);
+  assert.equal(guessPieceLengthM('木製手すり 35φ ４ｍ'), 4);
+  assert.equal(guessPieceLengthM('手すり 2.5M ナチュラル'), 2.5);
+  assert.equal(guessPieceLengthM('木製手すり 35φ 2000mm'), 2);
+  assert.equal(guessPieceLengthM('手すり I型 600mm'), 0.6);
+  assert.equal(guessPieceLengthM('ディスタンスバー L=4000'), 4);
+  assert.equal(guessPieceLengthM('ブラケット(エンド)'), 0);
+  assert.equal(guessPieceLengthM('エンドキャップ 35φ'), 0);
+  assert.equal(guessPieceLengthM('L型手すり 600×600'), 0);
+  assert.equal(guessPieceLengthM('消毒液 500ml'), 0);
+  assert.equal(guessPieceLengthM('TL-4000'), 0); // 品番の「L-4000」は長さにしない
 });
 
 test('PDFの表：見出しの位置に合わせて列をそろえる（右寄せの金額・長い商品名）', () => {

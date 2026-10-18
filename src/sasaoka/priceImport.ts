@@ -22,6 +22,21 @@ export function parsePrice(s: unknown): number | null {
   return Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
 }
 
+/**
+ * 商品名から1本の長さ（m）を読む：「4m」「2.5m」「2000mm」「L=4000」など。読めなければ 0。
+ * 手すりなど切って使う部材の、見積の数量（使う長さ÷1本の長さ）に使う
+ */
+export function guessPieceLengthM(name: string): number {
+  const s = normalize(name).toLowerCase();
+  const mm = /(?:^|[^\d.])(\d+(?:\.\d+)?) ?mm(?![a-z])/.exec(s);
+  if (mm) return Math.round(Number(mm[1])) / 1000;
+  const m = /(?:^|[^\d.])(\d+(?:\.\d+)?) ?m(?![a-z])/.exec(s);
+  if (m) return Number(m[1]);
+  const l = /(?:^|[^a-z])l ?[=:]? ?(\d{3,5})(?!\d)/.exec(s);
+  if (l) return Number(l[1]) / 1000;
+  return 0;
+}
+
 /** 文字コードを判定して文字にする（UTF-8 でなければ Shift_JIS とみなす） */
 export function decodeText(bytes: Uint8Array): string {
   try {
@@ -393,6 +408,7 @@ export function mergeMaterials(existing: Material[], incoming: Candidate[], now 
         name: c.name,
         price: c.price,
         listPrice,
+        pieceLengthM: m.pieceLengthM || guessPieceLengthM(c.name),
         unit: c.unit || m.unit,
         favorite: m.favorite || c.favorite,
         updatedAt: changed ? now : m.updatedAt,
@@ -405,6 +421,7 @@ export function mergeMaterials(existing: Material[], incoming: Candidate[], now 
         name: c.name,
         price: c.price,
         listPrice: c.listPrice ?? 0,
+        pieceLengthM: guessPieceLengthM(c.name),
         maker: c.maker,
         code: c.code,
         unit: c.unit,

@@ -1,4 +1,5 @@
-// 見積作成モードを確かめる：定価×0.8×長さ・見積の単価の手入力・部材ごとの同上施工費・金額だけの行・一式・見積書の印刷・定価の取り込み
+// 見積作成モードを確かめる：定価×0.8・切って使う部材の数量（使う長さ÷1本の長さ）・見積の単価の手入力・部材ごとの同上施工費・
+// 金額だけの行・一式・見積書の印刷・定価の取り込み
 // usage: node e2e-estimate.mjs <dist-sasaoka/index.html の URL> <出力フォルダ>
 // Playwright はこのリポジトリの依存に入れていない。入っている場所を PLAYWRIGHT で指定できる（既定はクラウド環境の場所）
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
@@ -22,30 +23,33 @@ await page.getByRole('cell', {name: /（サンプル）山田様邸/}).waitFor()
 
 // ---------------- 見積作成に切り替え：一覧に見積の金額
 await page.getByRole('button', {name: '見積作成', exact: true}).click();
-// 玄関：木の手すり 定価20,000×0.8×0.6m＝9,600・同上施工費（木2）2,000・ブラケット 2,100×0.8＝1,680×2
+// 玄関：木の手すり 定価20,000（1本4m）を60cm → 0.15本×16,000＝2,400・同上施工費（木2）2,000・ブラケット 2,100×0.8＝1,680×2
 // トイレ：L型 11,000×0.8＝8,800・同上施工費（タイル2）3,000・キャップ 450×0.8＝360×2
-// 税抜 27,480・消費税 2,748（切り捨て）・合計 30,228
+// 部材 15,280・施工費 5,000・税抜 20,280・消費税 2,028（切り捨て）・合計 22,308
 const row = await page.getByRole('row', {name: /（サンプル）山田様邸/}).innerText();
-for (const v of ['22,480', '5,000', '27,480', '2,748', '30,228']) assert.ok(row.includes(v), `見積の一覧に ${v} がない: ${row}`);
+for (const v of ['15,280', '5,000', '20,280', '2,028', '22,308']) assert.ok(row.includes(v), `見積の一覧に ${v} がない: ${row}`);
 log('見積の一覧OK');
 
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 const box = () => page.locator('aside table').innerText();
-assert.ok((await box()).includes('30,228'));
+assert.ok((await box()).includes('22,308'));
 const places = page.locator('section').filter({has: page.getByPlaceholder('箇所名（玄関など）')});
 const genkan = places.nth(0);
 const toilet = places.nth(1);
 const rowNames = (section) => section.getByRole('textbox', {name: '品名'}).evaluateAll((els) => els.map((e) => e.value));
 assert.deepEqual(await rowNames(genkan), ['木の手すり 35φ 4m', '木', 'ブラケット']);
 const railRow = genkan.getByRole('row', {name: /木の手すり 35φ 4m/});
-assert.ok((await railRow.innerText()).includes('定価×0.8×0.6m'));
+assert.ok((await railRow.innerText()).includes('0.15本（60cm÷4m）'), await railRow.innerText());
+assert.equal(await railRow.getByRole('textbox', {name: '1本の長さ（m）'}).inputValue(), '4'); // 商品名の「4m」から
+assert.equal(await railRow.getByRole('textbox', {name: '見積の単価'}).inputValue(), '16,000');
 
-// 長さを 120cm にする → 20,000×0.8×1.2＝19,200
-await railRow.getByRole('textbox', {name: '長さ（cm）'}).fill('120');
+// 使う長さを 120cm にする → 1.2÷4＝0.3本 → 16,000×0.3＝4,800
+await railRow.getByRole('textbox', {name: '使う長さ（cm）'}).fill('120');
 await page.waitForTimeout(100);
-assert.ok((await railRow.innerText()).includes('19,200'));
-assert.ok((await box()).includes('40,788'), await box()); // 37,080＋3,708
-log('長さで計算OK：20,000×0.8×1.2＝19,200');
+assert.ok((await railRow.innerText()).includes('0.3本'));
+assert.ok((await railRow.innerText()).includes('4,800'));
+assert.ok((await box()).includes('24,948'), await box()); // 22,680＋2,268
+log('切って使う部材の数量OK：120cm÷4m＝0.3本×16,000＝4,800');
 
 // 見積の単価を手で入れる → 黄色・↺ で定価×0.8 に戻る
 const bracketRow = genkan.getByRole('row', {name: /ブラケット/});
@@ -74,8 +78,8 @@ await genkan.getByRole('button', {name: '＋ 工事を金額だけ入れる'}).c
 await page.keyboard.type('3000');
 await page.keyboard.press('Tab');
 await page.waitForTimeout(100);
-// 37,080＋1,000（ブラケットの施工費）＋5,000＋3,000＝46,080 → 消費税 4,608 → 50,688
-assert.ok((await box()).includes('50,688'), await box());
+// 22,680＋1,000（ブラケットの施工費）＋5,000＋3,000＝31,680 → 消費税 3,168 → 34,848
+assert.ok((await box()).includes('34,848'), await box());
 log('金額だけの行OK');
 
 // 一式：サンプルの一式をトイレに入れる → この箇所を一式に登録 → 一式が2つ
@@ -95,9 +99,12 @@ await page.screenshot({path: path.join(outDir, '32-estimate-editor.png'), fullPa
 await page.getByRole('button', {name: '🖨 見積書を印刷'}).click();
 await page.locator('.print-overlay').waitFor();
 const doc = await page.locator('.sheet').first().innerText();
-for (const t of ['御見積書', '（サンプル）山田', '定価20,000円（税抜）', '（長さ 120cm）', '同上施工費', '行橋営業所所長　久保 匠史', '担当　久保', '所長印', '玄関・トイレ 手すり取付工事']) {
+for (const t of ['御見積書', '（サンプル）山田', '定価20,000円（税抜）', '（120cm使用・1本4m）', '同上施工費', '行橋営業所所長　久保 匠史', '担当　久保', '所長印', '玄関・トイレ 手すり取付工事']) {
   assert.ok(doc.includes(t), `見積書に「${t}」がない`);
 }
+// 手すりの行：数量 0.3・単位 本・単価 16,000・金額 4,800
+const railLine = await page.locator('.sheet').first().locator('tr', {hasText: '木の手すり 35φ 4m'}).first().locator('td').allInnerTexts();
+assert.deepEqual(railLine.slice(2, 6), ['0.3', '本', '16,000', '4,800'], railLine.join('|'));
 await page.screenshot({path: path.join(outDir, '33-estimate-print.png')});
 await page.emulateMedia({media: 'print'});
 await page.pdf({path: path.join(outDir, 'estimate.pdf'), format: 'A4', printBackground: true, preferCSSPageSize: true});

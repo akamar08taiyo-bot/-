@@ -187,7 +187,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
 
       <Section
         title="見積書"
-        note="上の「見積作成」に切り替えると、様邸に入れた部材・取付手間から見積書を作ります。部材の単価は定価×率（長さを入れた部材は さらに×長さ）、部材のすぐ下の取付手間は「同上施工費」の1行にまとめます。書式は仮のものです。"
+        note="上の「見積作成」に切り替えると、様邸に入れた部材・取付手間から見積書を作ります。部材の単価は定価×率。手すりなどを切って使うときは、数量を 使う長さ÷1本の長さ（例：60cm÷4m＝0.15本）にします。部材のすぐ下の取付手間は「同上施工費」の1行にまとめます。書式は仮のものです。"
       >
         <Field label="部材の単価＝定価×この率（0.8＝定価の8割）">
           <NumberInput value={s.estimateRate} onChange={(estimateRate) => set({estimateRate})} className="w-28" min={0} ariaLabel="見積の率" />

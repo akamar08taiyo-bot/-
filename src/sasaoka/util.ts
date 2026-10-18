@@ -17,10 +17,10 @@ export function yen(n: number): string {
   return Math.round(n).toLocaleString('ja-JP');
 }
 
-/** 単価・数量の表示（小数があるときだけ小数を出す） */
-export function num(n: number): string {
+/** 単価・数量の表示（小数があるときだけ小数を出す。digits は小数の桁数の上限） */
+export function num(n: number, digits = 2): string {
   if (!Number.isFinite(n)) return '';
-  return Number.isInteger(n) ? n.toLocaleString('ja-JP') : n.toLocaleString('ja-JP', {maximumFractionDigits: 2});
+  return Number.isInteger(n) ? n.toLocaleString('ja-JP') : n.toLocaleString('ja-JP', {maximumFractionDigits: digits});
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');

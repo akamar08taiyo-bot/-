@@ -1,6 +1,7 @@
 // 「サンプルで試す」で入れる例
 //   仕切り：玄関 木の手すり1万円・ブラケット1,500円×2個・取付手間 木×2箇所
-//   見積：木の手すり 定価2万円を60cm → 20,000×0.8×0.6＝9,600円、そのすぐ下に同上施工費（木 2箇所＝2,000円）
+//   見積：木の手すり 定価2万円（1本4m）を60cm → 0.15本×単価16,000円＝2,400円、そのすぐ下に同上施工費（木 2箇所＝2,000円）
+import {guessPieceLengthM} from './priceImport.ts';
 import {kitFromRows, laborRow, manualRow, materialRow} from './rows.ts';
 import type {AppData, Job, Kit, Material} from './types.ts';
 import {uid} from './util.ts';
@@ -15,6 +16,7 @@ export function addSamples(data: AppData, month: string): {materials: Material[]
     name,
     price,
     listPrice,
+    pieceLengthM: guessPieceLengthM(name),
     maker: SAMPLE_MAKER,
     code,
     unit,

@@ -1,6 +1,6 @@
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
-import {estimatePlaceLines, estimateTotals, jobName, jobTotals, jobWork, monthSummary, placeTotals, rowAmount} from '../calc.ts';
+import {cutToLength, estimatePlaceLines, estimateTotals, jobName, jobTotals, jobWork, monthSummary, placeTotals, rowAmount} from '../calc.ts';
 import type {MonthSummary} from '../calc.ts';
 import type {AppData, Job, Settings} from '../types.ts';
 import {dateLabel, monthEnd, monthLabel, num, shortDate, todayIso, yen} from '../util.ts';
@@ -451,7 +451,8 @@ function JobDoc({job, settings: s}: {job: Job; settings: Settings}) {
 
 /**
  * 見積書（仮の書式。正式な書式をいただいたら合わせる）。
- * 部材は 定価×掛率（長さがあれば×長さ）、右端の備考に「定価○○円（税抜）」。部材のすぐ下の手間は「同上施工費」の1行。
+ * 部材の単価は 定価×掛率、切って使う部材の数量は 使う長さ÷1本の長さ（例：60cm÷4m＝0.15本）。
+ * 右端の備考に「定価○○円（税抜）」。部材のすぐ下の手間は「同上施工費」の1行。
  */
 function EstimateDoc({job, settings: s, meta}: {job: Job; settings: Settings; meta: DocMeta}) {
   const t = estimateTotals(job, s);
@@ -546,11 +547,13 @@ function EstimateDoc({job, settings: s, meta}: {job: Job; settings: Settings; me
                     <td className="c">{++no}</td>
                     <td className="name">
                       {l.row.name || '部材'}
-                      {l.row.lengthCm > 0 && `（長さ ${num(l.row.lengthCm)}cm）`}
+                      {cutToLength(l.row)
+                        ? `（${num(l.row.lengthCm)}cm使用・1本${num(l.row.pieceLengthM)}m）`
+                        : l.row.lengthCm > 0 && `（長さ ${num(l.row.lengthCm)}cm）`}
                       {l.row.code && <span className="code-sub">{l.row.code}</span>}
                     </td>
-                    <td className="num">{num(l.row.qty)}</td>
-                    <td className="c">{l.row.unit}</td>
+                    <td className="num">{num(l.qty, 3)}</td>
+                    <td className="c">{l.row.unit || (cutToLength(l.row) ? '本' : '')}</td>
                     <td className="num">{yen(l.unitPrice)}</td>
                     <td className="num">{yen(l.amount)}</td>
                     <td className="note">{l.row.listPrice > 0 && `定価${yen(l.row.listPrice)}円（税抜）`}</td>

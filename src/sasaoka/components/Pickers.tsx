@@ -1,6 +1,7 @@
 import {useMemo, useState} from 'react';
 import type {ReactNode} from 'react';
 import {roundYen} from '../calc.ts';
+import {guessPieceLengthM} from '../priceImport.ts';
 import {laborCount, manualRow, materialRow, setLaborCount} from '../rows.ts';
 import type {AppMode, LaborItem, Material, Place, Row} from '../types.ts';
 import {matchesAll, uid, yen} from '../util.ts';
@@ -57,6 +58,7 @@ export function MaterialPicker({
       name,
       price: manual.price,
       listPrice: manual.listPrice,
+      pieceLengthM: guessPieceLengthM(name),
       maker: '',
       code: '',
       unit: '',

@@ -3,6 +3,7 @@
 // 分け合っているため、件数の多い部材リストは容量に余裕のある IndexedDB に入れる。
 
 import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES, SETTINGS_REV} from './defaults.ts';
+import {guessPieceLengthM} from './priceImport.ts';
 import type {AppData, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, Place, Rounding, Row, Settings, TaxMode} from './types.ts';
 import {uid} from './util.ts';
 
@@ -100,6 +101,8 @@ export function cleanMaterials(raw: unknown): Material[] {
     name: str(m.name),
     price: numv(m.price),
     listPrice: numv(m.listPrice),
+    // 1本の長さを入れる前に保存した部材は、商品名（「4m」「2000mm」など）から入れる
+    pieceLengthM: m.pieceLengthM === undefined ? guessPieceLengthM(str(m.name)) : Math.max(0, numv(m.pieceLengthM)),
     maker: str(m.maker),
     code: str(m.code),
     unit: str(m.unit),
@@ -125,6 +128,8 @@ const cleanRow = (r: Record<string, unknown>): Row => ({
   qty: numv(r.qty, 1),
   listPrice: numv(r.listPrice),
   lengthCm: Math.max(0, numv(r.lengthCm)),
+  pieceLengthM:
+    r.pieceLengthM === undefined ? (r.kind === 'labor' ? 0 : guessPieceLengthM(str(r.name))) : Math.max(0, numv(r.pieceLengthM)),
   estPrice: optNum(r.estPrice),
 });
 

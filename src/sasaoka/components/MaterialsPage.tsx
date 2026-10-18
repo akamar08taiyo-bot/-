@@ -1,4 +1,5 @@
 import {useMemo, useState} from 'react';
+import {guessPieceLengthM} from '../priceImport.ts';
 import type {AppData, Material} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {matchesAll, uid} from '../util.ts';
@@ -13,7 +14,7 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
   const [query, setQuery] = useState('');
   const [maker, setMaker] = useState('');
   const [favOnly, setFavOnly] = useState(false);
-  const [draft, setDraft] = useState({name: '', code: '', maker: '', price: 0, listPrice: 0});
+  const [draft, setDraft] = useState({name: '', code: '', maker: '', price: 0, listPrice: 0, pieceLengthM: 0});
   const [limit, setLimit] = useState(SHOW_LIMIT);
 
   const makers = useMemo(
@@ -43,12 +44,13 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
       maker: draft.maker.trim(),
       price: draft.price,
       listPrice: draft.listPrice,
+      pieceLengthM: draft.pieceLengthM || guessPieceLengthM(draft.name),
       unit: '',
       favorite: true,
       updatedAt: Date.now(),
     };
     update('materials', (all) => [m, ...all]);
-    setDraft({name: '', code: '', maker: draft.maker, price: 0, listPrice: 0});
+    setDraft({name: '', code: '', maker: draft.maker, price: 0, listPrice: 0, pieceLengthM: 0});
     toast(`「${m.name}」をお気に入り（★）で追加しました`);
   };
 
@@ -76,6 +78,7 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
       </div>
       <p className="text-xs leading-5 text-slate-500">
         ★（お気に入り）を付けた部材は、様邸の画面で「部材を追加」を押したときに最初に出ます。定価は見積書の単価（定価×{data.settings.estimateRate}）に使います。
+        「1本の長さ」は手すりなど切って使う部材の長さで、見積で使う長さを入れると 数量＝使う長さ÷1本の長さ（例：60cm÷4m＝0.15本）になります（商品名の「4m」「2000mm」などから自動で入ります）。
         仕切価格・定価を変えても、すでに作った様邸の金額は変わりません（選んだときの単価で計算します）。
       </p>
 
@@ -103,6 +106,19 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
           <label className="flex items-center gap-1 text-xs text-slate-600">
             仕切価格
             <NumberInput value={draft.price} onChange={(price) => setDraft({...draft, price})} className="w-28" ariaLabel="仕切価格" />
+          </label>
+          <label className="flex items-center gap-1 text-xs text-slate-600">
+            1本の長さ
+            <NumberInput
+              value={draft.pieceLengthM}
+              onChange={(pieceLengthM) => setDraft({...draft, pieceLengthM})}
+              className="w-16"
+              ariaLabel="1本の長さ（m）"
+              blankZero
+              min={0}
+              placeholder={guessPieceLengthM(draft.name) ? String(guessPieceLengthM(draft.name)) : '—'}
+            />
+            m
           </label>
           <Btn small color="emerald" type="submit" disabled={!draft.name.trim()}>
             ＋ 追加
@@ -146,7 +162,7 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-          <table className="w-full min-w-[980px] text-sm">
+          <table className="w-full min-w-[1080px] text-sm">
             <thead className="bg-slate-100 text-xs text-slate-600">
               <tr>
                 <th className="w-10 px-1 py-2">★</th>
@@ -156,6 +172,7 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
                 <th className="w-20 px-2 py-2 text-left">単位</th>
                 <th className="w-32 px-2 py-2 pr-4 text-right">定価</th>
                 <th className="w-32 px-2 py-2 pr-4 text-right">仕切価格</th>
+                <th className="w-28 px-2 py-2 pr-4 text-right">1本の長さ(m)</th>
                 <th className="w-24 px-2 py-2 text-left">更新日</th>
                 <th className="w-10 px-1 py-2" />
               </tr>
@@ -183,6 +200,17 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
                   </td>
                   <td className="px-2 py-1 text-right">
                     <NumberInput value={m.price} onChange={(price) => setMat(m.id, {price})} className="w-28" ariaLabel="仕切価格" />
+                  </td>
+                  <td className="px-2 py-1 text-right">
+                    <NumberInput
+                      value={m.pieceLengthM}
+                      onChange={(pieceLengthM) => setMat(m.id, {pieceLengthM: Math.max(0, pieceLengthM)})}
+                      className="w-20"
+                      ariaLabel="1本の長さ（m）"
+                      blankZero
+                      min={0}
+                      placeholder="—"
+                    />
                   </td>
                   <td className="px-2 py-1 text-xs text-slate-500">{new Date(m.updatedAt).toLocaleDateString('ja-JP')}</td>
                   <td className="px-1 text-center">

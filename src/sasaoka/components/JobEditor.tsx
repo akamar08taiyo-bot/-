@@ -1,5 +1,17 @@
 import {useEffect, useState} from 'react';
-import {estimateAmount, estimatePlaceLines, estimateTotals, estimateUnitPrice, jobName, jobTotals, jobWork, placeTotals, rowAmount} from '../calc.ts';
+import {
+  cutToLength,
+  estimateAmount,
+  estimatePlaceLines,
+  estimateQty,
+  estimateTotals,
+  estimateUnitPrice,
+  jobName,
+  jobTotals,
+  jobWork,
+  placeTotals,
+  rowAmount,
+} from '../calc.ts';
 import type {EstimateLine, EstimateTotals, JobTotals} from '../calc.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {copyRows, kitFromRows, manualRow, replaceRange, workRange} from '../rows.ts';
@@ -251,7 +263,8 @@ export function JobEditor({
 
           {estimate && (
             <p className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs leading-5 text-indigo-900">
-              見積作成：部材の単価は <b>定価×{s.estimateRate}</b>（長さを入れると さらに×長さ）で入ります。単価は手で直せます。
+              見積作成：部材の単価は <b>定価×{s.estimateRate}</b> で入ります（手で直せます）。手すりなどを切って使うときは「使う長さ」を入れると、
+              数量が <b>使う長さ÷1本の長さ</b>（例：60cm÷4m＝0.15本）になります。
               取付手間は、部材のすぐ下に「<b>同上施工費</b>」として足し上げます（部材の「＋ この部材の施工費」で数えます）。
             </p>
           )}
@@ -317,7 +330,7 @@ export function JobEditor({
             <>
               <EstimateSummaryBox totals={est} settings={s} />
               <p className="mt-2 text-xs leading-5 text-slate-500">
-                見積書の金額です。部材は定価×{s.estimateRate}（長さがあれば×長さ）、施工費は取付手間の合計、消費税は税抜の合計にかけます（1円未満は設定で決めます）。
+                見積書の金額です。部材は 定価×{s.estimateRate}×数量（切って使う部材の数量は 使う長さ÷1本の長さ）、施工費は取付手間の合計、消費税は税抜の合計にかけます（1円未満は設定で決めます）。
               </p>
             </>
           ) : (
@@ -512,7 +525,7 @@ function PlaceCard({
                 <th className="w-14 px-2 py-1.5 text-left">区分</th>
                 <th className="px-2 py-1.5 text-left">品名</th>
                 {estimate && <th className="w-28 px-2 py-1.5 pr-4 text-right">定価</th>}
-                {estimate && <th className="w-24 px-2 py-1.5 pr-4 text-right">長さ(cm)</th>}
+                {estimate && <th className="w-36 px-2 py-1.5 pr-4 text-right">長さ（使う／1本）</th>}
                 <th className="w-32 px-2 py-1.5 pr-4 text-right">{estimate ? '見積の単価' : '単価'}</th>
                 <th className="w-36 px-2 py-1.5 text-center">数量・箇所</th>
                 <th className="w-28 px-2 py-1.5 text-right">{estimate ? '見積金額' : '金額'}</th>
@@ -533,13 +546,15 @@ function PlaceCard({
                         value={r.name}
                         onChange={(e) => setRow(r.id, {name: e.target.value})}
                         placeholder={r.kind === 'labor' ? '（工事内容なし）' : '（品名なし）'}
-                        className="h-9 w-full min-w-[14rem] rounded-md border border-slate-200 px-2 font-bold text-slate-800 hover:border-slate-300 focus:border-blue-500"
+                        className={`h-9 w-full rounded-md border border-slate-200 px-2 font-bold text-slate-800 hover:border-slate-300 focus:border-blue-500 ${
+                          estimate ? 'min-w-[12rem]' : 'min-w-[14rem]'
+                        }`}
                         aria-label="品名"
                       />
                       {(r.code || r.maker) && <div className="px-2 text-[11px] text-slate-500">{[r.maker, r.code].filter(Boolean).join('　')}</div>}
                       {estimate && r.kind === 'material' && (
                         <button type="button" onClick={() => onPickLabor(r.id)} className="mt-0.5 rounded px-2 py-0.5 text-[11px] font-bold text-sky-700 hover:bg-sky-50">
-                          ＋ この部材の施工費（同上施工費）
+                          ＋ この部材の施工費
                         </button>
                       )}
                     </td>
@@ -551,9 +566,36 @@ function PlaceCard({
                       </td>
                     )}
                     {estimate && (
-                      <td data-cell="len" data-label={r.kind === 'material' ? '長さ(cm)' : undefined} className="px-2 py-1.5 text-right">
+                      <td data-cell="len" data-label={r.kind === 'material' ? '長さ（切って使うとき）' : undefined} className="px-2 py-1.5 text-right">
                         {r.kind === 'material' && (
-                          <NumberInput value={r.lengthCm} onChange={(lengthCm) => setRow(r.id, {lengthCm: Math.max(0, lengthCm)})} className="w-20" ariaLabel="長さ（cm）" blankZero min={0} placeholder="—" />
+                          <div className="grid justify-items-end gap-1 text-[11px] text-slate-500">
+                            <label className="flex items-center gap-1">
+                              使う
+                              <NumberInput
+                                value={r.lengthCm}
+                                onChange={(lengthCm) => setRow(r.id, {lengthCm: Math.max(0, lengthCm)})}
+                                className="w-16 text-sm"
+                                ariaLabel="使う長さ（cm）"
+                                blankZero
+                                min={0}
+                                placeholder="—"
+                              />
+                              cm
+                            </label>
+                            <label className="flex items-center gap-1">
+                              1本
+                              <NumberInput
+                                value={r.pieceLengthM}
+                                onChange={(pieceLengthM) => setRow(r.id, {pieceLengthM: Math.max(0, pieceLengthM)})}
+                                className={`w-16 text-sm ${r.lengthCm > 0 && !(r.pieceLengthM > 0) ? 'border-amber-400 bg-amber-50' : ''}`}
+                                ariaLabel="1本の長さ（m）"
+                                blankZero
+                                min={0}
+                                placeholder="—"
+                              />
+                              m
+                            </label>
+                          </div>
                         )}
                       </td>
                     )}
@@ -564,8 +606,16 @@ function PlaceCard({
                         <NumberInput value={r.price} onChange={(price) => setRow(r.id, {price})} className="w-24" ariaLabel="単価" autoFocus={r.id === focusRowId} />
                       )}
                     </td>
-                    <td data-cell="qty" data-label="数量・箇所" className="px-2 py-1.5 text-center">
+                    <td data-cell="qty" data-label={estimate && r.lengthCm > 0 ? '本数（同じ長さのもの）' : '数量・箇所'} className="px-2 py-1.5 text-center">
                       <Stepper value={r.qty} onChange={(qty) => setRow(r.id, {qty})} ariaLabel={`${r.name || '金額だけの行'}の数量`} />
+                      {estimate && cutToLength(r) && (
+                        <div className="mt-0.5 text-[11px] font-bold tabular-nums text-indigo-800">
+                          ＝ {num(estimateQty(r), 3)}本（{num(r.lengthCm)}cm÷{num(r.pieceLengthM)}m{r.qty !== 1 ? `×${num(r.qty)}` : ''}）
+                        </div>
+                      )}
+                      {estimate && r.kind === 'material' && r.lengthCm > 0 && !(r.pieceLengthM > 0) && (
+                        <div className="mt-0.5 text-[11px] font-bold text-amber-700">1本の長さを入れてください</div>
+                      )}
                     </td>
                     <td data-cell="amount" data-label={estimate ? '見積金額' : '金額'} className="px-2 py-1.5 text-right font-bold tabular-nums">
                       {yen(estimate ? estimateAmount(r, rate) : rowAmount(r))}
@@ -631,11 +681,10 @@ function PlaceCard({
   );
 }
 
-/** 見積の単価の欄。何も入れなければ 定価×掛率（×長さ）。手で入れたら黄色になり、↺ で自動に戻せる */
+/** 見積の単価の欄。何も入れなければ 定価×掛率。手で入れたら黄色になり、↺ で自動に戻せる */
 function EstPriceCell({row, rate, autoFocus, onChange}: {row: Row; rate: number; autoFocus: boolean; onChange: (v: number | null) => void}) {
   const auto = row.estPrice === null;
-  const how =
-    row.listPrice > 0 ? `定価×${rate}${row.lengthCm > 0 ? `×${num(row.lengthCm / 100)}m` : ''}` : auto ? '定価がありません' : '';
+  const how = row.listPrice > 0 ? `定価×${rate}` : auto ? '定価がありません' : '';
   return (
     <div className="grid justify-items-end gap-0.5">
       <div className="flex items-center gap-1">

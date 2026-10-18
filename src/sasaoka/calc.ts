@@ -139,8 +139,9 @@ export function jobWork(job: Pick<Job, 'work' | 'places'>, word: string): string
 }
 
 // ---------------------------------------------------------------- 見積書
-// 部材の単価 ＝ 定価×掛率（0.8）。長さを入れた部材は さらに×長さ（m）。
-//   例：定価 20,000円・長さ 60cm → 20,000×0.8×0.6 ＝ 9,600円
+// 部材の単価 ＝ 定価×掛率（0.8）。規格品をそのまま使うときは 数量＝本数（1本4mの手すりなら1本）。
+// 切って使うとき（使う長さを入れた部材）は 数量＝使う長さ÷1本の長さ。
+//   例：定価 20,000円（1本4m）を60cm使う → 0.6÷4＝0.15本、単価 16,000円、金額 16,000×0.15＝2,400円
 // 取付手間は、部材のすぐ下に続く手間の行を足して「同上施工費」の1行にする（例：木 2箇所 ＝ 2,000円）。
 
 export type EstimateSettings = Pick<Settings, 'estimateRate' | 'taxRate' | 'totalTaxRounding'>;
@@ -150,16 +151,26 @@ export function estimateUnitPrice(row: Row, rate: number): number {
   if (row.kind === 'labor') return Number.isFinite(row.price) ? row.price : 0;
   if (row.estPrice !== null && Number.isFinite(row.estPrice)) return row.estPrice;
   const list = Number.isFinite(row.listPrice) ? row.listPrice : 0;
-  const meters = row.lengthCm > 0 ? row.lengthCm / 100 : 1;
-  return roundYen(list * rate * meters);
+  return roundYen(list * rate);
+}
+
+/** 長さで数える部材か（使う長さと1本の長さの両方が入っている） */
+export function cutToLength(row: Pick<Row, 'kind' | 'lengthCm' | 'pieceLengthM'>): boolean {
+  return row.kind === 'material' && row.lengthCm > 0 && row.pieceLengthM > 0;
+}
+
+/** 見積の数量：切って使う部材は 使う長さ÷1本の長さ×本数（例：60cm÷4m＝0.15本）。それ以外は数量のまま */
+export function estimateQty(row: Row): number {
+  const qty = Number.isFinite(row.qty) ? row.qty : 0;
+  return cutToLength(row) ? clean((qty * row.lengthCm) / 100 / row.pieceLengthM) : qty;
 }
 
 export function estimateAmount(row: Row, rate: number): number {
-  return rowAmount({price: estimateUnitPrice(row, rate), qty: row.qty});
+  return rowAmount({price: estimateUnitPrice(row, rate), qty: estimateQty(row)});
 }
 
 export type EstimateLine =
-  | {kind: 'material'; row: Row; unitPrice: number; amount: number}
+  | {kind: 'material'; row: Row; unitPrice: number; qty: number; amount: number}
   // 続けて並んだ手間の行をまとめたもの。部材のすぐ下なら「同上施工費」、箇所の最初なら「施工費」
   | {kind: 'work'; rows: Row[]; amount: number; afterMaterial: boolean};
 
@@ -167,7 +178,7 @@ export function estimatePlaceLines(place: Pick<Place, 'rows'>, rate: number): Es
   const out: EstimateLine[] = [];
   for (const r of place.rows) {
     if (r.kind === 'material') {
-      out.push({kind: 'material', row: r, unitPrice: estimateUnitPrice(r, rate), amount: estimateAmount(r, rate)});
+      out.push({kind: 'material', row: r, unitPrice: estimateUnitPrice(r, rate), qty: estimateQty(r), amount: estimateAmount(r, rate)});
       continue;
     }
     const last = out[out.length - 1];

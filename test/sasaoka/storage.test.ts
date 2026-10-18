@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {DEFAULT_STAFF, OFFICES, settingsForOffice} from '../../src/sasaoka/defaults.ts';
-import {cleanJobs, cleanKits, cleanList, cleanSettings} from '../../src/sasaoka/storage.ts';
+import {cleanJobs, cleanKits, cleanList, cleanMaterials, cleanSettings} from '../../src/sasaoka/storage.ts';
 
 test('営業所を選ぶと所長名も入る', () => {
   const s = settingsForOffice(cleanSettings(undefined), '行橋営業所');
@@ -51,7 +51,11 @@ test('見積の設定：最初は定価×0.8', () => {
 test('前のデータの行・部材にも、定価・長さ・見積の単価が入る', () => {
   const [j] = cleanJobs([{customer: '山田', places: [{name: '玄関', rows: [{kind: 'material', name: '手すり', price: 3000, qty: 1}]}]}]);
   const r = j.places[0].rows[0];
-  assert.deepEqual([r.listPrice, r.lengthCm, r.estPrice, r.unit], [0, 0, null, '']);
+  assert.deepEqual([r.listPrice, r.lengthCm, r.pieceLengthM, r.estPrice, r.unit], [0, 0, 0, null, '']);
+  // 1本の長さを入れる前の行・部材は、商品名から入れる（手間の行には入れない）
+  const [j2] = cleanJobs([{places: [{rows: [{kind: 'material', name: '木製手すり 35φ 4m'}, {kind: 'labor', name: '補強板 2m以下'}]}]}]);
+  assert.deepEqual(j2.places[0].rows.map((x) => x.pieceLengthM), [4, 0]);
+  assert.deepEqual(cleanMaterials([{name: '手すり 2000mm'}, {name: 'ブラケット'}, {name: '手すり 4m', pieceLengthM: 0}]).map((m) => m.pieceLengthM), [2, 0, 0]);
   assert.equal(j.work, '');
   const [r2] = cleanJobs([{places: [{rows: [{kind: 'material', estPrice: '9600', lengthCm: -5}]}]}])[0].places[0].rows;
   assert.deepEqual([r2.estPrice, r2.lengthCm], [9600, 0]);
