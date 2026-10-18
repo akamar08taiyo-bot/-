@@ -1,19 +1,20 @@
 import {useMemo} from 'react';
-import {jobName, monthSummary} from '../calc.ts';
+import {estimateTotals, jobName, monthSummary} from '../calc.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {addSamples, hasSamples} from '../samples.ts';
-import type {AppData, Job} from '../types.ts';
+import type {AppData, AppMode, Job} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {addMonths, downloadBlob, monthLabel, shortDate, uid, yen} from '../util.ts';
 import {Btn, useToast} from './ui.tsx';
 
 export function newJob(month: string): Job {
   const now = Date.now();
-  return {id: uid('j'), month, customer: '', suffix: '様邸', staff: '', date: '', address: '', note: '', places: [], createdAt: now, updatedAt: now};
+  return {id: uid('j'), month, customer: '', suffix: '様邸', staff: '', date: '', address: '', note: '', work: '', places: [], createdAt: now, updatedAt: now};
 }
 
 export function JobsPage({
   data,
+  mode,
   update,
   month,
   setMonth,
@@ -22,6 +23,7 @@ export function JobsPage({
   goMaterials,
 }: {
   data: AppData;
+  mode: AppMode;
   update: Update;
   month: string;
   setMonth: (m: string) => void;
@@ -33,6 +35,7 @@ export function JobsPage({
   const jobs = useMemo(() => data.jobs.filter((j) => j.month === month), [data.jobs, month]);
   const summary = useMemo(() => monthSummary(jobs, data.settings), [jobs, data.settings]);
   const monthly = data.settings.invoiceTaxMode === 'monthly';
+  const estimate = mode === 'estimate';
 
   const add = () => {
     const j = newJob(month);
@@ -43,8 +46,17 @@ export function JobsPage({
   const saveCsv = () => {
     const head = ['No.', '施工日', 'お客様名', '担当', '部材代', '取付手間', '部材上乗せ', '諸経費', '税抜計', '消費税', '合計'];
     const lines = [head];
+    // 1か月の合計にまとめて消費税をかけるときは、様邸ごとの消費税・合計は空にする（請求書と同じ）
     summary.rows.forEach(({job, totals: t}, i) =>
-      lines.push([String(i + 1), job.date, jobName(job), job.staff, ...[t.material, t.labor, t.markup, t.overhead, t.subtotal, t.tax, t.total].map(String)]),
+      lines.push([
+        String(i + 1),
+        job.date,
+        jobName(job),
+        job.staff,
+        ...[t.material, t.labor, t.markup, t.overhead, t.subtotal].map(String),
+        monthly ? '' : String(t.tax),
+        monthly ? '' : String(t.total),
+      ]),
     );
     const s = summary.sum;
     lines.push(['', '', '合計', '', ...[s.material, s.labor, s.markup, s.overhead, s.subtotal, summary.invoice.tax, summary.invoice.total].map(String)]);
@@ -56,7 +68,8 @@ export function JobsPage({
     const r = addSamples(data, month);
     update('materials', () => r.materials);
     update('jobs', () => r.jobs);
-    toast('サンプルの部材5件と「（サンプル）山田様邸」を入れました。設定画面からまとめて消せます。');
+    update('kits', () => r.kits);
+    toast('サンプルの部材5件と「（サンプル）山田様邸」・一式1件を入れました。設定画面からまとめて消せます。');
   };
 
   return (
@@ -83,17 +96,23 @@ export function JobsPage({
         <Btn color="emerald" onClick={add}>
           ＋ 様邸を追加
         </Btn>
-        <div className="ml-auto flex flex-wrap gap-2">
-          <Btn color="sky" disabled={jobs.length === 0} onClick={() => onPrint({kind: 'invoice', month, withDetails: false})}>
-            🖨 請求書を印刷
-          </Btn>
-          <Btn color="cyan" disabled={jobs.length === 0} onClick={() => onPrint({kind: 'invoice', month, withDetails: true})}>
-            🖨 請求書＋各様邸の明細
-          </Btn>
-          <Btn color="white" disabled={jobs.length === 0} onClick={saveCsv}>
-            CSVで保存
-          </Btn>
-        </div>
+        {estimate ? (
+          <p className="ml-auto text-xs leading-5 text-indigo-900">
+            見積作成：様邸を開いて部材・取付手間を入れると、見積書（部材は定価×{data.settings.estimateRate}、取付手間は同上施工費）ができます。
+          </p>
+        ) : (
+          <div className="ml-auto flex flex-wrap gap-2">
+            <Btn color="sky" disabled={jobs.length === 0} onClick={() => onPrint({kind: 'invoice', month, withDetails: false})}>
+              🖨 請求書を印刷
+            </Btn>
+            <Btn color="cyan" disabled={jobs.length === 0} onClick={() => onPrint({kind: 'invoice', month, withDetails: true})}>
+              🖨 請求書＋各様邸の明細
+            </Btn>
+            <Btn color="white" disabled={jobs.length === 0} onClick={saveCsv}>
+              CSVで保存
+            </Btn>
+          </div>
+        )}
       </div>
 
       {jobs.length === 0 ? (
@@ -105,10 +124,11 @@ export function JobsPage({
               <button type="button" className="font-bold text-purple-700 underline" onClick={goMaterials}>
                 部材リスト（メーカー仕切り）
               </button>
-              」で、メーカーの仕切り表（Excel・CSV・PDF）を取り込み、よく使う部材に★を付けます。
+              」で、メーカーの仕切り表（Excel・CSV・PDF）を取り込み、よく使う部材をお気に入り（★）にします。
             </li>
             <li>「＋ 様邸を追加」で○○様邸を作り、玄関・トイレなどの箇所ごとに部材と取付手間（箇所数）を入れます。</li>
             <li>月の分がそろったら「請求書を印刷」で1か月分の一覧を印刷し、笹岡工務店さまへお渡しします。</li>
+            <li>上の「見積作成」に切り替えると、同じ入力から見積書（部材は定価×{data.settings.estimateRate}、取付手間は同上施工費）を作れます。</li>
           </ol>
           {!hasSamples(data) && (
             <div className="mt-4">
@@ -118,6 +138,8 @@ export function JobsPage({
             </div>
           )}
         </div>
+      ) : estimate ? (
+        <EstimateList data={data} rows={summary.rows.map((r) => r.job)} onOpen={onOpen} onPrint={onPrint} month={month} />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full min-w-[1040px] text-sm">
@@ -188,12 +210,87 @@ export function JobsPage({
           <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 border-t border-slate-200 px-4 py-3 text-sm">
             <span>税抜合計 {yen(summary.invoice.subtotal)}円</span>
             <span>
-              消費税 {yen(summary.invoice.tax)}円{monthly ? '（月の合計で計算）' : '（様邸ごとの合計）'}
+              消費税 {yen(summary.invoice.tax)}円{monthly ? '（すべての様邸の合計に消費税率をかけています）' : '（様邸ごとの消費税の合計）'}
             </span>
             <span className="text-lg font-bold text-[#0c315e]">ご請求金額（税込） {yen(summary.invoice.total)}円</span>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** 見積作成のときの一覧（様邸ごとの見積の金額） */
+function EstimateList({data, rows, month, onOpen, onPrint}: {data: AppData; rows: Job[]; month: string; onOpen: (id: string) => void; onPrint: (r: PrintRequest) => void}) {
+  const list = rows.map((job) => ({job, t: estimateTotals(job, data.settings)}));
+  const sum = list.reduce((a, {t}) => ({material: a.material + t.material, work: a.work + t.work, subtotal: a.subtotal + t.subtotal, tax: a.tax + t.tax, total: a.total + t.total}), {
+    material: 0,
+    work: 0,
+    subtotal: 0,
+    tax: 0,
+    total: 0,
+  });
+  return (
+    <div className="overflow-x-auto rounded-xl border border-indigo-200 bg-white shadow-sm">
+      <table className="w-full min-w-[980px] text-sm">
+        <thead className="bg-indigo-50 text-xs text-indigo-900">
+          <tr>
+            <th className="px-2 py-2 text-center">No.</th>
+            <th className="px-2 py-2 text-left">施工日</th>
+            <th className="px-2 py-2 text-left">お客様名</th>
+            <th className="px-2 py-2 text-left">担当</th>
+            <th className="px-2 py-2 text-right">部材（定価×{data.settings.estimateRate}）</th>
+            <th className="px-2 py-2 text-right">施工費</th>
+            <th className="px-2 py-2 text-right">小計（税抜）</th>
+            <th className="px-2 py-2 text-right">消費税</th>
+            <th className="px-2 py-2 text-right">御見積金額（税込）</th>
+            <th className="px-2 py-2" />
+          </tr>
+        </thead>
+        <tbody>
+          {list.map(({job, t}, i) => (
+            <tr key={job.id} className="cursor-pointer border-t border-slate-100 hover:bg-indigo-50/60" onClick={() => onOpen(job.id)}>
+              <td className="px-2 py-2 text-center tabular-nums">{i + 1}</td>
+              <td className="px-2 py-2 tabular-nums">{shortDate(job.date) || '—'}</td>
+              <td className="px-2 py-2 font-bold text-slate-800">
+                {jobName(job)}
+                <span className="ml-2 text-xs font-normal text-slate-500">{job.places.map((p) => p.name || '（箇所名なし）').join('・')}</span>
+              </td>
+              <td className="whitespace-nowrap px-2 py-2">{job.staff || <span className="text-slate-400">—</span>}</td>
+              <td className="px-2 py-2 text-right tabular-nums">{yen(t.material)}</td>
+              <td className="px-2 py-2 text-right tabular-nums">{yen(t.work)}</td>
+              <td className="px-2 py-2 text-right tabular-nums">{yen(t.subtotal)}</td>
+              <td className="px-2 py-2 text-right tabular-nums">{yen(t.tax)}</td>
+              <td className="px-2 py-2 text-right font-bold tabular-nums text-indigo-900">{yen(t.total)}</td>
+              <td className="px-2 py-1.5 text-right">
+                <Btn
+                  small
+                  color="white"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPrint({kind: 'estimate', jobId: job.id});
+                  }}
+                >
+                  見積書を印刷
+                </Btn>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot className="border-t-2 border-indigo-200 bg-indigo-50/50 font-bold">
+          <tr>
+            <td colSpan={4} className="px-2 py-2 text-right">
+              {monthLabel(month)}分の見積 合計（{list.length}件）
+            </td>
+            <td className="px-2 py-2 text-right tabular-nums">{yen(sum.material)}</td>
+            <td className="px-2 py-2 text-right tabular-nums">{yen(sum.work)}</td>
+            <td className="px-2 py-2 text-right tabular-nums">{yen(sum.subtotal)}</td>
+            <td className="px-2 py-2 text-right tabular-nums">{yen(sum.tax)}</td>
+            <td className="px-2 py-2 text-right tabular-nums text-indigo-900">{yen(sum.total)}</td>
+            <td />
+          </tr>
+        </tfoot>
+      </table>
     </div>
   );
 }

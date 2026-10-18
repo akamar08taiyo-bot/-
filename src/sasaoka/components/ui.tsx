@@ -35,7 +35,10 @@ export function Btn({
   );
 }
 
-/** 数字の入力欄。打っている途中（空・「1.」など）は文字のまま持ち、数字として読めたときだけ反映する */
+/**
+ * 数字の入力欄。打っている途中（空・「1.」など）は文字のまま持ち、数字として読めたときだけ反映する。
+ * blankZero：0 のときは空欄に見せ、空にしたら 0 にする（長さなど、入れないこともある欄）
+ */
 export function NumberInput({
   value,
   onChange,
@@ -43,6 +46,8 @@ export function NumberInput({
   min,
   ariaLabel,
   placeholder,
+  blankZero = false,
+  autoFocus = false,
 }: {
   value: number;
   onChange: (n: number) => void;
@@ -50,15 +55,21 @@ export function NumberInput({
   min?: number;
   ariaLabel?: string;
   placeholder?: string;
+  blankZero?: boolean;
+  autoFocus?: boolean;
 }) {
   // 入力していないときは「3,360」のように桁区切りで見せ、入力を始めたら「3360」のまま直せるようにする
-  const show = (v: number) => (Number.isFinite(v) ? v.toLocaleString('ja-JP', {maximumFractionDigits: 2}) : '');
+  const show = (v: number) => (!Number.isFinite(v) || (blankZero && v === 0) ? '' : v.toLocaleString('ja-JP', {maximumFractionDigits: 2}));
   const [text, setText] = useState(() => show(value));
   const focused = useRef(false);
   useEffect(() => {
     if (!focused.current) setText(show(value));
-  }, [value]);
+  }, [value, blankZero]);
   const commit = (t: string) => {
+    if (blankZero && t.trim() === '') {
+      onChange(0);
+      return;
+    }
     const n = Number(t.normalize('NFKC').replace(/[,，\s¥円]/g, ''));
     if (t.trim() !== '' && Number.isFinite(n)) onChange(min !== undefined ? Math.max(min, n) : n);
   };
@@ -68,10 +79,11 @@ export function NumberInput({
       inputMode="decimal"
       aria-label={ariaLabel}
       placeholder={placeholder}
+      autoFocus={autoFocus}
       value={text}
       onFocus={(e) => {
         focused.current = true;
-        setText(Number.isFinite(value) ? String(value) : '');
+        setText(Number.isFinite(value) && !(blankZero && value === 0) ? String(value) : '');
         const el = e.currentTarget;
         requestAnimationFrame(() => el.select());
       }}
@@ -207,10 +219,10 @@ export function ToastProvider({children}: {children: ReactNode}) {
 
 export const useToast = () => useContext(ToastCtx);
 
-export function KindBadge({kind}: {kind: 'material' | 'labor'}) {
+export function KindBadge({kind, label}: {kind: 'material' | 'labor'; label?: string}) {
   // 元の仕切り計算表の色（商品＝黄、施工費＝青）に合わせる
   return kind === 'labor' ? (
-    <span className="inline-block rounded bg-sky-500 px-1.5 py-0.5 text-[11px] font-bold text-white">手間</span>
+    <span className="inline-block whitespace-nowrap rounded bg-sky-500 px-1.5 py-0.5 text-[11px] font-bold text-white">{label ?? '手間'}</span>
   ) : (
     <span className="inline-block rounded bg-yellow-300 px-1.5 py-0.5 text-[11px] font-bold text-slate-800">部材</span>
   );
@@ -223,7 +235,7 @@ export function Star({on, onClick, label}: {on: boolean; onClick: () => void; la
       onClick={onClick}
       aria-pressed={on}
       aria-label={label}
-      title={on ? '「よく使う」から外す' : '「よく使う」に入れる'}
+      title={on ? 'お気に入りから外す' : 'お気に入りに登録する'}
       className={`h-8 w-8 rounded-md text-lg leading-none transition ${on ? 'text-amber-500 hover:bg-amber-50' : 'text-slate-300 hover:bg-slate-100 hover:text-amber-400'}`}
     >
       {on ? '★' : '☆'}

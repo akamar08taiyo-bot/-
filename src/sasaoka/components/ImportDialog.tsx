@@ -3,6 +3,7 @@ import {
   alignToHeader,
   columnCount,
   decodeText,
+  detectListNth,
   detectMapping,
   gridCandidates,
   lineCandidates,
@@ -24,7 +25,7 @@ type Source =
   | {kind: 'paste'; text: string}
   | {kind: 'pdf'; lines: string[]; words: PositionedWord[][]; pages: number};
 
-type Override = Partial<Pick<Candidate, 'include' | 'favorite' | 'name' | 'price'>>;
+type Override = Partial<Pick<Candidate, 'include' | 'favorite' | 'name' | 'price' | 'listPrice'>>;
 
 const PREVIEW_LIMIT = 300;
 const colName = (c: number) => {
@@ -60,6 +61,7 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
   const [mode, setMode] = useState<'table' | 'lines'>('table');
   const [mapping, setMapping] = useState<Mapping | null>(null);
   const [nth, setNth] = useState(1);
+  const [listNth, setListNth] = useState(0);
   const [maker, setMaker] = useState('');
   const [overrides, setOverrides] = useState<Record<string, Override>>({});
   const [query, setQuery] = useState('');
@@ -100,6 +102,8 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
     const tabular = next.kind === 'xlsx' || next.kind === 'csv' || (next.kind === 'paste' && /\t/.test(next.text)) || aligned !== null;
     setMode(tabular ? 'table' : 'lines');
     setMapping(tabular ? detectMapping(g) : null);
+    setNth(1);
+    setListNth(detectListNth(next.kind === 'pdf' ? next.lines : next.kind === 'paste' ? textToLines(next.text) : g.map((r) => r.join('  '))));
     if (!maker && name) setMaker(makerFromFileName(name));
   };
 
@@ -142,8 +146,8 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
   const base: Candidate[] = useMemo(() => {
     if (!source) return [];
     if (mode === 'table' && mapping) return gridCandidates(grid, mapping, maker.trim());
-    return lineCandidates(lines, nth, maker.trim());
-  }, [source, mode, mapping, grid, lines, nth, maker]);
+    return lineCandidates(lines, nth, maker.trim(), listNth);
+  }, [source, mode, mapping, grid, lines, nth, listNth, maker]);
 
   const candidates = useMemo(() => base.map((c) => ({...c, ...overrides[c.key]})), [base, overrides]);
   const filtered = useMemo(() => candidates.filter((c) => matchesAll(`${c.name} ${c.code} ${c.maker}`, query)), [candidates, query]);
@@ -335,6 +339,7 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
               </label>
               {colSelect('商品名の列', 'name', false)}
               {colSelect('仕切価格の列', 'price', false)}
+              {colSelect('定価の列（見積に使う）', 'list', true)}
               {colSelect('品番の列', 'code', true)}
               {colSelect('メーカーの列', 'maker', true)}
               {colSelect('単位の列', 'unit', true)}
@@ -349,8 +354,16 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
                   </option>
                 ))}
               </select>
-              の金額
-              <span className="text-xs text-slate-500">（「定価 4,800　仕切 3,360」のように並んでいれば右から1番目）</span>
+              の金額。定価（見積に使う）は
+              <select value={listNth} onChange={(e) => setListNth(Number(e.target.value))} className="h-9 rounded-md border border-slate-300 px-2" aria-label="定価にする金額">
+                <option value={0}>読まない</option>
+                {[1, 2, 3, 4].map((n) => (
+                  <option key={n} value={n}>
+                    右から{n}番目
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs text-slate-500">（「定価 4,800　仕切 3,360」のように並んでいれば、仕切は右から1番目・定価は2番目）</span>
             </div>
           )}
 
@@ -363,7 +376,7 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
               {query ? '表示中の' : 'すべての'}チェックを外す
             </Btn>
             <Btn small color="amber" onClick={() => setMany(filtered.filter((c) => c.include), {favorite: true})}>
-              チェックした行を★（よく使う）に
+              チェックした行を★（お気に入り）に
             </Btn>
             <span className="text-xs text-slate-500">よく使う部材だけチェックして取り込むこともできます。</span>
           </div>
@@ -383,6 +396,7 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
                     <th className="px-2 py-1.5 text-left">品番</th>
                     <th className="px-2 py-1.5 text-left">商品名</th>
                     <th className="px-2 py-1.5 text-left">メーカー</th>
+                    <th className="w-32 px-2 py-1.5 pr-4 text-right">定価</th>
                     <th className="w-32 px-2 py-1.5 pr-4 text-right">仕切価格</th>
                   </tr>
                 </thead>
@@ -402,6 +416,13 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
                       </td>
                       <td className="px-2 text-xs">{c.maker}</td>
                       <td className="px-2 py-1 text-right">
+                        {c.listPrice === null ? (
+                          <span className="text-xs text-slate-400">—</span>
+                        ) : (
+                          <NumberInput value={c.listPrice} onChange={(listPrice) => setOv(c.key, {listPrice})} className="w-28" ariaLabel="定価" />
+                        )}
+                      </td>
+                      <td className="px-2 py-1 text-right">
                         {c.price === null ? (
                           <span className="text-xs text-rose-600">金額なし</span>
                         ) : (
@@ -420,7 +441,8 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
             </div>
           )}
           <p className="text-xs text-slate-500">
-            すでに部材リストにある商品（同じメーカーで品番が同じもの。品番がなければ商品名が同じもの）は、新しい仕切価格に書き換えます。★はそのまま残ります。
+            すでに部材リストにある商品（同じメーカーで品番が同じもの。品番がなければ商品名が同じもの）は、新しい仕切価格・定価に書き換えます。★はそのまま残ります。
+            定価は見積書の単価（定価×掛率。設定で決めます）に使います。
           </p>
         </div>
       )}

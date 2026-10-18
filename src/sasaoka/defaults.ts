@@ -85,6 +85,12 @@ export function settingsForOffice(base: Settings, officeName: string): Settings 
   return {...base, officeName: o.name, manager: o.manager, postal: o.postal, address: o.address, tel: o.tel, fax: o.fax};
 }
 
+/**
+ * 設定の版。古い版で保存した設定を読み込むときに直す（storage.ts の cleanSettings）。
+ * 2：請求書の消費税を「すべての様邸の合計に最後にかける」形にした
+ */
+export const SETTINGS_REV = 2;
+
 export function defaultSettings(): Settings {
   const base: Settings = {
     clientName: '笹岡工務店',
@@ -104,9 +110,15 @@ export function defaultSettings(): Settings {
     rate: 0.07,
     taxRate: 0.1,
     taxMode: 'original',
-    invoiceTaxMode: 'perJob',
+    invoiceTaxMode: 'monthly',
+    totalTaxRounding: 'floor',
     placePresets: DEFAULT_PLACES,
     staffList: DEFAULT_STAFF,
+    estimateRate: 0.8,
+    estimateWork: '手すり取付工事',
+    estimateValid: 'お見積り日より1か月',
+    estimateNote: '',
+    rev: SETTINGS_REV,
   };
   return settingsForOffice(base, portalOffice() || '行橋営業所');
 }

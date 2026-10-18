@@ -34,6 +34,92 @@ body {
   padding: 16px 8px 40px;
 }
 
+/* ---------------------------------------------------------------- スマホ：箇所の行を縦に並べる（表のままだと横にはみ出す） */
+@media (max-width: 639px) {
+  table.rows-table {
+    min-width: 0 !important;
+  }
+  table.rows-table thead {
+    display: none;
+  }
+  table.rows-table,
+  table.rows-table tbody {
+    display: block;
+  }
+  table.rows-table tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'kind name name ops'
+      'price price qty amount';
+    gap: 6px 8px;
+    align-items: end;
+    padding: 10px 12px;
+  }
+  /* 1列目の幅は区分の印だけで決める（下の段の欄は、幅の伸びる2列目にかけて置く） */
+  table.rows-table.estimate tr {
+    grid-template-areas:
+      'kind name name ops'
+      'list list len len'
+      'price price qty amount';
+  }
+  table.rows-table td {
+    display: block;
+    padding: 0 !important;
+    text-align: left !important;
+  }
+  table.rows-table td:empty {
+    display: none;
+  }
+  table.rows-table td[data-cell='kind'] {
+    grid-area: kind;
+    align-self: center;
+  }
+  table.rows-table td[data-cell='name'] {
+    grid-area: name;
+  }
+  table.rows-table td[data-cell='name'] input {
+    min-width: 0 !important;
+  }
+  table.rows-table td[data-cell='ops'] {
+    grid-area: ops;
+    align-self: center;
+  }
+  table.rows-table td[data-cell='list'] {
+    grid-area: list;
+  }
+  table.rows-table td[data-cell='len'] {
+    grid-area: len;
+  }
+  table.rows-table td[data-cell='price'] {
+    grid-area: price;
+  }
+  table.rows-table td[data-cell='price'] > div {
+    justify-items: start;
+  }
+  table.rows-table td[data-cell='qty'] {
+    grid-area: qty;
+  }
+  table.rows-table td[data-cell='amount'] {
+    grid-area: amount;
+    align-self: center;
+    text-align: right !important;
+  }
+  table.rows-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  table.rows-table tr.work-sum {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 12px;
+  }
+}
+
 /* ---------------------------------------------------------------- 帳票（A4縦・明朝・ネイビー） */
 .sheet {
   box-sizing: border-box;
@@ -244,6 +330,40 @@ body {
   border-left: 3px solid #93c5fd;
   font-size: 8.5pt;
   white-space: pre-wrap;
+}
+
+/* 見積書 */
+.sheet .stamps {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2mm;
+  margin-top: 2mm;
+}
+.sheet .stamps .stamp {
+  width: 15mm;
+  color: #1e3a8a;
+  font-size: 7.5pt;
+  text-align: center;
+}
+.sheet .stamps .stamp .box {
+  height: 15mm;
+  margin-top: 0.5mm;
+  border: 1px solid #93c5fd;
+}
+.sheet table.items td.note {
+  color: #4b5563;
+  font-size: 8pt;
+  line-height: 1.4;
+}
+.sheet table.items td .code-sub {
+  display: block;
+  color: #6b7280;
+  font-size: 7.5pt;
+}
+.sheet table.items tbody tr.place-row td {
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-weight: 700;
 }
 
 /* 様邸の明細 */

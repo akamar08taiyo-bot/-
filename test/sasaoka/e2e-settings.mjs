@@ -28,10 +28,13 @@ assert.equal(await toast.count(), 0, 'お知らせが消えていない');
 log('お知らせは数秒で消えるOK');
 
 // サンプルの金額（玄関：10,000＋1,500×2＋木1,000×2／トイレ：7,800＋300×2＋タイル1,500×2）
-// ① 21,400 ② 5,000 ③ 1,498 ④ round(27,898×0.07=1,952.86)=1,953 ⑦ 29,851 ⑤ round(2,985.1)-1=2,984 ⑥ 32,835
+// ① 21,400 ② 5,000 ③ 1,498 ④ round(27,898×0.07=1,952.86)=1,953 ⑦ 29,851
+// 請求書の消費税は すべての様邸の合計×0.1 を切り捨て：2,985.1 → 2,985、ご請求金額 32,836
 const row = await page.getByRole('row', {name: /（サンプル）山田様邸/}).innerText();
-for (const v of ['21,400', '5,000', '1,498', '1,953', '29,851', '2,984', '32,835']) assert.ok(row.includes(v), `一覧に ${v} がない: ${row}`);
-log('サンプルの金額OK');
+for (const v of ['21,400', '5,000', '1,498', '1,953', '29,851']) assert.ok(row.includes(v), `一覧に ${v} がない: ${row}`);
+assert.ok((await page.getByText(/ご請求金額（税込）/).innerText()).includes('32,836'));
+assert.ok((await page.getByText(/すべての様邸の合計に消費税率をかけています/).innerText()).includes('2,985'));
+log('サンプルの金額OK（消費税は全様邸の合計にかける）');
 
 // CSV
 const [csvDl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: 'CSVで保存'}).click()]);
@@ -39,7 +42,8 @@ const csvPath = path.join(outDir, 'list.csv');
 await csvDl.saveAs(csvPath);
 const csv = readFileSync(csvPath, 'utf8');
 assert.ok(csv.startsWith('﻿No.,施工日,お客様名,担当,部材代,取付手間,部材上乗せ,諸経費,税抜計,消費税,合計'), csv.slice(0, 80));
-assert.ok(csv.includes('（サンプル）山田様邸,久保,21400,5000,1498,1953,29851,2984,32835'), csv);
+assert.ok(csv.includes('（サンプル）山田様邸,久保,21400,5000,1498,1953,29851,,\r\n'), csv);
+assert.ok(csv.includes(',,合計,,21400,5000,1498,1953,29851,2985,32836'), csv);
 log('CSV OK:', csvDl.suggestedFilename());
 
 // 請求書（様邸ごとの消費税）：所長名と、お客様名の横の担当
@@ -107,6 +111,7 @@ const json = JSON.parse(readFileSync(bkPath, 'utf8'));
 assert.equal(json.kind, 'taiyo-sasaoka-shikiri-backup');
 assert.equal(json.jobs.length, 1);
 assert.equal(json.materials.length, 5);
+assert.equal(json.kits.length, 1);
 log('バックアップ保存OK:', bk.suggestedFilename());
 
 const ctx2 = await browser.newContext({viewport: {width: 1366, height: 900}, locale: 'ja-JP'});
@@ -115,7 +120,7 @@ watch(p2);
 await p2.goto(url);
 await p2.getByRole('navigation').getByRole('button', {name: '設定'}).click();
 await p2.locator('input[type=file][accept*=json]').setInputFiles(bkPath);
-await p2.getByText(/部材 5件・取付手間 17件・様邸 1件・設定/).waitFor();
+await p2.getByText(/部材 5件・取付手間 17件・様邸 1件・一式 1件・設定/).waitFor();
 await p2.getByRole('button', {name: '今のデータを置き換える'}).click();
 await p2.getByRole('navigation').getByRole('button', {name: /様邸一覧/}).click();
 await p2.getByRole('cell', {name: /（サンプル）山田様邸/}).waitFor();

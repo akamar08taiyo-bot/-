@@ -7,6 +7,7 @@ import {SettingsPage} from './components/SettingsPage.tsx';
 import {ToastProvider} from './components/ui.tsx';
 import {PrintView} from './print/PrintView.tsx';
 import type {PrintRequest} from './print/PrintView.tsx';
+import type {AppMode} from './types.ts';
 import {useStore} from './useStore.ts';
 import {thisMonth} from './util.ts';
 
@@ -21,6 +22,21 @@ const TABS: {id: Tab; label: string}[] = [
 
 const PORTAL_URL = 'https://akamar08taiyo-bot.github.io/taiyo-portal/';
 const MONTH_KEY = 'sasaoka-app:ui-month';
+const MODE_KEY = 'sasaoka-app:mode';
+
+const MODES: [AppMode, string][] = [
+  ['shikiri', '仕切り・請求書'],
+  ['estimate', '見積作成'],
+];
+
+/** 前に使っていた使い方（仕切り・請求書／見積作成）。この端末で覚えておく */
+function loadMode(): AppMode {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'estimate' ? 'estimate' : 'shikiri';
+  } catch {
+    return 'shikiri';
+  }
+}
 
 function loadMonth(): string {
   try {
@@ -38,6 +54,7 @@ export default function App() {
   const [month, setMonth] = useState(loadMonth);
   const [openJobId, setOpenJobId] = useState<string | null>(null);
   const [print, setPrint] = useState<PrintRequest | null>(null);
+  const [mode, setMode] = useState<AppMode>(loadMode);
 
   useEffect(() => {
     try {
@@ -46,6 +63,13 @@ export default function App() {
       /* 覚えられなくても困らない */
     }
   }, [month]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(MODE_KEY, mode);
+    } catch {
+      /* 覚えられなくても困らない */
+    }
+  }, [mode]);
 
   const data = store.data;
   const openJob = useMemo(() => (data && openJobId ? data.jobs.find((j) => j.id === openJobId) ?? null : null), [data, openJobId]);
@@ -70,6 +94,21 @@ export default function App() {
                   請求先：{data.settings.clientName || '（未設定）'}　／　{data.settings.officeName || '営業所未設定'}
                 </div>
               </div>
+            </div>
+            <div className="flex rounded-lg bg-white/10 p-0.5" role="group" aria-label="使い方">
+              {MODES.map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={mode === id}
+                  onClick={() => setMode(id)}
+                  className={`rounded-md px-3 py-1.5 text-sm font-bold transition ${
+                    mode === id ? (id === 'estimate' ? 'bg-indigo-500 text-white shadow' : 'bg-white text-[#0c315e] shadow') : 'text-blue-100 hover:bg-white/10'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
             <div className="ml-auto flex items-center gap-3 text-[11px] text-blue-100">
               {store.saveError ? (
@@ -110,6 +149,7 @@ export default function App() {
               <JobEditor
                 job={openJob}
                 data={data}
+                mode={mode}
                 update={store.update}
                 onBack={() => {
                   // 何も入れずに戻った様邸は残さない。請求月を変えていたら、その月の一覧に戻る
@@ -120,11 +160,12 @@ export default function App() {
                   setOpenJobId(null);
                 }}
                 onOpen={setOpenJobId}
-                onPrint={(jobId) => setPrint({kind: 'job', jobId})}
+                onPrint={setPrint}
               />
             ) : (
               <JobsPage
                 data={data}
+                mode={mode}
                 update={store.update}
                 month={month}
                 setMonth={setMonth}

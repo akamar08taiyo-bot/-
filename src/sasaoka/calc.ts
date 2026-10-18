@@ -8,6 +8,7 @@
 //   ⑦ 税抜合計 ＝ ①＋②＋③＋④
 // 請求書に並べる数字が縦にも横にも合うよう、③④⑤はそれぞれ1円単位にしてから足す
 // （Excelは小数のまま持って表示だけ丸めるので、まれに1円ずれることがある）。
+// 請求書（1か月分）の消費税は、最初は「すべての様邸の税抜合計×消費税率」を1回だけ計算する。
 
 import type {InvoiceTaxMode, Job, Place, Row, Settings, TaxMode} from './types.ts';
 
@@ -113,11 +114,12 @@ export type MonthSummary = {
   invoice: {subtotal: number; tax: number; total: number; mode: InvoiceTaxMode};
 };
 
-export function monthSummary(jobs: Job[], s: CalcSettings & Pick<Settings, 'invoiceTaxMode'>): MonthSummary {
+export function monthSummary(jobs: Job[], s: CalcSettings & Pick<Settings, 'invoiceTaxMode' | 'totalTaxRounding'>): MonthSummary {
   const rows = sortJobs(jobs).map((job) => ({job, totals: jobTotals(job, s)}));
   const sum = rows.reduce((acc, r) => addTotals(acc, r.totals), ZERO_TOTALS);
   if (s.invoiceTaxMode === 'monthly') {
-    const tax = taxAmount(sum.subtotal, s.taxRate, s.taxMode);
+    // すべての様邸を合計した税抜の金額に、最後に消費税率をかける
+    const tax = taxAmount(sum.subtotal, s.taxRate, s.totalTaxRounding);
     return {rows, sum, invoice: {subtotal: sum.subtotal, tax, total: sum.subtotal + tax, mode: 'monthly'}};
   }
   return {rows, sum, invoice: {subtotal: sum.subtotal, tax: sum.tax, total: sum.total, mode: 'perJob'}};
@@ -127,4 +129,74 @@ export function jobName(job: Pick<Job, 'customer' | 'suffix'>): string {
   const name = job.customer.trim();
   if (!name) return '（お客様名未入力）';
   return job.suffix && !name.endsWith(job.suffix) ? name + job.suffix : name;
+}
+
+/** 工事内容：手で入れたもの。なければ「玄関・トイレ 手すり取付工事」のように箇所の名前から作る */
+export function jobWork(job: Pick<Job, 'work' | 'places'>, word: string): string {
+  if (job.work.trim()) return job.work.trim();
+  const names = [...new Set(job.places.map((p) => p.name.trim()).filter(Boolean))];
+  return [names.join('・'), word.trim()].filter(Boolean).join(' ');
+}
+
+// ---------------------------------------------------------------- 見積書
+// 部材の単価 ＝ 定価×掛率（0.8）。長さを入れた部材は さらに×長さ（m）。
+//   例：定価 20,000円・長さ 60cm → 20,000×0.8×0.6 ＝ 9,600円
+// 取付手間は、部材のすぐ下に続く手間の行を足して「同上施工費」の1行にする（例：木 2箇所 ＝ 2,000円）。
+
+export type EstimateSettings = Pick<Settings, 'estimateRate' | 'taxRate' | 'totalTaxRounding'>;
+
+/** 見積の単価（1円未満は四捨五入）。手で入れた単価があればそれを使う。手間は取付手間の単価のまま */
+export function estimateUnitPrice(row: Row, rate: number): number {
+  if (row.kind === 'labor') return Number.isFinite(row.price) ? row.price : 0;
+  if (row.estPrice !== null && Number.isFinite(row.estPrice)) return row.estPrice;
+  const list = Number.isFinite(row.listPrice) ? row.listPrice : 0;
+  const meters = row.lengthCm > 0 ? row.lengthCm / 100 : 1;
+  return roundYen(list * rate * meters);
+}
+
+export function estimateAmount(row: Row, rate: number): number {
+  return rowAmount({price: estimateUnitPrice(row, rate), qty: row.qty});
+}
+
+export type EstimateLine =
+  | {kind: 'material'; row: Row; unitPrice: number; amount: number}
+  // 続けて並んだ手間の行をまとめたもの。部材のすぐ下なら「同上施工費」、箇所の最初なら「施工費」
+  | {kind: 'work'; rows: Row[]; amount: number; afterMaterial: boolean};
+
+export function estimatePlaceLines(place: Pick<Place, 'rows'>, rate: number): EstimateLine[] {
+  const out: EstimateLine[] = [];
+  for (const r of place.rows) {
+    if (r.kind === 'material') {
+      out.push({kind: 'material', row: r, unitPrice: estimateUnitPrice(r, rate), amount: estimateAmount(r, rate)});
+      continue;
+    }
+    const last = out[out.length - 1];
+    if (last && last.kind === 'work') {
+      last.rows.push(r);
+      last.amount += rowAmount(r);
+    } else out.push({kind: 'work', rows: [r], amount: rowAmount(r), afterMaterial: last?.kind === 'material'});
+  }
+  return out;
+}
+
+export type EstimateTotals = {
+  material: number; // 部材（定価×掛率）
+  work: number; // 施工費
+  subtotal: number; // 税抜
+  tax: number;
+  total: number; // 税込
+};
+
+export function estimateTotals(job: Pick<Job, 'places'>, s: EstimateSettings): EstimateTotals {
+  let material = 0;
+  let work = 0;
+  for (const p of job.places) {
+    for (const l of estimatePlaceLines(p, s.estimateRate)) {
+      if (l.kind === 'material') material += l.amount;
+      else work += l.amount;
+    }
+  }
+  const subtotal = material + work;
+  const tax = taxAmount(subtotal, s.taxRate, s.totalTaxRounding);
+  return {material, work, subtotal, tax, total: subtotal + tax};
 }

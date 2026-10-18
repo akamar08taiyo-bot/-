@@ -36,6 +36,7 @@ const selectedText = async (label) =>
   page.locator('[role=dialog] label', {hasText: label}).locator('select').evaluate((s) => s.options[s.selectedIndex].text);
 assert.match(await selectedText('商品名の列'), /^C列/);
 assert.match(await selectedText('仕切価格の列'), /^E列：3360/);
+assert.match(await selectedText('定価の列（見積に使う）'), /^D列：4800/);
 assert.match(await selectedText('品番の列'), /^B列/);
 log('Excel の列の自動判定OK', await selects.count());
 await page.getByRole('button', {name: '手すり I型 600mmを★に'}).click();
@@ -52,8 +53,9 @@ await page.getByText(/PDF 1ページ/).waitFor({timeout: 30000});
 await page.getByPlaceholder('例：マツ六').fill('サンプル精工');
 const pdfRows = await page.locator('[role=dialog] tbody tr').count();
 const names = await page.locator('[role=dialog] tbody tr td:nth-child(5) input').evaluateAll((els) => els.map((e) => e.value));
-const prices = await page.locator('[role=dialog] tbody tr td:nth-child(7) input').evaluateAll((els) => els.map((e) => e.value.replace(/,/g, '')));
-log('PDF（CMap）読み取り', pdfRows, names, prices);
+const prices = await page.locator('[role=dialog] tbody tr td:nth-child(8) input').evaluateAll((els) => els.map((e) => e.value.replace(/,/g, '')));
+const lists = await page.locator('[role=dialog] tbody tr td:nth-child(7)').evaluateAll((tds) => tds.map((td) => td.querySelector('input')?.value.replace(/,/g, '') ?? td.textContent.trim()));
+log('PDF（CMap）読み取り', pdfRows, names, prices, '定価', lists);
 assert.deepEqual(names, ['木製手すり 35φ 600mm', '木製手すり 35φ 2000mm', 'エンドブラケット', 'I型ブラケット', 'エンドキャップ 35φ', 'L型コーナー(自在)']);
 assert.deepEqual(prices, ['3360', '9800', '1470', '1330', '350', '2240']);
 await page.getByRole('button', {name: '木製手すり 35φ 2000mmを★に'}).click();
@@ -120,7 +122,9 @@ await shot(page, '08-editor.png');
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
 const listText = await page.locator('table').first().innerText();
 assert.ok(listText.includes('田中様邸'));
-assert.ok(listText.includes('15,352'));
+assert.ok(listText.includes('13,957'));
+// 請求書の消費税は全様邸の合計×0.1（切り捨て）：13,957 → 1,395、ご請求金額 15,352
+assert.ok((await page.getByText(/ご請求金額（税込）/).innerText()).includes('15,352'));
 // 次の月でサンプルを試してから、この月に戻ってもう1件（複製）
 await page.getByRole('button', {name: '＋ 様邸を追加'}).click();
 await page.getByPlaceholder('例：山田').fill('佐藤');

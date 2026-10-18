@@ -1,18 +1,22 @@
 import {useMemo, useState} from 'react';
-import type {LaborItem, Material, Place, Row} from '../types.ts';
+import type {ReactNode} from 'react';
+import {roundYen} from '../calc.ts';
+import {laborCount, manualRow, materialRow, setLaborCount} from '../rows.ts';
+import type {AppMode, LaborItem, Material, Place, Row} from '../types.ts';
 import {matchesAll, uid, yen} from '../util.ts';
 import {Btn, Modal, NumberInput, Star, Stepper, TextInput} from './ui.tsx';
 
 const SHOW_LIMIT = 200;
 
-export function materialRow(m: Material, qty = 1): Row {
-  return {id: uid('r'), kind: 'material', refId: m.id, name: m.name, code: m.code, maker: m.maker, price: m.price, qty};
-}
-
-/** 部材を選ぶ画面。★よく使う／すべて を切り替えて検索し、「追加」を押すと箇所に1行入る（続けて選べる） */
+/**
+ * 部材を選ぶ画面。★お気に入り／すべて を切り替えて検索し、「追加」を押すと箇所に1行入る（続けて選べる）。
+ * 見積作成のときは、定価×掛率（見積の単価）も並べる。
+ */
 export function MaterialPicker({
   place,
   materials,
+  mode,
+  rate,
   onAdd,
   onToggleFavorite,
   onAddToMaster,
@@ -20,6 +24,8 @@ export function MaterialPicker({
 }: {
   place: Place;
   materials: Material[];
+  mode: AppMode;
+  rate: number;
   onAdd: (row: Row) => void;
   onToggleFavorite: (id: string) => void;
   onAddToMaster: (m: Material) => void;
@@ -29,7 +35,8 @@ export function MaterialPicker({
   const [tab, setTab] = useState<'fav' | 'all'>(favCount > 0 ? 'fav' : 'all');
   const [query, setQuery] = useState('');
   const [maker, setMaker] = useState('');
-  const [manual, setManual] = useState({name: '', price: 0, qty: 1, save: true});
+  const [manual, setManual] = useState({name: '', price: 0, listPrice: 0, qty: 1, save: true});
+  const estimate = mode === 'estimate';
   const makers = useMemo(() => [...new Set(materials.map((m) => m.maker).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja')), [materials]);
 
   const list = useMemo(() => {
@@ -39,21 +46,26 @@ export function MaterialPicker({
 
   const addedCount = (id: string) => place.rows.filter((r) => r.refId === id).reduce((n, r) => n + r.qty, 0);
 
+  // 商品名は空でもよい（金額だけの行）。名前があるときだけ部材リストにも登録できる
+  const canAddManual = manual.name.trim() !== '' || manual.price > 0 || manual.listPrice > 0;
   const addManual = () => {
-    if (!manual.name.trim()) return;
+    if (!canAddManual) return;
+    const name = manual.name.trim();
+    const save = manual.save && name !== '';
     const m: Material = {
       id: uid('m'),
-      name: manual.name.trim(),
+      name,
       price: manual.price,
+      listPrice: manual.listPrice,
       maker: '',
       code: '',
       unit: '',
       favorite: true,
       updatedAt: Date.now(),
     };
-    if (manual.save) onAddToMaster(m);
-    onAdd({...materialRow(m, manual.qty), refId: manual.save ? m.id : null});
-    setManual({name: '', price: 0, qty: 1, save: manual.save});
+    if (save) onAddToMaster(m);
+    onAdd({...materialRow(m, manual.qty), refId: save ? m.id : null});
+    setManual({name: '', price: 0, listPrice: 0, qty: 1, save: manual.save});
   };
 
   return (
@@ -76,7 +88,7 @@ export function MaterialPicker({
         <div className="flex rounded-lg border border-slate-300 p-0.5">
           {(
             [
-              ['fav', `★ よく使う（${favCount}）`],
+              ['fav', `★ お気に入り（${favCount}）`],
               ['all', `すべて（${materials.length}）`],
             ] as const
           ).map(([id, label]) => (
@@ -105,22 +117,24 @@ export function MaterialPicker({
 
       {materials.length === 0 ? (
         <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-          部材リストがまだありません。上のタブの「部材リスト（メーカー仕切り）」でメーカーの仕切り表を取り込むか、下の「手入力で追加」を使ってください。
+          部材リストがまだありません。上のタブの「部材リスト（メーカー仕切り）」でメーカーの仕切り表を取り込むか、下の「手入力で追加」を使ってください（金額だけでも入れられます）。
         </p>
       ) : list.length === 0 ? (
         <p className="mt-4 text-sm text-slate-500">
-          {tab === 'fav' && !query ? '★の付いた部材がありません。「すべて」から探して★を付けると、次からここに出ます。' : '見つかりませんでした。'}
+          {tab === 'fav' && !query ? 'お気に入り（★）の部材がありません。「すべて」から探して★を付けると、次からここに出ます。' : '見つかりませんでした。'}
         </p>
       ) : (
         <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
-          <table className="w-full min-w-[640px] text-sm">
+          <table className="w-full min-w-[760px] text-sm">
             <thead className="bg-slate-50 text-xs text-slate-500">
               <tr>
                 <th className="w-10 px-1 py-1.5" />
                 <th className="px-2 py-1.5 text-left">商品名</th>
                 <th className="px-2 py-1.5 text-left">品番</th>
                 <th className="px-2 py-1.5 text-left">メーカー</th>
+                <th className="px-2 py-1.5 text-right">定価</th>
                 <th className="px-2 py-1.5 text-right">仕切価格</th>
+                {estimate && <th className="px-2 py-1.5 text-right text-indigo-700">見積の単価（定価×{rate}）</th>}
                 <th className="w-32 px-2 py-1.5" />
               </tr>
             </thead>
@@ -130,12 +144,18 @@ export function MaterialPicker({
                 return (
                   <tr key={m.id} className="border-t border-slate-100 hover:bg-purple-50/50">
                     <td className="px-1 text-center">
-                      <Star on={m.favorite} onClick={() => onToggleFavorite(m.id)} label={`${m.name}をよく使うに`} />
+                      <Star on={m.favorite} onClick={() => onToggleFavorite(m.id)} label={`${m.name}をお気に入りに`} />
                     </td>
                     <td className="px-2 py-1.5 font-bold text-slate-800">{m.name}</td>
                     <td className="px-2 py-1.5 text-xs text-slate-500">{m.code}</td>
                     <td className="px-2 py-1.5 text-xs text-slate-500">{m.maker}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums text-slate-500">{m.listPrice > 0 ? yen(m.listPrice) : '—'}</td>
                     <td className="px-2 py-1.5 text-right tabular-nums">{yen(m.price)}</td>
+                    {estimate && (
+                      <td className="px-2 py-1.5 text-right font-bold tabular-nums text-indigo-800">
+                        {m.listPrice > 0 ? yen(roundYen(m.listPrice * rate)) : <span className="text-xs font-normal text-amber-700">定価なし</span>}
+                      </td>
+                    )}
                     <td className="px-2 py-1 text-right">
                       <Btn small color="emerald" onClick={() => onAdd(materialRow(m))}>
                         ＋ 追加
@@ -156,22 +176,31 @@ export function MaterialPicker({
       )}
 
       <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-        <div className="mb-2 text-xs font-bold text-slate-600">リストにない部材を手入力で追加</div>
+        <div className="mb-2 text-xs font-bold text-slate-600">リストにない部材を手入力で追加（商品名は空でも、金額だけでも入れられます）</div>
         <div className="flex flex-wrap items-center gap-2">
-          <TextInput value={manual.name} onChange={(name) => setManual({...manual, name})} placeholder="商品名" className="min-w-[14rem] flex-1" />
+          <TextInput value={manual.name} onChange={(name) => setManual({...manual, name})} placeholder="商品名（なくてもよい）" className="min-w-[14rem] flex-1" />
           <label className="flex items-center gap-1 text-xs text-slate-600">
-            単価
-            <NumberInput value={manual.price} onChange={(price) => setManual({...manual, price})} className="w-28" ariaLabel="手入力の単価" />
+            定価
+            <NumberInput value={manual.listPrice} onChange={(listPrice) => setManual({...manual, listPrice})} className="w-28" ariaLabel="手入力の定価" />
+          </label>
+          <label className="flex items-center gap-1 text-xs text-slate-600">
+            仕切価格
+            <NumberInput value={manual.price} onChange={(price) => setManual({...manual, price})} className="w-28" ariaLabel="手入力の仕切価格" />
           </label>
           <label className="flex items-center gap-1 text-xs text-slate-600">
             数量
             <NumberInput value={manual.qty} onChange={(qty) => setManual({...manual, qty})} className="w-16" min={0} ariaLabel="手入力の数量" />
           </label>
-          <label className="flex items-center gap-1 text-xs text-slate-600">
-            <input type="checkbox" checked={manual.save} onChange={(e) => setManual({...manual, save: e.target.checked})} />
-            部材リストにも★で登録
+          <label className={`flex items-center gap-1 text-xs ${manual.name.trim() ? 'text-slate-600' : 'text-slate-400'}`}>
+            <input
+              type="checkbox"
+              checked={manual.save && manual.name.trim() !== ''}
+              disabled={!manual.name.trim()}
+              onChange={(e) => setManual({...manual, save: e.target.checked})}
+            />
+            部材リストにもお気に入り（★）で登録
           </label>
-          <Btn small color="emerald" disabled={!manual.name.trim()} onClick={addManual}>
+          <Btn small color="emerald" disabled={!canAddManual} onClick={addManual}>
             ＋ 追加
           </Btn>
         </div>
@@ -180,39 +209,30 @@ export function MaterialPicker({
   );
 }
 
-/** 取付手間を数える画面。木 −／＋ のように箇所数を数えると、その箇所の行が増減する */
+/**
+ * 取付手間を数える画面。木 −／＋ のように箇所数を数えると、行が増減する。
+ * rows は数える範囲（箇所の行すべて、または部材のすぐ下の手間の行＝見積の「同上施工費」）。
+ */
 export function LaborCounter({
-  place,
+  title,
+  rows,
   labor,
   onChange,
   onClose,
 }: {
-  place: Place;
+  title: ReactNode;
+  rows: Row[];
   labor: LaborItem[];
   onChange: (rows: Row[]) => void;
   onClose: () => void;
 }) {
-  const [manual, setManual] = useState({name: '', price: 0});
-  const count = (id: string) => place.rows.filter((r) => r.kind === 'labor' && r.refId === id).reduce((n, r) => n + r.qty, 0);
-
-  const setCount = (item: LaborItem, n: number) => {
-    const rows = place.rows;
-    const idx = rows.findIndex((r) => r.kind === 'labor' && r.refId === item.id);
-    if (n <= 0) {
-      onChange(rows.filter((r) => !(r.kind === 'labor' && r.refId === item.id)));
-    } else if (idx < 0) {
-      onChange([...rows, {id: uid('r'), kind: 'labor', refId: item.id, name: item.name, code: '', maker: '', price: item.price, qty: n}]);
-    } else {
-      // 同じ手間が複数行あるときは1行にまとめる
-      const others = rows.filter((r, i) => i === idx || !(r.kind === 'labor' && r.refId === item.id));
-      onChange(others.map((r) => (r.id === rows[idx].id ? {...r, qty: n} : r)));
-    }
-  };
-
+  const [manual, setManual] = useState({name: '', price: 0, qty: 1});
+  // 工事内容の名前は空でもよい（金額だけ）
+  const canAddManual = manual.name.trim() !== '' || manual.price > 0;
   const addManual = () => {
-    if (!manual.name.trim()) return;
-    onChange([...place.rows, {id: uid('r'), kind: 'labor', refId: null, name: manual.name.trim(), code: '', maker: '', price: manual.price, qty: 1}]);
-    setManual({name: '', price: 0});
+    if (!canAddManual) return;
+    onChange([...rows, manualRow('labor', {name: manual.name.trim(), price: manual.price, qty: manual.qty})]);
+    setManual({name: '', price: 0, qty: 1});
   };
 
   return (
@@ -220,7 +240,7 @@ export function LaborCounter({
       wide
       title={
         <>
-          「{place.name || '箇所'}」の取付手間
+          {title}
           <span className="ml-2 text-xs font-normal text-slate-500">箇所数を ＋／− で数えます（例：木 2箇所＝2,000円）</span>
         </>
       }
@@ -233,7 +253,7 @@ export function LaborCounter({
     >
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {labor.map((item) => {
-          const n = count(item.id);
+          const n = laborCount(rows, item.id);
           return (
             <div
               key={item.id}
@@ -245,20 +265,24 @@ export function LaborCounter({
                   1箇所 {yen(item.price)}円{n > 0 && <span className="ml-2 font-bold text-sky-800">＝ {yen(item.price * n)}円</span>}
                 </div>
               </div>
-              <Stepper value={n} onChange={(v) => setCount(item, v)} ariaLabel={`${item.name}の箇所数`} />
+              <Stepper value={n} onChange={(v) => onChange(setLaborCount(rows, item, v))} ariaLabel={`${item.name}の箇所数`} />
             </div>
           );
         })}
       </div>
       <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-        <div className="mb-2 text-xs font-bold text-slate-600">単価表にない手間を手入力で追加</div>
+        <div className="mb-2 text-xs font-bold text-slate-600">単価表にない工事を手入力で追加（工事内容は空でも、金額だけでも入れられます）</div>
         <div className="flex flex-wrap items-center gap-2">
-          <TextInput value={manual.name} onChange={(name) => setManual({...manual, name})} placeholder="項目名" className="min-w-[14rem] flex-1" />
+          <TextInput value={manual.name} onChange={(name) => setManual({...manual, name})} placeholder="工事内容（なくてもよい）" className="min-w-[14rem] flex-1" />
           <label className="flex items-center gap-1 text-xs text-slate-600">
             単価
             <NumberInput value={manual.price} onChange={(price) => setManual({...manual, price})} className="w-28" ariaLabel="手入力の手間の単価" />
           </label>
-          <Btn small color="emerald" disabled={!manual.name.trim()} onClick={addManual}>
+          <label className="flex items-center gap-1 text-xs text-slate-600">
+            箇所数
+            <NumberInput value={manual.qty} onChange={(qty) => setManual({...manual, qty})} className="w-16" min={0} ariaLabel="手入力の手間の箇所数" />
+          </label>
+          <Btn small color="emerald" disabled={!canAddManual} onClick={addManual}>
             ＋ 追加
           </Btn>
         </div>

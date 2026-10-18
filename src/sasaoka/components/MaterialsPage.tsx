@@ -13,7 +13,7 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
   const [query, setQuery] = useState('');
   const [maker, setMaker] = useState('');
   const [favOnly, setFavOnly] = useState(false);
-  const [draft, setDraft] = useState({name: '', code: '', maker: '', price: 0});
+  const [draft, setDraft] = useState({name: '', code: '', maker: '', price: 0, listPrice: 0});
   const [limit, setLimit] = useState(SHOW_LIMIT);
 
   const makers = useMemo(
@@ -42,13 +42,14 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
       code: draft.code.trim(),
       maker: draft.maker.trim(),
       price: draft.price,
+      listPrice: draft.listPrice,
       unit: '',
       favorite: true,
       updatedAt: Date.now(),
     };
     update('materials', (all) => [m, ...all]);
-    setDraft({name: '', code: '', maker: draft.maker, price: 0});
-    toast(`「${m.name}」を★付きで追加しました`);
+    setDraft({name: '', code: '', maker: draft.maker, price: 0, listPrice: 0});
+    toast(`「${m.name}」をお気に入り（★）で追加しました`);
   };
 
   const removeShown = () => {
@@ -65,7 +66,7 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-lg font-bold text-[#0c315e]">部材リスト（メーカーの仕切り）</h1>
         <span className="text-sm text-slate-500">
-          全{data.materials.length}件・★よく使う {favCount}件
+          全{data.materials.length}件・★お気に入り {favCount}件
         </span>
         <div className="ml-auto">
           <Btn color="purple" onClick={() => setImporting(true)}>
@@ -74,11 +75,12 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
         </div>
       </div>
       <p className="text-xs leading-5 text-slate-500">
-        ★を付けた部材は、様邸の画面で「部材を追加」を押したときに最初に出ます。仕切価格を変えても、すでに作った様邸の金額は変わりません（選んだときの単価で計算します）。
+        ★（お気に入り）を付けた部材は、様邸の画面で「部材を追加」を押したときに最初に出ます。定価は見積書の単価（定価×{data.settings.estimateRate}）に使います。
+        仕切価格・定価を変えても、すでに作った様邸の金額は変わりません（選んだときの単価で計算します）。
       </p>
 
       <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-        <div className="mb-2 text-xs font-bold text-slate-600">手入力で1件追加（★付きで入ります）</div>
+        <div className="mb-2 text-xs font-bold text-slate-600">手入力で1件追加（お気に入り★で入ります）</div>
         <form
           className="flex flex-wrap items-center gap-2"
           onSubmit={(e) => {
@@ -94,6 +96,10 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
               <option key={m} value={m} />
             ))}
           </datalist>
+          <label className="flex items-center gap-1 text-xs text-slate-600">
+            定価
+            <NumberInput value={draft.listPrice} onChange={(listPrice) => setDraft({...draft, listPrice})} className="w-28" ariaLabel="定価" />
+          </label>
           <label className="flex items-center gap-1 text-xs text-slate-600">
             仕切価格
             <NumberInput value={draft.price} onChange={(price) => setDraft({...draft, price})} className="w-28" ariaLabel="仕切価格" />
@@ -116,7 +122,7 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
         </select>
         <label className="flex items-center gap-1.5 text-sm">
           <input type="checkbox" checked={favOnly} onChange={(e) => setFavOnly(e.target.checked)} />
-          ★だけ表示
+          ★お気に入りだけ表示
         </label>
         <div className="ml-auto flex flex-wrap gap-2">
           <Btn small color="amber" disabled={list.length === 0} onClick={() => setMany(new Set(list.map((m) => m.id)), {favorite: true})}>
@@ -135,12 +141,12 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
         <div className="rounded-xl border border-dashed border-purple-300 bg-white p-6 text-sm leading-7 text-slate-600">
           <p className="font-bold text-slate-800">部材リストはまだ空です。</p>
           <p>
-            「📥 メーカーの仕切り表を取り込む」から、メーカーの仕切り表（Excel・CSV・PDF）を読み込みます。商品が多い表でも、よく使うものだけチェックして取り込んだり、★を付けたりできます。
+            「📥 メーカーの仕切り表を取り込む」から、メーカーの仕切り表（Excel・CSV・PDF）を読み込みます。商品が多い表でも、よく使うものだけチェックして取り込んだり、お気に入り（★）を付けたりできます。
           </p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-          <table className="w-full min-w-[860px] text-sm">
+          <table className="w-full min-w-[980px] text-sm">
             <thead className="bg-slate-100 text-xs text-slate-600">
               <tr>
                 <th className="w-10 px-1 py-2">★</th>
@@ -148,6 +154,7 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
                 <th className="px-2 py-2 text-left">品番</th>
                 <th className="px-2 py-2 text-left">商品名</th>
                 <th className="w-20 px-2 py-2 text-left">単位</th>
+                <th className="w-32 px-2 py-2 pr-4 text-right">定価</th>
                 <th className="w-32 px-2 py-2 pr-4 text-right">仕切価格</th>
                 <th className="w-24 px-2 py-2 text-left">更新日</th>
                 <th className="w-10 px-1 py-2" />
@@ -157,7 +164,7 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
               {list.slice(0, limit).map((m) => (
                 <tr key={m.id} className="border-t border-slate-100">
                   <td className="px-1 text-center">
-                    <Star on={m.favorite} onClick={() => setMany(new Set([m.id]), {favorite: !m.favorite})} label={`${m.name}をよく使うに`} />
+                    <Star on={m.favorite} onClick={() => setMany(new Set([m.id]), {favorite: !m.favorite})} label={`${m.name}をお気に入りに`} />
                   </td>
                   <td className="px-2 py-1">
                     <TextInput value={m.maker} onChange={(v) => setMat(m.id, {maker: v})} className="w-32" list="maker-list" />
@@ -170,6 +177,9 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
                   </td>
                   <td className="px-2 py-1">
                     <TextInput value={m.unit} onChange={(v) => setMat(m.id, {unit: v})} className="w-16" />
+                  </td>
+                  <td className="px-2 py-1 text-right">
+                    <NumberInput value={m.listPrice} onChange={(listPrice) => setMat(m.id, {listPrice})} className="w-28" ariaLabel="定価" />
                   </td>
                   <td className="px-2 py-1 text-right">
                     <NumberInput value={m.price} onChange={(price) => setMat(m.id, {price})} className="w-28" ariaLabel="仕切価格" />
@@ -200,7 +210,7 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
           )}
           {list.length === 0 && <p className="px-3 py-4 text-sm text-slate-500">条件に合う部材がありません。</p>}
           <p className="border-t border-slate-100 px-3 py-2 text-right text-xs text-slate-500">
-            表示中 {list.length}件・仕切価格は税抜の金額です
+            表示中 {list.length}件・定価・仕切価格は税抜の金額です
           </p>
         </div>
       )}

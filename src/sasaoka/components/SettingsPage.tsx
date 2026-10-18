@@ -3,7 +3,7 @@ import type {ReactNode} from 'react';
 import {DEFAULT_PLACES, DEFAULT_STAFF, OFFICES, settingsForOffice} from '../defaults.ts';
 import {hasSamples, withoutSamples} from '../samples.ts';
 import {backupJson, cleanList, masterJson, mergeById, parseBackup} from '../storage.ts';
-import type {AppData, InvoiceTaxMode, Settings, TaxMode} from '../types.ts';
+import type {AppData, InvoiceTaxMode, Rounding, Settings, TaxMode} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {downloadBlob, todayIso} from '../util.ts';
 import {Btn, NumberInput, TextInput, useToast} from './ui.tsx';
@@ -68,7 +68,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
   const exportAll = () =>
     downloadBlob(new Blob([backupJson(data)], {type: 'application/json'}), `仕切り計算・請求書_バックアップ_${todayIso()}.json`);
   const exportMaster = () =>
-    downloadBlob(new Blob([masterJson(data)], {type: 'application/json'}), `部材リスト・手間単価_${todayIso()}.json`);
+    downloadBlob(new Blob([masterJson(data)], {type: 'application/json'}), `部材リスト・手間単価・一式_${todayIso()}.json`);
 
   const readBackup = async (f: File) => {
     try {
@@ -84,6 +84,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
     if (d.materials) update('materials', (cur) => (replace ? d.materials! : mergeById(cur, d.materials!)));
     if (d.labor) update('labor', (cur) => (replace ? d.labor! : mergeById(cur, d.labor!)));
     if (d.jobs && (replace || d.jobs.length > 0)) update('jobs', (cur) => (replace ? d.jobs! : mergeById(cur, d.jobs!)));
+    if (d.kits) update('kits', (cur) => (replace ? d.kits! : mergeById(cur, d.kits!)));
     if (d.settings && replace) update('settings', () => d.settings!);
     setPending(null);
     toast(replace ? 'バックアップの内容に置き換えました' : 'バックアップの内容を足しました');
@@ -153,7 +154,28 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
         <Field label="消費税率（0.1＝10%）">
           <NumberInput value={s.taxRate} onChange={(taxRate) => set({taxRate})} className="w-28" min={0} ariaLabel="消費税率" />
         </Field>
-        <Field label="⑤消費税の1円未満">
+        <Field label="請求書（1か月分）の消費税">
+          <select
+            value={s.invoiceTaxMode}
+            onChange={(e) => set({invoiceTaxMode: e.target.value as InvoiceTaxMode})}
+            className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
+          >
+            <option value="monthly">すべての様邸の税抜合計に、最後に消費税率をかける</option>
+            <option value="perJob">様邸ごとの⑤消費税を足す（一覧に様邸ごとの消費税・合計を出す）</option>
+          </select>
+        </Field>
+        <Field label="合計にかける消費税の1円未満（請求書・見積書）">
+          <select
+            value={s.totalTaxRounding}
+            onChange={(e) => set({totalTaxRounding: e.target.value as Rounding})}
+            className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
+          >
+            <option value="floor">切り捨て</option>
+            <option value="round">四捨五入</option>
+            <option value="ceil">切り上げ</option>
+          </select>
+        </Field>
+        <Field label="様邸ごとの仕切り計算表の⑤消費税の1円未満">
           <select value={s.taxMode} onChange={(e) => set({taxMode: e.target.value as TaxMode})} className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal">
             <option value="original">元の表と同じ（⑦×0.1－1円・四捨五入）</option>
             <option value="floor">切り捨て</option>
@@ -161,15 +183,25 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
             <option value="ceil">切り上げ</option>
           </select>
         </Field>
-        <Field label="請求書（1か月分）の消費税">
-          <select
-            value={s.invoiceTaxMode}
-            onChange={(e) => set({invoiceTaxMode: e.target.value as InvoiceTaxMode})}
-            className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
-          >
-            <option value="perJob">様邸ごとの⑤消費税を足す（一覧に様邸ごとの消費税・合計を出す）</option>
-            <option value="monthly">1か月の税抜合計に対して1回だけ計算する（インボイスの端数処理）</option>
-          </select>
+      </Section>
+
+      <Section
+        title="見積書"
+        note="上の「見積作成」に切り替えると、様邸に入れた部材・取付手間から見積書を作ります。部材の単価は定価×率（長さを入れた部材は さらに×長さ）、部材のすぐ下の取付手間は「同上施工費」の1行にまとめます。書式は仮のものです。"
+      >
+        <Field label="部材の単価＝定価×この率（0.8＝定価の8割）">
+          <NumberInput value={s.estimateRate} onChange={(estimateRate) => set({estimateRate})} className="w-28" min={0} ariaLabel="見積の率" />
+        </Field>
+        <Field label="工事内容を自動で作るときの言葉（箇所の名前のあとに付く）">{text('estimateWork', '手すり取付工事')}</Field>
+        <Field label="有効期限">{text('estimateValid', 'お見積り日より1か月')}</Field>
+        <Field label="見積書の備考（下に出ます）" wide>
+          <textarea
+            value={s.estimateNote}
+            onChange={(e) => set({estimateNote: e.target.value})}
+            rows={3}
+            className="w-full rounded-md border border-slate-300 p-2 text-sm font-normal"
+            placeholder="例：介護保険の住宅改修として申請する場合は、事前申請が必要です。"
+          />
         </Field>
       </Section>
 
@@ -202,14 +234,14 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
         <h2 className="mb-1 text-base font-bold text-[#0c315e]">データ（この端末のブラウザに保存）</h2>
         <p className="mb-3 text-xs leading-5 text-slate-500">
           入力した内容は、このパソコンのこのブラウザにだけ保存されます（サーバーには送りません）。ほかのパソコンでは見えないので、ときどきバックアップを保存してください。
-          部材リスト・手間単価だけを保存したファイルは、ほかの人に渡して読み込んでもらえます。
+          部材リスト・手間単価・一式だけを保存したファイルは、ほかの人に渡して読み込んでもらえます。
         </p>
         <div className="flex flex-wrap gap-2">
           <Btn color="blue" onClick={exportAll}>
             バックアップを保存（すべて）
           </Btn>
           <Btn color="teal" onClick={exportMaster}>
-            部材リスト・手間単価だけ保存（ほかの人に渡す用）
+            部材リスト・手間単価・一式だけ保存（ほかの人に渡す用）
           </Btn>
           <label className="inline-flex cursor-pointer items-center rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50">
             保存したファイルを読み込む
@@ -231,7 +263,8 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
                 const r = withoutSamples(data);
                 update('materials', () => r.materials);
                 update('jobs', () => r.jobs);
-                toast('サンプルの部材と様邸を消しました');
+                update('kits', () => r.kits);
+                toast('サンプルの部材・様邸・一式を消しました');
               }}
             >
               サンプルを消す
@@ -242,7 +275,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
           <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
             <p className="font-bold text-slate-800">「{pending.name}」の中身</p>
             <p className="text-slate-600">
-              部材 {pending.data.materials?.length ?? 0}件・取付手間 {pending.data.labor?.length ?? 0}件・様邸 {pending.data.jobs?.length ?? 0}件
+              部材 {pending.data.materials?.length ?? 0}件・取付手間 {pending.data.labor?.length ?? 0}件・様邸 {pending.data.jobs?.length ?? 0}件・一式 {pending.data.kits?.length ?? 0}件
               {pending.data.settings ? '・設定' : ''}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">

@@ -2,8 +2,8 @@
 // 太陽ポータルのアプリはすべて同じサイト（akamar08taiyo-bot.github.io）にあり、localStorage の容量を
 // 分け合っているため、件数の多い部材リストは容量に余裕のある IndexedDB に入れる。
 
-import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES} from './defaults.ts';
-import type {AppData, InvoiceTaxMode, Job, LaborItem, Material, NameSuffix, Place, Row, Settings, TaxMode} from './types.ts';
+import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES, SETTINGS_REV} from './defaults.ts';
+import type {AppData, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, Place, Rounding, Row, Settings, TaxMode} from './types.ts';
 import {uid} from './util.ts';
 
 const DB_NAME = 'taiyo-sasaoka-shikiri';
@@ -87,12 +87,19 @@ const numv = (v: unknown, d = 0) => {
   return Number.isFinite(n) ? n : d;
 };
 
+/** 数字なら数字、空・数字でなければ null */
+const optNum = (v: unknown): number | null => {
+  const n = numv(v, NaN);
+  return Number.isFinite(n) ? n : null;
+};
+
 export function cleanMaterials(raw: unknown): Material[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter(isObj).map((m) => ({
     id: str(m.id) || uid('m'),
     name: str(m.name),
     price: numv(m.price),
+    listPrice: numv(m.listPrice),
     maker: str(m.maker),
     code: str(m.code),
     unit: str(m.unit),
@@ -113,8 +120,12 @@ const cleanRow = (r: Record<string, unknown>): Row => ({
   name: str(r.name),
   code: str(r.code),
   maker: str(r.maker),
+  unit: str(r.unit),
   price: numv(r.price),
   qty: numv(r.qty, 1),
+  listPrice: numv(r.listPrice),
+  lengthCm: Math.max(0, numv(r.lengthCm)),
+  estPrice: optNum(r.estPrice),
 });
 
 const cleanPlace = (p: Record<string, unknown>): Place => ({
@@ -136,9 +147,20 @@ export function cleanJobs(raw: unknown): Job[] {
     date: /^\d{4}-\d{2}-\d{2}$/.test(str(j.date)) ? str(j.date) : '',
     address: str(j.address),
     note: str(j.note),
+    work: str(j.work),
     places: Array.isArray(j.places) ? j.places.filter(isObj).map(cleanPlace) : [],
     createdAt: numv(j.createdAt, Date.now()),
     updatedAt: numv(j.updatedAt, Date.now()),
+  }));
+}
+
+export function cleanKits(raw: unknown): Kit[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(isObj).map((k) => ({
+    id: str(k.id) || uid('k'),
+    name: str(k.name),
+    rows: Array.isArray(k.rows) ? k.rows.filter(isObj).map(cleanRow) : [],
+    updatedAt: numv(k.updatedAt, Date.now()),
   }));
 }
 
@@ -149,12 +171,30 @@ export function cleanList(raw: unknown[]): string[] {
 
 const TAX_MODES: TaxMode[] = ['original', 'floor', 'round', 'ceil'];
 const INV_MODES: InvoiceTaxMode[] = ['perJob', 'monthly'];
+const ROUNDINGS: Rounding[] = ['floor', 'round', 'ceil'];
 
 export function cleanSettings(raw: unknown): Settings {
   const d = defaultSettings();
   if (!isObj(raw)) return d;
   const s = {...d};
-  for (const k of ['clientName', 'company', 'officeName', 'manager', 'postal', 'address', 'tel', 'fax', 'person', 'regNo', 'bank', 'subject', 'invoiceNote'] as const) {
+  for (const k of [
+    'clientName',
+    'company',
+    'officeName',
+    'manager',
+    'postal',
+    'address',
+    'tel',
+    'fax',
+    'person',
+    'regNo',
+    'bank',
+    'subject',
+    'invoiceNote',
+    'estimateWork',
+    'estimateValid',
+    'estimateNote',
+  ] as const) {
     if (typeof raw[k] === 'string') s[k] = raw[k] as string;
   }
   // 所長名を入れる前に保存した設定は、保存してある営業所の所長名にする
@@ -163,22 +203,29 @@ export function cleanSettings(raw: unknown): Settings {
   s.taxRate = numv(raw.taxRate, d.taxRate);
   s.taxMode = TAX_MODES.includes(raw.taxMode as TaxMode) ? (raw.taxMode as TaxMode) : d.taxMode;
   s.invoiceTaxMode = INV_MODES.includes(raw.invoiceTaxMode as InvoiceTaxMode) ? (raw.invoiceTaxMode as InvoiceTaxMode) : d.invoiceTaxMode;
+  s.totalTaxRounding = ROUNDINGS.includes(raw.totalTaxRounding as Rounding) ? (raw.totalTaxRounding as Rounding) : d.totalTaxRounding;
   s.placePresets = Array.isArray(raw.placePresets) ? cleanList(raw.placePresets) : DEFAULT_PLACES;
   s.staffList = Array.isArray(raw.staffList) ? cleanList(raw.staffList) : DEFAULT_STAFF;
+  s.estimateRate = numv(raw.estimateRate, d.estimateRate);
+  // 版2より前の設定：請求書の消費税は「すべての様邸の合計に最後に消費税率をかける」形に直す
+  if (numv(raw.rev, 1) < 2) s.invoiceTaxMode = 'monthly';
+  s.rev = SETTINGS_REV;
   return s;
 }
 
 export async function loadAll(): Promise<AppData> {
-  const [materials, labor, jobs, settings] = await Promise.all([
+  const [materials, labor, jobs, kits, settings] = await Promise.all([
     loadKey('materials'),
     loadKey('labor'),
     loadKey('jobs'),
+    loadKey('kits'),
     loadKey('settings'),
   ]);
   return {
     materials: cleanMaterials(materials),
     labor: labor === undefined ? DEFAULT_LABOR.map((l) => ({...l})) : cleanLabor(labor),
     jobs: cleanJobs(jobs),
+    kits: cleanKits(kits),
     settings: cleanSettings(settings),
   };
 }
@@ -191,9 +238,13 @@ export function backupJson(data: AppData): string {
   return JSON.stringify({kind: BACKUP_KIND, version: 1, exportedAt: new Date().toISOString(), ...data}, null, 1);
 }
 
-/** 部材リスト・手間単価だけ（ほかの人に渡す用。様邸・設定は入れない） */
-export function masterJson(data: Pick<AppData, 'materials' | 'labor'>): string {
-  return JSON.stringify({kind: BACKUP_KIND, version: 1, exportedAt: new Date().toISOString(), materials: data.materials, labor: data.labor}, null, 1);
+/** 部材リスト・手間単価・一式だけ（ほかの人に渡す用。様邸・設定は入れない） */
+export function masterJson(data: Pick<AppData, 'materials' | 'labor' | 'kits'>): string {
+  return JSON.stringify(
+    {kind: BACKUP_KIND, version: 1, exportedAt: new Date().toISOString(), materials: data.materials, labor: data.labor, kits: data.kits},
+    null,
+    1,
+  );
 }
 
 export function parseBackup(text: string): Partial<AppData> {
@@ -203,6 +254,7 @@ export function parseBackup(text: string): Partial<AppData> {
   if (Array.isArray(raw.materials)) out.materials = cleanMaterials(raw.materials);
   if (Array.isArray(raw.labor)) out.labor = cleanLabor(raw.labor);
   if (Array.isArray(raw.jobs)) out.jobs = cleanJobs(raw.jobs);
+  if (Array.isArray(raw.kits)) out.kits = cleanKits(raw.kits);
   if (isObj(raw.settings)) out.settings = cleanSettings(raw.settings);
   return out;
 }

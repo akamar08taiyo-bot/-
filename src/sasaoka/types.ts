@@ -6,10 +6,11 @@ export type Material = {
   id: string;
   name: string; // 商品名
   price: number; // 仕切り価格（円）
+  listPrice: number; // 定価（税抜・円）。見積の単価のもと。分からなければ 0
   maker: string; // メーカー名
   code: string; // 品番
   unit: string; // 単位（本・個など。空でもよい）
-  favorite: boolean; // よく使う（★）
+  favorite: boolean; // お気に入り（★）
   updatedAt: number;
 };
 
@@ -27,6 +28,7 @@ export type RowKind = 'material' | 'labor';
  * 箇所の中の1行（部材 または 取付手間）。
  * 品名・単価は選んだときの値を行に書き写して持つので、あとで部材リストや手間の単価を変えても、
  * すでに作った様邸の金額は変わらない。
+ * 品名は空でもよい（金額だけ入れた行）。
  */
 export type Row = {
   id: string;
@@ -35,8 +37,13 @@ export type Row = {
   name: string;
   code: string; // 品番（部材だけ）
   maker: string; // メーカー（部材だけ）
-  price: number; // 単価
+  unit: string; // 単位（部材だけ。見積書に出す）
+  price: number; // 単価（部材は仕切り価格。仕切り計算表・請求書に使う）
   qty: number; // 数量・箇所数
+  // ---- 見積書だけに使う（部材の行）
+  listPrice: number; // 定価（税抜）
+  lengthCm: number; // 長さ（cm）。0 なら長さでは計算しない
+  estPrice: number | null; // 見積の単価を手で入れたとき。null なら 定価×掛率（×長さ）
 };
 
 /** 箇所（玄関・トイレなど） */
@@ -48,6 +55,14 @@ export type Place = {
 
 export type NameSuffix = '様邸' | '様' | '';
 
+/** 一式（よく使う部材・取付手間の組み合わせ）。箇所に入れると、まとめて行が入る */
+export type Kit = {
+  id: string;
+  name: string;
+  rows: Row[];
+  updatedAt: number;
+};
+
 /** 1件（○○様邸） */
 export type Job = {
   id: string;
@@ -58,6 +73,7 @@ export type Job = {
   date: string; // 施工日 'YYYY-MM-DD'（空でもよい）
   address: string;
   note: string;
+  work: string; // 工事内容（見積書に出す。空なら箇所の名前から自動で作る）
   places: Place[];
   createdAt: number;
   updatedAt: number;
@@ -71,10 +87,16 @@ export type TaxMode = 'original' | 'floor' | 'round' | 'ceil';
 
 /**
  * 請求書（1か月分）の消費税の出し方。
+ * monthly = すべての様邸の税抜合計に、最後に消費税率をかける（最初はこれ）
  * perJob  = 様邸ごとの⑤消費税をそのまま足す（一覧に様邸ごとの消費税・合計を出す）
- * monthly = 1か月の税抜合計に対して1回だけ計算する（インボイス制度の端数処理の考え方）
  */
 export type InvoiceTaxMode = 'perJob' | 'monthly';
+
+/** 合計にかける消費税の1円未満（請求書の1か月分・見積書） */
+export type Rounding = 'floor' | 'round' | 'ceil';
+
+/** 画面の使い方：仕切り計算・請求書 か 見積作成 か */
+export type AppMode = 'shikiri' | 'estimate';
 
 export type Settings = {
   clientName: string; // 請求先（笹岡工務店）
@@ -94,13 +116,21 @@ export type Settings = {
   taxRate: number; // 消費税率（0.1）
   taxMode: TaxMode;
   invoiceTaxMode: InvoiceTaxMode;
+  totalTaxRounding: Rounding;
   placePresets: string[]; // 箇所の候補
   staffList: string[]; // 担当者の候補（様邸ごとに選ぶ）
+  // ---- 見積書
+  estimateRate: number; // 見積の部材の単価＝定価×この率（0.8）
+  estimateWork: string; // 工事内容を自動で作るときに箇所の名前のあとに付ける言葉（「手すり取付工事」）
+  estimateValid: string; // 有効期限（例：お見積り日より1か月）
+  estimateNote: string; // 見積書の備考
+  rev: number; // 設定の版（古い版で保存した設定を読み込むときの直し方に使う）
 };
 
 export type AppData = {
   materials: Material[];
   labor: LaborItem[];
   jobs: Job[];
+  kits: Kit[];
   settings: Settings;
 };
