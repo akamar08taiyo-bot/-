@@ -16,7 +16,7 @@ const lab = (price: number, qty: number, name = '木'): Row => ({
   id: `r${++seq}`, kind: 'labor', refId: null, name, code: '', maker: '', price, qty,
 });
 const job = (rows: Row[][], extra: Partial<Job> = {}): Job => ({
-  id: `j${++seq}`, month: '2026-10', customer: '山田', suffix: '様邸', date: '', address: '', note: '',
+  id: `j${++seq}`, month: '2026-10', customer: '山田', suffix: '様邸', staff: '', date: '', address: '', note: '',
   places: rows.map((r, i) => ({id: `p${i}`, name: `箇所${i}`, rows: r})),
   createdAt: seq, updatedAt: seq, ...extra,
 });

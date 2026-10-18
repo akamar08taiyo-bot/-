@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState} from 'react';
+import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
 import {jobName, jobTotals, monthSummary, placeTotals, rowAmount} from '../calc.ts';
 import type {MonthSummary} from '../calc.ts';
@@ -8,6 +8,7 @@ import {dateLabel, monthEnd, monthLabel, num, shortDate, todayIso, yen} from '..
 export type PrintRequest = {kind: 'invoice'; month: string; withDetails: boolean} | {kind: 'job'; jobId: string};
 
 type InvoiceMeta = {date: string; number: string; due: string};
+
 const META_KEY = 'sasaoka-app:invoice-meta';
 
 /** 請求日・請求書番号・お支払期限は月ごとに覚えておく（次に開いたときも同じものが入る） */
@@ -35,9 +36,35 @@ function useInvoiceMeta(month: string) {
   return [meta, setMeta] as const;
 }
 
+/** A4の幅（210mm）＋まわりの余白。画面がこれより狭いと、用紙全体が見えるように縮めて見せる */
+const PAGE_PX = (210 / 25.4) * 96 + 16;
+
+/** 印刷イメージを画面の幅に合わせる倍率（1＝原寸） */
+function useFitScale() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setScale(Math.min(1, el.clientWidth / PAGE_PX));
+    measure();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure);
+      return () => window.removeEventListener('resize', measure);
+    }
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, scale] as const;
+}
+
 export function PrintView({request, data, onClose}: {request: PrintRequest; data: AppData; onClose: () => void}) {
   const month = request.kind === 'invoice' ? request.month : data.jobs.find((j) => j.id === request.jobId)?.month ?? '';
   const [meta, setMeta] = useInvoiceMeta(month);
+  const [overlayRef, fitScale] = useFitScale();
+  const [actualSize, setActualSize] = useState(false);
+  const zoom = actualSize ? 1 : fitScale;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -74,11 +101,11 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
   }
 
   return (
-    <div className="print-overlay">
+    <div className="print-overlay" ref={overlayRef}>
       <div className="print-toolbar">
         <div className="text-sm font-bold">
           印刷イメージ（A4縦）
-          <span className="ml-2 font-normal text-slate-300">印刷の画面で「PDFに保存」を選ぶとPDFにできます</span>
+          <span className="ml-2 hidden font-normal text-slate-300 sm:inline">印刷の画面で「PDFに保存」を選ぶとPDFにできます</span>
         </div>
         {request.kind === 'invoice' && (
           <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -97,6 +124,15 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
           </div>
         )}
         <div className="ml-auto flex gap-2">
+          {fitScale < 1 && (
+            <button
+              type="button"
+              onClick={() => setActualSize((v) => !v)}
+              className="rounded-md border border-white/40 px-3 py-2 text-sm font-bold text-white hover:bg-white/10"
+            >
+              {actualSize ? '全体を表示' : '🔍 拡大'}
+            </button>
+          )}
           <button type="button" onClick={() => window.print()} className="rounded-md bg-sky-600 px-4 py-2 text-sm font-bold text-white shadow hover:bg-sky-700">
             🖨 印刷する
           </button>
@@ -105,7 +141,10 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
           </button>
         </div>
       </div>
-      <div className="print-root">{sheets}</div>
+      {/* 画面の幅が足りないときは zoom で縮める（印刷するときは CSS で原寸に戻す） */}
+      <div className="print-root" style={zoom < 1 ? {zoom} : undefined}>
+        {sheets}
+      </div>
     </div>
   );
 }
@@ -124,7 +163,16 @@ function Issuer({s}: {s: Settings}) {
       )}
       {telFax && <div>{telFax}</div>}
       {s.regNo && <div>登録番号　{s.regNo}</div>}
-      {s.person && <div>担当　{s.person}</div>}
+      {s.manager && (
+        <div className="person">
+          {s.officeName}所長　<b>{s.manager}</b>
+        </div>
+      )}
+      {s.person && (
+        <div className="person">
+          担当　<b>{s.person}</b>
+        </div>
+      )}
     </div>
   );
 }
@@ -163,10 +211,11 @@ function InvoiceDoc({month, summary, settings: s, meta}: {month: string; summary
       <table className="items invoice">
         <colgroup>
           <col style={{width: '4%'}} />
-          <col style={{width: '7.5%'}} />
-          <col style={{width: monthly ? '26.5%' : '17.5%'}} />
+          <col style={{width: '7%'}} />
+          <col style={{width: monthly ? '22.5%' : '15.5%'}} />
+          <col style={{width: '7%'}} />
           {Array.from({length: monthly ? 5 : 7}, (_, i) => (
-            <col key={i} style={{width: monthly ? '12.4%' : '10.14%'}} />
+            <col key={i} style={{width: monthly ? '11.9%' : '9.5%'}} />
           ))}
         </colgroup>
         <thead>
@@ -174,6 +223,7 @@ function InvoiceDoc({month, summary, settings: s, meta}: {month: string; summary
             <th>No.</th>
             <th>施工日</th>
             <th>お客様名</th>
+            <th>担当</th>
             <th>部材代</th>
             <th>取付手間</th>
             <th>部材上乗せ</th>
@@ -189,6 +239,7 @@ function InvoiceDoc({month, summary, settings: s, meta}: {month: string; summary
               <td className="c">{i + 1}</td>
               <td className="c">{shortDate(job.date)}</td>
               <td className="name">{jobName(job)}</td>
+              <td className="c staff">{job.staff}</td>
               <td className="num">{yen(t.material)}</td>
               <td className="num">{yen(t.labor)}</td>
               <td className="num">{yen(t.markup)}</td>
@@ -201,7 +252,7 @@ function InvoiceDoc({month, summary, settings: s, meta}: {month: string; summary
         </tbody>
         <tfoot>
           <tr>
-            <td colSpan={3} className="r">
+            <td colSpan={4} className="r">
               合計（{summary.rows.length}件）
             </td>
             <td className="num">{yen(summary.sum.material)}</td>
@@ -215,13 +266,13 @@ function InvoiceDoc({month, summary, settings: s, meta}: {month: string; summary
           {monthly && (
             <>
               <tr>
-                <td colSpan={7} className="r">
+                <td colSpan={8} className="r">
                   消費税（{taxPct}）
                 </td>
                 <td className="num">{yen(summary.invoice.tax)}</td>
               </tr>
               <tr>
-                <td colSpan={7} className="r">
+                <td colSpan={8} className="r">
                   ご請求金額（税込）
                 </td>
                 <td className="num strong">{yen(summary.invoice.total)}</td>
@@ -261,7 +312,14 @@ function JobDoc({job, settings: s}: {job: Job; settings: Settings}) {
       <div className="doc-title job-title">{s.clientName}仕切り計算表</div>
       <div className="doc-head">
         <div className="left">
-          <div className="customer">{jobName(job)}</div>
+          <div className="customer-line">
+            <div className="customer">{jobName(job)}</div>
+            {job.staff && (
+              <div className="staff">
+                担当　<b>{job.staff}</b>
+              </div>
+            )}
+          </div>
           <table className="info">
             <tbody>
               {job.date && (
@@ -288,10 +346,7 @@ function JobDoc({job, settings: s}: {job: Job; settings: Settings}) {
               )}
             </tbody>
           </table>
-          <div className="issuer-small">
-            {[s.company, s.officeName].filter(Boolean).join('　')}
-            {s.person && `　担当 ${s.person}`}
-          </div>
+          <div className="issuer-small">{[s.company, s.officeName, s.manager && `所長 ${s.manager}`].filter(Boolean).join('　')}</div>
         </div>
         <table className="summary">
           <tbody>

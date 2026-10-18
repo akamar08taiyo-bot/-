@@ -1,8 +1,8 @@
-import {useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
-import {DEFAULT_PLACES, OFFICES, settingsForOffice} from '../defaults.ts';
+import {DEFAULT_PLACES, DEFAULT_STAFF, OFFICES, settingsForOffice} from '../defaults.ts';
 import {hasSamples, withoutSamples} from '../samples.ts';
-import {backupJson, masterJson, mergeById, parseBackup} from '../storage.ts';
+import {backupJson, cleanList, masterJson, mergeById, parseBackup} from '../storage.ts';
 import type {AppData, InvoiceTaxMode, Settings, TaxMode} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {downloadBlob, todayIso} from '../util.ts';
@@ -24,6 +24,35 @@ function Field({label, children, wide = false}: {label: string; children: ReactN
       {label}
       {children}
     </label>
+  );
+}
+
+/**
+ * 1行に1つずつ書く候補の欄。打っている途中の改行・空行は文字のまま持ち、
+ * 空でない行だけを候補として反映する（反映した候補から書き戻すと、改行を打てなくなるため）
+ */
+function ListArea({value, onChange, rows, label}: {value: string[]; onChange: (v: string[]) => void; rows: number; label: string}) {
+  const [text, setText] = useState(() => value.join('\n'));
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focused.current) setText(value.join('\n'));
+  }, [value]);
+  return (
+    <textarea
+      value={text}
+      aria-label={label}
+      onFocus={() => (focused.current = true)}
+      onBlur={() => {
+        focused.current = false;
+        setText(value.join('\n'));
+      }}
+      onChange={(e) => {
+        setText(e.target.value);
+        onChange(cleanList(e.target.value.split('\n')));
+      }}
+      rows={rows}
+      className="w-full rounded-md border border-slate-300 p-2 text-sm font-normal"
+    />
   );
 }
 
@@ -66,7 +95,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
         <Field label="請求先（工務店）の名前　※請求書には「○○　御中」と出ます">{text('clientName', '笹岡工務店')}</Field>
       </Section>
 
-      <Section title="発行元（請求書に載せる自社の情報）" note="営業所を選ぶと住所・電話番号が入ります。太陽ポータルから開くと、ポータルで選んだ営業所が最初から入ります。">
+      <Section title="発行元（請求書に載せる自社の情報）" note="営業所を選ぶと住所・電話番号・所長名が入ります。太陽ポータルから開くと、ポータルで選んだ営業所が最初から入ります。">
         <Field label="営業所">
           <select
             value={OFFICES.some((o) => o.name === s.officeName) ? s.officeName : ''}
@@ -83,14 +112,15 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
         </Field>
         <Field label="会社名">{text('company')}</Field>
         <Field label="営業所名（請求書に出る名前）">{text('officeName')}</Field>
+        <Field label="所長名（請求書に「○○営業所所長　氏名」と出ます）">{text('manager', '例：久保 匠史')}</Field>
         <Field label="郵便番号">{text('postal')}</Field>
         <Field label="住所" wide>
           {text('address')}
         </Field>
         <Field label="電話番号">{text('tel')}</Field>
         <Field label="FAX番号">{text('fax')}</Field>
-        <Field label="担当者">{text('person', '例：山本')}</Field>
         <Field label="登録番号（インボイス）">{text('regNo', 'T＋13桁')}</Field>
+        <Field label="請求書の担当者（任意・様邸ごとの担当とは別）">{text('person', '例：山本')}</Field>
       </Section>
 
       <Section title="請求書">
@@ -144,19 +174,28 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
       </Section>
 
       <Section title="箇所の候補" note="様邸の画面の「＋ 箇所を追加」に並ぶ名前です。1行に1つずつ書きます。">
-        <Field label="箇所の名前" wide>
-          <textarea
-            value={s.placePresets.join('\n')}
-            onChange={(e) => set({placePresets: e.target.value.split('\n').map((x) => x.trim()).filter(Boolean)})}
-            rows={5}
-            className="w-full rounded-md border border-slate-300 p-2 text-sm font-normal"
-          />
+        <div className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2">
+          <ListArea label="箇所の名前" value={s.placePresets} onChange={(placePresets) => set({placePresets})} rows={5} />
           <span>
             <Btn small color="white" onClick={() => set({placePresets: DEFAULT_PLACES})}>
               最初の候補に戻す
             </Btn>
           </span>
-        </Field>
+        </div>
+      </Section>
+
+      <Section
+        title="担当者の候補"
+        note="様邸の画面で、お客様名の横の「担当」から選ぶ名前です。1行に1つずつ書きます。選んだ担当は、請求書と明細のお客様名の横に出ます。"
+      >
+        <div className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2">
+          <ListArea label="担当者の名前" value={s.staffList} onChange={(staffList) => set({staffList})} rows={5} />
+          <span>
+            <Btn small color="white" onClick={() => set({staffList: DEFAULT_STAFF})}>
+              最初の候補に戻す（{DEFAULT_STAFF.join('・')}）
+            </Btn>
+          </span>
+        </div>
       </Section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">

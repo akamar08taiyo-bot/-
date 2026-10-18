@@ -54,6 +54,7 @@ export type Job = {
   month: string; // 請求する月 'YYYY-MM'
   customer: string; // お客様名（「様邸」は suffix で付ける）
   suffix: NameSuffix;
+  staff: string; // 担当（設定の「担当者の候補」から選ぶ。空でもよい）
   date: string; // 施工日 'YYYY-MM-DD'（空でもよい）
   address: string;
   note: string;
@@ -79,11 +80,12 @@ export type Settings = {
   clientName: string; // 請求先（笹岡工務店）
   company: string; // 発行元の会社名
   officeName: string; // 営業所名
+  manager: string; // 所長名（請求書に「○○営業所所長　氏名」と出る）
   postal: string;
   address: string;
   tel: string;
   fax: string;
-  person: string; // 担当者
+  person: string; // 請求書の担当者（発行元の欄に出る。様邸ごとの担当とは別）
   regNo: string; // 登録番号（インボイス）
   bank: string; // お振込先（1行）
   subject: string; // 請求書の件名（「○年○月分」のあとに付く）
@@ -93,6 +95,7 @@ export type Settings = {
   taxMode: TaxMode;
   invoiceTaxMode: InvoiceTaxMode;
   placePresets: string[]; // 箇所の候補
+  staffList: string[]; // 担当者の候補（様邸ごとに選ぶ）
 };
 
 export type AppData = {

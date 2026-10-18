@@ -142,6 +142,12 @@ body {
   font-size: 9.5pt;
   font-weight: 700;
 }
+.sheet .issuer .person {
+  font-size: 9pt;
+}
+.sheet .issuer .person b {
+  font-size: 9.5pt;
+}
 
 .sheet table.items {
   width: 100%;
@@ -191,6 +197,10 @@ body {
   font-size: 8pt;
   overflow-wrap: anywhere;
 }
+.sheet table.items td.staff {
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
 .sheet table.items td.strong {
   font-weight: 700;
 }
@@ -237,6 +247,16 @@ body {
 }
 
 /* 様邸の明細 */
+.sheet .customer-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1mm 5mm;
+}
+.sheet .customer-line .staff {
+  padding-bottom: 1.5mm;
+  font-size: 10.5pt;
+}
 .sheet .customer {
   display: inline-block;
   min-width: 70mm;
@@ -327,6 +347,7 @@ body {
   }
   .print-root {
     padding: 0;
+    zoom: 1 !important; /* 画面で縮めて見せていても、印刷は原寸 */
   }
   .sheet {
     width: auto;

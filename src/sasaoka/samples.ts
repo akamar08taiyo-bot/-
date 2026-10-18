@@ -42,6 +42,7 @@ export function addSamples(data: AppData, month: string): {materials: Material[]
     month,
     customer: SAMPLE_PREFIX + '山田',
     suffix: '様邸',
+    staff: data.settings.staffList[0] ?? '',
     date: `${month}-05`,
     address: '',
     note: '玄関・トイレの手すり取付（サンプル）',

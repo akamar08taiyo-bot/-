@@ -91,6 +91,9 @@ export function JobEditor({
   const pickPlace = picker ? job.places.find((p) => p.id === picker.placeId) : undefined;
   const presets = data.settings.placePresets;
   const used = new Set(job.places.map((p) => p.name));
+  // 候補から消した人が担当の様邸でも、その名前は選んだまま残す
+  const staffList = data.settings.staffList;
+  const staffOptions = !job.staff || staffList.includes(job.staff) ? staffList : [...staffList, job.staff];
 
   return (
     <div className="space-y-4">
@@ -99,6 +102,7 @@ export function JobEditor({
           ← 一覧へ戻る
         </Btn>
         <h1 className="text-lg font-bold text-[#0c315e]">{jobName(job)}</h1>
+        {job.staff && <span className="text-sm font-bold text-slate-500">担当 {job.staff}</span>}
         <div className="ml-auto flex flex-wrap gap-2">
           <Btn color="sky" onClick={() => onPrint(job.id)}>
             🖨 この様邸の明細を印刷
@@ -116,28 +120,48 @@ export function JobEditor({
         {/* min-w-0：表が広くても画面からはみ出さず、表の中で横に動かせるようにする */}
         <div className="min-w-0 space-y-4">
           <section className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 xl:grid-cols-4">
-            <label className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2">
-              お客様名
-              <div className="flex gap-2">
-                <TextInput
-                  value={job.customer}
-                  onChange={(customer) => setJob((j) => ({...j, customer}))}
-                  placeholder="例：山田"
-                  className="w-0 min-w-0 flex-1 text-base font-bold"
-                  autoFocus={!job.customer}
-                />
+            {/* 担当はお客様名の横。狭い画面で入りきらないときは下の行に回る */}
+            <div className="flex flex-wrap items-end gap-x-3 gap-y-3 sm:col-span-2">
+              <label className="grid min-w-0 flex-[1_1_14rem] gap-1 text-xs font-bold text-slate-600">
+                お客様名
+                <div className="flex gap-2">
+                  <TextInput
+                    value={job.customer}
+                    onChange={(customer) => setJob((j) => ({...j, customer}))}
+                    placeholder="例：山田"
+                    className="w-0 min-w-0 flex-1 text-base font-bold"
+                    autoFocus={!job.customer}
+                  />
+                  <select
+                    value={job.suffix}
+                    onChange={(e) => setJob((j) => ({...j, suffix: e.target.value as NameSuffix}))}
+                    className="h-9 rounded-md border border-slate-300 px-2 text-sm"
+                    aria-label="敬称"
+                  >
+                    <option value="様邸">様邸</option>
+                    <option value="様">様</option>
+                    <option value="">（付けない）</option>
+                  </select>
+                </div>
+              </label>
+              <label className="grid gap-1 text-xs font-bold text-slate-600">
+                担当
                 <select
-                  value={job.suffix}
-                  onChange={(e) => setJob((j) => ({...j, suffix: e.target.value as NameSuffix}))}
-                  className="h-9 rounded-md border border-slate-300 px-2 text-sm"
-                  aria-label="敬称"
+                  value={job.staff}
+                  onChange={(e) => setJob((j) => ({...j, staff: e.target.value}))}
+                  className={`h-9 min-w-[6.5rem] rounded-md border px-2 text-sm ${
+                    job.staff ? 'border-slate-300 text-slate-800' : 'border-amber-400 bg-amber-50 text-amber-800'
+                  }`}
                 >
-                  <option value="様邸">様邸</option>
-                  <option value="様">様</option>
-                  <option value="">（付けない）</option>
+                  <option value="">（選ぶ）</option>
+                  {staffOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
                 </select>
-              </div>
-            </label>
+              </label>
+            </div>
             <label className="grid gap-1 text-xs font-bold text-slate-600">
               施工日
               <input

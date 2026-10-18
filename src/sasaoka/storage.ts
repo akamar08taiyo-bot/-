@@ -2,7 +2,7 @@
 // 太陽ポータルのアプリはすべて同じサイト（akamar08taiyo-bot.github.io）にあり、localStorage の容量を
 // 分け合っているため、件数の多い部材リストは容量に余裕のある IndexedDB に入れる。
 
-import {DEFAULT_LABOR, DEFAULT_PLACES, defaultSettings} from './defaults.ts';
+import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES} from './defaults.ts';
 import type {AppData, InvoiceTaxMode, Job, LaborItem, Material, NameSuffix, Place, Row, Settings, TaxMode} from './types.ts';
 import {uid} from './util.ts';
 
@@ -132,6 +132,7 @@ export function cleanJobs(raw: unknown): Job[] {
     month: /^\d{4}-\d{2}$/.test(str(j.month)) ? str(j.month) : new Date().toISOString().slice(0, 7),
     customer: str(j.customer),
     suffix: SUFFIXES.includes(j.suffix as NameSuffix) ? (j.suffix as NameSuffix) : '様邸',
+    staff: str(j.staff),
     date: /^\d{4}-\d{2}-\d{2}$/.test(str(j.date)) ? str(j.date) : '',
     address: str(j.address),
     note: str(j.note),
@@ -141,6 +142,11 @@ export function cleanJobs(raw: unknown): Job[] {
   }));
 }
 
+/** 名前の候補の並び（空・重複を除く） */
+export function cleanList(raw: unknown[]): string[] {
+  return [...new Set(raw.map((x) => str(x).trim()).filter(Boolean))];
+}
+
 const TAX_MODES: TaxMode[] = ['original', 'floor', 'round', 'ceil'];
 const INV_MODES: InvoiceTaxMode[] = ['perJob', 'monthly'];
 
@@ -148,14 +154,17 @@ export function cleanSettings(raw: unknown): Settings {
   const d = defaultSettings();
   if (!isObj(raw)) return d;
   const s = {...d};
-  for (const k of ['clientName', 'company', 'officeName', 'postal', 'address', 'tel', 'fax', 'person', 'regNo', 'bank', 'subject', 'invoiceNote'] as const) {
+  for (const k of ['clientName', 'company', 'officeName', 'manager', 'postal', 'address', 'tel', 'fax', 'person', 'regNo', 'bank', 'subject', 'invoiceNote'] as const) {
     if (typeof raw[k] === 'string') s[k] = raw[k] as string;
   }
+  // 所長名を入れる前に保存した設定は、保存してある営業所の所長名にする
+  if (typeof raw.manager !== 'string') s.manager = OFFICES.find((o) => o.name === s.officeName)?.manager ?? '';
   s.rate = numv(raw.rate, d.rate);
   s.taxRate = numv(raw.taxRate, d.taxRate);
   s.taxMode = TAX_MODES.includes(raw.taxMode as TaxMode) ? (raw.taxMode as TaxMode) : d.taxMode;
   s.invoiceTaxMode = INV_MODES.includes(raw.invoiceTaxMode as InvoiceTaxMode) ? (raw.invoiceTaxMode as InvoiceTaxMode) : d.invoiceTaxMode;
-  s.placePresets = Array.isArray(raw.placePresets) ? raw.placePresets.map((x) => str(x)).filter(Boolean) : DEFAULT_PLACES;
+  s.placePresets = Array.isArray(raw.placePresets) ? cleanList(raw.placePresets) : DEFAULT_PLACES;
+  s.staffList = Array.isArray(raw.staffList) ? cleanList(raw.staffList) : DEFAULT_STAFF;
   return s;
 }
 

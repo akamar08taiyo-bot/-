@@ -9,7 +9,7 @@ import {Btn, useToast} from './ui.tsx';
 
 export function newJob(month: string): Job {
   const now = Date.now();
-  return {id: uid('j'), month, customer: '', suffix: '様邸', date: '', address: '', note: '', places: [], createdAt: now, updatedAt: now};
+  return {id: uid('j'), month, customer: '', suffix: '様邸', staff: '', date: '', address: '', note: '', places: [], createdAt: now, updatedAt: now};
 }
 
 export function JobsPage({
@@ -41,13 +41,13 @@ export function JobsPage({
   };
 
   const saveCsv = () => {
-    const head = ['No.', '施工日', 'お客様名', '部材代', '取付手間', '部材上乗せ', '諸経費', '税抜計', '消費税', '合計'];
+    const head = ['No.', '施工日', 'お客様名', '担当', '部材代', '取付手間', '部材上乗せ', '諸経費', '税抜計', '消費税', '合計'];
     const lines = [head];
     summary.rows.forEach(({job, totals: t}, i) =>
-      lines.push([String(i + 1), job.date, jobName(job), ...[t.material, t.labor, t.markup, t.overhead, t.subtotal, t.tax, t.total].map(String)]),
+      lines.push([String(i + 1), job.date, jobName(job), job.staff, ...[t.material, t.labor, t.markup, t.overhead, t.subtotal, t.tax, t.total].map(String)]),
     );
     const s = summary.sum;
-    lines.push(['', '', '合計', ...[s.material, s.labor, s.markup, s.overhead, s.subtotal, summary.invoice.tax, summary.invoice.total].map(String)]);
+    lines.push(['', '', '合計', '', ...[s.material, s.labor, s.markup, s.overhead, s.subtotal, summary.invoice.tax, summary.invoice.total].map(String)]);
     const csv = lines.map((r) => r.map((c) => (/[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(',')).join('\r\n');
     downloadBlob(new Blob(['﻿' + csv], {type: 'text/csv'}), `${data.settings.clientName || '請求'}_${month}_一覧.csv`);
   };
@@ -120,12 +120,13 @@ export function JobsPage({
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-          <table className="w-full min-w-[980px] text-sm">
+          <table className="w-full min-w-[1040px] text-sm">
             <thead className="bg-slate-100 text-xs text-slate-600">
               <tr>
                 <th className="px-2 py-2 text-center">No.</th>
                 <th className="px-2 py-2 text-left">施工日</th>
                 <th className="px-2 py-2 text-left">お客様名</th>
+                <th className="px-2 py-2 text-left">担当</th>
                 <th className="px-2 py-2 text-right">① 部材代</th>
                 <th className="px-2 py-2 text-right">② 取付手間</th>
                 <th className="px-2 py-2 text-right">③ 部材上乗せ</th>
@@ -145,6 +146,7 @@ export function JobsPage({
                     {jobName(job)}
                     <span className="ml-2 text-xs font-normal text-slate-500">{job.places.map((p) => p.name || '（箇所名なし）').join('・')}</span>
                   </td>
+                  <td className="whitespace-nowrap px-2 py-2">{job.staff || <span className="text-slate-400">—</span>}</td>
                   <td className="px-2 py-2 text-right tabular-nums">{yen(t.material)}</td>
                   <td className="px-2 py-2 text-right tabular-nums">{yen(t.labor)}</td>
                   <td className="px-2 py-2 text-right tabular-nums">{yen(t.markup)}</td>
@@ -169,7 +171,7 @@ export function JobsPage({
             </tbody>
             <tfoot className="border-t-2 border-slate-300 bg-slate-50 font-bold">
               <tr>
-                <td colSpan={3} className="px-2 py-2 text-right">
+                <td colSpan={4} className="px-2 py-2 text-right">
                   {monthLabel(month)}分 合計（{summary.rows.length}件）
                 </td>
                 <td className="px-2 py-2 text-right tabular-nums">{yen(summary.sum.material)}</td>
