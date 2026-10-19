@@ -11,6 +11,7 @@
   paper  … 紙がサッと出る
   stamp  … はんこをドンと押す
   coin   … へそくり（チャリン）
+  pen    … 失言ノートに書き込む（カリカリッ）
 """
 import os, sys, wave
 import numpy as np
@@ -129,3 +130,15 @@ for at, f0 in ((0.0, 2637.0), (0.07, 3520.0)):
     j = int(at * SR)
     x[j:j + len(y)] += y[: len(x) - j]
 save('coin', with_verb(x, wet=0.18, decay=0.25), peak=0.55)
+
+# pen：カリカリッ（紙の上をペンが走る短い擦れを4回）
+x = np.zeros(int(0.7 * SR))
+rng = np.random.default_rng(51)
+for i, (at, dur) in enumerate([(0.0, 0.09), (0.11, 0.07), (0.2, 0.12), (0.36, 0.06)]):
+    n = int(dur * SR)
+    tt = np.arange(n) / SR
+    y = fft_filter(noise(n, 60 + i), lo=2500, hi=9000) * np.sin(np.pi * tt / dur) ** 0.6
+    y *= 1 + 0.5 * np.sin(2 * np.pi * rng.uniform(25, 40) * tt)  # ペン先の細かい引っかかり
+    j = int(at * SR)
+    x[j:j + n] += y * rng.uniform(0.7, 1.0)
+save('pen', x, peak=0.5)

@@ -213,3 +213,115 @@ export const Menace: React.FC<{from: number; to: number; spots: {x: number; y: n
     </div>
   );
 };
+
+// ───────── 名札（はじめて出たとき、頭の上に「妻・しのぶ（44）」） ─────────
+export const NameTag: React.FC<{x: number; y: number; text: string; color: string; from: number; to: number; side?: 'top' | 'left' | 'right'}> = ({
+  x,
+  y,
+  text,
+  color,
+  from,
+  to,
+  side = 'top',
+}) => {
+  const frame = useCurrentFrame();
+  if (frame < from || frame >= to) return null;
+  const p = pop(frame, from, 11, 190);
+  const left = side === 'left';
+  const right = side === 'right';
+  const arrowRight = <div style={{width: 0, height: 0, borderTop: '14px solid transparent', borderBottom: '14px solid transparent', borderLeft: '18px solid #fff'}} />;
+  const arrowLeft = <div style={{width: 0, height: 0, borderTop: '14px solid transparent', borderBottom: '14px solid transparent', borderRight: '18px solid #fff'}} />;
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: x,
+        top: y,
+        display: left || right ? 'flex' : 'block',
+        alignItems: 'center',
+        opacity: life(frame, from, to, 3, 6),
+        transform: `${left ? 'translate(-100%, -50%)' : right ? 'translate(0, -50%)' : 'translate(-50%, -100%)'} scale(${0.5 + 0.5 * p})`,
+        transformOrigin: left ? '100% 50%' : right ? '0 50%' : '50% 100%',
+      }}
+    >
+      {right && arrowLeft}
+      <div
+        style={{
+          background: '#fff',
+          borderRadius: 16,
+          borderLeft: `14px solid ${color}`,
+          padding: '6px 22px 9px 16px',
+          fontFamily: F.maru,
+          fontWeight: 900,
+          fontSize: 40,
+          color: C.ink,
+          whiteSpace: 'nowrap',
+          boxShadow: '0 6px 0 rgba(60,40,30,0.2)',
+        }}
+      >
+        {text}
+      </div>
+      {left && arrowRight}
+      {!left && !right && (
+        <div style={{width: 0, height: 0, margin: '0 auto', borderLeft: '14px solid transparent', borderRight: '14px solid transparent', borderTop: '18px solid #fff'}} />
+      )}
+    </div>
+  );
+};
+
+// ───────── 失言ノート（黒い手帳）に「記録」のはんこ ─────────
+export const NoteStamp: React.FC<{x: number; y: number; from: number; to: number; scale?: number; rot?: number}> = ({x, y, from, to, scale = 1, rot = -8}) => {
+  const frame = useCurrentFrame();
+  if (frame < from || frame >= to) return null;
+  const p = pop(frame, from, 12, 200);
+  const sp = pop(frame, from + 6, 14, 260);
+  const w = 230;
+  const h = 300;
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: x - (w * scale) / 2,
+        top: y - (h * scale) / 2,
+        width: w * scale,
+        height: h * scale,
+        opacity: life(frame, from, to, 2, 5),
+        transform: `rotate(${rot + (1 - p) * -14}deg) scale(${0.4 + 0.6 * p})`,
+      }}
+    >
+      <svg width={w * scale} height={h * scale} viewBox={`0 0 ${w} ${h}`} style={{filter: 'drop-shadow(0 10px 12px rgba(20,10,5,0.4))'}}>
+        <rect x={0} y={0} width={w} height={h} rx={14} fill="#22201f" />
+        <rect x={10} y={0} width={10} height={h} fill="#3a3634" />
+        <rect x={42} y={70} width={160} height={74} rx={6} fill="#f4efe6" />
+        <text x={122} y={104} textAnchor="middle" fontFamily={F.mincho} fontWeight={700} fontSize={26} fill="#22201f">
+          失言
+        </text>
+        <text x={122} y={134} textAnchor="middle" fontFamily={F.mincho} fontWeight={700} fontSize={26} fill="#22201f">
+          ノート
+        </text>
+        <rect x={198} y={0} width={14} height={h} fill="#c94a5b" opacity={0.85} />
+      </svg>
+      {frame >= from + 6 && (
+        <div
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '80%',
+            transform: `translate(-50%, -50%) rotate(-12deg) scale(${(2.1 - 1.1 * sp) * scale})`,
+            opacity: clamp01(sp * 2) * 0.95,
+            border: `7px solid ${C.red}`,
+            borderRadius: 12,
+            padding: '2px 14px 6px',
+            background: 'rgba(255,255,255,0.88)',
+            color: C.red,
+            fontFamily: F.dela,
+            fontSize: 54,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          記録
+        </div>
+      )}
+    </div>
+  );
+};

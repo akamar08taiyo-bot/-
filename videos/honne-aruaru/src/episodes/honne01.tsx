@@ -124,7 +124,7 @@ export const Honne01: React.FC = () => {
       ))}
       {/* 上下を少し暗くして文字を読みやすく */}
       <AbsoluteFill style={{background: 'linear-gradient(180deg, rgba(40,25,20,0.28) 0%, rgba(40,25,20,0) 26%, rgba(40,25,20,0) 70%, rgba(40,25,20,0.22) 100%)'}} />
-      <Header episode="夫に冷めた瞬間" item={item} since={since} />
+      <Header series="本音あるある" episode="夫に冷めた瞬間" item={item} since={since} />
       <HookTitle
         from={0}
         to={T.s('promise', LEAD)}

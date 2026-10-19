@@ -47,7 +47,7 @@ export const Outlined: React.FC<{
 };
 
 // ───────── シリーズ名と進み具合（①〜⑤） ─────────
-export const Header: React.FC<{episode: string; item: number; since: number}> = ({episode, item, since}) => {
+export const Header: React.FC<{series?: string; episode: string; item: number; since: number}> = ({series = '本音あるある', episode, item, since}) => {
   const frame = useCurrentFrame();
   const pill = (bg: string, fg: string, size: number): React.CSSProperties => ({
     background: bg,
@@ -62,8 +62,8 @@ export const Header: React.FC<{episode: string; item: number; since: number}> = 
   return (
     <div style={{position: 'absolute', top: 126, left: 0, width: W, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16}}>
       <div style={{display: 'flex', gap: 12, alignItems: 'center'}}>
-        <div style={pill(C.coral, '#fff', 44)}>本音あるある</div>
-        <div style={pill('#fff', C.ink, 40)}>{episode}</div>
+        <div style={pill(C.coral, '#fff', [...series].length > 7 ? 40 : 44)}>{series}</div>
+        <div style={pill('#fff', C.ink, [...episode].length > 8 ? 36 : 40)}>{episode}</div>
       </div>
       <div style={{display: 'flex', alignItems: 'center', gap: 0}}>
         {[1, 2, 3, 4, 5].map((n) => {

@@ -6,7 +6,7 @@ import script from '../../episodes/honne02/script.json';
 import faces from '../../episodes/honne02/faces.json';
 import timeline from '../../episodes/honne02/timeline.json';
 import {Boso, C, Header, HookTitle, Poll, Subtitle, Telop} from '../parts';
-import {DivorceForm, GoalMeter, Menace, PriceTag} from '../props';
+import {DivorceForm, GoalMeter, Menace, NameTag, NoteStamp, PriceTag} from '../props';
 import {makeT, ramp} from '../lib';
 import {Box, Line, Scene, SceneView, cam, center, currentItem, faceOf, subtitleSpans} from '../scene';
 
@@ -21,6 +21,29 @@ const M = (k: string, off = 0) => {
 };
 const F = faces as unknown as Record<string, unknown>;
 const face = (scene: string, who: string) => faceOf(F, scene, who);
+const box = (scene: string, who: string) => {
+  const f = (F[scene] as {who: string; box: Box}[]).find((v) => v.who === who);
+  if (!f) throw new Error(`faces.json に ${scene} の ${who} がありません`);
+  return {top: f.box[0] / 1000, left: f.box[1] / 1000, bottom: f.box[2] / 1000, right: f.box[3] / 1000};
+};
+const TAG = {WIFE: '#E8A33A', HUSBAND: '#2E4A86', 'MOTHER-IN-LAW': '#9B7BC4'} as const;
+type At = (nx: number, ny: number) => {x: number; y: number};
+/** 名札を置く場所：頭の上がテロップにかかるときは、顔の横（収まるほう）に。名札の幅は文字数から見込む */
+const tagPlace = (at: At, scene: string, who: string, text: string): {x: number; y: number; side: 'top' | 'left' | 'right'} => {
+  const b = box(scene, who);
+  const top = at((b.left + b.right) / 2, b.top - 0.01);
+  const w = 40 * [...text].length + 70;
+  const l = at(b.left, (b.top + b.bottom) / 2);
+  const r = at(b.right, (b.top + b.bottom) / 2);
+  if (top.y > 560 && top.x - w / 2 > 16 && top.x + w / 2 < 1064) return {...top, side: 'top'};
+  if (l.x - 6 - w > 16) return {x: l.x - 6, y: l.y, side: 'left'};
+  if (r.x + 6 + w < 1064) return {x: r.x + 6, y: r.y, side: 'right'};
+  return {x: Math.min(1064 - w / 2, Math.max(16 + w / 2, top.x)), y: Math.max(top.y, 560), side: 'top'};
+};
+// ボソッのあと、失言ノートに「記録」（次の場面に変わるまで）
+const recorded = (aside: string, next: string) => (
+  <NoteStamp x={820} y={1060} scale={0.72} rot={8} from={T.e(aside, -0.15)} to={T.s(next, LEAD)} />
+);
 const bag = center((F.X5_extra as {bag: Box}).bag);
 
 const X1 = face('X1', 'WIFE');
@@ -36,7 +59,13 @@ const X10img = (F.X10_new ? 'honne02/img/X10.jpg' : 'honne01/img/S10.jpg') as st
 
 const SCENES: Scene[] = [
   // 夜の食卓で離婚届に向かう妻（題字）
-  {img: 'honne02/img/X1.jpg', from: 0, to: T.s('promise', LEAD), keys: [{at: 0, cam: cam(X1.x, X1.y, 1.2, 540, 500)}], drift: 0.04},
+  {
+    img: 'honne02/img/X1.jpg',
+    from: 0,
+    to: T.s('promise', LEAD),
+    keys: [{at: 0, cam: cam(X1.x, X1.y, 1.2, 540, 500)}],
+    drift: 0.04,
+  },
   // 目が笑っていない笑顔（#1 の絵）
   {img: 'honne01/img/S2.jpg', from: T.s('promise', LEAD), to: T.s('a1', LEAD), keys: [{at: 0, cam: cam(0.502, 0.435, 1.0, 540, 830)}], drift: 0.07},
   {
@@ -49,7 +78,16 @@ const SCENES: Scene[] = [
     ],
     overlay: ({at}) => {
       const p = at(X3w.x + 0.13, X3w.y - 0.07);
-      return <Boso x={p.x} y={p.y} from={T.s('a1t', -0.02)} to={T.s('a2', LEAD)} />;
+      const t = tagPlace(at, 'X3', 'HUSBAND', '夫・まもる（46）');
+      const w = tagPlace(at, 'X3', 'WIFE', '妻・しのぶ（44）');
+      return (
+        <>
+          <NameTag {...t} text="夫・まもる（46）" color={TAG.HUSBAND} from={T.s('a1', 0.1)} to={T.s('a1t', -0.12)} />
+          <NameTag {...w} text="妻・しのぶ（44）" color={TAG.WIFE} from={T.s('a1', 0.35)} to={T.s('a1t', -0.12)} />
+          <Boso x={p.x} y={p.y} from={T.s('a1t', -0.02)} to={T.s('a2', LEAD)} />
+          {recorded('a1t', 'a2')}
+        </>
+      );
     },
   },
   // 熱で寝込む妻とドアの夫（#1 の絵）
@@ -63,7 +101,12 @@ const SCENES: Scene[] = [
     ],
     overlay: ({at}) => {
       const p = at(0.8, 0.44);
-      return <Boso x={p.x} y={p.y} from={T.s('a2t', -0.02)} to={T.s('a3', LEAD)} />;
+      return (
+        <>
+          <Boso x={p.x} y={p.y} from={T.s('a2t', -0.02)} to={T.s('a3', LEAD)} />
+          {recorded('a2t', 'a3')}
+        </>
+      );
     },
   },
   {
@@ -81,6 +124,7 @@ const SCENES: Scene[] = [
         <>
           <PriceTag x={tag.x} y={tag.y} text="10万円" from={M('price')} to={T.s('a3t', -0.12)} scale={Math.min(1.2, s / 0.75)} />
           <Boso x={p.x} y={p.y} from={T.s('a3t', -0.02)} to={T.s('a4', LEAD)} />
+          {recorded('a3t', 'a4')}
         </>
       );
     },
@@ -95,7 +139,14 @@ const SCENES: Scene[] = [
     ],
     overlay: ({at}) => {
       const p = at(X6w.x + 0.12, X6w.y - 0.07);
-      return <Boso x={p.x} y={p.y} from={T.s('a4t', -0.02)} to={T.s('a5a', LEAD)} />;
+      const t = tagPlace(at, 'X6', 'MOTHER-IN-LAW', '義母・よしえ（72）');
+      return (
+        <>
+          <NameTag {...t} text="義母・よしえ（72）" color={TAG['MOTHER-IN-LAW']} from={T.s('a4', 0.1)} to={T.s('a4t', -0.12)} />
+          <Boso x={p.x} y={p.y} from={T.s('a4t', -0.02)} to={T.s('a5a', LEAD)} />
+          {recorded('a4t', 'a5a')}
+        </>
+      );
     },
   },
   // 「誰のおかげで」：言い出したら夫の顔に寄って、ゴゴゴ…
@@ -134,7 +185,12 @@ const SCENES: Scene[] = [
     overlay: ({frame}) => {
       const from = T.s('a5t', -0.25);
       const dark = ramp(frame, from, from + 10);
-      return <div style={{position: 'absolute', inset: 0, background: `radial-gradient(ellipse at 50% 50%, rgba(10,20,40,0) 45%, rgba(10,20,45,${0.55 * dark}) 100%)`}} />;
+      return (
+        <>
+          <div style={{position: 'absolute', inset: 0, background: `radial-gradient(ellipse at 50% 50%, rgba(10,20,40,0) 45%, rgba(10,20,45,${0.55 * dark}) 100%)`}} />
+          <NoteStamp x={800} y={470} scale={1.1} rot={10} from={M('record')} to={M('form', -0.05)} />
+        </>
+      );
     },
   },
   // 山場2：「離婚届、もう書いてあります」夜の食卓（冒頭の絵をぼかす）に記入済みの用紙
@@ -176,7 +232,7 @@ export const Honne02: React.FC = () => {
       ))}
       {/* 上下を少し暗くして文字を読みやすく */}
       <AbsoluteFill style={{background: 'linear-gradient(180deg, rgba(40,25,20,0.3) 0%, rgba(40,25,20,0) 26%, rgba(40,25,20,0) 70%, rgba(40,25,20,0.22) 100%)'}} />
-      <Header episode="離婚を考えた瞬間" item={item} since={since} />
+      <Header series="しのぶの失言ノート" episode="#2 離婚を考えた瞬間" item={item} since={since} />
       <HookTitle
         from={0}
         to={T.s('promise', LEAD)}

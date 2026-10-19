@@ -1,14 +1,14 @@
 {
   "id": "honne02",
-  "series": "本音あるある",
-  "episode": "離婚を考えた瞬間",
-  "title": "本気で離婚を考えた瞬間あるある【結婚10年目】",
+  "series": "しのぶの失言ノート",
+  "episode": "#2 離婚を考えた瞬間",
+  "title": "「誰のおかげで生活できてると思ってるんだ」…はい、記録しました。【しのぶの失言ノート#2】",
   "format": "vertical",
   "fps": 30,
   "voice": {
     "name": "Sulafat",
     "model": "gemini-3.8-flash-tts",
-    "profile": "A Japanese woman in her mid-40s, married for twelve years with one son in elementary school. Calm, slightly low, mature voice with a dry, sharp wit. She sounds like a frank friend of the same generation who teases husbands but is always on the listener's side. Natural standard Tokyo Japanese.",
+    "profile": "A Japanese woman named Shinobu, 44 years old, married for twelve years to Mamoru, with one son. Calm, slightly low, mature voice with a dry, sharp wit. Outwardly she smiles and never argues back; inwardly she is ice-cold and records every thoughtless remark of her husband in a secret notebook. She sounds like a frank friend of the same generation who is always on the listener's side. Natural standard Tokyo Japanese.",
     "scene": "She is narrating a short vertical video about relatable moments when a wife's feelings for her husband went cold. She talks straight to women in their 30s to 50s, as if chatting with a close friend over tea at the kitchen table."
   },
   "styles": {
@@ -78,20 +78,20 @@
     {
       "id": "a3",
       "style": "narr",
-      "text": "子どもの塾代は渋るのに、自分の趣味には10万。",
-      "sub": "子どもの塾代は渋るのに、自分の趣味には**10万**。",
+      "text": "子どもの塾代は渋るのに、ゴルフ道具には10万。",
+      "sub": "子どもの塾代は渋るのに、ゴルフ道具には**10万**。",
       "gap": 0.2,
       "item": 3,
-      "telop": "塾代は渋って趣味に10万",
-      "speak": "子どもの塾代は渋るのに、自分の趣味には、じゅうまん。"
+      "telop": "塾代は渋ってゴルフに10万",
+      "speak": "子どもの塾代は渋るのに、ゴルフ道具には、じゅうまん。"
     },
     {
       "id": "a3t",
       "style": "aside",
-      "text": "その10万、塾なら3か月分です。",
+      "text": "スコア、毎回120ですけど。",
       "gap": 0.35,
       "aside": true,
-      "speak": "そのじゅうまん、塾なら、さんかげつぶんです。"
+      "speak": "スコア、毎回ひゃくにじゅうですけど。"
     },
     {
       "id": "a4",
@@ -128,9 +128,9 @@
     {
       "id": "a5t",
       "style": "verdict",
-      "text": "……はい。離婚届、もう書いてあります。",
-      "sub": "……はい。**離婚届**、もう書いてあります。",
-      "speak": "はい。離婚届、もう書いてあります。",
+      "text": "……はい、記録しました。離婚届も、もう書いてあります。",
+      "sub": "……はい、**記録しました**。|**離婚届**も、もう書いてあります。",
+      "speak": "はい、記録しました。離婚届も、もう書いてあります。",
       "gap": 0.5
     },
     {
@@ -236,6 +236,41 @@
       "",
       0.0,
       0.22
+    ],
+    [
+      "pen",
+      "a1t",
+      "e",
+      -0.1,
+      0.35
+    ],
+    [
+      "pen",
+      "a2t",
+      "e",
+      -0.1,
+      0.35
+    ],
+    [
+      "pen",
+      "a3t",
+      "e",
+      -0.1,
+      0.35
+    ],
+    [
+      "pen",
+      "a4t",
+      "e",
+      -0.1,
+      0.35
+    ],
+    [
+      "stamp",
+      "@record",
+      "",
+      0.2,
+      0.38
     ]
   ],
   "bgm": {
@@ -266,12 +301,12 @@
     "form": [
       "a5t",
       "s",
-      0.85
+      1.9
     ],
     "stamp": [
       "a5t",
       "s",
-      1.6
+      3.0
     ],
     "pollA": [
       "ask",
@@ -282,6 +317,25 @@
       "ask",
       "s",
       1.35
+    ],
+    "record": [
+      "a5t",
+      "s",
+      0.55
+    ]
+  },
+  "nametags": {
+    "X1": [
+      "WIFE",
+      "妻・しのぶ（44）"
+    ],
+    "X3": [
+      "HUSBAND",
+      "夫・まもる（46）"
+    ],
+    "X6": [
+      "MOTHER-IN-LAW",
+      "義母・よしえ（72）"
     ]
   }
 }
