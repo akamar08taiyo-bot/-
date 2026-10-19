@@ -223,6 +223,18 @@ assert.ok((await preview.innerText()).includes('トイレ（1階）'), '左で�
 await toilet.getByPlaceholder('箇所名（玄関など）').fill('トイレ');
 log('左で入れると右の見積書に入るOK');
 
+// 改修内容・工事名称は改修の種類だけで決まる（別に入れる欄はない）。見積書の工事名称の欄をクリックすると改修の種類を選び直せる
+assert.equal(await page.getByRole('textbox', {name: '工事名称'}).count(), 0);
+await preview.locator('[data-edit$=":work"]').first().click();
+await editor.getByRole('combobox', {name: '改修の種類'}).selectOption('2');
+await editor.getByRole('combobox', {name: '改修の種類'}).press('Enter');
+await editor.waitFor({state: 'detached'});
+assert.equal(await genkan.getByRole('combobox', {name: '改修の種類'}).inputValue(), '2');
+assert.ok((await preview.locator('tr', {hasText: '玄関'}).first().innerText()).includes('段差解消'));
+await genkan.getByRole('combobox', {name: '改修の種類'}).selectOption('1');
+assert.ok((await preview.locator('tr', {hasText: '玄関'}).first().innerText()).includes('手すり取付'));
+log('改修内容は改修の種類だけで決まるOK');
+
 // 単価の欄をクリックして直す → 左の「見積の単価」も手入力になり、その行に色が付く。↺ で 定価×0.8 に戻る
 const lLine = preview.locator('tr', {hasText: 'L型手すり'}).first();
 await lLine.locator('[data-edit$=":price"]').first().click();

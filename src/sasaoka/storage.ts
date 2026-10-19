@@ -146,7 +146,7 @@ const cleanPlace = (p: Record<string, unknown>): Place => ({
   rows: Array.isArray(p.rows) ? p.rows.filter(isObj).map(cleanRow) : [],
   kind: KINDS.includes(numv(p.kind, 1)) ? numv(p.kind, 1) : 1,
   photo: Math.max(0, Math.floor(numv(p.photo))),
-  work: str(p.work),
+  // 前の版の「工事名称」（work）は読まない。見積書の改修内容・工事名称は改修の種類から
 });
 
 const SUFFIXES: NameSuffix[] = ['様邸', '様', ''];

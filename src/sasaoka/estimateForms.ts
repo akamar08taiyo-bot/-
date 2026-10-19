@@ -19,9 +19,9 @@ export const FORM_INFO: Record<EstimateForm, {name: string; title: string; perPa
 /** 合計の欄（小計・諸経費・消費税・合計）の行数 */
 export const TOTAL_ROWS = 4;
 
-/** 改修の種類（みやこ町・広域連合用の「改修の種類」①〜⑥、苅田町・行橋用の「改修内容」） */
+/** 改修の種類（みやこ町・広域連合用の「改修の種類」①〜⑥、苅田町・行橋用の「改修内容」）。どの箇所もこのどれかにあてはめる */
 export const KINDS = ['手すりの取付', '段差の解消', '床材の変更', '扉の取替', '便器の取替', '付帯工事'];
-/** 工事名称を入れていないときの名前（みやこ町・広域連合用の「改修箇所毎工事名称」。元の見積書の「手すり取付」） */
+/** みやこ町・広域連合用の「改修箇所毎工事名称」に書く名前（元の見積書の「手すり取付」） */
 const KIND_WORK = ['手すり取付', '段差解消', '床材変更', '扉取替', '便器取替', '付帯工事'];
 
 /** 住所の市町村から書式を決める（福岡県介護保険広域連合の京築の町・市は広域連合の様式）。分からなければ null */
@@ -42,9 +42,9 @@ export function circled(n: number): string {
   return n >= 1 && n <= 20 ? String.fromCharCode(0x2460 + n - 1) : `(${n})`;
 }
 
-/** 箇所の工事名称：入れてあればそれ、なければ改修の種類から */
-export function placeWork(place: Pick<Place, 'work' | 'kind'>, form: EstimateForm): string {
-  return place.work.trim() || (form === 'kouiki' ? KIND_WORK : KINDS)[place.kind - 1] || '';
+/** 箇所の改修内容（苅田町・行橋用）・工事名称（みやこ町・広域連合用）。改修の種類から決まる */
+export function placeWork(place: Pick<Place, 'kind'>, form: EstimateForm): string {
+  return (form === 'kouiki' ? KIND_WORK : KINDS)[place.kind - 1] || '';
 }
 
 /** 見積書に出る箇所（行のあるもの）ごとの写真番号。入れていなければ見積書に出る順番 */
@@ -91,7 +91,7 @@ export type FormLine = {
   isWork: boolean; // 施工費のまとまり
   first: boolean; // 箇所の最初の行（箇所名・工事名称・写真番号・改修の種類を出す）
   placeName: string;
-  work: string; // 工事名称（苅田町・行橋用は改修内容）
+  work: string; // 工事名称（苅田町・行橋用は改修内容）。改修の種類から
   kind: number; // 改修の種類 1〜6
   photo: number; // 写真番号
   mark: '材' | '手';

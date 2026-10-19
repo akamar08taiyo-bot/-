@@ -184,7 +184,6 @@ export function EstimatePreview({
       const commit = (v: Record<string, Value>) =>
         updatePlace(id, {
           ...('name' in v ? {name: String(v.name)} : {}),
-          ...('work' in v ? {work: String(v.work).trim()} : {}),
           ...('photo' in v ? {photo: Math.max(0, Math.round(toNumber(v.photo)))} : {}),
           ...('kind' in v ? {kind: Number(v.kind)} : {}),
         });
@@ -196,11 +195,11 @@ export function EstimatePreview({
         };
       }
       if (field === 'work') {
-        const auto = placeWork({...place, work: ''}, form);
+        // 改修内容・工事名称は改修の種類から決まる（種類を選び直す）
         return {
-          title: form === 'kouiki' ? '改修箇所毎工事名称' : '改修内容（付帯工事含む）',
-          fields: [{name: 'work', label: '名前（空なら改修の種類から）', type: 'text', value: place.work, placeholder: auto}, kindField],
-          reset: place.work ? {label: `改修の種類から（${auto}）`, run: () => updatePlace(id, {work: ''})} : undefined,
+          title: form === 'kouiki' ? '改修箇所毎工事名称（改修の種類から）' : '改修内容（改修の種類から）',
+          fields: [kindField],
+          note: `いまは「${placeWork(place, form)}」と書きます`,
           commit,
         };
       }

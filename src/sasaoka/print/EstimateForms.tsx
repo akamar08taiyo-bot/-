@@ -214,7 +214,7 @@ function YkLine({line: l, bottom, editable}: {line: FormLine | undefined; bottom
   const note = 'split' in v ? [v.split.join('')] : v.lines;
   return (
     <tr className="g" style={{height: `${YK_ROW}mm`}} {...(editable ? {'data-rows': l.rowIds.join(' ')} : {})}>
-      {cell(l.first ? l.work || KINDS[l.kind - 1] : '', YK.A, 11, 'ml', l.first ? `place:${l.placeId}:work` : null)}
+      {cell(l.first ? l.work : '', YK.A, 11, 'ml', l.first ? `place:${l.placeId}:work` : null)}
       {cell(l.first ? `${l.placeName}${circled(l.photo)}` : '', YK.B, 11, '', l.first ? `place:${l.placeId}:name` : null)}
       {cell(l.text, YK.C, 9, '', k('text'), 2)}
       {cell(qty, YK.D, 9, 'r nr', l.isWork ? null : k('qty'))}

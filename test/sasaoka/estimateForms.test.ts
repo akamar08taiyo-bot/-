@@ -9,7 +9,7 @@ let seq = 0;
 const blank = {refId: null, code: '', maker: '', unit: '', price: 0, listPrice: 0, lengthCm: 0, pieceLengthM: 0, estPrice: null, excluded: false, estText: null, estNote: null, estAmount: null};
 const mat = (name: string, listPrice: number, extra: Partial<Row> = {}): Row => ({...blank, id: `r${++seq}`, kind: 'material', name, qty: 1, listPrice, ...extra});
 const lab = (price: number, qty = 1): Row => ({...blank, id: `r${++seq}`, kind: 'labor', name: '木', price, qty});
-const place = (name: string, rows: Row[], extra: Partial<Place> = {}): Place => ({id: `p${++seq}`, name, rows, kind: 1, photo: 0, work: '', ...extra});
+const place = (name: string, rows: Row[], extra: Partial<Place> = {}): Place => ({id: `p${++seq}`, name, rows, kind: 1, photo: 0, ...extra});
 
 test('書式は住所の市町村から：みやこ町・築上町・豊前市など → 広域連合の様式、行橋市・苅田町 → 行橋の様式。分からなければ設定の書式', () => {
   assert.equal(formForAddress('福岡県京都郡みやこ町豊津1118'), 'kouiki');
@@ -35,7 +35,7 @@ test('みやこ町・広域連合用：施工費は 時間×2,500円、部材は
         lab(1000, 2),
       ]),
       place('玄関', [], {photo: 5}), // 行のない箇所は出さない
-      place('トイレ', [mat('エンドキャップ', 450, {unit: '個', qty: 2}), lab(1234)], {kind: 6, work: '手すり取付（2か所）'}),
+      place('トイレ', [mat('エンドキャップ', 450, {unit: '個', qty: 2}), lab(1234)], {kind: 5}),
     ],
   };
   const lines = formLines(job, S, 'kouiki');
@@ -46,19 +46,21 @@ test('みやこ町・広域連合用：施工費は 時間×2,500円、部材は
       [true, '屋外', '手すり取付', 1, '材', '矢崎化工 HCDT-4000 T BBR NTディンプルパイプ', 0.7, '本', 11520, 8064, 14400, 0.8, '2.8m÷4m＝0.7本', false],
       [false, '屋外', '手すり取付', 1, '材', '矢崎化工 HL7-P11 T USL NT屋外支柱', 4, '本', 3680, 14720, 4600, 0.8, '', false],
       [false, '屋外', '手すり取付', 1, '手', '同上施工費', 2.8, '時間', 2500, 7000, 0, null, '', true], // 5,000＋2,000＝7,000円＝2.8時間
-      [true, 'トイレ', '手すり取付（2か所）', 2, '材', 'エンドキャップ', 2, '個', 360, 720, 450, 0.8, '', false],
-      [false, 'トイレ', '手すり取付（2か所）', 2, '手', '同上施工費', 1, '式', 1234, 1234, 0, null, '', false], // 時間で割り切れない金額は1式
+      [true, 'トイレ', '便器取替', 2, '材', 'エンドキャップ', 2, '個', 360, 720, 450, 0.8, '', false],
+      [false, 'トイレ', '便器取替', 2, '手', '同上施工費', 1, '式', 1234, 1234, 0, null, '', false], // 時間で割り切れない金額は1式
     ],
   );
-  // 苅田町・行橋用は施工費を1式で書き、工事名称を入れていなければ改修の種類（手すりの取付）
+  // 苅田町・行橋用は施工費を1式で書き、改修内容は改修の種類（手すりの取付）。工事名称・改修内容は改修の種類だけで決まる
   const yk = formLines(job, S, 'yukuhashi');
   assert.deepEqual(yk.map((l) => [l.work, l.qty, l.unit, l.unitPrice]).slice(0, 3), [
     ['手すりの取付', 0.7, '本', 11520],
     ['手すりの取付', 4, '本', 3680],
     ['手すりの取付', 1, '式', 7000],
   ]);
-  assert.equal(placeWork({work: '', kind: 2}, 'kouiki'), '段差解消');
-  assert.equal(placeWork({work: '', kind: 5}, 'yukuhashi'), '便器の取替');
+  assert.equal(yk[3].work, '便器の取替');
+  assert.equal(placeWork({kind: 2}, 'kouiki'), '段差解消');
+  assert.equal(placeWork({kind: 5}, 'yukuhashi'), '便器の取替');
+  assert.equal(placeWork({kind: 6}, 'kouiki'), '付帯工事');
 });
 
 test('写真番号：入れていなければ見積書に出る箇所の順番（行のない箇所は数えない）', () => {

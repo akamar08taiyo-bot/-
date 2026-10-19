@@ -13,7 +13,7 @@ import {
   rowAmount,
 } from '../calc.ts';
 import type {EstimateLine, EstimateTotals, JobTotals} from '../calc.ts';
-import {circled, FORM_IDS, FORM_INFO, formForAddress, jobForm, KINDS, photoNumbers, placeWork, workHours} from '../estimateForms.ts';
+import {circled, FORM_IDS, FORM_INFO, formForAddress, jobForm, KINDS, photoNumbers, workHours} from '../estimateForms.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {copyRows, kitFromRows, manualRow, newPlace as makePlace, replaceRange, workRange} from '../rows.ts';
 import type {AppData, AppMode, EstimateForm, Job, Kit, Material, NameSuffix, Place, Row, Settings} from '../types.ts';
@@ -566,7 +566,7 @@ function PlaceCard({
   form: EstimateForm;
   photo: number; // 見積書の写真番号（入れていなければ自動の番号）
   hourRate: number;
-  onPlace: (patch: Partial<Pick<Place, 'kind' | 'photo' | 'work'>>) => void;
+  onPlace: (patch: Partial<Pick<Place, 'kind' | 'photo'>>) => void;
   focusRowId: string | null;
   activeRowId: string | null; // 入力している行（右の見積書でも色を付ける）
   onActiveRow: (rowId: string) => void;
@@ -671,10 +671,6 @@ function PlaceCard({
               min={0}
               placeholder={photo > 0 ? `${circled(photo)}（自動）` : '自動'}
             />
-          </label>
-          <label className="grid min-w-[12rem] flex-1 gap-1">
-            {form === 'kouiki' ? '改修箇所毎工事名称' : '改修内容'}（空なら改修の種類から）
-            <TextInput value={place.work} onChange={(work) => onPlace({work})} placeholder={placeWork({...place, work: ''}, form)} className="h-8 font-normal" aria-label="工事名称" />
           </label>
         </div>
       )}

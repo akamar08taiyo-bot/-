@@ -67,14 +67,16 @@ test('見積書の項目：前のデータ（項目なし）も読める', () =>
   const [j] = cleanJobs([{customer: '山田', work: '前の工事内容', places: [{name: '玄関', rows: [{kind: 'material', excluded: true}, {kind: 'labor'}]}]}]);
   assert.deepEqual([j.insuredNo, j.form, j.overhead, j.overheadTarget], ['', '', null, null]);
   assert.deepEqual(cleanJobs([{overhead: 15911, overheadTarget: '2700'}]).map((x) => [x.overhead, x.overheadTarget]), [[15911, 2700]]);
-  assert.deepEqual([j.places[0].kind, j.places[0].photo, j.places[0].work], [1, 0, '']);
+  assert.deepEqual([j.places[0].kind, j.places[0].photo], [1, 0]);
   assert.deepEqual(j.places[0].rows.map((r) => r.excluded), [true, false]);
   const [k] = cleanJobs([{insuredNo: '0000366989', form: 'kouiki', places: [{kind: 3, photo: '2', work: '床材変更'}, {kind: 9, photo: -1}]}]);
   assert.deepEqual([k.insuredNo, k.form], ['0000366989', 'kouiki']);
-  assert.deepEqual(k.places.map((p) => [p.kind, p.photo, p.work]), [
-    [3, 2, '床材変更'],
-    [1, 0, ''],
+  assert.deepEqual(k.places.map((p) => [p.kind, p.photo]), [
+    [3, 2],
+    [1, 0],
   ]);
+  // 前の版の工事名称（work）は読まない（見積書の改修内容・工事名称は改修の種類から）
+  assert.equal('work' in k.places[0], false);
 });
 
 test('前のデータの行・部材にも、定価・長さ・見積の単価が入る', () => {
