@@ -146,6 +146,87 @@ table.rows-table tr.row-active > td,
 }
 
 
+/* ---------------------------------------------------------------- 見積書に直接入力（Excel のように欄を選んで打ち込む） */
+.est-sheet .form-page {
+  margin: 0 0 14px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+.est-sheet .form-page:last-child {
+  margin-bottom: 0;
+}
+.est-sheet [data-edit],
+.est-sheet tr[data-blank] td {
+  cursor: cell;
+}
+.est-sheet [data-edit]:hover {
+  background-color: rgba(33, 115, 70, 0.08);
+}
+/* 打ち込める空いた行（ここに打つと行が増える） */
+.est-sheet tr.sheet-new > td {
+  background-color: #ecfdf5;
+}
+/* 選んでいる欄の枠（Excel と同じ緑） */
+.sheet-sel {
+  position: absolute;
+  z-index: 5;
+  box-sizing: border-box;
+  border: 2px solid #217346;
+  pointer-events: none;
+}
+/* 選んだ欄の上の入力欄。打ち始めるまでは見えない（日本語入力がそのまま使える） */
+.sheet-input {
+  position: absolute;
+  z-index: 6;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 3px;
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  line-height: 1.25;
+  white-space: pre;
+}
+.sheet-input.editing {
+  background: #fff;
+  color: #111827;
+  caret-color: auto;
+  border: 2px solid #217346;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  white-space: pre-wrap;
+}
+.sheet-btn {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.sheet-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+}
+.sheet-btn:disabled {
+  opacity: 0.4;
+}
+.sheet-tool {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  padding: 3px 8px;
+  font-weight: 700;
+  color: #334155;
+}
+.sheet-tool:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+.sheet-tool:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 /* ---------------------------------------------------------------- 帳票（A4縦・明朝・ネイビー） */
 .sheet {
   box-sizing: border-box;

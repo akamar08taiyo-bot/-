@@ -139,7 +139,7 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
         } catch (e) {
           if (e instanceof NoTextError) {
             setError(
-              'このPDFには文字の情報がありません（紙をスキャンしたPDFのようです）。メーカーにExcel・CSVの仕切り表をもらうか、文字を読み取れるPDFを使ってください。',
+              'このPDFは紙をスキャンした画像だけのPDFで、文字の情報がありません（コピー機でスキャンした価格表など）。アプリでは読み取れないので、Excel・CSVの仕切り表を取り込んでください。スキャンした価格表は、文字に起こした Excel にすれば取り込めます（品番・品名・定価・仕切価格の列があれば読めます）。',
             );
           } else throw e;
         }

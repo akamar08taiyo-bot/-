@@ -3,11 +3,13 @@
 // editable のとき（様邸の画面の右のプレビュー）は、手で直せる欄に data-edit（何を直す欄か）を付ける：
 //   job:customer など様邸の項目／date 作成日／place:箇所ID:name|work|photo|kind／line:行ID:text|qty|unit|price|note／
 //   excl:行ID（介護保険の対象外）／overhead:all|target（諸経費）。明細の行には data-rows（もとになった入力の行）を付ける
+// sheet のとき（見積書に直接入力）は、金額のない施工費の行も出し、明細のあとに打ち込める空いた行（new:…、data-new）を1行足す。
+//   ほかの空いた行には data-blank を付ける（押すと、打ち込める行の同じ列を選ぶ）
 
 import type {ReactNode} from 'react';
 import {estimateTotals} from '../calc.ts';
 import type {EstimateTotals} from '../calc.ts';
-import {circled, FORM_INFO, formLines, KINDS, lineNote, paginate, reiwa, TOTAL_ROWS} from '../estimateForms.ts';
+import {circled, FORM_INFO, formLines, KINDS, lineNote, paginate, reiwa, sheetNewLine, TOTAL_ROWS} from '../estimateForms.ts';
 import type {FormLine} from '../estimateForms.ts';
 import type {Job, Settings} from '../types.ts';
 import {num, staffFull, yen} from '../util.ts';
@@ -18,6 +20,16 @@ const pct = (rate: number) => num(Math.round(rate * 1000) / 10);
 
 /** 手で直せる欄の印（editable のときだけ） */
 const ed = (editable: boolean, key: string | null) => (editable && key ? {'data-edit': key} : {});
+
+/** 見積書に直接入力するとき：広域連合用の「材／手」（いちばん下の行に施工費を入れるか） */
+export type SheetOpts = {mark: '材' | '手'};
+
+/** 書式の明細の行（sheet なら金額のない施工費の行と、打ち込める空いた行も） */
+function sheetLines(job: Job, s: Settings, form: 'yukuhashi' | 'kouiki', sheet: SheetOpts | null | undefined) {
+  if (!sheet) return formLines(job, s, form);
+  const lines = formLines(job, s, form, {all: true});
+  return [...lines, sheetNewLine(job, lines, form, sheet.mark)];
+}
 
 /** 合計の欄の4行（小計・諸経費・消費税・合計）。[名前, 全体, 介護保険の対象] */
 function totalRows(t: EstimateTotals): [string, number, number][] {
@@ -35,9 +47,22 @@ function totalRows(t: EstimateTotals): [string, number, number][] {
 const YK = {A: 31.1, B: 24.9, C: 48.1, D: 7.1, E: 7.1, F: 15.5, G: 22.3, H: 7.1, I: 7.1, J: 15.5, K: 25.2, L: 22.9, M: 32.2};
 const YK_ROW = 5.77; // 明細の1行（元の 16.35pt）
 
-export function YukuhashiForm({job, settings: s, date, editable = false}: {job: Job; settings: Settings; date: string; editable?: boolean}) {
+export function YukuhashiForm({
+  job,
+  settings: s,
+  date,
+  editable: edit = false,
+  sheet = null,
+}: {
+  job: Job;
+  settings: Settings;
+  date: string;
+  editable?: boolean;
+  sheet?: SheetOpts | null;
+}) {
+  const editable = edit || sheet !== null;
   const per = FORM_INFO.yukuhashi.perPage;
-  const pages = paginate(formLines(job, s, 'yukuhashi'), per);
+  const pages = paginate(sheetLines(job, s, 'yukuhashi', sheet), per);
   const totals = totalRows(estimateTotals(job, s));
   const d = reiwa(date);
   const issuer = [
@@ -176,7 +201,7 @@ export function YukuhashiForm({job, settings: s, date, editable = false}: {job: 
                       </tr>
                     );
                   }
-                  return <YkLine key={i} line={page[i]} bottom={bottom} editable={editable} />;
+                  return <YkLine key={i} line={page[i]} bottom={bottom} editable={editable} sheet={sheet !== null} />;
                 })}
               </tbody>
             </table>
@@ -190,7 +215,7 @@ export function YukuhashiForm({job, settings: s, date, editable = false}: {job: 
   );
 }
 
-function YkLine({line: l, bottom, editable}: {line: FormLine | undefined; bottom: string; editable: boolean}) {
+function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined; bottom: string; editable: boolean; sheet: boolean}) {
   const cell = (text: string, w: number, pt: number, cls = '', edit: string | null = null, lines = 1): ReactNode => (
     <td className={cls + bottom} style={text ? fitStyle(text, w, YK_ROW, pt, lines) : undefined} {...ed(editable, edit)}>
       {text}
@@ -198,10 +223,28 @@ function YkLine({line: l, bottom, editable}: {line: FormLine | undefined; bottom
   );
   if (!l) {
     return (
-      <tr className="g" style={{height: `${YK_ROW}mm`}}>
+      <tr className="g" style={{height: `${YK_ROW}mm`}} {...(sheet ? {'data-blank': ''} : {})}>
         {['ml', '', '', 'nr', 'nl', '', 'mr', 'nr', 'nl', '', 'mr', 'mr', 'mr'].map((c, i) => (
           <td key={i} className={c + bottom} />
         ))}
+      </tr>
+    );
+  }
+  if (l.isNew) {
+    // 打ち込める空いた行。最後の箇所に行がまだなければ、その箇所の改修内容・改修場所を出す
+    const nk = (field: string) => `new:${field}`;
+    return (
+      <tr className="g sheet-new" style={{height: `${YK_ROW}mm`}} data-new="">
+        {cell(l.first ? l.work : '', YK.A, 11, 'ml', nk('work'))}
+        {cell(l.first && l.placeName ? `${l.placeName}${circled(l.photo)}` : '', YK.B, 11, '', nk('name'))}
+        {cell('', YK.C, 9, '', nk('text'))}
+        {cell('', YK.D, 9, 'r nr', nk('qty'))}
+        {cell('', YK.E, 11, 'nl', nk('unit'))}
+        {cell('', YK.F, 11, 'r', nk('price'))}
+        {['r mr', 'r nr', 'nl', 'r', 'r mr', 'r mr'].map((c, i) => (
+          <td key={i} className={c + bottom} />
+        ))}
+        {cell('', YK.M, 11, 'mr', nk('note'))}
       </tr>
     );
   }
@@ -270,9 +313,10 @@ const NOTE_PHOTO = '※写真番号は、写真貼り付け用紙の写真番号
 const NOTE_MARK = '※材料費と施工費を工事項目毎に明記。　※「改修箇所毎工事名称」欄記入の時は、材料費は（材）、施工費は（手）を名称の前に明記。';
 const NOTE_KIND = '※改修の種類は、該当する番号だけを記入';
 
-export function KouikiForm({job, settings: s, editable = false}: {job: Job; settings: Settings; editable?: boolean}) {
+export function KouikiForm({job, settings: s, editable: edit = false, sheet = null}: {job: Job; settings: Settings; editable?: boolean; sheet?: SheetOpts | null}) {
+  const editable = edit || sheet !== null;
   const per = FORM_INFO.kouiki.perPage;
-  const pages = paginate(formLines(job, s, 'kouiki'), per);
+  const pages = paginate(sheetLines(job, s, 'kouiki', sheet), per);
   const totals = totalRows(estimateTotals(job, s));
   const tax = pct(s.taxRate);
   return (
@@ -393,7 +437,7 @@ export function KouikiForm({job, settings: s, editable = false}: {job: Job; sett
                       </tr>
                     );
                   }
-                  return <KkLine key={i} line={page[i]} height={h} bottom={bottom} hourRate={s.estimateHourRate} editable={editable} />;
+                  return <KkLine key={i} line={page[i]} height={h} bottom={bottom} hourRate={s.estimateHourRate} editable={editable} sheet={sheet !== null} />;
                 })}
                 <tr style={{height: '4.35mm'}}>
                   <td />
@@ -423,7 +467,21 @@ export function KouikiForm({job, settings: s, editable = false}: {job: Job; sett
   );
 }
 
-function KkLine({line: l, height, bottom, hourRate, editable}: {line: FormLine | undefined; height: number; bottom: string; hourRate: number; editable: boolean}) {
+function KkLine({
+  line: l,
+  height,
+  bottom,
+  hourRate,
+  editable,
+  sheet,
+}: {
+  line: FormLine | undefined;
+  height: number;
+  bottom: string;
+  hourRate: number;
+  editable: boolean;
+  sheet: boolean;
+}) {
   const cell = (text: string, w: number, pt: number, cls = '', edit: string | null = null, lines = 1): ReactNode => (
     <td className={cls + bottom} style={text ? fitStyle(text, w, height, pt, lines) : undefined} {...ed(editable, edit)}>
       {text}
@@ -431,10 +489,37 @@ function KkLine({line: l, height, bottom, hourRate, editable}: {line: FormLine |
   );
   if (!l) {
     return (
-      <tr className="g" style={{height: `${height}mm`}}>
+      <tr className="g" style={{height: `${height}mm`}} {...(sheet ? {'data-blank': ''} : {})}>
         {['ml', '', '', 'mr', 'gap', 'ml', '', '', 'mr', 'gap', 'ml', '', 'ml', '', '', 'mr', 'ml', 'mr'].map((c, i) => (
           <td key={i} className={c + bottom} />
         ))}
+      </tr>
+    );
+  }
+  if (l.isNew) {
+    // 打ち込める空いた行。材／手で、部材と施工費のどちらを入れるかを選ぶ
+    const nk = (field: string) => `new:${field}`;
+    return (
+      <tr className="g sheet-new" style={{height: `${height}mm`}} data-new="">
+        {cell(l.first ? l.placeName : '', KK.A, 11, 'c ml', nk('name'), 2)}
+        {cell(l.first ? l.work : '', KK.B, 11, 'c', nk('work'), 2)}
+        <td className={`mark${bottom}`} {...ed(editable, nk('mark'))}>
+          {l.mark}
+        </td>
+        {cell('', KK.D, 9, 'mr gothic', nk('text'))}
+        <td className={`gap${bottom}`} />
+        {cell('', KK.F, 9, 'r ml gothic', nk('qty'))}
+        {cell('', KK.G, 11, 'gothic', nk('unit'))}
+        {cell('', KK.H, 11, 'r gothic', nk('price'))}
+        <td className={`r mr gothic${bottom}`} />
+        <td className={`gap${bottom}`} />
+        {cell(l.first ? circled(l.photo) : '', KK.K, 11, 'c ml', nk('photo'))}
+        {cell(l.first ? circled(l.kind) : '', KK.L, 11, 'c', nk('kind'))}
+        {['r ml gothic', 'gothic', 'r gothic', 'r mr gothic'].map((c, i) => (
+          <td key={i} className={c + bottom} />
+        ))}
+        <td className={`ml${bottom}`} {...ed(editable, nk('note'))} />
+        <td className={`mr${bottom}`} {...ed(editable, nk('note'))} />
       </tr>
     );
   }

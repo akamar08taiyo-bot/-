@@ -21,9 +21,10 @@ import type {AppData, AppMode, EstimateForm, Job, Kit, Material, NameSuffix, Pla
 import type {Update} from '../useStore.ts';
 import {num, staffFull, todayIso, uid, yen} from '../util.ts';
 import {EstimatePreview} from './EstimatePreview.tsx';
+import {EstimateSheet} from './EstimateSheet.tsx';
 import {KitPicker} from './Kits.tsx';
 import {LaborCounter, MaterialPicker} from './Pickers.tsx';
-import {Btn, KindBadge, NumberInput, Stepper, TextInput, useToast} from './ui.tsx';
+import {Btn, KindBadge, Modal, NumberInput, Stepper, TextInput, useToast} from './ui.tsx';
 
 export function copyJob(job: Job): Job {
   const now = Date.now();
@@ -41,6 +42,24 @@ export function copyJob(job: Job): Job {
 }
 
 const PREVIEW_KEY = 'sasaoka-app:estimate-preview';
+const VIEW_KEY = 'sasaoka-app:estimate-view';
+
+type EstimateView = 'sheet' | 'cards';
+const VIEWS: [EstimateView, string][] = [
+  ['sheet', '📝 見積書に直接入力（Excel のように）'],
+  ['cards', '🗂 項目ごとに入力'],
+];
+
+/** 見積作成の入力のしかた（この端末で覚えておく）。はじめてなら、広い画面は見積書に直接入力、スマホなどは項目ごと */
+function loadView(): EstimateView {
+  try {
+    const v = localStorage.getItem(VIEW_KEY);
+    if (v === 'sheet' || v === 'cards') return v;
+  } catch {
+    /* 下の決め方で */
+  }
+  return typeof matchMedia === 'function' && !matchMedia('(min-width: 1024px)').matches ? 'cards' : 'sheet';
+}
 
 /** 見積作成で、右に見積書を映すか（この端末で覚えておく） */
 function loadPreview(): boolean {
@@ -78,6 +97,7 @@ export function JobEditor({
   onBack,
   onOpen,
   onPrint,
+  onMode,
 }: {
   job: Job;
   data: AppData;
@@ -86,6 +106,7 @@ export function JobEditor({
   onBack: () => void;
   onOpen: (id: string) => void;
   onPrint: (r: PrintRequest) => void;
+  onMode?: (m: AppMode) => void;
 }) {
   const toast = useToast();
   const [picker, setPicker] = useState<Picker | null>(null);
@@ -109,6 +130,17 @@ export function JobEditor({
     }
   }, [showPreview]);
   const preview = estimate && showPreview;
+  // 見積作成の入力のしかた：見積書に直接入力（Excel のように）／項目ごとに入力（この端末で覚えておく）
+  const [view, setView] = useState<EstimateView>(loadView);
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_KEY, view);
+    } catch {
+      /* 覚えられなくても困らない */
+    }
+  }, [view]);
+  const sheetView = estimate && view === 'sheet';
+  const [fixPrices, setFixPrices] = useState(false);
   const side = useMedia('(min-width: 1024px)');
   // 入力している行（右の見積書でも色を付ける）
   const [activeRowId, setActiveRowId] = useState<string | null>(null);
@@ -325,6 +357,66 @@ export function JobEditor({
     </label>
   );
 
+  // 見積作成：見積書（苅田町・行橋用）と同じ順番に並べる（作成日 → お客様名 → 被保険者番号 → 工事場所 → 担当）。見積書に出ない項目は下にまとめる
+  const estimateInfo = (
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="grid gap-3">
+        <div className="flex flex-wrap items-end gap-3">
+          {form === 'yukuhashi' && <EstimateDateField key={job.id} jobId={job.id} />}
+          {customerField('min-w-[15rem] flex-1')}
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          {form === 'yukuhashi' && insuredField('min-w-[12rem] flex-1')}
+          {addressField('工事場所（住所）', 'min-w-[16rem] flex-[2_1_0%]')}
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          {formField}
+          {staffField}
+        </div>
+      </div>
+      <div className="mt-3 border-t border-dashed border-slate-200 pt-2.5">
+        <div className="mb-1.5 text-[11px] font-bold text-slate-400">見積書には出ない項目（仕切り・請求書に使います）</div>
+        <div className="flex flex-wrap items-end gap-3">
+          {dateField}
+          {monthField}
+          {noteField('min-w-[14rem] flex-[2_1_0%]')}
+          {form === 'kouiki' && insuredField('min-w-[12rem] flex-1')}
+        </div>
+      </div>
+    </section>
+  );
+  // 見積書に直接入力するとき：見積書の欄にないものだけ（苅田町・行橋用はお客様名・被保険者番号・工事場所・作成日を見積書の欄に打ち込む）
+  const sheetInfo = (
+    <section className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      <div className="flex flex-wrap items-end gap-3">
+        {form === 'kouiki' && customerField('min-w-[14rem] flex-[2_1_0%]')}
+        {form === 'kouiki' && addressField('工事場所（住所）', 'min-w-[14rem] flex-[2_1_0%]')}
+        {formField}
+        {staffField}
+        {dateField}
+        {monthField}
+        {noteField('min-w-[12rem] flex-[2_1_0%]')}
+        {form === 'kouiki' && insuredField('min-w-[10rem] flex-1')}
+      </div>
+      {form === 'yukuhashi' && (
+        <p className="mt-1.5 text-[11px] text-slate-500">お客様名・介護保険被保険者番号・工事場所（住所）・作成日は、下の見積書の欄に直接打ち込みます。施工日・請求する月・備考は見積書には出ません（仕切り・請求書に使います）。</p>
+      )}
+    </section>
+  );
+  const shikiriInfo = (
+    <section className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 xl:grid-cols-4">
+      {/* 担当はお客様名の横。狭い画面で入りきらないときは下の行に回る */}
+      <div className="flex flex-wrap items-end gap-x-3 gap-y-3 sm:col-span-2">
+        {customerField('flex-[1_1_14rem]')}
+        {staffField}
+      </div>
+      {dateField}
+      {monthField}
+      {addressField('住所（任意）', 'sm:col-span-2')}
+      {noteField('sm:col-span-2')}
+    </section>
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -362,49 +454,66 @@ export function JobEditor({
         </div>
       </div>
 
+      {estimate && (
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="入力のしかた">
+          <span className="text-xs font-bold text-slate-500">入力のしかた</span>
+          <div className="flex rounded-lg border border-slate-300 bg-white p-0.5">
+            {VIEWS.map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={view === id}
+                onClick={() => setView(id)}
+                className={`rounded-md px-3 py-1.5 text-sm font-bold ${view === id ? 'bg-emerald-700 text-white shadow' : 'text-slate-600 hover:bg-slate-100'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <span className="text-xs text-slate-500">
+            {sheetView ? '見積書の形のまま、Excel と同じように欄を選んで打ち込めます' : '箇所ごとに部材・取付手間を選んで入れます（右に見積書が映ります）'}
+          </span>
+        </div>
+      )}
+
+      {sheetView ? (
+        <div className="space-y-4">
+          {sheetInfo}
+          <EstimateSheet
+            key={job.id}
+            job={job}
+            settings={s}
+            form={form}
+            materials={data.materials}
+            setJob={setJob}
+            onPickMaterial={(placeId) => {
+              if (placeId) {
+                setPicker({placeId, kind: 'material'});
+                return;
+              }
+              const p = makePlace('');
+              setJob((j) => ({...j, places: [...j.places, p]}));
+              setPicker({placeId: p.id, kind: 'material'});
+            }}
+            onPickLabor={(placeId, rowId) => setPicker({placeId, kind: 'labor', rowId})}
+            onPickKit={(placeId) => {
+              if (placeId) {
+                setPicker({placeId, kind: 'kit'});
+                return;
+              }
+              const p = makePlace('');
+              setJob((j) => ({...j, places: [...j.places, p]}));
+              setPicker({placeId: p.id, kind: 'kit'});
+            }}
+            onPrint={() => onPrint({kind: 'estimate', jobId: job.id})}
+          />
+          <ShikiriLink job={job} totals={totals} onShow={onMode ? () => onMode('shikiri') : undefined} onFix={() => setFixPrices(true)} />
+        </div>
+      ) : (
       <div className={`grid gap-4 ${preview ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,46%)]' : 'lg:grid-cols-[minmax(0,1fr)_330px]'}`}>
         {/* min-w-0：表が広くても画面からはみ出さず、表の中で横に動かせるようにする */}
         <div ref={mainRef} className={`min-w-0 space-y-4 ${narrow ? 'rows-narrow' : ''}`}>
-          {estimate ? (
-            // 見積作成：見積書（苅田町・行橋用）と同じ順番に並べる（作成日 → お客様名 → 被保険者番号 → 工事場所 → 担当）。見積書に出ない項目は下にまとめる
-            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="grid gap-3">
-                <div className="flex flex-wrap items-end gap-3">
-                  {form === 'yukuhashi' && <EstimateDateField key={job.id} jobId={job.id} />}
-                  {customerField('min-w-[15rem] flex-1')}
-                </div>
-                <div className="flex flex-wrap items-end gap-3">
-                  {form === 'yukuhashi' && insuredField('min-w-[12rem] flex-1')}
-                  {addressField('工事場所（住所）', 'min-w-[16rem] flex-[2_1_0%]')}
-                </div>
-                <div className="flex flex-wrap items-end gap-3">
-                  {formField}
-                  {staffField}
-                </div>
-              </div>
-              <div className="mt-3 border-t border-dashed border-slate-200 pt-2.5">
-                <div className="mb-1.5 text-[11px] font-bold text-slate-400">見積書には出ない項目（仕切り・請求書に使います）</div>
-                <div className="flex flex-wrap items-end gap-3">
-                  {dateField}
-                  {monthField}
-                  {noteField('min-w-[14rem] flex-[2_1_0%]')}
-                  {form === 'kouiki' && insuredField('min-w-[12rem] flex-1')}
-                </div>
-              </div>
-            </section>
-          ) : (
-            <section className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 xl:grid-cols-4">
-              {/* 担当はお客様名の横。狭い画面で入りきらないときは下の行に回る */}
-              <div className="flex flex-wrap items-end gap-x-3 gap-y-3 sm:col-span-2">
-                {customerField('flex-[1_1_14rem]')}
-                {staffField}
-              </div>
-              {dateField}
-              {monthField}
-              {addressField('住所（任意）', 'sm:col-span-2')}
-              {noteField('sm:col-span-2')}
-            </section>
-          )}
+          {estimate ? estimateInfo : shikiriInfo}
 
           {estimate && (
             <p className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs leading-5 text-indigo-900">
@@ -529,6 +638,9 @@ export function JobEditor({
           )}
         </aside>
       </div>
+      )}
+
+      {fixPrices && <ShikiriPriceDialog job={job} materials={data.materials} setJob={setJob} update={update} onClose={() => setFixPrices(false)} />}
 
       {picker && pickPlace && picker.kind === 'material' && (
         <MaterialPicker
@@ -1035,6 +1147,109 @@ function EstPriceCell({row, rate, autoFocus, onChange}: {row: Row; rate: number;
       </div>
       <div className={`text-[10px] ${auto && row.listPrice <= 0 ? 'font-bold text-amber-700' : 'text-slate-500'}`}>{auto ? how : `手入力（${how || '定価なし'}）`}</div>
     </div>
+  );
+}
+
+/** 見積書に入れたものが、仕切り計算表・請求書（笹岡工務店）に入る金額。仕切価格のない部材があれば知らせる */
+function ShikiriLink({job, totals: t, onShow, onFix}: {job: Job; totals: JobTotals; onShow?: () => void; onFix: () => void}) {
+  const missing = job.places.flatMap((p) => p.rows).filter((r) => r.kind === 'material' && !(r.price > 0));
+  const [y, m] = job.month.split('-');
+  return (
+    <section className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm" aria-label="請求書に入る金額">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <b className="text-[#0c315e]">請求書（笹岡工務店）に入る金額</b>
+        <span className="tabular-nums">①部材代 {yen(t.material)}</span>
+        <span className="tabular-nums">②取付手間 {yen(t.labor)}</span>
+        <span className="tabular-nums">⑦税抜合計 {yen(t.subtotal)}</span>
+        <span className="tabular-nums">
+          ⑥合計 <b>{yen(t.total)}</b>円
+        </span>
+        <span className="text-xs text-slate-500">
+          （{Number(y)}年{Number(m)}月の請求書に入ります。見積書と同じ入力から仕切り計算表を作ります）
+        </span>
+        {onShow && (
+          <Btn small color="white" onClick={onShow} className="ml-auto">
+            仕切り計算表・請求書を見る →
+          </Btn>
+        )}
+      </div>
+      {missing.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-xs text-amber-900">
+          仕切価格が入っていない部材が {missing.length} 行あります（請求書では、その部材代が0円になります）。
+          <Btn small color="white" onClick={onFix}>
+            仕切価格を入れる
+          </Btn>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** 仕切価格の入っていない部材に、仕切価格を入れる（部材リストにある部材は、部材リストの仕切価格も同じにできる） */
+function ShikiriPriceDialog({
+  job,
+  materials,
+  setJob,
+  update,
+  onClose,
+}: {
+  job: Job;
+  materials: Material[];
+  setJob: (fn: (j: Job) => Job) => void;
+  update: Update;
+  onClose: () => void;
+}) {
+  // 開いたときの行を覚えておく（仕切価格を入れても一覧から消えないように）
+  const [ids] = useState(() => new Set(job.places.flatMap((p) => p.rows).filter((r) => r.kind === 'material' && !(r.price > 0)).map((r) => r.id)));
+  const [toMaster, setToMaster] = useState(true);
+  const list = job.places.flatMap((p) => p.rows.filter((r) => ids.has(r.id)).map((r) => ({place: p, row: r})));
+  const setPrice = (row: Row, price: number) => {
+    setJob((j) => ({...j, places: j.places.map((p) => ({...p, rows: p.rows.map((r) => (r.id === row.id ? {...r, price} : r))}))}));
+    if (toMaster && row.refId && materials.some((m) => m.id === row.refId)) {
+      update('materials', (all) => all.map((m) => (m.id === row.refId ? {...m, price, updatedAt: Date.now()} : m)));
+    }
+  };
+  return (
+    <Modal
+      wide
+      title="仕切価格を入れる（請求書の部材代）"
+      onClose={onClose}
+      footer={
+        <Btn color="blue" onClick={onClose}>
+          閉じる
+        </Btn>
+      }
+    >
+      <p className="mb-2 text-xs text-slate-600">見積書に入れた部材のうち、仕切価格（笹岡工務店への請求に使う価格）がまだ入っていないものです。入れるとすぐ請求書に入ります。</p>
+      <table className="w-full text-sm">
+        <thead className="text-xs text-slate-500">
+          <tr>
+            <th className="px-2 py-1 text-left">箇所</th>
+            <th className="px-2 py-1 text-left">部材</th>
+            <th className="px-2 py-1 text-right">数量</th>
+            <th className="px-2 py-1 text-right">定価</th>
+            <th className="px-2 py-1 text-right">仕切価格</th>
+          </tr>
+        </thead>
+        <tbody>
+          {list.map(({place, row}) => (
+            <tr key={row.id} className="border-t border-slate-100">
+              <td className="px-2 py-1">{place.name || '（箇所）'}</td>
+              <td className="px-2 py-1">{[row.maker, row.code, row.name].filter(Boolean).join(' ') || '（品名なし）'}</td>
+              <td className="px-2 py-1 text-right tabular-nums">{num(row.qty)}</td>
+              <td className="px-2 py-1 text-right tabular-nums">{row.listPrice > 0 ? yen(row.listPrice) : '—'}</td>
+              <td className="px-2 py-1 text-right">
+                <NumberInput value={row.price} onChange={(n) => setPrice(row, Math.max(0, n))} className="w-28" ariaLabel={`${row.name || '部材'}の仕切価格`} blankZero placeholder="仕切価格" />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <label className="mt-3 flex items-center gap-2 text-xs text-slate-700">
+        <input type="checkbox" checked={toMaster} onChange={(e) => setToMaster(e.target.checked)} className="h-4 w-4" />
+        部材リストにある部材は、部材リストの仕切価格も同じにする（次から自動で入ります）
+      </label>
+    </Modal>
   );
 }
 

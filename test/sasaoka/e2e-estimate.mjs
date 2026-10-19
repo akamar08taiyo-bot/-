@@ -31,6 +31,8 @@ for (const v of ['苅田町・行橋用', '15,280', '5,000', '20,280', '2,028', 
 log('見積の一覧OK');
 
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
+// 広い画面のはじめは「見積書に直接入力」（e2e-sheet.mjs）。このテストは「項目ごとに入力」で確かめる（この端末で覚えておく）
+await page.getByRole('button', {name: '🗂 項目ごとに入力'}).click();
 const box = () => page.getByRole('table', {name: '見積書の金額'}).innerText();
 // 上の切り替えは 見積作成 が左。見積書の書式は2つ（苅田町・行橋用／みやこ町・広域連合用）
 assert.deepEqual(await page.getByRole('group', {name: '使い方'}).getByRole('button').allInnerTexts(), ['見積作成', '仕切り・請求書']);

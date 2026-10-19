@@ -153,6 +153,7 @@ export default function App() {
                 job={openJob}
                 data={data}
                 mode={mode}
+                onMode={setMode}
                 update={store.update}
                 onBack={() => {
                   // 何も入れずに戻った様邸は残さない。請求月を変えていたら、その月の一覧に戻る

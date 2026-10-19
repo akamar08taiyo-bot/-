@@ -111,13 +111,15 @@ export type FormLine = {
   hourly: boolean; // 施工費を「時間×1時間の単価」で書いた行
   note: string | null; // 備考（定価等）・算出根拠を手で直したとき（改行で行を分ける）
   manualAmount: boolean; // 施工費の金額を見積書で手で直した
+  isNew?: boolean; // 見積書に直接入力するときの、いちばん下の空いた行
 };
 
-export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateRate' | 'estimateHourRate'>, form: EstimateForm): FormLine[] {
+/** all：金額のない施工費の行も出す（見積書に直接入力するとき。まだ金額を入れていない行も直せるように） */
+export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateRate' | 'estimateHourRate'>, form: EstimateForm, opts: {all?: boolean} = {}): FormLine[] {
   const photos = photoNumbers(job, s.estimateRate);
   const out: FormLine[] = [];
   job.places.forEach((place, pi) => {
-    shownLines(place, s.estimateRate).forEach((l, i) => {
+    (opts.all ? estimatePlaceLines(place, s.estimateRate) : shownLines(place, s.estimateRate)).forEach((l, i) => {
       const base = {
         place: pi,
         placeId: place.id,
@@ -183,6 +185,45 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
     });
   });
   return out;
+}
+
+/**
+ * 見積書に直接入力するときの、いちばん下の空いた行（打ち込むと行が増える）。
+ * 最後の箇所に行がなければ、その箇所の名前・改修の種類・写真番号を出す（そこに入る）。mark は広域連合用の「材／手」
+ */
+export function sheetNewLine(job: Pick<Job, 'places'>, lines: FormLine[], form: EstimateForm, mark: '材' | '手' = '材'): FormLine {
+  const last = job.places[job.places.length - 1];
+  const pending = last && last.rows.length === 0 ? last : null;
+  const shownPlaces = new Set(lines.map((l) => l.placeId)).size;
+  return {
+    place: pending ? job.places.length - 1 : 1e6, // 前の箇所とは別のまとまり（ページの送りに巻き込まない）
+    placeId: pending?.id ?? '',
+    rowId: '',
+    rowIds: [],
+    excludeId: '',
+    isWork: mark === '手',
+    first: pending !== null,
+    placeName: pending?.name.trim() ?? '',
+    work: pending ? placeWork(pending, form) : '',
+    kind: pending?.kind ?? 1,
+    photo: pending ? (pending.photo > 0 ? pending.photo : shownPlaces + 1) : 0,
+    mark,
+    text: '',
+    autoText: '',
+    qty: 0,
+    unit: '',
+    unitPrice: 0,
+    amount: 0,
+    excluded: false,
+    listPrice: 0,
+    rate: null,
+    cut: '',
+    piece: 0,
+    hourly: false,
+    note: null,
+    manualAmount: false,
+    isNew: true,
+  };
 }
 
 /**
