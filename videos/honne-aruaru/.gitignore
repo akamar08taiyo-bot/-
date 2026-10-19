@@ -1,0 +1,7 @@
+node_modules/
+work/
+# 生成画像の原本（大きいので入れない。使った絵は public/img、人物の設定画は assets/gen/sheet_v1.jpg）
+assets/gen/*.png
+# スクリプトで作り直せる音（prep_audio.py / sfx.py / bgm.py）
+public/audio/
+__pycache__/

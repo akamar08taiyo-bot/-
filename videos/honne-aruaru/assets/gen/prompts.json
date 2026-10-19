@@ -1,0 +1,48 @@
+{
+  "style": "Illustration in the style of a Japanese comic essay about family life (the kind of warm, slightly humorous everyday manga popular on Instagram): clean, confident dark-brown line art, flat soft colors with very light cel shading, warm pastel palette (cream, peach, mustard, sage green, dusty blue), simple but very expressive faces, cozy and realistic Japanese apartment details. Not photorealistic, not 3D, not chibi, no heavy screentone. Original characters: do not imitate any existing manga, anime, brand or real person. Absolutely no text, letters, numbers, logos, signs, labels, speech bubbles, captions, sound-effect lettering or watermarks anywhere in the image.",
+  "characters": "WIFE (the main character, always exactly the same person): Japanese woman, 44 years old, average slim build, dark brown hair tied in a loose low bun with a few loose strands, side-swept bangs, small gold stud earrings, natural makeup, a mustard-yellow knit cardigan over a plain white T-shirt, light grey wide trousers. HUSBAND: Japanese man, 45 years old, slightly chubby, short slightly messy black hair, black rectangular glasses, navy hoodie, beige chinos, a carefree face. SON: Japanese boy, 9 years old, short black hair, red-and-white horizontal striped T-shirt, navy shorts.",
+  "vertical": "Vertical 9:16 full-bleed illustration that fills the entire canvas edge to edge: no borders, no frames, no panel lines, no blank margins and no flat color bands at the top or bottom. Leave a calm, uncluttered area in the upper fifth of the picture (a plain wall, ceiling or sky that is part of the scene), because captions will be placed there. Faces must be large, clear and well inside the frame, roughly between 25% and 65% of the height, and away from the right edge.",
+  "sheet": "Character design sheet on a plain off-white background, landscape layout. Left: the WIFE full-body front view, plus four head-and-shoulder close-ups of her: (1) a blank, ice-cold expressionless stare, (2) a polite smile whose eyes are not smiling, with a faint dark shadow over the eyes, (3) exhausted and sick with flushed cheeks, (4) a wry, tired half-smile. Middle: the HUSBAND full-body front view, plus two head close-ups: (1) a proud, pleased grin, (2) a clueless, innocent face. Right: the SON full-body front view. Same outfits and proportions everywhere. No text, no labels, no numbers.",
+  "scenes": [
+    {
+      "id": "S1",
+      "prompt": "Living room in the evening. The WIFE stands in the middle of the frame, holding a laundry basket against her hip, and stares down at the back of her HUSBAND with a blank, ice-cold, expressionless face (her face is large and clearly visible, about 30-45% from the top). In the lower foreground the HUSBAND sits slouched on a grey sofa, seen from behind, absorbed in his smartphone, its screen glowing. Slightly cool, dim evening light, a floor lamp, a few toys on the rug."
+    },
+    {
+      "id": "S2",
+      "prompt": "Close-up portrait of the WIFE from the chest up, centered, facing the viewer. She wears a polite, perfectly calm smile, but her eyes are not smiling at all: half-lidded, flat, with a faint dark shadow over the upper half of her face, a subtle chill. A plain soft dusty-blue background with a gentle vignette fills the whole canvas. Her face is large, about 28-55% from the top."
+    },
+    {
+      "id": "S3",
+      "prompt": "The narrow entrance hall (genkan) of a Japanese apartment in the morning. The HUSBAND, in the middle-left, holds up one small tied white garbage bag with a proud, pleased grin, as if expecting praise, his other hand giving a thumbs-up. Behind him on the right, the WIFE stands with arms crossed, giving him a flat, deadpan, unimpressed look; her face is clearly visible and not too small. Shoes on the floor, a shoe cabinet, soft morning light."
+    },
+    {
+      "id": "S4",
+      "prompt": "A Japanese bedroom with tatami and a futon on the floor, shown full-bleed with the ceiling and walls reaching the edges. The WIFE lies in the futon in the lower-middle of the frame, sick with a fever: flushed cheeks, a cooling gel sheet on her forehead, a thermometer and a glass of water beside the pillow; she looks weakly and coldly toward the door. Upper left, the HUSBAND peeks in through the half-open sliding door with a clueless, innocent face, one hand on his stomach as if hungry. Dim, quiet daytime light through a curtain. No calendar, no posters."
+    },
+    {
+      "id": "S5",
+      "prompt": "A sunny neighborhood park. In the center the HUSBAND carries the SON on his shoulders, laughing proudly. Two other mothers (different women, casual clothes) look at him admiringly and clap, delighted. In the background on the right, slightly smaller but with her face still clearly visible, the WIFE holds a heavy shopping bag and a water bottle and watches with a tired, dull, unimpressed look. Green trees, blue sky at the top."
+    },
+    {
+      "id": "S6",
+      "prompt": "Living room in the evening. On the left the WIFE stands holding an overflowing laundry basket, shoulders slumped, completely exhausted, dark circles under her eyes. On the right the HUSBAND is sprawled on the sofa with an exaggerated weary face, pointing up with one finger at the empty space above his own head, as if to say he is the more tired one. Leave clear empty space above both of their heads (wall area). Warm lamp light."
+    },
+    {
+      "id": "S7",
+      "prompt": "Dining kitchen in the evening. The HUSBAND, excited like a child, holds up a colorful cake-shop leaflet toward the viewer and points at a picture of a fancy strawberry shortcake printed on it. There is no real cake anywhere in the scene, only pictures of cakes on the leaflet, and the leaflet has absolutely no writing. Next to him the WIFE stands with a flat, stone-cold, straight face, holding a cooking ladle. No calendar, no posters."
+    },
+    {
+      "id": "S8",
+      "prompt": "Extreme close-up of the WIFE's face, centered and large (about 25-60% from the top), completely straight-faced and cold, eyes flat and still, mouth a thin line; the moment her feelings go cold. A pale icy-blue background with a few subtle frost sparkles fills the whole canvas from edge to edge. Cool bluish light on her face."
+    },
+    {
+      "id": "S9",
+      "prompt": "Inside a bright, pretty cake shop. The WIFE is alone (no husband and no child in the scene). She stands at the counter and receives a white cake box tied with a ribbon from a shop clerk (only the clerk's arms and apron are visible). She has a wry, resigned half-smile, slightly tired, as if laughing at herself. A glass showcase with colorful cakes, warm light. No signs, no price cards, no labels, no writing."
+    },
+    {
+      "id": "S10",
+      "prompt": "The WIFE, standing in her living room, faces the viewer directly at medium shot (waist up), holding the white ribbon-tied cake box in both hands at chest height. She tilts her head slightly with a knowing, teasing half-smile, as if asking the viewer a question. Warm evening light, soft background. Her face is large and centered, about 25-50% from the top."
+    }
+  ]
+}

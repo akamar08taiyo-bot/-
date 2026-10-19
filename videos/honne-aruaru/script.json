@@ -1,0 +1,158 @@
+{
+  "id": "honne01",
+  "series": "本音あるある",
+  "episode": "夫に冷めた瞬間",
+  "title": "夫に冷めた瞬間あるある【結婚10年目】",
+  "format": "vertical",
+  "fps": 30,
+  "voice": {
+    "name": "Sulafat",
+    "model": "gemini-3.8-flash-tts",
+    "profile": "A Japanese woman in her mid-40s, married for twelve years with one son in elementary school. Calm, slightly low, mature voice with a dry, sharp wit. She sounds like a frank friend of the same generation who teases husbands but is always on the listener's side. Natural standard Tokyo Japanese.",
+    "scene": "She is narrating a short vertical video about relatable moments when a wife's feelings for her husband went cold. She talks straight to women in their 30s to 50s, as if chatting with a close friend over tea at the kitchen table."
+  },
+  "styles": {
+    "narr": "Brisk pace, noticeably quicker than a calm narration, like a quick-witted friend talking. Keep the pauses between phrases very short. Clear diction, a hint of amused exasperation. No exaggerated cartoon acting.",
+    "quote": "Brisk pace with very short pauses. When you read the husband's words inside the Japanese quotation marks, imitate him briefly with a lower, carefree, slightly smug tone, then return to your own voice.",
+    "aside": "A muttered aside under her breath: noticeably quieter, lower and closer to the microphone, deadpan and dry. A low murmur, not a breathy whisper. Do not drag; keep the pause between the two sentences short.",
+    "verdict": "Slow, flat and cold. A short, final verdict, delivered quietly with total calm. End with the short casual 'deshō' cut short as 'desho' — do not lengthen the last syllable.",
+    "twist": "Wry and self-deprecating, with a small tired laugh in the voice. Conversational and fairly quick, short pauses.",
+    "ask": "Turn to the listener with a friendly, teasing question. A little brighter and warmer, unhurried."
+  },
+  "lines": [
+    {
+      "id": "hook",
+      "scene": "S1",
+      "style": "narr",
+      "text": "夫に冷めた瞬間、覚えてますか？",
+      "gap": 0.25
+    },
+    {
+      "id": "promise",
+      "scene": "S2",
+      "style": "narr",
+      "text": "最後のやつが当てはまったら、もう戻れません。",
+      "gap": 0.35,
+      "sub": "最後のやつが当てはまったら、**もう戻れません**。"
+    },
+    {
+      "id": "a1",
+      "scene": "S3",
+      "style": "quote",
+      "text": "ゴミ出しをして「手伝ったよ」。",
+      "gap": 0.2,
+      "item": 1,
+      "telop": "「手伝ったよ」…誰の家？",
+      "sub": "ゴミ出しをして{「手伝ったよ」}。"
+    },
+    {
+      "id": "a1t",
+      "scene": "S3z",
+      "style": "aside",
+      "text": "手伝うって何？ あなたの家でもあるんですけど。",
+      "gap": 0.35,
+      "aside": true
+    },
+    {
+      "id": "a2",
+      "scene": "S4",
+      "style": "quote",
+      "text": "熱で寝込んでいるのに「俺の昼ごはんは？」。",
+      "gap": 0.2,
+      "item": 2,
+      "telop": "熱があっても「俺の昼は？」",
+      "sub": "熱で寝込んでいるのに{「俺の昼ごはんは？」}。"
+    },
+    {
+      "id": "a2t",
+      "scene": "S4z",
+      "style": "aside",
+      "text": "冷蔵庫、開けたことあります？",
+      "gap": 0.35,
+      "aside": true
+    },
+    {
+      "id": "a3",
+      "scene": "S5",
+      "style": "narr",
+      "text": "子どもが何組かも知らないのに、外ではイクメンの顔。",
+      "speak": "子どもが、なんくみかも知らないのに、外ではイクメンの顔。",
+      "gap": 0.35,
+      "item": 3,
+      "telop": "外でだけイクメン"
+    },
+    {
+      "id": "a4",
+      "scene": "S6",
+      "style": "quote",
+      "text": "「疲れた」って言ったら「俺の方が疲れてる」。",
+      "speak": "「疲れた」って言ったら、「俺のほうが疲れてる」。",
+      "gap": 0.2,
+      "item": 4,
+      "telop": "疲れは競技じゃない",
+      "sub": "「疲れた」って言ったら{「俺の方が疲れてる」}。"
+    },
+    {
+      "id": "a4t",
+      "scene": "S6z",
+      "style": "aside",
+      "text": "疲れって、いつから競うものになったの？",
+      "gap": 0.35,
+      "aside": true
+    },
+    {
+      "id": "a5a",
+      "scene": "S7",
+      "style": "narr",
+      "text": "そして最後。私の誕生日は忘れるのに、",
+      "gap": 0.1,
+      "item": 5,
+      "telop": "自分の誕生日だけ覚えてる"
+    },
+    {
+      "id": "a5b",
+      "scene": "S7z",
+      "style": "narr",
+      "text": "自分の誕生日には、ケーキの種類まで指定してくる。",
+      "gap": 0.7,
+      "sub": "自分の誕生日には、**ケーキの種類まで**指定してくる。"
+    },
+    {
+      "id": "a5t",
+      "scene": "S8",
+      "style": "verdict",
+      "text": "……それは、冷めるでしょ。",
+      "speak": "それは、冷めるでしょ。",
+      "gap": 0.55
+    },
+    {
+      "id": "twist",
+      "scene": "S9",
+      "style": "twist",
+      "text": "でも結局、そのケーキを買いに行くのも、私なんですけどね。",
+      "gap": 0.3,
+      "sub": "でも結局、そのケーキを買いに行くのも、**私**なんですけどね。"
+    },
+    {
+      "id": "ask",
+      "scene": "S10",
+      "style": "ask",
+      "text": "あなたなら、買う？ 買わない？",
+      "gap": 0.0
+    }
+  ],
+  "tail": 1.6,
+  "tempo": {
+    "narr": 1.16,
+    "quote": 1.16,
+    "twist": 1.12,
+    "aside": 1.08,
+    "verdict": 1.0,
+    "ask": 1.06
+  },
+  "telops": {
+    "promise": "最後のは、戻れないやつ",
+    "twist": "結局、買いに行くのは私",
+    "ask": "あなたなら？"
+  }
+}

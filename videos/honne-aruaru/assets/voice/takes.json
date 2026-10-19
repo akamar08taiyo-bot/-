@@ -1,0 +1,128 @@
+{
+ "hook": {
+  "ok": true,
+  "heard": "夫に冷めた瞬間 覚えてますか?",
+  "why": "",
+  "dur": 3.64,
+  "voice": "Sulafat",
+  "take": 1,
+  "text": "夫に冷めた瞬間、覚えてますか？"
+ },
+ "promise": {
+  "ok": true,
+  "heard": "最後のやつが当てはまったらもう戻れません",
+  "why": "句読点の有無を除き、台本どおりに読まれています。",
+  "dur": 3.48,
+  "voice": "Sulafat",
+  "take": 1,
+  "text": "最後のやつが当てはまったら、もう戻れません。"
+ },
+ "a1": {
+  "ok": true,
+  "heard": "ゴミ出しをして手伝ったよ",
+  "why": "retake chosen by Gemini listening comparison (work/takes/a1/judge.json)",
+  "dur": 3.28,
+  "voice": "Sulafat",
+  "take": 1,
+  "text": "ゴミ出しをして「手伝ったよ」。"
+ },
+ "a1t": {
+  "ok": true,
+  "heard": "手伝うって何?あなたの家でもあるんですけど",
+  "why": "",
+  "dur": 4.08,
+  "voice": "Sulafat",
+  "take": 1,
+  "text": "手伝うって何？ あなたの家でもあるんですけど。"
+ },
+ "a2": {
+  "ok": true,
+  "heard": "熱で寝込んでいるのに俺の昼ご飯は",
+  "why": "",
+  "dur": 4.24,
+  "voice": "Sulafat",
+  "take": 1,
+  "text": "熱で寝込んでいるのに「俺の昼ごはんは？」。"
+ },
+ "a2t": {
+  "ok": true,
+  "heard": "冷蔵庫開けたことあります？",
+  "why": "句読点の違いのみで、言葉の抜けや変更はなく台本どおり読まれています。",
+  "dur": 3.4,
+  "voice": "Sulafat",
+  "take": 1,
+  "text": "冷蔵庫、開けたことあります？"
+ },
+ "a3": {
+  "ok": true,
+  "heard": "子供が何組かも知らないのに外ではイクメンの顔",
+  "why": "retake chosen by Gemini listening comparison (work/takes/a3/judge.json)",
+  "dur": 4.4,
+  "voice": "Sulafat",
+  "take": 1,
+  "text": "子どもが何組かも知らないのに、外ではイクメンの顔。"
+ },
+ "a4": {
+  "ok": true,
+  "heard": "疲れたって言ったら、俺の方が疲れてる",
+  "why": "retake chosen by Gemini listening comparison (work/takes/a4/judge.json)",
+  "dur": 4.12,
+  "voice": "Sulafat",
+  "take": 1,
+  "text": "「疲れた」って言ったら「俺の方が疲れてる」。"
+ },
+ "a4t": {
+  "ok": true,
+  "heard": "疲れっていつから競うものになったの?",
+  "why": "",
+  "dur": 3.8,
+  "voice": "Sulafat",
+  "take": 1,
+  "text": "疲れって、いつから競うものになったの？"
+ },
+ "a5a": {
+  "ok": true,
+  "heard": "そして最後私の誕生日は忘れるのに",
+  "why": "",
+  "dur": 4.88,
+  "voice": "Sulafat",
+  "take": 1,
+  "text": "そして最後。私の誕生日は忘れるのに、"
+ },
+ "a5b": {
+  "ok": true,
+  "heard": "自分の誕生日にはケーキの種類まで指定してくる",
+  "why": "",
+  "dur": 3.84,
+  "voice": "Sulafat",
+  "take": 1,
+  "text": "自分の誕生日には、ケーキの種類まで指定してくる。"
+ },
+ "a5t": {
+  "ok": true,
+  "heard": "それは冷めるでしょ",
+  "why": "retake v0_0 (short でしょ), chosen by transcript + Gemini listening check",
+  "dur": 2.0,
+  "voice": "Sulafat",
+  "take": 1,
+  "text": "……それは、冷めるでしょ。"
+ },
+ "twist": {
+  "ok": true,
+  "heard": "でも結局そのケーキを買いに行くのも私なんですけどね",
+  "why": "",
+  "dur": 5.36,
+  "voice": "Sulafat",
+  "take": 1,
+  "text": "でも結局、そのケーキを買いに行くのも、私なんですけどね。"
+ },
+ "ask": {
+  "ok": true,
+  "heard": "あなたなら買う買わない",
+  "why": "retake chosen by Gemini listening comparison (work/takes/ask/judge.json)",
+  "dur": 3.24,
+  "voice": "Sulafat",
+  "take": 1,
+  "text": "あなたなら、買う？ 買わない？"
+ }
+}

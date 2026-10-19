@@ -1,0 +1,21 @@
+{
+  "name": "honne-aruaru",
+  "version": "1.0.0",
+  "private": true,
+  "description": "本音あるある（30〜50代女性向けショート）— Gemini TTS の声＋Remotion で組む縦型ショート",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "stills": "node scripts/stills.mjs",
+    "render": "node scripts/render.mjs"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.355",
+    "@remotion/cli": "4.0.355",
+    "@remotion/renderer": "4.0.355",
+    "@types/react": "^18.3.12",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "4.0.355",
+    "typescript": "^5.6.3"
+  }
+}
