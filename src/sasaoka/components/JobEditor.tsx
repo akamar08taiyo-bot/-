@@ -150,15 +150,17 @@ export function JobEditor({
       [places[i], places[k]] = [places[k], places[i]];
       return {...j, places};
     });
-  const copyPlace = (place: Place) =>
+  // 同じ箇所（浴室など）を写真番号ごとに別々に入れるときは、同じ名前の箇所をいくつでも作れる（見積書では「浴室①」「浴室②」）。
+  // 複製も名前はそのまま。どちらも写真番号は付け直す（自動で次の番号。同じ番号が2つにならないように）
+  const insertAfter = (place: Place, next: Place) =>
     setJob((j) => {
       const i = j.places.findIndex((p) => p.id === place.id);
-      // 写真番号は付け直す（同じ番号が2つにならないように）
-      const c: Place = {...place, id: uid('p'), name: place.name + '（コピー）', rows: copyRows(place.rows), photo: 0};
       const places = [...j.places];
-      places.splice(i + 1, 0, c);
+      places.splice(i + 1, 0, next);
       return {...j, places};
     });
+  const copyPlace = (place: Place) => insertAfter(place, {...place, id: uid('p'), rows: copyRows(place.rows), photo: 0});
+  const addSamePlace = (place: Place) => insertAfter(place, {...makePlace(place.name), kind: place.kind});
   const removePlace = (place: Place) => {
     if (place.rows.length > 0 && !confirm(`「${place.name || '箇所'}」と、その中の${place.rows.length}行を削除します。よろしいですか？`)) return;
     setJob((j) => ({...j, places: j.places.filter((p) => p.id !== place.id)}));
@@ -199,7 +201,8 @@ export function JobEditor({
 
   const pickPlace = picker ? job.places.find((p) => p.id === picker.placeId) : undefined;
   const presets = data.settings.placePresets;
-  const used = new Set(job.places.map((p) => p.name));
+  const used = new Map<string, number>();
+  for (const p of job.places) used.set(p.name, (used.get(p.name) ?? 0) + 1);
   // 候補から消した人が担当の様邸でも、その名前は選んだまま残す。名字だけで入っている様邸は、候補のフルネームにして見せる
   const staffList = data.settings.staffList;
   const staff = staffFull(job.staff, staffList);
@@ -432,6 +435,7 @@ export function JobEditor({
               onRows={(rows) => setPlace(place.id, (p) => ({...p, rows}))}
               onMove={(d) => movePlace(place.id, d)}
               onCopy={() => copyPlace(place)}
+              onAddSame={() => addSamePlace(place)}
               onRemove={() => removePlace(place)}
               onPickMaterial={() => setPicker({placeId: place.id, kind: 'material'})}
               onPickLabor={(rowId) => setPicker({placeId: place.id, kind: 'labor', rowId})}
@@ -444,20 +448,31 @@ export function JobEditor({
           <section className="rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50/40 p-4">
             <div className="mb-2 text-sm font-bold text-emerald-800">
               ＋ 箇所を追加{job.places.length === 0 && '（まず玄関・トイレなどの箇所を作り、その中に部材と取付手間を入れます）'}
+              {estimate && job.places.length > 0 && (
+                <span className="ml-2 text-xs font-normal text-emerald-700">同じ箇所（浴室など）も、写真番号ごとに別々に足せます（見積書では「浴室①」「浴室②」）</span>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
-              {presets.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => addPlace(name)}
-                  className={`rounded-full border px-3 py-1.5 text-sm font-bold transition ${
-                    used.has(name) ? 'border-slate-200 bg-white text-slate-400 hover:text-slate-600' : 'border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-100'
-                  }`}
-                >
-                  {name}
-                </button>
-              ))}
+              {presets.map((name) => {
+                // もうある箇所も押せる（同じ箇所を写真番号ごとに別々に入れる）。いくつあるかを小さく出す
+                const n = used.get(name) ?? 0;
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => addPlace(name)}
+                    title={n > 0 ? `もう1つ「${name}」を足します（同じ箇所を別々に入れるとき。写真番号は次の番号）` : undefined}
+                    className="rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100"
+                  >
+                    {name}
+                    {n > 0 && (
+                      <span className="ml-1 rounded-full bg-emerald-100 px-1.5 text-[10px] text-emerald-700" aria-hidden="true">
+                        {n}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
               <form
                 className="flex gap-1"
                 onSubmit={(e) => {
@@ -606,6 +621,7 @@ function PlaceCard({
   onRows,
   onMove,
   onCopy,
+  onAddSame,
   onRemove,
   onPickMaterial,
   onPickLabor,
@@ -630,6 +646,7 @@ function PlaceCard({
   onRows: (rows: Row[]) => void;
   onMove: (delta: number) => void;
   onCopy: () => void;
+  onAddSame: () => void;
   onRemove: () => void;
   onPickMaterial: () => void;
   onPickLabor: (rowId: string | null) => void;
@@ -983,6 +1000,11 @@ function PlaceCard({
         {place.rows.length > 0 && (
           <Btn small color="white" onClick={onSaveKit}>
             この箇所を一式に登録
+          </Btn>
+        )}
+        {estimate && place.rows.length > 0 && (
+          <Btn small color="white" onClick={onAddSame} title="同じ箇所を写真番号ごとに別々に入れるとき（見積書では別の行のまとまりになります）">
+            ＋ 「{place.name || '箇所'}」をもう1つ（次の写真番号）
           </Btn>
         )}
         {place.rows.length === 0 && <span className="text-xs text-slate-500">部材リストから部材を選び、取付手間を数えます。</span>}

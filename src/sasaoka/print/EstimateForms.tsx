@@ -209,9 +209,8 @@ function YkLine({line: l, bottom, editable}: {line: FormLine | undefined; bottom
   const qty = qtyText(l.qty);
   const k = (field: string) => `line:${l.rowId}:${field}`;
   const excl = `excl:${l.excludeId}`;
-  // 備考（定価等）：定価。切って使う部材は「定価：￥20,000×0.8」と「0.6m÷4m＝0.15本」の2行
-  const v = lineNote(l, 'yukuhashi', 0);
-  const note = 'split' in v ? [v.split.join('')] : v.lines;
+  // 備考（定価等）：「定価8,000円×0.8」。切って使う部材は「定価40,000円×0.8」と「600÷4000＝0.15」の2行
+  const note = lineNote(l, 'yukuhashi', 0);
   return (
     <tr className="g" style={{height: `${YK_ROW}mm`}} {...(editable ? {'data-rows': l.rowIds.join(' ')} : {})}>
       {cell(l.first ? l.work : '', YK.A, 11, 'ml', l.first ? `place:${l.placeId}:work` : null)}
@@ -443,26 +442,19 @@ function KkLine({line: l, height, bottom, hourRate, editable}: {line: FormLine |
   const qty = qtyText(l.qty);
   const k = (field: string) => `line:${l.rowId}:${field}`;
   const excl = `excl:${l.excludeId}`;
-  // 算出根拠：定価「4,600｜円/本」。施工費は「1時間2,500円」、切って使う部材は「14,400円/本×0.8」と「2.8m÷4m＝0.7本」の2行
-  const v = lineNote(l, 'kouiki', hourRate);
+  // 算出根拠：「定価8,000円×0.8」。施工費は「1時間2,500円」、切って使う部材は「定価40,000円×0.8」と「600÷4000＝0.15」の2行
+  const note = lineNote(l, 'kouiki', hourRate);
   let basis: ReactNode;
-  if ('split' in v) {
+  if (note.length === 1 && l.hourly && l.note === null) {
     basis = (
-      <>
-        {cell(v.split[0], KK.Q, 11, 'r ml gothic', k('note'))}
-        {cell(v.split[1], KK.R, 11, 'c mr', k('note'))}
-      </>
-    );
-  } else if (v.lines.length === 1 && l.hourly && l.note === null) {
-    basis = (
-      <td colSpan={2} className={`c ml mr${bottom}`} style={fitStyle(v.lines[0], KK.Q + KK.R, height, 11)} {...ed(editable, k('note'))}>
-        {v.lines[0]}
+      <td colSpan={2} className={`c ml mr${bottom}`} style={fitStyle(note[0], KK.Q + KK.R, height, 11)} {...ed(editable, k('note'))}>
+        {note[0]}
       </td>
     );
-  } else if (v.lines.length > 0) {
+  } else if (note.length > 0) {
     basis = (
-      <td colSpan={2} className={`ml mr gothic${bottom}`} style={fitLinesStyle(v.lines, KK.Q + KK.R, height, 10)} {...ed(editable, k('note'))}>
-        {v.lines.map((t, i) => (
+      <td colSpan={2} className={`ml mr gothic${bottom}`} style={fitLinesStyle(note, KK.Q + KK.R, height, 10)} {...ed(editable, k('note'))}>
+        {note.map((t, i) => (
           <div key={i}>{t}</div>
         ))}
       </td>

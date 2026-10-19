@@ -2,7 +2,7 @@
 // どちらも元の Excel と同じく、金額は ROUNDDOWN(数量×単価)。最後のページの下4行が 小計・諸経費・消費税・合計。
 //   苅田町・行橋用「工事費見積書兼工事費内訳書」：1ページ18行。施工費は「1式」
 //   みやこ町・広域連合用「住宅改修内訳明細書」（福岡県介護保険広域連合の様式）：1ページ14行。施工費は「時間×1時間の単価（2,500円）」
-// 切って使う部材は 数量＝使う長さ÷1本の長さ（本）で書き、備考・算出根拠にその計算を書く（例：0.6m÷4m＝0.15本）。
+// 備考・算出根拠は「定価8,000円×0.8」。切って使う部材は 数量＝使う長さ÷1本の長さ（本）で書き、2行目に mm で計算を書く（例：600÷4000＝0.15）。
 
 import {cutToLength, estimatePlaceLines, estimateQty} from './calc.ts';
 import {normalize} from './priceImport.ts';
@@ -68,11 +68,12 @@ export function materialText(r: Row): string {
   return r.lengthCm > 0 && !cutToLength(r) ? `${base}（長さ${num(r.lengthCm)}cm）` : base;
 }
 
-/** 切って使う部材の数量の計算（例：0.6m÷4m＝0.15本、同じ長さを2本なら 0.6m÷4m×2＝0.3本）。切らない部材は '' */
+/** 切って使う部材の数量の計算。長さは mm で書く（例：60cm を 4m から → 600÷4000＝0.15、同じ長さを2本なら 600÷4000×2＝0.3）。切らない部材は '' */
 export function cutCalc(r: Row): string {
   if (!cutToLength(r)) return '';
+  const mm = (n: number) => String(Math.round(n * 100) / 100);
   const times = r.qty !== 1 ? `×${num(r.qty)}` : '';
-  return `${num(r.lengthCm / 100, 3)}m÷${num(r.pieceLengthM, 3)}m${times}＝${num(estimateQty(r), 3)}本`;
+  return `${mm(r.lengthCm * 10)}÷${mm(r.pieceLengthM * 1000)}${times}＝${num(estimateQty(r), 3)}`;
 }
 
 /** 施工費の金額を「時間×1時間の単価」で書けるときの時間（小数2けたで割り切れるとき。0.8時間×2,500円＝2,000円）。書けなければ null */
@@ -102,9 +103,9 @@ export type FormLine = {
   unitPrice: number;
   amount: number;
   excluded: boolean; // 介護保険の対象外
-  listPrice: number; // 定価（苅田町・行橋用の備考「定価：￥…」、みやこ町・広域連合用の算出根拠）。施工費は 0
+  listPrice: number; // 定価（備考・算出根拠の「定価8,000円×0.8」）。施工費は 0
   rate: number | null; // 単価＝定価×この率のとき（見積の単価を手で入れた行・定価のない行は null）
-  cut: string; // 切って使う部材の数量の計算（0.6m÷4m＝0.15本）。ほかは ''
+  cut: string; // 切って使う部材の数量の計算（600÷4000＝0.15）。ほかは ''
   hourly: boolean; // 施工費を「時間×1時間の単価」で書いた行
   note: string | null; // 備考（定価等）・算出根拠を手で直したとき（改行で行を分ける）
   manualAmount: boolean; // 施工費の金額を見積書で手で直した
@@ -181,34 +182,25 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
 }
 
 /**
- * 備考（定価等・苅田町・行橋用）／算出根拠（みやこ町・広域連合用）に出すもの。
- * lines は1行ずつ（切って使う部材は「定価」と「長さの計算」の2行）。split は算出根拠の「4,600｜円/本」のように2つの欄に分けて出すもの
+ * 手で直していないときの備考（定価等・苅田町・行橋用）／算出根拠（みやこ町・広域連合用）。1行ずつ。
+ * 部材は「定価8,000円×0.8」（見積の単価を手で入れた行は ×0.8 を付けない）。切って使う部材は2行目に「600÷4000＝0.15」。
+ * 算出根拠は対象工事部分の欄なので、介護保険の対象外の行は空。時間で書いた施工費は「1時間2,500円」
  */
-export type NoteView = {lines: string[]} | {split: [string, string]};
-
-/** 手で直していないときの備考・算出根拠 */
-export function autoNote(l: FormLine, form: EstimateForm, hourRate: number): NoteView {
-  if (form === 'yukuhashi') {
-    const list = l.listPrice > 0 ? `定価：￥${yen(l.listPrice)}` : '';
-    if (l.cut) return {lines: [list && (l.rate !== null ? `${list}×${l.rate}` : list), l.cut].filter(Boolean)};
-    return {lines: list ? [list] : []};
-  }
-  // 算出根拠は対象工事部分の欄なので、介護保険の対象外の行は空
-  if (l.excluded) return {lines: []};
-  if (l.hourly) return {lines: [`1時間${yen(hourRate)}円`]};
-  if (l.cut) return {lines: [l.listPrice > 0 ? `${yen(l.listPrice)}円/本${l.rate !== null ? `×${l.rate}` : ''}` : '', l.cut].filter(Boolean)};
-  if (l.listPrice > 0) return {split: [yen(l.listPrice), l.unit ? `円/${l.unit}` : '円']};
-  return {lines: []};
+export function autoNote(l: FormLine, form: EstimateForm, hourRate: number): string[] {
+  if (form === 'kouiki' && l.excluded) return [];
+  if (form === 'kouiki' && l.hourly) return [`1時間${yen(hourRate)}円`];
+  const list = l.listPrice > 0 ? `定価${yen(l.listPrice)}円${l.rate !== null ? `×${l.rate}` : ''}` : '';
+  return [list, l.cut].filter(Boolean);
 }
 
-/** 見積書に出す備考・算出根拠（手で直していればそれ） */
-export function lineNote(l: FormLine, form: EstimateForm, hourRate: number): NoteView {
-  return l.note !== null ? {lines: l.note.split('\n')} : autoNote(l, form, hourRate);
+/** 見積書に出す備考・算出根拠（手で直していればそれ。改行で行を分ける） */
+export function lineNote(l: FormLine, form: EstimateForm, hourRate: number): string[] {
+  return l.note !== null ? l.note.split('\n') : autoNote(l, form, hourRate);
 }
 
 /** 備考・算出根拠を1つの文字にする（手で直す欄の最初の文字） */
-export function noteText(v: NoteView): string {
-  return 'split' in v ? v.split.join('') : v.lines.join('\n');
+export function noteText(lines: string[]): string {
+  return lines.join('\n');
 }
 
 /**

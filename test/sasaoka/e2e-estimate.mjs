@@ -144,9 +144,9 @@ for (const t of [
   '①　工事費見積書兼工事費内訳書',
   '（サンプル）山田',
   '介護保険被保険者番号（0000366989）',
-  '定価：￥20,000',
-  '定価：￥20,000×0.8', // 切って使う手すりの備考：定価×0.8 と 長さの計算
-  '1.2m÷4m＝0.3本',
+  '定価2,100円×0.8', // 備考は「定価○円×0.8」（ブラケット）
+  '定価20,000円×0.8', // 切って使う手すりの備考：1行目に定価×0.8、2行目に mm で長さの計算
+  '1200÷4000＝0.3',
   '同上施工費',
   '代表者名　行橋営業所所長　久保 匠史',
   '担当： 久保 匠史　0930-26-9640', // 見積書の担当はフルネーム
@@ -204,7 +204,7 @@ await page.getByRole('button', {name: '🖨 見積書を印刷'}).click();
 await page.locator('.print-overlay').waitFor();
 const kk = page.locator('.print-root .form-page').first();
 const kdoc = await page.locator('.print-root').innerText(); // すべてのページ
-for (const t of ['内訳書　様式', '全改修工事部分', '対象工事部分', '1時間2,500円', '福岡県介護保険広域連合', '20,000\t円/本', 'トイレ\t便器取替\t材']) {
+for (const t of ['内訳書　様式', '全改修工事部分', '対象工事部分', '1時間2,500円', '福岡県介護保険広域連合', '定価20,000円×0.8', '定価11,000円×0.8', 'トイレ\t便器取替\t材']) {
   assert.ok(kdoc.includes(t), `広域連合の書式に「${t}」がない`);
 }
 // 木 2箇所＝2,000円 → 0.8時間×2,500円
@@ -348,6 +348,26 @@ await preview.getByRole('button', {name: '隠す'}).click();
 await page.getByRole('button', {name: '📄 見積書を映しながら入力する'}).click();
 await preview.waitFor();
 log('作成日・印刷・拡大・隠すOK');
+
+// 同じ箇所を写真番号ごとに別々に入れる：「玄関」をもう1つ → すぐ下に空の玄関（写真番号は次の番号）。見積書では 玄関①・玄関②（トイレは手で⑤にしてある）
+await genkan.getByRole('button', {name: '＋ 「玄関」をもう1つ（次の写真番号）'}).click();
+const genkan2 = places.nth(1);
+assert.equal(await genkan2.getByPlaceholder('箇所名（玄関など）').inputValue(), '玄関');
+await genkan2.getByRole('button', {name: '＋ 部材を金額だけ入れる'}).click();
+await focusedPrice();
+await page.keyboard.type('1000');
+await page.keyboard.press('Tab');
+await page.waitForTimeout(100);
+const sameText = await preview.innerText();
+assert.ok(sameText.includes('玄関①') && sameText.includes('玄関②') && sameText.includes('トイレ⑤'), sameText);
+// 箇所の候補の「玄関」も、使ってあっても押せる（もう1つ足す）
+await page.getByRole('button', {name: '玄関', exact: true}).click();
+assert.equal(await places.count(), 4);
+await places.nth(3).getByTitle('この箇所を削除').click(); // 行のない箇所はそのまま消える
+await genkan2.getByTitle('この箇所を削除').click(); // 行のある箇所は確かめてから消す（ダイアログは自動で OK）
+assert.equal(await places.count(), 2);
+assert.ok((await box()).includes('65,049'), await box());
+log('同じ箇所を写真番号ごとに別々に入れるOK');
 
 // 仕切り・請求書に戻すと、仕切り計算表の金額は見積の操作で変わっていない（長さ・見積の単価は仕切りに関係しない）
 await page.getByRole('button', {name: '仕切り・請求書', exact: true}).click();
