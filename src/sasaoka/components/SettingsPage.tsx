@@ -188,7 +188,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
 
       <Section
         title="見積書"
-        note="上の「見積作成」に切り替えると、様邸に入れた部材・取付手間から見積書を作ります。書式は、行橋市・苅田町用「工事費見積書兼工事費内訳書」と、みやこ町・築上町用「住宅改修内訳明細書」（様邸の住所の市町村で決まり、様邸ごとに選び直せます）。部材の単価は定価×率、手すりなどを切って使うときの数量は 使う長さ÷1本の長さ（例：60cm÷4m＝0.15本）、部材のすぐ下の取付手間は「同上施工費」の1行です。金額は元の見積書と同じく、どれも1円未満を切り捨てます。"
+        note="上の「見積作成」に切り替えると、様邸に入れた部材・取付手間から見積書を作ります。書式は、苅田町・行橋用「工事費見積書兼工事費内訳書」と、みやこ町・広域連合用「住宅改修内訳明細書」の2つです（様邸の住所の市町村で決まり（みやこ町・築上町・豊前市などは広域連合用）、様邸ごとに選び直せます）。部材の単価は定価×率、手すりなどを切って使うときの数量は 使う長さ÷1本の長さ（例：60cm÷4m＝0.15本）、部材のすぐ下の取付手間は「同上施工費」の1行です。金額は元の見積書と同じく、どれも1円未満を切り捨てます。"
       >
         <Field label="部材の単価＝定価×この率（0.8＝定価の8割）">
           <NumberInput value={s.estimateRate} onChange={(estimateRate) => set({estimateRate})} className="w-28" min={0} ariaLabel="見積の率" />
@@ -196,7 +196,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
         <Field label="諸経費＝小計×この率（0.1＝10%）">
           <NumberInput value={s.estimateOverheadRate} onChange={(estimateOverheadRate) => set({estimateOverheadRate})} className="w-28" min={0} ariaLabel="諸経費の率" />
         </Field>
-        <Field label="みやこ町・築上町用：施工費を「時間×1時間の単価」で書くときの単価（円・0なら「1式」）">
+        <Field label="みやこ町・広域連合用：施工費を「時間×1時間の単価」で書くときの単価（円・0なら「1式」）">
           <NumberInput value={s.estimateHourRate} onChange={(estimateHourRate) => set({estimateHourRate})} className="w-28" min={0} ariaLabel="1時間の単価" />
         </Field>
         <Field label="住所から市町村が分からないときの書式">
@@ -207,7 +207,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
           >
             {FORM_IDS.map((f) => (
               <option key={f} value={f}>
-                {FORM_INFO[f].name}「{FORM_INFO[f].title}」
+                {FORM_INFO[f].name}
               </option>
             ))}
           </select>

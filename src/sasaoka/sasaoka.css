@@ -575,7 +575,7 @@ table.fm tr.head > th {
 .form-page.kk table.fm tr.head > th {
   font-size: 9pt;
 }
-/* みやこ町・築上町用：E・J 列は二重線のすき間 */
+/* みやこ町・広域連合用：E・J 列は二重線のすき間 */
 table.fm .gap {
   padding: 0;
   border-right: 1.5pt solid #000 !important;

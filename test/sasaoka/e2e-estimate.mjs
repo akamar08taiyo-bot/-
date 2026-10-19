@@ -1,5 +1,5 @@
 // 見積作成モードを確かめる：定価×0.8・切って使う部材の数量（使う長さ÷1本の長さ）・見積の単価の手入力・部材ごとの同上施工費・
-// 金額だけの行・一式・見積書の2つの書式（行橋市・苅田町用／みやこ町・築上町用）の印刷・介護保険の対象外・定価の取り込み
+// 金額だけの行・一式・見積書の2つの書式（苅田町・行橋用／みやこ町・広域連合用）の印刷・介護保険の対象外・定価の取り込み
 // usage: node e2e-estimate.mjs <dist-sasaoka/index.html の URL> <出力フォルダ>
 // Playwright はこのリポジトリの依存に入れていない。入っている場所を PLAYWRIGHT で指定できる（既定はクラウド環境の場所）
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
@@ -27,11 +27,18 @@ await page.getByRole('button', {name: '見積作成', exact: true}).click();
 // トイレ：L型 11,000×0.8＝8,800・同上施工費（タイル2）3,000・キャップ 450×0.8＝360×2
 // 部材 15,280・施工費 5,000・小計 20,280・諸経費 2,028（10%）・消費税 2,230（(20,280＋2,028)×0.1 切り捨て）・合計 24,538
 const row = await page.getByRole('row', {name: /（サンプル）山田様邸/}).innerText();
-for (const v of ['行橋市・苅田町用', '15,280', '5,000', '20,280', '2,028', '2,230', '24,538']) assert.ok(row.includes(v), `見積の一覧に ${v} がない: ${row}`);
+for (const v of ['苅田町・行橋用', '15,280', '5,000', '20,280', '2,028', '2,230', '24,538']) assert.ok(row.includes(v), `見積の一覧に ${v} がない: ${row}`);
 log('見積の一覧OK');
 
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 const box = () => page.getByRole('table', {name: '見積書の金額'}).innerText();
+// 上の切り替えは 見積作成 が左。見積書の書式は2つ（苅田町・行橋用／みやこ町・広域連合用）
+assert.deepEqual(await page.getByRole('group', {name: '使い方'}).getByRole('button').allInnerTexts(), ['見積作成', '仕切り・請求書']);
+const formSelect = page.getByRole('combobox', {name: '見積書の書式'});
+const formLabel = page.locator('label', {has: formSelect});
+assert.deepEqual(await formSelect.locator('option').allInnerTexts(), ['苅田町・行橋用', 'みやこ町・広域連合用']);
+assert.equal(await formSelect.inputValue(), 'yukuhashi'); // 住所がないので設定の書式
+assert.ok((await formLabel.innerText()).includes('（設定の書式）'));
 assert.ok((await box()).includes('24,538'));
 const places = page.locator('section').filter({has: page.getByPlaceholder('箇所名（玄関など）')});
 const genkan = places.nth(0);
@@ -99,7 +106,7 @@ await page.getByRole('dialog').getByRole('button', {name: '閉じる'}).first().
 log('一式を入れる・登録するOK');
 await page.screenshot({path: path.join(outDir, '32-estimate-editor.png'), fullPage: true});
 
-// 見積書の印刷（住所がないので設定の書式＝行橋市・苅田町用「工事費見積書兼工事費内訳書」）
+// 見積書の印刷（住所がないので設定の書式＝苅田町・行橋用「工事費見積書兼工事費内訳書」）
 await page.getByPlaceholder('例：0000366989').fill('0000366989');
 await page.getByRole('button', {name: '🖨 見積書を印刷'}).click();
 await page.locator('.print-overlay').waitFor();
@@ -151,7 +158,7 @@ await page.emulateMedia({media: 'screen'});
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
 await page.getByRole('button', {name: '諸経費を自動に戻す'}).click();
 assert.ok((await box()).includes('65,049'), await box());
-log('見積書（行橋市・苅田町用）の印刷・諸経費の手入力OK');
+log('見積書（苅田町・行橋用）の印刷・諸経費の手入力OK');
 
 // ブラケットを介護保険の対象外にする → 部材 3,360 と同上施工費 1,000 が対象外。金額の欄に「介護保険の対象」が出る
 await genkan.getByRole('row', {name: /ブラケット/}).getByLabel('介護保険の対象外').check();
@@ -161,7 +168,7 @@ assert.ok((await box()).includes('59,774'), await box());
 assert.ok((await page.locator('aside').innerText()).includes('介護保険の対象外：4,360円'));
 log('介護保険の対象外OK');
 
-// みやこ町・築上町用：住所の市町村で書式が変わる。施工費は「時間×2,500円」、写真番号・改修の種類を出す
+// みやこ町・広域連合用：住所の市町村で書式が変わる。施工費は「時間×2,500円」、写真番号・改修の種類を出す
 await page.locator('label', {hasText: '住所（任意）'}).locator('input').fill('福岡県京都郡みやこ町豊津');
 await toilet.getByRole('textbox', {name: '写真番号'}).fill('5');
 await toilet.getByRole('combobox', {name: '改修の種類'}).selectOption('5');
@@ -193,7 +200,17 @@ await page.emulateMedia({media: 'print'});
 await page.pdf({path: path.join(outDir, 'estimate-kouiki.pdf'), printBackground: true, preferCSSPageSize: true});
 await page.emulateMedia({media: 'screen'});
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
-log('見積書（みやこ町・築上町用）の印刷OK');
+log('見積書（みやこ町・広域連合用）の印刷OK');
+
+// 書式を選び直す：苅田町・行橋用を選ぶとその書式に。住所で決まる方（みやこ町・広域連合用）を選び直すと、住所に合わせて変わるままに戻る
+assert.equal(await formSelect.inputValue(), 'kouiki');
+assert.ok((await formLabel.innerText()).includes('（住所の市町村から）'));
+await formSelect.selectOption({label: '苅田町・行橋用'});
+assert.ok((await formLabel.innerText()).includes('（この様邸で選んだ書式）'));
+assert.ok((await page.getByRole('region', {name: '見積書のでき上がり'}).innerText()).includes('工事費見積書兼工事費内訳書'));
+await formSelect.selectOption({label: 'みやこ町・広域連合用'});
+assert.ok((await formLabel.innerText()).includes('（住所の市町村から）'));
+log('書式は2つから選び直せるOK');
 
 // ---------------- 右に映す見積書：左で入れるとすぐに入る。欄をクリックすると、その欄を打ち直せる
 const preview = page.getByRole('region', {name: '見積書のでき上がり'});
@@ -265,7 +282,7 @@ assert.ok((await page.locator('aside').innerText()).includes('手入力（自動
 await page.getByRole('button', {name: '諸経費を自動に戻す'}).click();
 log('右の見積書で諸経費を直す・Esc でやめるOK');
 
-// 住所を消すと行橋市・苅田町用に戻る。作成日を右の見積書で直す → 印刷の作成日も同じ。直した内容も印刷に入る
+// 住所を消すと苅田町・行橋用に戻る。作成日を右の見積書で直す → 印刷の作成日も同じ。直した内容も印刷に入る
 await page.locator('label', {hasText: '住所（任意）'}).locator('input').fill('');
 await preview.locator('.form-page', {hasText: '工事費見積書兼工事費内訳書'}).waitFor();
 await preview.locator('[data-edit="date"]').click();

@@ -315,25 +315,32 @@ export function JobEditor({
             </label>
             {estimate && (
               <>
+                {/* 書式は2つ。選ぶまでは住所の市町村で決まる（住所で決まる書式を選んだときも、住所に合わせて変わるままにする） */}
                 <label className="grid min-w-0 gap-1 text-xs font-bold text-slate-600 sm:col-span-2">
-                  見積書の書式
-                  {/* 選択肢の名前が長いので、欄の幅に合わせる（はみ出さない） */}
+                  <span>
+                    見積書の書式
+                    <span className="ml-1 font-normal text-slate-500">
+                      {job.form !== '' ? '（この様邸で選んだ書式）' : formForAddress(job.address) ? '（住所の市町村から）' : '（設定の書式）'}
+                    </span>
+                  </span>
                   <select
-                    value={job.form}
-                    onChange={(e) => setJob((j) => ({...j, form: e.target.value as EstimateForm | ''}))}
+                    value={form}
+                    onChange={(e) => {
+                      const f = e.target.value as EstimateForm;
+                      setJob((j) => ({...j, form: f === (formForAddress(j.address) ?? s.estimateForm) ? '' : f}));
+                    }}
                     className="h-9 w-full min-w-0 rounded-md border border-slate-300 px-2 text-sm"
                     aria-label="見積書の書式"
                   >
-                    <option value="">住所の市町村で決める（今は {FORM_INFO[formForAddress(job.address) ?? s.estimateForm].name}）</option>
                     {FORM_IDS.map((f) => (
                       <option key={f} value={f}>
-                        {FORM_INFO[f].name}「{FORM_INFO[f].title}」
+                        {FORM_INFO[f].name}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2">
-                  介護保険被保険者番号{form === 'kouiki' && <span className="font-normal text-slate-500">（みやこ町・築上町用の書式には出ません）</span>}
+                  介護保険被保険者番号{form === 'kouiki' && <span className="font-normal text-slate-500">（みやこ町・広域連合用の書式には出ません）</span>}
                   <TextInput value={job.insuredNo} onChange={(insuredNo) => setJob((j) => ({...j, insuredNo}))} placeholder="例：0000366989" inputMode="numeric" />
                 </label>
               </>

@@ -192,7 +192,7 @@ test('見積の合計：小計＝部材＋施工費、諸経費＝小計×0.1、
   assert.deepEqual(t, {material: 15280, work: 5000, all: sums, target: sums, excluded: 0});
   // 仕切り計算表の金額は見積を入れても変わらない（部材は仕切り価格のまま）
   assert.equal(jobTotals(j, S).material, 10000 + 3000 + 7800 + 600);
-  // 元の見積書（行橋市・苅田町用）の記入例：小計 27,440 → 諸経費 2,744・消費税 3,018・合計 33,202
+  // 元の見積書（苅田町・行橋用）の記入例：小計 27,440 → 諸経費 2,744・消費税 3,018・合計 33,202
   const ex = estimateTotals(job([[mat(0, 1, 'TOTO 32インテリアバー', {listPrice: 24300}), lab(8000, 1, '施工費')]]), S);
   assert.deepEqual(ex.all, {subtotal: 27440, overhead: 2744, tax: 3018, total: 33202});
 });

@@ -25,7 +25,7 @@ test('書式は住所の市町村から：みやこ町・築上町・豊前市�
   assert.equal(jobForm({form: '', address: ''}, {estimateForm: 'kouiki'}), 'kouiki');
 });
 
-test('みやこ町・築上町用：施工費は 時間×2,500円、部材は メーカー 品番 品名・定価は算出根拠に', () => {
+test('みやこ町・広域連合用：施工費は 時間×2,500円、部材は メーカー 品番 品名・定価は算出根拠に', () => {
   const job: Pick<Job, 'places'> = {
     places: [
       place('屋外', [
@@ -50,7 +50,7 @@ test('みやこ町・築上町用：施工費は 時間×2,500円、部材は �
       [false, 'トイレ', '手すり取付（2か所）', 2, '手', '同上施工費', 1, '式', 1234, 1234, 0, null, '', false], // 時間で割り切れない金額は1式
     ],
   );
-  // 行橋市・苅田町用は施工費を1式で書き、工事名称を入れていなければ改修の種類（手すりの取付）
+  // 苅田町・行橋用は施工費を1式で書き、工事名称を入れていなければ改修の種類（手すりの取付）
   const yk = formLines(job, S, 'yukuhashi');
   assert.deepEqual(yk.map((l) => [l.work, l.qty, l.unit, l.unitPrice]).slice(0, 3), [
     ['手すりの取付', 0.7, '本', 11520],
@@ -111,7 +111,7 @@ test('見積書だけの内容・備考・施工費の金額（右に映す見�
   assert.deepEqual(autoNote(c, 'yukuhashi', 2500), {lines: ['定価：￥450']});
   // 施工費のまとまり：名前と金額は最初の手間の行のもの
   assert.deepEqual([w.isWork, w.text, w.autoText, w.amount, w.manualAmount, w.rowId, w.rowIds], [true, '手すり取付費', '同上施工費', 2500, true, wood.id, [wood.id]]);
-  // みやこ町・築上町用：2,500円は 1時間×2,500円 と書ける
+  // みやこ町・広域連合用：2,500円は 1時間×2,500円 と書ける
   const k = formLines(job, S, 'kouiki');
   assert.deepEqual([k[2].qty, k[2].unit, k[2].unitPrice, k[2].amount, k[2].hourly], [1, '時間', 2500, 2500, true]);
   assert.deepEqual(lineNote(k[2], 'kouiki', 2500), {lines: ['1時間2,500円']});

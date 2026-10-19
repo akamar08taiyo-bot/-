@@ -24,12 +24,13 @@ const PORTAL_URL = 'https://akamar08taiyo-bot.github.io/taiyo-portal/';
 const MONTH_KEY = 'sasaoka-app:ui-month';
 const MODE_KEY = 'sasaoka-app:mode';
 
+// 見積作成を左に（見積 → 施工のあと仕切り・請求書の順）
 const MODES: [AppMode, string][] = [
-  ['shikiri', '仕切り・請求書'],
   ['estimate', '見積作成'],
+  ['shikiri', '仕切り・請求書'],
 ];
 
-/** 前に使っていた使い方（仕切り・請求書／見積作成）。この端末で覚えておく */
+/** 前に使っていた使い方（見積作成／仕切り・請求書）。この端末で覚えておく */
 function loadMode(): AppMode {
   try {
     return localStorage.getItem(MODE_KEY) === 'estimate' ? 'estimate' : 'shikiri';
