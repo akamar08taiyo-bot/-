@@ -1,0 +1,287 @@
+{
+  "id": "honne02",
+  "series": "本音あるある",
+  "episode": "離婚を考えた瞬間",
+  "title": "本気で離婚を考えた瞬間あるある【結婚10年目】",
+  "format": "vertical",
+  "fps": 30,
+  "voice": {
+    "name": "Sulafat",
+    "model": "gemini-3.8-flash-tts",
+    "profile": "A Japanese woman in her mid-40s, married for twelve years with one son in elementary school. Calm, slightly low, mature voice with a dry, sharp wit. She sounds like a frank friend of the same generation who teases husbands but is always on the listener's side. Natural standard Tokyo Japanese.",
+    "scene": "She is narrating a short vertical video about relatable moments when a wife's feelings for her husband went cold. She talks straight to women in their 30s to 50s, as if chatting with a close friend over tea at the kitchen table."
+  },
+  "styles": {
+    "narr": "Brisk pace, noticeably quicker than a calm narration, like a quick-witted friend talking. Keep the pauses between phrases very short. Clear diction, a hint of amused exasperation. No exaggerated cartoon acting.",
+    "quote": "Brisk pace with very short pauses. When you read the husband's words inside the Japanese quotation marks, clearly switch to a playful imitation of him, as a wife mimicking her husband to a close friend: drop your voice lower and broader, smug, arrogant and completely oblivious, a little exaggerated. Then snap back to your own dry voice.",
+    "aside": "A muttered aside under her breath: noticeably quieter, lower and closer to the microphone, ice-cold, deadpan and cutting. A low murmur, not a breathy whisper. Do not drag; keep any pause short.",
+    "verdict": "Quiet, slow and completely flat, with an unsettling calm. A final verdict. The ending is short and clipped.",
+    "twist": "Lower your voice as if sharing a secret with a close friend, with a sly, satisfied little smile in the voice. Conversational and fairly quick.",
+    "ask": "Turn to the listener with a friendly, teasing question. A little brighter and warmer, unhurried."
+  },
+  "tempo": {
+    "narr": 1.16,
+    "quote": 1.16,
+    "twist": 1.12,
+    "aside": 1.08,
+    "verdict": 1.0,
+    "ask": 1.06
+  },
+  "lines": [
+    {
+      "id": "hook",
+      "style": "narr",
+      "text": "本気で離婚を考えた瞬間、ありますか？",
+      "gap": 0.25
+    },
+    {
+      "id": "promise",
+      "style": "narr",
+      "text": "最後のは、言われた日に離婚届をもらいました。",
+      "sub": "最後のは、言われた日に**離婚届**をもらいました。",
+      "gap": 0.35
+    },
+    {
+      "id": "a1",
+      "style": "quote",
+      "text": "出産の翌日、病院で「で、俺の晩飯は？」。",
+      "sub": "出産の翌日、病院で{「で、俺の晩飯は？」}。",
+      "gap": 0.2,
+      "item": 1,
+      "telop": "産後翌日に「俺の晩飯は？」",
+      "speak": "出産の翌日、病院で、「で、俺の晩飯は？」。"
+    },
+    {
+      "id": "a1t",
+      "style": "aside",
+      "text": "産んだの、昨日です。",
+      "gap": 0.35,
+      "aside": true
+    },
+    {
+      "id": "a2",
+      "style": "quote",
+      "text": "熱が39度でも「うつすなよ」と、自分だけ別室へ。",
+      "sub": "熱が39度でも{「うつすなよ」}と、自分だけ別室へ。",
+      "gap": 0.2,
+      "item": 2,
+      "telop": "39度の妻に「うつすなよ」",
+      "speak": "熱が、さんじゅうきゅう度でも、「うつすなよ」と、自分だけ別室へ。"
+    },
+    {
+      "id": "a2t",
+      "style": "aside",
+      "text": "看病じゃなくて、避難ですか？",
+      "gap": 0.35,
+      "aside": true
+    },
+    {
+      "id": "a3",
+      "style": "narr",
+      "text": "子どもの塾代は渋るのに、自分の趣味には10万。",
+      "sub": "子どもの塾代は渋るのに、自分の趣味には**10万**。",
+      "gap": 0.2,
+      "item": 3,
+      "telop": "塾代は渋って趣味に10万",
+      "speak": "子どもの塾代は渋るのに、自分の趣味には、じゅうまん。"
+    },
+    {
+      "id": "a3t",
+      "style": "aside",
+      "text": "その10万、塾なら3か月分です。",
+      "gap": 0.35,
+      "aside": true,
+      "speak": "そのじゅうまん、塾なら、さんかげつぶんです。"
+    },
+    {
+      "id": "a4",
+      "style": "quote",
+      "text": "義実家で「こいつ、料理だけは下手でさ」。",
+      "sub": "義実家で{「こいつ、料理だけは下手でさ」}。",
+      "gap": 0.2,
+      "item": 4,
+      "telop": "義実家で妻をネタにする",
+      "speak": "ぎじっかで、「こいつ、料理だけは下手でさ」。"
+    },
+    {
+      "id": "a4t",
+      "style": "aside",
+      "text": "笑ってるの、あなたたち親子だけです。",
+      "gap": 0.35,
+      "aside": true
+    },
+    {
+      "id": "a5a",
+      "style": "narr",
+      "text": "そして最後。ケンカのたびに出る、",
+      "gap": 0.1,
+      "item": 5,
+      "telop": "伝家の宝刀「誰のおかげで」"
+    },
+    {
+      "id": "a5b",
+      "style": "quote",
+      "text": "「誰のおかげで生活できてると思ってるんだ」。",
+      "sub": "{「誰のおかげで|生活できてると思ってるんだ」}。",
+      "gap": 0.7
+    },
+    {
+      "id": "a5t",
+      "style": "verdict",
+      "text": "……はい。離婚届、もう書いてあります。",
+      "sub": "……はい。**離婚届**、もう書いてあります。",
+      "speak": "はい。離婚届、もう書いてあります。",
+      "gap": 0.5
+    },
+    {
+      "id": "twist",
+      "style": "twist",
+      "text": "でも、まだ出しません。へそくりが、あと100万貯まるまでは。",
+      "sub": "でも、まだ出しません。|へそくりが、**あと100万**貯まるまでは。",
+      "speak": "でも、まだ出しません。へそくりが、あと、ひゃくまん貯まるまでは。",
+      "gap": 0.3
+    },
+    {
+      "id": "ask",
+      "style": "ask",
+      "text": "あなたなら、すぐ出す？ 貯まるまで待つ？",
+      "gap": 0.0
+    }
+  ],
+  "telops": {
+    "promise": "最後のは、離婚届案件",
+    "twist": "まだ出さない理由"
+  },
+  "sfx": [
+    [
+      "don",
+      "hook",
+      "s",
+      -0.25,
+      0.45
+    ],
+    [
+      "pop",
+      "a1",
+      "s",
+      -0.15,
+      0.32
+    ],
+    [
+      "pop",
+      "a2",
+      "s",
+      -0.15,
+      0.32
+    ],
+    [
+      "pop",
+      "a3",
+      "s",
+      -0.15,
+      0.32
+    ],
+    [
+      "pop",
+      "a4",
+      "s",
+      -0.15,
+      0.32
+    ],
+    [
+      "pop",
+      "a5a",
+      "s",
+      -0.15,
+      0.38
+    ],
+    [
+      "gaan",
+      "a5b",
+      "e",
+      0.05,
+      0.42
+    ],
+    [
+      "paper",
+      "@form",
+      "",
+      0.0,
+      0.35
+    ],
+    [
+      "stamp",
+      "@stamp",
+      "",
+      0.0,
+      0.5
+    ],
+    [
+      "coin",
+      "twist",
+      "s",
+      -0.15,
+      0.3
+    ],
+    [
+      "pikon",
+      "@pollA",
+      "",
+      0.0,
+      0.22
+    ],
+    [
+      "pikon",
+      "@pollB",
+      "",
+      0.0,
+      0.22
+    ]
+  ],
+  "bgm": {
+    "style": "tense",
+    "stop": [
+      "a5b",
+      "e",
+      0.08
+    ],
+    "restart": [
+      "twist",
+      "s",
+      -0.05
+    ],
+    "outro": [
+      "ask",
+      "s",
+      0.1
+    ]
+  },
+  "tail": 1.6,
+  "marks": {
+    "price": [
+      "a3",
+      "e",
+      -0.75
+    ],
+    "form": [
+      "a5t",
+      "s",
+      0.85
+    ],
+    "stamp": [
+      "a5t",
+      "s",
+      1.6
+    ],
+    "pollA": [
+      "ask",
+      "s",
+      0.55
+    ],
+    "pollB": [
+      "ask",
+      "s",
+      1.35
+    ]
+  }
+}

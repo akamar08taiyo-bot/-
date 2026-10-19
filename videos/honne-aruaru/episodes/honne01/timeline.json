@@ -1,7 +1,7 @@
 {
  "fps": 30,
  "total": 46.083,
- "tempo": null,
+ "estimated": false,
  "lines": [
   {
    "id": "hook",

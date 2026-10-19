@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """台本（script.json）の行を Gemini TTS で読み上げ、文字起こしで台本どおりか確かめる。
 
-  python3 -I scripts/tts.py                 # 全行（キャッシュ済みの行は飛ばす）
-  python3 -I scripts/tts.py --only a1 a1t   # 指定行だけ作り直す（take を1つ進める）
+  python3 -I scripts/tts.py --ep honne02                 # 全行（キャッシュ済みの行は飛ばす）
+  python3 -I scripts/tts.py --ep honne02 --only a1 a1t   # 指定行だけ作り直す（take を1つ進める）
   python3 -I scripts/tts.py --voice Kore --only hook --out-dir work/audition   # 声の試し録り
 
 演技指示は英語の構造化プロンプト（AUDIO PROFILE / SCENE / DIRECTOR NOTES / TRANSCRIPT）。
@@ -11,13 +11,14 @@
 import argparse, json, os, re, sys, unicodedata
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gapi
+from common import episode
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-S = json.load(open(os.path.join(ROOT, 'script.json'), encoding='utf-8'))
+EP = episode()
+S = EP.script()
 ap = argparse.ArgumentParser()
 ap.add_argument('--only', nargs='*')
 ap.add_argument('--voice', default=S['voice']['name'])
-ap.add_argument('--out-dir', default=os.path.join(ROOT, 'assets', 'voice'))
+ap.add_argument('--out-dir', default=EP.voice)
 ap.add_argument('--tries', type=int, default=3)
 ap.add_argument('--force', action='store_true')
 a = ap.parse_args()
@@ -55,7 +56,7 @@ def judge(heard, ln):
     return bool(r.get('ok')), r.get('reason', '')
 
 
-takes_path = os.path.join(ROOT, 'assets', 'voice', 'takes.json')
+takes_path = os.path.join(EP.voice, 'takes.json')
 takes = json.load(open(takes_path)) if os.path.exists(takes_path) else {}
 for ln in S['lines']:
     lid = ln['id']
@@ -73,6 +74,6 @@ for ln in S['lines']:
         best = dict(ok=ok, heard=heard, why=why, dur=round(dur, 3), voice=a.voice)
         if ok:
             break
-    if a.out_dir == os.path.join(ROOT, 'assets', 'voice'):
+    if a.out_dir == EP.voice:
         takes[lid] = dict(best, take=takes.get(lid, {}).get('take', 0) + 1, text=ln['text'])
         json.dump(takes, open(takes_path, 'w'), ensure_ascii=False, indent=1)

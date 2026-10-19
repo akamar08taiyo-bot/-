@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""効果音をコードで合成する（権利フリー）。 python3 -I scripts/sfx.py → public/audio/sfx/<名前>.wav
+"""効果音をコードで合成する（権利フリー）。 python3 -I scripts/sfx.py → public/shared/sfx/<名前>.wav（全部の回で共通）
 
   don    … 題字がドンと出る（低い打撃＋軽い残響）
   pop    … ①〜⑤の番号が出る（ポン）
@@ -7,6 +7,10 @@
   freeze … 「冷めるでしょ」の瞬間（凍る・ヒューッ）
   tehe   … オチの前（ポロロン↓、ちょっと間の抜けた）
   pikon  … 最後の問いかけ（ピコン）
+  gaan   … 衝撃のひと言の直後（ガーン：不協和の和音の一撃）
+  paper  … 紙がサッと出る
+  stamp  … はんこをドンと押す
+  coin   … へそくり（チャリン）
 """
 import os, sys, wave
 import numpy as np
@@ -14,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from synth import SR, t_, noise, fft_filter, convolve, reverb_ir, midi, pluck, glock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, 'public', 'audio', 'sfx')
+OUT = os.path.join(ROOT, 'public', 'shared', 'sfx')
 os.makedirs(OUT, exist_ok=True)
 
 
@@ -91,3 +95,37 @@ for i, (m, at) in enumerate([(88, 0.0), (93, 0.09)]):
     j = int(at * SR)
     x[j:j + len(n)] += n[: len(x) - j]
 save('pikon', with_verb(x, wet=0.15, decay=0.2), peak=0.6)
+
+# gaan：ガーン（半音でぶつかる和音の一撃＋低い打撃。ノコギリ波を丸めて金管っぽく）
+t = t_(1.6)
+x = np.zeros_like(t)
+for m in (45, 46, 52, 57, 58):
+    f = midi(m)
+    saw = sum(np.sin(2 * np.pi * f * k * t) / k for k in range(1, 12))
+    x += saw * np.exp(-t * 2.2) * np.minimum(t / 0.012, 1)
+x = fft_filter(x, hi=2400)
+x += 0.8 * np.sin(2 * np.pi * np.cumsum(38 + 60 * np.exp(-t * 20)) / SR) * np.exp(-t * 6)
+save('gaan', with_verb(x, wet=0.3, dur=1.4, decay=0.4), peak=0.8)
+
+# paper：紙がサッ（短い帯域ノイズの掃き）
+t = t_(0.35)
+n = noise(len(t), 31)
+x = fft_filter(n, lo=1500, hi=7000) * np.exp(-((t - 0.09) / 0.06) ** 2)
+x += 0.5 * fft_filter(n, lo=600, hi=2000) * np.exp(-((t - 0.16) / 0.05) ** 2)
+save('paper', x, peak=0.6)
+
+# stamp：はんこ（低いドン＋紙の当たる音）
+t = t_(0.6)
+x = np.sin(2 * np.pi * np.cumsum(70 + 120 * np.exp(-t * 40)) / SR) * np.exp(-t * 18)
+x += 0.6 * fft_filter(noise(len(t), 41), lo=300, hi=3500) * np.exp(-t * 60)
+save('stamp', with_verb(x, wet=0.12, decay=0.12), peak=0.85)
+
+# coin：チャリン（高い金属音を2回）
+x = np.zeros(int(1.2 * SR))
+for at, f0 in ((0.0, 2637.0), (0.07, 3520.0)):
+    tt = t_(1.0)
+    y = sum(np.sin(2 * np.pi * f0 * r * tt) * np.exp(-tt * (6 + 3 * i)) / (1 + i)
+            for i, r in enumerate((1.0, 2.76, 5.4, 8.9)))
+    j = int(at * SR)
+    x[j:j + len(y)] += y[: len(x) - j]
+save('coin', with_verb(x, wet=0.18, decay=0.25), peak=0.55)

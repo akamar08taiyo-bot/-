@@ -1,14 +1,12 @@
 import {Composition} from 'remotion';
-import {Video} from './Video';
-import timeline from './timeline.json';
+import {FPS} from './lib';
+import {Honne01, timelineHonne01} from './episodes/honne01';
+import {Honne02, timelineHonne02} from './episodes/honne02';
 
+// 回ごとに1つ。id は episodes/<id> と同じ（node scripts/render.mjs <id>）
 export const Root: React.FC = () => (
-  <Composition
-    id="Main"
-    component={Video}
-    durationInFrames={Math.ceil(timeline.total * timeline.fps)}
-    fps={timeline.fps}
-    width={1080}
-    height={1920}
-  />
+  <>
+    <Composition id="honne01" component={Honne01} durationInFrames={Math.ceil(timelineHonne01.total * FPS)} fps={FPS} width={1080} height={1920} />
+    <Composition id="honne02" component={Honne02} durationInFrames={Math.ceil(timelineHonne02.total * FPS)} fps={FPS} width={1080} height={1920} />
+  </>
 );

@@ -1,25 +1,31 @@
 #!/usr/bin/env python3
 """声を整えて並べ、行ごとの時刻（timeline.json）を作る。
 
-  python3 -I scripts/prep_audio.py [--tempo 1.1]
+  python3 -I scripts/prep_audio.py --ep honne02 [--tempo 1.1]
+  python3 -I scripts/prep_audio.py --ep honne02 --estimate   # 声がまだ無いとき：文字数から仮の時刻だけ作る
 
 1. 行の前後の無音を切る（頭 0.03 秒・お尻 0.08 秒だけ残す）
 2. 行の中の長すぎる間（0.30 秒超）を 0.22 秒に詰める
 3. 話す速さを style ごとの倍率に（script.json の tempo。ffmpeg atempo なので声の高さは変わらない）
 4. 行ごとの音量をそろえる（ボソッとの行は少しだけ小さく）
-5. script.json の gap どおりに並べ、public/audio/voice/<id>.wav と src/timeline.json を書く
+5. script.json の gap どおりに並べ、public/<回>/audio/voice/<行>.wav と episodes/<回>/timeline.json を書く
 """
-import argparse, json, os, subprocess, wave
+import argparse, json, os, re, subprocess, sys, wave
 import numpy as np
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from common import episode
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-S = json.load(open(os.path.join(ROOT, 'script.json'), encoding='utf-8'))
+EP = episode()
+S = EP.script()
 ap = argparse.ArgumentParser()
 ap.add_argument('--tempo', type=float, default=None, help='全行を同じ倍率に（省略時は script.json の tempo を style ごとに使う）')
+ap.add_argument('--estimate', action='store_true', help='声を使わず、文字数から仮の時刻を作る')
 a = ap.parse_args()
 SR = 48000
-OUT = os.path.join(ROOT, 'public', 'audio', 'voice')
+OUT = os.path.join(EP.pub, 'audio', 'voice')
 os.makedirs(OUT, exist_ok=True)
+# 仮の時刻に使う話す速さ（文字/秒、tempo をかけた後の実測に近い値）
+EST_RATE = {'narr': 6.2, 'quote': 6.0, 'aside': 5.6, 'verdict': 4.6, 'twist': 6.0, 'ask': 5.4}
 
 
 def load(path):
@@ -45,36 +51,28 @@ def frames_db(x, hop=480):
 def trim_and_tighten(x, thr_rel=-38.0, max_gap=0.30, keep_gap=0.22):
     hop = 480  # 10 ms
     db = frames_db(x, hop)
-    thr = db.max() + thr_rel
-    voiced = db > thr
+    voiced = db > db.max() + thr_rel
     idx = np.where(voiced)[0]
     s, e = idx[0], idx[-1] + 1
     head, tail = int(0.03 * SR), int(0.08 * SR)
-    seg = x[max(0, s * hop - head): min(len(x), e * hop + tail)]
+    off = max(0, s * hop - head)
+    seg = x[off: min(len(x), e * hop + tail)]
+    # 声のある区間・ない区間に分け、長すぎる間だけ keep_gap に詰める
     v = voiced[s:e]
-    # 行の中の長い間を詰める
-    out, i, n = [], 0, len(v)
-    pos = head if s * hop - head >= 0 else s * hop
-    cur = 0
-    runs = []
-    while i < n:
+    runs, i = [], 0
+    while i < len(v):
         j = i
-        while j < n and v[j] == v[i]:
+        while j < len(v) and v[j] == v[i]:
             j += 1
         runs.append((v[i], i, j))
         i = j
-    off = max(0, s * hop - head)
-    last = 0
-    pieces = []
+    pieces, last = [], 0
     for vv, i, j in runs:
-        dur = (j - i) * hop / SR
-        if not vv and dur > max_gap:
+        if not vv and (j - i) * hop / SR > max_gap:
             a0 = s * hop + i * hop - off
             a1 = s * hop + j * hop - off
-            cut0 = a0 + int(keep_gap / 2 * SR)
-            cut1 = a1 - int(keep_gap / 2 * SR)
-            pieces.append(seg[last:cut0])
-            last = cut1
+            pieces.append(seg[last:a0 + int(keep_gap / 2 * SR)])
+            last = a1 - int(keep_gap / 2 * SR)
     pieces.append(seg[last:])
     # つなぎ目は 5ms でなじませる
     y = pieces[0]
@@ -105,21 +103,25 @@ def speech_level(x):
 t = 0.25  # 最初の声までの間（絵が先に出る）
 timeline = []
 for ln in S['lines']:
-    x = load(os.path.join(ROOT, 'assets', 'voice', f"{ln['id']}.wav"))
-    x = trim_and_tighten(x)
-    x = tempo(x, a.tempo or S.get('tempo', {}).get(ln['style'], 1.0))
-    target = -20.0 - (2.0 if ln.get('aside') else 0.0)
-    x = x * 10 ** ((target - speech_level(x)) / 20)
-    peak = np.abs(x).max()
-    if peak > 0.89:
-        x = x * 0.89 / peak
-    save(os.path.join(OUT, f"{ln['id']}.wav"), x)
-    d = len(x) / SR
+    if a.estimate:
+        n = len(re.sub(r'[、。？！「」…\s]', '', ln.get('speak', ln['text'])))
+        d = n / EST_RATE.get(ln['style'], 6.0) + 0.25
+    else:
+        x = load(os.path.join(EP.voice, f"{ln['id']}.wav"))
+        x = trim_and_tighten(x)
+        x = tempo(x, a.tempo or S.get('tempo', {}).get(ln['style'], 1.0))
+        target = -20.0 - (2.0 if ln.get('aside') else 0.0)
+        x = x * 10 ** ((target - speech_level(x)) / 20)
+        peak = np.abs(x).max()
+        if peak > 0.89:
+            x = x * 0.89 / peak
+        save(os.path.join(OUT, f"{ln['id']}.wav"), x)
+        d = len(x) / SR
     timeline.append({'id': ln['id'], 'start': round(t, 3), 'end': round(t + d, 3), 'dur': round(d, 3)})
     t += d + ln.get('gap', 0.25)
 total = t + S.get('tail', 1.5)
-json.dump({'fps': S['fps'], 'total': round(total, 3), 'tempo': a.tempo, 'lines': timeline},
-          open(os.path.join(ROOT, 'src', 'timeline.json'), 'w'), ensure_ascii=False, indent=1)
+json.dump({'fps': S['fps'], 'total': round(total, 3), 'estimated': a.estimate, 'lines': timeline},
+          open(EP.timeline_path, 'w'), ensure_ascii=False, indent=1)
 for x in timeline:
     print(f"{x['id']:8s} {x['start']:6.2f} - {x['end']:6.2f}  ({x['dur']:.2f}s)")
-print(f'total {total:.2f}s  tempo {a.tempo}')
+print(f"total {total:.2f}s{'  （文字数からの仮の時刻）' if a.estimate else ''}")

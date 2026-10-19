@@ -7,6 +7,7 @@ const FONTS: [string, string, string][] = [
   ['ZenMaru', 'fonts/ZenMaruGothic-Bold.woff2', '700'],
   ['Dela', 'fonts/DelaGothicOne-Regular.woff2', '400'],
   ['Yusei', 'fonts/YuseiMagic-Regular.woff2', '400'],
+  ['Mincho', 'fonts/ZenOldMincho-Bold.woff2', '700'],
 ];
 
 const handle = delayRender('fonts', {timeoutInMilliseconds: 60000, retries: 2});
@@ -24,4 +25,5 @@ export const F = {
   maru: '"ZenMaru", sans-serif',
   dela: '"Dela", "ZenMaru", sans-serif',
   hand: '"Yusei", "ZenMaru", sans-serif',
+  mincho: '"Mincho", serif',
 };

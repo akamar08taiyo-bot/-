@@ -1,33 +1,30 @@
 #!/usr/bin/env python3
-"""声・BGM・効果音を時刻どおりに並べてミックスする。 python3 -I scripts/mix.py → work/mix.wav
+"""声・BGM・効果音を時刻どおりに並べてミックスする。 python3 -I scripts/mix.py --ep honne02 → work/<回>/mix.wav
 
-- 効果音の時刻は画面（src/Video.tsx）と同じく台本の行基準（行の話し始め/終わり＋秒）
+- 効果音は script.json の sfx（[名前, 行, 's'=話し始め/'e'=話し終わり, 秒, 音量]）。画面と同じ行基準。
+  行の代わりに '@名前' と書くと script.json の marks（行の中の語の頭など）を使う
 - BGM は声が出ている間だけ下げる（アタック 50ms・リリース 300ms）
 - 仕上げの音量（-14 LUFS）は render.mjs の後の finish.py で合わせる
 """
-import json, os, subprocess, wave
+import os, subprocess, sys, wave
 import numpy as np
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from common import ROOT, episode
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+EP = episode()
 SR = 48000
-T = json.load(open(os.path.join(ROOT, 'src', 'timeline.json')))
+T = EP.timeline()
 L = {l['id']: l for l in T['lines']}
 N = int(round(T['total'] * SR))
-LEAD = -0.15
+SFX = EP.script().get('sfx', [])
+MARKS = EP.script().get('marks', {})
 
-# (名前, 行, 's' or 'e', 秒, 音量) … Video.tsx の演出と同じ時刻
-SFX = [
-    ('don', 'hook', 's', -0.25, 0.42),       # 題字（0 秒）
-    ('pop', 'a1', 's', LEAD, 0.32),          # ① 番号テロップ
-    ('pop', 'a2', 's', LEAD, 0.32),          # ②
-    ('pop', 'a3', 's', LEAD, 0.32),          # ③
-    ('pop', 'a4', 's', LEAD, 0.32),          # ④
-    ('pop', 'a5a', 's', LEAD, 0.38),         # ⑤（最後）
-    ('freeze', 'a5t', 's', -0.25, 0.48),     # 冷めるでしょ
-    ('tehe', 'twist', 's', LEAD, 0.26),      # オチ
-    ('pikon', 'ask', 's', 0.62, 0.22),       # 買う
-    ('pikon', 'ask', 's', 1.18, 0.22),       # 買わない
-]
+
+def when(lid, which, off):
+    if lid.startswith('@'):
+        lid, which, moff = MARKS[lid[1:]]
+        off += moff
+    return L[lid]['start' if which == 's' else 'end'] + off
 
 
 def load(path, ch=2):
@@ -47,14 +44,14 @@ def put(buf, x, at, gain=1.0):
 
 voice = np.zeros((2, N), dtype=np.float32)
 for l in T['lines']:
-    put(voice, load(os.path.join(ROOT, 'public', 'audio', 'voice', f"{l['id']}.wav")), l['start'])
+    put(voice, load(os.path.join(EP.pub, 'audio', 'voice', f"{l['id']}.wav")), l['start'])
 
 sfx = np.zeros((2, N), dtype=np.float32)
 for name, lid, which, off, g in SFX:
-    t = L[lid]['start' if which == 's' else 'end'] + off
-    put(sfx, load(os.path.join(ROOT, 'public', 'audio', 'sfx', f'{name}.wav')), max(0.0, t), g)
+    t = when(lid, which, off)
+    put(sfx, load(os.path.join(ROOT, 'public', 'shared', 'sfx', f'{name}.wav')), max(0.0, t), g)
 
-bgm = load(os.path.join(ROOT, 'public', 'audio', 'bgm.wav'))
+bgm = load(os.path.join(EP.pub, 'audio', 'bgm.wav'))
 bgm = np.pad(bgm, ((0, 0), (0, max(0, N - bgm.shape[1]))))[:, :N]
 
 # 声の有無で BGM を下げる（-5 dB）
@@ -79,11 +76,8 @@ mix = voice + sfx + bgm * BGM_GAIN * duck
 peak = np.abs(mix).max()
 if peak > 0.98:
     mix *= 0.98 / peak
-os.makedirs(os.path.join(ROOT, 'work'), exist_ok=True)
-
-
 def write(name, x):
-    with wave.open(os.path.join(ROOT, 'work', name), 'wb') as w:
+    with wave.open(os.path.join(EP.work, name), 'wb') as w:
         w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR)
         w.writeframes((np.clip(x, -1, 1).T * 32767).astype('<i2').tobytes())
 
@@ -93,4 +87,4 @@ write('mix.wav', mix)
 scale = min(1.0, 0.98 / peak)
 for name, x in (('stem_voice.wav', voice), ('stem_sfx.wav', sfx), ('stem_bgm.wav', bgm * BGM_GAIN * duck)):
     write(name, x * scale)
-print(f'work/mix.wav {N / SR:.2f}s peak={peak:.2f}')
+print(f'work/{EP.id}/mix.wav {N / SR:.2f}s peak={peak:.2f}')

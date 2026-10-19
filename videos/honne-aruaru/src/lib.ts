@@ -1,20 +1,28 @@
 // 時刻・動き・カメラの共通部品。演出の時刻は台本の行基準（T.s / T.e）で書き、秒を直書きしない。
 import {Easing, interpolate, spring} from 'remotion';
-import timeline from './timeline.json';
 
-export const FPS = timeline.fps;
+export const FPS = 30;
 export const W = 1080;
 export const H = 1920;
-const LINES: Record<string, {start: number; end: number}> = Object.fromEntries(
-  timeline.lines.map((l) => [l.id, {start: l.start, end: l.end}]),
-);
 
-export const T = {
-  /** 行 id の話し始め（+off 秒）のフレーム */
-  s: (id: string, off = 0) => Math.round((LINES[id].start + off) * FPS),
-  /** 行 id の話し終わり（+off 秒）のフレーム */
-  e: (id: string, off = 0) => Math.round((LINES[id].end + off) * FPS),
-  total: Math.ceil(timeline.total * FPS),
+export type Timeline = {fps: number; total: number; lines: {id: string; start: number; end: number}[]};
+export type Times = {s: (id: string, off?: number) => number; e: (id: string, off?: number) => number; total: number};
+
+/** 回の timeline.json から、行基準の時刻（フレーム）を返す T を作る */
+export const makeT = (timeline: Timeline): Times => {
+  const lines: Record<string, {start: number; end: number}> = Object.fromEntries(timeline.lines.map((l) => [l.id, l]));
+  const get = (id: string) => {
+    const l = lines[id];
+    if (!l) throw new Error(`timeline に行 ${id} がありません`);
+    return l;
+  };
+  return {
+    /** 行 id の話し始め（+off 秒）のフレーム */
+    s: (id, off = 0) => Math.round((get(id).start + off) * FPS),
+    /** 行 id の話し終わり（+off 秒）のフレーム */
+    e: (id, off = 0) => Math.round((get(id).end + off) * FPS),
+    total: Math.ceil(timeline.total * FPS),
+  };
 };
 
 export const clamp01 = (x: number) => Math.min(1, Math.max(0, x));

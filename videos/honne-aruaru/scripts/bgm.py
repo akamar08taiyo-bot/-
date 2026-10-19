@@ -1,29 +1,52 @@
 #!/usr/bin/env python3
-"""BGM をコードで作曲・合成する（権利フリー）。 python3 -I scripts/bgm.py → public/audio/bgm.wav
+"""BGM をコードで作曲・合成する（権利フリー）。 python3 -I scripts/bgm.py --ep honne02 → public/<回>/audio/bgm.wav
 
-軽いウクレレ風ストラム＋ベース＋小さなドラム（96BPM、F の I–vi–IV–V）。
-台本の流れに合わせて：「冷めるでしょ」の直前で止め（無音で決める）、オチから軽い編成で戻り、
-最後の問いかけでグロッケンの短いフレーズを足して終わる。時刻は src/timeline.json の行から取る。
+曲調は script.json の bgm.style：
+  ukulele … 軽いウクレレ風ストラム＋ベース＋小さなドラム（96BPM、F の I–vi–IV–V）
+  tense   … 不穏でちょっと可笑しいピチカート（92BPM、Dm の i–VI–iv–V）。修羅場・へそくり向き
+台本の流れに合わせて：決めの一言の直前で止め（無音で決める）、オチから軽い編成で戻り、
+最後の問いかけでグロッケンの短いフレーズを足して終わる。止め所は script.json の bgm（行・s/e・秒）。
 """
-import json, os, sys, wave
+import os, sys, wave
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from synth import SR, midi, pluck, glock, bass, kick, snap, shaker, place, convolve, reverb_ir, fft_filter
+from common import episode
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-T = json.load(open(os.path.join(ROOT, 'src', 'timeline.json')))
+EP = episode()
+S = EP.script()
+T = EP.timeline()
 L = {l['id']: l for l in T['lines']}
 TOTAL = T['total']
-BPM = 96
+CFG = {'style': 'ukulele', 'stop': ['a5b', 'e', 0.12], 'restart': ['twist', 's', -0.05], 'outro': ['ask', 's', 0.1],
+       **S.get('bgm', {})}
+STYLES = {
+    'ukulele': dict(bpm=96, chords=[  # (ストラムの音, ベースの根音)
+        ([65, 69, 72, 77], 41),  # F
+        ([62, 65, 69, 74], 38),  # Dm
+        ([62, 65, 70, 74], 46),  # Bb
+        ([60, 64, 67, 72], 48),  # C
+    ], strum=[(0, 'D', 1.0), (1, 'D', 0.7), (1.5, 'U', 0.5), (2.5, 'U', 0.55), (3, 'D', 0.75), (3.5, 'U', 0.5)],
+        bright=(0.5, 0.42), outro=[77, 81, 84, 89]),
+    'tense': dict(bpm=92, chords=[
+        ([62, 65, 69, 74], 38),  # Dm
+        ([58, 62, 65, 70], 46),  # Bb
+        ([55, 58, 62, 67], 43),  # Gm
+        ([57, 61, 64, 69], 45),  # A
+    ], strum=[(0, 'D', 1.0), (0.75, 'U', 0.45), (1.5, 'D', 0.7), (2.5, 'D', 0.8), (3.25, 'U', 0.45), (3.5, 'D', 0.6)],
+        bright=(0.38, 0.32), outro=[74, 77, 81, 86]),
+}
+ST = STYLES[CFG['style']]
+BPM = ST['bpm']
 BEAT = 60 / BPM
 BAR = 4 * BEAT
-CHORDS = [  # (ストラムの音, ベースの根音)
-    ([65, 69, 72, 77], 41),  # F
-    ([62, 65, 69, 74], 38),  # Dm
-    ([62, 65, 70, 74], 46),  # Bb
-    ([60, 64, 67, 72], 48),  # C
-]
-STRUM = [(0, 'D', 1.0), (1, 'D', 0.7), (1.5, 'U', 0.5), (2.5, 'U', 0.55), (3, 'D', 0.75), (3.5, 'U', 0.5)]
+CHORDS = ST['chords']
+STRUM = ST['strum']
+
+
+def at_line(ref):
+    lid, which, off = ref
+    return L[lid]['start' if which == 's' else 'end'] + off
 
 
 def section(start, end, drums=True, strum_gain=1.0, n=None):
@@ -44,7 +67,7 @@ def section(start, end, drums=True, strum_gain=1.0, n=None):
             spread = rng.uniform(0.009, 0.016)
             at += rng.uniform(-0.006, 0.006)
             for k, m in enumerate(order):
-                x = pluck(midi(m), 0.9, bright=0.5 if d == 'D' else 0.42, seed=bar * 31 + k)
+                x = pluck(midi(m), 0.9, bright=ST['bright'][0 if d == 'D' else 1], seed=bar * 31 + k)
                 place(pl, x, at + k * spread, gain=0.16 * v * strum_gain * rng.uniform(0.85, 1.0), pan=-0.25 + 0.15 * k)
         for beat, m in [(0, root), (2, root + 7), (3.5, root + (2 if bar % 4 != 3 else -1))]:
             at = b0 + beat * BEAT
@@ -76,14 +99,14 @@ def section(start, end, drums=True, strum_gain=1.0, n=None):
 
 
 N = int((TOTAL + 2) * SR)
-stop = L['a5b']['end'] + 0.12            # 「…指定してくる。」の直後で止める
-restart = L['twist']['start'] - 0.05     # オチで戻る（軽い編成）
+stop = at_line(CFG['stop'])          # 決めの一言の直前で止める
+restart = at_line(CFG['restart'])    # オチで戻る（軽い編成）
 music = section(0.0, stop, drums=True, n=N)
 music += section(restart, TOTAL + 0.2, drums=False, strum_gain=0.85, n=N)
 # 最後の問いかけにグロッケンの短いフレーズ
 g = np.zeros((2, N))
-for k, (m, beat) in enumerate([(77, 0), (81, 0.5), (84, 1.0), (89, 2.0)]):
-    place(g, glock(midi(m), 1.4), L['ask']['start'] + 0.1 + beat * BEAT, gain=0.12, pan=0.2)
+for m, beat in zip(ST['outro'], (0, 0.5, 1.0, 2.0)):
+    place(g, glock(midi(m), 1.4), at_line(CFG['outro']) + beat * BEAT, gain=0.12, pan=0.2)
 music += g
 # 部屋の響き
 ir_l, ir_r = reverb_ir(1.6, 0.42, 3, lo=250, hi=5000), reverb_ir(1.6, 0.42, 4, lo=250, hi=5000)
@@ -99,8 +122,8 @@ music[:, end:] = 0
 music = music[:, :end]
 music /= np.abs(music).max() + 1e-9
 music *= 0.7
-os.makedirs(os.path.join(ROOT, 'public', 'audio'), exist_ok=True)
-with wave.open(os.path.join(ROOT, 'public', 'audio', 'bgm.wav'), 'wb') as w:
+os.makedirs(os.path.join(EP.pub, 'audio'), exist_ok=True)
+with wave.open(os.path.join(EP.pub, 'audio', 'bgm.wav'), 'wb') as w:
     w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR)
     w.writeframes((music.T * 32767).astype('<i2').tobytes())
-print(f'bgm.wav {music.shape[1] / SR:.2f}s stop={stop:.2f} restart={restart:.2f}')
+print(f"{EP.id}/audio/bgm.wav {music.shape[1] / SR:.2f}s style={CFG['style']} stop={stop:.2f} restart={restart:.2f}")

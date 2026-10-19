@@ -1,17 +1,18 @@
-// 映像を無音で書き出す（音は scripts/finish.py で重ねる）。 node scripts/render.mjs [--draft]
+// 映像を無音で書き出す（音は scripts/finish.py で重ねる）。 node scripts/render.mjs <回> [--draft]
 import path from 'node:path';
 import {bundle} from '@remotion/bundler';
 import {openBrowser, renderMedia, selectComposition} from '@remotion/renderer';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const ep = process.argv[2];
 const draft = process.argv.includes('--draft');
-const out = path.join(root, 'work', draft ? 'video_draft.mp4' : 'video_silent.mp4');
+const out = path.join(root, 'work', ep, draft ? 'video_draft.mp4' : 'video_silent.mp4');
 const serveUrl = await bundle({entryPoint: path.join(root, 'src', 'index.ts'), publicDir: path.join(root, 'public'), outDir: path.join(root, 'work', 'bundle')});
 const browser = await openBrowser('chrome', {
   browserExecutable: '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell',
   chromiumOptions: {gl: 'swangle'},
 });
-const composition = await selectComposition({serveUrl, id: 'Main', puppeteerInstance: browser});
+const composition = await selectComposition({serveUrl, id: ep, puppeteerInstance: browser});
 const t0 = Date.now();
 let last = 0;
 await renderMedia({

@@ -47,7 +47,7 @@ export const Outlined: React.FC<{
 };
 
 // ───────── シリーズ名と進み具合（①〜⑤） ─────────
-export const Header: React.FC<{item: number; since: number}> = ({item, since}) => {
+export const Header: React.FC<{episode: string; item: number; since: number}> = ({episode, item, since}) => {
   const frame = useCurrentFrame();
   const pill = (bg: string, fg: string, size: number): React.CSSProperties => ({
     background: bg,
@@ -63,7 +63,7 @@ export const Header: React.FC<{item: number; since: number}> = ({item, since}) =
     <div style={{position: 'absolute', top: 126, left: 0, width: W, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16}}>
       <div style={{display: 'flex', gap: 12, alignItems: 'center'}}>
         <div style={pill(C.coral, '#fff', 44)}>本音あるある</div>
-        <div style={pill('#fff', C.ink, 40)}>夫に冷めた瞬間</div>
+        <div style={pill('#fff', C.ink, 40)}>{episode}</div>
       </div>
       <div style={{display: 'flex', alignItems: 'center', gap: 0}}>
         {[1, 2, 3, 4, 5].map((n) => {
@@ -179,10 +179,20 @@ const parse = (s: string): Seg[] => {
   return out;
 };
 
-/** 句読点・閉じかっこの後で、なるべく真ん中で2行に分ける */
+/** 句読点・閉じかっこの後で、なるべく真ん中で2行に分ける（'|' があればそこで分ける） */
 const split2 = (segs: Seg[], max: number): Seg[][] => {
-  const chars = segs.flatMap((sg) => [...sg.t].map((ch) => ({ch, k: sg.k})));
-  if (chars.length <= max) return [segs];
+  const all = segs.flatMap((sg) => [...sg.t].map((ch) => ({ch, k: sg.k})));
+  const forced = all.findIndex((c) => c.ch === '|');
+  const chars = all.filter((c) => c.ch !== '|');
+  const toSegsAt = (cs: typeof chars) =>
+    cs.reduce<Seg[]>((acc, c) => {
+      const lastSeg = acc[acc.length - 1];
+      if (lastSeg && lastSeg.k === c.k) lastSeg.t += c.ch;
+      else acc.push({t: c.ch, k: c.k});
+      return acc;
+    }, []);
+  if (forced >= 0) return [toSegsAt(chars.slice(0, forced)), toSegsAt(chars.slice(forced))];
+  if (chars.length <= max) return [toSegsAt(chars)];
   const mid = chars.length / 2;
   let best = -1;
   let bestD = 1e9;
@@ -205,20 +215,16 @@ const split2 = (segs: Seg[], max: number): Seg[][] => {
     best = Math.ceil(mid);
     while (best < chars.length - 1 && ('」』。、？！…'.includes(chars[best].ch) || chars[best - 1].ch === '「')) best++;
   }
-  const toSegs = (cs: typeof chars) =>
-    cs.reduce<Seg[]>((acc, c) => {
-      const lastSeg = acc[acc.length - 1];
-      if (lastSeg && lastSeg.k === c.k) lastSeg.t += c.ch;
-      else acc.push({t: c.ch, k: c.k});
-      return acc;
-    }, []);
-  return [toSegs(chars.slice(0, best)), toSegs(chars.slice(best))];
+  return [toSegsAt(chars.slice(0, best)), toSegsAt(chars.slice(best))];
 };
 
 export const Subtitle: React.FC<{text: string; from: number; to: number; aside?: boolean; cy?: number}> = ({text, from, to, aside, cy = 1262}) => {
   const frame = useCurrentFrame();
   if (frame < from || frame >= to) return null;
   const lines = split2(parse(text), 15);
+  // 1行が長いときは文字を小さくして箱に収める（15文字までは元の大きさ）
+  const longest = Math.max(...lines.map((ln) => ln.reduce((n, sg) => n + [...sg.t].length, 0)));
+  const fs = Math.min(aside ? 58 : 56, Math.floor(880 / Math.max(longest, 1)));
   const o = life(frame, from, to, 3, 3);
   const y = (1 - ramp(frame, from, from + 5)) * 18;
   const color = (k: Seg['k']) => (aside ? '#fff' : k === 'q' ? C.navy : k === 'e' ? C.coral : C.ink);
@@ -237,7 +243,7 @@ export const Subtitle: React.FC<{text: string; from: number; to: number; aside?:
         }}
       >
         {lines.map((ln, i) => (
-          <div key={i} style={{fontFamily: aside ? F.hand : F.maru, fontWeight: aside ? 400 : 900, fontSize: aside ? 58 : 56, lineHeight: 1.36, whiteSpace: 'pre'}}>
+          <div key={i} style={{fontFamily: aside ? F.hand : F.maru, fontWeight: aside ? 400 : 900, fontSize: fs, lineHeight: 1.36, whiteSpace: 'pre'}}>
             {ln.map((sg, j) => (
               <span key={j} style={{color: color(sg.k)}}>
                 {sg.t}
@@ -273,21 +279,38 @@ export const Boso: React.FC<{x: number; y: number; from: number; to: number}> = 
 };
 
 // ───────── 冒頭の題字 ─────────
-export const HookTitle: React.FC<{from: number; to: number; sub: number}> = ({from, to, sub}) => {
+export type TitleLine = {text: string; size: number; color: string; stroke?: number; shadow?: string; mb?: number};
+
+export const HookTitle: React.FC<{from: number; to: number; sub: number; lines: TitleLine[]; pill: string; top?: number}> = ({
+  from,
+  to,
+  sub,
+  lines,
+  pill,
+  top = 790,
+}) => {
   const frame = useCurrentFrame();
   if (frame < from || frame >= to) return null;
   // 1コマ目からはっきり読めるように、大きめから少し縮んで止まる
   const punch = 1 + 0.12 * (1 - ramp(frame, from, from + 7));
   const ps = pop(frame, sub, 12, 200);
   return (
-    <div style={{position: 'absolute', left: 0, width: W, top: 790, display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: life(frame, from, to, 0, 4)}}>
+    <div style={{position: 'absolute', left: 0, width: W, top, display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: life(frame, from, to, 0, 4)}}>
       <div style={{transform: `scale(${punch}) rotate(-3deg)`, display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-        <Outlined size={104} color={C.ink} stroke={20} font={F.dela} weight={400} style={{marginBottom: -10}}>
-          夫に
-        </Outlined>
-        <Outlined size={168} color={C.ice} stroke={24} font={F.dela} weight={400} shadow="drop-shadow(0 10px 0 rgba(30,50,90,0.35))">
-          冷めた瞬間
-        </Outlined>
+        {lines.map((l, i) => (
+          <Outlined
+            key={i}
+            size={l.size}
+            color={l.color}
+            stroke={l.stroke ?? Math.round(l.size * 0.16)}
+            font={F.dela}
+            weight={400}
+            shadow={l.shadow}
+            style={{marginBottom: l.mb ?? -10}}
+          >
+            {l.text}
+          </Outlined>
+        ))}
       </div>
       <div
         style={{
@@ -304,7 +327,7 @@ export const HookTitle: React.FC<{from: number; to: number; sub: number}> = ({fr
           boxShadow: '0 8px 24px rgba(40,25,20,0.25)',
         }}
       >
-        覚えてますか？
+        {pill}
       </div>
     </div>
   );
@@ -407,7 +430,16 @@ export const Note: React.FC<{x: number; y: number; text: string; from: number; t
 };
 
 // ───────── 最後の投票ボタン ─────────
-export const Poll: React.FC<{a: number; b: number; hint: number; to: number; top?: number; cy?: number}> = ({a, b, hint, to, top = 292, cy = 1262}) => {
+export const Poll: React.FC<{labels: [string, string]; a: number; b: number; hint: number; to: number; top?: number; cy?: number; size?: number}> = ({
+  labels,
+  a,
+  b,
+  hint,
+  to,
+  top = 292,
+  cy = 1262,
+  size = 66,
+}) => {
   const frame = useCurrentFrame();
   if (frame < a || frame >= to) return null;
   const btn = (label: string, at: number, bg: string): React.ReactNode => {
@@ -421,8 +453,8 @@ export const Poll: React.FC<{a: number; b: number; hint: number; to: number; top
           color: '#fff',
           fontFamily: F.maru,
           fontWeight: 900,
-          fontSize: 66,
-          padding: '14px 48px 18px',
+          fontSize: size,
+          padding: `${Math.round(size * 0.21)}px ${Math.round(size * 0.727)}px ${Math.round(size * 0.27)}px`,
           borderRadius: 999,
           border: '7px solid #fff',
           boxShadow: '0 8px 0 rgba(60,40,30,0.2)',
@@ -436,8 +468,8 @@ export const Poll: React.FC<{a: number; b: number; hint: number; to: number; top
   return (
     <>
       <div style={{position: 'absolute', top, left: 0, width: W, display: 'flex', justifyContent: 'center', gap: 36}}>
-        {btn('買う', a, C.coral)}
-        {btn('買わない', b, C.navy)}
+        {btn(labels[0], a, C.coral)}
+        {btn(labels[1], b, C.navy)}
       </div>
       {frame >= hint && (
         <div style={{position: 'absolute', top: cy, left: 0, width: W, display: 'flex', justifyContent: 'center'}}>

@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """1行を何テイクか録り直し、読み間違いのないテイクの中から Gemini に聞き比べで選ばせる。
 
-  python3 -I scripts/voice_takes.py a1 --takes 4 --notes "演技の指示（英語）" --criteria "選ぶ基準（日本語）"
+  python3 -I scripts/voice_takes.py a1 --ep honne02 --takes 4 --notes "演技の指示（英語）" --criteria "選ぶ基準（日本語）"
 
-選ばれたテイクを assets/voice/<id>.wav にし、work/takes/<id>/ に全テイクと判定を残す。
-今の assets/voice/<id>.wav も候補に入れて比べる（良くならなければ今のまま）。
+選ばれたテイクを episodes/<回>/voice/<行>.wav にし、work/<回>/takes/<行>/ に全テイクと判定を残す。
+今の声も候補に入れて比べる（良くならなければ今のまま）。
 """
 import argparse, json, os, re, shutil, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gapi
+from common import episode
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-S = json.load(open(os.path.join(ROOT, 'script.json'), encoding='utf-8'))
+EP = episode()
+S = EP.script()
 ap = argparse.ArgumentParser()
 ap.add_argument('id')
 ap.add_argument('--takes', type=int, default=4)
@@ -24,9 +25,9 @@ notes = a.notes or S['styles'][ln['style']]
 prompt = (f"# AUDIO PROFILE: {v['profile']}\n## SCENE: {v['scene']}\n### DIRECTOR NOTES: {notes} "
           f"Read only the transcript below, exactly as written. Do not read these notes aloud.\n"
           f"#### TRANSCRIPT\n{ln.get('speak', ln['text'])}")
-d = os.path.join(ROOT, 'work', 'takes', a.id)
+d = os.path.join(EP.work, 'takes', a.id)
 os.makedirs(d, exist_ok=True)
-cur = os.path.join(ROOT, 'assets', 'voice', f'{a.id}.wav')
+cur = os.path.join(EP.voice, f'{a.id}.wav')
 cands = []
 if os.path.exists(cur):
     shutil.copy(cur, os.path.join(d, 'current.wav'))
@@ -52,4 +53,4 @@ best = res.get('best')
 print('scores', res.get('scores'), '\nbest', best, '-', res.get('why'))
 if best in names and best != 'current':
     shutil.copy(cands[names.index(best)], cur)
-    print('->', os.path.relpath(cur, ROOT), 'を差し替え')
+    print('->', cur, 'を差し替え')

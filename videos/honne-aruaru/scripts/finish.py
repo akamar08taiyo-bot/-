@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 """仕上げ：音量を -14 LUFS（真のピーク -1.5 dBTP 以下）に合わせ、映像と重ね、字幕と概要欄を書き、検査する。
 
-  python3 -I scripts/finish.py   → out/<id>.mp4, out/<id>.srt, out/<id>_概要欄.txt
+  python3 -I scripts/finish.py --ep honne02   → out/<回>.mp4, out/<回>.srt（概要欄は out/<回>_概要欄.txt に手で書く）
 """
 import json, os, re, subprocess, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from common import ROOT, episode
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-S = json.load(open(os.path.join(ROOT, 'script.json'), encoding='utf-8'))
-T = json.load(open(os.path.join(ROOT, 'src', 'timeline.json')))
+EP = episode()
+S = EP.script()
+T = EP.timeline()
+if T.get('estimated'):
+    sys.exit('timeline.json が文字数からの仮の時刻です。声を作って prep_audio.py を通してから仕上げてください')
 OUT = os.path.join(ROOT, 'out')
 os.makedirs(OUT, exist_ok=True)
 vid = S['id']
-mix = os.path.join(ROOT, 'work', 'mix.wav')
-silent = os.path.join(ROOT, 'work', 'video_silent.mp4')
+mix = os.path.join(EP.work, 'mix.wav')
+silent = os.path.join(EP.work, 'video_silent.mp4')
 final = os.path.join(OUT, f'{vid}.mp4')
 
 

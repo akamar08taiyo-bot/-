@@ -1,28 +1,33 @@
 #!/usr/bin/env python3
 """場面の絵を Gemini で作り、版ごとに記録する。
 
-  python3 -I scripts/gen_image.py sheet                       # 人物の設定画（横長）
-  python3 -I scripts/gen_image.py S3 --refs assets/gen/sheet_v1.png [--extra "直したい点"]
+  python3 -I scripts/gen_image.py --ep honne01 sheet          # 人物の設定画（横長）
+  python3 -I scripts/gen_image.py --ep honne02 S3 [--extra "直したい点"]
 
-出力: assets/gen/<ID>_v<n>.png と assets/gen/ledger.json（プロンプト・モデル・時間・使用量）
+場面の絵は、人物の設定画 assets/characters/sheet_v1.png を毎回参照させる（--refs で変えられる）。
+指示文は episodes/<回>/prompts.json。
+出力: episodes/<回>/gen/<ID>_v<n>.png と ledger.json（プロンプト・モデル・時間・使用量）
 """
 import argparse, json, os, sys, time
 from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gapi
+from common import ROOT, episode
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-GEN = os.path.join(ROOT, 'assets', 'gen')
-P = json.load(open(os.path.join(GEN, 'prompts.json'), encoding='utf-8'))
+EP = episode()
+GEN = EP.gen
+os.makedirs(GEN, exist_ok=True)
+P = json.load(open(os.path.join(EP.dir, 'prompts.json'), encoding='utf-8'))
+SHEET = os.path.join(ROOT, 'assets', 'characters', 'sheet_v1.png')
 ap = argparse.ArgumentParser()
 ap.add_argument('id')
-ap.add_argument('--refs', default='')
+ap.add_argument('--refs', default=None, help='参照画像（カンマ区切り）。省略時は場面なら人物の設定画')
 ap.add_argument('--extra', default='')
 ap.add_argument('--model', default='gemini-3-pro-image')
 ap.add_argument('--size', default='2K')
 a = ap.parse_args()
 
-refs = [r for r in a.refs.split(',') if r]
+refs = [r for r in (a.refs if a.refs is not None else ('' if a.id == 'sheet' else SHEET)).split(',') if r]
 if a.id == 'sheet':
     text = f"{P['style']}\n\nCharacters:\n{P['characters']}\n\n{P['sheet']}"
     aspect = '16:9'
