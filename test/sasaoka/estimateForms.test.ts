@@ -106,28 +106,32 @@ test('見積書だけの内容・備考・施工費の金額（右に映す見�
   const wood = {...lab(1000, 2), estText: '手すり取付費', estAmount: 2500};
   const job = {places: [place('玄関', [rail, cap, wood])]};
   const [r, c, w] = formLines(job, S, 'yukuhashi');
-  // 直していなければ元の内容・備考（定価8,000円×0.8 の形。切って使う部材は2行目に長さの計算）
+  // 直していなければ元の内容・備考（定価8,000円（税抜）×0.8 の形。切って使う部材はかっこに1本の長さ、2行目に長さの計算）
   assert.deepEqual([r.text, r.autoText, r.note], ['手すり 4m', '手すり 4m', null]);
-  assert.deepEqual(lineNote(r, 'yukuhashi', 2500), ['定価20,000円×0.8', '600÷4000＝0.15']);
+  assert.deepEqual(lineNote(r, 'yukuhashi', 2500), ['定価20,000円（4m）×0.8', '600÷4000＝0.15']);
   // 直した内容・備考（改行で2行）。元の内容は autoText に残る
   assert.deepEqual([c.text, c.autoText], ['エンドキャップ（木口用）', 'エンドキャップ']);
   assert.deepEqual(lineNote(c, 'yukuhashi', 2500), ['定価450円', '（税抜）']);
-  assert.deepEqual(autoNote(c, 'yukuhashi', 2500), ['定価450円×0.8']);
+  assert.deepEqual(autoNote(c, 'yukuhashi', 2500), ['定価450円（税抜）×0.8']);
   // 見積の単価を手で入れた行は ×0.8 を付けない
-  assert.deepEqual(autoNote(formLines({places: [place('玄関', [{...cap, estPrice: 400, estNote: null}])]}, S, 'yukuhashi')[0], 'yukuhashi', 2500), ['定価450円']);
+  assert.deepEqual(autoNote(formLines({places: [place('玄関', [{...cap, estPrice: 400, estNote: null}])]}, S, 'yukuhashi')[0], 'yukuhashi', 2500), ['定価450円（税抜）']);
+  // 1本の長さが小数でも（3.6m の手すりを 90cm）
+  const rail36 = formLines({places: [place('玄関', [mat('手すり 3.6m', 18000, {lengthCm: 90, pieceLengthM: 3.6})])]}, S, 'yukuhashi')[0];
+  assert.deepEqual(autoNote(rail36, 'yukuhashi', 2500), ['定価18,000円（3.6m）×0.8', '900÷3600＝0.25']);
   // 施工費のまとまり：名前と金額は最初の手間の行のもの
   assert.deepEqual([w.isWork, w.text, w.autoText, w.amount, w.manualAmount, w.rowId, w.rowIds], [true, '手すり取付費', '同上施工費', 2500, true, wood.id, [wood.id]]);
   // みやこ町・広域連合用：2,500円は 1時間×2,500円 と書ける
   const k = formLines(job, S, 'kouiki');
   assert.deepEqual([k[2].qty, k[2].unit, k[2].unitPrice, k[2].amount, k[2].hourly], [1, '時間', 2500, 2500, true]);
   assert.deepEqual(lineNote(k[2], 'kouiki', 2500), ['1時間2,500円']);
-  // 算出根拠も備考と同じ書き方（定価○円×0.8、2行目に長さの計算）
-  assert.deepEqual(autoNote(k[0], 'kouiki', 2500), ['定価20,000円×0.8', '600÷4000＝0.15']);
+  // 算出根拠も備考と同じ書き方（定価○円（4m）×0.8、2行目に長さの計算）
+  assert.deepEqual(autoNote(k[0], 'kouiki', 2500), ['定価20,000円（4m）×0.8', '600÷4000＝0.15']);
+  assert.deepEqual(autoNote(k[1], 'kouiki', 2500), ['定価450円（税抜）×0.8']);
   // 介護保険の対象外の行は、算出根拠（対象工事部分の欄）は空。苅田町・行橋用の備考は書く
   const ex = formLines({places: [place('玄関', [{...rail, excluded: true}])]}, S, 'kouiki')[0];
-  assert.deepEqual([autoNote(ex, 'kouiki', 2500), autoNote(ex, 'yukuhashi', 2500)], [[], ['定価20,000円×0.8', '600÷4000＝0.15']]);
+  assert.deepEqual([autoNote(ex, 'kouiki', 2500), autoNote(ex, 'yukuhashi', 2500)], [[], ['定価20,000円（4m）×0.8', '600÷4000＝0.15']]);
   // 手で直す欄の最初の文字
-  assert.equal(noteText(['定価20,000円×0.8', '600÷4000＝0.15']), '定価20,000円×0.8\n600÷4000＝0.15');
+  assert.equal(noteText(['定価20,000円（4m）×0.8', '600÷4000＝0.15']), '定価20,000円（4m）×0.8\n600÷4000＝0.15');
 });
 
 test('令和の年月日', () => {

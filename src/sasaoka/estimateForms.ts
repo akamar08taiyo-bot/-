@@ -2,7 +2,8 @@
 // どちらも元の Excel と同じく、金額は ROUNDDOWN(数量×単価)。最後のページの下4行が 小計・諸経費・消費税・合計。
 //   苅田町・行橋用「工事費見積書兼工事費内訳書」：1ページ18行。施工費は「1式」
 //   みやこ町・広域連合用「住宅改修内訳明細書」（福岡県介護保険広域連合の様式）：1ページ14行。施工費は「時間×1時間の単価（2,500円）」
-// 備考・算出根拠は「定価8,000円×0.8」。切って使う部材は 数量＝使う長さ÷1本の長さ（本）で書き、2行目に mm で計算を書く（例：600÷4000＝0.15）。
+// 備考・算出根拠は「定価8,000円（税抜）×0.8」。切って使う部材は 数量＝使う長さ÷1本の長さ（本）で書き、備考は「定価20,000円（4m）×0.8」、
+// 2行目に mm で計算を書く（例：600÷4000＝0.15）。
 
 import {cutToLength, estimatePlaceLines, estimateQty} from './calc.ts';
 import {normalize} from './priceImport.ts';
@@ -106,6 +107,7 @@ export type FormLine = {
   listPrice: number; // 定価（備考・算出根拠の「定価8,000円×0.8」）。施工費は 0
   rate: number | null; // 単価＝定価×この率のとき（見積の単価を手で入れた行・定価のない行は null）
   cut: string; // 切って使う部材の数量の計算（600÷4000＝0.15）。ほかは ''
+  piece: number; // 切って使う部材の1本の長さ（m。備考の「定価20,000円（4m）」）。ほかは 0
   hourly: boolean; // 施工費を「時間×1時間の単価」で書いた行
   note: string | null; // 備考（定価等）・算出根拠を手で直したとき（改行で行を分ける）
   manualAmount: boolean; // 施工費の金額を見積書で手で直した
@@ -145,6 +147,7 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
           listPrice: r.listPrice > 0 ? r.listPrice : 0,
           rate: r.estPrice === null && r.listPrice > 0 ? s.estimateRate : null,
           cut: cutCalc(r),
+          piece: cutToLength(r) ? r.pieceLengthM : 0,
           hourly: false,
           note: r.estNote,
           manualAmount: false,
@@ -172,6 +175,7 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
         listPrice: 0,
         rate: null,
         cut: '',
+        piece: 0,
         hourly,
         note: head.estNote,
         manualAmount: head.estAmount !== null,
@@ -183,13 +187,14 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
 
 /**
  * 手で直していないときの備考（定価等・苅田町・行橋用）／算出根拠（みやこ町・広域連合用）。1行ずつ。
- * 部材は「定価8,000円×0.8」（見積の単価を手で入れた行は ×0.8 を付けない）。切って使う部材は2行目に「600÷4000＝0.15」。
+ * 部材は「定価8,000円（税抜）×0.8」（見積の単価を手で入れた行は ×0.8 を付けない）。
+ * 切って使う部材は「定価20,000円（4m）×0.8」（かっこは1本の長さ）と、2行目に「600÷4000＝0.15」。
  * 算出根拠は対象工事部分の欄なので、介護保険の対象外の行は空。時間で書いた施工費は「1時間2,500円」
  */
 export function autoNote(l: FormLine, form: EstimateForm, hourRate: number): string[] {
   if (form === 'kouiki' && l.excluded) return [];
   if (form === 'kouiki' && l.hourly) return [`1時間${yen(hourRate)}円`];
-  const list = l.listPrice > 0 ? `定価${yen(l.listPrice)}円${l.rate !== null ? `×${l.rate}` : ''}` : '';
+  const list = l.listPrice > 0 ? `定価${yen(l.listPrice)}円（${l.piece > 0 ? `${num(l.piece, 3)}m` : '税抜'}）${l.rate !== null ? `×${l.rate}` : ''}` : '';
   return [list, l.cut].filter(Boolean);
 }
 

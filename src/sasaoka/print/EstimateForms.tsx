@@ -209,7 +209,7 @@ function YkLine({line: l, bottom, editable}: {line: FormLine | undefined; bottom
   const qty = qtyText(l.qty);
   const k = (field: string) => `line:${l.rowId}:${field}`;
   const excl = `excl:${l.excludeId}`;
-  // 備考（定価等）：「定価8,000円×0.8」。切って使う部材は「定価40,000円×0.8」と「600÷4000＝0.15」の2行
+  // 備考（定価等）：「定価8,000円（税抜）×0.8」。切って使う部材は「定価20,000円（4m）×0.8」と「600÷4000＝0.15」の2行
   const note = lineNote(l, 'yukuhashi', 0);
   return (
     <tr className="g" style={{height: `${YK_ROW}mm`}} {...(editable ? {'data-rows': l.rowIds.join(' ')} : {})}>
@@ -442,7 +442,7 @@ function KkLine({line: l, height, bottom, hourRate, editable}: {line: FormLine |
   const qty = qtyText(l.qty);
   const k = (field: string) => `line:${l.rowId}:${field}`;
   const excl = `excl:${l.excludeId}`;
-  // 算出根拠：「定価8,000円×0.8」。施工費は「1時間2,500円」、切って使う部材は「定価40,000円×0.8」と「600÷4000＝0.15」の2行
+  // 算出根拠：「定価8,000円（税抜）×0.8」。施工費は「1時間2,500円」、切って使う部材は「定価20,000円（4m）×0.8」と「600÷4000＝0.15」の2行
   const note = lineNote(l, 'kouiki', hourRate);
   let basis: ReactNode;
   if (note.length === 1 && l.hourly && l.note === null) {
