@@ -277,7 +277,7 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
     const auto = estimateUnitPrice({...r, estPrice: null}, rate);
     return {job: patchRow(job, found, {estPrice: n === auto ? null : n}), key};
   }
-  if (field === 'note') return {job: patchRow(job, found, notePatch(text)), key};
+  if (field === 'note') return {job: patchRow(job, found, notePatch(r, text)), key};
   return {job, key};
 }
 
@@ -320,13 +320,17 @@ function qtyPatch(r: Row, trimmed: string): Partial<Row> {
   return {qty: n, lengthCm: 0};
 }
 
-/** 備考（算出根拠）：定価を入れたら単価は 定価×0.8（手で入れた単価はやめる）。定価でない文字はそのまま備考に */
-function notePatch(text: string): Partial<Row> {
+/** 備考（算出根拠）：定価を入れたら単価は 定価×0.8（手で入れた単価はやめる）。定価でない文字はそのまま備考に。
+ *  1本の長さ（4m）も入れたら、先に入れてあった小数の数量（0.15）は切って使う長さにする（数量の欄と同じ） */
+function notePatch(r: Row, text: string): Partial<Row> {
   const trimmed = text.trim();
   if (trimmed === '') return {listPrice: 0, estNote: null};
   const p = parseListNote(trimmed);
-  if (p) return {listPrice: p.list, estNote: null, estPrice: null, ...(p.pieceM ? {pieceLengthM: p.pieceM} : {})};
-  return {estNote: text.replace(/\s+$/, '')};
+  if (!p) return {estNote: text.replace(/\s+$/, '')};
+  const patch: Partial<Row> = {listPrice: p.list, estNote: null, estPrice: null};
+  if (!p.pieceM) return patch;
+  const cut = !(r.lengthCm > 0) && r.qty > 0 && !Number.isInteger(r.qty);
+  return {...patch, pieceLengthM: p.pieceM, ...(cut ? {lengthCm: Math.round(r.qty * p.pieceM * 100 * 1000) / 1000, qty: 1} : {})};
 }
 
 /** いちばん下の空いた行に打ち込んだとき */
