@@ -224,8 +224,8 @@ export function cleanSettings(raw: unknown): Settings {
   s.estimateForm = FORMS.includes(raw.estimateForm as EstimateForm) ? (raw.estimateForm as EstimateForm) : d.estimateForm;
   // 版2より前の設定：請求書の消費税は「すべての様邸の合計に最後に消費税率をかける」形に直す
   if (numv(raw.rev, 1) < 2) s.invoiceTaxMode = 'monthly';
-  // 版3より前の設定：名字だけの担当者の候補を、分かっている人はフルネームにする（見積書に出す）
-  if (numv(raw.rev, 1) < 3) s.staffList = cleanList(s.staffList.map((n) => STAFF_FULL_NAMES.get(n) ?? n));
+  // 版4より前の設定：名字だけの担当者の候補をフルネームにする（見積書に出す）
+  if (numv(raw.rev, 1) < 4) s.staffList = cleanList(s.staffList.map((n) => STAFF_FULL_NAMES.get(n) ?? n));
   s.rev = SETTINGS_REV;
   return s;
 }

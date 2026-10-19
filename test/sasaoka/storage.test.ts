@@ -20,17 +20,19 @@ test('所長名を入れる前に保存した設定は、保存してある営�
   assert.equal(cleanSettings({officeName: '行橋営業所', manager: '久保匠史'}).manager, '久保匠史');
 });
 
-test('担当者の候補：最初は 久保 匠史・土居 翔太・宮村・信田・藤田、保存したものは空・重複を除いて使う', () => {
-  assert.deepEqual(DEFAULT_STAFF, ['久保 匠史', '土居 翔太', '宮村', '信田', '藤田']);
+test('担当者の候補：最初は5人のフルネーム、保存したものは空・重複を除いて使う', () => {
+  assert.deepEqual(DEFAULT_STAFF, ['久保 匠史', '土居 翔太', '宮村 茉莉花', '信田 裕太', '藤田 知美']);
   assert.deepEqual(cleanSettings({}).staffList, DEFAULT_STAFF);
-  assert.deepEqual(cleanSettings({staffList: [' 久保 ', '', '土居', '久保', 3], rev: 3}).staffList, ['久保', '土居', '3']);
+  assert.deepEqual(cleanSettings({staffList: [' 久保 ', '', '土居', '久保', 3], rev: 4}).staffList, ['久保', '土居', '3']);
   assert.deepEqual(cleanSettings({staffList: []}).staffList, []);
-  // 版3より前に保存した名字だけの候補は、分かっている人をフルネームに（見積書に出す）
-  assert.deepEqual(cleanSettings({staffList: ['久保', '土居', '宮村', '山本'], rev: 2}).staffList, ['久保 匠史', '土居 翔太', '宮村', '山本']);
+  // 版4より前に保存した名字だけの候補はフルネームに（見積書に出す）。候補に足した人はそのまま
+  assert.deepEqual(cleanSettings({staffList: ['久保', '土居', '宮村', '信田', '藤田', '山本'], rev: 2}).staffList, [...DEFAULT_STAFF, '山本']);
+  // 版3（久保・土居だけフルネームにした版）で保存した候補も、残りの3人をフルネームに
+  assert.deepEqual(cleanSettings({staffList: ['久保 匠史', '土居 翔太', '宮村', '信田', '藤田'], rev: 3}).staffList, DEFAULT_STAFF);
   // 見積書はフルネーム、請求書・一覧は名字
   assert.equal(staffFull('土居', DEFAULT_STAFF), '土居 翔太'); // 名字だけで入っている前の様邸
   assert.equal(staffFull('土居 翔太', DEFAULT_STAFF), '土居 翔太');
-  assert.equal(staffFull('宮村', DEFAULT_STAFF), '宮村');
+  assert.equal(staffFull('宮村', DEFAULT_STAFF), '宮村 茉莉花');
   assert.equal(staffFull('山本', DEFAULT_STAFF), '山本'); // 候補にない人はそのまま
   assert.equal(staffShort('土居 翔太'), '土居');
   assert.equal(staffShort('土居　翔太'), '土居');
@@ -49,7 +51,7 @@ test('請求書の消費税：前の版の設定（様邸ごと）は「すべ�
   assert.equal(cleanSettings({}).totalTaxRounding, 'floor');
   // 新しい版で保存した設定は、選んだまま
   assert.equal(cleanSettings({invoiceTaxMode: 'perJob', rev: 2}).invoiceTaxMode, 'perJob');
-  assert.equal(cleanSettings({rev: 1}).rev, 3);
+  assert.equal(cleanSettings({rev: 1}).rev, 4);
 });
 
 test('見積の設定：最初は定価×0.8・諸経費10%・施工費1時間2,500円・書式は行橋市・苅田町用', () => {
