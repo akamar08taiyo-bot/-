@@ -162,6 +162,9 @@ assert.deepEqual(bk.slice(2), ['2', '個', '1,680', '3,360'], bk.join('|'));
 // 1ページ14行：明細13行のあとに合計の4行が入らないので、トイレ（7行）を2ページ目に送り、合計はその下4行
 assert.equal(await page.locator('.form-page').count(), 2);
 assert.ok((await page.locator('.form-page').last().innerText()).includes('トイレ\t便器取替'));
+// 1つの見積書の中で Ｐ－1・Ｐ－2 と続く
+assert.ok((await page.locator('.form-page').first().innerText()).includes('Ｐ－1'));
+assert.ok((await page.locator('.form-page').last().innerText()).includes('Ｐ－2'));
 const kLast = page.locator('.form-page').last();
 const kTotal = (await kLast.locator('tr', {hasText: '合計'}).last().locator('td').allInnerTexts()).filter(Boolean);
 assert.deepEqual(kTotal, ['合計', '65,049', '59,774']);

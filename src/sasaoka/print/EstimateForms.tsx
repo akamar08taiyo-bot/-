@@ -375,7 +375,7 @@ export function KouikiForm({job, settings: s}: {job: Job; settings: Settings}) {
                     ※介護保険対象にならない部分は、全改修工事部分の欄に記入。
                   </td>
                   <td colSpan={3} style={{fontSize: '11pt'}}>
-                    Ｐ－
+                    Ｐ－{pi + 1}
                   </td>
                 </tr>
                 <tr style={{height: '4.84mm'}}>
