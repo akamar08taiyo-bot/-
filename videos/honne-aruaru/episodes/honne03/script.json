@@ -1,0 +1,128 @@
+{
+ "id": "honne03",
+ "title": "夫の失言ランキングTOP10【しのぶの失言ノート#3】",
+ "silent": true,
+ "bpm": 120,
+ "header": {
+  "series": "しのぶの失言ノート",
+  "episode": "#3 夫の失言TOP10"
+ },
+ "hook": {
+  "beats": 6,
+  "img": "honne02/img/X1.jpg",
+  "face": "X1",
+  "chip": "妻のノートの「記録回数」で発表"
+ },
+ "ranks": [
+  {
+   "rank": 10,
+   "beats": 8,
+   "quote": "母さんはこうしてた",
+   "count": 41,
+   "tsukkomi": "では、お母さんに|頼んでください。",
+   "img": "honne02/img/X6.jpg",
+   "face": "X6"
+  },
+  {
+   "rank": 9,
+   "beats": 8,
+   "quote": "了",
+   "chat": "今日は懇談会で遅くなります。カレーを温めて、みなとにも食べさせてね。お風呂も洗っておいてくれると助かります。",
+   "count": 58,
+   "tsukkomi": "54字に、1文字。",
+   "img": "honne02/img/X1.jpg",
+   "face": "X1"
+  },
+  {
+   "rank": 8,
+   "beats": 8,
+   "quote": "言ってくれれば|やったのに",
+   "count": 77,
+   "tsukkomi": "言ったら「あとで」でしょ。",
+   "img": "honne03/img/R8.jpg",
+   "face": "R8"
+  },
+  {
+   "rank": 7,
+   "beats": 8,
+   "quote": "手伝おうか？",
+   "note": "（座ったまま）",
+   "count": 96,
+   "tsukkomi": "立ってから言ってください。",
+   "img": "honne01/img/S1.jpg",
+   "face": "S1"
+  },
+  {
+   "rank": 6,
+   "beats": 8,
+   "quote": "俺、もうダメかも…",
+   "note": "（熱 37.2度）",
+   "count": 103,
+   "tsukkomi": "私は39度で、|ごはん作ってました。",
+   "img": "honne03/img/R6.jpg",
+   "face": "R6"
+  },
+  {
+   "rank": 5,
+   "beats": 8,
+   "quote": "今日、なにしてたの？",
+   "count": 131,
+   "tsukkomi": "全部です。",
+   "img": "honne03/img/R5.jpg",
+   "face": "R5"
+  },
+  {
+   "rank": 4,
+   "beats": 8,
+   "quote": "ごはん、これだけ？",
+   "count": 166,
+   "tsukkomi": "品数より、感謝の数で。",
+   "img": "honne03/img/R4.jpg",
+   "face": "R4"
+  },
+  {
+   "rank": 3,
+   "beats": 10,
+   "quote": "で？",
+   "note": "（スマホを見たまま）",
+   "count": 204,
+   "tsukkomi": "スマホじゃなくて、|こっちを見て。",
+   "img": "honne03/img/R3.jpg",
+   "face": "R3"
+  },
+  {
+   "rank": 2,
+   "beats": 10,
+   "quote": "俺の方が疲れてる",
+   "count": 287,
+   "tsukkomi": "疲れ、競ってません。",
+   "img": "honne01/img/S6.jpg",
+   "face": "S6"
+  },
+  {
+   "rank": 1,
+   "beats": 14,
+   "build": 4,
+   "quote": "俺の靴下どこ？",
+   "count": 1208,
+   "tsukkomi": "肩の上です。",
+   "img": "honne03/img/R1.jpg",
+   "face": "R1"
+  }
+ ],
+ "hof": {
+  "beats": 8,
+  "label": "殿堂入り",
+  "quote": "誰のおかげで|生活できてると|思ってるんだ",
+  "note": "回数ではなく、重さで別格。",
+  "img": "honne02/img/X7.jpg",
+  "face": "X7"
+ },
+ "end": {
+  "beats": 8,
+  "q": "あなたの家の第1位は？",
+  "cta": "コメントで教えてね",
+  "img": "honne02/img/X10.jpg",
+  "face": "X10"
+ }
+}

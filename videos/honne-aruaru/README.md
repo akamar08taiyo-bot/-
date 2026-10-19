@@ -8,6 +8,7 @@ BGM・効果音は numpy で合成（権利フリー）。フォントは Zen Ma
 | --- | --- | --- | --- |
 | honne01 | 夫に冷めた瞬間あるある【結婚10年目】 | 46秒 | `out/honne01.mp4` |
 | honne02 | 「誰のおかげで生活できてると思ってるんだ」…はい、記録しました。【しのぶの失言ノート#2】 | 53秒 | `out/honne02.mp4` |
+| honne03 | 妻が12年記録した「夫の失言」TOP10…1位は1,208回【しのぶの失言ノート#3】（声なし。音楽は YouTube で足す） | 56秒 | `out/honne03.mp4` |
 
 ## 登場人物（#2 から、シリーズ名は「しのぶの失言ノート」）
 
@@ -27,7 +28,7 @@ BGM・効果音は numpy で合成（権利フリー）。フォントは Zen Ma
 - `episodes/<回>/`：台本 `script.json`（行・テロップ・字幕の色分け・効果音・BGM の止め所・語の頭の時刻 marks）、
   絵の指示文 `prompts.json`、声 `voice/`、行の時刻 `timeline.json`、絵の中の顔の位置 `faces.json`
 - `public/<回>/img`：画面で使う絵（`public/shared/sfx` は全部の回で共通の効果音）
-- `src/episodes/<回>.tsx`：その回の場面・カメラ・演出。共通の部品は `src/parts.tsx`（字幕・テロップ・題字・投票ボタンなど）と `src/props.tsx`（離婚届・値札・へそくりメーター・失言ノート・名札）
+- `src/episodes/<回>.tsx`：その回の場面・カメラ・演出。共通の部品は `src/parts.tsx`（字幕・テロップ・題字・投票ボタンなど）と `src/props.tsx`（離婚届・値札・へそくりメーター・失言ノート・名札）、ランキングの回は `src/ranking.tsx`（順位・失言カード・ツッコミ・記録回数のはんこ・チャット画面・まとめのノート）
 - `out/`：完成品（mp4・字幕・概要欄・サムネ）
 - `kit/`：投稿キット（完成した回を「動画・サムネ・タイトル・説明文・タグ・固定コメント」の1セットずつ並べたページ）。公開先は https://claude.ai/artifact/9gc3QC3EpoCRMARJpYnmAT 、回の並びと動画の id は `kit/kit.json`
 
@@ -52,5 +53,7 @@ python3 -I scripts/build_kit.py                    # 投稿キット kit/index.h
 投稿キットに回を足すとき：`out/<回>_概要欄.txt`（【タイトル】【概要欄】【タグ欄】【固定コメント】）を書き、`kit/kit.json` に回を足して `build_kit.py` を通す → `work/kit/<回>.mp4` を投稿キットの assets に上げ、返ってきた id を `kit.json` の "vid" に書く → もう一度 `build_kit.py` を通して `kit/index.html` を公開し直す（サムネと chars.jpg も一緒に）。
 
 声がまだ無いときは `prep_audio.py --estimate` で文字数から仮の時刻を作れば、画面の確認だけ先にできる。
+
+声のない回（honne03 のランキング）は、`script.json` に `"silent": true` と `"bpm"` を書き、区切りを拍の数で決める（声・BGM・ミックスは作らない）。絵 → `detect.py` → `stills.mjs` → `render.mjs` → `finish.py`（音のトラックなしで書き出し、60秒未満か確かめる）。音楽は投稿のときに YouTube アプリの「サウンドを追加」で足す。
 
 メモ：Gemini API は前払いクレジット制。尽きると 402 になり、声と絵が作れない（AI Studio で補充する）。

@@ -2,6 +2,9 @@
 """仕上げ：音量を -14 LUFS（真のピーク -1.5 dBTP 以下）に合わせ、映像と重ね、字幕と概要欄を書き、検査する。
 
   python3 -I scripts/finish.py --ep honne02   → out/<回>.mp4, out/<回>.srt（概要欄は out/<回>_概要欄.txt に手で書く）
+
+script.json に "silent": true の回（声も音もなく、音楽は投稿のときに YouTube で足す）は、映像だけを圧縮し直して
+音のトラックなしで書き出す。YouTube の音源を足せるよう、60秒未満かも確かめる。
 """
 import json, os, re, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -9,9 +12,6 @@ from common import ROOT, episode
 
 EP = episode()
 S = EP.script()
-T = EP.timeline()
-if T.get('estimated'):
-    sys.exit('timeline.json が文字数からの仮の時刻です。声を作って prep_audio.py を通してから仕上げてください')
 OUT = os.path.join(ROOT, 'out')
 os.makedirs(OUT, exist_ok=True)
 vid = S['id']
@@ -22,6 +22,39 @@ final = os.path.join(OUT, f'{vid}.mp4')
 
 def run(cmd):
     return subprocess.run(cmd, capture_output=True, text=True, check=True)
+
+
+def report(checks):
+    ok = True
+    for name, good, val in checks:
+        print(('✓' if good else '✗'), name, val)
+        ok &= good
+    print('size', f"{os.path.getsize(final) / 1e6:.1f} MB", os.path.relpath(final, ROOT))
+    sys.exit(0 if ok else 1)
+
+
+def video_checks(probe, max_len=60):
+    v = next(s for s in probe['streams'] if s['codec_type'] == 'video')
+    fps = eval(v['r_frame_rate'])
+    dur = float(probe['format']['duration'])
+    return v, [
+        ('解像度 1080x1920', v['width'] == 1080 and v['height'] == 1920, f"{v['width']}x{v['height']}"),
+        ('30fps', abs(fps - 30) < 0.01, f'{fps:.2f}'),
+        (f'長さ 35〜{max_len}秒', 35 <= dur <= max_len, f'{dur:.2f}s'),
+    ]
+
+
+if S.get('silent'):
+    run(['ffmpeg', '-y', '-hide_banner', '-i', silent, '-map', '0:v', '-c:v', 'libx264', '-preset', 'slow', '-tune', 'animation',
+         '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', final])
+    probe = json.loads(run(['ffprobe', '-v', 'error', '-show_streams', '-show_format', '-of', 'json', final]).stdout)
+    _, checks = video_checks(probe, max_len=59)
+    checks.append(('音のトラックなし（音楽は YouTube で足す）', not any(s['codec_type'] == 'audio' for s in probe['streams']), '音なし'))
+    report(checks)
+
+T = EP.timeline()
+if T.get('estimated'):
+    sys.exit('timeline.json が文字数からの仮の時刻です。声を作って prep_audio.py を通してから仕上げてください')
 
 
 # 1) 音量：loudnorm の2回通し（1回目で測り、2回目で合わせる）
@@ -55,16 +88,12 @@ open(os.path.join(OUT, f'{vid}.srt'), 'w', encoding='utf-8').write('\n'.join(srt
 
 # 4) 検査
 probe = json.loads(run(['ffprobe', '-v', 'error', '-show_streams', '-show_format', '-of', 'json', final]).stdout)
-v = next(s for s in probe['streams'] if s['codec_type'] == 'video')
+v, checks = video_checks(probe)
 a = next(s for s in probe['streams'] if s['codec_type'] == 'audio')
 eb = run(['ffmpeg', '-hide_banner', '-nostats', '-i', final, '-af', 'ebur128=peak=true', '-f', 'null', '-']).stderr
 I = float(re.findall(r'I:\s+(-?[\d.]+) LUFS', eb)[-1])
 TPk = float(re.findall(r'Peak:\s+(-?[\d.]+) dBFS', eb)[-1])
-fps = eval(v['r_frame_rate'])
-checks = [
-    ('解像度 1080x1920', v['width'] == 1080 and v['height'] == 1920, f"{v['width']}x{v['height']}"),
-    ('30fps', abs(fps - 30) < 0.01, f'{fps:.2f}'),
-    ('長さ 35〜60秒', 35 <= float(probe['format']['duration']) <= 60, f"{float(probe['format']['duration']):.2f}s"),
+checks += [
     ('音量 -14 LUFS ±1', abs(I + 14) <= 1.0, f'{I:.1f} LUFS'),
     ('真のピーク ≤ -1.0 dBTP', TPk <= -1.0, f'{TPk:.1f} dBTP'),
     ('音声 AAC 48kHz ステレオ', a['codec_name'] == 'aac' and a['sample_rate'] == '48000' and a['channels'] == 2,
@@ -72,9 +101,4 @@ checks = [
     ('音と映像の長さの差 < 0.1秒', abs(float(a['duration']) - float(v['duration'])) < 0.1,
      f"音 {float(a['duration']):.2f}s / 映像 {float(v['duration']):.2f}s"),
 ]
-ok = True
-for name, good, val in checks:
-    print(('✓' if good else '✗'), name, val)
-    ok &= good
-print('size', f"{os.path.getsize(final) / 1e6:.1f} MB", os.path.relpath(final, ROOT))
-sys.exit(0 if ok else 1)
+report(checks)

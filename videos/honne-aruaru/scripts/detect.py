@@ -15,7 +15,7 @@ EP = episode()
 WHO = ('WIFE（茶色い髪を低い位置でまとめた40代の女性・からし色のカーディガン）、'
        'HUSBAND（黒髪・黒縁メガネ・紺のパーカーの男性）、MOTHER-IN-LAW（白髪まじりのパーマ・丸メガネの年配の女性）、'
        'SON（赤白しま模様の男の子）、BABY（白いおくるみの赤ちゃん）、OTHER（その他の人）')
-EXTRA = {'bag': 'ゴルフバッグ（クラブの入った袋）', 'paper': '机の上の緑のふちの紙', 'passbook': '通帳'}
+EXTRA = {'bag': 'ゴルフバッグ（クラブの入った袋）', 'paper': '机の上の緑のふちの紙', 'passbook': '通帳', 'socks': '夫の肩にかかった紺の靴下'}
 path = os.path.join(EP.dir, 'faces.json')
 faces = json.load(open(path)) if os.path.exists(path) else {}
 for arg in sys.argv[1:]:

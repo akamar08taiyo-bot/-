@@ -40,10 +40,15 @@ def kit_video(key):
         return dst
     os.makedirs(WORK, exist_ok=True)
     master = os.path.join(ROOT, 'work', key, 'video_silent.mp4')  # あれば画質の高い元の映像から
+    sound = bool(subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'a', '-show_entries', 'stream=index', '-of', 'csv=p=0', src],
+                                capture_output=True, text=True).stdout.strip())  # 音なしの回は映像だけ
     for crf in (24, 26, 28):
-        ins = ['-i', master, '-i', src, '-map', '0:v', '-map', '1:a'] if os.path.exists(master) else ['-i', src, '-map', '0:v', '-map', '0:a']
+        if os.path.exists(master):
+            ins = ['-i', master, '-i', src, '-map', '0:v'] + (['-map', '1:a'] if sound else [])
+        else:
+            ins = ['-i', src, '-map', '0:v'] + (['-map', '0:a'] if sound else [])
         subprocess.run(['ffmpeg', '-y', '-v', 'error', *ins, '-c:v', 'libx264', '-preset', 'slow', '-tune', 'animation',
-                        '-crf', str(crf), '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', dst], check=True)
+                        '-crf', str(crf), '-pix_fmt', 'yuv420p', *(['-c:a', 'copy'] if sound else []), '-movflags', '+faststart', dst], check=True)
         if os.path.getsize(dst) <= LIMIT:
             return dst
     sys.exit(f'{dst} が 20 MiB に収まりません')
@@ -60,7 +65,8 @@ eps = []
 for i, e in enumerate(C['episodes'], 1):
     s = sections(os.path.join(OUT, f"{e['key']}_概要欄.txt"))
     titles = [t for t in s['タイトル（どれか1つ）'].splitlines() if t.strip()]
-    total = json.load(open(os.path.join(ROOT, 'episodes', e['key'], 'timeline.json')))['total']
+    total = float(subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', os.path.join(OUT, f"{e['key']}.mp4")],
+                                 capture_output=True, text=True, check=True).stdout)
     v = kit_video(e['key'])
     images(e['key'])
     eps.append(dict(e, n=i, titles=titles, desc=s['概要欄'], tags=s['タグ欄'], pin=s['固定コメント'],
@@ -80,7 +86,7 @@ def card(e):
     return f'''<article class="vc" id="v-{k}" data-key="{k}" data-vid="{vid}">
   <span class="posted" hidden>投稿済</span>
   <div class="vh"><span class="no">{n}</span><span class="series">{esc(e['series'])}</span><span class="dur">{e['sec']}秒</span></div>
-  <p class="when">{esc(e['when'])}</p>
+  <p class="when">{esc(e['when'])}</p>{f'{chr(10)}  <p class="note">{esc(e["note"])}</p>' if e.get('note') else ''}
   <div class="vb">
     <img class="th" src="thumb_s/{k}.jpg" alt="サムネ：{esc(e['titles'][0])}" width="135" height="240" loading="lazy">
     <div class="vm">
@@ -102,7 +108,7 @@ def card(e):
   <details><summary>説明文を見る</summary><pre id="d-{k}">{esc(e['desc'])}</pre></details>
   <details><summary>タグを見る</summary><pre id="g-{k}">{esc(e['tags'])}</pre><p class="count">YouTube Studio の動画の詳細 →「タグ」に貼ります（, で区切られて1つずつのタグになります）。</p></details>
   <details><summary>固定コメントを見る</summary><pre id="p-{k}">{esc(e['pin'])}</pre></details>
-  <details><summary>どんな回？</summary><p class="intro">{esc(e['about'])}（尺：{e['sec']}秒。サムネにするコマ：最初から約{e['cover_t']:g}秒）</p></details>
+  <details><summary>どんな回？</summary><p class="intro">{esc(e['about'])}（尺：{e['sec']}秒。サムネにするコマ：{f"最初から約{e['cover_t']:g}秒" if e['cover_t'] else '最初のコマ'}）</p></details>
 </article>'''
 
 
@@ -160,6 +166,7 @@ section{{display:flex;flex-direction:column;gap:14px;scroll-margin-top:12px}}
 .series{{font-size:12.5px;font-weight:900;color:var(--pink);background:var(--pink-bg);border-radius:99px;padding:2px 11px;white-space:nowrap}}
 .dur{{font-size:12.5px;color:var(--ink2);font-variant-numeric:tabular-nums}}
 .when{{margin:0;font-size:13px;font-weight:700;color:var(--ink2)}}
+.note{{margin:0;font-size:13px;font-weight:700;color:var(--pink);background:var(--pink-bg);border-radius:10px;padding:8px 12px}}
 .vb{{display:flex;gap:12px;align-items:flex-start}}
 .th{{flex:none;width:112px;height:auto;aspect-ratio:9/16;border-radius:8px;border:1px solid var(--line);object-fit:cover;max-width:100%}}
 .vm{{min-width:0;display:flex;flex-direction:column;gap:8px}}
@@ -233,6 +240,7 @@ tr:last-child th,tr:last-child td{{border-bottom:0}}
   <ol class="flow">
     <li><b>動画を保存</b>上の「動画を保存」で、スマホに保存します。</li>
     <li><b>YouTubeアプリでアップロード</b>「＋」から保存した動画を選びます。縦で1分以内なので、ショートになります。</li>
+    <li><b>音なしの回は曲をつける</b>カードに「音なしの回」とある動画は、アップロードの編集画面の「サウンドを追加」で曲を選びます（YouTube の音源なら権利の心配はありません）。</li>
     <li><b>タイトルと説明文を貼る</b>「タイトルをコピー」「説明文をコピー」で貼りつけます。タグは、YouTube Studio の動画の詳細の「タグ」に貼ります（アプリの投稿画面にタグ欄がないときは、投稿のあとで）。</li>
     <li><b>設定して公開</b>下の「投稿のときの設定」のとおりにして、公開（または予約）します。</li>
     <li><b>サムネを選び直す（投稿のあと）</b>YouTube アプリで：右下「マイページ」→「動画」→ その動画の「︙」→「編集」→ サムネのえんぴつ → コマを、題字がそろうところ（各回の「どんな回？」に書いた秒数）に合わせて「完了」→「保存」。</li>
@@ -247,10 +255,10 @@ tr:last-child th,tr:last-child td{{border-bottom:0}}
     <ul class="check">
       <li>公開範囲：公開（または日時を決めて予約）</li>
       <li>視聴者：子ども向けではない</li>
-      <li>改変または合成されたコンテンツ：「はい」（ナレーションが AI で作った声のため。申告しても表示回数には影響しません）</li>
+      <li>改変または合成されたコンテンツ：ナレーションが AI の声の回（#1・#2）は「はい」（申告しても表示回数には影響しません）。声のない回は「いいえ」で大丈夫です</li>
       <li>カテゴリ：エンターテイメント</li>
       <li>コメント：オン。固定コメントを付ける</li>
-      <li>2本は同じ日に出さず、数日あける</li>
+      <li>同じ日に2本出さず、数日あける</li>
       <li>投稿のあとに見る数字：「視聴を選んだ割合」と「平均再生率」。コメントで多かった失言は、次の回の台本の候補にする</li>
     </ul>
   </div>

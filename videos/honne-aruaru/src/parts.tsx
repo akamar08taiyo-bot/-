@@ -47,7 +47,7 @@ export const Outlined: React.FC<{
 };
 
 // ───────── シリーズ名と進み具合（①〜⑤） ─────────
-export const Header: React.FC<{series?: string; episode: string; item: number; since: number}> = ({series = '本音あるある', episode, item, since}) => {
+export const Header: React.FC<{series?: string; episode: string; item: number; since: number; dots?: boolean}> = ({series = '本音あるある', episode, item, since, dots = true}) => {
   const frame = useCurrentFrame();
   const pill = (bg: string, fg: string, size: number): React.CSSProperties => ({
     background: bg,
@@ -65,6 +65,7 @@ export const Header: React.FC<{series?: string; episode: string; item: number; s
         <div style={pill(C.coral, '#fff', [...series].length > 7 ? 40 : 44)}>{series}</div>
         <div style={pill('#fff', C.ink, [...episode].length > 8 ? 36 : 40)}>{episode}</div>
       </div>
+      {dots && (
       <div style={{display: 'flex', alignItems: 'center', gap: 0}}>
         {[1, 2, 3, 4, 5].map((n) => {
           const done = n < item;
@@ -96,6 +97,7 @@ export const Header: React.FC<{series?: string; episode: string; item: number; s
           );
         })}
       </div>
+      )}
     </div>
   );
 };
