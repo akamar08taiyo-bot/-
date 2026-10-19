@@ -54,12 +54,13 @@ const plan = (r: Rank) => {
   return {s, reveal: s.from, quote: s.b(1), roll: undefined, stamp: s.b(long ? 7 : 6), tsukkomi: s.b(long ? 5 : 4)};
 };
 
-// 絵ごとのカメラ：はじめは夫（言った人）、ツッコミで妻に寄る
-const ZOOM: Record<string, {h: number; w: number; start?: {x: number; y: number}}> = {
+// 絵ごとのカメラ：はじめは夫（言った人）、ツッコミで妻に寄る。ty / wty は顔を置く高さ、quoteY は失言カードの高さ
+// （順位の文字にもカードにも顔がかからないように。7位は引きの絵でカードを上に、6位は寝ている夫の顔に寄る）
+const ZOOM: Record<string, {h: number; w: number; start?: {x: number; y: number}; ty?: number; wty?: number; quoteY?: number}> = {
   X6: {h: 1.35, w: 1.6},
   R8: {h: 1.3, w: 1.55},
-  S1: {h: 1.2, w: 1.55, start: {x: 0.66, y: 0.47}},
-  R6: {h: 1.25, w: 1.55},
+  S1: {h: 1.0, w: 1.25, start: {x: 0.5, y: 0.45}, wty: 560, quoteY: 820},
+  R6: {h: 1.6, w: 1.55, ty: 730},
   R5: {h: 1.12, w: 1.6, start: {x: 0.42, y: 0.42}},
   R4: {h: 1.3, w: 1.55},
   R3: {h: 1.3, w: 1.55},
@@ -78,8 +79,8 @@ const rankScene = (r: Rank): Scene => {
   const h = z.start ?? face(r.face, 'HUSBAND');
   const w = face(r.face, 'WIFE');
   const keys = [
-    {at: reveal, cam: cam(h.x, h.y, z.h, 540, 720)},
-    {at: tsukkomi - 2, cam: cam(w.x, w.y, z.w, 560, 720), dur: 6},
+    {at: reveal, cam: cam(h.x, h.y, z.h, 540, z.ty ?? 720)},
+    {at: tsukkomi - 2, cam: cam(w.x, w.y, z.w, 560, z.wty ?? 720), dur: 6},
   ];
   // 1位：ツッコミでは肩の靴下に寄る
   if (r.rank === 1) keys[1] = {at: tsukkomi - 2, cam: cam(socks.x, socks.y, 1.55, 560, 760), dur: 6};
@@ -251,7 +252,7 @@ export const Honne03: React.FC = () => {
             {r.chat ? (
               <ChatScreen name="まもる" mine={r.chat} reply={r.quote} cx={540} cy={800} from={p.s.from} to={p.s.to} replyAt={p.quote} />
             ) : (
-              <QuoteCard text={r.quote} note={r.note} cy={QUOTE_Y} from={p.quote} to={p.s.to} />
+              <QuoteCard text={r.quote} note={r.note} cy={ZOOM[r.face]?.quoteY ?? QUOTE_Y} from={p.quote} to={p.s.to} />
             )}
             <Tsukkomi text={r.tsukkomi} cy={TSUK_Y} from={p.tsukkomi} to={p.s.to} />
             <CountStamp x={STAMP.x} y={STAMP.y} count={r.count} from={p.roll ?? p.stamp} to={p.s.to} rollTo={p.roll === undefined ? undefined : p.stamp} />
