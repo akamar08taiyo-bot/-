@@ -75,6 +75,8 @@ export function readXlsx(bytes: Uint8Array): Sheet[] {
   const sheets: Sheet[] = [];
   const wb = read('xl/workbook.xml');
   for (const tag of wb.match(/<sheet\b[^>]*>/g) ?? []) {
+    // 隠してあるシート（計算用・社内用など）は読まない
+    if (/hidden/i.test(attr(tag, 'state'))) continue;
     const name = attr(tag, 'name');
     const rid = attr(tag, 'r:id');
     const path = rels.get(rid);

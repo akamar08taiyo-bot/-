@@ -1,9 +1,11 @@
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
-import {cutToLength, estimatePlaceLines, estimateTotals, jobName, jobTotals, jobWork, monthSummary, placeTotals, rowAmount} from '../calc.ts';
+import {jobName, jobTotals, monthSummary, placeTotals, rowAmount} from '../calc.ts';
 import type {MonthSummary} from '../calc.ts';
+import {FORM_INFO, jobForm} from '../estimateForms.ts';
 import type {AppData, Job, Settings} from '../types.ts';
 import {dateLabel, monthEnd, monthLabel, num, shortDate, todayIso, yen} from '../util.ts';
+import {KouikiForm, YukuhashiForm} from './EstimateForms.tsx';
 
 export type PrintRequest =
   | {kind: 'invoice'; month: string; withDetails: boolean}
@@ -15,7 +17,7 @@ type DocMeta = {date: string; number: string; due: string};
 const META_KEY = 'sasaoka-app:invoice-meta';
 
 /**
- * 請求日・請求書番号・お支払期限は月ごとに、見積日・見積番号は様邸ごとに覚えておく（次に開いたときも同じものが入る）。
+ * 請求日・請求書番号・お支払期限は月ごとに、見積書の作成日は様邸ごとに覚えておく（次に開いたときも同じものが入る）。
  * key は請求書なら 'YYYY-MM'、見積書なら 'est:様邸のID'
  */
 function useDocMeta(key: string, defaultDate: () => string) {
@@ -41,17 +43,17 @@ function useDocMeta(key: string, defaultDate: () => string) {
   return [meta, setMeta] as const;
 }
 
-/** A4の幅（210mm）＋まわりの余白。画面がこれより狭いと、用紙全体が見えるように縮めて見せる */
-const PAGE_PX = (210 / 25.4) * 96 + 16;
+/** 用紙の幅（A4縦 210mm・横 297mm）＋まわりの余白。画面がこれより狭いと、用紙全体が見えるように縮めて見せる */
+const pagePx = (mm: number) => (mm / 25.4) * 96 + 16;
 
 /** 印刷イメージを画面の幅に合わせる倍率（1＝原寸） */
-function useFitScale() {
+function useFitScale(pageMm: number) {
   const ref = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const measure = () => setScale(Math.min(1, el.clientWidth / PAGE_PX));
+    const measure = () => setScale(Math.min(1, el.clientWidth / pagePx(pageMm)));
     measure();
     if (typeof ResizeObserver === 'undefined') {
       window.addEventListener('resize', measure);
@@ -60,7 +62,7 @@ function useFitScale() {
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [pageMm]);
   return [ref, scale] as const;
 }
 
@@ -70,7 +72,10 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
     const today = todayIso();
     return request.kind !== 'estimate' && today.slice(0, 7) > month ? monthEnd(month) : today;
   });
-  const [overlayRef, fitScale] = useFitScale();
+  // 見積書は A4横（元の Excel と同じ）
+  const estJob = request.kind === 'estimate' ? data.jobs.find((j) => j.id === request.jobId) : undefined;
+  const form = estJob ? jobForm(estJob, data.settings) : null;
+  const [overlayRef, fitScale] = useFitScale(request.kind === 'estimate' ? 297 : 210);
   const [actualSize, setActualSize] = useState(false);
   const zoom = actualSize ? 1 : fitScale;
 
@@ -84,14 +89,14 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
     if (request.kind === 'invoice') document.title = `${data.settings.clientName}様_御請求書_${monthLabel(request.month)}分`;
     else {
       const j = data.jobs.find((x) => x.id === request.jobId);
-      if (j && request.kind === 'estimate') document.title = `御見積書_${j.customer.trim() || 'お客様'}様`;
+      if (j && request.kind === 'estimate') document.title = `${FORM_INFO[jobForm(j, data.settings)].title}_${j.customer.trim() || 'お客様'}様`;
       else if (j) document.title = `${data.settings.clientName}仕切り計算表_${jobName(j)}`;
     }
     return () => {
       window.removeEventListener('keydown', onKey);
       document.title = title;
     };
-  }, [onClose, request, data.jobs, data.settings.clientName]);
+  }, [onClose, request, data.jobs, data.settings]);
 
   const jobs = useMemo(() => data.jobs.filter((j) => j.month === month), [data.jobs, month]);
   const summary = useMemo(() => monthSummary(jobs, data.settings), [jobs, data.settings]);
@@ -109,7 +114,11 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
     sheets = !job ? (
       <div className="sheet">見つかりませんでした</div>
     ) : request.kind === 'estimate' ? (
-      <EstimateDoc job={job} settings={data.settings} meta={meta} />
+      form === 'kouiki' ? (
+        <KouikiForm job={job} settings={data.settings} />
+      ) : (
+        <YukuhashiForm job={job} settings={data.settings} date={meta.date} />
+      )
     ) : (
       <JobDoc job={job} settings={data.settings} />
     );
@@ -117,21 +126,20 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
 
   return (
     <div className="print-overlay" ref={overlayRef}>
+      {/* 見積書は A4横で印刷する（この画面を開いているあいだだけ） */}
+      {form && <style>{'@media print { @page { size: A4 landscape; margin: 0; } }'}</style>}
       <div className="print-toolbar">
         <div className="text-sm font-bold">
-          印刷イメージ（A4縦）
+          {form ? `見積書（A4横）・${FORM_INFO[form].name}「${FORM_INFO[form].title}」` : '印刷イメージ（A4縦）'}
           <span className="ml-2 hidden font-normal text-slate-300 sm:inline">印刷の画面で「PDFに保存」を選ぶとPDFにできます</span>
         </div>
-        {request.kind === 'estimate' && (
+        {form === 'yukuhashi' && (
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <label className="flex items-center gap-1">
-              見積日
+              作成日
               <input type="date" value={meta.date} onChange={(e) => setMeta({...meta, date: e.target.value})} className="h-8 rounded bg-white px-1 text-slate-900" />
             </label>
-            <label className="flex items-center gap-1">
-              見積番号
-              <input value={meta.number} onChange={(e) => setMeta({...meta, number: e.target.value})} className="h-8 w-28 rounded bg-white px-1 text-slate-900" placeholder="任意" />
-            </label>
+            <span className="text-slate-300">（空にすると「令和　年　月　日」のまま）</span>
           </div>
         )}
         {request.kind === 'invoice' && (
@@ -445,166 +453,6 @@ function JobDoc({job, settings: s}: {job: Job; settings: Settings}) {
           </div>
         );
       })}
-    </div>
-  );
-}
-
-/**
- * 見積書（仮の書式。正式な書式をいただいたら合わせる）。
- * 部材の単価は 定価×掛率、切って使う部材の数量は 使う長さ÷1本の長さ（例：60cm÷4m＝0.15本）。
- * 右端の備考に「定価○○円（税抜）」。部材のすぐ下の手間は「同上施工費」の1行。
- */
-function EstimateDoc({job, settings: s, meta}: {job: Job; settings: Settings; meta: DocMeta}) {
-  const t = estimateTotals(job, s);
-  const taxPct = `${Math.round(s.taxRate * 1000) / 10}%`;
-  let no = 0;
-  return (
-    <div className="sheet">
-      <div className="doc-title">御見積書</div>
-      <div className="doc-head">
-        <div className="left">
-          <div className="to">
-            {job.customer.trim() || '　　　　'}
-            <small>様</small>
-          </div>
-          <p className="greeting">下記のとおりお見積り申し上げます。</p>
-          <table className="info">
-            <tbody>
-              <tr>
-                <th>工事内容</th>
-                <td>{jobWork(job, s.estimateWork)}</td>
-              </tr>
-              {job.address && (
-                <tr>
-                  <th>工事場所</th>
-                  <td>{job.address}</td>
-                </tr>
-              )}
-              {s.estimateValid && (
-                <tr>
-                  <th>有効期限</th>
-                  <td>{s.estimateValid}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          <div className="amount-box">
-            <div className="k">御見積金額（税込）</div>
-            <div className="v">¥{yen(t.total)}-</div>
-          </div>
-        </div>
-        <div className="right">
-          <div className="meta">
-            {meta.date && <div>見積日　{dateLabel(meta.date)}</div>}
-            {meta.number && <div>見積番号　{meta.number}</div>}
-          </div>
-          <Issuer s={s} staff={job.staff} />
-          <div className="stamps">
-            {['所長印', '担当印'].map((label) => (
-              <div key={label} className="stamp">
-                <div>{label}</div>
-                <div className="box" />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <table className="items estimate">
-        <colgroup>
-          <col style={{width: '5%'}} />
-          <col style={{width: '39%'}} />
-          <col style={{width: '7%'}} />
-          <col style={{width: '6%'}} />
-          <col style={{width: '11%'}} />
-          <col style={{width: '12%'}} />
-          <col style={{width: '20%'}} />
-        </colgroup>
-        <thead>
-          <tr>
-            <th>No.</th>
-            <th>品名・規格</th>
-            <th>数量</th>
-            <th>単位</th>
-            <th>単価</th>
-            <th>金額</th>
-            <th>備考</th>
-          </tr>
-        </thead>
-        <tbody>
-          {job.places.map((place) => {
-            // 金額のない施工費の行は出さない
-            const lines = estimatePlaceLines(place, s.estimateRate).filter((l) => l.kind === 'material' || l.amount !== 0);
-            if (lines.length === 0) return null;
-            return [
-              <tr key={place.id} className="place-row">
-                <td />
-                <td colSpan={6}>【{place.name || '箇所'}】</td>
-              </tr>,
-              ...lines.map((l, i) =>
-                l.kind === 'material' ? (
-                  <tr key={`${place.id}-${i}`}>
-                    <td className="c">{++no}</td>
-                    <td className="name">
-                      {l.row.name || '部材'}
-                      {cutToLength(l.row)
-                        ? `（${num(l.row.lengthCm)}cm使用・1本${num(l.row.pieceLengthM)}m）`
-                        : l.row.lengthCm > 0 && `（長さ ${num(l.row.lengthCm)}cm）`}
-                      {l.row.code && <span className="code-sub">{l.row.code}</span>}
-                    </td>
-                    <td className="num">{num(l.qty, 3)}</td>
-                    <td className="c">{l.row.unit || (cutToLength(l.row) ? '本' : '')}</td>
-                    <td className="num">{yen(l.unitPrice)}</td>
-                    <td className="num">{yen(l.amount)}</td>
-                    <td className="note">{l.row.listPrice > 0 && `定価${yen(l.row.listPrice)}円（税抜）`}</td>
-                  </tr>
-                ) : (
-                  <tr key={`${place.id}-${i}`}>
-                    <td className="c">{++no}</td>
-                    <td className="name">{l.afterMaterial ? '同上施工費' : '施工費'}</td>
-                    <td className="num">1</td>
-                    <td className="c">式</td>
-                    <td className="num">{yen(l.amount)}</td>
-                    <td className="num">{yen(l.amount)}</td>
-                    <td className="note" />
-                  </tr>
-                ),
-              ),
-            ];
-          })}
-          {no === 0 && (
-            <tr>
-              <td colSpan={7} className="c muted">
-                （入力なし）
-              </td>
-            </tr>
-          )}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td colSpan={5} className="r">
-              小計（税抜）
-            </td>
-            <td className="num">{yen(t.subtotal)}</td>
-            <td />
-          </tr>
-          <tr>
-            <td colSpan={5} className="r">
-              消費税（{taxPct}）
-            </td>
-            <td className="num">{yen(t.tax)}</td>
-            <td />
-          </tr>
-          <tr>
-            <td colSpan={5} className="r">
-              合計（税込）
-            </td>
-            <td className="num strong">{yen(t.total)}</td>
-            <td />
-          </tr>
-        </tfoot>
-      </table>
-      {s.estimateNote && <div className="remarks">{s.estimateNote}</div>}
     </div>
   );
 }

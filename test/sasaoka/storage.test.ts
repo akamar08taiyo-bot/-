@@ -41,11 +41,26 @@ test('請求書の消費税：前の版の設定（様邸ごと）は「すべ�
   assert.equal(cleanSettings({rev: 1}).rev, 2);
 });
 
-test('見積の設定：最初は定価×0.8', () => {
+test('見積の設定：最初は定価×0.8・諸経費10%・施工費1時間2,500円・書式は行橋市・苅田町用', () => {
   const s = cleanSettings({});
-  assert.equal(s.estimateRate, 0.8);
-  assert.equal(s.estimateWork, '手すり取付工事');
+  assert.deepEqual([s.estimateRate, s.estimateOverheadRate, s.estimateHourRate, s.estimateForm], [0.8, 0.1, 2500, 'yukuhashi']);
   assert.equal(cleanSettings({estimateRate: '0.75'}).estimateRate, 0.75);
+  assert.equal(cleanSettings({estimateForm: 'kouiki'}).estimateForm, 'kouiki');
+  assert.equal(cleanSettings({estimateForm: 'x', estimateOverheadRate: -1}).estimateForm, 'yukuhashi');
+  assert.equal(cleanSettings({estimateOverheadRate: -1}).estimateOverheadRate, 0);
+});
+
+test('見積書の項目：前のデータ（項目なし）も読める', () => {
+  const [j] = cleanJobs([{customer: '山田', work: '前の工事内容', places: [{name: '玄関', rows: [{kind: 'material', excluded: true}, {kind: 'labor'}]}]}]);
+  assert.deepEqual([j.insuredNo, j.form], ['', '']);
+  assert.deepEqual([j.places[0].kind, j.places[0].photo, j.places[0].work], [1, 0, '']);
+  assert.deepEqual(j.places[0].rows.map((r) => r.excluded), [true, false]);
+  const [k] = cleanJobs([{insuredNo: '0000366989', form: 'kouiki', places: [{kind: 3, photo: '2', work: '床材変更'}, {kind: 9, photo: -1}]}]);
+  assert.deepEqual([k.insuredNo, k.form], ['0000366989', 'kouiki']);
+  assert.deepEqual(k.places.map((p) => [p.kind, p.photo, p.work]), [
+    [3, 2, '床材変更'],
+    [1, 0, ''],
+  ]);
 });
 
 test('前のデータの行・部材にも、定価・長さ・見積の単価が入る', () => {
@@ -56,7 +71,6 @@ test('前のデータの行・部材にも、定価・長さ・見積の単価�
   const [j2] = cleanJobs([{places: [{rows: [{kind: 'material', name: '木製手すり 35φ 4m'}, {kind: 'labor', name: '補強板 2m以下'}]}]}]);
   assert.deepEqual(j2.places[0].rows.map((x) => x.pieceLengthM), [4, 0]);
   assert.deepEqual(cleanMaterials([{name: '手すり 2000mm'}, {name: 'ブラケット'}, {name: '手すり 4m', pieceLengthM: 0}]).map((m) => m.pieceLengthM), [2, 0, 0]);
-  assert.equal(j.work, '');
   const [r2] = cleanJobs([{places: [{rows: [{kind: 'material', estPrice: '9600', lengthCm: -5}]}]}])[0].places[0].rows;
   assert.deepEqual([r2.estPrice, r2.lengthCm], [9600, 0]);
   assert.deepEqual(cleanKits([{name: '一式', rows: [{kind: 'labor', name: '木', price: 1000, qty: 2}]}, 'x']).map((k) => [k.name, k.rows.length]), [['一式', 1]]);

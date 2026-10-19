@@ -115,9 +115,9 @@ export function defaultSettings(): Settings {
     placePresets: DEFAULT_PLACES,
     staffList: DEFAULT_STAFF,
     estimateRate: 0.8,
-    estimateWork: '手すり取付工事',
-    estimateValid: 'お見積り日より1か月',
-    estimateNote: '',
+    estimateOverheadRate: 0.1,
+    estimateHourRate: 2500,
+    estimateForm: 'yukuhashi',
     rev: SETTINGS_REV,
   };
   return settingsForOffice(base, portalOffice() || '行橋営業所');

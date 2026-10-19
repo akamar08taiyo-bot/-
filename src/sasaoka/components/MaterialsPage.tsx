@@ -14,6 +14,7 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
   const [query, setQuery] = useState('');
   const [maker, setMaker] = useState('');
   const [favOnly, setFavOnly] = useState(false);
+  const [noPriceOnly, setNoPriceOnly] = useState(false);
   const [draft, setDraft] = useState({name: '', code: '', maker: '', price: 0, listPrice: 0, pieceLengthM: 0});
   const [limit, setLimit] = useState(SHOW_LIMIT);
 
@@ -24,11 +25,16 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
   const list = useMemo(
     () =>
       data.materials.filter(
-        (m) => (!favOnly || m.favorite) && (!maker || m.maker === maker) && matchesAll(`${m.name} ${m.code} ${m.maker}`, query),
+        (m) =>
+          (!favOnly || m.favorite) &&
+          (!noPriceOnly || !(m.price > 0)) &&
+          (!maker || m.maker === maker) &&
+          matchesAll(`${m.name} ${m.code} ${m.maker}`, query),
       ),
-    [data.materials, favOnly, maker, query],
+    [data.materials, favOnly, noPriceOnly, maker, query],
   );
   const favCount = data.materials.filter((m) => m.favorite).length;
+  const noPriceCount = data.materials.filter((m) => !(m.price > 0)).length;
 
   const setMat = (id: string, patch: Partial<Material>) =>
     update('materials', (all) => all.map((m) => (m.id === id ? {...m, ...patch, updatedAt: Date.now()} : m)));
@@ -68,7 +74,7 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-lg font-bold text-[#0c315e]">部材リスト（メーカーの仕切り）</h1>
         <span className="text-sm text-slate-500">
-          全{data.materials.length}件・★お気に入り {favCount}件
+          全{data.materials.length}件・★お気に入り {favCount}件{noPriceCount > 0 && `・仕切価格が空欄 ${noPriceCount}件`}
         </span>
         <div className="ml-auto">
           <Btn color="purple" onClick={() => setImporting(true)}>
@@ -140,6 +146,12 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
           <input type="checkbox" checked={favOnly} onChange={(e) => setFavOnly(e.target.checked)} />
           ★お気に入りだけ表示
         </label>
+        {noPriceCount > 0 && (
+          <label className="flex items-center gap-1.5 text-sm">
+            <input type="checkbox" checked={noPriceOnly} onChange={(e) => setNoPriceOnly(e.target.checked)} />
+            仕切価格が空欄のものだけ
+          </label>
+        )}
         <div className="ml-auto flex flex-wrap gap-2">
           <Btn small color="amber" disabled={list.length === 0} onClick={() => setMany(new Set(list.map((m) => m.id)), {favorite: true})}>
             表示中を★に

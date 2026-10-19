@@ -5,13 +5,16 @@ import {strToU8, zipSync} from 'fflate';
 import {
   alignToHeader,
   decodeText,
+  codeHasSpec,
   detectListNth,
   detectMapping,
+  guessMaker,
   guessPieceLengthM,
   gridCandidates,
   lineCandidates,
   mergeMaterials,
   parseDelimited,
+  parseLengthM,
   parsePrice,
   splitLine,
   textToGrid,
@@ -42,7 +45,7 @@ test('Excel（.xlsx）の仕切り表を読む：見出しを見つけて「仕�
   assert.deepEqual(grid[1], ['メーカー', '品番', '商品名', '定価', '仕切価格', '単位']);
   const m = detectMapping(grid);
   // 「定価」と「仕切価格」の両方があれば、仕切価格は仕切の列、定価は定価の列
-  assert.deepEqual(m, {header: 1, name: 2, price: 4, code: 1, maker: 0, unit: 5, list: 3});
+  assert.deepEqual(m, {header: 1, name: 2, price: 4, code: 1, maker: 0, unit: 5, list: 3, spec: -1, len: -1});
   const c = gridCandidates(grid, m, '');
   assert.equal(c.length, 6);
   assert.deepEqual(
@@ -114,11 +117,109 @@ test('Shift_JIS の CSV（"..." 囲み・カンマ入り）', () => {
   assert.deepEqual([m.header, m.code, m.name, m.price, m.list], [0, 0, 1, 2, -1]);
 });
 
-test('定価の列しかない表：仕切価格も定価の列（取り込む画面で選び直せる）', () => {
+test('定価の列しかない表：仕切価格は空欄で取り込む（あとで仕切価格の入った表を取り込むと入る）', () => {
   const grid = textToGrid('商品名\t定価\n手すり 600\t4,800\n');
   const m = detectMapping(grid);
-  assert.deepEqual([m.name, m.price, m.list], [0, 1, 1]);
-  assert.deepEqual(gridCandidates(grid, m, '').map((x) => [x.price, x.listPrice]), [[4800, 4800]]);
+  assert.deepEqual([m.name, m.price, m.list], [0, -1, 1]);
+  assert.deepEqual(gridCandidates(grid, m, '').map((x) => [x.price, x.listPrice, x.include]), [[null, 4800, true]]);
+});
+
+test('TOTOの価格表の形：改定前・改定後の「定価」「売価」が並ぶ → 右の（新しい）方。新しい売価が空欄なら仕切価格は空欄', () => {
+  const grid: string[][] = [
+    ['太陽シルバーサービス株式会社御中'],
+    ['', '', '', '', '2025年9月までの価格', '', '', '2025年10月からの新値'],
+    ['品番', '品名', '色', '色', '定価', '売価', '', '定価', '売価', ''],
+    ['TS136GU8#NW1', 'インテリア・バーＦ　ＵＢ後付Ｉ型', '#NW1', 'ﾎﾜｲﾄ', '14500', '6380', '0.44', '15200', '', '0'],
+    ['EWCS450S51', 'ウォシュレット付補高便座', ' ', ' ', '175700', '101105', '0.57', '183000', '', '0'],
+  ];
+  const m = detectMapping(grid);
+  assert.deepEqual([m.header, m.code, m.name, m.spec, m.list, m.price], [2, 0, 1, 3, 7, 8]);
+  assert.deepEqual(
+    gridCandidates(grid, m, 'TOTO').map((c) => [c.code, c.name, c.listPrice, c.price, c.include]),
+    [
+      ['TS136GU8#NW1', 'インテリア・バーF UB後付I型 ホワイト', 15200, null, true], // 色の名前を商品名のうしろに
+      ['EWCS450S51', 'ウォシュレット付補高便座', 183000, null, true],
+    ],
+  );
+  assert.equal(guessMaker(grid.slice(0, 5).map((r) => r.join(' ')).concat('TOTO九州販売株式会社')), 'TOTO');
+});
+
+test('マツ六の価格表の形：「品番等」の品番と寸法・色を分ける。「掛率」は価格にしない。同じ商品が何度も載っていても1件', () => {
+  const head = ['ページ', 'メーカー', '商品コード', 'JANコード', '商品名', '品番等', '単位', '定価', '掛率', '', '備考'];
+  const row = (page: string, code: string, name: string, spec: string, unit: string, list: string) => [page, 'マツ六', code, '4976415954244', name, spec, unit, list, '0.32', '', '価格変更'];
+  const grid = [
+    head,
+    row('71', '040-0950', 'BAUHAUS 35アッシュ丸棒 ディンプル付', 'BD-134 φ35×4000mm Mオーク', '本', '18600'),
+    row('73', '040-0950', 'BAUHAUS 35アッシュ丸棒 ディンプル付', 'BD-134 φ35×4000mm Mオーク', '本', '18600'),
+    row('96', '040-1046', 'BAUHAUS セレクト 35エンドブラケットカバー付', 'BD-08G ゴールド', '個', '2350'),
+    row('97', '040-0000', 'BAUHAUS フリーRレール 錆び止めローバル', 'BJ-33', '個', '2350'),
+  ];
+  const m = detectMapping(grid);
+  assert.deepEqual([m.code, m.name, m.maker, m.unit, m.list, m.price], [5, 4, 1, 6, 7, -1]);
+  assert.equal(codeHasSpec(grid, m), true);
+  const c = gridCandidates(grid, m, '');
+  assert.deepEqual(c[0], {
+    key: 'g1',
+    row: 2,
+    name: 'BAUHAUS 35アッシュ丸棒 ディンプル付 φ35×4000mm Mオーク',
+    price: null,
+    listPrice: 18600,
+    code: 'BD-134',
+    maker: 'マツ六',
+    unit: '本',
+    pieceLengthM: 0, // 長さの列はない（部材リストに入れるときに商品名の「4000mm」から読む）
+    include: true,
+    favorite: false,
+  });
+  assert.deepEqual(c.slice(2).map((x) => [x.code, x.name]), [
+    ['BD-08G', 'BAUHAUS セレクト 35エンドブラケットカバー付 ゴールド'],
+    ['BJ-33', 'BAUHAUS フリーRレール 錆び止めローバル'],
+  ]);
+  const r = mergeMaterials([], c, 5);
+  assert.deepEqual([r.added, r.unchanged, r.list.length], [3, 1, 3]); // 2回載っている BD-134 は1件
+  assert.deepEqual(r.list.map((x) => [x.code, x.price, x.listPrice, x.pieceLengthM]), [
+    ['BD-134', 0, 18600, 4], // 仕切価格は空欄 → 0円（あとで入れる）
+    ['BD-08G', 0, 2350, 0],
+    ['BJ-33', 0, 2350, 0],
+  ]);
+});
+
+test('仕切価格はあとで取り込める：空欄の表で今の仕切価格を消さない／品番と仕切価格だけの表で入れる', () => {
+  const now: Material[] = [
+    {id: 'a', name: '手すり', price: 0, listPrice: 18600, pieceLengthM: 4, maker: 'マツ六', code: 'BD-134', unit: '本', favorite: true, updatedAt: 1},
+    {id: 'b', name: 'ブラケット', price: 760, listPrice: 2350, pieceLengthM: 0, maker: 'マツ六', code: 'BD-08G', unit: '個', favorite: false, updatedAt: 1},
+  ];
+  // 品番と仕切価格だけの表（商品名の列なし）
+  const grid = textToGrid('品番\t仕切価格\nBD-134\t5,952\nBD-08G\t\nXX-999\t100\n');
+  const m = detectMapping(grid);
+  assert.deepEqual([m.name, m.code, m.price], [-1, 0, 1]);
+  const c = gridCandidates(grid, m, 'マツ六');
+  // 仕切価格が空欄の行（BD-08G）は読まない
+  assert.deepEqual(c.map((x) => [x.code, x.price, x.include]), [
+    ['BD-134', 5952, true],
+    ['XX-999', 100, true],
+  ]);
+  const r = mergeMaterials(now, c, 9);
+  assert.deepEqual(r.list.map((x) => [x.code, x.name, x.price, x.listPrice]), [
+    ['BD-134', '手すり', 5952, 18600], // 仕切価格が入る（商品名・定価・★はそのまま）
+    ['BD-08G', 'ブラケット', 760, 2350], // 空欄の行は今のまま
+  ]);
+  assert.equal(r.list[0].favorite, true);
+  assert.deepEqual([r.added, r.updated], [0, 1]); // 部材リストにない XX-999 は足さない
+  // 定価だけの表を取り込み直しても、入っている仕切価格は消えない
+  const again = mergeMaterials(
+    r.list,
+    [{key: 'k', row: 2, name: 'ブラケット', price: null, listPrice: 2450, code: 'BD-08G', maker: 'マツ六', unit: '個', pieceLengthM: 0, include: true, favorite: false}],
+    10,
+  );
+  assert.deepEqual([again.list[1].price, again.list[1].listPrice], [760, 2450]);
+});
+
+test('メーカー名を表の上の文字・ファイル名から', () => {
+  assert.equal(guessMaker(['2025年10月 価格改定 価格表', 'TOTO九州販売株式会社']), 'TOTO');
+  assert.equal(guessMaker(['矢崎化工_住宅改修_価格表.xlsx']), '矢崎化工');
+  assert.equal(guessMaker(['ヤザキ 屋外手すり']), '矢崎化工');
+  assert.equal(guessMaker(['バリアフリー建材カタログ vol.24 価格表']), '');
 });
 
 test('UTF-8（BOM付き）の文字', () => {
@@ -186,7 +287,7 @@ test('mergeMaterials：同じ品番は価格だけ更新し、★は残す', () 
     {id: 'a', name: '手すり I型 600mm', price: 3200, listPrice: 4600, pieceLengthM: 0, maker: 'マツ六', code: 'BP-600', unit: '本', favorite: true, updatedAt: 1},
     {id: 'b', name: 'ブラケット', price: 1500, listPrice: 2000, pieceLengthM: 0, maker: 'マツ六', code: '', unit: '', favorite: false, updatedAt: 1},
   ];
-  const base = {key: '', row: 1, unit: '', include: true, favorite: false, listPrice: null};
+  const base = {key: '', row: 1, unit: '', pieceLengthM: 0, include: true, favorite: false, listPrice: null};
   const r = mergeMaterials(
     existing,
     [
@@ -243,4 +344,80 @@ test('PDFの表：見出しの位置に合わせて列をそろえる（右寄�
     ['AJ-K01', '安寿 上がり框手すり', 19600, 28000],
   ]);
   assert.equal(alignToHeader([[w('こんにちは', 0, 50)]]), null);
+});
+
+test('同じ品番で寸法・色の違う商品は別々に残す（マツ六の「P-30V I-40」「Y-09-GR W50×L25000mm」など）', () => {
+  const head = ['メーカー', '商品名', '品番等', '定価', '掛率', '', '備考'];
+  const grid = [
+    head,
+    ['マツ六', 'ソフトハンド', 'P-30V I-40 φ30×400mm ホワイト', '12300', '0.4', '', ''],
+    ['マツ六', 'ソフトハンド', 'P-30V I-60 φ30×600mm ホワイト', '14200', '0.4', '', ''],
+    ['マツ六', 'パイオランテープ', 'Y-09-GR W50×L25000mm グリーン', 'オープン', '', '', ''],
+    ['マツ六', 'パイオランテープ', 'Y-09-GR W38×L25000mm グリーン', '900', '', '', ''],
+    ['マツ六', 'パイオランテープ', 'Y-09-GR W75×L25000mm グリーン', '1200', '', '', ''],
+    ['マツ六', 'ソフトハンド', 'P-30V I-60 φ30×600mm ホワイト', '14200', '0.4', '', '別のページ'],
+  ];
+  const m = detectMapping(grid);
+  assert.equal(m.price, -1); // 見出しのない列は空欄なので仕切価格はなし
+  const c = gridCandidates(grid, m, '');
+  const r = mergeMaterials([], c, 1);
+  assert.deepEqual(
+    r.list.map((x) => [x.code, x.name, x.listPrice]),
+    [
+      ['P-30V', 'ソフトハンド I-40 φ30×400mm ホワイト', 12300],
+      ['P-30V', 'ソフトハンド I-60 φ30×600mm ホワイト', 14200],
+      ['Y-09-GR', 'パイオランテープ W38×L25000mm グリーン', 900],
+      ['Y-09-GR', 'パイオランテープ W75×L25000mm グリーン', 1200],
+    ],
+  );
+  assert.deepEqual([r.added, r.unchanged], [4, 1]); // 2回載っている I-60 は1件
+
+  // あとで「見出しのない列」に仕切価格を入れた同じ形の表を取り込むと、それぞれの商品に仕切価格が入る
+  const filled = grid.map((row, i) => (i === 0 ? row : row.map((v, k) => (k === 5 ? String(Math.round(Number(row[3]) * 0.4) || '') : v))));
+  const m2 = detectMapping(filled);
+  assert.equal(m2.price, 5);
+  const r2 = mergeMaterials(r.list, gridCandidates(filled, m2, ''), 2);
+  assert.deepEqual(
+    r2.list.map((x) => [x.name.split(' ')[1], x.price]),
+    [
+      ['I-40', 4920],
+      ['I-60', 5680],
+      ['W38×L25000mm', 360],
+      ['W75×L25000mm', 480],
+    ],
+  );
+  assert.equal(r2.added, 0);
+
+  // 品番と仕切価格だけの表では、同じ品番が2つ以上ある部材は決められないので入れない（1つだけの品番は入る）
+  const only = gridCandidates(textToGrid('品番\t仕切価格\nP-30V\t1\n'), {header: 0, name: -1, price: 1, code: 0, maker: -1, unit: -1, list: -1, spec: -1, len: -1}, 'マツ六');
+  const r3 = mergeMaterials(r2.list, only, 3);
+  assert.deepEqual([r3.updated, r3.list[0].price, r3.list[1].price], [0, 4920, 5680]);
+});
+
+test('商品名が変わっても、同じ品番が1つだけなら書き換える（新しい仕切り表に差し替えるとき）', () => {
+  const existing: Material[] = [
+    {id: 'a', name: '手すり I型 600', price: 3200, listPrice: 4600, pieceLengthM: 0, maker: 'マツ六', code: 'BP-600', unit: '本', favorite: true, updatedAt: 1},
+  ];
+  const base = {key: '', row: 1, unit: '', pieceLengthM: 0, include: true, favorite: false, maker: 'マツ六'};
+  const r = mergeMaterials(existing, [{...base, name: '手すり I型 600mm', code: 'BP-600', price: 3360, listPrice: 4800}], 5);
+  assert.deepEqual([r.added, r.updated], [0, 1]);
+  assert.deepEqual([r.list[0].name, r.list[0].price, r.list[0].favorite], ['手すり I型 600mm', 3360, true]);
+});
+
+test('「1本の長さ」の列を読む（見出しの単位で m・mm・cm）', () => {
+  const grid = textToGrid('品番\t品名\t入数\t1本の長さ(m)\t定価(税抜)\t仕切価格\nHD5-4000 T LBR\tφ35手すりイレクターパイプ\t1本\t4\t10,480\t\nCZA-2500 LBR\tφ35木製手すり丸棒\t1本\t2.5\t9,490\t\nECA-5031 SGD\tφ34つなぎジョイント\t1個\t\t4,300\t\n');
+  const m = detectMapping(grid);
+  assert.deepEqual([m.code, m.name, m.unit, m.len, m.list, m.price], [0, 1, 2, 3, 4, 5]);
+  const c = gridCandidates(grid, m, '矢崎化工');
+  assert.deepEqual(c.map((x) => [x.code, x.pieceLengthM, x.listPrice, x.price]), [
+    ['HD5-4000 T LBR', 4, 10480, null],
+    ['CZA-2500 LBR', 2.5, 9490, null],
+    ['ECA-5031 SGD', 0, 4300, null],
+  ]);
+  assert.deepEqual(mergeMaterials([], c, 1).list.map((x) => x.pieceLengthM), [4, 2.5, 0]);
+  assert.equal(parseLengthM('4000', '長さ(mm)'), 4);
+  assert.equal(parseLengthM('120', '長さ(cm)'), 1.2);
+  assert.equal(parseLengthM('2000', '長さ'), 2); // 単位がなく 100 以上は mm
+  assert.equal(parseLengthM('4m', '長さ'), 4);
+  assert.equal(parseLengthM('', '長さ'), 0);
 });

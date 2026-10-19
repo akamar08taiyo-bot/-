@@ -37,6 +37,21 @@ export function guessPieceLengthM(name: string): number {
   return 0;
 }
 
+/**
+ * 表の「1本の長さ」の欄を m にする。見出しに単位（mm・cm・m）があればそれで、なければ 100 以上は mm とみなす。
+ * 「4m」「4000mm」のように単位の付いた文字はそのまま読む。読めなければ 0
+ */
+export function parseLengthM(v: unknown, header: unknown = ''): number {
+  const n = parsePrice(v);
+  if (n === null) return guessPieceLengthM(normalize(v));
+  if (n <= 0) return 0;
+  const h = normalize(header).toLowerCase();
+  if (/mm|ミリ/.test(h)) return n / 1000;
+  if (/cm|センチ/.test(h)) return n / 100;
+  if (/\(m\)|\[m\]|メートル|（m）|m$/.test(h)) return n;
+  return n >= 100 ? n / 1000 : n;
+}
+
 /** 文字コードを判定して文字にする（UTF-8 でなければ Shift_JIS とみなす） */
 export function decodeText(bytes: Uint8Array): string {
   try {
@@ -114,19 +129,52 @@ const isCode = (w: string) => /\d/.test(w) && CODE_TOKEN.test(w) && !DIMENSION.t
 
 // ---------------------------------------------------------------- 表の列で読む
 
-/** 列の番号（-1 はその列なし）。list は定価の列 */
-export type Mapping = {header: number; name: number; price: number; code: number; maker: number; unit: number; list: number};
+/**
+ * 列の番号（-1 はその列なし）。list は定価の列、spec は商品名のうしろに付ける列（色・規格など）、len は1本の長さの列。
+ * price（仕切価格）が -1 なら、仕切価格は空欄として取り込む（あとで仕切価格の入った表を取り込むと入る）
+ */
+export type Mapping = {header: number; name: number; price: number; code: number; maker: number; unit: number; list: number; spec: number; len: number};
 
-const CODE_KEYS = ['品番', '型番', '商品コード', '品目コード', '製品コード', '型式', 'コード', 'jan'];
-const NAME_KEYS = ['商品名', '品名', '製品名', '名称', '品目', '商品'];
+const keyScore = (cell: string, keys: [string, number][]) => {
+  const c = normalize(cell).toLowerCase();
+  let best = 0;
+  for (const [k, w] of keys) if (c.includes(k)) best = Math.max(best, w);
+  return best;
+};
+// 品番らしい見出しほど高い点（「商品コード」「JANコード」より「品番」）
+const CODE_KEYS: [string, number][] = [
+  ['品番', 6],
+  ['型番', 5],
+  ['型式', 4],
+  ['商品コード', 3],
+  ['品目コード', 3],
+  ['製品コード', 3],
+  ['コード', 2],
+  ['jan', 1],
+];
+const NAME_KEYS: [string, number][] = [
+  ['商品名', 5],
+  ['品名', 4],
+  ['製品名', 4],
+  ['名称', 3],
+  ['品目', 2],
+  ['商品', 1],
+];
 const MAKER_KEYS = ['メーカー', '製造元', '仕入先'];
 const UNIT_KEYS = ['単位', '入数'];
 const LIST_KEYS = ['定価', '希望小売', '標準価格', '上代'];
-// 仕切り価格らしい見出しほど高い点（「定価」と「仕切」が両方あれば仕切を選ぶ）
+const SPEC_KEYS = ['色', 'カラー', '規格', '仕様', 'サイズ'];
+const LEN_KEYS = ['1本の長さ', '長さ', '全長'];
+// 仕切り価格らしい見出しほど高い点（「定価」と「仕切」が両方あれば仕切を選ぶ）。「掛率」「UP率」など「率」の列は価格にしない
 const PRICE_KEYS: [string, number][] = [
   ['仕切', 10],
   ['納価', 9],
+  ['納入', 9],
+  ['売価', 9],
   ['卸', 8],
+  ['仕入', 8],
+  ['御社', 8],
+  ['貴社', 8],
   ['ネット', 8],
   ['net', 8],
   ['特価', 7],
@@ -142,18 +190,16 @@ const has = (cell: string, keys: string[]) => {
   const c = normalize(cell).toLowerCase();
   return keys.some((k) => c.includes(k));
 };
-const priceScore = (cell: string) => {
-  const c = normalize(cell).toLowerCase();
-  let best = 0;
-  for (const [k, w] of PRICE_KEYS) if (c.includes(k)) best = Math.max(best, w);
-  return best;
-};
+const priceScore = (cell: string) => (normalize(cell).includes('率') ? 0 : keyScore(cell, PRICE_KEYS));
 
 export function columnCount(grid: Grid): number {
   return grid.reduce((n, r) => Math.max(n, r.length), 0);
 }
 
-/** 見出しの行と、商品名・仕切価格・品番などの列を推測する（画面で変えられる） */
+/**
+ * 見出しの行と、商品名・仕切価格・品番などの列を推測する（画面で変えられる）。
+ * 「定価」「売価」が2組あるとき（改定前・改定後）は、右の（新しい）方を使う。
+ */
 export function detectMapping(grid: Grid): Mapping {
   const cols = columnCount(grid);
   for (let r = 0; r < Math.min(grid.length, 30); r++) {
@@ -164,22 +210,49 @@ export function detectMapping(grid: Grid): Mapping {
     let unit = -1;
     let price = -1;
     let list = -1;
+    let spec = -1;
+    let len = -1;
+    let codeBest = 0;
+    let nameBest = 0;
     let score = 0;
     row.forEach((cell, c) => {
-      if (!normalize(cell)) return;
-      if (code < 0 && has(cell, CODE_KEYS)) code = c;
-      else if (name < 0 && has(cell, NAME_KEYS)) name = c;
-      else if (maker < 0 && has(cell, MAKER_KEYS)) maker = c;
+      const t = normalize(cell);
+      // 見出しは短い言葉。長い文（「※仕切価格は空欄です。品番で合わせます」のような注意書き）は見出しにしない
+      if (!t || t.length > 24) return;
+      const cs = keyScore(cell, CODE_KEYS);
+      const ns = keyScore(cell, NAME_KEYS);
+      // 1つの列は1つの役目だけ（「商品コード」は商品名ではなく品番の候補。品番・商品名の列は価格の列にしない）
+      if (cs > 0 && cs >= ns) {
+        if (cs > codeBest) {
+          codeBest = cs;
+          code = c;
+        }
+        return;
+      } else if (ns > 0) {
+        if (ns > nameBest) {
+          nameBest = ns;
+          name = c;
+        }
+        return;
+      } else if (maker < 0 && has(cell, MAKER_KEYS)) maker = c;
       else if (unit < 0 && has(cell, UNIT_KEYS)) unit = c;
-      if (list < 0 && has(cell, LIST_KEYS)) list = c;
+      else if (len < 0 && has(cell, LEN_KEYS)) len = c;
+      else if (has(cell, SPEC_KEYS)) spec = c; // 色の列が2つ（色の記号・色の名前）なら右の方
+      if (has(cell, LIST_KEYS)) list = c;
       const s = priceScore(cell);
-      if (s > score) {
+      if (s > 2 && s >= score) {
         score = s;
         price = c;
       }
     });
-    // 定価の列しかなければ、仕切価格の列も定価の列になる（画面で選び直せる）
-    if (name >= 0 && price >= 0 && price !== name) return {header: r, name, price, code, maker, unit, list};
+    if (name >= 0 && (price >= 0 || list >= 0)) {
+      // 仕切価格の見出しがなければ、定価より右の見出しのない列に金額が入っていればそれを使う。
+      // なければ仕切価格は空欄で取り込む
+      if (price < 0) price = untitledPriceColumn(grid, r, list, new Set([name, code, maker, unit, spec, len]));
+      return {header: r, name, price, code, maker, unit, list, spec, len};
+    }
+    // 商品名の列がなくても、品番と仕切価格があれば「仕切価格だけを入れる表」として読む
+    if (code >= 0 && price >= 0) return {header: r, name: -1, price, code, maker, unit, list, spec, len};
   }
 
   // 見出しがないとき：数字の多い一番右の列を価格、長い文字の列を商品名にする
@@ -206,7 +279,80 @@ export function detectMapping(grid: Grid): Mapping {
   const codeCol = stats.find((s) => s.c !== price && s.c !== name && s.codeLike >= Math.max(1, s.filled * 0.5));
   // 価格の左どなりの数字の列が、ほとんどの行で価格以上なら定価とみなす（「定価 4,800　仕切 3,360」の並び）
   const left = priceCols.length >= 2 ? priceCols[priceCols.length - 2].c : -1;
-  return {header: -1, name, price, code: codeCol ? codeCol.c : -1, maker: -1, unit: -1, list: left >= 0 && mostlyAtLeast(grid, left, price) ? left : -1};
+  return {
+    header: -1,
+    name,
+    price,
+    code: codeCol ? codeCol.c : -1,
+    maker: -1,
+    unit: -1,
+    list: left >= 0 && mostlyAtLeast(grid, left, price) ? left : -1,
+    spec: -1,
+    len: -1,
+  };
+}
+
+/**
+ * 定価の列より右にある見出しのない列のうち、定価のある行の半分以上に金額（1円以上）が入っている一番右の列。なければ -1。
+ * マツ六の価格表のように、仕切価格の列の見出しが空のことがある（今は空欄でも、あとで金額を入れて取り込めば仕切価格になる）
+ */
+function untitledPriceColumn(grid: Grid, header: number, list: number, taken: Set<number>): number {
+  if (list < 0) return -1;
+  let best = -1;
+  for (let c = list + 1; c < columnCount(grid); c++) {
+    if (taken.has(c) || normalize(grid[header]?.[c])) continue;
+    let rows = 0;
+    let prices = 0;
+    for (let r = header + 1; r < grid.length; r++) {
+      if (parsePrice(grid[r]?.[list]) === null) continue;
+      rows++;
+      if ((parsePrice(grid[r]?.[c]) ?? 0) >= 1) prices++;
+    }
+    if (rows > 0 && prices >= rows * 0.5) best = c;
+  }
+  return best;
+}
+
+/** 寸法・色らしい文字（φ・×・mm など、かな・漢字）。「T LBR」「SET SGD」のような英字だけのものは品番の続き */
+const SPEC_LIKE = /[φΦ×*～~]|\d(mm|cm|m|kg|g|ml)(?![a-z])|[\u3040-\u30ff\u4e00-\u9fff\uff66-\uff9f]/i;
+
+/**
+ * 品番の列に「BD-134 φ35×4000mm Mオーク」のように品番と寸法・色が一緒に入っているか（半分以上の行）。
+ * 「HD5-4000 T LBR」（矢崎化工）のように、空白のあとも英数字だけなら品番そのもの
+ */
+export function codeHasSpec(grid: Grid, m: Mapping): boolean {
+  if (m.code < 0) return false;
+  let filled = 0;
+  let multi = 0;
+  for (let r = m.header + 1; r < grid.length; r++) {
+    const v = normalize(grid[r]?.[m.code]);
+    if (!v) continue;
+    filled++;
+    const [first, ...rest] = v.split(' ');
+    if (rest.length > 0 && isCode(first) && SPEC_LIKE.test(rest.join(' '))) multi++;
+  }
+  return filled > 0 && multi >= filled * 0.5;
+}
+
+/** メーカー名：ファイル名か、表の上の方の文字に知っているメーカー名があれば使う（「TOTO九州販売」→ TOTO） */
+const KNOWN_MAKERS: [RegExp, string][] = [
+  [/toto/i, 'TOTO'],
+  [/マツ六/, 'マツ六'],
+  [/矢崎|ヤザキ|yazaki/i, '矢崎化工'],
+  [/アロン化成/, 'アロン化成'],
+  [/ナカ工業/, 'ナカ工業'],
+  [/パナソニック|panasonic/i, 'パナソニック'],
+  [/lixil|リクシル/i, 'LIXIL'],
+  [/シコク/, 'シコク'],
+  [/川口技研/, '川口技研'],
+];
+
+export function guessMaker(texts: string[]): string {
+  for (const t of texts) {
+    const s = normalize(t);
+    for (const [re, name] of KNOWN_MAKERS) if (re.test(s)) return name;
+  }
+  return '';
 }
 
 /** 列 a の金額が、両方に金額のある行の8割以上で列 b 以上か */
@@ -226,38 +372,51 @@ function mostlyAtLeast(grid: Grid, a: number, b: number): boolean {
 export type Candidate = {
   key: string;
   row: number; // 元の表の何行目か（1から）
-  name: string;
-  price: number | null; // 仕切価格
+  name: string; // 空なら「仕切価格だけを入れる行」（同じ品番の部材があるときだけ入れる）
+  price: number | null; // 仕切価格（空欄なら null）
   listPrice: number | null; // 定価（なければ null）
   code: string;
   maker: string;
   unit: string;
+  pieceLengthM: number; // 表の「1本の長さ」（m）。なければ 0（商品名から読む）
   include: boolean; // 取り込む
   favorite: boolean; // ★お気に入り
 };
 
-const looksLikeHeader = (name: string) => NAME_KEYS.includes(name) || CODE_KEYS.includes(name.toLowerCase());
+const looksLikeHeader = (text: string) => NAME_KEYS.some(([k]) => k === text) || CODE_KEYS.some(([k]) => k === text.toLowerCase());
 
 export function gridCandidates(grid: Grid, m: Mapping, defaultMaker: string): Candidate[] {
   const out: Candidate[] = [];
   const cell = (row: string[], c: number) => (c >= 0 ? normalize(row[c]) : '');
+  const split = codeHasSpec(grid, m);
   grid.forEach((row, r) => {
     if (r <= m.header) return;
-    const name = cell(row, m.name);
+    let code = cell(row, m.code);
+    let spec = m.spec >= 0 && m.spec !== m.code ? cell(row, m.spec) : '';
+    if (split && code.includes(' ')) {
+      // 「BD-134 φ35×4000mm Mオーク」→ 品番 BD-134、寸法・色は商品名のうしろへ
+      const at = code.indexOf(' ');
+      spec = [code.slice(at + 1), spec].filter(Boolean).join(' ');
+      code = code.slice(0, at);
+    }
+    const base = cell(row, m.name);
+    const name = base && spec && !base.includes(spec) ? `${base} ${spec}` : base;
     const price = m.price >= 0 ? parsePrice(row[m.price]) : null;
     const listPrice = m.list >= 0 ? parsePrice(row[m.list]) : null;
-    if (!name && price === null) return;
-    if (looksLikeHeader(name)) return; // ページごとに繰り返される見出し
-    const valid = name !== '' && price !== null && price > 0;
+    if (!name && (!code || price === null)) return;
+    if (looksLikeHeader(base) || looksLikeHeader(code)) return; // ページごとに繰り返される見出し
+    // 仕切価格が空欄でも、定価があれば取り込む（仕切価格はあとで入れられる）
+    const valid = (name !== '' || code !== '') && ((price ?? 0) > 0 || (listPrice ?? 0) > 0);
     out.push({
       key: `g${r}`,
       row: r + 1,
       name,
-      price,
-      listPrice,
-      code: cell(row, m.code),
+      price: price !== null && price > 0 ? price : null,
+      listPrice: listPrice !== null && listPrice > 0 ? listPrice : null,
+      code,
       maker: cell(row, m.maker) || defaultMaker,
       unit: cell(row, m.unit),
+      pieceLengthM: m.len >= 0 ? parseLengthM(row[m.len], m.header >= 0 ? grid[m.header]?.[m.len] : '') : 0,
       include: valid,
       favorite: false,
     });
@@ -276,7 +435,7 @@ export function alignToHeader(rows: PositionedWord[][]): Grid | null {
   for (let h = 0; h < Math.min(rows.length, 40); h++) {
     const head = rows[h];
     const texts = head.map((w) => w.s);
-    if (!texts.some((t) => has(t, NAME_KEYS) || has(t, CODE_KEYS)) || !texts.some((t) => priceScore(t) > 0)) continue;
+    if (!texts.some((t) => keyScore(t, NAME_KEYS) > 0 || keyScore(t, CODE_KEYS) > 0) || !texts.some((t) => priceScore(t) > 0)) continue;
     const cols = head.map((w) => ({x0: w.x0, x1: w.x1}));
     return rows.map((row, r) => {
       if (r === h) return texts;
@@ -361,6 +520,7 @@ export function lineCandidates(lines: string[], nthFromRight: number, defaultMak
       code,
       maker: defaultMaker,
       unit,
+      pieceLengthM: 0,
       include: price !== null && price > 0,
       favorite: false,
     });
@@ -379,36 +539,65 @@ export function detectListNth(lines: string[]): number {
 
 // ---------------------------------------------------------------- 部材リストへの取り込み
 
-const matKey = (maker: string, code: string, name: string) =>
-  `${normalize(maker).toLowerCase()}|${code ? 'c:' + normalize(code).toLowerCase() : 'n:' + normalize(name).toLowerCase()}`;
+const norm = (s: string) => normalize(s).toLowerCase();
+const codeKey = (maker: string, code: string) => `${norm(maker)}|${norm(code)}`;
+const nameKey = (maker: string, name: string) => `${norm(maker)}|${norm(name)}`;
 
 export type MergeResult = {list: Material[]; added: number; updated: number; unchanged: number};
 
 /**
  * 同じメーカーで品番（品番がなければ商品名）が同じものは、新しい価格に書き換える（★はそのまま残す）。
- * 新しい仕切り表に差し替えるときも、★を付け直さなくてよい。定価は、表に定価があるときだけ書き換える。
+ * 新しい仕切り表に差し替えるときも、★を付け直さなくてよい。
+ * 同じ品番で寸法・色の違う商品（「P-30V I-40」「P-30V I-60」など、品番等の先頭が同じもの）は、商品名で分けて別々に残す。
+ * 仕切価格・定価は、表に金額があるときだけ書き換える（空欄なら今の金額のまま）。
+ * 商品名のない行（仕切価格だけの表）は、同じ品番の部材が1つだけあるときに仕切価格を入れる。
  */
 export function mergeMaterials(existing: Material[], incoming: Candidate[], now = Date.now()): MergeResult {
   const list = existing.map((m) => ({...m}));
-  const index = new Map<string, number>();
-  list.forEach((m, i) => index.set(matKey(m.maker, m.code, m.name), i));
+  const byCode = new Map<string, number[]>(); // 同じ品番の部材（寸法・色違いで2つ以上のこともある）
+  const byName = new Map<string, number>(); // 品番のない部材
+  const remember = (m: Material, i: number) => {
+    if (m.code) byCode.set(codeKey(m.maker, m.code), [...(byCode.get(codeKey(m.maker, m.code)) ?? []), i]);
+    else byName.set(nameKey(m.maker, m.name), i);
+  };
+  list.forEach(remember);
+  const ok = (c: Candidate) => c.include && (c.name !== '' || c.code !== '') && (c.price !== null || c.listPrice !== null);
+  // 取り込む表の中で、同じ品番に商品名がいくつあるか（2つ以上なら寸法・色違いの別の商品）
+  const names = new Map<string, Set<string>>();
+  for (const c of incoming) {
+    if (!ok(c) || !c.code || !c.name) continue;
+    const k = codeKey(c.maker, c.code);
+    names.set(k, (names.get(k) ?? new Set()).add(norm(c.name)));
+  }
+  const find = (c: Candidate): number | undefined => {
+    if (!c.code) return byName.get(nameKey(c.maker, c.name));
+    const same = byCode.get(codeKey(c.maker, c.code)) ?? [];
+    if (!c.name) return same.length === 1 ? same[0] : undefined;
+    const exact = same.find((i) => norm(list[i].name) === norm(c.name));
+    if (exact !== undefined) return exact;
+    // 商品名だけ変わった（同じ品番の部材が1つだけで、表の中でもその品番は1種類）なら、その部材を書き換える
+    return same.length === 1 && (names.get(codeKey(c.maker, c.code))?.size ?? 0) <= 1 ? same[0] : undefined;
+  };
   let added = 0;
   let updated = 0;
   let unchanged = 0;
   for (const c of incoming) {
-    if (!c.include || !c.name || c.price === null) continue;
-    const key = matKey(c.maker, c.code, c.name);
-    const at = index.get(key);
+    if (!ok(c)) continue;
+    const at = find(c);
     if (at !== undefined) {
       const m = list[at];
+      const price = c.price ?? m.price;
       const listPrice = c.listPrice ?? m.listPrice;
-      const changed = m.price !== c.price || m.listPrice !== listPrice || m.name !== c.name || (c.unit && m.unit !== c.unit);
+      const name = c.name || m.name;
+      const pieceLengthM = c.pieceLengthM || m.pieceLengthM || guessPieceLengthM(name);
+      const changed =
+        m.price !== price || m.listPrice !== listPrice || m.name !== name || m.pieceLengthM !== pieceLengthM || (c.unit !== '' && m.unit !== c.unit);
       list[at] = {
         ...m,
-        name: c.name,
-        price: c.price,
+        name,
+        price,
         listPrice,
-        pieceLengthM: m.pieceLengthM || guessPieceLengthM(c.name),
+        pieceLengthM,
         unit: c.unit || m.unit,
         favorite: m.favorite || c.favorite,
         updatedAt: changed ? now : m.updatedAt,
@@ -416,19 +605,21 @@ export function mergeMaterials(existing: Material[], incoming: Candidate[], now 
       if (changed) updated++;
       else unchanged++;
     } else {
-      list.push({
+      if (!c.name) continue; // 仕切価格だけの行で、部材リストにない（または同じ品番が2つ以上ある）品番
+      const m: Material = {
         id: uid('m'),
         name: c.name,
-        price: c.price,
+        price: c.price ?? 0,
         listPrice: c.listPrice ?? 0,
-        pieceLengthM: guessPieceLengthM(c.name),
+        pieceLengthM: c.pieceLengthM || guessPieceLengthM(c.name),
         maker: c.maker,
         code: c.code,
         unit: c.unit,
         favorite: c.favorite,
         updatedAt: now,
-      });
-      index.set(key, list.length - 1);
+      };
+      list.push(m);
+      remember(m, list.length - 1);
       added++;
     }
   }

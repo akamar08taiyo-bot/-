@@ -1,6 +1,6 @@
 // 箇所の行を作る・取付手間の箇所数を数える・一式を入れる などの行の操作
 
-import type {Kit, LaborItem, Material, Row, RowKind} from './types.ts';
+import type {Kit, LaborItem, Material, Place, Row, RowKind} from './types.ts';
 import {uid} from './util.ts';
 
 const BLANK: Omit<Row, 'id' | 'kind'> = {
@@ -15,7 +15,13 @@ const BLANK: Omit<Row, 'id' | 'kind'> = {
   lengthCm: 0,
   pieceLengthM: 0,
   estPrice: null,
+  excluded: false,
 };
+
+/** 新しい箇所。見積書の改修の種類は「①手すりの取付」、写真番号は箇所の順番、工事名称は改修の種類から */
+export function newPlace(name: string, rows: Row[] = []): Place {
+  return {id: uid('p'), name: name.trim(), rows, kind: 1, photo: 0, work: ''};
+}
 
 /** 部材リストから選んだ部材の行（仕切り価格・定価を書き写す） */
 export function materialRow(m: Material, qty = 1): Row {

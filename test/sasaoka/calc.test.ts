@@ -9,9 +9,9 @@ import {
   estimateUnitPrice,
   jobName,
   jobTotals,
-  jobWork,
   monthSummary,
   placeTotals,
+  rounddown,
   roundYen,
   rowAmount,
   sortJobs,
@@ -26,10 +26,16 @@ const S = {
   invoiceTaxMode: 'perJob',
   totalTaxRounding: 'floor',
   estimateRate: 0.8,
-} as const satisfies Pick<Settings, 'rate' | 'taxRate' | 'taxMode' | 'invoiceTaxMode' | 'totalTaxRounding' | 'estimateRate'>;
+  estimateOverheadRate: 0.1,
+  estimateHourRate: 2500,
+  estimateForm: 'yukuhashi',
+} as const satisfies Pick<
+  Settings,
+  'rate' | 'taxRate' | 'taxMode' | 'invoiceTaxMode' | 'totalTaxRounding' | 'estimateRate' | 'estimateOverheadRate' | 'estimateHourRate' | 'estimateForm'
+>;
 
 let seq = 0;
-const blank = {code: '', maker: '', unit: '', listPrice: 0, lengthCm: 0, pieceLengthM: 0, estPrice: null};
+const blank = {code: '', maker: '', unit: '', listPrice: 0, lengthCm: 0, pieceLengthM: 0, estPrice: null, excluded: false};
 const mat = (price: number, qty: number, name = '部材', extra: Partial<Row> = {}): Row => ({
   ...blank, id: `r${++seq}`, kind: 'material', refId: null, name, price, qty, ...extra,
 });
@@ -37,8 +43,8 @@ const lab = (price: number, qty: number, name = '木'): Row => ({
   ...blank, id: `r${++seq}`, kind: 'labor', refId: null, name, price, qty,
 });
 const job = (rows: Row[][], extra: Partial<Job> = {}): Job => ({
-  id: `j${++seq}`, month: '2026-10', customer: '山田', suffix: '様邸', staff: '', date: '', address: '', note: '', work: '',
-  places: rows.map((r, i) => ({id: `p${i}`, name: `箇所${i}`, rows: r})),
+  id: `j${++seq}`, month: '2026-10', customer: '山田', suffix: '様邸', staff: '', date: '', address: '', note: '', insuredNo: '', form: '',
+  places: rows.map((r, i) => ({id: `p${i}`, name: `箇所${i}`, rows: r, kind: 1, photo: 0, work: ''})),
   createdAt: seq, updatedAt: seq, ...extra,
 });
 
@@ -137,7 +143,9 @@ test('見積：単価は定価×0.8、切って使う部材の数量は 使う�
   // 1本の長さが分からないときは長さで数えない（画面で「1本の長さを入れてください」と出す）
   assert.equal(cutToLength({...rail, pieceLengthM: 0}), false);
   assert.equal(estimateQty({...rail, pieceLengthM: 0}), 1);
-  assert.equal(estimateUnitPrice(mat(0, 1, 'ブラケット', {listPrice: 333}), 0.8), 266); // 266.4 → 四捨五入
+  assert.equal(estimateUnitPrice(mat(0, 1, 'ブラケット', {listPrice: 333}), 0.8), 266); // 266.4
+  assert.equal(estimateUnitPrice(mat(0, 1, 'ブラケット', {listPrice: 1231}), 0.8), 984); // 984.8 → 切り捨て（元の見積書と同じ）
+  assert.equal(estimateAmount(mat(0, 3, 'キャップ', {estPrice: 333.5}), 0.8), 1000); // 1,000.5 → 切り捨て
   // 手で入れた見積の単価がそのまま使われる（金額だけの行も）
   assert.equal(estimateUnitPrice({...rail, estPrice: 12000}, 0.8), 12000);
   assert.equal(estimateAmount(mat(0, 3, '', {estPrice: 500}), 0.8), 1500);
@@ -173,25 +181,55 @@ test('見積：部材のすぐ下に続く手間の行を「同上施工費」1�
   assert.equal((estimatePlaceLines({rows: [lab(1000, 1)]}, 0.8)[0] as {afterMaterial: boolean}).afterMaterial, false);
 });
 
-test('見積の合計：部材＋施工費に消費税（1円未満は切り捨て）', () => {
+test('見積の合計：小計＝部材＋施工費、諸経費＝小計×0.1、消費税＝（小計＋諸経費）×0.1（どれも切り捨て）', () => {
   const j = job([
     [mat(10000, 1, '木製手すり', {listPrice: 20000, lengthCm: 60, pieceLengthM: 4}), lab(1000, 2), mat(1500, 2, 'ブラケット', {listPrice: 2100})],
     [mat(7800, 1, 'L型手すり', {listPrice: 11000}), lab(1500, 2, 'タイル'), mat(300, 2, 'エンドキャップ', {listPrice: 450})],
   ]);
   const t = estimateTotals(j, S);
-  // 2,400＋3,360＋8,800＋720＝15,280／施工費 2,000＋3,000＝5,000／税抜 20,280・消費税 2,028
-  assert.deepEqual(t, {material: 15280, work: 5000, subtotal: 20280, tax: 2028, total: 22308});
+  // 2,400＋3,360＋8,800＋720＝15,280／施工費 2,000＋3,000＝5,000／小計 20,280・諸経費 2,028・消費税 2,230（2,230.8）・合計 24,538
+  const sums = {subtotal: 20280, overhead: 2028, tax: 2230, total: 24538};
+  assert.deepEqual(t, {material: 15280, work: 5000, all: sums, target: sums, excluded: 0});
   // 仕切り計算表の金額は見積を入れても変わらない（部材は仕切り価格のまま）
   assert.equal(jobTotals(j, S).material, 10000 + 3000 + 7800 + 600);
+  // 元の見積書（行橋市・苅田町用）の記入例：小計 27,440 → 諸経費 2,744・消費税 3,018・合計 33,202
+  const ex = estimateTotals(job([[mat(0, 1, 'TOTO 32インテリアバー', {listPrice: 24300}), lab(8000, 1, '施工費')]]), S);
+  assert.deepEqual(ex.all, {subtotal: 27440, overhead: 2744, tax: 3018, total: 33202});
 });
 
-test('工事内容：手で入れたもの、なければ箇所の名前から作る', () => {
-  const j = job([[], []]);
-  j.places[0].name = '玄関';
-  j.places[1].name = 'トイレ';
-  assert.equal(jobWork(j, '手すり取付工事'), '玄関・トイレ 手すり取付工事');
-  assert.equal(jobWork({...j, work: '浴室改修工事'}, '手すり取付工事'), '浴室改修工事');
-  assert.equal(jobWork({...j, places: []}, '手すり取付工事'), '手すり取付工事');
+test('介護保険の対象外：全体には入り、対象の小計からは外す。部材のすぐ下の施工費は部材に合わせる', () => {
+  const j = job([
+    [
+      mat(0, 1, '手すり', {listPrice: 10000}),
+      lab(1000, 2),
+      mat(0, 1, '踏み台（対象外）', {listPrice: 20000, excluded: true}),
+      lab(1500, 1), // 対象外の部材の同上施工費 → 対象外
+    ],
+    [lab(3000, 1, 'コア抜き'), {...lab(2000, 1, '撤去'), excluded: true}], // 箇所の最初の施工費：行がすべて対象外のときだけ対象外
+    [{...lab(5000, 1, '処分'), excluded: true}],
+  ]);
+  const lines = j.places.map((p) => estimatePlaceLines(p, 0.8).map((l) => [l.kind, l.amount, l.excluded]));
+  assert.deepEqual(lines, [
+    [
+      ['material', 8000, false],
+      ['work', 2000, false],
+      ['material', 16000, true],
+      ['work', 1500, true],
+    ],
+    [['work', 5000, false]],
+    [['work', 5000, true]],
+  ]);
+  const t = estimateTotals(j, S);
+  assert.equal(t.all.subtotal, 37500); // 8,000＋2,000＋16,000＋1,500＋5,000＋5,000
+  assert.equal(t.excluded, 22500); // 16,000＋1,500＋5,000
+  assert.deepEqual(t.target, {subtotal: 15000, overhead: 1500, tax: 1650, total: 18150});
+});
+
+test('rounddown は0の方へ切り捨て（浮動小数の誤差は除く）', () => {
+  assert.equal(rounddown(2230.8), 2230);
+  assert.equal(rounddown(0.29 * 100), 29); // 28.999999999999996 → 29
+  assert.equal(rounddown(-2.5), -2);
+  assert.equal(rounddown(12000 / 3), 4000);
 });
 
 test('sortJobs：施工日なしは後ろ、同じ日は作った順', () => {

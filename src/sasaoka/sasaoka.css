@@ -444,6 +444,134 @@ body {
   margin-top: 1mm;
 }
 
+/* ---------------------------------------------------------------- 見積書（A4横。いただいた Excel の書式どおり） */
+.form-page {
+  position: relative;
+  box-sizing: border-box;
+  width: 297mm;
+  height: 210mm;
+  margin: 0 auto 16px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  color: #000;
+  font-family: 'MS PGothic', 'ＭＳ Ｐゴシック', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Noto Sans JP', 'Meiryo', sans-serif;
+  font-size: 11pt;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+/* 余白は元の Excel のページ設定と同じ */
+.form-page.yk {
+  padding: 20mm 10mm 0 15mm;
+}
+.form-page.kk {
+  padding: 16mm 15mm 0 16mm;
+}
+.form-page .fm-head-right {
+  position: absolute;
+  top: 13mm;
+  right: 12mm;
+  font-size: 10.5pt;
+}
+.form-page .fm-foot {
+  position: absolute;
+  right: 0;
+  bottom: 11mm;
+  left: 0;
+  font-size: 10.5pt;
+  text-align: center;
+}
+.form-page .fm-foot.kk-foot {
+  display: flex;
+  justify-content: space-between;
+  right: 15mm;
+  bottom: 3mm;
+  left: 16mm;
+  font-size: 9pt;
+}
+.form-page .mincho,
+.form-page .mincho td,
+.form-page .mincho th {
+  font-family: 'MS PMincho', 'ＭＳ Ｐ明朝', 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', serif;
+}
+.form-page .mincho td.gothic {
+  font-family: 'MS PGothic', 'ＭＳ Ｐゴシック', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Noto Sans JP', 'Meiryo', sans-serif;
+}
+table.fm {
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+table.fm td,
+table.fm th {
+  overflow: hidden;
+  padding: 0 0.8mm;
+  font-weight: 400;
+  line-height: 1.12;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+table.fm th {
+  text-align: center;
+}
+/* 罫線：細線（thin）と中太線（medium）。nr・nl はその側の線を消す（数量と単位を1つの欄に見せる） */
+table.fm tr.g > td,
+table.fm tr.g > th {
+  border: 0.75pt solid #000;
+}
+table.fm .ml {
+  border-left: 1.5pt solid #000 !important;
+}
+table.fm .mr {
+  border-right: 1.5pt solid #000 !important;
+}
+table.fm .mt {
+  border-top: 1.5pt solid #000 !important;
+}
+table.fm .mb {
+  border-bottom: 1.5pt solid #000 !important;
+}
+table.fm .nr {
+  border-right-style: hidden !important;
+}
+table.fm .nl {
+  border-left-style: hidden !important;
+}
+table.fm .bt {
+  border-top: 0.75pt solid #000;
+}
+table.fm .bb {
+  border-bottom: 0.75pt solid #000;
+}
+table.fm .r {
+  text-align: right;
+}
+table.fm .c {
+  text-align: center;
+}
+table.fm tr.head > th {
+  font-size: 10.5pt;
+}
+.form-page.kk table.fm tr.head > th {
+  font-size: 9pt;
+}
+/* みやこ町・築上町用：E・J 列は二重線のすき間 */
+table.fm .gap {
+  padding: 0;
+  border-right: 1.5pt solid #000 !important;
+  border-left: 1.5pt solid #000 !important;
+}
+table.fm .kk-label {
+  border: 0.5pt solid #000;
+}
+table.fm td.mark {
+  padding-bottom: 0.3mm;
+  vertical-align: bottom;
+}
+table.fm .yk-issuer {
+  padding: 0 0 0.5mm 1mm;
+  vertical-align: bottom;
+}
+
 /* ---------------------------------------------------------------- 印刷するとき */
 @media print {
   @page {
@@ -478,6 +606,16 @@ body {
     break-after: page;
   }
   .sheet:last-child {
+    break-after: auto;
+  }
+  /* 見積書は用紙いっぱい（余白は .form-page の中に取ってある） */
+  .form-page {
+    height: 209.6mm;
+    margin: 0;
+    box-shadow: none;
+    break-after: page;
+  }
+  .form-page:last-child {
     break-after: auto;
   }
 }

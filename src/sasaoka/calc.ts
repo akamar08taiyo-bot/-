@@ -131,27 +131,29 @@ export function jobName(job: Pick<Job, 'customer' | 'suffix'>): string {
   return job.suffix && !name.endsWith(job.suffix) ? name + job.suffix : name;
 }
 
-/** 工事内容：手で入れたもの。なければ「玄関・トイレ 手すり取付工事」のように箇所の名前から作る */
-export function jobWork(job: Pick<Job, 'work' | 'places'>, word: string): string {
-  if (job.work.trim()) return job.work.trim();
-  const names = [...new Set(job.places.map((p) => p.name.trim()).filter(Boolean))];
-  return [names.join('・'), word.trim()].filter(Boolean).join(' ');
-}
-
 // ---------------------------------------------------------------- 見積書
+// 元の見積書（行橋市・苅田町用、みやこ町・築上町用）と同じく、金額はすべて ROUNDDOWN（1円未満を切り捨て）。
 // 部材の単価 ＝ 定価×掛率（0.8）。規格品をそのまま使うときは 数量＝本数（1本4mの手すりなら1本）。
 // 切って使うとき（使う長さを入れた部材）は 数量＝使う長さ÷1本の長さ。
 //   例：定価 20,000円（1本4m）を60cm使う → 0.6÷4＝0.15本、単価 16,000円、金額 16,000×0.15＝2,400円
 // 取付手間は、部材のすぐ下に続く手間の行を足して「同上施工費」の1行にする（例：木 2箇所 ＝ 2,000円）。
+//   小計 ＝ 部材＋施工費、諸経費 ＝ 小計×0.1、消費税 ＝（小計＋諸経費）×0.1、合計 ＝ 小計＋諸経費＋消費税
+// 介護保険の対象外にした行は「全体」にだけ入り、「介護保険の対象」には入らない。
 
-export type EstimateSettings = Pick<Settings, 'estimateRate' | 'taxRate' | 'totalTaxRounding'>;
+/** ROUNDDOWN（0の方へ1円未満を切り捨て） */
+export function rounddown(x: number): number {
+  const v = clean(x);
+  return v >= 0 ? Math.floor(v) : -Math.floor(-v);
+}
 
-/** 見積の単価（1円未満は四捨五入）。手で入れた単価があればそれを使う。手間は取付手間の単価のまま */
+export type EstimateSettings = Pick<Settings, 'estimateRate' | 'estimateOverheadRate' | 'taxRate'>;
+
+/** 見積の単価（定価×掛率の1円未満は切り捨て）。手で入れた単価があればそれを使う。手間は取付手間の単価のまま */
 export function estimateUnitPrice(row: Row, rate: number): number {
   if (row.kind === 'labor') return Number.isFinite(row.price) ? row.price : 0;
   if (row.estPrice !== null && Number.isFinite(row.estPrice)) return row.estPrice;
   const list = Number.isFinite(row.listPrice) ? row.listPrice : 0;
-  return roundYen(list * rate);
+  return rounddown(list * rate);
 }
 
 /** 長さで数える部材か（使う長さと1本の長さの両方が入っている） */
@@ -165,49 +167,66 @@ export function estimateQty(row: Row): number {
   return cutToLength(row) ? clean((qty * row.lengthCm) / 100 / row.pieceLengthM) : qty;
 }
 
+/** 見積の金額 ＝ ROUNDDOWN(数量×単価)。割り切れない数量（1m÷3m など）は丸める前の数量で計算する */
 export function estimateAmount(row: Row, rate: number): number {
-  return rowAmount({price: estimateUnitPrice(row, rate), qty: estimateQty(row)});
+  const unit = estimateUnitPrice(row, rate);
+  const qty = Number.isFinite(row.qty) ? row.qty : 0;
+  return rounddown(cutToLength(row) ? (unit * qty * row.lengthCm) / 100 / row.pieceLengthM : unit * qty);
 }
 
 export type EstimateLine =
-  | {kind: 'material'; row: Row; unitPrice: number; qty: number; amount: number}
-  // 続けて並んだ手間の行をまとめたもの。部材のすぐ下なら「同上施工費」、箇所の最初なら「施工費」
-  | {kind: 'work'; rows: Row[]; amount: number; afterMaterial: boolean};
+  | {kind: 'material'; row: Row; unitPrice: number; qty: number; amount: number; excluded: boolean}
+  // 続けて並んだ手間の行をまとめたもの。部材のすぐ下なら「同上施工費」（対象外かどうかは部材に合わせる）、箇所の最初なら「施工費」
+  | {kind: 'work'; rows: Row[]; amount: number; afterMaterial: boolean; excluded: boolean};
 
 export function estimatePlaceLines(place: Pick<Place, 'rows'>, rate: number): EstimateLine[] {
   const out: EstimateLine[] = [];
   for (const r of place.rows) {
     if (r.kind === 'material') {
-      out.push({kind: 'material', row: r, unitPrice: estimateUnitPrice(r, rate), qty: estimateQty(r), amount: estimateAmount(r, rate)});
+      out.push({kind: 'material', row: r, unitPrice: estimateUnitPrice(r, rate), qty: estimateQty(r), amount: estimateAmount(r, rate), excluded: r.excluded});
       continue;
     }
+    const amount = estimateAmount(r, rate);
     const last = out[out.length - 1];
     if (last && last.kind === 'work') {
       last.rows.push(r);
-      last.amount += rowAmount(r);
-    } else out.push({kind: 'work', rows: [r], amount: rowAmount(r), afterMaterial: last?.kind === 'material'});
+      last.amount += amount;
+      if (!last.afterMaterial) last.excluded = last.excluded && r.excluded;
+    } else if (last && last.kind === 'material') {
+      out.push({kind: 'work', rows: [r], amount, afterMaterial: true, excluded: last.excluded});
+    } else out.push({kind: 'work', rows: [r], amount, afterMaterial: false, excluded: r.excluded});
   }
   return out;
+}
+
+/** 小計から諸経費・消費税・合計を出す */
+export type EstimateSums = {subtotal: number; overhead: number; tax: number; total: number};
+
+export function estimateSums(subtotal: number, s: Pick<Settings, 'estimateOverheadRate' | 'taxRate'>): EstimateSums {
+  const overhead = rounddown(subtotal * s.estimateOverheadRate);
+  const tax = rounddown((subtotal + overhead) * s.taxRate);
+  return {subtotal, overhead, tax, total: subtotal + overhead + tax};
 }
 
 export type EstimateTotals = {
   material: number; // 部材（定価×掛率）
   work: number; // 施工費
-  subtotal: number; // 税抜
-  tax: number;
-  total: number; // 税込
+  all: EstimateSums; // 全体（見積書の「金額」「全改修工事部分」）
+  target: EstimateSums; // 介護保険の対象（「介護保険対象部分」「対象工事部分」）
+  excluded: number; // 介護保険の対象外の金額（小計）
 };
 
 export function estimateTotals(job: Pick<Job, 'places'>, s: EstimateSettings): EstimateTotals {
   let material = 0;
   let work = 0;
+  let excluded = 0;
   for (const p of job.places) {
     for (const l of estimatePlaceLines(p, s.estimateRate)) {
       if (l.kind === 'material') material += l.amount;
       else work += l.amount;
+      if (l.excluded) excluded += l.amount;
     }
   }
   const subtotal = material + work;
-  const tax = taxAmount(subtotal, s.taxRate, s.totalTaxRounding);
-  return {material, work, subtotal, tax, total: subtotal + tax};
+  return {material, work, all: estimateSums(subtotal, s), target: estimateSums(subtotal - excluded, s), excluded};
 }

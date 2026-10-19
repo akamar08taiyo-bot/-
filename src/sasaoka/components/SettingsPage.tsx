@@ -3,7 +3,8 @@ import type {ReactNode} from 'react';
 import {DEFAULT_PLACES, DEFAULT_STAFF, OFFICES, settingsForOffice} from '../defaults.ts';
 import {hasSamples, withoutSamples} from '../samples.ts';
 import {backupJson, cleanList, masterJson, mergeById, parseBackup} from '../storage.ts';
-import type {AppData, InvoiceTaxMode, Rounding, Settings, TaxMode} from '../types.ts';
+import {FORM_IDS, FORM_INFO} from '../estimateForms.ts';
+import type {AppData, EstimateForm, InvoiceTaxMode, Rounding, Settings, TaxMode} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {downloadBlob, todayIso} from '../util.ts';
 import {Btn, NumberInput, TextInput, useToast} from './ui.tsx';
@@ -164,7 +165,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
             <option value="perJob">様邸ごとの⑤消費税を足す（一覧に様邸ごとの消費税・合計を出す）</option>
           </select>
         </Field>
-        <Field label="合計にかける消費税の1円未満（請求書・見積書）">
+        <Field label="合計にかける消費税の1円未満（請求書）">
           <select
             value={s.totalTaxRounding}
             onChange={(e) => set({totalTaxRounding: e.target.value as Rounding})}
@@ -187,21 +188,29 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
 
       <Section
         title="見積書"
-        note="上の「見積作成」に切り替えると、様邸に入れた部材・取付手間から見積書を作ります。部材の単価は定価×率。手すりなどを切って使うときは、数量を 使う長さ÷1本の長さ（例：60cm÷4m＝0.15本）にします。部材のすぐ下の取付手間は「同上施工費」の1行にまとめます。書式は仮のものです。"
+        note="上の「見積作成」に切り替えると、様邸に入れた部材・取付手間から見積書を作ります。書式は、行橋市・苅田町用「工事費見積書兼工事費内訳書」と、みやこ町・築上町用「住宅改修内訳明細書」（様邸の住所の市町村で決まり、様邸ごとに選び直せます）。部材の単価は定価×率、手すりなどを切って使うときの数量は 使う長さ÷1本の長さ（例：60cm÷4m＝0.15本）、部材のすぐ下の取付手間は「同上施工費」の1行です。金額は元の見積書と同じく、どれも1円未満を切り捨てます。"
       >
         <Field label="部材の単価＝定価×この率（0.8＝定価の8割）">
           <NumberInput value={s.estimateRate} onChange={(estimateRate) => set({estimateRate})} className="w-28" min={0} ariaLabel="見積の率" />
         </Field>
-        <Field label="工事内容を自動で作るときの言葉（箇所の名前のあとに付く）">{text('estimateWork', '手すり取付工事')}</Field>
-        <Field label="有効期限">{text('estimateValid', 'お見積り日より1か月')}</Field>
-        <Field label="見積書の備考（下に出ます）" wide>
-          <textarea
-            value={s.estimateNote}
-            onChange={(e) => set({estimateNote: e.target.value})}
-            rows={3}
-            className="w-full rounded-md border border-slate-300 p-2 text-sm font-normal"
-            placeholder="例：介護保険の住宅改修として申請する場合は、事前申請が必要です。"
-          />
+        <Field label="諸経費＝小計×この率（0.1＝10%）">
+          <NumberInput value={s.estimateOverheadRate} onChange={(estimateOverheadRate) => set({estimateOverheadRate})} className="w-28" min={0} ariaLabel="諸経費の率" />
+        </Field>
+        <Field label="みやこ町・築上町用：施工費を「時間×1時間の単価」で書くときの単価（円・0なら「1式」）">
+          <NumberInput value={s.estimateHourRate} onChange={(estimateHourRate) => set({estimateHourRate})} className="w-28" min={0} ariaLabel="1時間の単価" />
+        </Field>
+        <Field label="住所から市町村が分からないときの書式">
+          <select
+            value={s.estimateForm}
+            onChange={(e) => set({estimateForm: e.target.value as EstimateForm})}
+            className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
+          >
+            {FORM_IDS.map((f) => (
+              <option key={f} value={f}>
+                {FORM_INFO[f].name}「{FORM_INFO[f].title}」
+              </option>
+            ))}
+          </select>
         </Field>
       </Section>
 

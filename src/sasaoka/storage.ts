@@ -4,7 +4,7 @@
 
 import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES, SETTINGS_REV} from './defaults.ts';
 import {guessPieceLengthM} from './priceImport.ts';
-import type {AppData, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, Place, Rounding, Row, Settings, TaxMode} from './types.ts';
+import type {AppData, EstimateForm, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, Place, Rounding, Row, Settings, TaxMode} from './types.ts';
 import {uid} from './util.ts';
 
 const DB_NAME = 'taiyo-sasaoka-shikiri';
@@ -131,12 +131,19 @@ const cleanRow = (r: Record<string, unknown>): Row => ({
   pieceLengthM:
     r.pieceLengthM === undefined ? (r.kind === 'labor' ? 0 : guessPieceLengthM(str(r.name))) : Math.max(0, numv(r.pieceLengthM)),
   estPrice: optNum(r.estPrice),
+  excluded: r.excluded === true,
 });
+
+const KINDS = [1, 2, 3, 4, 5, 6]; // 見積書の改修の種類（①〜⑥）
+const FORMS: EstimateForm[] = ['yukuhashi', 'kouiki'];
 
 const cleanPlace = (p: Record<string, unknown>): Place => ({
   id: str(p.id) || uid('p'),
   name: str(p.name),
   rows: Array.isArray(p.rows) ? p.rows.filter(isObj).map(cleanRow) : [],
+  kind: KINDS.includes(numv(p.kind, 1)) ? numv(p.kind, 1) : 1,
+  photo: Math.max(0, Math.floor(numv(p.photo))),
+  work: str(p.work),
 });
 
 const SUFFIXES: NameSuffix[] = ['様邸', '様', ''];
@@ -152,7 +159,8 @@ export function cleanJobs(raw: unknown): Job[] {
     date: /^\d{4}-\d{2}-\d{2}$/.test(str(j.date)) ? str(j.date) : '',
     address: str(j.address),
     note: str(j.note),
-    work: str(j.work),
+    insuredNo: str(j.insuredNo),
+    form: FORMS.includes(j.form as EstimateForm) ? (j.form as EstimateForm) : '',
     places: Array.isArray(j.places) ? j.places.filter(isObj).map(cleanPlace) : [],
     createdAt: numv(j.createdAt, Date.now()),
     updatedAt: numv(j.updatedAt, Date.now()),
@@ -196,9 +204,6 @@ export function cleanSettings(raw: unknown): Settings {
     'bank',
     'subject',
     'invoiceNote',
-    'estimateWork',
-    'estimateValid',
-    'estimateNote',
   ] as const) {
     if (typeof raw[k] === 'string') s[k] = raw[k] as string;
   }
@@ -212,6 +217,9 @@ export function cleanSettings(raw: unknown): Settings {
   s.placePresets = Array.isArray(raw.placePresets) ? cleanList(raw.placePresets) : DEFAULT_PLACES;
   s.staffList = Array.isArray(raw.staffList) ? cleanList(raw.staffList) : DEFAULT_STAFF;
   s.estimateRate = numv(raw.estimateRate, d.estimateRate);
+  s.estimateOverheadRate = Math.max(0, numv(raw.estimateOverheadRate, d.estimateOverheadRate));
+  s.estimateHourRate = Math.max(0, numv(raw.estimateHourRate, d.estimateHourRate));
+  s.estimateForm = FORMS.includes(raw.estimateForm as EstimateForm) ? (raw.estimateForm as EstimateForm) : d.estimateForm;
   // 版2より前の設定：請求書の消費税は「すべての様邸の合計に最後に消費税率をかける」形に直す
   if (numv(raw.rev, 1) < 2) s.invoiceTaxMode = 'monthly';
   s.rev = SETTINGS_REV;

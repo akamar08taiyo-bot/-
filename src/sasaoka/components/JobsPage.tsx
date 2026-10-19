@@ -1,5 +1,7 @@
 import {useMemo} from 'react';
 import {estimateTotals, jobName, monthSummary} from '../calc.ts';
+import type {EstimateTotals} from '../calc.ts';
+import {FORM_INFO, jobForm} from '../estimateForms.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {addSamples, hasSamples} from '../samples.ts';
 import type {AppData, AppMode, Job} from '../types.ts';
@@ -9,7 +11,21 @@ import {Btn, useToast} from './ui.tsx';
 
 export function newJob(month: string): Job {
   const now = Date.now();
-  return {id: uid('j'), month, customer: '', suffix: '様邸', staff: '', date: '', address: '', note: '', work: '', places: [], createdAt: now, updatedAt: now};
+  return {
+    id: uid('j'),
+    month,
+    customer: '',
+    suffix: '様邸',
+    staff: '',
+    date: '',
+    address: '',
+    note: '',
+    insuredNo: '',
+    form: '',
+    places: [],
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 export function JobsPage({
@@ -220,35 +236,34 @@ export function JobsPage({
   );
 }
 
-/** 見積作成のときの一覧（様邸ごとの見積の金額） */
+/** 見積作成のときの一覧（様邸ごとの見積書の金額） */
 function EstimateList({data, rows, month, onOpen, onPrint}: {data: AppData; rows: Job[]; month: string; onOpen: (id: string) => void; onPrint: (r: PrintRequest) => void}) {
-  const list = rows.map((job) => ({job, t: estimateTotals(job, data.settings)}));
-  const sum = list.reduce((a, {t}) => ({material: a.material + t.material, work: a.work + t.work, subtotal: a.subtotal + t.subtotal, tax: a.tax + t.tax, total: a.total + t.total}), {
-    material: 0,
-    work: 0,
-    subtotal: 0,
-    tax: 0,
-    total: 0,
-  });
+  const s = data.settings;
+  const list = rows.map((job) => ({job, t: estimateTotals(job, s), form: jobForm(job, s)}));
+  const keys = ['material', 'work', 'subtotal', 'overhead', 'tax', 'total'] as const;
+  const values = (t: EstimateTotals) => [t.material, t.work, t.all.subtotal, t.all.overhead, t.all.tax, t.all.total];
+  const sum = list.reduce((acc, {t}) => values(t).map((v, i) => acc[i] + v), keys.map(() => 0));
   return (
     <div className="overflow-x-auto rounded-xl border border-indigo-200 bg-white shadow-sm">
-      <table className="w-full min-w-[980px] text-sm">
+      <table className="w-full min-w-[1080px] text-sm">
         <thead className="bg-indigo-50 text-xs text-indigo-900">
           <tr>
             <th className="px-2 py-2 text-center">No.</th>
             <th className="px-2 py-2 text-left">施工日</th>
             <th className="px-2 py-2 text-left">お客様名</th>
             <th className="px-2 py-2 text-left">担当</th>
-            <th className="px-2 py-2 text-right">部材（定価×{data.settings.estimateRate}）</th>
+            <th className="px-2 py-2 text-left">書式</th>
+            <th className="px-2 py-2 text-right">部材（定価×{s.estimateRate}）</th>
             <th className="px-2 py-2 text-right">施工費</th>
-            <th className="px-2 py-2 text-right">小計（税抜）</th>
+            <th className="px-2 py-2 text-right">小計</th>
+            <th className="px-2 py-2 text-right">諸経費</th>
             <th className="px-2 py-2 text-right">消費税</th>
-            <th className="px-2 py-2 text-right">御見積金額（税込）</th>
+            <th className="px-2 py-2 text-right">見積の合計</th>
             <th className="px-2 py-2" />
           </tr>
         </thead>
         <tbody>
-          {list.map(({job, t}, i) => (
+          {list.map(({job, t, form}, i) => (
             <tr key={job.id} className="cursor-pointer border-t border-slate-100 hover:bg-indigo-50/60" onClick={() => onOpen(job.id)}>
               <td className="px-2 py-2 text-center tabular-nums">{i + 1}</td>
               <td className="px-2 py-2 tabular-nums">{shortDate(job.date) || '—'}</td>
@@ -257,11 +272,12 @@ function EstimateList({data, rows, month, onOpen, onPrint}: {data: AppData; rows
                 <span className="ml-2 text-xs font-normal text-slate-500">{job.places.map((p) => p.name || '（箇所名なし）').join('・')}</span>
               </td>
               <td className="whitespace-nowrap px-2 py-2">{job.staff || <span className="text-slate-400">—</span>}</td>
-              <td className="px-2 py-2 text-right tabular-nums">{yen(t.material)}</td>
-              <td className="px-2 py-2 text-right tabular-nums">{yen(t.work)}</td>
-              <td className="px-2 py-2 text-right tabular-nums">{yen(t.subtotal)}</td>
-              <td className="px-2 py-2 text-right tabular-nums">{yen(t.tax)}</td>
-              <td className="px-2 py-2 text-right font-bold tabular-nums text-indigo-900">{yen(t.total)}</td>
+              <td className="whitespace-nowrap px-2 py-2 text-xs">{FORM_INFO[form].name}</td>
+              {values(t).map((v, k) => (
+                <td key={keys[k]} className={`px-2 py-2 text-right tabular-nums ${k === 5 ? 'font-bold text-indigo-900' : ''}`}>
+                  {yen(v)}
+                </td>
+              ))}
               <td className="px-2 py-1.5 text-right">
                 <Btn
                   small
@@ -279,14 +295,14 @@ function EstimateList({data, rows, month, onOpen, onPrint}: {data: AppData; rows
         </tbody>
         <tfoot className="border-t-2 border-indigo-200 bg-indigo-50/50 font-bold">
           <tr>
-            <td colSpan={4} className="px-2 py-2 text-right">
+            <td colSpan={5} className="px-2 py-2 text-right">
               {monthLabel(month)}分の見積 合計（{list.length}件）
             </td>
-            <td className="px-2 py-2 text-right tabular-nums">{yen(sum.material)}</td>
-            <td className="px-2 py-2 text-right tabular-nums">{yen(sum.work)}</td>
-            <td className="px-2 py-2 text-right tabular-nums">{yen(sum.subtotal)}</td>
-            <td className="px-2 py-2 text-right tabular-nums">{yen(sum.tax)}</td>
-            <td className="px-2 py-2 text-right tabular-nums text-indigo-900">{yen(sum.total)}</td>
+            {sum.map((v, k) => (
+              <td key={keys[k]} className={`px-2 py-2 text-right tabular-nums ${k === 5 ? 'text-indigo-900' : ''}`}>
+                {yen(v)}
+              </td>
+            ))}
             <td />
           </tr>
         </tfoot>

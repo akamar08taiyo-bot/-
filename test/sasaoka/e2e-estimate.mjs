@@ -1,5 +1,5 @@
 // 見積作成モードを確かめる：定価×0.8・切って使う部材の数量（使う長さ÷1本の長さ）・見積の単価の手入力・部材ごとの同上施工費・
-// 金額だけの行・一式・見積書の印刷・定価の取り込み
+// 金額だけの行・一式・見積書の2つの書式（行橋市・苅田町用／みやこ町・築上町用）の印刷・介護保険の対象外・定価の取り込み
 // usage: node e2e-estimate.mjs <dist-sasaoka/index.html の URL> <出力フォルダ>
 // Playwright はこのリポジトリの依存に入れていない。入っている場所を PLAYWRIGHT で指定できる（既定はクラウド環境の場所）
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
@@ -25,14 +25,14 @@ await page.getByRole('cell', {name: /（サンプル）山田様邸/}).waitFor()
 await page.getByRole('button', {name: '見積作成', exact: true}).click();
 // 玄関：木の手すり 定価20,000（1本4m）を60cm → 0.15本×16,000＝2,400・同上施工費（木2）2,000・ブラケット 2,100×0.8＝1,680×2
 // トイレ：L型 11,000×0.8＝8,800・同上施工費（タイル2）3,000・キャップ 450×0.8＝360×2
-// 部材 15,280・施工費 5,000・税抜 20,280・消費税 2,028（切り捨て）・合計 22,308
+// 部材 15,280・施工費 5,000・小計 20,280・諸経費 2,028（10%）・消費税 2,230（(20,280＋2,028)×0.1 切り捨て）・合計 24,538
 const row = await page.getByRole('row', {name: /（サンプル）山田様邸/}).innerText();
-for (const v of ['15,280', '5,000', '20,280', '2,028', '22,308']) assert.ok(row.includes(v), `見積の一覧に ${v} がない: ${row}`);
+for (const v of ['行橋市・苅田町用', '15,280', '5,000', '20,280', '2,028', '2,230', '24,538']) assert.ok(row.includes(v), `見積の一覧に ${v} がない: ${row}`);
 log('見積の一覧OK');
 
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 const box = () => page.locator('aside table').innerText();
-assert.ok((await box()).includes('22,308'));
+assert.ok((await box()).includes('24,538'));
 const places = page.locator('section').filter({has: page.getByPlaceholder('箇所名（玄関など）')});
 const genkan = places.nth(0);
 const toilet = places.nth(1);
@@ -48,7 +48,7 @@ await railRow.getByRole('textbox', {name: '使う長さ（cm）'}).fill('120');
 await page.waitForTimeout(100);
 assert.ok((await railRow.innerText()).includes('0.3本'));
 assert.ok((await railRow.innerText()).includes('4,800'));
-assert.ok((await box()).includes('24,948'), await box()); // 22,680＋2,268
+assert.ok((await box()).includes('27,442'), await box()); // 小計 22,680＋諸経費 2,268＋消費税 2,494
 log('切って使う部材の数量OK：120cm÷4m＝0.3本×16,000＝4,800');
 
 // 見積の単価を手で入れる → 黄色・↺ で定価×0.8 に戻る
@@ -72,14 +72,18 @@ assert.ok(works[0].includes('2,000') && works[1].includes('1,000'), works.join('
 log('部材ごとの同上施工費OK', works.map((w) => w.replace(/\s+/g, ' ')));
 
 // 金額だけの行（部材・工事）：名前なしで金額を入れるとすぐ合計に入る
+// 足した行の金額の欄にすぐ入力できる（入力欄が選ばれてから打つ）
+const focusedPrice = () => page.waitForFunction(() => /単価/.test(document.activeElement?.getAttribute('aria-label') ?? '')).then(() => page.waitForTimeout(50));
 await genkan.getByRole('button', {name: '＋ 部材を金額だけ入れる'}).click();
+await focusedPrice();
 await page.keyboard.type('5000');
 await genkan.getByRole('button', {name: '＋ 工事を金額だけ入れる'}).click();
+await focusedPrice();
 await page.keyboard.type('3000');
 await page.keyboard.press('Tab');
 await page.waitForTimeout(100);
-// 22,680＋1,000（ブラケットの施工費）＋5,000＋3,000＝31,680 → 消費税 3,168 → 34,848
-assert.ok((await box()).includes('34,848'), await box());
+// 小計 22,680＋1,000（ブラケットの施工費）＋5,000＋3,000＝31,680 → 諸経費 3,168 → 消費税 3,484 → 38,332
+assert.ok((await box()).includes('38,332'), await box());
 log('金額だけの行OK');
 
 // 一式：サンプルの一式をトイレに入れる → この箇所を一式に登録 → 一式が2つ
@@ -95,22 +99,79 @@ await page.getByRole('dialog').getByRole('button', {name: '閉じる'}).first().
 log('一式を入れる・登録するOK');
 await page.screenshot({path: path.join(outDir, '32-estimate-editor.png'), fullPage: true});
 
-// 見積書の印刷
+// 見積書の印刷（住所がないので設定の書式＝行橋市・苅田町用「工事費見積書兼工事費内訳書」）
+await page.getByPlaceholder('例：0000366989').fill('0000366989');
 await page.getByRole('button', {name: '🖨 見積書を印刷'}).click();
 await page.locator('.print-overlay').waitFor();
-const doc = await page.locator('.sheet').first().innerText();
-for (const t of ['御見積書', '（サンプル）山田', '定価20,000円（税抜）', '（120cm使用・1本4m）', '同上施工費', '行橋営業所所長　久保 匠史', '担当　久保', '所長印', '玄関・トイレ 手すり取付工事']) {
+const sheet = page.locator('.form-page').first();
+const doc = await sheet.innerText();
+for (const t of [
+  '①　工事費見積書兼工事費内訳書',
+  '（サンプル）山田',
+  '介護保険被保険者番号（0000366989）',
+  '定価：￥20,000',
+  '（120cm使用・1本4m）',
+  '同上施工費',
+  '代表者名　行橋営業所所長　久保 匠史',
+  '担当： 久保　0930-26-9640',
+  '玄関①',
+  'トイレ②',
+  'ページ　1　／　1',
+]) {
   assert.ok(doc.includes(t), `見積書に「${t}」がない`);
 }
-// 手すりの行：数量 0.3・単位 本・単価 16,000・金額 4,800
-const railLine = await page.locator('.sheet').first().locator('tr', {hasText: '木の手すり 35φ 4m'}).first().locator('td').allInnerTexts();
-assert.deepEqual(railLine.slice(2, 6), ['0.3', '本', '16,000', '4,800'], railLine.join('|'));
+// 手すりの行：数量 0.3・単位 本・単価 16,000・金額 4,800（介護保険対象部分も同じ）
+const railLine = await sheet.locator('tr', {hasText: '木の手すり 35φ 4m'}).first().locator('td').allInnerTexts();
+assert.deepEqual(railLine.slice(3, 11), ['0.3', '本', '16,000', '4,800', '0.3', '本', '16,000', '4,800'], railLine.join('|'));
+// 最後の4行（一式でトイレに 22,080円 足したあと）：小計 53,760・諸経費 5,376・消費税 5,913・合計 65,049（全体と介護保険の対象）
+const totalLine = async (label) => (await sheet.locator('tr', {hasText: label}).last().locator('td').allInnerTexts()).filter(Boolean);
+assert.deepEqual(await totalLine('小計'), ['小計', '53,760', '53,760']);
+assert.deepEqual(await totalLine('合計'), ['合計', '65,049', '65,049']);
 await page.screenshot({path: path.join(outDir, '33-estimate-print.png')});
 await page.emulateMedia({media: 'print'});
-await page.pdf({path: path.join(outDir, 'estimate.pdf'), format: 'A4', printBackground: true, preferCSSPageSize: true});
+await page.pdf({path: path.join(outDir, 'estimate-yukuhashi.pdf'), printBackground: true, preferCSSPageSize: true});
 await page.emulateMedia({media: 'screen'});
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
-log('見積書の印刷OK');
+log('見積書（行橋市・苅田町用）の印刷OK');
+
+// ブラケットを介護保険の対象外にする → 部材 3,360 と同上施工費 1,000 が対象外。金額の欄に「介護保険の対象」が出る
+await genkan.getByRole('row', {name: /ブラケット/}).getByLabel('介護保険の対象外').check();
+await page.waitForTimeout(100);
+// 対象：53,760−4,360＝49,400 → 諸経費 4,940 → 消費税 5,434 → 合計 59,774
+assert.ok((await box()).includes('59,774'), await box());
+assert.ok((await page.locator('aside').innerText()).includes('介護保険の対象外：4,360円'));
+log('介護保険の対象外OK');
+
+// みやこ町・築上町用：住所の市町村で書式が変わる。施工費は「時間×2,500円」、写真番号・改修の種類を出す
+await page.locator('label', {hasText: '住所（任意）'}).locator('input').fill('福岡県京都郡みやこ町豊津');
+await toilet.getByRole('textbox', {name: '写真番号'}).fill('5');
+await toilet.getByRole('combobox', {name: '改修の種類'}).selectOption('5');
+await page.getByRole('button', {name: '🖨 見積書を印刷'}).click();
+await page.locator('.print-overlay').waitFor();
+const kk = page.locator('.form-page').first();
+const kdoc = await page.locator('.print-root').innerText(); // すべてのページ
+for (const t of ['内訳書　様式', '全改修工事部分', '対象工事部分', '1時間2,500円', '福岡県介護保険広域連合', '20,000\t円/本', 'トイレ\t便器取替\t材']) {
+  assert.ok(kdoc.includes(t), `広域連合の書式に「${t}」がない`);
+}
+// 木 2箇所＝2,000円 → 0.8時間×2,500円
+const woodLine = (await kk.locator('tr', {hasText: '同上施工費'}).first().locator('td').allInnerTexts()).filter(Boolean);
+assert.deepEqual(woodLine.slice(0, 5), ['手', '同上施工費', '0.8', '時間', '2,500'], woodLine.join('|'));
+// 対象外のブラケット：全改修工事部分だけに金額があり、対象工事部分は空
+const bk = (await kk.locator('tr', {hasText: 'ブラケット'}).first().locator('td').allInnerTexts()).filter(Boolean);
+assert.deepEqual(bk.slice(2), ['2', '個', '1,680', '3,360'], bk.join('|'));
+// 1ページ14行：明細13行のあとに合計の4行が入らないので、トイレ（7行）を2ページ目に送り、合計はその下4行
+assert.equal(await page.locator('.form-page').count(), 2);
+assert.ok((await page.locator('.form-page').last().innerText()).includes('トイレ\t便器取替'));
+const kLast = page.locator('.form-page').last();
+const kTotal = (await kLast.locator('tr', {hasText: '合計'}).last().locator('td').allInnerTexts()).filter(Boolean);
+assert.deepEqual(kTotal, ['合計', '65,049', '59,774']);
+assert.ok(kdoc.includes('⑤'), '写真番号⑤・改修の種類⑤がない');
+await page.screenshot({path: path.join(outDir, '34-estimate-kouiki.png')});
+await page.emulateMedia({media: 'print'});
+await page.pdf({path: path.join(outDir, 'estimate-kouiki.pdf'), printBackground: true, preferCSSPageSize: true});
+await page.emulateMedia({media: 'screen'});
+await page.getByRole('button', {name: '✕ 閉じる'}).click();
+log('見積書（みやこ町・築上町用）の印刷OK');
 
 // 仕切り・請求書に戻すと、仕切り計算表の金額は見積の操作で変わっていない（長さ・見積の単価は仕切りに関係しない）
 await page.getByRole('button', {name: '仕切り・請求書', exact: true}).click();

@@ -2,7 +2,7 @@
 //   仕切り：玄関 木の手すり1万円・ブラケット1,500円×2個・取付手間 木×2箇所
 //   見積：木の手すり 定価2万円（1本4m）を60cm → 0.15本×単価16,000円＝2,400円、そのすぐ下に同上施工費（木 2箇所＝2,000円）
 import {guessPieceLengthM} from './priceImport.ts';
-import {kitFromRows, laborRow, manualRow, materialRow} from './rows.ts';
+import {kitFromRows, laborRow, manualRow, materialRow, newPlace} from './rows.ts';
 import type {AppData, Job, Kit, Material} from './types.ts';
 import {uid} from './util.ts';
 
@@ -41,10 +41,11 @@ export function addSamples(data: AppData, month: string): {materials: Material[]
     date: `${month}-05`,
     address: '',
     note: '玄関・トイレの手すり取付（サンプル）',
-    work: '',
+    insuredNo: '',
+    form: '',
     places: [
-      {id: uid('p'), name: '玄関', rows: [{...materialRow(handrail, 1), lengthCm: 60}, labor('木', 2), materialRow(bracket, 2)]},
-      {id: uid('p'), name: 'トイレ', rows: [materialRow(lHandrail, 1), labor('タイル', 2), materialRow(cap, 2)]},
+      newPlace('玄関', [{...materialRow(handrail, 1), lengthCm: 60}, labor('木', 2), materialRow(bracket, 2)]),
+      newPlace('トイレ', [materialRow(lHandrail, 1), labor('タイル', 2), materialRow(cap, 2)]),
     ],
     createdAt: now,
     updatedAt: now,

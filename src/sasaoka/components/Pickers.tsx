@@ -152,7 +152,9 @@ export function MaterialPicker({
                     <td className="px-2 py-1.5 text-xs text-slate-500">{m.code}</td>
                     <td className="px-2 py-1.5 text-xs text-slate-500">{m.maker}</td>
                     <td className="px-2 py-1.5 text-right tabular-nums text-slate-500">{m.listPrice > 0 ? yen(m.listPrice) : '—'}</td>
-                    <td className="px-2 py-1.5 text-right tabular-nums">{yen(m.price)}</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums">
+                      {m.price > 0 ? yen(m.price) : <span className="text-xs font-bold text-amber-700">空欄</span>}
+                    </td>
                     {estimate && (
                       <td className="px-2 py-1.5 text-right font-bold tabular-nums text-indigo-800">
                         {m.listPrice > 0 ? yen(roundYen(m.listPrice * rate)) : <span className="text-xs font-normal text-amber-700">定価なし</span>}

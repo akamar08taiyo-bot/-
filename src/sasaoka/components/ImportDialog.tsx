@@ -6,6 +6,7 @@ import {
   detectListNth,
   detectMapping,
   gridCandidates,
+  guessMaker,
   lineCandidates,
   mergeMaterials,
   normalize,
@@ -14,7 +15,7 @@ import {
 } from '../priceImport.ts';
 import type {Candidate, Grid, Mapping, PositionedWord} from '../priceImport.ts';
 import type {Material} from '../types.ts';
-import {matchesAll} from '../util.ts';
+import {matchesAll, num} from '../util.ts';
 import {isXlsx, readXlsx} from '../xlsx.ts';
 import type {Sheet} from '../xlsx.ts';
 import {Btn, Modal, NumberInput, Star, TextInput, useToast} from './ui.tsx';
@@ -50,6 +51,20 @@ function makerFromFileName(name: string): string {
   return cleaned.length <= 12 && /[^\x00-\x7f]/.test(cleaned) ? cleaned : '';
 }
 
+/** 取り込める行がいちばん多いシート */
+function bestSheet(sheets: Sheet[]): number {
+  let best = 0;
+  let bestCount = -1;
+  sheets.forEach((sh, i) => {
+    const n = gridCandidates(sh.rows, detectMapping(sh.rows), '').filter((c) => c.include).length;
+    if (n > bestCount) {
+      best = i;
+      bestCount = n;
+    }
+  });
+  return best;
+}
+
 export function ImportDialog({materials, onDone, onClose}: {materials: Material[]; onDone: (list: Material[]) => void; onClose: () => void}) {
   const toast = useToast();
   const [source, setSource] = useState<Source | null>(null);
@@ -83,16 +98,18 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
   }, [source, grid]);
 
   const start = (next: Source, name: string) => {
+    // Excel は、取り込める行がいちばん多いシートから始める（表紙のシートなどを飛ばす）
+    const firstSheet = next.kind === 'xlsx' ? bestSheet(next.sheets) : 0;
     setSource(next);
     setFileName(name);
-    setSheetIndex(0);
+    setSheetIndex(firstSheet);
     setOverrides({});
     setQuery('');
     setError('');
     const aligned = next.kind === 'pdf' ? alignToHeader(next.words) : null;
     const g =
       next.kind === 'xlsx'
-        ? next.sheets[0]?.rows ?? []
+        ? next.sheets[firstSheet]?.rows ?? []
         : next.kind === 'csv'
           ? next.grid
           : next.kind === 'paste'
@@ -104,7 +121,7 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
     setMapping(tabular ? detectMapping(g) : null);
     setNth(1);
     setListNth(detectListNth(next.kind === 'pdf' ? next.lines : next.kind === 'paste' ? textToLines(next.text) : g.map((r) => r.join('  '))));
-    if (!maker && name) setMaker(makerFromFileName(name));
+    if (!maker) setMaker(guessMaker([name, ...g.slice(0, 8).map((r) => r.join(' '))]) || makerFromFileName(name));
   };
 
   const readFile = async (f: File) => {
@@ -151,8 +168,9 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
 
   const candidates = useMemo(() => base.map((c) => ({...c, ...overrides[c.key]})), [base, overrides]);
   const filtered = useMemo(() => candidates.filter((c) => matchesAll(`${c.name} ${c.code} ${c.maker}`, query)), [candidates, query]);
-  const included = candidates.filter((c) => c.include && c.name && c.price !== null);
+  const included = candidates.filter((c) => c.include && (c.name || c.code) && (c.price !== null || c.listPrice !== null));
   const favCount = included.filter((c) => c.favorite).length;
+  const noShikiri = included.filter((c) => c.price === null).length;
 
   const setOv = (key: string, patch: Override) => setOverrides((o) => ({...o, [key]: {...o[key], ...patch}}));
   const setMany = (list: Candidate[], patch: Override) =>
@@ -165,7 +183,10 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
   const doImport = () => {
     const r = mergeMaterials(materials, included);
     onDone(r.list);
-    toast(`部材リストに取り込みました：新しく ${r.added}件・価格を更新 ${r.updated}件・変わらず ${r.unchanged}件`);
+    toast(
+      `部材リストに取り込みました：新しく ${r.added}件・価格を更新 ${r.updated}件・変わらず ${r.unchanged}件` +
+        (noShikiri > 0 ? `（仕切価格が空欄の ${noShikiri}件は、あとで仕切価格の入った表を取り込むと入ります）` : ''),
+    );
     onClose();
   };
 
@@ -206,7 +227,7 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
         source ? (
           <>
             <span className="mr-auto text-sm text-slate-600">
-              取り込む <b className="text-slate-900">{included.length}</b>件（うち★ {favCount}件）／ 読み取った {candidates.length}件
+              取り込む <b className="text-slate-900">{included.length}</b>件（うち★ {favCount}件{noShikiri > 0 ? `・仕切価格が空欄 ${noShikiri}件` : ''}）／ 読み取った {candidates.length}件
             </span>
             <Btn color="white" onClick={() => setSource(null)}>
               別のファイルにする
@@ -338,11 +359,12 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
                 </select>
               </label>
               {colSelect('商品名の列', 'name', false)}
-              {colSelect('仕切価格の列', 'price', false)}
+              {colSelect('仕切価格の列（空欄なら「なし」）', 'price', true)}
               {colSelect('定価の列（見積に使う）', 'list', true)}
               {colSelect('品番の列', 'code', true)}
               {colSelect('メーカーの列', 'maker', true)}
               {colSelect('単位の列', 'unit', true)}
+              {colSelect('1本の長さの列（切って使う部材）', 'len', true)}
             </div>
           ) : (
             <div className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
@@ -413,6 +435,7 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
                       <td className="px-2 text-xs">{c.code}</td>
                       <td className="px-2 py-1">
                         <TextInput value={c.name} onChange={(name) => setOv(c.key, {name})} className="w-full min-w-[16rem]" />
+                        {c.pieceLengthM > 0 && <div className="px-1 text-[11px] text-slate-500">1本の長さ {num(c.pieceLengthM)}m</div>}
                       </td>
                       <td className="px-2 text-xs">{c.maker}</td>
                       <td className="px-2 py-1 text-right">
@@ -424,7 +447,9 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
                       </td>
                       <td className="px-2 py-1 text-right">
                         {c.price === null ? (
-                          <span className="text-xs text-rose-600">金額なし</span>
+                          <span className="text-xs text-slate-400" title="仕切価格の入った表をあとで取り込むと入ります">
+                            空欄（あとで）
+                          </span>
                         ) : (
                           <NumberInput value={c.price} onChange={(price) => setOv(c.key, {price})} className="w-28" ariaLabel="仕切価格" />
                         )}
@@ -442,6 +467,7 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
           )}
           <p className="text-xs text-slate-500">
             すでに部材リストにある商品（同じメーカーで品番が同じもの。品番がなければ商品名が同じもの）は、新しい仕切価格・定価に書き換えます。★はそのまま残ります。
+            表の仕切価格が空欄のときは、今の仕切価格のままにします。あとで仕切価格を入れた表（品番と仕切価格の列だけでもよい）を取り込むと、仕切価格だけが入ります。
             定価は見積書の単価（定価×掛率。設定で決めます）に使います。
           </p>
         </div>

@@ -8,14 +8,14 @@ import {
   estimateUnitPrice,
   jobName,
   jobTotals,
-  jobWork,
   placeTotals,
   rowAmount,
 } from '../calc.ts';
 import type {EstimateLine, EstimateTotals, JobTotals} from '../calc.ts';
+import {circled, FORM_IDS, FORM_INFO, formForAddress, jobForm, KINDS, photoNumbers, placeWork, workHours} from '../estimateForms.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
-import {copyRows, kitFromRows, manualRow, replaceRange, workRange} from '../rows.ts';
-import type {AppData, AppMode, Job, Kit, Material, NameSuffix, Place, Row, Settings} from '../types.ts';
+import {copyRows, kitFromRows, manualRow, newPlace as makePlace, replaceRange, workRange} from '../rows.ts';
+import type {AppData, AppMode, EstimateForm, Job, Kit, Material, NameSuffix, Place, Row, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {num, uid, yen} from '../util.ts';
 import {KitPicker} from './Kits.tsx';
@@ -29,6 +29,7 @@ export function copyJob(job: Job): Job {
     id: uid('j'),
     customer: job.customer + '（コピー）',
     places: job.places.map((p) => ({...p, id: uid('p'), rows: copyRows(p.rows)})),
+    insuredNo: '',
     createdAt: now,
     updatedAt: now,
   };
@@ -71,6 +72,8 @@ export function JobEditor({
   const estimate = mode === 'estimate';
   const totals = jobTotals(job, s);
   const est = estimateTotals(job, s);
+  const form = jobForm(job, s);
+  const photos = photoNumbers(job, s.estimateRate);
 
   const setJob = (fn: (j: Job) => Job) =>
     update('jobs', (list) => list.map((j) => (j.id === job.id ? {...fn(j), updatedAt: Date.now()} : j)));
@@ -78,7 +81,7 @@ export function JobEditor({
     setJob((j) => ({...j, places: j.places.map((p) => (p.id === placeId ? fn(p) : p))}));
 
   const addPlace = (name: string) => {
-    const p: Place = {id: uid('p'), name: name.trim(), rows: []};
+    const p = makePlace(name);
     setJob((j) => ({...j, places: [...j.places, p]}));
     setNewPlace('');
   };
@@ -94,7 +97,8 @@ export function JobEditor({
   const copyPlace = (place: Place) =>
     setJob((j) => {
       const i = j.places.findIndex((p) => p.id === place.id);
-      const c: Place = {...place, id: uid('p'), name: place.name + '（コピー）', rows: copyRows(place.rows)};
+      // 写真番号は付け直す（同じ番号が2つにならないように）
+      const c: Place = {...place, id: uid('p'), name: place.name + '（コピー）', rows: copyRows(place.rows), photo: 0};
       const places = [...j.places];
       places.splice(i + 1, 0, c);
       return {...j, places};
@@ -254,18 +258,37 @@ export function JobEditor({
               <TextInput value={job.note} onChange={(note) => setJob((j) => ({...j, note}))} />
             </label>
             {estimate && (
-              <label className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2 xl:col-span-4">
-                工事内容（見積書に出ます。空なら箇所の名前から自動で入ります。書き換えてもかまいません）
-                <TextInput value={job.work} onChange={(work) => setJob((j) => ({...j, work}))} placeholder={jobWork({...job, work: ''}, s.estimateWork)} />
-              </label>
+              <>
+                <label className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2">
+                  見積書の書式
+                  <select
+                    value={job.form}
+                    onChange={(e) => setJob((j) => ({...j, form: e.target.value as EstimateForm | ''}))}
+                    className="h-9 rounded-md border border-slate-300 px-2 text-sm"
+                    aria-label="見積書の書式"
+                  >
+                    <option value="">住所の市町村で決める（今は {FORM_INFO[formForAddress(job.address) ?? s.estimateForm].name}）</option>
+                    {FORM_IDS.map((f) => (
+                      <option key={f} value={f}>
+                        {FORM_INFO[f].name}「{FORM_INFO[f].title}」
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2">
+                  介護保険被保険者番号{form === 'kouiki' && <span className="font-normal text-slate-500">（みやこ町・築上町用の書式には出ません）</span>}
+                  <TextInput value={job.insuredNo} onChange={(insuredNo) => setJob((j) => ({...j, insuredNo}))} placeholder="例：0000366989" inputMode="numeric" />
+                </label>
+              </>
             )}
           </section>
 
           {estimate && (
             <p className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs leading-5 text-indigo-900">
-              見積作成：部材の単価は <b>定価×{s.estimateRate}</b> で入ります（手で直せます）。手すりなどを切って使うときは「使う長さ」を入れると、
-              数量が <b>使う長さ÷1本の長さ</b>（例：60cm÷4m＝0.15本）になります。
+              見積作成（{FORM_INFO[form].name}「{FORM_INFO[form].title}」）：部材の単価は <b>定価×{s.estimateRate}</b> で入ります（手で直せます）。
+              手すりなどを切って使うときは「使う長さ」を入れると、数量が <b>使う長さ÷1本の長さ</b>（例：60cm÷4m＝0.15本）になります。
               取付手間は、部材のすぐ下に「<b>同上施工費</b>」として足し上げます（部材の「＋ この部材の施工費」で数えます）。
+              金額は元の見積書と同じく1円未満を切り捨て、諸経費は小計×{num(s.estimateOverheadRate * 100)}%です。
             </p>
           )}
 
@@ -278,6 +301,10 @@ export function JobEditor({
               presets={presets}
               mode={mode}
               rate={s.estimateRate}
+              form={form}
+              photo={photos.get(place.id) ?? 0}
+              hourRate={s.estimateHourRate}
+              onPlace={(patch) => setPlace(place.id, (p) => ({...p, ...patch}))}
               focusRowId={focusRowId}
               onRename={(name) => setPlace(place.id, (p) => ({...p, name}))}
               onRows={(rows) => setPlace(place.id, (p) => ({...p, rows}))}
@@ -328,9 +355,10 @@ export function JobEditor({
         <aside className="min-w-0 lg:sticky lg:top-3 lg:self-start">
           {estimate ? (
             <>
-              <EstimateSummaryBox totals={est} settings={s} />
+              <EstimateSummaryBox totals={est} settings={s} form={form} />
               <p className="mt-2 text-xs leading-5 text-slate-500">
-                見積書の金額です。部材は 定価×{s.estimateRate}×数量（切って使う部材の数量は 使う長さ÷1本の長さ）、施工費は取付手間の合計、消費税は税抜の合計にかけます（1円未満は設定で決めます）。
+                見積書の金額です。部材は 定価×{s.estimateRate}×数量（切って使う部材の数量は 使う長さ÷1本の長さ）、施工費は取付手間の合計。
+                小計に諸経費（{num(s.estimateOverheadRate * 100)}%）を足し、消費税をかけます。どれも1円未満は切り捨てです。
               </p>
             </>
           ) : (
@@ -424,6 +452,10 @@ function PlaceCard({
   presets,
   mode,
   rate,
+  form,
+  photo,
+  hourRate,
+  onPlace,
   focusRowId,
   onRename,
   onRows,
@@ -442,6 +474,10 @@ function PlaceCard({
   presets: string[];
   mode: AppMode;
   rate: number;
+  form: EstimateForm;
+  photo: number; // 見積書の写真番号（入れていなければ自動の番号）
+  hourRate: number;
+  onPlace: (patch: Partial<Pick<Place, 'kind' | 'photo' | 'work'>>) => void;
   focusRowId: string | null;
   onRename: (name: string) => void;
   onRows: (rows: Row[]) => void;
@@ -515,6 +551,42 @@ function PlaceCard({
           </button>
         </div>
       </div>
+      {estimate && (
+        <div className="flex flex-wrap items-end gap-x-3 gap-y-2 border-b border-slate-100 bg-indigo-50/40 px-4 py-2 text-xs font-bold text-slate-600">
+          <label className="grid gap-1">
+            改修の種類
+            <select
+              value={place.kind}
+              onChange={(e) => onPlace({kind: Number(e.target.value)})}
+              className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm font-normal"
+              aria-label="改修の種類"
+            >
+              {KINDS.map((k, i) => (
+                <option key={k} value={i + 1}>
+                  {circled(i + 1)}
+                  {k}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1">
+            写真番号
+            <NumberInput
+              value={place.photo}
+              onChange={(n) => onPlace({photo: Math.max(0, Math.round(n))})}
+              className="h-8 w-20 text-center font-normal"
+              ariaLabel="写真番号"
+              blankZero
+              min={0}
+              placeholder={photo > 0 ? `${circled(photo)}（自動）` : '自動'}
+            />
+          </label>
+          <label className="grid min-w-[12rem] flex-1 gap-1">
+            {form === 'kouiki' ? '改修箇所毎工事名称' : '改修内容'}（空なら改修の種類から）
+            <TextInput value={place.work} onChange={(work) => onPlace({work})} placeholder={placeWork({...place, work: ''}, form)} className="h-8 font-normal" aria-label="工事名称" />
+          </label>
+        </div>
+      )}
 
       {place.rows.length > 0 && (
         <div className="overflow-x-auto">
@@ -537,7 +609,7 @@ function PlaceCard({
                 const isWork = estimate && r.kind === 'labor';
                 const group = workEnd.get(r.id);
                 return [
-                  <tr key={r.id} className={`border-t border-slate-100 align-middle ${isWork ? 'bg-sky-50/40' : ''}`}>
+                  <tr key={r.id} className={`border-t border-slate-100 align-middle ${isWork ? 'bg-sky-50/40' : ''} ${estimate && r.kind === 'material' && r.excluded ? 'bg-slate-100/80' : ''}`}>
                     <td data-cell="kind" className={`px-2 py-1.5 ${isWork ? 'pl-5' : ''}`}>
                       <KindBadge kind={r.kind} label={estimate ? '施工費' : undefined} />
                     </td>
@@ -553,9 +625,12 @@ function PlaceCard({
                       />
                       {(r.code || r.maker) && <div className="px-2 text-[11px] text-slate-500">{[r.maker, r.code].filter(Boolean).join('　')}</div>}
                       {estimate && r.kind === 'material' && (
-                        <button type="button" onClick={() => onPickLabor(r.id)} className="mt-0.5 rounded px-2 py-0.5 text-[11px] font-bold text-sky-700 hover:bg-sky-50">
-                          ＋ この部材の施工費
-                        </button>
+                        <div className="flex flex-wrap items-center gap-x-2">
+                          <button type="button" onClick={() => onPickLabor(r.id)} className="mt-0.5 rounded px-2 py-0.5 text-[11px] font-bold text-sky-700 hover:bg-sky-50">
+                            ＋ この部材の施工費
+                          </button>
+                          <ExcludedToggle on={r.excluded} onChange={(excluded) => setRow(r.id, {excluded})} />
+                        </div>
                       )}
                     </td>
                     {estimate && (
@@ -616,6 +691,22 @@ function PlaceCard({
                       {estimate && r.kind === 'material' && r.lengthCm > 0 && !(r.pieceLengthM > 0) && (
                         <div className="mt-0.5 text-[11px] font-bold text-amber-700">1本の長さを入れてください</div>
                       )}
+                      {estimate && r.kind === 'material' && (
+                        <label className="mt-1 flex items-center justify-center gap-1 text-[11px] text-slate-500">
+                          単位
+                          {cutToLength(r) ? (
+                            <span className="font-bold text-slate-700">本</span>
+                          ) : (
+                            <input
+                              value={r.unit}
+                              onChange={(e) => setRow(r.id, {unit: e.target.value})}
+                              placeholder="例：個"
+                              className="h-7 w-14 rounded border border-slate-200 px-1 text-center text-xs text-slate-800"
+                              aria-label="単位"
+                            />
+                          )}
+                        </label>
+                      )}
                     </td>
                     <td data-cell="amount" data-label={estimate ? '見積金額' : '金額'} className="px-2 py-1.5 text-right font-bold tabular-nums">
                       {yen(estimate ? estimateAmount(r, rate) : rowAmount(r))}
@@ -641,7 +732,19 @@ function PlaceCard({
                   estimate && group && (
                     <tr key={`${r.id}-work`} className="work-sum border-t border-dashed border-sky-200 bg-sky-50/60 text-xs">
                       <td colSpan={cols - 2} className="px-2 py-1 text-right font-bold text-sky-900">
-                        {group.afterMaterial ? '同上施工費' : '施工費'}（見積書ではこの1行）
+                        {!group.afterMaterial && (
+                          <span className="mr-3 inline-block align-middle">
+                            <ExcludedToggle
+                              on={group.excluded}
+                              onChange={(excluded) => onRows(place.rows.map((x) => (group.rows.some((g) => g.id === x.id) ? {...x, excluded} : x)))}
+                            />
+                          </span>
+                        )}
+                        {group.afterMaterial ? '同上施工費' : '施工費'}
+                        {form === 'kouiki' && workHours(group.amount, hourRate) !== null && (
+                          <span className="font-normal">（{num(workHours(group.amount, hourRate) ?? 0)}時間×{yen(hourRate)}円）</span>
+                        )}
+                        （見積書ではこの1行{group.afterMaterial && group.excluded ? '・部材と同じく介護保険の対象外' : ''}）
                       </td>
                       <td className="px-2 py-1 text-right text-sm font-bold tabular-nums text-sky-900">{yen(group.amount)}</td>
                       <td />
@@ -706,27 +809,54 @@ function EstPriceCell({row, rate, autoFocus, onChange}: {row: Row; rate: number;
   );
 }
 
-export function EstimateSummaryBox({totals: t, settings: s}: {totals: EstimateTotals; settings: Settings}) {
-  const rows: [string, number, boolean][] = [
-    [`部材（定価×${s.estimateRate}）`, t.material, false],
-    ['施工費', t.work, false],
-    ['小計（税抜）', t.subtotal, true],
-    [`消費税（${Math.round(s.taxRate * 1000) / 10}%）`, t.tax, false],
-    ['御見積金額（税込）', t.total, true],
+/** 介護保険の対象外にするチェック（見積書では「対象外」の欄に出す） */
+function ExcludedToggle({on, onChange}: {on: boolean; onChange: (v: boolean) => void}) {
+  return (
+    <label className={`inline-flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-bold ${on ? 'bg-slate-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>
+      <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} className="h-3.5 w-3.5" />
+      介護保険の対象外
+    </label>
+  );
+}
+
+export function EstimateSummaryBox({totals: t, settings: s, form}: {totals: EstimateTotals; settings: Settings; form: EstimateForm}) {
+  const pctOf = (r: number) => `${num(Math.round(r * 1000) / 10)}%`;
+  const rows: [string, number, number, boolean][] = [
+    [`部材（定価×${s.estimateRate}）`, t.material, NaN, false],
+    ['施工費', t.work, NaN, false],
+    ['小計', t.all.subtotal, t.target.subtotal, true],
+    [`諸経費（${pctOf(s.estimateOverheadRate)}）`, t.all.overhead, t.target.overhead, false],
+    [`消費税（${pctOf(s.taxRate)}）`, t.all.tax, t.target.tax, false],
+    ['合計', t.all.total, t.target.total, true],
   ];
+  const split = t.excluded !== 0;
   return (
     <div className="overflow-hidden rounded-xl border-2 border-indigo-900 bg-white">
-      <div className="bg-indigo-900 px-3 py-1.5 text-sm font-bold text-white">見積書の金額</div>
+      <div className="bg-indigo-900 px-3 py-1.5 text-sm font-bold text-white">
+        見積書の金額
+        <span className="ml-1 text-xs font-normal text-indigo-100">（{FORM_INFO[form].name}）</span>
+      </div>
       <table className="w-full text-sm">
+        {split && (
+          <thead className="bg-indigo-50 text-[11px] text-indigo-900">
+            <tr>
+              <th />
+              <th className="px-3 py-1 text-right">全体</th>
+              <th className="px-3 py-1 text-right">介護保険の対象</th>
+            </tr>
+          </thead>
+        )}
         <tbody>
-          {rows.map(([label, value, strong]) => (
+          {rows.map(([label, value, target, strong]) => (
             <tr key={label} className="border-b border-indigo-200 last:border-b-0">
               <td className={`px-3 py-2 ${strong ? 'bg-indigo-50 font-bold' : ''}`}>{label}</td>
               <td className={`px-3 py-2 text-right tabular-nums ${strong ? 'text-base font-bold' : ''}`}>{yen(value)}</td>
+              {split && <td className={`px-3 py-2 text-right tabular-nums ${strong ? 'font-bold' : ''}`}>{Number.isNaN(target) ? '' : yen(target)}</td>}
             </tr>
           ))}
         </tbody>
       </table>
+      {split && <div className="border-t border-indigo-200 px-3 py-1.5 text-xs text-slate-600">介護保険の対象外：{yen(t.excluded)}円（小計）</div>}
     </div>
   );
 }
