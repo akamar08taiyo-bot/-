@@ -492,7 +492,19 @@ export function EstimateSheet({
     : {left: -9999, top: 0, width: 10, height: 10};
   const rows = editing ? Math.max(1, edit.value.split('\n').length) : 1;
 
-  // 候補の場所（画面の上に、ふつうの大きさで出す）
+  // 候補の場所（画面の上に、ふつうの大きさで出す）。画面を動かしたら付いていく
+  const [, setTick] = useState(0);
+  const showSug = suggestions.length > 0;
+  useEffect(() => {
+    if (!showSug) return;
+    const onMove = () => setTick((t) => t + 1);
+    window.addEventListener('scroll', onMove, true);
+    window.addEventListener('resize', onMove);
+    return () => {
+      window.removeEventListener('scroll', onMove, true);
+      window.removeEventListener('resize', onMove);
+    };
+  }, [showSug]);
   const anchor = findCell(sel);
   const sugPos = (() => {
     if (!anchor || suggestions.length === 0) return null;
