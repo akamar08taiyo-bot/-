@@ -138,6 +138,7 @@ export function jobName(job: Pick<Job, 'customer' | 'suffix'>): string {
 //   例：定価 20,000円（1本4m）を60cm使う → 0.6÷4＝0.15本、単価 16,000円、金額 16,000×0.15＝2,400円
 // 取付手間は、部材のすぐ下に続く手間の行を足して「同上施工費」の1行にする（例：木 2箇所 ＝ 2,000円）。
 //   小計 ＝ 部材＋施工費、諸経費 ＝ 小計×0.1、消費税 ＝（小計＋諸経費）×0.1、合計 ＝ 小計＋諸経費＋消費税
+//   諸経費は見積ごとに手で直せる（端数の調整など）。笹岡工務店の仕切り計算表の④諸経費は一律の式のまま。
 // 介護保険の対象外にした行は「全体」にだけ入り、「介護保険の対象」には入らない。
 
 /** ROUNDDOWN（0の方へ1円未満を切り捨て） */
@@ -199,13 +200,18 @@ export function estimatePlaceLines(place: Pick<Place, 'rows'>, rate: number): Es
   return out;
 }
 
-/** 小計から諸経費・消費税・合計を出す */
+/** 小計から諸経費・消費税・合計を出す。overhead を渡すと、その金額を諸経費にする（手で直したとき） */
 export type EstimateSums = {subtotal: number; overhead: number; tax: number; total: number};
 
-export function estimateSums(subtotal: number, s: Pick<Settings, 'estimateOverheadRate' | 'taxRate'>): EstimateSums {
-  const overhead = rounddown(subtotal * s.estimateOverheadRate);
-  const tax = rounddown((subtotal + overhead) * s.taxRate);
-  return {subtotal, overhead, tax, total: subtotal + overhead + tax};
+export function estimateSums(subtotal: number, s: Pick<Settings, 'estimateOverheadRate' | 'taxRate'>, overhead: number | null = null): EstimateSums {
+  const o = overhead ?? overheadAuto(subtotal, s);
+  const tax = rounddown((subtotal + o) * s.taxRate);
+  return {subtotal, overhead: o, tax, total: subtotal + o + tax};
+}
+
+/** 諸経費（手で直していないとき）＝ 小計×率 */
+export function overheadAuto(subtotal: number, s: Pick<Settings, 'estimateOverheadRate'>): number {
+  return rounddown(subtotal * s.estimateOverheadRate);
 }
 
 export type EstimateTotals = {
@@ -216,7 +222,14 @@ export type EstimateTotals = {
   excluded: number; // 介護保険の対象外の金額（小計）
 };
 
-export function estimateTotals(job: Pick<Job, 'places'>, s: EstimateSettings): EstimateTotals {
+/**
+ * 見積の合計。諸経費を手で直してあればその金額（対象外の行がなければ、全体と介護保険の対象は同じ金額）。
+ * 対象外の行があるときの介護保険の対象の諸経費は overheadTarget（なければ 対象の小計×率）
+ */
+export function estimateTotals(
+  job: Pick<Job, 'places'> & Partial<Pick<Job, 'overhead' | 'overheadTarget'>>,
+  s: EstimateSettings,
+): EstimateTotals {
   let material = 0;
   let work = 0;
   let excluded = 0;
@@ -228,5 +241,7 @@ export function estimateTotals(job: Pick<Job, 'places'>, s: EstimateSettings): E
     }
   }
   const subtotal = material + work;
-  return {material, work, all: estimateSums(subtotal, s), target: estimateSums(subtotal - excluded, s), excluded};
+  const all = estimateSums(subtotal, s, job.overhead ?? null);
+  const target = excluded === 0 ? {...all} : estimateSums(subtotal - excluded, s, job.overheadTarget ?? null);
+  return {material, work, all, target, excluded};
 }

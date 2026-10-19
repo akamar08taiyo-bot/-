@@ -69,6 +69,18 @@ export function monthEnd(month: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/** 担当者の名字（「土居 翔太」→「土居」）。請求書・一覧など欄のせまいところに出す */
+export function staffShort(name: string): string {
+  return name.trim().split(/[\s　]+/)[0] ?? '';
+}
+
+/** 担当者のフルネーム（見積書に出す）。名字だけで入っている様邸でも、候補にその名字のフルネームがあればそれにする */
+export function staffFull(name: string, list: string[]): string {
+  const n = name.trim();
+  if (!n || list.includes(n)) return n;
+  return list.find((x) => staffShort(x) === n) ?? n;
+}
+
 /** 検索用：全角半角・大文字小文字をそろえる */
 export function searchKey(s: string): string {
   return (s || '').normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();

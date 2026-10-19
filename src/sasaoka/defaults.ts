@@ -40,8 +40,17 @@ export const DEFAULT_PLACES = [
   '屋外・アプローチ',
 ];
 
-/** 様邸ごとの担当者の候補（最初の内容。送付状作成アプリと同じ行橋営業所の担当者）。設定で書き換えられる */
-export const DEFAULT_STAFF = ['久保', '土居', '宮村', '信田', '藤田'];
+/**
+ * 様邸ごとの担当者の候補（最初の内容。送付状作成アプリと同じ行橋営業所の担当者）。設定で書き換えられる。
+ * 見積書にはフルネームで出す（請求書・一覧は名字だけ）。下の名前の分かっている人はフルネームにしてある
+ */
+export const DEFAULT_STAFF = ['久保 匠史', '土居 翔太', '宮村', '信田', '藤田'];
+
+/** 名字だけで保存してある担当者の候補をフルネームにする（設定の版3） */
+export const STAFF_FULL_NAMES = new Map([
+  ['久保', '久保 匠史'],
+  ['土居', '土居 翔太'],
+]);
 
 export type Office = {name: string; postal: string; address: string; tel: string; fax: string; manager: string};
 
@@ -88,8 +97,9 @@ export function settingsForOffice(base: Settings, officeName: string): Settings 
 /**
  * 設定の版。古い版で保存した設定を読み込むときに直す（storage.ts の cleanSettings）。
  * 2：請求書の消費税を「すべての様邸の合計に最後にかける」形にした
+ * 3：担当者の候補をフルネームにした（久保 → 久保 匠史、土居 → 土居 翔太）
  */
-export const SETTINGS_REV = 2;
+export const SETTINGS_REV = 3;
 
 export function defaultSettings(): Settings {
   const base: Settings = {

@@ -6,7 +6,7 @@ import type {PrintRequest} from '../print/PrintView.tsx';
 import {addSamples, hasSamples} from '../samples.ts';
 import type {AppData, AppMode, Job} from '../types.ts';
 import type {Update} from '../useStore.ts';
-import {addMonths, downloadBlob, monthLabel, shortDate, uid, yen} from '../util.ts';
+import {addMonths, downloadBlob, monthLabel, shortDate, staffShort, uid, yen} from '../util.ts';
 import {Btn, useToast} from './ui.tsx';
 
 export function newJob(month: string): Job {
@@ -22,6 +22,8 @@ export function newJob(month: string): Job {
     note: '',
     insuredNo: '',
     form: '',
+    overhead: null,
+    overheadTarget: null,
     places: [],
     createdAt: now,
     updatedAt: now,
@@ -68,7 +70,7 @@ export function JobsPage({
         String(i + 1),
         job.date,
         jobName(job),
-        job.staff,
+        staffShort(job.staff),
         ...[t.material, t.labor, t.markup, t.overhead, t.subtotal].map(String),
         monthly ? '' : String(t.tax),
         monthly ? '' : String(t.total),
@@ -184,7 +186,7 @@ export function JobsPage({
                     {jobName(job)}
                     <span className="ml-2 text-xs font-normal text-slate-500">{job.places.map((p) => p.name || '（箇所名なし）').join('・')}</span>
                   </td>
-                  <td className="whitespace-nowrap px-2 py-2">{job.staff || <span className="text-slate-400">—</span>}</td>
+                  <td className="whitespace-nowrap px-2 py-2">{staffShort(job.staff) || <span className="text-slate-400">—</span>}</td>
                   <td className="px-2 py-2 text-right tabular-nums">{yen(t.material)}</td>
                   <td className="px-2 py-2 text-right tabular-nums">{yen(t.labor)}</td>
                   <td className="px-2 py-2 text-right tabular-nums">{yen(t.markup)}</td>
@@ -271,7 +273,7 @@ function EstimateList({data, rows, month, onOpen, onPrint}: {data: AppData; rows
                 {jobName(job)}
                 <span className="ml-2 text-xs font-normal text-slate-500">{job.places.map((p) => p.name || '（箇所名なし）').join('・')}</span>
               </td>
-              <td className="whitespace-nowrap px-2 py-2">{job.staff || <span className="text-slate-400">—</span>}</td>
+              <td className="whitespace-nowrap px-2 py-2">{staffShort(job.staff) || <span className="text-slate-400">—</span>}</td>
               <td className="whitespace-nowrap px-2 py-2 text-xs">{FORM_INFO[form].name}</td>
               {values(t).map((v, k) => (
                 <td key={keys[k]} className={`px-2 py-2 text-right tabular-nums ${k === 5 ? 'font-bold text-indigo-900' : ''}`}>

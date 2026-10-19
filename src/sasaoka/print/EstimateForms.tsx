@@ -7,8 +7,8 @@ import type {EstimateTotals} from '../calc.ts';
 import {circled, FORM_INFO, formLines, KINDS, paginate, reiwa, TOTAL_ROWS} from '../estimateForms.ts';
 import type {FormLine} from '../estimateForms.ts';
 import type {Job, Settings} from '../types.ts';
-import {num, yen} from '../util.ts';
-import {fitStyle} from './fit.ts';
+import {num, staffFull, yen} from '../util.ts';
+import {fitLinesStyle, fitStyle} from './fit.ts';
 
 const qtyText = (n: number) => num(n, 3);
 const pct = (rate: number) => num(Math.round(rate * 1000) / 10);
@@ -38,7 +38,7 @@ export function YukuhashiForm({job, settings: s, date}: {job: Job; settings: Set
     `住　　　所　${s.address}`,
     `施工業者名　${s.company.replace('株式会社', '(株)')}${s.officeName}`,
     `代表者名　${s.officeName}所長　${s.manager}`,
-    `担当者・電話番号　担当： ${job.staff || s.person}　${s.tel}`,
+    `担当者・電話番号　担当： ${staffFull(job.staff, s.staffList) || s.person}　${s.tel}`,
   ];
   const issuerW = YK.H + YK.I + YK.J + YK.K + YK.L + YK.M;
   const name = job.customer.trim();
@@ -197,6 +197,9 @@ function YkLine({line: l, bottom}: {line: FormLine | undefined; bottom: string})
   }
   const target = !l.excluded;
   const qty = qtyText(l.qty);
+  // 備考（定価等）：定価。切って使う部材は「定価：￥20,000×0.8」と「0.6m÷4m＝0.15本」の2行
+  const list = l.listPrice > 0 ? `定価：￥${yen(l.listPrice)}` : '';
+  const note = l.cut ? [list && (l.rate !== null ? `${list}×${l.rate}` : list), l.cut].filter(Boolean) : list ? [list] : [];
   return (
     <tr className="g" style={{height: `${YK_ROW}mm`}}>
       {cell(l.first ? l.work || KINDS[l.kind - 1] : '', YK.A, 11, 'ml')}
@@ -211,7 +214,15 @@ function YkLine({line: l, bottom}: {line: FormLine | undefined; bottom: string})
       {cell(target ? yen(l.unitPrice) : '', YK.J, 11, 'r')}
       {cell(target ? yen(l.amount) : '', YK.K, 11, 'r mr')}
       {cell(target ? '' : yen(l.amount), YK.L, 11, 'r mr')}
-      {cell(l.listPrice > 0 ? `定価：￥${yen(l.listPrice)}` : '', YK.M, 11, 'mr')}
+      {note.length > 1 ? (
+        <td className={`mr${bottom}`} style={fitLinesStyle(note, YK.M, YK_ROW, 11)}>
+          {note.map((t) => (
+            <div key={t}>{t}</div>
+          ))}
+        </td>
+      ) : (
+        cell(note[0] ?? '', YK.M, 11, 'mr')
+      )}
     </tr>
   );
 }
@@ -419,6 +430,16 @@ function KkLine({line: l, height, bottom, hourRate}: {line: FormLine | undefined
     basis = (
       <td colSpan={2} className={`c ml mr${bottom}`} style={fitStyle(`1時間${yen(hourRate)}円`, KK.Q + KK.R, height, 11)}>
         1時間{yen(hourRate)}円
+      </td>
+    );
+  } else if (target && l.cut) {
+    // 切って使う部材：「14,400円/本×0.8」と「2.8m÷4m＝0.7本」の2行
+    const lines = [l.listPrice > 0 ? `${yen(l.listPrice)}円/本${l.rate !== null ? `×${l.rate}` : ''}` : '', l.cut].filter(Boolean);
+    basis = (
+      <td colSpan={2} className={`ml mr gothic${bottom}`} style={fitLinesStyle(lines, KK.Q + KK.R, height, 10)}>
+        {lines.map((t) => (
+          <div key={t}>{t}</div>
+        ))}
       </td>
     );
   } else if (target && l.listPrice > 0) {

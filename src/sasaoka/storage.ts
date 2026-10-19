@@ -2,7 +2,7 @@
 // 太陽ポータルのアプリはすべて同じサイト（akamar08taiyo-bot.github.io）にあり、localStorage の容量を
 // 分け合っているため、件数の多い部材リストは容量に余裕のある IndexedDB に入れる。
 
-import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES, SETTINGS_REV} from './defaults.ts';
+import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES, SETTINGS_REV, STAFF_FULL_NAMES} from './defaults.ts';
 import {guessPieceLengthM} from './priceImport.ts';
 import type {AppData, EstimateForm, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, Place, Rounding, Row, Settings, TaxMode} from './types.ts';
 import {uid} from './util.ts';
@@ -161,6 +161,8 @@ export function cleanJobs(raw: unknown): Job[] {
     note: str(j.note),
     insuredNo: str(j.insuredNo),
     form: FORMS.includes(j.form as EstimateForm) ? (j.form as EstimateForm) : '',
+    overhead: optNum(j.overhead),
+    overheadTarget: optNum(j.overheadTarget),
     places: Array.isArray(j.places) ? j.places.filter(isObj).map(cleanPlace) : [],
     createdAt: numv(j.createdAt, Date.now()),
     updatedAt: numv(j.updatedAt, Date.now()),
@@ -222,6 +224,8 @@ export function cleanSettings(raw: unknown): Settings {
   s.estimateForm = FORMS.includes(raw.estimateForm as EstimateForm) ? (raw.estimateForm as EstimateForm) : d.estimateForm;
   // 版2より前の設定：請求書の消費税は「すべての様邸の合計に最後に消費税率をかける」形に直す
   if (numv(raw.rev, 1) < 2) s.invoiceTaxMode = 'monthly';
+  // 版3より前の設定：名字だけの担当者の候補を、分かっている人はフルネームにする（見積書に出す）
+  if (numv(raw.rev, 1) < 3) s.staffList = cleanList(s.staffList.map((n) => STAFF_FULL_NAMES.get(n) ?? n));
   s.rev = SETTINGS_REV;
   return s;
 }

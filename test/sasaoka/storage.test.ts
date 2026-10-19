@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {DEFAULT_STAFF, OFFICES, settingsForOffice} from '../../src/sasaoka/defaults.ts';
 import {cleanJobs, cleanKits, cleanList, cleanMaterials, cleanSettings} from '../../src/sasaoka/storage.ts';
+import {staffFull, staffShort} from '../../src/sasaoka/util.ts';
 
 test('営業所を選ぶと所長名も入る', () => {
   const s = settingsForOffice(cleanSettings(undefined), '行橋営業所');
@@ -19,11 +20,21 @@ test('所長名を入れる前に保存した設定は、保存してある営�
   assert.equal(cleanSettings({officeName: '行橋営業所', manager: '久保匠史'}).manager, '久保匠史');
 });
 
-test('担当者の候補：最初は 久保・土居・宮村・信田・藤田、保存したものは空・重複を除いて使う', () => {
-  assert.deepEqual(DEFAULT_STAFF, ['久保', '土居', '宮村', '信田', '藤田']);
+test('担当者の候補：最初は 久保 匠史・土居 翔太・宮村・信田・藤田、保存したものは空・重複を除いて使う', () => {
+  assert.deepEqual(DEFAULT_STAFF, ['久保 匠史', '土居 翔太', '宮村', '信田', '藤田']);
   assert.deepEqual(cleanSettings({}).staffList, DEFAULT_STAFF);
-  assert.deepEqual(cleanSettings({staffList: [' 久保 ', '', '土居', '久保', 3]}).staffList, ['久保', '土居', '3']);
+  assert.deepEqual(cleanSettings({staffList: [' 久保 ', '', '土居', '久保', 3], rev: 3}).staffList, ['久保', '土居', '3']);
   assert.deepEqual(cleanSettings({staffList: []}).staffList, []);
+  // 版3より前に保存した名字だけの候補は、分かっている人をフルネームに（見積書に出す）
+  assert.deepEqual(cleanSettings({staffList: ['久保', '土居', '宮村', '山本'], rev: 2}).staffList, ['久保 匠史', '土居 翔太', '宮村', '山本']);
+  // 見積書はフルネーム、請求書・一覧は名字
+  assert.equal(staffFull('土居', DEFAULT_STAFF), '土居 翔太'); // 名字だけで入っている前の様邸
+  assert.equal(staffFull('土居 翔太', DEFAULT_STAFF), '土居 翔太');
+  assert.equal(staffFull('宮村', DEFAULT_STAFF), '宮村');
+  assert.equal(staffFull('山本', DEFAULT_STAFF), '山本'); // 候補にない人はそのまま
+  assert.equal(staffShort('土居 翔太'), '土居');
+  assert.equal(staffShort('土居　翔太'), '土居');
+  assert.equal(staffShort(''), '');
   assert.deepEqual(cleanList(['玄関', '玄関', ' ', 'トイレ']), ['玄関', 'トイレ']);
 });
 
@@ -38,7 +49,7 @@ test('請求書の消費税：前の版の設定（様邸ごと）は「すべ�
   assert.equal(cleanSettings({}).totalTaxRounding, 'floor');
   // 新しい版で保存した設定は、選んだまま
   assert.equal(cleanSettings({invoiceTaxMode: 'perJob', rev: 2}).invoiceTaxMode, 'perJob');
-  assert.equal(cleanSettings({rev: 1}).rev, 2);
+  assert.equal(cleanSettings({rev: 1}).rev, 3);
 });
 
 test('見積の設定：最初は定価×0.8・諸経費10%・施工費1時間2,500円・書式は行橋市・苅田町用', () => {
@@ -52,7 +63,8 @@ test('見積の設定：最初は定価×0.8・諸経費10%・施工費1時間2,
 
 test('見積書の項目：前のデータ（項目なし）も読める', () => {
   const [j] = cleanJobs([{customer: '山田', work: '前の工事内容', places: [{name: '玄関', rows: [{kind: 'material', excluded: true}, {kind: 'labor'}]}]}]);
-  assert.deepEqual([j.insuredNo, j.form], ['', '']);
+  assert.deepEqual([j.insuredNo, j.form, j.overhead, j.overheadTarget], ['', '', null, null]);
+  assert.deepEqual(cleanJobs([{overhead: 15911, overheadTarget: '2700'}]).map((x) => [x.overhead, x.overheadTarget]), [[15911, 2700]]);
   assert.deepEqual([j.places[0].kind, j.places[0].photo, j.places[0].work], [1, 0, '']);
   assert.deepEqual(j.places[0].rows.map((r) => r.excluded), [true, false]);
   const [k] = cleanJobs([{insuredNo: '0000366989', form: 'kouiki', places: [{kind: 3, photo: '2', work: '床材変更'}, {kind: 9, photo: -1}]}]);

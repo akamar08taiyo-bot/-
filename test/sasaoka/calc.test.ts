@@ -43,7 +43,7 @@ const lab = (price: number, qty: number, name = '木'): Row => ({
   ...blank, id: `r${++seq}`, kind: 'labor', refId: null, name, price, qty,
 });
 const job = (rows: Row[][], extra: Partial<Job> = {}): Job => ({
-  id: `j${++seq}`, month: '2026-10', customer: '山田', suffix: '様邸', staff: '', date: '', address: '', note: '', insuredNo: '', form: '',
+  id: `j${++seq}`, month: '2026-10', customer: '山田', suffix: '様邸', staff: '', date: '', address: '', note: '', insuredNo: '', form: '', overhead: null, overheadTarget: null,
   places: rows.map((r, i) => ({id: `p${i}`, name: `箇所${i}`, rows: r, kind: 1, photo: 0, work: ''})),
   createdAt: seq, updatedAt: seq, ...extra,
 });
@@ -223,6 +223,23 @@ test('介護保険の対象外：全体には入り、対象の小計からは�
   assert.equal(t.all.subtotal, 37500); // 8,000＋2,000＋16,000＋1,500＋5,000＋5,000
   assert.equal(t.excluded, 22500); // 16,000＋1,500＋5,000
   assert.deepEqual(t.target, {subtotal: 15000, overhead: 1500, tax: 1650, total: 18150});
+});
+
+test('見積の諸経費は手で直せる（端数の調整）。対象外の行がなければ介護保険の対象も同じ金額', () => {
+  const rows = [[mat(0, 1, 'TOTO 32インテリアバー', {listPrice: 24300}), lab(8000, 1, '施工費')]];
+  // 小計 27,440 → 諸経費を 2,700 にすると 消費税 3,014（(27,440＋2,700)×0.1）・合計 33,154
+  const t = estimateTotals(job(rows, {overhead: 2700}), S);
+  assert.deepEqual(t.all, {subtotal: 27440, overhead: 2700, tax: 3014, total: 33154});
+  assert.deepEqual(t.target, t.all);
+  // 手で入れていなければ 小計×0.1
+  assert.equal(estimateTotals(job(rows, {overhead: null}), S).all.overhead, 2744);
+  // 対象外の行があるとき、介護保険の対象の諸経費は overheadTarget（なければ 対象の小計×0.1）
+  const ex = [[...rows[0], mat(0, 1, '対象外', {listPrice: 10000, excluded: true})]];
+  const t2 = estimateTotals(job(ex, {overhead: 3500}), S);
+  assert.deepEqual([t2.all.subtotal, t2.all.overhead, t2.target.subtotal, t2.target.overhead], [35440, 3500, 27440, 2744]);
+  assert.equal(estimateTotals(job(ex, {overhead: 3500, overheadTarget: 2700}), S).target.total, 33154);
+  // 仕切り計算表の④諸経費は一律の式のまま（見積の諸経費を直しても変わらない）
+  assert.equal(jobTotals(job(rows, {overhead: 2700}), S).overhead, jobTotals(job(rows), S).overhead);
 });
 
 test('rounddown は0の方へ切り捨て（浮動小数の誤差は除く）', () => {

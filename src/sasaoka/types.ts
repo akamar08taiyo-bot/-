@@ -82,6 +82,8 @@ export type Job = {
   note: string;
   insuredNo: string; // 介護保険被保険者番号（行橋市・苅田町用の見積書に出す）
   form: EstimateForm | ''; // 見積書の書式（空なら住所の市町村から決める）
+  overhead: number | null; // 見積書の諸経費を手で入れたとき（端数の調整など）。null なら 小計×率
+  overheadTarget: number | null; // 介護保険の対象の諸経費を手で入れたとき（対象外の行があるときだけ使う）
   places: Place[];
   createdAt: number;
   updatedAt: number;
@@ -109,7 +111,7 @@ export type AppMode = 'shikiri' | 'estimate';
 /**
  * 見積書の書式（市町村で違う）。
  * yukuhashi = 行橋市・苅田町用「工事費見積書兼工事費内訳書」
- * kouiki    = みやこ町・築上町用「住宅改修内訳明細書」（福岡県介護保険広域連合の様式）
+ * kouiki    = みやこ町・築上町・豊前市など用「住宅改修内訳明細書」（福岡県介護保険広域連合の様式）
  */
 export type EstimateForm = 'yukuhashi' | 'kouiki';
 

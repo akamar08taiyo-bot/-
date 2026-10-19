@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {circled, formForAddress, formLines, jobForm, materialText, paginate, photoNumbers, placeWork, reiwa} from '../../src/sasaoka/estimateForms.ts';
+import {circled, cutCalc, formForAddress, formLines, jobForm, materialText, paginate, photoNumbers, placeWork, reiwa} from '../../src/sasaoka/estimateForms.ts';
 import type {Job, Place, Row} from '../../src/sasaoka/types.ts';
 
 const S = {estimateRate: 0.8, estimateHourRate: 2500, estimateForm: 'yukuhashi'} as const;
@@ -11,12 +11,15 @@ const mat = (name: string, listPrice: number, extra: Partial<Row> = {}): Row => 
 const lab = (price: number, qty = 1): Row => ({...blank, id: `r${++seq}`, kind: 'labor', name: '木', price, qty});
 const place = (name: string, rows: Row[], extra: Partial<Place> = {}): Place => ({id: `p${++seq}`, name, rows, kind: 1, photo: 0, work: '', ...extra});
 
-test('書式は住所の市町村から：みやこ町・築上町 → 広域連合の様式、行橋市・苅田町 → 行橋の様式。分からなければ設定の書式', () => {
+test('書式は住所の市町村から：みやこ町・築上町・豊前市など → 広域連合の様式、行橋市・苅田町 → 行橋の様式。分からなければ設定の書式', () => {
   assert.equal(formForAddress('福岡県京都郡みやこ町豊津1118'), 'kouiki');
   assert.equal(formForAddress('築上郡築上町椎田'), 'kouiki');
+  assert.equal(formForAddress('福岡県豊前市八屋'), 'kouiki');
+  assert.equal(formForAddress('築上郡上毛町'), 'kouiki');
+  assert.equal(formForAddress('築上郡吉富町'), 'kouiki');
   assert.equal(formForAddress('行橋市東大橋2-1-7'), 'yukuhashi');
   assert.equal(formForAddress('京都郡苅田町富久町'), 'yukuhashi');
-  assert.equal(formForAddress('豊前市'), null);
+  assert.equal(formForAddress('北九州市小倉南区'), null);
   assert.equal(jobForm({form: '', address: 'みやこ町'}, S), 'kouiki');
   assert.equal(jobForm({form: 'yukuhashi', address: 'みやこ町'}, S), 'yukuhashi'); // 選んだ書式が先
   assert.equal(jobForm({form: '', address: ''}, {estimateForm: 'kouiki'}), 'kouiki');
@@ -37,13 +40,14 @@ test('みやこ町・築上町用：施工費は 時間×2,500円、部材は �
   };
   const lines = formLines(job, S, 'kouiki');
   assert.deepEqual(
-    lines.map((l) => [l.first, l.placeName, l.work, l.photo, l.mark, l.text, l.qty, l.unit, l.unitPrice, l.amount, l.listPrice, l.hourly]),
+    lines.map((l) => [l.first, l.placeName, l.work, l.photo, l.mark, l.text, l.qty, l.unit, l.unitPrice, l.amount, l.listPrice, l.rate, l.cut, l.hourly]),
     [
-      [true, '屋外', '手すり取付', 1, '材', '矢崎化工 HCDT-4000 T BBR NTディンプルパイプ（280cm使用・1本4m）', 0.7, '本', 11520, 8064, 14400, false],
-      [false, '屋外', '手すり取付', 1, '材', '矢崎化工 HL7-P11 T USL NT屋外支柱', 4, '本', 3680, 14720, 4600, false],
-      [false, '屋外', '手すり取付', 1, '手', '同上施工費', 2.8, '時間', 2500, 7000, 0, true], // 5,000＋2,000＝7,000円＝2.8時間
-      [true, 'トイレ', '手すり取付（2か所）', 2, '材', 'エンドキャップ', 2, '個', 360, 720, 450, false],
-      [false, 'トイレ', '手すり取付（2か所）', 2, '手', '同上施工費', 1, '式', 1234, 1234, 0, false], // 時間で割り切れない金額は1式
+      // 切って使う部材は「本」で書き、数量の計算（2.8m÷4m＝0.7本）を算出根拠に出す
+      [true, '屋外', '手すり取付', 1, '材', '矢崎化工 HCDT-4000 T BBR NTディンプルパイプ', 0.7, '本', 11520, 8064, 14400, 0.8, '2.8m÷4m＝0.7本', false],
+      [false, '屋外', '手すり取付', 1, '材', '矢崎化工 HL7-P11 T USL NT屋外支柱', 4, '本', 3680, 14720, 4600, 0.8, '', false],
+      [false, '屋外', '手すり取付', 1, '手', '同上施工費', 2.8, '時間', 2500, 7000, 0, null, '', true], // 5,000＋2,000＝7,000円＝2.8時間
+      [true, 'トイレ', '手すり取付（2か所）', 2, '材', 'エンドキャップ', 2, '個', 360, 720, 450, 0.8, '', false],
+      [false, 'トイレ', '手すり取付（2か所）', 2, '手', '同上施工費', 1, '式', 1234, 1234, 0, null, '', false], // 時間で割り切れない金額は1式
     ],
   );
   // 行橋市・苅田町用は施工費を1式で書き、工事名称を入れていなければ改修の種類（手すりの取付）
@@ -78,9 +82,18 @@ test('ページ分け：箇所の行はなるべく同じページに。最後�
   assert.deepEqual(sizes(paginate([], 14)), [0]);
 });
 
-test('部材の内容の書き方', () => {
+test('部材の内容の書き方・切って使う部材の数量の計算', () => {
   assert.equal(materialText(mat('', 0)), '材料費'); // 金額だけの行
   assert.equal(materialText(mat('手すり', 0, {lengthCm: 60})), '手すり（長さ60cm）'); // 1本の長さが分からない
+  const rail = mat('手すり 4m', 20000, {lengthCm: 60, pieceLengthM: 4});
+  assert.equal(materialText(rail), '手すり 4m'); // 長さの計算は内容ではなく備考・算出根拠に
+  assert.equal(cutCalc(rail), '0.6m÷4m＝0.15本');
+  assert.equal(cutCalc({...rail, qty: 2}), '0.6m÷4m×2＝0.3本'); // 同じ長さを2本
+  assert.equal(cutCalc({...rail, lengthCm: 130}), '1.3m÷4m＝0.325本');
+  assert.equal(cutCalc({...rail, lengthCm: 0}), ''); // 規格品そのまま
+  // 見積の単価を手で入れた行は「×0.8」を書かない
+  const [line] = formLines({places: [place('玄関', [{...rail, estPrice: 15000}])]}, S, 'yukuhashi');
+  assert.deepEqual([line.rate, line.unitPrice, line.amount], [null, 15000, 2250]);
 });
 
 test('令和の年月日', () => {

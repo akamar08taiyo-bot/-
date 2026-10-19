@@ -4,7 +4,7 @@ import {jobName, jobTotals, monthSummary, placeTotals, rowAmount} from '../calc.
 import type {MonthSummary} from '../calc.ts';
 import {FORM_INFO, jobForm} from '../estimateForms.ts';
 import type {AppData, Job, Settings} from '../types.ts';
-import {dateLabel, monthEnd, monthLabel, num, shortDate, todayIso, yen} from '../util.ts';
+import {dateLabel, monthEnd, monthLabel, num, shortDate, staffShort, todayIso, yen} from '../util.ts';
 import {KouikiForm, YukuhashiForm} from './EstimateForms.tsx';
 
 export type PrintRequest =
@@ -184,9 +184,9 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
   );
 }
 
-/** 発行元。staff を渡すと（見積書）、その様邸の担当を「担当」に出す（担当が空なら設定の請求書の担当者） */
-function Issuer({s, staff}: {s: Settings; staff?: string}) {
-  const person = staff || s.person;
+/** 請求書の発行元（担当は設定の請求書の担当者） */
+function Issuer({s}: {s: Settings}) {
+  const person = s.person;
   const telFax = [s.tel && `TEL ${s.tel}`, s.fax && `FAX ${s.fax}`].filter(Boolean).join('　');
   return (
     <div className="issuer">
@@ -276,7 +276,7 @@ function InvoiceDoc({month, summary, settings: s, meta}: {month: string; summary
               <td className="c">{i + 1}</td>
               <td className="c">{shortDate(job.date)}</td>
               <td className="name">{jobName(job)}</td>
-              <td className="c staff">{job.staff}</td>
+              <td className="c staff">{staffShort(job.staff)}</td>
               <td className="num">{yen(t.material)}</td>
               <td className="num">{yen(t.labor)}</td>
               <td className="num">{yen(t.markup)}</td>
@@ -353,7 +353,7 @@ function JobDoc({job, settings: s}: {job: Job; settings: Settings}) {
             <div className="customer">{jobName(job)}</div>
             {job.staff && (
               <div className="staff">
-                担当　<b>{job.staff}</b>
+                担当　<b>{staffShort(job.staff)}</b>
               </div>
             )}
           </div>

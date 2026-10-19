@@ -1,9 +1,10 @@
-// 見積書の2つの書式（行橋市・苅田町用／みやこ町・築上町用）に並べる行を作る。
+// 見積書の2つの書式（行橋市・苅田町用／みやこ町・築上町・豊前市など用）に並べる行を作る。
 // どちらも元の Excel と同じく、金額は ROUNDDOWN(数量×単価)。最後のページの下4行が 小計・諸経費・消費税・合計。
 //   行橋市・苅田町用「工事費見積書兼工事費内訳書」：1ページ18行。施工費は「1式」
-//   みやこ町・築上町用「住宅改修内訳明細書」：1ページ14行。施工費は「時間×1時間の単価（2,500円）」
+//   みやこ町・築上町・豊前市など用「住宅改修内訳明細書」（福岡県介護保険広域連合の様式）：1ページ14行。施工費は「時間×1時間の単価（2,500円）」
+// 切って使う部材は 数量＝使う長さ÷1本の長さ（本）で書き、備考・算出根拠にその計算を書く（例：0.6m÷4m＝0.15本）。
 
-import {cutToLength, estimatePlaceLines} from './calc.ts';
+import {cutToLength, estimatePlaceLines, estimateQty} from './calc.ts';
 import {normalize} from './priceImport.ts';
 import type {EstimateForm, Job, Place, Row, Settings} from './types.ts';
 import {num} from './util.ts';
@@ -12,7 +13,7 @@ export const FORM_IDS: EstimateForm[] = ['yukuhashi', 'kouiki'];
 
 export const FORM_INFO: Record<EstimateForm, {name: string; title: string; perPage: number}> = {
   yukuhashi: {name: '行橋市・苅田町用', title: '工事費見積書兼工事費内訳書', perPage: 18},
-  kouiki: {name: 'みやこ町・築上町用', title: '住宅改修内訳明細書', perPage: 14},
+  kouiki: {name: 'みやこ町・築上町・豊前市など用', title: '住宅改修内訳明細書', perPage: 14},
 };
 
 /** 合計の欄（小計・諸経費・消費税・合計）の行数 */
@@ -23,10 +24,10 @@ export const KINDS = ['手すりの取付', '段差の解消', '床材の変更'
 /** 工事名称を入れていないときの名前（みやこ町・築上町用の「改修箇所毎工事名称」。元の見積書の「手すり取付」） */
 const KIND_WORK = ['手すり取付', '段差解消', '床材変更', '扉取替', '便器取替', '付帯工事'];
 
-/** 住所の市町村から書式を決める。分からなければ null */
+/** 住所の市町村から書式を決める（福岡県介護保険広域連合の京築の町・市は広域連合の様式）。分からなければ null */
 export function formForAddress(address: string): EstimateForm | null {
   const a = normalize(address);
-  if (/みやこ町|築上町/.test(a)) return 'kouiki';
+  if (/みやこ町|築上町|豊前市|上毛町|吉富町/.test(a)) return 'kouiki';
   if (/行橋市|苅田町/.test(a)) return 'yukuhashi';
   return null;
 }
@@ -61,11 +62,17 @@ export function photoNumbers(job: Pick<Job, 'places'>, rate: number): Map<string
 // 金額のない施工費の行は出さない
 const shownLines = (place: Pick<Place, 'rows'>, rate: number) => estimatePlaceLines(place, rate).filter((l) => l.kind === 'material' || l.amount !== 0);
 
-/** 部材の「内容（規格・範囲）」：メーカー 品番 品名（切って使うときは使う長さも） */
+/** 部材の「内容（規格・範囲）」：メーカー 品番 品名（切って使う部材の長さの計算は備考・算出根拠に書く） */
 export function materialText(r: Row): string {
   const base = [r.maker, r.code, r.name].map((x) => x.trim()).filter(Boolean).join(' ') || '材料費';
-  if (cutToLength(r)) return `${base}（${num(r.lengthCm)}cm使用・1本${num(r.pieceLengthM)}m）`;
-  return r.lengthCm > 0 ? `${base}（長さ${num(r.lengthCm)}cm）` : base;
+  return r.lengthCm > 0 && !cutToLength(r) ? `${base}（長さ${num(r.lengthCm)}cm）` : base;
+}
+
+/** 切って使う部材の数量の計算（例：0.6m÷4m＝0.15本、同じ長さを2本なら 0.6m÷4m×2＝0.3本）。切らない部材は '' */
+export function cutCalc(r: Row): string {
+  if (!cutToLength(r)) return '';
+  const times = r.qty !== 1 ? `×${num(r.qty)}` : '';
+  return `${num(r.lengthCm / 100, 3)}m÷${num(r.pieceLengthM, 3)}m${times}＝${num(estimateQty(r), 3)}本`;
 }
 
 /** 施工費の金額を「時間×1時間の単価」で書けるときの時間（小数2けたで割り切れるとき。0.8時間×2,500円＝2,000円）。書けなければ null */
@@ -90,6 +97,8 @@ export type FormLine = {
   amount: number;
   excluded: boolean; // 介護保険の対象外
   listPrice: number; // 定価（行橋市・苅田町用の備考「定価：￥…」、みやこ町・築上町用の算出根拠）。施工費は 0
+  rate: number | null; // 単価＝定価×この率のとき（見積の単価を手で入れた行・定価のない行は null）
+  cut: string; // 切って使う部材の数量の計算（0.6m÷4m＝0.15本）。ほかは ''
   hourly: boolean; // 施工費を「時間×1時間の単価」で書いた行
 };
 
@@ -118,6 +127,8 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
           unitPrice: l.unitPrice,
           amount: l.amount,
           listPrice: r.listPrice > 0 ? r.listPrice : 0,
+          rate: r.estPrice === null && r.listPrice > 0 ? s.estimateRate : null,
+          cut: cutCalc(r),
           hourly: false,
         });
         return;
@@ -134,6 +145,8 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
         unitPrice: hourly ? s.estimateHourRate : l.amount,
         amount: l.amount,
         listPrice: 0,
+        rate: null,
+        cut: '',
         hourly,
       });
     });

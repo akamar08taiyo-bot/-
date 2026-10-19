@@ -110,10 +110,11 @@ for (const t of [
   '（サンプル）山田',
   '介護保険被保険者番号（0000366989）',
   '定価：￥20,000',
-  '（120cm使用・1本4m）',
+  '定価：￥20,000×0.8', // 切って使う手すりの備考：定価×0.8 と 長さの計算
+  '1.2m÷4m＝0.3本',
   '同上施工費',
   '代表者名　行橋営業所所長　久保 匠史',
-  '担当： 久保　0930-26-9640',
+  '担当： 久保 匠史　0930-26-9640', // 見積書の担当はフルネーム
   '玄関①',
   'トイレ②',
   'ページ　1　／　1',
@@ -127,12 +128,30 @@ assert.deepEqual(railLine.slice(3, 11), ['0.3', '本', '16,000', '4,800', '0.3',
 const totalLine = async (label) => (await sheet.locator('tr', {hasText: label}).last().locator('td').allInnerTexts()).filter(Boolean);
 assert.deepEqual(await totalLine('小計'), ['小計', '53,760', '53,760']);
 assert.deepEqual(await totalLine('合計'), ['合計', '65,049', '65,049']);
+await page.getByRole('button', {name: '✕ 閉じる'}).click();
+
+// 諸経費を手で直す（端数の調整）→ 見積書の諸経費・消費税・合計が変わる。↺ で 小計×10% に戻る
+const overhead = page.getByRole('textbox', {name: '諸経費', exact: true});
+await overhead.click();
+await page.waitForTimeout(100); // 入力欄が「5,376」→「5376」に変わってから打つ
+await overhead.press('ControlOrMeta+A');
+await page.keyboard.type('5000');
+await page.keyboard.press('Tab');
+// 53,760＋5,000＝58,760 → 消費税 5,876 → 合計 64,636
+assert.ok((await box()).includes('64,636'), await box());
+assert.ok((await page.locator('aside').innerText()).includes('手入力（自動なら 5,376）'));
+await page.getByRole('button', {name: '🖨 見積書を印刷'}).click();
+await page.locator('.print-overlay').waitFor();
+assert.deepEqual(await totalLine('諸経費'), ['諸経費', '5,000', '5,000']);
+assert.deepEqual(await totalLine('合計'), ['合計', '64,636', '64,636']);
 await page.screenshot({path: path.join(outDir, '33-estimate-print.png')});
 await page.emulateMedia({media: 'print'});
 await page.pdf({path: path.join(outDir, 'estimate-yukuhashi.pdf'), printBackground: true, preferCSSPageSize: true});
 await page.emulateMedia({media: 'screen'});
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
-log('見積書（行橋市・苅田町用）の印刷OK');
+await page.getByRole('button', {name: '諸経費を自動に戻す'}).click();
+assert.ok((await box()).includes('65,049'), await box());
+log('見積書（行橋市・苅田町用）の印刷・諸経費の手入力OK');
 
 // ブラケットを介護保険の対象外にする → 部材 3,360 と同上施工費 1,000 が対象外。金額の欄に「介護保険の対象」が出る
 await genkan.getByRole('row', {name: /ブラケット/}).getByLabel('介護保険の対象外').check();

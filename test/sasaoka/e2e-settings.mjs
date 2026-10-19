@@ -64,18 +64,19 @@ await staffArea.click();
 await staffArea.press('Control+End');
 await staffArea.press('Enter');
 await staffArea.pressSequentially('山本');
-assert.equal(await staffArea.inputValue(), '久保\n土居\n宮村\n信田\n藤田\n山本');
+assert.equal(await staffArea.inputValue(), '久保 匠史\n土居 翔太\n宮村\n信田\n藤田\n山本');
 await page.getByRole('navigation').getByRole('button', {name: /様邸一覧/}).click();
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 const staffSelect = page.locator('label', {hasText: '担当'}).locator('select');
-assert.deepEqual(await staffSelect.locator('option').allInnerTexts(), ['（選ぶ）', '久保', '土居', '宮村', '信田', '藤田', '山本']);
-await staffSelect.selectOption('土居');
+assert.deepEqual(await staffSelect.locator('option').allInnerTexts(), ['（選ぶ）', '久保 匠史', '土居 翔太', '宮村', '信田', '藤田', '山本']);
+await staffSelect.selectOption('土居 翔太');
 await page.getByRole('button', {name: '🖨 この様邸の明細を印刷'}).click();
 const jobDoc = await page.locator('.sheet').first().innerText();
-assert.ok(jobDoc.includes('担当　土居'), jobDoc);
+assert.ok(jobDoc.includes('担当　土居'), jobDoc); // 仕切りの明細・請求書は名字だけ（見積書はフルネーム）
+assert.ok(!jobDoc.includes('翔太'), jobDoc);
 assert.ok(jobDoc.includes('所長 久保 匠史'), jobDoc);
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
-await staffSelect.selectOption('久保');
+await staffSelect.selectOption('久保 匠史');
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
 log('担当の候補の追加・様邸の明細の担当OK');
 

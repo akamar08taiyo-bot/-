@@ -8,6 +8,7 @@ import {
   estimateUnitPrice,
   jobName,
   jobTotals,
+  overheadAuto,
   placeTotals,
   rowAmount,
 } from '../calc.ts';
@@ -17,7 +18,7 @@ import type {PrintRequest} from '../print/PrintView.tsx';
 import {copyRows, kitFromRows, manualRow, newPlace as makePlace, replaceRange, workRange} from '../rows.ts';
 import type {AppData, AppMode, EstimateForm, Job, Kit, Material, NameSuffix, Place, Row, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
-import {num, uid, yen} from '../util.ts';
+import {num, staffFull, uid, yen} from '../util.ts';
 import {KitPicker} from './Kits.tsx';
 import {LaborCounter, MaterialPicker} from './Pickers.tsx';
 import {Btn, KindBadge, NumberInput, Stepper, TextInput, useToast} from './ui.tsx';
@@ -30,6 +31,8 @@ export function copyJob(job: Job): Job {
     customer: job.customer + '（コピー）',
     places: job.places.map((p) => ({...p, id: uid('p'), rows: copyRows(p.rows)})),
     insuredNo: '',
+    overhead: null,
+    overheadTarget: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -144,9 +147,10 @@ export function JobEditor({
   const pickPlace = picker ? job.places.find((p) => p.id === picker.placeId) : undefined;
   const presets = data.settings.placePresets;
   const used = new Set(job.places.map((p) => p.name));
-  // 候補から消した人が担当の様邸でも、その名前は選んだまま残す
+  // 候補から消した人が担当の様邸でも、その名前は選んだまま残す。名字だけで入っている様邸は、候補のフルネームにして見せる
   const staffList = data.settings.staffList;
-  const staffOptions = !job.staff || staffList.includes(job.staff) ? staffList : [...staffList, job.staff];
+  const staff = staffFull(job.staff, staffList);
+  const staffOptions = !staff || staffList.includes(staff) ? staffList : [...staffList, staff];
 
   return (
     <div className="space-y-4">
@@ -155,7 +159,7 @@ export function JobEditor({
           ← 一覧へ戻る
         </Btn>
         <h1 className="text-lg font-bold text-[#0c315e]">{jobName(job)}</h1>
-        {job.staff && <span className="text-sm font-bold text-slate-500">担当 {job.staff}</span>}
+        {staff && <span className="text-sm font-bold text-slate-500">担当 {staff}</span>}
         <div className="ml-auto flex flex-wrap gap-2">
           {estimate ? (
             <>
@@ -216,10 +220,10 @@ export function JobEditor({
               <label className="grid gap-1 text-xs font-bold text-slate-600">
                 担当
                 <select
-                  value={job.staff}
+                  value={staff}
                   onChange={(e) => setJob((j) => ({...j, staff: e.target.value}))}
                   className={`h-9 min-w-[6.5rem] rounded-md border px-2 text-sm ${
-                    job.staff ? 'border-slate-300 text-slate-800' : 'border-amber-400 bg-amber-50 text-amber-800'
+                    staff ? 'border-slate-300 text-slate-800' : 'border-amber-400 bg-amber-50 text-amber-800'
                   }`}
                 >
                   <option value="">（選ぶ）</option>
@@ -355,10 +359,11 @@ export function JobEditor({
         <aside className="min-w-0 lg:sticky lg:top-3 lg:self-start">
           {estimate ? (
             <>
-              <EstimateSummaryBox totals={est} settings={s} form={form} />
+              <EstimateSummaryBox job={job} totals={est} settings={s} form={form} onOverhead={(patch) => setJob((j) => ({...j, ...patch}))} />
               <p className="mt-2 text-xs leading-5 text-slate-500">
                 見積書の金額です。部材は 定価×{s.estimateRate}×数量（切って使う部材の数量は 使う長さ÷1本の長さ）、施工費は取付手間の合計。
                 小計に諸経費（{num(s.estimateOverheadRate * 100)}%）を足し、消費税をかけます。どれも1円未満は切り捨てです。
+                諸経費は端数の調整などで金額を直せます（↺で小計×{num(s.estimateOverheadRate * 100)}%に戻ります）。
               </p>
             </>
           ) : (
@@ -819,17 +824,51 @@ function ExcludedToggle({on, onChange}: {on: boolean; onChange: (v: boolean) => 
   );
 }
 
-export function EstimateSummaryBox({totals: t, settings: s, form}: {totals: EstimateTotals; settings: Settings; form: EstimateForm}) {
+/** 見積書の諸経費の欄。何も入れなければ 小計×率。手で入れたら黄色になり、↺ で自動に戻せる（端数の調整など） */
+function OverheadCell({value, auto, label, onChange}: {value: number | null; auto: number; label: string; onChange: (v: number | null) => void}) {
+  const manual = value !== null;
+  return (
+    <div className="grid justify-items-end gap-0.5">
+      <div className="flex items-center gap-1">
+        {manual && (
+          <button type="button" onClick={() => onChange(null)} className="rounded px-1 text-sm text-amber-700 hover:bg-amber-100" title="小計×率に戻す" aria-label={`${label}を自動に戻す`}>
+            ↺
+          </button>
+        )}
+        <NumberInput
+          value={value ?? auto}
+          onChange={(n) => onChange(Math.round(n))}
+          className={`w-24 ${manual ? 'border-amber-400 bg-amber-50' : 'bg-indigo-50'}`}
+          ariaLabel={label}
+        />
+      </div>
+      {manual && <div className="text-[10px] font-bold text-amber-700">手入力（自動なら {yen(auto)}）</div>}
+    </div>
+  );
+}
+
+export function EstimateSummaryBox({
+  job,
+  totals: t,
+  settings: s,
+  form,
+  onOverhead,
+}: {
+  job: Pick<Job, 'overhead' | 'overheadTarget'>;
+  totals: EstimateTotals;
+  settings: Settings;
+  form: EstimateForm;
+  onOverhead: (patch: Partial<Pick<Job, 'overhead' | 'overheadTarget'>>) => void;
+}) {
   const pctOf = (r: number) => `${num(Math.round(r * 1000) / 10)}%`;
-  const rows: [string, number, number, boolean][] = [
-    [`部材（定価×${s.estimateRate}）`, t.material, NaN, false],
-    ['施工費', t.work, NaN, false],
-    ['小計', t.all.subtotal, t.target.subtotal, true],
-    [`諸経費（${pctOf(s.estimateOverheadRate)}）`, t.all.overhead, t.target.overhead, false],
-    [`消費税（${pctOf(s.taxRate)}）`, t.all.tax, t.target.tax, false],
-    ['合計', t.all.total, t.target.total, true],
-  ];
   const split = t.excluded !== 0;
+  const line = (label: string, value: number, target: number | null, strong: boolean) => (
+    <tr key={label} className="border-b border-indigo-200 last:border-b-0">
+      <td className={`px-3 py-2 ${strong ? 'bg-indigo-50 font-bold' : ''}`}>{label}</td>
+      <td className={`px-3 py-2 text-right tabular-nums ${strong ? 'text-base font-bold' : ''}`}>{yen(value)}</td>
+      {split && <td className={`px-3 py-2 text-right tabular-nums ${strong ? 'font-bold' : ''}`}>{target === null ? '' : yen(target)}</td>}
+    </tr>
+  );
   return (
     <div className="overflow-hidden rounded-xl border-2 border-indigo-900 bg-white">
       <div className="bg-indigo-900 px-3 py-1.5 text-sm font-bold text-white">
@@ -847,13 +886,27 @@ export function EstimateSummaryBox({totals: t, settings: s, form}: {totals: Esti
           </thead>
         )}
         <tbody>
-          {rows.map(([label, value, target, strong]) => (
-            <tr key={label} className="border-b border-indigo-200 last:border-b-0">
-              <td className={`px-3 py-2 ${strong ? 'bg-indigo-50 font-bold' : ''}`}>{label}</td>
-              <td className={`px-3 py-2 text-right tabular-nums ${strong ? 'text-base font-bold' : ''}`}>{yen(value)}</td>
-              {split && <td className={`px-3 py-2 text-right tabular-nums ${strong ? 'font-bold' : ''}`}>{Number.isNaN(target) ? '' : yen(target)}</td>}
-            </tr>
-          ))}
+          {line(`部材（定価×${s.estimateRate}）`, t.material, null, false)}
+          {line('施工費', t.work, null, false)}
+          {line('小計', t.all.subtotal, t.target.subtotal, true)}
+          <tr className="border-b border-indigo-200">
+            <td className="px-3 py-2">諸経費（{pctOf(s.estimateOverheadRate)}）</td>
+            <td className="px-2 py-1.5 text-right">
+              <OverheadCell value={job.overhead} auto={overheadAuto(t.all.subtotal, s)} label="諸経費" onChange={(overhead) => onOverhead({overhead})} />
+            </td>
+            {split && (
+              <td className="px-2 py-1.5 text-right">
+                <OverheadCell
+                  value={job.overheadTarget}
+                  auto={overheadAuto(t.target.subtotal, s)}
+                  label="介護保険の対象の諸経費"
+                  onChange={(overheadTarget) => onOverhead({overheadTarget})}
+                />
+              </td>
+            )}
+          </tr>
+          {line(`消費税（${pctOf(s.taxRate)}）`, t.all.tax, t.target.tax, false)}
+          {line('合計', t.all.total, t.target.total, true)}
         </tbody>
       </table>
       {split && <div className="border-t border-indigo-200 px-3 py-1.5 text-xs text-slate-600">介護保険の対象外：{yen(t.excluded)}円（小計）</div>}
