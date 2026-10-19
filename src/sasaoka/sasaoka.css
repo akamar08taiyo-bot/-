@@ -56,12 +56,14 @@ body {
   align-items: end;
   padding: 10px 12px;
 }
-/* 1列目の幅は区分の印だけで決める（下の段の欄は、幅の伸びる2列目にかけて置く） */
+/* 1列目の幅は区分の印だけで決める（下の段の欄は、幅の伸びる2列目にかけて置く）。
+   見積作成は見積書と同じ順番：品名 → 長さ・数量 → 単価・金額（介護保険の対象外）→ 定価（備考） */
 .rows-narrow table.rows-table.estimate tr {
   grid-template-areas:
     'kind name name ops'
-    'list list len len'
-    'price price qty amount';
+    'len len qty qty'
+    'price price amount amount'
+    'list list list list';
 }
 .rows-narrow table.rows-table td {
   display: block;
@@ -90,6 +92,9 @@ body {
 }
 .rows-narrow table.rows-table td[data-cell='len'] {
   grid-area: len;
+}
+.rows-narrow table.rows-table td[data-cell='len'] > div {
+  justify-items: start;
 }
 .rows-narrow table.rows-table td[data-cell='price'] {
   grid-area: price;

@@ -14,11 +14,12 @@ import {
 } from '../calc.ts';
 import type {EstimateLine, EstimateTotals, JobTotals} from '../calc.ts';
 import {circled, FORM_IDS, FORM_INFO, formForAddress, jobForm, KINDS, photoNumbers, workHours} from '../estimateForms.ts';
+import {useDocMeta} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {copyRows, kitFromRows, manualRow, newPlace as makePlace, replaceRange, workRange} from '../rows.ts';
 import type {AppData, AppMode, EstimateForm, Job, Kit, Material, NameSuffix, Place, Row, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
-import {num, staffFull, uid, yen} from '../util.ts';
+import {num, staffFull, todayIso, uid, yen} from '../util.ts';
 import {EstimatePreview} from './EstimatePreview.tsx';
 import {KitPicker} from './Kits.tsx';
 import {LaborCounter, MaterialPicker} from './Pickers.tsx';
@@ -204,6 +205,123 @@ export function JobEditor({
   const staff = staffFull(job.staff, staffList);
   const staffOptions = !staff || staffList.includes(staff) ? staffList : [...staffList, staff];
 
+  // ---------------------------------------------------------------- 様邸の項目（見積作成と仕切り・請求書で並べる順番が違う）
+  const customerField = (className: string) => (
+    <label className={`grid min-w-0 gap-1 text-xs font-bold text-slate-600 ${className}`}>
+      お客様名
+      <div className="flex gap-2">
+        <TextInput
+          value={job.customer}
+          onChange={(customer) => setJob((j) => ({...j, customer}))}
+          placeholder="例：山田"
+          className="w-0 min-w-0 flex-1 text-base font-bold"
+          autoFocus={!job.customer}
+        />
+        <select
+          value={job.suffix}
+          onChange={(e) => setJob((j) => ({...j, suffix: e.target.value as NameSuffix}))}
+          className="h-9 rounded-md border border-slate-300 px-2 text-sm"
+          aria-label="敬称"
+        >
+          <option value="様邸">様邸</option>
+          <option value="様">様</option>
+          <option value="">（付けない）</option>
+        </select>
+      </div>
+    </label>
+  );
+  const staffField = (
+    <label className="grid gap-1 text-xs font-bold text-slate-600">
+      担当
+      <select
+        value={staff}
+        onChange={(e) => setJob((j) => ({...j, staff: e.target.value}))}
+        className={`h-9 min-w-[6.5rem] rounded-md border px-2 text-sm ${staff ? 'border-slate-300 text-slate-800' : 'border-amber-400 bg-amber-50 text-amber-800'}`}
+      >
+        <option value="">（選ぶ）</option>
+        {staffOptions.map((name) => (
+          <option key={name} value={name}>
+            {name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+  const dateField = (
+    <label className="grid gap-1 text-xs font-bold text-slate-600">
+      施工日
+      <input
+        type="date"
+        value={job.date}
+        onChange={(e) => setJob((j) => ({...j, date: e.target.value}))}
+        className="h-9 rounded-md border border-slate-300 px-2 text-sm"
+      />
+    </label>
+  );
+  const monthField = (
+    <label className="grid gap-1 text-xs font-bold text-slate-600">
+      請求する月
+      <input
+        type="month"
+        value={job.month}
+        onChange={(e) => e.target.value && setJob((j) => ({...j, month: e.target.value}))}
+        className="h-9 rounded-md border border-slate-300 px-2 text-sm"
+      />
+    </label>
+  );
+  const addressField = (label: string, className: string) => (
+    <label className={`grid gap-1 text-xs font-bold text-slate-600 ${className}`}>
+      {label}
+      <TextInput value={job.address} onChange={(address) => setJob((j) => ({...j, address}))} className="w-full min-w-0 text-sm font-normal text-slate-800" aria-label="住所" />
+    </label>
+  );
+  const noteField = (className: string) => (
+    <label className={`grid gap-1 text-xs font-bold text-slate-600 ${className}`}>
+      備考（任意・明細に印刷されます）
+      <TextInput value={job.note} onChange={(note) => setJob((j) => ({...j, note}))} className="w-full min-w-0 text-sm font-normal text-slate-800" />
+    </label>
+  );
+  // 書式は2つ。選ぶまでは住所の市町村で決まる（住所で決まる書式を選んだときも、住所に合わせて変わるままにする）
+  const formField = (
+    <label className="grid min-w-[12rem] flex-1 gap-1 text-xs font-bold text-slate-600">
+      <span>
+        見積書の書式
+        <span className="ml-1 font-normal text-slate-500">
+          {job.form !== '' ? '（この様邸で選んだ書式）' : formForAddress(job.address) ? '（住所の市町村から）' : '（設定の書式）'}
+        </span>
+      </span>
+      <select
+        value={form}
+        onChange={(e) => {
+          const f = e.target.value as EstimateForm;
+          setJob((j) => ({...j, form: f === (formForAddress(j.address) ?? s.estimateForm) ? '' : f}));
+        }}
+        className="h-9 w-full min-w-0 rounded-md border border-slate-300 px-2 text-sm"
+        aria-label="見積書の書式"
+      >
+        {FORM_IDS.map((f) => (
+          <option key={f} value={f}>
+            {FORM_INFO[f].name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+  const insuredField = (className: string) => (
+    <label className={`grid min-w-0 gap-1 text-xs font-bold text-slate-600 ${className}`}>
+      <span>
+        介護保険被保険者番号{form === 'kouiki' && <span className="font-normal text-slate-500">（この書式には出ません）</span>}
+      </span>
+      <TextInput
+        value={job.insuredNo}
+        onChange={(insuredNo) => setJob((j) => ({...j, insuredNo}))}
+        placeholder="例：0000366989"
+        inputMode="numeric"
+        className="w-full min-w-0 text-sm font-normal text-slate-800"
+      />
+    </label>
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -244,108 +362,46 @@ export function JobEditor({
       <div className={`grid gap-4 ${preview ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,46%)]' : 'lg:grid-cols-[minmax(0,1fr)_330px]'}`}>
         {/* min-w-0：表が広くても画面からはみ出さず、表の中で横に動かせるようにする */}
         <div ref={mainRef} className={`min-w-0 space-y-4 ${narrow ? 'rows-narrow' : ''}`}>
-          <section className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 xl:grid-cols-4">
-            {/* 担当はお客様名の横。狭い画面で入りきらないときは下の行に回る */}
-            <div className="flex flex-wrap items-end gap-x-3 gap-y-3 sm:col-span-2">
-              <label className="grid min-w-0 flex-[1_1_14rem] gap-1 text-xs font-bold text-slate-600">
-                お客様名
-                <div className="flex gap-2">
-                  <TextInput
-                    value={job.customer}
-                    onChange={(customer) => setJob((j) => ({...j, customer}))}
-                    placeholder="例：山田"
-                    className="w-0 min-w-0 flex-1 text-base font-bold"
-                    autoFocus={!job.customer}
-                  />
-                  <select
-                    value={job.suffix}
-                    onChange={(e) => setJob((j) => ({...j, suffix: e.target.value as NameSuffix}))}
-                    className="h-9 rounded-md border border-slate-300 px-2 text-sm"
-                    aria-label="敬称"
-                  >
-                    <option value="様邸">様邸</option>
-                    <option value="様">様</option>
-                    <option value="">（付けない）</option>
-                  </select>
+          {estimate ? (
+            // 見積作成：見積書（苅田町・行橋用）と同じ順番に並べる（作成日 → お客様名 → 被保険者番号 → 工事場所 → 担当）。見積書に出ない項目は下にまとめる
+            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="grid gap-3">
+                <div className="flex flex-wrap items-end gap-3">
+                  {form === 'yukuhashi' && <EstimateDateField key={job.id} jobId={job.id} />}
+                  {customerField('min-w-[15rem] flex-1')}
                 </div>
-              </label>
-              <label className="grid gap-1 text-xs font-bold text-slate-600">
-                担当
-                <select
-                  value={staff}
-                  onChange={(e) => setJob((j) => ({...j, staff: e.target.value}))}
-                  className={`h-9 min-w-[6.5rem] rounded-md border px-2 text-sm ${
-                    staff ? 'border-slate-300 text-slate-800' : 'border-amber-400 bg-amber-50 text-amber-800'
-                  }`}
-                >
-                  <option value="">（選ぶ）</option>
-                  {staffOptions.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <label className="grid gap-1 text-xs font-bold text-slate-600">
-              施工日
-              <input
-                type="date"
-                value={job.date}
-                onChange={(e) => setJob((j) => ({...j, date: e.target.value}))}
-                className="h-9 rounded-md border border-slate-300 px-2 text-sm"
-              />
-            </label>
-            <label className="grid gap-1 text-xs font-bold text-slate-600">
-              請求する月
-              <input
-                type="month"
-                value={job.month}
-                onChange={(e) => e.target.value && setJob((j) => ({...j, month: e.target.value}))}
-                className="h-9 rounded-md border border-slate-300 px-2 text-sm"
-              />
-            </label>
-            <label className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2">
-              住所（任意）
-              <TextInput value={job.address} onChange={(address) => setJob((j) => ({...j, address}))} />
-            </label>
-            <label className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2">
-              備考（任意・明細に印刷されます）
-              <TextInput value={job.note} onChange={(note) => setJob((j) => ({...j, note}))} />
-            </label>
-            {estimate && (
-              <>
-                {/* 書式は2つ。選ぶまでは住所の市町村で決まる（住所で決まる書式を選んだときも、住所に合わせて変わるままにする） */}
-                <label className="grid min-w-0 gap-1 text-xs font-bold text-slate-600 sm:col-span-2">
-                  <span>
-                    見積書の書式
-                    <span className="ml-1 font-normal text-slate-500">
-                      {job.form !== '' ? '（この様邸で選んだ書式）' : formForAddress(job.address) ? '（住所の市町村から）' : '（設定の書式）'}
-                    </span>
-                  </span>
-                  <select
-                    value={form}
-                    onChange={(e) => {
-                      const f = e.target.value as EstimateForm;
-                      setJob((j) => ({...j, form: f === (formForAddress(j.address) ?? s.estimateForm) ? '' : f}));
-                    }}
-                    className="h-9 w-full min-w-0 rounded-md border border-slate-300 px-2 text-sm"
-                    aria-label="見積書の書式"
-                  >
-                    {FORM_IDS.map((f) => (
-                      <option key={f} value={f}>
-                        {FORM_INFO[f].name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2">
-                  介護保険被保険者番号{form === 'kouiki' && <span className="font-normal text-slate-500">（みやこ町・広域連合用の書式には出ません）</span>}
-                  <TextInput value={job.insuredNo} onChange={(insuredNo) => setJob((j) => ({...j, insuredNo}))} placeholder="例：0000366989" inputMode="numeric" />
-                </label>
-              </>
-            )}
-          </section>
+                <div className="flex flex-wrap items-end gap-3">
+                  {form === 'yukuhashi' && insuredField('min-w-[12rem] flex-1')}
+                  {addressField('工事場所（住所）', 'min-w-[16rem] flex-[2_1_0%]')}
+                </div>
+                <div className="flex flex-wrap items-end gap-3">
+                  {formField}
+                  {staffField}
+                </div>
+              </div>
+              <div className="mt-3 border-t border-dashed border-slate-200 pt-2.5">
+                <div className="mb-1.5 text-[11px] font-bold text-slate-400">見積書には出ない項目（仕切り・請求書に使います）</div>
+                <div className="flex flex-wrap items-end gap-3">
+                  {dateField}
+                  {monthField}
+                  {noteField('min-w-[14rem] flex-[2_1_0%]')}
+                  {form === 'kouiki' && insuredField('min-w-[12rem] flex-1')}
+                </div>
+              </div>
+            </section>
+          ) : (
+            <section className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 xl:grid-cols-4">
+              {/* 担当はお客様名の横。狭い画面で入りきらないときは下の行に回る */}
+              <div className="flex flex-wrap items-end gap-x-3 gap-y-3 sm:col-span-2">
+                {customerField('flex-[1_1_14rem]')}
+                {staffField}
+              </div>
+              {dateField}
+              {monthField}
+              {addressField('住所（任意）', 'sm:col-span-2')}
+              {noteField('sm:col-span-2')}
+            </section>
+          )}
 
           {estimate && (
             <p className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs leading-5 text-indigo-900">
@@ -599,23 +655,60 @@ function PlaceCard({
     onRows(rows);
   };
   const cols = estimate ? 8 : 6;
+  // 改修の種類（苅田町・行橋用の改修内容、広域連合用の工事名称・改修の種類もここから）
+  const kindField = (
+    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
+      改修の種類
+      <select
+        value={place.kind}
+        onChange={(e) => onPlace({kind: Number(e.target.value)})}
+        className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm font-normal text-slate-800"
+        aria-label="改修の種類"
+      >
+        {KINDS.map((k, i) => (
+          <option key={k} value={i + 1}>
+            {circled(i + 1)}
+            {k}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-white px-4 py-2.5">
-        <span className="text-xs font-bold text-slate-500">箇所</span>
-        <input
-          value={place.name}
-          onChange={(e) => onRename(e.target.value)}
-          list={listId}
-          placeholder="箇所名（玄関など）"
-          className="h-9 w-48 rounded-md border border-slate-300 bg-white px-2 text-base font-bold text-[#0c315e]"
-        />
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-white px-4 py-2.5">
+        {estimate && form === 'yukuhashi' && kindField}
+        <label className="flex items-center gap-2">
+          <span className="text-xs font-bold text-slate-500">{estimate ? (form === 'kouiki' ? '改修箇所' : '改修場所') : '箇所'}</span>
+          <input
+            value={place.name}
+            onChange={(e) => onRename(e.target.value)}
+            list={listId}
+            placeholder="箇所名（玄関など）"
+            className="h-9 w-48 rounded-md border border-slate-300 bg-white px-2 text-base font-bold text-[#0c315e]"
+          />
+        </label>
         <datalist id={listId}>
           {presets.map((p) => (
             <option key={p} value={p} />
           ))}
         </datalist>
+        {estimate && form === 'kouiki' && kindField}
+        {estimate && (
+          <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
+            写真番号
+            <NumberInput
+              value={place.photo}
+              onChange={(n) => onPlace({photo: Math.max(0, Math.round(n))})}
+              className="w-20 text-center font-normal"
+              ariaLabel="写真番号"
+              blankZero
+              min={0}
+              placeholder={photo > 0 ? `${circled(photo)}（自動）` : '自動'}
+            />
+          </label>
+        )}
         <span className="ml-auto text-sm tabular-nums text-slate-600">
           {estimate ? (
             <>
@@ -642,38 +735,6 @@ function PlaceCard({
           </button>
         </div>
       </div>
-      {estimate && (
-        <div className="flex flex-wrap items-end gap-x-3 gap-y-2 border-b border-slate-100 bg-indigo-50/40 px-4 py-2 text-xs font-bold text-slate-600">
-          <label className="grid gap-1">
-            改修の種類
-            <select
-              value={place.kind}
-              onChange={(e) => onPlace({kind: Number(e.target.value)})}
-              className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm font-normal"
-              aria-label="改修の種類"
-            >
-              {KINDS.map((k, i) => (
-                <option key={k} value={i + 1}>
-                  {circled(i + 1)}
-                  {k}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1">
-            写真番号
-            <NumberInput
-              value={place.photo}
-              onChange={(n) => onPlace({photo: Math.max(0, Math.round(n))})}
-              className="h-8 w-20 text-center font-normal"
-              ariaLabel="写真番号"
-              blankZero
-              min={0}
-              placeholder={photo > 0 ? `${circled(photo)}（自動）` : '自動'}
-            />
-          </label>
-        </div>
-      )}
 
       {place.rows.length > 0 && (
         <div className="overflow-x-auto">
@@ -683,11 +744,22 @@ function PlaceCard({
               <tr>
                 <th className="w-14 px-2 py-1.5 text-left">区分</th>
                 <th className="px-2 py-1.5 text-left">品名</th>
-                {estimate && <th className="w-28 px-2 py-1.5 pr-4 text-right">定価</th>}
-                {estimate && <th className="w-36 px-2 py-1.5 pr-4 text-right">長さ（使う／1本）</th>}
-                <th className="w-32 px-2 py-1.5 pr-4 text-right">{estimate ? '見積の単価' : '単価'}</th>
-                <th className="w-36 px-2 py-1.5 text-center">数量・箇所</th>
-                <th className="w-28 px-2 py-1.5 text-right">{estimate ? '見積金額' : '金額'}</th>
+                {estimate ? (
+                  // 見積書と同じ順番：内容 → 数量・単位 → 単価 → 金額 → 介護保険の対象外 → 備考（定価）
+                  <>
+                    <th className="w-36 px-2 py-1.5 pr-4 text-right">長さ（使う／1本）</th>
+                    <th className="w-36 px-2 py-1.5 text-center">数量・単位</th>
+                    <th className="w-32 px-2 py-1.5 pr-4 text-right">見積の単価</th>
+                    <th className="w-36 px-2 py-1.5 text-right">見積金額</th>
+                    <th className="w-28 px-2 py-1.5 pr-4 text-right">定価（備考）</th>
+                  </>
+                ) : (
+                  <>
+                    <th className="w-32 px-2 py-1.5 pr-4 text-right">単価</th>
+                    <th className="w-36 px-2 py-1.5 text-center">数量・箇所</th>
+                    <th className="w-28 px-2 py-1.5 text-right">金額</th>
+                  </>
+                )}
                 <th className="w-20 px-1 py-1.5" />
               </tr>
             </thead>
@@ -695,6 +767,48 @@ function PlaceCard({
               {place.rows.map((r, i) => {
                 const isWork = estimate && r.kind === 'labor';
                 const group = workEnd.get(r.id);
+                const priceCell = (
+                  <td data-cell="price" data-label={estimate && r.kind === 'material' ? '見積の単価' : '単価'} className="px-2 py-1.5 text-right">
+                    {estimate && r.kind === 'material' ? (
+                      <EstPriceCell row={r} rate={rate} autoFocus={r.id === focusRowId} onChange={(estPrice) => setRow(r.id, {estPrice})} />
+                    ) : (
+                      <NumberInput value={r.price} onChange={(price) => setRow(r.id, {price})} className="w-24" ariaLabel="単価" autoFocus={r.id === focusRowId} />
+                    )}
+                  </td>
+                );
+                const qtyCell = (
+                  <td
+                    data-cell="qty"
+                    data-label={estimate && r.kind === 'material' ? (r.lengthCm > 0 ? '本数（同じ長さのもの）' : '数量・単位') : '数量・箇所'}
+                    className="px-2 py-1.5 text-center"
+                  >
+                    <Stepper value={r.qty} onChange={(qty) => setRow(r.id, {qty})} ariaLabel={`${r.name || '金額だけの行'}の数量`} />
+                    {estimate && cutToLength(r) && (
+                      <div className="mt-0.5 text-[11px] font-bold tabular-nums text-indigo-800">
+                        ＝ {num(estimateQty(r), 3)}本（{num(r.lengthCm)}cm÷{num(r.pieceLengthM)}m{r.qty !== 1 ? `×${num(r.qty)}` : ''}）
+                      </div>
+                    )}
+                    {estimate && r.kind === 'material' && r.lengthCm > 0 && !(r.pieceLengthM > 0) && (
+                      <div className="mt-0.5 text-[11px] font-bold text-amber-700">1本の長さを入れてください</div>
+                    )}
+                    {estimate && r.kind === 'material' && (
+                      <label className="mt-1 flex items-center justify-center gap-1 text-[11px] text-slate-500">
+                        単位
+                        {cutToLength(r) ? (
+                          <span className="font-bold text-slate-700">本</span>
+                        ) : (
+                          <input
+                            value={r.unit}
+                            onChange={(e) => setRow(r.id, {unit: e.target.value})}
+                            placeholder="例：個"
+                            className="h-7 w-14 rounded border border-slate-200 px-1 text-center text-xs text-slate-800"
+                            aria-label="単位"
+                          />
+                        )}
+                      </label>
+                    )}
+                  </td>
+                );
                 return [
                   <tr
                     key={r.id}
@@ -719,12 +833,9 @@ function PlaceCard({
                       />
                       {(r.code || r.maker) && <div className="px-2 text-[11px] text-slate-500">{[r.maker, r.code].filter(Boolean).join('　')}</div>}
                       {estimate && r.kind === 'material' && (
-                        <div className="flex flex-wrap items-center gap-x-2">
-                          <button type="button" onClick={() => onPickLabor(r.id)} className="mt-0.5 rounded px-2 py-0.5 text-[11px] font-bold text-sky-700 hover:bg-sky-50">
-                            ＋ この部材の施工費
-                          </button>
-                          <ExcludedToggle on={r.excluded} onChange={(excluded) => setRow(r.id, {excluded})} />
-                        </div>
+                        <button type="button" onClick={() => onPickLabor(r.id)} className="mt-0.5 rounded px-2 py-0.5 text-[11px] font-bold text-sky-700 hover:bg-sky-50">
+                          ＋ この部材の施工費
+                        </button>
                       )}
                       {estimate && r.kind === 'material' && (
                         <EstOverride label="見積書の内容" value={r.estText} onReset={() => setRow(r.id, {estText: null})} />
@@ -733,13 +844,6 @@ function PlaceCard({
                         <EstOverride label="見積書の備考" value={r.estNote} onReset={() => setRow(r.id, {estNote: null})} />
                       )}
                     </td>
-                    {estimate && (
-                      <td data-cell="list" data-label={r.kind === 'material' ? '定価' : undefined} className="px-2 py-1.5 text-right">
-                        {r.kind === 'material' && (
-                          <NumberInput value={r.listPrice} onChange={(listPrice) => setRow(r.id, {listPrice})} className="w-24" ariaLabel="定価" blankZero placeholder="定価" />
-                        )}
-                      </td>
-                    )}
                     {estimate && (
                       <td data-cell="len" data-label={r.kind === 'material' ? '長さ（切って使うとき）' : undefined} className="px-2 py-1.5 text-right">
                         {r.kind === 'material' && (
@@ -774,43 +878,24 @@ function PlaceCard({
                         )}
                       </td>
                     )}
-                    <td data-cell="price" data-label={estimate && r.kind === 'material' ? '見積の単価' : '単価'} className="px-2 py-1.5 text-right">
-                      {estimate && r.kind === 'material' ? (
-                        <EstPriceCell row={r} rate={rate} autoFocus={r.id === focusRowId} onChange={(estPrice) => setRow(r.id, {estPrice})} />
-                      ) : (
-                        <NumberInput value={r.price} onChange={(price) => setRow(r.id, {price})} className="w-24" ariaLabel="単価" autoFocus={r.id === focusRowId} />
-                      )}
-                    </td>
-                    <td data-cell="qty" data-label={estimate && r.lengthCm > 0 ? '本数（同じ長さのもの）' : '数量・箇所'} className="px-2 py-1.5 text-center">
-                      <Stepper value={r.qty} onChange={(qty) => setRow(r.id, {qty})} ariaLabel={`${r.name || '金額だけの行'}の数量`} />
-                      {estimate && cutToLength(r) && (
-                        <div className="mt-0.5 text-[11px] font-bold tabular-nums text-indigo-800">
-                          ＝ {num(estimateQty(r), 3)}本（{num(r.lengthCm)}cm÷{num(r.pieceLengthM)}m{r.qty !== 1 ? `×${num(r.qty)}` : ''}）
-                        </div>
-                      )}
-                      {estimate && r.kind === 'material' && r.lengthCm > 0 && !(r.pieceLengthM > 0) && (
-                        <div className="mt-0.5 text-[11px] font-bold text-amber-700">1本の長さを入れてください</div>
-                      )}
-                      {estimate && r.kind === 'material' && (
-                        <label className="mt-1 flex items-center justify-center gap-1 text-[11px] text-slate-500">
-                          単位
-                          {cutToLength(r) ? (
-                            <span className="font-bold text-slate-700">本</span>
-                          ) : (
-                            <input
-                              value={r.unit}
-                              onChange={(e) => setRow(r.id, {unit: e.target.value})}
-                              placeholder="例：個"
-                              className="h-7 w-14 rounded border border-slate-200 px-1 text-center text-xs text-slate-800"
-                              aria-label="単位"
-                            />
-                          )}
-                        </label>
-                      )}
-                    </td>
+                    {!estimate && priceCell}
+                    {qtyCell}
+                    {estimate && priceCell}
                     <td data-cell="amount" data-label={estimate ? '見積金額' : '金額'} className="px-2 py-1.5 text-right font-bold tabular-nums">
                       {yen(estimate ? estimateAmount(r, rate) : rowAmount(r))}
+                      {estimate && r.kind === 'material' && (
+                        <div className="mt-0.5 whitespace-nowrap font-normal">
+                          <ExcludedToggle on={r.excluded} onChange={(excluded) => setRow(r.id, {excluded})} />
+                        </div>
+                      )}
                     </td>
+                    {estimate && (
+                      <td data-cell="list" data-label={r.kind === 'material' ? '定価（備考）' : undefined} className="px-2 py-1.5 text-right">
+                        {r.kind === 'material' && (
+                          <NumberInput value={r.listPrice} onChange={(listPrice) => setRow(r.id, {listPrice})} className="w-24" ariaLabel="定価" blankZero placeholder="定価" />
+                        )}
+                      </td>
+                    )}
                     <td data-cell="ops" className="whitespace-nowrap px-1 py-1.5 text-right">
                       <button type="button" onClick={() => moveRow(i, -1)} disabled={i === 0} className="rounded px-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30" title="上へ">
                         ▲
@@ -831,7 +916,7 @@ function PlaceCard({
                   </tr>,
                   estimate && group && (
                     <tr key={`${r.id}-work`} className="work-sum border-t border-dashed border-sky-200 bg-sky-50/60 text-xs">
-                      <td colSpan={cols - 2} className="px-2 py-1 text-right font-bold text-sky-900">
+                      <td colSpan={cols - 3} className="px-2 py-1 text-right font-bold text-sky-900">
                         {!group.afterMaterial && (
                           <span className="mr-3 inline-block align-middle">
                             <ExcludedToggle
@@ -868,6 +953,7 @@ function PlaceCard({
                         )}
                       </td>
                       <td className="px-2 py-1 text-right text-sm font-bold tabular-nums text-sky-900">{yen(group.amount)}</td>
+                      <td />
                       <td />
                     </tr>
                   ),
@@ -927,6 +1013,23 @@ function EstPriceCell({row, rate, autoFocus, onChange}: {row: Row; rate: number;
       </div>
       <div className={`text-[10px] ${auto && row.listPrice <= 0 ? 'font-bold text-amber-700' : 'text-slate-500'}`}>{auto ? how : `手入力（${how || '定価なし'}）`}</div>
     </div>
+  );
+}
+
+/** 見積書の作成日（苅田町・行橋用の右上）。右の見積書・印刷の画面の作成日と同じ値（様邸ごとに覚えておく） */
+function EstimateDateField({jobId}: {jobId: string}) {
+  const [meta, setMeta] = useDocMeta(`est:${jobId}`, todayIso);
+  return (
+    <label className="grid gap-1 text-xs font-bold text-slate-600">
+      作成日
+      <input
+        type="date"
+        value={meta.date}
+        onChange={(e) => setMeta({...meta, date: e.target.value})}
+        className="h-9 rounded-md border border-slate-300 px-2 text-sm"
+        aria-label="作成日"
+      />
+    </label>
   );
 }
 

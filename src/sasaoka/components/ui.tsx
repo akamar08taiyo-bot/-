@@ -85,7 +85,8 @@ export function NumberInput({
         focused.current = true;
         setText(Number.isFinite(value) && !(blankZero && value === 0) ? String(value) : '');
         const el = e.currentTarget;
-        requestAnimationFrame(() => el.select());
+        // 選ぶのは次の描画のあと（数字を書き換えてから）。その前に Tab で次の欄へ移っていたら選ばない（select() は欄に戻ってしまう）
+        requestAnimationFrame(() => document.activeElement === el && el.select());
       }}
       onBlur={() => {
         focused.current = false;

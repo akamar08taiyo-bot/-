@@ -507,7 +507,7 @@ function CellEditor({anchor, spec, onClose, onTab}: {anchor: HTMLElement; spec: 
       onKeyDown: (e: ReactKeyboardEvent) => onKey(e, f),
       onFocus: (e: {currentTarget: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement}) => {
         const el = e.currentTarget;
-        if ('select' in el && el.tagName !== 'SELECT') requestAnimationFrame(() => (el as HTMLInputElement).select());
+        if ('select' in el && el.tagName !== 'SELECT') requestAnimationFrame(() => document.activeElement === el && (el as HTMLInputElement).select());
       },
     };
     const box = 'w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';

@@ -39,6 +39,34 @@ const formLabel = page.locator('label', {has: formSelect});
 assert.deepEqual(await formSelect.locator('option').allInnerTexts(), ['苅田町・行橋用', 'みやこ町・広域連合用']);
 assert.equal(await formSelect.inputValue(), 'yukuhashi'); // 住所がないので設定の書式
 assert.ok((await formLabel.innerText()).includes('（設定の書式）'));
+
+// 入力の欄は見積書と同じ順番に並び、Tab でその順に進む：作成日 → お客様名 → 被保険者番号 → 工事場所 → 書式 → 担当、
+// 箇所は 改修の種類 → 改修場所 → 写真番号、行は 品名 → 長さ → 数量 → 単価 → 介護保険の対象外 → 定価（備考）
+const tabOrder = async (from, until, max = 40) => {
+  await from.focus();
+  const seen = [];
+  for (let i = 0; i < max; i++) {
+    // 入力の欄だけを数える（ボタンは飛ばす。日付の欄は年・月・日で何度か止まるので1つにまとめる）
+    const name = await page.evaluate(() => {
+      const e = document.activeElement;
+      if (!e || e.tagName === 'BUTTON') return '';
+      return e.getAttribute('aria-label') || e.getAttribute('placeholder') || e.closest('label')?.innerText.split('\n')[0].trim() || e.tagName;
+    });
+    if (name && seen[seen.length - 1] !== name) seen.push(name);
+    if (name === until) return seen;
+    await page.keyboard.press('Tab');
+  }
+  return seen;
+};
+const jobOrder = await tabOrder(page.getByRole('textbox', {name: '作成日', exact: true}), '担当');
+assert.deepEqual(jobOrder, ['作成日', '例：山田', '敬称', '例：0000366989', '住所', '見積書の書式', '担当'], jobOrder.join(' → '));
+const rowOrder = await tabOrder(page.getByRole('combobox', {name: '改修の種類'}).first(), '定価');
+assert.deepEqual(
+  rowOrder,
+  ['改修の種類', '箇所名（玄関など）', '写真番号', '品名', '使う長さ（cm）', '1本の長さ（m）', '木の手すり 35φ 4mの数量', '見積の単価', '介護保険の対象外', '定価'],
+  rowOrder.join(' → '),
+);
+log('入力の順番が見積書と同じOK');
 assert.ok((await box()).includes('24,538'));
 const places = page.locator('section').filter({has: page.getByPlaceholder('箇所名（玄関など）')});
 const genkan = places.nth(0);
@@ -169,7 +197,7 @@ assert.ok((await page.locator('aside').innerText()).includes('介護保険の対
 log('介護保険の対象外OK');
 
 // みやこ町・広域連合用：住所の市町村で書式が変わる。施工費は「時間×2,500円」、写真番号・改修の種類を出す
-await page.locator('label', {hasText: '住所（任意）'}).locator('input').fill('福岡県京都郡みやこ町豊津');
+await page.getByRole('textbox', {name: '住所', exact: true}).fill('福岡県京都郡みやこ町豊津');
 await toilet.getByRole('textbox', {name: '写真番号'}).fill('5');
 await toilet.getByRole('combobox', {name: '改修の種類'}).selectOption('5');
 await page.getByRole('button', {name: '🖨 見積書を印刷'}).click();
@@ -295,12 +323,13 @@ await page.getByRole('button', {name: '諸経費を自動に戻す'}).click();
 log('右の見積書で諸経費を直す・Esc でやめるOK');
 
 // 住所を消すと苅田町・行橋用に戻る。作成日を右の見積書で直す → 印刷の作成日も同じ。直した内容も印刷に入る
-await page.locator('label', {hasText: '住所（任意）'}).locator('input').fill('');
+await page.getByRole('textbox', {name: '住所', exact: true}).fill('');
 await preview.locator('.form-page', {hasText: '工事費見積書兼工事費内訳書'}).waitFor();
 await preview.locator('[data-edit="date"]').click();
 await editor.getByLabel('作成日').fill('2026-10-01');
 await editor.getByLabel('作成日').press('Enter');
 assert.ok((await preview.innerText()).includes('令和8年10月1日'));
+assert.equal(await page.getByRole('textbox', {name: '作成日', exact: true}).inputValue(), '2026-10-01'); // 左の作成日の欄も同じ日
 await page.getByRole('button', {name: '🖨 見積書を印刷'}).click();
 await page.locator('.print-overlay').waitFor();
 const printed = await page.locator('.print-root').innerText();
