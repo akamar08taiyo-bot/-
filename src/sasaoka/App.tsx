@@ -73,6 +73,8 @@ export default function App() {
 
   const data = store.data;
   const openJob = useMemo(() => (data && openJobId ? data.jobs.find((j) => j.id === openJobId) ?? null : null), [data, openJobId]);
+  // 見積作成で様邸を開いているときは、右に見積書を映すので広く使う
+  const width = tab === 'jobs' && openJob && mode === 'estimate' ? 'max-w-[1920px]' : 'max-w-[1400px]';
 
   if (store.loadError) {
     return <div className="p-8 text-rose-700">データを読み込めませんでした：{store.loadError}</div>;
@@ -85,7 +87,7 @@ export default function App() {
     <ToastProvider>
       <div className={`min-h-screen bg-[#f3f6fa] text-slate-800 ${print ? 'no-print' : ''}`}>
         <header className="no-print bg-[#0c315e] text-white">
-          <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+          <div className={`mx-auto flex ${width} flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3`}>
             <div className="flex items-center gap-3">
               <div className="grid h-9 w-9 place-items-center rounded-lg bg-white/15 text-lg font-black">仕</div>
               <div>
@@ -121,7 +123,7 @@ export default function App() {
               </a>
             </div>
           </div>
-          <nav className="mx-auto flex max-w-[1400px] gap-1 overflow-x-auto px-3">
+          <nav className={`mx-auto flex ${width} gap-1 overflow-x-auto px-3`}>
             {TABS.map((t) => (
               <button
                 key={t.id}
@@ -143,7 +145,7 @@ export default function App() {
           </nav>
         </header>
 
-        <main className="no-print mx-auto min-w-0 max-w-[1400px] px-3 py-4 sm:px-4">
+        <main className={`no-print mx-auto min-w-0 px-3 py-4 sm:px-4 ${width}`}>
           {tab === 'jobs' &&
             (openJob ? (
               <JobEditor

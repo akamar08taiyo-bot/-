@@ -132,6 +132,9 @@ const cleanRow = (r: Record<string, unknown>): Row => ({
     r.pieceLengthM === undefined ? (r.kind === 'labor' ? 0 : guessPieceLengthM(str(r.name))) : Math.max(0, numv(r.pieceLengthM)),
   estPrice: optNum(r.estPrice),
   excluded: r.excluded === true,
+  estText: typeof r.estText === 'string' ? r.estText : null,
+  estNote: typeof r.estNote === 'string' ? r.estNote : null,
+  estAmount: optNum(r.estAmount),
 });
 
 const KINDS = [1, 2, 3, 4, 5, 6]; // 見積書の改修の種類（①〜⑥）

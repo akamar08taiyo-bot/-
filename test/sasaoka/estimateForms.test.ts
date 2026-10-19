@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {circled, cutCalc, formForAddress, formLines, jobForm, materialText, paginate, photoNumbers, placeWork, reiwa} from '../../src/sasaoka/estimateForms.ts';
+import {autoNote, circled, cutCalc, formForAddress, formLines, jobForm, lineNote, materialText, noteText, paginate, photoNumbers, placeWork, reiwa} from '../../src/sasaoka/estimateForms.ts';
 import type {Job, Place, Row} from '../../src/sasaoka/types.ts';
 
 const S = {estimateRate: 0.8, estimateHourRate: 2500, estimateForm: 'yukuhashi'} as const;
 
 let seq = 0;
-const blank = {refId: null, code: '', maker: '', unit: '', price: 0, listPrice: 0, lengthCm: 0, pieceLengthM: 0, estPrice: null, excluded: false};
+const blank = {refId: null, code: '', maker: '', unit: '', price: 0, listPrice: 0, lengthCm: 0, pieceLengthM: 0, estPrice: null, excluded: false, estText: null, estNote: null, estAmount: null};
 const mat = (name: string, listPrice: number, extra: Partial<Row> = {}): Row => ({...blank, id: `r${++seq}`, kind: 'material', name, qty: 1, listPrice, ...extra});
 const lab = (price: number, qty = 1): Row => ({...blank, id: `r${++seq}`, kind: 'labor', name: '木', price, qty});
 const place = (name: string, rows: Row[], extra: Partial<Place> = {}): Place => ({id: `p${++seq}`, name, rows, kind: 1, photo: 0, work: '', ...extra});
@@ -94,6 +94,31 @@ test('部材の内容の書き方・切って使う部材の数量の計算', ()
   // 見積の単価を手で入れた行は「×0.8」を書かない
   const [line] = formLines({places: [place('玄関', [{...rail, estPrice: 15000}])]}, S, 'yukuhashi');
   assert.deepEqual([line.rate, line.unitPrice, line.amount], [null, 15000, 2250]);
+});
+
+test('見積書だけの内容・備考・施工費の金額（右に映す見積書で直したもの）', () => {
+  const rail = mat('手すり 4m', 20000, {lengthCm: 60, pieceLengthM: 4, unit: '本'});
+  const cap = mat('エンドキャップ', 450, {unit: '個', qty: 2, estText: 'エンドキャップ（木口用）', estNote: '定価：￥450\n（税抜）'});
+  const wood = {...lab(1000, 2), estText: '手すり取付費', estAmount: 2500};
+  const job = {places: [place('玄関', [rail, cap, wood])]};
+  const [r, c, w] = formLines(job, S, 'yukuhashi');
+  // 直していなければ元の内容・備考（切って使う部材は 定価×0.8 と長さの計算の2行）
+  assert.deepEqual([r.text, r.autoText, r.note], ['手すり 4m', '手すり 4m', null]);
+  assert.deepEqual(lineNote(r, 'yukuhashi', 2500), {lines: ['定価：￥20,000×0.8', '0.6m÷4m＝0.15本']});
+  // 直した内容・備考（改行で2行）。元の内容は autoText に残る
+  assert.deepEqual([c.text, c.autoText], ['エンドキャップ（木口用）', 'エンドキャップ']);
+  assert.deepEqual(lineNote(c, 'yukuhashi', 2500), {lines: ['定価：￥450', '（税抜）']});
+  assert.deepEqual(autoNote(c, 'yukuhashi', 2500), {lines: ['定価：￥450']});
+  // 施工費のまとまり：名前と金額は最初の手間の行のもの
+  assert.deepEqual([w.isWork, w.text, w.autoText, w.amount, w.manualAmount, w.rowId, w.rowIds], [true, '手すり取付費', '同上施工費', 2500, true, wood.id, [wood.id]]);
+  // みやこ町・築上町用：2,500円は 1時間×2,500円 と書ける
+  const k = formLines(job, S, 'kouiki');
+  assert.deepEqual([k[2].qty, k[2].unit, k[2].unitPrice, k[2].amount, k[2].hourly], [1, '時間', 2500, 2500, true]);
+  assert.deepEqual(lineNote(k[2], 'kouiki', 2500), {lines: ['1時間2,500円']});
+  assert.deepEqual(autoNote(k[0], 'kouiki', 2500), {lines: ['20,000円/本×0.8', '0.6m÷4m＝0.15本']});
+  // 手で直す欄の最初の文字
+  assert.equal(noteText({split: ['450', '円/個']}), '450円/個');
+  assert.equal(noteText({lines: ['定価：￥20,000×0.8', '0.6m÷4m＝0.15本']}), '定価：￥20,000×0.8\n0.6m÷4m＝0.15本');
 });
 
 test('令和の年月日', () => {

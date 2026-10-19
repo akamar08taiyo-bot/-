@@ -5,43 +5,14 @@ import type {MonthSummary} from '../calc.ts';
 import {FORM_INFO, jobForm} from '../estimateForms.ts';
 import type {AppData, Job, Settings} from '../types.ts';
 import {dateLabel, monthEnd, monthLabel, num, shortDate, staffShort, todayIso, yen} from '../util.ts';
+import {useDocMeta} from './docMeta.ts';
+import type {DocMeta} from './docMeta.ts';
 import {KouikiForm, YukuhashiForm} from './EstimateForms.tsx';
 
 export type PrintRequest =
   | {kind: 'invoice'; month: string; withDetails: boolean}
   | {kind: 'job'; jobId: string}
   | {kind: 'estimate'; jobId: string};
-
-type DocMeta = {date: string; number: string; due: string};
-
-const META_KEY = 'sasaoka-app:invoice-meta';
-
-/**
- * 請求日・請求書番号・お支払期限は月ごとに、見積書の作成日は様邸ごとに覚えておく（次に開いたときも同じものが入る）。
- * key は請求書なら 'YYYY-MM'、見積書なら 'est:様邸のID'
- */
-function useDocMeta(key: string, defaultDate: () => string) {
-  const read = (): DocMeta => {
-    try {
-      const all = JSON.parse(localStorage.getItem(META_KEY) || '{}');
-      if (all && all[key]) return {date: '', number: '', due: '', ...all[key]};
-    } catch {
-      /* 初期値にする */
-    }
-    return {date: defaultDate(), number: '', due: ''};
-  };
-  const [meta, setMeta] = useState<DocMeta>(read);
-  useEffect(() => {
-    try {
-      const all = JSON.parse(localStorage.getItem(META_KEY) || '{}') || {};
-      all[key] = meta;
-      localStorage.setItem(META_KEY, JSON.stringify(all));
-    } catch {
-      /* 覚えられなくても印刷はできる */
-    }
-  }, [key, meta]);
-  return [meta, setMeta] as const;
-}
 
 /** 用紙の幅（A4縦 210mm・横 297mm）＋まわりの余白。画面がこれより狭いと、用紙全体が見えるように縮めて見せる */
 const pagePx = (mm: number) => (mm / 25.4) * 96 + 16;

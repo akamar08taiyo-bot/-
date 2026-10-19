@@ -177,8 +177,9 @@ export function estimateAmount(row: Row, rate: number): number {
 
 export type EstimateLine =
   | {kind: 'material'; row: Row; unitPrice: number; qty: number; amount: number; excluded: boolean}
-  // 続けて並んだ手間の行をまとめたもの。部材のすぐ下なら「同上施工費」（対象外かどうかは部材に合わせる）、箇所の最初なら「施工費」
-  | {kind: 'work'; rows: Row[]; amount: number; afterMaterial: boolean; excluded: boolean};
+  // 続けて並んだ手間の行をまとめたもの。部材のすぐ下なら「同上施工費」（対象外かどうかは部材に合わせる）、箇所の最初なら「施工費」。
+  // 金額は取付手間の合計。見積書で金額を手で直していれば（最初の手間の行の estAmount）その金額。owner は上の部材の行
+  | {kind: 'work'; rows: Row[]; amount: number; sum: number; afterMaterial: boolean; excluded: boolean; owner: Row | null};
 
 export function estimatePlaceLines(place: Pick<Place, 'rows'>, rate: number): EstimateLine[] {
   const out: EstimateLine[] = [];
@@ -191,12 +192,13 @@ export function estimatePlaceLines(place: Pick<Place, 'rows'>, rate: number): Es
     const last = out[out.length - 1];
     if (last && last.kind === 'work') {
       last.rows.push(r);
-      last.amount += amount;
+      last.sum += amount;
       if (!last.afterMaterial) last.excluded = last.excluded && r.excluded;
     } else if (last && last.kind === 'material') {
-      out.push({kind: 'work', rows: [r], amount, afterMaterial: true, excluded: last.excluded});
-    } else out.push({kind: 'work', rows: [r], amount, afterMaterial: false, excluded: r.excluded});
+      out.push({kind: 'work', rows: [r], amount, sum: amount, afterMaterial: true, excluded: last.excluded, owner: last.row});
+    } else out.push({kind: 'work', rows: [r], amount, sum: amount, afterMaterial: false, excluded: r.excluded, owner: null});
   }
+  for (const l of out) if (l.kind === 'work') l.amount = l.rows[0].estAmount ?? l.sum;
   return out;
 }
 

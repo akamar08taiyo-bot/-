@@ -7,7 +7,7 @@
 import {cutToLength, estimatePlaceLines, estimateQty} from './calc.ts';
 import {normalize} from './priceImport.ts';
 import type {EstimateForm, Job, Place, Row, Settings} from './types.ts';
-import {num} from './util.ts';
+import {num, yen} from './util.ts';
 
 export const FORM_IDS: EstimateForm[] = ['yukuhashi', 'kouiki'];
 
@@ -84,13 +84,19 @@ export function workHours(amount: number, hourRate: number): number | null {
 
 export type FormLine = {
   place: number; // 何番目の箇所か
+  placeId: string;
+  rowId: string; // 見積書で手で直した値を持つ行（部材の行。施工費のまとまりはその最初の手間の行）
+  rowIds: string[]; // この1行のもとになった入力の行（左の入力と見積書の行をつなぐ）
+  excludeId: string; // 介護保険の対象外かどうかを持つ行（部材のすぐ下の施工費は、上の部材の行）
+  isWork: boolean; // 施工費のまとまり
   first: boolean; // 箇所の最初の行（箇所名・工事名称・写真番号・改修の種類を出す）
   placeName: string;
   work: string; // 工事名称（行橋市・苅田町用は改修内容）
   kind: number; // 改修の種類 1〜6
   photo: number; // 写真番号
   mark: '材' | '手';
-  text: string; // 内容（規格・範囲）／部材・仕様
+  text: string; // 内容（規格・範囲）／部材・仕様（手で直していればそれ）
+  autoText: string; // 手で直していないときの内容
   qty: number;
   unit: string;
   unitPrice: number;
@@ -100,6 +106,8 @@ export type FormLine = {
   rate: number | null; // 単価＝定価×この率のとき（見積の単価を手で入れた行・定価のない行は null）
   cut: string; // 切って使う部材の数量の計算（0.6m÷4m＝0.15本）。ほかは ''
   hourly: boolean; // 施工費を「時間×1時間の単価」で書いた行
+  note: string | null; // 備考（定価等）・算出根拠を手で直したとき（改行で行を分ける）
+  manualAmount: boolean; // 施工費の金額を見積書で手で直した
 };
 
 export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateRate' | 'estimateHourRate'>, form: EstimateForm): FormLine[] {
@@ -109,6 +117,7 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
     shownLines(place, s.estimateRate).forEach((l, i) => {
       const base = {
         place: pi,
+        placeId: place.id,
         first: i === 0,
         placeName: place.name.trim(),
         work: placeWork(place, form),
@@ -118,10 +127,16 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
       };
       if (l.kind === 'material') {
         const r = l.row;
+        const auto = materialText(r);
         out.push({
           ...base,
+          rowId: r.id,
+          rowIds: [r.id],
+          excludeId: r.id,
+          isWork: false,
           mark: '材',
-          text: materialText(r),
+          text: r.estText ?? auto,
+          autoText: auto,
           qty: l.qty,
           unit: cutToLength(r) ? '本' : r.unit.trim(),
           unitPrice: l.unitPrice,
@@ -130,16 +145,25 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
           rate: r.estPrice === null && r.listPrice > 0 ? s.estimateRate : null,
           cut: cutCalc(r),
           hourly: false,
+          note: r.estNote,
+          manualAmount: false,
         });
         return;
       }
       // みやこ町・築上町用は「0.8時間×2,500円＝2,000円」のように時間で書く。時間が小数2けたで割り切れないときは「1式」
       const hours = form === 'kouiki' ? workHours(l.amount, s.estimateHourRate) : null;
       const hourly = hours !== null;
+      const head = l.rows[0];
+      const auto = l.afterMaterial ? '同上施工費' : '施工費';
       out.push({
         ...base,
+        rowId: head.id,
+        rowIds: l.rows.map((r) => r.id),
+        excludeId: l.owner?.id ?? head.id,
+        isWork: true,
         mark: '手',
-        text: l.afterMaterial ? '同上施工費' : '施工費',
+        text: head.estText ?? auto,
+        autoText: auto,
         qty: hours ?? 1,
         unit: hourly ? '時間' : '式',
         unitPrice: hourly ? s.estimateHourRate : l.amount,
@@ -148,10 +172,43 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
         rate: null,
         cut: '',
         hourly,
+        note: head.estNote,
+        manualAmount: head.estAmount !== null,
       });
     });
   });
   return out;
+}
+
+/**
+ * 備考（定価等・行橋市・苅田町用）／算出根拠（みやこ町・築上町・豊前市など用）に出すもの。
+ * lines は1行ずつ（切って使う部材は「定価」と「長さの計算」の2行）。split は算出根拠の「4,600｜円/本」のように2つの欄に分けて出すもの
+ */
+export type NoteView = {lines: string[]} | {split: [string, string]};
+
+/** 手で直していないときの備考・算出根拠 */
+export function autoNote(l: FormLine, form: EstimateForm, hourRate: number): NoteView {
+  if (form === 'yukuhashi') {
+    const list = l.listPrice > 0 ? `定価：￥${yen(l.listPrice)}` : '';
+    if (l.cut) return {lines: [list && (l.rate !== null ? `${list}×${l.rate}` : list), l.cut].filter(Boolean)};
+    return {lines: list ? [list] : []};
+  }
+  // 算出根拠は対象工事部分の欄なので、介護保険の対象外の行は空
+  if (l.excluded) return {lines: []};
+  if (l.hourly) return {lines: [`1時間${yen(hourRate)}円`]};
+  if (l.cut) return {lines: [l.listPrice > 0 ? `${yen(l.listPrice)}円/本${l.rate !== null ? `×${l.rate}` : ''}` : '', l.cut].filter(Boolean)};
+  if (l.listPrice > 0) return {split: [yen(l.listPrice), l.unit ? `円/${l.unit}` : '円']};
+  return {lines: []};
+}
+
+/** 見積書に出す備考・算出根拠（手で直していればそれ） */
+export function lineNote(l: FormLine, form: EstimateForm, hourRate: number): NoteView {
+  return l.note !== null ? {lines: l.note.split('\n')} : autoNote(l, form, hourRate);
+}
+
+/** 備考・算出根拠を1つの文字にする（手で直す欄の最初の文字） */
+export function noteText(v: NoteView): string {
+  return 'split' in v ? v.split.join('') : v.lines.join('\n');
 }
 
 /**

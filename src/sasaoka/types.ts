@@ -47,6 +47,10 @@ export type Row = {
   pieceLengthM: number; // 1本の長さ（m）。見積の数量＝使う長さ÷1本の長さ（例：60cm÷4m＝0.15本）
   estPrice: number | null; // 見積の単価を手で入れたとき。null なら 定価×掛率
   excluded: boolean; // 介護保険の対象外（見積書の「対象外」の欄に出す）。部材のすぐ下の施工費は部材に合わせる
+  // ---- 見積書の欄を手で直したとき（見積書だけに出る。仕切り計算表・請求書は変わらない）。null なら自動
+  estText: string | null; // 内容（品名）。施工費のまとまりは、その最初の手間の行に持つ
+  estNote: string | null; // 備考（定価等）・算出根拠（改行で2行）
+  estAmount: number | null; // 施工費のまとまりの金額（最初の手間の行に持つ。null なら取付手間の合計）
 };
 
 /** 箇所（玄関・トイレなど） */

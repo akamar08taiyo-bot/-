@@ -1,10 +1,13 @@
 // 見積書の2つの書式を、いただいた Excel と同じ形で A4横に印刷する。
 // 列の幅・行の高さは元の Excel の比のまま（mm）。長い品名は Excel の「縮小して全体を表示」のように小さく・2行にする。
+// editable のとき（様邸の画面の右のプレビュー）は、手で直せる欄に data-edit（何を直す欄か）を付ける：
+//   job:customer など様邸の項目／date 作成日／place:箇所ID:name|work|photo|kind／line:行ID:text|qty|unit|price|note／
+//   excl:行ID（介護保険の対象外）／overhead:all|target（諸経費）。明細の行には data-rows（もとになった入力の行）を付ける
 
 import type {ReactNode} from 'react';
 import {estimateTotals} from '../calc.ts';
 import type {EstimateTotals} from '../calc.ts';
-import {circled, FORM_INFO, formLines, KINDS, paginate, reiwa, TOTAL_ROWS} from '../estimateForms.ts';
+import {circled, FORM_INFO, formLines, KINDS, lineNote, paginate, reiwa, TOTAL_ROWS} from '../estimateForms.ts';
 import type {FormLine} from '../estimateForms.ts';
 import type {Job, Settings} from '../types.ts';
 import {num, staffFull, yen} from '../util.ts';
@@ -12,6 +15,9 @@ import {fitLinesStyle, fitStyle} from './fit.ts';
 
 const qtyText = (n: number) => num(n, 3);
 const pct = (rate: number) => num(Math.round(rate * 1000) / 10);
+
+/** 手で直せる欄の印（editable のときだけ） */
+const ed = (editable: boolean, key: string | null) => (editable && key ? {'data-edit': key} : {});
 
 /** 合計の欄の4行（小計・諸経費・消費税・合計）。[名前, 全体, 介護保険の対象] */
 function totalRows(t: EstimateTotals): [string, number, number][] {
@@ -29,7 +35,7 @@ function totalRows(t: EstimateTotals): [string, number, number][] {
 const YK = {A: 31.1, B: 24.9, C: 48.1, D: 7.1, E: 7.1, F: 15.5, G: 22.3, H: 7.1, I: 7.1, J: 15.5, K: 25.2, L: 22.9, M: 32.2};
 const YK_ROW = 5.77; // 明細の1行（元の 16.35pt）
 
-export function YukuhashiForm({job, settings: s, date}: {job: Job; settings: Settings; date: string}) {
+export function YukuhashiForm({job, settings: s, date, editable = false}: {job: Job; settings: Settings; date: string; editable?: boolean}) {
   const per = FORM_INFO.yukuhashi.perPage;
   const pages = paginate(formLines(job, s, 'yukuhashi'), per);
   const totals = totalRows(estimateTotals(job, s));
@@ -48,7 +54,7 @@ export function YukuhashiForm({job, settings: s, date}: {job: Job; settings: Set
         const last = pi === pages.length - 1;
         return (
           <div key={pi} className="form-page yk">
-            <div className="fm-head-right">
+            <div className="fm-head-right" {...ed(editable, 'date')}>
               作成日　令和{d ? d.y : '　'}年{d ? d.m : '　　'}月{d ? d.d : '　　'}日
             </div>
             <table className="fm" style={{width: `${Object.values(YK).reduce((a, b) => a + b, 0)}mm`}}>
@@ -75,14 +81,14 @@ export function YukuhashiForm({job, settings: s, date}: {job: Job; settings: Set
                   </td>
                 </tr>
                 <tr style={{height: '7.67mm'}}>
-                  <td colSpan={2} className="c bb" style={fitStyle(name, YK.A + YK.B, 7.67, 18)}>
+                  <td colSpan={2} className="c bb" style={fitStyle(name, YK.A + YK.B, 7.67, 18)} {...ed(editable, 'job:customer')}>
                     {name}
                   </td>
                   <td style={{fontSize: '12pt'}}>様邸　住宅改修</td>
                   <td colSpan={4} />
                 </tr>
                 <tr style={{height: '7.67mm'}}>
-                  <td colSpan={3} className="bb" style={{fontSize: '12pt'}}>
+                  <td colSpan={3} className="bb" style={{fontSize: '12pt'}} {...ed(editable && pi === 0, 'job:insuredNo')}>
                     {pi === 0 && `介護保険被保険者番号（${job.insuredNo.trim() || '　　　　　　　　　　'}）`}
                   </td>
                   <td colSpan={4} />
@@ -91,7 +97,7 @@ export function YukuhashiForm({job, settings: s, date}: {job: Job; settings: Set
                   <td className="bt bb" style={fitStyle('工事場所（住所）', YK.A, 7.67, 12)}>
                     工事場所（住所）
                   </td>
-                  <td colSpan={2} className="bt bb" style={fitStyle(job.address, YK.B + YK.C, 7.67, 11)}>
+                  <td colSpan={2} className="bt bb" style={fitStyle(job.address, YK.B + YK.C, 7.67, 11)} {...ed(editable, 'job:address')}>
                     {job.address}
                   </td>
                   <td colSpan={10} />
@@ -156,17 +162,21 @@ export function YukuhashiForm({job, settings: s, date}: {job: Job; settings: Set
                         <td className={`nr${bottom}`} />
                         <td className={`nl${bottom}`} />
                         <td className={bottom} />
-                        <td className={`r mr${bottom}`}>{yen(all)}</td>
+                        <td className={`r mr${bottom}`} {...ed(editable && label === '諸経費', 'overhead:all')}>
+                          {yen(all)}
+                        </td>
                         <td className={`nr${bottom}`} />
                         <td className={`nl${bottom}`} />
                         <td className={bottom} />
-                        <td className={`r mr${bottom}`}>{yen(target)}</td>
+                        <td className={`r mr${bottom}`} {...ed(editable && label === '諸経費', 'overhead:target')}>
+                          {yen(target)}
+                        </td>
                         <td className={`mr${bottom}`} />
                         <td className={`mr${bottom}`} />
                       </tr>
                     );
                   }
-                  return <YkLine key={i} line={page[i]} bottom={bottom} />;
+                  return <YkLine key={i} line={page[i]} bottom={bottom} editable={editable} />;
                 })}
               </tbody>
             </table>
@@ -180,9 +190,9 @@ export function YukuhashiForm({job, settings: s, date}: {job: Job; settings: Set
   );
 }
 
-function YkLine({line: l, bottom}: {line: FormLine | undefined; bottom: string}) {
-  const cell = (text: string, w: number, pt: number, cls = '', lines = 1): ReactNode => (
-    <td className={cls + bottom} style={text ? fitStyle(text, w, YK_ROW, pt, lines) : undefined}>
+function YkLine({line: l, bottom, editable}: {line: FormLine | undefined; bottom: string; editable: boolean}) {
+  const cell = (text: string, w: number, pt: number, cls = '', edit: string | null = null, lines = 1): ReactNode => (
+    <td className={cls + bottom} style={text ? fitStyle(text, w, YK_ROW, pt, lines) : undefined} {...ed(editable, edit)}>
       {text}
     </td>
   );
@@ -197,31 +207,33 @@ function YkLine({line: l, bottom}: {line: FormLine | undefined; bottom: string})
   }
   const target = !l.excluded;
   const qty = qtyText(l.qty);
+  const k = (field: string) => `line:${l.rowId}:${field}`;
+  const excl = `excl:${l.excludeId}`;
   // 備考（定価等）：定価。切って使う部材は「定価：￥20,000×0.8」と「0.6m÷4m＝0.15本」の2行
-  const list = l.listPrice > 0 ? `定価：￥${yen(l.listPrice)}` : '';
-  const note = l.cut ? [list && (l.rate !== null ? `${list}×${l.rate}` : list), l.cut].filter(Boolean) : list ? [list] : [];
+  const v = lineNote(l, 'yukuhashi', 0);
+  const note = 'split' in v ? [v.split.join('')] : v.lines;
   return (
-    <tr className="g" style={{height: `${YK_ROW}mm`}}>
-      {cell(l.first ? l.work || KINDS[l.kind - 1] : '', YK.A, 11, 'ml')}
-      {cell(l.first ? `${l.placeName}${circled(l.photo)}` : '', YK.B, 11)}
-      {cell(l.text, YK.C, 9, '', 2)}
-      {cell(qty, YK.D, 9, 'r nr')}
-      {cell(l.unit, YK.E, 11, 'nl')}
-      {cell(yen(l.unitPrice), YK.F, 11, 'r')}
+    <tr className="g" style={{height: `${YK_ROW}mm`}} {...(editable ? {'data-rows': l.rowIds.join(' ')} : {})}>
+      {cell(l.first ? l.work || KINDS[l.kind - 1] : '', YK.A, 11, 'ml', l.first ? `place:${l.placeId}:work` : null)}
+      {cell(l.first ? `${l.placeName}${circled(l.photo)}` : '', YK.B, 11, '', l.first ? `place:${l.placeId}:name` : null)}
+      {cell(l.text, YK.C, 9, '', k('text'), 2)}
+      {cell(qty, YK.D, 9, 'r nr', l.isWork ? null : k('qty'))}
+      {cell(l.unit, YK.E, 11, 'nl', l.isWork || l.cut ? null : k('unit'))}
+      {cell(yen(l.unitPrice), YK.F, 11, 'r', k('price'))}
       {cell(yen(l.amount), YK.G, 11, 'r mr')}
-      {cell(target ? qty : '', YK.H, 9, 'r nr')}
-      {cell(target ? l.unit : '', YK.I, 11, 'nl')}
-      {cell(target ? yen(l.unitPrice) : '', YK.J, 11, 'r')}
-      {cell(target ? yen(l.amount) : '', YK.K, 11, 'r mr')}
-      {cell(target ? '' : yen(l.amount), YK.L, 11, 'r mr')}
+      {cell(target ? qty : '', YK.H, 9, 'r nr', excl)}
+      {cell(target ? l.unit : '', YK.I, 11, 'nl', excl)}
+      {cell(target ? yen(l.unitPrice) : '', YK.J, 11, 'r', excl)}
+      {cell(target ? yen(l.amount) : '', YK.K, 11, 'r mr', excl)}
+      {cell(target ? '' : yen(l.amount), YK.L, 11, 'r mr', excl)}
       {note.length > 1 ? (
-        <td className={`mr${bottom}`} style={fitLinesStyle(note, YK.M, YK_ROW, 11)}>
-          {note.map((t) => (
-            <div key={t}>{t}</div>
+        <td className={`mr${bottom}`} style={fitLinesStyle(note, YK.M, YK_ROW, 11)} {...ed(editable, k('note'))}>
+          {note.map((t, i) => (
+            <div key={i}>{t}</div>
           ))}
         </td>
       ) : (
-        cell(note[0] ?? '', YK.M, 11, 'mr')
+        cell(note[0] ?? '', YK.M, 11, 'mr', k('note'))
       )}
     </tr>
   );
@@ -259,7 +271,7 @@ const NOTE_PHOTO = '※写真番号は、写真貼り付け用紙の写真番号
 const NOTE_MARK = '※材料費と施工費を工事項目毎に明記。　※「改修箇所毎工事名称」欄記入の時は、材料費は（材）、施工費は（手）を名称の前に明記。';
 const NOTE_KIND = '※改修の種類は、該当する番号だけを記入';
 
-export function KouikiForm({job, settings: s}: {job: Job; settings: Settings}) {
+export function KouikiForm({job, settings: s, editable = false}: {job: Job; settings: Settings; editable?: boolean}) {
   const per = FORM_INFO.kouiki.perPage;
   const pages = paginate(formLines(job, s, 'kouiki'), per);
   const totals = totalRows(estimateTotals(job, s));
@@ -366,19 +378,23 @@ export function KouikiForm({job, settings: s}: {job: Job; settings: Settings}) {
                         <td className={`r ml${bottom}`}>{isTax ? tax : ''}</td>
                         <td className={bottom}>{isTax ? '％' : ''}</td>
                         <td className={bottom} />
-                        <td className={`r mr${bottom}`}>{yen(all)}</td>
+                        <td className={`r mr${bottom}`} {...ed(editable && label === '諸経費', 'overhead:all')}>
+                          {yen(all)}
+                        </td>
                         <td className={`gap${bottom}`} />
                         <td className={`ml${bottom}`} />
                         <td className={bottom} />
                         <td className={`r ml${bottom}`}>{isTax ? tax : ''}</td>
                         <td className={bottom}>{isTax ? '％' : ''}</td>
                         <td className={bottom} />
-                        <td className={`r mr${bottom}`}>{yen(target)}</td>
+                        <td className={`r mr${bottom}`} {...ed(editable && label === '諸経費', 'overhead:target')}>
+                          {yen(target)}
+                        </td>
                         <td colSpan={2} className={`ml mr${bottom}`} />
                       </tr>
                     );
                   }
-                  return <KkLine key={i} line={page[i]} height={h} bottom={bottom} hourRate={s.estimateHourRate} />;
+                  return <KkLine key={i} line={page[i]} height={h} bottom={bottom} hourRate={s.estimateHourRate} editable={editable} />;
                 })}
                 <tr style={{height: '4.35mm'}}>
                   <td />
@@ -408,9 +424,9 @@ export function KouikiForm({job, settings: s}: {job: Job; settings: Settings}) {
   );
 }
 
-function KkLine({line: l, height, bottom, hourRate}: {line: FormLine | undefined; height: number; bottom: string; hourRate: number}) {
-  const cell = (text: string, w: number, pt: number, cls = '', lines = 1): ReactNode => (
-    <td className={cls + bottom} style={text ? fitStyle(text, w, height, pt, lines) : undefined}>
+function KkLine({line: l, height, bottom, hourRate, editable}: {line: FormLine | undefined; height: number; bottom: string; hourRate: number; editable: boolean}) {
+  const cell = (text: string, w: number, pt: number, cls = '', edit: string | null = null, lines = 1): ReactNode => (
+    <td className={cls + bottom} style={text ? fitStyle(text, w, height, pt, lines) : undefined} {...ed(editable, edit)}>
       {text}
     </td>
   );
@@ -425,56 +441,58 @@ function KkLine({line: l, height, bottom, hourRate}: {line: FormLine | undefined
   }
   const target = !l.excluded;
   const qty = qtyText(l.qty);
+  const k = (field: string) => `line:${l.rowId}:${field}`;
+  const excl = `excl:${l.excludeId}`;
+  // 算出根拠：定価「4,600｜円/本」。施工費は「1時間2,500円」、切って使う部材は「14,400円/本×0.8」と「2.8m÷4m＝0.7本」の2行
+  const v = lineNote(l, 'kouiki', hourRate);
   let basis: ReactNode;
-  if (target && l.hourly) {
-    basis = (
-      <td colSpan={2} className={`c ml mr${bottom}`} style={fitStyle(`1時間${yen(hourRate)}円`, KK.Q + KK.R, height, 11)}>
-        1時間{yen(hourRate)}円
-      </td>
-    );
-  } else if (target && l.cut) {
-    // 切って使う部材：「14,400円/本×0.8」と「2.8m÷4m＝0.7本」の2行
-    const lines = [l.listPrice > 0 ? `${yen(l.listPrice)}円/本${l.rate !== null ? `×${l.rate}` : ''}` : '', l.cut].filter(Boolean);
-    basis = (
-      <td colSpan={2} className={`ml mr gothic${bottom}`} style={fitLinesStyle(lines, KK.Q + KK.R, height, 10)}>
-        {lines.map((t) => (
-          <div key={t}>{t}</div>
-        ))}
-      </td>
-    );
-  } else if (target && l.listPrice > 0) {
+  if ('split' in v) {
     basis = (
       <>
-        {cell(yen(l.listPrice), KK.Q, 11, 'r ml gothic')}
-        {cell(l.unit ? `円/${l.unit}` : '円', KK.R, 11, 'c mr')}
+        {cell(v.split[0], KK.Q, 11, 'r ml gothic', k('note'))}
+        {cell(v.split[1], KK.R, 11, 'c mr', k('note'))}
       </>
+    );
+  } else if (v.lines.length === 1 && l.hourly && l.note === null) {
+    basis = (
+      <td colSpan={2} className={`c ml mr${bottom}`} style={fitStyle(v.lines[0], KK.Q + KK.R, height, 11)} {...ed(editable, k('note'))}>
+        {v.lines[0]}
+      </td>
+    );
+  } else if (v.lines.length > 0) {
+    basis = (
+      <td colSpan={2} className={`ml mr gothic${bottom}`} style={fitLinesStyle(v.lines, KK.Q + KK.R, height, 10)} {...ed(editable, k('note'))}>
+        {v.lines.map((t, i) => (
+          <div key={i}>{t}</div>
+        ))}
+      </td>
     );
   } else {
     basis = (
       <>
-        <td className={`ml${bottom}`} />
-        <td className={`mr${bottom}`} />
+        <td className={`ml${bottom}`} {...ed(editable, k('note'))} />
+        <td className={`mr${bottom}`} {...ed(editable, k('note'))} />
       </>
     );
   }
   return (
-    <tr className="g" style={{height: `${height}mm`}}>
-      {cell(l.first ? l.placeName : '', KK.A, 11, 'c ml', 2)}
-      {cell(l.first ? l.work : '', KK.B, 11, 'c', 2)}
+    <tr className="g" style={{height: `${height}mm`}} {...(editable ? {'data-rows': l.rowIds.join(' ')} : {})}>
+      {cell(l.first ? l.placeName : '', KK.A, 11, 'c ml', l.first ? `place:${l.placeId}:name` : null, 2)}
+      {cell(l.first ? l.work : '', KK.B, 11, 'c', l.first ? `place:${l.placeId}:work` : null, 2)}
       <td className={`mark${bottom}`}>{l.mark}</td>
-      {cell(l.text, KK.D, 9, 'mr gothic', 3)}
+      {cell(l.text, KK.D, 9, 'mr gothic', k('text'), 3)}
       <td className={`gap${bottom}`} />
-      {cell(qty, KK.F, 9, 'r ml gothic')}
-      {cell(l.unit, KK.G, 11, 'gothic')}
-      {cell(yen(l.unitPrice), KK.H, 11, 'r gothic')}
+      {cell(qty, KK.F, 9, 'r ml gothic', !l.isWork || l.hourly ? k('qty') : null)}
+      {cell(l.unit, KK.G, 11, 'gothic', l.isWork || l.cut ? null : k('unit'))}
+      {cell(yen(l.unitPrice), KK.H, 11, 'r gothic', l.hourly ? null : k('price'))}
       {cell(yen(l.amount), KK.I, 11, 'r mr gothic')}
       <td className={`gap${bottom}`} />
-      {cell(l.first ? circled(l.photo) : '', KK.K, 11, 'c ml')}
-      {cell(l.first ? circled(l.kind) : '', KK.L, 11, 'c')}
-      {cell(target ? qty : '', KK.M, 9, 'r ml gothic')}
-      {cell(target ? l.unit : '', KK.N, 11, 'gothic')}
-      {cell(target ? yen(l.unitPrice) : '', KK.O, 11, 'r gothic')}
-      {cell(target ? yen(l.amount) : '', KK.P, 11, 'r mr gothic')}
+      {cell(l.first ? circled(l.photo) : '', KK.K, 11, 'c ml', l.first ? `place:${l.placeId}:photo` : null)}
+      {cell(l.first ? circled(l.kind) : '', KK.L, 11, 'c', l.first ? `place:${l.placeId}:kind` : null)}
+      {cell(target ? qty : '', KK.M, 9, 'r ml gothic', excl)}
+      {cell(target ? l.unit : '', KK.N, 11, 'gothic', excl)}
+      {cell(target ? yen(l.unitPrice) : '', KK.O, 11, 'r gothic', excl)}
+      {cell(target ? yen(l.amount) : '', KK.P, 11, 'r mr gothic', excl)}
       {basis}
     </tr>
   );

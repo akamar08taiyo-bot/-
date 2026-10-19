@@ -16,6 +16,9 @@ const BLANK: Omit<Row, 'id' | 'kind'> = {
   pieceLengthM: 0,
   estPrice: null,
   excluded: false,
+  estText: null,
+  estNote: null,
+  estAmount: null,
 };
 
 /** 新しい箇所。見積書の改修の種類は「①手すりの取付」、写真番号は箇所の順番、工事名称は改修の種類から */

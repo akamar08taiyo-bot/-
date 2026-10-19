@@ -35,7 +35,7 @@ const S = {
 >;
 
 let seq = 0;
-const blank = {code: '', maker: '', unit: '', listPrice: 0, lengthCm: 0, pieceLengthM: 0, estPrice: null, excluded: false};
+const blank = {code: '', maker: '', unit: '', listPrice: 0, lengthCm: 0, pieceLengthM: 0, estPrice: null, excluded: false, estText: null, estNote: null, estAmount: null};
 const mat = (price: number, qty: number, name = '部材', extra: Partial<Row> = {}): Row => ({
   ...blank, id: `r${++seq}`, kind: 'material', refId: null, name, price, qty, ...extra,
 });
@@ -240,6 +240,20 @@ test('見積の諸経費は手で直せる（端数の調整）。対象外の�
   assert.equal(estimateTotals(job(ex, {overhead: 3500, overheadTarget: 2700}), S).target.total, 33154);
   // 仕切り計算表の④諸経費は一律の式のまま（見積の諸経費を直しても変わらない）
   assert.equal(jobTotals(job(rows, {overhead: 2700}), S).overhead, jobTotals(job(rows), S).overhead);
+});
+
+test('見積書で施工費の金額を直す（最初の手間の行の estAmount）：見積の合計に入り、仕切り計算表は変わらない', () => {
+  const wood = {...lab(1000, 2), estAmount: 3000};
+  const rows = [mat(10000, 1, '手すり', {listPrice: 20000}), wood, lab(500, 1, 'タイル')];
+  const [, work] = estimatePlaceLines({rows}, 0.8);
+  // 取付手間の合計は 2,000＋500＝2,500。見積書の金額は 3,000
+  assert.deepEqual(work.kind === 'work' && [work.sum, work.amount, work.rows.length], [2500, 3000, 2]);
+  const t = estimateTotals(job([rows]), S);
+  assert.deepEqual([t.material, t.work, t.all.subtotal], [16000, 3000, 19000]);
+  // 仕切り計算表の②取付手間合計は 2,500 のまま
+  assert.equal(jobTotals(job([rows]), S).labor, 2500);
+  // 直していなければ取付手間の合計
+  assert.equal(estimateTotals(job([[rows[0], {...wood, estAmount: null}, rows[2]]]), S).work, 2500);
 });
 
 test('rounddown は0の方へ切り捨て（浮動小数の誤差は除く）', () => {
