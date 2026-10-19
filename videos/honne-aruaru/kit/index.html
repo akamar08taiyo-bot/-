@@ -1,0 +1,285 @@
+<title>しのぶの失言ノート投稿キット</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Yusei+Magic&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
+<style>
+/* 配置：黒い「失言ノート」の表紙 →「動画（投稿の順番）」→「投稿の流れ」→「投稿のときの設定」→「登場人物」。スマホは一列、広い画面は動画を2列 */
+:root{
+  --bg:#F2EFF3; --surface:#FFFFFF; --ink:#2A2230; --ink2:#655A6A; --line:#E0D8E1; --soft:#F7F4F7;
+  --pink:#C2335B; --pink-bg:#FBE6EC; --navy:#26385F; --on-navy:#FFFFFF; --stamp:#C3302C; --check:#9A6A06;
+  --cover:#221C26; --cover-band:#17121A; --on-cover:#F6F1F6; --on-cover2:#C9BECC; --cover-accent:#E9B949; --cover-stamp:#FF7A70;
+  --f-display:"Dela Gothic One","Hiragino Sans","Noto Sans JP",sans-serif;
+  --f-body:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif;
+  --f-hand:"Yusei Magic","Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141117; --surface:#1F1A23; --ink:#F1EBF2; --ink2:#B5AAB9; --line:#352D3A; --soft:#19151C;
+  --pink:#F27E9E; --pink-bg:#3A1C27; --navy:#AFC2F2; --on-navy:#141117; --stamp:#F2716B; --check:#E5B84E;
+  --cover:#2A232F; --cover-band:#1D1821; --on-cover:#F6F1F6; --on-cover2:#C9BECC; --cover-accent:#E9B949; --cover-stamp:#FF7A70; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141117; --surface:#1F1A23; --ink:#F1EBF2; --ink2:#B5AAB9; --line:#352D3A; --soft:#19151C;
+  --pink:#F27E9E; --pink-bg:#3A1C27; --navy:#AFC2F2; --on-navy:#141117; --stamp:#F2716B; --check:#E5B84E;
+  --cover:#2A232F; --cover-band:#1D1821; --on-cover:#F6F1F6; --on-cover2:#C9BECC; --cover-accent:#E9B949; --cover-stamp:#FF7A70; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-weight:500;font-size:15px;line-height:1.75}
+.wrap{max-width:1040px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px 72px;display:flex;flex-direction:column;gap:32px}
+h1,h2,h3{margin:0;text-wrap:balance}
+h2{font-family:var(--f-display);font-weight:400;font-size:clamp(20px,4.4vw,25px);line-height:1.35}
+h3{font-size:15.5px;font-weight:900;line-height:1.55}
+.top{display:flex;flex-direction:column;gap:12px}
+.cover{position:relative;overflow:hidden;background:var(--cover);color:var(--on-cover);border-radius:6px 16px 16px 6px;padding:22px 22px 24px 40px;display:flex;flex-direction:column;gap:6px}
+.cover::before{content:"";position:absolute;left:0;top:0;bottom:0;width:16px;background:var(--cover-band)}
+.eyebrow{margin:0;font-size:12.5px;font-weight:700;letter-spacing:.14em;color:var(--cover-accent)}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(30px,7.4vw,46px);line-height:1.15;letter-spacing:.02em}
+.hand{margin:0;font-family:var(--f-hand);font-size:18px;color:var(--on-cover2)}
+.cover .stamp{position:absolute;right:20px;bottom:18px;transform:rotate(-9deg);border:3px solid var(--cover-stamp);color:var(--cover-stamp);font-family:var(--f-display);font-size:18px;line-height:1;padding:6px 9px 5px;border-radius:6px}
+.lead{margin:0;color:var(--ink2);max-width:44em}
+.nav{display:flex;flex-wrap:wrap;gap:8px}
+.nav a{font-size:13px;font-weight:700;text-decoration:none;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:5px 14px}
+.nav a:hover,.nav a:focus-visible{border-color:var(--pink);outline:none}
+section{display:flex;flex-direction:column;gap:14px;scroll-margin-top:12px}
+.sec-lead{margin:0;color:var(--ink2);font-size:14px;max-width:46em}
+.progress{font-weight:900;font-size:15px;font-variant-numeric:tabular-nums}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+.vc{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.vc.is-done .vb{opacity:.7}
+.posted{position:absolute;right:14px;top:12px;transform:rotate(-10deg);border:2.5px solid var(--stamp);color:var(--stamp);font-family:var(--f-display);font-size:15px;line-height:1;padding:5px 8px 4px;border-radius:5px}
+.vh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.no{font-family:var(--f-display);font-size:15px;min-width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--pink-bg);color:var(--pink);border:2px solid var(--pink)}
+.series{font-size:12.5px;font-weight:900;color:var(--pink);background:var(--pink-bg);border-radius:99px;padding:2px 11px;white-space:nowrap}
+.dur{font-size:12.5px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.when{margin:0;font-size:13px;font-weight:700;color:var(--ink2)}
+.vb{display:flex;gap:12px;align-items:flex-start}
+.th{flex:none;width:112px;height:auto;aspect-ratio:9/16;border-radius:8px;border:1px solid var(--line);object-fit:cover;max-width:100%}
+.vm{min-width:0;display:flex;flex-direction:column;gap:8px}
+.lbl{margin:0;font-size:12px;font-weight:700;color:var(--ink2);display:flex;gap:8px;align-items:baseline}
+.vt{overflow-wrap:anywhere}
+.btns{display:flex;flex-wrap:wrap;gap:6px}
+.btn{font:inherit;font-size:12.5px;font-weight:700;border-radius:99px;padding:5px 11px;cursor:pointer;border:1px solid var(--navy);background:var(--surface);color:var(--ink);line-height:1.4}
+.btn.save{background:var(--navy);color:var(--on-navy)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:focus-visible,.nav a:focus-visible,summary:focus-visible,.done input:focus-visible{outline:3px solid var(--pink);outline-offset:2px}
+.done{font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:6px;cursor:pointer}
+.done input{width:18px;height:18px;accent-color:var(--stamp)}
+details{border-top:1px solid var(--line);padding-top:8px}
+summary{cursor:pointer;font-size:13.5px;font-weight:700;color:var(--ink2)}
+details pre,details .alt,details video{margin-top:8px}
+pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--f-body);font-weight:500;font-size:13.5px;line-height:1.8;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+ul.alt{margin:8px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+ul.alt li{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:8px 10px 8px 12px;font-size:14px;font-weight:700}
+ul.alt li span{min-width:0;overflow-wrap:anywhere}
+ul.alt .btn{flex:none}
+p.intro{margin:8px 0 0;font-size:13.5px;color:var(--ink2)}
+.count{color:var(--ink2);font-size:12px;font-weight:500;font-variant-numeric:tabular-nums}
+details > .count{margin:6px 0 0}
+video{display:block;width:100%;max-width:270px;aspect-ratio:9/16;border-radius:10px;background:var(--cover)}
+ol.flow{margin:0;padding:0;list-style:none;counter-reset:f;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:10px}
+ol.flow li{counter-increment:f;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px 12px 52px;position:relative;font-size:14px;min-width:0}
+ol.flow li::before{content:counter(f);position:absolute;left:14px;top:12px;width:26px;height:26px;border-radius:50%;background:var(--navy);color:var(--on-navy);font-weight:900;font-size:14px;display:grid;place-items:center}
+ol.flow b{display:block}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+ul.check{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+ul.check li{padding-left:28px;position:relative;font-size:14px}
+ul.check li::before{content:"";position:absolute;left:2px;top:5px;width:16px;height:16px;border:2px solid var(--check);border-radius:4px}
+.chars-img{width:100%;height:auto;border-radius:10px;border:1px solid var(--line);max-width:100%}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:520px;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px dashed var(--line)}
+thead th{font-size:12.5px;color:var(--ink2);border-bottom:1px solid var(--line)}
+tbody th{white-space:nowrap;font-weight:900}
+tr:last-child th,tr:last-child td{border-bottom:0}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.row a{font-size:13px;font-weight:700;color:var(--pink)}
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--navy);color:var(--on-navy);padding:10px 18px;border-radius:99px;font-size:14px;font-weight:700;max-width:calc(100% - 32px);text-align:center;z-index:10}
+@media (max-width:860px){.cards{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:520px){.th{width:96px}.cover{padding-left:34px}.cover::before{width:12px}}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="cover">
+    <p class="eyebrow">投稿キット</p>
+    <h1>しのぶの失言ノート</h1>
+    <p class="hand">はい、記録しました。</p>
+    <span class="stamp" aria-hidden="true">記録</span>
+  </div>
+  <p class="lead">完成した2本を、「動画・サムネ・タイトル・説明文・タグ・固定コメント」の1セットずつにまとめました。上から順に、スマホだけで投稿できます。</p>
+  <nav class="nav" aria-label="ページの中"><a href="#videos">動画2本</a><a href="#flow">投稿の流れ</a><a href="#settings">投稿のときの設定</a><a href="#chars">登場人物</a></nav>
+</header>
+
+<section id="videos">
+  <h2>動画2本（投稿の順番）</h2>
+  <p class="sec-lead">番号は投稿する順番です。同じ日に2本出さず、数日あけて反応を比べます。保存される動画は、元の動画を少し軽くした版です（見た目はほとんど変わりません）。</p>
+  <div class="row"><span class="progress" id="prog">投稿済み 0 / 2</span></div>
+  <div class="cards" id="cards">
+<article class="vc" id="v-honne01" data-key="honne01" data-vid="e0a23ab96dc97d0f714f53fda9b160bc">
+  <span class="posted" hidden>投稿済</span>
+  <div class="vh"><span class="no">1</span><span class="series">本音あるある #1</span><span class="dur">46秒</span></div>
+  <p class="when">1本目</p>
+  <div class="vb">
+    <img class="th" src="thumb_s/honne01.jpg" alt="サムネ：夫に冷めた瞬間あるある【結婚10年目】" width="135" height="240" loading="lazy">
+    <div class="vm">
+      <p class="lbl">タイトル（おすすめ）<span class="count">19字</span></p>
+      <h3 class="vt" id="t-honne01">夫に冷めた瞬間あるある【結婚10年目】</h3>
+      <div class="btns">
+        <button type="button" class="btn save" data-act="video">動画を保存</button>
+        <button type="button" class="btn save" data-act="thumb">サムネを保存</button>
+        <button type="button" class="btn copy" data-copy="t-honne01">タイトルをコピー</button>
+        <button type="button" class="btn copy" data-copy="d-honne01">説明文をコピー</button>
+        <button type="button" class="btn copy" data-copy="g-honne01">タグをコピー</button>
+        <button type="button" class="btn copy" data-copy="p-honne01">固定コメントをコピー</button>
+      </div>
+      <label class="done"><input type="checkbox" id="done-honne01"> 投稿した</label>
+    </div>
+  </div>
+  <details class="play"><summary>動画を見る</summary><video controls playsinline preload="none" poster="thumb_s/honne01.jpg" data-src="/_blob/e0a23ab96dc97d0f714f53fda9b160bc"></video></details>
+  <details><summary>ほかのタイトル案（2つ）</summary><ul class="alt"><li><span id="t2-honne01">「手伝ったよ」って何？ 夫に冷めた瞬間あるある</span><button type="button" class="btn copy" data-copy="t2-honne01">コピー</button></li><li><span id="t3-honne01">最後のが当てはまったら、もう戻れません。夫に冷めた瞬間あるある</span><button type="button" class="btn copy" data-copy="t3-honne01">コピー</button></li></ul></details>
+  <details><summary>説明文を見る</summary><pre id="d-honne01">夫に冷めた瞬間、覚えてますか？
+最後のやつが当てはまったら、もう戻れません。
+
+① ゴミ出しをして「手伝ったよ」
+② 熱があっても「俺の昼ごはんは？」
+③ 外でだけイクメン
+④ 「俺の方が疲れてる」
+⑤ 自分の誕生日だけ覚えてる
+
+あなたなら、そのケーキ……買う？ 買わない？
+コメントで教えてください。
+
+#夫婦あるある #結婚生活 #夫にイラッ #本音あるある #shorts
+
+※この動画はフィクションです。ナレーションの声とイラストは AI で作成しています。</pre></details>
+  <details><summary>タグを見る</summary><pre id="g-honne01">夫婦あるある, 夫に冷めた瞬間, 旦那 イライラ, 夫にイラッ, 結婚生活, 主婦の本音, 本音あるある, 結婚10年目</pre><p class="count">YouTube Studio の動画の詳細 →「タグ」に貼ります（, で区切られて1つずつのタグになります）。</p></details>
+  <details><summary>固定コメントを見る</summary><pre id="p-honne01">当てはまった番号（①〜⑤）と、ケーキを「買う派」「買わない派」か教えてください。
+全部当てはまった人は……本当にお疲れさまです。</pre></details>
+  <details><summary>どんな回？</summary><p class="intro">「夫に冷めた瞬間」を5つ並べる、あるある型の回です。①ゴミ出しをして「手伝ったよ」②熱で寝込んでいるのに「俺の昼ごはんは？」③外でだけイクメン ④「俺の方が疲れてる」⑤自分の誕生日だけ、ケーキの種類まで指定。決めは「……それは、冷めるでしょ。」、オチは「そのケーキを買いに行くのも、私なんですけどね。」、最後に「買う？ 買わない？」の二択。キャラに名前を付ける前に作った回なので、画面の上の表示は「本音あるある」で、名札は出ません。（尺：46秒。サムネにするコマ：最初から約0.6秒）</p></details>
+</article>
+<article class="vc" id="v-honne02" data-key="honne02" data-vid="8b62d5624083a4b62f52d2f6b5d55530">
+  <span class="posted" hidden>投稿済</span>
+  <div class="vh"><span class="no">2</span><span class="series">しのぶの失言ノート #2</span><span class="dur">53秒</span></div>
+  <p class="when">#1 の数日あと（同じ日に出さない）</p>
+  <div class="vb">
+    <img class="th" src="thumb_s/honne02.jpg" alt="サムネ：「誰のおかげで生活できてると思ってるんだ」…はい、記録しました。【しのぶの失言ノート#2】" width="135" height="240" loading="lazy">
+    <div class="vm">
+      <p class="lbl">タイトル（おすすめ）<span class="count">45字</span></p>
+      <h3 class="vt" id="t-honne02">「誰のおかげで生活できてると思ってるんだ」…はい、記録しました。【しのぶの失言ノート#2】</h3>
+      <div class="btns">
+        <button type="button" class="btn save" data-act="video">動画を保存</button>
+        <button type="button" class="btn save" data-act="thumb">サムネを保存</button>
+        <button type="button" class="btn copy" data-copy="t-honne02">タイトルをコピー</button>
+        <button type="button" class="btn copy" data-copy="d-honne02">説明文をコピー</button>
+        <button type="button" class="btn copy" data-copy="g-honne02">タグをコピー</button>
+        <button type="button" class="btn copy" data-copy="p-honne02">固定コメントをコピー</button>
+      </div>
+      <label class="done"><input type="checkbox" id="done-honne02"> 投稿した</label>
+    </div>
+  </div>
+  <details class="play"><summary>動画を見る</summary><video controls playsinline preload="none" poster="thumb_s/honne02.jpg" data-src="/_blob/8b62d5624083a4b62f52d2f6b5d55530"></video></details>
+  <details><summary>ほかのタイトル案（2つ）</summary><ul class="alt"><li><span id="t2-honne02">夫の名前は「守」。守るのは自分だけでした【しのぶの失言ノート#2】</span><button type="button" class="btn copy" data-copy="t2-honne02">コピー</button></li><li><span id="t3-honne02">本気で離婚を考えた夫の一言5選【しのぶの失言ノート#2】</span><button type="button" class="btn copy" data-copy="t3-honne02">コピー</button></li></ul></details>
+  <details><summary>説明文を見る</summary><pre id="d-honne02">本気で離婚を考えた瞬間、ありますか？
+妻・しのぶ（44）が12年つけている「失言ノート」から、夫・まもる（46）の失言を5つ。
+
+①出産の翌日に「で、俺の晩飯は？」
+②39度の熱の妻に「うつすなよ」
+③塾代は渋るのに、ゴルフ道具に10万
+④夫の実家で「こいつ、料理だけは下手でさ」
+⑤「誰のおかげで生活できてると思ってるんだ」
+
+はい、記録しました。離婚届も、もう書いてあります。
+でも、まだ出しません。へそくりが、あと100万貯まるまでは。
+
+あなたなら、すぐ出す？ 貯まるまで待つ？
+あなたの家の「失言」も、コメントで教えてください。しのぶのノートに書き足します。
+
+#しのぶの失言ノート #夫婦あるある #モラハラ夫 #本音あるある #shorts
+
+※この動画はフィクションです。登場人物は架空で、声とイラストはAIで作成しています。</pre></details>
+  <details><summary>タグを見る</summary><pre id="g-honne02">夫婦あるある, 旦那 イライラ, モラハラ夫, 離婚, 離婚届, 産後クライシス, 義実家, 義母 あるある, へそくり, 結婚生活, 主婦の本音, 本音あるある, しのぶの失言ノート</pre><p class="count">YouTube Studio の動画の詳細 →「タグ」に貼ります（, で区切られて1つずつのタグになります）。</p></details>
+  <details><summary>固定コメントを見る</summary><pre id="p-honne02">あなたなら①〜⑤のどれで離婚届をもらいに行きますか？
+「すぐ出す派」「貯まるまで待つ派」も教えてください。
+一番多かった失言は、次回しのぶのノートに書き足します。</pre></details>
+  <details><summary>どんな回？</summary><p class="intro">妻・しのぶ（44）の「失言ノート」から、夫・まもる（46）の失言を5つ読み上げる回です。①出産の翌日「で、俺の晩飯は？」②39度の熱の妻に「うつすなよ」③塾代は渋るのに、ゴルフ道具に10万 ④夫の実家で「こいつ、料理だけは下手でさ」⑤「誰のおかげで生活できてると思ってるんだ」。失言のたびにしのぶがボソッとツッコミ、ノートに「記録」のスタンプ。決め台詞「はい、記録しました。」で離婚届に「記入済」、逆転はへそくりメーター「あと100万」、最後は「すぐ出す？ 貯まるまで待つ？」の二択ボタン。初めて出る場面で、まもる・しのぶ・義母よしえ（72）の名札が出ます。（尺：53秒。サムネにするコマ：最初から約2秒）</p></details>
+</article>
+  </div>
+</section>
+
+<section id="flow">
+  <h2>投稿の流れ（1本ぶん）</h2>
+  <ol class="flow">
+    <li><b>動画を保存</b>上の「動画を保存」で、スマホに保存します。</li>
+    <li><b>YouTubeアプリでアップロード</b>「＋」から保存した動画を選びます。縦で1分以内なので、ショートになります。</li>
+    <li><b>タイトルと説明文を貼る</b>「タイトルをコピー」「説明文をコピー」で貼りつけます。タグは、YouTube Studio の動画の詳細の「タグ」に貼ります（アプリの投稿画面にタグ欄がないときは、投稿のあとで）。</li>
+    <li><b>設定して公開</b>下の「投稿のときの設定」のとおりにして、公開（または予約）します。</li>
+    <li><b>サムネを選び直す（投稿のあと）</b>YouTube アプリで：右下「マイページ」→「動画」→ その動画の「︙」→「編集」→ サムネのえんぴつ → コマを、題字がそろうところ（各回の「どんな回？」に書いた秒数）に合わせて「完了」→「保存」。</li>
+    <li><b>固定コメント</b>「固定コメントをコピー」でコメントに貼り、そのコメントの「︙」→「固定」。</li>
+    <li><b>「投稿した」にチェック</b>このスマホに記録され、カードに「投稿済」のはんこが付きます。</li>
+  </ol>
+</section>
+
+<section id="settings">
+  <h2>投稿のときの設定</h2>
+  <div class="card">
+    <ul class="check">
+      <li>公開範囲：公開（または日時を決めて予約）</li>
+      <li>視聴者：子ども向けではない</li>
+      <li>改変または合成されたコンテンツ：「はい」（ナレーションが AI で作った声のため。申告しても表示回数には影響しません）</li>
+      <li>カテゴリ：エンターテイメント</li>
+      <li>コメント：オン。固定コメントを付ける</li>
+      <li>2本は同じ日に出さず、数日あける</li>
+      <li>投稿のあとに見る数字：「視聴を選んだ割合」と「平均再生率」。コメントで多かった失言は、次の回の台本の候補にする</li>
+    </ul>
+  </div>
+</section>
+
+<section id="chars">
+  <h2>登場人物</h2>
+  <p class="sec-lead">#2 から、4人に名前があります。Tシャツやキーホルダーを作るときも、この見た目と目印に合わせます。</p>
+  <div class="card">
+    <img class="chars-img" src="chars.jpg" alt="登場人物：しのぶ、まもる、よしえ、みなと、赤ちゃんの全身" width="1600" height="1300" loading="lazy">
+    <div class="tbl"><table><thead><tr><th scope="col">名前</th><th scope="col">立場</th><th scope="col">目印</th></tr></thead><tbody><tr><th scope="row">しのぶ（44）</th><td>妻・語り。夫の失言を「失言ノート」に記録し、へそくりを貯めている（目標300万、今は200万）</td><td>からし色のカーディガン、黒い手帳</td></tr><tr><th scope="row">まもる（46）</th><td>夫。名前は「守」なのに、守るのは自分だけ</td><td>紺、黒縁メガネ、頭のアホ毛、スマホ</td></tr><tr><th scope="row">よしえ（72）</th><td>まもるの母。息子を今も「まーくん」と呼ぶ</td><td>ラベンダーのカーディガン、真珠のネックレス</td></tr><tr><th scope="row">みなと（9）</th><td>息子。家でいちばん大人</td><td>赤白しま模様のTシャツ</td></tr></tbody></table></div>
+    <div class="row"><button type="button" class="btn save" data-file="chars.jpg" data-name="shinobu_characters.jpg">キャラ一覧を保存</button><a href="https://claude.ai/code/artifact/6c87ee3d-e877-44ab-8f64-2b0514c1cb82" target="_blank" rel="noopener">キャラクター設定書を開く</a></div>
+  </div>
+</section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function(){
+  var N=2;
+  var toastT; function toast(m){var t=document.getElementById('toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){t.hidden=true},2600)}
+  // コピー
+  document.addEventListener('click',function(ev){
+    var b=ev.target.closest('[data-copy]'); if(!b) return;
+    var el=document.getElementById(b.dataset.copy); var text=el.textContent;
+    var done=function(){toast('コピーしました')};
+    var fail=function(){var d=el.closest('details'); if(d) d.open=true; var r=document.createRange();r.selectNodeContents(el);var s=getSelection();s.removeAllRanges();s.addRange(r); toast('選びました。長押しでコピーしてください')};
+    try{navigator.clipboard.writeText(text).then(done,fail)}catch(e){fail()}
+  });
+  // 保存（downloads）
+  var dlP=null; function dl(){ if(!dlP) dlP=(window.claude&&window.claude.use)?window.claude.use('downloads').catch(function(){return null}):Promise.resolve(null); return dlP }
+  async function save(url,name,btn){
+    var api=await dl(); if(!api){toast('保存は、Claude のアプリかブラウザでこのページを開くと使えます');return}
+    var old=btn.textContent; btn.disabled=true; btn.textContent='読み込み中…';
+    try{ var r=await fetch(url); if(!r.ok) throw {code:'fetch'}; var blob=await r.blob();
+      btn.textContent='保存の確認中…'; await api.save({filename:name,data:blob}); toast('保存しました');
+    }catch(e){ var c=e&&e.code; if(c==='declined') toast('保存をやめました'); else if(c==='rate_limited') toast('少し待ってから、もう一度押してください'); else toast('保存できませんでした（'+(c||'エラー')+'）'); }
+    finally{ btn.disabled=false; btn.textContent=old; }
+  }
+  document.addEventListener('click',function(ev){
+    var b=ev.target.closest('.btn.save'); if(!b||b.disabled) return;
+    if(b.dataset.file){ save(b.dataset.file,b.dataset.name,b); return }
+    var c=b.closest('.vc'); var k=c.dataset.key;
+    if(b.dataset.act==='thumb') save('thumb/'+k+'.jpg',k+'_thumb.jpg',b);
+    if(b.dataset.act==='video'&&c.dataset.vid) save('/_blob/'+c.dataset.vid,k+'.mp4',b);
+  });
+  // 動画を見る（開いたときだけ読み込む）
+  document.querySelectorAll('details.play').forEach(function(d){d.addEventListener('toggle',function(){var v=d.querySelector('video'); if(d.open&&v&&!v.getAttribute('src')) v.src=v.dataset.src})});
+  // 投稿した（このスマホに記録）
+  var KEY='shinobu-kit-done-v1', state={}; try{state=JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(e){}
+  function paint(){var n=0; document.querySelectorAll('.vc').forEach(function(c){var on=!!state[c.dataset.key]; c.classList.toggle('is-done',on); c.querySelector('.posted').hidden=!on; c.querySelector('.done input').checked=on; if(on) n++}); document.getElementById('prog').textContent='投稿済み '+n+' / '+N}
+  document.addEventListener('change',function(ev){var i=ev.target.closest('.done input'); if(!i) return; var k=i.closest('.vc').dataset.key; if(i.checked) state[k]=1; else delete state[k]; try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){} paint()});
+  paint();
+})();
+</script>

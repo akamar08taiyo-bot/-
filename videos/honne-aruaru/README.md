@@ -29,6 +29,7 @@ BGM・効果音は numpy で合成（権利フリー）。フォントは Zen Ma
 - `public/<回>/img`：画面で使う絵（`public/shared/sfx` は全部の回で共通の効果音）
 - `src/episodes/<回>.tsx`：その回の場面・カメラ・演出。共通の部品は `src/parts.tsx`（字幕・テロップ・題字・投票ボタンなど）と `src/props.tsx`（離婚届・値札・へそくりメーター・失言ノート・名札）
 - `out/`：完成品（mp4・字幕・概要欄・サムネ）
+- `kit/`：投稿キット（完成した回を「動画・サムネ・タイトル・説明文・タグ・固定コメント」の1セットずつ並べたページ）。公開先は https://claude.ai/artifact/9gc3QC3EpoCRMARJpYnmAT 、回の並びと動画の id は `kit/kit.json`
 
 ## 作る手順（回ごと、例は honne02）
 
@@ -45,7 +46,10 @@ python3 -I scripts/sfx.py && python3 -I scripts/bgm.py --ep honne02 && python3 -
 node scripts/stills.mjs honne02 0 9 22.9 42.6       # 確認用の静止画（work/honne02/stills/sheet.jpg）
 node scripts/render.mjs honne02                     # 映像（無音）
 python3 -I scripts/finish.py --ep honne02           # -14 LUFS に合わせて重ね、字幕を書き、検査
+python3 -I scripts/build_kit.py                    # 投稿キット kit/index.html（概要欄の txt から。動画は work/kit/ に軽くした版）
 ```
+
+投稿キットに回を足すとき：`out/<回>_概要欄.txt`（【タイトル】【概要欄】【タグ欄】【固定コメント】）を書き、`kit/kit.json` に回を足して `build_kit.py` を通す → `work/kit/<回>.mp4` を投稿キットの assets に上げ、返ってきた id を `kit.json` の "vid" に書く → もう一度 `build_kit.py` を通して `kit/index.html` を公開し直す（サムネと chars.jpg も一緒に）。
 
 声がまだ無いときは `prep_audio.py --estimate` で文字数から仮の時刻を作れば、画面の確認だけ先にできる。
 
