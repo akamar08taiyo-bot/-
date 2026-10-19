@@ -4,7 +4,7 @@
   python3 -I scripts/gen_image.py --ep honne01 sheet          # 人物の設定画（横長）
   python3 -I scripts/gen_image.py --ep honne02 S3 [--extra "直したい点"]
 
-場面の絵は、人物の設定画（assets/characters/sheet_v<n>.png の最新版）を毎回参照させる（--refs で変えられる）。
+場面の絵は、人物の設定画（assets/characters/sheet_v<n> の最新版）を毎回参照させる（--refs で変えられる）。
 指示文は episodes/<回>/prompts.json。
 出力: episodes/<回>/gen/<ID>_v<n>.png と ledger.json（プロンプト・モデル・時間・使用量）
 """
@@ -18,8 +18,9 @@ EP = episode()
 GEN = EP.gen
 os.makedirs(GEN, exist_ok=True)
 P = json.load(open(os.path.join(EP.dir, 'prompts.json'), encoding='utf-8'))
-# 人物の設定画は assets/characters/sheet_v<n>.png のいちばん新しい版
-_sheets = sorted(glob.glob(os.path.join(ROOT, 'assets', 'characters', 'sheet_v*.png')), key=lambda p: int(re.findall(r'_v(\d+)', p)[-1]))
+# 人物の設定画は assets/characters/sheet_v<n> のいちばん新しい版（原本の .png が無ければ、リポジトリに入れてある .jpg）
+_sheets = sorted(glob.glob(os.path.join(ROOT, 'assets', 'characters', 'sheet_v*.png')) + glob.glob(os.path.join(ROOT, 'assets', 'characters', 'sheet_v*.jpg')),
+                 key=lambda p: (int(re.findall(r'_v(\d+)', p)[-1]), p.endswith('.png')))
 SHEET = _sheets[-1] if _sheets else ''
 ap = argparse.ArgumentParser()
 ap.add_argument('id')

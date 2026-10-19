@@ -1,7 +1,7 @@
 node_modules/
 work/
 __pycache__/
-# 生成画像の原本（大きいので入れない。使った絵は public/<回>/img、人物の設定画は assets/characters/sheet_v1.jpg）
+# 生成画像の原本（大きいので入れない。使った絵は public/<回>/img、人物の設定画は assets/characters/sheet_v<n>.jpg）
 *.png
 !out/*.png
 # スクリプトで作り直せる音（prep_audio.py / sfx.py / bgm.py）

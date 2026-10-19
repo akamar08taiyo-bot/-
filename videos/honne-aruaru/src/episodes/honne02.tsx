@@ -40,9 +40,9 @@ const tagPlace = (at: At, scene: string, who: string, text: string): {x: number;
   if (r.x + 6 + w < 1064) return {x: r.x + 6, y: r.y, side: 'right'};
   return {x: Math.min(1064 - w / 2, Math.max(16 + w / 2, top.x)), y: Math.max(top.y, 560), side: 'top'};
 };
-// ボソッのあと、失言ノートに「記録」（次の場面に変わるまで）
+// ボソッの言い終わりに、失言ノートに「記録」（次の場面に変わるまで。0.9秒ほど見えるように少し前から）
 const recorded = (aside: string, next: string) => (
-  <NoteStamp x={820} y={1060} scale={0.72} rot={8} from={T.e(aside, -0.15)} to={T.s(next, LEAD)} />
+  <NoteStamp x={820} y={1060} scale={0.72} rot={8} from={T.e(aside, -0.7)} to={T.s(next, LEAD)} />
 );
 const bag = center((F.X5_extra as {bag: Box}).bag);
 
@@ -63,7 +63,7 @@ const SCENES: Scene[] = [
     img: 'honne02/img/X1.jpg',
     from: 0,
     to: T.s('promise', LEAD),
-    keys: [{at: 0, cam: cam(X1.x, X1.y, 1.2, 540, 500)}],
+    keys: [{at: 0, cam: cam(X1.x, X1.y, 1.3, 560, 560)}],
     drift: 0.04,
   },
   // 目が笑っていない笑顔（#1 の絵）
@@ -118,7 +118,8 @@ const SCENES: Scene[] = [
       {at: T.s('a3t', -0.12), cam: cam(X5w.x, X5w.y, 1.6, 560, 820), dur: 9},
     ],
     overlay: ({at, s}) => {
-      const tag = at(bag.x, bag.y - 0.08);
+      const bagTop = ((F.X5_extra as {bag: Box}).bag[0]) / 1000;
+      const tag = at(bag.x + 0.04, bagTop - 0.02);
       const p = at(X5w.x + 0.13, X5w.y - 0.06);
       return (
         <>
@@ -238,7 +239,7 @@ export const Honne02: React.FC = () => {
         to={T.s('promise', LEAD)}
         sub={T.s('hook', 1.1)}
         pill="ありますか？"
-        top={690}
+        top={820}
         lines={[
           {text: '本気で', size: 92, color: C.ink, stroke: 18},
           {text: '離婚', size: 236, color: C.red, stroke: 32, shadow: 'drop-shadow(0 12px 0 rgba(90,20,30,0.35))', mb: -28},

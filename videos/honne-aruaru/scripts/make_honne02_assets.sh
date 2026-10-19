@@ -8,7 +8,7 @@ EP=honne02
 mkdir -p "work/$EP"
 case "${1:-scenes}" in
   sheet)
-    python3 -I scripts/gen_image.py --ep $EP sheet --refs assets/characters/sheet_v1.png
+    python3 -I scripts/gen_image.py --ep $EP sheet --refs assets/characters/sheet_v1.jpg
     ;;
   scenes)
     for id in X1 X3 X5 X6 X7 X9 X10; do
