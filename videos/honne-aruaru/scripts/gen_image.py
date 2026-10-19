@@ -4,11 +4,11 @@
   python3 -I scripts/gen_image.py --ep honne01 sheet          # 人物の設定画（横長）
   python3 -I scripts/gen_image.py --ep honne02 S3 [--extra "直したい点"]
 
-場面の絵は、人物の設定画 assets/characters/sheet_v1.png を毎回参照させる（--refs で変えられる）。
+場面の絵は、人物の設定画（assets/characters/sheet_v<n>.png の最新版）を毎回参照させる（--refs で変えられる）。
 指示文は episodes/<回>/prompts.json。
 出力: episodes/<回>/gen/<ID>_v<n>.png と ledger.json（プロンプト・モデル・時間・使用量）
 """
-import argparse, json, os, sys, time
+import argparse, glob, json, os, re, sys, time
 from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gapi
@@ -18,7 +18,9 @@ EP = episode()
 GEN = EP.gen
 os.makedirs(GEN, exist_ok=True)
 P = json.load(open(os.path.join(EP.dir, 'prompts.json'), encoding='utf-8'))
-SHEET = os.path.join(ROOT, 'assets', 'characters', 'sheet_v1.png')
+# 人物の設定画は assets/characters/sheet_v<n>.png のいちばん新しい版
+_sheets = sorted(glob.glob(os.path.join(ROOT, 'assets', 'characters', 'sheet_v*.png')), key=lambda p: int(re.findall(r'_v(\d+)', p)[-1]))
+SHEET = _sheets[-1] if _sheets else ''
 ap = argparse.ArgumentParser()
 ap.add_argument('id')
 ap.add_argument('--refs', default=None, help='参照画像（カンマ区切り）。省略時は場面なら人物の設定画')
@@ -35,7 +37,11 @@ else:
     sc = next(s for s in P['scenes'] if s['id'] == a.id)
     text = f"{P['style']}\n\nCharacters:\n{P['characters']}\n\n{P['vertical']}\n\nScene:\n{sc['prompt']}"
     aspect = '9:16'
-if refs:
+if refs and a.id == 'sheet':
+    text = ('The attached image is the previous character design sheet. Keep exactly the same characters: same faces, '
+            'hairstyles, glasses, earrings and outfits, in the same art style and colors, and add the new details '
+            'described below. Do not add any text.\n\n' + text)
+elif refs:
     text = ('The attached image is the character design sheet. Draw exactly the same characters: same faces, '
             'hairstyles, glasses, earrings and outfits, in the same art style and colors. Do not copy the sheet '
             'layout and do not add any text.\n\n' + text)
