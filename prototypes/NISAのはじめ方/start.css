@@ -7,6 +7,7 @@
 .resume-banner .button{font-size:16px;padding:10px 18px;min-height:48px;gap:12px}
 /* 入口：特典1〜3をぎゅっと並べ、すぐ下に口座の申し込み */
 .pr-line{margin:0 0 14px;font-size:12px;line-height:1.7;color:var(--muted)}
+.pr-line.pr-top{margin:14px 0 0}
 .content-wide>.pr-line{margin-top:14px}
 .gift-rows{list-style:none;margin:0 0 22px;padding:0;display:grid;gap:10px}
 .gift-rows li{min-width:0}
@@ -34,6 +35,7 @@
 .open-now .text-link+.text-link{margin-top:12px}
 .open-now{margin:0 0 28px;padding:20px 18px;background:var(--white);border:2px solid var(--green);border-radius:12px}
 .open-now h2{margin:0 0 14px;font-size:23px;line-height:1.45}
+.open-now h2+.open-lead{margin:-8px 0 14px;font-size:15px;line-height:1.7}
 .open-q{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 10px;margin:0 0 8px;font-size:15px;font-weight:700}
 .open-q span{font-size:13px;font-weight:400;color:var(--muted)}
 .open-order{margin:-4px 0 8px;font-size:12px;line-height:1.6;color:var(--muted)}
