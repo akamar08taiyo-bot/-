@@ -579,13 +579,6 @@ export function EstimateSheet({
           {bar.replace(/\n/g, ' ／ ') || '　'}
         </span>
       </div>
-      <p className="px-3 py-1 text-[11px] leading-4 text-slate-600">
-        欄を選んで打ち込みます（<b>Enter で下へ・Tab で右へ</b>・矢印で移動・ダブルクリックか F2 で書き直す・Delete で消す・Esc でやめる・Ctrl+Z で元に戻す）。
-        内容に品名を打つと部材リストの候補が出ます（★お気に入りが先。空のまま F2 で★だけ）。<b>備考に定価を入れると単価は 定価×{s.estimateRate}</b>。
-        数量に 0.15 や 60cm と入れると切って使う長さ。いちばん下の緑の行に打つと行が増え、改修場所を打つと箇所が増えます。
-        {form === 'kouiki' ? '「材／手」の欄で「手」にすると施工費の行（数量は時間）。' : '内容に「同上施工費」と打つと施工費の行（単価に金額）。'}
-        介護保険の対象外は、その欄でスペースかダブルクリック。<b>行の左の「＋」でその下に1行入れる・「✕」でその行を消す</b>（何も打たなければ空白の行のまま）。
-      </p>
       <div
         ref={scrollRef}
         className="est-sheet relative overflow-auto bg-slate-500"
