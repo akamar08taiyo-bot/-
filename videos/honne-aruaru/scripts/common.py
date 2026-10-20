@@ -33,6 +33,13 @@ class Ep:
     def timeline(self):
         return json.load(open(self.timeline_path, encoding='utf-8'))
 
+    def voice_of(self, ln, S=None):
+        """行の話し手（who）の声と人物像。script.json に cast がなければ回の声（voice）をそのまま使う"""
+        S = S or self.script()
+        v = dict(S['voice'])
+        v.update(S.get('cast', {}).get(ln.get('who', ''), {}))
+        return v
+
 
 def episode():
     """sys.argv から --ep を取り除いて Ep を返す（残りの引数は各スクリプトの argparse へ）"""

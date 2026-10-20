@@ -12,6 +12,10 @@
   stamp  … はんこをドンと押す
   coin   … へそくり（チャリン）
   pen    … 失言ノートに書き込む（カリカリッ）
+  braam  … スパイドラマの決め（低い金管のドーン）
+  whoosh … 任務の札が飛び込む（シュッ）
+  tick   … 時計の秒針（カチッ）
+  alarm  … 緊急会議の警報（ピピッ、ピピッ）
 """
 import os, sys, wave
 import numpy as np
@@ -142,3 +146,36 @@ for i, (at, dur) in enumerate([(0.0, 0.09), (0.11, 0.07), (0.2, 0.12), (0.36, 0.
     j = int(at * SR)
     x[j:j + n] += y * rng.uniform(0.7, 1.0)
 save('pen', x, peak=0.5)
+
+# braam：低い金管の一撃（D の和音をノコギリ波で。ゆっくり立ち上がって長く響く）
+t = t_(2.6)
+x = np.zeros_like(t)
+for m, g in ((26, 1.0), (38, 0.8), (45, 0.5), (50, 0.35)):
+    f = midi(m)
+    x += g * sum(np.sin(2 * np.pi * f * k * t + k) / k for k in range(1, 18))
+x = fft_filter(x * np.minimum(t / 0.06, 1) * np.exp(-t * 1.3), hi=1800)
+x += 0.9 * np.sin(2 * np.pi * np.cumsum(35 + 40 * np.exp(-t * 8)) / SR) * np.exp(-t * 3)
+save('braam', with_verb(x, wet=0.35, dur=2.2, decay=0.7), peak=0.85)
+
+# whoosh：風切り（3本の帯域を順に重ねて、上がる）
+t = t_(0.55)
+n = noise(len(t), 61)
+x = np.zeros_like(t)
+for lo, hi, c, w in ((300, 900, 0.12, 0.08), (900, 3000, 0.22, 0.07), (2500, 7000, 0.3, 0.06)):
+    x += fft_filter(n, lo=lo, hi=hi) * np.exp(-((t - c) / w) ** 2)
+save('whoosh', with_verb(x, wet=0.12, decay=0.2), peak=0.5)
+
+# tick：秒針（高いクリック＋小さな芯）
+t = t_(0.09)
+x = fft_filter(noise(len(t), 71), lo=2500, hi=9000) * np.exp(-t * 220)
+x += 0.4 * np.sin(2 * np.pi * 1800 * t) * np.exp(-t * 150)
+save('tick', x, peak=0.6)
+
+# alarm：警報（ピピッ、ピピッ。角ばった音を丸めて）
+x = np.zeros(int(0.7 * SR))
+for at in (0.0, 0.12, 0.35, 0.47):
+    tt = t_(0.08)
+    y = fft_filter(np.sign(np.sin(2 * np.pi * 1320 * tt)) * np.minimum(tt / 0.003, 1) * np.exp(-tt * 8), hi=5000)
+    j = int(at * SR)
+    x[j:j + len(y)] += y
+save('alarm', with_verb(x, wet=0.1, decay=0.15), peak=0.4)

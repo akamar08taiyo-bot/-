@@ -5,6 +5,8 @@
   python3 -I scripts/tts.py --ep honne02 --only a1 a1t   # 指定行だけ作り直す（take を1つ進める）
   python3 -I scripts/tts.py --voice Kore --only hook --out-dir work/audition   # 声の試し録り
 
+登場人物が何人もいる回は、script.json の cast に話し手ごとの声（name）と人物像（profile）を書き、行に who を付ける。
+
 演技指示は英語の構造化プロンプト（AUDIO PROFILE / SCENE / DIRECTOR NOTES / TRANSCRIPT）。
 日本語で指示を書くと指示文まで読み上げることがあるため。
 """
@@ -17,7 +19,7 @@ EP = episode()
 S = EP.script()
 ap = argparse.ArgumentParser()
 ap.add_argument('--only', nargs='*')
-ap.add_argument('--voice', default=S['voice']['name'])
+ap.add_argument('--voice', default=None, help='省略時は行の話し手（cast）の声、なければ回の声')
 ap.add_argument('--out-dir', default=EP.voice)
 ap.add_argument('--tries', type=int, default=3)
 ap.add_argument('--force', action='store_true')
@@ -26,7 +28,7 @@ os.makedirs(a.out_dir, exist_ok=True)
 
 
 def prompt_for(ln):
-    v = S['voice']
+    v = EP.voice_of(ln, S)
     notes = S['styles'][ln['style']]
     return (f"# AUDIO PROFILE: {v['profile']}\n## SCENE: {v['scene']}\n"
             f"### DIRECTOR NOTES: {notes} Read only the transcript below, exactly as written. "
@@ -66,12 +68,13 @@ for ln in S['lines']:
     if os.path.exists(out) and not a.only and not a.force:
         continue
     best = None
+    voice = a.voice or EP.voice_of(ln, S)['name']
     for k in range(a.tries):
-        dur = gapi.tts(prompt_for(ln), a.voice, out, model=S['voice']['model'])
+        dur = gapi.tts(prompt_for(ln), voice, out, model=S['voice']['model'])
         heard = transcribe(out)
         ok, why = judge(heard, ln)
-        print(f'{lid} try{k + 1} {a.voice} {dur:.2f}s -> {heard!r} {"OK" if ok else "NG " + why}', flush=True)
-        best = dict(ok=ok, heard=heard, why=why, dur=round(dur, 3), voice=a.voice)
+        print(f'{lid} try{k + 1} {voice} {dur:.2f}s -> {heard!r} {"OK" if ok else "NG " + why}', flush=True)
+        best = dict(ok=ok, heard=heard, why=why, dur=round(dur, 3), voice=voice)
         if ok:
             break
     if a.out_dir == EP.voice:

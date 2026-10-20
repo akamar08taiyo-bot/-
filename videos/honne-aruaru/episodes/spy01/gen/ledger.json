@@ -1,0 +1,438 @@
+{
+ "records": [
+  {
+   "id": "sheet_v1",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "px": [
+    2752,
+    1536
+   ],
+   "refs": [],
+   "extra": "",
+   "seconds": 22.4,
+   "usage": {
+    "promptTokenCount": 471,
+    "candidatesTokenCount": 1451,
+    "totalTokenCount": 2256,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 471
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 334,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "created_utc": "2026-10-20T10:29:04.996249+00:00",
+   "prompt": "Illustration in the style of a Japanese comic essay (clean, confident dark line art, flat colors with light cel shading, simple but very expressive faces, realistic Japanese apartment details), but staged and lit like a tense spy-thriller TV drama: low-key cinematic lighting, strong shadows, a single hard light source, cool teal shadows with warm amber highlights, subtle rim light. The contrast between the cosy everyday home and the dead-serious thriller mood is the joke. Not photorealistic, not 3D, not chibi. Original characters only: they must not resemble any real person, actor or character from an existing TV drama, film, manga or anime. Absolutely no text, letters, numbers, logos, signs, labels, speech bubbles, captions or watermarks anywhere in the image.\n\nCharacters:\nHUSBAND (MAKOTO): Japanese man, 45, an ordinary, timid office worker. Average height, slightly soft round face, droopy eyebrows, thin round silver-framed glasses, short neat dark-brown hair, a permanent nervous, apologetic smile; at home he wears a beige knit vest over a light-blue shirt and grey slacks. WIFE (REIKO): Japanese woman, 43, the sharp \"investigator\" of the household. Straight black chin-length bob with a side part, narrow sharp eyes, calm and expressionless, a thin silver wristwatch, a charcoal-grey turtleneck sweater and a long camel cardigan, black slim trousers; she often crosses her arms. MOTHER-IN-LAW (CHIZURU, the husband's mother): Japanese woman, 70, short silver bob, red-framed glasses on a beaded chain, a cream knit cardigan with a small round brooch, cheerful, chatty and totally unable to keep a secret.\n\nCharacter design sheet on a plain light-grey background: the three characters (HUSBAND, WIFE, MOTHER-IN-LAW) standing side by side in full body, front view, neutral lighting so their colors and outfits are clear, each with one small head-and-shoulders close-up showing a typical expression (husband: nervous apologetic smile; wife: cold sharp stare; mother-in-law: chatty grin with a hand on her cheek). Consistent proportions, no text."
+  },
+  {
+   "id": "P2_v1",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "px": [
+    1536,
+    2752
+   ],
+   "refs": [
+    "assets/characters/spy_sheet_v1.png"
+   ],
+   "extra": "",
+   "seconds": 23.1,
+   "usage": {
+    "promptTokenCount": 904,
+    "candidatesTokenCount": 1438,
+    "totalTokenCount": 2608,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 646
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 266,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "created_utc": "2026-10-20T10:29:47.319424+00:00",
+   "prompt": "The attached image is the character design sheet. Draw exactly the same characters: same faces, hairstyles, glasses, earrings and outfits, in the same art style and colors. Do not copy the sheet layout and do not add any text.\n\nIllustration in the style of a Japanese comic essay (clean, confident dark line art, flat colors with light cel shading, simple but very expressive faces, realistic Japanese apartment details), but staged and lit like a tense spy-thriller TV drama: low-key cinematic lighting, strong shadows, a single hard light source, cool teal shadows with warm amber highlights, subtle rim light. The contrast between the cosy everyday home and the dead-serious thriller mood is the joke. Not photorealistic, not 3D, not chibi. Original characters only: they must not resemble any real person, actor or character from an existing TV drama, film, manga or anime. Absolutely no text, letters, numbers, logos, signs, labels, speech bubbles, captions or watermarks anywhere in the image.\n\nCharacters:\nHUSBAND (MAKOTO): Japanese man, 45, an ordinary, timid office worker. Average height, slightly soft round face, droopy eyebrows, thin round silver-framed glasses, short neat dark-brown hair, a permanent nervous, apologetic smile; at home he wears a beige knit vest over a light-blue shirt and grey slacks. WIFE (REIKO): Japanese woman, 43, the sharp \"investigator\" of the household. Straight black chin-length bob with a side part, narrow sharp eyes, calm and expressionless, a thin silver wristwatch, a charcoal-grey turtleneck sweater and a long camel cardigan, black slim trousers; she often crosses her arms. MOTHER-IN-LAW (CHIZURU, the husband's mother): Japanese woman, 70, short silver bob, red-framed glasses on a beaded chain, a cream knit cardigan with a small round brooch, cheerful, chatty and totally unable to keep a secret.\n\nVertical 9:16 full-bleed illustration that fills the entire canvas edge to edge: no borders, no frames, no panel lines, no blank margins and no flat color bands at the top or bottom. Keep the top eighth of the picture calm and dark (a wall or ceiling in shadow that is part of the scene), because a title will be placed there. Faces must be large, clear and well inside the frame, roughly between 22% and 52% of the height and away from the edges; the lower part of the picture (below about 58%) should hold bodies, furniture or the floor, because subtitles will cover it.\n\nScene:\nA dining table at night under a single hanging lamp, like an interrogation room. On the left the HUSBAND sits stiffly with a nervous, apologetic smile and a drop of sweat on his temple; on the right the WIFE sits facing him, calm, expressionless, fingers interlaced, staring at him. Strong contrast between the warm lamp light and the dark room. Both faces large and clear in the upper-middle of the picture."
+  },
+  {
+   "id": "P4_v1",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "px": [
+    1536,
+    2752
+   ],
+   "refs": [
+    "assets/characters/spy_sheet_v1.png"
+   ],
+   "extra": "",
+   "seconds": 23.2,
+   "usage": {
+    "promptTokenCount": 898,
+    "candidatesTokenCount": 1485,
+    "totalTokenCount": 2615,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 640
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 232,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "created_utc": "2026-10-20T10:29:47.389572+00:00",
+   "prompt": "The attached image is the character design sheet. Draw exactly the same characters: same faces, hairstyles, glasses, earrings and outfits, in the same art style and colors. Do not copy the sheet layout and do not add any text.\n\nIllustration in the style of a Japanese comic essay (clean, confident dark line art, flat colors with light cel shading, simple but very expressive faces, realistic Japanese apartment details), but staged and lit like a tense spy-thriller TV drama: low-key cinematic lighting, strong shadows, a single hard light source, cool teal shadows with warm amber highlights, subtle rim light. The contrast between the cosy everyday home and the dead-serious thriller mood is the joke. Not photorealistic, not 3D, not chibi. Original characters only: they must not resemble any real person, actor or character from an existing TV drama, film, manga or anime. Absolutely no text, letters, numbers, logos, signs, labels, speech bubbles, captions or watermarks anywhere in the image.\n\nCharacters:\nHUSBAND (MAKOTO): Japanese man, 45, an ordinary, timid office worker. Average height, slightly soft round face, droopy eyebrows, thin round silver-framed glasses, short neat dark-brown hair, a permanent nervous, apologetic smile; at home he wears a beige knit vest over a light-blue shirt and grey slacks. WIFE (REIKO): Japanese woman, 43, the sharp \"investigator\" of the household. Straight black chin-length bob with a side part, narrow sharp eyes, calm and expressionless, a thin silver wristwatch, a charcoal-grey turtleneck sweater and a long camel cardigan, black slim trousers; she often crosses her arms. MOTHER-IN-LAW (CHIZURU, the husband's mother): Japanese woman, 70, short silver bob, red-framed glasses on a beaded chain, a cream knit cardigan with a small round brooch, cheerful, chatty and totally unable to keep a secret.\n\nVertical 9:16 full-bleed illustration that fills the entire canvas edge to edge: no borders, no frames, no panel lines, no blank margins and no flat color bands at the top or bottom. Keep the top eighth of the picture calm and dark (a wall or ceiling in shadow that is part of the scene), because a title will be placed there. Faces must be large, clear and well inside the frame, roughly between 22% and 52% of the height and away from the edges; the lower part of the picture (below about 58%) should hold bodies, furniture or the floor, because subtitles will cover it.\n\nScene:\nThe HUSBAND sits on a single dining chair in the middle of a dark room under one overhead lamp, both hands raised defensively in front of his chest, sweating heavily, eyes wide, mouth open as if blurting out an excuse. The WIFE stands to the right with her arms crossed, her face half in shadow, one eyebrow slightly raised. Both faces large and clear in the upper-middle of the picture."
+  },
+  {
+   "id": "P1_v1",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "px": [
+    1536,
+    2752
+   ],
+   "refs": [
+    "assets/characters/spy_sheet_v1.png"
+   ],
+   "extra": "",
+   "seconds": 23.3,
+   "usage": {
+    "promptTokenCount": 923,
+    "candidatesTokenCount": 1432,
+    "totalTokenCount": 2576,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 665
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 221,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "created_utc": "2026-10-20T10:29:47.626475+00:00",
+   "prompt": "The attached image is the character design sheet. Draw exactly the same characters: same faces, hairstyles, glasses, earrings and outfits, in the same art style and colors. Do not copy the sheet layout and do not add any text.\n\nIllustration in the style of a Japanese comic essay (clean, confident dark line art, flat colors with light cel shading, simple but very expressive faces, realistic Japanese apartment details), but staged and lit like a tense spy-thriller TV drama: low-key cinematic lighting, strong shadows, a single hard light source, cool teal shadows with warm amber highlights, subtle rim light. The contrast between the cosy everyday home and the dead-serious thriller mood is the joke. Not photorealistic, not 3D, not chibi. Original characters only: they must not resemble any real person, actor or character from an existing TV drama, film, manga or anime. Absolutely no text, letters, numbers, logos, signs, labels, speech bubbles, captions or watermarks anywhere in the image.\n\nCharacters:\nHUSBAND (MAKOTO): Japanese man, 45, an ordinary, timid office worker. Average height, slightly soft round face, droopy eyebrows, thin round silver-framed glasses, short neat dark-brown hair, a permanent nervous, apologetic smile; at home he wears a beige knit vest over a light-blue shirt and grey slacks. WIFE (REIKO): Japanese woman, 43, the sharp \"investigator\" of the household. Straight black chin-length bob with a side part, narrow sharp eyes, calm and expressionless, a thin silver wristwatch, a charcoal-grey turtleneck sweater and a long camel cardigan, black slim trousers; she often crosses her arms. MOTHER-IN-LAW (CHIZURU, the husband's mother): Japanese woman, 70, short silver bob, red-framed glasses on a beaded chain, a cream knit cardigan with a small round brooch, cheerful, chatty and totally unable to keep a secret.\n\nVertical 9:16 full-bleed illustration that fills the entire canvas edge to edge: no borders, no frames, no panel lines, no blank margins and no flat color bands at the top or bottom. Keep the top eighth of the picture calm and dark (a wall or ceiling in shadow that is part of the scene), because a title will be placed there. Faces must be large, clear and well inside the frame, roughly between 22% and 52% of the height and away from the edges; the lower part of the picture (below about 58%) should hold bodies, furniture or the floor, because subtitles will cover it.\n\nScene:\nLate at night, a Japanese living room secretly turned into an investigation room. On the wall hangs a cork board covered with photos of the HUSBAND, crumpled shop receipts and sticky notes, all connected by red strings (no readable text anywhere). The WIFE stands in front of the board in three-quarter view, arms crossed, studying it with cold, sharp eyes, lit by a single desk lamp from below; the rest of the room is in deep teal shadow. Her face is large and clear in the upper-middle of the picture."
+  },
+  {
+   "id": "P3_v1",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "px": [
+    1536,
+    2752
+   ],
+   "refs": [
+    "assets/characters/spy_sheet_v1.png"
+   ],
+   "extra": "",
+   "seconds": 24.0,
+   "usage": {
+    "promptTokenCount": 904,
+    "candidatesTokenCount": 1387,
+    "totalTokenCount": 2626,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 646
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 335,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "created_utc": "2026-10-20T10:29:48.146159+00:00",
+   "prompt": "The attached image is the character design sheet. Draw exactly the same characters: same faces, hairstyles, glasses, earrings and outfits, in the same art style and colors. Do not copy the sheet layout and do not add any text.\n\nIllustration in the style of a Japanese comic essay (clean, confident dark line art, flat colors with light cel shading, simple but very expressive faces, realistic Japanese apartment details), but staged and lit like a tense spy-thriller TV drama: low-key cinematic lighting, strong shadows, a single hard light source, cool teal shadows with warm amber highlights, subtle rim light. The contrast between the cosy everyday home and the dead-serious thriller mood is the joke. Not photorealistic, not 3D, not chibi. Original characters only: they must not resemble any real person, actor or character from an existing TV drama, film, manga or anime. Absolutely no text, letters, numbers, logos, signs, labels, speech bubbles, captions or watermarks anywhere in the image.\n\nCharacters:\nHUSBAND (MAKOTO): Japanese man, 45, an ordinary, timid office worker. Average height, slightly soft round face, droopy eyebrows, thin round silver-framed glasses, short neat dark-brown hair, a permanent nervous, apologetic smile; at home he wears a beige knit vest over a light-blue shirt and grey slacks. WIFE (REIKO): Japanese woman, 43, the sharp \"investigator\" of the household. Straight black chin-length bob with a side part, narrow sharp eyes, calm and expressionless, a thin silver wristwatch, a charcoal-grey turtleneck sweater and a long camel cardigan, black slim trousers; she often crosses her arms. MOTHER-IN-LAW (CHIZURU, the husband's mother): Japanese woman, 70, short silver bob, red-framed glasses on a beaded chain, a cream knit cardigan with a small round brooch, cheerful, chatty and totally unable to keep a secret.\n\nVertical 9:16 full-bleed illustration that fills the entire canvas edge to edge: no borders, no frames, no panel lines, no blank margins and no flat color bands at the top or bottom. Keep the top eighth of the picture calm and dark (a wall or ceiling in shadow that is part of the scene), because a title will be placed there. Faces must be large, clear and well inside the frame, roughly between 22% and 52% of the height and away from the edges; the lower part of the picture (below about 58%) should hold bodies, furniture or the floor, because subtitles will cover it.\n\nScene:\nClose-up of the WIFE at a desk under a desk lamp, holding a crumpled shop receipt (blank, no printed text) with a pair of tweezers and examining it through a magnifying glass with narrow, cold, sharp eyes. Behind her, in the dark doorway, the HUSBAND peeks in anxiously, half hidden. Her face is large in the upper-middle; his face is smaller in the background, also in the upper half."
+  },
+  {
+   "id": "P7_v1",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "px": [
+    1536,
+    2752
+   ],
+   "refs": [
+    "assets/characters/spy_sheet_v1.png"
+   ],
+   "extra": "",
+   "seconds": 22.2,
+   "usage": {
+    "promptTokenCount": 902,
+    "candidatesTokenCount": 1376,
+    "totalTokenCount": 2500,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 644
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 222,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "created_utc": "2026-10-20T10:30:12.369051+00:00",
+   "prompt": "The attached image is the character design sheet. Draw exactly the same characters: same faces, hairstyles, glasses, earrings and outfits, in the same art style and colors. Do not copy the sheet layout and do not add any text.\n\nIllustration in the style of a Japanese comic essay (clean, confident dark line art, flat colors with light cel shading, simple but very expressive faces, realistic Japanese apartment details), but staged and lit like a tense spy-thriller TV drama: low-key cinematic lighting, strong shadows, a single hard light source, cool teal shadows with warm amber highlights, subtle rim light. The contrast between the cosy everyday home and the dead-serious thriller mood is the joke. Not photorealistic, not 3D, not chibi. Original characters only: they must not resemble any real person, actor or character from an existing TV drama, film, manga or anime. Absolutely no text, letters, numbers, logos, signs, labels, speech bubbles, captions or watermarks anywhere in the image.\n\nCharacters:\nHUSBAND (MAKOTO): Japanese man, 45, an ordinary, timid office worker. Average height, slightly soft round face, droopy eyebrows, thin round silver-framed glasses, short neat dark-brown hair, a permanent nervous, apologetic smile; at home he wears a beige knit vest over a light-blue shirt and grey slacks. WIFE (REIKO): Japanese woman, 43, the sharp \"investigator\" of the household. Straight black chin-length bob with a side part, narrow sharp eyes, calm and expressionless, a thin silver wristwatch, a charcoal-grey turtleneck sweater and a long camel cardigan, black slim trousers; she often crosses her arms. MOTHER-IN-LAW (CHIZURU, the husband's mother): Japanese woman, 70, short silver bob, red-framed glasses on a beaded chain, a cream knit cardigan with a small round brooch, cheerful, chatty and totally unable to keep a secret.\n\nVertical 9:16 full-bleed illustration that fills the entire canvas edge to edge: no borders, no frames, no panel lines, no blank margins and no flat color bands at the top or bottom. Keep the top eighth of the picture calm and dark (a wall or ceiling in shadow that is part of the scene), because a title will be placed there. Faces must be large, clear and well inside the frame, roughly between 22% and 52% of the height and away from the edges; the lower part of the picture (below about 58%) should hold bodies, furniture or the floor, because subtitles will cover it.\n\nScene:\nA bookshelf in the living room at night lit by a flashlight beam. The WIFE pulls out a thick old dictionary and a stack of banknotes (plain, no visible numbers or text) slides out from between its pages; she looks at it with a cold, triumphant half-smile. In the background the HUSBAND stands frozen in shock, mouth open, glasses slipping. Both faces in the upper-middle of the picture, hers larger."
+  },
+  {
+   "id": "P8_v1",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "px": [
+    1536,
+    2752
+   ],
+   "refs": [
+    "assets/characters/spy_sheet_v1.png"
+   ],
+   "extra": "",
+   "seconds": 22.1,
+   "usage": {
+    "promptTokenCount": 920,
+    "candidatesTokenCount": 1427,
+    "totalTokenCount": 2585,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 662
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 238,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "created_utc": "2026-10-20T10:30:12.504449+00:00",
+   "prompt": "The attached image is the character design sheet. Draw exactly the same characters: same faces, hairstyles, glasses, earrings and outfits, in the same art style and colors. Do not copy the sheet layout and do not add any text.\n\nIllustration in the style of a Japanese comic essay (clean, confident dark line art, flat colors with light cel shading, simple but very expressive faces, realistic Japanese apartment details), but staged and lit like a tense spy-thriller TV drama: low-key cinematic lighting, strong shadows, a single hard light source, cool teal shadows with warm amber highlights, subtle rim light. The contrast between the cosy everyday home and the dead-serious thriller mood is the joke. Not photorealistic, not 3D, not chibi. Original characters only: they must not resemble any real person, actor or character from an existing TV drama, film, manga or anime. Absolutely no text, letters, numbers, logos, signs, labels, speech bubbles, captions or watermarks anywhere in the image.\n\nCharacters:\nHUSBAND (MAKOTO): Japanese man, 45, an ordinary, timid office worker. Average height, slightly soft round face, droopy eyebrows, thin round silver-framed glasses, short neat dark-brown hair, a permanent nervous, apologetic smile; at home he wears a beige knit vest over a light-blue shirt and grey slacks. WIFE (REIKO): Japanese woman, 43, the sharp \"investigator\" of the household. Straight black chin-length bob with a side part, narrow sharp eyes, calm and expressionless, a thin silver wristwatch, a charcoal-grey turtleneck sweater and a long camel cardigan, black slim trousers; she often crosses her arms. MOTHER-IN-LAW (CHIZURU, the husband's mother): Japanese woman, 70, short silver bob, red-framed glasses on a beaded chain, a cream knit cardigan with a small round brooch, cheerful, chatty and totally unable to keep a secret.\n\nVertical 9:16 full-bleed illustration that fills the entire canvas edge to edge: no borders, no frames, no panel lines, no blank margins and no flat color bands at the top or bottom. Keep the top eighth of the picture calm and dark (a wall or ceiling in shadow that is part of the scene), because a title will be placed there. Faces must be large, clear and well inside the frame, roughly between 22% and 52% of the height and away from the edges; the lower part of the picture (below about 58%) should hold bodies, furniture or the floor, because subtitles will cover it.\n\nScene:\nThe MOTHER-IN-LAW stands in the doorway of the living room holding a plastic food container wrapped in a cloth, one hand on her cheek, chatting happily with a big careless grin, as if she just let a secret slip. Behind her in the hallway, the HUSBAND reaches out in panic as if trying to stop her, too late. Warm light from the hallway, teal shadows. The mother-in-law's face is large and clear in the upper-middle; the husband is smaller behind her."
+  },
+  {
+   "id": "P6_v1",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "px": [
+    1536,
+    2752
+   ],
+   "refs": [
+    "assets/characters/spy_sheet_v1.png"
+   ],
+   "extra": "",
+   "seconds": 22.5,
+   "usage": {
+    "promptTokenCount": 894,
+    "candidatesTokenCount": 1399,
+    "totalTokenCount": 2532,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 636
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 239,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "created_utc": "2026-10-20T10:30:13.027087+00:00",
+   "prompt": "The attached image is the character design sheet. Draw exactly the same characters: same faces, hairstyles, glasses, earrings and outfits, in the same art style and colors. Do not copy the sheet layout and do not add any text.\n\nIllustration in the style of a Japanese comic essay (clean, confident dark line art, flat colors with light cel shading, simple but very expressive faces, realistic Japanese apartment details), but staged and lit like a tense spy-thriller TV drama: low-key cinematic lighting, strong shadows, a single hard light source, cool teal shadows with warm amber highlights, subtle rim light. The contrast between the cosy everyday home and the dead-serious thriller mood is the joke. Not photorealistic, not 3D, not chibi. Original characters only: they must not resemble any real person, actor or character from an existing TV drama, film, manga or anime. Absolutely no text, letters, numbers, logos, signs, labels, speech bubbles, captions or watermarks anywhere in the image.\n\nCharacters:\nHUSBAND (MAKOTO): Japanese man, 45, an ordinary, timid office worker. Average height, slightly soft round face, droopy eyebrows, thin round silver-framed glasses, short neat dark-brown hair, a permanent nervous, apologetic smile; at home he wears a beige knit vest over a light-blue shirt and grey slacks. WIFE (REIKO): Japanese woman, 43, the sharp \"investigator\" of the household. Straight black chin-length bob with a side part, narrow sharp eyes, calm and expressionless, a thin silver wristwatch, a charcoal-grey turtleneck sweater and a long camel cardigan, black slim trousers; she often crosses her arms. MOTHER-IN-LAW (CHIZURU, the husband's mother): Japanese woman, 70, short silver bob, red-framed glasses on a beaded chain, a cream knit cardigan with a small round brooch, cheerful, chatty and totally unable to keep a secret.\n\nVertical 9:16 full-bleed illustration that fills the entire canvas edge to edge: no borders, no frames, no panel lines, no blank margins and no flat color bands at the top or bottom. Keep the top eighth of the picture calm and dark (a wall or ceiling in shadow that is part of the scene), because a title will be placed there. Faces must be large, clear and well inside the frame, roughly between 22% and 52% of the height and away from the edges; the lower part of the picture (below about 58%) should hold bodies, furniture or the floor, because subtitles will cover it.\n\nScene:\nThe entrance hall (genkan) of a Japanese apartment at night, plain and ordinary. The WIFE stands holding a tied clear garbage bag full of empty cans and bottles, with a totally relaxed, casual, slightly bored face, as if saying something ordinary. Lighting is suddenly normal and flat, an anticlimax after the tension. Her face large and clear in the upper-middle of the picture."
+  },
+  {
+   "id": "P5_v1",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "px": [
+    1536,
+    2752
+   ],
+   "refs": [
+    "assets/characters/spy_sheet_v1.png"
+   ],
+   "extra": "",
+   "seconds": 23.1,
+   "usage": {
+    "promptTokenCount": 903,
+    "candidatesTokenCount": 1500,
+    "totalTokenCount": 2643,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 645
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 240,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "created_utc": "2026-10-20T10:30:13.589813+00:00",
+   "prompt": "The attached image is the character design sheet. Draw exactly the same characters: same faces, hairstyles, glasses, earrings and outfits, in the same art style and colors. Do not copy the sheet layout and do not add any text.\n\nIllustration in the style of a Japanese comic essay (clean, confident dark line art, flat colors with light cel shading, simple but very expressive faces, realistic Japanese apartment details), but staged and lit like a tense spy-thriller TV drama: low-key cinematic lighting, strong shadows, a single hard light source, cool teal shadows with warm amber highlights, subtle rim light. The contrast between the cosy everyday home and the dead-serious thriller mood is the joke. Not photorealistic, not 3D, not chibi. Original characters only: they must not resemble any real person, actor or character from an existing TV drama, film, manga or anime. Absolutely no text, letters, numbers, logos, signs, labels, speech bubbles, captions or watermarks anywhere in the image.\n\nCharacters:\nHUSBAND (MAKOTO): Japanese man, 45, an ordinary, timid office worker. Average height, slightly soft round face, droopy eyebrows, thin round silver-framed glasses, short neat dark-brown hair, a permanent nervous, apologetic smile; at home he wears a beige knit vest over a light-blue shirt and grey slacks. WIFE (REIKO): Japanese woman, 43, the sharp \"investigator\" of the household. Straight black chin-length bob with a side part, narrow sharp eyes, calm and expressionless, a thin silver wristwatch, a charcoal-grey turtleneck sweater and a long camel cardigan, black slim trousers; she often crosses her arms. MOTHER-IN-LAW (CHIZURU, the husband's mother): Japanese woman, 70, short silver bob, red-framed glasses on a beaded chain, a cream knit cardigan with a small round brooch, cheerful, chatty and totally unable to keep a secret.\n\nVertical 9:16 full-bleed illustration that fills the entire canvas edge to edge: no borders, no frames, no panel lines, no blank margins and no flat color bands at the top or bottom. Keep the top eighth of the picture calm and dark (a wall or ceiling in shadow that is part of the scene), because a title will be placed there. Faces must be large, clear and well inside the frame, roughly between 22% and 52% of the height and away from the edges; the lower part of the picture (below about 58%) should hold bodies, furniture or the floor, because subtitles will cover it.\n\nScene:\nA dim hallway at night. The HUSBAND stands frozen in the foreground, eyes wide with panic. Right behind his shoulder looms a translucent, ghostly second version of himself (his inner self), drawn with a cold blue glow: the same man but with a sharp, calm, confident stare, leaning in to whisper into his ear like a cool spy commander. Dramatic blue and teal light. Both faces large in the upper-middle of the picture."
+  },
+  {
+   "id": "P9_v1",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "px": [
+    1536,
+    2752
+   ],
+   "refs": [
+    "assets/characters/spy_sheet_v1.png"
+   ],
+   "extra": "",
+   "seconds": 22.2,
+   "usage": {
+    "promptTokenCount": 882,
+    "candidatesTokenCount": 1359,
+    "totalTokenCount": 2467,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 624
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 226,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "created_utc": "2026-10-20T10:30:36.783050+00:00",
+   "prompt": "The attached image is the character design sheet. Draw exactly the same characters: same faces, hairstyles, glasses, earrings and outfits, in the same art style and colors. Do not copy the sheet layout and do not add any text.\n\nIllustration in the style of a Japanese comic essay (clean, confident dark line art, flat colors with light cel shading, simple but very expressive faces, realistic Japanese apartment details), but staged and lit like a tense spy-thriller TV drama: low-key cinematic lighting, strong shadows, a single hard light source, cool teal shadows with warm amber highlights, subtle rim light. The contrast between the cosy everyday home and the dead-serious thriller mood is the joke. Not photorealistic, not 3D, not chibi. Original characters only: they must not resemble any real person, actor or character from an existing TV drama, film, manga or anime. Absolutely no text, letters, numbers, logos, signs, labels, speech bubbles, captions or watermarks anywhere in the image.\n\nCharacters:\nHUSBAND (MAKOTO): Japanese man, 45, an ordinary, timid office worker. Average height, slightly soft round face, droopy eyebrows, thin round silver-framed glasses, short neat dark-brown hair, a permanent nervous, apologetic smile; at home he wears a beige knit vest over a light-blue shirt and grey slacks. WIFE (REIKO): Japanese woman, 43, the sharp \"investigator\" of the household. Straight black chin-length bob with a side part, narrow sharp eyes, calm and expressionless, a thin silver wristwatch, a charcoal-grey turtleneck sweater and a long camel cardigan, black slim trousers; she often crosses her arms. MOTHER-IN-LAW (CHIZURU, the husband's mother): Japanese woman, 70, short silver bob, red-framed glasses on a beaded chain, a cream knit cardigan with a small round brooch, cheerful, chatty and totally unable to keep a secret.\n\nVertical 9:16 full-bleed illustration that fills the entire canvas edge to edge: no borders, no frames, no panel lines, no blank margins and no flat color bands at the top or bottom. Keep the top eighth of the picture calm and dark (a wall or ceiling in shadow that is part of the scene), because a title will be placed there. Faces must be large, clear and well inside the frame, roughly between 22% and 52% of the height and away from the edges; the lower part of the picture (below about 58%) should hold bodies, furniture or the floor, because subtitles will cover it.\n\nScene:\nClose-up of the WIFE at the bookshelf, quietly sliding the banknotes back into the thick dictionary. Her usually cold face has softened: a faint blush, eyes looking away, the corner of her mouth barely smiling, trying not to show it. Warm amber light. Her face is large and clear in the upper-middle of the picture."
+  },
+  {
+   "id": "P10_v1",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "px": [
+    1536,
+    2752
+   ],
+   "refs": [
+    "assets/characters/spy_sheet_v1.png"
+   ],
+   "extra": "",
+   "seconds": 24.0,
+   "usage": {
+    "promptTokenCount": 880,
+    "candidatesTokenCount": 1476,
+    "totalTokenCount": 2597,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 622
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 241,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "created_utc": "2026-10-20T10:30:38.515988+00:00",
+   "prompt": "The attached image is the character design sheet. Draw exactly the same characters: same faces, hairstyles, glasses, earrings and outfits, in the same art style and colors. Do not copy the sheet layout and do not add any text.\n\nIllustration in the style of a Japanese comic essay (clean, confident dark line art, flat colors with light cel shading, simple but very expressive faces, realistic Japanese apartment details), but staged and lit like a tense spy-thriller TV drama: low-key cinematic lighting, strong shadows, a single hard light source, cool teal shadows with warm amber highlights, subtle rim light. The contrast between the cosy everyday home and the dead-serious thriller mood is the joke. Not photorealistic, not 3D, not chibi. Original characters only: they must not resemble any real person, actor or character from an existing TV drama, film, manga or anime. Absolutely no text, letters, numbers, logos, signs, labels, speech bubbles, captions or watermarks anywhere in the image.\n\nCharacters:\nHUSBAND (MAKOTO): Japanese man, 45, an ordinary, timid office worker. Average height, slightly soft round face, droopy eyebrows, thin round silver-framed glasses, short neat dark-brown hair, a permanent nervous, apologetic smile; at home he wears a beige knit vest over a light-blue shirt and grey slacks. WIFE (REIKO): Japanese woman, 43, the sharp \"investigator\" of the household. Straight black chin-length bob with a side part, narrow sharp eyes, calm and expressionless, a thin silver wristwatch, a charcoal-grey turtleneck sweater and a long camel cardigan, black slim trousers; she often crosses her arms. MOTHER-IN-LAW (CHIZURU, the husband's mother): Japanese woman, 70, short silver bob, red-framed glasses on a beaded chain, a cream knit cardigan with a small round brooch, cheerful, chatty and totally unable to keep a secret.\n\nVertical 9:16 full-bleed illustration that fills the entire canvas edge to edge: no borders, no frames, no panel lines, no blank margins and no flat color bands at the top or bottom. Keep the top eighth of the picture calm and dark (a wall or ceiling in shadow that is part of the scene), because a title will be placed there. Faces must be large, clear and well inside the frame, roughly between 22% and 52% of the height and away from the edges; the lower part of the picture (below about 58%) should hold bodies, furniture or the floor, because subtitles will cover it.\n\nScene:\nThe WIFE faces the viewer in a medium close-up (chest up), centered, holding the thick dictionary against her chest, with a sly, knowing half-smile and one eyebrow raised, as if asking the viewer a question. Dramatic side light with teal shadows. Her face is large in the upper-middle of the picture."
+  }
+ ]
+}

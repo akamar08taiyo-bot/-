@@ -1,0 +1,357 @@
+{
+ "id": "spy01",
+ "title": "夫婦の心理戦をスパイドラマ風にしたら…【わが家の情報戦#1】",
+ "fps": 30,
+ "tail": 1.5,
+ "header": {
+  "series": "わが家の情報戦",
+  "episode": "#1 夫婦の心理戦"
+ },
+ "voice": {
+  "name": "Charon",
+  "model": "gemini-3.8-flash-tts",
+  "profile": "A Japanese male narrator in his fifties with a deep, gravelly, cinematic voice, like the narrator of a dead-serious spy-thriller TV drama trailer. Natural standard Tokyo Japanese.",
+  "scene": "A short vertical comedy video that stages an ordinary Japanese married couple's everyday mind games as if it were a tense spy-thriller drama. Everything is played completely straight, which is what makes it funny."
+ },
+ "cast": {
+  "narr": {
+   "name": "Charon",
+   "profile": "A Japanese male narrator in his fifties with a deep, gravelly, cinematic voice, like the narrator of a dead-serious spy-thriller TV drama trailer. Natural standard Tokyo Japanese."
+  },
+  "wife": {
+   "name": "Kore",
+   "profile": "Reiko, a Japanese woman, 43, the sharp \"investigator\" of her household. A cool, low, controlled voice with precise diction; she never raises her voice; deadpan and a little scary, with dry humor. Natural standard Tokyo Japanese."
+  },
+  "husband": {
+   "name": "Puck",
+   "profile": "Makoto, a Japanese man, 45, a timid, kind office worker who is terrible at hiding anything. A slightly high, nervous voice that cracks when he panics. Natural standard Tokyo Japanese."
+  },
+  "inner": {
+   "name": "Iapetus",
+   "profile": "The imaginary inner self of Makoto, a timid office worker: in his head he is a cool, calm elite spy commander. A low, smooth, confident male voice, very close to the microphone. Natural standard Tokyo Japanese."
+  },
+  "mil": {
+   "name": "Laomedeia",
+   "profile": "Chizuru, a Japanese woman, 70, the husband's cheerful, chatty mother who can never keep a secret. A bright, sing-song, gossipy older lady's voice. Natural standard Tokyo Japanese."
+  }
+ },
+ "styles": {
+  "narr": "Deep, slow and deadly serious, like a spy-thriller trailer narrator. Short dramatic pauses only at the commas; keep it tight and controlled.",
+  "wife": "Cool, quiet and controlled, with sharp precision. A tiny dry pause before the punchline. Never shout.",
+  "husband": "Panicky and flustered, a bit fast, the voice slightly cracking. Comedic but natural, not cartoonish.",
+  "inner": "An urgent, cool whisper right at the microphone, like a calm spy commander giving orders in a crisis. Low and smooth, not breathy.",
+  "mil": "Cheerful, chatty and carefree, slightly sing-song; at the very end, a light \"oops\" tone as she realizes she has let a secret slip.",
+  "soft": "Quiet, soft and a little embarrassed: she tries to sound cool, but she is clearly touched. Slow, with a small smile in the voice.",
+  "ask": "Still deep and serious, but turning to the viewer with a hint of a smile. Unhurried."
+ },
+ "tempo": {
+  "narr": 1.2,
+  "wife": 1.12,
+  "husband": 1.15,
+  "inner": 1.15,
+  "mil": 1.2,
+  "soft": 1.05,
+  "ask": 1.12
+ },
+ "lines": [
+  {
+   "id": "hook",
+   "who": "narr",
+   "style": "narr",
+   "text": "この家では、毎日、情報戦が行われている。",
+   "gap": 0.25
+  },
+  {
+   "id": "m1",
+   "who": "narr",
+   "style": "narr",
+   "text": "任務１。証拠は、レシート一枚。",
+   "speak": "任務いち。証拠は、レシート一枚。",
+   "item": 1,
+   "gap": 0.15
+  },
+  {
+   "id": "m1w",
+   "who": "wife",
+   "style": "wife",
+   "text": "12時4分、からあげ棒。……節約してるんじゃなかった？",
+   "speak": "十二時四分、からあげ棒。……節約してるんじゃなかった？",
+   "gap": 0.4
+  },
+  {
+   "id": "m2h",
+   "who": "husband",
+   "style": "husband",
+   "text": "な、何もしてないよ！",
+   "item": 2,
+   "gap": 0.12
+  },
+  {
+   "id": "m2w",
+   "who": "wife",
+   "style": "wife",
+   "text": "……まだ、何も聞いてないけど？",
+   "gap": 0.25
+  },
+  {
+   "id": "m2n",
+   "who": "narr",
+   "style": "narr",
+   "text": "容疑者は、聞かれる前に自白した。",
+   "gap": 0.4
+  },
+  {
+   "id": "m3w",
+   "who": "wife",
+   "style": "wife",
+   "text": "ねえ、ちょっといい？",
+   "item": 3,
+   "gap": 0.2
+  },
+  {
+   "id": "m3i",
+   "who": "inner",
+   "style": "inner",
+   "text": "落ち着け。この3日間の失言を、すべて洗い出せ。",
+   "speak": "落ち着け。この三日間の失言を、すべて洗い出せ。",
+   "gap": 0.25
+  },
+  {
+   "id": "m3w2",
+   "who": "wife",
+   "style": "wife",
+   "text": "……明日、燃えないゴミの日だから。",
+   "gap": 0.4
+  },
+  {
+   "id": "m4",
+   "who": "narr",
+   "style": "narr",
+   "text": "3か月かけて隠したへそくり。発見まで、3秒。",
+   "speak": "三か月かけて隠したへそくり。発見まで、三秒。",
+   "item": 4,
+   "gap": 1.0
+  },
+  {
+   "id": "m4w",
+   "who": "wife",
+   "style": "wife",
+   "text": "この辞書、あなたが開いたとこ、一度も見たことないのよ。",
+   "gap": 0.4
+  },
+  {
+   "id": "t1",
+   "who": "narr",
+   "style": "narr",
+   "text": "そして、この家で最も危険な人物。",
+   "item": 5,
+   "gap": 0.25
+  },
+  {
+   "id": "t1m",
+   "who": "mil",
+   "style": "mil",
+   "text": "誠ちゃんね、あなたの誕生日にネックレス予約してたのよ〜。あら、これ内緒だった？",
+   "speak": "まことちゃんね、あなたの誕生日にネックレス予約してたのよ〜。あら、これ内緒だった？",
+   "gap": 0.45,
+   "sub": "誠ちゃんね、あなたの誕生日に|ネックレス予約してたのよ〜。|あら、これ内緒だった？"
+  },
+  {
+   "id": "t2",
+   "who": "narr",
+   "style": "narr",
+   "text": "夫は、敵か。味方か。",
+   "gap": 0.55
+  },
+  {
+   "id": "t2w",
+   "who": "wife",
+   "style": "soft",
+   "text": "……今回だけは、泳がせておく。",
+   "gap": 0.4
+  },
+  {
+   "id": "ask",
+   "who": "narr",
+   "style": "ask",
+   "text": "あなたの家の情報屋は、誰ですか？"
+  }
+ ],
+ "telops": {
+  "1": "レシートの解読",
+  "2": "取り調べ",
+  "3": "緊急会議",
+  "4": "へそくり捜索",
+  "5": "情報屋"
+ },
+ "marks": {
+  "count": [
+   "m4",
+   "e",
+   -0.05
+  ],
+  "teki": [
+   "t2",
+   "s",
+   0.45
+  ],
+  "mikata": [
+   "t2",
+   "s",
+   0.95
+  ]
+ },
+ "sfx": [
+  [
+   "don",
+   "hook",
+   "s",
+   -0.2,
+   -2
+  ],
+  [
+   "whoosh",
+   "m1",
+   "s",
+   -0.3,
+   -5
+  ],
+  [
+   "whoosh",
+   "m2h",
+   "s",
+   -0.3,
+   -5
+  ],
+  [
+   "whoosh",
+   "m3w",
+   "s",
+   -0.3,
+   -5
+  ],
+  [
+   "whoosh",
+   "m4",
+   "s",
+   -0.3,
+   -5
+  ],
+  [
+   "whoosh",
+   "t1",
+   "s",
+   -0.3,
+   -5
+  ],
+  [
+   "paper",
+   "m1w",
+   "s",
+   -0.1,
+   -6
+  ],
+  [
+   "braam",
+   "m2n",
+   "s",
+   0.85,
+   -3
+  ],
+  [
+   "stamp",
+   "m2n",
+   "s",
+   0.9,
+   -4
+  ],
+  [
+   "alarm",
+   "m3i",
+   "s",
+   -0.3,
+   -8
+  ],
+  [
+   "tehe",
+   "m3w2",
+   "e",
+   -0.4,
+   -6
+  ],
+  [
+   "tick",
+   "@count",
+   "s",
+   0.0,
+   -4
+  ],
+  [
+   "tick",
+   "@count",
+   "s",
+   0.3,
+   -4
+  ],
+  [
+   "tick",
+   "@count",
+   "s",
+   0.6,
+   -4
+  ],
+  [
+   "stamp",
+   "@count",
+   "s",
+   0.9,
+   -2
+  ],
+  [
+   "coin",
+   "@count",
+   "s",
+   0.95,
+   -6
+  ],
+  [
+   "braam",
+   "t1",
+   "s",
+   -0.05,
+   -3
+  ],
+  [
+   "braam",
+   "@teki",
+   "s",
+   -0.05,
+   -1
+  ],
+  [
+   "pikon",
+   "ask",
+   "e",
+   0.05,
+   -8
+  ]
+ ],
+ "bgm": {
+  "style": "tense",
+  "stop": [
+   "t1m",
+   "e",
+   0.1
+  ],
+  "restart": [
+   "t2w",
+   "s",
+   -0.15
+  ],
+  "outro": [
+   "ask",
+   "s",
+   0.1
+  ]
+ }
+}

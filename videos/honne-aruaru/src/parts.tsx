@@ -47,7 +47,15 @@ export const Outlined: React.FC<{
 };
 
 // ───────── シリーズ名と進み具合（①〜⑤） ─────────
-export const Header: React.FC<{series?: string; episode: string; item: number; since: number; dots?: boolean}> = ({series = '本音あるある', episode, item, since, dots = true}) => {
+export const Header: React.FC<{series?: string; episode: string; item: number; since: number; dots?: boolean; accent?: string; soft?: string}> = ({
+  series = '本音あるある',
+  episode,
+  item,
+  since,
+  dots = true,
+  accent = C.coral,
+  soft = '#d99aa6',
+}) => {
   const frame = useCurrentFrame();
   const pill = (bg: string, fg: string, size: number): React.CSSProperties => ({
     background: bg,
@@ -62,7 +70,7 @@ export const Header: React.FC<{series?: string; episode: string; item: number; s
   return (
     <div style={{position: 'absolute', top: 126, left: 0, width: W, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16}}>
       <div style={{display: 'flex', gap: 12, alignItems: 'center'}}>
-        <div style={pill(C.coral, '#fff', [...series].length > 7 ? 40 : 44)}>{series}</div>
+        <div style={pill(accent, '#fff', [...series].length > 7 ? 40 : 44)}>{series}</div>
         <div style={pill('#fff', C.ink, [...episode].length > 8 ? 36 : 40)}>{episode}</div>
       </div>
       {dots && (
@@ -73,7 +81,7 @@ export const Header: React.FC<{series?: string; episode: string; item: number; s
           const s = cur ? 0.85 + 0.25 * pop(frame, since) : 1;
           return (
             <React.Fragment key={n}>
-              {n > 1 && <div style={{width: 26, height: 5, borderRadius: 3, background: n <= item ? C.coral : 'rgba(255,255,255,0.85)'}} />}
+              {n > 1 && <div style={{width: 26, height: 5, borderRadius: 3, background: n <= item ? accent : 'rgba(255,255,255,0.85)'}} />}
               <div
                 style={{
                   width: 46,
@@ -85,7 +93,7 @@ export const Header: React.FC<{series?: string; episode: string; item: number; s
                   fontFamily: F.dela,
                   fontSize: 26,
                   color: done || cur ? '#fff' : n === 5 ? C.red : '#9a8f88',
-                  background: cur ? C.coral : done ? '#d99aa6' : '#fff',
+                  background: cur ? accent : done ? soft : '#fff',
                   border: n === 5 && !done && !cur ? `4px solid ${C.red}` : '4px solid #fff',
                   boxShadow: cur ? `0 0 0 5px rgba(232,103,127,0.35), 0 4px 0 rgba(60,40,30,0.15)` : '0 4px 0 rgba(60,40,30,0.12)',
                   transform: `scale(${s})`,

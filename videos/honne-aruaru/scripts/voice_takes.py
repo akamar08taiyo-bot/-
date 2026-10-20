@@ -20,7 +20,7 @@ ap.add_argument('--notes', default='')
 ap.add_argument('--criteria', required=True)
 a = ap.parse_args()
 ln = next(l for l in S['lines'] if l['id'] == a.id)
-v = S['voice']
+v = EP.voice_of(ln, S)
 notes = a.notes or S['styles'][ln['style']]
 prompt = (f"# AUDIO PROFILE: {v['profile']}\n## SCENE: {v['scene']}\n### DIRECTOR NOTES: {notes} "
           f"Read only the transcript below, exactly as written. Do not read these notes aloud.\n"
@@ -43,8 +43,8 @@ for k in range(a.takes):
     if r.get('ok') and not re.search(r'[A-Za-z]{3,}', heard):
         cands.append(out)
 names = [os.path.splitext(os.path.basename(c))[0] for c in cands]
-q = (f'添付の音声は順に {", ".join(names)} です。どれも同じ一言「{ln["text"]}」を、40代の既婚女性ナレーター'
-     f'（落ち着いた低めの声・ちょっと毒舌だけど視聴者の味方）が読んだテイクです。\n選ぶ基準: {a.criteria}\n'
+q = (f'添付の音声は順に {", ".join(names)} です。どれも同じ一言「{ln["text"]}」を、次の人物として読んだテイクです：'
+     f'{v["profile"]}\n選ぶ基準: {a.criteria}\n'
      'テイクごとに10点満点で採点し、理由を一言。JSON {"scores": {"名前": 点, ...}, "best": "名前", "why": "..."} だけ返す。')
 res = json.loads(gapi.ask(q, cands, think='medium', json_out=True))
 json.dump({'prompt': prompt, 'candidates': names, 'result': res}, open(os.path.join(d, 'judge.json'), 'w'),

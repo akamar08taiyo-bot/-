@@ -4,6 +4,8 @@
   python3 -I scripts/prep_audio.py --ep honne02 [--tempo 1.1]
   python3 -I scripts/prep_audio.py --ep honne02 --estimate   # 声がまだ無いとき：文字数から仮の時刻だけ作る
 
+声が一部の行にしか無いときは、無い行だけ文字数から見積もる（timeline.json は仮の時刻の扱いになり、仕上げには使えない）。
+
 1. 行の前後の無音を切る（頭 0.03 秒・お尻 0.08 秒だけ残す）
 2. 行の中の長すぎる間（0.30 秒超）を 0.22 秒に詰める
 3. 話す速さを style ごとの倍率に（script.json の tempo。ffmpeg atempo なので声の高さは変わらない）
@@ -25,7 +27,8 @@ SR = 48000
 OUT = os.path.join(EP.pub, 'audio', 'voice')
 os.makedirs(OUT, exist_ok=True)
 # 仮の時刻に使う話す速さ（文字/秒、tempo をかけた後の実測に近い値）
-EST_RATE = {'narr': 6.2, 'quote': 6.0, 'aside': 5.6, 'verdict': 4.6, 'twist': 6.0, 'ask': 5.4}
+EST_RATE = {'narr': 6.2, 'quote': 6.0, 'aside': 5.6, 'verdict': 4.6, 'twist': 6.0, 'ask': 5.4,
+            'wife': 5.6, 'husband': 6.5, 'inner': 6.0, 'mil': 6.8, 'soft': 4.8}
 
 
 def load(path):
@@ -102,8 +105,11 @@ def speech_level(x):
 
 t = 0.25  # 最初の声までの間（絵が先に出る）
 timeline = []
+missing = []
 for ln in S['lines']:
-    if a.estimate:
+    if not a.estimate and not os.path.exists(os.path.join(EP.voice, f"{ln['id']}.wav")):
+        missing.append(ln['id'])
+    if a.estimate or ln['id'] in missing:
         n = len(re.sub(r'[、。？！「」…\s]', '', ln.get('speak', ln['text'])))
         d = n / EST_RATE.get(ln['style'], 6.0) + 0.25
     else:
@@ -120,8 +126,10 @@ for ln in S['lines']:
     timeline.append({'id': ln['id'], 'start': round(t, 3), 'end': round(t + d, 3), 'dur': round(d, 3)})
     t += d + ln.get('gap', 0.25)
 total = t + S.get('tail', 1.5)
-json.dump({'fps': S['fps'], 'total': round(total, 3), 'estimated': a.estimate, 'lines': timeline},
+json.dump({'fps': S['fps'], 'total': round(total, 3), 'estimated': a.estimate or bool(missing), 'lines': timeline},
           open(EP.timeline_path, 'w'), ensure_ascii=False, indent=1)
 for x in timeline:
     print(f"{x['id']:8s} {x['start']:6.2f} - {x['end']:6.2f}  ({x['dur']:.2f}s)")
 print(f"total {total:.2f}s{'  （文字数からの仮の時刻）' if a.estimate else ''}")
+if missing:
+    print('声が無いので文字数から見積もった行:', ' '.join(missing))
