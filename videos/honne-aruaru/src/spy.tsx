@@ -180,7 +180,7 @@ export const Receipt: React.FC<{x: number; y: number; from: number; to: number; 
   const mark = (w: number) => <div style={{position: 'absolute', left: -10, top: '18%', height: '70%', width: `calc(${w * m}% + 20px)`, background: 'rgba(255,214,0,0.55)', borderRadius: 4, zIndex: 0}} />;
   return (
     <div style={{position: 'absolute', left: x, top: y, transform: `translate(-50%, -50%) rotate(${-4 + (1 - p) * -10}deg) scale(${0.5 + 0.5 * p})`, opacity: life(frame, from, to, 2, 4)}}>
-      <div style={{width: 470, background: '#FDFBF6', padding: '26px 34px 34px', boxShadow: '0 16px 30px rgba(0,0,0,0.45)', clipPath: 'polygon(0 0,100% 0,100% 94%,95% 100%,90% 94%,85% 100%,80% 94%,75% 100%,70% 94%,65% 100%,60% 94%,55% 100%,50% 94%,45% 100%,40% 94%,35% 100%,30% 94%,25% 100%,20% 94%,15% 100%,10% 94%,5% 100%,0 94%)'}}>
+      <div style={{width: 560, background: '#FDFBF6', padding: '26px 34px 34px', boxShadow: '0 16px 30px rgba(0,0,0,0.45)', clipPath: 'polygon(0 0,100% 0,100% 94%,95% 100%,90% 94%,85% 100%,80% 94%,75% 100%,70% 94%,65% 100%,60% 94%,55% 100%,50% 94%,45% 100%,40% 94%,35% 100%,30% 94%,25% 100%,20% 94%,15% 100%,10% 94%,5% 100%,0 94%)'}}>
         <div style={{textAlign: 'center', fontFamily: F.mincho, fontWeight: 700, fontSize: 42, letterSpacing: 10, color: '#2a2622', marginBottom: 12}}>レシート</div>
         <div style={{...row, marginBottom: 6}}>
           {mark(100)}
@@ -238,5 +238,88 @@ export const AlarmTint: React.FC<{from: number; to: number}> = ({from, to}) => {
         transform: `translate(${wobble(frame, 9, 1.5)}px, 0)`,
       }}
     />
+  );
+};
+
+// ───────── 調書の札（上の帯）：赤い見出し（「表の顔」など）と名前。左から滑り込む ─────────
+export const Dossier: React.FC<{tab: string; name: string; from: number; to: number; top?: number}> = ({tab, name, from, to, top = 296}) => {
+  const frame = useCurrentFrame();
+  if (frame < from || frame >= to) return null;
+  const p = pop(frame, from, 13, 200);
+  const np = pop(frame, from + 5, 13, 200);
+  return (
+    <div style={{position: 'absolute', left: 44, top, opacity: life(frame, from, to, 2, 4)}}>
+      <div style={{display: 'inline-block', transform: `translateX(${(1 - p) * -900}px)`, background: SPY.red, color: '#fff', fontFamily: F.mincho, fontWeight: 700, fontSize: 40, padding: '4px 22px 8px', borderRadius: '6px 6px 0 0', letterSpacing: 3}}>
+        {tab}
+      </div>
+      <div style={{transform: `translateX(${(1 - np) * -1000}px)`, background: 'rgba(14,16,22,0.9)', color: '#fff', fontFamily: F.mincho, fontWeight: 700, fontSize: 60, padding: '10px 30px 14px', borderRadius: '0 6px 6px 6px', boxShadow: '0 10px 24px rgba(0,0,0,0.45)', whiteSpace: 'nowrap', letterSpacing: 2}}>
+        {name}
+      </div>
+    </div>
+  );
+};
+
+// ───────── 冷蔵庫の赤いプリン（暗い画面に、冷蔵庫の光と光るプリン） ─────────
+export const RedPudding: React.FC<{from: number; to: number; cy?: number}> = ({from, to, cy = 760}) => {
+  const frame = useCurrentFrame();
+  if (frame < from || frame >= to) return null;
+  const p = pop(frame, from, 14, 150);
+  const glow = 0.65 + 0.35 * Math.sin(((frame - from) / 30) * Math.PI * 2 * 0.8);
+  return (
+    <div style={{position: 'absolute', left: 0, top: cy - 380, width: W, height: 760, display: 'flex', justifyContent: 'center', opacity: life(frame, from, to, 4, 4)}}>
+      <div style={{position: 'relative', width: 760, height: 760, transform: `scale(${0.85 + 0.15 * p})`}}>
+        {/* 冷蔵庫の中の光 */}
+        <div style={{position: 'absolute', inset: 0, borderRadius: 40, background: 'radial-gradient(ellipse at 50% 30%, rgba(226,240,255,0.95) 0%, rgba(150,180,215,0.85) 45%, rgba(40,55,80,0.9) 100%)', boxShadow: '0 30px 60px rgba(0,0,0,0.6)', border: '10px solid #d9dee6'}} />
+        <div style={{position: 'absolute', left: 30, right: 30, top: 470, height: 14, borderRadius: 7, background: 'rgba(255,255,255,0.75)', boxShadow: '0 6px 10px rgba(0,0,0,0.25)'}} />
+        <svg width={760} height={760} viewBox="0 0 760 760" style={{position: 'absolute', inset: 0}}>
+          <defs>
+            <radialGradient id="pg" cx="50%" cy="40%" r="60%">
+              <stop offset="0%" stopColor="#ff6b6b" />
+              <stop offset="70%" stopColor="#d7263d" />
+              <stop offset="100%" stopColor="#8f1023" />
+            </radialGradient>
+          </defs>
+          <ellipse cx={380} cy={470} rx={190} ry={30} fill={`rgba(215,38,61,${0.35 * glow})`} />
+          <ellipse cx={380} cy={462} rx={150} ry={18} fill="#f4f4f4" />
+          {/* プリン（台形のカップから出したかたち） */}
+          <path d="M 270 455 L 300 300 Q 380 280 460 300 L 490 455 Q 380 478 270 455 Z" fill="url(#pg)" stroke="#5e0a17" strokeWidth={5} />
+          <path d="M 300 300 Q 380 280 460 300 Q 380 322 300 300 Z" fill="#7a0d1d" />
+          <path d="M 318 330 Q 330 390 322 440" stroke="rgba(255,255,255,0.55)" strokeWidth={10} strokeLinecap="round" fill="none" />
+        </svg>
+        <div style={{position: 'absolute', left: 380 - 220, top: 360 - 220, width: 440, height: 440, borderRadius: 220, background: `radial-gradient(circle, rgba(255,60,80,${0.35 * glow}) 0%, rgba(255,60,80,0) 70%)`}} />
+      </div>
+    </div>
+  );
+};
+
+// ───────── 読み上げアプリのスマホ（無口な協力者の返事） ─────────
+export const VoicePhone: React.FC<{text: string; from: number; to: number; cx?: number; cy?: number}> = ({text, from, to, cx = 540, cy = 780}) => {
+  const frame = useCurrentFrame();
+  if (frame < from || frame >= to) return null;
+  const p = pop(frame, from, 13, 190);
+  const w = 520;
+  const h = 760;
+  const lines = text.split('|');
+  const fs = Math.min(52, Math.floor(420 / Math.max(...lines.map((l) => [...l].length))));
+  return (
+    <div style={{position: 'absolute', left: cx - w / 2, top: cy - h / 2, width: w, height: h, borderRadius: 54, background: '#16181d', padding: 16, boxSizing: 'border-box', boxShadow: '0 24px 50px rgba(0,0,0,0.55)', opacity: life(frame, from, to, 2, 3), transform: `translateY(${(1 - p) * 90}px) rotate(${-3 + (1 - p) * -6}deg)`}}>
+      <div style={{width: '100%', height: '100%', borderRadius: 40, background: 'linear-gradient(180deg, #f6f7f9 0%, #e7ebf1 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 34, padding: 30, boxSizing: 'border-box'}}>
+        <div style={{fontFamily: F.maru, fontWeight: 700, fontSize: 30, color: '#6b7380', letterSpacing: 2}}>読み上げ中…</div>
+        {/* スピーカーと音の棒 */}
+        <div style={{display: 'flex', alignItems: 'center', gap: 10, height: 110}}>
+          {Array.from({length: 9}).map((_, i) => {
+            const amp = 0.35 + 0.65 * Math.abs(Math.sin((frame - from) * 0.35 + i * 0.9));
+            return <div key={i} style={{width: 18, height: 110 * amp, borderRadius: 9, background: SPY.teal}} />;
+          })}
+        </div>
+        <div style={{textAlign: 'center'}}>
+          {lines.map((l, i) => (
+            <div key={i} style={{fontFamily: F.maru, fontWeight: 900, fontSize: fs, lineHeight: 1.35, color: '#1f2733', whiteSpace: 'nowrap'}}>
+              {l}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 };
