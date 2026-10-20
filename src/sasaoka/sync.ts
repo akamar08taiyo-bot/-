@@ -31,7 +31,7 @@ export function mergeValue<T>(base: T, mine: T, theirs: T): T {
   return mine;
 }
 
-/** IDのある並び（様邸・箇所・行・部材・一式・取付手間の単価）をまとめる。並びはこちらの順、向こうが足したものはうしろに */
+/** IDのある並び（様邸・箇所・行・部材・部材＋施工費（常用）・取付手間の単価）をまとめる。並びはこちらの順、向こうが足したものはうしろに */
 export function mergeRecords<T extends Rec>(base: readonly T[], mine: readonly T[], theirs: readonly T[]): T[] {
   const b = new Map(base.map((x) => [x.id, x]));
   const m = new Map(mine.map((x) => [x.id, x]));

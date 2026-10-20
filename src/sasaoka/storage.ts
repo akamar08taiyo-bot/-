@@ -383,7 +383,7 @@ export function backupJson(data: AppData): string {
   );
 }
 
-/** 部材リスト・手間単価・一式だけ（ほかの人に渡す用。様邸・設定は入れない） */
+/** 部材リスト・手間単価・部材＋施工費（常用）だけ（ほかの人に渡す用。様邸・設定は入れない） */
 export function masterJson(data: Pick<AppData, 'materials' | 'labor' | 'kits'>): string {
   return JSON.stringify(
     {

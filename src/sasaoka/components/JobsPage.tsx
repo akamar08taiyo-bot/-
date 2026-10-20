@@ -85,7 +85,7 @@ export function JobsPage({
     update('materials', () => r.materials);
     update('jobs', () => r.jobs);
     update('kits', () => r.kits);
-    toast('サンプルの部材5件と「（サンプル）山田様邸」・一式1件を入れました。設定画面からまとめて消せます。');
+    toast('サンプルの部材5件と「（サンプル）山田様邸」・部材＋施工費（常用）1件を入れました。設定画面からまとめて消せます。');
   };
 
   return (

@@ -555,7 +555,7 @@ export function EstimateSheet({
           🔧 施工費（笹岡工務店の手間）から入れる
         </button>
         <button type="button" className="sheet-tool" onClick={() => onPickKit(place?.id ?? null)}>
-          ＋ 一式から入れる
+          ＋ 部材＋施工費（常用）から入れる
         </button>
         <span className="mx-1 h-6 w-px bg-slate-300" />
         <button type="button" className="sheet-tool" disabled={!lineRowId} onClick={insertBelow} title="この行のすぐ下に空いた行を入れる">

@@ -65,7 +65,7 @@ export type Place = {
 
 export type NameSuffix = '様邸' | '様' | '';
 
-/** 一式（よく使う部材・取付手間の組み合わせ）。箇所に入れると、まとめて行が入る */
+/** 部材＋施工費（常用）（よく使う部材・取付手間の組み合わせ）。箇所に入れると、まとめて行が入る */
 export type Kit = {
   id: string;
   name: string;
@@ -111,7 +111,7 @@ export type InvoiceTaxMode = 'perJob' | 'monthly';
 /** 合計にかける消費税の1円未満（請求書の1か月分・見積書） */
 export type Rounding = 'floor' | 'round' | 'ceil';
 
-/** どちらのアプリで開いているか（部材・一式を選ぶ画面に、仕切価格と見積の単価のどちらを出すか） */
+/** どちらのアプリで開いているか（部材・部材＋施工費（常用）を選ぶ画面に、仕切価格と見積の単価のどちらを出すか） */
 export type AppMode = 'shikiri' | 'estimate';
 
 /**

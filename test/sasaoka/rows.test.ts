@@ -62,7 +62,7 @@ test('workRange・replaceRange：部材のすぐ下の手間だけを数え直�
   assert.deepEqual(replaceRange(r2, range2, setLaborCount([], wood, 2)).map((r) => r.name), ['木製手すり 4m', '木', 'ブラケット']);
 });
 
-test('一式：登録したときの行を、今の仕切り価格・定価・手間の単価で入れる', () => {
+test('部材＋施工費（常用）：登録したときの行を、今の仕切り価格・定価・手間の単価で入れる', () => {
   const kit = kitFromRows(' 玄関の一式 ', [{...materialRow(rail), lengthCm: 60}, laborRow(wood, 2), materialRow(bracket, 2)]);
   assert.equal(kit.name, '玄関の一式');
   const newer = [{...rail, price: 11000, listPrice: 22000}, bracket];
@@ -72,7 +72,7 @@ test('一式：登録したときの行を、今の仕切り価格・定価・�
     ['木', 1200, 0, 2, 0],
     ['ブラケット', 1500, 2100, 2, 0],
   ]);
-  // 行のIDは毎回付け直す（同じ一式を2回入れても別の行）
+  // 行のIDは毎回付け直す（同じものを2回入れても別の行）
   assert.notEqual(rows[0].id, kit.rows[0].id);
   assert.notEqual(kitRows(kit, newer, [wood])[0].id, rows[0].id);
   // 部材リストから消えた部材は、登録したときの単価のまま

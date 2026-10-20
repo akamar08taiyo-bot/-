@@ -122,13 +122,13 @@ export function JobEditor({
     setFocusRowId(row.id);
   };
   const saveKit = (place: Place) => {
-    const name = prompt('一式の名前（例：玄関 I型手すり一式）', `${place.name || '箇所'}の一式`);
+    const name = prompt('部材＋施工費（常用）の名前（例：玄関 I型手すり）', `${place.name || '箇所'}の部材＋施工費`);
     if (name === null || !name.trim()) return;
     update('kits', (list) => [...list, kitFromRows(name, place.rows)]);
-    toast(`一式「${name.trim()}」を登録しました。ほかの箇所・様邸でも「＋ 一式から入れる」で使えます。`);
+    toast(`部材＋施工費（常用）「${name.trim()}」を登録しました。ほかの箇所・様邸でも「＋ 部材＋施工費（常用）から入れる」で使えます。`);
   };
   const removeKit = (kit: Kit) => {
-    if (!confirm(`一式「${kit.name}」を削除します。すでに入れた様邸の行はそのまま残ります。よろしいですか？`)) return;
+    if (!confirm(`部材＋施工費（常用）「${kit.name}」を削除します。すでに入れた様邸の行はそのまま残ります。よろしいですか？`)) return;
     update('kits', (list) => list.filter((k) => k.id !== kit.id));
   };
 
@@ -340,7 +340,7 @@ export function JobEditor({
           onInsert={(rows) => {
             setPlace(pickPlace.id, (p) => ({...p, rows: [...p.rows, ...rows]}));
             setPicker(null);
-            toast(`一式の${rows.length}行を「${pickPlace.name || '箇所'}」に入れました`);
+            toast(`部材＋施工費（常用）の${rows.length}行を「${pickPlace.name || '箇所'}」に入れました`);
           }}
           onRename={(id, name) => update('kits', (list) => list.map((k) => (k.id === id ? {...k, name, updatedAt: Date.now()} : k)))}
           onRemove={removeKit}
@@ -519,11 +519,11 @@ function PlaceCard({
           ＋ 工事を金額だけ入れる
         </Btn>
         <Btn small color="white" onClick={onPickKit}>
-          ＋ 一式から入れる
+          ＋ 部材＋施工費（常用）から入れる
         </Btn>
         {place.rows.length > 0 && (
           <Btn small color="white" onClick={onSaveKit}>
-            この箇所を一式に登録
+            この箇所を部材＋施工費（常用）に登録
           </Btn>
         )}
         {place.rows.length === 0 && <span className="text-xs text-slate-500">部材リストから部材を選び、取付手間を数えます。</span>}

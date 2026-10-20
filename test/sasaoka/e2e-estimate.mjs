@@ -1,5 +1,5 @@
 // 住宅改修 見積書作成を確かめる：一覧（見積の合計・笹岡工務店の請求書の印・探す）・サンプルの見積書（定価×0.8・切って使う部材の数量・同上施工費）・
-// 見積の単価の手入力・部材ごとの施工費・一式・保存（ボタン・Ctrl+S）・Excel で保存・諸経費の手入力・介護保険の対象外・
+// 見積の単価の手入力・部材ごとの施工費・部材＋施工費（常用）・保存（ボタン・Ctrl+S）・Excel で保存・諸経費の手入力・介護保険の対象外・
 // 2つの書式（苅田町・行橋市・みやこ町用／広域連合用）の印刷・複製・削除・定価の取り込み
 // usage: node e2e-estimate.mjs <サイトのURL> <出力フォルダ>
 //   サイトは太陽ポータルと同じ形（<サイト>/jutaku-mitsumori/index.html と <サイト>/sasaoka/index.html）
@@ -84,10 +84,10 @@ assert.equal(works.length, 3, works.join('|'));
 assert.ok(works[0].includes('2,000') && works[1].includes('1,000') && works[2].includes('3,000'), works.join('|'));
 log('部材ごとの同上施工費OK');
 
-// ---------------- 一式：トイレの行を選んで「一式から入れる」→ トイレのうしろに4行（木の手すり 16,000・同上施工費 2,000・ブラケット 3,360・キャップ 720）
+// ---------------- 部材＋施工費（常用）：トイレの行を選んで「部材＋施工費（常用）から入れる」→ トイレのうしろに4行（木の手すり 16,000・同上施工費 2,000・ブラケット 3,360・キャップ 720）
 await cell(await key('L型手すり', 'text')).click();
-await sheet.getByRole('button', {name: '＋ 一式から入れる'}).click();
-assert.equal(await page.getByRole('dialog').getByRole('textbox', {name: '一式の名前'}).inputValue(), '（サンプル）I型手すり一式（木の下地）');
+await sheet.getByRole('button', {name: '＋ 部材＋施工費（常用）から入れる'}).click();
+assert.equal(await page.getByRole('dialog').getByRole('textbox', {name: '部材＋施工費（常用）の名前'}).inputValue(), '（サンプル）I型手すり（木の下地）');
 await page.getByRole('dialog').getByRole('button', {name: '＋ 入れる'}).click();
 const texts = (await sheet.locator('.form-page [data-edit$=":text"]').allInnerTexts()).map((t) => t.trim()).filter(Boolean);
 assert.deepEqual(texts, [
@@ -105,7 +105,7 @@ assert.deepEqual(texts, [
 ]);
 // 小計 22,680＋1,000＋22,080＝45,760 → 諸経費 4,576 → 消費税 5,033 → 合計 55,369
 assert.deepEqual(await totals(), ['合計', '55,369', '55,369']);
-log('一式を入れるOK');
+log('部材＋施工費（常用）を入れるOK');
 await page.screenshot({path: path.join(outDir, '50-estimate-app.png'), fullPage: true});
 
 // ---------------- 保存：ボタンと Ctrl+S（見積書の欄に打ち込んでいる途中の値も入れて保存）。読み直しても同じ

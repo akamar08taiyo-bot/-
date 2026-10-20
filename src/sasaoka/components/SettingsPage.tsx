@@ -72,7 +72,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
 
   const exportAll = () => downloadBlob(new Blob([backupJson(data)], {type: 'application/json'}), `見積書・仕切り計算・請求書_バックアップ_${todayIso()}.json`);
   const exportMaster = () =>
-    downloadBlob(new Blob([masterJson(data)], {type: 'application/json'}), `部材リスト・手間単価・一式_${todayIso()}.json`);
+    downloadBlob(new Blob([masterJson(data)], {type: 'application/json'}), `部材リスト・手間単価・部材＋施工費（常用）_${todayIso()}.json`);
 
   const readBackup = async (f: File) => {
     try {
@@ -262,14 +262,14 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
         <p className="mb-3 text-xs leading-5 text-slate-500">
           入力した内容は、このパソコンのこのブラウザにだけ保存されます（サーバーには送りません）。ほかのパソコンでは見えないので、ときどきバックアップを保存してください。
           見積書と請求書は同じ保存場所です。
-          部材リスト・手間単価・一式だけを保存したファイルは、ほかの人に渡して読み込んでもらえます。
+          部材リスト・手間単価・部材＋施工費（常用）だけを保存したファイルは、ほかの人に渡して読み込んでもらえます。
         </p>
         <div className="flex flex-wrap gap-2">
           <Btn color="blue" onClick={exportAll}>
             バックアップを保存（すべて）
           </Btn>
           <Btn color="teal" onClick={exportMaster}>
-            部材リスト・手間単価・一式だけ保存（ほかの人に渡す用）
+            部材リスト・手間単価・部材＋施工費（常用）だけ保存（ほかの人に渡す用）
           </Btn>
           <label className="inline-flex cursor-pointer items-center rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50">
             保存したファイルを読み込む
@@ -292,7 +292,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
                 update('materials', () => r.materials);
                 update('jobs', () => r.jobs);
                 update('kits', () => r.kits);
-                toast('サンプルの部材・様邸・一式を消しました');
+                toast('サンプルの部材・様邸・部材＋施工費（常用）を消しました');
               }}
             >
               サンプルを消す
@@ -304,7 +304,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
             <p className="font-bold text-slate-800">「{pending.name}」の中身</p>
             <p className="text-slate-600">
               部材 {pending.data.materials?.length ?? 0}件・取付手間 {pending.data.labor?.length ?? 0}件・様邸（見積書）
-              {pending.data.jobs?.length ?? 0}件・一式 {pending.data.kits?.length ?? 0}件{pending.data.settings ? '・設定' : ''}
+              {pending.data.jobs?.length ?? 0}件・部材＋施工費（常用） {pending.data.kits?.length ?? 0}件{pending.data.settings ? '・設定' : ''}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <Btn small color="blue" onClick={() => applyBackup(false)}>

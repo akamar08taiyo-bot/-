@@ -1,4 +1,4 @@
-// 箇所の行を作る・取付手間の箇所数を数える・一式を入れる などの行の操作
+// 箇所の行を作る・取付手間の箇所数を数える・部材＋施工費（常用）を入れる などの行の操作
 
 import type {Kit, LaborItem, Material, Place, Row, RowKind} from './types.ts';
 import {uid} from './util.ts';
@@ -115,14 +115,14 @@ export function replaceRange(rows: Row[], [start, end]: [number, number], next: 
   return [...rows.slice(0, start), ...next, ...rows.slice(end)];
 }
 
-/** 箇所の行から一式を作る */
+/** 箇所の行から部材＋施工費（常用）を作る */
 export function kitFromRows(name: string, rows: Row[]): Kit {
   return {id: uid('k'), name: name.trim(), rows: copyRows(rows), updatedAt: Date.now()};
 }
 
 /**
- * 一式を箇所に入れる行にする。IDを付け直し、部材リスト・取付手間の単価に今もあるものは今の単価・定価にする
- * （仕切り表を新しくしても、一式を作り直さなくてよい）。
+ * 部材＋施工費（常用）を箇所に入れる行にする。IDを付け直し、部材リスト・取付手間の単価に今もあるものは今の単価・定価にする
+ * （仕切り表を新しくしても、作り直さなくてよい）。
  */
 export function kitRows(kit: Kit, materials: Material[], labor: LaborItem[]): Row[] {
   const mats = new Map(materials.map((m) => [m.id, m]));

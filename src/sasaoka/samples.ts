@@ -53,7 +53,7 @@ export function addSamples(data: AppData, month: string): {materials: Material[]
     createdAt: now,
     updatedAt: now,
   };
-  const kit = kitFromRows(SAMPLE_PREFIX + 'I型手すり一式（木の下地）', [materialRow(handrail, 1), labor('木', 2), materialRow(bracket, 2), materialRow(cap, 2)]);
+  const kit = kitFromRows(SAMPLE_PREFIX + 'I型手すり（木の下地）', [materialRow(handrail, 1), labor('木', 2), materialRow(bracket, 2), materialRow(cap, 2)]);
   return {
     materials: [...data.materials, handrail, bracket, lHandrail, cap, board],
     jobs: [...data.jobs, job],

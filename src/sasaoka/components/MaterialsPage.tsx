@@ -68,14 +68,14 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
     update('materials', (all) => all.filter((m) => !ids.has(m.id)));
     toast(`${ids.size}件を削除しました`);
   };
-  // メーカーの仕切り表を入れ直すとき：仕切価格が空欄のものだけ、または全部を消す（取付手間の単価・一式は消さない）
+  // メーカーの仕切り表を入れ直すとき：仕切価格が空欄のものだけ、または全部を消す（取付手間の単価・部材＋施工費（常用）は消さない）
   const removeNoPrice = () => {
     if (!confirm(`仕切価格が空欄の${noPriceCount}件を部材リストから削除します。すでに作った見積書・様邸の金額は変わりません。よろしいですか？`)) return;
     update('materials', (all) => all.filter((m) => m.price > 0));
     toast(`仕切価格が空欄の${noPriceCount}件を削除しました`);
   };
   const removeAll = () => {
-    if (!confirm(`部材リストの全${data.materials.length}件（★お気に入りも）を削除して、0件にします。施工費（取付手間の単価）・一式・すでに作った見積書と様邸は消えません。よろしいですか？`)) return;
+    if (!confirm(`部材リストの全${data.materials.length}件（★お気に入りも）を削除して、0件にします。施工費（取付手間の単価）・部材＋施工費（常用）・すでに作った見積書と様邸は消えません。よろしいですか？`)) return;
     update('materials', () => []);
     toast('部材リストを空にしました（0件）。メーカーの仕切り表を取り込んでください。');
   };

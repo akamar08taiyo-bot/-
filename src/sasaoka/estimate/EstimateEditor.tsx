@@ -92,7 +92,7 @@ export function EstimateEditor({
   const toggleFavorite = (id: string) => update('materials', (list) => list.map((m) => (m.id === id ? {...m, favorite: !m.favorite} : m)));
   const addToMaster = (m: Material) => update('materials', (list) => [...list, m]);
   const removeKit = (kit: Kit) => {
-    if (!confirm(`一式「${kit.name}」を削除します。すでに入れた見積書の行はそのまま残ります。よろしいですか？`)) return;
+    if (!confirm(`部材＋施工費（常用）「${kit.name}」を削除します。すでに入れた見積書の行はそのまま残ります。よろしいですか？`)) return;
     update('kits', (list) => list.filter((k) => k.id !== kit.id));
   };
 
@@ -272,7 +272,7 @@ export function EstimateEditor({
               rows: [...p.rows, ...rows],
             }));
             setPicker(null);
-            toast(`一式の${rows.length}行を「${pickPlace.name || '箇所'}」に入れました`);
+            toast(`部材＋施工費（常用）の${rows.length}行を「${pickPlace.name || '箇所'}」に入れました`);
           }}
           onRename={(id, n) => update('kits', (list) => list.map((k) => (k.id === id ? {...k, name: n, updatedAt: Date.now()} : k)))}
           onRemove={removeKit}
