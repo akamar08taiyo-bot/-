@@ -5,7 +5,8 @@
 //   excl:行ID（介護保険の対象外）／overhead:all|target（諸経費）。明細の行には data-rows（もとになった入力の行）を付ける。
 //   金額のない施工費の行も出し、明細のあとに打ち込める空いた行（new:…、data-new）を1行足す。
 //   ほかの空いた行には data-blank を付ける（押すと、打ち込める行の同じ列を選ぶ）。
-//   明細の行の左（余白）には「✕消す」（data-del：消す行のID。部材は同上施工費ごと）を出す
+//   明細の行の左（余白）には「＋」（data-ins：この行の下に空白の行を入れる）と「✕」（data-del：この行を消す。部材は同上施工費ごと）を出す。
+// 何も入っていない部材の行（line.blank）は、印刷でも空白の行（数量・単価・金額も出さない）
 
 import type {ReactNode} from 'react';
 import {estimateTotals} from '../calc.ts';
@@ -26,18 +27,22 @@ const ed = (editable: boolean, key: string | null) => (editable && key ? {'data-
 export type SheetOpts = {mark: '材' | '手'};
 
 /**
- * 見積書に直接入力するときの、明細の行の左の「✕消す」（押すとその行を消す。部材は同上施工費ごと）。印刷には出ない。
- * 文字は CSS で出す（欄の文字 innerText に混ざらないように）
+ * 見積書に直接入力するときの、明細の行の左のボタン：「＋」この行の下に1行入れる（空白の行）／「✕」この行を消す（部材は同上施工費ごと）。
+ * 印刷には出ない。文字は CSS で出す（欄の文字 innerText に混ざらないように）
  */
-function DelButton({line: l}: {line: FormLine}) {
+function RowTools({line: l}: {line: FormLine}) {
+  const name = l.text || (l.isWork ? '施工費' : l.blank ? '空白' : '部材');
   return (
-    <button
-      type="button"
-      className="sheet-del no-print"
-      data-del={l.rowId}
-      title={l.isWork ? 'この行を消す' : 'この部材（と同上施工費）を消す'}
-      aria-label={`${l.text || (l.isWork ? '施工費' : '部材')}の行を消す`}
-    />
+    <span className="sheet-rowtools no-print">
+      <button type="button" className="sheet-ins" data-ins={l.rowId} title="この行の下に1行入れる" aria-label={`${name}の行の下に1行入れる`} />
+      <button
+        type="button"
+        className="sheet-del"
+        data-del={l.rowId}
+        title={l.isWork || l.blank ? 'この行を消す' : 'この部材（と同上施工費）を消す'}
+        aria-label={`${name}の行を消す`}
+      />
+    </span>
   );
 }
 
@@ -245,27 +250,30 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
       </tr>
     );
   }
-  const target = !l.excluded;
-  const qty = qtyText(l.qty);
+  const target = !l.excluded && !l.blank;
+  // 空白の行（何も入っていない部材の行）は数量・単価・金額も出さない（打ち込めばふつうの行になる）
+  const qty = l.blank ? '' : qtyText(l.qty);
+  const price = l.blank ? '' : yen(l.unitPrice);
+  const amount = l.blank ? '' : yen(l.amount);
   const k = (field: string) => `line:${l.rowId}:${field}`;
   const excl = `excl:${l.excludeId}`;
   // 備考（定価等）：「定価8,000円（税抜）×0.8」。切って使う部材は「定価20,000円（4m）×0.8」と「600÷4000＝0.15」の2行
   const note = lineNote(l, 'yukuhashi', 0);
   return (
     <tr className="g" style={{height: `${YK_ROW}mm`}} {...(editable ? {'data-rows': l.rowIds.join(' ')} : {})}>
-      {cell(l.first ? l.work : '', YK.A, 11, editable ? 'ml del-cell' : 'ml', l.first ? `place:${l.placeId}:work` : null, 1, editable ? <DelButton line={l} /> : null)}
+      {cell(l.first ? l.work : '', YK.A, 11, editable ? 'ml tools-cell' : 'ml', l.first ? `place:${l.placeId}:work` : null, 1, editable ? <RowTools line={l} /> : null)}
       {/* 改修場所（写真No.）：「①勝手口」。写真番号のあとに箇所名を打ち込める */}
       {cell(l.first ? `${circled(l.photo)}${l.placeName}` : '', YK.B, 11, '', l.first ? `place:${l.placeId}:name` : null)}
       {cell(l.text, YK.C, 9, '', k('text'), 2)}
       {cell(qty, YK.D, 9, 'r nr', l.isWork ? null : k('qty'))}
       {cell(l.unit, YK.E, 11, 'nl', l.isWork || l.cut ? null : k('unit'))}
-      {cell(yen(l.unitPrice), YK.F, 11, 'r', k('price'))}
-      {cell(yen(l.amount), YK.G, 11, 'r mr')}
+      {cell(price, YK.F, 11, 'r', k('price'))}
+      {cell(amount, YK.G, 11, 'r mr')}
       {cell(target ? qty : '', YK.H, 9, 'r nr', excl)}
       {cell(target ? l.unit : '', YK.I, 11, 'nl', excl)}
-      {cell(target ? yen(l.unitPrice) : '', YK.J, 11, 'r', excl)}
-      {cell(target ? yen(l.amount) : '', YK.K, 11, 'r mr', excl)}
-      {cell(target ? '' : yen(l.amount), YK.L, 11, 'r mr', excl)}
+      {cell(target ? price : '', YK.J, 11, 'r', excl)}
+      {cell(target ? amount : '', YK.K, 11, 'r mr', excl)}
+      {cell(target || l.blank ? '' : amount, YK.L, 11, 'r mr', excl)}
       {note.length > 1 ? (
         <td className={`mr${bottom}`} style={fitLinesStyle(note, YK.M, YK_ROW, 11)} {...ed(editable, k('note'))}>
           {note.map((t, i) => (
@@ -492,8 +500,11 @@ function KkLine({
       </tr>
     );
   }
-  const target = !l.excluded;
-  const qty = qtyText(l.qty);
+  const target = !l.excluded && !l.blank;
+  // 空白の行（何も入っていない部材の行）は材／手・数量・単価・金額も出さない
+  const qty = l.blank ? '' : qtyText(l.qty);
+  const price = l.blank ? '' : yen(l.unitPrice);
+  const amount = l.blank ? '' : yen(l.amount);
   const k = (field: string) => `line:${l.rowId}:${field}`;
   const excl = `excl:${l.excludeId}`;
   // 算出根拠：「定価8,000円（税抜）×0.8」。施工費は「1時間2,500円」、切って使う部材は「定価20,000円（4m）×0.8」と「600÷4000＝0.15」の2行
@@ -523,22 +534,22 @@ function KkLine({
   }
   return (
     <tr className="g" style={{height: `${height}mm`}} {...(editable ? {'data-rows': l.rowIds.join(' ')} : {})}>
-      {cell(l.first ? l.placeName : '', KK.A, 11, editable ? 'c ml del-cell' : 'c ml', l.first ? `place:${l.placeId}:name` : null, 2, editable ? <DelButton line={l} /> : null)}
+      {cell(l.first ? l.placeName : '', KK.A, 11, editable ? 'c ml tools-cell' : 'c ml', l.first ? `place:${l.placeId}:name` : null, 2, editable ? <RowTools line={l} /> : null)}
       {cell(l.first ? l.work : '', KK.B, 11, 'c', l.first ? `place:${l.placeId}:work` : null, 2)}
-      <td className={`mark${bottom}`}>{l.mark}</td>
+      <td className={`mark${bottom}`}>{l.blank ? '' : l.mark}</td>
       {cell(l.text, KK.D, 9, 'mr gothic', k('text'), 3)}
       <td className={`gap${bottom}`} />
       {cell(qty, KK.F, 9, 'r ml gothic', !l.isWork || l.hourly ? k('qty') : null)}
       {cell(l.unit, KK.G, 11, 'gothic', l.isWork || l.cut ? null : k('unit'))}
-      {cell(yen(l.unitPrice), KK.H, 11, 'r gothic', l.hourly ? null : k('price'))}
-      {cell(yen(l.amount), KK.I, 11, 'r mr gothic')}
+      {cell(price, KK.H, 11, 'r gothic', l.hourly ? null : k('price'))}
+      {cell(amount, KK.I, 11, 'r mr gothic')}
       <td className={`gap${bottom}`} />
       {cell(l.first ? circled(l.photo) : '', KK.K, 11, 'c ml', l.first ? `place:${l.placeId}:photo` : null)}
       {cell(l.first ? circled(l.kind) : '', KK.L, 11, 'c', l.first ? `place:${l.placeId}:kind` : null)}
       {cell(target ? qty : '', KK.M, 9, 'r ml gothic', excl)}
       {cell(target ? l.unit : '', KK.N, 11, 'gothic', excl)}
-      {cell(target ? yen(l.unitPrice) : '', KK.O, 11, 'r gothic', excl)}
-      {cell(target ? yen(l.amount) : '', KK.P, 11, 'r mr gothic', excl)}
+      {cell(target ? price : '', KK.O, 11, 'r gothic', excl)}
+      {cell(target ? amount : '', KK.P, 11, 'r mr gothic', excl)}
       {basis}
     </tr>
   );

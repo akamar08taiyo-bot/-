@@ -5,7 +5,7 @@
 // 備考・算出根拠は「定価8,000円（税抜）×0.8」。切って使う部材は 数量＝使う長さ÷1本の長さ（本）で書き、備考は「定価20,000円（4m）×0.8」、
 // 2行目に mm で計算を書く（例：600÷4000＝0.15）。
 
-import {cutToLength, estimatePlaceLines, estimateQty, listPriceOf} from './calc.ts';
+import {cutToLength, estimatePlaceLines, estimateQty, isBlankRow, listPriceOf} from './calc.ts';
 import {normalize} from './priceImport.ts';
 import type {EstimateForm, Job, Place, Row, Settings} from './types.ts';
 import {num, yen} from './util.ts';
@@ -125,6 +125,7 @@ export type FormLine = {
   hourly: boolean; // 施工費を「時間×1時間の単価」で書いた行
   note: string | null; // 備考（定価等）・算出根拠を手で直したとき（改行で行を分ける）
   manualAmount: boolean; // 施工費の金額を見積書で手で直した
+  blank: boolean; // 何も入っていない部材の行（空白の行として出す。数量・単価・金額も出さない）
   isNew?: boolean; // 見積書に直接入力するときの、いちばん下の空いた行
 };
 
@@ -146,7 +147,8 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
       };
       if (l.kind === 'material') {
         const r = l.row;
-        const auto = materialText(r);
+        const blank = isBlankRow(r);
+        const auto = blank ? '' : materialText(r);
         out.push({
           ...base,
           rowId: r.id,
@@ -167,6 +169,7 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
           hourly: false,
           note: r.estNote,
           manualAmount: false,
+          blank,
         });
         return;
       }
@@ -195,6 +198,7 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
         hourly,
         note: head.estNote,
         manualAmount: head.estAmount !== null,
+        blank: false,
       });
     });
   });
@@ -236,6 +240,7 @@ export function sheetNewLine(job: Pick<Job, 'places'>, lines: FormLine[], form: 
     hourly: false,
     note: null,
     manualAmount: false,
+    blank: false,
     isNew: true,
   };
 }

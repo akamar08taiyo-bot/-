@@ -1,6 +1,6 @@
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
-import {cutToLength, estimateQty, jobName, jobTotals, monthSummary, placeTotals, rowAmount, shikiriPrice} from '../calc.ts';
+import {cutToLength, estimateQty, isBlankRow, jobName, jobTotals, monthSummary, placeTotals, rowAmount, shikiriPrice} from '../calc.ts';
 import type {MonthSummary} from '../calc.ts';
 import {cutCalc, FORM_INFO, jobForm} from '../estimateForms.ts';
 import type {AppData, Job, Settings} from '../types.ts';
@@ -394,21 +394,24 @@ function JobDoc({job, settings: s}: {job: Job; settings: Settings}) {
                 </tr>
               </thead>
               <tbody>
-                {place.rows.map((r) => (
-                  <tr key={r.id}>
-                    <td className={`c kind ${r.kind}`}>{r.kind === 'labor' ? '手間' : '部材'}</td>
-                    <td className="name">
-                      {r.name || (r.kind === 'labor' ? '工事' : '部材')}
-                      {/* 切って使う部材は見積書と同じ本数（4m を 60cm → 600÷4000＝0.15本） */}
-                      {cutToLength(r) && <span className="code-sub">{cutCalc(r)}本</span>}
-                    </td>
-                    <td className="code">{r.code}</td>
-                    <td className="num">{yen(shikiriPrice(r))}</td>
-                    <td className="num">{cutToLength(r) ? num(estimateQty(r), 3) : num(r.qty)}</td>
-                    <td className="num">{yen(rowAmount(r))}</td>
-                  </tr>
-                ))}
-                {place.rows.length === 0 && (
+                {/* 見積書の空白の行（何も入っていない部材の行）は出さない */}
+                {place.rows
+                  .filter((r) => !isBlankRow(r))
+                  .map((r) => (
+                    <tr key={r.id}>
+                      <td className={`c kind ${r.kind}`}>{r.kind === 'labor' ? '手間' : '部材'}</td>
+                      <td className="name">
+                        {r.name || (r.kind === 'labor' ? '工事' : '部材')}
+                        {/* 切って使う部材は見積書と同じ本数（4m を 60cm → 600÷4000＝0.15本） */}
+                        {cutToLength(r) && <span className="code-sub">{cutCalc(r)}本</span>}
+                      </td>
+                      <td className="code">{r.code}</td>
+                      <td className="num">{yen(shikiriPrice(r))}</td>
+                      <td className="num">{cutToLength(r) ? num(estimateQty(r), 3) : num(r.qty)}</td>
+                      <td className="num">{yen(rowAmount(r))}</td>
+                    </tr>
+                  ))}
+                {place.rows.every(isBlankRow) && (
                   <tr>
                     <td colSpan={6} className="c muted">
                       （入力なし）

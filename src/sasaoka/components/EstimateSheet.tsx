@@ -428,8 +428,8 @@ export function EstimateSheet({
   const onMouseDown = (e: ReactMouseEvent) => {
     let t = e.target as HTMLElement;
     if (sugRef.current?.contains(t)) return;
-    if (t.closest('[data-del]')) {
-      e.preventDefault(); // 行の左の「✕消す」：欄は選ばない（押し終わったら onClick で消す）
+    if (t.closest('[data-del], [data-ins]')) {
+      e.preventDefault(); // 行の左の「＋」「✕」：欄は選ばない（押し終わったら onClick で入れる・消す）
       return;
     }
     if (t === inputRef.current) {
@@ -456,14 +456,22 @@ export function EstimateSheet({
     select(el);
     inputRef.current?.focus({preventScroll: true});
   };
-  // 行の左の「✕消す」：その行（部材は同上施工費ごと）を消す。箇所の行がなくなれば箇所も消す（その行が空白になる）
+  // 行の左の「＋」：その行の下に空白の行を入れて、内容の欄を選ぶ（そのまま打ち込める）。
+  // 「✕」：その行（部材は同上施工費ごと）を消す。箇所の行がなくなれば箇所も消す（その行が空白になる）
   const onClick = (e: ReactMouseEvent) => {
-    const id = (e.target as HTMLElement).closest<HTMLElement>('[data-del]')?.dataset.del;
-    if (!id) return;
+    const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-ins], [data-del]');
+    if (!btn) return;
     if (edit && sel) commit(edit.value, null, null, true); // 打ち込んでいた値を入れてから
-    change(deleteLine(jobRef.current, id));
-    setSel(null);
-    toast('行を消しました（「↶ 元に戻す」で戻せます）');
+    if (btn.dataset.ins) {
+      const res = insertBlankAfter(jobRef.current, btn.dataset.ins);
+      change(res.job);
+      if (res.rowId) setSel({key: `line:${res.rowId}:text`, occ: 0});
+      inputRef.current?.focus({preventScroll: true});
+    } else if (btn.dataset.del) {
+      change(deleteLine(jobRef.current, btn.dataset.del));
+      setSel(null);
+      toast('行を消しました（「↶ 元に戻す」で戻せます）');
+    }
   };
   const onDoubleClick = (e: ReactMouseEvent) => {
     const t = e.target as HTMLElement;
@@ -620,7 +628,7 @@ export function EstimateSheet({
         内容に品名を打つと部材リストの候補が出ます（★お気に入りが先。空のまま F2 で★だけ）。<b>備考に定価を入れると単価は 定価×{s.estimateRate}</b>。
         数量に 0.15 や 60cm と入れると切って使う長さ。いちばん下の緑の行に打つと行が増え、改修場所を打つと箇所が増えます。
         {form === 'kouiki' ? '「材／手」の欄で「手」にすると施工費の行（数量は時間）。' : '内容に「同上施工費」と打つと施工費の行（単価に金額）。'}
-        介護保険の対象外は、その欄でスペースかダブルクリック。<b>行の左の「✕消す」でその行を消せます</b>（空白になります）。
+        介護保険の対象外は、その欄でスペースかダブルクリック。<b>行の左の「＋」でその下に1行入れる・「✕」でその行を消す</b>（何も打たなければ空白の行のまま）。
       </p>
       <div
         ref={scrollRef}

@@ -182,6 +182,11 @@ function ykLine(l: FormLine, r: number, put: Put) {
   const place = `${circled(l.photo)}${l.placeName}`;
   put(0, l.first ? l.work || null : null, 'ml', fit(l.work, YK.A, YK_ROW, 11));
   put(1, l.first ? place : null, '', fit(place, YK.B, YK_ROW, 11));
+  if (l.blank) {
+    // 空白の行（何も入っていない部材の行）は、罫線だけの行
+    ['', 'r nr', 'nl', 'r', 'r mr', 'r nr', 'nl', 'r', 'r mr', 'r mr', 'mr'].forEach((cls, i) => put(i + 2, null, cls));
+    return;
+  }
   put(2, l.text || null, '', fit(l.text, YK.C, YK_ROW, 9, 2));
   put(3, q, 'r nr', count(9));
   put(4, l.unit || null, 'nl', fit(l.unit, YK.E, YK_ROW, 11));
@@ -323,6 +328,14 @@ function kkLine(l: FormLine, r: number, height: number, bottom: string, hourRate
   const kind = circled(l.kind);
   put(0, l.first ? l.placeName || null : null, 'c ml', fit(l.placeName, KK.A, height, 11, 2));
   put(1, l.first ? l.work || null : null, 'c', fit(l.work, KK.B, height, 11, 2));
+  if (l.blank) {
+    // 空白の行（何も入っていない部材の行）は、箇所の欄のほかは罫線だけ
+    ['', 'mr', 'gap', 'ml', '', '', 'mr', 'gap'].forEach((cls, i) => put(i + 2, null, cls));
+    put(10, l.first ? photo : null, 'c ml', fit(photo, KK.K, height, 11));
+    put(11, l.first ? kind : null, 'c', fit(kind, KK.L, height, 11));
+    ['ml', '', '', 'mr', 'ml', 'mr'].forEach((cls, i) => put(i + 12, null, cls));
+    return;
+  }
   put(2, l.mark, 'mark', {v: 'bottom'});
   put(3, l.text || null, 'mr gothic', fit(l.text, KK.D, height, 9, 3));
   put(4, null, 'gap');

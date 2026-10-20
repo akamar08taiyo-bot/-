@@ -180,6 +180,26 @@ export function estimateUnitPrice(row: Row, rate: number): number {
   return rounddown(listPriceOf(row) * rate);
 }
 
+/**
+ * 何も入っていない部材の行（見積書の「＋」で入れた行など）。見積書では空白の行になり、金額は0。
+ * 品名などを打ち込めば、ふつうの部材の行になる
+ */
+export function isBlankRow(r: Row): boolean {
+  return (
+    r.kind === 'material' &&
+    !r.name.trim() &&
+    !r.maker.trim() &&
+    !r.code.trim() &&
+    !r.unit.trim() &&
+    !r.price &&
+    !r.listPrice &&
+    !r.lengthCm &&
+    r.estPrice === null &&
+    !(r.estText ?? '').trim() &&
+    !(r.estNote ?? '').trim()
+  );
+}
+
 /** 長さで数える部材か（使う長さと1本の長さの両方が入っている） */
 export function cutToLength(row: Pick<Row, 'kind' | 'lengthCm' | 'pieceLengthM'>): boolean {
   return row.kind === 'material' && row.lengthCm > 0 && row.pieceLengthM > 0;

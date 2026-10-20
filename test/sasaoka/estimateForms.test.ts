@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {autoNote, circled, cutCalc, formForAddress, formLines, jobForm, lineNote, materialText, noteText, paginate, photoNumbers, placeWork, reiwa, rowUnit} from '../../src/sasaoka/estimateForms.ts';
+import {isBlankRow} from '../../src/sasaoka/calc.ts';
+import {manualRow} from '../../src/sasaoka/rows.ts';
 import type {Job, Place, Row} from '../../src/sasaoka/types.ts';
 
 const S = {estimateRate: 0.8, estimateHourRate: 2500, estimateForm: 'yukuhashi'} as const;
@@ -146,6 +148,18 @@ test('単位：部材リストに単位のない既製品の手すり（TOTO の
   assert.equal(rowUnit(mat('φ34エンドブラケット', 5000, {unit: '個'})), '個'); // 単位があればそれ
   assert.equal(rowUnit({...bar, unit: 'セット'}), 'セット');
   assert.equal(rowUnit(mat('手すり 4m', 20000, {lengthCm: 60, pieceLengthM: 4, unit: '個'})), '本'); // 切って使う部材は本
+});
+
+test('空白の行：何も入っていない部材の行（見積書の「＋」で入れた行）は、内容も数量・単価・金額も出さない。行の数には入る', () => {
+  const blank = manualRow('material', {qty: 1});
+  assert.equal(isBlankRow(blank), true);
+  assert.equal(isBlankRow({...blank, name: 'エンドキャップ'}), false);
+  assert.equal(isBlankRow({...blank, price: 300}), false);
+  assert.equal(isBlankRow({...blank, estText: '養生'}), false);
+  assert.equal(isBlankRow(manualRow('labor')), false);
+  const lines = formLines({places: [place('玄関', [mat('手すり', 9000), blank, mat('ブラケット', 2100)])]}, S, 'yukuhashi');
+  assert.deepEqual(lines.map((l) => [l.text, l.blank, l.amount]), [['手すり', false, 7200], ['', true, 0], ['ブラケット', false, 1680]]);
+  assert.deepEqual(lineNote(lines[1], 'yukuhashi', 2500), []);
 });
 
 test('令和の年月日', () => {

@@ -1,6 +1,6 @@
 // 住宅改修 見積書作成：見積書に直接入力（Excel のように欄を選んで打ち込む）を確かめる：
 // 新しい見積書を見積書の形のまま打ち込む（お客様名・改修内容・改修場所・内容の候補（★お気に入り）・数量 60cm・同上施工費・備考に定価）→
-// 合計・元に戻す・行の挿入／移動／削除（行の左の✕消す）・介護保険の対象外・諸経費・作成日・笹岡工務店の請求書に入れる（仕切価格を入れる）・
+// 合計・元に戻す・行の挿入／移動／削除（行の左の＋・✕）・介護保険の対象外・諸経費・作成日・笹岡工務店の請求書に入れる（仕切価格を入れる）・
 // 広域連合用（材／手・時間）・「請求書を確認する」とのつながり
 // usage: node e2e-sheet.mjs <サイトのURL> <出力フォルダ>
 //   サイトは太陽ポータルと同じ形（<サイト>/jutaku-mitsumori/index.html と <サイト>/sasaoka/index.html）
@@ -164,6 +164,20 @@ await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
 assert.equal(await lines(), before);
 assert.deepEqual((await tds('エンドキャップ')).slice(0, 2), ['手すりの取付', '②トイレ']);
 log('行の左の✕消す（空白になる・元に戻す）OK');
+
+// ---------------- 行の左の「＋」：その行の下に空白の行が入り、内容の欄が選ばれる（そのまま打ち込める）。何も打たなければ空白の行のまま
+await sheet.getByRole('button', {name: 'サンプル S-EC01 エンドキャップの行の下に1行入れる'}).click();
+assert.equal(await selected(), '内容（品名）');
+assert.equal(await lines(), before + 1);
+const blankRow = sheet.locator('.form-page tr[data-rows]').nth(await sheet.locator('.form-page tr[data-rows]').evaluateAll((trs) => trs.findIndex((tr) => tr.innerText.includes('エンドキャップ')) + 1));
+assert.deepEqual((await blankRow.locator('td').allInnerTexts()).map((t) => t.trim()).filter(Boolean), []); // 数量・単価・金額も出さない
+assert.equal(await page.getByText(/仕切価格も定価も入っていない部材/).count(), 0); // 空白の行は「仕切価格がない」と言わない
+await page.keyboard.type('養生テープ');
+await page.keyboard.press('Enter');
+assert.equal((await tds('養生テープ'))[2], '養生テープ');
+await sheet.getByRole('button', {name: '養生テープの行を消す'}).click();
+assert.equal(await lines(), before);
+log('行の左の＋（空白の行を入れて打ち込む）OK');
 
 // ---------------- 諸経費・作成日・工事場所（見積書の欄）
 await typeIn('overhead:all', '1000');

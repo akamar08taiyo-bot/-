@@ -5,6 +5,7 @@ import {estimateTotals} from '../../src/sasaoka/calc.ts';
 import {defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {estimateFileName, estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import type {Job, Place, Row} from '../../src/sasaoka/types.ts';
+import {manualRow} from '../../src/sasaoka/rows.ts';
 import {readXlsx} from '../../src/sasaoka/xlsx.ts';
 import {colName, SheetBuilder, writeXlsx} from '../../src/sasaoka/xlsxWrite.ts';
 
@@ -209,6 +210,21 @@ test('Excel：1ページ18行に入らなければ、印刷と同じところで
   assert.equal(x.cells.get('G75')?.f, 'SUM(G9:G26,G35:G52,G61:G74)');
   for (const [ref, c] of x.cells) if (c.f) assert.equal(evaluate(x.cells, ref), c.v, `${ref} =${c.f}`);
   assert.equal(x.text('G78'), estimateTotals(j, S).all.total);
+});
+
+test('Excel：空白の行（何も入っていない部材の行）は罫線だけの行（数量・金額・式を書かない）', () => {
+  const base = job();
+  const j = job({places: [{...base.places[0], rows: [base.places[0].rows[1], manualRow('material', {qty: 1})]}]});
+  for (const form of ['yukuhashi', 'kouiki'] as const) {
+    const x = open(estimateXlsx({...j, form}, S, '2026-10-20').bytes);
+    const r = form === 'yukuhashi' ? 10 : 6; // 2行目（空白の行）
+    const cols = form === 'yukuhashi' ? 'CDEFGHIJKLM' : 'CDEFGHIJKLMNOPQR';
+    for (const c of cols) {
+      assert.equal(x.text(`${c}${r}`), undefined, `${form} ${c}${r}`);
+      assert.equal(x.cells.get(`${c}${r}`)?.f, undefined, `${form} ${c}${r}`);
+    }
+    if (form === 'yukuhashi') assert.equal(x.border('G10').r, 'medium'); // 罫線は同じ
+  }
 });
 
 // ---------------------------------------------------------------- 広域連合用
