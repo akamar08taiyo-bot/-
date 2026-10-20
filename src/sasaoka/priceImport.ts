@@ -162,10 +162,11 @@ const NAME_KEYS: [string, number][] = [
 ];
 const MAKER_KEYS = ['メーカー', '製造元', '仕入先'];
 const UNIT_KEYS = ['単位', '入数'];
-const LIST_KEYS = ['定価', '希望小売', '標準価格', '上代'];
+const LIST_KEYS = ['定価', '希望小売', '標準価格', '上代', 'ガイド価格'];
 const SPEC_KEYS = ['色', 'カラー', '規格', '仕様', 'サイズ'];
 const LEN_KEYS = ['1本の長さ', '長さ', '全長'];
-// 仕切り価格らしい見出しほど高い点（「定価」と「仕切」が両方あれば仕切を選ぶ）。「掛率」「UP率」など「率」の列は価格にしない
+// 仕切り価格らしい見出しほど高い点（「定価」と「仕切」が両方あれば仕切を選ぶ）。「掛率」「UP率」など「率」の列は価格にしない。
+// 定価の見出し（「希望小売価格」「ガイド価格」（矢崎化工）など）の列は、仕切価格にしない
 const PRICE_KEYS: [string, number][] = [
   ['仕切', 10],
   ['納価', 9],
@@ -191,6 +192,7 @@ const has = (cell: string, keys: string[]) => {
   return keys.some((k) => c.includes(k));
 };
 const priceScore = (cell: string) => (normalize(cell).includes('率') ? 0 : keyScore(cell, PRICE_KEYS));
+const isListHeader = (cell: string) => has(cell, LIST_KEYS) && keyScore(cell, PRICE_KEYS) < 5; // 「定価・売価」のように仕切価格の言葉もあれば定価にしない
 
 export function columnCount(grid: Grid): number {
   return grid.reduce((n, r) => Math.max(n, r.length), 0);
@@ -239,7 +241,7 @@ export function detectMapping(grid: Grid): Mapping {
       else if (len < 0 && has(cell, LEN_KEYS)) len = c;
       else if (has(cell, SPEC_KEYS)) spec = c; // 色の列が2つ（色の記号・色の名前）なら右の方
       if (has(cell, LIST_KEYS)) list = c;
-      const s = priceScore(cell);
+      const s = isListHeader(cell) ? 0 : priceScore(cell);
       if (s > 2 && s >= score) {
         score = s;
         price = c;
@@ -383,6 +385,25 @@ export type Candidate = {
   favorite: boolean; // ★お気に入り
 };
 
+/** 単位・入数の欄：「1個」「1本」は「個」「本」、数字だけ（入数「1」）なら空欄。「10枚」のように2つ以上入りのものはそのまま */
+export function unitText(s: string): string {
+  const t = normalize(s);
+  return /^\d+$/.test(t) ? '' : t.replace(/^1 ?(?=[^\d./])/, '');
+}
+
+// 切って使う部材らしい商品名（「カバー」はのぞく）
+const BAR_LIKE = /パイプ|ディンプル|丸棒|手すり棒|取付け?ベース|(?<!カ)バー|レール/;
+
+/**
+ * 品番に入った1本の長さ（m）：手すりのパイプ・丸棒・木製の取付けベースなど切って使う部材で、品番に「-2000」「-4000」（mm）とあるもの
+ * （矢崎化工の「HCT-4000 T USL」φ34屋外手すりパイプ など。商品名には長さがない）。1本ずつの部材だけ（「3本」入りなどは読まない）。読めなければ 0
+ */
+export function codeLengthM(code: string, name: string, unit: string): number {
+  if (!BAR_LIKE.test(normalize(name)) || !['', '本', '枚'].includes(unit)) return 0;
+  const mm = Number(/-(\d{4})(?!\d)/.exec(normalize(code))?.[1] ?? 0);
+  return mm >= 1000 && mm <= 4000 && mm % 100 === 0 ? mm / 1000 : 0;
+}
+
 const looksLikeHeader = (text: string) => NAME_KEYS.some(([k]) => k === text) || CODE_KEYS.some(([k]) => k === text.toLowerCase());
 
 export function gridCandidates(grid: Grid, m: Mapping, defaultMaker: string): Candidate[] {
@@ -400,11 +421,16 @@ export function gridCandidates(grid: Grid, m: Mapping, defaultMaker: string): Ca
       code = code.slice(0, at);
     }
     const base = cell(row, m.name);
-    const name = base && spec && !base.includes(spec) ? `${base} ${spec}` : base;
+    const full = base && spec && !base.includes(spec) ? `${base} ${spec}` : base;
+    // 商品名のうしろに品番がくり返されていれば外す（矢崎化工「たちあっぷ サムリング CKM-02 SET GR」）
+    const name = code && full.endsWith(` ${code}`) ? full.slice(0, -code.length - 1) : full;
     const price = m.price >= 0 ? parsePrice(row[m.price]) : null;
     const listPrice = m.list >= 0 ? parsePrice(row[m.list]) : null;
     if (!name && (!code || price === null)) return;
     if (looksLikeHeader(base) || looksLikeHeader(code)) return; // ページごとに繰り返される見出し
+    // 品番の列がある表で、品番も金額もない行は、表の中の小見出し（「住宅改修（屋外スタンダードシリーズ）」など）
+    if (m.code >= 0 && !code && price === null && listPrice === null) return;
+    const unit = unitText(cell(row, m.unit));
     // 仕切価格が空欄でも、定価があれば取り込む（仕切価格はあとで入れられる）
     const valid = (name !== '' || code !== '') && ((price ?? 0) > 0 || (listPrice ?? 0) > 0);
     out.push({
@@ -415,8 +441,8 @@ export function gridCandidates(grid: Grid, m: Mapping, defaultMaker: string): Ca
       listPrice: listPrice !== null && listPrice > 0 ? listPrice : null,
       code,
       maker: cell(row, m.maker) || defaultMaker,
-      unit: cell(row, m.unit),
-      pieceLengthM: m.len >= 0 ? parseLengthM(row[m.len], m.header >= 0 ? grid[m.header]?.[m.len] : '') : 0,
+      unit,
+      pieceLengthM: (m.len >= 0 ? parseLengthM(row[m.len], m.header >= 0 ? grid[m.header]?.[m.len] : '') : 0) || codeLengthM(code, name, unit),
       include: valid,
       favorite: false,
     });
@@ -436,33 +462,79 @@ export function alignToHeader(rows: PositionedWord[][]): Grid | null {
     const head = rows[h];
     const texts = head.map((w) => w.s);
     if (!texts.some((t) => keyScore(t, NAME_KEYS) > 0 || keyScore(t, CODE_KEYS) > 0) || !texts.some((t) => priceScore(t) > 0)) continue;
-    const cols = head.map((w) => ({x0: w.x0, x1: w.x1}));
-    return rows.map((row, r) => {
-      if (r === h) return texts;
-      const cells: string[][] = cols.map(() => []);
-      for (const w of row) {
-        let best = -1;
-        let bestOverlap = 0;
-        cols.forEach((c, i) => {
-          const overlap = Math.min(w.x1, c.x1) - Math.max(w.x0, c.x0);
-          if (overlap > bestOverlap) {
-            bestOverlap = overlap;
-            best = i;
-          }
-        });
-        if (best < 0) {
-          // 重なる見出しがなければ、その語より左で始まる一番右の列（左寄せの長い商品名など）
-          cols.forEach((c, i) => {
-            if (c.x0 <= w.x0 + 0.5) best = i;
-          });
-          if (best < 0) best = 0;
-        }
-        cells[best].push(w.s);
-      }
-      return cells.map((c) => c.join(' '));
-    });
+    return placeWords(head, rows, h);
   }
   return null;
+}
+
+const overlap = (a: {x0: number; x1: number}, b: {x0: number; x1: number}) => Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
+const isPriceWord = (s: string) => parsePrice(s) !== null;
+
+/**
+ * 語を列に入れる。見出しの語と重なる語はその列（いちばん重なる列）。
+ * 重ならない語は、その列の見出しと重なる語（ほかの行のものも）が並ぶ範囲に入っていればその列
+ * （見出しが列のまん中にあり、短い商品名が見出しまで届かないとき。矢崎化工の価格表）。どの範囲にも入らなければ、
+ *   左の列に見出しと重なる語が1つもない → 左の列（金額が右寄せで、見出しより右にあるとき）
+ *   左の列と同じく文字 → 左の列（商品名の続き）
+ *   それ以外（金額の列のすぐ右の〇×など）→ 見出しのない列（矢崎化工の「価格改定」の〇×は、見出しが上下の行に分かれている）
+ */
+function placeWords(head: PositionedWord[], rows: PositionedWord[][], h: number): Grid {
+  const n = head.length;
+  const titleOf = (w: PositionedWord) => {
+    let best = -1;
+    let most = 0;
+    let hits = 0;
+    head.forEach((t, i) => {
+      const o = overlap(w, t);
+      if (o > 0) hits++;
+      if (o > most) {
+        most = o;
+        best = i;
+      }
+    });
+    return {best, hits};
+  };
+  // 見出しごとに、見出しと重なる語が並ぶ範囲と、金額の語の多さ。表の行（3語以上）だけで数え、
+  // 2つ以上の見出しにかかる長い語はのぞく（表の中の小見出し・注意書きで範囲を広げない）
+  const span = head.map((t) => ({x0: t.x0, x1: t.x1, words: 0, prices: 0}));
+  for (const row of rows.slice(h + 1)) {
+    if (row.length < 3) continue;
+    for (const w of row) {
+      const {best, hits} = titleOf(w);
+      if (best < 0 || hits > 1) continue;
+      const sp = span[best];
+      sp.x0 = Math.min(sp.x0, w.x0);
+      sp.x1 = Math.max(sp.x1, w.x1);
+      sp.words++;
+      if (isPriceWord(w.s)) sp.prices++;
+    }
+  }
+  const numeric = (i: number) => span[i].words > 0 && span[i].prices >= span[i].words / 2;
+  // 列の番号：見出し i は 2i、見出し i と i+1 の間の見出しのない列は 2i+1
+  const slotOf = (w: PositionedWord): number => {
+    const {best} = titleOf(w);
+    if (best >= 0) return best * 2;
+    const mid = (w.x0 + w.x1) / 2;
+    const inside = span.findIndex((sp) => sp.x0 <= mid && mid <= sp.x1);
+    if (inside >= 0) return inside * 2;
+    let left = -1;
+    span.forEach((sp, i) => {
+      if (sp.x1 <= mid) left = i;
+    });
+    if (left < 0) return 0;
+    if (left === n - 1 || span[left].words === 0) return left * 2;
+    if (!isPriceWord(w.s) && !numeric(left)) return left * 2;
+    return left * 2 + 1;
+  };
+  const grid = rows.map((row, r) => {
+    const cells: string[][] = Array.from({length: n * 2 - 1}, () => []);
+    if (r === h) head.forEach((t, i) => cells[i * 2].push(t.s));
+    else for (const w of row) cells[slotOf(w)].push(w.s);
+    return cells.map((c) => c.join(' '));
+  });
+  // 見出しのない列は、どの行にも語がなければなくす
+  const keep = Array.from({length: n * 2 - 1}, (_, c) => c % 2 === 0 || grid.some((row) => row[c] !== ''));
+  return grid.map((row) => row.filter((_, c) => keep[c]));
 }
 
 // ---------------------------------------------------------------- 1行ずつ読む

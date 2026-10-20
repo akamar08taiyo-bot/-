@@ -10,6 +10,7 @@ import {
   lineCandidates,
   mergeMaterials,
   normalize,
+  parsePrice,
   textToGrid,
   textToLines,
 } from '../priceImport.ts';
@@ -193,11 +194,11 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
   const cols = columnCount(grid);
   const sample = (c: number) => {
     const from = mapping && mapping.header >= 0 ? mapping.header + 1 : 0;
-    for (let r = from; r < Math.min(grid.length, from + 30); r++) {
-      const v = normalize(grid[r]?.[c]);
-      if (v) return v.length > 14 ? v.slice(0, 14) + '…' : v;
-    }
-    return '';
+    const values = grid.slice(from, from + 30).map((r) => normalize(r?.[c])).filter(Boolean);
+    // 金額の列は金額を見せる（見出しの続きの「(税抜)」や「オープンプライス」の行より先に）
+    const prices = values.filter((v) => parsePrice(v) !== null);
+    const v = (prices.length >= values.length / 4 ? prices[0] : values[0]) ?? '';
+    return v.length > 14 ? v.slice(0, 14) + '…' : v;
   };
   const colSelect = (label: string, field: keyof Mapping, optional: boolean) =>
     mapping && (
