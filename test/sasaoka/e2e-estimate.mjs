@@ -1,5 +1,5 @@
 // 住宅改修 見積書作成を確かめる：一覧（見積の合計・笹岡工務店の請求書の印・探す）・サンプルの見積書（定価×0.8・切って使う部材の数量・同上施工費）・
-// 見積の単価の手入力・部材ごとの施工費・一式・諸経費の手入力・介護保険の対象外・2つの書式（苅田町・行橋用／みやこ町・広域連合用）の印刷・
+// 見積の単価の手入力・部材ごとの施工費・一式・諸経費の手入力・介護保険の対象外・2つの書式（苅田町・行橋市・みやこ町用／広域連合用）の印刷・
 // 複製・削除・定価の取り込み
 // usage: node e2e-estimate.mjs <サイトのURL> <出力フォルダ>
 //   サイトは太陽ポータルと同じ形（<サイト>/jutaku-mitsumori/index.html と <サイト>/sasaoka/index.html）
@@ -31,7 +31,7 @@ const now = new Date();
 const thisMonthLabel = `${now.getFullYear()}年${now.getMonth() + 1}月分に入れる`;
 const sampleRow = page.getByRole('row', {name: /（サンプル）山田様邸/});
 const rowText = await sampleRow.innerText();
-for (const v of ['苅田町・行橋用', '久保', '24,538', thisMonthLabel]) assert.ok(rowText.includes(v), `一覧に ${v} がない: ${rowText}`);
+for (const v of ['苅田町・行橋市・みやこ町用', '久保', '24,538', thisMonthLabel]) assert.ok(rowText.includes(v), `一覧に ${v} がない: ${rowText}`);
 log('一覧OK');
 
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
@@ -48,7 +48,7 @@ const typeIn = async (k, text, end = 'Enter') => {
   await page.waitForTimeout(60);
 };
 assert.deepEqual(await totals(), ['合計', '24,538', '24,538']);
-assert.deepEqual(await page.getByRole('combobox', {name: '見積書の書式'}).locator('option').allInnerTexts(), ['苅田町・行橋用', 'みやこ町・広域連合用']);
+assert.deepEqual(await page.getByRole('combobox', {name: '見積書の書式'}).locator('option').allInnerTexts(), ['苅田町・行橋市・みやこ町用', '広域連合用']);
 
 // ---------------- 見積書の欄：被保険者番号・切って使う手すりを 120cm（1.2÷4＝0.3本×16,000＝4,800）
 await typeIn('job:insuredNo', '0000366989');
@@ -72,7 +72,7 @@ log('見積の単価の手入力と自動に戻すOK');
 
 // ---------------- ブラケットの施工費（取付手間を数える）：木を1つ → ブラケットのすぐ下に同上施工費 1,000
 await cell(await key('ブラケット', 'text')).click();
-await sheet.getByRole('button', {name: '＋ この部材の施工費（取付手間を数える）'}).click();
+await sheet.getByRole('button', {name: '🔧 工賃（笹岡工務店の手間）から入れる'}).click();
 await page.getByRole('dialog').getByText('「ブラケット」の施工費').waitFor();
 await page.getByRole('button', {name: '木の箇所数を1増やす', exact: true}).click();
 await page.getByRole('button', {name: '数え終わったら閉じる'}).click();
@@ -105,7 +105,7 @@ assert.deepEqual(await totals(), ['合計', '55,369', '55,369']);
 log('一式を入れるOK');
 await page.screenshot({path: path.join(outDir, '50-estimate-app.png'), fullPage: true});
 
-// ---------------- 苅田町・行橋用の印刷
+// ---------------- 苅田町・行橋市・みやこ町用の印刷
 await page.getByRole('button', {name: '🖨 見積書を印刷'}).click();
 await page.locator('.print-overlay').waitFor();
 const printed = page.locator('.print-root .form-page').first();
@@ -120,8 +120,8 @@ for (const t of [
   '同上施工費',
   '代表者名　行橋営業所所長　久保 匠史',
   '担当： 久保 匠史　0930-26-9640',
-  '玄関①',
-  'トイレ②',
+  '①玄関',
+  '②トイレ',
   'ページ　1　／　1',
 ]) {
   assert.ok(doc.includes(t), `見積書に「${t}」がない`);
@@ -134,7 +134,7 @@ await page.emulateMedia({media: 'print'});
 await page.pdf({path: path.join(outDir, 'estimate-yukuhashi.pdf'), printBackground: true, preferCSSPageSize: true});
 await page.emulateMedia({media: 'screen'});
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
-log('見積書（苅田町・行橋用）の印刷OK');
+log('見積書（苅田町・行橋市・みやこ町用）の印刷OK');
 
 // ---------------- 諸経費を見積書の欄で直す（端数の調整）→ 消すと 小計×10% に戻る
 await typeIn('overhead:all', '5000');
@@ -152,7 +152,7 @@ await sheet.getByLabel('介護保険の対象外').check();
 assert.deepEqual(await totals(), ['合計', '55,369', '50,094']);
 log('介護保険の対象外OK');
 
-// ---------------- みやこ町・広域連合用に変える：写真番号・改修の種類を見積書の欄で入れる。施工費は「時間×2,500円」。2ページ（Ｐ－1・Ｐ－2）
+// ---------------- 広域連合用に変える：写真番号・改修の種類を見積書の欄で入れる。施工費は「時間×2,500円」。2ページ（Ｐ－1・Ｐ－2）
 await page.getByRole('combobox', {name: '見積書の書式'}).selectOption('kouiki');
 await sheet.locator('.form-page', {hasText: '内訳書　様式'}).first().waitFor();
 await typeIn(await key('L型手すり', 'photo'), '5');
@@ -179,11 +179,11 @@ await page.emulateMedia({media: 'print'});
 await page.pdf({path: path.join(outDir, 'estimate-kouiki.pdf'), printBackground: true, preferCSSPageSize: true});
 await page.emulateMedia({media: 'screen'});
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
-log('見積書（みやこ町・広域連合用）の印刷OK');
+log('見積書（広域連合用）の印刷OK');
 
 // ---------------- 一覧に戻る：書式が変わっている。探す
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
-assert.ok((await sampleRow.innerText()).includes('みやこ町・広域連合用'));
+assert.ok((await sampleRow.innerText()).includes('広域連合用'));
 const search = page.getByRole('textbox', {name: '見積書を探す'});
 await search.fill('山田');
 assert.equal(await page.locator('tbody tr').count(), 1);
@@ -192,23 +192,23 @@ assert.ok((await page.locator('main').innerText()).includes('見つかりませ�
 await search.fill('');
 log('一覧の書式・探すOK');
 
-// ---------------- 複製（請求書には入れないで作る）→ 削除
+// ---------------- 複製（今月分の請求書に入れて作る）→ 削除
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 await page.getByRole('button', {name: '複製', exact: true}).click();
 await page.getByRole('heading', {level: 1, name: '（サンプル）山田（コピー）様邸'}).waitFor();
-assert.equal(await page.getByLabel('笹岡工務店の請求書に入れる').isChecked(), false);
+assert.equal(await page.getByLabel('笹岡工務店の請求書に入れる').isChecked(), true);
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
 const copyRow = page.getByRole('row', {name: /（コピー）/});
-assert.ok((await copyRow.innerText()).includes('—')); // 笹岡工務店の請求書には入れていない
+assert.ok((await copyRow.innerText()).includes(thisMonthLabel)); // 笹岡工務店の請求書（今月分）に入る
 assert.ok((await sampleRow.innerText()).includes(thisMonthLabel));
 await page.getByRole('cell', {name: /（コピー）/}).click();
 await page.getByRole('button', {name: '削除', exact: true}).click();
 assert.equal(await page.locator('tbody tr').count(), 1);
 log('複製・削除OK');
 
-// ---------------- 部材リスト（仕切り計算・請求書作成と同じもの）：Excel の「定価」の列も読む
-await page.getByRole('navigation').getByRole('button', {name: /部材リスト/}).click();
-assert.ok((await page.locator('main').innerText()).includes('両方で同じものを使います'));
+// ---------------- 部材・工賃マスタ（請求書と同じ部材リスト）：Excel の「定価」の列も読む。工賃（笹岡工務店の手間）も同じタブ
+await page.getByRole('navigation').getByRole('button', {name: /部材・工賃マスタ/}).click();
+assert.ok((await page.locator('main').innerText()).includes('見積書（見積もりを作成する）と請求書（請求書を確認する）の両方で使います'));
 await page.getByRole('button', {name: /メーカーの仕切り表を取り込む/}).click();
 await page.locator('[role=dialog] input[type=file]').setInputFiles(path.join(FIX, 'maker-list.xlsx'));
 await page.getByRole('button', {name: '部材リストに取り込む（5件）'}).click();
@@ -217,11 +217,14 @@ assert.equal(await bp.getByRole('textbox', {name: '定価'}).inputValue(), '4,80
 assert.equal(await bp.getByRole('textbox', {name: '仕切価格'}).inputValue(), '3,360');
 log('定価の取り込みOK');
 
-// ---------------- 設定：見積書に関係するものだけ（請求先・計算のしかたは出さない）
+// ---------------- 工賃（笹岡工務店の手間）：部材・工賃マスタのもう1つのタブ
+await page.getByRole('tab', {name: /工賃（笹岡工務店の手間/}).click();
+assert.ok((await page.locator('main').innerText()).includes('取付手間の単価'));
+// ---------------- 設定：見積書と請求書の両方
 await page.getByRole('navigation').getByRole('button', {name: '設定'}).click();
 const settings = await page.locator('main').innerText();
-assert.ok(settings.includes('施工業者（見積書に載せる自社の情報）') && settings.includes('部材の単価＝定価×この率'), settings);
-assert.ok(!settings.includes('請求先（工務店）の名前') && !settings.includes('③部材上乗せ・④諸経費の率'), settings);
+assert.ok(settings.includes('自社の情報（請求書の発行元・見積書の施工業者）') && settings.includes('部材の単価＝定価×この率'), settings);
+assert.ok(settings.includes('請求先（工務店）の名前') && settings.includes('③部材上乗せ・④諸経費の率'), settings);
 log('設定OK');
 
 console.log('\nERRORS:', errors.length ? errors : 'なし');

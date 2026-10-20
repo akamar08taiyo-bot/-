@@ -4,8 +4,6 @@ import {DEFAULT_PLACES, DEFAULT_STAFF, OFFICES, settingsForOffice} from '../defa
 import {hasSamples, withoutSamples} from '../samples.ts';
 import {backupJson, cleanList, masterJson, mergeById, parseBackup} from '../storage.ts';
 import {FORM_IDS, FORM_INFO} from '../estimateForms.ts';
-import {APP_NAMES} from '../links.ts';
-import type {AppId} from '../links.ts';
 import type {AppData, EstimateForm, InvoiceTaxMode, Rounding, Settings, TaxMode} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {downloadBlob, todayIso} from '../util.ts';
@@ -59,12 +57,9 @@ function ListArea({value, onChange, rows, label}: {value: string[]; onChange: (v
   );
 }
 
-/**
- * 設定。見積書作成アプリ（app="estimate"）と仕切り計算・請求書アプリは同じ設定を使い、それぞれのアプリに関係するものだけを出す
- */
-export function SettingsPage({data, update, app = 'shikiri'}: {data: AppData; update: Update; app?: AppId}) {
+/** 設定（見積書・請求書の両方） */
+export function SettingsPage({data, update}: {data: AppData; update: Update}) {
   const toast = useToast();
-  const estimate = app === 'estimate';
   const s = data.settings;
   const set = (patch: Partial<Settings>) => update('settings', (prev) => ({...prev, ...patch}));
   const text = (key: keyof Settings, placeholder = '') => (
@@ -101,15 +96,13 @@ export function SettingsPage({data, update, app = 'shikiri'}: {data: AppData; up
 
   return (
     <div className="max-w-5xl space-y-4">
-      {!estimate && (
-        <Section title="請求先">
-          <Field label="請求先（工務店）の名前　※請求書には「○○　御中」と出ます">{text('clientName', '笹岡工務店')}</Field>
-        </Section>
-      )}
+      <Section title="請求先">
+        <Field label="請求先（工務店）の名前　※請求書には「○○　御中」と出ます">{text('clientName', '笹岡工務店')}</Field>
+      </Section>
 
       <Section
-        title={estimate ? '施工業者（見積書に載せる自社の情報）' : '発行元（請求書に載せる自社の情報）'}
-        note={`営業所を選ぶと住所・電話番号・所長名が入ります。太陽ポータルから開くと、ポータルで選んだ営業所が最初から入ります。${APP_NAMES[estimate ? 'shikiri' : 'estimate']}アプリと同じ設定です。`}
+        title="自社の情報（請求書の発行元・見積書の施工業者）"
+        note="営業所を選ぶと住所・電話番号・所長名が入ります。太陽ポータルから開くと、ポータルで選んだ営業所が最初から入ります。"
       >
         <Field label="営業所">
           <select
@@ -126,145 +119,133 @@ export function SettingsPage({data, update, app = 'shikiri'}: {data: AppData; up
           </select>
         </Field>
         <Field label="会社名">{text('company')}</Field>
-        <Field label={estimate ? '営業所名（見積書の施工業者名に出る名前）' : '営業所名（請求書に出る名前）'}>{text('officeName')}</Field>
-        <Field label={estimate ? '所長名（見積書の代表者名に出ます）' : '所長名（請求書に「○○営業所所長　氏名」と出ます）'}>
+        <Field label="営業所名（請求書・見積書の施工業者名に出る名前）">{text('officeName')}</Field>
+        <Field label="所長名（請求書に「○○営業所所長　氏名」、見積書の代表者名に出ます）">
           {text('manager', '例：久保 匠史')}
         </Field>
-        {!estimate && <Field label="郵便番号">{text('postal')}</Field>}
+        <Field label="郵便番号">{text('postal')}</Field>
         <Field label="住所" wide>
           {text('address')}
         </Field>
         <Field label="電話番号">{text('tel')}</Field>
-        {!estimate && <Field label="FAX番号">{text('fax')}</Field>}
-        {!estimate && <Field label="登録番号（インボイス）">{text('regNo', 'T＋13桁')}</Field>}
-        {!estimate && <Field label="請求書の担当者（任意・様邸ごとの担当とは別）">{text('person', '例：山本')}</Field>}
+        <Field label="FAX番号">{text('fax')}</Field>
+        <Field label="登録番号（インボイス）">{text('regNo', 'T＋13桁')}</Field>
+        <Field label="請求書の担当者（任意・様邸ごとの担当とは別）">{text('person', '例：山本')}</Field>
       </Section>
 
-      {!estimate && (
-        <>
-          <Section title="請求書">
-            <Field label="お振込先（1行で）" wide>
-              {text('bank', '例：○○銀行 ○○支店 普通 1234567 口座名義 ○○○○')}
-            </Field>
-            <Field label="件名（「○年○月分」のあとに付く言葉）">{text('subject', '工事代金')}</Field>
-            <Field label="備考（請求書の下に出ます）" wide>
-              <textarea
-                value={s.invoiceNote}
-                onChange={(e) => set({invoiceNote: e.target.value})}
-                rows={3}
-                className="w-full rounded-md border border-slate-300 p-2 text-sm font-normal"
-                placeholder="例：恐れ入りますが、振込手数料は貴社にてご負担ください。"
-              />
-            </Field>
-          </Section>
+      <Section title="請求書">
+        <Field label="お振込先（1行で）" wide>
+          {text('bank', '例：○○銀行 ○○支店 普通 1234567 口座名義 ○○○○')}
+        </Field>
+        <Field label="件名（「○年○月分」のあとに付く言葉）">{text('subject', '工事代金')}</Field>
+        <Field label="備考（請求書の下に出ます）" wide>
+          <textarea
+            value={s.invoiceNote}
+            onChange={(e) => set({invoiceNote: e.target.value})}
+            rows={3}
+            className="w-full rounded-md border border-slate-300 p-2 text-sm font-normal"
+            placeholder="例：恐れ入りますが、振込手数料は貴社にてご負担ください。"
+          />
+        </Field>
+      </Section>
 
-          <Section
-            title="計算のしかた"
-            note={
-              <>
-                ①部材代・②取付手間・③部材上乗せ（①×率）・④諸経費（（①＋②＋③）×率）・⑦税抜合計（①〜④）・⑤消費税・⑥合計（⑦＋⑤）は、元の「仕切り計算表」と同じ式です。
-              </>
-            }
+      <Section
+        title="計算のしかた"
+        note={
+          <>
+            ①部材代・②取付手間・③部材上乗せ（①×率）・④諸経費（（①＋②＋③）×率）・⑦税抜合計（①〜④）・⑤消費税・⑥合計（⑦＋⑤）は、元の「仕切り計算表」と同じ式です。
+          </>
+        }
+      >
+        <Field label="③部材上乗せ・④諸経費の率（元の表は 0.07）">
+          <NumberInput value={s.rate} onChange={(rate) => set({rate})} className="w-28" min={0} ariaLabel="率" />
+        </Field>
+        <Field label="消費税率（0.1＝10%）">
+          <NumberInput value={s.taxRate} onChange={(taxRate) => set({taxRate})} className="w-28" min={0} ariaLabel="消費税率" />
+        </Field>
+        <Field label="請求書（1か月分）の消費税">
+          <select
+            value={s.invoiceTaxMode}
+            onChange={(e) => set({invoiceTaxMode: e.target.value as InvoiceTaxMode})}
+            className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
           >
-            <Field label="③部材上乗せ・④諸経費の率（元の表は 0.07）">
-              <NumberInput value={s.rate} onChange={(rate) => set({rate})} className="w-28" min={0} ariaLabel="率" />
-            </Field>
-            <Field label="消費税率（0.1＝10%）">
-              <NumberInput value={s.taxRate} onChange={(taxRate) => set({taxRate})} className="w-28" min={0} ariaLabel="消費税率" />
-            </Field>
-            <Field label="請求書（1か月分）の消費税">
-              <select
-                value={s.invoiceTaxMode}
-                onChange={(e) => set({invoiceTaxMode: e.target.value as InvoiceTaxMode})}
-                className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
-              >
-                <option value="monthly">すべての様邸の税抜合計に、最後に消費税率をかける</option>
-                <option value="perJob">様邸ごとの⑤消費税を足す（一覧に様邸ごとの消費税・合計を出す）</option>
-              </select>
-            </Field>
-            <Field label="合計にかける消費税の1円未満（請求書）">
-              <select
-                value={s.totalTaxRounding}
-                onChange={(e) => set({totalTaxRounding: e.target.value as Rounding})}
-                className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
-              >
-                <option value="floor">切り捨て</option>
-                <option value="round">四捨五入</option>
-                <option value="ceil">切り上げ</option>
-              </select>
-            </Field>
-            <Field label="様邸ごとの仕切り計算表の⑤消費税の1円未満">
-              <select
-                value={s.taxMode}
-                onChange={(e) => set({taxMode: e.target.value as TaxMode})}
-                className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
-              >
-                <option value="original">元の表と同じ（⑦×0.1－1円・四捨五入）</option>
-                <option value="floor">切り捨て</option>
-                <option value="round">四捨五入</option>
-                <option value="ceil">切り上げ</option>
-              </select>
-            </Field>
-          </Section>
-        </>
-      )}
+            <option value="monthly">すべての様邸の税抜合計に、最後に消費税率をかける</option>
+            <option value="perJob">様邸ごとの⑤消費税を足す（一覧に様邸ごとの消費税・合計を出す）</option>
+          </select>
+        </Field>
+        <Field label="合計にかける消費税の1円未満（請求書）">
+          <select
+            value={s.totalTaxRounding}
+            onChange={(e) => set({totalTaxRounding: e.target.value as Rounding})}
+            className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
+          >
+            <option value="floor">切り捨て</option>
+            <option value="round">四捨五入</option>
+            <option value="ceil">切り上げ</option>
+          </select>
+        </Field>
+        <Field label="様邸ごとの仕切り計算表の⑤消費税の1円未満">
+          <select
+            value={s.taxMode}
+            onChange={(e) => set({taxMode: e.target.value as TaxMode})}
+            className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
+          >
+            <option value="original">元の表と同じ（⑦×0.1－1円・四捨五入）</option>
+            <option value="floor">切り捨て</option>
+            <option value="round">四捨五入</option>
+            <option value="ceil">切り上げ</option>
+          </select>
+        </Field>
+      </Section>
 
-      {estimate && (
-        <Section
-          title="見積書"
-          note="書式は、苅田町・行橋用「工事費見積書兼工事費内訳書」と、みやこ町・広域連合用「住宅改修内訳明細書」の2つです（見積書ごとに選び直せます）。部材の単価は定価×率、手すりなどを切って使うときの数量は 使う長さ÷1本の長さ（例：60cm÷4m＝0.15本）、部材のすぐ下の取付手間は「同上施工費」の1行です。金額は元の見積書と同じく、どれも1円未満を切り捨てます。"
-        >
-          <Field label="部材の単価＝定価×この率（0.8＝定価の8割）">
-            <NumberInput value={s.estimateRate} onChange={(estimateRate) => set({estimateRate})} className="w-28" min={0} ariaLabel="見積の率" />
-          </Field>
-          <Field label="諸経費＝小計×この率（0.1＝10%）">
-            <NumberInput
-              value={s.estimateOverheadRate}
-              onChange={(estimateOverheadRate) => set({estimateOverheadRate})}
-              className="w-28"
-              min={0}
-              ariaLabel="諸経費の率"
-            />
-          </Field>
-          <Field label="みやこ町・広域連合用：施工費を「時間×1時間の単価」で書くときの単価（円・0なら「1式」）">
-            <NumberInput value={s.estimateHourRate} onChange={(estimateHourRate) => set({estimateHourRate})} className="w-28" min={0} ariaLabel="1時間の単価" />
-          </Field>
-          <Field label="住所から市町村が分からないときの書式（仕切り計算・請求書アプリで作った様邸の見積書）">
-            <select
-              value={s.estimateForm}
-              onChange={(e) => set({estimateForm: e.target.value as EstimateForm})}
-              className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
-            >
-              {FORM_IDS.map((f) => (
-                <option key={f} value={f}>
-                  {FORM_INFO[f].name}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </Section>
-      )}
+      <Section
+        title="見積書"
+        note="書式は、苅田町・行橋市・みやこ町用「工事費見積書兼工事費内訳書」と、広域連合用「住宅改修内訳明細書」の2つです（見積書ごとに選び直せます）。部材の単価は定価×率、手すりなどを切って使うときの数量は 使う長さ÷1本の長さ（例：60cm÷4m＝0.15本）、部材のすぐ下の取付手間は「同上施工費」の1行です。金額は元の見積書と同じく、どれも1円未満を切り捨てます。"
+      >
+        <Field label="部材の単価＝定価×この率（0.8＝定価の8割）">
+          <NumberInput value={s.estimateRate} onChange={(estimateRate) => set({estimateRate})} className="w-28" min={0} ariaLabel="見積の率" />
+        </Field>
+        <Field label="諸経費＝小計×この率（0.1＝10%）">
+          <NumberInput
+            value={s.estimateOverheadRate}
+            onChange={(estimateOverheadRate) => set({estimateOverheadRate})}
+            className="w-28"
+            min={0}
+            ariaLabel="諸経費の率"
+          />
+        </Field>
+        <Field label="広域連合用：施工費を「時間×1時間の単価」で書くときの単価（円・0なら「1式」）">
+          <NumberInput value={s.estimateHourRate} onChange={(estimateHourRate) => set({estimateHourRate})} className="w-28" min={0} ariaLabel="1時間の単価" />
+        </Field>
+        <Field label="住所から市町村が分からないときの書式（仕切り計算・請求書アプリで作った様邸の見積書）">
+          <select
+            value={s.estimateForm}
+            onChange={(e) => set({estimateForm: e.target.value as EstimateForm})}
+            className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
+          >
+            {FORM_IDS.map((f) => (
+              <option key={f} value={f}>
+                {FORM_INFO[f].name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </Section>
 
-      {!estimate && (
-        <Section title="箇所の候補" note="様邸の画面の「＋ 箇所を追加」に並ぶ名前です。1行に1つずつ書きます。">
-          <div className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2">
-            <ListArea label="箇所の名前" value={s.placePresets} onChange={(placePresets) => set({placePresets})} rows={5} />
-            <span>
-              <Btn small color="white" onClick={() => set({placePresets: DEFAULT_PLACES})}>
-                最初の候補に戻す
-              </Btn>
-            </span>
-          </div>
-        </Section>
-      )}
+      <Section title="箇所の候補" note="様邸の画面の「＋ 箇所を追加」に並ぶ名前です。1行に1つずつ書きます。">
+        <div className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2">
+          <ListArea label="箇所の名前" value={s.placePresets} onChange={(placePresets) => set({placePresets})} rows={5} />
+          <span>
+            <Btn small color="white" onClick={() => set({placePresets: DEFAULT_PLACES})}>
+              最初の候補に戻す
+            </Btn>
+          </span>
+        </div>
+      </Section>
 
       <Section
         title="担当者の候補"
-        note={
-          estimate
-            ? '見積書の画面の「担当」から選ぶ名前です。1行に1つずつ書きます。見積書にはフルネームで出ます。'
-            : '様邸の画面で、お客様名の横の「担当」から選ぶ名前です。1行に1つずつ書きます。選んだ担当は、請求書と明細のお客様名の横に出ます。'
-        }
+        note="見積書・様邸の画面の「担当」から選ぶ名前です。1行に1つずつ書きます。見積書にはフルネーム、請求書と明細のお客様名の横には名字が出ます。"
       >
         <div className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2">
           <ListArea label="担当者の名前" value={s.staffList} onChange={(staffList) => set({staffList})} rows={5} />
@@ -280,8 +261,7 @@ export function SettingsPage({data, update, app = 'shikiri'}: {data: AppData; up
         <h2 className="mb-1 text-base font-bold text-[#0c315e]">データ（この端末のブラウザに保存）</h2>
         <p className="mb-3 text-xs leading-5 text-slate-500">
           入力した内容は、このパソコンのこのブラウザにだけ保存されます（サーバーには送りません）。ほかのパソコンでは見えないので、ときどきバックアップを保存してください。
-          見積書（{APP_NAMES.estimate}
-          ）と仕切り計算・請求書は同じ保存場所なので、どちらのアプリで保存しても、両方の内容が入ります。
+          見積書と請求書は同じ保存場所です。
           部材リスト・手間単価・一式だけを保存したファイルは、ほかの人に渡して読み込んでもらえます。
         </p>
         <div className="flex flex-wrap gap-2">

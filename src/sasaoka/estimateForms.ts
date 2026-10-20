@@ -1,7 +1,7 @@
-// 見積書の2つの書式（苅田町・行橋用／みやこ町・広域連合用）に並べる行を作る。
+// 見積書の2つの書式（苅田町・行橋市・みやこ町用／広域連合用）に並べる行を作る。
 // どちらも元の Excel と同じく、金額は ROUNDDOWN(数量×単価)。最後のページの下4行が 小計・諸経費・消費税・合計。
-//   苅田町・行橋用「工事費見積書兼工事費内訳書」：1ページ18行。施工費は「1式」
-//   みやこ町・広域連合用「住宅改修内訳明細書」（福岡県介護保険広域連合の様式）：1ページ14行。施工費は「時間×1時間の単価（2,500円）」
+//   苅田町・行橋市・みやこ町用「工事費見積書兼工事費内訳書」：1ページ18行。施工費は「1式」
+//   広域連合用「住宅改修内訳明細書」（福岡県介護保険広域連合の様式）：1ページ14行。施工費は「時間×1時間の単価（2,500円）」
 // 備考・算出根拠は「定価8,000円（税抜）×0.8」。切って使う部材は 数量＝使う長さ÷1本の長さ（本）で書き、備考は「定価20,000円（4m）×0.8」、
 // 2行目に mm で計算を書く（例：600÷4000＝0.15）。
 
@@ -13,23 +13,23 @@ import {num, yen} from './util.ts';
 export const FORM_IDS: EstimateForm[] = ['yukuhashi', 'kouiki'];
 
 export const FORM_INFO: Record<EstimateForm, {name: string; title: string; perPage: number}> = {
-  yukuhashi: {name: '苅田町・行橋用', title: '工事費見積書兼工事費内訳書', perPage: 18},
-  kouiki: {name: 'みやこ町・広域連合用', title: '住宅改修内訳明細書', perPage: 14},
+  yukuhashi: {name: '苅田町・行橋市・みやこ町用', title: '工事費見積書兼工事費内訳書', perPage: 18},
+  kouiki: {name: '広域連合用', title: '住宅改修内訳明細書', perPage: 14},
 };
 
 /** 合計の欄（小計・諸経費・消費税・合計）の行数 */
 export const TOTAL_ROWS = 4;
 
-/** 改修の種類（みやこ町・広域連合用の「改修の種類」①〜⑥、苅田町・行橋用の「改修内容」）。どの箇所もこのどれかにあてはめる */
+/** 改修の種類（広域連合用の「改修の種類」①〜⑥、苅田町・行橋市・みやこ町用の「改修内容」）。どの箇所もこのどれかにあてはめる */
 export const KINDS = ['手すりの取付', '段差の解消', '床材の変更', '扉の取替', '便器の取替', '付帯工事'];
-/** みやこ町・広域連合用の「改修箇所毎工事名称」に書く名前（元の見積書の「手すり取付」） */
+/** 広域連合用の「改修箇所毎工事名称」に書く名前（元の見積書の「手すり取付」） */
 const KIND_WORK = ['手すり取付', '段差解消', '床材変更', '扉取替', '便器取替', '付帯工事'];
 
-/** 住所の市町村から書式を決める（福岡県介護保険広域連合の京築の町・市は広域連合の様式）。分からなければ null */
+/** 住所の市町村から書式を決める（築上町・豊前市・上毛町・吉富町は広域連合の様式、苅田町・行橋市・みやこ町はもう一方）。分からなければ null */
 export function formForAddress(address: string): EstimateForm | null {
   const a = normalize(address);
-  if (/みやこ町|築上町|豊前市|上毛町|吉富町/.test(a)) return 'kouiki';
-  if (/行橋市|苅田町/.test(a)) return 'yukuhashi';
+  if (/築上町|豊前市|上毛町|吉富町/.test(a)) return 'kouiki';
+  if (/行橋市|苅田町|みやこ町/.test(a)) return 'yukuhashi';
   return null;
 }
 
@@ -43,7 +43,7 @@ export function circled(n: number): string {
   return n >= 1 && n <= 20 ? String.fromCharCode(0x2460 + n - 1) : `(${n})`;
 }
 
-/** 箇所の改修内容（苅田町・行橋用）・工事名称（みやこ町・広域連合用）。改修の種類から決まる */
+/** 箇所の改修内容（苅田町・行橋市・みやこ町用）・工事名称（広域連合用）。改修の種類から決まる */
 export function placeWork(place: Pick<Place, 'kind'>, form: EstimateForm): string {
   return (form === 'kouiki' ? KIND_WORK : KINDS)[place.kind - 1] || '';
 }
@@ -67,6 +67,20 @@ const shownLines = (place: Pick<Place, 'rows'>, rate: number) => estimatePlaceLi
 export function materialText(r: Row): string {
   const base = [r.maker, r.code, r.name].map((x) => x.trim()).filter(Boolean).join(' ') || '材料費';
   return r.lengthCm > 0 && !cutToLength(r) ? `${base}（長さ${num(r.lengthCm)}cm）` : base;
+}
+
+// 単位のない部材のうち「本」で数える既製品の手すり（TOTO のインテリア・バー、手すり棒・パイプ）。手すりの部品はのぞく
+const READY_MADE_BAR = /手すり|てすり|バー|丸棒|パイプ/;
+const BAR_PARTS = /ブラケット|キャップ|ジョイント|金具|受け|ベース|カバー|エンド|スタンド|支柱|アダプター|スペーサー|ソケット|ホルダー|チーズ|エルボ|プレート|ビス|ネジ|ねじ/;
+
+/**
+ * 見積書の単位。切って使う部材は「本」。部材リストに単位のない部材（単位の列のないメーカーの表から取り込んだもの）は、
+ * 既製品の手すり（TOTO「インテリア・バーF Lタイプ」など）なら「本」。手で入れた単位があればそれ
+ */
+export function rowUnit(r: Row): string {
+  if (cutToLength(r)) return '本';
+  const name = normalize(r.name);
+  return r.unit.trim() || (READY_MADE_BAR.test(name) && !BAR_PARTS.test(name) ? '本' : '');
 }
 
 /** 切って使う部材の数量の計算。長さは mm で書く（例：60cm を 4m から → 600÷4000＝0.15、同じ長さを2本なら 600÷4000×2＝0.3）。切らない部材は '' */
@@ -93,7 +107,7 @@ export type FormLine = {
   isWork: boolean; // 施工費のまとまり
   first: boolean; // 箇所の最初の行（箇所名・工事名称・写真番号・改修の種類を出す）
   placeName: string;
-  work: string; // 工事名称（苅田町・行橋用は改修内容）。改修の種類から
+  work: string; // 工事名称（苅田町・行橋市・みやこ町用は改修内容）。改修の種類から
   kind: number; // 改修の種類 1〜6
   photo: number; // 写真番号
   mark: '材' | '手';
@@ -143,7 +157,7 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
           text: r.estText ?? auto,
           autoText: auto,
           qty: l.qty,
-          unit: cutToLength(r) ? '本' : r.unit.trim(),
+          unit: rowUnit(r),
           unitPrice: l.unitPrice,
           amount: l.amount,
           listPrice: r.listPrice > 0 ? r.listPrice : 0,
@@ -156,7 +170,7 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
         });
         return;
       }
-      // みやこ町・広域連合用は「0.8時間×2,500円＝2,000円」のように時間で書く。時間が小数2けたで割り切れないときは「1式」
+      // 広域連合用は「0.8時間×2,500円＝2,000円」のように時間で書く。時間が小数2けたで割り切れないときは「1式」
       const hours = form === 'kouiki' ? workHours(l.amount, s.estimateHourRate) : null;
       const hourly = hours !== null;
       const head = l.rows[0];
@@ -227,7 +241,7 @@ export function sheetNewLine(job: Pick<Job, 'places'>, lines: FormLine[], form: 
 }
 
 /**
- * 手で直していないときの備考（定価等・苅田町・行橋用）／算出根拠（みやこ町・広域連合用）。1行ずつ。
+ * 手で直していないときの備考（定価等・苅田町・行橋市・みやこ町用）／算出根拠（広域連合用）。1行ずつ。
  * 部材は「定価8,000円（税抜）×0.8」（見積の単価を手で入れた行は ×0.8 を付けない）。
  * 切って使う部材は「定価20,000円（4m）×0.8」（かっこは1本の長さ）と、2行目に「600÷4000＝0.15」。
  * 算出根拠は対象工事部分の欄なので、介護保険の対象外の行は空。時間で書いた施工費は「1時間2,500円」

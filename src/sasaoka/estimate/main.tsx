@@ -1,10 +1,11 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
+import App from '../App.tsx';
 import '../sasaoka.css';
-import EstimateApp from './EstimateApp.tsx';
 
+// 太陽ポータルの jutaku-mitsumori/（もとの「住宅改修 見積書作成」）：「見積もりを作成する」から開く
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <EstimateApp />
+    <App start="estimate" />
   </StrictMode>,
 );

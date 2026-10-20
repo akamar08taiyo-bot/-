@@ -41,7 +41,7 @@ function totalRows(t: EstimateTotals): [string, number, number][] {
   ];
 }
 
-// ================================================================ 苅田町・行橋用「工事費見積書兼工事費内訳書」
+// ================================================================ 苅田町・行橋市・みやこ町用「工事費見積書兼工事費内訳書」
 // 列 A〜M の幅（mm）。A 改修内容／B 改修場所（写真No.）／C 内容（規格・範囲）／D・E 数量と単位／F 単価／G 金額／
 // H〜K 介護保険対象部分（数量・単位・単価・金額）／L 介護保険対象外金額／M 備考（定価等）
 const YK = {A: 31.1, B: 24.9, C: 48.1, D: 7.1, E: 7.1, F: 15.5, G: 22.3, H: 7.1, I: 7.1, J: 15.5, K: 25.2, L: 22.9, M: 32.2};
@@ -234,7 +234,7 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
     return (
       <tr className="g sheet-new" style={{height: `${YK_ROW}mm`}} data-new="">
         {cell(l.first ? l.work : '', YK.A, 11, 'ml', nk('work'))}
-        {cell(l.first && l.placeName ? `${l.placeName}${circled(l.photo)}` : '', YK.B, 11, '', nk('name'))}
+        {cell(l.first && l.placeName ? `${circled(l.photo)}${l.placeName}` : '', YK.B, 11, '', nk('name'))}
         {cell('', YK.C, 9, '', nk('text'))}
         {cell('', YK.D, 9, 'r nr', nk('qty'))}
         {cell('', YK.E, 11, 'nl', nk('unit'))}
@@ -255,7 +255,8 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
   return (
     <tr className="g" style={{height: `${YK_ROW}mm`}} {...(editable ? {'data-rows': l.rowIds.join(' ')} : {})}>
       {cell(l.first ? l.work : '', YK.A, 11, 'ml', l.first ? `place:${l.placeId}:work` : null)}
-      {cell(l.first ? `${l.placeName}${circled(l.photo)}` : '', YK.B, 11, '', l.first ? `place:${l.placeId}:name` : null)}
+      {/* 改修場所（写真No.）：「①勝手口」。写真番号のあとに箇所名を打ち込める */}
+      {cell(l.first ? `${circled(l.photo)}${l.placeName}` : '', YK.B, 11, '', l.first ? `place:${l.placeId}:name` : null)}
       {cell(l.text, YK.C, 9, '', k('text'), 2)}
       {cell(qty, YK.D, 9, 'r nr', l.isWork ? null : k('qty'))}
       {cell(l.unit, YK.E, 11, 'nl', l.isWork || l.cut ? null : k('unit'))}
@@ -279,7 +280,7 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
   );
 }
 
-// ================================================================ みやこ町・広域連合用「住宅改修内訳明細書」（福岡県介護保険広域連合の様式）
+// ================================================================ 広域連合用「住宅改修内訳明細書」（福岡県介護保険広域連合の様式）
 // 列 A〜R の幅（mm）。E・J は区切りの二重線のすき間。
 // A 改修箇所（室名）／B 改修箇所毎工事名称／C 材・手／D 部材・仕様／F〜I 全改修工事部分（数量・単位・単価・金額）／
 // K 写真番号／L 改修の種類／M〜P 対象工事部分（数量・単位・単価・金額）／Q・R 算出根拠

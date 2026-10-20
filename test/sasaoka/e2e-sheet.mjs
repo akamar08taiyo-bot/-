@@ -1,7 +1,7 @@
 // 住宅改修 見積書作成：見積書に直接入力（Excel のように欄を選んで打ち込む）を確かめる：
 // 新しい見積書を見積書の形のまま打ち込む（お客様名・改修内容・改修場所・内容の候補（★お気に入り）・数量 60cm・同上施工費・備考に定価）→
 // 合計・元に戻す・行の挿入／移動／削除・介護保険の対象外・諸経費・作成日・笹岡工務店の請求書に入れる（仕切価格を入れる）・
-// 広域連合用（材／手・時間）・仕切り計算・請求書作成アプリとのつながり
+// 広域連合用（材／手・時間）・「請求書を確認する」とのつながり
 // usage: node e2e-sheet.mjs <サイトのURL> <出力フォルダ>
 //   サイトは太陽ポータルと同じ形（<サイト>/jutaku-mitsumori/index.html と <サイト>/sasaoka/index.html）
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
@@ -20,7 +20,7 @@ page.on('console', (m) => m.type() === 'error' && errors.push('console: ' + m.te
 page.on('dialog', (d) => d.accept());
 await page.goto(`${site}/jutaku-mitsumori/index.html`);
 await page.getByRole('button', {name: /サンプルで試す/}).click(); // 部材リスト（★お気に入り）と取付手間の単価
-await page.getByRole('button', {name: '＋ 苅田町・行橋用の見積書'}).click();
+await page.getByRole('button', {name: '＋ 苅田町・行橋市・みやこ町用の見積書'}).click();
 
 const sheet = page.getByRole('region', {name: '見積書に直接入力'});
 await sheet.waitFor();
@@ -64,7 +64,7 @@ await page.keyboard.type('60cm');
 await page.keyboard.press('Enter');
 await page.screenshot({path: path.join(outDir, '40-sheet-first.png')});
 let rail = await tds('木の手すり 35φ 4m');
-assert.deepEqual(rail.slice(0, 7), ['手すりの取付', '浴室①', 'サンプル S-TS35 木の手すり 35φ 4m', '0.15', '本', '16,000', '2,400'], rail.join('|'));
+assert.deepEqual(rail.slice(0, 7), ['手すりの取付', '①浴室', 'サンプル S-TS35 木の手すり 35φ 4m', '0.15', '本', '16,000', '2,400'], rail.join('|'));
 assert.ok(rail[12].includes('定価20,000円（4m）×0.8') && rail[12].includes('600÷4000＝0.15'), rail[12]);
 log('改修内容・改修場所・内容（候補から）・数量 60cm＝0.15本OK');
 
@@ -119,7 +119,7 @@ await page.keyboard.press('Tab');
 await page.keyboard.type('L型');
 await page.keyboard.press('ArrowDown');
 await page.keyboard.press('Enter');
-assert.deepEqual((await tds('L型手すり')).slice(0, 7), ['手すりの取付', 'トイレ②', 'サンプル S-TL01 L型手すり', '1', '本', '8,800', '8,800']);
+assert.deepEqual((await tds('L型手すり')).slice(0, 7), ['手すりの取付', '②トイレ', 'サンプル S-TL01 L型手すり', '1', '本', '8,800', '8,800']);
 log('空いた行・新しい箇所OK');
 
 // ---------------- ツールバー：下に1行入れる → 打ち込む／上へ／介護保険の対象外（スペース）／消す
@@ -167,12 +167,16 @@ await cell(await key('手すり受け', 'text')).click();
 await sheet.getByRole('button', {name: 'この部材（と同上施工費）を消す'}).click();
 log('見積書の外を押すと打った値が入るOK');
 
-// ---------------- 笹岡工務店の請求書に入れる：請求書に入る金額を出し、仕切価格のない部材を知らせ、その場で入れられる
+// ---------------- 笹岡工務店の請求書：新しい見積書は最初から入っていて、打ち込んだ内容で請求書に入る金額を自動で出す。
+// 仕切価格のない部材を知らせ、その場で入れられる。外すと金額は出ない
 await typeIn('new:text', '取付金具', 'Tab');
 await page.keyboard.press('Enter');
 const link = page.getByRole('region', {name: '笹岡工務店の請求書'});
-assert.ok(!(await link.innerText()).includes('①部材代'), '入れる前から金額が出ている');
-await link.getByLabel('笹岡工務店の請求書に入れる').check();
+const inInvoice = link.getByLabel('笹岡工務店の請求書に入れる');
+assert.equal(await inInvoice.isChecked(), true);
+await inInvoice.uncheck();
+assert.ok(!(await link.innerText()).includes('①部材代'), '外しても金額が出ている');
+await inInvoice.check();
 assert.ok((await link.innerText()).includes('仕切価格が入っていない部材が 1 行'), await link.innerText());
 await link.getByRole('button', {name: '仕切価格を入れる'}).click();
 await page.getByRole('dialog').getByRole('textbox', {name: '取付金具の仕切価格'}).fill('300');
@@ -180,15 +184,17 @@ await page.getByRole('dialog').getByRole('button', {name: '閉じる'}).first().
 // 部材代：木の手すり 60cm（10,000×0.15＝1,500）＋L型 7,800＋エンドキャップ 300＋取付金具 300＝9,900、取付手間 2,000
 const linkText = await link.innerText();
 assert.ok(linkText.includes('①部材代（仕切価格） 9,900') && linkText.includes('②取付手間 2,000') && !linkText.includes('仕切価格が入っていない'), linkText);
-log('笹岡工務店の請求書に入れる・仕切価格を入れるOK');
+log('笹岡工務店の請求書に最初から入る・外す・仕切価格を入れるOK');
 
-// ---------------- 工事場所をみやこ町にすると「みやこ町・広域連合用」の書式だと知らせる（打っている途中では変えない）。
-// ボタンで広域連合用に。材／手を「手」にすると施工費（数量は時間）
+// ---------------- 工事場所を築上町にすると「広域連合用」の書式だと知らせる（打っている途中では変えない）。みやこ町は今の書式のまま。
+// ボタンで広域連合用に。材／手を「手」にすると施工費（数量は時間・1時間2,500円）
 await typeIn('job:address', '福岡県京都郡みやこ町豊津');
+assert.equal(await page.getByRole('button', {name: '広域連合用にする'}).count(), 0);
+await typeIn('job:address', '福岡県築上郡築上町椎田');
 assert.ok((await sheet.locator('.form-page').first().innerText()).includes('工事費見積書兼工事費内訳書'));
-await page.getByRole('button', {name: 'みやこ町・広域連合用にする'}).click();
+await page.getByRole('button', {name: '広域連合用にする'}).click();
 await sheet.locator('.form-page', {hasText: '内訳書　様式'}).first().waitFor();
-assert.equal(await page.getByRole('button', {name: 'みやこ町・広域連合用にする'}).count(), 0);
+assert.equal(await page.getByRole('button', {name: '広域連合用にする'}).count(), 0);
 await cell('new:mark').click();
 await page.keyboard.press(' ');
 assert.equal((await cell('new:mark').innerText()).trim(), '手');
@@ -199,18 +205,18 @@ assert.deepEqual(hours.slice(2, 9).filter((t) => t !== ''), ['手', '同上施�
 await page.screenshot({path: path.join(outDir, '41-sheet-kouiki.png')});
 log('広域連合用：材／手・時間OK');
 
-// ---------------- 仕切り計算・請求書作成アプリで開くと、同じ入力から仕切り計算表ができている（別のアプリ・同じデータ）
+// ---------------- 「請求書を確認する」で開くと、同じ入力から仕切り計算表ができている（同じデータ）
 await page.waitForTimeout(600); // 自動保存を待つ
-await link.getByRole('link', {name: '仕切り計算・請求書作成で開く →'}).click();
-await page.waitForURL(/\/sasaoka\/index\.html#job=/);
+await link.getByRole('button', {name: /請求書（仕切り計算表）で見る/}).click();
+await page.waitForURL(/#tab=invoice&job=/);
 await page.getByRole('heading', {level: 1, name: '見本 太郎様邸'}).waitFor();
 const shikiri = await page.locator('aside table').innerText();
 assert.ok(shikiri.includes('部材代合計') && shikiri.includes('9,900') && shikiri.includes('5,000'), shikiri); // 取付手間 2,000＋3,000
 log('仕切り計算表につながるOK');
 
-// ---------------- 仕切り計算・請求書作成アプリから「見積書を開く」で戻ると、同じ見積書
-await page.getByRole('link', {name: '📝 見積書を開く'}).click();
-await page.waitForURL(/\/jutaku-mitsumori\/index\.html#job=/);
+// ---------------- 「請求書を確認する」の「見積書を開く」で戻ると、同じ見積書
+await page.getByRole('button', {name: '📝 見積書を開く'}).click();
+await page.waitForURL(/#tab=estimate&job=/);
 await sheet.waitFor();
 assert.ok((await sheet.innerText()).includes('同上施工費'));
 assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '見本 太郎様邸');

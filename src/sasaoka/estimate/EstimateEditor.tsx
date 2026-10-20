@@ -1,17 +1,17 @@
 import {useState} from 'react';
 import {jobName, jobTotals} from '../calc.ts';
 import {EstimateSheet} from '../components/EstimateSheet.tsx';
-import {copyJob, LaborPickerFor, missingShikiri, ShikiriPriceDialog} from '../components/JobTools.tsx';
+import {LaborPickerFor, missingShikiri, ShikiriPriceDialog} from '../components/JobTools.tsx';
 import {KitPicker} from '../components/Kits.tsx';
 import {MaterialPicker} from '../components/Pickers.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_IDS, FORM_INFO, formForAddress, jobForm} from '../estimateForms.ts';
-import {appUrl, APP_NAMES} from '../links.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
-import {newPlace as makePlace} from '../rows.ts';
+import {addMaterial, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
 import type {AppData, EstimateForm, Job, Kit, Material, NameSuffix, Place} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {monthLabel, staffFull, thisMonth, yen} from '../util.ts';
+import {duplicateEstimate, removeEstimate} from './EstimateList.tsx';
 
 type Picker =
   | {placeId: string; kind: 'material'}
@@ -25,6 +25,7 @@ export function EstimateEditor({
   update,
   onBack,
   onOpen,
+  onOpenInvoice,
   onPrint,
 }: {
   job: Job;
@@ -32,6 +33,7 @@ export function EstimateEditor({
   update: Update;
   onBack: () => void;
   onOpen: (id: string) => void;
+  onOpenInvoice: (id: string) => void; // 「請求書を確認する」で同じ様邸の仕切り計算表を開く
   onPrint: (r: PrintRequest) => void;
 }) {
   const toast = useToast();
@@ -56,18 +58,9 @@ export function EstimateEditor({
 
   const name = job.customer.trim() ? jobName(job) : '新しい見積書';
   const removeJob = () => {
-    const also = job.shikiri ? `笹岡工務店の請求書（${monthLabel(job.month)}分）からも消えます。` : '';
-    if (!confirm(`「${name}」の見積書を削除します。${also}元に戻せません。よろしいですか？`)) return;
-    update('jobs', (list) => list.filter((j) => j.id !== job.id));
-    toast(`「${name}」を削除しました`);
-    onBack();
+    if (removeEstimate(job, name, update, toast)) onBack();
   };
-  const duplicate = () => {
-    const c = {...copyJob(job), shikiri: false};
-    update('jobs', (list) => [...list, c]);
-    toast('複製しました。お客様名などを書き換えてください。');
-    onOpen(c.id);
-  };
+  const duplicate = () => onOpen(duplicateEstimate(job, update, toast).id);
 
   const toggleFavorite = (id: string) => update('materials', (list) => list.map((m) => (m.id === id ? {...m, favorite: !m.favorite} : m)));
   const addToMaster = (m: Material) => update('materials', (list) => [...list, m]);
@@ -107,7 +100,7 @@ export function EstimateEditor({
         </div>
       </div>
 
-      {/* 見積書の欄にないものだけ（苅田町・行橋用は、お客様名・被保険者番号・工事場所・作成日を見積書の欄に打ち込む） */}
+      {/* 見積書の欄にないものだけ（苅田町・行橋市・みやこ町用は、お客様名・被保険者番号・工事場所・作成日を見積書の欄に打ち込む） */}
       <section className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
         {form === 'kouiki' && (
           <>
@@ -194,6 +187,9 @@ export function EstimateEditor({
         )}
       </section>
 
+      {/* 笹岡工務店の請求書に入る金額は、見積書に打ち込むとすぐ変わる（見積書の上に出して、打ちながら見えるように） */}
+      <ShikiriPanel job={job} data={data} setJob={setJob} onFix={() => setFixPrices(true)} onOpenInvoice={() => onOpenInvoice(job.id)} />
+
       <EstimateSheet
         job={job}
         settings={s}
@@ -201,12 +197,10 @@ export function EstimateEditor({
         materials={data.materials}
         setJob={setJob}
         onPickMaterial={(placeId) => setPicker({placeId: placeFor(placeId), kind: 'material'})}
-        onPickLabor={(placeId, rowId) => setPicker({placeId, kind: 'labor', rowId})}
+        onPickLabor={(placeId, rowId) => setPicker({placeId: placeFor(placeId), kind: 'labor', rowId})}
         onPickKit={(placeId) => setPicker({placeId: placeFor(placeId), kind: 'kit'})}
         onPrint={() => onPrint({kind: 'estimate', jobId: job.id})}
       />
-
-      <ShikiriPanel job={job} data={data} setJob={setJob} onFix={() => setFixPrices(true)} />
 
       {fixPrices && <ShikiriPriceDialog job={job} materials={data.materials} setJob={setJob} update={update} onClose={() => setFixPrices(false)} />}
       {picker && pickPlace && picker.kind === 'material' && (
@@ -215,17 +209,8 @@ export function EstimateEditor({
           materials={data.materials}
           mode="estimate"
           rate={s.estimateRate}
-          onAdd={(row) =>
-            setPlace(pickPlace.id, (p) => {
-              // 同じ部材をもう一度選んだら、行を増やさずに数量を足す
-              const same = row.refId ? p.rows.find((r) => r.kind === 'material' && r.refId === row.refId) : undefined;
-              if (!same) return {...p, rows: [...p.rows, row]};
-              return {
-                ...p,
-                rows: p.rows.map((r) => (r.id === same.id ? {...r, qty: r.qty + row.qty} : r)),
-              };
-            })
-          }
+          onAdd={(row) => setPlace(pickPlace.id, (p) => ({...p, rows: addMaterial(p.rows, row)}))}
+          onRemoveOne={(refId) => setPlace(pickPlace.id, (p) => ({...p, rows: removeOneMaterial(p.rows, refId)}))}
           onToggleFavorite={toggleFavorite}
           onAddToMaster={addToMaster}
           onClose={() => setPicker(null)}
@@ -269,7 +254,19 @@ export function EstimateEditor({
  * 笹岡工務店の請求書：選ぶと、この見積書の部材（仕切価格）と施工費が、仕切り計算・請求書作成アプリの仕切り計算表と請求書（請求する月の分）に入る。
  * 見積書と同じ入力から作るので、入れ直さなくてよい（見積書を直すと請求書も変わる）
  */
-function ShikiriPanel({job, data, setJob, onFix}: {job: Job; data: AppData; setJob: (fn: (j: Job) => Job) => void; onFix: () => void}) {
+function ShikiriPanel({
+  job,
+  data,
+  setJob,
+  onFix,
+  onOpenInvoice,
+}: {
+  job: Job;
+  data: AppData;
+  setJob: (fn: (j: Job) => Job) => void;
+  onFix: () => void;
+  onOpenInvoice: () => void;
+}) {
   const t = jobTotals(job, data.settings);
   const missing = missingShikiri(job);
   const client = data.settings.clientName || '笹岡工務店';
@@ -318,19 +315,14 @@ function ShikiriPanel({job, data, setJob, onFix}: {job: Job; data: AppData; setJ
                 aria-label="施工日"
               />
             </label>
-            <a
-              href={appUrl('shikiri', job.id)}
-              className="ml-auto rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50"
-            >
-              {APP_NAMES.shikiri}で開く →
-            </a>
+            <Btn small color="white" className="ml-auto" onClick={onOpenInvoice}>
+              🧾 請求書（仕切り計算表）で見る →
+            </Btn>
           </>
         ) : (
           <span className="text-xs text-slate-500">
-            {client}
-            の工事のときに選びます。この見積書の部材（仕切価格）と施工費が、
-            {APP_NAMES.shikiri}
-            の仕切り計算表と請求書に入ります（入れ直さなくてよくなります）。
+            この見積書は{client}の請求書に入れていません（{client}の工事でないとき）。チェックを入れると、部材（仕切価格）と施工費が
+            「請求書を確認する」の仕切り計算表と請求書に入り、自動で計算されます。
           </span>
         )}
       </div>

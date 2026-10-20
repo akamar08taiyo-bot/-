@@ -1,17 +1,18 @@
 import {useMemo, useState} from 'react';
 import {estimateTotals, jobName} from '../calc.ts';
+import {copyJob} from '../components/JobTools.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_IDS, FORM_INFO, jobForm} from '../estimateForms.ts';
 import {readDocDate} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {addSamples, hasSamples} from '../samples.ts';
-import type {AppData, EstimateForm, Job} from '../types.ts';
+import type {AppData, EstimateForm, Job, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
-import {matchesAll, monthLabel, staffShort, thisMonth, uid, yen} from '../util.ts';
+import {addMonths, matchesAll, monthLabel, staffShort, thisMonth, uid, yen} from '../util.ts';
 
 const SHOW_LIMIT = 100;
 
-/** 新しい見積書。選んだ書式で作る。笹岡工務店の請求書には、選んだときだけ入れる */
+/** 新しい見積書。選んだ書式で作る。笹岡工務店の請求書（今月分）に最初から入れる（笹岡工務店の工事でなければ、見積書の画面で外す） */
 export function newEstimate(form: EstimateForm): Job {
   const now = Date.now();
   return {
@@ -27,11 +28,28 @@ export function newEstimate(form: EstimateForm): Job {
     form,
     overhead: null,
     overheadTarget: null,
-    shikiri: false,
+    shikiri: true,
     places: [],
     createdAt: now,
     updatedAt: now,
   };
+}
+
+/** 見積書を削除する（確かめてから）。笹岡工務店の請求書に入れていれば、そこからも消えると知らせる。消したら true */
+export function removeEstimate(job: Job, label: string, update: Update, toast: (text: string) => void): boolean {
+  const also = job.shikiri ? `笹岡工務店の請求書（${monthLabel(job.month)}分）からも消えます。` : '';
+  if (!confirm(`「${label}」の見積書を削除します。${also}元に戻せません。よろしいですか？`)) return false;
+  update('jobs', (list) => list.filter((j) => j.id !== job.id));
+  toast(`「${label}」を削除しました`);
+  return true;
+}
+
+/** 見積書を複製する（お客様名に「（コピー）」。今月分の笹岡工務店の請求書に入れる）。複製したものを返す */
+export function duplicateEstimate(job: Job, update: Update, toast: (text: string) => void): Job {
+  const c = {...copyJob(job), shikiri: true, month: thisMonth()};
+  update('jobs', (list) => [...list, c]);
+  toast('複製しました。お客様名などを書き換えてください。');
+  return c;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -44,16 +62,139 @@ const dateText = (iso: string) => {
   return m ? `${Number(m[1])}/${Number(m[2])}/${Number(m[3])}` : '';
 };
 
+/** 見積書の作成日（見積書の右上の日付。入れていなければ作った日） */
+const estimateDate = (job: Job) => readDocDate(`est:${job.id}`) || isoOf(job.createdAt);
+
+function useEstimates(data: AppData, s: Settings) {
+  // 作成日の新しい順
+  return useMemo(
+    () =>
+      data.jobs
+        .map((job) => ({job, date: estimateDate(job), form: jobForm(job, s), t: estimateTotals(job, s)}))
+        .sort((a, b) => b.date.localeCompare(a.date) || b.job.createdAt - a.job.createdAt),
+    [data.jobs, s],
+  );
+}
+
+/** 見積もりを作成する：最初に「新規作成」か「一覧から作成」かを選ぶ */
+export function EstimateHome({
+  data,
+  update,
+  onNew,
+  onList,
+  goMaterials,
+}: {
+  data: AppData;
+  update: Update;
+  onNew: (form: EstimateForm) => void;
+  onList: () => void;
+  goMaterials: () => void;
+}) {
+  const all = useEstimates(data, data.settings);
+  const month = thisMonth();
+  const inMonth = all.filter((e) => e.date.startsWith(month)).length;
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        <section className="rounded-xl border-2 border-emerald-600 bg-white p-5 shadow-sm" aria-label="新規作成">
+          <h2 className="text-xl font-bold text-[#14532d]">＋ 新規作成</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-600">新しい見積書を作ります。工事場所の市町村の書式を選んでください。</p>
+          <div className="mt-4 grid gap-3">
+            {FORM_IDS.map((f) => (
+              <Btn key={f} color="emerald" className="!justify-start !px-5 !py-4 !text-base" onClick={() => onNew(f)}>
+                ＋ {FORM_INFO[f].name}の見積書
+                <span className="ml-1 text-xs font-normal text-emerald-50">
+                  （{FORM_INFO[f].title}
+                  {f === 'kouiki' && data.settings.estimateHourRate > 0 ? `・施工費は1時間${yen(data.settings.estimateHourRate)}円` : ''}）
+                </span>
+              </Btn>
+            ))}
+          </div>
+        </section>
+        <section className="rounded-xl border-2 border-slate-300 bg-white p-5 shadow-sm" aria-label="一覧から作成">
+          <h2 className="text-xl font-bold text-slate-800">📋 一覧から作成</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-600">
+            作った見積書を、月ごとの一覧から開いて続きを打ち込みます。「複製」で、前の見積書をもとに新しい見積書を作れます。
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Btn color="white" className="!px-5 !py-4 !text-base" onClick={onList}>
+              📋 見積書の一覧を開く
+            </Btn>
+            <span className="text-sm text-slate-600">
+              {monthLabel(month)}：{inMonth}件　／　全部で {all.length}件
+            </span>
+          </div>
+        </section>
+      </div>
+      {all.length === 0 && <GettingStarted data={data} update={update} goMaterials={goMaterials} onSample={onList} />}
+    </div>
+  );
+}
+
+/** はじめて使うときの説明 */
+function GettingStarted({data, update, goMaterials, onSample}: {data: AppData; update: Update; goMaterials: () => void; onSample?: () => void}) {
+  const toast = useToast();
+  const s = data.settings;
+  return (
+    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm leading-7 text-slate-600">
+      <p className="text-base font-bold text-slate-800">見積書はまだありません。</p>
+      <ol className="mt-2 list-decimal space-y-1 pl-6">
+        <li>
+          「
+          <button type="button" className="font-bold text-purple-800 underline" onClick={goMaterials}>
+            部材・工賃マスタ
+          </button>
+          」で、メーカーの価格表（Excel・CSV・PDF）を取り込み、よく使う部材に★を付けます。
+        </li>
+        <li>
+          「＋ 新規作成」で書式を選ぶと、いただいた見積書の形が出ます。Excel と同じように欄を選んで打ち込みます。
+        </li>
+        <li>
+          品名を打つと部材リストの候補が出ます（★お気に入りが先）。備考（算出根拠）に定価を入れると、単価は定価×
+          {s.estimateRate} になります。
+        </li>
+        <li>
+          見積書に入れた内容は、そのまま笹岡工務店の仕切り計算表と請求書（「請求書を確認する」）に入り、自動で計算されます（笹岡工務店の工事でない見積書は、見積書の上の「笹岡工務店の請求書に入れる」を外します）。
+        </li>
+      </ol>
+      {!hasSamples(data) && (
+        <div className="mt-4">
+          <Btn
+            color="white"
+            onClick={() => {
+              const r = addSamples(data, thisMonth());
+              update('materials', () => r.materials);
+              update('jobs', () => r.jobs);
+              update('kits', () => r.kits);
+              toast('サンプルの部材5件と「（サンプル）山田様邸」の見積書・一式1件を入れました。設定画面からまとめて消せます。');
+              onSample?.();
+            }}
+          >
+            サンプルで試す（玄関・トイレの例）
+          </Btn>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 見積書の一覧（作成日の月ごと）。探すときは、すべての月から探す */
 export function EstimateList({
   data,
   update,
+  month,
+  setMonth,
   onOpen,
+  onNew,
   onPrint,
   goMaterials,
 }: {
   data: AppData;
   update: Update;
+  month: string;
+  setMonth: (m: string) => void;
   onOpen: (id: string) => void;
+  onNew: (form: EstimateForm) => void;
   onPrint: (r: PrintRequest) => void;
   goMaterials: () => void;
 }) {
@@ -61,82 +202,51 @@ export function EstimateList({
   const s = data.settings;
   const [query, setQuery] = useState('');
   const [limit, setLimit] = useState(SHOW_LIMIT);
-
-  // 作成日（見積書の右上の日付。入れていなければ作った日）の新しい順
-  const all = useMemo(
-    () =>
-      data.jobs
-        .map((job) => ({
-          job,
-          date: readDocDate(`est:${job.id}`) || isoOf(job.createdAt),
-          form: jobForm(job, s),
-          t: estimateTotals(job, s),
-        }))
-        .sort((a, b) => b.date.localeCompare(a.date) || b.job.createdAt - a.job.createdAt),
-    [data.jobs, s],
-  );
+  const all = useEstimates(data, s);
+  const searching = query.trim() !== '';
   const list = useMemo(
-    () => all.filter(({job}) => matchesAll(`${job.customer} ${job.address} ${job.staff} ${job.places.map((p) => p.name).join(' ')}`, query)),
-    [all, query],
+    () =>
+      searching
+        ? all.filter(({job}) => matchesAll(`${job.customer} ${job.address} ${job.staff} ${job.places.map((p) => p.name).join(' ')}`, query))
+        : all.filter((e) => e.date.startsWith(month)),
+    [all, query, searching, month],
   );
-
-  const add = (form: EstimateForm) => {
-    const j = newEstimate(form);
-    update('jobs', (jobs) => [...jobs, j]);
-    onOpen(j.id);
-  };
-
-  const trySample = () => {
-    const r = addSamples(data, thisMonth());
-    update('materials', () => r.materials);
-    update('jobs', () => r.jobs);
-    update('kits', () => r.kits);
-    toast('サンプルの部材5件と「（サンプル）山田様邸」の見積書・一式1件を入れました。設定画面からまとめて消せます。');
-  };
+  const total = list.reduce((n, e) => n + e.t.all.total, 0);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
+        <div className={`flex items-center gap-1 rounded-lg border border-slate-300 bg-white p-1 shadow-sm ${searching ? 'opacity-50' : ''}`}>
+          <button type="button" className="rounded-md px-3 py-1.5 text-lg font-bold text-slate-600 hover:bg-slate-100" onClick={() => setMonth(addMonths(month, -1))} aria-label="前の月">
+            ◀
+          </button>
+          <label className="flex items-center gap-2 px-1">
+            <span className="text-lg font-bold text-[#14532d]">{monthLabel(month)}</span>
+            <input
+              type="month"
+              value={month}
+              onChange={(e) => e.target.value && setMonth(e.target.value)}
+              className="h-8 w-[9.5rem] rounded border border-slate-300 px-1 text-sm"
+              aria-label="見積書を作った月"
+            />
+          </label>
+          <button type="button" className="rounded-md px-3 py-1.5 text-lg font-bold text-slate-600 hover:bg-slate-100" onClick={() => setMonth(addMonths(month, 1))} aria-label="次の月">
+            ▶
+          </button>
+        </div>
         {FORM_IDS.map((f) => (
-          <Btn key={f} color="emerald" onClick={() => add(f)}>
+          <Btn key={f} color="emerald" onClick={() => onNew(f)}>
             ＋ {FORM_INFO[f].name}の見積書
           </Btn>
         ))}
-        <TextInput value={query} onChange={setQuery} placeholder="お客様名・住所・担当で探す" className="ml-auto w-64 text-sm" aria-label="見積書を探す" />
+        <TextInput value={query} onChange={setQuery} placeholder="お客様名・住所・担当で探す（すべての月）" className="ml-auto w-72 text-sm" aria-label="見積書を探す" />
       </div>
 
       {all.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm leading-7 text-slate-600">
-          <p className="text-base font-bold text-slate-800">見積書はまだありません。</p>
-          <ol className="mt-2 list-decimal space-y-1 pl-6">
-            <li>
-              「
-              <button type="button" className="font-bold text-emerald-800 underline" onClick={goMaterials}>
-                部材リスト（★お気に入り）
-              </button>
-              」で、メーカーの価格表（Excel・CSV・PDF）を取り込み、よく使う部材に★を付けます（仕切り計算・請求書作成アプリと同じ部材リストです）。
-            </li>
-            <li>
-              上の「＋ 苅田町・行橋用の見積書」か「＋ みやこ町・広域連合用の見積書」を押すと、いただいた見積書の形が出ます。Excel
-              と同じように欄を選んで打ち込みます。
-            </li>
-            <li>
-              品名を打つと部材リストの候補が出ます（★お気に入りが先）。備考（算出根拠）に定価を入れると、単価は定価×
-              {s.estimateRate} になります。
-            </li>
-            <li>笹岡工務店の工事は、見積書の下の「笹岡工務店の請求書に入れる」を選ぶと、仕切り計算表と請求書に入ります。</li>
-          </ol>
-          {!hasSamples(data) && (
-            <div className="mt-4">
-              <Btn color="white" onClick={trySample}>
-                サンプルで試す（玄関・トイレの例）
-              </Btn>
-            </div>
-          )}
-        </div>
+        <GettingStarted data={data} update={update} goMaterials={goMaterials} />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-emerald-200 bg-white shadow-sm">
-          <table className="w-full min-w-[960px] text-sm">
+          <table className="w-full min-w-[1040px] text-sm">
             <thead className="bg-emerald-50 text-xs text-emerald-900">
               <tr>
                 <th className="px-2 py-2 text-left">作成日</th>
@@ -149,45 +259,63 @@ export function EstimateList({
               </tr>
             </thead>
             <tbody>
-              {list.slice(0, limit).map(({job, date, form, t}) => (
-                <tr key={job.id} className="cursor-pointer border-t border-slate-100 hover:bg-emerald-50/60" onClick={() => onOpen(job.id)}>
-                  <td className="whitespace-nowrap px-2 py-2 tabular-nums">{dateText(date)}</td>
-                  <td className="px-2 py-2 font-bold text-slate-800">
-                    {job.customer.trim() ? jobName(job) : <span className="text-slate-400">（お客様名なし）</span>}
-                    <span className="ml-2 text-xs font-normal text-slate-500">
-                      {job.places
-                        .map((p) => p.name)
-                        .filter(Boolean)
-                        .join('・')}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-2 py-2 text-xs">{FORM_INFO[form].name}</td>
-                  <td className="whitespace-nowrap px-2 py-2">{staffShort(job.staff) || <span className="text-slate-400">—</span>}</td>
-                  <td className="px-2 py-2 text-right font-bold tabular-nums text-emerald-900">{yen(t.all.total)}</td>
-                  <td className="whitespace-nowrap px-2 py-2 text-xs">
-                    {job.shikiri ? (
-                      <span className="rounded bg-[#0c315e] px-1.5 py-0.5 font-bold text-white">{monthLabel(job.month)}分に入れる</span>
-                    ) : (
-                      <span className="text-slate-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-2 py-1.5 text-right">
-                    <Btn
-                      small
-                      color="white"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onPrint({kind: 'estimate', jobId: job.id});
-                      }}
-                    >
-                      🖨 印刷
-                    </Btn>
-                  </td>
-                </tr>
-              ))}
+              {list.slice(0, limit).map(({job, date, form, t}) => {
+                // お客様名のない見積書は、作成日と金額でどれか分かるようにする
+                const label = job.customer.trim() ? jobName(job) : `お客様名なし・${dateText(date)}・${yen(t.all.total)}円`;
+                return (
+                  <tr key={job.id} className="cursor-pointer border-t border-slate-100 hover:bg-emerald-50/60" onClick={() => onOpen(job.id)}>
+                    <td className="whitespace-nowrap px-2 py-2 tabular-nums">{dateText(date)}</td>
+                    <td className="px-2 py-2 font-bold text-slate-800">
+                      {job.customer.trim() ? jobName(job) : <span className="text-slate-400">（お客様名なし）</span>}
+                      <span className="ml-2 text-xs font-normal text-slate-500">
+                        {job.places
+                          .map((p) => p.name)
+                          .filter(Boolean)
+                          .join('・')}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-2 py-2 text-xs">{FORM_INFO[form].name}</td>
+                    <td className="whitespace-nowrap px-2 py-2">{staffShort(job.staff) || <span className="text-slate-400">—</span>}</td>
+                    <td className="px-2 py-2 text-right font-bold tabular-nums text-emerald-900">{yen(t.all.total)}</td>
+                    <td className="whitespace-nowrap px-2 py-2 text-xs">
+                      {job.shikiri ? (
+                        <span className="rounded bg-[#0c315e] px-1.5 py-0.5 font-bold text-white">{monthLabel(job.month)}分に入れる</span>
+                      ) : (
+                        <span className="text-slate-400">入れない</span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-2 py-1.5 text-right" onClick={(e) => e.stopPropagation()}>
+                      <Btn small color="white" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
+                        🖨 印刷
+                      </Btn>
+                      <Btn small color="white" className="ml-1.5" onClick={() => onOpen(duplicateEstimate(job, update, toast).id)}>
+                        複製
+                      </Btn>
+                      <Btn small color="rose" className="ml-1.5" onClick={() => removeEstimate(job, label, update, toast)}>
+                        削除
+                      </Btn>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
+            {list.length > 0 && (
+              <tfoot>
+                <tr className="border-t border-slate-200 bg-emerald-50/60 text-sm">
+                  <td colSpan={4} className="px-2 py-2 text-right font-bold text-emerald-900">
+                    {searching ? `「${query}」の見積書` : `${monthLabel(month)}に作った見積書`}（{list.length}件）
+                  </td>
+                  <td className="px-2 py-2 text-right font-bold tabular-nums text-emerald-900">{yen(total)}</td>
+                  <td colSpan={2} />
+                </tr>
+              </tfoot>
+            )}
           </table>
-          {list.length === 0 && <p className="px-4 py-6 text-center text-sm text-slate-500">「{query}」の見積書は見つかりませんでした。</p>}
+          {list.length === 0 && (
+            <p className="px-4 py-6 text-center text-sm text-slate-500">
+              {searching ? `「${query}」の見積書は見つかりませんでした。` : `${monthLabel(month)}に作った見積書はありません。◀ ▶ でほかの月を見られます。`}
+            </p>
+          )}
           {list.length > limit && (
             <div className="border-t border-slate-100 px-4 py-2 text-center">
               <Btn small color="white" onClick={() => setLimit((n) => n + SHOW_LIMIT)}>

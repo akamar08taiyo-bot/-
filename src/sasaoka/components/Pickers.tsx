@@ -4,7 +4,7 @@ import {roundYen} from '../calc.ts';
 import {guessPieceLengthM} from '../priceImport.ts';
 import {laborCount, manualRow, materialRow, setLaborCount} from '../rows.ts';
 import type {AppMode, LaborItem, Material, Place, Row} from '../types.ts';
-import {matchesAll, uid, yen} from '../util.ts';
+import {matchesAll, num, uid, yen} from '../util.ts';
 import {Btn, Modal, NumberInput, Star, Stepper, TextInput} from './ui.tsx';
 
 const SHOW_LIMIT = 200;
@@ -19,6 +19,7 @@ export function MaterialPicker({
   mode,
   rate,
   onAdd,
+  onRemoveOne,
   onToggleFavorite,
   onAddToMaster,
   onClose,
@@ -28,6 +29,7 @@ export function MaterialPicker({
   mode: AppMode;
   rate: number;
   onAdd: (row: Row) => void;
+  onRemoveOne: (refId: string) => void; // − で1つ減らす（0 で行を消す）
   onToggleFavorite: (id: string) => void;
   onAddToMaster: (m: Material) => void;
   onClose: () => void;
@@ -76,7 +78,7 @@ export function MaterialPicker({
       title={
         <>
           「{place.name || '箇所'}」に部材を追加
-          <span className="ml-2 text-xs font-normal text-slate-500">「追加」を押すと1行入ります（続けて選べます）</span>
+          <span className="ml-2 text-xs font-normal text-slate-500">「追加」を押すと入ります。入れたあとは ＋／− で数量を変えられます（続けて選べます）</span>
         </>
       }
       onClose={onClose}
@@ -160,11 +162,25 @@ export function MaterialPicker({
                         {m.listPrice > 0 ? yen(roundYen(m.listPrice * rate)) : <span className="text-xs font-normal text-amber-700">定価なし</span>}
                       </td>
                     )}
-                    <td className="px-2 py-1 text-right">
-                      <Btn small color="emerald" onClick={() => onAdd(materialRow(m))}>
-                        ＋ 追加
-                      </Btn>
-                      {n > 0 && <span className="ml-1.5 text-xs font-bold text-emerald-700">×{n}</span>}
+                    <td className="whitespace-nowrap px-2 py-1 text-right">
+                      {n > 0 ? (
+                        // 入れた部材は ＋／− で数量を変える（0 にすると行を消す）
+                        <span className="inline-flex items-center gap-1">
+                          <Btn small color="white" className="!px-3 !text-sm" onClick={() => onRemoveOne(m.id)} aria-label={`${m.name}を1つ減らす`}>
+                            −
+                          </Btn>
+                          <span className="min-w-[2.5rem] text-center text-base font-bold tabular-nums text-emerald-800" aria-label={`${m.name}の数量`}>
+                            {num(n)}
+                          </span>
+                          <Btn small color="emerald" className="!px-3 !text-sm" onClick={() => onAdd(materialRow(m))} aria-label={`${m.name}を1つ増やす`}>
+                            ＋
+                          </Btn>
+                        </span>
+                      ) : (
+                        <Btn small color="emerald" onClick={() => onAdd(materialRow(m))}>
+                          ＋ 追加
+                        </Btn>
+                      )}
                     </td>
                   </tr>
                 );

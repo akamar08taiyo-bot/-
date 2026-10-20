@@ -65,7 +65,7 @@ await staffArea.press('Control+End');
 await staffArea.press('Enter');
 await staffArea.pressSequentially('山本');
 assert.equal(await staffArea.inputValue(), '久保 匠史\n土居 翔太\n宮村 茉莉花\n信田 裕太\n藤田 知美\n山本');
-await page.getByRole('navigation').getByRole('button', {name: /様邸一覧/}).click();
+await page.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click();
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 const staffSelect = page.locator('label', {hasText: '担当'}).locator('select');
 assert.deepEqual(await staffSelect.locator('option').allInnerTexts(), ['（選ぶ）', '久保 匠史', '土居 翔太', '宮村 茉莉花', '信田 裕太', '藤田 知美', '山本']);
@@ -87,7 +87,7 @@ await page.locator('label', {hasText: 'お振込先'}).locator('input').fill('�
 await page.locator('label', {hasText: '請求書（1か月分）の消費税'}).locator('select').selectOption('monthly');
 await page.locator('label', {hasText: '⑤消費税の1円未満'}).locator('select').selectOption('floor');
 await page.screenshot({path: path.join(outDir, '21-settings.png'), fullPage: true});
-await page.getByRole('navigation').getByRole('button', {name: /様邸一覧/}).click();
+await page.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click();
 const foot = await page.getByText(/ご請求金額（税込）/).innerText();
 // 切り捨て：⑤ floor(2,011.9)=2,011 → 1か月で1回：20,119×0.1=2,011.9 → 2,011、合計 22,130
 assert.ok(foot.includes('22,130'), foot);
@@ -123,7 +123,7 @@ await p2.getByRole('navigation').getByRole('button', {name: '設定'}).click();
 await p2.locator('input[type=file][accept*=json]').setInputFiles(bkPath);
 await p2.getByText(/部材 5件・取付手間 17件・様邸（見積書）1件・一式 1件・設定/).waitFor();
 await p2.getByRole('button', {name: '今のデータを置き換える'}).click();
-await p2.getByRole('navigation').getByRole('button', {name: /様邸一覧/}).click();
+await p2.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click();
 await p2.getByRole('cell', {name: /（サンプル）山田様邸/}).waitFor();
 log('別のブラウザにバックアップを読み込めたOK');
 

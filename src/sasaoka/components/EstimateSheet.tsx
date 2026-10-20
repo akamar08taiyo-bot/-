@@ -56,12 +56,12 @@ export function EstimateSheet({
   materials: Material[];
   setJob: (fn: (j: Job) => Job) => void;
   onPickMaterial: (placeId: string | null) => void; // null：新しい箇所に
-  onPickLabor: (placeId: string, rowId: string) => void;
+  onPickLabor: (placeId: string | null, rowId: string | null) => void; // rowId：その部材の同上施工費。null：箇所の施工費
   onPickKit: (placeId: string | null) => void;
   onPrint: () => void;
 }) {
   const [meta, setMeta] = useDocMeta(`est:${job.id}`, todayIso);
-  // お客様名がまだなければ、見積書のお客様名の欄を選んでおく（苅田町・行橋用。すぐ打ち込める）
+  // お客様名がまだなければ、見積書のお客様名の欄を選んでおく（苅田町・行橋市・みやこ町用。すぐ打ち込める）
   const [sel, setSel] = useState<Sel | null>(() => (form === 'yukuhashi' && !job.customer.trim() ? {key: 'job:customer', occ: 0} : null));
   const [edit, setEdit] = useState<Edit | null>(null);
   const [hl, setHl] = useState(-1); // 候補の中で選んでいるもの
@@ -463,6 +463,13 @@ export function EstimateSheet({
   const row = target.row;
   const place = target.place;
   const lineRowId = row?.id ?? null;
+  // 工賃を入れる先の部材：選んでいる部材か、選んでいる施工費（同上施工費）の上の部材
+  const workOwner = (() => {
+    if (!row || !place) return null;
+    let k = place.rows.findIndex((r) => r.id === row.id);
+    while (k >= 0 && place.rows[k].kind === 'labor') k--;
+    return k >= 0 ? place.rows[k] : null;
+  })();
   // 介護保険の対象外は、見積書の1行ごと（部材のすぐ下の施工費は部材に合わせる）
   const lines = useMemo(() => formLines(job, s, form, {all: true}), [job, s, form]);
   const line = row ? lines.find((l) => l.rowId === row.id || l.excludeId === row.id) : undefined;
@@ -535,14 +542,22 @@ export function EstimateSheet({
           </button>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-xs">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm">
         <button type="button" className="sheet-tool" onClick={() => onPickMaterial(place?.id ?? null)} title="選んでいる行の箇所に入れます（いちばん下の行なら最後の箇所）">
           📋 部材リスト・★お気に入りから入れる
+        </button>
+        <button
+          type="button"
+          className="sheet-tool"
+          onClick={() => onPickLabor(place?.id ?? null, workOwner?.id ?? null)}
+          title="笹岡工務店の取付手間（木・タイルなど）を数えて施工費にします。部材を選んでいれば、その部材の「同上施工費」になります"
+        >
+          🔧 工賃（笹岡工務店の手間）から入れる
         </button>
         <button type="button" className="sheet-tool" onClick={() => onPickKit(place?.id ?? null)}>
           ＋ 一式から入れる
         </button>
-        <span className="mx-1 h-4 w-px bg-slate-300" />
+        <span className="mx-1 h-6 w-px bg-slate-300" />
         <button type="button" className="sheet-tool" disabled={!lineRowId} onClick={insertBelow} title="この行のすぐ下に空いた行を入れる">
           ↓ 下に1行入れる
         </button>
@@ -564,17 +579,14 @@ export function EstimateSheet({
         >
           {row?.kind === 'material' ? 'この部材（と同上施工費）を消す' : 'この行を消す'}
         </button>
-        <span className="mx-1 h-4 w-px bg-slate-300" />
-        <button type="button" className="sheet-tool" disabled={row?.kind !== 'material' || !place} onClick={() => row && place && onPickLabor(place.id, row.id)} title="取付手間（木・タイルなど）を数えて、同上施工費にする">
-          ＋ この部材の施工費（取付手間を数える）
-        </button>
-        <label className={`sheet-tool inline-flex items-center gap-1 ${line ? '' : 'opacity-40'}`}>
+        <span className="mx-1 h-6 w-px bg-slate-300" />
+        <label className={`sheet-tool inline-flex items-center gap-1.5 ${line ? '' : 'opacity-50'}`}>
           <input
             type="checkbox"
             disabled={!line}
             checked={line?.excluded ?? false}
             onChange={() => line && act((j) => toggleExcluded(j, line.excludeId))}
-            className="h-3.5 w-3.5"
+            className="h-4 w-4"
           />
           介護保険の対象外
         </label>

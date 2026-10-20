@@ -165,18 +165,18 @@ body {
   opacity: 0.4;
 }
 .sheet-tool {
-  border: 1px solid #cbd5e1;
+  border: 1px solid #94a3b8;
   border-radius: 6px;
   background: #fff;
-  padding: 3px 8px;
+  padding: 6px 12px;
   font-weight: 700;
-  color: #334155;
+  color: #1e293b;
 }
 .sheet-tool:hover:not(:disabled) {
   background: #f1f5f9;
 }
 .sheet-tool:disabled {
-  opacity: 0.4;
+  opacity: 0.5;
   cursor: default;
 }
 
@@ -614,7 +614,7 @@ table.fm tr.head > th {
 .form-page.kk table.fm tr.head > th {
   font-size: 9pt;
 }
-/* みやこ町・広域連合用：E・J 列は二重線のすき間 */
+/* 広域連合用：E・J 列は二重線のすき間 */
 table.fm .gap {
   padding: 0;
   border-right: 1.5pt solid #000 !important;

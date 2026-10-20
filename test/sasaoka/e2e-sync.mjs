@@ -1,4 +1,4 @@
-// 住宅改修 見積書作成と仕切り計算・請求書作成を、同じブラウザで同時に開いても、どちらの変更も消えないことを確かめる：
+// 見積書（jutaku-mitsumori/）と請求書（sasaoka/）を、同じブラウザの2つのタブで同時に開いても、どちらの変更も消えないことを確かめる：
 //   見積書で直す → 開いたままの仕切り計算に入る／仕切り計算で直す → 開いたままの見積書に入る／
 //   両方でほぼ同時に保存しても両方残る（あとから保存した方で前の変更を消さない）／読み直しても残っている
 // usage: node e2e-sync.mjs <サイトのURL> <出力フォルダ>
@@ -54,7 +54,7 @@ log('仕切り計算で直す → 開いたままの見積書に入るOK');
 
 // ---------------- ほぼ同時に保存：見積書で新しい見積書を作り、すぐに仕切り計算で備考を書く（どちらも保存を待たない）
 await est.getByRole('button', {name: '← 一覧へ戻る'}).click();
-await est.getByRole('button', {name: '＋ みやこ町・広域連合用の見積書'}).click();
+await est.getByRole('button', {name: '＋ 広域連合用の見積書'}).click();
 await est.getByPlaceholder('例：山田').fill('同時 一郎');
 const memo = shi.locator('label', {hasText: '備考（任意・明細に印刷されます）'}).locator('input');
 await memo.fill('同時に保存した備考');
@@ -76,11 +76,15 @@ assert.equal(await shi.getByRole('textbox', {name: 'タイルの数量'}).inputV
 await shi.screenshot({path: path.join(outDir, '60-sync-shikiri.png'), fullPage: true});
 log('ほぼ同時に保存しても両方残るOK');
 
-// ---------------- 請求書に入れていない見積書（同時 一郎）は、仕切り計算の一覧には出ない
+// ---------------- 新しい見積書（同時 一郎）は、そのまま仕切り計算の一覧に入る。見積書で「請求書に入れる」を外すと一覧から消える
 await shi.getByRole('button', {name: '← 一覧へ戻る'}).click();
-assert.equal(await shi.getByRole('cell', {name: /同時 一郎/}).count(), 0);
+await shi.getByRole('cell', {name: /同時 一郎/}).waitFor();
 assert.equal(await shi.getByRole('cell', {name: /（サンプル）山田様邸/}).count(), 1);
-log('請求書に入れていない見積書は仕切り計算の一覧に出ないOK');
+await est.getByRole('cell', {name: /同時 一郎/}).click();
+await est.getByLabel('笹岡工務店の請求書に入れる').uncheck();
+await shi.waitForFunction(() => !document.querySelector('main')?.textContent?.includes('同時 一郎'), null, {timeout: 5000});
+await est.getByRole('button', {name: '← 一覧へ戻る'}).click();
+log('新しい見積書はそのまま仕切り計算の一覧に入り、外すと消えるOK');
 
 // ---------------- 知らせ（BroadcastChannel）が届かないブラウザでも、古いままのタブで保存したときに、前の変更を消さない
 // 知らせを出せないタブ（見積書）でエンドキャップを3個に → 仕切り計算（古いまま）で木を3箇所に → 読み直すと両方残る
@@ -90,6 +94,7 @@ await quiet.addInitScript(() => {
   delete window.BroadcastChannel;
 });
 await quiet.goto(`${site}/jutaku-mitsumori/index.html`);
+await quiet.getByRole('button', {name: /見積書の一覧を開く/}).click();
 await quiet.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 const qs = quiet.getByRole('region', {name: '見積書に直接入力'});
 const capKey = await qs.locator('.form-page tr', {hasText: 'エンドキャップ'}).first().locator('[data-edit$=":qty"]').first().getAttribute('data-edit');

@@ -54,7 +54,7 @@ test('請求書の消費税：前の版の設定（様邸ごと）は「すべ�
   assert.equal(cleanSettings({rev: 1}).rev, 4);
 });
 
-test('見積の設定：最初は定価×0.8・諸経費10%・施工費1時間2,500円・書式は苅田町・行橋用', () => {
+test('見積の設定：最初は定価×0.8・諸経費10%・施工費1時間2,500円・書式は苅田町・行橋市・みやこ町用', () => {
   const s = cleanSettings({});
   assert.deepEqual([s.estimateRate, s.estimateOverheadRate, s.estimateHourRate, s.estimateForm], [0.8, 0.1, 2500, 'yukuhashi']);
   assert.equal(cleanSettings({estimateRate: '0.75'}).estimateRate, 0.75);

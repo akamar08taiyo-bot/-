@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {autoNote, circled, cutCalc, formForAddress, formLines, jobForm, lineNote, materialText, noteText, paginate, photoNumbers, placeWork, reiwa} from '../../src/sasaoka/estimateForms.ts';
+import {autoNote, circled, cutCalc, formForAddress, formLines, jobForm, lineNote, materialText, noteText, paginate, photoNumbers, placeWork, reiwa, rowUnit} from '../../src/sasaoka/estimateForms.ts';
 import type {Job, Place, Row} from '../../src/sasaoka/types.ts';
 
 const S = {estimateRate: 0.8, estimateHourRate: 2500, estimateForm: 'yukuhashi'} as const;
@@ -11,8 +11,8 @@ const mat = (name: string, listPrice: number, extra: Partial<Row> = {}): Row => 
 const lab = (price: number, qty = 1): Row => ({...blank, id: `r${++seq}`, kind: 'labor', name: '木', price, qty});
 const place = (name: string, rows: Row[], extra: Partial<Place> = {}): Place => ({id: `p${++seq}`, name, rows, kind: 1, photo: 0, ...extra});
 
-test('書式は住所の市町村から：みやこ町・築上町・豊前市など → 広域連合の様式、行橋市・苅田町 → 行橋の様式。分からなければ設定の書式', () => {
-  assert.equal(formForAddress('福岡県京都郡みやこ町豊津1118'), 'kouiki');
+test('書式は住所の市町村から：築上町・豊前市など → 広域連合の様式、行橋市・苅田町・みやこ町 → 苅田町・行橋市・みやこ町用。分からなければ設定の書式', () => {
+  assert.equal(formForAddress('福岡県京都郡みやこ町豊津1118'), 'yukuhashi'); // みやこ町は苅田町・行橋市と同じ書式
   assert.equal(formForAddress('築上郡築上町椎田'), 'kouiki');
   assert.equal(formForAddress('福岡県豊前市八屋'), 'kouiki');
   assert.equal(formForAddress('築上郡上毛町'), 'kouiki');
@@ -20,12 +20,12 @@ test('書式は住所の市町村から：みやこ町・築上町・豊前市�
   assert.equal(formForAddress('行橋市東大橋2-1-7'), 'yukuhashi');
   assert.equal(formForAddress('京都郡苅田町富久町'), 'yukuhashi');
   assert.equal(formForAddress('北九州市小倉南区'), null);
-  assert.equal(jobForm({form: '', address: 'みやこ町'}, S), 'kouiki');
-  assert.equal(jobForm({form: 'yukuhashi', address: 'みやこ町'}, S), 'yukuhashi'); // 選んだ書式が先
+  assert.equal(jobForm({form: '', address: '築上町'}, S), 'kouiki');
+  assert.equal(jobForm({form: 'yukuhashi', address: '築上町'}, S), 'yukuhashi'); // 選んだ書式が先
   assert.equal(jobForm({form: '', address: ''}, {estimateForm: 'kouiki'}), 'kouiki');
 });
 
-test('みやこ町・広域連合用：施工費は 時間×2,500円、部材は メーカー 品番 品名・定価は算出根拠に', () => {
+test('広域連合用：施工費は 時間×2,500円、部材は メーカー 品番 品名・定価は算出根拠に', () => {
   const job: Pick<Job, 'places'> = {
     places: [
       place('屋外', [
@@ -50,7 +50,7 @@ test('みやこ町・広域連合用：施工費は 時間×2,500円、部材は
       [false, 'トイレ', '便器取替', 2, '手', '同上施工費', 1, '式', 1234, 1234, 0, null, '', false], // 時間で割り切れない金額は1式
     ],
   );
-  // 苅田町・行橋用は施工費を1式で書き、改修内容は改修の種類（手すりの取付）。工事名称・改修内容は改修の種類だけで決まる
+  // 苅田町・行橋市・みやこ町用は施工費を1式で書き、改修内容は改修の種類（手すりの取付）。工事名称・改修内容は改修の種類だけで決まる
   const yk = formLines(job, S, 'yukuhashi');
   assert.deepEqual(yk.map((l) => [l.work, l.qty, l.unit, l.unitPrice]).slice(0, 3), [
     ['手すりの取付', 0.7, '本', 11520],
@@ -120,18 +120,32 @@ test('見積書だけの内容・備考・施工費の金額（右に映す見�
   assert.deepEqual(autoNote(rail36, 'yukuhashi', 2500), ['定価18,000円（3.6m）×0.8', '900÷3600＝0.25']);
   // 施工費のまとまり：名前と金額は最初の手間の行のもの
   assert.deepEqual([w.isWork, w.text, w.autoText, w.amount, w.manualAmount, w.rowId, w.rowIds], [true, '手すり取付費', '同上施工費', 2500, true, wood.id, [wood.id]]);
-  // みやこ町・広域連合用：2,500円は 1時間×2,500円 と書ける
+  // 広域連合用：2,500円は 1時間×2,500円 と書ける
   const k = formLines(job, S, 'kouiki');
   assert.deepEqual([k[2].qty, k[2].unit, k[2].unitPrice, k[2].amount, k[2].hourly], [1, '時間', 2500, 2500, true]);
   assert.deepEqual(lineNote(k[2], 'kouiki', 2500), ['1時間2,500円']);
   // 算出根拠も備考と同じ書き方（定価○円（4m）×0.8、2行目に長さの計算）
   assert.deepEqual(autoNote(k[0], 'kouiki', 2500), ['定価20,000円（4m）×0.8', '600÷4000＝0.15']);
   assert.deepEqual(autoNote(k[1], 'kouiki', 2500), ['定価450円（税抜）×0.8']);
-  // 介護保険の対象外の行は、算出根拠（対象工事部分の欄）は空。苅田町・行橋用の備考は書く
+  // 介護保険の対象外の行は、算出根拠（対象工事部分の欄）は空。苅田町・行橋市・みやこ町用の備考は書く
   const ex = formLines({places: [place('玄関', [{...rail, excluded: true}])]}, S, 'kouiki')[0];
   assert.deepEqual([autoNote(ex, 'kouiki', 2500), autoNote(ex, 'yukuhashi', 2500)], [[], ['定価20,000円（4m）×0.8', '600÷4000＝0.15']]);
   // 手で直す欄の最初の文字
   assert.equal(noteText(['定価20,000円（4m）×0.8', '600÷4000＝0.15']), '定価20,000円（4m）×0.8\n600÷4000＝0.15');
+});
+
+test('単位：部材リストに単位のない既製品の手すり（TOTO のインテリア・バーなど）は「本」。部品・単位を入れたものはそのまま', () => {
+  const bar = mat('インテリア・バーF Lタイプ ホワイト', 18700, {maker: 'TOTO', code: 'TS136GLY66#NW1'});
+  assert.equal(rowUnit(bar), '本');
+  assert.equal(formLines({places: [place('トイレ', [bar])]}, S, 'yukuhashi')[0].unit, '本');
+  assert.equal(rowUnit(mat('木製手すり 35φ 600mm', 4800)), '本');
+  assert.equal(rowUnit(mat('φ34屋外手すりパイプ', 14000)), '本');
+  assert.equal(rowUnit(mat('手すりブラケット', 2100)), ''); // 手すりの部品
+  assert.equal(rowUnit(mat('インテリア・バー用エンドキャップ', 450)), '');
+  assert.equal(rowUnit(mat('手すりカバー', 500)), '');
+  assert.equal(rowUnit(mat('φ34エンドブラケット', 5000, {unit: '個'})), '個'); // 単位があればそれ
+  assert.equal(rowUnit({...bar, unit: 'セット'}), 'セット');
+  assert.equal(rowUnit(mat('手すり 4m', 20000, {lengthCm: 60, pieceLengthM: 4, unit: '個'})), '本'); // 切って使う部材は本
 });
 
 test('令和の年月日', () => {

@@ -83,7 +83,7 @@ export type Job = {
   date: string; // 施工日 'YYYY-MM-DD'（空でもよい）
   address: string;
   note: string;
-  insuredNo: string; // 介護保険被保険者番号（苅田町・行橋用の見積書に出す）
+  insuredNo: string; // 介護保険被保険者番号（苅田町・行橋市・みやこ町用の見積書に出す）
   form: EstimateForm | ''; // 見積書の書式（空なら住所の市町村から決める）
   overhead: number | null; // 見積書の諸経費を手で入れたとき（端数の調整など）。null なら 小計×率
   overheadTarget: number | null; // 介護保険の対象の諸経費を手で入れたとき（対象外の行があるときだけ使う）
@@ -116,8 +116,8 @@ export type AppMode = 'shikiri' | 'estimate';
 
 /**
  * 見積書の書式（市町村で違う）。
- * yukuhashi = 苅田町・行橋用「工事費見積書兼工事費内訳書」
- * kouiki    = みやこ町・広域連合用「住宅改修内訳明細書」（福岡県介護保険広域連合の様式）
+ * yukuhashi = 苅田町・行橋市・みやこ町用「工事費見積書兼工事費内訳書」
+ * kouiki    = 広域連合用「住宅改修内訳明細書」（福岡県介護保険広域連合の様式）
  */
 export type EstimateForm = 'yukuhashi' | 'kouiki';
 
@@ -145,7 +145,7 @@ export type Settings = {
   // ---- 見積書
   estimateRate: number; // 見積の部材の単価＝定価×この率（0.8）
   estimateOverheadRate: number; // 見積書の諸経費＝小計×この率（0.1）
-  estimateHourRate: number; // みやこ町・広域連合用の書式で、施工費を「時間×1時間の単価」で書くときの単価（2,500円）。0 なら「1式」
+  estimateHourRate: number; // 広域連合用の書式で、施工費を「時間×1時間の単価」で書くときの単価（2,500円）。0 なら「1式」
   estimateForm: EstimateForm; // 住所から市町村が分からないときの見積書の書式
   rev: number; // 設定の版（古い版で保存した設定を読み込むときの直し方に使う）
 };

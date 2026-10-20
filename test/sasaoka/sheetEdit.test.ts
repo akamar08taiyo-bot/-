@@ -67,6 +67,8 @@ test('打ち込んだ文字を読む：数字・長さ・定価・改修の種�
   assert.equal(parseKind('便器'), 5);
   assert.equal(parseKind('なにか'), null);
   assert.deepEqual(parsePlace('浴室③'), {name: '浴室', photo: 3});
+  assert.deepEqual(parsePlace('①勝手口'), {name: '勝手口', photo: 1}); // 写真番号を先に打っても
+  assert.deepEqual(parsePlace('② 浴室'), {name: '浴室', photo: 2});
   assert.deepEqual(parsePlace('浴室(12)'), {name: '浴室', photo: 12});
   assert.deepEqual(parsePlace('玄関'), {name: '玄関', photo: null});
 });
@@ -154,7 +156,7 @@ test('施工費：内容に「同上施工費」と入れて単価を入れる �
   const lines = formLines(job, S, 'yukuhashi');
   assert.deepEqual(lines.map((l) => [l.text, l.qty, l.unit, l.amount]), [['TOTO TS136GY6 インテリアバー', 1, '本', 6400], ['同上施工費', 1, '式', 2000]]);
   assert.deepEqual([estimateTotals(job, S).work, jobTotals(job, S).labor], [2000, 2000]);
-  // みやこ町・広域連合用は時間で：数量に 1.2（時間）→ 1.2×2,500＝3,000円
+  // 広域連合用は時間で：数量に 1.2（時間）→ 1.2×2,500＝3,000円
   const head = rows[1].id;
   const k = applySheet(job, `line:${head}:qty`, '1.2', kk).job;
   assert.deepEqual([formLines(k, S, 'kouiki')[1].qty, formLines(k, S, 'kouiki')[1].amount, jobTotals(k, S).labor], [1.2, 3000, 3000]);

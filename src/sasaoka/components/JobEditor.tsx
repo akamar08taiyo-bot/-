@@ -2,9 +2,8 @@ import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {cutToLength, jobName, jobTotals, placeTotals, rowAmount} from '../calc.ts';
 import type {JobTotals} from '../calc.ts';
 import {cutCalc} from '../estimateForms.ts';
-import {appUrl, APP_NAMES} from '../links.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
-import {copyRows, kitFromRows, manualRow, newPlace as makePlace} from '../rows.ts';
+import {addMaterial, copyRows, kitFromRows, manualRow, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
 import type {AppData, Job, Kit, Material, NameSuffix, Place, Row, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {staffFull, uid, yen} from '../util.ts';
@@ -21,6 +20,7 @@ export function JobEditor({
   update,
   onBack,
   onOpen,
+  onOpenEstimate,
   onPrint,
 }: {
   job: Job;
@@ -28,6 +28,7 @@ export function JobEditor({
   update: Update;
   onBack: () => void;
   onOpen: (id: string) => void;
+  onOpenEstimate: (id: string) => void; // 「見積もりを作成する」で同じ様邸の見積書を開く
   onPrint: (r: PrintRequest) => void;
 }) {
   const toast = useToast();
@@ -90,7 +91,7 @@ export function JobEditor({
   const removeJob = () => {
     if (
       !confirm(
-        `「${jobName(job)}」を削除します。${APP_NAMES.estimate}の見積書からも消えます。元に戻せません。よろしいですか？\n（この請求書に入れないだけなら「請求書から外す」を押してください）`,
+        `「${jobName(job)}」を削除します。見積書からも消えます。元に戻せません。よろしいですか？\n（この請求書に入れないだけなら「請求書から外す」を押してください）`,
       )
     )
       return;
@@ -98,10 +99,10 @@ export function JobEditor({
     toast(`「${jobName(job)}」を削除しました`);
     onBack();
   };
-  // 見積書（見積書作成アプリ）は残して、この請求書にだけ入れない
+  // 見積書は残して、この請求書にだけ入れない
   const leaveInvoice = () => {
     setJob((j) => ({...j, shikiri: false}));
-    toast(`「${jobName(job)}」を請求書から外しました（見積書は${APP_NAMES.estimate}に残っています）`);
+    toast(`「${jobName(job)}」を請求書から外しました（見積書は「見積もりを作成する」に残っています）`);
     onBack();
   };
   const duplicate = () => {
@@ -152,13 +153,9 @@ export function JobEditor({
           <Btn color="sky" onClick={() => onPrint({kind: 'job', jobId: job.id})}>
             🖨 この様邸の明細を印刷
           </Btn>
-          <a
-            href={appUrl('estimate', job.id)}
-            className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
-            title={`同じ入力から作る見積書を、${APP_NAMES.estimate}で開きます`}
-          >
+          <Btn color="white" onClick={() => onOpenEstimate(job.id)} title="同じ入力から作る見積書を「見積もりを作成する」で開きます">
             📝 見積書を開く
-          </a>
+          </Btn>
           <Btn color="white" onClick={duplicate}>
             複製
           </Btn>
@@ -311,7 +308,7 @@ export function JobEditor({
             ①〜⑦は元の「仕切り計算表」と同じ式です。③④⑤は1円単位にしてから足しているので、表の数字は縦にも横にも合います。
           </p>
           <p className="mt-2 text-xs leading-5 text-slate-500">
-            見積書は「{APP_NAMES.estimate}」で、この様邸と同じ入力から作ります（どちらで部材・取付手間を直しても、もう片方も変わります）。
+            見積書は「見積もりを作成する」で、この様邸と同じ入力から作ります（どちらで部材・取付手間を直しても、もう片方も変わります）。
           </p>
         </aside>
       </div>
@@ -322,14 +319,8 @@ export function JobEditor({
           materials={data.materials}
           mode="shikiri"
           rate={s.estimateRate}
-          onAdd={(row) =>
-            setPlace(pickPlace.id, (p) => {
-              // 同じ部材をもう一度選んだら、行を増やさずに数量を足す
-              const same = row.refId ? p.rows.find((r) => r.kind === 'material' && r.refId === row.refId) : undefined;
-              if (!same) return {...p, rows: [...p.rows, row]};
-              return {...p, rows: p.rows.map((r) => (r.id === same.id ? {...r, qty: r.qty + row.qty} : r))};
-            })
-          }
+          onAdd={(row) => setPlace(pickPlace.id, (p) => ({...p, rows: addMaterial(p.rows, row)}))}
+          onRemoveOne={(refId) => setPlace(pickPlace.id, (p) => ({...p, rows: removeOneMaterial(p.rows, refId)}))}
           onToggleFavorite={toggleFavorite}
           onAddToMaster={addToMaster}
           onClose={() => setPicker(null)}

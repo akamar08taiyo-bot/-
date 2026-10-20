@@ -26,7 +26,7 @@ log('起動OK');
 await shot(page, '01-empty.png');
 
 // ---------------- 部材リスト：Excel の取り込み
-await page.getByRole('navigation').getByRole('button', {name: /部材リスト（メーカー仕切り）/}).click();
+await page.getByRole('navigation').getByRole('button', {name: /部材・工賃マスタ/}).click();
 await page.getByRole('button', {name: /メーカーの仕切り表を取り込む/}).click();
 await page.locator('input[type=file]').setInputFiles(path.join(FIX, 'maker-list.xlsx'));
 await page.getByRole('button', {name: '部材リストに取り込む（5件）'}).waitFor();
@@ -82,15 +82,20 @@ await page.locator('[role=dialog]').getByRole('button', {name: '閉じる'}).fir
 await shot(page, '05-materials.png');
 
 // ---------------- 様邸を作る：玄関（部材2種＋木2箇所）・トイレ（部材＋タイル1箇所）
-await page.getByRole('navigation').getByRole('button', {name: /様邸一覧/}).click();
+await page.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click();
 await page.getByRole('button', {name: '＋ 様邸を追加'}).click();
 await page.getByPlaceholder('例：山田').fill('田中');
 await page.locator('input[type=date]').first().fill('2026-10-03');
 await page.getByRole('button', {name: '玄関', exact: true}).click();
 await page.getByRole('button', {name: '＋ 部材を追加'}).click();
 const dlg = page.locator('[role=dialog]');
-await dlg.getByRole('row', {name: /手すり I型 600mm/}).getByRole('button', {name: '＋ 追加'}).click();
-await dlg.getByRole('row', {name: /手すり I型 600mm/}).getByRole('button', {name: '＋ 追加'}).click();
+// 入れたあとは ＋／− で数量を変える（＋ 追加 → ＋ → ＋ → − で2本）
+const railRow = dlg.getByRole('row', {name: /手すり I型 600mm/});
+await railRow.getByRole('button', {name: '＋ 追加'}).click();
+await railRow.getByRole('button', {name: /を1つ増やす/}).click();
+await railRow.getByRole('button', {name: /を1つ増やす/}).click();
+await railRow.getByRole('button', {name: /を1つ減らす/}).click();
+assert.equal((await railRow.getByLabel(/の数量$/).innerText()).trim(), '2');
 await dlg.getByRole('row', {name: /ブラケット\(エンド\)/}).getByRole('button', {name: '＋ 追加'}).click();
 await shot(page, '06-picker.png');
 await page.getByRole('button', {name: '選び終わったら閉じる'}).click();
@@ -105,7 +110,7 @@ await page.getByRole('button', {name: '＋ 部材を追加'}).nth(1).click();
 await dlg.getByRole('button', {name: /^すべて/}).click();
 await dlg.getByPlaceholder(/商品名・品番で検索/).fill('エンドキャップ サンプル精工');
 await dlg.getByRole('row', {name: /エンドキャップ 35φ/}).first().getByRole('button', {name: '＋ 追加'}).click();
-await dlg.getByRole('row', {name: /エンドキャップ 35φ/}).first().getByRole('button', {name: '＋ 追加'}).click();
+await dlg.getByRole('row', {name: /エンドキャップ 35φ/}).first().getByRole('button', {name: /を1つ増やす/}).click();
 await page.getByRole('button', {name: '選び終わったら閉じる'}).click();
 await page.getByRole('button', {name: '＋ 取付手間（箇所数を数える）'}).nth(1).click();
 await page.getByRole('button', {name: 'タイルの箇所数を1増やす', exact: true}).click();
@@ -156,12 +161,12 @@ await page.reload();
 await page.getByText('田中様邸').waitFor();
 const after = await page.locator('table').first().innerText();
 assert.ok(after.includes('佐藤様邸'));
-await page.getByRole('navigation').getByRole('button', {name: /部材リスト（メーカー仕切り）/}).click();
+await page.getByRole('navigation').getByRole('button', {name: /部材・工賃マスタ/}).click();
 assert.ok((await page.getByText('全11件').count()) === 1, '部材リストが11件残っていない');
 log('再読み込み後も保存されているOK');
 
 // サンプル（次の月）
-await page.getByRole('navigation').getByRole('button', {name: /様邸一覧/}).click();
+await page.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click();
 await page.getByRole('button', {name: '次の月'}).click();
 await page.getByRole('button', {name: /サンプルで試す/}).click();
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).waitFor();

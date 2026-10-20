@@ -1,6 +1,5 @@
 import {useMemo} from 'react';
 import {jobName, monthSummary} from '../calc.ts';
-import {appUrl, APP_NAMES} from '../links.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {addSamples, hasSamples} from '../samples.ts';
 import type {AppData, Job} from '../types.ts';
@@ -38,6 +37,7 @@ export function JobsPage({
   onOpen,
   onPrint,
   goMaterials,
+  goEstimate,
 }: {
   data: AppData;
   update: Update;
@@ -46,6 +46,7 @@ export function JobsPage({
   onOpen: (id: string) => void;
   onPrint: (r: PrintRequest) => void;
   goMaterials: () => void;
+  goEstimate: () => void;
 }) {
   const toast = useToast();
   const jobs = useMemo(() => data.jobs.filter((j) => j.shikiri && j.month === month), [data.jobs, month]);
@@ -131,7 +132,7 @@ export function JobsPage({
             <li>
               「
               <button type="button" className="font-bold text-purple-700 underline" onClick={goMaterials}>
-                部材リスト（メーカー仕切り）
+                部材・工賃マスタ
               </button>
               」で、メーカーの仕切り表（Excel・CSV・PDF）を取り込み、よく使う部材をお気に入り（★）にします。
             </li>
@@ -139,10 +140,10 @@ export function JobsPage({
             <li>月の分がそろったら「請求書を印刷」で1か月分の一覧を印刷し、笹岡工務店さまへお渡しします。</li>
             <li>
               見積書は「
-              <a href={appUrl('estimate')} className="font-bold text-emerald-800 underline">
-                {APP_NAMES.estimate}
-              </a>
-              」で作ります。見積書の下の「笹岡工務店の請求書に入れる」を選ぶと、その見積書の部材・施工費がこの一覧（請求する月の分）に入ります。
+              <button type="button" className="font-bold text-emerald-800 underline" onClick={goEstimate}>
+                見積もりを作成する
+              </button>
+              」で作ります。見積書に入れた部材・施工費は、そのままこの一覧（請求する月の分）に入り、自動で計算されます。
             </li>
           </ol>
           {!hasSamples(data) && (

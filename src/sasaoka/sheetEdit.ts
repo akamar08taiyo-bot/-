@@ -8,7 +8,7 @@
 // 打ち込んだ値は、仕切り計算表・請求書と同じ行（部材・取付手間）に入る（見積書と請求書はいつも同じ入力から作る）。
 
 import {cutToLength, estimatePlaceLines, estimateQty, estimateUnitPrice, overheadAuto, estimateTotals, rounddown} from './calc.ts';
-import {KINDS, materialText} from './estimateForms.ts';
+import {KINDS, materialText, rowUnit} from './estimateForms.ts';
 import {guessPieceLengthM} from './priceImport.ts';
 import {manualRow, materialRow, newPlace} from './rows.ts';
 import type {EstimateForm, Job, Material, Place, Row, Settings} from './types.ts';
@@ -27,7 +27,7 @@ export type SheetCtx = {
 /** 打ち込んだあとの様邸と、その値が入った欄（いちばん下の行に入れたら、増えた行の欄） */
 export type SheetResult = {job: Job; key: string | null};
 
-/** みやこ町・広域連合用の「改修箇所毎工事名称」の短い名前（改修の種類と同じ順） */
+/** 広域連合用の「改修箇所毎工事名称」の短い名前（改修の種類と同じ順） */
 const KIND_SHORT = ['手すり', '段差', '床', '扉', '便器', '付帯'];
 /** 施工費として入れる内容 */
 const LABOR_TEXT = /施工費|手間|工賃|取付費/;
@@ -78,9 +78,11 @@ export function parseKind(input: string): number | null {
   return null;
 }
 
-/** 箇所名：「浴室」「浴室③」「浴室(3)」（後ろの番号は写真番号） */
+/** 箇所名：「浴室」「①勝手口」「浴室③」「浴室(3)」（前か後ろの丸数字・後ろのかっこの番号は写真番号） */
 export function parsePlace(input: string): {name: string; photo: number | null} {
   const s = input.trim();
+  const lead = /^([①-⑳])\s*(.*)$/.exec(s);
+  if (lead) return {name: lead[2].trim(), photo: lead[1].charCodeAt(0) - 0x2460 + 1};
   const circledNo = /^(.*?)\s*([①-⑳])$/.exec(s);
   if (circledNo) return {name: circledNo[1].trim(), photo: circledNo[2].charCodeAt(0) - 0x2460 + 1};
   const paren = /^(.*?)\s*[（(](\d+)[）)]$/.exec(s.normalize('NFKC'));
@@ -195,7 +197,7 @@ export function sheetValue(job: Job, key: string, ctx: SheetCtx, date = ''): str
   }
   if (field === 'text') return r.estText ?? materialText(r);
   if (field === 'qty') return String(cutToLength(r) ? Math.round(estimateQty(r) * 1000) / 1000 : r.qty);
-  if (field === 'unit') return r.unit;
+  if (field === 'unit') return rowUnit(r);
   if (field === 'price') return String(estimateUnitPrice(r, rate));
   if (field === 'note') return r.estNote ?? (r.listPrice > 0 ? String(r.listPrice) : '');
   return '';

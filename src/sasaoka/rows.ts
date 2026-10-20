@@ -44,6 +44,19 @@ export function materialRow(m: Material, qty = 1): Row {
   };
 }
 
+/** 部材を選ぶ画面で選んだ部材を箇所に入れる。同じ部材（部材リストの同じもの）がもうあれば、行を増やさずに数量を足す */
+export function addMaterial(rows: Row[], row: Row): Row[] {
+  const same = row.refId ? rows.find((r) => r.kind === 'material' && r.refId === row.refId) : undefined;
+  return same ? rows.map((r) => (r === same ? {...r, qty: r.qty + row.qty} : r)) : [...rows, row];
+}
+
+/** 部材を選ぶ画面の −：同じ部材の数量を1つ減らす。0 になったら行を消す（すぐ下の施工費の行はそのまま） */
+export function removeOneMaterial(rows: Row[], refId: string): Row[] {
+  const same = rows.find((r) => r.kind === 'material' && r.refId === refId);
+  if (!same) return rows;
+  return same.qty > 1 ? rows.map((r) => (r === same ? {...r, qty: r.qty - 1} : r)) : rows.filter((r) => r !== same);
+}
+
 export function laborRow(item: LaborItem, qty = 1): Row {
   return {...BLANK, id: uid('r'), kind: 'labor', refId: item.id, name: item.name, price: item.price, qty};
 }
