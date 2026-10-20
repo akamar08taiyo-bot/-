@@ -4,12 +4,14 @@
 //                       （苅田町・行橋市・みやこ町用「工事費見積書兼工事費内訳書」・広域連合用「住宅改修内訳明細書」）の形のまま打ち込む。
 //                       打ち込んだ内容は、そのまま笹岡工務店の仕切り計算表・請求書に入る（入れない見積書は外せる）
 //   請求書を確認する：請求する月ごとの様邸（仕切り計算表）と、1か月分の御請求書
-//   部材・施工費マスタ：部材リスト（メーカーの仕切価格・定価）と、施工費（笹岡工務店の取付手間の単価）
+//   部材・施工費マスタ：部材リスト（メーカーの仕切価格・定価）と、施工費（笹岡工務店の取付手間の単価）と、
+//                       部材＋施工費（常用）のセット（よく使う部材と施工費の組み合わせ）
 //   設定
 
 import {useEffect, useMemo, useState} from 'react';
 import {JobEditor} from './components/JobEditor.tsx';
 import {JobsPage} from './components/JobsPage.tsx';
+import {KitsPage} from './components/KitsPage.tsx';
 import {LaborPage} from './components/LaborPage.tsx';
 import {MaterialsPage} from './components/MaterialsPage.tsx';
 import {SettingsPage} from './components/SettingsPage.tsx';
@@ -39,7 +41,7 @@ const THEME: Record<MainTab, {head: string; page: string; active: string; sub: s
   settings: {head: 'bg-[#334155]', page: 'bg-[#f4f5f7]', active: 'bg-[#f4f5f7] text-[#334155]', sub: 'text-slate-200', width: 'max-w-[1400px]'},
 };
 
-type MasterTab = 'materials' | 'labor';
+type MasterTab = 'materials' | 'labor' | 'kits';
 
 const MONTH_KEY = 'sasaoka-app:ui-month';
 
@@ -196,6 +198,7 @@ export default function App({start}: {start: MainTab}) {
                 onOpenInvoice={openInvoice}
                 onPrint={setPrint}
                 onSave={store.flush}
+                onManageKits={() => goMaster('kits')}
               />
             ) : estimateView === 'home' ? (
               <EstimateHome data={data} update={store.update} onNew={newOne} onList={() => setEstimateView('list')} goMaterials={() => goMaster()} />
@@ -226,6 +229,7 @@ export default function App({start}: {start: MainTab}) {
                 onOpen={setInvoiceId}
                 onOpenEstimate={openEstimate}
                 onPrint={setPrint}
+                onManageKits={() => goMaster('kits')}
               />
             ) : (
               <JobsPage
@@ -246,6 +250,7 @@ export default function App({start}: {start: MainTab}) {
                   [
                     ['materials', `部材リスト（${data.materials.length}件）`],
                     ['labor', `施工費（笹岡工務店の手間・${data.labor.length}項目）`],
+                    ['kits', `部材＋施工費（常用・${data.kits.length}件）`],
                   ] as const
                 ).map(([id, label]) => (
                   <button
@@ -262,7 +267,9 @@ export default function App({start}: {start: MainTab}) {
                   </button>
                 ))}
               </div>
-              {masterTab === 'materials' ? <MaterialsPage data={data} update={store.update} /> : <LaborPage data={data} update={store.update} />}
+              {masterTab === 'materials' && <MaterialsPage data={data} update={store.update} />}
+              {masterTab === 'labor' && <LaborPage data={data} update={store.update} />}
+              {masterTab === 'kits' && <KitsPage data={data} update={store.update} />}
             </div>
           )}
           {tab === 'settings' && <SettingsPage data={data} update={store.update} />}

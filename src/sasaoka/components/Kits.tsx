@@ -17,6 +17,7 @@ export function KitPicker({
   onInsert,
   onRename,
   onRemove,
+  onManage,
   onClose,
 }: {
   kits: Kit[];
@@ -28,6 +29,7 @@ export function KitPicker({
   onInsert: (rows: Row[]) => void;
   onRename: (id: string, name: string) => void;
   onRemove: (kit: Kit) => void;
+  onManage?: () => void; // 部材・施工費マスタの「部材＋施工費（常用）」を開く（セットを登録・直す）
   onClose: () => void;
 }) {
   return (
@@ -41,14 +43,22 @@ export function KitPicker({
       }
       onClose={onClose}
       footer={
-        <Btn color="blue" onClick={onClose}>
-          閉じる
-        </Btn>
+        <>
+          {onManage && (
+            <Btn color="white" onClick={onManage}>
+              📦 部材・施工費マスタで登録・直す
+            </Btn>
+          )}
+          <Btn color="blue" onClick={onClose}>
+            閉じる
+          </Btn>
+        </>
       }
     >
       {kits.length === 0 ? (
         <p className="rounded-lg bg-amber-50 p-3 text-sm leading-6 text-amber-900">
-          部材＋施工費（常用）はまだありません。部材と取付手間を入れた箇所で「この箇所を部材＋施工費（常用）に登録」を押すと、同じ組み合わせを次から1回で入れられます。
+          部材＋施工費（常用）はまだありません。「📦 部材・施工費マスタ」の「部材＋施工費（常用）」で、部材と施工費のセットを登録できます
+          （請求書を確認するの様邸で「この箇所を部材＋施工費（常用）に登録」を押しても登録できます）。登録すると、同じ組み合わせを次から1回で入れられます。
         </p>
       ) : (
         <ul className="space-y-2">

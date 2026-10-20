@@ -28,6 +28,7 @@ export function EstimateEditor({
   onOpenInvoice,
   onPrint,
   onSave,
+  onManageKits,
 }: {
   job: Job;
   data: AppData;
@@ -37,6 +38,7 @@ export function EstimateEditor({
   onOpenInvoice: (id: string) => void; // 「請求書を確認する」で同じ様邸の仕切り計算表を開く
   onPrint: (r: PrintRequest) => void;
   onSave: () => Promise<boolean>; // まだ保存していない変更をすぐ保存する（保存できたら true）
+  onManageKits?: () => void; // 部材・施工費マスタの「部材＋施工費（常用）」を開く
 }) {
   const toast = useToast();
   const s = data.settings;
@@ -276,6 +278,13 @@ export function EstimateEditor({
           }}
           onRename={(id, n) => update('kits', (list) => list.map((k) => (k.id === id ? {...k, name: n, updatedAt: Date.now()} : k)))}
           onRemove={removeKit}
+          onManage={
+            onManageKits &&
+            (() => {
+              setPicker(null);
+              onManageKits();
+            })
+          }
           onClose={() => setPicker(null)}
         />
       )}

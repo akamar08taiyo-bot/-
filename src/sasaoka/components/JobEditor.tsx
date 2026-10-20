@@ -22,6 +22,7 @@ export function JobEditor({
   onOpen,
   onOpenEstimate,
   onPrint,
+  onManageKits,
 }: {
   job: Job;
   data: AppData;
@@ -30,6 +31,7 @@ export function JobEditor({
   onOpen: (id: string) => void;
   onOpenEstimate: (id: string) => void; // 「見積もりを作成する」で同じ様邸の見積書を開く
   onPrint: (r: PrintRequest) => void;
+  onManageKits?: () => void; // 部材・施工費マスタの「部材＋施工費（常用）」を開く
 }) {
   const toast = useToast();
   const [picker, setPicker] = useState<Picker | null>(null);
@@ -344,6 +346,13 @@ export function JobEditor({
           }}
           onRename={(id, name) => update('kits', (list) => list.map((k) => (k.id === id ? {...k, name, updatedAt: Date.now()} : k)))}
           onRemove={removeKit}
+          onManage={
+            onManageKits &&
+            (() => {
+              setPicker(null);
+              onManageKits();
+            })
+          }
           onClose={() => setPicker(null)}
         />
       )}

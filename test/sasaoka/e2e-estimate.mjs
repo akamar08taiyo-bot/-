@@ -1,6 +1,6 @@
 // 住宅改修 見積書作成を確かめる：一覧（見積の合計・笹岡工務店の請求書の印・探す）・サンプルの見積書（定価×0.8・切って使う部材の数量・同上施工費）・
 // 見積の単価の手入力・部材ごとの施工費・部材＋施工費（常用）・保存（ボタン・Ctrl+S）・Excel で保存・諸経費の手入力・介護保険の対象外・
-// 2つの書式（苅田町・行橋市・みやこ町用／広域連合用）の印刷・複製・削除・定価の取り込み
+// 2つの書式（苅田町・行橋市・みやこ町用／広域連合用）の印刷・複製・削除・定価の取り込み・部材＋施工費（常用）のセットを登録
 // usage: node e2e-estimate.mjs <サイトのURL> <出力フォルダ>
 //   サイトは太陽ポータルと同じ形（<サイト>/jutaku-mitsumori/index.html と <サイト>/sasaoka/index.html）
 // Playwright はこのリポジトリの依存に入れていない。入っている場所を PLAYWRIGHT で指定できる（既定はクラウド環境の場所）
@@ -262,6 +262,37 @@ log('定価の取り込みOK');
 // ---------------- 施工費（笹岡工務店の手間）：部材・施工費マスタのもう1つのタブ
 await page.getByRole('tab', {name: /施工費（笹岡工務店の手間/}).click();
 assert.ok((await page.locator('main').innerText()).includes('取付手間の単価'));
+
+// ---------------- 部材＋施工費（常用）：部材・施工費マスタでセットを登録する（部材を入れ、その部材の施工費を数える）
+await page.getByRole('tab', {name: '部材＋施工費（常用・1件）'}).click();
+await page.getByRole('region', {name: 'セット「（サンプル）I型手すり（木の下地）」'}).waitFor();
+await page.getByRole('button', {name: '＋ 新しいセットを登録'}).click();
+await page.keyboard.type('トイレ L型手すり'); // 名前の欄が選ばれている
+const kitCard = page.getByRole('region', {name: 'セット「トイレ L型手すり」'});
+await kitCard.getByRole('button', {name: /部材を入れる/}).click();
+await page.getByRole('dialog').getByRole('row', {name: /L型手すり/}).getByRole('button', {name: '＋ 追加'}).click();
+await page.getByRole('button', {name: '選び終わったら閉じる'}).click();
+await kitCard.getByRole('button', {name: 'L型手すりの施工費を数える'}).click();
+await page.getByRole('button', {name: 'タイルの箇所数を1増やす', exact: true}).click();
+await page.getByRole('button', {name: '数え終わったら閉じる'}).click();
+// L型 11,000×0.8＝8,800 ＋ タイル 1,500 ＝ 見積 10,300円。仕切りは 7,800＋1,500＝9,300円
+const kitText = await kitCard.innerText();
+assert.ok(kitText.includes('10,300円') && kitText.includes('仕切り 9,300円'), kitText);
+assert.deepEqual((await kitCard.locator('tbody tr').allInnerTexts()).map((t) => t.split('\n')[0].split('\t')[0]), ['部材', '施工費']);
+await page.getByRole('tab', {name: '部材＋施工費（常用・2件）'}).waitFor();
+log('部材＋施工費（常用）のセットを登録OK');
+
+// ---------------- 見積書の「＋ 部材＋施工費（常用）から入れる」に、登録したセットが出る。そこから部材・施工費マスタへも行ける
+await page.getByRole('navigation').getByRole('button', {name: /見積もりを作成する/}).click();
+await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
+await sheet.getByRole('button', {name: '＋ 部材＋施工費（常用）から入れる'}).click();
+const kitDialog = page.getByRole('dialog');
+assert.equal(await kitDialog.getByRole('textbox', {name: '部材＋施工費（常用）の名前'}).first().inputValue(), 'トイレ L型手すり');
+assert.ok((await kitDialog.innerText()).includes('見積 10,300円（税抜）'));
+await kitDialog.getByRole('button', {name: '📦 部材・施工費マスタで登録・直す'}).click();
+await page.getByRole('region', {name: 'セット「トイレ L型手すり」'}).waitFor();
+assert.equal(await page.getByRole('tab', {name: '部材＋施工費（常用・2件）'}).getAttribute('aria-selected'), 'true');
+log('見積書から部材＋施工費（常用）を選ぶ・マスタへ行くOK');
 // ---------------- 設定：見積書と請求書の両方
 await page.getByRole('navigation').getByRole('button', {name: '設定'}).click();
 const settings = await page.locator('main').innerText();
