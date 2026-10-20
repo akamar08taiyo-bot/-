@@ -23,6 +23,7 @@ import type {MainTab} from './links.ts';
 import {PrintView} from './print/PrintView.tsx';
 import type {PrintRequest} from './print/PrintView.tsx';
 import type {EstimateForm, Job} from './types.ts';
+import {useNewVersion} from './update.ts';
 import {useStore} from './useStore.ts';
 import {thisMonth} from './util.ts';
 
@@ -60,6 +61,7 @@ const isEmpty = (j: Job) => !j.customer.trim() && !j.staff && j.places.length ==
 
 export default function App({start}: {start: MainTab}) {
   const store = useStore();
+  const newVersion = useNewVersion();
   // URL に #tab=…&job=… があれば、そのタブ・見積書（様邸）を開く（前の版の #job=… は、最初のタブで開く）
   const [initial] = useState(readHash);
   const [tab, setTab] = useState<MainTab>(initial.tab ?? start);
@@ -144,6 +146,19 @@ export default function App({start}: {start: MainTab}) {
 
   return (
     <ToastProvider>
+      {newVersion && (
+        // 新しい版が出ている（スマホなどで前の版が出たままのとき）。打ち込んだ内容を保存してから読み込み直す
+        <div role="status" className="no-print sticky top-0 z-50 flex flex-wrap items-center justify-center gap-3 bg-amber-300 px-4 py-2 text-sm font-bold text-slate-900 shadow">
+          このアプリの新しい版が出ています。
+          <button
+            type="button"
+            onClick={() => void store.flush().then(() => location.reload())}
+            className="rounded-md border border-slate-900/20 bg-white px-3 py-1.5 font-bold text-slate-900 shadow-sm hover:bg-amber-50"
+          >
+            ⟳ 読み込み直す
+          </button>
+        </div>
+      )}
       <div className={`min-h-screen ${theme.page} text-slate-800 ${print ? 'no-print' : ''}`}>
         <header className={`no-print ${theme.head} text-white transition-colors`}>
           <div className={`mx-auto flex ${theme.width} flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3`}>

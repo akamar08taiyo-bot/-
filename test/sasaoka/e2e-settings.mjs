@@ -158,5 +158,18 @@ assert.equal(printZoom, '1');
 await p2.emulateMedia({media: 'screen'});
 log('スマホの印刷イメージが画面に収まるOK');
 
+// ---------------- 新しい版の知らせ：version.json の版が開いている版と違えば「読み込み直す」を出す（前の版が出たままのスマホ向け）
+const p3 = await ctx.newPage();
+await p3.route('**/version.json', (route) => route.fulfill({contentType: 'application/json', body: JSON.stringify({build: 'これより新しい版'})}));
+await p3.goto(url);
+const banner = p3.getByRole('status').filter({hasText: 'このアプリの新しい版が出ています'});
+await banner.waitFor({timeout: 8000});
+await p3.unroute('**/version.json');
+await Promise.all([p3.waitForEvent('load'), banner.getByRole('button', {name: '⟳ 読み込み直す'}).click()]);
+await p3.waitForTimeout(3000); // 読み込み直したあとは同じ版なので出ない
+assert.equal(await p3.getByText('このアプリの新しい版が出ています').count(), 0);
+await p3.close();
+log('新しい版の知らせ・読み込み直すOK');
+
 console.log('\nERRORS:', errors.length ? errors : 'なし');
 await browser.close();

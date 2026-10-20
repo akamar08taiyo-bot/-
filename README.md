@@ -122,12 +122,13 @@
 #### ビルド・公開
 
 ```
-npm run build:sasaoka    # dist-sasaoka/index.html（仕切り計算・請求書作成。1ファイル・約2.9MB、JS・CSS・PDF読み取り用データを同梱）
-npm run build:jutaku     # dist-jutaku/index.html（住宅改修 見積書作成。同じく1ファイル）
+npm run build:sasaoka    # dist-sasaoka/index.html（仕切り計算・請求書作成。1ファイル・約2.9MB、JS・CSS・PDF読み取り用データを同梱）と version.json
+npm run build:jutaku     # dist-jutaku/index.html（住宅改修 見積書作成。同じく1ファイル）と version.json
 ```
 
 公開中：太陽ポータル（taiyo-portal リポジトリ）の `sasaoka/index.html`（タイル名「仕切り計算・請求書作成」）と `jutaku-mitsumori/index.html`（タイル名「住宅改修 見積書作成」）。
-直したときは、このブランチでビルド → `dist-sasaoka/index.html` を taiyo-portal の `sasaoka/index.html` に、`dist-jutaku/index.html` を `jutaku-mitsumori/index.html` に上書き → taiyo-portal の master に push（GitHub Pages が自動で公開する）。
+直したときは、このブランチでビルド → `dist-sasaoka/` の `index.html` と `version.json` を taiyo-portal の `sasaoka/` に、`dist-jutaku/` の2つを `jutaku-mitsumori/` に上書き → taiyo-portal の master に push（GitHub Pages が自動で公開する）。
+`version.json` はビルドした日時（`vite.version.ts`。アプリにも同じ印を埋め込む）。スマホのブラウザは前に開いたページをしばらく覚えていて直した版がすぐ出ないことがあるので、アプリは開いて少ししてからと画面に戻ったときに `version.json` を見て、印が違えば上に「このアプリの新しい版が出ています ⟳ 読み込み直す」を出す（`update.ts`。保存してから読み込み直す）。
 2つは必ず同じサイトに置く（別のサイトだとデータ（IndexedDB）が別になり、部材リストも請求書も連動しない）。ポータルと同じサイトなので、ポータルで選んだ営業所（`localStorage` の `taiyo_portal_session`）を発行元・施工業者に使う。
 パソコンに保存したファイルで開いたときのデータは、ポータルのデータとは別（移すときはバックアップを使う）。
 
@@ -137,10 +138,10 @@ npm run build:jutaku     # dist-jutaku/index.html（住宅改修 見積書作成
 npm run test:sasaoka     # 計算（仕切り・請求書・見積）・行の操作・見積書への打ち込み・見積書の Excel・保存データの読み込みとまとめ方・仕切り表の読み取り（Excel/CSV/PDFの表）の単体テスト
 npm run build:sasaoka && npm run build:jutaku
 mkdir -p /tmp/site/sasaoka /tmp/site/jutaku-mitsumori      # 太陽ポータルと同じ形にする
-cp dist-sasaoka/index.html /tmp/site/sasaoka/ && cp dist-jutaku/index.html /tmp/site/jutaku-mitsumori/
+cp dist-sasaoka/index.html dist-sasaoka/version.json /tmp/site/sasaoka/ && cp dist-jutaku/index.html dist-jutaku/version.json /tmp/site/jutaku-mitsumori/
 npx http-server /tmp/site -p 5190 &
 node test/sasaoka/e2e.mjs http://127.0.0.1:5190/sasaoka/index.html /tmp/out           # 仕切り：取り込み→様邸→印刷→保存
-node test/sasaoka/e2e-settings.mjs http://127.0.0.1:5190/sasaoka/index.html /tmp/out  # 仕切り：設定・CSV・所長と担当・バックアップ・狭い画面
+node test/sasaoka/e2e-settings.mjs http://127.0.0.1:5190/sasaoka/index.html /tmp/out  # 仕切り：設定・CSV・所長と担当・バックアップ・狭い画面・新しい版の知らせ
 node test/sasaoka/e2e-sheet.mjs http://127.0.0.1:5190 /tmp/out     # 見積書に直接入力：打ち込み・候補・定価×0.8・施工費・元に戻す・行の操作（行の左の＋・コピー・✕）・広域連合用・請求書に入れる・仕切り計算との行き来
 node test/sasaoka/e2e-estimate.mjs http://127.0.0.1:5190 /tmp/out  # 見積書：一覧・切って使う部材・単価の手入力・施工費・部材＋施工費（常用）・保存（ボタン・Ctrl+S）・Excelで保存・諸経費・対象外・2つの書式の印刷・複製・削除・定価の取り込み・部材＋施工費（常用）のセットを登録・設定
 node test/sasaoka/e2e-sync.mjs http://127.0.0.1:5190 /tmp/out      # 2つのアプリを同時に開いて直しても、どちらの変更も消えない（知らせが届かないときも）

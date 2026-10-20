@@ -4,6 +4,7 @@ import path from 'path';
 import {defineConfig} from 'vite';
 import type {Plugin} from 'vite';
 import {viteSingleFile} from 'vite-plugin-singlefile';
+import {APP_BUILD, appVersion} from './vite.version.ts';
 
 /**
  * 住宅改修 見積書作成アプリだけを、1つのHTMLファイルとしてビルドする設定（仕切り計算・請求書作成の vite.sasaoka.config.ts と同じ形）。
@@ -28,8 +29,10 @@ function htmlAsIndex(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), viteSingleFile(), htmlAsIndex()],
+  plugins: [react(), tailwindcss(), viteSingleFile(), htmlAsIndex(), appVersion()],
   base: './',
+  // 公開する版の印（新しい版が出たら知らせる。vite.version.ts）
+  define: {__APP_BUILD__: JSON.stringify(APP_BUILD)},
   // PDFの日本語の文字を読むための対応表（pdf.js の CMap）をファイルとして同梱する
   assetsInclude: ['**/*.bcmap'],
   build: {
