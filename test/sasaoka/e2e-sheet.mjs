@@ -122,9 +122,8 @@ await page.keyboard.press('Enter');
 assert.deepEqual((await tds('L型手すり')).slice(0, 7), ['手すりの取付', '②トイレ', 'サンプル S-TL01 L型手すり', '1', '本', '8,800', '8,800']);
 log('空いた行・新しい箇所OK');
 
-// ---------------- ツールバー：下に1行入れる → 打ち込む／上へ／介護保険の対象外（スペース）／消す
-await cell(await key('L型手すり', 'text')).click();
-await sheet.getByRole('button', {name: '↓ 下に1行入れる'}).click();
+// ---------------- 行の左の「＋」：下に1行入れる → 打ち込む／介護保険の対象外（スペース）／行の左の「✕」で消す
+await sheet.getByRole('button', {name: 'サンプル S-TL01 L型手すりの行の下に1行入れる'}).click();
 assert.equal(await selected(), '内容（品名）');
 await page.keyboard.type('エンド');
 await page.keyboard.press('ArrowDown');
@@ -132,37 +131,36 @@ await page.keyboard.press('Enter');
 const order = async () =>
   (await sheet.locator('.form-page tr', {has: page.locator('[data-edit$=":text"]')}).allInnerTexts()).map((t) => t.split('\t')[2]?.trim()).filter(Boolean);
 assert.deepEqual((await order()).slice(-2), ['サンプル S-TL01 L型手すり', 'サンプル S-EC01 エンドキャップ']);
-await cell(await key('エンドキャップ', 'text')).click();
-await sheet.getByRole('button', {name: '▲ 上へ'}).click();
-assert.deepEqual((await order()).slice(-2), ['サンプル S-EC01 エンドキャップ', 'サンプル S-TL01 L型手すり']);
+// 行を動かすボタン・介護保険の対象外のチェック・下に1行入れる・この行を消す はツールバーに出さない（行の左の「＋」「✕」と、欄で切り替える）
+for (const name of ['↓ 下に1行入れる', '▲ 上へ', '▼ 下へ', 'この行を消す', 'この部材（と同上施工費）を消す']) assert.equal(await sheet.getByRole('button', {name, exact: true}).count(), 0, name);
+assert.equal(await sheet.getByLabel('介護保険の対象外').count(), 0);
 // 対象外金額の欄でスペース → 介護保険の対象外
 await sheet.locator('.form-page tr', {hasText: 'L型手すり'}).first().locator('[data-edit^="excl:"]').last().click();
 await page.keyboard.press(' ');
 const lt = await tds('L型手すり');
 assert.deepEqual([lt[7], lt[10], lt[11]], ['', '', '8,800'], lt.join('|'));
-assert.equal(await sheet.getByLabel('介護保険の対象外').isChecked(), true);
-await cell(await key('手すりカバー', 'text')).click();
-await sheet.getByRole('button', {name: 'この部材（と同上施工費）を消す'}).click();
+await sheet.locator('.form-page tr', {hasText: '手すりカバー'}).first().locator('.sheet-del').click();
 assert.equal(await sheet.locator('.form-page tr', {hasText: '手すりカバー'}).count(), 0);
-log('下に1行・上へ・対象外・消すOK');
+log('行の左の＋で下に1行・対象外・行の左の✕で消すOK');
 
 // ---------------- 行の左の「✕消す」：その行を消す。箇所の行がなくなれば改修内容・改修場所も消えて、その行が空白になる。元に戻せる
 const lines = async () => sheet.locator('.form-page tr[data-rows]').count();
 const before = await lines();
 assert.equal(await sheet.locator('.sheet-del').count(), before); // 明細の行ごとに1つ
-await sheet.getByRole('button', {name: 'サンプル S-EC01 エンドキャップの行を消す'}).click();
-assert.equal(await sheet.locator('.form-page tr', {hasText: 'エンドキャップ'}).count(), 0);
-assert.deepEqual((await tds('L型手すり')).slice(0, 2), ['手すりの取付', '②トイレ']); // 箇所の名前は次の行に
-await page.locator('[aria-live] > div', {hasText: '行を消しました'}).first().waitFor();
 await sheet.getByRole('button', {name: 'サンプル S-TL01 L型手すりの行を消す'}).click();
 assert.equal(await sheet.locator('.form-page tr', {hasText: 'L型手すり'}).count(), 0);
+assert.deepEqual((await tds('エンドキャップ')).slice(0, 2), ['手すりの取付', '②トイレ']); // 箇所の名前は次の行に
+await page.locator('[aria-live] > div', {hasText: '行を消しました'}).first().waitFor();
+await sheet.getByRole('button', {name: 'サンプル S-EC01 エンドキャップの行を消す'}).click();
+assert.equal(await sheet.locator('.form-page tr', {hasText: 'エンドキャップ'}).count(), 0);
 assert.equal(await sheet.locator('.form-page', {hasText: 'トイレ'}).count(), 0); // 箇所ごと消えて、空白の行になる
 assert.equal((await sheet.locator('.form-page tr.sheet-new').innerText()).trim(), '');
 assert.equal(await lines(), before - 2);
 await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
 await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
 assert.equal(await lines(), before);
-assert.deepEqual((await tds('エンドキャップ')).slice(0, 2), ['手すりの取付', '②トイレ']);
+assert.deepEqual((await tds('L型手すり')).slice(0, 2), ['手すりの取付', '②トイレ']);
+assert.equal(await sheet.locator('.form-page tr', {hasText: 'エンドキャップ'}).count(), 1);
 log('行の左の✕消す（空白になる・元に戻す）OK');
 
 // ---------------- 行の左の「＋」：その行の下に空白の行が入り、内容の欄が選ばれる（そのまま打ち込める）。何も打たなければ空白の行のまま
@@ -196,8 +194,8 @@ await staffSelect.selectOption('土居 翔太');
 assert.equal(await staffSelect.inputValue(), '土居 翔太');
 assert.ok((await sheet.locator('.form-page').first().innerText()).includes('担当： 土居 翔太'));
 assert.equal(await sheet.locator('.form-page tr', {hasText: '手すり受け'}).count(), 1);
-await cell(await key('手すり受け', 'text')).click();
-await sheet.getByRole('button', {name: 'この部材（と同上施工費）を消す'}).click();
+await sheet.locator('.form-page tr', {hasText: '手すり受け'}).first().locator('.sheet-del').click();
+assert.equal(await sheet.locator('.form-page tr', {hasText: '手すり受け'}).count(), 0);
 log('見積書の外を押すと打った値が入るOK');
 
 // ---------------- 笹岡工務店の請求書：新しい見積書は最初から入っていて、打ち込んだ内容で請求書に入る金額を自動で出す。

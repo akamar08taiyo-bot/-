@@ -178,9 +178,9 @@ await page.keyboard.press('Delete');
 assert.deepEqual(await totals(), ['合計', '55,369', '55,369']);
 log('諸経費の手入力OK');
 
-// ---------------- 玄関のブラケットを介護保険の対象外（ツールバー）→ ブラケット 3,360 と同上施工費 1,000 が対象外
-await cell(await key('ブラケット', 'text')).click();
-await sheet.getByLabel('介護保険の対象外').check();
+// ---------------- 玄関のブラケットを介護保険の対象外（対象外金額の欄でスペース）→ ブラケット 3,360 と同上施工費 1,000 が対象外
+await sheet.locator('.form-page tr', {hasText: 'ブラケット'}).first().locator('[data-edit^="excl:"]').last().click();
+await page.keyboard.press(' ');
 // 対象：45,760−4,360＝41,400 → 諸経費 4,140 → 消費税 4,554 → 合計 50,094
 assert.deepEqual(await totals(), ['合計', '55,369', '50,094']);
 log('介護保険の対象外OK');

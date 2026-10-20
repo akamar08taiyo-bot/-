@@ -7,10 +7,10 @@
 
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ChangeEvent, ClipboardEvent as ReactClipboardEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent} from 'react';
-import {circled, formLines, KINDS, materialText} from '../estimateForms.ts';
+import {circled, KINDS, materialText} from '../estimateForms.ts';
 import {useDocMeta} from '../print/docMeta.ts';
 import {KouikiForm, YukuhashiForm} from '../print/EstimateForms.tsx';
-import {applySheet, deleteLine, insertBlankAfter, moveLine, parseDate, sheetTarget, sheetValue, toggleExcluded} from '../sheetEdit.ts';
+import {applySheet, deleteLine, insertBlankAfter, parseDate, sheetTarget, sheetValue, toggleExcluded} from '../sheetEdit.ts';
 import type {EstimateForm, Job, Material, Settings} from '../types.ts';
 import {matchesAll, todayIso, yen} from '../util.ts';
 import {useToast} from './ui.tsx';
@@ -482,10 +482,9 @@ export function EstimateSheet({
     }
   };
 
-  // ---------------------------------------------------------------- ツールバー（選んだ行の操作）
+  // ---------------------------------------------------------------- ツールバー（部材・施工費を入れる。行を入れる・消すは行の左の「＋」「✕」）
   const row = target.row;
   const place = target.place;
-  const lineRowId = row?.id ?? null;
   // 施工費を入れる先の部材：選んでいる部材か、選んでいる施工費（同上施工費）の上の部材
   const workOwner = (() => {
     if (!row || !place) return null;
@@ -493,16 +492,6 @@ export function EstimateSheet({
     while (k >= 0 && place.rows[k].kind === 'labor') k--;
     return k >= 0 ? place.rows[k] : null;
   })();
-  // 介護保険の対象外は、見積書の1行ごと（部材のすぐ下の施工費は部材に合わせる）
-  const lines = useMemo(() => formLines(job, s, form, {all: true}), [job, s, form]);
-  const line = row ? lines.find((l) => l.rowId === row.id || l.excludeId === row.id) : undefined;
-  const act = (fn: (j: Job) => Job) => change(fn(jobRef.current));
-  const insertBelow = () => {
-    if (!lineRowId) return;
-    const res = insertBlankAfter(jobRef.current, lineRowId);
-    change(res.job);
-    if (res.rowId) setSel({key: `line:${res.rowId}:text`, occ: 0});
-  };
 
   // 打ち込む欄の位置・文字の大きさ（見積書の欄と同じ）
   const editing = edit !== null;
@@ -580,39 +569,6 @@ export function EstimateSheet({
         <button type="button" className="sheet-tool" onClick={() => onPickKit(place?.id ?? null)}>
           ＋ 部材＋施工費（常用）から入れる
         </button>
-        <span className="mx-1 h-6 w-px bg-slate-300" />
-        <button type="button" className="sheet-tool" disabled={!lineRowId} onClick={insertBelow} title="この行のすぐ下に空いた行を入れる">
-          ↓ 下に1行入れる
-        </button>
-        <button type="button" className="sheet-tool" disabled={!lineRowId} onClick={() => lineRowId && act((j) => moveLine(j, lineRowId, -1))} title="この行を上へ（同じ箇所の中）">
-          ▲ 上へ
-        </button>
-        <button type="button" className="sheet-tool" disabled={!lineRowId} onClick={() => lineRowId && act((j) => moveLine(j, lineRowId, 1))} title="この行を下へ（同じ箇所の中）">
-          ▼ 下へ
-        </button>
-        <button
-          type="button"
-          className="sheet-tool text-rose-700"
-          disabled={!lineRowId}
-          onClick={() => {
-            if (!lineRowId) return;
-            act((j) => deleteLine(j, lineRowId));
-            setSel(null);
-          }}
-        >
-          {row?.kind === 'material' ? 'この部材（と同上施工費）を消す' : 'この行を消す'}
-        </button>
-        <span className="mx-1 h-6 w-px bg-slate-300" />
-        <label className={`sheet-tool inline-flex items-center gap-1.5 ${line ? '' : 'opacity-50'}`}>
-          <input
-            type="checkbox"
-            disabled={!line}
-            checked={line?.excluded ?? false}
-            onChange={() => line && act((j) => toggleExcluded(j, line.excludeId))}
-            className="h-4 w-4"
-          />
-          介護保険の対象外
-        </label>
       </div>
       <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-1 text-xs">
         <span className="w-28 shrink-0 truncate font-bold text-emerald-800" title={selName}>

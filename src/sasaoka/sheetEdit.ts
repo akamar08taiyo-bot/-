@@ -388,24 +388,6 @@ function unitRange(rows: Row[], ri: number): [number, number] {
   return [head, workEnd(rows, head)];
 }
 
-/** 見積書の1行（部材と同上施工費、または施工費）を、同じ箇所の中で上下に動かす */
-export function moveLine(job: Job, rowId: string, delta: -1 | 1): Job {
-  const found = findRow(job, rowId);
-  if (!found) return job;
-  const rows = found.place.rows;
-  const units: Row[][] = [];
-  for (let i = 0; i < rows.length; ) {
-    const [a, b] = unitRange(rows, i);
-    units.push(rows.slice(a, b));
-    i = b;
-  }
-  const at = units.findIndex((u) => u.some((r) => r.id === rowId));
-  const to = at + delta;
-  if (at < 0 || to < 0 || to >= units.length) return job;
-  [units[at], units[to]] = [units[to], units[at]];
-  return setPlaceRows(job, found.pi, units.flat());
-}
-
 /**
  * 見積書の1行を消す：部材の行はその部材と同上施工費、施工費の行はそのまとまり。
  * 箇所の行がなくなったら箇所も消す（改修内容・改修場所も消えて、その行が空白になる）
