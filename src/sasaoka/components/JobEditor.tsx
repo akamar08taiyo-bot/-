@@ -1,6 +1,7 @@
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
-import {jobName, jobTotals, placeTotals, rowAmount} from '../calc.ts';
+import {cutToLength, jobName, jobTotals, placeTotals, rowAmount} from '../calc.ts';
 import type {JobTotals} from '../calc.ts';
+import {cutCalc} from '../estimateForms.ts';
 import {appUrl, APP_NAMES} from '../links.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {copyRows, kitFromRows, manualRow, newPlace as makePlace} from '../rows.ts';
@@ -475,6 +476,8 @@ function PlaceCard({
                   </td>
                   <td data-cell="qty" data-label="数量・箇所" className="px-2 py-1.5 text-center">
                     <Stepper value={r.qty} onChange={(qty) => setRow(r.id, {qty})} ariaLabel={`${r.name || '金額だけの行'}の数量`} />
+                    {/* 切って使う部材（見積書で長さを入れたもの）は 使う長さ÷1本の長さ の本数で計算する */}
+                    {cutToLength(r) && <div className="mt-0.5 text-[11px] text-slate-500">{cutCalc(r)}本</div>}
                   </td>
                   <td data-cell="amount" data-label="金額" className="px-2 py-1.5 text-right font-bold tabular-nums">
                     {yen(rowAmount(r))}

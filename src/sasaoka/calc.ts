@@ -39,10 +39,14 @@ export function taxAmount(subtotal: number, taxRate: number, mode: TaxMode): num
   }
 }
 
-export function rowAmount(row: Pick<Row, 'price' | 'qty'>): number {
+/**
+ * 仕切り計算表の金額 ＝ 単価×数量（1円単位に四捨五入）。切って使う部材は見積書と同じく 使う長さ÷1本の長さ の本数で数える
+ * （仕切価格 10,000円・1本4m を60cm使う → 0.15本・1,500円）。割り切れない数量（1m÷3m など）は丸める前の数量で計算する
+ */
+export function rowAmount(row: Pick<Row, 'kind' | 'price' | 'qty' | 'lengthCm' | 'pieceLengthM'>): number {
   const price = Number.isFinite(row.price) ? row.price : 0;
   const qty = Number.isFinite(row.qty) ? row.qty : 0;
-  return roundYen(price * qty);
+  return roundYen(cutToLength(row) ? (price * qty * row.lengthCm) / 100 / row.pieceLengthM : price * qty);
 }
 
 export type PlaceTotals = {material: number; labor: number; total: number};
@@ -134,7 +138,7 @@ export function jobName(job: Pick<Job, 'customer' | 'suffix'>): string {
 // ---------------------------------------------------------------- 見積書
 // 元の見積書（苅田町・行橋用、みやこ町・広域連合用）と同じく、金額はすべて ROUNDDOWN（1円未満を切り捨て）。
 // 部材の単価 ＝ 定価×掛率（0.8）。規格品をそのまま使うときは 数量＝本数（1本4mの手すりなら1本）。
-// 切って使うとき（使う長さを入れた部材）は 数量＝使う長さ÷1本の長さ。
+// 切って使うとき（使う長さを入れた部材）は 数量＝使う長さ÷1本の長さ（笹岡工務店の仕切り計算表も同じ数量）。
 //   例：定価 20,000円（1本4m）を60cm使う → 0.6÷4＝0.15本、単価 16,000円、金額 16,000×0.15＝2,400円
 // 取付手間は、部材のすぐ下に続く手間の行を足して「同上施工費」の1行にする（例：木 2箇所 ＝ 2,000円）。
 //   小計 ＝ 部材＋施工費、諸経費 ＝ 小計×0.1、消費税 ＝（小計＋諸経費）×0.1、合計 ＝ 小計＋諸経費＋消費税
@@ -162,7 +166,7 @@ export function cutToLength(row: Pick<Row, 'kind' | 'lengthCm' | 'pieceLengthM'>
   return row.kind === 'material' && row.lengthCm > 0 && row.pieceLengthM > 0;
 }
 
-/** 見積の数量：切って使う部材は 使う長さ÷1本の長さ×本数（例：60cm÷4m＝0.15本）。それ以外は数量のまま */
+/** 見積書・仕切り計算表の数量：切って使う部材は 使う長さ÷1本の長さ×本数（例：60cm÷4m＝0.15本）。それ以外は数量のまま */
 export function estimateQty(row: Row): number {
   const qty = Number.isFinite(row.qty) ? row.qty : 0;
   return cutToLength(row) ? clean((qty * row.lengthCm) / 100 / row.pieceLengthM) : qty;

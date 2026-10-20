@@ -30,16 +30,16 @@ watch(shi, '仕切り');
 await shi.goto(`${site}/sasaoka/index.html`);
 await shi.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 const shiTotal = () => shi.locator('aside table').innerText();
-assert.ok((await shiTotal()).includes('21,400')); // ①部材代：10,000＋3,000＋7,800＋600
+assert.ok((await shiTotal()).includes('12,900')); // ①部材代：手すり60cm 10,000×0.15＝1,500＋3,000＋7,800＋600
 
-// ---------------- 見積書で L型手すりを2本にする → 開いたままの仕切り計算に入る（①部材代 21,400＋7,800＝29,200）
+// ---------------- 見積書で L型手すりを2本にする → 開いたままの仕切り計算に入る（①部材代 12,900＋7,800＝20,700）
 await est.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 const sheet = est.getByRole('region', {name: '見積書に直接入力'});
 const qtyKey = await sheet.locator('.form-page tr', {hasText: 'L型手すり'}).first().locator('[data-edit$=":qty"]').first().getAttribute('data-edit');
 await sheet.locator(`[data-edit="${qtyKey}"]`).click();
 await est.keyboard.type('2');
 await est.keyboard.press('Enter');
-await shi.waitForFunction(() => document.querySelector('aside table')?.textContent?.includes('29,200'), null, {timeout: 5000});
+await shi.waitForFunction(() => document.querySelector('aside table')?.textContent?.includes('20,700'), null, {timeout: 5000});
 assert.equal(await shi.getByRole('textbox', {name: 'L型手すりの数量'}).inputValue(), '2');
 log('見積書で直す → 開いたままの仕切り計算に入るOK');
 

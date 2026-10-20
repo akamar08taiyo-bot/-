@@ -76,6 +76,18 @@ test('rowAmount と placeTotals（玄関の例：手すり10,000＋ブラケッ�
   assert.deepEqual(placeTotals(place), {material: 13000, labor: 2000, total: 15000});
 });
 
+test('仕切り計算表：切って使う部材は見積書と同じ本数（4m を 60cm 使う → 0.15本）で計算する', () => {
+  const rail = mat(10000, 1, '木製手すり 35φ 4m', {listPrice: 20000, lengthCm: 60, pieceLengthM: 4});
+  assert.equal(rowAmount(rail), 1500); // 10,000×0.15
+  assert.equal(rowAmount({...rail, qty: 2}), 3000); // 60cm を2本 → 0.3本
+  assert.equal(rowAmount({...rail, lengthCm: 90, price: 9850}), 2216); // 9,850×0.225＝2,216.25 → 四捨五入
+  assert.equal(rowAmount({...rail, price: 9850}), 1478); // 9,850×0.15＝1,477.5 → 四捨五入（見積書は切り捨て）
+  assert.equal(rowAmount(mat(9000, 1, '手すり 3m', {lengthCm: 100, pieceLengthM: 3})), 3000); // 1m÷3m は丸める前の数量で計算
+  assert.equal(rowAmount({...rail, lengthCm: 0}), 10000); // 規格品そのまま → 1本
+  assert.equal(rowAmount({...rail, pieceLengthM: 0}), 10000); // 1本の長さが分からない → 数量のまま
+  assert.deepEqual(placeTotals({rows: [rail, lab(1000, 2)]}), {material: 1500, labor: 2000, total: 3500});
+});
+
 test('jobTotals は元の仕切り計算表と同じ（Excelの記入例と同じ数字）', () => {
   // 記入例：商品 23,500／施工費 9,500
   const j = job([[mat(3800, 2), mat(4500, 1), mat(7800, 1), mat(600, 6), lab(1000, 3), lab(1500, 1), lab(1500, 1), lab(1500, 1), lab(2000, 1)]]);
@@ -190,8 +202,8 @@ test('見積の合計：小計＝部材＋施工費、諸経費＝小計×0.1、
   // 2,400＋3,360＋8,800＋720＝15,280／施工費 2,000＋3,000＝5,000／小計 20,280・諸経費 2,028・消費税 2,230（2,230.8）・合計 24,538
   const sums = {subtotal: 20280, overhead: 2028, tax: 2230, total: 24538};
   assert.deepEqual(t, {material: 15280, work: 5000, all: sums, target: sums, excluded: 0});
-  // 仕切り計算表の金額は見積を入れても変わらない（部材は仕切り価格のまま）
-  assert.equal(jobTotals(j, S).material, 10000 + 3000 + 7800 + 600);
+  // 仕切り計算表は仕切価格で計算する（見積の定価・掛率は使わない）。切って使う手すりは見積と同じ 0.15本（10,000×0.15＝1,500）
+  assert.equal(jobTotals(j, S).material, 1500 + 3000 + 7800 + 600);
   // 元の見積書（苅田町・行橋用）の記入例：小計 27,440 → 諸経費 2,744・消費税 3,018・合計 33,202
   const ex = estimateTotals(job([[mat(0, 1, 'TOTO 32インテリアバー', {listPrice: 24300}), lab(8000, 1, '施工費')]]), S);
   assert.deepEqual(ex.all, {subtotal: 27440, overhead: 2744, tax: 3018, total: 33202});

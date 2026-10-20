@@ -27,13 +27,13 @@ await page.waitForTimeout(4200);
 assert.equal(await toast.count(), 0, 'お知らせが消えていない');
 log('お知らせは数秒で消えるOK');
 
-// サンプルの金額（玄関：10,000＋1,500×2＋木1,000×2／トイレ：7,800＋300×2＋タイル1,500×2）
-// ① 21,400 ② 5,000 ③ 1,498 ④ round(27,898×0.07=1,952.86)=1,953 ⑦ 29,851
-// 請求書の消費税は すべての様邸の合計×0.1 を切り捨て：2,985.1 → 2,985、ご請求金額 32,836
+// サンプルの金額（玄関：手すり60cm 10,000×0.15＋1,500×2＋木1,000×2／トイレ：7,800＋300×2＋タイル1,500×2）
+// ① 12,900 ② 5,000 ③ 903 ④ round(18,803×0.07=1,316.21)=1,316 ⑦ 20,119
+// 請求書の消費税は すべての様邸の合計×0.1 を切り捨て：2,011.9 → 2,011、ご請求金額 22,130
 const row = await page.getByRole('row', {name: /（サンプル）山田様邸/}).innerText();
-for (const v of ['21,400', '5,000', '1,498', '1,953', '29,851']) assert.ok(row.includes(v), `一覧に ${v} がない: ${row}`);
-assert.ok((await page.getByText(/ご請求金額（税込）/).innerText()).includes('32,836'));
-assert.ok((await page.getByText(/すべての様邸の合計に消費税率をかけています/).innerText()).includes('2,985'));
+for (const v of ['12,900', '5,000', '903', '1,316', '20,119']) assert.ok(row.includes(v), `一覧に ${v} がない: ${row}`);
+assert.ok((await page.getByText(/ご請求金額（税込）/).innerText()).includes('22,130'));
+assert.ok((await page.getByText(/すべての様邸の合計に消費税率をかけています/).innerText()).includes('2,011'));
 log('サンプルの金額OK（消費税は全様邸の合計にかける）');
 
 // CSV
@@ -42,8 +42,8 @@ const csvPath = path.join(outDir, 'list.csv');
 await csvDl.saveAs(csvPath);
 const csv = readFileSync(csvPath, 'utf8');
 assert.ok(csv.startsWith('﻿No.,施工日,お客様名,担当,部材代,取付手間,部材上乗せ,諸経費,税抜計,消費税,合計'), csv.slice(0, 80));
-assert.ok(csv.includes('（サンプル）山田様邸,久保,21400,5000,1498,1953,29851,,\r\n'), csv);
-assert.ok(csv.includes(',,合計,,21400,5000,1498,1953,29851,2985,32836'), csv);
+assert.ok(csv.includes('（サンプル）山田様邸,久保,12900,5000,903,1316,20119,,\r\n'), csv);
+assert.ok(csv.includes(',,合計,,12900,5000,903,1316,20119,2011,22130'), csv);
 log('CSV OK:', csvDl.suggestedFilename());
 
 // 請求書（様邸ごとの消費税）：所長名と、お客様名の横の担当
@@ -53,7 +53,7 @@ const inv = page.locator('.sheet').first();
 assert.ok((await inv.innerText()).includes('行橋営業所所長　久保 匠史'), await inv.innerText());
 const invHead = await inv.locator('thead th').allInnerTexts();
 assert.deepEqual(invHead.slice(0, 5), ['No.', '施工日', 'お客様名', '担当', '部材代']);
-assert.deepEqual((await inv.locator('tbody tr').first().locator('td').allInnerTexts()).slice(2, 5), ['（サンプル）山田様邸', '久保', '21,400']);
+assert.deepEqual((await inv.locator('tbody tr').first().locator('td').allInnerTexts()).slice(2, 5), ['（サンプル）山田様邸', '久保', '12,900']);
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
 log('請求書の所長名・担当OK');
 
@@ -89,8 +89,8 @@ await page.locator('label', {hasText: '⑤消費税の1円未満'}).locator('sel
 await page.screenshot({path: path.join(outDir, '21-settings.png'), fullPage: true});
 await page.getByRole('navigation').getByRole('button', {name: /様邸一覧/}).click();
 const foot = await page.getByText(/ご請求金額（税込）/).innerText();
-// 切り捨て：⑤ floor(2,985.1)=2,985 → 1か月で1回：29,851×0.1=2,985.1 → 2,985、合計 32,836
-assert.ok(foot.includes('32,836'), foot);
+// 切り捨て：⑤ floor(2,011.9)=2,011 → 1か月で1回：20,119×0.1=2,011.9 → 2,011、合計 22,130
+assert.ok(foot.includes('22,130'), foot);
 log('1か月で1回計算・切り捨て OK', foot);
 await page.getByRole('button', {name: '🖨 請求書を印刷'}).click();
 await page.locator('.print-overlay').waitFor();

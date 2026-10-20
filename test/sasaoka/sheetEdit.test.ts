@@ -124,6 +124,8 @@ test('切って使う手すり：数量に 0.15 や 60cm を入れると 使う�
   assert.deepEqual([r.lengthCm, r.pieceLengthM, r.qty], [60, 4, 1]);
   let [l] = formLines(job, S, 'yukuhashi');
   assert.deepEqual([l.qty, l.unit, l.unitPrice, l.amount, l.cut], [0.15, '本', 16000, 2400, '600÷4000＝0.15']);
+  // 仕切り計算表も同じ 0.15本（仕切価格 10,000×0.15）
+  assert.equal(jobTotals(job, S).material, 1500);
   ({job} = type(job, [[`line:${id}:qty`, '90cm']]));
   [l] = formLines(job, S, 'yukuhashi');
   assert.deepEqual([l.qty, l.amount], [0.225, 3600]);

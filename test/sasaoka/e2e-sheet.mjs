@@ -177,9 +177,9 @@ assert.ok((await link.innerText()).includes('仕切価格が入っていない�
 await link.getByRole('button', {name: '仕切価格を入れる'}).click();
 await page.getByRole('dialog').getByRole('textbox', {name: '取付金具の仕切価格'}).fill('300');
 await page.getByRole('dialog').getByRole('button', {name: '閉じる'}).first().click();
-// 部材代：木の手すり 10,000＋L型 7,800＋エンドキャップ 300＋取付金具 300＝18,400、取付手間 2,000
+// 部材代：木の手すり 60cm（10,000×0.15＝1,500）＋L型 7,800＋エンドキャップ 300＋取付金具 300＝9,900、取付手間 2,000
 const linkText = await link.innerText();
-assert.ok(linkText.includes('①部材代（仕切価格） 18,400') && linkText.includes('②取付手間 2,000') && !linkText.includes('仕切価格が入っていない'), linkText);
+assert.ok(linkText.includes('①部材代（仕切価格） 9,900') && linkText.includes('②取付手間 2,000') && !linkText.includes('仕切価格が入っていない'), linkText);
 log('笹岡工務店の請求書に入れる・仕切価格を入れるOK');
 
 // ---------------- 工事場所をみやこ町にすると「みやこ町・広域連合用」の書式だと知らせる（打っている途中では変えない）。
@@ -205,7 +205,7 @@ await link.getByRole('link', {name: '仕切り計算・請求書作成で開く 
 await page.waitForURL(/\/sasaoka\/index\.html#job=/);
 await page.getByRole('heading', {level: 1, name: '見本 太郎様邸'}).waitFor();
 const shikiri = await page.locator('aside table').innerText();
-assert.ok(shikiri.includes('部材代合計') && shikiri.includes('18,400') && shikiri.includes('5,000'), shikiri); // 取付手間 2,000＋3,000
+assert.ok(shikiri.includes('部材代合計') && shikiri.includes('9,900') && shikiri.includes('5,000'), shikiri); // 取付手間 2,000＋3,000
 log('仕切り計算表につながるOK');
 
 // ---------------- 仕切り計算・請求書作成アプリから「見積書を開く」で戻ると、同じ見積書
