@@ -198,7 +198,7 @@ function ykLine(l: FormLine, r: number, put: Put) {
   put(9, target ? l.unitPrice : null, 'r', money(11), target ? F : undefined);
   put(10, target ? l.amount : null, 'r mr', money(11), target ? G : undefined);
   put(11, target ? null : l.amount, 'r mr', money(11), target ? undefined : G);
-  // 備考（定価等）：「定価8,000円（税抜）×0.8」。切って使う部材は「定価20,000円（4m）×0.8」と「600÷4000＝0.15」の2行
+  // 備考（定価等）：「定価8,000円（税抜）×0.8」。切って使う部材は「定価20,000円（4m）×0.8」と「600mm÷4000mm＝0.15」の2行
   const note = lineNote(l, 'yukuhashi', 0);
   put(12, note.join('\n') || null, 'mr', note.length > 1 ? {size: fitLinesPt(note, YK.M, YK_ROW, 11), wrap: true} : fit(note[0] ?? '', YK.M, YK_ROW, 11));
 }
@@ -351,7 +351,7 @@ function kkLine(l: FormLine, r: number, height: number, bottom: string, hourRate
   put(13, target ? l.unit || null : null, 'gothic', fit(l.unit, KK.N, height, 11));
   put(14, target ? l.unitPrice : null, 'r gothic', money(11), target ? H : undefined);
   put(15, target ? l.amount : null, 'r mr gothic', money(11), target ? I : undefined);
-  // 算出根拠：「定価8,000円（税抜）×0.8」。施工費は「1時間2,500円」、切って使う部材は「定価20,000円（4m）×0.8」と「600÷4000＝0.15」の2行
+  // 算出根拠：「定価8,000円（税抜）×0.8」。施工費は「1時間2,500円」、切って使う部材は「定価20,000円（4m）×0.8」と「600mm÷4000mm＝0.15」の2行
   const note = lineNote(l, 'kouiki', hourRate);
   const basis = edges(`ml mr${bottom}`, true);
   if (note.length === 1 && l.hourly && l.note === null) {

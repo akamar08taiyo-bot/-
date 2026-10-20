@@ -3,7 +3,7 @@
 //   苅田町・行橋市・みやこ町用「工事費見積書兼工事費内訳書」：1ページ18行。施工費は「1式」
 //   広域連合用「住宅改修内訳明細書」（福岡県介護保険広域連合の様式）：1ページ14行。施工費は「時間×1時間の単価（2,500円）」
 // 備考・算出根拠は「定価8,000円（税抜）×0.8」。切って使う部材は 数量＝使う長さ÷1本の長さ（本）で書き、備考は「定価20,000円（4m）×0.8」、
-// 2行目に mm で計算を書く（例：600÷4000＝0.15）。
+// 2行目に mm で計算を書く（例：600mm÷4000mm＝0.15）。
 
 import {cutToLength, estimatePlaceLines, estimateQty, isBlankRow, listPriceOf} from './calc.ts';
 import {normalize} from './priceImport.ts';
@@ -83,12 +83,12 @@ export function rowUnit(r: Row): string {
   return r.unit.trim() || (READY_MADE_BAR.test(name) && !BAR_PARTS.test(name) ? '本' : '');
 }
 
-/** 切って使う部材の数量の計算。長さは mm で書く（例：60cm を 4m から → 600÷4000＝0.15、同じ長さを2本なら 600÷4000×2＝0.3）。切らない部材は '' */
+/** 切って使う部材の数量の計算。長さは mm を付けて書く（例：60cm を 4m から → 600mm÷4000mm＝0.15、同じ長さを2本なら 600mm÷4000mm×2＝0.3）。切らない部材は '' */
 export function cutCalc(r: Row): string {
   if (!cutToLength(r)) return '';
   const mm = (n: number) => String(Math.round(n * 100) / 100);
   const times = r.qty !== 1 ? `×${num(r.qty)}` : '';
-  return `${mm(r.lengthCm * 10)}÷${mm(r.pieceLengthM * 1000)}${times}＝${num(estimateQty(r), 3)}`;
+  return `${mm(r.lengthCm * 10)}mm÷${mm(r.pieceLengthM * 1000)}mm${times}＝${num(estimateQty(r), 3)}`;
 }
 
 /** 施工費の金額を「時間×1時間の単価」で書けるときの時間（小数2けたで割り切れるとき。0.8時間×2,500円＝2,000円）。書けなければ null */
@@ -120,7 +120,7 @@ export type FormLine = {
   excluded: boolean; // 介護保険の対象外
   listPrice: number; // 定価（備考・算出根拠の「定価8,000円×0.8」）。施工費は 0
   rate: number | null; // 単価＝定価×この率のとき（見積の単価を手で入れた行・定価のない行は null）
-  cut: string; // 切って使う部材の数量の計算（600÷4000＝0.15）。ほかは ''
+  cut: string; // 切って使う部材の数量の計算（600mm÷4000mm＝0.15）。ほかは ''
   piece: number; // 切って使う部材の1本の長さ（m。備考の「定価20,000円（4m）」）。ほかは 0
   hourly: boolean; // 施工費を「時間×1時間の単価」で書いた行
   note: string | null; // 備考（定価等）・算出根拠を手で直したとき（改行で行を分ける）
@@ -248,7 +248,7 @@ export function sheetNewLine(job: Pick<Job, 'places'>, lines: FormLine[], form: 
 /**
  * 手で直していないときの備考（定価等・苅田町・行橋市・みやこ町用）／算出根拠（広域連合用）。1行ずつ。
  * 部材は「定価8,000円（税抜）×0.8」（見積の単価を手で入れた行は ×0.8 を付けない）。
- * 切って使う部材は「定価20,000円（4m）×0.8」（かっこは1本の長さ）と、2行目に「600÷4000＝0.15」。
+ * 切って使う部材は「定価20,000円（4m）×0.8」（かっこは1本の長さ）と、2行目に「600mm÷4000mm＝0.15」。
  * 算出根拠は対象工事部分の欄なので、介護保険の対象外の行は空。時間で書いた施工費は「1時間2,500円」
  */
 export function autoNote(l: FormLine, form: EstimateForm, hourRate: number): string[] {

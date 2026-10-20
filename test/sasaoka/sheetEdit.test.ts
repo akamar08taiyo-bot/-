@@ -125,7 +125,7 @@ test('切って使う手すり：数量に 0.15 や 60cm を入れると 使う�
   let r: Row = job.places[0].rows[0];
   assert.deepEqual([r.lengthCm, r.pieceLengthM, r.qty], [60, 4, 1]);
   let [l] = formLines(job, S, 'yukuhashi');
-  assert.deepEqual([l.qty, l.unit, l.unitPrice, l.amount, l.cut], [0.15, '本', 16000, 2400, '600÷4000＝0.15']);
+  assert.deepEqual([l.qty, l.unit, l.unitPrice, l.amount, l.cut], [0.15, '本', 16000, 2400, '600mm÷4000mm＝0.15']);
   // 仕切り計算表も同じ 0.15本（仕切価格 10,000×0.15）
   assert.equal(jobTotals(job, S).material, 1500);
   ({job} = type(job, [[`line:${id}:qty`, '90cm']]));
@@ -136,12 +136,12 @@ test('切って使う手すり：数量に 0.15 や 60cm を入れると 使う�
   assert.deepEqual([r.lengthCm, r.qty], [0, 2]);
   // 仕切り計算表は本数のまま（1本 10,000 × 2）
   assert.equal(jobTotals(job, S).material, 20000);
-  // 品名だけの部材：数量 0.15 を先に入れて、あとで備考に「20000(4m)」と入れても 600÷4000＝0.15 になる
+  // 品名だけの部材：数量 0.15 を先に入れて、あとで備考に「20000(4m)」と入れても 600mm÷4000mm＝0.15 になる
   ({job} = type(job, [['new:text', '屋外用手すり'], ['line:@:qty', '0.15'], ['line:@:note', '20000(4m)']]));
   r = job.places[0].rows[1];
   assert.deepEqual([r.lengthCm, r.pieceLengthM, r.qty], [60, 4, 1]);
   [, l] = formLines(job, S, 'yukuhashi');
-  assert.deepEqual([l.qty, l.unitPrice, l.amount, l.cut], [0.15, 16000, 2400, '600÷4000＝0.15']);
+  assert.deepEqual([l.qty, l.unitPrice, l.amount, l.cut], [0.15, 16000, 2400, '600mm÷4000mm＝0.15']);
 });
 
 test('施工費：内容に「同上施工費」と入れて単価を入れる → 取付手間の行になり、仕切り計算表の取付手間も同じ金額', () => {

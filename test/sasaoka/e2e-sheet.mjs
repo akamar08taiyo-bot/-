@@ -65,7 +65,7 @@ await page.keyboard.press('Enter');
 await page.screenshot({path: path.join(outDir, '40-sheet-first.png')});
 let rail = await tds('木の手すり 35φ 4m');
 assert.deepEqual(rail.slice(0, 7), ['手すりの取付', '①浴室', 'サンプル S-TS35 木の手すり 35φ 4m', '0.15', '本', '16,000', '2,400'], rail.join('|'));
-assert.ok(rail[12].includes('定価20,000円（4m）×0.8') && rail[12].includes('600÷4000＝0.15'), rail[12]);
+assert.ok(rail[12].includes('定価20,000円（4m）×0.8') && rail[12].includes('600mm÷4000mm＝0.15'), rail[12]);
 log('改修内容・改修場所・内容（候補から）・数量 60cm＝0.15本OK');
 
 // ---------------- 同上施工費：内容に打って、単価に金額

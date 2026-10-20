@@ -44,8 +44,8 @@ test('広域連合用：施工費は 時間×2,500円、部材は メーカー �
   assert.deepEqual(
     lines.map((l) => [l.first, l.placeName, l.work, l.photo, l.mark, l.text, l.qty, l.unit, l.unitPrice, l.amount, l.listPrice, l.rate, l.cut, l.hourly]),
     [
-      // 切って使う部材は「本」で書き、数量の計算（mm で 2800÷4000＝0.7）を算出根拠に出す
-      [true, '屋外', '手すり取付', 1, '材', '矢崎化工 HCDT-4000 T BBR NTディンプルパイプ', 0.7, '本', 11520, 8064, 14400, 0.8, '2800÷4000＝0.7', false],
+      // 切って使う部材は「本」で書き、数量の計算（mm で 2800mm÷4000mm＝0.7）を算出根拠に出す
+      [true, '屋外', '手すり取付', 1, '材', '矢崎化工 HCDT-4000 T BBR NTディンプルパイプ', 0.7, '本', 11520, 8064, 14400, 0.8, '2800mm÷4000mm＝0.7', false],
       [false, '屋外', '手すり取付', 1, '材', '矢崎化工 HL7-P11 T USL NT屋外支柱', 4, '本', 3680, 14720, 4600, 0.8, '', false],
       [false, '屋外', '手すり取付', 1, '手', '同上施工費', 2.8, '時間', 2500, 7000, 0, null, '', true], // 5,000＋2,000＝7,000円＝2.8時間
       [true, 'トイレ', '便器取替', 2, '材', 'エンドキャップ', 2, '個', 360, 720, 450, 0.8, '', false],
@@ -91,11 +91,11 @@ test('部材の内容の書き方・切って使う部材の数量の計算', ()
   assert.equal(materialText(mat('手すり', 0, {lengthCm: 60})), '手すり（長さ60cm）'); // 1本の長さが分からない
   const rail = mat('手すり 4m', 20000, {lengthCm: 60, pieceLengthM: 4});
   assert.equal(materialText(rail), '手すり 4m'); // 長さの計算は内容ではなく備考・算出根拠に
-  // 長さは mm で書く：60cm を 4m の手すりから → 600÷4000＝0.15
-  assert.equal(cutCalc(rail), '600÷4000＝0.15');
-  assert.equal(cutCalc({...rail, qty: 2}), '600÷4000×2＝0.3'); // 同じ長さを2本
-  assert.equal(cutCalc({...rail, lengthCm: 130}), '1300÷4000＝0.325');
-  assert.equal(cutCalc({...rail, lengthCm: 62.5, pieceLengthM: 3.6}), '625÷3600＝0.174'); // 割り切れない数量は小数3けたまで書く
+  // 長さは mm で書く：60cm を 4m の手すりから → 600mm÷4000mm＝0.15
+  assert.equal(cutCalc(rail), '600mm÷4000mm＝0.15');
+  assert.equal(cutCalc({...rail, qty: 2}), '600mm÷4000mm×2＝0.3'); // 同じ長さを2本
+  assert.equal(cutCalc({...rail, lengthCm: 130}), '1300mm÷4000mm＝0.325');
+  assert.equal(cutCalc({...rail, lengthCm: 62.5, pieceLengthM: 3.6}), '625mm÷3600mm＝0.174'); // 割り切れない数量は小数3けたまで書く
   assert.equal(cutCalc({...rail, lengthCm: 0}), ''); // 規格品そのまま
   // 見積の単価を手で入れた行は「×0.8」を書かない
   const [line] = formLines({places: [place('玄関', [{...rail, estPrice: 15000}])]}, S, 'yukuhashi');
@@ -110,7 +110,7 @@ test('見積書だけの内容・備考・施工費の金額（右に映す見�
   const [r, c, w] = formLines(job, S, 'yukuhashi');
   // 直していなければ元の内容・備考（定価8,000円（税抜）×0.8 の形。切って使う部材はかっこに1本の長さ、2行目に長さの計算）
   assert.deepEqual([r.text, r.autoText, r.note], ['手すり 4m', '手すり 4m', null]);
-  assert.deepEqual(lineNote(r, 'yukuhashi', 2500), ['定価20,000円（4m）×0.8', '600÷4000＝0.15']);
+  assert.deepEqual(lineNote(r, 'yukuhashi', 2500), ['定価20,000円（4m）×0.8', '600mm÷4000mm＝0.15']);
   // 直した内容・備考（改行で2行）。元の内容は autoText に残る
   assert.deepEqual([c.text, c.autoText], ['エンドキャップ（木口用）', 'エンドキャップ']);
   assert.deepEqual(lineNote(c, 'yukuhashi', 2500), ['定価450円', '（税抜）']);
@@ -119,7 +119,7 @@ test('見積書だけの内容・備考・施工費の金額（右に映す見�
   assert.deepEqual(autoNote(formLines({places: [place('玄関', [{...cap, estPrice: 400, estNote: null}])]}, S, 'yukuhashi')[0], 'yukuhashi', 2500), ['定価450円（税抜）']);
   // 1本の長さが小数でも（3.6m の手すりを 90cm）
   const rail36 = formLines({places: [place('玄関', [mat('手すり 3.6m', 18000, {lengthCm: 90, pieceLengthM: 3.6})])]}, S, 'yukuhashi')[0];
-  assert.deepEqual(autoNote(rail36, 'yukuhashi', 2500), ['定価18,000円（3.6m）×0.8', '900÷3600＝0.25']);
+  assert.deepEqual(autoNote(rail36, 'yukuhashi', 2500), ['定価18,000円（3.6m）×0.8', '900mm÷3600mm＝0.25']);
   // 施工費のまとまり：名前と金額は最初の手間の行のもの
   assert.deepEqual([w.isWork, w.text, w.autoText, w.amount, w.manualAmount, w.rowId, w.rowIds], [true, '手すり取付費', '同上施工費', 2500, true, wood.id, [wood.id]]);
   // 広域連合用：2,500円は 1時間×2,500円 と書ける
@@ -127,13 +127,13 @@ test('見積書だけの内容・備考・施工費の金額（右に映す見�
   assert.deepEqual([k[2].qty, k[2].unit, k[2].unitPrice, k[2].amount, k[2].hourly], [1, '時間', 2500, 2500, true]);
   assert.deepEqual(lineNote(k[2], 'kouiki', 2500), ['1時間2,500円']);
   // 算出根拠も備考と同じ書き方（定価○円（4m）×0.8、2行目に長さの計算）
-  assert.deepEqual(autoNote(k[0], 'kouiki', 2500), ['定価20,000円（4m）×0.8', '600÷4000＝0.15']);
+  assert.deepEqual(autoNote(k[0], 'kouiki', 2500), ['定価20,000円（4m）×0.8', '600mm÷4000mm＝0.15']);
   assert.deepEqual(autoNote(k[1], 'kouiki', 2500), ['定価450円（税抜）×0.8']);
   // 介護保険の対象外の行は、算出根拠（対象工事部分の欄）は空。苅田町・行橋市・みやこ町用の備考は書く
   const ex = formLines({places: [place('玄関', [{...rail, excluded: true}])]}, S, 'kouiki')[0];
-  assert.deepEqual([autoNote(ex, 'kouiki', 2500), autoNote(ex, 'yukuhashi', 2500)], [[], ['定価20,000円（4m）×0.8', '600÷4000＝0.15']]);
+  assert.deepEqual([autoNote(ex, 'kouiki', 2500), autoNote(ex, 'yukuhashi', 2500)], [[], ['定価20,000円（4m）×0.8', '600mm÷4000mm＝0.15']]);
   // 手で直す欄の最初の文字
-  assert.equal(noteText(['定価20,000円（4m）×0.8', '600÷4000＝0.15']), '定価20,000円（4m）×0.8\n600÷4000＝0.15');
+  assert.equal(noteText(['定価20,000円（4m）×0.8', '600mm÷4000mm＝0.15']), '定価20,000円（4m）×0.8\n600mm÷4000mm＝0.15');
 });
 
 test('単位：部材リストに単位のない既製品の手すり（TOTO のインテリア・バーなど）は「本」。部品・単位を入れたものはそのまま', () => {

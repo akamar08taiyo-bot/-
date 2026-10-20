@@ -58,7 +58,7 @@ await typeIn('job:insuredNo', '0000366989');
 await typeIn(await key('木の手すり 35φ 4m', 'qty'), '120cm');
 const rail = await tds('木の手すり 35φ 4m');
 assert.deepEqual(rail.slice(3, 7), ['0.3', '本', '16,000', '4,800'], rail.join('|'));
-assert.ok(rail[12].includes('定価20,000円（4m）×0.8') && rail[12].includes('1200÷4000＝0.3'), rail[12]);
+assert.ok(rail[12].includes('定価20,000円（4m）×0.8') && rail[12].includes('1200mm÷4000mm＝0.3'), rail[12]);
 assert.deepEqual(await totals(), ['合計', '27,442', '27,442']); // 小計 22,680＋諸経費 2,268＋消費税 2,494
 log('切って使う部材：120cm÷4m＝0.3本×16,000＝4,800 OK');
 
@@ -132,7 +132,7 @@ const download = async (click) => {
 };
 const yx = await download(() => page.getByRole('button', {name: '📗 Excelで保存'}).click());
 assert.match(yx.name, /^工事費見積書兼工事費内訳書_（サンプル）山田様_\d{4}-\d{2}-\d{2}\.xlsx$/);
-for (const t of ['（サンプル）山田', '介護保険被保険者番号（0000366989）', '1200÷4000＝0.3', '<f>ROUNDDOWN(D9*F9,0)</f><v>4800</v>', '<v>45760</v>', '<v>55369</v>', '令和']) {
+for (const t of ['（サンプル）山田', '介護保険被保険者番号（0000366989）', '1200mm÷4000mm＝0.3', '<f>ROUNDDOWN(D9*F9,0)</f><v>4800</v>', '<v>45760</v>', '<v>55369</v>', '令和']) {
   assert.ok(yx.sheet.includes(t), `Excel に「${t}」がない`);
 }
 await page.locator('[aria-live] > div', {hasText: `Excel ファイル「${yx.name}」を保存しました`}).waitFor();
@@ -149,7 +149,7 @@ for (const t of [
   '介護保険被保険者番号（0000366989）',
   '定価2,100円（税抜）×0.8',
   '定価20,000円（4m）×0.8',
-  '1200÷4000＝0.3',
+  '1200mm÷4000mm＝0.3',
   '同上施工費',
   '代表者名　行橋営業所所長　久保 匠史',
   '担当： 久保 匠史　0930-26-9640',
