@@ -293,7 +293,7 @@ export const RedPudding: React.FC<{from: number; to: number; cy?: number}> = ({f
 };
 
 // ───────── 読み上げアプリのスマホ（無口な協力者の返事） ─────────
-export const VoicePhone: React.FC<{text: string; from: number; to: number; cx?: number; cy?: number}> = ({text, from, to, cx = 540, cy = 780}) => {
+export const VoicePhone: React.FC<{text: string; from: number; to: number; cx?: number; cy?: number; scale?: number}> = ({text, from, to, cx = 540, cy = 780, scale = 1}) => {
   const frame = useCurrentFrame();
   if (frame < from || frame >= to) return null;
   const p = pop(frame, from, 13, 190);
@@ -302,7 +302,7 @@ export const VoicePhone: React.FC<{text: string; from: number; to: number; cx?: 
   const lines = text.split('|');
   const fs = Math.min(52, Math.floor(420 / Math.max(...lines.map((l) => [...l].length))));
   return (
-    <div style={{position: 'absolute', left: cx - w / 2, top: cy - h / 2, width: w, height: h, borderRadius: 54, background: '#16181d', padding: 16, boxSizing: 'border-box', boxShadow: '0 24px 50px rgba(0,0,0,0.55)', opacity: life(frame, from, to, 2, 3), transform: `translateY(${(1 - p) * 90}px) rotate(${-3 + (1 - p) * -6}deg)`}}>
+    <div style={{position: 'absolute', left: cx - w / 2, top: cy - h / 2, width: w, height: h, borderRadius: 54, background: '#16181d', padding: 16, boxSizing: 'border-box', boxShadow: '0 24px 50px rgba(0,0,0,0.55)', opacity: life(frame, from, to, 2, 3), transform: `translateY(${(1 - p) * 90}px) rotate(${-3 + (1 - p) * -6}deg) scale(${scale})`}}>
       <div style={{width: '100%', height: '100%', borderRadius: 40, background: 'linear-gradient(180deg, #f6f7f9 0%, #e7ebf1 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 34, padding: 30, boxSizing: 'border-box'}}>
         <div style={{fontFamily: F.maru, fontWeight: 700, fontSize: 30, color: '#6b7380', letterSpacing: 2}}>読み上げ中…</div>
         {/* スピーカーと音の棒 */}

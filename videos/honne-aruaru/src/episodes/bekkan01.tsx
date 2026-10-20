@@ -1,13 +1,13 @@
 // 家庭内別班 #1「赤いプリン」：声も音もなし（曲は投稿のときに足す）。テロップだけで、夫婦の日常をスパイドラマとして見せる。
 // 役どころはスパイドラマの定番（謝ってばかりの会社員と頭の中のもう一人の自分、公安のような妻、無口な協力者、組織のボス）に寄せ、
-// 顔・名前・劇中のセリフは実在の作品や俳優に似せない。絵は spy01 の10枚を使う。
+// 顔・名前・劇中のセリフは実在の作品や俳優に似せない。絵は spy01 の10枚（P）と、この回のために描いた3枚（B）。
 import React from 'react';
 import {AbsoluteFill, useCurrentFrame} from 'remotion';
 import {F} from '../fonts';
 import script from '../../episodes/bekkan01/script.json';
 import faces from '../../episodes/bekkan01/faces.json';
 import {Header, Outlined} from '../parts';
-import {BigWords, CineSub, Dossier, Receipt, RedPudding, SPY, Stamp, VoicePhone} from '../spy';
+import {BigWords, CineSub, Dossier, Receipt, SPY, Stamp, VoicePhone} from '../spy';
 import {FPS, clamp01, pop, ramp} from '../lib';
 import {Box, Scene, SceneView, cam, center, faceOf} from '../scene';
 
@@ -46,7 +46,8 @@ const span = (id: string) => SPANS.find((s) => s.seg.id === id) as Span;
 
 const FC = faces as unknown as Record<string, unknown>;
 const face = (scene: string, who: string) => faceOf(FC, scene, who);
-const img = (id: string) => `spy01/img/${id}.jpg`;
+const img = (id: string) => (id.startsWith('B') ? `bekkan01/img/${id}.jpg` : `spy01/img/${id}.jpg`);
+const pudding = center((FC.B1_extra as {pudding: Box}).pudding);
 const P5h = face('P5', 'HUSBAND');
 const P5g = face('P5', 'HUSBAND_GHOST');
 const dict = center((FC.P7_extra as {dictionary: Box}).dictionary);
@@ -64,12 +65,27 @@ const sceneOf = (sp: Span): Scene => {
     }
     case 'ura':
       return {...base, keys: [{at: from, cam: cam(P5g.x, P5g.y, 1.6, 560, 720)}], drift: 0.1};
-    case 'pudding':
-      return {...base, keys: [{at: from, cam: cam(0.5, 0.45, 1.2, 540, 900)}], filter: 'blur(12px) brightness(0.3) saturate(0.6)'};
+    case 'pudding': {
+      // 冷蔵庫の赤いプリン → 「緊急招集」で、目つきの変わった夫の顔に寄る
+      const h = face('B1', 'HUSBAND');
+      return {
+        ...base,
+        keys: [
+          {at: from, cam: cam(pudding.x, pudding.y, 2.3, 540, 860)}, // 光るプリンの寄り（字幕にかからない高さ）
+          {at: b(2.2), cam: cam(h.x, h.y, 1.5, 540, 680), dur: 12},
+        ],
+      };
+    }
     case 'order':
       return {...base, keys: [{at: from, cam: cam((P5h.x + P5g.x) / 2, (P5h.y + P5g.y) / 2, 1.5, 540, 700)}], drift: 0.12, shake: 6};
-    case 'son':
-      return {...base, keys: [{at: from, cam: cam(0.5, 0.45, 1.2, 540, 900)}], filter: 'blur(12px) brightness(0.4) saturate(0.7)'};
+    case 'son': {
+      const g = face('B2', 'SON');
+      return {...base, keys: [{at: from, cam: cam(g.x, g.y, 1.3, 400, 640)}]};
+    }
+    case 'hq': {
+      const m = face('B3', 'MOTHER-IN-LAW');
+      return {...base, keys: [{at: from, cam: cam(m.x, m.y, 1.25, 540, 720)}], drift: 0.08};
+    }
     case 'koan': {
       const w = face('P1', 'WIFE');
       return {...base, keys: [{at: from, cam: cam(w.x, w.y, 1.35, 560, 680)}]};
@@ -88,7 +104,7 @@ const sceneOf = (sp: Span): Scene => {
         ],
       };
     }
-    case 'boss': {
+    case 'leak': {
       const m = face('P8', 'MOTHER-IN-LAW');
       return {...base, keys: [{at: from, cam: cam(m.x, m.y, 1.35, 520, 680)}], shake: 5};
     }
@@ -186,8 +202,7 @@ export const Bekkan01: React.FC = () => {
         const {seg, from, to, b} = sp;
         return (
           <React.Fragment key={seg.id}>
-            {seg.id === 'pudding' && <RedPudding from={from} to={to} cy={760} />}
-            {seg.phone && <VoicePhone text={seg.phone} from={b(0.6)} to={to} cy={850} />}
+            {seg.phone && <VoicePhone text={seg.phone} from={b(0.6)} to={to} cx={790} cy={830} scale={0.72} />}
             {seg.receipt && <Receipt x={310} y={1000} from={b(0.4)} to={to} time={seg.receipt.time} item={seg.receipt.item} price={seg.receipt.price} markAt={b(1.4)} />}
             {seg.stamp && <Stamp text={seg.stamp} x={560} y={800} at={b(1.2)} to={to} size={120} rot={-10} />}
             {seg.tab && seg.name && <Dossier tab={seg.tab} name={seg.name} from={from + 2} to={to} />}
@@ -211,8 +226,8 @@ export const Bekkan01: React.FC = () => {
             {seg.say && (
               <CineSub
                 text={seg.say}
-                label={seg.id === 'boss' ? '義母・千鶴' : '妻・玲子'}
-                color={seg.id === 'boss' ? '#B8860B' : SPY.red}
+                label={seg.id === 'leak' ? '義母・千鶴' : '妻・玲子'}
+                color={seg.id === 'leak' ? '#B8860B' : SPY.red}
                 from={seg.cap ? b(2.2) : b(1.0)}
                 to={to}
                 cy={CAP_Y}
