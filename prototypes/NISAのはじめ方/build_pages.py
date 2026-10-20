@@ -1,10 +1,15 @@
-"""おかねの地図に、入口・資産シミュレーター・証券会社診断・申し込みサポートのページを組み立てる。
-ヘッダーとフッターは既存ページ（brokers.html）から抜き出したものをそのまま使う。"""
+"""「三大無料プレゼント」の4ページ（入口・資産シミュレーター・証券会社診断・申し込みサポート）を組み立てる。
+ヘッダーとフッターは既存ページ（brokers.html）から抜き出し、「おかねの地図」の名前と絵を「三大無料プレゼント」に変えたもの。
+入口は大きな見出しに「三大無料プレゼント」があるので、上の名前を出さない（メニューだけ）。"""
 import pathlib
 
 HERE = pathlib.Path(__file__).parent
 HEADER = (HERE / "_header.html").read_text(encoding="utf-8")
 FOOTER = (HERE / "_footer.html").read_text(encoding="utf-8")
+SITE_NAME = "三大無料プレゼント"
+# 入口の上は、名前（三大無料プレゼント）を出さずにメニューだけにする
+HEADER_START = HEADER.replace('<header class="site-header">', '<header class="site-header no-brand">', 1)
+HEADER_START = HEADER_START[:HEADER_START.index('<a class="brand"')] + HEADER_START[HEADER_START.index('</a>', HEADER_START.index('<a class="brand"')) + 4:]
 ARROW = ('<svg class="icon " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
          'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
          '<path d="M4 12h16m-6-6 6 6-6 6"/></svg>')
@@ -16,7 +21,7 @@ HEAD = """<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light">
 <meta name="robots" content="noindex,nofollow">
-<title>{title}｜おかねの地図</title>
+<title>{title}</title>
 <meta name="description" content="{desc}">
 <meta name="theme-color" content="#143E35">
 <link rel="icon" href="assets/profile-icon.png">
@@ -48,16 +53,15 @@ GUIDE_CHOICES = (f'<div class="gift-choices">{GUIDE_VIDEO_BTN}'
                  f'<a class="gift-btn" href="downloads/NISA-complete-guide.pdf">{DOC}資料で見る</a></div>')
 
 START = f"""<div class="narrow">
-<p class="pr-line pr-top">【PR】このページには広告（アフィリエイトリンク）を含みます。</p>
 <header class="start-hero">
-<h1>NISAを迷わず始める<br>3つの無料プレゼント</h1>
+<h1>NISAを迷わず始める<br>三大無料プレゼント</h1>
 <p>登録なしで、すぐ使えます。</p>
 </header>
 <div class="resume-banner" id="resume" hidden>
 <p id="resume-text"></p>
 <a class="button" id="resume-link" href="support.html">続きから進める {ARROW}</a>
 </div>
-<h2 class="visually-hidden">3つの無料プレゼント</h2>
+<h2 class="visually-hidden">3つのプレゼント</h2>
 <ol class="gift-rows">
 <li id="gift-app"><a class="gift-row" href="goal.html"><span class="gift-no" aria-hidden="true">1</span><span class="gift-text"><b>未来が見える 資産シミュレーター</b><span class="gift-desc">月3万円なら、65歳でいくら？ 目標の2,000万円には何歳で届く？</span></span>{ARROW}</a></li>
 <li id="gift-guide"><div class="gift-row is-split"><span class="gift-no" aria-hidden="true">2</span><span class="gift-text"><b>ゼロからわかる NISA完全攻略ガイド</b><span class="gift-desc">動画32分＋PDF45ページ。しくみから口座づくり・積立の始め方まで</span></span>{GUIDE_CHOICES}</div></li>
@@ -67,7 +71,7 @@ START = f"""<div class="narrow">
 <h2 id="open-title">口座開設に進む</h2>
 <p class="open-lead">NISA口座の申し込みは、スマホで約10分です。</p>
 <p class="open-q" id="brokers-label">おすすめの証券会社</p>
-<p class="open-order">並びは、広告の条件や使いやすさなどをもとに、このサイトが決めています。</p>
+<p class="open-order">【PR】下のボタンには広告（アフィリエイトリンク）が含まれます。並びは、広告の条件や使いやすさなどをもとに、このサイトが決めています。</p>
 <ol class="brokers" id="brokers" aria-labelledby="brokers-label"></ol>
 <details class="more-brokers" id="more-brokers" hidden>
 <summary>ほかの<span id="more-count"></span>社も見る</summary>
@@ -85,11 +89,12 @@ START = f"""<div class="narrow">
 <a class="text-link" href="support.html">手順を見ながら申し込む {ARROW}</a>
 </section>
 <p class="fine-print">このサイトの運営者は、金融商品取引業者・金融商品仲介業者ではありません。口座の申し込みや投資の判断は、各社の公式サイトで条件を確かめて、ご自身で行ってください。このサイトは、特定の銘柄や商品をすすめるものではありません。試算は仮定にもとづくもので、将来の成果を約束しません。出典と編集方針は<a href="sources.html">出典・編集方針</a>、広告の考え方は<a href="about.html">このサイトについて</a>にあります。</p>
+<p class="pr-line pr-bottom">【PR】このページには広告（アフィリエイトリンク）を含みます。</p>
 </div>"""
 
 CHOOSE = f"""<div class="content-wide">
 <div class="breadcrumb">
-<a href="start.html">3つの無料プレゼント</a>
+<a href="start.html">三大無料プレゼント</a>
 <span aria-hidden="true">/</span>
 <span>証券会社診断</span>
 </div>
@@ -114,7 +119,7 @@ CHOOSE = f"""<div class="content-wide">
 
 SUPPORT = f"""<div class="narrow">
 <div class="breadcrumb">
-<a href="start.html">3つの無料プレゼント</a>
+<a href="start.html">三大無料プレゼント</a>
 <span aria-hidden="true">/</span>
 <a href="choose.html">証券会社診断</a>
 <span aria-hidden="true">/</span>
@@ -183,7 +188,7 @@ def helper_field(fid, label, unit, value, mode="decimal"):
 
 GOAL = f"""<div class="content-wide">
 <div class="breadcrumb">
-<a href="start.html">3つの無料プレゼント</a>
+<a href="start.html">三大無料プレゼント</a>
 <span aria-hidden="true">/</span>
 <span>資産シミュレーター</span>
 </div>
@@ -355,7 +360,7 @@ GOAL = f"""<div class="content-wide">
 
 PAGES = {
     "goal.html": ("未来が見える 資産シミュレーター", "目標の金額と毎月の積立額を入れて、期間のつまみを動かすだけ。自分で積み立てたお金と、投資で増えた分の推移がグラフでわかります。入力はこの端末の中だけで使われます。", "goal.js", GOAL),
-    "start.html": ("NISAを迷わず始める 3つの無料プレゼント", "未来が見える資産シミュレーター・ゼロからわかるNISA完全攻略ガイド・30秒で選べる証券会社診断の3つを無料で。登録なしで使えます。", "video.js gift-videos.js partners.js choose.js start.js", START),
+    "start.html": ("NISAを迷わず始める 三大無料プレゼント", "未来が見える資産シミュレーター・ゼロからわかるNISA完全攻略ガイド・30秒で選べる証券会社診断の3つを無料で。登録なしで使えます。", "video.js gift-videos.js partners.js choose.js start.js", START),
     "choose.html": ("30秒で選べる 証券会社診断", "使っているカードや買い物の場所に答えるだけで、合いそうな証券会社がわかります。", "partners.js choose.js", CHOOSE),
     "support.html": ("NISA口座の申し込みサポート", "NISA口座の申し込みを、チェックリストで最後まで一緒に進めます。", "video.js partners.js support.js", SUPPORT),
 }
@@ -363,11 +368,13 @@ PAGES = {
 
 def build(out_dir):
     out = pathlib.Path(out_dir)
-    for name, (title, desc, script, body) in PAGES.items():
+    for page, (title, desc, script, body) in PAGES.items():
         scripts = "\n".join(f'<script defer src="{name}"></script>' for name in script.split())
-        html = HEAD.format(title=title, desc=desc, scripts=scripts) + HEADER + '<main id="main">\n' + body + "\n</main>\n" + FOOTER + "\n</body>\n</html>\n"
-        (out / name).write_text(html, encoding="utf-8")
-        print("wrote", out / name)
+        # 入口は見出しが「三大無料プレゼント」なので、ページの名前はそのまま。ほかの3ページは「｜三大無料プレゼント」をつける
+        full_title = title if page == "start.html" else f"{title}｜{SITE_NAME}"
+        html = HEAD.format(title=full_title, desc=desc, scripts=scripts) + (HEADER_START if page == "start.html" else HEADER) + '<main id="main">\n' + body + "\n</main>\n" + FOOTER + "\n</body>\n</html>\n"
+        (out / page).write_text(html, encoding="utf-8")
+        print("wrote", out / page)
 
 
 if __name__ == "__main__":
