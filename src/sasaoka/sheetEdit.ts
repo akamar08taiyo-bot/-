@@ -7,7 +7,7 @@
 //   job:customer|insuredNo|address、overhead:all|target
 // 打ち込んだ値は、仕切り計算表・請求書と同じ行（部材・取付手間）に入る（見積書と請求書はいつも同じ入力から作る）。
 
-import {cutToLength, estimatePlaceLines, estimateQty, estimateUnitPrice, overheadAuto, estimateTotals, rounddown} from './calc.ts';
+import {cutToLength, estimatePlaceLines, estimateQty, estimateUnitPrice, listPriceOf, overheadAuto, estimateTotals, rounddown} from './calc.ts';
 import {KINDS, materialText, rowUnit} from './estimateForms.ts';
 import {guessPieceLengthM} from './priceImport.ts';
 import {manualRow, materialRow, newPlace} from './rows.ts';
@@ -199,7 +199,7 @@ export function sheetValue(job: Job, key: string, ctx: SheetCtx, date = ''): str
   if (field === 'qty') return String(cutToLength(r) ? Math.round(estimateQty(r) * 1000) / 1000 : r.qty);
   if (field === 'unit') return rowUnit(r);
   if (field === 'price') return String(estimateUnitPrice(r, rate));
-  if (field === 'note') return r.estNote ?? (r.listPrice > 0 ? String(r.listPrice) : '');
+  if (field === 'note') return r.estNote ?? (listPriceOf(r) > 0 ? String(listPriceOf(r)) : '');
   return '';
 }
 

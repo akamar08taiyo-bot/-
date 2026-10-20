@@ -9,11 +9,13 @@ import {
   estimateUnitPrice,
   jobName,
   jobTotals,
+  listPriceOf,
   monthSummary,
   placeTotals,
   rounddown,
   roundYen,
   rowAmount,
+  shikiriPrice,
   sortJobs,
   taxAmount,
 } from '../../src/sasaoka/calc.ts';
@@ -86,6 +88,22 @@ test('仕切り計算表：切って使う部材は見積書と同じ本数（4m
   assert.equal(rowAmount({...rail, lengthCm: 0}), 10000); // 規格品そのまま → 1本
   assert.equal(rowAmount({...rail, pieceLengthM: 0}), 10000); // 1本の長さが分からない → 数量のまま
   assert.deepEqual(placeTotals({rows: [rail, lab(1000, 2)]}), {material: 1500, labor: 2000, total: 3500});
+});
+
+test('仕切価格・定価のどちらかが空欄：仕切価格は 定価×0.8、定価は 仕切価格×1.25（ご指示）', () => {
+  assert.equal(shikiriPrice(mat(0, 1, 'TOTO インテリア・バー', {listPrice: 18700})), 14960); // 定価×0.8
+  assert.equal(shikiriPrice(mat(0, 1, '部材', {listPrice: 1231})), 984); // 984.8 → 切り捨て（見積の単価と同じ）
+  assert.equal(shikiriPrice(mat(5600, 1, '部材', {listPrice: 8000})), 5600); // 仕切価格があればそれ
+  assert.equal(shikiriPrice(mat(-500, 1, '値引き')), -500); // 値引きの行はそのまま
+  assert.equal(shikiriPrice(lab(1000, 2)), 1000);
+  assert.equal(listPriceOf(mat(1470, 1)), 1838); // 1,837.5 → 切り上げ
+  assert.equal(listPriceOf(mat(1001, 1)), 1252); // 1,251.25 → 切り上げ（×0.8＝1,001.6 → 見積の単価 1,001）
+  assert.equal(listPriceOf(mat(1470, 1, '部材', {listPrice: 2100})), 2100); // 定価があればそれ
+  assert.equal(listPriceOf(mat(0, 1)), 0);
+  assert.equal(estimateUnitPrice(mat(1001, 1), 0.8), 1001);
+  // 仕切り計算表：仕切価格が空欄の部材は 定価×0.8。どちらもない行は0円
+  assert.equal(rowAmount(mat(0, 2, 'TOTO インテリア・バー', {listPrice: 18700})), 29920);
+  assert.equal(jobTotals(job([[mat(0, 1, 'TOTO', {listPrice: 18700}), mat(0, 1, '金具')]]), S).material, 14960);
 });
 
 test('jobTotals は元の仕切り計算表と同じ（Excelの記入例と同じ数字）', () => {
@@ -161,8 +179,9 @@ test('見積：単価は定価×0.8、切って使う部材の数量は 使う�
   // 手で入れた見積の単価がそのまま使われる（金額だけの行も）
   assert.equal(estimateUnitPrice({...rail, estPrice: 12000}, 0.8), 12000);
   assert.equal(estimateAmount(mat(0, 3, '', {estPrice: 500}), 0.8), 1500);
-  // 定価のない部材は0円（画面で「定価がありません」と出す）
-  assert.equal(estimateUnitPrice(mat(3360, 1), 0.8), 0);
+  // 定価のない部材は 仕切価格×1.25 を定価に（×0.8 で仕切価格と同じ金額）。どちらもなければ0円
+  assert.equal(estimateUnitPrice(mat(3360, 1), 0.8), 3360);
+  assert.equal(estimateUnitPrice(mat(0, 1), 0.8), 0);
   // 手間は取付手間の単価のまま
   assert.equal(estimateUnitPrice(lab(1000, 2), 0.8), 1000);
 });

@@ -177,13 +177,13 @@ assert.equal(await inInvoice.isChecked(), true);
 await inInvoice.uncheck();
 assert.ok(!(await link.innerText()).includes('①部材代'), '外しても金額が出ている');
 await inInvoice.check();
-assert.ok((await link.innerText()).includes('仕切価格が入っていない部材が 1 行'), await link.innerText());
+assert.ok((await link.innerText()).includes('仕切価格も定価も入っていない部材が 1 行'), await link.innerText());
 await link.getByRole('button', {name: '仕切価格を入れる'}).click();
 await page.getByRole('dialog').getByRole('textbox', {name: '取付金具の仕切価格'}).fill('300');
 await page.getByRole('dialog').getByRole('button', {name: '閉じる'}).first().click();
 // 部材代：木の手すり 60cm（10,000×0.15＝1,500）＋L型 7,800＋エンドキャップ 300＋取付金具 300＝9,900、取付手間 2,000
 const linkText = await link.innerText();
-assert.ok(linkText.includes('①部材代（仕切価格） 9,900') && linkText.includes('②取付手間 2,000') && !linkText.includes('仕切価格が入っていない'), linkText);
+assert.ok(linkText.includes('①部材代（仕切価格） 9,900') && linkText.includes('②取付手間 2,000') && !linkText.includes('入っていない部材'), linkText);
 log('笹岡工務店の請求書に最初から入る・外す・仕切価格を入れるOK');
 
 // ---------------- 工事場所を築上町にすると「広域連合用」の書式だと知らせる（打っている途中では変えない）。みやこ町は今の書式のまま。

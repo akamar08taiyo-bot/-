@@ -39,12 +39,32 @@ export function taxAmount(subtotal: number, taxRate: number, mode: TaxMode): num
   }
 }
 
+// 仕切価格・定価のどちらかが空欄の部材（ご指示）：仕切価格が空欄なら 定価×0.8、定価が空欄なら 仕切価格×1.25（＝25%を足す。×0.8 の逆）
+export const SHIKIRI_FROM_LIST = 0.8;
+export const LIST_FROM_SHIKIRI = 1.25;
+
+/** 仕切り計算表に使う仕切価格。空欄（0）の部材は 定価×0.8（1円未満は切り捨て。見積書の単価と同じ）。手間・値引きの行はそのまま */
+export function shikiriPrice(row: Pick<Row, 'kind' | 'price' | 'listPrice'>): number {
+  const price = Number.isFinite(row.price) ? row.price : 0;
+  if (row.kind !== 'material' || price !== 0) return price;
+  const list = Number.isFinite(row.listPrice) ? row.listPrice : 0;
+  return list > 0 ? rounddown(list * SHIKIRI_FROM_LIST) : 0;
+}
+
+/** 見積書に使う定価。空欄（0）の部材は 仕切価格×1.25（1円未満は切り上げ。×0.8 で仕切価格にもどる） */
+export function listPriceOf(row: Pick<Row, 'kind' | 'price' | 'listPrice'>): number {
+  const list = Number.isFinite(row.listPrice) ? row.listPrice : 0;
+  if (row.kind !== 'material' || list > 0) return list;
+  const price = Number.isFinite(row.price) ? row.price : 0;
+  return price > 0 ? Math.ceil(clean(price * LIST_FROM_SHIKIRI)) : 0;
+}
+
 /**
- * 仕切り計算表の金額 ＝ 単価×数量（1円単位に四捨五入）。切って使う部材は見積書と同じく 使う長さ÷1本の長さ の本数で数える
+ * 仕切り計算表の金額 ＝ 単価（仕切価格）×数量（1円単位に四捨五入）。切って使う部材は見積書と同じく 使う長さ÷1本の長さ の本数で数える
  * （仕切価格 10,000円・1本4m を60cm使う → 0.15本・1,500円）。割り切れない数量（1m÷3m など）は丸める前の数量で計算する
  */
-export function rowAmount(row: Pick<Row, 'kind' | 'price' | 'qty' | 'lengthCm' | 'pieceLengthM'>): number {
-  const price = Number.isFinite(row.price) ? row.price : 0;
+export function rowAmount(row: Pick<Row, 'kind' | 'price' | 'listPrice' | 'qty' | 'lengthCm' | 'pieceLengthM'>): number {
+  const price = shikiriPrice(row);
   const qty = Number.isFinite(row.qty) ? row.qty : 0;
   return roundYen(cutToLength(row) ? (price * qty * row.lengthCm) / 100 / row.pieceLengthM : price * qty);
 }
@@ -153,12 +173,11 @@ export function rounddown(x: number): number {
 
 export type EstimateSettings = Pick<Settings, 'estimateRate' | 'estimateOverheadRate' | 'taxRate'>;
 
-/** 見積の単価（定価×掛率の1円未満は切り捨て）。手で入れた単価があればそれを使う。手間は取付手間の単価のまま */
+/** 見積の単価（定価×掛率の1円未満は切り捨て。定価が空欄なら 仕切価格×1.25 を定価に）。手で入れた単価があればそれを使う。手間は取付手間の単価のまま */
 export function estimateUnitPrice(row: Row, rate: number): number {
   if (row.kind === 'labor') return Number.isFinite(row.price) ? row.price : 0;
   if (row.estPrice !== null && Number.isFinite(row.estPrice)) return row.estPrice;
-  const list = Number.isFinite(row.listPrice) ? row.listPrice : 0;
-  return rounddown(list * rate);
+  return rounddown(listPriceOf(row) * rate);
 }
 
 /** 長さで数える部材か（使う長さと1本の長さの両方が入っている） */

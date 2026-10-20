@@ -1,5 +1,5 @@
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
-import {cutToLength, jobName, jobTotals, placeTotals, rowAmount} from '../calc.ts';
+import {cutToLength, jobName, jobTotals, placeTotals, rowAmount, shikiriPrice} from '../calc.ts';
 import type {JobTotals} from '../calc.ts';
 import {cutCalc} from '../estimateForms.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
@@ -463,7 +463,15 @@ function PlaceCard({
                     {(r.code || r.maker) && <div className="px-2 text-[11px] text-slate-500">{[r.maker, r.code].filter(Boolean).join('　')}</div>}
                   </td>
                   <td data-cell="price" data-label="単価" className="px-2 py-1.5 text-right">
-                    <NumberInput value={r.price} onChange={(price) => setRow(r.id, {price})} className="w-24" ariaLabel="単価" autoFocus={r.id === focusRowId} />
+                    {r.kind === 'material' && r.price === 0 && shikiriPrice(r) > 0 ? (
+                      // 仕切価格が空欄の部材は 定価×0.8（打ち込めば、その仕切価格で計算する）
+                      <>
+                        <NumberInput value={0} blankZero placeholder={yen(shikiriPrice(r))} onChange={(price) => setRow(r.id, {price})} className="w-24" ariaLabel="単価" autoFocus={r.id === focusRowId} />
+                        <div className="text-[11px] text-slate-500">定価×0.8</div>
+                      </>
+                    ) : (
+                      <NumberInput value={r.price} onChange={(price) => setRow(r.id, {price})} className="w-24" ariaLabel="単価" autoFocus={r.id === focusRowId} />
+                    )}
                   </td>
                   <td data-cell="qty" data-label="数量・箇所" className="px-2 py-1.5 text-center">
                     <Stepper value={r.qty} onChange={(qty) => setRow(r.id, {qty})} ariaLabel={`${r.name || '金額だけの行'}の数量`} />

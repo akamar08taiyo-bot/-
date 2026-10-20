@@ -1,7 +1,7 @@
 import {useState} from 'react';
 import {jobName, jobTotals} from '../calc.ts';
 import {EstimateSheet} from '../components/EstimateSheet.tsx';
-import {LaborPickerFor, missingShikiri, ShikiriPriceDialog} from '../components/JobTools.tsx';
+import {LaborPickerFor, missingShikiri, shikiriFromList, ShikiriPriceDialog} from '../components/JobTools.tsx';
 import {KitPicker} from '../components/Kits.tsx';
 import {MaterialPicker} from '../components/Pickers.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
@@ -269,6 +269,7 @@ function ShikiriPanel({
 }) {
   const t = jobTotals(job, data.settings);
   const missing = missingShikiri(job);
+  const fromList = shikiriFromList(job);
   const client = data.settings.clientName || '笹岡工務店';
   return (
     <section
@@ -337,9 +338,12 @@ function ShikiriPanel({
               ⑥合計 <b>{yen(t.total)}</b>円
             </span>
           </div>
+          {fromList.length > 0 && (
+            <p className="mt-2 text-xs text-slate-500">仕切価格が空欄の部材 {fromList.length} 行は、定価×0.8 で計算しています（仕切価格を入れると、そちらで計算します）。</p>
+          )}
           {missing.length > 0 && (
             <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-xs text-amber-900">
-              仕切価格が入っていない部材が {missing.length} 行あります（請求書では、その部材代が0円になります）。
+              仕切価格も定価も入っていない部材が {missing.length} 行あります（請求書では、その部材代が0円になります）。
               <Btn small color="white" onClick={onFix}>
                 仕切価格を入れる
               </Btn>

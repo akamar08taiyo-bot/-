@@ -62,11 +62,22 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
 
   const removeShown = () => {
     if (list.length === 0) return;
-    const what = query || maker || favOnly ? `表示中の${list.length}件` : `部材リストの全${list.length}件`;
+    const what = query || maker || favOnly || noPriceOnly ? `表示中の${list.length}件` : `部材リストの全${list.length}件`;
     if (!confirm(`${what}を部材リストから削除します。すでに作った様邸の金額は変わりません。よろしいですか？`)) return;
     const ids = new Set(list.map((m) => m.id));
     update('materials', (all) => all.filter((m) => !ids.has(m.id)));
     toast(`${ids.size}件を削除しました`);
+  };
+  // メーカーの仕切り表を入れ直すとき：仕切価格が空欄のものだけ、または全部を消す（取付手間の単価・一式は消さない）
+  const removeNoPrice = () => {
+    if (!confirm(`仕切価格が空欄の${noPriceCount}件を部材リストから削除します。すでに作った見積書・様邸の金額は変わりません。よろしいですか？`)) return;
+    update('materials', (all) => all.filter((m) => m.price > 0));
+    toast(`仕切価格が空欄の${noPriceCount}件を削除しました`);
+  };
+  const removeAll = () => {
+    if (!confirm(`部材リストの全${data.materials.length}件（★お気に入りも）を削除して、0件にします。工賃（取付手間の単価）・一式・すでに作った見積書と様邸は消えません。よろしいですか？`)) return;
+    update('materials', () => []);
+    toast('部材リストを空にしました（0件）。メーカーの仕切り表を取り込んでください。');
   };
 
   return (
@@ -76,7 +87,17 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
         <span className="text-sm text-slate-500">
           全{data.materials.length}件・★お気に入り {favCount}件{noPriceCount > 0 && `・仕切価格が空欄 ${noPriceCount}件`}
         </span>
-        <div className="ml-auto">
+        <div className="ml-auto flex flex-wrap gap-2">
+          {noPriceCount > 0 && (
+            <Btn color="white" className="!text-rose-700" onClick={removeNoPrice}>
+              仕切価格が空欄の{noPriceCount}件を消す
+            </Btn>
+          )}
+          {data.materials.length > 0 && (
+            <Btn color="rose" onClick={removeAll}>
+              🗑 部材リストを空にする
+            </Btn>
+          )}
           <Btn color="purple" onClick={() => setImporting(true)}>
             📥 メーカーの仕切り表を取り込む
           </Btn>

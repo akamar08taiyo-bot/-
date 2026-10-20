@@ -1,6 +1,6 @@
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
-import {cutToLength, estimateQty, jobName, jobTotals, monthSummary, placeTotals, rowAmount} from '../calc.ts';
+import {cutToLength, estimateQty, jobName, jobTotals, monthSummary, placeTotals, rowAmount, shikiriPrice} from '../calc.ts';
 import type {MonthSummary} from '../calc.ts';
 import {cutCalc, FORM_INFO, jobForm} from '../estimateForms.ts';
 import type {AppData, Job, Settings} from '../types.ts';
@@ -403,7 +403,7 @@ function JobDoc({job, settings: s}: {job: Job; settings: Settings}) {
                       {cutToLength(r) && <span className="code-sub">{cutCalc(r)}本</span>}
                     </td>
                     <td className="code">{r.code}</td>
-                    <td className="num">{yen(r.price)}</td>
+                    <td className="num">{yen(shikiriPrice(r))}</td>
                     <td className="num">{cutToLength(r) ? num(estimateQty(r), 3) : num(r.qty)}</td>
                     <td className="num">{yen(rowAmount(r))}</td>
                   </tr>

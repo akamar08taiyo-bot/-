@@ -5,7 +5,7 @@
 // 備考・算出根拠は「定価8,000円（税抜）×0.8」。切って使う部材は 数量＝使う長さ÷1本の長さ（本）で書き、備考は「定価20,000円（4m）×0.8」、
 // 2行目に mm で計算を書く（例：600÷4000＝0.15）。
 
-import {cutToLength, estimatePlaceLines, estimateQty} from './calc.ts';
+import {cutToLength, estimatePlaceLines, estimateQty, listPriceOf} from './calc.ts';
 import {normalize} from './priceImport.ts';
 import type {EstimateForm, Job, Place, Row, Settings} from './types.ts';
 import {num, yen} from './util.ts';
@@ -160,8 +160,8 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
           unit: rowUnit(r),
           unitPrice: l.unitPrice,
           amount: l.amount,
-          listPrice: r.listPrice > 0 ? r.listPrice : 0,
-          rate: r.estPrice === null && r.listPrice > 0 ? s.estimateRate : null,
+          listPrice: listPriceOf(r), // 定価が空欄なら 仕切価格×1.25
+          rate: r.estPrice === null && listPriceOf(r) > 0 ? s.estimateRate : null,
           cut: cutCalc(r),
           piece: cutToLength(r) ? r.pieceLengthM : 0,
           hourly: false,

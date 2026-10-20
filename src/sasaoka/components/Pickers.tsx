@@ -1,6 +1,6 @@
 import {useMemo, useState} from 'react';
 import type {ReactNode} from 'react';
-import {roundYen} from '../calc.ts';
+import {estimateUnitPrice, shikiriPrice} from '../calc.ts';
 import {guessPieceLengthM} from '../priceImport.ts';
 import {laborCount, manualRow, materialRow, setLaborCount} from '../rows.ts';
 import type {AppMode, LaborItem, Material, Place, Row} from '../types.ts';
@@ -155,11 +155,21 @@ export function MaterialPicker({
                     <td className="px-2 py-1.5 text-xs text-slate-500">{m.maker}</td>
                     <td className="px-2 py-1.5 text-right tabular-nums text-slate-500">{m.listPrice > 0 ? yen(m.listPrice) : '—'}</td>
                     <td className="px-2 py-1.5 text-right tabular-nums">
-                      {m.price > 0 ? yen(m.price) : <span className="text-xs font-bold text-amber-700">空欄</span>}
+                      {m.price > 0 ? (
+                        yen(m.price)
+                      ) : m.listPrice > 0 ? (
+                        // 仕切価格が空欄なら 定価×0.8 で計算する
+                        <span className="text-slate-500" title="仕切価格が空欄なので、定価×0.8 で計算します">
+                          <span className="mr-1 text-[10px]">定価×0.8</span>
+                          {yen(shikiriPrice(materialRow(m)))}
+                        </span>
+                      ) : (
+                        <span className="text-xs font-bold text-amber-700">空欄</span>
+                      )}
                     </td>
                     {estimate && (
                       <td className="px-2 py-1.5 text-right font-bold tabular-nums text-indigo-800">
-                        {m.listPrice > 0 ? yen(roundYen(m.listPrice * rate)) : <span className="text-xs font-normal text-amber-700">定価なし</span>}
+                        {m.listPrice > 0 || m.price > 0 ? yen(estimateUnitPrice(materialRow(m), rate)) : <span className="text-xs font-normal text-amber-700">定価なし</span>}
                       </td>
                     )}
                     <td className="whitespace-nowrap px-2 py-1 text-right">
