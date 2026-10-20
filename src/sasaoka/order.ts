@@ -21,7 +21,6 @@ export const ORDER_MARGIN = 0.1;
 
 const EPS = 1e-6;
 const norm = (s: string) => normalize(s).toLowerCase();
-const mm = (x: number) => String(Math.round(x * 10) / 10); // 見積書と同じく桁区切りなし（4000mm）
 
 export function emptyOrderEdits(): OrderEdits {
   return {qty: {}, removed: [], added: [], supplier: '', date: '', note: ''};
@@ -155,7 +154,6 @@ type Group = {
   stockMm: number; // 1本の長さ（mm）。0 なら長さでは数えない
   whole: number; // 切らずに使う数
   pieces: Map<number, number>; // 切って使う長さ（mm）→ 本数
-  places: Map<string, number>; // 箇所 → 数（規格品のとき、内訳に出す）
 };
 
 const productKey = (r: Row) => [r.maker, r.code, r.name].map(norm).join('|');
@@ -172,7 +170,7 @@ export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[]):
       const key = stockMm > 0 ? `bar:${productKey(r)}|${stockMm}` : `qty:${productKey(r)}|${norm(r.unit)}`;
       let g = groups.get(key);
       if (!g) {
-        g = {key, first: r, stockMm, whole: 0, pieces: new Map(), places: new Map()};
+        g = {key, first: r, stockMm, whole: 0, pieces: new Map()};
         groups.set(key, g);
       }
       if (cutToLength(r)) {
@@ -180,8 +178,6 @@ export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[]):
         g.pieces.set(len, (g.pieces.get(len) ?? 0) + r.qty);
       } else {
         g.whole += r.qty;
-        const pn = place.name.trim() || '（箇所名なし）';
-        g.places.set(pn, (g.places.get(pn) ?? 0) + r.qty);
       }
     }
   }
@@ -203,12 +199,10 @@ export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[]):
       lengthMm: bar ? g.stockMm : 0,
       price: shikiriPrice(r),
       listPrice: listPriceOf(r),
-      detail: '',
       warn: '',
     };
     if (g.pieces.size === 0) {
-      // 規格品をそのまま使う：見積書の数量のまま。2か所以上なら箇所ごとの数を内訳に
-      if (g.places.size > 1) line.detail = [...g.places].map(([pn, q]) => `${pn} ${num(q, 3)}${unit}`).join('＋');
+      // 規格品をそのまま使う：見積書の数量のまま
       out.push(line);
       continue;
     }
@@ -219,20 +213,11 @@ export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[]):
     const pieces = [...g.pieces].map(([len, count]) => ({mm: len, count})); // 見積書に出てくる順
     const plan = planBars(pieces, g.stockMm, halfOk);
     line.qty = line.calc = g.whole + plan.full;
-
-    const used = pieces.map((p) => `${mm(p.mm)}mm×${num(p.count, 3)}${unit}`).join('＋');
-    const ratio = num(plan.totalMm / g.stockMm, 3);
-    const half = g.stockMm / 2;
-    const order = [plan.full > 0 ? `${g.stockMm}mm ${plan.full}${unit}` : '', plan.half > 0 ? `${half}mm ${plan.half}${unit}` : ''].filter(Boolean).join('＋');
-    const why = plan.extra
-      ? `余りが${mm(g.stockMm * ORDER_MARGIN)}mm（${ORDER_MARGIN}${unit}）より少ないので${halfOk ? `${half}mm` : ''}をもう1${unit}`
-      : `余り ${mm(plan.slackMm)}mm`;
-    line.detail =
-      (g.whole > 0 ? `切らずに使う ${num(g.whole, 3)}${unit}＋` : '') +
-      `使う長さ ${used}＝${mm(plan.totalMm)}mm（${ratio}${unit}）→ ${order}（${why}）`;
+    // 計算の説明（使う長さ・余り）は発注書に出さない（ユーザーの指示）。何を何本かだけが分かればよい
     if (line.qty > 0) out.push(line);
 
     if (plan.half > 0) {
+      const half = g.stockMm / 2;
       const hl: OrderLine = halfMat
         ? {
             ...line,
@@ -257,9 +242,6 @@ export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[]):
           };
       hl.lengthMm = half;
       hl.qty = hl.calc = plan.half;
-      // 4000mm を発注しないとき（2000mm だけで足りる）は、計算をこの行に出す
-      hl.detail =
-        line.qty > 0 ? `${line.code || line.name}（${g.stockMm}mm）の${plan.extra && !plan.halved ? '余りが少ないので足す分' : `${half}mmで足りる分`}` : line.detail;
       out.push(hl);
     }
   }
@@ -328,7 +310,6 @@ export function addOrderLine(edits: OrderEdits, row: Pick<Row, 'refId' | 'maker'
     lengthMm: 0,
     price: shikiriPrice(r),
     listPrice: listPriceOf(r),
-    detail: '',
     warn: '',
   };
   return {...edits, added: [...edits.added, line]};
@@ -402,7 +383,7 @@ export function hacchuImport(job: Pick<Job, 'customer' | 'suffix' | 'address' | 
       unit: l.unit,
       listPrice: l.listPrice,
       cost: l.price,
-      note: l.detail,
+      note: '', // 販売受注簿の備考。計算の説明は渡さない
     })),
   };
 }

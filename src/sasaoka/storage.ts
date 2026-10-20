@@ -244,7 +244,6 @@ const cleanOrderLine = (l: Record<string, unknown>): OrderLine => ({
   lengthMm: Math.max(0, numv(l.lengthMm)),
   price: numv(l.price),
   listPrice: numv(l.listPrice),
-  detail: str(l.detail),
   warn: str(l.warn),
 });
 

@@ -102,18 +102,15 @@ test('見積書の部材を、箇所をまたいで足して発注する数に�
     ['BP-80-4000', 1, '枚'],
     ['BP-80-2000', 1, '枚'],
   ]);
-  assert.equal(lines[0].detail, '使う長さ 600mm×2本＋1600mm×1本＝2800mm（0.7本）→ 4000mm 1本（余り 1200mm）');
-  assert.equal(lines[1].detail, '玄関 3個＋トイレ 2個');
-  assert.equal(lines[2].detail, '使う長さ 3800mm×1枚＝3800mm（0.95枚）→ 4000mm 1枚＋2000mm 1枚（余りが400mm（0.1枚）より少ないので2000mmをもう1枚）');
-  assert.equal(lines[3].detail, 'BP-80-4000（4000mm）の余りが少ないので足す分');
+  // 計算の説明（使う長さ・余り・箇所ごとの数）は持たない。発注書には何を何本かだけを出す（ユーザーの指示）
+  assert.ok(lines.every((l) => !('detail' in l)));
   assert.deepEqual([lines[3].price, lines[3].listPrice, lines[3].lengthMm, lines[3].warn], [2100, 4200, 2000, '']);
 });
 
-test('2000mmだけで足りるときは2000mmの行に計算を出す。部材リストに2000mmの品がなければ品番を空けて知らせる', () => {
+test('2000mmだけで足りるときは2000mmの品だけを発注する。部材リストに2000mmの品がなければ品番を空けて知らせる', () => {
   const j = job(['廊下', [cut(BD134, 160)]]);
   const withHalf = orderBaseLines(j, [BD134, BD132]);
   assert.deepEqual(brief(withHalf), [['BD-132', 1, '本']]);
-  assert.equal(withHalf[0].detail, '使う長さ 1600mm×1本＝1600mm（0.4本）→ 2000mm 1本（余り 400mm）');
   assert.equal(withHalf[0].name, BD132.name);
 
   const noHalf = orderBaseLines(j, [BD134]);
@@ -185,7 +182,7 @@ test('販売受注簿へ渡す内容（数量は1以上の整数・営業担当�
       unit: '本',
       listPrice: 18600,
       cost: 6000,
-      note: '使う長さ 1600mm×2本＝3200mm（0.8本）→ 4000mm 1本（余り 800mm）',
+      note: '', // 計算の説明は渡さない
     },
   ]);
   const half = {...base[0], qty: 0.5};

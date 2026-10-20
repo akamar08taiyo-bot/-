@@ -1,5 +1,5 @@
 // 発注書（A4縦）。見積書に入っている部材を、何を何個（何本・何枚）発注するか（発注書の画面で直した数）。
-// 切って使う部材は、品名の下に使う長さの計算（4000mm を何本にしたか）を小さく出す。
+// 計算の説明（使う長さ・余り・足す分）は出さない（ユーザーの指示）。品名・品番と数量・単位だけ。
 
 import {jobName} from '../calc.ts';
 import {applyOrderEdits, orderBaseLines, orderedLines, unitTotals} from '../order.ts';
@@ -75,10 +75,7 @@ export function OrderDoc({job, data}: {job: Job; data: AppData}) {
               <td className="c">{i + 1}</td>
               <td className="name">{l.maker}</td>
               <td className="code">{l.code}</td>
-              <td className="name">
-                {l.name}
-                {l.detail && <span className="code-sub">{l.detail}</span>}
-              </td>
+              <td className="name">{l.name}</td>
               <td className="num qty">{num(l.qty, 3)}</td>
               <td className="c unit">{l.unit}</td>
             </tr>

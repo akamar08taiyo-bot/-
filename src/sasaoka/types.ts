@@ -89,7 +89,6 @@ export type OrderLine = {
   lengthMm: number; // 切って使う部材の1本の長さ（mm）。0 なら長さでは数えない
   price: number; // 仕切価格（1つあたり・税抜）
   listPrice: number; // 定価（1つあたり・税抜）
-  detail: string; // 内訳（使う長さの計算など）
   warn: string; // 確かめてほしいこと（2000mm の品が部材リストにない など）
 };
 

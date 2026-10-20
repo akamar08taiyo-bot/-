@@ -230,7 +230,6 @@ function OrderRow({line: l, no, onQty, onReset, onRemove}: {line: OrderLine; no:
           {[l.maker, l.code && `品番 ${l.code}`, l.lengthMm > 0 && `1${l.unit} ${l.lengthMm}mm`].filter(Boolean).join('　')}
           {l.key.startsWith('add:') && <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 font-bold text-emerald-800">発注書で足した行</span>}
         </div>
-        {l.detail && <div className="mt-1 text-xs leading-5 text-slate-600">{l.detail}</div>}
         {l.warn && <div className="mt-1 rounded bg-amber-50 px-2 py-1 text-xs font-bold text-amber-900">⚠ {l.warn}</div>}
         {changed && (
           <div className="mt-1 text-xs text-blue-700">
