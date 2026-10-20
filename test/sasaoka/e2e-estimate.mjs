@@ -75,7 +75,7 @@ log('見積の単価の手入力と自動に戻すOK');
 
 // ---------------- ブラケットの施工費（取付手間を数える）：木を1つ → ブラケットのすぐ下に同上施工費 1,000
 await cell(await key('ブラケット', 'text')).click();
-await sheet.getByRole('button', {name: '🔧 工賃（笹岡工務店の手間）から入れる'}).click();
+await sheet.getByRole('button', {name: '🔧 施工費（笹岡工務店の手間）から入れる'}).click();
 await page.getByRole('dialog').getByText('「ブラケット」の施工費').waitFor();
 await page.getByRole('button', {name: '木の箇所数を1増やす', exact: true}).click();
 await page.getByRole('button', {name: '数え終わったら閉じる'}).click();
@@ -248,8 +248,8 @@ await page.getByRole('button', {name: '削除', exact: true}).click();
 assert.equal(await page.locator('tbody tr').count(), 1);
 log('複製・削除OK');
 
-// ---------------- 部材・工賃マスタ（請求書と同じ部材リスト）：Excel の「定価」の列も読む。工賃（笹岡工務店の手間）も同じタブ
-await page.getByRole('navigation').getByRole('button', {name: /部材・工賃マスタ/}).click();
+// ---------------- 部材・施工費マスタ（請求書と同じ部材リスト）：Excel の「定価」の列も読む。施工費（笹岡工務店の手間）も同じタブ
+await page.getByRole('navigation').getByRole('button', {name: /部材・施工費マスタ/}).click();
 assert.ok((await page.locator('main').innerText()).includes('見積書（見積もりを作成する）と請求書（請求書を確認する）の両方で使います'));
 await page.getByRole('button', {name: /メーカーの仕切り表を取り込む/}).click();
 await page.locator('[role=dialog] input[type=file]').setInputFiles(path.join(FIX, 'maker-list.xlsx'));
@@ -259,8 +259,8 @@ assert.equal(await bp.getByRole('textbox', {name: '定価'}).inputValue(), '4,80
 assert.equal(await bp.getByRole('textbox', {name: '仕切価格'}).inputValue(), '3,360');
 log('定価の取り込みOK');
 
-// ---------------- 工賃（笹岡工務店の手間）：部材・工賃マスタのもう1つのタブ
-await page.getByRole('tab', {name: /工賃（笹岡工務店の手間/}).click();
+// ---------------- 施工費（笹岡工務店の手間）：部材・施工費マスタのもう1つのタブ
+await page.getByRole('tab', {name: /施工費（笹岡工務店の手間/}).click();
 assert.ok((await page.locator('main').innerText()).includes('取付手間の単価'));
 // ---------------- 設定：見積書と請求書の両方
 await page.getByRole('navigation').getByRole('button', {name: '設定'}).click();

@@ -463,7 +463,7 @@ export function EstimateSheet({
   const row = target.row;
   const place = target.place;
   const lineRowId = row?.id ?? null;
-  // 工賃を入れる先の部材：選んでいる部材か、選んでいる施工費（同上施工費）の上の部材
+  // 施工費を入れる先の部材：選んでいる部材か、選んでいる施工費（同上施工費）の上の部材
   const workOwner = (() => {
     if (!row || !place) return null;
     let k = place.rows.findIndex((r) => r.id === row.id);
@@ -552,7 +552,7 @@ export function EstimateSheet({
           onClick={() => onPickLabor(place?.id ?? null, workOwner?.id ?? null)}
           title="笹岡工務店の取付手間（木・タイルなど）を数えて施工費にします。部材を選んでいれば、その部材の「同上施工費」になります"
         >
-          🔧 工賃（笹岡工務店の手間）から入れる
+          🔧 施工費（笹岡工務店の手間）から入れる
         </button>
         <button type="button" className="sheet-tool" onClick={() => onPickKit(place?.id ?? null)}>
           ＋ 一式から入れる

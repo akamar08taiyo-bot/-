@@ -1,10 +1,10 @@
-// 住宅改修の見積書と、笹岡工務店への請求書（仕切り計算）と、部材・工賃のマスタを、タブで切り替えて使う1つのアプリ。
+// 住宅改修の見積書と、笹岡工務店への請求書（仕切り計算）と、部材・施工費のマスタを、タブで切り替えて使う1つのアプリ。
 // 太陽ポータルの2つの入口（jutaku-mitsumori/・sasaoka/）は同じアプリで、最初に開くタブ（start）だけが違う。
 //   見積もりを作成する：「新規作成」か「一覧から作成」（作った月ごとの一覧）を選び、いただいた見積書
 //                       （苅田町・行橋市・みやこ町用「工事費見積書兼工事費内訳書」・広域連合用「住宅改修内訳明細書」）の形のまま打ち込む。
 //                       打ち込んだ内容は、そのまま笹岡工務店の仕切り計算表・請求書に入る（入れない見積書は外せる）
 //   請求書を確認する：請求する月ごとの様邸（仕切り計算表）と、1か月分の御請求書
-//   部材・工賃マスタ：部材リスト（メーカーの仕切価格・定価）と、工賃（笹岡工務店の取付手間の単価）
+//   部材・施工費マスタ：部材リスト（メーカーの仕切価格・定価）と、施工費（笹岡工務店の取付手間の単価）
 //   設定
 
 import {useEffect, useMemo, useState} from 'react';
@@ -27,11 +27,11 @@ import {thisMonth} from './util.ts';
 const TABS: {id: MainTab; label: string}[] = [
   {id: 'estimate', label: '📝 見積もりを作成する'},
   {id: 'invoice', label: '🧾 請求書を確認する'},
-  {id: 'master', label: '📦 部材・工賃マスタ'},
+  {id: 'master', label: '📦 部材・施工費マスタ'},
   {id: 'settings', label: '⚙ 設定'},
 ];
 
-// タブごとの色（見積書は緑、請求書は紺、部材・工賃マスタは紫、設定は灰）。選んでいるタブは下の画面と同じ色にしてつなげる
+// タブごとの色（見積書は緑、請求書は紺、部材・施工費マスタは紫、設定は灰）。選んでいるタブは下の画面と同じ色にしてつなげる
 const THEME: Record<MainTab, {head: string; page: string; active: string; sub: string; width: string}> = {
   estimate: {head: 'bg-[#14532d]', page: 'bg-[#f2f6f4]', active: 'bg-[#f2f6f4] text-[#14532d]', sub: 'text-green-100', width: 'max-w-[1600px]'},
   invoice: {head: 'bg-[#0c315e]', page: 'bg-[#f3f6fa]', active: 'bg-[#f3f6fa] text-[#0c315e]', sub: 'text-blue-100', width: 'max-w-[1400px]'},
@@ -241,11 +241,11 @@ export default function App({start}: {start: MainTab}) {
             ))}
           {tab === 'master' && (
             <div className="space-y-4">
-              <div className="flex flex-wrap gap-2" role="tablist" aria-label="部材・工賃マスタ">
+              <div className="flex flex-wrap gap-2" role="tablist" aria-label="部材・施工費マスタ">
                 {(
                   [
                     ['materials', `部材リスト（${data.materials.length}件）`],
-                    ['labor', `工賃（笹岡工務店の手間・${data.labor.length}項目）`],
+                    ['labor', `施工費（笹岡工務店の手間・${data.labor.length}項目）`],
                   ] as const
                 ).map(([id, label]) => (
                   <button

@@ -132,7 +132,7 @@ export function JobsPage({
             <li>
               「
               <button type="button" className="font-bold text-purple-700 underline" onClick={goMaterials}>
-                部材・工賃マスタ
+                部材・施工費マスタ
               </button>
               」で、メーカーの仕切り表（Excel・CSV・PDF）を取り込み、よく使う部材をお気に入り（★）にします。
             </li>

@@ -26,7 +26,7 @@ log('起動OK');
 await shot(page, '01-empty.png');
 
 // ---------------- 部材リスト：Excel の取り込み
-await page.getByRole('navigation').getByRole('button', {name: /部材・工賃マスタ/}).click();
+await page.getByRole('navigation').getByRole('button', {name: /部材・施工費マスタ/}).click();
 await page.getByRole('button', {name: /メーカーの仕切り表を取り込む/}).click();
 await page.locator('input[type=file]').setInputFiles(path.join(FIX, 'maker-list.xlsx'));
 await page.getByRole('button', {name: '部材リストに取り込む（5件）'}).waitFor();
@@ -161,7 +161,7 @@ await page.reload();
 await page.getByText('田中様邸').waitFor();
 const after = await page.locator('table').first().innerText();
 assert.ok(after.includes('佐藤様邸'));
-await page.getByRole('navigation').getByRole('button', {name: /部材・工賃マスタ/}).click();
+await page.getByRole('navigation').getByRole('button', {name: /部材・施工費マスタ/}).click();
 assert.ok((await page.getByText('全11件').count()) === 1, '部材リストが11件残っていない');
 log('再読み込み後も保存されているOK');
 

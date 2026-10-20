@@ -153,7 +153,7 @@ function GettingStarted({data, update, goMaterials, onSample}: {data: AppData; u
         <li>
           「
           <button type="button" className="font-bold text-purple-800 underline" onClick={goMaterials}>
-            部材・工賃マスタ
+            部材・施工費マスタ
           </button>
           」で、メーカーの価格表（Excel・CSV・PDF）を取り込み、よく使う部材に★を付けます。
         </li>
