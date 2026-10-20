@@ -367,5 +367,34 @@ assert.ok((await sheet.innerText()).includes('同上施工費'));
 assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '見本 太郎様邸');
 log('見積書に戻れるOK');
 
+// ---------------- 「📄 白紙に戻す」（印刷の横）：確かめてから、見積書に打ち込んだ内容を全部消す。やめれば何も消えない。
+// 保険者（書式）・担当は残す。Ctrl+Z で戻せる
+const headButtons = (await page.locator('main button').allInnerTexts()).map((t) => t.trim());
+assert.equal(headButtons[headButtons.indexOf('🖨 見積書を印刷') + 1], '📄 白紙に戻す', headButtons.slice(0, 10).join('|'));
+const clearBtn = page.getByRole('button', {name: '📄 白紙に戻す'});
+page.removeAllListeners('dialog');
+let asked = '';
+let answer = false;
+page.on('dialog', (d) => {
+  asked = d.message();
+  void (answer ? d.accept() : d.dismiss());
+});
+const rowsBefore = await lines();
+await clearBtn.click();
+assert.match(asked, /白紙に戻しますか/);
+assert.equal(await lines(), rowsBefore); // 「キャンセル」なら消えない
+answer = true;
+await clearBtn.click();
+assert.equal(await lines(), 0);
+assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '新しい見積書');
+assert.equal(await insurer.inputValue(), 'kouiki');
+assert.equal(await staffSelect.inputValue(), '土居 翔太');
+assert.ok(await clearBtn.isDisabled()); // もう白紙
+await page.locator('header').first().click({position: {x: 4, y: 4}});
+await undoKey();
+assert.equal(await lines(), rowsBefore);
+assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '見本 太郎様邸');
+log('白紙に戻す（確かめる・やめる・Ctrl+Z で戻す）OK');
+
 console.log('\nERRORS:', errors.length ? errors : 'なし');
 await browser.close();

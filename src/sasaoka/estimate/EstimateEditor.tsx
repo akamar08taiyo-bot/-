@@ -92,6 +92,14 @@ export function EstimateEditor({
   const removeJob = () => {
     if (removeEstimate(job, name, update, toast)) onBack();
   };
+  // 白紙に戻す：見積書に打ち込んだ内容（お客様名・被保険者番号・工事場所・明細・諸経費）と発注書で直したところを消す。
+  // いきなり消えると困るので確かめてから（消したあとも Ctrl+Z で戻せる）。保険者（書式）・担当・請求書に入れるかは残す
+  const blank = !job.customer.trim() && !job.insuredNo.trim() && !job.address.trim() && job.places.length === 0 && job.overhead === null && job.overheadTarget === null;
+  const clearSheet = () => {
+    if (!confirm('見積書を白紙に戻しますか？\n打ち込んだ内容（お客様名・工事場所・明細など）がすべて消えます。')) return;
+    setJob((j) => ({...j, insurer: jobInsurer(j), form: jobForm(j, s), customer: '', insuredNo: '', address: '', places: [], overhead: null, overheadTarget: null, order: null}));
+    toast('白紙に戻しました');
+  };
   const duplicate = () => onOpen(duplicateEstimate(job, update, toast).id);
 
   const toggleFavorite = (id: string) => update('materials', (list) => list.map((m) => (m.id === id ? {...m, favorite: !m.favorite} : m)));
@@ -130,6 +138,9 @@ export function EstimateEditor({
           </Btn>
           <Btn color="sky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
             🖨 見積書を印刷
+          </Btn>
+          <Btn color="white" onClick={clearSheet} disabled={blank}>
+            📄 白紙に戻す
           </Btn>
           <Btn color="teal" onClick={onOpenOrder}>
             🛒 発注書を作成

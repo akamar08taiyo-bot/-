@@ -73,6 +73,9 @@ React 19 ＋ TypeScript ＋ Vite（Tailwind）。リポジトリにはほかの�
   見積書の外での変更（部材リストから入れる・保険者・担当・請求書に入れる）も `useLayoutEffect` で見分けて積む（戻すのは Job の全体なので、積まないと Ctrl+Z でそれらまで消える）。
   自分の変更は、保存で `updatedAt` だけが付いて戻ってくるので `sameJob` で除く。続けての変更（打ち込み）は1秒以内なら1回にまとめる。
   Ctrl+Z／Y は欄を選んでいなくても `window` の keydown で効く（文字を打つ欄・ダイアログ・印刷の画面の中では効かない）。ボタンは置かない（ユーザーの指示）。
+- 白紙に戻す（`estimate/EstimateEditor.tsx` の `clearSheet`。ボタンは「🖨 見積書を印刷」の横）：`confirm` で確かめてから customer・insuredNo・address・places・overhead・
+  overheadTarget・order を空にする。保険者と書式は `jobInsurer`／`jobForm` の値で固定して残す（住所から決まっていた古い見積書でも書式が変わらないように）。
+  見積書の外での変更なので、上のしくみで Ctrl+Z で戻せる。選んでいた欄がなくなったら、選択の枠の `useLayoutEffect` でお客様名の欄を選び直す（すぐ打ち込める）。
 - **行の左のボタンを足すときの決まり**：
   - `RowTools` は2つの書式（苅田町・行橋市・みやこ町用・広域連合用）で共通（`print/EstimateForms.tsx` の YkLine と KkLine の両方から呼ぶ）。1か所直せば両方に出る。印刷・Excel には出ない。
   - 置き場所は見積書の左の余白だけ。入力の画面だけ表を右に寄せている（`sasaoka.css` の `.est-sheet .form-page.yk { padding-left: 25mm }`・`.kk { 26mm }`、書式ごとに別の指定）。

@@ -300,5 +300,27 @@ assert.ok(settings.includes('自社の情報（請求書の発行元・見積書
 assert.ok(settings.includes('請求先（工務店）の名前') && settings.includes('③部材上乗せ・④諸経費の率'), settings);
 log('設定OK');
 
+// ---------------- 苅田町・行橋市・みやこ町用で「📄 白紙に戻す」：明細もお客様名も消え、お客様名の欄が選ばれてそのまま打ち込める。Ctrl+Z で戻る
+await page.getByRole('navigation').getByRole('button', {name: /見積もりを作成する/}).click();
+const sampleCell = page.getByRole('cell', {name: /（サンプル）山田様邸/});
+await Promise.race([sheet.waitFor(), sampleCell.waitFor()]); // 開いていた見積書に戻るか、一覧
+if ((await sheet.count()) === 0) await sampleCell.click();
+await sheet.waitFor();
+assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '（サンプル）山田様邸');
+await page.getByRole('combobox', {name: '保険者'}).selectOption('yukuhashi'); // 上で広域連合用にしたので戻す（お客様名の欄は苅田町・行橋市・みやこ町用の見積書にある）
+const filled = await sheet.locator('.form-page tr[data-rows]').count();
+await cell(await sheet.locator('.form-page tr', {hasText: 'ブラケット'}).first().locator('[data-edit$=":qty"]').first().getAttribute('data-edit')).click();
+await page.getByRole('button', {name: '📄 白紙に戻す'}).click(); // 確かめのダイアログは「OK」
+assert.equal(await sheet.locator('.form-page tr[data-rows]').count(), 0);
+assert.equal(await sheet.locator('textarea.sheet-input').getAttribute('aria-label'), 'お客様名');
+await page.keyboard.type('白紙 次郎');
+await page.keyboard.press('Enter');
+assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '白紙 次郎様邸');
+await page.keyboard.press('ControlOrMeta+z'); // お客様名を戻す
+await page.keyboard.press('ControlOrMeta+z'); // 白紙に戻す前に戻す
+assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '（サンプル）山田様邸');
+assert.equal(await sheet.locator('.form-page tr[data-rows]').count(), filled);
+log('白紙に戻す（お客様名の欄から打ち込める・Ctrl+Z で戻る）OK');
+
 console.log('\nERRORS:', errors.length ? errors : 'なし');
 await browser.close();

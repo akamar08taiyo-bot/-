@@ -187,7 +187,11 @@ export function EstimateSheet({
     const inner = innerRef.current;
     if (!el || !inner) {
       if (box) setBox(null);
-      if (sel && !el) setSel(null);
+      if (sel && !el) {
+        // 選んでいた欄がなくなった（白紙に戻したときなど）。お客様名が空ならお客様名の欄を選ぶ（すぐ打ち込める）
+        const customer: Sel = {key: 'job:customer', occ: 0};
+        setSel(form === 'yukuhashi' && !jobRef.current.customer.trim() && findCell(customer) ? customer : null);
+      }
       return;
     }
     const r = el.getBoundingClientRect();
