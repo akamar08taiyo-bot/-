@@ -204,7 +204,7 @@ export function OrderPage({
           rate={data.settings.estimateRate}
           // 見積書から作った行にある部材は、その行の数を増やす（同じ部材が2行に分かれないように）
           onAdd={(row) => {
-            const same = row.refId ? lines.find((l) => l.refId === row.refId && l.key.startsWith('qty:')) : undefined;
+            const same = row.refId ? lines.find((l) => l.refId === row.refId && !l.key.startsWith('add:')) : undefined;
             setEdits((e) => (same ? bumpOrderQty(e, same, row.qty) : addOrderLine(e, row)));
             if (same) toast(`「${same.name || same.code}」の発注する数を増やしました`);
           }}
