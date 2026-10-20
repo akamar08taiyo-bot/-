@@ -62,7 +62,11 @@ def images(key):
 
 
 eps = []
-for i, e in enumerate(C['episodes'], 1):
+for e in C['episodes']:
+    if not os.path.exists(os.path.join(OUT, f"{e['key']}.mp4")):  # まだ書き出していない回は載せない
+        print(e['key'], '（まだ書き出していないので載せない）')
+        continue
+    i = len(eps) + 1
     s = sections(os.path.join(OUT, f"{e['key']}_概要欄.txt"))
     titles = [t for t in s['タイトル（どれか1つ）'].splitlines() if t.strip()]
     total = float(subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', os.path.join(OUT, f"{e['key']}.mp4")],
@@ -70,8 +74,8 @@ for i, e in enumerate(C['episodes'], 1):
     v = kit_video(e['key'])
     images(e['key'])
     eps.append(dict(e, n=i, titles=titles, desc=s['概要欄'], tags=s['タグ欄'], pin=s['固定コメント'],
-                    sec=round(total), mb=os.path.getsize(v) / 1048576))
-    print(e['key'], f'{round(total)}秒', f'{os.path.getsize(v) / 1048576:.1f} MiB', 'vid=' + (e['vid'] or '（まだ）'))
+                    sec=int(total), mb=os.path.getsize(v) / 1048576))  # 尺は YouTube の表示と同じく切り捨て（56.5秒 → 56秒）
+    print(e['key'], f'{int(total)}秒', f'{os.path.getsize(v) / 1048576:.1f} MiB', 'vid=' + (e['vid'] or '（まだ）'))
 ch = Image.open(os.path.join(OUT, 'honne_characters.png')).convert('RGB')
 ch.resize((1600, 1600 * ch.height // ch.width), Image.LANCZOS).save(os.path.join(KIT, 'chars.jpg'), quality=86)
 
