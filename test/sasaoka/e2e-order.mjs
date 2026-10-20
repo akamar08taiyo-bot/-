@@ -33,7 +33,7 @@ page.on('dialog', (d) => d.accept());
 await page.goto(`${site}/jutaku-mitsumori/index.html`);
 await page.getByRole('button', {name: /サンプルで試す/}).click();
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
-const sheet = page.getByRole('region', {name: '見積書に直接入力'});
+const sheet = page.getByRole('region', {name: '見積書', exact: true});
 await sheet.waitFor();
 
 // 木の手すり（1本4m）を 380cm 使う → 3800mm（0.95本）。4000mm 1本だと余りが 200mm（0.1本＝400mm より少ない）→ 2000mm をもう1本

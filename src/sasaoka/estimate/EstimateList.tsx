@@ -113,7 +113,6 @@ export function EstimateHome({
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded-xl border-2 border-emerald-600 bg-white p-5 shadow-sm" aria-label="新規作成">
           <h2 className="text-xl font-bold text-[#14532d]">＋ 新規作成</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-600">新しい見積書を作ります。保険者（工事場所の市町村）を選んでください。</p>
           <div className="mt-4 grid gap-3">
             {/* 苅田町・行橋市・みやこ町は見積書が同じ書式。申請書は保険者ごとに違うので、保険者を分けて選ぶ */}
             <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
@@ -124,24 +123,16 @@ export function EstimateHome({
                   </Btn>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-slate-600">見積書は3つとも同じ「{FORM_INFO.yukuhashi.title}」です。</p>
             </div>
             <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
               <Btn color="emerald" className="w-full !px-4 !py-4 !text-base" onClick={() => onNew('kouiki')}>
                 ＋ {INSURER_INFO.kouiki.name}
               </Btn>
-              <p className="mt-2 text-xs text-slate-600">
-                {INSURER_INFO.kouiki.area}。見積書は広域連合の「{FORM_INFO.kouiki.title}」
-                {data.settings.estimateHourRate > 0 ? `（施工費は1時間${yen(data.settings.estimateHourRate)}円）` : ''}です。
-              </p>
             </div>
           </div>
         </section>
         <section className="rounded-xl border-2 border-slate-300 bg-white p-5 shadow-sm" aria-label="一覧から作成">
           <h2 className="text-xl font-bold text-slate-800">📋 一覧から作成</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-600">
-            作った見積書を、月ごとの一覧から開いて続きを打ち込みます。「複製」で、前の見積書をもとに新しい見積書を作れます。
-          </p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Btn color="white" className="!px-5 !py-4 !text-base" onClick={onList}>
               📋 見積書の一覧を開く

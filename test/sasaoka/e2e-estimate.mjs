@@ -38,7 +38,7 @@ for (const v of ['行橋市', '久保', '24,538', thisMonthLabel]) assert.ok(row
 log('一覧OK');
 
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
-const sheet = page.getByRole('region', {name: '見積書に直接入力'});
+const sheet = page.getByRole('region', {name: '見積書', exact: true});
 await sheet.waitFor();
 const cell = (k) => sheet.locator(`[data-edit="${k}"]`).first();
 const tds = async (text) => (await sheet.locator('.form-page tr', {hasText: text}).first().locator('td').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
@@ -109,9 +109,9 @@ log('部材＋施工費（常用）を入れるOK');
 await page.screenshot({path: path.join(outDir, '50-estimate-app.png'), fullPage: true});
 
 // ---------------- 保存：ボタンと Ctrl+S（見積書の欄に打ち込んでいる途中の値も入れて保存）。読み直しても同じ
-const savedToasts = () => page.locator('[aria-live] > div', {hasText: '保存しました（この端末に保存されています'}).count();
+const savedToasts = () => page.locator('[aria-live] > div', {hasText: /^保存しました$/}).count();
 await page.getByRole('button', {name: '💾 保存'}).click();
-await page.locator('[aria-live] > div', {hasText: '保存しました（この端末に保存されています'}).first().waitFor();
+await page.locator('[aria-live] > div', {hasText: /^保存しました$/}).first().waitFor();
 await cell('job:insuredNo').click();
 await page.keyboard.type('1111111111'); // Enter を押さずに Ctrl+S
 await page.keyboard.press('Control+s');

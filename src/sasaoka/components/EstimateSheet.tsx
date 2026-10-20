@@ -1,6 +1,7 @@
 // 見積書に直接入力する（Excel のように欄を選んで打ち込む）。見積書と同じ形のまま、打ち込んだ値は様邸の行（部材・取付手間）に入り、
 // 仕切り計算表・請求書も同じ行から作る。操作は Excel と同じ：
-//   欄を選んで打ち込むと書き換え／Enter で下・Tab で右・矢印で移動／F2 かダブルクリックで書き直す／Delete で消す／Esc でやめる／Ctrl+Z で元に戻す
+//   欄を選んで打ち込むと書き換え／Enter で下・Tab で右・矢印で移動／F2 かダブルクリックで書き直す／Delete で消す／Esc でやめる／Ctrl+Z で元に戻す・Ctrl+Y でやり直す
+//   （元に戻す・やり直すのボタンや、画面の説明は置かない。ユーザーの指示）
 //   行：左の「＋」で下に1行・「✕」で消す・「コピー」→ 貼り付けたい行の「貼付」（Ctrl+C／Ctrl+X → 行を選んで Ctrl+V も同じ。Esc でコピーをやめる）
 //   Ctrl+Shift+＋ で下に1行・Ctrl+－ で行を消す・Alt+↓ で候補（改修場所・改修の種類）・Ctrl+P で印刷
 // 内容（品名）は部材リストから選べる（★お気に入りが先）。備考（算出根拠）に定価を入れると、単価は 定価×0.8。
@@ -43,6 +44,9 @@ const FIELD_NAMES: Record<string, string> = {
   address: '工事場所（住所）',
 };
 
+/** 保存のときに付く updatedAt のほかは同じ見積書か */
+const sameJob = (a: Job, b: Job) => a === b || JSON.stringify({...a, updatedAt: 0}) === JSON.stringify({...b, updatedAt: 0});
+
 export function EstimateSheet({
   job,
   settings: s,
@@ -82,8 +86,25 @@ export function EstimateSheet({
   const redoStack = useRef<Job[]>([]);
   const pendingMove = useRef<Dir | null>(null);
   const pendingPos = useRef<{page: number; tr: number; td: number} | null>(null);
-  const jobRef = useRef(job);
-  jobRef.current = job;
+  const jobRef = useRef(job); // いちばん新しい見積書（入れたらすぐ書きかえる）
+  const seen = useRef(job); // 最後に画面に出した見積書
+  const own = useRef<Job | null>(null); // この見積書の欄で入れた変更（保存のときに updatedAt だけが付いて戻ってくる）
+  const lastOutside = useRef(0);
+  // 見積書の外（部材リストから入れる・保険者・担当・請求書に入れる など）で変わったときも、Ctrl+Z でその前に戻せるようにする
+  //（戻すのは見積書の全体なので、記録しないと Ctrl+Z でそちらの変更まで消えてしまう）。続けて変わったもの（打ち込みなど）は1回にまとめる
+  useLayoutEffect(() => {
+    if (job === seen.current) return;
+    const prev = seen.current;
+    seen.current = job;
+    const mine = own.current !== null && sameJob(job, own.current);
+    own.current = null;
+    jobRef.current = job;
+    if (mine || sameJob(job, prev)) return;
+    const now = Date.now();
+    if (now - lastOutside.current > 1000) pushUndo(prev);
+    lastOutside.current = now;
+    redoStack.current = [];
+  }, [job]);
   const ctx = {settings: s, form};
   const clip = useClip();
 
@@ -234,30 +255,56 @@ export function EstimateSheet({
     if (target) select(target);
   };
 
-  // ---------------------------------------------------------------- 入れる・元に戻す
+  // ---------------------------------------------------------------- 入れる・元に戻す（Ctrl+Z）・やり直す（Ctrl+Y）
+  function pushUndo(prev: Job) {
+    undoStack.current.push(prev);
+    if (undoStack.current.length > 100) undoStack.current.shift();
+  }
+  const put = (next: Job) => {
+    jobRef.current = next;
+    own.current = next;
+    setJob(() => next);
+  };
   const change = (next: Job) => {
     const prev = jobRef.current;
     if (next === prev) return;
-    undoStack.current.push(prev);
-    if (undoStack.current.length > 100) undoStack.current.shift();
+    pushUndo(prev);
     redoStack.current = [];
-    jobRef.current = next;
-    setJob(() => next);
+    put(next);
   };
   const undo = () => {
     const prev = undoStack.current.pop();
     if (!prev) return;
     redoStack.current.push(jobRef.current);
-    jobRef.current = prev;
-    setJob(() => prev);
+    put(prev);
   };
   const redo = () => {
     const next = redoStack.current.pop();
     if (!next) return;
-    undoStack.current.push(jobRef.current);
-    jobRef.current = next;
-    setJob(() => next);
+    pushUndo(jobRef.current);
+    put(next);
   };
+  // 見積書の欄を選んでいないとき（ボタンを押したあと・部材を選ぶ画面を閉じたあとなど）も Ctrl+Z／Ctrl+Y が効くように。
+  // 文字を打つ欄（お客様名など）の中ではブラウザの元に戻す（その欄の文字）、部材を選ぶ画面などが開いているときは何もしない
+  const undoRef = useRef(undo);
+  undoRef.current = undo;
+  const redoRef = useRef(redo);
+  redoRef.current = redo;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || !(e.ctrlKey || e.metaKey) || e.altKey || e.isComposing) return;
+      const k = e.key.toLowerCase();
+      if (k !== 'z' && k !== 'y') return;
+      const t = e.target instanceof HTMLElement ? e.target : null;
+      if (t?.closest('textarea, [contenteditable="true"], input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="month"]):not([type="date"])')) return;
+      if (document.querySelector('[role="dialog"], .print-overlay')) return;
+      e.preventDefault();
+      if (k === 'y' || e.shiftKey) redoRef.current();
+      else undoRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   /** 打ち込んだ値を入れる。then：入れたあとに動く向き。keepSel：選んでいる欄を変えない（見積書の外を押したとき。そちらに文字が入るように） */
   const commit = (value: string, pick: Material | null, then: Dir | null, keepSel = false) => {
@@ -544,7 +591,7 @@ export function EstimateSheet({
     setSel({key: `line:${res.rowId}:text`, occ: 0});
     setEdit(null);
     if (c.cut) setClip(null);
-    toast(c.cut ? `「${c.label}」を移しました` : `「${c.label}」を貼り付けました（続けて貼り付けられます。Esc でやめる）`);
+    toast(c.cut ? `「${c.label}」を移しました` : `「${c.label}」を貼り付けました`);
     inputRef.current?.focus({preventScroll: true});
   };
   const pasteTarget = () => {
@@ -561,7 +608,7 @@ export function EstimateSheet({
   const deleteRow = (rowId: string) => {
     change(deleteLine(jobRef.current, rowId));
     setSel(null);
-    toast('行を消しました（「↶ 元に戻す」で戻せます）');
+    toast('行を消しました');
   };
 
   // ---------------------------------------------------------------- マウス
@@ -676,34 +723,12 @@ export function EstimateSheet({
   const bar = editing ? edit.value : sel ? (sel.key === 'date' ? meta.date : sel.key === 'new:mark' ? mark : sheetValue(job, sel.key, ctx, meta.date)) : '';
 
   return (
-    <section className="rounded-xl border-2 border-emerald-800 bg-white shadow-sm" aria-label="見積書に直接入力">
-      <div className="flex flex-wrap items-center gap-2 border-b border-emerald-200 bg-emerald-800 px-3 py-1.5 text-white">
-        <div className="text-sm font-bold">
-          見積書に直接入力
-          <span className="ml-1 text-xs font-normal text-emerald-100">（Excel と同じように欄を選んで打ち込みます）</span>
-        </div>
-        <div className="ml-auto flex flex-wrap gap-1">
-          <button type="button" onClick={undo} disabled={undoStack.current.length === 0} className="sheet-btn" title="元に戻す（Ctrl+Z）">
-            ↶ 元に戻す
-          </button>
-          <button type="button" onClick={redo} disabled={redoStack.current.length === 0} className="sheet-btn" title="やり直す（Ctrl+Y）">
-            ↷ やり直す
-          </button>
-          <button type="button" onClick={onPrint} className="rounded bg-sky-500 px-2 py-1 text-xs font-bold hover:bg-sky-400">
-            🖨 印刷
-          </button>
-        </div>
-      </div>
+    <section className="overflow-hidden rounded-xl border-2 border-emerald-800 bg-white shadow-sm" aria-label="見積書">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-        <button type="button" className="sheet-tool" onClick={() => onPickMaterial(place?.id ?? null)} title="選んでいる行の箇所に入れます（いちばん下の行なら最後の箇所）">
+        <button type="button" className="sheet-tool" onClick={() => onPickMaterial(place?.id ?? null)}>
           📋 部材リストから入れる
         </button>
-        <button
-          type="button"
-          className="sheet-tool"
-          onClick={() => onPickLabor(place?.id ?? null, workOwner?.id ?? null)}
-          title="笹岡工務店の取付手間（木・タイルなど）を数えて施工費にします。部材を選んでいれば、その部材の「同上施工費」になります"
-        >
+        <button type="button" className="sheet-tool" onClick={() => onPickLabor(place?.id ?? null, workOwner?.id ?? null)}>
           🔧 施工費（笹岡工務店の手間）から入れる
         </button>
         <button type="button" className="sheet-tool" onClick={() => onPickKit(place?.id ?? null)}>
@@ -715,19 +740,18 @@ export function EstimateSheet({
           <span className="font-bold">
             {clip.cut ? '✂ 切り取り中' : '📋 コピー中'}：「{clip.label}」
           </span>
-          <span>貼り付けたい行の左の「貼付」か、行を選んで Ctrl+V</span>
           <button
             type="button"
             className="ml-auto rounded border border-amber-300 bg-white px-2 py-0.5 font-bold text-amber-900 hover:bg-amber-100"
             onClick={() => setClip(null)}
           >
-            コピーをやめる（Esc）
+            やめる
           </button>
         </div>
       )}
       <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-1 text-xs">
         <span className="w-28 shrink-0 truncate font-bold text-emerald-800" title={selName}>
-          {selName || '欄を選んでください'}
+          {selName}
         </span>
         <span className="font-mono text-slate-400">fx</span>
         <span className="min-w-0 flex-1 truncate rounded border border-slate-200 bg-white px-2 py-0.5 text-slate-800" aria-label="選んでいる欄の値">
@@ -754,7 +778,6 @@ export function EstimateSheet({
                 data-drop=""
                 style={{left: box.x + box.w - 15, top: box.y + Math.max(0, (box.h - 14) / 2)}}
                 onClick={openList}
-                title="候補から選ぶ（Alt+↓）"
                 aria-label={`${selName}を候補から選ぶ`}
               >
                 ▼
@@ -812,9 +835,6 @@ export function EstimateSheet({
               </button>
             ))}
           </div>
-          {textCell && (
-            <div className="border-t border-slate-200 bg-slate-50 px-3 py-1 text-[11px] text-slate-500">↑↓で選んで Enter（選ばずに Enter なら打った文字のまま）</div>
-          )}
         </div>
       )}
     </section>

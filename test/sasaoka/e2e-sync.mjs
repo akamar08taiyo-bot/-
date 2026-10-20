@@ -34,7 +34,7 @@ assert.ok((await shiTotal()).includes('12,900')); // ①部材代：手すり60c
 
 // ---------------- 見積書で L型手すりを2本にする → 開いたままの仕切り計算に入る（①部材代 12,900＋7,800＝20,700）
 await est.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
-const sheet = est.getByRole('region', {name: '見積書に直接入力'});
+const sheet = est.getByRole('region', {name: '見積書', exact: true});
 const qtyKey = await sheet.locator('.form-page tr', {hasText: 'L型手すり'}).first().locator('[data-edit$=":qty"]').first().getAttribute('data-edit');
 await sheet.locator(`[data-edit="${qtyKey}"]`).click();
 await est.keyboard.type('2');
@@ -96,7 +96,7 @@ await quiet.addInitScript(() => {
 await quiet.goto(`${site}/jutaku-mitsumori/index.html`);
 await quiet.getByRole('button', {name: /見積書の一覧を開く/}).click();
 await quiet.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
-const qs = quiet.getByRole('region', {name: '見積書に直接入力'});
+const qs = quiet.getByRole('region', {name: '見積書', exact: true});
 const capKey = await qs.locator('.form-page tr', {hasText: 'エンドキャップ'}).first().locator('[data-edit$=":qty"]').first().getAttribute('data-edit');
 await qs.locator(`[data-edit="${capKey}"]`).click();
 await quiet.keyboard.type('3');

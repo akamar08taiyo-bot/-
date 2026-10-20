@@ -61,9 +61,6 @@ export function LaborPickerFor({
 /** 仕切価格も定価も入っていない部材の行（請求書では、その部材代が0円になる。仕切価格だけ空欄なら 定価×0.8 で計算する）。空白の行はのぞく */
 export const missingShikiri = (job: Job) => job.places.flatMap((p) => p.rows).filter((r) => r.kind === 'material' && shikiriPrice(r) === 0 && !isBlankRow(r));
 
-/** 仕切価格が空欄で、定価×0.8 で計算している部材の行 */
-export const shikiriFromList = (job: Job) => job.places.flatMap((p) => p.rows).filter((r) => r.kind === 'material' && r.price === 0 && shikiriPrice(r) > 0);
-
 /** 仕切価格の入っていない部材に、仕切価格を入れる（部材リストにある部材は、部材リストの仕切価格も同じにできる） */
 export function ShikiriPriceDialog({
   job,

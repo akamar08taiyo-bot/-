@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
-import {jobName, jobTotals} from '../calc.ts';
+import {jobName} from '../calc.ts';
 import {EstimateSheet} from '../components/EstimateSheet.tsx';
-import {LaborPickerFor, missingShikiri, shikiriFromList, ShikiriPriceDialog} from '../components/JobTools.tsx';
+import {LaborPickerFor, missingShikiri, ShikiriPriceDialog} from '../components/JobTools.tsx';
 import {KitPicker} from '../components/Kits.tsx';
 import {MaterialPicker} from '../components/Pickers.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
@@ -10,7 +10,7 @@ import type {PrintRequest} from '../print/PrintView.tsx';
 import {addMaterial, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
 import type {AppData, Insurer, Job, Kit, Material, NameSuffix, Place} from '../types.ts';
 import type {Update} from '../useStore.ts';
-import {monthLabel, staffFull, thisMonth, yen} from '../util.ts';
+import {staffFull, thisMonth} from '../util.ts';
 import {duplicateEstimate, removeEstimate, saveEstimateExcel} from './EstimateList.tsx';
 
 type Picker =
@@ -72,7 +72,7 @@ export function EstimateEditor({
     window.setTimeout(() => {
       if (el?.matches('textarea, input')) el.focus({preventScroll: true}); // Ctrl+S のあとも続けて打ち込めるように
       void onSave().then((ok) => {
-        if (ok) toast('保存しました（この端末に保存されています。「見積もりを作成する」の一覧からいつでも開けます）');
+        if (ok) toast('保存しました');
         else toast('保存できませんでした。画面の上の表示を見てください。', 'error');
       });
     }, 0);
@@ -122,16 +122,16 @@ export function EstimateEditor({
           {insurer ? INSURER_INFO[insurer].name : FORM_INFO[form].name}「{FORM_INFO[form].title}」
         </span>
         <div className="ml-auto flex flex-wrap gap-2">
-          <Btn color="blue" onClick={save} title="この端末に保存します（Ctrl＋S でも保存できます）">
+          <Btn color="blue" onClick={save}>
             💾 保存
           </Btn>
-          <Btn color="white" onClick={() => saveEstimateExcel(job, s, toast)} title="印刷する見積書と同じ形の Excel ファイル（.xlsx）を保存します">
+          <Btn color="white" onClick={() => saveEstimateExcel(job, s, toast)}>
             📗 Excelで保存
           </Btn>
           <Btn color="sky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
             🖨 見積書を印刷
           </Btn>
-          <Btn color="teal" onClick={onOpenOrder} title="見積書に入っている部材を、何を何個（何本・何枚）発注するかにまとめます。販売受注簿にも転記できます">
+          <Btn color="teal" onClick={onOpenOrder}>
             🛒 発注書を作成
           </Btn>
           <Btn color="white" onClick={duplicate}>
@@ -143,12 +143,13 @@ export function EstimateEditor({
         </div>
       </div>
 
-      {/* 見積書の欄にないものだけ（苅田町・行橋市・みやこ町用は、お客様名・被保険者番号・工事場所・作成日を見積書の欄に打ち込む） */}
+      {/* 見積書の欄にないものだけ（苅田町・行橋市・みやこ町用は、お客様名・被保険者番号・工事場所・作成日を見積書の欄に打ち込む）。
+          説明の文は置かない（ユーザーの指示）。笹岡工務店の請求書に入れるかも同じ枠に並べる */}
       <section className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
         {form === 'kouiki' && (
           <>
             <label className="grid min-w-[14rem] flex-[2_1_0%] gap-1 text-xs font-bold text-slate-600">
-              お客様名（この書式には出ません。一覧と印刷のファイル名に使います）
+              お客様名
               <div className="flex gap-2">
                 <TextInput
                   value={job.customer}
@@ -186,7 +187,7 @@ export function EstimateEditor({
           </>
         )}
         <label className="grid min-w-[10rem] gap-1 text-xs font-bold text-slate-600">
-          保険者（申請書を出す先）
+          保険者
           <select
             value={insurer}
             onChange={(e) => e.target.value && setInsurer(e.target.value as Insurer)}
@@ -216,11 +217,7 @@ export function EstimateEditor({
             ))}
           </select>
         </label>
-        {form === 'yukuhashi' && (
-          <p className="min-w-[16rem] flex-1 pb-1 text-[11px] leading-4 text-slate-500">
-            お客様名・介護保険被保険者番号・工事場所（住所）・作成日は、下の見積書の欄に直接打ち込みます。
-          </p>
-        )}
+        <ShikiriFields job={job} data={data} setJob={setJob} onFix={() => setFixPrices(true)} onOpenInvoice={() => onOpenInvoice(job.id)} />
         {byAddress && byAddress !== insurer && (
           <div className="flex w-full flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900">
             工事場所の住所は「{INSURER_INFO[byAddress].name}」です{INSURER_INFO[byAddress].form !== form ? `（見積書は${FORM_INFO[INSURER_INFO[byAddress].form].name}）` : ''}。
@@ -230,9 +227,6 @@ export function EstimateEditor({
           </div>
         )}
       </section>
-
-      {/* 笹岡工務店の請求書に入る金額は、見積書に打ち込むとすぐ変わる（見積書の上に出して、打ちながら見えるように） */}
-      <ShikiriPanel job={job} data={data} setJob={setJob} onFix={() => setFixPrices(true)} onOpenInvoice={() => onOpenInvoice(job.id)} />
 
       <EstimateSheet
         job={job}
@@ -303,9 +297,11 @@ export function EstimateEditor({
 
 /**
  * 笹岡工務店の請求書：選ぶと、この見積書の部材（仕切価格）と施工費が、仕切り計算・請求書作成アプリの仕切り計算表と請求書（請求する月の分）に入る。
- * 見積書と同じ入力から作るので、入れ直さなくてよい（見積書を直すと請求書も変わる）
+ * 見積書と同じ入力から作るので、入れ直さなくてよい（見積書を直すと請求書も変わる）。
+ * 入力の画面がごちゃごちゃしないように、請求書に入る金額や説明の文は出さない（ユーザーの指示。金額は「請求書を見る」で）。
+ * 仕切価格も定価もない部材があるときだけ知らせる（請求書でその部材代が0円になるため）
  */
-function ShikiriPanel({
+function ShikiriFields({
   job,
   data,
   setJob,
@@ -318,83 +314,55 @@ function ShikiriPanel({
   onFix: () => void;
   onOpenInvoice: () => void;
 }) {
-  const t = jobTotals(job, data.settings);
   const missing = missingShikiri(job);
-  const fromList = shikiriFromList(job);
   const client = data.settings.clientName || '笹岡工務店';
   return (
-    <section
-      className={`rounded-xl border px-4 py-3 text-sm shadow-sm ${job.shikiri ? 'border-[#0c315e]/40 bg-white' : 'border-slate-200 bg-white'}`}
-      aria-label={`${client}の請求書`}
-    >
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <label className="inline-flex cursor-pointer items-center gap-2 font-bold text-[#0c315e]">
-          <input
-            type="checkbox"
-            checked={job.shikiri}
-            onChange={(e) => {
-              const on = e.target.checked;
-              // 前の月に作った見積書を入れるときは、今月の請求書に入れる（あとで月は直せる）
-              setJob((j) => ({
-                ...j,
-                shikiri: on,
-                month: on && j.month < thisMonth() ? thisMonth() : j.month,
-              }));
-            }}
-            className="h-4 w-4"
-          />
-          {client}の請求書に入れる
-        </label>
-        {job.shikiri ? (
-          <>
-            <label className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600">
-              請求する月
-              <input
-                type="month"
-                value={job.month}
-                onChange={(e) => e.target.value && setJob((j) => ({...j, month: e.target.value}))}
-                className="h-8 rounded-md border border-slate-300 px-2 text-sm font-normal"
-                aria-label="請求する月"
-              />
-            </label>
-            <label className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600">
-              施工日
-              <input
-                type="date"
-                value={job.date}
-                onChange={(e) => setJob((j) => ({...j, date: e.target.value}))}
-                className="h-8 rounded-md border border-slate-300 px-2 text-sm font-normal"
-                aria-label="施工日"
-              />
-            </label>
-            <Btn small color="white" className="ml-auto" onClick={onOpenInvoice}>
-              🧾 請求書（仕切り計算表）で見る →
-            </Btn>
-          </>
-        ) : (
-          <span className="text-xs text-slate-500">
-            この見積書は{client}の請求書に入れていません（{client}の工事でないとき）。チェックを入れると、部材（仕切価格）と施工費が
-            「請求書を確認する」の仕切り計算表と請求書に入り、自動で計算されます。
-          </span>
-        )}
-      </div>
+    <>
+      <label className="inline-flex h-9 cursor-pointer items-center gap-2 text-sm font-bold text-[#0c315e]">
+        <input
+          type="checkbox"
+          checked={job.shikiri}
+          onChange={(e) => {
+            const on = e.target.checked;
+            // 前の月に作った見積書を入れるときは、今月の請求書に入れる（あとで月は直せる）
+            setJob((j) => ({
+              ...j,
+              shikiri: on,
+              month: on && j.month < thisMonth() ? thisMonth() : j.month,
+            }));
+          }}
+          className="h-4 w-4"
+        />
+        {client}の請求書に入れる
+      </label>
       {job.shikiri && (
         <>
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-100 pt-2">
-            <span className="text-xs text-slate-500">{monthLabel(job.month)}分の請求書に入る金額：</span>
-            <span className="tabular-nums">①部材代（仕切価格） {yen(t.material)}</span>
-            <span className="tabular-nums">②取付手間 {yen(t.labor)}</span>
-            <span className="tabular-nums">⑦税抜合計 {yen(t.subtotal)}</span>
-            <span className="tabular-nums">
-              ⑥合計 <b>{yen(t.total)}</b>円
-            </span>
-          </div>
-          {fromList.length > 0 && (
-            <p className="mt-2 text-xs text-slate-500">仕切価格が空欄の部材 {fromList.length} 行は、定価×0.8 で計算しています（仕切価格を入れると、そちらで計算します）。</p>
-          )}
+          <label className="grid gap-1 text-xs font-bold text-slate-600">
+            請求する月
+            <input
+              type="month"
+              value={job.month}
+              onChange={(e) => e.target.value && setJob((j) => ({...j, month: e.target.value}))}
+              className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
+              aria-label="請求する月"
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-bold text-slate-600">
+            施工日
+            <input
+              type="date"
+              value={job.date}
+              onChange={(e) => setJob((j) => ({...j, date: e.target.value}))}
+              className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
+              aria-label="施工日"
+            />
+          </label>
+          <Btn color="white" onClick={onOpenInvoice}>
+            🧾 請求書を見る
+          </Btn>
           {missing.length > 0 && (
-            <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-xs text-amber-900">
-              仕切価格も定価も入っていない部材が {missing.length} 行あります（請求書では、その部材代が0円になります）。
+            <div className="flex w-full flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900">
+              仕切価格も定価もない部材が {missing.length} 行あります
               <Btn small color="white" onClick={onFix}>
                 仕切価格を入れる
               </Btn>
@@ -402,6 +370,6 @@ function ShikiriPanel({
           )}
         </>
       )}
-    </section>
+    </>
   );
 }

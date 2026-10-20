@@ -1,4 +1,4 @@
-// 住宅改修 見積書作成：見積書に直接入力（Excel のように欄を選んで打ち込む）を確かめる：
+// 住宅改修 見積書作成：見積書の欄に打ち込む（Excel のように欄を選んで打ち込む）を確かめる：
 // 新しい見積書を見積書の形のまま打ち込む（お客様名・改修内容・改修場所・内容の候補（★お気に入り）・数量 60cm・同上施工費・備考に定価）→
 // 合計・元に戻す・行の挿入／削除／コピー→貼付（行の左の＋・✕・コピー、Ctrl+C／X／V、Ctrl+Shift+＋／Ctrl+－）・改修場所の候補（▼・Alt+↓）・
 // 介護保険の対象外・諸経費・作成日・笹岡工務店の請求書に入れる（仕切価格を入れる）・
@@ -24,7 +24,7 @@ await page.goto(`${site}/jutaku-mitsumori/index.html`);
 await page.getByRole('button', {name: /サンプルで試す/}).click(); // 部材リスト（★お気に入り）と取付手間の単価
 await page.getByRole('button', {name: '＋ 行橋市', exact: true}).click(); // 保険者（苅田町・行橋市・みやこ町は同じ書式）
 
-const sheet = page.getByRole('region', {name: '見積書に直接入力'});
+const sheet = page.getByRole('region', {name: '見積書', exact: true});
 await sheet.waitFor();
 const input = sheet.locator('textarea.sheet-input');
 const cell = (key) => sheet.locator(`[data-edit="${key}"]`).first();
@@ -33,12 +33,19 @@ const bar = () => sheet.getByLabel('選んでいる欄の値').innerText();
 const tds = async (text) => (await sheet.locator('.form-page tr', {hasText: text}).first().locator('td').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
 const totals = async () => (await tds('合計')).filter(Boolean);
 const key = async (text, field) => (await sheet.locator('.form-page tr', {hasText: text}).first().locator(`[data-edit$=":${field}"]`).first().getAttribute('data-edit'));
+const undoKey = () => page.keyboard.press('ControlOrMeta+z'); // 元に戻すのボタンは置かない（Ctrl+Z だけ）
 const typeIn = async (k, text, end = 'Enter') => {
   await cell(k).click();
   await page.keyboard.type(text);
   if (end) await page.keyboard.press(end);
   await page.waitForTimeout(60);
 };
+
+// ---------------- 画面に「直接入力」などの文言・説明、元に戻す／やり直すのボタンは出さない（ユーザーの指示）
+const mainText = await page.locator('main').innerText();
+assert.ok(!/直接入力|直接打ち込|Excel と同じように|請求書に入る金額|申請書を出す先/.test(mainText), mainText.slice(0, 400));
+assert.equal(await page.getByRole('button', {name: /元に戻す|やり直す/}).count(), 0);
+log('文言・説明・元に戻す／やり直すのボタンなしOK');
 
 // ---------------- 新しい見積書：お客様名の欄が選ばれていて、そのまま打ち込める
 assert.equal(await selected(), 'お客様名');
@@ -159,8 +166,8 @@ assert.equal(await sheet.locator('.form-page tr', {hasText: 'エンドキャッ�
 assert.equal(await sheet.locator('.form-page', {hasText: 'トイレ'}).count(), 0); // 箇所ごと消えて、空白の行になる
 assert.equal((await sheet.locator('.form-page tr.sheet-new').innerText()).trim(), '');
 assert.equal(await lines(), before - 2);
-await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
-await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
+await undoKey();
+await undoKey();
 assert.equal(await lines(), before);
 assert.deepEqual((await tds('L型手すり')).slice(0, 2), ['手すりの取付', '②トイレ']);
 assert.equal(await sheet.locator('.form-page tr', {hasText: 'エンドキャップ'}).count(), 1);
@@ -172,7 +179,7 @@ assert.equal(await selected(), '内容（品名）');
 assert.equal(await lines(), before + 1);
 const blankRow = sheet.locator('.form-page tr[data-rows]').nth(await sheet.locator('.form-page tr[data-rows]').evaluateAll((trs) => trs.findIndex((tr) => tr.innerText.includes('エンドキャップ')) + 1));
 assert.deepEqual((await blankRow.locator('td').allInnerTexts()).map((t) => t.trim()).filter(Boolean), []); // 数量・単価・金額も出さない
-assert.equal(await page.getByText(/仕切価格も定価も入っていない部材/).count(), 0); // 空白の行は「仕切価格がない」と言わない
+assert.equal(await page.getByText(/仕切価格も定価もない部材/).count(), 0); // 空白の行は「仕切価格がない」と言わない
 await page.keyboard.type('養生テープ');
 await page.keyboard.press('Enter');
 assert.equal((await tds('養生テープ'))[2], '養生テープ');
@@ -197,8 +204,8 @@ assert.equal(await lines(), copyBefore + 4);
 await page.keyboard.press('Escape');
 assert.equal(await strip.count(), 0);
 assert.equal(await sheet.locator('[data-paste]').count(), 0);
-await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
-await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
+await undoKey();
+await undoKey();
 assert.equal(await lines(), copyBefore);
 // 同上施工費もコピーできる：施工費のないエンドキャップの下に貼り付けると、エンドキャップの同上施工費になる
 await sheet.locator('.form-page tr', {hasText: '同上施工費'}).first().getByRole('button', {name: /をコピー$/}).click();
@@ -206,7 +213,7 @@ await sheet.getByRole('button', {name: /エンドキャップの行の下に貼�
 assert.deepEqual((await order()).slice(-2), ['サンプル S-EC01 エンドキャップ', '同上施工費']);
 assert.deepEqual((await tds('同上施工費')).slice(5, 7), ['2,000', '2,000']);
 await page.keyboard.press('Escape');
-await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
+await undoKey();
 log('行の左の「＋」「✕」「コピー」→「貼付」（部材・同上施工費）OK');
 
 // ---------------- キーボード：行の欄で Ctrl+C → 貼り付けたい行を選んで Ctrl+V／Ctrl+X は移す（1回だけ）／Ctrl+Shift+＋ で下に1行・Ctrl+－ で消す
@@ -218,7 +225,7 @@ await page.keyboard.press('ControlOrMeta+v');
 assert.deepEqual((await order()).slice(-2), ['サンプル S-EC01 エンドキャップ', 'サンプル S-TL01 L型手すり']);
 assert.equal(await lines(), copyBefore + 1);
 await page.keyboard.press('Escape');
-await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
+await undoKey();
 await cell(await key('L型手すり', 'text')).click();
 await page.keyboard.press('ControlOrMeta+x');
 const cutStrip = page.getByRole('status').filter({hasText: '切り取り中'});
@@ -228,7 +235,7 @@ await page.keyboard.press('ControlOrMeta+v');
 assert.deepEqual((await order()).slice(-2), ['サンプル S-EC01 エンドキャップ', 'サンプル S-TL01 L型手すり']);
 assert.equal(await lines(), copyBefore); // 移しただけ
 assert.equal(await cutStrip.count(), 0);
-await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
+await undoKey();
 assert.deepEqual((await order()).slice(-2), ['サンプル S-TL01 L型手すり', 'サンプル S-EC01 エンドキャップ']);
 // 行でない欄（お客様名）の Ctrl+C は欄の文字だけ。そのあとの Ctrl+V は、ふつうに欄に文字が入る
 await cell('job:customer').click();
@@ -246,6 +253,22 @@ await page.keyboard.press('ControlOrMeta+Minus');
 assert.equal(await lines(), copyBefore);
 log('Ctrl+C／Ctrl+X／Ctrl+V（行）・欄の文字の貼り付け・Ctrl+Shift+＋／Ctrl+－ OK');
 
+// ---------------- 見積書の外で入れたもの（部材リストから入れる）も Ctrl+Z で戻せる。見積書の欄を選んでいなくても効く（Ctrl+Y でやり直す）
+const pickBefore = await lines();
+await cell(await key('エンドキャップ', 'text')).click();
+await sheet.getByRole('button', {name: '📋 部材リストから入れる'}).click();
+await page.getByRole('dialog').getByRole('row', {name: /ブラケット/}).getByRole('button', {name: '＋ 追加'}).click();
+await page.getByRole('button', {name: '選び終わったら閉じる'}).click();
+assert.equal(await lines(), pickBefore + 1);
+await page.locator('header').first().click({position: {x: 4, y: 4}}); // 見積書の外を押す
+await undoKey();
+assert.equal(await lines(), pickBefore);
+await page.keyboard.press('ControlOrMeta+y');
+assert.equal(await lines(), pickBefore + 1);
+await undoKey();
+assert.equal(await lines(), pickBefore);
+log('部材リストから入れたものも Ctrl+Z／Ctrl+Y（欄を選んでいなくても）OK');
+
 // ---------------- 改修場所：欄の「▼」（Alt+↓）で箇所の名前の候補から選ぶ。打ち込んでもよい（打った文字で絞る）
 await cell(await key('木の手すり 35φ 4m', 'name')).click();
 await sheet.getByRole('button', {name: '改修場所（箇所名）を候補から選ぶ'}).click();
@@ -259,8 +282,8 @@ assert.deepEqual(await placeOptions.allInnerTexts(), ['脱衣所']);
 await page.keyboard.press('ArrowDown');
 await page.keyboard.press('Enter');
 assert.equal((await tds('木の手すり 35φ 4m'))[1], '①脱衣所');
-await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
-await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
+await undoKey();
+await undoKey();
 assert.equal((await tds('木の手すり 35φ 4m'))[1], '①浴室');
 log('改修場所の候補（▼・Alt+↓・打って絞る）OK');
 
@@ -285,23 +308,22 @@ await sheet.locator('.form-page tr', {hasText: '手すり受け'}).first().locat
 assert.equal(await sheet.locator('.form-page tr', {hasText: '手すり受け'}).count(), 0);
 log('見積書の外を押すと打った値が入るOK');
 
-// ---------------- 笹岡工務店の請求書：新しい見積書は最初から入っていて、打ち込んだ内容で請求書に入る金額を自動で出す。
-// 仕切価格のない部材を知らせ、その場で入れられる。外すと金額は出ない
+// ---------------- 笹岡工務店の請求書：新しい見積書は最初から入っている。外すと請求する月・施工日も出ない。
+// 入力の画面には請求書に入る金額を出さない（金額は「請求書を見る」の仕切り計算表で確かめる）。仕切価格のない部材だけ知らせ、その場で入れられる
 await typeIn('new:text', '取付金具', 'Tab');
 await page.keyboard.press('Enter');
-const link = page.getByRole('region', {name: '笹岡工務店の請求書'});
-const inInvoice = link.getByLabel('笹岡工務店の請求書に入れる');
+const inInvoice = page.getByLabel('笹岡工務店の請求書に入れる');
 assert.equal(await inInvoice.isChecked(), true);
 await inInvoice.uncheck();
-assert.ok(!(await link.innerText()).includes('①部材代'), '外しても金額が出ている');
+assert.equal(await page.getByLabel('請求する月').count(), 0);
 await inInvoice.check();
-assert.ok((await link.innerText()).includes('仕切価格も定価も入っていない部材が 1 行'), await link.innerText());
-await link.getByRole('button', {name: '仕切価格を入れる'}).click();
+const noPrice = page.getByText('仕切価格も定価もない部材が 1 行あります');
+await noPrice.waitFor();
+await page.getByRole('button', {name: '仕切価格を入れる'}).click();
 await page.getByRole('dialog').getByRole('textbox', {name: '取付金具の仕切価格'}).fill('300');
 await page.getByRole('dialog').getByRole('button', {name: '閉じる'}).first().click();
-// 部材代：木の手すり 60cm（10,000×0.15＝1,500）＋L型 7,800＋エンドキャップ 300＋取付金具 300＝9,900、取付手間 2,000
-const linkText = await link.innerText();
-assert.ok(linkText.includes('①部材代（仕切価格） 9,900') && linkText.includes('②取付手間 2,000') && !linkText.includes('入っていない部材'), linkText);
+assert.equal(await noPrice.count(), 0);
+assert.ok(!(await page.locator('main').innerText()).includes('①部材代'), '入力の画面に請求書の金額が出ている');
 log('笹岡工務店の請求書に最初から入る・外す・仕切価格を入れるOK');
 
 // ---------------- 工事場所の住所の市町村が保険者と違うと知らせる（打っている途中では変えない。変えるのはボタンで）。
@@ -330,7 +352,7 @@ log('広域連合用：材／手・時間OK');
 
 // ---------------- 「請求書を確認する」で開くと、同じ入力から仕切り計算表ができている（同じデータ）
 await page.waitForTimeout(600); // 自動保存を待つ
-await link.getByRole('button', {name: /請求書（仕切り計算表）で見る/}).click();
+await page.getByRole('button', {name: '🧾 請求書を見る'}).click();
 await page.waitForURL(/#tab=invoice&job=/);
 await page.getByRole('heading', {level: 1, name: '見本 太郎様邸'}).waitFor();
 const shikiri = await page.locator('aside table').innerText();
