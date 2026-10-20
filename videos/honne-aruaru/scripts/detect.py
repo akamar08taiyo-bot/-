@@ -15,7 +15,9 @@ EP = episode()
 WHO = ('WIFE（茶色い髪を低い位置でまとめた40代の女性・からし色のカーディガン）、'
        'HUSBAND（黒髪・黒縁メガネ・紺のパーカーの男性）、MOTHER-IN-LAW（白髪まじりのパーマ・丸メガネの年配の女性）、'
        'SON（赤白しま模様の男の子）、BABY（白いおくるみの赤ちゃん）、OTHER（その他の人）')
-EXTRA = {'bag': 'ゴルフバッグ（クラブの入った袋）', 'paper': '机の上の緑のふちの紙', 'passbook': '通帳', 'socks': '夫の肩にかかった紺の靴下'}
+EXTRA = {'bag': 'ゴルフバッグ（クラブの入った袋）', 'paper': '机の上の緑のふちの紙', 'passbook': '通帳', 'socks': '夫の肩にかかった紺の靴下',
+         'cup': '小皿の上の空になったプリンの器とスプーン', 'pudding': '赤いプリン（器ごと）', 'pbag': 'プリンの入ったレジ袋',
+         'shelf': '空っぽのスイーツの棚', 'closet': '開いたクローゼットとあふれ出た荷物'}
 # 人物の見た目は回ごとに違うことがある（prompts.json の detect_who があればそれを使う）
 _pp = os.path.join(EP.dir, 'prompts.json')
 WHO = (json.load(open(_pp, encoding='utf-8')).get('detect_who') if os.path.exists(_pp) else None) or WHO

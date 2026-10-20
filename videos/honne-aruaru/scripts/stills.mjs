@@ -10,7 +10,7 @@ const [ep, ...rest] = process.argv.slice(2);
 const times = rest.map(Number);
 const outDir = path.join(root, 'work', ep, 'stills');
 fs.mkdirSync(outDir, {recursive: true});
-const serveUrl = await bundle({entryPoint: path.join(root, 'src', 'index.ts'), publicDir: path.join(root, 'public'), outDir: path.join(root, 'work', 'bundle')});
+const serveUrl = await bundle({entryPoint: path.join(root, 'src', 'index.ts'), publicDir: path.join(root, 'public'), outDir: path.join(root, 'work', 'bundle_stills')}); // 書き出しと同時に動かせるよう別の場所に
 const browser = await openBrowser('chrome', {
   browserExecutable: '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell',
   chromiumOptions: {gl: 'swangle'},
