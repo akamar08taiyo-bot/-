@@ -8,6 +8,7 @@ import {
   findHalfMaterial,
   hacchuImport,
   orderBaseLines,
+  photoLabel,
   planBars,
   removedLines,
   removeOrderLine,
@@ -36,6 +37,8 @@ const BD132 = mat('m132', 'BAUHAUS 35アッシュ丸棒 ディンプル付 φ35�
 const PLATE4 = mat('mp4', 'ベースプレート 80mm幅 4000mm', 'BP-80-4000', 4, '枚', 4000, 8000);
 const PLATE2 = mat('mp2', 'ベースプレート 80mm幅 2000mm', 'BP-80-2000', 2, '枚', 2100, 4200);
 const BRACKET: Material = {id: 'mb', name: 'ブラケット', price: 500, listPrice: 1000, pieceLengthM: 0, maker: 'マツ六', code: 'BR-1', unit: '個', favorite: false, updatedAt: 1};
+
+const RATE = 0.8; // 見積の掛率（写真番号を見積書と同じに数えるのに使う）
 
 /** 切って使う行（使う長さ cm × 本数） */
 const cut = (m: Material, cm: number, qty = 1): Row => ({...materialRow(m, qty), lengthCm: cm});
@@ -95,7 +98,7 @@ test('見積書の部材を、箇所をまたいで足して発注する数に�
     ['玄関', [cut(BD134, 60, 2), laborRow({id: 'l1', name: '木', price: 1000, note: ''}, 2), materialRow(BRACKET, 3)]],
     ['トイレ', [cut(BD134, 160), materialRow(BRACKET, 2), cut(PLATE4, 380)]],
   );
-  const lines = orderBaseLines(j, [BD134, BD132, PLATE4, PLATE2, BRACKET]);
+  const lines = orderBaseLines(j, [BD134, BD132, PLATE4, PLATE2, BRACKET], RATE);
   assert.deepEqual(brief(lines), [
     ['BD-134', 1, '本'],
     ['BR-1', 5, '個'],
@@ -105,15 +108,35 @@ test('見積書の部材を、箇所をまたいで足して発注する数に�
   // 計算の説明（使う長さ・余り・箇所ごとの数）は持たない。発注書には何を何本かだけを出す（ユーザーの指示）
   assert.ok(lines.every((l) => !('detail' in l)));
   assert.deepEqual([lines[3].price, lines[3].listPrice, lines[3].lengthMm, lines[3].warn], [2100, 4200, 2000, '']);
+  // どこで使うか：玄関①・トイレ②。2000mm の行（足す分）も同じ箇所
+  assert.deepEqual(lines.map((l) => l.photos), [[1, 2], [1, 2], [2], [2]]);
+});
+
+test('どこで使うか（写真番号）：見積書と同じ番号。入れた写真番号を使い、入れていなければ見積書に出る順番', () => {
+  const j = job(
+    ['玄関', [materialRow(BRACKET, 2)]],
+    ['廊下', []], // 行のない箇所は見積書に出ないので数えない
+    ['トイレ', [materialRow(BRACKET, 1), cut(BD134, 80)]],
+    ['浴室', [cut(BD134, 60)]],
+  );
+  j.places[0].photo = 5;
+  const lines = orderBaseLines(j, [BD134, BD132, BRACKET], RATE);
+  assert.deepEqual(lines.map((l) => [l.code, l.photos]), [
+    ['BR-1', [2, 5]], // 小さい順
+    ['BD-132', [2, 3]], // 80cm＋60cm は 2000mm 1本で足りる
+  ]);
+  assert.equal(photoLabel([2, 5]), '②⑤');
+  assert.equal(photoLabel([20, 21]), '⑳(21)');
+  assert.deepEqual(addOrderLine(emptyOrderEdits(), {...materialRow(PLATE2), qty: 1}).added[0].photos, []); // 発注書で足した行は持たない
 });
 
 test('2000mmだけで足りるときは2000mmの品だけを発注する。部材リストに2000mmの品がなければ品番を空けて知らせる', () => {
   const j = job(['廊下', [cut(BD134, 160)]]);
-  const withHalf = orderBaseLines(j, [BD134, BD132]);
+  const withHalf = orderBaseLines(j, [BD134, BD132], RATE);
   assert.deepEqual(brief(withHalf), [['BD-132', 1, '本']]);
   assert.equal(withHalf[0].name, BD132.name);
 
-  const noHalf = orderBaseLines(j, [BD134]);
+  const noHalf = orderBaseLines(j, [BD134], RATE);
   assert.deepEqual(brief(noHalf), [['', 1, '本']]);
   assert.equal(noHalf[0].name, 'BAUHAUS 35アッシュ丸棒 ディンプル付 φ35×2000mm Mオーク');
   assert.match(noHalf[0].warn, /2000mmの品が部材リストにありません/);
@@ -125,12 +148,12 @@ test('施工費・何も入っていない行・金額だけの行は発注し�
   const valueOnly: Row = {...blank, price: -3000};
   const bar = materialRow({...BD134, id: 'mx', name: '既製の手すり 600mm', code: 'K-600', pieceLengthM: 0.6}, 2); // 切らずに使う
   const j = job(['浴室', [blank, valueOnly, laborRow({id: 'l1', name: '木', price: 1000, note: ''}), bar]]);
-  assert.deepEqual(brief(orderBaseLines(j, [])), [['K-600', 2, '本']]);
+  assert.deepEqual(brief(orderBaseLines(j, [], RATE)), [['K-600', 2, '本']]);
 });
 
 test('発注書で数を直す・消す・戻す・足す（見積書を直しても、手で直したところは残る）', () => {
   const j = job(['玄関', [cut(BD134, 160, 2), materialRow(BRACKET, 3)]]);
-  const base = orderBaseLines(j, [BD134, BRACKET]);
+  const base = orderBaseLines(j, [BD134, BRACKET], RATE);
   let e = emptyOrderEdits();
   e = setOrderQty(e, base[0], 2);
   e = removeOrderLine(e, base[1]);
@@ -149,7 +172,7 @@ test('発注書で数を直す・消す・戻す・足す（見積書を直し�
   e = restoreOrderLine(e, base[1].key);
   assert.deepEqual(brief(applyOrderEdits(base, e)).map((x) => x[0]), ['BD-134', 'BR-1', 'BP-80-2000']);
   // 見積書に部材が増えても、直した数はそのまま
-  const more = orderBaseLines(job(['玄関', [cut(BD134, 160, 2), materialRow(BRACKET, 4), cut(PLATE4, 100)]]), [BD134, BRACKET, PLATE4, PLATE2]);
+  const more = orderBaseLines(job(['玄関', [cut(BD134, 160, 2), materialRow(BRACKET, 4), cut(PLATE4, 100)]]), [BD134, BRACKET, PLATE4, PLATE2], RATE);
   assert.deepEqual(brief(applyOrderEdits(more, e)), [
     ['BD-134', 2, '本'],
     ['BR-1', 4, '個'],
@@ -161,7 +184,7 @@ test('発注書で数を直す・消す・戻す・足す（見積書を直し�
 
 test('販売受注簿へ渡す内容（数量は1以上の整数・営業担当は名字・数が0の行は渡さない）', () => {
   const j = job(['玄関', [cut(BD134, 160, 2), materialRow(BRACKET, 3)]]);
-  const base = orderBaseLines(j, [BD134, BRACKET]);
+  const base = orderBaseLines(j, [BD134, BRACKET], RATE);
   const e = {...setOrderQty(emptyOrderEdits(), base[1], 0), supplier: 'ケアマックス'};
   const lines = applyOrderEdits(base, e);
   const payload = hacchuImport(j, lines, e);

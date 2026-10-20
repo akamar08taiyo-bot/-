@@ -242,6 +242,7 @@ const cleanOrderLine = (l: Record<string, unknown>): OrderLine => ({
   qty: Math.max(0, numv(l.qty, 1)),
   calc: 0,
   lengthMm: Math.max(0, numv(l.lengthMm)),
+  photos: [], // 発注書で足した行は、どこで使うか（写真番号）を持たない
   price: numv(l.price),
   listPrice: numv(l.listPrice),
   warn: str(l.warn),

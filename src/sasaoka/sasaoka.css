@@ -802,3 +802,9 @@ table.fm .yk-issuer {
 .sheet table.items.order td.unit {
   font-size: 12pt;
 }
+/* どこで使うか（写真番号 ①③）。多いときは折り返す */
+.sheet table.items.order td.photo {
+  font-size: 11pt;
+  letter-spacing: 0.05em;
+  overflow-wrap: anywhere;
+}

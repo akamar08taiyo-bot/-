@@ -12,6 +12,7 @@
 // 発注書で数を直した・消した・足した行は、様邸の order に持つ（見積書を直しても、手で直したところはそのまま）。
 
 import {cutToLength, isBlankRow, listPriceOf, shikiriPrice} from './calc.ts';
+import {circled, photoNumbers} from './estimateForms.ts';
 import {normalize} from './priceImport.ts';
 import type {Job, Material, OrderEdits, OrderLine, Row} from './types.ts';
 import {num, staffShort, uid} from './util.ts';
@@ -154,14 +155,17 @@ type Group = {
   stockMm: number; // 1本の長さ（mm）。0 なら長さでは数えない
   whole: number; // 切らずに使う数
   pieces: Map<number, number>; // 切って使う長さ（mm）→ 本数
+  photos: Set<number>; // 使う箇所の写真番号
 };
 
 const productKey = (r: Row) => [r.maker, r.code, r.name].map(norm).join('|');
 
-/** 見積書の部材から、発注書の行を作る（手で直したところは入れない） */
-export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[]): OrderLine[] {
+/** 見積書の部材から、発注書の行を作る（手で直したところは入れない）。rate は見積の掛率（写真番号を見積書と同じに数えるため） */
+export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[], rate: number): OrderLine[] {
   const groups = new Map<string, Group>();
+  const photoOf = photoNumbers(job, rate);
   for (const place of job.places) {
+    const photo = photoOf.get(place.id) ?? 0;
     for (const r of place.rows) {
       if (r.kind !== 'material' || isBlankRow(r)) continue;
       if (!r.name.trim() && !r.code.trim()) continue; // 金額だけの行（値引きなど）は発注しない
@@ -170,9 +174,10 @@ export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[]):
       const key = stockMm > 0 ? `bar:${productKey(r)}|${stockMm}` : `qty:${productKey(r)}|${norm(r.unit)}`;
       let g = groups.get(key);
       if (!g) {
-        g = {key, first: r, stockMm, whole: 0, pieces: new Map()};
+        g = {key, first: r, stockMm, whole: 0, pieces: new Map(), photos: new Set()};
         groups.set(key, g);
       }
+      if (photo > 0) g.photos.add(photo);
       if (cutToLength(r)) {
         const len = Math.round(r.lengthCm * 100) / 10;
         g.pieces.set(len, (g.pieces.get(len) ?? 0) + r.qty);
@@ -197,6 +202,7 @@ export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[]):
       qty: g.whole,
       calc: g.whole,
       lengthMm: bar ? g.stockMm : 0,
+      photos: [...g.photos].sort((a, b) => a - b), // 2000mm の行も同じ（同じ箇所で使う）
       price: shikiriPrice(r),
       listPrice: listPriceOf(r),
       warn: '',
@@ -308,6 +314,7 @@ export function addOrderLine(edits: OrderEdits, row: Pick<Row, 'refId' | 'maker'
     qty: row.qty,
     calc: 0,
     lengthMm: 0,
+    photos: [],
     price: shikiriPrice(r),
     listPrice: listPriceOf(r),
     warn: '',
@@ -323,6 +330,9 @@ export function removeOneOrderLine(edits: OrderEdits, refId: string): OrderEdits
     ? {...edits, added: edits.added.map((l) => (l === same ? {...l, qty: l.qty - 1} : l))}
     : {...edits, added: edits.added.filter((l) => l !== same)};
 }
+
+/** どこで使うか（写真番号）：「①③」。発注書の画面と印刷に出す */
+export const photoLabel = (photos: number[]) => photos.map(circled).join('');
 
 /** 発注する行（数が 0 の行は発注しない） */
 export const orderedLines = (lines: OrderLine[]) => lines.filter((l) => l.qty > 0);

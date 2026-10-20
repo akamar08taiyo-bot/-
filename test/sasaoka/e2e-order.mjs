@@ -54,11 +54,13 @@ const items = async () => (await list.locator('ol > li').allInnerTexts()).map((t
 const total = () => page.getByTestId('order-total').innerText();
 let rows = await items();
 assert.equal(rows.length, 5, rows.join('\n'));
-assert.match(rows[0], /^1 木の手すり 35φ 4m サンプル 品番 S-TS35 1本 4000mm − ＋ 本 ✕$/);
-assert.match(rows[1], /^2 木の手すり 35φ 2m サンプル 1本 2000mm ⚠ 2000mmの品が部材リストにありません。品番・価格を確かめてください/);
+// どこで使うか：見積書の写真番号（玄関①・トイレ②）
+assert.match(rows[0], /^1 木の手すり 35φ 4m サンプル 品番 S-TS35 1本 4000mm ?写真番号 ① − ＋ 本 ✕$/);
+assert.match(rows[1], /^2 木の手すり 35φ 2m サンプル 1本 2000mm ?写真番号 ① ⚠ 2000mmの品が部材リストにありません。品番・価格を確かめてください/);
 // 計算の説明（使う長さ・余り・足す分）は出さない（ユーザーの指示）
 assert.ok(rows.every((t) => !/使う長さ|余り|足す分/.test(t)), rows.join('\n'));
-assert.match(rows[2], /^3 ブラケット サンプル 品番 S-BK01 − ＋ 個 ✕$/);
+assert.match(rows[2], /^3 ブラケット サンプル 品番 S-BK01 ?写真番号 ① − ＋ 個 ✕$/);
+assert.match(rows[3], /^4 L型手すり サンプル 品番 S-TL01 ?写真番号 ② − ＋ 本 ✕$/);
 assert.equal(await list.getByLabel('ブラケットの発注する数', {exact: true}).inputValue(), '2');
 assert.equal(await total(), '5品目（3本・4個）');
 log('見積書の部材から発注する数（4000mm 1本＋余りが少ないので 2000mm 1本・規格品は見積書の数）OK');
@@ -101,14 +103,15 @@ await page.getByRole('button', {name: '🖨 発注書を印刷'}).click();
 const doc = page.locator('.order-doc');
 await doc.waitFor();
 const docText = (await doc.innerText()).replace(/\s+/g, ' ');
-for (const t of ['発 注 書', 'ケアマックス 御中', '件名：（サンプル）山田様邸 住宅改修の部材']) {
+for (const t of ['発 注 書', 'ケアマックス 御中', '件名：（サンプル）山田様邸 住宅改修の部材', '写真番号']) {
   assert.ok(docText.includes(t) || docText.replace(/ /g, '').includes(t.replace(/ /g, '')), `発注書に「${t}」がない: ${docText}`);
 }
 assert.ok(!/使う長さ|余り|足す分|品目|納品|現場|行橋市中央/.test(docText), `発注書に要らないもの（計算の説明・品目数・備考・現場の住所）が出ている: ${docText}`);
 const docRows = (await doc.locator('tbody tr').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
 assert.deepEqual(
   docRows,
-  ['1 サンプル S-TS35 木の手すり 35φ 4m 1 本', '2 サンプル 木の手すり 35φ 2m 1 本', '3 サンプル S-BK01 ブラケット 3 個', '4 サンプル S-TL01 L型手すり 2 本', '5 サンプル S-EC01 エンドキャップ 2 個', '6 サンプル S-HB01 補強板 1 枚'],
+  // いちばん右の欄は、どこで使うか（写真番号）。発注書で足した補強板は空
+  ['1 サンプル S-TS35 木の手すり 35φ 4m 1 本 ①', '2 サンプル 木の手すり 35φ 2m 1 本 ①', '3 サンプル S-BK01 ブラケット 3 個 ①', '4 サンプル S-TL01 L型手すり 2 本 ②', '5 サンプル S-EC01 エンドキャップ 2 個 ②', '6 サンプル S-HB01 補強板 1 枚'],
 );
 assert.equal(await page.title(), '発注書_（サンプル）山田様');
 await doc.screenshot({path: path.join(outDir, '71-order-doc.png')});

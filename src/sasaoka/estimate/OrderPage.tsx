@@ -17,6 +17,7 @@ import {
   hacchuImport,
   orderBaseLines,
   orderedLines,
+  photoLabel,
   removedLines,
   removeOneOrderLine,
   removeOrderLine,
@@ -36,8 +37,8 @@ export function hacchuUrl(): string {
 }
 
 /** 見積書から作った発注書の行と、手で直したところを重ねたもの */
-export function useOrderLines(job: Job, materials: Material[]) {
-  const base = useMemo(() => orderBaseLines(job, materials), [job.places, materials]);
+export function useOrderLines(job: Job, materials: Material[], rate: number) {
+  const base = useMemo(() => orderBaseLines(job, materials, rate), [job.places, materials, rate]);
   return {base, lines: applyOrderEdits(base, job.order), removed: removedLines(base, job.order)};
 }
 
@@ -55,7 +56,7 @@ export function OrderPage({
   onPrint: (r: PrintRequest) => void;
 }) {
   const toast = useToast();
-  const {lines, removed} = useOrderLines(job, data.materials);
+  const {lines, removed} = useOrderLines(job, data.materials, data.settings.estimateRate);
   const edits = job.order ?? emptyOrderEdits();
   const [picking, setPicking] = useState(false);
   const name = jobName(job);
@@ -224,6 +225,7 @@ function OrderRow({line: l, no, onQty, onReset, onRemove}: {line: OrderLine; no:
         <div className="break-words text-[15px] font-bold leading-snug text-slate-800">{label}</div>
         <div className="text-xs text-slate-500">
           {[l.maker, l.code && `品番 ${l.code}`, l.lengthMm > 0 && `1${l.unit} ${l.lengthMm}mm`].filter(Boolean).join('　')}
+          {l.photos.length > 0 && <span className="ml-2 inline-block whitespace-nowrap font-bold text-slate-700">写真番号 {photoLabel(l.photos)}</span>}
           {l.key.startsWith('add:') && <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 font-bold text-emerald-800">発注書で足した行</span>}
         </div>
         {l.warn && <div className="mt-1 rounded bg-amber-50 px-2 py-1 text-xs font-bold text-amber-900">⚠ {l.warn}</div>}
