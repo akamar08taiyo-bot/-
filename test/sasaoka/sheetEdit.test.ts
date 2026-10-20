@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {estimateTotals, jobTotals} from '../../src/sasaoka/calc.ts';
 import {formLines} from '../../src/sasaoka/estimateForms.ts';
-import {applySheet, copyLine, deleteLine, parseKind, parseLengthCm, parseListNote, parseNum, parsePlace, setWorkAmount, sheetValue, toggleExcluded} from '../../src/sasaoka/sheetEdit.ts';
+import {applySheet, deleteLine, insertBlankAfter, lineRows, parseKind, parseLengthCm, parseListNote, parseNum, parsePlace, pasteLines, setWorkAmount, sheetValue, toggleExcluded} from '../../src/sasaoka/sheetEdit.ts';
 import type {Job, Material, Row, Settings} from '../../src/sasaoka/types.ts';
 
 const S = {
@@ -236,7 +236,7 @@ test('行を消す（行の左の✕消す・この行を消す）：部材は�
   assert.equal(deleteLine(job, 'no-such-row'), job);
 });
 
-test('行をコピー：部材の行は同上施工費ごと、すぐ下（同上施工費のうしろ）に入る。施工費だけの行はコピーしない', () => {
+test('行をコピーして貼り付け：部材は同上施工費ごと、施工費（同上施工費）はそのまとまり。選んだ行のすぐ下に入る', () => {
   const {job} = type(emptyJob(), [
     ['new:text', 'インテリアバー', bar],
     ['new:text', '同上施工費'],
@@ -244,21 +244,55 @@ test('行をコピー：部材の行は同上施工費ごと、すぐ下（同�
     ['new:text', '木の手すり 35φ 4m', rail],
   ]);
   const [barRow, work, railRow] = job.places[0].rows;
-  const res = copyLine(job, barRow.id);
+  // 部材の行：部材と同上施工費
+  assert.deepEqual(lineRows(job, barRow.id)?.map((r) => r.id), [barRow.id, work.id]);
+  // 施工費の行：そのまとまり
+  assert.deepEqual(lineRows(job, work.id)?.map((r) => r.id), [work.id]);
+  assert.equal(lineRows(job, 'no-such-row'), null);
+
+  // 部材（と同上施工費）を、木の手すりの行の下に貼り付ける（新しい行。IDは別）
+  const res = pasteLines(job, `line:${railRow.id}:text`, lineRows(job, barRow.id) ?? []);
   const rows = res.job.places[0].rows;
-  assert.equal(rows.length, 5);
-  assert.deepEqual(rows.map((r) => r.name), [barRow.name, work.name, barRow.name, work.name, railRow.name]);
-  assert.equal(res.rowId, rows[2].id);
-  assert.notEqual(rows[2].id, barRow.id); // 新しい行（IDは別）
-  assert.notEqual(rows[3].id, work.id);
+  assert.deepEqual(rows.map((r) => r.name), [barRow.name, work.name, railRow.name, barRow.name, work.name]);
+  assert.equal(res.rowId, rows[3].id);
+  assert.notEqual(rows[3].id, barRow.id);
   assert.deepEqual(formLines(res.job, S, 'yukuhashi').map((l) => [l.text, l.amount]), [
     ['TOTO TS136GY6 インテリアバー', 6400],
     ['同上施工費', 2000],
+    ['サンプル S-TS35 木の手すり 35φ 4m', 16000],
+    ['TOTO TS136GY6 インテリアバー', 6400],
+    ['同上施工費', 2000],
+  ]);
+
+  // 同上施工費だけを、木の手すり（施工費なし）の下に貼り付ける → 木の手すりの同上施工費になる。返す行は施工費のまとまりの最初の行
+  const w = pasteLines(job, `line:${railRow.id}:text`, lineRows(job, work.id) ?? []);
+  assert.deepEqual(formLines(w.job, S, 'yukuhashi').map((l) => [l.text, l.amount]), [
     ['TOTO TS136GY6 インテリアバー', 6400],
     ['同上施工費', 2000],
     ['サンプル S-TS35 木の手すり 35φ 4m', 16000],
+    ['同上施工費', 2000],
   ]);
-  // 同上施工費の行・ない行はそのまま
-  assert.deepEqual(copyLine(job, work.id), {job, rowId: null});
-  assert.deepEqual(copyLine(job, 'no-such-row'), {job, rowId: null});
+  assert.equal(w.rowId, w.job.places[0].rows[3].id);
+
+  // 空白の行に貼り付けると、その行に入る（行は増えない）
+  const blank = insertBlankAfter(job, railRow.id);
+  const intoBlank = pasteLines(blank.job, `line:${blank.rowId}:text`, lineRows(job, barRow.id) ?? []);
+  assert.deepEqual(intoBlank.job.places[0].rows.map((r) => r.name), [barRow.name, work.name, railRow.name, barRow.name, work.name]);
+  // いちばん下の空いた行：最後の箇所のうしろ／貼り付ける場所がない欄：そのまま
+  assert.equal(pasteLines(job, 'new:text', lineRows(job, work.id) ?? []).job.places[0].rows.length, 4);
+  assert.deepEqual(pasteLines(job, 'job:customer', lineRows(job, work.id) ?? []), {job, rowId: null});
+});
+
+test('行を切り取って貼り付け：貼り付けた所に移る（もとの行は消え、箇所の行がなくなれば箇所も消える）', () => {
+  let {job} = type(emptyJob(), [
+    ['new:name', '玄関'],
+    ['new:text', 'インテリアバー', bar],
+    ['new:name', 'トイレ'],
+    ['new:text', '木の手すり 35φ 4m', rail],
+  ]);
+  const [genkan, toilet] = job.places;
+  const moved = pasteLines(job, `line:${toilet.rows[0].id}:text`, lineRows(job, genkan.rows[0].id) ?? [], [genkan.rows[0].id]);
+  job = moved.job;
+  assert.deepEqual(job.places.map((p) => [p.name, p.rows.map((r) => r.name)]), [['トイレ', ['木の手すり 35φ 4m', 'インテリアバー']]]);
+  assert.equal(moved.rowId, job.places[0].rows[1].id);
 });

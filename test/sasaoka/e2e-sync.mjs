@@ -54,7 +54,7 @@ log('仕切り計算で直す → 開いたままの見積書に入るOK');
 
 // ---------------- ほぼ同時に保存：見積書で新しい見積書を作り、すぐに仕切り計算で備考を書く（どちらも保存を待たない）
 await est.getByRole('button', {name: '← 一覧へ戻る'}).click();
-await est.getByRole('button', {name: '＋ 広域連合用の見積書'}).click();
+await est.getByRole('button', {name: '＋ 広域連合', exact: true}).click();
 await est.getByPlaceholder('例：山田').fill('同時 一郎');
 const memo = shi.locator('label', {hasText: '備考（任意・明細に印刷されます）'}).locator('input');
 await memo.fill('同時に保存した備考');

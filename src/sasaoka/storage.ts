@@ -7,7 +7,8 @@
 
 import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES, SETTINGS_REV, STAFF_FULL_NAMES} from './defaults.ts';
 import {guessPieceLengthM} from './priceImport.ts';
-import type {AppData, EstimateForm, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, Rounding, Row, Settings, TaxMode} from './types.ts';
+import {jobInsurer} from './estimateForms.ts';
+import type {AppData, EstimateForm, Insurer, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, Rounding, Row, Settings, TaxMode} from './types.ts';
 import {uid} from './util.ts';
 
 const DB_NAME = 'taiyo-sasaoka-shikiri';
@@ -218,6 +219,7 @@ const cleanRow = (r: Record<string, unknown>): Row => ({
 
 const KINDS = [1, 2, 3, 4, 5, 6]; // 見積書の改修の種類（①〜⑥）
 const FORMS: EstimateForm[] = ['yukuhashi', 'kouiki'];
+const INSURERS: Insurer[] = ['kanda', 'yukuhashi', 'miyako', 'kouiki'];
 
 const cleanPlace = (p: Record<string, unknown>): Place => ({
   id: str(p.id) || uid('p'),
@@ -268,25 +270,31 @@ function cleanOrder(raw: unknown): OrderEdits | null {
 
 export function cleanJobs(raw: unknown): Job[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter(isObj).map((j) => ({
-    id: str(j.id) || uid('j'),
-    month: /^\d{4}-\d{2}$/.test(str(j.month)) ? str(j.month) : new Date().toISOString().slice(0, 7),
-    customer: str(j.customer),
-    suffix: SUFFIXES.includes(j.suffix as NameSuffix) ? (j.suffix as NameSuffix) : '様邸',
-    staff: str(j.staff),
-    date: /^\d{4}-\d{2}-\d{2}$/.test(str(j.date)) ? str(j.date) : '',
-    address: str(j.address),
-    note: str(j.note),
-    insuredNo: str(j.insuredNo),
-    form: FORMS.includes(j.form as EstimateForm) ? (j.form as EstimateForm) : '',
-    overhead: optNum(j.overhead),
-    overheadTarget: optNum(j.overheadTarget),
-    shikiri: j.shikiri !== false, // 見積書作成アプリができる前の様邸は、どれも仕切り計算・請求書アプリで作ったもの
-    places: Array.isArray(j.places) ? j.places.filter(isObj).map(cleanPlace) : [],
-    order: cleanOrder(j.order),
-    createdAt: numv(j.createdAt, Date.now()),
-    updatedAt: numv(j.updatedAt, Date.now()),
-  }));
+  return raw.filter(isObj).map((j) => {
+    const form: EstimateForm | '' = FORMS.includes(j.form as EstimateForm) ? (j.form as EstimateForm) : '';
+    const address = str(j.address);
+    return {
+      id: str(j.id) || uid('j'),
+      month: /^\d{4}-\d{2}$/.test(str(j.month)) ? str(j.month) : new Date().toISOString().slice(0, 7),
+      customer: str(j.customer),
+      suffix: SUFFIXES.includes(j.suffix as NameSuffix) ? (j.suffix as NameSuffix) : '様邸',
+      staff: str(j.staff),
+      date: /^\d{4}-\d{2}-\d{2}$/.test(str(j.date)) ? str(j.date) : '',
+      address,
+      note: str(j.note),
+      insuredNo: str(j.insuredNo),
+      // 保険者を選ぶ前に保存した見積書は、住所・書式から（苅田町・行橋市・みやこ町用で住所から分からなければ空。見積書の画面で選ぶ）
+      insurer: INSURERS.includes(j.insurer as Insurer) ? (j.insurer as Insurer) : jobInsurer({insurer: '', form, address}),
+      form,
+      overhead: optNum(j.overhead),
+      overheadTarget: optNum(j.overheadTarget),
+      shikiri: j.shikiri !== false, // 見積書作成アプリができる前の様邸は、どれも仕切り計算・請求書アプリで作ったもの
+      places: Array.isArray(j.places) ? j.places.filter(isObj).map(cleanPlace) : [],
+      order: cleanOrder(j.order),
+      createdAt: numv(j.createdAt, Date.now()),
+      updatedAt: numv(j.updatedAt, Date.now()),
+    };
+  });
 }
 
 export function cleanKits(raw: unknown): Kit[] {

@@ -118,7 +118,8 @@ body {
 .est-sheet tr.sheet-new > td {
   background-color: #ecfdf5;
 }
-/* 明細の行の左（見積書の余白）のボタン：「＋」この行の下に1行入れる／「コピー」部材の行を同上施工費ごとコピー／「✕」この行を消す。
+/* 明細の行の左（見積書の余白）のボタン：「＋」この行の下に1行入れる／「✕」この行を消す／「コピー」この行をコピー
+   （コピーしているあいだは「貼付」：コピーした行をこの行の下に貼り付け）。
    3つ並ぶよう、入力の画面だけ表を10mm右に寄せる（印刷は元の余白のまま） */
 .est-sheet .form-page.yk {
   padding-left: 25mm;
@@ -157,7 +158,8 @@ body {
 .sheet-ins::before {
   content: '＋';
 }
-.sheet-rowtools .sheet-copy {
+.sheet-rowtools .sheet-copy,
+.sheet-rowtools .sheet-paste {
   width: auto;
   padding: 0 1.2mm;
   color: #1d4ed8;
@@ -165,6 +167,16 @@ body {
 }
 .sheet-copy::before {
   content: 'コピー';
+}
+/* 「貼付」は「コピー」と同じ幅（並びがずれないように）。コピー中の帯と同じ色 */
+.sheet-rowtools .sheet-paste {
+  min-width: 11mm;
+  border-color: #f59e0b;
+  background: #fffbeb;
+  color: #b45309;
+}
+.sheet-paste::before {
+  content: '貼付';
 }
 /* コピーのない行（施工費・空白の行）は、場所だけ空けて「＋」「✕」の並びをそろえる */
 .sheet-copy-none {
@@ -191,6 +203,15 @@ body {
   border-color: #2563eb;
   background: #eff6ff;
 }
+.sheet-paste:hover,
+.sheet-paste:focus-visible {
+  border-color: #d97706;
+  background: #fef3c7;
+}
+/* コピー・切り取りした行（貼り付けるまで） */
+.est-sheet tr[data-copied] > td {
+  background-color: #fef3c7;
+}
 .sheet-del:hover,
 .sheet-del:focus-visible {
   border-color: #e11d48;
@@ -203,6 +224,24 @@ body {
   box-sizing: border-box;
   border: 2px solid #217346;
   pointer-events: none;
+}
+/* 改修場所・改修の種類の欄を選んだときの「▼」（候補から選ぶ） */
+.sheet-drop {
+  position: absolute;
+  z-index: 7;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 1px solid #217346;
+  border-radius: 2px;
+  background: #fff;
+  color: #217346;
+  font-size: 8px;
+  line-height: 12px;
+  cursor: pointer;
+}
+.sheet-drop:hover {
+  background: #ecfdf5;
 }
 /* 選んだ欄の上の入力欄。打ち始めるまでは見えない（日本語入力がそのまま使える） */
 .sheet-input {

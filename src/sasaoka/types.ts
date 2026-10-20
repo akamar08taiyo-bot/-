@@ -114,7 +114,8 @@ export type Job = {
   address: string;
   note: string;
   insuredNo: string; // 介護保険被保険者番号（苅田町・行橋市・みやこ町用の見積書に出す）
-  form: EstimateForm | ''; // 見積書の書式（空なら住所の市町村から決める）
+  insurer?: Insurer | ''; // 保険者（申請書を出す先）。選んであれば見積書の書式はこれで決まる。空なら住所の市町村から
+  form: EstimateForm | ''; // 見積書の書式（保険者を選んでいないとき。空なら住所の市町村から決める）
   overhead: number | null; // 見積書の諸経費を手で入れたとき（端数の調整など）。null なら 小計×率
   overheadTarget: number | null; // 介護保険の対象の諸経費を手で入れたとき（対象外の行があるときだけ使う）
   // 笹岡工務店の仕切り計算表・請求書に入れるか。仕切り計算・請求書アプリで作った様邸は入れる。
@@ -151,6 +152,13 @@ export type AppMode = 'shikiri' | 'estimate';
  * kouiki    = 広域連合用「住宅改修内訳明細書」（福岡県介護保険広域連合の様式）
  */
 export type EstimateForm = 'yukuhashi' | 'kouiki';
+
+/**
+ * 保険者（介護保険の住宅改修の申請書を出す先）。申請書は保険者ごとに違う。
+ * 苅田町・行橋市・みやこ町は見積書が同じ書式（苅田町・行橋市・みやこ町用）、
+ * kouiki ＝ 福岡県介護保険広域連合（築上町・豊前市・上毛町・吉富町）は広域連合用の書式
+ */
+export type Insurer = 'kanda' | 'yukuhashi' | 'miyako' | 'kouiki';
 
 export type Settings = {
   clientName: string; // 請求先（笹岡工務店）

@@ -1,6 +1,24 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {autoNote, circled, cutCalc, formForAddress, formLines, jobForm, lineNote, materialText, noteText, paginate, photoNumbers, placeWork, reiwa, rowUnit} from '../../src/sasaoka/estimateForms.ts';
+import {
+  autoNote,
+  circled,
+  cutCalc,
+  formForAddress,
+  formLines,
+  insurerForAddress,
+  insurerLabel,
+  jobForm,
+  jobInsurer,
+  lineNote,
+  materialText,
+  noteText,
+  paginate,
+  photoNumbers,
+  placeWork,
+  reiwa,
+  rowUnit,
+} from '../../src/sasaoka/estimateForms.ts';
 import {isBlankRow} from '../../src/sasaoka/calc.ts';
 import {manualRow} from '../../src/sasaoka/rows.ts';
 import type {Job, Place, Row} from '../../src/sasaoka/types.ts';
@@ -25,6 +43,25 @@ test('書式は住所の市町村から：築上町・豊前市など → 広域
   assert.equal(jobForm({form: '', address: '築上町'}, S), 'kouiki');
   assert.equal(jobForm({form: 'yukuhashi', address: '築上町'}, S), 'yukuhashi'); // 選んだ書式が先
   assert.equal(jobForm({form: '', address: ''}, {estimateForm: 'kouiki'}), 'kouiki');
+});
+
+test('保険者：苅田町・行橋市・みやこ町は同じ書式（苅田町・行橋市・みやこ町用）、広域連合は広域連合用。選んだ保険者が先、なければ住所から', () => {
+  assert.equal(insurerForAddress('京都郡苅田町富久町'), 'kanda');
+  assert.equal(insurerForAddress('行橋市東大橋2-1-7'), 'yukuhashi');
+  assert.equal(insurerForAddress('福岡県京都郡みやこ町豊津1118'), 'miyako');
+  assert.equal(insurerForAddress('福岡県豊前市八屋'), 'kouiki');
+  assert.equal(insurerForAddress('北九州市小倉南区'), null);
+  // 選んだ保険者で書式が決まる（住所・前に選んだ書式より先）
+  assert.equal(jobForm({insurer: 'miyako', form: 'kouiki', address: '築上町'}, S), 'yukuhashi');
+  assert.equal(jobForm({insurer: 'kouiki', form: '', address: '行橋市'}, S), 'kouiki');
+  // 保険者を選ぶ前の見積書：住所から（書式と食い違わないとき）。広域連合用の書式なら広域連合。分からなければ ''
+  assert.equal(jobInsurer({insurer: '', form: 'yukuhashi', address: '苅田町与原'}), 'kanda');
+  assert.equal(jobInsurer({insurer: '', form: 'yukuhashi', address: '築上町椎田'}), ''); // 書式と住所が食い違う
+  assert.equal(jobInsurer({insurer: '', form: 'kouiki', address: ''}), 'kouiki');
+  assert.equal(jobInsurer({insurer: '', form: '', address: 'みやこ町'}), 'miyako');
+  assert.equal(jobInsurer({insurer: '', form: 'yukuhashi', address: ''}), '');
+  assert.equal(insurerLabel({insurer: 'kanda', form: 'yukuhashi', address: ''}, S), '苅田町');
+  assert.equal(insurerLabel({insurer: '', form: 'yukuhashi', address: ''}, S), '苅田町・行橋市・みやこ町用'); // 分からなければ書式の名前
 });
 
 test('広域連合用：施工費は 時間×2,500円、部材は メーカー 品番 品名・定価は算出根拠に', () => {

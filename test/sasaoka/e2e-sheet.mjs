@@ -1,6 +1,7 @@
 // 住宅改修 見積書作成：見積書に直接入力（Excel のように欄を選んで打ち込む）を確かめる：
 // 新しい見積書を見積書の形のまま打ち込む（お客様名・改修内容・改修場所・内容の候補（★お気に入り）・数量 60cm・同上施工費・備考に定価）→
-// 合計・元に戻す・行の挿入／コピー／削除（行の左の＋・コピー・✕）・介護保険の対象外・諸経費・作成日・笹岡工務店の請求書に入れる（仕切価格を入れる）・
+// 合計・元に戻す・行の挿入／削除／コピー→貼付（行の左の＋・✕・コピー、Ctrl+C／X／V、Ctrl+Shift+＋／Ctrl+－）・改修場所の候補（▼・Alt+↓）・
+// 介護保険の対象外・諸経費・作成日・笹岡工務店の請求書に入れる（仕切価格を入れる）・
 // 広域連合用（材／手・時間）・「請求書を確認する」とのつながり
 // usage: node e2e-sheet.mjs <サイトのURL> <出力フォルダ>
 //   サイトは太陽ポータルと同じ形（<サイト>/jutaku-mitsumori/index.html と <サイト>/sasaoka/index.html）
@@ -14,13 +15,14 @@ const browser = await chromium.launch();
 const errors = [];
 const ctx = await browser.newContext({viewport: {width: 1366, height: 900}, locale: 'ja-JP'});
 await ctx.addInitScript(() => localStorage.setItem('taiyo_portal_session', JSON.stringify({office: '行橋営業所'})));
+await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], {origin: new URL(site).origin}); // 行のコピー（Ctrl+C／Ctrl+V）
 const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 page.on('console', (m) => m.type() === 'error' && errors.push('console: ' + m.text()));
 page.on('dialog', (d) => d.accept());
 await page.goto(`${site}/jutaku-mitsumori/index.html`);
 await page.getByRole('button', {name: /サンプルで試す/}).click(); // 部材リスト（★お気に入り）と取付手間の単価
-await page.getByRole('button', {name: '＋ 苅田町・行橋市・みやこ町用の見積書'}).click();
+await page.getByRole('button', {name: '＋ 行橋市', exact: true}).click(); // 保険者（苅田町・行橋市・みやこ町は同じ書式）
 
 const sheet = page.getByRole('region', {name: '見積書に直接入力'});
 await sheet.waitFor();
@@ -178,18 +180,89 @@ await sheet.getByRole('button', {name: '養生テープの行を消す'}).click(
 assert.equal(await lines(), before);
 log('行の左の＋（空白の行を入れて打ち込む）OK');
 
-// ---------------- 行の左の「コピー」：部材の行を同上施工費ごと、すぐ下にコピーする（施工費の行にはコピーがない）。元に戻せる
+// ---------------- 行の左のボタンは「＋」「✕」「コピー」の順。「コピー」→ 貼り付けたい行の「貼付」（部材は同上施工費ごと）。続けて貼り付けられ、Esc でやめる
+const tools = await sheet.locator('.sheet-rowtools').first().locator(':scope > *').evaluateAll((els) => els.map((e) => e.className.split(' ')[0]));
+assert.deepEqual(tools, ['sheet-ins', 'sheet-del', 'sheet-copy']);
 const copyBefore = await lines();
-const works = await sheet.locator('.form-page tr', {hasText: '同上施工費'}).count();
-assert.equal(await sheet.locator('.form-page tr', {hasText: '同上施工費'}).first().getByRole('button', {name: /をコピー$/}).count(), 0);
+const strip = page.getByRole('status').filter({hasText: 'コピー中'});
 await sheet.getByRole('button', {name: /木の手すり 35φ 4mの行をコピー$/}).click();
+assert.match(await strip.innerText(), /📋 コピー中：「サンプル S-TS35 木の手すり 35φ 4m」/);
+assert.equal(await sheet.locator('tr[data-copied]').count(), 2); // 部材と同上施工費に印
+assert.equal(await sheet.locator('[data-copy]').count(), 0); // コピーのあいだは「コピー」の代わりに「貼付」
+await sheet.getByRole('button', {name: /エンドキャップの行の下に貼り付け$/}).click();
 assert.equal(await lines(), copyBefore + 2);
-assert.equal(await sheet.locator('.form-page tr', {hasText: '木の手すり 35φ 4m'}).count(), 2);
-assert.equal(await sheet.locator('.form-page tr', {hasText: '同上施工費'}).count(), works + 1);
-await page.locator('[aria-live] > div', {hasText: '行をコピーしました'}).first().waitFor();
+assert.deepEqual((await order()).slice(-3), ['サンプル S-EC01 エンドキャップ', 'サンプル S-TS35 木の手すり 35φ 4m', '同上施工費']);
+await sheet.getByRole('button', {name: /L型手すりの行の下に貼り付け$/}).click(); // 続けて貼り付けられる
+assert.equal(await lines(), copyBefore + 4);
+await page.keyboard.press('Escape');
+assert.equal(await strip.count(), 0);
+assert.equal(await sheet.locator('[data-paste]').count(), 0);
+await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
 await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
 assert.equal(await lines(), copyBefore);
-log('行の左のコピー（部材と同上施工費）OK');
+// 同上施工費もコピーできる：施工費のないエンドキャップの下に貼り付けると、エンドキャップの同上施工費になる
+await sheet.locator('.form-page tr', {hasText: '同上施工費'}).first().getByRole('button', {name: /をコピー$/}).click();
+await sheet.getByRole('button', {name: /エンドキャップの行の下に貼り付け$/}).click();
+assert.deepEqual((await order()).slice(-2), ['サンプル S-EC01 エンドキャップ', '同上施工費']);
+assert.deepEqual((await tds('同上施工費')).slice(5, 7), ['2,000', '2,000']);
+await page.keyboard.press('Escape');
+await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
+log('行の左の「＋」「✕」「コピー」→「貼付」（部材・同上施工費）OK');
+
+// ---------------- キーボード：行の欄で Ctrl+C → 貼り付けたい行を選んで Ctrl+V／Ctrl+X は移す（1回だけ）／Ctrl+Shift+＋ で下に1行・Ctrl+－ で消す
+await cell(await key('L型手すり', 'text')).click();
+await page.keyboard.press('ControlOrMeta+c');
+assert.match(await strip.innerText(), /L型手すり/);
+await cell(await key('エンドキャップ', 'qty')).click();
+await page.keyboard.press('ControlOrMeta+v');
+assert.deepEqual((await order()).slice(-2), ['サンプル S-EC01 エンドキャップ', 'サンプル S-TL01 L型手すり']);
+assert.equal(await lines(), copyBefore + 1);
+await page.keyboard.press('Escape');
+await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
+await cell(await key('L型手すり', 'text')).click();
+await page.keyboard.press('ControlOrMeta+x');
+const cutStrip = page.getByRole('status').filter({hasText: '切り取り中'});
+assert.match(await cutStrip.innerText(), /L型手すり/);
+await cell(await key('エンドキャップ', 'text')).click();
+await page.keyboard.press('ControlOrMeta+v');
+assert.deepEqual((await order()).slice(-2), ['サンプル S-EC01 エンドキャップ', 'サンプル S-TL01 L型手すり']);
+assert.equal(await lines(), copyBefore); // 移しただけ
+assert.equal(await cutStrip.count(), 0);
+await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
+assert.deepEqual((await order()).slice(-2), ['サンプル S-TL01 L型手すり', 'サンプル S-EC01 エンドキャップ']);
+// 行でない欄（お客様名）の Ctrl+C は欄の文字だけ。そのあとの Ctrl+V は、ふつうに欄に文字が入る
+await cell('job:customer').click();
+await page.keyboard.press('ControlOrMeta+c');
+assert.equal(await strip.count(), 0);
+await cell(await key('エンドキャップ', 'note')).click();
+await page.keyboard.press('ControlOrMeta+v');
+assert.equal(await input.inputValue(), '見本 太郎');
+await page.keyboard.press('Escape');
+await cell(await key('エンドキャップ', 'text')).click();
+await page.keyboard.press('ControlOrMeta+Shift+Equal');
+assert.equal(await lines(), copyBefore + 1);
+assert.equal(await selected(), '内容（品名）');
+await page.keyboard.press('ControlOrMeta+Minus');
+assert.equal(await lines(), copyBefore);
+log('Ctrl+C／Ctrl+X／Ctrl+V（行）・欄の文字の貼り付け・Ctrl+Shift+＋／Ctrl+－ OK');
+
+// ---------------- 改修場所：欄の「▼」（Alt+↓）で箇所の名前の候補から選ぶ。打ち込んでもよい（打った文字で絞る）
+await cell(await key('木の手すり 35φ 4m', 'name')).click();
+await sheet.getByRole('button', {name: '改修場所（箇所名）を候補から選ぶ'}).click();
+const placeOptions = page.getByRole('listbox', {name: '候補'}).getByRole('option');
+assert.deepEqual((await placeOptions.allInnerTexts()).slice(0, 3), ['玄関', '上がり框', '廊下']);
+await placeOptions.filter({hasText: /^廊下$/}).click();
+assert.equal((await tds('木の手すり 35φ 4m'))[1], '①廊下');
+await page.keyboard.press('Alt+ArrowDown');
+await page.keyboard.type('脱衣');
+assert.deepEqual(await placeOptions.allInnerTexts(), ['脱衣所']);
+await page.keyboard.press('ArrowDown');
+await page.keyboard.press('Enter');
+assert.equal((await tds('木の手すり 35φ 4m'))[1], '①脱衣所');
+await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
+await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
+assert.equal((await tds('木の手すり 35φ 4m'))[1], '①浴室');
+log('改修場所の候補（▼・Alt+↓・打って絞る）OK');
 
 // ---------------- 諸経費・作成日・工事場所（見積書の欄）
 await typeIn('overhead:all', '1000');
@@ -231,15 +304,20 @@ const linkText = await link.innerText();
 assert.ok(linkText.includes('①部材代（仕切価格） 9,900') && linkText.includes('②取付手間 2,000') && !linkText.includes('入っていない部材'), linkText);
 log('笹岡工務店の請求書に最初から入る・外す・仕切価格を入れるOK');
 
-// ---------------- 工事場所を築上町にすると「広域連合用」の書式だと知らせる（打っている途中では変えない）。みやこ町は今の書式のまま。
-// ボタンで広域連合用に。材／手を「手」にすると施工費（数量は時間・1時間2,500円）
+// ---------------- 工事場所の住所の市町村が保険者と違うと知らせる（打っている途中では変えない。変えるのはボタンで）。
+// みやこ町は書式は同じで保険者だけ変わる。築上町は広域連合（書式も広域連合用）。材／手を「手」にすると施工費（数量は時間・1時間2,500円）
+const insurer = page.getByRole('combobox', {name: '保険者'});
+assert.equal(await insurer.inputValue(), 'yukuhashi');
 await typeIn('job:address', '福岡県京都郡みやこ町豊津');
-assert.equal(await page.getByRole('button', {name: '広域連合用にする'}).count(), 0);
+await page.getByRole('button', {name: '保険者をみやこ町にする'}).click();
+assert.equal(await insurer.inputValue(), 'miyako');
+assert.ok((await sheet.locator('.form-page').first().innerText()).includes('工事費見積書兼工事費内訳書')); // 書式は同じ
 await typeIn('job:address', '福岡県築上郡築上町椎田');
 assert.ok((await sheet.locator('.form-page').first().innerText()).includes('工事費見積書兼工事費内訳書'));
-await page.getByRole('button', {name: '広域連合用にする'}).click();
+await page.getByRole('button', {name: '保険者を広域連合にする'}).click();
 await sheet.locator('.form-page', {hasText: '内訳書　様式'}).first().waitFor();
-assert.equal(await page.getByRole('button', {name: '広域連合用にする'}).count(), 0);
+assert.equal(await insurer.inputValue(), 'kouiki');
+assert.equal(await page.getByRole('button', {name: /^保険者を.*にする$/}).count(), 0);
 await cell('new:mark').click();
 await page.keyboard.press(' ');
 assert.equal((await cell('new:mark').innerText()).trim(), '手');

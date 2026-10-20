@@ -2,7 +2,7 @@ import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
 import {cutToLength, estimateQty, isBlankRow, jobName, jobTotals, monthSummary, placeTotals, rowAmount, shikiriPrice} from '../calc.ts';
 import type {MonthSummary} from '../calc.ts';
-import {cutCalc, FORM_INFO, jobForm} from '../estimateForms.ts';
+import {cutCalc, FORM_INFO, insurerLabel, jobForm} from '../estimateForms.ts';
 import type {AppData, Job, Settings} from '../types.ts';
 import {dateLabel, monthEnd, monthLabel, num, shortDate, staffShort, todayIso, yen} from '../util.ts';
 import {useDocMeta} from './docMeta.ts';
@@ -106,7 +106,7 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
       {form && <style>{'@media print { @page { size: A4 landscape; margin: 0; } }'}</style>}
       <div className="print-toolbar">
         <div className="text-sm font-bold">
-          {form ? `見積書（A4横）・${FORM_INFO[form].name}「${FORM_INFO[form].title}」` : request.kind === 'order' ? '発注書（A4縦）' : '印刷イメージ（A4縦）'}
+          {form && estJob ? `見積書（A4横）・${insurerLabel(estJob, data.settings)}「${FORM_INFO[form].title}」` : request.kind === 'order' ? '発注書（A4縦）' : '印刷イメージ（A4縦）'}
           <span className="ml-2 hidden font-normal text-slate-300 sm:inline">印刷の画面で「PDFに保存」を選ぶとPDFにできます</span>
         </div>
         {form === 'yukuhashi' && (

@@ -1,6 +1,8 @@
 // 見積書に直接入力する（Excel のように欄を選んで打ち込む）。見積書と同じ形のまま、打ち込んだ値は様邸の行（部材・取付手間）に入り、
 // 仕切り計算表・請求書も同じ行から作る。操作は Excel と同じ：
 //   欄を選んで打ち込むと書き換え／Enter で下・Tab で右・矢印で移動／F2 かダブルクリックで書き直す／Delete で消す／Esc でやめる／Ctrl+Z で元に戻す
+//   行：左の「＋」で下に1行・「✕」で消す・「コピー」→ 貼り付けたい行の「貼付」（Ctrl+C／Ctrl+X → 行を選んで Ctrl+V も同じ。Esc でコピーをやめる）
+//   Ctrl+Shift+＋ で下に1行・Ctrl+－ で行を消す・Alt+↓ で候補（改修場所・改修の種類）・Ctrl+P で印刷
 // 内容（品名）は部材リストから選べる（★お気に入りが先）。備考（算出根拠）に定価を入れると、単価は 定価×0.8。
 // いちばん下の空いた行に打ち込むと行が増え、改修場所を打ち込むと箇所が増える。
 // 日本語入力（IME）がそのまま使えるように、選んだ欄の上にいつも見えない入力欄を置いておき、打ち始めたら見えるようにする。
@@ -10,7 +12,8 @@ import type {ChangeEvent, ClipboardEvent as ReactClipboardEvent, KeyboardEvent a
 import {circled, KINDS, materialText} from '../estimateForms.ts';
 import {useDocMeta} from '../print/docMeta.ts';
 import {KouikiForm, YukuhashiForm} from '../print/EstimateForms.tsx';
-import {applySheet, copyLine, deleteLine, insertBlankAfter, parseDate, sheetTarget, sheetValue, toggleExcluded} from '../sheetEdit.ts';
+import {applySheet, deleteLine, insertBlankAfter, lineRows, parseDate, parsePlace, pasteLines, sheetTarget, sheetValue, toggleExcluded} from '../sheetEdit.ts';
+import {getClip, setClip, useClip} from '../sheetClip.ts';
 import type {EstimateForm, Job, Material, Settings} from '../types.ts';
 import {matchesAll, todayIso, yen} from '../util.ts';
 import {useToast} from './ui.tsx';
@@ -82,6 +85,7 @@ export function EstimateSheet({
   const jobRef = useRef(job);
   jobRef.current = job;
   const ctx = {settings: s, form};
+  const clip = useClip();
 
   // ---------------------------------------------------------------- 大きさ（画面の幅に合わせる。小さすぎるときは横に動かす）
   useLayoutEffect(() => {
@@ -292,11 +296,21 @@ export function EstimateSheet({
     setHl(-1);
   };
 
-  // ---------------------------------------------------------------- 候補（内容は部材リスト・★お気に入り、改修の種類は①〜⑥）
+  /** 候補を全部出す（改修場所・改修の種類の欄の ▼ と Alt+↓） */
+  const openList = () => {
+    if (!sel) return;
+    setEdit({mode: 'enter', value: ''});
+    setHl(-1);
+    inputRef.current?.focus({preventScroll: true});
+  };
+
+  // ---------------------------------------------------------------- 候補（内容は部材リスト・★お気に入り、改修の種類は①〜⑥、改修場所は箇所の名前）
   const field = sel?.key.split(':').pop() ?? '';
   const target = sel ? sheetTarget(job, sel.key) : {place: null, row: null};
   const textCell = !!sel && field === 'text' && (sel.key.startsWith('new:') ? mark === '材' : target.row?.kind === 'material');
   const kindCell = !!sel && (field === 'work' || field === 'kind');
+  // 改修場所（箇所名）：設定の「箇所の名前」から選べる（手で打ってもよい）
+  const placeCell = !!sel && field === 'name' && (sel.key.startsWith('place:') || sel.key === 'new:name');
   const suggestions = useMemo(() => {
     if (!edit) return [] as {label: string; sub: string; value: string; pick: Material | null}[];
     const q = edit.value.trim();
@@ -318,8 +332,15 @@ export function EstimateSheet({
         (k) => !q || k.label.includes(q) || k.value === q.normalize('NFKC'),
       );
     }
+    if (placeCell) {
+      // 写真番号（①）を付けて打っていても、名前の部分で探す
+      const name = parsePlace(q).name;
+      return s.placePresets
+        .filter((p) => !name || matchesAll(p, name))
+        .map((p) => ({label: p, sub: '', value: p, pick: null}));
+    }
     return [];
-  }, [edit, textCell, kindCell, materials]);
+  }, [edit, textCell, kindCell, placeCell, materials, s.placePresets]);
 
   // ---------------------------------------------------------------- キーボード（Excel と同じ）
   const onKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
@@ -337,7 +358,35 @@ export function EstimateSheet({
         redo();
         return;
       }
-      if (ctrl) return; // コピー・貼り付けなどはそのまま
+      // Ctrl+Shift+＋（テンキーの＋）：選んでいる行の下に1行入れる／Ctrl+－：選んでいる行を消す（Excel と同じ）
+      if (ctrl && (e.key === '+' || e.code === 'NumpadAdd')) {
+        e.preventDefault();
+        const id = lineIdOf(sel);
+        if (id) insertRow(id);
+        return;
+      }
+      if (ctrl && (e.key === '-' || e.code === 'NumpadSubtract')) {
+        e.preventDefault();
+        const id = lineIdOf(sel);
+        if (id) deleteRow(id);
+        return;
+      }
+      if (ctrl && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault(); // Ctrl+P：見積書を印刷（入力の画面ではなく）
+        onPrint();
+        return;
+      }
+      if (ctrl) return; // コピー・切り取り・貼り付けは onCopy・onCut・onPaste
+      if (e.key === 'Escape' && getClip()) {
+        e.preventDefault(); // コピーをやめる（Excel と同じ）
+        setClip(null);
+        return;
+      }
+      if (e.altKey && e.key === 'ArrowDown' && (placeCell || kindCell)) {
+        e.preventDefault(); // Alt+↓：候補を開く（Excel のリストと同じ）
+        openList();
+        return;
+      }
       const arrows: Record<string, Dir> = {ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right'};
       if (arrows[e.key]) {
         e.preventDefault();
@@ -417,19 +466,110 @@ export function EstimateSheet({
     setHl(-1);
   };
 
+  /** 欄の文字（Ctrl+C で OS の貼り付けに入れる） */
+  const cellText = () => (sel ? sheetValue(jobRef.current, sel.key, ctx, meta.date) || findCell(sel)?.innerText || '' : '');
+  /** 明細の行の欄（line:・excl:）か。行の欄の Ctrl+C／Ctrl+X は行をコピー・切り取り */
+  const rowCell = (x: Sel | null) => !!x && /^(line|excl):/.test(x.key);
+
+  // Ctrl+C：明細の行の欄なら、その行（部材は同上施工費ごと）をコピー。OS の貼り付けにも欄の文字を入れる（ほかのアプリに貼れる）。
+  // ほかの欄（お客様名・改修場所など）は欄の文字だけ
   const onCopy = (e: ReactClipboardEvent<HTMLTextAreaElement>) => {
     if (edit || !sel) return;
-    const el = findCell(sel);
     e.preventDefault();
-    e.clipboardData.setData('text/plain', sheetValue(jobRef.current, sel.key, ctx, meta.date) || el?.innerText || '');
+    const text = cellText();
+    e.clipboardData.setData('text/plain', text);
+    const id = rowCell(sel) ? lineIdOf(sel) : null;
+    if (!id || !copyRow(id, false, text)) setClip(null);
+  };
+  // Ctrl+X：明細の行なら切り取り（貼り付けたときに移す）。ほかの欄は文字を切り取る（欄を空にする）
+  const onCut = (e: ReactClipboardEvent<HTMLTextAreaElement>) => {
+    if (edit || !sel) return;
+    e.preventDefault();
+    const text = cellText();
+    e.clipboardData.setData('text/plain', text);
+    const id = rowCell(sel) ? lineIdOf(sel) : null;
+    if (id && copyRow(id, true, text)) return;
+    setClip(null);
+    if (!isToggle(sel.key)) commit('', null, null);
+  };
+  // Ctrl+V：コピーした行があり、OS の貼り付けがそのとき入れた文字のままなら、選んでいる行の下に行を貼り付ける。
+  // ほかの所で文字をコピーしたあと（文字が違う）なら、ふつうに欄に文字を貼り付ける（打ち込んだのと同じ）
+  const onPaste = (e: ReactClipboardEvent<HTMLTextAreaElement>) => {
+    if (edit || !sel) return;
+    const c = getClip();
+    if (!c) return;
+    if (c.text !== null && e.clipboardData.getData('text/plain') !== c.text) {
+      setClip(null);
+      return;
+    }
+    e.preventDefault();
+    pasteAt(pasteTarget());
+  };
+
+  // ---------------------------------------------------------------- 行のコピー・切り取り・貼り付け・入れる・消す
+  /** 選んでいる欄の明細の1行（その行の最初の入力の行）。いちばん下の空いた行・明細でない欄は null */
+  const lineIdOf = (x: Sel | null) => findCell(x)?.closest('tr')?.getAttribute('data-rows')?.split(' ')[0] ?? null;
+
+  /** 行をコピー（cut：切り取り）。text：OS の貼り付けに入れた文字（Ctrl+C／Ctrl+X のとき） */
+  const copyRow = (rowId: string, cut: boolean, text: string | null) => {
+    const rows = lineRows(jobRef.current, rowId);
+    if (!rows) return false;
+    const head = rows[0];
+    const label = head.kind === 'labor' ? (head.estText ?? (rows.length > 1 || head.refId ? '施工費' : head.name || '施工費')) : head.estText ?? materialText(head);
+    setClip({rows: rows.map((r) => ({...r})), label, sourceIds: rows.map((r) => r.id), jobId: jobRef.current.id, cut, text});
+    // ボタンで押したときも、ほかのアプリに貼り付けられるよう品名を入れておく（入れられたら、Ctrl+V で行を貼り付ける目印にする）
+    if (text === null) {
+      void navigator.clipboard
+        ?.writeText(label)
+        .then(() => {
+          const c = getClip();
+          if (c && c.sourceIds[0] === head.id) setClip({...c, text: label});
+        })
+        .catch(() => undefined);
+    }
+    toast(`${cut ? '切り取りました' : 'コピーしました'}：「${label}」`);
+    return true;
+  };
+
+  /** コピーした行を貼り付ける（欄のキーの行のすぐ下。空白の行ならその行に） */
+  const pasteAt = (key: string) => {
+    const c = getClip();
+    if (!c) return;
+    const res = pasteLines(jobRef.current, key, c.rows, c.cut && c.jobId === jobRef.current.id ? c.sourceIds : []);
+    if (!res.rowId) {
+      toast('貼り付ける行を選んでください', 'error');
+      return;
+    }
+    change(res.job);
+    setSel({key: `line:${res.rowId}:text`, occ: 0});
+    setEdit(null);
+    if (c.cut) setClip(null);
+    toast(c.cut ? `「${c.label}」を移しました` : `「${c.label}」を貼り付けました（続けて貼り付けられます。Esc でやめる）`);
+    inputRef.current?.focus({preventScroll: true});
+  };
+  const pasteTarget = () => {
+    const id = lineIdOf(sel);
+    return id ? `line:${id}:text` : (sel?.key ?? '');
+  };
+
+  const insertRow = (rowId: string) => {
+    const res = insertBlankAfter(jobRef.current, rowId);
+    change(res.job);
+    if (res.rowId) setSel({key: `line:${res.rowId}:text`, occ: 0});
+    inputRef.current?.focus({preventScroll: true});
+  };
+  const deleteRow = (rowId: string) => {
+    change(deleteLine(jobRef.current, rowId));
+    setSel(null);
+    toast('行を消しました（「↶ 元に戻す」で戻せます）');
   };
 
   // ---------------------------------------------------------------- マウス
   const onMouseDown = (e: ReactMouseEvent) => {
     let t = e.target as HTMLElement;
     if (sugRef.current?.contains(t)) return;
-    if (t.closest('[data-del], [data-ins], [data-copy]')) {
-      e.preventDefault(); // 行の左の「＋」「コピー」「✕」：欄は選ばない（押し終わったら onClick で入れる・コピーする・消す）
+    if (t.closest('[data-del], [data-ins], [data-copy], [data-paste], [data-drop]')) {
+      e.preventDefault(); // 行の左の「＋」「✕」「コピー」「貼付」、欄の「▼」：欄は選ばない（押し終わったら onClick で入れる・消す・コピー・貼り付け・候補を出す）
       return;
     }
     if (t === inputRef.current) {
@@ -457,26 +597,18 @@ export function EstimateSheet({
     inputRef.current?.focus({preventScroll: true});
   };
   // 行の左の「＋」：その行の下に空白の行を入れて、内容の欄を選ぶ（そのまま打ち込める）。
-  // 「コピー」：部材の行を同上施工費ごと、すぐ下にコピーする。
-  // 「✕」：その行（部材は同上施工費ごと）を消す。箇所の行がなくなれば箇所も消す（その行が空白になる）
+  // 「✕」：その行（部材は同上施工費ごと）を消す。箇所の行がなくなれば箇所も消す（その行が空白になる）。
+  // 「コピー」：部材は同上施工費ごと、施工費はそのまとまりをコピーする。コピーしているあいだは「貼付」：その行の下に貼り付ける
   const onClick = (e: ReactMouseEvent) => {
-    const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-ins], [data-copy], [data-del]');
+    const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-ins], [data-copy], [data-paste], [data-del]');
     if (!btn) return;
     if (edit && sel) commit(edit.value, null, null, true); // 打ち込んでいた値を入れてから
-    if (btn.dataset.ins) {
-      const res = insertBlankAfter(jobRef.current, btn.dataset.ins);
-      change(res.job);
-      if (res.rowId) setSel({key: `line:${res.rowId}:text`, occ: 0});
+    if (btn.dataset.ins) insertRow(btn.dataset.ins);
+    else if (btn.dataset.copy) {
+      copyRow(btn.dataset.copy, false, null);
       inputRef.current?.focus({preventScroll: true});
-    } else if (btn.dataset.copy) {
-      const res = copyLine(jobRef.current, btn.dataset.copy);
-      change(res.job);
-      if (res.rowId) toast('行をコピーしました（すぐ下に入りました）');
-    } else if (btn.dataset.del) {
-      change(deleteLine(jobRef.current, btn.dataset.del));
-      setSel(null);
-      toast('行を消しました（「↶ 元に戻す」で戻せます）');
-    }
+    } else if (btn.dataset.paste) pasteAt(`line:${btn.dataset.paste}:text`);
+    else if (btn.dataset.del) deleteRow(btn.dataset.del);
   };
   const onDoubleClick = (e: ReactMouseEvent) => {
     const t = e.target as HTMLElement;
@@ -537,6 +669,9 @@ export function EstimateSheet({
     return {left: Math.max(8, Math.min(r.left, window.innerWidth - 448)), top: below ? r.bottom + 4 : Math.max(8, r.top - 4 - Math.min(320, suggestions.length * 44 + 40))};
   })();
 
+  // コピーした行の印・行の左の「貼付」（コピーした行があるあいだ）
+  const sheetOpts = {mark, copied: clip && clip.jobId === job.id ? clip.sourceIds : [], pasting: clip !== null};
+
   const selName = sel ? FIELD_NAMES[field] ?? (sel.key.startsWith('excl:') ? '介護保険の対象／対象外' : sel.key.startsWith('overhead:') ? '諸経費' : sel.key === 'date' ? '作成日' : '') : '';
   const bar = editing ? edit.value : sel ? (sel.key === 'date' ? meta.date : sel.key === 'new:mark' ? mark : sheetValue(job, sel.key, ctx, meta.date)) : '';
 
@@ -575,6 +710,21 @@ export function EstimateSheet({
           ＋ 部材＋施工費（常用）から入れる
         </button>
       </div>
+      {clip && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900" role="status">
+          <span className="font-bold">
+            {clip.cut ? '✂ 切り取り中' : '📋 コピー中'}：「{clip.label}」
+          </span>
+          <span>貼り付けたい行の左の「貼付」か、行を選んで Ctrl+V</span>
+          <button
+            type="button"
+            className="ml-auto rounded border border-amber-300 bg-white px-2 py-0.5 font-bold text-amber-900 hover:bg-amber-100"
+            onClick={() => setClip(null)}
+          >
+            コピーをやめる（Esc）
+          </button>
+        </div>
+      )}
       <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-1 text-xs">
         <span className="w-28 shrink-0 truncate font-bold text-emerald-800" title={selName}>
           {selName || '欄を選んでください'}
@@ -594,12 +744,22 @@ export function EstimateSheet({
       >
         <div style={{width: PAGE_W * scale, height: innerH * scale}}>
           <div ref={innerRef} className="relative" style={{width: PAGE_W, transform: `scale(${scale})`, transformOrigin: 'top left'}}>
-            {form === 'kouiki' ? (
-              <KouikiForm job={job} settings={s} sheet={{mark}} />
-            ) : (
-              <YukuhashiForm job={job} settings={s} date={meta.date} sheet={{mark}} />
-            )}
+            {form === 'kouiki' ? <KouikiForm job={job} settings={s} sheet={sheetOpts} /> : <YukuhashiForm job={job} settings={s} date={meta.date} sheet={sheetOpts} />}
             {box && <div className="sheet-sel" style={{left: box.x, top: box.y, width: box.w, height: box.h}} />}
+            {/* 改修場所・改修の種類の欄の「▼」：候補から選ぶ（Excel のリストと同じ。Alt+↓ でも開く） */}
+            {box && !editing && (placeCell || kindCell) && (
+              <button
+                type="button"
+                className="sheet-drop"
+                data-drop=""
+                style={{left: box.x + box.w - 15, top: box.y + Math.max(0, (box.h - 14) / 2)}}
+                onClick={openList}
+                title="候補から選ぶ（Alt+↓）"
+                aria-label={`${selName}を候補から選ぶ`}
+              >
+                ▼
+              </button>
+            )}
             <textarea
               ref={inputRef}
               className={`sheet-input ${editing ? 'editing' : ''}`}
@@ -609,6 +769,8 @@ export function EstimateSheet({
               onChange={onChange}
               onKeyDown={onKeyDown}
               onCopy={onCopy}
+              onCut={onCut}
+              onPaste={onPaste}
               onBlur={(e) => {
                 // 見積書の外（ボタンなど）を押したら、打ち込んでいた値を入れる（Excel と同じ）
                 if (edit && !scrollRef.current?.contains(e.relatedTarget as Node | null) && !sugRef.current?.contains(e.relatedTarget as Node | null)) {

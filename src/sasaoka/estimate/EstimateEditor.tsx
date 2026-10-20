@@ -5,10 +5,10 @@ import {LaborPickerFor, missingShikiri, shikiriFromList, ShikiriPriceDialog} fro
 import {KitPicker} from '../components/Kits.tsx';
 import {MaterialPicker} from '../components/Pickers.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
-import {FORM_IDS, FORM_INFO, formForAddress, jobForm} from '../estimateForms.ts';
+import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerForAddress, jobForm, jobInsurer} from '../estimateForms.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {addMaterial, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
-import type {AppData, EstimateForm, Job, Kit, Material, NameSuffix, Place} from '../types.ts';
+import type {AppData, Insurer, Job, Kit, Material, NameSuffix, Place} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {monthLabel, staffFull, thisMonth, yen} from '../util.ts';
 import {duplicateEstimate, removeEstimate, saveEstimateExcel} from './EstimateList.tsx';
@@ -45,6 +45,7 @@ export function EstimateEditor({
   const toast = useToast();
   const s = data.settings;
   const form = jobForm(job, s);
+  const insurer = jobInsurer(job);
   const [picker, setPicker] = useState<Picker | null>(null);
   const [fixPrices, setFixPrices] = useState(false);
 
@@ -105,8 +106,10 @@ export function EstimateEditor({
   const staff = staffFull(job.staff, staffList);
   const staffOptions = !staff || staffList.includes(staff) ? staffList : [...staffList, staff];
   const pickPlace = picker ? job.places.find((p) => p.id === picker.placeId) : undefined;
-  // 工事場所の市町村の書式と違うときは知らせる（打っている途中で書式が勝手に変わらないように、変えるのはボタンで）
-  const byAddress = formForAddress(job.address);
+  // 保険者を選ぶと、見積書の書式も決まる（苅田町・行橋市・みやこ町は同じ書式、広域連合は広域連合用）
+  const setInsurer = (i: Insurer) => setJob((j) => ({...j, insurer: i, form: INSURER_INFO[i].form}));
+  // 工事場所の市町村が保険者と違うときは知らせる（打っている途中で勝手に変わらないように、変えるのはボタンで）
+  const byAddress = insurerForAddress(job.address);
 
   return (
     <div className="space-y-3">
@@ -116,7 +119,7 @@ export function EstimateEditor({
         </Btn>
         <h1 className="text-lg font-bold text-[#14532d]">{name}</h1>
         <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-900">
-          {FORM_INFO[form].name}「{FORM_INFO[form].title}」
+          {insurer ? INSURER_INFO[insurer].name : FORM_INFO[form].name}「{FORM_INFO[form].title}」
         </span>
         <div className="ml-auto flex flex-wrap gap-2">
           <Btn color="blue" onClick={save} title="この端末に保存します（Ctrl＋S でも保存できます）">
@@ -182,17 +185,18 @@ export function EstimateEditor({
             </label>
           </>
         )}
-        <label className="grid min-w-[12rem] gap-1 text-xs font-bold text-slate-600">
-          見積書の書式
+        <label className="grid min-w-[10rem] gap-1 text-xs font-bold text-slate-600">
+          保険者（申請書を出す先）
           <select
-            value={form}
-            onChange={(e) => setJob((j) => ({...j, form: e.target.value as EstimateForm}))}
-            className="h-9 w-full min-w-0 rounded-md border border-slate-300 px-2 text-sm"
-            aria-label="見積書の書式"
+            value={insurer}
+            onChange={(e) => e.target.value && setInsurer(e.target.value as Insurer)}
+            className={`h-9 w-full min-w-0 rounded-md border px-2 text-sm ${insurer ? 'border-slate-300 text-slate-800' : 'border-amber-400 bg-amber-50 text-amber-800'}`}
+            aria-label="保険者"
           >
-            {FORM_IDS.map((f) => (
-              <option key={f} value={f}>
-                {FORM_INFO[f].name}
+            {!insurer && <option value="">（選ぶ）</option>}
+            {INSURER_IDS.map((i) => (
+              <option key={i} value={i}>
+                {INSURER_INFO[i].name}
               </option>
             ))}
           </select>
@@ -217,11 +221,11 @@ export function EstimateEditor({
             お客様名・介護保険被保険者番号・工事場所（住所）・作成日は、下の見積書の欄に直接打ち込みます。
           </p>
         )}
-        {byAddress && byAddress !== form && (
+        {byAddress && byAddress !== insurer && (
           <div className="flex w-full flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900">
-            工事場所の市町村は「{FORM_INFO[byAddress].name}」の書式です。
-            <Btn small color="white" onClick={() => setJob((j) => ({...j, form: byAddress}))}>
-              {FORM_INFO[byAddress].name}にする
+            工事場所の住所は「{INSURER_INFO[byAddress].name}」です{INSURER_INFO[byAddress].form !== form ? `（見積書は${FORM_INFO[INSURER_INFO[byAddress].form].name}）` : ''}。
+            <Btn small color="white" onClick={() => setInsurer(byAddress)}>
+              保険者を{INSURER_INFO[byAddress].name}にする
             </Btn>
           </div>
         )}

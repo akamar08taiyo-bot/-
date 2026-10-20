@@ -26,7 +26,7 @@ await page.goto(`${site}/jutaku-mitsumori/index.html`);
 assert.ok((await page.locator('main').innerText()).includes('見積書はまだありません'));
 await page.getByRole('button', {name: /サンプルで試す/}).click();
 
-// ---------------- 一覧：見積の合計・書式・担当・笹岡工務店の請求書の印
+// ---------------- 一覧：見積の合計・保険者・担当・笹岡工務店の請求書の印
 // 玄関：木の手すり 定価20,000（1本4m）を60cm → 0.15本×16,000＝2,400・同上施工費（木2）2,000・ブラケット 2,100×0.8＝1,680×2
 // トイレ：L型 11,000×0.8＝8,800・同上施工費（タイル2）3,000・キャップ 450×0.8＝360×2
 // 部材 15,280・施工費 5,000・小計 20,280・諸経費 2,028（10%）・消費税 2,230（(20,280＋2,028)×0.1 切り捨て）・合計 24,538
@@ -34,7 +34,7 @@ const now = new Date();
 const thisMonthLabel = `${now.getFullYear()}年${now.getMonth() + 1}月分に入れる`;
 const sampleRow = page.getByRole('row', {name: /（サンプル）山田様邸/});
 const rowText = await sampleRow.innerText();
-for (const v of ['苅田町・行橋市・みやこ町用', '久保', '24,538', thisMonthLabel]) assert.ok(rowText.includes(v), `一覧に ${v} がない: ${rowText}`);
+for (const v of ['行橋市', '久保', '24,538', thisMonthLabel]) assert.ok(rowText.includes(v), `一覧に ${v} がない: ${rowText}`);
 log('一覧OK');
 
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
@@ -51,7 +51,7 @@ const typeIn = async (k, text, end = 'Enter') => {
   await page.waitForTimeout(60);
 };
 assert.deepEqual(await totals(), ['合計', '24,538', '24,538']);
-assert.deepEqual(await page.getByRole('combobox', {name: '見積書の書式'}).locator('option').allInnerTexts(), ['苅田町・行橋市・みやこ町用', '広域連合用']);
+assert.deepEqual(await page.getByRole('combobox', {name: '保険者'}).locator('option').allInnerTexts(), ['苅田町', '行橋市', 'みやこ町', '広域連合']);
 
 // ---------------- 見積書の欄：被保険者番号・切って使う手すりを 120cm（1.2÷4＝0.3本×16,000＝4,800）
 await typeIn('job:insuredNo', '0000366989');
@@ -186,7 +186,7 @@ assert.deepEqual(await totals(), ['合計', '55,369', '50,094']);
 log('介護保険の対象外OK');
 
 // ---------------- 広域連合用に変える：写真番号・改修の種類を見積書の欄で入れる。施工費は「時間×2,500円」。2ページ（Ｐ－1・Ｐ－2）
-await page.getByRole('combobox', {name: '見積書の書式'}).selectOption('kouiki');
+await page.getByRole('combobox', {name: '保険者'}).selectOption('kouiki'); // 広域連合 → 広域連合用の書式
 await sheet.locator('.form-page', {hasText: '内訳書　様式'}).first().waitFor();
 await typeIn(await key('L型手すり', 'photo'), '5');
 await typeIn(await key('L型手すり', 'kind'), '5');
@@ -216,7 +216,7 @@ log('見積書（広域連合用）の印刷OK');
 
 // ---------------- 一覧に戻る：書式が変わっている。探す
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
-assert.ok((await sampleRow.innerText()).includes('広域連合用'));
+assert.ok((await sampleRow.innerText()).includes('広域連合'));
 const search = page.getByRole('textbox', {name: '見積書を探す'});
 await search.fill('山田');
 assert.equal(await page.locator('tbody tr').count(), 1);

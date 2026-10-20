@@ -7,7 +7,7 @@
 //   job:customer|insuredNo|address、overhead:all|target
 // 打ち込んだ値は、仕切り計算表・請求書と同じ行（部材・取付手間）に入る（見積書と請求書はいつも同じ入力から作る）。
 
-import {cutToLength, estimatePlaceLines, estimateQty, estimateUnitPrice, listPriceOf, overheadAuto, estimateTotals, rounddown} from './calc.ts';
+import {cutToLength, estimatePlaceLines, estimateQty, estimateUnitPrice, isBlankRow, listPriceOf, overheadAuto, estimateTotals, rounddown} from './calc.ts';
 import {KINDS, materialText, rowUnit} from './estimateForms.ts';
 import {guessPieceLengthM} from './priceImport.ts';
 import {copyRows, manualRow, materialRow, newPlace} from './rows.ts';
@@ -377,7 +377,7 @@ export function overheadValue(job: Job, s: SheetSettings, target: boolean): numb
   return target ? (job.overheadTarget ?? overheadAuto(t.target.subtotal, s)) : (job.overhead ?? overheadAuto(t.all.subtotal, s));
 }
 
-// ---------------------------------------------------------------- 行の削除・挿入・コピー（見積書の1行ずつ）
+// ---------------------------------------------------------------- 行の削除・挿入・コピー・貼り付け（見積書の1行ずつ）
 
 /**
  * 見積書の1行のもとになる行の範囲：部材ならその部材と、すぐ下の施工費（同上施工費）。施工費ならそのまとまり
@@ -402,16 +402,61 @@ export function deleteLine(job: Job, rowId: string): Job {
 }
 
 /**
- * 見積書の部材の1行をコピーする：その部材と同上施工費を、すぐ下（同上施工費のうしろ）に入れる。返す rowId はコピーした部材の行。
- * 施工費の行だけはコピーしない（続けて並んだ施工費は見積書で1行にまとまるので、別の行にならない）
+ * 見積書の1行のもとになる行（コピー・切り取りに使う）：部材の行はその部材と同上施工費、施工費の行はそのまとまり。
+ * 何も入っていない部材の行（空白の行）は null
  */
-export function copyLine(job: Job, rowId: string): {job: Job; rowId: string | null} {
+export function lineRows(job: Job, rowId: string): Row[] | null {
   const found = findRow(job, rowId);
-  if (!found || found.row.kind !== 'material') return {job, rowId: null};
+  if (!found) return null;
   const [a, b] = unitRange(found.place.rows, found.ri);
-  const copy = copyRows(found.place.rows.slice(a, b));
-  const rows = [...found.place.rows.slice(0, b), ...copy, ...found.place.rows.slice(b)];
-  return {job: setPlaceRows(job, found.pi, rows), rowId: copy[0].id};
+  const rows = found.place.rows.slice(a, b);
+  return rows.length === 1 && isBlankRow(rows[0]) ? null : rows;
+}
+
+/**
+ * コピー・切り取りした行を貼り付ける。貼り付ける場所は選んでいる欄のキーから：
+ *   明細の行（line:・excl:）→ その行のすぐ下（部材なら同上施工費のうしろ）。空白の行なら、その行に入れる
+ *   箇所の欄（place:）→ その箇所の最初の行のすぐ下（行のない箇所ならその箇所に）
+ *   いちばん下の空いた行（new:）→ 最後の箇所のうしろ（箇所がなければ作る）
+ * 施工費は、すぐ上に施工費があればそのまとまりに入る（見積書では1行の同上施工費になる）。
+ * removeIds：切り取ったもとの行（貼り付けたあとに消す。箇所の行がなくなれば箇所も消す）。
+ * 返す rowId は、貼り付けた見積書の1行（選ぶ欄に使う）。貼り付ける場所がなければ null
+ */
+export function pasteLines(job: Job, key: string, rows: Row[], removeIds: string[] = []): {job: Job; rowId: string | null} {
+  if (rows.length === 0) return {job, rowId: null};
+  const [kind, id] = key.split(':');
+  const copies = copyRows(rows);
+  let j = job;
+  let pi = -1;
+  if (kind === 'line' || kind === 'excl') {
+    const found = findRow(job, id);
+    if (!found) return {job, rowId: null};
+    pi = found.pi;
+    const [a, b] = unitRange(found.place.rows, found.ri);
+    const blank = b - a === 1 && isBlankRow(found.place.rows[a]);
+    j = setPlaceRows(j, pi, [...found.place.rows.slice(0, blank ? a : b), ...copies, ...found.place.rows.slice(b)]);
+  } else if (kind === 'place') {
+    pi = job.places.findIndex((p) => p.id === id);
+    if (pi < 0) return {job, rowId: null};
+    const pr = job.places[pi].rows;
+    const b = pr.length === 0 ? 0 : unitRange(pr, 0)[1];
+    j = setPlaceRows(j, pi, [...pr.slice(0, b), ...copies, ...pr.slice(b)]);
+  } else if (kind === 'new') {
+    if (j.places.length === 0) j = {...j, places: [newPlace('')]};
+    pi = j.places.length - 1;
+    j = setPlaceRows(j, pi, [...j.places[pi].rows, ...copies]);
+  } else return {job, rowId: null};
+
+  const targetId = j.places[pi].id;
+  if (removeIds.length > 0) {
+    const gone = new Set(removeIds);
+    j = {...j, places: j.places.map((p) => ({...p, rows: p.rows.filter((r) => !gone.has(r.id))})).filter((p) => p.rows.length > 0 || p.id === targetId)};
+  }
+  // 貼り付けた最初の行の見積書の1行（施工費は、まとまりの最初の手間の行）
+  const place = j.places.find((p) => p.id === targetId);
+  const at = place ? place.rows.findIndex((r) => r.id === copies[0].id) : -1;
+  if (!place || at < 0) return {job: j, rowId: null};
+  return {job: j, rowId: place.rows[place.rows[at].kind === 'labor' ? workHead(place.rows, at) : at].id};
 }
 
 /** 見積書の1行のすぐ下に、空の部材の行を入れる（その行の欄に打ち込む） */

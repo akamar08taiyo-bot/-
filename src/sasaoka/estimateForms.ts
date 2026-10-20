@@ -7,7 +7,7 @@
 
 import {cutToLength, estimatePlaceLines, estimateQty, isBlankRow, listPriceOf} from './calc.ts';
 import {normalize} from './priceImport.ts';
-import type {EstimateForm, Job, Place, Row, Settings} from './types.ts';
+import type {EstimateForm, Insurer, Job, Place, Row, Settings} from './types.ts';
 import {num, yen} from './util.ts';
 
 export const FORM_IDS: EstimateForm[] = ['yukuhashi', 'kouiki'];
@@ -25,17 +25,53 @@ export const KINDS = ['手すりの取付', '段差の解消', '床材の変更'
 /** 広域連合用の「改修箇所毎工事名称」に書く名前（元の見積書の「手すり取付」） */
 const KIND_WORK = ['手すり取付', '段差解消', '床材変更', '扉取替', '便器取替', '付帯工事'];
 
-/** 住所の市町村から書式を決める（築上町・豊前市・上毛町・吉富町は広域連合の様式、苅田町・行橋市・みやこ町はもう一方）。分からなければ null */
-export function formForAddress(address: string): EstimateForm | null {
+/** 保険者（申請書を出す先）。苅田町・行橋市・みやこ町は見積書の書式が同じ。申請書は保険者ごとに違う */
+export const INSURER_IDS: Insurer[] = ['kanda', 'yukuhashi', 'miyako', 'kouiki'];
+
+export const INSURER_INFO: Record<Insurer, {name: string; form: EstimateForm; area: string}> = {
+  kanda: {name: '苅田町', form: 'yukuhashi', area: '苅田町'},
+  yukuhashi: {name: '行橋市', form: 'yukuhashi', area: '行橋市'},
+  miyako: {name: 'みやこ町', form: 'yukuhashi', area: 'みやこ町'},
+  kouiki: {name: '広域連合', form: 'kouiki', area: '築上町・豊前市・上毛町・吉富町'}, // 福岡県介護保険広域連合
+};
+
+/** 住所の市町村から保険者を決める。分からなければ null */
+export function insurerForAddress(address: string): Insurer | null {
   const a = normalize(address);
+  if (/苅田町/.test(a)) return 'kanda';
+  if (/行橋市/.test(a)) return 'yukuhashi';
+  if (/みやこ町/.test(a)) return 'miyako';
   if (/築上町|豊前市|上毛町|吉富町/.test(a)) return 'kouiki';
-  if (/行橋市|苅田町|みやこ町/.test(a)) return 'yukuhashi';
   return null;
 }
 
-/** 様邸の見積書の書式：選んであればそれ、なければ住所から、それでも分からなければ設定の書式 */
-export function jobForm(job: Pick<Job, 'form' | 'address'>, s: Pick<Settings, 'estimateForm'>): EstimateForm {
+/** 住所の市町村から書式を決める（築上町・豊前市・上毛町・吉富町は広域連合の様式、苅田町・行橋市・みやこ町はもう一方）。分からなければ null */
+export function formForAddress(address: string): EstimateForm | null {
+  const i = insurerForAddress(address);
+  return i ? INSURER_INFO[i].form : null;
+}
+
+/**
+ * 様邸の保険者：選んであればそれ、なければ住所から（書式と食い違わないときだけ）、広域連合用の書式なら広域連合。
+ * 苅田町・行橋市・みやこ町用の書式で住所から分からなければ ''（見積書の画面で選ぶ）
+ */
+export function jobInsurer(job: Pick<Job, 'insurer' | 'form' | 'address'>): Insurer | '' {
+  if (job.insurer) return job.insurer;
+  const byAddress = insurerForAddress(job.address);
+  if (byAddress && (!job.form || INSURER_INFO[byAddress].form === job.form)) return byAddress;
+  return job.form === 'kouiki' ? 'kouiki' : '';
+}
+
+/** 様邸の見積書の書式：保険者を選んであればその書式、なければ選んだ書式、住所から、それでも分からなければ設定の書式 */
+export function jobForm(job: Pick<Job, 'insurer' | 'form' | 'address'>, s: Pick<Settings, 'estimateForm'>): EstimateForm {
+  if (job.insurer) return INSURER_INFO[job.insurer].form;
   return job.form || formForAddress(job.address) || s.estimateForm;
+}
+
+/** 一覧などに出す保険者の名前（分からなければ書式の名前） */
+export function insurerLabel(job: Pick<Job, 'insurer' | 'form' | 'address'>, s: Pick<Settings, 'estimateForm'>): string {
+  const i = jobInsurer(job);
+  return i ? INSURER_INFO[i].name : FORM_INFO[jobForm(job, s)].name;
 }
 
 /** ①〜⑳（21からは (21)） */

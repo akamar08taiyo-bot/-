@@ -124,3 +124,14 @@ test('発注書で直したところ：前のデータ（なし）は null。直
   );
   assert.deepEqual([j.order?.supplier, j.order?.date, j.order?.note], ['ケアマックス', '2026-10-20', '午前中に納品']);
 });
+
+test('保険者：前のデータ（なし）は住所・書式から入れる。選んだものはそのまま', () => {
+  const [a, b, c, d, e] = cleanJobs([
+    {id: 'a', form: 'yukuhashi', address: '行橋市中央1-1'},
+    {id: 'b', form: 'kouiki', address: ''},
+    {id: 'c', form: 'yukuhashi', address: ''},
+    {id: 'd', insurer: 'miyako', form: 'yukuhashi', address: '行橋市'},
+    {id: 'e', insurer: 'other', form: '', address: '苅田町'},
+  ]);
+  assert.deepEqual([a.insurer, b.insurer, c.insurer, d.insurer, e.insurer], ['yukuhashi', 'kouiki', '', 'miyako', 'kanda']);
+});

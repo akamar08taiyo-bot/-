@@ -2,19 +2,22 @@ import {useMemo, useState} from 'react';
 import {estimateTotals, jobName} from '../calc.ts';
 import {copyJob} from '../components/JobTools.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
-import {FORM_IDS, FORM_INFO, jobForm} from '../estimateForms.ts';
+import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm} from '../estimateForms.ts';
 import {estimateXlsx, XLSX_TYPE} from '../estimateXlsx.ts';
 import {readDocDate} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {addSamples, hasSamples} from '../samples.ts';
-import type {AppData, EstimateForm, Job, Settings} from '../types.ts';
+import type {AppData, Insurer, Job, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {addMonths, downloadBlob, matchesAll, monthLabel, staffShort, thisMonth, todayIso, uid, yen} from '../util.ts';
 
 const SHOW_LIMIT = 100;
 
-/** 新しい見積書。選んだ書式で作る。笹岡工務店の請求書（今月分）に最初から入れる（笹岡工務店の工事でなければ、見積書の画面で外す） */
-export function newEstimate(form: EstimateForm): Job {
+/**
+ * 新しい見積書。選んだ保険者（苅田町・行橋市・みやこ町・広域連合）の書式で作る（申請書も保険者ごと）。
+ * 笹岡工務店の請求書（今月分）に最初から入れる（笹岡工務店の工事でなければ、見積書の画面で外す）
+ */
+export function newEstimate(insurer: Insurer): Job {
   const now = Date.now();
   return {
     id: uid('j'),
@@ -26,7 +29,8 @@ export function newEstimate(form: EstimateForm): Job {
     address: '',
     note: '',
     insuredNo: '',
-    form,
+    insurer,
+    form: INSURER_INFO[insurer].form,
     overhead: null,
     overheadTarget: null,
     shikiri: true,
@@ -81,7 +85,7 @@ function useEstimates(data: AppData, s: Settings) {
   return useMemo(
     () =>
       data.jobs
-        .map((job) => ({job, date: estimateDate(job), form: jobForm(job, s), t: estimateTotals(job, s)}))
+        .map((job) => ({job, date: estimateDate(job), form: jobForm(job, s), insurer: insurerLabel(job, s), t: estimateTotals(job, s)}))
         .sort((a, b) => b.date.localeCompare(a.date) || b.job.createdAt - a.job.createdAt),
     [data.jobs, s],
   );
@@ -97,7 +101,7 @@ export function EstimateHome({
 }: {
   data: AppData;
   update: Update;
-  onNew: (form: EstimateForm) => void;
+  onNew: (insurer: Insurer) => void;
   onList: () => void;
   goMaterials: () => void;
 }) {
@@ -109,17 +113,28 @@ export function EstimateHome({
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded-xl border-2 border-emerald-600 bg-white p-5 shadow-sm" aria-label="新規作成">
           <h2 className="text-xl font-bold text-[#14532d]">＋ 新規作成</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-600">新しい見積書を作ります。工事場所の市町村の書式を選んでください。</p>
+          <p className="mt-1 text-sm leading-6 text-slate-600">新しい見積書を作ります。保険者（工事場所の市町村）を選んでください。</p>
           <div className="mt-4 grid gap-3">
-            {FORM_IDS.map((f) => (
-              <Btn key={f} color="emerald" className="!justify-start !px-5 !py-4 !text-base" onClick={() => onNew(f)}>
-                ＋ {FORM_INFO[f].name}の見積書
-                <span className="ml-1 text-xs font-normal text-emerald-50">
-                  （{FORM_INFO[f].title}
-                  {f === 'kouiki' && data.settings.estimateHourRate > 0 ? `・施工費は1時間${yen(data.settings.estimateHourRate)}円` : ''}）
-                </span>
+            {/* 苅田町・行橋市・みやこ町は見積書が同じ書式。申請書は保険者ごとに違うので、保険者を分けて選ぶ */}
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
+              <div className="grid gap-2 sm:grid-cols-3">
+                {INSURER_IDS.filter((i) => INSURER_INFO[i].form === 'yukuhashi').map((i) => (
+                  <Btn key={i} color="emerald" className="!px-4 !py-4 !text-base" onClick={() => onNew(i)}>
+                    ＋ {INSURER_INFO[i].name}
+                  </Btn>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-slate-600">見積書は3つとも同じ「{FORM_INFO.yukuhashi.title}」です。</p>
+            </div>
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
+              <Btn color="emerald" className="w-full !px-4 !py-4 !text-base" onClick={() => onNew('kouiki')}>
+                ＋ {INSURER_INFO.kouiki.name}
               </Btn>
-            ))}
+              <p className="mt-2 text-xs text-slate-600">
+                {INSURER_INFO.kouiki.area}。見積書は広域連合の「{FORM_INFO.kouiki.title}」
+                {data.settings.estimateHourRate > 0 ? `（施工費は1時間${yen(data.settings.estimateHourRate)}円）` : ''}です。
+              </p>
+            </div>
           </div>
         </section>
         <section className="rounded-xl border-2 border-slate-300 bg-white p-5 shadow-sm" aria-label="一覧から作成">
@@ -205,7 +220,7 @@ export function EstimateList({
   month: string;
   setMonth: (m: string) => void;
   onOpen: (id: string) => void;
-  onNew: (form: EstimateForm) => void;
+  onNew: (insurer: Insurer) => void;
   onPrint: (r: PrintRequest) => void;
   goMaterials: () => void;
 }) {
@@ -218,7 +233,7 @@ export function EstimateList({
   const list = useMemo(
     () =>
       searching
-        ? all.filter(({job}) => matchesAll(`${job.customer} ${job.address} ${job.staff} ${job.places.map((p) => p.name).join(' ')}`, query))
+        ? all.filter(({job, insurer}) => matchesAll(`${job.customer} ${job.address} ${job.staff} ${insurer} ${job.places.map((p) => p.name).join(' ')}`, query))
         : all.filter((e) => e.date.startsWith(month)),
     [all, query, searching, month],
   );
@@ -245,12 +260,13 @@ export function EstimateList({
             ▶
           </button>
         </div>
-        {FORM_IDS.map((f) => (
-          <Btn key={f} color="emerald" onClick={() => onNew(f)}>
-            ＋ {FORM_INFO[f].name}の見積書
+        <span className="text-sm font-bold text-slate-600">＋ 新規作成：</span>
+        {INSURER_IDS.map((i) => (
+          <Btn key={i} color="emerald" onClick={() => onNew(i)} title={`${INSURER_INFO[i].area}の見積書（${FORM_INFO[INSURER_INFO[i].form].name}「${FORM_INFO[INSURER_INFO[i].form].title}」）`}>
+            ＋ {INSURER_INFO[i].name}
           </Btn>
         ))}
-        <TextInput value={query} onChange={setQuery} placeholder="お客様名・住所・担当で探す（すべての月）" className="ml-auto w-72 text-sm" aria-label="見積書を探す" />
+        <TextInput value={query} onChange={setQuery} placeholder="お客様名・住所・担当・保険者で探す（すべての月）" className="ml-auto w-72 text-sm" aria-label="見積書を探す" />
       </div>
 
       {all.length === 0 ? (
@@ -262,7 +278,7 @@ export function EstimateList({
               <tr>
                 <th className="px-2 py-2 text-left">作成日</th>
                 <th className="px-2 py-2 text-left">お客様名</th>
-                <th className="px-2 py-2 text-left">書式</th>
+                <th className="px-2 py-2 text-left">保険者</th>
                 <th className="px-2 py-2 text-left">担当</th>
                 <th className="px-2 py-2 text-right">見積の合計（税込）</th>
                 <th className="px-2 py-2 text-left">笹岡工務店の請求書</th>
@@ -270,7 +286,7 @@ export function EstimateList({
               </tr>
             </thead>
             <tbody>
-              {list.slice(0, limit).map(({job, date, form, t}) => {
+              {list.slice(0, limit).map(({job, date, form, insurer, t}) => {
                 // お客様名のない見積書は、作成日と金額でどれか分かるようにする
                 const label = job.customer.trim() ? jobName(job) : `お客様名なし・${dateText(date)}・${yen(t.all.total)}円`;
                 return (
@@ -285,7 +301,9 @@ export function EstimateList({
                           .join('・')}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-2 py-2 text-xs">{FORM_INFO[form].name}</td>
+                    <td className="whitespace-nowrap px-2 py-2 text-xs" title={`${FORM_INFO[form].name}「${FORM_INFO[form].title}」`}>
+                      {insurer}
+                    </td>
                     <td className="whitespace-nowrap px-2 py-2">{staffShort(job.staff) || <span className="text-slate-400">—</span>}</td>
                     <td className="px-2 py-2 text-right font-bold tabular-nums text-emerald-900">{yen(t.all.total)}</td>
                     <td className="whitespace-nowrap px-2 py-2 text-xs">

@@ -23,7 +23,7 @@ import {APP_TITLE, PORTAL_URL, readHash, writeHash} from './links.ts';
 import type {MainTab} from './links.ts';
 import {PrintView} from './print/PrintView.tsx';
 import type {PrintRequest} from './print/PrintView.tsx';
-import type {EstimateForm, Job} from './types.ts';
+import type {Insurer, Job} from './types.ts';
 import {useNewVersion} from './update.ts';
 import {useStore} from './useStore.ts';
 import {thisMonth} from './util.ts';
@@ -133,8 +133,8 @@ export default function App({start}: {start: MainTab}) {
     }
     setTab(t);
   };
-  const newOne = (form: EstimateForm) => {
-    const j = newEstimate(form);
+  const newOne = (insurer: Insurer) => {
+    const j = newEstimate(insurer);
     store.update('jobs', (jobs) => [...jobs, j]);
     setEstimateId(j.id);
   };
