@@ -1,6 +1,9 @@
 // 保存：この端末のブラウザの IndexedDB（使えないときは localStorage）だけに保存する。サーバーへは送らない。
 // 太陽ポータルのアプリはすべて同じサイト（akamar08taiyo-bot.github.io）にあり、localStorage の容量を
 // 分け合っているため、件数の多い部材リストは容量に余裕のある IndexedDB に入れる。
+// 見積書作成アプリ（住宅改修 見積書作成）も同じ保存場所を使う（部材リスト・★お気に入り・様邸を一緒に使う）。
+// どちらかが保存するたびに、その項目の「印」（stamp:項目名）を変える。前に読んだときと印が違えば、ほかのアプリ・タブが
+// 保存したということなので、読み直す・まとめてから保存する（sync.ts）。
 
 import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES, SETTINGS_REV, STAFF_FULL_NAMES} from './defaults.ts';
 import {guessPieceLengthM} from './priceImport.ts';
@@ -36,41 +39,112 @@ function openDb(): Promise<IDBDatabase> {
   return dbPromise;
 }
 
-async function idbGet(key: string): Promise<unknown> {
+/** IndexedDB を使えなかったときは localStorage に保存する（ここで失敗したら呼び出し側で警告を出す） */
+export function saveLocal(key: DataKey, value: unknown) {
+  localStorage.setItem(LS_PREFIX + key, JSON.stringify(value));
+}
+
+// ---------------------------------------------------------------- ほかのアプリ・タブと一緒に使う（印を見て、読み直す・まとめる）
+
+const STAMP = 'stamp:';
+export const DATA_KEYS: DataKey[] = ['materials', 'labor', 'jobs', 'kits', 'settings'];
+export type Stamps = Partial<Record<DataKey, string>>;
+
+export const newStamp = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+/** 保存してある項目ごとの印（IndexedDB を使えないときは空。そのときは読み直し・まとめをしない） */
+export async function loadStamps(): Promise<Stamps> {
+  try {
+    const db = await openDb();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const store = tx.objectStore(STORE);
+      const out: Stamps = {};
+      for (const k of DATA_KEYS) {
+        const req = store.get(STAMP + k);
+        req.onsuccess = () => {
+          if (typeof req.result === 'string') out[k] = req.result;
+        };
+      }
+      tx.oncomplete = () => resolve(out);
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch {
+    return {};
+  }
+}
+
+/** 1つの項目を、その印と一緒に読む（読み直すとき） */
+export async function loadKeyStamped(key: DataKey): Promise<{value: unknown; stamp: string | undefined}> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
-    const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(key);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    const tx = db.transaction(STORE, 'readonly');
+    const store = tx.objectStore(STORE);
+    const v = store.get(key);
+    const s = store.get(STAMP + key);
+    tx.oncomplete = () =>
+      resolve({
+        value: v.result,
+        stamp: typeof s.result === 'string' ? s.result : undefined,
+      });
+    tx.onerror = () => reject(tx.error);
   });
 }
 
-async function idbSet(key: string, value: unknown): Promise<void> {
-  const db = await openDb();
+/**
+ * 項目を保存する。known は前に読んだ（保存した）ときの印。そのあとでほかのアプリ・タブが同じ項目を保存していれば、
+ * merge（向こうが保存したもの → まとめたもの）でまとめてから保存する。読むのと書くのは1つのトランザクションなので、間にほかの保存は入らない。
+ * IndexedDB を使えないときは localStorage にそのまま保存する（まとめない）。
+ */
+export async function saveKeySynced<T>(
+  key: DataKey,
+  value: T,
+  known: string | undefined,
+  merge: (theirs: unknown) => T,
+): Promise<{value: T; stamp: string | undefined; merged: boolean}> {
+  let db: IDBDatabase;
+  try {
+    db = await openDb();
+  } catch {
+    saveLocal(key, value);
+    return {value, stamp: undefined, merged: false};
+  }
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).put(value, key);
-    tx.oncomplete = () => resolve();
+    const store = tx.objectStore(STORE);
+    const stamp = newStamp();
+    let result = {value, stamp: stamp as string | undefined, merged: false};
+    const write = (v: T) => {
+      store.put(v, key);
+      store.put(stamp, STAMP + key);
+    };
+    const cur = store.get(STAMP + key);
+    cur.onsuccess = () => {
+      const now = typeof cur.result === 'string' ? cur.result : undefined;
+      if (now === known) {
+        write(value);
+        return;
+      }
+      const theirs = store.get(key);
+      theirs.onsuccess = () => {
+        let next = value;
+        try {
+          next = merge(theirs.result);
+        } catch {
+          /* まとめられなければ、こちらの今を保存する */
+        }
+        result = {value: next, stamp, merged: true};
+        write(next);
+      };
+    };
+    tx.oncomplete = () => resolve(result);
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error ?? new Error('保存が中断されました'));
   });
 }
 
-export async function saveKey(key: DataKey, value: unknown): Promise<void> {
-  try {
-    await idbSet(key, value);
-  } catch {
-    localStorage.setItem(LS_PREFIX + key, JSON.stringify(value)); // ここで失敗したら呼び出し側で警告を出す
-  }
-}
-
-async function loadKey(key: DataKey): Promise<unknown> {
-  try {
-    const v = await idbGet(key);
-    if (v !== undefined) return v;
-  } catch {
-    /* localStorage を見る */
-  }
+/** localStorage に保存したもの（IndexedDB を使えなかったときの保存先） */
+function lsGet(key: DataKey): unknown {
   try {
     const raw = localStorage.getItem(LS_PREFIX + key);
     return raw === null ? undefined : JSON.parse(raw);
@@ -113,7 +187,12 @@ export function cleanMaterials(raw: unknown): Material[] {
 
 export function cleanLabor(raw: unknown): LaborItem[] {
   if (!Array.isArray(raw)) return DEFAULT_LABOR.map((l) => ({...l}));
-  return raw.filter(isObj).map((l) => ({id: str(l.id) || uid('l'), name: str(l.name), price: numv(l.price), note: str(l.note)}));
+  return raw.filter(isObj).map((l) => ({
+    id: str(l.id) || uid('l'),
+    name: str(l.name),
+    price: numv(l.price),
+    note: str(l.note),
+  }));
 }
 
 const cleanRow = (r: Record<string, unknown>): Row => ({
@@ -166,6 +245,7 @@ export function cleanJobs(raw: unknown): Job[] {
     form: FORMS.includes(j.form as EstimateForm) ? (j.form as EstimateForm) : '',
     overhead: optNum(j.overhead),
     overheadTarget: optNum(j.overheadTarget),
+    shikiri: j.shikiri !== false, // 見積書作成アプリができる前の様邸は、どれも仕切り計算・請求書アプリで作ったもの
     places: Array.isArray(j.places) ? j.places.filter(isObj).map(cleanPlace) : [],
     createdAt: numv(j.createdAt, Date.now()),
     updatedAt: numv(j.updatedAt, Date.now()),
@@ -233,20 +313,56 @@ export function cleanSettings(raw: unknown): Settings {
   return s;
 }
 
-export async function loadAll(): Promise<AppData> {
-  const [materials, labor, jobs, kits, settings] = await Promise.all([
-    loadKey('materials'),
-    loadKey('labor'),
-    loadKey('jobs'),
-    loadKey('kits'),
-    loadKey('settings'),
-  ]);
+/** 保存してあったもの（ほかのアプリが保存したものも）を、この版の形に整える */
+export function cleanKey<K extends DataKey>(key: K, raw: unknown): AppData[K] {
+  const clean: {[P in DataKey]: (raw: unknown) => AppData[P]} = {
+    materials: cleanMaterials,
+    labor: (v) => (v === undefined ? DEFAULT_LABOR.map((l) => ({...l})) : cleanLabor(v)),
+    jobs: cleanJobs,
+    kits: cleanKits,
+    settings: cleanSettings,
+  };
+  return clean[key](raw);
+}
+
+/** すべての項目と、その印を読む（1つのトランザクションで読むので、読んでいるあいだのほかの保存とまざらない） */
+export async function loadAllStamped(): Promise<{
+  data: AppData;
+  stamps: Stamps;
+}> {
+  const raw: Partial<Record<DataKey, unknown>> = {};
+  const stamps: Stamps = {};
+  try {
+    const db = await openDb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const store = tx.objectStore(STORE);
+      for (const k of DATA_KEYS) {
+        const v = store.get(k);
+        v.onsuccess = () => {
+          raw[k] = v.result;
+        };
+        const s = store.get(STAMP + k);
+        s.onsuccess = () => {
+          if (typeof s.result === 'string') stamps[k] = s.result;
+        };
+      }
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch {
+    /* localStorage を見る */
+  }
+  for (const k of DATA_KEYS) if (raw[k] === undefined) raw[k] = lsGet(k);
   return {
-    materials: cleanMaterials(materials),
-    labor: labor === undefined ? DEFAULT_LABOR.map((l) => ({...l})) : cleanLabor(labor),
-    jobs: cleanJobs(jobs),
-    kits: cleanKits(kits),
-    settings: cleanSettings(settings),
+    data: {
+      materials: cleanKey('materials', raw.materials),
+      labor: cleanKey('labor', raw.labor),
+      jobs: cleanKey('jobs', raw.jobs),
+      kits: cleanKey('kits', raw.kits),
+      settings: cleanKey('settings', raw.settings),
+    },
+    stamps,
   };
 }
 
@@ -255,13 +371,29 @@ export async function loadAll(): Promise<AppData> {
 export const BACKUP_KIND = 'taiyo-sasaoka-shikiri-backup';
 
 export function backupJson(data: AppData): string {
-  return JSON.stringify({kind: BACKUP_KIND, version: 1, exportedAt: new Date().toISOString(), ...data}, null, 1);
+  return JSON.stringify(
+    {
+      kind: BACKUP_KIND,
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      ...data,
+    },
+    null,
+    1,
+  );
 }
 
 /** 部材リスト・手間単価・一式だけ（ほかの人に渡す用。様邸・設定は入れない） */
 export function masterJson(data: Pick<AppData, 'materials' | 'labor' | 'kits'>): string {
   return JSON.stringify(
-    {kind: BACKUP_KIND, version: 1, exportedAt: new Date().toISOString(), materials: data.materials, labor: data.labor, kits: data.kits},
+    {
+      kind: BACKUP_KIND,
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      materials: data.materials,
+      labor: data.labor,
+      kits: data.kits,
+    },
     null,
     1,
   );

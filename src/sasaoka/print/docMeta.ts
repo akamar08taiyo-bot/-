@@ -16,6 +16,16 @@ function readMeta(key: string, defaultDate: () => string): DocMeta {
   return {date: defaultDate(), number: '', due: ''};
 }
 
+/** 覚えている日付（見積書の一覧に作成日を出すとき）。覚えていなければ '' */
+export function readDocDate(key: string): string {
+  try {
+    const all = JSON.parse(localStorage.getItem(META_KEY) || '{}');
+    return all && all[key] && typeof all[key].date === 'string' ? all[key].date : '';
+  } catch {
+    return '';
+  }
+}
+
 function writeMeta(key: string, meta: DocMeta) {
   try {
     const all = JSON.parse(localStorage.getItem(META_KEY) || '{}') || {};

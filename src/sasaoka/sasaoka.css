@@ -56,15 +56,7 @@ body {
   align-items: end;
   padding: 10px 12px;
 }
-/* 1列目の幅は区分の印だけで決める（下の段の欄は、幅の伸びる2列目にかけて置く）。
-   見積作成は見積書と同じ順番：品名 → 長さ・数量 → 単価・金額（介護保険の対象外）→ 定価（備考） */
-.rows-narrow table.rows-table.estimate tr {
-  grid-template-areas:
-    'kind name name ops'
-    'len len qty qty'
-    'price price amount amount'
-    'list list list list';
-}
+/* 1列目の幅は区分の印だけで決める（下の段の欄は、幅の伸びる2列目にかけて置く） */
 .rows-narrow table.rows-table td {
   display: block;
   padding: 0 !important;
@@ -87,20 +79,8 @@ body {
   grid-area: ops;
   align-self: center;
 }
-.rows-narrow table.rows-table td[data-cell='list'] {
-  grid-area: list;
-}
-.rows-narrow table.rows-table td[data-cell='len'] {
-  grid-area: len;
-}
-.rows-narrow table.rows-table td[data-cell='len'] > div {
-  justify-items: start;
-}
 .rows-narrow table.rows-table td[data-cell='price'] {
   grid-area: price;
-}
-.rows-narrow table.rows-table td[data-cell='price'] > div {
-  justify-items: start;
 }
 .rows-narrow table.rows-table td[data-cell='qty'] {
   grid-area: qty;
@@ -118,33 +98,6 @@ body {
   font-size: 10px;
   font-weight: 700;
 }
-.rows-narrow table.rows-table tr.work-sum {
-  display: flex;
-  justify-content: space-between;
-  padding: 6px 12px;
-}
-
-/* 入力している行（右の見積書でも同じ行に色が付く） */
-table.rows-table tr.row-active > td,
-.rows-narrow table.rows-table tr.row-active {
-  background-color: #fffbeb;
-}
-
-/* ---------------------------------------------------------------- 見積作成：右に映す見積書（縮めて表示。欄をクリックすると直せる） */
-.est-preview .form-page {
-  margin: 0 0 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
-}
-.est-preview .form-page:last-child {
-  margin-bottom: 0;
-}
-.est-preview [data-edit] {
-  cursor: pointer;
-}
-.est-preview [data-edit]:hover {
-  background-color: rgba(59, 130, 246, 0.16) !important;
-}
-
 
 /* ---------------------------------------------------------------- 見積書に直接入力（Excel のように欄を選んで打ち込む） */
 .est-sheet .form-page {

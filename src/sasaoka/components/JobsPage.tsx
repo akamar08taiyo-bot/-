@@ -1,10 +1,9 @@
 import {useMemo} from 'react';
-import {estimateTotals, jobName, monthSummary} from '../calc.ts';
-import type {EstimateTotals} from '../calc.ts';
-import {FORM_INFO, jobForm} from '../estimateForms.ts';
+import {jobName, monthSummary} from '../calc.ts';
+import {appUrl, APP_NAMES} from '../links.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {addSamples, hasSamples} from '../samples.ts';
-import type {AppData, AppMode, Job} from '../types.ts';
+import type {AppData, Job} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {addMonths, downloadBlob, monthLabel, shortDate, staffShort, uid, yen} from '../util.ts';
 import {Btn, useToast} from './ui.tsx';
@@ -24,6 +23,7 @@ export function newJob(month: string): Job {
     form: '',
     overhead: null,
     overheadTarget: null,
+    shikiri: true,
     places: [],
     createdAt: now,
     updatedAt: now,
@@ -32,7 +32,6 @@ export function newJob(month: string): Job {
 
 export function JobsPage({
   data,
-  mode,
   update,
   month,
   setMonth,
@@ -41,7 +40,6 @@ export function JobsPage({
   goMaterials,
 }: {
   data: AppData;
-  mode: AppMode;
   update: Update;
   month: string;
   setMonth: (m: string) => void;
@@ -50,10 +48,9 @@ export function JobsPage({
   goMaterials: () => void;
 }) {
   const toast = useToast();
-  const jobs = useMemo(() => data.jobs.filter((j) => j.month === month), [data.jobs, month]);
+  const jobs = useMemo(() => data.jobs.filter((j) => j.shikiri && j.month === month), [data.jobs, month]);
   const summary = useMemo(() => monthSummary(jobs, data.settings), [jobs, data.settings]);
   const monthly = data.settings.invoiceTaxMode === 'monthly';
-  const estimate = mode === 'estimate';
 
   const add = () => {
     const j = newJob(month);
@@ -114,23 +111,17 @@ export function JobsPage({
         <Btn color="emerald" onClick={add}>
           ＋ 様邸を追加
         </Btn>
-        {estimate ? (
-          <p className="ml-auto text-xs leading-5 text-indigo-900">
-            見積作成：様邸を開いて部材・取付手間を入れると、見積書（部材は定価×{data.settings.estimateRate}、取付手間は同上施工費）ができます。
-          </p>
-        ) : (
-          <div className="ml-auto flex flex-wrap gap-2">
-            <Btn color="sky" disabled={jobs.length === 0} onClick={() => onPrint({kind: 'invoice', month, withDetails: false})}>
-              🖨 請求書を印刷
-            </Btn>
-            <Btn color="cyan" disabled={jobs.length === 0} onClick={() => onPrint({kind: 'invoice', month, withDetails: true})}>
-              🖨 請求書＋各様邸の明細
-            </Btn>
-            <Btn color="white" disabled={jobs.length === 0} onClick={saveCsv}>
-              CSVで保存
-            </Btn>
-          </div>
-        )}
+        <div className="ml-auto flex flex-wrap gap-2">
+          <Btn color="sky" disabled={jobs.length === 0} onClick={() => onPrint({kind: 'invoice', month, withDetails: false})}>
+            🖨 請求書を印刷
+          </Btn>
+          <Btn color="cyan" disabled={jobs.length === 0} onClick={() => onPrint({kind: 'invoice', month, withDetails: true})}>
+            🖨 請求書＋各様邸の明細
+          </Btn>
+          <Btn color="white" disabled={jobs.length === 0} onClick={saveCsv}>
+            CSVで保存
+          </Btn>
+        </div>
       </div>
 
       {jobs.length === 0 ? (
@@ -146,7 +137,13 @@ export function JobsPage({
             </li>
             <li>「＋ 様邸を追加」で○○様邸を作り、玄関・トイレなどの箇所ごとに部材と取付手間（箇所数）を入れます。</li>
             <li>月の分がそろったら「請求書を印刷」で1か月分の一覧を印刷し、笹岡工務店さまへお渡しします。</li>
-            <li>上の「見積作成」に切り替えると、同じ入力から見積書（部材は定価×{data.settings.estimateRate}、取付手間は同上施工費）を作れます。</li>
+            <li>
+              見積書は「
+              <a href={appUrl('estimate')} className="font-bold text-emerald-800 underline">
+                {APP_NAMES.estimate}
+              </a>
+              」で作ります。見積書の下の「笹岡工務店の請求書に入れる」を選ぶと、その見積書の部材・施工費がこの一覧（請求する月の分）に入ります。
+            </li>
           </ol>
           {!hasSamples(data) && (
             <div className="mt-4">
@@ -156,8 +153,6 @@ export function JobsPage({
             </div>
           )}
         </div>
-      ) : estimate ? (
-        <EstimateList data={data} rows={summary.rows.map((r) => r.job)} onOpen={onOpen} onPrint={onPrint} month={month} />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full min-w-[1040px] text-sm">
@@ -234,81 +229,6 @@ export function JobsPage({
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-/** 見積作成のときの一覧（様邸ごとの見積書の金額） */
-function EstimateList({data, rows, month, onOpen, onPrint}: {data: AppData; rows: Job[]; month: string; onOpen: (id: string) => void; onPrint: (r: PrintRequest) => void}) {
-  const s = data.settings;
-  const list = rows.map((job) => ({job, t: estimateTotals(job, s), form: jobForm(job, s)}));
-  const keys = ['material', 'work', 'subtotal', 'overhead', 'tax', 'total'] as const;
-  const values = (t: EstimateTotals) => [t.material, t.work, t.all.subtotal, t.all.overhead, t.all.tax, t.all.total];
-  const sum = list.reduce((acc, {t}) => values(t).map((v, i) => acc[i] + v), keys.map(() => 0));
-  return (
-    <div className="overflow-x-auto rounded-xl border border-indigo-200 bg-white shadow-sm">
-      <table className="w-full min-w-[1080px] text-sm">
-        <thead className="bg-indigo-50 text-xs text-indigo-900">
-          <tr>
-            <th className="px-2 py-2 text-center">No.</th>
-            <th className="px-2 py-2 text-left">施工日</th>
-            <th className="px-2 py-2 text-left">お客様名</th>
-            <th className="px-2 py-2 text-left">担当</th>
-            <th className="px-2 py-2 text-left">書式</th>
-            <th className="px-2 py-2 text-right">部材（定価×{s.estimateRate}）</th>
-            <th className="px-2 py-2 text-right">施工費</th>
-            <th className="px-2 py-2 text-right">小計</th>
-            <th className="px-2 py-2 text-right">諸経費</th>
-            <th className="px-2 py-2 text-right">消費税</th>
-            <th className="px-2 py-2 text-right">見積の合計</th>
-            <th className="px-2 py-2" />
-          </tr>
-        </thead>
-        <tbody>
-          {list.map(({job, t, form}, i) => (
-            <tr key={job.id} className="cursor-pointer border-t border-slate-100 hover:bg-indigo-50/60" onClick={() => onOpen(job.id)}>
-              <td className="px-2 py-2 text-center tabular-nums">{i + 1}</td>
-              <td className="px-2 py-2 tabular-nums">{shortDate(job.date) || '—'}</td>
-              <td className="px-2 py-2 font-bold text-slate-800">
-                {jobName(job)}
-                <span className="ml-2 text-xs font-normal text-slate-500">{job.places.map((p) => p.name || '（箇所名なし）').join('・')}</span>
-              </td>
-              <td className="whitespace-nowrap px-2 py-2">{staffShort(job.staff) || <span className="text-slate-400">—</span>}</td>
-              <td className="whitespace-nowrap px-2 py-2 text-xs">{FORM_INFO[form].name}</td>
-              {values(t).map((v, k) => (
-                <td key={keys[k]} className={`px-2 py-2 text-right tabular-nums ${k === 5 ? 'font-bold text-indigo-900' : ''}`}>
-                  {yen(v)}
-                </td>
-              ))}
-              <td className="px-2 py-1.5 text-right">
-                <Btn
-                  small
-                  color="white"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onPrint({kind: 'estimate', jobId: job.id});
-                  }}
-                >
-                  見積書を印刷
-                </Btn>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot className="border-t-2 border-indigo-200 bg-indigo-50/50 font-bold">
-          <tr>
-            <td colSpan={5} className="px-2 py-2 text-right">
-              {monthLabel(month)}分の見積 合計（{list.length}件）
-            </td>
-            {sum.map((v, k) => (
-              <td key={keys[k]} className={`px-2 py-2 text-right tabular-nums ${k === 5 ? 'text-indigo-900' : ''}`}>
-                {yen(v)}
-              </td>
-            ))}
-            <td />
-          </tr>
-        </tfoot>
-      </table>
     </div>
   );
 }

@@ -87,6 +87,9 @@ export type Job = {
   form: EstimateForm | ''; // 見積書の書式（空なら住所の市町村から決める）
   overhead: number | null; // 見積書の諸経費を手で入れたとき（端数の調整など）。null なら 小計×率
   overheadTarget: number | null; // 介護保険の対象の諸経費を手で入れたとき（対象外の行があるときだけ使う）
+  // 笹岡工務店の仕切り計算表・請求書に入れるか。仕切り計算・請求書アプリで作った様邸は入れる。
+  // 見積書作成アプリで作った見積書は、「笹岡工務店の請求書に入れる」を選んだものだけ入れる
+  shikiri: boolean;
   places: Place[];
   createdAt: number;
   updatedAt: number;
@@ -108,7 +111,7 @@ export type InvoiceTaxMode = 'perJob' | 'monthly';
 /** 合計にかける消費税の1円未満（請求書の1か月分・見積書） */
 export type Rounding = 'floor' | 'round' | 'ceil';
 
-/** 画面の使い方：仕切り計算・請求書 か 見積作成 か */
+/** どちらのアプリで開いているか（部材・一式を選ぶ画面に、仕切価格と見積の単価のどちらを出すか） */
 export type AppMode = 'shikiri' | 'estimate';
 
 /**

@@ -69,7 +69,7 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
     };
   }, [onClose, request, data.jobs, data.settings]);
 
-  const jobs = useMemo(() => data.jobs.filter((j) => j.month === month), [data.jobs, month]);
+  const jobs = useMemo(() => data.jobs.filter((j) => j.shikiri && j.month === month), [data.jobs, month]);
   const summary = useMemo(() => monthSummary(jobs, data.settings), [jobs, data.settings]);
 
   let sheets: ReactNode;

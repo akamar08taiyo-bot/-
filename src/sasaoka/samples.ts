@@ -45,6 +45,7 @@ export function addSamples(data: AppData, month: string): {materials: Material[]
     form: '',
     overhead: null,
     overheadTarget: null,
+    shikiri: true,
     places: [
       newPlace('玄関', [{...materialRow(handrail, 1), lengthCm: 60}, labor('木', 2), materialRow(bracket, 2)]),
       newPlace('トイレ', [materialRow(lHandrail, 1), labor('タイル', 2), materialRow(cap, 2)]),

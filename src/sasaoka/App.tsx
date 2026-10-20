@@ -5,9 +5,9 @@ import {LaborPage} from './components/LaborPage.tsx';
 import {MaterialsPage} from './components/MaterialsPage.tsx';
 import {SettingsPage} from './components/SettingsPage.tsx';
 import {ToastProvider} from './components/ui.tsx';
+import {appUrl, APP_NAMES, hashJobId, PORTAL_URL, setHashJobId} from './links.ts';
 import {PrintView} from './print/PrintView.tsx';
 import type {PrintRequest} from './print/PrintView.tsx';
-import type {AppMode} from './types.ts';
 import {useStore} from './useStore.ts';
 import {thisMonth} from './util.ts';
 
@@ -20,24 +20,7 @@ const TABS: {id: Tab; label: string}[] = [
   {id: 'settings', label: '設定'},
 ];
 
-const PORTAL_URL = 'https://akamar08taiyo-bot.github.io/taiyo-portal/';
 const MONTH_KEY = 'sasaoka-app:ui-month';
-const MODE_KEY = 'sasaoka-app:mode';
-
-// 見積作成を左に（見積 → 施工のあと仕切り・請求書の順）
-const MODES: [AppMode, string][] = [
-  ['estimate', '見積作成'],
-  ['shikiri', '仕切り・請求書'],
-];
-
-/** 前に使っていた使い方（見積作成／仕切り・請求書）。この端末で覚えておく */
-function loadMode(): AppMode {
-  try {
-    return localStorage.getItem(MODE_KEY) === 'estimate' ? 'estimate' : 'shikiri';
-  } catch {
-    return 'shikiri';
-  }
-}
 
 function loadMonth(): string {
   try {
@@ -53,9 +36,9 @@ export default function App() {
   const store = useStore();
   const [tab, setTab] = useState<Tab>('jobs');
   const [month, setMonth] = useState(loadMonth);
-  const [openJobId, setOpenJobId] = useState<string | null>(null);
+  // 見積書作成アプリの「仕切り計算・請求書作成で開く」から来たときは、その様邸を開く
+  const [openJobId, setOpenJobId] = useState<string | null>(hashJobId);
   const [print, setPrint] = useState<PrintRequest | null>(null);
-  const [mode, setMode] = useState<AppMode>(loadMode);
 
   useEffect(() => {
     try {
@@ -64,18 +47,19 @@ export default function App() {
       /* 覚えられなくても困らない */
     }
   }, [month]);
-  useEffect(() => {
-    try {
-      localStorage.setItem(MODE_KEY, mode);
-    } catch {
-      /* 覚えられなくても困らない */
-    }
-  }, [mode]);
 
   const data = store.data;
-  const openJob = useMemo(() => (data && openJobId ? data.jobs.find((j) => j.id === openJobId) ?? null : null), [data, openJobId]);
-  // 見積作成で様邸を開いているときは、右に見積書を映すので広く使う
-  const width = tab === 'jobs' && openJob && mode === 'estimate' ? 'max-w-[1920px]' : 'max-w-[1400px]';
+  // 請求書に入れていない見積書（見積書作成アプリで「笹岡工務店の請求書に入れる」を選んでいないもの）は開かない
+  const openJob = useMemo(() => (data && openJobId ? data.jobs.find((j) => j.id === openJobId && j.shikiri) ?? null : null), [data, openJobId]);
+  const width = 'max-w-[1400px]';
+  const loaded = data !== null;
+  // 開いている様邸の請求する月の一覧に戻れるように、その月にしておく。開いている様邸は URL にも残す
+  useEffect(() => {
+    if (openJob) setMonth(openJob.month);
+  }, [openJob?.id]);
+  useEffect(() => {
+    if (loaded) setHashJobId(tab === 'jobs' && openJob ? openJob.id : null);
+  }, [loaded, tab, openJob?.id]);
 
   if (store.loadError) {
     return <div className="p-8 text-rose-700">データを読み込めませんでした：{store.loadError}</div>;
@@ -92,27 +76,19 @@ export default function App() {
             <div className="flex items-center gap-3">
               <div className="grid h-9 w-9 place-items-center rounded-lg bg-white/15 text-lg font-black">仕</div>
               <div>
-                <div className="text-base font-bold leading-tight">仕切り計算・請求書作成</div>
+                <div className="text-base font-bold leading-tight">{APP_NAMES.shikiri}</div>
                 <div className="text-[11px] text-blue-100">
                   請求先：{data.settings.clientName || '（未設定）'}　／　{data.settings.officeName || '営業所未設定'}
                 </div>
               </div>
             </div>
-            <div className="flex rounded-lg bg-white/10 p-0.5" role="group" aria-label="使い方">
-              {MODES.map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  aria-pressed={mode === id}
-                  onClick={() => setMode(id)}
-                  className={`rounded-md px-3 py-1.5 text-sm font-bold transition ${
-                    mode === id ? (id === 'estimate' ? 'bg-indigo-500 text-white shadow' : 'bg-white text-[#0c315e] shadow') : 'text-blue-100 hover:bg-white/10'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <a
+              href={appUrl('estimate')}
+              className="rounded-md bg-[#14532d] px-3 py-1.5 text-sm font-bold text-white shadow hover:bg-[#166534]"
+              title="見積書は別のアプリで作ります（部材リスト・★お気に入りは同じものを使います）"
+            >
+              📝 見積書は「{APP_NAMES.estimate}」へ
+            </a>
             <div className="ml-auto flex items-center gap-3 text-[11px] text-blue-100">
               {store.saveError ? (
                 <span className="rounded bg-rose-100 px-2 py-1 font-bold text-rose-800">{store.saveError}</span>
@@ -152,8 +128,6 @@ export default function App() {
               <JobEditor
                 job={openJob}
                 data={data}
-                mode={mode}
-                onMode={setMode}
                 update={store.update}
                 onBack={() => {
                   // 何も入れずに戻った様邸は残さない。請求月を変えていたら、その月の一覧に戻る
@@ -169,7 +143,6 @@ export default function App() {
             ) : (
               <JobsPage
                 data={data}
-                mode={mode}
                 update={store.update}
                 month={month}
                 setMonth={setMonth}

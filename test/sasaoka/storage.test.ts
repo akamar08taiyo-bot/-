@@ -91,3 +91,9 @@ test('前のデータの行・部材にも、定価・長さ・見積の単価�
   assert.deepEqual([r2.estPrice, r2.lengthCm], [9600, 0]);
   assert.deepEqual(cleanKits([{name: '一式', rows: [{kind: 'labor', name: '木', price: 1000, qty: 2}]}, 'x']).map((k) => [k.name, k.rows.length]), [['一式', 1]]);
 });
+
+test('笹岡工務店の請求書に入れるか：前の版の様邸は入れる。見積書作成アプリで入れないままの見積書は入れない', () => {
+  assert.equal(cleanJobs([{id: 'a'}])[0].shikiri, true);
+  assert.equal(cleanJobs([{id: 'a', shikiri: true}])[0].shikiri, true);
+  assert.equal(cleanJobs([{id: 'a', shikiri: false}])[0].shikiri, false);
+});

@@ -1,9 +1,9 @@
 // 見積書の2つの書式を、いただいた Excel と同じ形で A4横に印刷する。
 // 列の幅・行の高さは元の Excel の比のまま（mm）。長い品名は Excel の「縮小して全体を表示」のように小さく・2行にする。
-// editable のとき（様邸の画面の右のプレビュー）は、手で直せる欄に data-edit（何を直す欄か）を付ける：
+// sheet のとき（見積書に直接入力）は、手で直せる欄に data-edit（何を直す欄か）を付ける：
 //   job:customer など様邸の項目／date 作成日／place:箇所ID:name|work|photo|kind／line:行ID:text|qty|unit|price|note／
-//   excl:行ID（介護保険の対象外）／overhead:all|target（諸経費）。明細の行には data-rows（もとになった入力の行）を付ける
-// sheet のとき（見積書に直接入力）は、金額のない施工費の行も出し、明細のあとに打ち込める空いた行（new:…、data-new）を1行足す。
+//   excl:行ID（介護保険の対象外）／overhead:all|target（諸経費）。明細の行には data-rows（もとになった入力の行）を付ける。
+//   金額のない施工費の行も出し、明細のあとに打ち込める空いた行（new:…、data-new）を1行足す。
 //   ほかの空いた行には data-blank を付ける（押すと、打ち込める行の同じ列を選ぶ）
 
 import type {ReactNode} from 'react';
@@ -18,7 +18,7 @@ import {fitLinesStyle, fitStyle} from './fit.ts';
 const qtyText = (n: number) => num(n, 3);
 const pct = (rate: number) => num(Math.round(rate * 1000) / 10);
 
-/** 手で直せる欄の印（editable のときだけ） */
+/** 手で直せる欄の印（見積書に直接入力するときだけ） */
 const ed = (editable: boolean, key: string | null) => (editable && key ? {'data-edit': key} : {});
 
 /** 見積書に直接入力するとき：広域連合用の「材／手」（いちばん下の行に施工費を入れるか） */
@@ -51,16 +51,14 @@ export function YukuhashiForm({
   job,
   settings: s,
   date,
-  editable: edit = false,
   sheet = null,
 }: {
   job: Job;
   settings: Settings;
   date: string;
-  editable?: boolean;
   sheet?: SheetOpts | null;
 }) {
-  const editable = edit || sheet !== null;
+  const editable = sheet !== null;
   const per = FORM_INFO.yukuhashi.perPage;
   const pages = paginate(sheetLines(job, s, 'yukuhashi', sheet), per);
   const totals = totalRows(estimateTotals(job, s));
@@ -313,8 +311,8 @@ const NOTE_PHOTO = '※写真番号は、写真貼り付け用紙の写真番号
 const NOTE_MARK = '※材料費と施工費を工事項目毎に明記。　※「改修箇所毎工事名称」欄記入の時は、材料費は（材）、施工費は（手）を名称の前に明記。';
 const NOTE_KIND = '※改修の種類は、該当する番号だけを記入';
 
-export function KouikiForm({job, settings: s, editable: edit = false, sheet = null}: {job: Job; settings: Settings; editable?: boolean; sheet?: SheetOpts | null}) {
-  const editable = edit || sheet !== null;
+export function KouikiForm({job, settings: s, sheet = null}: {job: Job; settings: Settings; sheet?: SheetOpts | null}) {
+  const editable = sheet !== null;
   const per = FORM_INFO.kouiki.perPage;
   const pages = paginate(sheetLines(job, s, 'kouiki', sheet), per);
   const totals = totalRows(estimateTotals(job, s));

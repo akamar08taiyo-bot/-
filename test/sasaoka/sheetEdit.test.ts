@@ -23,7 +23,7 @@ const yk = {settings: S, form: 'yukuhashi'} as const;
 const kk = {settings: S, form: 'kouiki'} as const;
 
 const emptyJob = (): Job => ({
-  id: 'j1', month: '2026-10', customer: '', suffix: '様邸', staff: '', date: '', address: '', note: '', insuredNo: '', form: '', overhead: null, overheadTarget: null,
+  id: 'j1', month: '2026-10', customer: '', suffix: '様邸', staff: '', date: '', address: '', note: '', insuredNo: '', form: '', overhead: null, overheadTarget: null, shikiri: true,
   places: [], createdAt: 1, updatedAt: 1,
 });
 const rail: Material = {id: 'm1', name: '木の手すり 35φ 4m', price: 10000, listPrice: 20000, pieceLengthM: 4, maker: 'サンプル', code: 'S-TS35', unit: '本', favorite: true, updatedAt: 1};

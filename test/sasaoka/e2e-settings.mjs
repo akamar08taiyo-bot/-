@@ -121,7 +121,7 @@ watch(p2);
 await p2.goto(url);
 await p2.getByRole('navigation').getByRole('button', {name: '設定'}).click();
 await p2.locator('input[type=file][accept*=json]').setInputFiles(bkPath);
-await p2.getByText(/部材 5件・取付手間 17件・様邸 1件・一式 1件・設定/).waitFor();
+await p2.getByText(/部材 5件・取付手間 17件・様邸（見積書）1件・一式 1件・設定/).waitFor();
 await p2.getByRole('button', {name: '今のデータを置き換える'}).click();
 await p2.getByRole('navigation').getByRole('button', {name: /様邸一覧/}).click();
 await p2.getByRole('cell', {name: /（サンプル）山田様邸/}).waitFor();

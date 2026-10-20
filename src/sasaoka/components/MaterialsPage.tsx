@@ -1,4 +1,5 @@
 import {useMemo, useState} from 'react';
+import {APP_NAMES} from '../links.ts';
 import {guessPieceLengthM} from '../priceImport.ts';
 import type {AppData, Material} from '../types.ts';
 import type {Update} from '../useStore.ts';
@@ -83,9 +84,10 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
         </div>
       </div>
       <p className="text-xs leading-5 text-slate-500">
-        ★（お気に入り）を付けた部材は、様邸の画面で「部材を追加」を押したときに最初に出ます。定価は見積書の単価（定価×{data.settings.estimateRate}）に使います。
+        ★（お気に入り）を付けた部材は、部材を選ぶ画面や見積書の品名の候補で最初に出ます。仕切価格は仕切り計算表・請求書に、定価は見積書の単価（定価×{data.settings.estimateRate}）に使います。
+        この部材リストは「{APP_NAMES.estimate}」と「{APP_NAMES.shikiri}」の両方で同じものを使います（どちらで取り込んでも、★を付けても同じです）。
         「1本の長さ」は手すりなど切って使う部材の長さで、見積で使う長さを入れると 数量＝使う長さ÷1本の長さ（例：60cm÷4m＝0.15本）になります（商品名の「4m」「2000mm」などから自動で入ります）。
-        仕切価格・定価を変えても、すでに作った様邸の金額は変わりません（選んだときの単価で計算します）。
+        仕切価格・定価を変えても、すでに作った様邸・見積書の金額は変わりません（選んだときの単価で計算します）。
       </p>
 
       <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
