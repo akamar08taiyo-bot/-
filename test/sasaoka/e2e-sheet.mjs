@@ -1,6 +1,6 @@
 // 住宅改修 見積書作成：見積書に直接入力（Excel のように欄を選んで打ち込む）を確かめる：
 // 新しい見積書を見積書の形のまま打ち込む（お客様名・改修内容・改修場所・内容の候補（★お気に入り）・数量 60cm・同上施工費・備考に定価）→
-// 合計・元に戻す・行の挿入／移動／削除・介護保険の対象外・諸経費・作成日・笹岡工務店の請求書に入れる（仕切価格を入れる）・
+// 合計・元に戻す・行の挿入／移動／削除（行の左の✕消す）・介護保険の対象外・諸経費・作成日・笹岡工務店の請求書に入れる（仕切価格を入れる）・
 // 広域連合用（材／手・時間）・「請求書を確認する」とのつながり
 // usage: node e2e-sheet.mjs <サイトのURL> <出力フォルダ>
 //   サイトは太陽ポータルと同じ形（<サイト>/jutaku-mitsumori/index.html と <サイト>/sasaoka/index.html）
@@ -145,6 +145,25 @@ await cell(await key('手すりカバー', 'text')).click();
 await sheet.getByRole('button', {name: 'この部材（と同上施工費）を消す'}).click();
 assert.equal(await sheet.locator('.form-page tr', {hasText: '手すりカバー'}).count(), 0);
 log('下に1行・上へ・対象外・消すOK');
+
+// ---------------- 行の左の「✕消す」：その行を消す。箇所の行がなくなれば改修内容・改修場所も消えて、その行が空白になる。元に戻せる
+const lines = async () => sheet.locator('.form-page tr[data-rows]').count();
+const before = await lines();
+assert.equal(await sheet.locator('.sheet-del').count(), before); // 明細の行ごとに1つ
+await sheet.getByRole('button', {name: 'サンプル S-EC01 エンドキャップの行を消す'}).click();
+assert.equal(await sheet.locator('.form-page tr', {hasText: 'エンドキャップ'}).count(), 0);
+assert.deepEqual((await tds('L型手すり')).slice(0, 2), ['手すりの取付', '②トイレ']); // 箇所の名前は次の行に
+await page.locator('[aria-live] > div', {hasText: '行を消しました'}).first().waitFor();
+await sheet.getByRole('button', {name: 'サンプル S-TL01 L型手すりの行を消す'}).click();
+assert.equal(await sheet.locator('.form-page tr', {hasText: 'L型手すり'}).count(), 0);
+assert.equal(await sheet.locator('.form-page', {hasText: 'トイレ'}).count(), 0); // 箇所ごと消えて、空白の行になる
+assert.equal((await sheet.locator('.form-page tr.sheet-new').innerText()).trim(), '');
+assert.equal(await lines(), before - 2);
+await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
+await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
+assert.equal(await lines(), before);
+assert.deepEqual((await tds('エンドキャップ')).slice(0, 2), ['手すりの取付', '②トイレ']);
+log('行の左の✕消す（空白になる・元に戻す）OK');
 
 // ---------------- 諸経費・作成日・工事場所（見積書の欄）
 await typeIn('overhead:all', '1000');

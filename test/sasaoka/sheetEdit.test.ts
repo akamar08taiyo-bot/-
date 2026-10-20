@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {estimateTotals, jobTotals} from '../../src/sasaoka/calc.ts';
 import {formLines} from '../../src/sasaoka/estimateForms.ts';
-import {applySheet, parseKind, parseLengthCm, parseListNote, parseNum, parsePlace, setWorkAmount, sheetValue, toggleExcluded} from '../../src/sasaoka/sheetEdit.ts';
+import {applySheet, deleteLine, parseKind, parseLengthCm, parseListNote, parseNum, parsePlace, setWorkAmount, sheetValue, toggleExcluded} from '../../src/sasaoka/sheetEdit.ts';
 import type {Job, Material, Row, Settings} from '../../src/sasaoka/types.ts';
 
 const S = {
@@ -208,4 +208,30 @@ test('介護保険の対象外を切り替える・お客様名などの欄・�
   assert.equal(job.overhead, null);
   // 空のまま決めても行は増えない
   assert.equal(applySheet(job, 'new:qty', '', yk).job, job);
+});
+
+test('行を消す（行の左の✕消す・この行を消す）：部材は同上施工費ごと。箇所の行がなくなれば箇所も消える（最後の箇所も。その行が空白になる）', () => {
+  let {job} = type(emptyJob(), [
+    ['new:work', '1'],
+    ['new:name', '玄関'],
+    ['new:text', 'インテリアバー', bar],
+    ['new:text', '同上施工費'],
+    ['line:@:price', '2000'],
+    ['new:text', '木の手すり 35φ 4m', rail],
+    ['new:name', 'トイレ'],
+    ['new:text', 'インテリアバー', bar],
+  ]);
+  assert.deepEqual(job.places.map((p) => [p.name, p.rows.length]), [['玄関', 3], ['トイレ', 1]]);
+  const [barRow, , railRow] = job.places[0].rows;
+  // 部材の行を消すと、すぐ下の同上施工費も消える
+  job = deleteLine(job, barRow.id);
+  assert.deepEqual(job.places[0].rows.map((r) => r.id), [railRow.id]);
+  // 最後の箇所の、ただ1つの行を消す → 箇所も消えて、改修内容・改修場所も出ない
+  job = deleteLine(job, job.places[1].rows[0].id);
+  assert.deepEqual(job.places.map((p) => p.name), ['玄関']);
+  assert.ok(formLines(job, S, 'yukuhashi').every((l) => l.placeName === '玄関'));
+  // 残りの1行も消すと、箇所がなくなる
+  job = deleteLine(job, railRow.id);
+  assert.deepEqual(job.places, []);
+  assert.equal(deleteLine(job, 'no-such-row'), job);
 });

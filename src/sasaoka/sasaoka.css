@@ -118,6 +118,37 @@ body {
 .est-sheet tr.sheet-new > td {
   background-color: #ecfdf5;
 }
+/* 明細の行の左（見積書の余白）の「✕消す」。押すとその行を消す（部材は同上施工費ごと） */
+.est-sheet td.del-cell {
+  position: relative;
+  overflow: visible;
+}
+.sheet-del {
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 1.2mm);
+  transform: translateY(-50%);
+  padding: 0.7mm 1.4mm;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #fff;
+  color: #64748b;
+  font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Noto Sans JP', 'Meiryo', sans-serif;
+  font-size: 9pt;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sheet-del::before {
+  content: '✕消す';
+}
+.sheet-del:hover,
+.sheet-del:focus-visible {
+  border-color: #e11d48;
+  background: #fff1f2;
+  color: #be123c;
+}
 /* 選んでいる欄の枠（Excel と同じ緑） */
 .sheet-sel {
   position: absolute;

@@ -13,6 +13,7 @@ import {KouikiForm, YukuhashiForm} from '../print/EstimateForms.tsx';
 import {applySheet, deleteLine, insertBlankAfter, moveLine, parseDate, sheetTarget, sheetValue, toggleExcluded} from '../sheetEdit.ts';
 import type {EstimateForm, Job, Material, Settings} from '../types.ts';
 import {matchesAll, todayIso, yen} from '../util.ts';
+import {useToast} from './ui.tsx';
 
 /** A4横の幅（297mm）を画面の px に */
 const PAGE_W = (297 / 25.4) * 96;
@@ -61,6 +62,7 @@ export function EstimateSheet({
   onPrint: () => void;
 }) {
   const [meta, setMeta] = useDocMeta(`est:${job.id}`, todayIso);
+  const toast = useToast();
   // お客様名がまだなければ、見積書のお客様名の欄を選んでおく（苅田町・行橋市・みやこ町用。すぐ打ち込める）
   const [sel, setSel] = useState<Sel | null>(() => (form === 'yukuhashi' && !job.customer.trim() ? {key: 'job:customer', occ: 0} : null));
   const [edit, setEdit] = useState<Edit | null>(null);
@@ -426,6 +428,10 @@ export function EstimateSheet({
   const onMouseDown = (e: ReactMouseEvent) => {
     let t = e.target as HTMLElement;
     if (sugRef.current?.contains(t)) return;
+    if (t.closest('[data-del]')) {
+      e.preventDefault(); // 行の左の「✕消す」：欄は選ばない（押し終わったら onClick で消す）
+      return;
+    }
     if (t === inputRef.current) {
       const cur = findCell(sel)?.getBoundingClientRect();
       const inside = cur && e.clientX >= cur.left && e.clientX <= cur.right && e.clientY >= cur.top && e.clientY <= cur.bottom;
@@ -449,6 +455,15 @@ export function EstimateSheet({
     }
     select(el);
     inputRef.current?.focus({preventScroll: true});
+  };
+  // 行の左の「✕消す」：その行（部材は同上施工費ごと）を消す。箇所の行がなくなれば箇所も消す（その行が空白になる）
+  const onClick = (e: ReactMouseEvent) => {
+    const id = (e.target as HTMLElement).closest<HTMLElement>('[data-del]')?.dataset.del;
+    if (!id) return;
+    if (edit && sel) commit(edit.value, null, null, true); // 打ち込んでいた値を入れてから
+    change(deleteLine(jobRef.current, id));
+    setSel(null);
+    toast('行を消しました（「↶ 元に戻す」で戻せます）');
   };
   const onDoubleClick = (e: ReactMouseEvent) => {
     const t = e.target as HTMLElement;
@@ -605,9 +620,16 @@ export function EstimateSheet({
         内容に品名を打つと部材リストの候補が出ます（★お気に入りが先。空のまま F2 で★だけ）。<b>備考に定価を入れると単価は 定価×{s.estimateRate}</b>。
         数量に 0.15 や 60cm と入れると切って使う長さ。いちばん下の緑の行に打つと行が増え、改修場所を打つと箇所が増えます。
         {form === 'kouiki' ? '「材／手」の欄で「手」にすると施工費の行（数量は時間）。' : '内容に「同上施工費」と打つと施工費の行（単価に金額）。'}
-        介護保険の対象外は、その欄でスペースかダブルクリック。
+        介護保険の対象外は、その欄でスペースかダブルクリック。<b>行の左の「✕消す」でその行を消せます</b>（空白になります）。
       </p>
-      <div ref={scrollRef} className="est-sheet relative overflow-auto bg-slate-500" style={{padding: PAD}} onMouseDown={onMouseDown} onDoubleClick={onDoubleClick}>
+      <div
+        ref={scrollRef}
+        className="est-sheet relative overflow-auto bg-slate-500"
+        style={{padding: PAD}}
+        onMouseDown={onMouseDown}
+        onClick={onClick}
+        onDoubleClick={onDoubleClick}
+      >
         <div style={{width: PAGE_W * scale, height: innerH * scale}}>
           <div ref={innerRef} className="relative" style={{width: PAGE_W, transform: `scale(${scale})`, transformOrigin: 'top left'}}>
             {form === 'kouiki' ? (

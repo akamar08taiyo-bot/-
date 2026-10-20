@@ -408,14 +408,14 @@ export function moveLine(job: Job, rowId: string, delta: -1 | 1): Job {
 
 /**
  * 見積書の1行を消す：部材の行はその部材と同上施工費、施工費の行はそのまとまり。
- * 箇所の行がなくなったら箇所も消す（最後の箇所は残し、いちばん下の空いた行に名前を出す）
+ * 箇所の行がなくなったら箇所も消す（改修内容・改修場所も消えて、その行が空白になる）
  */
 export function deleteLine(job: Job, rowId: string): Job {
   const found = findRow(job, rowId);
   if (!found) return job;
   const [a, b] = unitRange(found.place.rows, found.ri);
   const rows = [...found.place.rows.slice(0, a), ...found.place.rows.slice(b)];
-  if (rows.length === 0 && found.pi < job.places.length - 1) return {...job, places: job.places.filter((_, i) => i !== found.pi)};
+  if (rows.length === 0) return {...job, places: job.places.filter((_, i) => i !== found.pi)};
   return setPlaceRows(job, found.pi, rows);
 }
 

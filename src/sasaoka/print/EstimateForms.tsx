@@ -4,7 +4,8 @@
 //   job:customer など様邸の項目／date 作成日／place:箇所ID:name|work|photo|kind／line:行ID:text|qty|unit|price|note／
 //   excl:行ID（介護保険の対象外）／overhead:all|target（諸経費）。明細の行には data-rows（もとになった入力の行）を付ける。
 //   金額のない施工費の行も出し、明細のあとに打ち込める空いた行（new:…、data-new）を1行足す。
-//   ほかの空いた行には data-blank を付ける（押すと、打ち込める行の同じ列を選ぶ）
+//   ほかの空いた行には data-blank を付ける（押すと、打ち込める行の同じ列を選ぶ）。
+//   明細の行の左（余白）には「✕消す」（data-del：消す行のID。部材は同上施工費ごと）を出す
 
 import type {ReactNode} from 'react';
 import {estimateTotals} from '../calc.ts';
@@ -23,6 +24,22 @@ const ed = (editable: boolean, key: string | null) => (editable && key ? {'data-
 
 /** 見積書に直接入力するとき：広域連合用の「材／手」（いちばん下の行に施工費を入れるか） */
 export type SheetOpts = {mark: '材' | '手'};
+
+/**
+ * 見積書に直接入力するときの、明細の行の左の「✕消す」（押すとその行を消す。部材は同上施工費ごと）。印刷には出ない。
+ * 文字は CSS で出す（欄の文字 innerText に混ざらないように）
+ */
+function DelButton({line: l}: {line: FormLine}) {
+  return (
+    <button
+      type="button"
+      className="sheet-del no-print"
+      data-del={l.rowId}
+      title={l.isWork ? 'この行を消す' : 'この部材（と同上施工費）を消す'}
+      aria-label={`${l.text || (l.isWork ? '施工費' : '部材')}の行を消す`}
+    />
+  );
+}
 
 /** 書式の明細の行（sheet なら金額のない施工費の行と、打ち込める空いた行も） */
 function sheetLines(job: Job, s: Settings, form: 'yukuhashi' | 'kouiki', sheet: SheetOpts | null | undefined) {
@@ -195,9 +212,10 @@ export function YukuhashiForm({
 }
 
 function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined; bottom: string; editable: boolean; sheet: boolean}) {
-  const cell = (text: string, w: number, pt: number, cls = '', edit: string | null = null, lines = 1): ReactNode => (
+  const cell = (text: string, w: number, pt: number, cls = '', edit: string | null = null, lines = 1, extra: ReactNode = null): ReactNode => (
     <td className={cls + bottom} style={text ? fitStyle(text, w, YK_ROW, pt, lines) : undefined} {...ed(editable, edit)}>
       {text}
+      {extra}
     </td>
   );
   if (!l) {
@@ -235,7 +253,7 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
   const note = lineNote(l, 'yukuhashi', 0);
   return (
     <tr className="g" style={{height: `${YK_ROW}mm`}} {...(editable ? {'data-rows': l.rowIds.join(' ')} : {})}>
-      {cell(l.first ? l.work : '', YK.A, 11, 'ml', l.first ? `place:${l.placeId}:work` : null)}
+      {cell(l.first ? l.work : '', YK.A, 11, editable ? 'ml del-cell' : 'ml', l.first ? `place:${l.placeId}:work` : null, 1, editable ? <DelButton line={l} /> : null)}
       {/* 改修場所（写真No.）：「①勝手口」。写真番号のあとに箇所名を打ち込める */}
       {cell(l.first ? `${circled(l.photo)}${l.placeName}` : '', YK.B, 11, '', l.first ? `place:${l.placeId}:name` : null)}
       {cell(l.text, YK.C, 9, '', k('text'), 2)}
@@ -432,9 +450,10 @@ function KkLine({
   editable: boolean;
   sheet: boolean;
 }) {
-  const cell = (text: string, w: number, pt: number, cls = '', edit: string | null = null, lines = 1): ReactNode => (
+  const cell = (text: string, w: number, pt: number, cls = '', edit: string | null = null, lines = 1, extra: ReactNode = null): ReactNode => (
     <td className={cls + bottom} style={text ? fitStyle(text, w, height, pt, lines) : undefined} {...ed(editable, edit)}>
       {text}
+      {extra}
     </td>
   );
   if (!l) {
@@ -504,7 +523,7 @@ function KkLine({
   }
   return (
     <tr className="g" style={{height: `${height}mm`}} {...(editable ? {'data-rows': l.rowIds.join(' ')} : {})}>
-      {cell(l.first ? l.placeName : '', KK.A, 11, 'c ml', l.first ? `place:${l.placeId}:name` : null, 2)}
+      {cell(l.first ? l.placeName : '', KK.A, 11, editable ? 'c ml del-cell' : 'c ml', l.first ? `place:${l.placeId}:name` : null, 2, editable ? <DelButton line={l} /> : null)}
       {cell(l.first ? l.work : '', KK.B, 11, 'c', l.first ? `place:${l.placeId}:work` : null, 2)}
       <td className={`mark${bottom}`}>{l.mark}</td>
       {cell(l.text, KK.D, 9, 'mr gothic', k('text'), 3)}
