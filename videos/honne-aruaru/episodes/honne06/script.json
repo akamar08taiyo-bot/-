@@ -1,0 +1,277 @@
+{
+ "id": "honne06",
+ "title": "夫の返信ランキングTOP10【しのぶの失言ノート#6】",
+ "silent": true,
+ "bpm": 120,
+ "header": {
+  "series": "しのぶの失言ノート",
+  "episode": "#6 夫の返信TOP10"
+ },
+ "hook": {
+  "beats": 6,
+  "chip": "妻のノートの「記録回数」で発表",
+  "img": "honne03/img/R3.jpg",
+  "cam": {
+   "on": [
+    "R3",
+    "WIFE"
+   ]
+  },
+  "title": [
+   "夫の",
+   "返信",
+   "ランキング"
+  ]
+ },
+ "ranks": [
+  {
+   "rank": 10,
+   "beats": 8,
+   "quote": "たぶん",
+   "count": 41,
+   "tsukkomi": "“たぶん”は、|来ない人の言葉。",
+   "img": "honne01/img/S7.jpg",
+   "cam": {
+    "on": [
+     "S7",
+     "WIFE"
+    ]
+   },
+   "chat": {
+    "mine": "明日の参観日、来れる？",
+    "times": [
+     "21:14",
+     "23:58"
+    ]
+   }
+  },
+  {
+   "rank": 9,
+   "beats": 8,
+   "quote": "お大事に",
+   "count": 58,
+   "tsukkomi": "お迎えを、|お願いしてます。",
+   "img": "honne01/img/S4.jpg",
+   "cam": {
+    "on": [
+     "S4",
+     "WIFE"
+    ]
+   },
+   "chat": {
+    "mine": "熱が38度…。みなとのお迎え、お願いできる？",
+    "times": [
+     "14:03",
+     "15:40"
+    ]
+   }
+  },
+  {
+   "rank": 8,
+   "beats": 8,
+   "quote": "おけ",
+   "count": 73,
+   "tsukkomi": "“おけ”だけ、|帰ってきました。",
+   "img": "honne03/img/R5.jpg",
+   "cam": {
+    "on": [
+     "R5",
+     "WIFE"
+    ]
+   },
+   "chat": {
+    "mine": "帰りに牛乳、買ってきて",
+    "times": [
+     "17:30",
+     "18:12"
+    ]
+   }
+  },
+  {
+   "rank": 7,
+   "beats": 8,
+   "quote": "わからん",
+   "count": 86,
+   "tsukkomi": "ごはんの量が、|決まりません。",
+   "img": "honne02/img/X1.jpg",
+   "cam": {
+    "on": [
+     "X1",
+     "WIFE"
+    ]
+   },
+   "chat": {
+    "mine": "今日、何時に帰る？",
+    "times": [
+     "16:45",
+     "19:20"
+    ]
+   }
+  },
+  {
+   "rank": 6,
+   "beats": 8,
+   "quote": "いいんじゃない？",
+   "count": 104,
+   "tsukkomi": "どっちが、|ですか。",
+   "img": "honne01/img/S9.jpg",
+   "cam": {
+    "on": [
+     "S9",
+     "WIFE"
+    ]
+   },
+   "chat": {
+    "mine": "AとB、どっちの服がいいと思う？",
+    "times": [
+     "13:10",
+     "13:52"
+    ]
+   }
+  },
+  {
+   "rank": 5,
+   "beats": 8,
+   "quote": "任せる",
+   "count": 129,
+   "tsukkomi": "“任せる”は、|丸投げです。",
+   "img": "honne02/img/X6.jpg",
+   "cam": {
+    "on": [
+     "X6",
+     "WIFE"
+    ]
+   },
+   "chat": {
+    "mine": "週末、あなたの実家どうする？",
+    "times": [
+     "20:05",
+     "22:31"
+    ]
+   }
+  },
+  {
+   "rank": 4,
+   "beats": 8,
+   "quote": "俺も",
+   "count": 167,
+   "tsukkomi": "“おつかれさま”が、|聞きたかった。",
+   "img": "honne01/img/S2.jpg",
+   "cam": {
+    "on": [
+     "S2",
+     "WIFE"
+    ],
+    "z": 1.1
+   },
+   "chat": {
+    "mine": "今日、すごく疲れた…",
+    "times": [
+     "21:40",
+     "21:41"
+    ]
+   }
+  },
+  {
+   "rank": 3,
+   "beats": 10,
+   "quote": "もうすぐ",
+   "count": 216,
+   "tsukkomi": "“もうすぐ”から、|2時間です。",
+   "img": "honne01/img/S6.jpg",
+   "cam": {
+    "on": [
+     "S6",
+     "WIFE"
+    ]
+   },
+   "chat": {
+    "mine": "今どこ？",
+    "times": [
+     "20:30",
+     "20:31"
+    ]
+   }
+  },
+  {
+   "rank": 2,
+   "beats": 10,
+   "quote": "なんでもいい",
+   "count": 341,
+   "tsukkomi": "なんでもいいなら、|文句も言わないで。",
+   "img": "honne03/img/R8.jpg",
+   "cam": {
+    "on": [
+     "R8",
+     "WIFE"
+    ]
+   },
+   "chat": {
+    "mine": "晩ごはん、何がいい？",
+    "times": [
+     "15:20",
+     "17:05"
+    ]
+   }
+  },
+  {
+   "rank": 1,
+   "beats": 14,
+   "quote": "今日、|ごはんいらない",
+   "count": 1207,
+   "tsukkomi": "もう、|できてます。",
+   "img": "honne03/img/R4.jpg",
+   "cam": {
+    "on": [
+     "R4",
+     "WIFE"
+    ]
+   },
+   "build": 4,
+   "short": "今日、ごはんいらない",
+   "chat": {
+    "mine": "ごはん、できたよ",
+    "times": [
+     "19:30",
+     "19:31"
+    ]
+   }
+  }
+ ],
+ "build": {
+  "stamp": "記録 1,000回超え"
+ },
+ "hof": {
+  "beats": 8,
+  "img": "honne02/img/X3.jpg",
+  "cam": {
+   "on": [
+    "X3",
+    "WIFE"
+   ]
+  },
+  "label": "殿堂入り",
+  "quote": "了解！|飲み会終わったら行く",
+  "chat": {
+   "mine": "陣痛きた。今から病院行くね",
+   "times": [
+    "20:12",
+    "20:48"
+   ]
+  },
+  "note": "回数ではなく、|重さで別格。"
+ },
+ "end": {
+  "beats": 8,
+  "q": "あなたの家の第1位は？",
+  "cta": "コメントで教えてね",
+  "img": "honne02/img/X1.jpg",
+  "cam": {
+   "on": [
+    "X1",
+    "WIFE"
+   ]
+  },
+  "title": "夫の返信 TOP10"
+ }
+}

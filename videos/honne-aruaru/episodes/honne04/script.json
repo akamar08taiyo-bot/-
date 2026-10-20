@@ -1,0 +1,247 @@
+{
+ "id": "honne04",
+ "title": "夫の「やったよ」家事ランキングTOP10【しのぶの失言ノート#4】",
+ "silent": true,
+ "bpm": 120,
+ "header": {
+  "series": "しのぶの失言ノート",
+  "episode": "#4 やったよ家事TOP10"
+ },
+ "hook": {
+  "beats": 6,
+  "chip": "妻の「やり直し回数」で発表",
+  "img": "honne01/img/S3.jpg",
+  "cam": {
+   "on": [
+    "S3",
+    "WIFE"
+   ]
+  },
+  "title": [
+   "夫の",
+   "やったよ",
+   "家事ランキング"
+  ]
+ },
+ "ranks": [
+  {
+   "rank": 10,
+   "beats": 8,
+   "quote": "テーブル、|拭いといたよ",
+   "count": 38,
+   "tsukkomi": "それ、|台ふきんです。",
+   "img": "honne03/img/R8.jpg",
+   "cam": {
+    "on": [
+     "R8",
+     "HUSBAND"
+    ]
+   },
+   "note": "（台ふきんで、床も）",
+   "short": "テーブル拭いといたよ"
+  },
+  {
+   "rank": 9,
+   "beats": 8,
+   "quote": "掃除、|しといたよ",
+   "count": 52,
+   "tsukkomi": "働いたのは、|ロボットです。",
+   "img": "honne01/img/S6.jpg",
+   "cam": {
+    "on": [
+     "S6",
+     "HUSBAND"
+    ]
+   },
+   "cam2": {
+    "on": [
+     "S6",
+     "WIFE"
+    ],
+    "z": 1.6
+   },
+   "note": "（ロボット掃除機のボタンを押した）"
+  },
+  {
+   "rank": 8,
+   "beats": 8,
+   "quote": "洗濯機、|回しといたよ",
+   "count": 69,
+   "tsukkomi": "回したのは、|洗濯機です。",
+   "img": "honne01/img/S1.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.45,
+    "z": 1.0
+   },
+   "cam2": {
+    "on": [
+     "S1",
+     "WIFE"
+    ],
+    "z": 1.25,
+    "ty": 560
+   },
+   "note": "（干してない）",
+   "quoteY": 820
+  },
+  {
+   "rank": 7,
+   "beats": 8,
+   "quote": "洗い物、|やっといたよ",
+   "count": 84,
+   "tsukkomi": "いちばん大物が、|残ってます。",
+   "img": "honne04/img/K1.jpg",
+   "cam": {
+    "on": [
+     "K1",
+     "HUSBAND"
+    ]
+   },
+   "cam2": {
+    "obj": [
+     "K1",
+     "pan"
+    ],
+    "z": 1.7,
+    "tx": 560,
+    "ty": 760
+   },
+   "note": "（フライパンは残して）",
+   "circle": [
+    "K1",
+    "pan"
+   ]
+  },
+  {
+   "rank": 6,
+   "beats": 8,
+   "quote": "子ども、|見てたよ",
+   "count": 97,
+   "tsukkomi": "見てたのは、|画面です。",
+   "img": "honne04/img/K2.jpg",
+   "cam": {
+    "on": [
+     "K2",
+     "HUSBAND"
+    ]
+   },
+   "note": "（一緒にゲーム）"
+  },
+  {
+   "rank": 5,
+   "beats": 8,
+   "quote": "ごはん、|よそっといたよ",
+   "count": 121,
+   "tsukkomi": "家族は、|3人です。",
+   "img": "honne03/img/R4.jpg",
+   "cam": {
+    "on": [
+     "R4",
+     "HUSBAND"
+    ]
+   },
+   "note": "（自分の分だけ）"
+  },
+  {
+   "rank": 4,
+   "beats": 8,
+   "quote": "買い物、|行ってきたよ",
+   "count": 158,
+   "tsukkomi": "牛乳は？|卵は？",
+   "img": "honne02/img/X5.jpg",
+   "cam": {
+    "on": [
+     "X5",
+     "HUSBAND"
+    ]
+   },
+   "note": "（頼んでないものだけ）"
+  },
+  {
+   "rank": 3,
+   "beats": 10,
+   "quote": "ゴミ、|出しといたよ",
+   "count": 216,
+   "tsukkomi": "集めて、分けて、|縛ったのは私です。",
+   "img": "honne01/img/S3.jpg",
+   "cam": {
+    "on": [
+     "S3",
+     "HUSBAND"
+    ]
+   },
+   "note": "（集積所まで運んだだけ）"
+  },
+  {
+   "rank": 2,
+   "beats": 10,
+   "quote": "洗濯物、|取り込んだよ",
+   "count": 342,
+   "tsukkomi": "たたむまでが、|洗濯です。",
+   "img": "honne02/img/X7.jpg",
+   "cam": {
+    "x": 0.62,
+    "y": 0.72,
+    "z": 1.35,
+    "ty": 900
+   },
+   "cam2": {
+    "on": [
+     "X7",
+     "WIFE"
+    ],
+    "z": 1.5
+   },
+   "note": "（山のまま）"
+  },
+  {
+   "rank": 1,
+   "beats": 14,
+   "quote": "……で、|ありがとうは？",
+   "count": 1126,
+   "tsukkomi": "私は、一度も|言われてません。",
+   "img": "honne04/img/K3.jpg",
+   "cam": {
+    "on": [
+     "K3",
+     "HUSBAND"
+    ]
+   },
+   "build": 4,
+   "note": "（やったあとで）",
+   "short": "で、ありがとうは？"
+  }
+ ],
+ "build": {
+  "stamp": "やり直し 1,000回超え"
+ },
+ "hof": {
+  "beats": 8,
+  "img": "honne03/img/R3.jpg",
+  "cam": {
+   "on": [
+    "R3",
+    "HUSBAND"
+   ]
+  },
+  "label": "殿堂入り",
+  "quote": "家事って、|そんなに大変？",
+  "note": "回数ではなく、|重さで別格。",
+  "form": true
+ },
+ "end": {
+  "beats": 8,
+  "q": "あなたの家の第1位は？",
+  "cta": "コメントで教えてね",
+  "img": "honne02/img/X9.jpg",
+  "cam": {
+   "on": [
+    "X9",
+    "WIFE"
+   ]
+  },
+  "title": "やったよ家事 TOP10",
+  "unit": "やり直し回数"
+ }
+}

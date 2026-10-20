@@ -1,0 +1,227 @@
+{
+ "id": "honne08",
+ "title": "夫の育児失言ランキングTOP10【しのぶの失言ノート#8】",
+ "silent": true,
+ "bpm": 120,
+ "header": {
+  "series": "しのぶの失言ノート",
+  "episode": "#8 夫の育児失言TOP10"
+ },
+ "hook": {
+  "beats": 6,
+  "chip": "妻のノートの「記録回数」で発表",
+  "img": "honne08/img/C3.jpg",
+  "cam": {
+   "on": [
+    "C3",
+    "WIFE"
+   ]
+  },
+  "title": [
+   "夫の",
+   "育児",
+   "失言ランキング"
+  ]
+ },
+ "ranks": [
+  {
+   "rank": 10,
+   "beats": 8,
+   "quote": "パパ、今日は|お休みの日だから",
+   "count": 38,
+   "tsukkomi": "ママに、お休みの日は|ありません。",
+   "img": "honne04/img/K2.jpg",
+   "cam": {
+    "on": [
+     "K2",
+     "HUSBAND"
+    ]
+   },
+   "short": "パパはお休みの日"
+  },
+  {
+   "rank": 9,
+   "beats": 8,
+   "quote": "泣いてるよー",
+   "count": 56,
+   "tsukkomi": "実況は、|いりません。",
+   "img": "honne08/img/C1.jpg",
+   "cam": {
+    "on": [
+     "C1",
+     "HUSBAND"
+    ]
+   },
+   "note": "（抱っこはしない）"
+  },
+  {
+   "rank": 8,
+   "beats": 8,
+   "quote": "ママがいいって",
+   "count": 74,
+   "tsukkomi": "5秒で、|返さないで。",
+   "img": "honne08/img/C2.jpg",
+   "cam": {
+    "on": [
+     "C2",
+     "HUSBAND"
+    ]
+   },
+   "note": "（5秒で返す）"
+  },
+  {
+   "rank": 7,
+   "beats": 8,
+   "quote": "俺が見とくから、|ゆっくりしてて",
+   "count": 89,
+   "tsukkomi": "ゆっくり、|できません。",
+   "img": "honne01/img/S1.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.45,
+    "z": 1.0
+   },
+   "cam2": {
+    "on": [
+     "S1",
+     "WIFE"
+    ],
+    "z": 1.25,
+    "ty": 560
+   },
+   "note": "（5分おきに呼ぶ）",
+   "short": "俺が見とくから",
+   "quoteY": 820
+  },
+  {
+   "rank": 6,
+   "beats": 8,
+   "quote": "俺も、|疲れたよ〜",
+   "count": 107,
+   "tsukkomi": "産んだのは、|私です。",
+   "img": "honne02/img/X3.jpg",
+   "cam": {
+    "on": [
+     "X3",
+     "HUSBAND"
+    ]
+   },
+   "note": "（出産の直後に）"
+  },
+  {
+   "rank": 5,
+   "beats": 8,
+   "quote": "……え、|泣いてた？",
+   "count": 133,
+   "tsukkomi": "隣で、|寝てましたよね。",
+   "img": "honne08/img/C3.jpg",
+   "cam": {
+    "on": [
+     "C3",
+     "HUSBAND"
+    ]
+   },
+   "note": "（夜泣きの翌朝）",
+   "short": "え、泣いてた？"
+  },
+  {
+   "rank": 4,
+   "beats": 8,
+   "quote": "宿題？|ママに聞いて",
+   "count": 168,
+   "tsukkomi": "パパも、|親です。",
+   "img": "honne03/img/R5.jpg",
+   "cam": {
+    "x": 0.42,
+    "y": 0.42,
+    "z": 1.12
+   },
+   "cam2": {
+    "on": [
+     "R5",
+     "WIFE"
+    ],
+    "z": 1.6
+   },
+   "short": "宿題？ママに聞いて"
+  },
+  {
+   "rank": 3,
+   "beats": 10,
+   "quote": "俺、けっこう育児|してる方だよね？",
+   "count": 231,
+   "tsukkomi": "“方”って、|誰と比べて？",
+   "img": "honne01/img/S5.jpg",
+   "cam": {
+    "on": [
+     "S5",
+     "HUSBAND"
+    ]
+   },
+   "short": "育児してる方だよね？"
+  },
+  {
+   "rank": 2,
+   "beats": 10,
+   "quote": "休みの日くらい、|寝かせてよ",
+   "count": 352,
+   "tsukkomi": "私は9年、|寝不足です。",
+   "img": "honne02/img/X1.jpg",
+   "cam": {
+    "on": [
+     "X1",
+     "HUSBAND"
+    ],
+    "z": 1.4
+   },
+   "short": "休みの日くらい寝かせて"
+  },
+  {
+   "rank": 1,
+   "beats": 14,
+   "quote": "今日、子守りしてたから|疲れた",
+   "count": 1142,
+   "tsukkomi": "子守りじゃなくて、育児。|自分の子です。",
+   "img": "honne08/img/C4.jpg",
+   "cam": {
+    "on": [
+     "C4",
+     "HUSBAND"
+    ]
+   },
+   "build": 4,
+   "short": "子守りしてたから疲れた"
+  }
+ ],
+ "build": {
+  "stamp": "記録 1,000回超え"
+ },
+ "hof": {
+  "beats": 8,
+  "img": "honne03/img/R1.jpg",
+  "cam": {
+   "on": [
+    "R1",
+    "HUSBAND"
+   ]
+  },
+  "label": "殿堂入り",
+  "quote": "ママに、電話して|もらえますか",
+  "note": "保育園からの電話です。|あなたも、保護者です。",
+  "form": true
+ },
+ "end": {
+  "beats": 8,
+  "q": "あなたの家の第1位は？",
+  "cta": "コメントで教えてね",
+  "img": "honne01/img/S2.jpg",
+  "cam": {
+   "on": [
+    "S2",
+    "WIFE"
+   ],
+   "z": 1.0
+  },
+  "title": "夫の育児失言 TOP10"
+ }
+}

@@ -1,0 +1,253 @@
+{
+ "id": "honne07",
+ "title": "夫の言い訳ランキングTOP10【しのぶの失言ノート#7】",
+ "silent": true,
+ "bpm": 120,
+ "header": {
+  "series": "しのぶの失言ノート",
+  "episode": "#7 夫の言い訳TOP10"
+ },
+ "hook": {
+  "beats": 6,
+  "chip": "妻のノートの「記録回数」で発表",
+  "img": "honne07/img/I1.jpg",
+  "cam": {
+   "on": [
+    "I1",
+    "WIFE"
+   ]
+  },
+  "title": [
+   "夫の",
+   "言い訳",
+   "ランキング"
+  ]
+ },
+ "ranks": [
+  {
+   "rank": 10,
+   "beats": 8,
+   "quote": "みんな、|そうだよ",
+   "count": 39,
+   "tsukkomi": "みんなって、|誰ですか。",
+   "img": "honne02/img/X5.jpg",
+   "cam": {
+    "on": [
+     "X5",
+     "HUSBAND"
+    ]
+   }
+  },
+  {
+   "rank": 9,
+   "beats": 8,
+   "quote": "仕事なんだから、|しょうがないだろ",
+   "count": 57,
+   "tsukkomi": "私の家事も、|仕事です。",
+   "img": "honne03/img/R1.jpg",
+   "cam": {
+    "on": [
+     "R1",
+     "HUSBAND"
+    ],
+    "z": 1.25
+   },
+   "cam2": {
+    "on": [
+     "R1",
+     "WIFE"
+    ],
+    "z": 1.5
+   },
+   "short": "仕事なんだから"
+  },
+  {
+   "rank": 8,
+   "beats": 8,
+   "quote": "そういうつもりじゃ、|なかった",
+   "count": 71,
+   "tsukkomi": "どういうつもり、|でしたか。",
+   "img": "honne02/img/X6.jpg",
+   "cam": {
+    "on": [
+     "X6",
+     "HUSBAND"
+    ],
+    "z": 1.35
+   },
+   "cam2": {
+    "on": [
+     "X6",
+     "WIFE"
+    ],
+    "z": 1.6
+   },
+   "short": "そういうつもりじゃ…"
+  },
+  {
+   "rank": 7,
+   "beats": 8,
+   "quote": "男って、そういう|もんだから",
+   "count": 92,
+   "tsukkomi": "主語を、|大きくしないで。",
+   "img": "honne01/img/S6.jpg",
+   "cam": {
+    "on": [
+     "S6",
+     "HUSBAND"
+    ]
+   },
+   "cam2": {
+    "on": [
+     "S6",
+     "WIFE"
+    ],
+    "z": 1.6
+   },
+   "short": "男ってそういうもん"
+  },
+  {
+   "rank": 6,
+   "beats": 8,
+   "quote": "今、やろうと|思ってた",
+   "count": 115,
+   "tsukkomi": "“今”から、|3日たちました。",
+   "img": "honne03/img/R8.jpg",
+   "cam": {
+    "on": [
+     "R8",
+     "HUSBAND"
+    ]
+   }
+  },
+  {
+   "rank": 5,
+   "beats": 8,
+   "quote": "覚えてない",
+   "count": 138,
+   "tsukkomi": "私は、全部|覚えてます。",
+   "img": "honne02/img/X1.jpg",
+   "cam": {
+    "on": [
+     "X1",
+     "HUSBAND"
+    ],
+    "z": 1.4
+   }
+  },
+  {
+   "rank": 4,
+   "beats": 8,
+   "quote": "そんなに、|怒ること？",
+   "count": 172,
+   "tsukkomi": "怒ってません。|説明してます。",
+   "img": "honne03/img/R3.jpg",
+   "cam": {
+    "on": [
+     "R3",
+     "HUSBAND"
+    ]
+   }
+  },
+  {
+   "rank": 3,
+   "beats": 10,
+   "quote": "言ったっけ？",
+   "count": 229,
+   "tsukkomi": "聞いてません。|カレンダーにもありません。",
+   "img": "honne03/img/R5.jpg",
+   "cam": {
+    "x": 0.42,
+    "y": 0.42,
+    "z": 1.12
+   },
+   "cam2": {
+    "on": [
+     "R5",
+     "WIFE"
+    ],
+    "z": 1.6
+   },
+   "note": "（飲み会の予定）"
+  },
+  {
+   "rank": 2,
+   "beats": 10,
+   "quote": "わかってるって",
+   "count": 347,
+   "tsukkomi": "わかってる人は、|もうやってます。",
+   "img": "honne01/img/S1.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.45,
+    "z": 1.0
+   },
+   "cam2": {
+    "on": [
+     "S1",
+     "WIFE"
+    ],
+    "z": 1.25,
+    "ty": 560
+   },
+   "quoteY": 820
+  },
+  {
+   "rank": 1,
+   "beats": 14,
+   "quote": "聞いてない",
+   "count": 1163,
+   "tsukkomi": "3回言いました。|冷蔵庫にも貼りました。",
+   "img": "honne07/img/I1.jpg",
+   "cam": {
+    "on": [
+     "I1",
+     "HUSBAND"
+    ]
+   },
+   "build": 4,
+   "cam2": {
+    "obj": [
+     "I1",
+     "calendar"
+    ],
+    "z": 1.6,
+    "tx": 560,
+    "ty": 760
+   },
+   "circle": [
+    "I1",
+    "calendar"
+   ]
+  }
+ ],
+ "build": {
+  "stamp": "記録 1,000回超え"
+ },
+ "hof": {
+  "beats": 8,
+  "img": "honne02/img/X7.jpg",
+  "cam": {
+   "on": [
+    "X7",
+    "HUSBAND"
+   ]
+  },
+  "label": "殿堂入り",
+  "quote": "じゃあ、|もういいよ",
+  "note": "話し合いは、|まだ始まってません。"
+ },
+ "end": {
+  "beats": 8,
+  "q": "あなたの家の第1位は？",
+  "cta": "コメントで教えてね",
+  "img": "honne02/img/X10.jpg",
+  "cam": {
+   "on": [
+    "X10",
+    "WIFE"
+   ]
+  },
+  "title": "夫の言い訳 TOP10"
+ }
+}

@@ -1,0 +1,164 @@
+{
+ "records": [
+  {
+   "id": "C2_v1",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "px": [
+    1536,
+    2752
+   ],
+   "refs": [
+    "/home/user/-/videos/honne-aruaru/assets/characters/sheet_v2.png"
+   ],
+   "extra": "",
+   "seconds": 22.9,
+   "usage": {
+    "promptTokenCount": 968,
+    "candidatesTokenCount": 1478,
+    "totalTokenCount": 2678,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 710
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 232,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "created_utc": "2026-10-20T21:16:19.423068+00:00",
+   "prompt": "The attached image is the character design sheet. Draw exactly the same characters: same faces, hairstyles, glasses, earrings and outfits, in the same art style and colors. Do not copy the sheet layout and do not add any text.\n\nIllustration in the style of a Japanese comic essay about family life (the kind of warm, slightly humorous everyday manga popular on Instagram): clean, confident dark-brown line art, flat soft colors with very light cel shading, warm pastel palette (cream, peach, mustard, sage green, dusty blue), simple but very expressive faces, cozy and realistic Japanese apartment details. Not photorealistic, not 3D, not chibi, no heavy screentone. Original characters: do not imitate any existing manga, anime, brand or real person. Absolutely no text, letters, numbers, logos, signs, labels, speech bubbles, captions, sound-effect lettering or watermarks anywhere in the image.\n\nCharacters:\nWIFE (SHINOBU, the main character, always exactly the same person): Japanese woman, 44 years old, average slim build, dark brown hair tied in a loose low bun with a few loose strands, side-swept bangs, small gold stud earrings, natural makeup, a mustard-yellow knit cardigan over a plain white T-shirt, light grey wide trousers; she often holds a small black notebook and a pen. HUSBAND (MAMORU): Japanese man, 46 years old, slightly chubby, short slightly messy black hair with ONE distinctive upright cowlick tuft sticking straight up from the top of his head (his signature), black rectangular glasses, navy hoodie, beige chinos, usually holding a smartphone, a carefree, self-satisfied face. SON (MINATO): Japanese boy, 9 years old, short black hair, calm and sharp eyes, red-and-white horizontal striped T-shirt, navy shorts. MOTHER-IN-LAW (YOSHIE, the husband's mother): Japanese woman in her early 70s, short permed grey hair, small round gold-rimmed glasses, lavender cardigan, a pearl necklace, a cheerful but thoughtless face. BABY: a newborn wrapped in a plain white blanket.\n\nVertical 9:16 full-bleed illustration that fills the entire canvas edge to edge: no borders, no frames, no panel lines, no blank margins and no flat color bands at the top or bottom. Keep the top eighth of the picture calm (a plain wall or ceiling that is part of the scene), because a title will be placed there. Faces must be large, clear and well inside the frame, roughly between 22% and 50% of the height and away from the edges; the lower part of the picture (below about 55%) should hold bodies, furniture or the floor, because big captions will cover it.\n\nScene:\nLiving room, about nine years ago. The HUSBAND holds a crying baby (about 8 months old, plain white onesie) stiffly at arm's length, like handing back a parcel, with an awkward, helpless smile, holding the baby out toward the WIFE after only a few seconds. The WIFE, who had just sat down for the first time that day with a cup of tea, looks up at him with a tired, flat stare. Both faces large and clear in the upper-middle of the picture. The baby is in the middle of the picture."
+  },
+  {
+   "id": "C3_v1",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "px": [
+    1536,
+    2752
+   ],
+   "refs": [
+    "/home/user/-/videos/honne-aruaru/assets/characters/sheet_v2.png"
+   ],
+   "extra": "",
+   "seconds": 23.4,
+   "usage": {
+    "promptTokenCount": 968,
+    "candidatesTokenCount": 1457,
+    "totalTokenCount": 2721,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 710
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 296,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "created_utc": "2026-10-20T21:16:22.064812+00:00",
+   "prompt": "The attached image is the character design sheet. Draw exactly the same characters: same faces, hairstyles, glasses, earrings and outfits, in the same art style and colors. Do not copy the sheet layout and do not add any text.\n\nIllustration in the style of a Japanese comic essay about family life (the kind of warm, slightly humorous everyday manga popular on Instagram): clean, confident dark-brown line art, flat soft colors with very light cel shading, warm pastel palette (cream, peach, mustard, sage green, dusty blue), simple but very expressive faces, cozy and realistic Japanese apartment details. Not photorealistic, not 3D, not chibi, no heavy screentone. Original characters: do not imitate any existing manga, anime, brand or real person. Absolutely no text, letters, numbers, logos, signs, labels, speech bubbles, captions, sound-effect lettering or watermarks anywhere in the image.\n\nCharacters:\nWIFE (SHINOBU, the main character, always exactly the same person): Japanese woman, 44 years old, average slim build, dark brown hair tied in a loose low bun with a few loose strands, side-swept bangs, small gold stud earrings, natural makeup, a mustard-yellow knit cardigan over a plain white T-shirt, light grey wide trousers; she often holds a small black notebook and a pen. HUSBAND (MAMORU): Japanese man, 46 years old, slightly chubby, short slightly messy black hair with ONE distinctive upright cowlick tuft sticking straight up from the top of his head (his signature), black rectangular glasses, navy hoodie, beige chinos, usually holding a smartphone, a carefree, self-satisfied face. SON (MINATO): Japanese boy, 9 years old, short black hair, calm and sharp eyes, red-and-white horizontal striped T-shirt, navy shorts. MOTHER-IN-LAW (YOSHIE, the husband's mother): Japanese woman in her early 70s, short permed grey hair, small round gold-rimmed glasses, lavender cardigan, a pearl necklace, a cheerful but thoughtless face. BABY: a newborn wrapped in a plain white blanket.\n\nVertical 9:16 full-bleed illustration that fills the entire canvas edge to edge: no borders, no frames, no panel lines, no blank margins and no flat color bands at the top or bottom. Keep the top eighth of the picture calm (a plain wall or ceiling that is part of the scene), because a title will be placed there. Faces must be large, clear and well inside the frame, roughly between 22% and 50% of the height and away from the edges; the lower part of the picture (below about 55%) should hold bodies, furniture or the floor, because big captions will cover it.\n\nScene:\nNight in the bedroom, about nine years ago, lit only by a dim night-light and moonlight through the curtains. The WIFE sits up on the futon, rocking a crying baby in her arms, with dark circles under her eyes and messy hair. Right next to her, the HUSBAND sleeps deeply on his back, snoring with his mouth wide open, his black rectangular glasses folded on a small tray beside his pillow and his cowlick still sticking up, completely undisturbed. Both faces large and clear in the upper-middle of the picture. The futons fill the lower part."
+  },
+  {
+   "id": "C1_v1",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "px": [
+    1536,
+    2752
+   ],
+   "refs": [
+    "/home/user/-/videos/honne-aruaru/assets/characters/sheet_v2.png"
+   ],
+   "extra": "",
+   "seconds": 25.9,
+   "usage": {
+    "promptTokenCount": 984,
+    "candidatesTokenCount": 1435,
+    "totalTokenCount": 2766,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 726
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 347,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "created_utc": "2026-10-20T21:16:22.364735+00:00",
+   "prompt": "The attached image is the character design sheet. Draw exactly the same characters: same faces, hairstyles, glasses, earrings and outfits, in the same art style and colors. Do not copy the sheet layout and do not add any text.\n\nIllustration in the style of a Japanese comic essay about family life (the kind of warm, slightly humorous everyday manga popular on Instagram): clean, confident dark-brown line art, flat soft colors with very light cel shading, warm pastel palette (cream, peach, mustard, sage green, dusty blue), simple but very expressive faces, cozy and realistic Japanese apartment details. Not photorealistic, not 3D, not chibi, no heavy screentone. Original characters: do not imitate any existing manga, anime, brand or real person. Absolutely no text, letters, numbers, logos, signs, labels, speech bubbles, captions, sound-effect lettering or watermarks anywhere in the image.\n\nCharacters:\nWIFE (SHINOBU, the main character, always exactly the same person): Japanese woman, 44 years old, average slim build, dark brown hair tied in a loose low bun with a few loose strands, side-swept bangs, small gold stud earrings, natural makeup, a mustard-yellow knit cardigan over a plain white T-shirt, light grey wide trousers; she often holds a small black notebook and a pen. HUSBAND (MAMORU): Japanese man, 46 years old, slightly chubby, short slightly messy black hair with ONE distinctive upright cowlick tuft sticking straight up from the top of his head (his signature), black rectangular glasses, navy hoodie, beige chinos, usually holding a smartphone, a carefree, self-satisfied face. SON (MINATO): Japanese boy, 9 years old, short black hair, calm and sharp eyes, red-and-white horizontal striped T-shirt, navy shorts. MOTHER-IN-LAW (YOSHIE, the husband's mother): Japanese woman in her early 70s, short permed grey hair, small round gold-rimmed glasses, lavender cardigan, a pearl necklace, a cheerful but thoughtless face. BABY: a newborn wrapped in a plain white blanket.\n\nVertical 9:16 full-bleed illustration that fills the entire canvas edge to edge: no borders, no frames, no panel lines, no blank margins and no flat color bands at the top or bottom. Keep the top eighth of the picture calm (a plain wall or ceiling that is part of the scene), because a title will be placed there. Faces must be large, clear and well inside the frame, roughly between 22% and 50% of the height and away from the edges; the lower part of the picture (below about 55%) should hold bodies, furniture or the floor, because big captions will cover it.\n\nScene:\nLiving room in the daytime, about nine years ago. A baby (about 6 months old, in a plain white onesie) is crying loudly in a baby bouncer on the floor. The HUSBAND sits on the sofa right next to it, still holding his smartphone, and only turns his head toward the kitchen, calling out casually with one hand by his mouth, making no move to pick up the baby. In the kitchen doorway, the WIFE in an apron rushes in with wet hands and a tense, exasperated face. Both faces large and clear in the upper-middle of the picture. The crying baby is clearly visible in the lower-middle."
+  },
+  {
+   "id": "C4_v1",
+   "model": "gemini-3-pro-image",
+   "size": "2K",
+   "px": [
+    1536,
+    2752
+   ],
+   "refs": [
+    "/home/user/-/videos/honne-aruaru/assets/characters/sheet_v2.png"
+   ],
+   "extra": "",
+   "seconds": 23.9,
+   "usage": {
+    "promptTokenCount": 993,
+    "candidatesTokenCount": 1552,
+    "totalTokenCount": 2831,
+    "promptTokensDetails": [
+     {
+      "modality": "TEXT",
+      "tokenCount": 735
+     },
+     {
+      "modality": "IMAGE",
+      "tokenCount": 258
+     }
+    ],
+    "candidatesTokensDetails": [
+     {
+      "modality": "IMAGE",
+      "tokenCount": 1120
+     }
+    ],
+    "thoughtsTokenCount": 286,
+    "serviceTier": "standard"
+   },
+   "model_text": [],
+   "created_utc": "2026-10-20T21:16:44.174372+00:00",
+   "prompt": "The attached image is the character design sheet. Draw exactly the same characters: same faces, hairstyles, glasses, earrings and outfits, in the same art style and colors. Do not copy the sheet layout and do not add any text.\n\nIllustration in the style of a Japanese comic essay about family life (the kind of warm, slightly humorous everyday manga popular on Instagram): clean, confident dark-brown line art, flat soft colors with very light cel shading, warm pastel palette (cream, peach, mustard, sage green, dusty blue), simple but very expressive faces, cozy and realistic Japanese apartment details. Not photorealistic, not 3D, not chibi, no heavy screentone. Original characters: do not imitate any existing manga, anime, brand or real person. Absolutely no text, letters, numbers, logos, signs, labels, speech bubbles, captions, sound-effect lettering or watermarks anywhere in the image.\n\nCharacters:\nWIFE (SHINOBU, the main character, always exactly the same person): Japanese woman, 44 years old, average slim build, dark brown hair tied in a loose low bun with a few loose strands, side-swept bangs, small gold stud earrings, natural makeup, a mustard-yellow knit cardigan over a plain white T-shirt, light grey wide trousers; she often holds a small black notebook and a pen. HUSBAND (MAMORU): Japanese man, 46 years old, slightly chubby, short slightly messy black hair with ONE distinctive upright cowlick tuft sticking straight up from the top of his head (his signature), black rectangular glasses, navy hoodie, beige chinos, usually holding a smartphone, a carefree, self-satisfied face. SON (MINATO): Japanese boy, 9 years old, short black hair, calm and sharp eyes, red-and-white horizontal striped T-shirt, navy shorts. MOTHER-IN-LAW (YOSHIE, the husband's mother): Japanese woman in her early 70s, short permed grey hair, small round gold-rimmed glasses, lavender cardigan, a pearl necklace, a cheerful but thoughtless face. BABY: a newborn wrapped in a plain white blanket.\n\nVertical 9:16 full-bleed illustration that fills the entire canvas edge to edge: no borders, no frames, no panel lines, no blank margins and no flat color bands at the top or bottom. Keep the top eighth of the picture calm (a plain wall or ceiling that is part of the scene), because a title will be placed there. Faces must be large, clear and well inside the frame, roughly between 22% and 50% of the height and away from the edges; the lower part of the picture (below about 55%) should hold bodies, furniture or the floor, because big captions will cover it.\n\nScene:\nEarly evening in the living room, about seven years ago. The WIFE has just come home from work, still in her coat over the mustard cardigan, standing in the doorway with a heavy grocery bag (a leek sticking out). The HUSBAND lies collapsed on the sofa like an exhausted marathon runner, one arm over his forehead, sighing dramatically. On the play mat beside the sofa a cheerful toddler (about 2 years old, short black hair, in overalls) is happily playing with blocks, perfectly fine. Toys are scattered everywhere. The WIFE looks at the husband with a flat, unimpressed, dead-eyed stare. Both adult faces large and clear in the upper-middle of the picture."
+  }
+ ]
+}

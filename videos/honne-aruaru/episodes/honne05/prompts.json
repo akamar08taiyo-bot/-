@@ -1,0 +1,27 @@
+{
+ "style": "Illustration in the style of a Japanese comic essay about family life (the kind of warm, slightly humorous everyday manga popular on Instagram): clean, confident dark-brown line art, flat soft colors with very light cel shading, warm pastel palette (cream, peach, mustard, sage green, dusty blue), simple but very expressive faces, cozy and realistic Japanese apartment details. Not photorealistic, not 3D, not chibi, no heavy screentone. Original characters: do not imitate any existing manga, anime, brand or real person. Absolutely no text, letters, numbers, logos, signs, labels, speech bubbles, captions, sound-effect lettering or watermarks anywhere in the image.",
+ "characters": "WIFE (SHINOBU, the main character, always exactly the same person): Japanese woman, 44 years old, average slim build, dark brown hair tied in a loose low bun with a few loose strands, side-swept bangs, small gold stud earrings, natural makeup, a mustard-yellow knit cardigan over a plain white T-shirt, light grey wide trousers; she often holds a small black notebook and a pen. HUSBAND (MAMORU): Japanese man, 46 years old, slightly chubby, short slightly messy black hair with ONE distinctive upright cowlick tuft sticking straight up from the top of his head (his signature), black rectangular glasses, navy hoodie, beige chinos, usually holding a smartphone, a carefree, self-satisfied face. SON (MINATO): Japanese boy, 9 years old, short black hair, calm and sharp eyes, red-and-white horizontal striped T-shirt, navy shorts. MOTHER-IN-LAW (YOSHIE, the husband's mother): Japanese woman in her early 70s, short permed grey hair, small round gold-rimmed glasses, lavender cardigan, a pearl necklace, a cheerful but thoughtless face. BABY: a newborn wrapped in a plain white blanket.",
+ "vertical": "Vertical 9:16 full-bleed illustration that fills the entire canvas edge to edge: no borders, no frames, no panel lines, no blank margins and no flat color bands at the top or bottom. Keep the top eighth of the picture calm (a plain wall or ceiling that is part of the scene), because a title will be placed there. Faces must be large, clear and well inside the frame, roughly between 22% and 50% of the height and away from the edges; the lower part of the picture (below about 55%) should hold bodies, furniture or the floor, because big captions will cover it.",
+ "scenes": [
+  {
+   "id": "Y1",
+   "prompt": "The entrance (genkan) of the family's apartment on a weekday morning. The front door is open and the MOTHER-IN-LAW stands in the doorway beaming happily, waving one hand cheerfully, carrying a big paper bag full of vegetables and a furoshiki-wrapped box: clearly an unannounced surprise visit. Inside, the WIFE, in her mustard cardigan with an apron and slightly messy hair, still holding a vacuum cleaner hose, freezes in shock with a strained, forced smile. The hallway behind the wife is a little messy (toys, a pile of laundry). Both faces large and clear in the upper-middle of the picture."
+  },
+  {
+   "id": "Y2",
+   "prompt": "The family kitchen in the afternoon. The MOTHER-IN-LAW stands at the wide-open refrigerator, busily and cheerfully rearranging everything inside on her own: she is pulling out containers, has lined up jars and vegetables on the counter, and is putting things back in completely different places, with a satisfied, thoughtless smile. The WIFE stands behind her, still holding a shopping bag, staring at the fridge with a stiff, speechless face and a twitching smile. No labels or text on any packages. Both faces large and clear in the upper-middle of the picture. The open fridge and the counter fill the lower part."
+  },
+  {
+   "id": "Y3",
+   "prompt": "The family kitchen in the evening. The HUSBAND is drying one single plate with a dish towel, looking very pleased with himself. The MOTHER-IN-LAW stands right next to him, cupping his cheek with one hand and looking up at him with exaggerated pity and worry, as if her poor son were overworked and much too thin. Behind them at the sink, the WIFE is washing a mountain of dishes, pots and pans, glancing over her shoulder at the two of them with a flat, dead-eyed stare. All three faces large and clear in the upper-middle of the picture."
+  },
+  {
+   "id": "Y4",
+   "prompt": "Dinner at the family's dining table. Several home-cooked dishes are on the table, plus a few store-bought side dishes still in their clear plastic deli containers (no labels, no text). The MOTHER-IN-LAW sits at the table pointing her chopsticks at the deli containers, with a sweet but sly, slightly condescending smile, as if saying something passive-aggressive. The WIFE stands beside the table holding a rice paddle and a rice bowl, with a frozen polite smile and a tense, twitching eye. The HUSBAND sits next to his mother, eating happily and noticing nothing. All faces large and clear in the upper-middle of the picture."
+  },
+  {
+   "id": "Y5",
+   "prompt": "Lunch at the family's dining table. The MOTHER-IN-LAW sits next to the HUSBAND (46 years old) and feeds him like a small child: with her chopsticks she holds a piece of sweet rolled omelet (tamagoyaki) up to his mouth, while piling more food onto his plate with her other hand and gazing at him lovingly. The HUSBAND opens his mouth happily like a little boy. Across the table, the WIFE sits with her chopsticks frozen in mid-air, staring at them in total disbelief with a blank, dead-eyed face. All three faces large and clear in the upper-middle of the picture."
+  }
+ ]
+}

@@ -231,7 +231,7 @@ export const RankStrip: React.FC<{cur: number; since: number; top?: number}> = (
 };
 
 // ───────── チャット画面（しのぶの長文に、夫の返事）。特定のアプリの見た目には似せない ─────────
-export const ChatScreen: React.FC<{name: string; mine: string; reply: string; cx: number; cy: number; from: number; to: number; replyAt: number}> = ({
+export const ChatScreen: React.FC<{name: string; mine: string; reply: string; cx: number; cy: number; from: number; to: number; replyAt: number; times?: [string, string]}> = ({
   name,
   mine,
   reply,
@@ -240,6 +240,7 @@ export const ChatScreen: React.FC<{name: string; mine: string; reply: string; cx
   from,
   to,
   replyAt,
+  times = ['18:02', '18:47'],
 }) => {
   const frame = useCurrentFrame();
   if (frame < from || frame >= to) return null;
@@ -248,6 +249,8 @@ export const ChatScreen: React.FC<{name: string; mine: string; reply: string; cx
   const p = pop(frame, from, 13, 190);
   const rp = pop(frame, replyAt, 10, 230);
   const small: React.CSSProperties = {fontFamily: F.maru, fontWeight: 700, fontSize: 24, color: '#8d8478', lineHeight: 1.3, whiteSpace: 'nowrap'};
+  const replyLines = reply.split('|');
+  const replyFs = fit(replyLines, 440, 92); // 1文字の「了」は 92px のまま
   return (
     <div
       style={{
@@ -274,7 +277,7 @@ export const ChatScreen: React.FC<{name: string; mine: string; reply: string; cx
           <div style={{display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-end', gap: 12}}>
             <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end'}}>
               <span style={small}>既読</span>
-              <span style={small}>18:02</span>
+              <span style={small}>{times[0]}</span>
             </div>
             <div
               style={{
@@ -309,12 +312,14 @@ export const ChatScreen: React.FC<{name: string; mine: string; reply: string; cx
                   flex: 'none',
                 }}
               >
-                ま
+                {[...name][0]}
               </div>
-              <div style={{background: '#fff', borderRadius: '8px 28px 28px 28px', padding: '6px 34px 10px', fontFamily: F.maru, fontWeight: 900, fontSize: 92, color: C.navy, lineHeight: 1.2}}>
-                {reply}
+              <div style={{background: '#fff', borderRadius: '8px 28px 28px 28px', padding: '6px 34px 10px', fontFamily: F.maru, fontWeight: 900, fontSize: replyFs, color: C.navy, lineHeight: 1.2, whiteSpace: 'nowrap'}}>
+                {replyLines.map((l, i) => (
+                  <div key={i}>{l}</div>
+                ))}
               </div>
-              <span style={small}>18:47</span>
+              <span style={small}>{times[1]}</span>
             </div>
           )}
         </div>
@@ -325,11 +330,12 @@ export const ChatScreen: React.FC<{name: string; mine: string; reply: string; cx
 
 // ───────── まとめ：失言ノートのページに TOP10 を書き出す（下の10位から順に） ─────────
 export type NoteRow = {rank: number; quote: string; count: number};
-export const NotePage: React.FC<{x: number; top: number; w: number; title: string; rows: NoteRow[]; rowAt: (rank: number) => number; from: number; to: number}> = ({
+export const NotePage: React.FC<{x: number; top: number; w: number; title: string; unit?: string; rows: NoteRow[]; rowAt: (rank: number) => number; from: number; to: number}> = ({
   x,
   top,
   w,
   title,
+  unit = '記録回数',
   rows,
   rowAt,
   from,
@@ -360,7 +366,7 @@ export const NotePage: React.FC<{x: number; top: number; w: number; title: strin
       <div style={{position: 'absolute', left: 120, top: 0, bottom: 0, width: 3, background: 'rgba(201,74,91,0.45)'}} />
       <div style={{display: 'flex', alignItems: 'baseline', gap: 14, height: 76, paddingLeft: 6}}>
         <span style={{fontFamily: F.mincho, fontWeight: 700, fontSize: 52, color: '#22201f'}}>{title}</span>
-        <span style={{fontFamily: F.maru, fontWeight: 700, fontSize: 30, color: '#8a7f78'}}>（記録回数）</span>
+        <span style={{fontFamily: F.maru, fontWeight: 700, fontSize: 30, color: '#8a7f78'}}>（{unit}）</span>
       </div>
       {rows.map((r) => {
         const at = rowAt(r.rank);

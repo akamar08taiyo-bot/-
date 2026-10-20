@@ -1,0 +1,242 @@
+{
+ "id": "honne05",
+ "title": "義母の一言ランキングTOP10【しのぶの失言ノート#5】",
+ "silent": true,
+ "bpm": 120,
+ "who": "義母・よしえ",
+ "header": {
+  "series": "しのぶの失言ノート",
+  "episode": "#5 義母の一言TOP10"
+ },
+ "hook": {
+  "beats": 6,
+  "chip": "妻のノートの「記録回数」で発表",
+  "img": "honne05/img/Y2.jpg",
+  "cam": {
+   "on": [
+    "Y2",
+    "MOTHER-IN-LAW"
+   ]
+  },
+  "title": [
+   "義母の",
+   "一言",
+   "ランキング"
+  ]
+ },
+ "ranks": [
+  {
+   "rank": 10,
+   "beats": 8,
+   "quote": "あら、今日は|お惣菜？",
+   "count": 41,
+   "tsukkomi": "はい、|プロの味です。",
+   "img": "honne05/img/Y4.jpg",
+   "cam": {
+    "on": [
+     "Y4",
+     "MOTHER-IN-LAW"
+    ]
+   }
+  },
+  {
+   "rank": 9,
+   "beats": 8,
+   "quote": "私の頃は、もっと|大変だったわよ",
+   "count": 58,
+   "tsukkomi": "今も、|十分大変です。",
+   "img": "honne02/img/X6.jpg",
+   "cam": {
+    "on": [
+     "X6",
+     "MOTHER-IN-LAW"
+    ],
+    "z": 1.35
+   },
+   "cam2": {
+    "on": [
+     "X6",
+     "WIFE"
+    ],
+    "z": 1.6
+   },
+   "short": "私の頃は大変だった"
+  },
+  {
+   "rank": 8,
+   "beats": 8,
+   "quote": "冷蔵庫、|片付けといたわよ",
+   "count": 73,
+   "tsukkomi": "どこに何があるか、|わかりません。",
+   "img": "honne05/img/Y2.jpg",
+   "cam": {
+    "on": [
+     "Y2",
+     "MOTHER-IN-LAW"
+    ],
+    "z": 1.5
+   }
+  },
+  {
+   "rank": 7,
+   "beats": 8,
+   "quote": "しのぶさんって、|のんびりしてるわね〜",
+   "count": 88,
+   "tsukkomi": "朝5時から、|動いてます。",
+   "img": "honne05/img/Y1.jpg",
+   "cam": {
+    "on": [
+     "Y1",
+     "MOTHER-IN-LAW"
+    ],
+    "z": 1.6
+   },
+   "cam2": {
+    "on": [
+     "Y1",
+     "WIFE"
+    ],
+    "z": 1.6
+   },
+   "short": "のんびりしてるわね"
+  },
+  {
+   "rank": 6,
+   "beats": 8,
+   "quote": "私はいいのよ、|私は",
+   "count": 104,
+   "tsukkomi": "“いい”顔で、|言ってください。",
+   "img": "honne02/img/X6.jpg",
+   "cam": {
+    "on": [
+     "X6",
+     "MOTHER-IN-LAW"
+    ],
+    "z": 1.7
+   },
+   "cam2": {
+    "on": [
+     "X6",
+     "WIFE"
+    ],
+    "z": 1.6
+   },
+   "note": "（よくない顔で）"
+  },
+  {
+   "rank": 5,
+   "beats": 8,
+   "quote": "まーくん、|痩せたんじゃない？",
+   "count": 131,
+   "tsukkomi": "2キロ、|太りました。",
+   "img": "honne05/img/Y5.jpg",
+   "cam": {
+    "on": [
+     "Y5",
+     "MOTHER-IN-LAW"
+    ]
+   },
+   "short": "痩せたんじゃない？"
+  },
+  {
+   "rank": 4,
+   "beats": 8,
+   "quote": "来ちゃった♪",
+   "count": 172,
+   "tsukkomi": "せめて、駅から|連絡を。",
+   "img": "honne05/img/Y1.jpg",
+   "cam": {
+    "on": [
+     "Y1",
+     "MOTHER-IN-LAW"
+    ],
+    "z": 1.3
+   },
+   "cam2": {
+    "on": [
+     "Y1",
+     "WIFE"
+    ],
+    "z": 1.5
+   },
+   "note": "（連絡なし）"
+  },
+  {
+   "rank": 3,
+   "beats": 10,
+   "quote": "まーくんは、|甘い卵焼き派なのよ",
+   "count": 238,
+   "tsukkomi": "20年、だし巻きで|おかわりしてます。",
+   "img": "honne05/img/Y4.jpg",
+   "cam": {
+    "on": [
+     "Y4",
+     "MOTHER-IN-LAW"
+    ],
+    "z": 1.6
+   },
+   "short": "まーくんは甘い卵焼き派"
+  },
+  {
+   "rank": 2,
+   "beats": 10,
+   "quote": "まーくん、|かわいそうに",
+   "count": 349,
+   "tsukkomi": "私は毎日、|全部やってます。",
+   "img": "honne05/img/Y3.jpg",
+   "cam": {
+    "on": [
+     "Y3",
+     "MOTHER-IN-LAW"
+    ]
+   },
+   "note": "（お皿を1枚ふいただけ）"
+  },
+  {
+   "rank": 1,
+   "beats": 14,
+   "quote": "まーくん、ちゃんと|食べさせてもらってる？",
+   "count": 1084,
+   "tsukkomi": "46歳です。|自分で食べられます。",
+   "img": "honne05/img/Y5.jpg",
+   "cam": {
+    "on": [
+     "Y5",
+     "MOTHER-IN-LAW"
+    ],
+    "z": 1.4
+   },
+   "build": 4,
+   "short": "食べさせてもらってる？"
+  }
+ ],
+ "build": {
+  "stamp": "記録 1,000回超え"
+ },
+ "hof": {
+  "beats": 8,
+  "img": "honne05/img/Y3.jpg",
+  "cam": {
+   "on": [
+    "Y3",
+    "MOTHER-IN-LAW"
+   ]
+  },
+  "label": "殿堂入り",
+  "quote": "まーくんは座ってて。|しのぶさん、お茶。",
+  "note": "回数ではなく、|破壊力で別格。"
+ },
+ "end": {
+  "beats": 8,
+  "q": "あなたの家の第1位は？",
+  "cta": "コメントで教えてね",
+  "img": "honne02/img/X9.jpg",
+  "cam": {
+   "on": [
+    "X9",
+    "WIFE"
+   ]
+  },
+  "title": "義母の一言 TOP10"
+ }
+}
