@@ -1,6 +1,6 @@
 // 住宅改修 見積書作成：見積書に直接入力（Excel のように欄を選んで打ち込む）を確かめる：
 // 新しい見積書を見積書の形のまま打ち込む（お客様名・改修内容・改修場所・内容の候補（★お気に入り）・数量 60cm・同上施工費・備考に定価）→
-// 合計・元に戻す・行の挿入／移動／削除（行の左の＋・✕）・介護保険の対象外・諸経費・作成日・笹岡工務店の請求書に入れる（仕切価格を入れる）・
+// 合計・元に戻す・行の挿入／コピー／削除（行の左の＋・コピー・✕）・介護保険の対象外・諸経費・作成日・笹岡工務店の請求書に入れる（仕切価格を入れる）・
 // 広域連合用（材／手・時間）・「請求書を確認する」とのつながり
 // usage: node e2e-sheet.mjs <サイトのURL> <出力フォルダ>
 //   サイトは太陽ポータルと同じ形（<サイト>/jutaku-mitsumori/index.html と <サイト>/sasaoka/index.html）
@@ -177,6 +177,19 @@ assert.equal((await tds('養生テープ'))[2], '養生テープ');
 await sheet.getByRole('button', {name: '養生テープの行を消す'}).click();
 assert.equal(await lines(), before);
 log('行の左の＋（空白の行を入れて打ち込む）OK');
+
+// ---------------- 行の左の「コピー」：部材の行を同上施工費ごと、すぐ下にコピーする（施工費の行にはコピーがない）。元に戻せる
+const copyBefore = await lines();
+const works = await sheet.locator('.form-page tr', {hasText: '同上施工費'}).count();
+assert.equal(await sheet.locator('.form-page tr', {hasText: '同上施工費'}).first().getByRole('button', {name: /をコピー$/}).count(), 0);
+await sheet.getByRole('button', {name: /木の手すり 35φ 4mの行をコピー$/}).click();
+assert.equal(await lines(), copyBefore + 2);
+assert.equal(await sheet.locator('.form-page tr', {hasText: '木の手すり 35φ 4m'}).count(), 2);
+assert.equal(await sheet.locator('.form-page tr', {hasText: '同上施工費'}).count(), works + 1);
+await page.locator('[aria-live] > div', {hasText: '行をコピーしました'}).first().waitFor();
+await sheet.getByTitle('元に戻す（Ctrl+Z）').click();
+assert.equal(await lines(), copyBefore);
+log('行の左のコピー（部材と同上施工費）OK');
 
 // ---------------- 諸経費・作成日・工事場所（見積書の欄）
 await typeIn('overhead:all', '1000');

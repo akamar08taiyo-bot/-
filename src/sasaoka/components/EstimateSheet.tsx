@@ -10,7 +10,7 @@ import type {ChangeEvent, ClipboardEvent as ReactClipboardEvent, KeyboardEvent a
 import {circled, KINDS, materialText} from '../estimateForms.ts';
 import {useDocMeta} from '../print/docMeta.ts';
 import {KouikiForm, YukuhashiForm} from '../print/EstimateForms.tsx';
-import {applySheet, deleteLine, insertBlankAfter, parseDate, sheetTarget, sheetValue, toggleExcluded} from '../sheetEdit.ts';
+import {applySheet, copyLine, deleteLine, insertBlankAfter, parseDate, sheetTarget, sheetValue, toggleExcluded} from '../sheetEdit.ts';
 import type {EstimateForm, Job, Material, Settings} from '../types.ts';
 import {matchesAll, todayIso, yen} from '../util.ts';
 import {useToast} from './ui.tsx';
@@ -428,8 +428,8 @@ export function EstimateSheet({
   const onMouseDown = (e: ReactMouseEvent) => {
     let t = e.target as HTMLElement;
     if (sugRef.current?.contains(t)) return;
-    if (t.closest('[data-del], [data-ins]')) {
-      e.preventDefault(); // 行の左の「＋」「✕」：欄は選ばない（押し終わったら onClick で入れる・消す）
+    if (t.closest('[data-del], [data-ins], [data-copy]')) {
+      e.preventDefault(); // 行の左の「＋」「コピー」「✕」：欄は選ばない（押し終わったら onClick で入れる・コピーする・消す）
       return;
     }
     if (t === inputRef.current) {
@@ -457,9 +457,10 @@ export function EstimateSheet({
     inputRef.current?.focus({preventScroll: true});
   };
   // 行の左の「＋」：その行の下に空白の行を入れて、内容の欄を選ぶ（そのまま打ち込める）。
+  // 「コピー」：部材の行を同上施工費ごと、すぐ下にコピーする。
   // 「✕」：その行（部材は同上施工費ごと）を消す。箇所の行がなくなれば箇所も消す（その行が空白になる）
   const onClick = (e: ReactMouseEvent) => {
-    const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-ins], [data-del]');
+    const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-ins], [data-copy], [data-del]');
     if (!btn) return;
     if (edit && sel) commit(edit.value, null, null, true); // 打ち込んでいた値を入れてから
     if (btn.dataset.ins) {
@@ -467,6 +468,10 @@ export function EstimateSheet({
       change(res.job);
       if (res.rowId) setSel({key: `line:${res.rowId}:text`, occ: 0});
       inputRef.current?.focus({preventScroll: true});
+    } else if (btn.dataset.copy) {
+      const res = copyLine(jobRef.current, btn.dataset.copy);
+      change(res.job);
+      if (res.rowId) toast('行をコピーしました（すぐ下に入りました）');
     } else if (btn.dataset.del) {
       change(deleteLine(jobRef.current, btn.dataset.del));
       setSel(null);

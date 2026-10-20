@@ -118,7 +118,14 @@ body {
 .est-sheet tr.sheet-new > td {
   background-color: #ecfdf5;
 }
-/* 明細の行の左（見積書の余白）のボタン：「＋」この行の下に1行入れる／「✕」この行を消す（部材は同上施工費ごと） */
+/* 明細の行の左（見積書の余白）のボタン：「＋」この行の下に1行入れる／「コピー」部材の行を同上施工費ごとコピー／「✕」この行を消す。
+   3つ並ぶよう、入力の画面だけ表を10mm右に寄せる（印刷は元の余白のまま） */
+.est-sheet .form-page.yk {
+  padding-left: 25mm;
+}
+.est-sheet .form-page.kk {
+  padding-left: 26mm;
+}
 .est-sheet td.tools-cell {
   position: relative;
   overflow: visible;
@@ -150,6 +157,24 @@ body {
 .sheet-ins::before {
   content: '＋';
 }
+.sheet-rowtools .sheet-copy {
+  width: auto;
+  padding: 0 1.2mm;
+  color: #1d4ed8;
+  font-size: 8pt;
+}
+.sheet-copy::before {
+  content: 'コピー';
+}
+/* コピーのない行（施工費・空白の行）は、場所だけ空けて「＋」「✕」の並びをそろえる */
+.sheet-copy-none {
+  visibility: hidden;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid transparent;
+  font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Noto Sans JP', 'Meiryo', sans-serif;
+  font-weight: 700;
+}
 .sheet-del {
   color: #be123c;
 }
@@ -160,6 +185,11 @@ body {
 .sheet-ins:focus-visible {
   border-color: #059669;
   background: #ecfdf5;
+}
+.sheet-copy:hover,
+.sheet-copy:focus-visible {
+  border-color: #2563eb;
+  background: #eff6ff;
 }
 .sheet-del:hover,
 .sheet-del:focus-visible {

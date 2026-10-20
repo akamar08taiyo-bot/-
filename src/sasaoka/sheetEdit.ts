@@ -10,7 +10,7 @@
 import {cutToLength, estimatePlaceLines, estimateQty, estimateUnitPrice, listPriceOf, overheadAuto, estimateTotals, rounddown} from './calc.ts';
 import {KINDS, materialText, rowUnit} from './estimateForms.ts';
 import {guessPieceLengthM} from './priceImport.ts';
-import {manualRow, materialRow, newPlace} from './rows.ts';
+import {copyRows, manualRow, materialRow, newPlace} from './rows.ts';
 import type {EstimateForm, Job, Material, Place, Row, Settings} from './types.ts';
 
 export type SheetSettings = Pick<Settings, 'estimateRate' | 'estimateHourRate' | 'estimateOverheadRate' | 'taxRate'>;
@@ -377,7 +377,7 @@ export function overheadValue(job: Job, s: SheetSettings, target: boolean): numb
   return target ? (job.overheadTarget ?? overheadAuto(t.target.subtotal, s)) : (job.overhead ?? overheadAuto(t.all.subtotal, s));
 }
 
-// ---------------------------------------------------------------- 行の並べ替え・削除・挿入（見積書の1行ずつ）
+// ---------------------------------------------------------------- 行の削除・挿入・コピー（見積書の1行ずつ）
 
 /**
  * 見積書の1行のもとになる行の範囲：部材ならその部材と、すぐ下の施工費（同上施工費）。施工費ならそのまとまり
@@ -399,6 +399,19 @@ export function deleteLine(job: Job, rowId: string): Job {
   const rows = [...found.place.rows.slice(0, a), ...found.place.rows.slice(b)];
   if (rows.length === 0) return {...job, places: job.places.filter((_, i) => i !== found.pi)};
   return setPlaceRows(job, found.pi, rows);
+}
+
+/**
+ * 見積書の部材の1行をコピーする：その部材と同上施工費を、すぐ下（同上施工費のうしろ）に入れる。返す rowId はコピーした部材の行。
+ * 施工費の行だけはコピーしない（続けて並んだ施工費は見積書で1行にまとまるので、別の行にならない）
+ */
+export function copyLine(job: Job, rowId: string): {job: Job; rowId: string | null} {
+  const found = findRow(job, rowId);
+  if (!found || found.row.kind !== 'material') return {job, rowId: null};
+  const [a, b] = unitRange(found.place.rows, found.ri);
+  const copy = copyRows(found.place.rows.slice(a, b));
+  const rows = [...found.place.rows.slice(0, b), ...copy, ...found.place.rows.slice(b)];
+  return {job: setPlaceRows(job, found.pi, rows), rowId: copy[0].id};
 }
 
 /** 見積書の1行のすぐ下に、空の部材の行を入れる（その行の欄に打ち込む） */

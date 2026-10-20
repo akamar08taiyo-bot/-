@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {estimateTotals, jobTotals} from '../../src/sasaoka/calc.ts';
 import {formLines} from '../../src/sasaoka/estimateForms.ts';
-import {applySheet, deleteLine, parseKind, parseLengthCm, parseListNote, parseNum, parsePlace, setWorkAmount, sheetValue, toggleExcluded} from '../../src/sasaoka/sheetEdit.ts';
+import {applySheet, copyLine, deleteLine, parseKind, parseLengthCm, parseListNote, parseNum, parsePlace, setWorkAmount, sheetValue, toggleExcluded} from '../../src/sasaoka/sheetEdit.ts';
 import type {Job, Material, Row, Settings} from '../../src/sasaoka/types.ts';
 
 const S = {
@@ -234,4 +234,31 @@ test('行を消す（行の左の✕消す・この行を消す）：部材は�
   job = deleteLine(job, railRow.id);
   assert.deepEqual(job.places, []);
   assert.equal(deleteLine(job, 'no-such-row'), job);
+});
+
+test('行をコピー：部材の行は同上施工費ごと、すぐ下（同上施工費のうしろ）に入る。施工費だけの行はコピーしない', () => {
+  const {job} = type(emptyJob(), [
+    ['new:text', 'インテリアバー', bar],
+    ['new:text', '同上施工費'],
+    ['line:@:price', '2000'],
+    ['new:text', '木の手すり 35φ 4m', rail],
+  ]);
+  const [barRow, work, railRow] = job.places[0].rows;
+  const res = copyLine(job, barRow.id);
+  const rows = res.job.places[0].rows;
+  assert.equal(rows.length, 5);
+  assert.deepEqual(rows.map((r) => r.name), [barRow.name, work.name, barRow.name, work.name, railRow.name]);
+  assert.equal(res.rowId, rows[2].id);
+  assert.notEqual(rows[2].id, barRow.id); // 新しい行（IDは別）
+  assert.notEqual(rows[3].id, work.id);
+  assert.deepEqual(formLines(res.job, S, 'yukuhashi').map((l) => [l.text, l.amount]), [
+    ['TOTO TS136GY6 インテリアバー', 6400],
+    ['同上施工費', 2000],
+    ['TOTO TS136GY6 インテリアバー', 6400],
+    ['同上施工費', 2000],
+    ['サンプル S-TS35 木の手すり 35φ 4m', 16000],
+  ]);
+  // 同上施工費の行・ない行はそのまま
+  assert.deepEqual(copyLine(job, work.id), {job, rowId: null});
+  assert.deepEqual(copyLine(job, 'no-such-row'), {job, rowId: null});
 });

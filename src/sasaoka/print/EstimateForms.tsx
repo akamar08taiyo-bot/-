@@ -5,7 +5,8 @@
 //   excl:行ID（介護保険の対象外）／overhead:all|target（諸経費）。明細の行には data-rows（もとになった入力の行）を付ける。
 //   金額のない施工費の行も出し、明細のあとに打ち込める空いた行（new:…、data-new）を1行足す。
 //   ほかの空いた行には data-blank を付ける（押すと、打ち込める行の同じ列を選ぶ）。
-//   明細の行の左（余白）には「＋」（data-ins：この行の下に空白の行を入れる）と「✕」（data-del：この行を消す。部材は同上施工費ごと）を出す。
+//   明細の行の左（余白）には「＋」（data-ins：この行の下に空白の行を入れる）・「コピー」（data-copy：部材の行を同上施工費ごとすぐ下にコピー）・
+//   「✕」（data-del：この行を消す。部材は同上施工費ごと）を出す。
 // 何も入っていない部材の行（line.blank）は、印刷でも空白の行（数量・単価・金額も出さない）
 
 import type {ReactNode} from 'react';
@@ -27,14 +28,21 @@ const ed = (editable: boolean, key: string | null) => (editable && key ? {'data-
 export type SheetOpts = {mark: '材' | '手'};
 
 /**
- * 見積書に直接入力するときの、明細の行の左のボタン：「＋」この行の下に1行入れる（空白の行）／「✕」この行を消す（部材は同上施工費ごと）。
+ * 見積書に直接入力するときの、明細の行の左のボタン：「＋」この行の下に1行入れる（空白の行）／「コピー」部材の行を同上施工費ごとすぐ下にコピー
+ * （施工費・空白の行にはない。並びがそろうよう、場所だけ空ける）／「✕」この行を消す（部材は同上施工費ごと）。
  * 印刷には出ない。文字は CSS で出す（欄の文字 innerText に混ざらないように）
  */
 function RowTools({line: l}: {line: FormLine}) {
   const name = l.text || (l.isWork ? '施工費' : l.blank ? '空白' : '部材');
+  const canCopy = !l.isWork && !l.blank;
   return (
     <span className="sheet-rowtools no-print">
       <button type="button" className="sheet-ins" data-ins={l.rowId} title="この行の下に1行入れる" aria-label={`${name}の行の下に1行入れる`} />
+      {canCopy ? (
+        <button type="button" className="sheet-copy" data-copy={l.rowId} title="この部材（と同上施工費）をすぐ下にコピー" aria-label={`${name}の行をコピー`} />
+      ) : (
+        <span className="sheet-copy sheet-copy-none" aria-hidden="true" />
+      )}
       <button
         type="button"
         className="sheet-del"
