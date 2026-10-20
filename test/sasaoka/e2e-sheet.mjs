@@ -133,6 +133,7 @@ const order = async () =>
 assert.deepEqual((await order()).slice(-2), ['サンプル S-TL01 L型手すり', 'サンプル S-EC01 エンドキャップ']);
 // 行を動かすボタン・介護保険の対象外のチェック・下に1行入れる・この行を消す はツールバーに出さない（行の左の「＋」「✕」と、欄で切り替える）
 for (const name of ['↓ 下に1行入れる', '▲ 上へ', '▼ 下へ', 'この行を消す', 'この部材（と同上施工費）を消す']) assert.equal(await sheet.getByRole('button', {name, exact: true}).count(), 0, name);
+assert.equal(await sheet.getByRole('button', {name: '📋 部材リストから入れる'}).count(), 1);
 assert.equal(await sheet.getByLabel('介護保険の対象外').count(), 0);
 // 対象外金額の欄でスペース → 介護保険の対象外
 await sheet.locator('.form-page tr', {hasText: 'L型手すり'}).first().locator('[data-edit^="excl:"]').last().click();

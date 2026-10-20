@@ -556,7 +556,7 @@ export function EstimateSheet({
       </div>
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm">
         <button type="button" className="sheet-tool" onClick={() => onPickMaterial(place?.id ?? null)} title="選んでいる行の箇所に入れます（いちばん下の行なら最後の箇所）">
-          📋 部材リスト・★お気に入りから入れる
+          📋 部材リストから入れる
         </button>
         <button
           type="button"

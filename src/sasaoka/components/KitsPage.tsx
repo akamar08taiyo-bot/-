@@ -1,6 +1,6 @@
 // 部材・施工費マスタの「部材＋施工費（常用）」：よく使う部材と施工費（笹岡工務店の取付手間）の組み合わせ（セット）を登録・直す。
 // 見積書・請求書の「＋ 部材＋施工費（常用）から入れる」で、まとめて1回で入れられる（入れるときは部材リスト・施工費の今の単価）。
-// 部材の行の「🔧 施工費」で数えた手間はその部材のすぐ下に入り、見積書ではその部材の「同上施工費」になる。
+// 部材は「📋 部材リストから入れる」で選び、部材の行の「🔧 施工費」で数えた手間はその部材のすぐ下に入り、見積書ではその部材の「同上施工費」になる。
 
 import {useLayoutEffect, useRef, useState} from 'react';
 import {estimateAmount, estimatePlaceLines, estimateUnitPrice, placeTotals, rowAmount, shikiriPrice} from '../calc.ts';
@@ -247,7 +247,7 @@ function KitCard({
 
       <div className="flex flex-wrap items-center gap-2 px-4 py-3">
         <Btn small color="emerald" onClick={onPickMaterial}>
-          📋 部材を入れる（部材リスト・★お気に入り）
+          📋 部材リストから入れる
         </Btn>
         <Btn small color="sky" onClick={() => onPickLabor(null)}>
           🔧 施工費を入れる（笹岡工務店の手間）

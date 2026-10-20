@@ -269,7 +269,7 @@ await page.getByRole('region', {name: 'セット「（サンプル）I型手す�
 await page.getByRole('button', {name: '＋ 新しいセットを登録'}).click();
 await page.keyboard.type('トイレ L型手すり'); // 名前の欄が選ばれている
 const kitCard = page.getByRole('region', {name: 'セット「トイレ L型手すり」'});
-await kitCard.getByRole('button', {name: /部材を入れる/}).click();
+await kitCard.getByRole('button', {name: '📋 部材リストから入れる'}).click();
 await page.getByRole('dialog').getByRole('row', {name: /L型手すり/}).getByRole('button', {name: '＋ 追加'}).click();
 await page.getByRole('button', {name: '選び終わったら閉じる'}).click();
 await kitCard.getByRole('button', {name: 'L型手すりの施工費を数える'}).click();
