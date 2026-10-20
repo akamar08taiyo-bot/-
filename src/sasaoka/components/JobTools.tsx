@@ -23,6 +23,7 @@ export function copyJob(job: Job): Job {
     insuredNo: '',
     overhead: null,
     overheadTarget: null,
+    order: null, // 発注書はコピーした見積書から作り直す
     createdAt: now,
     updatedAt: now,
   };

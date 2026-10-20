@@ -8,11 +8,13 @@ import {dateLabel, monthEnd, monthLabel, num, shortDate, staffShort, todayIso, y
 import {useDocMeta} from './docMeta.ts';
 import type {DocMeta} from './docMeta.ts';
 import {KouikiForm, YukuhashiForm} from './EstimateForms.tsx';
+import {OrderDoc} from './OrderDoc.tsx';
 
 export type PrintRequest =
   | {kind: 'invoice'; month: string; withDetails: boolean}
   | {kind: 'job'; jobId: string}
-  | {kind: 'estimate'; jobId: string};
+  | {kind: 'estimate'; jobId: string}
+  | {kind: 'order'; jobId: string}; // 見積書の部材の発注書（A4縦）
 
 /** 用紙の幅（A4縦 210mm・横 297mm）＋まわりの余白。画面がこれより狭いと、用紙全体が見えるように縮めて見せる */
 const pagePx = (mm: number) => (mm / 25.4) * 96 + 16;
@@ -61,6 +63,7 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
     else {
       const j = data.jobs.find((x) => x.id === request.jobId);
       if (j && request.kind === 'estimate') document.title = `${FORM_INFO[jobForm(j, data.settings)].title}_${j.customer.trim() || 'お客様'}様`;
+      else if (j && request.kind === 'order') document.title = `発注書_${j.customer.trim() || 'お客様'}様`;
       else if (j) document.title = `${data.settings.clientName}仕切り計算表_${jobName(j)}`;
     }
     return () => {
@@ -84,6 +87,8 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
     const job = data.jobs.find((j) => j.id === request.jobId);
     sheets = !job ? (
       <div className="sheet">見つかりませんでした</div>
+    ) : request.kind === 'order' ? (
+      <OrderDoc job={job} data={data} />
     ) : request.kind === 'estimate' ? (
       form === 'kouiki' ? (
         <KouikiForm job={job} settings={data.settings} />
@@ -101,7 +106,7 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
       {form && <style>{'@media print { @page { size: A4 landscape; margin: 0; } }'}</style>}
       <div className="print-toolbar">
         <div className="text-sm font-bold">
-          {form ? `見積書（A4横）・${FORM_INFO[form].name}「${FORM_INFO[form].title}」` : '印刷イメージ（A4縦）'}
+          {form ? `見積書（A4横）・${FORM_INFO[form].name}「${FORM_INFO[form].title}」` : request.kind === 'order' ? '発注書（A4縦）' : '印刷イメージ（A4縦）'}
           <span className="ml-2 hidden font-normal text-slate-300 sm:inline">印刷の画面で「PDFに保存」を選ぶとPDFにできます</span>
         </div>
         {form === 'yukuhashi' && (

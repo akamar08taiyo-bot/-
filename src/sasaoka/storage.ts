@@ -7,7 +7,7 @@
 
 import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES, SETTINGS_REV, STAFF_FULL_NAMES} from './defaults.ts';
 import {guessPieceLengthM} from './priceImport.ts';
-import type {AppData, EstimateForm, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, Place, Rounding, Row, Settings, TaxMode} from './types.ts';
+import type {AppData, EstimateForm, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, Rounding, Row, Settings, TaxMode} from './types.ts';
 import {uid} from './util.ts';
 
 const DB_NAME = 'taiyo-sasaoka-shikiri';
@@ -230,6 +230,42 @@ const cleanPlace = (p: Record<string, unknown>): Place => ({
 
 const SUFFIXES: NameSuffix[] = ['様邸', '様', ''];
 
+const cleanOrderLine = (l: Record<string, unknown>): OrderLine => ({
+  key: str(l.key).startsWith('add:') ? str(l.key) : uid('add:'), // 持っておくのは発注書で足した行だけ
+  refId: typeof l.refId === 'string' ? l.refId : null,
+  maker: str(l.maker),
+  code: str(l.code),
+  name: str(l.name),
+  unit: str(l.unit),
+  qty: Math.max(0, numv(l.qty, 1)),
+  calc: 0,
+  lengthMm: Math.max(0, numv(l.lengthMm)),
+  price: numv(l.price),
+  listPrice: numv(l.listPrice),
+  detail: str(l.detail),
+  warn: str(l.warn),
+});
+
+/** 発注書で手で直したところ（なければ null ＝ 見積書から計算したまま） */
+function cleanOrder(raw: unknown): OrderEdits | null {
+  if (!isObj(raw)) return null;
+  const qty: Record<string, number> = {};
+  if (isObj(raw.qty)) {
+    for (const [k, v] of Object.entries(raw.qty)) {
+      const n = numv(v, NaN);
+      if (Number.isFinite(n) && n >= 0) qty[k] = n;
+    }
+  }
+  return {
+    qty,
+    removed: Array.isArray(raw.removed) ? raw.removed.filter((k): k is string => typeof k === 'string') : [],
+    added: Array.isArray(raw.added) ? raw.added.filter(isObj).map(cleanOrderLine) : [],
+    supplier: str(raw.supplier),
+    date: /^\d{4}-\d{2}-\d{2}$/.test(str(raw.date)) ? str(raw.date) : '',
+    note: str(raw.note),
+  };
+}
+
 export function cleanJobs(raw: unknown): Job[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter(isObj).map((j) => ({
@@ -247,6 +283,7 @@ export function cleanJobs(raw: unknown): Job[] {
     overheadTarget: optNum(j.overheadTarget),
     shikiri: j.shikiri !== false, // 見積書作成アプリができる前の様邸は、どれも仕切り計算・請求書アプリで作ったもの
     places: Array.isArray(j.places) ? j.places.filter(isObj).map(cleanPlace) : [],
+    order: cleanOrder(j.order),
     createdAt: numv(j.createdAt, Date.now()),
     updatedAt: numv(j.updatedAt, Date.now()),
   }));

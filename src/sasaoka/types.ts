@@ -73,6 +73,36 @@ export type Kit = {
   updatedAt: number;
 };
 
+/**
+ * 発注書の1行（何を何個・何本・何枚発注するか）。見積書の部材から作る（order.ts）。
+ * 切って使う部材は、1本の長さ（4000mm・2000mm）ごとに1行
+ */
+export type OrderLine = {
+  key: string; // 見積書から作った行の目印（同じ部材・同じ長さ）。発注書で足した行は 'add:' から始まる
+  refId: string | null; // 部材リストのID（手入力の行・部材リストにない 2000mm の品は null）
+  maker: string;
+  code: string; // 品番
+  name: string; // 品名
+  unit: string; // 単位（本・枚・個など）
+  qty: number; // 発注する数
+  calc: number; // 見積書から計算した数（発注書で足した行は 0）
+  lengthMm: number; // 切って使う部材の1本の長さ（mm）。0 なら長さでは数えない
+  price: number; // 仕切価格（1つあたり・税抜）
+  listPrice: number; // 定価（1つあたり・税抜）
+  detail: string; // 内訳（使う長さの計算など）
+  warn: string; // 確かめてほしいこと（2000mm の品が部材リストにない など）
+};
+
+/** 発注書で手で直したところ。見積書から計算した行に重ねるので、見積書を直しても手で直したところは残る */
+export type OrderEdits = {
+  qty: Record<string, number>; // 数を直した行（key → 数）
+  removed: string[]; // 消した行（key）
+  added: OrderLine[]; // 発注書で足した行
+  supplier: string; // 発注先
+  date: string; // 発注日 'YYYY-MM-DD'（空なら印刷した日）
+  note: string; // 備考（発注書のいちばん下に出す）
+};
+
 /** 1件（○○様邸） */
 export type Job = {
   id: string;
@@ -91,6 +121,7 @@ export type Job = {
   // 見積書作成アプリで作った見積書は、「笹岡工務店の請求書に入れる」を選んだものだけ入れる
   shikiri: boolean;
   places: Place[];
+  order?: OrderEdits | null; // 発注書で手で直したところ（なければ見積書から計算したまま）
   createdAt: number;
   updatedAt: number;
 };

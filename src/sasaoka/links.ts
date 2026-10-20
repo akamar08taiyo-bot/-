@@ -1,7 +1,7 @@
 // 見積書・請求書・部材と施工費のマスタは、タブで切り替える1つのアプリ。
 // 太陽ポータル（taiyo-portal）の2つのフォルダ（jutaku-mitsumori/・sasaoka/）に同じアプリを置き、最初に開くタブだけを変える。
 // 同じサイトなので、データ（IndexedDB）も同じものを使う。
-// 開いているタブ・見積書（様邸）は、URL のうしろに #tab=…&job=… で残す（読み直しても同じ所を開く）。
+// 開いているタブ・見積書（様邸）・発注書は、URL のうしろに #tab=…&job=…&view=order で残す（読み直しても同じ所を開く）。
 
 export const PORTAL_URL = 'https://akamar08taiyo-bot.github.io/taiyo-portal/';
 
@@ -10,21 +10,21 @@ export const APP_TITLE = '住宅改修 見積書・請求書（笹岡工務店�
 export type MainTab = 'estimate' | 'invoice' | 'master' | 'settings';
 const TABS: MainTab[] = ['estimate', 'invoice', 'master', 'settings'];
 
-/** URL のうしろの #tab=…&job=…（前の版の #job=… だけのときは、タブは null） */
-export function readHash(): {tab: MainTab | null; job: string | null} {
+/** URL のうしろの #tab=…&job=…&view=order（前の版の #job=… だけのときは、タブは null）。view=order は見積書の発注書 */
+export function readHash(): {tab: MainTab | null; job: string | null; order: boolean} {
   try {
     const p = new URLSearchParams(location.hash.replace(/^#/, ''));
     const tab = p.get('tab');
-    return {tab: TABS.includes(tab as MainTab) ? (tab as MainTab) : null, job: p.get('job') || null};
+    return {tab: TABS.includes(tab as MainTab) ? (tab as MainTab) : null, job: p.get('job') || null, order: p.get('view') === 'order'};
   } catch {
-    return {tab: null, job: null};
+    return {tab: null, job: null, order: false};
   }
 }
 
-/** 開いているタブ・見積書（様邸）を URL に残す。書き換えられない所では何もしない */
-export function writeHash(tab: MainTab, jobId: string | null) {
+/** 開いているタブ・見積書（様邸）・発注書を URL に残す。書き換えられない所では何もしない */
+export function writeHash(tab: MainTab, jobId: string | null, order = false) {
   try {
-    const hash = `#tab=${tab}${jobId ? `&job=${encodeURIComponent(jobId)}` : ''}`;
+    const hash = `#tab=${tab}${jobId ? `&job=${encodeURIComponent(jobId)}${order ? '&view=order' : ''}` : ''}`;
     if (hash !== location.hash) history.replaceState(null, '', location.pathname + location.search + hash);
   } catch {
     /* 書き換えられなくても困らない */

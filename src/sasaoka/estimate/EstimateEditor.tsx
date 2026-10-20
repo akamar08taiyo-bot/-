@@ -26,6 +26,7 @@ export function EstimateEditor({
   onBack,
   onOpen,
   onOpenInvoice,
+  onOpenOrder,
   onPrint,
   onSave,
   onManageKits,
@@ -36,6 +37,7 @@ export function EstimateEditor({
   onBack: () => void;
   onOpen: (id: string) => void;
   onOpenInvoice: (id: string) => void; // 「請求書を確認する」で同じ様邸の仕切り計算表を開く
+  onOpenOrder: () => void; // この見積書の部材の発注書を開く
   onPrint: (r: PrintRequest) => void;
   onSave: () => Promise<boolean>; // まだ保存していない変更をすぐ保存する（保存できたら true）
   onManageKits?: () => void; // 部材・施工費マスタの「部材＋施工費（常用）」を開く
@@ -125,6 +127,9 @@ export function EstimateEditor({
           </Btn>
           <Btn color="sky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
             🖨 見積書を印刷
+          </Btn>
+          <Btn color="teal" onClick={onOpenOrder} title="見積書に入っている部材を、何を何個（何本・何枚）発注するかにまとめます。販売受注簿にも転記できます">
+            🛒 発注書を作成
           </Btn>
           <Btn color="white" onClick={duplicate}>
             複製

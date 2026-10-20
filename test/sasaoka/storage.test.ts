@@ -97,3 +97,30 @@ test('笹岡工務店の請求書に入れるか：前の版の様邸は入れ�
   assert.equal(cleanJobs([{id: 'a', shikiri: true}])[0].shikiri, true);
   assert.equal(cleanJobs([{id: 'a', shikiri: false}])[0].shikiri, false);
 });
+
+test('発注書で直したところ：前のデータ（なし）は null。直した数・消した行・足した行を読み直せる', () => {
+  assert.equal(cleanJobs([{id: 'j'}])[0].order, null);
+  const [j] = cleanJobs([
+    {
+      id: 'j',
+      order: {
+        qty: {'bar:a': 2, 'qty:b': '3', bad: 'x', neg: -1},
+        removed: ['qty:c', 4],
+        added: [{key: 'add:1', name: 'ブラケット', code: 'BR-1', unit: '個', qty: 2, price: 500}, {name: '鍵のない行'}],
+        supplier: 'ケアマックス',
+        date: '2026-10-20',
+        note: '午前中に納品',
+      },
+    },
+  ]);
+  assert.deepEqual(j.order?.qty, {'bar:a': 2, 'qty:b': 3});
+  assert.deepEqual(j.order?.removed, ['qty:c']);
+  assert.deepEqual(
+    j.order?.added.map((l) => [l.key.startsWith('add:'), l.name, l.qty]),
+    [
+      [true, 'ブラケット', 2],
+      [true, '鍵のない行', 1],
+    ],
+  );
+  assert.deepEqual([j.order?.supplier, j.order?.date, j.order?.note], ['ケアマックス', '2026-10-20', '午前中に納品']);
+});

@@ -18,6 +18,7 @@ import {SettingsPage} from './components/SettingsPage.tsx';
 import {ToastProvider} from './components/ui.tsx';
 import {EstimateEditor} from './estimate/EstimateEditor.tsx';
 import {EstimateHome, EstimateList, newEstimate} from './estimate/EstimateList.tsx';
+import {OrderPage} from './estimate/OrderPage.tsx';
 import {APP_TITLE, PORTAL_URL, readHash, writeHash} from './links.ts';
 import type {MainTab} from './links.ts';
 import {PrintView} from './print/PrintView.tsx';
@@ -70,6 +71,8 @@ export default function App({start}: {start: MainTab}) {
   // 見積もりを作成する：最初の画面（新規作成・一覧から作成）か、月ごとの一覧か
   // URL から見積書を開いたとき（読み直したとき）は、戻ると一覧
   const [estimateView, setEstimateView] = useState<'home' | 'list'>(estimateId ? 'list' : 'home');
+  // 見積書から開いた発注書（見積書を閉じると閉じる）
+  const [orderOpen, setOrderOpen] = useState(!!estimateId && initial.order);
   const [estimateMonth, setEstimateMonth] = useState(thisMonth);
   const [month, setMonth] = useState(loadMonth); // 請求書を確認する：請求する月
   const [masterTab, setMasterTab] = useState<MasterTab>('materials');
@@ -93,8 +96,12 @@ export default function App({start}: {start: MainTab}) {
     if (invoiceJob) setMonth(invoiceJob.month);
   }, [invoiceJob?.id]);
   useEffect(() => {
-    if (loaded) writeHash(tab, tab === 'estimate' ? (estimateJob?.id ?? null) : tab === 'invoice' ? (invoiceJob?.id ?? null) : null);
-  }, [loaded, tab, estimateJob?.id, invoiceJob?.id]);
+    if (loaded) writeHash(tab, tab === 'estimate' ? (estimateJob?.id ?? null) : tab === 'invoice' ? (invoiceJob?.id ?? null) : null, tab === 'estimate' && orderOpen);
+  }, [loaded, tab, estimateJob?.id, invoiceJob?.id, orderOpen]);
+  // 別の見積書を開いた・見積書を閉じたら、発注書も閉じる
+  useEffect(() => {
+    if (loaded && !estimateJob) setOrderOpen(false);
+  }, [loaded, estimateJob?.id]);
   useEffect(() => {
     document.title = APP_TITLE;
   }, []);
@@ -117,6 +124,7 @@ export default function App({start}: {start: MainTab}) {
         removeIfEmpty(estimateJob);
         setEstimateId(null);
         setEstimateView('home');
+        setOrderOpen(false);
       }
       if (t === 'invoice') {
         removeIfEmpty(invoiceJob);
@@ -133,6 +141,7 @@ export default function App({start}: {start: MainTab}) {
   // 見積書と請求書（仕切り計算表）を行き来する（同じ様邸を開く）
   const openEstimate = (id: string) => {
     setEstimateId(id);
+    setOrderOpen(false);
     setTab('estimate');
   };
   const openInvoice = (id: string) => {
@@ -199,7 +208,9 @@ export default function App({start}: {start: MainTab}) {
 
         <main className={`no-print mx-auto min-w-0 px-3 py-4 sm:px-4 ${theme.width}`}>
           {tab === 'estimate' &&
-            (estimateJob ? (
+            (estimateJob && orderOpen ? (
+              <OrderPage key={estimateJob.id} job={estimateJob} data={data} update={store.update} onBack={() => setOrderOpen(false)} onPrint={setPrint} />
+            ) : estimateJob ? (
               <EstimateEditor
                 key={estimateJob.id}
                 job={estimateJob}
@@ -211,6 +222,7 @@ export default function App({start}: {start: MainTab}) {
                 }}
                 onOpen={setEstimateId}
                 onOpenInvoice={openInvoice}
+                onOpenOrder={() => setOrderOpen(true)}
                 onPrint={setPrint}
                 onSave={store.flush}
                 onManageKits={() => goMaster('kits')}
