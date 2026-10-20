@@ -1,0 +1,367 @@
+// 見積書を Excel（.xlsx）で保存する。印刷する見積書（print/EstimateForms.tsx）と同じ書式・同じ数字で、
+// ページごとに下へ並べて改ページを入れる（Excel で開いて、そのまま印刷できる）。
+// 金額の欄は、Excel で数量・単価を直しても計算し直されるよう、元の見積書と同じ式（ROUNDDOWN(数量×単価) など）にする。
+// 式ではアプリと同じ金額にならない行（割り切れない長さの部材など）は、アプリの金額をそのまま書く。
+
+import {estimateTotals, rounddown} from './calc.ts';
+import type {EstimateTotals} from './calc.ts';
+import {circled, FORM_INFO, formLines, jobForm, KINDS, lineNote, paginate, reiwa, TOTAL_ROWS} from './estimateForms.ts';
+import type {FormLine} from './estimateForms.ts';
+import {fitLinesPt, fitText} from './print/fit.ts';
+import {issuerLines, KK, KK_FOOT, KK_NOTE_1, KK_NOTE_2, KK_ROWS, NOTE_KIND, NOTE_MARK, NOTE_PHOTO, totalRows, YK, YK_ROW} from './print/formLayout.ts';
+import type {Job, Settings} from './types.ts';
+import {cellRef, SheetBuilder, writeXlsx} from './xlsxWrite.ts';
+import type {XEdges, XSheet, XStyle} from './xlsxWrite.ts';
+
+export const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+const GOTHIC = 'ＭＳ Ｐゴシック';
+const MINCHO = 'ＭＳ Ｐ明朝';
+const MONEY = '#,##0';
+
+/**
+ * 印刷の見積書の欄の印（'ml mr nr' など）を罫線にする。ruled は罫線のある行（ふだんは細線）。
+ * ml・mr・mt・mb は太い線、nr・nl はその側の線なし、gap は左右が太い線、bt・bb は上・下の細線、box はまわりの細線
+ */
+function edges(cls: string, ruled: boolean): XEdges {
+  const has = new Set(cls.split(' '));
+  const e: XEdges = ruled || has.has('box') ? {l: 'thin', r: 'thin', t: 'thin', b: 'thin'} : {};
+  if (has.has('bt')) e.t = 'thin';
+  if (has.has('bb')) e.b = 'thin';
+  if (has.has('ml') || has.has('gap')) e.l = 'medium';
+  if (has.has('mr') || has.has('gap')) e.r = 'medium';
+  if (has.has('mt')) e.t = 'medium';
+  if (has.has('mb')) e.b = 'medium';
+  if (has.has('nr')) e.r = 'hidden';
+  if (has.has('nl')) e.l = 'hidden';
+  return e;
+}
+
+/** 欄の印の r（右寄せ）・c（中央） */
+function align(cls: string): XStyle['h'] {
+  const has = new Set(cls.split(' '));
+  return has.has('r') ? 'right' : has.has('c') ? 'center' : undefined;
+}
+
+/** 文字の大きさ。折り返してよい欄（lines が2以上）は印刷と同じ大きさで折り返す。1行の欄は Excel の「縮小して全体を表示」 */
+function fit(text: string, w: number, h: number, maxPt: number, lines = 1): XStyle {
+  return lines > 1 ? {size: fitText(text, w, h, maxPt, lines).pt, wrap: true} : {size: maxPt, shrink: true};
+}
+
+const money = (size: number): XStyle => ({size, numFmt: MONEY, shrink: true});
+const count = (size: number): XStyle => ({size, shrink: true});
+/** 数量は印刷と同じく小数3けたまで */
+const qty3 = (n: number) => Math.round(n * 1000) / 1000;
+const pct = (rate: number) => Math.round(rate * 1000) / 10;
+
+/** 金額＝ROUNDDOWN(数量×単価) の式。式の答えがアプリの金額と違うとき（割り切れない長さを丸めた数量など）は使わない */
+function amountFormula(qty: number, price: number, amount: number, qtyCell: string, priceCell: string): string | undefined {
+  return rounddown(qty * price) === amount ? `ROUNDDOWN(${qtyCell}*${priceCell},0)` : undefined;
+}
+
+/**
+ * 合計の欄（小計・諸経費・消費税・合計）の式。col は金額の列、ranges は明細の金額の範囲（ページごと）。
+ * 諸経費を手で直してあれば、その金額をそのまま書く
+ */
+function totalFormulas(col: number, top: number, ranges: string[], manualOverhead: boolean, s: Settings): (string | undefined)[] {
+  const [sub, oh, tax] = [cellRef(top, col), cellRef(top + 1, col), cellRef(top + 2, col)];
+  return [
+    `SUM(${ranges.join(',')})`,
+    manualOverhead ? undefined : `ROUNDDOWN(${sub}*${s.estimateOverheadRate},0)`,
+    `ROUNDDOWN((${sub}+${oh})*${s.taxRate},0)`,
+    `${sub}+${oh}+${tax}`,
+  ];
+}
+
+/** 介護保険の対象の諸経費を手で直してあるか（対象外の行がなければ全体と同じ諸経費） */
+function manualTargetOverhead(job: Job, t: EstimateTotals): boolean {
+  return t.excluded === 0 ? job.overhead != null : job.overheadTarget != null;
+}
+
+// ================================================================ 苅田町・行橋市・みやこ町用「工事費見積書兼工事費内訳書」
+
+function yukuhashiSheet(job: Job, s: Settings, date: string): XSheet {
+  const b = new SheetBuilder();
+  const per = FORM_INFO.yukuhashi.perPage;
+  const pages = paginate(formLines(job, s, 'yukuhashi'), per);
+  const t = estimateTotals(job, s);
+  const totals = totalRows(t);
+  const name = job.customer.trim();
+  const issuer = issuerLines(job, s);
+  const issuerPt = Math.min(...issuer.map((l) => fitText(l, YK.H + YK.I + YK.J + YK.K + YK.L + YK.M, 5, 11).pt));
+  const ranges = {all: [] as string[], target: [] as string[]};
+
+  pages.forEach((page, pi) => {
+    const last = pi === pages.length - 1;
+    if (pi > 0) b.pageBreak();
+    const title = b.row(10.05);
+    b.put(title, 0, `①　${FORM_INFO.yukuhashi.title}`, {size: 24, h: 'center'}, {}, 1, 13);
+    const [r2, r3, r4, r5] = [b.row(5.82), b.row(7.67), b.row(7.67), b.row(7.67)];
+    b.put(r2, 7, pi === 0 ? issuer.join('\n') : null, {size: issuerPt, h: 'left', v: 'bottom', wrap: true}, {}, 4, 6);
+    b.put(r3, 0, name || null, {size: 18, h: 'center', shrink: true}, edges('bb', false), 1, 2);
+    b.put(r3, 2, '様邸　住宅改修', {size: 12});
+    b.put(r4, 0, pi === 0 ? `介護保険被保険者番号（${job.insuredNo.trim() || '　　　　　　　　　　'}）` : null, {size: 12, shrink: true}, edges('bb', false), 1, 3);
+    b.put(r5, 0, '工事場所（住所）', {size: 12, shrink: true}, edges('bt bb', false));
+    b.put(r5, 1, job.address || null, {size: 11, shrink: true}, edges('bt bb', false), 1, 2);
+    b.row(5.03);
+
+    const [h1, h2] = [b.row(10.53), b.row(5.03)];
+    const th = (r: number, c: number, text: string, cls: string, rs = 1, cs = 1) =>
+      b.put(r, c, text, {size: 10.5, h: 'center', wrap: true}, edges(cls, true), rs, cs);
+    th(h1, 0, '改修内容\n（付帯工事含む）', 'ml mt mb', 2);
+    th(h1, 1, '改修場所\n（写真No．）', 'mt mb', 2);
+    th(h1, 2, '内容（　規格・範囲　）', 'mt mb', 2);
+    th(h1, 3, '数量', 'mt mb', 2, 2);
+    th(h1, 5, '単価', 'mt mb', 2);
+    th(h1, 6, '金額', 'mt mb mr', 2);
+    th(h1, 7, '介護保険対象部分', 'mt mr', 1, 4);
+    th(h1, 11, '介護保険\n対象外金額', 'mt mb mr', 2);
+    th(h1, 12, '備考（定価等）', 'mt mb mr', 2);
+    th(h2, 7, '数量', 'mb', 1, 2);
+    th(h2, 9, '単価', 'mb');
+    th(h2, 10, '金額', 'mb mr');
+
+    const first = b.rows.length; // 明細の最初の行
+    const detailEnd = first + (last ? per - TOTAL_ROWS : per) - 1;
+    ranges.all.push(`${cellRef(first, 6)}:${cellRef(detailEnd, 6)}`);
+    ranges.target.push(`${cellRef(first, 10)}:${cellRef(detailEnd, 10)}`);
+    const top = first + per - TOTAL_ROWS; // 小計の行
+    const fAll = totalFormulas(6, top, ranges.all, job.overhead != null, s);
+    const fTarget = totalFormulas(10, top, ranges.target, manualTargetOverhead(job, t), s);
+    for (let i = 0; i < per; i++) {
+      const r = b.row(YK_ROW);
+      const bottom = i === per - 1 ? ' mb' : '';
+      const put = (c: number, v: string | number | null, cls: string, st: XStyle = {}, f?: string) =>
+        b.put(r, c, v, {...st, h: align(cls) ?? st.h}, edges(cls + bottom, true), 1, 1, f);
+      const ti = i - (per - TOTAL_ROWS);
+      if (last && ti >= 0) {
+        const [label, all, target] = totals[ti];
+        put(0, null, 'ml');
+        put(1, null, '');
+        put(2, label, 'c', {size: 9, bold: true});
+        put(3, null, 'nr');
+        put(4, null, 'nl');
+        put(5, null, '');
+        put(6, all, 'r mr', money(11), fAll[ti]);
+        put(7, null, 'nr');
+        put(8, null, 'nl');
+        put(9, null, '');
+        put(10, target, 'r mr', money(11), fTarget[ti]);
+        put(11, null, 'mr');
+        put(12, null, 'mr');
+        continue;
+      }
+      const l = page[i];
+      if (!l) {
+        ['ml', '', '', 'nr', 'nl', '', 'mr', 'nr', 'nl', '', 'mr', 'mr', 'mr'].forEach((cls, c) => put(c, null, cls));
+        continue;
+      }
+      ykLine(l, r, put);
+    }
+  });
+
+  const d = reiwa(date);
+  return b.sheet({
+    name: name ? `${name}様` : '見積書',
+    cols: Object.values(YK),
+    landscape: true,
+    scale: 98, // パソコン・プリンターで列の幅が少し変わっても、右の列が次のページに行かないように
+    margins: {l: 15, r: 10, t: 20, b: 15, header: 13, footer: 11},
+    header: `&R作成日　令和${d ? d.y : '　'}年${d ? d.m : '　　'}月${d ? d.d : '　　'}日`,
+    footer: '&Cページ　&P　／　&N',
+    font: {name: GOTHIC, size: 11},
+  });
+}
+
+type Put = (c: number, v: string | number | null, cls: string, st?: XStyle, f?: string) => void;
+
+function ykLine(l: FormLine, r: number, put: Put) {
+  const target = !l.excluded;
+  const q = qty3(l.qty);
+  const [D, F, G] = [cellRef(r, 3), cellRef(r, 5), cellRef(r, 6)];
+  const place = `${circled(l.photo)}${l.placeName}`;
+  put(0, l.first ? l.work || null : null, 'ml', fit(l.work, YK.A, YK_ROW, 11));
+  put(1, l.first ? place : null, '', fit(place, YK.B, YK_ROW, 11));
+  put(2, l.text || null, '', fit(l.text, YK.C, YK_ROW, 9, 2));
+  put(3, q, 'r nr', count(9));
+  put(4, l.unit || null, 'nl', fit(l.unit, YK.E, YK_ROW, 11));
+  put(5, l.unitPrice, 'r', money(11));
+  put(6, l.amount, 'r mr', money(11), amountFormula(q, l.unitPrice, l.amount, D, F));
+  // 介護保険対象部分は左の数量・単価・金額と同じ（左を直せば、こちらも変わる）
+  put(7, target ? q : null, 'r nr', count(9), target ? D : undefined);
+  put(8, target ? l.unit || null : null, 'nl', fit(l.unit, YK.I, YK_ROW, 11));
+  put(9, target ? l.unitPrice : null, 'r', money(11), target ? F : undefined);
+  put(10, target ? l.amount : null, 'r mr', money(11), target ? G : undefined);
+  put(11, target ? null : l.amount, 'r mr', money(11), target ? undefined : G);
+  // 備考（定価等）：「定価8,000円（税抜）×0.8」。切って使う部材は「定価20,000円（4m）×0.8」と「600÷4000＝0.15」の2行
+  const note = lineNote(l, 'yukuhashi', 0);
+  put(12, note.join('\n') || null, 'mr', note.length > 1 ? {size: fitLinesPt(note, YK.M, YK_ROW, 11), wrap: true} : fit(note[0] ?? '', YK.M, YK_ROW, 11));
+}
+
+// ================================================================ 広域連合用「住宅改修内訳明細書」（福岡県介護保険広域連合の様式）
+
+function kouikiSheet(job: Job, s: Settings): XSheet {
+  const b = new SheetBuilder();
+  const per = FORM_INFO.kouiki.perPage;
+  const pages = paginate(formLines(job, s, 'kouiki'), per);
+  const t = estimateTotals(job, s);
+  const totals = totalRows(t);
+  const tax = pct(s.taxRate);
+  const ranges = {all: [] as string[], target: [] as string[]};
+  // 本文は明朝、数字の欄（印刷の gothic）はゴシック
+  const font = (cls: string) => (cls.split(' ').includes('gothic') ? GOTHIC : MINCHO);
+
+  pages.forEach((page, pi) => {
+    const last = pi === pages.length - 1;
+    if (pi > 0) b.pageBreak();
+    const r1 = b.row(4.35);
+    b.put(r1, 0, '内訳書　様式', {font: MINCHO, size: 9, h: 'center'}, edges('box', false), 1, 2);
+    b.put(r1, 11, NOTE_PHOTO, {font: MINCHO, size: 8, shrink: true}, {}, 1, 7);
+    const r2 = b.row(4.6);
+    b.put(r2, 0, NOTE_MARK, {font: MINCHO, size: 8, shrink: true}, {}, 1, 11);
+    b.put(r2, 11, NOTE_KIND, {font: MINCHO, size: 8, shrink: true}, {}, 1, 7);
+
+    const th = (r: number, c: number, text: string | null, cls: string, st: XStyle = {}, cs = 1) =>
+      b.put(r, c, text, {font: MINCHO, size: 9, h: 'center', wrap: true, ...st}, edges(cls, true), 1, cs);
+    const g = b.row(7.74);
+    th(g, 0, '改修箇所：箇所毎工事名称：部材・仕様記入欄', 'ml mt mb mr', {size: 11}, 4);
+    th(g, 4, null, 'gap mt mb');
+    th(g, 5, '全改修工事部分', 'ml mt mb mr', {size: 11}, 4);
+    th(g, 9, null, 'gap mt mb');
+    th(g, 10, '対象工事部分', 'ml mt mb mr', {size: 11}, 8);
+    const h = b.row(28.05);
+    th(h, 0, '改修箇所\n（室名）', 'ml mb');
+    th(h, 1, '改修箇所毎工事名称', 'mb');
+    th(h, 2, null, 'mb');
+    th(h, 3, '部材・仕様・・・・（材料）\n付属品を含めた単価を記入。\n手間・・・・・・（手間）', 'mb mr', {h: 'left', size: fitText('部材・仕様・・・・（材料）', KK.D, 10, 9).pt});
+    th(h, 4, null, 'gap mb');
+    th(h, 5, '数量', 'ml mb');
+    th(h, 6, '単位', 'mb');
+    th(h, 7, '単価', 'mb');
+    th(h, 8, '金額', 'mb mr');
+    th(h, 9, null, 'gap mb');
+    th(h, 10, '写\n真\n番\n号', 'ml mb');
+    th(h, 11, ['改修の種類', ...KINDS.map((k, i) => `${circled(i + 1)}${k}`)].join('\n'), 'mb', {
+      h: 'left',
+      bold: true,
+      size: fitText('①手すりの取付', KK.L, 4, 9).pt,
+    });
+    th(h, 12, '数量', 'ml mb');
+    th(h, 13, '単位', 'mb');
+    th(h, 14, '単価', 'mb');
+    th(h, 15, '金額', 'mb mr');
+    th(h, 16, '算出根拠', 'ml mb mr', {}, 2);
+
+    const first = b.rows.length;
+    const detailEnd = first + (last ? per - TOTAL_ROWS : per) - 1;
+    ranges.all.push(`${cellRef(first, 8)}:${cellRef(detailEnd, 8)}`);
+    ranges.target.push(`${cellRef(first, 15)}:${cellRef(detailEnd, 15)}`);
+    const top = first + per - TOTAL_ROWS;
+    const fAll = totalFormulas(8, top, ranges.all, job.overhead != null, s);
+    const fTarget = totalFormulas(15, top, ranges.target, manualTargetOverhead(job, t), s);
+    KK_ROWS.forEach((height, i) => {
+      const r = b.row(height);
+      const bottom = i === per - 1 ? ' mb' : '';
+      const put = (c: number, v: string | number | null, cls: string, st: XStyle = {}, f?: string) =>
+        b.put(r, c, v, {font: font(cls), ...st, h: align(cls) ?? st.h}, edges(cls + bottom, true), 1, 1, f);
+      const ti = i - (per - TOTAL_ROWS);
+      if (last && ti >= 0) {
+        const [label, all, target] = totals[ti];
+        const isTax = label === '消費税';
+        put(0, null, 'ml');
+        put(1, null, '');
+        put(2, null, '');
+        put(3, label, 'c mr', {size: 11});
+        put(4, null, 'gap');
+        put(5, isTax ? tax : null, 'r ml', {size: 11});
+        put(6, isTax ? '％' : null, '', {size: 11});
+        put(7, null, '');
+        put(8, all, 'r mr', money(11), fAll[ti]);
+        put(9, null, 'gap');
+        put(10, null, 'ml');
+        put(11, null, '');
+        put(12, isTax ? tax : null, 'r ml', {size: 11});
+        put(13, isTax ? '％' : null, '', {size: 11});
+        put(14, null, '');
+        put(15, target, 'r mr', money(11), fTarget[ti]);
+        b.put(r, 16, null, {font: MINCHO}, edges(`ml mr${bottom}`, true), 1, 2);
+        return;
+      }
+      const l = page[i];
+      if (!l) {
+        ['ml', '', '', 'mr', 'gap', 'ml', '', '', 'mr', 'gap', 'ml', '', 'ml', '', '', 'mr', 'ml', 'mr'].forEach((cls, c) => put(c, null, cls));
+        return;
+      }
+      kkLine(l, r, height, bottom, s.estimateHourRate, put, b);
+    });
+
+    const f1 = b.row(4.35);
+    b.put(f1, 1, KK_NOTE_1, {font: MINCHO, size: 10}, {}, 1, 14);
+    b.put(f1, 15, `Ｐ－${pi + 1}`, {font: MINCHO, size: 11}, {}, 1, 3);
+    const f2 = b.row(4.84);
+    b.put(f2, 1, KK_NOTE_2, {font: MINCHO, size: 10, shrink: true}, {}, 1, 17);
+  });
+
+  const name = job.customer.trim();
+  return b.sheet({
+    name: name ? `${name}様` : '見積書',
+    cols: Object.values(KK),
+    landscape: true,
+    scale: 96, // 列の幅の合計が用紙の幅ちょうどなので、少し縮めて1ページの幅に入れる
+    margins: {l: 16, r: 15, t: 16, b: 8, header: 8, footer: 3},
+    // 大きさの指定（&9）のすぐあとに数字を書くと大きさの一部になるので、2021.4 の前は空ける
+    footer: `&L&9${KK_FOOT[0]}&R&9 ${KK_FOOT[1]}`,
+    font: {name: GOTHIC, size: 11},
+  });
+}
+
+function kkLine(l: FormLine, r: number, height: number, bottom: string, hourRate: number, put: Put, b: SheetBuilder) {
+  const target = !l.excluded;
+  const q = qty3(l.qty);
+  const [F, H, I] = [cellRef(r, 5), cellRef(r, 7), cellRef(r, 8)];
+  const photo = circled(l.photo);
+  const kind = circled(l.kind);
+  put(0, l.first ? l.placeName || null : null, 'c ml', fit(l.placeName, KK.A, height, 11, 2));
+  put(1, l.first ? l.work || null : null, 'c', fit(l.work, KK.B, height, 11, 2));
+  put(2, l.mark, 'mark', {v: 'bottom'});
+  put(3, l.text || null, 'mr gothic', fit(l.text, KK.D, height, 9, 3));
+  put(4, null, 'gap');
+  put(5, q, 'r ml gothic', count(9));
+  put(6, l.unit || null, 'gothic', fit(l.unit, KK.G, height, 11));
+  put(7, l.unitPrice, 'r gothic', money(11));
+  put(8, l.amount, 'r mr gothic', money(11), amountFormula(q, l.unitPrice, l.amount, F, H));
+  put(9, null, 'gap');
+  put(10, l.first ? photo : null, 'c ml', fit(photo, KK.K, height, 11));
+  put(11, l.first ? kind : null, 'c', fit(kind, KK.L, height, 11));
+  // 対象工事部分は左の全改修工事部分と同じ（左を直せば、こちらも変わる）
+  put(12, target ? q : null, 'r ml gothic', count(9), target ? F : undefined);
+  put(13, target ? l.unit || null : null, 'gothic', fit(l.unit, KK.N, height, 11));
+  put(14, target ? l.unitPrice : null, 'r gothic', money(11), target ? H : undefined);
+  put(15, target ? l.amount : null, 'r mr gothic', money(11), target ? I : undefined);
+  // 算出根拠：「定価8,000円（税抜）×0.8」。施工費は「1時間2,500円」、切って使う部材は「定価20,000円（4m）×0.8」と「600÷4000＝0.15」の2行
+  const note = lineNote(l, 'kouiki', hourRate);
+  const basis = edges(`ml mr${bottom}`, true);
+  if (note.length === 1 && l.hourly && l.note === null) {
+    b.put(r, 16, note[0], {font: MINCHO, h: 'center', ...fit(note[0], KK.Q + KK.R, height, 11)}, basis, 1, 2);
+  } else if (note.length > 0) {
+    b.put(r, 16, note.join('\n'), {font: GOTHIC, size: fitLinesPt(note, KK.Q + KK.R, height, 10), wrap: true}, basis, 1, 2);
+  } else {
+    put(16, null, 'ml');
+    put(17, null, 'mr');
+  }
+}
+
+// ================================================================
+
+/** 保存するファイルの名前（印刷の PDF と同じ「書式の名前_お客様名様」に作成日を付ける） */
+export function estimateFileName(job: Job, s: Settings, date: string): string {
+  const who = (job.customer.trim() || 'お客様').replace(/[\\/:*?"<>|]/g, '_');
+  return `${FORM_INFO[jobForm(job, s)].title}_${who}様${date ? `_${date}` : ''}.xlsx`;
+}
+
+/** 見積書の .xlsx。date は作成日（'YYYY-MM-DD'。空なら作成日の欄は空ける） */
+export function estimateXlsx(job: Job, s: Settings, date: string): {bytes: Uint8Array; fileName: string} {
+  const form = jobForm(job, s);
+  const sheet = form === 'kouiki' ? kouikiSheet(job, s) : yukuhashiSheet(job, s, date);
+  return {bytes: writeXlsx([sheet]), fileName: estimateFileName(job, s, date)};
+}

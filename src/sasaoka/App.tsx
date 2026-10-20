@@ -195,6 +195,7 @@ export default function App({start}: {start: MainTab}) {
                 onOpen={setEstimateId}
                 onOpenInvoice={openInvoice}
                 onPrint={setPrint}
+                onSave={store.flush}
               />
             ) : estimateView === 'home' ? (
               <EstimateHome data={data} update={store.update} onNew={newOne} onList={() => setEstimateView('list')} goMaterials={() => goMaster()} />

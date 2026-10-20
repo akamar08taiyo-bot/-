@@ -32,15 +32,20 @@ export function fitText(text: string, widthMm: number, heightMm: number, maxPt: 
   return {pt: Math.max(minPt, Math.floor(best.pt * 10) / 10), lines: best.lines};
 }
 
-/** 決まった行（備考の「定価」と「長さの計算」など）を、それぞれ1行ずつ欄に入れる大きさ */
-export function fitLinesStyle(lines: string[], widthMm: number, heightMm: number, maxPt: number, minPt = 4.5): CSSProperties {
+/** 決まった行（備考の「定価」と「長さの計算」など）を、それぞれ1行ずつ欄に入れる文字の大きさ（pt） */
+export function fitLinesPt(lines: string[], widthMm: number, heightMm: number, maxPt: number, minPt = 4.5): number {
   const w = Math.max(1, widthMm - 1.6);
   let pt = Math.min(maxPt, (heightMm - 0.4) / (lines.length * LINE * MM_PER_PT));
   for (const l of lines) {
     const em = textEm(l);
     if (em > 0) pt = Math.min(pt, w / (em * MM_PER_PT));
   }
-  return {fontSize: `${Math.max(minPt, Math.floor(pt * 10) / 10)}pt`, lineHeight: LINE, whiteSpace: 'nowrap'};
+  return Math.max(minPt, Math.floor(pt * 10) / 10);
+}
+
+/** fitLinesPt の大きさを欄の style にする */
+export function fitLinesStyle(lines: string[], widthMm: number, heightMm: number, maxPt: number, minPt = 4.5): CSSProperties {
+  return {fontSize: `${fitLinesPt(lines, widthMm, heightMm, maxPt, minPt)}pt`, lineHeight: LINE, whiteSpace: 'nowrap'};
 }
 
 /** fitText の結果を欄の style にする */

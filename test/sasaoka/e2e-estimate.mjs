@@ -1,17 +1,20 @@
 // 住宅改修 見積書作成を確かめる：一覧（見積の合計・笹岡工務店の請求書の印・探す）・サンプルの見積書（定価×0.8・切って使う部材の数量・同上施工費）・
-// 見積の単価の手入力・部材ごとの施工費・一式・諸経費の手入力・介護保険の対象外・2つの書式（苅田町・行橋市・みやこ町用／広域連合用）の印刷・
-// 複製・削除・定価の取り込み
+// 見積の単価の手入力・部材ごとの施工費・一式・保存（ボタン・Ctrl+S）・Excel で保存・諸経費の手入力・介護保険の対象外・
+// 2つの書式（苅田町・行橋市・みやこ町用／広域連合用）の印刷・複製・削除・定価の取り込み
 // usage: node e2e-estimate.mjs <サイトのURL> <出力フォルダ>
 //   サイトは太陽ポータルと同じ形（<サイト>/jutaku-mitsumori/index.html と <サイト>/sasaoka/index.html）
 // Playwright はこのリポジトリの依存に入れていない。入っている場所を PLAYWRIGHT で指定できる（既定はクラウド環境の場所）
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import path from 'node:path';
+import {strFromU8, unzipSync} from 'fflate';
 
 const [site, outDir] = process.argv.slice(2);
 const FIX = path.join(path.dirname(new URL(import.meta.url).pathname), 'fixtures');
 const log = (...a) => console.log('•', ...a);
-const browser = await chromium.launch();
+// 文字の設定のない環境では、日本語のファイル名のダウンロードが「download」になるので UTF-8 にする
+const browser = await chromium.launch({env: {...process.env, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8'}});
 const errors = [];
 const ctx = await browser.newContext({viewport: {width: 1366, height: 900}, locale: 'ja-JP'});
 await ctx.addInitScript(() => localStorage.setItem('taiyo_portal_session', JSON.stringify({office: '行橋営業所'})));
@@ -105,6 +108,36 @@ assert.deepEqual(await totals(), ['合計', '55,369', '55,369']);
 log('一式を入れるOK');
 await page.screenshot({path: path.join(outDir, '50-estimate-app.png'), fullPage: true});
 
+// ---------------- 保存：ボタンと Ctrl+S（見積書の欄に打ち込んでいる途中の値も入れて保存）。読み直しても同じ
+const savedToasts = () => page.locator('[aria-live] > div', {hasText: '保存しました（この端末に保存されています'}).count();
+await page.getByRole('button', {name: '💾 保存'}).click();
+await page.locator('[aria-live] > div', {hasText: '保存しました（この端末に保存されています'}).first().waitFor();
+await cell('job:insuredNo').click();
+await page.keyboard.type('1111111111'); // Enter を押さずに Ctrl+S
+await page.keyboard.press('Control+s');
+for (let i = 0; i < 40 && (await savedToasts()) < 2; i++) await page.waitForTimeout(50);
+assert.equal(await savedToasts(), 2);
+await page.reload();
+await sheet.waitFor();
+assert.ok((await cell('job:insuredNo').innerText()).includes('1111111111'));
+assert.deepEqual(await totals(), ['合計', '55,369', '55,369']);
+await typeIn('job:insuredNo', '0000366989');
+log('保存（ボタン・Ctrl+S・読み直しても同じ）OK');
+
+// ---------------- Excel で保存：印刷する見積書と同じ形の .xlsx（金額は式。計算済みの値も入っている）
+const download = async (click) => {
+  const [dl] = await Promise.all([page.waitForEvent('download'), click()]);
+  const files = unzipSync(new Uint8Array(await readFile(await dl.path())));
+  return {name: dl.suggestedFilename(), sheet: strFromU8(files['xl/worksheets/sheet1.xml'])};
+};
+const yx = await download(() => page.getByRole('button', {name: '📗 Excelで保存'}).click());
+assert.match(yx.name, /^工事費見積書兼工事費内訳書_（サンプル）山田様_\d{4}-\d{2}-\d{2}\.xlsx$/);
+for (const t of ['（サンプル）山田', '介護保険被保険者番号（0000366989）', '1200÷4000＝0.3', '<f>ROUNDDOWN(D9*F9,0)</f><v>4800</v>', '<v>45760</v>', '<v>55369</v>', '令和']) {
+  assert.ok(yx.sheet.includes(t), `Excel に「${t}」がない`);
+}
+await page.locator('[aria-live] > div', {hasText: `Excel ファイル「${yx.name}」を保存しました`}).waitFor();
+log('Excelで保存（苅田町・行橋市・みやこ町用）OK');
+
 // ---------------- 苅田町・行橋市・みやこ町用の印刷
 await page.getByRole('button', {name: '🖨 見積書を印刷'}).click();
 await page.locator('.print-overlay').waitFor();
@@ -191,6 +224,15 @@ await search.fill('見つからない名前');
 assert.ok((await page.locator('main').innerText()).includes('見つかりませんでした'));
 await search.fill('');
 log('一覧の書式・探すOK');
+
+// ---------------- 一覧の「📗 Excel」：広域連合用の .xlsx（2ページ。介護保険の対象は対象外を除いた金額）
+const kx = await download(() => sampleRow.getByRole('button', {name: '📗 Excel'}).click());
+assert.match(kx.name, /^住宅改修内訳明細書_（サンプル）山田様_/);
+for (const t of ['内訳書　様式', 'Ｐ－1', 'Ｐ－2', '1時間2,500円', '<v>55369</v>', '<v>50094</v>', '<rowBreaks count="1"']) {
+  assert.ok(kx.sheet.includes(t), `Excel（広域連合用）に「${t}」がない`);
+}
+assert.equal(await page.getByRole('heading', {level: 1}).count(), 0); // 一覧のまま（見積書は開かない）
+log('一覧からExcelで保存（広域連合用）OK');
 
 // ---------------- 複製（今月分の請求書に入れて作る）→ 削除
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();

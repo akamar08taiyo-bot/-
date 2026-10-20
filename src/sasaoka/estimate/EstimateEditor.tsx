@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {jobName, jobTotals} from '../calc.ts';
 import {EstimateSheet} from '../components/EstimateSheet.tsx';
 import {LaborPickerFor, missingShikiri, shikiriFromList, ShikiriPriceDialog} from '../components/JobTools.tsx';
@@ -11,7 +11,7 @@ import {addMaterial, newPlace as makePlace, removeOneMaterial} from '../rows.ts'
 import type {AppData, EstimateForm, Job, Kit, Material, NameSuffix, Place} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {monthLabel, staffFull, thisMonth, yen} from '../util.ts';
-import {duplicateEstimate, removeEstimate} from './EstimateList.tsx';
+import {duplicateEstimate, removeEstimate, saveEstimateExcel} from './EstimateList.tsx';
 
 type Picker =
   | {placeId: string; kind: 'material'}
@@ -27,6 +27,7 @@ export function EstimateEditor({
   onOpen,
   onOpenInvoice,
   onPrint,
+  onSave,
 }: {
   job: Job;
   data: AppData;
@@ -35,6 +36,7 @@ export function EstimateEditor({
   onOpen: (id: string) => void;
   onOpenInvoice: (id: string) => void; // 「請求書を確認する」で同じ様邸の仕切り計算表を開く
   onPrint: (r: PrintRequest) => void;
+  onSave: () => Promise<boolean>; // まだ保存していない変更をすぐ保存する（保存できたら true）
 }) {
   const toast = useToast();
   const s = data.settings;
@@ -57,6 +59,31 @@ export function EstimateEditor({
   };
 
   const name = job.customer.trim() ? jobName(job) : '新しい見積書';
+  // 保存：打ち込むたびに自動で保存しているが、ボタン（と Ctrl+S）でもすぐ保存できる。
+  // 見積書の欄に打ち込んでいる途中なら、欄から離れて値を入れてから保存する
+  const save = () => {
+    const el = document.activeElement as HTMLElement | null;
+    el?.blur?.();
+    window.setTimeout(() => {
+      if (el?.matches('textarea, input')) el.focus({preventScroll: true}); // Ctrl+S のあとも続けて打ち込めるように
+      void onSave().then((ok) => {
+        if (ok) toast('保存しました（この端末に保存されています。「見積もりを作成する」の一覧からいつでも開けます）');
+        else toast('保存できませんでした。画面の上の表示を見てください。', 'error');
+      });
+    }, 0);
+  };
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 's') {
+        e.preventDefault(); // ブラウザの「ページを保存」ではなく、見積書を保存する
+        saveRef.current();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const removeJob = () => {
     if (removeEstimate(job, name, update, toast)) onBack();
   };
@@ -88,6 +115,12 @@ export function EstimateEditor({
           {FORM_INFO[form].name}「{FORM_INFO[form].title}」
         </span>
         <div className="ml-auto flex flex-wrap gap-2">
+          <Btn color="blue" onClick={save} title="この端末に保存します（Ctrl＋S でも保存できます）">
+            💾 保存
+          </Btn>
+          <Btn color="white" onClick={() => saveEstimateExcel(job, s, toast)} title="印刷する見積書と同じ形の Excel ファイル（.xlsx）を保存します">
+            📗 Excelで保存
+          </Btn>
           <Btn color="sky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
             🖨 見積書を印刷
           </Btn>

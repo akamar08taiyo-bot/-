@@ -3,12 +3,13 @@ import {estimateTotals, jobName} from '../calc.ts';
 import {copyJob} from '../components/JobTools.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_IDS, FORM_INFO, jobForm} from '../estimateForms.ts';
+import {estimateXlsx, XLSX_TYPE} from '../estimateXlsx.ts';
 import {readDocDate} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {addSamples, hasSamples} from '../samples.ts';
 import type {AppData, EstimateForm, Job, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
-import {addMonths, matchesAll, monthLabel, staffShort, thisMonth, uid, yen} from '../util.ts';
+import {addMonths, downloadBlob, matchesAll, monthLabel, staffShort, thisMonth, todayIso, uid, yen} from '../util.ts';
 
 const SHOW_LIMIT = 100;
 
@@ -50,6 +51,16 @@ export function duplicateEstimate(job: Job, update: Update, toast: (text: string
   update('jobs', (list) => [...list, c]);
   toast('複製しました。お客様名などを書き換えてください。');
   return c;
+}
+
+/**
+ * 見積書を Excel ファイル（.xlsx）で保存する（ダウンロード）。印刷する見積書と同じ書式・同じ数字。
+ * 作成日は見積書の右上の日付（入れていなければ今日。印刷と同じ）
+ */
+export function saveEstimateExcel(job: Job, s: Settings, toast: (text: string) => void) {
+  const {bytes, fileName} = estimateXlsx(job, s, readDocDate(`est:${job.id}`) || todayIso());
+  downloadBlob(new Blob([bytes], {type: XLSX_TYPE}), fileName);
+  toast(`Excel ファイル「${fileName}」を保存しました（ダウンロードのフォルダに入ります）`);
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -246,7 +257,7 @@ export function EstimateList({
         <GettingStarted data={data} update={update} goMaterials={goMaterials} />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-emerald-200 bg-white shadow-sm">
-          <table className="w-full min-w-[1040px] text-sm">
+          <table className="w-full min-w-[1120px] text-sm">
             <thead className="bg-emerald-50 text-xs text-emerald-900">
               <tr>
                 <th className="px-2 py-2 text-left">作成日</th>
@@ -287,6 +298,9 @@ export function EstimateList({
                     <td className="whitespace-nowrap px-2 py-1.5 text-right" onClick={(e) => e.stopPropagation()}>
                       <Btn small color="white" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
                         🖨 印刷
+                      </Btn>
+                      <Btn small color="white" className="ml-1.5" onClick={() => saveEstimateExcel(job, s, toast)}>
+                        📗 Excel
                       </Btn>
                       <Btn small color="white" className="ml-1.5" onClick={() => onOpen(duplicateEstimate(job, update, toast).id)}>
                         複製

@@ -42,14 +42,15 @@ export function useStore() {
 
   const schedule = useRef<() => void>(() => {});
 
-  const flush = useCallback(() => {
+  /** まだ保存していない変更をすぐ保存する（「保存」ボタン・画面を閉じるとき）。保存できたら true */
+  const flush = useCallback((): Promise<boolean> => {
     if (timer.current !== null) {
       window.clearTimeout(timer.current);
       timer.current = null;
     }
     const items = [...pending.current.entries()];
     pending.current.clear();
-    if (items.length === 0) return;
+    if (items.length === 0) return Promise.resolve(true);
     const saves = items.map(async ([key, value]) => {
       inFlight.current.add(key);
       try {
@@ -77,12 +78,16 @@ export function useStore() {
         inFlight.current.delete(key);
       }
     });
-    Promise.all(saves)
+    return Promise.all(saves)
       .then(() => {
         setSaveError('');
         setSavedAt(Date.now());
+        return true;
       })
-      .catch(() => setSaveError('保存できませんでした。この端末の空き容量、またはプライベート（シークレット）モードでないことを確認してください。'));
+      .catch(() => {
+        setSaveError('保存できませんでした。この端末の空き容量、またはプライベート（シークレット）モードでないことを確認してください。');
+        return false;
+      });
   }, []);
 
   schedule.current = () => {
