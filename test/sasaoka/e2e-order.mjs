@@ -41,6 +41,10 @@ const qtyKey = await sheet.locator('.form-page tr', {hasText: '木の手すり 3
 await sheet.locator(`[data-edit="${qtyKey}"]`).click();
 await page.keyboard.type('380cm');
 await page.keyboard.press('Enter');
+// 工事場所の住所（印刷した発注書には出さない。発注先に要らないため）
+await sheet.locator('[data-edit="job:address"]').click();
+await page.keyboard.type('福岡県行橋市中央1-1');
+await page.keyboard.press('Enter');
 
 await page.getByRole('button', {name: '🛒 発注書を作成'}).click();
 await page.getByRole('heading', {name: '発注書　（サンプル）山田様邸'}).waitFor();
@@ -67,7 +71,7 @@ assert.equal(await total(), '4品目（3本・3個）');
 await list.getByRole('button', {name: '戻す', exact: true}).last().click(); // 消した行：エンドキャップ
 assert.equal(await total(), '5品目（3本・5個）');
 await page.getByPlaceholder('例：ケアマックス').fill('ケアマックス');
-await page.getByPlaceholder('例：○月○日までに納品').fill('10月25日までに納品');
+assert.equal(await page.getByText('備考').count(), 0); // 備考（○月○日までに納品など）の欄はない
 // 部材リストから足す：見積書にない部材は行が増える。見積書にある部材は、その行の数が増える
 await list.getByRole('button', {name: '＋ 部材リストから足す'}).click();
 const picker = page.getByRole('dialog');
@@ -92,15 +96,15 @@ assert.equal(await list.getByLabel('ブラケットの発注する数', {exact: 
 await page.screenshot({path: path.join(outDir, '70-order.png'), fullPage: true});
 log('読み直しても同じOK');
 
-// 印刷：A4縦の発注書（発注先・件名・品目数・数量と単位）
+// 印刷：A4縦の発注書（発注先・件名・数量と単位。品目数・現場の住所・備考・計算の説明は出さない）
 await page.getByRole('button', {name: '🖨 発注書を印刷'}).click();
 const doc = page.locator('.order-doc');
 await doc.waitFor();
 const docText = (await doc.innerText()).replace(/\s+/g, ' ');
-for (const t of ['発 注 書', 'ケアマックス 御中', '件名：（サンプル）山田様邸 住宅改修の部材', '6品目（4本・5個・1枚）', '10月25日までに納品']) {
+for (const t of ['発 注 書', 'ケアマックス 御中', '件名：（サンプル）山田様邸 住宅改修の部材']) {
   assert.ok(docText.includes(t) || docText.replace(/ /g, '').includes(t.replace(/ /g, '')), `発注書に「${t}」がない: ${docText}`);
 }
-assert.ok(!/使う長さ|余り|足す分/.test(docText), `発注書に計算の説明が出ている: ${docText}`);
+assert.ok(!/使う長さ|余り|足す分|品目|納品|現場|行橋市中央/.test(docText), `発注書に要らないもの（計算の説明・品目数・備考・現場の住所）が出ている: ${docText}`);
 const docRows = (await doc.locator('tbody tr').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
 assert.deepEqual(
   docRows,

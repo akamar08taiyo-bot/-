@@ -138,10 +138,6 @@ export function OrderPage({
             aria-label="発注日"
           />
         </label>
-        <label className="grid min-w-[14rem] flex-[2_1_0%] gap-1 text-xs font-bold text-slate-600">
-          備考（発注書のいちばん下に出ます）
-          <TextInput value={edits.note} onChange={(note) => setEdits((e) => ({...e, note}))} placeholder="例：○月○日までに納品" className="w-full min-w-0 text-sm font-normal" />
-        </label>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white shadow-sm" aria-label="発注する部材">

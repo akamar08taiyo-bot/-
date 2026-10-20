@@ -23,7 +23,7 @@ const EPS = 1e-6;
 const norm = (s: string) => normalize(s).toLowerCase();
 
 export function emptyOrderEdits(): OrderEdits {
-  return {qty: {}, removed: [], added: [], supplier: '', date: '', note: ''};
+  return {qty: {}, removed: [], added: [], supplier: '', date: ''};
 }
 
 /** 単位が空の部材：切って使うものは「本」（ベースプレート・板は「枚」）、ほかは「個」 */

@@ -99,7 +99,6 @@ export type OrderEdits = {
   added: OrderLine[]; // 発注書で足した行
   supplier: string; // 発注先
   date: string; // 発注日 'YYYY-MM-DD'（空なら印刷した日）
-  note: string; // 備考（発注書のいちばん下に出す）
 };
 
 /** 1件（○○様邸） */

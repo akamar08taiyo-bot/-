@@ -1,8 +1,9 @@
 // 発注書（A4縦）。見積書に入っている部材を、何を何個（何本・何枚）発注するか（発注書の画面で直した数）。
-// 計算の説明（使う長さ・余り・足す分）は出さない（ユーザーの指示）。品名・品番と数量・単位だけ。
+// 計算の説明（使う長さ・余り・足す分）・品目数・現場の住所・備考（○月○日までに納品など）は出さない（ユーザーの指示）。
+// 発注先・発注日・発注元と、品名・品番・数量・単位だけ。
 
 import {jobName} from '../calc.ts';
-import {applyOrderEdits, orderBaseLines, orderedLines, unitTotals} from '../order.ts';
+import {applyOrderEdits, orderBaseLines, orderedLines} from '../order.ts';
 import type {AppData, Job} from '../types.ts';
 import {dateLabel, num, staffShort, todayIso} from '../util.ts';
 
@@ -22,10 +23,6 @@ export function OrderDoc({job, data}: {job: Job; data: AppData}) {
           </div>
           <p className="greeting">下記のとおり発注いたします。</p>
           <p className="subject">件名：{jobName(job)}　住宅改修の部材</p>
-          {job.address.trim() && <p className="subject">現場：{job.address.trim()}</p>}
-          <p className="order-count">
-            {lines.length}品目{lines.length > 0 && `（${unitTotals(lines)}）`}
-          </p>
         </div>
         <div className="right">
           <div className="meta">
@@ -89,7 +86,6 @@ export function OrderDoc({job, data}: {job: Job; data: AppData}) {
           )}
         </tbody>
       </table>
-      {edits?.note.trim() && <div className="remarks">{edits.note.trim()}</div>}
     </div>
   );
 }

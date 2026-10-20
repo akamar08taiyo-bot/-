@@ -798,10 +798,6 @@ table.fm .yk-issuer {
 }
 
 /* 発注書（A4縦）：何を何個（何本・何枚）発注するかが一目で分かるように、数量と単位を大きく */
-.sheet.order-doc .order-count {
-  margin: 3mm 0 0;
-  font-size: 10.5pt;
-}
 .sheet table.items.order td.qty,
 .sheet table.items.order td.unit {
   font-size: 12pt;

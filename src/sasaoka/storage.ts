@@ -263,7 +263,6 @@ function cleanOrder(raw: unknown): OrderEdits | null {
     added: Array.isArray(raw.added) ? raw.added.filter(isObj).map(cleanOrderLine) : [],
     supplier: str(raw.supplier),
     date: /^\d{4}-\d{2}-\d{2}$/.test(str(raw.date)) ? str(raw.date) : '',
-    note: str(raw.note),
   };
 }
 
