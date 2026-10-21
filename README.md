@@ -277,7 +277,7 @@ npm run build:sasaoka    # dist-sasaoka/index.html（仕切り計算・請求書
 npm run build:jutaku     # dist-jutaku/index.html（住宅改修 見積書作成。同じく1ファイル）と version.json
 ```
 
-公開中：太陽ポータル（taiyo-portal リポジトリ）の `sasaoka/index.html`（タイル名「仕切り計算・請求書作成」）と `jutaku-mitsumori/index.html`（タイル名「住宅改修 見積書作成」）。
+公開中：太陽ポータル（taiyo-portal リポジトリ）の `jutaku-mitsumori/index.html`（タイル名「住宅改修 見積書作成」）と `sasaoka/index.html`（タイルはなく、アプリの請求書のタブから開く）。
 直したときは、このブランチでビルド → `dist-sasaoka/` の `index.html` と `version.json` を taiyo-portal の `sasaoka/` に、`dist-jutaku/` の2つを `jutaku-mitsumori/` に上書き → taiyo-portal の master に push（GitHub Pages が自動で公開する）。
 `version.json` はビルドした日時（`vite.version.ts`。アプリにも同じ印を埋め込む）。スマホのブラウザは前に開いたページをしばらく覚えていて直した版がすぐ出ないことがあるので、アプリは開いて少ししてからと画面に戻ったときに `version.json` を見て、印が違えば上に「このアプリの新しい版が出ています ⟳ 読み込み直す」を出す（`update.ts`。保存してから読み込み直す）。
 2つは必ず同じサイトに置く（別のサイトだとデータ（IndexedDB）が別になり、部材リストも請求書も連動しない）。ポータルと同じサイトなので、ポータルで選んだ営業所（`localStorage` の `taiyo_portal_session`）を発行元・施工業者に使う。

@@ -65,7 +65,7 @@ cp dist-jutaku/index.html dist-jutaku/version.json /home/user/taiyo-portal/jutak
 ```
 
 `scripts/build-to-portal.sh` がこの5行をまとめて行う。そのあと：
-- タイルの使い方の文（`taiyo-portal/index.html` の `APPS` の `name:'住宅改修 見積書作成'` と `name:'仕切り計算・請求書作成'`）を、変えた機能に合わせて直す。
+- タイルの使い方の文（`taiyo-portal/index.html` の `APPS` の `name:'住宅改修 見積書作成'`。「仕切り計算・請求書作成」のタイルは今はない）を、変えた機能に合わせて直す。
   直したら `<script>` が壊れていないか確かめる：`node -e "const h=require('fs').readFileSync('index.html','utf8');for(const m of h.match(/<script>([\s\S]*?)<\/script>/g)||[])new Function(m.replace(/<\/?script>/g,''))"`
 - README（`/home/user/-/README.md` の「住宅改修 見積書・請求書（笹岡工務店）」の節）も直す。
 - 先にアプリのリポジトリを commit・push し、それから taiyo-portal を commit・push。

@@ -15,7 +15,7 @@ description: 太陽シルバーサービス行橋営業所の業務アプリ「�
 |---|---|
 | 見積書・請求書アプリ（1つのアプリを4つのタブで切り替え） | リポジトリ `akamar08taiyo-bot/-` の `src/sasaoka/`。**ブランチは `claude/sasaoka-shikiri-app`**（既定の main ではない） |
 | 公開先 | `akamar08taiyo-bot/taiyo-portal`（master）の `jutaku-mitsumori/`（見積もりのタブから開く）と `sasaoka/`（請求書のタブから開く）。同じアプリ・同じデータ（IndexedDB）で、最初に開くタブだけ違う |
-| 公開の URL | https://akamar08taiyo-bot.github.io/taiyo-portal/jutaku-mitsumori/ と …/sasaoka/（ポータルのタイル「住宅改修 見積書作成」「仕切り計算・請求書作成」） |
+| 公開の URL | https://akamar08taiyo-bot.github.io/taiyo-portal/jutaku-mitsumori/ と …/sasaoka/（ポータルのタイルは「住宅改修 見積書作成」の1つ＝jutaku-mitsumori/。sasaoka/ はアプリの請求書のタブから開く。2026-10 に確かめた） |
 | 販売受注簿作成ツール（発注書から部材を受け取る側） | `akamar08taiyo-bot/taiyo-hacchu-scan`（master）。公開は `docs/`。https://akamar08taiyo-bot.github.io/taiyo-hacchu-scan/ |
 
 ポータルのアプリはすべて同じサイト（akamar08taiyo-bot.github.io）にある。だから localStorage・IndexedDB を共有でき、アプリ同士の受け渡しもできる（容量も分け合うので、大きいデータは IndexedDB）。
