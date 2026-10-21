@@ -58,7 +58,7 @@ window.OKANE_CHOOSER = {
       cards: ['aupay'], points: ['ponta'], styles: [],
       cardText: 'au PAYカード・三菱UFJカード', pointText: 'Pontaポイントなど',
       notes: [],
-      video: 'videos/esmart.mp4', videoPoster: 'videos/esmart.jpg', videoLength: '6分',
+      video: 'videos/esmart.mp4', videoPoster: 'videos/esmart.jpg', videoLength: '6分16秒',
       card: { name: '三菱UFJカード', applyUrl: '' },
       bank: { name: 'auじぶん銀行', why: '口座をつなぐと、入金の手間がへる（auマネーコネクト）', applyUrl: '' }
     },
@@ -77,7 +77,7 @@ window.OKANE_CHOOSER = {
       cards: ['rakuten'], points: ['rakuten'], styles: ['lineup'],
       cardText: '楽天カード', pointText: '楽天ポイント',
       notes: [],
-      video: 'videos/rakuten.mp4', videoPoster: 'videos/rakuten.jpg', videoLength: '6分23秒',
+      video: 'videos/rakuten.mp4', videoPoster: 'videos/rakuten.jpg', videoLength: '6分50秒',
       card: { name: '楽天カード', applyUrl: '' },
       bank: { name: '楽天銀行', why: '口座をつなぐと、入金の手間がへる（マネーブリッジ）', applyUrl: '' }
     },
@@ -87,7 +87,7 @@ window.OKANE_CHOOSER = {
       cards: ['smbc', 'jcb'], points: ['v'], styles: ['lineup'],
       cardText: '三井住友カード・JCBカードなど', pointText: 'Vポイントなど',
       notes: [],
-      video: 'videos/sbi.mp4', videoPoster: 'videos/sbi.jpg', videoLength: '6分15秒',
+      video: 'videos/sbi.mp4', videoPoster: 'videos/sbi.jpg', videoLength: '6分27秒',
       card: { name: '三井住友カード（NL）', applyUrl: '' }
     },
     {
