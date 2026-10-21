@@ -55,6 +55,8 @@ node <スキル>/scripts/serve.mjs $SITE sh <スキル>/scripts/run-e2e.sh <出�
 
 ## 3. ビルドと公開（taiyo-portal）
 
+**ポータルへの push は本番の公開。ユーザーが「公開して」と言ってから。** 作業環境の安全確認（Production Deploy）で止められたら、回り道をせずユーザーに聞く（2026-10-21：「公開して」のあとは通った）。
+
 ```sh
 cd /home/user/-
 npm run -s build:sasaoka   # dist-sasaoka/index.html（1ファイル・約3MB）と version.json
