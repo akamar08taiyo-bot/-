@@ -82,13 +82,61 @@ def ts(t):
     return f'{ms // 3600000:02d}:{ms // 60000 % 60:02d}:{ms // 1000 % 60:02d},{ms % 1000:03d}'
 
 
+def chunks(text, mx):
+    """src/drama.tsx の字幕と同じ分け方：文ごと、長い文は真ん中に近い読点で分け、1行に収まる長さでまとめる"""
+    sent = [x.strip() for x in re.findall(r'[^。？！]+[。？！]?', text) if x.strip()] or [text]
+    parts = []
+    for x in sent:
+        if len(x) <= mx:
+            parts.append(x)
+            continue
+        cands = [i for i, c in enumerate(x) if c == '、']
+        if cands:
+            b = min(cands, key=lambda i: abs(i - len(x) / 2))
+            parts += [x[:b + 1], x[b + 1:]]
+        else:
+            parts.append(x)
+    out = []
+    for p in parts:
+        if out and len(out[-1] + p) <= mx and not out[-1].endswith('、'):
+            out[-1] += p
+        else:
+            out.append(p)
+    return out
+
+
+def tidy(x):
+    return re.sub(r'[。、]$', '', x).replace('。', '　').strip()
+
+
 lines = {l['id']: l for l in S['lines']}
-srt = []
-for i, l in enumerate(T['lines']):
-    nxt = T['lines'][i + 1]['start'] - 0.05 if i + 1 < len(T['lines']) else l['end'] + 0.3
-    end = min(nxt, l['end'] + 0.6)
-    text = re.sub(r'[{}*]', '', lines[l['id']].get('sub', lines[l['id']]['text']))
-    srt.append(f"{i + 1}\n{ts(l['start'])} --> {ts(end)}\n{text}\n")
+cues = []
+if S.get('srt') == 'chunks':  # 横長の会話劇：画面の字幕と同じ区切り。心の声は（ ）、電話は［電話］
+    for i, l in enumerate(T['lines']):
+        ln = lines[l['id']]
+        nxt = T['lines'][i + 1] if i + 1 < len(T['lines']) else None
+        cs = chunks(re.sub(r'[{}*]', '', ln.get('sub', ln['text'])), 24)
+        total = sum(len(c) for c in cs)
+        dur = l['end'] - l['start']
+        bounds, acc = [0.0], 0
+        for c in cs[:-1]:
+            acc += len(c)
+            b = acc / total * dur
+            near = min(l.get('breaks', []) or [1e9], key=lambda x: abs(x - b))
+            bounds.append(near if abs(near - b) < 0.9 else b)
+        bounds.append(dur)
+        for k, c in enumerate(cs):
+            a = l['start'] + bounds[k]
+            e = min(l['end'] + 0.55, nxt['start'] - 0.06) if k == len(cs) - 1 and nxt else (l['end'] + 0.55 if k == len(cs) - 1 else l['start'] + bounds[k + 1] - 0.06)
+            text = tidy(c)
+            text = f'（{text}）' if ln.get('style') == 'w_inner' else (f'［電話］{text}' if ln.get('phone') else text)
+            cues.append((a, e, text))
+else:
+    for i, l in enumerate(T['lines']):
+        nxt = T['lines'][i + 1]['start'] - 0.05 if i + 1 < len(T['lines']) else l['end'] + 0.3
+        end = min(nxt, l['end'] + 0.6)
+        cues.append((l['start'], end, re.sub(r'[{}*]', '', lines[l['id']].get('sub', lines[l['id']]['text']))))
+srt = [f"{i + 1}\n{ts(a)} --> {ts(e)}\n{text}\n" for i, (a, e, text) in enumerate(cues)]
 open(os.path.join(OUT, f'{vid}.srt'), 'w', encoding='utf-8').write('\n'.join(srt))
 
 # 4) 検査
