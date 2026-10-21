@@ -1,8 +1,7 @@
 // 制作ラインの動作確認（本編ではない）。声・効果音・BGM・字幕・フォントが通るかだけを見る。
 import React from 'react';
 import {AbsoluteFill, useCurrentFrame} from 'remotion';
-import '../fonts';
-import {F} from '../fonts';
+import {F, useFonts} from '../fonts';
 import script from '../../episodes/check00/script.json';
 import timeline from '../../episodes/check00/timeline.json';
 import {H, W, life, makeT, pop} from '../lib';
@@ -11,6 +10,7 @@ export const timelineCheck00 = timeline;
 const T = makeT(timeline);
 
 export const Check00: React.FC = () => {
+  useFonts();
   const frame = useCurrentFrame();
   const title = pop(frame, T.s('intro', -0.15));
   const current = script.lines.find((l, i) => {

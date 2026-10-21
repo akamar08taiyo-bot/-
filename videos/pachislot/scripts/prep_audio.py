@@ -9,8 +9,12 @@
 1. 行の前後の無音を切る（頭 0.03 秒・お尻 0.08 秒だけ残す）
 2. 行の中の長すぎる間（0.30 秒超）を 0.22 秒に詰める
 3. 話す速さを style ごとの倍率に（script.json の tempo。ffmpeg atempo なので声の高さは変わらない）
-4. 行ごとの音量をそろえる（ボソッとの行は少しだけ小さく）
-5. script.json の gap どおりに並べ、public/<回>/audio/voice/<行>.wav と episodes/<回>/timeline.json を書く
+4. 行ごとの音量をそろえる（ボソッとの行は少しだけ小さく。script.json の levels で style ごとに dB を足し引き）
+5. phone: true の行は電話の声に（300〜3400Hz に絞り、軽く圧縮）
+6. script.json の pre（行の前の間）と gap（行の後の間）どおりに並べ、public/<回>/audio/voice/<行>.wav と
+   episodes/<回>/timeline.json を書く。行に scene があれば、場面の始まり（最初の行の pre の前）も scenes に書く
+
+行の中の間を詰める長さは script.json の pauses（{"max": 0.30, "keep": 0.22} 秒が既定）。
 """
 import argparse, json, os, re, subprocess, sys, wave
 import numpy as np
@@ -89,6 +93,34 @@ def trim_and_tighten(x, thr_rel=-38.0, max_gap=0.30, keep_gap=0.22):
     return y
 
 
+PHONE_AF = 'highpass=f=300,highpass=f=300,lowpass=f=3400,lowpass=f=3400,acompressor=threshold=-20dB:ratio=3:attack=5:release=60'
+
+
+def phone(x):
+    """電話の向こうの声（帯域を絞って軽く圧縮）"""
+    r = subprocess.run(['ffmpeg', '-v', 'error', '-f', 'f32le', '-ar', str(SR), '-ac', '1', '-i', '-',
+                        '-af', PHONE_AF, '-f', 'f32le', '-'], input=x.tobytes(), capture_output=True, check=True)
+    return np.frombuffer(r.stdout, dtype=np.float32).copy()
+
+
+def breaks(x, min_gap=0.16):
+    """行の中の息継ぎ（無音）の中ほどの時刻（秒）。字幕を文ごとに分けるときの目印"""
+    db = frames_db(x)
+    quiet = db < db.max() - 32
+    out, i = [], 0
+    while i < len(quiet):
+        if quiet[i]:
+            j = i
+            while j < len(quiet) and quiet[j]:
+                j += 1
+            if (j - i) * 0.01 >= min_gap and i > 0 and j < len(quiet):
+                out.append(round((i + j) / 2 * 0.01, 2))
+            i = j
+        else:
+            i += 1
+    return out
+
+
 def tempo(x, t):
     if abs(t - 1) < 1e-3:
         return x
@@ -103,10 +135,15 @@ def speech_level(x):
     return 10 * np.log10(np.mean(10 ** (loud / 10)))
 
 
-t = 0.25  # 最初の声までの間（絵が先に出る）
+t = 0.25 if 'pre' not in S['lines'][0] else 0.0  # 最初の声までの間（絵が先に出る。pre があればそれに任せる）
 timeline = []
+scenes = {}
 missing = []
+P = S.get('pauses', {})
 for ln in S['lines']:
+    if ln.get('scene') and ln['scene'] not in scenes:
+        scenes[ln['scene']] = round(t, 3)
+    t += ln.get('pre', 0)
     if not a.estimate and not os.path.exists(os.path.join(EP.voice, f"{ln['id']}.wav")):
         missing.append(ln['id'])
     if a.estimate or ln['id'] in missing:
@@ -114,22 +151,30 @@ for ln in S['lines']:
         d = n / EST_RATE.get(ln['style'], 6.0) + 0.25
     else:
         x = load(os.path.join(EP.voice, f"{ln['id']}.wav"))
-        x = trim_and_tighten(x)
+        x = trim_and_tighten(x, max_gap=P.get('max', 0.30), keep_gap=P.get('keep', 0.22))
         x = tempo(x, a.tempo or S.get('tempo', {}).get(ln['style'], 1.0))
-        target = -20.0 - (2.0 if ln.get('aside') else 0.0)
+        if ln.get('phone'):
+            x = phone(x)
+        target = -20.0 - (2.0 if ln.get('aside') else 0.0) + S.get('levels', {}).get(ln['style'], 0.0)
         x = x * 10 ** ((target - speech_level(x)) / 20)
         peak = np.abs(x).max()
         if peak > 0.89:
             x = x * 0.89 / peak
         save(os.path.join(OUT, f"{ln['id']}.wav"), x)
         d = len(x) / SR
-    timeline.append({'id': ln['id'], 'start': round(t, 3), 'end': round(t + d, 3), 'dur': round(d, 3)})
+    item = {'id': ln['id'], 'start': round(t, 3), 'end': round(t + d, 3), 'dur': round(d, 3)}
+    if not (a.estimate or ln['id'] in missing):
+        item['breaks'] = breaks(x)
+    timeline.append(item)
     t += d + ln.get('gap', 0.25)
 total = t + S.get('tail', 1.5)
-json.dump({'fps': S['fps'], 'total': round(total, 3), 'estimated': a.estimate or bool(missing), 'lines': timeline},
+json.dump({'fps': S['fps'], 'total': round(total, 3), 'estimated': a.estimate or bool(missing), 'scenes': scenes, 'lines': timeline},
           open(EP.timeline_path, 'w'), ensure_ascii=False, indent=1)
 for x in timeline:
     print(f"{x['id']:8s} {x['start']:6.2f} - {x['end']:6.2f}  ({x['dur']:.2f}s)")
 print(f"total {total:.2f}s{'  （文字数からの仮の時刻）' if a.estimate else ''}")
+if scenes:
+    ends = list(scenes.values())[1:] + [total]
+    print('scenes', '  '.join(f'{k} {v:.1f}s（{e - v:.1f}s）' for (k, v), e in zip(scenes.items(), ends)))
 if missing:
     print('声が無いので文字数から見積もった行:', ' '.join(missing))

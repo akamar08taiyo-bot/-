@@ -7,4 +7,12 @@ __pycache__/
 # スクリプトで作り直せる音（prep_audio.py / sfx.py / bgm.py）とフォント（subset_fonts.py）
 public/*/audio/
 public/shared/sfx/
+public/shared/amb/
 public/fonts/
+# subset_fonts.py が作る埋め込みフォント
+src/fonts_data.ts
+# 第1話の中身（台本・カット表・絵・声・完成品）はユーザーの作品。公開リポジトリには入れない（入れるかはユーザーが決める）
+episodes/ep01/
+public/ep01/
+src/episodes/ep01.tsx
+out/ep01*

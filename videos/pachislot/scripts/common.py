@@ -49,3 +49,19 @@ def episode():
         ep = sys.argv[i + 1]
         del sys.argv[i:i + 2]
     return Ep(ep)
+
+
+def anchor(T, a):
+    """アンカー（S01+0＝場面の始まり、s01_1.s-3.2＝行の話し始め、s01_1.e+0.5＝話し終わり、end-5＝最後）を秒にする"""
+    import re
+    m = re.match(r'^(S\d+)([+-]\d+(?:\.\d+)?)?$', a)
+    if m:
+        return T['scenes'][m.group(1)] + float(m.group(2) or 0)
+    m = re.match(r'^(s\d+_\d+)\.(s|e)([+-]\d+(?:\.\d+)?)?$', a)
+    if m:
+        l = next(x for x in T['lines'] if x['id'] == m.group(1))
+        return (l['start'] if m.group(2) == 's' else l['end']) + float(m.group(3) or 0)
+    m = re.match(r'^end([+-]\d+(?:\.\d+)?)?$', a)
+    if m:
+        return T['total'] + float(m.group(1) or 0)
+    raise ValueError(f'アンカーの書き方が違います: {a}')

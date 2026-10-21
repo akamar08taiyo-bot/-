@@ -34,16 +34,17 @@ def report(checks):
 
 
 def video_checks(probe, max_len=None):
-    """縦横（script.json の format: vertical / horizontal）と長さの範囲（len: [最短, 最長] 秒）を確かめる"""
+    """縦横（script.json の format: vertical / horizontal）、フレームレート（fps、既定 30）と長さの範囲（len: [最短, 最長] 秒）を確かめる"""
     v = next(s for s in probe['streams'] if s['codec_type'] == 'video')
     fps = eval(v['r_frame_rate'])
     dur = float(probe['format']['duration'])
     w, h = (1920, 1080) if S.get('format') == 'horizontal' else (1080, 1920)
     lo, hi = S.get('len', [35, 60])
     hi = min(hi, max_len) if max_len else hi
+    want = S.get('fps', 30)
     return v, [
         (f'解像度 {w}x{h}', v['width'] == w and v['height'] == h, f"{v['width']}x{v['height']}"),
-        ('30fps', abs(fps - 30) < 0.01, f'{fps:.2f}'),
+        (f'{want}fps', abs(fps - want) < 0.01, f'{fps:.2f}'),
         (f'長さ {lo}〜{hi}秒', lo <= dur <= hi, f'{dur:.2f}s'),
     ]
 
