@@ -23,7 +23,7 @@ for sid in sys.argv[1:]:
         'source': spec.get('source', '番外編の創作実戦ログ。本編の帳簿とは別'),
         'voice': BASE['voice'], 'cast': {**BASE['cast'], **spec.get('cast', {})},
         'styles': {**BASE['styles'], **spec.get('styles', {})},
-        'pauses': BASE.get('pauses', {'max': 0.55, 'keep': 0.42}), 'levels': BASE.get('levels', {}),
+        'pauses': BASE.get('pauses', {'max': 0.55, 'keep': 0.42}), 'levels': BASE.get('levels', {}), 'tempo': BASE.get('tempo', {}),
         'lines': spec['lines'], 'screen': spec.get('screen', {}),
         'sfx': spec.get('sfx', []), 'beds': spec.get('beds', []), 'music': spec.get('music', []),
     }
