@@ -265,11 +265,12 @@ log('定価の取り込みOK');
 // ---------------- 施工費（笹岡工務店の手間）：部材・施工費マスタのもう1つのタブ
 await page.getByRole('tab', {name: /施工費（笹岡工務店の手間/}).click();
 assert.ok((await page.locator('main').innerText()).includes('取付手間の単価'));
-// 仕切り（笹岡工務店）と見積の両方の単価を持つ。見積が空いている項目（踏台 木）は 仕切り×1.5 を薄く出す
+// 仕切り（笹岡工務店）と見積の両方の単価を持つ。踏台 木 の見積は 2,000円（ユーザーの指示）。見積を消すと 仕切り×1.5 を薄く出す
 assert.deepEqual([await page.getByLabel('木の単価', {exact: true}).inputValue(), await page.getByLabel('木の見積の単価', {exact: true}).inputValue()], ['1,000', '1,500']);
 assert.deepEqual([await page.getByLabel('タイルの単価', {exact: true}).inputValue(), await page.getByLabel('タイルの見積の単価', {exact: true}).inputValue()], ['1,500', '2,000']);
 const stepWood = page.getByLabel('踏台 木の見積の単価', {exact: true});
-assert.deepEqual([await stepWood.inputValue(), await stepWood.getAttribute('placeholder')], ['', '2,250']);
+assert.deepEqual([await page.getByLabel('踏台 木の単価', {exact: true}).inputValue(), await stepWood.inputValue()], ['1,500', '2,000']);
+assert.equal(await stepWood.getAttribute('placeholder'), '2,250');
 
 // ---------------- 部材＋施工費（常用）：部材・施工費マスタでセットを登録する（部材を入れ、その部材の施工費を数える）
 await page.getByRole('tab', {name: '部材＋施工費（常用・2件）'}).click(); // サンプルと、最初に入る例（BD-134＋BD-08G＋施工費）

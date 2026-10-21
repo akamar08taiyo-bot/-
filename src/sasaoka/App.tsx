@@ -16,6 +16,7 @@ import {LaborPage} from './components/LaborPage.tsx';
 import {MaterialsPage} from './components/MaterialsPage.tsx';
 import {SettingsPage} from './components/SettingsPage.tsx';
 import {ToastProvider} from './components/ui.tsx';
+import {LABOR_REV} from './defaults.ts';
 import {EstimateEditor} from './estimate/EstimateEditor.tsx';
 import {EstimateHome, EstimateList, newEstimate} from './estimate/EstimateList.tsx';
 import {OrderPage} from './estimate/OrderPage.tsx';
@@ -123,6 +124,21 @@ export default function App({start}: {start: MainTab}) {
       return next.some((j, i) => j !== jobs[i]) ? next : jobs;
     });
     store.update('settings', (s) => ({...s, laborEst: true}));
+  }, [loaded]);
+  // 取付手間の見積の単価を直した（版2：踏台 木 は1箇所 2,000円。ユーザーの指示）。前に保存したマスタと見積書の行で、空のままのものだけ直す（一度だけ。手で入れた単価は変えない）
+  useEffect(() => {
+    if (!data || data.settings.laborRev >= LABOR_REV) return;
+    const fixes = new Map<string, number>([['l07', 2000]]);
+    store.update('labor', (list) => {
+      const next = list.map((l) => (l.estPrice === null && fixes.has(l.id) ? {...l, estPrice: fixes.get(l.id) ?? null} : l));
+      return next.some((l, i) => l !== list[i]) ? next : list;
+    });
+    const fix = (r: Row): Row => (r.kind === 'labor' && r.refId && r.estPrice === null && fixes.has(r.refId) ? {...r, estPrice: fixes.get(r.refId) ?? null} : r);
+    store.update('jobs', (jobs) => {
+      const next = jobs.map((j) => (j.places.some((p) => p.rows.some((r) => fix(r) !== r)) ? {...j, places: j.places.map((p) => ({...p, rows: p.rows.map(fix)}))} : j));
+      return next.some((j, i) => j !== jobs[i]) ? next : jobs;
+    });
+    store.update('settings', (s) => ({...s, laborRev: LABOR_REV}));
   }, [loaded]);
 
   if (store.loadError) {

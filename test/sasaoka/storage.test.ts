@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {DEFAULT_STAFF, OFFICES, settingsForOffice} from '../../src/sasaoka/defaults.ts';
-import {cleanJobs, cleanKits, cleanList, cleanMaterials, cleanSettings} from '../../src/sasaoka/storage.ts';
+import {DEFAULT_LABOR, DEFAULT_STAFF, LABOR_REV, OFFICES, settingsForOffice} from '../../src/sasaoka/defaults.ts';
+import {cleanJobs, cleanKits, cleanLabor, cleanList, cleanMaterials, cleanSettings} from '../../src/sasaoka/storage.ts';
 import {staffFull, staffShort} from '../../src/sasaoka/util.ts';
 
 test('営業所を選ぶと所長名も入る', () => {
@@ -135,4 +135,14 @@ test('保険者：前のデータ（なし）は住所・書式から入れる�
     {id: 'e', insurer: 'other', form: '', address: '苅田町'},
   ]);
   assert.deepEqual([a.insurer, b.insurer, c.insurer, d.insurer, e.insurer], ['yukuhashi', 'kouiki', '', 'miyako', 'kanda']);
+});
+
+test('取付手間の見積の単価：踏台 木 は 2,000円（ユーザーの指示）。前の版の設定は laborRev が 0（読み込んだあと、空のままの見積の単価を直す）', () => {
+  assert.equal(DEFAULT_LABOR.find((l) => l.id === 'l07')?.estPrice, 2000);
+  assert.equal(cleanSettings(undefined).laborRev, LABOR_REV); // 新しく始めたときは最新（マスタも最初から 2,000）
+  assert.equal(cleanSettings({officeName: '行橋営業所'}).laborRev, 0); // 前の版で保存した設定
+  assert.equal(cleanSettings({laborRev: LABOR_REV}).laborRev, LABOR_REV);
+  // 前の版で保存したマスタは、見積の単価の空欄（null）をそのまま読む（直すのは App.tsx で一度だけ）
+  assert.equal(cleanLabor([{id: 'l07', name: '踏台 木', price: 1500, estPrice: null}])[0].estPrice, null);
+  assert.equal(cleanLabor([{id: 'l07', name: '踏台 木', price: 1500}])[0].estPrice, 2000); // 見積の単価の項目がなければマスタの初期値
 });

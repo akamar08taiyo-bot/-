@@ -356,6 +356,7 @@ export function cleanSettings(raw: unknown): Settings {
   s.estimateForm = FORMS.includes(raw.estimateForm as EstimateForm) ? (raw.estimateForm as EstimateForm) : d.estimateForm;
   s.kitExample = raw.kitExample === true;
   s.laborEst = raw.laborEst === true;
+  s.laborRev = numv(raw.laborRev, 0); // 前の版で保存した設定は 0（取付手間の見積の単価を直す）
   // 版2より前の設定：請求書の消費税は「すべての様邸の合計に最後に消費税率をかける」形に直す
   if (numv(raw.rev, 1) < 2) s.invoiceTaxMode = 'monthly';
   // 版4より前の設定：名字だけの担当者の候補をフルネームにする（見積書に出す）

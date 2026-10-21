@@ -190,6 +190,7 @@ export type Settings = {
   estimateForm: EstimateForm; // 住所から市町村が分からないときの見積書の書式
   kitExample: boolean; // 部材＋施工費（常用）の例をもう入れたか（消したら入れ直さない）
   laborEst: boolean; // 前に作った見積書の取付手間の行に、見積の単価（取付手間のマスタ）を入れたか
+  laborRev: number; // 取付手間の見積の単価を直した版（defaults.ts の LABOR_REV より古ければ、空のままの見積の単価を直す）
   rev: number; // 設定の版（古い版で保存した設定を読み込むときの直し方に使う）
 };
 

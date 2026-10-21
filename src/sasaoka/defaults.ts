@@ -4,7 +4,7 @@ import type {LaborItem, Settings} from './types.ts';
  * 取付手間の単価（「笹岡手間」の表より。1箇所あたり）。
  * 「〃」の行は上の行の項目名を補っている（〃 タイル → 踏台 タイル、〃 部品代 → ウォシュレット 部品代）。
  */
-// 取付手間の単価表（笹岡工務店）。price＝仕切り、estPrice＝見積の単価（ユーザーにいただいた表。踏台 木 はなかったので空＝仕切り×1.5）
+// 取付手間の単価表（笹岡工務店）。price＝仕切り、estPrice＝見積の単価（ユーザーにいただいた表。表になかった踏台 木 は「踏み台は取り付け1箇所2000円で計算」の指示）
 export const DEFAULT_LABOR: LaborItem[] = [
   {id: 'l01', name: '木', price: 1000, estPrice: 1500, note: ''},
   {id: 'l02', name: 'タイル', price: 1500, estPrice: 2000, note: ''},
@@ -12,7 +12,7 @@ export const DEFAULT_LABOR: LaborItem[] = [
   {id: 'l04', name: '補強板 2m以下', price: 1500, estPrice: 2500, note: ''},
   {id: 'l05', name: '補強板 2m～3m', price: 3000, estPrice: 4000, note: '元の表：2m～3m'},
   {id: 'l06', name: '補強板 3m以上', price: 4000, estPrice: 5000, note: '元の表：3m以上'},
-  {id: 'l07', name: '踏台 木', price: 1500, estPrice: null, note: ''},
+  {id: 'l07', name: '踏台 木', price: 1500, estPrice: 2000, note: ''},
   {id: 'l08', name: '踏台 タイル', price: 2500, estPrice: 4000, note: '元の表：〃 タイル'},
   {id: 'l09', name: 'コア抜き', price: 5000, estPrice: 6000, note: ''},
   {id: 'l10', name: '基礎工事', price: 6000, estPrice: 9000, note: ''},
@@ -105,6 +105,8 @@ export function settingsForOffice(base: Settings, officeName: string): Settings 
  * 4：残りの担当者の候補もフルネームにした（宮村 → 宮村 茉莉花、信田 → 信田 裕太、藤田 → 藤田 知美）
  */
 export const SETTINGS_REV = 4;
+/** 取付手間の見積の単価を直した版（2：踏台 木 を 2,000円に）。前に保存したマスタ・見積書の行を一度だけ直す（App.tsx） */
+export const LABOR_REV = 2;
 
 export function defaultSettings(): Settings {
   const base: Settings = {
@@ -136,6 +138,7 @@ export function defaultSettings(): Settings {
     estimateForm: 'yukuhashi',
     kitExample: false,
     laborEst: false,
+    laborRev: LABOR_REV,
     rev: SETTINGS_REV,
   };
   return settingsForOffice(base, portalOffice() || '行橋営業所');
