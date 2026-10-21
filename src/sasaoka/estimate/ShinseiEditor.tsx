@@ -12,7 +12,7 @@ import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {circled, eraOf, INSURER_IDS, INSURER_INFO, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, photoNumbers} from '../estimateForms.ts';
 import {manualRow, newPlace} from '../rows.ts';
 import {usePhotoUrls} from '../photos.ts';
-import {costIsTotal, estimateLength, insuredBoxes, padInsuredNo, photoSheets, SHINSEI, shinseiCost, shinseiKinds, shinseiValues, shinseiWorks, workItems} from '../shinsei.ts';
+import {costIsTotal, estimateLength, insuredBoxes, padInsuredNo, photoNoteLines, photoSheets, SHINSEI, shinseiCost, shinseiKinds, shinseiValues, shinseiWorks, workItems} from '../shinsei.ts';
 import type {WorkItem} from '../shinsei.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
@@ -430,6 +430,10 @@ export function ShinseiEditor({
                 scrollBox={previewBox}
                 photos={{
                   of: photoOf,
+                  note: (no) => {
+                    const x = photoList.find((p) => p.no === no);
+                    return x ? photoNoteLines(x.place) : [];
+                  },
                   onDrop: (no, slot, e) => {
                     const key = photoKey(no, slot);
                     if (key) photoActions.drop(e, key);

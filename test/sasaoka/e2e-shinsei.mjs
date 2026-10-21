@@ -425,10 +425,68 @@ await page.waitForFunction(
 assert.ok((await photoIds()).length >= 3); // 使っている3枚は残る（入れ替えた古い写真は、1時間たつまで消さない）
 log('写真（選ぶ・ドロップ・押して入れ替え・押して移す・削除・差し替え・プレビューの枠にドロップ・Excel の写真貼付用紙・読み直し・古い写真を消す）OK');
 
+// ---------------- 写真に書く内容（ユーザーの指示「写真をめいいっぱいにしない。縦写真の場合、写真を左に寄せてスペースをつくる。横写真の場合、上にスペースをあけて
+// 入力スペースをつくる」「自動入力 手すり L=800mm H=600mm、追加 手入力例 ベースプレート L=800mm」）：写真の欄の箇所ごとに、自動の文（改修の種類・寸法）と手で足す行。
+// プレビューと Excel の写真貼付用紙は、改修前・改修後の枠の両方に書く（縦の写真は左に寄せて右に、横の写真・写真のない枠は上に）
+const noteGroup = (no, name) => photoBoard.getByRole('group', {name: `${no}${name} 写真に書く内容`});
+assert.match(await noteGroup('①', '玄関').innerText(), /自動\s*手すりの取り付け　L=600mm H=800mm/);
+assert.match(await noteGroup('②', 'トイレ').innerText(), /自動\s*手すりの取り付け/);
+await photoBoard.getByLabel('②トイレ 写真に書く内容の追加').fill('ベースプレート　L=800mm');
+const p2 = pageOf('住改・写真②');
+/** プレビューの写真貼付用紙の枠に書いた内容（枠の写真のボタンと同じ所にある文字） */
+const pvNote = (pg, name, text) => pg.getByRole('button', {name, exact: true}).locator('xpath=..').getByText(text);
+const [noteB, noteA] = ['改修前', '改修後'].map((w) => pvNote(p2, `写真貼付用紙②の${w}`, 'ベースプレート　L=800mm'));
+await noteB.waitFor();
+const auto2 = (await noteB.innerText()).split('\n');
+assert.equal(auto2.length, 2);
+assert.ok(auto2[0].startsWith('手すりの取り付け') && auto2[1] === 'ベースプレート　L=800mm', auto2.join('/'));
+assert.equal(await noteA.innerText(), auto2.join('\n'));
+// 改修前は縦の写真（青 900×1600）→ 写真は左、書く内容は右。改修後は横の写真（緑 1200×900）→ 書く内容は上、写真は下。どちらも枠の中
+const boxOf = (loc) => loc.boundingBox();
+const [nb, na, ib, ia, fb, fa] = await Promise.all([
+  boxOf(noteB),
+  boxOf(noteA),
+  boxOf(p2.getByRole('button', {name: '写真貼付用紙②の改修前', exact: true}).locator('img')),
+  boxOf(p2.getByRole('button', {name: '写真貼付用紙②の改修後', exact: true}).locator('img')),
+  boxOf(p2.getByRole('button', {name: '写真貼付用紙②の改修前', exact: true})),
+  boxOf(p2.getByRole('button', {name: '写真貼付用紙②の改修後', exact: true})),
+]);
+assert.ok(nb.x >= ib.x + ib.width - 1 && Math.abs(ib.x - fb.x) < fb.width * 0.05, `縦の写真の右に書いていない ${JSON.stringify([ib, nb])}`);
+assert.ok(na.y + na.height <= ia.y + 1 && na.width > fa.width * 0.9, `横の写真の上に書いていない ${JSON.stringify([ia, na])}`);
+const inside = (b, f) => b.x >= f.x - 1 && b.y >= f.y - 1 && b.x + b.width <= f.x + f.width + 1 && b.y + b.height <= f.y + f.height + 1;
+assert.ok([[nb, fb], [ib, fb], [na, fa], [ia, fa]].every(([b, f]) => inside(b, f)), '写真か書く内容が枠からはみ出す');
+// 写真のない枠（①玄関の改修後）にも、上に自動の文
+await pvNote(pageOf('住改・写真 ①'), '写真貼付用紙①の改修後', 'L=600mm H=800mm').waitFor();
+await p2.screenshot({path: path.join(outDir, '86b-photo-notes.png')});
+await photoBoard.screenshot({path: path.join(outDir, '85a-photo-notes-board.png')});
+// Excel：写真貼付用紙の改修前・改修後の枠に、書く内容のテキストボックス（自動の文と足した行）
+/** シートに足した書く欄（「改修前の説明」「改修後の説明」のテキストボックス）の行 */
+const notesOf = (book, name) => {
+  const rid = /<drawing r:id="([^"]+)"/.exec(book.sheets.get(name))?.[1];
+  if (!rid) return [];
+  const rels = strFromU8(book.files[book.paths.get(name).replace(/([^/]+)$/, '_rels/$1.rels')]);
+  const d = strFromU8(book.files[`xl/drawings/${new RegExp(`Id="${rid}"[^>]*Target="\\.\\./drawings/([^"]+)"`).exec(rels)[1]}`]);
+  return [...d.matchAll(/<xdr:twoCellAnchor>([\s\S]*?)<\/xdr:twoCellAnchor>/g)]
+    .map((m) => [/name="(改修[前後]の説明) \d+"/.exec(m[1])?.[1], [...m[1].matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((t) => t[1]).join('/')])
+    .filter(([n]) => n)
+    .map(([n, t]) => `${n}:${t}`)
+    .sort();
+};
+const noted = sheetsOf((await saveExcel()).bytes);
+assert.deepEqual(notesOf(noted, '住改・写真②'), ['改修前の説明', '改修後の説明'].map((n) => `${n}:${auto2.join('/')}`));
+assert.deepEqual(notesOf(noted, '住改・写真 ①'), ['改修前の説明:手すりの取り付け　L=600mm H=800mm', '改修後の説明:手すりの取り付け　L=600mm H=800mm']);
+assert.deepEqual(photosOf(noted, '住改・写真②', 28).sort(), ['改修前:900x1600', '改修後:1200x900']); // 写真はそのまま
+// 読み直しても残る
+await page.waitForTimeout(1200);
+await page.reload();
+await photoBoard.waitFor();
+assert.equal(await photoBoard.getByLabel('②トイレ 写真に書く内容の追加').inputValue(), 'ベースプレート　L=800mm');
+log('写真に書く内容（自動の文・追加・縦の写真は右に・横の写真は上に・写真のない枠・Excel のテキストボックス・読み直し）OK');
+
 // ---------------- 写真番号の入れ替え（ユーザーの指示「①勝手口・②浴室を、押したりドラッグで横にずらしたりして、①浴室・②勝手口に簡単に入れ替える」
 // 「クリックしてそのままドロップしたら入れ替え」）：▶ ◀ で隣と、箇所をつかんで（見出しでも写真の上でも）ほかの箇所に重ねて離す。
 // 写真は箇所と一緒に動き、申請書の改修の内容・見積書の箇所の順番・写真貼付用紙の番号もそろう
-const cards = (where = photoBoard) => where.getByRole('group').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+const cards = (where = photoBoard) => where.getByRole('group').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')).filter((l) => l.endsWith('の写真'))); // 箇所（中の「写真に書く内容」は数えない）
 const workNames = () => works.getByRole('listitem').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
 assert.deepEqual(await cards(), ['①玄関の写真', '②トイレの写真']);
 const [yellowSrc, blueSrc2, greenSrc2] = [await srcOf(slot('①', '玄関', '改修前')), await srcOf(slot('②', 'トイレ', '改修前')), await srcOf(slot('②', 'トイレ', '改修後'))];
@@ -437,6 +495,7 @@ await photoBoard.getByRole('button', {name: '①玄関と②トイレを入れ�
 assert.deepEqual(await cards(), ['①トイレの写真', '②玄関の写真']);
 assert.deepEqual([await srcOf(slot('①', 'トイレ', '改修前')), await srcOf(slot('①', 'トイレ', '改修後')), await srcOf(slot('②', '玄関', '改修前'))], [blueSrc2, greenSrc2, yellowSrc]);
 assert.deepEqual(await workNames(), ['①トイレ', '②玄関']);
+assert.equal(await photoBoard.getByLabel('①トイレ 写真に書く内容の追加').inputValue(), 'ベースプレート　L=800mm'); // 写真に書く内容も箇所と一緒に
 await pvHas('①トイレ　手すりの取り付け');
 await pvHas('②玄関　手すりの取り付け　L=600mm H=800mm');
 assert.equal(await pageOf('住改・写真 ①').getByRole('button', {name: '写真貼付用紙①の改修後'}).locator('img').count(), 1); // ①トイレの改修後（緑）
@@ -501,15 +560,19 @@ const full = await sizeOf(pvPic);
 await photoBoard.getByRole('button', {name: '①玄関 改修前を右に回す'}).click();
 assert.equal(await rotOf(thumb('①', '玄関', '改修前')), 90);
 assert.equal(await rotOf(pvPic), 90);
-const turned = await sizeOf(pvPic); // 横長の写真を立てると、枠の高さに合わせて小さくなる（枠からはみ出さない）
-assert.ok(turned.w < full.w && Math.abs(turned.x - full.x) < 0.5 && Math.abs(turned.y - full.y) < 0.5, '回した写真が枠のまん中にない');
+// 横長の写真を立てると、枠の高さに合わせて小さくなり（枠からはみ出さない）、縦の写真なので左に寄る（写真に書く内容は上から右へ）
+const turned = await sizeOf(pvPic);
+assert.ok(turned.w < full.w && turned.x < full.x, '回して縦になった写真が左に寄っていない');
+const [turnedImg, rightNote] = [await pvPhoto.locator('img').boundingBox(), await pvNote(p1, '写真貼付用紙①の改修前', 'L=600mm H=800mm').boundingBox()];
+assert.ok(rightNote.x >= turnedImg.x + turnedImg.width - 1, `回して縦になった写真の右に書いていない ${JSON.stringify([turnedImg, rightNote])}`);
 /** Excel の写真貼付用紙①の改修前の写真の向き・位置・大きさ（EMU） */
 const picXfrm = async () => {
   const book = sheetsOf((await saveExcel()).bytes);
   const rid = /<drawing r:id="([^"]+)"/.exec(book.sheets.get('住改・写真 ①'))[1];
   const rels = strFromU8(book.files[book.paths.get('住改・写真 ①').replace(/([^/]+)$/, '_rels/$1.rels')]);
   const d = strFromU8(book.files[`xl/drawings/${new RegExp(`Id="${rid}"[^>]*Target="\\.\\./drawings/([^"]+)"`).exec(rels)[1]}`]);
-  const pics = [...d.matchAll(/<xdr:pic>[\s\S]*?<a:xfrm(?: rot="(\d+)")?><a:off x="(\d+)" y="(\d+)"\/><a:ext cx="(\d+)" cy="(\d+)"\/>/g)].map((m) => ({
+  // 回した写真の回す前の四角は、紙の端より外に出ることがある（位置がマイナス）
+  const pics = [...d.matchAll(/<xdr:pic>[\s\S]*?<a:xfrm(?: rot="(\d+)")?><a:off x="(-?\d+)" y="(-?\d+)"\/><a:ext cx="(\d+)" cy="(\d+)"\/>/g)].map((m) => ({
     rot: Number(m[1] ?? 0) / 60000,
     x: +m[2],
     y: +m[3],

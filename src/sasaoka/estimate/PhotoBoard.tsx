@@ -19,7 +19,7 @@ import {Btn, useToast} from '../components/ui.tsx';
 import {circled, photoNumbers, swapPhotoNumbers} from '../estimateForms.ts';
 import {cleanEdit, turn} from '../photoEdit.ts';
 import {photoTakenDate, preparePhoto, putPhoto, rememberPhotoUrl, usePhotoUrls} from '../photos.ts';
-import {photoPlacement} from '../shinsei.ts';
+import {photoPlacement, workText} from '../shinsei.ts';
 import type {Job, PhotoEdit, Place, PlacePhotoEdits, PlacePhotos} from '../types.ts';
 import {todayIso} from '../util.ts';
 
@@ -67,6 +67,16 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
       const nos = photoNumbers(j, rates);
       return {...j, places: j.places.map((p) => (nos.has(p.id) ? withSlot(p, 'photoDates', slot, date || undefined) : p))};
     });
+  /** 写真の横（上）に書く内容の追加を直す（空なら持たない） */
+  const setNote = (placeId: string, note: string) =>
+    setJob((j) => ({
+      ...j,
+      places: j.places.map((p) => {
+        if (p.id !== placeId) return p;
+        const {photoNote: _old, ...rest} = p;
+        return note ? {...rest, photoNote: note} : rest;
+      }),
+    }));
   /** 写真の向き・大きさを直す（そのままに戻したら持たない） */
   const setEdit = (key: PhotoKey, edit: PhotoEdit | undefined) =>
     setJob((j) => ({...j, places: j.places.map((p) => (p.id === key.placeId ? withSlot(p, 'photoEdits', key.slot, cleanEdit(edit)) : p))}));
@@ -132,7 +142,7 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
     e.stopPropagation();
     if (e.dataTransfer.files.length) void put([...e.dataTransfer.files], target);
   };
-  return {put, swap, remove, drop, setDate, setEdit, swapPlaces, busy};
+  return {put, swap, remove, drop, setDate, setNote, setEdit, swapPlaces, busy};
 }
 
 /** ドラッグしているものが写真のファイルか */
@@ -407,83 +417,106 @@ export function PhotoBoard({
                       </button>
                     </div>
                   </div>
-                  <div className="grid min-w-0 flex-1 grid-cols-2 gap-1.5">
-                    {(['before', 'after'] as const).map((slot) => {
-                      const key = {placeId: place.id, slot};
-                      const id = place.photos?.[slot];
-                      const photo = id ? urls[id] : undefined;
-                      const edit = place.photoEdits?.[slot];
-                      const k = `${place.id}:${slot}`;
-                      return (
-                        <div key={slot} className="min-w-0">
-                          <div className="relative">
-                            <button
-                              type="button"
-                              aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}`}
-                              aria-pressed={same(selected, key)}
-                              onDragOver={(e) => {
-                                if (!draggable(e)) return;
-                                e.preventDefault();
-                                setOver(k);
-                              }}
-                              onDragLeave={() => setOver((o) => (o === k ? '' : o))}
-                              onDrop={(e) => {
-                                setOver('');
-                                actions.drop(e, key);
-                                setSelected(null);
-                              }}
-                              onClick={() => press(key, !!id)}
-                              className={`relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-md text-xs transition ${
-                                same(selected, key)
-                                  ? 'ring-4 ring-sky-500'
-                                  : over === k
-                                    ? 'ring-4 ring-emerald-500'
-                                    : id
-                                      ? 'bg-slate-100 ring-1 ring-slate-300 hover:ring-2 hover:ring-emerald-500'
-                                      : 'border-2 border-dashed border-slate-300 text-slate-500 hover:border-emerald-500 hover:bg-emerald-50'
-                              } ${selected && !same(selected, key) ? 'cursor-copy' : ''}`}
-                            >
-                              {photo ? (
-                                <Thumb url={photo.url} w={photo.w} h={photo.h} edit={edit} />
-                              ) : photo === null ? (
-                                <span className="px-2 text-amber-800">この端末にない写真</span>
-                              ) : id ? (
-                                '…'
-                              ) : (
-                                `＋ ${SLOT_LABEL[slot]}`
-                              )}
-                              {id && <span className="absolute left-1 top-1 rounded bg-white/85 px-1 text-[10px] font-bold text-slate-700">{SLOT_LABEL[slot]}</span>}
-                            </button>
-                            {/* 右に 90°回す（押すたびに。iPad でもすぐに。続けて押しても画面が拡大しないように touch-manipulation） */}
-                            {id && (
+                  <div className="min-w-0 flex-1">
+                    <div className="grid min-w-0 grid-cols-2 gap-1.5">
+                      {(['before', 'after'] as const).map((slot) => {
+                        const key = {placeId: place.id, slot};
+                        const id = place.photos?.[slot];
+                        const photo = id ? urls[id] : undefined;
+                        const edit = place.photoEdits?.[slot];
+                        const k = `${place.id}:${slot}`;
+                        return (
+                          <div key={slot} className="min-w-0">
+                            <div className="relative">
                               <button
                                 type="button"
-                                data-no-drag
-                                onClick={() => actions.setEdit(key, turn(edit, 1))}
-                                className="absolute right-1 top-1 flex h-8 w-8 touch-manipulation items-center justify-center rounded-full bg-white/90 text-lg leading-none text-slate-700 shadow ring-1 ring-slate-300 hover:bg-white hover:text-emerald-700"
-                                title="右に回す"
-                                aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}を右に回す`}
+                                aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}`}
+                                aria-pressed={same(selected, key)}
+                                onDragOver={(e) => {
+                                  if (!draggable(e)) return;
+                                  e.preventDefault();
+                                  setOver(k);
+                                }}
+                                onDragLeave={() => setOver((o) => (o === k ? '' : o))}
+                                onDrop={(e) => {
+                                  setOver('');
+                                  actions.drop(e, key);
+                                  setSelected(null);
+                                }}
+                                onClick={() => press(key, !!id)}
+                                className={`relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-md text-xs transition ${
+                                  same(selected, key)
+                                    ? 'ring-4 ring-sky-500'
+                                    : over === k
+                                      ? 'ring-4 ring-emerald-500'
+                                      : id
+                                        ? 'bg-slate-100 ring-1 ring-slate-300 hover:ring-2 hover:ring-emerald-500'
+                                        : 'border-2 border-dashed border-slate-300 text-slate-500 hover:border-emerald-500 hover:bg-emerald-50'
+                                } ${selected && !same(selected, key) ? 'cursor-copy' : ''}`}
                               >
-                                ↻
+                                {photo ? (
+                                  <Thumb url={photo.url} w={photo.w} h={photo.h} edit={edit} />
+                                ) : photo === null ? (
+                                  <span className="px-2 text-amber-800">この端末にない写真</span>
+                                ) : id ? (
+                                  '…'
+                                ) : (
+                                  `＋ ${SLOT_LABEL[slot]}`
+                                )}
+                                {id && <span className="absolute left-1 top-1 rounded bg-white/85 px-1 text-[10px] font-bold text-slate-700">{SLOT_LABEL[slot]}</span>}
                               </button>
+                              {/* 右に 90°回す（押すたびに。iPad でもすぐに。続けて押しても画面が拡大しないように touch-manipulation） */}
+                              {id && (
+                                <button
+                                  type="button"
+                                  data-no-drag
+                                  onClick={() => actions.setEdit(key, turn(edit, 1))}
+                                  className="absolute right-1 top-1 flex h-8 w-8 touch-manipulation items-center justify-center rounded-full bg-white/90 text-lg leading-none text-slate-700 shadow ring-1 ring-slate-300 hover:bg-white hover:text-emerald-700"
+                                  title="右に回す"
+                                  aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}を右に回す`}
+                                >
+                                  ↻
+                                </button>
+                              )}
+                            </div>
+                            {dates && (
+                              // 日付が切れないように、「改修前撮影日」「改修後撮影日」は欄の上・日付の欄は枠の幅いっぱい。直すと全部の写真の同じ撮影日が同じ日に
+                              <label data-no-drag className="mt-1 block text-[11px] text-slate-600">
+                                {SLOT_LABEL[slot]}撮影日
+                                <input
+                                  type="date"
+                                  value={place.photoDates?.[slot] ?? ''}
+                                  onChange={(e) => actions.setDate(slot, e.target.value)}
+                                  className="mt-0.5 block h-7 w-full min-w-0 rounded border border-slate-300 px-1 text-xs text-slate-800"
+                                  aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}撮影日`}
+                                />
+                              </label>
                             )}
                           </div>
-                          {dates && (
-                            // 日付が切れないように、「改修前撮影日」「改修後撮影日」は欄の上・日付の欄は枠の幅いっぱい。直すと全部の写真の同じ撮影日が同じ日に
-                            <label data-no-drag className="mt-1 block text-[11px] text-slate-600">
-                              {SLOT_LABEL[slot]}撮影日
-                              <input
-                                type="date"
-                                value={place.photoDates?.[slot] ?? ''}
-                                onChange={(e) => actions.setDate(slot, e.target.value)}
-                                className="mt-0.5 block h-7 w-full min-w-0 rounded border border-slate-300 px-1 text-xs text-slate-800"
-                                aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}撮影日`}
-                              />
-                            </label>
-                          )}
+                        );
+                      })}
+                    </div>
+                    {/* 写真貼付用紙の写真の横（上）に書く内容：自動の文（改修の種類・寸法）と、手で足す行（ユーザーの指示「自動入力 手すり L=800mm H=600mm、追加 手入力 ベースプレート L=800mm」） */}
+                    <div data-no-drag className="mt-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs" role="group" aria-label={`${circled(no)}${place.name} 写真に書く内容`}>
+                      <div className="text-[11px] font-bold text-slate-600">写真に書く内容</div>
+                      {workText(place) && (
+                        <div className="mt-0.5 text-slate-700">
+                          <span className="mr-1.5 text-[11px] text-slate-500">自動</span>
+                          {workText(place)}
                         </div>
-                      );
-                    })}
+                      )}
+                      <label className="mt-1 block text-[11px] text-slate-600">
+                        追加
+                        <textarea
+                          rows={2}
+                          value={place.photoNote ?? ''}
+                          onChange={(e) => actions.setNote(place.id, e.target.value)}
+                          placeholder="ベースプレート　L=800mm"
+                          className="mt-0.5 block w-full min-w-0 resize-y rounded border border-slate-300 bg-white px-1.5 py-1 text-xs text-slate-800"
+                          aria-label={`${circled(no)}${place.name} 写真に書く内容の追加`}
+                        />
+                      </label>
+                    </div>
                   </div>
                 </div>
               </div>

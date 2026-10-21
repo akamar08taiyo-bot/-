@@ -9,7 +9,8 @@ import type {CSSProperties, DragEvent, PointerEvent as ReactPointerEvent, RefObj
 import type {PvFont, PvHeader, PvPage, PvPhotoSlot, PvShape, PvText, Rect, ShinseiField} from '../shinseiPreview.ts';
 import {circled} from '../estimateForms.ts';
 import {clampScale, normRot, ROT_SNAP, turn} from '../photoEdit.ts';
-import {photoPlacement} from '../shinsei.ts';
+import {NOTE_INSET, photoNoteLayout, photoNotePt, photoPlacement} from '../shinsei.ts';
+import {familyOf} from '../shinseiPreview.ts';
 import type {PhotoEdit, ShinseiMarks} from '../types.ts';
 
 const PAD = 18; // 紙の余白（画素）
@@ -218,6 +219,7 @@ export type PreviewPhotos = {
   onDrop: (no: number, slot: PvPhotoSlot['slot'], e: DragEvent) => void;
   onPick: (no: number, slot: PvPhotoSlot['slot']) => void;
   onEdit: (no: number, slot: PvPhotoSlot['slot'], edit: PhotoEdit | undefined) => void;
+  note?: (no: number) => string[]; // 写真の横（上）に書く内容（自動の文と手で足した行。photoNoteLines）
 };
 
 const SLOT_NAME = {before: '改修前', after: '改修後'} as const;
@@ -260,7 +262,11 @@ function PhotoSlotView({
   const touches = useRef(new Map<number, {x: number; y: number}>());
   const pinch = useRef<{d0: number; a0: number; base: PhotoEdit} | null>(null);
   const edit: PhotoEdit = draft ?? photo?.edit ?? {rot: 0, scale: 1};
-  const box = photo ? photoPlacement({x: 0, y: 0, w: slot.w, h: slot.h}, photo.w, photo.h, edit) : null;
+  // 書く内容があれば、写真を横（上）に寄せて空いた所に書く（Excel と同じ photoNoteLayout）。
+  // 回している間（draft）は回す前の向きで分けたまま（縦・横が変わるたびに写真のまん中が動くと回しにくい）。離すと分け直す
+  const lines = photos.note?.(no) ?? [];
+  const parts = photoNoteLayout({x: 0, y: 0, w: slot.w, h: slot.h}, photo ? {w: photo.w, h: photo.h, rot: photo.edit?.rot ?? 0} : null, lines);
+  const box = photo ? photoPlacement(parts.photo, photo.w, photo.h, edit) : null;
   const name = `写真貼付用紙${circled(no)}の${SLOT_NAME[slot.slot]}`;
   const z = 1 / Math.max(zoom, 0.05);
 
@@ -471,8 +477,23 @@ function PhotoSlotView({
           onClick={() => photos.onPick(no, slot.slot)}
           className={`absolute inset-0 cursor-pointer ${over ? 'bg-emerald-400/15 outline outline-4 outline-emerald-600' : 'hover:bg-emerald-400/10'}`}
         >
-          <span className="absolute inset-3 flex items-center justify-center rounded-md border-2 border-dashed border-slate-300 text-base text-slate-400">＋ {SLOT_NAME[slot.slot]}</span>
+          {/* 写真を入れる所（書く内容があれば、その横・下の写真の所だけ） */}
+          <span
+            className="absolute flex items-center justify-center rounded-md border-2 border-dashed border-slate-300 text-base text-slate-400"
+            style={{left: parts.photo.x + 12, top: parts.photo.y + 12, width: Math.max(0, parts.photo.w - 24), height: Math.max(0, parts.photo.h - 24)}}
+          >
+            ＋ {SLOT_NAME[slot.slot]}
+          </span>
         </button>
+      )}
+      {parts.note && (
+        // 写真の横（上）に書く内容（押しても写真の枠のボタンに届くように、押せない文字）
+        <div
+          className="pointer-events-none absolute overflow-hidden"
+          style={{left: parts.note.x, top: parts.note.y, width: parts.note.w, height: parts.note.h, padding: `${NOTE_INSET.y}px ${NOTE_INSET.x}px`, fontFamily: familyOf(''), fontSize: (photoNotePt(parts.note, lines) * 4) / 3, lineHeight: 1.25, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#000'}}
+        >
+          {lines.join('\n')}
+        </div>
       )}
     </div>
   );

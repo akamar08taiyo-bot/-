@@ -239,6 +239,7 @@ export type ShinseiValues = {
   photos: Record<number, string>; // 写真番号 → 改修場所（写真貼付用紙の改修箇所）
   photoKinds?: Record<number, number>; // 写真番号 → 改修の種類（1〜6。苅田町の写真の用紙の実施した工事種類）
   photoDates?: Record<number, PlacePhotos>; // 写真番号 → 改修前・改修後の撮影日（'YYYY-MM-DD'）
+  photoNotes?: Record<number, string[]>; // 写真番号 → 写真貼付用紙の写真の横（上）に書く内容（自動の文と、手で足した行。photoNoteLines）
   marks: ShinseiMarks; // 丸で囲む値
   texts: ShinseiTexts; // 申請書の画面で入れた項目の文字（書き方の {名前} の値）
   cost: number | null; // 改修費用（数で書く欄。なければ null）
@@ -335,6 +336,15 @@ export function workText(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText'
   return [KINDS[p.kind - 1] ?? '', dimsText(p), p.shinseiText?.trim() ?? ''].filter(Boolean).join('　');
 }
 
+/**
+ * 写真貼付用紙の写真の横（上）に書く内容（ユーザーの指示「自動入力　手すり　L=800mm H=600mm、追加　手入力例ベースプレート　L=800mm みたいな感じ」）：
+ * 1行目は自動の文（改修の種類・寸法・そのほか＝workText）、そのあとに手で足した行（`Place.photoNote`。空の行は書かない）
+ */
+export function photoNoteLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText' | 'photoNote'>): string[] {
+  const added = (p.photoNote ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  return [workText(p), ...added].filter(Boolean);
+}
+
 /** 改修の内容・箇所及び規模（苅田町・行橋市の申請書の欄）・平面図の工事内容：箇所ごとに1行「①玄関　手すりの取り付け　L=600mm」。写真番号・改修場所は見積書と同じ */
 export function shinseiWorks(job: Pick<Job, 'places'>, rates: EstimateRates): string[] {
   return workItems(job, rates)
@@ -401,6 +411,7 @@ export function shinseiValues(job: Job, s: EstimateSettings): ShinseiValues {
     photos: shinseiPhotos(job, s),
     photoKinds: Object.fromEntries([...photoPlacesOf(job, s)].map(([n, p]) => [n, p.kind])),
     photoDates: Object.fromEntries([...photoPlacesOf(job, s)].filter(([, p]) => p.photoDates).map(([n, p]) => [n, {...p.photoDates}])),
+    photoNotes: Object.fromEntries([...photoPlacesOf(job, s)].map(([n, p]) => [n, photoNoteLines(p)] as const).filter(([, lines]) => lines.length > 0)),
     marks: {gender: info.gender, era: eraOf(info), care: info.care, renovated: info.renovated}, // 元号は選んでいなければ昭和
     texts: {
       kana: info.kana.trim(),
@@ -694,10 +705,15 @@ export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void
     fitLines(files, sheet, v);
     drawMarks(files, sheet, v.marks);
     if (sheet.legend?.box) drawLegend(files, sheet, v.works);
-    const images = photo > 0 && v.photos[photo] !== undefined && !pasted.has(photo) ? v.photoImages?.[photo] : undefined; // 箇所のある写真番号だけ
-    if (images && (images.before || images.after)) {
-      pasted.add(photo);
-      drawPhotos(files, sheet, images);
+    // Excel に保存するとき（photoImages があるとき）：箇所のある写真番号の最初の用紙に、写真と、写真の横（上）に書く内容を入れる
+    //（画面のプレビューは、写真と書く内容を枠に重ねて描く）
+    if (v.photoImages && photo > 0 && v.photos[photo] !== undefined && !pasted.has(photo)) {
+      const images = v.photoImages[photo] ?? {};
+      const notes = v.photoNotes?.[photo] ?? [];
+      if (images.before || images.after || notes.length) {
+        pasted.add(photo);
+        drawPhotos(files, sheet, images, notes);
+      }
     }
   }
 }
@@ -1090,6 +1106,17 @@ function fromTo(lay: SheetLayout, box: Box): string {
   );
 }
 
+/**
+ * 回した図形の置き場所（from・to）の四角。Excel は 45〜135°・225〜315° 回した図形の置き場所を、回す前の四角をまん中で 90°回した四角
+ * （縦と横を入れかえた四角）で持つ（LibreOffice の読み込みも同じ）。回す前の四角のままだと、Excel で写真の形・位置がくずれる
+ * （縦に回した写真を枠の左に寄せると、回す前の四角が紙の左の端より外に出て、置き場所が切れる）
+ */
+function anchorBox(box: Box, rot = 0): Box {
+  const r = normRot(rot);
+  if (!((r >= 45 && r < 135) || (r >= 225 && r < 315))) return box;
+  return {x: box.x + (box.w - box.h) / 2, y: box.y + (box.h - box.w) / 2, w: box.h, h: box.w};
+}
+
 const emu = (px: number) => Math.round(px * EMU);
 /** 図形の位置と大きさ。rot＝右回りの角度（度。回す前の四角のまん中で回る） */
 const xfrm = (box: Box, rot = 0) =>
@@ -1226,8 +1253,42 @@ export function photoPlacement(frame: Box, w: number, h: number, edit?: PhotoEdi
   return {x: frame.x + (frame.w - pw) / 2, y: frame.y + (frame.h - ph) / 2, w: pw, h: ph, rot};
 }
 
-/** 写真貼付用紙の改修前・改修後の枠に写真を貼る（xl/media に JPEG を入れ、図形のファイルに写真の図形を足す） */
-function drawPhotos(files: Files, sheet: ShinseiSheet, images: PhotoImages): void {
+/** 写真の横（上）に書く内容の文字の大きさ（pt）。入らなければ小さくする（いちばん小さくて NOTE_MIN_PT） */
+export const NOTE_PT = 10.5;
+const NOTE_MIN_PT = 6;
+/** 書く欄のまわりの余白（画素）：左右・上下 */
+export const NOTE_INSET = {x: 5, y: 3};
+
+/** 写真の枠を、写真の所（photo）と書く欄（note）に分けた四角。書くことがなければ note は null（写真は枠いっぱい） */
+export type PhotoNoteLayout = {photo: Box; note: Box | null};
+
+/**
+ * 写真の枠を、写真の所と書く欄に分ける（ユーザーの指示「写真をめいいっぱいにしない。縦写真の場合、写真を左に寄せてスペースをつくる。
+ * 横写真の場合、上にスペースをあけて入力スペースをつくるなど、バランスよく」、2026-10-21）。
+ * 縦長の写真（回したあとで）：枠の高さに合わせた写真の幅（枠の幅の 62% まで）を左に、残りの右を書く欄に。
+ * 横長の写真・写真のない枠：上に書く欄（行の数に合わせて、枠の高さの 16〜32%）、その下に写真。画面のプレビューと Excel で同じ計算を使う
+ */
+export function photoNoteLayout(frame: Box, size: {w: number; h: number; rot?: number} | null, lines: string[], pad = 4): PhotoNoteLayout {
+  if (lines.length === 0) return {photo: frame, note: null};
+  if (size) {
+    const t = (normRot(size.rot ?? 0) * Math.PI) / 180;
+    const [c, s] = [Math.abs(Math.cos(t)), Math.abs(Math.sin(t))];
+    const [bw, bh] = [Math.max(size.w, 1) * c + Math.max(size.h, 1) * s, Math.max(size.w, 1) * s + Math.max(size.h, 1) * c];
+    if (bh > bw * 1.05) {
+      const pw = Math.min(frame.w * 0.62, ((frame.h - 2 * pad) * bw) / bh + 2 * pad);
+      return {photo: {x: frame.x, y: frame.y, w: pw, h: frame.h}, note: {x: frame.x + pw, y: frame.y, w: frame.w - pw, h: frame.h}};
+    }
+  }
+  const line = ((NOTE_PT * 4) / 3) * LINE_K;
+  const nh = Math.min(frame.h * 0.32, Math.max(frame.h * 0.16, lines.length * line + 2 * NOTE_INSET.y + 2));
+  return {photo: {x: frame.x, y: frame.y + nh, w: frame.w, h: frame.h - nh}, note: {x: frame.x, y: frame.y, w: frame.w, h: nh}};
+}
+
+/** 書く欄の文字の大きさ（pt）：欄（余白の内側）に入る大きさ */
+export const photoNotePt = (note: Box, lines: string[]) => fitLinesSize(lines, note.w - 2 * NOTE_INSET.x + 6, note.h - 2 * NOTE_INSET.y + 4, NOTE_PT, NOTE_MIN_PT);
+
+/** 写真貼付用紙の改修前・改修後の枠に写真を貼る（xl/media に JPEG を入れ、図形のファイルに写真の図形を足す）。書く内容があれば写真の横（上）にテキストボックスで */
+function drawPhotos(files: Files, sheet: ShinseiSheet, images: PhotoImages, notes: string[] = []): void {
   const place = sheet.photoPlace;
   const path = sheetPaths(files).get(sheet.sheet);
   if (!place || !path || !files[path]) return;
@@ -1239,11 +1300,20 @@ function drawPhotos(files: Files, sheet: ShinseiSheet, images: PhotoImages): voi
   let rels = files[relsPath] ? strFromU8(files[relsPath]) : '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
   let id = nextShapeId(d);
   const pics: string[] = [];
+  const texts: string[] = [];
   for (const slot of ['before', 'after'] as const) {
     const img = images[slot];
     const range = place[slot];
-    if (!img || !range) continue;
-    const box = photoPlacement(rangeBox(lay, range), img.w, img.h, img.edit);
+    if (!range) continue;
+    // 書く内容があれば、写真を横（上）に寄せて、空いた所にテキストボックス（写真のない枠も）
+    const parts = photoNoteLayout(rangeBox(lay, range), img ? {w: img.w, h: img.h, rot: img.edit?.rot} : null, notes);
+    if (parts.note) {
+      const pt = photoNotePt(parts.note, notes);
+      texts.push(noteBoxXml(lay, parts.note, notes, pt, id, slot === 'before' ? '改修前の説明' : '改修後の説明'));
+      id++;
+    }
+    if (!img) continue;
+    const box = photoPlacement(parts.photo, img.w, img.h, img.edit);
     let n = 1;
     while (files[`xl/media/image${n}.jpeg`]) n++;
     files[`xl/media/image${n}.jpeg`] = img.bytes;
@@ -1252,19 +1322,39 @@ function drawPhotos(files: Files, sheet: ShinseiSheet, images: PhotoImages): voi
     rels = rels.replace('</Relationships>', `<Relationship Id="rId${k}" Type="${REL_IMAGE}" Target="../media/image${n}.jpeg"/></Relationships>`);
     const name = slot === 'before' ? '改修前' : '改修後';
     pics.push(
-      `<xdr:twoCellAnchor editAs="oneCell">${fromTo(lay, box)}<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${id}" name="${name} ${id}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>` +
+      `<xdr:twoCellAnchor editAs="oneCell">${fromTo(lay, anchorBox(box, box.rot))}<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${id}" name="${name} ${id}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>` +
         `<xdr:blipFill><a:blip r:embed="rId${k}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>` +
         `<xdr:spPr>${xfrm(box, box.rot)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor>`,
     );
     id++;
   }
-  if (pics.length === 0) return;
+  if (pics.length === 0) {
+    if (texts.length) files[drawing] = strToU8(d.replace('</xdr:wsDr>', `${texts.join('')}</xdr:wsDr>`));
+    return;
+  }
   files[relsPath] = strToU8(rels);
   const root = /<xdr:wsDr\b[^>]*>/.exec(d)?.[0] ?? '';
   if (root && !/\sxmlns:r=/.test(root)) d = d.replace(root, root.replace('<xdr:wsDr', `<xdr:wsDr xmlns:r="${NS_R}"`));
-  files[drawing] = strToU8(d.replace('</xdr:wsDr>', `${pics.join('')}</xdr:wsDr>`));
+  files[drawing] = strToU8(d.replace('</xdr:wsDr>', `${pics.join('')}${texts.join('')}</xdr:wsDr>`));
   const ct = strFromU8(files['[Content_Types].xml']);
   if (!/<Default\b[^>]*Extension="jpeg"/i.test(ct)) files['[Content_Types].xml'] = strToU8(ct.replace(/(<Types\b[^>]*>)/, '$1<Default Extension="jpeg" ContentType="image/jpeg"/>'));
+}
+
+/**
+ * 写真の横（上）に書く内容のテキストボックス（枠線・塗りなし。余白は NOTE_INSET。文字は pt）。
+ * 字体と色は、原本のテキストボックスと同じく style（テーマの本文の字体・文字の色）で。書かないと Excel・LibreOffice が別の字体（明朝など）で出す
+ */
+function noteBoxXml(lay: SheetLayout, box: Box, lines: string[], pt: number, id: number, name: string): string {
+  const sz = Math.round(pt * 100);
+  const [ix, iy] = [Math.round(NOTE_INSET.x * EMU), Math.round(NOTE_INSET.y * EMU)];
+  const paras = lines.map((l) => `<a:p><a:r><a:rPr lang="ja-JP" altLang="en-US" sz="${sz}"/><a:t>${esc(l)}</a:t></a:r></a:p>`).join('');
+  const none = '<a:scrgbClr r="0" g="0" b="0"/>';
+  return (
+    `<xdr:twoCellAnchor>${fromTo(lay, box)}<xdr:sp macro="" textlink=""><xdr:nvSpPr><xdr:cNvPr id="${id}" name="${name} ${id}"/><xdr:cNvSpPr txBox="1"/></xdr:nvSpPr>` +
+    `<xdr:spPr>${xfrm(box)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln w="9525"><a:noFill/></a:ln></xdr:spPr>` +
+    `<xdr:style><a:lnRef idx="0">${none}</a:lnRef><a:fillRef idx="0">${none}</a:fillRef><a:effectRef idx="0">${none}</a:effectRef><a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef></xdr:style>` +
+    `<xdr:txBody><a:bodyPr wrap="square" lIns="${ix}" tIns="${iy}" rIns="${ix}" bIns="${iy}" rtlCol="0" anchor="t"/><a:lstStyle/>${paras}</xdr:txBody></xdr:sp><xdr:clientData/></xdr:twoCellAnchor>`
+  );
 }
 
 /** 選んだ値（性別の「女」など）を丸で囲む：原本のシートの図形に楕円を足す */

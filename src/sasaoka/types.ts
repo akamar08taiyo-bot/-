@@ -69,6 +69,7 @@ export type Place = {
   photos?: PlacePhotos; // 写真貼付用紙の写真（この箇所の写真番号の用紙に貼る）
   photoDates?: PlacePhotos; // 写真の撮影日（'YYYY-MM-DD'。改修前・改修後。苅田町の写真の用紙の「撮影日」に書く）
   photoEdits?: PlacePhotoEdits; // 写真の向き・大きさ（なければ そのまま・枠いっぱい。photoEdit.ts）
+  photoNote?: string; // 写真貼付用紙の写真の横（上）に書く内容の追加（手で打つ。1行ずつ。「ベースプレート　L=800mm」）。自動の文（改修の種類・寸法）の下に書く
 };
 
 /** 改修の内容の寸法（mm。打ったまま）：l 長さ（手すり。空なら見積書の使う長さ）・h 高さ・w 幅・d 奥行 */

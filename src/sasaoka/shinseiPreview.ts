@@ -219,7 +219,7 @@ function colorOf(tag: string | undefined, st: StyleParts, theme: Theme, fallback
 }
 
 /** 字体の名前 → 画面の字体（Windows のパソコンは原本と同じ字体。ないとき＝スマホなどは近い字体） */
-function familyOf(name: string): string {
+export function familyOf(name: string): string {
   const mincho = /明朝|Mincho/i.test(name);
   const fixed = !/[ＰP]/.test(name) && /ＭＳ|MS/.test(name);
   const alias: Record<string, string> = {'ＭＳ Ｐゴシック': 'MS PGothic', 'ＭＳ ゴシック': 'MS Gothic', 'ＭＳ Ｐ明朝': 'MS PMincho', 'ＭＳ 明朝': 'MS Mincho'};

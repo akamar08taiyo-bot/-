@@ -237,6 +237,7 @@ const cleanPlace = (p: Record<string, unknown>): Place => ({
   ...cleanDims(p.dims),
   ...cleanPhotos(p.photos),
   ...cleanPhotoDates(p.photoDates),
+  ...(str(p.photoNote).trim() ? {photoNote: str(p.photoNote)} : {}), // 写真に書く内容の追加
   ...cleanPhotoEdits(p.photoEdits),
 });
 
