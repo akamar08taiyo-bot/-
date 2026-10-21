@@ -152,6 +152,18 @@ test('苅田町の申請書：事前申請書の氏名・住所・被保険者�
   assert.equal(strip(pre), strip(orig.byName.get('事前申請書')!)); // 欄のほか（罫線・結合・印刷の範囲など）はそのまま
 });
 
+test('苅田町の写真の用紙（9枚）の実施した工事種類は「🔳手すりの取付　□(2)段差の解消…」（原本の「■(1)手摺の取付」をユーザーの指示で直した）', () => {
+  const {files, byName} = sheets(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(job(), RATES)));
+  const strings = [...strFromU8(files['xl/sharedStrings.xml']).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => [...m[1].matchAll(/<t[^>]*>([^<]*)<\/t>/g)].map((t) => t[1]).join(''));
+  const photo = [...byName.keys()].filter((name) => name.startsWith('1 '));
+  assert.equal(photo.length, 9);
+  for (const name of photo) {
+    const at = /<c r="B4"[^>]*t="s"[^>]*><v>(\d+)<\/v>/.exec(byName.get(name)!)?.[1];
+    assert.ok(strings[Number(at)]?.startsWith('🔳手すりの取付　□(2)段差の解消　□(3)'), name);
+  }
+  assert.ok(!strings.some((s) => s.includes('■') || s.includes('手摺')));
+});
+
 test('行橋市の申請書：住改・受領委任払の氏名・住所・被保険者番号（10マス）・改修の内容。読み戻すと同じ', () => {
   const v = shinseiValues(job({insurer: 'yukuhashi', address: '福岡県行橋市中央1-1'}), RATES);
   const out = fillShinsei(YUKUHASHI, SHINSEI.yukuhashi!, v);

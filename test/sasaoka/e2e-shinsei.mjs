@@ -410,6 +410,10 @@ assert.match(k.sheets.get('事後申請書'), /<f>事前申請書!J7<\/f><v>（�
 assert.deepEqual([k.ellipses('事前申請書'), k.ellipses('事後申請書')], [3, 3]); // 女・昭・要支援１（事後申請書にも）
 assert.deepEqual(['J6', 'J9', 'J10', 'AB11', 'W13', 'Y16'].map((r) => text(pre, r)), ['サンプル　ヤマダ', '明　・　大　・　昭　23年5月6日生', '〒824-0001', '0930-11-2222', '本人との関係（本人）', '令和8年11月20日']);
 assert.ok(!/令和|46331/.test(cellOf(pre, 'Y15')), cellOf(pre, 'Y15')); // 着工予定日は空白
+// 写真の用紙の実施した工事種類は「🔳手すりの取付　□(2)段差の解消…」（ユーザーの指示。原本は「■(1)手摺の取付」）
+assert.ok((await pageOf('1 ').innerText()).includes('🔳手すりの取付'));
+const kStrings = strFromU8(unzipSync(kd.bytes)['xl/sharedStrings.xml']);
+assert.ok(kStrings.includes('🔳手すりの取付　□(2)段差の解消') && !kStrings.includes('手摺'));
 await page.locator('[aria-live] > div', {hasText: `「${kd.name}」を保存しました`}).waitFor();
 log('苅田町の申請書（申請書の順番の一覧・事前申請書・事後申請書は式で同じ・丸を外す・着工予定日は空白）OK');
 
