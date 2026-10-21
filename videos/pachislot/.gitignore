@@ -1,0 +1,10 @@
+node_modules/
+work/
+__pycache__/
+# 生成画像の原本（大きいので入れない。使った絵は public/<回>/img）
+*.png
+!out/*.png
+# スクリプトで作り直せる音（prep_audio.py / sfx.py / bgm.py）とフォント（subset_fonts.py）
+public/*/audio/
+public/shared/sfx/
+public/fonts/

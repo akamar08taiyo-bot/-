@@ -1,0 +1,24 @@
+{
+  "id": "check00",
+  "title": "制作ラインの動作確認（本編ではありません）",
+  "format": "vertical",
+  "len": [5, 20],
+  "fps": 30,
+  "voice": {
+    "name": "Sulafat",
+    "model": "gemini-3.8-flash-tts",
+    "profile": "A calm Japanese narrator in her 30s. Clear, friendly, natural standard Tokyo Japanese.",
+    "scene": "She is reading a short system check message for a video production pipeline."
+  },
+  "styles": {
+    "narr": "Natural, brisk and clear. Short pauses between phrases. No exaggerated acting."
+  },
+  "lines": [
+    {"id": "intro", "style": "narr", "text": "制作ラインの動作確認です。", "gap": 0.3},
+    {"id": "body", "style": "narr", "text": "声と効果音とBGMと字幕が、きちんと重なるかを見ています。", "speak": "声と効果音とビージーエムと字幕が、きちんと重なるかを見ています。", "gap": 0.3},
+    {"id": "end", "style": "narr", "text": "引き継ぎ書が届いたら、すぐ本番に入ります。", "gap": 0.2}
+  ],
+  "sfx": [["pop", "intro", "s", -0.12, 0.6], ["pikon", "end", "e", 0.08, 0.5]],
+  "bgm": {"style": "ukulele", "stop": ["end", "e", 0.6], "restart": ["end", "e", 0.6], "outro": ["end", "e", 0.1]},
+  "tail": 1.4
+}

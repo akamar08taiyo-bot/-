@@ -1,0 +1,25 @@
+{
+ "fps": 30,
+ "total": 13.875,
+ "estimated": false,
+ "lines": [
+  {
+   "id": "intro",
+   "start": 0.25,
+   "end": 2.33,
+   "dur": 2.08
+  },
+  {
+   "id": "body",
+   "start": 2.63,
+   "end": 8.61,
+   "dur": 5.98
+  },
+  {
+   "id": "end",
+   "start": 8.91,
+   "end": 12.275,
+   "dur": 3.365
+  }
+ ]
+}
