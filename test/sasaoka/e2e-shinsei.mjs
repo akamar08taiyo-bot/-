@@ -6,9 +6,9 @@
 //   被保険者番号の空いたマスは 0。苅田町・行橋市の着工予定日は空白（入れる欄もない）。
 //   「📗 申請書をExcelで保存」で、原本（行橋市・苅田町・みやこ町・広域連合）に転記した Excel を保存する（ほかのシートはそのまま。丸は楕円の図形）。
 //   新規作成は申請書のタブから（フリガナの欄にカーソル）。見積書に行を入れると笹岡工務店の請求書・発注書に入る（申請書だけなら入れない）。
-//   写真：写真の欄（写真番号の箇所ごとに改修前・改修後）に写真のファイルを選ぶ・ドロップする。押して（ドラッグして）入れ替える・差し替える・消す。
+//   写真：写真の欄（写真番号の箇所ごとに改修前・改修後）に写真のファイルを選ぶ・ドロップする。押して入れ替える・差し替える・消す。
 //   プレビューの写真貼付用紙にも出て（枠にドロップしてもよい）、Excel の写真貼付用紙の枠に貼る。平面図の空いた所には工事内容（改修の内容と同じ行）。
-//   写真番号は ▶ ◀・見出しのドラッグで入れ替える（写真・改修の内容・見積書の順番も一緒に）。写真の向き・大きさは、写真の欄の ↻ と、
+//   写真番号は ▶ ◀・箇所をつかんで（見出しでも写真の上でも）ほかの箇所に重ねて入れ替える（写真・改修の内容・見積書の順番も一緒に）。写真の向き・大きさは、写真の欄の ↻ と、
 //   プレビューの写真を押して角のつまみ・上の丸（マウス）、2本の指でひねる・つまむ（iPad）。枠より大きくしない。Excel にも同じ向き・大きさで貼る
 //   見積もりの入口の「申請書（Excel）から作る」はない（ユーザーの指示「不要」）
 // usage: node e2e-shinsei.mjs <サイトのURL> <出力フォルダ>
@@ -327,11 +327,13 @@ await page.getByRole('status', {name: '選んでいる写真'}).waitFor();
 await slot('②', 'トイレ', '改修前').click();
 assert.deepEqual([await srcOf(slot('①', '玄関', '改修前')), await srcOf(slot('②', 'トイレ', '改修前'))], [blueSrc, redSrc]);
 assert.equal(await page.getByRole('status', {name: '選んでいる写真'}).count(), 0);
-// ドラッグして移す（空いた枠）・入れ替える（写真のある枠）
-await slot('①', '玄関', '改修後').dragTo(slot('②', 'トイレ', '改修後'));
+// 押して移す（空いた枠）・入れ替える（写真のある枠）。写真をドラッグしてほかの箇所に重ねるのは、写真番号の入れ替え（下）
+await slot('①', '玄関', '改修後').click();
+await slot('②', 'トイレ', '改修後').click();
 assert.equal(await srcOf(slot('②', 'トイレ', '改修後')), greenSrc);
 assert.ok(await emptySlot(slot('①', '玄関', '改修後')));
-await slot('②', 'トイレ', '改修前').dragTo(slot('①', '玄関', '改修前'));
+await slot('②', 'トイレ', '改修前').click();
+await slot('①', '玄関', '改修前').click();
 assert.deepEqual([await srcOf(slot('①', '玄関', '改修前')), await srcOf(slot('②', 'トイレ', '改修前'))], [redSrc, blueSrc]);
 // 消す：押して「削除」
 await slot('②', 'トイレ', '改修後').click();
@@ -421,10 +423,11 @@ await page.waitForFunction(
     }),
 );
 assert.ok((await photoIds()).length >= 3); // 使っている3枚は残る（入れ替えた古い写真は、1時間たつまで消さない）
-log('写真（選ぶ・ドロップ・押して入れ替え・ドラッグで入れ替え・削除・差し替え・プレビューの枠にドロップ・Excel の写真貼付用紙・読み直し・古い写真を消す）OK');
+log('写真（選ぶ・ドロップ・押して入れ替え・押して移す・削除・差し替え・プレビューの枠にドロップ・Excel の写真貼付用紙・読み直し・古い写真を消す）OK');
 
-// ---------------- 写真番号の入れ替え（ユーザーの指示「①勝手口・②浴室を、押したりドラッグで横にずらしたりして、①浴室・②勝手口に簡単に入れ替える」）：
-// ▶ ◀ で隣と、箇所の見出しをドラッグしてほかの箇所に重ねて。写真は箇所と一緒に動き、申請書の改修の内容・見積書の箇所の順番・写真貼付用紙の番号もそろう
+// ---------------- 写真番号の入れ替え（ユーザーの指示「①勝手口・②浴室を、押したりドラッグで横にずらしたりして、①浴室・②勝手口に簡単に入れ替える」
+// 「クリックしてそのままドロップしたら入れ替え」）：▶ ◀ で隣と、箇所をつかんで（見出しでも写真の上でも）ほかの箇所に重ねて離す。
+// 写真は箇所と一緒に動き、申請書の改修の内容・見積書の箇所の順番・写真貼付用紙の番号もそろう
 const cards = (where = photoBoard) => where.getByRole('group').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
 const workNames = () => works.getByRole('listitem').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
 assert.deepEqual(await cards(), ['①玄関の写真', '②トイレの写真']);
@@ -443,28 +446,41 @@ const est1 = await sheet.locator('.form-page').first().innerText();
 assert.ok(est1.indexOf('①トイレ') >= 0 && est1.indexOf('①トイレ') < est1.indexOf('②玄関'), '見積書の箇所の順番が入れ替わっていない');
 await shinseiTab.click();
 await photoBoard.waitFor();
-/** 箇所の見出しをつかんで、ほかの箇所に重ねて離す（マウス） */
-const dragCard = async (fromName, toName) => {
-  const handle = photoBoard.getByRole('group', {name: fromName}).getByTitle('ドラッグしてほかの写真番号と入れ替え');
-  await handle.scrollIntoViewIfNeeded();
-  const a = await handle.boundingBox();
-  const b = await photoBoard.getByRole('group', {name: toName}).boundingBox();
+const handleOf = (name) => photoBoard.getByRole('group', {name}).getByTitle('ドラッグしてほかの写真番号と入れ替え');
+/** つかむ所（見出し・写真）を押したまま、ほかの箇所に重ねて離す（マウス）。to が null なら箇所でない所（申請書の一覧）へ */
+const dragCard = async (from, toName, shot = '') => {
+  await from.scrollIntoViewIfNeeded();
+  const a = await from.boundingBox();
+  const to = toName ? photoBoard.getByRole('group', {name: toName}) : form.getByLabel('フリガナ');
+  const b = await to.boundingBox();
   await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
   await page.mouse.down();
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, {steps: 12});
-  assert.ok(await photoBoard.getByRole('group', {name: toName}).evaluate((el) => el.className.includes('ring-emerald-500')), '重ねている箇所が分からない');
+  if (toName) assert.ok(await to.evaluate((el) => el.className.includes('ring-emerald-500')), '重ねている箇所が分からない');
+  if (shot) await photoBoard.screenshot({path: path.join(outDir, shot)});
   await page.mouse.up();
 };
-await dragCard('①トイレの写真', '②玄関の写真');
+await dragCard(handleOf('①トイレの写真'), '②玄関の写真');
 assert.deepEqual(await cards(), ['①玄関の写真', '②トイレの写真']);
 assert.deepEqual([await srcOf(slot('①', '玄関', '改修前')), await srcOf(slot('②', 'トイレ', '改修前'))], [yellowSrc, blueSrc2]);
 assert.deepEqual(await workNames(), ['①玄関', '②トイレ']);
 await pvHas('①玄関　手すりの取り付け　L=600mm H=800mm');
+// 写真の上をつかんでも同じ（写真は選ばない）。空いた枠からでも。箇所でない所で離すと、そのまま
+await dragCard(slot('①', '玄関', '改修前'), '②トイレの写真', '85c-photo-drag.png');
+assert.deepEqual(await cards(), ['①トイレの写真', '②玄関の写真']);
+assert.equal(await page.getByRole('status', {name: '選んでいる写真'}).count(), 0);
+await pvHas('①トイレ　手すりの取り付け');
+await dragCard(slot('②', '玄関', '改修後'), '①トイレの写真');
+assert.deepEqual(await cards(), ['①玄関の写真', '②トイレの写真']);
+assert.deepEqual([await srcOf(slot('①', '玄関', '改修前')), await srcOf(slot('②', 'トイレ', '改修前')), await srcOf(slot('②', 'トイレ', '改修後'))], [yellowSrc, blueSrc2, greenSrc2]);
+await dragCard(slot('①', '玄関', '改修前'), null);
+assert.deepEqual(await cards(), ['①玄関の写真', '②トイレの写真']);
+assert.equal(await page.getByRole('status', {name: '選んでいる写真'}).count(), 0);
 // 少し動かしただけ（押しただけ）では入れ替えない
 await page.mouse.move(0, 0);
-await photoBoard.getByRole('group', {name: '①玄関の写真'}).getByTitle('ドラッグしてほかの写真番号と入れ替え').click();
+await handleOf('①玄関の写真').click();
 assert.deepEqual(await cards(), ['①玄関の写真', '②トイレの写真']);
-log('写真番号の入れ替え（▶ ◀・見出しをドラッグ。写真・改修の内容・見積書の順番も一緒に）OK');
+log('写真番号の入れ替え（▶ ◀・見出しや写真をつかんでドラッグ。写真・改修の内容・見積書の順番も一緒に）OK');
 
 // ---------------- 写真の向き・大きさ（ユーザーの指示「写真の方向転換」「画像の角っこを持ち上げて縮小したり拡大したり」「申請書の大きさは絶対に大きくしない」
 // 「パソコンでくるくると回転」「iPad でもくるっとすぐに簡単に回転」）：写真の欄の ↻ で右に 90°。プレビューの写真を押すと、角のつまみで大きさ・上の丸で向き、
@@ -578,9 +594,11 @@ await form.getByLabel('フリガナ').click();
 assert.equal(await tools.count(), 0);
 // 写真を入れ替えると、向き・大きさも写真と一緒に動く
 await photoBoard.getByRole('button', {name: '②トイレ 改修前を右に回す'}).click();
-await slot('②', 'トイレ', '改修前').dragTo(slot('①', '玄関', '改修後'));
+await slot('②', 'トイレ', '改修前').click();
+await slot('①', '玄関', '改修後').click();
 assert.equal(await rotOf(thumb('①', '玄関', '改修後')), 90);
-await slot('①', '玄関', '改修後').dragTo(slot('②', 'トイレ', '改修前'));
+await slot('①', '玄関', '改修後').click();
+await slot('②', 'トイレ', '改修前').click();
 assert.equal(await rotOf(thumb('②', 'トイレ', '改修前')), 90);
 await photoBoard.getByRole('button', {name: '②トイレ 改修前を右に回す'}).click();
 await photoBoard.getByRole('button', {name: '②トイレ 改修前を右に回す'}).click();
@@ -626,12 +644,14 @@ const until = async (check, what) => {
 await slot2('②', 'トイレ', '改修前').locator('img').waitFor();
 const cdp = await tab.newCDPSession(ipad);
 const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', {type, touchPoints: pts.map(([x, y], id) => ({x, y, id, radiusX: 4, radiusY: 4, force: 1}))});
-/** 指1本でドラッグする（重ねた所で少し止めてから離す。勢いよく離すと、次に押したのが「止める」扱いになって押せない） */
-const fingerDrag = async (from, to) => {
+/** 指1本でドラッグする（hold：押してから動かすまで待つミリ秒。重ねた所で少し止めてから離す。勢いよく離すと、次に押したのが「止める」扱いになって押せない） */
+const fingerDrag = async (from, to, hold = 0) => {
+  await to.evaluate((el) => el.scrollIntoView({block: 'center'})); // 画面の端（近づけるとスクロールする）から離しておく
   await from.scrollIntoViewIfNeeded();
   const [a, b] = [await from.boundingBox(), await to.boundingBox()];
   const [sx, sy, ex, ey] = [a.x + a.width / 2, a.y + a.height / 2, b.x + b.width / 2, b.y + b.height / 2];
   await touch('touchStart', [[sx, sy]]);
+  if (hold) await ipad.waitForTimeout(hold);
   for (let i = 1; i <= 12; i++) await touch('touchMove', [[sx + ((ex - sx) * i) / 12, sy + ((ey - sy) * i) / 12]]);
   for (const dx of [0.4, 0, 0.4, 0]) {
     await ipad.waitForTimeout(50);
@@ -641,6 +661,16 @@ const fingerDrag = async (from, to) => {
 };
 await fingerDrag(board2.getByRole('group', {name: '①玄関の写真'}).getByTitle('ドラッグしてほかの写真番号と入れ替え'), board2.getByRole('group', {name: '②トイレの写真'}));
 assert.deepEqual(await cards(board2), ['①トイレの写真', '②玄関の写真']);
+// 写真の上は、すぐに動かすと画面のスクロール（入れ替えない）。少し押したままにしてから動かすと、つかんで入れ替え（写真は選ばない）
+await fingerDrag(slot2('①', 'トイレ', '改修前'), board2.getByRole('group', {name: '②玄関の写真'}));
+await ipad.waitForTimeout(300);
+assert.deepEqual(await cards(board2), ['①トイレの写真', '②玄関の写真']);
+await fingerDrag(slot2('①', 'トイレ', '改修前'), board2.getByRole('group', {name: '②玄関の写真'}), 450);
+await until(async () => (await cards(board2))[0] === '①玄関の写真', '写真の上を押したままドラッグしても入れ替わらない');
+await fingerDrag(slot2('①', '玄関', '改修前'), board2.getByRole('group', {name: '②トイレの写真'}), 450);
+await until(async () => (await cards(board2))[0] === '①トイレの写真', '写真の上を押したままドラッグしても入れ替わらない（2回目）');
+await ipad.waitForTimeout(600);
+assert.equal(await board2.getByRole('status', {name: '選んでいる写真'}).count(), 0);
 // 写真の欄の ↻ を指で押す
 await board2.getByRole('button', {name: '②玄関 改修前を右に回す'}).tap();
 await until(async () => (await rotOf(slot2('②', '玄関', '改修前').locator('img'))) === 90, '写真の欄の ↻ を指で押しても回らない');
@@ -698,7 +728,7 @@ await until(async () => (await ipPhoto.getAttribute('aria-pressed')) === 'true',
 await ipPage.screenshot({path: path.join(outDir, '93-phone-photo-edit.png')});
 assert.ok(await ipad.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'スマホの幅で横にはみ出す（写真を選んだとき）');
 await tab.close();
-log('iPad・スマホ（指で見出しをドラッグして入れ替え・↻・2本の指でひねる／つまむ・道具・はみ出さない）OK');
+log('iPad・スマホ（指で見出し・写真の上を押したままドラッグして入れ替え・すぐに動かすとスクロール・↻・2本の指でひねる／つまむ・道具・はみ出さない）OK');
 
 // ---------------- 苅田町：保険者を替えると苅田町の申請書。丸は残る（もう一度押すと外れる）。事後申請書は式で同じ内容
 await shinseiTab.click();

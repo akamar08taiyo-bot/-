@@ -1,7 +1,7 @@
 // 申請書のプレビュー：原本の様式のまま描く（材料は shinseiPreview.ts。Excel に保存するときと同じ書き込みをしたもの）。
 // 申請書のタブで、一覧で入れながら横で見る（ユーザーの指示「一覧から入力をメインとする。プレビューをみながら入力」）。
 // 一覧で入れている項目の欄は囲んで、見える所まで動かす。欄を押すと一覧のその項目へ。丸で囲む値（男・女など）は押すと丸がつく（もう一度押すと外れる）。
-// まだ入っていない欄は薄い黄色。写真貼付用紙は、改修前・改修後の枠に写真を重ねて出す（枠に写真のファイル・写真の欄の写真をドロップ、押して選ぶ）。
+// まだ入っていない欄は薄い黄色。写真貼付用紙は、改修前・改修後の枠に写真を重ねて出す（枠に写真のファイルをドロップ、押して選ぶ）。
 // 写真を押すと、向き・大きさを直せる（ユーザーの指示「写真の方向転換」「画像の角っこを持ち上げて縮小・拡大」「iPad でもくるっと回転」）：
 // 角のつまみで大きさ（枠より大きくはしない）、上の丸いつまみでくるくる回す（90°の近くはそろう）、↺ ↻ で 90°ずつ、2本の指でひねる・つまむ（iPad）
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
@@ -358,7 +358,7 @@ function PhotoSlotView({
 
   const dropProps = {
     onDragOver: (e: DragEvent) => {
-      if (![...e.dataTransfer.types].some((t) => t === 'Files' || t.startsWith('application/x-sasaoka-photo'))) return;
+      if (![...e.dataTransfer.types].includes('Files')) return;
       e.preventDefault();
       setOver(true);
     },

@@ -2,14 +2,15 @@
 // 「写真番号の1番と2番の入れ替えなど、編集もしやすく」）。
 // 写真番号（見積書の箇所の順番。申請書の改修の内容と同じ）ごとに 改修前・改修後 の枠を並べる。枠に写真のファイルをドロップするか、枠を押して選ぶ。
 // 何枚かまとめて選ぶ（ドロップする）と、①から順に改修前の空いた枠に入る。
-// 入れ替え：写真を別の枠へドラッグするか、写真を押して選んでから入れ替えたい枠を押す（空いた枠なら移す）。差し替え・削除もできる。
+// 写真の入れ替え：写真を押して選んでから入れ替えたい枠を押す（空いた枠なら移す）。差し替え・削除もできる。
 // 写真は縮めてこの端末に保存し（photos.ts）、申請書の Excel の写真貼付用紙（写真番号の用紙）に貼る。
 // 撮影日（苅田町の写真の用紙の「撮影日」）：写真を入れると、写真の撮影日時（Exif）、なければ当日にする。枠の下の欄で直せる。入れ替えると写真と一緒に動く
 // 写真番号の入れ替え（ユーザーの指示「①勝手口・②浴室を、押したりドラッグで横にずらしたりして、①浴室・②勝手口に簡単に入れ替える」）：
-// 箇所の見出しをドラッグしてほかの箇所に重ねるか、◀ ▶ で隣と入れ替える（写真・撮影日・向きは箇所と一緒に動く）。指（iPad）でも動くようにポインターで動かす
+// 箇所をつかんで（見出しでも写真の上でも）ほかの箇所に重ねて離すか（ユーザーの指示「クリックしてそのままドロップしたら入れ替え」）、◀ ▶ で隣と入れ替える
+// （写真・撮影日・向きは箇所と一緒に動く）。指（iPad）でも動くようにポインターで動かす
 // 向き（ユーザーの指示「写真の方向転換」「iPad でもくるっとすぐに回転」）：写真の右上の ↻ で右に 90°。大きさと細かい向きはプレビューの写真で直す
 
-import {useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import type {DragEvent, PointerEvent as ReactPointerEvent} from 'react';
 import type {EstimateRates} from '../calc.ts';
 import {Btn, useToast} from '../components/ui.tsx';
@@ -23,8 +24,8 @@ import {todayIso} from '../util.ts';
 export type PhotoSlot = 'before' | 'after';
 export type PhotoKey = {placeId: string; slot: PhotoSlot};
 export const SLOT_LABEL: Record<PhotoSlot, string> = {before: '改修前', after: '改修後'};
-/** 写真を枠から枠へドラッグするときの印 */
-export const PHOTO_DRAG = 'application/x-sasaoka-photo';
+/** 指で写真の上を押したまま、この時間（ミリ秒）たってから動かすと箇所をつかむ（すぐに動かしたときは画面のスクロール） */
+const HOLD_MS = 280;
 
 type SlotFields = {photos: PlacePhotos; photoDates: PlacePhotos; photoEdits: PlacePhotoEdits};
 
@@ -114,27 +115,17 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
       return {...j, places};
     });
   const remove = (key: PhotoKey) => setPhoto(key, undefined, undefined);
-  /** ドロップしたもの：写真のファイルならその枠から入れる。ほかの枠の写真なら入れ替える */
+  /** 写真のファイルをドロップした：その枠から入れる */
   const drop = (e: DragEvent, target: PhotoKey) => {
     e.preventDefault();
     e.stopPropagation();
-    const moved = e.dataTransfer.getData(PHOTO_DRAG);
-    if (moved) {
-      try {
-        const from = JSON.parse(moved) as PhotoKey;
-        if (from.placeId !== target.placeId || from.slot !== target.slot) swap(from, target);
-      } catch {
-        /* ほかのものはしない */
-      }
-      return;
-    }
     if (e.dataTransfer.files.length) void put([...e.dataTransfer.files], target);
   };
   return {put, swap, remove, drop, setDate, setEdit, swapPlaces, busy};
 }
 
-/** ドラッグしているものが写真のファイルか、枠の写真か */
-const draggable = (e: DragEvent) => [...e.dataTransfer.types].some((t) => t === 'Files' || t === PHOTO_DRAG);
+/** ドラッグしているものが写真のファイルか */
+const draggable = (e: DragEvent) => [...e.dataTransfer.types].includes('Files');
 
 export type PhotoActions = ReturnType<typeof usePhotoActions>;
 
@@ -147,7 +138,7 @@ function Thumb({url, w, h, edit}: {url: string; w: number; h: number; edit?: Pho
       alt=""
       draggable={false}
       className="absolute max-w-none"
-      style={{left: `${b.x / 4}%`, top: `${b.y / 3}%`, width: `${b.w / 4}%`, height: `${b.h / 3}%`, transform: b.rot ? `rotate(${b.rot}deg)` : undefined}}
+      style={{left: `${b.x / 4}%`, top: `${b.y / 3}%`, width: `${b.w / 4}%`, height: `${b.h / 3}%`, transform: b.rot ? `rotate(${b.rot}deg)` : undefined, WebkitTouchCallout: 'none'}}
     />
   );
 }
@@ -170,9 +161,12 @@ export function PhotoBoard({
   const list = photoPlaces(job, rates);
   const urls = usePhotoUrls(list.flatMap(({place}) => [place.photos?.before ?? '', place.photos?.after ?? '']));
   const [selected, setSelected] = useState<PhotoKey | null>(null);
-  const [over, setOver] = useState<string>(''); // ドラッグして重ねている枠
-  // 箇所の見出しをドラッグしているとき：動かしている箇所・ずらした量・重ねている箇所
+  const [over, setOver] = useState<string>(''); // 写真のファイルをドラッグして重ねている枠
+  // 箇所をつかんでいるとき：動かしている箇所・ずらした量・重ねている箇所
   const [cardDrag, setCardDrag] = useState<{id: string; dx: number; dy: number; over: string | null} | null>(null);
+  const holding = useRef(false); // 箇所をつかんでいる（指で動かしても画面をスクロールしない）
+  const swallowClick = useRef(false); // 動かし終わったときの click（離した所の写真を選ぶ）を捨てる
+  const sectionRef = useRef<HTMLElement>(null);
   const lastSheet = sheetNos && sheetNos.size ? Math.max(...sheetNos) : 0;
   const same = (a: PhotoKey | null, b: PhotoKey) => !!a && a.placeId === b.placeId && a.slot === b.slot;
   const pick = onPick;
@@ -190,13 +184,33 @@ export function PhotoBoard({
     setSelected(null);
   };
 
-  /** 箇所の見出しをドラッグして、ほかの箇所に重ねて離すと写真番号を入れ替える（マウスでも指でも） */
+  // 指で箇所をつかんでいるあいだは画面をスクロールさせない（touchmove を止める。iPad の Safari でも効くように、はじめから passive でない形で付けておく）
+  useEffect(() => {
+    const el = sectionRef.current;
+    const still = (e: TouchEvent) => {
+      if (holding.current && e.cancelable) e.preventDefault();
+    };
+    el?.addEventListener('touchmove', still, {passive: false});
+    return () => el?.removeEventListener('touchmove', still);
+  }, []);
+
+  /**
+   * 箇所をつかんで（見出しでも写真の上でも）ほかの箇所に重ねて離すと、写真番号を入れ替える（ユーザーの指示「クリックしてそのままドロップしたら入れ替え」）。
+   * マウスは押したまま動かすとすぐ。指は見出しならすぐ、写真の上は少し押したままにしてから（すぐに動かしたときは画面のスクロール）。
+   * ↻ ◀ ▶・撮影日の欄（data-no-drag）からはつかまない。画面の上下の端に近づけると、ゆっくりスクロールする（遠くの箇所にも届くように）。
+   * 動かさずに離したときは、ふつうに押したのと同じ（写真を選ぶ）
+   */
   const startCardDrag = (e: ReactPointerEvent<HTMLElement>, id: string) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    const el = e.currentTarget;
-    const [x0, y0] = [e.clientX, e.clientY];
-    let moved = false;
-    el.setPointerCapture(e.pointerId);
+    if ((e.pointerType === 'mouse' && e.button !== 0) || !e.isPrimary || holding.current) return;
+    const t = e.target as HTMLElement;
+    if (t.closest('[data-no-drag]')) return;
+    const pid = e.pointerId;
+    const [x0, y0, sy0] = [e.clientX, e.clientY, window.scrollY];
+    let last = {x: x0, y: y0};
+    // wait＝指で写真の上を押したところ（押したままになるのを待つ）、ready＝つかんだ（動かすとドラッグ）、drag＝動かしている
+    let phase: 'wait' | 'ready' | 'drag' = e.pointerType !== 'mouse' && !t.closest('[data-drag-handle]') ? 'wait' : 'ready';
+    let timer = 0;
+    let frame = 0;
     const targetAt = (x: number, y: number) => {
       for (const node of document.elementsFromPoint(x, y)) {
         const card = node instanceof HTMLElement ? node.closest<HTMLElement>('[data-photo-card]') : null;
@@ -204,29 +218,78 @@ export function PhotoBoard({
       }
       return null;
     };
-    const move = (ev: PointerEvent) => {
-      const [dx, dy] = [ev.clientX - x0, ev.clientY - y0];
-      if (!moved && Math.hypot(dx, dy) < 6) return;
-      moved = true;
-      setCardDrag({id, dx, dy, over: targetAt(ev.clientX, ev.clientY)});
+    const show = () => setCardDrag({id, dx: last.x - x0, dy: last.y - y0 + window.scrollY - sy0, over: phase === 'drag' ? targetAt(last.x, last.y) : null});
+    // 画面の上下の端から 48px 以内に入れると、端に近いほど速く（1こまで最大 10px）
+    const edgeScroll = () => {
+      const edge = 48;
+      const v = last.y < edge ? -((edge - last.y) / edge) * 10 : last.y > window.innerHeight - edge ? ((last.y - (window.innerHeight - edge)) / edge) * 10 : 0;
+      if (v) {
+        window.scrollBy(0, v);
+        show();
+      }
+      frame = requestAnimationFrame(edgeScroll);
     };
-    const done = (ev: PointerEvent) => {
-      el.removeEventListener('pointermove', move);
-      el.removeEventListener('pointerup', done);
-      el.removeEventListener('pointercancel', done);
-      const target = moved && ev.type === 'pointerup' ? targetAt(ev.clientX, ev.clientY) : null;
+    const end = () => {
+      window.clearTimeout(timer);
+      cancelAnimationFrame(frame);
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      document.removeEventListener('pointercancel', up);
+      holding.current = false;
       setCardDrag(null);
+    };
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== pid) return;
+      last = {x: ev.clientX, y: ev.clientY};
+      const far = Math.hypot(last.x - x0, last.y - y0);
+      if (phase === 'wait') {
+        if (far > 8) end(); // すぐに動かした：画面のスクロール
+        return;
+      }
+      if (phase === 'ready') {
+        if (far < 6) return;
+        phase = 'drag';
+        frame = requestAnimationFrame(edgeScroll);
+      }
+      show();
+    };
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerId !== pid) return;
+      const target = phase === 'drag' && ev.type === 'pointerup' ? targetAt(ev.clientX, ev.clientY) : null;
+      if (phase === 'drag') {
+        // マウスを離したときの click は、このすぐあとに続けて来る
+        swallowClick.current = true;
+        window.setTimeout(() => (swallowClick.current = false), 0);
+      }
+      end();
       if (target) swapPlaces(id, target);
     };
-    el.addEventListener('pointermove', move);
-    el.addEventListener('pointerup', done);
-    el.addEventListener('pointercancel', done);
+    holding.current = phase !== 'wait';
+    if (phase === 'wait')
+      timer = window.setTimeout(() => {
+        phase = 'ready';
+        holding.current = true;
+        show(); // つかんだ（少し浮かせて見せる）
+      }, HOLD_MS);
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+    document.addEventListener('pointercancel', up);
   };
 
   return (
     <section
+      ref={sectionRef}
       aria-label="写真"
       className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
+      onClickCapture={(e) => {
+        if (swallowClick.current) {
+          e.stopPropagation();
+          e.preventDefault();
+        }
+      }}
+      onContextMenu={(e) => {
+        if (holding.current) e.preventDefault(); // 指で押したままのとき、写真の保存などのメニューを出さない
+      }}
       onDragOver={(e) => {
         if (draggable(e)) e.preventDefault();
       }}
@@ -287,15 +350,16 @@ export function PhotoBoard({
                 role="group"
                 aria-label={`${circled(no)}${place.name}の写真`}
                 data-photo-card={place.id}
-                className={`@container relative rounded-lg border p-2 ${target ? 'border-emerald-500 ring-4 ring-emerald-500/60' : 'border-slate-200'} ${dragging ? 'z-30 bg-white opacity-90 shadow-xl' : ''}`}
-                style={dragging && cardDrag ? {transform: `translate(${cardDrag.dx}px, ${cardDrag.dy}px)`, pointerEvents: 'none'} : undefined}
+                onPointerDown={(e) => startCardDrag(e, place.id)}
+                className={`@container relative select-none rounded-lg border p-2 ${target ? 'border-emerald-500 ring-4 ring-emerald-500/60' : 'border-slate-200'} ${dragging ? 'z-30 bg-white opacity-90 shadow-xl' : ''}`}
+                style={dragging && cardDrag ? {transform: `translate(${cardDrag.dx}px, ${cardDrag.dy}px)`, pointerEvents: 'none', WebkitTouchCallout: 'none'} : {WebkitTouchCallout: 'none'}}
               >
                 <div className="flex flex-col gap-1 @md:flex-row @md:items-start @md:gap-2">
                   <div className="flex items-center gap-1 @md:w-28 @md:shrink-0 @md:flex-col @md:items-start @md:gap-1.5">
-                    {/* 見出しをつかんでほかの箇所に重ねると入れ替え（指で動かしてもページが動かないように touch-none） */}
+                    {/* 見出し：指でもすぐにつかめる（指で動かしてもページが動かないように touch-none） */}
                     <div
-                      onPointerDown={(e) => startCardDrag(e, place.id)}
-                      className="flex min-w-0 flex-1 cursor-grab touch-none select-none flex-wrap items-baseline gap-x-1.5 text-sm active:cursor-grabbing @md:w-full @md:flex-none @md:py-1"
+                      data-drag-handle
+                      className="flex min-w-0 flex-1 cursor-grab touch-none flex-wrap items-baseline gap-x-1.5 text-sm active:cursor-grabbing @md:w-full @md:flex-none @md:py-1"
                       title="ドラッグしてほかの写真番号と入れ替え"
                     >
                       <span aria-hidden className="text-slate-400">
@@ -308,7 +372,7 @@ export function PhotoBoard({
                         <span className="text-[11px] text-amber-700 @md:basis-full">{lastSheet ? `Excel の写真の用紙は${circled(lastSheet)}まで` : 'Excel に写真の用紙なし'}</span>
                       )}
                     </div>
-                    <div className="flex shrink-0 gap-1">
+                    <div data-no-drag className="flex shrink-0 gap-1">
                       {/* 隣の写真番号と入れ替える（押すだけ。iPad でも） */}
                       <button
                         type="button"
@@ -346,11 +410,6 @@ export function PhotoBoard({
                               type="button"
                               aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}`}
                               aria-pressed={same(selected, key)}
-                              draggable={!!id}
-                              onDragStart={(e) => {
-                                e.dataTransfer.setData(PHOTO_DRAG, JSON.stringify(key));
-                                e.dataTransfer.effectAllowed = 'move';
-                              }}
                               onDragOver={(e) => {
                                 if (!draggable(e)) return;
                                 e.preventDefault();
@@ -388,6 +447,7 @@ export function PhotoBoard({
                             {id && (
                               <button
                                 type="button"
+                                data-no-drag
                                 onClick={() => actions.setEdit(key, turn(edit, 1))}
                                 className="absolute right-1 top-1 flex h-8 w-8 touch-manipulation items-center justify-center rounded-full bg-white/90 text-lg leading-none text-slate-700 shadow ring-1 ring-slate-300 hover:bg-white hover:text-emerald-700"
                                 title="右に回す"
@@ -399,7 +459,7 @@ export function PhotoBoard({
                           </div>
                           {dates && (
                             // 日付が切れないように、「撮影日」は欄の上・日付の欄は枠の幅いっぱい
-                            <label className="mt-1 block text-[11px] text-slate-600">
+                            <label data-no-drag className="mt-1 block text-[11px] text-slate-600">
                               撮影日
                               <input
                                 type="date"
