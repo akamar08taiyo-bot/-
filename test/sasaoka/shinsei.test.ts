@@ -196,6 +196,25 @@ test('苅田町の写真の用紙：改修箇所・実施した工事種類の�
   assert.ok(!strings.some((s) => s.includes('手摺')));
 });
 
+test('みやこ町の写真の用紙の撮影日：原本の「撮影日」のうしろに日付（改修前 D7・改修後 D32）。撮影日のない写真番号・広域連合は原本のまま', () => {
+  const j = job({insurer: 'miyako', places: [...job().places, place('勝手口', [mat('L型手すり')], {photoDates: {before: '2026-10-01', after: '2026-11-20'}})]});
+  const {files, byName} = sheets(fillShinsei(MIYAKO, SHINSEI.miyako!, shinseiValues(j, RATES)));
+  const strings = [...strFromU8(files['xl/sharedStrings.xml']).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) =>
+    [...m[1].replace(/<rPh\b[\s\S]*?<\/rPh>/g, '').matchAll(/<t[^>]*>([^<]*)<\/t>/g)].map((t) => t[1]).join(''),
+  );
+  const text = (xml: string, ref: string) => {
+    const shared = new RegExp(`<c r="${ref}"[^>]*t="s"[^>]*><v>(\\d+)</v>`).exec(xml)?.[1];
+    return shared === undefined ? txt(xml, ref) : strings[Number(shared)];
+  };
+  // ①浴室（撮影日なし）・④勝手口（撮影日あり）
+  assert.deepEqual([1, 4].map((n) => byName.get(`写真 (${n})`)!).map((xml) => [text(xml, 'R4'), text(xml, 'D7'), text(xml, 'D32')]), [
+    ['①', '撮影日', '撮影日'],
+    ['④', '撮影日　令和8年10月1日', '撮影日　令和8年11月20日'],
+  ]);
+  // 広域連合の写真貼付用紙には撮影日の欄がないので書かない（A7:S8 は「改　　修　　前」の結合の欄）
+  assert.ok(!SHINSEI.kouiki!.sheets.some((x) => x.photoPlace?.dates));
+});
+
 test('改修の内容が10箇所・12箇所でも欄からはみ出さない：入らなければ文字を小さくする（申請書の欄・式で同じ内容を出す欄・内訳明細書の行・平面図）', () => {
   const NAMES = ['玄関', '上がり框', '廊下', '階段', 'トイレ', '浴室', '脱衣所', '洗面所', '居室', '寝室', '台所', '勝手口'];
   const many = (n: number, insurer: Insurer = 'kanda') => job({insurer, places: NAMES.slice(0, n).map((name) => place(name, [mat('L型手すり')], {dims: {l: '600×850', h: '800'}}))});

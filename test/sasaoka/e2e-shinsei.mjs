@@ -767,22 +767,35 @@ assert.deepEqual([text(kPhoto1, 'D6'), text(k.sheets.get('1  (3)'), 'D6'), text(
 assert.ok((await pageOf('1 ').innerText()).includes('■玄関'));
 const kStrings = strFromU8(unzipSync(kd.bytes)['xl/sharedStrings.xml']);
 assert.ok(!kStrings.includes('手摺'));
-// 撮影日の欄（写真の用紙に撮影日の欄のある苅田町だけ）：写真を入れた枠は当日。直せる。撮影日時の入った写真（JPEG）を入れると、その日
-const dateOf = (no, name, which) => photoBoard.getByLabel(`${no}${name} ${which}の撮影日`, {exact: true});
+// 撮影日の欄（写真の用紙に撮影日の欄のある苅田町・みやこ町）：「改修前撮影日」「改修後撮影日」。写真を入れた枠は当日（撮影日時のない写真）。
+// 1つ直すと、すべての写真の同じ撮影日がその日になる（ユーザーの指示「一つ入力したら全ての写真で全部入力」）。撮影日時の入った写真（JPEG）を入れると、その日
+const dateOf = (no, name, which) => photoBoard.getByLabel(`${no}${name} ${which}撮影日`, {exact: true});
 const isoToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 assert.deepEqual([await dateOf('①', '玄関', '改修前').inputValue(), await dateOf('①', '玄関', '改修後').inputValue(), await dateOf('②', 'トイレ', '改修後').inputValue()], [isoToday, '', isoToday]);
+assert.ok(/改修前撮影日[\s\S]*改修後撮影日/.test(await photoBoard.innerText()));
 await dateOf('②', 'トイレ', '改修後').fill('2026-12-01');
 await pvHas('令和8年12月1日');
+assert.equal(await dateOf('①', '玄関', '改修後').inputValue(), '2026-12-01'); // 写真のまだない枠にも入る
+await dateOf('①', '玄関', '改修前').fill('2026-10-01');
+assert.equal(await dateOf('②', 'トイレ', '改修前').inputValue(), '2026-10-01');
+await pvHas('令和8年10月1日');
 await dropFile(slot('①', '玄関', '改修後'), await datedJpeg('#8e44ad', '2026:10:05 09:30:00'), 'dated.jpg', 'image/jpeg');
 await slot('①', '玄関', '改修後').locator('img').waitFor();
-await page.waitForFunction(() => document.querySelector('[aria-label="①玄関 改修後の撮影日"]')?.value === '2026-10-05');
+await page.waitForFunction(() => document.querySelector('[aria-label="①玄関 改修後撮影日"]')?.value === '2026-10-05');
 await pvHas('令和8年10月5日');
 await photoBoard.screenshot({path: path.join(outDir, '88-photo-dates.png')});
 // 写真を消すと撮影日も消える（あとの保険者の確かめのため、入れる前に戻す）
 await slot('①', '玄関', '改修後').click();
 await page.getByRole('status', {name: '選んでいる写真'}).getByRole('button', {name: '削除'}).click();
 assert.equal(await dateOf('①', '玄関', '改修後').inputValue(), '');
-log('苅田町の写真の用紙（改修箇所・工事種類の□が連動・撮影日は当日・手で直す・写真の撮影日時を読む）OK');
+// 撮影日時のない写真を入れると、ほかの写真のそろえた撮影日になる（当日ではなく）。あとの保険者の確かめのため、また消す
+await dropFile(slot('①', '玄関', '改修後'), await makeImage('#16a085', 800, 600), 'plain.png');
+await slot('①', '玄関', '改修後').locator('img').waitFor();
+assert.equal(await dateOf('①', '玄関', '改修後').inputValue(), '2026-12-01');
+await slot('①', '玄関', '改修後').click();
+await page.getByRole('status', {name: '選んでいる写真'}).getByRole('button', {name: '削除'}).click();
+assert.equal(await dateOf('①', '玄関', '改修後').inputValue(), '');
+log('苅田町の写真の用紙（改修箇所・工事種類の□が連動・撮影日は当日・1つ直すと全部の写真に・写真の撮影日時を読む）OK');
 await page.locator('[aria-live] > div', {hasText: `「${kd.name}」を保存しました`}).waitFor();
 log('苅田町の申請書（申請書の順番の一覧・事前申請書・事後申請書は式で同じ・丸を外す・着工予定日は空白）OK');
 
@@ -804,6 +817,11 @@ const my = await make(['無']);
 assert.match(my.name, /^みやこ町申請書_（サンプル）山田様_/);
 const m = sheetsOf(my.bytes);
 assert.equal(m.sheets.size, 12);
+// 撮影日：みやこ町の写真の用紙は原本の「撮影日」のうしろに日付（①玄関の改修後は写真を消したので撮影日なし＝原本のまま）
+assert.deepEqual(
+  [1, 2].flatMap((n) => [text(m.sheets.get(`写真 (${n})`), 'D7'), text(m.sheets.get(`写真 (${n})`), 'D32')]),
+  ['撮影日　令和8年10月1日', '撮影日', '撮影日　令和8年10月1日', '撮影日　令和8年12月1日'],
+);
 const top = m.sheets.get('住宅改修承認届出書');
 assert.deepEqual([text(top, 'I5'), text(top, 'I9'), boxes('W', 10, 4).map((r) => text(top, r)).join('')], ['（サンプル）山田', '福岡県行橋市中央1-1', '0000366989']);
 assert.equal(text(m.sheets.get('住宅改修費支給申請書(受領委任払用)'), 'J6'), '（サンプル）山田');

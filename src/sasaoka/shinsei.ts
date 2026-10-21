@@ -24,8 +24,9 @@ export type ShinseiSheet = {
   kinds?: {places: string; works: string}[]; // 改修の種類（①手すりの取り付け〜⑥付帯工事）ごとの行の、箇所の欄と工事内容の欄（住宅改修内訳明細書）
   // 写真貼付用紙：原本の写真番号の欄（①・写真番号①・№①）を読み、その写真番号の改修場所を改修箇所の欄（place）に入れ、
   // その写真番号の箇所の写真を改修前・改修後の枠（番地の範囲。before・after）に貼る（同じ写真番号の用紙が2枚あれば、最初の用紙だけ）。
-  // 苅田町の写真の用紙は、改修箇所・実施した工事種類が□の一覧（placeChecks・kindChecks。その写真番号の箇所の□を■に）と、撮影日の欄（dates）
-  photoPlace?: {photo: string; place?: string; before?: string; after?: string; placeChecks?: string; kindChecks?: string; dates?: {before: string; after: string}};
+  // 苅田町の写真の用紙は、改修箇所・実施した工事種類が□の一覧（placeChecks・kindChecks。その写真番号の箇所の□を■に）と、撮影日の欄（dates）。
+  // みやこ町の写真の用紙も撮影日の欄がある（原本は「撮影日」とだけ書いた欄なので、label のうしろに日付）
+  photoPlace?: {photo: string; place?: string; before?: string; after?: string; placeChecks?: string; kindChecks?: string; dates?: {before: string; after: string; label?: string}};
   // 平面図：写真番号の順の工事内容（改修の内容と同じ行「玄関① 木製L字手すり L=600×850㎜」）を空いた所に書く（ユーザーの指示）。
   // cell＝折り返しの欄に書く（みやこ町の下の欄）、box＝その範囲にテキストボックスを置く（前の申請の平面図と同じ）。平面図そのものはユーザーが Excel で描く
   legend?: {cell?: string; box?: string};
@@ -69,6 +70,8 @@ const KOUIKI_PHOTO_SHEETS = ['写真貼付用紙', ...[6, 2, 7, 3, 8, 4, 9, 5, 1
 const KIND_ROWS = [14, 16, 18, 20, 22, 24].map((r) => ({places: `D${r + 1}`, works: `K${r}`}));
 /** 写真貼付用紙（みやこ町・広域連合）：被保険者氏名（B4）・被保険者番号（D4〜M4）・写真番号（R4）・改修箇所（B5）・改修前の写真（A9:S31）・改修後（A34:S58） */
 const PHOTO_SHEET = {name: 'B4', insuredNo: boxes('D', 10, 4), photoPlace: {photo: 'R4', place: 'B5', before: 'A9:S31', after: 'A34:S58'}};
+/** みやこ町の写真貼付用紙：広域連合と同じ欄のほか、撮影日（改修前 D7・改修後 D32。原本は「撮影日」とだけ書いた欄。広域連合の用紙には撮影日の欄がない） */
+const MIYAKO_PHOTO = {...PHOTO_SHEET, photoPlace: {...PHOTO_SHEET.photoPlace, dates: {before: 'D7', after: 'D32', label: '撮影日　'}}};
 /**
  * 苅田町の写真の用紙（「1 」「1  (3)」…。写真番号①〜⑨は G42 の「写真番号①」）：改修前の写真（A7:H22）・改修後（A24:H40）。
  * 改修箇所（B2）・実施した工事種類（B4）は□の一覧なので、その写真番号の箇所・改修の種類の□を■にする（ユーザーの指示「□の部分は、選択した項目と連動する」、2026-10-21）。
@@ -174,7 +177,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
       {sheet: '住宅改修費支給申請書(受領委任払用)', name: 'J6', marks: [GENDER('AB8'), RENOVATED('X18')], texts: [T('AA10', '{phone}'), T('J16', '{start}', 'date'), T('X16', '{end}', 'date')]},
       {sheet: '住宅改修内訳明細書', kinds: KIND_ROWS},
       {sheet: '平面図', name: 'A1', nameFormat: '{name}　邸　平面図', legend: {cell: 'M48'}}, // 下の M48:AW48 は左上にそろえて折り返す空いた欄
-      ...[1, 2, 3, 4].map((n) => ({sheet: `写真 (${n})`, ...PHOTO_SHEET})),
+      ...[1, 2, 3, 4].map((n) => ({sheet: `写真 (${n})`, ...MIYAKO_PHOTO})),
     ],
   },
   kouiki: {
@@ -762,7 +765,7 @@ export function placeBox(labels: string[], name: string): number | null {
 }
 
 /**
- * 苅田町の写真の用紙：改修箇所（その写真番号の改修場所の□を■。一覧にない場所は「■勝手口」）・実施した工事種類（改修の種類の□を■）と撮影日（令和の日付）。
+ * 苅田町の写真の用紙：改修箇所（その写真番号の改修場所の□を■。一覧にない場所は「■勝手口」）・実施した工事種類（改修の種類の□を■）と撮影日（令和の日付。みやこ町の写真の用紙も）。
  * 箇所のない写真番号の用紙は原本のまま
  */
 function photoBoxes(files: Files, sheet: ShinseiSheet, v: ShinseiValues, photo: number): Map<string, CellValue> {
@@ -782,7 +785,7 @@ function photoBoxes(files: Files, sheet: ShinseiSheet, v: ShinseiValues, photo: 
   }
   for (const slot of ['before', 'after'] as const) {
     const day = v.photoDates?.[photo]?.[slot];
-    if (pp.dates && day) out.set(pp.dates[slot], reiwaText(day));
+    if (pp.dates && day) out.set(pp.dates[slot], (pp.dates.label ?? '') + reiwaText(day));
   }
   return out;
 }
