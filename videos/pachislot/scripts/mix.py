@@ -97,7 +97,7 @@ for e in S.get('sfx', []):
 beds = np.zeros((2, N), dtype=np.float32)
 for name, a0, a1, db, fin, fout in S.get('beds', []):
     src = load(os.path.join(ROOT, 'public', 'shared', 'amb', f'{name}.wav'))
-    put(beds, faded(span_of(src, a0, a1), fin, fout), anchor(T, a0), 10 ** (db / 20))
+    put(beds, faded(span_of(src, a0, a1), fin, fout), anchor(T, a0), 10 ** (float(db) / 20))
 
 music = np.zeros((2, N), dtype=np.float32)
 if S.get('music'):

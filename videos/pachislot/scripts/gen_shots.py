@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""カット表（episodes/<回>/shots.json）の場面画を Gemini で作り、版ごとに記録する（横長 16:9 の回用）。
+"""カット表（episodes/<回>/shots.json）の場面画を Gemini で作り、版ごとに記録する（横長 16:9 の回と、縦型 9:16 のショート。shots.json の aspect）。
 
   python3 -I scripts/gen_shots.py --ep ep01                  # まだ絵の無いカットを全部（並行 --jobs）
   python3 -I scripts/gen_shots.py --ep ep01 S03-3 S04-1      # 指定カットを作り直す（版を1つ進める）
@@ -98,7 +98,7 @@ def make(sid):
             n += 1
     t0 = time.time()
     try:
-        usage, notes = gapi.image(text, out, refs=refs, model=a.model, aspect='16:9', size=a.size)
+        usage, notes = gapi.image(text, out, refs=refs, model=a.model, aspect=P.get('aspect', '16:9'), size=a.size)
     except Exception as e:
         os.remove(out)
         print(f'{sid} 失敗: {e}', flush=True)
