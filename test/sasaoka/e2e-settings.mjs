@@ -1,8 +1,8 @@
-// 設定・バックアップ・CSV・1か月で1回計算・所長と担当・狭い画面・お知らせが消えること を確かめる
+// 設定・バックアップ・CSV・1か月で1回計算・所長と担当・狭い画面・お知らせが消えること・前に保存した名前の「手摺」を「手すり」に直すこと を確かめる
 // Playwright はこのリポジトリの依存に入れていない。入っている場所を PLAYWRIGHT で指定できる（既定はクラウド環境の場所）
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 
 const [url, outDir] = process.argv.slice(2);
@@ -157,6 +157,39 @@ const printZoom = await p2.locator('.print-root').evaluate((el) => getComputedSt
 assert.equal(printZoom, '1');
 await p2.emulateMedia({media: 'screen'});
 log('スマホの印刷イメージが画面に収まるOK');
+
+// ---------------- 「手摺」ではなく「手すり」（ユーザーの指示）：前の版で保存した名前（施工費の安寿框手摺・部材・常用のセット・見積書の行）は、
+// 開いたときに一度だけ「手すり」に直す（前の版のバックアップを読み込んでも、次に開いたときに直る）
+const old = JSON.parse(readFileSync(bkPath, 'utf8'));
+delete old.settings.tesuri;
+const rail = old.materials.find((m) => m.code === 'S-TS35');
+rail.name = rail.name.replace('手すり', '手摺り'); // 木の手摺り 35φ 4m
+old.labor = old.labor.map((l) => (l.id === 'l17' ? {...l, name: '安寿框手摺'} : l));
+old.kits = old.kits.map((k) => ({...k, name: k.name.replace('手すり', '手摺')}));
+old.jobs = old.jobs.map((j) => ({...j, places: j.places.map((p) => ({...p, rows: p.rows.map((r) => (r.refId === rail.id ? {...r, name: rail.name} : r))}))}));
+assert.equal((JSON.stringify(old).match(/手摺/g) ?? []).length, 5);
+const oldPath = path.join(outDir, 'backup-old.json');
+writeFileSync(oldPath, JSON.stringify(old));
+const ctx3 = await browser.newContext({viewport: {width: 1366, height: 900}, locale: 'ja-JP', acceptDownloads: true});
+const p4 = await ctx3.newPage();
+watch(p4);
+await p4.goto(url);
+await p4.getByRole('navigation').getByRole('button', {name: '設定'}).click();
+await p4.locator('input[type=file][accept*=json]').setInputFiles(oldPath);
+await p4.getByRole('button', {name: '今のデータを置き換える'}).click();
+await p4.waitForTimeout(1200);
+await p4.reload();
+await p4.getByRole('navigation').getByRole('button', {name: '設定'}).click();
+await p4.waitForTimeout(500);
+const [bk2] = await Promise.all([p4.waitForEvent('download'), p4.getByRole('button', {name: 'バックアップを保存（すべて）'}).click()]);
+const fixed = JSON.parse(readFileSync(await bk2.path(), 'utf8'));
+assert.ok(!JSON.stringify(fixed).includes('手摺'), JSON.stringify(fixed).match(/.{0,20}手摺.{0,20}/g)?.join(' / '));
+assert.equal(fixed.labor.find((l) => l.id === 'l17').name, '安寿框手すり');
+assert.equal(fixed.materials.find((m) => m.code === 'S-TS35').name, '木の手すり 35φ 4m');
+assert.deepEqual(fixed.kits.map((k) => k.name).sort(), json.kits.map((k) => k.name).sort());
+assert.equal(fixed.settings.tesuri, true);
+await ctx3.close();
+log('「手摺」を「手すり」に（前に保存した施工費・部材・常用のセット・見積書の行を一度だけ）OK');
 
 // ---------------- 新しい版の知らせ：version.json の版が開いている版と違えば「読み込み直す」を出す（前の版が出たままのスマホ向け）
 const p3 = await ctx.newPage();

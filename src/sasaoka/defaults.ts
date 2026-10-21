@@ -22,7 +22,7 @@ export const DEFAULT_LABOR: LaborItem[] = [
   {id: 'l14', name: '敷居撤去', price: 12000, estPrice: 15000, note: ''},
   {id: 'l15', name: 'ウォシュレット', price: 8000, estPrice: 10000, note: ''},
   {id: 'l16', name: 'ウォシュレット 部品代', price: 2000, estPrice: 3000, note: '元の表：〃 部品代'},
-  {id: 'l17', name: '安寿框手摺', price: 2000, estPrice: 3000, note: ''},
+  {id: 'l17', name: '安寿框手すり', price: 2000, estPrice: 3000, note: ''}, // 元の表：安寿框手摺（「手摺ではなく、手すり」）
 ];
 
 export const DEFAULT_PLACES = [
@@ -139,6 +139,7 @@ export function defaultSettings(): Settings {
     kitExample: false,
     laborEst: false,
     laborRev: LABOR_REV,
+    tesuri: false,
     rev: SETTINGS_REV,
   };
   return settingsForOffice(base, portalOffice() || '行橋営業所');

@@ -3,7 +3,7 @@
 // 定価は見積書の単価（定価×0.8）に使う。
 
 import type {Material} from './types.ts';
-import {uid} from './util.ts';
+import {tesuri, uid} from './util.ts';
 
 export type Grid = string[][];
 
@@ -516,7 +516,8 @@ export function gridCandidates(grid: Grid, m: Mapping, defaultMaker: string): Ca
     const base = cell(row, m.name);
     const full = base && spec && !base.includes(spec) ? `${base} ${spec}` : base;
     // 商品名のうしろに品番がくり返されていれば外す（矢崎化工「たちあっぷ サムリング CKM-02 SET GR」）
-    const name = code && full.endsWith(` ${code}`) ? full.slice(0, -code.length - 1) : full;
+    // 「手摺」は「手すり」と書く（ユーザーの指示）
+    const name = tesuri(code && full.endsWith(` ${code}`) ? full.slice(0, -code.length - 1) : full);
     const listPrice = m.list >= 0 ? parsePrice(row[m.list]) : null;
     let price = m.price >= 0 ? parsePrice(row[m.price]) : null;
     // 仕切価格の欄がない（空の）行は、表の掛率で 定価×掛率（マツ六の価格表の「掛率 0.32」）。決まった率で計算することはしない
@@ -675,7 +676,8 @@ export function lineCandidates(lines: string[], nthFromRight: number, defaultMak
     return nth > 0 && idx >= 0 ? prices[idx] : null;
   };
   lines.forEach((line, i) => {
-    const {code, name, unit, prices} = splitLine(line);
+    const {code, unit, prices, ...line1} = splitLine(line);
+    const name = tesuri(line1.name);
     if (prices.length === 0 || !name) return;
     const price = pick(prices, Math.max(1, nthFromRight));
     if (looksLikeHeader(name)) return;

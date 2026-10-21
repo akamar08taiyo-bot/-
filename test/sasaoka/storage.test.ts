@@ -3,7 +3,7 @@ import test from 'node:test';
 import {DEFAULT_LABOR, DEFAULT_STAFF, LABOR_REV, OFFICES, settingsForOffice} from '../../src/sasaoka/defaults.ts';
 import {NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {cleanJobs, cleanKits, cleanLabor, cleanList, cleanMaterials, cleanSettings} from '../../src/sasaoka/storage.ts';
-import {staffFull, staffShort} from '../../src/sasaoka/util.ts';
+import {staffFull, staffShort, tesuri} from '../../src/sasaoka/util.ts';
 
 test('営業所を選ぶと所長名も入る', () => {
   const s = settingsForOffice(cleanSettings(undefined), '行橋営業所');
@@ -153,4 +153,12 @@ test('取付手間の見積の単価：踏台 木 は 2,000円（ユーザーの
   // 前の版で保存したマスタは、見積の単価の空欄（null）をそのまま読む（直すのは App.tsx で一度だけ）
   assert.equal(cleanLabor([{id: 'l07', name: '踏台 木', price: 1500, estPrice: null}])[0].estPrice, null);
   assert.equal(cleanLabor([{id: 'l07', name: '踏台 木', price: 1500}])[0].estPrice, 2000); // 見積の単価の項目がなければマスタの初期値
+});
+
+test('「手摺」ではなく「手すり」（ユーザーの指示）：施工費の初期値・前の版の設定は tesuri が false（読み込んだあと、保存してある名前を一度だけ直す）', () => {
+  assert.deepEqual(['安寿框手摺', '木製手摺り 4m', '手摺 I型', '手すり', 'L型手すり'].map(tesuri), ['安寿框手すり', '木製手すり 4m', '手すり I型', '手すり', 'L型手すり']);
+  assert.equal(DEFAULT_LABOR.find((l) => l.id === 'l17')?.name, '安寿框手すり');
+  assert.ok(!DEFAULT_LABOR.some((l) => l.name.includes('手摺')));
+  assert.equal(cleanSettings({officeName: '行橋営業所'}).tesuri, false); // 前の版で保存した設定
+  assert.equal(cleanSettings({tesuri: true}).tesuri, true);
 });

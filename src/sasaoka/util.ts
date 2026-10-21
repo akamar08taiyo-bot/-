@@ -86,6 +86,11 @@ export function staffFull(name: string, list: string[]): string {
   return list.find((x) => staffShort(x) === n) ?? n;
 }
 
+/** 「手摺」「手摺り」は「手すり」と書く（ユーザーの指示「手摺ではなく、手すり」）。取り込む部材リストの商品名と、前に保存した名前に使う */
+export function tesuri(s: string): string {
+  return s.replace(/手摺り?/g, '手すり');
+}
+
 /** 検索用：全角半角・大文字小文字をそろえる */
 export function searchKey(s: string): string {
   return (s || '').normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();

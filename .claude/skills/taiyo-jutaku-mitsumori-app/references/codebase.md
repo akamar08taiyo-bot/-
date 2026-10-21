@@ -54,7 +54,7 @@ React 19 ＋ TypeScript ＋ Vite（Tailwind）。リポジトリにはほかの�
 - `Place`（箇所）：name・kind（改修の種類1〜6）・photo（写真番号、0なら順番）・rows・dims?（申請書の改修の内容の寸法 `{l?, h?, w?, d?}`。読み込みは `cleanDims`）・shinseiText?（そのほか）・photos?（写真貼付用紙の写真＝`photos.ts` の番号。`{before?, after?}`。読み込みは `cleanPhotos`、複製では引き継がない）。
 - `Row`（行）：kind（material／labor）・refId（部材リスト・手間のID）・name・code・maker・unit・price（仕切価格）・qty・listPrice・lengthCm（使う長さ）・pieceLengthM（1本の長さ）・
   estPrice（部材は見積の単価を手で。施工費はマスタの見積の単価を写したもの。null なら 定価×0.8／仕切り×1.5）・excluded（対象外）・estText／estNote／estAmount（見積書だけの手直し）。部材リストの値は選んだときに書き写す（あとでマスタを変えても過去の金額は変わらない）。
-- `LaborItem`（取付手間）：name・price（仕切り）・estPrice（見積。null なら 仕切り×`estimateLaborRate`）・note。`Settings` の `kitExample`・`laborEst` は「一度だけ入れた」の印（例のセット・前の版の施工費の見積の単価）。
+- `LaborItem`（取付手間）：name・price（仕切り）・estPrice（見積。null なら 仕切り×`estimateLaborRate`）・note。`Settings` の `kitExample`・`laborEst`・`tesuri` は「一度だけ入れた／直した」の印（例のセット・前の版の施工費の見積の単価・前に保存した名前の「手摺」→「手すり」。直すのは App.tsx の `useEffect`）。
 - 見積書の行と入力の行の関係：部材の行1つが見積書の1行。そのすぐ下に続く手間の行（1つでも何行でも）は、見積書では「同上施工費」の**別の1行**にまとまる
   （箇所の最初の手間は「施工費」の1行）。見積書の明細の `tr` の `data-rows` に、その1行のもとになった入力の行のIDが入る。
 - `sheetEdit.ts` の `unitRange` は、行の「✕」「コピー」が相手にする範囲：部材の行から押せば、部材＋すぐ下の手間の行（同上施工費）。同上施工費（手間）の行から押せば、その手間のまとまりだけ。

@@ -34,7 +34,7 @@ import {EXAMPLE_KIT_ID, exampleKit} from './samples.ts';
 import type {Insurer, Job, Row} from './types.ts';
 import {useNewVersion} from './update.ts';
 import {useStore} from './useStore.ts';
-import {thisMonth} from './util.ts';
+import {tesuri, thisMonth} from './util.ts';
 
 const TABS: {id: MainTab; label: string}[] = [
   {id: 'estimate', label: '📝 見積もり・申請書を作成する'},
@@ -172,6 +172,34 @@ export default function App({start}: {start: MainTab}) {
       return next.some((j, i) => j !== jobs[i]) ? next : jobs;
     });
     store.update('settings', (s) => ({...s, laborRev: LABOR_REV}));
+  }, [loaded]);
+  // 名前の「手摺」は「手すり」と書く（ユーザーの指示「手摺ではなく、手すり」）。前に保存した部材リスト・施工費（安寿框手摺）・常用のセット・
+  // 見積書の行の名前を一度だけ直す（あとで自分で打った文字は変えない）
+  useEffect(() => {
+    if (!data || data.settings.tesuri) return;
+    const fixName = <T extends {name: string}>(x: T): T => (tesuri(x.name) === x.name ? x : {...x, name: tesuri(x.name)});
+    const fixList = <T extends {name: string}>(list: T[]): T[] => {
+      const next = list.map(fixName);
+      return next.some((x, i) => x !== list[i]) ? next : list;
+    };
+    const fixRows = <T extends {rows: Row[]}>(x: T): T => {
+      const rows = fixList(x.rows);
+      return rows === x.rows ? x : {...x, rows};
+    };
+    store.update('materials', fixList);
+    store.update('labor', fixList);
+    store.update('kits', (kits) => {
+      const next = kits.map((k) => fixRows(fixName(k)));
+      return next.some((k, i) => k !== kits[i]) ? next : kits;
+    });
+    store.update('jobs', (jobs) => {
+      const next = jobs.map((j) => {
+        const places = j.places.map(fixRows);
+        return places.some((p, i) => p !== j.places[i]) ? {...j, places} : j;
+      });
+      return next.some((j, i) => j !== jobs[i]) ? next : jobs;
+    });
+    store.update('settings', (s) => ({...s, tesuri: true}));
   }, [loaded]);
 
   // どの様邸からも使われなくなった写真（写真を消した・差し替えた・様邸を消した）を、この端末から消す。開いたときに一度。

@@ -545,3 +545,13 @@ test('「1本の長さ」の列を読む（見出しの単位で m・mm・cm）'
   assert.equal(parseLengthM('4m', '長さ'), 4);
   assert.equal(parseLengthM('', '長さ'), 0);
 });
+
+test('取り込む商品名の「手摺」「手摺り」は「手すり」にする（ユーザーの指示「手摺ではなく、手すり」）', () => {
+  const grid = [
+    ['品番', '商品名', '仕切価格'],
+    ['TS-01', '木製手摺り 4m', '10,000'],
+    ['TS-02', '安寿框手摺', '8,000'],
+  ];
+  assert.deepEqual(gridCandidates(grid, detectMapping(grid), '').map((c) => c.name), ['木製手すり 4m', '安寿框手すり']);
+  assert.deepEqual(lineCandidates(['TS-03 手摺ブラケット 1,500'], 1, 'マツ六').map((c) => [c.code, c.name, c.price]), [['TS-03', '手すりブラケット', 1500]]);
+});
