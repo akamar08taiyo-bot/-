@@ -903,8 +903,8 @@ await form.getByRole('group', {name: '性別'}).getByRole('button', {name: '男'
 await form.getByRole('group', {name: '要介護状態区分'}).getByRole('button', {name: '要支援2'}).click();
 await mark('昭和').click();
 // 改修の内容：箇所を足して、手すりは長さ・高さ、段差の解消は幅・奥行・高さ（ユーザーの指示の書き方）
-await works.getByRole('button', {name: '＋ 玄関'}).click();
-await works.getByRole('button', {name: '＋ トイレ'}).click();
+await works.getByRole('button', {name: '＋ 玄関', exact: true}).click();
+await works.getByRole('button', {name: '＋ トイレ', exact: true}).click();
 const g1 = works.getByRole('listitem', {name: '①玄関'});
 await g1.getByLabel('長さ（mm）').fill('800');
 await g1.getByLabel('高さ（mm）').fill('750');
@@ -942,6 +942,17 @@ await form.waitFor();
 assert.equal(await shinseiTab.getAttribute('aria-selected'), 'true');
 await pvHas('②トイレ　段差の解消　W600mm D350mm H150mm');
 assert.equal(await works.getByRole('listitem', {name: '①玄関'}).getByLabel('高さ（mm）').inputValue(), '750');
+// 改修の内容が10箇所でも欄からはみ出さない（ユーザーの指示「6箇所以上になった場合、はみ出ている」）。小さくした文字に行の間もそろえる
+const addPlace = works.getByRole('button', {name: /^＋ /});
+for (let i = 0; i < 8; i++) await addPlace.nth(i).click();
+await pvHas('⑩');
+const fit = await pageOf('事前申請書').evaluate((pg) => {
+  const box = [...pg.querySelectorAll('div')].find((d) => d.children.length > 0 && [...d.children].every((c) => c.tagName === 'SPAN') && /^①[\s\S]*⑩/.test(d.textContent ?? ''));
+  const [a, b] = [box.getBoundingClientRect(), box.parentElement.getBoundingClientRect()];
+  return {text: Math.round(a.height), cell: Math.round(b.height), inside: a.top >= b.top - 1 && a.bottom <= b.bottom + 1};
+});
+assert.ok(fit.inside, `改修の内容が欄からはみ出す：${JSON.stringify(fit)}`);
+await pageOf('事前申請書').screenshot({path: path.join(outDir, '89-many-places.png')});
 // 見積書のタブ：氏名・番号・住所・箇所が入っている。行を入れるまでは笹岡工務店の請求書・発注書は出さない。行を入れると入る（見積もり作成日も今日）
 await estimateTab.click();
 await sheet.waitFor();
@@ -967,7 +978,7 @@ await form.waitFor();
 await form.getByLabel('被保険者氏名').fill('見本 次郎');
 await form.getByLabel('理由書作成者の事業所名').fill('見本居宅介護支援事業所');
 await form.getByLabel('理由書作成者の氏名').fill('見本 三郎');
-await works.getByRole('button', {name: '＋ 浴室'}).click();
+await works.getByRole('button', {name: '＋ 浴室', exact: true}).click();
 await works.getByRole('listitem', {name: '①浴室'}).getByLabel('長さ（mm）').fill('600');
 await form.getByLabel('改修費用（介護保険対象分）').fill('80000');
 await pvHas('①浴室　手すりの取り付け　L=600mm');

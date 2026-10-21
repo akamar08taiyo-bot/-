@@ -141,6 +141,9 @@ function TextView({t}: {t: PvText}) {
           whiteSpace: t.wrap ? (distributed ? 'normal' : 'pre-wrap') : 'pre',
           wordBreak: 'break-all',
           lineHeight: 1.2,
+          // 行の高さは、この箱の文字の大きさ（ないと画面の 16px）の 1.2 倍より低くならないので、欄の文字の大きさにそろえる
+          //（そろえないと、小さくした文字でも行の間が広いままで、改修の内容が6箇所をこえると欄からはみ出していた）
+          fontSize: t.runs.length ? Math.max(...t.runs.map((r) => r.font.size)) * k : undefined,
           paddingLeft: t.align === 'left' || distributed ? t.indent : 0,
           paddingRight: t.align === 'right' || distributed ? t.indent : 0,
         }}
