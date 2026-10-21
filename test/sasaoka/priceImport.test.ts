@@ -12,12 +12,16 @@ import {
   guessMaker,
   guessPieceLengthM,
   gridCandidates,
+  headerLabels,
   lineCandidates,
   mergeMaterials,
   parseDelimited,
   parseLengthM,
   parsePrice,
+  parseRate,
+  specHasCode,
   splitLine,
+  subHeaderOf,
   textToGrid,
   textToLines,
   unitText,
@@ -47,7 +51,7 @@ test('Excel（.xlsx）の仕切り表を読む：見出しを見つけて「仕�
   assert.deepEqual(grid[1], ['メーカー', '品番', '商品名', '定価', '仕切価格', '単位']);
   const m = detectMapping(grid);
   // 「定価」と「仕切価格」の両方があれば、仕切価格は仕切の列、定価は定価の列
-  assert.deepEqual(m, {header: 1, name: 2, price: 4, code: 1, maker: 0, unit: 5, list: 3, spec: -1, len: -1});
+  assert.deepEqual(m, {header: 1, name: 2, price: 4, code: 1, maker: 0, unit: 5, list: 3, spec: -1, len: -1, rate: -1});
   const c = gridCandidates(grid, m, '');
   assert.equal(c.length, 6);
   assert.deepEqual(
@@ -146,7 +150,7 @@ test('TOTOの価格表の形：改定前・改定後の「定価」「売価」�
   assert.equal(guessMaker(grid.slice(0, 5).map((r) => r.join(' ')).concat('TOTO九州販売株式会社')), 'TOTO');
 });
 
-test('マツ六の価格表の形：「品番等」の品番と寸法・色を分ける。「掛率」は価格にしない。同じ商品が何度も載っていても1件', () => {
+test('マツ六の価格表の形：「品番等」の品番と寸法・色を分ける。「掛率」の列は価格にせず、仕切価格は 定価×掛率。同じ商品が何度も載っていても1件', () => {
   const head = ['ページ', 'メーカー', '商品コード', 'JANコード', '商品名', '品番等', '単位', '定価', '掛率', '', '備考'];
   const row = (page: string, code: string, name: string, spec: string, unit: string, list: string) => [page, 'マツ六', code, '4976415954244', name, spec, unit, list, '0.32', '', '価格変更'];
   const grid = [
@@ -157,14 +161,14 @@ test('マツ六の価格表の形：「品番等」の品番と寸法・色を�
     row('97', '040-0000', 'BAUHAUS フリーRレール 錆び止めローバル', 'BJ-33', '個', '2350'),
   ];
   const m = detectMapping(grid);
-  assert.deepEqual([m.code, m.name, m.maker, m.unit, m.list, m.price], [5, 4, 1, 6, 7, -1]);
+  assert.deepEqual([m.code, m.name, m.maker, m.unit, m.list, m.price, m.rate], [5, 4, 1, 6, 7, -1, 8]);
   assert.equal(codeHasSpec(grid, m), true);
   const c = gridCandidates(grid, m, '');
   assert.deepEqual(c[0], {
     key: 'g1',
     row: 2,
     name: 'BAUHAUS 35アッシュ丸棒 ディンプル付 φ35×4000mm Mオーク',
-    price: null,
+    price: 5952, // 仕切価格の列がないので、表の掛率で 18,600×0.32
     listPrice: 18600,
     code: 'BD-134',
     maker: 'マツ六',
@@ -180,10 +184,64 @@ test('マツ六の価格表の形：「品番等」の品番と寸法・色を�
   const r = mergeMaterials([], c, 5);
   assert.deepEqual([r.added, r.unchanged, r.list.length], [3, 1, 3]); // 2回載っている BD-134 は1件
   assert.deepEqual(r.list.map((x) => [x.code, x.price, x.listPrice, x.pieceLengthM]), [
-    ['BD-134', 0, 18600, 4], // 仕切価格は空欄 → 0円（あとで入れる）
-    ['BD-08G', 0, 2350, 0],
-    ['BJ-33', 0, 2350, 0],
+    ['BD-134', 5952, 18600, 4],
+    ['BD-08G', 752, 2350, 0],
+    ['BJ-33', 752, 2350, 0],
   ]);
+});
+
+test('マツ六の価格改定一覧の形：見出しが2行（「現行価格」「価格改定価格」の下に「定価・単価・掛率」）→ 改定後の単価が仕切価格。品番は「商品名2」の先頭', () => {
+  // 列の並びだけをまねた見本（品番・金額は作りもの）
+  const grid: string[][] = [
+    ['サンプル商事 御中', '', '', '', '', '', '', '', '', '', '', '', 'マツ六株式会社'],
+    ['2099年 価格改定一覧（住宅改修部材）'],
+    ['Vol.1\nページ', '商品コード', 'JANコード', '商品名1', '商品名2', '単位', '現行価格', '', '', '価格改定価格', '', '', '備考'],
+    ['', '', '', '', '', '', '定価', '単価', '掛率', '定価', '単価', '掛率', ''],
+    ['新規', '900-0001', '4900000000001', '35テスト横型ブラケット', 'ZB-02GR　グリーン', '個', '1000', '320', '0.32', '1100', '352', '0.32', ''],
+    // 改定後の単価が空欄 → 表の掛率で 定価×掛率（1450×0.35＝507.5 → 508。小数の誤差で 507 にしない）
+    ['12', '900-0002', '4900000000002', '35テスト丸棒', 'ZB-777　グレー　4m', '本', '1300', '455', '0.35', '1450', '', '0.35', ''],
+    // 単価も掛率もない（特値未設定）→ 仕切価格は空欄（決まった率で計算しない）。定価はある
+    ['13', '900-0003', '4900000000003', 'テスト取替レバー錠', 'ZK200-2A-B-70 シルバー', 'セット', '8000', '3000', '', '8800', '特値未設定', '', ''],
+    // 廃番 → 金額がないので取り込まない
+    ['14', '900-0004', '4900000000004', 'テスト引き戸', 'ZQ-05WD ブラウン', 'セット', '40000', '', '', '廃番', '-', '', ''],
+    // 商品名2 に品番がない → 商品コードのまま。数字で始まる古い形の品番（28ZX4R）は品番
+    ['15', '900-0005', '4900000000005', 'テスト踏台 TD 500-80', 'W500XH80～90XD300mm ナチュラル', '台', '20000', '6800', '0.34', '22000', '7480', '0.34', ''],
+    ['16', '900-0006', '4900000000006', '35テスト丸棒手すり', '28ZX4R ホワイト 4m', '本', '12000', '3000', '0.25', '13000', '3250', '0.25', ''],
+  ];
+  assert.deepEqual(subHeaderOf(grid, 2)?.slice(6, 12), ['定価', '単価', '掛率', '定価', '単価', '掛率']);
+  assert.equal(subHeaderOf(grid, 3), null);
+  const m = detectMapping(grid);
+  // 仕切価格は右の組（価格改定価格）の単価、定価も右の組。現行価格の定価を仕切価格にしない
+  assert.deepEqual(m, {header: 2, name: 3, price: 10, code: 1, maker: -1, unit: 5, list: 9, spec: 4, len: -1, rate: 11});
+  assert.equal(specHasCode(grid, m), true);
+  const c = gridCandidates(grid, m, guessMaker(grid.slice(0, 8).map((r) => r.join(' '))));
+  assert.deepEqual(
+    c.map((x) => [x.row, x.code, x.name, x.price, x.listPrice, x.unit, x.maker, x.include]),
+    [
+      [5, 'ZB-02GR', '35テスト横型ブラケット グリーン', 352, 1100, '個', 'マツ六', true],
+      [6, 'ZB-777', '35テスト丸棒 グレー 4m', 508, 1450, '本', 'マツ六', true],
+      [7, 'ZK200-2A-B-70', 'テスト取替レバー錠 シルバー', null, 8800, 'セット', 'マツ六', true],
+      [8, 'ZQ-05WD', 'テスト引き戸 ブラウン', null, null, 'セット', 'マツ六', false],
+      [9, '900-0005', 'テスト踏台 TD 500-80 W500XH80~90XD300mm ナチュラル', 7480, 22000, '台', 'マツ六', true],
+      [10, '28ZX4R', '35テスト丸棒手すり ホワイト 4m', 3250, 13000, '本', 'マツ六', true],
+    ],
+  );
+  // 品番の列が「品番」なら、商品名2の先頭の語を品番にしない
+  const withCode = grid.map((r, i) => (i === 2 ? r.map((v, k) => (k === 1 ? '品番' : v)) : r));
+  assert.equal(specHasCode(withCode, detectMapping(withCode)), false);
+});
+
+test('掛率の欄・2行の見出しの下の行が「(税抜)」のときは上の見出しとつなぐ', () => {
+  assert.deepEqual(['0.32', '32', '32%', '４５．０％', '1', '', '0', '150', 'オープン'].map(parseRate), [0.32, 0.32, 0.32, 0.45, 1, null, null, null, null]);
+  const grid = [
+    ['品番', '品名', '入数', 'ガイド価格', 'ガイド価格'],
+    ['', '', '', '(税抜)', '(税抜)'],
+    ['TX-1', 'テスト手すり', '1本', '2,000', '2,200'],
+  ];
+  assert.deepEqual(headerLabels(grid, 0), ['品番', '品名', '入数', 'ガイド価格 (税抜)', 'ガイド価格 (税抜)']);
+  const m = detectMapping(grid);
+  assert.deepEqual([m.header, m.code, m.name, m.unit, m.list, m.price, m.rate], [0, 0, 1, 2, 4, -1, -1]);
+  assert.deepEqual(gridCandidates(grid, m, '').map((x) => [x.code, x.listPrice, x.price]), [['TX-1', 2200, null]]);
 });
 
 test('仕切価格はあとで取り込める：空欄の表で今の仕切価格を消さない／品番と仕切価格だけの表で入れる', () => {
@@ -372,7 +430,7 @@ test('矢崎化工の改定価格表（PDF）：見出しが列のまん中、�
   assert.deepEqual(grid[6], ['HCT-4000 T USL', 'φ34屋外手すりパイプ', '1本', '14,000', '14,000', '×', '']);
   assert.deepEqual(grid[9].slice(0, 2), ['CKM-02 SET GR', 'たちあっぷ ｻﾑﾘﾝｸﾞ CKM-02 SET GR']);
   const m = detectMapping(grid);
-  assert.deepEqual([m.header, m.code, m.name, m.unit, m.list, m.price], [3, 0, 1, 2, 4, -1]); // ガイド価格は定価（仕切価格にしない）
+  assert.deepEqual([m.header, m.code, m.name, m.unit, m.list, m.price, m.rate], [3, 0, 1, 2, 4, -1, -1]); // ガイド価格は定価（仕切価格にしない）。UP率は掛率ではない
   assert.deepEqual(
     gridCandidates(grid, m, '矢崎化工').map((c) => [c.code, c.name, c.listPrice, c.price, c.unit, c.pieceLengthM, c.include]),
     [
@@ -455,7 +513,7 @@ test('同じ品番で寸法・色の違う商品は別々に残す（マツ六�
   assert.equal(r2.added, 0);
 
   // 品番と仕切価格だけの表では、同じ品番が2つ以上ある部材は決められないので入れない（1つだけの品番は入る）
-  const only = gridCandidates(textToGrid('品番\t仕切価格\nP-30V\t1\n'), {header: 0, name: -1, price: 1, code: 0, maker: -1, unit: -1, list: -1, spec: -1, len: -1}, 'マツ六');
+  const only = gridCandidates(textToGrid('品番\t仕切価格\nP-30V\t1\n'), {header: 0, name: -1, price: 1, code: 0, maker: -1, unit: -1, list: -1, spec: -1, len: -1, rate: -1}, 'マツ六');
   const r3 = mergeMaterials(r2.list, only, 3);
   assert.deepEqual([r3.updated, r3.list[0].price, r3.list[1].price], [0, 4920, 5680]);
 });

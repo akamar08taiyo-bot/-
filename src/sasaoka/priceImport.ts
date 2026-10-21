@@ -126,14 +126,17 @@ const CODE_TOKEN = /^[a-z0-9][a-z0-9\-_/.#]{2,}$/i;
 const DIMENSION = /^\d+(\.\d+)?(mm|cm|m|kg|g|φ|ml|l|w|v|a)$/i;
 /** 品番らしい語：数字を含み、ハイフン入りか英字2文字以上で始まる（BP-600・EB35・AJ-K01 など） */
 const isCode = (w: string) => /\d/.test(w) && CODE_TOKEN.test(w) && !DIMENSION.test(w) && (/-/.test(w) || /^[a-z]{2,}/i.test(w));
+/** 規格の列（商品名2）の先頭の品番：品番らしい語のほか、数字で始まる古い形の品番（35AB4C など）も */
+const isSpecCode = (w: string) => isCode(w) || /^\d+[a-z]{2,}\d[a-z\d]*$/i.test(w);
 
 // ---------------------------------------------------------------- 表の列で読む
 
 /**
  * 列の番号（-1 はその列なし）。list は定価の列、spec は商品名のうしろに付ける列（色・規格など）、len は1本の長さの列。
- * price（仕切価格）が -1 なら、仕切価格は空欄として取り込む（あとで仕切価格の入った表を取り込むと入る）
+ * rate は掛率の列（仕切価格の欄が空の行は 定価×掛率 を仕切価格にする。マツ六の表）。
+ * price（仕切価格）が -1 で掛率もなければ、仕切価格は空欄として取り込む（あとで仕切価格の入った表を取り込むと入る）
  */
-export type Mapping = {header: number; name: number; price: number; code: number; maker: number; unit: number; list: number; spec: number; len: number};
+export type Mapping = {header: number; name: number; price: number; code: number; maker: number; unit: number; list: number; spec: number; len: number; rate: number};
 
 const keyScore = (cell: string, keys: [string, number][]) => {
   const c = normalize(cell).toLowerCase();
@@ -193,10 +196,60 @@ const has = (cell: string, keys: string[]) => {
 };
 const priceScore = (cell: string) => (normalize(cell).includes('率') ? 0 : keyScore(cell, PRICE_KEYS));
 const isListHeader = (cell: string) => has(cell, LIST_KEYS) && keyScore(cell, PRICE_KEYS) < 5; // 「定価・売価」のように仕切価格の言葉もあれば定価にしない
+// 掛率の列（「UP率」（値上げの率）は掛率ではない）
+const RATE_HEADER = /掛け?率|仕切り?率|卸率/;
 
 export function columnCount(grid: Grid): number {
   return grid.reduce((n, r) => Math.max(n, r.length), 0);
 }
+
+/** 見出しの続きの行に入る言葉（定価・単価・掛率 など） */
+const SUB_WORDS = /定価|単価|価格|売価|仕切|納価|掛|率|税|入数|単位|数量|金額|上代|下代|ネット|net/i;
+const hasRole = (s: string) => keyScore(s, PRICE_KEYS) > 0 || has(s, LIST_KEYS) || RATE_HEADER.test(normalize(s));
+
+/**
+ * 見出しが2行に分かれた表の、下の行（マツ六の価格改定一覧：「現行価格」「価格改定価格」の下に「定価・単価・掛率」）。
+ * 見出しのすぐ下の行が、短い見出しの言葉（2つ以上）だけで金額のない行なら、その行。なければ null
+ */
+export function subHeaderOf(grid: Grid, header: number): string[] | null {
+  const row = header >= 0 ? grid[header + 1] : undefined;
+  if (!row) return null;
+  const cells = row.map((c) => normalize(c)).filter(Boolean);
+  if (cells.length < 2 || !cells.every((c) => c.length <= 8 && parsePrice(c) === null && SUB_WORDS.test(c))) return null;
+  return row.map((c) => normalize(c));
+}
+
+/**
+ * 列の見出しの文字。見出しが2行なら下の行の言葉で決める（「価格改定価格」の下の「単価」は単価、右の組ほど新しい）。
+ * 下の行が「(税抜)」のように役目のない言葉なら上の行とつなぐ。上の行が空の列は、左の組の名前を引き継ぐ（結合したセル）
+ */
+export function headerLabels(grid: Grid, header: number): string[] {
+  const top = (header >= 0 ? grid[header] ?? [] : []).map((c) => normalize(c));
+  const sub = subHeaderOf(grid, header);
+  if (!sub) return top;
+  let group = '';
+  return Array.from({length: Math.max(top.length, sub.length)}, (_, c) => {
+    const t = top[c] ?? '';
+    const s = sub[c] ?? '';
+    if (t) group = s ? t : '';
+    else if (!s) group = '';
+    if (s && hasRole(s)) return s;
+    return [t || group, s].filter(Boolean).join(' ');
+  });
+}
+
+/** 掛率の欄：「0.32」「32」「32%」→ 0.32。読めない・0以下・100%を超えるものは null */
+export function parseRate(v: unknown): number | null {
+  const t = normalize(v);
+  const pct = /%$/.test(t);
+  const n = parsePrice(t.replace(/%$/, ''));
+  if (n === null || n <= 0) return null;
+  const r = pct || n > 1 ? n / 100 : n;
+  return r > 0 && r <= 1 ? r : null;
+}
+
+/** 定価×掛率（1円未満は四捨五入。0.41 のような小数の計算の誤差で 266.5 が 266 にならないよう、先に小数3けたでそろえる） */
+const byRate = (listPrice: number, rate: number) => Math.round(Math.round(listPrice * rate * 1000) / 1000);
 
 /**
  * 見出しの行と、商品名・仕切価格・品番などの列を推測する（画面で変えられる）。
@@ -205,7 +258,8 @@ export function columnCount(grid: Grid): number {
 export function detectMapping(grid: Grid): Mapping {
   const cols = columnCount(grid);
   for (let r = 0; r < Math.min(grid.length, 30); r++) {
-    const row = grid[r];
+    // 見出しが2行（「現行価格」「価格改定価格」の下に「定価・単価・掛率」）なら、下の行の言葉で列の役目を決める
+    const labels = headerLabels(grid, r);
     let name = -1;
     let code = -1;
     let maker = -1;
@@ -214,15 +268,22 @@ export function detectMapping(grid: Grid): Mapping {
     let list = -1;
     let spec = -1;
     let len = -1;
+    let rate = -1;
+    let second = -1; // 「商品名2」（品番と色・寸法。マツ六の価格改定一覧）
     let codeBest = 0;
     let nameBest = 0;
     let score = 0;
-    row.forEach((cell, c) => {
+    labels.forEach((cell, c) => {
       const t = normalize(cell);
       // 見出しは短い言葉。長い文（「※仕切価格は空欄です。品番で合わせます」のような注意書き）は見出しにしない
       if (!t || t.length > 24) return;
       const cs = keyScore(cell, CODE_KEYS);
       const ns = keyScore(cell, NAME_KEYS);
+      // 掛率の列は価格にしない（仕切価格の欄がない行は 定価×掛率）。右の組（改定後）ほど新しい
+      if (RATE_HEADER.test(t)) {
+        rate = c;
+        return;
+      }
       // 1つの列は1つの役目だけ（「商品コード」は商品名ではなく品番の候補。品番・商品名の列は価格の列にしない）
       if (cs > 0 && cs >= ns) {
         if (cs > codeBest) {
@@ -231,7 +292,9 @@ export function detectMapping(grid: Grid): Mapping {
         }
         return;
       } else if (ns > 0) {
-        if (ns > nameBest) {
+        if (/名2$/.test(t)) {
+          if (second < 0) second = c;
+        } else if (ns > nameBest) {
           nameBest = ns;
           name = c;
         }
@@ -247,14 +310,16 @@ export function detectMapping(grid: Grid): Mapping {
         price = c;
       }
     });
+    if (name < 0) name = second;
+    else if (spec < 0) spec = second; // 「商品名2」は商品名のうしろに付ける（品番が入っていれば品番にする：gridCandidates）
     if (name >= 0 && (price >= 0 || list >= 0)) {
       // 仕切価格の見出しがなければ、定価より右の見出しのない列に金額が入っていればそれを使う。
-      // なければ仕切価格は空欄で取り込む
-      if (price < 0) price = untitledPriceColumn(grid, r, list, new Set([name, code, maker, unit, spec, len]));
-      return {header: r, name, price, code, maker, unit, list, spec, len};
+      // なければ仕切価格は空欄で取り込む（掛率の列があれば 定価×掛率）
+      if (price < 0) price = untitledPriceColumn(grid, r, labels, list, new Set([name, code, maker, unit, spec, len, rate]));
+      return {header: r, name, price, code, maker, unit, list, spec, len, rate};
     }
     // 商品名の列がなくても、品番と仕切価格があれば「仕切価格だけを入れる表」として読む
-    if (code >= 0 && price >= 0) return {header: r, name: -1, price, code, maker, unit, list, spec, len};
+    if (code >= 0 && price >= 0) return {header: r, name: -1, price, code, maker, unit, list, spec, len, rate};
   }
 
   // 見出しがないとき：数字の多い一番右の列を価格、長い文字の列を商品名にする
@@ -291,6 +356,7 @@ export function detectMapping(grid: Grid): Mapping {
     list: left >= 0 && mostlyAtLeast(grid, left, price) ? left : -1,
     spec: -1,
     len: -1,
+    rate: -1,
   };
 }
 
@@ -298,11 +364,11 @@ export function detectMapping(grid: Grid): Mapping {
  * 定価の列より右にある見出しのない列のうち、定価のある行の半分以上に金額（1円以上）が入っている一番右の列。なければ -1。
  * マツ六の価格表のように、仕切価格の列の見出しが空のことがある（今は空欄でも、あとで金額を入れて取り込めば仕切価格になる）
  */
-function untitledPriceColumn(grid: Grid, header: number, list: number, taken: Set<number>): number {
+function untitledPriceColumn(grid: Grid, header: number, labels: string[], list: number, taken: Set<number>): number {
   if (list < 0) return -1;
   let best = -1;
   for (let c = list + 1; c < columnCount(grid); c++) {
-    if (taken.has(c) || normalize(grid[header]?.[c])) continue;
+    if (taken.has(c) || labels[c]) continue;
     let rows = 0;
     let prices = 0;
     for (let r = header + 1; r < grid.length; r++) {
@@ -334,6 +400,24 @@ export function codeHasSpec(grid: Grid, m: Mapping): boolean {
     if (rest.length > 0 && isCode(first) && SPEC_LIKE.test(rest.join(' '))) multi++;
   }
   return filled > 0 && multi >= filled * 0.5;
+}
+
+/**
+ * 規格の列（「商品名2」）の先頭に品番が入っているか（半分以上の行）：マツ六の価格改定一覧「AB-12CD ブラック」の形。
+ * 品番の列が「品番」「型番」「型式」なら、その列を品番のままにする（「商品コード」「JANコード」は社内の番号なので、規格の列の品番を使う）
+ */
+export function specHasCode(grid: Grid, m: Mapping): boolean {
+  if (m.spec < 0 || m.spec === m.code) return false;
+  if (m.code >= 0 && keyScore(headerLabels(grid, m.header)[m.code] ?? '', CODE_KEYS) >= 4) return false;
+  let filled = 0;
+  let coded = 0;
+  for (let r = m.header + 1; r < grid.length; r++) {
+    const v = normalize(grid[r]?.[m.spec]);
+    if (!v) continue;
+    filled++;
+    if (isSpecCode(v.split(' ')[0])) coded++;
+  }
+  return filled > 0 && coded >= filled * 0.5;
 }
 
 /** メーカー名：ファイル名か、表の上の方の文字に知っているメーカー名があれば使う（「TOTO九州販売」→ TOTO） */
@@ -410,8 +494,11 @@ export function gridCandidates(grid: Grid, m: Mapping, defaultMaker: string): Ca
   const out: Candidate[] = [];
   const cell = (row: string[], c: number) => (c >= 0 ? normalize(row[c]) : '');
   const split = codeHasSpec(grid, m);
+  const fromSpec = specHasCode(grid, m);
+  const labels = headerLabels(grid, m.header);
+  const body = m.header + (subHeaderOf(grid, m.header) ? 2 : 1); // 見出しが2行なら、その下から
   grid.forEach((row, r) => {
-    if (r <= m.header) return;
+    if (r < body) return;
     let code = cell(row, m.code);
     let spec = m.spec >= 0 && m.spec !== m.code ? cell(row, m.spec) : '';
     if (split && code.includes(' ')) {
@@ -420,12 +507,21 @@ export function gridCandidates(grid: Grid, m: Mapping, defaultMaker: string): Ca
       spec = [code.slice(at + 1), spec].filter(Boolean).join(' ');
       code = code.slice(0, at);
     }
+    const [first = '', ...rest] = spec.split(' ');
+    if (fromSpec && isSpecCode(first)) {
+      // 「商品名2」の「AB-12CD ブラック」→ 品番 AB-12CD（「商品コード」の社内の番号より、見積書・発注書で使う品番）、色は商品名のうしろへ
+      code = first;
+      spec = rest.join(' ');
+    }
     const base = cell(row, m.name);
     const full = base && spec && !base.includes(spec) ? `${base} ${spec}` : base;
     // 商品名のうしろに品番がくり返されていれば外す（矢崎化工「たちあっぷ サムリング CKM-02 SET GR」）
     const name = code && full.endsWith(` ${code}`) ? full.slice(0, -code.length - 1) : full;
-    const price = m.price >= 0 ? parsePrice(row[m.price]) : null;
     const listPrice = m.list >= 0 ? parsePrice(row[m.list]) : null;
+    let price = m.price >= 0 ? parsePrice(row[m.price]) : null;
+    // 仕切価格の欄がない（空の）行は、表の掛率で 定価×掛率（マツ六の価格表の「掛率 0.32」）。決まった率で計算することはしない
+    const rate = m.rate >= 0 ? parseRate(row[m.rate]) : null;
+    if (!(price !== null && price > 0) && rate !== null && listPrice !== null && listPrice > 0) price = byRate(listPrice, rate);
     if (!name && (!code || price === null)) return;
     if (looksLikeHeader(base) || looksLikeHeader(code)) return; // ページごとに繰り返される見出し
     // 品番の列がある表で、品番も金額もない行は、表の中の小見出し（「住宅改修（屋外スタンダードシリーズ）」など）
@@ -442,7 +538,7 @@ export function gridCandidates(grid: Grid, m: Mapping, defaultMaker: string): Ca
       code,
       maker: cell(row, m.maker) || defaultMaker,
       unit,
-      pieceLengthM: (m.len >= 0 ? parseLengthM(row[m.len], m.header >= 0 ? grid[m.header]?.[m.len] : '') : 0) || codeLengthM(code, name, unit),
+      pieceLengthM: (m.len >= 0 ? parseLengthM(row[m.len], labels[m.len] ?? '') : 0) || codeLengthM(code, name, unit),
       include: valid,
       favorite: false,
     });

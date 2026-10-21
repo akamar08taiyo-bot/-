@@ -186,7 +186,7 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
     onDone(r.list);
     toast(
       `部材リストに取り込みました：新しく ${r.added}件・価格を更新 ${r.updated}件・変わらず ${r.unchanged}件` +
-        (noShikiri > 0 ? `（仕切価格が空欄の ${noShikiri}件は、それまで定価×0.8で計算します。あとで仕切価格の入った表を取り込むと入ります）` : ''),
+        (noShikiri > 0 ? `（仕切価格が空欄の ${noShikiri}件は、仕切価格の入った表をあとで取り込むと入ります）` : ''),
     );
     onClose();
   };
@@ -362,6 +362,7 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
               {colSelect('商品名の列', 'name', false)}
               {colSelect('仕切価格の列（空欄なら「なし」）', 'price', true)}
               {colSelect('定価の列（見積に使う）', 'list', true)}
+              {colSelect('掛率の列（仕切価格が空欄の行は 定価×掛率）', 'rate', true)}
               {colSelect('品番の列', 'code', true)}
               {colSelect('メーカーの列', 'maker', true)}
               {colSelect('単位の列', 'unit', true)}
@@ -448,8 +449,8 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
                       </td>
                       <td className="px-2 py-1 text-right">
                         {c.price === null ? (
-                          <span className="text-xs text-slate-400" title="仕切価格の入った表をあとで取り込むと入ります。それまでは定価×0.8で計算します">
-                            {c.listPrice !== null ? '空欄（定価×0.8で計算）' : '空欄（あとで）'}
+                          <span className="text-xs text-slate-400" title="仕切価格の入った表をあとで取り込むと入ります">
+                            空欄（あとで）
                           </span>
                         ) : (
                           <NumberInput value={c.price} onChange={(price) => setOv(c.key, {price})} className="w-28" ariaLabel="仕切価格" />
