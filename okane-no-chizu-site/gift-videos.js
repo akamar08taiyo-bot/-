@@ -9,8 +9,8 @@
 window.OKANE_GUIDE_VIDEOS = {
   title: 'ゼロからわかる NISA完全攻略ガイド',
   chapters: [
-    { label: '第1章', name: 'しくみと準備', src: 'videos/nisa_ch1_720.mp4', poster: 'videos/nisa_ch1.jpg', length: '10分17秒' },
-    { label: '第2章', name: '何を、いくら買う？', src: 'videos/nisa_ch2_720.mp4', poster: 'videos/nisa_ch2.jpg', length: '9分23秒' },
-    { label: '第3章', name: '続け方・守り方・使い方', src: 'videos/nisa_ch3_720.mp4', poster: 'videos/nisa_ch3.jpg', length: '12分42秒' }
+    { label: '第1章', name: 'しくみと準備', src: 'videos/nisa_ch1_720.mp4', poster: 'videos/nisa_ch1.jpg', length: '10分2秒' },
+    { label: '第2章', name: '何を、いくら買う？', src: 'videos/nisa_ch2_720.mp4', poster: 'videos/nisa_ch2.jpg', length: '11分8秒' },
+    { label: '第3章', name: '続け方・守り方・使い方', src: 'videos/nisa_ch3_720.mp4', poster: 'videos/nisa_ch3.jpg', length: '13分19秒' }
   ]
 };

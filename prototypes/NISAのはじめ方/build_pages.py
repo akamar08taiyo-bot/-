@@ -64,7 +64,7 @@ START = f"""<div class="narrow">
 <h2 class="visually-hidden">3つのプレゼント</h2>
 <ol class="gift-rows">
 <li id="gift-app"><a class="gift-row" href="goal.html"><span class="gift-no" aria-hidden="true">1</span><span class="gift-text"><b>未来が見える 資産シミュレーター</b><span class="gift-desc">月3万円なら、65歳でいくら？ 目標の2,000万円には何歳で届く？</span></span>{ARROW}</a></li>
-<li id="gift-guide"><div class="gift-row is-split"><span class="gift-no" aria-hidden="true">2</span><span class="gift-text"><b>ゼロからわかる NISA完全攻略ガイド</b><span class="gift-desc">動画32分＋PDF45ページ。しくみから口座づくり・積立の始め方まで</span></span>{GUIDE_CHOICES}</div></li>
+<li id="gift-guide"><div class="gift-row is-split"><span class="gift-no" aria-hidden="true">2</span><span class="gift-text"><b>ゼロからわかる NISA完全攻略ガイド</b><span class="gift-desc">動画34分＋PDF45ページ。しくみから口座づくり・積立の始め方まで</span></span>{GUIDE_CHOICES}</div></li>
 <li id="gift-broker"><a class="gift-row" href="#quiz-tab"><span class="gift-no" aria-hidden="true">3</span><span class="gift-text"><b>30秒で選べる 証券会社診断</b><span class="gift-desc">{BROKER_DESC}</span></span>{ARROW}</a></li>
 </ol>
 <section class="open-now" id="open" aria-labelledby="open-title">
