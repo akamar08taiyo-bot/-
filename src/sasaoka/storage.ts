@@ -5,7 +5,7 @@
 // どちらかが保存するたびに、その項目の「印」（stamp:項目名）を変える。前に読んだときと印が違えば、ほかのアプリ・タブが
 // 保存したということなので、読み直す・まとめてから保存する（sync.ts）。
 
-import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES, SETTINGS_REV, STAFF_FULL_NAMES} from './defaults.ts';
+import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES, OLD_DEFAULT_PLACES, SETTINGS_REV, STAFF_FULL_NAMES} from './defaults.ts';
 import {guessPieceLengthM} from './priceImport.ts';
 import {jobInsurer, MARK_INFO, MARK_KEYS, NO_SHINSEI} from './estimateForms.ts';
 import {cleanEdit} from './photoEdit.ts';
@@ -426,6 +426,8 @@ export function cleanSettings(raw: unknown): Settings {
   if (numv(raw.rev, 1) < 2) s.invoiceTaxMode = 'monthly';
   // 版4より前の設定：名字だけの担当者の候補をフルネームにする（見積書に出す）
   if (numv(raw.rev, 1) < 4) s.staffList = cleanList(s.staffList.map((n) => STAFF_FULL_NAMES.get(n) ?? n));
+  // 版5より前の設定：箇所の候補が前の初期値のままなら、写真の用紙の改修箇所の名前にする（自分で直した候補はそのまま）
+  if (numv(raw.rev, 1) < 5 && s.placePresets.join('\n') === OLD_DEFAULT_PLACES.join('\n')) s.placePresets = DEFAULT_PLACES;
   s.rev = SETTINGS_REV;
   return s;
 }

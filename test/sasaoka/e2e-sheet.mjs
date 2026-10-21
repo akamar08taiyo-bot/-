@@ -347,15 +347,15 @@ log('押している行に入れる（部材リストから入れる・続けて
 await cell(await key('木の手すり 35φ 4m', 'name')).click();
 await sheet.getByRole('button', {name: '改修場所（箇所名）を候補から選ぶ'}).click();
 const placeOptions = page.getByRole('listbox', {name: '候補'}).getByRole('option');
-assert.deepEqual((await placeOptions.allInnerTexts()).slice(0, 3), ['玄関', '上がり框', '廊下']);
+assert.deepEqual((await placeOptions.allInnerTexts()).slice(0, 3), ['廊下', '階段', '台所']); // 写真の用紙の改修箇所と同じ名前・順番
 await placeOptions.filter({hasText: /^廊下$/}).click();
 assert.equal((await tds('木の手すり 35φ 4m'))[1], '①廊下');
 await page.keyboard.press('Alt+ArrowDown');
 await page.keyboard.type('脱衣');
-assert.deepEqual(await placeOptions.allInnerTexts(), ['脱衣所']);
+assert.deepEqual(await placeOptions.allInnerTexts(), ['洗面・脱衣室']);
 await page.keyboard.press('ArrowDown');
 await page.keyboard.press('Enter');
-assert.equal((await tds('木の手すり 35φ 4m'))[1], '①脱衣所');
+assert.equal((await tds('木の手すり 35φ 4m'))[1], '①洗面・脱衣室');
 await undoKey();
 await undoKey();
 assert.equal((await tds('木の手すり 35φ 4m'))[1], '①浴室');

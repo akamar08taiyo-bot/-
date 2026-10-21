@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {DEFAULT_LABOR, DEFAULT_STAFF, LABOR_REV, OFFICES, settingsForOffice} from '../../src/sasaoka/defaults.ts';
+import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, LABOR_REV, OFFICES, OLD_DEFAULT_PLACES, settingsForOffice} from '../../src/sasaoka/defaults.ts';
 import {NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {cleanJobs, cleanKits, cleanLabor, cleanList, cleanMaterials, cleanSettings} from '../../src/sasaoka/storage.ts';
 import {staffFull, staffShort, tesuri} from '../../src/sasaoka/util.ts';
@@ -52,7 +52,7 @@ test('請求書の消費税：前の版の設定（様邸ごと）は「すべ�
   assert.equal(cleanSettings({}).totalTaxRounding, 'floor');
   // 新しい版で保存した設定は、選んだまま
   assert.equal(cleanSettings({invoiceTaxMode: 'perJob', rev: 2}).invoiceTaxMode, 'perJob');
-  assert.equal(cleanSettings({rev: 1}).rev, 4);
+  assert.equal(cleanSettings({rev: 1}).rev, 5);
 });
 
 test('見積の設定：最初は定価×0.8・諸経費10%・施工費1時間2,500円・書式は苅田町・行橋市・みやこ町用', () => {
@@ -182,4 +182,11 @@ test('「手摺」ではなく「手すり」（ユーザーの指示）：施�
   assert.ok(!DEFAULT_LABOR.some((l) => l.name.includes('手摺')));
   assert.equal(cleanSettings({officeName: '行橋営業所'}).tesuri, false); // 前の版で保存した設定
   assert.equal(cleanSettings({tesuri: true}).tesuri, true);
+});
+
+test('箇所の候補は写真の用紙の改修箇所の名前（ユーザーの指示）。前の版の初期値のままなら新しい候補に、自分で直した候補はそのまま', () => {
+  assert.deepEqual(cleanSettings(undefined).placePresets, DEFAULT_PLACES);
+  assert.deepEqual(cleanSettings({rev: 4, placePresets: OLD_DEFAULT_PLACES}).placePresets, DEFAULT_PLACES);
+  assert.deepEqual(cleanSettings({rev: 4, placePresets: ['玄関', '自分の箇所']}).placePresets, ['玄関', '自分の箇所']);
+  assert.deepEqual(cleanSettings({rev: 5, placePresets: OLD_DEFAULT_PLACES}).placePresets, OLD_DEFAULT_PLACES); // 新しい版で選び直したもの
 });

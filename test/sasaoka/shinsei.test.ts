@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {strFromU8, unzipSync, zipSync} from 'fflate';
 import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
-import {defaultSettings} from '../../src/sasaoka/defaults.ts';
+import {DEFAULT_PLACES, defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {boxLabels, checkBoxes, fillShinsei, fitLinesSize, insuredBoxes, padInsuredNo, parseWorkLine, placeBox, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems} from '../../src/sasaoka/shinsei.ts';
 import type {Insurer, Job, Place, Row, ShinseiInfo, ShinseiMarks} from '../../src/sasaoka/types.ts';
@@ -194,6 +194,18 @@ test('苅田町の写真の用紙：改修箇所・実施した工事種類の�
   assert.ok(at('②', 'B4').startsWith('🔳手すりの取り付け　□(2)段差の解消　□(3)'));
   assert.ok(at('②', 'B2').includes('□その他（　　　）'));
   assert.ok(!strings.some((s) => s.includes('手摺')));
+});
+
+test('箇所の候補（箇所を足す・改修場所の候補）は、苅田町の写真の用紙の改修箇所の□の名前と同じ（その他は名前を打つ）', () => {
+  const xml = strFromU8(unzipSync(KANDA)['xl/sharedStrings.xml']);
+  const text = [...xml.matchAll(/<si>([\s\S]*?)<\/si>/g)]
+    .map((m) => [...m[1].replace(/<rPh\b[\s\S]*?<\/rPh>/g, '').matchAll(/<t[^>]*>([^<]*)<\/t>/g)].map((t) => t[1]).join(''))
+    .find((t) => t.includes('□廊下'))!;
+  const labels = boxLabels(text);
+  assert.equal(labels.at(-1)?.replace(/[（）\s　]/g, ''), 'その他');
+  assert.deepEqual(DEFAULT_PLACES, labels.slice(0, -1));
+  // どの候補も、その写真の用紙の□に当たる
+  assert.deepEqual(DEFAULT_PLACES.map((name) => placeBox(labels, name)), DEFAULT_PLACES.map((_, i) => i));
 });
 
 test('みやこ町の写真の用紙の撮影日：原本の「撮影日」のうしろに日付（改修前 D7・改修後 D32）。撮影日のない写真番号・広域連合は原本のまま', () => {
