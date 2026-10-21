@@ -319,7 +319,7 @@
 
 - **独立したアプリ**として、このリポジトリ（akamar08taiyo-bot/-）の `src/tokutei/` に作る（住宅改修アプリの `src/sasaoka/` とは別のフォルダ。行き来しない）。
   - `tokutei.html` → `src/tokutei/main.tsx`（React 19＋TypeScript＋Vite＋Tailwind）。`vite.tokutei.config.ts` で1つの HTML ファイル（`dist-tokutei/index.html`）にビルド（`vite-plugin-singlefile`）。
-  - 太陽ポータル（taiyo-portal）の `tokutei/` に置き、タイル「特定福祉用具 購入申請書・見積もり作成」を足す（公開はユーザーに確かめてから）。
+  - 太陽ポータル（taiyo-portal）の `tokutei/` に置き、タイル「特定福祉用具 購入申請書・見積もり作成」を足した（2026-10-21 公開。https://akamar08taiyo-bot.github.io/taiyo-portal/tokutei/ ）。
   - あとで別のリポジトリに分けたくなっても、`src/tokutei/` と `tokutei.html`・`vite.tokutei.config.ts` だけで動くようにしておく。
 - 保存はこの端末の IndexedDB（`taiyo-tokutei`）。使えないときは localStorage。サーバーには送らない。設定からバックアップ（JSON）の保存・読み込み。
   商品マスタは CSV でも書き出せるようにする（ほかの端末へ移す・営業所で配る）。

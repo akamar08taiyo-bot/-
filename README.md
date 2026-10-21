@@ -49,7 +49,8 @@ npm run -s build:tokutei    # dist-tokutei/index.html（1ファイル）と vers
 node test/tokutei/e2e.mjs <出力フォルダ>   # ブラウザで通しで確かめる（Playwright。ビルドのあと）
 ```
 
-公開するときは、`dist-tokutei/index.html` と `version.json` を太陽ポータル（taiyo-portal）の `tokutei/` に置く。
+公開先は太陽ポータル（taiyo-portal、master）の `tokutei/`：https://akamar08taiyo-bot.github.io/taiyo-portal/tokutei/ （タイル「特定福祉用具 購入申請書・見積もり作成」）。
+直したら `dist-tokutei/index.html` と `version.json` を `taiyo-portal/tokutei/` に置き、タイルの使い方の文（`taiyo-portal/index.html` の `APPS`）も合わせて直す。
 
 ## 技術スタック
 
