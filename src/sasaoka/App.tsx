@@ -23,7 +23,8 @@ import {APP_TITLE, PORTAL_URL, readHash, writeHash} from './links.ts';
 import type {MainTab} from './links.ts';
 import {PrintView} from './print/PrintView.tsx';
 import type {PrintRequest} from './print/PrintView.tsx';
-import type {Insurer, Job} from './types.ts';
+import {EXAMPLE_KIT_ID, exampleKit} from './samples.ts';
+import type {Insurer, Job, Row} from './types.ts';
 import {useNewVersion} from './update.ts';
 import {useStore} from './useStore.ts';
 import {thisMonth} from './util.ts';
@@ -105,6 +106,24 @@ export default function App({start}: {start: MainTab}) {
   useEffect(() => {
     document.title = APP_TITLE;
   }, []);
+  // 部材＋施工費（常用）の例を1つ入れておく（ユーザーの指示。一度だけ。消したら入れ直さない）
+  useEffect(() => {
+    if (!data || data.settings.kitExample) return;
+    const kit = exampleKit(data.materials, data.labor);
+    store.update('kits', (list) => (list.some((k) => k.id === EXAMPLE_KIT_ID) ? list : [...list, kit]));
+    store.update('settings', (s) => ({...s, kitExample: true}));
+  }, [loaded]);
+  // 取付手間に見積の単価ができる前に作った見積書：取付手間のマスタの見積の単価を入れる（一度だけ）
+  useEffect(() => {
+    if (!data || data.settings.laborEst) return;
+    const est = new Map(data.labor.map((l) => [l.id, l.estPrice]));
+    const fix = (r: Row): Row => (r.kind === 'labor' && r.refId && r.estPrice === null && est.get(r.refId) != null ? {...r, estPrice: est.get(r.refId) ?? null} : r);
+    store.update('jobs', (jobs) => {
+      const next = jobs.map((j) => (j.places.some((p) => p.rows.some((r) => fix(r) !== r)) ? {...j, places: j.places.map((p) => ({...p, rows: p.rows.map(fix)}))} : j));
+      return next.some((j, i) => j !== jobs[i]) ? next : jobs;
+    });
+    store.update('settings', (s) => ({...s, laborEst: true}));
+  }, [loaded]);
 
   if (store.loadError) {
     return <div className="p-8 text-rose-700">データを読み込めませんでした：{store.loadError}</div>;
@@ -228,7 +247,17 @@ export default function App({start}: {start: MainTab}) {
                 onManageKits={() => goMaster('kits')}
               />
             ) : estimateView === 'home' ? (
-              <EstimateHome data={data} update={store.update} onNew={newOne} onList={() => setEstimateView('list')} goMaterials={() => goMaster()} />
+              <EstimateHome
+                data={data}
+                update={store.update}
+                onNew={newOne}
+                onCreate={(j) => {
+                  store.update('jobs', (jobs) => [...jobs, j]);
+                  setEstimateId(j.id);
+                }}
+                onList={() => setEstimateView('list')}
+                goMaterials={() => goMaster()}
+              />
             ) : (
               <EstimateList
                 data={data}

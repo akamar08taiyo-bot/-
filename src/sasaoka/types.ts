@@ -19,7 +19,8 @@ export type Material = {
 export type LaborItem = {
   id: string;
   name: string;
-  price: number;
+  price: number; // 仕切り（笹岡工務店の単価・1箇所あたり）。仕切り計算表・請求書に使う
+  estPrice: number | null; // 見積の単価（1箇所あたり。こちらで決める）。null なら 仕切り×見積の施工費の率（1.5）
   note: string;
 };
 
@@ -45,7 +46,7 @@ export type Row = {
   listPrice: number; // 定価（税抜）
   lengthCm: number; // 使う長さ（cm）。0 なら長さでは数えない（規格品そのまま）
   pieceLengthM: number; // 1本の長さ（m）。見積の数量＝使う長さ÷1本の長さ（例：60cm÷4m＝0.15本）
-  estPrice: number | null; // 見積の単価を手で入れたとき。null なら 定価×掛率
+  estPrice: number | null; // 部材：見積の単価を手で入れたとき（null なら 定価×掛率）。手間：見積の単価（取付手間のマスタから。null なら 仕切り×率）
   excluded: boolean; // 介護保険の対象外（見積書の「対象外」の欄に出す）。部材のすぐ下の施工費は部材に合わせる
   // ---- 見積書の欄を手で直したとき（見積書だけに出る。仕切り計算表・請求書は変わらない）。null なら自動
   estText: string | null; // 内容（品名）。施工費のまとまりは、その最初の手間の行に持つ
@@ -109,7 +110,8 @@ export type Job = {
   customer: string; // お客様名（「様邸」は suffix で付ける）
   suffix: NameSuffix;
   staff: string; // 担当（設定の「担当者の候補」から選ぶ。空でもよい）
-  date: string; // 施工日 'YYYY-MM-DD'（空でもよい）
+  date: string; // 施工日 'YYYY-MM-DD'（空でもよい。仕切り計算表・請求書に出す）
+  estDate?: string; // 見積もり作成日 'YYYY-MM-DD'（見積書の右上・一覧・Excel）。空なら作った日（estimateDateOf）
   address: string;
   note: string;
   insuredNo: string; // 介護保険被保険者番号（苅田町・行橋市・みやこ町用の見積書に出す）
@@ -182,9 +184,12 @@ export type Settings = {
   staffList: string[]; // 担当者の候補（様邸ごとに選ぶ）
   // ---- 見積書
   estimateRate: number; // 見積の部材の単価＝定価×この率（0.8）
+  estimateLaborRate: number; // 見積の単価を入れていない取付手間の、見積の単価＝仕切り（笹岡工務店）×この率（1.5）
   estimateOverheadRate: number; // 見積書の諸経費＝小計×この率（0.1）
   estimateHourRate: number; // 広域連合用の書式で、施工費を「時間×1時間の単価」で書くときの単価（2,500円）。0 なら「1式」
   estimateForm: EstimateForm; // 住所から市町村が分からないときの見積書の書式
+  kitExample: boolean; // 部材＋施工費（常用）の例をもう入れたか（消したら入れ直さない）
+  laborEst: boolean; // 前に作った見積書の取付手間の行に、見積の単価（取付手間のマスタ）を入れたか
   rev: number; // 設定の版（古い版で保存した設定を読み込むときの直し方に使う）
 };
 

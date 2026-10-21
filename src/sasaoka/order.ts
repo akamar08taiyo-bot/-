@@ -12,6 +12,7 @@
 // 発注書で数を直した・消した・足した行は、様邸の order に持つ（見積書を直しても、手で直したところはそのまま）。
 
 import {cutToLength, isBlankRow, listPriceOf, shikiriPrice} from './calc.ts';
+import type {EstimateRates} from './calc.ts';
 import {circled, photoNumbers} from './estimateForms.ts';
 import {normalize} from './priceImport.ts';
 import type {Job, Material, OrderEdits, OrderLine, Row} from './types.ts';
@@ -160,10 +161,10 @@ type Group = {
 
 const productKey = (r: Row) => [r.maker, r.code, r.name].map(norm).join('|');
 
-/** 見積書の部材から、発注書の行を作る（手で直したところは入れない）。rate は見積の掛率（写真番号を見積書と同じに数えるため） */
-export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[], rate: number): OrderLine[] {
+/** 見積書の部材から、発注書の行を作る（手で直したところは入れない）。rates は見積の率（写真番号を見積書と同じに数えるため） */
+export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[], rates: EstimateRates): OrderLine[] {
   const groups = new Map<string, Group>();
-  const photoOf = photoNumbers(job, rate);
+  const photoOf = photoNumbers(job, rates);
   for (const place of job.places) {
     const photo = photoOf.get(place.id) ?? 0;
     for (const r of place.rows) {
@@ -233,7 +234,7 @@ export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[], 
             code: halfMat.code.trim(),
             name: halfMat.name.trim(),
             unit: halfMat.unit.trim() || unit,
-            price: shikiriPrice({kind: 'material', price: halfMat.price, listPrice: halfMat.listPrice}),
+            price: shikiriPrice(halfMat),
             listPrice: listPriceOf({kind: 'material', price: halfMat.price, listPrice: halfMat.listPrice}),
           }
         : {

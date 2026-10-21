@@ -1,11 +1,13 @@
+import {rounddown} from '../calc.ts';
 import {DEFAULT_LABOR} from '../defaults.ts';
 import type {AppData, LaborItem} from '../types.ts';
 import type {Update} from '../useStore.ts';
-import {uid} from '../util.ts';
+import {uid, yen} from '../util.ts';
 import {Btn, NumberInput, TextInput, useToast} from './ui.tsx';
 
 export function LaborPage({data, update}: {data: AppData; update: Update}) {
   const toast = useToast();
+  const laborRate = data.settings.estimateLaborRate;
   const set = (id: string, patch: Partial<LaborItem>) => update('labor', (list) => list.map((l) => (l.id === id ? {...l, ...patch} : l)));
   const move = (i: number, d: number) =>
     update('labor', (list) => {
@@ -19,9 +21,9 @@ export function LaborPage({data, update}: {data: AppData; update: Update}) {
   return (
     <div className="max-w-4xl space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-lg font-bold text-[#0c315e]">取付手間の単価（笹岡手間・1箇所あたり）</h1>
+        <h1 className="text-lg font-bold text-[#0c315e]">取付手間の単価（仕切り・見積・1箇所あたり）</h1>
         <div className="ml-auto flex gap-2">
-          <Btn color="emerald" onClick={() => update('labor', (list) => [...list, {id: uid('l'), name: '', price: 0, note: ''}])}>
+          <Btn color="emerald" onClick={() => update('labor', (list) => [...list, {id: uid('l'), name: '', price: 0, estPrice: null, note: ''}])}>
             ＋ 項目を追加
           </Btn>
           <Btn
@@ -40,12 +42,14 @@ export function LaborPage({data, update}: {data: AppData; update: Update}) {
         様邸の画面で「取付手間」を押すと、ここの項目が並び、箇所数を数えるだけで「単価×箇所数」が入ります。単価を変えても、すでに作った様邸の金額は変わりません。
       </p>
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full min-w-[640px] text-sm">
+        <table className="w-full min-w-[760px] text-sm">
           <thead className="bg-slate-100 text-xs text-slate-600">
             <tr>
               <th className="w-12 px-2 py-2">No.</th>
               <th className="px-2 py-2 text-left">項目</th>
-              <th className="w-36 px-2 py-2 pr-4 text-right">単価（1箇所）</th>
+              <th className="w-36 px-2 py-2 pr-4 text-right">仕切り（笹岡工務店）</th>
+              {/* 見積書に入れる単価。入れていなければ 仕切り×率（薄い字で出す） */}
+              <th className="w-36 px-2 py-2 pr-4 text-right">見積</th>
               <th className="px-2 py-2 text-left">メモ</th>
               <th className="w-28 px-2 py-2" />
             </tr>
@@ -59,6 +63,16 @@ export function LaborPage({data, update}: {data: AppData; update: Update}) {
                 </td>
                 <td className="px-2 py-1 text-right">
                   <NumberInput value={l.price} onChange={(price) => set(l.id, {price})} className="w-28" ariaLabel={`${l.name}の単価`} />
+                </td>
+                <td className="px-2 py-1 text-right">
+                  <NumberInput
+                    value={l.estPrice ?? 0}
+                    onChange={(v) => set(l.id, {estPrice: v > 0 ? v : null})}
+                    blankZero
+                    placeholder={yen(rounddown(l.price * laborRate))}
+                    className="w-28"
+                    ariaLabel={`${l.name}の見積の単価`}
+                  />
                 </td>
                 <td className="px-2 py-1">
                   <TextInput value={l.note} onChange={(note) => set(l.id, {note})} className="w-full text-xs" />

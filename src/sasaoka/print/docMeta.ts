@@ -1,4 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
+import type {Job} from '../types.ts';
+import {isoDate} from '../util.ts';
 
 /** 請求書の請求日・請求書番号・お支払期限、見積書の作成日 */
 export type DocMeta = {date: string; number: string; due: string};
@@ -16,8 +18,8 @@ function readMeta(key: string, defaultDate: () => string): DocMeta {
   return {date: defaultDate(), number: '', due: ''};
 }
 
-/** 覚えている日付（見積書の一覧に作成日を出すとき）。覚えていなければ '' */
-export function readDocDate(key: string): string {
+/** 覚えている日付。覚えていなければ '' */
+function readDocDate(key: string): string {
   try {
     const all = JSON.parse(localStorage.getItem(META_KEY) || '{}');
     return all && all[key] && typeof all[key].date === 'string' ? all[key].date : '';
@@ -27,6 +29,7 @@ export function readDocDate(key: string): string {
 }
 
 function writeMeta(key: string, meta: DocMeta) {
+  if (!key) return;
   try {
     const all = JSON.parse(localStorage.getItem(META_KEY) || '{}') || {};
     all[key] = meta;
@@ -37,9 +40,16 @@ function writeMeta(key: string, meta: DocMeta) {
 }
 
 /**
- * 請求日・請求書番号・お支払期限は月ごとに、見積書の作成日は様邸ごとに覚えておく（次に開いたときも同じものが入る）。
- * key は請求書なら 'YYYY-MM'、見積書なら 'est:様邸のID'。
- * 様邸の画面の見積書のプレビューと印刷の画面のどちらで変えても、もう片方に同じ日が入る
+ * 見積もり作成日：見積書に入れた日（Job.estDate）。入れていなければ、前の版で見積書の右上に入れた日（この端末に覚えていたもの）、
+ * それもなければ見積書を作った日（何も入れなければ当日）
+ */
+export function estimateDateOf(job: Pick<Job, 'id' | 'estDate' | 'createdAt'>): string {
+  return job.estDate || readDocDate(`est:${job.id}`) || isoDate(job.createdAt);
+}
+
+/**
+ * 請求書の請求日・請求書番号・お支払期限は月ごとに覚えておく（次に開いたときも同じものが入る）。key は 'YYYY-MM'（'' なら覚えない）。
+ * 見積書の作成日は様邸（Job.estDate）に持つ
  */
 export function useDocMeta(key: string, defaultDate: () => string) {
   const dflt = useRef(defaultDate);

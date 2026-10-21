@@ -2,8 +2,8 @@
 //   仕切り：玄関 木の手すり1万円・ブラケット1,500円×2個・取付手間 木×2箇所
 //   見積：木の手すり 定価2万円（1本4m）を60cm → 0.15本×単価16,000円＝2,400円、そのすぐ下に同上施工費（木 2箇所＝2,000円）
 import {guessPieceLengthM} from './priceImport.ts';
-import {kitFromRows, laborRow, manualRow, materialRow, newPlace} from './rows.ts';
-import type {AppData, Job, Kit, Material} from './types.ts';
+import {codeKey, kitFromRows, laborRow, manualRow, materialRow, newPlace} from './rows.ts';
+import type {AppData, Job, Kit, LaborItem, Material} from './types.ts';
 import {uid} from './util.ts';
 
 export const SAMPLE_MAKER = 'サンプル';
@@ -60,6 +60,26 @@ export function addSamples(data: AppData, month: string): {materials: Material[]
     jobs: [...data.jobs, job],
     kits: [...data.kits, kit],
   };
+}
+
+/** 部材＋施工費（常用）の例。IDを決めておく（2つのアプリで同時に入れても1つになる） */
+export const EXAMPLE_KIT_ID = 'kit-example';
+
+/**
+ * 部材＋施工費（常用）の例（ユーザーの指示）：マツ六の手すり BD-134（何本かは見積ごとに違うので空けておく）・金具 BD-08G・
+ * 施工費（笹岡工務店の木 2箇所＝2,000円。見積では1.5倍の 3,000円）。部材リストに同じ品番があれば、その部材（単価・定価）にする
+ */
+export function exampleKit(materials: Material[], labor: LaborItem[]): Kit {
+  const find = (code: string) => materials.find((m) => codeKey(m.code) === codeKey(code));
+  const bar = find('BD-134');
+  const bracket = find('BD-08G');
+  const wood = labor.find((l) => l.name === '木');
+  const rows = [
+    bar ? materialRow(bar, 0) : manualRow('material', {name: '手すり（丸棒 4000mm）', code: 'BD-134', maker: 'マツ六', unit: '本', qty: 0, pieceLengthM: 4}),
+    bracket ? materialRow(bracket, 0) : manualRow('material', {name: '金具', code: 'BD-08G', maker: 'マツ六', unit: '個', qty: 0}),
+    wood ? laborRow(wood, 2) : manualRow('labor', {name: '取付手間', price: 2000, qty: 1}),
+  ];
+  return {...kitFromRows('（例）手すり BD-134＋金具 BD-08G＋施工費', rows), id: EXAMPLE_KIT_ID};
 }
 
 export function hasSamples(data: AppData): boolean {

@@ -6,6 +6,7 @@
 // 2行目に mm で計算を書く（例：600mm÷4000mm＝0.15）。
 
 import {cutToLength, estimatePlaceLines, estimateQty, isBlankRow, listPriceOf} from './calc.ts';
+import type {EstimateRates} from './calc.ts';
 import {normalize} from './priceImport.ts';
 import type {EstimateForm, Insurer, Job, Place, Row, Settings} from './types.ts';
 import {num, yen} from './util.ts';
@@ -85,11 +86,11 @@ export function placeWork(place: Pick<Place, 'kind'>, form: EstimateForm): strin
 }
 
 /** 見積書に出る箇所（行のあるもの）ごとの写真番号。入れていなければ見積書に出る順番 */
-export function photoNumbers(job: Pick<Job, 'places'>, rate: number): Map<string, number> {
+export function photoNumbers(job: Pick<Job, 'places'>, rates: EstimateRates): Map<string, number> {
   const out = new Map<string, number>();
   let n = 0;
   for (const p of job.places) {
-    if (shownLines(p, rate).length === 0) continue;
+    if (shownLines(p, rates).length === 0) continue;
     n++;
     out.set(p.id, p.photo > 0 ? p.photo : n);
   }
@@ -97,7 +98,7 @@ export function photoNumbers(job: Pick<Job, 'places'>, rate: number): Map<string
 }
 
 // 金額のない施工費の行は出さない
-const shownLines = (place: Pick<Place, 'rows'>, rate: number) => estimatePlaceLines(place, rate).filter((l) => l.kind === 'material' || l.amount !== 0);
+const shownLines = (place: Pick<Place, 'rows'>, rates: EstimateRates) => estimatePlaceLines(place, rates).filter((l) => l.kind === 'material' || l.amount !== 0);
 
 /** 部材の「内容（規格・範囲）」：メーカー 品番 品名（切って使う部材の長さの計算は備考・算出根拠に書く） */
 export function materialText(r: Row): string {
@@ -166,11 +167,11 @@ export type FormLine = {
 };
 
 /** all：金額のない施工費の行も出す（見積書に直接入力するとき。まだ金額を入れていない行も直せるように） */
-export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateRate' | 'estimateHourRate'>, form: EstimateForm, opts: {all?: boolean} = {}): FormLine[] {
-  const photos = photoNumbers(job, s.estimateRate);
+export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateRate' | 'estimateLaborRate' | 'estimateHourRate'>, form: EstimateForm, opts: {all?: boolean} = {}): FormLine[] {
+  const photos = photoNumbers(job, s);
   const out: FormLine[] = [];
   job.places.forEach((place, pi) => {
-    (opts.all ? estimatePlaceLines(place, s.estimateRate) : shownLines(place, s.estimateRate)).forEach((l, i) => {
+    (opts.all ? estimatePlaceLines(place, s) : shownLines(place, s)).forEach((l, i) => {
       const base = {
         place: pi,
         placeId: place.id,

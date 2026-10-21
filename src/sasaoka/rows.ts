@@ -1,7 +1,11 @@
 // 箇所の行を作る・取付手間の箇所数を数える・部材＋施工費（常用）を入れる などの行の操作
 
+import {normalize} from './priceImport.ts';
 import type {Kit, LaborItem, Material, Place, Row, RowKind} from './types.ts';
 import {uid} from './util.ts';
+
+/** 品番を比べるための形（全角・大文字小文字・空白・ハイフンの違いは同じとみる） */
+export const codeKey = (code: string) => normalize(code).toLowerCase().replace(/[\s\-‐－ー―]/g, '');
 
 const BLANK: Omit<Row, 'id' | 'kind'> = {
   refId: null,
@@ -57,8 +61,9 @@ export function removeOneMaterial(rows: Row[], refId: string): Row[] {
   return same.qty > 1 ? rows.map((r) => (r === same ? {...r, qty: r.qty - 1} : r)) : rows.filter((r) => r !== same);
 }
 
+/** 取付手間の行。仕切り（笹岡工務店）と見積の単価を書き写す */
 export function laborRow(item: LaborItem, qty = 1): Row {
-  return {...BLANK, id: uid('r'), kind: 'labor', refId: item.id, name: item.name, price: item.price, qty};
+  return {...BLANK, id: uid('r'), kind: 'labor', refId: item.id, name: item.name, price: item.price, estPrice: item.estPrice ?? null, qty};
 }
 
 /** 手入力の行。品名は空でもよい（金額だけ入れる行） */
@@ -128,12 +133,16 @@ export function kitRows(kit: Kit, materials: Material[], labor: LaborItem[]): Ro
   const mats = new Map(materials.map((m) => [m.id, m]));
   const labs = new Map(labor.map((l) => [l.id, l]));
   return copyRows(kit.rows).map((r) => {
-    if (!r.refId) return r;
+    if (!r.refId) {
+      // 品番だけ入れた行（例のセットなど）：部材リストに同じ品番があれば、その部材にする（あとから価格表を取り込んでも使える）
+      const m = r.kind === 'material' && r.code.trim() ? materials.find((x) => codeKey(x.code) === codeKey(r.code)) : undefined;
+      return m ? {...materialRow(m, r.qty), id: r.id, lengthCm: r.lengthCm, excluded: r.excluded} : r;
+    }
     if (r.kind === 'material') {
       const m = mats.get(r.refId);
       return m ? {...r, price: m.price, listPrice: m.listPrice, pieceLengthM: m.pieceLengthM || r.pieceLengthM} : r;
     }
     const l = labs.get(r.refId);
-    return l ? {...r, price: l.price} : r;
+    return l ? {...r, price: l.price, estPrice: l.estPrice ?? null} : r;
   });
 }

@@ -94,7 +94,7 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
             </Btn>
           )}
           {data.materials.length > 0 && (
-            <Btn color="rose" onClick={removeAll}>
+            <Btn color="white" onClick={removeAll}>
               🗑 部材リストを空にする
             </Btn>
           )}
@@ -181,7 +181,7 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
           <Btn small color="white" disabled={list.length === 0} onClick={() => setMany(new Set(list.map((m) => m.id)), {favorite: false})}>
             表示中の★を外す
           </Btn>
-          <Btn small color="rose" disabled={list.length === 0} onClick={removeShown}>
+          <Btn small color="white" disabled={list.length === 0} onClick={removeShown}>
             表示中を削除
           </Btn>
         </div>

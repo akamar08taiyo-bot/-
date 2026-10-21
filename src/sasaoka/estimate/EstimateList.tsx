@@ -4,9 +4,11 @@ import {copyJob} from '../components/JobTools.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm} from '../estimateForms.ts';
 import {estimateXlsx, XLSX_TYPE} from '../estimateXlsx.ts';
-import {readDocDate} from '../print/docMeta.ts';
+import {estimateDateOf} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
+import {manualRow, newPlace} from '../rows.ts';
 import {addSamples, hasSamples} from '../samples.ts';
+import {readShinsei} from '../shinsei.ts';
 import type {AppData, Insurer, Job, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {addMonths, downloadBlob, matchesAll, monthLabel, staffShort, thisMonth, todayIso, uid, yen} from '../util.ts';
@@ -26,6 +28,7 @@ export function newEstimate(insurer: Insurer): Job {
     suffix: '様邸',
     staff: '',
     date: '',
+    estDate: todayIso(), // 見積もり作成日（何も入れなければ当日）
     address: '',
     note: '',
     insuredNo: '',
@@ -51,41 +54,32 @@ export function removeEstimate(job: Job, label: string, update: Update, toast: (
 
 /** 見積書を複製する（お客様名に「（コピー）」。今月分の笹岡工務店の請求書に入れる）。複製したものを返す */
 export function duplicateEstimate(job: Job, update: Update, toast: (text: string) => void): Job {
-  const c = {...copyJob(job), shikiri: true, month: thisMonth()};
+  const c = {...copyJob(job), estDate: todayIso(), shikiri: true, month: thisMonth()};
   update('jobs', (list) => [...list, c]);
   toast('複製しました。お客様名などを書き換えてください。');
   return c;
 }
 
 /**
- * 見積書を Excel ファイル（.xlsx）で保存する（ダウンロード）。印刷する見積書と同じ書式・同じ数字。
- * 作成日は見積書の右上の日付（入れていなければ今日。印刷と同じ）
+ * 見積書を Excel ファイル（.xlsx）で保存する（ダウンロード）。印刷する見積書と同じ書式・同じ数字。作成日は見積もり作成日（印刷と同じ）
  */
 export function saveEstimateExcel(job: Job, s: Settings, toast: (text: string) => void) {
-  const {bytes, fileName} = estimateXlsx(job, s, readDocDate(`est:${job.id}`) || todayIso());
+  const {bytes, fileName} = estimateXlsx(job, s, estimateDateOf(job));
   downloadBlob(new Blob([bytes], {type: XLSX_TYPE}), fileName);
   toast(`Excel ファイル「${fileName}」を保存しました（ダウンロードのフォルダに入ります）`);
 }
 
-const pad = (n: number) => String(n).padStart(2, '0');
-const isoOf = (ms: number) => {
-  const d = new Date(ms);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
 const dateText = (iso: string) => {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   return m ? `${Number(m[1])}/${Number(m[2])}/${Number(m[3])}` : '';
 };
-
-/** 見積書の作成日（見積書の右上の日付。入れていなければ作った日） */
-const estimateDate = (job: Job) => readDocDate(`est:${job.id}`) || isoOf(job.createdAt);
 
 function useEstimates(data: AppData, s: Settings) {
   // 作成日の新しい順
   return useMemo(
     () =>
       data.jobs
-        .map((job) => ({job, date: estimateDate(job), form: jobForm(job, s), insurer: insurerLabel(job, s), t: estimateTotals(job, s)}))
+        .map((job) => ({job, date: estimateDateOf(job), form: jobForm(job, s), insurer: insurerLabel(job, s), t: estimateTotals(job, s)}))
         .sort((a, b) => b.date.localeCompare(a.date) || b.job.createdAt - a.job.createdAt),
     [data.jobs, s],
   );
@@ -96,18 +90,33 @@ export function EstimateHome({
   data,
   update,
   onNew,
+  onCreate,
   onList,
   goMaterials,
 }: {
   data: AppData;
   update: Update;
   onNew: (insurer: Insurer) => void;
+  onCreate: (job: Job) => void; // 作った見積書を入れて開く
   onList: () => void;
   goMaterials: () => void;
 }) {
+  const toast = useToast();
   const all = useEstimates(data, data.settings);
   const month = thisMonth();
   const inMonth = all.filter((e) => e.date.startsWith(month)).length;
+  // 申請書（Excel）から作る：申請書に書いた 氏名・住所・被保険者番号・改修の箇所（①浴室　手すりの取付）で見積書を作る。
+  // 箇所ごとに空白の行を1つ入れておく（見積書に箇所が出て、そこに部材・施工費を入れていける）
+  const fromShinsei = async (file: File) => {
+    const r = readShinsei(new Uint8Array(await file.arrayBuffer()));
+    if (!r) {
+      toast('苅田町・行橋市・みやこ町・広域連合の申請書（Excel）を選んでください', 'error');
+      return;
+    }
+    const places = r.places.map((w) => ({...newPlace(w.name, [manualRow('material')]), photo: w.photo, kind: w.kind}));
+    onCreate({...newEstimate(r.insurer), customer: r.name, address: r.address, insuredNo: r.insuredNo, places});
+    toast(`申請書から見積書を作りました（${INSURER_INFO[r.insurer].name}・${places.length}箇所）`);
+  };
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
@@ -129,6 +138,20 @@ export function EstimateHome({
                 ＋ {INSURER_INFO.kouiki.name}
               </Btn>
             </div>
+            <label className="inline-flex cursor-pointer items-center justify-center gap-1.5 justify-self-start rounded-md border border-emerald-300 bg-white px-3 py-2 text-sm font-bold text-emerald-800 shadow-sm hover:bg-emerald-50">
+              📥 申請書（Excel）から作る
+              <input
+                type="file"
+                accept=".xlsx,.xltx,.xlsm"
+                className="hidden"
+                aria-label="申請書（Excel）から作る"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (f) void fromShinsei(f);
+                }}
+              />
+            </label>
           </div>
         </section>
         <section className="rounded-xl border-2 border-slate-300 bg-white p-5 shadow-sm" aria-label="一覧から作成">
@@ -305,16 +328,16 @@ export function EstimateList({
                       )}
                     </td>
                     <td className="whitespace-nowrap px-2 py-1.5 text-right" onClick={(e) => e.stopPropagation()}>
-                      <Btn small color="white" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
+                      <Btn small color="softSky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
                         🖨 印刷
                       </Btn>
-                      <Btn small color="white" className="ml-1.5" onClick={() => saveEstimateExcel(job, s, toast)}>
+                      <Btn small color="softGreen" className="ml-1.5" onClick={() => saveEstimateExcel(job, s, toast)}>
                         📗 Excel
                       </Btn>
                       <Btn small color="white" className="ml-1.5" onClick={() => onOpen(duplicateEstimate(job, update, toast).id)}>
                         複製
                       </Btn>
-                      <Btn small color="rose" className="ml-1.5" onClick={() => removeEstimate(job, label, update, toast)}>
+                      <Btn small color="white" className="ml-1.5" onClick={() => removeEstimate(job, label, update, toast)}>
                         削除
                       </Btn>
                     </td>

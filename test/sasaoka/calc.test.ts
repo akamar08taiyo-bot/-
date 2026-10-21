@@ -28,13 +28,16 @@ const S = {
   invoiceTaxMode: 'perJob',
   totalTaxRounding: 'floor',
   estimateRate: 0.8,
+  estimateLaborRate: 1.5,
   estimateOverheadRate: 0.1,
   estimateHourRate: 2500,
   estimateForm: 'yukuhashi',
 } as const satisfies Pick<
   Settings,
-  'rate' | 'taxRate' | 'taxMode' | 'invoiceTaxMode' | 'totalTaxRounding' | 'estimateRate' | 'estimateOverheadRate' | 'estimateHourRate' | 'estimateForm'
+  'rate' | 'taxRate' | 'taxMode' | 'invoiceTaxMode' | 'totalTaxRounding' | 'estimateRate' | 'estimateLaborRate' | 'estimateOverheadRate' | 'estimateHourRate' | 'estimateForm'
 >;
+/** 施工費を笹岡工務店の手間のまま（×1）で見る設定（施工費が主題でないテスト・元の見積書の記入例） */
+const S1 = {...S, estimateLaborRate: 1};
 
 let seq = 0;
 const blank = {code: '', maker: '', unit: '', listPrice: 0, lengthCm: 0, pieceLengthM: 0, estPrice: null, excluded: false, estText: null, estNote: null, estAmount: null};
@@ -90,9 +93,8 @@ test('仕切り計算表：切って使う部材は見積書と同じ本数（4m
   assert.deepEqual(placeTotals({rows: [rail, lab(1000, 2)]}), {material: 1500, labor: 2000, total: 3500});
 });
 
-test('仕切価格・定価のどちらかが空欄：仕切価格は 定価×0.8、定価は 仕切価格×1.25（ご指示）', () => {
-  assert.equal(shikiriPrice(mat(0, 1, 'TOTO インテリア・バー', {listPrice: 18700})), 14960); // 定価×0.8
-  assert.equal(shikiriPrice(mat(0, 1, '部材', {listPrice: 1231})), 984); // 984.8 → 切り捨て（見積の単価と同じ）
+test('仕切価格・定価のどちらかが空欄：仕切価格は定価から計算しない（「仕切り価格は0.8ではありません」）。定価は 仕切価格×1.25（ご指示）', () => {
+  assert.equal(shikiriPrice(mat(0, 1, 'TOTO インテリア・バー', {listPrice: 18700})), 0); // 空欄のまま（請求書の画面で知らせる）
   assert.equal(shikiriPrice(mat(5600, 1, '部材', {listPrice: 8000})), 5600); // 仕切価格があればそれ
   assert.equal(shikiriPrice(mat(-500, 1, '値引き')), -500); // 値引きの行はそのまま
   assert.equal(shikiriPrice(lab(1000, 2)), 1000);
@@ -100,10 +102,10 @@ test('仕切価格・定価のどちらかが空欄：仕切価格は 定価×0.
   assert.equal(listPriceOf(mat(1001, 1)), 1252); // 1,251.25 → 切り上げ（×0.8＝1,001.6 → 見積の単価 1,001）
   assert.equal(listPriceOf(mat(1470, 1, '部材', {listPrice: 2100})), 2100); // 定価があればそれ
   assert.equal(listPriceOf(mat(0, 1)), 0);
-  assert.equal(estimateUnitPrice(mat(1001, 1), 0.8), 1001);
-  // 仕切り計算表：仕切価格が空欄の部材は 定価×0.8。どちらもない行は0円
-  assert.equal(rowAmount(mat(0, 2, 'TOTO インテリア・バー', {listPrice: 18700})), 29920);
-  assert.equal(jobTotals(job([[mat(0, 1, 'TOTO', {listPrice: 18700}), mat(0, 1, '金具')]]), S).material, 14960);
+  assert.equal(estimateUnitPrice(mat(1001, 1), S), 1001);
+  // 仕切り計算表：仕切価格が空欄の部材は0円（定価があっても）
+  assert.equal(rowAmount(mat(0, 2, 'TOTO インテリア・バー', {listPrice: 18700})), 0);
+  assert.equal(jobTotals(job([[mat(0, 1, 'TOTO', {listPrice: 18700}), mat(3000, 1, '金具')]]), S).material, 3000);
 });
 
 test('jobTotals は元の仕切り計算表と同じ（Excelの記入例と同じ数字）', () => {
@@ -159,34 +161,44 @@ test('monthSummary：すべての様邸の税抜合計に、最後に消費税�
 
 test('見積：単価は定価×0.8、切って使う部材の数量は 使う長さ÷1本の長さ（定価2万円・1本4mを60cm → 0.15本・2,400円）', () => {
   const rail = mat(10000, 1, '木製手すり 35φ 4m', {listPrice: 20000, lengthCm: 60, pieceLengthM: 4});
-  assert.equal(estimateUnitPrice(rail, 0.8), 16000); // 20,000×0.8（長さで単価は変えない）
+  assert.equal(estimateUnitPrice(rail, S), 16000); // 20,000×0.8（長さで単価は変えない）
   assert.equal(estimateQty(rail), 0.15); // 0.6m÷4m
-  assert.equal(estimateAmount(rail, 0.8), 2400); // 16,000×0.15
+  assert.equal(estimateAmount(rail, S), 2400); // 16,000×0.15
   // 規格品をそのまま（長さを入れない）なら1本
   assert.equal(estimateQty({...rail, lengthCm: 0}), 1);
-  assert.equal(estimateAmount({...rail, lengthCm: 0}, 0.8), 16000);
+  assert.equal(estimateAmount({...rail, lengthCm: 0}, S), 16000);
   // 同じ長さを2本：0.3本
-  assert.equal(estimateAmount({...rail, qty: 2}, 0.8), 4800);
+  assert.equal(estimateAmount({...rail, qty: 2}, S), 4800);
   // 90cm÷4m＝0.225本 → 3,600円。1m÷3m は 0.333…本 → 金額は割り切れない数量のまま計算して 4,000円
-  assert.equal(estimateAmount({...rail, lengthCm: 90}, 0.8), 3600);
-  assert.equal(estimateAmount(mat(0, 1, '手すり 3m', {listPrice: 15000, lengthCm: 100, pieceLengthM: 3}), 0.8), 4000);
+  assert.equal(estimateAmount({...rail, lengthCm: 90}, S), 3600);
+  assert.equal(estimateAmount(mat(0, 1, '手すり 3m', {listPrice: 15000, lengthCm: 100, pieceLengthM: 3}), S), 4000);
   // 1本の長さが分からないときは長さで数えない（画面で「1本の長さを入れてください」と出す）
   assert.equal(cutToLength({...rail, pieceLengthM: 0}), false);
   assert.equal(estimateQty({...rail, pieceLengthM: 0}), 1);
-  assert.equal(estimateUnitPrice(mat(0, 1, 'ブラケット', {listPrice: 333}), 0.8), 266); // 266.4
-  assert.equal(estimateUnitPrice(mat(0, 1, 'ブラケット', {listPrice: 1231}), 0.8), 984); // 984.8 → 切り捨て（元の見積書と同じ）
-  assert.equal(estimateAmount(mat(0, 3, 'キャップ', {estPrice: 333.5}), 0.8), 1000); // 1,000.5 → 切り捨て
+  assert.equal(estimateUnitPrice(mat(0, 1, 'ブラケット', {listPrice: 333}), S), 266); // 266.4
+  assert.equal(estimateUnitPrice(mat(0, 1, 'ブラケット', {listPrice: 1231}), S), 984); // 984.8 → 切り捨て（元の見積書と同じ）
+  assert.equal(estimateAmount(mat(0, 3, 'キャップ', {estPrice: 333.5}), S), 1000); // 1,000.5 → 切り捨て
   // 手で入れた見積の単価がそのまま使われる（金額だけの行も）
-  assert.equal(estimateUnitPrice({...rail, estPrice: 12000}, 0.8), 12000);
-  assert.equal(estimateAmount(mat(0, 3, '', {estPrice: 500}), 0.8), 1500);
+  assert.equal(estimateUnitPrice({...rail, estPrice: 12000}, S), 12000);
+  assert.equal(estimateAmount(mat(0, 3, '', {estPrice: 500}), S), 1500);
   // 定価のない部材は 仕切価格×1.25 を定価に（×0.8 で仕切価格と同じ金額）。どちらもなければ0円
-  assert.equal(estimateUnitPrice(mat(3360, 1), 0.8), 3360);
-  assert.equal(estimateUnitPrice(mat(0, 1), 0.8), 0);
-  // 手間は取付手間の単価のまま
-  assert.equal(estimateUnitPrice(lab(1000, 2), 0.8), 1000);
+  assert.equal(estimateUnitPrice(mat(3360, 1), S), 3360);
+  assert.equal(estimateUnitPrice(mat(0, 1), S), 0);
+  // 手間は笹岡工務店の取付手間の単価×1.5（施工費の率）
+  assert.equal(estimateUnitPrice(lab(1000, 2), S), 1500);
 });
 
-test('見積：部材のすぐ下に続く手間の行を「同上施工費」1行にまとめる（手すり1本・木2箇所＝2,000円）', () => {
+test('見積の施工費は取付手間のマスタの見積の単価×箇所数。見積の単価がなければ 仕切り×1.5（2,000円 → 3,000円）。仕切り計算表は仕切りのまま', () => {
+  assert.equal(estimateAmount({...lab(1000, 2), estPrice: 1800}, S), 3600);
+  assert.equal(estimateUnitPrice({...lab(1000, 2), estPrice: 1800}, S), 1800);
+  assert.equal(estimateAmount(lab(1000, 2), S), 3000);
+  assert.equal(estimateAmount(lab(1500, 1), S), 2250);
+  assert.equal(estimateAmount(lab(1000, 2), {...S, estimateLaborRate: 1.2}), 2400);
+  assert.equal(estimateAmount(lab(1333, 1), S), 1999); // 1,999.5 → 切り捨て
+  assert.equal(jobTotals(job([[{...lab(1000, 2), estPrice: 1800}]]), S).labor, 2000);
+});
+
+test('見積：部材のすぐ下に続く手間の行を「同上施工費」1行にまとめる（手すり1本・木2箇所＝笹岡工務店 2,000円 → 見積 3,000円）', () => {
   const place = {
     rows: [
       mat(10000, 1, '木製手すり', {listPrice: 20000, lengthCm: 60, pieceLengthM: 4}),
@@ -196,20 +208,20 @@ test('見積：部材のすぐ下に続く手間の行を「同上施工費」1�
       lab(1500, 1, '補強板'),
     ],
   };
-  const lines = estimatePlaceLines(place, 0.8);
+  const lines = estimatePlaceLines(place, S);
   assert.deepEqual(
     lines.map((l) =>
       l.kind === 'material' ? ['部材', l.row.name, l.qty, l.unitPrice, l.amount] : ['施工費', l.rows.length, l.amount, l.afterMaterial],
     ),
     [
       ['部材', '木製手すり', 0.15, 16000, 2400],
-      ['施工費', 1, 2000, true],
+      ['施工費', 1, 3000, true],
       ['部材', 'ブラケット', 2, 1680, 3360],
-      ['施工費', 2, 3000, true],
+      ['施工費', 2, 4500, true], // タイル 1,500＋補強板 1,500＝3,000 → ×1.5
     ],
   );
   // 箇所の最初が手間なら「施工費」（同上ではない）
-  assert.equal((estimatePlaceLines({rows: [lab(1000, 1)]}, 0.8)[0] as {afterMaterial: boolean}).afterMaterial, false);
+  assert.equal((estimatePlaceLines({rows: [lab(1000, 1)]}, S)[0] as {afterMaterial: boolean}).afterMaterial, false);
 });
 
 test('見積の合計：小計＝部材＋施工費、諸経費＝小計×0.1、消費税＝（小計＋諸経費）×0.1（どれも切り捨て）', () => {
@@ -218,13 +230,13 @@ test('見積の合計：小計＝部材＋施工費、諸経費＝小計×0.1、
     [mat(7800, 1, 'L型手すり', {listPrice: 11000}), lab(1500, 2, 'タイル'), mat(300, 2, 'エンドキャップ', {listPrice: 450})],
   ]);
   const t = estimateTotals(j, S);
-  // 2,400＋3,360＋8,800＋720＝15,280／施工費 2,000＋3,000＝5,000／小計 20,280・諸経費 2,028・消費税 2,230（2,230.8）・合計 24,538
-  const sums = {subtotal: 20280, overhead: 2028, tax: 2230, total: 24538};
-  assert.deepEqual(t, {material: 15280, work: 5000, all: sums, target: sums, excluded: 0});
+  // 2,400＋3,360＋8,800＋720＝15,280／施工費（笹岡工務店 2,000＋3,000）×1.5＝7,500／小計 22,780・諸経費 2,278・消費税 2,505（2,505.8）・合計 27,563
+  const sums = {subtotal: 22780, overhead: 2278, tax: 2505, total: 27563};
+  assert.deepEqual(t, {material: 15280, work: 7500, all: sums, target: sums, excluded: 0});
   // 仕切り計算表は仕切価格で計算する（見積の定価・掛率は使わない）。切って使う手すりは見積と同じ 0.15本（10,000×0.15＝1,500）
   assert.equal(jobTotals(j, S).material, 1500 + 3000 + 7800 + 600);
-  // 元の見積書（苅田町・行橋市・みやこ町用）の記入例：小計 27,440 → 諸経費 2,744・消費税 3,018・合計 33,202
-  const ex = estimateTotals(job([[mat(0, 1, 'TOTO 32インテリアバー', {listPrice: 24300}), lab(8000, 1, '施工費')]]), S);
+  // 元の見積書（苅田町・行橋市・みやこ町用）の記入例（施工費 8,000円はそのまま）：小計 27,440 → 諸経費 2,744・消費税 3,018・合計 33,202
+  const ex = estimateTotals(job([[mat(0, 1, 'TOTO 32インテリアバー', {listPrice: 24300}), lab(8000, 1, '施工費')]]), S1);
   assert.deepEqual(ex.all, {subtotal: 27440, overhead: 2744, tax: 3018, total: 33202});
 });
 
@@ -239,7 +251,7 @@ test('介護保険の対象外：全体には入り、対象の小計からは�
     [lab(3000, 1, 'コア抜き'), {...lab(2000, 1, '撤去'), excluded: true}], // 箇所の最初の施工費：行がすべて対象外のときだけ対象外
     [{...lab(5000, 1, '処分'), excluded: true}],
   ]);
-  const lines = j.places.map((p) => estimatePlaceLines(p, 0.8).map((l) => [l.kind, l.amount, l.excluded]));
+  const lines = j.places.map((p) => estimatePlaceLines(p, S1).map((l) => [l.kind, l.amount, l.excluded]));
   assert.deepEqual(lines, [
     [
       ['material', 8000, false],
@@ -250,7 +262,7 @@ test('介護保険の対象外：全体には入り、対象の小計からは�
     [['work', 5000, false]],
     [['work', 5000, true]],
   ]);
-  const t = estimateTotals(j, S);
+  const t = estimateTotals(j, S1);
   assert.equal(t.all.subtotal, 37500); // 8,000＋2,000＋16,000＋1,500＋5,000＋5,000
   assert.equal(t.excluded, 22500); // 16,000＋1,500＋5,000
   assert.deepEqual(t.target, {subtotal: 15000, overhead: 1500, tax: 1650, total: 18150});
@@ -258,17 +270,17 @@ test('介護保険の対象外：全体には入り、対象の小計からは�
 
 test('見積の諸経費は手で直せる（端数の調整）。対象外の行がなければ介護保険の対象も同じ金額', () => {
   const rows = [[mat(0, 1, 'TOTO 32インテリアバー', {listPrice: 24300}), lab(8000, 1, '施工費')]];
-  // 小計 27,440 → 諸経費を 2,700 にすると 消費税 3,014（(27,440＋2,700)×0.1）・合計 33,154
-  const t = estimateTotals(job(rows, {overhead: 2700}), S);
+  // 小計 27,440 → 諸経費を 2,700 にすると 消費税 3,014（(27,440＋2,700)×0.1）・合計 33,154（施工費 8,000円はそのまま）
+  const t = estimateTotals(job(rows, {overhead: 2700}), S1);
   assert.deepEqual(t.all, {subtotal: 27440, overhead: 2700, tax: 3014, total: 33154});
   assert.deepEqual(t.target, t.all);
   // 手で入れていなければ 小計×0.1
-  assert.equal(estimateTotals(job(rows, {overhead: null}), S).all.overhead, 2744);
+  assert.equal(estimateTotals(job(rows, {overhead: null}), S1).all.overhead, 2744);
   // 対象外の行があるとき、介護保険の対象の諸経費は overheadTarget（なければ 対象の小計×0.1）
   const ex = [[...rows[0], mat(0, 1, '対象外', {listPrice: 10000, excluded: true})]];
-  const t2 = estimateTotals(job(ex, {overhead: 3500}), S);
+  const t2 = estimateTotals(job(ex, {overhead: 3500}), S1);
   assert.deepEqual([t2.all.subtotal, t2.all.overhead, t2.target.subtotal, t2.target.overhead], [35440, 3500, 27440, 2744]);
-  assert.equal(estimateTotals(job(ex, {overhead: 3500, overheadTarget: 2700}), S).target.total, 33154);
+  assert.equal(estimateTotals(job(ex, {overhead: 3500, overheadTarget: 2700}), S1).target.total, 33154);
   // 仕切り計算表の④諸経費は一律の式のまま（見積の諸経費を直しても変わらない）
   assert.equal(jobTotals(job(rows, {overhead: 2700}), S).overhead, jobTotals(job(rows), S).overhead);
 });
@@ -276,15 +288,15 @@ test('見積の諸経費は手で直せる（端数の調整）。対象外の�
 test('見積書で施工費の金額を直す（最初の手間の行の estAmount）：見積の合計に入り、仕切り計算表は変わらない', () => {
   const wood = {...lab(1000, 2), estAmount: 3000};
   const rows = [mat(10000, 1, '手すり', {listPrice: 20000}), wood, lab(500, 1, 'タイル')];
-  const [, work] = estimatePlaceLines({rows}, 0.8);
-  // 取付手間の合計は 2,000＋500＝2,500。見積書の金額は 3,000
-  assert.deepEqual(work.kind === 'work' && [work.sum, work.amount, work.rows.length], [2500, 3000, 2]);
+  const [, work] = estimatePlaceLines({rows}, S);
+  // 取付手間の合計は 2,000＋500＝2,500（×1.5 で 3,750）。見積書で直した金額は 3,000
+  assert.deepEqual(work.kind === 'work' && [work.sum, work.amount, work.rows.length], [3750, 3000, 2]);
   const t = estimateTotals(job([rows]), S);
   assert.deepEqual([t.material, t.work, t.all.subtotal], [16000, 3000, 19000]);
   // 仕切り計算表の②取付手間合計は 2,500 のまま
   assert.equal(jobTotals(job([rows]), S).labor, 2500);
-  // 直していなければ取付手間の合計
-  assert.equal(estimateTotals(job([[rows[0], {...wood, estAmount: null}, rows[2]]]), S).work, 2500);
+  // 直していなければ取付手間の合計×1.5
+  assert.equal(estimateTotals(job([[rows[0], {...wood, estAmount: null}, rows[2]]]), S).work, 3750);
 });
 
 test('rounddown は0の方へ切り捨て（浮動小数の誤差は除く）', () => {

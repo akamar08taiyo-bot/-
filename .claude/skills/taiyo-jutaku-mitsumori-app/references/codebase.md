@@ -27,7 +27,9 @@ React 19 ＋ TypeScript ＋ Vite（Tailwind）。リポジトリにはほかの�
 | `sheetEdit.ts` | 見積書の欄の値の読み書き（`applySheet`・`sheetValue`）、行の挿入・削除・コピー・貼り付け（`insertBlankAfter`・`deleteLine`・`lineRows`・`pasteLines`） |
 | `rows.ts` | 行・箇所を作る部品（`newPlace`・`materialRow`・`laborRow`・`manualRow`・`copyRows`（IDを付け直す）・`addMaterial`・`workRange`・`kitRows`）。行の操作はこれを使う |
 | `sheetClip.ts` | 行のコピーを覚えておく所（画面を移っても残る。別の見積書にも貼り付けられる） |
-| `estimate/EstimateEditor.tsx` | 見積書の画面（💾 保存・📗 Excel・🖨 印刷・🛒 発注書を作成・保険者・担当・笹岡工務店の請求書に入れる） |
+| `estimate/EstimateEditor.tsx` | 見積書の画面（💾 保存・📗 Excel・📝 申請書を作成・🖨 印刷・📄 白紙に戻す・🛒 発注書を作成・保険者・担当・見積もり作成日・笹岡工務店の請求書に入れる） |
+| `shinsei.ts` | 申請書：保険者ごとの転記する欄（`SHINSEI`。シートごとに 氏名・住所・番号の10マス・改修の内容・改修の種類の行・写真の改修箇所・平面図の表題）、転記する内容（`shinseiValues`）、原本のセルを書きかえる（`setCell`・`fillShinsei`。式の答えも `updateRefs`）、読む（`readShinsei`・`parseWorkLine`） |
+| `estimate/shinseiFiles.ts`・`shinsei/*.xltx` | 申請書の原本（名残りを消したもの。`?inline` でビルドに入る＝`assetsInclude` に xltx）と保存（ダウンロード）。原本を作り直す手順は `business-rules.md` の11 |
 | `estimate/EstimateList.tsx` | 見積もりの最初の画面（新規作成＝保険者を選ぶ／一覧から作成）、月ごとの一覧、`newEstimate(insurer)`、Excel 保存・複製・削除 |
 | `estimate/OrderPage.tsx` | 発注書の画面（数の直し・消す・戻す・足す・印刷・販売受注簿に転記） |
 | `order.ts` | 発注する数の計算（切って使う部材の本数・2000mm の品・余り0.1本）、手で直したところの重ね方、販売受注簿へ渡す JSON |
@@ -37,15 +39,16 @@ React 19 ＋ TypeScript ＋ Vite（Tailwind）。リポジトリにはほかの�
 | `storage.ts` | IndexedDB（`taiyo-sasaoka-shikiri`）への保存と、読み込むときの直し方（`cleanJobs` など。前の版のデータもここで今の形にする） |
 | `sync.ts`・`useStore.ts` | 2つの画面（タブ）で同じデータを直したときのまとめ方、自動保存（0.4秒後）、`flush` |
 | `update.ts`・`vite.version.ts` | `version.json` を見て「このアプリの新しい版が出ています ⟳ 読み込み直す」を出す |
-| `samples.ts` | 「サンプルで試す」（サンプルの部材5件・（サンプル）山田様邸・部材＋施工費（常用）1件） |
+| `samples.ts` | 「サンプルで試す」（サンプルの部材5件・（サンプル）山田様邸・部材＋施工費（常用）1件）、最初に入れる例のセット（`exampleKit`：BD-134＋BD-08G＋施工費） |
 
 ## 2. データの形（`types.ts`）
 
-- `Job`（様邸）：customer・suffix（様邸／様）・staff（担当フルネーム）・date（施工日）・address・insuredNo・**insurer**（保険者）・form（保険者を選ぶ前の書式）・
+- `Job`（様邸）：customer・suffix（様邸／様）・staff（担当フルネーム）・date（施工日。請求書のタブで使う）・**estDate?**（見積もり作成日。空なら前に覚えた作成日か作った日＝`print/docMeta.ts` の `estimateDateOf`）・address・insuredNo・**insurer**（保険者）・form（保険者を選ぶ前の書式）・
   overhead／overheadTarget（諸経費を手で直したとき）・**shikiri**（笹岡工務店の請求書に入れる）・month（請求する月）・**places**・**order?**（発注書で直したところ）。
 - `Place`（箇所）：name・kind（改修の種類1〜6）・photo（写真番号、0なら順番）・rows。
 - `Row`（行）：kind（material／labor）・refId（部材リスト・手間のID）・name・code・maker・unit・price（仕切価格）・qty・listPrice・lengthCm（使う長さ）・pieceLengthM（1本の長さ）・
-  estPrice（見積の単価を手で）・excluded（対象外）・estText／estNote／estAmount（見積書だけの手直し）。部材リストの値は選んだときに書き写す（あとでマスタを変えても過去の金額は変わらない）。
+  estPrice（部材は見積の単価を手で。施工費はマスタの見積の単価を写したもの。null なら 定価×0.8／仕切り×1.5）・excluded（対象外）・estText／estNote／estAmount（見積書だけの手直し）。部材リストの値は選んだときに書き写す（あとでマスタを変えても過去の金額は変わらない）。
+- `LaborItem`（取付手間）：name・price（仕切り）・estPrice（見積。null なら 仕切り×`estimateLaborRate`）・note。`Settings` の `kitExample`・`laborEst` は「一度だけ入れた」の印（例のセット・前の版の施工費の見積の単価）。
 - 見積書の行と入力の行の関係：部材の行1つが見積書の1行。そのすぐ下に続く手間の行（1つでも何行でも）は、見積書では「同上施工費」の**別の1行**にまとまる
   （箇所の最初の手間は「施工費」の1行）。見積書の明細の `tr` の `data-rows` に、その1行のもとになった入力の行のIDが入る。
 - `sheetEdit.ts` の `unitRange` は、行の「✕」「コピー」が相手にする範囲：部材の行から押せば、部材＋すぐ下の手間の行（同上施工費）。同上施工費（手間）の行から押せば、その手間のまとまりだけ。

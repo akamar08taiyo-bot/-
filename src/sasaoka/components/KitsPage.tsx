@@ -96,7 +96,7 @@ export function KitsPage({data, update}: {data: AppData; update: Update}) {
           place={asPlace(pickKit)}
           materials={data.materials}
           mode="estimate"
-          rate={s.estimateRate}
+          rates={s}
           onAdd={(row) => setRows(pickKit.id, (rows) => addMaterial(rows, row))}
           onRemoveOne={(refId) => setRows(pickKit.id, (rows) => removeOneMaterial(rows, refId))}
           onToggleFavorite={toggleFavorite}
@@ -132,10 +132,10 @@ function KitCard({
   onDuplicate: () => void;
   onRemove: () => void;
 }) {
-  const rate = data.settings.estimateRate;
+  const rates = data.settings;
   // 今の単価（部材リスト・施工費の単価が変わっていれば、入れるときはそちら）。kit.rows と同じ並び
   const current = kitRows(kit, data.materials, data.labor);
-  const estimate = estimatePlaceLines({rows: current}, rate).reduce((n, l) => n + l.amount, 0);
+  const estimate = estimatePlaceLines({rows: current}, rates).reduce((n, l) => n + l.amount, 0);
   const shikiri = placeTotals({rows: current}).total;
   const name = kit.name.trim() || '名前なし';
   const setRow = (id: string, patch: Partial<Row>) => onRows((rows) => rows.map((r) => (r.id === id ? {...r, ...patch} : r)));
@@ -199,14 +199,17 @@ function KitCard({
                       {(r.maker || r.code) && <div className="text-[11px] text-slate-500">{[r.maker, r.code].filter(Boolean).join('　')}</div>}
                     </td>
                     <td data-cell="price" data-label="単価" className="px-2 py-1.5 text-right tabular-nums">
-                      {yen(estimateUnitPrice(cur, rate))}
-                      {r.kind === 'material' && <div className="text-[11px] text-slate-500">仕切 {yen(shikiriPrice(cur))}</div>}
+                      {yen(estimateUnitPrice(cur, rates))}
+                      {r.kind === 'material' && (
+                        <div className={`text-[11px] ${shikiriPrice(cur) > 0 ? 'text-slate-500' : 'font-bold text-amber-700'}`}>仕切 {shikiriPrice(cur) > 0 ? yen(shikiriPrice(cur)) : '空欄'}</div>
+                      )}
                     </td>
                     <td data-cell="qty" data-label="数量・箇所" className="px-2 py-1.5 text-center">
-                      <Stepper value={r.qty} onChange={(qty) => setRow(r.id, {qty})} ariaLabel={`${label}の数量`} />
+                      {/* 部材の数を空けておけるように（例：手すりの本数は見積ごとに入れる）、0 は空にして出す */}
+                      <Stepper value={r.qty} onChange={(qty) => setRow(r.id, {qty})} ariaLabel={`${label}の数量`} blankZero={r.kind === 'material'} />
                     </td>
                     <td data-cell="amount" data-label="金額（見積）" className="px-2 py-1.5 text-right font-bold tabular-nums">
-                      {yen(estimateAmount(cur, rate))}
+                      {yen(estimateAmount(cur, rates))}
                       {r.kind === 'material' && <div className="text-[11px] font-normal text-slate-500">仕切 {yen(rowAmount(cur))}</div>}
                     </td>
                     <td data-cell="ops" className="whitespace-nowrap px-1 py-1.5 text-right">

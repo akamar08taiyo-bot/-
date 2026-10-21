@@ -15,7 +15,8 @@ const mat = (name: string, listPrice: number, extra: Partial<Row> = {}): Row => 
 const lab = (price: number, qty = 1): Row => ({...blank, id: `r${++seq}`, kind: 'labor', name: '木', price, qty});
 const place = (name: string, rows: Row[], extra: Partial<Place> = {}): Place => ({id: `p${++seq}`, name, rows, kind: 1, photo: 0, ...extra});
 
-const S = {...defaultSettings(), staffList: ['久保 匠史']};
+// 施工費は笹岡工務店の手間のまま（×1）で見る（Excel の形・式を確かめるテスト。×1.5 は calc.test.ts・sheetEdit.test.ts）
+const S = {...defaultSettings(), staffList: ['久保 匠史'], estimateLaborRate: 1};
 
 function job(extra: Partial<Job> = {}): Job {
   return {

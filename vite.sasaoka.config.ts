@@ -31,7 +31,7 @@ export default defineConfig({
   // 公開する版の印（新しい版が出たら知らせる。vite.version.ts）
   define: {__APP_BUILD__: JSON.stringify(APP_BUILD)},
   // PDFの日本語の文字を読むための対応表（pdf.js の CMap）をファイルとして同梱する
-  assetsInclude: ['**/*.bcmap'],
+  assetsInclude: ['**/*.bcmap', '**/*.xltx'], // xltx：申請書の原本（?inline で中に入れる）
   build: {
     outDir: 'dist-sasaoka',
     emptyOutDir: true,

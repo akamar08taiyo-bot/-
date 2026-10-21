@@ -38,7 +38,7 @@ const PLATE4 = mat('mp4', 'ベースプレート 80mm幅 4000mm', 'BP-80-4000', 
 const PLATE2 = mat('mp2', 'ベースプレート 80mm幅 2000mm', 'BP-80-2000', 2, '枚', 2100, 4200);
 const BRACKET: Material = {id: 'mb', name: 'ブラケット', price: 500, listPrice: 1000, pieceLengthM: 0, maker: 'マツ六', code: 'BR-1', unit: '個', favorite: false, updatedAt: 1};
 
-const RATE = 0.8; // 見積の掛率（写真番号を見積書と同じに数えるのに使う）
+const RATE = {estimateRate: 0.8, estimateLaborRate: 1.5}; // 見積の率（写真番号を見積書と同じに数えるのに使う）
 
 /** 切って使う行（使う長さ cm × 本数） */
 const cut = (m: Material, cm: number, qty = 1): Row => ({...materialRow(m, qty), lengthCm: cm});
@@ -95,7 +95,7 @@ test('2000mmの品を部材リストから探す（長さだけ違う同じ品�
 
 test('見積書の部材を、箇所をまたいで足して発注する数にする（手すりは本・ベースプレートは枚）', () => {
   const j = job(
-    ['玄関', [cut(BD134, 60, 2), laborRow({id: 'l1', name: '木', price: 1000, note: ''}, 2), materialRow(BRACKET, 3)]],
+    ['玄関', [cut(BD134, 60, 2), laborRow({id: 'l1', name: '木', price: 1000, estPrice: null, note: ''}, 2), materialRow(BRACKET, 3)]],
     ['トイレ', [cut(BD134, 160), materialRow(BRACKET, 2), cut(PLATE4, 380)]],
   );
   const lines = orderBaseLines(j, [BD134, BD132, PLATE4, PLATE2, BRACKET], RATE);
@@ -147,7 +147,7 @@ test('施工費・何も入っていない行・金額だけの行は発注し�
   const blank: Row = {...materialRow(BRACKET), refId: null, name: '', code: '', maker: '', unit: '', price: 0, listPrice: 0};
   const valueOnly: Row = {...blank, price: -3000};
   const bar = materialRow({...BD134, id: 'mx', name: '既製の手すり 600mm', code: 'K-600', pieceLengthM: 0.6}, 2); // 切らずに使う
-  const j = job(['浴室', [blank, valueOnly, laborRow({id: 'l1', name: '木', price: 1000, note: ''}), bar]]);
+  const j = job(['浴室', [blank, valueOnly, laborRow({id: 'l1', name: '木', price: 1000, estPrice: null, note: ''}), bar]]);
   assert.deepEqual(brief(orderBaseLines(j, [], RATE)), [['K-600', 2, '本']]);
 });
 

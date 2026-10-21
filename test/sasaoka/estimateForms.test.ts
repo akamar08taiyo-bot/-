@@ -23,7 +23,7 @@ import {isBlankRow} from '../../src/sasaoka/calc.ts';
 import {manualRow} from '../../src/sasaoka/rows.ts';
 import type {Job, Place, Row} from '../../src/sasaoka/types.ts';
 
-const S = {estimateRate: 0.8, estimateHourRate: 2500, estimateForm: 'yukuhashi'} as const;
+const S = {estimateRate: 0.8, estimateLaborRate: 1.5, estimateHourRate: 2500, estimateForm: 'yukuhashi'} as const;
 
 let seq = 0;
 const blank = {refId: null, code: '', maker: '', unit: '', price: 0, listPrice: 0, lengthCm: 0, pieceLengthM: 0, estPrice: null, excluded: false, estText: null, estNote: null, estAmount: null};
@@ -84,9 +84,10 @@ test('広域連合用：施工費は 時間×2,500円、部材は メーカー �
       // 切って使う部材は「本」で書き、数量の計算（mm で 2800mm÷4000mm＝0.7）を算出根拠に出す
       [true, '屋外', '手すり取付', 1, '材', '矢崎化工 HCDT-4000 T BBR NTディンプルパイプ', 0.7, '本', 11520, 8064, 14400, 0.8, '2800mm÷4000mm＝0.7', false],
       [false, '屋外', '手すり取付', 1, '材', '矢崎化工 HL7-P11 T USL NT屋外支柱', 4, '本', 3680, 14720, 4600, 0.8, '', false],
-      [false, '屋外', '手すり取付', 1, '手', '同上施工費', 2.8, '時間', 2500, 7000, 0, null, '', true], // 5,000＋2,000＝7,000円＝2.8時間
+      // 笹岡工務店の手間 5,000＋2,000＝7,000円 ×1.5＝10,500円＝4.2時間
+      [false, '屋外', '手すり取付', 1, '手', '同上施工費', 4.2, '時間', 2500, 10500, 0, null, '', true],
       [true, 'トイレ', '便器取替', 2, '材', 'エンドキャップ', 2, '個', 360, 720, 450, 0.8, '', false],
-      [false, 'トイレ', '便器取替', 2, '手', '同上施工費', 1, '式', 1234, 1234, 0, null, '', false], // 時間で割り切れない金額は1式
+      [false, 'トイレ', '便器取替', 2, '手', '同上施工費', 1, '式', 1851, 1851, 0, null, '', false], // 1,234×1.5＝1,851円。時間で割り切れない金額は1式
     ],
   );
   // 苅田町・行橋市・みやこ町用は施工費を1式で書き、改修内容は改修の種類（手すりの取付）。工事名称・改修内容は改修の種類だけで決まる
@@ -94,7 +95,7 @@ test('広域連合用：施工費は 時間×2,500円、部材は メーカー �
   assert.deepEqual(yk.map((l) => [l.work, l.qty, l.unit, l.unitPrice]).slice(0, 3), [
     ['手すりの取付', 0.7, '本', 11520],
     ['手すりの取付', 4, '本', 3680],
-    ['手すりの取付', 1, '式', 7000],
+    ['手すりの取付', 1, '式', 10500],
   ]);
   assert.equal(yk[3].work, '便器の取替');
   assert.equal(placeWork({kind: 2}, 'kouiki'), '段差解消');
@@ -104,7 +105,7 @@ test('広域連合用：施工費は 時間×2,500円、部材は メーカー �
 
 test('写真番号：入れていなければ見積書に出る箇所の順番（行のない箇所は数えない）', () => {
   const job = {places: [place('玄関', [mat('手すり', 1000)]), place('廊下', []), place('トイレ', [mat('手すり', 1000)]), place('浴室', [mat('手すり', 1000)], {photo: 9})]};
-  assert.deepEqual([...photoNumbers(job, 0.8).values()], [1, 2, 9]);
+  assert.deepEqual([...photoNumbers(job, S).values()], [1, 2, 9]);
   assert.equal(circled(1), '①');
   assert.equal(circled(20), '⑳');
   assert.equal(circled(21), '(21)');

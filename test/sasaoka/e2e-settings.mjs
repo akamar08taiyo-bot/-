@@ -112,7 +112,7 @@ const json = JSON.parse(readFileSync(bkPath, 'utf8'));
 assert.equal(json.kind, 'taiyo-sasaoka-shikiri-backup');
 assert.equal(json.jobs.length, 1);
 assert.equal(json.materials.length, 5);
-assert.equal(json.kits.length, 1);
+assert.equal(json.kits.length, 2); // サンプルの1件と、最初に入る例（BD-134＋BD-08G＋施工費）
 log('バックアップ保存OK:', bk.suggestedFilename());
 
 const ctx2 = await browser.newContext({viewport: {width: 1366, height: 900}, locale: 'ja-JP'});
@@ -121,7 +121,7 @@ watch(p2);
 await p2.goto(url);
 await p2.getByRole('navigation').getByRole('button', {name: '設定'}).click();
 await p2.locator('input[type=file][accept*=json]').setInputFiles(bkPath);
-await p2.getByText(/部材 5件・取付手間 17件・様邸（見積書）1件・部材＋施工費（常用） 1件・設定/).waitFor();
+await p2.getByText(/部材 5件・取付手間 17件・様邸（見積書）1件・部材＋施工費（常用） 2件・設定/).waitFor();
 await p2.getByRole('button', {name: '今のデータを置き換える'}).click();
 await p2.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click();
 await p2.getByRole('cell', {name: /（サンプル）山田様邸/}).waitFor();

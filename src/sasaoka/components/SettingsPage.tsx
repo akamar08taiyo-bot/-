@@ -205,6 +205,9 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
         <Field label="部材の単価＝定価×この率（0.8＝定価の8割）">
           <NumberInput value={s.estimateRate} onChange={(estimateRate) => set({estimateRate})} className="w-28" min={0} ariaLabel="見積の率" />
         </Field>
+        <Field label="見積の単価が空欄の施工費＝取付手間（仕切り）×この率（1.5＝1,500円の手間なら2,250円）">
+          <NumberInput value={s.estimateLaborRate} onChange={(estimateLaborRate) => set({estimateLaborRate})} className="w-28" min={0} ariaLabel="施工費の率" />
+        </Field>
         <Field label="諸経費＝小計×この率（0.1＝10%）">
           <NumberInput
             value={s.estimateOverheadRate}

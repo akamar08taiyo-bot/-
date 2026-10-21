@@ -176,6 +176,7 @@ function yukuhashiSheet(job: Job, s: Settings, date: string): XSheet {
 type Put = (c: number, v: string | number | null, cls: string, st?: XStyle, f?: string) => void;
 
 function ykLine(l: FormLine, r: number, put: Put) {
+  const open = !l.isWork && l.qty === 0; // 数を入れていない部材（部材＋施工費（常用）で本数を空けたもの）：印刷と同じく数量・金額は空
   const target = !l.excluded;
   const q = qty3(l.qty);
   const [D, F, G] = [cellRef(r, 3), cellRef(r, 5), cellRef(r, 6)];
@@ -188,16 +189,16 @@ function ykLine(l: FormLine, r: number, put: Put) {
     return;
   }
   put(2, l.text || null, '', fit(l.text, YK.C, YK_ROW, 9, 2));
-  put(3, q, 'r nr', count(9));
+  put(3, open ? null : q, 'r nr', count(9));
   put(4, l.unit || null, 'nl', fit(l.unit, YK.E, YK_ROW, 11));
   put(5, l.unitPrice, 'r', money(11));
-  put(6, l.amount, 'r mr', money(11), amountFormula(q, l.unitPrice, l.amount, D, F));
+  put(6, open ? null : l.amount, 'r mr', money(11), open ? undefined : amountFormula(q, l.unitPrice, l.amount, D, F));
   // 介護保険対象部分は左の数量・単価・金額と同じ（左を直せば、こちらも変わる）
-  put(7, target ? q : null, 'r nr', count(9), target ? D : undefined);
+  put(7, target && !open ? q : null, 'r nr', count(9), target && !open ? D : undefined);
   put(8, target ? l.unit || null : null, 'nl', fit(l.unit, YK.I, YK_ROW, 11));
   put(9, target ? l.unitPrice : null, 'r', money(11), target ? F : undefined);
-  put(10, target ? l.amount : null, 'r mr', money(11), target ? G : undefined);
-  put(11, target ? null : l.amount, 'r mr', money(11), target ? undefined : G);
+  put(10, target && !open ? l.amount : null, 'r mr', money(11), target && !open ? G : undefined);
+  put(11, target || open ? null : l.amount, 'r mr', money(11), target || open ? undefined : G);
   // 備考（定価等）：「定価8,000円（税抜）×0.8」。切って使う部材は「定価20,000円（4m）×0.8」と「600mm÷4000mm＝0.15」の2行
   const note = lineNote(l, 'yukuhashi', 0);
   put(12, note.join('\n') || null, 'mr', note.length > 1 ? {size: fitLinesPt(note, YK.M, YK_ROW, 11), wrap: true} : fit(note[0] ?? '', YK.M, YK_ROW, 11));
@@ -321,6 +322,7 @@ function kouikiSheet(job: Job, s: Settings): XSheet {
 }
 
 function kkLine(l: FormLine, r: number, height: number, bottom: string, hourRate: number, put: Put, b: SheetBuilder) {
+  const open = !l.isWork && l.qty === 0; // 数を入れていない部材：印刷と同じく数量・金額は空
   const target = !l.excluded;
   const q = qty3(l.qty);
   const [F, H, I] = [cellRef(r, 5), cellRef(r, 7), cellRef(r, 8)];
@@ -339,18 +341,18 @@ function kkLine(l: FormLine, r: number, height: number, bottom: string, hourRate
   put(2, l.mark, 'mark', {v: 'bottom'});
   put(3, l.text || null, 'mr gothic', fit(l.text, KK.D, height, 9, 3));
   put(4, null, 'gap');
-  put(5, q, 'r ml gothic', count(9));
+  put(5, open ? null : q, 'r ml gothic', count(9));
   put(6, l.unit || null, 'gothic', fit(l.unit, KK.G, height, 11));
   put(7, l.unitPrice, 'r gothic', money(11));
-  put(8, l.amount, 'r mr gothic', money(11), amountFormula(q, l.unitPrice, l.amount, F, H));
+  put(8, open ? null : l.amount, 'r mr gothic', money(11), open ? undefined : amountFormula(q, l.unitPrice, l.amount, F, H));
   put(9, null, 'gap');
   put(10, l.first ? photo : null, 'c ml', fit(photo, KK.K, height, 11));
   put(11, l.first ? kind : null, 'c', fit(kind, KK.L, height, 11));
   // 対象工事部分は左の全改修工事部分と同じ（左を直せば、こちらも変わる）
-  put(12, target ? q : null, 'r ml gothic', count(9), target ? F : undefined);
+  put(12, target && !open ? q : null, 'r ml gothic', count(9), target && !open ? F : undefined);
   put(13, target ? l.unit || null : null, 'gothic', fit(l.unit, KK.N, height, 11));
   put(14, target ? l.unitPrice : null, 'r gothic', money(11), target ? H : undefined);
-  put(15, target ? l.amount : null, 'r mr gothic', money(11), target ? I : undefined);
+  put(15, target && !open ? l.amount : null, 'r mr gothic', money(11), target && !open ? I : undefined);
   // 算出根拠：「定価8,000円（税抜）×0.8」。施工費は「1時間2,500円」、切って使う部材は「定価20,000円（4m）×0.8」と「600mm÷4000mm＝0.15」の2行
   const note = lineNote(l, 'kouiki', hourRate);
   const basis = edges(`ml mr${bottom}`, true);

@@ -6,12 +6,14 @@ import {KitPicker} from '../components/Kits.tsx';
 import {MaterialPicker} from '../components/Pickers.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerForAddress, jobForm, jobInsurer} from '../estimateForms.ts';
+import {estimateDateOf} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {addMaterial, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
 import type {AppData, Insurer, Job, Kit, Material, NameSuffix, Place} from '../types.ts';
 import type {Update} from '../useStore.ts';
-import {staffFull, thisMonth} from '../util.ts';
+import {staffFull, thisMonth, todayIso} from '../util.ts';
 import {duplicateEstimate, removeEstimate, saveEstimateExcel} from './EstimateList.tsx';
+import {canMakeShinsei, saveShinsei} from './shinseiFiles.ts';
 
 type Picker =
   | {placeId: string; kind: 'material'}
@@ -92,6 +94,14 @@ export function EstimateEditor({
   const removeJob = () => {
     if (removeEstimate(job, name, update, toast)) onBack();
   };
+  // 申請書（保険者の Excel の原本）に、氏名・住所・被保険者番号・改修の内容を転記して保存する
+  const makeShinsei = () => {
+    if (!insurer) return;
+    void saveShinsei(job, insurer, s).then(
+      (fileName) => toast(`「${fileName}」を保存しました`),
+      () => toast('申請書を作れませんでした', 'error'),
+    );
+  };
   // 白紙に戻す：見積書に打ち込んだ内容（お客様名・被保険者番号・工事場所・明細・諸経費）と発注書で直したところを消す。
   // いきなり消えると困るので確かめてから（消したあとも Ctrl+Z で戻せる）。保険者（書式）・担当・請求書に入れるかは残す
   const blank = !job.customer.trim() && !job.insuredNo.trim() && !job.address.trim() && job.places.length === 0 && job.overhead === null && job.overheadTarget === null;
@@ -130,25 +140,30 @@ export function EstimateEditor({
           {insurer ? INSURER_INFO[insurer].name : FORM_INFO[form].name}「{FORM_INFO[form].title}」
         </span>
         <div className="ml-auto flex flex-wrap gap-2">
-          <Btn color="blue" onClick={save}>
+          <Btn color="softBlue" onClick={save}>
             💾 保存
           </Btn>
-          <Btn color="white" onClick={() => saveEstimateExcel(job, s, toast)}>
+          <Btn color="softGreen" onClick={() => saveEstimateExcel(job, s, toast)}>
             📗 Excelで保存
           </Btn>
-          <Btn color="sky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
+          {canMakeShinsei(insurer) && (
+            <Btn color="white" onClick={makeShinsei}>
+              📝 申請書を作成
+            </Btn>
+          )}
+          <Btn color="softSky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
             🖨 見積書を印刷
           </Btn>
           <Btn color="white" onClick={clearSheet} disabled={blank}>
             📄 白紙に戻す
           </Btn>
-          <Btn color="teal" onClick={onOpenOrder}>
+          <Btn color="white" onClick={onOpenOrder}>
             🛒 発注書を作成
           </Btn>
           <Btn color="white" onClick={duplicate}>
             複製
           </Btn>
-          <Btn color="rose" onClick={removeJob}>
+          <Btn color="white" onClick={removeJob}>
             削除
           </Btn>
         </div>
@@ -228,6 +243,16 @@ export function EstimateEditor({
             ))}
           </select>
         </label>
+        <label className="grid gap-1 text-xs font-bold text-slate-600">
+          見積もり作成日
+          <input
+            type="date"
+            value={estimateDateOf(job)}
+            onChange={(e) => setJob((j) => ({...j, estDate: e.target.value || todayIso()}))} // 消したら当日
+            className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
+            aria-label="見積もり作成日"
+          />
+        </label>
         <ShikiriFields job={job} data={data} setJob={setJob} onFix={() => setFixPrices(true)} onOpenInvoice={() => onOpenInvoice(job.id)} />
         {byAddress && byAddress !== insurer && (
           <div className="flex w-full flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900">
@@ -257,7 +282,7 @@ export function EstimateEditor({
           place={pickPlace}
           materials={data.materials}
           mode="estimate"
-          rate={s.estimateRate}
+          rates={s}
           onAdd={(row) => setPlace(pickPlace.id, (p) => ({...p, rows: addMaterial(p.rows, row)}))}
           onRemoveOne={(refId) => setPlace(pickPlace.id, (p) => ({...p, rows: removeOneMaterial(p.rows, refId)}))}
           onToggleFavorite={toggleFavorite}
@@ -280,7 +305,7 @@ export function EstimateEditor({
           materials={data.materials}
           labor={data.labor}
           mode="estimate"
-          rate={s.estimateRate}
+          rates={s}
           placeName={pickPlace.name}
           onInsert={(rows) => {
             setPlace(pickPlace.id, (p) => ({
@@ -310,7 +335,7 @@ export function EstimateEditor({
  * 笹岡工務店の請求書：選ぶと、この見積書の部材（仕切価格）と施工費が、仕切り計算・請求書作成アプリの仕切り計算表と請求書（請求する月の分）に入る。
  * 見積書と同じ入力から作るので、入れ直さなくてよい（見積書を直すと請求書も変わる）。
  * 入力の画面がごちゃごちゃしないように、請求書に入る金額や説明の文は出さない（ユーザーの指示。金額は「請求書を見る」で）。
- * 仕切価格も定価もない部材があるときだけ知らせる（請求書でその部材代が0円になるため）
+ * 仕切価格が空欄の部材があるときだけ知らせる（請求書でその部材代が0円になるため）
  */
 function ShikiriFields({
   job,
@@ -358,22 +383,12 @@ function ShikiriFields({
               aria-label="請求する月"
             />
           </label>
-          <label className="grid gap-1 text-xs font-bold text-slate-600">
-            施工日
-            <input
-              type="date"
-              value={job.date}
-              onChange={(e) => setJob((j) => ({...j, date: e.target.value}))}
-              className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
-              aria-label="施工日"
-            />
-          </label>
           <Btn color="white" onClick={onOpenInvoice}>
             🧾 請求書を見る
           </Btn>
           {missing.length > 0 && (
             <div className="flex w-full flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900">
-              仕切価格も定価もない部材が {missing.length} 行あります
+              仕切価格が空欄の部材が {missing.length} 行あります
               <Btn small color="white" onClick={onFix}>
                 仕切価格を入れる
               </Btn>

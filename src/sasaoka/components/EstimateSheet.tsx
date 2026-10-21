@@ -11,7 +11,7 @@
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ChangeEvent, ClipboardEvent as ReactClipboardEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent} from 'react';
 import {circled, KINDS, materialText} from '../estimateForms.ts';
-import {useDocMeta} from '../print/docMeta.ts';
+import {estimateDateOf} from '../print/docMeta.ts';
 import {KouikiForm, YukuhashiForm} from '../print/EstimateForms.tsx';
 import {applySheet, deleteLine, insertBlankAfter, lineRows, parseDate, parsePlace, pasteLines, sheetTarget, sheetValue, toggleExcluded} from '../sheetEdit.ts';
 import {getClip, setClip, useClip} from '../sheetClip.ts';
@@ -68,7 +68,7 @@ export function EstimateSheet({
   onPickKit: (placeId: string | null) => void;
   onPrint: () => void;
 }) {
-  const [meta, setMeta] = useDocMeta(`est:${job.id}`, todayIso);
+  const estDate = estimateDateOf(job); // 見積もり作成日（右上の作成日）
   const toast = useToast();
   // お客様名がまだなければ、見積書のお客様名の欄を選んでおく（苅田町・行橋市・みやこ町用。すぐ打ち込める）
   const [sel, setSel] = useState<Sel | null>(() => (form === 'yukuhashi' && !job.customer.trim() ? {key: 'job:customer', occ: 0} : null));
@@ -316,7 +316,7 @@ export function EstimateSheet({
     const key = sel.key;
     if (key === 'date') {
       const d = parseDate(value);
-      if (d !== null) setMeta({...meta, date: d});
+      if (d !== null) change({...jobRef.current, estDate: d || todayIso()}); // 消したら当日
     } else if (key === 'new:mark') {
       if (/手/.test(value)) setMark('手');
       else if (/材/.test(value)) setMark('材');
@@ -343,7 +343,7 @@ export function EstimateSheet({
       toggle();
       return;
     }
-    setEdit({mode, value: mode === 'edit' ? (sel.key === 'date' ? meta.date : sheetValue(jobRef.current, sel.key, ctx, meta.date)) : ''});
+    setEdit({mode, value: mode === 'edit' ? sheetValue(jobRef.current, sel.key, ctx, estDate) : ''});
     setHl(-1);
   };
 
@@ -518,7 +518,7 @@ export function EstimateSheet({
   };
 
   /** 欄の文字（Ctrl+C で OS の貼り付けに入れる） */
-  const cellText = () => (sel ? sheetValue(jobRef.current, sel.key, ctx, meta.date) || findCell(sel)?.innerText || '' : '');
+  const cellText = () => (sel ? sheetValue(jobRef.current, sel.key, ctx, estDate) || findCell(sel)?.innerText || '' : '');
   /** 明細の行の欄（line:・excl:）か。行の欄の Ctrl+C／Ctrl+X は行をコピー・切り取り */
   const rowCell = (x: Sel | null) => !!x && /^(line|excl):/.test(x.key);
 
@@ -658,7 +658,7 @@ export function EstimateSheet({
     else if (btn.dataset.copy) {
       copyRow(btn.dataset.copy, false, null);
       inputRef.current?.focus({preventScroll: true});
-    } else if (btn.dataset.paste) pasteAt(`line:${btn.dataset.paste}:text`);
+    } else if (btn.dataset.paste) pasteAt(btn.dataset.paste === 'new' ? 'new:text' : `line:${btn.dataset.paste}:text`); // new：いちばん下に
     else if (btn.dataset.del) deleteRow(btn.dataset.del);
   };
   const onDoubleClick = (e: ReactMouseEvent) => {
@@ -724,7 +724,7 @@ export function EstimateSheet({
   const sheetOpts = {mark, copied: clip && clip.jobId === job.id ? clip.sourceIds : [], pasting: clip !== null};
 
   const selName = sel ? FIELD_NAMES[field] ?? (sel.key.startsWith('excl:') ? '介護保険の対象／対象外' : sel.key.startsWith('overhead:') ? '諸経費' : sel.key === 'date' ? '作成日' : '') : '';
-  const bar = editing ? edit.value : sel ? (sel.key === 'date' ? meta.date : sel.key === 'new:mark' ? mark : sheetValue(job, sel.key, ctx, meta.date)) : '';
+  const bar = editing ? edit.value : sel ? (sel.key === 'new:mark' ? mark : sheetValue(job, sel.key, ctx, estDate)) : '';
 
   return (
     <section className="overflow-hidden rounded-xl border-2 border-emerald-800 bg-white shadow-sm" aria-label="見積書">
@@ -772,7 +772,7 @@ export function EstimateSheet({
       >
         <div style={{width: PAGE_W * scale, height: innerH * scale}}>
           <div ref={innerRef} className="relative" style={{width: PAGE_W, transform: `scale(${scale})`, transformOrigin: 'top left'}}>
-            {form === 'kouiki' ? <KouikiForm job={job} settings={s} sheet={sheetOpts} /> : <YukuhashiForm job={job} settings={s} date={meta.date} sheet={sheetOpts} />}
+            {form === 'kouiki' ? <KouikiForm job={job} settings={s} sheet={sheetOpts} /> : <YukuhashiForm job={job} settings={s} date={estDate} sheet={sheetOpts} />}
             {box && <div className="sheet-sel" style={{left: box.x, top: box.y, width: box.w, height: box.h}} />}
             {/* 改修場所・改修の種類の欄の「▼」：候補から選ぶ（Excel のリストと同じ。Alt+↓ でも開く） */}
             {box && !editing && (placeCell || kindCell) && (

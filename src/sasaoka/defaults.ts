@@ -4,24 +4,25 @@ import type {LaborItem, Settings} from './types.ts';
  * 取付手間の単価（「笹岡手間」の表より。1箇所あたり）。
  * 「〃」の行は上の行の項目名を補っている（〃 タイル → 踏台 タイル、〃 部品代 → ウォシュレット 部品代）。
  */
+// 取付手間の単価表（笹岡工務店）。price＝仕切り、estPrice＝見積の単価（ユーザーにいただいた表。踏台 木 はなかったので空＝仕切り×1.5）
 export const DEFAULT_LABOR: LaborItem[] = [
-  {id: 'l01', name: '木', price: 1000, note: ''},
-  {id: 'l02', name: 'タイル', price: 1500, note: ''},
-  {id: 'l03', name: 'エルボ・チーズ（屋内）', price: 1000, note: ''},
-  {id: 'l04', name: '補強板 2m以下', price: 1500, note: ''},
-  {id: 'l05', name: '補強板 2m～3m', price: 3000, note: '元の表：2m～3m'},
-  {id: 'l06', name: '補強板 3m以上', price: 4000, note: '元の表：3m以上'},
-  {id: 'l07', name: '踏台 木', price: 1500, note: ''},
-  {id: 'l08', name: '踏台 タイル', price: 2500, note: '元の表：〃 タイル'},
-  {id: 'l09', name: 'コア抜き', price: 5000, note: ''},
-  {id: 'l10', name: '基礎工事', price: 6000, note: ''},
-  {id: 'l11', name: 'スタンド', price: 3000, note: ''},
-  {id: 'l12', name: 'ヤザキステップ台', price: 3000, note: ''},
-  {id: 'l13', name: 'レバーハンドル', price: 1500, note: ''},
-  {id: 'l14', name: '敷居撤去', price: 12000, note: ''},
-  {id: 'l15', name: 'ウォシュレット', price: 8000, note: ''},
-  {id: 'l16', name: 'ウォシュレット 部品代', price: 2000, note: '元の表：〃 部品代'},
-  {id: 'l17', name: '安寿框手摺', price: 2000, note: ''},
+  {id: 'l01', name: '木', price: 1000, estPrice: 1500, note: ''},
+  {id: 'l02', name: 'タイル', price: 1500, estPrice: 2000, note: ''},
+  {id: 'l03', name: 'エルボ・チーズ（屋内）', price: 1000, estPrice: 1500, note: ''},
+  {id: 'l04', name: '補強板 2m以下', price: 1500, estPrice: 2500, note: ''},
+  {id: 'l05', name: '補強板 2m～3m', price: 3000, estPrice: 4000, note: '元の表：2m～3m'},
+  {id: 'l06', name: '補強板 3m以上', price: 4000, estPrice: 5000, note: '元の表：3m以上'},
+  {id: 'l07', name: '踏台 木', price: 1500, estPrice: null, note: ''},
+  {id: 'l08', name: '踏台 タイル', price: 2500, estPrice: 4000, note: '元の表：〃 タイル'},
+  {id: 'l09', name: 'コア抜き', price: 5000, estPrice: 6000, note: ''},
+  {id: 'l10', name: '基礎工事', price: 6000, estPrice: 9000, note: ''},
+  {id: 'l11', name: 'スタンド', price: 3000, estPrice: 4000, note: ''},
+  {id: 'l12', name: 'ヤザキステップ台', price: 3000, estPrice: 4000, note: ''},
+  {id: 'l13', name: 'レバーハンドル', price: 1500, estPrice: 2500, note: ''},
+  {id: 'l14', name: '敷居撤去', price: 12000, estPrice: 15000, note: ''},
+  {id: 'l15', name: 'ウォシュレット', price: 8000, estPrice: 10000, note: ''},
+  {id: 'l16', name: 'ウォシュレット 部品代', price: 2000, estPrice: 3000, note: '元の表：〃 部品代'},
+  {id: 'l17', name: '安寿框手摺', price: 2000, estPrice: 3000, note: ''},
 ];
 
 export const DEFAULT_PLACES = [
@@ -129,9 +130,12 @@ export function defaultSettings(): Settings {
     placePresets: DEFAULT_PLACES,
     staffList: DEFAULT_STAFF,
     estimateRate: 0.8,
+    estimateLaborRate: 1.5, // 見積の単価を入れていない取付手間は、仕切りの1.5倍（例：2,000円 → 3,000円）
     estimateOverheadRate: 0.1,
     estimateHourRate: 2500,
     estimateForm: 'yukuhashi',
+    kitExample: false,
+    laborEst: false,
     rev: SETTINGS_REV,
   };
   return settingsForOffice(base, portalOffice() || '行橋営業所');

@@ -69,6 +69,18 @@ function RowTools({line: l, sheet}: {line: FormLine; sheet: SheetOpts}) {
   );
 }
 
+/**
+ * コピーしているあいだ、いちばん下の打ち込める行と、その下の空いた行の左にも「貼付」を出す（ユーザーの指示：貼り付ける行を自分で選べるように）。
+ * そこに貼り付けると、いちばん下（最後の箇所のあと。打ち込める行に改修場所を打っていれば、その箇所）に入る
+ */
+function PasteHere() {
+  return (
+    <span className="sheet-rowtools no-print">
+      <button type="button" className="sheet-paste" data-paste="new" title="コピーした行をいちばん下に貼り付ける（Ctrl+V）" aria-label="いちばん下に貼り付け" />
+    </span>
+  );
+}
+
 /** 書式の明細の行（sheet なら金額のない施工費の行と、打ち込める空いた行も） */
 function sheetLines(job: Job, s: Settings, form: 'yukuhashi' | 'kouiki', sheet: SheetOpts | null | undefined) {
   if (!sheet) return formLines(job, s, form);
@@ -249,9 +261,15 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
   if (!l) {
     return (
       <tr className="g" style={{height: `${YK_ROW}mm`}} {...(sheet ? {'data-blank': ''} : {})}>
-        {['ml', '', '', 'nr', 'nl', '', 'mr', 'nr', 'nl', '', 'mr', 'mr', 'mr'].map((c, i) => (
-          <td key={i} className={c + bottom} />
-        ))}
+        {['ml', '', '', 'nr', 'nl', '', 'mr', 'nr', 'nl', '', 'mr', 'mr', 'mr'].map((c, i) =>
+          i === 0 && sheet?.pasting ? (
+            <td key={i} className={`${c} tools-cell${bottom}`}>
+              <PasteHere />
+            </td>
+          ) : (
+            <td key={i} className={c + bottom} />
+          ),
+        )}
       </tr>
     );
   }
@@ -260,7 +278,7 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
     const nk = (field: string) => `new:${field}`;
     return (
       <tr className="g sheet-new" style={{height: `${YK_ROW}mm`}} data-new="">
-        {cell(l.first ? l.work : '', YK.A, 11, 'ml', nk('work'))}
+        {cell(l.first ? l.work : '', YK.A, 11, sheet?.pasting ? 'ml tools-cell' : 'ml', nk('work'), 1, sheet?.pasting ? <PasteHere /> : null)}
         {cell(l.first && l.placeName ? `${circled(l.photo)}${l.placeName}` : '', YK.B, 11, '', nk('name'))}
         {cell('', YK.C, 9, '', nk('text'))}
         {cell('', YK.D, 9, 'r nr', nk('qty'))}
@@ -274,10 +292,12 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
     );
   }
   const target = !l.excluded && !l.blank;
-  // 空白の行（何も入っていない部材の行）は数量・単価・金額も出さない（打ち込めばふつうの行になる）
-  const qty = l.blank ? '' : qtyText(l.qty);
+  // 空白の行（何も入っていない部材の行）は数量・単価・金額も出さない（打ち込めばふつうの行になる）。
+  // 数を入れていない部材（部材＋施工費（常用）で本数を空けたもの）は数量・金額を空に
+  const open = !l.isWork && l.qty === 0;
+  const qty = l.blank || open ? '' : qtyText(l.qty);
   const price = l.blank ? '' : yen(l.unitPrice);
-  const amount = l.blank ? '' : yen(l.amount);
+  const amount = l.blank || open ? '' : yen(l.amount);
   const k = (field: string) => `line:${l.rowId}:${field}`;
   const excl = `excl:${l.excludeId}`;
   // 備考（定価等）：「定価8,000円（税抜）×0.8」。切って使う部材は「定価20,000円（4m）×0.8」と「600mm÷4000mm＝0.15」の2行
@@ -490,9 +510,15 @@ function KkLine({
   if (!l) {
     return (
       <tr className="g" style={{height: `${height}mm`}} {...(sheet ? {'data-blank': ''} : {})}>
-        {['ml', '', '', 'mr', 'gap', 'ml', '', '', 'mr', 'gap', 'ml', '', 'ml', '', '', 'mr', 'ml', 'mr'].map((c, i) => (
-          <td key={i} className={c + bottom} />
-        ))}
+        {['ml', '', '', 'mr', 'gap', 'ml', '', '', 'mr', 'gap', 'ml', '', 'ml', '', '', 'mr', 'ml', 'mr'].map((c, i) =>
+          i === 0 && sheet?.pasting ? (
+            <td key={i} className={`${c} tools-cell${bottom}`}>
+              <PasteHere />
+            </td>
+          ) : (
+            <td key={i} className={c + bottom} />
+          ),
+        )}
       </tr>
     );
   }
@@ -501,7 +527,7 @@ function KkLine({
     const nk = (field: string) => `new:${field}`;
     return (
       <tr className="g sheet-new" style={{height: `${height}mm`}} data-new="">
-        {cell(l.first ? l.placeName : '', KK.A, 11, 'c ml', nk('name'), 2)}
+        {cell(l.first ? l.placeName : '', KK.A, 11, sheet?.pasting ? 'c ml tools-cell' : 'c ml', nk('name'), 2, sheet?.pasting ? <PasteHere /> : null)}
         {cell(l.first ? l.work : '', KK.B, 11, 'c', nk('work'), 2)}
         <td className={`mark${bottom}`} {...ed(editable, nk('mark'))}>
           {l.mark}
@@ -524,10 +550,11 @@ function KkLine({
     );
   }
   const target = !l.excluded && !l.blank;
-  // 空白の行（何も入っていない部材の行）は材／手・数量・単価・金額も出さない
-  const qty = l.blank ? '' : qtyText(l.qty);
+  // 空白の行（何も入っていない部材の行）は材／手・数量・単価・金額も出さない。数を入れていない部材は数量・金額を空に
+  const open = !l.isWork && l.qty === 0;
+  const qty = l.blank || open ? '' : qtyText(l.qty);
   const price = l.blank ? '' : yen(l.unitPrice);
-  const amount = l.blank ? '' : yen(l.amount);
+  const amount = l.blank || open ? '' : yen(l.amount);
   const k = (field: string) => `line:${l.rowId}:${field}`;
   const excl = `excl:${l.excludeId}`;
   // 算出根拠：「定価8,000円（税抜）×0.8」。施工費は「1時間2,500円」、切って使う部材は「定価20,000円（4m）×0.8」と「600mm÷4000mm＝0.15」の2行

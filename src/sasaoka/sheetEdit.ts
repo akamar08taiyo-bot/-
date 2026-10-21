@@ -7,13 +7,14 @@
 //   job:customer|insuredNo|address、overhead:all|target
 // 打ち込んだ値は、仕切り計算表・請求書と同じ行（部材・取付手間）に入る（見積書と請求書はいつも同じ入力から作る）。
 
-import {cutToLength, estimatePlaceLines, estimateQty, estimateUnitPrice, isBlankRow, listPriceOf, overheadAuto, estimateTotals, rounddown} from './calc.ts';
+import {cutToLength, estimateAmount, estimatePlaceLines, estimateQty, estimateUnitPrice, isBlankRow, listPriceOf, overheadAuto, estimateTotals, rounddown} from './calc.ts';
+import type {EstimateRates} from './calc.ts';
 import {KINDS, materialText, rowUnit} from './estimateForms.ts';
 import {guessPieceLengthM} from './priceImport.ts';
 import {copyRows, manualRow, materialRow, newPlace} from './rows.ts';
 import type {EstimateForm, Job, Material, Place, Row, Settings} from './types.ts';
 
-export type SheetSettings = Pick<Settings, 'estimateRate' | 'estimateHourRate' | 'estimateOverheadRate' | 'taxRate'>;
+export type SheetSettings = Pick<Settings, 'estimateRate' | 'estimateLaborRate' | 'estimateHourRate' | 'estimateOverheadRate' | 'taxRate'>;
 
 export type SheetCtx = {
   settings: SheetSettings;
@@ -31,7 +32,7 @@ export type SheetResult = {job: Job; key: string | null};
 const KIND_SHORT = ['手すり', '段差', '床', '扉', '便器', '付帯'];
 /** 施工費として入れる内容 */
 const LABOR_TEXT = /施工費|手間|工賃|取付費/;
-const ADJUST_NAME = '施工費（調整）';
+const ADJUST_NAME = '施工費（調整）'; // 前の版で、見積書で直した施工費の差を仕切り計算表に入れていた行（直し直すときに外す）
 
 // ---------------------------------------------------------------- 打ち込んだ文字を読む
 
@@ -138,28 +139,27 @@ function materialFields(m: Material): Partial<Row> {
 }
 
 /**
- * 施工費のまとまりの金額を amount にする。手入力の1行だけならその金額を直す。
- * 取付手間を数えた行（木 2箇所など）は残し、差を「施工費（調整）」の行で足し引きする（仕切り計算表の取付手間も同じ金額になる）
+ * 施工費のまとまりの見積の金額を amount にする（見積書の金額・広域連合用の時間の欄で打ったとき。null なら自動＝見積の単価×箇所数に戻す）。
+ * 仕切り（笹岡工務店の金額）は見積とは別なので変えない（見積の金額だけを直す＝estAmount）。
+ * ただし、見積書で打ち込んで作った手入力の1行で、まだ仕切りの金額がない（0）ときは、仕切りも同じ金額にする（仕切り計算表に入る。あとで直せる）。
+ * 前の版で、見積書で直した差を仕切り計算表に入れていた「施工費（調整）」の行は外す
  */
-export function setWorkAmount(rows: Row[], headIndex: number, amount: number): Row[] {
+export function setWorkAmount(rows: Row[], headIndex: number, amount: number | null, rates: EstimateRates): Row[] {
   const end = workEnd(rows, headIndex);
-  const group = rows.slice(headIndex, end);
+  const group = rows.slice(headIndex, end).filter((r, i) => i === 0 || !(r.refId === null && r.name === ADJUST_NAME));
   const head = group[0];
   if (!head) return rows;
-  if (group.length === 1 && head.refId === null) {
-    return rows.map((r, i) => (i === headIndex ? {...r, price: amount, qty: 1, estAmount: null} : r));
+  if (group.length === 1 && head.refId === null && head.price === 0 && amount !== null) {
+    return [...rows.slice(0, headIndex), {...head, price: amount, qty: 1, estPrice: amount, estAmount: null}, ...rows.slice(end)];
   }
-  const adj = group.find((r) => r.refId === null && r.name === ADJUST_NAME && r !== head);
-  const others = group.filter((r) => r !== adj).map((r, i) => (i === 0 ? {...r, estAmount: null} : r));
-  const sum = others.reduce((n, r) => n + r.price * r.qty, 0);
-  const diff = amount - sum;
-  const next = diff === 0 ? others : [...others, adj ? {...adj, price: diff, qty: 1} : manualRow('labor', {name: ADJUST_NAME, price: diff, qty: 1, excluded: head.excluded})];
+  const auto = group.reduce((n, r) => n + estimateAmount(r, rates), 0);
+  const next = group.map((r, i) => (i === 0 ? {...r, estAmount: amount === null || amount === auto ? null : amount} : r));
   return [...rows.slice(0, headIndex), ...next, ...rows.slice(end)];
 }
 
 /** 施工費のまとまりの今の金額（手で直した見積の金額があればそれ） */
-function workAmount(place: Place, headId: string, rate: number): number {
-  const w = estimatePlaceLines(place, rate).find((l) => l.kind === 'work' && l.rows[0].id === headId);
+function workAmount(place: Place, headId: string, rates: EstimateRates): number {
+  const w = estimatePlaceLines(place, rates).find((l) => l.kind === 'work' && l.rows[0].id === headId);
   return w?.kind === 'work' ? w.amount : 0;
 }
 
@@ -167,7 +167,7 @@ function workAmount(place: Place, headId: string, rate: number): number {
 
 export function sheetValue(job: Job, key: string, ctx: SheetCtx, date = ''): string {
   const [kind, id, field] = key.split(':');
-  const rate = ctx.settings.estimateRate;
+  const rates = ctx.settings;
   if (kind === 'job') return String(job[id as 'customer' | 'insuredNo' | 'address'] ?? '');
   if (kind === 'date') return date;
   if (kind === 'overhead') {
@@ -188,7 +188,7 @@ export function sheetValue(job: Job, key: string, ctx: SheetCtx, date = ''): str
   if (!found) return '';
   const r = found.row;
   if (r.kind === 'labor') {
-    const amount = workAmount(found.place, r.id, rate);
+    const amount = workAmount(found.place, r.id, rates);
     if (field === 'text') return r.estText ?? '';
     if (field === 'qty') return ctx.settings.estimateHourRate > 0 ? String(Math.round((amount / ctx.settings.estimateHourRate) * 100) / 100) : '1';
     if (field === 'price') return String(amount);
@@ -198,7 +198,7 @@ export function sheetValue(job: Job, key: string, ctx: SheetCtx, date = ''): str
   if (field === 'text') return r.estText ?? materialText(r);
   if (field === 'qty') return String(cutToLength(r) ? Math.round(estimateQty(r) * 1000) / 1000 : r.qty);
   if (field === 'unit') return rowUnit(r);
-  if (field === 'price') return String(estimateUnitPrice(r, rate));
+  if (field === 'price') return String(estimateUnitPrice(r, rates));
   if (field === 'note') return r.estNote ?? (listPriceOf(r) > 0 ? String(listPriceOf(r)) : '');
   return '';
 }
@@ -215,7 +215,7 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
   const [kind, id, field] = key.split(':');
   const text = input.replace(/\r/g, '');
   const trimmed = text.trim();
-  const rate = ctx.settings.estimateRate;
+  const rates = ctx.settings;
 
   if (kind === 'job') {
     const name = id as 'customer' | 'insuredNo' | 'address';
@@ -247,17 +247,11 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
       return {job: patchRow(job, {...found, ri: head, row: headRow}, {estText, ...(single && trimmed !== '' ? {name: trimmed} : {})}), key};
     }
     if (field === 'qty' || field === 'price') {
-      let amount: number;
-      if (field === 'qty') {
-        const hours = parseNum(trimmed);
-        if (hours === null && trimmed !== '') return {job, key};
-        amount = rounddown((hours ?? 0) * ctx.settings.estimateHourRate);
-      } else {
-        const n = parseNum(trimmed);
-        if (n === null && trimmed !== '') return {job, key};
-        amount = Math.round(n ?? 0);
-      }
-      return {job: setPlaceRows(job, found.pi, setWorkAmount(found.place.rows, head, amount)), key};
+      // 広域連合用の時間の欄は 時間×1時間の単価、金額の欄はその金額。空にしたら自動（笹岡工務店の手間×施工費の率）に戻す
+      const n = parseNum(trimmed);
+      if (n === null && trimmed !== '') return {job, key};
+      const amount = n === null ? null : field === 'qty' ? rounddown(n * ctx.settings.estimateHourRate) : Math.round(n);
+      return {job: setPlaceRows(job, found.pi, setWorkAmount(found.place.rows, head, amount, ctx.settings)), key};
     }
     if (field === 'note') return {job: patchRow(job, {...found, ri: head, row: headRow}, {estNote: trimmed === '' ? null : text}), key};
     return {job, key};
@@ -276,7 +270,7 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
     if (trimmed === '') return {job: patchRow(job, found, {estPrice: null}), key};
     const n = parseNum(trimmed);
     if (n === null) return {job, key};
-    const auto = estimateUnitPrice({...r, estPrice: null}, rate);
+    const auto = estimateUnitPrice({...r, estPrice: null}, rates);
     return {job: patchRow(job, found, {estPrice: n === auto ? null : n}), key};
   }
   if (field === 'note') return {job: patchRow(job, found, notePatch(r, text)), key};

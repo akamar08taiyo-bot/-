@@ -39,16 +39,13 @@ export function taxAmount(subtotal: number, taxRate: number, mode: TaxMode): num
   }
 }
 
-// 仕切価格・定価のどちらかが空欄の部材（ご指示）：仕切価格が空欄なら 定価×0.8、定価が空欄なら 仕切価格×1.25（＝25%を足す。×0.8 の逆）
-export const SHIKIRI_FROM_LIST = 0.8;
+// 定価が空欄の部材（ご指示）：定価は 仕切価格×1.25（＝25%を足す。見積の単価 定価×0.8 で仕切価格と同じ金額になる）。
+// 仕切価格が空欄でも、定価からは計算しない（ユーザーの指示「仕切り価格は0.8ではありません」。仕切りの率はメーカーごとに違う）
 export const LIST_FROM_SHIKIRI = 1.25;
 
-/** 仕切り計算表に使う仕切価格。空欄（0）の部材は 定価×0.8（1円未満は切り捨て。見積書の単価と同じ）。手間・値引きの行はそのまま */
-export function shikiriPrice(row: Pick<Row, 'kind' | 'price' | 'listPrice'>): number {
-  const price = Number.isFinite(row.price) ? row.price : 0;
-  if (row.kind !== 'material' || price !== 0) return price;
-  const list = Number.isFinite(row.listPrice) ? row.listPrice : 0;
-  return list > 0 ? rounddown(list * SHIKIRI_FROM_LIST) : 0;
+/** 仕切り計算表に使う仕切価格。空欄（0）の部材は0円（見積書の画面で「仕切価格が空欄の部材」と知らせ、入れてもらう）。手間・値引きの行はそのまま */
+export function shikiriPrice(row: Pick<Row, 'price'>): number {
+  return Number.isFinite(row.price) ? row.price : 0;
 }
 
 /** 見積書に使う定価。空欄（0）の部材は 仕切価格×1.25（1円未満は切り上げ。×0.8 で仕切価格にもどる） */
@@ -160,7 +157,9 @@ export function jobName(job: Pick<Job, 'customer' | 'suffix'>): string {
 // 部材の単価 ＝ 定価×掛率（0.8）。規格品をそのまま使うときは 数量＝本数（1本4mの手すりなら1本）。
 // 切って使うとき（使う長さを入れた部材）は 数量＝使う長さ÷1本の長さ（笹岡工務店の仕切り計算表も同じ数量）。
 //   例：定価 20,000円（1本4m）を60cm使う → 0.6÷4＝0.15本、単価 16,000円、金額 16,000×0.15＝2,400円
-// 取付手間は、部材のすぐ下に続く手間の行を足して「同上施工費」の1行にする（例：木 2箇所 ＝ 2,000円）。
+// 取付手間は、部材のすぐ下に続く手間の行を足して「同上施工費」の1行にする。施工費は取付手間のマスタの見積の単価（こちらで決める）×箇所数。
+//   見積の単価を入れていない手間は 仕切り（笹岡工務店）×1.5（設定の率。例：木 2箇所 ＝ 仕切り 2,000円 → 見積 3,000円）。
+//   仕切り計算表・請求書は笹岡工務店の金額のまま。
 //   小計 ＝ 部材＋施工費、諸経費 ＝ 小計×0.1、消費税 ＝（小計＋諸経費）×0.1、合計 ＝ 小計＋諸経費＋消費税
 //   諸経費は見積ごとに手で直せる（端数の調整など）。笹岡工務店の仕切り計算表の④諸経費は一律の式のまま。
 // 介護保険の対象外にした行は「全体」にだけ入り、「介護保険の対象」には入らない。
@@ -171,13 +170,18 @@ export function rounddown(x: number): number {
   return v >= 0 ? Math.floor(v) : -Math.floor(-v);
 }
 
-export type EstimateSettings = Pick<Settings, 'estimateRate' | 'estimateOverheadRate' | 'taxRate'>;
+/** 見積の率：部材の単価＝定価×estimateRate（0.8）、見積の単価のない取付手間＝仕切り×estimateLaborRate（1.5） */
+export type EstimateRates = Pick<Settings, 'estimateRate' | 'estimateLaborRate'>;
+export type EstimateSettings = EstimateRates & Pick<Settings, 'estimateOverheadRate' | 'taxRate'>;
 
-/** 見積の単価（定価×掛率の1円未満は切り捨て。定価が空欄なら 仕切価格×1.25 を定価に）。手で入れた単価があればそれを使う。手間は取付手間の単価のまま */
-export function estimateUnitPrice(row: Row, rate: number): number {
-  if (row.kind === 'labor') return Number.isFinite(row.price) ? row.price : 0;
+/**
+ * 見積の単価（定価×掛率の1円未満は切り捨て。定価が空欄なら 仕切価格×1.25 を定価に）。手で入れた単価があればそれを使う。
+ * 手間は見積の単価（取付手間のマスタ）。なければ 仕切り×率
+ */
+export function estimateUnitPrice(row: Row, rates: EstimateRates): number {
+  if (row.kind === 'labor') return row.estPrice !== null && Number.isFinite(row.estPrice) ? row.estPrice : Number.isFinite(row.price) ? rounddown(row.price * rates.estimateLaborRate) : 0;
   if (row.estPrice !== null && Number.isFinite(row.estPrice)) return row.estPrice;
-  return rounddown(listPriceOf(row) * rate);
+  return rounddown(listPriceOf(row) * rates.estimateRate);
 }
 
 /**
@@ -211,10 +215,17 @@ export function estimateQty(row: Row): number {
   return cutToLength(row) ? clean((qty * row.lengthCm) / 100 / row.pieceLengthM) : qty;
 }
 
-/** 見積の金額 ＝ ROUNDDOWN(数量×単価)。割り切れない数量（1m÷3m など）は丸める前の数量で計算する */
-export function estimateAmount(row: Row, rate: number): number {
-  const unit = estimateUnitPrice(row, rate);
+/**
+ * 見積の金額 ＝ ROUNDDOWN(数量×単価)。割り切れない数量（1m÷3m など）は丸める前の数量で計算する。
+ * 手間は 見積の単価×箇所数（見積の単価がなければ ROUNDDOWN(仕切りの金額×率)）
+ */
+export function estimateAmount(row: Row, rates: EstimateRates): number {
   const qty = Number.isFinite(row.qty) ? row.qty : 0;
+  if (row.kind === 'labor') {
+    if (row.estPrice !== null && Number.isFinite(row.estPrice)) return rounddown(row.estPrice * qty);
+    return Number.isFinite(row.price) ? rounddown(row.price * qty * rates.estimateLaborRate) : 0;
+  }
+  const unit = estimateUnitPrice(row, rates);
   return rounddown(cutToLength(row) ? (unit * qty * row.lengthCm) / 100 / row.pieceLengthM : unit * qty);
 }
 
@@ -224,14 +235,14 @@ export type EstimateLine =
   // 金額は取付手間の合計。見積書で金額を手で直していれば（最初の手間の行の estAmount）その金額。owner は上の部材の行
   | {kind: 'work'; rows: Row[]; amount: number; sum: number; afterMaterial: boolean; excluded: boolean; owner: Row | null};
 
-export function estimatePlaceLines(place: Pick<Place, 'rows'>, rate: number): EstimateLine[] {
+export function estimatePlaceLines(place: Pick<Place, 'rows'>, rates: EstimateRates): EstimateLine[] {
   const out: EstimateLine[] = [];
   for (const r of place.rows) {
     if (r.kind === 'material') {
-      out.push({kind: 'material', row: r, unitPrice: estimateUnitPrice(r, rate), qty: estimateQty(r), amount: estimateAmount(r, rate), excluded: r.excluded});
+      out.push({kind: 'material', row: r, unitPrice: estimateUnitPrice(r, rates), qty: estimateQty(r), amount: estimateAmount(r, rates), excluded: r.excluded});
       continue;
     }
-    const amount = estimateAmount(r, rate);
+    const amount = estimateAmount(r, rates);
     const last = out[out.length - 1];
     if (last && last.kind === 'work') {
       last.rows.push(r);
@@ -279,7 +290,7 @@ export function estimateTotals(
   let work = 0;
   let excluded = 0;
   for (const p of job.places) {
-    for (const l of estimatePlaceLines(p, s.estimateRate)) {
+    for (const l of estimatePlaceLines(p, s)) {
       if (l.kind === 'material') material += l.amount;
       else work += l.amount;
       if (l.excluded) excluded += l.amount;

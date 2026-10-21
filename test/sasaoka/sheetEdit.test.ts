@@ -12,12 +12,13 @@ const S = {
   invoiceTaxMode: 'perJob',
   totalTaxRounding: 'floor',
   estimateRate: 0.8,
+  estimateLaborRate: 1.5,
   estimateOverheadRate: 0.1,
   estimateHourRate: 2500,
   estimateForm: 'yukuhashi',
 } as const satisfies Pick<
   Settings,
-  'rate' | 'taxRate' | 'taxMode' | 'invoiceTaxMode' | 'totalTaxRounding' | 'estimateRate' | 'estimateOverheadRate' | 'estimateHourRate' | 'estimateForm'
+  'rate' | 'taxRate' | 'taxMode' | 'invoiceTaxMode' | 'totalTaxRounding' | 'estimateRate' | 'estimateLaborRate' | 'estimateOverheadRate' | 'estimateHourRate' | 'estimateForm'
 >;
 const yk = {settings: S, form: 'yukuhashi'} as const;
 const kk = {settings: S, form: 'kouiki'} as const;
@@ -144,7 +145,7 @@ test('切って使う手すり：数量に 0.15 や 60cm を入れると 使う�
   assert.deepEqual([l.qty, l.unitPrice, l.amount, l.cut], [0.15, 16000, 2400, '600mm÷4000mm＝0.15']);
 });
 
-test('施工費：内容に「同上施工費」と入れて単価を入れる → 取付手間の行になり、仕切り計算表の取付手間も同じ金額', () => {
+test('施工費：内容に「同上施工費」と入れて単価を入れる → 取付手間の行になり、仕切り計算表の取付手間も最初は同じ金額。そのあと見積で直しても仕切りは変えない', () => {
   const {job} = type(emptyJob(), [
     ['new:name', '玄関'],
     ['new:text', 'インテリアバー', bar],
@@ -152,28 +153,30 @@ test('施工費：内容に「同上施工費」と入れて単価を入れる �
     ['line:@:price', '2000'],
   ]);
   const rows = job.places[0].rows;
-  assert.deepEqual(rows.map((r) => [r.kind, r.price, r.qty]), [['material', 5600, 1], ['labor', 2000, 1]]);
+  assert.deepEqual(rows.map((r) => [r.kind, r.price, r.qty, r.estPrice]), [['material', 5600, 1, null], ['labor', 2000, 1, 2000]]);
   const lines = formLines(job, S, 'yukuhashi');
   assert.deepEqual(lines.map((l) => [l.text, l.qty, l.unit, l.amount]), [['TOTO TS136GY6 インテリアバー', 1, '本', 6400], ['同上施工費', 1, '式', 2000]]);
   assert.deepEqual([estimateTotals(job, S).work, jobTotals(job, S).labor], [2000, 2000]);
-  // 広域連合用は時間で：数量に 1.2（時間）→ 1.2×2,500＝3,000円
+  // 広域連合用は時間で：数量に 1.2（時間）→ 1.2×2,500＝3,000円。仕切り（笹岡工務店）は 2,000円のまま
   const head = rows[1].id;
   const k = applySheet(job, `line:${head}:qty`, '1.2', kk).job;
-  assert.deepEqual([formLines(k, S, 'kouiki')[1].qty, formLines(k, S, 'kouiki')[1].amount, jobTotals(k, S).labor], [1.2, 3000, 3000]);
+  assert.deepEqual([formLines(k, S, 'kouiki')[1].qty, formLines(k, S, 'kouiki')[1].amount, jobTotals(k, S).labor], [1.2, 3000, 2000]);
 });
 
-test('数えた取付手間（木 2箇所）の金額を見積書で直す → 数えた行は残し、差を「施工費（調整）」で足し引き', () => {
+test('数えた取付手間（木 2箇所）の見積の金額を直す → 数えた行（仕切り計算表）はそのまま、見積の金額だけ。前の版の「施工費（調整）」は外す', () => {
   const lab = (price: number, qty: number, refId: string): Row => ({
     id: `l${refId}${qty}`, kind: 'labor', refId, name: '木', price, qty, code: '', maker: '', unit: '', listPrice: 0, lengthCm: 0, pieceLengthM: 0,
     estPrice: null, excluded: false, estText: null, estNote: null, estAmount: null,
   });
-  const rows: Row[] = [lab(1000, 2, 'k1')];
-  const up = setWorkAmount(rows, 0, 2500);
-  assert.deepEqual(up.map((r) => [r.name, r.price, r.qty]), [['木', 1000, 2], ['施工費（調整）', 500, 1]]);
-  const again = setWorkAmount(up, 0, 1800);
-  assert.deepEqual(again.map((r) => [r.name, r.price, r.qty]), [['木', 1000, 2], ['施工費（調整）', -200, 1]]);
-  const back = setWorkAmount(again, 0, 2000);
-  assert.deepEqual(back.map((r) => [r.name, r.price, r.qty]), [['木', 1000, 2]]);
+  const rows: Row[] = [lab(1000, 2, 'k1')]; // 見積の単価がないので 仕切り 2,000×1.5＝3,000円
+  const up = setWorkAmount(rows, 0, 3500, S);
+  assert.deepEqual(up.map((r) => [r.name, r.price, r.qty, r.estAmount]), [['木', 1000, 2, 3500]]);
+  assert.equal(setWorkAmount(up, 0, 3000, S)[0].estAmount, null); // 自動と同じ金額なら直した印を消す
+  assert.equal(setWorkAmount(up, 0, null, S)[0].estAmount, null); // 空にしたら自動に戻す
+  // 見積の単価がある手間（マスタで 1箇所 1,800円）は、見積の単価×箇所数が自動
+  assert.equal(setWorkAmount([{...rows[0], estPrice: 1800}], 0, 3600, S)[0].estAmount, null);
+  const old: Row[] = [lab(1000, 2, 'k1'), {...lab(500, 1, 'x'), refId: null, name: '施工費（調整）'}];
+  assert.deepEqual(setWorkAmount(old, 0, 3200, S).map((r) => [r.name, r.price, r.estAmount]), [['木', 1000, 3200]]);
 });
 
 test('箇所の欄：改修場所に「浴室③」→ 名前と写真番号。改修内容に数字か名前。新しい箇所は下に足す（同じ名前でも別の箇所）', () => {

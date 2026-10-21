@@ -5,6 +5,7 @@
 import {useMemo, useState} from 'react';
 import type {MouseEvent} from 'react';
 import {jobName} from '../calc.ts';
+import type {EstimateRates} from '../calc.ts';
 import {MaterialPicker} from '../components/Pickers.tsx';
 import {Btn, Stepper, TextInput, useToast} from '../components/ui.tsx';
 import {
@@ -37,8 +38,8 @@ export function hacchuUrl(): string {
 }
 
 /** 見積書から作った発注書の行と、手で直したところを重ねたもの */
-export function useOrderLines(job: Job, materials: Material[], rate: number) {
-  const base = useMemo(() => orderBaseLines(job, materials, rate), [job.places, materials, rate]);
+export function useOrderLines(job: Job, materials: Material[], rates: EstimateRates) {
+  const base = useMemo(() => orderBaseLines(job, materials, rates), [job.places, materials, rates]);
   return {base, lines: applyOrderEdits(base, job.order), removed: removedLines(base, job.order)};
 }
 
@@ -56,7 +57,7 @@ export function OrderPage({
   onPrint: (r: PrintRequest) => void;
 }) {
   const toast = useToast();
-  const {lines, removed} = useOrderLines(job, data.materials, data.settings.estimateRate);
+  const {lines, removed} = useOrderLines(job, data.materials, data.settings);
   const edits = job.order ?? emptyOrderEdits();
   const [picking, setPicking] = useState(false);
   const name = jobName(job);
@@ -110,7 +111,7 @@ export function OrderPage({
         </Btn>
         <h1 className="text-lg font-bold text-[#14532d]">発注書　{name}</h1>
         <div className="ml-auto flex flex-wrap gap-2">
-          <Btn color="sky" onClick={() => onPrint({kind: 'order', jobId: job.id})} disabled={ordered.length === 0}>
+          <Btn color="softSky" onClick={() => onPrint({kind: 'order', jobId: job.id})} disabled={ordered.length === 0}>
             🖨 発注書を印刷
           </Btn>
           <a
@@ -198,7 +199,7 @@ export function OrderPage({
           place={pickPlace}
           materials={data.materials}
           mode="estimate"
-          rate={data.settings.estimateRate}
+          rates={data.settings}
           // 見積書から作った行にある部材は、その行の数を増やす（同じ部材が2行に分かれないように）
           onAdd={(row) => {
             const same = row.refId ? lines.find((l) => l.refId === row.refId && !l.key.startsWith('add:')) : undefined;

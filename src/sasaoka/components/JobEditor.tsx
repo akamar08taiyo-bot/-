@@ -1,5 +1,5 @@
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
-import {cutToLength, jobName, jobTotals, placeTotals, rowAmount, shikiriPrice} from '../calc.ts';
+import {cutToLength, jobName, jobTotals, placeTotals, rowAmount} from '../calc.ts';
 import type {JobTotals} from '../calc.ts';
 import {cutCalc} from '../estimateForms.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
@@ -152,7 +152,7 @@ export function JobEditor({
         <h1 className="text-lg font-bold text-[#0c315e]">{jobName(job)}</h1>
         {staff && <span className="text-sm font-bold text-slate-500">担当 {staff}</span>}
         <div className="ml-auto flex flex-wrap gap-2">
-          <Btn color="sky" onClick={() => onPrint({kind: 'job', jobId: job.id})}>
+          <Btn color="softSky" onClick={() => onPrint({kind: 'job', jobId: job.id})}>
             🖨 この様邸の明細を印刷
           </Btn>
           <Btn color="white" onClick={() => onOpenEstimate(job.id)} title="同じ入力から作る見積書を「見積もりを作成する」で開きます">
@@ -164,7 +164,7 @@ export function JobEditor({
           <Btn color="white" onClick={leaveInvoice}>
             請求書から外す
           </Btn>
-          <Btn color="rose" onClick={removeJob}>
+          <Btn color="white" onClick={removeJob}>
             削除
           </Btn>
         </div>
@@ -320,7 +320,7 @@ export function JobEditor({
           place={pickPlace}
           materials={data.materials}
           mode="shikiri"
-          rate={s.estimateRate}
+          rates={s}
           onAdd={(row) => setPlace(pickPlace.id, (p) => ({...p, rows: addMaterial(p.rows, row)}))}
           onRemoveOne={(refId) => setPlace(pickPlace.id, (p) => ({...p, rows: removeOneMaterial(p.rows, refId)}))}
           onToggleFavorite={toggleFavorite}
@@ -337,7 +337,7 @@ export function JobEditor({
           materials={data.materials}
           labor={data.labor}
           mode="shikiri"
-          rate={s.estimateRate}
+          rates={s}
           placeName={pickPlace.name}
           onInsert={(rows) => {
             setPlace(pickPlace.id, (p) => ({...p, rows: [...p.rows, ...rows]}));
@@ -472,12 +472,9 @@ function PlaceCard({
                     {(r.code || r.maker) && <div className="px-2 text-[11px] text-slate-500">{[r.maker, r.code].filter(Boolean).join('　')}</div>}
                   </td>
                   <td data-cell="price" data-label="単価" className="px-2 py-1.5 text-right">
-                    {r.kind === 'material' && r.price === 0 && shikiriPrice(r) > 0 ? (
-                      // 仕切価格が空欄の部材は 定価×0.8（打ち込めば、その仕切価格で計算する）
-                      <>
-                        <NumberInput value={0} blankZero placeholder={yen(shikiriPrice(r))} onChange={(price) => setRow(r.id, {price})} className="w-24" ariaLabel="単価" autoFocus={r.id === focusRowId} />
-                        <div className="text-[11px] text-slate-500">定価×0.8</div>
-                      </>
+                    {r.kind === 'material' && r.price === 0 ? (
+                      // 仕切価格が空欄の部材（定価からは計算しない）。打ち込めば、その仕切価格で計算する
+                      <NumberInput value={0} blankZero placeholder="空欄" onChange={(price) => setRow(r.id, {price})} className="w-24" ariaLabel="単価" autoFocus={r.id === focusRowId} />
                     ) : (
                       <NumberInput value={r.price} onChange={(price) => setRow(r.id, {price})} className="w-24" ariaLabel="単価" autoFocus={r.id === focusRowId} />
                     )}

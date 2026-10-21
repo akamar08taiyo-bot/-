@@ -21,6 +21,7 @@ export function copyJob(job: Job): Job {
       rows: copyRows(p.rows),
     })),
     insuredNo: '',
+    estDate: '', // 見積もり作成日は複製した日（空なら作った日）
     overhead: null,
     overheadTarget: null,
     order: null, // 発注書はコピーした見積書から作り直す
@@ -52,13 +53,14 @@ export function LaborPickerFor({
       title={target ? `「${target.name || '部材'}」の施工費（見積書の「同上施工費」）` : `「${place.name || '箇所'}」の取付手間`}
       rows={rows.slice(range[0], range[1])}
       labor={data.labor}
+      laborRate={data.settings.estimateLaborRate}
       onChange={(next) => onRows(replaceRange(rows, range, next))}
       onClose={onClose}
     />
   );
 }
 
-/** 仕切価格も定価も入っていない部材の行（請求書では、その部材代が0円になる。仕切価格だけ空欄なら 定価×0.8 で計算する）。空白の行はのぞく */
+/** 仕切価格が空欄の部材の行（請求書では、その部材代が0円になる。定価からは計算しない）。空白の行はのぞく */
 export const missingShikiri = (job: Job) => job.places.flatMap((p) => p.rows).filter((r) => r.kind === 'material' && shikiriPrice(r) === 0 && !isBlankRow(r));
 
 /** 仕切価格の入っていない部材に、仕切価格を入れる（部材リストにある部材は、部材リストの仕切価格も同じにできる） */

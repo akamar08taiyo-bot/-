@@ -1,6 +1,7 @@
 import {useMemo, useState} from 'react';
 import type {ReactNode} from 'react';
-import {estimateUnitPrice, shikiriPrice} from '../calc.ts';
+import {estimateUnitPrice, rounddown} from '../calc.ts';
+import type {EstimateRates} from '../calc.ts';
 import {guessPieceLengthM} from '../priceImport.ts';
 import {laborCount, manualRow, materialRow, setLaborCount} from '../rows.ts';
 import type {AppMode, LaborItem, Material, Place, Row} from '../types.ts';
@@ -17,7 +18,7 @@ export function MaterialPicker({
   place,
   materials,
   mode,
-  rate,
+  rates,
   onAdd,
   onRemoveOne,
   onToggleFavorite,
@@ -27,7 +28,7 @@ export function MaterialPicker({
   place: Place;
   materials: Material[];
   mode: AppMode;
-  rate: number;
+  rates: EstimateRates; // 見積の単価（定価×率）を出すとき
   onAdd: (row: Row) => void;
   onRemoveOne: (refId: string) => void; // − で1つ減らす（0 で行を消す）
   onToggleFavorite: (id: string) => void;
@@ -138,8 +139,8 @@ export function MaterialPicker({
                 <th className="px-2 py-1.5 text-left">メーカー</th>
                 <th className="px-2 py-1.5 text-right">定価</th>
                 <th className="px-2 py-1.5 text-right">仕切価格</th>
-                {estimate && <th className="px-2 py-1.5 text-right text-indigo-700">見積の単価（定価×{rate}）</th>}
-                <th className="w-32 px-2 py-1.5" />
+                {estimate && <th className="px-2 py-1.5 text-right text-indigo-700">見積の単価（定価×{rates.estimateRate}）</th>}
+                <th className={`${tab === 'fav' ? 'w-44' : 'w-32'} px-2 py-1.5`} />
               </tr>
             </thead>
             <tbody>
@@ -155,21 +156,12 @@ export function MaterialPicker({
                     <td className="px-2 py-1.5 text-xs text-slate-500">{m.maker}</td>
                     <td className="px-2 py-1.5 text-right tabular-nums text-slate-500">{m.listPrice > 0 ? yen(m.listPrice) : '—'}</td>
                     <td className="px-2 py-1.5 text-right tabular-nums">
-                      {m.price > 0 ? (
-                        yen(m.price)
-                      ) : m.listPrice > 0 ? (
-                        // 仕切価格が空欄なら 定価×0.8 で計算する
-                        <span className="text-slate-500" title="仕切価格が空欄なので、定価×0.8 で計算します">
-                          <span className="mr-1 text-[10px]">定価×0.8</span>
-                          {yen(shikiriPrice(materialRow(m)))}
-                        </span>
-                      ) : (
-                        <span className="text-xs font-bold text-amber-700">空欄</span>
-                      )}
+                      {/* 仕切価格が空欄でも、定価からは計算しない（仕切りの率はメーカーごとに違う） */}
+                      {m.price > 0 ? yen(m.price) : <span className="text-xs font-bold text-amber-700">空欄</span>}
                     </td>
                     {estimate && (
                       <td className="px-2 py-1.5 text-right font-bold tabular-nums text-indigo-800">
-                        {m.listPrice > 0 || m.price > 0 ? yen(estimateUnitPrice(materialRow(m), rate)) : <span className="text-xs font-normal text-amber-700">定価なし</span>}
+                        {m.listPrice > 0 || m.price > 0 ? yen(estimateUnitPrice(materialRow(m), rates)) : <span className="text-xs font-normal text-amber-700">定価なし</span>}
                       </td>
                     )}
                     <td className="whitespace-nowrap px-2 py-1 text-right">
@@ -189,6 +181,12 @@ export function MaterialPicker({
                       ) : (
                         <Btn small color="emerald" onClick={() => onAdd(materialRow(m))}>
                           ＋ 追加
+                        </Btn>
+                      )}
+                      {tab === 'fav' && (
+                        // お気に入りから外す（ユーザーの指示）。部材リストには残るので、「すべて」で★を押せばまた入る
+                        <Btn small color="white" className="ml-1.5" onClick={() => onToggleFavorite(m.id)} aria-label={`${m.name}をお気に入りから削除`}>
+                          削除
                         </Btn>
                       )}
                     </td>
@@ -247,12 +245,14 @@ export function LaborCounter({
   title,
   rows,
   labor,
+  laborRate,
   onChange,
   onClose,
 }: {
   title: ReactNode;
   rows: Row[];
   labor: LaborItem[];
+  laborRate: number; // 見積の単価を入れていない手間の、見積の単価＝仕切り×この率
   onChange: (rows: Row[]) => void;
   onClose: () => void;
 }) {
@@ -284,6 +284,7 @@ export function LaborCounter({
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {labor.map((item) => {
           const n = laborCount(rows, item.id);
+          const est = item.estPrice ?? rounddown(item.price * laborRate); // 見積の単価
           return (
             <div
               key={item.id}
@@ -292,7 +293,12 @@ export function LaborCounter({
               <div className="min-w-0">
                 <div className="truncate text-sm font-bold text-slate-800">{item.name}</div>
                 <div className="text-xs tabular-nums text-slate-500">
-                  1箇所 {yen(item.price)}円{n > 0 && <span className="ml-2 font-bold text-sky-800">＝ {yen(item.price * n)}円</span>}
+                  1箇所 仕切り {yen(item.price)}円・見積 {yen(est)}円
+                  {n > 0 && (
+                    <span className="ml-2 font-bold text-sky-800">
+                      ＝ {yen(item.price * n)}円・見積 {yen(rounddown(est * n))}円
+                    </span>
+                  )}
                 </div>
               </div>
               <Stepper value={n} onChange={(v) => onChange(setLaborCount(rows, item, v))} ariaLabel={`${item.name}の箇所数`} />

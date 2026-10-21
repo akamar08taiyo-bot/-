@@ -186,14 +186,17 @@ export function cleanMaterials(raw: unknown): Material[] {
   }));
 }
 
+/** 最初の単価表の見積の単価（見積の単価がなかった前の版の単価表に入れる） */
+const DEFAULT_EST = new Map(DEFAULT_LABOR.map((l) => [l.id, l.estPrice]));
+
 export function cleanLabor(raw: unknown): LaborItem[] {
   if (!Array.isArray(raw)) return DEFAULT_LABOR.map((l) => ({...l}));
-  return raw.filter(isObj).map((l) => ({
-    id: str(l.id) || uid('l'),
-    name: str(l.name),
-    price: numv(l.price),
-    note: str(l.note),
-  }));
+  return raw.filter(isObj).map((l) => {
+    const id = str(l.id) || uid('l');
+    // 前の版（見積の単価がない）は、最初の単価表の見積の単価にする（同じ項目＝同じID）
+    const estPrice = l.estPrice === undefined ? (DEFAULT_EST.get(id) ?? null) : l.estPrice === null || l.estPrice === '' ? null : numv(l.estPrice);
+    return {id, name: str(l.name), price: numv(l.price), estPrice, note: str(l.note)};
+  });
 }
 
 const cleanRow = (r: Record<string, unknown>): Row => ({
@@ -279,6 +282,7 @@ export function cleanJobs(raw: unknown): Job[] {
       suffix: SUFFIXES.includes(j.suffix as NameSuffix) ? (j.suffix as NameSuffix) : '様邸',
       staff: str(j.staff),
       date: /^\d{4}-\d{2}-\d{2}$/.test(str(j.date)) ? str(j.date) : '',
+      estDate: /^\d{4}-\d{2}-\d{2}$/.test(str(j.estDate)) ? str(j.estDate) : '',
       address,
       note: str(j.note),
       insuredNo: str(j.insuredNo),
@@ -346,9 +350,12 @@ export function cleanSettings(raw: unknown): Settings {
   s.placePresets = Array.isArray(raw.placePresets) ? cleanList(raw.placePresets) : DEFAULT_PLACES;
   s.staffList = Array.isArray(raw.staffList) ? cleanList(raw.staffList) : DEFAULT_STAFF;
   s.estimateRate = numv(raw.estimateRate, d.estimateRate);
+  s.estimateLaborRate = Math.max(0, numv(raw.estimateLaborRate, d.estimateLaborRate));
   s.estimateOverheadRate = Math.max(0, numv(raw.estimateOverheadRate, d.estimateOverheadRate));
   s.estimateHourRate = Math.max(0, numv(raw.estimateHourRate, d.estimateHourRate));
   s.estimateForm = FORMS.includes(raw.estimateForm as EstimateForm) ? (raw.estimateForm as EstimateForm) : d.estimateForm;
+  s.kitExample = raw.kitExample === true;
+  s.laborEst = raw.laborEst === true;
   // 版2より前の設定：請求書の消費税は「すべての様邸の合計に最後に消費税率をかける」形に直す
   if (numv(raw.rev, 1) < 2) s.invoiceTaxMode = 'monthly';
   // 版4より前の設定：名字だけの担当者の候補をフルネームにする（見積書に出す）

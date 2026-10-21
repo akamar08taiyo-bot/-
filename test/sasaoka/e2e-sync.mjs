@@ -43,10 +43,10 @@ await shi.waitForFunction(() => document.querySelector('aside table')?.textConte
 assert.equal(await shi.getByRole('textbox', {name: 'L型手すりの数量'}).inputValue(), '2');
 log('見積書で直す → 開いたままの仕切り計算に入るOK');
 
-// ---------------- 仕切り計算でタイルを3箇所にする → 開いたままの見積書の同上施工費が 4,500
+// ---------------- 仕切り計算でタイルを3箇所にする → 開いたままの見積書の同上施工費が 6,000（タイルの見積の単価 2,000×3）
 await shi.getByRole('button', {name: 'タイルの数量を1増やす'}).click();
 await est.waitForFunction(
-  () => [...document.querySelectorAll('.est-sheet .form-page tr')].some((tr) => /同上施工費/.test(tr.textContent ?? '') && /4,500/.test(tr.textContent ?? '')),
+  () => [...document.querySelectorAll('.est-sheet .form-page tr')].some((tr) => /同上施工費/.test(tr.textContent ?? '') && /6,000/.test(tr.textContent ?? '')),
   null,
   {timeout: 5000},
 );

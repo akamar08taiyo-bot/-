@@ -10,7 +10,7 @@ import {dateLabel, num, staffShort, todayIso} from '../util.ts';
 export function OrderDoc({job, data}: {job: Job; data: AppData}) {
   const s = data.settings;
   const edits = job.order ?? null;
-  const lines = orderedLines(applyOrderEdits(orderBaseLines(job, data.materials, s.estimateRate), edits));
+  const lines = orderedLines(applyOrderEdits(orderBaseLines(job, data.materials, s), edits));
   const telFax = [s.tel && `TEL ${s.tel}`, s.fax && `FAX ${s.fax}`].filter(Boolean).join('　');
   return (
     <div className="sheet order-doc">

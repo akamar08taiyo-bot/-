@@ -12,6 +12,10 @@ const COLORS = {
   purple: 'bg-purple-600 hover:bg-purple-700 text-white', // メーカー・取り込み
   amber: 'bg-amber-500 hover:bg-amber-600 text-white',
   white: 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-300',
+  // 薄い色（ユーザーの指示：色を付けるのは保存・Excel・印刷くらいにして、濃い色にしない。削除・白紙に戻す・発注書などは白）
+  softBlue: 'bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200', // 保存
+  softGreen: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300', // Excel で保存
+  softSky: 'bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300', // 印刷
 } as const;
 
 export type BtnColor = keyof typeof COLORS;
@@ -102,7 +106,7 @@ export function NumberInput({
 }
 
 /** −／＋ で数える欄（取付手間の箇所数・部材の数量） */
-export function Stepper({value, onChange, ariaLabel}: {value: number; onChange: (n: number) => void; ariaLabel?: string}) {
+export function Stepper({value, onChange, ariaLabel, blankZero = false}: {value: number; onChange: (n: number) => void; ariaLabel?: string; blankZero?: boolean}) {
   return (
     <div className="inline-flex items-center gap-1">
       <button
@@ -113,7 +117,7 @@ export function Stepper({value, onChange, ariaLabel}: {value: number; onChange: 
       >
         −
       </button>
-      <NumberInput value={value} onChange={(n) => onChange(roundQty(n))} min={0} ariaLabel={ariaLabel} className="w-14 text-center" />
+      <NumberInput value={value} onChange={(n) => onChange(roundQty(n))} min={0} ariaLabel={ariaLabel} className="w-14 text-center" blankZero={blankZero} />
       <button
         type="button"
         aria-label={`${ariaLabel ?? '数量'}を1増やす`}

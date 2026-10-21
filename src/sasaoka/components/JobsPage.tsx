@@ -113,10 +113,10 @@ export function JobsPage({
           ＋ 様邸を追加
         </Btn>
         <div className="ml-auto flex flex-wrap gap-2">
-          <Btn color="sky" disabled={jobs.length === 0} onClick={() => onPrint({kind: 'invoice', month, withDetails: false})}>
+          <Btn color="softSky" disabled={jobs.length === 0} onClick={() => onPrint({kind: 'invoice', month, withDetails: false})}>
             🖨 請求書を印刷
           </Btn>
-          <Btn color="cyan" disabled={jobs.length === 0} onClick={() => onPrint({kind: 'invoice', month, withDetails: true})}>
+          <Btn color="softSky" disabled={jobs.length === 0} onClick={() => onPrint({kind: 'invoice', month, withDetails: true})}>
             🖨 請求書＋各様邸の明細
           </Btn>
           <Btn color="white" disabled={jobs.length === 0} onClick={saveCsv}>

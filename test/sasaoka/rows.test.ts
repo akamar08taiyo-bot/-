@@ -3,8 +3,8 @@ import test from 'node:test';
 import {kitFromRows, kitRows, laborCount, laborRow, materialRow, replaceRange, setLaborCount, workRange} from '../../src/sasaoka/rows.ts';
 import type {LaborItem, Material} from '../../src/sasaoka/types.ts';
 
-const wood: LaborItem = {id: 'l01', name: '木', price: 1000, note: ''};
-const tile: LaborItem = {id: 'l02', name: 'タイル', price: 1500, note: ''};
+const wood: LaborItem = {id: 'l01', name: '木', price: 1000, estPrice: null, note: ''};
+const tile: LaborItem = {id: 'l02', name: 'タイル', price: 1500, estPrice: null, note: ''};
 const rail: Material = {
   id: 'm1',
   name: '木製手すり 4m',

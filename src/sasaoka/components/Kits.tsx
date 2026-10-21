@@ -1,4 +1,5 @@
 import {estimatePlaceLines, placeTotals} from '../calc.ts';
+import type {EstimateRates} from '../calc.ts';
 import {kitRows} from '../rows.ts';
 import type {AppMode, Kit, LaborItem, Material, Row} from '../types.ts';
 import {num, yen} from '../util.ts';
@@ -12,7 +13,7 @@ export function KitPicker({
   materials,
   labor,
   mode,
-  rate,
+  rates,
   placeName,
   onInsert,
   onRename,
@@ -24,7 +25,7 @@ export function KitPicker({
   materials: Material[];
   labor: LaborItem[];
   mode: AppMode;
-  rate: number;
+  rates: EstimateRates;
   placeName: string;
   onInsert: (rows: Row[]) => void;
   onRename: (id: string, name: string) => void;
@@ -65,7 +66,7 @@ export function KitPicker({
           {kits.map((kit) => {
             const rows = kitRows(kit, materials, labor);
             const shikiri = placeTotals({rows}).total;
-            const est = estimatePlaceLines({rows}, rate).reduce((n, l) => n + l.amount, 0);
+            const est = estimatePlaceLines({rows}, rates).reduce((n, l) => n + l.amount, 0);
             return (
               <li key={kit.id} className="rounded-lg border border-slate-200 p-3">
                 <div className="flex flex-wrap items-center gap-2">

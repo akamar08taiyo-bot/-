@@ -5,7 +5,7 @@ import type {MonthSummary} from '../calc.ts';
 import {cutCalc, FORM_INFO, insurerLabel, jobForm} from '../estimateForms.ts';
 import type {AppData, Job, Settings} from '../types.ts';
 import {dateLabel, monthEnd, monthLabel, num, shortDate, staffShort, todayIso, yen} from '../util.ts';
-import {useDocMeta} from './docMeta.ts';
+import {estimateDateOf, useDocMeta} from './docMeta.ts';
 import type {DocMeta} from './docMeta.ts';
 import {KouikiForm, YukuhashiForm} from './EstimateForms.tsx';
 import {OrderDoc} from './OrderDoc.tsx';
@@ -41,9 +41,10 @@ function useFitScale(pageMm: number) {
 
 export function PrintView({request, data, onClose}: {request: PrintRequest; data: AppData; onClose: () => void}) {
   const month = request.kind === 'invoice' ? request.month : data.jobs.find((j) => j.id === request.jobId)?.month ?? '';
-  const [meta, setMeta] = useDocMeta(request.kind === 'estimate' ? `est:${request.jobId}` : month, () => {
+  // 請求日など（請求書は月ごとに覚える）。見積書の作成日は様邸に持つ見積もり作成日（見積書の画面で入れる）
+  const [meta, setMeta] = useDocMeta(request.kind === 'estimate' ? '' : month, () => {
     const today = todayIso();
-    return request.kind !== 'estimate' && today.slice(0, 7) > month ? monthEnd(month) : today;
+    return today.slice(0, 7) > month ? monthEnd(month) : today;
   });
   // 見積書は A4横（元の Excel と同じ）
   const estJob = request.kind === 'estimate' ? data.jobs.find((j) => j.id === request.jobId) : undefined;
@@ -93,7 +94,7 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
       form === 'kouiki' ? (
         <KouikiForm job={job} settings={data.settings} />
       ) : (
-        <YukuhashiForm job={job} settings={data.settings} date={meta.date} />
+        <YukuhashiForm job={job} settings={data.settings} date={estimateDateOf(job)} />
       )
     ) : (
       <JobDoc job={job} settings={data.settings} />
@@ -109,15 +110,6 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
           {form && estJob ? `見積書（A4横）・${insurerLabel(estJob, data.settings)}「${FORM_INFO[form].title}」` : request.kind === 'order' ? '発注書（A4縦）' : '印刷イメージ（A4縦）'}
           <span className="ml-2 hidden font-normal text-slate-300 sm:inline">印刷の画面で「PDFに保存」を選ぶとPDFにできます</span>
         </div>
-        {form === 'yukuhashi' && (
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <label className="flex items-center gap-1">
-              作成日
-              <input type="date" value={meta.date} onChange={(e) => setMeta({...meta, date: e.target.value})} className="h-8 rounded bg-white px-1 text-slate-900" />
-            </label>
-            <span className="text-slate-300">（空にすると「令和　年　月　日」のまま）</span>
-          </div>
-        )}
         {request.kind === 'invoice' && (
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <label className="flex items-center gap-1">
