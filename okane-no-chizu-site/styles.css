@@ -15,3 +15,7 @@
 .market-chart.compact text{font-size:22px}.market-chart.savings-chart.compact text{font-size:17px}.chart-legend{font-size:14px;line-height:1.8;text-align:center}.result-breakdown.is-long{grid-template-columns:1fr;gap:14px}
 .chapters,.reader-sidebar{min-width:0}
 .static-chart-scroll{overflow-x:auto;max-width:100%}.static-chart-scroll .market-chart{min-width:640px}.static-chart-scroll .market-chart text{font-size:21px}@media print{.static-chart-scroll{overflow:visible}.static-chart-scroll .market-chart{min-width:0}}
+
+/* 上の名前（三大無料プレゼント）が長いので、せまい画面では小さくして、メニューと1行に入れる */
+@media(max-width:420px){.site-header .header-inner{gap:12px}.site-header .brand{font-size:19px;gap:8px}.site-header .brand-mark{width:38px;height:34px}}
+@media(max-width:340px){.site-header .brand{font-size:17px}}
