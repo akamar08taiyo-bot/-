@@ -30,7 +30,7 @@ export function JobEditor({
   update: Update;
   onBack: () => void;
   onOpen: (id: string) => void;
-  onOpenEstimate: (id: string) => void; // 「見積もりを作成する」で同じ様邸の見積書を開く
+  onOpenEstimate: (id: string) => void; // 「見積もり・申請書を作成する」で同じ様邸の見積書を開く
   onBackToEstimate: () => void; // 左上の「← 見積もりへ戻る」：この様邸の見積書を開く（請求書のタブは一覧に戻しておく）
   onPrint: (r: PrintRequest) => void;
   onManageKits?: () => void; // 部材・施工費マスタの「部材＋施工費（常用）」を開く
@@ -106,7 +106,7 @@ export function JobEditor({
   // 見積書は残して、この請求書にだけ入れない
   const leaveInvoice = () => {
     setJob((j) => ({...j, shikiri: false}));
-    toast(`「${jobName(job)}」を請求書から外しました（見積書は「見積もりを作成する」に残っています）`);
+    toast(`「${jobName(job)}」を請求書から外しました（見積書は「見積もり・申請書を作成する」に残っています）`);
     onBack();
   };
   const duplicate = () => {
@@ -158,7 +158,7 @@ export function JobEditor({
           <Btn color="softSky" onClick={() => onPrint({kind: 'job', jobId: job.id})}>
             🖨 この様邸の明細を印刷
           </Btn>
-          <Btn color="white" onClick={() => onOpenEstimate(job.id)} title="同じ入力から作る見積書を「見積もりを作成する」で開きます">
+          <Btn color="white" onClick={() => onOpenEstimate(job.id)} title="同じ入力から作る見積書を「見積もり・申請書を作成する」で開きます">
             📝 見積書を開く
           </Btn>
           <Btn color="white" onClick={duplicate}>
@@ -313,7 +313,7 @@ export function JobEditor({
             ①〜⑦は元の「仕切り計算表」と同じ式です。③④⑤は1円単位にしてから足しているので、表の数字は縦にも横にも合います。
           </p>
           <p className="mt-2 text-xs leading-5 text-slate-500">
-            見積書は「見積もりを作成する」で、この様邸と同じ入力から作ります（どちらで部材・取付手間を直しても、もう片方も変わります）。
+            見積書は「見積もり・申請書を作成する」で、この様邸と同じ入力から作ります（どちらで部材・取付手間を直しても、もう片方も変わります）。
           </p>
         </aside>
       </div>

@@ -26,7 +26,7 @@ await page.goto(`${site}/jutaku-mitsumori/index.html`);
 assert.ok((await page.locator('main').innerText()).includes('見積書はまだありません'));
 await page.getByRole('button', {name: /サンプルで試す/}).click();
 
-// ---------------- 一覧：見積の合計・保険者・担当・笹岡工務店の請求書の印
+// ---------------- 一覧：見積の合計・笹岡工務店の請求書の印（改修場所・保険者・担当は出さない。ユーザーの指示）
 // 玄関：木の手すり 定価20,000（1本4m）を60cm → 0.15本×16,000＝2,400・同上施工費（木2。見積は1箇所1,500）3,000・ブラケット 2,100×0.8＝1,680×2
 // トイレ：L型 11,000×0.8＝8,800・同上施工費（タイル2。見積は1箇所2,000）4,000・キャップ 450×0.8＝360×2
 // 部材 15,280・施工費 7,000・小計 22,280・諸経費 2,228（10%）・消費税 2,450（(22,280＋2,228)×0.1 切り捨て）・合計 26,958
@@ -34,8 +34,27 @@ const now = new Date();
 const thisMonthLabel = `${now.getFullYear()}年${now.getMonth() + 1}月分に入れる`;
 const sampleRow = page.getByRole('row', {name: /（サンプル）山田様邸/});
 const rowText = await sampleRow.innerText();
-for (const v of ['行橋市', '久保', '26,958', thisMonthLabel]) assert.ok(rowText.includes(v), `一覧に ${v} がない: ${rowText}`);
+for (const v of ['26,958', thisMonthLabel]) assert.ok(rowText.includes(v), `一覧に ${v} がない: ${rowText}`);
+for (const v of ['行橋市', '久保', '玄関・トイレ']) assert.ok(!rowText.includes(v), `一覧に ${v} が出ている: ${rowText}`);
 log('一覧OK');
+
+// ---------------- 一覧の先頭のチェック：選んで次月に回す・前月に回す（一覧の月＝様邸の月。笹岡工務店の請求書の月も一緒に）
+const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+const nextMonth = `${next.getFullYear()}年${next.getMonth() + 1}月`;
+const bar = page.getByRole('status', {name: '選んだ見積書'});
+assert.equal(await bar.count(), 0);
+await sampleRow.getByRole('checkbox', {name: '選ぶ'}).check();
+assert.match(await bar.innerText(), /1件を選んでいます/);
+await bar.getByRole('button', {name: '次月に回す ▶'}).click();
+await page.locator('[aria-live] > div', {hasText: `1件を${nextMonth}に回しました`}).waitFor();
+assert.equal(await sampleRow.count(), 0); // この月の一覧から消える
+await page.getByRole('button', {name: '次の月'}).click();
+assert.ok((await sampleRow.innerText()).includes(`${nextMonth}分に入れる`));
+await page.getByRole('checkbox', {name: 'すべて選ぶ'}).check();
+await bar.getByRole('button', {name: '◀ 前月に回す'}).click();
+await page.getByRole('button', {name: '前の月'}).click();
+assert.ok((await sampleRow.innerText()).includes(thisMonthLabel));
+log('一覧の先頭のチェックで次月・前月に回すOK');
 
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 const sheet = page.getByRole('region', {name: '見積書', exact: true});
@@ -84,7 +103,7 @@ assert.equal(works.length, 3, works.join('|'));
 assert.ok(works[0].includes('3,000') && works[1].includes('1,500') && works[2].includes('4,000'), works.join('|'));
 log('部材ごとの同上施工費OK');
 
-// ---------------- 部材＋施工費（常用）：トイレの行を選んで「部材＋施工費（常用）から入れる」→ トイレのうしろに4行（木の手すり 16,000・同上施工費 3,000・ブラケット 3,360・キャップ 720）
+// ---------------- 部材＋施工費（常用）：トイレの L型手すりを選んで「部材＋施工費（常用）から入れる」→ 選んだ行（と同上施工費）のすぐ下に4行（木の手すり 16,000・同上施工費 3,000・ブラケット 3,360・キャップ 720）
 await cell(await key('L型手すり', 'text')).click();
 await sheet.getByRole('button', {name: '＋ 部材＋施工費（常用）から入れる'}).click();
 // 最初に入る例（BD-134 と BD-08G は数量を空けておく。施工費は木 2箇所＝見積 3,000円）と、サンプルのセット
@@ -100,11 +119,11 @@ assert.deepEqual(texts, [
   '同上施工費',
   'サンプル S-TL01 L型手すり',
   '同上施工費',
-  'サンプル S-EC01 エンドキャップ',
   'サンプル S-TS35 木の手すり 35φ 4m',
   '同上施工費',
   'サンプル S-BK01 ブラケット',
   'サンプル S-EC01 エンドキャップ',
+  'サンプル S-EC01 エンドキャップ', // もとからあったキャップは、入れた4行の下
 ]);
 // 小計 24,680＋1,500＋23,080＝49,260 → 諸経費 4,926 → 消費税 5,418 → 合計 59,604
 assert.deepEqual(await totals(), ['合計', '59,604', '59,604']);
@@ -219,7 +238,7 @@ log('見積書（広域連合用）の印刷OK');
 
 // ---------------- 一覧に戻る：書式が変わっている。探す
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
-assert.ok((await sampleRow.innerText()).includes('広域連合'));
+await sampleRow.waitFor();
 const search = page.getByRole('textbox', {name: '見積書を探す'});
 await search.fill('山田');
 assert.equal(await page.locator('tbody tr').count(), 1);
@@ -253,7 +272,7 @@ log('複製・削除OK');
 
 // ---------------- 部材・施工費マスタ（請求書と同じ部材リスト）：Excel の「定価」の列も読む。施工費（笹岡工務店の手間）も同じタブ
 await page.getByRole('navigation').getByRole('button', {name: /部材・施工費マスタ/}).click();
-assert.ok((await page.locator('main').innerText()).includes('見積書（見積もりを作成する）と請求書（請求書を確認する）の両方で使います'));
+assert.ok((await page.locator('main').innerText()).includes('見積書（見積もり・申請書を作成する）と請求書（請求書を確認する）の両方で使います'));
 await page.getByRole('button', {name: /メーカーの仕切り表を取り込む/}).click();
 await page.locator('[role=dialog] input[type=file]').setInputFiles(path.join(FIX, 'maker-list.xlsx'));
 await page.getByRole('button', {name: '部材リストに取り込む（5件）'}).click();
@@ -292,7 +311,7 @@ await page.getByRole('tab', {name: '部材＋施工費（常用・3件）'}).wai
 log('部材＋施工費（常用）のセットを登録OK');
 
 // ---------------- 見積書の「＋ 部材＋施工費（常用）から入れる」に、登録したセットが出る。そこから部材・施工費マスタへも行ける
-await page.getByRole('navigation').getByRole('button', {name: /見積もりを作成する/}).click();
+await page.getByRole('navigation').getByRole('button', {name: /見積もり・申請書を作成する/}).click();
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 await sheet.getByRole('button', {name: '＋ 部材＋施工費（常用）から入れる'}).click();
 const kitDialog = page.getByRole('dialog');
@@ -310,7 +329,7 @@ assert.ok(settings.includes('請求先（工務店）の名前') && settings.inc
 log('設定OK');
 
 // ---------------- 苅田町・行橋市・みやこ町用で「📄 白紙に戻す」：明細もお客様名も消え、お客様名の欄が選ばれてそのまま打ち込める。Ctrl+Z で戻る
-await page.getByRole('navigation').getByRole('button', {name: /見積もりを作成する/}).click();
+await page.getByRole('navigation').getByRole('button', {name: /見積もり・申請書を作成する/}).click();
 const sampleCell = page.getByRole('cell', {name: /（サンプル）山田様邸/});
 await Promise.race([sheet.waitFor(), sampleCell.waitFor()]); // 開いていた見積書に戻るか、一覧
 if ((await sheet.count()) === 0) await sampleCell.click();

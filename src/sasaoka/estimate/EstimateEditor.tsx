@@ -9,17 +9,18 @@ import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerForAddress, jobForm, jobInsurer, NO_SHINSEI} from '../estimateForms.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
-import {addMaterial, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
+import {addMaterial, insertRowsAt, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
 import type {AppData, Insurer, Job, Kit, Material, NameSuffix, Place} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {staffFull, thisMonth, todayIso} from '../util.ts';
 import {duplicateEstimate, removeEstimate, saveEstimateExcel} from './EstimateList.tsx';
 
+// at：見積書で選んでいた（タップしていた）行。部材・部材＋施工費（常用）はそこに入れる（`insertRowsAt`）
 type Picker =
-  | {placeId: string; kind: 'material'}
-  // rowId の部材のすぐ下の手間（見積書の「同上施工費」）だけを数える
+  | {placeId: string; kind: 'material'; at: string | null}
+  // rowId：見積書で選んでいた行。施工費はそこに入れる（部材ならその同上施工費、空白の行ならその行。`laborSpot`）
   | {placeId: string; kind: 'labor'; rowId: string | null}
-  | {placeId: string; kind: 'kit'};
+  | {placeId: string; kind: 'kit'; at: string | null};
 
 export function EstimateEditor({
   job,
@@ -263,9 +264,9 @@ export function EstimateEditor({
         form={form}
         materials={data.materials}
         setJob={setJob}
-        onPickMaterial={(placeId) => setPicker({placeId: placeFor(placeId), kind: 'material'})}
+        onPickMaterial={(placeId, rowId) => setPicker({placeId: placeFor(placeId), kind: 'material', at: placeId ? rowId : null})}
         onPickLabor={(placeId, rowId) => setPicker({placeId: placeFor(placeId), kind: 'labor', rowId})}
-        onPickKit={(placeId) => setPicker({placeId: placeFor(placeId), kind: 'kit'})}
+        onPickKit={(placeId, rowId) => setPicker({placeId: placeFor(placeId), kind: 'kit', at: placeId ? rowId : null})}
         onPrint={() => onPrint({kind: 'estimate', jobId: job.id})}
       />
 
@@ -276,7 +277,12 @@ export function EstimateEditor({
           materials={data.materials}
           mode="estimate"
           rates={s}
-          onAdd={(row) => setPlace(pickPlace.id, (p) => ({...p, rows: addMaterial(p.rows, row)}))}
+          onAdd={(row) => {
+            const at = picker.at;
+            setPlace(pickPlace.id, (p) => ({...p, rows: addMaterial(p.rows, row, at)}));
+            // 続けて選んだ部材は、いま入れた行のすぐ下に（同じ部材なら数が増えるだけなので、そのまま）
+            if (!pickPlace.rows.some((r) => r.kind === 'material' && r.refId === row.refId)) setPicker((pk) => (pk && pk.kind === 'material' ? {...pk, at: row.id} : pk));
+          }}
           onRemoveOne={(refId) => setPlace(pickPlace.id, (p) => ({...p, rows: removeOneMaterial(p.rows, refId)}))}
           onToggleFavorite={toggleFavorite}
           onAddToMaster={addToMaster}
@@ -301,10 +307,8 @@ export function EstimateEditor({
           rates={s}
           placeName={pickPlace.name}
           onInsert={(rows) => {
-            setPlace(pickPlace.id, (p) => ({
-              ...p,
-              rows: [...p.rows, ...rows],
-            }));
+            const at = picker.at;
+            setPlace(pickPlace.id, (p) => ({...p, rows: insertRowsAt(p.rows, rows, at)}));
             setPicker(null);
             toast(`部材＋施工費（常用）の${rows.length}行を「${pickPlace.name || '箇所'}」に入れました`);
           }}

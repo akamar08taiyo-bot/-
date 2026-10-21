@@ -141,7 +141,7 @@ export function JobsPage({
             <li>
               見積書は「
               <button type="button" className="font-bold text-emerald-800 underline" onClick={goEstimate}>
-                見積もりを作成する
+                見積もり・申請書を作成する
               </button>
               」で作ります。見積書に入れた部材・施工費は、そのままこの一覧（請求する月の分）に入り、自動で計算されます。
             </li>

@@ -205,6 +205,9 @@ test('介護保険の対象外を切り替える・お客様名などの欄・�
   assert.equal(estimateTotals(job, S).excluded, 0);
   job = applySheet(job, 'job:customer', ' 山田 ', yk).job;
   assert.equal(job.customer, '山田');
+  // 被保険者番号は確定したら右に詰めて、空いた左は 0（ユーザーの指示）
+  job = applySheet(job, 'job:insuredNo', '366989', yk).job;
+  assert.equal(job.insuredNo, '0000366989');
   job = applySheet(job, 'overhead:all', '800', yk).job;
   assert.equal(estimateTotals(job, S).all.overhead, 800);
   job = applySheet(job, 'overhead:all', '', yk).job;

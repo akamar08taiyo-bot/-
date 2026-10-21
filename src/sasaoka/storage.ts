@@ -8,7 +8,7 @@
 import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES, SETTINGS_REV, STAFF_FULL_NAMES} from './defaults.ts';
 import {guessPieceLengthM} from './priceImport.ts';
 import {jobInsurer, MARK_INFO, MARK_KEYS, NO_SHINSEI} from './estimateForms.ts';
-import type {AppData, EstimateForm, Insurer, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, PlacePhotos, Rounding, Row, Settings, ShinseiInfo, TaxMode} from './types.ts';
+import type {AppData, EstimateForm, Insurer, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, PlaceDims, PlacePhotos, Rounding, Row, Settings, ShinseiInfo, TaxMode} from './types.ts';
 import {uid} from './util.ts';
 
 const DB_NAME = 'taiyo-sasaoka-shikiri';
@@ -232,8 +232,17 @@ const cleanPlace = (p: Record<string, unknown>): Place => ({
   photo: Math.max(0, Math.floor(numv(p.photo))),
   // 前の版の「工事名称」（work）は読まない。見積書の改修内容・工事名称は改修の種類から
   ...(str(p.shinseiText).trim() ? {shinseiText: str(p.shinseiText)} : {}),
+  ...cleanDims(p.dims),
   ...cleanPhotos(p.photos),
 });
+
+/** 改修の内容の寸法（打ったままの文字）。どれもなければ持たない */
+function cleanDims(raw: unknown): {dims?: PlaceDims} {
+  if (!isObj(raw)) return {};
+  const dims: PlaceDims = {};
+  for (const k of ['l', 'h', 'w', 'd'] as const) if (str(raw[k]).trim()) dims[k] = str(raw[k]);
+  return Object.keys(dims).length ? {dims} : {};
+}
 
 /** 箇所の写真（改修前・改修後の写真の番号）。どちらもなければ持たない */
 function cleanPhotos(raw: unknown): {photos?: PlacePhotos} {

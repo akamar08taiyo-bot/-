@@ -1,10 +1,9 @@
 // 申請書のプレビュー：原本の様式のまま描く（材料は shinseiPreview.ts。Excel に保存するときと同じ書き込みをしたもの）。
-// 欄を押すと、その項目を入れる所が欄のすぐ下に出る（打つとプレビューもすぐ変わる。Enter で次の欄へ）。
-// 丸で囲む値（男・女など）は押すと丸がつく（もう一度押すと外れる）。まだ入っていない欄は薄い黄色。スマホでは入れる所を画面の下に出す。
-// 写真貼付用紙は、改修前・改修後の枠に写真を重ねて出す（枠に写真のファイル・写真の欄の写真をドロップ、押して選ぶ）
-
+// 申請書のタブで、一覧で入れながら横で見る（ユーザーの指示「一覧から入力をメインとする。プレビューをみながら入力」）。
+// 一覧で入れている項目の欄は囲んで、見える所まで動かす。欄を押すと一覧のその項目へ。丸で囲む値（男・女など）は押すと丸がつく（もう一度押すと外れる）。
+// まだ入っていない欄は薄い黄色。写真貼付用紙は、改修前・改修後の枠に写真を重ねて出す（枠に写真のファイル・写真の欄の写真をドロップ、押して選ぶ）
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
-import type {CSSProperties, DragEvent, KeyboardEvent, ReactNode} from 'react';
+import type {CSSProperties, DragEvent, RefObject} from 'react';
 import type {PvFont, PvHeader, PvPage, PvPhotoSlot, PvShape, PvText, Rect, ShinseiField} from '../shinseiPreview.ts';
 import {circled} from '../estimateForms.ts';
 import {photoFit} from '../shinsei.ts';
@@ -12,7 +11,6 @@ import type {ShinseiMarks} from '../types.ts';
 
 const PAD = 18; // 紙の余白（画素）
 const MAX_SCALE = 1.3; // 広い画面では少し大きく
-const PHONE = 640; // これより狭い画面は、入れる所を画面の下に出す
 
 /** 要素の幅（画面の幅が変わったら測り直す） */
 function useWidth<T extends HTMLElement>() {
@@ -243,134 +241,42 @@ export function ShinseiPages({
   label,
   onOpen,
   onToggle,
-  onMove,
-  editor,
-  wide,
   photos,
+  scrollBox,
 }: {
   pages: PvPage[];
   missing: Partial<Record<ShinseiField, boolean>>;
-  active: ShinseiField | null; // 入れる所を開いている項目
+  active: ShinseiField | null; // 一覧で入れている項目（その欄を囲む）
   marks: ShinseiMarks; // 今の丸
   label: (f: ShinseiField) => string;
-  onOpen: (f: ShinseiField | null) => void;
+  onOpen: (f: ShinseiField) => void; // 欄を押したとき（一覧のその項目へ）
   onToggle: (key: keyof ShinseiMarks, option: string) => void;
-  onMove: (dir: 1 | -1) => void; // 前・次の項目へ
-  editor: ReactNode; // 開いている項目の入れる所
-  wide: boolean; // 入れる所を広く（改修の内容）
   photos?: PreviewPhotos; // 写真貼付用紙の写真（ないときは枠を出さない）
+  scrollBox?: RefObject<HTMLElement | null>; // プレビューを入れた枠（一覧の横に並べて、枠の中で動くとき）
 }) {
   const [wrapRef, wrapWidth] = useWidth<HTMLDivElement>();
-  // どの欄を押して開いたか（同じ項目が2枚目にもあるとき＝式で同じ値を出している欄、押した方の下に出す）
-  const [spot, setSpot] = useState<{page: number; rect: Rect} | null>(null);
-  const phone = wrapWidth > 0 && wrapWidth < PHONE;
   const widest = Math.max(...pages.map((p) => paper(p).width), 1);
   const scale = wrapWidth ? Math.min(MAX_SCALE, wrapWidth / widest) : 1;
 
-  // 開いている項目の欄：押した欄、なければ最初に出てくる欄
-  let anchor: {page: number; rect: Rect} | null = null;
-  if (active) {
-    if (spot && pages[spot.page]?.fields.some((f) => f.field === active && f.x === spot.rect.x && f.y === spot.rect.y)) anchor = spot;
-    else {
-      const page = pages.findIndex((p) => p.fields.some((f) => f.field === active));
-      const f = page >= 0 ? pages[page].fields.find((x) => x.field === active) : undefined;
-      if (f) anchor = {page, rect: f};
-    }
-  }
-
-  // 開いた欄が見えるように動かし、入れる所の最初の欄にカーソルを置く（Enter のすぐあとに打った文字も次の欄に入るように、描いたすぐあと）
-  const popRef = useRef<HTMLDivElement>(null);
-  const spotRef = useRef<HTMLDivElement>(null);
-  const anchorKey = anchor ? `${active}:${anchor.page}:${anchor.rect.x}:${anchor.rect.y}` : '';
-  useLayoutEffect(() => {
-    if (!anchorKey) return;
-    spotRef.current?.scrollIntoView({block: phone ? 'center' : 'nearest', behavior: 'smooth'});
-    // 打つ欄があればその最初（生年月日は年）、なければ丸の値（性別など）の最初
-    const first = popRef.current?.querySelector<HTMLElement>('input[data-nav], select[data-nav], textarea') ?? popRef.current?.querySelector<HTMLElement>('[role="group"] button');
-    first?.focus({preventScroll: true});
-    if (first instanceof HTMLInputElement && first.type !== 'date') first.select();
-  }, [anchorKey]);
-
-  // 外を押したら閉じる（欄・丸・入れる所を押したときは閉じない）
+  // 一覧で入れている項目の欄（同じ項目が2枚目にもあるとき＝式で同じ値を出している欄は、最初に出てくる欄）が見えるように、プレビューの枠の中を動かす。
+  // 縦に並べた狭い画面（枠が動かない）では、画面ごと動かさない（入れている欄が見えなくなるので）
+  const firstRef = useRef<HTMLDivElement>(null);
+  const firstKey = active ? `${active}:${pages.findIndex((p) => p.fields.some((f) => f.field === active))}` : '';
   useEffect(() => {
-    if (!active) return;
-    const onDown = (e: PointerEvent) => {
-      const el = e.target as HTMLElement | null;
-      if (el?.closest('[data-shinsei-pop], [data-shinsei-spot]')) return;
-      onOpen(null);
-    };
-    document.addEventListener('pointerdown', onDown);
-    return () => document.removeEventListener('pointerdown', onDown);
-  }, [active, onOpen]);
-
-  // Enter で次の欄（入れる所の中の次の欄、最後なら次の項目）。Esc で閉じる
-  const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      onOpen(null);
-      return;
-    }
-    if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
-    const el = e.target as HTMLElement;
-    if (!el.matches('input')) return;
-    e.preventDefault();
-    const all = [...e.currentTarget.querySelectorAll<HTMLElement>('input[data-nav], select[data-nav]')];
-    const next = all[all.indexOf(el) + (e.shiftKey ? -1 : 1)];
-    if (next) next.focus();
-    else onMove(e.shiftKey ? -1 : 1);
-  };
-
-  const popWidth = Math.min(wide ? 760 : 540, Math.max(wrapWidth - 8, 280));
-  // 入れる所の左の位置（紙の左から）。紙は真ん中に置いているので、紙の外（画面の端まで）にはみ出してもよい
-  const popLeft = (page: PvPage, rect: Rect) => {
-    const side = (wrapWidth - paper(page).width * scale) / 2;
-    return Math.max(4 - side, Math.min((PAD + rect.x) * scale, paper(page).width * scale + side - popWidth - 4));
-  };
-  const pop =
-    active && anchor ? (
-      <div
-        ref={popRef}
-        data-shinsei-pop
-        role="dialog"
-        aria-label={`${label(active)}を入れる`}
-        onKeyDown={onKey}
-        className={
-          phone
-            ? 'fixed inset-x-0 bottom-0 z-40 max-h-[60vh] overflow-y-auto rounded-t-2xl border-t-2 border-sky-600 bg-white px-3 pb-4 pt-2 shadow-[0_-8px_24px_rgba(0,0,0,0.18)]'
-            : 'absolute z-30 rounded-xl border-2 border-sky-600 bg-white px-3 pb-3 pt-2 shadow-xl'
-        }
-        style={
-          phone
-            ? undefined
-            : {
-                width: popWidth,
-                left: popLeft(pages[anchor.page], anchor.rect),
-                top: (PAD + paper(pages[anchor.page]).head + anchor.rect.y + anchor.rect.h) * scale + 6,
-              }
-        }
-      >
-        <div className="mb-2 flex items-center gap-1.5">
-          <span className="text-sm font-bold text-sky-900">{label(active)}</span>
-          <span className="ml-auto" />
-          <button type="button" onClick={() => onMove(-1)} className="rounded-md border border-slate-300 px-2 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50" aria-label="前の欄">
-            ◀ 前
-          </button>
-          <button type="button" onClick={() => onMove(1)} className="rounded-md border border-slate-300 px-2 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50" aria-label="次の欄">
-            次 ▶
-          </button>
-          <button type="button" onClick={() => onOpen(null)} className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-100" aria-label="閉じる">
-            ✕
-          </button>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">{editor}</div>
-      </div>
-    ) : null;
+    const box = scrollBox?.current;
+    const el = firstRef.current;
+    if (!box || !el || box.scrollHeight <= box.clientHeight + 1) return;
+    const b = box.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    if (r.top >= b.top + 8 && r.bottom <= b.bottom - 8) return;
+    box.scrollTo({top: box.scrollTop + r.top - b.top - b.height / 3, behavior: 'smooth'});
+  }, [firstKey]);
+  let firstDone = false;
 
   return (
     <div ref={wrapRef} className="space-y-4" aria-label="申請書のプレビュー">
-      {pages.map((page, pi) => {
+      {pages.map((page) => {
         const pp = paper(page);
-        const isAnchor = anchor?.page === pi;
         return (
           <div key={page.sheet} className="relative mx-auto" style={{width: pp.width * scale, height: pp.height * scale}}>
             <div
@@ -428,23 +334,20 @@ export function ShinseiPages({
                     <ShapeView key={i} s={s} />
                   ))}
                 </svg>
-                {/* 押すと入れられる欄（まだ入っていない欄は薄い黄色） */}
+                {/* 押すと一覧のその項目へ（まだ入っていない欄は薄い黄色、入れている項目は囲む） */}
                 {page.fields.map((f, i) => {
                   const on = active === f.field;
-                  const here = isAnchor && anchor?.rect.x === f.x && anchor?.rect.y === f.y;
+                  const first = on && !firstDone;
+                  if (first) firstDone = true;
                   return (
                     <div
                       key={`f${i}`}
-                      ref={here ? spotRef : undefined}
-                      data-shinsei-spot
+                      ref={first ? firstRef : undefined}
                       role="button"
                       tabIndex={-1}
                       aria-label={label(f.field)}
                       title={label(f.field)}
-                      onClick={() => {
-                        setSpot({page: pi, rect: f});
-                        onOpen(f.field);
-                      }}
+                      onClick={() => onOpen(f.field)}
                       className={`absolute cursor-pointer rounded-[2px] transition-colors ${
                         on ? 'bg-sky-400/15 outline outline-2 outline-sky-600' : missing[f.field] ? 'bg-amber-300/35 hover:outline hover:outline-2 hover:outline-emerald-600' : 'hover:bg-emerald-400/10 hover:outline hover:outline-2 hover:outline-emerald-600'
                       }`}
@@ -459,7 +362,6 @@ export function ShinseiPages({
                   <button
                     key={`o${i}`}
                     type="button"
-                    data-shinsei-spot
                     aria-label={`${o.option}に丸をつける`}
                     aria-pressed={marks[o.key] === o.option}
                     title={marks[o.key] === o.option ? `${o.option}の丸を外す` : `${o.option}に丸をつける`}
@@ -470,11 +372,9 @@ export function ShinseiPages({
                 ))}
               </div>
             </div>
-            {isAnchor && !phone && pop}
           </div>
         );
       })}
-      {phone && pop}
     </div>
   );
 }

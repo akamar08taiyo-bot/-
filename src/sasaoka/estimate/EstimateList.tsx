@@ -1,17 +1,15 @@
-import {useMemo, useState} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {estimateTotals, hasEstimateRows, jobName} from '../calc.ts';
 import {copyJob} from '../components/JobTools.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
-import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm, NO_SHINSEI} from '../estimateForms.ts';
+import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm} from '../estimateForms.ts';
 import {estimateXlsx, XLSX_TYPE} from '../estimateXlsx.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
-import {manualRow, newPlace} from '../rows.ts';
 import {addSamples, hasSamples} from '../samples.ts';
-import {readShinsei} from '../shinsei.ts';
 import type {AppData, Insurer, Job, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
-import {addMonths, downloadBlob, matchesAll, monthLabel, staffShort, thisMonth, todayIso, uid, yen} from '../util.ts';
+import {addMonths, downloadBlob, matchesAll, monthLabel, thisMonth, todayIso, uid, yen} from '../util.ts';
 
 const SHOW_LIMIT = 100;
 
@@ -87,38 +85,23 @@ function useEstimates(data: AppData, s: Settings) {
   );
 }
 
-/** 見積もりを作成する：最初に「新規作成」か「一覧から作成」かを選ぶ */
+/** 見積もり・申請書を作成する：最初に「新規作成」か「一覧から作成」かを選ぶ */
 export function EstimateHome({
   data,
   update,
   onNew,
-  onCreate,
   onList,
   goMaterials,
 }: {
   data: AppData;
   update: Update;
   onNew: (insurer: Insurer) => void; // 新しい様邸（申請書と見積書のタブ）を開く
-  onCreate: (job: Job) => void; // 作った見積書を入れて開く
   onList: () => void;
   goMaterials: () => void;
 }) {
-  const toast = useToast();
   const all = useEstimates(data, data.settings);
   const month = thisMonth();
-  const inMonth = all.filter((e) => e.date.startsWith(month)).length;
-  // 申請書（Excel）から作る：申請書に書いた 氏名・住所・被保険者番号・改修の箇所（①浴室　手すりの取付）と、フリガナ・生年月日・電話番号などで見積書を作る。
-  // 箇所ごとに空白の行を1つ入れておく（見積書に箇所が出て、そこに部材・施工費を入れていける）。申請書に書いてあった改修の内容の文は、申請書の文として残す
-  const fromShinsei = async (file: File) => {
-    const r = readShinsei(new Uint8Array(await file.arrayBuffer()));
-    if (!r) {
-      toast('苅田町・行橋市・みやこ町・広域連合の申請書（Excel）を選んでください', 'error');
-      return;
-    }
-    const places = r.places.map((w) => ({...newPlace(w.name, [manualRow('material')]), photo: w.photo, kind: w.kind, ...(w.text ? {shinseiText: w.text} : {})}));
-    onCreate({...newEstimate(r.insurer), customer: r.name, address: r.address, insuredNo: r.insuredNo, places, shinsei: {...NO_SHINSEI, ...r.info}});
-    toast(`申請書から見積書を作りました（${INSURER_INFO[r.insurer].name}・${places.length}箇所）`);
-  };
+  const inMonth = all.filter((e) => e.job.month === month).length;
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
@@ -140,20 +123,6 @@ export function EstimateHome({
                 ＋ {INSURER_INFO.kouiki.name}
               </Btn>
             </div>
-            <label className="inline-flex cursor-pointer items-center justify-center gap-1.5 justify-self-start rounded-md border border-emerald-300 bg-white px-3 py-2 text-sm font-bold text-emerald-800 shadow-sm hover:bg-emerald-50">
-              📥 申請書（Excel）から作る
-              <input
-                type="file"
-                accept=".xlsx,.xltx,.xlsm"
-                className="hidden"
-                aria-label="申請書（Excel）から作る"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = '';
-                  if (f) void fromShinsei(f);
-                }}
-              />
-            </label>
           </div>
         </section>
         <section className="rounded-xl border-2 border-slate-300 bg-white p-5 shadow-sm" aria-label="一覧から作成">
@@ -252,10 +221,29 @@ export function EstimateList({
     () =>
       searching
         ? all.filter(({job, insurer}) => matchesAll(`${job.customer} ${job.address} ${job.staff} ${insurer} ${job.places.map((p) => p.name).join(' ')}`, query))
-        : all.filter((e) => e.date.startsWith(month)),
+        : all.filter((e) => e.job.month === month),
     [all, query, searching, month],
   );
   const total = list.reduce((n, e) => n + e.t.all.total, 0);
+  const shown = list.slice(0, limit);
+  // 一覧の先頭のチェック：選んだ様邸を次の月・前の月の一覧に回す（ユーザーの指示「先頭にチェックマークをつくり、次月にまわす、前月に回せるようにする」）。
+  // 一覧の月は様邸の月（Job.month）。笹岡工務店の請求書に入れている様邸は、請求する月も一緒に移る
+  const [checked, setChecked] = useState<Set<string>>(() => new Set());
+  useEffect(() => setChecked(new Set()), [month, query]);
+  const allChecked = shown.length > 0 && shown.every(({job}) => checked.has(job.id));
+  const toggle = (id: string) =>
+    setChecked((c) => {
+      const next = new Set(c);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const moveMonth = (dir: 1 | -1) => {
+    const ids = checked;
+    update('jobs', (jobs) => jobs.map((j) => (ids.has(j.id) ? {...j, month: addMonths(j.month, dir), updatedAt: Date.now()} : j)));
+    toast(`${ids.size}件を${searching ? (dir === 1 ? '次の月' : '前の月') : monthLabel(addMonths(month, dir))}に回しました`);
+    setChecked(new Set());
+  };
 
   return (
     <div className="space-y-4">
@@ -271,7 +259,7 @@ export function EstimateList({
               value={month}
               onChange={(e) => e.target.value && setMonth(e.target.value)}
               className="h-8 w-[9.5rem] rounded border border-slate-300 px-1 text-sm"
-              aria-label="見積書を作った月"
+              aria-label="一覧の月"
             />
           </label>
           <button type="button" className="rounded-md px-3 py-1.5 text-lg font-bold text-slate-600 hover:bg-slate-100" onClick={() => setMonth(addMonths(month, 1))} aria-label="次の月">
@@ -284,8 +272,22 @@ export function EstimateList({
             ＋ {INSURER_INFO[i].name}
           </Btn>
         ))}
-        <TextInput value={query} onChange={setQuery} placeholder="お客様名・住所・担当・保険者で探す（すべての月）" className="ml-auto w-72 text-sm" aria-label="見積書を探す" />
+        <TextInput value={query} onChange={setQuery} placeholder="お客様名・住所で探す（すべての月）" className="ml-auto w-72 text-sm" aria-label="見積書を探す" />
       </div>
+      {checked.size > 0 && (
+        <div role="status" aria-label="選んだ見積書" className="flex flex-wrap items-center gap-2 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-900">
+          <span className="font-bold">{checked.size}件を選んでいます</span>
+          <Btn small color="white" onClick={() => moveMonth(-1)}>
+            ◀ 前月に回す
+          </Btn>
+          <Btn small color="white" onClick={() => moveMonth(1)}>
+            次月に回す ▶
+          </Btn>
+          <Btn small color="white" onClick={() => setChecked(new Set())}>
+            やめる
+          </Btn>
+        </div>
+      )}
 
       {all.length === 0 ? (
         <GettingStarted data={data} update={update} goMaterials={goMaterials} />
@@ -294,36 +296,35 @@ export function EstimateList({
           <table className="w-full min-w-[1120px] text-sm">
             <thead className="bg-emerald-50 text-xs text-emerald-900">
               <tr>
+                <th className="w-8 px-2 py-2">
+                  <input
+                    type="checkbox"
+                    checked={allChecked}
+                    onChange={() => setChecked(allChecked ? new Set() : new Set(shown.map(({job}) => job.id)))}
+                    className="h-4 w-4 align-middle"
+                    aria-label="すべて選ぶ"
+                  />
+                </th>
                 <th className="px-2 py-2 text-left">作成日</th>
                 <th className="px-2 py-2 text-left">お客様名</th>
-                <th className="px-2 py-2 text-left">保険者</th>
-                <th className="px-2 py-2 text-left">担当</th>
                 <th className="px-2 py-2 text-right">見積の合計（税込）</th>
                 <th className="px-2 py-2 text-left">笹岡工務店の請求書</th>
                 <th className="px-2 py-2" />
               </tr>
             </thead>
             <tbody>
-              {list.slice(0, limit).map(({job, date, form, insurer, t}) => {
+              {shown.map(({job, date, t}) => {
                 // お客様名のない見積書は、作成日と金額でどれか分かるようにする
                 const label = job.customer.trim() ? jobName(job) : `お客様名なし・${dateText(date)}・${yen(t.all.total)}円`;
                 const estimated = hasEstimateRows(job); // 見積書を作った様邸（申請書だけの様邸は、請求書・発注書に入らない）
                 return (
-                  <tr key={job.id} className="cursor-pointer border-t border-slate-100 hover:bg-emerald-50/60" onClick={() => onOpen(job.id)}>
+                  <tr key={job.id} className={`cursor-pointer border-t border-slate-100 hover:bg-emerald-50/60 ${checked.has(job.id) ? 'bg-sky-50' : ''}`} onClick={() => onOpen(job.id)}>
+                    <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" checked={checked.has(job.id)} onChange={() => toggle(job.id)} className="h-4 w-4 align-middle" aria-label="選ぶ" />
+                    </td>
                     <td className="whitespace-nowrap px-2 py-2 tabular-nums">{dateText(date)}</td>
-                    <td className="px-2 py-2 font-bold text-slate-800">
-                      {job.customer.trim() ? jobName(job) : <span className="text-slate-400">（お客様名なし）</span>}
-                      <span className="ml-2 text-xs font-normal text-slate-500">
-                        {job.places
-                          .map((p) => p.name)
-                          .filter(Boolean)
-                          .join('・')}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-2 py-2 text-xs" title={`${FORM_INFO[form].name}「${FORM_INFO[form].title}」`}>
-                      {insurer}
-                    </td>
-                    <td className="whitespace-nowrap px-2 py-2">{staffShort(job.staff) || <span className="text-slate-400">—</span>}</td>
+                    {/* 改修場所（玄関・トイレ…）・保険者・担当は出さない（ユーザーの指示「詳細や、保険者名、担当名などは不要」） */}
+                    <td className="px-2 py-2 font-bold text-slate-800">{job.customer.trim() ? jobName(job) : <span className="text-slate-400">（お客様名なし）</span>}</td>
                     <td className="px-2 py-2 text-right font-bold tabular-nums text-emerald-900">{estimated ? yen(t.all.total) : <span className="font-normal text-slate-400">—</span>}</td>
                     <td className="whitespace-nowrap px-2 py-2 text-xs">
                       {job.shikiri ? (
@@ -358,8 +359,8 @@ export function EstimateList({
             {list.length > 0 && (
               <tfoot>
                 <tr className="border-t border-slate-200 bg-emerald-50/60 text-sm">
-                  <td colSpan={4} className="px-2 py-2 text-right font-bold text-emerald-900">
-                    {searching ? `「${query}」の見積書` : `${monthLabel(month)}に作った見積書`}（{list.length}件）
+                  <td colSpan={3} className="px-2 py-2 text-right font-bold text-emerald-900">
+                    {searching ? `「${query}」の見積書` : `${monthLabel(month)}の見積書`}（{list.length}件）
                   </td>
                   <td className="px-2 py-2 text-right font-bold tabular-nums text-emerald-900">{yen(total)}</td>
                   <td colSpan={2} />
@@ -369,7 +370,7 @@ export function EstimateList({
           </table>
           {list.length === 0 && (
             <p className="px-4 py-6 text-center text-sm text-slate-500">
-              {searching ? `「${query}」の見積書は見つかりませんでした。` : `${monthLabel(month)}に作った見積書はありません。◀ ▶ でほかの月を見られます。`}
+              {searching ? `「${query}」の見積書は見つかりませんでした。` : `${monthLabel(month)}の見積書はありません。◀ ▶ でほかの月を見られます。`}
             </p>
           )}
           {list.length > limit && (

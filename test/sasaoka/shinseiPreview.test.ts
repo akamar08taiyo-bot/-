@@ -81,7 +81,7 @@ test('プレビュー：様式のうしろに平面図（空いた所に工事�
   // 広域連合は同じ写真番号の用紙が2枚ずつ。写真を貼る最初の用紙だけ
   assert.deepEqual(kinds('kouiki').slice(3), ['plan:平面図 (2)', 'photo:写真貼付用紙:1', 'photo:写真貼付用紙 (2):2']);
   // 工事内容は申請書の改修の内容と同じ行（苅田町・行橋市・広域連合は空いた所いっぱいの文字の枠、みやこ町は平面図の下の欄 M48）
-  const lines = '玄関① 木製手すり L=600㎜\nトイレ② L字手すり';
+  const lines = '①玄関　手すりの取付　L=600mm\n②トイレ　手すりの取付';
   for (const insurer of ['kanda', 'yukuhashi', 'kouiki'] as const) {
     const plan = preview(insurer).find((p) => p.kind === 'plan')!;
     const box = plan.shapes.find((s) => s.text === lines);
@@ -110,9 +110,10 @@ test('プレビュー：転記した内容（Excel に保存するときと同�
   assert.equal(textAt(pre, 'J6'), 'ヤマダ　タロウ');
   assert.equal(textAt(pre, 'J7'), '山田 太郎');
   assert.equal(textAt(pre, 'J9'), '明　・　大　・　昭　23年5月6日生');
-  assert.equal(textAt(pre, 'J14'), '玄関① 木製手すり L=600㎜\nトイレ② L字手すり');
+  assert.equal(textAt(pre, 'J14'), '①玄関　手すりの取付　L=600mm\n②トイレ　手すりの取付');
   assert.equal(textAt(pre, 'M28'), '山田 太郎'); // 申請者の氏名（=J7 の式）
-  assert.equal(textAt(pre, 'Y15'), '令和8年11月5日');
+  assert.equal(textAt(pre, 'Y15'), '　　年　　　月　　　日'); // 着工予定日は空白（原本のまま。ユーザーの指示）
+  assert.equal(textAt(pre, 'Y16'), '令和8年11月20日');
   assert.deepEqual(
     pre.texts.filter((t) => ['X6', 'Y6', 'AG6'].includes(t.ref)).map((t) => t.runs[0].text),
     ['0', '0', '9'],
@@ -184,6 +185,9 @@ test('見積書をはじめて書きはじめたとき：見積もり作成日�
   // 見積書に行が入った
   const started = startEstimate(fresh, {...fresh, places: [place('p1', '玄関', [mat('r1', 'L型手すり')])]}, '2026-10-21');
   assert.deepEqual([started.estDate, started.shikiri, started.month], ['2026-10-21', true, '2026-10']);
+  // 一覧で次の月に回してあった様邸は、その月のまま
+  const moved = startEstimate({...fresh, month: '2026-11'}, {...fresh, month: '2026-11', places: [place('p1', '玄関', [mat('r1', 'L型手すり')])]}, '2026-10-21');
+  assert.equal(moved.month, '2026-11');
   // 前から行のある見積書・見積もり作成日のある見積書は変えない（前の版で作った見積書を直しても、請求する月は変わらない）
   const old = job('kanda', {estDate: '', shikiri: false, month: '2026-08'});
   const edited = {...old, customer: '山田 次郎'};

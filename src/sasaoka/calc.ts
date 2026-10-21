@@ -215,7 +215,9 @@ export const hasEstimateRows = (job: Pick<Job, 'places'>) => job.places.some((p)
  */
 export function startEstimate(before: Job, after: Job, today = todayIso()): Job {
   if (after.estDate || hasEstimateRows(before) || !hasEstimateRows(after)) return after;
-  return {...after, estDate: today, shikiri: true, month: today.slice(0, 7)};
+  // 一覧で次の月に回してあった様邸は、その月のまま（前の月の様邸は今月の請求書に入れる）
+  const month = after.month > today.slice(0, 7) ? after.month : today.slice(0, 7);
+  return {...after, estDate: today, shikiri: true, month};
 }
 
 /** 長さで数える部材か（使う長さと1本の長さの両方が入っている） */

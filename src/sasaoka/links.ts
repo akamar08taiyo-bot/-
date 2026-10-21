@@ -10,7 +10,7 @@ export const APP_TITLE = '住宅改修 見積書・請求書（笹岡工務店�
 export type MainTab = 'estimate' | 'invoice' | 'master' | 'settings';
 const TABS: MainTab[] = ['estimate', 'invoice', 'master', 'settings'];
 
-/** 見積もりを作成するのタブで、様邸のどの画面を開いているか（見積書・発注書・申請書） */
+/** 見積もり・申請書を作成するのタブで、様邸のどの画面を開いているか（見積書・発注書・申請書） */
 export type JobView = 'estimate' | 'order' | 'shinsei';
 
 /** URL のうしろの #tab=…&job=…&view=order（前の版の #job=… だけのときは、タブは null）。view=order は見積書の発注書、view=shinsei は申請書 */

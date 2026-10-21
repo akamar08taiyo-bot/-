@@ -1,13 +1,14 @@
-// 申請書を確かめる：様邸の画面の2つのタブ（左に「📝 申請書」、右に「📋 見積書」）。申請書のタブは、保険者の申請書の原本を様式のまま画面に描き（プレビュー）、
-//   欄を押して入れる（入れる所が欄の下に出る。Enter で次の欄。性別・元号・要介護状態区分・改修状況は申請書の文字を押すと丸）。
+// 申請書を確かめる：様邸の画面の2つのタブ（左に「📝 申請書」、右に「📋 見積書」）。申請書のタブは、左に申請書の順番の一覧（入れる所）、右にプレビュー
+//   （原本の様式のまま。ユーザーの指示「一覧から入力をメインとする。プレビューをみながら入力」）。Enter で次の欄、入れている項目はプレビューで囲み、
+//   プレビューの欄を押すと一覧のその欄へ。性別・元号・要介護状態区分・改修状況は一覧のボタンか、プレビューの申請書の文字を押すと丸。
 //   同じ様邸なので、見積書で入れた氏名・番号・住所・改修の内容・金額（改修予定費用）がすぐ申請書に出て、申請書で入れた氏名なども見積書に出る。
+//   改修の内容は「①玄関　手すりの取付　L=600mm H=800mm」「②屋外　段差の解消　W600mm D350mm H150mm」（寸法は箇所ごとの 長さ・高さ／幅・奥行・高さ の欄）。
+//   被保険者番号の空いたマスは 0。苅田町・行橋市の着工予定日は空白（入れる欄もない）。
 //   「📗 申請書をExcelで保存」で、原本（行橋市・苅田町・みやこ町・広域連合）に転記した Excel を保存する（ほかのシートはそのまま。丸は楕円の図形）。
-//   「📋 一覧で入れる」にすると、前の版の入れ方（申請書の順番の一覧）。
-//   新規作成は申請書のタブから（フリガナの欄が開いている）。見積書に行を入れると笹岡工務店の請求書に入る（申請書だけなら入れない）。
-//   「📥 申請書（Excel）から作る」で、書いた申請書から見積書を作る。
+//   新規作成は申請書のタブから（フリガナの欄にカーソル）。見積書に行を入れると笹岡工務店の請求書・発注書に入る（申請書だけなら入れない）。
 //   写真：写真の欄（写真番号の箇所ごとに改修前・改修後）に写真のファイルを選ぶ・ドロップする。押して（ドラッグして）入れ替える・差し替える・消す。
 //   プレビューの写真貼付用紙にも出て（枠にドロップしてもよい）、Excel の写真貼付用紙の枠に貼る。平面図の空いた所には工事内容（改修の内容と同じ行）。
-//   見積書に行がないうち（申請書だけ＝ほかの工務店の工事）は、笹岡工務店の請求書・発注書に入れない
+//   見積もりの入口の「申請書（Excel）から作る」はない（ユーザーの指示「不要」）
 // usage: node e2e-shinsei.mjs <サイトのURL> <出力フォルダ>
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
@@ -80,14 +81,18 @@ const sheetsOf = (bytes) => {
 const text = (xml, ref) => (/<t[^>]*>([\s\S]*?)<\/t>/.exec(new RegExp(`<c r="${ref}"[^>]*?(?:/>|>([\\s\\S]*?)</c>)`).exec(xml)?.[0] ?? '')?.[1] ?? '').replace(/&#10;/g, '\n');
 
 const preview = page.getByLabel('申請書のプレビュー');
+/** 一覧（入れる所） */
+const form = page.getByRole('form', {name: '申請書'});
+const rowLabels = () => form.locator(':scope > div[data-field] > div:first-child').allInnerTexts();
 /** プレビューの1枚（原本のシート） */
 const pageOf = (name) => preview.getByRole('group', {name, exact: true});
 const pageNames = () => preview.getByRole('group').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
-/** 申請書の欄を押して入れる所を開く（同じ項目の欄が2つ＝式で同じ値を出す欄があるときは最初。開いている入れる所は下の欄にかぶるので、先に Esc で閉じる） */
-const openSpot = async (label, where = preview) => {
-  if (await page.getByRole('dialog').count()) await page.keyboard.press('Escape');
+/** プレビューにその文字が出るまで待つ（プレビューは打つのを待たせないように少し遅れて描く） */
+const pvHas = (t, timeout = 5000) => page.waitForFunction((x) => document.querySelector('[aria-label="申請書のプレビュー"]')?.innerText.includes(x), t, {timeout});
+/** プレビューの欄を押す（同じ項目の欄が2つ＝式で同じ値を出す欄があるときは最初。欄の中の丸で囲む値（生年月日の「昭」など）でない所を押す） */
+const spot = async (label, where = preview) => {
   const el = where.getByRole('button', {name: label, exact: true}).first();
-  // 欄の中の丸で囲む値（生年月日の「昭」など）を押すと丸がつくので、値のない所を押す
+  await el.scrollIntoViewIfNeeded();
   const at = await el.evaluate((node) => {
     const r = node.getBoundingClientRect();
     const opts = [...node.parentElement.querySelectorAll('button[aria-pressed]')].map((b) => b.getBoundingClientRect());
@@ -100,15 +105,14 @@ const openSpot = async (label, where = preview) => {
     return {x: r.width / 2, y: r.height / 2};
   });
   await el.click({position: at});
-  await dlg(label).waitFor();
 };
-/** 欄を押したときに出る、入れる所 */
-const dlg = (label) => page.getByRole('dialog', {name: `${label}を入れる`});
-/** 丸で囲む値を押す */
+/** 丸で囲む値を押す（プレビューの申請書の文字） */
 const mark = (value) => preview.getByRole('button', {name: `${value}に丸をつける`}).first();
 const pressed = () => preview.locator('button[aria-pressed="true"]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label').replace('に丸をつける', '')));
 const status = page.getByRole('status', {name: '入っていない欄'});
 const focused = () => page.evaluate(() => document.activeElement?.getAttribute('aria-label'));
+/** 欄の XML（文字でない欄・原本のままの欄を見るとき） */
+const cellOf = (xml, ref) => new RegExp(`<c r="${ref}"[^>]*?(?:/>|>([\\s\\S]*?)</c>)`).exec(xml)?.[0] ?? '';
 /** 「📗 申請書をExcelで保存」 */
 const saveExcel = async () => {
   const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📗 申請書をExcelで保存'}).click()]);
@@ -125,51 +129,65 @@ const make = async (picks = [], shot = '') => {
   return saveExcel();
 };
 
-// 改修の内容・工事内容は前の申請の書き方（玄関① 木製L字手すり L=600×850㎜）。サンプルの玄関は木の手すりを 60cm、トイレは L型手すり
-const WORKS = '玄関① 木製手すり L=600㎜\nトイレ② L字手すり';
+// 改修の内容（4つの保険者の申請書・内訳明細書・平面図とも同じ書き方）：「①玄関　手すりの取付　L=600mm H=800mm」。
+// サンプルの玄関は木の手すりを 60cm（長さは見積書から）、高さは申請書のタブで 800 を入れる。トイレは L型手すり（長さなし）
+const WORKS = '①玄関　手すりの取付　L=600mm H=800mm\n②トイレ　手すりの取付';
 
-// ---------------- 行橋市：申請書のタブ＝原本の様式のまま（表題はヘッダー）。見積書の氏名・住所・改修の内容・金額がもう入っている
+// ---------------- 行橋市：申請書のタブ＝左に一覧、右にプレビュー（原本の様式のまま。表題はヘッダー）。見積書の氏名・住所・改修の内容・金額がもう入っている
 await shinseiTab.click();
+await form.waitFor();
 await preview.waitFor();
 // 申請書の様式・平面図・写真番号の箇所（玄関①・トイレ②）の写真貼付用紙
 assert.deepEqual(await pageNames(), ['住改・受領委任払', '平面図  (2)', '住改・写真 ①', '住改・写真②']);
+// 一覧とプレビューは横に並ぶ（見ながら入れる）。入れ方の切り替え・欄の下に出る入れる所はない
+const formBox = await form.boundingBox();
+const previewBox = await preview.boundingBox();
+assert.ok(formBox && previewBox && formBox.x + formBox.width <= previewBox.x + 1 && previewBox.y < formBox.y + 300, `${JSON.stringify(formBox)} ${JSON.stringify(previewBox)}`);
+assert.equal(await page.getByRole('group', {name: '入れ方'}).count(), 0);
+assert.equal(await page.getByRole('dialog').count(), 0);
+// 一覧は行橋市の申請書の順番（氏名が番号の前）。着工予定日はない（空白のまま。ユーザーの指示）
+assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '住宅の所有者', '改修の内容・箇所及び規模', '完成予定日', '改修予定費用']);
+assert.equal(await form.getByLabel('着工予定日').count(), 0);
 let pv = await preview.innerText();
-for (const t of ['介護保険居宅（ 介護・介護予防 ）住宅改修費受領委任払い申請書', '被保険者氏名', '（サンプル）山田', '福岡県行橋市中央1-1', '玄関① 木製手すり L=600㎜', 'トイレ② L字手すり', '26,958']) {
+for (const t of ['介護保険居宅（ 介護・介護予防 ）住宅改修費受領委任払い申請書', '被保険者氏名', '（サンプル）山田', '福岡県行橋市中央1-1', '①玄関　手すりの取付　L=600mm', '②トイレ　手すりの取付', '26,958']) {
   assert.ok(pv.includes(t), `プレビューに「${t}」がない`);
 }
-// まだ入っていない欄は上に出て、押すとその欄が開く。開いている欄がないので何も出ていない（入れた様邸）
-assert.equal(await page.getByRole('dialog').count(), 0);
-for (const t of ['フリガナ', '生年月日', '性別', '郵便番号', '電話番号', '要介護状態区分', '住宅の所有者', '着工予定日・完成予定日']) assert.ok((await status.innerText()).includes(t), t);
-assert.ok(!(await status.innerText()).includes('被保険者氏名'));
+// まだ入っていない欄は上に出て、押すと一覧のその欄へ。着工・完成の日は数えない
+for (const t of ['フリガナ', '生年月日', '性別', '郵便番号', '電話番号', '要介護状態区分', '住宅の所有者']) assert.ok((await status.innerText()).includes(t), t);
+assert.ok(!/被保険者氏名|着工|完成/.test(await status.innerText()));
 await status.getByRole('button', {name: 'フリガナ'}).click();
-await dlg('フリガナ').getByLabel('フリガナ').fill('サンプル　ヤマダ');
-await dlg('フリガナ').getByLabel('フリガナ').press('Enter');
-// Enter で次の欄（行橋市の申請書の順番：フリガナ → 被保険者氏名）。氏名は見積書と同じ
-await dlg('被保険者氏名').waitFor();
+assert.equal(await focused(), 'フリガナ');
+await page.keyboard.type('サンプル　ヤマダ');
+await page.keyboard.press('Enter');
+// Enter で次の欄（行橋市の申請書の順番：フリガナ → 被保険者氏名）。打つとプレビューにすぐ出る
 assert.equal(await focused(), '被保険者氏名');
-assert.equal(await dlg('被保険者氏名').getByLabel('被保険者氏名').inputValue(), '（サンプル）山田');
-assert.ok((await preview.innerText()).includes('サンプル　ヤマダ'));
-// 欄を押して入れる（入れる所は欄のすぐ下）
-await openSpot('生年月日');
-await dlg('生年月日').getByLabel('生年月日の年').fill('23');
-await dlg('生年月日').getByLabel('生年月日の月').fill('5');
-await dlg('生年月日').getByLabel('生年月日の日').fill('6');
-await openSpot('郵便番号');
-await dlg('郵便番号').getByLabel('郵便番号').fill('824-0001');
-await openSpot('電話番号');
-await dlg('電話番号').getByLabel('電話番号').fill('0930-11-2222');
-await openSpot('住宅の所有者');
-await dlg('住宅の所有者').getByRole('button', {name: '本人の家'}).click();
-await openSpot('着工予定日・完成予定日');
-await dlg('着工予定日・完成予定日').getByLabel('着工予定日').fill('2026-11-05');
-await dlg('着工予定日・完成予定日').getByLabel('完了予定日').fill('2026-11-20');
-await page.keyboard.press('Escape');
-assert.equal(await page.getByRole('dialog').count(), 0);
-// 丸：申請書の「女」「昭」「要介護２」を押す
+assert.equal(await form.getByLabel('被保険者氏名').inputValue(), '（サンプル）山田');
+await pvHas('サンプル　ヤマダ');
+// プレビューの欄を押すと、一覧のその欄へ。入れている項目はプレビューで囲む
+await spot('電話番号');
+assert.equal(await focused(), '電話番号');
+await page.keyboard.type('0930-11-2222');
+assert.ok(await preview.getByRole('button', {name: '電話番号', exact: true}).first().evaluate((el) => el.className.includes('outline-sky-600')));
+await form.getByLabel('生年月日の年').fill('23');
+await form.getByLabel('生年月日の月').fill('5');
+await form.getByLabel('生年月日の日').fill('6');
+await form.getByLabel('郵便番号').fill('824-0001');
+await form.getByRole('button', {name: '本人の家'}).click();
+await form.getByLabel('完成予定日').fill('2026-11-20');
+// 改修の内容：箇所ごとに改修場所・改修の種類と寸法。手すりは長さ（入れなければ見積書の使う長さ＝薄い字）と高さ（任意）。段差の解消でないので幅・奥行はない
+const works = form.locator('[data-field="works"]');
+const genkan = works.getByRole('listitem', {name: '①玄関'});
+assert.equal(await genkan.getByLabel('長さ（mm）').getAttribute('placeholder'), '600');
+assert.equal(await works.getByLabel('幅（mm）').count(), 0);
+await genkan.getByLabel('高さ（mm）').fill('800');
+await pvHas('①玄関　手すりの取付　L=600mm H=800mm');
+assert.ok((await works.getByLabel('申請書に書く内容').innerText()).includes('①玄関　手すりの取付　L=600mm H=800mm'));
+// 丸：プレビューの申請書の「女」「昭」「要介護２」を押す（一覧のボタンにも出る）
 const yk = await make(['女', '昭和', '要介護2'], '81-shinsei-preview.png');
 pv = await preview.innerText();
-for (const t of ['サンプル　ヤマダ', '23年5月6日生', '824-0001', '0930-11-2222', '本人との関係（本人）', '令和8年11月5日', '令和8年11月20日']) assert.ok(pv.includes(t), `プレビューに「${t}」がない`);
+for (const t of ['サンプル　ヤマダ', '23年5月6日生', '824-0001', '0930-11-2222', '本人との関係（本人）', '令和8年11月20日']) assert.ok(pv.includes(t), `プレビューに「${t}」がない`);
 assert.deepEqual(await pressed(), ['昭和', '女', '要介護2']);
+assert.equal(await form.getByRole('group', {name: '性別'}).getByRole('button', {name: '女'}).getAttribute('aria-pressed'), 'true');
 assert.equal(await pageOf('住改・受領委任払').locator('svg ellipse').count(), 3); // 画面にも丸
 assert.match(yk.name, /^行橋市申請書_（サンプル）山田様_\d{4}-\d{2}-\d{2}\.xlsx$/);
 const y = sheetsOf(yk.bytes);
@@ -180,9 +198,10 @@ assert.equal(text(main, 'F11'), '福岡県行橋市中央1-1');
 assert.equal(['Z7', 'AA7', 'AB7', 'AC7', 'AD7', 'AE7', 'AF7', 'AG7', 'AH7', 'AI7'].map((r) => text(main, r)).join(''), '0000366989');
 assert.equal(text(main, 'F14'), WORKS);
 assert.equal(y.ellipses('住改・受領委任払'), 3); // 図形のないシートに図形を足して、女・昭・要介護２を囲む
-assert.deepEqual(['F4', 'F9', 'G10', 'Y10', 'F13', 'V13', 'AB16', 'AB18'].map((r) => text(main, r)), ['サンプル　ヤマダ', '明・大・昭　23年5月6日生', '824-0001', '0930-11-2222', '（サンプル）山田', '本人との関係（本人）', '令和8年11月5日', '令和8年11月20日']);
+assert.deepEqual(['F4', 'F9', 'G10', 'Y10', 'F13', 'V13', 'AB18'].map((r) => text(main, r)), ['サンプル　ヤマダ', '明・大・昭　23年5月6日生', '824-0001', '0930-11-2222', '（サンプル）山田', '本人との関係（本人）', '令和8年11月20日']);
+assert.ok(!/令和|46331/.test(cellOf(main, 'AB16')), cellOf(main, 'AB16')); // 着工予定日は空白（原本のまま）
 assert.match(main, /<c r="F20" s="\d+"><v>26958<\/v><\/c>/); // 改修予定費用は見積書の合計（数）
-log('行橋市の申請書（タブ・プレビュー・欄を押して入れる・Enter で次の欄・丸・見積書の金額・Excel）OK');
+log('行橋市の申請書（一覧とプレビューを並べる・Enter で次の欄・プレビューの欄から一覧へ・寸法・丸・着工予定日は空白・見積書の金額・Excel）OK');
 
 // ---------------- 見積書で直すと、申請書にすぐ出る（改修予定費用＝見積書の合計）。申請書で直した氏名は見積書に出る
 await estimateTab.click();
@@ -191,24 +210,22 @@ await typeIn(lKey, '2');
 const total2 = (await tds('合計')).filter(Boolean)[1];
 assert.notEqual(total2, '26,958');
 await shinseiTab.click();
-assert.ok((await preview.innerText()).includes(total2), `改修予定費用が見積書の合計（${total2}）になっていない`);
-await openSpot('被保険者氏名');
-await dlg('被保険者氏名').getByLabel('被保険者氏名').fill('（サンプル）山田 花');
+await pvHas(total2);
+await form.getByLabel('被保険者氏名').fill('（サンプル）山田 花');
 await estimateTab.click();
 assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '（サンプル）山田 花様邸');
 assert.ok((await sheet.locator('.form-page').first().innerText()).includes('（サンプル）山田 花'));
 await shinseiTab.click();
-await openSpot('被保険者氏名');
-await dlg('被保険者氏名').getByLabel('被保険者氏名').fill('（サンプル）山田');
-await page.keyboard.press('Escape');
+await form.getByLabel('被保険者氏名').fill('（サンプル）山田');
 await estimateTab.click();
 await typeIn(lKey, '1');
 log('見積書と申請書がすぐつながる（金額・氏名）OK');
 
 // ---------------- 平面図：空いた所に工事内容（申請書の改修の内容と同じ行）。平面図そのものは Excel で描く
 await shinseiTab.click();
+await pvHas('①玄関　手すりの取付　L=600mm H=800mm');
 const plan = await pageOf('平面図  (2)').innerText();
-for (const t of ['（サンプル）山田', '玄関① 木製手すり L=600㎜', 'トイレ② L字手すり']) assert.ok(plan.includes(t), `平面図に「${t}」がない`);
+for (const t of ['（サンプル）山田', '①玄関　手すりの取付　L=600mm H=800mm', '②トイレ　手すりの取付']) assert.ok(plan.includes(t), `平面図に「${t}」がない`);
 await pageOf('平面図  (2)').screenshot({path: path.join(outDir, '84-plan.png')});
 log('平面図の工事内容OK');
 
@@ -373,6 +390,11 @@ await shinseiTab.click();
 await page.getByRole('combobox', {name: '保険者'}).selectOption('kanda');
 await pageOf('事前申請書').waitFor();
 assert.deepEqual(await pageNames(), ['事前申請書', '平面図  (2)', '1 ', '1  (3)']);
+// 一覧は苅田町の申請書の順番（番号が氏名の前）。完了予定日だけ（着工予定日は空白）
+assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者番号', '被保険者氏名', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '住宅の所有者', '改修の内容・箇所及び規模', '完了予定日', '改修予定費用']);
+assert.equal(await form.getByLabel('完了予定日').inputValue(), '2026-11-20');
+assert.equal(await form.getByLabel('改修予定費用').inputValue(), '26,958');
+assert.ok((await form.innerText()).includes('見積書の合計（税込）'));
 assert.deepEqual(await pressed(), ['昭和', '女', '要介護2']);
 assert.ok((await preview.innerText()).includes('26,958円')); // 苅田町も改修予定費用＝見積書の合計
 await mark('要介護2').click();
@@ -386,9 +408,10 @@ assert.deepEqual([text(pre, 'J7'), text(pre, 'J11'), text(pre, 'J14'), text(pre,
 assert.equal(['X6', 'Y6', 'Z6', 'AA6', 'AB6', 'AC6', 'AD6', 'AE6', 'AF6', 'AG6'].map((r) => text(pre, r)).join(''), '0000366989');
 assert.match(k.sheets.get('事後申請書'), /<f>事前申請書!J7<\/f><v>（サンプル）山田<\/v>/);
 assert.deepEqual([k.ellipses('事前申請書'), k.ellipses('事後申請書')], [3, 3]); // 女・昭・要支援１（事後申請書にも）
-assert.deepEqual(['J6', 'J9', 'J10', 'AB11', 'W13'].map((r) => text(pre, r)), ['サンプル　ヤマダ', '明　・　大　・　昭　23年5月6日生', '〒824-0001', '0930-11-2222', '本人との関係（本人）']);
+assert.deepEqual(['J6', 'J9', 'J10', 'AB11', 'W13', 'Y16'].map((r) => text(pre, r)), ['サンプル　ヤマダ', '明　・　大　・　昭　23年5月6日生', '〒824-0001', '0930-11-2222', '本人との関係（本人）', '令和8年11月20日']);
+assert.ok(!/令和|46331/.test(cellOf(pre, 'Y15')), cellOf(pre, 'Y15')); // 着工予定日は空白
 await page.locator('[aria-live] > div', {hasText: `「${kd.name}」を保存しました`}).waitFor();
-log('苅田町の申請書（事前申請書・事後申請書は式で同じ・丸を外す）OK');
+log('苅田町の申請書（申請書の順番の一覧・事前申請書・事後申請書は式で同じ・丸を外す・着工予定日は空白）OK');
 
 // ---------------- みやこ町：承認届出書・支給申請書・内訳明細書の3枚（支給申請書・内訳明細書の氏名などは承認届出書を参照する式）。改修の内容は内訳明細書の種類の行
 const boxes = (col, n, row) =>
@@ -400,10 +423,10 @@ const boxes = (col, n, row) =>
 await page.getByRole('combobox', {name: '保険者'}).selectOption('miyako');
 await pageOf('住宅改修承認届出書').waitFor();
 assert.deepEqual(await pageNames(), ['住宅改修承認届出書', '住宅改修費支給申請書(受領委任払用)', '住宅改修内訳明細書', '平面図', '写真 (1)', '写真 (2)']);
-// 支給申請書の氏名（式で承認届出書と同じ）を押しても、氏名の欄が開く
-await openSpot('被保険者氏名', pageOf('住宅改修内訳明細書'));
-await page.keyboard.press('Escape');
-assert.ok((await pageOf('住宅改修内訳明細書').innerText()).includes('玄関① 木製手すり L=600㎜'));
+// 内訳明細書の氏名（式で承認届出書と同じ）を押しても、一覧の氏名の欄へ
+await spot('被保険者氏名', pageOf('住宅改修内訳明細書'));
+assert.equal(await focused(), '被保険者氏名');
+assert.ok((await pageOf('住宅改修内訳明細書').innerText()).includes('①玄関　手すりの取付　L=600mm H=800mm'));
 const my = await make(['無']);
 assert.match(my.name, /^みやこ町申請書_（サンプル）山田様_/);
 const m = sheetsOf(my.bytes);
@@ -416,7 +439,7 @@ assert.deepEqual([text(md, 'D15'), text(md, 'K14')], ['玄関・トイレ', WORK
 assert.deepEqual([1, 2, 3].map((n) => text(m.sheets.get(`写真 (${n})`), 'B5')), ['玄関', 'トイレ', '']); // 写真番号の改修場所
 // 性別（女）・改修状況（無）を囲む。承認届出書は原本の丸（受領委任払いなど2つ）に足す。支給申請書は図形を足す
 assert.deepEqual([m.ellipses('住宅改修承認届出書'), m.ellipses('住宅改修費支給申請書(受領委任払用)')], [2 + 2, 2]);
-log('みやこ町の申請書（3枚のプレビュー・式の欄も押せる・承認届出書・支給申請書・内訳明細書・写真）OK');
+log('みやこ町の申請書（6枚のプレビュー・式の欄も押せる・承認届出書・支給申請書・内訳明細書・写真）OK');
 
 // ---------------- 広域連合（築上町など）：承認申請書・支給申請書（受領委任払用）・内訳明細書（別紙）・平面図・写真貼付用紙
 await page.getByRole('combobox', {name: '保険者'}).selectOption('kouiki');
@@ -443,7 +466,7 @@ assert.deepEqual(photosOf(g, '写真貼付用紙', 31), ['改修前:1600x533']);
 assert.deepEqual(photosOf(g, '写真貼付用紙 (2)', 31).sort(), ['改修前:900x1600', '改修後:1200x900']);
 const twins = SHINSEI_PHOTO_SHEETS.kouiki.filter((n) => !['写真貼付用紙', '写真貼付用紙 (2)'].includes(n));
 for (const n of twins) assert.deepEqual(photosOf(g, n, 31), [], n);
-log('広域連合の申請書（3枚のプレビュー・ヘッダー・承認申請書・支給申請書・内訳明細書・平面図・写真貼付用紙・丸）OK');
+log('広域連合の申請書（6枚のプレビュー・ヘッダー・承認申請書・支給申請書・内訳明細書・平面図・写真貼付用紙・丸）OK');
 // 4つの保険者すべてで申請書の Excel のボタンが出る
 for (const i of ['kanda', 'yukuhashi', 'miyako', 'kouiki']) {
   await page.getByRole('combobox', {name: '保険者'}).selectOption(i);
@@ -451,120 +474,77 @@ for (const i of ['kanda', 'yukuhashi', 'miyako', 'kouiki']) {
 }
 await page.getByRole('combobox', {name: '保険者'}).selectOption('kanda');
 
-// ---------------- 一覧で入れる（前の版の入れ方）：申請書の順番に項目が並ぶ。入れたものは申請書の形でも同じ。この端末で覚えておく
-const shinseiForm = page.getByRole('form', {name: '申請書'});
-const rowLabels = () => shinseiForm.locator(':scope > div.border-b > div:first-child').allInnerTexts();
-await page.getByRole('button', {name: '📋 一覧で入れる'}).click();
-await shinseiForm.waitFor();
-assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者番号', '被保険者氏名', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '住宅の所有者', '改修の内容・箇所及び規模', '着工予定日・完了予定日', '改修予定費用']);
-assert.equal(await shinseiForm.getByLabel('フリガナ').inputValue(), 'サンプル　ヤマダ');
-await shinseiForm.getByLabel('フリガナ').press('Enter');
-assert.equal(await focused(), '被保険者番号'); // Enter で次の欄
-assert.equal(await shinseiForm.getByLabel('改修予定費用').inputValue(), '26,958');
-assert.ok((await shinseiForm.innerText()).includes('見積書の合計（税込）'));
-await page.reload();
-await shinseiForm.waitFor();
-await page.getByRole('button', {name: '📄 申請書で入れる'}).click();
-await preview.waitFor();
-log('一覧で入れる（申請書の順番・Enter で次の欄・覚えておく）OK');
-
-// ---------------- 申請書（Excel）から作る：氏名・住所・被保険者番号・改修の箇所で新しい見積書（見積書のタブで開く）
+// ---------------- 見積もりの入口：「申請書（Excel）から作る」はない（ユーザーの指示「不要」）。タブの名前は「見積もり・申請書を作成する」
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
-await page.getByRole('navigation').getByRole('button', {name: /見積もりを作成する/}).click();
+await page.getByRole('navigation').getByRole('button', {name: '📝 見積もり・申請書を作成する'}).click();
 const home = page.getByRole('region', {name: '新規作成'});
 await home.waitFor();
-assert.equal(await page.getByRole('group', {name: '申請書から作る'}).count(), 0); // 新規作成で申請書と見積書の両方
-await home.getByLabel('申請書（Excel）から作る').setInputFiles(kd.file);
-await sheet.waitFor();
-await page.locator('[aria-live] > div', {hasText: '申請書から見積書を作りました（苅田町・2箇所）'}).waitFor();
-assert.equal(await estimateTab.getAttribute('aria-selected'), 'true');
-assert.equal(await page.getByRole('combobox', {name: '保険者'}).inputValue(), 'kanda');
-const form = await sheet.locator('.form-page').first().innerText();
-for (const t of ['（サンプル）山田', '0000366989', '福岡県行橋市中央1-1', '①玄関', '②トイレ']) assert.ok(form.includes(t), `見積書に「${t}」がない`);
-assert.equal(await sheet.locator('.form-page tr[data-rows]').count(), 2); // 箇所ごとに空白の行
-await page.screenshot({path: path.join(outDir, '80-from-shinsei.png')});
-// 申請書に書いてあったフリガナ・生年月日・電話番号や改修の内容の文も、申請書のタブに出る
-await shinseiTab.click();
-pv = await preview.innerText();
-for (const t of ['サンプル　ヤマダ', '23年5月6日生', '0930-11-2222', '〒824-0001', '玄関① 木製手すり L=600㎜', 'トイレ② L字手すり']) assert.ok(pv.includes(t), `プレビューに「${t}」がない`);
-// 広域連合の申請書から（改修の内容は内訳明細書の改修の種類の行から読む）
-await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
-await page.getByRole('navigation').getByRole('button', {name: /見積もりを作成する/}).click();
-await home.waitFor();
-await home.getByLabel('申請書（Excel）から作る').setInputFiles(kk.file);
-await page.locator('[aria-live] > div', {hasText: '申請書から見積書を作りました（広域連合・2箇所）'}).waitFor();
-assert.equal(await page.getByRole('combobox', {name: '保険者'}).inputValue(), 'kouiki');
-assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '（サンプル）山田様邸'); // 広域連合用の書式には氏名の欄がない
-const kform = await sheet.locator('.form-page').first().innerText();
-for (const t of ['玄関', 'トイレ']) assert.ok(kform.includes(t), `見積書（広域連合用）に「${t}」がない`);
-log('申請書（Excel）から見積書を作るOK（苅田町・広域連合。申請書の項目も出る）');
+assert.equal(await page.getByText('申請書（Excel）から作る').count(), 0);
+assert.ok(!(await page.locator('header').innerText()).includes('請求先')); // 上の「請求先：笹岡工務店」も出さない
+log('見積もりの入口（申請書から作るなし・タブの名前・請求先なし）OK');
 
-// ---------------- 新規作成（苅田町）：申請書のタブで開き、フリガナの欄が開いている。申請書の順番に打って Enter（性別・要介護状態区分は選ぶと次へ）
-await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
-await page.getByRole('navigation').getByRole('button', {name: /見積もりを作成する/}).click();
-await home.waitFor();
+// ---------------- 新規作成（苅田町）：申請書のタブで開き、フリガナの欄にカーソル。申請書の順番に打って Enter。丸は一覧のボタンかプレビューの文字
 await home.getByRole('button', {name: '＋ 苅田町', exact: true}).click();
-await dlg('フリガナ').waitFor();
+await form.waitFor();
 assert.equal(await shinseiTab.getAttribute('aria-selected'), 'true');
 assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '新しい申請書');
 assert.equal(await focused(), 'フリガナ');
-for (const t of ['ミホン　イチロウ', '1234567890', '見本 一郎', '10', '3', '4']) {
+// フリガナ → 被保険者番号（6けたでも確定すると右に詰めて左は 0）→ 被保険者氏名 → 生年月日の年・月・日 → 郵便番号 → 住所 → 電話番号 → 所有者 → 関係
+for (const t of ['ミホン　イチロウ', '366989', '見本 一郎', '10', '3', '4', '800-0300', '福岡県京都郡苅田町富久町2-2', '0930-33-4444', '見本 花子', '妻']) {
   await page.keyboard.type(t);
   await page.keyboard.press('Enter');
 }
-await dlg('性別').waitFor();
-await page.keyboard.press('Enter'); // 男
-for (const t of ['800-0300', '福岡県京都郡苅田町富久町2-2', '0930-33-4444']) {
-  await page.keyboard.type(t);
-  await page.keyboard.press('Enter');
-}
-await dlg('要介護状態区分').waitFor();
-await page.keyboard.press('Tab');
-await page.keyboard.press('Enter'); // 要支援2
-for (const t of ['見本 花子', '妻']) {
-  await page.keyboard.type(t);
-  await page.keyboard.press('Enter');
-}
-const works = dlg('改修の内容・箇所及び規模');
+assert.equal((await form.getByLabel('被保険者番号の10マス').innerText()).replace(/\s/g, ''), '0000366989');
+assert.equal(await form.getByLabel('被保険者番号', {exact: true}).inputValue(), '0000366989'); // 確定（Enter）したら右に詰めて 0 が入る
+await form.getByRole('group', {name: '性別'}).getByRole('button', {name: '男'}).click();
+await form.getByRole('group', {name: '要介護状態区分'}).getByRole('button', {name: '要支援2'}).click();
+await mark('昭和').click();
+// 改修の内容：箇所を足して、手すりは長さ・高さ、段差の解消は幅・奥行・高さ（ユーザーの指示の書き方）
 await works.getByRole('button', {name: '＋ 玄関'}).click();
 await works.getByRole('button', {name: '＋ トイレ'}).click();
-await works.getByLabel('申請書に書く文').first().fill('I型手すり L=800㎜ H=750');
-await works.getByRole('button', {name: '次の欄'}).click();
-await dlg('着工予定日・完了予定日').getByLabel('着工予定日').fill('2026-12-01');
-await dlg('着工予定日・完了予定日').getByLabel('完了予定日').fill('2026-12-10');
-await dlg('着工予定日・完了予定日').getByRole('button', {name: '次の欄'}).click();
-await dlg('改修予定費用').getByLabel('改修予定費用').fill('120000');
-await page.keyboard.press('Enter'); // 最後の欄なので閉じる
-assert.equal(await page.getByRole('dialog').count(), 0);
-await mark('昭和').click();
+const g1 = works.getByRole('listitem', {name: '①玄関'});
+await g1.getByLabel('長さ（mm）').fill('800');
+await g1.getByLabel('高さ（mm）').fill('750');
+const t2 = works.getByRole('listitem', {name: '②トイレ'});
+await t2.getByLabel('改修の種類').selectOption('2');
+await t2.getByLabel('幅（mm）').fill('600');
+await t2.getByLabel('奥行（mm）').fill('350');
+await t2.getByLabel('高さ（mm）').fill('150');
+assert.equal(await t2.getByLabel('長さ（mm）').count(), 0); // 段差の解消は幅・奥行・高さ
+await form.getByLabel('完了予定日').fill('2026-12-10');
+await form.getByLabel('改修予定費用').fill('120000');
 await status.filter({hasText: 'すべて入っています'}).waitFor();
 assert.deepEqual(await pressed(), ['昭和', '男', '要支援2']);
+const NEW_WORKS = '①玄関　手すりの取付　L=800mm H=750mm\n②トイレ　段差の解消　W600mm D350mm H150mm';
+await pvHas('②トイレ　段差の解消　W600mm D350mm H150mm');
 await page.screenshot({path: path.join(outDir, '82-shinsei-new.png'), fullPage: true});
 pv = await preview.innerText();
-for (const t of ['ミホン　イチロウ', '見本 一郎', '10年3月4日生', '〒800-0300', '福岡県京都郡苅田町富久町2-2', '0930-33-4444', '本人との関係（妻）', '玄関① I型手すり L=800㎜ H=750', 'トイレ② 手すり', '令和8年12月1日', '120,000円']) {
+for (const t of ['ミホン　イチロウ', '見本 一郎', '10年3月4日生', '〒800-0300', '福岡県京都郡苅田町富久町2-2', '0930-33-4444', '本人との関係（妻）', '①玄関　手すりの取付　L=800mm H=750mm', '令和8年12月10日', '120,000円']) {
   assert.ok(pv.includes(t), `プレビューに「${t}」がない`);
 }
 const first = sheetsOf((await saveExcel()).bytes);
 const fp = first.sheets.get('事前申請書');
 assert.deepEqual(
-  ['J6', 'J7', 'J9', 'J10', 'J11', 'AB11', 'J13', 'W13', 'J14', 'Y15', 'Y16', 'J17'].map((r) => text(fp, r)),
-  ['ミホン　イチロウ', '見本 一郎', '明　・　大　・　昭　10年3月4日生', '〒800-0300', '福岡県京都郡苅田町富久町2-2', '0930-33-4444', '見本 花子', '本人との関係（妻）', '玄関① I型手すり L=800㎜ H=750\nトイレ② 手すり', '令和8年12月1日', '令和8年12月10日', '120,000円'],
+  ['J6', 'J7', 'J9', 'J10', 'J11', 'AB11', 'J13', 'W13', 'J14', 'Y16', 'J17'].map((r) => text(fp, r)),
+  ['ミホン　イチロウ', '見本 一郎', '明　・　大　・　昭　10年3月4日生', '〒800-0300', '福岡県京都郡苅田町富久町2-2', '0930-33-4444', '見本 花子', '本人との関係（妻）', NEW_WORKS, '令和8年12月10日', '120,000円'],
 );
-assert.equal(['X6', 'Y6', 'Z6', 'AA6', 'AB6', 'AC6', 'AD6', 'AE6', 'AF6', 'AG6'].map((r) => text(fp, r)).join(''), '1234567890');
+assert.equal(['X6', 'Y6', 'Z6', 'AA6', 'AB6', 'AC6', 'AD6', 'AE6', 'AF6', 'AG6'].map((r) => text(fp, r)).join(''), '0000366989'); // 空いたマスは 0
+assert.ok(!/令和/.test(cellOf(fp, 'Y15'))); // 着工予定日は空白
 assert.deepEqual([first.ellipses('事前申請書'), first.ellipses('事後申請書')], [3, 3]);
-// 読み直しても申請書のタブのまま（URL に view=shinsei）。自動保存は打ち終わって 0.4 秒後なので、少し待ってから読み直す
+assert.equal(text(first.sheets.get('平面図  (2)'), 'C2'), '見本 一郎');
+// 読み直しても申請書のタブのまま（URL に view=shinsei）。寸法も残る。自動保存は打ち終わって 0.4 秒後なので、少し待ってから読み直す
 await page.waitForTimeout(1200);
 await page.reload();
-await preview.waitFor();
+await form.waitFor();
 assert.equal(await shinseiTab.getAttribute('aria-selected'), 'true');
-assert.ok((await preview.innerText()).includes('ミホン　イチロウ'));
-assert.equal(await page.getByRole('dialog').count(), 0); // 入れてある様邸は、欄を開かない
-// 見積書のタブ：氏名・番号・住所・箇所が入っている。行を入れるまでは笹岡工務店の請求書に入れない。行を入れると入る（見積もり作成日も今日）
+await pvHas('②トイレ　段差の解消　W600mm D350mm H150mm');
+assert.equal(await works.getByRole('listitem', {name: '①玄関'}).getByLabel('高さ（mm）').inputValue(), '750');
+// 見積書のタブ：氏名・番号・住所・箇所が入っている。行を入れるまでは笹岡工務店の請求書・発注書は出さない。行を入れると入る（見積もり作成日も今日）
 await estimateTab.click();
 await sheet.waitFor();
 assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '見本 一郎様邸');
 const est = await sheet.locator('.form-page').first().innerText();
-for (const t of ['見本 一郎', '1234567890', '福岡県京都郡苅田町富久町2-2', '①玄関', '②トイレ']) assert.ok(est.includes(t), `見積書に「${t}」がない`);
+for (const t of ['見本 一郎', '0000366989', '福岡県京都郡苅田町富久町2-2', '①玄関', '②トイレ']) assert.ok(est.includes(t), `見積書に「${t}」がない`);
 const inInvoice = page.getByLabel('笹岡工務店の請求書に入れる');
 const orderBtn = page.getByRole('button', {name: '🛒 発注書を作成'});
 assert.equal(await inInvoice.count(), 0); // 見積書に行がないうちは出さない（申請書だけの様邸＝ほかの工務店の工事）
@@ -573,32 +553,27 @@ await typeIn('new:text', '取付金具', 'Tab');
 await page.keyboard.press('Enter');
 assert.equal(await inInvoice.isChecked(), true);
 assert.equal(await orderBtn.isDisabled(), false);
-log('新規作成（申請書のタブから・フリガナが開いている・申請書の順番に Enter・丸・箇所・Excel・読み直し・見積書に行を入れると請求書・発注書）OK');
+log('新規作成（申請書のタブから・フリガナにカーソル・申請書の順番に Enter・番号は0で埋める・丸・箇所の寸法・Excel・読み直し・見積書に行を入れると請求書・発注書）OK');
 
 // ---------------- 申請書だけ（みやこ町）：見積書を作らずに Excel にする。一覧に出て（請求書には入れない）、押すと申請書のタブで開く
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
-await page.getByRole('navigation').getByRole('button', {name: /見積もりを作成する/}).click();
+await page.getByRole('navigation').getByRole('button', {name: /見積もり・申請書を作成する/}).click();
 await home.waitFor();
 await home.getByRole('button', {name: '＋ みやこ町', exact: true}).click();
-await dlg('フリガナ').waitFor();
-await page.keyboard.press('Escape');
-await openSpot('被保険者氏名');
-await dlg('被保険者氏名').getByLabel('被保険者氏名').fill('見本 次郎');
-await openSpot('住宅改修が必要な理由書作成者');
-await dlg('住宅改修が必要な理由書作成者').getByLabel('理由書作成者の事業所名').fill('見本居宅介護支援事業所');
-await dlg('住宅改修が必要な理由書作成者').getByLabel('理由書作成者の氏名').fill('見本 三郎');
-await openSpot('改修の内容・箇所及び規模', pageOf('住宅改修内訳明細書'));
-await dlg('改修の内容・箇所及び規模').getByRole('button', {name: '＋ 浴室'}).click();
-await dlg('改修の内容・箇所及び規模').getByLabel('申請書に書く文').fill('浴室用手すり L=600㎜');
-await openSpot('改修費用（介護保険対象分）');
-await dlg('改修費用（介護保険対象分）').getByLabel('改修費用（介護保険対象分）').fill('80000');
-await page.keyboard.press('Escape');
-assert.ok((await pageOf('住宅改修内訳明細書').innerText()).includes('浴室① 浴室用手すり L=600㎜'));
+await form.waitFor();
+await form.getByLabel('被保険者氏名').fill('見本 次郎');
+await form.getByLabel('理由書作成者の事業所名').fill('見本居宅介護支援事業所');
+await form.getByLabel('理由書作成者の氏名').fill('見本 三郎');
+await works.getByRole('button', {name: '＋ 浴室'}).click();
+await works.getByRole('listitem', {name: '①浴室'}).getByLabel('長さ（mm）').fill('600');
+await form.getByLabel('改修費用（介護保険対象分）').fill('80000');
+await pvHas('①浴室　手すりの取付　L=600mm');
+assert.ok((await pageOf('住宅改修内訳明細書').innerText()).includes('①浴室　手すりの取付　L=600mm'));
 const onlyMy = sheetsOf((await saveExcel()).bytes);
 const myTop = onlyMy.sheets.get('住宅改修承認届出書');
 assert.deepEqual(['I5', 'N11', 'N12'].map((r) => text(myTop, r)), ['見本 次郎', '見本居宅介護支援事業所', '見本 三郎']);
 assert.match(myTop, /<c r="I23" s="\d+"><v>80000<\/v><\/c>/);
-assert.equal(text(onlyMy.sheets.get('住宅改修内訳明細書'), 'K14'), '浴室① 浴室用手すり L=600㎜');
+assert.equal(text(onlyMy.sheets.get('住宅改修内訳明細書'), 'K14'), '①浴室　手すりの取付　L=600mm');
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
 await page.getByRole('region', {name: '一覧から作成'}).getByRole('button', {name: '📋 見積書の一覧を開く'}).click();
 const listRow = page.getByRole('row', {name: /見本 次郎/});
@@ -607,7 +582,7 @@ assert.match(await listRow.innerText(), /申請書だけ/); // 見積書のな�
 await page.getByRole('cell', {name: /見本 次郎/}).click();
 await preview.waitFor();
 assert.equal(await shinseiTab.getAttribute('aria-selected'), 'true'); // まだ申請書だけなので申請書のタブ
-assert.ok((await preview.innerText()).includes('見本 次郎'));
+await pvHas('見本 次郎');
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
 await page.getByRole('row', {name: /見本 次郎/}).getByRole('button', {name: '📝 申請書'}).click();
 await preview.waitFor();
@@ -619,19 +594,21 @@ await shinseiTab.click();
 await preview.waitFor();
 log('申請書だけ（みやこ町。見積書なしで Excel・請求書に入れない・一覧から申請書のタブで開く）OK');
 
-// ---------------- スマホの幅：申請書は画面の幅に縮めて出し、欄を押すと入れる所は画面の下に出る
+// ---------------- スマホの幅：一覧の下にプレビュー（縦に並べる）。プレビューは画面の幅に縮める。横にはみ出さない
 await page.setViewportSize({width: 390, height: 844});
-await openSpot('フリガナ');
-const sheetBox = await dlg('フリガナ').boundingBox();
-assert.ok(sheetBox && sheetBox.y + sheetBox.height >= 843 && sheetBox.x <= 1 && sheetBox.width >= 389, JSON.stringify(sheetBox));
+await page.waitForTimeout(300);
+const formPhone = await form.boundingBox();
+const previewPhone = await preview.boundingBox();
+assert.ok(formPhone && previewPhone && previewPhone.y >= formPhone.y + formPhone.height - 1, `${JSON.stringify(formPhone)} ${JSON.stringify(previewPhone)}`);
 const paperBox = await pageOf('住宅改修承認届出書').boundingBox();
 assert.ok(paperBox && paperBox.width <= 390, JSON.stringify(paperBox));
 assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true); // 横にはみ出さない
+await form.getByLabel('フリガナ').focus();
 await page.screenshot({path: path.join(outDir, '83-shinsei-phone.png')});
-await page.keyboard.press('Escape');
-await photoBoard.scrollIntoViewIfNeeded();
-await photoBoard.screenshot({path: path.join(outDir, '87-photo-board-phone.png')});
-log('スマホの幅（縮めて出す・入れる所は画面の下）OK');
+const photoBoardPhone = page.getByRole('region', {name: '写真'});
+await photoBoardPhone.scrollIntoViewIfNeeded();
+await photoBoardPhone.screenshot({path: path.join(outDir, '87-photo-board-phone.png')});
+log('スマホの幅（一覧の下にプレビュー・縮めて出す・はみ出さない）OK');
 
 console.log('\nERRORS:', errors.length ? errors : 'なし');
 assert.deepEqual(errors, []);

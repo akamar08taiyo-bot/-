@@ -63,9 +63,9 @@ export function EstimateSheet({
   form: EstimateForm;
   materials: Material[];
   setJob: (fn: (j: Job) => Job) => void;
-  onPickMaterial: (placeId: string | null) => void; // null：新しい箇所に
-  onPickLabor: (placeId: string | null, rowId: string | null) => void; // rowId：その部材の同上施工費。null：箇所の施工費
-  onPickKit: (placeId: string | null) => void;
+  onPickMaterial: (placeId: string | null, rowId: string | null) => void; // null：新しい箇所に。rowId：選んでいる行（そこに入れる）
+  onPickLabor: (placeId: string | null, rowId: string | null) => void; // rowId：選んでいる行（部材ならその同上施工費・空白の行ならその行に。`laborSpot`）。null：箇所の施工費
+  onPickKit: (placeId: string | null, rowId: string | null) => void;
   onPrint: () => void;
 }) {
   const estDate = estimateDateOf(job); // 見積もり作成日（右上の作成日）
@@ -673,13 +673,6 @@ export function EstimateSheet({
   // ---------------------------------------------------------------- ツールバー（部材・施工費を入れる。行を入れる・消すは行の左の「＋」「✕」）
   const row = target.row;
   const place = target.place;
-  // 施工費を入れる先の部材：選んでいる部材か、選んでいる施工費（同上施工費）の上の部材
-  const workOwner = (() => {
-    if (!row || !place) return null;
-    let k = place.rows.findIndex((r) => r.id === row.id);
-    while (k >= 0 && place.rows[k].kind === 'labor') k--;
-    return k >= 0 ? place.rows[k] : null;
-  })();
 
   // 打ち込む欄の位置・文字の大きさ（見積書の欄と同じ）
   const editing = edit !== null;
@@ -729,13 +722,13 @@ export function EstimateSheet({
   return (
     <section className="overflow-hidden rounded-xl border-2 border-emerald-800 bg-white shadow-sm" aria-label="見積書">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-        <button type="button" className="sheet-tool" onClick={() => onPickMaterial(place?.id ?? null)}>
+        <button type="button" className="sheet-tool" onClick={() => onPickMaterial(place?.id ?? null, row?.id ?? null)}>
           📋 部材リストから入れる
         </button>
-        <button type="button" className="sheet-tool" onClick={() => onPickLabor(place?.id ?? null, workOwner?.id ?? null)}>
+        <button type="button" className="sheet-tool" onClick={() => onPickLabor(place?.id ?? null, row?.id ?? null)}>
           🔧 施工費（笹岡工務店の手間）から入れる
         </button>
-        <button type="button" className="sheet-tool" onClick={() => onPickKit(place?.id ?? null)}>
+        <button type="button" className="sheet-tool" onClick={() => onPickKit(place?.id ?? null, row?.id ?? null)}>
           ＋ 部材＋施工費（常用）から入れる
         </button>
       </div>

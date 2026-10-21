@@ -1,6 +1,6 @@
 // 住宅改修の見積書と、笹岡工務店への請求書（仕切り計算）と、部材・施工費のマスタを、タブで切り替えて使う1つのアプリ。
 // 太陽ポータルの2つの入口（jutaku-mitsumori/・sasaoka/）は同じアプリで、最初に開くタブ（start）だけが違う。
-//   見積もりを作成する：「新規作成」か「一覧から作成」（作った月ごとの一覧）を選ぶ。新規作成で保険者を選ぶと、
+//   見積もり・申請書を作成する：「新規作成」か「一覧から作成」（作った月ごとの一覧）を選ぶ。新規作成で保険者を選ぶと、
 //                       様邸の画面に2つのタブ（左に申請書、右に見積書）ができる（ユーザーの指示）。同じ様邸の内容なので、どちらで直しても両方に出る。
 //                       申請書は保険者の Excel の様式のまま画面に出して、欄を押して入れる。見積書はいただいた見積書
 //                       （苅田町・行橋市・みやこ町用「工事費見積書兼工事費内訳書」・広域連合用「住宅改修内訳明細書」）の形のまま打ち込む。
@@ -37,7 +37,7 @@ import {useStore} from './useStore.ts';
 import {thisMonth} from './util.ts';
 
 const TABS: {id: MainTab; label: string}[] = [
-  {id: 'estimate', label: '📝 見積もりを作成する'},
+  {id: 'estimate', label: '📝 見積もり・申請書を作成する'},
   {id: 'invoice', label: '🧾 請求書を確認する'},
   {id: 'master', label: '📦 部材・施工費マスタ'},
   {id: 'settings', label: '⚙ 設定'},
@@ -103,7 +103,7 @@ export default function App({start}: {start: MainTab}) {
   const [tab, setTab] = useState<MainTab>(initial.tab ?? start);
   const [estimateId, setEstimateId] = useState<string | null>((initial.tab ?? start) === 'estimate' ? initial.job : null);
   const [invoiceId, setInvoiceId] = useState<string | null>((initial.tab ?? start) === 'invoice' ? initial.job : null);
-  // 見積もりを作成する：最初の画面（新規作成・一覧から作成）か、月ごとの一覧か
+  // 見積もり・申請書を作成する：最初の画面（新規作成・一覧から作成）か、月ごとの一覧か
   // URL から見積書を開いたとき（読み直したとき）は、戻ると一覧
   const [estimateView, setEstimateView] = useState<'home' | 'list'>(estimateId ? 'list' : 'home');
   // 見積書の画面か、そこから開いた発注書・申請書か（見積書を閉じると見積書の画面にもどる）
@@ -267,9 +267,8 @@ export default function App({start}: {start: MainTab}) {
               <div className="grid h-9 w-9 place-items-center rounded-lg bg-white/15 text-lg font-black">住</div>
               <div>
                 <div className="text-base font-bold leading-tight">住宅改修 見積書・請求書</div>
-                <div className={`text-[11px] ${theme.sub}`}>
-                  請求先：{data.settings.clientName || '（未設定）'}　／　{data.settings.officeName || '営業所未設定'}
-                </div>
+                {/* 「請求先：笹岡工務店」は出さない（ユーザーの指示）。営業所だけ */}
+                <div className={`text-[11px] ${theme.sub}`}>{data.settings.officeName || '営業所未設定'}</div>
               </div>
             </div>
             <div className={`ml-auto flex flex-wrap items-center gap-3 text-[11px] ${theme.sub}`}>
@@ -338,11 +337,6 @@ export default function App({start}: {start: MainTab}) {
                 data={data}
                 update={store.update}
                 onNew={newOne}
-                onCreate={(j) => {
-                  store.update('jobs', (jobs) => [...jobs, j]);
-                  setEstimateId(j.id);
-                  setJobView('estimate');
-                }}
                 onList={() => setEstimateView('list')}
                 goMaterials={() => goMaster()}
               />

@@ -3,7 +3,7 @@
 import {useState} from 'react';
 import {isBlankRow, shikiriPrice} from '../calc.ts';
 import {NO_SHINSEI} from '../estimateForms.ts';
-import {copyRows, replaceRange, workRange} from '../rows.ts';
+import {copyRows, laborRange, laborSpot, replaceRange} from '../rows.ts';
 import type {AppData, Job, Material, Place, Row} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {num, uid, yen} from '../util.ts';
@@ -33,7 +33,10 @@ export function copyJob(job: Job): Job {
   };
 }
 
-/** 取付手間を数える画面を、箇所全体（rowId なし）か、ある部材の施工費（rowId の部材のすぐ下の手間）に向けて開く */
+/**
+ * 取付手間を数える画面を、箇所全体（rowId なし）か、選んでいる行の所に向けて開く（`laborSpot`。部材ならそのすぐ下の手間＝同上施工費、
+ * 同上施工費ならそのまとまり、空白の行ならその行に入れる）
+ */
 export function LaborPickerFor({
   place,
   rowId,
@@ -48,13 +51,14 @@ export function LaborPickerFor({
   onClose: () => void;
 }) {
   const rows = place.rows;
-  const at = rowId ? rows.findIndex((r) => r.id === rowId) : -1;
-  const range: [number, number] = at >= 0 ? workRange(rows, at) : [0, rows.length];
-  const target = at >= 0 ? rows[at] : null;
+  // 入れる所は開いたときに決める（空白の行は、施工費を入れるとなくなるため）
+  const [spot] = useState(() => laborSpot(rows, rowId));
+  const range = laborRange(rows, spot);
+  const owner = spot.owner ? rows.find((r) => r.id === spot.owner) : null;
   return (
     <LaborCounter
-      title={target ? `「${target.name || '部材'}」の施工費（見積書の「同上施工費」）` : `「${place.name || '箇所'}」の取付手間`}
-      rows={rows.slice(range[0], range[1])}
+      title={owner ? `「${owner.name || '部材'}」の施工費（見積書の「同上施工費」）` : `「${place.name || '箇所'}」の取付手間`}
+      rows={rows.slice(range[0], range[1]).filter((r) => r.id !== spot.drop)}
       labor={data.labor}
       laborRate={data.settings.estimateLaborRate}
       onChange={(next) => onRows(replaceRange(rows, range, next))}

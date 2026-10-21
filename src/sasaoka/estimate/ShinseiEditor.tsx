@@ -1,23 +1,21 @@
-// 申請書のタブ（様邸の画面の左のタブ。右は見積書）：保険者の申請書を、原本の様式のまま画面に出して（プレビュー）、確かめながら作る
-// （ユーザーの指示「申請書については、プレビューで、確認しながら作成できるようにする。その他の部分に関しては手入力で、そのまま入力できるように」）。
-// 申請書の欄を押すと、その項目を入れる所がすぐ下に出る。打つとプレビューもすぐ変わる。Enter で次の欄（申請書の上からの順番）へ移る。
-// 丸で囲む項目（性別・要介護状態区分など）は、申請書の文字を押すと丸がつく。まだ入っていない欄は薄い黄色にし、上にも一覧で出す。
-// 「一覧で入れる」にすると、前の版と同じ、申請書の順番に項目を並べた入れ方になる。
+// 申請書のタブ（様邸の画面の左のタブ。右は見積書）：保険者の申請書の項目を、申請書の上からの順番に並べた一覧で入れ、横のプレビュー（原本の様式のまま）で確かめる
+// （ユーザーの指示「一覧から入力をメインとする。プレビューをみながら入力」）。Enter で次の欄。入れている項目はプレビューで囲み、プレビューの欄を押すと一覧のその項目へ。
+// 丸で囲む項目（性別・要介護状態区分など）は一覧のボタンか、プレビューの申請書の文字を押す。まだ入っていない欄は薄い黄色にし、上にも並べる。
 // 見積書と同じ様邸（Job）：氏名・住所・被保険者番号・改修の箇所は見積書と同じ欄、改修予定費用は見積書の金額なので、どちらで直してもすぐ両方に出る。
-// 申請書だけ・見積書だけでもよい（見積書がないときは、改修の内容を箇所ごとに書き、改修費用を手で入れる）。
+// 申請書だけ・見積書だけでもよい（見積書がないときは、改修の箇所と寸法を入れ、改修費用を手で入れる）。
 // 写真（PhotoBoard）：写真番号の箇所ごとに改修前・改修後の写真を入れ、入れ替える。プレビューの写真貼付用紙にも出し、Excel の写真貼付用紙に貼る
 
-import {Fragment, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState} from 'react';
+import {Fragment, useDeferredValue, useMemo, useRef, useState} from 'react';
 import type {KeyboardEvent, ReactNode} from 'react';
 import {isBlankRow, jobName} from '../calc.ts';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {circled, INSURER_IDS, INSURER_INFO, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, photoNumbers} from '../estimateForms.ts';
 import {manualRow, newPlace} from '../rows.ts';
 import {usePhotoUrls} from '../photos.ts';
-import {autoWorkText, costIsTotal, insuredBoxes, photoSheets, SHINSEI, shinseiCost, shinseiKinds, shinseiValues, shinseiWorks} from '../shinsei.ts';
+import {costIsTotal, estimateLength, insuredBoxes, padInsuredNo, photoSheets, SHINSEI, shinseiCost, shinseiKinds, shinseiValues, shinseiWorks} from '../shinsei.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
-import type {AppData, Insurer, Job, Place, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
+import type {AppData, Insurer, Job, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {yen} from '../util.ts';
 import {PhotoBoard, photoPlaces, usePhotoActions} from './PhotoBoard.tsx';
@@ -39,7 +37,8 @@ const twoForms = (i: Insurer) => i === 'miyako' || i === 'kouiki';
 /** 欄の名前（申請書の言葉） */
 function label(f: Field, i: Insurer): string {
   if (f === 'cost') return twoForms(i) ? '改修費用（介護保険対象分）' : '改修予定費用';
-  if (f === 'dates') return twoForms(i) ? '着工日・完成日' : i === 'kanda' ? '着工予定日・完了予定日' : '着工予定日・完成予定日';
+  // 苅田町・行橋市の着工予定日は書かない（ユーザーの指示「申請書の着工予定日は空白にする」）ので、完了（完成）予定日だけ
+  if (f === 'dates') return twoForms(i) ? '着工日・完成日' : i === 'kanda' ? '完了予定日' : '完成予定日';
   return {
     kana: 'フリガナ',
     name: '被保険者氏名',
@@ -55,17 +54,6 @@ function label(f: Field, i: Insurer): string {
     works: '改修の内容・箇所及び規模',
     renovated: '現在までの改修状況',
   }[f];
-}
-
-/** 入れ方：申請書の形（プレビューの欄を押して入れる）か、一覧（項目を並べて入れる）か。この端末で覚えておく */
-type Mode = 'form' | 'list';
-const MODE_KEY = 'sasaoka-app:shinsei-mode';
-function loadMode(): Mode {
-  try {
-    return localStorage.getItem(MODE_KEY) === 'list' ? 'list' : 'form';
-  } catch {
-    return 'form';
-  }
 }
 
 /** 申請書の名前（画面の上に出す） */
@@ -98,21 +86,12 @@ export function ShinseiEditor({
   const setInsurer = (i: Insurer) => setJob((j) => ({...j, insurer: i, form: INSURER_INFO[i].form}));
   const cost = shinseiCost(job, s);
   const lines = shinseiWorks(job, s);
-  const [mode, setModeState] = useState<Mode>(loadMode);
-  const setMode = (m: Mode) => {
-    setModeState(m);
-    try {
-      localStorage.setItem(MODE_KEY, m);
-    } catch {
-      /* 覚えられなくても使える */
-    }
-  };
 
-  // まだ入っていない欄（色を付けて、上に一覧で出す）。みやこ町・広域連合の着工日・完成日は工事のあとに入れるので数えない
+  // まだ入っていない欄（色を付けて、上に一覧で出す）。着工・完了の日は数えない（苅田町・行橋市の着工予定日は空白のまま。みやこ町・広域連合の着工日・完成日は工事のあと）
   const missing: Record<Field, boolean> = {
     kana: !info.kana.trim(),
     name: !job.customer.trim(),
-    insuredNo: insuredBoxes(job.insuredNo).join('').length !== 10,
+    insuredNo: !insuredBoxes(job.insuredNo).join(''),
     birth: !info.era || !info.birthY.trim() || !info.birthM.trim() || !info.birthD.trim(),
     gender: !info.gender,
     zip: !info.zip.trim(),
@@ -124,7 +103,7 @@ export function ShinseiEditor({
     works: lines.length === 0,
     cost: cost === null,
     renovated: !info.renovated,
-    dates: !!insurer && !twoForms(insurer) && (!info.start || !info.end),
+    dates: false,
   };
   const fields = insurer ? FIELDS[insurer] : [];
   const todo = fields.filter((f) => missing[f]);
@@ -138,22 +117,13 @@ export function ShinseiEditor({
     try {
       return shinseiPreview(template, map, shinseiValues(shown, s));
     } catch {
-      return []; // 描けないとき（原本がこわれているなど）は一覧で入れる
+      return []; // 描けないとき（原本がこわれているなど）は一覧だけ
     }
   }, [template, map, shown, s]);
-  // 入れる所を開いている項目。何も入っていない新しい申請書は、最初の欄（フリガナ）を開いておく
-  const [active, setActive] = useState<Field | null>(() => (fields[0] && !job.customer.trim() && !info.kana.trim() && job.places.length === 0 ? fields[0] : null));
-  const open = useCallback((f: Field | null) => setActive(f), []);
-  const move = (dir: 1 | -1) => setActive((cur) => (cur ? (fields[fields.indexOf(cur) + dir] ?? null) : null));
-  useEffect(() => {
-    if (active && !fields.includes(active)) setActive(null); // 保険者を替えて、その申請書にない項目
-  }, [insurer]);
+  // 一覧で入れている項目（プレビューのその欄を囲む）
+  const [active, setActive] = useState<Field | null>(null);
+  const previewBox = useRef<HTMLDivElement>(null);
   const toggleMark = (key: keyof ShinseiMarks, option: string) => setInfo({[key]: info[key] === option ? '' : option} as Partial<ShinseiInfo>);
-  // 丸で囲む項目（性別・要介護状態区分・改修状況）：申請書の欄を押して出した所で選んだら、次の欄へ（Enter と同じ）
-  const pickMark = (key: 'gender' | 'care' | 'renovated', v: string, inList: boolean) => {
-    setInfo({[key]: v} as Partial<ShinseiInfo>);
-    if (!inList && v) move(1);
-  };
 
   // 写真：写真番号の箇所の改修前・改修後（写真の欄・プレビューの写真貼付用紙で、ドロップ・選ぶ・入れ替える）
   const sheetNos = useMemo(() => (template && map ? new Set(photoSheets(template, map).keys()) : null), [template, map]);
@@ -198,8 +168,8 @@ export function ShinseiEditor({
     }
   };
 
-  // 項目を入れる欄（一覧の1行・申請書の欄を押したときに出る所で同じもの）。inList：一覧の中（改修の内容の下に、申請書に書く内容も出す）
-  const row = (f: Field, i: Insurer, inList: boolean): ReactNode => {
+  // 項目を入れる欄（一覧の1行）
+  const row = (f: Field, i: Insurer): ReactNode => {
     switch (f) {
       case 'kana':
         return <TextInput value={info.kana} onChange={(kana) => setInfo({kana})} placeholder="ヤマダ　タロウ" className="w-full max-w-md" aria-label="フリガナ" data-nav autoFocus={!job.customer && !info.kana} />;
@@ -208,9 +178,18 @@ export function ShinseiEditor({
       case 'insuredNo':
         return (
           <>
-            <TextInput value={job.insuredNo} onChange={(insuredNo) => setJob((j) => ({...j, insuredNo}))} inputMode="numeric" placeholder="10けた" className="w-36 font-mono" aria-label="被保険者番号" data-nav />
-            {/* 申請書の10マスと同じ形で見せる（右に寄せる） */}
-            <span className="flex" aria-hidden="true">
+            <TextInput
+              value={job.insuredNo}
+              onChange={(insuredNo) => setJob((j) => ({...j, insuredNo}))}
+              onBlur={() => padInsuredNo(job.insuredNo) !== job.insuredNo && setJob((j) => ({...j, insuredNo: padInsuredNo(j.insuredNo)}))} // 確定したら右に詰めて 0 で10けた
+              inputMode="numeric"
+              placeholder="10けた"
+              className="w-36 font-mono"
+              aria-label="被保険者番号"
+              data-nav
+            />
+            {/* 申請書の10マスと同じ形で見せる（右に寄せ、空いた左のマスは 0） */}
+            <span className="flex" aria-label="被保険者番号の10マス">
               {insuredBoxes(job.insuredNo).map((d, k) => (
                 <span key={k} className="grid h-8 w-5 place-items-center border border-l-0 border-slate-400 font-mono text-base first:border-l sm:w-6">
                   {d}
@@ -231,7 +210,7 @@ export function ShinseiEditor({
           </>
         );
       case 'gender':
-        return <Circles label="性別" options={MARK_INFO.gender.options} value={info.gender} onPick={(v) => pickMark('gender', v, inList)} />;
+        return <Circles label="性別" options={MARK_INFO.gender.options} value={info.gender} onPick={(gender) => setInfo({gender} as Partial<ShinseiInfo>)} />;
       case 'zip':
         return (
           <span className="inline-flex items-center gap-1">
@@ -248,7 +227,7 @@ export function ShinseiEditor({
           </>
         );
       case 'care':
-        return <Circles label="要介護状態区分" options={MARK_INFO.care.options} value={info.care} onPick={(v) => pickMark('care', v, inList)} />;
+        return <Circles label="要介護状態区分" options={MARK_INFO.care.options} value={info.care} onPick={(care) => setInfo({care} as Partial<ShinseiInfo>)} />;
       case 'owner':
         return (
           <>
@@ -276,7 +255,7 @@ export function ShinseiEditor({
           </>
         );
       case 'works':
-        return <WorksEditor job={job} setJob={setJob} s={s} insurer={i} lines={inList ? lines : []} />;
+        return <WorksEditor job={job} setJob={setJob} s={s} insurer={i} lines={lines} />;
       case 'cost':
         return (
           <>
@@ -301,30 +280,35 @@ export function ShinseiEditor({
           </>
         );
       case 'renovated':
-        return <Circles label="現在までの改修状況" options={MARK_INFO.renovated.options} value={info.renovated} onPick={(v) => pickMark('renovated', v, inList)} />;
-      case 'dates':
+        return <Circles label="現在までの改修状況" options={MARK_INFO.renovated.options} value={info.renovated} onPick={(renovated) => setInfo({renovated} as Partial<ShinseiInfo>)} />;
+      case 'dates': {
+        // 苅田町・行橋市は完了（完成）予定日だけ（着工予定日は空白のまま）。みやこ町・広域連合は支給申請書の着工日・完成日（工事のあと）
+        const end = twoForms(i) ? '完成日' : i === 'kanda' ? '完了予定日' : '完成予定日';
         return (
           <>
+            {twoForms(i) && (
+              <label className="inline-flex items-center gap-1 whitespace-nowrap text-sm">
+                着工日
+                <input type="date" value={info.start} onChange={(e) => setInfo({start: e.target.value})} className="h-9 rounded-md border border-slate-300 px-2" aria-label="着工日" data-nav />
+              </label>
+            )}
             <label className="inline-flex items-center gap-1 whitespace-nowrap text-sm">
-              {twoForms(i) ? '着工日' : '着工予定日'}
-              <input type="date" value={info.start} onChange={(e) => setInfo({start: e.target.value})} className="h-9 rounded-md border border-slate-300 px-2" aria-label={twoForms(i) ? '着工日' : '着工予定日'} data-nav />
-            </label>
-            <label className="inline-flex items-center gap-1 whitespace-nowrap text-sm">
-              {twoForms(i) ? '完成日' : i === 'kanda' ? '完了予定日' : '完成予定日'}
-              <input type="date" value={info.end} onChange={(e) => setInfo({end: e.target.value})} className="h-9 rounded-md border border-slate-300 px-2" aria-label={twoForms(i) ? '完成日' : '完了予定日'} data-nav />
+              {end}
+              <input type="date" value={info.end} onChange={(e) => setInfo({end: e.target.value})} className="h-9 rounded-md border border-slate-300 px-2" aria-label={end} data-nav />
             </label>
             {twoForms(i) && <Note>支給申請書に書きます（工事のあと）</Note>}
           </>
         );
+      }
     }
   };
 
   const marks: ShinseiMarks = {gender: info.gender, era: info.era, care: info.care, renovated: info.renovated};
   const shortLabel = (f: Field) => (f === 'reason' ? '理由書作成者' : f === 'works' ? '改修の内容' : insurer ? label(f, insurer) : f);
-  // 入っていない欄を押したとき：申請書の形ならその欄の入れる所を開く。一覧ならその欄へ
+  // 入っていない欄・プレビューの欄を押したとき：一覧のその項目の最初の欄へ
   const goField = (f: Field) => {
-    if (mode === 'form' && pages?.length) setActive(f);
-    else document.querySelector<HTMLElement>(`[data-field="${f}"] input, [data-field="${f}"] select, [data-field="${f}"] button`)?.focus();
+    setActive(f);
+    document.querySelector<HTMLElement>(`[data-field="${f}"] input, [data-field="${f}"] select, [data-field="${f}"] button`)?.focus();
   };
 
   return (
@@ -336,33 +320,13 @@ export function ShinseiEditor({
         {tabs}
         <h1 className="text-lg font-bold text-[#14532d]">{job.customer.trim() ? jobName(job) : '新しい申請書'}</h1>
         {insurer && <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-900">{INSURER_INFO[insurer].name}</span>}
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          {insurer && (
-            <div role="group" aria-label="入れ方" className="inline-flex overflow-hidden rounded-md border border-slate-300 bg-white text-sm font-bold shadow-sm">
-              {(
-                [
-                  ['form', '📄 申請書で入れる'],
-                  ['list', '📋 一覧で入れる'],
-                ] as const
-              ).map(([m, text]) => (
-                <button
-                  key={m}
-                  type="button"
-                  aria-pressed={mode === m}
-                  onClick={() => setMode(m)}
-                  className={`px-3 py-2 transition ${mode === m ? 'bg-slate-700 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
-                >
-                  {text}
-                </button>
-              ))}
-            </div>
-          )}
-          {canMakeShinsei(insurer) && (
+        {canMakeShinsei(insurer) && (
+          <div className="ml-auto">
             <Btn color="softGreen" onClick={save}>
               📗 申請書をExcelで保存
             </Btn>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <section className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
@@ -405,67 +369,73 @@ export function ShinseiEditor({
         )}
       </section>
 
-      {insurer && (
-        <>
-          <input
-            ref={photoInput}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            aria-label="写真のファイル"
-            onChange={(e) => {
-              const files = [...(e.target.files ?? [])];
-              e.target.value = '';
-              const key = pickFor.current;
-              pickFor.current = undefined;
-              if (files.length) void photoActions.put(files, key);
-            }}
-          />
-          <PhotoBoard job={job} rates={s} sheetNos={sheetNos} actions={photoActions} onPick={pickPhoto} />
-        </>
-      )}
-
       {!insurer ? (
         <p className="rounded-xl border border-dashed border-amber-300 bg-amber-50 px-4 py-6 text-center text-sm text-amber-900">保険者を選ぶと、その申請書が出ます。</p>
-      ) : mode === 'form' && pages === null ? (
-        <p className="px-4 py-10 text-center text-sm text-slate-500">申請書を開いています…</p>
-      ) : mode === 'form' && pages && pages.length > 0 ? (
-        <ShinseiPages
-          pages={pages}
-          missing={missing}
-          active={active}
-          marks={marks}
-          label={(f) => label(f, insurer)}
-          onOpen={open}
-          onToggle={toggleMark}
-          onMove={move}
-          editor={active ? row(active, insurer, false) : null}
-          wide={active === 'works'}
-          photos={{
-            of: photoOf,
-            onDrop: (no, slot, e) => {
-              const key = photoKey(no, slot);
-              if (key) photoActions.drop(e, key);
-            },
-            onPick: (no, slot) => {
-              const key = photoKey(no, slot);
-              if (key) pickPhoto(key);
-            },
-          }}
-        />
       ) : (
-        <div role="form" aria-label="申請書" onKeyDown={nextOnEnter} className="mx-auto max-w-5xl overflow-hidden rounded-lg border-2 border-slate-700 bg-white shadow-sm">
-          <div className="border-b-2 border-slate-700 px-4 py-2.5 text-center text-base font-bold text-slate-800">
-            {INSURER_INFO[insurer].name}　{FORM_TITLE[insurer]}
-          </div>
-          {/* 左に申請書の項目名、右に入れる欄（スマホは項目名を上に） */}
-          {fields.map((f) => (
-            <div key={f} data-field={f} className="border-b border-slate-300 last:border-b-0 sm:grid sm:grid-cols-[11rem_1fr]">
-              <div className="flex items-center border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-bold text-slate-700 sm:border-b-0 sm:border-r sm:border-slate-300 sm:py-2">{label(f, insurer)}</div>
-              <div className={`flex min-w-0 flex-wrap items-center gap-2 px-3 py-2 ${missing[f] ? 'bg-amber-50' : ''}`}>{row(f, insurer, true)}</div>
+        // 左に一覧（入れる所）と写真、右にプレビュー（見ながら入れる。広い画面ではプレビューの枠だけ動く）。スマホは縦に並べる
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]">
+          <div className="min-w-0 space-y-3">
+            <div role="form" aria-label="申請書" onKeyDown={nextOnEnter} className="overflow-hidden rounded-lg border-2 border-slate-700 bg-white shadow-sm">
+              <div className="border-b-2 border-slate-700 px-4 py-2.5 text-center text-base font-bold text-slate-800">
+                {INSURER_INFO[insurer].name}　{FORM_TITLE[insurer]}
+              </div>
+              {/* 左に申請書の項目名、右に入れる欄（スマホは項目名を上に）。入れている項目は囲む */}
+              {fields.map((f) => (
+                <div
+                  key={f}
+                  data-field={f}
+                  onFocus={() => setActive(f)}
+                  className={`border-b border-slate-300 last:border-b-0 sm:grid sm:grid-cols-[9.5rem_1fr] ${active === f ? 'relative z-[1] outline outline-2 -outline-offset-2 outline-sky-500' : ''}`}
+                >
+                  <div className="flex items-center border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-bold text-slate-700 sm:border-b-0 sm:border-r sm:border-slate-300 sm:py-2">{label(f, insurer)}</div>
+                  <div className={`flex min-w-0 flex-wrap items-center gap-2 px-3 py-2 ${missing[f] ? 'bg-amber-50' : ''}`}>{row(f, insurer)}</div>
+                </div>
+              ))}
             </div>
-          ))}
+            <input
+              ref={photoInput}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              aria-label="写真のファイル"
+              onChange={(e) => {
+                const files = [...(e.target.files ?? [])];
+                e.target.value = '';
+                const key = pickFor.current;
+                pickFor.current = undefined;
+                if (files.length) void photoActions.put(files, key);
+              }}
+            />
+            <PhotoBoard job={job} rates={s} sheetNos={sheetNos} actions={photoActions} onPick={pickPhoto} />
+          </div>
+          <div ref={previewBox} className="min-w-0 rounded-lg bg-slate-200/60 p-2 lg:sticky lg:top-2 lg:max-h-[calc(100vh-1rem)] lg:overflow-y-auto">
+            {pages === null ? (
+              <p className="px-4 py-10 text-center text-sm text-slate-500">申請書を開いています…</p>
+            ) : pages.length > 0 ? (
+              <ShinseiPages
+                pages={pages}
+                missing={missing}
+                active={active}
+                marks={marks}
+                label={(f) => label(f, insurer)}
+                onOpen={goField}
+                onToggle={toggleMark}
+                scrollBox={previewBox}
+                photos={{
+                  of: photoOf,
+                  onDrop: (no, slot, e) => {
+                    const key = photoKey(no, slot);
+                    if (key) photoActions.drop(e, key);
+                  },
+                  onPick: (no, slot) => {
+                    const key = photoKey(no, slot);
+                    if (key) pickPhoto(key);
+                  },
+                }}
+              />
+            ) : null}
+          </div>
         </div>
       )}
     </div>
@@ -499,13 +469,32 @@ function Circles({label, options, value, onPick}: {label: string; options: reado
   );
 }
 
+/** 寸法の欄（mm。打ったまま。全角でもよい）。長さは「600×850」のように2つ以上も（区切りは × のほか , 、 すき間） */
+function Dim({label, value, placeholder, wide, onChange}: {label: string; value: string; placeholder: string; wide: boolean; onChange: (v: string) => void}) {
+  return (
+    <label className="inline-flex items-center gap-1 whitespace-nowrap">
+      {label}
+      <TextInput value={value} onChange={onChange} inputMode={wide ? undefined : 'numeric'} placeholder={placeholder} className={`${wide ? 'w-28' : 'w-16'} text-right`} aria-label={`${label}（mm）`} data-nav />
+      <span className="text-xs text-slate-500">mm</span>
+    </label>
+  );
+}
+
 /**
- * 改修の内容：箇所ごとに 写真番号・改修場所・改修の種類・申請書に書く文。見積書の箇所と同じもの（ここで足した箇所は見積書にも出る）。
- * 申請書に書く文は、見積書の部材から作った文（薄い字）。手で書いたらそちら（高さ H= を足すなど）。下に、申請書に書く行をそのまま出す
+ * 改修の内容：箇所ごとに 写真番号・改修場所・改修の種類と寸法。見積書の箇所と同じもの（ここで足した箇所は見積書にも出る）。
+ * 寸法（ユーザーの指示「入力項目に長さ、高さという項目をつくる」「段差の解消は幅・奥行・高さの入力欄」）：手すりは 長さ（L=600mm。入れなければ見積書の使う長さ＝薄い字）・
+ * 高さ（H=800mm。任意）、段差の解消は 幅・奥行・高さ（W600mm D350mm H150mm）。「そのほか」はうしろに足す文。下に、申請書に書く行をそのまま出す
  */
 function WorksEditor({job, setJob, s, insurer, lines}: {job: Job; setJob: (fn: (j: Job) => Job) => void; s: Settings; insurer: Insurer; lines: string[]}) {
   const photos = photoNumbers(job, s);
   const setPlace = (id: string, fn: (p: Place) => Place) => setJob((j) => ({...j, places: j.places.map((p) => (p.id === id ? fn(p) : p))}));
+  const setDim = (id: string, key: keyof PlaceDims, v: string) =>
+    setPlace(id, (x) => {
+      const dims: PlaceDims = {...x.dims, [key]: v};
+      if (!v.trim()) delete dims[key];
+      const {dims: _old, ...rest} = x;
+      return Object.keys(dims).length ? {...rest, dims} : rest;
+    });
   // 見積書に箇所が出るように、空白の行を1つ入れておく（見積書で部材・施工費を入れていける）
   const add = (name: string) => setJob((j) => ({...j, places: [...j.places, newPlace(name, [manualRow('material')])]}));
   const remove = (id: string) => setJob((j) => ({...j, places: j.places.filter((p) => p.id !== id)}));
@@ -513,34 +502,51 @@ function WorksEditor({job, setJob, s, insurer, lines}: {job: Job; setJob: (fn: (
     <div className="w-full space-y-2">
       {job.places.length > 0 && (
         <div className="text-sm" role="list" aria-label="改修の箇所">
-          <div className="hidden gap-2 pb-1 text-xs text-slate-500 sm:flex">
-            <span className="w-7 text-center">写真</span>
-            <span className="w-28">改修場所</span>
-            <span className="w-40">改修の種類</span>
-            <span>申請書に書く文（薄い字は見積書から作った文。直すときは書く）</span>
-          </div>
           {job.places.map((p) => {
             const n = photos.get(p.id);
             const used = p.rows.some((r) => !isBlankRow(r)); // 見積書に行のある箇所は、見積書で消す
+            const dim = (key: keyof PlaceDims, text: string, wide = false, placeholder = '') => (
+              <Dim label={text} value={p.dims?.[key] ?? ''} placeholder={placeholder} wide={wide} onChange={(v) => setDim(p.id, key, v)} />
+            );
             return (
-              <div key={p.id} role="listitem" className="flex flex-wrap items-center gap-2 border-t border-slate-100 py-1.5">
-                <span className="w-7 text-center text-base">{n ? circled(n) : '—'}</span>
-                <TextInput value={p.name} onChange={(name) => setPlace(p.id, (x) => ({...x, name}))} placeholder="改修場所" className="w-28" aria-label="改修場所" data-nav />
-                <select value={p.kind} onChange={(e) => setPlace(p.id, (x) => ({...x, kind: Number(e.target.value)}))} className="h-9 w-40 rounded-md border border-slate-300 px-1 text-sm" aria-label="改修の種類" data-nav>
-                  {KINDS.map((k, i) => (
-                    <option key={k} value={i + 1}>
-                      {circled(i + 1)} {k}
-                    </option>
-                  ))}
-                </select>
-                <TextInput value={p.shinseiText ?? ''} onChange={(t) => setPlace(p.id, (x) => ({...x, shinseiText: t}))} placeholder={autoWorkText(p)} className="min-w-[12rem] flex-1" aria-label="申請書に書く文" data-nav />
-                {used ? (
-                  <span className="w-7" />
-                ) : (
-                  <button type="button" onClick={() => remove(p.id)} className="w-7 rounded py-1 text-slate-400 hover:bg-rose-50 hover:text-rose-700" aria-label={`${p.name || '箇所'}を消す`}>
-                    ✕
-                  </button>
-                )}
+              <div key={p.id} role="listitem" aria-label={`${n ? circled(n) : ''}${p.name || '改修場所'}`} className="border-t border-slate-100 py-2 first:border-t-0 first:pt-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="w-7 text-center text-base">{n ? circled(n) : '—'}</span>
+                  <TextInput value={p.name} onChange={(name) => setPlace(p.id, (x) => ({...x, name}))} placeholder="改修場所" className="w-28" aria-label="改修場所" data-nav />
+                  <select value={p.kind} onChange={(e) => setPlace(p.id, (x) => ({...x, kind: Number(e.target.value)}))} className="h-9 w-40 rounded-md border border-slate-300 px-1 text-sm" aria-label="改修の種類" data-nav>
+                    {KINDS.map((k, i) => (
+                      <option key={k} value={i + 1}>
+                        {circled(i + 1)} {k}
+                      </option>
+                    ))}
+                  </select>
+                  {used ? (
+                    <span className="w-7" />
+                  ) : (
+                    <button type="button" onClick={() => remove(p.id)} className="w-7 rounded py-1 text-slate-400 hover:bg-rose-50 hover:text-rose-700" aria-label={`${p.name || '箇所'}を消す`}>
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-9">
+                  {p.kind === 1 && (
+                    <>
+                      {dim('l', '長さ', true, estimateLength(p))}
+                      {dim('h', '高さ')}
+                    </>
+                  )}
+                  {p.kind === 2 && (
+                    <>
+                      {dim('w', '幅')}
+                      {dim('d', '奥行')}
+                      {dim('h', '高さ')}
+                    </>
+                  )}
+                  <label className="flex min-w-[9rem] flex-1 items-center gap-1 whitespace-nowrap">
+                    そのほか
+                    <TextInput value={p.shinseiText ?? ''} onChange={(t) => setPlace(p.id, (x) => ({...x, shinseiText: t}))} className="min-w-0 flex-1" aria-label="そのほか" data-nav />
+                  </label>
+                </div>
               </div>
             );
           })}

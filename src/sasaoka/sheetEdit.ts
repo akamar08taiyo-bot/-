@@ -12,6 +12,7 @@ import type {EstimateRates} from './calc.ts';
 import {KINDS, materialText, rowUnit} from './estimateForms.ts';
 import {guessPieceLengthM} from './priceImport.ts';
 import {copyRows, manualRow, materialRow, newPlace} from './rows.ts';
+import {padInsuredNo} from './shinsei.ts';
 import type {EstimateForm, Job, Material, Place, Row, Settings} from './types.ts';
 
 export type SheetSettings = Pick<Settings, 'estimateRate' | 'estimateLaborRate' | 'estimateHourRate' | 'estimateOverheadRate' | 'taxRate'>;
@@ -219,7 +220,8 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
 
   if (kind === 'job') {
     const name = id as 'customer' | 'insuredNo' | 'address';
-    return {job: {...job, [name]: trimmed}, key};
+    // 被保険者番号は、確定したら右に詰めて空いた左を 0 で10けたに（ユーザーの指示）
+    return {job: {...job, [name]: name === 'insuredNo' ? padInsuredNo(trimmed) : trimmed}, key};
   }
   if (kind === 'overhead') {
     const n = parseNum(trimmed);

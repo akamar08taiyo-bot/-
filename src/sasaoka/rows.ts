@@ -1,5 +1,6 @@
 // 箇所の行を作る・取付手間の箇所数を数える・部材＋施工費（常用）を入れる などの行の操作
 
+import {isBlankRow} from './calc.ts';
 import {normalize} from './priceImport.ts';
 import type {Kit, LaborItem, Material, Place, Row, RowKind} from './types.ts';
 import {uid} from './util.ts';
@@ -49,9 +50,22 @@ export function materialRow(m: Material, qty = 1): Row {
 }
 
 /** 部材を選ぶ画面で選んだ部材を箇所に入れる。同じ部材（部材リストの同じもの）がもうあれば、行を増やさずに数量を足す */
-export function addMaterial(rows: Row[], row: Row): Row[] {
+export function addMaterial(rows: Row[], row: Row, at: string | null = null): Row[] {
   const same = row.refId ? rows.find((r) => r.kind === 'material' && r.refId === row.refId) : undefined;
-  return same ? rows.map((r) => (r === same ? {...r, qty: r.qty + row.qty} : r)) : [...rows, row];
+  return same ? rows.map((r) => (r === same ? {...r, qty: r.qty + row.qty} : r)) : insertRowsAt(rows, [row], at);
+}
+
+/**
+ * 見積書で選んでいる（タップしている）行のところに行を入れる（ユーザーの指示「タップしている部分に、施工費や部材をいれる」）：
+ * 選んでいる行が空白の行ならその行と入れ替え、ほかの行ならその行の組（部材とすぐ下の同上施工費）のすぐ下。選んでいなければいちばん下
+ */
+export function insertRowsAt(rows: Row[], add: Row[], at: string | null): Row[] {
+  const i = at ? rows.findIndex((r) => r.id === at) : -1;
+  if (i < 0) return [...rows, ...add];
+  if (isBlankRow(rows[i])) return [...rows.slice(0, i), ...add, ...rows.slice(i + 1)];
+  let end = i + 1;
+  while (end < rows.length && rows[end].kind === 'labor') end++;
+  return [...rows.slice(0, end), ...add, ...rows.slice(end)];
 }
 
 /** 部材を選ぶ画面の −：同じ部材の数量を1つ減らす。0 になったら行を消す（すぐ下の施工費の行はそのまま） */
@@ -113,6 +127,31 @@ export function workRange(rows: Row[], at: number): [number, number] {
   let end = at + 1;
   while (end < rows.length && rows[end].kind === 'labor') end++;
   return [at + 1, end];
+}
+
+/**
+ * 施工費を入れる所（見積書で選んでいる＝タップしている行から決める）。owner：すぐ下の手間を数える部材（null は箇所のはじめの施工費）。
+ * 同上施工費の行ならその上の部材。空白の行なら、施工費はその行に入る（drop＝施工費を入れたら外す空白の行。すぐ上の部材の同上施工費になる）。
+ * 行を選んでいなければ箇所の全部（whole）
+ */
+export type LaborSpot = {whole: boolean; owner: string | null; drop: string | null};
+export function laborSpot(rows: Row[], rowId: string | null): LaborSpot {
+  const i = rowId ? rows.findIndex((r) => r.id === rowId) : -1;
+  if (i < 0) return {whole: true, owner: null, drop: null};
+  const blank = isBlankRow(rows[i]);
+  let k = blank ? i - 1 : i;
+  while (k >= 0 && rows[k].kind === 'labor') k--;
+  return {whole: false, owner: k >= 0 ? rows[k].id : null, drop: blank ? rows[i].id : null};
+}
+
+/** laborSpot の手間の行の範囲 [start, end)（外す空白の行もふくむ） */
+export function laborRange(rows: Row[], spot: LaborSpot): [number, number] {
+  if (spot.whole) return [0, rows.length];
+  const start = spot.owner ? rows.findIndex((r) => r.id === spot.owner) + 1 : 0;
+  if (spot.owner && start === 0) return [0, rows.length]; // 部材がなくなっていたら箇所の全部
+  let end = start;
+  while (end < rows.length && (rows[end].kind === 'labor' || rows[end].id === spot.drop)) end++;
+  return [start, end];
 }
 
 /** rows の [start, end) を next に入れ替える */

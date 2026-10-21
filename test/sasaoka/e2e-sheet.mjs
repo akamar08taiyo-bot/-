@@ -294,6 +294,44 @@ await undoKey();
 assert.equal(await lines(), pickBefore);
 log('部材リストから入れたものも Ctrl+Z／Ctrl+Y（欄を選んでいなくても）・お気に入りの削除 OK');
 
+// ---------------- 押している行に入れる：部材リストから入れた部材は、選んでいる行（と同上施工費）のすぐ下。続けて入れたものはその下。
+// 空白の行を選んでいれば、その行に入る（行は増えない）
+const pickAdd = async (...names) => {
+  await sheet.getByRole('button', {name: '📋 部材リストから入れる'}).click();
+  for (const name of names) await page.getByRole('dialog').getByRole('row', {name}).getByRole('button', {name: '＋ 追加'}).click();
+  await page.getByRole('button', {name: '選び終わったら閉じる'}).click();
+};
+const from = async (name, n) => {
+  const o = await order();
+  return o.slice(o.indexOf(name), o.indexOf(name) + n);
+};
+// 片づけは行の左の✕で（見積書の外で続けて入れたものは Ctrl+Z 1回にまとまるので、回数が決まらない）
+const drop = (name) => sheet.getByRole('button', {name: `${name}の行を消す`}).click();
+await cell(await key('木の手すり 35φ 4m', 'text')).click();
+await pickAdd(/ブラケット/, /補強板/);
+assert.deepEqual(await from('サンプル S-TS35 木の手すり 35φ 4m', 4), ['サンプル S-TS35 木の手すり 35φ 4m', '同上施工費', 'サンプル S-BK01 ブラケット', 'サンプル S-HB01 補強板']);
+assert.equal(await lines(), pickBefore + 2);
+await drop('サンプル S-BK01 ブラケット');
+await drop('サンプル S-HB01 補強板');
+assert.equal(await lines(), pickBefore);
+await sheet.getByRole('button', {name: 'サンプル S-EC01 エンドキャップの行の下に1行入れる'}).click(); // 空白の行の欄が選ばれる
+await pickAdd(/ブラケット/);
+assert.deepEqual(await from('サンプル S-EC01 エンドキャップ', 2), ['サンプル S-EC01 エンドキャップ', 'サンプル S-BK01 ブラケット']);
+assert.equal(await lines(), pickBefore + 1);
+await drop('サンプル S-BK01 ブラケット');
+assert.equal(await lines(), pickBefore);
+// 施工費も：空白の行を選んで「🔧 施工費…」→ その行に入り、すぐ上の部材（エンドキャップ）の同上施工費になる
+await sheet.getByRole('button', {name: 'サンプル S-EC01 エンドキャップの行の下に1行入れる'}).click();
+await sheet.getByRole('button', {name: '🔧 施工費（笹岡工務店の手間）から入れる'}).click();
+await page.getByRole('dialog').getByText('「エンドキャップ」の施工費').waitFor();
+await page.getByRole('button', {name: '木の箇所数を1増やす', exact: true}).click();
+await page.getByRole('button', {name: '数え終わったら閉じる'}).click();
+assert.deepEqual(await from('サンプル S-EC01 エンドキャップ', 2), ['サンプル S-EC01 エンドキャップ', '同上施工費']);
+assert.equal(await lines(), pickBefore + 1);
+await sheet.locator('.form-page tr', {hasText: '同上施工費'}).last().getByRole('button', {name: /の行を消す$/}).click();
+assert.equal(await lines(), pickBefore);
+log('押している行に入れる（部材リストから入れる・続けて入れる・空白の行・施工費）OK');
+
 // ---------------- 改修場所：欄の「▼」（Alt+↓）で箇所の名前の候補から選ぶ。打ち込んでもよい（打った文字で絞る）
 await cell(await key('木の手すり 35φ 4m', 'name')).click();
 await sheet.getByRole('button', {name: '改修場所（箇所名）を候補から選ぶ'}).click();
