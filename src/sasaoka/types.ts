@@ -124,8 +124,17 @@ export type Job = {
   shikiri: boolean;
   places: Place[];
   order?: OrderEdits | null; // 発注書で手で直したところ（なければ見積書から計算したまま）
+  shinseiMarks?: ShinseiMarks; // 申請書で丸をつける項目（申請書を作るときに選ぶ）
   createdAt: number;
   updatedAt: number;
+};
+
+/** 申請書で丸で囲む項目（申請書を作るときに選ぶ。空なら丸をつけない）。どの保険者の申請書にどの項目があるかは shinsei.ts の SHINSEI */
+export type ShinseiMarks = {
+  gender: '' | '男' | '女'; // 性別
+  era: '' | '明治' | '大正' | '昭和'; // 生年月日の元号（苅田町・行橋市）
+  care: '' | '要支援1' | '要支援2' | '要介護1' | '要介護2' | '要介護3' | '要介護4' | '要介護5'; // 要介護状態区分（苅田町・行橋市）
+  renovated: '' | '有' | '無'; // 現在までの改修状況（みやこ町・広域連合）
 };
 
 /**

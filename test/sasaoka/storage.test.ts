@@ -77,6 +77,10 @@ test('見積書の項目：前のデータ（項目なし）も読める', () =>
   ]);
   // 前の版の工事名称（work）は読まない（見積書の改修内容・工事名称は改修の種類から）
   assert.equal('work' in k.places[0], false);
+  // 申請書で丸をつける項目：前のデータ（項目なし）は空。選べる値のほかは空にする
+  assert.deepEqual(j.shinseiMarks, {gender: '', era: '', care: '', renovated: ''});
+  const [m] = cleanJobs([{shinseiMarks: {gender: '女', era: '平成', care: '要介護2', renovated: 1}}]);
+  assert.deepEqual(m.shinseiMarks, {gender: '女', era: '', care: '要介護2', renovated: ''});
 });
 
 test('前のデータの行・部材にも、定価・長さ・見積の単価が入る', () => {

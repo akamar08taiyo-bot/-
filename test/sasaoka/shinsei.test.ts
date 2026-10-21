@@ -4,8 +4,9 @@ import test from 'node:test';
 import {strFromU8, unzipSync} from 'fflate';
 import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import {defaultSettings} from '../../src/sasaoka/defaults.ts';
-import {fillShinsei, insuredBoxes, parseWorkLine, readShinsei, SHINSEI, shinseiFileName, shinseiKinds, shinseiPhotos, shinseiValues, shinseiWorks} from '../../src/sasaoka/shinsei.ts';
-import type {Job, Place, Row} from '../../src/sasaoka/types.ts';
+import {MARK_INFO} from '../../src/sasaoka/estimateForms.ts';
+import {fillShinsei, insuredBoxes, parseWorkLine, readShinsei, SHINSEI, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks} from '../../src/sasaoka/shinsei.ts';
+import type {Insurer, Job, Place, Row, ShinseiMarks} from '../../src/sasaoka/types.ts';
 
 const RATES = {estimateRate: 0.8, estimateLaborRate: 1.5};
 const blank = {code: '', maker: '', unit: '', price: 0, listPrice: 0, lengthCm: 0, pieceLengthM: 0, estPrice: null, excluded: false, estText: null, estNote: null, estAmount: null};
@@ -234,4 +235,103 @@ test('広域連合（築上町など）の申請書：承認申請書・支給�
     {photo: 5, name: '玄関', kind: 1},
     {photo: 3, name: 'トイレ', kind: 2},
   ]});
+});
+
+/** シートの楕円の図形（from・to の [列, 列の中の位置, 行, 行の中の位置]。0始まり） */
+function ellipses(bytes: Uint8Array, sheet: string): {from: number[]; to: number[]}[] {
+  const files = unzipSync(bytes);
+  const wb = strFromU8(files['xl/workbook.xml']);
+  const rels = strFromU8(files['xl/_rels/workbook.xml.rels']);
+  const rid = new RegExp(`<sheet [^>]*name="${sheet.replace(/[()]/g, '\\$&')}"[^>]*r:id="([^"]+)"`).exec(wb)?.[1];
+  const path = `xl/${new RegExp(`Id="${rid}"[^>]*Target="([^"]+)"`).exec(rels)?.[1]}`;
+  const drawingId = /<drawing r:id="([^"]+)"/.exec(strFromU8(files[path]))?.[1];
+  if (!drawingId) return [];
+  const sheetRels = strFromU8(files[path.replace(/([^/]+)$/, '_rels/$1.rels')]);
+  const target = new RegExp(`<Relationship [^>]*Id="${drawingId}"[^>]*Target="\\.\\./drawings/([^"]+)"`).exec(sheetRels)?.[1];
+  const d = strFromU8(files[`xl/drawings/${target}`]);
+  return d
+    .split('</xdr:twoCellAnchor>')
+    .filter((a) => /prst="ellipse"/.test(a))
+    .map((a) => {
+      const n = [...a.matchAll(/<xdr:(?:col|colOff|row|rowOff)>(\d+)</g)].map((m) => Number(m[1]));
+      return {from: n.slice(0, 4), to: n.slice(4, 8)};
+    });
+}
+const marksOf = (m: Partial<ShinseiMarks>): ShinseiMarks => ({gender: '', era: '', care: '', renovated: '', ...m});
+const TEMPLATES: Record<Insurer, Uint8Array> = {kanda: KANDA, yukuhashi: YUKUHASHI, miyako: MIYAKO, kouiki: KOUIKI};
+
+test('申請書の丸：選んだ性別・元号・要介護状態区分・改修状況を楕円で囲む（苅田町は事前申請書と事後申請書の両方）。選ばなければ囲まない', () => {
+  assert.deepEqual(shinseiMarkKeys('kanda'), ['gender', 'era', 'care']);
+  assert.deepEqual(shinseiMarkKeys('yukuhashi'), ['gender', 'era', 'care']);
+  assert.deepEqual(shinseiMarkKeys('miyako'), ['gender', 'renovated']);
+  assert.deepEqual(shinseiMarkKeys('kouiki'), ['gender', 'renovated']);
+  // 苅田町：生年月日（昭）・性別（女）は9行目、要介護状態区分（要介護２）は12行目。文字の位置から計算した場所
+  const kd = fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(job({shinseiMarks: marksOf({gender: '女', era: '昭和', care: '要介護2'})}), RATES));
+  assert.deepEqual(ellipses(kd, '事前申請書'), [
+    {from: [15, 37386, 8, 19050], to: [16, 123111, 8, 285750]},
+    {from: [28, 69056, 8, 19050], to: [29, 173831, 8, 285750]},
+    {from: [17, 885825, 11, 38100], to: [20, 27813, 11, 266700]},
+  ]);
+  assert.equal(ellipses(kd, '事後申請書').length, 3);
+  // 選ばなければ図形は原本のまま（前の申請の丸は原本から消してある）
+  assert.deepEqual(ellipses(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(job(), RATES)), '事前申請書'), []);
+  // 保険者・項目・値のどれでも：値の欄の行に1つ。左の値ほど左（申請書に並んでいる順）
+  for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki'] as const) {
+    for (const sheet of SHINSEI[insurer]!.sheets.filter((x) => x.marks)) {
+      for (const mark of sheet.marks!) {
+        const row = Number(/\d+$/.exec(mark.cell)![0]) - 1;
+        let last = [-1, 0];
+        for (const value of MARK_INFO[mark.key].options) {
+          const out = fillShinsei(TEMPLATES[insurer], SHINSEI[insurer]!, shinseiValues(job({shinseiMarks: marksOf({[mark.key]: value})}), RATES));
+          const mine = ellipses(out, sheet.sheet).filter((e) => e.from[2] <= row + 1 && e.to[2] >= row);
+          assert.equal(mine.length, 1, `${insurer} ${sheet.sheet} ${mark.cell} ${value}`);
+          const at = mine[0].from;
+          assert.ok(at[0] > last[0] || (at[0] === last[0] && at[1] > last[1]), `${insurer} ${sheet.sheet} ${value} が前の値より右にない`);
+          last = at;
+        }
+      }
+    }
+  }
+});
+
+test('申請書の丸：図形のないシート（行橋市の申請書・みやこ町の支給申請書）には図形のファイルを足す。もとの図形は残す', () => {
+  const marks = marksOf({gender: '男', era: '大正', care: '要支援1', renovated: '有'});
+  const yk = unzipSync(fillShinsei(YUKUHASHI, SHINSEI.yukuhashi!, shinseiValues(job({insurer: 'yukuhashi', shinseiMarks: marks}), RATES)));
+  const sheet1 = strFromU8(yk['xl/worksheets/sheet1.xml']);
+  const rid = /<drawing r:id="(rId\d+)"\/><\/worksheet>$|<drawing r:id="(rId\d+)"\/><(?:legacyDrawing|tableParts|extLst)/.exec(sheet1);
+  assert.ok(rid, '住改・受領委任払のシートに <drawing> がない');
+  const rels = strFromU8(yk['xl/worksheets/_rels/sheet1.xml.rels']);
+  const target = new RegExp(`Id="${rid[1] ?? rid[2]}" Type="[^"]*/drawing" Target="\\.\\./drawings/(drawing\\d+\\.xml)"`).exec(rels)?.[1];
+  assert.ok(target && yk[`xl/drawings/${target}`], rels);
+  assert.match(strFromU8(yk['[Content_Types].xml']), new RegExp(`PartName="/xl/drawings/${target}" ContentType="application/vnd\\.openxmlformats-officedocument\\.drawing\\+xml"`));
+  assert.equal((strFromU8(yk[`xl/drawings/${target}`]).match(/prst="ellipse"/g) ?? []).length, 3);
+  // 行橋市の要支援は「要支援　１・２」の数字を囲む（数字1字の幅より大きく）
+  const yb = fillShinsei(YUKUHASHI, SHINSEI.yukuhashi!, shinseiValues(job({insurer: 'yukuhashi', shinseiMarks: marks}), RATES));
+  assert.equal(ellipses(yb, '住改・受領委任払').length, 3);
+  // みやこ町：承認届出書は原本の図形（受領委任払いの丸など2つ）に足す。支給申請書は図形を作る
+  const my = fillShinsei(MIYAKO, SHINSEI.miyako!, shinseiValues(job({insurer: 'miyako', shinseiMarks: marks}), RATES));
+  assert.equal(ellipses(my, '住宅改修承認届出書').length, 2 + 2);
+  assert.equal(ellipses(my, '住宅改修費支給申請書(受領委任払用)').length, 2);
+  const d1 = strFromU8(unzipSync(my)['xl/drawings/drawing1.xml']);
+  const ids = [...d1.matchAll(/<xdr:cNvPr [^>]*\bid="(\d+)"/g)].map((m) => m[1]);
+  assert.equal(new Set(ids).size, ids.length, '図形の番号が重なっている');
+  // 広域連合：承認申請書・支給申請書の性別・改修状況
+  const kk = fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(job({insurer: 'kouiki', shinseiMarks: marks}), RATES));
+  for (const name of ['様式第2号（住宅改修承認申請書）', '様式第7号（住宅改修費支給申請書（受領委任払用）']) assert.equal(ellipses(kk, name).length, 2, name);
+});
+
+test('内訳明細書の②〜⑥の行も、①の行と同じ折り返しの書式にする（①②ごとに1行で見えるように）', () => {
+  const two = job({
+    insurer: 'kouiki',
+    places: [place('玄関', [mat('段差解消スロープ')], {kind: 2}), place('勝手口', [mat('木製踏台 DX 1段 15')], {kind: 2})],
+  });
+  const style = (xml: string, ref: string) => /\ss="(\d+)"/.exec(cell(xml, ref))?.[1];
+  for (const [insurer, name] of [['kouiki', '様式第2号別紙（住宅改修内訳明細書）'], ['miyako', '住宅改修内訳明細書']] as const) {
+    const out = sheets(fillShinsei(TEMPLATES[insurer], SHINSEI[insurer]!, shinseiValues({...two, insurer}, RATES))).byName.get(name)!;
+    const orig = sheets(TEMPLATES[insurer]).byName.get(name)!;
+    assert.equal(txt(out, 'K16'), '玄関① スロープ\n勝手口② 木製踏台');
+    assert.equal(style(out, 'K16'), style(orig, 'K14'), insurer); // 左上にそろえて折り返す
+    assert.equal(style(out, 'D17'), style(orig, 'D15'), insurer);
+    assert.equal(style(out, 'K18'), style(orig, 'K18'), insurer); // 書かない行は原本のまま
+  }
 });

@@ -1,5 +1,6 @@
 // 申請書を確かめる：見積書の「📝 申請書を作成」で、保険者の申請書の原本（行橋市・苅田町・みやこ町・広域連合）に
 //   被保険者氏名・住所・被保険者番号（10マス）・改修の内容（前の申請と同じ書き方「玄関① 木製L字手すり L=600×850㎜」）を転記した Excel を保存する。ほかのシートはそのまま。
+//   作る前に、丸で囲む項目（性別・元号・要介護状態区分・改修状況）を選ぶ画面が出る。選んだものは楕円の図形で囲む（見積書に残るので次も同じ）
 //   見積もりの入口の「📥 申請書（Excel）から作る」で、書いた申請書から見積書を作る
 // usage: node e2e-shinsei.mjs <サイトのURL> <出力フォルダ>
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
@@ -37,21 +38,38 @@ await page.keyboard.type('福岡県行橋市中央1-1');
 await page.keyboard.press('Enter');
 // 玄関の木の手すりを 60cm で使っている（サンプル）
 
-/** シート名 → XML */
+/** シート名 → XML。ellipses はシートの楕円の図形の数（申請書の丸） */
 const sheetsOf = (bytes) => {
   const files = unzipSync(bytes);
   const wb = strFromU8(files['xl/workbook.xml']);
   const rels = strFromU8(files['xl/_rels/workbook.xml.rels']);
   const out = new Map();
+  const paths = new Map();
   for (const m of wb.matchAll(/<sheet [^>]*name="([^"]*)"[^>]*r:id="([^"]+)"/g)) {
     const target = new RegExp(`Id="${m[2]}"[^>]*Target="([^"]+)"`).exec(rels)?.[1] ?? '';
     out.set(m[1], strFromU8(files[`xl/${target}`]));
+    paths.set(m[1], `xl/${target}`);
   }
-  return {files, sheets: out};
+  const ellipses = (name) => {
+    const p = paths.get(name);
+    const rid = /<drawing r:id="([^"]+)"/.exec(out.get(name))?.[1];
+    if (!rid) return 0;
+    const sheetRels = strFromU8(files[p.replace(/([^/]+)$/, '_rels/$1.rels')]);
+    const d = new RegExp(`Id="${rid}"[^>]*Target="\\.\\./drawings/([^"]+)"`).exec(sheetRels)?.[1];
+    return (strFromU8(files[`xl/drawings/${d}`]).match(/prst="ellipse"/g) ?? []).length;
+  };
+  return {files, sheets: out, ellipses};
 };
 const text = (xml, ref) => (/<t[^>]*>([\s\S]*?)<\/t>/.exec(new RegExp(`<c r="${ref}"[^>]*?(?:/>|>([\\s\\S]*?)</c>)`).exec(xml)?.[0] ?? '')?.[1] ?? '').replace(/&#10;/g, '\n');
-const make = async () => {
-  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📝 申請書を作成'}).click()]);
+/** 「📝 申請書を作成」→ 丸で囲むものを選ぶ（[項目, 値]。選んであるものをもう一度押すと外す）→ Excel を保存 */
+const make = async (picks = [], shot = '') => {
+  await page.getByRole('button', {name: '📝 申請書を作成'}).click();
+  const dlg = page.getByRole('dialog');
+  await dlg.waitFor();
+  for (const [group, value] of picks) await dlg.getByRole('group', {name: group}).getByRole('button', {name: value, exact: true}).click();
+  if (shot) await page.screenshot({path: path.join(outDir, shot)});
+  const [dl] = await Promise.all([page.waitForEvent('download'), dlg.getByRole('button', {name: '📝 申請書を作成（Excel）'}).click()]);
+  await dlg.waitFor({state: 'detached'});
   const file = path.join(outDir, dl.suggestedFilename());
   await dl.saveAs(file);
   return {name: dl.suggestedFilename(), file, bytes: new Uint8Array(await readFile(file))};
@@ -60,8 +78,12 @@ const make = async () => {
 // 改修の内容・工事内容は前の申請の書き方（玄関① 木製L字手すり L=600×850㎜）。サンプルの玄関は木の手すりを 60cm、トイレは L型手すり
 const WORKS = '玄関① 木製手すり L=600㎜\nトイレ② L字手すり';
 
-// ---------------- 行橋市：住改・受領委任払のシートに転記（14枚のシートはそのまま）
-const yk = await make();
+// ---------------- 行橋市：住改・受領委任払のシートに転記（14枚のシートはそのまま）。丸は 元号・性別・要介護状態区分
+await page.getByRole('button', {name: '📝 申請書を作成'}).click();
+assert.deepEqual(await page.getByRole('dialog').getByRole('group').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label'))), ['性別', '生年月日の元号', '要介護状態区分']);
+await page.getByRole('dialog').getByRole('button', {name: 'やめる'}).click();
+await page.getByRole('dialog').waitFor({state: 'detached'});
+const yk = await make([['性別', '女'], ['生年月日の元号', '昭和'], ['要介護状態区分', '要介護2']], '81-shinsei-dialog.png');
 assert.match(yk.name, /^行橋市申請書_（サンプル）山田様_\d{4}-\d{2}-\d{2}\.xlsx$/);
 const y = sheetsOf(yk.bytes);
 assert.equal(y.sheets.size, 14);
@@ -70,11 +92,19 @@ assert.equal(text(main, 'F5'), '（サンプル）山田');
 assert.equal(text(main, 'F11'), '福岡県行橋市中央1-1');
 assert.equal(['Z7', 'AA7', 'AB7', 'AC7', 'AD7', 'AE7', 'AF7', 'AG7', 'AH7', 'AI7'].map((r) => text(main, r)).join(''), '0000366989');
 assert.equal(text(main, 'F14'), WORKS);
-log('行橋市の申請書（氏名・住所・被保険者番号・改修の内容）OK');
+assert.equal(y.ellipses('住改・受領委任払'), 3); // 図形のないシートに図形を足して、女・昭・要介護２を囲む
+log('行橋市の申請書（氏名・住所・被保険者番号・改修の内容・丸3つ）OK');
 
 // ---------------- 苅田町：事前申請書のシートに転記（事後申請書は式で同じ内容）
 await page.getByRole('combobox', {name: '保険者'}).selectOption('kanda');
-const kd = await make();
+// 選んだものは見積書に残る（次に開いたときも選んである）。もう一度押すと外れる
+await page.getByRole('button', {name: '📝 申請書を作成'}).click();
+const pressed = () => page.getByRole('dialog').locator('button[aria-pressed="true"]').allInnerTexts();
+assert.deepEqual(await pressed(), ['女', '昭和', '要介護2']);
+await page.getByRole('dialog').getByRole('button', {name: '要介護2', exact: true}).click();
+assert.deepEqual(await pressed(), ['女', '昭和']);
+await page.getByRole('dialog').getByRole('button', {name: 'やめる'}).click();
+const kd = await make([['要介護状態区分', '要支援1']]);
 assert.match(kd.name, /^苅田町申請書_（サンプル）山田様_/);
 const k = sheetsOf(kd.bytes);
 assert.equal(k.sheets.size, 15);
@@ -82,6 +112,7 @@ const pre = k.sheets.get('事前申請書');
 assert.deepEqual([text(pre, 'J7'), text(pre, 'J11'), text(pre, 'J14')], ['（サンプル）山田', '福岡県行橋市中央1-1', WORKS]);
 assert.equal(['X6', 'Y6', 'Z6', 'AA6', 'AB6', 'AC6', 'AD6', 'AE6', 'AF6', 'AG6'].map((r) => text(pre, r)).join(''), '0000366989');
 assert.match(k.sheets.get('事後申請書'), /<f>事前申請書!J7<\/f><v>（サンプル）山田<\/v>/);
+assert.deepEqual([k.ellipses('事前申請書'), k.ellipses('事後申請書')], [3, 3]); // 女・昭・要支援１（事後申請書にも）
 await page.locator('[aria-live] > div', {hasText: `「${kd.name}」を保存しました`}).waitFor();
 log('苅田町の申請書（事前申請書・事後申請書は式で同じ）OK');
 
@@ -92,7 +123,7 @@ const boxes = (col, n, row) => Array.from({length: n}, (_, i) => {
   return `${name(c)}${row}`;
 });
 await page.getByRole('combobox', {name: '保険者'}).selectOption('miyako');
-const my = await make();
+const my = await make([['現在までの改修状況', '無']]);
 assert.match(my.name, /^みやこ町申請書_（サンプル）山田様_/);
 const m = sheetsOf(my.bytes);
 assert.equal(m.sheets.size, 12);
@@ -102,6 +133,8 @@ assert.equal(text(m.sheets.get('住宅改修費支給申請書(受領委任払�
 const md = m.sheets.get('住宅改修内訳明細書');
 assert.deepEqual([text(md, 'D15'), text(md, 'K14')], ['玄関・トイレ', WORKS]);
 assert.deepEqual([1, 2, 3].map((n) => text(m.sheets.get(`写真 (${n})`), 'B5')), ['玄関', 'トイレ', '']); // 写真番号の改修場所
+// 性別（女）・改修状況（無）を囲む。承認届出書は原本の丸（受領委任払いなど2つ）に足す。支給申請書は図形を足す
+assert.deepEqual([m.ellipses('住宅改修承認届出書'), m.ellipses('住宅改修費支給申請書(受領委任払用)')], [2 + 2, 2]);
 log('みやこ町の申請書（承認届出書・支給申請書・内訳明細書・写真）OK');
 
 // ---------------- 広域連合（築上町など）：承認申請書・支給申請書（受領委任払用）・内訳明細書（別紙）・平面図・写真貼付用紙
@@ -119,7 +152,8 @@ const gb = g.sheets.get('様式第2号別紙（住宅改修内訳明細書）');
 assert.deepEqual([text(gb, 'I6'), text(gb, 'D15'), text(gb, 'K14')], ['（サンプル）山田', '玄関・トイレ', WORKS]);
 assert.equal(text(g.sheets.get('平面図 (2)'), 'A1'), '　（サンプル）山田　様　邸　平面図');
 assert.deepEqual([text(g.sheets.get('写真貼付用紙'), 'B4'), text(g.sheets.get('写真貼付用紙'), 'B5'), text(g.sheets.get('写真貼付用紙 (2)'), 'B5')], ['（サンプル）山田', '玄関', 'トイレ']);
-log('広域連合の申請書（承認申請書・支給申請書・内訳明細書・平面図・写真貼付用紙）OK');
+for (const name of ['様式第2号（住宅改修承認申請書）', '様式第7号（住宅改修費支給申請書（受領委任払用）']) assert.equal(g.ellipses(name), 2, name);
+log('広域連合の申請書（承認申請書・支給申請書・内訳明細書・平面図・写真貼付用紙・丸）OK');
 // 4つの保険者すべてで申請書のボタンが出る
 for (const i of ['kanda', 'yukuhashi', 'miyako', 'kouiki']) {
   await page.getByRole('combobox', {name: '保険者'}).selectOption(i);

@@ -28,7 +28,8 @@ React 19 ＋ TypeScript ＋ Vite（Tailwind）。リポジトリにはほかの�
 | `rows.ts` | 行・箇所を作る部品（`newPlace`・`materialRow`・`laborRow`・`manualRow`・`copyRows`（IDを付け直す）・`addMaterial`・`workRange`・`kitRows`）。行の操作はこれを使う |
 | `sheetClip.ts` | 行のコピーを覚えておく所（画面を移っても残る。別の見積書にも貼り付けられる） |
 | `estimate/EstimateEditor.tsx` | 見積書の画面（💾 保存・📗 Excel・📝 申請書を作成・🖨 印刷・📄 白紙に戻す・🛒 発注書を作成・保険者・担当・見積もり作成日・笹岡工務店の請求書に入れる） |
-| `shinsei.ts` | 申請書：保険者ごとの転記する欄（`SHINSEI`。シートごとに 氏名・住所・番号の10マス・改修の内容・改修の種類の行・写真の改修箇所・平面図の表題）、転記する内容（`shinseiValues`）、原本のセルを書きかえる（`setCell`・`fillShinsei`。式の答えも `updateRefs`）、読む（`readShinsei`・`parseWorkLine`） |
+| `shinsei.ts` | 申請書：保険者ごとの転記する欄（`SHINSEI`。シートごとに 氏名・住所・番号の10マス・改修の内容・改修の種類の行・写真の改修箇所・平面図の表題・丸で囲む欄 `marks`）、転記する内容（`shinseiValues`）、原本のセルを書きかえる（`setCell`・`fillShinsei`。式の答えも `updateRefs`。②〜⑥の行の折り返し `wrapKinds`。丸の楕円 `drawMarks`・`markBox`・図形のファイルを足す `drawingOf`）、読む（`readShinsei`・`parseWorkLine`） |
+| `estimate/ShinseiDialog.tsx` | 「📝 申請書を作成」で出る、丸で囲むもの（性別・元号・要介護状態区分・改修状況。`MARK_INFO`＝`estimateForms.ts`）を選ぶ画面。選んだものは `Job.shinseiMarks` |
 | `estimate/shinseiFiles.ts`・`shinsei/*.xltx` | 申請書の原本（名残りを消したもの。`?inline` でビルドに入る＝`assetsInclude` に xltx）と保存（ダウンロード）。原本を作り直す手順は `business-rules.md` の11 |
 | `estimate/EstimateList.tsx` | 見積もりの最初の画面（新規作成＝保険者を選ぶ／一覧から作成）、月ごとの一覧、`newEstimate(insurer)`、Excel 保存・複製・削除 |
 | `estimate/OrderPage.tsx` | 発注書の画面（数の直し・消す・戻す・足す・印刷・販売受注簿に転記） |

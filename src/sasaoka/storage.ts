@@ -7,8 +7,8 @@
 
 import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES, SETTINGS_REV, STAFF_FULL_NAMES} from './defaults.ts';
 import {guessPieceLengthM} from './priceImport.ts';
-import {jobInsurer} from './estimateForms.ts';
-import type {AppData, EstimateForm, Insurer, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, Rounding, Row, Settings, TaxMode} from './types.ts';
+import {jobInsurer, MARK_INFO, MARK_KEYS, NO_MARKS} from './estimateForms.ts';
+import type {AppData, EstimateForm, Insurer, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, Rounding, Row, Settings, ShinseiMarks, TaxMode} from './types.ts';
 import {uid} from './util.ts';
 
 const DB_NAME = 'taiyo-sasaoka-shikiri';
@@ -270,6 +270,17 @@ function cleanOrder(raw: unknown): OrderEdits | null {
   };
 }
 
+/** 申請書で丸をつける項目（選べる値のほかは空にする） */
+function cleanMarks(raw: unknown): ShinseiMarks {
+  const out: ShinseiMarks = {...NO_MARKS};
+  if (!isObj(raw)) return out;
+  for (const key of MARK_KEYS) {
+    const v = str(raw[key]);
+    if ((MARK_INFO[key].options as string[]).includes(v)) (out as Record<string, string>)[key] = v;
+  }
+  return out;
+}
+
 export function cleanJobs(raw: unknown): Job[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter(isObj).map((j) => {
@@ -294,6 +305,7 @@ export function cleanJobs(raw: unknown): Job[] {
       shikiri: j.shikiri !== false, // 見積書作成アプリができる前の様邸は、どれも仕切り計算・請求書アプリで作ったもの
       places: Array.isArray(j.places) ? j.places.filter(isObj).map(cleanPlace) : [],
       order: cleanOrder(j.order),
+      shinseiMarks: cleanMarks(j.shinseiMarks),
       createdAt: numv(j.createdAt, Date.now()),
       updatedAt: numv(j.updatedAt, Date.now()),
     };

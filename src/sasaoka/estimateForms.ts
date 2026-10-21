@@ -8,7 +8,7 @@
 import {cutToLength, estimatePlaceLines, estimateQty, isBlankRow, listPriceOf} from './calc.ts';
 import type {EstimateRates} from './calc.ts';
 import {normalize} from './priceImport.ts';
-import type {EstimateForm, Insurer, Job, Place, Row, Settings} from './types.ts';
+import type {EstimateForm, Insurer, Job, Place, Row, Settings, ShinseiMarks} from './types.ts';
 import {num, yen} from './util.ts';
 
 export const FORM_IDS: EstimateForm[] = ['yukuhashi', 'kouiki'];
@@ -35,6 +35,16 @@ export const INSURER_INFO: Record<Insurer, {name: string; form: EstimateForm; ar
   miyako: {name: 'みやこ町', form: 'yukuhashi', area: 'みやこ町'},
   kouiki: {name: '広域連合', form: 'kouiki', area: '築上町・豊前市・上毛町・吉富町'}, // 福岡県介護保険広域連合
 };
+
+/** 申請書で丸で囲む項目の名前と、選べる値（申請書に並んでいる順） */
+export const MARK_INFO: {[K in keyof ShinseiMarks]: {label: string; options: Exclude<ShinseiMarks[K], ''>[]}} = {
+  gender: {label: '性別', options: ['男', '女']},
+  era: {label: '生年月日の元号', options: ['明治', '大正', '昭和']},
+  care: {label: '要介護状態区分', options: ['要支援1', '要支援2', '要介護1', '要介護2', '要介護3', '要介護4', '要介護5']},
+  renovated: {label: '現在までの改修状況', options: ['有', '無']},
+};
+export const MARK_KEYS = Object.keys(MARK_INFO) as (keyof ShinseiMarks)[];
+export const NO_MARKS: ShinseiMarks = {gender: '', era: '', care: '', renovated: ''};
 
 /** 住所の市町村から保険者を決める。分からなければ null */
 export function insurerForAddress(address: string): Insurer | null {
