@@ -41,6 +41,29 @@ const TABLE = [
   .map((r) => r.join('\t'))
   .join('\n');
 
+/**
+ * 印刷イメージの見積書が A4 1枚に収まっているか：いちばん下の備考が、下の余白（14mm）より上にある（画面と印刷の両方。
+ * mm は .est の幅 210mm から）。印刷の media のままで戻る。縮めた割合（1＝縮めていない）を返す
+ */
+async function assertFits(page, label) {
+  for (const media of ['screen', 'print']) {
+    await page.emulateMedia({media});
+    const bottom = await page.evaluate(() => {
+      const est = document.querySelector('.est').getBoundingClientRect();
+      const last = document.querySelector('.est-remarks').getBoundingClientRect();
+      return ((last.bottom - est.top) / est.width) * 210;
+    });
+    assert.ok(bottom <= 296 - 14 + 0.2, `${label}（${media}）：備考の下が ${bottom.toFixed(1)}mm で、A4 からはみ出している`);
+  }
+  const t = await page.locator('.est-body').evaluate((e) => e.style.transform);
+  return t ? Number(/scale\(([\d.]+)\)/.exec(t)[1]) : 1;
+}
+
+/** PDF のページ数（pdfinfo がなくても数えられるように、ページのオブジェクトを数える） */
+function pdfPages(file) {
+  return (readFileSync(file).toString('latin1').match(/\/Type\s*\/Page\b(?!s)/g) ?? []).length;
+}
+
 const browser = await chromium.launch({env: {...process.env, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8'}});
 const errors = [];
 try {
@@ -106,10 +129,28 @@ try {
   await download.saveAs(`${out}/estimate.xlsx`);
   const sheet = strFromU8(unzipSync(readFileSync(`${out}/estimate.xlsx`))['xl/worksheets/sheet1.xml']);
   for (const v of ['42944', '4295', '38649']) assert.ok(sheet.includes(`<v>${v}</v>`), `Excel に ${v} がない`);
-  // 印刷（PDF）は A4縦 1枚に収まる（ページ数は pdfinfo で確かめる）
-  await page.emulateMedia({media: 'print'});
+  // 印刷（PDF）は A4縦 1枚で、下が切れない（入りきらなければ縮める）
+  await assertFits(page, '2品');
   await page.pdf({path: `${out}/estimate.pdf`, preferCSSPageSize: true, printBackground: true});
+  assert.equal(pdfPages(`${out}/estimate.pdf`), 1);
   await page.emulateMedia({media: 'screen'});
+  await page.getByRole('button', {name: '閉じる'}).click();
+
+  // ---- 品目と備考が多くて A4 1枚に入らない見積書は、縮めて1枚に収める（下が切れない。ユーザーの答え「縮めます」）
+  // 手で入れた品目は価格が空（0円）なので、合計（42,944円）は変わらない
+  for (let n = 1; n <= 8; n++) {
+    await page.getByRole('button', {name: '＋ 手で入れる'}).click();
+    await page.getByLabel('商品名').last().fill(`見本の商品 ${n}`);
+  }
+  await page.getByLabel('備考').fill(['デモ機の貸し出しがあります。', 'ご不明な点は担当までお問い合わせください。', '納品の前にお電話いたします。', '見本の備考 4', '見本の備考 5'].join('\n'));
+  await page.getByRole('button', {name: '🖨 見積書を印刷'}).first().click();
+  await page.locator('.est').waitFor();
+  const scale = await assertFits(page, '10品・備考5行');
+  assert.ok(scale < 0.85, `10品なのに ${scale} までしか縮めていない`);
+  await page.pdf({path: `${out}/estimate-long.pdf`, preferCSSPageSize: true, printBackground: true});
+  assert.equal(pdfPages(`${out}/estimate-long.pdf`), 1);
+  await page.emulateMedia({media: 'screen'});
+  await page.locator('.est').screenshot({path: `${out}/05c-estimate-long.png`});
   await page.getByRole('button', {name: '閉じる'}).click();
 
   // ---- 読み直しても残っている（IndexedDB）
