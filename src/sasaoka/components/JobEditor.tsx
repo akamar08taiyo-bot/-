@@ -21,6 +21,7 @@ export function JobEditor({
   onBack,
   onOpen,
   onOpenEstimate,
+  onBackToEstimate,
   onPrint,
   onManageKits,
 }: {
@@ -30,6 +31,7 @@ export function JobEditor({
   onBack: () => void;
   onOpen: (id: string) => void;
   onOpenEstimate: (id: string) => void; // 「見積もりを作成する」で同じ様邸の見積書を開く
+  onBackToEstimate: () => void; // 左上の「← 見積もりへ戻る」：この様邸の見積書を開く（請求書のタブは一覧に戻しておく）
   onPrint: (r: PrintRequest) => void;
   onManageKits?: () => void; // 部材・施工費マスタの「部材＋施工費（常用）」を開く
 }) {
@@ -146,8 +148,9 @@ export function JobEditor({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Btn color="white" onClick={onBack}>
-          ← 一覧へ戻る
+        {/* 一覧へは上の「🧾 請求書を確認する」のタブで戻る（ユーザーの指示：「一覧へ戻るではなく、見積もりへ戻るへ変更」） */}
+        <Btn color="white" onClick={onBackToEstimate}>
+          ← 見積もりへ戻る
         </Btn>
         <h1 className="text-lg font-bold text-[#0c315e]">{jobName(job)}</h1>
         {staff && <span className="text-sm font-bold text-slate-500">担当 {staff}</span>}

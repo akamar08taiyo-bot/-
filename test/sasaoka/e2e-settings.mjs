@@ -77,7 +77,7 @@ assert.ok(!jobDoc.includes('翔太'), jobDoc);
 assert.ok(jobDoc.includes('所長 久保 匠史'), jobDoc);
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
 await staffSelect.selectOption('久保 匠史');
-await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
+await page.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click(); // 様邸の画面の左上は「← 見積もりへ戻る」。一覧へはタブで戻る
 log('担当の候補の追加・様邸の明細の担当OK');
 
 // 設定：請求書の担当者・振込先・1か月で1回計算
@@ -136,7 +136,7 @@ for (const [w, h, name] of [
   await p2.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
   await p2.waitForTimeout(300);
   await p2.screenshot({path: path.join(outDir, name), fullPage: true});
-  await p2.getByRole('button', {name: '← 一覧へ戻る'}).click();
+  await p2.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click(); // 様邸の画面の左上は「← 見積もりへ戻る」。一覧へはタブで戻る
 }
 log('狭い画面のスクリーンショットOK');
 

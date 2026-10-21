@@ -387,13 +387,24 @@ const shikiri = await page.locator('aside table').innerText();
 assert.ok(shikiri.includes('部材代合計') && shikiri.includes('9,900') && shikiri.includes('5,000'), shikiri); // 取付手間 2,000＋3,000
 log('仕切り計算表につながるOK');
 
-// ---------------- 「請求書を確認する」の「見積書を開く」で戻ると、同じ見積書
-await page.getByRole('button', {name: '📝 見積書を開く'}).click();
+// ---------------- 様邸の画面（請求書を確認する）の左上は「← 見積もりへ戻る」：同じ見積書が開く。請求書のタブは一覧に戻っている。右の「📝 見積書を開く」も残す
+assert.equal(await page.getByRole('button', {name: '← 一覧へ戻る'}).count(), 0);
+assert.equal(await page.getByRole('button', {name: '📝 見積書を開く'}).count(), 1);
+await page.getByRole('button', {name: '← 見積もりへ戻る'}).click();
 await page.waitForURL(/#tab=estimate&job=/);
 await sheet.waitFor();
 assert.ok((await sheet.innerText()).includes('同上施工費'));
 assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '見本 太郎様邸');
-log('見積書に戻れるOK');
+await page.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click();
+await page.getByRole('cell', {name: /見本 太郎様邸/}).waitFor(); // 様邸ではなく一覧
+assert.equal(await page.getByRole('button', {name: '← 見積もりへ戻る'}).count(), 0);
+// 「📝 見積書を開く」でも同じ見積書
+await page.getByRole('cell', {name: /見本 太郎様邸/}).click();
+await page.getByRole('button', {name: '📝 見積書を開く'}).click();
+await page.waitForURL(/#tab=estimate&job=/);
+await sheet.waitFor();
+assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '見本 太郎様邸');
+log('見積書に戻れるOK（← 見積もりへ戻る・📝 見積書を開く）');
 
 // ---------------- 「📄 白紙に戻す」（印刷の横）：確かめてから、見積書に打ち込んだ内容を全部消す。やめれば何も消えない。
 // 保険者（書式）・担当は残す。Ctrl+Z で戻せる

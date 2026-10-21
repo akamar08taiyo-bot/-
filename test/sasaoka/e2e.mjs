@@ -124,7 +124,7 @@ for (const v of ['8,920', '3,500', '624', '913', '1,395', '15,352', '13,957']) a
 await shot(page, '08-editor.png');
 
 // ---------------- 一覧・2件目（サンプル）・印刷
-await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
+await page.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click(); // 様邸の画面の左上は「← 見積もりへ戻る」。一覧へはタブで戻る
 const listText = await page.locator('table').first().innerText();
 assert.ok(listText.includes('田中様邸'));
 assert.ok(listText.includes('13,957'));
@@ -142,7 +142,7 @@ await page.getByRole('button', {name: '＋ 取付手間（箇所数を数える�
 await page.getByRole('button', {name: 'ウォシュレットの箇所数を1増やす', exact: true}).click();
 await page.getByRole('button', {name: 'ウォシュレット 部品代の箇所数を1増やす', exact: true}).click();
 await page.getByRole('button', {name: '数え終わったら閉じる'}).click();
-await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
+await page.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click(); // 様邸の画面の左上は「← 見積もりへ戻る」。一覧へはタブで戻る
 await shot(page, '09-list.png');
 
 await page.getByRole('button', {name: '🖨 請求書＋各様邸の明細'}).click();

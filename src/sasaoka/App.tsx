@@ -146,6 +146,8 @@ export default function App({start}: {start: MainTab}) {
         setOrderOpen(false);
       }
       if (t === 'invoice') {
+        // 様邸から一覧に戻る（様邸の画面の左上は「← 見積もりへ戻る」なので、一覧へはこのタブで戻る）。請求月を変えていたら、その月の一覧
+        if (invoiceJob && !isEmpty(invoiceJob)) setMonth(invoiceJob.month);
         removeIfEmpty(invoiceJob);
         setInvoiceId(null);
       }
@@ -284,6 +286,12 @@ export default function App({start}: {start: MainTab}) {
                 }}
                 onOpen={setInvoiceId}
                 onOpenEstimate={openEstimate}
+                onBackToEstimate={() => {
+                  // この様邸の見積書を開き、請求書のタブは一覧に戻しておく（請求月を変えていたら、その月）。空の様邸も見積書で開く（見積書を閉じるときに消える）
+                  if (!isEmpty(invoiceJob)) setMonth(invoiceJob.month);
+                  setInvoiceId(null);
+                  openEstimate(invoiceJob.id);
+                }}
                 onPrint={setPrint}
                 onManageKits={() => goMaster('kits')}
               />

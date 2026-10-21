@@ -77,7 +77,7 @@ await shi.screenshot({path: path.join(outDir, '60-sync-shikiri.png'), fullPage: 
 log('ほぼ同時に保存しても両方残るOK');
 
 // ---------------- 新しい見積書（同時 一郎）は、そのまま仕切り計算の一覧に入る。見積書で「請求書に入れる」を外すと一覧から消える
-await shi.getByRole('button', {name: '← 一覧へ戻る'}).click();
+await shi.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click(); // 様邸の画面の左上は「← 見積もりへ戻る」。一覧へはタブで戻る
 await shi.getByRole('cell', {name: /同時 一郎/}).waitFor();
 assert.equal(await shi.getByRole('cell', {name: /（サンプル）山田様邸/}).count(), 1);
 await est.getByRole('cell', {name: /同時 一郎/}).click();
