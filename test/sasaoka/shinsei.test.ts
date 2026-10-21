@@ -72,13 +72,30 @@ test('改修の内容・箇所及び規模：「①浴室　手すりの取付�
   assert.deepEqual(insuredBoxes('0000366989'), [...'0000366989']);
   assert.deepEqual(insuredBoxes('３６６９８９'), ['', '', '', '', '3', '6', '6', '9', '8', '9']); // 全角でもよい。足りなければ右に寄せる
   assert.equal(shinseiFileName(SHINSEI.kanda!, job(), '2026-10-21'), '苅田町申請書_山田 太郎様_2026-10-21.xlsx');
-  // 改修の種類ごと（住宅改修内訳明細書の行）と、写真番号 → 改修場所（写真貼付用紙）
+  // 改修の種類ごと（住宅改修内訳明細書の行）：前の申請の書き方「玄関① 木製L字手すり L=600×850㎜」。写真番号 → 改修場所（写真貼付用紙）
   const kinds = shinseiKinds(job(), RATES);
   assert.equal(kinds.length, 6);
-  assert.deepEqual(kinds[0], {places: '浴室・玄関', works: ['①浴室　手すりの取付　長さ60cm', '⑤玄関　手すりの取付　長さ40cm×60cm×60cm']});
-  assert.deepEqual(kinds[1], {places: 'トイレ', works: ['③トイレ　段差の解消']});
+  assert.deepEqual(kinds[0], {places: '浴室・玄関', works: ['浴室① 浴室用手すり L=600㎜', '玄関⑤ 木製手すり L=400×600×600㎜']});
+  assert.deepEqual(kinds[1], {places: 'トイレ', works: ['トイレ③ スロープ']});
   assert.deepEqual(kinds.slice(2), [0, 0, 0, 0].map(() => ({places: '', works: []})));
   assert.deepEqual(shinseiPhotos(job(), RATES), {1: '浴室', 5: '玄関', 3: 'トイレ'});
+  // 品名の見当：L型・コーナーの部材 → L字、木の部材 → 木製、浴室 → 浴室用、踏台 → 木製踏台。補強板（ベースプレート）の長さは別に。1,000mm からはカンマ
+  const more = job({
+    places: [
+      place('廊下', [
+        mat('BAUHAUS 35アッシュ丸棒 ディンプル付 φ35×4000mm Mオーク', {code: 'BD-134', lengthCm: 160, pieceLengthM: 4}),
+        mat('木製ベースプレート 120mm幅', {code: 'BH-422', lengthCm: 170, pieceLengthM: 4}),
+        mat('35コーナーブラケット', {code: 'BD-13G'}),
+      ]),
+      place('玄関', [mat('木製踏台 DX 1段 15')], {kind: 2}),
+      place('浴室', [mat('インテリア・バーF Lタイプ ホワイト', {code: 'TS136GLU66'})]),
+      place('居室', [mat('クッションフロア')], {kind: 3}),
+    ],
+  });
+  assert.deepEqual(
+    shinseiKinds(more, RATES).map((k) => k.works),
+    [['廊下① 木製L字手すり L=1,600㎜ 補強板L=1,700㎜', '浴室③ 浴室用L字手すり'], ['玄関② 木製踏台'], ['居室④ 床材の変更'], [], [], []],
+  );
 });
 
 test('苅田町の申請書：事前申請書の氏名・住所・被保険者番号（10マス）・改修の内容に入れる。ほかのシート・欄は原本のまま', () => {
@@ -164,9 +181,9 @@ test('みやこ町の申請書：承認届出書の氏名・住所・番号（�
   assert.match(cell(detail, 'I6'), /<v>山田 太郎<\/v>/);
   assert.deepEqual([txt(detail, 'D15'), txt(detail, 'K14'), txt(detail, 'D17'), txt(detail, 'K16'), txt(detail, 'K18')], [
     '浴室・玄関',
-    '①浴室　手すりの取付　長さ60cm\n⑤玄関　手すりの取付　長さ40cm×60cm×60cm',
+    '浴室① 浴室用手すり L=600㎜\n玄関⑤ 木製手すり L=400×600×600㎜',
     'トイレ',
-    '③トイレ　段差の解消',
+    'トイレ③ スロープ',
     '',
   ]);
   assert.equal(txt(byName.get('平面図')!, 'A1'), '山田 太郎　邸　平面図');
@@ -198,9 +215,9 @@ test('広域連合（築上町など）の申請書：承認申請書・支給�
     '山田 太郎',
     '0000366989',
     '浴室・玄関',
-    '①浴室　手すりの取付　長さ60cm\n⑤玄関　手すりの取付　長さ40cm×60cm×60cm',
+    '浴室① 浴室用手すり L=600㎜\n玄関⑤ 木製手すり L=400×600×600㎜',
     'トイレ',
-    '③トイレ　段差の解消',
+    'トイレ③ スロープ',
   ]);
   assert.equal(txt(byName.get('平面図 (2)')!, 'A1'), '　山田 太郎　様　邸　平面図');
   // 写真貼付用紙：原本の写真番号（①①②②③③④④⑤⑤）ごとの改修場所。番号は10マス

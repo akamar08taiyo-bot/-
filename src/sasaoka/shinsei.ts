@@ -5,9 +5,10 @@
 // 逆に、書き込んだ申請書（Excel）から 氏名・住所・被保険者番号・改修の箇所 を読んで、見積書を作ることもできる（readShinsei）。
 
 import {strFromU8, strToU8, unzipSync, zipSync} from 'fflate';
+import {isBlankRow} from './calc.ts';
 import type {EstimateRates} from './calc.ts';
 import {circled, KINDS, photoNumbers} from './estimateForms.ts';
-import type {Insurer, Job} from './types.ts';
+import type {Insurer, Job, Place} from './types.ts';
 import {num} from './util.ts';
 
 /** 申請書の原本の、1つのシートで転記する欄（番地）。ないものは書かない */
@@ -91,10 +92,10 @@ export type ShinseiValues = {
   photos: Record<number, string>; // 写真番号 → 改修場所（写真貼付用紙の改修箇所）
 };
 
-/** 見積書に出る箇所ごとの、改修の内容の行と改修の種類（1〜6）・改修場所 */
-function workLines(job: Pick<Job, 'places'>, rates: EstimateRates): {kind: number; name: string; line: string}[] {
+/** 見積書に出る箇所ごとの、改修の内容の行（2つの書き方）と改修の種類（1〜6）・改修場所 */
+function workLines(job: Pick<Job, 'places'>, rates: EstimateRates): {kind: number; name: string; line: string; detail: string}[] {
   const photos = photoNumbers(job, rates);
-  const out: {kind: number; name: string; line: string}[] = [];
+  const out: {kind: number; name: string; line: string; detail: string}[] = [];
   for (const p of job.places) {
     const photo = photos.get(p.id);
     if (photo === undefined) continue;
@@ -104,9 +105,46 @@ function workLines(job: Pick<Job, 'places'>, rates: EstimateRates): {kind: numbe
       for (let i = 0; i < Math.max(1, Math.round(r.qty)); i++) lengths.push(`${num(r.lengthCm, 1)}cm`);
     }
     const name = p.name.trim();
-    out.push({kind: p.kind, name, line: [`${circled(photo)}${name}`, KINDS[p.kind - 1] ?? '', lengths.length > 0 ? `長さ${lengths.join('×')}` : ''].filter(Boolean).join('　')});
+    const line = [`${circled(photo)}${name}`, KINDS[p.kind - 1] ?? '', lengths.length > 0 ? `長さ${lengths.join('×')}` : ''].filter(Boolean).join('　');
+    out.push({kind: p.kind, name, line, detail: detailLine(p, photo)});
   }
   return out;
+}
+
+// 品名から見当をつける言葉（内訳明細書の工事内容）
+const WOOD = /木|アッシュ|オーク|ウッド|ヒノキ|桧|ナラ|ブナ|メープル|ウォールナット/;
+const L_SHAPE = /L型|Lタイプ|L字|コーナー/i;
+const I_SHAPE = /I型|Iタイプ|I字/i;
+const BASE_PLATE = /ベースプレート|補強板|取付板/;
+
+/**
+ * 内訳明細書（みやこ町・広域連合）の工事内容の1行。前の申請と同じ書き方にする（ユーザーの指示）：「玄関① 木製L字手すり L=600×850㎜」
+ * （改修場所・写真番号、品名、切って使う部材の使う長さ）。高さ（H=850mm）は見積書にないので手で入れてもらう。
+ * 品名は部材の品名から見当をつける：手すりは 浴室用／木製・L字（L型・コーナーの部材があるとき）、段差の解消は 木製踏台・スロープ・敷居撤去。
+ * 長さは部材ごと（補強板・ベースプレートは「補強板L=1,700㎜」）。2本以上は「×」でつなぐ
+ */
+function detailLine(p: Place, photo: number): string {
+  const mats = p.rows.filter((r) => r.kind === 'material' && !isBlankRow(r));
+  const text = mats.map((r) => `${r.estText ?? ''} ${r.name} ${r.code}`).join(' ');
+  const labor = p.rows.filter((r) => r.kind === 'labor').map((r) => `${r.estText ?? ''} ${r.name}`).join(' ');
+  const wood = WOOD.test(text);
+  let item = KINDS[p.kind - 1] ?? '';
+  if (p.kind === 1) item = `${/浴室|風呂/.test(p.name) ? '浴室用' : wood ? '木製' : ''}${L_SHAPE.test(text) ? 'L字' : I_SHAPE.test(text) ? 'I字' : ''}手すり`;
+  else if (p.kind === 2) {
+    if (/踏台|踏み台|ステップ/.test(text + labor)) item = `${wood ? '木製' : ''}踏台`;
+    else if (/スロープ/.test(text)) item = 'スロープ';
+    else if (/敷居/.test(text + labor)) item = '敷居撤去';
+  }
+  const groups = new Map<string, {name: string; mm: string[]}>();
+  for (const r of mats) {
+    if (!(r.lengthCm > 0) || !(r.qty > 0)) continue;
+    const key = r.refId ?? `${r.code}|${r.name}`;
+    const g = groups.get(key) ?? {name: `${r.estText ?? ''} ${r.name}`, mm: []};
+    for (let i = 0; i < Math.max(1, Math.round(r.qty)); i++) g.mm.push(Math.round(r.lengthCm * 10).toLocaleString('en-US'));
+    groups.set(key, g);
+  }
+  const sizes = [...groups.values()].map((g) => `${BASE_PLATE.test(g.name) ? '補強板' : ''}L=${g.mm.join('×')}㎜`);
+  return [`${p.name.trim()}${circled(photo)}`, item, ...sizes].filter(Boolean).join(' ');
 }
 
 /**
@@ -117,12 +155,12 @@ export function shinseiWorks(job: Pick<Job, 'places'>, rates: EstimateRates): st
   return workLines(job, rates).map((w) => w.line);
 }
 
-/** 改修の種類ごと（6行）：箇所は改修場所を「・」でつなぐ（同じ名前は1つ）。工事内容は上と同じ行 */
+/** 改修の種類ごと（6行）：箇所は改修場所を「・」でつなぐ（同じ名前は1つ）。工事内容は「玄関① 木製L字手すり L=600×850㎜」の書き方 */
 export function shinseiKinds(job: Pick<Job, 'places'>, rates: EstimateRates): ShinseiKind[] {
   const lines = workLines(job, rates);
   return KINDS.map((_, i) => {
     const mine = lines.filter((w) => w.kind === i + 1);
-    return {places: [...new Set(mine.map((w) => w.name).filter(Boolean))].join('・'), works: mine.map((w) => w.line)};
+    return {places: [...new Set(mine.map((w) => w.name).filter(Boolean))].join('・'), works: mine.map((w) => w.detail)};
   });
 }
 

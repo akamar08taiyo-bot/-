@@ -88,7 +88,7 @@ const boxes = (col, n, row) => Array.from({length: n}, (_, i) => {
   const name = (k) => (k <= 0 ? '' : name(Math.floor((k - 1) / 26)) + String.fromCharCode(65 + ((k - 1) % 26)));
   return `${name(c)}${row}`;
 });
-const WORKS = '①玄関　手すりの取付　長さ60cm\n②トイレ　手すりの取付';
+const WORKS = '玄関① 木製手すり L=600㎜\nトイレ② L字手すり'; // 内訳明細書は前の申請の書き方（玄関① 木製L字手すり L=600×850㎜）
 await page.getByRole('combobox', {name: '保険者'}).selectOption('miyako');
 const my = await make();
 assert.match(my.name, /^みやこ町申請書_（サンプル）山田様_/);
