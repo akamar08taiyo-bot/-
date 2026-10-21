@@ -1,5 +1,5 @@
 // 申請書を確かめる：見積書の「📝 申請書を作成」で、保険者の申請書の原本（行橋市・苅田町・みやこ町・広域連合）に
-//   被保険者氏名・住所・被保険者番号（10マス）・改修の内容（①玄関　手すりの取付　長さ60cm）を転記した Excel を保存する。ほかのシートはそのまま。
+//   被保険者氏名・住所・被保険者番号（10マス）・改修の内容（前の申請と同じ書き方「玄関① 木製L字手すり L=600×850㎜」）を転記した Excel を保存する。ほかのシートはそのまま。
 //   見積もりの入口の「📥 申請書（Excel）から作る」で、書いた申請書から見積書を作る
 // usage: node e2e-shinsei.mjs <サイトのURL> <出力フォルダ>
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
@@ -57,6 +57,9 @@ const make = async () => {
   return {name: dl.suggestedFilename(), file, bytes: new Uint8Array(await readFile(file))};
 };
 
+// 改修の内容・工事内容は前の申請の書き方（玄関① 木製L字手すり L=600×850㎜）。サンプルの玄関は木の手すりを 60cm、トイレは L型手すり
+const WORKS = '玄関① 木製手すり L=600㎜\nトイレ② L字手すり';
+
 // ---------------- 行橋市：住改・受領委任払のシートに転記（14枚のシートはそのまま）
 const yk = await make();
 assert.match(yk.name, /^行橋市申請書_（サンプル）山田様_\d{4}-\d{2}-\d{2}\.xlsx$/);
@@ -66,7 +69,7 @@ const main = y.sheets.get('住改・受領委任払');
 assert.equal(text(main, 'F5'), '（サンプル）山田');
 assert.equal(text(main, 'F11'), '福岡県行橋市中央1-1');
 assert.equal(['Z7', 'AA7', 'AB7', 'AC7', 'AD7', 'AE7', 'AF7', 'AG7', 'AH7', 'AI7'].map((r) => text(main, r)).join(''), '0000366989');
-assert.equal(text(main, 'F14'), '①玄関　手すりの取付　長さ60cm\n②トイレ　手すりの取付');
+assert.equal(text(main, 'F14'), WORKS);
 log('行橋市の申請書（氏名・住所・被保険者番号・改修の内容）OK');
 
 // ---------------- 苅田町：事前申請書のシートに転記（事後申請書は式で同じ内容）
@@ -76,7 +79,7 @@ assert.match(kd.name, /^苅田町申請書_（サンプル）山田様_/);
 const k = sheetsOf(kd.bytes);
 assert.equal(k.sheets.size, 15);
 const pre = k.sheets.get('事前申請書');
-assert.deepEqual([text(pre, 'J7'), text(pre, 'J11'), text(pre, 'J14')], ['（サンプル）山田', '福岡県行橋市中央1-1', '①玄関　手すりの取付　長さ60cm\n②トイレ　手すりの取付']);
+assert.deepEqual([text(pre, 'J7'), text(pre, 'J11'), text(pre, 'J14')], ['（サンプル）山田', '福岡県行橋市中央1-1', WORKS]);
 assert.equal(['X6', 'Y6', 'Z6', 'AA6', 'AB6', 'AC6', 'AD6', 'AE6', 'AF6', 'AG6'].map((r) => text(pre, r)).join(''), '0000366989');
 assert.match(k.sheets.get('事後申請書'), /<f>事前申請書!J7<\/f><v>（サンプル）山田<\/v>/);
 await page.locator('[aria-live] > div', {hasText: `「${kd.name}」を保存しました`}).waitFor();
@@ -88,7 +91,6 @@ const boxes = (col, n, row) => Array.from({length: n}, (_, i) => {
   const name = (k) => (k <= 0 ? '' : name(Math.floor((k - 1) / 26)) + String.fromCharCode(65 + ((k - 1) % 26)));
   return `${name(c)}${row}`;
 });
-const WORKS = '玄関① 木製手すり L=600㎜\nトイレ② L字手すり'; // 内訳明細書は前の申請の書き方（玄関① 木製L字手すり L=600×850㎜）
 await page.getByRole('combobox', {name: '保険者'}).selectOption('miyako');
 const my = await make();
 assert.match(my.name, /^みやこ町申請書_（サンプル）山田様_/);

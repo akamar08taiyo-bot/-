@@ -1,5 +1,5 @@
 // 申請書：保険者ごとにいただいた Excel の原本（苅田町・行橋市・みやこ町・広域連合＝築上町など）に、見積書の内容を転記する（ユーザーの指示）。
-// 転記するのは 被保険者氏名・住所・被保険者番号（10マス）・改修の内容・箇所及び規模（「①浴室　手すりの取付　長さ60cm」）だけ。
+// 転記するのは 被保険者氏名・住所・被保険者番号（10マス）・改修の内容・箇所及び規模（前の申請と同じ書き方「玄関① 木製L字手すり L=600×850㎜」）だけ。
 // 原本のほかのシート（事後申請書・承諾書・委任状・平面図・写真）・空欄・罫線・図形はそのまま残す（決めた欄の文字だけを書きかえる）。
 // 事後申請書など、転記した欄を参照する式は、Excel で開いたときに計算し直す（保存しておく答えも同じ値にしておく）。
 // 逆に、書き込んだ申請書（Excel）から 氏名・住所・被保険者番号・改修の箇所 を読んで、見積書を作ることもできる（readShinsei）。
@@ -9,7 +9,6 @@ import {isBlankRow} from './calc.ts';
 import type {EstimateRates} from './calc.ts';
 import {circled, KINDS, photoNumbers} from './estimateForms.ts';
 import type {Insurer, Job, Place} from './types.ts';
-import {num} from './util.ts';
 
 /** 申請書の原本の、1つのシートで転記する欄（番地）。ないものは書かない */
 export type ShinseiSheet = {
@@ -92,21 +91,13 @@ export type ShinseiValues = {
   photos: Record<number, string>; // 写真番号 → 改修場所（写真貼付用紙の改修箇所）
 };
 
-/** 見積書に出る箇所ごとの、改修の内容の行（2つの書き方）と改修の種類（1〜6）・改修場所 */
-function workLines(job: Pick<Job, 'places'>, rates: EstimateRates): {kind: number; name: string; line: string; detail: string}[] {
+/** 見積書に出る箇所ごとの、改修の内容の行と改修の種類（1〜6）・改修場所。見積書に出ない箇所（行のない箇所）は入れない */
+function workLines(job: Pick<Job, 'places'>, rates: EstimateRates): {kind: number; name: string; line: string}[] {
   const photos = photoNumbers(job, rates);
-  const out: {kind: number; name: string; line: string; detail: string}[] = [];
+  const out: {kind: number; name: string; line: string}[] = [];
   for (const p of job.places) {
     const photo = photos.get(p.id);
-    if (photo === undefined) continue;
-    const lengths: string[] = [];
-    for (const r of p.rows) {
-      if (r.kind !== 'material' || !(r.lengthCm > 0) || !(r.qty > 0)) continue;
-      for (let i = 0; i < Math.max(1, Math.round(r.qty)); i++) lengths.push(`${num(r.lengthCm, 1)}cm`);
-    }
-    const name = p.name.trim();
-    const line = [`${circled(photo)}${name}`, KINDS[p.kind - 1] ?? '', lengths.length > 0 ? `長さ${lengths.join('×')}` : ''].filter(Boolean).join('　');
-    out.push({kind: p.kind, name, line, detail: detailLine(p, photo)});
+    if (photo !== undefined) out.push({kind: p.kind, name: p.name.trim(), line: workLine(p, photo)});
   }
   return out;
 }
@@ -118,12 +109,12 @@ const I_SHAPE = /I型|Iタイプ|I字/i;
 const BASE_PLATE = /ベースプレート|補強板|取付板/;
 
 /**
- * 内訳明細書（みやこ町・広域連合）の工事内容の1行。前の申請と同じ書き方にする（ユーザーの指示）：「玄関① 木製L字手すり L=600×850㎜」
+ * 改修の内容（苅田町・行橋市）・内訳明細書の工事内容（みやこ町・広域連合）の1行。前の申請と同じ書き方にする（ユーザーの指示）：「玄関① 木製L字手すり L=600×850㎜」
  * （改修場所・写真番号、品名、切って使う部材の使う長さ）。高さ（H=850mm）は見積書にないので手で入れてもらう。
  * 品名は部材の品名から見当をつける：手すりは 浴室用／木製・L字（L型・コーナーの部材があるとき）、段差の解消は 木製踏台・スロープ・敷居撤去。
  * 長さは部材ごと（補強板・ベースプレートは「補強板L=1,700㎜」）。2本以上は「×」でつなぐ
  */
-function detailLine(p: Place, photo: number): string {
+function workLine(p: Place, photo: number): string {
   const mats = p.rows.filter((r) => r.kind === 'material' && !isBlankRow(r));
   const text = mats.map((r) => `${r.estText ?? ''} ${r.name} ${r.code}`).join(' ');
   const labor = p.rows.filter((r) => r.kind === 'labor').map((r) => `${r.estText ?? ''} ${r.name}`).join(' ');
@@ -147,10 +138,7 @@ function detailLine(p: Place, photo: number): string {
   return [`${p.name.trim()}${circled(photo)}`, item, ...sizes].filter(Boolean).join(' ');
 }
 
-/**
- * 改修の内容・箇所及び規模の行：「①浴室　手すりの取付　長さ60cm」。写真番号・改修場所・改修の種類は見積書と同じ。
- * 長さは切って使う部材の使う長さ（2本以上は「×」でつなぐ：長さ40cm×60cm）。見積書に出ない箇所（行のない箇所）は入れない
- */
+/** 改修の内容・箇所及び規模（苅田町・行橋市の申請書の欄）：箇所ごとに1行「玄関① 木製L字手すり L=600×850㎜」。写真番号・改修場所は見積書と同じ */
 export function shinseiWorks(job: Pick<Job, 'places'>, rates: EstimateRates): string[] {
   return workLines(job, rates).map((w) => w.line);
 }
@@ -160,7 +148,7 @@ export function shinseiKinds(job: Pick<Job, 'places'>, rates: EstimateRates): Sh
   const lines = workLines(job, rates);
   return KINDS.map((_, i) => {
     const mine = lines.filter((w) => w.kind === i + 1);
-    return {places: [...new Set(mine.map((w) => w.name).filter(Boolean))].join('・'), works: mine.map((w) => w.detail)};
+    return {places: [...new Set(mine.map((w) => w.name).filter(Boolean))].join('・'), works: mine.map((w) => w.line)};
   });
 }
 
@@ -439,7 +427,7 @@ export function readShinsei(bytes: Uint8Array): ShinseiRead | null {
 
 
 /**
- * 改修の内容の1行（「①浴室　手すりの取付　長さ60cm」「(3) 玄関 段差の解消」「玄関①　木製L字手すり」）から、写真番号・改修場所・改修の種類を読む。
+ * 改修の内容の1行（「玄関① 木製L字手すり L=600×850㎜」、前の版の「①浴室　手すりの取付　長さ60cm」「(3) 玄関 段差の解消」）から、写真番号・改修場所・改修の種類を読む。
  * kind（改修の種類の行に書いてあったとき）があればそれ。なければ文から見分ける
  */
 export function parseWorkLine(line: string, kind?: number): ShinseiPlace {
@@ -460,6 +448,6 @@ export function parseWorkLine(line: string, kind?: number): ShinseiPlace {
   const name = (trail ? trail[1] : first).normalize('NFKC');
   if (trail && photo === 0) photo = circledNum(trail[2]);
   const work = others.join(' ').normalize('NFKC');
-  const guess = /手[すスず摺]/.test(work) ? 1 : /段差|スロープ/.test(work) ? 2 : /床/.test(work) ? 3 : /扉|引[き]?戸|ドア/.test(work) ? 4 : /便器/.test(work) ? 5 : work ? 6 : 1;
+  const guess = /手[すスず摺]/.test(work) ? 1 : /段差|スロープ|踏台|踏み台|ステップ|敷居/.test(work) ? 2 : /床/.test(work) ? 3 : /扉|引[き]?戸|ドア/.test(work) ? 4 : /便器/.test(work) ? 5 : work ? 6 : 1;
   return {photo, name, kind: kind ?? guess};
 }

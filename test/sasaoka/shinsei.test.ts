@@ -67,8 +67,8 @@ const row = (col: string, n: number, r: number) => Array.from({length: n}, (_, i
   return `${name(c)}${r}`;
 });
 
-test('改修の内容・箇所及び規模：「①浴室　手すりの取付　長さ60cm」（写真番号・改修場所・改修の種類・切って使う長さ）', () => {
-  assert.deepEqual(shinseiWorks(job(), RATES), ['①浴室　手すりの取付　長さ60cm', '⑤玄関　手すりの取付　長さ40cm×60cm×60cm', '③トイレ　段差の解消']);
+test('改修の内容・箇所及び規模：前の申請と同じ書き方「浴室① 浴室用手すり L=600㎜」（改修場所・写真番号・品名・切って使う長さ）', () => {
+  assert.deepEqual(shinseiWorks(job(), RATES), ['浴室① 浴室用手すり L=600㎜', '玄関⑤ 木製手すり L=400×600×600㎜', 'トイレ③ スロープ']);
   assert.deepEqual(insuredBoxes('0000366989'), [...'0000366989']);
   assert.deepEqual(insuredBoxes('３６６９８９'), ['', '', '', '', '3', '6', '6', '9', '8', '9']); // 全角でもよい。足りなければ右に寄せる
   assert.equal(shinseiFileName(SHINSEI.kanda!, job(), '2026-10-21'), '苅田町申請書_山田 太郎様_2026-10-21.xlsx');
@@ -111,8 +111,8 @@ test('苅田町の申請書：事前申請書の氏名・住所・被保険者�
   assert.match(cell(pre, 'J7'), /^<c r="J7" s="233" t="inlineStr"><is><t xml:space="preserve">山田 太郎<\/t><\/is><\/c>$/);
   assert.match(cell(pre, 'J11'), /福岡県京都郡苅田町富久町1-1/);
   assert.equal([...'XYZ'].map((c) => cell(pre, `${c}6`)).concat(['AA6', 'AG6'].map((r) => cell(pre, r))).map((c) => /<t[^>]*>(\d)<\/t>/.exec(c)?.[1]).join(''), '00009');
-  assert.equal(txt(pre, 'J14'), '①浴室　手すりの取付　長さ60cm\n⑤玄関　手すりの取付　長さ40cm×60cm×60cm\n③トイレ　段差の解消');
-  assert.match(cell(pre, 'J14'), /長さ60cm&#10;⑤玄関/); // 改行は &#10;（LibreOffice・スマホのプレビューでも改行する）
+  assert.equal(txt(pre, 'J14'), '浴室① 浴室用手すり L=600㎜\n玄関⑤ 木製手すり L=400×600×600㎜\nトイレ③ スロープ');
+  assert.match(cell(pre, 'J14'), /L=600㎜&#10;玄関⑤/); // 改行は &#10;（LibreOffice・スマホのプレビューでも改行する）
   // 事後申請書は事前申請書を参照する式。保存しておく答えも同じにする（スマホのプレビュー用）
   const post = byName.get('事後申請書')!;
   assert.match(cell(post, 'I7'), /<f>事前申請書!J7<\/f><v>山田 太郎<\/v>/);
@@ -134,7 +134,7 @@ test('行橋市の申請書：住改・受領委任払の氏名・住所・被�
   assert.match(cell(main, 'F11'), /福岡県行橋市中央1-1/);
   assert.match(cell(main, 'Z7'), /<t[^>]*>0<\/t>/);
   assert.match(cell(main, 'AI7'), /<t[^>]*>9<\/t>/);
-  assert.match(cell(main, 'F14'), /①浴室　手すりの取付　長さ60cm/);
+  assert.match(cell(main, 'F14'), /浴室① 浴室用手すり L=600㎜/);
   // 書き込んだ申請書から読む（申請書から見積書を作るとき）。どの保険者の申請書かはシートで見分ける
   const places = [
     {photo: 1, name: '浴室', kind: 1},
@@ -160,6 +160,7 @@ test('改修の内容の1行から、写真番号・改修場所・改修の種�
   assert.deepEqual(parseWorkLine('廊下 手摺取付'), {photo: 0, name: '廊下', kind: 1});
   // 改修場所のうしろに写真番号（広域連合の内訳明細書の書き方）。改修の種類の行に書いてあれば、その種類
   assert.deepEqual(parseWorkLine('玄関① 木製L字手すり L=600×850㎜ H=850mm'), {photo: 1, name: '玄関', kind: 1});
+  assert.deepEqual(parseWorkLine('玄関② 木製踏台'), {photo: 2, name: '玄関', kind: 2}); // 踏台は段差の解消
   assert.deepEqual(parseWorkLine('玄関②\u3000木製踏台L=400×600mm  H=170mm', 2), {photo: 2, name: '玄関', kind: 2});
 });
 
