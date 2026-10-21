@@ -8,7 +8,8 @@
 import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES, SETTINGS_REV, STAFF_FULL_NAMES} from './defaults.ts';
 import {guessPieceLengthM} from './priceImport.ts';
 import {jobInsurer, MARK_INFO, MARK_KEYS, NO_SHINSEI} from './estimateForms.ts';
-import type {AppData, EstimateForm, Insurer, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, PlaceDims, PlacePhotos, Rounding, Row, Settings, ShinseiInfo, TaxMode} from './types.ts';
+import {cleanEdit} from './photoEdit.ts';
+import type {AppData, EstimateForm, Insurer, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, PlaceDims, PlacePhotoEdits, PlacePhotos, Rounding, Row, Settings, ShinseiInfo, TaxMode} from './types.ts';
 import {uid} from './util.ts';
 
 const DB_NAME = 'taiyo-sasaoka-shikiri';
@@ -236,6 +237,7 @@ const cleanPlace = (p: Record<string, unknown>): Place => ({
   ...cleanDims(p.dims),
   ...cleanPhotos(p.photos),
   ...cleanPhotoDates(p.photoDates),
+  ...cleanPhotoEdits(p.photoEdits),
 });
 
 /** 改修の内容の寸法（打ったままの文字）。どれもなければ持たない */
@@ -262,6 +264,18 @@ function cleanPhotoDates(raw: unknown): {photoDates?: PlacePhotos} {
   if (isoDate(raw.before)) dates.before = isoDate(raw.before);
   if (isoDate(raw.after)) dates.after = isoDate(raw.after);
   return dates.before || dates.after ? {photoDates: dates} : {};
+}
+
+/** 写真の向き・大きさ（そのまま＝0°・枠いっぱいのものは持たない） */
+function cleanPhotoEdits(raw: unknown): {photoEdits?: PlacePhotoEdits} {
+  if (!isObj(raw)) return {};
+  const edits: PlacePhotoEdits = {};
+  for (const slot of ['before', 'after'] as const) {
+    const e = raw[slot];
+    const clean = isObj(e) ? cleanEdit({rot: numv(e.rot), scale: numv(e.scale, 1)}) : undefined;
+    if (clean) edits[slot] = clean;
+  }
+  return edits.before || edits.after ? {photoEdits: edits} : {};
 }
 
 const SUFFIXES: NameSuffix[] = ['様邸', '様', ''];

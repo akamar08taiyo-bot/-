@@ -10,7 +10,8 @@ import {strFromU8, strToU8, unzipSync, zipSync} from 'fflate';
 import {estimateTotals, isBlankRow} from './calc.ts';
 import type {EstimateRates, EstimateSettings} from './calc.ts';
 import {circled, eraOf, jobInsurer, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa} from './estimateForms.ts';
-import type {Insurer, Job, Place, PlacePhotos, ShinseiInfo, ShinseiMarks} from './types.ts';
+import {clampScale, normRot} from './photoEdit.ts';
+import type {Insurer, Job, PhotoEdit, Place, PlacePhotos, ShinseiInfo, ShinseiMarks} from './types.ts';
 
 /** 申請書の原本の、1つのシートで転記する欄（番地）。ないものは書かない */
 export type ShinseiSheet = {
@@ -244,7 +245,7 @@ export type ShinseiValues = {
 };
 
 /** 写真貼付用紙に貼る写真（JPEG のバイト列と、縦横の画素） */
-export type PhotoImage = {bytes: Uint8Array; w: number; h: number};
+export type PhotoImage = {bytes: Uint8Array; w: number; h: number; edit?: PhotoEdit}; // edit＝向き・大きさ（photoEdit.ts）
 export type PhotoImages = {before?: PhotoImage; after?: PhotoImage};
 
 /**
@@ -1087,7 +1088,9 @@ function fromTo(lay: SheetLayout, box: Box): string {
 }
 
 const emu = (px: number) => Math.round(px * EMU);
-const xfrm = (box: Box) => `<a:xfrm><a:off x="${emu(box.x)}" y="${emu(box.y)}"/><a:ext cx="${emu(box.w)}" cy="${emu(box.h)}"/></a:xfrm>`;
+/** 図形の位置と大きさ。rot＝右回りの角度（度。回す前の四角のまん中で回る） */
+const xfrm = (box: Box, rot = 0) =>
+  `<a:xfrm${rot ? ` rot="${Math.round(rot * 60000)}"` : ''}><a:off x="${emu(box.x)}" y="${emu(box.y)}"/><a:ext cx="${emu(box.w)}" cy="${emu(box.h)}"/></a:xfrm>`;
 
 /** 楕円の図形（前の申請の丸と同じ：塗りなし・黒の線） */
 function ellipseXml(lay: SheetLayout, box: Box, id: number): string {
@@ -1201,10 +1204,23 @@ const NS_R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationship
 
 /** 写真の枠（範囲）に写真を置く位置：縦横の比はそのまま、枠に収まるだけ大きく、まん中に（まわりに 4画素あける） */
 export function photoFit(frame: Box, w: number, h: number): Box {
-  const pad = 4;
-  const k = Math.max(0, Math.min((frame.w - 2 * pad) / Math.max(w, 1), (frame.h - 2 * pad) / Math.max(h, 1)));
-  const [pw, ph] = [w * k, h * k];
-  return {x: frame.x + (frame.w - pw) / 2, y: frame.y + (frame.h - ph) / 2, w: pw, h: ph};
+  const {x, y, w: pw, h: ph} = photoPlacement(frame, w, h);
+  return {x, y, w: pw, h: ph};
+}
+
+/**
+ * 向き・大きさを直した写真を枠に置く位置：回す前の写真の四角（まん中は枠のまん中）と、右回りの角度。
+ * 回したあとの写真（の外側の四角）が枠に収まるだけ大きくして、その scale 倍にする（1 より大きくしないので、写真は枠からはみ出さない）。
+ * 画面のプレビュー・写真の欄と、Excel の写真の図形（この四角に置いて rot だけ回す）で同じ計算を使う
+ */
+export function photoPlacement(frame: Box, w: number, h: number, edit?: PhotoEdit, pad = 4): Box & {rot: number} {
+  const rot = normRot(edit?.rot ?? 0);
+  const t = (rot * Math.PI) / 180;
+  const [c, s] = [Math.abs(Math.cos(t)), Math.abs(Math.sin(t))];
+  const [bw, bh] = [Math.max(w, 1) * c + Math.max(h, 1) * s, Math.max(w, 1) * s + Math.max(h, 1) * c];
+  const k = Math.max(0, Math.min((frame.w - 2 * pad) / bw, (frame.h - 2 * pad) / bh)) * clampScale(edit?.scale ?? 1);
+  const [pw, ph] = [Math.max(w, 1) * k, Math.max(h, 1) * k];
+  return {x: frame.x + (frame.w - pw) / 2, y: frame.y + (frame.h - ph) / 2, w: pw, h: ph, rot};
 }
 
 /** 写真貼付用紙の改修前・改修後の枠に写真を貼る（xl/media に JPEG を入れ、図形のファイルに写真の図形を足す） */
@@ -1224,7 +1240,7 @@ function drawPhotos(files: Files, sheet: ShinseiSheet, images: PhotoImages): voi
     const img = images[slot];
     const range = place[slot];
     if (!img || !range) continue;
-    const box = photoFit(rangeBox(lay, range), img.w, img.h);
+    const box = photoPlacement(rangeBox(lay, range), img.w, img.h, img.edit);
     let n = 1;
     while (files[`xl/media/image${n}.jpeg`]) n++;
     files[`xl/media/image${n}.jpeg`] = img.bytes;
@@ -1235,7 +1251,7 @@ function drawPhotos(files: Files, sheet: ShinseiSheet, images: PhotoImages): voi
     pics.push(
       `<xdr:twoCellAnchor editAs="oneCell">${fromTo(lay, box)}<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${id}" name="${name} ${id}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>` +
         `<xdr:blipFill><a:blip r:embed="rId${k}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>` +
-        `<xdr:spPr>${xfrm(box)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor>`,
+        `<xdr:spPr>${xfrm(box, box.rot)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor>`,
     );
     id++;
   }

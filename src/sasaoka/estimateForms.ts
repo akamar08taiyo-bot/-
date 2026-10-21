@@ -131,8 +131,23 @@ export function photoNumbers(job: Pick<Job, 'places'>, rates: EstimateRates): Ma
   return out;
 }
 
+/**
+ * 2つの箇所の写真番号を入れ替える（ユーザーの指示「写真番号の1と2を簡単に入れ替える」。①勝手口・②浴室 → ①浴室・②勝手口）。
+ * 写真番号は見積書の箇所の順番（手で入れた番号があればその番号）なので、箇所の順番と手で入れた番号の両方を入れ替える。
+ * 写真・撮影日・向きは箇所が持っているので一緒に動き、見積書・申請書の改修の内容・平面図の番号もそろう
+ */
+export function swapPhotoNumbers(places: Place[], a: string, b: string): Place[] {
+  const i = places.findIndex((p) => p.id === a);
+  const k = places.findIndex((p) => p.id === b);
+  if (i < 0 || k < 0 || i === k) return places;
+  const out = places.slice();
+  out[i] = {...places[k], photo: places[i].photo};
+  out[k] = {...places[i], photo: places[k].photo};
+  return out;
+}
+
 // 金額のない施工費の行は出さない
-const shownLines = (place: Pick<Place, 'rows'>, rates: EstimateRates) => estimatePlaceLines(place, rates).filter((l) => l.kind === 'material' || l.amount !== 0);
+const shownLines =(place: Pick<Place, 'rows'>, rates: EstimateRates) => estimatePlaceLines(place, rates).filter((l) => l.kind === 'material' || l.amount !== 0);
 
 /** 部材の「内容（規格・範囲）」：メーカー 品番 品名（切って使う部材の長さの計算は備考・算出根拠に書く） */
 export function materialText(r: Row): string {

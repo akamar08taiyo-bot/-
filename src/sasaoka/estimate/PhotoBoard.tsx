@@ -5,14 +5,19 @@
 // 入れ替え：写真を別の枠へドラッグするか、写真を押して選んでから入れ替えたい枠を押す（空いた枠なら移す）。差し替え・削除もできる。
 // 写真は縮めてこの端末に保存し（photos.ts）、申請書の Excel の写真貼付用紙（写真番号の用紙）に貼る。
 // 撮影日（苅田町の写真の用紙の「撮影日」）：写真を入れると、写真の撮影日時（Exif）、なければ当日にする。枠の下の欄で直せる。入れ替えると写真と一緒に動く
+// 写真番号の入れ替え（ユーザーの指示「①勝手口・②浴室を、押したりドラッグで横にずらしたりして、①浴室・②勝手口に簡単に入れ替える」）：
+// 箇所の見出しをドラッグしてほかの箇所に重ねるか、◀ ▶ で隣と入れ替える（写真・撮影日・向きは箇所と一緒に動く）。指（iPad）でも動くようにポインターで動かす
+// 向き（ユーザーの指示「写真の方向転換」「iPad でもくるっとすぐに回転」）：写真の右上の ↻ で右に 90°。大きさと細かい向きはプレビューの写真で直す
 
 import {useState} from 'react';
-import type {DragEvent} from 'react';
+import type {DragEvent, PointerEvent as ReactPointerEvent} from 'react';
 import type {EstimateRates} from '../calc.ts';
 import {Btn, useToast} from '../components/ui.tsx';
-import {circled, photoNumbers} from '../estimateForms.ts';
+import {circled, photoNumbers, swapPhotoNumbers} from '../estimateForms.ts';
+import {cleanEdit, turn} from '../photoEdit.ts';
 import {photoTakenDate, preparePhoto, putPhoto, rememberPhotoUrl, usePhotoUrls} from '../photos.ts';
-import type {Job, Place, PlacePhotos} from '../types.ts';
+import {photoPlacement} from '../shinsei.ts';
+import type {Job, PhotoEdit, Place, PlacePhotoEdits, PlacePhotos} from '../types.ts';
 import {todayIso} from '../util.ts';
 
 export type PhotoSlot = 'before' | 'after';
@@ -21,16 +26,21 @@ export const SLOT_LABEL: Record<PhotoSlot, string> = {before: '改修前', after
 /** 写真を枠から枠へドラッグするときの印 */
 export const PHOTO_DRAG = 'application/x-sasaoka-photo';
 
+type SlotFields = {photos: PlacePhotos; photoDates: PlacePhotos; photoEdits: PlacePhotoEdits};
+
 /** 改修前・改修後の1つを替える（空なら外す。どちらもなければ持たない） */
-function withSlot(p: Place, field: 'photos' | 'photoDates', slot: PhotoSlot, v: string | undefined): Place {
-  const next: PlacePhotos = {...p[field], [slot]: v};
+function withSlot<F extends keyof SlotFields>(p: Place, field: F, slot: PhotoSlot, v: SlotFields[F][PhotoSlot] | undefined): Place {
+  const next = {...p[field], [slot]: v} as SlotFields[F];
   if (!v) delete next[slot];
-  const {[field]: _old, ...rest} = p;
-  return next.before || next.after ? {...rest, [field]: next} : rest;
+  const out: Record<string, unknown> = {...p};
+  if (next.before || next.after) out[field] = next;
+  else delete out[field];
+  return out as Place;
 }
 
-/** 枠の写真と撮影日を替える */
-const withPhoto = (p: Place, slot: PhotoSlot, id: string | undefined, date: string | undefined): Place => withSlot(withSlot(p, 'photos', slot, id), 'photoDates', slot, date);
+/** 枠の写真・撮影日・向きと大きさを替える */
+const withPhoto = (p: Place, slot: PhotoSlot, id: string | undefined, date: string | undefined, edit: PhotoEdit | undefined): Place =>
+  withSlot(withSlot(withSlot(p, 'photos', slot, id), 'photoDates', slot, date), 'photoEdits', slot, edit);
 
 /** 写真の番号の箇所（写真番号の順）。写真番号のない箇所（見積書に出ない箇所）は入らない */
 export function photoPlaces(job: Pick<Job, 'places'>, rates: EstimateRates): {place: Place; no: number}[] {
@@ -45,10 +55,16 @@ export function photoPlaces(job: Pick<Job, 'places'>, rates: EstimateRates): {pl
 export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void, rates: EstimateRates) {
   const toast = useToast();
   const [busy, setBusy] = useState(0);
+  // 新しい写真は、向き・大きさをそのまま（0°・枠いっぱい）にする
   const setPhoto = (key: PhotoKey, id: string | undefined, date: string | undefined) =>
-    setJob((j) => ({...j, places: j.places.map((p) => (p.id === key.placeId ? withPhoto(p, key.slot, id, date) : p))}));
+    setJob((j) => ({...j, places: j.places.map((p) => (p.id === key.placeId ? withPhoto(p, key.slot, id, date, undefined) : p))}));
   /** 撮影日を直す（空にもできる） */
   const setDate = (key: PhotoKey, date: string) => setJob((j) => ({...j, places: j.places.map((p) => (p.id === key.placeId ? withSlot(p, 'photoDates', key.slot, date || undefined) : p))}));
+  /** 写真の向き・大きさを直す（そのままに戻したら持たない） */
+  const setEdit = (key: PhotoKey, edit: PhotoEdit | undefined) =>
+    setJob((j) => ({...j, places: j.places.map((p) => (p.id === key.placeId ? withSlot(p, 'photoEdits', key.slot, cleanEdit(edit)) : p))}));
+  /** 2つの箇所の写真番号を入れ替える（写真・撮影日・向きは箇所と一緒に動く） */
+  const swapPlaces = (a: string, b: string) => setJob((j) => ({...j, places: swapPhotoNumbers(j.places, a, b)}));
   /** 写真のファイルを入れる：start の枠から（なければ①の改修前から）、改修前の空いた枠に順に */
   const put = async (files: File[], start?: PhotoKey) => {
     const images = files.filter((f) => f.type.startsWith('image/') || /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(f.name));
@@ -85,16 +101,16 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
     }
     if (images.length > used.length) toast(`写真番号の枠が足りないので、${images.length - used.length}枚は入れませんでした`, 'error');
   };
-  /** 2つの枠の写真を入れ替える（片方が空なら移す）。撮影日も一緒に */
+  /** 2つの枠の写真を入れ替える（片方が空なら移す）。撮影日・向きと大きさも一緒に */
   const swap = (a: PhotoKey, b: PhotoKey) =>
     setJob((j) => {
       const get = (k: PhotoKey) => {
         const p = j.places.find((x) => x.id === k.placeId);
-        return [p?.photos?.[k.slot], p?.photoDates?.[k.slot]] as const;
+        return [p?.photos?.[k.slot], p?.photoDates?.[k.slot], p?.photoEdits?.[k.slot]] as const;
       };
-      const [[ia, da], [ib, db]] = [get(a), get(b)];
-      let places = j.places.map((p) => (p.id === a.placeId ? withPhoto(p, a.slot, ib, db) : p));
-      places = places.map((p) => (p.id === b.placeId ? withPhoto(p, b.slot, ia, da) : p));
+      const [[ia, da, ea], [ib, db, eb]] = [get(a), get(b)];
+      let places = j.places.map((p) => (p.id === a.placeId ? withPhoto(p, a.slot, ib, db, eb) : p));
+      places = places.map((p) => (p.id === b.placeId ? withPhoto(p, b.slot, ia, da, ea) : p));
       return {...j, places};
     });
   const remove = (key: PhotoKey) => setPhoto(key, undefined, undefined);
@@ -114,13 +130,27 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
     }
     if (e.dataTransfer.files.length) void put([...e.dataTransfer.files], target);
   };
-  return {put, swap, remove, drop, setDate, busy};
+  return {put, swap, remove, drop, setDate, setEdit, swapPlaces, busy};
 }
 
 /** ドラッグしているものが写真のファイルか、枠の写真か */
 const draggable = (e: DragEvent) => [...e.dataTransfer.types].some((t) => t === 'Files' || t === PHOTO_DRAG);
 
 export type PhotoActions = ReturnType<typeof usePhotoActions>;
+
+/** 写真の欄の枠の中の写真：写真貼付用紙と同じく、向き・大きさを直した形で（枠は 4:3。％で置く） */
+function Thumb({url, w, h, edit}: {url: string; w: number; h: number; edit?: PhotoEdit}) {
+  const b = photoPlacement({x: 0, y: 0, w: 400, h: 300}, w, h, edit, 0);
+  return (
+    <img
+      src={url}
+      alt=""
+      draggable={false}
+      className="absolute max-w-none"
+      style={{left: `${b.x / 4}%`, top: `${b.y / 3}%`, width: `${b.w / 4}%`, height: `${b.h / 3}%`, transform: b.rot ? `rotate(${b.rot}deg)` : undefined}}
+    />
+  );
+}
 
 export function PhotoBoard({
   job,
@@ -141,6 +171,8 @@ export function PhotoBoard({
   const urls = usePhotoUrls(list.flatMap(({place}) => [place.photos?.before ?? '', place.photos?.after ?? '']));
   const [selected, setSelected] = useState<PhotoKey | null>(null);
   const [over, setOver] = useState<string>(''); // ドラッグして重ねている枠
+  // 箇所の見出しをドラッグしているとき：動かしている箇所・ずらした量・重ねている箇所
+  const [cardDrag, setCardDrag] = useState<{id: string; dx: number; dy: number; over: string | null} | null>(null);
   const lastSheet = sheetNos && sheetNos.size ? Math.max(...sheetNos) : 0;
   const same = (a: PhotoKey | null, b: PhotoKey) => !!a && a.placeId === b.placeId && a.slot === b.slot;
   const pick = onPick;
@@ -153,6 +185,43 @@ export function PhotoBoard({
     else pick(key);
   };
   const selPlace = selected ? list.find((x) => x.place.id === selected.placeId) : undefined;
+  const swapPlaces = (a: string, b: string) => {
+    actions.swapPlaces(a, b);
+    setSelected(null);
+  };
+
+  /** 箇所の見出しをドラッグして、ほかの箇所に重ねて離すと写真番号を入れ替える（マウスでも指でも） */
+  const startCardDrag = (e: ReactPointerEvent<HTMLElement>, id: string) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const el = e.currentTarget;
+    const [x0, y0] = [e.clientX, e.clientY];
+    let moved = false;
+    el.setPointerCapture(e.pointerId);
+    const targetAt = (x: number, y: number) => {
+      for (const node of document.elementsFromPoint(x, y)) {
+        const card = node instanceof HTMLElement ? node.closest<HTMLElement>('[data-photo-card]') : null;
+        if (card && card.dataset.photoCard !== id) return card.dataset.photoCard ?? null;
+      }
+      return null;
+    };
+    const move = (ev: PointerEvent) => {
+      const [dx, dy] = [ev.clientX - x0, ev.clientY - y0];
+      if (!moved && Math.hypot(dx, dy) < 6) return;
+      moved = true;
+      setCardDrag({id, dx, dy, over: targetAt(ev.clientX, ev.clientY)});
+    };
+    const done = (ev: PointerEvent) => {
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', done);
+      el.removeEventListener('pointercancel', done);
+      const target = moved && ev.type === 'pointerup' ? targetAt(ev.clientX, ev.clientY) : null;
+      setCardDrag(null);
+      if (target) swapPlaces(id, target);
+    };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', done);
+    el.addEventListener('pointercancel', done);
+  };
 
   return (
     <section
@@ -182,7 +251,8 @@ export function PhotoBoard({
         <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md bg-sky-50 px-3 py-1.5 text-sm text-sky-900" role="status" aria-label="選んでいる写真">
           <span>
             {circled(selPlace.no)}
-            {selPlace.place.name}の{SLOT_LABEL[selected.slot]}：入れ替える枠を押してください
+            {selPlace.place.name}の{SLOT_LABEL[selected.slot]}
+            ：入れ替える枠を押してください
           </span>
           <Btn small color="white" onClick={() => pick(selected)}>
             差し替え
@@ -203,84 +273,151 @@ export function PhotoBoard({
         </div>
       )}
       {list.length > 0 && (
-        <div className="mt-2 grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(15.5rem,1fr))]">
-          {list.map(({place, no}) => (
-            <div key={place.id} role="group" aria-label={`${circled(no)}${place.name}の写真`} className="rounded-lg border border-slate-200 p-2">
-              <div className="mb-1 flex items-baseline gap-1.5 text-sm">
-                <b className="text-slate-800">
-                  {circled(no)} {place.name || '（改修場所）'}
-                </b>
-                {sheetNos && !sheetNos.has(no) && <span className="text-[11px] text-amber-700">{lastSheet ? `Excel の写真の用紙は${circled(lastSheet)}まで` : 'Excel に写真の用紙なし'}</span>}
-              </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                {(['before', 'after'] as const).map((slot) => {
-                  const key = {placeId: place.id, slot};
-                  const id = place.photos?.[slot];
-                  const photo = id ? urls[id] : undefined;
-                  const k = `${place.id}:${slot}`;
-                  return (
-                    <div key={slot} className="min-w-0">
-                      <button
-                        type="button"
-                        aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}`}
-                        aria-pressed={same(selected, key)}
-                        draggable={!!id}
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData(PHOTO_DRAG, JSON.stringify(key));
-                          e.dataTransfer.effectAllowed = 'move';
-                        }}
-                        onDragOver={(e) => {
-                          if (!draggable(e)) return;
-                          e.preventDefault();
-                          setOver(k);
-                        }}
-                        onDragLeave={() => setOver((o) => (o === k ? '' : o))}
-                        onDrop={(e) => {
-                          setOver('');
-                          actions.drop(e, key);
-                          setSelected(null);
-                        }}
-                        onClick={() => press(key, !!id)}
-                        className={`relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-md text-xs transition ${
-                          same(selected, key)
-                            ? 'ring-4 ring-sky-500'
-                            : over === k
-                              ? 'ring-4 ring-emerald-500'
-                              : id
-                                ? 'ring-1 ring-slate-300 hover:ring-2 hover:ring-emerald-500'
-                                : 'border-2 border-dashed border-slate-300 text-slate-500 hover:border-emerald-500 hover:bg-emerald-50'
-                        } ${selected && !same(selected, key) ? 'cursor-copy' : ''}`}
-                      >
-                        {photo ? (
-                          <img src={photo.url} alt="" className="h-full w-full bg-slate-100 object-contain" draggable={false} />
-                        ) : photo === null ? (
-                          <span className="px-2 text-amber-800">この端末にない写真</span>
-                        ) : id ? (
-                          '…'
-                        ) : (
-                          `＋ ${SLOT_LABEL[slot]}`
-                        )}
-                        {id && <span className="absolute left-1 top-1 rounded bg-white/85 px-1 text-[10px] font-bold text-slate-700">{SLOT_LABEL[slot]}</span>}
-                      </button>
-                      {dates && (
-                        // 日付が切れないように、「撮影日」は欄の上・日付の欄は枠の幅いっぱい
-                        <label className="mt-1 block text-[11px] text-slate-600">
-                          撮影日
-                          <input
-                            type="date"
-                            value={place.photoDates?.[slot] ?? ''}
-                            onChange={(e) => actions.setDate(key, e.target.value)}
-                            className="mt-0.5 block h-7 w-full min-w-0 rounded border border-slate-300 px-1 text-xs text-slate-800"
-                            aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}の撮影日`}
-                          />
-                        </label>
+        // 枠はユーザーの指示「気持ちだけ大きく」で少し大きく：パソコンの一覧の幅では、前は1段に箇所を2つ（枠の幅 約7.4rem）、
+        // いまは1段に1つで見出しを左に（枠の幅 約11rem）。箇所の幅（@container）が 28rem より狭いときは見出しを上に
+        <div className="mt-2 grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(min(22rem,100%),1fr))]">
+          {list.map(({place, no}, i) => {
+            const dragging = cardDrag?.id === place.id;
+            const target = cardDrag?.over === place.id;
+            const prev = list[i - 1];
+            const next = list[i + 1];
+            return (
+              <div
+                key={place.id}
+                role="group"
+                aria-label={`${circled(no)}${place.name}の写真`}
+                data-photo-card={place.id}
+                className={`@container relative rounded-lg border p-2 ${target ? 'border-emerald-500 ring-4 ring-emerald-500/60' : 'border-slate-200'} ${dragging ? 'z-30 bg-white opacity-90 shadow-xl' : ''}`}
+                style={dragging && cardDrag ? {transform: `translate(${cardDrag.dx}px, ${cardDrag.dy}px)`, pointerEvents: 'none'} : undefined}
+              >
+                <div className="flex flex-col gap-1 @md:flex-row @md:items-start @md:gap-2">
+                  <div className="flex items-center gap-1 @md:w-28 @md:shrink-0 @md:flex-col @md:items-start @md:gap-1.5">
+                    {/* 見出しをつかんでほかの箇所に重ねると入れ替え（指で動かしてもページが動かないように touch-none） */}
+                    <div
+                      onPointerDown={(e) => startCardDrag(e, place.id)}
+                      className="flex min-w-0 flex-1 cursor-grab touch-none select-none flex-wrap items-baseline gap-x-1.5 text-sm active:cursor-grabbing @md:w-full @md:flex-none @md:py-1"
+                      title="ドラッグしてほかの写真番号と入れ替え"
+                    >
+                      <span aria-hidden className="text-slate-400">
+                        ⠿
+                      </span>
+                      <b className="min-w-0 flex-1 truncate text-slate-800">
+                        {circled(no)} {place.name || '（改修場所）'}
+                      </b>
+                      {sheetNos && !sheetNos.has(no) && (
+                        <span className="text-[11px] text-amber-700 @md:basis-full">{lastSheet ? `Excel の写真の用紙は${circled(lastSheet)}まで` : 'Excel に写真の用紙なし'}</span>
                       )}
                     </div>
-                  );
-                })}
+                    <div className="flex shrink-0 gap-1">
+                      {/* 隣の写真番号と入れ替える（押すだけ。iPad でも） */}
+                      <button
+                        type="button"
+                        disabled={!prev}
+                        onClick={() => prev && swapPlaces(place.id, prev.place.id)}
+                        className="h-8 w-8 shrink-0 touch-manipulation rounded-md border border-slate-300 bg-white text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-30"
+                        title="前の写真番号と入れ替え"
+                        aria-label={prev ? `${circled(no)}${place.name}と${circled(prev.no)}${prev.place.name}を入れ替える` : '前の写真番号なし'}
+                      >
+                        ◀
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!next}
+                        onClick={() => next && swapPlaces(place.id, next.place.id)}
+                        className="h-8 w-8 shrink-0 touch-manipulation rounded-md border border-slate-300 bg-white text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-30"
+                        title="次の写真番号と入れ替え"
+                        aria-label={next ? `${circled(no)}${place.name}と${circled(next.no)}${next.place.name}を入れ替える` : '次の写真番号なし'}
+                      >
+                        ▶
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid min-w-0 flex-1 grid-cols-2 gap-1.5">
+                    {(['before', 'after'] as const).map((slot) => {
+                      const key = {placeId: place.id, slot};
+                      const id = place.photos?.[slot];
+                      const photo = id ? urls[id] : undefined;
+                      const edit = place.photoEdits?.[slot];
+                      const k = `${place.id}:${slot}`;
+                      return (
+                        <div key={slot} className="min-w-0">
+                          <div className="relative">
+                            <button
+                              type="button"
+                              aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}`}
+                              aria-pressed={same(selected, key)}
+                              draggable={!!id}
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData(PHOTO_DRAG, JSON.stringify(key));
+                                e.dataTransfer.effectAllowed = 'move';
+                              }}
+                              onDragOver={(e) => {
+                                if (!draggable(e)) return;
+                                e.preventDefault();
+                                setOver(k);
+                              }}
+                              onDragLeave={() => setOver((o) => (o === k ? '' : o))}
+                              onDrop={(e) => {
+                                setOver('');
+                                actions.drop(e, key);
+                                setSelected(null);
+                              }}
+                              onClick={() => press(key, !!id)}
+                              className={`relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-md text-xs transition ${
+                                same(selected, key)
+                                  ? 'ring-4 ring-sky-500'
+                                  : over === k
+                                    ? 'ring-4 ring-emerald-500'
+                                    : id
+                                      ? 'bg-slate-100 ring-1 ring-slate-300 hover:ring-2 hover:ring-emerald-500'
+                                      : 'border-2 border-dashed border-slate-300 text-slate-500 hover:border-emerald-500 hover:bg-emerald-50'
+                              } ${selected && !same(selected, key) ? 'cursor-copy' : ''}`}
+                            >
+                              {photo ? (
+                                <Thumb url={photo.url} w={photo.w} h={photo.h} edit={edit} />
+                              ) : photo === null ? (
+                                <span className="px-2 text-amber-800">この端末にない写真</span>
+                              ) : id ? (
+                                '…'
+                              ) : (
+                                `＋ ${SLOT_LABEL[slot]}`
+                              )}
+                              {id && <span className="absolute left-1 top-1 rounded bg-white/85 px-1 text-[10px] font-bold text-slate-700">{SLOT_LABEL[slot]}</span>}
+                            </button>
+                            {/* 右に 90°回す（押すたびに。iPad でもすぐに。続けて押しても画面が拡大しないように touch-manipulation） */}
+                            {id && (
+                              <button
+                                type="button"
+                                onClick={() => actions.setEdit(key, turn(edit, 1))}
+                                className="absolute right-1 top-1 flex h-8 w-8 touch-manipulation items-center justify-center rounded-full bg-white/90 text-lg leading-none text-slate-700 shadow ring-1 ring-slate-300 hover:bg-white hover:text-emerald-700"
+                                title="右に回す"
+                                aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}を右に回す`}
+                              >
+                                ↻
+                              </button>
+                            )}
+                          </div>
+                          {dates && (
+                            // 日付が切れないように、「撮影日」は欄の上・日付の欄は枠の幅いっぱい
+                            <label className="mt-1 block text-[11px] text-slate-600">
+                              撮影日
+                              <input
+                                type="date"
+                                value={place.photoDates?.[slot] ?? ''}
+                                onChange={(e) => actions.setDate(key, e.target.value)}
+                                className="mt-0.5 block h-7 w-full min-w-0 rounded border border-slate-300 px-1 text-xs text-slate-800"
+                                aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}の撮影日`}
+                              />
+                            </label>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>

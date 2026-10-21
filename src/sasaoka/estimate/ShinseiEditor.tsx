@@ -144,8 +144,10 @@ export function ShinseiEditor({
     return x ? {placeId: x.place.id, slot} : null;
   };
   const photoOf = (no: number, slot: PhotoSlot) => {
-    const id = photoList.find((p) => p.no === no)?.place.photos?.[slot];
-    return id ? (photoUrls[id] ?? null) : null;
+    const place = photoList.find((p) => p.no === no)?.place;
+    const id = place?.photos?.[slot];
+    const url = id ? photoUrls[id] : null;
+    return url ? {...url, edit: place?.photoEdits?.[slot]} : null;
   };
 
   const save = () => {
@@ -435,6 +437,10 @@ export function ShinseiEditor({
                   onPick: (no, slot) => {
                     const key = photoKey(no, slot);
                     if (key) pickPhoto(key);
+                  },
+                  onEdit: (no, slot, edit) => {
+                    const key = photoKey(no, slot);
+                    if (key) photoActions.setEdit(key, edit);
                   },
                 }}
               />

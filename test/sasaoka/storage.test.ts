@@ -85,6 +85,20 @@ test('見積書の項目：前のデータ（項目なし）も読める', () =>
     ['玄関　手すりの取り付け　L=650mm', '', undefined, undefined],
   );
   assert.equal('shinseiLine' in w.places[3], false);
+  // 写真の向き・大きさ：角度は 0〜360、大きさは 0.2〜1。そのまま（0°・1）や、こわれた値は持たない
+  const [e] = cleanJobs([
+    {
+      places: [
+        {name: '玄関', photoEdits: {before: {rot: 450, scale: 0.5}, after: {rot: 0, scale: 1}}},
+        {name: 'トイレ', photoEdits: {after: {rot: -90, scale: 3}}},
+        {name: '浴室', photoEdits: {before: 'x', after: {rot: 'a', scale: 'b'}}},
+      ],
+    },
+  ]);
+  assert.deepEqual(
+    e.places.map((p) => p.photoEdits),
+    [{before: {rot: 90, scale: 0.5}}, {after: {rot: 270, scale: 1}}, undefined],
+  );
   // 申請書の項目：前のデータ（項目なし）は空。丸で囲む項目は選べる値のほかは空にする。前の版の丸（shinseiMarks）も読む
   assert.deepEqual(j.shinsei, NO_SHINSEI);
   const [m] = cleanJobs([{shinseiMarks: {gender: '女', era: '平成', care: '要介護2', renovated: 1}}]);

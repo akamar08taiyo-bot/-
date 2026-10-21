@@ -698,6 +698,27 @@ test('写真貼付用紙：写真番号の用紙の改修前・改修後の枠�
     assert.match(strFromU8(files['[Content_Types].xml']), /<Default Extension="jpeg" ContentType="image\/jpeg"\/>/);
     assert.ok(readShinsei(zipSync(files)), insurer); // 開き直せる（読み戻せる）
   }
+  // 向き・大きさ（ユーザーの指示「写真の方向転換」「角を持って縮小・拡大」）：写真の図形を回す前の四角に置いて rot だけ回す。
+  // 回したあとの写真が枠に収まる大きさ（縦横の比はそのまま）、縮めた写真は小さく（まん中はそのまま）
+  const edited = {1: {before: {...photoImages[1].before, edit: {rot: 90, scale: 1}}, after: {...photoImages[1].after, edit: {rot: 0, scale: 0.5}}}};
+  const ef = unzipSync(fillShinsei(KOUIKI, SHINSEI.kouiki!, {...shinseiValues(job({insurer: 'kouiki'}), RATES), photoImages: edited}));
+  const kSheet = SHINSEI.kouiki!.sheets.find((x) => x.photoPlace)!;
+  const pics = anchorsOf(strFromU8(ef[drawingPath(ef, kSheet.sheet)!])).filter((x) => x.includes('<xdr:pic>'));
+  const ext = (a: string) => /<a:ext cx="(\d+)" cy="(\d+)"\/>/.exec(a)!.slice(1).map(Number);
+  const [rotated, small] = pics;
+  assert.match(rotated, /<a:xfrm rot="5400000">/);
+  assert.doesNotMatch(small, /rot="/);
+  const [rw, rh] = ext(rotated);
+  assert.ok(Math.abs(rw / rh - 1600 / 1200) < 0.01); // 回す前の形（1600×1200）のまま
+  const unedited = anchorsOf(strFromU8(unzipSync(fillShinsei(KOUIKI, SHINSEI.kouiki!, {...shinseiValues(job({insurer: 'kouiki'}), RATES), photoImages}))[drawingPath(ef, kSheet.sheet)!])).filter((x) => x.includes('<xdr:pic>'));
+  const [ow, oh] = ext(unedited[1]);
+  const [sw, sh] = ext(small);
+  assert.ok(Math.abs(sw - ow / 2) <= 2 && Math.abs(sh - oh / 2) <= 2, `${sw}×${sh} / ${ow}×${oh}`);
+  // 回した写真の外側の四角（高さ＝回す前の幅）は、改修前の枠の高さに収まる
+  const [c1, r1, c2, r2] = cellsOf(kSheet.photoPlace!.before!);
+  const {from, to} = anchorOf(rotated);
+  assert.ok(from[2] >= r1 && to[2] <= r2 + 1, `${from} ${to} / ${r1}-${r2}`);
+  assert.ok(c1 >= 0 && c2 >= c1);
   // 写真がなければ、写真のファイル・図形は足さない
   const plain = unzipSync(fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(job({insurer: 'kouiki'}), RATES)));
   assert.ok(!Object.keys(plain).some((k) => k.startsWith('xl/media/') && !unzipSync(KOUIKI)[k]));

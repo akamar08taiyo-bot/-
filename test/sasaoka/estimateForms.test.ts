@@ -15,6 +15,7 @@ import {
   noteText,
   paginate,
   photoNumbers,
+  swapPhotoNumbers,
   placeWork,
   reiwa,
   rowUnit,
@@ -109,6 +110,32 @@ test('写真番号：入れていなければ見積書に出る箇所の順番�
   assert.equal(circled(1), '①');
   assert.equal(circled(20), '⑳');
   assert.equal(circled(21), '(21)');
+});
+
+test('写真番号の入れ替え：①勝手口・②浴室 → ①浴室・②勝手口（見積書の順番も。写真・向きは箇所と一緒に動く）', () => {
+  const kat = place('勝手口', [mat('手すり', 1000)], {photos: {before: 'ph1'}, photoEdits: {before: {rot: 90, scale: 1}}});
+  const roka = place('廊下', []); // 行のない箇所（写真番号なし）は動かさない
+  const yoku = place('浴室', [mat('手すり', 1000)], {photos: {after: 'ph2'}});
+  const names = (ps: Place[]) => photoPlacesOf(ps).map(([n, p]) => `${n}${p.name}:${p.photos?.before ?? ''}${p.photos?.after ?? ''}`);
+  const photoPlacesOf = (ps: Place[]) => {
+    const nos = photoNumbers({places: ps}, S);
+    return ps.filter((p) => nos.has(p.id)).map((p) => [nos.get(p.id)!, p] as const).sort((a, b) => a[0] - b[0]);
+  };
+  const before = [kat, roka, yoku];
+  assert.deepEqual(names(before), ['1勝手口:ph1', '2浴室:ph2']);
+  const swapped = swapPhotoNumbers(before, kat.id, yoku.id);
+  assert.deepEqual(names(swapped), ['1浴室:ph2', '2勝手口:ph1']);
+  assert.deepEqual(swapped.map((p) => p.name), ['浴室', '廊下', '勝手口']); // 見積書の順番も入れ替わる
+  assert.deepEqual(swapped[2].photoEdits, {before: {rot: 90, scale: 1}});
+  assert.deepEqual(names(swapPhotoNumbers(swapped, yoku.id, kat.id)), names(before)); // もう一度で元どおり
+  // 手で入れた写真番号（⑤と⑨）も入れ替わる。片方だけ手で入れた番号でも
+  const a = place('玄関', [mat('手すり', 1000)], {photo: 5});
+  const b = place('トイレ', [mat('手すり', 1000)], {photo: 9});
+  assert.deepEqual(names(swapPhotoNumbers([a, b], a.id, b.id)), ['5トイレ:', '9玄関:']);
+  const c = place('居室', [mat('手すり', 1000)]);
+  assert.deepEqual(names([c, b]), ['1居室:', '9トイレ:']);
+  assert.deepEqual(names(swapPhotoNumbers([c, b], c.id, b.id)), ['1トイレ:', '9居室:']);
+  assert.equal(swapPhotoNumbers(before, kat.id, 'none'), before);
 });
 
 test('ページ分け：箇所の行はなるべく同じページに。最後のページの下4行は合計の欄', () => {

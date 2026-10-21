@@ -1,13 +1,16 @@
 // 申請書のプレビュー：原本の様式のまま描く（材料は shinseiPreview.ts。Excel に保存するときと同じ書き込みをしたもの）。
 // 申請書のタブで、一覧で入れながら横で見る（ユーザーの指示「一覧から入力をメインとする。プレビューをみながら入力」）。
 // 一覧で入れている項目の欄は囲んで、見える所まで動かす。欄を押すと一覧のその項目へ。丸で囲む値（男・女など）は押すと丸がつく（もう一度押すと外れる）。
-// まだ入っていない欄は薄い黄色。写真貼付用紙は、改修前・改修後の枠に写真を重ねて出す（枠に写真のファイル・写真の欄の写真をドロップ、押して選ぶ）
+// まだ入っていない欄は薄い黄色。写真貼付用紙は、改修前・改修後の枠に写真を重ねて出す（枠に写真のファイル・写真の欄の写真をドロップ、押して選ぶ）。
+// 写真を押すと、向き・大きさを直せる（ユーザーの指示「写真の方向転換」「画像の角っこを持ち上げて縮小・拡大」「iPad でもくるっと回転」）：
+// 角のつまみで大きさ（枠より大きくはしない）、上の丸いつまみでくるくる回す（90°の近くはそろう）、↺ ↻ で 90°ずつ、2本の指でひねる・つまむ（iPad）
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
-import type {CSSProperties, DragEvent, RefObject} from 'react';
+import type {CSSProperties, DragEvent, PointerEvent as ReactPointerEvent, RefObject} from 'react';
 import type {PvFont, PvHeader, PvPage, PvPhotoSlot, PvShape, PvText, Rect, ShinseiField} from '../shinseiPreview.ts';
 import {circled} from '../estimateForms.ts';
-import {photoFit} from '../shinsei.ts';
-import type {ShinseiMarks} from '../types.ts';
+import {clampScale, normRot, ROT_SNAP, turn} from '../photoEdit.ts';
+import {photoPlacement} from '../shinsei.ts';
+import type {PhotoEdit, ShinseiMarks} from '../types.ts';
 
 const PAD = 18; // 紙の余白（画素）
 const MAX_SCALE = 1.3; // 広い画面では少し大きく
@@ -206,45 +209,269 @@ function ShapeText({s}: {s: PvShape}) {
   );
 }
 
-/** 写真貼付用紙の写真（画面の URL と大きさ）と、枠にドロップ・枠を押したとき */
+/** 写真貼付用紙の写真（画面の URL・大きさ・向きと大きさ）と、枠にドロップ・写真を選ぶ・向きと大きさを直したとき */
 export type PreviewPhotos = {
-  of: (no: number, slot: PvPhotoSlot['slot']) => {url: string; w: number; h: number} | null;
+  of: (no: number, slot: PvPhotoSlot['slot']) => {url: string; w: number; h: number; edit?: PhotoEdit} | null;
   onDrop: (no: number, slot: PvPhotoSlot['slot'], e: DragEvent) => void;
   onPick: (no: number, slot: PvPhotoSlot['slot']) => void;
+  onEdit: (no: number, slot: PvPhotoSlot['slot'], edit: PhotoEdit | undefined) => void;
 };
 
 const SLOT_NAME = {before: '改修前', after: '改修後'} as const;
 
-/** 写真貼付用紙の改修前・改修後の枠：写真は Excel に貼るのと同じ大きさ・位置（photoFit）。ないときは「＋ 改修前」 */
-function PhotoSlotView({slot, no, photos}: {slot: PvPhotoSlot; no: number; photos: PreviewPhotos}) {
+/** 角のつまみ（左上・右上・右下・左下）。写真の四角の中の位置（0〜1） */
+const CORNERS = [
+  ['左上', 0, 0],
+  ['右上', 1, 0],
+  ['右下', 1, 1],
+  ['左下', 0, 1],
+] as const;
+const HANDLE = 22; // つまみの大きさ（画面の画素。紙を縮めて見せていても同じ大きさ）
+const HIT = 44; // つまみの押せる所の大きさ（指で押しやすいように、見た目より広く）
+
+/**
+ * 写真貼付用紙の改修前・改修後の枠：写真は Excel に貼るのと同じ大きさ・位置・向き（photoPlacement）。ないときは「＋ 改修前」。
+ * 写真を押すと選んで、つまみ・道具（↺ ↻・元に戻す・差し替え・完了）を出す。動かしている間は下書き（draft）だけ変え、指を離したら保存する
+ */
+function PhotoSlotView({
+  slot,
+  no,
+  photos,
+  selected,
+  onSelect,
+  zoom,
+}: {
+  slot: PvPhotoSlot;
+  no: number;
+  photos: PreviewPhotos;
+  selected: boolean;
+  onSelect: (on: boolean) => void;
+  zoom: number; // 紙を縮めている割合（つまみ・道具は画面で同じ大きさにする）
+}) {
   const [over, setOver] = useState(false);
   const photo = photos.of(no, slot.slot);
-  const fit = photo ? photoFit({x: 0, y: 0, w: slot.w, h: slot.h}, photo.w, photo.h) : null;
+  const [draft, setDraft] = useState<PhotoEdit | null>(null);
+  const draftRef = useRef<PhotoEdit | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const picRef = useRef<HTMLDivElement>(null); // 回す前の写真の四角（まん中で回る）
+  const touches = useRef(new Map<number, {x: number; y: number}>());
+  const pinch = useRef<{d0: number; a0: number; base: PhotoEdit} | null>(null);
+  const edit: PhotoEdit = draft ?? photo?.edit ?? {rot: 0, scale: 1};
+  const box = photo ? photoPlacement({x: 0, y: 0, w: slot.w, h: slot.h}, photo.w, photo.h, edit) : null;
+  const name = `写真貼付用紙${circled(no)}の${SLOT_NAME[slot.slot]}`;
+  const z = 1 / Math.max(zoom, 0.05);
+
+  // ほかの所を押す・Esc で選ぶのをやめる
+  useEffect(() => {
+    if (!selected) return;
+    const outside = (e: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) onSelect(false);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onSelect(false);
+    };
+    // iPad の Safari：2本の指でひねる・つまむとき、画面ごと拡大しないように
+    const el = rootRef.current;
+    const still = (e: Event) => e.preventDefault();
+    document.addEventListener('pointerdown', outside, true);
+    document.addEventListener('keydown', esc);
+    el?.addEventListener('gesturestart', still);
+    el?.addEventListener('gesturechange', still);
+    return () => {
+      document.removeEventListener('pointerdown', outside, true);
+      document.removeEventListener('keydown', esc);
+      el?.removeEventListener('gesturestart', still);
+      el?.removeEventListener('gesturechange', still);
+    };
+  }, [selected, onSelect]);
+
+  const preview = (e: PhotoEdit) => {
+    draftRef.current = e;
+    setDraft(e);
+  };
+  const commit = () => {
+    const e = draftRef.current;
+    draftRef.current = null;
+    setDraft(null);
+    if (e) photos.onEdit(no, slot.slot, e);
+  };
+  const center = () => {
+    const r = picRef.current?.getBoundingClientRect();
+    return r ? {x: r.left + r.width / 2, y: r.top + r.height / 2} : {x: 0, y: 0};
+  };
+  const deg = (rad: number) => (rad * 180) / Math.PI;
+
+  /** つまみをドラッグ：角＝写真のまん中からの距離の割合で大きさ、上の丸＝まん中のまわりの角度で向き（マウスでも指でも） */
+  const dragHandle = (e: ReactPointerEvent<HTMLElement>, kind: 'scale' | 'rotate') => {
+    e.preventDefault();
+    e.stopPropagation();
+    const el = e.currentTarget;
+    el.setPointerCapture(e.pointerId);
+    const c = center();
+    const base = edit;
+    const d0 = Math.hypot(e.clientX - c.x, e.clientY - c.y) || 1;
+    const a0 = Math.atan2(e.clientY - c.y, e.clientX - c.x);
+    const move = (ev: PointerEvent) => {
+      if (kind === 'scale') preview({...base, scale: clampScale((base.scale * Math.hypot(ev.clientX - c.x, ev.clientY - c.y)) / d0)});
+      else preview({...base, rot: normRot(base.rot + deg(Math.atan2(ev.clientY - c.y, ev.clientX - c.x) - a0), ROT_SNAP)});
+    };
+    const up = () => {
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', up);
+      commit();
+    };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+  };
+
+  /** 2本の指（iPad）：ひねると回り、つまむ・広げると大きさが変わる */
+  const twoFingers = () => {
+    const [p, q] = [...touches.current.values()];
+    return {d: Math.hypot(q.x - p.x, q.y - p.y) || 1, a: Math.atan2(q.y - p.y, q.x - p.x)};
+  };
+  const touchDown = (e: ReactPointerEvent<HTMLElement>) => {
+    if (!selected || e.pointerType === 'mouse') return;
+    touches.current.set(e.pointerId, {x: e.clientX, y: e.clientY});
+    e.currentTarget.setPointerCapture(e.pointerId);
+    if (touches.current.size === 2) {
+      const {d, a} = twoFingers();
+      pinch.current = {d0: d, a0: a, base: edit};
+    }
+  };
+  const touchMove = (e: ReactPointerEvent<HTMLElement>) => {
+    if (!touches.current.has(e.pointerId)) return;
+    touches.current.set(e.pointerId, {x: e.clientX, y: e.clientY});
+    const g = pinch.current;
+    if (!g || touches.current.size < 2) return;
+    const {d, a} = twoFingers();
+    preview({rot: normRot(g.base.rot + deg(a - g.a0), ROT_SNAP), scale: clampScale((g.base.scale * d) / g.d0)});
+  };
+  const touchUp = (e: ReactPointerEvent<HTMLElement>) => {
+    touches.current.delete(e.pointerId);
+    if (pinch.current && touches.current.size < 2) {
+      pinch.current = null;
+      commit();
+    }
+  };
+
+  const dropProps = {
+    onDragOver: (e: DragEvent) => {
+      if (![...e.dataTransfer.types].some((t) => t === 'Files' || t.startsWith('application/x-sasaoka-photo'))) return;
+      e.preventDefault();
+      setOver(true);
+    },
+    onDragLeave: () => setOver(false),
+    onDrop: (e: DragEvent) => {
+      setOver(false);
+      photos.onDrop(no, slot.slot, e);
+    },
+  };
+  const rotated = (b: {x: number; y: number; w: number; h: number; rot: number}): CSSProperties => ({
+    left: b.x,
+    top: b.y,
+    width: b.w,
+    height: b.h,
+    transform: b.rot ? `rotate(${b.rot}deg)` : undefined,
+  });
+  const tool =
+    'flex h-9 min-w-9 touch-manipulation items-center justify-center rounded-md border border-slate-300 bg-white px-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800';
+
   return (
-    <button
-      type="button"
-      aria-label={`写真貼付用紙${circled(no)}の${SLOT_NAME[slot.slot]}`}
-      title={photo ? `${SLOT_NAME[slot.slot]}の写真を差し替える（写真をドロップしても入ります）` : `${SLOT_NAME[slot.slot]}の写真を入れる`}
-      onDragOver={(e) => {
-        if (![...e.dataTransfer.types].some((t) => t === 'Files' || t.startsWith('application/x-sasaoka-photo'))) return;
-        e.preventDefault();
-        setOver(true);
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        setOver(false);
-        photos.onDrop(no, slot.slot, e);
-      }}
-      onClick={() => photos.onPick(no, slot.slot)}
-      className={`absolute cursor-pointer ${over ? 'bg-emerald-400/15 outline outline-4 outline-emerald-600' : photo ? 'hover:outline hover:outline-2 hover:outline-emerald-600' : 'hover:bg-emerald-400/10'}`}
-      style={{left: slot.x, top: slot.y, width: slot.w, height: slot.h}}
-    >
-      {photo && fit ? (
-        <img src={photo.url} alt="" draggable={false} className="absolute" style={{left: fit.x, top: fit.y, width: fit.w, height: fit.h}} />
+    // 選んでいるときは、つまみ・道具がほかの欄・下の枠より上に出るように
+    <div ref={rootRef} className="absolute" style={{left: slot.x, top: slot.y, width: slot.w, height: slot.h, zIndex: selected ? 20 : undefined}} {...dropProps}>
+      {photo && box ? (
+        <>
+          <button
+            type="button"
+            aria-label={name}
+            aria-pressed={selected}
+            title={`${SLOT_NAME[slot.slot]}の写真（押すと向き・大きさ）`}
+            onClick={() => onSelect(true)}
+            onPointerDown={touchDown}
+            onPointerMove={touchMove}
+            onPointerUp={touchUp}
+            onPointerCancel={touchUp}
+            className={`absolute inset-0 cursor-pointer ${over ? 'bg-emerald-400/15 outline outline-4 outline-emerald-600' : selected ? '' : 'hover:outline hover:outline-2 hover:outline-emerald-600'}`}
+            style={{touchAction: selected ? 'none' : undefined}}
+          >
+            <div ref={picRef} className="absolute" style={rotated(box)}>
+              <img src={photo.url} alt="" draggable={false} className="block h-full w-full max-w-none select-none" style={{WebkitTouchCallout: 'none'}} />
+            </div>
+          </button>
+          {selected && (
+            <>
+              {/* つまみ（写真と一緒に回る） */}
+              <div className="pointer-events-none absolute outline outline-2 outline-sky-600" style={{...rotated(box), outlineWidth: 2 * z}}>
+                {CORNERS.map(([label, fx, fy]) => (
+                  <div
+                    key={label}
+                    role="button"
+                    aria-label={`${name}の大きさ（${label}の角）`}
+                    title="ドラッグで大きさ"
+                    onPointerDown={(e) => dragHandle(e, 'scale')}
+                    className="pointer-events-auto absolute flex touch-none items-center justify-center"
+                    style={{left: `${fx * 100}%`, top: `${fy * 100}%`, width: HIT * z, height: HIT * z, transform: 'translate(-50%, -50%)', cursor: fx === fy ? 'nwse-resize' : 'nesw-resize'}}
+                  >
+                    <span className="block rounded-sm border-sky-700 bg-white shadow" style={{width: HANDLE * z, height: HANDLE * z, borderWidth: 2 * z}} />
+                  </div>
+                ))}
+                <div className="absolute left-1/2 bg-sky-600" style={{top: -26 * z, width: 2 * z, height: 26 * z, transform: 'translateX(-50%)'}} />
+                <div
+                  role="button"
+                  aria-label={`${name}の向き（回す）`}
+                  title="ドラッグで回す"
+                  onPointerDown={(e) => dragHandle(e, 'rotate')}
+                  className="pointer-events-auto absolute left-1/2 flex touch-none items-center justify-center"
+                  style={{top: -(26 + (HANDLE + 6) / 2) * z, width: HIT * z, height: HIT * z, transform: 'translate(-50%, -50%)', cursor: 'grab'}}
+                >
+                  <span
+                    className="flex items-center justify-center rounded-full border-sky-700 bg-white text-sky-800 shadow"
+                    style={{width: (HANDLE + 6) * z, height: (HANDLE + 6) * z, borderWidth: 2 * z, fontSize: 17 * z, lineHeight: 1}}
+                  >
+                    ↻
+                  </span>
+                </div>
+              </div>
+              {/* 道具（紙を縮めていても同じ大きさ）。写真にかぶらないように枠のすぐ下 */}
+              <div
+                role="toolbar"
+                aria-label={`${name}の向き・大きさ`}
+                className="absolute left-1/2 top-full flex gap-1 rounded-lg bg-white/95 p-1 shadow-lg ring-1 ring-slate-300"
+                style={{transform: `translate(-50%, ${6 * z}px) scale(${z})`, transformOrigin: 'top center'}}
+              >
+                <button type="button" className={tool} title="左に回す" aria-label="左に回す" onClick={() => photos.onEdit(no, slot.slot, turn(edit, -1))}>
+                  ↺
+                </button>
+                <button type="button" className={tool} title="右に回す" aria-label="右に回す" onClick={() => photos.onEdit(no, slot.slot, turn(edit, 1))}>
+                  ↻
+                </button>
+                <button type="button" className={tool} title="向き・大きさを元に戻す" onClick={() => photos.onEdit(no, slot.slot, undefined)}>
+                  元に戻す
+                </button>
+                <button type="button" className={tool} onClick={() => photos.onPick(no, slot.slot)}>
+                  差し替え
+                </button>
+                <button type="button" className={`${tool} border-sky-600 text-sky-800`} onClick={() => onSelect(false)}>
+                  完了
+                </button>
+              </div>
+            </>
+          )}
+        </>
       ) : (
-        <span className="absolute inset-3 flex items-center justify-center rounded-md border-2 border-dashed border-slate-300 text-base text-slate-400">＋ {SLOT_NAME[slot.slot]}</span>
+        <button
+          type="button"
+          aria-label={name}
+          title={`${SLOT_NAME[slot.slot]}の写真を入れる`}
+          onClick={() => photos.onPick(no, slot.slot)}
+          className={`absolute inset-0 cursor-pointer ${over ? 'bg-emerald-400/15 outline outline-4 outline-emerald-600' : 'hover:bg-emerald-400/10'}`}
+        >
+          <span className="absolute inset-3 flex items-center justify-center rounded-md border-2 border-dashed border-slate-300 text-base text-slate-400">＋ {SLOT_NAME[slot.slot]}</span>
+        </button>
       )}
-    </button>
+    </div>
   );
 }
 
@@ -300,6 +527,8 @@ export function ShinseiPages({
   const [wrapRef, wrapWidth] = useWidth<HTMLDivElement>();
   const widest = Math.max(...pages.map((p) => paper(p).width), 1);
   const scale = wrapWidth ? Math.min(MAX_SCALE, wrapWidth / widest) : 1;
+  // 向き・大きさを直している写真（写真番号:改修前／改修後）
+  const [editing, setEditing] = useState('');
 
   // 一覧で入れている項目の欄（同じ項目が2枚目にもあるとき＝式で同じ値を出している欄は、最初に出てくる欄）が見えるように、プレビューの枠の中を動かす。
   // 縦に並べた狭い画面（枠が動かない）では、画面ごと動かさない（入れている欄が見えなくなるので）
@@ -399,7 +628,21 @@ export function ShinseiPages({
                   );
                 })}
                 {/* 写真貼付用紙の写真の枠 */}
-                {photos && page.photoSlots.map((slot) => <PhotoSlotView key={slot.slot} slot={slot} no={page.photo} photos={photos} />)}
+                {photos &&
+                  page.photoSlots.map((slot) => {
+                    const key = `${page.photo}:${slot.slot}`;
+                    return (
+                      <PhotoSlotView
+                        key={slot.slot}
+                        slot={slot}
+                        no={page.photo}
+                        photos={photos}
+                        selected={editing === key}
+                        onSelect={(on) => setEditing((cur) => (on ? key : cur === key ? '' : cur))}
+                        zoom={scale}
+                      />
+                    );
+                  })}
                 {/* 押すと丸がつく値 */}
                 {page.options.map((o, i) => (
                   <button

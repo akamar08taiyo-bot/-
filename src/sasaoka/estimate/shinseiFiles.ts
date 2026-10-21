@@ -79,7 +79,7 @@ async function photoImagesOf(job: Job, s: Settings): Promise<{images: Record<num
       }
       // 同じ写真番号の箇所が2つ（写真番号を手で同じにした）なら、先の箇所の写真
       if (images[n]?.[slot]) continue;
-      images[n] = {...images[n], [slot]: {bytes: new Uint8Array(await photo.blob.arrayBuffer()), w: photo.w, h: photo.h}};
+      images[n] = {...images[n], [slot]: {bytes: new Uint8Array(await photo.blob.arrayBuffer()), w: photo.w, h: photo.h, edit: p.photoEdits?.[slot]}};
     }
   }
   return {images, missing};

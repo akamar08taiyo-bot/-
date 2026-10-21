@@ -68,6 +68,7 @@ export type Place = {
   dims?: PlaceDims; // 申請書の改修の内容の寸法（mm）：手すりは長さ・高さ、段差の解消は幅・奥行・高さ
   photos?: PlacePhotos; // 写真貼付用紙の写真（この箇所の写真番号の用紙に貼る）
   photoDates?: PlacePhotos; // 写真の撮影日（'YYYY-MM-DD'。改修前・改修後。苅田町の写真の用紙の「撮影日」に書く）
+  photoEdits?: PlacePhotoEdits; // 写真の向き・大きさ（なければ そのまま・枠いっぱい。photoEdit.ts）
 };
 
 /** 改修の内容の寸法（mm。打ったまま）：l 長さ（手すり。空なら見積書の使う長さ）・h 高さ・w 幅・d 奥行 */
@@ -75,6 +76,10 @@ export type PlaceDims = {l?: string; h?: string; w?: string; d?: string};
 
 /** 箇所の写真：改修前・改修後（写真の中身は端末の IndexedDB に別に持つ。ここは番号＝`photos.ts` の id） */
 export type PlacePhotos = {before?: string; after?: string}; // 改修前・改修後（写真の番号か、撮影日）
+
+/** 写真の向き・大きさ（写真貼付用紙の枠の中で）：rot＝右回りの角度（度）、scale＝枠いっぱい（1）に対する大きさ（0.2〜1） */
+export type PhotoEdit = {rot: number; scale: number};
+export type PlacePhotoEdits = {before?: PhotoEdit; after?: PhotoEdit};
 
 export type NameSuffix = '様邸' | '様' | '';
 
