@@ -11,6 +11,7 @@
 // 請求書（1か月分）の消費税は、最初は「すべての様邸の税抜合計×消費税率」を1回だけ計算する。
 
 import type {InvoiceTaxMode, Job, Place, Row, Settings, TaxMode} from './types.ts';
+import {todayIso} from './util.ts';
 
 /** 掛け算の浮動小数の誤差（78150×0.07＝5470.500000000001 など）を取り除く */
 function clean(x: number): number {
@@ -202,6 +203,19 @@ export function isBlankRow(r: Row): boolean {
     !(r.estText ?? '').trim() &&
     !(r.estNote ?? '').trim()
   );
+}
+
+/** 見積書に行（部材・施工費・金額）が入っているか（空白の行だけの箇所＝申請書で足した箇所しかなければ false） */
+export const hasEstimateRows = (job: Pick<Job, 'places'>) => job.places.some((p) => p.rows.some((r) => !isBlankRow(r)));
+
+/**
+ * 見積書をはじめて書きはじめたとき（行のなかった見積書に、部材・施工費・金額の行が入った）：見積もり作成日を今日にし、今月の笹岡工務店の請求書に入れる。
+ * 新規作成の様邸は申請書と見積書の両方なので、申請書だけで終わる様邸を請求書に入れないため（入れないときは「笹岡工務店の請求書に入れる」を外す）。
+ * 前から行のある見積書・見積もり作成日のある見積書は変えない
+ */
+export function startEstimate(before: Job, after: Job, today = todayIso()): Job {
+  if (after.estDate || hasEstimateRows(before) || !hasEstimateRows(after)) return after;
+  return {...after, estDate: today, shikiri: true, month: today.slice(0, 7)};
 }
 
 /** 長さで数える部材か（使う長さと1本の長さの両方が入っている） */

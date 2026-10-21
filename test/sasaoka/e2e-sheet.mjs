@@ -23,6 +23,7 @@ page.on('dialog', (d) => d.accept());
 await page.goto(`${site}/jutaku-mitsumori/index.html`);
 await page.getByRole('button', {name: /サンプルで試す/}).click(); // 部材リスト（★お気に入り）と取付手間の単価
 await page.getByRole('button', {name: '＋ 行橋市', exact: true}).click(); // 保険者（苅田町・行橋市・みやこ町は同じ書式）
+await page.getByRole('tab', {name: '📋 見積書'}).click(); // 新規作成は申請書のタブから開く
 
 const sheet = page.getByRole('region', {name: '見積書', exact: true});
 await sheet.waitFor();
@@ -55,6 +56,8 @@ assert.ok((await page.getByRole('heading', {level: 1}).innerText()).includes('�
 log('お客様名を見積書の欄に打ち込むOK');
 
 // ---------------- いちばん下の行：改修内容 → 改修場所 → 内容（候補から） → 数量（60cm）
+// 行を入れるまでは笹岡工務店の請求書に入れない（申請書だけの様邸を入れないため）。行を入れると入る
+assert.equal(await page.getByLabel('笹岡工務店の請求書に入れる').isChecked(), false);
 await cell('new:work').click();
 await page.keyboard.type('1');
 await page.keyboard.press('Tab');
@@ -75,7 +78,8 @@ await page.screenshot({path: path.join(outDir, '40-sheet-first.png')});
 let rail = await tds('木の手すり 35φ 4m');
 assert.deepEqual(rail.slice(0, 7), ['手すりの取付', '①浴室', 'サンプル S-TS35 木の手すり 35φ 4m', '0.15', '本', '16,000', '2,400'], rail.join('|'));
 assert.ok(rail[12].includes('定価20,000円（4m）×0.8') && rail[12].includes('600mm÷4000mm＝0.15'), rail[12]);
-log('改修内容・改修場所・内容（候補から）・数量 60cm＝0.15本OK');
+assert.equal(await page.getByLabel('笹岡工務店の請求書に入れる').isChecked(), true); // 行を入れたので請求書に入る
+log('改修内容・改修場所・内容（候補から）・数量 60cm＝0.15本・行を入れると請求書に入るOK');
 
 // ---------------- 同上施工費：内容に打って、単価に金額
 await typeIn('new:text', '同上施工費', 'Tab');
@@ -336,7 +340,7 @@ await sheet.locator('.form-page tr', {hasText: '手すり受け'}).first().locat
 assert.equal(await sheet.locator('.form-page tr', {hasText: '手すり受け'}).count(), 0);
 log('見積書の外を押すと打った値が入るOK');
 
-// ---------------- 笹岡工務店の請求書：新しい見積書は最初から入っている。外すと請求する月・施工日も出ない。
+// ---------------- 笹岡工務店の請求書：新しい見積書は、行を入れたときから入っている（上で確かめた）。外すと請求する月・施工日も出ない。
 // 入力の画面には請求書に入る金額を出さない（金額は「請求書を見る」の仕切り計算表で確かめる）。仕切価格のない部材だけ知らせ、その場で入れられる
 await typeIn('new:text', '取付金具', 'Tab');
 await page.keyboard.press('Enter');

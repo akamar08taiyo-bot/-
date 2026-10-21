@@ -1,16 +1,17 @@
 // 住宅改修の見積書と、笹岡工務店への請求書（仕切り計算）と、部材・施工費のマスタを、タブで切り替えて使う1つのアプリ。
 // 太陽ポータルの2つの入口（jutaku-mitsumori/・sasaoka/）は同じアプリで、最初に開くタブ（start）だけが違う。
-//   見積もりを作成する：「新規作成」か「一覧から作成」（作った月ごとの一覧）を選び、いただいた見積書
+//   見積もりを作成する：「新規作成」か「一覧から作成」（作った月ごとの一覧）を選ぶ。新規作成で保険者を選ぶと、
+//                       様邸の画面に2つのタブ（左に申請書、右に見積書）ができる（ユーザーの指示）。同じ様邸の内容なので、どちらで直しても両方に出る。
+//                       申請書は保険者の Excel の様式のまま画面に出して、欄を押して入れる。見積書はいただいた見積書
 //                       （苅田町・行橋市・みやこ町用「工事費見積書兼工事費内訳書」・広域連合用「住宅改修内訳明細書」）の形のまま打ち込む。
-//                       打ち込んだ内容は、そのまま笹岡工務店の仕切り計算表・請求書に入る（入れない見積書は外せる）。
-//                       申請書（保険者の Excel）は、見積書から作っても、申請書の画面から先に入れて見積書を作ってもよい
+//                       見積書に打ち込んだ内容は、そのまま笹岡工務店の仕切り計算表・請求書に入る（入れない見積書は外せる）
 //   請求書を確認する：請求する月ごとの様邸（仕切り計算表）と、1か月分の御請求書
 //   部材・施工費マスタ：部材リスト（メーカーの仕切価格・定価）と、施工費（笹岡工務店の取付手間の単価）と、
 //                       部材＋施工費（常用）のセット（よく使う部材と施工費の組み合わせ）
 //   設定
 
 import {useEffect, useMemo, useState} from 'react';
-import {isBlankRow} from './calc.ts';
+import {hasEstimateRows} from './calc.ts';
 import {JobEditor} from './components/JobEditor.tsx';
 import {JobsPage} from './components/JobsPage.tsx';
 import {KitsPage} from './components/KitsPage.tsx';
@@ -32,7 +33,7 @@ import {EXAMPLE_KIT_ID, exampleKit} from './samples.ts';
 import type {Insurer, Job, Row} from './types.ts';
 import {useNewVersion} from './update.ts';
 import {useStore} from './useStore.ts';
-import {thisMonth, todayIso} from './util.ts';
+import {thisMonth} from './util.ts';
 
 const TABS: {id: MainTab; label: string}[] = [
   {id: 'estimate', label: '📝 見積もりを作成する'},
@@ -61,6 +62,33 @@ function loadMonth(): string {
     /* 使えなければ今月 */
   }
   return thisMonth();
+}
+
+/**
+ * 様邸の画面の2つのタブ：左に申請書、右に見積書（ユーザーの指示「新規作成で、保険者を選んだら、2種類、タブを作る。左側に、申請書、右側に見積もり」）。
+ * 同じ様邸の内容（氏名・住所・被保険者番号・改修の箇所・金額）なので、どちらで直しても、もう一方にすぐ出る
+ */
+function JobTabs({view, onView}: {view: JobView; onView: (v: JobView) => void}) {
+  const tabs: [JobView, string][] = [
+    ['shinsei', '📝 申請書'],
+    ['estimate', '📋 見積書'],
+  ];
+  return (
+    <div role="tablist" aria-label="申請書と見積書" className="inline-flex overflow-hidden rounded-lg border-2 border-[#14532d] bg-white shadow-sm">
+      {tabs.map(([v, text]) => (
+        <button
+          key={v}
+          type="button"
+          role="tab"
+          aria-selected={view === v}
+          onClick={() => onView(v)}
+          className={`px-5 py-2 text-[15px] font-bold transition ${view === v ? 'bg-[#14532d] text-white' : 'text-[#14532d] hover:bg-emerald-50'}`}
+        >
+          {text}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 /** 何も入れていない見積書・様邸・申請書（作ってすぐ戻ったもの。残さない） */
@@ -174,15 +202,10 @@ export default function App({start}: {start: MainTab}) {
     }
     setTab(t);
   };
+  // 新規作成：保険者を選ぶと、申請書と見積書のタブのある様邸の画面を開く（左の申請書のタブから）。
+  // 見積書に行を入れるまでは、見積もり作成日は空・笹岡工務店の請求書には入れない（申請書だけの様邸を請求書に入れないため。calc.ts の startEstimate）
   const newOne = (insurer: Insurer) => {
     const j = newEstimate(insurer);
-    store.update('jobs', (jobs) => [...jobs, j]);
-    setEstimateId(j.id);
-    setJobView('estimate');
-  };
-  // 申請書から作る：申請書の画面を開く。見積書はまだないので、見積もり作成日は空・笹岡工務店の請求書には入れない（見積書を作るときに入れる）
-  const newShinsei = (insurer: Insurer) => {
-    const j = {...newEstimate(insurer), estDate: '', shikiri: false};
     store.update('jobs', (jobs) => [...jobs, j]);
     setEstimateId(j.id);
     setJobView('shinsei');
@@ -191,14 +214,13 @@ export default function App({start}: {start: MainTab}) {
     setEstimateId(id);
     setJobView('shinsei');
   };
-  // 申請書から見積書へ：見積書をはじめて作るとき（申請書から作った様邸で、見積書の行がまだない）は、見積もり作成日を今日にし、
-  // 新しい見積書と同じく笹岡工務店の請求書に入れる（入れないときは見積書の画面で外す）
-  const shinseiToEstimate = (job: Job) => {
-    if (!job.estDate && job.places.every((p) => p.rows.every(isBlankRow))) {
-      store.update('jobs', (list) => list.map((j) => (j.id === job.id ? {...j, estDate: todayIso(), shikiri: true, month: thisMonth(), updatedAt: Date.now()} : j)));
-    }
-    setJobView('estimate');
+  // 一覧から開く：見積書を作ってあれば見積書のタブ、まだ申請書だけなら申請書のタブ
+  const openJob = (id: string) => {
+    const j = data.jobs.find((x) => x.id === id);
+    setEstimateId(id);
+    setJobView(j && !j.estDate && !hasEstimateRows(j) ? 'shinsei' : 'estimate');
   };
+  const tabs = <JobTabs view={jobView} onView={setJobView} />;
   // 見積書と請求書（仕切り計算表）を行き来する（同じ様邸を開く）
   const openEstimate = (id: string) => {
     setEstimateId(id);
@@ -282,7 +304,7 @@ export default function App({start}: {start: MainTab}) {
                   setEstimateId(null);
                   setJobView('estimate');
                 }}
-                onOpenEstimate={() => shinseiToEstimate(estimateJob)}
+                tabs={tabs}
               />
             ) : estimateJob ? (
               <EstimateEditor
@@ -297,7 +319,7 @@ export default function App({start}: {start: MainTab}) {
                 onOpen={setEstimateId}
                 onOpenInvoice={openInvoice}
                 onOpenOrder={() => setJobView('order')}
-                onOpenShinsei={() => setJobView('shinsei')}
+                tabs={tabs}
                 onPrint={setPrint}
                 onSave={store.flush}
                 onManageKits={() => goMaster('kits')}
@@ -307,7 +329,6 @@ export default function App({start}: {start: MainTab}) {
                 data={data}
                 update={store.update}
                 onNew={newOne}
-                onNewShinsei={newShinsei}
                 onCreate={(j) => {
                   store.update('jobs', (jobs) => [...jobs, j]);
                   setEstimateId(j.id);
@@ -322,10 +343,7 @@ export default function App({start}: {start: MainTab}) {
                 update={store.update}
                 month={estimateMonth}
                 setMonth={setEstimateMonth}
-                onOpen={(id) => {
-                  setEstimateId(id);
-                  setJobView('estimate');
-                }}
+                onOpen={openJob}
                 onOpenShinsei={openShinsei}
                 onNew={newOne}
                 onPrint={setPrint}

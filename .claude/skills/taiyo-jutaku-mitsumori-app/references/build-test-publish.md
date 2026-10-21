@@ -26,6 +26,7 @@ npm run -s lint           # 型チェック（tsc --noEmit。テストのファ�
 
 単体テストの主なもの：`calc.test.ts`（仕切り・請求書・見積の計算）、`estimateForms.test.ts`（見積書の行・備考・保険者）、`sheetEdit.test.ts`（欄への打ち込み・行の挿入・削除・コピー・貼り付け）、
 `order.test.ts`（発注書の本数・2000mm の品・直したところ・販売受注簿へ渡す内容）、`storage.test.ts`（前のデータの読み込み・移し替え）、`estimateXlsx.test.ts`（Excel の中身と式）、
+`shinsei.test.ts`（申請書の転記・丸の位置・読み戻し）、`shinseiPreview.test.ts`（申請書のプレビュー：シート・押せる欄・丸の値・表示形式、改修予定費用＝見積書の金額、`startEstimate`）、
 `sync.test.ts`、`priceImport.test.ts`、`rows.test.ts`。
 
 ブラウザのテスト（Playwright。リポジトリの依存には入れていない。場所は環境変数 `PLAYWRIGHT`、既定 `/opt/node-tools/node_modules/playwright/index.mjs`）：
@@ -38,7 +39,7 @@ npm run -s lint           # 型チェック（tsc --noEmit。テストのファ�
 | `e2e-estimate.mjs` | `<サイト>` | 見積書：一覧・切って使う部材・保存（Ctrl+S）・Excel・印刷・複製・削除・部材＋施工費（常用） |
 | `e2e-sync.mjs` | `<サイト>` | 2つのアプリを同時に開いて直しても、どちらの変更も消えない |
 | `e2e-order.mjs` | `<サイト>` | 発注書：本数の計算・直す・消す・戻す・足す・印刷・販売受注簿に転記・スマホの幅 |
-| `e2e-shinsei.mjs` | `<サイト>` | 申請書：申請書の画面（申請書の順番・Enter で次の欄・丸・10マス）・4つの保険者の原本に転記（欄・式の答え・丸の数・申請書の画面の項目）・申請書から先に作る→見積書・申請書だけ・読み直し（view=shinsei）・Excel から見積書（項目ももどる） |
+| `e2e-shinsei.mjs` | `<サイト>` | 申請書：様邸の画面のタブ（左📝 申請書・右📋 見積書）・プレビュー（欄を押して入れる・Enter で次の欄・丸・式の欄も押せる・3枚のシート・ヘッダー）・見積書とすぐつながる（改修予定費用＝見積書の合計・氏名）・4つの保険者の原本に転記（欄・式の答え・丸の数）・一覧で入れる（覚えておく）・Excel から見積書・新規作成（フリガナが開いている・Enter で順番に・見積書に行を入れると請求書に入る）・申請書だけ（一覧から申請書のタブ）・スマホの幅（入れる所は画面の下） |
 
 サイトは太陽ポータルと同じ形にする（`<サイト>/sasaoka/`・`<サイト>/jutaku-mitsumori/`、販売受注簿まで通すなら `<サイト>/taiyo-hacchu-scan/` に taiyo-hacchu-scan の `docs/` か `dist/`）。
 常駐のサーバーは作業環境の時間制限（2時間）で止められるので、テストのあいだだけ立てる `scripts/serve.mjs` を使う：

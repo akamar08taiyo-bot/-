@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
-import {jobName} from '../calc.ts';
+import type {ReactNode} from 'react';
+import {jobName, startEstimate} from '../calc.ts';
 import {EstimateSheet} from '../components/EstimateSheet.tsx';
 import {LaborPickerFor, missingShikiri, ShikiriPriceDialog} from '../components/JobTools.tsx';
 import {KitPicker} from '../components/Kits.tsx';
@@ -13,7 +14,6 @@ import type {AppData, Insurer, Job, Kit, Material, NameSuffix, Place} from '../t
 import type {Update} from '../useStore.ts';
 import {staffFull, thisMonth, todayIso} from '../util.ts';
 import {duplicateEstimate, removeEstimate, saveEstimateExcel} from './EstimateList.tsx';
-import {canMakeShinsei} from './shinseiFiles.ts';
 
 type Picker =
   | {placeId: string; kind: 'material'}
@@ -29,7 +29,7 @@ export function EstimateEditor({
   onOpen,
   onOpenInvoice,
   onOpenOrder,
-  onOpenShinsei,
+  tabs,
   onPrint,
   onSave,
   onManageKits,
@@ -41,7 +41,7 @@ export function EstimateEditor({
   onOpen: (id: string) => void;
   onOpenInvoice: (id: string) => void; // 「請求書を確認する」で同じ様邸の仕切り計算表を開く
   onOpenOrder: () => void; // この見積書の部材の発注書を開く
-  onOpenShinsei: () => void; // この見積書の申請書の画面を開く（氏名・番号・住所・改修の箇所は同じ）
+  tabs: ReactNode; // 申請書・見積書のタブ（氏名・番号・住所・改修の箇所・金額は申請書と同じ）
   onPrint: (r: PrintRequest) => void;
   onSave: () => Promise<boolean>; // まだ保存していない変更をすぐ保存する（保存できたら true）
   onManageKits?: () => void; // 部材・施工費マスタの「部材＋施工費（常用）」を開く
@@ -53,7 +53,7 @@ export function EstimateEditor({
   const [picker, setPicker] = useState<Picker | null>(null);
   const [fixPrices, setFixPrices] = useState(false);
 
-  const setJob = (fn: (j: Job) => Job) => update('jobs', (list) => list.map((j) => (j.id === job.id ? {...fn(j), updatedAt: Date.now()} : j)));
+  const setJob = (fn: (j: Job) => Job) => update('jobs', (list) => list.map((j) => (j.id === job.id ? startEstimate(j, {...fn(j), updatedAt: Date.now()}) : j)));
   const setPlace = (placeId: string, fn: (p: Place) => Place) =>
     setJob((j) => ({
       ...j,
@@ -129,6 +129,7 @@ export function EstimateEditor({
         <Btn color="white" onClick={onBack}>
           ← 一覧へ戻る
         </Btn>
+        {tabs}
         <h1 className="text-lg font-bold text-[#14532d]">{name}</h1>
         <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-900">
           {insurer ? INSURER_INFO[insurer].name : FORM_INFO[form].name}「{FORM_INFO[form].title}」
@@ -140,11 +141,6 @@ export function EstimateEditor({
           <Btn color="softGreen" onClick={() => saveEstimateExcel(job, s, toast)}>
             📗 Excelで保存
           </Btn>
-          {canMakeShinsei(insurer) && (
-            <Btn color="white" onClick={onOpenShinsei}>
-              📝 申請書を作成
-            </Btn>
-          )}
           <Btn color="softSky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
             🖨 見積書を印刷
           </Btn>
@@ -355,8 +351,10 @@ function ShikiriFields({
           onChange={(e) => {
             const on = e.target.checked;
             // 前の月に作った見積書を入れるときは、今月の請求書に入れる（あとで月は直せる）
+            // 見積もり作成日も決める（このあと行を入れても、選んだとおりのまま）
             setJob((j) => ({
               ...j,
+              estDate: j.estDate || todayIso(),
               shikiri: on,
               month: on && j.month < thisMonth() ? thisMonth() : j.month,
             }));

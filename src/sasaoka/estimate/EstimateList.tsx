@@ -16,8 +16,9 @@ import {addMonths, downloadBlob, matchesAll, monthLabel, staffShort, thisMonth, 
 const SHOW_LIMIT = 100;
 
 /**
- * 新しい見積書。選んだ保険者（苅田町・行橋市・みやこ町・広域連合）の書式で作る（申請書も保険者ごと）。
- * 笹岡工務店の請求書（今月分）に最初から入れる（笹岡工務店の工事でなければ、見積書の画面で外す）
+ * 新しい様邸（申請書と見積書）。選んだ保険者（苅田町・行橋市・みやこ町・広域連合）の書式で作る（申請書も保険者ごと）。
+ * 見積書に行を入れたときに、見積もり作成日（今日）を入れ、笹岡工務店の請求書（今月分）に入れる（calc.ts の startEstimate。
+ * 申請書だけで終わる様邸を請求書に入れないため。笹岡工務店の工事でなければ、見積書の画面で外す）
  */
 export function newEstimate(insurer: Insurer): Job {
   const now = Date.now();
@@ -28,7 +29,7 @@ export function newEstimate(insurer: Insurer): Job {
     suffix: '様邸',
     staff: '',
     date: '',
-    estDate: todayIso(), // 見積もり作成日（何も入れなければ当日）
+    estDate: '', // 見積もり作成日（見積書に行を入れた日。それまでは作った日）
     address: '',
     note: '',
     insuredNo: '',
@@ -36,7 +37,7 @@ export function newEstimate(insurer: Insurer): Job {
     form: INSURER_INFO[insurer].form,
     overhead: null,
     overheadTarget: null,
-    shikiri: true,
+    shikiri: false,
     places: [],
     createdAt: now,
     updatedAt: now,
@@ -90,15 +91,13 @@ export function EstimateHome({
   data,
   update,
   onNew,
-  onNewShinsei,
   onCreate,
   onList,
   goMaterials,
 }: {
   data: AppData;
   update: Update;
-  onNew: (insurer: Insurer) => void;
-  onNewShinsei: (insurer: Insurer) => void; // 申請書から先に作る（申請書の画面を開く）
+  onNew: (insurer: Insurer) => void; // 新しい様邸（申請書と見積書のタブ）を開く
   onCreate: (job: Job) => void; // 作った見積書を入れて開く
   onList: () => void;
   goMaterials: () => void;
@@ -139,17 +138,6 @@ export function EstimateHome({
               <Btn color="emerald" className="w-full !px-4 !py-4 !text-base" onClick={() => onNew('kouiki')}>
                 ＋ {INSURER_INFO.kouiki.name}
               </Btn>
-            </div>
-            {/* 申請書から先に作る（ユーザーの指示：申請書から先に入れたら、そこから見積書へ。見積書からなら申請書へ。どちらが先でもよい） */}
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3" role="group" aria-label="申請書から作る">
-              <div className="mb-2 text-sm font-bold text-slate-700">📝 申請書から作る（申請書の順番で入れて、あとで見積書へ）</div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {INSURER_IDS.map((i) => (
-                  <Btn key={i} color="white" className="!py-3" onClick={() => onNewShinsei(i)}>
-                    📝 {INSURER_INFO[i].name}
-                  </Btn>
-                ))}
-              </div>
             </div>
             <label className="inline-flex cursor-pointer items-center justify-center gap-1.5 justify-self-start rounded-md border border-emerald-300 bg-white px-3 py-2 text-sm font-bold text-emerald-800 shadow-sm hover:bg-emerald-50">
               📥 申請書（Excel）から作る
@@ -200,7 +188,7 @@ function GettingStarted({data, update, goMaterials, onSample}: {data: AppData; u
           」で、メーカーの価格表（Excel・CSV・PDF）を取り込み、よく使う部材に★を付けます。
         </li>
         <li>
-          「＋ 新規作成」で書式を選ぶと、いただいた見積書の形が出ます。Excel と同じように欄を選んで打ち込みます。
+          「＋ 新規作成」で保険者を選ぶと、申請書と見積書のタブができます。見積書は、いただいた見積書の形のまま Excel と同じように欄を選んで打ち込みます。
         </li>
         <li>
           品名を打つと部材リストの候補が出ます（★お気に入りが先）。備考（算出根拠）に定価を入れると、単価は定価×

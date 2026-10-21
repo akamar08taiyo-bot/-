@@ -17,7 +17,7 @@ React 19 ＋ TypeScript ＋ Vite（Tailwind）。リポジトリにはほかの�
 | `App.tsx` | 4つのタブ（📝 見積もりを作成する／🧾 請求書を確認する／📦 部材・施工費マスタ／⚙ 設定）、新しい版の帯、印刷の画面の開閉、発注書の画面の開閉 |
 | `links.ts` | URL のうしろの `#tab=…&job=…&view=order`（読み直しても同じ所を開く）、ポータルの URL |
 | `types.ts` | データの形（Material・LaborItem・Row・Place・Kit・Job・OrderLine・OrderEdits・Settings・Insurer…） |
-| `calc.ts` | 金額の計算（仕切り計算表 ①〜⑦、見積の単価・数量・金額・合計、`isBlankRow`、`cutToLength`、空欄の価格の扱い） |
+| `calc.ts` | 金額の計算（仕切り計算表 ①〜⑦、見積の単価・数量・金額・合計、`isBlankRow`、`cutToLength`、空欄の価格の扱い）。見積書に行があるか `hasEstimateRows`・見積書を書きはじめたとき（見積もり作成日・請求書に入れる）`startEstimate` |
 | `estimateForms.ts` | 見積書の2つの書式に並べる行（`formLines`・`paginate`）、備考の文字（`lineNote`・`cutCalc`）、保険者（`INSURER_INFO`・`jobInsurer`・`jobForm`・`insurerLabel`） |
 | `print/EstimateForms.tsx` | 見積書の書式の描画（印刷と、見積書に直接入力の両方）。行の左のボタン `RowTools`（＋・✕・コピー／貼付） |
 | `print/formLayout.ts` | 見積書の列幅・行の高さ（mm）。印刷と Excel 保存で同じ寸法を使う |
@@ -27,11 +27,14 @@ React 19 ＋ TypeScript ＋ Vite（Tailwind）。リポジトリにはほかの�
 | `sheetEdit.ts` | 見積書の欄の値の読み書き（`applySheet`・`sheetValue`）、行の挿入・削除・コピー・貼り付け（`insertBlankAfter`・`deleteLine`・`lineRows`・`pasteLines`） |
 | `rows.ts` | 行・箇所を作る部品（`newPlace`・`materialRow`・`laborRow`・`manualRow`・`copyRows`（IDを付け直す）・`addMaterial`・`workRange`・`kitRows`）。行の操作はこれを使う |
 | `sheetClip.ts` | 行のコピーを覚えておく所（画面を移っても残る。別の見積書にも貼り付けられる） |
-| `estimate/EstimateEditor.tsx` | 見積書の画面（💾 保存・📗 Excel・📝 申請書を作成・🖨 印刷・📄 白紙に戻す・🛒 発注書を作成・保険者・担当・見積もり作成日・笹岡工務店の請求書に入れる） |
-| `shinsei.ts` | 申請書：保険者ごとの転記する欄（`SHINSEI`。シートごとに 氏名・住所・番号の10マス・改修の内容・改修の種類の行・写真の改修箇所・平面図の表題・丸で囲む欄 `marks`・申請書の画面の項目の欄と書き方 `texts`）、改修費用（`shinseiCost`）、改修の内容の文（`autoWorkText`・`Place.shinseiText`）、転記する内容（`shinseiValues`）、原本のセルを書きかえる（`setCell`・`fillShinsei`。式の答えも `updateRefs`。②〜⑥の行の折り返し `wrapKinds`。丸の楕円 `drawMarks`・`markBox`・図形のファイルを足す `drawingOf`）、読む（`readShinsei`・`parseWorkLine`） |
-| `estimate/ShinseiEditor.tsx` | 申請書の画面（保険者ごとの申請書の順番 `FIELDS`・丸・10マス・入っていない欄・Enter で次の欄・改修の箇所と申請書に書く文・改修費用・Excel で保存・→ 見積書へ）。項目は `Job.shinsei`（`ShinseiInfo`。丸の値は `MARK_INFO`＝`estimateForms.ts`） |
-| `estimate/shinseiFiles.ts`・`shinsei/*.xltx` | 申請書の原本（名残りを消したもの。`?inline` でビルドに入る＝`assetsInclude` に xltx）と保存（ダウンロード）。原本を作り直す手順は `business-rules.md` の11 |
-| `estimate/EstimateList.tsx` | 見積もりの最初の画面（新規作成＝保険者を選ぶ／一覧から作成）、月ごとの一覧、`newEstimate(insurer)`、Excel 保存・複製・削除 |
+| `App.tsx` | 4つのタブ・様邸の画面の2つのタブ（`JobTabs`：左📝 申請書・右📋 見積書。`jobView`＝'shinsei'／'estimate'／'order'、URL の `view=`）・新規作成（`newOne`＝申請書のタブで開く）・一覧から開く（`openJob`） |
+| `estimate/EstimateEditor.tsx` | 見積書のタブ（💾 保存・📗 Excel・🖨 印刷・📄 白紙に戻す・🛒 発注書を作成・保険者・担当・見積もり作成日・笹岡工務店の請求書に入れる）。`setJob` で `startEstimate` を通す |
+| `shinsei.ts` | 申請書：保険者ごとの転記する欄（`SHINSEI`。シートごとに 氏名・住所・番号の10マス・改修の内容・改修の種類の行・写真の改修箇所・平面図の表題・丸で囲む欄 `marks`・申請書の画面の項目の欄と書き方 `texts`）、改修費用（`shinseiCost`。苅田町・行橋市は見積書の合計、みやこ町・広域連合は介護保険対象分＝`costIsTotal`）、改修の内容の文（`autoWorkText`・`Place.shinseiText`）、転記する内容（`shinseiValues`）、原本のセルを書きかえる（`setCell`・`fillShinsei`＝開いて `fillFiles`→zip。式の答えも `updateRefs`。②〜⑥の行の折り返し `wrapKinds`。丸の楕円 `drawMarks`・`markBox`（文字の位置は `textLayout`。プレビュー用に `markTexts`・`markOptions`）・図形のファイルを足す `drawingOf`）、読む（`readShinsei`・`parseWorkLine`） |
+| `shinseiPreview.ts` | 申請書のプレビューの材料：原本に `fillFiles` で転記したシートを読み、列の幅・行の高さ・結合・罫線（`joinLines`）・塗り・文字（字体・大きさ・配置・はみ出し・表示形式 `formatNumber`）・図形・ヘッダーを画素の `PvPage` にする。押せる欄 `fields`（式で参照している欄も）・丸の値 `options`。様式の範囲は原本の罫線・塗り・文字の四角（`formRange`） |
+| `estimate/ShinseiEditor.tsx` | 申請書のタブ（入れ方は「📄 申請書で入れる」＝プレビュー／「📋 一覧で入れる」。保険者ごとの申請書の順番 `FIELDS`・項目を入れる欄 `row(field, insurer, inList)`・丸・10マス・入っていない欄・Enter で次の欄・改修の箇所と申請書に書く文・改修費用・Excel で保存）。項目は `Job.shinsei`（`ShinseiInfo`。丸の値は `MARK_INFO`＝`estimateForms.ts`） |
+| `estimate/ShinseiPreview.tsx` | プレビューを描く（`ShinseiPages`：紙の大きさを画面の幅に合わせて縮める・欄を押すと入れる所＝欄の下、スマホは画面の下・丸の値を押す・Enter／Esc） |
+| `estimate/shinseiFiles.ts`・`shinsei/*.xltx` | 申請書の原本（名残りを消したもの。`?inline` でビルドに入る＝`assetsInclude` に xltx）を開いて覚える（`openTemplate`・`useTemplate`）と保存（ダウンロード）。原本を作り直す手順は `business-rules.md` の11 |
+| `estimate/EstimateList.tsx` | 見積もりの最初の画面（新規作成＝保険者を選ぶ／一覧から作成／申請書（Excel）から作る）、月ごとの一覧、`newEstimate(insurer)`（見積もり作成日は空・請求書に入れない。見積書に行を入れたときに入る）、Excel 保存・複製・削除 |
 | `estimate/OrderPage.tsx` | 発注書の画面（数の直し・消す・戻す・足す・印刷・販売受注簿に転記） |
 | `order.ts` | 発注する数の計算（切って使う部材の本数・2000mm の品・余り0.1本）、手で直したところの重ね方、販売受注簿へ渡す JSON |
 | `estimateXlsx.ts`・`xlsxWrite.ts` | 見積書を同じ形の .xlsx にする（列幅＝mm×96/25.4/8、固定の倍率で印刷、金額は式＋計算済みの値） |

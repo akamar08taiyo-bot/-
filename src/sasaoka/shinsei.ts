@@ -9,7 +9,7 @@
 import {strFromU8, strToU8, unzipSync, zipSync} from 'fflate';
 import {estimateTotals, isBlankRow} from './calc.ts';
 import type {EstimateRates, EstimateSettings} from './calc.ts';
-import {circled, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa} from './estimateForms.ts';
+import {circled, jobInsurer, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa} from './estimateForms.ts';
 import type {Insurer, Job, Place, ShinseiInfo, ShinseiMarks} from './types.ts';
 
 /** 申請書の原本の、1つのシートで転記する欄（番地）。ないものは書かない */
@@ -49,8 +49,8 @@ export type ShinseiMap = {
 };
 
 /** 列の番号（A＝1） */
-const colNum = (letters: string) => [...letters].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
-const colName = (n: number): string => (n <= 0 ? '' : colName(Math.floor((n - 1) / 26)) + String.fromCharCode(65 + ((n - 1) % 26)));
+export const colNum = (letters: string) => [...letters].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
+export const colName = (n: number): string => (n <= 0 ? '' : colName(Math.floor((n - 1) / 26)) + String.fromCharCode(65 + ((n - 1) % 26)));
 /** 横に並んだマス（start から n 個） */
 const boxes = (start: string, n: number, row: number) => Array.from({length: n}, (_, i) => `${colName(colNum(start) + i)}${row}`);
 /** 丸数字（①〜⑳）→ 番号 */
@@ -295,10 +295,17 @@ export function shinseiPhotos(job: Pick<Job, 'places'>, rates: EstimateRates): R
   return out;
 }
 
-/** 改修費用：手で入れた金額、なければ見積書の介護保険対象分の合計（税込）。見積書がなければ null */
+/**
+ * 改修費用は見積書の金額と連動する（ユーザーの指示「改修予定費用のところが、自分で作った見積もりの金額が連動するように」）。
+ * 苅田町・行橋市の申請書は「改修予定費用」＝見積書の合計（税込）。みやこ町・広域連合は「改修費用（介護保険対象分）」＝見積書の介護保険対象分の合計（税込）
+ */
+export const costIsTotal = (insurer: Insurer | '') => insurer === 'kanda' || insurer === 'yukuhashi';
+
+/** 改修費用：手で入れた金額、なければ見積書の金額（costIsTotal）。見積書がなければ null */
 export function shinseiCost(job: Job, s: EstimateSettings): number | null {
   if (job.shinsei?.cost != null) return job.shinsei.cost;
-  return estimateTotals(job, s).target.total || null;
+  const t = estimateTotals(job, s);
+  return (costIsTotal(jobInsurer(job)) ? t.all.total : t.target.total) || null;
 }
 
 /** 日付 → 「令和8年11月5日」（申請書の日付の欄） */
@@ -361,17 +368,32 @@ export function shinseiFileName(map: Pick<ShinseiMap, 'title'>, job: Pick<Job, '
 
 // ---------------------------------------------------------------- Excel（xlsx）の中身を書きかえる
 
-type Files = Record<string, Uint8Array>;
+/** 開いた xlsx の中身（ファイルの名前 → 中身）。書きかえるときは中身を置きかえる（もとの Uint8Array は変えない＝原本を覚えておいて何度も使える） */
+export type Files = Record<string, Uint8Array>;
 
 // 改行は &#10; で書く（そのままの改行は LibreOffice などが読み飛ばし、1行につながる。Excel はどちらでも改行する）
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\r?\n/g, '&#10;');
-const unesc = (s: string) =>
+export const unesc = (s: string) =>
   s.replace(/&(lt|gt|quot|apos|amp|#(\d+)|#x([0-9a-f]+));/gi, (m, name: string, dec?: string, hex?: string) =>
     dec ? String.fromCodePoint(Number(dec)) : hex ? String.fromCodePoint(parseInt(hex, 16)) : ({lt: '<', gt: '>', quot: '"', apos: "'", amp: '&'} as Record<string, string>)[name.toLowerCase()] ?? m,
   );
 
+// 原本から読んだもの（シートの場所・共有の文字・書式）は、ファイルの中身ごとに覚えておく（プレビューで打つたびに読み直さない）
+const pathCache = new WeakMap<Uint8Array, Map<string, string>>();
+const sharedCache = new WeakMap<Uint8Array, string[]>();
+
 /** シート名 → シートのファイル（xl/worksheets/sheet1.xml） */
-function sheetPaths(files: Files): Map<string, string> {
+export function sheetPaths(files: Files): Map<string, string> {
+  const key = files['xl/workbook.xml'];
+  if (!key) return new Map();
+  const cached = pathCache.get(key);
+  if (cached) return cached;
+  const out = readSheetPaths(files);
+  pathCache.set(key, out);
+  return out;
+}
+
+function readSheetPaths(files: Files): Map<string, string> {
   const wb = strFromU8(files['xl/workbook.xml']);
   const rels = strFromU8(files['xl/_rels/workbook.xml.rels']);
   const targets = new Map<string, string>();
@@ -431,19 +453,27 @@ export function setCell(xml: string, ref: string, text: CellValue): string {
  * 転記した欄をそのまま参照する式（=J7、=事前申請書!J7 など）の、保存しておく答えを同じ値にする
  * （Excel は開いたときに計算し直すが、スマホのプレビューなどは保存してある答えを出すため）
  */
+/**
+ * 欄をそのまま参照する式（=J7、=事前申請書!J7、空なら空にする =IF(承認届出書!I5="","",承認届出書!I5)（みやこ町））の、参照する先のシートと番地。
+ * name は式のあるシート。そのほかの式は null
+ */
+export function formulaRef(formula: string, name: string): {sheet: string; ref: string; iff: boolean} | null {
+  const text0 = unesc(formula).trim();
+  const iff = /^IF\((.+?)="","",(.+)\)$/.exec(text0);
+  const refText = iff && iff[1].trim() === iff[2].trim() ? iff[1].trim() : text0;
+  const m = /^(?:'?([^'!]+)'?!)?\$?([A-Z]+)\$?(\d+)$/.exec(refText);
+  return m ? {sheet: (m[1] ?? name).trim(), ref: `${m[2]}${m[3]}`, iff: !!iff} : null;
+}
+
 function updateRefs(files: Files, paths: Map<string, string>, sheet: string, values: Map<string, CellValue>) {
   for (const [name, path] of paths) {
     const xml = files[path] ? strFromU8(files[path]) : null;
     if (xml === null) continue;
     let changed = false;
     const next = xml.replace(/<c r="([A-Z]+\d+)"([^>]*?)>(<f>([^<]*)<\/f>)(?:<v>[^<]*<\/v>|<v\/>)?<\/c>/g, (all, ref: string, attrs: string, f: string, formula: string) => {
-      // =J7・=事前申請書!J7、または空なら空にする式 =IF(承認届出書!I5="","",承認届出書!I5)（みやこ町）
-      const text0 = unesc(formula).trim();
-      const iff = /^IF\((.+?)="","",(.+)\)$/.exec(text0);
-      const refText = iff && iff[1].trim() === iff[2].trim() ? iff[1].trim() : text0;
-      const m = /^(?:'?([^'!]+)'?!)?\$?([A-Z]+)\$?(\d+)$/.exec(refText);
-      if (!m) return all;
-      const target = (m[1] ?? name).trim() === sheet.trim() ? `${m[2]}${m[3]}` : null;
+      const m = formulaRef(formula, name);
+      const iff = m?.iff;
+      const target = m && m.sheet === sheet.trim() ? m.ref : null;
       if (!target || !values.has(target)) return all;
       const text = values.get(target) ?? '';
       changed = true;
@@ -512,7 +542,7 @@ export function shinseiCells(sheet: ShinseiSheet, v: ShinseiValues, photo = 0): 
 }
 
 /** 書き方の中の {名前} */
-const placeholders = (format: string) => [...format.matchAll(/\{(\w+)\}/g)].map((m) => m[1] as keyof ShinseiTexts);
+export const placeholders = (format: string) => [...format.matchAll(/\{(\w+)\}/g)].map((m) => m[1] as keyof ShinseiTexts);
 /** 生年月日の一部だけ入れたときの空き（「昭和　23年　　月　　日生」） */
 const BLANK: Partial<ShinseiTexts> = {y: '　　', m: '　　', d: '　　'};
 
@@ -547,19 +577,31 @@ export const EMPTY_SHINSEI: ShinseiValues = {
  * 決めた欄のほかは原本のまま（シートを消したり、空欄を詰めたりしない）。テンプレート（.xltx）はふつうのブック（.xlsx）にする
  */
 export function fillShinsei(template: Uint8Array, map: ShinseiMap, v: ShinseiValues): Uint8Array {
-  const files = unzipSync(template);
-  for (const sheet of map.sheets) {
-    const photo = sheet.photoPlace ? photoNumberOf(readCell(files, sheet.sheet, sheet.photoPlace.photo)) : 0;
-    writeCells(files, sheet.sheet, shinseiCells(sheet, v, photo));
-    wrapKinds(files, sheet, v);
-    drawMarks(files, sheet, v.marks);
-  }
+  return fillShinseiFiles(unzipSync(template), map, v);
+}
+
+/** 開いた原本（unzipSync したもの）に転記して、申請書（.xlsx）のバイト列にする。files は書きかえる（覚えておいた原本なら {...files} を渡す） */
+export function fillShinseiFiles(files: Files, map: ShinseiMap, v: ShinseiValues): Uint8Array {
+  fillFiles(files, map, v);
   // Excel で開いたときに式を計算し直す（事後申請書など）
   const wb = strFromU8(files['xl/workbook.xml']);
   if (/<calcPr\b(?![^>]*fullCalcOnLoad)/.test(wb)) files['xl/workbook.xml'] = strToU8(wb.replace(/<calcPr\b/, '<calcPr fullCalcOnLoad="1"'));
   const ct = strFromU8(files['[Content_Types].xml']);
   files['[Content_Types].xml'] = strToU8(ct.replace('spreadsheetml.template.main+xml', 'spreadsheetml.sheet.main+xml'));
   return zipSync(files, {level: 6});
+}
+
+/**
+ * 開いた原本（unzipSync したもの）のシートに転記する（Excel に保存するときと、画面のプレビューで同じ書き込みをする）。
+ * ファイルの中身は置きかえるだけなので、原本を開いたものを {...files} で写してから渡せば、原本は何度でも使える
+ */
+export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void {
+  for (const sheet of map.sheets) {
+    const photo = sheet.photoPlace ? photoNumberOf(readCell(files, sheet.sheet, sheet.photoPlace.photo)) : 0;
+    writeCells(files, sheet.sheet, shinseiCells(sheet, v, photo));
+    wrapKinds(files, sheet, v);
+    drawMarks(files, sheet, v.marks);
+  }
 }
 
 /** 原本に残っていた被保険者番号などを消した原本（アプリに入れる原本を作るとき。転記する欄を空にする。ほかは原本のまま） */
@@ -602,17 +644,17 @@ function setStyle(xml: string, ref: string, style: string): string {
 // 欄の文字の位置を、列の幅・行の高さ・文字の大きさ・横の配置（中央・左）から計算して、楕円の図形を置く（前の申請の手書きの丸と同じ図形）。
 // 画素は Excel の画面（100%）と同じ数え方：列の幅は標準の文字の数字の幅（8画素。4つの原本の図形の位置で確かめた）から、文字は 11pt＝15画素。
 
-const EMU = 9525; // 1画素
+export const EMU = 9525; // 1画素
 const MDW = 8;
 /** 列の幅（Excel の文字数）→ 画素 */
 const colPx = (width: number) => Math.trunc(((256 * width + Math.trunc(128 / MDW)) / 256) * MDW);
-const attrOf = (tag: string, name: string) => new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1];
-const numOf = (text: string | undefined, d: number) => (text !== undefined && text !== '' && Number.isFinite(Number(text)) ? Number(text) : d);
+export const attrOf = (tag: string, name: string) => new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1];
+export const numOf = (text: string | undefined, d: number) => (text !== undefined && text !== '' && Number.isFinite(Number(text)) ? Number(text) : d);
 
-type SheetLayout = {colW: (c: number) => number; rowH: (r: number) => number; merges: number[][]};
+export type SheetLayout = {colW: (c: number) => number; rowH: (r: number) => number; merges: number[][]};
 
 /** シートの列の幅・行の高さ（画素。1始まり）と結合した欄 */
-function sheetLayout(xml: string): SheetLayout {
+export function sheetLayout(xml: string): SheetLayout {
   const fmt = /<sheetFormatPr\b[^>]*>/.exec(xml)?.[0] ?? '';
   const defW = colPx(numOf(attrOf(fmt, 'defaultColWidth'), 9));
   const defH = (numOf(attrOf(fmt, 'defaultRowHeight'), 13.5) * 4) / 3;
@@ -633,11 +675,28 @@ function sheetLayout(xml: string): SheetLayout {
 
 type CellStyle = {size: number; font: string; horizontal: string; vertical: string; shrink: boolean; indent: number};
 
+/** styles.xml の中身（字体・塗り・罫線・書式の XML を番号の順に。表示形式の番号 → 書き方。決まった色の番号の色を替えていればその色） */
+export type StyleParts = {fonts: string[]; fills: string[]; borders: string[]; xfs: string[]; numFmts: Map<number, string>; palette: string[]};
+const styleCache = new WeakMap<Uint8Array, StyleParts>();
+
+/** styles.xml を項目ごとに分ける（ファイルの中身ごとに覚えておく） */
+export function styleParts(files: Files): StyleParts {
+  const f = files['xl/styles.xml'];
+  const cached = f && styleCache.get(f);
+  if (cached) return cached;
+  const st = f ? strFromU8(f) : '';
+  const list = (outer: string, inner: string) => [...(new RegExp(`<${outer}\\b[^>]*>([\\s\\S]*?)</${outer}>`).exec(st)?.[1] ?? '').matchAll(new RegExp(`<${inner}\\b[^>]*?(?:/>|>[\\s\\S]*?</${inner}>)`, 'g'))].map((m) => m[0]);
+  const numFmts = new Map<number, string>();
+  for (const m of st.matchAll(/<numFmt\b[^>]*>/g)) numFmts.set(numOf(attrOf(m[0], 'numFmtId'), -1), unesc(attrOf(m[0], 'formatCode') ?? ''));
+  const palette = [...(/<indexedColors\b[^>]*>([\s\S]*?)<\/indexedColors>/.exec(st)?.[1] ?? '').matchAll(/<rgbColor rgb="([0-9A-Fa-f]{6,8})"/g)].map((m) => m[1].slice(-6));
+  const out: StyleParts = {fonts: list('fonts', 'font'), fills: list('fills', 'fill'), borders: list('borders', 'border'), xfs: list('cellXfs', 'xf'), numFmts, palette};
+  if (f) styleCache.set(f, out);
+  return out;
+}
+
 /** 欄の文字の大きさ・字体・配置（styles.xml の書式） */
 function cellStyle(files: Files, xml: string, ref: string): CellStyle {
-  const st = strFromU8(files['xl/styles.xml']);
-  const fonts = [...(/<fonts\b[^>]*>([\s\S]*?)<\/fonts>/.exec(st)?.[1] ?? '').matchAll(/<font\b[^>]*?(?:\/>|>([\s\S]*?)<\/font>)/g)].map((m) => m[1] ?? '');
-  const xfs = [...(/<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/.exec(st)?.[1] ?? '').matchAll(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g)].map((m) => m[0]);
+  const {fonts, xfs} = styleParts(files);
   const xf = xfs[numOf(attrOf(cellRe(ref).exec(xml)?.[1] ?? '', 's'), 0)] ?? '';
   const font = fonts[numOf(attrOf(xf, 'fontId'), 0)] ?? '';
   const align = /<alignment\b[^>]*>/.exec(xf)?.[0] ?? '';
@@ -664,10 +723,20 @@ function charWidth(ch: string, proportional: boolean): number {
   return half ? (proportional ? 0.6 : 0.5) : 1;
 }
 
-type Box = {x: number; y: number; w: number; h: number}; // 画素（シートの左上から）
+export type Box = {x: number; y: number; w: number; h: number}; // 画素（シートの左上から）
 
-/** 欄（結合した範囲）の text の start〜end 文字目を囲む楕円の位置 */
-function markBox(lay: SheetLayout, st: CellStyle, ref: string, text: string, start: number, end: number): Box {
+/** 欄（結合した範囲）の text の start〜end 文字目の位置：左・幅・まん中の高さ・文字の大きさ（画素）と、欄の高さ */
+type Span = {tx: number; tw: number; cy: number; em: number; height: number};
+
+function textSpan(lay: SheetLayout, st: CellStyle, ref: string, text: string, start: number, end: number): Span {
+  const {xs, ws, cy, em, height} = textLayout(lay, st, ref, text);
+  const tx = start < xs.length ? xs[start] : (xs[xs.length - 1] ?? 0) + (ws[ws.length - 1] ?? 0);
+  const tw = ws.slice(start, end).reduce((a, b) => a + b, 0);
+  return {tx, tw, cy, em, height};
+}
+
+/** 欄の文字の1文字ずつの左の位置と幅（画素。シートの左上から）、まん中の高さ・文字の大きさ・欄の高さ（Excel の画面と同じ数え方） */
+function textLayout(lay: SheetLayout, st: CellStyle, ref: string, text: string): {xs: number[]; ws: number[]; cy: number; em: number; height: number} {
   const [, col = 'A', row = '1'] = /^([A-Z]+)(\d+)$/.exec(ref) ?? [];
   const c0 = colNum(col);
   const r0 = Number(row);
@@ -693,9 +762,19 @@ function markBox(lay: SheetLayout, st: CellStyle, ref: string, text: string, sta
       : st.horizontal === 'right'
         ? left + width - pad - total * scale
         : left + pad + st.indent * em;
-  const tx = x0 + widths.slice(0, start).reduce((a, b) => a + b, 0) * scale;
-  const tw = widths.slice(start, end).reduce((a, b) => a + b, 0) * scale;
+  const xs: number[] = [];
+  let x = x0;
+  for (const w of widths) {
+    xs.push(x);
+    x += w * scale;
+  }
   const cy = st.vertical === 'center' ? top + height / 2 : st.vertical === 'top' ? top + pad + em * 0.6 : top + height - pad - em * 0.6;
+  return {xs, ws: widths.map((w) => w * scale), cy, em, height};
+}
+
+/** 欄（結合した範囲）の text の start〜end 文字目を囲む楕円の位置 */
+function markBox(lay: SheetLayout, st: CellStyle, ref: string, text: string, start: number, end: number): Box {
+  const {tx, tw, cy, em, height} = textSpan(lay, st, ref, text, start, end);
   // 高さは欄に収まるだけ（文字の2倍まで）。幅は文字の四すみが入るだけ（左右に文字の半分はあける）
   const b = Math.max(em * 0.6, Math.min(height - 4, em * 2) / 2);
   const inner = Math.min(0.9, ((em * 0.42) / b) ** 2);
@@ -804,18 +883,66 @@ function drawMarks(files: Files, sheet: ShinseiSheet, marks: ShinseiMarks): void
   files[drawing] = strToU8(d.replace('</xdr:wsDr>', `${boxes.map((b, k) => ellipseXml(lay, b, id + k)).join('')}</xdr:wsDr>`));
 }
 
+/**
+ * 丸で囲む欄の文字の1文字ずつの位置（画素・シートの左上から）。丸の位置と同じ計算なので、画面のプレビューでこの位置に文字を置けば、
+ * 原本の字体のない端末（スマホなど）でも丸と文字がずれない
+ */
+export type MarkText = {ref: string; chars: {ch: string; x: number; w: number}[]; cy: number; em: number};
+
+export function markTexts(files: Files, sheet: ShinseiSheet): MarkText[] {
+  const path = sheetPaths(files).get(sheet.sheet);
+  if (!path || !files[path] || !sheet.marks?.length) return [];
+  const xml = strFromU8(files[path]);
+  const lay = sheetLayout(xml);
+  const shared = sharedStrings(files);
+  return sheet.marks.flatMap((m) => {
+    const text = cellText(xml, m.cell, shared);
+    if (!text) return [];
+    const {xs, ws, cy, em} = textLayout(lay, cellStyle(files, xml, m.cell), m.cell, text);
+    return [{ref: m.cell, chars: text.split('').map((ch, i) => ({ch, x: xs[i], w: ws[i]})), cy, em}];
+  });
+}
+
+/** 丸で囲む欄の、選べる値（男・女 など）の文字の位置（画面のプレビューで、押して丸をつける所。画素・シートの左上から） */
+export type MarkOption = {key: keyof ShinseiMarks; option: string; box: Box};
+
+export function markOptions(files: Files, sheet: ShinseiSheet): MarkOption[] {
+  const path = sheetPaths(files).get(sheet.sheet);
+  if (!path || !files[path] || !sheet.marks?.length) return [];
+  const xml = strFromU8(files[path]);
+  const lay = sheetLayout(xml);
+  const shared = sharedStrings(files);
+  const out: MarkOption[] = [];
+  for (const m of sheet.marks) {
+    const text = cellText(xml, m.cell, shared);
+    const st = cellStyle(files, xml, m.cell);
+    (MARK_INFO[m.key].options as string[]).forEach((option, i) => {
+      const at = text ? findNeedle(text, m.needles, i) : null;
+      if (!at) return;
+      // 文字のまわり（上下は文字の高さの7割、左右は文字の1/4ずつ広く）。となりの値と重ならない
+      const {tx, tw, cy, em} = textSpan(lay, st, m.cell, text, at[0], at[1]);
+      out.push({key: m.key, option, box: {x: tx - em * 0.25, y: cy - em * 0.7, w: tw + em * 0.5, h: em * 1.4}});
+    });
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- 書き込んだ申請書から読む（申請書から見積書を作る）
 
 /** 共有の文字（ふりがな＝rPh は除く） */
-function sharedStrings(files: Files): string[] {
+export function sharedStrings(files: Files): string[] {
   const f = files['xl/sharedStrings.xml'];
   if (!f) return [];
-  return [...strFromU8(f).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) =>
+  const cached = sharedCache.get(f);
+  if (cached) return cached;
+  const out = [...strFromU8(f).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) =>
     unesc([...m[1].replace(/<rPh\b[\s\S]*?<\/rPh>/g, '').matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)].map((t) => t[1]).join('')),
   );
+  sharedCache.set(f, out);
+  return out;
 }
 
-function cellText(xml: string, ref: string, shared: string[]): string {
+export function cellText(xml: string, ref: string, shared: string[]): string {
   const m = cellRe(ref).exec(xml);
   if (!m) return '';
   const t = /\st="([^"]+)"/.exec(m[1])?.[1];
