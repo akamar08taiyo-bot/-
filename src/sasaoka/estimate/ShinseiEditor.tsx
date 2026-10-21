@@ -4,20 +4,24 @@
 // 丸で囲む項目（性別・要介護状態区分など）は、申請書の文字を押すと丸がつく。まだ入っていない欄は薄い黄色にし、上にも一覧で出す。
 // 「一覧で入れる」にすると、前の版と同じ、申請書の順番に項目を並べた入れ方になる。
 // 見積書と同じ様邸（Job）：氏名・住所・被保険者番号・改修の箇所は見積書と同じ欄、改修予定費用は見積書の金額なので、どちらで直してもすぐ両方に出る。
-// 申請書だけ・見積書だけでもよい（見積書がないときは、改修の内容を箇所ごとに書き、改修費用を手で入れる）
+// 申請書だけ・見積書だけでもよい（見積書がないときは、改修の内容を箇所ごとに書き、改修費用を手で入れる）。
+// 写真（PhotoBoard）：写真番号の箇所ごとに改修前・改修後の写真を入れ、入れ替える。プレビューの写真貼付用紙にも出し、Excel の写真貼付用紙に貼る
 
-import {Fragment, useCallback, useDeferredValue, useEffect, useMemo, useState} from 'react';
+import {Fragment, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState} from 'react';
 import type {KeyboardEvent, ReactNode} from 'react';
 import {isBlankRow, jobName} from '../calc.ts';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {circled, INSURER_IDS, INSURER_INFO, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, photoNumbers} from '../estimateForms.ts';
 import {manualRow, newPlace} from '../rows.ts';
-import {autoWorkText, costIsTotal, insuredBoxes, SHINSEI, shinseiCost, shinseiKinds, shinseiValues, shinseiWorks} from '../shinsei.ts';
+import {usePhotoUrls} from '../photos.ts';
+import {autoWorkText, costIsTotal, insuredBoxes, photoSheets, SHINSEI, shinseiCost, shinseiKinds, shinseiValues, shinseiWorks} from '../shinsei.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
 import type {AppData, Insurer, Job, Place, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {yen} from '../util.ts';
+import {PhotoBoard, photoPlaces, usePhotoActions} from './PhotoBoard.tsx';
+import type {PhotoKey, PhotoSlot} from './PhotoBoard.tsx';
 import {canMakeShinsei, saveShinsei, useTemplate} from './shinseiFiles.ts';
 import {ShinseiPages} from './ShinseiPreview.tsx';
 
@@ -151,10 +155,33 @@ export function ShinseiEditor({
     if (!inList && v) move(1);
   };
 
+  // 写真：写真番号の箇所の改修前・改修後（写真の欄・プレビューの写真貼付用紙で、ドロップ・選ぶ・入れ替える）
+  const sheetNos = useMemo(() => (template && map ? new Set(photoSheets(template, map).keys()) : null), [template, map]);
+  const photoActions = usePhotoActions(job, setJob, s);
+  const photoList = photoPlaces(job, s);
+  const photoUrls = usePhotoUrls(photoList.flatMap(({place}) => [place.photos?.before ?? '', place.photos?.after ?? '']));
+  const photoInput = useRef<HTMLInputElement>(null);
+  const pickFor = useRef<PhotoKey | undefined>(undefined);
+  const pickPhoto = (key?: PhotoKey) => {
+    pickFor.current = key;
+    photoInput.current?.click();
+  };
+  const photoKey = (no: number, slot: PhotoSlot): PhotoKey | null => {
+    const x = photoList.find((p) => p.no === no);
+    return x ? {placeId: x.place.id, slot} : null;
+  };
+  const photoOf = (no: number, slot: PhotoSlot) => {
+    const id = photoList.find((p) => p.no === no)?.place.photos?.[slot];
+    return id ? (photoUrls[id] ?? null) : null;
+  };
+
   const save = () => {
     if (!insurer) return;
     void saveShinsei(job, insurer, s).then(
-      (fileName) => toast(`「${fileName}」を保存しました`),
+      ({fileName, missingPhotos}) => {
+        toast(`「${fileName}」を保存しました`);
+        if (missingPhotos) toast(`写真${missingPhotos}枚はこの端末にないので貼っていません`, 'error');
+      },
       () => toast('申請書を作れませんでした', 'error'),
     );
   };
@@ -378,6 +405,27 @@ export function ShinseiEditor({
         )}
       </section>
 
+      {insurer && (
+        <>
+          <input
+            ref={photoInput}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            aria-label="写真のファイル"
+            onChange={(e) => {
+              const files = [...(e.target.files ?? [])];
+              e.target.value = '';
+              const key = pickFor.current;
+              pickFor.current = undefined;
+              if (files.length) void photoActions.put(files, key);
+            }}
+          />
+          <PhotoBoard job={job} rates={s} sheetNos={sheetNos} actions={photoActions} onPick={pickPhoto} />
+        </>
+      )}
+
       {!insurer ? (
         <p className="rounded-xl border border-dashed border-amber-300 bg-amber-50 px-4 py-6 text-center text-sm text-amber-900">保険者を選ぶと、その申請書が出ます。</p>
       ) : mode === 'form' && pages === null ? (
@@ -394,6 +442,17 @@ export function ShinseiEditor({
           onMove={move}
           editor={active ? row(active, insurer, false) : null}
           wide={active === 'works'}
+          photos={{
+            of: photoOf,
+            onDrop: (no, slot, e) => {
+              const key = photoKey(no, slot);
+              if (key) photoActions.drop(e, key);
+            },
+            onPick: (no, slot) => {
+              const key = photoKey(no, slot);
+              if (key) pickPhoto(key);
+            },
+          }}
         />
       ) : (
         <div role="form" aria-label="申請書" onKeyDown={nextOnEnter} className="mx-auto max-w-5xl overflow-hidden rounded-lg border-2 border-slate-700 bg-white shadow-sm">

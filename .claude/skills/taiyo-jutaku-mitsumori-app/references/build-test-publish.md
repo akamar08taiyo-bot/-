@@ -26,7 +26,7 @@ npm run -s lint           # 型チェック（tsc --noEmit。テストのファ�
 
 単体テストの主なもの：`calc.test.ts`（仕切り・請求書・見積の計算）、`estimateForms.test.ts`（見積書の行・備考・保険者）、`sheetEdit.test.ts`（欄への打ち込み・行の挿入・削除・コピー・貼り付け）、
 `order.test.ts`（発注書の本数・2000mm の品・直したところ・販売受注簿へ渡す内容）、`storage.test.ts`（前のデータの読み込み・移し替え）、`estimateXlsx.test.ts`（Excel の中身と式）、
-`shinsei.test.ts`（申請書の転記・丸の位置・読み戻し）、`shinseiPreview.test.ts`（申請書のプレビュー：シート・押せる欄・丸の値・表示形式、改修予定費用＝見積書の金額、`startEstimate`）、
+`shinsei.test.ts`（申請書の転記・丸の位置・読み戻し・平面図の工事内容・写真貼付用紙の写真）、`shinseiPreview.test.ts`（申請書のプレビュー：シート・平面図・写真貼付用紙の枠・押せる欄・丸の値・表示形式、改修予定費用＝見積書の金額、`startEstimate`）、
 `sync.test.ts`、`priceImport.test.ts`、`rows.test.ts`。
 
 ブラウザのテスト（Playwright。リポジトリの依存には入れていない。場所は環境変数 `PLAYWRIGHT`、既定 `/opt/node-tools/node_modules/playwright/index.mjs`）：
@@ -39,7 +39,7 @@ npm run -s lint           # 型チェック（tsc --noEmit。テストのファ�
 | `e2e-estimate.mjs` | `<サイト>` | 見積書：一覧・切って使う部材・保存（Ctrl+S）・Excel・印刷・複製・削除・部材＋施工費（常用） |
 | `e2e-sync.mjs` | `<サイト>` | 2つのアプリを同時に開いて直しても、どちらの変更も消えない |
 | `e2e-order.mjs` | `<サイト>` | 発注書：本数の計算・直す・消す・戻す・足す・印刷・販売受注簿に転記・スマホの幅 |
-| `e2e-shinsei.mjs` | `<サイト>` | 申請書：様邸の画面のタブ（左📝 申請書・右📋 見積書）・プレビュー（欄を押して入れる・Enter で次の欄・丸・式の欄も押せる・3枚のシート・ヘッダー）・見積書とすぐつながる（改修予定費用＝見積書の合計・氏名）・4つの保険者の原本に転記（欄・式の答え・丸の数）・一覧で入れる（覚えておく）・Excel から見積書・新規作成（フリガナが開いている・Enter で順番に・見積書に行を入れると請求書に入る）・申請書だけ（一覧から申請書のタブ）・スマホの幅（入れる所は画面の下） |
+| `e2e-shinsei.mjs` | `<サイト>` | 申請書：様邸の画面のタブ（左📝 申請書・右📋 見積書）・プレビュー（欄を押して入れる・Enter で次の欄・丸・式の欄も押せる・様式・平面図の工事内容・写真貼付用紙・ヘッダー）・見積書とすぐつながる（改修予定費用＝見積書の合計・氏名）・写真（📷 写真を選ぶ・枠にドロップ・押して入れ替え・ドラッグで入れ替え・削除・差し替え・プレビューの枠にドロップ・Excel の写真貼付用紙に貼る・読み直し・古い写真を消す）・4つの保険者の原本に転記（欄・式の答え・丸の数・広域連合は最初の用紙だけに写真）・一覧で入れる（覚えておく）・Excel から見積書・新規作成（フリガナが開いている・Enter で順番に・見積書に行を入れると請求書・発注書）・申請書だけ（「申請書だけ」・請求書のチェックと発注書なし・一覧から申請書のタブ）・スマホの幅（入れる所は画面の下） |
 
 サイトは太陽ポータルと同じ形にする（`<サイト>/sasaoka/`・`<サイト>/jutaku-mitsumori/`、販売受注簿まで通すなら `<サイト>/taiyo-hacchu-scan/` に taiyo-hacchu-scan の `docs/` か `dist/`）。
 常駐のサーバーは作業環境の時間制限（2時間）で止められるので、テストのあいだだけ立てる `scripts/serve.mjs` を使う：
@@ -97,4 +97,9 @@ github.io はこの作業環境から見えない（403）。GitHub MCP で確�
 - 自動保存（0.4秒後）を待ってから読み直す（`waitForTimeout(1200)`）。
 - 数字の欄（`NumberInput`）は type=text なので `getByRole('spinbutton')` では見つからない → `getByLabel(…, {exact: true})`。
 - 見た目を変えたら、1366px とスマホ（390×844、deviceScaleFactor 2）のスクリーンショットを撮って自分で見る。横にはみ出していないか（`document.documentElement.scrollWidth`）も見る。
+- 写真のファイル：ボタンで選ぶのは `const [chooser] = await Promise.all([page.waitForEvent('filechooser'), ボタン.click()]); await chooser.setFiles({name, mimeType, buffer})`。
+  画像はブラウザの canvas で作れる（`e2e-shinsei.mjs` の `makeImage`。大きさを変えておくと、Excel の JPEG の大きさでどの写真か分かる）。
+  エクスプローラーからのドロップは、ページの中で `new DataTransfer()` に `File` を入れて `dragenter`・`dragover`・`drop` の `DragEvent` を出す（`dropFile`）。
+  枠から枠へのドラッグ（HTML5 の draggable）は `locator.dragTo(相手)` で効く（Chromium）。
+- 写真の IndexedDB（`taiyo-sasaoka-photos`）は `page.evaluate` で `indexedDB.open` して読める・書ける（古い写真を消すテストは `created: 0` の写真を入れて読み直す）。
 - 印刷の画面は `.print-overlay`・`.print-root`。見積書は A4横、請求書・発注書は A4縦。

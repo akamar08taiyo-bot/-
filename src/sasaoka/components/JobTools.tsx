@@ -16,7 +16,8 @@ export function copyJob(job: Job): Job {
     ...job,
     id: uid('j'),
     customer: job.customer + '（コピー）',
-    places: job.places.map((p) => ({
+    // 写真（写真貼付用紙）はそのお宅の写真なので、複製には入れない
+    places: job.places.map(({photos: _photos, ...p}) => ({
       ...p,
       id: uid('p'),
       rows: copyRows(p.rows),

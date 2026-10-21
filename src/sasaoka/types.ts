@@ -64,7 +64,11 @@ export type Place = {
   photo: number; // 写真番号（0 なら箇所の順番）
   // ---- 申請書だけに使う
   shinseiText?: string; // 申請書の改修の内容（「木製L字手すり L=600×850㎜」）を手で書いたとき。空なら見積書の部材から作る
+  photos?: PlacePhotos; // 写真貼付用紙の写真（この箇所の写真番号の用紙に貼る）
 };
+
+/** 箇所の写真：改修前・改修後（写真の中身は端末の IndexedDB に別に持つ。ここは番号＝`photos.ts` の id） */
+export type PlacePhotos = {before?: string; after?: string};
 
 export type NameSuffix = '様邸' | '様' | '';
 

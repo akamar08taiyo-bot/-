@@ -56,20 +56,53 @@ test('表示形式：3けた区切り・円・日付・元号（申請書の原�
   assert.equal(formatNumber(0, '0;-0;;@'), ''); // 0 を出さない書き方
 });
 
-test('プレビュー：保険者ごとに申請書の様式のシートを1枚ずつ（平面図・写真貼付用紙・事後申請書は出さない）。表題がヘッダーの行橋市はヘッダーも', () => {
-  assert.deepEqual(preview('kanda').map((p) => p.sheet), ['事前申請書']);
-  assert.deepEqual(preview('yukuhashi').map((p) => p.sheet), ['住改・受領委任払']);
-  assert.deepEqual(preview('miyako').map((p) => p.sheet), ['住宅改修承認届出書', '住宅改修費支給申請書(受領委任払用)', '住宅改修内訳明細書']);
-  assert.deepEqual(preview('kouiki').map((p) => p.sheet), ['様式第2号（住宅改修承認申請書）', '様式第7号（住宅改修費支給申請書（受領委任払用）', '様式第2号別紙（住宅改修内訳明細書）']);
+test('プレビュー：保険者ごとに申請書の様式のシートを1枚ずつ（事後申請書は出さない）。表題がヘッダーの行橋市はヘッダーも', () => {
+  const forms = (insurer: Insurer) => preview(insurer).filter((p) => p.kind === 'form').map((p) => p.sheet);
+  assert.deepEqual(forms('kanda'), ['事前申請書']);
+  assert.deepEqual(forms('yukuhashi'), ['住改・受領委任払']);
+  assert.deepEqual(forms('miyako'), ['住宅改修承認届出書', '住宅改修費支給申請書(受領委任払用)', '住宅改修内訳明細書']);
+  assert.deepEqual(forms('kouiki'), ['様式第2号（住宅改修承認申請書）', '様式第7号（住宅改修費支給申請書（受領委任払用）', '様式第2号別紙（住宅改修内訳明細書）']);
   const [yk] = preview('yukuhashi');
   const title = yk.header?.center.map((r) => r.text).join('');
   assert.equal(title, '介護保険居宅（ 介護・介護予防 ）住宅改修費受領委任払い申請書');
   assert.equal(yk.header?.center[0].font.bold, true);
   assert.ok(yk.header!.center[0].font.size > 20); // 16pt
-  for (const p of [...preview('kanda'), ...preview('kouiki')]) {
+  for (const p of [...preview('kanda'), ...preview('kouiki')].filter((x) => x.kind === 'form')) {
     assert.ok(p.width > 600 && p.width < 800 && p.height > 700 && p.height < 1200, `${p.sheet} ${p.width}x${p.height}`); // A4 の様式（画素）
     assert.ok(p.lines.length > 20, p.sheet);
   }
+});
+
+test('プレビュー：様式のうしろに平面図（空いた所に工事内容）と、写真番号の箇所の写真貼付用紙（改修前・改修後の枠）', () => {
+  const kinds = (insurer: Insurer, j?: Job) => preview(insurer, j).map((p) => `${p.kind}:${p.sheet}${p.photo ? `:${p.photo}` : ''}`);
+  assert.deepEqual(kinds('kanda'), ['form:事前申請書', 'plan:平面図  (2)', 'photo:1 :1', 'photo:1  (3):2']);
+  assert.deepEqual(kinds('yukuhashi'), ['form:住改・受領委任払', 'plan:平面図  (2)', 'photo:住改・写真 ①:1', 'photo:住改・写真②:2']);
+  assert.deepEqual(kinds('miyako').slice(3), ['plan:平面図', 'photo:写真 (1):1', 'photo:写真 (2):2']);
+  // 広域連合は同じ写真番号の用紙が2枚ずつ。写真を貼る最初の用紙だけ
+  assert.deepEqual(kinds('kouiki').slice(3), ['plan:平面図 (2)', 'photo:写真貼付用紙:1', 'photo:写真貼付用紙 (2):2']);
+  // 工事内容は申請書の改修の内容と同じ行（苅田町・行橋市・広域連合は空いた所いっぱいの文字の枠、みやこ町は平面図の下の欄 M48）
+  const lines = '玄関① 木製手すり L=600㎜\nトイレ② L字手すり';
+  for (const insurer of ['kanda', 'yukuhashi', 'kouiki'] as const) {
+    const plan = preview(insurer).find((p) => p.kind === 'plan')!;
+    const box = plan.shapes.find((s) => s.text === lines);
+    assert.ok(box, insurer);
+    assert.deepEqual([box.align, box.valign, box.wrap, box.font?.size], ['left', 'top', true, 16], insurer); // 12pt
+    assert.ok(box.x >= 0 && box.x + box.w <= plan.width + 1 && box.y > plan.height / 2 && box.y + box.h <= plan.height + 1, `${insurer} ${JSON.stringify(box)}`);
+  }
+  const mp = preview('miyako').find((p) => p.kind === 'plan')!;
+  assert.equal(textAt(mp, 'M48'), lines);
+  // 写真の枠：改修前が上、改修後が下で、ページの中
+  for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki'] as const) {
+    for (const p of preview(insurer).filter((x) => x.kind === 'photo')) {
+      assert.deepEqual(p.photoSlots.map((s) => s.slot), ['before', 'after'], p.sheet);
+      const [b, a] = p.photoSlots;
+      assert.ok(b.y + b.h <= a.y + 1, p.sheet);
+      for (const s of p.photoSlots) assert.ok(s.x >= 0 && s.y >= 0 && s.x + s.w <= p.width + 1 && s.y + s.h <= p.height + 1 && s.w > 500 && s.h > 300, `${insurer} ${p.sheet} ${JSON.stringify(s)}`);
+    }
+  }
+  // 箇所がなければ、平面図までで写真貼付用紙は出さない。様式・平面図のページに写真の枠はない
+  assert.deepEqual(kinds('kanda', job('kanda', {places: []})), ['form:事前申請書', 'plan:平面図  (2)']);
+  assert.ok(preview('kanda').filter((p) => p.kind !== 'photo').every((p) => p.photoSlots.length === 0));
 });
 
 test('プレビュー：転記した内容（Excel に保存するときと同じ書き込み）と、式で同じ値を出す欄・丸（楕円）が出る', () => {

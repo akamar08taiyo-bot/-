@@ -4,7 +4,10 @@
 //   「📗 申請書をExcelで保存」で、原本（行橋市・苅田町・みやこ町・広域連合）に転記した Excel を保存する（ほかのシートはそのまま。丸は楕円の図形）。
 //   「📋 一覧で入れる」にすると、前の版の入れ方（申請書の順番の一覧）。
 //   新規作成は申請書のタブから（フリガナの欄が開いている）。見積書に行を入れると笹岡工務店の請求書に入る（申請書だけなら入れない）。
-//   「📥 申請書（Excel）から作る」で、書いた申請書から見積書を作る
+//   「📥 申請書（Excel）から作る」で、書いた申請書から見積書を作る。
+//   写真：写真の欄（写真番号の箇所ごとに改修前・改修後）に写真のファイルを選ぶ・ドロップする。押して（ドラッグして）入れ替える・差し替える・消す。
+//   プレビューの写真貼付用紙にも出て（枠にドロップしてもよい）、Excel の写真貼付用紙の枠に貼る。平面図の空いた所には工事内容（改修の内容と同じ行）。
+//   見積書に行がないうち（申請書だけ＝ほかの工務店の工事）は、笹岡工務店の請求書・発注書に入れない
 // usage: node e2e-shinsei.mjs <サイトのURL> <出力フォルダ>
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
@@ -13,6 +16,8 @@ import path from 'node:path';
 import {strFromU8, unzipSync} from 'fflate';
 
 const [site, outDir] = process.argv.slice(2);
+// 広域連合の写真貼付用紙（写真番号ごとに2枚。原本の並び）
+const SHINSEI_PHOTO_SHEETS = {kouiki: ['写真貼付用紙', '写真貼付用紙 (6)', '写真貼付用紙 (2)', '写真貼付用紙 (7)', '写真貼付用紙 (3)', '写真貼付用紙 (8)', '写真貼付用紙 (4)', '写真貼付用紙 (9)', '写真貼付用紙 (5)', '写真貼付用紙 (10)']};
 const log = (...a) => console.log('•', ...a);
 // 文字の設定のない環境では、日本語のファイル名のダウンロードが「download」になるので UTF-8 にする
 const browser = await chromium.launch({env: {...process.env, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8'}});
@@ -70,7 +75,7 @@ const sheetsOf = (bytes) => {
     const d = new RegExp(`Id="${rid}"[^>]*Target="\\.\\./drawings/([^"]+)"`).exec(sheetRels)?.[1];
     return (strFromU8(files[`xl/drawings/${d}`]).match(/prst="ellipse"/g) ?? []).length;
   };
-  return {files, sheets: out, ellipses};
+  return {files, sheets: out, paths, ellipses};
 };
 const text = (xml, ref) => (/<t[^>]*>([\s\S]*?)<\/t>/.exec(new RegExp(`<c r="${ref}"[^>]*?(?:/>|>([\\s\\S]*?)</c>)`).exec(xml)?.[0] ?? '')?.[1] ?? '').replace(/&#10;/g, '\n');
 
@@ -126,7 +131,8 @@ const WORKS = '玄関① 木製手すり L=600㎜\nトイレ② L字手すり';
 // ---------------- 行橋市：申請書のタブ＝原本の様式のまま（表題はヘッダー）。見積書の氏名・住所・改修の内容・金額がもう入っている
 await shinseiTab.click();
 await preview.waitFor();
-assert.deepEqual(await pageNames(), ['住改・受領委任払']);
+// 申請書の様式・平面図・写真番号の箇所（玄関①・トイレ②）の写真貼付用紙
+assert.deepEqual(await pageNames(), ['住改・受領委任払', '平面図  (2)', '住改・写真 ①', '住改・写真②']);
 let pv = await preview.innerText();
 for (const t of ['介護保険居宅（ 介護・介護予防 ）住宅改修費受領委任払い申請書', '被保険者氏名', '（サンプル）山田', '福岡県行橋市中央1-1', '玄関① 木製手すり L=600㎜', 'トイレ② L字手すり', '26,958']) {
   assert.ok(pv.includes(t), `プレビューに「${t}」がない`);
@@ -199,11 +205,174 @@ await estimateTab.click();
 await typeIn(lKey, '1');
 log('見積書と申請書がすぐつながる（金額・氏名）OK');
 
+// ---------------- 平面図：空いた所に工事内容（申請書の改修の内容と同じ行）。平面図そのものは Excel で描く
+await shinseiTab.click();
+const plan = await pageOf('平面図  (2)').innerText();
+for (const t of ['（サンプル）山田', '玄関① 木製手すり L=600㎜', 'トイレ② L字手すり']) assert.ok(plan.includes(t), `平面図に「${t}」がない`);
+await pageOf('平面図  (2)').screenshot({path: path.join(outDir, '84-plan.png')});
+log('平面図の工事内容OK');
+
+// ---------------- 写真：写真の欄（写真番号の箇所ごとに 改修前・改修後）。選ぶ・ドロップ・押して入れ替える・ドラッグで入れ替える・消す・差し替える
+const photoBoard = page.getByRole('region', {name: '写真'});
+await photoBoard.waitFor();
+const slot = (no, name, which) => photoBoard.getByRole('button', {name: `${no}${name} ${which}`, exact: true});
+/** 色と大きさのちがう写真（PNG）をブラウザで作る（大きさで、どの写真か分かる） */
+const makeImage = async (color, w, h) =>
+  Buffer.from(
+    await page.evaluate(
+      async ({color, w, h}) => {
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        const g = c.getContext('2d');
+        g.fillStyle = color;
+        g.fillRect(0, 0, w, h);
+        const b = await new Promise((r) => c.toBlob(r, 'image/png'));
+        return [...new Uint8Array(await b.arrayBuffer())];
+      },
+      {color, w, h},
+    ),
+  );
+const red = await makeImage('#c0392b', 2000, 1500); // 長い辺を 1600 に縮める → 1600×1200
+const blue = await makeImage('#2471a3', 900, 1600);
+const green = await makeImage('#1e8449', 1200, 900);
+const yellow = await makeImage('#d4ac0d', 3000, 1000); // → 1600×533
+/** 写真のファイルをドロップする（エクスプローラーなどから枠に落とすのと同じ） */
+const dropFile = async (target, buffer, name) => {
+  const el = await target.elementHandle();
+  await page.evaluate(
+    ({el, bytes, name}) => {
+      const dt = new DataTransfer();
+      dt.items.add(new File([new Uint8Array(bytes)], name, {type: 'image/png'}));
+      for (const type of ['dragenter', 'dragover', 'drop']) el.dispatchEvent(new DragEvent(type, {dataTransfer: dt, bubbles: true, cancelable: true}));
+    },
+    {el, bytes: [...buffer], name},
+  );
+};
+const srcOf = (loc) => loc.locator('img').getAttribute('src');
+const emptySlot = async (loc) => (await loc.locator('img').count()) === 0 && (await loc.innerText()).startsWith('＋');
+// 「📷 写真を選ぶ」で2枚：①玄関・②トイレの改修前に順に入る
+const [chooser] = await Promise.all([page.waitForEvent('filechooser'), photoBoard.getByRole('button', {name: '📷 写真を選ぶ'}).click()]);
+await chooser.setFiles([
+  {name: 'red.png', mimeType: 'image/png', buffer: red},
+  {name: 'blue.png', mimeType: 'image/png', buffer: blue},
+]);
+await slot('①', '玄関', '改修前').locator('img').waitFor();
+await slot('②', 'トイレ', '改修前').locator('img').waitFor();
+const [redSrc, blueSrc] = [await srcOf(slot('①', '玄関', '改修前')), await srcOf(slot('②', 'トイレ', '改修前'))];
+assert.ok(await emptySlot(slot('①', '玄関', '改修後')));
+// ①玄関の改修後の枠に写真のファイルをドロップ
+await dropFile(slot('①', '玄関', '改修後'), green, 'green.png');
+await slot('①', '玄関', '改修後').locator('img').waitFor();
+const greenSrc = await srcOf(slot('①', '玄関', '改修後'));
+// 押して入れ替える：①の改修前を押して（選ぶ）、②の改修前を押す
+await slot('①', '玄関', '改修前').click();
+assert.equal(await slot('①', '玄関', '改修前').getAttribute('aria-pressed'), 'true');
+await page.getByRole('status', {name: '選んでいる写真'}).waitFor();
+await slot('②', 'トイレ', '改修前').click();
+assert.deepEqual([await srcOf(slot('①', '玄関', '改修前')), await srcOf(slot('②', 'トイレ', '改修前'))], [blueSrc, redSrc]);
+assert.equal(await page.getByRole('status', {name: '選んでいる写真'}).count(), 0);
+// ドラッグして移す（空いた枠）・入れ替える（写真のある枠）
+await slot('①', '玄関', '改修後').dragTo(slot('②', 'トイレ', '改修後'));
+assert.equal(await srcOf(slot('②', 'トイレ', '改修後')), greenSrc);
+assert.ok(await emptySlot(slot('①', '玄関', '改修後')));
+await slot('②', 'トイレ', '改修前').dragTo(slot('①', '玄関', '改修前'));
+assert.deepEqual([await srcOf(slot('①', '玄関', '改修前')), await srcOf(slot('②', 'トイレ', '改修前'))], [redSrc, blueSrc]);
+// 消す：押して「削除」
+await slot('②', 'トイレ', '改修後').click();
+await page.getByRole('status', {name: '選んでいる写真'}).getByRole('button', {name: '削除'}).click();
+assert.ok(await emptySlot(slot('②', 'トイレ', '改修後')));
+// 差し替える：押して「差し替え」→ 写真を選ぶ
+await slot('①', '玄関', '改修前').click();
+const [chooser2] = await Promise.all([page.waitForEvent('filechooser'), page.getByRole('status', {name: '選んでいる写真'}).getByRole('button', {name: '差し替え'}).click()]);
+await chooser2.setFiles({name: 'yellow.png', mimeType: 'image/png', buffer: yellow});
+await page.waitForFunction((old) => document.querySelector('[aria-label="①玄関 改修前"] img')?.getAttribute('src') !== old, redSrc);
+// プレビューの写真貼付用紙にも出る。写真貼付用紙の枠にドロップしても入る
+const photoPage = pageOf('住改・写真②');
+await dropFile(photoPage.getByRole('button', {name: '写真貼付用紙②の改修後'}), green, 'green2.png');
+await slot('②', 'トイレ', '改修後').locator('img').waitFor();
+assert.equal(await pageOf('住改・写真 ①').getByRole('button', {name: '写真貼付用紙①の改修前'}).locator('img').count(), 1);
+assert.equal(await pageOf('住改・写真 ①').getByRole('button', {name: '写真貼付用紙①の改修後'}).locator('img').count(), 0);
+assert.equal(await photoPage.locator('img').count(), 2);
+await photoBoard.screenshot({path: path.join(outDir, '85-photo-board.png')});
+await photoPage.screenshot({path: path.join(outDir, '86-photo-sheet.png')});
+// Excel：写真貼付用紙の枠に貼る（①玄関の改修前＝黄色 1600×533、②トイレの改修前＝青 900×1600・改修後＝緑 1200×900。JPEG に縮めて）
+/** JPEG の大きさ（幅×高さ） */
+const jpegSize = (b) => {
+  for (let i = 2; i < b.length - 9; ) {
+    if (b[i] !== 0xff) return '';
+    const m = b[i + 1];
+    if (m >= 0xc0 && m <= 0xc3) return `${(b[i + 7] << 8) | b[i + 8]}x${(b[i + 5] << 8) | b[i + 6]}`;
+    i += 2 + ((b[i + 2] << 8) | b[i + 3]);
+  }
+  return '';
+};
+/** シートに貼った写真の大きさ（どの枠か：改修前・改修後の枠の行で） */
+const photosOf = (book, name, beforeRows) => {
+  const rid = /<drawing r:id="([^"]+)"/.exec(book.sheets.get(name))?.[1];
+  if (!rid) return [];
+  const rels = strFromU8(book.files[book.paths.get(name).replace(/([^/]+)$/, '_rels/$1.rels')]);
+  const drawing = new RegExp(`Id="${rid}"[^>]*Target="\\.\\./drawings/([^"]+)"`).exec(rels)[1];
+  const d = strFromU8(book.files[`xl/drawings/${drawing}`]);
+  const drels = strFromU8(book.files[`xl/drawings/_rels/${drawing}.rels`] ?? new Uint8Array());
+  return [...d.matchAll(/<xdr:twoCellAnchor editAs="oneCell">([\s\S]*?)<\/xdr:twoCellAnchor>/g)].map((m) => {
+    const row = Number(/<xdr:from>[\s\S]*?<xdr:row>(\d+)<\/xdr:row>/.exec(m[1])[1]) + 1;
+    const embed = /r:embed="([^"]+)"/.exec(m[1])[1];
+    const media = new RegExp(`Id="${embed}"[^>]*Target="\\.\\./media/([^"]+)"`).exec(drels)[1];
+    return `${row <= beforeRows ? '改修前' : '改修後'}:${jpegSize(book.files[`xl/media/${media}`])}`;
+  });
+};
+const withPhotos = sheetsOf((await saveExcel()).bytes);
+assert.deepEqual(photosOf(withPhotos, '住改・写真 ①', 28), ['改修前:1600x533']);
+assert.deepEqual(photosOf(withPhotos, '住改・写真②', 28).sort(), ['改修前:900x1600', '改修後:1200x900']);
+assert.deepEqual(photosOf(withPhotos, '住改・写真③', 28), []);
+// 読み直しても写真は残る（この端末に保存）。どの様邸からも使われなくなった古い写真は、開いたときに消す
+const photoIds = () =>
+  page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const req = indexedDB.open('taiyo-sasaoka-photos');
+        req.onsuccess = () => {
+          const all = req.result.transaction('photos').objectStore('photos').getAllKeys();
+          all.onsuccess = () => resolve(all.result.map(String).sort());
+        };
+      }),
+  );
+await page.evaluate(
+  () =>
+    new Promise((resolve) => {
+      const req = indexedDB.open('taiyo-sasaoka-photos');
+      req.onsuccess = () => {
+        const tx = req.result.transaction('photos', 'readwrite');
+        tx.objectStore('photos').put({id: 'ph-old', blob: new Blob(['x']), w: 1, h: 1, created: 0});
+        tx.oncomplete = () => resolve(null);
+      };
+    }),
+);
+assert.ok((await photoIds()).includes('ph-old'));
+await page.waitForTimeout(1200);
+await page.reload();
+await photoBoard.waitFor();
+await slot('①', '玄関', '改修前').locator('img').waitFor();
+await slot('②', 'トイレ', '改修後').locator('img').waitFor();
+await page.waitForFunction(
+  () =>
+    new Promise((resolve) => {
+      const req = indexedDB.open('taiyo-sasaoka-photos');
+      req.onsuccess = () => {
+        const g = req.result.transaction('photos').objectStore('photos').get('ph-old');
+        g.onsuccess = () => resolve(!g.result);
+      };
+    }),
+);
+assert.ok((await photoIds()).length >= 3); // 使っている3枚は残る（入れ替えた古い写真は、1時間たつまで消さない）
+log('写真（選ぶ・ドロップ・押して入れ替え・ドラッグで入れ替え・削除・差し替え・プレビューの枠にドロップ・Excel の写真貼付用紙・読み直し・古い写真を消す）OK');
+
 // ---------------- 苅田町：保険者を替えると苅田町の申請書。丸は残る（もう一度押すと外れる）。事後申請書は式で同じ内容
 await shinseiTab.click();
 await page.getByRole('combobox', {name: '保険者'}).selectOption('kanda');
 await pageOf('事前申請書').waitFor();
-assert.deepEqual(await pageNames(), ['事前申請書']);
+assert.deepEqual(await pageNames(), ['事前申請書', '平面図  (2)', '1 ', '1  (3)']);
 assert.deepEqual(await pressed(), ['昭和', '女', '要介護2']);
 assert.ok((await preview.innerText()).includes('26,958円')); // 苅田町も改修予定費用＝見積書の合計
 await mark('要介護2').click();
@@ -230,7 +399,7 @@ const boxes = (col, n, row) =>
   });
 await page.getByRole('combobox', {name: '保険者'}).selectOption('miyako');
 await pageOf('住宅改修承認届出書').waitFor();
-assert.deepEqual(await pageNames(), ['住宅改修承認届出書', '住宅改修費支給申請書(受領委任払用)', '住宅改修内訳明細書']);
+assert.deepEqual(await pageNames(), ['住宅改修承認届出書', '住宅改修費支給申請書(受領委任払用)', '住宅改修内訳明細書', '平面図', '写真 (1)', '写真 (2)']);
 // 支給申請書の氏名（式で承認届出書と同じ）を押しても、氏名の欄が開く
 await openSpot('被保険者氏名', pageOf('住宅改修内訳明細書'));
 await page.keyboard.press('Escape');
@@ -252,7 +421,7 @@ log('みやこ町の申請書（3枚のプレビュー・式の欄も押せる�
 // ---------------- 広域連合（築上町など）：承認申請書・支給申請書（受領委任払用）・内訳明細書（別紙）・平面図・写真貼付用紙
 await page.getByRole('combobox', {name: '保険者'}).selectOption('kouiki');
 await pageOf('様式第2号（住宅改修承認申請書）').waitFor();
-assert.deepEqual(await pageNames(), ['様式第2号（住宅改修承認申請書）', '様式第7号（住宅改修費支給申請書（受領委任払用）', '様式第2号別紙（住宅改修内訳明細書）']);
+assert.deepEqual(await pageNames(), ['様式第2号（住宅改修承認申請書）', '様式第7号（住宅改修費支給申請書（受領委任払用）', '様式第2号別紙（住宅改修内訳明細書）', '平面図 (2)', '写真貼付用紙', '写真貼付用紙 (2)']);
 assert.ok((await preview.innerText()).includes('様式第２号（第６条関係）')); // ヘッダー
 await estimateTab.click();
 await sheet.locator('.form-page', {hasText: '内訳書　様式'}).first().waitFor(); // 見積書は広域連合用になる
@@ -269,6 +438,11 @@ assert.deepEqual([text(gb, 'I6'), text(gb, 'D15'), text(gb, 'K14')], ['（サン
 assert.equal(text(g.sheets.get('平面図 (2)'), 'A1'), '　（サンプル）山田　様　邸　平面図');
 assert.deepEqual([text(g.sheets.get('写真貼付用紙'), 'B4'), text(g.sheets.get('写真貼付用紙'), 'B5'), text(g.sheets.get('写真貼付用紙 (2)'), 'B5')], ['（サンプル）山田', '玄関', 'トイレ']);
 for (const name of ['様式第2号（住宅改修承認申請書）', '様式第7号（住宅改修費支給申請書（受領委任払用）']) assert.equal(g.ellipses(name), 2, name);
+// 写真は写真番号の最初の用紙だけに貼る（同じ番号の用紙が2枚ずつ）
+assert.deepEqual(photosOf(g, '写真貼付用紙', 31), ['改修前:1600x533']);
+assert.deepEqual(photosOf(g, '写真貼付用紙 (2)', 31).sort(), ['改修前:900x1600', '改修後:1200x900']);
+const twins = SHINSEI_PHOTO_SHEETS.kouiki.filter((n) => !['写真貼付用紙', '写真貼付用紙 (2)'].includes(n));
+for (const n of twins) assert.deepEqual(photosOf(g, n, 31), [], n);
 log('広域連合の申請書（3枚のプレビュー・ヘッダー・承認申請書・支給申請書・内訳明細書・平面図・写真貼付用紙・丸）OK');
 // 4つの保険者すべてで申請書の Excel のボタンが出る
 for (const i of ['kanda', 'yukuhashi', 'miyako', 'kouiki']) {
@@ -392,11 +566,14 @@ assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '見本 �
 const est = await sheet.locator('.form-page').first().innerText();
 for (const t of ['見本 一郎', '1234567890', '福岡県京都郡苅田町富久町2-2', '①玄関', '②トイレ']) assert.ok(est.includes(t), `見積書に「${t}」がない`);
 const inInvoice = page.getByLabel('笹岡工務店の請求書に入れる');
-assert.equal(await inInvoice.isChecked(), false);
+const orderBtn = page.getByRole('button', {name: '🛒 発注書を作成'});
+assert.equal(await inInvoice.count(), 0); // 見積書に行がないうちは出さない（申請書だけの様邸＝ほかの工務店の工事）
+assert.equal(await orderBtn.isDisabled(), true);
 await typeIn('new:text', '取付金具', 'Tab');
 await page.keyboard.press('Enter');
 assert.equal(await inInvoice.isChecked(), true);
-log('新規作成（申請書のタブから・フリガナが開いている・申請書の順番に Enter・丸・箇所・Excel・読み直し・見積書に行を入れると請求書に入る）OK');
+assert.equal(await orderBtn.isDisabled(), false);
+log('新規作成（申請書のタブから・フリガナが開いている・申請書の順番に Enter・丸・箇所・Excel・読み直し・見積書に行を入れると請求書・発注書）OK');
 
 // ---------------- 申請書だけ（みやこ町）：見積書を作らずに Excel にする。一覧に出て（請求書には入れない）、押すと申請書のタブで開く
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
@@ -426,13 +603,19 @@ await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
 await page.getByRole('region', {name: '一覧から作成'}).getByRole('button', {name: '📋 見積書の一覧を開く'}).click();
 const listRow = page.getByRole('row', {name: /見本 次郎/});
 await listRow.waitFor();
-assert.match(await listRow.innerText(), /入れない/); // 見積書のない申請書は笹岡工務店の請求書に入れない
+assert.match(await listRow.innerText(), /申請書だけ/); // 見積書のない申請書は笹岡工務店の請求書に入れない
 await page.getByRole('cell', {name: /見本 次郎/}).click();
 await preview.waitFor();
 assert.equal(await shinseiTab.getAttribute('aria-selected'), 'true'); // まだ申請書だけなので申請書のタブ
 assert.ok((await preview.innerText()).includes('見本 次郎'));
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
 await page.getByRole('row', {name: /見本 次郎/}).getByRole('button', {name: '📝 申請書'}).click();
+await preview.waitFor();
+// 見積書のタブも、請求書・発注書は出さない
+await estimateTab.click();
+assert.equal(await inInvoice.count(), 0);
+assert.equal(await orderBtn.isDisabled(), true);
+await shinseiTab.click();
 await preview.waitFor();
 log('申請書だけ（みやこ町。見積書なしで Excel・請求書に入れない・一覧から申請書のタブで開く）OK');
 
@@ -445,6 +628,9 @@ const paperBox = await pageOf('住宅改修承認届出書').boundingBox();
 assert.ok(paperBox && paperBox.width <= 390, JSON.stringify(paperBox));
 assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true); // 横にはみ出さない
 await page.screenshot({path: path.join(outDir, '83-shinsei-phone.png')});
+await page.keyboard.press('Escape');
+await photoBoard.scrollIntoViewIfNeeded();
+await photoBoard.screenshot({path: path.join(outDir, '87-photo-board-phone.png')});
 log('スマホの幅（縮めて出す・入れる所は画面の下）OK');
 
 console.log('\nERRORS:', errors.length ? errors : 'なし');

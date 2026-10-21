@@ -27,6 +27,7 @@ import {ShinseiEditor} from './estimate/ShinseiEditor.tsx';
 import {hasShinseiInfo} from './estimateForms.ts';
 import {APP_TITLE, PORTAL_URL, readHash, writeHash} from './links.ts';
 import type {JobView, MainTab} from './links.ts';
+import {prunePhotos} from './photos.ts';
 import {PrintView} from './print/PrintView.tsx';
 import type {PrintRequest} from './print/PrintView.tsx';
 import {EXAMPLE_KIT_ID, exampleKit} from './samples.ts';
@@ -173,6 +174,14 @@ export default function App({start}: {start: MainTab}) {
     store.update('settings', (s) => ({...s, laborRev: LABOR_REV}));
   }, [loaded]);
 
+  // どの様邸からも使われなくなった写真（写真を消した・差し替えた・様邸を消した）を、この端末から消す。開いたときに一度。
+  // ほかのタブで入れたばかりの写真（まだ様邸に保存されていないかもしれない）を消さないように、1時間より前に入れた写真だけ
+  useEffect(() => {
+    if (!data) return;
+    const keep = new Set(data.jobs.flatMap((j) => j.places.flatMap((p) => [p.photos?.before ?? '', p.photos?.after ?? ''])).filter(Boolean));
+    prunePhotos(keep, Date.now() - 60 * 60 * 1000).catch(() => undefined);
+  }, [loaded]);
+
   if (store.loadError) {
     return <div className="p-8 text-rose-700">データを読み込めませんでした：{store.loadError}</div>;
   }
@@ -291,7 +300,7 @@ export default function App({start}: {start: MainTab}) {
 
         <main className={`no-print mx-auto min-w-0 px-3 py-4 sm:px-4 ${theme.width}`}>
           {tab === 'estimate' &&
-            (estimateJob && jobView === 'order' ? (
+            (estimateJob && jobView === 'order' && hasEstimateRows(estimateJob) ? (
               <OrderPage key={estimateJob.id} job={estimateJob} data={data} update={store.update} onBack={() => setJobView('estimate')} onPrint={setPrint} />
             ) : estimateJob && jobView === 'shinsei' ? (
               <ShinseiEditor

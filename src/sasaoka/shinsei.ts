@@ -21,7 +21,12 @@ export type ShinseiSheet = {
   insuredNo?: string[]; // 被保険者番号の10マス（左から）
   works?: string; // 改修の内容・箇所及び規模（折り返しの欄。1行に1箇所）
   kinds?: {places: string; works: string}[]; // 改修の種類（①手すりの取付〜⑥付帯工事）ごとの行の、箇所の欄と工事内容の欄（住宅改修内訳明細書）
-  photoPlace?: {photo: string; place: string}; // 写真貼付用紙：原本の写真番号の欄（①）を読み、その写真番号の改修場所を改修箇所の欄に入れる
+  // 写真貼付用紙：原本の写真番号の欄（①・写真番号①・№①）を読み、その写真番号の改修場所を改修箇所の欄（place）に入れ、
+  // その写真番号の箇所の写真を改修前・改修後の枠（番地の範囲。before・after）に貼る（同じ写真番号の用紙が2枚あれば、最初の用紙だけ）
+  photoPlace?: {photo: string; place?: string; before?: string; after?: string};
+  // 平面図：写真番号の順の工事内容（改修の内容と同じ行「玄関① 木製L字手すり L=600×850㎜」）を空いた所に書く（ユーザーの指示）。
+  // cell＝折り返しの欄に書く（みやこ町の下の欄）、box＝その範囲にテキストボックスを置く（前の申請の平面図と同じ）。平面図そのものはユーザーが Excel で描く
+  legend?: {cell?: string; box?: string};
   marks?: MarkCell[]; // 丸で囲む欄（性別「男　　・　　女」など）
   texts?: TextCell[]; // 申請書の画面で入れた項目（フリガナ・生年月日・電話番号など）を書く欄と書き方
 };
@@ -60,8 +65,14 @@ const circledNum = (ch: string) => ch.charCodeAt(0) - 0x2460 + 1;
 const KOUIKI_PHOTO_SHEETS = ['写真貼付用紙', ...[6, 2, 7, 3, 8, 4, 9, 5, 10].map((n) => `写真貼付用紙 (${n})`)];
 /** 住宅改修内訳明細書（様式第2号別紙）の改修の種類の行（①14行目〜⑥24行目）：箇所はその下の行の D、工事内容は K（2行分） */
 const KIND_ROWS = [14, 16, 18, 20, 22, 24].map((r) => ({places: `D${r + 1}`, works: `K${r}`}));
-/** 写真貼付用紙：被保険者氏名（B4）・被保険者番号（D4〜M4）・写真番号（R4）・改修箇所（B5） */
-const PHOTO_SHEET = {name: 'B4', insuredNo: boxes('D', 10, 4), photoPlace: {photo: 'R4', place: 'B5'}};
+/** 写真貼付用紙（みやこ町・広域連合）：被保険者氏名（B4）・被保険者番号（D4〜M4）・写真番号（R4）・改修箇所（B5）・改修前の写真（A9:S31）・改修後（A34:S58） */
+const PHOTO_SHEET = {name: 'B4', insuredNo: boxes('D', 10, 4), photoPlace: {photo: 'R4', place: 'B5', before: 'A9:S31', after: 'A34:S58'}};
+/** 苅田町の写真の用紙（「1 」「1  (3)」…。写真番号①〜⑨は G42 の「写真番号①」）：改修前の写真（A7:H22）・改修後（A24:H40）。改修箇所はチェックの欄なので書かない */
+const KANDA_PHOTO_SHEETS = ['1 ', '1  (3)', '1  (2)', ...[4, 5, 6, 7, 8, 9].map((n) => `1  (${n})`)];
+const KANDA_PHOTO = {photoPlace: {photo: 'G42', before: 'A7:H22', after: 'A24:H40'}};
+/** 行橋市の写真添付用紙（№①〜⑧は M2）：改修場所（E4。「改 修 場 所 ：」のうしろ）・改修前の写真（B7:O28）・改修後（B30:O51） */
+const YUKUHASHI_PHOTO_SHEETS = ['住改・写真 ①', '住改・写真②', '住改・写真③', '住改・写真④', '住改・写真④ (3)', '住改・写真④ (4)', '住改・写真④ (5)', '住改・写真④ (2)'];
+const YUKUHASHI_PHOTO = {photoPlace: {photo: 'M2', place: 'E4', before: 'B7:O28', after: 'B30:O51'}};
 // 丸で囲む欄（原本の書き方）
 const GENDER = (cell: string): MarkCell => ({key: 'gender', cell, needles: ['男', '女']});
 const ERA = (cell: string): MarkCell => ({key: 'era', cell, needles: ['明', '大', '昭']});
@@ -104,6 +115,9 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
         ],
       },
       {sheet: '事後申請書', marks: [ERA('I9'), GENDER('V9'), CARE('I12')]},
+      // 平面図の表題は「（氏名）　様邸　平面図」（氏名は C2:AB6、「様邸　平面図」は原本の AC2）。工事内容は下の空いた所にテキストボックスで
+      {sheet: '平面図  (2)', name: 'C2', nameFormat: '{name}', legend: {box: 'C54:AQ68'}},
+      ...KANDA_PHOTO_SHEETS.map((sheet) => ({sheet, ...KANDA_PHOTO})),
     ],
   },
   yukuhashi: {
@@ -128,6 +142,8 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
           T('F20', '{cost}', 'number'),
         ],
       },
+      {sheet: '平面図  (2)', name: 'C2', nameFormat: '{name}', legend: {box: 'C54:AQ68'}},
+      ...YUKUHASHI_PHOTO_SHEETS.map((sheet) => ({sheet, ...YUKUHASHI_PHOTO})),
     ],
   },
   miyako: {
@@ -153,7 +169,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
       // フリガナ・生年月日・住所・住宅の所有者・改修費用は承認届出書を参照する式。電話番号と着工日・完成日（日付の欄）は書く
       {sheet: '住宅改修費支給申請書(受領委任払用)', name: 'J6', marks: [GENDER('AB8'), RENOVATED('X18')], texts: [T('AA10', '{phone}'), T('J16', '{start}', 'date'), T('X16', '{end}', 'date')]},
       {sheet: '住宅改修内訳明細書', kinds: KIND_ROWS},
-      {sheet: '平面図', name: 'A1', nameFormat: '{name}　邸　平面図'},
+      {sheet: '平面図', name: 'A1', nameFormat: '{name}　邸　平面図', legend: {cell: 'M48'}}, // 下の M48:AW48 は左上にそろえて折り返す空いた欄
       ...[1, 2, 3, 4].map((n) => ({sheet: `写真 (${n})`, ...PHOTO_SHEET})),
     ],
   },
@@ -193,7 +209,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
         ],
       },
       {sheet: '様式第2号別紙（住宅改修内訳明細書）', name: 'I6', insuredNo: boxes('W', 10, 7), kinds: KIND_ROWS, texts: [T('I5', '{kana}')]},
-      {sheet: '平面図 (2)', name: 'A1', nameFormat: '　{name}　様　邸　平面図'},
+      {sheet: '平面図 (2)', name: 'A1', nameFormat: '　{name}　様　邸　平面図', legend: {box: 'B37:H52'}}, // 前の申請と同じく、平面図の下にテキストボックス
       ...KOUIKI_PHOTO_SHEETS.map((sheet) => ({sheet, ...PHOTO_SHEET})),
     ],
   },
@@ -215,7 +231,12 @@ export type ShinseiValues = {
   cost: number | null; // 改修費用（数で書く欄。なければ null）
   start: string; // 着工・完了の日（'YYYY-MM-DD'。日付で書く欄）
   end: string;
+  photoImages?: Record<number, PhotoImages>; // 写真番号 → 写真貼付用紙に貼る写真（Excel に保存するときだけ。画面のプレビューは写真を別に重ねる）
 };
+
+/** 写真貼付用紙に貼る写真（JPEG のバイト列と、縦横の画素） */
+export type PhotoImage = {bytes: Uint8Array; w: number; h: number};
+export type PhotoImages = {before?: PhotoImage; after?: PhotoImage};
 
 /** 見積書に出る箇所ごとの、改修の内容の行と改修の種類（1〜6）・改修場所。見積書に出ない箇所（行のない箇所）は入れない */
 function workLines(job: Pick<Job, 'places'>, rates: EstimateRates): {kind: number; name: string; line: string}[] {
@@ -526,7 +547,8 @@ export function shinseiCells(sheet: ShinseiSheet, v: ShinseiValues, photo = 0): 
     out.set(k.places, v.kinds[i]?.places ?? '');
     out.set(k.works, v.kinds[i]?.works.join('\n') ?? '');
   });
-  if (sheet.photoPlace) out.set(sheet.photoPlace.place, (photo > 0 && v.photos[photo]) || '');
+  if (sheet.photoPlace?.place) out.set(sheet.photoPlace.place, (photo > 0 && v.photos[photo]) || '');
+  if (sheet.legend?.cell) out.set(sheet.legend.cell, v.works.join('\n'));
   for (const t of sheet.texts ?? []) {
     const keys = placeholders(t.format);
     // 何も入れていなければ原本の文字のまま（「本人との関係（　　　）」など）
@@ -596,12 +618,30 @@ export function fillShinseiFiles(files: Files, map: ShinseiMap, v: ShinseiValues
  * ファイルの中身は置きかえるだけなので、原本を開いたものを {...files} で写してから渡せば、原本は何度でも使える
  */
 export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void {
+  const pasted = new Set<number>(); // 写真を貼った写真番号（同じ番号の用紙が2枚＝広域連合なら、最初の用紙だけに貼る）
   for (const sheet of map.sheets) {
     const photo = sheet.photoPlace ? photoNumberOf(readCell(files, sheet.sheet, sheet.photoPlace.photo)) : 0;
     writeCells(files, sheet.sheet, shinseiCells(sheet, v, photo));
     wrapKinds(files, sheet, v);
     drawMarks(files, sheet, v.marks);
+    if (sheet.legend?.box) drawLegend(files, sheet, v.works);
+    const images = photo > 0 && v.photos[photo] !== undefined && !pasted.has(photo) ? v.photoImages?.[photo] : undefined; // 箇所のある写真番号だけ
+    if (images && (images.before || images.after)) {
+      pasted.add(photo);
+      drawPhotos(files, sheet, images);
+    }
   }
+}
+
+/** 写真貼付用紙の写真番号 → 写真を貼る用紙（原本の写真番号の欄を読む。同じ番号の用紙が2枚あれば最初の用紙） */
+export function photoSheets(files: Files, map: ShinseiMap): Map<number, ShinseiSheet> {
+  const out = new Map<number, ShinseiSheet>();
+  for (const sheet of map.sheets) {
+    if (!sheet.photoPlace?.before) continue;
+    const n = photoNumberOf(readCell(files, sheet.sheet, sheet.photoPlace.photo));
+    if (n > 0 && !out.has(n)) out.set(n, sheet);
+  }
+  return out;
 }
 
 /** 原本に残っていた被保険者番号などを消した原本（アプリに入れる原本を作るとき。転記する欄を空にする。ほかは原本のまま） */
@@ -790,18 +830,27 @@ function anchorAt(px: number, size: (i: number) => number): [number, number] {
   return [i - 1, Math.max(0, Math.round((px - acc) * EMU))];
 }
 
-/** 楕円の図形（前の申請の丸と同じ：塗りなし・黒の線） */
-function ellipseXml(lay: SheetLayout, box: Box, id: number): string {
+/** 図形の置き場所（左上と右下の欄と、その中の位置） */
+function fromTo(lay: SheetLayout, box: Box): string {
   const [c1, co1] = anchorAt(box.x, lay.colW);
   const [r1, ro1] = anchorAt(box.y, lay.rowH);
   const [c2, co2] = anchorAt(box.x + box.w, lay.colW);
   const [r2, ro2] = anchorAt(box.y + box.h, lay.rowH);
-  const e = (px: number) => Math.round(px * EMU);
   return (
-    `<xdr:twoCellAnchor><xdr:from><xdr:col>${c1}</xdr:col><xdr:colOff>${co1}</xdr:colOff><xdr:row>${r1}</xdr:row><xdr:rowOff>${ro1}</xdr:rowOff></xdr:from>` +
-    `<xdr:to><xdr:col>${c2}</xdr:col><xdr:colOff>${co2}</xdr:colOff><xdr:row>${r2}</xdr:row><xdr:rowOff>${ro2}</xdr:rowOff></xdr:to>` +
+    `<xdr:from><xdr:col>${c1}</xdr:col><xdr:colOff>${co1}</xdr:colOff><xdr:row>${r1}</xdr:row><xdr:rowOff>${ro1}</xdr:rowOff></xdr:from>` +
+    `<xdr:to><xdr:col>${c2}</xdr:col><xdr:colOff>${co2}</xdr:colOff><xdr:row>${r2}</xdr:row><xdr:rowOff>${ro2}</xdr:rowOff></xdr:to>`
+  );
+}
+
+const emu = (px: number) => Math.round(px * EMU);
+const xfrm = (box: Box) => `<a:xfrm><a:off x="${emu(box.x)}" y="${emu(box.y)}"/><a:ext cx="${emu(box.w)}" cy="${emu(box.h)}"/></a:xfrm>`;
+
+/** 楕円の図形（前の申請の丸と同じ：塗りなし・黒の線） */
+function ellipseXml(lay: SheetLayout, box: Box, id: number): string {
+  return (
+    `<xdr:twoCellAnchor>${fromTo(lay, box)}` +
     `<xdr:sp macro="" textlink=""><xdr:nvSpPr><xdr:cNvPr id="${id}" name="楕円 ${id}"/><xdr:cNvSpPr/></xdr:nvSpPr>` +
-    `<xdr:spPr><a:xfrm><a:off x="${e(box.x)}" y="${e(box.y)}"/><a:ext cx="${e(box.w)}" cy="${e(box.h)}"/></a:xfrm><a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom><a:noFill/>` +
+    `<xdr:spPr>${xfrm(box)}<a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom><a:noFill/>` +
     `<a:ln w="12700"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:ln></xdr:spPr></xdr:sp><xdr:clientData/></xdr:twoCellAnchor>`
   );
 }
@@ -861,6 +910,98 @@ function findNeedle(text: string, needles: string[], i: number): [number, number
   return null;
 }
 
+/** 範囲（'A9:S31'。結合した欄の左上だけでもよい）の位置と大きさ（画素。シートの左上から） */
+export function rangeBox(lay: SheetLayout, range: string): Box {
+  const m = /^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/.exec(range);
+  if (!m) return {x: 0, y: 0, w: 0, h: 0};
+  let [c1, r1, c2, r2] = [colNum(m[1]), Number(m[2]), colNum(m[3] ?? m[1]), Number(m[4] ?? m[2])];
+  const merged = lay.merges.find((x) => x[0] === c1 && x[1] === r1);
+  if (!m[3] && merged) [c1, r1, c2, r2] = merged;
+  const sum = (from: number, to: number, size: (i: number) => number) => {
+    let t = 0;
+    for (let i = from; i <= to; i++) t += size(i);
+    return t;
+  };
+  return {x: sum(1, c1 - 1, lay.colW), y: sum(1, r1 - 1, lay.rowH), w: sum(c1, c2, lay.colW), h: sum(r1, r2, lay.rowH)};
+}
+
+/** 図形のファイルの次の番号（cNvPr の id） */
+const nextShapeId = (d: string) => Math.max(1, ...[...d.matchAll(/<xdr:cNvPr\b[^>]*\sid="(\d+)"/g)].map((m) => Number(m[1]))) + 1;
+
+/**
+ * 平面図の工事内容：範囲いっぱいのテキストボックス（線・塗りなし、12pt、1行に1箇所）。前の申請の平面図と同じ形で、Excel で動かしたり直したりできる。
+ * 行が多くて枠からあふれても隠さない（切り取らない）。平面図そのもの（横棒＝横手すり、丸＝縦手すり、番号）はユーザーが Excel で描く
+ */
+function drawLegend(files: Files, sheet: ShinseiSheet, lines: string[]): void {
+  const range = sheet.legend?.box;
+  const path = sheetPaths(files).get(sheet.sheet);
+  if (!range || lines.length === 0 || !path || !files[path]) return;
+  const lay = sheetLayout(strFromU8(files[path]));
+  const box = rangeBox(lay, range);
+  const drawing = drawingOf(files, path);
+  const d = drawing && files[drawing] ? strFromU8(files[drawing]) : '';
+  if (!d.includes('</xdr:wsDr>')) return;
+  const id = nextShapeId(d);
+  const paras = lines.map((l) => `<a:p><a:r><a:rPr lang="ja-JP" altLang="en-US" sz="1200"/><a:t>${esc(l)}</a:t></a:r></a:p>`).join('');
+  const xml =
+    `<xdr:twoCellAnchor>${fromTo(lay, box)}<xdr:sp macro="" textlink=""><xdr:nvSpPr><xdr:cNvPr id="${id}" name="工事内容 ${id}"/><xdr:cNvSpPr txBox="1"/></xdr:nvSpPr>` +
+    `<xdr:spPr>${xfrm(box)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln w="9525"><a:noFill/></a:ln></xdr:spPr>` +
+    `<xdr:txBody><a:bodyPr wrap="square" rtlCol="0" anchor="t"/><a:lstStyle/>${paras}</xdr:txBody></xdr:sp><xdr:clientData/></xdr:twoCellAnchor>`;
+  files[drawing] = strToU8(d.replace('</xdr:wsDr>', `${xml}</xdr:wsDr>`));
+}
+
+const REL_IMAGE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
+const NS_R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+
+/** 写真の枠（範囲）に写真を置く位置：縦横の比はそのまま、枠に収まるだけ大きく、まん中に（まわりに 4画素あける） */
+export function photoFit(frame: Box, w: number, h: number): Box {
+  const pad = 4;
+  const k = Math.max(0, Math.min((frame.w - 2 * pad) / Math.max(w, 1), (frame.h - 2 * pad) / Math.max(h, 1)));
+  const [pw, ph] = [w * k, h * k];
+  return {x: frame.x + (frame.w - pw) / 2, y: frame.y + (frame.h - ph) / 2, w: pw, h: ph};
+}
+
+/** 写真貼付用紙の改修前・改修後の枠に写真を貼る（xl/media に JPEG を入れ、図形のファイルに写真の図形を足す） */
+function drawPhotos(files: Files, sheet: ShinseiSheet, images: PhotoImages): void {
+  const place = sheet.photoPlace;
+  const path = sheetPaths(files).get(sheet.sheet);
+  if (!place || !path || !files[path]) return;
+  const lay = sheetLayout(strFromU8(files[path]));
+  const drawing = drawingOf(files, path);
+  let d = drawing && files[drawing] ? strFromU8(files[drawing]) : '';
+  if (!drawing || !d.includes('</xdr:wsDr>')) return;
+  const relsPath = drawing.replace(/([^/]+)$/, '_rels/$1.rels');
+  let rels = files[relsPath] ? strFromU8(files[relsPath]) : '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+  let id = nextShapeId(d);
+  const pics: string[] = [];
+  for (const slot of ['before', 'after'] as const) {
+    const img = images[slot];
+    const range = place[slot];
+    if (!img || !range) continue;
+    const box = photoFit(rangeBox(lay, range), img.w, img.h);
+    let n = 1;
+    while (files[`xl/media/image${n}.jpeg`]) n++;
+    files[`xl/media/image${n}.jpeg`] = img.bytes;
+    let k = 1;
+    while (rels.includes(`Id="rId${k}"`)) k++;
+    rels = rels.replace('</Relationships>', `<Relationship Id="rId${k}" Type="${REL_IMAGE}" Target="../media/image${n}.jpeg"/></Relationships>`);
+    const name = slot === 'before' ? '改修前' : '改修後';
+    pics.push(
+      `<xdr:twoCellAnchor editAs="oneCell">${fromTo(lay, box)}<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${id}" name="${name} ${id}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>` +
+        `<xdr:blipFill><a:blip r:embed="rId${k}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>` +
+        `<xdr:spPr>${xfrm(box)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor>`,
+    );
+    id++;
+  }
+  if (pics.length === 0) return;
+  files[relsPath] = strToU8(rels);
+  const root = /<xdr:wsDr\b[^>]*>/.exec(d)?.[0] ?? '';
+  if (root && !/\sxmlns:r=/.test(root)) d = d.replace(root, root.replace('<xdr:wsDr', `<xdr:wsDr xmlns:r="${NS_R}"`));
+  files[drawing] = strToU8(d.replace('</xdr:wsDr>', `${pics.join('')}</xdr:wsDr>`));
+  const ct = strFromU8(files['[Content_Types].xml']);
+  if (!/<Default\b[^>]*Extension="jpeg"/i.test(ct)) files['[Content_Types].xml'] = strToU8(ct.replace(/(<Types\b[^>]*>)/, '$1<Default Extension="jpeg" ContentType="image/jpeg"/>'));
+}
+
 /** 選んだ値（性別の「女」など）を丸で囲む：原本のシートの図形に楕円を足す */
 function drawMarks(files: Files, sheet: ShinseiSheet, marks: ShinseiMarks): void {
   const path = sheetPaths(files).get(sheet.sheet);
@@ -879,7 +1020,7 @@ function drawMarks(files: Files, sheet: ShinseiSheet, marks: ShinseiMarks): void
   const drawing = drawingOf(files, path);
   const d = drawing && files[drawing] ? strFromU8(files[drawing]) : '';
   if (!d.includes('</xdr:wsDr>')) return;
-  const id = Math.max(1, ...[...d.matchAll(/<xdr:cNvPr\b[^>]*\sid="(\d+)"/g)].map((m) => Number(m[1]))) + 1;
+  const id = nextShapeId(d);
   files[drawing] = strToU8(d.replace('</xdr:wsDr>', `${boxes.map((b, k) => ellipseXml(lay, b, id + k)).join('')}</xdr:wsDr>`));
 }
 

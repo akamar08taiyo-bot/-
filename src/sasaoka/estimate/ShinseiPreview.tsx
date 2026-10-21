@@ -1,10 +1,13 @@
 // 申請書のプレビュー：原本の様式のまま描く（材料は shinseiPreview.ts。Excel に保存するときと同じ書き込みをしたもの）。
 // 欄を押すと、その項目を入れる所が欄のすぐ下に出る（打つとプレビューもすぐ変わる。Enter で次の欄へ）。
-// 丸で囲む値（男・女など）は押すと丸がつく（もう一度押すと外れる）。まだ入っていない欄は薄い黄色。スマホでは入れる所を画面の下に出す
+// 丸で囲む値（男・女など）は押すと丸がつく（もう一度押すと外れる）。まだ入っていない欄は薄い黄色。スマホでは入れる所を画面の下に出す。
+// 写真貼付用紙は、改修前・改修後の枠に写真を重ねて出す（枠に写真のファイル・写真の欄の写真をドロップ、押して選ぶ）
 
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
-import type {CSSProperties, KeyboardEvent, ReactNode} from 'react';
-import type {PvFont, PvHeader, PvPage, PvShape, PvText, Rect, ShinseiField} from '../shinseiPreview.ts';
+import type {CSSProperties, DragEvent, KeyboardEvent, ReactNode} from 'react';
+import type {PvFont, PvHeader, PvPage, PvPhotoSlot, PvShape, PvText, Rect, ShinseiField} from '../shinseiPreview.ts';
+import {circled} from '../estimateForms.ts';
+import {photoFit} from '../shinsei.ts';
 import type {ShinseiMarks} from '../types.ts';
 
 const PAD = 18; // 紙の余白（画素）
@@ -136,6 +139,74 @@ function ShapeView({s}: {s: PvShape}) {
   return <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke} strokeWidth={w} />;
 }
 
+/** 図形の中の文字（平面図の工事内容の文字の枠など）：段落ごとに改行し、左右・上下の配置と文字のまわりの余白は原本のとおり */
+function ShapeText({s}: {s: PvShape}) {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: s.x,
+        top: s.y,
+        width: s.w,
+        height: s.h,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: s.valign === 'top' ? 'flex-start' : s.valign === 'bottom' ? 'flex-end' : 'center',
+        padding: `${s.inset.t}px ${s.inset.r}px ${s.inset.b}px ${s.inset.l}px`,
+        textAlign: s.align,
+        whiteSpace: s.wrap ? 'pre-wrap' : 'pre',
+        wordBreak: 'break-all',
+        lineHeight: 1.2,
+        ...fontCss(s.font!),
+      }}
+    >
+      {s.text}
+    </div>
+  );
+}
+
+/** 写真貼付用紙の写真（画面の URL と大きさ）と、枠にドロップ・枠を押したとき */
+export type PreviewPhotos = {
+  of: (no: number, slot: PvPhotoSlot['slot']) => {url: string; w: number; h: number} | null;
+  onDrop: (no: number, slot: PvPhotoSlot['slot'], e: DragEvent) => void;
+  onPick: (no: number, slot: PvPhotoSlot['slot']) => void;
+};
+
+const SLOT_NAME = {before: '改修前', after: '改修後'} as const;
+
+/** 写真貼付用紙の改修前・改修後の枠：写真は Excel に貼るのと同じ大きさ・位置（photoFit）。ないときは「＋ 改修前」 */
+function PhotoSlotView({slot, no, photos}: {slot: PvPhotoSlot; no: number; photos: PreviewPhotos}) {
+  const [over, setOver] = useState(false);
+  const photo = photos.of(no, slot.slot);
+  const fit = photo ? photoFit({x: 0, y: 0, w: slot.w, h: slot.h}, photo.w, photo.h) : null;
+  return (
+    <button
+      type="button"
+      aria-label={`写真貼付用紙${circled(no)}の${SLOT_NAME[slot.slot]}`}
+      title={photo ? `${SLOT_NAME[slot.slot]}の写真を差し替える（写真をドロップしても入ります）` : `${SLOT_NAME[slot.slot]}の写真を入れる`}
+      onDragOver={(e) => {
+        if (![...e.dataTransfer.types].some((t) => t === 'Files' || t.startsWith('application/x-sasaoka-photo'))) return;
+        e.preventDefault();
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        setOver(false);
+        photos.onDrop(no, slot.slot, e);
+      }}
+      onClick={() => photos.onPick(no, slot.slot)}
+      className={`absolute cursor-pointer ${over ? 'bg-emerald-400/15 outline outline-4 outline-emerald-600' : photo ? 'hover:outline hover:outline-2 hover:outline-emerald-600' : 'hover:bg-emerald-400/10'}`}
+      style={{left: slot.x, top: slot.y, width: slot.w, height: slot.h}}
+    >
+      {photo && fit ? (
+        <img src={photo.url} alt="" draggable={false} className="absolute" style={{left: fit.x, top: fit.y, width: fit.w, height: fit.h}} />
+      ) : (
+        <span className="absolute inset-3 flex items-center justify-center rounded-md border-2 border-dashed border-slate-300 text-base text-slate-400">＋ {SLOT_NAME[slot.slot]}</span>
+      )}
+    </button>
+  );
+}
+
 function HeaderView({h, top, width, height}: {h: PvHeader; top: number; width: number; height: number}) {
   const part = (runs: PvHeader['left'], align: 'left' | 'center' | 'right') => (
     <div style={{flex: 1, textAlign: align, whiteSpace: 'pre'}}>
@@ -175,6 +246,7 @@ export function ShinseiPages({
   onMove,
   editor,
   wide,
+  photos,
 }: {
   pages: PvPage[];
   missing: Partial<Record<ShinseiField, boolean>>;
@@ -186,6 +258,7 @@ export function ShinseiPages({
   onMove: (dir: 1 | -1) => void; // 前・次の項目へ
   editor: ReactNode; // 開いている項目の入れる所
   wide: boolean; // 入れる所を広く（改修の内容）
+  photos?: PreviewPhotos; // 写真貼付用紙の写真（ないときは枠を出さない）
 }) {
   const [wrapRef, wrapWidth] = useWidth<HTMLDivElement>();
   // どの欄を押して開いたか（同じ項目が2枚目にもあるとき＝式で同じ値を出している欄、押した方の下に出す）
@@ -318,9 +391,7 @@ export function ShinseiPages({
                 {page.shapes
                   .filter((s) => s.text && s.font)
                   .map((s, i) => (
-                    <div key={`st${i}`} style={{position: 'absolute', left: s.x, top: s.y, width: s.w, height: s.h, display: 'grid', placeItems: 'center', textAlign: 'center', whiteSpace: 'pre', ...fontCss(s.font!)}}>
-                      {s.text}
-                    </div>
+                    <ShapeText key={`st${i}`} s={s} />
                   ))}
                 <svg width={page.width} height={page.height} className="pointer-events-none absolute left-0 top-0 overflow-visible">
                   {page.lines.map((l, i) =>
@@ -381,6 +452,8 @@ export function ShinseiPages({
                     />
                   );
                 })}
+                {/* 写真貼付用紙の写真の枠 */}
+                {photos && page.photoSlots.map((slot) => <PhotoSlotView key={slot.slot} slot={slot} no={page.photo} photos={photos} />)}
                 {/* 押すと丸がつく値 */}
                 {page.options.map((o, i) => (
                   <button

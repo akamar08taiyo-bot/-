@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
-import {jobName, startEstimate} from '../calc.ts';
+import {hasEstimateRows, jobName, startEstimate} from '../calc.ts';
 import {EstimateSheet} from '../components/EstimateSheet.tsx';
 import {LaborPickerFor, missingShikiri, ShikiriPriceDialog} from '../components/JobTools.tsx';
 import {KitPicker} from '../components/Kits.tsx';
@@ -68,6 +68,9 @@ export function EstimateEditor({
   };
 
   const name = job.customer.trim() ? jobName(job) : '新しい見積書';
+  // 発注書・笹岡工務店の請求書は、見積書を作ったとき（行を入れたとき）だけ（ユーザーの指示「見積もりを作成した時のみ、その利用者の請求書…発注書の作成をできるように」。
+  // 申請書だけの様邸＝ほかの工務店の工事は、見積書が向こうから来るので、ここでは作らない）
+  const estimated = hasEstimateRows(job);
   // 保存：打ち込むたびに自動で保存しているが、ボタン（と Ctrl+S）でもすぐ保存できる。
   // 見積書の欄に打ち込んでいる途中なら、欄から離れて値を入れてから保存する
   const save = () => {
@@ -147,7 +150,7 @@ export function EstimateEditor({
           <Btn color="white" onClick={clearSheet} disabled={blank}>
             📄 白紙に戻す
           </Btn>
-          <Btn color="white" onClick={onOpenOrder}>
+          <Btn color="white" onClick={onOpenOrder} disabled={!estimated} title={estimated ? undefined : '見積書に部材を入れると作れます'}>
             🛒 発注書を作成
           </Btn>
           <Btn color="white" onClick={duplicate}>
@@ -243,7 +246,7 @@ export function EstimateEditor({
             aria-label="見積もり作成日"
           />
         </label>
-        <ShikiriFields job={job} data={data} setJob={setJob} onFix={() => setFixPrices(true)} onOpenInvoice={() => onOpenInvoice(job.id)} />
+        {(estimated || job.shikiri) && <ShikiriFields job={job} data={data} setJob={setJob} onFix={() => setFixPrices(true)} onOpenInvoice={() => onOpenInvoice(job.id)} />}
         {byAddress && byAddress !== insurer && (
           <div className="flex w-full flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900">
             工事場所の住所は「{INSURER_INFO[byAddress].name}」です{INSURER_INFO[byAddress].form !== form ? `（見積書は${FORM_INFO[INSURER_INFO[byAddress].form].name}）` : ''}。

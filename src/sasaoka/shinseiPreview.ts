@@ -5,7 +5,7 @@
 // あわせて、押すと入れられる欄（フリガナ・生年月日…）と、押すと丸がつく値（男・女…）の位置も返す（式で同じ値を出している欄＝支給申請書の氏名なども押せる）
 
 import {strFromU8} from 'fflate';
-import {attrOf, colName, colNum, EMU, fillFiles, formulaRef, markOptions, markTexts, numOf, placeholders, sheetLayout, sheetPaths, styleParts, unesc} from './shinsei.ts';
+import {attrOf, colName, colNum, EMU, fillFiles, formulaRef, markOptions, markTexts, numOf, photoSheets, placeholders, rangeBox, sheetLayout, sheetPaths, styleParts, unesc} from './shinsei.ts';
 import type {Files, SheetLayout, ShinseiMap, ShinseiSheet, ShinseiTexts, ShinseiValues, StyleParts} from './shinsei.ts';
 import type {ShinseiMarks} from './types.ts';
 
@@ -28,7 +28,22 @@ export type PvText = Rect & {
   marked?: {chars: {ch: string; x: number; w: number}[]; cy: number; em: number};
 };
 export type PvLine = {x1: number; y1: number; x2: number; y2: number; width: number; dash: string; color: string; double: boolean};
-export type PvShape = Rect & {kind: 'ellipse' | 'rect' | 'roundRect' | 'bracketPair' | 'line'; stroke: string; width: number; fill: string; flipH: boolean; flipV: boolean; text: string; font: PvFont | null};
+export type PvShape = Rect & {
+  kind: 'ellipse' | 'rect' | 'roundRect' | 'bracketPair' | 'line';
+  stroke: string;
+  width: number;
+  fill: string;
+  flipH: boolean;
+  flipV: boolean;
+  text: string; // 図形の中の文字（段落ごとに改行）
+  font: PvFont | null;
+  align: 'left' | 'center' | 'right';
+  valign: 'top' | 'center' | 'bottom';
+  wrap: boolean; // 図形の幅で折り返す（bodyPr の wrap="none" のときだけ折り返さない）
+  inset: {l: number; t: number; r: number; b: number}; // 文字のまわりの余白（画素）
+};
+/** 写真貼付用紙の写真の枠（改修前・改修後） */
+export type PvPhotoSlot = Rect & {slot: 'before' | 'after'};
 export type PvHeader = {left: PvRun[]; center: PvRun[]; right: PvRun[]};
 /** 押すと入れられる欄（field の入れる所を開く） */
 export type PvField = Rect & {field: ShinseiField; ref: string};
@@ -37,6 +52,9 @@ export type PvOption = Rect & {key: keyof ShinseiMarks; option: string};
 /** 申請書の1枚（原本の1つのシート） */
 export type PvPage = {
   sheet: string;
+  kind: 'form' | 'plan' | 'photo'; // 申請書の様式・平面図・写真貼付用紙
+  photo: number; // 写真貼付用紙の写真番号（ほかは 0）
+  photoSlots: PvPhotoSlot[];
   width: number;
   height: number;
   fills: (Rect & {color: string})[];
@@ -53,7 +71,8 @@ export type PvPage = {
 export const isFormSheet = (s: ShinseiSheet) => !!(s.texts || s.works || s.kinds);
 
 /**
- * 申請書のプレビュー：原本（開いたもの）に転記して、様式のシートごとに1枚。
+ * 申請書のプレビュー：原本（開いたもの）に転記して、様式のシートごとに1枚。そのうしろに平面図（工事内容）と、
+ * 写真番号のある箇所の写真貼付用紙（写真番号ごとに1枚。写真は画面で枠に重ねる）。
  * 原本はそのまま（{...template} に書き込む）なので、打つたびに呼んでよい
  */
 export function shinseiPreview(template: Files, map: ShinseiMap, v: ShinseiValues): PvPage[] {
@@ -62,10 +81,16 @@ export function shinseiPreview(template: Files, map: ShinseiMap, v: ShinseiValue
   const paths = sheetPaths(files);
   const links = fieldCellsOf(map);
   const pages: PvPage[] = [];
-  for (const sheet of map.sheets.filter(isFormSheet)) {
+  const add = (sheet: ShinseiSheet, kind: PvPage['kind'], photo = 0) => {
     const path = paths.get(sheet.sheet);
-    if (!path || !files[path] || !template[path]) continue;
-    pages.push(buildPage(files, path, template[path], sheet, links));
+    if (path && files[path] && template[path]) pages.push(buildPage(files, path, template[path], sheet, links, kind, photo));
+  };
+  for (const sheet of map.sheets.filter(isFormSheet)) add(sheet, 'form');
+  for (const sheet of map.sheets.filter((s) => s.legend)) add(sheet, 'plan');
+  const sheets = photoSheets(template, map);
+  for (const n of Object.keys(v.photos).map(Number).sort((a, b) => a - b)) {
+    const sheet = sheets.get(n);
+    if (sheet) add(sheet, 'photo', n);
   }
   return pages;
 }
@@ -517,18 +542,48 @@ function formRange(templateXml: string, xfs: Xf[]): Range {
   return c2 ? [c1, r1, c2, r2] : [1, 1, 1, 1];
 }
 
-function buildPage(files: Files, path: string, templateSheet: Uint8Array, sheet: ShinseiSheet, links: Map<string, ShinseiField>): PvPage {
+/** シートの印刷の範囲（ブックの名前の定義 _xlnm.Print_Area。localSheetId はシートの順番） */
+function printRange(files: Files, sheetName: string): Range | null {
+  const wb = strFromU8(files['xl/workbook.xml']);
+  const order = [...wb.matchAll(/<sheet\b[^>]*\bname="([^"]*)"/g)].map((m) => unesc(m[1]));
+  const idx = order.indexOf(sheetName);
+  for (const m of wb.matchAll(/<definedName\b([^>]*)>([^<]*)<\/definedName>/g)) {
+    if (attrOf(m[1], 'name') !== '_xlnm.Print_Area' || Number(attrOf(m[1], 'localSheetId')) !== idx) continue;
+    const r = /\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)$/.exec(unesc(m[2]).split(',')[0]);
+    if (r) return [colNum(r[1]), Number(r[2]), colNum(r[3]), Number(r[4])];
+  }
+  return null;
+}
+
+/** 印刷の1ページ目に入る列・行（A4・余白・倍率から。印刷の範囲のない平面図） */
+function firstPage(xml: string, lay: SheetLayout): Range {
+  const setup = /<pageSetup\b[^>]*>/.exec(xml)?.[0] ?? '';
+  const margins = /<pageMargins\b[^>]*>/.exec(xml)?.[0] ?? '';
+  const scale = numOf(attrOf(setup, 'scale'), 100) / 100;
+  const landscape = attrOf(setup, 'orientation') === 'landscape';
+  const [pw, ph] = landscape ? [11.69, 8.27] : [8.27, 11.69];
+  const w = ((pw - numOf(attrOf(margins, 'left'), 0.7) - numOf(attrOf(margins, 'right'), 0.7)) * 96) / scale;
+  const h = ((ph - numOf(attrOf(margins, 'top'), 0.75) - numOf(attrOf(margins, 'bottom'), 0.75)) * 96) / scale;
+  let c = 1;
+  for (let x = 0; c < 16384 && x + lay.colW(c) <= w; c++) x += lay.colW(c);
+  let r = 1;
+  for (let y = 0; r < 1048576 && y + lay.rowH(r) <= h; r++) y += lay.rowH(r);
+  return [1, 1, Math.max(1, c - 1), Math.max(1, r - 1)];
+}
+
+function buildPage(files: Files, path: string, templateSheet: Uint8Array, sheet: ShinseiSheet, links: Map<string, ShinseiField>, kind: PvPage['kind'], photo: number): PvPage {
   const xml = strFromU8(files[path]);
   const xfs = xfsOf(files);
   const st = styleParts(files);
   const theme = themeOf(files);
+  const lay = sheetLayout(xml);
+  // 範囲：申請書の様式は罫線・文字のある四角。平面図・写真貼付用紙は印刷の範囲（なければ印刷の1ページ目）
   let range = rangeCache.get(templateSheet);
   if (!range) {
-    range = formRange(strFromU8(templateSheet), xfs);
+    range = kind === 'form' ? formRange(strFromU8(templateSheet), xfs) : (printRange(files, sheet.sheet) ?? firstPage(strFromU8(templateSheet), lay));
     rangeCache.set(templateSheet, range);
   }
   const [c1, r1, c2, r2] = range;
-  const lay = sheetLayout(xml);
   // 列・行の位置（ページの左上から。xs[c] は c 列の左、ys[r] は r 行の上）
   const xs: number[] = [];
   const ys: number[] = [];
@@ -660,8 +715,20 @@ function buildPage(files: Files, path: string, templateSheet: Uint8Array, sheet:
   }
   const lines = joinLines([...edges.values()]);
 
+  // 写真の枠（ページの位置）
+  const photoSlots: PvPhotoSlot[] = [];
+  for (const slot of ['before', 'after'] as const) {
+    const ref = kind === 'photo' ? sheet.photoPlace?.[slot] : undefined;
+    if (!ref) continue;
+    const b = rangeBox(lay, ref);
+    photoSlots.push({slot, x: b.x - ox, y: b.y - oy, w: b.w, h: b.h});
+  }
+
   return {
     sheet: sheet.sheet,
+    kind,
+    photo,
+    photoSlots,
     width: xs[c2 + 1],
     height: ys[r2 + 1],
     fills,
@@ -793,6 +860,8 @@ function readShapes(files: Files, sheetPath: string, xml: string, lay: SheetLayo
     y -= oy;
     // 様式の外（ページの外）の図形は出さない
     if (x + w / 2 < 0 || y + h / 2 < 0 || x + w / 2 > width || y + h / 2 > height) continue;
+    // 大きさのない図形（原本に残っている高さ0・幅がマイナスの図形。Excel でも見えない）は出さない。線は縦・横の線（幅か高さが0）もある
+    if (kind === 'line' ? Math.abs(w) < 0.5 && Math.abs(h) < 0.5 : w < 0.5 || h < 0.5) continue;
     const spPr = /<xdr:spPr\b[^>]*>([\s\S]*?)<\/xdr:spPr>/.exec(sp)?.[1] ?? '';
     const style = /<xdr:style>([\s\S]*?)<\/xdr:style>/.exec(sp)?.[1] ?? '';
     const ln = /<a:ln\b([^>]*)(?:\/>|>([\s\S]*?)<\/a:ln>)/.exec(spPr);
@@ -821,8 +890,13 @@ function readShapes(files: Files, sheetPath: string, xml: string, lay: SheetLayo
     else if (fillRef && Number(fillRef[1]) > 0) fill = drawColor(fillRef[2]);
     const xfrm = /<a:xfrm\b([^>]*)>/.exec(spPr)?.[1] ?? '';
     const paras = [...sp.matchAll(/<a:p>([\s\S]*?)<\/a:p>/g)].map((p) => [...p[1].matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((t) => unesc(t[1])).join(''));
-    const text = paras.join('\n').trim();
+    const text = paras.join('\n').replace(/^\n+|\n+$/g, '');
     const sz = /<a:rPr\b[^>]*\ssz="(\d+)"/.exec(sp)?.[1];
+    // 文字の配置：左右は段落の algn（ないときは左）、上下は bodyPr の anchor（ないときは上）。まわりの余白は lIns など（ないときは 0.1インチ・0.05インチ）
+    const bodyPr = /<a:bodyPr\b[^>]*>/.exec(sp)?.[0] ?? '';
+    const algn = /<a:pPr\b[^>]*\salgn="(\w+)"/.exec(sp)?.[1];
+    const anchor = attrOf(bodyPr, 'anchor');
+    const ins = (name: string, d: number) => numOf(attrOf(bodyPr, name), d) / EMU;
     out.push({
       kind,
       x,
@@ -835,7 +909,21 @@ function readShapes(files: Files, sheetPath: string, xml: string, lay: SheetLayo
       flipH: attrOf(xfrm, 'flipH') === '1',
       flipV: attrOf(xfrm, 'flipV') === '1',
       text,
-      font: text ? {family: familyOf(''), size: ((sz ? Number(sz) / 100 : 11) * 4) / 3, bold: false, italic: false, underline: false, strike: false, color: drawColor(/<xdr:txBody>[\s\S]*?<a:solidFill>([\s\S]*?)<\/a:solidFill>/.exec(sp)?.[1]) || '#000000'} : null,
+      font: text
+        ? {
+            family: familyOf(''),
+            size: ((sz ? Number(sz) / 100 : 11) * 4) / 3,
+            bold: /<a:rPr\b[^>]*\sb="1"/.test(sp),
+            italic: false,
+            underline: false,
+            strike: false,
+            color: drawColor(/<xdr:txBody>[\s\S]*?<a:solidFill>([\s\S]*?)<\/a:solidFill>/.exec(sp)?.[1]) || '#000000',
+          }
+        : null,
+      align: algn === 'ctr' ? 'center' : algn === 'r' ? 'right' : 'left',
+      valign: anchor === 'ctr' ? 'center' : anchor === 'b' ? 'bottom' : 'top',
+      wrap: attrOf(bodyPr, 'wrap') !== 'none',
+      inset: {l: ins('lIns', 91440), t: ins('tIns', 45720), r: ins('rIns', 91440), b: ins('bIns', 45720)},
     });
   }
   return out;

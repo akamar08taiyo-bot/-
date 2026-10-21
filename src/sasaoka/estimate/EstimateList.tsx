@@ -1,5 +1,5 @@
 import {useMemo, useState} from 'react';
-import {estimateTotals, jobName} from '../calc.ts';
+import {estimateTotals, hasEstimateRows, jobName} from '../calc.ts';
 import {copyJob} from '../components/JobTools.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm, NO_SHINSEI} from '../estimateForms.ts';
@@ -53,9 +53,10 @@ export function removeEstimate(job: Job, label: string, update: Update, toast: (
   return true;
 }
 
-/** 見積書を複製する（お客様名に「（コピー）」。今月分の笹岡工務店の請求書に入れる）。複製したものを返す */
+/** 見積書を複製する（お客様名に「（コピー）」。見積書を作ってあれば今月分の笹岡工務店の請求書に入れる。申請書だけなら申請書だけ）。複製したものを返す */
 export function duplicateEstimate(job: Job, update: Update, toast: (text: string) => void): Job {
-  const c = {...copyJob(job), estDate: todayIso(), shikiri: true, month: thisMonth()};
+  const estimated = hasEstimateRows(job);
+  const c = {...copyJob(job), estDate: estimated ? todayIso() : '', shikiri: estimated, month: thisMonth()};
   update('jobs', (list) => [...list, c]);
   toast('複製しました。お客様名などを書き換えてください。');
   return c;
@@ -195,7 +196,7 @@ function GettingStarted({data, update, goMaterials, onSample}: {data: AppData; u
           {s.estimateRate} になります。
         </li>
         <li>
-          見積書に入れた内容は、そのまま笹岡工務店の仕切り計算表と請求書（「請求書を確認する」）に入り、自動で計算されます（笹岡工務店の工事でない見積書は、見積書の上の「笹岡工務店の請求書に入れる」を外します）。
+          見積書に行を入れると、笹岡工務店の仕切り計算表と請求書（「請求書を確認する」）に入って自動で計算され、発注書も作れます。申請書だけの様邸（ほかの工務店の工事）は、請求書・発注書に入りません（笹岡工務店の工事でない見積書は、見積書の上の「笹岡工務店の請求書に入れる」を外します）。
         </li>
       </ol>
       {!hasSamples(data) && (
@@ -306,6 +307,7 @@ export function EstimateList({
               {list.slice(0, limit).map(({job, date, form, insurer, t}) => {
                 // お客様名のない見積書は、作成日と金額でどれか分かるようにする
                 const label = job.customer.trim() ? jobName(job) : `お客様名なし・${dateText(date)}・${yen(t.all.total)}円`;
+                const estimated = hasEstimateRows(job); // 見積書を作った様邸（申請書だけの様邸は、請求書・発注書に入らない）
                 return (
                   <tr key={job.id} className="cursor-pointer border-t border-slate-100 hover:bg-emerald-50/60" onClick={() => onOpen(job.id)}>
                     <td className="whitespace-nowrap px-2 py-2 tabular-nums">{dateText(date)}</td>
@@ -322,12 +324,14 @@ export function EstimateList({
                       {insurer}
                     </td>
                     <td className="whitespace-nowrap px-2 py-2">{staffShort(job.staff) || <span className="text-slate-400">—</span>}</td>
-                    <td className="px-2 py-2 text-right font-bold tabular-nums text-emerald-900">{yen(t.all.total)}</td>
+                    <td className="px-2 py-2 text-right font-bold tabular-nums text-emerald-900">{estimated ? yen(t.all.total) : <span className="font-normal text-slate-400">—</span>}</td>
                     <td className="whitespace-nowrap px-2 py-2 text-xs">
                       {job.shikiri ? (
                         <span className="rounded bg-[#0c315e] px-1.5 py-0.5 font-bold text-white">{monthLabel(job.month)}分に入れる</span>
-                      ) : (
+                      ) : estimated ? (
                         <span className="text-slate-400">入れない</span>
+                      ) : (
+                        <span className="text-slate-500">申請書だけ</span>
                       )}
                     </td>
                     <td className="whitespace-nowrap px-2 py-1.5 text-right" onClick={(e) => e.stopPropagation()}>

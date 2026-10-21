@@ -5,9 +5,11 @@ import {unzipSync} from 'fflate';
 import {useEffect, useState} from 'react';
 import {downloadBlob} from '../util.ts';
 import {XLSX_TYPE} from '../estimateXlsx.ts';
+import {photoNumbers} from '../estimateForms.ts';
+import {getPhotos} from '../photos.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {fillShinseiFiles, SHINSEI, shinseiFileName, shinseiValues} from '../shinsei.ts';
-import type {Files} from '../shinsei.ts';
+import type {Files, PhotoImages} from '../shinsei.ts';
 import type {Insurer, Job, Settings} from '../types.ts';
 import kanda from '../shinsei/kanda.xltx?inline';
 import kouiki from '../shinsei/kouiki.xltx?inline';
@@ -53,12 +55,43 @@ export function useTemplate(insurer: Insurer | ''): Files | null {
   return got && got.insurer === insurer ? got.files : null;
 }
 
-/** 見積書の内容を転記した申請書（Excel）を保存する（ダウンロード）。保存したファイル名を返す */
-export async function saveShinsei(job: Job, insurer: Insurer, s: Settings): Promise<string> {
+/**
+ * 写真貼付用紙に貼る写真（写真番号 → 改修前・改修後）。写真はこの端末に入れたもの（photos.ts）。
+ * missing：様邸に写真はあるのに、この端末にない枚数（ほかの端末で入れた写真）
+ */
+async function photoImagesOf(job: Job, s: Settings): Promise<{images: Record<number, PhotoImages>; missing: number}> {
+  const nos = photoNumbers(job, s);
+  const places = job.places.filter((p) => nos.has(p.id) && p.photos);
+  const ids = places.flatMap((p) => [p.photos?.before ?? '', p.photos?.after ?? '']).filter(Boolean);
+  const images: Record<number, PhotoImages> = {};
+  if (ids.length === 0) return {images, missing: 0};
+  const found = await getPhotos(ids);
+  let missing = 0;
+  for (const p of places) {
+    const n = nos.get(p.id) ?? 0;
+    for (const slot of ['before', 'after'] as const) {
+      const id = p.photos?.[slot];
+      if (!id) continue;
+      const photo = found.get(id);
+      if (!photo) {
+        missing++;
+        continue;
+      }
+      // 同じ写真番号の箇所が2つ（写真番号を手で同じにした）なら、先の箇所の写真
+      if (images[n]?.[slot]) continue;
+      images[n] = {...images[n], [slot]: {bytes: new Uint8Array(await photo.blob.arrayBuffer()), w: photo.w, h: photo.h}};
+    }
+  }
+  return {images, missing};
+}
+
+/** 見積書の内容を転記した申請書（Excel）を保存する（ダウンロード）。保存したファイル名と、この端末になくて貼れなかった写真の枚数を返す */
+export async function saveShinsei(job: Job, insurer: Insurer, s: Settings): Promise<{fileName: string; missingPhotos: number}> {
   const map = SHINSEI[insurer];
   if (!map) throw new Error('この保険者の申請書の原本がありません');
-  const bytes = fillShinseiFiles({...(await openTemplate(insurer))}, map, shinseiValues(job, s));
+  const photos = await photoImagesOf(job, s).catch(() => ({images: {}, missing: 0}));
+  const bytes = fillShinseiFiles({...(await openTemplate(insurer))}, map, {...shinseiValues(job, s), photoImages: photos.images});
   const fileName = shinseiFileName(map, job, estimateDateOf(job));
   downloadBlob(new Blob([bytes], {type: XLSX_TYPE}), fileName);
-  return fileName;
+  return {fileName, missingPhotos: photos.missing};
 }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
-import {strFromU8, unzipSync} from 'fflate';
+import {strFromU8, unzipSync, zipSync} from 'fflate';
 import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import {defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
@@ -120,7 +120,12 @@ test('苅田町の申請書：事前申請書の氏名・住所・被保険者�
   assert.match(cell(post, 'AF6'), /<f>事前申請書!AG6<\/f><v>9<\/v>/);
   // 転記した欄のほかは原本と同じ（式・図形・平面図・写真・承諾書・委任状のシート）
   const changed = Object.keys(files).filter((k) => strFromU8(files[k]) !== strFromU8(orig.files[k] ?? new Uint8Array()));
-  assert.deepEqual(changed.sort(), ['[Content_Types].xml', 'xl/workbook.xml', 'xl/worksheets/sheet1.xml', 'xl/worksheets/sheet2.xml']);
+  // 平面図（sheet6）は表題の氏名と、下の空いた所の工事内容のテキストボックス（drawing4）
+  assert.deepEqual(changed.sort(), ['[Content_Types].xml', 'xl/drawings/drawing4.xml', 'xl/workbook.xml', 'xl/worksheets/sheet1.xml', 'xl/worksheets/sheet2.xml', 'xl/worksheets/sheet6.xml']);
+  assert.equal(txt(byName.get('平面図  (2)')!, 'C2'), '山田 太郎');
+  const legend = strFromU8(files['xl/drawings/drawing4.xml']);
+  assert.match(legend, /<xdr:cNvSpPr txBox="1"\/>/);
+  assert.deepEqual([...legend.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]), ['浴室① 浴室用手すり L=600㎜', '玄関⑤ 木製手すり L=400×600×600㎜', 'トイレ③ スロープ']);
   const strip = (x: string) => x.replace(/<c r="[A-Z]+\d+"[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g, '');
   assert.equal(strip(pre), strip(orig.byName.get('事前申請書')!)); // 欄のほか（罫線・結合・印刷の範囲など）はそのまま
 });
@@ -237,25 +242,34 @@ test('広域連合（築上町など）の申請書：承認申請書・支給�
   ]});
 });
 
+/** シートの図形のファイルの場所（xl/drawings/drawing1.xml）。図形のないシートは '' */
+function drawingPath(files: Record<string, Uint8Array>, sheet: string): string {
+  const wb = strFromU8(files['xl/workbook.xml']);
+  const rels = strFromU8(files['xl/_rels/workbook.xml.rels']);
+  const rid = [...wb.matchAll(/<sheet [^>]*>/g)].map((m) => m[0]).find((t) => /name="([^"]*)"/.exec(t)?.[1] === sheet)?.match(/r:id="([^"]+)"/)?.[1];
+  const path = `xl/${new RegExp(`Id="${rid}"[^>]*Target="([^"]+)"`).exec(rels)?.[1]}`;
+  const drawingId = /<drawing r:id="([^"]+)"/.exec(strFromU8(files[path]))?.[1];
+  if (!drawingId) return '';
+  const sheetRels = strFromU8(files[path.replace(/([^/]+)$/, '_rels/$1.rels')]);
+  const target = new RegExp(`<Relationship [^>]*Id="${drawingId}"[^>]*Target="\\.\\./drawings/([^"]+)"`).exec(sheetRels)?.[1];
+  return `xl/drawings/${target}`;
+}
+/** 図形のファイルの図形（1つずつ。twoCellAnchor・oneCellAnchor など） */
+const anchorsOf = (d: string) => [...d.matchAll(/<xdr:(twoCellAnchor|oneCellAnchor|absoluteAnchor)\b[\s\S]*?<\/xdr:\1>/g)].map((m) => m[0]);
+/** 図形の置き場所（from・to の [列, 列の中の位置, 行, 行の中の位置]。0始まり） */
+const anchorOf = (a: string) => {
+  const n = [...a.matchAll(/<xdr:(?:col|colOff|row|rowOff)>(\d+)</g)].map((m) => Number(m[1]));
+  return {from: n.slice(0, 4), to: n.slice(4, 8)};
+};
+
 /** シートの楕円の図形（from・to の [列, 列の中の位置, 行, 行の中の位置]。0始まり） */
 function ellipses(bytes: Uint8Array, sheet: string): {from: number[]; to: number[]}[] {
   const files = unzipSync(bytes);
-  const wb = strFromU8(files['xl/workbook.xml']);
-  const rels = strFromU8(files['xl/_rels/workbook.xml.rels']);
-  const rid = new RegExp(`<sheet [^>]*name="${sheet.replace(/[()]/g, '\\$&')}"[^>]*r:id="([^"]+)"`).exec(wb)?.[1];
-  const path = `xl/${new RegExp(`Id="${rid}"[^>]*Target="([^"]+)"`).exec(rels)?.[1]}`;
-  const drawingId = /<drawing r:id="([^"]+)"/.exec(strFromU8(files[path]))?.[1];
-  if (!drawingId) return [];
-  const sheetRels = strFromU8(files[path.replace(/([^/]+)$/, '_rels/$1.rels')]);
-  const target = new RegExp(`<Relationship [^>]*Id="${drawingId}"[^>]*Target="\\.\\./drawings/([^"]+)"`).exec(sheetRels)?.[1];
-  const d = strFromU8(files[`xl/drawings/${target}`]);
-  return d
-    .split('</xdr:twoCellAnchor>')
+  const path = drawingPath(files, sheet);
+  if (!path) return [];
+  return anchorsOf(strFromU8(files[path]))
     .filter((a) => /prst="ellipse"/.test(a))
-    .map((a) => {
-      const n = [...a.matchAll(/<xdr:(?:col|colOff|row|rowOff)>(\d+)</g)].map((m) => Number(m[1]));
-      return {from: n.slice(0, 4), to: n.slice(4, 8)};
-    });
+    .map(anchorOf);
 }
 const marksOf = (m: Partial<ShinseiMarks>): ShinseiMarks => ({gender: '', era: '', care: '', renovated: '', ...m});
 const TEMPLATES: Record<Insurer, Uint8Array> = {kanda: KANDA, yukuhashi: YUKUHASHI, miyako: MIYAKO, kouiki: KOUIKI};
@@ -439,4 +453,94 @@ test('申請書から先に作る：見積書の行がない箇所（空白の�
   assert.equal(txt(sheets(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(manual, RATES))).byName.get('事前申請書')!, 'J17'), '180,000円');
   // 見積書の部材から作る文より、手で書いた文が先
   assert.deepEqual(shinseiWorks(job({places: [place('浴室', [mat('木の手すり 35φ 4m', {lengthCm: 60, pieceLengthM: 4})], {shinseiText: '浴室用手すり L=600㎜ H=750'})]}), RATES), ['浴室① 浴室用手すり L=600㎜ H=750']);
+});
+
+/** 範囲（'A7:H22'）→ [左の列, 上の行, 右の列, 下の行]（0始まり） */
+const cellsOf = (range: string) => {
+  const m = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(range)!;
+  const col = (c: string) => [...c].reduce((a, ch) => a * 26 + ch.charCodeAt(0) - 64, 0) - 1;
+  return [col(m[1]), Number(m[2]) - 1, col(m[3]), Number(m[4]) - 1];
+};
+
+test('平面図：空いた所に工事内容（申請書の改修の内容と同じ行）を書く（平面図そのものは Excel で描く）。箇所がなければ書かない', () => {
+  const lines = ['浴室① 浴室用手すり L=600㎜', '玄関⑤ 木製手すり L=400×600×600㎜', 'トイレ③ スロープ'];
+  for (const insurer of ['kanda', 'yukuhashi', 'kouiki'] as const) {
+    const sheet = SHINSEI[insurer]!.sheets.find((x) => x.legend?.box)!;
+    const files = unzipSync(fillShinsei(TEMPLATES[insurer], SHINSEI[insurer]!, shinseiValues(job({insurer}), RATES)));
+    const anchors = anchorsOf(strFromU8(files[drawingPath(files, sheet.sheet)]));
+    const box = anchors.filter((a) => /<xdr:cNvSpPr txBox="1"\/>/.test(a) && a.includes(lines[0]));
+    assert.equal(box.length, 1, insurer);
+    assert.deepEqual([...box[0].matchAll(/<a:p>[\s\S]*?<a:t>([^<]*)<\/a:t>[\s\S]*?<\/a:p>/g)].map((m) => m[1]), lines, insurer);
+    assert.match(box[0], /<a:noFill\/><a:ln w="9525"><a:noFill\/><\/a:ln>/); // 線・塗りなし
+    assert.doesNotMatch(box[0], /Overflow="clip"/); // 行が多くても隠さない
+    // 置き場所：原本の空いた所（前の申請の平面図で工事内容を書いていた所）
+    const [c1, r1, c2, r2] = cellsOf(sheet.legend!.box!);
+    const {from, to} = anchorOf(box[0]);
+    assert.deepEqual([from[0], from[2]], [c1, r1], insurer);
+    assert.ok(to[0] <= c2 + 1 && to[2] <= r2 + 1, `${insurer} ${to}`);
+    // 図形の番号（cNvPr の id）は重ならない
+    const ids = [...anchors.join('').matchAll(/<xdr:cNvPr\b[^>]*\sid="(\d+)"/g)].map((m) => m[1]);
+    assert.equal(new Set(ids).size, ids.length, insurer);
+    // 箇所がなければ足さない（原本の図形のまま）
+    const none = unzipSync(fillShinsei(TEMPLATES[insurer], SHINSEI[insurer]!, shinseiValues(job({insurer, places: []}), RATES)));
+    const orig = unzipSync(TEMPLATES[insurer]);
+    const path = drawingPath(none, sheet.sheet);
+    assert.equal(path ? strFromU8(none[path]) : '', path ? strFromU8(orig[path]) : '', insurer);
+  }
+  // みやこ町は平面図の下の欄（M48。折り返しの書式）に1行ずつ
+  const my = sheets(fillShinsei(MIYAKO, SHINSEI.miyako!, shinseiValues(job({insurer: 'miyako'}), RATES))).byName.get('平面図')!;
+  assert.equal(txt(my, 'M48'), lines.join('\n'));
+  // 苅田町・行橋市の平面図の表題：C2 に氏名（「様邸　平面図」は原本の AC2）
+  assert.equal(txt(sheets(fillShinsei(YUKUHASHI, SHINSEI.yukuhashi!, shinseiValues(job({insurer: 'yukuhashi'}), RATES))).byName.get('平面図  (2)')!, 'C2'), '山田 太郎');
+});
+
+test('写真貼付用紙：写真番号の用紙の改修前・改修後の枠の中に写真を貼る（縦横の比はそのまま・Excel で動かせる）。用紙のない番号・広域連合の2枚目には貼らない', () => {
+  const jpeg = (n: number) => new Uint8Array([0xff, 0xd8, 0xff, 0xe0, n, 0xff, 0xd9]); // 写真のファイルはそのまま入る
+  const photoImages = {1: {before: {bytes: jpeg(1), w: 1600, h: 1200}, after: {bytes: jpeg(2), w: 900, h: 1600}}, 5: {before: {bytes: jpeg(3), w: 1200, h: 1200}}, 7: {after: {bytes: jpeg(4), w: 10, h: 10}}};
+  // 浴室①・玄関⑤に写真（トイレ③はなし。写真番号⑦の箇所はない）。みやこ町の写真の用紙は④まで
+  const expected: Record<Insurer, string[]> = {
+    kanda: ['1 :before:1', '1 :after:2', '1  (5):before:3'],
+    yukuhashi: ['住改・写真 ①:before:1', '住改・写真 ①:after:2', '住改・写真④ (3):before:3'],
+    miyako: ['写真 (1):before:1', '写真 (1):after:2'],
+    kouiki: ['写真貼付用紙:before:1', '写真貼付用紙:after:2', '写真貼付用紙 (5):before:3'],
+  };
+  for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki'] as const) {
+    const files = unzipSync(fillShinsei(TEMPLATES[insurer], SHINSEI[insurer]!, {...shinseiValues(job({insurer}), RATES), photoImages}));
+    const got: string[] = [];
+    for (const sheet of SHINSEI[insurer]!.sheets.filter((x) => x.photoPlace)) {
+      const path = drawingPath(files, sheet.sheet);
+      if (!path) continue;
+      const d = strFromU8(files[path]);
+      const relsPath = path.replace(/([^/]+)$/, '_rels/$1.rels');
+      const rels = files[relsPath] ? strFromU8(files[relsPath]) : '';
+      for (const a of anchorsOf(d).filter((x) => x.includes('<xdr:pic>'))) {
+        const rid = /<a:blip r:embed="([^"]+)"/.exec(a)![1];
+        const target = new RegExp(`<Relationship [^>]*Id="${rid}"[^>]*Type="[^"]*/image"[^>]*Target="\\.\\./media/([^"]+)"`).exec(rels)?.[1];
+        assert.ok(target?.endsWith('.jpeg'), `${insurer} ${sheet.sheet} ${rid}`);
+        const bytes = files[`xl/media/${target}`];
+        // どちらの枠か：写真の左上・右下が枠の中
+        const {from, to} = anchorOf(a);
+        const slot = (['before', 'after'] as const).find((k) => {
+          const [c1, r1, c2, r2] = cellsOf(sheet.photoPlace![k]!);
+          return from[0] >= c1 && from[2] >= r1 && to[0] <= c2 && to[2] <= r2;
+        });
+        got.push(`${sheet.sheet}:${slot}:${bytes[4]}`);
+        // 縦横の比はそのまま（1600×1200 → 4:3、900×1600、1200×1200）・比を変えない設定
+        const [cx, cy] = /<a:ext cx="(\d+)" cy="(\d+)"\/>/.exec(a)!.slice(1).map(Number);
+        const img = Object.values(photoImages).flatMap((x) => Object.values(x)).find((x) => x.bytes[4] === bytes[4])!;
+        assert.ok(Math.abs(cx / cy - img.w / img.h) < 0.01, `${insurer} ${cx}/${cy}`);
+        assert.match(a, /<a:picLocks noChangeAspect="1"\/>/);
+      }
+      if (d.includes('<xdr:pic>')) assert.match(d.match(/<xdr:wsDr\b[^>]*>/)![0], /xmlns:r="http:\/\/schemas\.openxmlformats\.org\/officeDocument\/2006\/relationships"/);
+      const ids = [...d.matchAll(/<xdr:cNvPr\b[^>]*\sid="(\d+)"/g)].map((m) => m[1]);
+      assert.equal(new Set(ids).size, ids.length, `${insurer} ${sheet.sheet}`);
+    }
+    assert.deepEqual(got.sort(), [...expected[insurer]].sort(), insurer);
+    assert.match(strFromU8(files['[Content_Types].xml']), /<Default Extension="jpeg" ContentType="image\/jpeg"\/>/);
+    assert.ok(readShinsei(zipSync(files)), insurer); // 開き直せる（読み戻せる）
+  }
+  // 写真がなければ、写真のファイル・図形は足さない
+  const plain = unzipSync(fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(job({insurer: 'kouiki'}), RATES)));
+  assert.ok(!Object.keys(plain).some((k) => k.startsWith('xl/media/') && !unzipSync(KOUIKI)[k]));
+  assert.doesNotMatch(strFromU8(plain['[Content_Types].xml']), /Extension="jpeg"/);
 });

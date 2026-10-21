@@ -57,7 +57,12 @@ await est.getByRole('button', {name: '← 一覧へ戻る'}).click();
 await est.getByRole('button', {name: '＋ 広域連合', exact: true}).click();
 await est.getByRole('tab', {name: '📋 見積書'}).click(); // 新規作成は申請書のタブから開く
 await est.getByPlaceholder('例：山田').fill('同時 一郎');
-await est.getByLabel('笹岡工務店の請求書に入れる').check(); // 行を入れる前に請求書に入れる
+// 見積書に行を入れると請求書に入る（行のないうちは「請求書に入れる」は出ない）
+await est.locator('[data-edit="new:text"]').first().click();
+await est.keyboard.type('取付金具');
+await est.keyboard.press('Enter');
+await est.getByLabel('笹岡工務店の請求書に入れる').waitFor();
+assert.equal(await est.getByLabel('笹岡工務店の請求書に入れる').isChecked(), true);
 const memo = shi.locator('label', {hasText: '備考（任意・明細に印刷されます）'}).locator('input');
 await memo.fill('同時に保存した備考');
 await est.waitForTimeout(1500);
@@ -78,7 +83,7 @@ assert.equal(await shi.getByRole('textbox', {name: 'タイルの数量'}).inputV
 await shi.screenshot({path: path.join(outDir, '60-sync-shikiri.png'), fullPage: true});
 log('ほぼ同時に保存しても両方残るOK');
 
-// ---------------- 新しい見積書（同時 一郎）は、「請求書に入れる」で仕切り計算の一覧に入る（行を入れたときも入る）。外すと一覧から消える
+// ---------------- 新しい見積書（同時 一郎）は、行を入れたときに仕切り計算の一覧に入る。「請求書に入れる」を外すと一覧から消える
 await shi.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click(); // 様邸の画面の左上は「← 見積もりへ戻る」。一覧へはタブで戻る
 await shi.getByRole('cell', {name: /同時 一郎/}).waitFor();
 assert.equal(await shi.getByRole('cell', {name: /（サンプル）山田様邸/}).count(), 1);
@@ -86,7 +91,7 @@ await est.getByRole('cell', {name: /同時 一郎/}).click();
 await est.getByLabel('笹岡工務店の請求書に入れる').uncheck();
 await shi.waitForFunction(() => !document.querySelector('main')?.textContent?.includes('同時 一郎'), null, {timeout: 5000});
 await est.getByRole('button', {name: '← 一覧へ戻る'}).click();
-log('新しい見積書は請求書に入れると仕切り計算の一覧に入り、外すと消えるOK');
+log('新しい見積書は行を入れると仕切り計算の一覧に入り、外すと消えるOK');
 
 // ---------------- 知らせ（BroadcastChannel）が届かないブラウザでも、古いままのタブで保存したときに、前の変更を消さない
 // 知らせを出せないタブ（見積書）でエンドキャップを3個に → 仕切り計算（古いまま）で木を3箇所に → 読み直すと両方残る
