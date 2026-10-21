@@ -81,7 +81,7 @@ test('プレビュー：様式のうしろに平面図（空いた所に工事�
   // 広域連合は同じ写真番号の用紙が2枚ずつ。写真を貼る最初の用紙だけ
   assert.deepEqual(kinds('kouiki').slice(3), ['plan:平面図 (2)', 'photo:写真貼付用紙:1', 'photo:写真貼付用紙 (2):2']);
   // 工事内容は申請書の改修の内容と同じ行（苅田町・行橋市・広域連合は空いた所いっぱいの文字の枠、みやこ町は平面図の下の欄 M48）
-  const lines = '①玄関　手すりの取付　L=600mm\n②トイレ　手すりの取付';
+  const lines = '①玄関　手すりの取り付け　L=600mm\n②トイレ　手すりの取り付け';
   for (const insurer of ['kanda', 'yukuhashi', 'kouiki'] as const) {
     const plan = preview(insurer).find((p) => p.kind === 'plan')!;
     const box = plan.shapes.find((s) => s.text === lines);
@@ -110,7 +110,7 @@ test('プレビュー：転記した内容（Excel に保存するときと同�
   assert.equal(textAt(pre, 'J6'), 'ヤマダ　タロウ');
   assert.equal(textAt(pre, 'J7'), '山田 太郎');
   assert.equal(textAt(pre, 'J9'), '明　・　大　・　昭　23年5月6日生');
-  assert.equal(textAt(pre, 'J14'), '①玄関　手すりの取付　L=600mm\n②トイレ　手すりの取付');
+  assert.equal(textAt(pre, 'J14'), '①玄関　手すりの取り付け　L=600mm\n②トイレ　手すりの取り付け');
   assert.equal(textAt(pre, 'M28'), '山田 太郎'); // 申請者の氏名（=J7 の式）
   assert.equal(textAt(pre, 'Y15'), '　　年　　　月　　　日'); // 着工予定日は空白（原本のまま。ユーザーの指示）
   assert.equal(textAt(pre, 'Y16'), '令和8年11月20日');
@@ -131,6 +131,23 @@ test('プレビュー：転記した内容（Excel に保存するときと同�
   const [top] = preview('miyako');
   assert.equal(top.shapes.filter((s) => s.kind === 'ellipse').length, 1 + 2); // 受領委任払い＋女・無
   for (const s of top.shapes) assert.ok(s.x >= 0 && s.x + s.w <= top.width + 1, JSON.stringify(s));
+});
+
+test('プレビュー：原本で縦書きの欄は縦書き（写真貼付用紙の改修の種別①〜⑥・内訳明細書の「写真番号」・理由書の「利用者」など）。横へはみ出さない', () => {
+  const photo = preview('kouiki').find((p) => p.kind === 'photo')!;
+  const kinds = ['D6', 'F6', 'H6', 'J6', 'L6', 'N6'].map((ref) => photo.texts.find((t) => t.ref === ref)!);
+  assert.deepEqual(
+    kinds.map((t) => [t.runs.map((r) => r.text).join(''), t.vertical, t.valign]),
+    ['手すりの取り付け', '段差の解消', '床材の変更', '扉の取替', '便器の取替', '付帯工事'].map((k) => [k, true, 'top']),
+  );
+  assert.equal(kinds[0].shrink, true); // ①は縮小して全体を表示（原本のまま。縦の長さで縮める）
+  // 結合した2列の幅のまま（横書きのように右の欄へ広げない）
+  for (const t of kinds) assert.ok(t.w < 40 && t.h > 80, JSON.stringify([t.ref, t.w, t.h]));
+  // みやこ町の写真の用紙も同じ。横書きの欄は横書きのまま
+  const my = preview('miyako').find((p) => p.kind === 'photo')!;
+  assert.equal(my.texts.find((t) => t.ref === 'D6')?.vertical, true);
+  assert.equal(my.texts.find((t) => t.ref === 'C5')?.vertical, false);
+  assert.ok(preview('kanda').every((p) => p.texts.every((t) => !t.vertical))); // 苅田町の原本に縦書きはない
 });
 
 test('プレビュー：押すと入れられる欄（申請書の画面の項目）と、押すと丸がつく値。式で同じ値を出す欄（支給申請書の氏名など）も押せる', () => {
@@ -154,6 +171,12 @@ test('プレビュー：押すと入れられる欄（申請書の画面の項�
   const [, pay, detail] = preview('miyako');
   for (const f of ['kana', 'name', 'insuredNo', 'birth', 'zip', 'address', 'owner', 'cost', 'phone', 'dates', 'gender', 'renovated']) assert.ok(fieldsOf(pay).includes(f as never), `支給申請書に ${f} の欄がない`);
   assert.deepEqual(fieldsOf(detail), ['insuredNo', 'kana', 'name', 'works']);
+  // 広域連合：承認申請書・支給申請書の住所の欄の1行目が郵便番号（ユーザーの指示で足した）、2行目が住所
+  for (const p of preview('kouiki').slice(0, 2)) {
+    const zip = p.fields.find((f) => f.field === 'zip');
+    const address = p.fields.find((f) => f.field === 'address');
+    assert.deepEqual([zip?.ref, address?.ref], ['J9', 'J10'], p.sheet);
+  }
   // 丸で囲む欄の文字は、丸と同じ計算の位置（1文字ずつ）
   const gender = pre.texts.find((t) => t.ref === 'W9')!;
   assert.equal(gender.marked?.chars.map((c) => c.ch).join(''), '男　　・　　女');

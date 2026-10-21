@@ -2,7 +2,7 @@
 // 仕切り計算表・請求書も同じ行から作る。操作は Excel と同じ：
 //   欄を選んで打ち込むと書き換え／Enter で下・Tab で右・矢印で移動／F2 かダブルクリックで書き直す／Delete で消す／Esc でやめる／Ctrl+Z で元に戻す・Ctrl+Y でやり直す
 //   （元に戻す・やり直すのボタンや、画面の説明は置かない。ユーザーの指示）
-//   行：左の「＋」で下に1行・「✕」で消す・「コピー」→ 貼り付けたい行の「貼付」（Ctrl+C／Ctrl+X → 行を選んで Ctrl+V も同じ。Esc でコピーをやめる）
+//   行：左の「挿入」で下に1行・「✕」で消す・「コピー」→ 貼り付けたい行の「貼付」（Ctrl+C／Ctrl+X → 行を選んで Ctrl+V も同じ。Esc でコピーをやめる）
 //   Ctrl+Shift+＋ で下に1行・Ctrl+－ で行を消す・Alt+↓ で候補（改修場所・改修の種類）・Ctrl+P で印刷
 // 内容（品名）は部材リストから選べる（★お気に入りが先）。備考（算出根拠）に定価を入れると、単価は 定価×0.8。
 // いちばん下の空いた行に打ち込むと行が増え、改修場所を打ち込むと箇所が増える。
@@ -19,8 +19,8 @@ import type {EstimateForm, Job, Material, Settings} from '../types.ts';
 import {matchesAll, todayIso, yen} from '../util.ts';
 import {useToast} from './ui.tsx';
 
-/** A4横の幅（297mm）を画面の px に */
-const PAGE_W = (297 / 25.4) * 96;
+/** 入力の画面の用紙の幅を px に（A4横 297mm に、行の左の「挿入」「✕」「コピー」の分 3mm を足す。sasaoka.css の .est-sheet .form-page と同じ） */
+const PAGE_W = (300 / 25.4) * 96;
 const PAD = 12;
 
 type Sel = {key: string; occ: number};
@@ -620,7 +620,7 @@ export function EstimateSheet({
     let t = e.target as HTMLElement;
     if (sugRef.current?.contains(t)) return;
     if (t.closest('[data-del], [data-ins], [data-copy], [data-paste], [data-drop]')) {
-      e.preventDefault(); // 行の左の「＋」「✕」「コピー」「貼付」、欄の「▼」：欄は選ばない（押し終わったら onClick で入れる・消す・コピー・貼り付け・候補を出す）
+      e.preventDefault(); // 行の左の「挿入」「✕」「コピー」「貼付」、欄の「▼」：欄は選ばない（押し終わったら onClick で入れる・消す・コピー・貼り付け・候補を出す）
       return;
     }
     if (t === inputRef.current) {
@@ -647,7 +647,7 @@ export function EstimateSheet({
     select(el);
     inputRef.current?.focus({preventScroll: true});
   };
-  // 行の左の「＋」：その行の下に空白の行を入れて、内容の欄を選ぶ（そのまま打ち込める）。
+  // 行の左の「挿入」：その行の下に空白の行を入れて、内容の欄を選ぶ（そのまま打ち込める）。
   // 「✕」：その行（部材は同上施工費ごと）を消す。箇所の行がなくなれば箇所も消す（その行が空白になる）。
   // 「コピー」：部材は同上施工費ごと、施工費はそのまとまりをコピーする。コピーしているあいだは「貼付」：その行の下に貼り付ける
   const onClick = (e: ReactMouseEvent) => {
@@ -670,7 +670,7 @@ export function EstimateSheet({
     }
   };
 
-  // ---------------------------------------------------------------- ツールバー（部材・施工費を入れる。行を入れる・消すは行の左の「＋」「✕」）
+  // ---------------------------------------------------------------- ツールバー（部材・施工費を入れる。行を入れる・消すは行の左の「挿入」「✕」）
   const row = target.row;
   const place = target.place;
 
@@ -721,14 +721,14 @@ export function EstimateSheet({
 
   return (
     <section className="overflow-hidden rounded-xl border-2 border-emerald-800 bg-white shadow-sm" aria-label="見積書">
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-        <button type="button" className="sheet-tool" onClick={() => onPickMaterial(place?.id ?? null, row?.id ?? null)}>
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2.5 text-base">
+        <button type="button" className="sheet-tool tool-material" onClick={() => onPickMaterial(place?.id ?? null, row?.id ?? null)}>
           📋 部材リストから入れる
         </button>
-        <button type="button" className="sheet-tool" onClick={() => onPickLabor(place?.id ?? null, row?.id ?? null)}>
+        <button type="button" className="sheet-tool tool-labor" onClick={() => onPickLabor(place?.id ?? null, row?.id ?? null)}>
           🔧 施工費（笹岡工務店の手間）から入れる
         </button>
-        <button type="button" className="sheet-tool" onClick={() => onPickKit(place?.id ?? null, row?.id ?? null)}>
+        <button type="button" className="sheet-tool tool-kit" onClick={() => onPickKit(place?.id ?? null, row?.id ?? null)}>
           ＋ 部材＋施工費（常用）から入れる
         </button>
       </div>

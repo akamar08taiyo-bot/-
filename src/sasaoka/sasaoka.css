@@ -118,14 +118,18 @@ body {
 .est-sheet tr.sheet-new > td {
   background-color: #ecfdf5;
 }
-/* 明細の行の左（見積書の余白）のボタン：「＋」この行の下に1行入れる／「✕」この行を消す／「コピー」この行をコピー
+/* 明細の行の左（見積書の余白）のボタン：「挿入」この行の下に1行入れる／「✕」この行を消す／「コピー」この行をコピー
    （コピーしているあいだは「貼付」：コピーした行をこの行の下に貼り付け）。
-   3つ並ぶよう、入力の画面だけ表を10mm右に寄せる（印刷は元の余白のまま） */
+   3つ並ぶよう、入力の画面だけ用紙を 3mm 広げて表を 13mm 右に寄せる（印刷は A4 横・元の余白のまま。幅は EstimateSheet.tsx の PAGE_W と同じ）。
+   「＋」は「挿入」にした（ユーザーの指示「＋ボタンではなく、挿入とし」、2026-10-21）ので、その分 3mm 広い */
+.est-sheet .form-page {
+  width: 300mm;
+}
 .est-sheet .form-page.yk {
-  padding-left: 25mm;
+  padding-left: 28mm;
 }
 .est-sheet .form-page.kk {
-  padding-left: 26mm;
+  padding-left: 29mm;
 }
 .est-sheet td.tools-cell {
   position: relative;
@@ -155,8 +159,13 @@ body {
 .sheet-ins {
   color: #047857;
 }
+.sheet-rowtools .sheet-ins {
+  width: auto;
+  padding: 0 1.2mm;
+  font-size: 8pt;
+}
 .sheet-ins::before {
-  content: '＋';
+  content: '挿入';
 }
 .sheet-rowtools .sheet-copy,
 .sheet-rowtools .sheet-paste {
@@ -178,7 +187,7 @@ body {
 .sheet-paste::before {
   content: '貼付';
 }
-/* コピーのない行（施工費・空白の行）は、場所だけ空けて「＋」「✕」の並びをそろえる */
+/* コピーのない行（施工費・空白の行）は、場所だけ空けて「挿入」「✕」の並びをそろえる */
 .sheet-copy-none {
   visibility: hidden;
   display: inline-flex;
@@ -268,16 +277,43 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   white-space: pre-wrap;
 }
+/* 見積書の上の「部材リストから入れる」などのボタン。文字の大きさはツールバーの text-base（大きめにした。ユーザーの指示「ここの部分はもう少し大きくする」、2026-10-21） */
 .sheet-tool {
   border: 1px solid #94a3b8;
   border-radius: 6px;
   background: #fff;
-  padding: 6px 12px;
+  padding: 9px 16px;
   font-weight: 700;
   color: #1e293b;
 }
 .sheet-tool:hover:not(:disabled) {
   background: #f1f5f9;
+}
+/* ほんの少し色を付けて見分けやすく（ユーザーの指示「この部分はほんの少し色付けしてわかりやすくする」、2026-10-21）：
+   部材＝薄い緑・施工費＝薄い水色・部材＋施工費（常用）＝薄い紫 */
+.sheet-tool.tool-material {
+  border-color: #6ee7b7;
+  background: #f0fdf7;
+  color: #065f46;
+}
+.sheet-tool.tool-material:hover:not(:disabled) {
+  background: #d1fae5;
+}
+.sheet-tool.tool-labor {
+  border-color: #7dd3fc;
+  background: #f0f9ff;
+  color: #075985;
+}
+.sheet-tool.tool-labor:hover:not(:disabled) {
+  background: #e0f2fe;
+}
+.sheet-tool.tool-kit {
+  border-color: #c4b5fd;
+  background: #f7f5ff;
+  color: #5b21b6;
+}
+.sheet-tool.tool-kit:hover:not(:disabled) {
+  background: #ede9fe;
 }
 .sheet-tool:disabled {
   opacity: 0.5;

@@ -1,5 +1,5 @@
 // 申請書：保険者ごとにいただいた Excel の原本（苅田町・行橋市・みやこ町・広域連合＝築上町など）に、見積書の内容を転記する（ユーザーの指示）。
-// 転記するのは 被保険者氏名・住所・被保険者番号（10マス。空いたマスは0）・改修の内容・箇所及び規模（「①玄関　手すりの取付　L=600mm」。内訳明細書・平面図も同じ書き方）と、
+// 転記するのは 被保険者氏名・住所・被保険者番号（10マス。空いたマスは0）・改修の内容・箇所及び規模（「①玄関　手すりの取り付け　L=600mm」。内訳明細書・平面図も同じ書き方）と、
 // 申請書の画面で入れた フリガナ・生年月日・郵便番号・電話番号・住宅の所有者・理由書作成者・完了の日・改修費用（なければ見積書から）。着工予定日は書かない（空白）。
 // 改修の内容は①②（写真番号）ごとに1行。性別・元号・要介護状態区分・改修状況は、選んだものを丸（楕円の図形）で囲む。
 // 原本のほかのシート（事後申請書・承諾書・委任状・平面図・写真）・空欄・罫線・図形はそのまま残す（決めた欄の文字だけを書きかえる。足すのは丸・平面図の工事内容・写真）。
@@ -9,8 +9,8 @@
 import {strFromU8, strToU8, unzipSync, zipSync} from 'fflate';
 import {estimateTotals, isBlankRow} from './calc.ts';
 import type {EstimateRates, EstimateSettings} from './calc.ts';
-import {circled, jobInsurer, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa} from './estimateForms.ts';
-import type {Insurer, Job, Place, ShinseiInfo, ShinseiMarks} from './types.ts';
+import {circled, eraOf, jobInsurer, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa} from './estimateForms.ts';
+import type {Insurer, Job, Place, PlacePhotos, ShinseiInfo, ShinseiMarks} from './types.ts';
 
 /** 申請書の原本の、1つのシートで転記する欄（番地）。ないものは書かない */
 export type ShinseiSheet = {
@@ -20,10 +20,11 @@ export type ShinseiSheet = {
   address?: string; // 住所
   insuredNo?: string[]; // 被保険者番号の10マス（左から）
   works?: string; // 改修の内容・箇所及び規模（折り返しの欄。1行に1箇所）
-  kinds?: {places: string; works: string}[]; // 改修の種類（①手すりの取付〜⑥付帯工事）ごとの行の、箇所の欄と工事内容の欄（住宅改修内訳明細書）
+  kinds?: {places: string; works: string}[]; // 改修の種類（①手すりの取り付け〜⑥付帯工事）ごとの行の、箇所の欄と工事内容の欄（住宅改修内訳明細書）
   // 写真貼付用紙：原本の写真番号の欄（①・写真番号①・№①）を読み、その写真番号の改修場所を改修箇所の欄（place）に入れ、
-  // その写真番号の箇所の写真を改修前・改修後の枠（番地の範囲。before・after）に貼る（同じ写真番号の用紙が2枚あれば、最初の用紙だけ）
-  photoPlace?: {photo: string; place?: string; before?: string; after?: string};
+  // その写真番号の箇所の写真を改修前・改修後の枠（番地の範囲。before・after）に貼る（同じ写真番号の用紙が2枚あれば、最初の用紙だけ）。
+  // 苅田町の写真の用紙は、改修箇所・実施した工事種類が□の一覧（placeChecks・kindChecks。その写真番号の箇所の□を■に）と、撮影日の欄（dates）
+  photoPlace?: {photo: string; place?: string; before?: string; after?: string; placeChecks?: string; kindChecks?: string; dates?: {before: string; after: string}};
   // 平面図：写真番号の順の工事内容（改修の内容と同じ行「玄関① 木製L字手すり L=600×850㎜」）を空いた所に書く（ユーザーの指示）。
   // cell＝折り返しの欄に書く（みやこ町の下の欄）、box＝その範囲にテキストボックスを置く（前の申請の平面図と同じ）。平面図そのものはユーザーが Excel で描く
   legend?: {cell?: string; box?: string};
@@ -67,9 +68,13 @@ const KOUIKI_PHOTO_SHEETS = ['写真貼付用紙', ...[6, 2, 7, 3, 8, 4, 9, 5, 1
 const KIND_ROWS = [14, 16, 18, 20, 22, 24].map((r) => ({places: `D${r + 1}`, works: `K${r}`}));
 /** 写真貼付用紙（みやこ町・広域連合）：被保険者氏名（B4）・被保険者番号（D4〜M4）・写真番号（R4）・改修箇所（B5）・改修前の写真（A9:S31）・改修後（A34:S58） */
 const PHOTO_SHEET = {name: 'B4', insuredNo: boxes('D', 10, 4), photoPlace: {photo: 'R4', place: 'B5', before: 'A9:S31', after: 'A34:S58'}};
-/** 苅田町の写真の用紙（「1 」「1  (3)」…。写真番号①〜⑨は G42 の「写真番号①」）：改修前の写真（A7:H22）・改修後（A24:H40）。改修箇所はチェックの欄なので書かない */
+/**
+ * 苅田町の写真の用紙（「1 」「1  (3)」…。写真番号①〜⑨は G42 の「写真番号①」）：改修前の写真（A7:H22）・改修後（A24:H40）。
+ * 改修箇所（B2）・実施した工事種類（B4）は□の一覧なので、その写真番号の箇所・改修の種類の□を■にする（ユーザーの指示「□の部分は、選択した項目と連動する」、2026-10-21）。
+ * 撮影日は改修前の D6・改修後の D23（ユーザーの指示「撮影日をいれれるようにする」）
+ */
 const KANDA_PHOTO_SHEETS = ['1 ', '1  (3)', '1  (2)', ...[4, 5, 6, 7, 8, 9].map((n) => `1  (${n})`)];
-const KANDA_PHOTO = {photoPlace: {photo: 'G42', before: 'A7:H22', after: 'A24:H40'}};
+const KANDA_PHOTO = {photoPlace: {photo: 'G42', before: 'A7:H22', after: 'A24:H40', placeChecks: 'B2', kindChecks: 'B4', dates: {before: 'D6', after: 'D23'}}};
 /** 行橋市の写真添付用紙（№①〜⑧は M2）：改修場所（E4。「改 修 場 所 ：」のうしろ）・改修前の写真（B7:O28）・改修後（B30:O51） */
 const YUKUHASHI_PHOTO_SHEETS = ['住改・写真 ①', '住改・写真②', '住改・写真③', '住改・写真④', '住改・写真④ (3)', '住改・写真④ (4)', '住改・写真④ (5)', '住改・写真④ (2)'];
 const YUKUHASHI_PHOTO = {photoPlace: {photo: 'M2', place: 'E4', before: 'B7:O28', after: 'B30:O51'}};
@@ -174,15 +179,18 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
   kouiki: {
     title: '広域連合申請書',
     sheets: [
+      // 住所の欄は2行：1行目（J9）に〒と郵便番号、2行目（J10）に住所（同じ様式のみやこ町の支給申請書・広域連合の償還払い用と同じ。
+      // ユーザーの指示「郵便番号をいれれるようにする」、2026-10-21。前は郵便番号の欄がなく、住所を1行目に書いていた）
       {
         sheet: '様式第2号（住宅改修承認申請書）',
         name: 'J6',
-        address: 'J9',
+        address: 'J10',
         insuredNo: boxes('X', 10, 7),
         marks: [GENDER('AB8'), RENOVATED('Y22')],
         texts: [
           T('J5', '{kana}'),
           T('J8', '{era}　{y}年{m}月{d}日生'),
+          T('J9', '〒{zip}'),
           T('J11', '{owner}　　　　本人との関係（{relation}）'),
           T('O13', '{reasonOffice}'),
           T('O14', '{reasonName}'),
@@ -192,12 +200,13 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
       {
         sheet: '様式第7号（住宅改修費支給申請書（受領委任払用）',
         name: 'J6',
-        address: 'J9',
+        address: 'J10',
         insuredNo: boxes('X', 10, 7),
         marks: [GENDER('AB8'), RENOVATED('X16')],
         texts: [
           T('J5', '{kana}'),
           T('J8', '{era}　{y}年{m}月{d}日生'),
+          T('J9', '〒{zip}'),
           T('AA10', '{phone}'),
           T('J11', '{owner}　　　　本人との関係（{relation}）'),
           T('X12', '{start}'),
@@ -215,7 +224,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
 
 // ---------------------------------------------------------------- 転記する内容
 
-/** 改修の種類（①手すりの取付〜⑥付帯工事）ごとの 箇所（玄関・トイレ）と工事内容の行 */
+/** 改修の種類（①手すりの取り付け〜⑥付帯工事）ごとの 箇所（玄関・トイレ）と工事内容の行 */
 export type ShinseiKind = {places: string; works: string[]};
 export type ShinseiValues = {
   name: string;
@@ -224,6 +233,8 @@ export type ShinseiValues = {
   works: string[];
   kinds: ShinseiKind[];
   photos: Record<number, string>; // 写真番号 → 改修場所（写真貼付用紙の改修箇所）
+  photoKinds?: Record<number, number>; // 写真番号 → 改修の種類（1〜6。苅田町の写真の用紙の実施した工事種類）
+  photoDates?: Record<number, PlacePhotos>; // 写真番号 → 改修前・改修後の撮影日（'YYYY-MM-DD'）
   marks: ShinseiMarks; // 丸で囲む値
   texts: ShinseiTexts; // 申請書の画面で入れた項目の文字（書き方の {名前} の値）
   cost: number | null; // 改修費用（数で書く欄。なければ null）
@@ -236,13 +247,26 @@ export type ShinseiValues = {
 export type PhotoImage = {bytes: Uint8Array; w: number; h: number};
 export type PhotoImages = {before?: PhotoImage; after?: PhotoImage};
 
-/** 見積書に出る箇所ごとの、改修の内容の行と改修の種類（1〜6）・改修場所。見積書に出ない箇所（行のない箇所）は入れない */
-function workLines(job: Pick<Job, 'places'>, rates: EstimateRates): {kind: number; name: string; line: string}[] {
+/**
+ * 改修の内容の行（見積書に出る箇所ごと）：改修の種類（1〜6）・改修場所・写真番号と、申請書に書く1行（line）。
+ * auto は写真番号のうしろの自動の文、text は画面の欄の文（手で直していればその文。edited）。
+ * 申請書のタブで手で直せる（ユーザーの指示「手入力でも編集できるようにする」、2026-10-21。直した文は `Place.shinseiLine`）。
+ * 手で空にした行は申請書に書かない（line は空）
+ */
+export type WorkItem = {id: string; kind: number; name: string; photo: number; auto: string; text: string; edited: boolean; line: string};
+
+/** 見積書に出る箇所ごとの改修の内容の行。見積書に出ない箇所（行のない箇所）は入れない */
+export function workItems(job: Pick<Job, 'places'>, rates: EstimateRates): WorkItem[] {
   const photos = photoNumbers(job, rates);
-  const out: {kind: number; name: string; line: string}[] = [];
+  const out: WorkItem[] = [];
   for (const p of job.places) {
     const photo = photos.get(p.id);
-    if (photo !== undefined) out.push({kind: p.kind, name: p.name.trim(), line: workLine(p, photo)});
+    if (photo === undefined) continue;
+    const no = circled(photo);
+    const auto = workLine(p, photo).slice(no.length);
+    const edited = p.shinseiLine !== undefined;
+    const typed = (p.shinseiLine ?? '').trim();
+    out.push({id: p.id, kind: p.kind, name: p.name.trim(), photo, auto, text: edited ? (p.shinseiLine ?? '') : auto, edited, line: edited ? (typed ? no + typed : '') : no + auto});
   }
   return out;
 }
@@ -251,7 +275,7 @@ const BASE_PLATE = /ベースプレート|補強板|取付板/;
 
 /**
  * 改修の内容の1行（4つの保険者の申請書の改修の内容・内訳明細書の工事内容・平面図の工事内容。どれも同じ書き方）。
- * ユーザーの指示（2026-10-21）「①玄関　手すりの取付（項目名）L=600mm と表記する」：写真番号・改修場所、改修の種類の名前、寸法を全角のすき間で区切る。
+ * ユーザーの指示（2026-10-21）「①玄関　手すりの取付（項目名）L=600mm と表記する」（項目名はそのあと「手すりの取り付け」に）：写真番号・改修場所、改修の種類の名前、寸法を全角のすき間で区切る。
  * 寸法は申請書のタブで入れる（`Place.dims`）：手すりは長さ（L=）と高さ（H=。任意）、段差の解消は幅・奥行・高さ（「W600mm D350mm H150mm」）
  */
 function workLine(p: Place, photo: number): string {
@@ -302,19 +326,21 @@ function dimsText(p: Pick<Place, 'kind' | 'rows' | 'dims'>): string {
     .join(' ');
 }
 
-/** 改修の内容の文（写真番号・改修場所のうしろ）：改修の種類の名前・寸法・そのほか（`Place.shinseiText`。うしろに足す）。「手すりの取付　L=600mm H=800mm」 */
+/** 改修の内容の文（写真番号・改修場所のうしろ）：改修の種類の名前・寸法・そのほか（`Place.shinseiText`。うしろに足す）。「手すりの取り付け　L=600mm H=800mm」 */
 export function workText(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText'>): string {
   return [KINDS[p.kind - 1] ?? '', dimsText(p), p.shinseiText?.trim() ?? ''].filter(Boolean).join('　');
 }
 
-/** 改修の内容・箇所及び規模（苅田町・行橋市の申請書の欄）・平面図の工事内容：箇所ごとに1行「①玄関　手すりの取付　L=600mm」。写真番号・改修場所は見積書と同じ */
+/** 改修の内容・箇所及び規模（苅田町・行橋市の申請書の欄）・平面図の工事内容：箇所ごとに1行「①玄関　手すりの取り付け　L=600mm」。写真番号・改修場所は見積書と同じ */
 export function shinseiWorks(job: Pick<Job, 'places'>, rates: EstimateRates): string[] {
-  return workLines(job, rates).map((w) => w.line);
+  return workItems(job, rates)
+    .map((w) => w.line)
+    .filter(Boolean);
 }
 
-/** 改修の種類ごと（6行。内訳明細書）：箇所は改修場所を「・」でつなぐ（同じ名前は1つ）。工事内容は申請書と同じ「①玄関　手すりの取付　L=600mm」の書き方 */
+/** 改修の種類ごと（6行。内訳明細書）：箇所は改修場所を「・」でつなぐ（同じ名前は1つ）。工事内容は申請書と同じ「①玄関　手すりの取り付け　L=600mm」の書き方 */
 export function shinseiKinds(job: Pick<Job, 'places'>, rates: EstimateRates): ShinseiKind[] {
-  const lines = workLines(job, rates);
+  const lines = workItems(job, rates).filter((w) => w.line);
   return KINDS.map((_, i) => {
     const mine = lines.filter((w) => w.kind === i + 1);
     return {places: [...new Set(mine.map((w) => w.name).filter(Boolean))].join('・'), works: mine.map((w) => w.line)};
@@ -323,11 +349,18 @@ export function shinseiKinds(job: Pick<Job, 'places'>, rates: EstimateRates): Sh
 
 /** 写真番号 → 改修場所（見積書に出る箇所だけ） */
 export function shinseiPhotos(job: Pick<Job, 'places'>, rates: EstimateRates): Record<number, string> {
-  const photos = photoNumbers(job, rates);
   const out: Record<number, string> = {};
+  for (const [n, p] of photoPlacesOf(job, rates)) out[n] = p.name.trim();
+  return out;
+}
+
+/** 写真番号 → その番号の箇所（同じ番号の箇所が2つあれば、先の箇所） */
+function photoPlacesOf(job: Pick<Job, 'places'>, rates: EstimateRates): Map<number, Place> {
+  const photos = photoNumbers(job, rates);
+  const out = new Map<number, Place>();
   for (const p of job.places) {
     const n = photos.get(p.id);
-    if (n !== undefined && out[n] === undefined) out[n] = p.name.trim();
+    if (n !== undefined && !out.has(n)) out.set(n, p);
   }
   return out;
 }
@@ -362,7 +395,9 @@ export function shinseiValues(job: Job, s: EstimateSettings): ShinseiValues {
     works: shinseiWorks(job, s),
     kinds: shinseiKinds(job, s),
     photos: shinseiPhotos(job, s),
-    marks: {gender: info.gender, era: info.era, care: info.care, renovated: info.renovated},
+    photoKinds: Object.fromEntries([...photoPlacesOf(job, s)].map(([n, p]) => [n, p.kind])),
+    photoDates: Object.fromEntries([...photoPlacesOf(job, s)].filter(([, p]) => p.photoDates).map(([n, p]) => [n, {...p.photoDates}])),
+    marks: {gender: info.gender, era: eraOf(info), care: info.care, renovated: info.renovated}, // 元号は選んでいなければ昭和
     texts: {
       kana: info.kana.trim(),
       zip: t(info.zip),
@@ -371,7 +406,7 @@ export function shinseiValues(job: Job, s: EstimateSettings): ShinseiValues {
       relation: info.relation.trim(),
       reasonOffice: info.reasonOffice.trim(),
       reasonName: info.reasonName.trim(),
-      era: info.era,
+      era: eraOf(info),
       y: t(info.birthY),
       m: t(info.birthM),
       d: t(info.birthD),
@@ -648,8 +683,11 @@ export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void
   const pasted = new Set<number>(); // 写真を貼った写真番号（同じ番号の用紙が2枚＝広域連合なら、最初の用紙だけに貼る）
   for (const sheet of map.sheets) {
     const photo = sheet.photoPlace ? photoNumberOf(readCell(files, sheet.sheet, sheet.photoPlace.photo)) : 0;
-    writeCells(files, sheet.sheet, shinseiCells(sheet, v, photo));
+    const cells = shinseiCells(sheet, v, photo);
+    for (const [ref, text] of photoBoxes(files, sheet, v, photo)) cells.set(ref, text);
+    writeCells(files, sheet.sheet, cells);
     wrapKinds(files, sheet, v);
+    fitLines(files, sheet, v);
     drawMarks(files, sheet, v.marks);
     if (sheet.legend?.box) drawLegend(files, sheet, v.works);
     const images = photo > 0 && v.photos[photo] !== undefined && !pasted.has(photo) ? v.photoImages?.[photo] : undefined; // 箇所のある写真番号だけ
@@ -658,6 +696,94 @@ export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void
       drawPhotos(files, sheet, images);
     }
   }
+}
+
+/** □の一覧の印（□・■・◻︎・🔳 など。うしろの異体字セレクタも） */
+const BOX = /(?:\u{1F533}|\u{1F532}|[\u25A0\u25A1\u25FB\u25FC\u2610\u2611\u2612])\uFE0E?\uFE0F?/gu;
+
+/**
+ * □の一覧（「□廊下　□階段…」）の pick 番目（0始まり）だけを■にする（ほかは□。印の形もそろえる）。
+ * other があれば最後の項目（「□その他（　　）」）を「■勝手口」のように置きかえる（一覧にない改修場所。ユーザーの指示）
+ */
+export function checkBoxes(text: string, pick: number | null, other = ''): string {
+  const src = text.replace(/\r\n/g, '\n');
+  const marks = [...src.matchAll(BOX)];
+  if (marks.length === 0) return src;
+  let out = src.slice(0, marks[0].index);
+  marks.forEach((m, i) => {
+    const seg = src.slice((m.index ?? 0) + m[0].length, i + 1 < marks.length ? marks[i + 1].index : src.length);
+    out += other && i === marks.length - 1 ? `■${other}${/[\s　]*$/.exec(seg)?.[0] ?? ''}` : `${i === pick ? '■' : '□'}${seg}`;
+  });
+  return out;
+}
+
+/** 一覧の項目の名前（印のうしろ。うしろのすき間・改行は除く） */
+export function boxLabels(text: string): string[] {
+  const src = text.replace(/\r\n/g, '\n');
+  const marks = [...src.matchAll(BOX)];
+  return marks.map((m, i) => src.slice((m.index ?? 0) + m[0].length, i + 1 < marks.length ? marks[i + 1].index : src.length).replace(/[\s　]+$/, ''));
+}
+
+/** 改修場所の言いかえ（苅田町の写真の用紙の改修箇所の名前へ） */
+const PLACE_ALIAS: Record<string, string> = {
+  洗面所: '洗面・脱衣室',
+  脱衣所: '洗面・脱衣室',
+  脱衣室: '洗面・脱衣室',
+  洗面室: '洗面・脱衣室',
+  洗面脱衣所: '洗面・脱衣室',
+  洗面脱衣室: '洗面・脱衣室',
+  居間: '居間・食堂',
+  食堂: '居間・食堂',
+  リビング: '居間・食堂',
+  ダイニング: '居間・食堂',
+  '屋外・アプローチ': '玄関～道路',
+  アプローチ: '玄関～道路',
+  玄関アプローチ: '玄関～道路',
+  便所: 'トイレ',
+  風呂: '浴室',
+  風呂場: '浴室',
+};
+
+/**
+ * 改修場所が一覧のどれか（0始まり。最後の「その他（　）」は選ばない）：同じ名前・言いかえ・名前に入っている項目（「2階廊下」→ 廊下）。なければ null
+ */
+export function placeBox(labels: string[], name: string): number | null {
+  const norm = (s: string) => s.normalize('NFKC').replace(/[\s　]/g, '');
+  const list = labels.slice(0, -1).map(norm);
+  const n = norm(name);
+  if (!n) return null;
+  const exact = list.indexOf(n);
+  if (exact >= 0) return exact;
+  const alias = PLACE_ALIAS[n] ? list.indexOf(norm(PLACE_ALIAS[n])) : -1;
+  if (alias >= 0) return alias;
+  const inside = list.map((l, i) => ({l, i})).filter(({l}) => l && n.includes(l)).sort((a, b) => b.l.length - a.l.length)[0];
+  return inside ? inside.i : null;
+}
+
+/**
+ * 苅田町の写真の用紙：改修箇所（その写真番号の改修場所の□を■。一覧にない場所は「■勝手口」）・実施した工事種類（改修の種類の□を■）と撮影日（令和の日付）。
+ * 箇所のない写真番号の用紙は原本のまま
+ */
+function photoBoxes(files: Files, sheet: ShinseiSheet, v: ShinseiValues, photo: number): Map<string, CellValue> {
+  const out = new Map<string, CellValue>();
+  const pp = sheet.photoPlace;
+  const name = photo > 0 ? v.photos[photo] : undefined;
+  if (!pp || name === undefined) return out;
+  if (pp.placeChecks) {
+    const text = readCell(files, sheet.sheet, pp.placeChecks);
+    const at = placeBox(boxLabels(text), name);
+    if (text) out.set(pp.placeChecks, checkBoxes(text, at, at === null ? name.normalize('NFKC').trim() : ''));
+  }
+  const kind = v.photoKinds?.[photo];
+  if (pp.kindChecks && kind) {
+    const text = readCell(files, sheet.sheet, pp.kindChecks);
+    if (text) out.set(pp.kindChecks, checkBoxes(text, kind - 1));
+  }
+  for (const slot of ['before', 'after'] as const) {
+    const day = v.photoDates?.[photo]?.[slot];
+    if (pp.dates && day) out.set(pp.dates[slot], reiwaText(day));
+  }
+  return out;
 }
 
 /** 写真貼付用紙の写真番号 → 写真を貼る用紙（原本の写真番号の欄を読む。同じ番号の用紙が2枚あれば最初の用紙） */
@@ -696,6 +822,97 @@ function wrapKinds(files: Files, sheet: ShinseiSheet, v: ShinseiValues): void {
     if (places && kind?.places) xml = setStyle(xml, k.places, places);
   });
   files[path] = strToU8(xml);
+}
+
+// ---------------------------------------------------------------- 行が多いときは文字を小さくして欄に収める
+// ユーザーの指示「10箇所、12箇所となった場合にはみ出さないようにする」（2026-10-21）：改修の内容（箇所ごとに1行）の欄は、
+// 入りきらなければ入るまで文字を小さくする（欄の大きさは原本のまま）。式で同じ内容を出す欄（苅田町の事後申請書）も同じ大きさに
+
+/** 折り返しの行の高さ（文字の大きさの倍） */
+const LINE_K = 1.25;
+/** 文字の幅（全角＝1、半角＝0.55。プロポーショナルの字体でも、はみ出さない方に数える） */
+const emOf = (s: string) => [...s].reduce((n, ch) => n + (/[ -~｡-ﾟ]/.test(ch) ? 0.55 : 1), 0);
+
+/**
+ * 幅 w・高さ h（画素）の折り返しの欄に、lines を1行ずつ入れる文字の大きさ（pt）。base で入ればそのまま。
+ * 入らなければ 0.5pt ずつ小さくする（欄の幅より長い行は、折り返した行数で数える）。いちばん小さくて minPt
+ * （4.5pt：内訳明細書の改修の種類の行＝2行分の高さに、同じ種類の12箇所が入る大きさ。見積書の印刷の小さい文字と同じ）
+ */
+export function fitLinesSize(lines: string[], w: number, h: number, base: number, minPt = 4.5): number {
+  for (let pt = base; pt > minPt; pt -= 0.5) {
+    const px = (pt * 4) / 3;
+    const rows = lines.reduce((n, l) => n + Math.max(1, Math.ceil((emOf(l) * px) / Math.max(1, w - 6))), 0);
+    if (rows * px * LINE_K <= h - 4) return pt;
+  }
+  return minPt;
+}
+
+/** 書式（cellXfs の番号）の文字の大きさだけを pt にした書式を足して、その番号を返す（同じものがあればそれ） */
+function sizedStyle(files: Files, style: number, pt: number): number {
+  const {fonts, xfs} = styleParts(files);
+  const xf = xfs[style];
+  if (xf === undefined) return style;
+  const font = fonts[numOf(attrOf(xf, 'fontId'), 0)] ?? '<font/>';
+  const sized = /<sz\b[^>]*\/>/.test(font) ? font.replace(/<sz\b[^>]*\/>/, `<sz val="${pt}"/>`) : font.replace(/^<font\b([^>]*?)\s*(\/?)>/, (_, a: string, close: string) => `<font${a}><sz val="${pt}"/>${close ? '</font>' : ''}`);
+  let xml = strFromU8(files['xl/styles.xml']);
+  const count = (tag: string, n: number) => (xml = xml.replace(new RegExp(`<${tag}\\b([^>]*?)\\scount="\\d+"`), `<${tag}$1 count="${n}"`));
+  let fontId = fonts.indexOf(sized);
+  if (fontId < 0) {
+    fontId = fonts.length;
+    xml = xml.replace('</fonts>', `${sized}</fonts>`);
+    count('fonts', fonts.length + 1);
+  }
+  const withFont = /\sfontId=/.test(xf) ? xf.replace(/\sfontId="\d+"/, ` fontId="${fontId}"`) : xf.replace(/^<xf\b/, `<xf fontId="${fontId}"`);
+  const next = /\sapplyFont=/.test(withFont) ? withFont.replace(/\sapplyFont="[^"]*"/, ' applyFont="1"') : withFont.replace(/^<xf\b/, '<xf applyFont="1"');
+  let id = xfs.indexOf(next);
+  if (id < 0) {
+    id = xfs.length;
+    xml = xml.replace('</cellXfs>', `${next}</cellXfs>`);
+    count('cellXfs', xfs.length + 1);
+  }
+  files['xl/styles.xml'] = strToU8(xml);
+  return id;
+}
+
+/** 欄（結合した範囲）に lines が入るように、文字を小さくした書式にする（入るときはそのまま） */
+function fitCell(files: Files, path: string, ref: string, lines: string[]): void {
+  if (lines.length === 0 || !files[path]) return;
+  const xml = strFromU8(files[path]);
+  const found = cellRe(ref).exec(xml);
+  if (!found) return;
+  const box = rangeBox(sheetLayout(xml), ref);
+  const st = cellStyle(files, xml, ref);
+  const pt = fitLinesSize(lines, box.w, box.h, st.size);
+  if (pt >= st.size) return;
+  files[path] = strToU8(setStyle(xml, ref, String(sizedStyle(files, numOf(attrOf(found[1], 's'), 0), pt))));
+}
+
+/** 改修の内容の欄（申請書・内訳明細書の改修の種類の行・平面図の下の欄）と、それを式で出している欄の文字を、欄に入る大きさに */
+function fitLines(files: Files, sheet: ShinseiSheet, v: ShinseiValues): void {
+  const paths = sheetPaths(files);
+  const path = paths.get(sheet.sheet);
+  if (!path) return;
+  const targets: [string, string[]][] = [];
+  if (sheet.works) targets.push([sheet.works, v.works]);
+  if (sheet.legend?.cell) targets.push([sheet.legend.cell, v.works]);
+  sheet.kinds?.forEach((k, i) => {
+    targets.push([k.works, v.kinds[i]?.works ?? []]);
+    if (v.kinds[i]?.places) targets.push([k.places, [v.kinds[i].places]]);
+  });
+  if (!targets.some(([, lines]) => lines.length > 1)) return;
+  // 式でこのシートの欄を出している欄（苅田町の事後申請書の改修の内容＝事前申請書!J14）：シート → [番地, 出している欄]
+  const copies: [string, string, string][] = [];
+  for (const [name, other] of paths) {
+    const xml = files[other] ? strFromU8(files[other]) : '';
+    for (const m of xml.matchAll(/<c r="([A-Z]+\d+)"[^>]*?><f>([^<]*)<\/f>/g)) {
+      const target = formulaRef(m[2], name);
+      if (target && target.sheet === sheet.sheet.trim()) copies.push([other, m[1], target.ref]);
+    }
+  }
+  for (const [ref, lines] of targets) {
+    fitCell(files, path, ref, lines);
+    for (const [other, at, target] of copies) if (target === ref) fitCell(files, other, at, lines);
+  }
 }
 
 /** 欄の書式（s）を替える（欄があるときだけ） */
@@ -969,7 +1186,9 @@ function drawLegend(files: Files, sheet: ShinseiSheet, lines: string[]): void {
   const d = drawing && files[drawing] ? strFromU8(files[drawing]) : '';
   if (!d.includes('</xdr:wsDr>')) return;
   const id = nextShapeId(d);
-  const paras = lines.map((l) => `<a:p><a:r><a:rPr lang="ja-JP" altLang="en-US" sz="1200"/><a:t>${esc(l)}</a:t></a:r></a:p>`).join('');
+  // 文字は 12pt。行が多くて枠に入らなければ小さくする（まわりの余白は左右 0.1インチ・上下 0.05インチ）
+  const sz = Math.round(fitLinesSize(lines, box.w - 19.2 + 6, box.h - 9.6 + 4, 12) * 100);
+  const paras = lines.map((l) => `<a:p><a:r><a:rPr lang="ja-JP" altLang="en-US" sz="${sz}"/><a:t>${esc(l)}</a:t></a:r></a:p>`).join('');
   const xml =
     `<xdr:twoCellAnchor>${fromTo(lay, box)}<xdr:sp macro="" textlink=""><xdr:nvSpPr><xdr:cNvPr id="${id}" name="工事内容 ${id}"/><xdr:cNvSpPr txBox="1"/></xdr:nvSpPr>` +
     `<xdr:spPr>${xfrm(box)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln w="9525"><a:noFill/></a:ln></xdr:spPr>` +

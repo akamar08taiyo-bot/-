@@ -2,7 +2,7 @@
 //   （原本の様式のまま。ユーザーの指示「一覧から入力をメインとする。プレビューをみながら入力」）。Enter で次の欄、入れている項目はプレビューで囲み、
 //   プレビューの欄を押すと一覧のその欄へ。性別・元号・要介護状態区分・改修状況は一覧のボタンか、プレビューの申請書の文字を押すと丸。
 //   同じ様邸なので、見積書で入れた氏名・番号・住所・改修の内容・金額（改修予定費用）がすぐ申請書に出て、申請書で入れた氏名なども見積書に出る。
-//   改修の内容は「①玄関　手すりの取付　L=600mm H=800mm」「②屋外　段差の解消　W600mm D350mm H150mm」（寸法は箇所ごとの 長さ・高さ／幅・奥行・高さ の欄）。
+//   改修の内容は「①玄関　手すりの取り付け　L=600mm H=800mm」「②屋外　段差の解消　W600mm D350mm H150mm」（寸法は箇所ごとの 長さ・高さ／幅・奥行・高さ の欄）。
 //   被保険者番号の空いたマスは 0。苅田町・行橋市の着工予定日は空白（入れる欄もない）。
 //   「📗 申請書をExcelで保存」で、原本（行橋市・苅田町・みやこ町・広域連合）に転記した Excel を保存する（ほかのシートはそのまま。丸は楕円の図形）。
 //   新規作成は申請書のタブから（フリガナの欄にカーソル）。見積書に行を入れると笹岡工務店の請求書・発注書に入る（申請書だけなら入れない）。
@@ -129,9 +129,9 @@ const make = async (picks = [], shot = '') => {
   return saveExcel();
 };
 
-// 改修の内容（4つの保険者の申請書・内訳明細書・平面図とも同じ書き方）：「①玄関　手すりの取付　L=600mm H=800mm」。
+// 改修の内容（4つの保険者の申請書・内訳明細書・平面図とも同じ書き方）：「①玄関　手すりの取り付け　L=600mm H=800mm」。
 // サンプルの玄関は木の手すりを 60cm（長さは見積書から）、高さは申請書のタブで 800 を入れる。トイレは L型手すり（長さなし）
-const WORKS = '①玄関　手すりの取付　L=600mm H=800mm\n②トイレ　手すりの取付';
+const WORKS = '①玄関　手すりの取り付け　L=600mm H=800mm\n②トイレ　手すりの取り付け';
 
 // ---------------- 行橋市：申請書のタブ＝左に一覧、右にプレビュー（原本の様式のまま。表題はヘッダー）。見積書の氏名・住所・改修の内容・金額がもう入っている
 await shinseiTab.click();
@@ -149,7 +149,7 @@ assert.equal(await page.getByRole('dialog').count(), 0);
 assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '住宅の所有者', '改修の内容・箇所及び規模', '完成予定日', '改修予定費用']);
 assert.equal(await form.getByLabel('着工予定日').count(), 0);
 let pv = await preview.innerText();
-for (const t of ['介護保険居宅（ 介護・介護予防 ）住宅改修費受領委任払い申請書', '被保険者氏名', '（サンプル）山田', '福岡県行橋市中央1-1', '①玄関　手すりの取付　L=600mm', '②トイレ　手すりの取付', '26,958']) {
+for (const t of ['介護保険居宅（ 介護・介護予防 ）住宅改修費受領委任払い申請書', '被保険者氏名', '（サンプル）山田', '福岡県行橋市中央1-1', '①玄関　手すりの取り付け　L=600mm', '②トイレ　手すりの取り付け', '26,958']) {
   assert.ok(pv.includes(t), `プレビューに「${t}」がない`);
 }
 // まだ入っていない欄は上に出て、押すと一覧のその欄へ。着工・完成の日は数えない
@@ -180,8 +180,21 @@ const genkan = works.getByRole('listitem', {name: '①玄関'});
 assert.equal(await genkan.getByLabel('長さ（mm）').getAttribute('placeholder'), '600');
 assert.equal(await works.getByLabel('幅（mm）').count(), 0);
 await genkan.getByLabel('高さ（mm）').fill('800');
-await pvHas('①玄関　手すりの取付　L=600mm H=800mm');
-assert.ok((await works.getByLabel('申請書に書く内容').innerText()).includes('①玄関　手すりの取付　L=600mm H=800mm'));
+await pvHas('①玄関　手すりの取り付け　L=600mm H=800mm');
+// 申請書に書く内容は1行ずつの欄（写真番号のうしろ）。手で直せて、↺ で自動の文に戻る（ユーザーの指示「手入力でも編集できるようにする」）
+const workLines = () => works.getByLabel('申請書に書く内容').locator('input').evaluateAll((els) => els.map((e) => e.value));
+assert.deepEqual(await workLines(), ['玄関　手すりの取り付け　L=600mm H=800mm', 'トイレ　手すりの取り付け']);
+const line1 = works.getByLabel('①玄関の申請書に書く内容', {exact: true});
+await line1.fill('玄関　手すりの取り付け　L=600mm H=800mm　木製');
+await pvHas('①玄関　手すりの取り付け　L=600mm H=800mm　木製');
+await genkan.getByLabel('高さ（mm）').fill('850'); // 手で直した行は、寸法を変えても直した文のまま
+await page.waitForTimeout(300);
+assert.equal(await line1.inputValue(), '玄関　手すりの取り付け　L=600mm H=800mm　木製');
+await works.getByRole('button', {name: '①玄関の申請書に書く内容を自動の文に戻す'}).click();
+assert.equal(await line1.inputValue(), '玄関　手すりの取り付け　L=600mm H=850mm');
+await genkan.getByLabel('高さ（mm）').fill('800');
+await pvHas('①玄関　手すりの取り付け　L=600mm H=800mm');
+assert.equal(await works.getByRole('button', {name: /自動の文に戻す/}).count(), 0);
 // 丸：プレビューの申請書の「女」「昭」「要介護２」を押す（一覧のボタンにも出る）
 const yk = await make(['女', '昭和', '要介護2'], '81-shinsei-preview.png');
 pv = await preview.innerText();
@@ -223,9 +236,9 @@ log('見積書と申請書がすぐつながる（金額・氏名）OK');
 
 // ---------------- 平面図：空いた所に工事内容（申請書の改修の内容と同じ行）。平面図そのものは Excel で描く
 await shinseiTab.click();
-await pvHas('①玄関　手すりの取付　L=600mm H=800mm');
+await pvHas('①玄関　手すりの取り付け　L=600mm H=800mm');
 const plan = await pageOf('平面図  (2)').innerText();
-for (const t of ['（サンプル）山田', '①玄関　手すりの取付　L=600mm H=800mm', '②トイレ　手すりの取付']) assert.ok(plan.includes(t), `平面図に「${t}」がない`);
+for (const t of ['（サンプル）山田', '①玄関　手すりの取り付け　L=600mm H=800mm', '②トイレ　手すりの取り付け']) assert.ok(plan.includes(t), `平面図に「${t}」がない`);
 await pageOf('平面図  (2)').screenshot({path: path.join(outDir, '84-plan.png')});
 log('平面図の工事内容OK');
 
@@ -255,16 +268,39 @@ const blue = await makeImage('#2471a3', 900, 1600);
 const green = await makeImage('#1e8449', 1200, 900);
 const yellow = await makeImage('#d4ac0d', 3000, 1000); // → 1600×533
 /** 写真のファイルをドロップする（エクスプローラーなどから枠に落とすのと同じ） */
-const dropFile = async (target, buffer, name) => {
+const dropFile = async (target, buffer, name, type = 'image/png') => {
   const el = await target.elementHandle();
   await page.evaluate(
-    ({el, bytes, name}) => {
+    ({el, bytes, name, type}) => {
       const dt = new DataTransfer();
-      dt.items.add(new File([new Uint8Array(bytes)], name, {type: 'image/png'}));
-      for (const type of ['dragenter', 'dragover', 'drop']) el.dispatchEvent(new DragEvent(type, {dataTransfer: dt, bubbles: true, cancelable: true}));
+      dt.items.add(new File([new Uint8Array(bytes)], name, {type}));
+      for (const ev of ['dragenter', 'dragover', 'drop']) el.dispatchEvent(new DragEvent(ev, {dataTransfer: dt, bubbles: true, cancelable: true}));
     },
-    {el, bytes: [...buffer], name},
+    {el, bytes: [...buffer], name, type},
   );
+};
+/** JPEG の写真をブラウザで作り、撮影日時（Exif の DateTimeOriginal「2026:10:05 09:30:00」）を入れる（スマホ・デジカメの写真と同じ） */
+const datedJpeg = async (color, when) => {
+  const jpeg = Buffer.from(
+    await page.evaluate(async (color) => {
+      const c = document.createElement('canvas');
+      c.width = 800;
+      c.height = 600;
+      const g = c.getContext('2d');
+      g.fillStyle = color;
+      g.fillRect(0, 0, 800, 600);
+      const b = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.9));
+      return [...new Uint8Array(await b.arrayBuffer())];
+    }, color),
+  );
+  const le16 = (n) => [n & 255, n >> 8];
+  const le32 = (n) => [n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255];
+  const subAt = 8 + 2 + 12 + 4; // 最初の IFD（Exif の IFD の場所だけ）のうしろに Exif の IFD、そのうしろに日時の文字
+  const dataAt = subAt + 2 + 12 + 4;
+  const tiff = [0x49, 0x49, ...le16(42), ...le32(8), ...le16(1), ...le16(0x8769), ...le16(4), ...le32(1), ...le32(subAt), ...le32(0)];
+  tiff.push(...le16(1), ...le16(0x9003), ...le16(2), ...le32(20), ...le32(dataAt), ...le32(0), ...[...when].map((ch) => ch.charCodeAt(0)), 0);
+  const app1 = [0x45, 0x78, 0x69, 0x66, 0, 0, ...tiff];
+  return Buffer.concat([jpeg.subarray(0, 2), Buffer.from([0xff, 0xe1, (app1.length + 2) >> 8, (app1.length + 2) & 255, ...app1]), jpeg.subarray(2)]);
 };
 const srcOf = (loc) => loc.locator('img').getAttribute('src');
 const emptySlot = async (loc) => (await loc.locator('img').count()) === 0 && (await loc.innerText()).startsWith('＋');
@@ -390,8 +426,8 @@ await shinseiTab.click();
 await page.getByRole('combobox', {name: '保険者'}).selectOption('kanda');
 await pageOf('事前申請書').waitFor();
 assert.deepEqual(await pageNames(), ['事前申請書', '平面図  (2)', '1 ', '1  (3)']);
-// 一覧は苅田町の申請書の順番（番号が氏名の前）。完了予定日だけ（着工予定日は空白）
-assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者番号', '被保険者氏名', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '住宅の所有者', '改修の内容・箇所及び規模', '完了予定日', '改修予定費用']);
+// 一覧は苅田町の申請書の順番。ただし被保険者氏名はフリガナのすぐ下（ユーザーの指示）。完了予定日だけ（着工予定日は空白）
+assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '住宅の所有者', '改修の内容・箇所及び規模', '完了予定日', '改修予定費用']);
 assert.equal(await form.getByLabel('完了予定日').inputValue(), '2026-11-20');
 assert.equal(await form.getByLabel('改修予定費用').inputValue(), '26,958');
 assert.ok((await form.innerText()).includes('見積書の合計（税込）'));
@@ -410,10 +446,34 @@ assert.match(k.sheets.get('事後申請書'), /<f>事前申請書!J7<\/f><v>（�
 assert.deepEqual([k.ellipses('事前申請書'), k.ellipses('事後申請書')], [3, 3]); // 女・昭・要支援１（事後申請書にも）
 assert.deepEqual(['J6', 'J9', 'J10', 'AB11', 'W13', 'Y16'].map((r) => text(pre, r)), ['サンプル　ヤマダ', '明　・　大　・　昭　23年5月6日生', '〒824-0001', '0930-11-2222', '本人との関係（本人）', '令和8年11月20日']);
 assert.ok(!/令和|46331/.test(cellOf(pre, 'Y15')), cellOf(pre, 'Y15')); // 着工予定日は空白
-// 写真の用紙の実施した工事種類は「🔳手すりの取付　□(2)段差の解消…」（ユーザーの指示。原本は「■(1)手摺の取付」）
-assert.ok((await pageOf('1 ').innerText()).includes('🔳手すりの取付'));
+// 写真の用紙の改修箇所・実施した工事種類の□は、その写真番号の箇所・改修の種類を■に（ユーザーの指示「□の部分は、選択した項目と連動する」）。
+// 撮影日は写真を入れた日（写真に撮影日時が入っていなければ当日）
+const today = new Date();
+const reiwaToday = `令和${today.getFullYear() - 2018}年${today.getMonth() + 1}月${today.getDate()}日`;
+const kPhoto1 = k.sheets.get('1 ');
+assert.ok(text(kPhoto1, 'B2').includes('■玄関　□玄関～道路') && text(kPhoto1, 'B2').split('■').length === 2, text(kPhoto1, 'B2'));
+assert.ok(text(kPhoto1, 'B4').startsWith('■手すりの取り付け　□(2)段差の解消'), text(kPhoto1, 'B4'));
+assert.ok(text(k.sheets.get('1  (3)'), 'B2').includes('■トイレ'));
+assert.deepEqual([text(kPhoto1, 'D6'), text(k.sheets.get('1  (3)'), 'D6'), text(k.sheets.get('1  (3)'), 'D23')], [reiwaToday, reiwaToday, reiwaToday]);
+assert.ok((await pageOf('1 ').innerText()).includes('■玄関'));
 const kStrings = strFromU8(unzipSync(kd.bytes)['xl/sharedStrings.xml']);
-assert.ok(kStrings.includes('🔳手すりの取付　□(2)段差の解消') && !kStrings.includes('手摺'));
+assert.ok(!kStrings.includes('手摺'));
+// 撮影日の欄（写真の用紙に撮影日の欄のある苅田町だけ）：写真を入れた枠は当日。直せる。撮影日時の入った写真（JPEG）を入れると、その日
+const dateOf = (no, name, which) => photoBoard.getByLabel(`${no}${name} ${which}の撮影日`, {exact: true});
+const isoToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+assert.deepEqual([await dateOf('①', '玄関', '改修前').inputValue(), await dateOf('①', '玄関', '改修後').inputValue(), await dateOf('②', 'トイレ', '改修後').inputValue()], [isoToday, '', isoToday]);
+await dateOf('②', 'トイレ', '改修後').fill('2026-12-01');
+await pvHas('令和8年12月1日');
+await dropFile(slot('①', '玄関', '改修後'), await datedJpeg('#8e44ad', '2026:10:05 09:30:00'), 'dated.jpg', 'image/jpeg');
+await slot('①', '玄関', '改修後').locator('img').waitFor();
+await page.waitForFunction(() => document.querySelector('[aria-label="①玄関 改修後の撮影日"]')?.value === '2026-10-05');
+await pvHas('令和8年10月5日');
+await photoBoard.screenshot({path: path.join(outDir, '88-photo-dates.png')});
+// 写真を消すと撮影日も消える（あとの保険者の確かめのため、入れる前に戻す）
+await slot('①', '玄関', '改修後').click();
+await page.getByRole('status', {name: '選んでいる写真'}).getByRole('button', {name: '削除'}).click();
+assert.equal(await dateOf('①', '玄関', '改修後').inputValue(), '');
+log('苅田町の写真の用紙（改修箇所・工事種類の□が連動・撮影日は当日・手で直す・写真の撮影日時を読む）OK');
 await page.locator('[aria-live] > div', {hasText: `「${kd.name}」を保存しました`}).waitFor();
 log('苅田町の申請書（申請書の順番の一覧・事前申請書・事後申請書は式で同じ・丸を外す・着工予定日は空白）OK');
 
@@ -430,7 +490,7 @@ assert.deepEqual(await pageNames(), ['住宅改修承認届出書', '住宅改�
 // 内訳明細書の氏名（式で承認届出書と同じ）を押しても、一覧の氏名の欄へ
 await spot('被保険者氏名', pageOf('住宅改修内訳明細書'));
 assert.equal(await focused(), '被保険者氏名');
-assert.ok((await pageOf('住宅改修内訳明細書').innerText()).includes('①玄関　手すりの取付　L=600mm H=800mm'));
+assert.ok((await pageOf('住宅改修内訳明細書').innerText()).includes('①玄関　手すりの取り付け　L=600mm H=800mm'));
 const my = await make(['無']);
 assert.match(my.name, /^みやこ町申請書_（サンプル）山田様_/);
 const m = sheetsOf(my.bytes);
@@ -448,6 +508,17 @@ log('みやこ町の申請書（6枚のプレビュー・式の欄も押せる�
 // ---------------- 広域連合（築上町など）：承認申請書・支給申請書（受領委任払用）・内訳明細書（別紙）・平面図・写真貼付用紙
 await page.getByRole('combobox', {name: '保険者'}).selectOption('kouiki');
 await pageOf('様式第2号（住宅改修承認申請書）').waitFor();
+// 広域連合の一覧にも郵便番号（住所の前。ユーザーの指示で足した）
+assert.deepEqual((await rowLabels()).slice(0, 7), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '性別', '郵便番号', '住所']);
+// 写真貼付用紙の改修の種別①〜⑥は、原本どおり縦書き（ユーザーの指示「縦で入力できるようにする」）：1文字ずつ下へ、欄の中に収まる
+const vertical = await pageOf('写真貼付用紙').evaluate((el) => {
+  const span = [...el.querySelectorAll('span.sr-only')].find((x) => x.textContent === '手すりの取り付け');
+  const box = span.parentElement.getBoundingClientRect();
+  const chars = [...span.parentElement.querySelectorAll('div[aria-hidden="true"]')].map((d) => d.getBoundingClientRect());
+  return {n: chars.length, sameX: chars.every((r) => Math.abs(r.left - chars[0].left) < 1), down: chars.every((r, i) => i === 0 || r.top > chars[i - 1].top), inside: chars[chars.length - 1].bottom <= box.bottom + 0.5};
+});
+assert.deepEqual(vertical, {n: 8, sameX: true, down: true, inside: true});
+await pageOf('写真貼付用紙').screenshot({path: path.join(outDir, '89-kouiki-photo-vertical.png')});
 assert.deepEqual(await pageNames(), ['様式第2号（住宅改修承認申請書）', '様式第7号（住宅改修費支給申請書（受領委任払用）', '様式第2号別紙（住宅改修内訳明細書）', '平面図 (2)', '写真貼付用紙', '写真貼付用紙 (2)']);
 assert.ok((await preview.innerText()).includes('様式第２号（第６条関係）')); // ヘッダー
 await estimateTab.click();
@@ -458,7 +529,8 @@ const g = sheetsOf(kk.bytes);
 assert.equal(g.sheets.size, 25);
 for (const name of ['様式第2号（住宅改修承認申請書）', '様式第7号（住宅改修費支給申請書（受領委任払用）']) {
   const x = g.sheets.get(name);
-  assert.deepEqual([text(x, 'J6'), text(x, 'J9'), boxes('X', 10, 7).map((r) => text(x, r)).join('')], ['（サンプル）山田', '福岡県行橋市中央1-1', '0000366989'], name);
+  // 住所の欄は2行：1行目に〒と郵便番号（ユーザーの指示「郵便番号をいれれるようにする」）、2行目に住所
+  assert.deepEqual([text(x, 'J6'), text(x, 'J9'), text(x, 'J10'), boxes('X', 10, 7).map((r) => text(x, r)).join('')], ['（サンプル）山田', '〒824-0001', '福岡県行橋市中央1-1', '0000366989'], name);
 }
 const gb = g.sheets.get('様式第2号別紙（住宅改修内訳明細書）');
 assert.deepEqual([text(gb, 'I6'), text(gb, 'D15'), text(gb, 'K14')], ['（サンプル）山田', '玄関・トイレ', WORKS]);
@@ -493,8 +565,8 @@ await form.waitFor();
 assert.equal(await shinseiTab.getAttribute('aria-selected'), 'true');
 assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '新しい申請書');
 assert.equal(await focused(), 'フリガナ');
-// フリガナ → 被保険者番号（6けたでも確定すると右に詰めて左は 0）→ 被保険者氏名 → 生年月日の年・月・日 → 郵便番号 → 住所 → 電話番号 → 所有者 → 関係
-for (const t of ['ミホン　イチロウ', '366989', '見本 一郎', '10', '3', '4', '800-0300', '福岡県京都郡苅田町富久町2-2', '0930-33-4444', '見本 花子', '妻']) {
+// フリガナ → 被保険者氏名 → 被保険者番号（6けたでも確定すると右に詰めて左は 0）→ 生年月日の年・月・日 → 郵便番号 → 住所 → 電話番号 → 所有者 → 関係
+for (const t of ['ミホン　イチロウ', '見本 一郎', '366989', '10', '3', '4', '800-0300', '福岡県京都郡苅田町富久町2-2', '0930-33-4444', '見本 花子', '妻']) {
   await page.keyboard.type(t);
   await page.keyboard.press('Enter');
 }
@@ -519,11 +591,11 @@ await form.getByLabel('完了予定日').fill('2026-12-10');
 await form.getByLabel('改修予定費用').fill('120000');
 await status.filter({hasText: 'すべて入っています'}).waitFor();
 assert.deepEqual(await pressed(), ['昭和', '男', '要支援2']);
-const NEW_WORKS = '①玄関　手すりの取付　L=800mm H=750mm\n②トイレ　段差の解消　W600mm D350mm H150mm';
+const NEW_WORKS = '①玄関　手すりの取り付け　L=800mm H=750mm\n②トイレ　段差の解消　W600mm D350mm H150mm';
 await pvHas('②トイレ　段差の解消　W600mm D350mm H150mm');
 await page.screenshot({path: path.join(outDir, '82-shinsei-new.png'), fullPage: true});
 pv = await preview.innerText();
-for (const t of ['ミホン　イチロウ', '見本 一郎', '10年3月4日生', '〒800-0300', '福岡県京都郡苅田町富久町2-2', '0930-33-4444', '本人との関係（妻）', '①玄関　手すりの取付　L=800mm H=750mm', '令和8年12月10日', '120,000円']) {
+for (const t of ['ミホン　イチロウ', '見本 一郎', '10年3月4日生', '〒800-0300', '福岡県京都郡苅田町富久町2-2', '0930-33-4444', '本人との関係（妻）', '①玄関　手すりの取り付け　L=800mm H=750mm', '令和8年12月10日', '120,000円']) {
   assert.ok(pv.includes(t), `プレビューに「${t}」がない`);
 }
 const first = sheetsOf((await saveExcel()).bytes);
@@ -571,13 +643,13 @@ await form.getByLabel('理由書作成者の氏名').fill('見本 三郎');
 await works.getByRole('button', {name: '＋ 浴室'}).click();
 await works.getByRole('listitem', {name: '①浴室'}).getByLabel('長さ（mm）').fill('600');
 await form.getByLabel('改修費用（介護保険対象分）').fill('80000');
-await pvHas('①浴室　手すりの取付　L=600mm');
-assert.ok((await pageOf('住宅改修内訳明細書').innerText()).includes('①浴室　手すりの取付　L=600mm'));
+await pvHas('①浴室　手すりの取り付け　L=600mm');
+assert.ok((await pageOf('住宅改修内訳明細書').innerText()).includes('①浴室　手すりの取り付け　L=600mm'));
 const onlyMy = sheetsOf((await saveExcel()).bytes);
 const myTop = onlyMy.sheets.get('住宅改修承認届出書');
 assert.deepEqual(['I5', 'N11', 'N12'].map((r) => text(myTop, r)), ['見本 次郎', '見本居宅介護支援事業所', '見本 三郎']);
 assert.match(myTop, /<c r="I23" s="\d+"><v>80000<\/v><\/c>/);
-assert.equal(text(onlyMy.sheets.get('住宅改修内訳明細書'), 'K14'), '①浴室　手すりの取付　L=600mm');
+assert.equal(text(onlyMy.sheets.get('住宅改修内訳明細書'), 'K14'), '①浴室　手すりの取り付け　L=600mm');
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
 await page.getByRole('region', {name: '一覧から作成'}).getByRole('button', {name: '📋 見積書の一覧を開く'}).click();
 const listRow = page.getByRole('row', {name: /見本 次郎/});

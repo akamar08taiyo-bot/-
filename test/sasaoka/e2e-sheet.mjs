@@ -1,6 +1,6 @@
 // 住宅改修 見積書作成：見積書の欄に打ち込む（Excel のように欄を選んで打ち込む）を確かめる：
 // 新しい見積書を見積書の形のまま打ち込む（お客様名・改修内容・改修場所・内容の候補（★お気に入り）・数量 60cm・同上施工費・備考に定価）→
-// 合計・元に戻す・行の挿入／削除／コピー→貼付（行の左の＋・✕・コピー、Ctrl+C／X／V、Ctrl+Shift+＋／Ctrl+－）・改修場所の候補（▼・Alt+↓）・
+// 合計・元に戻す・行の挿入／削除／コピー→貼付（行の左の挿入・✕・コピー、Ctrl+C／X／V、Ctrl+Shift+＋／Ctrl+－）・改修場所の候補（▼・Alt+↓）・
 // 介護保険の対象外・諸経費・作成日・笹岡工務店の請求書に入れる（仕切価格を入れる）・
 // 広域連合用（材／手・時間）・「請求書を確認する」とのつながり
 // usage: node e2e-sheet.mjs <サイトのURL> <出力フォルダ>
@@ -77,7 +77,7 @@ await page.keyboard.type('60cm');
 await page.keyboard.press('Enter');
 await page.screenshot({path: path.join(outDir, '40-sheet-first.png')});
 let rail = await tds('木の手すり 35φ 4m');
-assert.deepEqual(rail.slice(0, 7), ['手すりの取付', '①浴室', 'サンプル S-TS35 木の手すり 35φ 4m', '0.15', '本', '16,000', '2,400'], rail.join('|'));
+assert.deepEqual(rail.slice(0, 7), ['手すりの取り付け', '①浴室', 'サンプル S-TS35 木の手すり 35φ 4m', '0.15', '本', '16,000', '2,400'], rail.join('|'));
 assert.ok(rail[12].includes('定価20,000円（4m）×0.8') && rail[12].includes('600mm÷4000mm＝0.15'), rail[12]);
 assert.equal(await page.getByLabel('笹岡工務店の請求書に入れる').isChecked(), true); // 行を入れたので請求書に入る
 assert.equal(await page.getByRole('button', {name: '🛒 発注書を作成'}).isDisabled(), false); // 発注書も作れる
@@ -134,10 +134,10 @@ await page.keyboard.press('Tab');
 await page.keyboard.type('L型');
 await page.keyboard.press('ArrowDown');
 await page.keyboard.press('Enter');
-assert.deepEqual((await tds('L型手すり')).slice(0, 7), ['手すりの取付', '②トイレ', 'サンプル S-TL01 L型手すり', '1', '本', '8,800', '8,800']);
+assert.deepEqual((await tds('L型手すり')).slice(0, 7), ['手すりの取り付け', '②トイレ', 'サンプル S-TL01 L型手すり', '1', '本', '8,800', '8,800']);
 log('空いた行・新しい箇所OK');
 
-// ---------------- 行の左の「＋」：下に1行入れる → 打ち込む／介護保険の対象外（スペース）／行の左の「✕」で消す
+// ---------------- 行の左の「挿入」：下に1行入れる → 打ち込む／介護保険の対象外（スペース）／行の左の「✕」で消す
 await sheet.getByRole('button', {name: 'サンプル S-TL01 L型手すりの行の下に1行入れる'}).click();
 assert.equal(await selected(), '内容（品名）');
 await page.keyboard.type('エンド');
@@ -146,7 +146,7 @@ await page.keyboard.press('Enter');
 const order = async () =>
   (await sheet.locator('.form-page tr', {has: page.locator('[data-edit$=":text"]')}).allInnerTexts()).map((t) => t.split('\t')[2]?.trim()).filter(Boolean);
 assert.deepEqual((await order()).slice(-2), ['サンプル S-TL01 L型手すり', 'サンプル S-EC01 エンドキャップ']);
-// 行を動かすボタン・介護保険の対象外のチェック・下に1行入れる・この行を消す はツールバーに出さない（行の左の「＋」「✕」と、欄で切り替える）
+// 行を動かすボタン・介護保険の対象外のチェック・下に1行入れる・この行を消す はツールバーに出さない（行の左の「挿入」「✕」と、欄で切り替える）
 for (const name of ['↓ 下に1行入れる', '▲ 上へ', '▼ 下へ', 'この行を消す', 'この部材（と同上施工費）を消す']) assert.equal(await sheet.getByRole('button', {name, exact: true}).count(), 0, name);
 assert.equal(await sheet.getByRole('button', {name: '📋 部材リストから入れる'}).count(), 1);
 assert.equal(await sheet.getByLabel('介護保険の対象外').count(), 0);
@@ -157,7 +157,7 @@ const lt = await tds('L型手すり');
 assert.deepEqual([lt[7], lt[10], lt[11]], ['', '', '8,800'], lt.join('|'));
 await sheet.locator('.form-page tr', {hasText: '手すりカバー'}).first().locator('.sheet-del').click();
 assert.equal(await sheet.locator('.form-page tr', {hasText: '手すりカバー'}).count(), 0);
-log('行の左の＋で下に1行・対象外・行の左の✕で消すOK');
+log('行の左の挿入で下に1行・対象外・行の左の✕で消すOK');
 
 // ---------------- 行の左の「✕消す」：その行を消す。箇所の行がなくなれば改修内容・改修場所も消えて、その行が空白になる。元に戻せる
 const lines = async () => sheet.locator('.form-page tr[data-rows]').count();
@@ -165,7 +165,7 @@ const before = await lines();
 assert.equal(await sheet.locator('.sheet-del').count(), before); // 明細の行ごとに1つ
 await sheet.getByRole('button', {name: 'サンプル S-TL01 L型手すりの行を消す'}).click();
 assert.equal(await sheet.locator('.form-page tr', {hasText: 'L型手すり'}).count(), 0);
-assert.deepEqual((await tds('エンドキャップ')).slice(0, 2), ['手すりの取付', '②トイレ']); // 箇所の名前は次の行に
+assert.deepEqual((await tds('エンドキャップ')).slice(0, 2), ['手すりの取り付け', '②トイレ']); // 箇所の名前は次の行に
 await page.locator('[aria-live] > div', {hasText: '行を消しました'}).first().waitFor();
 await sheet.getByRole('button', {name: 'サンプル S-EC01 エンドキャップの行を消す'}).click();
 assert.equal(await sheet.locator('.form-page tr', {hasText: 'エンドキャップ'}).count(), 0);
@@ -175,25 +175,36 @@ assert.equal(await lines(), before - 2);
 await undoKey();
 await undoKey();
 assert.equal(await lines(), before);
-assert.deepEqual((await tds('L型手すり')).slice(0, 2), ['手すりの取付', '②トイレ']);
+assert.deepEqual((await tds('L型手すり')).slice(0, 2), ['手すりの取り付け', '②トイレ']);
 assert.equal(await sheet.locator('.form-page tr', {hasText: 'エンドキャップ'}).count(), 1);
 log('行の左の✕消す（空白になる・元に戻す）OK');
 
-// ---------------- 行の左の「＋」：その行の下に空白の行が入り、内容の欄が選ばれる（そのまま打ち込める）。何も打たなければ空白の行のまま
-await sheet.getByRole('button', {name: 'サンプル S-EC01 エンドキャップの行の下に1行入れる'}).click();
+// ---------------- 行の左の「挿入」（ユーザーの指示で「＋」から変えた）：その行の下に空白の行が入り、内容の欄が選ばれる（そのまま打ち込める）。何も打たなければ空白の行のまま
+const insBtn = sheet.getByRole('button', {name: 'サンプル S-EC01 エンドキャップの行の下に1行入れる'});
+assert.equal(await insBtn.evaluate((el) => getComputedStyle(el, '::before').content), '"挿入"');
+await insBtn.click();
 assert.equal(await selected(), '内容（品名）');
 assert.equal(await lines(), before + 1);
 const blankRow = sheet.locator('.form-page tr[data-rows]').nth(await sheet.locator('.form-page tr[data-rows]').evaluateAll((trs) => trs.findIndex((tr) => tr.innerText.includes('エンドキャップ')) + 1));
 assert.deepEqual((await blankRow.locator('td').allInnerTexts()).map((t) => t.trim()).filter(Boolean), []); // 数量・単価・金額も出さない
 assert.equal(await page.getByText(/仕切価格が空欄の部材/).count(), 0); // 空白の行は「仕切価格がない」と言わない
+// 書き直し（F2・ダブルクリック）も空から（前は「材料費」と出た。ユーザーの指摘）
+await page.keyboard.press('F2');
+assert.equal(await input.inputValue(), '');
+await page.keyboard.press('Escape');
+await input.dblclick(); // 選んでいる欄の上には見えない入力欄があるので、ダブルクリックはそこに（人が押すのと同じ）
+assert.equal(await input.evaluate((el) => el.classList.contains('editing')), true);
+assert.equal(await input.inputValue(), '');
+assert.equal(await bar(), '　');
+await page.keyboard.press('Escape');
 await page.keyboard.type('養生テープ');
 await page.keyboard.press('Enter');
 assert.equal((await tds('養生テープ'))[2], '養生テープ');
 await sheet.getByRole('button', {name: '養生テープの行を消す'}).click();
 assert.equal(await lines(), before);
-log('行の左の＋（空白の行を入れて打ち込む）OK');
+log('行の左の挿入（空白の行を入れて打ち込む・書き直しも空から）OK');
 
-// ---------------- 行の左のボタンは「＋」「✕」「コピー」の順。「コピー」→ 貼り付けたい行の「貼付」（部材は同上施工費ごと）。続けて貼り付けられ、Esc でやめる
+// ---------------- 行の左のボタンは「挿入」「✕」「コピー」の順。「コピー」→ 貼り付けたい行の「貼付」（部材は同上施工費ごと）。続けて貼り付けられ、Esc でやめる
 const tools = await sheet.locator('.sheet-rowtools').first().locator(':scope > *').evaluateAll((els) => els.map((e) => e.className.split(' ')[0]));
 assert.deepEqual(tools, ['sheet-ins', 'sheet-del', 'sheet-copy']);
 const copyBefore = await lines();
@@ -227,7 +238,7 @@ assert.deepEqual((await order()).slice(-2), ['サンプル S-EC01 エンドキ�
 assert.deepEqual((await tds('同上施工費')).slice(5, 7), ['2,000', '2,000']);
 await page.keyboard.press('Escape');
 await undoKey();
-log('行の左の「＋」「✕」「コピー」→「貼付」（部材・同上施工費・空いた行）OK');
+log('行の左の「挿入」「✕」「コピー」→「貼付」（部材・同上施工費・空いた行）OK');
 
 // ---------------- キーボード：行の欄で Ctrl+C → 貼り付けたい行を選んで Ctrl+V／Ctrl+X は移す（1回だけ）／Ctrl+Shift+＋ で下に1行・Ctrl+－ で消す
 await cell(await key('L型手すり', 'text')).click();

@@ -5,7 +5,7 @@
 //   excl:行ID（介護保険の対象外）／overhead:all|target（諸経費）。明細の行には data-rows（もとになった入力の行）を付ける。
 //   金額のない施工費の行も出し、明細のあとに打ち込める空いた行（new:…、data-new）を1行足す。
 //   ほかの空いた行には data-blank を付ける（押すと、打ち込める行の同じ列を選ぶ）。
-//   明細の行の左（余白）には「＋」（data-ins：この行の下に空白の行を入れる）・「✕」（data-del：この行を消す。部材は同上施工費ごと）・
+//   明細の行の左（余白）には「挿入」（data-ins：この行の下に空白の行を入れる）・「✕」（data-del：この行を消す。部材は同上施工費ごと）・
 //   「コピー」（data-copy：部材は同上施工費ごと、施工費はそのまとまりをコピー）を出す。コピーしているあいだは「コピー」の代わりに
 //   「貼付」（data-paste：コピーした行をこの行の下に貼り付け）を出し、コピーした行には data-copied を付ける。
 // 何も入っていない部材の行（line.blank）は、印刷でも空白の行（数量・単価・金額も出さない）
@@ -35,7 +35,7 @@ export type SheetOpts = {mark: '材' | '手'; copied?: string[]; pasting?: boole
 const copiedAttr = (sheet: SheetOpts | null | undefined, l: FormLine) => (sheet?.copied?.length && l.rowIds.some((id) => sheet.copied?.includes(id)) ? {'data-copied': ''} : {});
 
 /**
- * 見積書に直接入力するときの、明細の行の左のボタン（左から）：「＋」この行の下に1行入れる（空白の行）／「✕」この行を消す（部材は同上施工費ごと）／
+ * 見積書に直接入力するときの、明細の行の左のボタン（左から）：「挿入」この行の下に1行入れる（空白の行）／「✕」この行を消す（部材は同上施工費ごと）／
  * 「コピー」部材は同上施工費ごと、施工費（同上施工費）はそのまとまりをコピー（空白の行にはない。並びがそろうよう、場所だけ空ける）。
  * コピーしているあいだは「コピー」の代わりに「貼付」（コピーした行をこの行の下に貼り付け。空白の行ならその行に入れる）。
  * 印刷には出ない。文字は CSS で出す（欄の文字 innerText に混ざらないように）
@@ -405,7 +405,7 @@ export function KouikiForm({job, settings: s, sheet = null}: {job: Job; settings
                   <th className="ml mb" style={{lineHeight: 1.15}}>
                     写<br />真<br />番<br />号
                   </th>
-                  <th className="mb" style={{...fitStyle('①手すりの取付', KK.L, 4, 9), textAlign: 'left', fontWeight: 700}}>
+                  <th className="mb" style={{...fitStyle(`${circled(1)}${KINDS[0]}`, KK.L, 4, 9), textAlign: 'left', fontWeight: 700}}>
                     改修の種類
                     {KINDS.map((k, i) => (
                       <div key={k}>

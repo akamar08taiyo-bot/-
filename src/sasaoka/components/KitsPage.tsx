@@ -248,14 +248,15 @@ function KitCard({
         </div>
       )}
 
+      {/* 見積書のツールバーと同じく大きめ（ユーザーの指示「この部分もう少し大きくする」、2026-10-21） */}
       <div className="flex flex-wrap items-center gap-2 px-4 py-3">
-        <Btn small color="emerald" onClick={onPickMaterial}>
+        <Btn color="emerald" onClick={onPickMaterial} className="!px-4 !text-base">
           📋 部材リストから入れる
         </Btn>
-        <Btn small color="sky" onClick={() => onPickLabor(null)}>
+        <Btn color="sky" onClick={() => onPickLabor(null)} className="!px-4 !text-base">
           🔧 施工費を入れる（笹岡工務店の手間）
         </Btn>
-        {kit.rows.length === 0 && <span className="text-xs text-slate-500">部材を入れてから、部材の行の「🔧 施工費」で取付手間を数えます。</span>}
+        {kit.rows.length === 0 && <span className="text-sm text-slate-500">部材を入れてから、部材の行の「🔧 施工費」で取付手間を数えます。</span>}
       </div>
     </section>
   );

@@ -196,6 +196,8 @@ export function sheetValue(job: Job, key: string, ctx: SheetCtx, date = ''): str
     if (field === 'note') return r.estNote ?? '';
     return '';
   }
+  // 何も入っていない行（挿入した行など）は見積書では空白なので、書き直すときも空から（前は内容の欄に「材料費」と出た。ユーザーの指摘、2026-10-21）
+  if (isBlankRow(r)) return '';
   if (field === 'text') return r.estText ?? materialText(r);
   if (field === 'qty') return String(cutToLength(r) ? Math.round(estimateQty(r) * 1000) / 1000 : r.qty);
   if (field === 'unit') return rowUnit(r);
@@ -262,7 +264,7 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
   // 部材の行
   if (field === 'text') {
     if (ctx.pick) return {job: patchRow(job, found, {...materialFields(ctx.pick), estText: null, estNote: null, estPrice: null}), key};
-    if (trimmed === (r.estText ?? materialText(r))) return {job, key};
+    if (trimmed === (isBlankRow(r) ? '' : (r.estText ?? materialText(r)))) return {job, key};
     if (trimmed === '') return {job: patchRow(job, found, {name: '', maker: '', code: '', estText: null}), key};
     return {job: patchRow(job, found, {name: trimmed, maker: '', code: '', estText: null, pieceLengthM: r.pieceLengthM || guessPieceLengthM(trimmed)}), key};
   }

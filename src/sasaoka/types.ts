@@ -60,19 +60,21 @@ export type Place = {
   name: string;
   rows: Row[];
   // ---- 見積書だけに使う
-  kind: number; // 改修の種類（1 手すりの取付・2 段差の解消・3 床材の変更・4 扉の取替・5 便器の取替・6 付帯工事）
+  kind: number; // 改修の種類（1 手すりの取り付け・2 段差の解消・3 床材の変更・4 扉の取替・5 便器の取替・6 付帯工事）
   photo: number; // 写真番号（0 なら箇所の順番）
   // ---- 申請書だけに使う
   shinseiText?: string; // 申請書の改修の内容の「そのほか」（寸法のうしろに足す文）
+  shinseiLine?: string; // 申請書の改修の内容を手で直した文（写真番号のうしろ「玄関　手すりの取り付け　L=600mm」）。あれば自動の文の代わりに書く
   dims?: PlaceDims; // 申請書の改修の内容の寸法（mm）：手すりは長さ・高さ、段差の解消は幅・奥行・高さ
   photos?: PlacePhotos; // 写真貼付用紙の写真（この箇所の写真番号の用紙に貼る）
+  photoDates?: PlacePhotos; // 写真の撮影日（'YYYY-MM-DD'。改修前・改修後。苅田町の写真の用紙の「撮影日」に書く）
 };
 
 /** 改修の内容の寸法（mm。打ったまま）：l 長さ（手すり。空なら見積書の使う長さ）・h 高さ・w 幅・d 奥行 */
 export type PlaceDims = {l?: string; h?: string; w?: string; d?: string};
 
 /** 箇所の写真：改修前・改修後（写真の中身は端末の IndexedDB に別に持つ。ここは番号＝`photos.ts` の id） */
-export type PlacePhotos = {before?: string; after?: string};
+export type PlacePhotos = {before?: string; after?: string}; // 改修前・改修後（写真の番号か、撮影日）
 
 export type NameSuffix = '様邸' | '様' | '';
 

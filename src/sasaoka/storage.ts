@@ -232,8 +232,10 @@ const cleanPlace = (p: Record<string, unknown>): Place => ({
   photo: Math.max(0, Math.floor(numv(p.photo))),
   // 前の版の「工事名称」（work）は読まない。見積書の改修内容・工事名称は改修の種類から
   ...(str(p.shinseiText).trim() ? {shinseiText: str(p.shinseiText)} : {}),
+  ...(typeof p.shinseiLine === 'string' ? {shinseiLine: p.shinseiLine} : {}), // 手で直した改修の内容（空にしたのも、そのまま）
   ...cleanDims(p.dims),
   ...cleanPhotos(p.photos),
+  ...cleanPhotoDates(p.photoDates),
 });
 
 /** 改修の内容の寸法（打ったままの文字）。どれもなければ持たない */
@@ -251,6 +253,15 @@ function cleanPhotos(raw: unknown): {photos?: PlacePhotos} {
   if (str(raw.before)) photos.before = str(raw.before);
   if (str(raw.after)) photos.after = str(raw.after);
   return photos.before || photos.after ? {photos} : {};
+}
+
+/** 写真の撮影日（日付の形 'YYYY-MM-DD' だけ）。どれもなければ持たない */
+function cleanPhotoDates(raw: unknown): {photoDates?: PlacePhotos} {
+  if (!isObj(raw)) return {};
+  const dates: PlacePhotos = {};
+  if (isoDate(raw.before)) dates.before = isoDate(raw.before);
+  if (isoDate(raw.after)) dates.after = isoDate(raw.after);
+  return dates.before || dates.after ? {photoDates: dates} : {};
 }
 
 const SUFFIXES: NameSuffix[] = ['様邸', '様', ''];

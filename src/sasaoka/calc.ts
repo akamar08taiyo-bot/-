@@ -186,7 +186,7 @@ export function estimateUnitPrice(row: Row, rates: EstimateRates): number {
 }
 
 /**
- * 何も入っていない部材の行（見積書の「＋」で入れた行など）。見積書では空白の行になり、金額は0。
+ * 何も入っていない部材の行（見積書の「挿入」で入れた行など）。見積書では空白の行になり、金額は0。
  * 品名などを打ち込めば、ふつうの部材の行になる
  */
 export function isBlankRow(r: Row): boolean {

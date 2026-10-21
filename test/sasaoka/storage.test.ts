@@ -78,6 +78,13 @@ test('見積書の項目：前のデータ（項目なし）も読める', () =>
   ]);
   // 前の版の工事名称（work）は読まない（見積書の改修内容・工事名称は改修の種類から）
   assert.equal('work' in k.places[0], false);
+  // 申請書の改修の内容を手で直した文は残す（空にしたものも、空のまま）。文字でなければ持たない
+  const [w] = cleanJobs([{places: [{name: '玄関', shinseiLine: '玄関　手すりの取り付け　L=650mm'}, {name: 'トイレ', shinseiLine: ''}, {name: '浴室', shinseiLine: 3}, {name: '居室'}]}]);
+  assert.deepEqual(
+    w.places.map((p) => p.shinseiLine),
+    ['玄関　手すりの取り付け　L=650mm', '', undefined, undefined],
+  );
+  assert.equal('shinseiLine' in w.places[3], false);
   // 申請書の項目：前のデータ（項目なし）は空。丸で囲む項目は選べる値のほかは空にする。前の版の丸（shinseiMarks）も読む
   assert.deepEqual(j.shinsei, NO_SHINSEI);
   const [m] = cleanJobs([{shinseiMarks: {gender: '女', era: '平成', care: '要介護2', renovated: 1}}]);

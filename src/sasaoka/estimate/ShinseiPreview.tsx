@@ -45,7 +45,50 @@ const fontCss = (f: PvFont, k = 1): CSSProperties => ({
   color: f.color,
 });
 
+/** 縦書きの1文字の高さ（文字の大きさの何倍か。行の高さと同じ） */
+const V_LINE = 1.2;
+
+/**
+ * 縦書きの欄（写真貼付用紙の改修の種別①〜⑥など）：Excel の縦書きと同じく、1文字ずつ下へ積む（文字の向きは横書きのまま。Excel も「ー」などを回さない）。
+ * 縮小して全体を表示する欄は、縦の長さが入るように縮める（ユーザーの指示「縦で入力できるようにする」、2026-10-21。前は横書きで描いていて、狭い欄からはみ出していた）
+ */
+function VerticalText({t}: {t: PvText}) {
+  const chars = t.runs.flatMap((r) => [...r.text].map((ch) => ({ch, font: r.font})));
+  let k = 1;
+  if (t.shrink) {
+    const need = chars.reduce((n, c) => n + c.font.size * V_LINE, 0);
+    const avail = t.h - 4;
+    if (need > avail && need > 0) k = Math.max(0.3, avail / need);
+  }
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: t.x,
+        top: t.y,
+        width: t.w,
+        height: t.h,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: t.valign === 'top' ? 'flex-start' : t.valign === 'bottom' ? 'flex-end' : 'center',
+        padding: '2px 0',
+        overflow: 'hidden',
+        textAlign: t.align === 'left' || t.align === 'right' ? t.align : 'center',
+        lineHeight: V_LINE,
+      }}
+    >
+      <span className="sr-only">{t.runs.map((r) => r.text).join('')}</span>
+      {chars.map((c, i) => (
+        <div key={i} aria-hidden="true" style={{...fontCss(c.font, k), whiteSpace: 'pre'}}>
+          {c.ch}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function TextView({t}: {t: PvText}) {
+  if (t.vertical) return <VerticalText t={t} />;
   if (t.marked) {
     // 丸で囲む欄：1文字ずつ、丸と同じ計算の位置に置く
     const font = t.runs[0]?.font;

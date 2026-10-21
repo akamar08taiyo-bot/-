@@ -164,18 +164,19 @@ export function EstimateEditor({
       </div>
 
       {/* 見積書の欄にないものだけ（苅田町・行橋市・みやこ町用は、お客様名・被保険者番号・工事場所・作成日を見積書の欄に打ち込む）。
-          説明の文は置かない（ユーザーの指示）。笹岡工務店の請求書に入れるかも同じ枠に並べる */}
+          説明の文は置かない（ユーザーの指示）。笹岡工務店の請求書に入れるかも同じ枠に並べる。
+          欄・文字はほかの画面より大きめ（ユーザーの指示「ここの部分はもう少し大きくする」、2026-10-21） */}
       <section className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
         {form === 'kouiki' && (
           <>
-            <label className="grid min-w-[14rem] flex-[2_1_0%] gap-1 text-xs font-bold text-slate-600">
+            <label className="grid min-w-[14rem] flex-[2_1_0%] gap-1 text-sm font-bold text-slate-600">
               お客様名
               <div className="flex gap-2">
                 <TextInput
                   value={job.customer}
                   onChange={(customer) => setJob((j) => ({...j, customer}))}
                   placeholder="例：山田"
-                  className="w-0 min-w-0 flex-1 text-base font-bold"
+                  className="!h-11 w-0 min-w-0 flex-1 text-base font-bold"
                   autoFocus={!job.customer}
                 />
                 <select
@@ -186,7 +187,7 @@ export function EstimateEditor({
                       suffix: e.target.value as NameSuffix,
                     }))
                   }
-                  className="h-9 rounded-md border border-slate-300 px-2 text-sm"
+                  className="h-11 rounded-md border border-slate-300 px-2 text-base"
                   aria-label="敬称"
                 >
                   <option value="様邸">様邸</option>
@@ -195,23 +196,23 @@ export function EstimateEditor({
                 </select>
               </div>
             </label>
-            <label className="grid min-w-[14rem] flex-[2_1_0%] gap-1 text-xs font-bold text-slate-600">
+            <label className="grid min-w-[14rem] flex-[2_1_0%] gap-1 text-sm font-bold text-slate-600">
               工事場所（住所）
               <TextInput
                 value={job.address}
                 onChange={(address) => setJob((j) => ({...j, address}))}
-                className="w-full min-w-0 text-sm font-normal text-slate-800"
+                className="!h-11 w-full min-w-0 text-base font-normal text-slate-800"
                 aria-label="住所"
               />
             </label>
           </>
         )}
-        <label className="grid min-w-[10rem] gap-1 text-xs font-bold text-slate-600">
+        <label className="grid min-w-[10rem] gap-1 text-sm font-bold text-slate-600">
           保険者
           <select
             value={insurer}
             onChange={(e) => e.target.value && setInsurer(e.target.value as Insurer)}
-            className={`h-9 w-full min-w-0 rounded-md border px-2 text-sm ${insurer ? 'border-slate-300 text-slate-800' : 'border-amber-400 bg-amber-50 text-amber-800'}`}
+            className={`h-11 w-full min-w-0 rounded-md border px-2 text-base ${insurer ? 'border-slate-300 text-slate-800' : 'border-amber-400 bg-amber-50 text-amber-800'}`}
             aria-label="保険者"
           >
             {!insurer && <option value="">（選ぶ）</option>}
@@ -222,12 +223,12 @@ export function EstimateEditor({
             ))}
           </select>
         </label>
-        <label className="grid gap-1 text-xs font-bold text-slate-600">
+        <label className="grid gap-1 text-sm font-bold text-slate-600">
           担当
           <select
             value={staff}
             onChange={(e) => setJob((j) => ({...j, staff: e.target.value}))}
-            className={`h-9 min-w-[8rem] rounded-md border px-2 text-sm ${staff ? 'border-slate-300 text-slate-800' : 'border-amber-400 bg-amber-50 text-amber-800'}`}
+            className={`h-11 min-w-[9rem] rounded-md border px-2 text-base ${staff ? 'border-slate-300 text-slate-800' : 'border-amber-400 bg-amber-50 text-amber-800'}`}
           >
             <option value="">（選ぶ）</option>
             {staffOptions.map((n) => (
@@ -237,19 +238,19 @@ export function EstimateEditor({
             ))}
           </select>
         </label>
-        <label className="grid gap-1 text-xs font-bold text-slate-600">
+        <label className="grid gap-1 text-sm font-bold text-slate-600">
           見積もり作成日
           <input
             type="date"
             value={estimateDateOf(job)}
             onChange={(e) => setJob((j) => ({...j, estDate: e.target.value || todayIso()}))} // 消したら当日
-            className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
+            className="h-11 rounded-md border border-slate-300 px-2 text-base font-normal"
             aria-label="見積もり作成日"
           />
         </label>
         {(estimated || job.shikiri) && <ShikiriFields job={job} data={data} setJob={setJob} onFix={() => setFixPrices(true)} onOpenInvoice={() => onOpenInvoice(job.id)} />}
         {byAddress && byAddress !== insurer && (
-          <div className="flex w-full flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900">
+          <div className="flex w-full flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-900">
             工事場所の住所は「{INSURER_INFO[byAddress].name}」です{INSURER_INFO[byAddress].form !== form ? `（見積書は${FORM_INFO[INSURER_INFO[byAddress].form].name}）` : ''}。
             <Btn small color="white" onClick={() => setInsurer(byAddress)}>
               保険者を{INSURER_INFO[byAddress].name}にする
@@ -351,7 +352,7 @@ function ShikiriFields({
   const client = data.settings.clientName || '笹岡工務店';
   return (
     <>
-      <label className="inline-flex h-9 cursor-pointer items-center gap-2 text-sm font-bold text-[#0c315e]">
+      <label className="inline-flex h-11 cursor-pointer items-center gap-2 text-base font-bold text-[#0c315e]">
         <input
           type="checkbox"
           checked={job.shikiri}
@@ -366,27 +367,27 @@ function ShikiriFields({
               month: on && j.month < thisMonth() ? thisMonth() : j.month,
             }));
           }}
-          className="h-4 w-4"
+          className="h-5 w-5"
         />
         {client}の請求書に入れる
       </label>
       {job.shikiri && (
         <>
-          <label className="grid gap-1 text-xs font-bold text-slate-600">
+          <label className="grid gap-1 text-sm font-bold text-slate-600">
             請求する月
             <input
               type="month"
               value={job.month}
               onChange={(e) => e.target.value && setJob((j) => ({...j, month: e.target.value}))}
-              className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
+              className="h-11 rounded-md border border-slate-300 px-2 text-base font-normal"
               aria-label="請求する月"
             />
           </label>
-          <Btn color="white" onClick={onOpenInvoice}>
+          <Btn color="white" onClick={onOpenInvoice} className="!h-11 !text-base">
             🧾 請求書を見る
           </Btn>
           {missing.length > 0 && (
-            <div className="flex w-full flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900">
+            <div className="flex w-full flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-900">
               仕切価格が空欄の部材が {missing.length} 行あります
               <Btn small color="white" onClick={onFix}>
                 仕切価格を入れる

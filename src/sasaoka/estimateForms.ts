@@ -21,8 +21,9 @@ export const FORM_INFO: Record<EstimateForm, {name: string; title: string; perPa
 /** 合計の欄（小計・諸経費・消費税・合計）の行数 */
 export const TOTAL_ROWS = 4;
 
-/** 改修の種類（広域連合用の「改修の種類」①〜⑥、苅田町・行橋市・みやこ町用の「改修内容」）。どの箇所もこのどれかにあてはめる */
-export const KINDS = ['手すりの取付', '段差の解消', '床材の変更', '扉の取替', '便器の取替', '付帯工事'];
+/** 改修の種類（広域連合用の「改修の種類」①〜⑥、苅田町・行橋市・みやこ町用の「改修内容」）。どの箇所もこのどれかにあてはめる。
+ *  「手すりの取付」ではなく「手すりの取り付け」と書く（ユーザーの指示、2026-10-21。申請書・内訳明細書・写真の用紙の原本の文字も同じにした） */
+export const KINDS = ['手すりの取り付け', '段差の解消', '床材の変更', '扉の取替', '便器の取替', '付帯工事'];
 /** 広域連合用の「改修箇所毎工事名称」に書く名前（元の見積書の「手すり取付」） */
 const KIND_WORK = ['手すり取付', '段差解消', '床材変更', '扉取替', '便器取替', '付帯工事'];
 
@@ -62,6 +63,9 @@ export const NO_SHINSEI: ShinseiInfo = {
   end: '',
   cost: null,
 };
+/** 生年月日の元号：選んでいなければ昭和（ユーザーの指示「昭和がデフォルトにする」、2026-10-21。介護保険を使う方は昭和の生まれが多い）。
+ *  保存する値は選んだときだけ（空のまま）にして、画面・申請書に出すときにこれで決める */
+export const eraOf = (info: Pick<ShinseiInfo, 'era'>): Exclude<ShinseiInfo['era'], ''> => info.era || '昭和';
 /** 申請書の項目が1つでも入っているか */
 export const hasShinseiInfo = (info: ShinseiInfo | undefined) =>
   !!info && Object.entries(info).some(([k, v]) => (k === 'cost' ? v !== null : typeof v === 'string' && v.trim() !== ''));

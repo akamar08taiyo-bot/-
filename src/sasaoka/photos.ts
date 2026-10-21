@@ -113,6 +113,67 @@ async function decode(file: Blob): Promise<{draw: (ctx: CanvasRenderingContext2D
   }
 }
 
+/**
+ * 写真の撮影日（'YYYY-MM-DD'）：スマホ・デジカメの写真（JPEG）に入っている撮影日時（Exif の DateTimeOriginal。なければ DateTimeDigitized・DateTime）。
+ * 入っていなければ ''（ユーザーの指示「日付入り写真で添付するときは、自動で読み取って日付をいれる」、2026-10-21）。
+ * 縮めた JPEG（preparePhoto）には残らないので、元のファイルから読む
+ */
+export async function photoTakenDate(file: Blob): Promise<string> {
+  try {
+    return exifDate(new DataView(await file.slice(0, 256 * 1024).arrayBuffer()));
+  } catch {
+    return '';
+  }
+}
+
+/** JPEG の先頭（Exif の入った APP1 は画像のデータより前）から撮影日を読む */
+export function exifDate(v: DataView): string {
+  if (v.byteLength < 4 || v.getUint16(0) !== 0xffd8) return '';
+  let off = 2;
+  while (off + 4 <= v.byteLength) {
+    const marker = v.getUint16(off);
+    if (marker >> 8 !== 0xff || marker === 0xffda || marker === 0xffd9) return '';
+    const len = v.getUint16(off + 2);
+    if (marker === 0xffe1 && off + 10 <= v.byteLength && v.getUint32(off + 4) === 0x45786966 && v.getUint16(off + 8) === 0) {
+      return tiffDate(v, off + 10, Math.min(v.byteLength, off + 2 + len)); // 「Exif\0\0」のうしろ
+    }
+    off += 2 + len;
+  }
+  return '';
+}
+
+function tiffDate(v: DataView, start: number, end: number): string {
+  if (start + 8 > end) return '';
+  const little = v.getUint16(start) === 0x4949; // II＝リトルエンディアン、MM＝ビッグエンディアン
+  const u16 = (o: number) => v.getUint16(start + o, little);
+  const u32 = (o: number) => v.getUint32(start + o, little);
+  if (u16(2) !== 42) return '';
+  // IFD の日時（文字 19けた「2026:10:21 09:30:00」）と、Exif の IFD の場所
+  const read = (ifd: number) => {
+    const dates = new Map<number, string>();
+    let sub = 0;
+    if (ifd <= 0 || start + ifd + 2 > end) return {dates, sub};
+    const n = u16(ifd);
+    for (let i = 0; i < n; i++) {
+      const e = ifd + 2 + i * 12;
+      if (start + e + 12 > end) break;
+      const tag = u16(e);
+      if (tag === 0x8769) sub = u32(e + 8);
+      else if ((tag === 0x9003 || tag === 0x9004 || tag === 0x0132) && u16(e + 2) === 2 && u32(e + 4) >= 19) {
+        const at = start + u32(e + 8);
+        if (at + 19 <= end) dates.set(tag, String.fromCharCode(...Array.from({length: 19}, (_, k) => v.getUint8(at + k))));
+      }
+    }
+    return {dates, sub};
+  };
+  const top = read(u32(4));
+  const exif = read(top.sub).dates;
+  const raw = exif.get(0x9003) ?? exif.get(0x9004) ?? top.dates.get(0x0132) ?? '';
+  const m = /^(\d{4}):(\d{2}):(\d{2})/.exec(raw);
+  if (!m || m[1] === '0000' || m[2] === '00' || m[3] === '00') return '';
+  return `${m[1]}-${m[2]}-${m[3]}`;
+}
+
 /** 撮ってきた写真を、長い辺 1600画素までの JPEG にする */
 export async function preparePhoto(file: Blob): Promise<{blob: Blob; w: number; h: number}> {
   const src = await decode(file);

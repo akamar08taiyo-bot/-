@@ -64,6 +64,7 @@ test('打ち込んだ文字を読む：数字・長さ・定価・改修の種�
   assert.equal(parseKind('2'), 2);
   assert.equal(parseKind('⑤'), 5);
   assert.equal(parseKind('①手すりの取付'), 1);
+  assert.equal(parseKind('①手すりの取り付け'), 1); // 今の書き方（上は前の書き方）
   assert.equal(parseKind('段差解消'), 2);
   assert.equal(parseKind('便器'), 5);
   assert.equal(parseKind('なにか'), null);
@@ -282,6 +283,8 @@ test('行をコピーして貼り付け：部材は同上施工費ごと、施�
 
   // 空白の行に貼り付けると、その行に入る（行は増えない）
   const blank = insertBlankAfter(job, railRow.id);
+  // 挿入した空白の行は、書き直すときも空から（前は内容の欄に「材料費」、数量に「1」と出た）
+  for (const f of ['text', 'qty', 'unit', 'price', 'note']) assert.equal(sheetValue(blank.job, `line:${blank.rowId}:${f}`, yk), '', f);
   const intoBlank = pasteLines(blank.job, `line:${blank.rowId}:text`, lineRows(job, barRow.id) ?? []);
   assert.deepEqual(intoBlank.job.places[0].rows.map((r) => r.name), [barRow.name, work.name, railRow.name, barRow.name, work.name]);
   // いちばん下の空いた行：最後の箇所のうしろ／貼り付ける場所がない欄：そのまま

@@ -26,7 +26,7 @@ const BLANK: Omit<Row, 'id' | 'kind'> = {
   estAmount: null,
 };
 
-/** 新しい箇所。見積書の改修の種類は「①手すりの取付」（改修内容・工事名称もここから）、写真番号は箇所の順番 */
+/** 新しい箇所。見積書の改修の種類は「①手すりの取り付け」（改修内容・工事名称もここから）、写真番号は箇所の順番 */
 export function newPlace(name: string, rows: Row[] = []): Place {
   return {id: uid('p'), name: name.trim(), rows, kind: 1, photo: 0};
 }

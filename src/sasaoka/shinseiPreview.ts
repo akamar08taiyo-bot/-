@@ -23,6 +23,7 @@ export type PvText = Rect & {
   valign: 'top' | 'center' | 'bottom';
   wrap: boolean;
   shrink: boolean; // 縮小して全体を表示する
+  vertical: boolean; // 縦書き（原本の文字の方向が「縦書き」。写真貼付用紙の改修の種別①〜⑥・理由書の「利用者」など）
   indent: number; // 画素
   // 丸で囲む欄（男・女 など）：1文字ずつの位置（丸の位置と同じ計算。原本の字体のない端末でも丸と文字をそろえる）。cy はまん中の高さ、em は文字の大きさ
   marked?: {chars: {ch: string; x: number; w: number}[]; cy: number; em: number};
@@ -280,7 +281,7 @@ const LINE: Record<string, {width: number; dash: string; double?: boolean}> = {
 const weight = (style: string) => (LINE[style] ?? LINE.thin).width * 10 + (LINE[style]?.dash ? 0 : 1);
 
 /** 書式（cellXfs の1つ）を読んだもの */
-type Xf = {font: PvFont; fill: string; sides: Sides; numFmt: string; align: string; valign: string; wrap: boolean; shrink: boolean; indent: number};
+type Xf = {font: PvFont; fill: string; sides: Sides; numFmt: string; align: string; valign: string; wrap: boolean; shrink: boolean; vertical: boolean; indent: number};
 const xfCache = new WeakMap<StyleParts, Xf[]>();
 
 function xfsOf(files: Files): Xf[] {
@@ -309,6 +310,7 @@ function xfsOf(files: Files): Xf[] {
       valign: attrOf(align, 'vertical') ?? 'bottom',
       wrap: attrOf(align, 'wrapText') === '1' || attrOf(align, 'wrapText') === 'true',
       shrink: attrOf(align, 'shrinkToFit') === '1' || attrOf(align, 'shrinkToFit') === 'true',
+      vertical: attrOf(align, 'textRotation') === '255', // 縦書き（ほかの角度は原本にない）
       indent: numOf(attrOf(align, 'indent'), 0),
     };
   });
@@ -653,8 +655,8 @@ function buildPage(files: Files, path: string, templateSheet: Uint8Array, sheet:
     let rect = rectOf(r, c);
     const h = xf.align === 'general' ? (number ? 'right' : 'left') : xf.align;
     const wrap = xf.wrap || h === 'distributed' || h === 'justify';
-    // 折り返さない欄の文字は、となりの空いた欄へはみ出す（Excel と同じ）。中央は左右に同じだけ
-    if (!merged && !wrap && !xf.shrink && !number) {
+    // 折り返さない欄の文字は、となりの空いた欄へはみ出す（Excel と同じ）。中央は左右に同じだけ。縦書きは横へはみ出さない
+    if (!merged && !wrap && !xf.shrink && !number && !xf.vertical) {
       let left = c;
       let right = c;
       if (h === 'left' || h === 'fill') while (right < c2 && empty(r, right + 1)) right++;
@@ -673,7 +675,7 @@ function buildPage(files: Files, path: string, templateSheet: Uint8Array, sheet:
     const valign: PvText['valign'] = xf.valign === 'top' ? 'top' : xf.valign === 'bottom' ? 'bottom' : 'center';
     // 折り返さない欄の改行は、Excel と同じく1行につなげて出す
     const shown = wrap ? runs : runs.map((run) => ({...run, text: run.text.replace(/\r?\n/g, '')}));
-    texts.push({...rect, ref: `${colName(c)}${r}`, runs: shown, align, valign, wrap, shrink: xf.shrink && !wrap, indent: xf.indent * xf.font.size});
+    texts.push({...rect, ref: `${colName(c)}${r}`, runs: shown, align, valign, wrap, shrink: xf.shrink && !wrap, vertical: xf.vertical, indent: xf.indent * xf.font.size});
   }
 
   // 丸で囲む欄は、丸と同じ計算の文字の位置で描く

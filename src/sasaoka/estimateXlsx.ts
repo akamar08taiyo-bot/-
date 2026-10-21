@@ -250,7 +250,7 @@ function kouikiSheet(job: Job, s: Settings): XSheet {
     th(h, 11, ['改修の種類', ...KINDS.map((k, i) => `${circled(i + 1)}${k}`)].join('\n'), 'mb', {
       h: 'left',
       bold: true,
-      size: fitText('①手すりの取付', KK.L, 4, 9).pt,
+      size: fitText(`${circled(1)}${KINDS[0]}`, KK.L, 4, 9).pt, // いちばん長い①の行が入る大きさ
     });
     th(h, 12, '数量', 'ml mb');
     th(h, 13, '単位', 'mb');

@@ -5,7 +5,7 @@ import {strFromU8, unzipSync, zipSync} from 'fflate';
 import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import {defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
-import {fillShinsei, insuredBoxes, padInsuredNo, parseWorkLine, readShinsei, SHINSEI, shinseiCost, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks} from '../../src/sasaoka/shinsei.ts';
+import {boxLabels, checkBoxes, fillShinsei, fitLinesSize, insuredBoxes, padInsuredNo, parseWorkLine, placeBox, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems} from '../../src/sasaoka/shinsei.ts';
 import type {Insurer, Job, Place, Row, ShinseiInfo, ShinseiMarks} from '../../src/sasaoka/types.ts';
 
 const RATES = {estimateRate: 0.8, estimateLaborRate: 1.5, estimateOverheadRate: 0.1, taxRate: 0.1};
@@ -68,8 +68,8 @@ const row = (col: string, n: number, r: number) => Array.from({length: n}, (_, i
   return `${name(c)}${r}`;
 });
 
-test('改修の内容・箇所及び規模：「①浴室　手すりの取付　L=600mm」（写真番号・改修場所・改修の種類の名前・寸法。手すりの長さは入れなければ見積書の使う長さ）', () => {
-  assert.deepEqual(shinseiWorks(job(), RATES), ['①浴室　手すりの取付　L=600mm', '⑤玄関　手すりの取付　L=400×600×600mm', '③トイレ　段差の解消']);
+test('改修の内容・箇所及び規模：「①浴室　手すりの取り付け　L=600mm」（写真番号・改修場所・改修の種類の名前・寸法。手すりの長さは入れなければ見積書の使う長さ）', () => {
+  assert.deepEqual(shinseiWorks(job(), RATES), ['①浴室　手すりの取り付け　L=600mm', '⑤玄関　手すりの取り付け　L=400×600×600mm', '③トイレ　段差の解消']);
   assert.deepEqual(insuredBoxes('0000366989'), [...'0000366989']);
   assert.deepEqual(insuredBoxes('３６６９８９'), [...'0000366989']); // 全角でもよい。足りなければ右に寄せ、空いた左のマスは 0
   assert.deepEqual(insuredBoxes('12345'), [...'0000012345']);
@@ -80,7 +80,7 @@ test('改修の内容・箇所及び規模：「①浴室　手すりの取付�
   // 改修の種類ごと（住宅改修内訳明細書の行）：申請書と同じ書き方。写真番号 → 改修場所（写真貼付用紙）
   const kinds = shinseiKinds(job(), RATES);
   assert.equal(kinds.length, 6);
-  assert.deepEqual(kinds[0], {places: '浴室・玄関', works: ['①浴室　手すりの取付　L=600mm', '⑤玄関　手すりの取付　L=400×600×600mm']});
+  assert.deepEqual(kinds[0], {places: '浴室・玄関', works: ['①浴室　手すりの取り付け　L=600mm', '⑤玄関　手すりの取り付け　L=400×600×600mm']});
   assert.deepEqual(kinds[1], {places: 'トイレ', works: ['③トイレ　段差の解消']});
   assert.deepEqual(kinds.slice(2), [0, 0, 0, 0].map(() => ({places: '', works: []})));
   assert.deepEqual(shinseiPhotos(job(), RATES), {1: '浴室', 5: '玄関', 3: 'トイレ'});
@@ -99,7 +99,7 @@ test('改修の内容・箇所及び規模：「①浴室　手すりの取付�
   });
   assert.deepEqual(
     shinseiKinds(more, RATES).map((k) => k.works),
-    [['①廊下　手すりの取付　L=1600mm', '③浴室　手すりの取付'], ['②玄関　段差の解消'], ['④居室　床材の変更'], [], [], []],
+    [['①廊下　手すりの取り付け　L=1600mm', '③浴室　手すりの取り付け'], ['②玄関　段差の解消'], ['④居室　床材の変更'], [], [], []],
   );
   // 申請書のタブで入れた寸法（ユーザーの指示）：手すりは長さ（見積書の長さより先）・高さ（任意）、段差の解消は「W600mm D350mm H150mm」。そのほかはうしろに足す
   const sized = job({
@@ -111,14 +111,14 @@ test('改修の内容・箇所及び規模：「①浴室　手すりの取付�
     ],
   });
   assert.deepEqual(shinseiWorks(sized, RATES), [
-    '①玄関　手すりの取付　L=800mm H=750mm',
+    '①玄関　手すりの取り付け　L=800mm H=750mm',
     '②屋外　段差の解消　W600mm D350mm H150mm',
-    '③トイレ　手すりの取付　L=600×850mm　木製',
+    '③トイレ　手すりの取り付け　L=600×850mm　木製',
     '④浴室　段差の解消　W700mm',
   ]);
   assert.deepEqual(shinseiKinds(sized, RATES)[1].works, ['②屋外　段差の解消　W600mm D350mm H150mm', '④浴室　段差の解消　W700mm']); // 内訳明細書も同じ
   // 「1,600」は3けた区切り（長さ1つ）、「600,850」は長さ2つ
-  assert.deepEqual(shinseiWorks(job({places: [place('廊下', [mat('L型手すり')], {dims: {l: '1,600'}}), place('居室', [mat('L型手すり')], {dims: {l: '600,850'}})]}), RATES), ['①廊下　手すりの取付　L=1600mm', '②居室　手すりの取付　L=600×850mm']);
+  assert.deepEqual(shinseiWorks(job({places: [place('廊下', [mat('L型手すり')], {dims: {l: '1,600'}}), place('居室', [mat('L型手すり')], {dims: {l: '600,850'}})]}), RATES), ['①廊下　手すりの取り付け　L=1600mm', '②居室　手すりの取り付け　L=600×850mm']);
 });
 
 test('苅田町の申請書：事前申請書の氏名・住所・被保険者番号（10マス）・改修の内容に入れる。ほかのシート・欄は原本のまま', () => {
@@ -134,7 +134,7 @@ test('苅田町の申請書：事前申請書の氏名・住所・被保険者�
   assert.match(cell(pre, 'J7'), /^<c r="J7" s="233" t="inlineStr"><is><t xml:space="preserve">山田 太郎<\/t><\/is><\/c>$/);
   assert.match(cell(pre, 'J11'), /福岡県京都郡苅田町富久町1-1/);
   assert.equal([...'XYZ'].map((c) => cell(pre, `${c}6`)).concat(['AA6', 'AG6'].map((r) => cell(pre, r))).map((c) => /<t[^>]*>(\d)<\/t>/.exec(c)?.[1]).join(''), '00009');
-  assert.equal(txt(pre, 'J14'), '①浴室　手すりの取付　L=600mm\n⑤玄関　手すりの取付　L=400×600×600mm\n③トイレ　段差の解消');
+  assert.equal(txt(pre, 'J14'), '①浴室　手すりの取り付け　L=600mm\n⑤玄関　手すりの取り付け　L=400×600×600mm\n③トイレ　段差の解消');
   assert.match(cell(pre, 'J14'), /L=600mm&#10;⑤玄関/); // 改行は &#10;（LibreOffice・スマホのプレビューでも改行する）
   // 事後申請書は事前申請書を参照する式。保存しておく答えも同じにする（スマホのプレビュー用）
   const post = byName.get('事後申請書')!;
@@ -142,26 +142,112 @@ test('苅田町の申請書：事前申請書の氏名・住所・被保険者�
   assert.match(cell(post, 'AF6'), /<f>事前申請書!AG6<\/f><v>9<\/v>/);
   // 転記した欄のほかは原本と同じ（式・図形・平面図・写真・承諾書・委任状のシート）
   const changed = Object.keys(files).filter((k) => strFromU8(files[k]) !== strFromU8(orig.files[k] ?? new Uint8Array()));
-  // 平面図（sheet6）は表題の氏名と、下の空いた所の工事内容のテキストボックス（drawing4）
-  assert.deepEqual(changed.sort(), ['[Content_Types].xml', 'xl/drawings/drawing4.xml', 'xl/workbook.xml', 'xl/worksheets/sheet1.xml', 'xl/worksheets/sheet2.xml', 'xl/worksheets/sheet6.xml']);
+  // 平面図（sheet6）は表題の氏名と、下の空いた所の工事内容のテキストボックス（drawing4）。
+  // 事前申請書・事後申請書の図形（drawing1・2）は元号の丸（選んでいなければ昭和。ユーザーの指示「昭和がデフォルトにする」）。
+  // 写真番号①③⑤の写真の用紙（sheet7・9・11）は、改修箇所・実施した工事種類の□（その写真番号の箇所を■）
+  assert.deepEqual(changed.sort(), [
+    '[Content_Types].xml',
+    'xl/drawings/drawing1.xml',
+    'xl/drawings/drawing2.xml',
+    'xl/drawings/drawing4.xml',
+    'xl/workbook.xml',
+    'xl/worksheets/sheet1.xml',
+    'xl/worksheets/sheet11.xml',
+    'xl/worksheets/sheet2.xml',
+    'xl/worksheets/sheet6.xml',
+    'xl/worksheets/sheet7.xml',
+    'xl/worksheets/sheet9.xml',
+  ]);
   assert.equal(txt(byName.get('平面図  (2)')!, 'C2'), '山田 太郎');
   const legend = strFromU8(files['xl/drawings/drawing4.xml']);
   assert.match(legend, /<xdr:cNvSpPr txBox="1"\/>/);
-  assert.deepEqual([...legend.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]), ['①浴室　手すりの取付　L=600mm', '⑤玄関　手すりの取付　L=400×600×600mm', '③トイレ　段差の解消']);
+  assert.deepEqual([...legend.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]), ['①浴室　手すりの取り付け　L=600mm', '⑤玄関　手すりの取り付け　L=400×600×600mm', '③トイレ　段差の解消']);
   const strip = (x: string) => x.replace(/<c r="[A-Z]+\d+"[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g, '');
   assert.equal(strip(pre), strip(orig.byName.get('事前申請書')!)); // 欄のほか（罫線・結合・印刷の範囲など）はそのまま
 });
 
-test('苅田町の写真の用紙（9枚）の実施した工事種類は「🔳手すりの取付　□(2)段差の解消…」（原本の「■(1)手摺の取付」をユーザーの指示で直した）', () => {
-  const {files, byName} = sheets(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(job(), RATES)));
-  const strings = [...strFromU8(files['xl/sharedStrings.xml']).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => [...m[1].matchAll(/<t[^>]*>([^<]*)<\/t>/g)].map((t) => t[1]).join(''));
-  const photo = [...byName.keys()].filter((name) => name.startsWith('1 '));
-  assert.equal(photo.length, 9);
-  for (const name of photo) {
-    const at = /<c r="B4"[^>]*t="s"[^>]*><v>(\d+)<\/v>/.exec(byName.get(name)!)?.[1];
-    assert.ok(strings[Number(at)]?.startsWith('🔳手すりの取付　□(2)段差の解消　□(3)'), name);
+test('苅田町の写真の用紙：改修箇所・実施した工事種類の□は、その写真番号の箇所・改修の種類を■に（一覧にない場所は「■勝手口」）。撮影日も書く', () => {
+  const j = job({places: [...job().places, place('勝手口', [mat('L型手すり')], {photoDates: {before: '2026-10-01', after: '2026-11-20'}})]});
+  const {files, byName} = sheets(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(j, RATES)));
+  const strings = [...strFromU8(files['xl/sharedStrings.xml']).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) =>
+    [...m[1].replace(/<rPh\b[\s\S]*?<\/rPh>/g, '').matchAll(/<t[^>]*>([^<]*)<\/t>/g)].map((t) => t[1].replace(/\r\n/g, '\n')).join(''),
+  );
+  // 欄の文字（共有の文字か、書いた文字）
+  const text = (xml: string, ref: string) => {
+    const shared = new RegExp(`<c r="${ref}"[^>]*t="s"[^>]*><v>(\\d+)</v>`).exec(xml)?.[1];
+    return shared === undefined ? txt(xml, ref) : strings[Number(shared)];
+  };
+  const byNo = new Map([...byName].filter(([name]) => name.startsWith('1 ')).map(([, xml]) => [text(xml, 'G42').replace('写真番号', ''), xml]));
+  assert.equal(byNo.size, 9);
+  const at = (no: string, ref: string) => text(byNo.get(no)!, ref);
+  // ①浴室（手すり）・③トイレ（段差の解消）・④勝手口（一覧にない）・⑤玄関
+  assert.equal(at('①', 'B2'), '□廊下　□階段　□台所　□居間・食堂　□寝室　□洗面・脱衣室　■浴室　□トイレ\n□玄関　□玄関～道路　□その他（　　　）');
+  assert.ok(at('①', 'B4').startsWith('■手すりの取り付け　□(2)段差の解消　□(3)'));
+  assert.ok(at('③', 'B2').includes('■トイレ') && at('③', 'B2').split('■').length === 2);
+  assert.ok(at('③', 'B4').startsWith('□手すりの取り付け　■(2)段差の解消　□(3)'));
+  assert.ok(at('④', 'B2').endsWith('□玄関　□玄関～道路　■勝手口'));
+  assert.ok(at('⑤', 'B2').includes('■玄関　□玄関～道路'));
+  // 撮影日（改修前 D6・改修後 D23）。入れていない写真番号は原本のまま
+  assert.deepEqual([at('④', 'D6'), at('④', 'D23')], ['令和8年10月1日', '令和8年11月20日']);
+  assert.equal(at('①', 'D23'), '年　　　月　　　日');
+  // 箇所のない写真番号の用紙（②⑥〜⑨）は原本のまま
+  assert.ok(at('②', 'B4').startsWith('🔳手すりの取り付け　□(2)段差の解消　□(3)'));
+  assert.ok(at('②', 'B2').includes('□その他（　　　）'));
+  assert.ok(!strings.some((s) => s.includes('手摺')));
+});
+
+test('改修の内容が10箇所・12箇所でも欄からはみ出さない：入らなければ文字を小さくする（申請書の欄・式で同じ内容を出す欄・内訳明細書の行・平面図）', () => {
+  const NAMES = ['玄関', '上がり框', '廊下', '階段', 'トイレ', '浴室', '脱衣所', '洗面所', '居室', '寝室', '台所', '勝手口'];
+  const many = (n: number, insurer: Insurer = 'kanda') => job({insurer, places: NAMES.slice(0, n).map((name) => place(name, [mat('L型手すり')], {dims: {l: '600×850', h: '800'}}))});
+  // 欄の文字の大きさ（pt）と、欄の大きさ（画素）
+  const sizeOf = (files: Record<string, Uint8Array>, xml: string, ref: string) => {
+    const st = strFromU8(files['xl/styles.xml']);
+    const list = (outer: string, inner: string) => [...(new RegExp(`<${outer}\\b[^>]*>([\\s\\S]*?)</${outer}>`).exec(st)?.[1] ?? '').matchAll(new RegExp(`<${inner}\\b[^>]*?(?:/>|>[\\s\\S]*?</${inner}>)`, 'g'))].map((m) => m[0]);
+    const xf = list('cellXfs', 'xf')[Number(/\ss="(\d+)"/.exec(cell(xml, ref))?.[1] ?? 0)];
+    const font = list('fonts', 'font')[Number(/fontId="(\d+)"/.exec(xf)?.[1] ?? 0)];
+    return Number(/<sz val="([\d.]+)"/.exec(font)?.[1]);
+  };
+  const fits = (files: Record<string, Uint8Array>, xml: string, ref: string, lines: number) => {
+    const box = rangeBox(sheetLayout(xml), ref);
+    return lines * ((sizeOf(files, xml, ref) * 4) / 3) * 1.25 <= box.h - 4;
+  };
+  const orig = sheets(KANDA);
+  for (const n of [3, 10, 12]) {
+    const {files, byName} = sheets(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(many(n), RATES)));
+    const pre = byName.get('事前申請書')!;
+    const post = byName.get('事後申請書')!;
+    assert.equal(txt(pre, 'J14').split('\n').length, n);
+    assert.ok(fits(files, pre, 'J14', n), `事前申請書 ${n}箇所`);
+    assert.ok(fits(files, post, 'I14', n), `事後申請書 ${n}箇所`); // =事前申請書!J14 の式の欄も
+    const base = sizeOf(orig.files, orig.byName.get('事前申請書')!, 'J14');
+    if (n === 3) assert.equal(sizeOf(files, pre, 'J14'), base); // 入るときは原本の大きさのまま
+    else assert.ok(sizeOf(files, pre, 'J14') < base && sizeOf(files, pre, 'J14') >= 5, `${n}箇所 ${sizeOf(files, pre, 'J14')}pt`);
+    // 平面図の工事内容の枠（12pt。入らなければ小さく）
+    const legend = strFromU8(files['xl/drawings/drawing4.xml']);
+    assert.match(legend, /sz="\d+"/);
   }
-  assert.ok(!strings.some((s) => s.includes('■') || s.includes('手摺')));
+  // 行橋市の申請書の欄・みやこ町の内訳明細書の改修の種類の行（12箇所とも手すり＝①の行に12行）
+  const yk = sheets(fillShinsei(YUKUHASHI, SHINSEI.yukuhashi!, shinseiValues(many(12, 'yukuhashi'), RATES)));
+  assert.ok(fits(yk.files, yk.byName.get('住改・受領委任払')!, 'F14', 12));
+  const my = sheets(fillShinsei(MIYAKO, SHINSEI.miyako!, shinseiValues(many(12, 'miyako'), RATES)));
+  assert.ok(fits(my.files, my.byName.get('住宅改修内訳明細書')!, 'K14', 12));
+  // 大きさの決め方：入るときは base、入らなければ 0.5pt ずつ小さく（長い行は折り返した行数で数える）
+  assert.equal(fitLinesSize(['あ'], 300, 100, 11), 11);
+  assert.equal(fitLinesSize(Array(12).fill('①玄関　手すりの取り付け'), 300, 126, 11), 6);
+  assert.ok(fitLinesSize(['①玄関　手すりの取り付け　L=600×850mm H=800mm　とても長い説明の文がつづく'], 120, 40, 11) < 11);
+});
+
+test('改修箇所の□の一覧：同じ名前・言いかえ・名前に入っている項目に■。一覧にない場所は「その他」の所を「■名前」に', () => {
+  const list = '□廊下　□階段　□台所　□居間・食堂　□寝室　□洗面・脱衣室　□浴室　□トイレ\r\n□玄関　◻︎玄関～道路　□その他（　　　）';
+  const labels = boxLabels(list);
+  assert.deepEqual(labels, ['廊下', '階段', '台所', '居間・食堂', '寝室', '洗面・脱衣室', '浴室', 'トイレ', '玄関', '玄関～道路', 'その他（　　　）']);
+  assert.deepEqual(
+    ['廊下', '洗面所', '脱衣所', 'リビング', '2階廊下', '屋外・アプローチ', '玄関', '玄関～道路', '勝手口', '上がり框', '居室', '', 'その他'].map((n) => placeBox(labels, n)),
+    [0, 5, 5, 3, 0, 9, 8, 9, null, null, null, null, null],
+  );
+  assert.equal(checkBoxes(list, 9), '□廊下　□階段　□台所　□居間・食堂　□寝室　□洗面・脱衣室　□浴室　□トイレ\n□玄関　■玄関～道路　□その他（　　　）');
+  assert.equal(checkBoxes(list, null, '勝手口'), '□廊下　□階段　□台所　□居間・食堂　□寝室　□洗面・脱衣室　□浴室　□トイレ\n□玄関　□玄関～道路　■勝手口');
+  assert.equal(checkBoxes('🔳手すりの取り付け　□(2)段差の解消', 1), '□手すりの取り付け　■(2)段差の解消');
 });
 
 test('行橋市の申請書：住改・受領委任払の氏名・住所・被保険者番号（10マス）・改修の内容。読み戻すと同じ', () => {
@@ -174,11 +260,11 @@ test('行橋市の申請書：住改・受領委任払の氏名・住所・被�
   assert.match(cell(main, 'F11'), /福岡県行橋市中央1-1/);
   assert.match(cell(main, 'Z7'), /<t[^>]*>0<\/t>/);
   assert.match(cell(main, 'AI7'), /<t[^>]*>9<\/t>/);
-  assert.match(cell(main, 'F14'), /①浴室　手すりの取付　L=600mm/);
+  assert.match(cell(main, 'F14'), /①浴室　手すりの取り付け　L=600mm/);
   // 書き込んだ申請書から読む（申請書から見積書を作るとき）。どの保険者の申請書かはシートで見分ける。うしろの文は書いたまま（全角のすき間も）
   const places = [
-    {photo: 1, name: '浴室', kind: 1, text: '手すりの取付　L=600mm'},
-    {photo: 5, name: '玄関', kind: 1, text: '手すりの取付　L=400×600×600mm'},
+    {photo: 1, name: '浴室', kind: 1, text: '手すりの取り付け　L=600mm'},
+    {photo: 5, name: '玄関', kind: 1, text: '手すりの取り付け　L=400×600×600mm'},
     {photo: 3, name: 'トイレ', kind: 2, text: '段差の解消'},
   ];
   assert.deepEqual(readShinsei(out), {insurer: 'yukuhashi', name: v.name, address: v.address, insuredNo: v.insuredNo, places, info: {}});
@@ -190,6 +276,32 @@ test('行橋市の申請書：住改・受領委任払の氏名・住所・被�
   // 申請書でない Excel は null
   assert.equal(readShinsei(estimateXlsx(job(), defaultSettings(), '2026-10-21').bytes), null);
   assert.equal(readShinsei(new Uint8Array([1, 2, 3])), null);
+});
+
+test('改修の内容を手で直す（Place.shinseiLine）：直した文を写真番号のうしろに書く（申請書・内訳明細書・平面図とも）。空にした行は書かない', () => {
+  const base = job();
+  const at = (i: number, extra: Partial<Place>) => job({places: base.places.map((p, k) => (k === i ? {...p, ...extra} : p))});
+  const edited = at(0, {shinseiLine: '浴室　手すりの取り付け　L=650mm　木製 '});
+  assert.deepEqual(shinseiWorks(edited, RATES), ['①浴室　手すりの取り付け　L=650mm　木製', '⑤玄関　手すりの取り付け　L=400×600×600mm', '③トイレ　段差の解消']);
+  // 画面の欄：直した行は打ったまま（edited）、ほかは自動の文。auto は自動の文（同じに戻したら手で直していないことにする）
+  assert.deepEqual(
+    workItems(edited, RATES).map((w) => [w.photo, w.edited, w.text, w.auto]),
+    [
+      [1, true, '浴室　手すりの取り付け　L=650mm　木製 ', '浴室　手すりの取り付け　L=600mm'],
+      [5, false, '玄関　手すりの取り付け　L=400×600×600mm', '玄関　手すりの取り付け　L=400×600×600mm'],
+      [3, false, 'トイレ　段差の解消', 'トイレ　段差の解消'],
+    ],
+  );
+  assert.deepEqual(shinseiKinds(edited, RATES)[0].works, ['①浴室　手すりの取り付け　L=650mm　木製', '⑤玄関　手すりの取り付け　L=400×600×600mm']);
+  const pre = sheets(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(edited, RATES))).byName.get('事前申請書')!;
+  assert.equal(txt(pre, 'J14').split('\n')[0], '①浴室　手すりの取り付け　L=650mm　木製');
+  // 写真番号は見積書の番号のまま（文の中に打っても付けない）
+  assert.deepEqual(shinseiWorks(at(3, {photo: 7, shinseiLine: 'トイレ　スロープ'}), RATES).slice(-1), ['⑦トイレ　スロープ']);
+  // 空にした行は申請書に書かない（欄は出す）。改修の種類の行の箇所にも入れない
+  const empty = at(3, {shinseiLine: '  '});
+  assert.deepEqual(shinseiWorks(empty, RATES), ['①浴室　手すりの取り付け　L=600mm', '⑤玄関　手すりの取り付け　L=400×600×600mm']);
+  assert.deepEqual(shinseiKinds(empty, RATES)[1], {places: '', works: []});
+  assert.equal(workItems(empty, RATES).length, 3);
 });
 
 test('改修の内容の1行から、写真番号・改修場所・改修の種類を読む', () => {
@@ -224,7 +336,7 @@ test('みやこ町の申請書：承認届出書の氏名・住所・番号（�
   assert.match(cell(detail, 'I6'), /<v>山田 太郎<\/v>/);
   assert.deepEqual([txt(detail, 'D15'), txt(detail, 'K14'), txt(detail, 'D17'), txt(detail, 'K16'), txt(detail, 'K18')], [
     '浴室・玄関',
-    '①浴室　手すりの取付　L=600mm\n⑤玄関　手すりの取付　L=400×600×600mm',
+    '①浴室　手すりの取り付け　L=600mm\n⑤玄関　手すりの取り付け　L=400×600×600mm',
     'トイレ',
     '③トイレ　段差の解消',
     '',
@@ -237,8 +349,8 @@ test('みやこ町の申請書：承認届出書の氏名・住所・番号（�
   const changed = Object.keys(files).filter((k) => strFromU8(files[k]) !== strFromU8(orig.files[k] ?? new Uint8Array()));
   assert.ok(!changed.some((k) => /sheet(4|5|11|12)\.xml$/.test(k)), changed.join(' '));
   assert.deepEqual(readShinsei(out), {insurer: 'miyako', name: '山田 太郎', address: '福岡県京都郡みやこ町勝山1-1', insuredNo: '0000366989', info: {}, places: [
-    {photo: 1, name: '浴室', kind: 1, text: '手すりの取付　L=600mm'},
-    {photo: 5, name: '玄関', kind: 1, text: '手すりの取付　L=400×600×600mm'},
+    {photo: 1, name: '浴室', kind: 1, text: '手すりの取り付け　L=600mm'},
+    {photo: 5, name: '玄関', kind: 1, text: '手すりの取り付け　L=400×600×600mm'},
     {photo: 3, name: 'トイレ', kind: 2, text: '段差の解消'},
   ]});
 });
@@ -251,14 +363,15 @@ test('広域連合（築上町など）の申請書：承認申請書・支給�
   assert.deepEqual([...byName.keys()], [...orig.byName.keys()]); // 25枚のまま
   for (const name of ['様式第2号（住宅改修承認申請書）', '様式第7号（住宅改修費支給申請書（受領委任払用）']) {
     const x = byName.get(name)!;
-    assert.deepEqual([txt(x, 'J6'), txt(x, 'J9'), digitsOf(x, row('X', 10, 7))], ['山田 太郎', '福岡県築上郡築上町椎田1-1', '0000366989'], name);
+    // 住所は2行目（J10）。1行目（J9）は〒と郵便番号で、入れていなければ原本のまま（空）
+    assert.deepEqual([txt(x, 'J6'), txt(x, 'J9'), txt(x, 'J10'), digitsOf(x, row('X', 10, 7))], ['山田 太郎', '', '福岡県築上郡築上町椎田1-1', '0000366989'], name);
   }
   const b = byName.get('様式第2号別紙（住宅改修内訳明細書）')!;
   assert.deepEqual([txt(b, 'I6'), digitsOf(b, row('W', 10, 7)), txt(b, 'D15'), txt(b, 'K14'), txt(b, 'D17'), txt(b, 'K16')], [
     '山田 太郎',
     '0000366989',
     '浴室・玄関',
-    '①浴室　手すりの取付　L=600mm\n⑤玄関　手すりの取付　L=400×600×600mm',
+    '①浴室　手すりの取り付け　L=600mm\n⑤玄関　手すりの取り付け　L=400×600×600mm',
     'トイレ',
     '③トイレ　段差の解消',
   ]);
@@ -272,8 +385,8 @@ test('広域連合（築上町など）の申請書：承認申請書・支給�
   const changed = Object.keys(files).filter((k) => strFromU8(files[k]) !== strFromU8(orig.files[k] ?? new Uint8Array()));
   assert.ok(!changed.some((k) => /sheet(19|2[0-5])\.xml$/.test(k)), changed.join(' '));
   assert.deepEqual(readShinsei(out), {insurer: 'kouiki', name: '山田 太郎', address: '福岡県築上郡築上町椎田1-1', insuredNo: '0000366989', info: {}, places: [
-    {photo: 1, name: '浴室', kind: 1, text: '手すりの取付　L=600mm'},
-    {photo: 5, name: '玄関', kind: 1, text: '手すりの取付　L=400×600×600mm'},
+    {photo: 1, name: '浴室', kind: 1, text: '手すりの取り付け　L=600mm'},
+    {photo: 5, name: '玄関', kind: 1, text: '手すりの取り付け　L=400×600×600mm'},
     {photo: 3, name: 'トイレ', kind: 2, text: '段差の解消'},
   ]});
 });
@@ -323,17 +436,22 @@ test('申請書の丸：選んだ性別・元号・要介護状態区分・改�
     {from: [17, 885825, 11, 38100], to: [20, 27813, 11, 266700]},
   ]);
   assert.equal(ellipses(kd, '事後申請書').length, 3);
-  // 選ばなければ図形は原本のまま（前の申請の丸は原本から消してある）
-  assert.deepEqual(ellipses(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(job(), RATES)), '事前申請書'), []);
-  // 保険者・項目・値のどれでも：値の欄の行に1つ。左の値ほど左（申請書に並んでいる順）
+  // 元号は選んでいなければ昭和（保存する値は空のまま）。選んだらその元号
+  assert.equal(shinseiValues(job(), RATES).marks.era, '昭和');
+  assert.equal(shinseiValues(job(), RATES).texts.era, '昭和');
+  assert.equal(shinseiValues(job({shinsei: {...NO_SHINSEI, era: '大正'}}), RATES).marks.era, '大正');
+  // 選ばなければ、元号の昭和だけを囲む（ユーザーの指示「昭和がデフォルトにする」）。ほかの図形は原本のまま（前の申請の丸は原本から消してある）
+  assert.deepEqual(ellipses(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(job(), RATES)), '事前申請書'), [{from: [15, 37386, 8, 19050], to: [16, 123111, 8, 285750]}]);
+  // 保険者・項目・値のどれでも：値の欄の行に1つ。左の値ほど左（申請書に並んでいる順）。元号のほかは、選ばなくても出る昭和の丸を数えない
   for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki'] as const) {
     for (const sheet of SHINSEI[insurer]!.sheets.filter((x) => x.marks)) {
+      const base = new Set(ellipses(fillShinsei(TEMPLATES[insurer], SHINSEI[insurer]!, shinseiValues(job(), RATES)), sheet.sheet).map((e) => JSON.stringify(e)));
       for (const mark of sheet.marks!) {
         const row = Number(/\d+$/.exec(mark.cell)![0]) - 1;
         let last = [-1, 0];
         for (const value of MARK_INFO[mark.key].options) {
           const out = fillShinsei(TEMPLATES[insurer], SHINSEI[insurer]!, shinseiValues(job({shinsei: {...NO_SHINSEI, ...marksOf({[mark.key]: value})}}), RATES));
-          const mine = ellipses(out, sheet.sheet).filter((e) => e.from[2] <= row + 1 && e.to[2] >= row);
+          const mine = ellipses(out, sheet.sheet).filter((e) => e.from[2] <= row + 1 && e.to[2] >= row && (mark.key === 'era' || !base.has(JSON.stringify(e))));
           assert.equal(mine.length, 1, `${insurer} ${sheet.sheet} ${mark.cell} ${value}`);
           const at = mine[0].from;
           assert.ok(at[0] > last[0] || (at[0] === last[0] && at[1] > last[1]), `${insurer} ${sheet.sheet} ${value} が前の値より右にない`);
@@ -459,11 +577,13 @@ test('申請書の画面で入れた項目：行橋市（〒のうしろ・数�
   // 広域連合：承認申請書（様式第2号）・支給申請書（様式第7号）・別紙
   const g = sheets(fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues({...j, insurer: 'kouiki'}, RATES))).byName;
   const two = g.get('様式第2号（住宅改修承認申請書）')!;
-  assert.deepEqual(['J5', 'J8', 'J11', 'O13', 'O14', 'J22'].map((r) => txt(two, r)), ['ヤマダ　タロウ', '昭和　23年5月6日生', '山田 太郎　　　　本人との関係（本人）', '見本居宅介護支援事業所', '見本 花子', `${yenText(cost)}円`]);
+  // 郵便番号は住所の欄の1行目（J9）。住所は2行目（J10）
+  assert.deepEqual(['J5', 'J8', 'J9', 'J11', 'O13', 'O14', 'J22'].map((r) => txt(two, r)), ['ヤマダ　タロウ', '昭和　23年5月6日生', '〒800-0300', '山田 太郎　　　　本人との関係（本人）', '見本居宅介護支援事業所', '見本 花子', `${yenText(cost)}円`]);
   const seven = g.get('様式第7号（住宅改修費支給申請書（受領委任払用）')!;
-  assert.deepEqual(['J5', 'J8', 'AA10', 'J11', 'X12', 'X14', 'J16', 'J18'].map((r) => txt(seven, r)), [
+  assert.deepEqual(['J5', 'J8', 'J9', 'AA10', 'J11', 'X12', 'X14', 'J16', 'J18'].map((r) => txt(seven, r)), [
     'ヤマダ　タロウ',
     '昭和　23年5月6日生',
+    '〒800-0300',
     '0930-00-0000',
     '山田 太郎　　　　本人との関係（本人）',
     '令和8年11月5日',
@@ -474,7 +594,7 @@ test('申請書の画面で入れた項目：行橋市（〒のうしろ・数�
   assert.equal(txt(g.get('様式第2号別紙（住宅改修内訳明細書）')!, 'I5'), 'ヤマダ　タロウ');
   // 読み戻す（様式第7号の「事業所名　氏名」はすき間だけの区切りなので読まない。様式第2号から読む）
   const back = readShinsei(fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues({...j, insurer: 'kouiki'}, RATES)))!;
-  assert.deepEqual(back.info, {kana: 'ヤマダ　タロウ', era: '昭和', birthY: '23', birthM: '5', birthD: '6', owner: '山田 太郎', relation: '本人', reasonOffice: '見本居宅介護支援事業所', reasonName: '見本 花子', phone: '0930-00-0000', start: '2026-11-05', end: '2026-11-20'});
+  assert.deepEqual(back.info, {kana: 'ヤマダ　タロウ', era: '昭和', birthY: '23', birthM: '5', birthD: '6', zip: '800-0300', owner: '山田 太郎', relation: '本人', reasonOffice: '見本居宅介護支援事業所', reasonName: '見本 花子', phone: '0930-00-0000', start: '2026-11-05', end: '2026-11-20'});
 });
 
 test('申請書から先に作る：見積書の行がない箇所（空白の行だけ）も写真番号と改修の内容の行が出る。寸法は入れたもの。改修費用は手で入れた金額、見積書も手入力もなければ書かない', () => {
@@ -483,7 +603,7 @@ test('申請書から先に作る：見積書の行がない箇所（空白の�
     places: [place('玄関', [blankRow], {dims: {l: '600×850', h: '850'}}), place('トイレ', [{...blankRow, id: 'b2'}]), place('浴室', [{...blankRow, id: 'b3'}], {kind: 2})],
     shinsei: {...NO_SHINSEI, kana: 'ヤマダ'},
   });
-  assert.deepEqual(shinseiWorks(only, RATES), ['①玄関　手すりの取付　L=600×850mm H=850mm', '②トイレ　手すりの取付', '③浴室　段差の解消']);
+  assert.deepEqual(shinseiWorks(only, RATES), ['①玄関　手すりの取り付け　L=600×850mm H=850mm', '②トイレ　手すりの取り付け', '③浴室　段差の解消']);
   assert.equal(shinseiCost(only, RATES), null);
   const pre = sheets(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(only, RATES))).byName.get('事前申請書')!;
   assert.equal(txt(pre, 'J17'), '　　円'.replace('　　円', txt(sheets(KANDA).byName.get('事前申請書')!, 'J17'))); // 原本のまま
@@ -491,7 +611,7 @@ test('申請書から先に作る：見積書の行がない箇所（空白の�
   assert.equal(shinseiCost(manual, RATES), 180000);
   assert.equal(txt(sheets(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(manual, RATES))).byName.get('事前申請書')!, 'J17'), '180,000円');
   // 見積書の使う長さより、入れた長さが先
-  assert.deepEqual(shinseiWorks(job({places: [place('浴室', [mat('木の手すり 35φ 4m', {lengthCm: 60, pieceLengthM: 4})], {dims: {l: '650', h: '750'}})]}), RATES), ['①浴室　手すりの取付　L=650mm H=750mm']);
+  assert.deepEqual(shinseiWorks(job({places: [place('浴室', [mat('木の手すり 35φ 4m', {lengthCm: 60, pieceLengthM: 4})], {dims: {l: '650', h: '750'}})]}), RATES), ['①浴室　手すりの取り付け　L=650mm H=750mm']);
 });
 
 /** 範囲（'A7:H22'）→ [左の列, 上の行, 右の列, 下の行]（0始まり） */
@@ -502,7 +622,7 @@ const cellsOf = (range: string) => {
 };
 
 test('平面図：空いた所に工事内容（申請書の改修の内容と同じ行）を書く（平面図そのものは Excel で描く）。箇所がなければ書かない', () => {
-  const lines = ['①浴室　手すりの取付　L=600mm', '⑤玄関　手すりの取付　L=400×600×600mm', '③トイレ　段差の解消'];
+  const lines = ['①浴室　手すりの取り付け　L=600mm', '⑤玄関　手すりの取り付け　L=400×600×600mm', '③トイレ　段差の解消'];
   for (const insurer of ['kanda', 'yukuhashi', 'kouiki'] as const) {
     const sheet = SHINSEI[insurer]!.sheets.find((x) => x.legend?.box)!;
     const files = unzipSync(fillShinsei(TEMPLATES[insurer], SHINSEI[insurer]!, shinseiValues(job({insurer}), RATES)));
