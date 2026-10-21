@@ -13,6 +13,7 @@
 | --- | --- |
 | `index.html` | 健康管理アプリ（食事・健診・筋トレ・サプリ・体重） |
 | `mortgage.html` | 住宅ローン 金利シナリオ・シミュレーター |
+| `tokutei.html` | 特定福祉用具 購入申請書・見積もり作成（別にビルドする。下の節） |
 
 開発サーバー起動後は `http://localhost:3000/`（健康管理）と `http://localhost:3000/mortgage.html`（シミュレーター）でそれぞれ開ける。
 公開後は `https://<ユーザー名>.github.io/<リポジトリ名>/mortgage.html`。
@@ -30,6 +31,25 @@
 
 計算ロジックは `src/mortgage/calc.ts`（元利均等返済・見直しごとの返済額再計算＝いわゆる「5年ルール」に近い方式）。
 上昇幅やタイミングは想定の一例であり、実際の適用金利・ルール・諸費用は金融機関によって異なる。
+
+### 特定福祉用具 購入申請書・見積もり作成（太陽シルバーサービス 行橋営業所）
+
+介護保険の特定福祉用具（入浴補助用具・腰掛便座・多点杖など）の販売で、仕切り一覧表から商品マスタを作り、
+★お気に入りから選ぶだけで、定価の2割引きの見積書（介護保険の内訳つき）を作る業務アプリ。ほかのアプリとは独立している。
+
+- 設計と、販売受注簿・見積書・住宅改修アプリなど既存アプリの読み取りメモ：`docs/tokutei/DESIGN.md`・`docs/tokutei/EXISTING_APPS.md`
+- コード：`src/tokutei/`（計算は `calc.ts`、種目の判定は `category.ts`、仕切り一覧表の読み取りは `import/`）
+- 保存：この端末の IndexedDB（`taiyo-tokutei`）だけ。設定からバックアップ（JSON）・商品マスタの CSV 書き出し
+- 申請書（保険者ごとの様式への差し込み）と販売受注簿への転記は、様式をいただいてから作る
+
+```
+npm run -s test:tokutei     # 単体テスト（計算・種目・取り込み）
+npm run -s lint             # 型チェック
+npm run -s build:tokutei    # dist-tokutei/index.html（1ファイル）と version.json
+node test/tokutei/e2e.mjs <出力フォルダ>   # ブラウザで通しで確かめる（Playwright。ビルドのあと）
+```
+
+公開するときは、`dist-tokutei/index.html` と `version.json` を太陽ポータル（taiyo-portal）の `tokutei/` に置く。
 
 ## 技術スタック
 

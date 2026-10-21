@@ -1,0 +1,366 @@
+/* このアプリのファイルだけを見て Tailwind のクラスを作る（同じリポジトリのほかのアプリの分は入れない） */
+@import 'tailwindcss' source(none);
+@source './';
+
+html,
+body {
+  margin: 0;
+  background: #f2f7f7;
+  font-family: 'Yu Gothic UI', 'Meiryo', 'BIZ UDPGothic', 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif;
+}
+
+/* ---------------------------------------------------------------- 印刷イメージ（画面） */
+.print-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow: auto;
+  background: #525659;
+}
+.print-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 10px 16px;
+  background: #0f4c5c;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+.print-root {
+  padding: 16px 8px 40px;
+}
+
+/* ---------------------------------------------------------------- 見積書（A4縦）
+   販売受注簿作成ツールの「御見積書」と同じ見た目（明朝・ネイビー・太字を使わない）に、介護保険の内訳を足したもの */
+.est {
+  box-sizing: border-box;
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto 16px;
+  padding: 15mm 18mm 14mm;
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  color: #29394c;
+  font-family: 'BIZ UDP明朝', 'BIZ UDPMincho', 'BIZ UD明朝', 'Yu Mincho', '游明朝', 'Hiragino Mincho ProN', 'MS Mincho', serif;
+  font-weight: 400;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.est * {
+  box-sizing: border-box;
+  font-weight: 400;
+}
+.est .gothic,
+.est th,
+.est .est-company,
+.est .est-total,
+.est .est-category,
+.est .est-remarks-title {
+  font-family: 'BIZ UDPゴシック', 'BIZ UDPGothic', 'Yu Gothic', 'Hiragino Sans', 'Meiryo', sans-serif;
+}
+.est-top {
+  display: grid;
+  grid-template-columns: 1fr 66mm;
+  gap: 8mm;
+  align-items: start;
+}
+.est-title {
+  margin: 0;
+  padding: 0 0 4mm;
+  border-bottom: 0.55mm solid #3b82d6;
+  color: #153f82;
+  font-size: 24pt;
+  line-height: 1;
+  letter-spacing: 0.2em;
+}
+.est-client {
+  display: flex;
+  align-items: baseline;
+  gap: 5mm;
+  margin-top: 6mm;
+  padding-bottom: 2.5mm;
+  border-bottom: 0.35mm solid #b7d4ed;
+  color: #1e293b;
+  font-size: 18pt;
+  line-height: 1.3;
+}
+.est-client .suffix {
+  color: #1b6cb2;
+  font-size: 12.5pt;
+  white-space: nowrap;
+}
+.est-lead {
+  margin: 4.5mm 0 5mm;
+  color: #34495d;
+  font-size: 10.5pt;
+  line-height: 1.75;
+}
+.est-cond {
+  width: 100%;
+  border-collapse: collapse;
+  color: #334155;
+  font-size: 9.5pt;
+}
+.est-cond th,
+.est-cond td {
+  height: 8mm;
+  padding: 1.6mm 2.6mm;
+  border: 0.3mm solid #c5d9ed;
+  text-align: left;
+  vertical-align: middle;
+}
+.est-cond th {
+  width: 27mm;
+  background: #e9f4ff;
+  color: #1a5aa7;
+  white-space: nowrap;
+}
+.est-company {
+  min-height: 74mm;
+  padding: 3.2mm 3.6mm;
+  border: 0.35mm solid #b9d7f0;
+  background: #eff7ff;
+  color: #334155;
+}
+.est-company .meta {
+  display: grid;
+  grid-template-columns: 18mm 1fr;
+  align-items: center;
+  border-bottom: 0.3mm solid #c2d9ec;
+}
+.est-company .meta span:first-child {
+  padding: 1mm 0;
+  color: #1d6dcc;
+  font-size: 9pt;
+}
+.est-company .meta span:last-child {
+  padding: 1mm 0;
+  text-align: right;
+  font-size: 9.2pt;
+}
+.est-company .name {
+  margin: 3mm 0 2mm;
+  color: #153f82;
+  font-size: 11pt;
+  line-height: 1.35;
+}
+.est-company .office {
+  color: #526174;
+  font-size: 8.6pt;
+  line-height: 1.5;
+}
+.est-company .office .label {
+  color: #1d6dcc;
+}
+.est-company .stamps {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4mm;
+  margin-top: 3.5mm;
+}
+.est-company .stamp {
+  color: #1d6dcc;
+  font-size: 8.4pt;
+  text-align: center;
+}
+.est-company .stamp div {
+  width: 14mm;
+  height: 14mm;
+  margin-top: 1mm;
+  border: 0.3mm solid #b9d1e8;
+  background: #fff;
+}
+.est-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 15mm;
+  margin: 7mm 0 5mm;
+  padding: 3mm 4mm;
+  border: 0.55mm solid #3b82d6;
+  background: #eff7ff;
+  color: #153f82;
+}
+.est-total .label {
+  font-size: 13pt;
+  letter-spacing: 0.08em;
+}
+.est-total .value {
+  font-family: 'BIZ UDP明朝', 'BIZ UDPMincho', 'Yu Mincho', serif;
+  font-size: 19pt;
+  line-height: 1;
+  white-space: nowrap;
+}
+.est-category {
+  min-height: 7.5mm;
+  padding: 1.8mm 2.8mm;
+  border: 0.35mm solid #c1d9ef;
+  border-bottom: 0;
+  background: #eff7ff;
+  color: #153f82;
+  font-size: 11pt;
+}
+.est-items {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 10pt;
+}
+.est-items th,
+.est-items td {
+  padding: 2mm 1.8mm;
+  border: 0.3mm solid #c1d9ef;
+  text-align: right;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+.est-items th {
+  height: 8mm;
+  background: #dcecff;
+  color: #153f82;
+  text-align: center;
+}
+.est-items td {
+  color: #39495a;
+}
+.est-items td.name {
+  text-align: left;
+  vertical-align: top;
+}
+.est-items .product {
+  color: #263749;
+  font-size: 10.5pt;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.est-items .subline {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.3mm;
+  margin-top: 1.2mm;
+  color: #244f91;
+  font-size: 8.6pt;
+  line-height: 1.35;
+}
+.est-items .subline::before {
+  content: '';
+  flex: 0 0 0.65mm;
+  align-self: stretch;
+  background: #6faaf0;
+}
+.est-items tr.spacer td {
+  height: 3.5mm;
+  border: 0;
+  background: #fff;
+}
+.est-items tr.sum td {
+  height: 8mm;
+  background: #f7fbff;
+  color: #1b4e91;
+}
+.est-items tr.sum td.blank {
+  border: 0;
+  background: #fff;
+}
+.est-items tr.sum.grand td:not(.blank) {
+  background: #eaf3ff;
+  font-size: 11pt;
+}
+.est-care {
+  margin-top: 6mm;
+  border: 0.35mm solid #c1d9ef;
+}
+.est-care .head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1mm 6mm;
+  padding: 2mm 2.8mm;
+  border-bottom: 0.3mm solid #c1d9ef;
+  background: #eff7ff;
+  color: #1d6dcc;
+  font-family: 'BIZ UDPゴシック', 'BIZ UDPGothic', 'Yu Gothic', 'Hiragino Sans', 'Meiryo', sans-serif;
+  font-size: 10pt;
+}
+.est-care table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10pt;
+}
+.est-care td {
+  height: 7.5mm;
+  padding: 1.4mm 2.8mm;
+  border-top: 0.3mm solid #e0ecf8;
+}
+.est-care td.num {
+  width: 38mm;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.est-care tr.pay td {
+  background: #fff8db;
+  color: #153f82;
+  font-size: 11.5pt;
+}
+.est-remarks {
+  margin-top: 6mm;
+  border: 0.35mm solid #c1d9ef;
+}
+.est-remarks-title {
+  padding: 1.8mm 2.8mm;
+  border-bottom: 0.3mm solid #c1d9ef;
+  background: #eff7ff;
+  color: #1d6dcc;
+  font-size: 10pt;
+}
+.est-remarks-body {
+  min-height: 12mm;
+  padding: 2mm 2.8mm;
+  color: #39495a;
+  font-size: 9.6pt;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* ---------------------------------------------------------------- 印刷するとき */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-overlay {
+    position: static;
+    overflow: visible;
+    background: none;
+  }
+  .print-toolbar {
+    display: none !important;
+  }
+  .print-root {
+    padding: 0;
+    zoom: 1 !important; /* 画面で縮めて見せていても、印刷は原寸 */
+  }
+  .est {
+    min-height: 0;
+    height: 296mm;
+    margin: 0;
+    box-shadow: none;
+    break-after: page;
+    overflow: hidden;
+  }
+  .est:last-child {
+    break-after: auto;
+  }
+}
