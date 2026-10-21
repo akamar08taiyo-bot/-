@@ -8,7 +8,7 @@
 import {cutToLength, estimatePlaceLines, estimateQty, isBlankRow, listPriceOf} from './calc.ts';
 import type {EstimateRates} from './calc.ts';
 import {normalize} from './priceImport.ts';
-import type {EstimateForm, Insurer, Job, Place, Row, Settings, ShinseiMarks} from './types.ts';
+import type {EstimateForm, Insurer, Job, Place, Row, Settings, ShinseiInfo, ShinseiMarks} from './types.ts';
 import {num, yen} from './util.ts';
 
 export const FORM_IDS: EstimateForm[] = ['yukuhashi', 'kouiki'];
@@ -45,6 +45,26 @@ export const MARK_INFO: {[K in keyof ShinseiMarks]: {label: string; options: Exc
 };
 export const MARK_KEYS = Object.keys(MARK_INFO) as (keyof ShinseiMarks)[];
 export const NO_MARKS: ShinseiMarks = {gender: '', era: '', care: '', renovated: ''};
+/** 申請書の項目が何も入っていないとき */
+export const NO_SHINSEI: ShinseiInfo = {
+  ...NO_MARKS,
+  kana: '',
+  birthY: '',
+  birthM: '',
+  birthD: '',
+  zip: '',
+  phone: '',
+  owner: '',
+  relation: '',
+  reasonOffice: '',
+  reasonName: '',
+  start: '',
+  end: '',
+  cost: null,
+};
+/** 申請書の項目が1つでも入っているか */
+export const hasShinseiInfo = (info: ShinseiInfo | undefined) =>
+  !!info && Object.entries(info).some(([k, v]) => (k === 'cost' ? v !== null : typeof v === 'string' && v.trim() !== ''));
 
 /** 住所の市町村から保険者を決める。分からなければ null */
 export function insurerForAddress(address: string): Insurer | null {

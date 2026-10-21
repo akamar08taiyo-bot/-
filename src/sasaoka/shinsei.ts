@@ -1,15 +1,16 @@
 // 申請書：保険者ごとにいただいた Excel の原本（苅田町・行橋市・みやこ町・広域連合＝築上町など）に、見積書の内容を転記する（ユーザーの指示）。
-// 転記するのは 被保険者氏名・住所・被保険者番号（10マス）・改修の内容・箇所及び規模（前の申請と同じ書き方「玄関① 木製L字手すり L=600×850㎜」）だけ。
-// 改修の内容は①②（写真番号）ごとに1行。性別・元号・要介護状態区分・改修状況は、申請書を作るときに選んだものを丸（楕円の図形）で囲む。
+// 転記するのは 被保険者氏名・住所・被保険者番号（10マス）・改修の内容・箇所及び規模（前の申請と同じ書き方「玄関① 木製L字手すり L=600×850㎜」）と、
+// 申請書の画面で入れた フリガナ・生年月日・郵便番号・電話番号・住宅の所有者・理由書作成者・着工／完了の日・改修費用（なければ見積書から）。
+// 改修の内容は①②（写真番号）ごとに1行。性別・元号・要介護状態区分・改修状況は、選んだものを丸（楕円の図形）で囲む。
 // 原本のほかのシート（事後申請書・承諾書・委任状・平面図・写真）・空欄・罫線・図形はそのまま残す（決めた欄の文字だけを書きかえる）。
 // 事後申請書など、転記した欄を参照する式は、Excel で開いたときに計算し直す（保存しておく答えも同じ値にしておく）。
 // 逆に、書き込んだ申請書（Excel）から 氏名・住所・被保険者番号・改修の箇所 を読んで、見積書を作ることもできる（readShinsei）。
 
 import {strFromU8, strToU8, unzipSync, zipSync} from 'fflate';
-import {isBlankRow} from './calc.ts';
-import type {EstimateRates} from './calc.ts';
-import {circled, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, photoNumbers} from './estimateForms.ts';
-import type {Insurer, Job, Place, ShinseiMarks} from './types.ts';
+import {estimateTotals, isBlankRow} from './calc.ts';
+import type {EstimateRates, EstimateSettings} from './calc.ts';
+import {circled, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa} from './estimateForms.ts';
+import type {Insurer, Job, Place, ShinseiInfo, ShinseiMarks} from './types.ts';
 
 /** 申請書の原本の、1つのシートで転記する欄（番地）。ないものは書かない */
 export type ShinseiSheet = {
@@ -22,7 +23,18 @@ export type ShinseiSheet = {
   kinds?: {places: string; works: string}[]; // 改修の種類（①手すりの取付〜⑥付帯工事）ごとの行の、箇所の欄と工事内容の欄（住宅改修内訳明細書）
   photoPlace?: {photo: string; place: string}; // 写真貼付用紙：原本の写真番号の欄（①）を読み、その写真番号の改修場所を改修箇所の欄に入れる
   marks?: MarkCell[]; // 丸で囲む欄（性別「男　　・　　女」など）
+  texts?: TextCell[]; // 申請書の画面で入れた項目（フリガナ・生年月日・電話番号など）を書く欄と書き方
 };
+
+/** 申請書の画面で入れた項目の文字（書き方の {名前} に入れる値） */
+export type ShinseiTexts = Record<'kana' | 'zip' | 'phone' | 'owner' | 'relation' | 'reasonOffice' | 'reasonName' | 'era' | 'y' | 'm' | 'd' | 'start' | 'end' | 'cost', string>;
+
+/**
+ * 申請書の画面で入れた項目を書く欄：format の {名前}（ShinseiTexts）に値を入れて書く（「本人との関係（{relation}）」）。
+ * format の値がどれも空なら原本の文字のまま。as：number＝数で書く（改修費用。表示形式のある欄）、date＝Excel の日付で書く
+ */
+export type TextCell = {cell: string; format: string; as?: 'number' | 'date'};
+const T = (cell: string, format: string, as?: TextCell['as']): TextCell => (as ? {cell, format, as} : {cell, format});
 
 /**
  * 丸で囲む欄：key の値（MARK_INFO の options）を、cell の文字の中から探して囲む。
@@ -72,19 +84,74 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
   kanda: {
     title: '苅田町申請書',
     sheets: [
-      {sheet: '事前申請書', name: 'J7', address: 'J11', insuredNo: boxes('X', 10, 6), works: 'J14', marks: [ERA('J9'), GENDER('W9'), CARE('J12')]},
+      {
+        sheet: '事前申請書',
+        name: 'J7',
+        address: 'J11',
+        insuredNo: boxes('X', 10, 6),
+        works: 'J14',
+        marks: [ERA('J9'), GENDER('W9'), CARE('J12')],
+        texts: [
+          T('J6', '{kana}'),
+          T('J9', '明　・　大　・　昭　{y}年{m}月{d}日生'),
+          T('J10', '〒{zip}'),
+          T('AB11', '{phone}'),
+          T('J13', '{owner}'),
+          T('W13', '本人との関係（{relation}）'),
+          T('Y15', '{start}'),
+          T('Y16', '{end}'),
+          T('J17', '{cost}円'),
+        ],
+      },
       {sheet: '事後申請書', marks: [ERA('I9'), GENDER('V9'), CARE('I12')]},
     ],
   },
   yukuhashi: {
     title: '行橋市申請書',
-    sheets: [{sheet: '住改・受領委任払', name: 'F5', address: 'F11', insuredNo: boxes('Z', 10, 7), works: 'F14', marks: [ERA('F9'), GENDER('Y9'), CARE('F12', ['１', '２'])]}],
+    sheets: [
+      {
+        sheet: '住改・受領委任払',
+        name: 'F5',
+        address: 'F11',
+        insuredNo: boxes('Z', 10, 7),
+        works: 'F14',
+        marks: [ERA('F9'), GENDER('Y9'), CARE('F12', ['１', '２'])],
+        texts: [
+          T('F4', '{kana}'),
+          T('F9', '明・大・昭　{y}年{m}月{d}日生'),
+          T('G10', '{zip}'), // 「〒」は原本の F10
+          T('Y10', '{phone}'),
+          T('F13', '{owner}'),
+          T('V13', '本人との関係（{relation}）'),
+          T('AB16', '{start}'),
+          T('AB18', '{end}'),
+          T('F20', '{cost}', 'number'),
+        ],
+      },
+    ],
   },
   miyako: {
     title: 'みやこ町申請書',
     sheets: [
-      {sheet: '住宅改修承認届出書', name: 'I5', address: 'I9', insuredNo: boxes('W', 10, 4), marks: [GENDER('AA7'), RENOVATED('X23')]},
-      {sheet: '住宅改修費支給申請書(受領委任払用)', name: 'J6', marks: [GENDER('AB8'), RENOVATED('X18')]},
+      {
+        sheet: '住宅改修承認届出書',
+        name: 'I5',
+        address: 'I9',
+        insuredNo: boxes('W', 10, 4),
+        marks: [GENDER('AA7'), RENOVATED('X23')],
+        texts: [
+          T('I4', '{kana}'),
+          T('I7', '{era}　{y}年{m}月{d}日生'), // 原本は「昭和」と書いてある
+          T('I8', '〒{zip}'),
+          T('Z9', '{phone}'),
+          T('I10', '{owner}　　　　本人との関係（{relation}）'),
+          T('N11', '{reasonOffice}'),
+          T('N12', '{reasonName}'),
+          T('I23', '{cost}', 'number'),
+        ],
+      },
+      // フリガナ・生年月日・住所・住宅の所有者・改修費用は承認届出書を参照する式。電話番号と着工日・完成日（日付の欄）は書く
+      {sheet: '住宅改修費支給申請書(受領委任払用)', name: 'J6', marks: [GENDER('AB8'), RENOVATED('X18')], texts: [T('AA10', '{phone}'), T('J16', '{start}', 'date'), T('X16', '{end}', 'date')]},
       {sheet: '住宅改修内訳明細書', kinds: KIND_ROWS},
       {sheet: '平面図', name: 'A1', nameFormat: '{name}　邸　平面図'},
       ...[1, 2, 3, 4].map((n) => ({sheet: `写真 (${n})`, ...PHOTO_SHEET})),
@@ -93,9 +160,39 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
   kouiki: {
     title: '広域連合申請書',
     sheets: [
-      {sheet: '様式第2号（住宅改修承認申請書）', name: 'J6', address: 'J9', insuredNo: boxes('X', 10, 7), marks: [GENDER('AB8'), RENOVATED('Y22')]},
-      {sheet: '様式第7号（住宅改修費支給申請書（受領委任払用）', name: 'J6', address: 'J9', insuredNo: boxes('X', 10, 7), marks: [GENDER('AB8'), RENOVATED('X16')]},
-      {sheet: '様式第2号別紙（住宅改修内訳明細書）', name: 'I6', insuredNo: boxes('W', 10, 7), kinds: KIND_ROWS},
+      {
+        sheet: '様式第2号（住宅改修承認申請書）',
+        name: 'J6',
+        address: 'J9',
+        insuredNo: boxes('X', 10, 7),
+        marks: [GENDER('AB8'), RENOVATED('Y22')],
+        texts: [
+          T('J5', '{kana}'),
+          T('J8', '{era}　{y}年{m}月{d}日生'),
+          T('J11', '{owner}　　　　本人との関係（{relation}）'),
+          T('O13', '{reasonOffice}'),
+          T('O14', '{reasonName}'),
+          T('J22', '{cost}円'),
+        ],
+      },
+      {
+        sheet: '様式第7号（住宅改修費支給申請書（受領委任払用）',
+        name: 'J6',
+        address: 'J9',
+        insuredNo: boxes('X', 10, 7),
+        marks: [GENDER('AB8'), RENOVATED('X16')],
+        texts: [
+          T('J5', '{kana}'),
+          T('J8', '{era}　{y}年{m}月{d}日生'),
+          T('AA10', '{phone}'),
+          T('J11', '{owner}　　　　本人との関係（{relation}）'),
+          T('X12', '{start}'),
+          T('X14', '{end}'),
+          T('J16', '{cost}'), // 「円」は原本の R16
+          T('J18', '{reasonOffice}　{reasonName}'), // 理由書作成者名及び事業所名（前の申請の書き方：事業所名　氏名）
+        ],
+      },
+      {sheet: '様式第2号別紙（住宅改修内訳明細書）', name: 'I6', insuredNo: boxes('W', 10, 7), kinds: KIND_ROWS, texts: [T('I5', '{kana}')]},
       {sheet: '平面図 (2)', name: 'A1', nameFormat: '　{name}　様　邸　平面図'},
       ...KOUIKI_PHOTO_SHEETS.map((sheet) => ({sheet, ...PHOTO_SHEET})),
     ],
@@ -114,6 +211,10 @@ export type ShinseiValues = {
   kinds: ShinseiKind[];
   photos: Record<number, string>; // 写真番号 → 改修場所（写真貼付用紙の改修箇所）
   marks: ShinseiMarks; // 丸で囲む値
+  texts: ShinseiTexts; // 申請書の画面で入れた項目の文字（書き方の {名前} の値）
+  cost: number | null; // 改修費用（数で書く欄。なければ null）
+  start: string; // 着工・完了の日（'YYYY-MM-DD'。日付で書く欄）
+  end: string;
 };
 
 /** 見積書に出る箇所ごとの、改修の内容の行と改修の種類（1〜6）・改修場所。見積書に出ない箇所（行のない箇所）は入れない */
@@ -140,6 +241,12 @@ const BASE_PLATE = /ベースプレート|補強板|取付板/;
  * 長さは部材ごと（補強板・ベースプレートは「補強板L=1,700㎜」）。2本以上は「×」でつなぐ
  */
 function workLine(p: Place, photo: number): string {
+  // 申請書の画面で改修の内容を手で書いたときは、それ
+  return [`${p.name.trim()}${circled(photo)}`, p.shinseiText?.trim() || autoWorkText(p)].filter(Boolean).join(' ');
+}
+
+/** 改修の内容の文（改修場所・写真番号のうしろ）を、見積書の部材の品名・使う長さから作る（「木製L字手すり L=600×850㎜」） */
+export function autoWorkText(p: Pick<Place, 'name' | 'kind' | 'rows'>): string {
   const mats = p.rows.filter((r) => r.kind === 'material' && !isBlankRow(r));
   const text = mats.map((r) => `${r.estText ?? ''} ${r.name} ${r.code}`).join(' ');
   const labor = p.rows.filter((r) => r.kind === 'labor').map((r) => `${r.estText ?? ''} ${r.name}`).join(' ');
@@ -160,7 +267,7 @@ function workLine(p: Place, photo: number): string {
     groups.set(key, g);
   }
   const sizes = [...groups.values()].map((g) => `${BASE_PLATE.test(g.name) ? '補強板' : ''}L=${g.mm.join('×')}㎜`);
-  return [`${p.name.trim()}${circled(photo)}`, item, ...sizes].filter(Boolean).join(' ');
+  return [item, ...sizes].filter(Boolean).join(' ');
 }
 
 /** 改修の内容・箇所及び規模（苅田町・行橋市の申請書の欄）：箇所ごとに1行「玄関① 木製L字手すり L=600×850㎜」。写真番号・改修場所は見積書と同じ */
@@ -188,15 +295,49 @@ export function shinseiPhotos(job: Pick<Job, 'places'>, rates: EstimateRates): R
   return out;
 }
 
-export function shinseiValues(job: Job, rates: EstimateRates): ShinseiValues {
+/** 改修費用：手で入れた金額、なければ見積書の介護保険対象分の合計（税込）。見積書がなければ null */
+export function shinseiCost(job: Job, s: EstimateSettings): number | null {
+  if (job.shinsei?.cost != null) return job.shinsei.cost;
+  return estimateTotals(job, s).target.total || null;
+}
+
+/** 日付 → 「令和8年11月5日」（申請書の日付の欄） */
+export function reiwaText(iso: string): string {
+  const r = reiwa(iso);
+  return r ? `令和${r.y === 1 ? '元' : r.y}年${r.m}月${r.d}日` : '';
+}
+
+export function shinseiValues(job: Job, s: EstimateSettings): ShinseiValues {
+  const info: ShinseiInfo = {...NO_SHINSEI, ...job.shinsei};
+  const cost = shinseiCost(job, s);
+  const t = (v: string) => v.normalize('NFKC').trim();
   return {
     name: job.customer.trim(),
     address: job.address.trim(),
     insuredNo: job.insuredNo,
-    works: shinseiWorks(job, rates),
-    kinds: shinseiKinds(job, rates),
-    photos: shinseiPhotos(job, rates),
-    marks: {...NO_MARKS, ...job.shinseiMarks},
+    works: shinseiWorks(job, s),
+    kinds: shinseiKinds(job, s),
+    photos: shinseiPhotos(job, s),
+    marks: {gender: info.gender, era: info.era, care: info.care, renovated: info.renovated},
+    texts: {
+      kana: info.kana.trim(),
+      zip: t(info.zip),
+      phone: t(info.phone),
+      owner: info.owner.trim(),
+      relation: info.relation.trim(),
+      reasonOffice: info.reasonOffice.trim(),
+      reasonName: info.reasonName.trim(),
+      era: info.era,
+      y: t(info.birthY),
+      m: t(info.birthM),
+      d: t(info.birthD),
+      start: reiwaText(info.start),
+      end: reiwaText(info.end),
+      cost: cost ? cost.toLocaleString('en-US') : '',
+    },
+    cost,
+    start: info.start,
+    end: info.end,
   };
 }
 
@@ -251,10 +392,18 @@ function sheetPaths(files: Files): Map<string, string> {
 
 const cellRe = (ref: string) => new RegExp(`<c r="${ref}"(?=[\\s/>])([^>]*?)(?:/>|>([\\s\\S]*?)</c>)`);
 
-/** 欄に文字を入れる（書式＝s はそのまま。空なら値を消す）。欄がなければ、その行に列の順で足す */
-export function setCell(xml: string, ref: string, text: string): string {
+/** 欄に入れる値：文字、または数（金額・日付の数。欄の表示形式で出る） */
+type CellValue = string | number;
+
+/** 欄に文字（数）を入れる（書式＝s はそのまま。空なら値を消す）。欄がなければ、その行に列の順で足す */
+export function setCell(xml: string, ref: string, text: CellValue): string {
   const style = (attrs: string) => /\ss="\d+"/.exec(attrs)?.[0] ?? '';
-  const make = (attrs: string) => (text === '' ? `<c r="${ref}"${style(attrs)}/>` : `<c r="${ref}"${style(attrs)} t="inlineStr"><is><t xml:space="preserve">${esc(text)}</t></is></c>`);
+  const make = (attrs: string) =>
+    typeof text === 'number'
+      ? `<c r="${ref}"${style(attrs)}><v>${text}</v></c>`
+      : text === ''
+        ? `<c r="${ref}"${style(attrs)}/>`
+        : `<c r="${ref}"${style(attrs)} t="inlineStr"><is><t xml:space="preserve">${esc(text)}</t></is></c>`;
   const found = cellRe(ref).exec(xml);
   if (found) return xml.slice(0, found.index) + make(found[1]) + xml.slice(found.index + found[0].length);
   const [, col, row] = /^([A-Z]+)(\d+)$/.exec(ref) ?? [];
@@ -282,7 +431,7 @@ export function setCell(xml: string, ref: string, text: string): string {
  * 転記した欄をそのまま参照する式（=J7、=事前申請書!J7 など）の、保存しておく答えを同じ値にする
  * （Excel は開いたときに計算し直すが、スマホのプレビューなどは保存してある答えを出すため）
  */
-function updateRefs(files: Files, paths: Map<string, string>, sheet: string, values: Map<string, string>) {
+function updateRefs(files: Files, paths: Map<string, string>, sheet: string, values: Map<string, CellValue>) {
   for (const [name, path] of paths) {
     const xml = files[path] ? strFromU8(files[path]) : null;
     if (xml === null) continue;
@@ -299,6 +448,7 @@ function updateRefs(files: Files, paths: Map<string, string>, sheet: string, val
       const text = values.get(target) ?? '';
       changed = true;
       const rest = attrs.replace(/\st="[^"]*"/, '');
+      if (typeof text === 'number') return `<c r="${ref}"${rest}>${f}<v>${text}</v></c>`;
       if (text === '') return iff ? `<c r="${ref}"${rest} t="str">${f}<v></v></c>` : `<c r="${ref}"${rest}>${f}<v>0</v></c>`;
       return `<c r="${ref}"${rest} t="str">${f}<v>${esc(text)}</v></c>`;
     });
@@ -307,7 +457,7 @@ function updateRefs(files: Files, paths: Map<string, string>, sheet: string, val
 }
 
 /** 欄に入れる値（番地 → 文字）を、原本のシートに書き込む。式の答え・Excel で開いたときの計算も合わせる */
-function writeCells(files: Files, sheet: string, values: Map<string, string>): void {
+function writeCells(files: Files, sheet: string, values: Map<string, CellValue>): void {
   const paths = sheetPaths(files);
   const path = paths.get(sheet);
   if (!path || !files[path]) throw new Error(`原本に「${sheet}」のシートがありません`);
@@ -332,8 +482,8 @@ function photoNumberOf(text: string): number {
 }
 
 /** 1つのシートで欄に入れる値（番地 → 文字）。photo は写真貼付用紙の原本の写真番号 */
-export function shinseiCells(sheet: ShinseiSheet, v: ShinseiValues, photo = 0): Map<string, string> {
-  const out = new Map<string, string>();
+export function shinseiCells(sheet: ShinseiSheet, v: ShinseiValues, photo = 0): Map<string, CellValue> {
+  const out = new Map<string, CellValue>();
   // 表題（平面図）は、氏名のないときは原本のまま
   if (sheet.name && !(sheet.nameFormat && !v.name)) out.set(sheet.name, sheet.nameFormat ? sheet.nameFormat.replace('{name}', v.name) : v.name);
   if (sheet.address) out.set(sheet.address, v.address);
@@ -347,11 +497,50 @@ export function shinseiCells(sheet: ShinseiSheet, v: ShinseiValues, photo = 0): 
     out.set(k.works, v.kinds[i]?.works.join('\n') ?? '');
   });
   if (sheet.photoPlace) out.set(sheet.photoPlace.place, (photo > 0 && v.photos[photo]) || '');
+  for (const t of sheet.texts ?? []) {
+    const keys = placeholders(t.format);
+    // 何も入れていなければ原本の文字のまま（「本人との関係（　　　）」など）
+    if (!keys.some((k) => v.texts[k])) continue;
+    if (t.as === 'number') {
+      if (v.cost !== null) out.set(t.cell, v.cost);
+    } else if (t.as === 'date') {
+      const serial = excelDate(keys.includes('end') ? v.end : v.start);
+      if (serial) out.set(t.cell, serial);
+    } else out.set(t.cell, t.format.replace(/\{(\w+)\}/g, (_, k: keyof ShinseiTexts) => v.texts[k] || BLANK[k] || ''));
+  }
   return out;
 }
 
+/** 書き方の中の {名前} */
+const placeholders = (format: string) => [...format.matchAll(/\{(\w+)\}/g)].map((m) => m[1] as keyof ShinseiTexts);
+/** 生年月日の一部だけ入れたときの空き（「昭和　23年　　月　　日生」） */
+const BLANK: Partial<ShinseiTexts> = {y: '　　', m: '　　', d: '　　'};
+
+/** 日付（'YYYY-MM-DD'）→ Excel の日付の数（1900年1月1日＝1）。なければ 0 */
+function excelDate(iso: string): number {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  return m ? Math.round((Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) - Date.UTC(1899, 11, 30)) / 86400000) : 0;
+}
+
+/** Excel の日付の数 → 'YYYY-MM-DD' */
+function fromExcelDate(n: number): string {
+  return n > 0 ? new Date(Date.UTC(1899, 11, 30) + n * 86400000).toISOString().slice(0, 10) : '';
+}
+
 /** 何も書いていない値（原本の欄を消すとき） */
-export const EMPTY_SHINSEI: ShinseiValues = {name: '', address: '', insuredNo: '', works: [], kinds: KINDS.map(() => ({places: '', works: []})), photos: {}, marks: NO_MARKS};
+export const EMPTY_SHINSEI: ShinseiValues = {
+  name: '',
+  address: '',
+  insuredNo: '',
+  works: [],
+  kinds: KINDS.map(() => ({places: '', works: []})),
+  photos: {},
+  marks: NO_MARKS,
+  texts: {kana: '', zip: '', phone: '', owner: '', relation: '', reasonOffice: '', reasonName: '', era: '', y: '', m: '', d: '', start: '', end: '', cost: ''},
+  cost: null,
+  start: '',
+  end: '',
+};
 
 /**
  * 原本（.xltx／.xlsx のバイト列）に転記した申請書（.xlsx）を作る。
@@ -639,9 +828,77 @@ function cellText(xml: string, ref: string, shared: string[]): string {
   return unesc(v);
 }
 
-/** 申請書から読んだ箇所（写真番号・改修場所・改修の種類 1〜6） */
-export type ShinseiPlace = {photo: number; name: string; kind: number};
-export type ShinseiRead = {insurer: Insurer; name: string; address: string; insuredNo: string; places: ShinseiPlace[]};
+/** 申請書から読んだ箇所（写真番号・改修場所・改修の種類 1〜6・改修の内容の文） */
+export type ShinseiPlace = {photo: number; name: string; kind: number; text: string};
+export type ShinseiRead = {insurer: Insurer; name: string; address: string; insuredNo: string; places: ShinseiPlace[]; info: Partial<ShinseiInfo>};
+
+/** 読むときの {名前} の形（年月日は数字、元号は 明治・大正・昭和。ほかは何でも） */
+const READ_AS: Partial<Record<keyof ShinseiTexts, string>> = {y: '([0-9０-９]*)', m: '([0-9０-９]*)', d: '([0-9０-９]*)', era: '(明治|大正|昭和|)'};
+
+/** 何でもの {名前} が、すき間だけをはさんで2つ並ぶ書き方（「{reasonOffice}　{reasonName}」）。どこで分けるか分からないので読まない */
+const ambiguous = (format: string) => [...format.matchAll(/\{(\w+)\}[\s　]*\{(\w+)\}/g)].some((m) => !READ_AS[m[1] as keyof ShinseiTexts] && !READ_AS[m[2] as keyof ShinseiTexts]);
+
+/** 書き方（format）にあてはめて、欄の文字から {名前} の値を読む（すき間の数は問わない）。合わなければ null */
+function unformat(format: string, text: string): Record<string, string> | null {
+  const keys: string[] = [];
+  const re = format
+    .split(/(\{\w+\})/)
+    .map((part) => {
+      const k = /^\{(\w+)\}$/.exec(part);
+      if (k) {
+        keys.push(k[1]);
+        return READ_AS[k[1] as keyof ShinseiTexts] ?? '(.*?)';
+      }
+      return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/[\s　]+/g, '[\\s　]*');
+    })
+    .join('');
+  const m = new RegExp(`^[\\s　]*${re}[\\s　]*$`).exec(text);
+  return m ? Object.fromEntries(keys.map((k, i) => [k, (m[i + 1] ?? '').trim()])) : null;
+}
+
+/** 「令和8年11月5日」→ '2026-11-05' */
+function fromReiwaText(text: string): string {
+  const m = /^令和(元|\d+)年(\d+)月(\d+)日$/.exec(text.normalize('NFKC').replace(/\s/g, ''));
+  if (!m) return '';
+  const pad = (n: string) => n.padStart(2, '0');
+  return `${2018 + (m[1] === '元' ? 1 : Number(m[1]))}-${pad(m[2])}-${pad(m[3])}`;
+}
+
+const TEXT_FIELDS: Partial<Record<keyof ShinseiTexts, keyof ShinseiInfo>> = {
+  kana: 'kana',
+  zip: 'zip',
+  phone: 'phone',
+  owner: 'owner',
+  relation: 'relation',
+  reasonOffice: 'reasonOffice',
+  reasonName: 'reasonName',
+  y: 'birthY',
+  m: 'birthM',
+  d: 'birthD',
+};
+
+/** 申請書の画面で入れる項目を、書いた欄から読む（まだ読んでいない項目だけ）。数の欄（改修費用）と、すき間だけで区切った書き方は読まない */
+function readTexts(sheet: ShinseiSheet, get: (ref: string) => string, info: Partial<ShinseiInfo>): void {
+  const put = (key: keyof ShinseiInfo, v: string) => {
+    if (v && !info[key]) (info as Record<string, string>)[key] = v;
+  };
+  for (const t of sheet.texts ?? []) {
+    if (t.as === 'number' || ambiguous(t.format)) continue;
+    const key = placeholders(t.format).includes('end') ? 'end' : 'start';
+    if (t.as === 'date') {
+      put(key, fromExcelDate(Number(get(t.cell)) || 0));
+      continue;
+    }
+    const got = unformat(t.format, get(t.cell));
+    if (!got) continue;
+    for (const [k, v] of Object.entries(got)) {
+      if (k === 'start' || k === 'end') put(k, fromReiwaText(v));
+      else if (k === 'era') {
+        if (got.y && (MARK_INFO.era.options as string[]).includes(v)) put('era', v); // 年を書いていないときの「昭和」は原本の文字
+      } else if (TEXT_FIELDS[k as keyof ShinseiTexts]) put(TEXT_FIELDS[k as keyof ShinseiTexts]!, k === 'y' || k === 'm' || k === 'd' ? v.normalize('NFKC') : v);
+    }
+  }
+}
 
 const linesOf = (text: string) =>
   text
@@ -663,7 +920,7 @@ export function readShinsei(bytes: Uint8Array): ShinseiRead | null {
   for (const [insurer, map] of Object.entries(SHINSEI) as [Insurer, ShinseiMap][]) {
     const first = paths.get(map.sheets[0]?.sheet ?? '');
     if (!first || !files[first]) continue;
-    const out: ShinseiRead = {insurer, name: '', address: '', insuredNo: '', places: []};
+    const out: ShinseiRead = {insurer, name: '', address: '', insuredNo: '', places: [], info: {}};
     for (const sheet of map.sheets) {
       const path = paths.get(sheet.sheet);
       if (!path || !files[path]) continue;
@@ -684,10 +941,11 @@ export function readShinsei(bytes: Uint8Array): ShinseiRead | null {
               ...get(k.places)
                 .split(/[・、，,\s　]+/)
                 .filter(Boolean)
-                .map((name) => ({photo: 0, name: name.normalize('NFKC'), kind: i + 1})),
+                .map((name) => ({photo: 0, name: name.normalize('NFKC'), kind: i + 1, text: ''})),
             );
         });
       }
+      readTexts(sheet, get, out.info);
     }
     return out;
   }
@@ -696,7 +954,7 @@ export function readShinsei(bytes: Uint8Array): ShinseiRead | null {
 
 
 /**
- * 改修の内容の1行（「玄関① 木製L字手すり L=600×850㎜」、前の版の「①浴室　手すりの取付　長さ60cm」「(3) 玄関 段差の解消」）から、写真番号・改修場所・改修の種類を読む。
+ * 改修の内容の1行（「玄関① 木製L字手すり L=600×850㎜」、前の版の「①浴室　手すりの取付　長さ60cm」「(3) 玄関 段差の解消」）から、写真番号・改修場所・改修の種類・改修の内容の文を読む。
  * kind（改修の種類の行に書いてあったとき）があればそれ。なければ文から見分ける
  */
 export function parseWorkLine(line: string, kind?: number): ShinseiPlace {
@@ -716,7 +974,8 @@ export function parseWorkLine(line: string, kind?: number): ShinseiPlace {
   const trail = /^(.+?)([①-⑳])$/.exec(first);
   const name = (trail ? trail[1] : first).normalize('NFKC');
   if (trail && photo === 0) photo = circledNum(trail[2]);
-  const work = others.join(' ').normalize('NFKC');
+  const text = others.join(' ');
+  const work = text.normalize('NFKC');
   const guess = /手[すスず摺]/.test(work) ? 1 : /段差|スロープ|踏台|踏み台|ステップ|敷居/.test(work) ? 2 : /床/.test(work) ? 3 : /扉|引[き]?戸|ドア/.test(work) ? 4 : /便器/.test(work) ? 5 : work ? 6 : 1;
-  return {photo, name, kind: kind ?? guess};
+  return {photo, name, kind: kind ?? guess, text};
 }

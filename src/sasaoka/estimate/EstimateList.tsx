@@ -2,7 +2,7 @@ import {useMemo, useState} from 'react';
 import {estimateTotals, jobName} from '../calc.ts';
 import {copyJob} from '../components/JobTools.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
-import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm} from '../estimateForms.ts';
+import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm, NO_SHINSEI} from '../estimateForms.ts';
 import {estimateXlsx, XLSX_TYPE} from '../estimateXlsx.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
@@ -90,6 +90,7 @@ export function EstimateHome({
   data,
   update,
   onNew,
+  onNewShinsei,
   onCreate,
   onList,
   goMaterials,
@@ -97,6 +98,7 @@ export function EstimateHome({
   data: AppData;
   update: Update;
   onNew: (insurer: Insurer) => void;
+  onNewShinsei: (insurer: Insurer) => void; // 申請書から先に作る（申請書の画面を開く）
   onCreate: (job: Job) => void; // 作った見積書を入れて開く
   onList: () => void;
   goMaterials: () => void;
@@ -105,16 +107,16 @@ export function EstimateHome({
   const all = useEstimates(data, data.settings);
   const month = thisMonth();
   const inMonth = all.filter((e) => e.date.startsWith(month)).length;
-  // 申請書（Excel）から作る：申請書に書いた 氏名・住所・被保険者番号・改修の箇所（①浴室　手すりの取付）で見積書を作る。
-  // 箇所ごとに空白の行を1つ入れておく（見積書に箇所が出て、そこに部材・施工費を入れていける）
+  // 申請書（Excel）から作る：申請書に書いた 氏名・住所・被保険者番号・改修の箇所（①浴室　手すりの取付）と、フリガナ・生年月日・電話番号などで見積書を作る。
+  // 箇所ごとに空白の行を1つ入れておく（見積書に箇所が出て、そこに部材・施工費を入れていける）。申請書に書いてあった改修の内容の文は、申請書の文として残す
   const fromShinsei = async (file: File) => {
     const r = readShinsei(new Uint8Array(await file.arrayBuffer()));
     if (!r) {
       toast('苅田町・行橋市・みやこ町・広域連合の申請書（Excel）を選んでください', 'error');
       return;
     }
-    const places = r.places.map((w) => ({...newPlace(w.name, [manualRow('material')]), photo: w.photo, kind: w.kind}));
-    onCreate({...newEstimate(r.insurer), customer: r.name, address: r.address, insuredNo: r.insuredNo, places});
+    const places = r.places.map((w) => ({...newPlace(w.name, [manualRow('material')]), photo: w.photo, kind: w.kind, ...(w.text ? {shinseiText: w.text} : {})}));
+    onCreate({...newEstimate(r.insurer), customer: r.name, address: r.address, insuredNo: r.insuredNo, places, shinsei: {...NO_SHINSEI, ...r.info}});
     toast(`申請書から見積書を作りました（${INSURER_INFO[r.insurer].name}・${places.length}箇所）`);
   };
   return (
@@ -137,6 +139,17 @@ export function EstimateHome({
               <Btn color="emerald" className="w-full !px-4 !py-4 !text-base" onClick={() => onNew('kouiki')}>
                 ＋ {INSURER_INFO.kouiki.name}
               </Btn>
+            </div>
+            {/* 申請書から先に作る（ユーザーの指示：申請書から先に入れたら、そこから見積書へ。見積書からなら申請書へ。どちらが先でもよい） */}
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3" role="group" aria-label="申請書から作る">
+              <div className="mb-2 text-sm font-bold text-slate-700">📝 申請書から作る（申請書の順番で入れて、あとで見積書へ）</div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {INSURER_IDS.map((i) => (
+                  <Btn key={i} color="white" className="!py-3" onClick={() => onNewShinsei(i)}>
+                    📝 {INSURER_INFO[i].name}
+                  </Btn>
+                ))}
+              </div>
             </div>
             <label className="inline-flex cursor-pointer items-center justify-center gap-1.5 justify-self-start rounded-md border border-emerald-300 bg-white px-3 py-2 text-sm font-bold text-emerald-800 shadow-sm hover:bg-emerald-50">
               📥 申請書（Excel）から作る
@@ -225,6 +238,7 @@ export function EstimateList({
   month,
   setMonth,
   onOpen,
+  onOpenShinsei,
   onNew,
   onPrint,
   goMaterials,
@@ -234,6 +248,7 @@ export function EstimateList({
   month: string;
   setMonth: (m: string) => void;
   onOpen: (id: string) => void;
+  onOpenShinsei: (id: string) => void; // 様邸の申請書の画面を開く
   onNew: (insurer: Insurer) => void;
   onPrint: (r: PrintRequest) => void;
   goMaterials: () => void;
@@ -328,7 +343,10 @@ export function EstimateList({
                       )}
                     </td>
                     <td className="whitespace-nowrap px-2 py-1.5 text-right" onClick={(e) => e.stopPropagation()}>
-                      <Btn small color="softSky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
+                      <Btn small color="white" onClick={() => onOpenShinsei(job.id)}>
+                        📝 申請書
+                      </Btn>
+                      <Btn small color="softSky" className="ml-1.5" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
                         🖨 印刷
                       </Btn>
                       <Btn small color="softGreen" className="ml-1.5" onClick={() => saveEstimateExcel(job, s, toast)}>

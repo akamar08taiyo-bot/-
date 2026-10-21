@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {DEFAULT_LABOR, DEFAULT_STAFF, LABOR_REV, OFFICES, settingsForOffice} from '../../src/sasaoka/defaults.ts';
+import {NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {cleanJobs, cleanKits, cleanLabor, cleanList, cleanMaterials, cleanSettings} from '../../src/sasaoka/storage.ts';
 import {staffFull, staffShort} from '../../src/sasaoka/util.ts';
 
@@ -77,10 +78,13 @@ test('見積書の項目：前のデータ（項目なし）も読める', () =>
   ]);
   // 前の版の工事名称（work）は読まない（見積書の改修内容・工事名称は改修の種類から）
   assert.equal('work' in k.places[0], false);
-  // 申請書で丸をつける項目：前のデータ（項目なし）は空。選べる値のほかは空にする
-  assert.deepEqual(j.shinseiMarks, {gender: '', era: '', care: '', renovated: ''});
+  // 申請書の項目：前のデータ（項目なし）は空。丸で囲む項目は選べる値のほかは空にする。前の版の丸（shinseiMarks）も読む
+  assert.deepEqual(j.shinsei, NO_SHINSEI);
   const [m] = cleanJobs([{shinseiMarks: {gender: '女', era: '平成', care: '要介護2', renovated: 1}}]);
-  assert.deepEqual(m.shinseiMarks, {gender: '女', era: '', care: '要介護2', renovated: ''});
+  assert.deepEqual(m.shinsei, {...NO_SHINSEI, gender: '女', care: '要介護2'});
+  const [n] = cleanJobs([{shinsei: {kana: 'ヤマダ', birthY: 23, phone: '0930-00-0000', start: '2026-11-05', end: 'x', cost: '198000', gender: '男'}, places: [{name: '玄関', shinseiText: ' 木製手すり '}, {name: 'トイレ', shinseiText: ''}]}]);
+  assert.deepEqual(n.shinsei, {...NO_SHINSEI, kana: 'ヤマダ', birthY: '23', phone: '0930-00-0000', start: '2026-11-05', cost: 198000, gender: '男'});
+  assert.deepEqual(n.places.map((p) => p.shinseiText), [' 木製手すり ', undefined]); // 申請書に書く文は空なら持たない
 });
 
 test('前のデータの行・部材にも、定価・長さ・見積の単価が入る', () => {

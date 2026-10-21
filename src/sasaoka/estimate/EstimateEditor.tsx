@@ -5,7 +5,7 @@ import {LaborPickerFor, missingShikiri, ShikiriPriceDialog} from '../components/
 import {KitPicker} from '../components/Kits.tsx';
 import {MaterialPicker} from '../components/Pickers.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
-import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerForAddress, jobForm, jobInsurer, NO_MARKS} from '../estimateForms.ts';
+import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerForAddress, jobForm, jobInsurer, NO_SHINSEI} from '../estimateForms.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {addMaterial, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
@@ -13,8 +13,7 @@ import type {AppData, Insurer, Job, Kit, Material, NameSuffix, Place} from '../t
 import type {Update} from '../useStore.ts';
 import {staffFull, thisMonth, todayIso} from '../util.ts';
 import {duplicateEstimate, removeEstimate, saveEstimateExcel} from './EstimateList.tsx';
-import {ShinseiDialog} from './ShinseiDialog.tsx';
-import {canMakeShinsei, saveShinsei} from './shinseiFiles.ts';
+import {canMakeShinsei} from './shinseiFiles.ts';
 
 type Picker =
   | {placeId: string; kind: 'material'}
@@ -30,6 +29,7 @@ export function EstimateEditor({
   onOpen,
   onOpenInvoice,
   onOpenOrder,
+  onOpenShinsei,
   onPrint,
   onSave,
   onManageKits,
@@ -41,6 +41,7 @@ export function EstimateEditor({
   onOpen: (id: string) => void;
   onOpenInvoice: (id: string) => void; // 「請求書を確認する」で同じ様邸の仕切り計算表を開く
   onOpenOrder: () => void; // この見積書の部材の発注書を開く
+  onOpenShinsei: () => void; // この見積書の申請書の画面を開く（氏名・番号・住所・改修の箇所は同じ）
   onPrint: (r: PrintRequest) => void;
   onSave: () => Promise<boolean>; // まだ保存していない変更をすぐ保存する（保存できたら true）
   onManageKits?: () => void; // 部材・施工費マスタの「部材＋施工費（常用）」を開く
@@ -51,7 +52,6 @@ export function EstimateEditor({
   const insurer = jobInsurer(job);
   const [picker, setPicker] = useState<Picker | null>(null);
   const [fixPrices, setFixPrices] = useState(false);
-  const [shinsei, setShinsei] = useState(false); // 申請書の丸で囲む項目を選ぶ画面
 
   const setJob = (fn: (j: Job) => Job) => update('jobs', (list) => list.map((j) => (j.id === job.id ? {...fn(j), updatedAt: Date.now()} : j)));
   const setPlace = (placeId: string, fn: (p: Place) => Place) =>
@@ -96,21 +96,12 @@ export function EstimateEditor({
   const removeJob = () => {
     if (removeEstimate(job, name, update, toast)) onBack();
   };
-  // 申請書（保険者の Excel の原本）に、氏名・住所・被保険者番号・改修の内容を転記し、選んだ性別などを丸で囲んで保存する
-  const makeShinsei = () => {
-    if (!insurer) return;
-    setShinsei(false);
-    void saveShinsei(job, insurer, s).then(
-      (fileName) => toast(`「${fileName}」を保存しました`),
-      () => toast('申請書を作れませんでした', 'error'),
-    );
-  };
   // 白紙に戻す：見積書に打ち込んだ内容（お客様名・被保険者番号・工事場所・明細・諸経費）と発注書で直したところを消す。
   // いきなり消えると困るので確かめてから（消したあとも Ctrl+Z で戻せる）。保険者（書式）・担当・請求書に入れるかは残す
   const blank = !job.customer.trim() && !job.insuredNo.trim() && !job.address.trim() && job.places.length === 0 && job.overhead === null && job.overheadTarget === null;
   const clearSheet = () => {
     if (!confirm('見積書を白紙に戻しますか？\n打ち込んだ内容（お客様名・工事場所・明細など）がすべて消えます。')) return;
-    setJob((j) => ({...j, insurer: jobInsurer(j), form: jobForm(j, s), customer: '', insuredNo: '', address: '', places: [], overhead: null, overheadTarget: null, order: null, shinseiMarks: {...NO_MARKS}}));
+    setJob((j) => ({...j, insurer: jobInsurer(j), form: jobForm(j, s), customer: '', insuredNo: '', address: '', places: [], overhead: null, overheadTarget: null, order: null, shinsei: {...NO_SHINSEI}}));
     toast('白紙に戻しました');
   };
   const duplicate = () => onOpen(duplicateEstimate(job, update, toast).id);
@@ -150,7 +141,7 @@ export function EstimateEditor({
             📗 Excelで保存
           </Btn>
           {canMakeShinsei(insurer) && (
-            <Btn color="white" onClick={() => setShinsei(true)}>
+            <Btn color="white" onClick={onOpenShinsei}>
               📝 申請書を作成
             </Btn>
           )}
@@ -279,15 +270,6 @@ export function EstimateEditor({
         onPrint={() => onPrint({kind: 'estimate', jobId: job.id})}
       />
 
-      {shinsei && insurer && (
-        <ShinseiDialog
-          insurer={insurer}
-          marks={job.shinseiMarks}
-          onChange={(shinseiMarks) => setJob((j) => ({...j, shinseiMarks}))}
-          onMake={makeShinsei}
-          onClose={() => setShinsei(false)}
-        />
-      )}
       {fixPrices && <ShikiriPriceDialog job={job} materials={data.materials} setJob={setJob} update={update} onClose={() => setFixPrices(false)} />}
       {picker && pickPlace && picker.kind === 'material' && (
         <MaterialPicker

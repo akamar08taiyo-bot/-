@@ -2,13 +2,15 @@
 // 太陽ポータルの2つの入口（jutaku-mitsumori/・sasaoka/）は同じアプリで、最初に開くタブ（start）だけが違う。
 //   見積もりを作成する：「新規作成」か「一覧から作成」（作った月ごとの一覧）を選び、いただいた見積書
 //                       （苅田町・行橋市・みやこ町用「工事費見積書兼工事費内訳書」・広域連合用「住宅改修内訳明細書」）の形のまま打ち込む。
-//                       打ち込んだ内容は、そのまま笹岡工務店の仕切り計算表・請求書に入る（入れない見積書は外せる）
+//                       打ち込んだ内容は、そのまま笹岡工務店の仕切り計算表・請求書に入る（入れない見積書は外せる）。
+//                       申請書（保険者の Excel）は、見積書から作っても、申請書の画面から先に入れて見積書を作ってもよい
 //   請求書を確認する：請求する月ごとの様邸（仕切り計算表）と、1か月分の御請求書
 //   部材・施工費マスタ：部材リスト（メーカーの仕切価格・定価）と、施工費（笹岡工務店の取付手間の単価）と、
 //                       部材＋施工費（常用）のセット（よく使う部材と施工費の組み合わせ）
 //   設定
 
 import {useEffect, useMemo, useState} from 'react';
+import {isBlankRow} from './calc.ts';
 import {JobEditor} from './components/JobEditor.tsx';
 import {JobsPage} from './components/JobsPage.tsx';
 import {KitsPage} from './components/KitsPage.tsx';
@@ -20,15 +22,17 @@ import {LABOR_REV} from './defaults.ts';
 import {EstimateEditor} from './estimate/EstimateEditor.tsx';
 import {EstimateHome, EstimateList, newEstimate} from './estimate/EstimateList.tsx';
 import {OrderPage} from './estimate/OrderPage.tsx';
+import {ShinseiEditor} from './estimate/ShinseiEditor.tsx';
+import {hasShinseiInfo} from './estimateForms.ts';
 import {APP_TITLE, PORTAL_URL, readHash, writeHash} from './links.ts';
-import type {MainTab} from './links.ts';
+import type {JobView, MainTab} from './links.ts';
 import {PrintView} from './print/PrintView.tsx';
 import type {PrintRequest} from './print/PrintView.tsx';
 import {EXAMPLE_KIT_ID, exampleKit} from './samples.ts';
 import type {Insurer, Job, Row} from './types.ts';
 import {useNewVersion} from './update.ts';
 import {useStore} from './useStore.ts';
-import {thisMonth} from './util.ts';
+import {thisMonth, todayIso} from './util.ts';
 
 const TABS: {id: MainTab; label: string}[] = [
   {id: 'estimate', label: '📝 見積もりを作成する'},
@@ -59,8 +63,8 @@ function loadMonth(): string {
   return thisMonth();
 }
 
-/** 何も入れていない見積書・様邸（作ってすぐ戻ったもの。残さない） */
-const isEmpty = (j: Job) => !j.customer.trim() && !j.staff && j.places.length === 0 && !j.address && !j.insuredNo && !j.date && !j.note;
+/** 何も入れていない見積書・様邸・申請書（作ってすぐ戻ったもの。残さない） */
+const isEmpty = (j: Job) => !j.customer.trim() && !j.staff && j.places.length === 0 && !j.address && !j.insuredNo && !j.date && !j.note && !hasShinseiInfo(j.shinsei);
 
 export default function App({start}: {start: MainTab}) {
   const store = useStore();
@@ -73,8 +77,8 @@ export default function App({start}: {start: MainTab}) {
   // 見積もりを作成する：最初の画面（新規作成・一覧から作成）か、月ごとの一覧か
   // URL から見積書を開いたとき（読み直したとき）は、戻ると一覧
   const [estimateView, setEstimateView] = useState<'home' | 'list'>(estimateId ? 'list' : 'home');
-  // 見積書から開いた発注書（見積書を閉じると閉じる）
-  const [orderOpen, setOrderOpen] = useState(!!estimateId && initial.order);
+  // 見積書の画面か、そこから開いた発注書・申請書か（見積書を閉じると見積書の画面にもどる）
+  const [jobView, setJobView] = useState<JobView>(estimateId ? initial.view : 'estimate');
   const [estimateMonth, setEstimateMonth] = useState(thisMonth);
   const [month, setMonth] = useState(loadMonth); // 請求書を確認する：請求する月
   const [masterTab, setMasterTab] = useState<MasterTab>('materials');
@@ -98,11 +102,11 @@ export default function App({start}: {start: MainTab}) {
     if (invoiceJob) setMonth(invoiceJob.month);
   }, [invoiceJob?.id]);
   useEffect(() => {
-    if (loaded) writeHash(tab, tab === 'estimate' ? (estimateJob?.id ?? null) : tab === 'invoice' ? (invoiceJob?.id ?? null) : null, tab === 'estimate' && orderOpen);
-  }, [loaded, tab, estimateJob?.id, invoiceJob?.id, orderOpen]);
-  // 別の見積書を開いた・見積書を閉じたら、発注書も閉じる
+    if (loaded) writeHash(tab, tab === 'estimate' ? (estimateJob?.id ?? null) : tab === 'invoice' ? (invoiceJob?.id ?? null) : null, tab === 'estimate' ? jobView : 'estimate');
+  }, [loaded, tab, estimateJob?.id, invoiceJob?.id, jobView]);
+  // 見積書を閉じたら、発注書・申請書も閉じる
   useEffect(() => {
-    if (loaded && !estimateJob) setOrderOpen(false);
+    if (loaded && !estimateJob) setJobView('estimate');
   }, [loaded, estimateJob?.id]);
   useEffect(() => {
     document.title = APP_TITLE;
@@ -159,7 +163,7 @@ export default function App({start}: {start: MainTab}) {
         removeIfEmpty(estimateJob);
         setEstimateId(null);
         setEstimateView('home');
-        setOrderOpen(false);
+        setJobView('estimate');
       }
       if (t === 'invoice') {
         // 様邸から一覧に戻る（様邸の画面の左上は「← 見積もりへ戻る」なので、一覧へはこのタブで戻る）。請求月を変えていたら、その月の一覧
@@ -174,11 +178,31 @@ export default function App({start}: {start: MainTab}) {
     const j = newEstimate(insurer);
     store.update('jobs', (jobs) => [...jobs, j]);
     setEstimateId(j.id);
+    setJobView('estimate');
+  };
+  // 申請書から作る：申請書の画面を開く。見積書はまだないので、見積もり作成日は空・笹岡工務店の請求書には入れない（見積書を作るときに入れる）
+  const newShinsei = (insurer: Insurer) => {
+    const j = {...newEstimate(insurer), estDate: '', shikiri: false};
+    store.update('jobs', (jobs) => [...jobs, j]);
+    setEstimateId(j.id);
+    setJobView('shinsei');
+  };
+  const openShinsei = (id: string) => {
+    setEstimateId(id);
+    setJobView('shinsei');
+  };
+  // 申請書から見積書へ：見積書をはじめて作るとき（申請書から作った様邸で、見積書の行がまだない）は、見積もり作成日を今日にし、
+  // 新しい見積書と同じく笹岡工務店の請求書に入れる（入れないときは見積書の画面で外す）
+  const shinseiToEstimate = (job: Job) => {
+    if (!job.estDate && job.places.every((p) => p.rows.every(isBlankRow))) {
+      store.update('jobs', (list) => list.map((j) => (j.id === job.id ? {...j, estDate: todayIso(), shikiri: true, month: thisMonth(), updatedAt: Date.now()} : j)));
+    }
+    setJobView('estimate');
   };
   // 見積書と請求書（仕切り計算表）を行き来する（同じ様邸を開く）
   const openEstimate = (id: string) => {
     setEstimateId(id);
-    setOrderOpen(false);
+    setJobView('estimate');
     setTab('estimate');
   };
   const openInvoice = (id: string) => {
@@ -245,8 +269,21 @@ export default function App({start}: {start: MainTab}) {
 
         <main className={`no-print mx-auto min-w-0 px-3 py-4 sm:px-4 ${theme.width}`}>
           {tab === 'estimate' &&
-            (estimateJob && orderOpen ? (
-              <OrderPage key={estimateJob.id} job={estimateJob} data={data} update={store.update} onBack={() => setOrderOpen(false)} onPrint={setPrint} />
+            (estimateJob && jobView === 'order' ? (
+              <OrderPage key={estimateJob.id} job={estimateJob} data={data} update={store.update} onBack={() => setJobView('estimate')} onPrint={setPrint} />
+            ) : estimateJob && jobView === 'shinsei' ? (
+              <ShinseiEditor
+                key={estimateJob.id}
+                job={estimateJob}
+                data={data}
+                update={store.update}
+                onBack={() => {
+                  removeIfEmpty(estimateJob);
+                  setEstimateId(null);
+                  setJobView('estimate');
+                }}
+                onOpenEstimate={() => shinseiToEstimate(estimateJob)}
+              />
             ) : estimateJob ? (
               <EstimateEditor
                 key={estimateJob.id}
@@ -259,7 +296,8 @@ export default function App({start}: {start: MainTab}) {
                 }}
                 onOpen={setEstimateId}
                 onOpenInvoice={openInvoice}
-                onOpenOrder={() => setOrderOpen(true)}
+                onOpenOrder={() => setJobView('order')}
+                onOpenShinsei={() => setJobView('shinsei')}
                 onPrint={setPrint}
                 onSave={store.flush}
                 onManageKits={() => goMaster('kits')}
@@ -269,9 +307,11 @@ export default function App({start}: {start: MainTab}) {
                 data={data}
                 update={store.update}
                 onNew={newOne}
+                onNewShinsei={newShinsei}
                 onCreate={(j) => {
                   store.update('jobs', (jobs) => [...jobs, j]);
                   setEstimateId(j.id);
+                  setJobView('estimate');
                 }}
                 onList={() => setEstimateView('list')}
                 goMaterials={() => goMaster()}
@@ -282,7 +322,11 @@ export default function App({start}: {start: MainTab}) {
                 update={store.update}
                 month={estimateMonth}
                 setMonth={setEstimateMonth}
-                onOpen={setEstimateId}
+                onOpen={(id) => {
+                  setEstimateId(id);
+                  setJobView('estimate');
+                }}
+                onOpenShinsei={openShinsei}
                 onNew={newOne}
                 onPrint={setPrint}
                 goMaterials={() => goMaster()}

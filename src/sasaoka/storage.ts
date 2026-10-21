@@ -7,8 +7,8 @@
 
 import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES, SETTINGS_REV, STAFF_FULL_NAMES} from './defaults.ts';
 import {guessPieceLengthM} from './priceImport.ts';
-import {jobInsurer, MARK_INFO, MARK_KEYS, NO_MARKS} from './estimateForms.ts';
-import type {AppData, EstimateForm, Insurer, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, Rounding, Row, Settings, ShinseiMarks, TaxMode} from './types.ts';
+import {jobInsurer, MARK_INFO, MARK_KEYS, NO_SHINSEI} from './estimateForms.ts';
+import type {AppData, EstimateForm, Insurer, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, Rounding, Row, Settings, ShinseiInfo, TaxMode} from './types.ts';
 import {uid} from './util.ts';
 
 const DB_NAME = 'taiyo-sasaoka-shikiri';
@@ -231,6 +231,7 @@ const cleanPlace = (p: Record<string, unknown>): Place => ({
   kind: KINDS.includes(numv(p.kind, 1)) ? numv(p.kind, 1) : 1,
   photo: Math.max(0, Math.floor(numv(p.photo))),
   // 前の版の「工事名称」（work）は読まない。見積書の改修内容・工事名称は改修の種類から
+  ...(str(p.shinseiText).trim() ? {shinseiText: str(p.shinseiText)} : {}),
 });
 
 const SUFFIXES: NameSuffix[] = ['様邸', '様', ''];
@@ -270,14 +271,21 @@ function cleanOrder(raw: unknown): OrderEdits | null {
   };
 }
 
-/** 申請書で丸をつける項目（選べる値のほかは空にする） */
-function cleanMarks(raw: unknown): ShinseiMarks {
-  const out: ShinseiMarks = {...NO_MARKS};
-  if (!isObj(raw)) return out;
+const SHINSEI_TEXTS = ['kana', 'birthY', 'birthM', 'birthD', 'zip', 'phone', 'owner', 'relation', 'reasonOffice', 'reasonName'] as const;
+const isoDate = (v: unknown) => (/^\d{4}-\d{2}-\d{2}$/.test(str(v)) ? str(v) : '');
+
+/** 申請書の項目。丸で囲む項目は選べる値のほかは空にする。前の版（丸だけを shinseiMarks に持っていた）も読む */
+function cleanShinsei(raw: unknown, legacyMarks: unknown): ShinseiInfo {
+  const src = isObj(raw) ? raw : isObj(legacyMarks) ? legacyMarks : {};
+  const out: ShinseiInfo = {...NO_SHINSEI};
   for (const key of MARK_KEYS) {
-    const v = str(raw[key]);
-    if ((MARK_INFO[key].options as string[]).includes(v)) (out as Record<string, string>)[key] = v;
+    const v = str(src[key]);
+    if ((MARK_INFO[key].options as string[]).includes(v)) (out as Record<string, unknown>)[key] = v;
   }
+  for (const key of SHINSEI_TEXTS) out[key] = str(src[key]);
+  out.start = isoDate(src.start);
+  out.end = isoDate(src.end);
+  out.cost = optNum(src.cost);
   return out;
 }
 
@@ -305,7 +313,7 @@ export function cleanJobs(raw: unknown): Job[] {
       shikiri: j.shikiri !== false, // 見積書作成アプリができる前の様邸は、どれも仕切り計算・請求書アプリで作ったもの
       places: Array.isArray(j.places) ? j.places.filter(isObj).map(cleanPlace) : [],
       order: cleanOrder(j.order),
-      shinseiMarks: cleanMarks(j.shinseiMarks),
+      shinsei: cleanShinsei(j.shinsei, j.shinseiMarks),
       createdAt: numv(j.createdAt, Date.now()),
       updatedAt: numv(j.updatedAt, Date.now()),
     };

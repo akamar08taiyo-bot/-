@@ -2,7 +2,7 @@
 
 import {useState} from 'react';
 import {isBlankRow, shikiriPrice} from '../calc.ts';
-import {NO_MARKS} from '../estimateForms.ts';
+import {NO_SHINSEI} from '../estimateForms.ts';
 import {copyRows, replaceRange, workRange} from '../rows.ts';
 import type {AppData, Job, Material, Place, Row} from '../types.ts';
 import type {Update} from '../useStore.ts';
@@ -22,7 +22,7 @@ export function copyJob(job: Job): Job {
       rows: copyRows(p.rows),
     })),
     insuredNo: '',
-    shinseiMarks: {...NO_MARKS}, // 性別・要介護状態区分などはお客様のことなので、番号と同じく消す
+    shinsei: {...NO_SHINSEI}, // 申請書の項目（フリガナ・生年月日・性別など）はお客様のことなので、番号と同じく消す
     estDate: '', // 見積もり作成日は複製した日（空なら作った日）
     overhead: null,
     overheadTarget: null,

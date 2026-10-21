@@ -62,6 +62,8 @@ export type Place = {
   // ---- 見積書だけに使う
   kind: number; // 改修の種類（1 手すりの取付・2 段差の解消・3 床材の変更・4 扉の取替・5 便器の取替・6 付帯工事）
   photo: number; // 写真番号（0 なら箇所の順番）
+  // ---- 申請書だけに使う
+  shinseiText?: string; // 申請書の改修の内容（「木製L字手すり L=600×850㎜」）を手で書いたとき。空なら見積書の部材から作る
 };
 
 export type NameSuffix = '様邸' | '様' | '';
@@ -124,7 +126,7 @@ export type Job = {
   shikiri: boolean;
   places: Place[];
   order?: OrderEdits | null; // 発注書で手で直したところ（なければ見積書から計算したまま）
-  shinseiMarks?: ShinseiMarks; // 申請書で丸をつける項目（申請書を作るときに選ぶ）
+  shinsei?: ShinseiInfo; // 申請書だけに書く項目（申請書の画面で入れる）
   createdAt: number;
   updatedAt: number;
 };
@@ -135,6 +137,26 @@ export type ShinseiMarks = {
   era: '' | '明治' | '大正' | '昭和'; // 生年月日の元号（苅田町・行橋市）
   care: '' | '要支援1' | '要支援2' | '要介護1' | '要介護2' | '要介護3' | '要介護4' | '要介護5'; // 要介護状態区分（苅田町・行橋市）
   renovated: '' | '有' | '無'; // 現在までの改修状況（みやこ町・広域連合）
+};
+
+/**
+ * 申請書だけに書く項目（申請書の画面で、申請書の順番に入れる）。丸で囲む項目（ShinseiMarks）も入る。
+ * 被保険者氏名・住所・被保険者番号・改修の箇所は、見積書と同じ欄（Job の customer・address・insuredNo・places）
+ */
+export type ShinseiInfo = ShinseiMarks & {
+  kana: string; // フリガナ
+  birthY: string; // 生年月日（元号の年。元号は era）
+  birthM: string;
+  birthD: string;
+  zip: string; // 郵便番号
+  phone: string; // 電話番号
+  owner: string; // 住宅の所有者
+  relation: string; // 住宅の所有者と本人との関係
+  reasonOffice: string; // 住宅改修が必要な理由書の作成者：事業所名（みやこ町・広域連合）
+  reasonName: string; // 理由書の作成者：氏名
+  start: string; // 着工予定日（みやこ町・広域連合は支給申請書の着工日） 'YYYY-MM-DD'
+  end: string; // 完了予定日（みやこ町・広域連合は支給申請書の完成日）
+  cost: number | null; // 改修費用を手で入れたとき（null なら見積書の介護保険対象分の合計）
 };
 
 /**
