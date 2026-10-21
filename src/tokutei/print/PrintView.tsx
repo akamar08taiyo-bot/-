@@ -2,6 +2,7 @@ import {useEffect, useState} from 'react';
 import {customerLabel} from '../sales.ts';
 import type {Sale, Settings} from '../types.ts';
 import {EstimateDoc} from './EstimateDoc.tsx';
+import {saveEstimateXlsx} from './estimateXlsx.ts';
 
 /** A4縦（210mm）を画面の幅に合わせて縮めて見せる（印刷は原寸。tokutei.css の @media print） */
 const A4_WIDTH_PX = (210 / 25.4) * 96;
@@ -39,6 +40,9 @@ export function PrintView({sale, settings, onClose}: {sale: Sale; settings: Sett
         <span className="font-bold">見積書（A4縦）</span>
         <button type="button" onClick={() => window.print()} className="rounded-md bg-sky-500 px-4 py-2 text-sm font-bold text-white shadow hover:bg-sky-600">
           🖨 印刷する
+        </button>
+        <button type="button" onClick={() => saveEstimateXlsx(sale, settings)} className="rounded-md bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-800 shadow hover:bg-emerald-100">
+          📗 Excelで保存
         </button>
         <button type="button" onClick={onClose} className="rounded-md border border-white/40 px-4 py-2 text-sm font-bold text-white hover:bg-white/10">
           閉じる

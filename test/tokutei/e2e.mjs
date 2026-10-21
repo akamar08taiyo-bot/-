@@ -8,6 +8,7 @@ import {createServer} from 'node:http';
 import {mkdirSync, readFileSync} from 'node:fs';
 import {join} from 'node:path';
 import assert from 'node:assert/strict';
+import {strFromU8, unzipSync} from 'fflate';
 
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node22/lib/node_modules/playwright/index.mjs');
 const out = process.argv[2] ?? 'e2e-out';
@@ -99,6 +100,12 @@ try {
   }
   await page.screenshot({path: `${out}/05-estimate.png`});
   await page.locator('.est').screenshot({path: `${out}/05b-estimate-doc.png`});
+  // Excel で保存：印刷と同じ金額（式の値）が入った .xlsx が、PDF と同じ名前で保存される
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('.print-toolbar').getByRole('button', {name: '📗 Excelで保存'}).click()]);
+  assert.equal(download.suggestedFilename(), '御見積書_山田 花子様.xlsx');
+  await download.saveAs(`${out}/estimate.xlsx`);
+  const sheet = strFromU8(unzipSync(readFileSync(`${out}/estimate.xlsx`))['xl/worksheets/sheet1.xml']);
+  for (const v of ['42944', '4295', '38649']) assert.ok(sheet.includes(`<v>${v}</v>`), `Excel に ${v} がない`);
   // 印刷（PDF）は A4縦 1枚に収まる（ページ数は pdfinfo で確かめる）
   await page.emulateMedia({media: 'print'});
   await page.pdf({path: `${out}/estimate.pdf`, preferCSSPageSize: true, printBackground: true});
@@ -149,7 +156,7 @@ try {
   assert.ok(overflow <= 1, `スマホの幅で横にはみ出している（${overflow}px）`);
 
   assert.deepEqual(errors, []);
-  console.log('ok: 取り込み → ★ → 見積もり → 見積書 → 読み直し → スマホの幅');
+  console.log('ok: 取り込み → ★ → 見積もり → 見積書・Excel → 読み直し → スマホの幅');
 } finally {
   await browser.close();
   server.close();

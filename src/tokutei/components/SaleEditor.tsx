@@ -7,6 +7,7 @@ import {blankItem, copySale, customerLabel, itemFromProduct, markUsed, saleWarni
 import type {AppData, BurdenRatio, PayMethod, Sale, SaleItem, SaleStatus, TaxType} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {todayIso, yen} from '../util.ts';
+import {saveEstimateXlsx} from '../print/estimateXlsx.ts';
 import {CategorySelect} from './CategorySelect.tsx';
 import {ProductPicker} from './ProductPicker.tsx';
 import {Btn, NumberInput, OptionalNumberInput, Segmented, Stepper, TextInput, useToast} from './ui.tsx';
@@ -93,6 +94,9 @@ export function SaleEditor({
         <div className="ml-auto flex flex-wrap gap-2">
           <Btn color="sky" onClick={() => onPrint(sale.id)}>
             🖨 見積書を印刷
+          </Btn>
+          <Btn color="excel" onClick={() => saveEstimateXlsx(sale, data.settings)}>
+            📗 Excelで保存
           </Btn>
           <Btn color="white" onClick={duplicate}>
             複製
