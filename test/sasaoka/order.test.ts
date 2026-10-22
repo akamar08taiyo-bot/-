@@ -93,6 +93,20 @@ test('2000mmの品を部材リストから探す（長さだけ違う同じ品�
   assert.equal(findHalfMaterial(materialRow(BD134), 4000, [BD134, other])?.id, 'm132');
 });
 
+test('BD-134（Mオーク 4m）の 2000mm は BD-132（Mオーク 2m）。同じ 2m でも色ちがい（BD-122 クリア）は選ばない（ユーザーの「念のため」、2026-10-22）', () => {
+  // マツ六の品番は BD-1［色］［長さ］（BD-122 クリア 2m・BD-124 クリア 4m・BD-132 Mオーク 2m・BD-134 Mオーク 4m）
+  const oak4 = mat('o4', 'BAUHAUS 35アッシュ丸棒 ディンプル付 Mオーク 4m', 'BD-134', 4);
+  const clear2 = mat('c2', 'BAUHAUS 35アッシュ丸棒 ディンプル付 クリア 2m', 'BD-122', 2);
+  const oak2 = mat('o2', 'BAUHAUS 35アッシュ丸棒 ディンプル付 Mオーク 2m', 'BD-132', 2);
+  assert.equal(findHalfMaterial(materialRow(oak4), 4000, [oak4, clear2, oak2])?.id, 'o2');
+  // 部材リストの品名に色がない（2m の品名が同じ）ときは、品番の見当で BD-132
+  const noColor = (m: Material) => ({...m, name: `35アッシュ丸棒 ディンプル付 ${m.pieceLengthM}m`});
+  assert.equal(findHalfMaterial(materialRow(noColor(oak4)), 4000, [oak4, clear2, oak2].map(noColor))?.id, 'o2');
+  // 品名の頭に品番が付いている書き方でも
+  const coded = (m: Material) => ({...m, name: `${m.code} ${m.name}`});
+  assert.equal(findHalfMaterial(materialRow(coded(oak4)), 4000, [oak4, clear2, oak2].map(coded))?.id, 'o2');
+});
+
 test('見積書の部材を、箇所をまたいで足して発注する数にする（手すりは本・ベースプレートは枚）', () => {
   const j = job(
     ['玄関', [cut(BD134, 60, 2), laborRow({id: 'l1', name: '木', price: 1000, estPrice: null, note: ''}, 2), materialRow(BRACKET, 3)]],
