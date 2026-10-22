@@ -8,9 +8,12 @@ import {
   gridCandidates,
   guessMaker,
   lineCandidates,
+  matchedCount,
+  matchedKeys,
   mergeMaterials,
   normalize,
   parsePrice,
+  sheetsCandidates,
   textToGrid,
   textToLines,
 } from '../priceImport.ts';
@@ -52,6 +55,22 @@ function makerFromFileName(name: string): string {
   return cleaned.length <= 12 && /[^\x00-\x7f]/.test(cleaned) ? cleaned : '';
 }
 
+/** シートごとの取り込める行の数 */
+const sheetCounts = (sheets: Sheet[]) => sheets.map((sh) => gridCandidates(sh.rows, detectMapping(sh.rows), '').filter((c) => c.include).length);
+
+/** すべてのシート（ALL）を最初に選んでおくか：取り込める行のあるシートが2つ以上（矢崎化工の価格表のように、手すりの種類ごとにシートが分かれている） */
+const ALL = -1;
+
+/**
+ * 「定価・仕切価格だけ更新」を最初に選んでおくか：表に仕切価格がなく（定価だけの改定価格表）、部材リストにある商品が載っているとき。
+ * 部材リストにない商品（改定価格表だけに載っている福祉用具など）は入れない（ユーザーの指示「②のみに入っている商品は無視する」）。
+ * 部材リストにある商品が1つもなければ、今までどおり新しい商品として入れる（仕切価格はあとで）
+ */
+const pricesOnlyFirst = (materials: Material[], list: Candidate[]) => {
+  const inc = list.filter((c) => c.include);
+  return inc.length > 0 && inc.every((c) => c.price === null) && matchedCount(materials, inc, {pricesOnly: true}) > 0;
+};
+
 /** 取り込める行がいちばん多いシート */
 function bestSheet(sheets: Sheet[]): number {
   let best = 0;
@@ -81,10 +100,12 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
   const [maker, setMaker] = useState('');
   const [overrides, setOverrides] = useState<Record<string, Override>>({});
   const [query, setQuery] = useState('');
+  const [pricesOnly, setPricesOnly] = useState(false);
+  const allSheets = source?.kind === 'xlsx' && sheetIndex === ALL;
 
   const grid: Grid = useMemo(() => {
     if (!source) return [];
-    if (source.kind === 'xlsx') return source.sheets[sheetIndex]?.rows ?? [];
+    if (source.kind === 'xlsx') return source.sheets[sheetIndex === ALL ? 0 : sheetIndex]?.rows ?? [];
     if (source.kind === 'csv') return source.grid;
     if (source.kind === 'paste') return textToGrid(source.text);
     // PDFは見出しの位置に合わせて列をそろえる（見出しが見つからなければタブで区切る）
@@ -99,8 +120,8 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
   }, [source, grid]);
 
   const start = (next: Source, name: string) => {
-    // Excel は、取り込める行がいちばん多いシートから始める（表紙のシートなどを飛ばす）
-    const firstSheet = next.kind === 'xlsx' ? bestSheet(next.sheets) : 0;
+    // Excel は、取り込める行のあるシートが2つ以上ならすべてのシート、ほかは取り込める行がいちばん多いシートから始める（表紙のシートなどを飛ばす）
+    const firstSheet = next.kind === 'xlsx' ? (sheetCounts(next.sheets).filter((n) => n > 0).length >= 2 ? ALL : bestSheet(next.sheets)) : 0;
     setSource(next);
     setFileName(name);
     setSheetIndex(firstSheet);
@@ -110,7 +131,7 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
     const aligned = next.kind === 'pdf' ? alignToHeader(next.words) : null;
     const g =
       next.kind === 'xlsx'
-        ? next.sheets[firstSheet]?.rows ?? []
+        ? next.sheets[firstSheet === ALL ? 0 : firstSheet]?.rows ?? []
         : next.kind === 'csv'
           ? next.grid
           : next.kind === 'paste'
@@ -121,8 +142,18 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
     setMode(tabular ? 'table' : 'lines');
     setMapping(tabular ? detectMapping(g) : null);
     setNth(1);
-    setListNth(detectListNth(next.kind === 'pdf' ? next.lines : next.kind === 'paste' ? textToLines(next.text) : g.map((r) => r.join('  '))));
-    if (!maker) setMaker(guessMaker([name, ...g.slice(0, 8).map((r) => r.join(' '))]) || makerFromFileName(name));
+    const lns = next.kind === 'pdf' ? next.lines : next.kind === 'paste' ? textToLines(next.text) : g.map((r) => r.join('  '));
+    const ln = detectListNth(lns);
+    setListNth(ln);
+    const mk = maker || guessMaker([name, ...g.slice(0, 8).map((r) => r.join(' '))]) || makerFromFileName(name);
+    if (!maker) setMaker(mk);
+    const first =
+      next.kind === 'xlsx' && firstSheet === ALL
+        ? sheetsCandidates(next.sheets, mk.trim())
+        : tabular
+          ? gridCandidates(g, detectMapping(g), mk.trim())
+          : lineCandidates(lns, 1, mk.trim(), ln);
+    setPricesOnly(pricesOnlyFirst(materials, first));
   };
 
   const readFile = async (f: File) => {
@@ -163,15 +194,20 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
 
   const base: Candidate[] = useMemo(() => {
     if (!source) return [];
+    // すべてのシート：列の割り当てはシートごとに推測（列を変えるときは1つのシートを選ぶ）
+    if (source.kind === 'xlsx' && sheetIndex === ALL) return sheetsCandidates(source.sheets, maker.trim());
     if (mode === 'table' && mapping) return gridCandidates(grid, mapping, maker.trim());
     return lineCandidates(lines, nth, maker.trim(), listNth);
-  }, [source, mode, mapping, grid, lines, nth, listNth, maker]);
+  }, [source, sheetIndex, mode, mapping, grid, lines, nth, listNth, maker]);
 
   const candidates = useMemo(() => base.map((c) => ({...c, ...overrides[c.key]})), [base, overrides]);
   const filtered = useMemo(() => candidates.filter((c) => matchesAll(`${c.name} ${c.code} ${c.maker}`, query)), [candidates, query]);
   const included = candidates.filter((c) => c.include && (c.name || c.code) && (c.price !== null || c.listPrice !== null));
   const favCount = included.filter((c) => c.favorite).length;
   const noShikiri = included.filter((c) => c.price === null).length;
+  // 「定価・仕切価格だけ更新」：部材リストにある商品（ない商品は入れない。一覧では薄く「部材リストにない」）
+  const inList = useMemo(() => (pricesOnly ? matchedKeys(materials, included, {pricesOnly: true}) : new Set<string>()), [pricesOnly, materials, included]);
+  const matched = inList.size;
 
   const setOv = (key: string, patch: Override) => setOverrides((o) => ({...o, [key]: {...o[key], ...patch}}));
   const setMany = (list: Candidate[], patch: Override) =>
@@ -182,11 +218,13 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
     });
 
   const doImport = () => {
-    const r = mergeMaterials(materials, included);
+    const r = mergeMaterials(materials, included, Date.now(), {pricesOnly});
     onDone(r.list);
     toast(
-      `部材リストに取り込みました：新しく ${r.added}件・価格を更新 ${r.updated}件・変わらず ${r.unchanged}件` +
-        (noShikiri > 0 ? `（仕切価格が空欄の ${noShikiri}件は、仕切価格の入った表をあとで取り込むと入ります）` : ''),
+      pricesOnly
+        ? `定価・仕切価格を更新しました：更新 ${r.updated}件・変わらず ${r.unchanged}件（部材リストにない ${r.skipped}件は入れていません）`
+        : `部材リストに取り込みました：新しく ${r.added}件・価格を更新 ${r.updated}件・変わらず ${r.unchanged}件` +
+            (noShikiri > 0 ? `（仕切価格が空欄の ${noShikiri}件は、仕切価格の入った表をあとで取り込むと入ります）` : ''),
     );
     onClose();
   };
@@ -227,15 +265,27 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
       footer={
         source ? (
           <>
-            <span className="mr-auto text-sm text-slate-600">
-              取り込む <b className="text-slate-900">{included.length}</b>件（うち★ {favCount}件{noShikiri > 0 ? `・仕切価格が空欄 ${noShikiri}件` : ''}）／ 読み取った {candidates.length}件
-            </span>
+            {pricesOnly ? (
+              <span className="mr-auto text-sm text-slate-600">
+                定価・仕切価格を更新 <b className="text-slate-900">{matched}</b>件（部材リストにない {included.length - matched}件は入れません）／ 読み取った {candidates.length}件
+              </span>
+            ) : (
+              <span className="mr-auto text-sm text-slate-600">
+                取り込む <b className="text-slate-900">{included.length}</b>件（うち★ {favCount}件{noShikiri > 0 ? `・仕切価格が空欄 ${noShikiri}件` : ''}）／ 読み取った {candidates.length}件
+              </span>
+            )}
             <Btn color="white" onClick={() => setSource(null)}>
               別のファイルにする
             </Btn>
-            <Btn color="purple" disabled={included.length === 0} onClick={doImport}>
-              部材リストに取り込む（{included.length}件）
-            </Btn>
+            {pricesOnly ? (
+              <Btn color="purple" disabled={matched === 0} onClick={doImport}>
+                定価・仕切価格を更新（{matched}件）
+              </Btn>
+            ) : (
+              <Btn color="purple" disabled={included.length === 0} onClick={doImport}>
+                部材リストに取り込む（{included.length}件）
+              </Btn>
+            )}
           </>
         ) : undefined
       }
@@ -300,10 +350,12 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
                     const i = Number(e.target.value);
                     setSheetIndex(i);
                     setOverrides({});
-                    setMapping(detectMapping(source.sheets[i]?.rows ?? []));
+                    setMapping(detectMapping(source.sheets[i === ALL ? 0 : i]?.rows ?? []));
+                    if (i === ALL) setMode('table');
                   }}
                   className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
                 >
+                  <option value={ALL}>すべてのシート（{source.sheets.length}シート）</option>
                   {source.sheets.map((s, i) => (
                     <option key={i} value={i}>
                       {s.name}（{s.rows.length}行）
@@ -316,33 +368,39 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
               メーカー名（表にメーカーの列がないとき）
               <TextInput value={maker} onChange={setMaker} placeholder="例：マツ六" className="w-48 font-normal" />
             </label>
-            <div className="grid gap-1 text-xs font-bold text-slate-600">
-              読み取り方
-              <div className="flex rounded-lg border border-slate-300 bg-white p-0.5">
-                {(
-                  [
-                    ['table', '表の列で読む'],
-                    ['lines', '1行ずつ読む'],
-                  ] as const
-                ).map(([id, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => {
-                      setMode(id);
-                      setOverrides({});
-                      if (id === 'table' && !mapping) setMapping(detectMapping(grid));
-                    }}
-                    className={`rounded-md px-3 py-1.5 text-sm font-bold ${mode === id ? 'bg-purple-600 text-white' : 'text-slate-600 hover:bg-purple-50'}`}
-                  >
-                    {label}
-                  </button>
-                ))}
+            {!allSheets && (
+              <div className="grid gap-1 text-xs font-bold text-slate-600">
+                読み取り方
+                <div className="flex rounded-lg border border-slate-300 bg-white p-0.5">
+                  {(
+                    [
+                      ['table', '表の列で読む'],
+                      ['lines', '1行ずつ読む'],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => {
+                        setMode(id);
+                        setOverrides({});
+                        if (id === 'table' && !mapping) setMapping(detectMapping(grid));
+                      }}
+                      className={`rounded-md px-3 py-1.5 text-sm font-bold ${mode === id ? 'bg-purple-600 text-white' : 'text-slate-600 hover:bg-purple-50'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+            <label className="flex items-center gap-2 self-center text-sm font-bold text-slate-700">
+              <input type="checkbox" checked={pricesOnly} onChange={(e) => setPricesOnly(e.target.checked)} />
+              定価・仕切価格だけ更新（部材リストにない商品は入れない）
+            </label>
           </div>
 
-          {mode === 'table' && mapping ? (
+          {allSheets ? null : mode === 'table' && mapping ? (
             <div className="flex flex-wrap items-end gap-3">
               <label className="grid gap-1 text-xs font-bold text-slate-600">
                 見出しの行
@@ -426,15 +484,21 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
                 </thead>
                 <tbody>
                   {filtered.slice(0, PREVIEW_LIMIT).map((c) => (
-                    <tr key={c.key} className={`border-t border-slate-100 ${c.include ? '' : 'bg-slate-50 text-slate-400'}`}>
+                    <tr key={c.key} className={`border-t border-slate-100 ${c.include && (!pricesOnly || inList.has(c.key)) ? '' : 'bg-slate-50 text-slate-400'}`}>
                       <td className="px-2 text-center">
                         <input type="checkbox" checked={c.include} onChange={(e) => setOv(c.key, {include: e.target.checked})} aria-label={`${c.name}を取り込む`} />
                       </td>
                       <td className="px-1 text-center">
                         <Star on={c.favorite} onClick={() => setOv(c.key, {favorite: !c.favorite, include: true})} label={`${c.name}を★に`} />
                       </td>
-                      <td className="px-2 text-right text-xs tabular-nums">{c.row}</td>
-                      <td className="px-2 text-xs">{c.code}</td>
+                      <td className="px-2 text-right text-xs tabular-nums">
+                        {c.sheet && <div className="whitespace-nowrap text-[10px] text-slate-400">{c.sheet}</div>}
+                        {c.row}
+                      </td>
+                      <td className="px-2 text-xs">
+                        {c.code}
+                        {pricesOnly && c.include && !inList.has(c.key) && <div className="text-[10px] text-slate-400">部材リストにない</div>}
+                      </td>
                       <td className="px-2 py-1">
                         <TextInput value={c.name} onChange={(name) => setOv(c.key, {name})} className="w-full min-w-[16rem]" />
                         {c.pieceLengthM > 0 && <div className="px-1 text-[11px] text-slate-500">1本の長さ {num(c.pieceLengthM)}m</div>}

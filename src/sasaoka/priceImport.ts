@@ -138,8 +138,14 @@ const isSpecCode = (w: string) => isCode(w) || /^\d+[a-z]{2,}\d[a-z\d]*$/i.test(
  */
 export type Mapping = {header: number; name: number; price: number; code: number; maker: number; unit: number; list: number; spec: number; len: number; rate: number};
 
+/**
+ * 見出しの言葉を比べるための文字：空白・改行を除く。セルの中で改行した見出し（矢崎化工の価格表の「販売⏎価格」「ｶﾞｲﾄﾞ⏎価格」）や、
+ * 字の間をあけた見出し（「定　価」）も、続けて書いた見出しと同じに読む
+ */
+const compact = (cell: string) => normalize(cell).toLowerCase().replace(/ /g, '');
+
 const keyScore = (cell: string, keys: [string, number][]) => {
-  const c = normalize(cell).toLowerCase();
+  const c = compact(cell);
   let best = 0;
   for (const [k, w] of keys) if (c.includes(k)) best = Math.max(best, w);
   return best;
@@ -169,9 +175,11 @@ const LIST_KEYS = ['定価', '希望小売', '標準価格', '上代', 'ガイ�
 const SPEC_KEYS = ['色', 'カラー', '規格', '仕様', 'サイズ'];
 const LEN_KEYS = ['1本の長さ', '長さ', '全長'];
 // 仕切り価格らしい見出しほど高い点（「定価」と「仕切」が両方あれば仕切を選ぶ）。「掛率」「UP率」など「率」の列は価格にしない。
-// 定価の見出し（「希望小売価格」「ガイド価格」（矢崎化工）など）の列は、仕切価格にしない
+// 定価の見出し（「希望小売価格」「ガイド価格」（矢崎化工）など）の列は、仕切価格にしない。
+// 矢崎化工の価格表（Excel）は「販売価格」（当社へ売る値＝仕入）と「ガイド価格」（定価）の2つ
 const PRICE_KEYS: [string, number][] = [
   ['仕切', 10],
+  ['販売価格', 9],
   ['納価', 9],
   ['納入', 9],
   ['売価', 9],
@@ -191,7 +199,7 @@ const PRICE_KEYS: [string, number][] = [
 ];
 
 const has = (cell: string, keys: string[]) => {
-  const c = normalize(cell).toLowerCase();
+  const c = compact(cell);
   return keys.some((k) => c.includes(k));
 };
 const priceScore = (cell: string) => (normalize(cell).includes('率') ? 0 : keyScore(cell, PRICE_KEYS));
@@ -205,7 +213,7 @@ export function columnCount(grid: Grid): number {
 
 /** 見出しの続きの行に入る言葉（定価・単価・掛率 など） */
 const SUB_WORDS = /定価|単価|価格|売価|仕切|納価|掛|率|税|入数|単位|数量|金額|上代|下代|ネット|net/i;
-const hasRole = (s: string) => keyScore(s, PRICE_KEYS) > 0 || has(s, LIST_KEYS) || RATE_HEADER.test(normalize(s));
+const hasRole = (s: string) => keyScore(s, PRICE_KEYS) > 0 || has(s, LIST_KEYS) || RATE_HEADER.test(compact(s));
 
 /**
  * 見出しが2行に分かれた表の、下の行（マツ六の価格改定一覧：「現行価格」「価格改定価格」の下に「定価・単価・掛率」）。
@@ -280,7 +288,7 @@ export function detectMapping(grid: Grid): Mapping {
       const cs = keyScore(cell, CODE_KEYS);
       const ns = keyScore(cell, NAME_KEYS);
       // 掛率の列は価格にしない（仕切価格の欄がない行は 定価×掛率）。右の組（改定後）ほど新しい
-      if (RATE_HEADER.test(t)) {
+      if (RATE_HEADER.test(compact(t))) {
         rate = c;
         return;
       }
@@ -467,6 +475,7 @@ export type Candidate = {
   pieceLengthM: number; // 表の「1本の長さ」（m）。なければ 0（商品名から読む）
   include: boolean; // 取り込む
   favorite: boolean; // ★お気に入り
+  sheet?: string; // すべてのシートを一度に読んだときの、元のシートの名前
 };
 
 /** 単位・入数の欄：「1個」「1本」は「個」「本」、数字だけ（入数「1」）なら空欄。「10枚」のように2つ以上入りのものはそのまま */
@@ -488,13 +497,36 @@ export function codeLengthM(code: string, name: string, unit: string): number {
   return mm >= 1000 && mm <= 4000 && mm % 100 === 0 ? mm / 1000 : 0;
 }
 
-const looksLikeHeader = (text: string) => NAME_KEYS.some(([k]) => k === text) || CODE_KEYS.some(([k]) => k === text.toLowerCase());
+const looksLikeHeader = (text: string) => NAME_KEYS.some(([k]) => k === compact(text)) || CODE_KEYS.some(([k]) => k === compact(text));
+
+/** 色の記号（矢崎化工の「LBR」「W」「SGD」「W2」など。英大文字で始まる5字までの英数字） */
+const COLOR_CODE = /^[A-Z][A-Z0-9]{0,4}$/;
+
+/**
+ * 色の列（見出しが「色」「カラー」）に色の記号が入っているか（半分以上の行）。入っていれば、品番のうしろに色の記号を付けたものが注文に使う品番。
+ * 矢崎化工の価格表（Excel）は品番「HD5-4000 T」と色「LBR」が別の列で、改定価格表（PDF）の品番は「HD5-4000 T LBR」
+ * （品番だけでは色違いの3つが同じ品番になり、PDF の品番と合わない）
+ */
+export function specIsColorCode(grid: Grid, m: Mapping): boolean {
+  if (m.spec < 0 || m.code < 0 || m.spec === m.code) return false;
+  if (!/色|カラー/.test(compact(headerLabels(grid, m.header)[m.spec] ?? ''))) return false;
+  let filled = 0;
+  let coded = 0;
+  for (let r = m.header + 1; r < grid.length; r++) {
+    const v = normalize(grid[r]?.[m.spec]);
+    if (!v) continue;
+    filled++;
+    if (COLOR_CODE.test(v)) coded++;
+  }
+  return filled > 0 && coded >= filled * 0.5;
+}
 
 export function gridCandidates(grid: Grid, m: Mapping, defaultMaker: string): Candidate[] {
   const out: Candidate[] = [];
   const cell = (row: string[], c: number) => (c >= 0 ? normalize(row[c]) : '');
   const split = codeHasSpec(grid, m);
   const fromSpec = specHasCode(grid, m);
+  const colorCode = specIsColorCode(grid, m);
   const labels = headerLabels(grid, m.header);
   const body = m.header + (subHeaderOf(grid, m.header) ? 2 : 1); // 見出しが2行なら、その下から
   grid.forEach((row, r) => {
@@ -513,6 +545,8 @@ export function gridCandidates(grid: Grid, m: Mapping, defaultMaker: string): Ca
       code = first;
       spec = rest.join(' ');
     }
+    // 「HD5-4000 T」＋色「LBR」→ 品番 HD5-4000 T LBR（色の記号は商品名のうしろにも残す）
+    if (colorCode && code && COLOR_CODE.test(spec) && !code.endsWith(` ${spec}`)) code = `${code} ${spec}`;
     const base = cell(row, m.name);
     const full = base && spec && !base.includes(spec) ? `${base} ${spec}` : base;
     // 商品名のうしろに品番がくり返されていれば外す（矢崎化工「たちあっぷ サムリング CKM-02 SET GR」）
@@ -543,6 +577,24 @@ export function gridCandidates(grid: Grid, m: Mapping, defaultMaker: string): Ca
       include: valid,
       favorite: false,
     });
+  });
+  return out;
+}
+
+/**
+ * すべてのシートを一度に読む（矢崎化工の価格表のように、手すりの種類ごとにシートが分かれている Excel）。
+ * 列の割り当てはシートごとに推測する。同じ品番・商品名の行がいくつかのシートにあれば（φ35・φ32 の両方に載っている取付ベースなど）、はじめの1つだけ
+ */
+export function sheetsCandidates(sheets: {name: string; rows: Grid}[], defaultMaker: string): Candidate[] {
+  const out: Candidate[] = [];
+  const seen = new Set<string>();
+  sheets.forEach((sh, i) => {
+    for (const c of gridCandidates(sh.rows, detectMapping(sh.rows), defaultMaker)) {
+      const k = [c.maker, c.code, c.name].map(compact).join('|'); // 空白の違い（「ベース(90幅)」「ベース (90幅)」）は同じ商品
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push({...c, key: `s${i}${c.key}`, sheet: sh.name});
+    }
   });
   return out;
 }
@@ -713,29 +765,37 @@ const norm = (s: string) => normalize(s).toLowerCase();
 const codeKey = (maker: string, code: string) => `${norm(maker)}|${norm(code)}`;
 const nameKey = (maker: string, name: string) => `${norm(maker)}|${norm(name)}`;
 
-export type MergeResult = {list: Material[]; added: number; updated: number; unchanged: number};
+export type MergeResult = {list: Material[]; added: number; updated: number; unchanged: number; skipped: number};
 
 /**
- * 同じメーカーで品番（品番がなければ商品名）が同じものは、新しい価格に書き換える（★はそのまま残す）。
- * 新しい仕切り表に差し替えるときも、★を付け直さなくてよい。
- * 同じ品番で寸法・色の違う商品（「P-30V I-40」「P-30V I-60」など、品番等の先頭が同じもの）は、商品名で分けて別々に残す。
- * 仕切価格・定価は、表に金額があるときだけ書き換える（空欄なら今の金額のまま）。
- * 商品名のない行（仕切価格だけの表）は、同じ品番の部材が1つだけあるときに仕切価格を入れる。
+ * 取り込み方。pricesOnly＝部材リストにある商品の定価・仕切価格だけを書き換え、部材リストにない商品は入れない
+ * （ユーザーの指示「①をベースにする。②のみに入っている商品は無視する。定価と仕入れだけ取り込めるようにする」：
+ * 矢崎化工の価格表（Excel）で部材リストを作ったあとの、改定価格表（PDF。福祉用具・施設向けの商品も載っている）の取り込み）
  */
-export function mergeMaterials(existing: Material[], incoming: Candidate[], now = Date.now()): MergeResult {
-  const list = existing.map((m) => ({...m}));
+export type MergeOptions = {pricesOnly?: boolean};
+
+const okCandidate = (c: Candidate) => c.include && (c.name !== '' || c.code !== '') && (c.price !== null || c.listPrice !== null);
+
+/**
+ * 取り込む行に合う部材を探す。同じメーカーで品番（品番がなければ商品名）が同じもの。
+ * 前の版で色の記号を付けずに取り込んだ部材（品番「HD5-4000 T」・商品名「… LBR」）は、品番の先頭と商品名が同じなら同じ部材。
+ * pricesOnly のときは、メーカー名が違っても（取り込むときのメーカー名の入れ方の違い）品番が部材リストに1つだけならその部材
+ */
+function materialFinder(list: Material[], incoming: Candidate[], loose: boolean) {
   const byCode = new Map<string, number[]>(); // 同じ品番の部材（寸法・色違いで2つ以上のこともある）
   const byName = new Map<string, number>(); // 品番のない部材
+  const anyMaker = new Map<string, number[]>(); // メーカーを問わない品番
   const remember = (m: Material, i: number) => {
-    if (m.code) byCode.set(codeKey(m.maker, m.code), [...(byCode.get(codeKey(m.maker, m.code)) ?? []), i]);
-    else byName.set(nameKey(m.maker, m.name), i);
+    if (m.code) {
+      byCode.set(codeKey(m.maker, m.code), [...(byCode.get(codeKey(m.maker, m.code)) ?? []), i]);
+      anyMaker.set(norm(m.code), [...(anyMaker.get(norm(m.code)) ?? []), i]);
+    } else byName.set(nameKey(m.maker, m.name), i);
   };
   list.forEach(remember);
-  const ok = (c: Candidate) => c.include && (c.name !== '' || c.code !== '') && (c.price !== null || c.listPrice !== null);
   // 取り込む表の中で、同じ品番に商品名がいくつあるか（2つ以上なら寸法・色違いの別の商品）
   const names = new Map<string, Set<string>>();
   for (const c of incoming) {
-    if (!ok(c) || !c.code || !c.name) continue;
+    if (!okCandidate(c) || !c.code || !c.name) continue;
     const k = codeKey(c.maker, c.code);
     names.set(k, (names.get(k) ?? new Set()).add(norm(c.name)));
   }
@@ -746,25 +806,76 @@ export function mergeMaterials(existing: Material[], incoming: Candidate[], now 
     const exact = same.find((i) => norm(list[i].name) === norm(c.name));
     if (exact !== undefined) return exact;
     // 商品名だけ変わった（同じ品番の部材が1つだけで、表の中でもその品番は1種類）なら、その部材を書き換える
-    return same.length === 1 && (names.get(codeKey(c.maker, c.code))?.size ?? 0) <= 1 ? same[0] : undefined;
+    if (same.length === 1 && (names.get(codeKey(c.maker, c.code))?.size ?? 0) <= 1) return same[0];
+    if (same.length > 0) return undefined;
+    // 色の記号を付けずに取り込んだ前の部材（品番の先頭が同じで、商品名が同じ）
+    const at = c.code.lastIndexOf(' ');
+    if (at > 0) {
+      const old = (byCode.get(codeKey(c.maker, c.code.slice(0, at))) ?? []).find((i) => norm(list[i].name) === norm(c.name));
+      if (old !== undefined) return old;
+    }
+    if (loose) {
+      const other = anyMaker.get(norm(c.code)) ?? [];
+      if (other.length === 1) return other[0];
+    }
+    return undefined;
   };
+  return {find, remember};
+}
+
+/** 部材リストにある商品（取り込むと書き換える行）の key。pricesOnly を最初に選んでおくか決めるのと、件数・ない商品の表示に使う */
+export function matchedKeys(existing: Material[], incoming: Candidate[], opts: MergeOptions = {}): Set<string> {
+  const {find} = materialFinder(existing, incoming, !!opts.pricesOnly);
+  return new Set(incoming.filter((c) => okCandidate(c) && find(c) !== undefined).map((c) => c.key));
+}
+
+export const matchedCount = (existing: Material[], incoming: Candidate[], opts: MergeOptions = {}) => matchedKeys(existing, incoming, opts).size;
+
+/**
+ * 同じメーカーで品番（品番がなければ商品名）が同じものは、新しい価格に書き換える（★はそのまま残す）。
+ * 新しい仕切り表に差し替えるときも、★を付け直さなくてよい。
+ * 同じ品番で寸法・色の違う商品（「P-30V I-40」「P-30V I-60」など、品番等の先頭が同じもの）は、商品名で分けて別々に残す。
+ * 仕切価格・定価は、表に金額があるときだけ書き換える（空欄なら今の金額のまま）。
+ * 商品名のない行（仕切価格だけの表）は、同じ品番の部材が1つだけあるときに仕切価格を入れる。
+ * pricesOnly のときは、部材リストにある商品の仕切価格・定価だけを書き換え（商品名・単位・長さ・品番はそのまま）、ない商品は数えるだけ（skipped）
+ */
+export function mergeMaterials(existing: Material[], incoming: Candidate[], now = Date.now(), opts: MergeOptions = {}): MergeResult {
+  const list = existing.map((m) => ({...m}));
+  const {find, remember} = materialFinder(list, incoming, !!opts.pricesOnly);
   let added = 0;
   let updated = 0;
   let unchanged = 0;
+  let skipped = 0;
   for (const c of incoming) {
-    if (!ok(c)) continue;
+    if (!okCandidate(c)) continue;
     const at = find(c);
-    if (at !== undefined) {
+    if (at !== undefined && opts.pricesOnly) {
+      const m = list[at];
+      const price = c.price ?? m.price;
+      const listPrice = c.listPrice ?? m.listPrice;
+      const changed = m.price !== price || m.listPrice !== listPrice;
+      list[at] = {...m, price, listPrice, updatedAt: changed ? now : m.updatedAt};
+      if (changed) updated++;
+      else unchanged++;
+    } else if (at !== undefined) {
       const m = list[at];
       const price = c.price ?? m.price;
       const listPrice = c.listPrice ?? m.listPrice;
       const name = c.name || m.name;
       const pieceLengthM = c.pieceLengthM || m.pieceLengthM || guessPieceLengthM(name);
+      // 色の記号を付けずに取り込んだ前の部材は、品番を色の記号つきに直す
+      const code = c.code && norm(c.code).startsWith(`${norm(m.code)} `) ? c.code : m.code;
       const changed =
-        m.price !== price || m.listPrice !== listPrice || m.name !== name || m.pieceLengthM !== pieceLengthM || (c.unit !== '' && m.unit !== c.unit);
+        m.price !== price ||
+        m.listPrice !== listPrice ||
+        m.name !== name ||
+        m.code !== code ||
+        m.pieceLengthM !== pieceLengthM ||
+        (c.unit !== '' && m.unit !== c.unit);
       list[at] = {
         ...m,
         name,
+        code,
         price,
         listPrice,
         pieceLengthM,
@@ -774,6 +885,8 @@ export function mergeMaterials(existing: Material[], incoming: Candidate[], now 
       };
       if (changed) updated++;
       else unchanged++;
+    } else if (opts.pricesOnly) {
+      skipped++; // 部材リストにない商品（改定価格表だけに載っている福祉用具など）は入れない
     } else {
       if (!c.name) continue; // 仕切価格だけの行で、部材リストにない（または同じ品番が2つ以上ある）品番
       const m: Material = {
@@ -793,5 +906,5 @@ export function mergeMaterials(existing: Material[], incoming: Candidate[], now 
       added++;
     }
   }
-  return {list, added, updated, unchanged};
+  return {list, added, updated, unchanged, skipped};
 }

@@ -14,12 +14,15 @@ import {
   gridCandidates,
   headerLabels,
   lineCandidates,
+  matchedCount,
   mergeMaterials,
   parseDelimited,
   parseLengthM,
   parsePrice,
   parseRate,
+  sheetsCandidates,
   specHasCode,
+  specIsColorCode,
   splitLine,
   subHeaderOf,
   textToGrid,
@@ -554,4 +557,134 @@ test('取り込む商品名の「手摺」「手摺り」は「手すり」に�
   ];
   assert.deepEqual(gridCandidates(grid, detectMapping(grid), '').map((c) => c.name), ['木製手すり 4m', '安寿框手すり']);
   assert.deepEqual(lineCandidates(['TS-03 手摺ブラケット 1,500'], 1, 'マツ六').map((c) => [c.code, c.name, c.price]), [['TS-03', '手すりブラケット', 1500]]);
+});
+
+// ---------------------------------------------------------------- 矢崎化工の価格表（Excel）をもとに、改定価格表（PDF）は定価・仕切価格だけ
+// ユーザーの指示（2026-10-22）「①（Excel）をベースにする。②（PDF）のみに入っている商品は無視する。定価と仕入れだけ取り込めるようにする。
+// ロジックのみ。リポジトリに仕入れや定価は残さない」。金額はすべて架空の値（お客様・メーカーの本物の価格表の値は使わない）
+
+/** 矢崎化工の価格表（Excel）の形：1行目にシートの題名、2行目に見出し（セルの中で改行した「販売⏎価格」「ｶﾞｲﾄﾞ⏎価格」）、品番と色が別の列 */
+const yazakiSheet = (title: string, rows: string[][]) => [[title, '', '', '', '', '', ''], ['JANコード', '商品名', '品番', '色', '販売\n価格', 'ｶﾞｲﾄﾞ\n価格', '販売\n数量'], ...rows];
+const yazakiSheets = () => [
+  {
+    name: 'φ35屋内手すり',
+    rows: yazakiSheet('35φ屋内手すり', [
+      ['4900000000011', 'φ35 見本パイプ 4m', 'HD5-4000 T', 'LBR', '1000', '2000', '1'],
+      ['4900000000012', 'φ35 見本パイプ 4m', 'HD5-4000 T', 'BR', '1000', '2000', '1'],
+      ['4900000000013', '木製取付ベース(90幅) 2m', 'CZB-2000', 'LBR', '300', '600', '1'],
+    ]),
+  },
+  {
+    name: 'φ32屋内手すり',
+    rows: yazakiSheet('32φ屋内手すり', [
+      ['4900000000021', 'φ32 見本パイプ 2m', 'HBT-2000 T', 'LBR', '700', '1400', '1'],
+      // φ35 のシートにもある共通の部品（商品名の空白だけ違う）
+      ['4900000000013', '木製取付ベース (90幅) 2m', 'CZB-2000', 'LBR', '300', '600', '1'],
+    ]),
+  },
+];
+
+test('矢崎化工の価格表（Excel）：「販売⏎価格」は仕切価格（仕入）、「ｶﾞｲﾄﾞ⏎価格」は定価。品番は色の記号つき', () => {
+  const grid = yazakiSheets()[0].rows;
+  const m = detectMapping(grid);
+  assert.deepEqual([m.header, m.name, m.code, m.spec, m.price, m.list, m.unit], [1, 1, 2, 3, 4, 5, -1]); // JANコード・販売数量は使わない
+  assert.equal(specIsColorCode(grid, m), true);
+  const c = gridCandidates(grid, m, '矢崎化工');
+  assert.deepEqual(
+    c.map((x) => [x.code, x.name, x.price, x.listPrice, x.pieceLengthM]),
+    [
+      ['HD5-4000 T LBR', 'φ35 見本パイプ 4m LBR', 1000, 2000, 4],
+      ['HD5-4000 T BR', 'φ35 見本パイプ 4m BR', 1000, 2000, 4],
+      ['CZB-2000 LBR', '木製取付ベース(90幅) 2m LBR', 300, 600, 2],
+    ],
+  );
+  // 字の間をあけた見出し（「定　価」「仕　切」）も同じに読む
+  const spaced = detectMapping([['品　番', '品　名', '定　価', '仕　切'], ['AB-1', '見本', '200', '100']]);
+  assert.deepEqual([spaced.code, spaced.name, spaced.list, spaced.price], [0, 1, 2, 3]);
+  // 色の列に色の名前（かな）が入っている表は、今までどおり品番に付けない
+  const named = [['品番', '商品名', '色', '定価', '仕切価格'], ['AB-1', '見本', 'ホワイト', '200', '100'], ['AB-2', '見本', 'ブラウン', '200', '100']];
+  assert.equal(specIsColorCode(named, detectMapping(named)), false);
+  assert.deepEqual(gridCandidates(named, detectMapping(named), '').map((x) => x.code), ['AB-1', 'AB-2']);
+});
+
+test('すべてのシートを一度に読む：シートごとに列を推測し、ほかのシートと同じ商品（空白だけ違う商品名）は1つにする', () => {
+  const c = sheetsCandidates(yazakiSheets(), '矢崎化工');
+  assert.deepEqual(
+    c.map((x) => [x.sheet, x.code]),
+    [
+      ['φ35屋内手すり', 'HD5-4000 T LBR'],
+      ['φ35屋内手すり', 'HD5-4000 T BR'],
+      ['φ35屋内手すり', 'CZB-2000 LBR'],
+      ['φ32屋内手すり', 'HBT-2000 T LBR'],
+    ],
+  );
+  assert.equal(new Set(c.map((x) => x.key)).size, c.length); // 行の印はシートをまたいでも重ならない
+  const r = mergeMaterials([], c, 1);
+  assert.deepEqual([r.added, r.list.length], [4, 4]);
+  // Excel の読み取り（xlsx.ts）からも同じ：セルの中の改行は見出しの判定に影響しない
+  const sheetXml = (rows: string[][]) =>
+    `<worksheet><sheetData>${rows.map((row, i) => `<row r="${i + 1}">${row.map((v, j) => `<c r="${String.fromCharCode(65 + j)}${i + 1}" t="inlineStr"><is><t xml:space="preserve">${v}</t></is></c>`).join('')}</row>`).join('')}</sheetData></worksheet>`;
+  const sheets = yazakiSheets();
+  const bytes = zipSync({
+    'xl/workbook.xml': strToU8(`<workbook><sheets>${sheets.map((s, i) => `<sheet name="${s.name}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`),
+    'xl/_rels/workbook.xml.rels': strToU8(`<Relationships>${sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}</Relationships>`),
+    ...Object.fromEntries(sheets.map((s, i) => [`xl/worksheets/sheet${i + 1}.xml`, strToU8(sheetXml(s.rows))])),
+  });
+  assert.deepEqual(
+    sheetsCandidates(readXlsx(bytes), '矢崎化工').map((x) => [x.code, x.price, x.listPrice]),
+    c.map((x) => [x.code, x.price, x.listPrice]),
+  );
+});
+
+test('定価・仕切価格だけ更新：部材リストにある商品の金額だけ書き換え、改定価格表だけに載っている商品は入れない', () => {
+  const base = mergeMaterials([], sheetsCandidates(yazakiSheets(), '矢崎化工'), 1).list;
+  // 改定価格表（PDF）の形：品番は色の記号つき、商品名は別の書き方、定価（改定後のガイド価格）だけ
+  const pdf: string[][] = [
+    ['品番', '品名', '入数', 'ガイド価格', 'ガイド価格', '', 'UP率'],
+    ['HD5-4000 T LBR', 'φ35手すり 見本パイプ', '1', '2000', '2100', '〇', '5%'],
+    ['CZB-2000 LBR', '木製取付ベース', '1', '600', '600', '×', ''],
+    ['CKA-99', 'たちあっぷ見本（福祉用具 貸与向け）', '1', '9000', '9500', '〇', '5%'],
+    ['CWB-9', '見本すのこ（入浴補助用具）', '1', '5000', '5200', '〇', '4%'],
+  ];
+  const c = gridCandidates(pdf, detectMapping(pdf), '矢崎化工');
+  assert.deepEqual(c.map((x) => [x.code, x.price, x.listPrice]), [
+    ['HD5-4000 T LBR', null, 2100],
+    ['CZB-2000 LBR', null, 600],
+    ['CKA-99', null, 9500],
+    ['CWB-9', null, 5200],
+  ]);
+  assert.equal(matchedCount(base, c, {pricesOnly: true}), 2);
+  const r = mergeMaterials(base, c, 2, {pricesOnly: true});
+  assert.deepEqual([r.added, r.updated, r.unchanged, r.skipped, r.list.length], [0, 1, 1, 2, base.length]);
+  const pipe = r.list.find((x) => x.code === 'HD5-4000 T LBR');
+  // 定価だけ変わり、商品名・仕切価格・1本の長さはもとの Excel のまま
+  assert.deepEqual([pipe?.name, pipe?.price, pipe?.listPrice, pipe?.pieceLengthM, pipe?.updatedAt], ['φ35 見本パイプ 4m LBR', 1000, 2100, 4, 2]);
+  assert.equal(r.list.find((x) => x.code === 'CZB-2000 LBR')?.updatedAt, 1);
+  assert.ok(!r.list.some((x) => x.code === 'CKA-99' || x.code === 'CWB-9'));
+  // 今までの取り込み方（pricesOnly なし）なら、改定価格表だけの商品も新しく入る
+  assert.equal(mergeMaterials(base, c, 2).added, 2);
+  // メーカー名の入れ方が違っても（「ヤザキ」）、品番が部材リストに1つだけなら同じ商品
+  const other = c.map((x) => ({...x, maker: 'ヤザキ'}));
+  assert.equal(matchedCount(base, other, {pricesOnly: true}), 2);
+  assert.equal(mergeMaterials(base, other, 3, {pricesOnly: true}).list.find((x) => x.code === 'HD5-4000 T LBR')?.listPrice, 2100);
+  // 仕切価格の入った表なら、仕切価格も書き換える
+  const withCost = mergeMaterials(base, [{...c[0], price: 1050}], 4, {pricesOnly: true}).list.find((x) => x.code === 'HD5-4000 T LBR');
+  assert.deepEqual([withCost?.price, withCost?.listPrice], [1050, 2100]);
+});
+
+test('色の記号を付けずに取り込んだ前の部材（品番「HD5-4000 T」）は、取り込み直すと同じ部材のまま品番と金額を直す', () => {
+  // 前の版では「販売⏎価格」「ｶﾞｲﾄﾞ⏎価格」を読み分けられず、ガイド価格を仕切価格にして、定価は空のまま取り込んでいた
+  const old: Material[] = [
+    {id: 'a', name: 'φ35 見本パイプ 4m LBR', price: 2000, listPrice: 0, pieceLengthM: 4, maker: '矢崎化工', code: 'HD5-4000 T', unit: '', favorite: true, updatedAt: 1},
+    {id: 'b', name: 'φ35 見本パイプ 4m BR', price: 2000, listPrice: 0, pieceLengthM: 4, maker: '矢崎化工', code: 'HD5-4000 T', unit: '', favorite: false, updatedAt: 1},
+  ];
+  const r = mergeMaterials(old, sheetsCandidates(yazakiSheets(), '矢崎化工'), 5);
+  assert.deepEqual([r.added, r.updated], [2, 2]);
+  assert.deepEqual(
+    r.list.slice(0, 2).map((x) => [x.id, x.code, x.price, x.listPrice, x.favorite]),
+    [
+      ['a', 'HD5-4000 T LBR', 1000, 2000, true],
+      ['b', 'HD5-4000 T BR', 1000, 2000, false],
+    ],
+  );
 });
