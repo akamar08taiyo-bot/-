@@ -1,7 +1,7 @@
 import {useMemo, useState} from 'react';
 import type {ReactNode} from 'react';
 import {unitPriceOf} from '../calc.ts';
-import {CATEGORIES, categoryLabel} from '../category.ts';
+import {CATEGORIES, docLabel} from '../category.ts';
 import {productsCsv} from '../storage.ts';
 import type {AppData, Product, Settings, TaxType} from '../types.ts';
 import type {Update} from '../useStore.ts';
@@ -288,7 +288,7 @@ export function ProductEditModal({product, settings, onSave, onClose}: {product:
           <Field label="種目">
             <CategorySelect category={p.category} sub={p.sub} onChange={(category, sub) => set({category, sub, categoryByHand: true})} />
           </Field>
-          {p.category && <p className="mt-1 text-xs text-slate-500">申請書・見積書には「{categoryLabel(p.category, p.sub)}」と書きます。</p>}
+          {p.category && <p className="mt-1 text-xs text-slate-500">申請書・見積書には「{docLabel(p.category, p.sub)}」と書きます。</p>}
         </div>
         <Field label="定価（税抜）">
           <NumberInput value={p.listPrice} onChange={(listPrice) => set({listPrice})} min={0} blankZero />

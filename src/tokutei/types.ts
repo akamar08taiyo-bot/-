@@ -48,11 +48,15 @@ export type SaleItem = {
   qty: number;
   discountRate: number; // 割引率（%）。20 ＝ 2割引き
   unitPrice: number | null; // 販売単価（税抜）を手で入れたとき。null なら 定価×(100−割引率)%
+  reason: string; // 福祉用具が必要な理由（申請書の欄。用具ごと）
 };
 
 export type BurdenRatio = 1 | 2 | 3;
 export type PayMethod = '受領委任払い' | '償還払い';
 export type SaleStatus = '見積' | '申請' | '承認' | '納品' | '集金';
+export type Gender = '' | '男' | '女';
+/** 居宅サービス計画の届出（みやこ町の申請書）。空なら、居宅介護支援事業所が入っていれば「有」とみなす */
+export type CarePlan = '' | '有' | '無';
 
 /** 案件（お客様1件の販売） */
 export type Sale = {
@@ -60,7 +64,9 @@ export type Sale = {
   customer: string; // お客様名（「様」は付けない）
   kana: string; // フリガナ
   insuredNo: string; // 被保険者番号
-  birthDate: string; // 'YYYY-MM-DD'
+  birthDate: string; // 'YYYY-MM-DD'（和暦でも打てる。wareki.ts）
+  gender: Gender; // 性別（申請書で丸をつける）
+  zip: string; // 郵便番号（住所から自動で入る。zip.ts）
   address: string;
   tel: string;
   careLevel: string; // 要支援1〜要介護5
@@ -73,12 +79,14 @@ export type Sale = {
   welfare: boolean; // 生活保護（利用者のお支払いは 0。負担割合の分は介護扶助）
   staff: string; // 担当（福祉用具専門相談員）
   careOffice: string; // 居宅介護支援事業所
-  careManager: string; // 担当ケアマネジャー
+  careManager: string; // 担当ケアマネジャー（申請書の「記載者 事業所・氏名」は 居宅介護支援事業所＋ケアマネジャー）
+  carePlan: CarePlan; // 居宅サービス計画の届出（みやこ町）
   quoteNo: string; // 見積番号
   estimateDate: string; // 見積日 'YYYY-MM-DD'
   applyDate: string; // 申請日
   approveDate: string; // 承認日
-  deliveryDate: string; // 納品日（＝購入日）
+  deliveryDate: string; // 納品日（＝購入日。事前申請書の購入予定日・支給申請書の購入日・写真の撮影日）
+  claimDate: string; // 支給申請日（支給申請書の日付。空なら空欄）
   collectDate: string; // 集金日
   status: SaleStatus;
   note: string; // 見積書の備考に足す文（デモ機など）

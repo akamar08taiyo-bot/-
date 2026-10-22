@@ -38,12 +38,13 @@
 ★お気に入りから選ぶだけで、定価の2割引きの見積書（介護保険の内訳つき）を作る業務アプリ。ほかのアプリとは独立している。
 
 - 設計と、販売受注簿・見積書・住宅改修アプリなど既存アプリの読み取りメモ：`docs/tokutei/DESIGN.md`・`docs/tokutei/EXISTING_APPS.md`
-- コード：`src/tokutei/`（計算は `calc.ts`、種目の判定は `category.ts`、仕切り一覧表の読み取りは `import/`）
+- コード：`src/tokutei/`（計算は `calc.ts`、種目の判定は `category.ts`、仕切り一覧表の読み取りは `import/`、
+  申請書（行橋市・苅田町・みやこ町の Excel の原本 `shinsei/` に書き込む）は `shinsei.ts`・`xlsxEdit.ts`）
 - 保存：この端末の IndexedDB（`taiyo-tokutei`）だけ。設定からバックアップ（JSON）・商品マスタの CSV 書き出し
 - 申請書（保険者ごとの様式への差し込み）と販売受注簿への転記は、様式をいただいてから作る
 
 ```
-npm run -s test:tokutei     # 単体テスト（計算・種目・取り込み）
+npm run -s test:tokutei     # 単体テスト（計算・種目・取り込み・申請書・連動）
 npm run -s lint             # 型チェック
 npm run -s build:tokutei    # dist-tokutei/index.html（1ファイル）と version.json
 node test/tokutei/e2e.mjs <出力フォルダ>   # ブラウザで通しで確かめる（Playwright。ビルドのあと）

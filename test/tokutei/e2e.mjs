@@ -90,6 +90,48 @@ try {
   assert.match(aside, /保険者負担（9割）\s*38,649円/);
   await page.screenshot({path: `${out}/04-sale.png`, fullPage: true});
 
+  // ---- 申請書：まだ入っていない欄が出る → 入れる（生年月日は和暦で・郵便番号は住所から自動・理由は文例のボタン）→ Excel を作る
+  await page.getByText('まだ入っていない欄（空欄のまま作ります）').waitFor();
+  await page.getByLabel('フリガナ').fill('ヤマダ ハナコ');
+  await page.getByLabel('生年月日').fill('S15.3.15');
+  await page.getByText('昭和15年3月15日（1940年）').waitFor();
+  await page.getByRole('radio', {name: '女'}).click();
+  await page.getByLabel('要介護度').selectOption('要介護2');
+  await page.getByLabel('住所').fill('行橋市大字流末1327番地');
+  assert.equal(await page.getByLabel('郵便番号').inputValue(), '824-0043');
+  await page.getByLabel('電話').fill('0930-00-0000');
+  await page.getByRole('button', {name: /^文例：下肢筋力が低下し、浴室の床/}).click();
+  await page.getByLabel('浴槽台 ユクリアが必要な理由').fill('浴槽内での立ち座りが困難なため。');
+  await page.getByLabel('居宅介護支援事業所').fill('見本居宅介護支援事業所');
+  await page.getByLabel('ケアマネジャー').fill('見本 太郎');
+  await page.getByLabel('申請日', {exact: true}).fill('2026-10-22');
+  await page.getByLabel('納品日').fill('2026-10-30');
+  await page.waitForTimeout(600);
+  assert.equal(await page.getByText('まだ入っていない欄（空欄のまま作ります）').count(), 0);
+  await page.screenshot({path: `${out}/04b-sale-shinsei.png`, fullPage: true});
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📄 申請書（Excel）を作る'}).click()]);
+  assert.equal(download.suggestedFilename(), '山田花子様特定福祉用具申請書.xlsx');
+  await download.saveAs(`${out}/shinsei.xlsx`);
+  {
+    const {unzipSync} = await import('fflate');
+    const {readCell, ellipseCount} = await import('../../src/tokutei/xlsxEdit.ts');
+    const f = unzipSync(new Uint8Array(readFileSync(`${out}/shinsei.xlsx`)));
+    const sh = '用具・受領委任払';
+    assert.equal(readCell(f, sh, 'F5'), '山田 花子');
+    assert.equal(readCell(f, sh, 'F4'), 'ヤマダ ハナコ');
+    assert.equal(['Z7', 'AA7', 'AB7', 'AC7', 'AD7', 'AE7', 'AF7', 'AG7', 'AH7', 'AI7'].map((r) => readCell(f, sh, r)).join(''), '0123456789');
+    assert.equal(readCell(f, sh, 'F9'), '明・大・昭　15年3月15日生');
+    assert.equal(readCell(f, sh, 'G10'), '824-0043');
+    assert.equal(readCell(f, sh, 'A15'), '入浴補助用具（入浴用いす）\nシャワーベンチ FSフィット');
+    assert.equal(readCell(f, sh, 'V15'), '30800');
+    assert.match(readCell(f, sh, 'E18'), /^入浴用いす：下肢筋力が低下し/);
+    assert.match(readCell(f, sh, 'E18'), /\n浴槽内いす：浴槽内での立ち座りが困難なため。$/);
+    assert.equal(readCell(f, sh, 'L20'), '見本居宅介護支援事業所　見本 太郎');
+    assert.equal(readCell(f, sh, 'C26'), '令和8年10月22日');
+    assert.equal(ellipseCount(f, sh), 3);
+    assert.match(readCell(f, '委任状', 'B23'), /38,649円$/);
+  }
+
   // ---- 見積書
   await page.getByRole('button', {name: '🖨 見積書を印刷'}).first().click();
   await page.locator('.est').waitFor();
@@ -149,7 +191,7 @@ try {
   assert.ok(overflow <= 1, `スマホの幅で横にはみ出している（${overflow}px）`);
 
   assert.deepEqual(errors, []);
-  console.log('ok: 取り込み → ★ → 見積もり → 見積書 → 読み直し → スマホの幅');
+  console.log('ok: 取り込み → ★ → 見積もり → 申請書（Excel） → 見積書 → 読み直し → スマホの幅');
 } finally {
   await browser.close();
   server.close();

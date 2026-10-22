@@ -1,14 +1,22 @@
-import {useState} from 'react';
+import {useRef, useState} from 'react';
 import type {ReactNode} from 'react';
 import {priceNote, saleTotals} from '../calc.ts';
-import {categoryLabel} from '../category.ts';
+import {docLabel} from '../category.ts';
 import {CARE_LEVELS, INSURERS, insurerLabel} from '../defaults.ts';
-import {blankItem, copySale, customerLabel, itemFromProduct, markUsed, saleWarnings} from '../sales.ts';
-import type {AppData, BurdenRatio, PayMethod, Sale, SaleItem, SaleStatus, TaxType} from '../types.ts';
+import {blankItem, copySale, customerLabel, customerPatch, frequentValues, itemFromProduct, markUsed, sameYearSales, saleWarnings} from '../sales.ts';
+import {carePlanOf, padInsuredNo, shinseiForm} from '../shinsei.ts';
+import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Sale, SaleItem, SaleStatus, TaxType} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {todayIso, yen} from '../util.ts';
+import {fiscalYearOf} from '../wareki.ts';
+import {addressOfZip, zipCandidates, zipLabel} from '../zip.ts';
+import {BirthInput} from './BirthInput.tsx';
 import {CategorySelect} from './CategorySelect.tsx';
+import {CustomerPicker} from './CustomerPicker.tsx';
 import {ProductPicker} from './ProductPicker.tsx';
+import {ReasonField} from './ReasonField.tsx';
+import {ShinseiPanel} from './ShinseiPanel.tsx';
+import {Suggest} from './Suggest.tsx';
 import {Btn, NumberInput, OptionalNumberInput, Segmented, Stepper, TextInput, useToast} from './ui.tsx';
 
 const STATUSES: SaleStatus[] = ['見積', '申請', '承認', '納品', '集金'];
@@ -55,13 +63,44 @@ export function SaleEditor({
 }) {
   const toast = useToast();
   const [picking, setPicking] = useState(false);
+  const [pickingCustomer, setPickingCustomer] = useState(false);
+  // 住所から自動で入れた郵便番号（手で直した番号は、住所を直しても変えない）
+  const autoZip = useRef('');
   const s = data.settings;
   const t = saleTotals(sale, s);
   const warnings = saleWarnings(sale);
+  const zips = zipCandidates(sale.address);
+  // 今年度の残り：このアプリの記録にある、同じ方の今年度の申請（ほかの事業所で買った分は入らない）
+  const prevYear = sameYearSales(data.sales, sale);
+  const usedYear = prevYear.reduce((n, x) => n + saleTotals(x, s).covered, 0);
+  const fy = fiscalYearOf(sale.deliveryDate || sale.applyDate || sale.estimateDate);
 
   const change = (patch: Partial<Sale>) =>
     update('sales', (list) => list.map((x) => (x.id === sale.id ? {...x, ...patch, updatedAt: Date.now()} : x)));
   const changeItem = (id: string, patch: Partial<SaleItem>) => change({items: sale.items.map((i) => (i.id === id ? {...i, ...patch} : i))});
+
+  /** 住所を打つと、郵便番号が1つに決まれば入れる（郵便番号が空か、前に自動で入れた番号のとき） */
+  const changeAddress = (address: string) => {
+    const hits = zipCandidates(address);
+    const zipNow = zipLabel(sale.zip);
+    if (hits.length === 1 && (!zipNow || zipNow === autoZip.current)) {
+      autoZip.current = hits[0].zip;
+      change({address, zip: hits[0].zip});
+    } else change({address});
+  };
+  /** 郵便番号を先に打つと、住所が空なら住所の頭（市区町村・町域）を入れる */
+  const changeZip = (zip: string) => {
+    const head = sale.address.trim() ? '' : addressOfZip(zip);
+    autoZip.current = '';
+    change(head ? {zip, address: head} : {zip});
+  };
+
+  const pickCustomer = (from: Sale) => {
+    if (sale.customer.trim() && !window.confirm(`今入っているお客様の欄を「${customerLabel(from)}」の内容に置きかえます。よろしいですか？`)) return;
+    change(customerPatch(from));
+    setPickingCustomer(false);
+    toast(`${customerLabel(from)} の内容を入れました`);
+  };
 
   const setStatus = (status: SaleStatus) => {
     const key = STATUS_DATE[status];
@@ -94,6 +133,11 @@ export function SaleEditor({
           <Btn color="sky" onClick={() => onPrint(sale.id)}>
             🖨 見積書を印刷
           </Btn>
+          {shinseiForm(sale.insurer) && (
+            <Btn color="blue" onClick={() => document.getElementById('shinsei-panel')?.scrollIntoView({behavior: 'smooth', block: 'center'})}>
+              📄 申請書
+            </Btn>
+          )}
           <Btn color="white" onClick={duplicate}>
             複製
           </Btn>
@@ -105,7 +149,14 @@ export function SaleEditor({
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-4">
-          <Card title="お客様">
+          <Card
+            title="お客様"
+            right={
+              <Btn color="white" small onClick={() => setPickingCustomer(true)}>
+                👤 前のお客様から入れる
+              </Btn>
+            }
+          >
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="お客様名（様は付けない）">
                 <TextInput value={sale.customer} onChange={(customer) => change({customer})} placeholder="例：山田 花子" aria-label="お客様名" />
@@ -117,14 +168,26 @@ export function SaleEditor({
                 <TextInput
                   value={sale.insuredNo}
                   onChange={(insuredNo) => change({insuredNo: insuredNo.normalize('NFKC').replace(/[^\d]/g, '').slice(0, 10)})}
+                  onBlur={() => sale.insuredNo && sale.insuredNo !== padInsuredNo(sale.insuredNo) && change({insuredNo: padInsuredNo(sale.insuredNo)})}
                   inputMode="numeric"
-                  placeholder="10けた"
+                  placeholder="10けた（足りない分は左に0）"
                   aria-label="被保険者番号"
                 />
               </Field>
+              <Field label="生年月日（和暦でも西暦でも）">
+                <BirthInput value={sale.birthDate} onChange={(birthDate) => change({birthDate})} />
+              </Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="生年月日">
-                  <input type="date" value={sale.birthDate} onChange={(e) => change({birthDate: e.target.value})} className={dateInput} aria-label="生年月日" />
+                <Field label="性別">
+                  <Segmented<Gender>
+                    ariaLabel="性別"
+                    value={sale.gender}
+                    onChange={(gender) => change({gender})}
+                    options={[
+                      ['男', '男'],
+                      ['女', '女'],
+                    ]}
+                  />
                 </Field>
                 <Field label="要介護度">
                   <select value={sale.careLevel} onChange={(e) => change({careLevel: e.target.value})} className="h-9 w-full min-w-0 rounded-md border border-slate-300 px-2 text-sm" aria-label="要介護度">
@@ -137,8 +200,29 @@ export function SaleEditor({
                   </select>
                 </Field>
               </div>
+              <Field label="郵便番号（住所から自動）">
+                <TextInput value={sale.zip} onChange={changeZip} onBlur={() => sale.zip && change({zip: zipLabel(sale.zip)})} inputMode="numeric" placeholder="824-0043" aria-label="郵便番号" />
+                {zips.length > 1 && (
+                  <span className="text-[11px] font-normal text-slate-500">
+                    この住所の郵便番号：
+                    {zips.map((z) => (
+                      <button key={z.zip} type="button" onClick={() => change({zip: z.zip})} className="mr-1 underline decoration-dotted hover:text-teal-700">
+                        {z.zip}（{z.label}）
+                      </button>
+                    ))}
+                  </span>
+                )}
+                {zips.length === 1 && sale.zip && zipLabel(sale.zip) !== zips[0].zip && (
+                  <span className="text-[11px] font-normal text-amber-700">
+                    住所からは {zips[0].zip}（{zips[0].label}）
+                    <button type="button" onClick={() => change({zip: zips[0].zip})} className="ml-1 underline hover:text-teal-700">
+                      こちらにする
+                    </button>
+                  </span>
+                )}
+              </Field>
               <Field label="住所" wide>
-                <TextInput value={sale.address} onChange={(address) => change({address})} placeholder="福岡県行橋市…" aria-label="住所" />
+                <TextInput value={sale.address} onChange={changeAddress} placeholder="行橋市大字流末1327番地" aria-label="住所" />
               </Field>
               <Field label="電話">
                 <TextInput value={sale.tel} onChange={(tel) => change({tel})} inputMode="tel" aria-label="電話" />
@@ -199,6 +283,16 @@ export function SaleEditor({
               </Field>
               <Field label={`今年度の残り（空欄なら ${yen(s.limit)}円）`}>
                 <OptionalNumberInput value={sale.remaining} onChange={(remaining) => change({remaining})} placeholder={`空欄＝${yen(s.limit)}円`} ariaLabel="今年度の残り" />
+                {prevYear.length > 0 && (
+                  <span className="text-[11px] font-normal text-slate-600">
+                    この方の{fy ?? ''}年度の申請（このアプリの記録）：{prevYear.length}件・{yen(usedYear)}円 → 残り {yen(Math.max(0, s.limit - usedYear))}円
+                    {sale.remaining !== Math.max(0, s.limit - usedYear) && (
+                      <button type="button" onClick={() => change({remaining: Math.max(0, s.limit - usedYear)})} className="ml-1 font-bold text-teal-700 underline">
+                        入れる
+                      </button>
+                    )}
+                  </span>
+                )}
               </Field>
               <div className="flex flex-wrap items-end gap-x-4 gap-y-2 pb-2 text-sm text-slate-700">
                 <label className="flex items-center gap-1.5">
@@ -210,6 +304,20 @@ export function SaleEditor({
                   生活保護
                 </label>
               </div>
+              {sale.insurer === 'miyako' && (
+                <Field label="居宅サービス計画の届出（みやこ町の申請書）">
+                  <Segmented<CarePlan>
+                    ariaLabel="居宅サービス計画の届出"
+                    value={carePlanOf(sale)}
+                    onChange={(carePlan) => change({carePlan})}
+                    options={[
+                      ['有', '有'],
+                      ['無', '無'],
+                    ]}
+                  />
+                  {!sale.carePlan && sale.careOffice.trim() && <span className="text-[11px] font-normal text-slate-500">居宅介護支援事業所が入っているので「有」にしています</span>}
+                </Field>
+              )}
             </div>
           </Card>
 
@@ -310,8 +418,12 @@ export function SaleEditor({
                             金額 {yen(l.amount)}円 ＋ 税 {yen(l.tax)}円
                           </div>
                           <div className="text-base font-bold tabular-nums text-slate-900">購入金額 {yen(l.total)}円</div>
-                          <div className="text-[11px] text-slate-500">{[priceNote(l), categoryLabel(i.category, i.sub)].filter(Boolean).join('　')}</div>
+                          <div className="text-[11px] text-slate-500">{[priceNote(l), docLabel(i.category, i.sub)].filter(Boolean).join('　')}</div>
                         </div>
+                      </div>
+                      <div className="mt-2 grid min-w-0 grid-cols-1 gap-1 pl-8 text-xs font-bold text-slate-600">
+                        福祉用具が必要な理由（申請書）
+                        <ReasonField item={i} sales={data.sales} saleId={sale.id} onChange={(reason) => changeItem(i.id, {reason})} />
                       </div>
                     </div>
                   );
@@ -332,11 +444,17 @@ export function SaleEditor({
                   ))}
                 </select>
               </Field>
-              <Field label="居宅介護支援事業所">
+              <Field label="居宅介護支援事業所（理由の記載者）">
                 <TextInput value={sale.careOffice} onChange={(careOffice) => change({careOffice})} aria-label="居宅介護支援事業所" />
+                <Suggest values={frequentValues(data.sales, (x) => x.careOffice)} current={sale.careOffice} onPick={(careOffice) => change({careOffice})} />
               </Field>
               <Field label="ケアマネジャー">
                 <TextInput value={sale.careManager} onChange={(careManager) => change({careManager})} aria-label="ケアマネジャー" />
+                <Suggest
+                  values={frequentValues(data.sales, (x) => x.careManager, (x) => !sale.careOffice.trim() || x.careOffice.trim() === sale.careOffice.trim())}
+                  current={sale.careManager}
+                  onPick={(careManager) => change({careManager})}
+                />
               </Field>
               <Field label="見積番号">
                 <TextInput value={sale.quoteNo} onChange={(quoteNo) => change({quoteNo})} aria-label="見積番号" />
@@ -353,8 +471,11 @@ export function SaleEditor({
               <Field label="承認日">
                 <input type="date" value={sale.approveDate} onChange={(e) => change({approveDate: e.target.value})} className={dateInput} aria-label="承認日" />
               </Field>
-              <Field label="納品日（購入日）">
+              <Field label="納品日（購入日・撮影日）">
                 <input type="date" value={sale.deliveryDate} onChange={(e) => change({deliveryDate: e.target.value})} className={dateInput} aria-label="納品日" />
+              </Field>
+              <Field label="支給申請日（支給申請書の日付）">
+                <input type="date" value={sale.claimDate} onChange={(e) => change({claimDate: e.target.value})} className={dateInput} aria-label="支給申請日" />
               </Field>
             </div>
             <div className="mt-3">
@@ -409,6 +530,9 @@ export function SaleEditor({
               </Btn>
             </div>
           </section>
+          <div id="shinsei-panel">
+            <ShinseiPanel sale={sale} settings={s} />
+          </div>
           {warnings.length > 0 && (
             <section className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
               <ul className="list-disc space-y-1 pl-4">
@@ -421,6 +545,7 @@ export function SaleEditor({
         </aside>
       </div>
 
+      {pickingCustomer && <CustomerPicker sales={data.sales} current={sale} onPick={pickCustomer} onClose={() => setPickingCustomer(false)} />}
       {picking && (
         <ProductPicker
           products={data.products}

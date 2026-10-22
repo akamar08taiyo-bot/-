@@ -5,7 +5,7 @@
 // 前に読んだときと印が違えば、別のタブが保存したということなので、読み直す・まとめてから保存する（sync.ts）。
 
 import {CARE_LEVELS, DEFAULT_STAFF, DEFAULT_SUPPLIERS, defaultSettings, SETTINGS_REV} from './defaults.ts';
-import type {AppData, BurdenRatio, PayMethod, Product, Sale, SaleItem, SaleStatus, Settings, TaxType} from './types.ts';
+import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Product, Sale, SaleItem, SaleStatus, Settings, TaxType} from './types.ts';
 import {uid} from './util.ts';
 
 const DB_NAME = 'taiyo-tokutei';
@@ -210,6 +210,7 @@ function cleanItem(i: Record<string, unknown>): SaleItem {
     qty: Math.max(0, numv(i.qty, 1)),
     discountRate: Math.min(100, Math.max(0, numv(i.discountRate, 20))),
     unitPrice: optNum(i.unitPrice),
+    reason: str(i.reason),
   };
 }
 
@@ -225,6 +226,8 @@ export function cleanSales(raw: unknown): Sale[] {
       kana: str(s.kana),
       insuredNo: str(s.insuredNo),
       birthDate: str(s.birthDate),
+      gender: (s.gender === '男' || s.gender === '女' ? s.gender : '') as Gender,
+      zip: str(s.zip),
       address: str(s.address),
       tel: str(s.tel),
       careLevel: CARE_LEVELS.includes(str(s.careLevel)) ? str(s.careLevel) : '',
@@ -238,11 +241,13 @@ export function cleanSales(raw: unknown): Sale[] {
       staff: str(s.staff),
       careOffice: str(s.careOffice),
       careManager: str(s.careManager),
+      carePlan: (s.carePlan === '有' || s.carePlan === '無' ? s.carePlan : '') as CarePlan,
       quoteNo: str(s.quoteNo),
       estimateDate: str(s.estimateDate),
       applyDate: str(s.applyDate),
       approveDate: str(s.approveDate),
       deliveryDate: str(s.deliveryDate),
+      claimDate: str(s.claimDate),
       collectDate: str(s.collectDate),
       status: STATUSES.includes(s.status as SaleStatus) ? (s.status as SaleStatus) : '見積',
       note: str(s.note),

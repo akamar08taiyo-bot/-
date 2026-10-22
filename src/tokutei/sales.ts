@@ -3,6 +3,7 @@
 import {INSURERS} from './defaults.ts';
 import type {Product, Sale, SaleItem, Settings} from './types.ts';
 import {todayIso, uid} from './util.ts';
+import {fiscalYearOf} from './wareki.ts';
 
 /** 見積番号：見積日（YYYYMMDD）＋その日の何件目か（「20261021-2」） */
 export function nextQuoteNo(sales: Sale[], date: string): string {
@@ -22,6 +23,8 @@ export function newSale(sales: Sale[], settings: Settings, insurer: string, now 
     kana: '',
     insuredNo: '',
     birthDate: '',
+    gender: '',
+    zip: '',
     address: '',
     tel: '',
     careLevel: '',
@@ -35,11 +38,13 @@ export function newSale(sales: Sale[], settings: Settings, insurer: string, now 
     staff: settings.staffList[0] ?? '',
     careOffice: '',
     careManager: '',
+    carePlan: '',
     quoteNo: nextQuoteNo(sales, date),
     estimateDate: date,
     applyDate: '',
     approveDate: '',
     deliveryDate: '',
+    claimDate: '',
     collectDate: '',
     status: '見積',
     note: '',
@@ -60,6 +65,7 @@ export function copySale(sale: Sale, sales: Sale[], now = Date.now()): Sale {
     applyDate: '',
     approveDate: '',
     deliveryDate: '',
+    claimDate: '',
     collectDate: '',
     status: '見積',
     items: sale.items.map((i) => ({...i, id: uid('i')})),
@@ -87,6 +93,7 @@ export function itemFromProduct(p: Product, settings: Pick<Settings, 'discountRa
     qty: 1,
     discountRate: settings.discountRate,
     unitPrice: null,
+    reason: '',
   };
 }
 
@@ -109,6 +116,7 @@ export function blankItem(settings: Pick<Settings, 'discountRate'>): SaleItem {
     qty: 1,
     discountRate: settings.discountRate,
     unitPrice: null,
+    reason: '',
   };
 }
 
@@ -134,4 +142,76 @@ export function saleWarnings(sale: Sale): string[] {
   if (noCost.length) out.push(`仕切が入っていない商品（利益が分かりません）：${noCost.map(named).join('、')}`);
   if (!sale.insurer || (sale.insurer === 'other' && !sale.insurerName.trim())) out.push('保険者が選ばれていません');
   return out;
+}
+
+// ---------------------------------------------------------------- 前に入れたものを使い回す（ユーザーの指示「無駄を省けるようにする」）
+
+/** 同じお客様かの見分け：被保険者番号（10けたにそろえる）、なければ 名前＋生年月日 */
+export function customerKey(sale: Pick<Sale, 'insuredNo' | 'customer' | 'birthDate'>): string {
+  const no = sale.insuredNo.normalize('NFKC').replace(/\D/g, '');
+  if (no) return `no:${no.padStart(10, '0')}`;
+  const name = sale.customer.normalize('NFKC').replace(/\s+/g, '');
+  return name ? `name:${name}|${sale.birthDate}` : '';
+}
+
+/** 前の見積もりのお客様（お客様ごとに いちばん新しい見積もり。新しい順）。今の見積もりのお客様は除く */
+export function pastCustomers(sales: Sale[], current: Sale): Sale[] {
+  const seen = new Set<string>([customerKey(current)]);
+  const out: Sale[] = [];
+  for (const s of [...sales].sort((a, b) => b.updatedAt - a.updatedAt)) {
+    const key = customerKey(s);
+    if (!key || s.id === current.id || seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
+}
+
+/** 前の見積もりから写すもの：お客様・介護保険・ケアマネジャー（商品・日付・番号は写さない） */
+export function customerPatch(from: Sale): Partial<Sale> {
+  return {
+    customer: from.customer,
+    kana: from.kana,
+    insuredNo: from.insuredNo,
+    birthDate: from.birthDate,
+    gender: from.gender,
+    zip: from.zip,
+    address: from.address,
+    tel: from.tel,
+    careLevel: from.careLevel,
+    insurer: from.insurer,
+    insurerName: from.insurerName,
+    burdenRatio: from.burdenRatio,
+    payMethod: from.payMethod,
+    perItem: from.perItem,
+    welfare: from.welfare,
+    careOffice: from.careOffice,
+    careManager: from.careManager,
+    carePlan: from.carePlan,
+  };
+}
+
+/** 案件の日（年度を決める日）：納品日、なければ申請日、なければ見積日 */
+const saleDay = (s: Pick<Sale, 'deliveryDate' | 'applyDate' | 'estimateDate'>) => s.deliveryDate || s.applyDate || s.estimateDate;
+
+/**
+ * このアプリの記録にある、同じお客様の同じ年度の申請（申請・承認・納品・集金の案件）。
+ * 今年度の残り（10万円 − 使った分）を出すのに使う。ほかの事業所で買った分は入っていない
+ */
+export function sameYearSales(sales: Sale[], current: Sale): Sale[] {
+  const key = customerKey(current);
+  const year = fiscalYearOf(saleDay(current));
+  if (!key || year === null) return [];
+  return sales.filter((s) => s.id !== current.id && s.status !== '見積' && customerKey(s) === key && fiscalYearOf(saleDay(s)) === year);
+}
+
+/** よく使う値（多い順。居宅介護支援事業所など）。where を付けると、その案件の中だけ */
+export function frequentValues(sales: Sale[], pick: (s: Sale) => string, where: (s: Sale) => boolean = () => true, limit = 6): string[] {
+  const count = new Map<string, number>();
+  for (const s of sales) {
+    if (!where(s)) continue;
+    const v = pick(s).trim();
+    if (v) count.set(v, (count.get(v) ?? 0) + 1);
+  }
+  return [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([v]) => v);
 }

@@ -1,0 +1,408 @@
+// 介護保険の申請書（保険者ごとにいただいた Excel の原本）に、案件の内容を書き込む。
+// どの欄に何を書くかは、いただいた3つの様式（行橋市・苅田町・みやこ町）のすべての欄を調べて決めた（docs/tokutei/DESIGN.md の 5.2）。
+// ユーザーの指示「入力できるところ、連動できる部分は徹底的に分析し、無駄を省けるようにする」（2026-10-22）：
+// 案件で1回入れた値（お客様・商品・日付）と計算した値（購入金額・保険給付額）を、事前申請書・支給申請書・委任状・写真の用紙のすべてに入れる。
+// 原本の式でつながっている欄（支給申請書・写真の用紙が事前申請書を参照）は式のまま使い、書くのは決めた欄だけ（原本のシート・空欄・図形は消さない）。
+// 書かない欄：個人番号・印・ケアマネジャーの署名・受け取り者氏名・市町村の記入欄。
+
+import {saleTotals} from './calc.ts';
+import {docLabel} from './category.ts';
+import {CARE_LEVELS} from './defaults.ts';
+import type {CarePlan, Gender, Sale, Settings} from './types.ts';
+import {warekiLabel, warekiOf} from './wareki.ts';
+import type {Wareki} from './wareki.ts';
+import {
+  boxes,
+  cellBox,
+  dropCalcChain,
+  drawMarks,
+  emOf,
+  finishWorkbook,
+  fitCell,
+  hideZeros,
+  LINE_K,
+  sameStyle,
+  sizeCell,
+  styleIdOf,
+  wrapText,
+  writeCells,
+} from './xlsxEdit.ts';
+import type {CellValue, Files, Mark} from './xlsxEdit.ts';
+import {zipLabel} from './zip.ts';
+
+/** 申請書の原本がある保険者 */
+export type ShinseiKey = 'yukuhashi' | 'kanda' | 'miyako';
+
+/** 申請書の明細の1行 */
+export type ShinseiItem = {
+  label: string; // 福祉用具名（種目及び商品名）：「入浴補助用具（入浴用いす）」と商品名の2行
+  labelLine: string; // 同じ内容を1つの段落に（欄の小さいみやこ町。行は Excel が折り返す）
+  makerSeller: string; // 製造事業者名及び販売事業者名：メーカー名と会社名の2行
+  total: number; // 購入金額（税込）
+  tais: string;
+  product: string; // 納品名（写真の用紙）：商品名 / 品番
+  short: string; // 理由の頭に付ける呼び名（細目・種目）
+  reason: string;
+};
+
+/** 申請書に書く値（案件・設定・計算から作る。どの様式でも同じ） */
+export type ShinseiValues = {
+  name: string;
+  kana: string;
+  insuredNo: string; // 10けた（足りない左は 0）。番号がなければ空
+  birth: Wareki | null;
+  gender: Gender;
+  zip: string; // 824-0043
+  address: string;
+  tel: string;
+  care: string; // 要支援1〜要介護5
+  items: ShinseiItem[];
+  recorder: string; // 記載者 事業所・氏名：居宅介護支援事業所　ケアマネジャー
+  carePlan: CarePlan; // 居宅サービス計画の届出（みやこ町）
+  applyDate: string; // 申請日（'YYYY-MM-DD'）
+  deliveryDate: string; // 納品日＝購入（予定）日・撮影日
+  claimDate: string; // 支給申請日
+  benefit: number; // 保険給付額（保険者負担）
+  staff: string; // 担当（みやこ町の届出者）
+};
+
+/** 被保険者番号を10けたに（数字だけ。足りない左は 0。ユーザーの指示「5桁なら、残りの空白部分は0でうめる」） */
+export function padInsuredNo(v: string): string {
+  const d = (v || '').normalize('NFKC').replace(/\D/g, '');
+  return d ? d.slice(-10).padStart(10, '0') : '';
+}
+
+/** 案件で使う明細（商品名も種目もない空の行は申請書に書かない） */
+const usedLines = (sale: Sale, s: Settings) => saleTotals(sale, s).lines.filter((l) => l.item.name.trim() || l.item.category);
+
+/** 居宅サービス計画の届出：選んでいなければ、居宅介護支援事業所が入っていれば「有」 */
+export const carePlanOf = (sale: Pick<Sale, 'carePlan' | 'careOffice'>): CarePlan => sale.carePlan || (sale.careOffice.trim() ? '有' : '');
+
+export function shinseiValues(sale: Sale, s: Settings): ShinseiValues {
+  const items = usedLines(sale, s).map((l): ShinseiItem => {
+    const i = l.item;
+    const qty = i.qty !== 1 ? `（${Math.round(i.qty * 100) / 100}${i.unit || '個'}）` : '';
+    return {
+      label: [docLabel(i.category, i.sub), `${i.name.trim()}${qty}`].filter(Boolean).join('\n'),
+      labelLine: [docLabel(i.category, i.sub), `${i.name.trim()}${qty}`].filter(Boolean).join('　'),
+      makerSeller: [i.maker.trim(), s.company.trim()].filter(Boolean).join('\n'),
+      total: l.total,
+      tais: i.tais.trim(),
+      product: [i.name.trim(), i.code.trim()].filter(Boolean).join(' / '),
+      short: i.sub || i.category || i.name.trim(),
+      reason: i.reason.trim(),
+    };
+  });
+  return {
+    name: sale.customer.trim(),
+    kana: sale.kana.trim(),
+    insuredNo: padInsuredNo(sale.insuredNo),
+    birth: warekiOf(sale.birthDate),
+    gender: sale.gender,
+    zip: zipLabel(sale.zip),
+    address: sale.address.trim(),
+    tel: sale.tel.trim(),
+    care: sale.careLevel,
+    items,
+    recorder: [sale.careOffice.trim(), sale.careManager.trim()].filter(Boolean).join('　'),
+    carePlan: carePlanOf(sale),
+    applyDate: sale.applyDate,
+    deliveryDate: sale.deliveryDate,
+    claimDate: sale.claimDate,
+    benefit: saleTotals(sale, s).insurerBurden,
+    staff: sale.staff.trim(),
+  };
+}
+
+/** 理由の欄の文：用具が2つ以上なら「入浴用いす：…」と用具ごとに1行（様式の注意書き「個々の用具ごとに記載」） */
+export function reasonText(v: Pick<ShinseiValues, 'items'>): string {
+  const withReason = v.items.filter((i) => i.reason);
+  if (v.items.length < 2) return withReason.map((i) => i.reason).join('\n');
+  return withReason.map((i) => `${i.short}：${i.reason}`).join('\n');
+}
+
+// ---------------------------------------------------------------- 様式ごとの欄
+
+/** 1つのシートに書くもの */
+type SheetWrite = {
+  sheet: string;
+  cells?: [string, CellValue][]; // 番地 → 値（空の文字は欄を空にする）
+  newStyles?: [string, string][]; // 欄がないときに足す書式：番地 → 同じ書式にする欄（日付の数字を「年」と同じ字体に）
+  same?: string[][]; // 明細の行の欄の文字の大きさ・配置を、最初の欄にそろえる（原本は行ごとにちがう）
+  fit?: string[]; // 入りきらなければ文字を小さくする欄
+  marks?: Mark[];
+  hideZeros?: boolean; // 式が空の欄を参照して 0 と出るシート
+  block?: {cell: string; head: string[]; body: string; tail: string[]}; // 理由のかたまり（みやこ町）：head の行・body（理由。欄の幅で折り返す）・tail の行を、入る大きさにして書く
+};
+
+export type ShinseiForm = {key: ShinseiKey; title: string; rows: number; sheets: (v: ShinseiValues) => SheetWrite[]};
+
+/** 'YYYY-MM-DD' → Excel の日付の数（1900年1月1日＝1）。なければ 0 */
+export function excelDate(iso: string): number {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+  return m ? Math.round((Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) - Date.UTC(1899, 11, 30)) / 86400000) : 0;
+}
+
+const pick = <T,>(list: readonly T[], v: T) => list.indexOf(v);
+// 丸で囲む欄（原本の書き方）
+const ERA = (cell: string, v: ShinseiValues): Mark => ({cell, needles: ['明', '大', '昭'], pick: v.birth ? pick(['明', '大', '昭'], v.birth.short) : -1});
+const GENDER = (cell: string, v: ShinseiValues): Mark => ({cell, needles: ['男', '女'], pick: v.gender ? pick(['男', '女'], v.gender) : -1});
+/** 要介護状態区分（「要支援　１・２」と書いてあるので、要支援は数字だけを囲む） */
+const CARE = (cell: string, v: ShinseiValues): Mark => ({cell, needles: ['１', '２', '要介護１', '要介護２', '要介護３', '要介護４', '要介護５'], pick: pick(CARE_LEVELS, v.care)});
+
+/** 値があるときだけ書く（なければ原本の文字のまま） */
+const when = (ok: unknown, cells: [string, CellValue][]): [string, CellValue][] => (ok ? cells : []);
+
+/** 生年月日：「明・大・昭　31年6月10日生」（元号は丸で囲む。明治・大正・昭和でなければ元号を書く） */
+function birthChoice(v: ShinseiValues, base: string): string | null {
+  const b = v.birth;
+  if (!b) return null;
+  const ymd = `${b.y}年${b.m}月${b.d}日生`;
+  return ['明', '大', '昭'].includes(b.short) ? `${base}　${ymd}` : `${b.era}${ymd}`;
+}
+
+/** 被保険者番号の10マス */
+const insuredCells = (start: string, row: number, v: ShinseiValues): [string, CellValue][] => {
+  const digits = v.insuredNo ? [...v.insuredNo] : Array.from({length: 10}, () => '');
+  return boxes(start, 10, row).map((ref, i) => [ref, digits[i] ?? '']);
+};
+
+/** 明細の行（rows の行に、前から書く。様式の行より多い分は書かない＝画面で知らせる） */
+function itemCells(v: ShinseiValues, rows: number[], cols: {label: string; maker: string; total: string; date?: string; tais?: string; oneLine?: boolean}): [string, CellValue][] {
+  const out: [string, CellValue][] = [];
+  v.items.slice(0, rows.length).forEach((it, k) => {
+    const r = rows[k];
+    out.push([`${cols.label}${r}`, cols.oneLine ? it.labelLine : it.label], [`${cols.maker}${r}`, it.makerSeller], [`${cols.total}${r}`, it.total]);
+    if (cols.tais) out.push([`${cols.tais}${r}`, it.tais]);
+    // 日付は令和の文字で書く（みやこ町の支給申請書の購入日は日付の表示形式の欄だが、英語の表示・欄に入らない「###」にならないように）
+    if (cols.date && v.deliveryDate) out.push([`${cols.date}${r}`, warekiLabel(v.deliveryDate)]);
+  });
+  return out;
+}
+
+/** 明細の行の列（refs）：rows の行ごとの番地 */
+const rowsOf = (col: string, rows: number[]) => rows.map((r) => `${col}${r}`);
+
+/**
+ * 委任状（行橋市・苅田町は同じ様式）：保険給付額・日付・委任者の住所と氏名。
+ * 原本は「すき間＋円」「すき間＋㊞」の1つの文字なので、円・㊞の位置が変わらないように、すき間を減らして書く
+ */
+function proxyCells(v: ShinseiValues): [string, CellValue][] {
+  const amount = v.benefit > 0 ? v.benefit.toLocaleString('ja-JP') : '';
+  const space = (n: number) => '　'.repeat(Math.max(1, Math.round(n)));
+  return [
+    ...when(amount, [['B23', `${space(27 - emOf(amount))}${amount}円`]]),
+    ...when(v.applyDate, [['A29', `${'　'.repeat(5)}${warekiLabel(v.applyDate)}`]]),
+    ...when(v.address, [['A32', `　　　　委任者　住　所　　${v.address}`]]),
+    ...when(v.name, [['A36', `　　　　　　　氏　名　　${v.name}${space(19 - emOf(v.name))}㊞　　`]]),
+  ];
+}
+
+/** 完了写真（行橋市・苅田町）：納品名（原本の式は #VALUE! になるので商品名を書く）・撮影日（納品日） */
+function photoCells(v: ShinseiValues): [string, CellValue][] {
+  return [['B3', v.items.map((i) => i.product).join('、')], ...when(v.deliveryDate, [['B4', excelDate(v.deliveryDate)]])];
+}
+
+/** 行橋市・苅田町の事前申請書（同じ並び。被保険者番号の行だけ違う） */
+function preCells(v: ShinseiValues, insuredRow: number): [string, CellValue][] {
+  const reasons = reasonText(v);
+  const birth = birthChoice(v, '明・大・昭');
+  return [
+    ['F4', v.kana],
+    ['F5', v.name],
+    ...insuredCells('Z', insuredRow, v),
+    ...when(birth, [['F9', birth ?? '']]),
+    ['G10', v.zip],
+    ['F11', v.address],
+    ['Y10', v.tel],
+    ...itemCells(v, [15, 16, 17], {label: 'A', maker: 'L', total: 'V', date: 'AB'}),
+    ...when(reasons, [['E18', reasons]]),
+    ...when(v.recorder, [['L20', v.recorder]]),
+    ...when(v.applyDate, [['C26', warekiLabel(v.applyDate)]]),
+  ];
+}
+
+const PRE_FIT = ['F4', 'F5', 'F11', 'Y10', 'A15', 'A16', 'A17', 'L15', 'L16', 'L17', 'E18', 'L20'];
+const PRE_ROWS = [15, 16, 17];
+const PRE_SAME = [rowsOf('A', PRE_ROWS), rowsOf('L', PRE_ROWS)];
+
+/** 令和の日付の数字（「令和」と年・月・日の数） */
+function reiwaParts(iso: string): {era: string; y: number; m: number; d: number} | null {
+  const w = warekiOf(iso);
+  return w ? {era: w.era, y: w.y, m: w.m, d: w.d} : null;
+}
+
+/** みやこ町の申請日の行：「令和」・年の数（「年」の欄の左）・月・日 */
+function dateRow(iso: string, cells: {era: string; y: string; m: string; d: string}): [string, CellValue][] {
+  const p = reiwaParts(iso);
+  if (!p) return [];
+  return [
+    [cells.era, p.era],
+    [cells.y, p.y],
+    [cells.m, p.m],
+    [cells.d, p.d],
+  ];
+}
+
+const MIYAKO_ROWS = [12, 14, 16, 18];
+const MIYAKO_PHOTOS = ['納品確認写真用紙', '納品確認写真用紙 (2)', '納品確認写真用紙 (3)', '納品確認写真用紙 (4)'];
+
+export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
+  yukuhashi: {
+    key: 'yukuhashi',
+    title: '行橋市',
+    rows: 3,
+    sheets: (v) => [
+      {sheet: '用具・受領委任払', cells: preCells(v, 7), same: PRE_SAME, fit: PRE_FIT, marks: [ERA('F9', v), GENDER('Y9', v), CARE('F12', v)]},
+      {sheet: '委任状', cells: proxyCells(v)},
+      {sheet: '完了写真', cells: photoCells(v), fit: ['B3'], hideZeros: true},
+    ],
+  },
+  kanda: {
+    key: 'kanda',
+    title: '苅田町',
+    rows: 3,
+    sheets: (v) => [
+      // 事前申請書の申請者は本人（住所 K28・氏名 K29 は原本の式）。電話番号 K30 にお客様の電話
+      {sheet: '用具・受領委任払', cells: [...preCells(v, 4), ['K30', v.tel]], same: PRE_SAME, fit: PRE_FIT, marks: [ERA('F9', v), GENDER('Y9', v), CARE('F12', v)]},
+      // 支給申請書：ほとんどの欄は事前申請書を参照する式。性別（式でない）・購入日・申請日だけ書く。丸は同じ位置に
+      {
+        sheet: '用具・支給申請　受領委任払 (2)',
+        cells: [
+          ...v.items.slice(0, 3).flatMap((_, k): [string, CellValue][] => (v.deliveryDate ? [[`AB${15 + k}`, warekiLabel(v.deliveryDate)]] : [])),
+          ...when(v.claimDate, [['C26', warekiLabel(v.claimDate)]]),
+        ],
+        same: PRE_SAME,
+        fit: PRE_FIT,
+        marks: [ERA('F9', v), GENDER('Y9', v), CARE('F12', v)],
+        hideZeros: true,
+      },
+      {sheet: '委任状', cells: proxyCells(v)},
+      {sheet: '完了写真', cells: photoCells(v), fit: ['B3'], hideZeros: true},
+    ],
+  },
+  miyako: {
+    key: 'miyako',
+    title: 'みやこ町',
+    rows: 4,
+    sheets: (v) => {
+      const b = v.birth;
+      const birth = b ? `${b.era}${b.y}年${String(b.m).padStart(2, '0')}月${String(b.d).padStart(2, '0')}日生` : '';
+      return [
+        {
+          sheet: '福祉用具購入受領委任払申請書',
+          cells: [
+            ['I4', v.kana],
+            ['I5', v.name],
+            ...insuredCells('W', 4, v),
+            ['I7', birth],
+            ['I8', v.zip ? `〒${v.zip}` : ''],
+            ['I9', v.address],
+            ['Z9', v.tel],
+            ...itemCells(v, MIYAKO_ROWS, {label: 'B', maker: 'I', total: 'R', tais: 'Y', oneLine: true}),
+            ...dateRow(v.applyDate, {era: 'D30', y: 'F30', m: 'I30', d: 'L30'}),
+            ['I34', v.name],
+            ['I36', v.staff],
+          ],
+          // 理由の欄は「（居宅サービス計画の届出　有・無）」の行と、ケアマネジャーの署名の行（空ける）も入っている。
+          // 届出の行を1行目にする（有・無の丸の位置を、理由の長さによらず決められるように）
+          block: {cell: 'I20', head: ['（居宅サービス計画の届出　　有・無）'], body: reasonText(v), tail: ['']},
+          same: [rowsOf('B', MIYAKO_ROWS), rowsOf('I', MIYAKO_ROWS), rowsOf('Y', MIYAKO_ROWS)],
+          fit: ['I4', 'I5', 'I9', 'Z9', ...rowsOf('B', MIYAKO_ROWS), ...rowsOf('I', MIYAKO_ROWS)],
+          marks: [GENDER('AA7', v), {cell: 'I20', needles: ['有', '無'], pick: v.carePlan ? pick(['有', '無'], v.carePlan) : -1, after: '居宅サービス計画の届出'}],
+        },
+        {
+          sheet: '福祉用具支給申請(受領委任）',
+          cells: [...itemCells(v, MIYAKO_ROWS, {label: 'B', maker: 'I', total: 'P', date: 'V', oneLine: true}), ...dateRow(v.claimDate, {era: 'H25', y: 'J25', m: 'M25', d: 'P25'})],
+          newStyles: ['H25', 'J25', 'M25', 'P25'].map((ref) => [ref, 'K25'] as [string, string]),
+          same: [rowsOf('B', MIYAKO_ROWS), rowsOf('I', MIYAKO_ROWS), rowsOf('V', MIYAKO_ROWS)],
+          fit: ['I4', 'I5', 'I9', 'Z9', ...rowsOf('B', MIYAKO_ROWS), ...rowsOf('I', MIYAKO_ROWS), ...rowsOf('V', MIYAKO_ROWS)],
+          marks: [GENDER('AA7', v)],
+        },
+        // 納品確認写真用紙：1枚に1つの商品（使わない用紙は空のまま）
+        ...v.items.slice(0, MIYAKO_PHOTOS.length).map(
+          (it, k): SheetWrite => ({
+            sheet: MIYAKO_PHOTOS[k],
+            cells: [
+              ['J5', v.name],
+              ['Y5', v.insuredNo],
+              ['J7', it.product],
+            ],
+            fit: ['J5', 'J7'],
+          }),
+        ),
+      ];
+    },
+  },
+};
+
+export const shinseiForm = (insurer: string): ShinseiForm | null => SHINSEI[insurer as ShinseiKey] ?? null;
+
+// ---------------------------------------------------------------- 書き込む
+
+/**
+ * 理由のかたまり（みやこ町の I20）：届出の行（head）・理由（body。欄の幅で折り返す）・署名の行（tail）。
+ * 全部が入る文字の大きさにする（折り返しはアプリで決めて改行を入れる）
+ */
+function writeBlock(files: Files, sheet: string, block: NonNullable<SheetWrite['block']>): void {
+  const {box, style} = cellBox(files, sheet, block.cell);
+  let pt = style.size;
+  let lines: string[] = [];
+  for (; pt > 4.5; pt -= 0.5) {
+    lines = [...block.head, ...(block.body ? wrapText(block.body, box.w * 0.97, pt) : []), ...block.tail];
+    if (lines.length * ((pt * 4) / 3) * LINE_K <= box.h - 4) break;
+  }
+  writeCells(files, sheet, new Map([[block.cell, lines.join('\n')]]));
+  if (pt < style.size) sizeCell(files, sheet, block.cell, Math.max(4.5, pt));
+}
+
+/** 開いた原本（unzipSync したもの）に書き込んで、申請書（.xlsx）のバイト列にする。files は書きかえる（原本を何度も使うなら {...files} を渡す） */
+export function fillShinsei(files: Files, form: ShinseiForm, v: ShinseiValues): Uint8Array {
+  const sheets = form.sheets(v);
+  // 1. 値を書く（式の答えも合わせる）→ 2. 入りきらない欄の文字を小さくする → 3. 丸（文字の大きさが決まってから位置を計算する）
+  for (const w of sheets) {
+    const styles = new Map((w.newStyles ?? []).map(([ref, like]) => [ref, styleIdOf(files, w.sheet, like) ?? '0'] as [string, string]));
+    if (w.cells?.length) writeCells(files, w.sheet, new Map(w.cells), styles);
+    if (w.block) writeBlock(files, w.sheet, w.block);
+    if (w.hideZeros) hideZeros(files, w.sheet);
+  }
+  for (const w of sheets) for (const refs of w.same ?? []) sameStyle(files, w.sheet, refs);
+  for (const w of sheets) for (const ref of w.fit ?? []) fitCell(files, w.sheet, ref);
+  for (const w of sheets) if (w.marks?.length) drawMarks(files, w.sheet, w.marks);
+  dropCalcChain(files);
+  return finishWorkbook(files);
+}
+
+/** ファイル名：「山田花子様特定福祉用具申請書.xlsx」（住宅改修アプリの「…様住宅改修申請書.xlsx」と同じ形） */
+export function shinseiFileName(sale: Pick<Sale, 'customer'>): string {
+  const name = sale.customer.replace(/[\s　]+/g, '').replace(/[\\/:*?"<>|]/g, '') || 'お客様';
+  return `${name}様特定福祉用具申請書.xlsx`;
+}
+
+// ---------------------------------------------------------------- 作る前に確かめる
+
+/** 申請書に入らないもの・まだ入っていない欄（空欄のまま作ってよい。画面で知らせる） */
+export function shinseiChecks(sale: Sale, s: Settings): {missing: string[]; overflow: string} {
+  const form = shinseiForm(sale.insurer);
+  const v = shinseiValues(sale, s);
+  const missing: string[] = [];
+  const need = (ok: unknown, label: string) => !ok && missing.push(label);
+  need(v.name, 'お客様名');
+  need(v.kana, 'フリガナ');
+  need(v.insuredNo, '被保険者番号');
+  need(v.birth, '生年月日');
+  need(v.gender, '性別');
+  need(v.zip, '郵便番号');
+  need(v.address, '住所');
+  need(v.tel, '電話');
+  need(v.care, '要介護度');
+  need(v.items.length, '商品');
+  const noReason = v.items.filter((i) => !i.reason).length;
+  if (v.items.length && noReason) missing.push(noReason === v.items.length ? '福祉用具が必要な理由' : `福祉用具が必要な理由（${noReason}つ）`);
+  need(v.recorder, '居宅介護支援事業所・ケアマネジャー（理由の記載者）');
+  need(v.applyDate, '申請日');
+  need(v.deliveryDate, '納品日（購入予定日）');
+  if (form?.key === 'miyako') need(v.carePlan, '居宅サービス計画の届出（有・無）');
+  const overflow = form && v.items.length > form.rows ? `${form.title}の申請書の商品の欄は${form.rows}行です。${form.rows + 1}つ目からの商品（${v.items.slice(form.rows).map((i) => i.product).join('、')}）は入りません。` : '';
+  return {missing, overflow};
+}

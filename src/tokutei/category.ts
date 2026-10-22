@@ -97,10 +97,25 @@ function byName(s: string): CategoryGuess {
   return none();
 }
 
-/** 種目と細目を1つの文字にする（見積書・申請書）：「入浴補助用具（入浴用いす）」 */
+/** 種目と細目を1つの文字にする（画面で選ぶとき）：「入浴補助用具（入浴用いす）」 */
 export function categoryLabel(category: string, sub: string): string {
   if (!category) return '';
   return sub ? `${category}（${sub}）` : category;
+}
+
+/**
+ * 書類（見積書・申請書）に書く種目：細目の名前が長い腰掛便座は、ふだんの呼び名にする
+ * （「腰掛便座（移動できる便器（ポータブルトイレ））」は申請書の欄に入りきらない → 「腰掛便座（ポータブルトイレ）」）
+ */
+const DOC_SUB: Record<string, string> = {
+  和式便器を腰掛式にするもの: '据置式便座',
+  洋式便器の高さを補うもの: '補高便座',
+  立ち上がりを補助するもの: '昇降便座',
+  '移動できる便器（ポータブルトイレ）': 'ポータブルトイレ',
+};
+
+export function docLabel(category: string, sub: string): string {
+  return categoryLabel(category, DOC_SUB[sub] ?? sub);
 }
 
 /** 種目の短い呼び名（商品を選ぶ画面のタブ） */

@@ -1,5 +1,5 @@
 import {priceNote, saleTotals} from '../calc.ts';
-import {categoryLabel} from '../category.ts';
+import {docLabel} from '../category.ts';
 import {insurerLabel} from '../defaults.ts';
 import type {Sale, Settings} from '../types.ts';
 import {dateLabel, yen} from '../util.ts';
@@ -115,7 +115,7 @@ export function EstimateDoc({sale, settings: s}: {sale: Sale; settings: Settings
           {t.lines.map((l) => {
             const i = l.item;
             const code = i.code && !i.name.includes(i.code) ? ` / ${i.code}` : '';
-            const sub = [categoryLabel(i.category, i.sub), i.maker, priceNote(l)].filter(Boolean).join(' / ');
+            const sub = [docLabel(i.category, i.sub), i.maker, priceNote(l)].filter(Boolean).join(' / ');
             return (
               <tr key={i.id}>
                 <td className="name">
