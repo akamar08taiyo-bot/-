@@ -21,7 +21,7 @@ function Section({title, children, note}: {title: string; children: ReactNode; n
 
 function Field({label, children, wide = false}: {label: string; children: ReactNode; wide?: boolean}) {
   return (
-    <label className={`grid gap-1 text-xs font-bold text-slate-600 ${wide ? 'sm:col-span-2' : ''}`}>
+    <label className={`grid min-w-0 grid-cols-1 gap-1 text-xs font-bold text-slate-600 ${wide ? 'sm:col-span-2' : ''}`}>
       {label}
       {children}
     </label>
@@ -108,7 +108,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
           <select
             value={OFFICES.some((o) => o.name === s.officeName) ? s.officeName : ''}
             onChange={(e) => e.target.value && update('settings', (prev) => settingsForOffice(prev, e.target.value))}
-            className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
+            className="h-9 max-w-full rounded-md border border-slate-300 px-2 text-sm font-normal"
           >
             <option value="">（選んでください）</option>
             {OFFICES.map((o) => (
@@ -167,7 +167,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
           <select
             value={s.invoiceTaxMode}
             onChange={(e) => set({invoiceTaxMode: e.target.value as InvoiceTaxMode})}
-            className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
+            className="h-9 max-w-full rounded-md border border-slate-300 px-2 text-sm font-normal"
           >
             <option value="monthly">すべての様邸の税抜合計に、最後に消費税率をかける</option>
             <option value="perJob">様邸ごとの⑤消費税を足す（一覧に様邸ごとの消費税・合計を出す）</option>
@@ -177,7 +177,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
           <select
             value={s.totalTaxRounding}
             onChange={(e) => set({totalTaxRounding: e.target.value as Rounding})}
-            className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
+            className="h-9 max-w-full rounded-md border border-slate-300 px-2 text-sm font-normal"
           >
             <option value="floor">切り捨て</option>
             <option value="round">四捨五入</option>
@@ -188,7 +188,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
           <select
             value={s.taxMode}
             onChange={(e) => set({taxMode: e.target.value as TaxMode})}
-            className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
+            className="h-9 max-w-full rounded-md border border-slate-300 px-2 text-sm font-normal"
           >
             <option value="original">元の表と同じ（⑦×0.1－1円・四捨五入）</option>
             <option value="floor">切り捨て</option>
@@ -224,7 +224,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
           <select
             value={s.estimateForm}
             onChange={(e) => set({estimateForm: e.target.value as EstimateForm})}
-            className="h-9 rounded-md border border-slate-300 px-2 text-sm font-normal"
+            className="h-9 max-w-full rounded-md border border-slate-300 px-2 text-sm font-normal"
           >
             {FORM_IDS.map((f) => (
               <option key={f} value={f}>
