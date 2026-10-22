@@ -54,6 +54,17 @@ body {
   box-sizing: border-box;
   font-weight: 400;
 }
+/* 1枚に入らないときは EstimateDoc.tsx の useFitToPage が scale を入れる（上を合わせ、左右の中央に縮める） */
+.est-body {
+  transform-origin: top center;
+}
+@media screen {
+  /* 縮めたときの印刷イメージも A4 1枚の大きさで見せる（縮める前の高さのぶん下が空かないように） */
+  .est.est-shrunk {
+    height: 297mm;
+    overflow: hidden;
+  }
+}
 .est .gothic,
 .est th,
 .est .est-company,

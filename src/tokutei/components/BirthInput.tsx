@@ -36,9 +36,11 @@ export function BirthInput({value, onChange}: {value: string; onChange: (iso: st
         }}
         className={`h-9 w-full min-w-0 rounded-md border px-2 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${bad ? 'border-rose-300 bg-rose-50' : 'border-slate-300 bg-white'}`}
       />
-      <span className={`text-[11px] font-normal ${bad ? 'text-rose-600' : 'text-slate-500'}`}>
-        {bad ? '日付として読めません（例：S31.6.10・1956/6/10）' : value ? `${warekiLabel(value)}（${Number(value.slice(0, 4))}年）${age !== null ? `・${age}歳` : ''}` : '和暦でも西暦でも打てます'}
-      </span>
+      {(bad || value) && (
+        <span className={`text-[11px] font-normal ${bad ? 'text-rose-600' : 'text-slate-500'}`}>
+          {bad ? '日付として読めません（例：S31.6.10）' : `${warekiLabel(value)}（${Number(value.slice(0, 4))}年）${age !== null ? `・${age}歳` : ''}`}
+        </span>
+      )}
     </div>
   );
 }

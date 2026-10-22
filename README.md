@@ -41,6 +41,8 @@
 - コード：`src/tokutei/`（計算は `calc.ts`、種目の判定は `category.ts`、仕切り一覧表の読み取りは `import/`、
   申請書（行橋市・苅田町・みやこ町の Excel の原本 `shinsei/` に書き込む）は `shinsei.ts`・`xlsxEdit.ts`）
 - 保存：この端末の IndexedDB（`taiyo-tokutei`）だけ。設定からバックアップ（JSON）・商品マスタの CSV 書き出し
+- 見積書の印刷（PDF）は A4縦1枚。品目や備考が多くて入りきらないときは、中身を縮めて1枚に収める（Excel の「1ページに収める」と同じ。`print/EstimateDoc.tsx` の `useFitToPage`）
+- 見積書は印刷（PDF）のほか、同じ形の Excel（.xlsx）でも保存できる（`src/tokutei/print/estimateXlsx.ts`。金額・消費税・合計・介護保険の内訳は Excel の計算式。書体は BIZ UDP明朝 Medium・BIZ UDPゴシック。A4縦1枚に収める印刷設定つき）
 - 申請書（保険者ごとの様式への差し込み）と販売受注簿への転記は、様式をいただいてから作る
 
 ```

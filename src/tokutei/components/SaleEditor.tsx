@@ -10,6 +10,7 @@ import type {Update} from '../useStore.ts';
 import {todayIso, yen} from '../util.ts';
 import {fiscalYearOf} from '../wareki.ts';
 import {addressOfZip, zipCandidates, zipLabel} from '../zip.ts';
+import {saveEstimateXlsx} from '../print/estimateXlsx.ts';
 import {BirthInput} from './BirthInput.tsx';
 import {CategorySelect} from './CategorySelect.tsx';
 import {CustomerPicker} from './CustomerPicker.tsx';
@@ -133,8 +134,11 @@ export function SaleEditor({
           <Btn color="sky" onClick={() => onPrint(sale.id)}>
             🖨 見積書を印刷
           </Btn>
+          <Btn color="excel" onClick={() => saveEstimateXlsx(sale, data.settings)}>
+            📗 Excelで保存
+          </Btn>
           {shinseiForm(sale.insurer) && (
-            <Btn color="blue" onClick={() => document.getElementById('shinsei-panel')?.scrollIntoView({behavior: 'smooth', block: 'center'})}>
+            <Btn color="white" onClick={() => document.getElementById('shinsei-panel')?.scrollIntoView({behavior: 'smooth', block: 'center'})}>
               📄 申請書
             </Btn>
           )}
@@ -174,7 +178,7 @@ export function SaleEditor({
                   aria-label="被保険者番号"
                 />
               </Field>
-              <Field label="生年月日（和暦でも西暦でも）">
+              <Field label="生年月日">
                 <BirthInput value={sale.birthDate} onChange={(birthDate) => change({birthDate})} />
               </Field>
               <div className="grid grid-cols-2 gap-3">
@@ -200,7 +204,7 @@ export function SaleEditor({
                   </select>
                 </Field>
               </div>
-              <Field label="郵便番号（住所から自動）">
+              <Field label="郵便番号">
                 <TextInput value={sale.zip} onChange={changeZip} onBlur={() => sale.zip && change({zip: zipLabel(sale.zip)})} inputMode="numeric" placeholder="824-0043" aria-label="郵便番号" />
                 {zips.length > 1 && (
                   <span className="text-[11px] font-normal text-slate-500">
@@ -285,7 +289,7 @@ export function SaleEditor({
                 <OptionalNumberInput value={sale.remaining} onChange={(remaining) => change({remaining})} placeholder={`空欄＝${yen(s.limit)}円`} ariaLabel="今年度の残り" />
                 {prevYear.length > 0 && (
                   <span className="text-[11px] font-normal text-slate-600">
-                    この方の{fy ?? ''}年度の申請（このアプリの記録）：{prevYear.length}件・{yen(usedYear)}円 → 残り {yen(Math.max(0, s.limit - usedYear))}円
+                    {fy ?? ''}年度の申請 {prevYear.length}件・{yen(usedYear)}円 → 残り {yen(Math.max(0, s.limit - usedYear))}円
                     {sale.remaining !== Math.max(0, s.limit - usedYear) && (
                       <button type="button" onClick={() => change({remaining: Math.max(0, s.limit - usedYear)})} className="ml-1 font-bold text-teal-700 underline">
                         入れる
@@ -315,7 +319,6 @@ export function SaleEditor({
                       ['無', '無'],
                     ]}
                   />
-                  {!sale.carePlan && sale.careOffice.trim() && <span className="text-[11px] font-normal text-slate-500">居宅介護支援事業所が入っているので「有」にしています</span>}
                 </Field>
               )}
             </div>
@@ -422,7 +425,7 @@ export function SaleEditor({
                         </div>
                       </div>
                       <div className="mt-2 grid min-w-0 grid-cols-1 gap-1 pl-8 text-xs font-bold text-slate-600">
-                        福祉用具が必要な理由（申請書）
+                        福祉用具が必要な理由
                         <ReasonField item={i} sales={data.sales} saleId={sale.id} onChange={(reason) => changeItem(i.id, {reason})} />
                       </div>
                     </div>
@@ -444,7 +447,7 @@ export function SaleEditor({
                   ))}
                 </select>
               </Field>
-              <Field label="居宅介護支援事業所（理由の記載者）">
+              <Field label="居宅介護支援事業所">
                 <TextInput value={sale.careOffice} onChange={(careOffice) => change({careOffice})} aria-label="居宅介護支援事業所" />
                 <Suggest values={frequentValues(data.sales, (x) => x.careOffice)} current={sale.careOffice} onPick={(careOffice) => change({careOffice})} />
               </Field>
@@ -471,10 +474,10 @@ export function SaleEditor({
               <Field label="承認日">
                 <input type="date" value={sale.approveDate} onChange={(e) => change({approveDate: e.target.value})} className={dateInput} aria-label="承認日" />
               </Field>
-              <Field label="納品日（購入日・撮影日）">
+              <Field label="納品日（購入日）">
                 <input type="date" value={sale.deliveryDate} onChange={(e) => change({deliveryDate: e.target.value})} className={dateInput} aria-label="納品日" />
               </Field>
-              <Field label="支給申請日（支給申請書の日付）">
+              <Field label="支給申請日">
                 <input type="date" value={sale.claimDate} onChange={(e) => change({claimDate: e.target.value})} className={dateInput} aria-label="支給申請日" />
               </Field>
             </div>

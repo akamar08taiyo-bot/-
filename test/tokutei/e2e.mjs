@@ -8,6 +8,7 @@ import {createServer} from 'node:http';
 import {mkdirSync, readFileSync} from 'node:fs';
 import {join} from 'node:path';
 import assert from 'node:assert/strict';
+import {strFromU8, unzipSync} from 'fflate';
 
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node22/lib/node_modules/playwright/index.mjs');
 const out = process.argv[2] ?? 'e2e-out';
@@ -39,6 +40,29 @@ const TABLE = [
 ]
   .map((r) => r.join('\t'))
   .join('\n');
+
+/**
+ * 印刷イメージの見積書が A4 1枚に収まっているか：いちばん下の備考が、下の余白（14mm）より上にある（画面と印刷の両方。
+ * mm は .est の幅 210mm から）。印刷の media のままで戻る。縮めた割合（1＝縮めていない）を返す
+ */
+async function assertFits(page, label) {
+  for (const media of ['screen', 'print']) {
+    await page.emulateMedia({media});
+    const bottom = await page.evaluate(() => {
+      const est = document.querySelector('.est').getBoundingClientRect();
+      const last = document.querySelector('.est-remarks').getBoundingClientRect();
+      return ((last.bottom - est.top) / est.width) * 210;
+    });
+    assert.ok(bottom <= 296 - 14 + 0.2, `${label}（${media}）：備考の下が ${bottom.toFixed(1)}mm で、A4 からはみ出している`);
+  }
+  const t = await page.locator('.est-body').evaluate((e) => e.style.transform);
+  return t ? Number(/scale\(([\d.]+)\)/.exec(t)[1]) : 1;
+}
+
+/** PDF のページ数（pdfinfo がなくても数えられるように、ページのオブジェクトを数える） */
+function pdfPages(file) {
+  return (readFileSync(file).toString('latin1').match(/\/Type\s*\/Page\b(?!s)/g) ?? []).length;
+}
 
 const browser = await chromium.launch({env: {...process.env, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8'}});
 const errors = [];
@@ -91,7 +115,7 @@ try {
   await page.screenshot({path: `${out}/04-sale.png`, fullPage: true});
 
   // ---- 申請書：まだ入っていない欄が出る → 入れる（生年月日は和暦で・郵便番号は住所から自動・理由は文例のボタン）→ Excel を作る
-  await page.getByText('まだ入っていない欄（空欄のまま作ります）').waitFor();
+  await page.getByText('未入力（空欄のまま作ります）').waitFor();
   await page.getByLabel('フリガナ').fill('ヤマダ ハナコ');
   await page.getByLabel('生年月日').fill('S15.3.15');
   await page.getByText('昭和15年3月15日（1940年）').waitFor();
@@ -107,13 +131,12 @@ try {
   await page.getByLabel('申請日', {exact: true}).fill('2026-10-22');
   await page.getByLabel('納品日').fill('2026-10-30');
   await page.waitForTimeout(600);
-  assert.equal(await page.getByText('まだ入っていない欄（空欄のまま作ります）').count(), 0);
+  assert.equal(await page.getByText('未入力（空欄のまま作ります）').count(), 0);
   await page.screenshot({path: `${out}/04b-sale-shinsei.png`, fullPage: true});
-  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📄 申請書（Excel）を作る'}).click()]);
-  assert.equal(download.suggestedFilename(), '山田花子様特定福祉用具申請書.xlsx');
-  await download.saveAs(`${out}/shinsei.xlsx`);
+  const [shinseiFile] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📄 申請書（Excel）を作る'}).click()]);
+  assert.equal(shinseiFile.suggestedFilename(), '山田花子様特定福祉用具申請書.xlsx');
+  await shinseiFile.saveAs(`${out}/shinsei.xlsx`);
   {
-    const {unzipSync} = await import('fflate');
     const {readCell, ellipseCount} = await import('../../src/tokutei/xlsxEdit.ts');
     const f = unzipSync(new Uint8Array(readFileSync(`${out}/shinsei.xlsx`)));
     const sh = '用具・受領委任払';
@@ -141,10 +164,34 @@ try {
   }
   await page.screenshot({path: `${out}/05-estimate.png`});
   await page.locator('.est').screenshot({path: `${out}/05b-estimate-doc.png`});
-  // 印刷（PDF）は A4縦 1枚に収まる（ページ数は pdfinfo で確かめる）
-  await page.emulateMedia({media: 'print'});
+  // Excel で保存：印刷と同じ金額（式の値）が入った .xlsx が、PDF と同じ名前で保存される
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('.print-toolbar').getByRole('button', {name: '📗 Excelで保存'}).click()]);
+  assert.equal(download.suggestedFilename(), '御見積書_山田 花子様.xlsx');
+  await download.saveAs(`${out}/estimate.xlsx`);
+  const sheet = strFromU8(unzipSync(readFileSync(`${out}/estimate.xlsx`))['xl/worksheets/sheet1.xml']);
+  for (const v of ['42944', '4295', '38649']) assert.ok(sheet.includes(`<v>${v}</v>`), `Excel に ${v} がない`);
+  // 印刷（PDF）は A4縦 1枚で、下が切れない（入りきらなければ縮める）
+  await assertFits(page, '2品');
   await page.pdf({path: `${out}/estimate.pdf`, preferCSSPageSize: true, printBackground: true});
+  assert.equal(pdfPages(`${out}/estimate.pdf`), 1);
   await page.emulateMedia({media: 'screen'});
+  await page.getByRole('button', {name: '閉じる'}).click();
+
+  // ---- 品目と備考が多くて A4 1枚に入らない見積書は、縮めて1枚に収める（下が切れない。ユーザーの答え「縮めます」）
+  // 手で入れた品目は価格が空（0円）なので、合計（42,944円）は変わらない
+  for (let n = 1; n <= 8; n++) {
+    await page.getByRole('button', {name: '＋ 手で入れる'}).click();
+    await page.getByLabel('商品名').last().fill(`見本の商品 ${n}`);
+  }
+  await page.getByLabel('備考').fill(['デモ機の貸し出しがあります。', 'ご不明な点は担当までお問い合わせください。', '納品の前にお電話いたします。', '見本の備考 4', '見本の備考 5'].join('\n'));
+  await page.getByRole('button', {name: '🖨 見積書を印刷'}).first().click();
+  await page.locator('.est').waitFor();
+  const scale = await assertFits(page, '10品・備考5行');
+  assert.ok(scale < 0.85, `10品なのに ${scale} までしか縮めていない`);
+  await page.pdf({path: `${out}/estimate-long.pdf`, preferCSSPageSize: true, printBackground: true});
+  assert.equal(pdfPages(`${out}/estimate-long.pdf`), 1);
+  await page.emulateMedia({media: 'screen'});
+  await page.locator('.est').screenshot({path: `${out}/05c-estimate-long.png`});
   await page.getByRole('button', {name: '閉じる'}).click();
 
   // ---- 読み直しても残っている（IndexedDB）
@@ -191,7 +238,7 @@ try {
   assert.ok(overflow <= 1, `スマホの幅で横にはみ出している（${overflow}px）`);
 
   assert.deepEqual(errors, []);
-  console.log('ok: 取り込み → ★ → 見積もり → 申請書（Excel） → 見積書 → 読み直し → スマホの幅');
+  console.log('ok: 取り込み → ★ → 見積もり → 申請書（Excel） → 見積書・Excel → 読み直し → スマホの幅');
 } finally {
   await browser.close();
   server.close();

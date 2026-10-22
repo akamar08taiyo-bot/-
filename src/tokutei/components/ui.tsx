@@ -8,6 +8,7 @@ const COLORS = {
   blue: 'bg-blue-600 hover:bg-blue-700 text-white', // 保存・決定
   rose: 'bg-rose-600 hover:bg-rose-700 text-white', // 削除
   sky: 'bg-sky-600 hover:bg-sky-700 text-white', // 印刷
+  excel: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300', // Excel で保存（薄い緑）
   cyan: 'bg-cyan-800 hover:bg-cyan-900 text-white', // まとめて印刷
   teal: 'bg-teal-600 hover:bg-teal-700 text-white', // 一覧・管理
   purple: 'bg-purple-600 hover:bg-purple-700 text-white', // メーカー・取り込み

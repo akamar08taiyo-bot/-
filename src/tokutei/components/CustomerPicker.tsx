@@ -34,7 +34,6 @@ export function CustomerPicker({sales, current, onPick, onClose}: {sales: Sale[]
           ))}
         </ul>
       )}
-      <p className="mt-3 text-xs text-slate-500">お客様・介護保険（保険者・負担割合）・居宅介護支援事業所・ケアマネジャーを写します。商品・日付は写しません。</p>
     </Modal>
   );
 }
