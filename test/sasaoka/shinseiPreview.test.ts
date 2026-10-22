@@ -150,6 +150,18 @@ test('プレビュー：原本で縦書きの欄は縦書き（写真貼付用�
   assert.ok(preview('kanda').every((p) => p.texts.every((t) => !t.vertical))); // 苅田町の原本に縦書きはない
 });
 
+test('プレビュー：みやこ町・広域連合の写真貼付用紙は、その写真番号の箇所の改修の種類（①〜⑥）に丸（原本に残っていた丸は出さない）', () => {
+  const j = (insurer: Insurer) => job(insurer, {places: [place('p1', '玄関', [mat('r1', 'L型手すり')]), place('p2', 'トイレ', [mat('r2', '段差解消スロープ')], {kind: 2})]});
+  for (const insurer of ['miyako', 'kouiki'] as const) {
+    const photos = preview(insurer, j(insurer)).filter((p) => p.kind === 'photo');
+    const circled = photos.map((p) => {
+      const cols = ['D6', 'F6', 'H6', 'J6', 'L6', 'N6'].map((ref) => p.texts.find((t) => t.ref === ref)!);
+      return p.shapes.filter((s) => s.kind === 'ellipse').map((s) => cols.findIndex((c) => s.x + s.w / 2 >= c.x && s.x + s.w / 2 <= c.x + c.w) + 1);
+    });
+    assert.deepEqual(circled, [[1], [2]], insurer); // ①玄関＝手すり、②トイレ＝段差の解消（プレビューは箇所のある写真番号だけ。箇所のない用紙は Excel のテスト）
+  }
+});
+
 test('プレビュー：押すと入れられる欄（申請書の画面の項目）と、押すと丸がつく値。式で同じ値を出す欄（支給申請書の氏名など）も押せる', () => {
   const fieldsOf = (p: PvPage) => [...new Set(p.fields.map((f) => f.field))].sort();
   const [pre] = preview('kanda');

@@ -969,7 +969,10 @@ assert.deepEqual([text(md, 'D15'), text(md, 'K14')], ['玄関・トイレ', WORK
 assert.deepEqual([1, 2, 3].map((n) => text(m.sheets.get(`写真 (${n})`), 'B5')), ['玄関', 'トイレ', '']); // 写真番号の改修場所
 // 性別（女）・改修状況（無）を囲む。承認届出書は原本の丸（受領委任払いなど2つ）に足す。支給申請書は図形を足す
 assert.deepEqual([m.ellipses('住宅改修承認届出書'), m.ellipses('住宅改修費支給申請書(受領委任払用)')], [2 + 2, 2]);
-log('みやこ町の申請書（6枚のプレビュー・式の欄も押せる・承認届出書・支給申請書・内訳明細書・写真）OK');
+// 写真の用紙の改修の種別：箇所のある写真番号はその改修の種類（①玄関・②トイレとも①手すり）に丸、箇所のない用紙は丸なし（原本に残っていた丸は消す）。プレビューにも
+assert.deepEqual([1, 2, 3, 4].map((n) => m.ellipses(`写真 (${n})`)), [1, 1, 0, 0]);
+assert.equal(await pageOf('写真 (2)').locator('svg ellipse').count(), 1);
+log('みやこ町の申請書（6枚のプレビュー・式の欄も押せる・承認届出書・支給申請書・内訳明細書・写真・改修の種別の丸）OK');
 
 // ---------------- 広域連合（築上町など）：承認申請書・支給申請書（受領委任払用）・内訳明細書（別紙）・平面図・写真貼付用紙
 await page.getByRole('combobox', {name: '保険者'}).selectOption('kouiki');
@@ -1008,6 +1011,8 @@ assert.deepEqual(photosOf(g, '写真貼付用紙', 31), ['改修前:1600x533']);
 assert.deepEqual(photosOf(g, '写真貼付用紙 (2)', 31).sort(), ['改修前:900x1600', '改修後:1200x900']);
 const twins = SHINSEI_PHOTO_SHEETS.kouiki.filter((n) => !['写真貼付用紙', '写真貼付用紙 (2)'].includes(n));
 for (const n of twins) assert.deepEqual(photosOf(g, n, 31), [], n);
+// 改修の種別の丸：①①②②の用紙は①手すり（原本の②の用紙の丸は②だった）、箇所のない③〜⑤の用紙は丸なし
+assert.deepEqual(SHINSEI_PHOTO_SHEETS.kouiki.map((n) => g.ellipses(n)), [1, 1, 1, 1, 0, 0, 0, 0, 0, 0]);
 log('広域連合の申請書（6枚のプレビュー・ヘッダー・承認申請書・支給申請書・内訳明細書・平面図・写真貼付用紙・丸）OK');
 // 4つの保険者すべてで申請書の Excel のボタンが出る
 for (const i of ['kanda', 'yukuhashi', 'miyako', 'kouiki']) {

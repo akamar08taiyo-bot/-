@@ -247,6 +247,39 @@ test('みやこ町の写真の用紙の撮影日：原本の「撮影日」の�
   assert.ok(!SHINSEI.kouiki!.sheets.some((x) => x.photoPlace?.dates));
 });
 
+test('みやこ町・広域連合の写真貼付用紙の改修の種別：その写真番号の箇所の改修の種類を楕円で囲む（原本に残っていた前の申請の丸は消す。箇所のない用紙は丸なし）', () => {
+  for (const insurer of ['miyako', 'kouiki'] as const) {
+    const v = shinseiValues(job({insurer}), RATES);
+    assert.deepEqual(v.photoKinds, {1: 1, 3: 2, 5: 1}); // 浴室①は手すり・トイレ③は段差の解消・玄関⑤は手すり（②④は箇所なし）
+    const {files, byName} = sheets(fillShinsei(TEMPLATES[insurer], SHINSEI[insurer]!, v));
+    const strings = [...strFromU8(files['xl/sharedStrings.xml']).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) =>
+      [...m[1].replace(/<rPh\b[\s\S]*?<\/rPh>/g, '').matchAll(/<t[^>]*>([^<]*)<\/t>/g)].map((t) => t[1]).join(''),
+    );
+    const photoSheets = SHINSEI[insurer]!.sheets.filter((x) => x.photoPlace?.kindCircles);
+    assert.equal(photoSheets.length, insurer === 'miyako' ? 4 : 10);
+    for (const sheet of photoSheets) {
+      const xml = byName.get(sheet.sheet)!;
+      const no = (strings[Number(/<c r="R4"[^>]*t="s"[^>]*><v>(\d+)<\/v>/.exec(xml)?.[1])] ?? '').charCodeAt(0) - 0x2460 + 1; // 原本の写真番号（①〜⑤）
+      const lay = sheetLayout(xml);
+      const path = drawingPath(files, sheet.sheet);
+      // 楕円のまん中がある種別の欄（1〜6。どれでもなければ 0）
+      const kinds = (path ? anchorsOf(strFromU8(files[path])) : [])
+        .filter((a) => /prst="ellipse"/.test(a))
+        .map((a) => {
+          const {from, to} = anchorOf(a);
+          const [cx, cy] = [(posPx(from[0], from[1], lay.colW) + posPx(to[0], to[1], lay.colW)) / 2, (posPx(from[2], from[3], lay.rowH) + posPx(to[2], to[3], lay.rowH)) / 2];
+          return (
+            sheet.photoPlace!.kindCircles!.findIndex((r) => {
+              const b = rangeBox(lay, r);
+              return cx >= b.x && cx <= b.x + b.w && cy >= b.y && cy <= b.y + b.h;
+            }) + 1
+          );
+        });
+      assert.deepEqual(kinds, v.photoKinds![no] ? [v.photoKinds![no]] : [], `${insurer} ${sheet.sheet}（${no}）`);
+    }
+  }
+});
+
 test('改修の内容が10箇所・12箇所でも欄からはみ出さない：入らなければ文字を小さくする（申請書の欄・式で同じ内容を出す欄・内訳明細書の行・平面図）', () => {
   const NAMES = ['玄関', '上がり框', '廊下', '階段', 'トイレ', '浴室', '脱衣所', '洗面所', '居室', '寝室', '台所', '勝手口'];
   const many = (n: number, insurer: Insurer = 'kanda') => job({insurer, places: NAMES.slice(0, n).map((name) => place(name, [mat('L型手すり')], {dims: {l: '600×850', h: '800'}}))});
@@ -465,6 +498,8 @@ const anchorOf = (a: string) => {
   const n = [...a.matchAll(/<xdr:(?:col|colOff|row|rowOff)>(\d+)</g)].map((m) => Number(m[1]));
   return {from: n.slice(0, 4), to: n.slice(4, 8)};
 };
+/** 置き場所の列（行）の番号と、その中の位置（EMU）→ シートの左上からの画素 */
+const posPx = (n: number, off: number, size: (i: number) => number) => Array.from({length: n}, (_, i) => size(i + 1)).reduce((a, b) => a + b, 0) + off / 9525;
 
 /** シートの楕円の図形（from・to の [列, 列の中の位置, 行, 行の中の位置]。0始まり） */
 function ellipses(bytes: Uint8Array, sheet: string): {from: number[]; to: number[]}[] {
@@ -776,8 +811,7 @@ test('写真貼付用紙：写真番号の用紙の改修前・改修後の枠�
   assert.ok(c1 >= 0 && c2 >= c1);
   // Excel は 90°回した図形の置き場所（from・to）を、まん中で 90°回した四角（縦横を入れかえた四角）で持つ：置き場所の幅＝回す前の高さ、高さ＝回す前の幅。まん中は同じ
   const lay = sheetLayout(strFromU8(ef[sheetPath(ef, kSheet.sheet)]));
-  const px = (n: number, off: number, size: (i: number) => number) => Array.from({length: n}, (_, i) => size(i + 1)).reduce((a, b) => a + b, 0) + off / 9525;
-  const [ax1, ay1, ax2, ay2] = [px(from[0], from[1], lay.colW), px(from[2], from[3], lay.rowH), px(to[0], to[1], lay.colW), px(to[2], to[3], lay.rowH)];
+  const [ax1, ay1, ax2, ay2] = [posPx(from[0], from[1], lay.colW), posPx(from[2], from[3], lay.rowH), posPx(to[0], to[1], lay.colW), posPx(to[2], to[3], lay.rowH)];
   const [ox, oy] = /<a:off x="(-?\d+)" y="(-?\d+)"\/>/.exec(rotated)!.slice(1).map((v) => Number(v) / 9525);
   assert.ok(Math.abs(ax2 - ax1 - rh / 9525) < 1 && Math.abs(ay2 - ay1 - rw / 9525) < 1, `置き場所が縦横を入れかえた四角でない ${[ax1, ay1, ax2, ay2]} / ${rw}×${rh}`);
   assert.ok(Math.abs((ax1 + ax2) / 2 - (ox + rw / 9525 / 2)) < 1 && Math.abs((ay1 + ay2) / 2 - (oy + rh / 9525 / 2)) < 1, '置き場所のまん中が写真のまん中でない');

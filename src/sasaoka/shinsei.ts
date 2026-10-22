@@ -26,8 +26,9 @@ export type ShinseiSheet = {
   // 写真貼付用紙：原本の写真番号の欄（①・写真番号①・№①）を読み、その写真番号の改修場所を改修箇所の欄（place）に入れ、
   // その写真番号の箇所の写真を改修前・改修後の枠（番地の範囲。before・after）に貼る（同じ写真番号の用紙が2枚あれば、最初の用紙だけ）。
   // 苅田町の写真の用紙は、改修箇所・実施した工事種類が□の一覧（placeChecks・kindChecks。その写真番号の箇所の□を■に）と、撮影日の欄（dates）。
-  // みやこ町の写真の用紙も撮影日の欄がある（原本は「撮影日」とだけ書いた欄なので、label のうしろに日付）
-  photoPlace?: {photo: string; place?: string; before?: string; after?: string; placeChecks?: string; kindChecks?: string; dates?: {before: string; after: string; label?: string}};
+  // みやこ町の写真の用紙も撮影日の欄がある（原本は「撮影日」とだけ書いた欄なので、label のうしろに日付）。
+  // みやこ町・広域連合の写真貼付用紙の改修の種別（①〜⑥の欄の範囲 kindCircles）は、その写真番号の箇所の改修の種類を楕円で囲む
+  photoPlace?: {photo: string; place?: string; before?: string; after?: string; placeChecks?: string; kindChecks?: string; kindCircles?: string[]; dates?: {before: string; after: string; label?: string}};
   // 平面図：写真番号の順の工事内容（改修の内容と同じ行「玄関① 木製L字手すり L=600×850㎜」）を空いた所に書く（ユーザーの指示）。
   // cell＝折り返しの欄に書く（みやこ町の下の欄）、box＝その範囲にテキストボックスを置く（前の申請の平面図と同じ）。平面図そのものはユーザーが Excel で描く
   legend?: {cell?: string; box?: string};
@@ -69,8 +70,15 @@ const circledNum = (ch: string) => ch.charCodeAt(0) - 0x2460 + 1;
 const KOUIKI_PHOTO_SHEETS = ['写真貼付用紙', ...[6, 2, 7, 3, 8, 4, 9, 5, 10].map((n) => `写真貼付用紙 (${n})`)];
 /** 住宅改修内訳明細書（様式第2号別紙）の改修の種類の行（①14行目〜⑥24行目）：箇所はその下の行の D、工事内容は K（2行分） */
 const KIND_ROWS = [14, 16, 18, 20, 22, 24].map((r) => ({places: `D${r + 1}`, works: `K${r}`}));
-/** 写真貼付用紙（みやこ町・広域連合）：被保険者氏名（B4）・被保険者番号（D4〜M4）・写真番号（R4）・改修箇所（B5）・改修前の写真（A9:S31）・改修後（A34:S58） */
-const PHOTO_SHEET = {name: 'B4', insuredNo: boxes('D', 10, 4), photoPlace: {photo: 'R4', place: 'B5', before: 'A9:S31', after: 'A34:S58'}};
+/**
+ * 写真貼付用紙（みやこ町・広域連合）：被保険者氏名（B4）・被保険者番号（D4〜M4）・写真番号（R4）・改修箇所（B5）・改修前の写真（A9:S31）・改修後（A34:S58）。
+ * 改修の種別（①手すり D5:E6・②段差解消 F5:G6 …⑥付帯工事 N5:O6）は、その写真番号の箇所の改修の種類を楕円で囲む（`drawKindCircle`）
+ */
+const PHOTO_SHEET = {
+  name: 'B4',
+  insuredNo: boxes('D', 10, 4),
+  photoPlace: {photo: 'R4', place: 'B5', before: 'A9:S31', after: 'A34:S58', kindCircles: ['D5:E6', 'F5:G6', 'H5:I6', 'J5:K6', 'L5:M6', 'N5:O6']},
+};
 /** みやこ町の写真貼付用紙：広域連合と同じ欄のほか、撮影日（改修前 D7・改修後 D32。原本は「撮影日」とだけ書いた欄。広域連合の用紙には撮影日の欄がない） */
 const MIYAKO_PHOTO = {...PHOTO_SHEET, photoPlace: {...PHOTO_SHEET.photoPlace, dates: {before: 'D7', after: 'D32', label: '撮影日　'}}};
 /**
@@ -733,6 +741,7 @@ export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void
     wrapKinds(files, sheet, v);
     fitLines(files, sheet, v);
     drawMarks(files, sheet, v.marks);
+    if (sheet.photoPlace?.kindCircles) drawKindCircle(files, sheet, photo > 0 && v.photos[photo] !== undefined ? (v.photoKinds?.[photo] ?? 0) : 0);
     if (sheet.legend?.box) drawLegend(files, sheet, v.works);
     // Excel に保存するとき（photoImages があるとき）：箇所のある写真番号の最初の用紙に、写真と、写真の横（上）に書く内容を入れる
     //（画面のプレビューは、写真と書く内容を枠に重ねて描く）
@@ -1384,6 +1393,43 @@ function noteBoxXml(lay: SheetLayout, box: Box, lines: string[], pt: number, id:
     `<xdr:style><a:lnRef idx="0">${none}</a:lnRef><a:fillRef idx="0">${none}</a:fillRef><a:effectRef idx="0">${none}</a:effectRef><a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef></xdr:style>` +
     `<xdr:txBody><a:bodyPr wrap="square" lIns="${ix}" tIns="${iy}" rIns="${ix}" bIns="${iy}" rtlCol="0" anchor="t"/><a:lstStyle/>${paras}</xdr:txBody></xdr:sp><xdr:clientData/></xdr:twoCellAnchor>`
   );
+}
+
+/** 図形の置き場所（from・to）の四角（画素・シートの左上から） */
+function anchorRect(lay: SheetLayout, anchor: string): Box | null {
+  const n = [...anchor.matchAll(/<xdr:(?:col|colOff|row|rowOff)>(\d+)</g)].map((m) => Number(m[1]));
+  if (n.length < 8) return null;
+  const at = (i: number, off: number, size: (i: number) => number) => {
+    let t = 0;
+    for (let k = 1; k <= i; k++) t += size(k);
+    return t + off / EMU;
+  };
+  const [x1, y1, x2, y2] = [at(n[0], n[1], lay.colW), at(n[2], n[3], lay.rowH), at(n[4], n[5], lay.colW), at(n[6], n[7], lay.rowH)];
+  return {x: x1, y: y1, w: x2 - x1, h: y2 - y1};
+}
+
+/**
+ * みやこ町・広域連合の写真貼付用紙の改修の種別（①手すり〜⑥付帯工事）：その写真番号の箇所の改修の種類を楕円で囲む（苅田町の□と同じく、選んだ項目と連動）。
+ * 原本には前の申請の丸が残っていた（みやこ町は4枚とも①、広域連合は②の用紙だけ②）ので、種別の欄に重なる楕円は消してから描く。kind が 0（箇所のない写真番号）なら丸なし
+ */
+function drawKindCircle(files: Files, sheet: ShinseiSheet, kind: number): void {
+  const ranges = sheet.photoPlace?.kindCircles;
+  const path = sheetPaths(files).get(sheet.sheet);
+  if (!ranges?.length || !path || !files[path]) return;
+  const lay = sheetLayout(strFromU8(files[path]));
+  const drawing = drawingOf(files, path);
+  let d = drawing && files[drawing] ? strFromU8(files[drawing]) : '';
+  if (!d.includes('</xdr:wsDr>')) return;
+  // ①〜⑥の欄（まん中が入っている楕円が、原本の丸）
+  const area = rangeBox(lay, `${ranges[0].split(':')[0]}:${ranges[ranges.length - 1].split(':')[1]}`);
+  const inArea = (b: Box | null) => !!b && b.x + b.w / 2 >= area.x && b.x + b.w / 2 <= area.x + area.w && b.y + b.h / 2 >= area.y && b.y + b.h / 2 <= area.y + area.h;
+  d = d.replace(/<xdr:(twoCellAnchor|oneCellAnchor|absoluteAnchor)\b[\s\S]*?<\/xdr:\1>/g, (a) => (/prst="ellipse"/.test(a) && inArea(anchorRect(lay, a)) ? '' : a));
+  const range = kind > 0 ? ranges[kind - 1] : undefined;
+  if (range) {
+    const b = rangeBox(lay, range);
+    d = d.replace('</xdr:wsDr>', `${ellipseXml(lay, {x: b.x + 1.5, y: b.y + 1, w: b.w - 3, h: b.h - 2}, nextShapeId(d))}</xdr:wsDr>`);
+  }
+  files[drawing] = strToU8(d);
 }
 
 /** 選んだ値（性別の「女」など）を丸で囲む：原本のシートの図形に楕円を足す */
