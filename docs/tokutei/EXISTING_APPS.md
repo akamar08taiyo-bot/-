@@ -72,6 +72,7 @@
 - 受注簿は `/taiyo-hacchu-scan/?from=jutaku` を新しいタブで開き、「受注簿に入れる／入れない」。どちらでも読んだら消す。
 - 1点1ページ、受注区分は「販売」固定、販売単価 ＝ 定価×(100−割引率)%。入力途中の受注簿があれば `window.confirm`。
 - **知らない kind・部材が空・リンクから開いていないのに1日より前のものは黙って消す。** → 特定福祉用具の受け取り（`kind: 'taiyo-tokutei-order'`）を足すまでは、こちらから送っても消える。
+  → 2026-10-22 に受注簿ツールのブランチ `claude/care-insurance-auto-transfer-3z0c9n` で特定福祉用具の受け取りを足した（同じ口を kind で分ける・`?from=tokutei`。DESIGN.md 5.3）。受注簿ツールの公開が先。
 - コード：`src/main.jsx` の `/* jutaku-import-begin */`〜`/* jutaku-import-end */`、テスト `test/jutaku-import.test.mjs`。
 
 ### 1.5 営業所の情報（受注簿ツールの `branchOffices`。行橋営業所）

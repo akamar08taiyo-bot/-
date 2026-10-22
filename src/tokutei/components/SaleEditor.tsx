@@ -1,8 +1,9 @@
 import {useRef, useState} from 'react';
-import type {ReactNode} from 'react';
+import type {MouseEvent, ReactNode} from 'react';
 import {priceNote, saleTotals} from '../calc.ts';
 import {docLabel} from '../category.ts';
 import {CARE_LEVELS, INSURERS, insurerLabel} from '../defaults.ts';
+import {HACCHU_IMPORT_KEY, hacchuImport, hacchuUrl} from '../handoff.ts';
 import {blankItem, copySale, customerLabel, customerPatch, frequentValues, itemFromProduct, markUsed, sameYearSales, saleWarnings} from '../sales.ts';
 import {carePlanOf, padInsuredNo, shinseiForm} from '../shinsei.ts';
 import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Sale, SaleItem, SaleStatus, TaxType} from '../types.ts';
@@ -18,7 +19,7 @@ import {ProductPicker} from './ProductPicker.tsx';
 import {ReasonField} from './ReasonField.tsx';
 import {ShinseiPanel} from './ShinseiPanel.tsx';
 import {Suggest} from './Suggest.tsx';
-import {Btn, NumberInput, OptionalNumberInput, Segmented, Stepper, TextInput, useToast} from './ui.tsx';
+import {Btn, btnClass, NumberInput, OptionalNumberInput, Segmented, Stepper, TextInput, useToast} from './ui.tsx';
 
 const STATUSES: SaleStatus[] = ['見積', '申請', '承認', '納品', '集金'];
 // 状態を進めたとき、その日付が空なら今日を入れる
@@ -122,6 +123,23 @@ export function SaleEditor({
     onOpen(c.id);
   };
 
+  // 販売受注簿作成ツールを新しいタブで開く（リンクなので、ポップアップを止める設定でも開く）。開く前に商品を置いておく（handoff.ts）
+  const transfer = (ev: MouseEvent<HTMLAnchorElement>) => {
+    if (sale.items.length === 0) {
+      ev.preventDefault();
+      toast('商品がありません', 'error');
+      return;
+    }
+    try {
+      localStorage.setItem(HACCHU_IMPORT_KEY, JSON.stringify(hacchuImport(sale, s)));
+    } catch {
+      ev.preventDefault();
+      toast('販売受注簿へ渡せませんでした（この端末のブラウザに保存できません）', 'error');
+      return;
+    }
+    toast(`販売受注簿を開きました（商品 ${sale.items.length}点）。開いた画面で「受注簿に入れる」を押してください`);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -142,6 +160,9 @@ export function SaleEditor({
               📄 申請書
             </Btn>
           )}
+          <a href={hacchuUrl()} target="_blank" onClick={transfer} className={btnClass('white')}>
+            📤 販売受注簿に転記
+          </a>
           <Btn color="white" onClick={duplicate}>
             複製
           </Btn>

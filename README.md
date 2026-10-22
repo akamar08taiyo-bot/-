@@ -43,7 +43,10 @@
 - 保存：この端末の IndexedDB（`taiyo-tokutei`）だけ。設定からバックアップ（JSON）・商品マスタの CSV 書き出し
 - 見積書の印刷（PDF）は A4縦1枚。品目や備考が多くて入りきらないときは、中身を縮めて1枚に収める（Excel の「1ページに収める」と同じ。`print/EstimateDoc.tsx` の `useFitToPage`）
 - 見積書は印刷（PDF）のほか、同じ形の Excel（.xlsx）でも保存できる（`src/tokutei/print/estimateXlsx.ts`。金額・消費税・合計・介護保険の内訳は Excel の計算式。書体は BIZ UDP明朝 Medium・BIZ UDPゴシック。A4縦1枚に収める印刷設定つき）
-- 申請書（保険者ごとの様式への差し込み）と販売受注簿への転記は、様式をいただいてから作る
+- 申請書は行橋市・苅田町・みやこ町の原本に書き込む（広域連合は様式をいただいてから）
+- 販売受注簿への転記：見積もりの画面の「📤 販売受注簿に転記」で、販売受注簿作成ツール（taiyo-hacchu-scan）を新しいタブで開き、商品1点ずつ受注区分「給付」のページにする
+  （同じサイトの localStorage `taiyo-hacchu-import-v1`、kind `taiyo-tokutei-order`。`src/tokutei/handoff.ts`。ページごとの給付内訳は、合計が見積書と同じになるようにこのアプリで分けて送る。
+  受け取りは受注簿ツールの `src/main.jsx` の jutaku-import-begin〜end。形を変えるときは両方を直す。DESIGN.md 5.3）
 - 住宅改修のアプリ（ポータルの `jutaku-mitsumori/`・`sasaoka/`）の様邸の画面の「🛁 特定福祉用具申請書」のタブの中にも出る（ユーザーの指示「特定福祉用具アプリを出す」、2026-10-22）。
   住宅改修はお客様の情報を localStorage `taiyo-tokutei-from-jutaku-v1` に書いてから `tokutei/index.html#jutaku=<様邸の id>&embed=1` を開く。
   このアプリはその様邸の案件を開き（なければ作る）、住宅改修で変わった値だけ入れ直す（ここで手で直した値はそのまま。`src/tokutei/jutaku.ts`）。embed=1 のときは題名の段を出さない。
@@ -54,6 +57,7 @@ npm run -s test:tokutei     # 単体テスト（計算・種目・取り込み�
 npm run -s lint             # 型チェック
 npm run -s build:tokutei    # dist-tokutei/index.html（1ファイル）と version.json
 node test/tokutei/e2e.mjs <出力フォルダ>   # ブラウザで通しで確かめる（Playwright。ビルドのあと）
+node test/tokutei/e2e-hacchu.mjs <受注簿ツールの dist> <出力フォルダ>   # 販売受注簿への転記を通しで（受注簿ツールも npm run build のあと）
 ```
 
 公開先は太陽ポータル（taiyo-portal、master）の `tokutei/`：https://akamar08taiyo-bot.github.io/taiyo-portal/tokutei/ 。
