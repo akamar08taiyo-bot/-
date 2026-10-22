@@ -12,6 +12,7 @@ import type {EstimateRates, EstimateSettings} from './calc.ts';
 import {circled, eraOf, jobInsurer, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa} from './estimateForms.ts';
 import {clampScale, normRot} from './photoEdit.ts';
 import type {Insurer, Job, PhotoEdit, Place, PlacePhotos, ShinseiInfo, ShinseiMarks} from './types.ts';
+import {todayIso} from './util.ts';
 
 /** 申請書の原本の、1つのシートで転記する欄（番地）。ないものは書かない */
 export type ShinseiSheet = {
@@ -380,6 +381,34 @@ function photoPlacesOf(job: Pick<Job, 'places'>, rates: EstimateRates): Map<numb
 }
 
 /**
+ * 改修前日付・改修後日付（写真の用紙の撮影日。申請書の一覧の「改修前日付・改修後日付」）：写真番号の順で最初に入っている日付。
+ * 入っていなければ、改修前は当日・改修後は空（ユーザーの指示「改修前は当日デフォルト」「改修後はデフォルト空白」。
+ * 日付入り写真を入れると、その写真の日付が箇所に入る＝こちらが優先。2026-10-22）
+ */
+export function photoDay(job: Pick<Job, 'places'>, rates: EstimateRates, slot: 'before' | 'after', today = todayIso()): string {
+  const first = [...photoPlacesOf(job, rates)]
+    .sort(([a], [b]) => a - b)
+    .map(([, p]) => p.photoDates?.[slot])
+    .find((d) => !!d);
+  return first ?? (slot === 'before' ? today : '');
+}
+
+/** 写真番号 → 改修前・改修後の日付：その箇所に入っている日付（その写真の日付）、なければ photoDay（写真のまだない枠も同じ日付） */
+function photoDatesOf(job: Pick<Job, 'places'>, rates: EstimateRates, today: string): Record<number, PlacePhotos> {
+  const day = {before: photoDay(job, rates, 'before', today), after: photoDay(job, rates, 'after', today)};
+  const out: Record<number, PlacePhotos> = {};
+  for (const [n, p] of photoPlacesOf(job, rates)) {
+    const d: PlacePhotos = {};
+    for (const slot of ['before', 'after'] as const) {
+      const v = p.photoDates?.[slot] || day[slot];
+      if (v) d[slot] = v;
+    }
+    if (d.before || d.after) out[n] = d;
+  }
+  return out;
+}
+
+/**
  * 改修費用は見積書の金額と連動する（ユーザーの指示「改修予定費用のところが、自分で作った見積もりの金額が連動するように」）。
  * 苅田町・行橋市の申請書は「改修予定費用」＝見積書の合計（税込）。みやこ町・広域連合は「改修費用（介護保険対象分）」＝見積書の介護保険対象分の合計（税込）
  */
@@ -398,7 +427,7 @@ export function reiwaText(iso: string): string {
   return r ? `令和${r.y === 1 ? '元' : r.y}年${r.m}月${r.d}日` : '';
 }
 
-export function shinseiValues(job: Job, s: EstimateSettings): ShinseiValues {
+export function shinseiValues(job: Job, s: EstimateSettings, today = todayIso()): ShinseiValues {
   const info: ShinseiInfo = {...NO_SHINSEI, ...job.shinsei};
   const cost = shinseiCost(job, s);
   const t = (v: string) => v.normalize('NFKC').trim();
@@ -410,7 +439,7 @@ export function shinseiValues(job: Job, s: EstimateSettings): ShinseiValues {
     kinds: shinseiKinds(job, s),
     photos: shinseiPhotos(job, s),
     photoKinds: Object.fromEntries([...photoPlacesOf(job, s)].map(([n, p]) => [n, p.kind])),
-    photoDates: Object.fromEntries([...photoPlacesOf(job, s)].filter(([, p]) => p.photoDates).map(([n, p]) => [n, {...p.photoDates}])),
+    photoDates: photoDatesOf(job, s, today),
     photoNotes: Object.fromEntries([...photoPlacesOf(job, s)].map(([n, p]) => [n, photoNoteLines(p)] as const).filter(([, lines]) => lines.length > 0)),
     marks: {gender: info.gender, era: eraOf(info), care: info.care, renovated: info.renovated}, // 元号は選んでいなければ昭和
     texts: {

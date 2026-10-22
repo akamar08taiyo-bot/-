@@ -27,7 +27,10 @@ npm run -s lint           # 型チェック（tsc --noEmit。テストのファ�
 単体テストの主なもの：`calc.test.ts`（仕切り・請求書・見積の計算）、`estimateForms.test.ts`（見積書の行・備考・保険者）、`sheetEdit.test.ts`（欄への打ち込み・行の挿入・削除・コピー・貼り付け）、
 `order.test.ts`（発注書の本数・2000mm の品・直したところ・販売受注簿へ渡す内容）、`storage.test.ts`（前のデータの読み込み・移し替え）、`estimateXlsx.test.ts`（Excel の中身と式）、
 `shinsei.test.ts`（申請書の転記・丸の位置・読み戻し・平面図の工事内容・写真貼付用紙の写真・回した写真の置き場所・写真に書く内容の分け方とテキストボックス）、`shinseiPreview.test.ts`（申請書のプレビュー：シート・平面図・写真貼付用紙の枠・押せる欄・丸の値・表示形式、改修予定費用＝見積書の金額、`startEstimate`）、
-`sync.test.ts`、`priceImport.test.ts`、`rows.test.ts`、`photos.test.ts`（写真の撮影日＝Exif の読み取り）。
+`sync.test.ts`、`priceImport.test.ts`、`rows.test.ts`、`photos.test.ts`（写真の撮影日＝Exif の読み取り）、`stampDate.test.ts`（写っている日付の文字から日付・字の行の切り出し）。
+写っている日付を読む部品（tesseract.js）はブラウザのテストで動く。`e2e-shinsei.mjs` は jsDelivr への取り寄せを `routeOcr` で手元の node_modules（`tesseract.js/dist`・`tesseract.js-core`・
+devDependencies の `@tesseract.js-data/jpn`）から返す（ネットにつながない。worker の中の取り寄せも context.route で返せる）。部品が日本語のデータを読むときに出す「Warning: Parameter not found: …」の
+console.error はアプリの誤りではないので数えない（`appError`）。
 
 ブラウザのテスト（Playwright。リポジトリの依存には入れていない。場所は環境変数 `PLAYWRIGHT`、既定 `/opt/node-tools/node_modules/playwright/index.mjs`）：
 

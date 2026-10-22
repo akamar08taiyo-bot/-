@@ -48,13 +48,14 @@ export class NoTextError extends Error {
 /** 1語ごとの文字と左右の位置（表の列をそろえるのに使う） */
 export type PdfWord = {s: string; x0: number; x1: number};
 
-export async function pdfToLines(data: Uint8Array): Promise<{lines: string[]; words: PdfWord[][]; pages: number}> {
+/** PDF を開く（画面の中で処理する。文字を読むときも、ページを画像にするときも同じ） */
+async function openPdf(data: Uint8Array) {
   // worker の本体を先に読み込んでおくと、pdf.js はそれを使って画面の中で処理する。
   // 新しい版の pdf.js は最新のブラウザにしかない機能（Map.getOrInsertComputed など）を使うため、
   // 足りない機能を補ってある legacy 版を使う（会社のパソコンのブラウザが少し古くても読める）
   await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs');
   const pdfjs = (await import('pdfjs-dist/legacy/build/pdf.min.mjs')) as typeof import('pdfjs-dist');
-  const task = pdfjs.getDocument({
+  return pdfjs.getDocument({
     data,
     cMapUrl: 'bundled://cmaps/',
     cMapPacked: true,
@@ -64,6 +65,39 @@ export async function pdfToLines(data: Uint8Array): Promise<{lines: string[]; wo
     isEvalSupported: false,
     disableFontFace: true,
   } as Parameters<typeof pdfjs.getDocument>[0]);
+}
+
+/**
+ * PDF の各ページを画像（JPEG。長い辺 maxSide 画素）にする。写真の枠に PDF をそのまま入れられるように
+ * （ユーザーの指示「PDFファイルをドラッグ＆ドロップでそのまま添付できるようにする」2026-10-22。スキャンした写真・PDF で届いた写真など）
+ */
+export async function pdfToImages(data: Uint8Array, maxSide = 1600, maxPages = 20): Promise<Blob[]> {
+  const task = await openPdf(data);
+  const out: Blob[] = [];
+  try {
+    const doc = await task.promise;
+    for (let p = 1; p <= Math.min(doc.numPages, maxPages); p++) {
+      const page = await doc.getPage(p);
+      const base = page.getViewport({scale: 1});
+      const viewport = page.getViewport({scale: Math.min(4, maxSide / Math.max(base.width, base.height, 1))});
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(viewport.width));
+      canvas.height = Math.max(1, Math.round(viewport.height));
+      const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+      ctx.fillStyle = '#fff'; // 透明な所は白（紙と同じ）
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({canvas, canvasContext: ctx, viewport}).promise;
+      out.push(await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('PDF を画像にできませんでした'))), 'image/jpeg', 0.9)));
+      page.cleanup();
+    }
+  } finally {
+    await task.destroy();
+  }
+  return out;
+}
+
+export async function pdfToLines(data: Uint8Array): Promise<{lines: string[]; words: PdfWord[][]; pages: number}> {
+  const task = await openPdf(data);
   const doc = await task.promise;
 
   const lines: string[] = [];

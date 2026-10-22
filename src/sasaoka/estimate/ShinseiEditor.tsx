@@ -5,21 +5,21 @@
 // 申請書だけ・見積書だけでもよい（見積書がないときは、改修の箇所と寸法を入れ、改修費用を手で入れる）。
 // 写真（PhotoBoard）：写真番号の箇所ごとに改修前・改修後の写真を入れ、入れ替える。プレビューの写真貼付用紙にも出し、Excel の写真貼付用紙に貼る
 
-import {Fragment, useDeferredValue, useMemo, useRef, useState} from 'react';
+import {Fragment, useDeferredValue, useEffect, useMemo, useRef, useState} from 'react';
 import type {KeyboardEvent, ReactNode} from 'react';
 import {isBlankRow, jobName} from '../calc.ts';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {circled, eraOf, INSURER_IDS, INSURER_INFO, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, photoNumbers} from '../estimateForms.ts';
 import {manualRow, newPlace} from '../rows.ts';
 import {usePhotoUrls} from '../photos.ts';
-import {costIsTotal, estimateLength, insuredBoxes, padInsuredNo, photoNoteLines, photoSheets, SHINSEI, shinseiCost, shinseiKinds, shinseiValues, shinseiWorks, workItems} from '../shinsei.ts';
+import {costIsTotal, estimateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLines, photoSheets, SHINSEI, shinseiCost, shinseiKinds, shinseiValues, shinseiWorks, workItems} from '../shinsei.ts';
 import type {WorkItem} from '../shinsei.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
 import type {AppData, Insurer, Job, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {yen} from '../util.ts';
-import {PhotoBoard, photoPlaces, usePhotoActions} from './PhotoBoard.tsx';
+import {PhotoBoard, photoPlaces, SLOT_LABEL, usePhotoActions} from './PhotoBoard.tsx';
 import type {PhotoKey, PhotoSlot} from './PhotoBoard.tsx';
 import {canMakeShinsei, saveShinsei, useTemplate} from './shinseiFiles.ts';
 import {ShinseiPages} from './ShinseiPreview.tsx';
@@ -27,11 +27,12 @@ import {ShinseiPages} from './ShinseiPreview.tsx';
 /** 欄の順番：保険者ごとの申請書の上からの順番（原本を見て決めた。みやこ町・広域連合は承認の申請書の順番で、支給申請書だけの着工日・完成日は最後）。
  *  ただし被保険者氏名はどの保険者もフリガナのすぐ下（ユーザーの指示「ふりがなの下に、名前をもってくる」、2026-10-21。苅田町・みやこ町は原本では番号が先） */
 const FIELDS: Record<Insurer, Field[]> = {
-  kanda: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'owner', 'works', 'dates', 'cost'],
-  yukuhashi: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'owner', 'works', 'dates', 'cost'],
-  miyako: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'owner', 'reason', 'works', 'cost', 'renovated', 'dates'],
-  kouiki: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'owner', 'reason', 'works', 'cost', 'renovated', 'dates'], // 郵便番号はユーザーの指示で足した（2026-10-21）
+  kanda: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'owner', 'photoDates', 'works', 'dates', 'cost'],
+  yukuhashi: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'owner', 'photoDates', 'works', 'dates', 'cost'],
+  miyako: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'owner', 'reason', 'photoDates', 'works', 'cost', 'renovated', 'dates'],
+  kouiki: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'owner', 'reason', 'photoDates', 'works', 'cost', 'renovated', 'dates'], // 郵便番号はユーザーの指示で足した（2026-10-21）
 };
+// 改修前日付・改修後日付（写真の日付）は、改修の内容のすぐ上（ユーザーの指示「この部分に改修前日付・改修後日付を入力欄となるようにする」2026-10-22）
 
 /** みやこ町・広域連合：改修の内容は内訳明細書（別紙）、着工日・完成日は支給申請書（工事のあと）に書く */
 const twoForms = (i: Insurer) => i === 'miyako' || i === 'kouiki';
@@ -55,6 +56,7 @@ function label(f: Field, i: Insurer): string {
     reason: '住宅改修が必要な理由書作成者',
     works: '改修の内容・箇所及び規模',
     renovated: '現在までの改修状況',
+    photoDates: '改修前日付・改修後日付',
   }[f];
 }
 
@@ -106,6 +108,7 @@ export function ShinseiEditor({
     cost: cost === null,
     renovated: !info.renovated,
     dates: false,
+    photoDates: false, // 改修前は当日、改修後は空でよい
   };
   const fields = insurer ? FIELDS[insurer] : [];
   const todo = fields.filter((f) => missing[f]);
@@ -287,6 +290,26 @@ export function ShinseiEditor({
         );
       case 'renovated':
         return <Circles label="現在までの改修状況" options={MARK_INFO.renovated.options} value={info.renovated} onPick={(renovated) => setInfo({renovated} as Partial<ShinseiInfo>)} />;
+      case 'photoDates':
+        // 写真の日付（苅田町・みやこ町は写真の用紙の撮影日に書く）。改修前は当日・改修後は空。日付入り写真を入れるとその日付（PhotoBoard.tsx）。
+        // 直すと、すべての写真の同じ改修前・改修後の日付になる。改修前を消すと当日に戻る
+        return (
+          <>
+            {(['before', 'after'] as const).map((slot) => (
+              <label key={slot} className="inline-flex items-center gap-1 whitespace-nowrap text-sm">
+                {SLOT_LABEL[slot]}日付
+                <input
+                  type="date"
+                  value={photoDay(job, s, slot)}
+                  onChange={(e) => photoActions.setDate(slot, e.target.value)}
+                  className="h-9 rounded-md border border-slate-300 px-2"
+                  aria-label={`${SLOT_LABEL[slot]}日付`}
+                  data-nav
+                />
+              </label>
+            ))}
+          </>
+        );
       case 'dates': {
         // 苅田町・行橋市は完了（完成）予定日だけ（着工予定日は空白のまま）。みやこ町・広域連合は支給申請書の着工日・完成日（工事のあと）
         const end = twoForms(i) ? '完成日' : i === 'kanda' ? '完了予定日' : '完成予定日';
@@ -401,7 +424,7 @@ export function ShinseiEditor({
             <input
               ref={photoInput}
               type="file"
-              accept="image/*"
+              accept="image/*,application/pdf,.pdf"
               multiple
               className="hidden"
               aria-label="写真のファイル"
@@ -488,7 +511,7 @@ function Dim({label, value, placeholder, wide, onChange}: {label: string; value:
   return (
     <label className="inline-flex items-center gap-1 whitespace-nowrap">
       {label}
-      <TextInput value={value} onChange={onChange} inputMode={wide ? undefined : 'numeric'} placeholder={placeholder} className={`${wide ? 'w-28' : 'w-16'} text-right`} aria-label={`${label}（mm）`} data-nav />
+      <TextInput value={value} onChange={onChange} inputMode={wide ? undefined : 'numeric'} placeholder={placeholder} className={`${wide ? 'w-28' : 'w-16'} text-right`} aria-label={`${label}（mm）`} data-nav data-dim />
       <span className="text-xs text-slate-500">mm</span>
     </label>
   );
@@ -509,8 +532,23 @@ function WorksEditor({job, setJob, s, insurer}: {job: Job; setJob: (fn: (j: Job)
       const {dims: _old, ...rest} = x;
       return Object.keys(dims).length ? {...rest, dims} : rest;
     });
-  // 見積書に箇所が出るように、空白の行を1つ入れておく（見積書で部材・施工費を入れていける）
-  const add = (name: string) => setJob((j) => ({...j, places: [...j.places, newPlace(name, [manualRow('material')])]}));
+  // 見積書に箇所が出るように、空白の行を1つ入れておく（見積書で部材・施工費を入れていける）。
+  // 足した箇所の寸法（手すりは長さ）にすぐ打ち込めるように、そこへ移る（ユーザーの指示「廊下、玄関など選択すると、長さの部分をすぐに入力できるようにする。とべるようにする」）。
+  // 「＋ そのほか」は改修場所の名前から
+  const list = useRef<HTMLDivElement>(null);
+  const focusPlace = useRef<{id: string; field: 'dim' | 'name'} | null>(null);
+  const add = (name: string) => {
+    const place = newPlace(name, [manualRow('material')]);
+    focusPlace.current = {id: place.id, field: name ? 'dim' : 'name'};
+    setJob((j) => ({...j, places: [...j.places, place]}));
+  };
+  useEffect(() => {
+    const want = focusPlace.current;
+    const row = want && list.current?.querySelector<HTMLElement>(`[data-place="${want.id}"]`);
+    if (!want || !row) return;
+    focusPlace.current = null;
+    row.querySelector<HTMLInputElement>(want.field === 'dim' ? 'input[data-dim]' : 'input[aria-label="改修場所"]')?.focus();
+  });
   const remove = (id: string) => setJob((j) => ({...j, places: j.places.filter((p) => p.id !== id)}));
   // 申請書に書く内容を手で直す（ユーザーの指示「手入力でも編集できるようにする」）。自動の文と同じに戻したら、手で直していないことにする
   // （寸法・そのほかを変えると、また自動で変わる）。↺ で自動の文に戻す
@@ -534,7 +572,7 @@ function WorksEditor({job, setJob, s, insurer}: {job: Job; setJob: (fn: (j: Job)
   return (
     <div className="w-full space-y-2">
       {job.places.length > 0 && (
-        <div className="text-sm" role="list" aria-label="改修の箇所">
+        <div ref={list} className="text-sm" role="list" aria-label="改修の箇所">
           {job.places.map((p) => {
             const n = photos.get(p.id);
             const used = p.rows.some((r) => !isBlankRow(r)); // 見積書に行のある箇所は、見積書で消す
@@ -542,7 +580,7 @@ function WorksEditor({job, setJob, s, insurer}: {job: Job; setJob: (fn: (j: Job)
               <Dim label={text} value={p.dims?.[key] ?? ''} placeholder={placeholder} wide={wide} onChange={(v) => setDim(p.id, key, v)} />
             );
             return (
-              <div key={p.id} role="listitem" aria-label={`${n ? circled(n) : ''}${p.name || '改修場所'}`} className="border-t border-slate-100 py-2 first:border-t-0 first:pt-0">
+              <div key={p.id} data-place={p.id} role="listitem" aria-label={`${n ? circled(n) : ''}${p.name || '改修場所'}`} className="border-t border-slate-100 py-2 first:border-t-0 first:pt-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="w-7 text-center text-base">{n ? circled(n) : '—'}</span>
                   <TextInput value={p.name} onChange={(name) => setPlace(p.id, (x) => ({...x, name}))} placeholder="改修場所" className="w-28" aria-label="改修場所" data-nav />

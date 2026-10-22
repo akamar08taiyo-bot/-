@@ -10,7 +10,7 @@ import type {Files, SheetLayout, ShinseiMap, ShinseiSheet, ShinseiTexts, Shinsei
 import type {ShinseiMarks} from './types.ts';
 
 /** 申請書の画面で入れる項目（欄の順番は ShinseiEditor の FIELDS） */
-export type ShinseiField = 'kana' | 'name' | 'insuredNo' | 'birth' | 'gender' | 'zip' | 'address' | 'phone' | 'care' | 'owner' | 'reason' | 'works' | 'cost' | 'renovated' | 'dates';
+export type ShinseiField = 'kana' | 'name' | 'insuredNo' | 'birth' | 'gender' | 'zip' | 'address' | 'phone' | 'care' | 'owner' | 'reason' | 'works' | 'cost' | 'renovated' | 'dates' | 'photoDates';
 
 export type Rect = {x: number; y: number; w: number; h: number}; // 画素（ページの左上から）
 export type PvFont = {family: string; size: number; bold: boolean; italic: boolean; underline: boolean; strike: boolean; color: string}; // size は画素
@@ -129,6 +129,9 @@ function fieldRefs(sheet: ShinseiSheet): {field: ShinseiField; ref: string}[] {
     if (key) out.push({field: TEXT_FIELD[key], ref: t.cell});
   }
   for (const m of sheet.marks ?? []) out.push({field: MARK_FIELD[m.key], ref: m.cell});
+  // 写真の用紙の撮影日（苅田町・みやこ町）：一覧の「改修前日付・改修後日付」
+  const dates = sheet.photoPlace?.dates;
+  if (dates) out.push({field: 'photoDates', ref: dates.before}, {field: 'photoDates', ref: dates.after});
   return out;
 }
 

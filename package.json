@@ -22,9 +22,11 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.13.3",
+    "tesseract.js": "7.0.0",
     "vite": "^6.2.0"
   },
   "devDependencies": {
+    "@tesseract.js-data/jpn": "1.0.0",
     "@types/node": "^22.14.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

@@ -4,9 +4,12 @@
 // 何枚かまとめて選ぶ（ドロップする）と、①から順に改修前の空いた枠に入る。
 // 写真の入れ替え：写真を押して選んでから入れ替えたい枠を押す（空いた枠なら移す）。差し替え・削除もできる。
 // 写真は縮めてこの端末に保存し（photos.ts）、申請書の Excel の写真貼付用紙（写真番号の用紙）に貼る。
-// 撮影日（苅田町・みやこ町の写真の用紙の「撮影日」）：写真を入れると、写真の撮影日時（Exif）にする。撮影日時のない写真は、入っている撮影日（ほかの写真の
-// 同じ改修前・改修後の撮影日）、なければ当日。枠の下の「改修前撮影日」「改修後撮影日」の欄で直すと、すべての写真の同じ撮影日が同じ日になる
+// 撮影日（申請書の一覧の「改修前日付・改修後日付」。苅田町・みやこ町の写真の用紙の「撮影日」）：写真を入れると、写真の撮影日時（Exif）、
+// なければ写真に写っている日付（日付入り写真。stampDate.ts）にする（ユーザーの指示「日付入り写真を添付した場合は、その日付に合わせて自動入力」2026-10-22）。
+// その日付は、同じ改修前・改修後で写真のまだない枠にも入る。日付のない写真の枠・写真のない枠は、写真番号の順で最初の日付、それもなければ
+// 改修前は当日・改修後は空（shinsei.ts の photoDay）。枠の下の「改修前撮影日」「改修後撮影日」・一覧の欄で直すと、すべての写真の同じ撮影日が同じ日になる
 // （ユーザーの指示「撮影前、一つ入力したら全ての写真で全部入力。撮影後も同様」）。入れ替えると写真と一緒に動く
+// PDF（スキャンした写真など）を入れると、ページごとに写真にする（ユーザーの指示「PDFファイルをドラッグ＆ドロップでそのまま添付できるようにする」）
 // 写真番号の入れ替え（ユーザーの指示「①勝手口・②浴室を、押したりドラッグで横にずらしたりして、①浴室・②勝手口に簡単に入れ替える」）：
 // 箇所をつかんで（見出しでも写真の上でも）ほかの箇所に重ねて離すか（ユーザーの指示「クリックしてそのままドロップしたら入れ替え」）、◀ ▶ で隣と入れ替える
 // （写真・撮影日・向きは箇所と一緒に動く）。指（iPad）でも動くようにポインターで動かす
@@ -19,9 +22,9 @@ import {Btn, useToast} from '../components/ui.tsx';
 import {circled, photoNumbers, swapPhotoNumbers} from '../estimateForms.ts';
 import {cleanEdit, turn} from '../photoEdit.ts';
 import {photoTakenDate, preparePhoto, putPhoto, rememberPhotoUrl, usePhotoUrls} from '../photos.ts';
-import {photoPlacement, workText} from '../shinsei.ts';
+import {photoDay, photoPlacement, workText} from '../shinsei.ts';
+import {readStampDate} from '../stampDate.ts';
 import type {Job, PhotoEdit, Place, PlacePhotoEdits, PlacePhotos} from '../types.ts';
-import {todayIso} from '../util.ts';
 
 export type PhotoSlot = 'before' | 'after';
 export type PhotoKey = {placeId: string; slot: PhotoSlot};
@@ -82,18 +85,44 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
     setJob((j) => ({...j, places: j.places.map((p) => (p.id === key.placeId ? withSlot(p, 'photoEdits', key.slot, cleanEdit(edit)) : p))}));
   /** 2つの箇所の写真番号を入れ替える（写真・撮影日・向きは箇所と一緒に動く） */
   const swapPlaces = (a: string, b: string) => setJob((j) => ({...j, places: swapPhotoNumbers(j.places, a, b)}));
-  /** 撮影日時のない写真の撮影日：その枠の撮影日、なければほかの写真番号の同じ改修前・改修後の撮影日（1つ入れた日がそろうように） */
-  const slotDate = (key: PhotoKey): string => {
-    const list = photoPlaces(job, rates).map(({place}) => place);
-    return list.find((p) => p.id === key.placeId)?.photoDates?.[key.slot] ?? list.find((p) => p.photoDates?.[key.slot])?.photoDates?.[key.slot] ?? '';
-  };
-  /** 写真のファイルを入れる：start の枠から（なければ①の改修前から）、改修前の空いた枠に順に */
+  /**
+   * 写真の日付（撮影日時・写っている日付）を入れる：その写真の枠と、同じ改修前・改修後で写真のまだない枠に。
+   * 日付を読んでいる間に写真を差し替えた・消したときは入れない
+   */
+  const setPhotoDate = (key: PhotoKey, id: string, date: string) =>
+    setJob((j) => {
+      if (j.places.find((p) => p.id === key.placeId)?.photos?.[key.slot] !== id) return j;
+      const nos = photoNumbers(j, rates);
+      return {...j, places: j.places.map((p) => (p.id === key.placeId || (nos.has(p.id) && !p.photos?.[key.slot]) ? withSlot(p, 'photoDates', key.slot, date) : p))};
+    });
+  /** 写真のファイル（PDF はページごとに写真にする）を入れる：start の枠から（なければ①の改修前から）、改修前の空いた枠に順に */
   const put = async (files: File[], start?: PhotoKey) => {
-    const images = files.filter((f) => f.type.startsWith('image/') || /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(f.name));
-    if (images.length === 0) {
-      if (files.length) toast('写真（画像）のファイルを選んでください', 'error');
+    const isPdf = (f: File) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+    const chosen = files.filter((f) => isPdf(f) || f.type.startsWith('image/') || /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(f.name));
+    if (chosen.length === 0) {
+      if (files.length) toast('写真（画像）か PDF のファイルを選んでください', 'error');
       return;
     }
+    const images: {file: Blob; name: string}[] = [];
+    setBusy((n) => n + 1);
+    try {
+      for (const f of chosen) {
+        if (!isPdf(f)) {
+          images.push({file: f, name: f.name});
+          continue;
+        }
+        try {
+          const {pdfToImages} = await import('../pdfText.ts');
+          const pages = await pdfToImages(new Uint8Array(await f.arrayBuffer()));
+          pages.forEach((file, i) => images.push({file, name: pages.length > 1 ? `${f.name}（${i + 1}ページ）` : f.name}));
+        } catch {
+          toast(`「${f.name}」を読めませんでした`, 'error');
+        }
+      }
+    } finally {
+      setBusy((n) => n - 1);
+    }
+    if (images.length === 0) return;
     // 入れる枠：選んだ枠と、そのあとの写真番号の同じ種類（改修前・改修後）の空いた枠
     const list = photoPlaces(job, rates);
     const slot = start?.slot ?? 'before';
@@ -109,14 +138,17 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
     }
     const used = images.slice(0, targets.length);
     setBusy((n) => n + used.length);
-    for (const [i, file] of used.entries()) {
+    for (const [i, {file, name}] of used.entries()) {
       try {
         const [taken, {blob, w, h}] = await Promise.all([photoTakenDate(file), preparePhoto(file)]);
         const id = await putPhoto({blob, w, h});
         rememberPhotoUrl(id, blob, w, h);
-        setPhoto(targets[i], id, taken || slotDate(targets[i]) || todayIso()); // 撮影日：写真の撮影日時、なければ入っている撮影日、なければ当日（ユーザーの指示）
+        setPhoto(targets[i], id, undefined);
+        // 撮影日：写真の撮影日時、なければ写真に写っている日付（読むのに少しかかるので、写真を入れてから）。どちらもなければ入れない
+        if (taken) setPhotoDate(targets[i], id, taken);
+        else void readStampDate(blob).then((day) => day && setPhotoDate(targets[i], id, day));
       } catch {
-        toast(`「${file.name}」を読めませんでした`, 'error');
+        toast(`「${name}」を読めませんでした`, 'error');
       } finally {
         setBusy((n) => n - 1);
       }
@@ -485,7 +517,7 @@ export function PhotoBoard({
                                 {SLOT_LABEL[slot]}撮影日
                                 <input
                                   type="date"
-                                  value={place.photoDates?.[slot] ?? ''}
+                                  value={place.photoDates?.[slot] || photoDay(job, rates, slot)}
                                   onChange={(e) => actions.setDate(slot, e.target.value)}
                                   className="mt-0.5 block h-7 w-full min-w-0 rounded border border-slate-300 px-1 text-xs text-slate-800"
                                   aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}撮影日`}

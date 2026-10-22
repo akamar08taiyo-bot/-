@@ -44,7 +44,8 @@ React 19 ＋ TypeScript ＋ Vite（Tailwind）。リポジトリにはほかの�
 | `order.ts` | 発注する数の計算（切って使う部材の本数・2000mm の品・余り0.1本）、手で直したところの重ね方、販売受注簿へ渡す JSON |
 | `estimateXlsx.ts`・`xlsxWrite.ts` | 見積書を同じ形の .xlsx にする（列幅＝mm×96/25.4/8、固定の倍率で印刷、金額は式＋計算済みの値） |
 | `components/JobEditor.tsx` ほか | 請求書のタブの様邸（仕切り計算表）、部材を選ぶ画面（`Pickers.tsx`）、施工費を数える画面（`JobTools.tsx`）、`KitsPage.tsx`（部材＋施工費（常用）） |
-| `priceImport.ts`・`xlsx.ts`・`pdfText.ts` | メーカーの価格表（Excel・CSV・PDF・貼り付けた表）の取り込み |
+| `priceImport.ts`・`xlsx.ts`・`pdfText.ts` | メーカーの価格表（Excel・CSV・PDF・貼り付けた表）の取り込み。`pdfText.ts` の `pdfToImages` は PDF のページを写真（JPEG）にする（写真の枠に PDF を入れたとき） |
+| `stampDate.ts` | 日付入り写真に写っている日付を読む：字の行の切り出し `stampCrops`（`colorMask`・`keepGlyphs`・`lineCrops`。テストできる純粋な関数）、読んだ文字から日付 `parseStampDate`、ブラウザで読む `readStampDate`（tesseract.js を使うときに読み込み、worker は1つを使い回して1分で片付ける。写真を何枚も入れたら順に） |
 | `storage.ts` | IndexedDB（`taiyo-sasaoka-shikiri`）への保存と、読み込むときの直し方（`cleanJobs` など。前の版のデータもここで今の形にする） |
 | `sync.ts`・`useStore.ts` | 2つの画面（タブ）で同じデータを直したときのまとめ方、自動保存（0.4秒後）、`flush` |
 | `update.ts`・`vite.version.ts` | `version.json` を見て「このアプリの新しい版が出ています ⟳ 読み込み直す」を出す |

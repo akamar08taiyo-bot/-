@@ -25,11 +25,23 @@ const log = (...a) => console.log('•', ...a);
 // 文字の設定のない環境では、日本語のファイル名のダウンロードが「download」になるので UTF-8 にする
 const browser = await chromium.launch({env: {...process.env, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8'}});
 const errors = [];
+// 写真に写った日付を読む部品（tesseract.js の読み取りの本体・日本語のデータ）は jsDelivr から取ってくる。テストでは手元の node_modules のファイルを返す（ネットにつながない）
+const NM = new URL('../../node_modules/', import.meta.url).pathname;
+const routeOcr = (c) =>
+  c.route('https://cdn.jsdelivr.net/**', async (route) => {
+    const m = /\/npm\/(tesseract\.js@v[\d.]+\/dist|tesseract\.js-core@v[\d.]+|@tesseract\.js-data\/jpn\/4\.0\.0_best_int)\/([^/?]+)$/.exec(route.request().url());
+    if (!m) return route.abort();
+    const dir = m[1].startsWith('tesseract.js@') ? 'tesseract.js/dist' : m[1].startsWith('tesseract.js-core') ? 'tesseract.js-core' : '@tesseract.js-data/jpn/4.0.0_best_int';
+    await route.fulfill({body: await readFile(NM + dir + '/' + m[2]), headers: {'access-control-allow-origin': '*', 'content-type': m[2].endsWith('.js') ? 'text/javascript' : 'application/octet-stream'}});
+  });
+// 読み取りの部品が日本語のデータを読むときに出す警告（「Parameter not found」）は、アプリの誤りではないので数えない
+const appError = (m) => m.type() === 'error' && !/^Warning: Parameter not found/.test(m.text());
 const ctx = await browser.newContext({viewport: {width: 1366, height: 900}, locale: 'ja-JP'});
+await routeOcr(ctx);
 await ctx.addInitScript(() => localStorage.setItem('taiyo_portal_session', JSON.stringify({office: '行橋営業所'})));
 const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
-page.on('console', (m) => m.type() === 'error' && errors.push('console: ' + m.text()));
+page.on('console', (m) => appError(m) && errors.push('console: ' + m.text()));
 page.on('dialog', (d) => d.accept());
 await page.goto(`${site}/jutaku-mitsumori/index.html`);
 await page.getByRole('button', {name: /サンプルで試す/}).click();
@@ -148,7 +160,7 @@ assert.ok(formBox && previewBox && formBox.x + formBox.width <= previewBox.x + 1
 assert.equal(await page.getByRole('group', {name: '入れ方'}).count(), 0);
 assert.equal(await page.getByRole('dialog').count(), 0);
 // 一覧は行橋市の申請書の順番（氏名が番号の前）。着工予定日はない（空白のまま。ユーザーの指示）
-assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '住宅の所有者', '改修の内容・箇所及び規模', '完成予定日', '改修予定費用']);
+assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '完成予定日', '改修予定費用']);
 assert.equal(await form.getByLabel('着工予定日').count(), 0);
 let pv = await preview.innerText();
 for (const t of ['介護保険居宅（ 介護・介護予防 ）住宅改修費受領委任払い申請書', '被保険者氏名', '（サンプル）山田', '福岡県行橋市中央1-1', '①玄関　手すりの取り付け　L=600mm', '②トイレ　手すりの取り付け', '26,958']) {
@@ -303,6 +315,38 @@ const datedJpeg = async (color, when) => {
   tiff.push(...le16(1), ...le16(0x9003), ...le16(2), ...le32(20), ...le32(dataAt), ...le32(0), ...[...when].map((ch) => ch.charCodeAt(0)), 0);
   const app1 = [0x45, 0x78, 0x69, 0x66, 0, 0, ...tiff];
   return Buffer.concat([jpeg.subarray(0, 2), Buffer.from([0xff, 0xe1, (app1.length + 2) >> 8, (app1.length + 2) & 255, ...app1]), jpeg.subarray(2)]);
+};
+/** 日付入り写真（右下に白い字で日付を写し込んだ写真。撮影日時の情報はない＝LINE で送られてきた写真など）をブラウザで作る */
+const stampedJpeg = async (when) =>
+  Buffer.from(
+    await page.evaluate(async (when) => {
+      const c = document.createElement('canvas');
+      c.width = 1200;
+      c.height = 1600;
+      const g = c.getContext('2d');
+      g.fillStyle = '#7a5a3c'; // 床・壁・洗面台のような地
+      g.fillRect(0, 0, 1200, 1600);
+      g.fillStyle = '#e8e8e8';
+      g.fillRect(100, 200, 500, 600);
+      g.fillStyle = '#dcdcd4';
+      g.fillRect(800, 1300, 400, 300);
+      g.font = '38px "IPAGothic", "Noto Sans CJK JP", sans-serif';
+      g.textAlign = 'right';
+      g.fillStyle = '#222';
+      g.fillText(when, 1172, 1562);
+      g.fillStyle = '#fff';
+      g.fillText(when, 1170, 1560);
+      const b = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.9));
+      return [...new Uint8Array(await b.arrayBuffer())];
+    }, when),
+  );
+/** 写真を1ページにした PDF（スキャンした写真・PDF で届いた写真と同じ形） */
+const pdfOf = async (jpeg) => {
+  const p2 = await ctx.newPage();
+  await p2.setContent(`<html><body style="margin:0"><img src="data:image/jpeg;base64,${jpeg.toString('base64')}" style="width:100%"></body></html>`);
+  const pdf = await p2.pdf({width: '600px', height: '800px', printBackground: true});
+  await p2.close();
+  return pdf;
 };
 const srcOf = (loc) => loc.locator('img').getAttribute('src');
 const emptySlot = async (loc) => (await loc.locator('img').count()) === 0 && (await loc.innerText()).startsWith('＋');
@@ -682,10 +726,11 @@ log('写真の向き・大きさ（写真の欄の ↻・プレビューの角�
 
 // ---------------- iPad（指）：写真を押して選び、2本の指でひねると回る（90°の近くはそろう）・つまむと小さく。写真の欄の ↻、見出しを指でドラッグして写真番号を入れ替え
 const tab = await browser.newContext({viewport: {width: 1180, height: 820}, deviceScaleFactor: 2, hasTouch: true, locale: 'ja-JP'});
+await routeOcr(tab);
 await tab.addInitScript(() => localStorage.setItem('taiyo_portal_session', JSON.stringify({office: '行橋営業所'})));
 const ipad = await tab.newPage();
 ipad.on('pageerror', (e) => errors.push('pageerror(iPad): ' + e.message));
-ipad.on('console', (m) => m.type() === 'error' && errors.push('console(iPad): ' + m.text()));
+ipad.on('console', (m) => appError(m) && errors.push('console(iPad): ' + m.text()));
 ipad.on('dialog', (d) => d.accept());
 await ipad.goto(`${site}/jutaku-mitsumori/index.html`);
 await ipad.getByRole('button', {name: /サンプルで試す/}).click();
@@ -799,7 +844,7 @@ await page.getByRole('combobox', {name: '保険者'}).selectOption('kanda');
 await pageOf('事前申請書').waitFor();
 assert.deepEqual(await pageNames(), ['事前申請書', '平面図  (2)', '1 ', '1  (3)']);
 // 一覧は苅田町の申請書の順番。ただし被保険者氏名はフリガナのすぐ下（ユーザーの指示）。完了予定日だけ（着工予定日は空白）
-assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '住宅の所有者', '改修の内容・箇所及び規模', '完了予定日', '改修予定費用']);
+assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '完了予定日', '改修予定費用']);
 assert.equal(await form.getByLabel('完了予定日').inputValue(), '2026-11-20');
 assert.equal(await form.getByLabel('改修予定費用').inputValue(), '26,958');
 assert.ok((await form.innerText()).includes('見積書の合計（税込）'));
@@ -819,46 +864,76 @@ assert.deepEqual([k.ellipses('事前申請書'), k.ellipses('事後申請書')],
 assert.deepEqual(['J6', 'J9', 'J10', 'AB11', 'W13', 'Y16'].map((r) => text(pre, r)), ['サンプル　ヤマダ', '明　・　大　・　昭　23年5月6日生', '〒824-0001', '0930-11-2222', '本人との関係（本人）', '令和8年11月20日']);
 assert.ok(!/令和|46331/.test(cellOf(pre, 'Y15')), cellOf(pre, 'Y15')); // 着工予定日は空白
 // 写真の用紙の改修箇所・実施した工事種類の□は、その写真番号の箇所・改修の種類を■に（ユーザーの指示「□の部分は、選択した項目と連動する」）。
-// 撮影日は写真を入れた日（写真に撮影日時が入っていなければ当日）
+// 撮影日（一覧の改修前日付・改修後日付）：写真に日付がなければ、改修前は当日・改修後は空（原本のまま）
 const today = new Date();
 const reiwaToday = `令和${today.getFullYear() - 2018}年${today.getMonth() + 1}月${today.getDate()}日`;
 const kPhoto1 = k.sheets.get('1 ');
 assert.ok(text(kPhoto1, 'B2').includes('■玄関　□玄関～道路') && text(kPhoto1, 'B2').split('■').length === 2, text(kPhoto1, 'B2'));
 assert.ok(text(kPhoto1, 'B4').startsWith('■手すりの取り付け　□(2)段差の解消'), text(kPhoto1, 'B4'));
 assert.ok(text(k.sheets.get('1  (3)'), 'B2').includes('■トイレ'));
-assert.deepEqual([text(kPhoto1, 'D6'), text(k.sheets.get('1  (3)'), 'D6'), text(k.sheets.get('1  (3)'), 'D23')], [reiwaToday, reiwaToday, reiwaToday]);
+assert.deepEqual([text(kPhoto1, 'D6'), text(k.sheets.get('1  (3)'), 'D6'), text(k.sheets.get('1  (3)'), 'D23')], [reiwaToday, reiwaToday, '']); // 改修後は書かない（原本のまま）
 assert.ok((await pageOf('1 ').innerText()).includes('■玄関'));
 const kStrings = strFromU8(unzipSync(kd.bytes)['xl/sharedStrings.xml']);
 assert.ok(!kStrings.includes('手摺'));
-// 撮影日の欄（写真の用紙に撮影日の欄のある苅田町・みやこ町）：「改修前撮影日」「改修後撮影日」。写真を入れた枠は当日（撮影日時のない写真）。
-// 1つ直すと、すべての写真の同じ撮影日がその日になる（ユーザーの指示「一つ入力したら全ての写真で全部入力」）。撮影日時の入った写真（JPEG）を入れると、その日
+// 撮影日の欄（写真の用紙に撮影日の欄のある苅田町・みやこ町）：「改修前撮影日」「改修後撮影日」と、一覧の「改修前日付」「改修後日付」（どの保険者も。改修の内容のすぐ上）。
+// 写真に日付がなければ改修前は当日・改修後は空（ユーザーの指示「改修前は当日デフォルト」「改修後はデフォルト空白」）。
+// 1つ直すと、すべての写真の同じ撮影日がその日になる（ユーザーの指示「一つ入力したら全ての写真で全部入力」）。撮影日時の入った写真（JPEG）・日付入り写真を入れると、その日
 const dateOf = (no, name, which) => photoBoard.getByLabel(`${no}${name} ${which}撮影日`, {exact: true});
+const listDate = (which) => form.getByLabel(`${which}日付`, {exact: true});
 const isoToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-assert.deepEqual([await dateOf('①', '玄関', '改修前').inputValue(), await dateOf('①', '玄関', '改修後').inputValue(), await dateOf('②', 'トイレ', '改修後').inputValue()], [isoToday, '', isoToday]);
+assert.deepEqual([await dateOf('①', '玄関', '改修前').inputValue(), await dateOf('①', '玄関', '改修後').inputValue(), await dateOf('②', 'トイレ', '改修後').inputValue()], [isoToday, '', '']);
+assert.deepEqual([await listDate('改修前').inputValue(), await listDate('改修後').inputValue()], [isoToday, '']);
 assert.ok(/改修前撮影日[\s\S]*改修後撮影日/.test(await photoBoard.innerText()));
 await dateOf('②', 'トイレ', '改修後').fill('2026-12-01');
 await pvHas('令和8年12月1日');
 assert.equal(await dateOf('①', '玄関', '改修後').inputValue(), '2026-12-01'); // 写真のまだない枠にも入る
+assert.equal(await listDate('改修後').inputValue(), '2026-12-01');
 await dateOf('①', '玄関', '改修前').fill('2026-10-01');
 assert.equal(await dateOf('②', 'トイレ', '改修前').inputValue(), '2026-10-01');
 await pvHas('令和8年10月1日');
+// 一覧の改修後日付で直しても、すべての写真の改修後の撮影日に（あとの確かめのため 12月1日に戻す）
+await listDate('改修後').fill('2026-12-02');
+assert.deepEqual([await dateOf('①', '玄関', '改修後').inputValue(), await dateOf('②', 'トイレ', '改修後').inputValue()], ['2026-12-02', '2026-12-02']);
+await listDate('改修後').fill('2026-12-01');
+await form.locator('[data-field="photoDates"]').screenshot({path: path.join(outDir, '87-photo-dates-list.png')});
 await dropFile(slot('①', '玄関', '改修後'), await datedJpeg('#8e44ad', '2026:10:05 09:30:00'), 'dated.jpg', 'image/jpeg');
 await slot('①', '玄関', '改修後').locator('img').waitFor();
 await page.waitForFunction(() => document.querySelector('[aria-label="①玄関 改修後撮影日"]')?.value === '2026-10-05');
 await pvHas('令和8年10月5日');
 await photoBoard.screenshot({path: path.join(outDir, '88-photo-dates.png')});
-// 写真を消すと撮影日も消える（あとの保険者の確かめのため、入れる前に戻す）
+// 写真を消すとその写真の撮影日も消え、ほかの写真と同じ日（写真番号の順で最初の日付）に戻る（あとの保険者の確かめのため、入れる前に戻す）
 await slot('①', '玄関', '改修後').click();
 await page.getByRole('status', {name: '選んでいる写真'}).getByRole('button', {name: '削除'}).click();
-assert.equal(await dateOf('①', '玄関', '改修後').inputValue(), '');
+assert.equal(await dateOf('①', '玄関', '改修後').inputValue(), '2026-12-01');
 // 撮影日時のない写真を入れると、ほかの写真のそろえた撮影日になる（当日ではなく）。あとの保険者の確かめのため、また消す
 await dropFile(slot('①', '玄関', '改修後'), await makeImage('#16a085', 800, 600), 'plain.png');
 await slot('①', '玄関', '改修後').locator('img').waitFor();
 assert.equal(await dateOf('①', '玄関', '改修後').inputValue(), '2026-12-01');
 await slot('①', '玄関', '改修後').click();
 await page.getByRole('status', {name: '選んでいる写真'}).getByRole('button', {name: '削除'}).click();
-assert.equal(await dateOf('①', '玄関', '改修後').inputValue(), '');
-log('苅田町の写真の用紙（改修箇所・工事種類の□が連動・撮影日は当日・1つ直すと全部の写真に・写真の撮影日時を読む）OK');
+assert.equal(await dateOf('①', '玄関', '改修後').inputValue(), '2026-12-01');
+// 日付入り写真（右下に「2026年9月17日木曜日」。撮影日時の情報はない）：写っている日付を読んで入れる（ユーザーの指示「日付入り写真を添付した場合は、
+// その日付に合わせて自動入力」）。一覧の改修後日付も（写真番号の順で最初の日付）。読み取りの部品の取り寄せと読み取りに少しかかる
+await dropFile(slot('①', '玄関', '改修後'), await stampedJpeg('2026年9月17日木曜日'), 'line.jpg', 'image/jpeg');
+await slot('①', '玄関', '改修後').locator('img').waitFor();
+await page.waitForFunction(() => document.querySelector('[aria-label="①玄関 改修後撮影日"]')?.value === '2026-09-17', null, {timeout: 60000});
+assert.equal(await listDate('改修後').inputValue(), '2026-09-17');
+assert.equal(await dateOf('②', 'トイレ', '改修後').inputValue(), '2026-12-01'); // 写真のある枠の撮影日はそのまま
+await pvHas('令和8年9月17日');
+// PDF（スキャンした日付入り写真など）をそのままドロップ：ページを写真にして入れ（写真のある枠なら差し替え）、写っている日付も読む
+// （ユーザーの指示「PDFファイルをドラッグ＆ドロップでそのまま添付できるようにする」）
+const stampedSrc = await srcOf(slot('①', '玄関', '改修後'));
+await dropFile(slot('①', '玄関', '改修後'), await pdfOf(await stampedJpeg('2026年9月18日金曜日')), 'scan.pdf', 'application/pdf');
+await page.waitForFunction((old) => { const img = document.querySelector('[aria-label="①玄関 改修後"] img'); return img && img.getAttribute('src') !== old; }, stampedSrc, {timeout: 30000});
+await page.waitForFunction(() => document.querySelector('[aria-label="①玄関 改修後撮影日"]')?.value === '2026-09-18', null, {timeout: 60000});
+await photoBoard.screenshot({path: path.join(outDir, '88b-photo-pdf-stamp.png')});
+// 写真でも PDF でもないファイルは入れない
+await dropFile(slot('②', 'トイレ', '改修前'), Buffer.from('memo'), 'memo.txt', 'text/plain');
+await page.locator('[aria-live] > div', {hasText: '写真（画像）か PDF のファイルを選んでください'}).waitFor();
+await slot('①', '玄関', '改修後').click();
+await page.getByRole('status', {name: '選んでいる写真'}).getByRole('button', {name: '削除'}).click();
+assert.equal(await dateOf('①', '玄関', '改修後').inputValue(), '2026-12-01');
+log('苅田町の写真の用紙（改修箇所・工事種類の□が連動・撮影日：改修前は当日・改修後は空・1つ直すと全部の写真に・一覧の改修前日付・改修後日付・写真の撮影日時と写っている日付を読む・PDF）OK');
 await page.locator('[aria-live] > div', {hasText: `「${kd.name}」を保存しました`}).waitFor();
 log('苅田町の申請書（申請書の順番の一覧・事前申請書・事後申請書は式で同じ・丸を外す・着工予定日は空白）OK');
 
@@ -880,10 +955,10 @@ const my = await make(['無']);
 assert.match(my.name, /^みやこ町申請書_（サンプル）山田様_/);
 const m = sheetsOf(my.bytes);
 assert.equal(m.sheets.size, 12);
-// 撮影日：みやこ町の写真の用紙は原本の「撮影日」のうしろに日付（①玄関の改修後は写真を消したので撮影日なし＝原本のまま）
+// 撮影日：みやこ町の写真の用紙は原本の「撮影日」のうしろに日付（①玄関の改修後は写真を消したので、②の改修後と同じ日）
 assert.deepEqual(
   [1, 2].flatMap((n) => [text(m.sheets.get(`写真 (${n})`), 'D7'), text(m.sheets.get(`写真 (${n})`), 'D32')]),
-  ['撮影日　令和8年10月1日', '撮影日', '撮影日　令和8年10月1日', '撮影日　令和8年12月1日'],
+  ['撮影日　令和8年10月1日', '撮影日　令和8年12月1日', '撮影日　令和8年10月1日', '撮影日　令和8年12月1日'],
 );
 const top = m.sheets.get('住宅改修承認届出書');
 assert.deepEqual([text(top, 'I5'), text(top, 'I9'), boxes('W', 10, 4).map((r) => text(top, r)).join('')], ['（サンプル）山田', '福岡県行橋市中央1-1', '0000366989']);
@@ -965,11 +1040,24 @@ assert.equal(await form.getByLabel('被保険者番号', {exact: true}).inputVal
 await form.getByRole('group', {name: '性別'}).getByRole('button', {name: '男'}).click();
 await form.getByRole('group', {name: '要介護状態区分'}).getByRole('button', {name: '要支援2'}).click();
 await mark('昭和').click();
-// 改修の内容：箇所を足して、手すりは長さ・高さ、段差の解消は幅・奥行・高さ（ユーザーの指示の書き方）
+// 改修前日付・改修後日付は、住宅の所有者の下・改修の内容のすぐ上。初めは改修前が当日・改修後は空
+const order = await form.locator('[data-field]').evaluateAll((els) => els.map((e) => e.getAttribute('data-field')));
+assert.deepEqual(order.slice(order.indexOf('owner'), order.indexOf('owner') + 3), ['owner', 'photoDates', 'works']);
+assert.deepEqual([await listDate('改修前').inputValue(), await listDate('改修後').inputValue()], [isoToday, '']);
+// 改修の内容：箇所を足して、手すりは長さ・高さ、段差の解消は幅・奥行・高さ（ユーザーの指示の書き方）。
+// 箇所を足すと、その箇所の長さの欄にすぐ打ち込める（ユーザーの指示「廊下、玄関など選択すると、長さの部分をすぐに入力できるようにする」）
+const where = () => page.evaluate(() => [document.activeElement?.closest('[role="listitem"]')?.getAttribute('aria-label'), document.activeElement?.getAttribute('aria-label')]);
 await works.getByRole('button', {name: '＋ 玄関', exact: true}).click();
+assert.deepEqual(await where(), ['①玄関', '長さ（mm）']);
+await page.keyboard.type('800');
 await works.getByRole('button', {name: '＋ トイレ', exact: true}).click();
+assert.deepEqual(await where(), ['②トイレ', '長さ（mm）']);
+// 「＋ そのほか」は改修場所の名前から（試したら消す）
+await works.getByRole('button', {name: '＋ そのほか', exact: true}).click();
+assert.deepEqual(await where(), ['③改修場所', '改修場所']);
+await works.getByRole('button', {name: '箇所を消す', exact: true}).click();
 const g1 = works.getByRole('listitem', {name: '①玄関'});
-await g1.getByLabel('長さ（mm）').fill('800');
+assert.equal(await g1.getByLabel('長さ（mm）').inputValue(), '800');
 await g1.getByLabel('高さ（mm）').fill('750');
 const t2 = works.getByRole('listitem', {name: '②トイレ'});
 await t2.getByLabel('改修の種類').selectOption('2');

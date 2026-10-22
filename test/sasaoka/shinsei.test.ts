@@ -5,7 +5,7 @@ import {strFromU8, unzipSync, zipSync} from 'fflate';
 import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import {DEFAULT_PLACES, defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
-import {boxLabels, checkBoxes, fillShinsei, fitLinesSize, insuredBoxes, padInsuredNo, parseWorkLine, photoNoteLayout, photoNoteLines, placeBox, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems} from '../../src/sasaoka/shinsei.ts';
+import {boxLabels, checkBoxes, fillShinsei, fitLinesSize, insuredBoxes, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, placeBox, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems} from '../../src/sasaoka/shinsei.ts';
 import type {Insurer, Job, Place, Row, ShinseiInfo, ShinseiMarks} from '../../src/sasaoka/types.ts';
 
 const RATES = {estimateRate: 0.8, estimateLaborRate: 1.5, estimateOverheadRate: 0.1, taxRate: 0.1};
@@ -187,13 +187,30 @@ test('苅田町の写真の用紙：改修箇所・実施した工事種類の�
   assert.ok(at('③', 'B4').startsWith('□手すりの取り付け　■(2)段差の解消　□(3)'));
   assert.ok(at('④', 'B2').endsWith('□玄関　□玄関～道路　■勝手口'));
   assert.ok(at('⑤', 'B2').includes('■玄関　□玄関～道路'));
-  // 撮影日（改修前 D6・改修後 D23）。入れていない写真番号は原本のまま
+  // 撮影日（改修前 D6・改修後 D23）。日付のない写真番号も、写真番号の順で最初に入っている日付（一覧の改修前日付・改修後日付）
   assert.deepEqual([at('④', 'D6'), at('④', 'D23')], ['令和8年10月1日', '令和8年11月20日']);
-  assert.equal(at('①', 'D23'), '年　　　月　　　日');
+  assert.deepEqual([at('①', 'D6'), at('①', 'D23')], ['令和8年10月1日', '令和8年11月20日']);
   // 箇所のない写真番号の用紙（②⑥〜⑨）は原本のまま
   assert.ok(at('②', 'B4').startsWith('🔳手すりの取り付け　□(2)段差の解消　□(3)'));
   assert.ok(at('②', 'B2').includes('□その他（　　　）'));
   assert.ok(!strings.some((s) => s.includes('手摺')));
+});
+
+test('改修前日付・改修後日付：入っていなければ改修前は当日・改修後は空（原本のまま）。写真の日付が入っていれば、写真番号の順で最初の日付', () => {
+  // ユーザーの指示「改修前は当日デフォルト」「改修後はデフォルト空白」「日付入り写真を添付した場合は、その日付に合わせて自動入力（優先）」（2026-10-22）
+  const plain = job();
+  assert.deepEqual([photoDay(plain, RATES, 'before', '2026-10-22'), photoDay(plain, RATES, 'after', '2026-10-22')], ['2026-10-22', '']);
+  const v = shinseiValues(plain, RATES, '2026-10-22');
+  assert.deepEqual(Object.values(v.photoDates ?? {}), [{before: '2026-10-22'}, {before: '2026-10-22'}, {before: '2026-10-22'}]);
+  const {byName} = sheets(fillShinsei(KANDA, SHINSEI.kanda!, v));
+  const first = [...byName].find(([name]) => name === '1 ')![1];
+  assert.equal(txt(first, 'D6'), '令和8年10月22日');
+  assert.ok(!/<c r="D23"[^>]*t="(?:inlineStr|str)"/.test(first)); // 改修後は書かない（原本のまま）
+  // ⑤玄関の写真の日付（改修前 9月17日）が入っていれば、それが一覧の改修前日付（当日より写真の日付）。写真の日付のないほかの写真番号もその日
+  const places = plain.places.map((p) => (p.name === '玄関' ? {...p, photoDates: {before: '2026-09-17'}} : p));
+  const dated = job({places});
+  assert.deepEqual([photoDay(dated, RATES, 'before', '2026-10-22'), photoDay(dated, RATES, 'after', '2026-10-22')], ['2026-09-17', '']);
+  assert.ok(Object.values(shinseiValues(dated, RATES, '2026-10-22').photoDates ?? {}).every((d) => d.before === '2026-09-17' && !d.after));
 });
 
 test('箇所の候補（箇所を足す・改修場所の候補）は、苅田町の写真の用紙の改修箇所の□の名前と同じ（その他は名前を打つ）', () => {
@@ -208,7 +225,7 @@ test('箇所の候補（箇所を足す・改修場所の候補）は、苅田�
   assert.deepEqual(DEFAULT_PLACES.map((name) => placeBox(labels, name)), DEFAULT_PLACES.map((_, i) => i));
 });
 
-test('みやこ町の写真の用紙の撮影日：原本の「撮影日」のうしろに日付（改修前 D7・改修後 D32）。撮影日のない写真番号・広域連合は原本のまま', () => {
+test('みやこ町の写真の用紙の撮影日：原本の「撮影日」のうしろに日付（改修前 D7・改修後 D32）。日付のない写真番号もほかの写真と同じ日。広域連合は書かない', () => {
   const j = job({insurer: 'miyako', places: [...job().places, place('勝手口', [mat('L型手すり')], {photoDates: {before: '2026-10-01', after: '2026-11-20'}})]});
   const {files, byName} = sheets(fillShinsei(MIYAKO, SHINSEI.miyako!, shinseiValues(j, RATES)));
   const strings = [...strFromU8(files['xl/sharedStrings.xml']).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) =>
@@ -218,11 +235,14 @@ test('みやこ町の写真の用紙の撮影日：原本の「撮影日」の�
     const shared = new RegExp(`<c r="${ref}"[^>]*t="s"[^>]*><v>(\\d+)</v>`).exec(xml)?.[1];
     return shared === undefined ? txt(xml, ref) : strings[Number(shared)];
   };
-  // ①浴室（撮影日なし）・④勝手口（撮影日あり）
+  // ①浴室（撮影日なし）は④勝手口（撮影日あり）と同じ日
   assert.deepEqual([1, 4].map((n) => byName.get(`写真 (${n})`)!).map((xml) => [text(xml, 'R4'), text(xml, 'D7'), text(xml, 'D32')]), [
-    ['①', '撮影日', '撮影日'],
+    ['①', '撮影日　令和8年10月1日', '撮影日　令和8年11月20日'],
     ['④', '撮影日　令和8年10月1日', '撮影日　令和8年11月20日'],
   ]);
+  // 日付を入れていなければ、改修前は当日・改修後は原本のまま（「撮影日」だけ）
+  const none = sheets(fillShinsei(MIYAKO, SHINSEI.miyako!, shinseiValues(job({insurer: 'miyako'}), RATES, '2026-10-22'))).byName.get('写真 (1)')!;
+  assert.deepEqual([text(none, 'D7'), text(none, 'D32')], ['撮影日　令和8年10月22日', '撮影日']);
   // 広域連合の写真貼付用紙には撮影日の欄がないので書かない（A7:S8 は「改　　修　　前」の結合の欄）
   assert.ok(!SHINSEI.kouiki!.sheets.some((x) => x.photoPlace?.dates));
 });
