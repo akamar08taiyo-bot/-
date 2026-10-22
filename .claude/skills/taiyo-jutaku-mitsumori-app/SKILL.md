@@ -1,6 +1,6 @@
 ---
 name: taiyo-jutaku-mitsumori-app
-description: 太陽シルバーサービス行橋営業所の業務アプリ「住宅改修 見積書・請求書（笹岡工務店）」（太陽ポータルの jutaku-mitsumori/ と sasaoka/。リポジトリ akamar08taiyo-bot/- の src/sasaoka、ブランチ claude/sasaoka-shikiri-app）と、そこから部材を受け取る「販売受注簿作成ツール」（taiyo-hacchu-scan）を直す・機能を足す・公開するときに必ず使う。見積書（苅田町・行橋市・みやこ町／広域連合）、申請書、発注書、仕切り計算表・御請求書、部材リスト・施工費（笹岡工務店の手間）・部材＋施工費（常用）、切って使う手すり（マツ六 BD-134 など 4000mm・2000mm）、Excel で保存、行のコピー・貼り付け、このアプリの太陽ポータル（taiyo-portal）への公開・タイルの使い方の文、の話が出たら、アプリ名を言われなくても使う。業務のルール・コードの場所・テストと公開の手順・ユーザーの好み・過去の落とし穴がまとまっている。
+description: 太陽シルバーサービス行橋営業所の業務アプリ「住宅改修 見積書・請求書（笹岡工務店）」（画面の題名・ポータルのタイルは「申請書・見積書作成」。太陽ポータルの jutaku-mitsumori/ と sasaoka/。リポジトリ akamar08taiyo-bot/- の src/sasaoka、ブランチ claude/sasaoka-shikiri-app）と、そこから部材を受け取る「販売受注簿作成ツール」（taiyo-hacchu-scan）を直す・機能を足す・公開するときに必ず使う。見積書（苅田町・行橋市・みやこ町／広域連合）、申請書、発注書、仕切り計算表・御請求書、部材リスト・施工費（笹岡工務店の手間）・部材＋施工費（常用）、切って使う手すり（マツ六 BD-134 など 4000mm・2000mm）、Excel で保存、行のコピー・貼り付け、このアプリの太陽ポータル（taiyo-portal）への公開・タイルの使い方の文、の話が出たら、アプリ名を言われなくても使う。業務のルール・コードの場所・テストと公開の手順・ユーザーの好み・過去の落とし穴がまとまっている。
 ---
 
 # 住宅改修 見積書・請求書アプリ（太陽シルバーサービス 行橋営業所）
@@ -16,7 +16,7 @@ description: 太陽シルバーサービス行橋営業所の業務アプリ「�
 |---|---|
 | 見積書・請求書アプリ（1つのアプリを4つのタブで切り替え） | リポジトリ `akamar08taiyo-bot/-` の `src/sasaoka/`。**ブランチは `claude/sasaoka-shikiri-app`**（既定の main ではない） |
 | 公開先 | `akamar08taiyo-bot/taiyo-portal`（master）の `jutaku-mitsumori/`（見積もりのタブから開く）と `sasaoka/`（請求書のタブから開く）。同じアプリ・同じデータ（IndexedDB）で、最初に開くタブだけ違う |
-| 公開の URL | https://akamar08taiyo-bot.github.io/taiyo-portal/jutaku-mitsumori/ と …/sasaoka/（ポータルのタイルは「住宅改修 見積書作成」の1つ＝jutaku-mitsumori/。sasaoka/ はアプリの請求書のタブから開く。2026-10 に確かめた） |
+| 公開の URL | https://akamar08taiyo-bot.github.io/taiyo-portal/jutaku-mitsumori/ と …/sasaoka/（ポータルのタイルは「申請書・見積書作成」の1つ＝jutaku-mitsumori/。2026-10-22 に「住宅改修 見積書作成」と「特定福祉用具 購入申請書・見積もり作成」を1つにまとめる（タイルは特定福祉用具のセッションが直す）。sasaoka/ はアプリの請求書のタブから開く。2026-10 に確かめた） |
 | 販売受注簿作成ツール（発注書から部材を受け取る側） | `akamar08taiyo-bot/taiyo-hacchu-scan`（master）。公開は `docs/`。https://akamar08taiyo-bot.github.io/taiyo-hacchu-scan/ |
 
 ポータルのアプリはすべて同じサイト（akamar08taiyo-bot.github.io）にある。だから localStorage・IndexedDB を共有でき、アプリ同士の受け渡しもできる（容量も分け合うので、大きいデータは IndexedDB）。

@@ -315,7 +315,7 @@ export default function App({start}: {start: MainTab}) {
             <div className="flex items-center gap-3">
               <div className="grid h-9 w-9 place-items-center rounded-lg bg-white/15 text-lg font-black">住</div>
               <div>
-                <div className="text-base font-bold leading-tight">住宅改修 見積書・請求書</div>
+                <div className="text-base font-bold leading-tight">{APP_TITLE}</div>
                 {/* 「請求先：笹岡工務店」は出さない（ユーザーの指示）。営業所だけ */}
                 <div className={`text-[11px] ${theme.sub}`}>{data.settings.officeName || '営業所未設定'}</div>
               </div>

@@ -27,6 +27,9 @@ await page.goto(`${site}/jutaku-mitsumori/index.html`);
 await page.getByRole('region', {name: '新規作成'}).getByRole('button', {name: '＋ 行橋市', exact: true}).click();
 const form = page.getByRole('form', {name: '申請書'});
 await form.waitFor();
+// 画面の上・ブラウザのタブの題名は「申請書・見積書作成」（太陽ポータルのタイルと同じ名前。ユーザーの答え「変える」、2026-10-22）
+assert.equal(await page.title(), '申請書・見積書作成');
+assert.equal(await page.locator('header').getByText('申請書・見積書作成', {exact: true}).count(), 1);
 const tablist = page.getByRole('tablist', {name: '住宅改修申請書・特定福祉用具申請書・工事見積書・理由書'});
 assert.deepEqual(await tablist.getByRole('tab').allInnerTexts(), ['📝 住宅改修申請書', '🛁 特定福祉用具申請書', '📋 工事見積書', '📄 理由書']);
 assert.equal(await page.getByRole('tab', {name: '📝 住宅改修申請書'}).getAttribute('aria-selected'), 'true');
