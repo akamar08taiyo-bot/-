@@ -57,6 +57,8 @@ export function CardDrop({onRead, children, className = '', big = false}: {onRea
       if (reading.current || !e.clipboardData) return;
       const t = e.target instanceof Element ? e.target : null;
       if (t?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
+      // 確かめる画面など、ほかの画面が開いているときは読まない。文字もあるとき（Excel の表をコピーすると、文字と一緒に表の絵も入る）は保険証にしない
+      if (document.querySelector('[role="dialog"]') || e.clipboardData.getData('text/plain').trim()) return;
       const fromItems = [...e.clipboardData.items].filter((i) => i.kind === 'file').map((i) => i.getAsFile());
       const files = (e.clipboardData.files.length ? [...e.clipboardData.files] : fromItems.filter((f): f is File => f !== null)).filter(isCardFile);
       if (files.length === 0) return;

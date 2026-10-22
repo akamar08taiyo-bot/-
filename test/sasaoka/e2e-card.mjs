@@ -196,13 +196,18 @@ for (const name of ['📝 住宅改修申請書', '🛁 特定福祉用具申請
 assert.equal(new Set(lefts).size, 1, `どのタブでも同じ位置 ${lefts}`);
 await page.screenshot({path: path.join(outDir, 'card-button.png'), clip: {x: 0, y: 0, width: 1366, height: 260}});
 /** クリップボードの画像を貼り付ける（Ctrl+V。今いる所に paste を出す） */
-const pasteCard = () =>
-  page.evaluate(async (b64) => {
-    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-    const d = new DataTransfer();
-    d.items.add(new File([bytes], 'image.png', {type: 'image/png'}));
-    (document.activeElement ?? document.body).dispatchEvent(new ClipboardEvent('paste', {clipboardData: d, bubbles: true, cancelable: true}));
-  }, cardRot.toString('base64'));
+const pasteCard = (withText = false) =>
+  page.evaluate(
+    async ({b64, withText}) => {
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const d = new DataTransfer();
+      d.items.add(new File([bytes], 'image.png', {type: 'image/png'}));
+      // Excel の表をコピーしたときのように、文字と一緒に絵も入っている
+      if (withText) d.setData('text/plain', '手すり\t1');
+      (document.activeElement ?? document.body).dispatchEvent(new ClipboardEvent('paste', {clipboardData: d, bubbles: true, cancelable: true}));
+    },
+    {b64: cardRot.toString('base64'), withText},
+  );
 // 工事見積書のタブで、字を打つ欄にいるときは読まない
 await page.getByRole('tab', {name: '📋 工事見積書'}).click();
 await page.locator('main input:visible').first().focus();
@@ -210,8 +215,11 @@ assert.equal(await page.evaluate(() => document.activeElement?.tagName), 'INPUT'
 await pasteCard();
 await page.waitForTimeout(800);
 assert.equal(await page.getByRole('status', {name: '介護保険証を読んでいます'}).count(), 0);
-// 画面（見出し）をクリックしてから Ctrl+V → 読んで確かめる画面
+// 画面（見出し）をクリックしてから Ctrl+V → 読んで確かめる画面（文字もあるとき＝Excel の表のコピーは読まない）
 await page.locator('h1').first().click();
+await pasteCard(true);
+await page.waitForTimeout(800);
+assert.equal(await page.getByRole('status', {name: '介護保険証を読んでいます'}).count(), 0);
 await pasteCard();
 await page.getByRole('status', {name: '介護保険証を読んでいます'}).waitFor();
 const dialog3 = page.getByRole('dialog').filter({hasText: '介護保険証から入れる'});
