@@ -196,14 +196,14 @@ for (const name of ['📝 住宅改修申請書', '🛁 特定福祉用具申請
 assert.equal(new Set(lefts).size, 1, `どのタブでも同じ位置 ${lefts}`);
 await page.screenshot({path: path.join(outDir, 'card-button.png'), clip: {x: 0, y: 0, width: 1366, height: 260}});
 /** クリップボードの画像を貼り付ける（Ctrl+V。今いる所に paste を出す） */
-const pasteCard = (withText = false) =>
+const pasteCard = (withText = '') =>
   page.evaluate(
     async ({b64, withText}) => {
       const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
       const d = new DataTransfer();
-      d.items.add(new File([bytes], 'image.png', {type: 'image/png'}));
-      // Excel の表をコピーしたときのように、文字と一緒に絵も入っている
-      if (withText) d.setData('text/plain', '手すり\t1');
+      d.items.add(new File([bytes], '保険証.png', {type: 'image/png'}));
+      // Excel の表をコピーしたときのように、文字と一緒に絵も入っている（Mac でファイルをコピーしたときは、ファイルの名前が文字で入る）
+      if (withText) d.setData('text/plain', withText);
       (document.activeElement ?? document.body).dispatchEvent(new ClipboardEvent('paste', {clipboardData: d, bubbles: true, cancelable: true}));
     },
     {b64: cardRot.toString('base64'), withText},
@@ -217,10 +217,11 @@ await page.waitForTimeout(800);
 assert.equal(await page.getByRole('status', {name: '介護保険証を読んでいます'}).count(), 0);
 // 画面（見出し）をクリックしてから Ctrl+V → 読んで確かめる画面（文字もあるとき＝Excel の表のコピーは読まない）
 await page.locator('h1').first().click();
-await pasteCard(true);
+await pasteCard('手すり\t1');
 await page.waitForTimeout(800);
 assert.equal(await page.getByRole('status', {name: '介護保険証を読んでいます'}).count(), 0);
-await pasteCard();
+// 文字がファイルの名前だけなら、ファイルの貼り付けとして読む
+await pasteCard('保険証.png');
 await page.getByRole('status', {name: '介護保険証を読んでいます'}).waitFor();
 const dialog3 = page.getByRole('dialog').filter({hasText: '介護保険証から入れる'});
 await dialog3.getByRole('table', {name: '読んだ値'}).waitFor({timeout: 240_000});
