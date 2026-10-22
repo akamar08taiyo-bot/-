@@ -853,6 +853,8 @@ assert.ok((await preview.innerText()).includes('26,958円')); // 苅田町も改
 await mark('要介護2').click();
 assert.deepEqual(await pressed(), ['昭和', '女']);
 const kd = await make(['要支援1']);
+// 保存のお知らせ（少しすると消えるので、時間のかかる写真の日付のテストより前に見る）
+await page.locator('[aria-live] > div', {hasText: `「${kd.name}」を保存しました`}).waitFor();
 assert.match(kd.name, /^苅田町申請書_（サンプル）山田様_/);
 const k = sheetsOf(kd.bytes);
 assert.equal(k.sheets.size, 15);
@@ -934,7 +936,6 @@ await slot('①', '玄関', '改修後').click();
 await page.getByRole('status', {name: '選んでいる写真'}).getByRole('button', {name: '削除'}).click();
 assert.equal(await dateOf('①', '玄関', '改修後').inputValue(), '2026-12-01');
 log('苅田町の写真の用紙（改修箇所・工事種類の□が連動・撮影日：改修前は当日・改修後は空・1つ直すと全部の写真に・一覧の改修前日付・改修後日付・写真の撮影日時と写っている日付を読む・PDF）OK');
-await page.locator('[aria-live] > div', {hasText: `「${kd.name}」を保存しました`}).waitFor();
 log('苅田町の申請書（申請書の順番の一覧・事前申請書・事後申請書は式で同じ・丸を外す・着工予定日は空白）OK');
 
 // ---------------- みやこ町：承認届出書・支給申請書・内訳明細書の3枚（支給申請書・内訳明細書の氏名などは承認届出書を参照する式）。改修の内容は内訳明細書の種類の行
@@ -1030,11 +1031,35 @@ await form.waitFor();
 assert.equal(await shinseiTab.getAttribute('aria-selected'), 'true');
 assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '新しい申請書');
 assert.equal(await focused(), 'フリガナ');
-// フリガナ → 被保険者氏名 → 被保険者番号（6けたでも確定すると右に詰めて左は 0）→ 生年月日の年・月・日 → 郵便番号 → 住所 → 電話番号 → 所有者 → 関係
-for (const t of ['ミホン　イチロウ', '見本 一郎', '366989', '10', '3', '4', '800-0300', '福岡県京都郡苅田町富久町2-2', '0930-33-4444', '見本 花子', '妻']) {
+// 上の段の「📗 申請書をExcelで保存」は画面のまん中（ユーザーの指示「Excelの印刷、保存ボタンを中央にもってくる」）。左・まん中・右に分けた段のまん中
+/** ボタンの入ったまん中のかたまりが、上の段のまん中から何画素ずれているか */
+const offCenter = (name) =>
+  page.getByRole('button', {name, exact: true}).evaluate((b) => {
+    const row = b.closest('.lg\\:grid').getBoundingClientRect();
+    const box = b.parentElement.getBoundingClientRect();
+    return Math.abs((box.left + box.right) / 2 - (row.left + row.right) / 2);
+  });
+assert.ok((await offCenter('📗 申請書をExcelで保存')) < 2);
+await page.screenshot({path: path.join(outDir, '81b-header-center.png'), clip: {x: 0, y: 0, width: 1366, height: 240}});
+// フリガナ → 被保険者氏名 → 被保険者番号（6けたでも確定すると右に詰めて左は 0）→ 生年月日の年・月・日 → 郵便番号 → 住所 → 電話番号 → 所有者 → 関係。
+// フリガナはひらがなで打っても全角カタカナになる（ユーザーの指示「ひらがなで入力しても、全角カタカナに自動的になるようにする」）
+for (const t of ['みほん　いちろう', '見本 一郎', '366989', '10', '3', '4', '800-0300', '福岡県京都郡苅田町富久町2-2', '0930-33-4444', '見本 花子', '妻']) {
   await page.keyboard.type(t);
   await page.keyboard.press('Enter');
 }
+assert.equal(await form.getByLabel('フリガナ').inputValue(), 'ミホン　イチロウ');
+// 日本語の変換中（IME）はひらがなのまま（変えると変換がこわれる）。確定するとカタカナ。半角カタカナも全角に
+const kana = form.getByLabel('フリガナ');
+await kana.fill('');
+await kana.focus();
+const ime = await ctx.newCDPSession(page);
+await ime.send('Input.imeSetComposition', {text: 'みほん', selectionStart: 3, selectionEnd: 3});
+assert.equal(await kana.inputValue(), 'みほん');
+await ime.send('Input.insertText', {text: 'みほん'});
+await page.waitForFunction(() => document.querySelector('[aria-label="フリガナ"]').value === 'ミホン');
+await kana.fill('ﾐﾎﾝ　ｲﾁﾛｳ');
+assert.equal(await kana.inputValue(), 'ミホン　イチロウ');
+await ime.detach();
 assert.equal((await form.getByLabel('被保険者番号の10マス').innerText()).replace(/\s/g, ''), '0000366989');
 assert.equal(await form.getByLabel('被保険者番号', {exact: true}).inputValue(), '0000366989'); // 確定（Enter）したら右に詰めて 0 が入る
 await form.getByRole('group', {name: '性別'}).getByRole('button', {name: '男'}).click();
@@ -1155,6 +1180,9 @@ await preview.waitFor();
 await estimateTab.click();
 assert.equal(await inInvoice.count(), 0);
 assert.equal(await orderBtn.isDisabled(), true);
+// 見積書のタブも、保存・Excel・印刷は上の段のまん中（白紙に戻す・発注書・複製・削除は右）
+assert.ok((await offCenter('📗 Excelで保存')) < 2);
+await page.screenshot({path: path.join(outDir, '81c-header-center-estimate.png'), clip: {x: 0, y: 0, width: 1366, height: 240}});
 await shinseiTab.click();
 await preview.waitFor();
 log('申請書だけ（みやこ町。見積書なしで Excel・請求書に入れない・一覧から申請書のタブで開く）OK');

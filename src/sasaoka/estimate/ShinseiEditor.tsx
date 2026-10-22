@@ -6,7 +6,7 @@
 // 写真（PhotoBoard）：写真番号の箇所ごとに改修前・改修後の写真を入れ、入れ替える。プレビューの写真貼付用紙にも出し、Excel の写真貼付用紙に貼る
 
 import {Fragment, useDeferredValue, useEffect, useMemo, useRef, useState} from 'react';
-import type {KeyboardEvent, ReactNode} from 'react';
+import type {InputHTMLAttributes, KeyboardEvent, ReactNode} from 'react';
 import {isBlankRow, jobName} from '../calc.ts';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {circled, eraOf, INSURER_IDS, INSURER_INFO, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, photoNumbers} from '../estimateForms.ts';
@@ -18,7 +18,7 @@ import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
 import type {AppData, Insurer, Job, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
 import type {Update} from '../useStore.ts';
-import {yen} from '../util.ts';
+import {toKatakana, yen} from '../util.ts';
 import {PhotoBoard, photoPlaces, SLOT_LABEL, usePhotoActions} from './PhotoBoard.tsx';
 import type {PhotoKey, PhotoSlot} from './PhotoBoard.tsx';
 import {canMakeShinsei, saveShinsei, useTemplate} from './shinseiFiles.ts';
@@ -180,7 +180,7 @@ export function ShinseiEditor({
   const row = (f: Field, i: Insurer): ReactNode => {
     switch (f) {
       case 'kana':
-        return <TextInput value={info.kana} onChange={(kana) => setInfo({kana})} placeholder="ヤマダ　タロウ" className="w-full max-w-md" aria-label="フリガナ" data-nav autoFocus={!job.customer && !info.kana} />;
+        return <KanaInput value={info.kana} onChange={(kana) => setInfo({kana})} placeholder="ヤマダ　タロウ" className="w-full max-w-md" aria-label="フリガナ" data-nav autoFocus={!job.customer && !info.kana} />;
       case 'name':
         return <TextInput value={job.customer} onChange={(customer) => setJob((j) => ({...j, customer}))} placeholder="山田　太郎" className="w-full max-w-md text-base font-bold" aria-label="被保険者氏名" data-nav />;
       case 'insuredNo':
@@ -342,20 +342,25 @@ export function ShinseiEditor({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <Btn color="white" onClick={onBack}>
-          ← 一覧へ戻る
-        </Btn>
-        {tabs}
-        <h1 className="text-lg font-bold text-[#14532d]">{job.customer.trim() ? jobName(job) : '新しい申請書'}</h1>
-        {insurer && <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-900">{INSURER_INFO[insurer].name}</span>}
-        {canMakeShinsei(insurer) && (
-          <div className="ml-auto">
+      {/* Excel で保存は画面のまん中（ユーザーの指示「Excelの印刷、保存ボタンを中央にもってくる」2026-10-22。見積書のタブの保存・Excel・印刷も同じ所）。
+          広い画面は 左・まん中・右 の3つに分け、まん中を画面のまん中にそろえる。狭い画面はまん中のボタンだけの行にして、そのまん中に */}
+      <div className="flex flex-wrap items-center gap-2 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+        <div className="flex flex-wrap items-center gap-2">
+          <Btn color="white" onClick={onBack}>
+            ← 一覧へ戻る
+          </Btn>
+          {tabs}
+          <h1 className="text-lg font-bold text-[#14532d]">{job.customer.trim() ? jobName(job) : '新しい申請書'}</h1>
+          {insurer && <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-900">{INSURER_INFO[insurer].name}</span>}
+        </div>
+        <div className="flex flex-wrap justify-center gap-2 max-lg:basis-full">
+          {canMakeShinsei(insurer) && (
             <Btn color="softGreen" onClick={save}>
               📗 申請書をExcelで保存
             </Btn>
-          </div>
-        )}
+          )}
+        </div>
+        <div />
       </div>
 
       <section className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
@@ -503,6 +508,33 @@ function Circles({label, options, value, onPick}: {label: string; options: reado
         </Fragment>
       ))}
     </div>
+  );
+}
+
+/**
+ * フリガナの欄：ひらがな・半角カタカナで打っても全角カタカナにする（`toKatakana`）。日本語の変換中は変えず（変えると変換がこわれる）、
+ * 確定したとき・貼り付けたとき・欄を離れたときに変える
+ */
+function KanaInput({value, onChange, ...rest}: {value: string; onChange: (v: string) => void} & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
+  const composing = useRef(false);
+  const commit = (v: string) => {
+    const k = toKatakana(v);
+    if (k !== value || k !== v) onChange(k);
+  };
+  return (
+    <TextInput
+      value={value}
+      onChange={(v) => (composing.current ? onChange(v) : commit(v))}
+      onCompositionStart={() => {
+        composing.current = true;
+      }}
+      onCompositionEnd={(e) => {
+        composing.current = false;
+        commit(e.currentTarget.value);
+      }}
+      onBlur={(e) => commit(e.currentTarget.value)}
+      {...rest}
+    />
   );
 }
 

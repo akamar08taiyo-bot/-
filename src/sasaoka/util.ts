@@ -91,6 +91,14 @@ export function tesuri(s: string): string {
   return s.replace(/手摺り?/g, '手すり');
 }
 
+/**
+ * フリガナは全角カタカナ（ユーザーの指示「ひらがなで入力しても、全角カタカナに自動的になるようにする」2026-10-22）：
+ * ひらがな → カタカナ（ゔ→ヴ・ゝゞ→ヽヾも）、半角カタカナ → 全角カタカナ（ｶﾞ→ガ）。空白（全角も）・漢字・英数字はそのまま
+ */
+export function toKatakana(s: string): string {
+  return s.replace(/[\u3041-\u3096\u309d\u309e]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60)).replace(/[\uff66-\uff9f]+/g, (h) => h.normalize('NFKC'));
+}
+
 /** 検索用：全角半角・大文字小文字をそろえる */
 export function searchKey(s: string): string {
   return (s || '').normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();

@@ -129,16 +129,20 @@ export function EstimateEditor({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <Btn color="white" onClick={onBack}>
-          ← 一覧へ戻る
-        </Btn>
-        {tabs}
-        <h1 className="text-lg font-bold text-[#14532d]">{name}</h1>
-        <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-900">
-          {insurer ? INSURER_INFO[insurer].name : FORM_INFO[form].name}「{FORM_INFO[form].title}」
-        </span>
-        <div className="ml-auto flex flex-wrap gap-2">
+      {/* 保存・Excel・印刷は画面のまん中（ユーザーの指示「Excelの印刷、保存ボタンを中央にもってくる」2026-10-22。申請書のタブの Excel も同じ所）。
+          広い画面は 左・まん中・右 の3つに分け、まん中を画面のまん中にそろえる。白紙に戻す・発注書・複製・削除は右。狭い画面はまん中のボタンだけの行にして、そのまん中に */}
+      <div className="flex flex-wrap items-center gap-2 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+        <div className="flex flex-wrap items-center gap-2">
+          <Btn color="white" onClick={onBack}>
+            ← 一覧へ戻る
+          </Btn>
+          {tabs}
+          <h1 className="text-lg font-bold text-[#14532d]">{name}</h1>
+          <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-900">
+            {insurer ? INSURER_INFO[insurer].name : FORM_INFO[form].name}「{FORM_INFO[form].title}」
+          </span>
+        </div>
+        <div className="flex flex-wrap justify-center gap-2 max-lg:basis-full">
           <Btn color="softBlue" onClick={save}>
             💾 保存
           </Btn>
@@ -148,6 +152,8 @@ export function EstimateEditor({
           <Btn color="softSky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
             🖨 見積書を印刷
           </Btn>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
           <Btn color="white" onClick={clearSheet} disabled={blank}>
             📄 白紙に戻す
           </Btn>
