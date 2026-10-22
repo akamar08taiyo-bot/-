@@ -12,6 +12,7 @@ import type {EstimateRates, EstimateSettings} from './calc.ts';
 import {BASE_PLATE} from './cutLink.ts';
 import {circled, eraOf, jobInsurer, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa} from './estimateForms.ts';
 import {clampOff, clampScale, normRot} from './photoEdit.ts';
+import type {RiyuValues} from './riyu.ts';
 import type {Insurer, Job, PhotoEdit, Place, PlacePhotos, ShinseiInfo, ShinseiMarks} from './types.ts';
 import {customerFilePart, todayIso} from './util.ts';
 
@@ -35,6 +36,9 @@ export type ShinseiSheet = {
   legend?: {cell?: string; box?: string};
   marks?: MarkCell[]; // 丸で囲む欄（性別「男　　・　　女」など）
   texts?: TextCell[]; // 申請書の画面で入れた項目（フリガナ・生年月日・電話番号など）を書く欄と書き方
+  riyu?: boolean; // 住宅改修が必要な理由書のシート：理由書だけの欄（ShinseiValues の riyu。riyu.ts の riyuCells）も書く
+  pages?: string[]; // プレビューでページに分ける範囲（1枚のシートに2ページある理由書。なければシートで1枚）
+  links?: {ref: string; field: string}[]; // プレビューで押すと一覧のその項目へ行く欄（上の欄のほかに。理由書だけの項目）
 };
 
 /** 申請書の画面で入れた項目の文字（書き方の {名前} に入れる値） */
@@ -256,6 +260,7 @@ export type ShinseiValues = {
   start: string; // 着工・完了の日（'YYYY-MM-DD'。日付で書く欄）
   end: string;
   photoImages?: Record<number, PhotoImages>; // 写真番号 → 写真貼付用紙に貼る写真（Excel に保存するときだけ。画面のプレビューは写真を別に重ねる）
+  riyu?: RiyuValues; // 理由書だけの欄（理由書のシートに書く）
 };
 
 /** 写真貼付用紙に貼る写真（JPEG のバイト列と、縦横の画素） */
@@ -736,6 +741,7 @@ export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void
     const photo = sheet.photoPlace ? photoNumberOf(readCell(files, sheet.sheet, sheet.photoPlace.photo)) : 0;
     const cells = shinseiCells(sheet, v, photo);
     for (const [ref, text] of photoBoxes(files, sheet, v, photo)) cells.set(ref, text);
+    if (sheet.riyu && v.riyu) for (const [ref, text] of riyuSheetCells(files, sheet, v.riyu)) cells.set(ref, text);
     writeCells(files, sheet.sheet, cells);
     wrapKinds(files, sheet, v);
     fitLines(files, sheet, v);
@@ -753,6 +759,25 @@ export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void
       }
     }
   }
+}
+
+/**
+ * 理由書だけの欄の値（riyu.ts の riyuCells）：文字の欄はそのまま、□の欄は原本の文字の pick 番目の□を■にして、
+ * fill があれば「その他（　）」のかっこの中をその文字にする（かっこは原本のまま）
+ */
+function riyuSheetCells(files: Files, sheet: ShinseiSheet, r: RiyuValues): Map<string, CellValue> {
+  const out = new Map<string, CellValue>(Object.entries(r.cells));
+  const path = sheetPaths(files).get(sheet.sheet);
+  const xml = path && files[path] ? strFromU8(files[path]) : '';
+  const shared = sharedStrings(files);
+  for (const [ref, c] of Object.entries(r.checks)) {
+    let text = cellText(xml, ref, shared);
+    if (!text) continue;
+    if (c.pick !== null) text = checkBoxes(text, c.pick);
+    if (c.fill) text = text.replace(/([（(])[^（()）]*([)）])/, (_, a: string, b: string) => `${a}${c.fill}${b}`);
+    out.set(ref, text);
+  }
+  return out;
 }
 
 /** □の一覧の印（□・■・◻︎・🔳 など。うしろの異体字セレクタも） */
@@ -1055,7 +1080,8 @@ function cellStyle(files: Files, xml: string, ref: string): CellStyle {
  * プロポーショナルの字体（ＭＳ Ｐゴシック・ＭＳ Ｐ明朝）で全角と幅の違う文字（全角＝1。同じ幅の IPA Pゴシックで測った）。
  * 全角のすき間（　）は、前の申請で手で書いた丸の位置（苅田町の性別・要介護状態区分、みやこ町・広域連合の改修状況）に合わせて 0.75
  */
-const P_WIDTH: Record<string, number> = {'　': 0.75, ' ': 0.27, '・': 0.5, '０': 0.68, '１': 0.49, '２': 0.66, '３': 0.64, '４': 0.68, '５': 0.66, '６': 0.66, '７': 0.61, '８': 0.68, '９': 0.66};
+// 全角のかっこ（理由書の「要支援 （ １ ・２ ）」）はＭＳ Ｐ明朝では半分ほど。1文字で数えると丸が右へ1字ほどずれた（2026-10-22）
+const P_WIDTH: Record<string, number> = {'（': 0.5, '）': 0.5, '　': 0.75, ' ': 0.27, '・': 0.5, '０': 0.68, '１': 0.49, '２': 0.66, '３': 0.64, '４': 0.68, '５': 0.66, '６': 0.66, '７': 0.61, '８': 0.68, '９': 0.66};
 /** 文字の幅（全角＝1） */
 function charWidth(ch: string, proportional: boolean): number {
   if (proportional && P_WIDTH[ch] !== undefined) return P_WIDTH[ch];
@@ -1070,14 +1096,16 @@ export type Box = {x: number; y: number; w: number; h: number}; // 画素（シ�
 type Span = {tx: number; tw: number; cy: number; em: number; height: number};
 
 function textSpan(lay: SheetLayout, st: CellStyle, ref: string, text: string, start: number, end: number): Span {
-  const {xs, ws, cy, em, height} = textLayout(lay, st, ref, text);
+  const {xs, ws, cy, cys, em, height} = textLayout(lay, st, ref, text);
   const tx = start < xs.length ? xs[start] : (xs[xs.length - 1] ?? 0) + (ws[ws.length - 1] ?? 0);
   const tw = ws.slice(start, end).reduce((a, b) => a + b, 0);
-  return {tx, tw, cy, em, height};
+  // 改行のある欄は、その行の高さ。丸の高さは行の高さに収める（となりの行にかからない）
+  const multi = text.includes('\n');
+  return {tx, tw, cy: cys[start] ?? cy, em, height: multi ? em * 1.2 + 4 : height};
 }
 
 /** 欄の文字の1文字ずつの左の位置と幅（画素。シートの左上から）、まん中の高さ・文字の大きさ・欄の高さ（Excel の画面と同じ数え方） */
-function textLayout(lay: SheetLayout, st: CellStyle, ref: string, text: string): {xs: number[]; ws: number[]; cy: number; em: number; height: number} {
+function textLayout(lay: SheetLayout, st: CellStyle, ref: string, text: string): {xs: number[]; ws: number[]; cy: number; cys: number[]; em: number; height: number} {
   const [, col = 'A', row = '1'] = /^([A-Z]+)(\d+)$/.exec(ref) ?? [];
   const c0 = colNum(col);
   const r0 = Number(row);
@@ -1093,24 +1121,42 @@ function textLayout(lay: SheetLayout, st: CellStyle, ref: string, text: string):
   const height = sum(r1, r2, lay.rowH);
   const pad = 2; // 罫線と文字のあいだ
   const proportional = /[ＰP]/.test(st.font);
-  const widths = text.split('').map((ch) => charWidth(ch, proportional) * Math.round((st.size * 4) / 3));
-  const total = widths.reduce((a, b) => a + b, 0);
-  const scale = st.shrink && total > width - 2 * pad ? (width - 2 * pad) / total : 1; // 縮小して全体を表示する
+  // 改行のある欄（理由書の「明治／大正／昭和」）は行ごとに並べる（行の高さは文字の 1.2 倍、行のまとまりを欄の縦の位置にそろえる）
+  const lines = text.split('\n');
+  const lineWidths = lines.map((l) => l.split('').map((ch) => charWidth(ch, proportional) * Math.round((st.size * 4) / 3)));
+  const widest = Math.max(...lineWidths.map((w) => w.reduce((a, b) => a + b, 0)));
+  const scale = st.shrink && widest > width - 2 * pad ? (width - 2 * pad) / widest : 1; // 縮小して全体を表示する
   const em = Math.round((st.size * 4) / 3) * scale;
-  const x0 =
-    st.horizontal === 'center' || st.horizontal === 'centerContinuous' || st.horizontal === 'distributed'
-      ? left + (width - total * scale) / 2
-      : st.horizontal === 'right'
-        ? left + width - pad - total * scale
-        : left + pad + st.indent * em;
+  const lh = lines.length > 1 ? em * 1.2 : 0;
+  const block = lh * (lines.length - 1);
+  const mid = st.vertical === 'center' ? top + height / 2 : st.vertical === 'top' ? top + pad + em * 0.6 + block / 2 : top + height - pad - em * 0.6 - block / 2;
   const xs: number[] = [];
-  let x = x0;
-  for (const w of widths) {
-    xs.push(x);
-    x += w * scale;
-  }
-  const cy = st.vertical === 'center' ? top + height / 2 : st.vertical === 'top' ? top + pad + em * 0.6 : top + height - pad - em * 0.6;
-  return {xs, ws: widths.map((w) => w * scale), cy, em, height};
+  const ws: number[] = [];
+  const cys: number[] = [];
+  lines.forEach((_, li) => {
+    const widths = lineWidths[li];
+    const total = widths.reduce((a, b) => a + b, 0);
+    const x0 =
+      st.horizontal === 'center' || st.horizontal === 'centerContinuous' || st.horizontal === 'distributed'
+        ? left + (width - total * scale) / 2
+        : st.horizontal === 'right'
+          ? left + width - pad - total * scale
+          : left + pad + st.indent * em;
+    const y = mid - block / 2 + li * lh;
+    let x = x0;
+    for (const w of widths) {
+      xs.push(x);
+      ws.push(w * scale);
+      cys.push(y);
+      x += w * scale;
+    }
+    if (li < lines.length - 1) {
+      xs.push(x); // 改行の文字（幅なし）
+      ws.push(0);
+      cys.push(y);
+    }
+  });
+  return {xs, ws, cy: cys[0] ?? mid, cys, em, height};
 }
 
 /** 欄（結合した範囲）の text の start〜end 文字目を囲む楕円の位置 */
@@ -1488,7 +1534,8 @@ export function markTexts(files: Files, sheet: ShinseiSheet): MarkText[] {
   const shared = sharedStrings(files);
   return sheet.marks.flatMap((m) => {
     const text = cellText(xml, m.cell, shared);
-    if (!text) return [];
+    // 改行のある欄（理由書の元号）は、画面でも原本の文字のまま描く（1文字ずつ置くのは1行の欄だけ）
+    if (!text || text.includes('\n')) return [];
     const {xs, ws, cy, em} = textLayout(lay, cellStyle(files, xml, m.cell), m.cell, text);
     return [{ref: m.cell, chars: text.split('').map((ch, i) => ({ch, x: xs[i], w: ws[i]})), cy, em}];
   });

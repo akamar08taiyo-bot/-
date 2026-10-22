@@ -24,6 +24,7 @@ export function copyJob(job: Job): Job {
     })),
     insuredNo: '',
     shinsei: {...NO_SHINSEI}, // 申請書の項目（フリガナ・生年月日・性別など）はお客様のことなので、番号と同じく消す
+    riyu: undefined, // 理由書（身体状況・介護状況など）もお客様のことなので消す
     estDate: '', // 見積もり作成日は複製した日（空なら作った日）
     overhead: null,
     overheadTarget: null,

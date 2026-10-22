@@ -15,16 +15,20 @@ import kanda from '../shinsei/kanda.xltx?inline';
 import kouiki from '../shinsei/kouiki.xltx?inline';
 import miyako from '../shinsei/miyako.xltx?inline';
 import yukuhashi from '../shinsei/yukuhashi.xltx?inline';
+import riyu from '../shinsei/riyu.xltx?inline';
+import {RIYU_MAP, riyuFileName, riyuValues} from '../riyu.ts';
 
-const TEMPLATES: Partial<Record<Insurer, string>> = {kanda, yukuhashi, miyako, kouiki};
+/** 原本：保険者ごとの申請書と、住宅改修が必要な理由書（国の様式。どの保険者も同じ） */
+export type TemplateKey = Insurer | 'riyu';
+const TEMPLATES: Partial<Record<TemplateKey, string>> = {kanda, yukuhashi, miyako, kouiki, riyu};
 
 /** この保険者の申請書を作れるか（原本をいただいた保険者だけ） */
 export const canMakeShinsei = (insurer: Insurer | '') => !!insurer && !!TEMPLATES[insurer] && !!SHINSEI[insurer];
 
-const opened = new Map<Insurer, Promise<Files>>();
+const opened = new Map<TemplateKey, Promise<Files>>();
 
 /** 原本を開いたもの（はじめの1回だけ開いて覚えておく。プレビューで打つたびに開き直さない） */
-export function openTemplate(insurer: Insurer): Promise<Files> {
+export function openTemplate(insurer: TemplateKey): Promise<Files> {
   const url = TEMPLATES[insurer];
   if (!url) return Promise.reject(new Error('この保険者の申請書の原本がありません'));
   let p = opened.get(insurer);
@@ -39,8 +43,8 @@ export function openTemplate(insurer: Insurer): Promise<Files> {
 }
 
 /** 原本を開いたもの（開くまでは null） */
-export function useTemplate(insurer: Insurer | ''): Files | null {
-  const [got, setGot] = useState<{insurer: Insurer; files: Files} | null>(null);
+export function useTemplate(insurer: TemplateKey | ''): Files | null {
+  const [got, setGot] = useState<{insurer: TemplateKey; files: Files} | null>(null);
   useEffect(() => {
     if (!insurer || !TEMPLATES[insurer]) return;
     let alive = true;
@@ -96,4 +100,12 @@ export async function saveShinsei(job: Job, insurer: Insurer, s: Settings): Prom
   const fileName = shinseiFileName(map, job, estimateDateOf(job));
   downloadBlob(new Blob([bytes], {type: XLSX_TYPE}), fileName);
   return {fileName, missingPhotos: photos.missing};
+}
+
+/** 住宅改修が必要な理由書（Excel）を保存する（ダウンロード）。保存したファイル名を返す（「山田花子様住宅改修理由書.xlsx」） */
+export async function saveRiyu(job: Job, s: Settings): Promise<string> {
+  const bytes = fillShinseiFiles({...(await openTemplate('riyu'))}, RIYU_MAP, riyuValues(job, s));
+  const fileName = riyuFileName(job);
+  downloadBlob(new Blob([bytes], {type: XLSX_TYPE}), fileName);
+  return fileName;
 }

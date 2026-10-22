@@ -568,6 +568,7 @@ export function ShinseiPages({
   onToggle,
   photos,
   scrollBox,
+  title = '申請書のプレビュー',
 }: {
   pages: PvPage[];
   missing: Partial<Record<ShinseiField, boolean>>;
@@ -578,6 +579,7 @@ export function ShinseiPages({
   onToggle: (key: keyof ShinseiMarks, option: string) => void;
   photos?: PreviewPhotos; // 写真貼付用紙の写真（ないときは枠を出さない）
   scrollBox?: RefObject<HTMLElement | null>; // プレビューを入れた枠（一覧の横に並べて、枠の中で動くとき）
+  title?: string; // プレビューの名前（理由書は「理由書のプレビュー」）
 }) {
   const [wrapRef, wrapWidth] = useWidth<HTMLDivElement>();
   const widest = Math.max(...pages.map((p) => paper(p).width), 1);
@@ -601,7 +603,7 @@ export function ShinseiPages({
   let firstDone = false;
 
   return (
-    <div ref={wrapRef} className="space-y-4" aria-label="申請書のプレビュー">
+    <div ref={wrapRef} className="space-y-4" aria-label={title}>
       {pages.map((page) => {
         const pp = paper(page);
         return (

@@ -93,7 +93,7 @@ export function ShinseiEditor({
   const lines = shinseiWorks(job, s);
 
   // まだ入っていない欄（色を付けて、上に一覧で出す）。着工・完了の日は数えない（苅田町・行橋市の着工予定日は空白のまま。みやこ町・広域連合の着工日・完成日は工事のあと）
-  const missing: Record<Field, boolean> = {
+  const missing: Partial<Record<Field, boolean>> = {
     kana: !info.kana.trim(),
     name: !job.customer.trim(),
     insuredNo: !insuredBoxes(job.insuredNo).join(''),
@@ -487,12 +487,12 @@ export function ShinseiEditor({
   );
 }
 
-function Note({children}: {children: ReactNode}) {
+export function Note({children}: {children: ReactNode}) {
   return <span className="text-xs text-slate-500">{children}</span>;
 }
 
 /** 丸で囲む項目（申請書と同じ「男　・　女」の形。押すと丸がつき、もう一度押すと外れる） */
-function Circles({label, options, value, onPick}: {label: string; options: readonly string[]; value: string; onPick: (v: string) => void}) {
+export function Circles({label, options, value, onPick}: {label: string; options: readonly string[]; value: string; onPick: (v: string) => void}) {
   return (
     <div role="group" aria-label={label} className="flex flex-wrap items-center gap-1">
       {options.map((o, k) => (
@@ -518,7 +518,7 @@ function Circles({label, options, value, onPick}: {label: string; options: reado
  * フリガナの欄：ひらがな・半角カタカナで打っても全角カタカナにする（`toKatakana`）。日本語の変換中は変えず（変えると変換がこわれる）、
  * 確定したとき・貼り付けたとき・欄を離れたときに変える
  */
-function KanaInput({value, onChange, ...rest}: {value: string; onChange: (v: string) => void} & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
+export function KanaInput({value, onChange, ...rest}: {value: string; onChange: (v: string) => void} & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
   const composing = useRef(false);
   const commit = (v: string) => {
     const k = toKatakana(v);

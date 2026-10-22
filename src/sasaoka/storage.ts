@@ -9,6 +9,7 @@ import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES, 
 import {guessPieceLengthM} from './priceImport.ts';
 import {jobInsurer, MARK_INFO, MARK_KEYS, NO_SHINSEI} from './estimateForms.ts';
 import {cleanEdit} from './photoEdit.ts';
+import {cleanRiyu} from './riyu.ts';
 import type {AppData, EstimateForm, Insurer, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, PlaceDims, PlacePhotoEdits, PlacePhotos, Rounding, Row, Settings, ShinseiInfo, TaxMode} from './types.ts';
 import {uid} from './util.ts';
 
@@ -364,6 +365,11 @@ function cleanShinsei(raw: unknown, legacyMarks: unknown): ShinseiInfo {
   out.start = isoDate(src.start);
   out.end = isoDate(src.end);
   out.cost = optNum(src.cost);
+  // 介護保険証から入れた項目（2026-10-22。前の版のデータにはない＝空）
+  out.careFrom = isoDate(src.careFrom);
+  out.careTo = isoDate(src.careTo);
+  out.insurerNo = str(src.insurerNo).replace(/\D/g, '').slice(0, 8);
+  out.burden = ['1', '2', '3'].includes(str(src.burden)) ? (str(src.burden) as ShinseiInfo['burden']) : '';
   return out;
 }
 
@@ -392,6 +398,7 @@ export function cleanJobs(raw: unknown): Job[] {
       places: Array.isArray(j.places) ? j.places.filter(isObj).map(cleanPlace) : [],
       order: cleanOrder(j.order),
       shinsei: cleanShinsei(j.shinsei, j.shinseiMarks),
+      ...(isObj(j.riyu) ? {riyu: cleanRiyu(j.riyu)} : {}),
       createdAt: numv(j.createdAt, Date.now()),
       updatedAt: numv(j.updatedAt, Date.now()),
     };

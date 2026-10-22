@@ -62,6 +62,10 @@ export const NO_SHINSEI: ShinseiInfo = {
   start: '',
   end: '',
   cost: null,
+  careFrom: '',
+  careTo: '',
+  insurerNo: '',
+  burden: '',
 };
 /** 生年月日の元号：選んでいなければ昭和（ユーザーの指示「昭和がデフォルトにする」、2026-10-21。介護保険を使う方は昭和の生まれが多い）。
  *  保存する値は選んだときだけ（空のまま）にして、画面・申請書に出すときにこれで決める */

@@ -10,7 +10,26 @@ import type {Files, SheetLayout, ShinseiMap, ShinseiSheet, ShinseiTexts, Shinsei
 import type {ShinseiMarks} from './types.ts';
 
 /** 申請書の画面で入れる項目（欄の順番は ShinseiEditor の FIELDS） */
-export type ShinseiField = 'kana' | 'name' | 'insuredNo' | 'birth' | 'gender' | 'zip' | 'address' | 'phone' | 'care' | 'owner' | 'reason' | 'works' | 'cost' | 'renovated' | 'dates' | 'photoDates';
+export type ShinseiField =
+  | 'kana'
+  | 'name'
+  | 'insuredNo'
+  | 'birth'
+  | 'gender'
+  | 'zip'
+  | 'address'
+  | 'phone'
+  | 'care'
+  | 'owner'
+  | 'reason'
+  | 'works'
+  | 'cost'
+  | 'renovated'
+  | 'dates'
+  | 'photoDates'
+  | RiyuField;
+/** 理由書だけの項目（理由書の画面の一覧の項目。riyu.ts の RIYU_LINKS で欄と結ぶ） */
+export type RiyuField = 'careTerm' | 'housing' | 'checkDate' | 'madeDate' | 'qualification' | 'tel' | 'body' | 'careState' | 'wish' | 'equipment' | 'act:toilet' | 'act:bath' | 'act:out' | 'act:home';
 
 export type Rect = {x: number; y: number; w: number; h: number}; // 画素（ページの左上から）
 export type PvFont = {family: string; size: number; bold: boolean; italic: boolean; underline: boolean; strike: boolean; color: string}; // size は画素
@@ -82,11 +101,15 @@ export function shinseiPreview(template: Files, map: ShinseiMap, v: ShinseiValue
   const paths = sheetPaths(files);
   const links = fieldCellsOf(map);
   const pages: PvPage[] = [];
-  const add = (sheet: ShinseiSheet, kind: PvPage['kind'], photo = 0) => {
+  const add = (sheet: ShinseiSheet, kind: PvPage['kind'], photo = 0, range?: Range, name?: string) => {
     const path = paths.get(sheet.sheet);
-    if (path && files[path] && template[path]) pages.push(buildPage(files, path, template[path], sheet, links, kind, photo));
+    if (path && files[path] && template[path]) pages.push({...buildPage(files, path, template[path], sheet, links, kind, photo, range), ...(name ? {sheet: name} : {})});
   };
-  for (const sheet of map.sheets.filter(isFormSheet)) add(sheet, 'form');
+  for (const sheet of map.sheets.filter(isFormSheet)) {
+    // 1枚のシートに2ページある様式（理由書）は、ページごとに1枚（名前は「住宅改修理由書（1ページ）」）
+    if (sheet.pages) sheet.pages.forEach((r, i) => add(sheet, 'form', 0, rangeOf(r), `${sheet.sheet}（${i + 1}ページ）`));
+    else add(sheet, 'form');
+  }
   for (const sheet of map.sheets.filter((s) => s.legend)) add(sheet, 'plan');
   const sheets = photoSheets(template, map);
   for (const n of Object.keys(v.photos).map(Number).sort((a, b) => a - b)) {
@@ -129,6 +152,7 @@ function fieldRefs(sheet: ShinseiSheet): {field: ShinseiField; ref: string}[] {
     if (key) out.push({field: TEXT_FIELD[key], ref: t.cell});
   }
   for (const m of sheet.marks ?? []) out.push({field: MARK_FIELD[m.key], ref: m.cell});
+  for (const l of sheet.links ?? []) out.push({field: l.field as ShinseiField, ref: l.ref});
   // 写真の用紙の撮影日（苅田町・みやこ町）：一覧の「改修前日付・改修後日付」
   const dates = sheet.photoPlace?.dates;
   if (dates) out.push({field: 'photoDates', ref: dates.before}, {field: 'photoDates', ref: dates.after});
@@ -507,6 +531,12 @@ function richShared(files: Files): RichRun[][] {
 
 type Cell = {s: number | null; t: string; inner: string};
 type Range = [number, number, number, number]; // 左の列・上の行・右の列・下の行（1始まり）
+/** 'A1:AP40' → 範囲 */
+const rangeOf = (ref: string): Range => {
+  const m = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(ref);
+  if (!m) throw new Error(`範囲の書き方がちがう: ${ref}`);
+  return [colNum(m[1]), Number(m[2]), colNum(m[3]), Number(m[4])];
+};
 const rangeCache = new WeakMap<Uint8Array, Range>();
 
 const cellsRe = /<c r="([A-Z]+)(\d+)"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g;
@@ -576,14 +606,14 @@ function firstPage(xml: string, lay: SheetLayout): Range {
   return [1, 1, Math.max(1, c - 1), Math.max(1, r - 1)];
 }
 
-function buildPage(files: Files, path: string, templateSheet: Uint8Array, sheet: ShinseiSheet, links: Map<string, ShinseiField>, kind: PvPage['kind'], photo: number): PvPage {
+function buildPage(files: Files, path: string, templateSheet: Uint8Array, sheet: ShinseiSheet, links: Map<string, ShinseiField>, kind: PvPage['kind'], photo: number, pageRange?: Range): PvPage {
   const xml = strFromU8(files[path]);
   const xfs = xfsOf(files);
   const st = styleParts(files);
   const theme = themeOf(files);
   const lay = sheetLayout(xml);
   // 範囲：申請書の様式は罫線・文字のある四角。平面図・写真貼付用紙は印刷の範囲（なければ印刷の1ページ目）
-  let range = rangeCache.get(templateSheet);
+  let range = pageRange ?? rangeCache.get(templateSheet);
   if (!range) {
     range = kind === 'form' ? formRange(strFromU8(templateSheet), xfs) : (printRange(files, sheet.sheet) ?? firstPage(strFromU8(templateSheet), lay));
     rangeCache.set(templateSheet, range);

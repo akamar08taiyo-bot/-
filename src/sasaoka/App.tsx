@@ -23,6 +23,7 @@ import {LABOR_REV} from './defaults.ts';
 import {EstimateEditor} from './estimate/EstimateEditor.tsx';
 import {EstimateHome, EstimateList, newEstimate} from './estimate/EstimateList.tsx';
 import {OrderPage} from './estimate/OrderPage.tsx';
+import {RiyuEditor} from './estimate/RiyuEditor.tsx';
 import {ShinseiEditor} from './estimate/ShinseiEditor.tsx';
 import {hasShinseiInfo} from './estimateForms.ts';
 import {APP_TITLE, PORTAL_URL, readHash, writeHash} from './links.ts';
@@ -30,6 +31,7 @@ import type {JobView, MainTab} from './links.ts';
 import {prunePhotos} from './photos.ts';
 import {PrintView} from './print/PrintView.tsx';
 import type {PrintRequest} from './print/PrintView.tsx';
+import {hasRiyuInfo} from './riyu.ts';
 import {EXAMPLE_KIT_ID, exampleKit} from './samples.ts';
 import type {Insurer, Job, Row} from './types.ts';
 import {useNewVersion} from './update.ts';
@@ -69,16 +71,17 @@ function loadMonth(): string {
 }
 
 /**
- * 様邸の画面の2つのタブ：左に申請書、右に見積書（ユーザーの指示「新規作成で、保険者を選んだら、2種類、タブを作る。左側に、申請書、右側に見積もり」）。
+ * 様邸の画面のタブ：左に申請書、まん中に理由書、右に見積書（ユーザーの指示「新規作成で、保険者を選んだら、2種類、タブを作る。左側に、申請書、右側に見積もり」・「必要に応じて住宅改修の理由書にも飛べるようにする」）。
  * 同じ様邸の内容（氏名・住所・被保険者番号・改修の箇所・金額）なので、どちらで直しても、もう一方にすぐ出る
  */
 function JobTabs({view, onView}: {view: JobView; onView: (v: JobView) => void}) {
   const tabs: [JobView, string][] = [
     ['shinsei', '📝 申請書'],
+    ['riyu', '📄 理由書'],
     ['estimate', '📋 見積書'],
   ];
   return (
-    <div role="tablist" aria-label="申請書と見積書" className="inline-flex overflow-hidden rounded-lg border-2 border-[#14532d] bg-white shadow-sm">
+    <div role="tablist" aria-label="申請書・理由書・見積書" className="inline-flex overflow-hidden rounded-lg border-2 border-[#14532d] bg-white shadow-sm">
       {tabs.map(([v, text]) => (
         <button
           key={v}
@@ -96,7 +99,7 @@ function JobTabs({view, onView}: {view: JobView; onView: (v: JobView) => void}) 
 }
 
 /** 何も入れていない見積書・様邸・申請書（作ってすぐ戻ったもの。残さない） */
-const isEmpty = (j: Job) => !j.customer.trim() && !j.staff && j.places.length === 0 && !j.address && !j.insuredNo && !j.date && !j.note && !hasShinseiInfo(j.shinsei);
+const isEmpty = (j: Job) => !j.customer.trim() && !j.staff && j.places.length === 0 && !j.address && !j.insuredNo && !j.date && !j.note && !hasShinseiInfo(j.shinsei) && !hasRiyuInfo(j.riyu);
 
 export default function App({start}: {start: MainTab}) {
   const store = useStore();
@@ -334,6 +337,19 @@ export default function App({start}: {start: MainTab}) {
               <OrderPage key={estimateJob.id} job={estimateJob} data={data} update={store.update} onBack={() => setJobView('estimate')} onPrint={setPrint} />
             ) : estimateJob && jobView === 'shinsei' ? (
               <ShinseiEditor
+                key={estimateJob.id}
+                job={estimateJob}
+                data={data}
+                update={store.update}
+                onBack={() => {
+                  removeIfEmpty(estimateJob);
+                  setEstimateId(null);
+                  setJobView('estimate');
+                }}
+                tabs={tabs}
+              />
+            ) : estimateJob && jobView === 'riyu' ? (
+              <RiyuEditor
                 key={estimateJob.id}
                 job={estimateJob}
                 data={data}

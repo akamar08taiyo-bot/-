@@ -147,6 +147,7 @@ export type Job = {
   places: Place[];
   order?: OrderEdits | null; // 発注書で手で直したところ（なければ見積書から計算したまま）
   shinsei?: ShinseiInfo; // 申請書だけに書く項目（申請書の画面で入れる）
+  riyu?: RiyuInfo; // 住宅改修が必要な理由書だけに書く項目（理由書の画面で入れる。riyu.ts）
   createdAt: number;
   updatedAt: number;
 };
@@ -177,6 +178,41 @@ export type ShinseiInfo = ShinseiMarks & {
   start: string; // 着工予定日（みやこ町・広域連合は支給申請書の着工日） 'YYYY-MM-DD'
   end: string; // 完了予定日（みやこ町・広域連合は支給申請書の完成日）
   cost: number | null; // 改修費用を手で入れたとき（null なら見積書の介護保険対象分の合計）
+  // 介護保険証から（2026-10-22。理由書・特定福祉用具にも転記する）
+  careFrom: string; // 認定の有効期間のはじめ 'YYYY-MM-DD'
+  careTo: string; // 認定の有効期間のおわり
+  insurerNo: string; // 保険者番号（6けた）
+  burden: '' | '1' | '2' | '3'; // 利用者負担の割合（介護保険負担割合証。特定福祉用具に渡す）
+};
+
+/** 理由書の「活動」（P2 の4つの段）。① 改善をしようとしている生活動作・② 困難な状況・③ 改修目的と改修の方針 */
+export type RiyuAct = {
+  items: number[]; // ① の□を■にする項目（RIYU_ACTS の items の番号）
+  itemOther: string; // ① のその他（自宅内の移動は ① の全部）
+  trouble: string; // ② 具体的な困難な状況
+  purposes: number[]; // ③ 改修目的・期待効果（RIYU_PURPOSES の番号）
+  purposeOther: string; // ③ のその他
+  policy: string; // ③ 改修の方針
+};
+export type RiyuActKey = 'toilet' | 'bath' | 'out' | 'home';
+
+/**
+ * 住宅改修が必要な理由書だけの項目（介護支援専門員などが書く国の様式。2026-10-22）。
+ * 被保険者番号・氏名・生年月日・性別・要介護・住所・作成者の事業所と氏名は申請書と同じ欄（Job・ShinseiInfo）を使う
+ */
+export type RiyuInfo = {
+  checkDate: string; // 現地確認日 'YYYY-MM-DD'
+  madeDate: string; // 作成日
+  qualification: string; // 作成者の資格（介護支援専門員でないとき）
+  tel: string; // 作成者の連絡先
+  housing: '' | '持ち家' | '借家' | '借間' | 'その他'; // 住宅状況
+  housingOther: string;
+  body: string; // 利用者の身体状況
+  care: string; // 介護状況
+  wish: string; // 住宅改修により、利用者等は日常生活をどう変えたいか
+  equipment: Record<string, {before?: boolean; after?: boolean}>; // 福祉用具の利用状況と住宅改修後の想定（RIYU_EQUIPMENT の名前 → 改修前・改修後）
+  equipmentOther: {name: string; before: boolean; after: boolean}[]; // その他（3行）
+  acts: Record<RiyuActKey, RiyuAct>;
 };
 
 /**
