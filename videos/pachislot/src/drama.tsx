@@ -21,7 +21,7 @@ export const makeAnchors = (tl: DramaTimeline): Anchors => {
       if (tl.scenes[m[1]] === undefined) throw new Error(`timeline に場面 ${m[1]} がありません`);
       return tl.scenes[m[1]] + num(m[2]);
     }
-    m = a.match(/^(s\d+_\d+)\.(s|e)([+-]\d+(?:\.\d+)?)?$/);
+    m = a.match(/^(s\d+_\d+[a-z]?)\.(s|e)([+-]\d+(?:\.\d+)?)?$/);
     if (m) {
       const l = L[m[1]];
       if (!l) throw new Error(`timeline に行 ${m[1]} がありません`);

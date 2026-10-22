@@ -57,7 +57,7 @@ def anchor(T, a):
     m = re.match(r'^(S\d+)([+-]\d+(?:\.\d+)?)?$', a)
     if m:
         return T['scenes'][m.group(1)] + float(m.group(2) or 0)
-    m = re.match(r'^(s\d+_\d+)\.(s|e)([+-]\d+(?:\.\d+)?)?$', a)
+    m = re.match(r'^(s\d+_\d+[a-z]?)\.(s|e)([+-]\d+(?:\.\d+)?)?$', a)
     if m:
         l = next(x for x in T['lines'] if x['id'] == m.group(1))
         return (l['start'] if m.group(2) == 's' else l['end']) + float(m.group(3) or 0)
