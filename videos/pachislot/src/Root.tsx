@@ -16,7 +16,7 @@ declare global {
 type Episode = {component: React.FC; timeline: {fps: number; total: number}; width: number; height: number};
 // 横長の回（src/episodes/epNN.tsx が export する episode）は、手元にファイルがある回だけ登録する。
 // 回の中身（台本・絵・声）はユーザーの作品なので、公開リポジトリには入れないことがあるため。
-const ctx = require.context('./episodes', false, /^\.\/ep\d+\.tsx$/);
+const ctx = require.context('./episodes', false, /^\.\/(ep|kaiso)\d+\.tsx$/);
 const EPISODES = [...new Set(ctx.keys())].map((k) => ({id: k.replace(/^\.\/|\.tsx$/g, ''), ...(ctx(k) as {episode: Episode}).episode}));
 
 // 縦型のショート（episodes/shNN/ の script・timeline・shots の JSON だけで組む。TSX は要らない）
