@@ -5,7 +5,7 @@
 // 文字を読む部品（読み取りの本体と日本語のデータ、あわせて約5MB）は、初めて使うときにネット（jsDelivr）から取ってきてブラウザに覚えさせる。
 // 写真はどこにも送らない（読むのはこの端末の中）。ネットにつながらない・日付が読めないときは ''（撮影日は入れない）
 
-import type {Worker} from 'tesseract.js';
+import {withOcr} from './ocrEngine.ts';
 
 /** 切り出した字の行（白黒：0＝字、255＝地） */
 export type StampCrop = {g: Uint8Array; w: number; h: number};
@@ -162,36 +162,6 @@ export function stampCrops(rgba: ArrayLike<number>, w: number, h: number, white 
 
 // ---------------------------------------------------------------- 文字を読む（ブラウザ）
 
-/** 読み取りの部品（tesseract.js の worker）。1つを使い回し、しばらく使わなければ片付ける（メモリを空ける） */
-let engine: Promise<Worker> | null = null;
-let idle: ReturnType<typeof setTimeout> | undefined;
-let queue: Promise<unknown> = Promise.resolve();
-
-async function getEngine(): Promise<Worker> {
-  if (!engine) {
-    engine = (async () => {
-      const {createWorker, OEM, PSM} = await import('tesseract.js');
-      // 読み取りの本体・日本語のデータの取り寄せ先は、tesseract.js の既定（jsDelivr。入れた版に合わせた URL）。日本語のデータはブラウザに覚えさせる
-      const worker = await createWorker('jpn', OEM.LSTM_ONLY, {errorHandler: () => undefined});
-      await worker.setParameters({tessedit_pageseg_mode: PSM.SINGLE_LINE});
-      return worker;
-    })();
-    engine.catch(() => {
-      engine = null; // ネットにつながらなかったときは、次の写真でまた試す
-    });
-  }
-  return engine;
-}
-
-function release() {
-  clearTimeout(idle);
-  idle = setTimeout(() => {
-    const e = engine;
-    engine = null;
-    void e?.then((w) => w.terminate()).catch(() => undefined);
-  }, 60_000);
-}
-
 /** 白黒の行を、読みやすい大きさ（字の高さ 30画素くらいより小さければ2倍）の canvas にする */
 function cropCanvas({g, w, h}: StampCrop): HTMLCanvasElement {
   const k = h < 48 ? 2 : 1;
@@ -231,28 +201,27 @@ async function pixels(image: Blob): Promise<{data: Uint8ClampedArray; w: number;
   }
 }
 
-/** 日付入り写真の日付（'YYYY-MM-DD'）。読めなければ ''。写真を何枚も入れたときは1枚ずつ順に読む */
-export function readStampDate(image: Blob, today = new Date()): Promise<string> {
-  const job = queue.then(async () => {
-    try {
-      const {data, w, h} = await pixels(image);
-      for (const white of [225, 200]) {
-        const crops = stampCrops(data, w, h, white);
-        if (crops.length === 0) continue;
-        const worker = await getEngine();
+/** 日付入り写真の日付（'YYYY-MM-DD'）。読めなければ ''。写真を何枚も入れたときは1枚ずつ順に読む（ocrEngine.ts） */
+export async function readStampDate(image: Blob, today = new Date()): Promise<string> {
+  try {
+    const {data, w, h} = await pixels(image);
+    for (const white of [225, 200]) {
+      const crops = stampCrops(data, w, h, white);
+      if (crops.length === 0) continue;
+      const day = await withOcr(async (worker) => {
+        const {PSM} = await import('tesseract.js');
+        await worker.setParameters({tessedit_pageseg_mode: PSM.SINGLE_LINE, tessedit_char_whitelist: ''});
         for (const crop of crops) {
           const {data: r} = await worker.recognize(cropCanvas(crop));
-          const day = parseStampDate(r.text, today);
-          if (day) return day;
+          const d = parseStampDate(r.text, today);
+          if (d) return d;
         }
-      }
-      return '';
-    } catch {
-      return '';
-    } finally {
-      release();
+        return '';
+      });
+      if (day) return day;
     }
-  });
-  queue = job;
-  return job;
+    return '';
+  } catch {
+    return '';
+  }
 }

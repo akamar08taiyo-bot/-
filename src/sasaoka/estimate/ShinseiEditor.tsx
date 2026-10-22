@@ -24,6 +24,7 @@ import {PhotoBoard, photoPlaces, SLOT_LABEL, usePhotoActions} from './PhotoBoard
 import type {PhotoKey, PhotoSlot} from './PhotoBoard.tsx';
 import {canMakeShinsei, saveShinsei, useTemplate} from './shinseiFiles.ts';
 import {ShinseiPages} from './ShinseiPreview.tsx';
+import {CardFill} from '../components/CardReader.tsx';
 
 /** 欄の順番：保険者ごとの申請書の上からの順番（原本を見て決めた。みやこ町・広域連合は承認の申請書の順番で、支給申請書だけの着工日・完成日は最後）。
  *  ただし被保険者氏名はどの保険者もフリガナのすぐ下（ユーザーの指示「ふりがなの下に、名前をもってくる」、2026-10-21。苅田町・みやこ町は原本では番号が先） */
@@ -364,7 +365,9 @@ export function ShinseiEditor({
             </Btn>
           )}
         </div>
-        <div />
+        <div className="flex flex-wrap justify-end gap-2">
+          <CardFill job={job} setJob={setJob} />
+        </div>
       </div>
 
       <section className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">

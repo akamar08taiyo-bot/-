@@ -1,9 +1,11 @@
 import {useEffect, useMemo, useState} from 'react';
 import {estimateTotals, hasEstimateRows, jobName} from '../calc.ts';
 import {copyJob} from '../components/JobTools.tsx';
+import {CardDialog, CardDrop} from '../components/CardReader.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm} from '../estimateForms.ts';
 import {estimateXlsx, XLSX_TYPE} from '../estimateXlsx.ts';
+import type {CardRead} from '../hokensho.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {addSamples, hasSamples} from '../samples.ts';
@@ -90,16 +92,19 @@ export function EstimateHome({
   data,
   update,
   onNew,
+  onNewJob,
   onList,
   goMaterials,
 }: {
   data: AppData;
   update: Update;
   onNew: (insurer: Insurer) => void; // 新しい様邸（申請書と見積書のタブ）を開く
+  onNewJob: (job: Job) => void; // 介護保険証から作った様邸を開く
   onList: () => void;
   goMaterials: () => void;
 }) {
   const all = useEstimates(data, data.settings);
+  const [card, setCard] = useState<{read: CardRead; thumbs: string[]} | null>(null);
   const month = thisMonth();
   const inMonth = all.filter((e) => e.job.month === month).length;
   return (
@@ -123,8 +128,26 @@ export function EstimateHome({
                 ＋ {INSURER_INFO.kouiki.name}
               </Btn>
             </div>
+            {/* 介護保険証（画像・PDF）を入れると、保険者・番号・氏名・生年月日・要介護・有効期間などを入れた様邸を作る */}
+            <CardDrop onRead={setCard} big className="w-full">
+              🪪 介護保険証から新規作成
+              <span className="block text-xs font-normal text-sky-700">保険証の画像・PDF をここにドロップ（押して選んでもよい）。保険者も保険証から</span>
+            </CardDrop>
           </div>
         </section>
+        {card && (
+          <CardDialog
+            job={newEstimate(card.read.info.insurer || 'yukuhashi')}
+            read={card.read}
+            thumbs={card.thumbs}
+            newJob
+            onClose={() => setCard(null)}
+            onApply={(job) => {
+              setCard(null);
+              onNewJob(job);
+            }}
+          />
+        )}
         <section className="rounded-xl border-2 border-slate-300 bg-white p-5 shadow-sm" aria-label="一覧から作成">
           <h2 className="text-xl font-bold text-slate-800">📋 一覧から作成</h2>
           <div className="mt-4 flex flex-wrap items-center gap-3">

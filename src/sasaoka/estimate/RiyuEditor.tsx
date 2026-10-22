@@ -18,6 +18,7 @@ import {todayIso} from '../util.ts';
 import {saveRiyu, useTemplate} from './shinseiFiles.ts';
 import {Circles, Note} from './ShinseiEditor.tsx';
 import {ShinseiPages} from './ShinseiPreview.tsx';
+import {CardFill} from '../components/CardReader.tsx';
 
 type Field = ShinseiField;
 
@@ -393,7 +394,9 @@ export function RiyuEditor({job, data, update, onBack, tabs}: {job: Job; data: A
             📗 理由書をExcelで保存
           </Btn>
         </div>
-        <div />
+        <div className="flex flex-wrap justify-end gap-2">
+          <CardFill job={job} setJob={setJob} />
+        </div>
       </div>
 
       <section role="status" aria-label="入っていない欄" className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">

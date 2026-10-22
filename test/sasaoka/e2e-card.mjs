@@ -1,0 +1,160 @@
+// 介護保険証から入れるを確かめる（ユーザーの指示「介護保険証をドラッグ＆ドロップで添付したら、全ての情報…入力必要項目が全て入力される」2026-10-22）：
+//   架空の保険証（cardFixture.mjs。スキャンのような白黒・ざらつき・90°横向き）と負担割合証を、
+//   1. 申請書のタブの「🪪 介護保険証から入れる」で選ぶ（画像2枚）→ 確かめる画面（読めた値・今の値）→ 入れる → 申請書・理由書・見積書に出る
+//   2. 見積もりの入口の「🪪 介護保険証から新規作成」にドロップ（PDF）→ 保険者も保険証から → 新しい様邸の申請書のタブ
+//   読み取りの部品（tesseract.js・日本語のデータ）は手元の node_modules から（ネットにつながない）
+// usage: node e2e-card.mjs <サイトのURL> <出力フォルダ>
+const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
+import assert from 'node:assert/strict';
+import {readFile, writeFile} from 'node:fs/promises';
+import path from 'node:path';
+import {cardHtml, SCAN_JS} from './cardFixture.mjs';
+
+const [site, outDir] = process.argv.slice(2);
+const log = (...a) => console.log('•', ...a);
+const browser = await chromium.launch({env: {...process.env, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8'}});
+const errors = [];
+const NM = new URL('../../node_modules/', import.meta.url).pathname;
+const routeOcr = (c) =>
+  c.route('https://cdn.jsdelivr.net/**', async (route) => {
+    const m = /\/npm\/(tesseract\.js@v[\d.]+\/dist|tesseract\.js-core@v[\d.]+|@tesseract\.js-data\/jpn\/4\.0\.0_best_int)\/([^/?]+)$/.exec(route.request().url());
+    if (!m) return route.abort();
+    const dir = m[1].startsWith('tesseract.js@') ? 'tesseract.js/dist' : m[1].startsWith('tesseract.js-core') ? 'tesseract.js-core' : '@tesseract.js-data/jpn/4.0.0_best_int';
+    await route.fulfill({body: await readFile(NM + dir + '/' + m[2]), headers: {'access-control-allow-origin': '*', 'content-type': m[2].endsWith('.js') ? 'text/javascript' : 'application/octet-stream'}});
+  });
+// 読み取りの部品が出すお知らせ（「Parameter not found」「Estimating resolution」）は、アプリの誤りではないので数えない
+const appError = (m) => m.type() === 'error' && !/^Warning: Parameter not found|^Estimating resolution|^Detected \d+ diacritics/.test(m.text());
+
+// ---------------- 架空の保険証の画像を作る（スキャンのように）
+const maker = await browser.newPage({deviceScaleFactor: 2});
+const scan = async (opt) => {
+  await maker.setContent(cardHtml(undefined, opt));
+  const png = await maker.locator('body').screenshot();
+  const url = await maker.evaluate(`(${SCAN_JS})('data:image/png;base64,${png.toString('base64')}')`);
+  return Buffer.from(url.split(',')[1], 'base64');
+};
+const cardRot = await scan({rotate: 90});
+const futan = await scan({kind: 'futan'});
+await writeFile(path.join(outDir, 'card-rot.png'), cardRot);
+await writeFile(path.join(outDir, 'futan.png'), futan);
+// PDF（A4 縦に、横向きの保険証の画像を貼ったもの＝スキャンした PDF のまね）
+// （縦長の画像は 1ページに入る大きさ：幅 105mm なら高さ約 270mm）
+await maker.setContent(`<!doctype html><style>@page{size:A4;margin:0}body{margin:0}img{display:block;margin:10mm}</style><img src="data:image/png;base64,${cardRot.toString('base64')}" style="width:105mm"><div style="page-break-before:always"></div><img src="data:image/png;base64,${futan.toString('base64')}" style="width:190mm">`);
+const pdf = await maker.pdf({format: 'A4'});
+await writeFile(path.join(outDir, 'card.pdf'), pdf);
+await maker.close();
+log('架空の保険証の画像・PDF を作った');
+
+const ctx = await browser.newContext({viewport: {width: 1366, height: 900}, locale: 'ja-JP'});
+await routeOcr(ctx);
+await ctx.addInitScript(() => localStorage.setItem('taiyo_portal_session', JSON.stringify({office: '行橋営業所'})));
+const page = await ctx.newPage();
+page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+page.on('console', (m) => appError(m) && errors.push('console: ' + m.text()));
+page.on('dialog', (d) => d.accept());
+await page.goto(`${site}/jutaku-mitsumori/index.html`);
+await page.getByRole('button', {name: /サンプルで試す/}).click();
+await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
+await page.getByRole('tab', {name: '📝 申請書'}).click();
+const form = page.getByRole('form', {name: '申請書'});
+await form.waitFor();
+
+// ---------------- 1. 申請書のタブで、画像2枚を選ぶ
+const t0 = Date.now();
+await page.getByLabel('介護保険証のファイル').setInputFiles([
+  {name: '保険証.png', mimeType: 'image/png', buffer: cardRot},
+  {name: '負担割合証.png', mimeType: 'image/png', buffer: futan},
+]);
+await page.getByRole('status', {name: '介護保険証を読んでいます'}).waitFor();
+const dialog = page.getByRole('dialog').filter({hasText: '介護保険証から入れる'});
+await dialog.getByRole('table', {name: '読んだ値'}).waitFor({timeout: 240_000});
+log(`読んだ（${Math.round((Date.now() - t0) / 1000)} 秒）`);
+await page.screenshot({path: path.join(outDir, 'card-dialog.png')});
+const row = (label) => dialog.getByRole('row', {name: label, exact: true});
+const val = (label) => row(label).getByLabel(`${label}（読んだ値）`);
+// 形の決まった項目は読めている（横向きのスキャン・ざらつきでも）
+assert.equal(await val('被保険者番号').inputValue(), '0000123456');
+assert.equal(await row('生年月日').getByLabel('生年月日の元号（読んだ値）').inputValue(), '昭和');
+assert.deepEqual(
+  await Promise.all(['年', '月', '日'].map((x) => row('生年月日').getByLabel(`生年月日の${x}（読んだ値）`).inputValue())),
+  ['13', '4', '14'],
+);
+assert.equal(await val('性別').inputValue(), '女');
+assert.equal(await val('郵便番号').inputValue(), '824-0001');
+assert.equal(await val('要介護状態区分').inputValue(), '要介護2');
+assert.equal(await row('認定の有効期間').getByLabel('認定の有効期間のはじめ（読んだ値）').inputValue(), '2024-04-01');
+assert.equal(await row('認定の有効期間').getByLabel('認定の有効期間のおわり（読んだ値）').inputValue(), '2027-03-31');
+assert.equal(await val('保険者').inputValue(), 'yukuhashi');
+assert.equal(await val('利用者負担の割合').inputValue(), '1');
+assert.match(await val('住所').inputValue(), /^行橋市中央一丁目1番1号$/);
+// 氏名・フリガナは読み違いがあるかもしれないので直せる。直したら、その行にチェックが付く
+await val('氏名').fill('見本　花子');
+await val('フリガナ').fill('ミホン　ハナコ');
+assert.equal(await row('氏名').getByLabel('氏名を入れる').isChecked(), true);
+// 保険者はこの様邸と同じ（行橋市）なので、はじめはチェックしない
+assert.equal(await row('保険者').getByLabel('保険者を入れる').isChecked(), false);
+// 「今の値」：サンプルの様邸の氏名
+assert.match(await row('氏名').innerText(), /今：（サンプル）山田/);
+await dialog.getByRole('button', {name: /項目を入れる$/}).click();
+await dialog.waitFor({state: 'detached'});
+assert.deepEqual(errors, []);
+log('確かめる画面 OK');
+
+// 申請書に出る
+const f = (label) => form.getByLabel(label, {exact: true});
+assert.equal(await f('被保険者番号').inputValue(), '0000123456');
+assert.equal(await f('被保険者氏名').inputValue(), '見本　花子');
+assert.equal(await f('フリガナ').inputValue(), 'ミホン　ハナコ');
+assert.equal(await f('郵便番号').inputValue(), '824-0001');
+assert.equal(await f('住所').inputValue(), '行橋市中央一丁目1番1号');
+assert.equal(await form.getByRole('group', {name: '性別'}).getByRole('button', {name: '女'}).getAttribute('aria-pressed'), 'true');
+// 理由書にも出る（要介護・認定有効期間・作成者の事業所）
+await page.getByRole('tab', {name: '📄 理由書'}).click();
+const rform = page.getByRole('form', {name: '理由書'});
+await rform.waitFor();
+assert.equal(await rform.getByLabel('認定有効期間のはじめ').inputValue(), '2024-04-01');
+assert.equal(await rform.getByLabel('認定有効期間のおわり').inputValue(), '2027-03-31');
+assert.equal(await rform.getByRole('group', {name: '要介護認定'}).getByRole('button', {name: '要介護2'}).getAttribute('aria-pressed'), 'true');
+assert.match(await rform.getByLabel('作成者の所属事業所').inputValue(), /ケアプランセンター/);
+await page.waitForFunction(() => document.querySelector('[aria-label="理由書のプレビュー"]')?.innerText.includes('令和6年4月1日～令和9年3月31日'), null, {timeout: 8000});
+// 見積書にも（氏名・番号・住所）
+await page.getByRole('tab', {name: '📋 見積書'}).click();
+await page.getByRole('region', {name: '見積書', exact: true}).waitFor();
+assert.match(await page.getByRole('region', {name: '見積書', exact: true}).innerText(), /見本　花子/);
+log('申請書・理由書・見積書に出た OK');
+
+// ---------------- 2. 見積もりの入口に PDF をドロップして新規作成（保険者も保険証から）
+await page.getByRole('button', {name: /見積もり・申請書を作成する/}).first().click();
+const drop = page.getByRole('button', {name: /介護保険証から新規作成/});
+await drop.waitFor();
+const dt = await page.evaluateHandle(async (b64) => {
+  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  const d = new DataTransfer();
+  d.items.add(new File([bytes], '保険証.pdf', {type: 'application/pdf'}));
+  return d;
+}, pdf.toString('base64'));
+await drop.dispatchEvent('dragover', {dataTransfer: dt});
+await drop.dispatchEvent('drop', {dataTransfer: dt});
+const dialog2 = page.getByRole('dialog').filter({hasText: '介護保険証から入れる'});
+await dialog2.getByRole('table', {name: '読んだ値'}).waitFor({timeout: 240_000});
+await page.screenshot({path: path.join(outDir, 'card-dialog-pdf.png')});
+assert.equal(await dialog2.getByRole('row', {name: '保険者', exact: true}).getByLabel('保険者（読んだ値）').inputValue(), 'yukuhashi');
+// PDF に貼った画像は粗い（150mm に縮めた）ので、読み違いもありうる：形（10けた）は合う
+assert.match(await dialog2.getByRole('row', {name: '被保険者番号', exact: true}).getByLabel('被保険者番号（読んだ値）').inputValue(), /^\d{10}$/);
+// 生年月日は、読めたか、読めなかった字がありそうなら確かめてもらう（細い「1」が読めず「昭和3年」など）
+const birthRow2 = dialog2.getByRole('row', {name: '生年月日', exact: true});
+const y2 = await birthRow2.getByLabel('生年月日の年（読んだ値）').inputValue();
+assert.ok(y2 === '13' || /確かめて/.test(await birthRow2.innerText()), `生年月日の年 ${y2}`);
+// 新規作成では保険者は必ず入れる（チェックを外せない）
+assert.equal(await dialog2.getByRole('row', {name: '保険者', exact: true}).getByLabel('保険者を入れる').isDisabled(), true);
+await dialog2.getByRole('row', {name: '氏名', exact: true}).getByLabel('氏名（読んだ値）').fill('見本　次郎');
+await dialog2.getByRole('button', {name: 'この内容で新規作成'}).click();
+await page.getByRole('form', {name: '申請書'}).waitFor();
+assert.equal(await page.getByRole('form', {name: '申請書'}).getByLabel('被保険者氏名', {exact: true}).inputValue(), '見本　次郎');
+assert.match(await page.locator('h1').first().innerText(), /見本　次郎/);
+await page.screenshot({path: path.join(outDir, 'card-new.png'), fullPage: false});
+log('新規作成 OK');
+
+assert.deepEqual(errors, []);
+await browser.close();
+console.log('e2e-card: all OK');
