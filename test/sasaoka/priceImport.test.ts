@@ -417,6 +417,18 @@ test('1本の長さ：幅・厚み・径・高さの寸法は長さにしない�
   for (const [name, m] of cases) assert.equal(guessPieceLengthM(name), m, name);
 });
 
+test('商品名の寸法の書き方のゆれ：幅・高さ・厚さ・太さを1本の長さにしない（どの数の名前かも）', () => {
+  assert.equal(guessPieceLengthM('マツ六 BH-414 木製ベースプレート 120mm幅 Mブラウン 4m'), 4); // ユーザーの見積書の部材
+  assert.equal(guessPieceLengthM('ベースプレート 4m 幅120mm'), 4); // 幅はうしろの 120mm の名前
+  assert.equal(guessPieceLengthM('ベースプレート 120mm巾 2m'), 2); // 巾は前の 120mm の名前
+  assert.equal(guessPieceLengthM('幅 120mm 4m'), 4);
+  assert.equal(guessPieceLengthM('ベースプレート t=15 W120 4m'), 4);
+  assert.equal(guessPieceLengthM('滑り止め 巾50mm 厚み3mm 10m'), 10);
+  assert.equal(guessPieceLengthM('段差解消スロープ 幅800mm 高さ30mm'), 0);
+  assert.equal(guessPieceLengthM('幅広タイプ 手すり 4m'), 4); // 「幅広」は寸法でない
+  assert.equal(guessPieceLengthM('ハンドレール set 4m'), 4); // 英語の t・w のうしろの長さは消さない
+});
+
 test('PDFの表：見出しの位置に合わせて列をそろえる（右寄せの金額・長い商品名）', () => {
   const w = (s: string, x0: number, x1: number) => ({s, x0, x1});
   const rows = [

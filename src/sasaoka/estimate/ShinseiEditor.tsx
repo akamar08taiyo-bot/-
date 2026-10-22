@@ -444,7 +444,9 @@ export function ShinseiEditor({
             />
             <PhotoBoard job={job} rates={s} sheetNos={sheetNos} dates={!!map?.sheets.some((x) => x.photoPlace?.dates)} actions={photoActions} onPick={pickPhoto} />
           </div>
-          <div ref={previewBox} className="min-w-0 rounded-lg bg-slate-200/60 p-2 lg:sticky lg:top-2 lg:max-h-[calc(100vh-1rem)] lg:overflow-y-auto">
+          {/* スクロールバーの場所はいつも空けておく（scrollbar-gutter）。空けないと、中身の高さが箱とほぼ同じ窓の大きさで、スクロールバーが出る → 幅が狭くなり
+              プレビューが縮む → スクロールバーが消える → 幅が戻って大きくなる…をくり返して、プレビューがふるえた（ユーザーの報告「右側の部分がふるえる」） */}
+          <div ref={previewBox} className="min-w-0 rounded-lg bg-slate-200/60 p-2 lg:sticky lg:top-2 lg:max-h-[calc(100vh-1rem)] lg:overflow-y-auto" style={{scrollbarGutter: 'stable'}}>
             {pages === null ? (
               <p className="px-4 py-10 text-center text-sm text-slate-500">申請書を開いています…</p>
             ) : pages.length > 0 ? (

@@ -174,5 +174,17 @@ await shot(page, '11-sample.png');
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 await shot(page, '12-sample-editor.png');
 
+// 広い画面でタブを切り替えても、タブの列と中身の左の位置は動かない（ユーザーの報告「申請書・見積書を作成するのタブを選んだときのみ、左にぐっと動く」。
+// 前は見積もりのタブだけ画面の幅が広く、1920px の画面では 100px 左に動いた）
+await page.setViewportSize({width: 1920, height: 1000});
+const lefts = [];
+for (const name of [/見積もり・申請書を作成する/, /請求書を確認する/, /部材・施工費マスタ/, /設定/]) {
+  await page.getByRole('navigation').getByRole('button', {name}).click();
+  await page.waitForTimeout(300);
+  lefts.push(await page.evaluate(() => [document.querySelector('nav button'), document.querySelector('main')?.firstElementChild].map((el) => Math.round(el.getBoundingClientRect().left)).join(',')));
+}
+assert.equal(new Set(lefts).size, 1, lefts.join(' / '));
+log('タブを切り替えても左右に動かないOK');
+
 console.log('\nERRORS:', errors.length ? errors : 'なし');
 await browser.close();

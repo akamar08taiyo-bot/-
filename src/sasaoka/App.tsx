@@ -44,12 +44,15 @@ const TABS: {id: MainTab; label: string}[] = [
 ];
 
 // タブごとの色（見積書は緑、請求書は紺、部材・施工費マスタは紫、設定は灰）。選んでいるタブは下の画面と同じ色にしてつなげる
-const THEME: Record<MainTab, {head: string; page: string; active: string; sub: string; width: string}> = {
-  estimate: {head: 'bg-[#14532d]', page: 'bg-[#f2f6f4]', active: 'bg-[#f2f6f4] text-[#14532d]', sub: 'text-green-100', width: 'max-w-[1600px]'},
-  invoice: {head: 'bg-[#0c315e]', page: 'bg-[#f3f6fa]', active: 'bg-[#f3f6fa] text-[#0c315e]', sub: 'text-blue-100', width: 'max-w-[1400px]'},
-  master: {head: 'bg-[#3b1f6b]', page: 'bg-[#f6f4fa]', active: 'bg-[#f6f4fa] text-[#3b1f6b]', sub: 'text-purple-100', width: 'max-w-[1400px]'},
-  settings: {head: 'bg-[#334155]', page: 'bg-[#f4f5f7]', active: 'bg-[#f4f5f7] text-[#334155]', sub: 'text-slate-200', width: 'max-w-[1400px]'},
+const THEME: Record<MainTab, {head: string; page: string; active: string; sub: string}> = {
+  estimate: {head: 'bg-[#14532d]', page: 'bg-[#f2f6f4]', active: 'bg-[#f2f6f4] text-[#14532d]', sub: 'text-green-100'},
+  invoice: {head: 'bg-[#0c315e]', page: 'bg-[#f3f6fa]', active: 'bg-[#f3f6fa] text-[#0c315e]', sub: 'text-blue-100'},
+  master: {head: 'bg-[#3b1f6b]', page: 'bg-[#f6f4fa]', active: 'bg-[#f6f4fa] text-[#3b1f6b]', sub: 'text-purple-100'},
+  settings: {head: 'bg-[#334155]', page: 'bg-[#f4f5f7]', active: 'bg-[#f4f5f7] text-[#334155]', sub: 'text-slate-200'},
 };
+// 画面の幅（ヘッダー・タブ・中身）はどのタブも同じ。前は見積もりのタブだけ広く（1600px、ほかは 1400px）、広い画面で見積もりのタブを選ぶと
+// 全体が左に 100px 動いていた（ユーザーの報告「申請書・見積書を作成するのタブを選んだときのみ、左にぐっと動く」）
+const PAGE_WIDTH = 'max-w-[1600px]';
 
 type MasterTab = 'materials' | 'labor' | 'kits';
 
@@ -290,7 +293,7 @@ export default function App({start}: {start: MainTab}) {
       )}
       <div className={`min-h-screen ${theme.page} text-slate-800 ${print ? 'no-print' : ''}`}>
         <header className={`no-print ${theme.head} text-white transition-colors`}>
-          <div className={`mx-auto flex ${theme.width} flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3`}>
+          <div className={`mx-auto flex ${PAGE_WIDTH} flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3`}>
             <div className="flex items-center gap-3">
               <div className="grid h-9 w-9 place-items-center rounded-lg bg-white/15 text-lg font-black">住</div>
               <div>
@@ -310,7 +313,7 @@ export default function App({start}: {start: MainTab}) {
               </a>
             </div>
           </div>
-          <nav className={`mx-auto flex ${theme.width} gap-1 overflow-x-auto px-3`}>
+          <nav className={`mx-auto flex ${PAGE_WIDTH} gap-1 overflow-x-auto px-3`}>
             {TABS.map((t) => (
               <button
                 key={t.id}
@@ -325,7 +328,7 @@ export default function App({start}: {start: MainTab}) {
           </nav>
         </header>
 
-        <main className={`no-print mx-auto min-w-0 px-3 py-4 sm:px-4 ${theme.width}`}>
+        <main className={`no-print mx-auto min-w-0 px-3 py-4 sm:px-4 ${PAGE_WIDTH}`}>
           {tab === 'estimate' &&
             (estimateJob && jobView === 'order' && hasEstimateRows(estimateJob) ? (
               <OrderPage key={estimateJob.id} job={estimateJob} data={data} update={store.update} onBack={() => setJobView('estimate')} onPrint={setPrint} />

@@ -168,6 +168,12 @@ old.labor = old.labor.map((l) => (l.id === 'l17' ? {...l, name: '安寿框手摺
 old.kits = old.kits.map((k) => ({...k, name: k.name.replace('手すり', '手摺')}));
 old.jobs = old.jobs.map((j) => ({...j, places: j.places.map((p) => ({...p, rows: p.rows.map((r) => (r.refId === rail.id ? {...r, name: rail.name} : r))}))}));
 assert.equal((JSON.stringify(old).match(/手摺/g) ?? []).length, 5);
+// 商品名の幅を1本の長さと読んでいた前の版の部材・見積書の行（ユーザーの指示「幅120mmは、商品の詳細のため、無視してください」）：
+// 「120mm幅 … 4m」が 0.12m、見積書で数量 0.6 と打った行は「72mm÷120mm＝0.6」と入っていた。読み込むと 4m・2400mm に直る（数量・金額はそのまま）
+const plateName = 'マツ六 BH-414 木製ベースプレート 120mm幅 Mブラウン 4m';
+old.materials.push({...rail, id: 'm-bh414', code: 'BH-414', name: plateName, pieceLengthM: 0.12});
+const platePlace = old.jobs.flatMap((j) => j.places).find((p) => p.rows.some((r) => r.kind === 'material'));
+platePlace.rows.push({...platePlace.rows.find((r) => r.kind === 'material'), id: 'r-bh414', refId: 'm-bh414', name: plateName, code: 'BH-414', qty: 1, lengthCm: 7.2, pieceLengthM: 0.12});
 const oldPath = path.join(outDir, 'backup-old.json');
 writeFileSync(oldPath, JSON.stringify(old));
 const ctx3 = await browser.newContext({viewport: {width: 1366, height: 900}, locale: 'ja-JP', acceptDownloads: true});
@@ -188,6 +194,9 @@ assert.equal(fixed.labor.find((l) => l.id === 'l17').name, '安寿框手すり')
 assert.equal(fixed.materials.find((m) => m.code === 'S-TS35').name, '木の手すり 35φ 4m');
 assert.deepEqual(fixed.kits.map((k) => k.name).sort(), json.kits.map((k) => k.name).sort());
 assert.equal(fixed.settings.tesuri, true);
+assert.equal(fixed.materials.find((m) => m.id === 'm-bh414').pieceLengthM, 4);
+const fixedPlate = fixed.jobs.flatMap((j) => j.places.flatMap((p) => p.rows)).find((r) => r.id === 'r-bh414');
+assert.deepEqual([fixedPlate.pieceLengthM, fixedPlate.lengthCm, fixedPlate.qty], [4, 240, 1]); // 0.6本のまま
 await ctx3.close();
 log('「手摺」を「手すり」に（前に保存した施工費・部材・常用のセット・見積書の行を一度だけ）OK');
 

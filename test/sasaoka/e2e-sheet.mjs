@@ -461,6 +461,18 @@ await sheet.waitFor();
 assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '見本 太郎様邸');
 log('見積書に戻れるOK（← 見積もりへ戻る・📝 見積書を開く）');
 
+// ---------------- 商品名の幅は1本の長さにしない（ユーザーの指示「幅120mmは、商品の詳細のため、無視してください」）：
+// 「…120mm幅 … 4m」に数量 0.6 → 4000mm の 0.6。備考は「定価19,800円（4m）×0.8」「2400mm÷4000mm＝0.6」（前は 0.12m・72mm÷120mm）
+await typeIn('new:text', 'マツ六 BH-414 木製ベースプレート 120mm幅 Mブラウン 4m', 'Tab');
+assert.equal(await selected(), '数量');
+await page.keyboard.type('0.6');
+await page.keyboard.press('Enter');
+await typeIn(await key('BH-414', 'note'), '19800');
+const plate = (await tds('BH-414')).join('|');
+assert.ok(plate.includes('|0.6|本|15,840|9,504|'), plate); // 数量・単価・金額（19,800円×0.8×0.6）
+assert.ok(plate.includes('定価19,800円（4m）×0.8') && plate.includes('2400mm÷4000mm＝0.6'), plate);
+log('商品名の幅（120mm幅）は1本の長さにしない（4m の 0.6＝2400mm）OK');
+
 // ---------------- 「📄 白紙に戻す」（印刷の横）：確かめてから、見積書に打ち込んだ内容を全部消す。やめれば何も消えない。
 // 保険者（書式）・担当は残す。Ctrl+Z で戻せる
 const headButtons = (await page.locator('main button').allInnerTexts()).map((t) => t.trim());
