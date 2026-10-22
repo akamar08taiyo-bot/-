@@ -155,6 +155,46 @@ try {
     assert.match(readCell(f, '委任状', 'B23'), /38,649円$/);
   }
 
+  // ---- 申請書の画面：左で入れながら、右で申請書の原本の形のまま見る（住宅改修の申請書と同じ）
+  await page.getByRole('button', {name: '📄 申請書', exact: true}).click();
+  assert.equal(await page.getByRole('tab', {name: '📄 申請書（行橋市）'}).getAttribute('aria-selected'), 'true');
+  const preview = page.getByLabel('申請書のプレビュー');
+  await preview.getByRole('group', {name: '用具・受領委任払', exact: true}).waitFor();
+  assert.deepEqual(await preview.getByRole('group').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label'))), ['用具・受領委任払', '委任状', '完了写真']);
+  const pv = () => preview.getByRole('group', {name: '用具・受領委任払', exact: true}).innerText();
+  assert.match(await pv(), /山田 花子/);
+  assert.match(await pv(), /ヤマダ ハナコ/);
+  assert.match(await pv(), /シャワーベンチ FSフィット/);
+  // 入れる所は左、プレビューは右に並ぶ
+  const inputBox = await page.getByRole('textbox', {name: 'お客様名'}).boundingBox();
+  const pvBox = await preview.boundingBox();
+  assert.ok(inputBox && pvBox && inputBox.x + inputBox.width < pvBox.x && pvBox.y < inputBox.y + 400, `${JSON.stringify(inputBox)} ${JSON.stringify(pvBox)}`);
+  assert.equal(await page.locator('aside').count(), 0);
+  // 打つとプレビューも変わる
+  await page.getByRole('textbox', {name: '電話'}).fill('0930-11-2222');
+  await page.waitForFunction(() => document.querySelector('[aria-label="申請書のプレビュー"]')?.textContent?.includes('0930-11-2222'));
+  // 入れている所の欄を囲む
+  await page.getByRole('textbox', {name: '住所'}).click();
+  await page.waitForFunction(() => document.querySelector('[aria-label="申請書のプレビュー"] [data-pv-field="address"]')?.className.includes('outline-sky-600'));
+  // プレビューの欄を押すと、左のその入れる所へ
+  await preview.getByRole('button', {name: 'フリガナ'}).first().click();
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'フリガナ');
+  await preview.getByRole('button', {name: '居宅介護支援事業所・ケアマネジャー'}).first().click();
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), '居宅介護支援事業所');
+  // まだ入っていない所は、プレビューの欄と入れる所が薄い黄色
+  await page.getByRole('textbox', {name: '電話'}).fill('');
+  await page.getByRole('textbox', {name: 'お客様名'}).focus(); // 入れている所は囲むほうが先なので、ほかへ
+  await page.waitForFunction(() => document.querySelector('[aria-label="申請書のプレビュー"] [data-pv-field="tel"]')?.className.includes('bg-amber'));
+  assert.match((await page.locator('label[data-field="tel"]').getAttribute('class')) ?? '', /bg-amber-50/);
+  await page.getByRole('textbox', {name: '電話'}).fill('0930-00-0000');
+  await page.waitForFunction(() => !document.querySelector('[aria-label="申請書のプレビュー"] [data-pv-field="tel"]')?.className.includes('bg-amber'));
+  // 申請書（Excel）もこの画面から作れる
+  await page.getByRole('button', {name: '📄 申請書（Excel）を作る'}).waitFor();
+  await page.screenshot({path: `${out}/04c-sale-shinsei-preview.png`});
+  // 見積もりの画面に戻る（金額のまとめ）
+  await page.getByRole('tab', {name: '📋 見積もり'}).click();
+  assert.match(await page.locator('aside').first().innerText(), /利用者負担（1割）\s*4,295円/);
+
   // ---- 見積書
   await page.getByRole('button', {name: '🖨 見積書を印刷'}).first().click();
   await page.locator('.est').waitFor();
@@ -204,8 +244,13 @@ try {
   await page.getByText('42,944円').first().waitFor();
   for (const [name, file] of [
     ['見積もり', '07-phone-sale.png'],
+    ['申請書', '07b-phone-shinsei.png'],
     ['商品マスタ', '08-phone-products.png'],
   ]) {
+    if (name === '申請書') {
+      await page.getByRole('tab', {name: /^📄 申請書/}).click();
+      await page.getByLabel('申請書のプレビュー').getByRole('group', {name: '用具・受領委任払', exact: true}).waitFor();
+    }
     if (name === '商品マスタ') await page.getByRole('button', {name: '📦 商品マスタ'}).click();
     await page.waitForTimeout(300);
     const wide = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

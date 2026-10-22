@@ -1,11 +1,14 @@
-import {useRef, useState} from 'react';
-import type {MouseEvent, ReactNode} from 'react';
+import {useDeferredValue, useMemo, useRef, useState} from 'react';
+import type {FocusEvent, MouseEvent, ReactNode} from 'react';
 import {priceNote, saleTotals} from '../calc.ts';
 import {docLabel} from '../category.ts';
 import {CARE_LEVELS, INSURERS, insurerLabel} from '../defaults.ts';
 import {HACCHU_IMPORT_KEY, hacchuImport, hacchuUrl} from '../handoff.ts';
 import {blankItem, copySale, customerLabel, customerPatch, frequentValues, itemFromProduct, markUsed, sameYearSales, saleWarnings} from '../sales.ts';
-import {carePlanOf, padInsuredNo, shinseiForm} from '../shinsei.ts';
+import {carePlanOf, padInsuredNo, shinseiForm, shinseiValues} from '../shinsei.ts';
+import {useTemplate} from '../shinseiFiles.ts';
+import {FIELD_LABEL, missingFields, shinseiPreview} from '../shinseiPreview.ts';
+import type {PvPage, ShinseiField} from '../shinseiPreview.ts';
 import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Sale, SaleItem, SaleStatus, TaxType} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {todayIso, yen} from '../util.ts';
@@ -18,6 +21,7 @@ import {CustomerPicker} from './CustomerPicker.tsx';
 import {ProductPicker} from './ProductPicker.tsx';
 import {ReasonField} from './ReasonField.tsx';
 import {ShinseiPanel} from './ShinseiPanel.tsx';
+import {ShinseiPages} from './ShinseiPreview.tsx';
 import {Suggest} from './Suggest.tsx';
 import {Btn, btnClass, NumberInput, OptionalNumberInput, Segmented, Stepper, TextInput, useToast} from './ui.tsx';
 
@@ -25,9 +29,9 @@ const STATUSES: SaleStatus[] = ['見積', '申請', '承認', '納品', '集金'
 // 状態を進めたとき、その日付が空なら今日を入れる
 const STATUS_DATE: Partial<Record<SaleStatus, keyof Sale>> = {申請: 'applyDate', 承認: 'approveDate', 納品: 'deliveryDate', 集金: 'collectDate'};
 
-function Card({title, children, right}: {title: string; children: ReactNode; right?: ReactNode}) {
+function Card({title, children, right, field, warn = false}: {title: string; children: ReactNode; right?: ReactNode; field?: ShinseiField; warn?: boolean}) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <section className={`rounded-xl border bg-white p-4 shadow-sm ${warn ? 'border-amber-300' : 'border-slate-200'}`} data-field={field}>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-bold text-teal-800">{title}</h3>
         {right && <div className="ml-auto flex flex-wrap gap-2">{right}</div>}
@@ -37,9 +41,13 @@ function Card({title, children, right}: {title: string; children: ReactNode; rig
   );
 }
 
-function Field({label, children, wide = false}: {label: string; children: ReactNode; wide?: boolean}) {
+/** 入れる所。field は申請書のプレビューの欄とつなぐ名前（申請書の画面で、まだ入っていなければ薄い黄色＝warn） */
+function Field({label, children, wide = false, field, warn = false}: {label: string; children: ReactNode; wide?: boolean; field?: ShinseiField; warn?: boolean}) {
   return (
-    <label className={`grid min-w-0 content-start gap-1 text-xs font-bold text-slate-600 ${wide ? 'sm:col-span-2' : ''}`}>
+    <label
+      className={`grid min-w-0 content-start gap-1 rounded-sm text-xs font-bold text-slate-600 ${wide ? 'sm:col-span-2' : ''} ${warn ? 'bg-amber-50 outline outline-4 outline-amber-50' : ''}`}
+      data-field={field}
+    >
       {label}
       {children}
     </label>
@@ -76,6 +84,41 @@ export function SaleEditor({
   const prevYear = sameYearSales(data.sales, sale);
   const usedYear = prevYear.reduce((n, x) => n + saleTotals(x, s).covered, 0);
   const fy = fiscalYearOf(sale.deliveryDate || sale.applyDate || sale.estimateDate);
+
+  // 見積もりの画面と、申請書の画面（左で入れながら、右で申請書の原本の形のまま見る。住宅改修の申請書と同じ）
+  const form = shinseiForm(sale.insurer);
+  const [view, setView] = useState<'quote' | 'shinsei'>('quote');
+  const onShinsei = view === 'shinsei' && !!form;
+  const template = useTemplate(onShinsei && form ? form.key : null);
+  // 打つたびに作り直す（打つのを待たせないように少し遅れてよい）
+  const shown = useDeferredValue(sale);
+  const values = useMemo(() => shinseiValues(shown, s), [shown, s]);
+  const pages = useMemo((): PvPage[] | null => {
+    if (!onShinsei || !template || !form) return null;
+    try {
+      return shinseiPreview(template, form, values);
+    } catch {
+      return []; // 描けないとき（原本がこわれているなど）は入れる所だけ
+    }
+  }, [onShinsei, template, form, values]);
+  const missing = useMemo(() => (form ? missingFields(shinseiValues(sale, s), form.key) : new Set<ShinseiField>()), [form, sale, s]);
+  const warn = (f: ShinseiField) => onShinsei && missing.has(f);
+  const [active, setActive] = useState<ShinseiField | null>(null);
+  const inputsRef = useRef<HTMLDivElement>(null);
+  const previewBox = useRef<HTMLDivElement>(null);
+  /** 入れている所（プレビューのその欄を囲む） */
+  const onFocusField = (e: FocusEvent<HTMLElement>) => {
+    const f = (e.target as HTMLElement).closest('[data-field]')?.getAttribute('data-field');
+    if (f) setActive(f as ShinseiField);
+  };
+  /** プレビューの欄を押したとき：左のその入れる所へ（見える所まで動かして、打てるように） */
+  const goField = (f: ShinseiField) => {
+    const el = inputsRef.current?.querySelector<HTMLElement>(`[data-field="${f}"]`);
+    if (!el) return;
+    setActive(f);
+    el.scrollIntoView({behavior: 'smooth', block: 'center'});
+    el.querySelector<HTMLElement>('input:not([type="hidden"]):not([type="checkbox"]), select, textarea, [role="radio"], button')?.focus({preventScroll: true});
+  };
 
   const change = (patch: Partial<Sale>) =>
     update('sales', (list) => list.map((x) => (x.id === sale.id ? {...x, ...patch, updatedAt: Date.now()} : x)));
@@ -155,8 +198,8 @@ export function SaleEditor({
           <Btn color="excel" onClick={() => saveEstimateXlsx(sale, data.settings)}>
             📗 Excelで保存
           </Btn>
-          {shinseiForm(sale.insurer) && (
-            <Btn color="white" onClick={() => document.getElementById('shinsei-panel')?.scrollIntoView({behavior: 'smooth', block: 'center'})}>
+          {form && (
+            <Btn color="white" onClick={() => setView('shinsei')}>
               📄 申請書
             </Btn>
           )}
@@ -172,8 +215,30 @@ export function SaleEditor({
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-w-0 space-y-4">
+      {form && (
+        <div className="flex flex-wrap gap-2" role="tablist" aria-label="見積もり・申請書">
+          {(
+            [
+              ['quote', '📋 見積もり'],
+              ['shinsei', `📄 申請書（${form.title}）`],
+            ] as const
+          ).map(([id, name]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={view === id}
+              onClick={() => setView(id)}
+              className={`rounded-t-lg border-b-2 px-4 py-2 text-sm font-bold ${view === id ? 'border-teal-700 bg-white text-teal-800 shadow-sm' : 'border-transparent text-slate-500 hover:bg-white/60 hover:text-teal-700'}`}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className={`grid gap-4 ${onShinsei ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]' : 'lg:grid-cols-[minmax(0,1fr)_320px]'}`}>
+        <div ref={inputsRef} className="min-w-0 space-y-4" onFocusCapture={onShinsei ? onFocusField : undefined}>
           <Card
             title="お客様"
             right={
@@ -183,13 +248,13 @@ export function SaleEditor({
             }
           >
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="お客様名（様は付けない）">
+              <Field label="お客様名（様は付けない）" field="customer" warn={warn('customer')}>
                 <TextInput value={sale.customer} onChange={(customer) => change({customer})} placeholder="例：山田 花子" aria-label="お客様名" />
               </Field>
-              <Field label="フリガナ">
+              <Field label="フリガナ" field="kana" warn={warn('kana')}>
                 <TextInput value={sale.kana} onChange={(kana) => change({kana})} placeholder="ヤマダ ハナコ" aria-label="フリガナ" />
               </Field>
-              <Field label="被保険者番号">
+              <Field label="被保険者番号" field="insuredNo" warn={warn('insuredNo')}>
                 <TextInput
                   value={sale.insuredNo}
                   onChange={(insuredNo) => change({insuredNo: insuredNo.normalize('NFKC').replace(/[^\d]/g, '').slice(0, 10)})}
@@ -199,11 +264,11 @@ export function SaleEditor({
                   aria-label="被保険者番号"
                 />
               </Field>
-              <Field label="生年月日">
+              <Field label="生年月日" field="birthDate" warn={warn('birthDate')}>
                 <BirthInput value={sale.birthDate} onChange={(birthDate) => change({birthDate})} />
               </Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="性別">
+                <Field label="性別" field="gender" warn={warn('gender')}>
                   <Segmented<Gender>
                     ariaLabel="性別"
                     value={sale.gender}
@@ -214,7 +279,7 @@ export function SaleEditor({
                     ]}
                   />
                 </Field>
-                <Field label="要介護度">
+                <Field label="要介護度" field="careLevel" warn={warn('careLevel')}>
                   <select value={sale.careLevel} onChange={(e) => change({careLevel: e.target.value})} className="h-9 w-full min-w-0 rounded-md border border-slate-300 px-2 text-sm" aria-label="要介護度">
                     <option value="">—</option>
                     {CARE_LEVELS.map((c) => (
@@ -225,7 +290,7 @@ export function SaleEditor({
                   </select>
                 </Field>
               </div>
-              <Field label="郵便番号">
+              <Field label="郵便番号" field="zip" warn={warn('zip')}>
                 <TextInput value={sale.zip} onChange={changeZip} onBlur={() => sale.zip && change({zip: zipLabel(sale.zip)})} inputMode="numeric" placeholder="824-0043" aria-label="郵便番号" />
                 {zips.length > 1 && (
                   <span className="text-[11px] font-normal text-slate-500">
@@ -246,10 +311,10 @@ export function SaleEditor({
                   </span>
                 )}
               </Field>
-              <Field label="住所" wide>
+              <Field label="住所" wide field="address" warn={warn('address')}>
                 <TextInput value={sale.address} onChange={changeAddress} placeholder="行橋市大字流末1327番地" aria-label="住所" />
               </Field>
-              <Field label="電話">
+              <Field label="電話" field="tel" warn={warn('tel')}>
                 <TextInput value={sale.tel} onChange={(tel) => change({tel})} inputMode="tel" aria-label="電話" />
               </Field>
             </div>
@@ -283,7 +348,7 @@ export function SaleEditor({
               ) : (
                 <div />
               )}
-              <Field label="負担割合（介護保険負担割合証）">
+              <Field label="負担割合（介護保険負担割合証）" field="burdenRatio">
                 <Segmented<BurdenRatio>
                   ariaLabel="負担割合"
                   value={sale.burdenRatio}
@@ -330,7 +395,7 @@ export function SaleEditor({
                 </label>
               </div>
               {sale.insurer === 'miyako' && (
-                <Field label="居宅サービス計画の届出（みやこ町の申請書）">
+                <Field label="居宅サービス計画の届出（みやこ町の申請書）" field="carePlan" warn={warn('carePlan')}>
                   <Segmented<CarePlan>
                     ariaLabel="居宅サービス計画の届出"
                     value={carePlanOf(sale)}
@@ -347,6 +412,8 @@ export function SaleEditor({
 
           <Card
             title="商品"
+            field="items"
+            warn={warn('items')}
             right={
               <>
                 <Btn color="teal" onClick={() => setPicking(true)}>
@@ -445,7 +512,10 @@ export function SaleEditor({
                           <div className="text-[11px] text-slate-500">{[priceNote(l), docLabel(i.category, i.sub)].filter(Boolean).join('　')}</div>
                         </div>
                       </div>
-                      <div className="mt-2 grid min-w-0 grid-cols-1 gap-1 pl-8 text-xs font-bold text-slate-600">
+                      <div
+                        className={`mt-2 grid min-w-0 grid-cols-1 gap-1 pl-8 text-xs font-bold text-slate-600 ${onShinsei && !i.reason.trim() ? 'rounded-sm bg-amber-50 outline outline-4 outline-amber-50' : ''}`}
+                        data-field="reason"
+                      >
                         福祉用具が必要な理由
                         <ReasonField item={i} sales={data.sales} saleId={sale.id} onChange={(reason) => changeItem(i.id, {reason})} />
                       </div>
@@ -458,7 +528,7 @@ export function SaleEditor({
 
           <Card title="担当・日付">
             <div className="grid gap-3 sm:grid-cols-3">
-              <Field label="担当（福祉用具専門相談員）">
+              <Field label="担当（福祉用具専門相談員）" field="staff" warn={warn('staff')}>
                 <select value={sale.staff} onChange={(e) => change({staff: e.target.value})} className="h-9 w-full min-w-0 rounded-md border border-slate-300 px-2 text-sm" aria-label="担当">
                   <option value="">—</option>
                   {[...new Set([...s.staffList, sale.staff].filter(Boolean))].map((x) => (
@@ -468,11 +538,11 @@ export function SaleEditor({
                   ))}
                 </select>
               </Field>
-              <Field label="居宅介護支援事業所">
+              <Field label="居宅介護支援事業所" field="recorder" warn={warn('recorder') && !sale.careOffice.trim()}>
                 <TextInput value={sale.careOffice} onChange={(careOffice) => change({careOffice})} aria-label="居宅介護支援事業所" />
                 <Suggest values={frequentValues(data.sales, (x) => x.careOffice)} current={sale.careOffice} onPick={(careOffice) => change({careOffice})} />
               </Field>
-              <Field label="ケアマネジャー">
+              <Field label="ケアマネジャー" field="recorder" warn={warn('recorder') && !sale.careManager.trim()}>
                 <TextInput value={sale.careManager} onChange={(careManager) => change({careManager})} aria-label="ケアマネジャー" />
                 <Suggest
                   values={frequentValues(data.sales, (x) => x.careManager, (x) => !sale.careOffice.trim() || x.careOffice.trim() === sale.careOffice.trim())}
@@ -489,16 +559,16 @@ export function SaleEditor({
               <Field label="状態">
                 <Segmented<SaleStatus> ariaLabel="状態" value={sale.status} onChange={setStatus} options={STATUSES.map((x) => [x, x] as const)} />
               </Field>
-              <Field label="申請日">
+              <Field label="申請日" field="applyDate" warn={warn('applyDate')}>
                 <input type="date" value={sale.applyDate} onChange={(e) => change({applyDate: e.target.value})} className={dateInput} aria-label="申請日" />
               </Field>
               <Field label="承認日">
                 <input type="date" value={sale.approveDate} onChange={(e) => change({approveDate: e.target.value})} className={dateInput} aria-label="承認日" />
               </Field>
-              <Field label="納品日（購入日）">
+              <Field label="納品日（購入日）" field="deliveryDate" warn={warn('deliveryDate')}>
                 <input type="date" value={sale.deliveryDate} onChange={(e) => change({deliveryDate: e.target.value})} className={dateInput} aria-label="納品日" />
               </Field>
-              <Field label="支給申請日">
+              <Field label="支給申請日" field="claimDate">
                 <input type="date" value={sale.claimDate} onChange={(e) => change({claimDate: e.target.value})} className={dateInput} aria-label="支給申請日" />
               </Field>
             </div>
@@ -516,57 +586,70 @@ export function SaleEditor({
           </Card>
         </div>
 
-        <aside className="space-y-3 lg:sticky lg:top-3 lg:self-start">
-          <section className="rounded-xl border border-teal-200 bg-white p-4 shadow-sm">
-            <div className="text-xs font-bold text-slate-500">購入金額（税込）</div>
-            <div className="text-3xl font-bold tabular-nums text-slate-900">{yen(t.total)}円</div>
-            <div className="mt-1 text-xs tabular-nums text-slate-500">
-              金額 {yen(t.amount)}円 ＋ 消費税 {yen(t.tax)}円
-            </div>
-            <dl className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-sm">
-              <Row label="介護保険の対象" value={t.covered} />
-              <Row label={`利用者負担（${t.ratio}割）`} value={t.userBurden} />
-              {t.aid > 0 && <Row label={`介護扶助（${t.ratio}割）`} value={t.aid} />}
-              <Row label={`保険者負担（${10 - t.ratio}割）`} value={t.insurerBurden} />
-              {t.excess > 0 && <Row label="限度額を超えた分" value={t.excess} warn />}
-              <div className="mt-2 flex items-baseline justify-between rounded-lg bg-amber-50 px-2 py-1.5">
-                <dt className="font-bold text-slate-700">{sale.payMethod === '償還払い' ? 'いったんお支払い' : 'お客様のお支払い'}</dt>
-                <dd className="text-lg font-bold tabular-nums text-slate-900">{yen(sale.payMethod === '償還払い' ? t.total : t.userPay)}円</dd>
-              </div>
-              {sale.payMethod === '償還払い' && <p className="text-xs text-slate-500">あとで保険者から {yen(t.insurerBurden)}円 が払い戻されます。</p>}
-            </dl>
-            <p className="mt-2 text-[11px] text-slate-500">
-              {t.remainingBlank ? `今年度の残りは空欄なので ${yen(t.limit)}円 として計算` : `今年度の残り ${yen(t.remaining)}円`}
-              {t.perItemApplied && '・個別切り上げ'}
-            </p>
-            <dl className="mt-3 space-y-1 border-t border-slate-100 pt-3 text-sm">
-              <Row label="仕切の合計" value={t.costTotal} />
-              <div className="flex items-baseline justify-between">
-                <dt className="text-slate-600">利益</dt>
-                <dd className={`tabular-nums ${t.lowProfit ? 'font-bold text-rose-600' : 'text-slate-800'}`}>
-                  {yen(t.profit)}円（{t.amount > 0 ? Math.round(t.profitRate * 100) : 0}%）
-                </dd>
-              </div>
-            </dl>
-            <div className="mt-4">
-              <Btn color="sky" className="w-full" onClick={() => onPrint(sale.id)}>
-                🖨 見積書を印刷
-              </Btn>
-            </div>
-          </section>
-          <div id="shinsei-panel">
+        {onShinsei ? (
+          <div className="min-w-0 space-y-3 lg:sticky lg:top-3 lg:self-start">
             <ShinseiPanel sale={sale} settings={s} />
+            <div ref={previewBox} className="min-w-0 rounded-xl bg-slate-200/70 p-2 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto" style={{scrollbarGutter: 'stable'}}>
+              {pages === null ? (
+                <p className="p-6 text-center text-sm text-slate-500">申請書を開いています…</p>
+              ) : (
+                <ShinseiPages pages={pages} missing={missing} active={active} label={(f) => FIELD_LABEL[f]} onOpen={goField} scrollBox={previewBox} />
+              )}
+            </div>
           </div>
-          {warnings.length > 0 && (
-            <section className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-              <ul className="list-disc space-y-1 pl-4">
-                {warnings.map((w) => (
-                  <li key={w}>{w}</li>
-                ))}
-              </ul>
+        ) : (
+          <aside className="space-y-3 lg:sticky lg:top-3 lg:self-start">
+            <section className="rounded-xl border border-teal-200 bg-white p-4 shadow-sm">
+              <div className="text-xs font-bold text-slate-500">購入金額（税込）</div>
+              <div className="text-3xl font-bold tabular-nums text-slate-900">{yen(t.total)}円</div>
+              <div className="mt-1 text-xs tabular-nums text-slate-500">
+                金額 {yen(t.amount)}円 ＋ 消費税 {yen(t.tax)}円
+              </div>
+              <dl className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-sm">
+                <Row label="介護保険の対象" value={t.covered} />
+                <Row label={`利用者負担（${t.ratio}割）`} value={t.userBurden} />
+                {t.aid > 0 && <Row label={`介護扶助（${t.ratio}割）`} value={t.aid} />}
+                <Row label={`保険者負担（${10 - t.ratio}割）`} value={t.insurerBurden} />
+                {t.excess > 0 && <Row label="限度額を超えた分" value={t.excess} warn />}
+                <div className="mt-2 flex items-baseline justify-between rounded-lg bg-amber-50 px-2 py-1.5">
+                  <dt className="font-bold text-slate-700">{sale.payMethod === '償還払い' ? 'いったんお支払い' : 'お客様のお支払い'}</dt>
+                  <dd className="text-lg font-bold tabular-nums text-slate-900">{yen(sale.payMethod === '償還払い' ? t.total : t.userPay)}円</dd>
+                </div>
+                {sale.payMethod === '償還払い' && <p className="text-xs text-slate-500">あとで保険者から {yen(t.insurerBurden)}円 が払い戻されます。</p>}
+              </dl>
+              <p className="mt-2 text-[11px] text-slate-500">
+                {t.remainingBlank ? `今年度の残りは空欄なので ${yen(t.limit)}円 として計算` : `今年度の残り ${yen(t.remaining)}円`}
+                {t.perItemApplied && '・個別切り上げ'}
+              </p>
+              <dl className="mt-3 space-y-1 border-t border-slate-100 pt-3 text-sm">
+                <Row label="仕切の合計" value={t.costTotal} />
+                <div className="flex items-baseline justify-between">
+                  <dt className="text-slate-600">利益</dt>
+                  <dd className={`tabular-nums ${t.lowProfit ? 'font-bold text-rose-600' : 'text-slate-800'}`}>
+                    {yen(t.profit)}円（{t.amount > 0 ? Math.round(t.profitRate * 100) : 0}%）
+                  </dd>
+                </div>
+              </dl>
+              <div className="mt-4">
+                <Btn color="sky" className="w-full" onClick={() => onPrint(sale.id)}>
+                  🖨 見積書を印刷
+                </Btn>
+              </div>
             </section>
-          )}
-        </aside>
+            <div id="shinsei-panel">
+              <ShinseiPanel sale={sale} settings={s} />
+            </div>
+            {warnings.length > 0 && (
+              <section className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                <ul className="list-disc space-y-1 pl-4">
+                  {warnings.map((w) => (
+                    <li key={w}>{w}</li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </aside>
+        )}
       </div>
 
       {pickingCustomer && <CustomerPicker sales={data.sales} current={sale} onPick={pickCustomer} onClose={() => setPickingCustomer(false)} />}

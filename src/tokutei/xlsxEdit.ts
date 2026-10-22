@@ -613,6 +613,26 @@ export function drawMarks(files: Files, sheet: string, marks: Mark[]): number {
   return found.length;
 }
 
+/**
+ * 丸で囲む欄の文字の1文字ずつの位置（シートの左上からの画素。丸と同じ計算。1行の欄だけ）。
+ * 申請書のプレビューで、原本の字体のない端末（スマホなど）でも、文字を丸と同じ所に描くため（shinseiPreview.ts）
+ */
+export function markLayouts(files: Files, sheet: string, marks: Mark[]): {ref: string; chars: {ch: string; x: number; w: number}[]; cy: number; em: number}[] {
+  const path = sheetPath(files, sheet);
+  const xml = strFromU8(files[path]);
+  const lay = sheetLayout(xml);
+  const shared = sharedStrings(files);
+  const out: {ref: string; chars: {ch: string; x: number; w: number}[]; cy: number; em: number}[] = [];
+  for (const m of marks) {
+    const text = cellText(xml, m.cell, shared);
+    if (!text || text.includes('\n') || out.some((o) => o.ref === m.cell)) continue;
+    const {chars, em} = charBoxes(lay, cellStyle(files, xml, m.cell), m.cell, text);
+    const list = text.split('').map((ch, i) => ({ch, box: chars[i]})).filter((c): c is {ch: string; box: CharBox} => !!c.box);
+    if (list.length) out.push({ref: m.cell, chars: list.map((c) => ({ch: c.ch, x: c.box.x, w: c.box.w})), cy: list[0].box.cy, em});
+  }
+  return out;
+}
+
 /** シートの図形の楕円の数（テスト用） */
 export function ellipseCount(files: Files, sheet: string): number {
   const path = sheetPath(files, sheet);

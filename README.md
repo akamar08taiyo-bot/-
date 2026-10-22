@@ -44,6 +44,9 @@
 - 見積書の印刷（PDF）は A4縦1枚。品目や備考が多くて入りきらないときは、中身を縮めて1枚に収める（Excel の「1ページに収める」と同じ。`print/EstimateDoc.tsx` の `useFitToPage`）
 - 見積書は印刷（PDF）のほか、同じ形の Excel（.xlsx）でも保存できる（`src/tokutei/print/estimateXlsx.ts`。金額・消費税・合計・介護保険の内訳は Excel の計算式。書体は BIZ UDP明朝 Medium・BIZ UDPゴシック。A4縦1枚に収める印刷設定つき）
 - 申請書は行橋市・苅田町・みやこ町の原本に書き込む（広域連合は様式をいただいてから）
+- 申請書の画面：案件の画面の「📄 申請書」（またはタブ「📄 申請書（行橋市）」など）で、左で入れながら右で申請書の原本の形のまま見る（住宅改修の申請書と同じ。
+  ユーザーの指示「特定福祉用具購入の申請書も、住宅改修の申請書と同じくプレビューを見ながら入力することができる」2026-10-22）。
+  プレビューの欄を押すと左のその入れる所へ、入れている所の欄は囲む、まだ入っていない所は薄い黄色（`shinseiPreview.ts`・`components/ShinseiPreview.tsx`）
 - 販売受注簿への転記：見積もりの画面の「📤 販売受注簿に転記」で、販売受注簿作成ツール（taiyo-hacchu-scan）を新しいタブで開き、商品1点ずつ受注区分「給付」のページにする
   （同じサイトの localStorage `taiyo-hacchu-import-v1`、kind `taiyo-tokutei-order`。`src/tokutei/handoff.ts`。ページごとの給付内訳は、合計が見積書と同じになるようにこのアプリで分けて送る。
   受け取りは受注簿ツールの `src/main.jsx` の jutaku-import-begin〜end。形を変えるときは両方を直す。DESIGN.md 5.3）

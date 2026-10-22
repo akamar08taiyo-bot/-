@@ -36,13 +36,14 @@ React 19 + TypeScript + Vite（`vite.tokutei.config.ts` で1ファイルの `dis
 | `category.ts` | 種目の自動判定（T字杖・歩行車・持ち運ぶスロープは対象外）。`docLabel`＝書類の種目（腰掛便座の長い細目は「腰掛便座（ポータブルトイレ）」） |
 | `shinsei.ts` | 申請書：`SHINSEI`（行橋市・苅田町・みやこ町。シートごとに書く欄・丸・文字を小さくする欄・行のそろえ）・`shinseiValues`（案件 → 書く値）・`fillShinsei`・`shinseiChecks`（未入力・行に入らない商品）・`shinseiFileName`（「〇〇様特定福祉用具申請書.xlsx」） |
 | `shinsei/` | 申請書の原本（`yukuhashi.xltx`・`kanda.xltx`・`miyako.xlsx`）。いただいた様式から前の方の記入・写真・丸を消したもの（式の誤りも2つ直した。DESIGN.md 5.2）。`shinseiFiles.ts` が `?inline` で中に入れて開く |
+| `shinseiPreview.ts` | 申請書のプレビューの材料：`shinseiPreview`（原本に `fillShinseiFiles` で書いたシートの列・行・結合・罫線・塗り・文字・図形・丸を画素に）・`SHINSEI_LINKS`（欄 → 入れる所。式で参照している欄もつなぐ）・`missingFields`。住宅改修の `shinseiPreview.ts` を写したもの |
 | `xlsxEdit.ts` | 原本の XML を直接書きかえる部品（住宅改修の `shinsei.ts` から写した）：`writeCells`（式の答えも合わせる）・`fitCell`・`sameStyle`・`drawMarks`（楕円。何行もある欄も）・`hideZeros`・`dropCalcChain`・`finishWorkbook` |
 | `wareki.ts`・`zip.ts`（`zipData.ts`＝福岡県の郵便番号）・`reasons.ts` | 生年月日の読み取り（和暦・西暦）・住所 ⇔ 郵便番号・理由の文例 |
 | `import/` | 仕切り一覧表の取り込み（`priceImport.ts`・`xlsx.ts`・`pdfText.ts`。住宅改修のアプリから写したもの） |
 | `storage.ts` | IndexedDB `taiyo-tokutei`（使えないときは localStorage `tokutei-app:`）。読み込みは `cleanProducts`・`cleanSales`・`cleanSettings`（項目を足したらここも）。バックアップ JSON `backupJson`・`parseBackup`・`mergeById` |
 | `useStore.ts`・`sync.ts` | 変更の 0.4秒後に自動保存・タブ間でまとめて保存。`flush` は保存の途中ならそれが終わるまで待つ（住宅改修のタブの中の枠が消える前に待つため） |
 | `update.ts` | `version.json` を見て「⟳ 読み込み直す」を出す |
-| `components/` | `SalesPage`（一覧）・`SaleEditor`（案件の画面。「📗 Excelで保存」）・`ShinseiPanel`（「📄 申請書（Excel）を作る」と未入力の欄）・`CustomerPicker`・`BirthInput`・`ReasonField`・`Suggest`・`ProductsPage`・`ProductPicker`・`CategorySelect`（種目を選ぶ）・`ImportDialog`・`SettingsPage`・`ui.tsx`（ボタンの色。Excel は `excel`＝薄い緑） |
+| `components/` | `SalesPage`（一覧）・`SaleEditor`（案件の画面。「📗 Excelで保存」）・`ShinseiPanel`（「📄 申請書（Excel）を作る」と未入力の欄）・`ShinseiPreview`（申請書のプレビューを描く。押すと入れる所へ）・`CustomerPicker`・`BirthInput`・`ReasonField`・`Suggest`・`ProductsPage`・`ProductPicker`・`CategorySelect`（種目を選ぶ）・`ImportDialog`・`SettingsPage`・`ui.tsx`（ボタンの色。Excel は `excel`＝薄い緑） |
 | `print/EstimateDoc.tsx` | 印刷の御見積書（A4縦） |
 | `print/PrintView.tsx` | 印刷の画面（画面の幅に合わせて縮めて見せる。「🖨 印刷する」「📗 Excelで保存」「閉じる」。PDF の名前は document.title「御見積書_〇〇様」） |
 | `tokutei.css` | `@media print` で `.est{height:296mm; overflow:hidden}`（1枚に固定。行が多いと下が切れる） |

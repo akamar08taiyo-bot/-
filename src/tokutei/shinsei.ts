@@ -124,7 +124,7 @@ export function reasonText(v: Pick<ShinseiValues, 'items'>): string {
 // ---------------------------------------------------------------- 様式ごとの欄
 
 /** 1つのシートに書くもの */
-type SheetWrite = {
+export type SheetWrite = {
   sheet: string;
   cells?: [string, CellValue][]; // 番地 → 値（空の文字は欄を空にする）
   newStyles?: [string, string][]; // 欄がないときに足す書式：番地 → 同じ書式にする欄（日付の数字を「年」と同じ字体に）
@@ -358,6 +358,12 @@ function writeBlock(files: Files, sheet: string, block: NonNullable<SheetWrite['
 
 /** 開いた原本（unzipSync したもの）に書き込んで、申請書（.xlsx）のバイト列にする。files は書きかえる（原本を何度も使うなら {...files} を渡す） */
 export function fillShinsei(files: Files, form: ShinseiForm, v: ShinseiValues): Uint8Array {
+  fillShinseiFiles(files, form, v);
+  return finishWorkbook(files);
+}
+
+/** 開いた原本に書き込む（ブックの仕上げ・zip はしない。申請書のプレビューも同じ書き込みをしたシートを描く＝shinseiPreview.ts） */
+export function fillShinseiFiles(files: Files, form: ShinseiForm, v: ShinseiValues): void {
   const sheets = form.sheets(v);
   // 1. 値を書く（式の答えも合わせる）→ 2. 入りきらない欄の文字を小さくする → 3. 丸（文字の大きさが決まってから位置を計算する）
   for (const w of sheets) {
@@ -370,7 +376,6 @@ export function fillShinsei(files: Files, form: ShinseiForm, v: ShinseiValues): 
   for (const w of sheets) for (const ref of w.fit ?? []) fitCell(files, w.sheet, ref);
   for (const w of sheets) if (w.marks?.length) drawMarks(files, w.sheet, w.marks);
   dropCalcChain(files);
-  return finishWorkbook(files);
 }
 
 /** ファイル名：「山田花子様特定福祉用具申請書.xlsx」（住宅改修アプリの「…様住宅改修申請書.xlsx」と同じ形） */
