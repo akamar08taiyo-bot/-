@@ -338,7 +338,7 @@ function personName(raw: string, kana: boolean): string {
  * 居宅介護支援事業者の欄の名前と届出年月日（ISO。読めなければ ''）と欄の位置。
  * 事業所を替えると、下のますに次の事業所と届出年月日が書かれる（ますは3つ。名前の下か右に「届出年月日」）
  */
-export type OfficeEntry = {name: string; date: string; x0: number; x1: number; y0: number; y1: number; dateBox: {x0: number; x1: number; y0: number; y1: number} | null};
+export type OfficeEntry = {name: string; date: string; x0: number; x1: number; y0: number; y1: number; dateBox: {x0: number; x1: number; y0: number; y1: number} | null}; // dateBox：届出年月日の欄（読めなかったときも）
 
 const OFFICE_LABEL = /居宅介護|援事業者|介護予防|事業所の|及びその|居宅介護支援事業者/;
 const OFFICE_LABEL_TEXT = '居宅介護支援事業者又は介護予防支援事業者及びその事業所の名称';
@@ -357,7 +357,7 @@ const OFFICE_STOP = /介護保険施設|入所|退所/;
  * ラベルから右の欄。読めなければ「〜センター」「〜事業所」などで終わる欄から下。
  * 届出年月日は、すぐ上（または同じ欄の左）の名前のもの
  */
-function officesOf(byY: Row[], kind: 'card' | 'futan' | null): OfficeEntry[] {
+function officesOf(byY: Row[], kind: 'card' | 'futan' | null, useLabel = true): OfficeEntry[] {
   const hs = byY.map((r) => r.y1 - r.y0).sort((a, b) => a - b);
   const lh = Math.max(8, hs[Math.floor(hs.length / 2)] ?? 20);
   // ラベルの欄：ラベルだけの言葉（「事業者又は」「及びその」など）か、居宅介護などで始まって事業所の名前の形で終わらない欄（「〜居宅介護支援事業所」は名前）
@@ -365,7 +365,7 @@ function officesOf(byY: Row[], kind: 'card' | 'futan' | null): OfficeEntry[] {
     const t = squeeze(c.text);
     return OFFICE_LABEL_STRONG.test(t) || (OFFICE_LABEL.test(t) && !OFFICE_END.test(t));
   };
-  const labelRow = byY.find((r) => r.cells.some(isLabel));
+  const labelRow = useLabel ? byY.find((r) => r.cells.some(isLabel)) : undefined;
   const labelCell = labelRow?.cells.find(isLabel);
   const nameOf = (raw: string): string => {
     const t = squeeze(raw);
@@ -429,16 +429,17 @@ function officesOf(byY: Row[], kind: 'card' | 'futan' | null): OfficeEntry[] {
       const name = kt ? nameOf(kt.slice(0, cutAt(kt))) : '';
       if (name) out.push({name, date: '', x0: Math.min(...kept.map((w) => w.x0)), x1: c.x1, y0: c.y0, y1: c.y1, dateBox: null});
       const datePart = c.text.slice(cutAt(c.text));
-      const m = new RegExp(DATE).exec(datePart);
       const e = out[out.length - 1];
-      if (!m || NOT_TODOKE.test(squeeze(datePart)) || !e || e.date) continue;
-      const iso = warekiIso(m[1], m[2], m[3], m[4]);
-      if (iso && c.y0 >= e.y0 - lh * 0.5 && c.y0 - e.y1 < lh * 4 && c.x1 > e.x0 - lh * 3) {
-        e.date = iso;
-        e.dateBox = {x0: c.x0, x1: c.x1, y0: c.y0, y1: c.y1};
-      }
+      if (!e || e.date || NOT_TODOKE.test(squeeze(datePart)) || !(c.y0 >= e.y0 - lh * 0.5 && c.y0 - e.y1 < lh * 4 && c.x1 > e.x0 - lh * 3)) continue;
+      const m = new RegExp(DATE).exec(datePart);
+      const iso = m ? warekiIso(m[1], m[2], m[3], m[4]) : '';
+      // 日付の字が欠けて読めなかったとき（「令和 6 年 4 月日」）も、届出年月日の所は覚えておく（cardRead.ts がその行だけ読み直す）
+      if (iso || (!e.dateBox && /届|出年月/.test(datePart))) e.dateBox = {x0: c.x0, x1: c.x1, y0: c.y0, y1: c.y1};
+      if (iso) e.date = iso;
     }
   }
+  // ラベルのまわりに名前が読めなければ、ラベルなしで（「〜センター」などで終わる欄から）
+  if (!out.length && labelCell) return officesOf(byY, kind, false);
   return out;
 }
 

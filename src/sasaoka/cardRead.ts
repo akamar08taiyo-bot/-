@@ -184,6 +184,7 @@ const OK = {
   zip: (t: string) => /\d{3}\s*-\s*\d{4}/.test(t),
   insurer: (t: string) => t.replace(/\D/g, '').length >= 6,
   burden: (t: string) => /[123一二三]\s*割(?!合)/.test(t),
+  todoke: (t: string) => /(令和|平成)\s*(\d{1,2}|元)\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/.test(t),
 };
 
 const labelWord = (text: string, r: Rect): OcrWord => ({text, ...r});
@@ -302,6 +303,24 @@ export async function readCardImage(src: Gray, recognize: Recognize, onStep: (st
   for (const r of findAll(/(令和|平成).{2,12}日.{0,3}(令和|平成)/).slice(0, 3)) {
     const lh = lhOf(r) / 1;
     add(withLabel('認定の有効期間', {x0: r.x0 - lh * 8, y0: r.y0, x1: r.x0 - lh * 6, y1: r.y1}, doubt(await readRect(clean, {x0: r.x0 - lh * 0.3, y0: r.y0 - lh * 0.3, x1: r.x1 + lh * 8, y1: r.y1 + lh * 0.3}, 'range', recognize, lh, OK.term))));
+  }
+  // 居宅介護支援事業者の届出年月日が読めなかった欄（字が欠けた「令和 6 年 4 月日」など。字体によって読み違える）は、その欄だけ読み直して、
+  // 全体を読んだページのその字と置きかえる（新しい届出の日付が読めないと、古い事業所を選んでしまう）
+  for (const p of pages) {
+    for (const e of officeEntries(p)) {
+      if (e.date || !e.dateBox) continue;
+      const d = e.dateBox;
+      // 字の高さは名前の行から（届出年月日の欄は、読み違えた字で縦に大きくなることがある）。名前が上の行なら、その行は入れない
+      const lh = lhOf(e);
+      const below = d.y0 > e.y1 - lh * 0.3;
+      const r = {x0: Math.max(d.x0, e.x0) - lh * 0.3, y0: below ? Math.max(e.y1 + 1, d.y0 - lh * 0.3) : d.y0 - lh * 0.3, x1: d.x1 + lh * 0.6, y1: d.y0 + lh * 1.3};
+      const got = await readRect(clean, r, 'line', recognize, lh, OK.todoke);
+      if (!OK.todoke(fixOcr(got.map((l) => l.words.map((w) => w.text).join(' ')).join(' ')).replace(/\s+/g, ''))) continue;
+      // 置きかえるのは、その欄の行の語（まん中がその欄の高さにある、名前の列から右の語）だけ
+      const mid = (w: OcrWord) => (w.y0 + w.y1) / 2;
+      for (const l of p.lines) l.words = l.words.filter((w) => !(w.x0 >= r.x0 - 1 && w.x1 <= r.x1 + 1 && mid(w) > r.y0 && mid(w) < r.y1));
+      p.lines.push(...got);
+    }
   }
   // 居宅介護支援事業者：届出年月日のちがう名前がいくつか読めたら、いちばん新しい届出のます（名前と届出年月日）だけを読み直す
   // （古い事業所の名前を読み直さない。ユーザーの指示「直近の…に担当している居宅介護支援事業者名を読む」）
