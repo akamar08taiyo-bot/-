@@ -257,6 +257,8 @@ export function cleanSales(raw: unknown): Sale[] {
       updatedAt: numv(s.updatedAt),
       // 住宅改修の様邸から開いた案件（jutaku.ts）
       ...(str(s.jutakuJob) ? {jutakuJob: str(s.jutakuJob), jutakuSync: isObj(s.jutakuSync) ? cleanJutakuFields(s.jutakuSync) : {}} : {}),
+      ...(str(s.bodyState) ? {bodyState: str(s.bodyState)} : {}),
+      ...(str(s.careState) ? {careState: str(s.careState)} : {}),
     };
   });
 }

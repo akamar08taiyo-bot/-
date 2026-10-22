@@ -3,12 +3,29 @@ import type {Sale, SaleItem} from '../types.ts';
 
 /**
  * 「福祉用具が必要な理由」（申請書の欄。用具ごと）。種目ごとの文例・前に同じ種目で書いた理由を、押すだけで入れられる。
+ * 住宅改修から開いた案件は、住宅改修の理由書の「利用者の身体状況」「介護状況」も先に出す（`hints`。ユーザーの答え「申請書の理由の欄のこと」2026-10-22）。
  * 入れたあとで、その方に合わせて直す
  */
-export function ReasonField({item, sales, saleId, onChange}: {item: SaleItem; sales: Sale[]; saleId: string; onChange: (reason: string) => void}) {
+export function ReasonField({
+  item,
+  sales,
+  saleId,
+  hints = [],
+  onChange,
+}: {
+  item: SaleItem;
+  sales: Sale[];
+  saleId: string;
+  hints?: {label: string; text: string}[];
+  onChange: (reason: string) => void;
+}) {
   const examples = reasonExamples(item.category, item.sub);
   const past = pastReasons(sales, item.category, item.sub, saleId);
-  const options = [...examples.map((text) => ({text, label: '文例'})), ...past.map((text) => ({text, label: '前に書いた理由'}))].filter((o) => o.text !== item.reason.trim());
+  const options = [
+    ...hints.map((h) => ({text: h.text.trim(), label: h.label})).filter((o) => o.text),
+    ...examples.map((text) => ({text, label: '文例'})),
+    ...past.map((text) => ({text, label: '前に書いた理由'})),
+  ].filter((o) => o.text !== item.reason.trim());
   return (
     <div className="grid min-w-0 grid-cols-1 gap-1">
       <textarea

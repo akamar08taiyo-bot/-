@@ -95,11 +95,18 @@ export type Sale = {
   updatedAt: number;
   jutakuJob?: string; // 住宅改修のアプリの様邸の画面（🛁 特定福祉用具申請書のタブ）から開いた案件：その様邸の id（jutaku.ts）
   jutakuSync?: JutakuFields; // 前に住宅改修から受け取ったお客様の情報（住宅改修で変わった値だけ入れ直すため）
+  // 住宅改修の理由書の「利用者の身体状況」「介護状況」（住宅改修から開いた案件だけ。画面には出さず、理由の欄の文例のボタンに使う。
+  // ユーザーの答え「申請書の理由の欄のこと」2026-10-22）
+  bodyState?: string;
+  careState?: string;
 };
 
 /** 住宅改修のアプリから受け取るお客様の情報（jutaku.ts。案件の項目の名前で） */
 export type JutakuFields = Partial<
-  Pick<Sale, 'customer' | 'kana' | 'insuredNo' | 'birthDate' | 'gender' | 'zip' | 'address' | 'tel' | 'careLevel' | 'insurer' | 'burdenRatio' | 'careOffice' | 'careManager'>
+  Pick<
+    Sale,
+    'customer' | 'kana' | 'insuredNo' | 'birthDate' | 'gender' | 'zip' | 'address' | 'tel' | 'careLevel' | 'insurer' | 'burdenRatio' | 'careOffice' | 'careManager' | 'bodyState' | 'careState'
+  >
 >;
 
 /** 見積書の発行元（営業所） */

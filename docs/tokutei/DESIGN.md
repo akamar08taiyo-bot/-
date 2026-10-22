@@ -353,6 +353,9 @@
   「🛁 特定福祉用具申請書」のタブができた。中身は、ユーザーが選んだ「特定福祉用具アプリを出す」＝このアプリを iframe で出す（住宅改修の `estimate/TokuteiEditor.tsx`）。
 - 受け渡し：住宅改修はタブを開くたびに localStorage `taiyo-tokutei-from-jutaku-v1` に `{job: 様邸の id, fields}` を書き、`tokutei/index.html#jutaku=<様邸の id>&embed=1` を開く。
   `fields` は案件の項目の名前（customer・kana・insuredNo・birthDate・gender・zip・address・tel・careLevel・insurer・burdenRatio・careOffice・careManager。保険者・負担割合は住宅改修で分からなければ入れない）。
+  ほかに住宅改修の理由書の「利用者の身体状況」`bodyState`・「介護状況」`careState`（2026-10-22。ユーザーの答え「特定福祉用具の理由書＝申請書の理由の欄のこと」）。
+  案件の画面には出さず、品目ごとの「福祉用具が必要な理由」の欄の下に「理由書の身体状況：…」「理由書の介護状況：…」のボタンとして出す（押すと理由の欄に入る。文例より先）。
+  ここでは直さないので、住宅改修で変わるたびに入れ直す。
 - このアプリ（`jutaku.ts`）：その様邸の案件（`Sale.jutakuJob`）を開く。なければ、その保険者で新しい案件を作って値を入れる。あれば、前に受け取った値（`jutakuSync`）と
   ちがう値を、ここでまだ直していない項目（空か、前に受け取った値のまま）にだけ入れる（ここで手で直した値はそのまま）。保険者が変わったら個別切り上げも合わせる。
   `jutakuSync` は作ったときの値（受け取らなかった項目は初めの値）から始めるので、初めの値のままの負担割合1割・保険者も、あとで住宅改修で入れた値が入る。

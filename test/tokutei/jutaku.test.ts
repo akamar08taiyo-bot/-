@@ -98,3 +98,24 @@ test('保存してある案件の jutakuJob・jutakuSync は読み込みで残�
   assert.equal(back[0].jutakuSync?.customer, '山田 花子');
   assert.equal(cleanSales([{id: 's1', customer: 'A'}])[0].jutakuJob, undefined); // 住宅改修から開いていない案件
 });
+
+test('住宅改修の理由書の「利用者の身体状況」「介護状況」を受け取る（理由の欄の文例のボタンに使う。住宅改修で直すたびに入れ直す）', () => {
+  const settings = defaultSettings();
+  const bodyState = '脳梗塞の後遺症で右片麻痺があり、立ち座りや歩行が不安定。';
+  const careState = '日中は独居。入浴は長女が週2回介助している。';
+  const h = readJutaku(JSON.stringify({job: 'j1', fields: {...fields, bodyState, careState}}), 'j1')!;
+  assert.deepEqual([h.fields.bodyState, h.fields.careState], [bodyState, careState]);
+  const {sales, id} = applyJutaku([], settings, h, 1000);
+  assert.deepEqual([sales[0].bodyState, sales[0].careState], [bodyState, careState]);
+  // 住宅改修で身体状況を直した → 入れ直す。介護状況を消した → 消す
+  const h2 = readJutaku(JSON.stringify({job: 'j1', fields: {...fields, bodyState: '右片麻痺。浴槽のまたぎが困難。', careState: ''}}), 'j1')!;
+  const s = applyJutaku(sales, settings, h2, 2000).sales.find((x) => x.id === id)!;
+  assert.deepEqual([s.bodyState, s.careState], ['右片麻痺。浴槽のまたぎが困難。', '']);
+  // 文字でないものは捨てる。保存してある値は読み込みで残す
+  assert.deepEqual(readJutaku(JSON.stringify({job: 'j1', fields: {bodyState: 1, careState: null}}), 'j1')?.fields, {});
+  const back = cleanSales(JSON.parse(JSON.stringify([s])))[0];
+  assert.deepEqual([back.bodyState, back.careState], ['右片麻痺。浴槽のまたぎが困難。', undefined]);
+  // 前の版の受け渡し（2つがない）で開いても、受け取った値は消さない
+  const old = applyJutaku([s], settings, readJutaku(JSON.stringify({job: 'j1', fields}), 'j1')!, 3000).sales[0];
+  assert.equal(old.bodyState, '右片麻痺。浴槽のまたぎが困難。');
+});
