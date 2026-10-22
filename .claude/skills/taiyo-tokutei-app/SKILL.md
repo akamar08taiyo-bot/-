@@ -20,7 +20,11 @@ description: 太陽シルバーサービス行橋営業所の業務アプリ「�
 | 公開先 | `akamar08taiyo-bot/taiyo-portal`（master、GitHub Pages）の `tokutei/`（`index.html` と `version.json` の2つだけ）。https://akamar08taiyo-bot.github.io/taiyo-portal/tokutei/ |
 | タイル | `taiyo-portal/index.html` の `APPS` の `name:'特定福祉用具 購入申請書・見積もり作成'`（`url:'tokutei/index.html'`） |
 
-**住宅改修のアプリとは独立。**（ユーザーの指示「全く別物として作成」）コードもデータも共有しない。部品（取り込み・自動保存など）は写してきたもので、直すときは別々に直す。
+**住宅改修のアプリとは独立。**（ユーザーの指示「全く別物として作成」）コードもデータも共有しない。
+ただし住宅改修の様邸の画面の「🛁 特定福祉用具申請書」のタブの中にこのアプリが出る（ユーザーが選んだ「特定福祉用具アプリを出す」、2026-10-22）。
+受け渡しは localStorage `taiyo-tokutei-from-jutaku-v1` のお客様の情報だけ（`src/tokutei/jutaku.ts` と住宅改修の `src/sasaoka/tokuteiLink.ts`。形を変えるときは両方を直す）。
+URL は `#jutaku=<様邸の id>&embed=1`：その様邸の案件を開き（なければ作る）、住宅改修で変わった値だけ入れ直す。embed では題名の段を出さない。
+住宅改修はタブを替える・一覧へ戻る前に `window.__taiyoTokuteiFlush` で保存を待つ（枠が消えると IndexedDB の保存が途中で止まり、直した値が消えた）。部品（取り込み・自動保存など）は写してきたもので、直すときは別々に直す。
 
 作業の場所：今のチェックアウトが別のブランチ（住宅改修など）なら、git worktree で別のフォルダに出す（`references/build-test-publish.md` の1）。
 2026-10 のセッションでは `/home/user/tokutei-wt` に出していた。`/home/user/-` は住宅改修のブランチなので取り違えない。

@@ -28,7 +28,8 @@ React 19 + TypeScript + Vite（`vite.tokutei.config.ts` で1ファイルの `dis
 
 | ファイル | 役割 |
 |---|---|
-| `App.tsx` | 3つのタブ（📝 見積もり・申請／📦 商品マスタ／⚙ 設定） |
+| `App.tsx` | 3つのタブ（📝 見積もり・申請／📦 商品マスタ／⚙ 設定）。URL の `#tab=…&sale=…&print=1`。住宅改修のタブの中では `#jutaku=<様邸の id>&embed=1`（題名の段を出さない・`window.__taiyoTokuteiFlush` を出す） |
+| `jutaku.ts` | 住宅改修のアプリから開いたとき：localStorage `taiyo-tokutei-from-jutaku-v1`（`{job, fields}`）を読む `readJutaku`・値を確かめる `cleanJutakuFields`・その様邸の案件を開く（なければ作る）`applyJutaku`（`Sale.jutakuJob`・前に受け取った値 `jutakuSync` とちがう値だけ、まだ手で直していない項目に入れる。`jutakuSync` は作ったときの値から始めるので、初めの値のままの負担割合1割・保険者も、あとで住宅改修で入れた値が入る。保険者が変わったら個別切り上げも）。形は住宅改修の `src/sasaoka/tokuteiLink.ts` と同じにする |
 | `defaults.ts` | 営業所（OFFICES、19か所）・担当・保険者（INSURERS。みやこ町は `perItem`）・`defaultSettings()`。営業所はポータルの localStorage `taiyo_portal_session` から |
 | `sales.ts` | 見積番号 `nextQuoteNo`・`newSale`・`copySale`・`itemFromProduct`・`blankItem`・`customerLabel`・`saleWarnings`。使い回し：`customerKey`（同じお客様＝被保険者番号10けた、なければ名前＋生年月日）・`pastCustomers`・`customerPatch`（前のお客様から入れる）・`sameYearSales`（今年度の残り）・`frequentValues`（居宅・ケアマネの候補） |
 | `category.ts` | 種目の自動判定（T字杖・歩行車・持ち運ぶスロープは対象外）。`docLabel`＝書類の種目（腰掛便座の長い細目は「腰掛便座（ポータブルトイレ）」） |
@@ -38,7 +39,7 @@ React 19 + TypeScript + Vite（`vite.tokutei.config.ts` で1ファイルの `dis
 | `wareki.ts`・`zip.ts`（`zipData.ts`＝福岡県の郵便番号）・`reasons.ts` | 生年月日の読み取り（和暦・西暦）・住所 ⇔ 郵便番号・理由の文例 |
 | `import/` | 仕切り一覧表の取り込み（`priceImport.ts`・`xlsx.ts`・`pdfText.ts`。住宅改修のアプリから写したもの） |
 | `storage.ts` | IndexedDB `taiyo-tokutei`（使えないときは localStorage `tokutei-app:`）。読み込みは `cleanProducts`・`cleanSales`・`cleanSettings`（項目を足したらここも）。バックアップ JSON `backupJson`・`parseBackup`・`mergeById` |
-| `useStore.ts`・`sync.ts` | 変更の 0.4秒後に自動保存・タブ間でまとめて保存 |
+| `useStore.ts`・`sync.ts` | 変更の 0.4秒後に自動保存・タブ間でまとめて保存。`flush` は保存の途中ならそれが終わるまで待つ（住宅改修のタブの中の枠が消える前に待つため） |
 | `update.ts` | `version.json` を見て「⟳ 読み込み直す」を出す |
 | `components/` | `SalesPage`（一覧）・`SaleEditor`（案件の画面。「📗 Excelで保存」）・`ShinseiPanel`（「📄 申請書（Excel）を作る」と未入力の欄）・`CustomerPicker`・`BirthInput`・`ReasonField`・`Suggest`・`ProductsPage`・`ProductPicker`・`CategorySelect`（種目を選ぶ）・`ImportDialog`・`SettingsPage`・`ui.tsx`（ボタンの色。Excel は `excel`＝薄い緑） |
 | `print/EstimateDoc.tsx` | 印刷の御見積書（A4縦） |
@@ -57,4 +58,4 @@ React 19 + TypeScript + Vite（`vite.tokutei.config.ts` で1ファイルの `dis
 ## テスト（`test/tokutei/`）
 
 `calc.test.ts`（計算の例）・`category.test.ts`・`priceImport.test.ts`・`estimateXlsx.test.ts`（式とキャッシュの値が `saleTotals` と同じか、超えた分・個別切り上げ・生活保護・償還払い・非課税、宛名・印刷設定・ファイル名）・
-`shinsei.test.ts`（3つの申請書の欄・丸の数・式の答え・原本に前の方の記入が残っていないか）・`link.test.ts`（生年月日・郵便番号・前のお客様・今年度の残り・理由）・`e2e.mjs`（ブラウザで通し。申請書の Excel を落として欄を読む）。
+`shinsei.test.ts`（3つの申請書の欄・丸の数・式の答え・原本に前の方の記入が残っていないか）・`link.test.ts`（生年月日・郵便番号・前のお客様・今年度の残り・理由）・`jutaku.test.ts`（住宅改修からの受け渡し：開いた様邸のものだけ・案件を作る／開く・変わった値だけ入れ直す・保険者と個別切り上げ・読み込みで残す）・`e2e.mjs`（ブラウザで通し。申請書の Excel を落として欄を読む）。

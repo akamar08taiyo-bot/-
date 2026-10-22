@@ -4,12 +4,13 @@
 //   設定：見積書の発行元（営業所）・割引率・限度額・バックアップ
 // 申請書（保険者ごとの様式への差し込み）と販売受注簿への転記は、様式をいただいてから足す（docs/tokutei/DESIGN.md）。
 
-import {useCallback, useEffect, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {ProductsPage} from './components/ProductsPage.tsx';
 import {SaleEditor} from './components/SaleEditor.tsx';
 import {SalesPage} from './components/SalesPage.tsx';
 import {SettingsPage} from './components/SettingsPage.tsx';
 import {ToastProvider} from './components/ui.tsx';
+import {applyJutaku, JUTAKU_KEY, readJutaku} from './jutaku.ts';
 import {PrintView} from './print/PrintView.tsx';
 import {useNewVersion} from './update.ts';
 import {useStore} from './useStore.ts';
@@ -22,21 +23,27 @@ const TABS: {id: Tab; label: string}[] = [
 ];
 const PORTAL_URL = 'https://akamar08taiyo-bot.github.io/taiyo-portal/';
 
-/** URL のうしろ（#tab=sales&sale=…&print=1）。読み直しても同じ画面を開く */
-function readHash(): {tab?: Tab; sale?: string; print?: boolean} {
+/**
+ * URL のうしろ（#tab=sales&sale=…&print=1）。読み直しても同じ画面を開く。
+ * 住宅改修のアプリの「🛁 特定福祉用具申請書」のタブの中では #jutaku=<様邸の id>&embed=1（jutaku.ts）
+ */
+function readHash(): {tab?: Tab; sale?: string; print?: boolean; jutaku?: string; embed?: boolean} {
   const p = new URLSearchParams(location.hash.replace(/^#/, ''));
   const tab = p.get('tab');
   return {
     tab: tab === 'sales' || tab === 'products' || tab === 'settings' ? tab : undefined,
     sale: p.get('sale') || undefined,
     print: p.get('print') === '1',
+    jutaku: p.get('jutaku') || undefined,
+    embed: p.get('embed') === '1',
   };
 }
 
-function writeHash(tab: Tab, sale: string | null, print: boolean) {
+function writeHash(tab: Tab, sale: string | null, print: boolean, embed: boolean) {
   const p = new URLSearchParams({tab});
   if (sale) p.set('sale', sale);
   if (print) p.set('print', '1');
+  if (embed) p.set('embed', '1'); // 住宅改修のタブの中で読み直しても、上の段を出さないまま
   try {
     history.replaceState(null, '', `#${p.toString()}`);
   } catch {
@@ -51,14 +58,46 @@ export default function App() {
   const [tab, setTab] = useState<Tab>(initial.tab ?? 'sales');
   const [saleId, setSaleId] = useState<string | null>(initial.sale ?? null);
   const [printId, setPrintId] = useState<string | null>(initial.print ? (initial.sale ?? null) : null);
+  const [embed] = useState(initial.embed === true);
+  const [jutaku] = useState(initial.jutaku ?? null);
+  const linked = useRef(false);
   const data = store.data;
 
   const sale = data?.sales.find((x) => x.id === saleId) ?? null;
   const printSale = data?.sales.find((x) => x.id === printId) ?? null;
 
   useEffect(() => {
-    if (data) writeHash(tab, tab === 'sales' ? (sale?.id ?? null) : null, !!printSale);
-  }, [data, tab, sale?.id, printSale]);
+    if (data) writeHash(tab, tab === 'sales' ? (sale?.id ?? null) : null, !!printSale, embed);
+  }, [data, tab, sale?.id, printSale, embed]);
+
+  // 住宅改修の様邸から開いたとき：その様邸の案件を開く（なければ作る。お客様の情報は住宅改修が localStorage に書いたもの）
+  useEffect(() => {
+    if (!data || !jutaku || linked.current) return;
+    linked.current = true;
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(JUTAKU_KEY);
+    } catch {
+      /* 読めなければ一覧のまま */
+    }
+    const handoff = readJutaku(raw, jutaku);
+    if (!handoff) return;
+    const r = applyJutaku(data.sales, data.settings, handoff);
+    if (r.sales !== data.sales) store.update('sales', () => r.sales);
+    setTab('sales');
+    setSaleId(r.id);
+  }, [data, jutaku, store]);
+
+  // 住宅改修のタブの中（embed）では、住宅改修がタブを替える・一覧へ戻る前にこれを呼んで、保存が終わるのを待つ
+  // （枠が消えると保存が途中で止まるため。住宅改修の src/sasaoka/tokuteiLink.ts の flushTokutei）
+  useEffect(() => {
+    if (!embed) return;
+    const w = window as Window & {__taiyoTokuteiFlush?: () => Promise<boolean>};
+    w.__taiyoTokuteiFlush = store.flush;
+    return () => {
+      delete w.__taiyoTokuteiFlush;
+    };
+  }, [embed, store.flush]);
 
   const closePrint = useCallback(() => setPrintId(null), []);
 
@@ -86,8 +125,9 @@ export default function App() {
         </div>
       )}
       <div className={`min-h-screen text-slate-800 ${printSale ? 'no-print' : ''}`}>
-        <header className="no-print bg-[#0f4c5c] text-white">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+        <header className={`no-print bg-[#0f4c5c] text-white ${embed ? 'pt-1.5' : ''}`}>
+          {/* 住宅改修のタブの中（embed）では、題名・ポータルへのリンクの段は出さない（住宅改修の画面の上にある） */}
+          <div className={`mx-auto max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 ${embed ? 'hidden' : 'flex'}`}>
             <div className="flex items-center gap-3">
               <div className="grid h-9 w-9 place-items-center rounded-lg bg-white/15 text-lg font-black">特</div>
               <div>

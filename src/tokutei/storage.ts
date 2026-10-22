@@ -5,6 +5,7 @@
 // 前に読んだときと印が違えば、別のタブが保存したということなので、読み直す・まとめてから保存する（sync.ts）。
 
 import {CARE_LEVELS, DEFAULT_STAFF, DEFAULT_SUPPLIERS, defaultSettings, SETTINGS_REV} from './defaults.ts';
+import {cleanJutakuFields} from './jutaku.ts';
 import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Product, Sale, SaleItem, SaleStatus, Settings, TaxType} from './types.ts';
 import {uid} from './util.ts';
 
@@ -254,6 +255,8 @@ export function cleanSales(raw: unknown): Sale[] {
       items: Array.isArray(s.items) ? s.items.filter(isObj).map(cleanItem) : [],
       createdAt: numv(s.createdAt),
       updatedAt: numv(s.updatedAt),
+      // 住宅改修の様邸から開いた案件（jutaku.ts）
+      ...(str(s.jutakuJob) ? {jutakuJob: str(s.jutakuJob), jutakuSync: isObj(s.jutakuSync) ? cleanJutakuFields(s.jutakuSync) : {}} : {}),
     };
   });
 }

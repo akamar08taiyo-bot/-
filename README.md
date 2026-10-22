@@ -44,6 +44,10 @@
 - 見積書の印刷（PDF）は A4縦1枚。品目や備考が多くて入りきらないときは、中身を縮めて1枚に収める（Excel の「1ページに収める」と同じ。`print/EstimateDoc.tsx` の `useFitToPage`）
 - 見積書は印刷（PDF）のほか、同じ形の Excel（.xlsx）でも保存できる（`src/tokutei/print/estimateXlsx.ts`。金額・消費税・合計・介護保険の内訳は Excel の計算式。書体は BIZ UDP明朝 Medium・BIZ UDPゴシック。A4縦1枚に収める印刷設定つき）
 - 申請書（保険者ごとの様式への差し込み）と販売受注簿への転記は、様式をいただいてから作る
+- 住宅改修のアプリ（ポータルの `jutaku-mitsumori/`・`sasaoka/`）の様邸の画面の「🛁 特定福祉用具申請書」のタブの中にも出る（ユーザーの指示「特定福祉用具アプリを出す」、2026-10-22）。
+  住宅改修はお客様の情報を localStorage `taiyo-tokutei-from-jutaku-v1` に書いてから `tokutei/index.html#jutaku=<様邸の id>&embed=1` を開く。
+  このアプリはその様邸の案件を開き（なければ作る）、住宅改修で変わった値だけ入れ直す（ここで手で直した値はそのまま。`src/tokutei/jutaku.ts`）。embed=1 のときは題名の段を出さない。
+  住宅改修がタブを替える前に `window.__taiyoTokuteiFlush`（保存の途中ならそれも待つ）で保存を待つ。受け渡しの形を変えるときは住宅改修の `src/sasaoka/tokuteiLink.ts` も直す
 
 ```
 npm run -s test:tokutei     # 単体テスト（計算・種目・取り込み・申請書・連動）
