@@ -1,6 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
 import {hasEstimateRows, jobName, startEstimate} from '../calc.ts';
+import {CardFill} from '../components/CardReader.tsx';
 import {EstimateSheet} from '../components/EstimateSheet.tsx';
 import {LaborPickerFor, missingShikiri, ShikiriPriceDialog} from '../components/JobTools.tsx';
 import {KitPicker} from '../components/Kits.tsx';
@@ -133,12 +134,14 @@ export function EstimateEditor({
       {/* 保存・Excel・印刷は画面のまん中（ユーザーの指示「Excelの印刷、保存ボタンを中央にもってくる」2026-10-22。申請書のタブの Excel も同じ所）。
           広い画面は 左・まん中・右 の3つに分け、まん中を画面のまん中にそろえる。白紙に戻す・発注書・複製・削除は右。狭い画面はまん中のボタンだけの行にして、そのまん中に */}
       <div className="flex flex-wrap items-center gap-2 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-        {/* 一覧へ戻る・様邸のタブは1段目に横いっぱい（4つのタブは左の列に入りきらない。どのタブでも同じ位置） */}
+        {/* 一覧へ戻る・様邸のタブは1段目に横いっぱい（4つのタブは左の列に入りきらない。どのタブでも同じ位置）。
+            介護保険証から入れるはタブのすぐ右（ユーザーの指示「上のタブの近辺に」） */}
         <div className="flex flex-wrap items-center gap-2 lg:col-span-3">
           <Btn color="white" onClick={onBack}>
             ← 一覧へ戻る
           </Btn>
           {tabs}
+          <CardFill job={job} setJob={setJob} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-lg font-bold text-[#14532d]">{name}</h1>

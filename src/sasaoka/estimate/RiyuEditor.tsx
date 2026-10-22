@@ -378,12 +378,14 @@ export function RiyuEditor({job, data, update, onBack, tabs}: {job: Job; data: A
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-        {/* 一覧へ戻る・様邸のタブは1段目に横いっぱい（4つのタブは左の列に入りきらない。どのタブでも同じ位置） */}
+        {/* 一覧へ戻る・様邸のタブは1段目に横いっぱい（4つのタブは左の列に入りきらない。どのタブでも同じ位置）。
+            介護保険証から入れるはタブのすぐ右（ユーザーの指示「上のタブの近辺に」） */}
         <div className="flex flex-wrap items-center gap-2 lg:col-span-3">
           <Btn color="white" onClick={onBack}>
             ← 一覧へ戻る
           </Btn>
           {tabs}
+          <CardFill job={job} setJob={setJob} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-lg font-bold text-[#14532d]">{job.customer.trim() ? jobName(job) : '新しい理由書'}</h1>
@@ -394,9 +396,7 @@ export function RiyuEditor({job, data, update, onBack, tabs}: {job: Job; data: A
             📗 理由書をExcelで保存
           </Btn>
         </div>
-        <div className="flex flex-wrap justify-end gap-2">
-          <CardFill job={job} setJob={setJob} />
-        </div>
+        <div />
       </div>
 
       <section role="status" aria-label="入っていない欄" className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">

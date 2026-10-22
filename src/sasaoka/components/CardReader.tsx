@@ -1,9 +1,11 @@
 // 介護保険証から入れる：ファイル（画像・PDF）を選ぶ・ドロップする → この端末の中で読む（cardOcr.ts）→ 確かめる画面で読めた値を直して入れる。
 // （ユーザーの指示「介護保険証をドラッグ＆ドロップで添付したら、全ての情報…入力必要項目が全て入力される」2026-10-22）
-// 申請書・理由書のタブの上（この様邸に入れる）と、見積もりの入口の新規作成（保険者も保険証から）にある。
+// 様邸の画面の4つのタブのすぐ右（この様邸に入れる）と、見積もりの入口の新規作成（保険者も保険証から）にある。
+// 画面をクリックしてから Ctrl+V で貼り付けてもよい（ユーザーの指示「上のタブの近辺に…ドラッグアンドドロップでも添付、もしくはクリックしてから挿入で貼り付け」2026-10-22。
+// スクリーンショットや、デスクトップでコピーしたファイル）。字を打つ欄にいるときの Ctrl+V は、ふつうの貼り付けのまま
 // 保険証の画像は保存せず、どこにも送らない（確かめる画面に出すだけ）
 
-import {useRef, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import type {DragEvent, ReactNode} from 'react';
 import {applyCard, birthText, CARD_FIELDS, currentOf, defaultPicks, fieldText, sameText} from '../cardApply.ts';
 import type {CardField} from '../cardApply.ts';
@@ -15,7 +17,7 @@ import type {Insurer, Job} from '../types.ts';
 import {Btn, Modal, TextInput, useToast} from './ui.tsx';
 
 /**
- * 介護保険証のボタン（押すとファイルを選ぶ。ファイルをこのボタンにドロップしてもよい）。読めたら onRead
+ * 介護保険証のボタン（押すとファイルを選ぶ。ファイルをこのボタンにドロップしても、画面で Ctrl+V で貼り付けてもよい）。読めたら onRead
  */
 export function CardDrop({onRead, children, className = '', big = false}: {onRead: (r: {read: CardRead; thumbs: string[]}) => void; children: ReactNode; className?: string; big?: boolean}) {
   const toast = useToast();
@@ -45,6 +47,25 @@ export function CardDrop({onRead, children, className = '', big = false}: {onRea
     setOver(false);
     void read(e.dataTransfer.files);
   };
+  // 画面で Ctrl+V：クリップボードの画像・PDF（files にないときは items から）を読む。読んでいるあいだ・字を打つ欄では何もしない
+  const reading = useRef(false);
+  reading.current = progress !== null;
+  const readLatest = useRef(read);
+  readLatest.current = read;
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      if (reading.current || !e.clipboardData) return;
+      const t = e.target instanceof Element ? e.target : null;
+      if (t?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
+      const fromItems = [...e.clipboardData.items].filter((i) => i.kind === 'file').map((i) => i.getAsFile());
+      const files = (e.clipboardData.files.length ? [...e.clipboardData.files] : fromItems.filter((f): f is File => f !== null)).filter(isCardFile);
+      if (files.length === 0) return;
+      e.preventDefault();
+      void readLatest.current(files);
+    };
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+  }, []);
   return (
     <>
       <button

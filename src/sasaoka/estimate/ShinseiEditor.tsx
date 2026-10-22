@@ -347,12 +347,14 @@ export function ShinseiEditor({
       {/* Excel で保存は画面のまん中（ユーザーの指示「Excelの印刷、保存ボタンを中央にもってくる」2026-10-22。見積書のタブの保存・Excel・印刷も同じ所）。
           広い画面は 左・まん中・右 の3つに分け、まん中を画面のまん中にそろえる。狭い画面はまん中のボタンだけの行にして、そのまん中に */}
       <div className="flex flex-wrap items-center gap-2 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-        {/* 一覧へ戻る・様邸のタブは1段目に横いっぱい（4つのタブは左の列に入りきらない。どのタブでも同じ位置） */}
+        {/* 一覧へ戻る・様邸のタブは1段目に横いっぱい（4つのタブは左の列に入りきらない。どのタブでも同じ位置）。
+            介護保険証から入れるはタブのすぐ右（ユーザーの指示「上のタブの近辺に」） */}
         <div className="flex flex-wrap items-center gap-2 lg:col-span-3">
           <Btn color="white" onClick={onBack}>
             ← 一覧へ戻る
           </Btn>
           {tabs}
+          <CardFill job={job} setJob={setJob} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-lg font-bold text-[#14532d]">{job.customer.trim() ? jobName(job) : '新しい申請書'}</h1>
@@ -365,9 +367,7 @@ export function ShinseiEditor({
             </Btn>
           )}
         </div>
-        <div className="flex flex-wrap justify-end gap-2">
-          <CardFill job={job} setJob={setJob} />
-        </div>
+        <div />
       </div>
 
       <section className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">

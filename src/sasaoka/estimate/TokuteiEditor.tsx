@@ -51,13 +51,10 @@ export function TokuteiEditor({job, onBack, tabs, update}: {job: Job; onBack: ()
           ← 一覧へ戻る
         </Btn>
         {tabs}
+        {/* 介護保険証から入れるは、ほかのタブと同じくタブのすぐ右 */}
+        {update && <CardFill job={job} setJob={setJob} />}
         <h1 className="text-lg font-bold text-[#14532d]">{job.customer.trim() ? jobName(job) : '新しい特定福祉用具申請書'}</h1>
         {insurer && <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-900">{INSURER_INFO[insurer].name}</span>}
-        {update && (
-          <span className="ml-auto">
-            <CardFill job={job} setJob={setJob} />
-          </span>
-        )}
       </div>
       <iframe
         key={frameKey}

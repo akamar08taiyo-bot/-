@@ -2,6 +2,7 @@
 //   架空の保険証（cardFixture.mjs。スキャンのような白黒・ざらつき・90°横向き）と負担割合証を、
 //   1. 申請書のタブの「🪪 介護保険証から入れる」で選ぶ（画像2枚）→ 確かめる画面（読めた値・今の値）→ 入れる → 申請書・理由書・見積書に出る
 //   2. 見積もりの入口の「🪪 介護保険証から新規作成」にドロップ（PDF）→ 保険者も保険証から → 新しい様邸の申請書のタブ
+//   3. ボタンは4つのタブのどれでもタブのすぐ右。画面をクリックしてから Ctrl+V（貼り付け）でも読む（字を打つ欄では読まない）
 //   読み取りの部品（tesseract.js・日本語のデータ）は手元の node_modules から（ネットにつながない）
 // usage: node e2e-card.mjs <サイトのURL> <出力フォルダ>
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
@@ -168,6 +169,47 @@ assert.equal(await page.getByRole('form', {name: '申請書'}).getByLabel('被�
 assert.match(await page.locator('h1').first().innerText(), /見本　次郎/);
 await page.screenshot({path: path.join(outDir, 'card-new.png'), fullPage: false});
 log('新規作成 OK');
+
+// ---------------- 3. 「🪪 介護保険証から入れる」は4つのタブのどれでも、1段目のタブのすぐ右（ユーザーの指示「上のタブの近辺に」）。
+//   画面をクリックしてから Ctrl+V で貼り付けても読む（「クリックしてから挿入で貼り付け」）。字を打つ欄での Ctrl+V は、ふつうの貼り付けのまま
+const cardBtn = page.getByRole('button', {name: '🪪 介護保険証から入れる'});
+const tablist = page.getByRole('tablist', {name: '住宅改修申請書・特定福祉用具申請書・工事見積書・理由書'});
+const lefts = [];
+for (const name of ['📝 住宅改修申請書', '🛁 特定福祉用具申請書', '📋 工事見積書', '📄 理由書']) {
+  await page.getByRole('tab', {name}).click();
+  await cardBtn.waitFor();
+  const [t, b] = [await tablist.boundingBox(), await cardBtn.boundingBox()];
+  assert.ok(b.x >= t.x + t.width && b.x - (t.x + t.width) < 24, `${name}：タブのすぐ右 ${JSON.stringify({t, b})}`);
+  assert.ok(Math.abs(b.y + b.height / 2 - (t.y + t.height / 2)) < 6, `${name}：タブと同じ段 ${JSON.stringify({t, b})}`);
+  lefts.push(Math.round(b.x));
+}
+assert.equal(new Set(lefts).size, 1, `どのタブでも同じ位置 ${lefts}`);
+await page.screenshot({path: path.join(outDir, 'card-button.png'), clip: {x: 0, y: 0, width: 1366, height: 260}});
+/** クリップボードの画像を貼り付ける（Ctrl+V。今いる所に paste を出す） */
+const pasteCard = () =>
+  page.evaluate(async (b64) => {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const d = new DataTransfer();
+    d.items.add(new File([bytes], 'image.png', {type: 'image/png'}));
+    (document.activeElement ?? document.body).dispatchEvent(new ClipboardEvent('paste', {clipboardData: d, bubbles: true, cancelable: true}));
+  }, cardRot.toString('base64'));
+// 工事見積書のタブで、字を打つ欄にいるときは読まない
+await page.getByRole('tab', {name: '📋 工事見積書'}).click();
+await page.locator('main input:visible').first().focus();
+assert.equal(await page.evaluate(() => document.activeElement?.tagName), 'INPUT');
+await pasteCard();
+await page.waitForTimeout(800);
+assert.equal(await page.getByRole('status', {name: '介護保険証を読んでいます'}).count(), 0);
+// 画面（見出し）をクリックしてから Ctrl+V → 読んで確かめる画面
+await page.locator('h1').first().click();
+await pasteCard();
+await page.getByRole('status', {name: '介護保険証を読んでいます'}).waitFor();
+const dialog3 = page.getByRole('dialog').filter({hasText: '介護保険証から入れる'});
+await dialog3.getByRole('table', {name: '読んだ値'}).waitFor({timeout: 240_000});
+assert.equal(await dialog3.getByRole('row', {name: '被保険者番号', exact: true}).getByLabel('被保険者番号（読んだ値）').inputValue(), '0000123456');
+await dialog3.getByRole('button', {name: 'キャンセル'}).click();
+await dialog3.waitFor({state: 'detached'});
+log('タブのすぐ右・貼り付け（Ctrl+V）OK');
 
 assert.deepEqual(errors, []);
 await browser.close();
