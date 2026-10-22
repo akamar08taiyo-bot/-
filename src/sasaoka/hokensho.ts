@@ -307,6 +307,20 @@ export function insurerOfName(name: string): {insurer: CardInsurer; name: string
 
 const CARE_NUM: Record<string, string> = {'1': '1', '2': '2', '3': '3', '4': '4', '5': '5', 一: '1', 二: '2', 三: '3', 四: '4', 五: '5'};
 
+/**
+ * 行の欄（タブで分けた字）と、ラベルのある欄の番号。ラベルの字が2つの欄に分かれて読めたとき（「住」と「所」の間があいた）は、その2つを1つの欄にする。
+ * 見つからなければ at は -1（行の字全体ではラベルに合っても、欄の中にはない）
+ */
+function labelCells(text: string, label: RegExp): {cells: string[]; at: number} {
+  const cells = text.split('\t');
+  let at = cells.findIndex((c) => label.test(c));
+  if (at < 0) {
+    at = cells.findIndex((c, i) => i + 1 < cells.length && label.test(`${c} ${cells[i + 1]}`));
+    if (at >= 0) cells.splice(at, 2, `${cells[at]} ${cells[at + 1]}`);
+  }
+  return {cells, at};
+}
+
 /** 氏名・フリガナの値：ラベル（氏名・フリガナ・被保険者の字）とごみを除き、姓と名の間を全角の空白1つに */
 function personName(raw: string, kana: boolean): string {
   const t = raw
@@ -318,8 +332,135 @@ function personName(raw: string, kana: boolean): string {
   return parts.join('　');
 }
 
+// ---------------------------------------------------------------- 居宅介護支援事業者
+
+/**
+ * 居宅介護支援事業者の欄の名前と届出年月日（ISO。読めなければ ''）と欄の位置。
+ * 事業所を替えると、下のますに次の事業所と届出年月日が書かれる（ますは3つ。名前の下か右に「届出年月日」）
+ */
+export type OfficeEntry = {name: string; date: string; x0: number; x1: number; y0: number; y1: number; dateBox: {x0: number; x1: number; y0: number; y1: number} | null};
+
+const OFFICE_LABEL = /居宅介護|援事業者|介護予防|事業所の|及びその|居宅介護支援事業者/;
+const OFFICE_LABEL_TEXT = '居宅介護支援事業者又は介護予防支援事業者及びその事業所の名称';
+/** ラベルにしかない言葉（名前の「〜居宅介護支援事業所」とまちがえない） */
+const OFFICE_LABEL_STRONG = /居宅介護支援事業者|事業者又|又は介護|介護予防|及びその|の名称/;
+const OFFICE_WORD = /(センター|事業所|ケア|プラン|支援|居宅|介護|ステーション|サービス|苑|園|会)/;
+const OFFICE_END = /(センター|事業所|ステーション|ケアプラン|支援室|相談所)$/;
+const TODOKE = /届\s*出\s*年\s*月\s*日/;
+/** 届出年月日でない日付（給付制限の開始・終了、介護保険施設の入所・退所） */
+const NOT_TODOKE = /開始|終了|入所|退所|認定|有効|交付|適用/;
+/** ここから下は介護保険施設の欄 */
+const OFFICE_STOP = /介護保険施設|入所|退所/;
+
+/**
+ * 居宅介護支援事業者の欄の名前（上から順に）。ラベルが読めればラベルの行の上下（ラベルはますの縦のまん中にある）の、
+ * ラベルから右の欄。読めなければ「〜センター」「〜事業所」などで終わる欄から下。
+ * 届出年月日は、すぐ上（または同じ欄の左）の名前のもの
+ */
+function officesOf(byY: Row[], kind: 'card' | 'futan' | null): OfficeEntry[] {
+  const hs = byY.map((r) => r.y1 - r.y0).sort((a, b) => a - b);
+  const lh = Math.max(8, hs[Math.floor(hs.length / 2)] ?? 20);
+  // ラベルの欄：ラベルだけの言葉（「事業者又は」「及びその」など）か、居宅介護などで始まって事業所の名前の形で終わらない欄（「〜居宅介護支援事業所」は名前）
+  const isLabel = (c: Cell) => {
+    const t = squeeze(c.text);
+    return OFFICE_LABEL_STRONG.test(t) || (OFFICE_LABEL.test(t) && !OFFICE_END.test(t));
+  };
+  const labelRow = byY.find((r) => r.cells.some(isLabel));
+  const labelCell = labelRow?.cells.find(isLabel);
+  const nameOf = (raw: string): string => {
+    const t = squeeze(raw);
+    if (labelCell) {
+      // ラベルと同じ欄に読めたとき（間があいていない）は、ラベルの字を除いた残り
+      const n = t.replace(/^.*(?:居宅介護支援事業者|介護予防支援事業者|事業所の名称|名称|事業所の|及びその事業所の)/, '');
+      // ラベルの字（の切れはし）は名前にしない。「〜居宅介護支援事業所」のような名前は取る
+      const label = OFFICE_LABEL_TEXT.includes(n) || (OFFICE_LABEL.test(n) && !OFFICE_END.test(n));
+      return n.length >= 3 && n.length <= 30 && !label && OFFICE_WORD.test(n) && !/届出|年月日|及び|その|名称|又は/.test(n) ? n.replace(/[^々〆ぁ-ゖァ-ヺー一-鿿A-Za-z0-9・]/g, '') : '';
+    }
+    return OFFICE_END.test(t) && t.length >= 4 && t.length <= 30 && !/年月日|区分|基準|種類|及び|その|名称|又は|予防/.test(t)
+      ? t.replace(/^[^一-鿿々ぁ-ゖァ-ヺA-Za-z]*/, '').replace(/[^々〆ぁ-ゖァ-ヺー一-鿿A-Za-z0-9・]/g, '')
+      : '';
+  };
+  let left: number;
+  let top: number;
+  if (labelRow && labelCell) {
+    left = labelCell.x0 - lh;
+    top = labelRow.y0 - lh * 4;
+  } else {
+    if (kind === 'futan') return [];
+    const first = byY.flatMap((r) => r.cells).find((c) => nameOf(c.text.split(TODOKE)[0]));
+    if (!first) return [];
+    left = first.x0 - lh * 3;
+    top = first.y0 - lh * 0.5;
+  }
+  const wordsOf = (r: Row, c: Cell) => r.words.filter((w) => w.x0 >= c.x0 - 1 && w.x1 <= c.x1 + 1);
+  // 名前の列の左：ラベルの列の字（読み違えた切れはし）が名前の前に付いて1つの欄に読めることがあるので、
+  // ラベルの列より右の「届出年月日」の字の左（名前のうしろに続く届出年月日は数えない）から右の語だけで名前を読む
+  let valueX: number | null = null;
+  if (labelCell) {
+    const xs: number[] = [];
+    for (const r of byY) {
+      if (r.y1 < top || r.y0 > (labelRow?.y1 ?? 0) + lh * 12) continue;
+      for (const c of r.cells.filter((x) => x.x1 > left)) {
+        const ws = wordsOf(r, c);
+        const i = ws.findIndex((w) => /届|出年月日/.test(w.text));
+        if (i >= 0 && ws[i].x0 > labelCell.x0 + lh && !nameOf(ws.slice(0, i).map((w) => w.text).join(''))) xs.push(ws[i].x0);
+      }
+    }
+    xs.sort((a, b) => a - b);
+    if (xs.length) valueX = xs[Math.floor(xs.length / 2)];
+  }
+  const cutAt = (t: string) => {
+    const tm = TODOKE.exec(t);
+    const dm = new RegExp(DATE).exec(t);
+    return tm ? tm.index : dm ? dm.index : t.length;
+  };
+  const out: OfficeEntry[] = [];
+  for (const r of byY) {
+    if (r.y1 < top) continue;
+    const cells = r.cells.filter((c) => c.x1 > left);
+    if (cells.some((c) => OFFICE_STOP.test(squeeze(c.text)))) break;
+    const last = out[out.length - 1];
+    if (last && r.y0 - Math.max(last.y1, last.dateBox?.y1 ?? 0) > lh * 8) break;
+    if (!last && labelRow && r.y0 > labelRow.y1 + lh * 8) break;
+    for (const c of cells) {
+      // 名前（名前の列の語だけ）と届出年月日（欄の字のまま。届出年月日・日付から右）
+      const kept = valueX === null ? wordsOf(r, c) : wordsOf(r, c).filter((w) => w.x0 >= valueX - lh * 0.6);
+      const kt = kept.length ? lineCells({words: kept}).map((x) => x.text).join(' ') : '';
+      const name = kt ? nameOf(kt.slice(0, cutAt(kt))) : '';
+      if (name) out.push({name, date: '', x0: Math.min(...kept.map((w) => w.x0)), x1: c.x1, y0: c.y0, y1: c.y1, dateBox: null});
+      const datePart = c.text.slice(cutAt(c.text));
+      const m = new RegExp(DATE).exec(datePart);
+      const e = out[out.length - 1];
+      if (!m || NOT_TODOKE.test(squeeze(datePart)) || !e || e.date) continue;
+      const iso = warekiIso(m[1], m[2], m[3], m[4]);
+      if (iso && c.y0 >= e.y0 - lh * 0.5 && c.y0 - e.y1 < lh * 4 && c.x1 > e.x0 - lh * 3) {
+        e.date = iso;
+        e.dateBox = {x0: c.x0, x1: c.x1, y0: c.y0, y1: c.y1};
+      }
+    }
+  }
+  return out;
+}
+
+/** 読んだページの居宅介護支援事業者の欄（上から順に） */
+export function officeEntries(page: OcrPage): OfficeEntry[] {
+  const rows = rowsOf(page).sort((a, b) => a.y0 - b.y0);
+  const flat = squeeze(rows.map((r) => r.text).join(''));
+  return officesOf(rows, /負担割合証|利用者負担の割合|利用者負担|適用期間/.test(flat) ? 'futan' : 'card');
+}
+
+/**
+ * いま担当の居宅介護支援事業者：届出年月日がいちばん新しいもの（ユーザーの指示「一番最新の届け出…直近の令和8年4月1日に担当している…」）。
+ * 届出年月日が読めなければ、いちばん下（ますは上から順に書かれる）
+ */
+export function latestOffice(entries: OfficeEntry[]): OfficeEntry | undefined {
+  const dated = entries.filter((e) => e.date);
+  if (dated.length) return dated.reduce((a, b) => (b.date >= a.date ? b : a));
+  return entries[entries.length - 1];
+}
+
 /** ページ1枚から取り出す（読めた項目だけ） */
-function parsePage(page: OcrPage): {info: Partial<CardInfo>; unsure: Set<CardKey>; weak: Set<CardKey>; doubt: Set<CardKey>; kind: 'card' | 'futan' | null; conf: Partial<Record<CardKey, number>>} {
+function parsePage(page: OcrPage): {info: Partial<CardInfo>; unsure: Set<CardKey>; weak: Set<CardKey>; doubt: Set<CardKey>; kind: 'card' | 'futan' | null; conf: Partial<Record<CardKey, number>>; offices: OfficeEntry[]} {
   const rows = rowsOf(page);
   const all = rows.map((r) => r.text).join('\n');
   const flat = squeeze(all);
@@ -381,9 +522,8 @@ function parsePage(page: OcrPage): {info: Partial<CardInfo>; unsure: Set<CardKey
   if (!info.address) {
     const r = byY.find((x) => /住\s*所/.test(x.text));
     if (r) {
-      const cells = r.text.split('\t');
-      const at = cells.findIndex((c) => /住\s*所/.test(c));
-      const rest = squeeze(cells[at].replace(/.*?住\s*所/, '')) || squeeze(cells[at + 1] ?? '');
+      const {cells, at} = labelCells(r.text, /住\s*所/);
+      const rest = at < 0 ? '' : squeeze(cells[at].replace(/.*?住\s*所/, '')) || squeeze(cells[at + 1] ?? '');
       const addr = rest.replace(/^〒?\d{3}-?\d{4}/, '').replace(/^[^一-鿿ぁ-ヿ]+/, '');
       if (/[市町村郡]/.test(addr) && addr.length >= 4) {
         info.address = addr;
@@ -397,8 +537,8 @@ function parsePage(page: OcrPage): {info: Partial<CardInfo>; unsure: Set<CardKey
   if (kanaRow >= 0) {
     // ラベルのある欄の残り（なければ次の欄）。ほかの面の欄は入れない
     const cellAfter = (text: string, label: RegExp) => {
-      const cells = text.split('\t');
-      const at = cells.findIndex((c) => label.test(c));
+      const {cells, at} = labelCells(text, label);
+      if (at < 0) return '';
       const rest = cells[at].replace(new RegExp('.*?' + label.source), '').trim();
       return rest || cells[at + 1] || '';
     };
@@ -408,10 +548,9 @@ function parsePage(page: OcrPage): {info: Partial<CardInfo>; unsure: Set<CardKey
   const NAME_LABEL = /[氏民岳氐]\s*名(?!称)/;
   const nameRow = rows.findIndex((r) => NAME_LABEL.test(r.text) && !/名称/.test(r.text));
   if (nameRow >= 0) {
-    const cells = rows[nameRow].text.split('\t');
-    const at = cells.findIndex((c) => NAME_LABEL.test(c));
-    const rest = cells[at].replace(new RegExp('.*?' + NAME_LABEL.source), '').trim();
-    const n = personName((rest || cells[at + 1] || '').split(/(?=生年月日)/)[0], false);
+    const {cells, at} = labelCells(rows[nameRow].text, NAME_LABEL);
+    const rest = at < 0 ? '' : cells[at].replace(new RegExp('.*?' + NAME_LABEL.source), '').trim();
+    const n = at < 0 ? '' : personName((rest || cells[at + 1] || '').split(/(?=生年月日)/)[0], false);
     if (n.replace(/　/g, '').length >= 2) info.name = n;
     else if (kanaRow >= 0 && nameRow === kanaRow && rows[nameRow + 1]) {
       const n2 = personName(rows[nameRow + 1].text, false);
@@ -474,33 +613,12 @@ function parsePage(page: OcrPage): {info: Partial<CardInfo>; unsure: Set<CardKey
     if (term.doubt) doubtKeys.add('careFrom').add('careTo');
   }
 
-  // 居宅介護支援事業者：ラベル（折り返して何行かにわたる）の行の、ラベルより右の欄。届出年月日は除く
-  const officeLabel = /居宅介護|援事業者|介護予防|事業所の|及びその|居宅介護支援事業者/;
-  const officeRows = rows.filter((r) => officeLabel.test(squeeze(r.text)));
-  for (const r of officeRows) {
-    const label = r.cells.find((c) => officeLabel.test(squeeze(c.text)));
-    // ラベルと同じ欄に読めたとき（間があいていない）は、ラベルの字を除いた残り
-    const cand = r.cells
-      .filter((c) => c !== label || !/^(居宅介護支援事業者|居宅介護支|援事業者又?|は介護予防|支援事業者|及びその事|業所の名称)$/.test(squeeze(c.text)))
-      .map((c) => squeeze(c.text.replace(/届\s*出\s*年\s*月\s*日.*$/, '')).replace(/^.*(?:居宅介護支援事業者|介護予防支援事業者|事業所の名称|名称|事業所の|及びその事業所の)/, ''))
-      .find((t) => t.length >= 3 && !officeLabel.test(t) && /(センター|事業所|ケア|プラン|支援|居宅|介護|ステーション|サービス|苑|園|会)/.test(t) && !/届出|年月日|及び|その|名称|又は/.test(t));
-    if (cand) {
-      info.office = cand.replace(/[^々〆ぁ-ゖァ-ヺー一-鿿A-Za-z0-9・]/g, '');
-      unsure.add('office');
-      break;
-    }
-  }
-
-  if (!info.office && kind !== 'futan') {
-    // ラベルが読めないとき：「〜センター」「〜事業所」などで終わる欄（届出年月日のついた欄）
-    for (const r of byY) {
-      const c = r.cells.map((x) => squeeze(x.text.replace(/届\s*出\s*年\s*月\s*日.*$/, ''))).find((t) => /(センター|事業所|ステーション|ケアプラン|支援室|相談所)$/.test(t) && t.length >= 4 && t.length <= 30 && !/年月日|区分|基準|種類|及び|その|名称|又は|予防/.test(t));
-      if (c) {
-        info.office = c.replace(/^[^一-鿿々ぁ-ゖァ-ヺA-Za-z]*/, '').replace(/[^々〆ぁ-ゖァ-ヺー一-鿿A-Za-z0-9・]/g, '');
-        unsure.add('office');
-        break;
-      }
-    }
+  // 居宅介護支援事業者：何件か届け出ていれば、届出年月日がいちばん新しい名前（officesOf）
+  const offices = officesOf(byY, kind);
+  const office = latestOffice(offices);
+  if (office) {
+    info.office = office.name;
+    unsure.add('office');
   }
 
   // 利用者負担の割合（「1割」。ラベルの「負担割合」の「割合」は取らない）と適用期間
@@ -608,7 +726,7 @@ function parsePage(page: OcrPage): {info: Partial<CardInfo>; unsure: Set<CardKey
     const cs = r?.words.map((w) => w.conf).filter((c): c is number => typeof c === 'number') ?? [];
     if (cs.length) conf[k] = cs.reduce((a, b) => a + b, 0) / cs.length;
   }
-  return {info, unsure, weak, doubt: doubtKeys, kind, conf};
+  return {info, unsure, weak, doubt: doubtKeys, kind, conf, offices};
 }
 
 /**
@@ -626,10 +744,16 @@ export function parseCard(pages: OcrPage[]): CardRead {
   const keys = Object.keys(NO_CARD) as CardKey[];
   // 生年月日・有効期間は、項目をばらばらにせず組で選ぶ
   const groups: CardKey[][] = [['era', 'birthY', 'birthM', 'birthD'], ['careFrom', 'careTo'], ['burdenFrom', 'burdenTo'], ['insurer', 'insurerName'], ['zip'], ['address'], ...keys.filter((k) => !['era', 'birthY', 'birthM', 'birthD', 'careFrom', 'careTo', 'burdenFrom', 'burdenTo', 'insurer', 'insurerName', 'zip', 'address'].includes(k)).map((k) => [k])];
+  // 居宅介護支援事業者：どれかのページで届出年月日の古い方と分かった名前は選ばない（切り出して読んだページには届出年月日がないことがある）
+  const dated = parsed.flatMap((p) => p.offices.filter((e) => e.date));
+  const newestDate = dated.reduce((a, e) => (e.date > a ? e.date : a), '');
+  const newestNames = new Set(dated.filter((e) => e.date === newestDate).map((e) => e.name));
+  const oldNames = new Set(dated.filter((e) => e.date < newestDate && !newestNames.has(e.name)).map((e) => e.name));
   for (const g of groups) {
     const votes = new Map<string, {n: number; first: number; sure: boolean; weak: boolean; doubt: boolean; conf: number; values: Partial<CardInfo>}>();
     order.forEach(({p}, rank) => {
       if (!g.every((k) => p.info[k])) return;
+      if (g[0] === 'office' && oldNames.has(p.info.office ?? '')) return;
       const sure = !g.some((k) => p.unsure.has(k));
       const key = g.map((k) => p.info[k]).join('|') + (sure ? '' : '?');
       const v = votes.get(key) ?? {n: 0, first: rank, sure, weak: true, doubt: false, conf: 0, values: Object.fromEntries(g.map((k) => [k, p.info[k]]))};

@@ -15,6 +15,7 @@ React 19 ＋ TypeScript ＋ Vite（Tailwind）。リポジトリにはほかの�
 | ファイル | 何をするか |
 |---|---|
 | `App.tsx` | 4つのタブ（📝 見積もり・申請書を作成する／🧾 請求書を確認する／📦 部材・施工費マスタ／⚙ 設定）、新しい版の帯、印刷の画面の開閉、発注書の画面の開閉 |
+| `noZoom.ts` | iPhone・iPad で欄を押したときに画面を拡大しない（viewport に maximum-scale=1。`main.tsx`・`estimate/main.tsx` で読み込む） |
 | `links.ts` | URL のうしろの `#tab=…&job=…&view=order`（読み直しても同じ所を開く）、ポータルの URL |
 | `types.ts` | データの形（Material・LaborItem・Row・Place・Kit・Job・OrderLine・OrderEdits・Settings・Insurer…） |
 | `calc.ts` | 金額の計算（仕切り計算表 ①〜⑦、見積の単価・数量・金額・合計、`isBlankRow`、`cutToLength`、空欄の価格の扱い）。見積書に行があるか `hasEstimateRows`・見積書を書きはじめたとき（見積もり作成日・請求書に入れる）`startEstimate` |

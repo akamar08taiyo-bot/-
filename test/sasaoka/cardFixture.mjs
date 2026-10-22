@@ -18,6 +18,9 @@ export const CARD_PERSON = {
   care: '要介護２',
   careDate: '令和 6年 3月 1日',
   careTerm: '令和 6年 4月 1日 ～ 令和 9年 3月31日',
+  // 居宅介護支援事業者は2件（前の事業所の下に、いまの事業所）。読むのは届出年月日の新しい方
+  oldOffice: '見本居宅介護支援事業所',
+  oldOfficeDate: '令和 5年 3月 1日',
   office: '見本ケアプランセンター',
   officeDate: '令和 6年 4月 1日',
   burden: '１割',
@@ -76,7 +79,8 @@ function panel3(p) {
     <table>
       <tr><td class="lbl small" rowspan="2">給付制限</td><td>内容</td><td class="small">開始年月日<br>終了年月日</td></tr>
       <tr><td></td><td class="small">開始年月日<br>終了年月日</td></tr>
-      <tr><td class="lbl small" rowspan="2" style="font-size:11px">居宅介護支援事業者又は介護予防支援事業者及びその事業所の名称</td><td colspan="2">${p.office}<br><span class="small">届出年月日 ${p.officeDate}</span></td></tr>
+      <tr><td class="lbl small" rowspan="3" style="font-size:11px">居宅介護支援事業者又は介護予防支援事業者及びその事業所の名称</td><td colspan="2">${p.oldOffice}<br><span class="small">届出年月日 ${p.oldOfficeDate}</span></td></tr>
+      <tr><td colspan="2">${p.office}<br><span class="small">届出年月日 ${p.officeDate}</span></td></tr>
       <tr><td colspan="2"><span class="small">届出年月日</span></td></tr>
       <tr><td class="lbl small" rowspan="2">介護保険施設等</td><td class="small">種類　名称</td><td class="small">入所等年月日<br>退所等年月日</td></tr>
       <tr><td class="small">種類　名称</td><td class="small">入所等年月日<br>退所等年月日</td></tr>

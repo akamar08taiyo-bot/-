@@ -428,7 +428,11 @@ export function ShinseiEditor({
                   onFocus={() => setActive(f)}
                   className={`border-b border-slate-300 last:border-b-0 sm:grid sm:grid-cols-[9.5rem_1fr] ${active === f ? 'relative z-[1] outline outline-2 -outline-offset-2 outline-sky-500' : ''}`}
                 >
-                  <div className="flex items-center border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-bold text-slate-700 sm:border-b-0 sm:border-r sm:border-slate-300 sm:py-2">{label(f, insurer)}</div>
+                  <div className="flex flex-wrap items-center border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-bold text-slate-700 sm:border-b-0 sm:border-r sm:border-slate-300 sm:py-2">
+                    {label(f, insurer)}
+                    {/* ユーザーの指示「振り仮名の横に括弧で、ひらがな入力でも自動的にカタカナに変換…を記載する」 */}
+                    {f === 'kana' && <span className="text-xs font-normal text-slate-500">（ひらがなで入力してもカタカナになります）</span>}
+                  </div>
                   <div className={`flex min-w-0 flex-wrap items-center gap-2 px-3 py-2 ${missing[f] ? 'bg-amber-50' : ''}`}>{row(f, insurer)}</div>
                 </div>
               ))}

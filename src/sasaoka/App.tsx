@@ -477,7 +477,7 @@ export default function App({start}: {start: MainTab}) {
                 {(
                   [
                     ['materials', `部材リスト（${data.materials.length}件）`],
-                    ['labor', `施工費（笹岡工務店の手間・${data.labor.length}項目）`],
+                    ['labor', `施工費（${data.labor.length}項目）`],
                     ['kits', `部材＋施工費（常用・${data.kits.length}件）`],
                   ] as const
                 ).map(([id, label]) => (

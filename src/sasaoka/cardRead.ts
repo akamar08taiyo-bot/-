@@ -8,7 +8,7 @@
 
 import {cropGray, despeckle, inkAdaptive, removeLines, rotateGray, scaleGray, textIsVertical, valueRect, verticalLines} from './cardImage.ts';
 import type {Gray, Rect} from './cardImage.ts';
-import {cardScore, fixOcr, locateValues} from './hokensho.ts';
+import {cardScore, fixOcr, latestOffice, locateValues, officeEntries} from './hokensho.ts';
 import type {OcrLine, OcrPage, OcrWord} from './hokensho.ts';
 
 /** 読み方：auto（ページ全体・段組みを見る）・block（ひとかたまりの文）・line（1行）・digits（数字だけ・1行／かたまり）・date（和暦の日付の字だけ）・kana（カタカナだけ） */
@@ -303,11 +303,24 @@ export async function readCardImage(src: Gray, recognize: Recognize, onStep: (st
     const lh = lhOf(r) / 1;
     add(withLabel('認定の有効期間', {x0: r.x0 - lh * 8, y0: r.y0, x1: r.x0 - lh * 6, y1: r.y1}, doubt(await readRect(clean, {x0: r.x0 - lh * 0.3, y0: r.y0 - lh * 0.3, x1: r.x1 + lh * 8, y1: r.y1 + lh * 0.3}, 'range', recognize, lh, OK.term))));
   }
-  for (const r of findAll(/(センター|事業所|ステーション|ケアプラン|支援室)(?!の名称)/).slice(0, 2)) {
-    const lh = lhOf(r);
-    // 左は、事業所の名前のますの左の罫線まで（ラベルの字を入れない）
-    const left = verticalLines(ink, img.w, img.h, r.y0, r.y1).filter((x) => x < r.x0 - lh && x > r.x0 - lh * 22).pop() ?? r.x0 - lh * 14;
-    add(withLabel('居宅介護支援事業者', {x0: left - lh * 6, y0: r.y0, x1: left - lh * 4, y1: r.y1}, await readRect(clean, {x0: left + 3, y0: r.y0 - lh * 0.35, x1: r.x1 + lh * 0.5, y1: r.y1 + lh * 0.35}, 'line', recognize, lh)));
+  // 居宅介護支援事業者：届出年月日のちがう名前がいくつか読めたら、いちばん新しい届出のます（名前と届出年月日）だけを読み直す
+  // （古い事業所の名前を読み直さない。ユーザーの指示「直近の…に担当している居宅介護支援事業者名を読む」）
+  const offices = pages.flatMap((p) => officeEntries(p));
+  const newest = latestOffice(offices);
+  const several = !!newest?.date && offices.some((e) => e.date && e.date !== newest.date);
+  if (newest && several) {
+    const lh = lhOf(newest);
+    const d = newest.dateBox ?? newest;
+    const left = verticalLines(ink, img.w, img.h, newest.y0, newest.y1).filter((x) => x < newest.x0 - lh * 0.3 && x > newest.x0 - lh * 22).pop() ?? newest.x0 - lh * 0.5;
+    const r = {x0: left + 3, y0: newest.y0 - lh * 0.35, x1: Math.max(newest.x1, d.x1) + lh * 0.5, y1: Math.max(newest.y1, d.y1) + lh * 0.35};
+    add(withLabel('居宅介護支援事業者', {x0: left - lh * 6, y0: newest.y0, x1: left - lh * 4, y1: newest.y1}, await readRect(clean, r, 'block', recognize, lh)));
+  } else {
+    for (const r of findAll(/(センター|事業所|ステーション|ケアプラン|支援室)(?!の名称)/).slice(0, 2)) {
+      const lh = lhOf(r);
+      // 左は、事業所の名前のますの左の罫線まで（ラベルの字を入れない）
+      const left = verticalLines(ink, img.w, img.h, r.y0, r.y1).filter((x) => x < r.x0 - lh && x > r.x0 - lh * 22).pop() ?? r.x0 - lh * 14;
+      add(withLabel('居宅介護支援事業者', {x0: left - lh * 6, y0: r.y0, x1: left - lh * 4, y1: r.y1}, await readRect(clean, {x0: left + 3, y0: r.y0 - lh * 0.35, x1: r.x1 + lh * 0.5, y1: r.y1 + lh * 0.35}, 'line', recognize, lh)));
+    }
   }
 
   const L = labels;
@@ -328,7 +341,7 @@ export async function readCardImage(src: Gray, recognize: Recognize, onStep: (st
   }
   if (L.care) add(withLabel('要介護状態区分等', L.care, await readRect(clean, cell(L.care, band(L.care, 0.8, 1.2)), 'block', recognize, lhOf(L.care), OK.care)));
   if (L.term) add(withLabel('認定の有効期間', L.term, await readRect(clean, cell(L.term, band(L.term, 0.7, 1.6)), 'block', recognize, lhOf(L.term), OK.term)));
-  if (L.office) add(withLabel('居宅介護支援事業者', L.office, await readRect(clean, cell(L.office, band(L.office, 0.8, 3.5)), 'block', recognize, lhOf(L.office))));
+  if (L.office && !several) add(withLabel('居宅介護支援事業者', L.office, await readRect(clean, cell(L.office, band(L.office, 0.8, 3.5)), 'block', recognize, lhOf(L.office))));
   if (L.insurer) {
     const lh = lhOf(L.insurer);
     const r = cell(L.insurer, band(L.insurer, 2.5, 1.0));

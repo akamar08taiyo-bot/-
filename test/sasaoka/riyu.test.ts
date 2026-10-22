@@ -37,7 +37,7 @@ const RIYU_INFO: RiyuInfo = {
   acts: {
     ...NO_RIYU.acts,
     toilet: {items: [0, 2], itemOther: '夜間の移動', trouble: '廊下に手すりがなく、ふらつく', purposes: [1, 2], purposeOther: '', policy: '手すりを付けて、安全に移動できるようにする'},
-    home: {items: [], itemOther: '居間から寝室への移動', trouble: '', purposes: [5], purposeOther: '見守りを減らす', policy: ''},
+    home: {items: [0], itemOther: '居間から寝室への移動', trouble: '', purposes: [5], purposeOther: '見守りを減らす', policy: ''},
   },
 };
 
@@ -100,8 +100,8 @@ test('理由書に転記：基本情報・作成者・総合的状況・福祉�
   assert.equal(text('B52'), '■その他(夜間の移動)');
   assert.deepEqual([text('M45'), text('AD45')], [RIYU_INFO.acts.toilet.trouble, RIYU_INFO.acts.toilet.policy]);
   assert.deepEqual([text('X45'), text('X47'), text('X48')], ['□できなかったことをできる', '■転倒等の防止、安全の確保', '■動作の容易性の確保']);
-  // 自宅内の移動：① は空いた欄に。③ のその他（かっこの中）
-  assert.equal(text('B72'), '居間から寝室への移動');
+  // 自宅内の移動：① は空いた欄に先頭の□（■）と文。③ のその他（かっこの中）
+  assert.equal(text('B72'), '■居間から寝室への移動');
   assert.equal(text('X79'), '■その他(見守りを減らす)');
   // ④：手すり（①廊下・②トイレ）と段差の解消（③玄関）
   assert.deepEqual([text('AJ47'), text('AL48'), text('AL50'), text('AJ56'), text('AL57'), text('AJ63')], ['■　手摺取付', '①廊下', '②トイレ', '■　段差の解消', '③玄関', '□　引き戸等への扉の取替え']);
@@ -111,6 +111,7 @@ test('理由書：何も入れていなければ原本のまま（□・空欄�
   const blank = job({shinsei: {...NO_SHINSEI}, insuredNo: '', customer: '', address: '', places: []});
   const {text, drawing} = sheetOf(fillShinsei(RIYU, RIYU_MAP, riyuValues(blank, RATES, '2026-10-22')));
   assert.deepEqual([text('C6'), text('P4'), text('Z4'), text('AA4'), text('S7'), text('W8').includes('■'), text('AJ47')], ['', '', '□男', '□女', '', false, '□　手摺取付']);
+  assert.equal(text('B72'), '□'); // 自宅内の移動の ① も、ほかの段と同じく空白の□
   assert.equal((drawing.match(/prst="ellipse"/g) ?? []).length, 1); // 元号は選んでいなければ昭和（申請書と同じ）
   const many = job({places: ['廊下', 'トイレ', '玄関', '浴室', '居間', '寝室'].map((n) => place(n, [mat('手すり')]))});
   const v = riyuCells(many, RATES, '2026-10-22');
@@ -124,6 +125,7 @@ test('理由書の項目を読み込むときにそろえる（前のデータ�
   assert.equal(r.checkDate, '');
   assert.deepEqual(r.equipment, {歩行器: {before: true}});
   assert.deepEqual([r.acts.toilet.items, r.acts.toilet.purposes], [[0], [1, 5]]);
+  assert.deepEqual(cleanRiyu({acts: {home: {items: [0, 1], itemOther: '居間'}}}).acts.home.items, [0]); // 自宅内の移動は先頭の□だけ
 });
 
 test('理由書のプレビュー：2ページ（P1・P2）。欄を押すと一覧の項目へ', () => {

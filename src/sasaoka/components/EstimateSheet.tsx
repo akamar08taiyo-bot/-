@@ -726,7 +726,7 @@ export function EstimateSheet({
           📋 部材リストから入れる
         </button>
         <button type="button" className="sheet-tool tool-labor" onClick={() => onPickLabor(place?.id ?? null, row?.id ?? null)}>
-          🔧 施工費（笹岡工務店の手間）から入れる
+          🔧 施工費から入れる
         </button>
         <button type="button" className="sheet-tool tool-kit" onClick={() => onPickKit(place?.id ?? null, row?.id ?? null)}>
           ＋ 部材＋施工費（常用）から入れる

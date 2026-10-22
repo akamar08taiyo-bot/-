@@ -188,7 +188,7 @@ export type ShinseiInfo = ShinseiMarks & {
 /** 理由書の「活動」（P2 の4つの段）。① 改善をしようとしている生活動作・② 困難な状況・③ 改修目的と改修の方針 */
 export type RiyuAct = {
   items: number[]; // ① の□を■にする項目（RIYU_ACTS の items の番号）
-  itemOther: string; // ① のその他（自宅内の移動は ① の全部）
+  itemOther: string; // ① のその他（自宅内の移動は ① の全部。先頭の□は items の 0）
   trouble: string; // ② 具体的な困難な状況
   purposes: number[]; // ③ 改修目的・期待効果（RIYU_PURPOSES の番号）
   purposeOther: string; // ③ のその他

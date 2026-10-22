@@ -97,7 +97,7 @@ const text = (xml, ref) => (/<t[^>]*>([\s\S]*?)<\/t>/.exec(new RegExp(`<c r="${r
 const preview = page.getByLabel('申請書のプレビュー');
 /** 一覧（入れる所） */
 const form = page.getByRole('form', {name: '申請書'});
-const rowLabels = () => form.locator(':scope > div[data-field] > div:first-child').allInnerTexts();
+const rowLabels = async () => (await form.locator(':scope > div[data-field] > div:first-child').allInnerTexts()).map((t) => t.replace(/\s*（ひらがなで入力してもカタカナになります）$/, ''));
 /** プレビューの1枚（原本のシート） */
 const pageOf = (name) => preview.getByRole('group', {name, exact: true});
 const pageNames = () => preview.getByRole('group').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
@@ -162,6 +162,7 @@ assert.equal(await page.getByRole('dialog').count(), 0);
 // 一覧は行橋市の申請書の順番（氏名が番号の前）。着工予定日はない（空白のまま。ユーザーの指示）
 assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '完成予定日', '改修予定費用']);
 assert.equal(await form.getByLabel('着工予定日').count(), 0);
+assert.match(await form.locator('div[data-field="kana"] > div:first-child').innerText(), /^フリガナ\s*（ひらがなで入力してもカタカナになります）$/);
 let pv = await preview.innerText();
 for (const t of ['介護保険居宅（ 介護・介護予防 ）住宅改修費受領委任払い申請書', '被保険者氏名', '（サンプル）山田', '福岡県行橋市中央1-1', '①玄関　手すりの取り付け　L=600mm', '②トイレ　手すりの取り付け', '26,950']) {
   assert.ok(pv.includes(t), `プレビューに「${t}」がない`);

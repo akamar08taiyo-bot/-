@@ -89,7 +89,10 @@ assert.equal(await val('保険者').inputValue(), 'yukuhashi');
 assert.equal(await val('利用者負担の割合').inputValue(), '1');
 assert.match(await val('住所').inputValue(), /^行橋市中央一丁目1番1号$/);
 // 氏名・フリガナは読み違いがあるかもしれないので直せる。直したら、その行にチェックが付く
+// （読んだ値がもう同じときも、いったん替えてから直す）
+await val('氏名').fill('見本');
 await val('氏名').fill('見本　花子');
+await val('フリガナ').fill('ミホン');
 await val('フリガナ').fill('ミホン　ハナコ');
 assert.equal(await row('氏名').getByLabel('氏名を入れる').isChecked(), true);
 // 保険者はこの様邸と同じ（行橋市）なので、はじめはチェックしない
@@ -116,7 +119,8 @@ await rform.waitFor();
 assert.equal(await rform.getByLabel('認定有効期間のはじめ').inputValue(), '2024-04-01');
 assert.equal(await rform.getByLabel('認定有効期間のおわり').inputValue(), '2027-03-31');
 assert.equal(await rform.getByRole('group', {name: '要介護認定'}).getByRole('button', {name: '要介護2'}).getAttribute('aria-pressed'), 'true');
-assert.match(await rform.getByLabel('作成者の所属事業所').inputValue(), /ケアプランセンター/);
+// 居宅介護支援事業者は2件のうち、届出年月日の新しい方（前の事業所「見本居宅介護支援事業所」ではない）
+assert.match(await rform.getByLabel('作成者の所属事業所').inputValue(), /^見本ケアプランセンター$/);
 await page.waitForFunction(() => document.querySelector('[aria-label="理由書のプレビュー"]')?.innerText.includes('令和6年4月1日～令和9年3月31日'), null, {timeout: 8000});
 // 見積書にも（氏名・番号・住所）
 await page.getByRole('tab', {name: '📋 工事見積書'}).click();

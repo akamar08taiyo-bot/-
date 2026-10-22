@@ -5,7 +5,7 @@ import test from 'node:test';
 import {despeckle, inkAdaptive, otsu, removeLines, rotateGray, scaleGray, textIsVertical, valueRect, verticalLines} from '../../src/sasaoka/cardImage.ts';
 import type {Gray} from '../../src/sasaoka/cardImage.ts';
 import {findLabels, missedStroke} from '../../src/sasaoka/cardRead.ts';
-import {cardScore, fixOcr, insurerOfName, locateValues, parseCard, plausibleTerm, warekiIso} from '../../src/sasaoka/hokensho.ts';
+import {cardScore, fixOcr, insurerOfName, latestOffice, locateValues, officeEntries, parseCard, plausibleTerm, warekiIso} from '../../src/sasaoka/hokensho.ts';
 import type {OcrLine, OcrPage} from '../../src/sasaoka/hokensho.ts';
 
 /**
@@ -139,6 +139,84 @@ test('保険証：何回か読んだ値は、形に合って多く読めた値�
   const r3 = parseCard([old, nowNoCare]);
   assert.equal(r3.info.careTo, '2025-03-31');
   assert.ok(r3.unsure.includes('care'));
+});
+
+test('居宅介護支援事業者：何件か届け出ていれば、届出年月日がいちばん新しい名前（上・下どちらでも。ほかの面・施設の日付は見ない）', () => {
+  // （三）の面：名前の下に届出年月日。1行に（一）（二）の面の欄も入る。下は介護保険施設の欄（入所の日付）
+  const card = (boxes: [string, string][]) =>
+    page([
+      [[40, '番号 0000123456'], [900, '要介護状態区分等 要介護 3'], [1700, '給付制限 内容']],
+      [[40, '住所 〒 824-0001'], [900, '認定年月日 令和 8 年 5 月 1 日'], [1700, '開始年月日 令和 8 年 6 月 1 日']],
+      ...boxes.flatMap(([name, date], i): [number, string][][] => [
+        [[40, i === 0 ? '氏名 見本 花子' : '生年月日 昭和 13 年 4 月 14 日 女'], ...(i === 0 ? ([[1700, '居宅介護支援事業者']] as [number, string][]) : []), [2100, name]],
+        [[900, i === 0 ? '認定の有効期間 令和 6 年 4 月 1 日 ～ 令和 9 年 3 月 31 日' : '区分支給限度基準額'], [2100, `届出年月日 ${date}`]],
+      ]),
+      [[1700, '介護保険施設等'], [2100, '種類 名称 見本苑']],
+      [[2100, '入所等年月日 令和 9 年 1 月 1 日']],
+    ]);
+  const oldFirst = card([
+    ['見本居宅介護支援事業所', '令和 7 年 3 月 1 日'],
+    ['見本ケアプランセンター', '令和 8 年 4 月 1 日'],
+  ]);
+  assert.deepEqual(
+    officeEntries(oldFirst).map((e) => [e.name, e.date]),
+    [
+      ['見本居宅介護支援事業所', '2025-03-01'],
+      ['見本ケアプランセンター', '2026-04-01'],
+    ],
+  );
+  assert.equal(parseCard([oldFirst]).info.office, '見本ケアプランセンター');
+  const newFirst = card([
+    ['見本ケアプランセンター', '令和 8 年 4 月 1 日'],
+    ['見本居宅介護支援事業所', '令和 7 年 3 月 1 日'],
+  ]);
+  assert.equal(parseCard([newFirst]).info.office, '見本ケアプランセンター');
+  // 1件だけ（今までどおり）
+  assert.equal(parseCard([card([['見本ケアプランセンター', '令和 8 年 4 月 1 日']])]).info.office, '見本ケアプランセンター');
+  // 名前と届出年月日が同じ欄に読めたとき
+  const oneLine = page([
+    [[1700, '居宅介護支援事業者'], [2100, '見本居宅介護支援事業所 届出年月日 令和 7 年 3 月 1 日']],
+    [[2100, '見本ケアプランセンター 届出年月日 令和 8 年 4 月 1 日']],
+  ]);
+  assert.equal(parseCard([oneLine]).info.office, '見本ケアプランセンター');
+  // 届出年月日が読めなければ、いちばん下（ますは上から順に書かれる）
+  assert.equal(latestOffice(officeEntries(card([['見本居宅介護支援事業所', ''], ['見本ケアプランセンター', '']])))?.name, '見本ケアプランセンター');
+  // ラベルの列の字（読み違えた切れはし）が名前の前に付いて1つの欄に読めたとき：名前の列（届出年月日の字の左）から右だけ
+  const merged = page([
+    [[1800, '見本居宅介護支援事業所']],
+    [[1642, '居宅 介護支'], [1800, '届出年月日 令和 5 年 3 月 1 日']],
+    [[1642, '信人生時壮'], [1800, '見本ケアプラ ンセンター']],
+    [[1643, '手事攻選出年月日令和 6 年 4 月 1 日']],
+    [[1799, '届出年月日']],
+  ]);
+  assert.deepEqual(
+    officeEntries(merged).map((e) => [e.name, e.date, e.x0]),
+    [
+      ['見本居宅介護支援事業所', '2023-03-01', 1800],
+      ['見本ケアプランセンター', '2024-04-01', 1800],
+    ],
+  );
+  // 切り出して読んだページ（届出年月日なし）に古い名前があっても、全体を読んだページで古いと分かれば選ばない
+  const crop = page([[[1700, '居宅介護支援事業者'], [2100, '見本居宅介護支援事業所']]], undefined, 99);
+  const r = parseCard([crop, crop, oldFirst]);
+  assert.equal(r.info.office, '見本ケアプランセンター');
+  assert.ok(r.unsure.includes('office'));
+});
+
+test('保険証：ラベルの字が2つの欄に分かれて読めても（「住」「所」・「氏」「名」の間があいた）止まらない', () => {
+  const r = parseCard([
+    page([
+      [[40, '番号 0000123456']],
+      [[40, '住'], [200, '所 〒 824-0001 行橋市中央一丁目 1 番 1 号']],
+      [[40, 'フ リ'], [200, 'ガナ ミホン ハナコ']],
+      [[40, '氏'], [200, '名 見本 花子']],
+      [[40, '生年月日 昭和 13 年 4 月 14 日 女']],
+    ]),
+  ]);
+  assert.equal(r.info.insuredNo, '0000123456');
+  assert.equal(r.info.address, '行橋市中央一丁目1番1号');
+  assert.equal(r.info.kana, 'ミホン　ハナコ');
+  assert.equal(r.info.name, '見本　花子');
 });
 
 test('負担割合証：利用者負担の割合（1割・2割・3割。「] 割」は 1割）と適用期間', () => {

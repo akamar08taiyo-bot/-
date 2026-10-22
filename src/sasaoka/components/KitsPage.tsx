@@ -254,7 +254,7 @@ function KitCard({
           📋 部材リストから入れる
         </Btn>
         <Btn color="sky" onClick={() => onPickLabor(null)} className="!px-4 !text-base">
-          🔧 施工費を入れる（笹岡工務店の手間）
+          🔧 施工費を入れる
         </Btn>
         {kit.rows.length === 0 && <span className="text-sm text-slate-500">部材を入れてから、部材の行の「🔧 施工費」で取付手間を数えます。</span>}
       </div>

@@ -346,7 +346,22 @@ export function RiyuEditor({job, data, update, onBack, tabs}: {job: Job; data: A
                   </span>
                 </div>
               ) : (
-                <TextArea value={a.itemOther} onChange={(itemOther) => setAct(key, {itemOther})} label={`${def.label}：①改善をしようとしている生活動作`} rows={2} />
+                // 先頭の□（ほかの段と同じ形。文を書くと■になる。外せば□のまま文を書く）
+                <div className="flex items-start gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={a.items.includes(0)}
+                    onChange={(e) => setAct(key, {items: e.target.checked ? [0] : []})}
+                    aria-label={`${def.label}：①の□`}
+                    className="mt-2 h-4 w-4 shrink-0 accent-slate-800"
+                  />
+                  <TextArea
+                    value={a.itemOther}
+                    onChange={(itemOther) => setAct(key, !a.itemOther.trim() && itemOther.trim() ? {itemOther, items: [0]} : {itemOther})}
+                    label={`${def.label}：①改善をしようとしている生活動作`}
+                    rows={2}
+                  />
+                </div>
               )}
             </div>
             <div>

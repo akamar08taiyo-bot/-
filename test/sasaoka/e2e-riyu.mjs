@@ -90,7 +90,9 @@ await fill('排泄：②具体的な困難な状況', '廊下に手すりがな�
 await form.getByLabel('排泄：転倒等の防止、安全の確保').check();
 await form.getByLabel('排泄：動作の容易性の確保').check();
 await fill('排泄：改修の方針', '手すりを付けて、安全に移動できるようにする');
+assert.equal(await form.getByLabel('その他（自宅内の移動）：①の□').isChecked(), false);
 await fill('その他（自宅内の移動）：①改善をしようとしている生活動作', '居間から寝室への移動');
+assert.equal(await form.getByLabel('その他（自宅内の移動）：①の□').isChecked(), true); // 文を書くと■
 await fill('その他（自宅内の移動）：③のその他', '見守りを減らす');
 // ④ 改修項目は見積書の箇所から（サンプルは玄関の手すり）
 assert.match(await form.locator('[data-riyu-field="works"]').innerText(), /■ 手すりの取付け：①玄関|手すり.*玄関/);
@@ -160,7 +162,7 @@ const expect = {
   H24: '長女が日中だけ見守り',
   M45: '廊下に手すりがなく、ふらつく',
   AD45: '手すりを付けて、安全に移動できるようにする',
-  B72: '居間から寝室への移動',
+  B72: '■居間から寝室への移動',
   AK36: '・シャワーチェア',
 };
 for (const [ref, v] of Object.entries(expect)) assert.equal(cellText(ref), v, ref);

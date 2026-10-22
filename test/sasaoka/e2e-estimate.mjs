@@ -94,7 +94,7 @@ log('見積の単価の手入力と自動に戻すOK');
 
 // ---------------- ブラケットの施工費（取付手間を数える）：木を1つ → ブラケットのすぐ下に同上施工費 1,500（木の見積の単価）
 await cell(await key('ブラケット', 'text')).click();
-await sheet.getByRole('button', {name: '🔧 施工費（笹岡工務店の手間）から入れる'}).click();
+await sheet.getByRole('button', {name: '🔧 施工費から入れる'}).click();
 await page.getByRole('dialog').getByText('「ブラケット」の施工費').waitFor();
 await page.getByRole('button', {name: '木の箇所数を1増やす', exact: true}).click();
 await page.getByRole('button', {name: '数え終わったら閉じる'}).click();
@@ -282,7 +282,7 @@ assert.equal(await bp.getByRole('textbox', {name: '仕切価格'}).inputValue(),
 log('定価の取り込みOK');
 
 // ---------------- 施工費（笹岡工務店の手間）：部材・施工費マスタのもう1つのタブ
-await page.getByRole('tab', {name: /施工費（笹岡工務店の手間/}).click();
+await page.getByRole('tab', {name: /^施工費（/}).click();
 assert.ok((await page.locator('main').innerText()).includes('取付手間の単価'));
 // 仕切り（笹岡工務店）と見積の両方の単価を持つ。踏台 木 の見積は 2,000円（ユーザーの指示）。見積を消すと 仕切り×1.5 を薄く出す
 assert.deepEqual([await page.getByLabel('木の単価', {exact: true}).inputValue(), await page.getByLabel('木の見積の単価', {exact: true}).inputValue()], ['1,000', '1,500']);
@@ -349,6 +349,15 @@ await page.keyboard.press('ControlOrMeta+z'); // 白紙に戻す前に戻す
 assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '（サンプル）山田様邸');
 assert.equal(await sheet.locator('.form-page tr[data-rows]').count(), filled);
 log('白紙に戻す（お客様名の欄から打ち込める・Ctrl+Z で戻る）OK');
+
+// ---------------- iPhone で見積書の欄を押しても画面が拡大されない（viewport に maximum-scale=1。iPhone・iPad だけ）
+const iphone = await browser.newContext({viewport: {width: 390, height: 844}, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1', isMobile: true, hasTouch: true, locale: 'ja-JP'});
+const ip = await iphone.newPage();
+await ip.goto(`${site}/jutaku-mitsumori/index.html`);
+assert.match(await ip.locator('meta[name="viewport"]').getAttribute('content'), /maximum-scale=1/);
+await iphone.close();
+assert.doesNotMatch(await page.locator('meta[name="viewport"]').getAttribute('content'), /maximum-scale/); // パソコン・Android は今までどおり
+log('iPhone で欄を押しても拡大しない（viewport）OK');
 
 console.log('\nERRORS:', errors.length ? errors : 'なし');
 await browser.close();

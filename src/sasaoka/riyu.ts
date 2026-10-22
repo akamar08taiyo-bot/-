@@ -25,7 +25,7 @@ export const RIYU_PURPOSES = ['できなかったことをできるようにす�
 
 /**
  * P2 の4つの活動：① の項目（名前と□の欄。最後の「その他（　）」はかっこの中に書く）、② ③ の方針の欄、③ の□の欄（RIYU_PURPOSES の順）。
- * 自宅内の移動の段は ① に項目がなく、空いた欄（B72）に書く
+ * 自宅内の移動の段は ① に項目がなく、空いた欄（B72）に先頭の□（items の 0 番。押すと■）と書いた文を書く
  */
 export const RIYU_ACTS: {key: RiyuActKey; label: string; items: {name: string; cell: string}[]; itemOther: string; trouble: string; policy: string; purposes: string[]}[] = [
   {
@@ -177,7 +177,7 @@ export function cleanRiyu(raw: unknown): RiyuInfo {
   const act = (key: RiyuActKey): RiyuAct => {
     const a = isObj(acts[key]) ? acts[key] : {};
     const def = RIYU_ACTS.find((x) => x.key === key)!;
-    return {items: nums(a.items, def.items.length), itemOther: str(a.itemOther), trouble: str(a.trouble), purposes: nums(a.purposes, RIYU_PURPOSES.length), purposeOther: str(a.purposeOther), policy: str(a.policy)};
+    return {items: nums(a.items, def.items.length || 1), itemOther: str(a.itemOther), trouble: str(a.trouble), purposes: nums(a.purposes, RIYU_PURPOSES.length), purposeOther: str(a.purposeOther), policy: str(a.policy)};
   };
   const equipment: RiyuInfo['equipment'] = {};
   if (isObj(r.equipment)) {
@@ -279,10 +279,9 @@ export function riyuCells(job: Job, s: EstimateSettings, today = todayIso()): Ri
   for (const a of RIYU_ACTS) {
     const v = r.acts[a.key];
     for (const i of v.items) if (a.items[i]) checks[a.items[i].cell] = {pick: 0};
-    if (v.itemOther.trim()) {
-      if (a.items.length === 0) cells[a.itemOther] = v.itemOther.trim();
-      else checks[a.itemOther] = {pick: 0, fill: v.itemOther.trim()};
-    }
+    // 自宅内の移動は、何も入れていなくても先頭の□を書く（ほかの段と同じく手で■にできる。ユーザーの指示「先頭に空白の四角がない」）
+    if (a.items.length === 0) cells[a.itemOther] = `${v.items.includes(0) ? '■' : '□'}${v.itemOther.trim()}`;
+    else if (v.itemOther.trim()) checks[a.itemOther] = {pick: 0, fill: v.itemOther.trim()};
     if (v.trouble.trim()) cells[a.trouble] = v.trouble.trim();
     for (const i of v.purposes) if (a.purposes[i] && i < RIYU_PURPOSES.length - 1) checks[a.purposes[i]] = {pick: 0};
     const otherCell = a.purposes[RIYU_PURPOSES.length - 1];

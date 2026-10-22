@@ -333,7 +333,7 @@ await drop('サンプル S-BK01 ブラケット');
 assert.equal(await lines(), pickBefore);
 // 施工費も：空白の行を選んで「🔧 施工費…」→ その行に入り、すぐ上の部材（エンドキャップ）の同上施工費になる
 await sheet.getByRole('button', {name: 'サンプル S-EC01 エンドキャップの行の下に1行入れる'}).click();
-await sheet.getByRole('button', {name: '🔧 施工費（笹岡工務店の手間）から入れる'}).click();
+await sheet.getByRole('button', {name: '🔧 施工費から入れる'}).click();
 await page.getByRole('dialog').getByText('「エンドキャップ」の施工費').waitFor();
 await page.getByRole('button', {name: '木の箇所数を1増やす', exact: true}).click();
 await page.getByRole('button', {name: '数え終わったら閉じる'}).click();
