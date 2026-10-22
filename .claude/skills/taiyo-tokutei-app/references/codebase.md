@@ -29,7 +29,7 @@ React 19 + TypeScript + Vite（`vite.tokutei.config.ts` で1ファイルの `dis
 | ファイル | 役割 |
 |---|---|
 | `App.tsx` | 3つのタブ（📝 見積もり・申請／📦 商品マスタ／⚙ 設定）。URL の `#tab=…&sale=…&print=1`。住宅改修のタブの中では `#jutaku=<様邸の id>&embed=1`（題名の段を出さない・`window.__taiyoTokuteiFlush` を出す） |
-| `jutaku.ts` | 住宅改修のアプリから開いたとき：localStorage `taiyo-tokutei-from-jutaku-v1`（`{job, fields}`）を読む `readJutaku`・値を確かめる `cleanJutakuFields`・その様邸の案件を開く（なければ作る）`applyJutaku`（`Sale.jutakuJob`・前に受け取った値 `jutakuSync` とちがう値だけ、まだ手で直していない項目に入れる。`jutakuSync` は作ったときの値から始めるので、初めの値のままの負担割合1割・保険者も、あとで住宅改修で入れた値が入る。保険者が変わったら個別切り上げも）。形は住宅改修の `src/sasaoka/tokuteiLink.ts` と同じにする。理由書の `bodyState`・`careState`（身体状況・介護状況）も受け取り、`ReasonField` の `hints`（文例のボタン）に出す |
+| `jutaku.ts` | 住宅改修のアプリから開いたとき：localStorage `taiyo-tokutei-from-jutaku-v1`（`{job, fields}`）を読む `readJutaku`・値を確かめる `cleanJutakuFields`・その様邸の案件を開く（なければ作る）`applyJutaku`（`Sale.jutakuJob`・前に受け取った値 `jutakuSync` とちがう値だけ、まだ手で直していない項目に入れる。`jutakuSync` は作ったときの値から始めるので、初めの値のままの負担割合1割・保険者も、あとで住宅改修で入れた値が入る。保険者が変わったら個別切り上げも）。形は住宅改修の `src/sasaoka/tokuteiLink.ts` と同じにする |
 | `handoff.ts` | 販売受注簿作成ツールへ渡す内容（DESIGN.md 5.3）：`hacchuImport(sale, s)`（kind `taiyo-tokutei-order`。お客様・担当の名字・納品日・給付割合・生活保護・商品ごとの値と見積書と同じ金額）・`benefitSplit`（給付内訳を商品ごとに：今年度の残りは前の商品から順に、利用者負担は切り上げから後ろの商品で1円ずつ減らして合計を見積書に合わせる）・`hacchuUrl`。受け取りは受注簿ツールの jutaku-import-begin〜end |
 | `defaults.ts` | 営業所（OFFICES、19か所）・担当・保険者（INSURERS。みやこ町は `perItem`）・`defaultSettings()`。営業所はポータルの localStorage `taiyo_portal_session` から |
 | `sales.ts` | 見積番号 `nextQuoteNo`・`newSale`・`copySale`・`itemFromProduct`・`blankItem`・`customerLabel`・`saleWarnings`。使い回し：`customerKey`（同じお客様＝被保険者番号10けた、なければ名前＋生年月日）・`pastCustomers`・`customerPatch`（前のお客様から入れる）・`sameYearSales`（今年度の残り）・`frequentValues`（居宅・ケアマネの候補） |

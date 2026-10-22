@@ -227,24 +227,6 @@ try {
   await page.getByRole('button', {name: '⬇ すべてをファイルに保存'}).waitFor();
   await page.screenshot({path: `${out}/09-settings.png`, fullPage: true});
 
-  // ---- 住宅改修の「🛁 特定福祉用具申請書」のタブの中で開いたとき（#jutaku=…&embed=1）：住宅改修の理由書の「利用者の身体状況」「介護状況」が、
-  //      理由の欄の文例のボタンに出る（ユーザーの答え「申請書の理由の欄のこと」2026-10-22）
-  await page.evaluate(() =>
-    localStorage.setItem(
-      'taiyo-tokutei-from-jutaku-v1',
-      JSON.stringify({job: 'job-e2e', fields: {customer: '見本 太郎', insurer: 'yukuhashi', bodyState: '右片麻痺があり、立ち座りが不安定。', careState: '日中は独居。'}}),
-    ),
-  );
-  await page.goto('about:blank');
-  await page.goto(`${url}#jutaku=job-e2e&embed=1`);
-  await page.getByLabel('お客様名').waitFor();
-  assert.equal(await page.getByLabel('お客様名').inputValue(), '見本 太郎');
-  await page.getByRole('button', {name: '＋ 手で入れる'}).click();
-  await page.getByRole('button', {name: '理由書の身体状況：右片麻痺があり、立ち座りが不安定。'}).click();
-  assert.equal(await page.getByLabel('商品が必要な理由').inputValue(), '右片麻痺があり、立ち座りが不安定。');
-  assert.ok(await page.getByRole('button', {name: '理由書の介護状況：日中は独居。'}).isVisible());
-  await page.screenshot({path: `${out}/10-jutaku-reason.png`});
-
   // ---- スマホの幅（はじめて開いたとき）
   const phone = await browser.newContext({viewport: {width: 390, height: 844}, deviceScaleFactor: 2});
   const p2 = await phone.newPage();

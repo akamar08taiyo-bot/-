@@ -76,11 +76,6 @@ export function SaleEditor({
   const prevYear = sameYearSales(data.sales, sale);
   const usedYear = prevYear.reduce((n, x) => n + saleTotals(x, s).covered, 0);
   const fy = fiscalYearOf(sale.deliveryDate || sale.applyDate || sale.estimateDate);
-  // 住宅改修の理由書の「利用者の身体状況」「介護状況」（住宅改修から開いた案件だけ。理由の欄の文例のボタンに出す）
-  const reasonHints = [
-    {label: '理由書の身体状況', text: sale.bodyState ?? ''},
-    {label: '理由書の介護状況', text: sale.careState ?? ''},
-  ];
 
   const change = (patch: Partial<Sale>) =>
     update('sales', (list) => list.map((x) => (x.id === sale.id ? {...x, ...patch, updatedAt: Date.now()} : x)));
@@ -452,7 +447,7 @@ export function SaleEditor({
                       </div>
                       <div className="mt-2 grid min-w-0 grid-cols-1 gap-1 pl-8 text-xs font-bold text-slate-600">
                         福祉用具が必要な理由
-                        <ReasonField item={i} sales={data.sales} saleId={sale.id} hints={reasonHints} onChange={(reason) => changeItem(i.id, {reason})} />
+                        <ReasonField item={i} sales={data.sales} saleId={sale.id} onChange={(reason) => changeItem(i.id, {reason})} />
                       </div>
                     </div>
                   );

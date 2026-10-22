@@ -13,8 +13,7 @@ export const JUTAKU_KEY = 'taiyo-tokutei-from-jutaku-v1';
 
 export type JutakuHandoff = {job: string; fields: JutakuFields};
 
-// bodyState・careState は住宅改修の理由書の「利用者の身体状況」「介護状況」（理由の欄の文例のボタンに使う。ここでは直さないので、いつも住宅改修の値が入る）
-const TEXT = ['customer', 'kana', 'insuredNo', 'zip', 'address', 'tel', 'careOffice', 'careManager', 'bodyState', 'careState'] as const;
+const TEXT = ['customer', 'kana', 'insuredNo', 'zip', 'address', 'tel', 'careOffice', 'careManager'] as const;
 /** 住宅改修から受け取る項目（JutakuFields）の全部 */
 const KEYS = [...TEXT, 'birthDate', 'gender', 'careLevel', 'insurer', 'burdenRatio'] as const;
 
