@@ -105,7 +105,7 @@ export function EstimateSheet({
     lastOutside.current = now;
     redoStack.current = [];
   }, [job]);
-  const ctx = {settings: s, form};
+  const ctx = {settings: s, form, materials};
   const clip = useClip();
 
   // ---------------------------------------------------------------- 大きさ（画面の幅に合わせる。小さすぎるときは横に動かす）
