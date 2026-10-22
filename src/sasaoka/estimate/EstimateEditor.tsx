@@ -10,7 +10,7 @@ import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerForAddress, jobForm, jobInsurer, NO_SHINSEI} from '../estimateForms.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
-import {fillAdded} from '../cutLink.ts';
+import {fillAdded, withBrackets} from '../cutLink.ts';
 import {addMaterial, insertRowsAt, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
 import type {AppData, Insurer, Job, Kit, Material, NameSuffix, Place} from '../types.ts';
 import type {Update} from '../useStore.ts';
@@ -293,8 +293,8 @@ export function EstimateEditor({
           rates={s}
           onAdd={(row) => {
             const at = picker.at;
-            // 長さの分かっている箇所に入れた手すり・ベースプレートは、その長さにする（`fillAdded`）
-            setPlace(pickPlace.id, (p) => fillAdded({...p, rows: addMaterial(p.rows, row, at)}, new Set([row.id])));
+            // 長さの分かっている箇所に入れた手すり・ベースプレートは、その長さにする（`fillAdded`）。中間のブラケットの数も（`withBrackets`）
+            setPlace(pickPlace.id, (p) => withBrackets(p, fillAdded({...p, rows: addMaterial(p.rows, row, at)}, new Set([row.id])), data.materials));
             // 続けて選んだ部材は、いま入れた行のすぐ下に（同じ部材なら数が増えるだけなので、そのまま）
             if (!pickPlace.rows.some((r) => r.kind === 'material' && r.refId === row.refId)) setPicker((pk) => (pk && pk.kind === 'material' ? {...pk, at: row.id} : pk));
           }}
@@ -323,7 +323,7 @@ export function EstimateEditor({
           placeName={pickPlace.name}
           onInsert={(rows) => {
             const at = picker.at;
-            setPlace(pickPlace.id, (p) => fillAdded({...p, rows: insertRowsAt(p.rows, rows, at)}, new Set(rows.map((r) => r.id))));
+            setPlace(pickPlace.id, (p) => withBrackets(p, fillAdded({...p, rows: insertRowsAt(p.rows, rows, at)}, new Set(rows.map((r) => r.id))), data.materials));
             setPicker(null);
             toast(`部材＋施工費（常用）の${rows.length}行を「${pickPlace.name || '箇所'}」に入れました`);
           }}

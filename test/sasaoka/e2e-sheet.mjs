@@ -473,6 +473,25 @@ assert.ok(plate.includes('|0.6|本|15,840|9,504|'), plate); // 数量・単価�
 assert.ok(plate.includes('定価19,800円（4m）×0.8') && plate.includes('2400mm÷4000mm＝0.6'), plate);
 log('商品名の幅（120mm幅）は1本の長さにしない（4m の 0.6＝2400mm）OK');
 
+// ---------------- 中間のブラケット（ユーザーの指示「見積書で、中間のブラケット（BD-01G）の数も」→「おねがいします」、2026-10-22）：
+// マツ六 BAUHAUS 35 の丸棒の数量に 2400mm → 手すりのすぐ下に BD-01G（35ブラケット横型）を2個（ブラケットの間は 900mm 以内）。900mm にしたら外す。Ctrl+Z は1回で戻る
+const midRow = () => sheet.locator('.form-page tr', {hasText: 'BD-01G'});
+await typeIn('new:text', 'マツ六 BD-134 35アッシュ丸棒 ディンプル付 Mオーク 4m', 'Tab');
+assert.equal(await selected(), '数量');
+await page.keyboard.type('2400mm');
+await page.keyboard.press('Enter');
+await midRow().first().waitFor();
+assert.ok((await tds('BD-01G')).join('|').includes('|2|個|'), (await tds('BD-01G')).join('|'));
+const rowTexts = await sheet.locator('.form-page tr').allInnerTexts();
+const railAt = rowTexts.findLastIndex((t) => t.includes('BD-134') || t.includes('ディンプル付 Mオーク 4m'));
+assert.ok(rowTexts[railAt + 1].includes('BD-01G'), rowTexts.slice(railAt, railAt + 3).join(' / '));
+await typeIn(await key('BD-134', 'qty'), '900mm');
+assert.equal(await midRow().count(), 0);
+await undoKey();
+await midRow().first().waitFor();
+assert.ok((await tds('BD-134')).join('|').includes('2400mm÷4000mm＝0.6'), (await tds('BD-134')).join('|'));
+log('中間のブラケット：2400mm → BD-01G 2個・900mm で外す・Ctrl+Z で戻る OK');
+
 // ---------------- 「📄 白紙に戻す」（印刷の横）：確かめてから、見積書に打ち込んだ内容を全部消す。やめれば何も消えない。
 // 保険者（書式）・担当は残す。Ctrl+Z で戻せる
 const headButtons = (await page.locator('main button').allInnerTexts()).map((t) => t.trim());

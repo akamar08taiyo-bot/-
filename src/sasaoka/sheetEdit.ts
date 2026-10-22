@@ -10,7 +10,7 @@
 import {cutToLength, estimateAmount, estimatePlaceLines, estimateQty, estimateUnitPrice, isBlankRow, listPriceOf, overheadAuto, estimateTotals, rounddown} from './calc.ts';
 import type {EstimateRates} from './calc.ts';
 import {KINDS, autoNote, formLines, lineNote, materialText, noteText, rowUnit} from './estimateForms.ts';
-import {fillAdded, placeAfterQty} from './cutLink.ts';
+import {fillAdded, placeAfterQty, withBrackets} from './cutLink.ts';
 import {guessPieceLengthM} from './priceImport.ts';
 import {copyRows, manualRow, materialRow, newPlace} from './rows.ts';
 import {padInsuredNo} from './shinsei.ts';
@@ -25,6 +25,8 @@ export type SheetCtx = {
   pick?: Material | null;
   /** いちばん下の行を施工費（手）として入れる */
   labor?: boolean;
+  /** 部材リスト（中間のブラケットの行を入れるとき。`withBrackets`） */
+  materials?: Material[];
 };
 
 /** 打ち込んだあとの様邸と、その値が入った欄（いちばん下の行に入れたら、増えた行の欄） */
@@ -268,13 +270,19 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
 
   // 部材の行
   if (field === 'text') {
-    if (ctx.pick) return {job: withPlace(patchRow(job, found, {...materialFields(ctx.pick), estText: null, estNote: null, estPrice: null}), found.pi, (p) => fillAdded(p, new Set([r.id]))), key};
+    if (ctx.pick) {
+      const picked = patchRow(job, found, {...materialFields(ctx.pick), estText: null, estNote: null, estPrice: null});
+      return {job: withPlace(picked, found.pi, (p) => withBrackets(found.place, fillAdded(p, new Set([r.id])), ctx.materials ?? [])), key};
+    }
     if (trimmed === (isBlankRow(r) ? '' : (r.estText ?? materialText(r)))) return {job, key};
     if (trimmed === '') return {job: patchRow(job, found, {name: '', maker: '', code: '', estText: null}), key};
     return {job: patchRow(job, found, {name: trimmed, maker: '', code: '', estText: null, pieceLengthM: r.pieceLengthM || guessPieceLengthM(trimmed)}), key};
   }
-  // 切って使う手すり・ベースプレートは、同じ箇所のもう一方と申請書の長さにもつなぐ（`cutLink.ts`）
-  if (field === 'qty') return {job: withPlace(patchRow(job, found, qtyPatch(r, trimmed)), found.pi, (p) => placeAfterQty(found.place, p, r.id)), key};
+  // 切って使う手すり・ベースプレートは、同じ箇所のもう一方と申請書の長さにもつなぐ。手すりの長さが変わったら中間のブラケットの数も（`cutLink.ts`）
+  if (field === 'qty') {
+    const typed = patchRow(job, found, qtyPatch(r, trimmed));
+    return {job: withPlace(typed, found.pi, (p) => withBrackets(found.place, placeAfterQty(found.place, p, r.id), ctx.materials ?? [])), key};
+  }
   if (field === 'unit') return {job: patchRow(job, found, {unit: trimmed}), key};
   if (field === 'price') {
     if (trimmed === '') return {job: patchRow(job, found, {estPrice: null}), key};
@@ -283,7 +291,11 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
     const auto = estimateUnitPrice({...r, estPrice: null}, rates);
     return {job: patchRow(job, found, {estPrice: n === auto ? null : n}), key};
   }
-  if (field === 'note') return {job: patchRow(job, found, notePatch(r, text, noteOf(job, r.id, ctx)?.auto ?? '')), key};
+  if (field === 'note') {
+    // 1本の長さ（定価○円（4m））を入れて使う長さが決まったときも、中間のブラケットの数を入れ直す
+    const noted = patchRow(job, found, notePatch(r, text, noteOf(job, r.id, ctx)?.auto ?? ''));
+    return {job: withPlace(noted, found.pi, (p) => withBrackets(found.place, p, ctx.materials ?? [])), key};
+  }
   return {job, key};
 }
 
@@ -381,7 +393,7 @@ function applyNew(job: Job, field: string, text: string, ctx: SheetCtx): SheetRe
   if (row.kind === 'material' && row.pieceLengthM === 0 && row.name) row.pieceLengthM = guessPieceLengthM(row.name);
   const rows = [...place.rows, row];
   j = setPlaceRows(j, pi, rows);
-  if (ctx.pick) j = withPlace(j, pi, (p) => fillAdded(p, new Set([row.id])));
+  if (ctx.pick) j = withPlace(j, pi, (p) => withBrackets(place, fillAdded(p, new Set([row.id])), ctx.materials ?? []));
   // 施工費は、上の手間とつながっていれば同じまとまり（見積書では1行）
   const lineId = row.kind === 'labor' ? rows[workHead(rows, rows.length - 1)].id : row.id;
   if (field === 'text') {
