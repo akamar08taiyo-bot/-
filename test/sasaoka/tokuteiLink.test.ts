@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
+import {NO_RIYU} from '../../src/sasaoka/riyu.ts';
 import {TOKUTEI_KEY, tokuteiFields, tokuteiUrl, writeTokutei} from '../../src/sasaoka/tokuteiLink.ts';
 import type {Job} from '../../src/sasaoka/types.ts';
 
@@ -31,7 +32,14 @@ test('特定福祉用具に渡すお客様の情報：特定福祉用具の案�
     burdenRatio: 2,
     careOffice: '見本居宅介護支援事業所',
     careManager: '見本 一郎',
+    bodyState: '',
+    careState: '',
   });
+});
+
+test('住宅改修の理由書の利用者の身体状況・介護状況も渡す（特定福祉用具の「福祉用具が必要な理由」の文例に使う。改行はそのまま）', () => {
+  const f = tokuteiFields(job({riyu: {...NO_RIYU, body: ' 膝が痛く、\n立ち座りがつらい ', care: '長女が日中だけ見守り'}}));
+  assert.deepEqual([f.bodyState, f.careState], ['膝が痛く、\n立ち座りがつらい', '長女が日中だけ見守り']);
 });
 
 test('介護保険証から入れた認定の有効期間・保険者番号も渡す（入っていなければ渡さない）', () => {
@@ -42,7 +50,7 @@ test('介護保険証から入れた認定の有効期間・保険者番号も�
 
 test('まだ入っていない様邸：空のまま渡す。保険者・負担割合は分からなければ渡さない（特定福祉用具の初めの値のまま）', () => {
   const blank = tokuteiFields({...job({customer: '', address: '', insuredNo: '', insurer: '', form: ''}), shinsei: undefined});
-  assert.deepEqual(blank, {customer: '', kana: '', insuredNo: '', birthDate: '', gender: '', zip: '', address: '', tel: '', careLevel: '', careOffice: '', careManager: ''});
+  assert.deepEqual(blank, {customer: '', kana: '', insuredNo: '', birthDate: '', gender: '', zip: '', address: '', tel: '', careLevel: '', careOffice: '', careManager: '', bodyState: '', careState: ''});
   // 保険者は住所の市町村からも決まる（申請書の保険者と同じ）
   assert.equal(tokuteiFields(job({insurer: '', form: '', address: '福岡県京都郡苅田町富久町1-1'})).insurer, 'kanda');
 });

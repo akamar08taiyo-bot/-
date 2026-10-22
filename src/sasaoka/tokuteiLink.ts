@@ -6,7 +6,7 @@
 //   特定福祉用具（同じリポジトリのブランチ claude/care-insurance-auto-transfer-3z0c9n）の src/tokutei/jutaku.ts も直す
 
 import {jobInsurer, NO_SHINSEI} from './estimateForms.ts';
-import {birthIso} from './riyu.ts';
+import {birthIso, NO_RIYU} from './riyu.ts';
 import type {Job} from './types.ts';
 
 export const TOKUTEI_KEY = 'taiyo-tokutei-from-jutaku-v1';
@@ -32,10 +32,15 @@ export type TokuteiFields = {
   careFrom?: string; // 認定の有効期間のはじめ 'YYYY-MM-DD'
   careTo?: string; // 認定の有効期間のおわり
   insurerNo?: string; // 保険者番号（6けた）
+  // 住宅改修の理由書から：特定福祉用具の品目ごとの「福祉用具が必要な理由」の文例のボタンに使う（空でも渡す。改行はそのまま）。
+  // （ユーザーの指示「特定福祉用具の理由書…連携してください。連動してください」。特定福祉用具の理由書＝申請書の理由の欄、と特定福祉用具のセッションがユーザーに確かめた、2026-10-22）
+  bodyState: string; // 利用者の身体状況
+  careState: string; // 介護状況
 };
 
 export function tokuteiFields(job: Job): TokuteiFields {
   const info = {...NO_SHINSEI, ...job.shinsei};
+  const riyu = {...NO_RIYU, ...job.riyu};
   const insurer = jobInsurer(job);
   return {
     customer: job.customer.trim(),
@@ -54,6 +59,8 @@ export function tokuteiFields(job: Job): TokuteiFields {
     ...(info.careFrom ? {careFrom: info.careFrom} : {}),
     ...(info.careTo ? {careTo: info.careTo} : {}),
     ...(info.insurerNo.trim() ? {insurerNo: info.insurerNo.trim()} : {}),
+    bodyState: riyu.body.trim(),
+    careState: riyu.care.trim(),
   };
 }
 
