@@ -56,8 +56,10 @@ npm run -s build:tokutei    # dist-tokutei/index.html（1ファイル）と vers
 node test/tokutei/e2e.mjs <出力フォルダ>   # ブラウザで通しで確かめる（Playwright。ビルドのあと）
 ```
 
-公開先は太陽ポータル（taiyo-portal、master）の `tokutei/`：https://akamar08taiyo-bot.github.io/taiyo-portal/tokutei/ （タイル「特定福祉用具 購入申請書・見積もり作成」）。
-直したら `dist-tokutei/index.html` と `version.json` を `taiyo-portal/tokutei/` に置き、タイルの使い方の文（`taiyo-portal/index.html` の `APPS`）も合わせて直す。
+公開先は太陽ポータル（taiyo-portal、master）の `tokutei/`：https://akamar08taiyo-bot.github.io/taiyo-portal/tokutei/ 。
+タイルは 2026-10-22 に住宅改修とまとめて「申請書・見積書作成」の1つになった（ユーザーの指示「太陽ポータルについても、申請書・見積書作成に変更し、一つにまとめる」）。
+タイルは住宅改修のアプリ（`jutaku-mitsumori/`）を開き、このアプリはその様邸の画面の「🛁 特定福祉用具申請書」のタブの中に出る（`tokutei/` は iframe と直接の URL で使うので消さない）。
+直したら `dist-tokutei/index.html` と `version.json` を `taiyo-portal/tokutei/` に置き、タイルの使い方の文（`taiyo-portal/index.html` の `APPS` の `申請書・見積書作成` の特定福祉用具の行）も合わせて直す。
 
 ## 技術スタック
 

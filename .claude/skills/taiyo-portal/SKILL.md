@@ -26,13 +26,13 @@ description: 太陽シルバーサービス㈱（行橋営業所）の「太陽�
 | 書類送付状作成 | ポータルの `soufujo/` | `taiyo-portal` そのもの（`soufujo/index.html` を直接コミット。ビルド・version.json なし） | — |
 | FAX送付状作成 | …/-/fax.html | `-` のブランチ `claude/fax-cover-sheet-app`（push すると deploy-fax.yml がビルドして gh-pages を置きかえる） | — |
 | 福祉用具ユーザー辞書 | …/fukushi-jisho/ | `fukushi-jisho` | — |
-| 住宅改修 見積書作成 | ポータルの `jutaku-mitsumori/`（請求書のタブは `sasaoka/`。同じアプリの2つのビルド） | `-` のブランチ `claude/sasaoka-shikiri-app` | `taiyo-jutaku-mitsumori-app` |
-| 特定福祉用具 購入申請書・見積もり作成 | ポータルの `tokutei/` | `-` のブランチ `claude/care-insurance-auto-transfer-3z0c9n` | `taiyo-tokutei-app` |
+| 申請書・見積書作成（住宅改修と特定福祉用具を1つのタイルに。2026-10-22） | ポータルの `jutaku-mitsumori/`（請求書のタブは `sasaoka/`。同じアプリの2つのビルド）。特定福祉用具は様邸の画面の「🛁 特定福祉用具申請書」のタブの中に `tokutei/` を iframe で出す | 住宅改修：`-` のブランチ `claude/sasaoka-shikiri-app`／特定福祉用具：`-` のブランチ `claude/care-insurance-auto-transfer-3z0c9n` | `taiyo-jutaku-mitsumori-app`・`taiyo-tokutei-app` |
 
 - リポジトリはどれも `akamar08taiyo-bot/<名前>`。URL は `https://akamar08taiyo-bot.github.io/<リポジトリ名>/`。**どれも public**（GitHub Pages のため）。ユーザーのデータを入れないのはこのため。
 - リポジトリ `-` は1つで複数のアプリ：main は健康管理アプリ（index.html）と住宅ローン（mortgage.html。`.github/workflows/deploy.yml`）、FAX送付状はブランチ `claude/fax-cover-sheet-app`（/-/ を開いても FAX）、住宅改修・特定福祉用具もブランチごと。
   **作業する前にブランチを確かめる。** main の deploy.yml（Actions で Pages に出す）と gh-pages の公開がぶつかる恐れがある（確かめていない）。`cd -` は「前のフォルダに戻る」になるので、必ず `/home/user/-` と書く。
-- 名前の取り違えに注意：「見積・提案書作成」（taiyo-mitsumori）と、チラシ作成（消耗品）の quote.html の画面の見出し「見積・提案書作成」と、「住宅改修 見積書作成」は別のもの。チラシ作成は（レンタル）と（消耗品）で別のリポジトリ。
+- 名前の取り違えに注意：「見積・提案書作成」（taiyo-mitsumori）と、チラシ作成（消耗品）の quote.html の画面の見出し「見積・提案書作成」と、「申請書・見積書作成」（前の「住宅改修 見積書作成」＋「特定福祉用具 購入申請書・見積もり作成」）は別のもの。チラシ作成は（レンタル）と（消耗品）で別のリポジトリ。
+- タイルの名前を変える・まとめるときは、ポータルの `RENAMED`（前の名前 → 新しい名前）に足す。並び順・非表示はタイルの名前で覚えているので、足さないと並べた位置が末尾にずれる。
 
 ## ポータルの仕組み（`taiyo-portal/index.html` の1ファイル）
 
@@ -82,6 +82,11 @@ description: 太陽シルバーサービス㈱（行橋営業所）の「太陽�
   タイルの使い方の文にも5つとも Excel 保存を書いた。チラシ作成（消耗品）の見積書の金額は円単位（四捨五入）・特定福祉用具の印刷は入りきらなければ縮めて1枚、も同じ日に公開。
 - 住宅改修の「改修前日付・改修後日付」（日付入り写真の日付を読む）・写真の枠に PDF・箇所を足すと長さへ・フリガナはカタカナ・保存／Excel／印刷のボタンをまん中、も公開した
   （2026-10-22。ポータル 7f3bd4b＝`claude/sasaoka-shikiri-app` の 4b79070 のビルド）。同じブランチの矢崎化工の価格表の取り込み（2f95be2。別のセッション）は、まだ公開していない。
+- 2026-10-22（夕方）：住宅改修と特定福祉用具のタイルを「申請書・見積書作成」の1つにまとめた（ポータル 1a47b1a）。その前に
+  特定福祉用具 e489b63（`claude/care-insurance-auto-transfer-3z0c9n` の fdd825d：申請書・入力の連動・タブの中で開く受け取り）、
+  住宅改修 81a89da（`claude/sasaoka-shikiri-app` の 2326b64：4つのタブ・🛁 特定福祉用具申請書のタブ・題名「申請書・見積書作成」・理由書）を公開。
+  タイルは住宅改修の4つのタブの版が出てから入れる順にした（先にまとめると特定福祉用具に行けなくなるため）。2つのセッションで相談して、
+  住宅改修の公開は住宅改修のセッション、tokutei/ とタイル（index.html）は特定福祉用具のセッションが受け持った。
 - **同じアプリのブランチで、ほかのセッションも作業していることがある。** 公開の前に `git fetch` して、自分の知らないコミットがあれば中身を見る。
   ユーザーが「公開して」と言ったのが自分の直しだけなら、自分のコミットまでの版をビルドして公開し（ほかのセッションの直しは、そのセッションの「公開して」で）、報告でそのことを書く。
 - スキル（`.claude/skills`）は、見積・提案書作成とチラシ作成（消耗品）は main に入った。消耗品売上管理は `claude/skills` のブランチ（main は本番なので、公開のときに入れる）。
