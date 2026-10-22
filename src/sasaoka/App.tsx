@@ -373,6 +373,7 @@ export default function App({start}: {start: MainTab}) {
               <TokuteiEditor
                 key={estimateJob.id}
                 job={estimateJob}
+                update={store.update}
                 onBack={() =>
                   leaveTokutei(() => {
                     removeIfEmpty(estimateJob);

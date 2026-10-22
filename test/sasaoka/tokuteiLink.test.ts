@@ -34,6 +34,12 @@ test('特定福祉用具に渡すお客様の情報：特定福祉用具の案�
   });
 });
 
+test('介護保険証から入れた認定の有効期間・保険者番号も渡す（入っていなければ渡さない）', () => {
+  const f = tokuteiFields(job({shinsei: {...job().shinsei, careFrom: '2024-04-01', careTo: '2027-03-31', insurerNo: ' 409999 '}}));
+  assert.deepEqual([f.careFrom, f.careTo, f.insurerNo], ['2024-04-01', '2027-03-31', '409999']);
+  assert.ok(!('careFrom' in tokuteiFields(job())));
+});
+
 test('まだ入っていない様邸：空のまま渡す。保険者・負担割合は分からなければ渡さない（特定福祉用具の初めの値のまま）', () => {
   const blank = tokuteiFields({...job({customer: '', address: '', insuredNo: '', insurer: '', form: ''}), shinsei: undefined});
   assert.deepEqual(blank, {customer: '', kana: '', insuredNo: '', birthDate: '', gender: '', zip: '', address: '', tel: '', careLevel: '', careOffice: '', careManager: ''});

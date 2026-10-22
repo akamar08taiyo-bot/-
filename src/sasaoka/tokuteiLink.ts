@@ -28,6 +28,10 @@ export type TokuteiFields = {
   burdenRatio?: 1 | 2 | 3;
   careOffice: string; // 居宅介護支援事業所（理由書の作成者の事業所）
   careManager: string; // ケアマネジャー（理由書の作成者）
+  // 介護保険証から（入っていなければ渡さない。特定福祉用具の支給申請書に書くとき用。2026-10-22）
+  careFrom?: string; // 認定の有効期間のはじめ 'YYYY-MM-DD'
+  careTo?: string; // 認定の有効期間のおわり
+  insurerNo?: string; // 保険者番号（6けた）
 };
 
 export function tokuteiFields(job: Job): TokuteiFields {
@@ -47,6 +51,9 @@ export function tokuteiFields(job: Job): TokuteiFields {
     ...(info.burden ? {burdenRatio: Number(info.burden) as 1 | 2 | 3} : {}),
     careOffice: info.reasonOffice.trim(),
     careManager: info.reasonName.trim(),
+    ...(info.careFrom ? {careFrom: info.careFrom} : {}),
+    ...(info.careTo ? {careTo: info.careTo} : {}),
+    ...(info.insurerNo.trim() ? {insurerNo: info.insurerNo.trim()} : {}),
   };
 }
 

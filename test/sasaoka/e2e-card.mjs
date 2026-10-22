@@ -55,7 +55,7 @@ page.on('dialog', (d) => d.accept());
 await page.goto(`${site}/jutaku-mitsumori/index.html`);
 await page.getByRole('button', {name: /サンプルで試す/}).click();
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
-await page.getByRole('tab', {name: '📝 申請書'}).click();
+await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
 const form = page.getByRole('form', {name: '申請書'});
 await form.waitFor();
 
@@ -118,10 +118,24 @@ assert.equal(await rform.getByRole('group', {name: '要介護認定'}).getByRole
 assert.match(await rform.getByLabel('作成者の所属事業所').inputValue(), /ケアプランセンター/);
 await page.waitForFunction(() => document.querySelector('[aria-label="理由書のプレビュー"]')?.innerText.includes('令和6年4月1日～令和9年3月31日'), null, {timeout: 8000});
 // 見積書にも（氏名・番号・住所）
-await page.getByRole('tab', {name: '📋 見積書'}).click();
+await page.getByRole('tab', {name: '📋 工事見積書'}).click();
 await page.getByRole('region', {name: '見積書', exact: true}).waitFor();
 assert.match(await page.getByRole('region', {name: '見積書', exact: true}).innerText(), /見本　花子/);
-log('申請書・理由書・見積書に出た OK');
+// 特定福祉用具申請書のタブにも渡す（中の特定福祉用具のアプリが受け取る localStorage）
+await page.getByRole('tab', {name: '🛁 特定福祉用具申請書'}).click();
+await page.waitForFunction(() => !!localStorage.getItem('taiyo-tokutei-from-jutaku-v1'));
+const handoff = JSON.parse(await page.evaluate(() => localStorage.getItem('taiyo-tokutei-from-jutaku-v1')));
+assert.equal(handoff.fields.insuredNo, '0000123456');
+assert.equal(handoff.fields.customer, '見本　花子');
+assert.equal(handoff.fields.kana, 'ミホン　ハナコ');
+assert.equal(handoff.fields.birthDate, '1938-04-14');
+assert.equal(handoff.fields.careLevel, '要介護2');
+assert.equal(handoff.fields.burdenRatio, 1);
+assert.equal(handoff.fields.insurer, 'yukuhashi');
+assert.deepEqual([handoff.fields.careFrom, handoff.fields.careTo], ['2024-04-01', '2027-03-31']);
+// 特定福祉用具申請書のタブにも「🪪 介護保険証から入れる」（入れると中の特定福祉用具のアプリを開き直す）
+assert.equal(await page.getByRole('button', {name: '🪪 介護保険証から入れる'}).isVisible(), true);
+log('申請書・理由書・見積書・特定福祉用具に出た OK');
 
 // ---------------- 2. 見積もりの入口に PDF をドロップして新規作成（保険者も保険証から）
 await page.getByRole('button', {name: /見積もり・申請書を作成する/}).first().click();
