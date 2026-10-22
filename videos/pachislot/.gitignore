@@ -20,3 +20,7 @@ public/sh*/
 src/episodes/ep*.tsx
 out/ep*
 out/sh*
+episodes/kaiso*/
+public/kaiso*/
+src/episodes/kaiso*.tsx
+out/kaiso*
