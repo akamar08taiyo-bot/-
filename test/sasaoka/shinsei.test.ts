@@ -5,7 +5,7 @@ import {strFromU8, unzipSync, zipSync} from 'fflate';
 import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import {DEFAULT_PLACES, defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
-import {boxLabels, checkBoxes, fillShinsei, fitLinesSize, insuredBoxes, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, placeBox, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems} from '../../src/sasaoka/shinsei.ts';
+import {boxLabels, checkBoxes, fillShinsei, fitLinesSize, insuredBoxes, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, placeBox, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems} from '../../src/sasaoka/shinsei.ts';
 import type {Insurer, Job, Place, Row, ShinseiInfo, ShinseiMarks} from '../../src/sasaoka/types.ts';
 
 const RATES = {estimateRate: 0.8, estimateLaborRate: 1.5, estimateOverheadRate: 0.1, taxRate: 0.1};
@@ -843,7 +843,7 @@ test('写真の用紙の写真の横（上）に書く欄：縦の写真は左�
   assert.deepEqual(photoNoteLines({kind: 2, rows: [], dims: {w: '600', d: '350', h: '150'}}), ['段差の解消　W600mm D350mm H150mm']);
 });
 
-test('写真の用紙（Excel）：写真の横（上）の書く欄に、自動の文と手で足した行をテキストボックスで書き、写真は残りの所に。写真のない写真番号にも書く', () => {
+test('写真の用紙（Excel）：改修前の写真の横（上）の書く欄に、自動の文と手で足した行をテキストボックスで書き、写真は残りの所に。改修後は写真を枠いっぱい。写真のない写真番号にも書く', () => {
   const jpeg = (n: number) => new Uint8Array([0xff, 0xd8, 0xff, 0xe0, n, 0xff, 0xd9]);
   const j = job({insurer: 'kanda', places: job().places.map((p, i) => (i === 0 ? {...p, photoNote: 'ベースプレート　L=800mm'} : p))});
   // 浴室①：改修前は縦の写真（900×1600）、改修後は横の写真（1600×1200）
@@ -852,10 +852,12 @@ test('写真の用紙（Excel）：写真の横（上）の書く欄に、自動
   const isNote = (a: string) => /name="改修[前後]の説明 \d+"/.test(a); // 足した書く欄（原本のテキストボックスとは名前で分ける）
   const boxes = anchors.filter(isNote);
   const pics = anchors.filter((a) => a.includes('<xdr:pic>'));
-  assert.equal(boxes.length, 2); // 改修前・改修後
-  for (const b of boxes) assert.deepEqual([...b.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]), ['手すりの取り付け　L=600mm', 'ベースプレート　L=800mm']);
+  // 書く欄は改修前の枠だけ（ユーザーの指示「改修後には入れる必要はありません。改修前の時に、工務店さんの方に…内容を伝える時に、見やすく分かりやすく伝えるもの」）
+  assert.equal(boxes.length, 1);
+  assert.match(boxes[0], /name="改修前の説明 \d+"/);
+  assert.deepEqual([...boxes[0].matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]), ['手すりの取り付け　L=600mm', 'ベースプレート　L=800mm']);
   // 字体は原本のテキストボックスと同じテーマの本文の字体（書かないと明朝などで出る）
-  for (const b of boxes) assert.match(b, /<xdr:style>.*<a:fontRef idx="minor">.*<\/xdr:style><xdr:txBody>/);
+  assert.match(boxes[0], /<xdr:style>.*<a:fontRef idx="minor">.*<\/xdr:style><xdr:txBody>/);
   const sheet = SHINSEI.kanda!.sheets.find((x) => x.sheet === '1 ')!;
   const inFrame = (a: string, k: 'before' | 'after') => {
     const [c1, r1, c2, r2] = cellsOf(sheet.photoPlace![k]!);
@@ -863,13 +865,18 @@ test('写真の用紙（Excel）：写真の横（上）の書く欄に、自動
     return from[0] >= c1 && from[2] >= r1 && to[0] <= c2 + 1 && to[2] <= r2 + 1; // 枠の右・下の端まで（終わりは次の欄の始まり）
   };
   const [bp, ap] = (['before', 'after'] as const).map((k) => pics.find((a) => inFrame(a, k))!);
-  const [bt, at] = (['before', 'after'] as const).map((k) => boxes.find((a) => inFrame(a, k))!);
-  // 縦の写真は書く欄の左（書く欄の始まりの列は、写真の終わりの列より右か同じ）。横の写真は書く欄の下
-  assert.ok(anchorOf(bt).from[0] >= anchorOf(bp).to[0] - 1, `${JSON.stringify(anchorOf(bp))} ${JSON.stringify(anchorOf(bt))}`);
-  assert.ok(anchorOf(ap).from[2] >= anchorOf(at).to[2] - 1, `${JSON.stringify(anchorOf(ap))} ${JSON.stringify(anchorOf(at))}`);
-  // 写真のない写真番号（⑤玄関）にも、改修前・改修後の枠の上に書く欄（自動の文だけ）
+  assert.ok(inFrame(boxes[0], 'before'));
+  // 改修前の縦の写真は書く欄の左（書く欄の始まりの列は、写真の終わりの列より右か同じ）
+  assert.ok(anchorOf(boxes[0]).from[0] >= anchorOf(bp).to[0] - 1, `${JSON.stringify(anchorOf(bp))} ${JSON.stringify(anchorOf(boxes[0]))}`);
+  // 改修後の写真は、書く欄なしで枠いっぱい（前と同じ置き方）
+  const lay = sheetLayout(strFromU8(files[sheetPath(files, '1 ')]));
+  const full = photoPlacement(rangeBox(lay, sheet.photoPlace!.after!), 1600, 1200);
+  const [ox, oy, cx, cy] = /<a:off x="(-?\d+)" y="(-?\d+)"\/><a:ext cx="(\d+)" cy="(\d+)"\/>/.exec(ap)!.slice(1).map((n) => Number(n) / 9525);
+  assert.ok(Math.abs(ox - full.x) < 1 && Math.abs(oy - full.y) < 1 && Math.abs(cx - full.w) < 1 && Math.abs(cy - full.h) < 1, `${[ox, oy, cx, cy]} / ${JSON.stringify(full)}`);
+  // 写真のない写真番号（⑤玄関）にも、改修前の枠の上に書く欄（自動の文だけ）。改修後の枠には書かない
   const five = anchorsOf(strFromU8(files[drawingPath(files, '1  (5)')!])).filter(isNote);
-  assert.equal(five.length, 2);
+  assert.equal(five.length, 1);
+  assert.match(five[0], /name="改修前の説明 \d+"/);
   assert.deepEqual([...five[0].matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]), ['手すりの取り付け　L=400×600×600mm']);
   // 画面のプレビュー（photoImages なし）では書かない（画面は枠に重ねて描く）
   const pv = unzipSync(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(j, RATES)));

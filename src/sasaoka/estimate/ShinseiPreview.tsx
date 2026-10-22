@@ -219,7 +219,7 @@ export type PreviewPhotos = {
   onDrop: (no: number, slot: PvPhotoSlot['slot'], e: DragEvent) => void;
   onPick: (no: number, slot: PvPhotoSlot['slot']) => void;
   onEdit: (no: number, slot: PvPhotoSlot['slot'], edit: PhotoEdit | undefined) => void;
-  note?: (no: number) => string[]; // 写真の横（上）に書く内容（自動の文と手で足した行。photoNoteLines）
+  note?: (no: number) => string[]; // 改修前の写真の横（上）に書く内容（自動の文と手で足した行。photoNoteLines）
 };
 
 const SLOT_NAME = {before: '改修前', after: '改修後'} as const;
@@ -262,9 +262,9 @@ function PhotoSlotView({
   const touches = useRef(new Map<number, {x: number; y: number}>());
   const pinch = useRef<{d0: number; a0: number; base: PhotoEdit} | null>(null);
   const edit: PhotoEdit = draft ?? photo?.edit ?? {rot: 0, scale: 1};
-  // 書く内容があれば、写真を横（上）に寄せて空いた所に書く（Excel と同じ photoNoteLayout）。
+  // 改修前の枠だけ、書く内容があれば写真を横（上）に寄せて空いた所に書く（Excel と同じ photoNoteLayout。改修後の写真は枠いっぱい）。
   // 回している間（draft）は回す前の向きで分けたまま（縦・横が変わるたびに写真のまん中が動くと回しにくい）。離すと分け直す
-  const lines = photos.note?.(no) ?? [];
+  const lines = slot.slot === 'before' ? (photos.note?.(no) ?? []) : [];
   const parts = photoNoteLayout({x: 0, y: 0, w: slot.w, h: slot.h}, photo ? {w: photo.w, h: photo.h, rot: photo.edit?.rot ?? 0} : null, lines);
   const box = photo ? photoPlacement(parts.photo, photo.w, photo.h, edit) : null;
   const name = `写真貼付用紙${circled(no)}の${SLOT_NAME[slot.slot]}`;

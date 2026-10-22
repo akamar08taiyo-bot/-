@@ -70,7 +70,7 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
       const nos = photoNumbers(j, rates);
       return {...j, places: j.places.map((p) => (nos.has(p.id) ? withSlot(p, 'photoDates', slot, date || undefined) : p))};
     });
-  /** 写真の横（上）に書く内容の追加を直す（空なら持たない） */
+  /** 改修前の写真の横（上）に書く内容の追加を直す（空なら持たない） */
   const setNote = (placeId: string, note: string) =>
     setJob((j) => ({
       ...j,
@@ -528,9 +528,10 @@ export function PhotoBoard({
                         );
                       })}
                     </div>
-                    {/* 写真貼付用紙の写真の横（上）に書く内容：自動の文（改修の種類・寸法）と、手で足す行（ユーザーの指示「自動入力 手すり L=800mm H=600mm、追加 手入力 ベースプレート L=800mm」） */}
-                    <div data-no-drag className="mt-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs" role="group" aria-label={`${circled(no)}${place.name} 写真に書く内容`}>
-                      <div className="text-[11px] font-bold text-slate-600">写真に書く内容</div>
+                    {/* 写真貼付用紙の改修前の写真の横（上）に書く内容：自動の文（改修の種類・寸法）と、手で足す行（ユーザーの指示「自動入力 手すり L=800mm H=600mm、
+                        追加 手入力 ベースプレート L=800mm」。改修前だけ＝工務店さんに見積もり依頼・内容を伝えるためのもの） */}
+                    <div data-no-drag className="mt-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs" role="group" aria-label={`${circled(no)}${place.name} 改修前の写真に書く内容`}>
+                      <div className="text-[11px] font-bold text-slate-600">改修前の写真に書く内容</div>
                       {workText(place) && (
                         <div className="mt-0.5 text-slate-700">
                           <span className="mr-1.5 text-[11px] text-slate-500">自動</span>
@@ -545,7 +546,7 @@ export function PhotoBoard({
                           onChange={(e) => actions.setNote(place.id, e.target.value)}
                           placeholder="ベースプレート　L=800mm"
                           className="mt-0.5 block w-full min-w-0 resize-y rounded border border-slate-300 bg-white px-1.5 py-1 text-xs text-slate-800"
-                          aria-label={`${circled(no)}${place.name} 写真に書く内容の追加`}
+                          aria-label={`${circled(no)}${place.name} 改修前の写真に書く内容の追加`}
                         />
                       </label>
                     </div>

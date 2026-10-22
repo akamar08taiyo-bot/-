@@ -248,7 +248,7 @@ export type ShinseiValues = {
   photos: Record<number, string>; // 写真番号 → 改修場所（写真貼付用紙の改修箇所）
   photoKinds?: Record<number, number>; // 写真番号 → 改修の種類（1〜6。苅田町の写真の用紙の実施した工事種類）
   photoDates?: Record<number, PlacePhotos>; // 写真番号 → 改修前・改修後の撮影日（'YYYY-MM-DD'）
-  photoNotes?: Record<number, string[]>; // 写真番号 → 写真貼付用紙の写真の横（上）に書く内容（自動の文と、手で足した行。photoNoteLines）
+  photoNotes?: Record<number, string[]>; // 写真番号 → 写真貼付用紙の改修前の写真の横（上）に書く内容（自動の文と、手で足した行。photoNoteLines）
   marks: ShinseiMarks; // 丸で囲む値
   texts: ShinseiTexts; // 申請書の画面で入れた項目の文字（書き方の {名前} の値）
   cost: number | null; // 改修費用（数で書く欄。なければ null）
@@ -1325,7 +1325,7 @@ export function photoNoteLayout(frame: Box, size: {w: number; h: number; rot?: n
 /** 書く欄の文字の大きさ（pt）：欄（余白の内側）に入る大きさ */
 export const photoNotePt = (note: Box, lines: string[]) => fitLinesSize(lines, note.w - 2 * NOTE_INSET.x + 6, note.h - 2 * NOTE_INSET.y + 4, NOTE_PT, NOTE_MIN_PT);
 
-/** 写真貼付用紙の改修前・改修後の枠に写真を貼る（xl/media に JPEG を入れ、図形のファイルに写真の図形を足す）。書く内容があれば写真の横（上）にテキストボックスで */
+/** 写真貼付用紙の改修前・改修後の枠に写真を貼る（xl/media に JPEG を入れ、図形のファイルに写真の図形を足す）。書く内容があれば改修前の写真の横（上）にテキストボックスで */
 function drawPhotos(files: Files, sheet: ShinseiSheet, images: PhotoImages, notes: string[] = []): void {
   const place = sheet.photoPlace;
   const path = sheetPaths(files).get(sheet.sheet);
@@ -1343,11 +1343,12 @@ function drawPhotos(files: Files, sheet: ShinseiSheet, images: PhotoImages, note
     const img = images[slot];
     const range = place[slot];
     if (!range) continue;
-    // 書く内容があれば、写真を横（上）に寄せて、空いた所にテキストボックス（写真のない枠も）
-    const parts = photoNoteLayout(rangeBox(lay, range), img ? {w: img.w, h: img.h, rot: img.edit?.rot} : null, notes);
+    // 改修前の枠だけ、書く内容があれば写真を横（上）に寄せて、空いた所にテキストボックス（写真のない枠も）。改修後の写真は枠いっぱい
+    //（ユーザーの指示「改修後には入れる必要はありません。改修前の時に、工務店さんの方に見積もり依頼…内容を伝える時に、見やすく分かりやすく伝えるもの」2026-10-22）
+    const parts = photoNoteLayout(rangeBox(lay, range), img ? {w: img.w, h: img.h, rot: img.edit?.rot} : null, slot === 'before' ? notes : []);
     if (parts.note) {
       const pt = photoNotePt(parts.note, notes);
-      texts.push(noteBoxXml(lay, parts.note, notes, pt, id, slot === 'before' ? '改修前の説明' : '改修後の説明'));
+      texts.push(noteBoxXml(lay, parts.note, notes, pt, id, '改修前の説明'));
       id++;
     }
     if (!img) continue;
