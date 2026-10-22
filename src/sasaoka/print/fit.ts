@@ -55,3 +55,55 @@ export function fitStyle(text: string, widthMm: number, heightMm: number, maxPt:
     ? {fontSize: `${f.pt}pt`, lineHeight: LINE, whiteSpace: 'normal', wordBreak: 'break-all'}
     : {fontSize: `${f.pt}pt`, whiteSpace: 'nowrap'};
 }
+
+/**
+ * 品名（内容・規格）の長い文字を、言葉の切れ目（すき間）で lines 行までに分ける（ユーザーの指示、2026-10-22
+ * 「適度に行替えをおこない、見やすくする。商品名が長い場合のみ」。前は欄の幅で字の途中から折り返していた：「ディンプル／付」）。
+ * 1行に入る（`fitText` が1行と決める）・すき間のない文字はそのまま [text]。手で入れた改行があればそれで分ける。
+ * 分け方は、文字がいちばん大きくできる所（行の数も、少ない方から）
+ */
+export function wordLines(text: string, widthMm: number, heightMm: number, maxPt: number, lines: number): string[] {
+  if (text.includes('\n')) return text.split('\n');
+  const f = fitText(text, widthMm, heightMm, maxPt, lines);
+  // 折り返す大きさでも1行に入るなら分けない（長い商品名だけ分ける）
+  if (lines < 2 || f.lines < 2 || textEm(text) * f.pt * MM_PER_PT <= Math.max(1, widthMm - 1.6)) return [text];
+  const words = text.trim().split(/\s+/);
+  if (words.length < 2) return [text];
+  let best: {lines: string[]; pt: number} = {lines: [text], pt: 0};
+  for (let n = 2; n <= Math.min(lines, words.length); n++) {
+    const split = balance(words, n);
+    const pt = fitLinesPt(split, widthMm, heightMm, maxPt);
+    if (pt > best.pt + 0.05) best = {lines: split, pt};
+  }
+  return best.lines;
+}
+
+/** 言葉を n 行に分ける：いちばん長い行（textEm）がいちばん短くなる分け方 */
+function balance(words: string[], n: number): string[] {
+  const w = words.length;
+  const em = (i: number, j: number) => textEm(words.slice(i, j).join(' '));
+  // cost[k][i]：words[i..] を k 行に分けたときの、いちばん長い行。cut[k][i]：その1行目の終わり
+  const cost: number[][] = Array.from({length: n + 1}, () => Array(w + 1).fill(Infinity));
+  const cut: number[][] = Array.from({length: n + 1}, () => Array(w + 1).fill(w));
+  for (let i = 0; i < w; i++) cost[1][i] = em(i, w);
+  for (let k = 2; k <= n; k++) {
+    for (let i = 0; i <= w - k; i++) {
+      for (let j = i + 1; j <= w - k + 1; j++) {
+        const c = Math.max(em(i, j), cost[k - 1][j]);
+        if (c < cost[k][i]) {
+          cost[k][i] = c;
+          cut[k][i] = j;
+        }
+      }
+    }
+  }
+  const out: string[] = [];
+  let i = 0;
+  for (let k = n; k >= 2; k--) {
+    const j = cut[k][i];
+    out.push(words.slice(i, j).join(' '));
+    i = j;
+  }
+  out.push(words.slice(i).join(' '));
+  return out;
+}

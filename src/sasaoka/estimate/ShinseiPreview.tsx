@@ -8,8 +8,8 @@ import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import type {CSSProperties, DragEvent, PointerEvent as ReactPointerEvent, RefObject} from 'react';
 import type {PvFont, PvHeader, PvPage, PvPhotoSlot, PvShape, PvText, Rect, ShinseiField} from '../shinseiPreview.ts';
 import {circled} from '../estimateForms.ts';
-import {clampScale, normRot, ROT_SNAP, turn} from '../photoEdit.ts';
-import {NOTE_INSET, photoNoteLayout, photoNotePt, photoPlacement} from '../shinsei.ts';
+import {clampOff, clampScale, normRot, ROT_SNAP, turn} from '../photoEdit.ts';
+import {NOTE_INSET, photoNoteLayout, photoNotePt, photoPlacement, photoSlack} from '../shinsei.ts';
 import {familyOf} from '../shinseiPreview.ts';
 import type {PhotoEdit, ShinseiMarks} from '../types.ts';
 
@@ -261,8 +261,9 @@ function PhotoSlotView({
   const picRef = useRef<HTMLDivElement>(null); // 回す前の写真の四角（まん中で回る）
   const touches = useRef(new Map<number, {x: number; y: number}>());
   const pinch = useRef<{d0: number; a0: number; base: PhotoEdit} | null>(null);
+  const move = useRef<{x0: number; y0: number; base: PhotoEdit; moved: boolean} | null>(null); // 選んだ写真をつかんで動かしているとき
   const edit: PhotoEdit = draft ?? photo?.edit ?? {rot: 0, scale: 1};
-  // 改修前の枠だけ、書く内容があれば写真を横（上）に寄せて空いた所に書く（Excel と同じ photoNoteLayout。改修後の写真は枠いっぱい）。
+  // 改修前の枠だけ、書く内容があれば写真を左（横の写真は上）に寄せて空いた所に書く（Excel と同じ photoNoteLayout。改修後の写真は枠いっぱい）。
   // 回している間（draft）は回す前の向きで分けたまま（縦・横が変わるたびに写真のまん中が動くと回しにくい）。離すと分け直す
   const lines = slot.slot === 'before' ? (photos.note?.(no) ?? []) : [];
   const parts = photoNoteLayout({x: 0, y: 0, w: slot.w, h: slot.h}, photo ? {w: photo.w, h: photo.h, rot: photo.edit?.rot ?? 0} : null, lines);
@@ -335,33 +336,63 @@ function PhotoSlotView({
     el.addEventListener('pointercancel', up);
   };
 
-  /** 2本の指（iPad）：ひねると回り、つまむ・広げると大きさが変わる */
+  /**
+   * 選んだ写真をつかんで動かす（ユーザーの指示「写真の位置の調整をおこなえるようにする」2026-10-22。マウスでも指でも）：
+   * 動かした画素を、写真の所の空き（`photoSlack`）に対する位置（−1〜1）にする。空きのない向きには動かない（枠からはみ出さない）
+   */
+  const moved = (base: PhotoEdit, dx: number, dy: number): PhotoEdit => {
+    if (!photo) return base;
+    const {sx, sy} = photoSlack(parts.photo, photo.w, photo.h, base);
+    const off = (v: number | undefined, d: number, slack: number) => (slack > 0.5 ? clampOff((v ?? 0) + (2 * d) / slack) : (v ?? 0));
+    return {...base, x: off(base.x, dx, sx), y: off(base.y, dy, sy)};
+  };
+
+  /** 2本の指（iPad）：ひねると回り、つまむ・広げると大きさが変わる。1本の指（とマウス）は写真を動かす */
   const twoFingers = () => {
     const [p, q] = [...touches.current.values()];
     return {d: Math.hypot(q.x - p.x, q.y - p.y) || 1, a: Math.atan2(q.y - p.y, q.x - p.x)};
   };
   const touchDown = (e: ReactPointerEvent<HTMLElement>) => {
-    if (!selected || e.pointerType === 'mouse') return;
+    if (!selected || (e.pointerType === 'mouse' && e.button !== 0)) return;
     touches.current.set(e.pointerId, {x: e.clientX, y: e.clientY});
     e.currentTarget.setPointerCapture(e.pointerId);
     if (touches.current.size === 2) {
       const {d, a} = twoFingers();
-      pinch.current = {d0: d, a0: a, base: edit};
+      pinch.current = {d0: d, a0: a, base: draftRef.current ?? edit};
+      move.current = null;
+    } else if (touches.current.size === 1) {
+      move.current = {x0: e.clientX, y0: e.clientY, base: edit, moved: false};
     }
   };
   const touchMove = (e: ReactPointerEvent<HTMLElement>) => {
     if (!touches.current.has(e.pointerId)) return;
     touches.current.set(e.pointerId, {x: e.clientX, y: e.clientY});
     const g = pinch.current;
-    if (!g || touches.current.size < 2) return;
-    const {d, a} = twoFingers();
-    preview({rot: normRot(g.base.rot + deg(a - g.a0), ROT_SNAP), scale: clampScale((g.base.scale * d) / g.d0)});
+    if (g && touches.current.size >= 2) {
+      const {d, a} = twoFingers();
+      preview({...g.base, rot: normRot(g.base.rot + deg(a - g.a0), ROT_SNAP), scale: clampScale((g.base.scale * d) / g.d0)});
+      return;
+    }
+    const m = move.current;
+    if (!m || touches.current.size !== 1) return;
+    // 紙を縮めて見せているので、画面の画素を紙の画素に（z＝1÷縮めた割合）。少し動かしただけ（押しただけ）では動かさない
+    const [dx, dy] = [(e.clientX - m.x0) * z, (e.clientY - m.y0) * z];
+    if (!m.moved && Math.hypot(e.clientX - m.x0, e.clientY - m.y0) < 4) return;
+    m.moved = true;
+    preview(moved(m.base, dx, dy));
   };
   const touchUp = (e: ReactPointerEvent<HTMLElement>) => {
     touches.current.delete(e.pointerId);
     if (pinch.current && touches.current.size < 2) {
       pinch.current = null;
+      move.current = null;
       commit();
+      return;
+    }
+    const m = move.current;
+    if (m && touches.current.size === 0) {
+      move.current = null;
+      if (m.moved) commit();
     }
   };
 
@@ -396,13 +427,13 @@ function PhotoSlotView({
             type="button"
             aria-label={name}
             aria-pressed={selected}
-            title={`${SLOT_NAME[slot.slot]}の写真（押すと向き・大きさ）`}
+            title={selected ? 'ドラッグで位置' : `${SLOT_NAME[slot.slot]}の写真（押すと向き・大きさ・位置）`}
             onClick={() => onSelect(true)}
             onPointerDown={touchDown}
             onPointerMove={touchMove}
             onPointerUp={touchUp}
             onPointerCancel={touchUp}
-            className={`absolute inset-0 cursor-pointer ${over ? 'bg-emerald-400/15 outline outline-4 outline-emerald-600' : selected ? '' : 'hover:outline hover:outline-2 hover:outline-emerald-600'}`}
+            className={`absolute inset-0 ${selected ? 'cursor-move' : 'cursor-pointer'} ${over ? 'bg-emerald-400/15 outline outline-4 outline-emerald-600' : selected ? '' : 'hover:outline hover:outline-2 hover:outline-emerald-600'}`}
             style={{touchAction: selected ? 'none' : undefined}}
           >
             <div ref={picRef} className="absolute" style={rotated(box)}>
@@ -456,7 +487,7 @@ function PhotoSlotView({
                 <button type="button" className={tool} title="右に回す" aria-label="右に回す" onClick={() => photos.onEdit(no, slot.slot, turn(edit, 1))}>
                   ↻
                 </button>
-                <button type="button" className={tool} title="向き・大きさを元に戻す" onClick={() => photos.onEdit(no, slot.slot, undefined)}>
+                <button type="button" className={tool} title="向き・大きさ・位置を元に戻す" onClick={() => photos.onEdit(no, slot.slot, undefined)}>
                   元に戻す
                 </button>
                 <button type="button" className={tool} onClick={() => photos.onPick(no, slot.slot)}>
@@ -487,10 +518,10 @@ function PhotoSlotView({
         </button>
       )}
       {parts.note && (
-        // 写真の横（上）に書く内容（押しても写真の枠のボタンに届くように、押せない文字）
+        // 写真の横（下）に書く内容（押しても写真の枠のボタンに届くように、押せない文字）
         <div
           className="pointer-events-none absolute overflow-hidden"
-          style={{left: parts.note.x, top: parts.note.y, width: parts.note.w, height: parts.note.h, padding: `${NOTE_INSET.y}px ${NOTE_INSET.x}px`, fontFamily: familyOf(''), fontSize: (photoNotePt(parts.note, lines) * 4) / 3, lineHeight: 1.25, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#000'}}
+          style={{left: parts.note.x, top: parts.note.y, width: parts.note.w, height: parts.note.h, padding: `${NOTE_INSET.y}px ${NOTE_INSET.x}px`, fontFamily: familyOf(''), fontSize: (photoNotePt(parts.note, lines) * 4) / 3, lineHeight: 1.25, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#000', textAlign: parts.align}}
         >
           {lines.join('\n')}
         </div>

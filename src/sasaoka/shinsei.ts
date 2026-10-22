@@ -9,10 +9,11 @@
 import {strFromU8, strToU8, unzipSync, zipSync} from 'fflate';
 import {estimateTotals, isBlankRow} from './calc.ts';
 import type {EstimateRates, EstimateSettings} from './calc.ts';
+import {BASE_PLATE} from './cutLink.ts';
 import {circled, eraOf, jobInsurer, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa} from './estimateForms.ts';
-import {clampScale, normRot} from './photoEdit.ts';
+import {clampOff, clampScale, normRot} from './photoEdit.ts';
 import type {Insurer, Job, PhotoEdit, Place, PlacePhotos, ShinseiInfo, ShinseiMarks} from './types.ts';
-import {todayIso} from './util.ts';
+import {customerFilePart, todayIso} from './util.ts';
 
 /** 申請書の原本の、1つのシートで転記する欄（番地）。ないものは書かない */
 export type ShinseiSheet = {
@@ -285,7 +286,6 @@ export function workItems(job: Pick<Job, 'places'>, rates: EstimateRates): WorkI
   return out;
 }
 
-const BASE_PLATE = /ベースプレート|補強板|取付板/;
 
 /**
  * 改修の内容の1行（4つの保険者の申請書の改修の内容・内訳明細書の工事内容・平面図の工事内容。どれも同じ書き方）。
@@ -495,10 +495,9 @@ export function insuredBoxes(insuredNo: string, n = 10): string[] {
   return digits ? [...digits.padStart(n, '0')] : Array.from({length: n}, () => '');
 }
 
-/** ファイル名：苅田町申請書_山田様_2026-10-21.xlsx */
-export function shinseiFileName(map: Pick<ShinseiMap, 'title'>, job: Pick<Job, 'customer'>, date: string): string {
-  const who = job.customer.trim().replace(/[\\/:*?"<>|]/g, '_') || 'お客様';
-  return `${map.title}_${who}様${date ? `_${date}` : ''}.xlsx`;
+/** ファイル名：「山田花子様住宅改修申請書.xlsx」（ユーザーの指示、2026-10-22。見積書は「…様住宅改修見積書.xlsx」）。保険者・作成日は付けない（引数は前の呼び方のまま） */
+export function shinseiFileName(_map: Pick<ShinseiMap, 'title'> | null, job: Pick<Job, 'customer'>, _date?: string): string {
+  return `${customerFilePart(job.customer)}住宅改修申請書.xlsx`;
 }
 
 // ---------------------------------------------------------------- Excel（xlsx）の中身を書きかえる
@@ -1277,18 +1276,32 @@ export function photoFit(frame: Box, w: number, h: number): Box {
 }
 
 /**
- * 向き・大きさを直した写真を枠に置く位置：回す前の写真の四角（まん中は枠のまん中）と、右回りの角度。
+ * 向き・大きさ・位置を直した写真を枠に置く位置：回す前の写真の四角（まん中は枠のまん中。位置 x・y を直していればその分ずらす）と、右回りの角度。
  * 回したあとの写真（の外側の四角）が枠に収まるだけ大きくして、その scale 倍にする（1 より大きくしないので、写真は枠からはみ出さない）。
+ * 位置は、回したあとの写真の外側の四角と枠（余白の内側）の空きの中で動かす（−1 で左・上の端、1 で右・下の端。`photoSlack`）。
  * 画面のプレビュー・写真の欄と、Excel の写真の図形（この四角に置いて rot だけ回す）で同じ計算を使う
  */
 export function photoPlacement(frame: Box, w: number, h: number, edit?: PhotoEdit, pad = 4): Box & {rot: number} {
   const rot = normRot(edit?.rot ?? 0);
-  const t = (rot * Math.PI) / 180;
+  const {k, sx, sy} = placeScale(frame, w, h, edit, pad);
+  const [pw, ph] = [Math.max(w, 1) * k, Math.max(h, 1) * k];
+  const [cx, cy] = [frame.x + frame.w / 2 + (clampOff(edit?.x) * sx) / 2, frame.y + frame.h / 2 + (clampOff(edit?.y) * sy) / 2];
+  return {x: cx - pw / 2, y: cy - ph / 2, w: pw, h: ph, rot};
+}
+
+/** 写真を動かせる空き（画素。回したあとの写真の外側の四角と、枠の余白の内側との差）。位置を1動かすと、空きの半分だけ動く */
+export function photoSlack(frame: Box, w: number, h: number, edit?: PhotoEdit, pad = 4): {sx: number; sy: number} {
+  const {sx, sy} = placeScale(frame, w, h, edit, pad);
+  return {sx, sy};
+}
+
+function placeScale(frame: Box, w: number, h: number, edit: PhotoEdit | undefined, pad: number): {k: number; sx: number; sy: number} {
+  const t = (normRot(edit?.rot ?? 0) * Math.PI) / 180;
   const [c, s] = [Math.abs(Math.cos(t)), Math.abs(Math.sin(t))];
   const [bw, bh] = [Math.max(w, 1) * c + Math.max(h, 1) * s, Math.max(w, 1) * s + Math.max(h, 1) * c];
-  const k = Math.max(0, Math.min((frame.w - 2 * pad) / bw, (frame.h - 2 * pad) / bh)) * clampScale(edit?.scale ?? 1);
-  const [pw, ph] = [Math.max(w, 1) * k, Math.max(h, 1) * k];
-  return {x: frame.x + (frame.w - pw) / 2, y: frame.y + (frame.h - ph) / 2, w: pw, h: ph, rot};
+  const [fw, fh] = [Math.max(0, frame.w - 2 * pad), Math.max(0, frame.h - 2 * pad)];
+  const k = Math.min(fw / bw, fh / bh) * clampScale(edit?.scale ?? 1);
+  return {k, sx: Math.max(0, fw - bw * k), sy: Math.max(0, fh - bh * k)};
 }
 
 /** 写真の横（上）に書く内容の文字の大きさ（pt）。入らなければ小さくする（いちばん小さくて NOTE_MIN_PT） */
@@ -1297,29 +1310,34 @@ const NOTE_MIN_PT = 6;
 /** 書く欄のまわりの余白（画素）：左右・上下 */
 export const NOTE_INSET = {x: 5, y: 3};
 
-/** 写真の枠を、写真の所（photo）と書く欄（note）に分けた四角。書くことがなければ note は null（写真は枠いっぱい） */
-export type PhotoNoteLayout = {photo: Box; note: Box | null};
+/** 写真の枠を、写真の所（photo）と書く欄（note）に分けた四角。書くことがなければ note は null（写真は枠いっぱい）。align は書く欄の文字のそろえ方 */
+export type PhotoNoteLayout = {photo: Box; note: Box | null; align: 'left' | 'center'};
 
 /**
  * 写真の枠を、写真の所と書く欄に分ける（ユーザーの指示「写真をめいいっぱいにしない。縦写真の場合、写真を左に寄せてスペースをつくる。
  * 横写真の場合、上にスペースをあけて入力スペースをつくるなど、バランスよく」、2026-10-21）。
- * 縦長の写真（回したあとで）：枠の高さに合わせた写真の幅（枠の幅の 62% まで）を左に、残りの右を書く欄に。
- * 横長の写真・写真のない枠：上に書く欄（行の数に合わせて、枠の高さの 16〜32%）、その下に写真。画面のプレビューと Excel で同じ計算を使う
+ * 縦長の写真（回したあとで）：枠の高さに合わせた写真の幅（枠の幅の 62% まで）を左に、残りの右を書く欄に（左ぞろえ）。
+ * 横長の写真・写真のない枠：上に写真、そのすぐ下に書く欄（行の数に合わせて、枠の高さの 16〜32%。写真の高さが余れば写真のすぐ下から）。
+ * 書く欄の文字は中央ぞろえ（ユーザーの指示「画像を上にもってきて、画像の下に寸法をもってくる」「文字については、中央ぞろえにする」2026-10-22。前は書く欄が上）。
+ * 画面のプレビューと Excel で同じ計算を使う
  */
 export function photoNoteLayout(frame: Box, size: {w: number; h: number; rot?: number} | null, lines: string[], pad = 4): PhotoNoteLayout {
-  if (lines.length === 0) return {photo: frame, note: null};
+  if (lines.length === 0) return {photo: frame, note: null, align: 'left'};
+  let ratio = 0; // 回したあとの写真の 高さ÷幅（写真がなければ 0）
   if (size) {
     const t = (normRot(size.rot ?? 0) * Math.PI) / 180;
     const [c, s] = [Math.abs(Math.cos(t)), Math.abs(Math.sin(t))];
     const [bw, bh] = [Math.max(size.w, 1) * c + Math.max(size.h, 1) * s, Math.max(size.w, 1) * s + Math.max(size.h, 1) * c];
     if (bh > bw * 1.05) {
       const pw = Math.min(frame.w * 0.62, ((frame.h - 2 * pad) * bw) / bh + 2 * pad);
-      return {photo: {x: frame.x, y: frame.y, w: pw, h: frame.h}, note: {x: frame.x + pw, y: frame.y, w: frame.w - pw, h: frame.h}};
+      return {photo: {x: frame.x, y: frame.y, w: pw, h: frame.h}, note: {x: frame.x + pw, y: frame.y, w: frame.w - pw, h: frame.h}, align: 'left'};
     }
+    ratio = bh / bw;
   }
   const line = ((NOTE_PT * 4) / 3) * LINE_K;
   const nh = Math.min(frame.h * 0.32, Math.max(frame.h * 0.16, lines.length * line + 2 * NOTE_INSET.y + 2));
-  return {photo: {x: frame.x, y: frame.y + nh, w: frame.w, h: frame.h - nh}, note: {x: frame.x, y: frame.y, w: frame.w, h: nh}};
+  const ph = ratio > 0 ? Math.min(frame.h - nh, (frame.w - 2 * pad) * ratio + 2 * pad) : frame.h - nh;
+  return {photo: {x: frame.x, y: frame.y, w: frame.w, h: ph}, note: {x: frame.x, y: frame.y + ph, w: frame.w, h: frame.h - ph}, align: 'center'};
 }
 
 /** 書く欄の文字の大きさ（pt）：欄（余白の内側）に入る大きさ */
@@ -1343,12 +1361,12 @@ function drawPhotos(files: Files, sheet: ShinseiSheet, images: PhotoImages, note
     const img = images[slot];
     const range = place[slot];
     if (!range) continue;
-    // 改修前の枠だけ、書く内容があれば写真を横（上）に寄せて、空いた所にテキストボックス（写真のない枠も）。改修後の写真は枠いっぱい
+    // 改修前の枠だけ、書く内容があれば写真を左（横の写真は上）に寄せて、空いた所にテキストボックス（写真のない枠も）。改修後の写真は枠いっぱい
     //（ユーザーの指示「改修後には入れる必要はありません。改修前の時に、工務店さんの方に見積もり依頼…内容を伝える時に、見やすく分かりやすく伝えるもの」2026-10-22）
     const parts = photoNoteLayout(rangeBox(lay, range), img ? {w: img.w, h: img.h, rot: img.edit?.rot} : null, slot === 'before' ? notes : []);
     if (parts.note) {
       const pt = photoNotePt(parts.note, notes);
-      texts.push(noteBoxXml(lay, parts.note, notes, pt, id, '改修前の説明'));
+      texts.push(noteBoxXml(lay, parts.note, notes, pt, id, '改修前の説明', parts.align));
       id++;
     }
     if (!img) continue;
@@ -1383,10 +1401,11 @@ function drawPhotos(files: Files, sheet: ShinseiSheet, images: PhotoImages, note
  * 写真の横（上）に書く内容のテキストボックス（枠線・塗りなし。余白は NOTE_INSET。文字は pt）。
  * 字体と色は、原本のテキストボックスと同じく style（テーマの本文の字体・文字の色）で。書かないと Excel・LibreOffice が別の字体（明朝など）で出す
  */
-function noteBoxXml(lay: SheetLayout, box: Box, lines: string[], pt: number, id: number, name: string): string {
+function noteBoxXml(lay: SheetLayout, box: Box, lines: string[], pt: number, id: number, name: string, align: PhotoNoteLayout['align'] = 'left'): string {
   const sz = Math.round(pt * 100);
   const [ix, iy] = [Math.round(NOTE_INSET.x * EMU), Math.round(NOTE_INSET.y * EMU)];
-  const paras = lines.map((l) => `<a:p><a:r><a:rPr lang="ja-JP" altLang="en-US" sz="${sz}"/><a:t>${esc(l)}</a:t></a:r></a:p>`).join('');
+  const ppr = align === 'center' ? '<a:pPr algn="ctr"/>' : '';
+  const paras = lines.map((l) => `<a:p>${ppr}<a:r><a:rPr lang="ja-JP" altLang="en-US" sz="${sz}"/><a:t>${esc(l)}</a:t></a:r></a:p>`).join('');
   const none = '<a:scrgbClr r="0" g="0" b="0"/>';
   return (
     `<xdr:twoCellAnchor>${fromTo(lay, box)}<xdr:sp macro="" textlink=""><xdr:nvSpPr><xdr:cNvPr id="${id}" name="${name} ${id}"/><xdr:cNvSpPr txBox="1"/></xdr:nvSpPr>` +

@@ -116,6 +116,12 @@ test('前のデータの行・部材にも、定価・長さ・見積の単価�
   const [j2] = cleanJobs([{places: [{rows: [{kind: 'material', name: '木製手すり 35φ 4m'}, {kind: 'labor', name: '補強板 2m以下'}]}]}]);
   assert.deepEqual(j2.places[0].rows.map((x) => x.pieceLengthM), [4, 0]);
   assert.deepEqual(cleanMaterials([{name: '手すり 2000mm'}, {name: 'ブラケット'}, {name: '手すり 4m', pieceLengthM: 0}]).map((m) => m.pieceLengthM), [2, 0, 0]);
+  // 前の版が「120mm幅」を1本の長さ（0.12m）と読んだ部材・行は読み直す。行は見積書の本数（1.2本）がそのままになるように使う長さも直す。
+  // 手で入れた1本の長さ（商品名から読んだのと違う）はそのまま
+  const plate = 'マツ六 BH-412 木製ベースプレート 120mm幅 Mブラウン 2m';
+  assert.deepEqual(cleanMaterials([{name: plate, pieceLengthM: 0.12}, {name: plate, pieceLengthM: 3}]).map((m) => m.pieceLengthM), [2, 3]);
+  const [j3] = cleanJobs([{places: [{rows: [{kind: 'material', name: plate, qty: 1, lengthCm: 14.4, pieceLengthM: 0.12}, {kind: 'material', name: plate, qty: 1, lengthCm: 60, pieceLengthM: 3}]}]}]);
+  assert.deepEqual(j3.places[0].rows.map((x) => [x.pieceLengthM, x.lengthCm]), [[2, 240], [3, 60]]);
   const [r2] = cleanJobs([{places: [{rows: [{kind: 'material', estPrice: '9600', lengthCm: -5}]}]}])[0].places[0].rows;
   assert.deepEqual([r2.estPrice, r2.lengthCm], [9600, 0]);
   assert.deepEqual(cleanKits([{name: '一式', rows: [{kind: 'labor', name: '木', price: 1000, qty: 2}]}, 'x']).map((k) => [k.name, k.rows.length]), [['一式', 1]]);

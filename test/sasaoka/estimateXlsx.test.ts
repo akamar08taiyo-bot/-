@@ -6,6 +6,7 @@ import {defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {estimateFileName, estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import type {Job, Place, Row} from '../../src/sasaoka/types.ts';
 import {manualRow} from '../../src/sasaoka/rows.ts';
+import {wordLines} from '../../src/sasaoka/print/fit.ts';
 import {readXlsx} from '../../src/sasaoka/xlsx.ts';
 import {colName, SheetBuilder, writeXlsx} from '../../src/sasaoka/xlsxWrite.ts';
 
@@ -105,10 +106,10 @@ function evaluate(cells: Map<string, Cell>, ref: string): number {
 
 // ---------------------------------------------------------------- 苅田町・行橋市・みやこ町用
 
-test('Excel（苅田町・行橋市・みやこ町用）：印刷と同じ欄に同じ文字・数字。ファイル名は 書式_お客様名様_作成日', () => {
+test('Excel（苅田町・行橋市・みやこ町用）：印刷と同じ欄に同じ文字・数字。ファイル名は お客様名様住宅改修見積書', () => {
   const j = job();
   const {bytes, fileName} = estimateXlsx(j, S, '2026-10-20');
-  assert.equal(fileName, '工事費見積書兼工事費内訳書_山田様_2026-10-20.xlsx');
+  assert.equal(fileName, '山田様住宅改修見積書.xlsx');
   const x = open(bytes);
   assert.equal(x.text('A1'), '①　工事費見積書兼工事費内訳書');
   assert.equal(x.text('A3'), '山田');
@@ -133,11 +134,11 @@ test('Excel（苅田町・行橋市・みやこ町用）：印刷と同じ欄に
     ['消費税', t.all.tax, t.target.tax],
     ['合計', t.all.total, t.target.total],
   ]);
-  assert.deepEqual([t.all.subtotal, t.all.total, t.target.total], [48184, 58302, 38942]); // 対象：48,184−16,000＝32,184
+  assert.deepEqual([t.all.subtotal, t.all.total, t.target.total], [48184, 58300, 38940]); // 対象：48,184−16,000＝32,184。合計の末尾は0（諸経費で端数調整）
   // 表として読める（取り込みの読み取りでも、お客様名と合計が読める）
   const grid = readXlsx(bytes)[0];
   assert.equal(grid.name, '山田様');
-  assert.ok(grid.rows.some((r) => r.includes('合計') && r.includes('58302')));
+  assert.ok(grid.rows.some((r) => r.includes('合計') && r.includes('58300')));
 });
 
 test('Excel の金額は式：数量・単価を直せば計算し直される。式の答えはアプリの金額と同じ（同じにならない行は数字のまま）', () => {
@@ -149,7 +150,9 @@ test('Excel の金額は式：数量・単価を直せば計算し直される�
   assert.equal(x.cells.get('L13')?.f, 'G13'); // 対象外金額
   assert.equal(x.cells.get('G12')?.f, undefined); // 0.333×7,200＝2,397 にならないよう、2,400 をそのまま書く
   assert.equal(x.cells.get('G23')?.f, 'SUM(G9:G22)');
-  assert.equal(x.cells.get('G24')?.f, `ROUNDDOWN(G23*${S.estimateOverheadRate},0)`);
+  // 諸経費は合計の末尾を0にする端数調整で 小計×0.1 と違う金額なので数字のまま（調整しなくてよい見積書なら式）
+  assert.equal(x.cells.get('G24')?.f, undefined);
+  assert.equal(x.text('G24'), estimateTotals(job(), S).all.overhead);
   assert.equal(x.cells.get('G25')?.f, `ROUNDDOWN((G23+G24)*${S.taxRate},0)`);
   assert.equal(x.cells.get('G26')?.f, 'G23+G24+G25');
   // すべての式を計算し直して、書いてある数字（アプリの金額）と同じになる
@@ -159,7 +162,7 @@ test('Excel の金額は式：数量・単価を直せば計算し直される�
     assert.equal(evaluate(x.cells, ref), c.v, `${ref} =${c.f}`);
     n++;
   }
-  assert.ok(n >= 25, `式の数 ${n}`);
+  assert.ok(n >= 23, `式の数 ${n}`); // 諸経費（全体・対象）は数字
 });
 
 test('諸経費を手で直した見積書は、その金額をそのまま書く（式にしない）', () => {
@@ -233,12 +236,13 @@ test('Excel：空白の行（何も入っていない部材の行）は罫線だ
 test('Excel（広域連合用）：施工費は 時間×2,500円、算出根拠、対象工事部分（対象外の行は空）、Ｐ－1、フッター', () => {
   const j = job({form: 'kouiki'});
   const {bytes, fileName} = estimateXlsx(j, S, '2026-10-20');
-  assert.equal(fileName, '住宅改修内訳明細書_山田様_2026-10-20.xlsx');
+  assert.equal(fileName, '山田様住宅改修見積書.xlsx');
   const x = open(bytes);
   assert.equal(x.text('A1'), '内訳書　様式');
   assert.equal(x.text('K3'), '対象工事部分');
   const row = (r: number) => 'ABCDEFGHIJKLMNOPQ'.split('').map((c) => x.text(`${c}${r}`) ?? '');
-  assert.deepEqual(row(5), ['勝手口', '手すり取付', '材', '矢崎化工 HCDT-4000 NTディンプルパイプ', '', 0.7, '本', 11520, 8064, '', '①', '①', 0.7, '本', 11520, 8064, '定価14,400円（4m）×0.8\n2800mm÷4000mm＝0.7']);
+  // 長い商品名は言葉の切れ目で改行（広域連合用の欄は狭い）
+  assert.deepEqual(row(5), ['勝手口', '手すり取付', '材', '矢崎化工 HCDT-4000\nNTディンプルパイプ', '', 0.7, '本', 11520, 8064, '', '①', '①', 0.7, '本', 11520, 8064, '定価14,400円（4m）×0.8\n2800mm÷4000mm＝0.7']);
   assert.deepEqual(row(7), ['', '', '手', '同上施工費', '', 2.8, '時間', 2500, 7000, '', '', '', 2.8, '時間', 2500, 7000, '1時間2,500円']);
   assert.deepEqual(row(9), ['', '', '材', 'エアコン移設', '', 1, '式', 16000, 16000, '', '', '', '', '', '', '', '']); // 対象外
   assert.equal(x.cells.get('I7')?.f, 'ROUNDDOWN(F7*H7,0)'); // 2.8時間×2,500円
@@ -260,9 +264,10 @@ test('Excel（広域連合用）：施工費は 時間×2,500円、算出根拠�
   assert.ok(styles.includes('<name val="ＭＳ Ｐ明朝"/>')); // 本文は明朝、数字はゴシック
 });
 
-test('ファイル名：お客様名がなければ「お客様」、ファイル名に使えない文字は _ にする。作成日がなければ日付を付けない', () => {
-  assert.equal(estimateFileName(job({customer: ''}), S, '2026-10-20'), '工事費見積書兼工事費内訳書_お客様様_2026-10-20.xlsx');
-  assert.equal(estimateFileName(job({customer: '山田/佐藤', form: 'kouiki'}), S, ''), '住宅改修内訳明細書_山田_佐藤様.xlsx');
+test('ファイル名：「山田花子様住宅改修見積書」（すき間は詰める）。お客様名がなければ「お客様」、ファイル名に使えない文字は _ にする', () => {
+  assert.equal(estimateFileName(job({customer: '山田　花子'}), S, '2026-10-22'), '山田花子様住宅改修見積書.xlsx');
+  assert.equal(estimateFileName(job({customer: ''}), S, '2026-10-20'), 'お客様住宅改修見積書.xlsx');
+  assert.equal(estimateFileName(job({customer: '山田/佐藤', form: 'kouiki'}), S, ''), '山田_佐藤様住宅改修見積書.xlsx');
 });
 
 // ---------------------------------------------------------------- 書き出しの部品
@@ -286,4 +291,20 @@ test('xlsxWrite：列の名前・となり合うマスの罫線を1本にまと�
   // 読み取りの部品で読み直せる（文字・数字）
   const grid = readXlsx(writeXlsx([sh]))[0];
   assert.deepEqual(grid.rows, [['a', 'b', 'c'], ['merged', '', '']]);
+});
+
+test('長い商品名は言葉の切れ目で改行する（印刷・Excel とも。ユーザーの指示「商品名が長い場合のみ」2026-10-22）', () => {
+  const C = 48.1; // 苅田町・行橋市・みやこ町用の内容（規格・範囲）の欄の幅（mm）
+  assert.deepEqual(wordLines('マツ六 BD-132 35アッシュ丸棒 ディンプル付 Mオーク 2m', C, 5.77, 9, 2), ['マツ六 BD-132 35アッシュ丸棒', 'ディンプル付 Mオーク 2m']);
+  assert.deepEqual(wordLines('マツ六 BH-412 木製ベースプレート 120mm幅 Mブラウン 2m', C, 5.77, 9, 2), ['マツ六 BH-412 木製ベースプレート', '120mm幅 Mブラウン 2m']);
+  assert.deepEqual(wordLines('マツ六 BD-08G 35エンドブラケットカバー付 ゴールド', C, 5.77, 9, 2), ['マツ六 BD-08G', '35エンドブラケットカバー付 ゴールド']);
+  // 1行に入る名前・すき間のない名前はそのまま。手で入れた改行はそのまま
+  assert.deepEqual(wordLines('同上施工費', C, 5.77, 9, 2), ['同上施工費']);
+  assert.deepEqual(wordLines('TOTO インテリア・バー I型 600mm', C, 5.77, 9, 2), ['TOTO インテリア・バー I型 600mm']);
+  assert.deepEqual(wordLines('木製手すりディンプル付きアッシュ丸棒ミディアムオーク二メートル', C, 5.77, 9, 2), ['木製手すりディンプル付きアッシュ丸棒ミディアムオーク二メートル']);
+  assert.deepEqual(wordLines('手すり\n長さ 2m', C, 5.77, 9, 2), ['手すり', '長さ 2m']);
+  // Excel の欄にも同じ改行（折り返しの書式）
+  const j = job({places: [place('廊下', [mat('マツ六 BD-132 35アッシュ丸棒 ディンプル付 Mオーク 2m', 12000)])]});
+  const x = open(estimateXlsx(j, S, '2026-10-22').bytes);
+  assert.equal(x.text('C9'), 'マツ六 BD-132 35アッシュ丸棒\nディンプル付 Mオーク 2m');
 });

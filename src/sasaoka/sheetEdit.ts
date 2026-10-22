@@ -9,7 +9,8 @@
 
 import {cutToLength, estimateAmount, estimatePlaceLines, estimateQty, estimateUnitPrice, isBlankRow, listPriceOf, overheadAuto, estimateTotals, rounddown} from './calc.ts';
 import type {EstimateRates} from './calc.ts';
-import {KINDS, materialText, rowUnit} from './estimateForms.ts';
+import {KINDS, autoNote, formLines, lineNote, materialText, noteText, rowUnit} from './estimateForms.ts';
+import {fillAdded, placeAfterQty} from './cutLink.ts';
 import {guessPieceLengthM} from './priceImport.ts';
 import {copyRows, manualRow, materialRow, newPlace} from './rows.ts';
 import {padInsuredNo} from './shinsei.ts';
@@ -124,6 +125,7 @@ function workHead(rows: Row[], ri: number): number {
 const setPlaceRows = (job: Job, pi: number, rows: Row[]): Job => ({...job, places: job.places.map((p, i) => (i === pi ? {...p, rows} : p))});
 const patchRow = (job: Job, f: Found, patch: Partial<Row>): Job => setPlaceRows(job, f.pi, f.place.rows.map((r, i) => (i === f.ri ? {...r, ...patch} : r)));
 const patchPlace = (job: Job, pi: number, patch: Partial<Place>): Job => ({...job, places: job.places.map((p, i) => (i === pi ? {...p, ...patch} : p))});
+const withPlace = (job: Job, pi: number, fn: (p: Place) => Place): Job => ({...job, places: job.places.map((p, i) => (i === pi ? fn(p) : p))});
 
 /** 部材リストの部材を行に書き写す */
 function materialFields(m: Material): Partial<Row> {
@@ -193,7 +195,7 @@ export function sheetValue(job: Job, key: string, ctx: SheetCtx, date = ''): str
     if (field === 'text') return r.estText ?? '';
     if (field === 'qty') return ctx.settings.estimateHourRate > 0 ? String(Math.round((amount / ctx.settings.estimateHourRate) * 100) / 100) : '1';
     if (field === 'price') return String(amount);
-    if (field === 'note') return r.estNote ?? '';
+    if (field === 'note') return noteOf(job, r.id, ctx)?.shown ?? r.estNote ?? '';
     return '';
   }
   // 何も入っていない行（挿入した行など）は見積書では空白なので、書き直すときも空から（前は内容の欄に「材料費」と出た。ユーザーの指摘、2026-10-21）
@@ -202,7 +204,7 @@ export function sheetValue(job: Job, key: string, ctx: SheetCtx, date = ''): str
   if (field === 'qty') return String(cutToLength(r) ? Math.round(estimateQty(r) * 1000) / 1000 : r.qty);
   if (field === 'unit') return rowUnit(r);
   if (field === 'price') return String(estimateUnitPrice(r, rates));
-  if (field === 'note') return r.estNote ?? (listPriceOf(r) > 0 ? String(listPriceOf(r)) : '');
+  if (field === 'note') return noteOf(job, r.id, ctx)?.shown ?? r.estNote ?? '';
   return '';
 }
 
@@ -257,18 +259,22 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
       const amount = n === null ? null : field === 'qty' ? rounddown(n * ctx.settings.estimateHourRate) : Math.round(n);
       return {job: setPlaceRows(job, found.pi, setWorkAmount(found.place.rows, head, amount, ctx.settings)), key};
     }
-    if (field === 'note') return {job: patchRow(job, {...found, ri: head, row: headRow}, {estNote: trimmed === '' ? null : text}), key};
+    if (field === 'note') {
+      const same = sameNote(text, noteOf(job, headRow.id, ctx)?.auto ?? '');
+      return {job: patchRow(job, {...found, ri: head, row: headRow}, {estNote: trimmed === '' || same ? null : text}), key};
+    }
     return {job, key};
   }
 
   // 部材の行
   if (field === 'text') {
-    if (ctx.pick) return {job: patchRow(job, found, {...materialFields(ctx.pick), estText: null, estNote: null, estPrice: null}), key};
+    if (ctx.pick) return {job: withPlace(patchRow(job, found, {...materialFields(ctx.pick), estText: null, estNote: null, estPrice: null}), found.pi, (p) => fillAdded(p, new Set([r.id]))), key};
     if (trimmed === (isBlankRow(r) ? '' : (r.estText ?? materialText(r)))) return {job, key};
     if (trimmed === '') return {job: patchRow(job, found, {name: '', maker: '', code: '', estText: null}), key};
     return {job: patchRow(job, found, {name: trimmed, maker: '', code: '', estText: null, pieceLengthM: r.pieceLengthM || guessPieceLengthM(trimmed)}), key};
   }
-  if (field === 'qty') return {job: patchRow(job, found, qtyPatch(r, trimmed)), key};
+  // 切って使う手すり・ベースプレートは、同じ箇所のもう一方と申請書の長さにもつなぐ（`cutLink.ts`）
+  if (field === 'qty') return {job: withPlace(patchRow(job, found, qtyPatch(r, trimmed)), found.pi, (p) => placeAfterQty(found.place, p, r.id)), key};
   if (field === 'unit') return {job: patchRow(job, found, {unit: trimmed}), key};
   if (field === 'price') {
     if (trimmed === '') return {job: patchRow(job, found, {estPrice: null}), key};
@@ -277,7 +283,7 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
     const auto = estimateUnitPrice({...r, estPrice: null}, rates);
     return {job: patchRow(job, found, {estPrice: n === auto ? null : n}), key};
   }
-  if (field === 'note') return {job: patchRow(job, found, notePatch(r, text)), key};
+  if (field === 'note') return {job: patchRow(job, found, notePatch(r, text, noteOf(job, r.id, ctx)?.auto ?? '')), key};
   return {job, key};
 }
 
@@ -321,16 +327,34 @@ function qtyPatch(r: Row, trimmed: string): Partial<Row> {
 }
 
 /** 備考（算出根拠）：定価を入れたら単価は 定価×0.8（手で入れた単価はやめる）。定価でない文字はそのまま備考に。
- *  1本の長さ（4m）も入れたら、先に入れてあった小数の数量（0.15）は切って使う長さにする（数量の欄と同じ） */
-function notePatch(r: Row, text: string): Partial<Row> {
+ *  1本の長さ（4m）も入れたら、先に入れてあった小数の数量（0.15）は切って使う長さにする（数量の欄と同じ）。
+ *  欄には備考の全文（「定価12,000円（2m）×0.8」と「2400mm÷2000mm＝1.2」の2行）が出るので、そのまま確定したら自動の文のまま。
+ *  1行目の定価・1本の長さだけ直して2行目（長さの計算）がそのままなら、定価を直したとみなす（計算の行は自動で書き直す） */
+function notePatch(r: Row, text: string, auto: string): Partial<Row> {
   const trimmed = text.trim();
   if (trimmed === '') return {listPrice: 0, estNote: null};
-  const p = parseListNote(trimmed);
-  if (!p) return {estNote: text.replace(/\s+$/, '')};
+  if (sameNote(trimmed, auto)) return {estNote: null};
+  const [first, ...rest] = trimmed.split('\n');
+  const p = parseListNote(first.trim());
+  if (!p || (rest.length > 0 && !sameNote(rest.join('\n'), auto.split('\n').slice(1).join('\n')))) return {estNote: text.replace(/\s+$/, '')};
   const patch: Partial<Row> = {listPrice: p.list, estNote: null, estPrice: null};
   if (!p.pieceM) return patch;
   const cut = !(r.lengthCm > 0) && r.qty > 0 && !Number.isInteger(r.qty);
   return {...patch, pieceLengthM: p.pieceM, ...(cut ? {lengthCm: Math.round(r.qty * p.pieceM * 100 * 1000) / 1000, qty: 1} : {})};
+}
+
+/** 見積書に出ている備考・算出根拠（shown。手で直していればその文）と自動の文（auto）。改行で行を分ける */
+function noteOf(job: Job, rowId: string, ctx: SheetCtx): {shown: string; auto: string} | null {
+  const l = formLines(job, ctx.settings, ctx.form, {all: true}).find((x) => x.rowId === rowId);
+  if (!l) return null;
+  const hourRate = ctx.settings.estimateHourRate;
+  return {shown: noteText(lineNote(l, ctx.form, hourRate)), auto: noteText(autoNote(l, ctx.form, hourRate))};
+}
+
+/** 備考の文が同じか（全角・半角、行の前後の空白、空の行は見ない） */
+function sameNote(a: string, b: string): boolean {
+  const norm = (s: string) => s.normalize('NFKC').split('\n').map((x) => x.trim()).filter(Boolean).join('\n');
+  return norm(a) === norm(b);
 }
 
 /** いちばん下の空いた行に打ち込んだとき */
@@ -357,6 +381,7 @@ function applyNew(job: Job, field: string, text: string, ctx: SheetCtx): SheetRe
   if (row.kind === 'material' && row.pieceLengthM === 0 && row.name) row.pieceLengthM = guessPieceLengthM(row.name);
   const rows = [...place.rows, row];
   j = setPlaceRows(j, pi, rows);
+  if (ctx.pick) j = withPlace(j, pi, (p) => fillAdded(p, new Set([row.id])));
   // 施工費は、上の手間とつながっていれば同じまとまり（見積書では1行）
   const lineId = row.kind === 'labor' ? rows[workHead(rows, rows.length - 1)].id : row.id;
   if (field === 'text') {

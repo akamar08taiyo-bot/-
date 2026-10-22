@@ -122,3 +122,9 @@ export function downloadBlob(blob: Blob, fileName: string) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/** ファイル名のお客様の所：「山田　花子」→「山田花子様」（すき間を詰め、ファイル名に使えない文字は _）。お客様名がなければ「お客様」 */
+export function customerFilePart(customer: string): string {
+  const who = customer.replace(/\s+/g, '').replace(/[\\/:*?"<>|]/g, '_');
+  return who ? `${who}様` : 'お客様';
+}

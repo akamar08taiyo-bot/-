@@ -4,12 +4,13 @@
 // 式ではアプリと同じ金額にならない行（割り切れない長さの部材など）は、アプリの金額をそのまま書く。
 
 import {estimateTotals, rounddown} from './calc.ts';
-import type {EstimateTotals} from './calc.ts';
+import type {EstimateSums, EstimateTotals} from './calc.ts';
 import {circled, FORM_INFO, formLines, jobForm, KINDS, lineNote, paginate, reiwa, TOTAL_ROWS} from './estimateForms.ts';
 import type {FormLine} from './estimateForms.ts';
-import {fitLinesPt, fitText} from './print/fit.ts';
+import {fitLinesPt, fitText, wordLines} from './print/fit.ts';
 import {issuerLines, KK, KK_FOOT, KK_NOTE_1, KK_NOTE_2, KK_ROWS, NOTE_KIND, NOTE_MARK, NOTE_PHOTO, totalRows, YK, YK_ROW} from './print/formLayout.ts';
 import type {Job, Settings} from './types.ts';
+import {customerFilePart} from './util.ts';
 import {cellRef, SheetBuilder, writeXlsx} from './xlsxWrite.ts';
 import type {XEdges, XSheet, XStyle} from './xlsxWrite.ts';
 
@@ -48,6 +49,12 @@ function fit(text: string, w: number, h: number, maxPt: number, lines = 1): XSty
   return lines > 1 ? {size: fitText(text, w, h, maxPt, lines).pt, wrap: true} : {size: maxPt, shrink: true};
 }
 
+/** 内容（品名）の欄：長い商品名は言葉の切れ目で改行した行（`wordLines`）が入る大きさ。印刷と同じ */
+function nameFit(text: string, w: number, h: number, maxPt: number, lines: number): XStyle {
+  const parts = wordLines(text, w, h, maxPt, lines);
+  return parts.length > 1 ? {size: fitLinesPt(parts, w, h, maxPt), wrap: true} : fit(text, w, h, maxPt, lines);
+}
+
 const money = (size: number): XStyle => ({size, numFmt: MONEY, shrink: true});
 const count = (size: number): XStyle => ({size, shrink: true});
 /** 数量は印刷と同じく小数3けたまで */
@@ -61,13 +68,15 @@ function amountFormula(qty: number, price: number, amount: number, qtyCell: stri
 
 /**
  * 合計の欄（小計・諸経費・消費税・合計）の式。col は金額の列、ranges は明細の金額の範囲（ページごと）。
- * 諸経費を手で直してあれば、その金額をそのまま書く
+ * 諸経費を手で直してあるか、合計の末尾を0にする端数調整で 小計×率 と違う金額にしたとき（`overheadAuto`）は、その金額をそのまま書く
+ * （式の答えがアプリの金額と同じにならない欄は数字のまま）
  */
-function totalFormulas(col: number, top: number, ranges: string[], manualOverhead: boolean, s: Settings): (string | undefined)[] {
+function totalFormulas(col: number, top: number, ranges: string[], manualOverhead: boolean, sums: EstimateSums, s: Settings): (string | undefined)[] {
   const [sub, oh, tax] = [cellRef(top, col), cellRef(top + 1, col), cellRef(top + 2, col)];
+  const plain = !manualOverhead && sums.overhead === rounddown(sums.subtotal * s.estimateOverheadRate);
   return [
     `SUM(${ranges.join(',')})`,
-    manualOverhead ? undefined : `ROUNDDOWN(${sub}*${s.estimateOverheadRate},0)`,
+    plain ? `ROUNDDOWN(${sub}*${s.estimateOverheadRate},0)` : undefined,
     `ROUNDDOWN((${sub}+${oh})*${s.taxRate},0)`,
     `${sub}+${oh}+${tax}`,
   ];
@@ -126,8 +135,8 @@ function yukuhashiSheet(job: Job, s: Settings, date: string): XSheet {
     ranges.all.push(`${cellRef(first, 6)}:${cellRef(detailEnd, 6)}`);
     ranges.target.push(`${cellRef(first, 10)}:${cellRef(detailEnd, 10)}`);
     const top = first + per - TOTAL_ROWS; // 小計の行
-    const fAll = totalFormulas(6, top, ranges.all, job.overhead != null, s);
-    const fTarget = totalFormulas(10, top, ranges.target, manualTargetOverhead(job, t), s);
+    const fAll = totalFormulas(6, top, ranges.all, job.overhead != null, t.all, s);
+    const fTarget = totalFormulas(10, top, ranges.target, manualTargetOverhead(job, t), t.target, s);
     for (let i = 0; i < per; i++) {
       const r = b.row(YK_ROW);
       const bottom = i === per - 1 ? ' mb' : '';
@@ -188,7 +197,7 @@ function ykLine(l: FormLine, r: number, put: Put) {
     ['', 'r nr', 'nl', 'r', 'r mr', 'r nr', 'nl', 'r', 'r mr', 'r mr', 'mr'].forEach((cls, i) => put(i + 2, null, cls));
     return;
   }
-  put(2, l.text || null, '', fit(l.text, YK.C, YK_ROW, 9, 2));
+  put(2, l.text ? wordLines(l.text, YK.C, YK_ROW, 9, 2).join('\n') : null, '', nameFit(l.text, YK.C, YK_ROW, 9, 2));
   put(3, open ? null : q, 'r nr', count(9));
   put(4, l.unit || null, 'nl', fit(l.unit, YK.E, YK_ROW, 11));
   put(5, l.unitPrice, 'r', money(11));
@@ -263,8 +272,8 @@ function kouikiSheet(job: Job, s: Settings): XSheet {
     ranges.all.push(`${cellRef(first, 8)}:${cellRef(detailEnd, 8)}`);
     ranges.target.push(`${cellRef(first, 15)}:${cellRef(detailEnd, 15)}`);
     const top = first + per - TOTAL_ROWS;
-    const fAll = totalFormulas(8, top, ranges.all, job.overhead != null, s);
-    const fTarget = totalFormulas(15, top, ranges.target, manualTargetOverhead(job, t), s);
+    const fAll = totalFormulas(8, top, ranges.all, job.overhead != null, t.all, s);
+    const fTarget = totalFormulas(15, top, ranges.target, manualTargetOverhead(job, t), t.target, s);
     KK_ROWS.forEach((height, i) => {
       const r = b.row(height);
       const bottom = i === per - 1 ? ' mb' : '';
@@ -339,7 +348,7 @@ function kkLine(l: FormLine, r: number, height: number, bottom: string, hourRate
     return;
   }
   put(2, l.mark, 'mark', {v: 'bottom'});
-  put(3, l.text || null, 'mr gothic', fit(l.text, KK.D, height, 9, 3));
+  put(3, l.text ? wordLines(l.text, KK.D, height, 9, 3).join('\n') : null, 'mr gothic', nameFit(l.text, KK.D, height, 9, 3));
   put(4, null, 'gap');
   put(5, open ? null : q, 'r ml gothic', count(9));
   put(6, l.unit || null, 'gothic', fit(l.unit, KK.G, height, 11));
@@ -368,10 +377,12 @@ function kkLine(l: FormLine, r: number, height: number, bottom: string, hourRate
 
 // ================================================================
 
-/** 保存するファイルの名前（印刷の PDF と同じ「書式の名前_お客様名様」に作成日を付ける） */
-export function estimateFileName(job: Job, s: Settings, date: string): string {
-  const who = (job.customer.trim() || 'お客様').replace(/[\\/:*?"<>|]/g, '_');
-  return `${FORM_INFO[jobForm(job, s)].title}_${who}様${date ? `_${date}` : ''}.xlsx`;
+/**
+ * 保存するファイルの名前：「山田花子様住宅改修見積書.xlsx」（ユーザーの指示、2026-10-22。申請書は「…様住宅改修申請書.xlsx」＝`shinseiFileName`）。
+ * お客様名のすき間は詰める。書式・作成日は付けない（引数は前の呼び方のまま）
+ */
+export function estimateFileName(job: Job, _s?: Settings, _date?: string): string {
+  return `${customerFilePart(job.customer)}住宅改修見積書.xlsx`;
 }
 
 /** 見積書の .xlsx。date は作成日（'YYYY-MM-DD'。空なら作成日の欄は空ける） */

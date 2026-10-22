@@ -101,15 +101,15 @@ await typeIn(await key('手すりカバー', 'note'), '3000');
 let cover = await tds('手すりカバー');
 assert.deepEqual(cover.slice(2, 7), ['手すりカバー', '2', '個', '2,400', '4,800'], cover.join('|'));
 assert.equal(cover[12], '定価3,000円（税抜）×0.8');
-// 2,400＋2,000＋4,800＝9,200 → 諸経費 920 → 消費税 1,012 → 合計 11,132
-assert.deepEqual(await totals(), ['合計', '11,132', '11,132']);
+// 2,400＋2,000＋4,800＝9,200 → 諸経費 919（920 から合計の末尾が0になるよう端数調整）→ 消費税 1,011 → 合計 11,130
+assert.deepEqual(await totals(), ['合計', '11,130', '11,130']);
 log('備考に定価を入れると単価が 定価×0.8 になるOK');
 
 // ---------------- Ctrl+Z で元に戻す・Ctrl+Y でやり直す
 await page.keyboard.press('ControlOrMeta+z');
 assert.equal((await tds('手すりカバー'))[6], '0');
 await page.keyboard.press('ControlOrMeta+y');
-assert.deepEqual(await totals(), ['合計', '11,132', '11,132']);
+assert.deepEqual(await totals(), ['合計', '11,130', '11,130']);
 log('元に戻す・やり直すOK');
 
 // ---------------- F2 で書き直す・Esc でやめる・Delete で消す

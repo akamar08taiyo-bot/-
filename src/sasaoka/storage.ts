@@ -177,8 +177,8 @@ export function cleanMaterials(raw: unknown): Material[] {
     name: str(m.name),
     price: numv(m.price),
     listPrice: numv(m.listPrice),
-    // 1本の長さを入れる前に保存した部材は、商品名（「4m」「2000mm」など）から入れる
-    pieceLengthM: m.pieceLengthM === undefined ? guessPieceLengthM(str(m.name)) : Math.max(0, numv(m.pieceLengthM)),
+    // 1本の長さを入れる前に保存した部材は、商品名（「4m」「2000mm」など）から入れる。前の版が商品名を読みちがえた長さは読み直す（`pieceLength`）
+    pieceLengthM: pieceLength(m),
     maker: str(m.maker),
     code: str(m.code),
     unit: str(m.unit),
@@ -200,6 +200,41 @@ export function cleanLabor(raw: unknown): LaborItem[] {
   });
 }
 
+/**
+ * 前の版（2026-10-22 まで）が商品名から読んだ1本の長さ。最初の「○mm」を長さにしていたので、
+ * 「木製ベースプレート 120mm幅 … 2m」を 0.12m と読んでいた。保存してある長さがこれと同じなら、読み直すために使う
+ */
+function oldPieceLengthM(name: string): number {
+  const s = name.normalize('NFKC').replace(/[\s　]+/g, ' ').trim().toLowerCase();
+  const mm = /(?:^|[^\d.])(\d+(?:\.\d+)?) ?mm(?![a-z])/.exec(s);
+  if (mm) return Math.round(Number(mm[1])) / 1000;
+  const m = /(?:^|[^\d.])(\d+(?:\.\d+)?) ?m(?![a-z])/.exec(s);
+  if (m) return Number(m[1]);
+  const l = /(?:^|[^a-z])l ?[=:]? ?(\d{3,5})(?!\d)/.exec(s);
+  if (l) return Number(l[1]) / 1000;
+  return 0;
+}
+
+/** 保存してある1本の長さ。ないときと、前の版が商品名を読みちがえたまま（手で直していない）のときは商品名から読む */
+function pieceLength(x: Record<string, unknown>): number {
+  const name = str(x.name);
+  if (x.pieceLengthM === undefined) return x.kind === 'labor' ? 0 : guessPieceLengthM(name);
+  const saved = Math.max(0, numv(x.pieceLengthM));
+  return saved > 0 && saved === oldPieceLengthM(name) ? guessPieceLengthM(name) : saved;
+}
+
+/**
+ * 見積書の行の使う長さ（cm）。前の版が1本の長さを読みちがえていた行は、見積書の本数（1.2本など）がそのままになるように直す
+ * （0.12m の 1.2本＝144mm → 2m の 1.2本＝2400mm。打った数は本数なので）。読み直して長さで数えない部材になったら、前のまま
+ */
+function rowLength(r: Record<string, unknown>, piece: number): {lengthCm: number; pieceLengthM: number} {
+  const lengthCm = Math.max(0, numv(r.lengthCm));
+  const saved = Math.max(0, numv(r.pieceLengthM));
+  if (r.pieceLengthM === undefined || !(lengthCm > 0) || !(saved > 0) || piece === saved) return {lengthCm, pieceLengthM: piece};
+  if (!(piece > 0)) return {lengthCm, pieceLengthM: saved};
+  return {lengthCm: Math.round(((lengthCm * piece) / saved) * 1000) / 1000, pieceLengthM: piece};
+}
+
 const cleanRow = (r: Record<string, unknown>): Row => ({
   id: str(r.id) || uid('r'),
   kind: r.kind === 'labor' ? 'labor' : 'material',
@@ -211,9 +246,7 @@ const cleanRow = (r: Record<string, unknown>): Row => ({
   price: numv(r.price),
   qty: numv(r.qty, 1),
   listPrice: numv(r.listPrice),
-  lengthCm: Math.max(0, numv(r.lengthCm)),
-  pieceLengthM:
-    r.pieceLengthM === undefined ? (r.kind === 'labor' ? 0 : guessPieceLengthM(str(r.name))) : Math.max(0, numv(r.pieceLengthM)),
+  ...rowLength(r, pieceLength(r)),
   estPrice: optNum(r.estPrice),
   excluded: r.excluded === true,
   estText: typeof r.estText === 'string' ? r.estText : null,
@@ -273,7 +306,7 @@ function cleanPhotoEdits(raw: unknown): {photoEdits?: PlacePhotoEdits} {
   const edits: PlacePhotoEdits = {};
   for (const slot of ['before', 'after'] as const) {
     const e = raw[slot];
-    const clean = isObj(e) ? cleanEdit({rot: numv(e.rot), scale: numv(e.scale, 1)}) : undefined;
+    const clean = isObj(e) ? cleanEdit({rot: numv(e.rot), scale: numv(e.scale, 1), x: numv(e.x), y: numv(e.y)}) : undefined;
     if (clean) edits[slot] = clean;
   }
   return edits.before || edits.after ? {photoEdits: edits} : {};

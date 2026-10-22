@@ -33,7 +33,7 @@ const FIELD_NAMES: Record<string, string> = {
   qty: '数量',
   unit: '単位',
   price: '単価',
-  note: '備考（定価）',
+  note: '備考（定価等）',
   name: '改修場所（箇所名）',
   work: '改修の種類',
   kind: '改修の種類',

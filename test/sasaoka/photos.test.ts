@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {exifDate} from '../../src/sasaoka/photos.ts';
+import {brightLut, exifDate} from '../../src/sasaoka/photos.ts';
 
 /** Exif の入った JPEG の先頭（撮影日時 DateTimeOriginal を Exif の IFD に、tag0132 の日時を最初の IFD に） */
 function jpeg({original = '', dateTime = '', big = false}: {original?: string; dateTime?: string; big?: boolean}): DataView {
@@ -42,4 +42,20 @@ test('写真の撮影日：JPEG の Exif の撮影日時（DateTimeOriginal、�
   assert.equal(exifDate(jpeg({})), '');
   assert.equal(exifDate(new DataView(new Uint8Array([0x89, 0x50, 0x4e, 0x47]).buffer)), ''); // PNG など
   assert.equal(exifDate(new DataView(new Uint8Array([0xff, 0xd8, 0xff, 0xe1, 0, 40]).buffer)), ''); // 途中で切れたファイル
+});
+
+test('暗い写真だけ明るくする表（ユーザーの指示「画像は少し暗いので、適宜明るさの調整をおこない、エクセルにおとす」2026-10-22）', () => {
+  const px = (r: number, g: number, b: number, n = 64) => Array.from({length: n}, () => [r, g, b, 255]).flat();
+  // 明るい写真（平均 200）・平均が 145 に近い写真は直さない
+  assert.equal(brightLut(px(200, 200, 200)), null);
+  assert.equal(brightLut(px(143, 143, 143)), null);
+  // 少し暗い写真（平均 113）：真っ白・真っ黒はそのまま、中ほどを持ち上げる（113 → 145 ほど）
+  const lut = brightLut([...px(20, 20, 20, 32), ...px(206, 206, 206, 32)])!;
+  assert.ok(lut, '直す');
+  assert.deepEqual([lut[0], lut[255]], [0, 255]);
+  assert.ok(lut[113] >= 140 && lut[113] <= 150, String(lut[113]));
+  assert.ok(lut.every((v, i) => i === 0 || v >= lut[i - 1]), '明るさの順番は変えない');
+  // とても暗い写真も、明るくしすぎない（ガンマ 1.8 まで）
+  const dark = brightLut(px(10, 10, 10))!;
+  assert.equal(dark[10], Math.round(255 * (10 / 255) ** (1 / 1.8)));
 });

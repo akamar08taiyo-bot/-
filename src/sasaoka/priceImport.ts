@@ -23,19 +23,45 @@ export function parsePrice(s: unknown): number | null {
 }
 
 /**
- * 商品名から1本の長さ（m）を読む：「4m」「2.5m」「2000mm」「L=4000」など。読めなければ 0。
- * 手すりなど切って使う部材の、見積の数量（使う長さ÷1本の長さ）に使う
+ * 商品名から1本の長さ（m）を読む：「4m」「2.5m」「2000mm」「60cm」「L=4000」「長さ600mm」など。読めなければ 0。
+ * 手すりなど切って使う部材の、見積の数量（使う長さ÷1本の長さ）に使う。
+ * 幅・厚み・径・高さ・奥行の寸法（「120mm幅」「幅120mm」「W=120mm」「φ35mm」「35mm丸」「厚み15mm」「t12mm」「H=800mm」「出幅75mm」）は長さにしない。
+ * 前は最初の「○mm」を長さにしていたので、マツ六「BH-412 木製ベースプレート 120mm幅 Mブラウン 2m」を 0.12m と読み、
+ * 備考が「定価○円（0.12m）」「144mm÷120mm＝1.2」になっていた（ユーザーの指摘、2026-10-22）。
+ * 長さの候補が2つ以上なら、L=・長さ の付いたもの、なければいちばん長いもの。20cm より短いものは1本の長さにしない（幅・厚みの書き方のゆれよけ）
  */
 export function guessPieceLengthM(name: string): number {
   const s = normalize(name).toLowerCase();
-  const mm = /(?:^|[^\d.])(\d+(?:\.\d+)?) ?mm(?![a-z])/.exec(s);
-  if (mm) return Math.round(Number(mm[1])) / 1000;
-  const m = /(?:^|[^\d.])(\d+(?:\.\d+)?) ?m(?![a-z])/.exec(s);
-  if (m) return Number(m[1]);
-  const l = /(?:^|[^a-z])l ?[=:]? ?(\d{3,5})(?!\d)/.exec(s);
-  if (l) return Number(l[1]) / 1000;
-  return 0;
+  const found: {m: number; explicit: boolean}[] = [];
+  for (const x of s.matchAll(/(\d+(?:\.\d+)?) ?(mm|cm|m)(?![a-z])/g)) {
+    const start = x.index ?? 0;
+    if (start > 0 && /[\d.]/.test(s[start - 1])) continue;
+    const before = s.slice(0, start);
+    const after = s.slice(start + x[0].length);
+    if (sizeBefore(before) || SIZE_AFTER.test(after)) continue;
+    const n = Number(x[1]);
+    found.push({m: x[2] === 'mm' ? Math.round(n) / 1000 : x[2] === 'cm' ? n / 100 : n, explicit: LENGTH_BEFORE.test(before)});
+  }
+  for (const x of s.matchAll(/(?:^|[^a-z])l ?[=:]? ?(\d{3,5})(?![\d.]|mm|cm|m(?![a-z]))/g)) found.push({m: Number(x[1]) / 1000, explicit: true});
+  const lengths = found.filter((f) => f.m >= 0.2);
+  const pick = lengths.filter((f) => f.explicit).length > 0 ? lengths.filter((f) => f.explicit) : lengths;
+  return pick.reduce((max, f) => Math.max(max, f.m), 0);
 }
+/**
+ * 数の前に長さでない寸法の印があるか（「幅120mm」「幅 120mm」「w=120mm」「φ35mm」「厚み15mm」「t12mm」「h=800mm」「出幅75mm」）。
+ * 印が前の数に付いているもの（「35φ 4m」「120mm幅 2m」）は、うしろの数の印ではない
+ */
+function sizeBefore(before: string): boolean {
+  const m = /(幅|巾|厚み?|径|φ|ø|高さ?|奥行き?|[wdht]) ?[=:]? ?$/.exec(before);
+  if (!m) return false;
+  const head = before.slice(0, m.index);
+  if (/^[wdht]$/.test(m[1]) && /[a-z]$/.test(head)) return false; // 品番などの英字の続き
+  return !/\d ?(?:mm|cm|m)?$/.test(head);
+}
+// 数のうしろの、長さでない寸法の印（「120mm幅」「15mm厚」）
+const SIZE_AFTER = /^(?:幅|巾|厚|径|φ|ø)/;
+// 1本の長さだとはっきり書いてある（「l=4000mm」「l2000mm」「長さ600mm」）
+const LENGTH_BEFORE = /(?:長さ|(?:^|[^a-z])l) ?[=:]? ?$/;
 
 /**
  * 表の「1本の長さ」の欄を m にする。見出しに単位（mm・cm・m）があればそれで、なければ 100 以上は mm とみなす。

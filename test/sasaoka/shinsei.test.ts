@@ -76,7 +76,7 @@ test('改修の内容・箇所及び規模：「①浴室　手すりの取り�
   assert.deepEqual(insuredBoxes(''), Array(10).fill('')); // 番号がなければ空のまま
   // 番号の欄で確定したとき：右に詰めて空いた左は 0（数字がなければ打ったまま、10けたより長ければ数字のまま）
   assert.deepEqual(['366989', '３６６９８９', ' 0000366989 ', '12-345', '', '未定', '123456789012'].map((v) => padInsuredNo(v)), ['0000366989', '0000366989', '0000366989', '0000012345', '', '未定', '123456789012']);
-  assert.equal(shinseiFileName(SHINSEI.kanda!, job(), '2026-10-21'), '苅田町申請書_山田 太郎様_2026-10-21.xlsx');
+  assert.equal(shinseiFileName(SHINSEI.kanda!, job(), '2026-10-21'), '山田太郎様住宅改修申請書.xlsx'); // ユーザーの指示「山田花子様住宅改修申請書」
   // 改修の種類ごと（住宅改修内訳明細書の行）：申請書と同じ書き方。写真番号 → 改修場所（写真貼付用紙）
   const kinds = shinseiKinds(job(), RATES);
   assert.equal(kinds.length, 6);
@@ -821,23 +821,29 @@ test('写真貼付用紙：写真番号の用紙の改修前・改修後の枠�
   assert.doesNotMatch(strFromU8(plain['[Content_Types].xml']), /Extension="jpeg"/);
 });
 
-test('写真の用紙の写真の横（上）に書く欄：縦の写真は左に寄せて右に、横の写真・写真のない枠は上に（ユーザーの指示「写真をめいいっぱいにしない」）', () => {
+test('写真の用紙の写真の横（下）に書く欄：縦の写真は左に寄せて右に、横の写真・写真のない枠は写真が上・書く欄は下で中央ぞろえ（ユーザーの指示「写真をめいいっぱいにしない」「画像を上に、画像の下に寸法」）', () => {
   const frame = {x: 0, y: 0, w: 600, h: 300};
   const lines = ['手すりの取り付け　L=800mm H=600mm', 'ベースプレート　L=800mm'];
   // 書くことがなければ枠いっぱい（前と同じ）
-  assert.deepEqual(photoNoteLayout(frame, {w: 900, h: 1600}, []), {photo: frame, note: null});
+  assert.deepEqual(photoNoteLayout(frame, {w: 900, h: 1600}, []), {photo: frame, note: null, align: 'left'});
   // 縦の写真：枠の高さに合わせた写真の幅を左に、残りを右の書く欄に
   const tall = photoNoteLayout(frame, {w: 900, h: 1600}, lines);
   assert.ok(Math.abs(tall.photo.w - (((300 - 8) * 900) / 1600 + 8)) < 0.01, JSON.stringify(tall));
   assert.ok(tall.note && Math.abs(tall.note.x - tall.photo.w) < 0.01 && tall.note.w > 250 && tall.note.h === 300 && tall.photo.h === 300);
-  // 横の写真：上に書く欄（枠の高さの 16〜32%）、その下に写真
+  assert.equal(tall.align, 'left');
+  // 横の写真：上に写真、そのすぐ下に書く欄（枠の高さの 16〜32%）。文字は中央ぞろえ
   const wide = photoNoteLayout(frame, {w: 1600, h: 1200}, lines);
-  assert.ok(wide.note && wide.note.y === 0 && wide.note.w === 600 && wide.note.h >= 48 && wide.note.h <= 96, JSON.stringify(wide));
-  assert.ok(Math.abs(wide.photo.y - wide.note.h) < 0.01 && Math.abs(wide.photo.h + wide.note.h - 300) < 0.01);
-  // 横の写真を 90°回すと縦の写真と同じ。写真のない枠は上に書く欄
+  assert.ok(wide.note && wide.photo.y === 0 && wide.note.w === 600 && wide.note.h >= 48 && wide.note.h <= 96, JSON.stringify(wide));
+  assert.ok(Math.abs(wide.note.y - wide.photo.h) < 0.01 && Math.abs(wide.photo.h + wide.note.h - 300) < 0.01);
+  assert.equal(wide.align, 'center');
+  // 枠より横に長い写真は、写真の高さまでが写真の所で、書く欄はそのすぐ下から（あいだを空けない）
+  const pano = photoNoteLayout(frame, {w: 3200, h: 1000}, lines);
+  assert.ok(Math.abs(pano.photo.h - ((600 - 8) * 1000) / 3200 - 8) < 0.01 && pano.note!.y === pano.photo.h, JSON.stringify(pano));
+  // 横の写真を 90°回すと縦の写真と同じ。写真のない枠は下に書く欄
   const turned = photoNoteLayout(frame, {w: 1600, h: 900, rot: 90}, lines);
   assert.ok(Math.abs(turned.photo.w - tall.photo.w) < 0.01 && turned.note!.y === 0);
-  assert.equal(photoNoteLayout(frame, null, lines).note?.y, 0);
+  const none = photoNoteLayout(frame, null, lines);
+  assert.ok(none.photo.y === 0 && none.note!.y === none.photo.h && none.note!.y > 200);
   // 書く内容：自動の文（改修の種類・寸法）のあとに、手で足した行（空の行は書かない）
   assert.deepEqual(photoNoteLines({kind: 1, rows: [], dims: {l: '800', h: '600'}, photoNote: 'ベースプレート　L=800mm\n\n 補強板 '}), ['手すりの取り付け　L=800mm H=600mm', 'ベースプレート　L=800mm', '補強板']);
   assert.deepEqual(photoNoteLines({kind: 2, rows: [], dims: {w: '600', d: '350', h: '150'}}), ['段差の解消　W600mm D350mm H150mm']);
@@ -873,11 +879,12 @@ test('写真の用紙（Excel）：改修前の写真の横（上）の書く欄
   const full = photoPlacement(rangeBox(lay, sheet.photoPlace!.after!), 1600, 1200);
   const [ox, oy, cx, cy] = /<a:off x="(-?\d+)" y="(-?\d+)"\/><a:ext cx="(\d+)" cy="(\d+)"\/>/.exec(ap)!.slice(1).map((n) => Number(n) / 9525);
   assert.ok(Math.abs(ox - full.x) < 1 && Math.abs(oy - full.y) < 1 && Math.abs(cx - full.w) < 1 && Math.abs(cy - full.h) < 1, `${[ox, oy, cx, cy]} / ${JSON.stringify(full)}`);
-  // 写真のない写真番号（⑤玄関）にも、改修前の枠の上に書く欄（自動の文だけ）。改修後の枠には書かない
+  // 写真のない写真番号（⑤玄関）にも、改修前の枠の下に書く欄（自動の文だけ。中央ぞろえ）。改修後の枠には書かない
   const five = anchorsOf(strFromU8(files[drawingPath(files, '1  (5)')!])).filter(isNote);
   assert.equal(five.length, 1);
   assert.match(five[0], /name="改修前の説明 \d+"/);
   assert.deepEqual([...five[0].matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]), ['手すりの取り付け　L=400×600×600mm']);
+  assert.match(five[0], /<a:p><a:pPr algn="ctr"\/>/);
   // 画面のプレビュー（photoImages なし）では書かない（画面は枠に重ねて描く）
   const pv = unzipSync(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(j, RATES)));
   assert.ok(!anchorsOf(strFromU8(pv[drawingPath(pv, '1 ')!] ?? new Uint8Array())).some(isNote));

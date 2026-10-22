@@ -78,8 +78,12 @@ export type PlaceDims = {l?: string; h?: string; w?: string; d?: string};
 /** 箇所の写真：改修前・改修後（写真の中身は端末の IndexedDB に別に持つ。ここは番号＝`photos.ts` の id） */
 export type PlacePhotos = {before?: string; after?: string}; // 改修前・改修後（写真の番号か、撮影日）
 
-/** 写真の向き・大きさ（写真貼付用紙の枠の中で）：rot＝右回りの角度（度）、scale＝枠いっぱい（1）に対する大きさ（0.2〜1） */
-export type PhotoEdit = {rot: number; scale: number};
+/**
+ * 写真の向き・大きさ・位置（写真貼付用紙の枠の中で）：rot＝右回りの角度（度）、scale＝枠いっぱい（1）に対する大きさ（0.2〜1）、
+ * x・y＝位置（ユーザーの指示「写真の位置の調整をおこなえるようにする」2026-10-22）。写真の所の空き（縮めた・縦横の比で余った所）の中で、
+ * −1＝左（上）の端・0＝まん中・1＝右（下）の端。空きのない向きには動かない（写真は枠の中だけ）。まん中なら持たない
+ */
+export type PhotoEdit = {rot: number; scale: number; x?: number; y?: number};
 export type PlacePhotoEdits = {before?: PhotoEdit; after?: PhotoEdit};
 
 export type NameSuffix = '様邸' | '様' | '';

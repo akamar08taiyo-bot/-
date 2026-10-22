@@ -10,6 +10,7 @@ import type {InputHTMLAttributes, KeyboardEvent, ReactNode} from 'react';
 import {isBlankRow, jobName} from '../calc.ts';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {circled, eraOf, INSURER_IDS, INSURER_INFO, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, photoNumbers} from '../estimateForms.ts';
+import {placeFromDims} from '../cutLink.ts';
 import {manualRow, newPlace} from '../rows.ts';
 import {usePhotoUrls} from '../photos.ts';
 import {costIsTotal, estimateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLines, photoSheets, SHINSEI, shinseiCost, shinseiKinds, shinseiValues, shinseiWorks, workItems} from '../shinsei.ts';
@@ -557,12 +558,14 @@ function Dim({label, value, placeholder, wide, onChange}: {label: string; value:
 function WorksEditor({job, setJob, s, insurer}: {job: Job; setJob: (fn: (j: Job) => Job) => void; s: Settings; insurer: Insurer}) {
   const photos = photoNumbers(job, s);
   const setPlace = (id: string, fn: (p: Place) => Place) => setJob((j) => ({...j, places: j.places.map((p) => (p.id === id ? fn(p) : p))}));
+  // 手すりの長さを入れたら、見積書のその箇所の手すり・ベースプレートの使う長さにもする（ユーザーの指示「どちらか一方を入力した際に、自動的に 1.2 の部分が入力される」。`cutLink.ts`）
   const setDim = (id: string, key: keyof PlaceDims, v: string) =>
     setPlace(id, (x) => {
       const dims: PlaceDims = {...x.dims, [key]: v};
       if (!v.trim()) delete dims[key];
       const {dims: _old, ...rest} = x;
-      return Object.keys(dims).length ? {...rest, dims} : rest;
+      const next: Place = Object.keys(dims).length ? {...rest, dims} : rest;
+      return key === 'l' ? placeFromDims(next) : next;
     });
   // 見積書に箇所が出るように、空白の行を1つ入れておく（見積書で部材・施工費を入れていける）。
   // 足した箇所の寸法（手すりは長さ）にすぐ打ち込めるように、そこへ移る（ユーザーの指示「廊下、玄関など選択すると、長さの部分をすぐに入力できるようにする。とべるようにする」）。

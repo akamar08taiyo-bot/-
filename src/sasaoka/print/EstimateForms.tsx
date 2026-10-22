@@ -16,8 +16,30 @@ import {circled, FORM_INFO, formLines, KINDS, lineNote, paginate, reiwa, sheetNe
 import type {FormLine} from '../estimateForms.ts';
 import type {Job, Settings} from '../types.ts';
 import {num, yen} from '../util.ts';
-import {fitLinesStyle, fitStyle} from './fit.ts';
+import {fitLinesStyle, fitStyle, wordLines} from './fit.ts';
 import {issuerLines, KK, KK_FOOT, KK_LEFT, KK_NOTE_1, KK_NOTE_2, KK_RIGHT, KK_ROWS, NOTE_KIND, NOTE_MARK, NOTE_PHOTO, totalRows, YK, YK_ROW} from './formLayout.ts';
+
+/**
+ * 内容（品名）の欄：長い商品名は言葉の切れ目で行を分けて書く（`wordLines`。「マツ六 BD-132 35アッシュ丸棒」／「ディンプル付 Mオーク 2m」）。
+ * 1行に入る商品名は前と同じ（入らなければ欄の幅で折り返す）
+ */
+function nameCell(text: string, w: number, h: number, pt: number, cls: string, edit: string, lines: number, editable: boolean): ReactNode {
+  const parts = text ? wordLines(text, w, h, pt, lines) : [''];
+  if (parts.length < 2) {
+    return (
+      <td className={cls} style={text ? fitStyle(text, w, h, pt, lines) : undefined} {...ed(editable, edit)}>
+        {text}
+      </td>
+    );
+  }
+  return (
+    <td className={cls} style={fitLinesStyle(parts, w, h, pt)} {...ed(editable, edit)}>
+      {parts.map((t, i) => (
+        <div key={i}>{t}</div>
+      ))}
+    </td>
+  );
+}
 
 const qtyText = (n: number) => num(n, 3);
 const pct = (rate: number) => num(Math.round(rate * 1000) / 10);
@@ -307,7 +329,7 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
       {cell(l.first ? l.work : '', YK.A, 11, editable ? 'ml tools-cell' : 'ml', l.first ? `place:${l.placeId}:work` : null, 1, sheet ? <RowTools line={l} sheet={sheet} /> : null)}
       {/* 改修場所（写真No.）：「①勝手口」。写真番号のあとに箇所名を打ち込める */}
       {cell(l.first ? `${circled(l.photo)}${l.placeName}` : '', YK.B, 11, '', l.first ? `place:${l.placeId}:name` : null)}
-      {cell(l.text, YK.C, 9, '', k('text'), 2)}
+      {nameCell(l.text, YK.C, YK_ROW, 9, `${bottom}`, k('text'), 2, editable)}
       {cell(qty, YK.D, 9, 'r nr', l.isWork ? null : k('qty'))}
       {cell(l.unit, YK.E, 11, 'nl', l.isWork || l.cut ? null : k('unit'))}
       {cell(price, YK.F, 11, 'r', k('price'))}
@@ -587,7 +609,7 @@ function KkLine({
       {cell(l.first ? l.placeName : '', KK.A, 11, editable ? 'c ml tools-cell' : 'c ml', l.first ? `place:${l.placeId}:name` : null, 2, sheet ? <RowTools line={l} sheet={sheet} /> : null)}
       {cell(l.first ? l.work : '', KK.B, 11, 'c', l.first ? `place:${l.placeId}:work` : null, 2)}
       <td className={`mark${bottom}`}>{l.blank ? '' : l.mark}</td>
-      {cell(l.text, KK.D, 9, 'mr gothic', k('text'), 3)}
+      {nameCell(l.text, KK.D, height, 9, `mr gothic${bottom}`, k('text'), 3, editable)}
       <td className={`gap${bottom}`} />
       {cell(qty, KK.F, 9, 'r ml gothic', !l.isWork || l.hourly ? k('qty') : null)}
       {cell(l.unit, KK.G, 11, 'gothic', l.isWork || l.cut ? null : k('unit'))}

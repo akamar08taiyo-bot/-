@@ -25,15 +25,23 @@ export function normRot(deg: number, snap = 0): number {
 /** 大きさを 0.2〜1 に */
 export const clampScale = (s: number): number => (Number.isFinite(s) ? Math.min(1, Math.max(PHOTO_MIN_SCALE, s)) : 1);
 
-/** 向き・大きさをそろえる。そのまま（0°・枠いっぱい）なら undefined（持たない） */
+/** 位置（−1〜1。0＝まん中）にそろえる */
+export const clampOff = (v: unknown): number => {
+  const n = Number(v ?? 0);
+  return Number.isFinite(n) ? Math.round(Math.min(1, Math.max(-1, n)) * 1000) / 1000 : 0;
+};
+
+/** 向き・大きさ・位置をそろえる。そのまま（0°・枠いっぱい・まん中）なら undefined（持たない）。位置はまん中なら持たない */
 export function cleanEdit(e: Partial<PhotoEdit> | null | undefined): PhotoEdit | undefined {
   if (!e) return undefined;
   const rot = normRot(Number(e.rot ?? 0));
   const scale = Math.round(clampScale(Number(e.scale ?? 1)) * 1000) / 1000;
-  return rot === 0 && scale === 1 ? undefined : {rot, scale};
+  const [x, y] = [clampOff(e.x), clampOff(e.y)];
+  if (rot === 0 && scale === 1 && x === 0 && y === 0) return undefined;
+  return {rot, scale, ...(x ? {x} : {}), ...(y ? {y} : {})};
 }
 
-/** 90°ずつ回す（dir＝1 右へ・−1 左へ）。斜めにしていたら、近い 90°の倍数にそろえてから回す */
+/** 90°ずつ回す（dir＝1 右へ・−1 左へ）。斜めにしていたら、近い 90°の倍数にそろえてから回す。位置はそのまま */
 export function turn(e: PhotoEdit | undefined, dir: 1 | -1): PhotoEdit {
-  return {scale: e?.scale ?? 1, rot: normRot(Math.round((e?.rot ?? 0) / 90) * 90 + 90 * dir)};
+  return {...e, scale: e?.scale ?? 1, rot: normRot(Math.round((e?.rot ?? 0) / 90) * 90 + 90 * dir)};
 }

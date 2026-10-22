@@ -67,8 +67,8 @@ await typeIn('job:insuredNo', '0000366989');
 // Enter で下の工事場所（住所）の欄に移っているので、そのまま打ち込む
 await page.keyboard.type('福岡県行橋市中央1-1');
 await page.keyboard.press('Enter');
-// 玄関の木の手すりを 60cm で使っている（サンプル）。見積の合計 26,958 円
-assert.deepEqual((await tds('合計')).filter(Boolean), ['合計', '26,958', '26,958']);
+// 玄関の木の手すりを 60cm で使っている（サンプル）。見積の合計 26,950 円（諸経費で末尾を0に端数調整）
+assert.deepEqual((await tds('合計')).filter(Boolean), ['合計', '26,950', '26,950']);
 
 /** シート名 → XML。ellipses はシートの楕円の図形の数（申請書の丸） */
 const sheetsOf = (bytes) => {
@@ -163,7 +163,7 @@ assert.equal(await page.getByRole('dialog').count(), 0);
 assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '完成予定日', '改修予定費用']);
 assert.equal(await form.getByLabel('着工予定日').count(), 0);
 let pv = await preview.innerText();
-for (const t of ['介護保険居宅（ 介護・介護予防 ）住宅改修費受領委任払い申請書', '被保険者氏名', '（サンプル）山田', '福岡県行橋市中央1-1', '①玄関　手すりの取り付け　L=600mm', '②トイレ　手すりの取り付け', '26,958']) {
+for (const t of ['介護保険居宅（ 介護・介護予防 ）住宅改修費受領委任払い申請書', '被保険者氏名', '（サンプル）山田', '福岡県行橋市中央1-1', '①玄関　手すりの取り付け　L=600mm', '②トイレ　手すりの取り付け', '26,950']) {
   assert.ok(pv.includes(t), `プレビューに「${t}」がない`);
 }
 // まだ入っていない欄は上に出て、押すと一覧のその欄へ。着工・完成の日は数えない
@@ -216,7 +216,7 @@ for (const t of ['サンプル　ヤマダ', '23年5月6日生', '824-0001', '09
 assert.deepEqual(await pressed(), ['昭和', '女', '要介護2']);
 assert.equal(await form.getByRole('group', {name: '性別'}).getByRole('button', {name: '女'}).getAttribute('aria-pressed'), 'true');
 assert.equal(await pageOf('住改・受領委任払').locator('svg ellipse').count(), 3); // 画面にも丸
-assert.match(yk.name, /^行橋市申請書_（サンプル）山田様_\d{4}-\d{2}-\d{2}\.xlsx$/);
+assert.equal(yk.name, '（サンプル）山田様住宅改修申請書.xlsx');
 const y = sheetsOf(yk.bytes);
 assert.equal(y.sheets.size, 14);
 const main = y.sheets.get('住改・受領委任払');
@@ -227,7 +227,7 @@ assert.equal(text(main, 'F14'), WORKS);
 assert.equal(y.ellipses('住改・受領委任払'), 3); // 図形のないシートに図形を足して、女・昭・要介護２を囲む
 assert.deepEqual(['F4', 'F9', 'G10', 'Y10', 'F13', 'V13', 'AB18'].map((r) => text(main, r)), ['サンプル　ヤマダ', '明・大・昭　23年5月6日生', '824-0001', '0930-11-2222', '（サンプル）山田', '本人との関係（本人）', '令和8年11月20日']);
 assert.ok(!/令和|46331/.test(cellOf(main, 'AB16')), cellOf(main, 'AB16')); // 着工予定日は空白（原本のまま）
-assert.match(main, /<c r="F20" s="\d+"><v>26958<\/v><\/c>/); // 改修予定費用は見積書の合計（数）
+assert.match(main, /<c r="F20" s="\d+"><v>26950<\/v><\/c>/); // 改修予定費用は見積書の合計（数）
 log('行橋市の申請書（一覧とプレビューを並べる・Enter で次の欄・プレビューの欄から一覧へ・寸法・丸・着工予定日は空白・見積書の金額・Excel）OK');
 
 // ---------------- 見積書で直すと、申請書にすぐ出る（改修予定費用＝見積書の合計）。申請書で直した氏名は見積書に出る
@@ -235,7 +235,7 @@ await estimateTab.click();
 const lKey = await sheet.locator('.form-page tr', {hasText: 'L型手すり'}).first().locator('[data-edit$=":qty"]').first().getAttribute('data-edit');
 await typeIn(lKey, '2');
 const total2 = (await tds('合計')).filter(Boolean)[1];
-assert.notEqual(total2, '26,958');
+assert.notEqual(total2, '26,950');
 await shinseiTab.click();
 await pvHas(total2);
 await form.getByLabel('被保険者氏名').fill('（サンプル）山田 花');
@@ -472,7 +472,7 @@ log('写真（選ぶ・ドロップ・押して入れ替え・押して移す・
 // ---------------- 写真に書く内容（ユーザーの指示「写真をめいいっぱいにしない。縦写真の場合、写真を左に寄せてスペースをつくる。横写真の場合、上にスペースをあけて
 // 入力スペースをつくる」「自動入力 手すり L=800mm H=600mm、追加 手入力例 ベースプレート L=800mm」）：写真の欄の箇所ごとに、自動の文（改修の種類・寸法）と手で足す行。
 // 改修前の枠だけに書く（「改修後には入れる必要はありません。改修前の時に、工務店さんの方に見積もり依頼…内容を伝える時に、見やすく分かりやすく伝えるもの」）。
-// プレビューと Excel の写真貼付用紙は、縦の写真は左に寄せて右に、横の写真・写真のない枠は上に書く。改修後の写真は枠いっぱい
+// プレビューと Excel の写真貼付用紙は、縦の写真は左に寄せて右に、横の写真・写真のない枠は写真の下に中央ぞろえで書く（「画像を上に、画像の下に寸法」2026-10-22）。改修後の写真は枠いっぱい
 const noteGroup = (no, name) => photoBoard.getByRole('group', {name: `${no}${name} 改修前の写真に書く内容`});
 assert.match(await noteGroup('①', '玄関').innerText(), /自動\s*手すりの取り付け　L=600mm H=800mm/);
 assert.match(await noteGroup('②', 'トイレ').innerText(), /自動\s*手すりの取り付け/);
@@ -489,7 +489,7 @@ assert.ok(auto2[0].startsWith('手すりの取り付け') && auto2[1] === 'ベ�
 // 改修後の枠には書かない（②の改修後の写真・①の写真のない改修後の枠）
 assert.equal(await pvNote(p2, '写真貼付用紙②の改修後', '手すりの取り付け').count(), 0);
 assert.equal(await pvNote(p1n, '写真貼付用紙①の改修後', '手すりの取り付け').count(), 0);
-// ②の改修前は縦の写真（青 900×1600）→ 写真は左、書く内容は右。①の改修前は横の写真（黄 1600×533）→ 書く内容は上、写真は下。
+// ②の改修前は縦の写真（青 900×1600）→ 写真は左、書く内容は右。①の改修前は横の写真（黄 1600×533）→ 写真は上、書く内容はそのすぐ下で中央ぞろえ。
 // ②の改修後の横の写真（緑 1200×900）は枠いっぱい（枠のまん中）。どれも枠の中
 const boxOf = (loc) => loc.boundingBox();
 const btn = (pg, name) => pg.getByRole('button', {name, exact: true});
@@ -504,7 +504,9 @@ const [nb, ib, fb, n1, i1, f1, ia, fa] = await Promise.all([
   boxOf(btn(p2, '写真貼付用紙②の改修後')),
 ]);
 assert.ok(nb.x >= ib.x + ib.width - 1 && Math.abs(ib.x - fb.x) < fb.width * 0.05, `縦の写真の右に書いていない ${JSON.stringify([ib, nb])}`);
-assert.ok(n1.y + n1.height <= i1.y + 1 && n1.width > f1.width * 0.9, `横の写真の上に書いていない ${JSON.stringify([i1, n1])}`);
+assert.ok(n1.y >= i1.y + i1.height - 1 && n1.y - (i1.y + i1.height) < f1.height * 0.1, `横の写真のすぐ下に書いていない ${JSON.stringify([i1, n1])}`);
+assert.ok(Math.abs(i1.y - f1.y) < f1.height * 0.05, `横の写真が枠の上にない ${JSON.stringify([i1, f1])}`);
+assert.equal(await pvNote(p1n, '写真貼付用紙①の改修前', 'L=600mm H=800mm').evaluate((el) => getComputedStyle(el).textAlign), 'center');
 assert.ok(Math.abs(ia.y + ia.height / 2 - (fa.y + fa.height / 2)) < 2 && Math.abs(ia.x + ia.width / 2 - (fa.x + fa.width / 2)) < 2, `改修後の写真が枠のまん中にない ${JSON.stringify([ia, fa])}`);
 const inside = (b, f) => b.x >= f.x - 1 && b.y >= f.y - 1 && b.x + b.width <= f.x + f.width + 1 && b.y + b.height <= f.y + f.height + 1;
 assert.ok([[nb, fb], [ib, fb], [n1, f1], [i1, f1], [ia, fa]].every(([b, f]) => inside(b, f)), '写真か書く内容が枠からはみ出す');
@@ -532,7 +534,7 @@ await page.waitForTimeout(1200);
 await page.reload();
 await photoBoard.waitFor();
 assert.equal(await photoBoard.getByLabel('②トイレ 改修前の写真に書く内容の追加').inputValue(), 'ベースプレート　L=800mm');
-log('写真に書く内容（改修前だけ・自動の文・追加・縦の写真は右に・横の写真は上に・改修後は枠いっぱい・Excel のテキストボックス・読み直し）OK');
+log('写真に書く内容（改修前だけ・自動の文・追加・縦の写真は右に・横の写真は下に中央ぞろえ・改修後は枠いっぱい・Excel のテキストボックス・読み直し）OK');
 
 // ---------------- 写真番号の入れ替え（ユーザーの指示「①勝手口・②浴室を、押したりドラッグで横にずらしたりして、①浴室・②勝手口に簡単に入れ替える」
 // 「クリックしてそのままドロップしたら入れ替え」）：▶ ◀ で隣と、箇所をつかんで（見出しでも写真の上でも）ほかの箇所に重ねて離す。
@@ -678,6 +680,28 @@ const x2 = await picXfrm();
 assert.equal(x2.rot, 90);
 assert.ok(Math.abs(x2.cx / x1.cx - 0.5) < 0.02 && Math.abs(x2.cy / x1.cy - 0.5) < 0.02, `Excel の写真が半分でない ${x2.cx}/${x1.cx}`);
 assert.ok(Math.abs(x2.x + x2.cx / 2 - (x1.x + x1.cx / 2)) < 2000 && Math.abs(x2.y + x2.cy / 2 - (x1.y + x1.cy / 2)) < 2000, 'Excel の写真がまん中にない');
+// 選んだ写真をつかんで動かす（ユーザーの指示「写真の位置の調整をおこなえるようにする」2026-10-22）：左上へ大きく動かしても枠からはみ出さず、
+// 写真の欄・Excel も同じ位置。大きさ・向きは変わらない
+await pvPhoto.click();
+await tools.waitFor();
+const grab = await pvPic.boundingBox();
+await page.mouse.move(grab.x + grab.width / 2, grab.y + grab.height / 2);
+await page.mouse.down();
+// 左下へ動かすと、回すつまみが左下に出るお知らせ（保存しました）の下になるので左上へ
+for (let i = 1; i <= 12; i++) await page.mouse.move(grab.x + grab.width / 2 - 60 * i, grab.y + grab.height / 2 - 30 * i);
+await page.mouse.up();
+const movedPic = await sizeOf(pvPic);
+assert.ok(movedPic.x < half.x - 20 && movedPic.y < half.y - 5, `写真が動いていない ${JSON.stringify([half, movedPic])}`);
+assert.ok(Math.abs(movedPic.w - half.w) < 0.5 && (await rotOf(pvPic)) === 90, '動かしたら大きさか向きが変わった');
+assert.equal(await pvPhoto.getAttribute('aria-pressed'), 'true'); // 選んだまま
+{
+  const [img, frameBox] = [await pvPhoto.locator('img').boundingBox(), await pvPhoto.boundingBox()];
+  assert.ok(img.x >= frameBox.x - 1 && img.y >= frameBox.y - 1 && img.x + img.width <= frameBox.x + frameBox.width + 1 && img.y + img.height <= frameBox.y + frameBox.height + 1, `動かした写真が枠からはみ出す ${JSON.stringify([img, frameBox])}`);
+}
+assert.ok((await thumb('①', '玄関', '改修前').evaluate((el) => parseFloat(el.style.left))) < 40, '写真の欄の写真が左に寄っていない');
+await p1.screenshot({path: path.join(outDir, '87c-photo-move.png')});
+const x3 = await picXfrm();
+assert.ok(x3.x < x2.x - 50000 && Math.abs(x3.cx - x2.cx) < 2 && x3.rot === 90, `Excel の写真が動いていない ${JSON.stringify([x2, x3])}`);
 // 上の丸をまわして回す（くるくる）：45°まわすと 135°。90°の倍数の近く（7°以内）はそろう
 await pvPhoto.click(); // Excel を保存したので選び直す
 await tools.waitFor();
@@ -853,20 +877,20 @@ assert.deepEqual(await pageNames(), ['事前申請書', '平面図  (2)', '1 ', 
 // 一覧は苅田町の申請書の順番。ただし被保険者氏名はフリガナのすぐ下（ユーザーの指示）。完了予定日だけ（着工予定日は空白）
 assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '完了予定日', '改修予定費用']);
 assert.equal(await form.getByLabel('完了予定日').inputValue(), '2026-11-20');
-assert.equal(await form.getByLabel('改修予定費用').inputValue(), '26,958');
+assert.equal(await form.getByLabel('改修予定費用').inputValue(), '26,950');
 assert.ok((await form.innerText()).includes('見積書の合計（税込）'));
 assert.deepEqual(await pressed(), ['昭和', '女', '要介護2']);
-assert.ok((await preview.innerText()).includes('26,958円')); // 苅田町も改修予定費用＝見積書の合計
+assert.ok((await preview.innerText()).includes('26,950円')); // 苅田町も改修予定費用＝見積書の合計
 await mark('要介護2').click();
 assert.deepEqual(await pressed(), ['昭和', '女']);
 const kd = await make(['要支援1']);
 // 保存のお知らせ（少しすると消えるので、時間のかかる写真の日付のテストより前に見る）
 await page.locator('[aria-live] > div', {hasText: `「${kd.name}」を保存しました`}).waitFor();
-assert.match(kd.name, /^苅田町申請書_（サンプル）山田様_/);
+assert.equal(kd.name, '（サンプル）山田様住宅改修申請書.xlsx');
 const k = sheetsOf(kd.bytes);
 assert.equal(k.sheets.size, 15);
 const pre = k.sheets.get('事前申請書');
-assert.deepEqual([text(pre, 'J7'), text(pre, 'J11'), text(pre, 'J14'), text(pre, 'J17')], ['（サンプル）山田', '福岡県行橋市中央1-1', WORKS, '26,958円']);
+assert.deepEqual([text(pre, 'J7'), text(pre, 'J11'), text(pre, 'J14'), text(pre, 'J17')], ['（サンプル）山田', '福岡県行橋市中央1-1', WORKS, '26,950円']);
 assert.equal(['X6', 'Y6', 'Z6', 'AA6', 'AB6', 'AC6', 'AD6', 'AE6', 'AF6', 'AG6'].map((r) => text(pre, r)).join(''), '0000366989');
 assert.match(k.sheets.get('事後申請書'), /<f>事前申請書!J7<\/f><v>（サンプル）山田<\/v>/);
 assert.deepEqual([k.ellipses('事前申請書'), k.ellipses('事後申請書')], [3, 3]); // 女・昭・要支援１（事後申請書にも）
@@ -960,7 +984,7 @@ await spot('被保険者氏名', pageOf('住宅改修内訳明細書'));
 assert.equal(await focused(), '被保険者氏名');
 assert.ok((await pageOf('住宅改修内訳明細書').innerText()).includes('①玄関　手すりの取り付け　L=600mm H=800mm'));
 const my = await make(['無']);
-assert.match(my.name, /^みやこ町申請書_（サンプル）山田様_/);
+assert.equal(my.name, '（サンプル）山田様住宅改修申請書.xlsx');
 const m = sheetsOf(my.bytes);
 assert.equal(m.sheets.size, 12);
 // 撮影日：みやこ町の写真の用紙は原本の「撮影日」のうしろに日付（①玄関の改修後は写真を消したので、②の改修後と同じ日）
@@ -1000,7 +1024,7 @@ assert.ok((await preview.innerText()).includes('様式第２号（第６条関�
 await estimateTab.click();
 await sheet.locator('.form-page', {hasText: '内訳書　様式'}).first().waitFor(); // 見積書は広域連合用になる
 const kk = await make();
-assert.match(kk.name, /^広域連合申請書_（サンプル）山田様_/);
+assert.equal(kk.name, '（サンプル）山田様住宅改修申請書.xlsx');
 const g = sheetsOf(kk.bytes);
 assert.equal(g.sheets.size, 25);
 for (const name of ['様式第2号（住宅改修承認申請書）', '様式第7号（住宅改修費支給申請書（受領委任払用）']) {

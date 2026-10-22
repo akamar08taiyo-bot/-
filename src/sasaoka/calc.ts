@@ -281,9 +281,17 @@ export function estimateSums(subtotal: number, s: Pick<Settings, 'estimateOverhe
   return {subtotal, overhead: o, tax, total: subtotal + o + tax};
 }
 
-/** 諸経費（手で直していないとき）＝ 小計×率 */
-export function overheadAuto(subtotal: number, s: Pick<Settings, 'estimateOverheadRate'>): number {
-  return rounddown(subtotal * s.estimateOverheadRate);
+/**
+ * 諸経費（手で直していないとき）：小計×率 から、合計（小計＋諸経費＋消費税）の末尾が 0 になるまで1円ずつ下げた金額（端数調整）。
+ * ユーザーの指示（2026-10-22）「諸経費は端数調整のために合計金額の末尾が0になるように」：小計 37,568円なら 3,756円では合計 45,456円、3,751円で 45,450円。
+ * 消費税の切り捨てで末尾が 0 にならない合計もあるので、下げるのは 20円まで（それでもならなければ 小計×率 のまま）
+ */
+export function overheadAuto(subtotal: number, s: Pick<Settings, 'estimateOverheadRate' | 'taxRate'>): number {
+  const base = rounddown(subtotal * s.estimateOverheadRate);
+  for (let o = base; o >= Math.max(0, base - 20); o--) {
+    if ((subtotal + o + rounddown((subtotal + o) * s.taxRate)) % 10 === 0) return o;
+  }
+  return base;
 }
 
 export type EstimateTotals = {

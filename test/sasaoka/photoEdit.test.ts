@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {cleanEdit, clampScale, normRot, PHOTO_MIN_SCALE, ROT_SNAP, turn} from '../../src/sasaoka/photoEdit.ts';
-import {photoFit, photoPlacement} from '../../src/sasaoka/shinsei.ts';
+import {photoFit, photoPlacement, photoSlack} from '../../src/sasaoka/shinsei.ts';
 
 test('写真の向き：0〜360°、回している途中は 90°の近く（7°以内）にそろう。↻・↺ は 90°ずつ（斜めならそろえてから）', () => {
   assert.deepEqual([normRot(0), normRot(90), normRot(360), normRot(450), normRot(-90), normRot(359.99), normRot(NaN)], [0, 90, 0, 90, 270, 0, 0]);
@@ -45,4 +45,21 @@ test('写真を枠に置く位置：そのままなら今までと同じ。回�
       assert.ok(x >= frame.x + 3.99 && x <= frame.x + frame.w - 3.99 && y >= frame.y + 3.99 && y <= frame.y + frame.h - 3.99, `${rot}° (${x}, ${y})`);
     }
   }
+});
+
+test('写真の位置（ユーザーの指示「写真の位置の調整をおこなえるようにする」2026-10-22）：−1〜1、まん中は持たない。回しても位置はそのまま', () => {
+  assert.deepEqual(cleanEdit({rot: 0, scale: 0.5, x: 0.25, y: -2}), {rot: 0, scale: 0.5, x: 0.25, y: -1});
+  assert.deepEqual(cleanEdit({rot: 0, scale: 1, x: 0, y: 0}), undefined);
+  assert.deepEqual(cleanEdit({rot: 0, scale: 1, x: 0.5}), {rot: 0, scale: 1, x: 0.5});
+  assert.deepEqual(turn({rot: 0, scale: 0.5, x: 1}, 1), {rot: 90, scale: 0.5, x: 1});
+  // 置く位置：空き（枠の余白の内側と写真の差）の中で動く。端まで動かしても枠からはみ出さない
+  const frame = {x: 0, y: 0, w: 408, h: 308};
+  const mid = photoPlacement(frame, 400, 300, {rot: 0, scale: 0.5});
+  assert.deepEqual([mid.x, mid.y, mid.w, mid.h], [104, 79, 200, 150]);
+  assert.deepEqual(photoSlack(frame, 400, 300, {rot: 0, scale: 0.5}), {sx: 200, sy: 150});
+  const left = photoPlacement(frame, 400, 300, {rot: 0, scale: 0.5, x: -1, y: 1});
+  assert.deepEqual([left.x, left.y], [4, 154]); // 左の端（余白 4）・下の端（308−4−150）
+  // 枠いっぱいの写真は動かない（空きがない）
+  const full = photoPlacement(frame, 400, 300, {rot: 0, scale: 1, x: 1, y: 1});
+  assert.deepEqual([full.x, full.y], [4, 4]);
 });

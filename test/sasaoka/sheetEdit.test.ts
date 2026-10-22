@@ -102,7 +102,11 @@ test('備考に定価を入れると、単価は 定価×0.8（数式と同じ�
   ({job} = type(job, [[`line:${id}:note`, '11000']]));
   let [l] = formLines(job, S, 'yukuhashi');
   assert.deepEqual([l.listPrice, l.unitPrice, l.rate], [11000, 8800, 0.8]);
-  assert.equal(sheetValue(job, `line:${id}:note`, yk), '11000');
+  // 欄を選ぶと、見積書に出ている備考の全文（定価の数字だけではない。ユーザーの指摘、2026-10-22）
+  assert.equal(sheetValue(job, `line:${id}:note`, yk), '定価11,000円（税抜）×0.8');
+  // そのまま確定しても自動の文のまま（手で直した備考にしない）
+  ({job} = type(job, [[`line:${id}:note`, '定価11,000円（税抜）×0.8']]));
+  assert.equal(job.places[0].rows[0].estNote, null);
   // 単価を手で入れる → ×0.8 はやめる。定価×0.8 と同じ金額を入れたら自動のまま
   ({job} = type(job, [[`line:${id}:price`, '8000']]));
   [l] = formLines(job, S, 'yukuhashi');
@@ -144,6 +148,18 @@ test('切って使う手すり：数量に 0.15 や 60cm を入れると 使う�
   assert.deepEqual([r.lengthCm, r.pieceLengthM, r.qty], [60, 4, 1]);
   [, l] = formLines(job, S, 'yukuhashi');
   assert.deepEqual([l.qty, l.unitPrice, l.amount, l.cut], [0.15, 16000, 2400, '600mm÷4000mm＝0.15']);
+  // 欄を選ぶと2行とも出る。そのまま確定しても、1行目の定価だけ直しても、2行目は自動の計算のまま
+  const key = `line:${r.id}:note`;
+  assert.equal(sheetValue(job, key, yk), '定価20,000円（4m）×0.8\n600mm÷4000mm＝0.15');
+  ({job} = type(job, [[key, '定価20,000円（4m）×0.8\n600mm÷4000mm＝0.15']]));
+  assert.equal(job.places[0].rows[1].estNote, null);
+  ({job} = type(job, [[key, '定価25,000円（4m）×0.8\n600mm÷4000mm=0.15']]));
+  r = job.places[0].rows[1];
+  assert.deepEqual([r.listPrice, r.estNote], [25000, null]);
+  // 2行目を書きかえたら、手で直した備考
+  ({job} = type(job, [[key, '定価25,000円（4m）×0.8\n現場で切る']]));
+  assert.equal(job.places[0].rows[1].estNote, '定価25,000円（4m）×0.8\n現場で切る');
+  assert.equal(sheetValue(job, key, yk), '定価25,000円（4m）×0.8\n現場で切る');
 });
 
 test('施工費：内容に「同上施工費」と入れて単価を入れる → 取付手間の行になり、仕切り計算表の取付手間も最初は同じ金額。そのあと見積で直しても仕切りは変えない', () => {

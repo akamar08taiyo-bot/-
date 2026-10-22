@@ -29,12 +29,12 @@ await page.getByRole('button', {name: /サンプルで試す/}).click();
 // ---------------- 一覧：見積の合計・笹岡工務店の請求書の印（改修場所・保険者・担当は出さない。ユーザーの指示）
 // 玄関：木の手すり 定価20,000（1本4m）を60cm → 0.15本×16,000＝2,400・同上施工費（木2。見積は1箇所1,500）3,000・ブラケット 2,100×0.8＝1,680×2
 // トイレ：L型 11,000×0.8＝8,800・同上施工費（タイル2。見積は1箇所2,000）4,000・キャップ 450×0.8＝360×2
-// 部材 15,280・施工費 7,000・小計 22,280・諸経費 2,228（10%）・消費税 2,450（(22,280＋2,228)×0.1 切り捨て）・合計 26,958
+// 部材 15,280・施工費 7,000・小計 22,280・諸経費 2,220（10%の 2,228 から、合計の末尾が0になるよう端数調整）・消費税 2,450（(22,280＋2,220)×0.1 切り捨て）・合計 26,950
 const now = new Date();
 const thisMonthLabel = `${now.getFullYear()}年${now.getMonth() + 1}月分に入れる`;
 const sampleRow = page.getByRole('row', {name: /（サンプル）山田様邸/});
 const rowText = await sampleRow.innerText();
-for (const v of ['26,958', thisMonthLabel]) assert.ok(rowText.includes(v), `一覧に ${v} がない: ${rowText}`);
+for (const v of ['26,950', thisMonthLabel]) assert.ok(rowText.includes(v), `一覧に ${v} がない: ${rowText}`);
 for (const v of ['行橋市', '久保', '玄関・トイレ']) assert.ok(!rowText.includes(v), `一覧に ${v} が出ている: ${rowText}`);
 log('一覧OK');
 
@@ -69,7 +69,7 @@ const typeIn = async (k, text, end = 'Enter') => {
   if (end) await page.keyboard.press(end);
   await page.waitForTimeout(60);
 };
-assert.deepEqual(await totals(), ['合計', '26,958', '26,958']);
+assert.deepEqual(await totals(), ['合計', '26,950', '26,950']);
 assert.deepEqual(await page.getByRole('combobox', {name: '保険者'}).locator('option').allInnerTexts(), ['苅田町', '行橋市', 'みやこ町', '広域連合']);
 
 // ---------------- 見積書の欄：被保険者番号・切って使う手すりを 120cm（1.2÷4＝0.3本×16,000＝4,800）
@@ -78,7 +78,7 @@ await typeIn(await key('木の手すり 35φ 4m', 'qty'), '120cm');
 const rail = await tds('木の手すり 35φ 4m');
 assert.deepEqual(rail.slice(3, 7), ['0.3', '本', '16,000', '4,800'], rail.join('|'));
 assert.ok(rail[12].includes('定価20,000円（4m）×0.8') && rail[12].includes('1200mm÷4000mm＝0.3'), rail[12]);
-assert.deepEqual(await totals(), ['合計', '29,862', '29,862']); // 小計 24,680＋諸経費 2,468＋消費税 2,714
+assert.deepEqual(await totals(), ['合計', '29,860', '29,860']); // 小計 24,680＋諸経費 2,466（端数調整）＋消費税 2,714
 log('切って使う部材：120cm÷4m＝0.3本×16,000＝4,800 OK');
 
 // ---------------- 見積の単価を手で入れる（備考の ×0.8 が消える）→ 消すと 定価×0.8 に戻る
@@ -125,8 +125,8 @@ assert.deepEqual(texts, [
   'サンプル S-EC01 エンドキャップ',
   'サンプル S-EC01 エンドキャップ', // もとからあったキャップは、入れた4行の下
 ]);
-// 小計 24,680＋1,500＋23,080＝49,260 → 諸経費 4,926 → 消費税 5,418 → 合計 59,604
-assert.deepEqual(await totals(), ['合計', '59,604', '59,604']);
+// 小計 24,680＋1,500＋23,080＝49,260 → 諸経費 4,922（端数調整）→ 消費税 5,418 → 合計 59,600
+assert.deepEqual(await totals(), ['合計', '59,600', '59,600']);
 log('部材＋施工費（常用）を入れるOK');
 await page.screenshot({path: path.join(outDir, '50-estimate-app.png'), fullPage: true});
 
@@ -142,7 +142,7 @@ assert.equal(await savedToasts(), 2);
 await page.reload();
 await sheet.waitFor();
 assert.ok((await cell('job:insuredNo').innerText()).includes('1111111111'));
-assert.deepEqual(await totals(), ['合計', '59,604', '59,604']);
+assert.deepEqual(await totals(), ['合計', '59,600', '59,600']);
 await typeIn('job:insuredNo', '0000366989');
 log('保存（ボタン・Ctrl+S・読み直しても同じ）OK');
 
@@ -153,8 +153,8 @@ const download = async (click) => {
   return {name: dl.suggestedFilename(), sheet: strFromU8(files['xl/worksheets/sheet1.xml'])};
 };
 const yx = await download(() => page.getByRole('button', {name: '📗 Excelで保存'}).click());
-assert.match(yx.name, /^工事費見積書兼工事費内訳書_（サンプル）山田様_\d{4}-\d{2}-\d{2}\.xlsx$/);
-for (const t of ['（サンプル）山田', '介護保険被保険者番号（0000366989）', '1200mm÷4000mm＝0.3', '<f>ROUNDDOWN(D9*F9,0)</f><v>4800</v>', '<v>49260</v>', '<v>59604</v>', '令和']) {
+assert.equal(yx.name, '（サンプル）山田様住宅改修見積書.xlsx');
+for (const t of ['（サンプル）山田', '介護保険被保険者番号（0000366989）', '1200mm÷4000mm＝0.3', '<f>ROUNDDOWN(D9*F9,0)</f><v>4800</v>', '<v>49260</v>', '<v>59600</v>', '令和']) {
   assert.ok(yx.sheet.includes(t), `Excel に「${t}」がない`);
 }
 await page.locator('[aria-live] > div', {hasText: `Excel ファイル「${yx.name}」を保存しました`}).waitFor();
@@ -183,7 +183,7 @@ for (const t of [
 }
 const totalLine = async (where, label) => (await where.locator('tr', {hasText: label}).last().locator('td').allInnerTexts()).filter(Boolean);
 assert.deepEqual(await totalLine(printed, '小計'), ['小計', '49,260', '49,260']);
-assert.deepEqual(await totalLine(printed, '合計'), ['合計', '59,604', '59,604']);
+assert.deepEqual(await totalLine(printed, '合計'), ['合計', '59,600', '59,600']);
 await page.screenshot({path: path.join(outDir, '51-print-yukuhashi.png')});
 await page.emulateMedia({media: 'print'});
 await page.pdf({path: path.join(outDir, 'estimate-yukuhashi.pdf'), printBackground: true, preferCSSPageSize: true});
@@ -191,20 +191,20 @@ await page.emulateMedia({media: 'screen'});
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
 log('見積書（苅田町・行橋市・みやこ町用）の印刷OK');
 
-// ---------------- 諸経費を見積書の欄で直す（端数の調整）→ 消すと 小計×10% に戻る
+// ---------------- 諸経費を見積書の欄で直す → 消すと自動（小計×10% から合計の末尾が0になるよう端数調整）に戻る
 await typeIn('overhead:all', '5000');
 assert.deepEqual(await totals(), ['合計', '59,686', '59,686']); // 49,260＋5,000＋5,426
 // 諸経費の下に打てる欄はないので、選んだまま。Delete で消す
 assert.equal(await sheet.locator('textarea.sheet-input').getAttribute('aria-label'), '諸経費');
 await page.keyboard.press('Delete');
-assert.deepEqual(await totals(), ['合計', '59,604', '59,604']);
+assert.deepEqual(await totals(), ['合計', '59,600', '59,600']);
 log('諸経費の手入力OK');
 
 // ---------------- 玄関のブラケットを介護保険の対象外（対象外金額の欄でスペース）→ ブラケット 3,360 と同上施工費 1,500 が対象外
 await sheet.locator('.form-page tr', {hasText: 'ブラケット'}).first().locator('[data-edit^="excl:"]').last().click();
 await page.keyboard.press(' ');
-// 対象：49,260−4,860＝44,400 → 諸経費 4,440 → 消費税 4,884 → 合計 53,724
-assert.deepEqual(await totals(), ['合計', '59,604', '53,724']);
+// 対象：49,260−4,860＝44,400 → 諸経費 4,437（端数調整）→ 消費税 4,883 → 合計 53,720
+assert.deepEqual(await totals(), ['合計', '59,600', '53,720']);
 log('介護保険の対象外OK');
 
 // ---------------- 広域連合用に変える：写真番号・改修の種類を見積書の欄で入れる。施工費は「時間×2,500円」。2ページ（Ｐ－1・Ｐ－2）
@@ -228,7 +228,7 @@ const wood = (await kk.locator('tr', {hasText: '同上施工費'}).first().locat
 assert.deepEqual(wood.slice(0, 5), ['手', '同上施工費', '1.2', '時間', '2,500'], wood.join('|')); // 木 2箇所＝見積 3,000円
 const kbk = (await kk.locator('tr', {hasText: 'ブラケット'}).first().locator('td').allInnerTexts()).filter(Boolean);
 assert.deepEqual(kbk.slice(2), ['2', '個', '1,680', '3,360'], kbk.join('|')); // 対象外：全改修工事部分だけ
-assert.deepEqual(await totalLine(pages.last(), '合計'), ['合計', '59,604', '53,724']);
+assert.deepEqual(await totalLine(pages.last(), '合計'), ['合計', '59,600', '53,720']);
 await page.screenshot({path: path.join(outDir, '52-print-kouiki.png')});
 await page.emulateMedia({media: 'print'});
 await page.pdf({path: path.join(outDir, 'estimate-kouiki.pdf'), printBackground: true, preferCSSPageSize: true});
@@ -249,8 +249,8 @@ log('一覧の書式・探すOK');
 
 // ---------------- 一覧の「📗 Excel」：広域連合用の .xlsx（2ページ。介護保険の対象は対象外を除いた金額）
 const kx = await download(() => sampleRow.getByRole('button', {name: '📗 Excel'}).click());
-assert.match(kx.name, /^住宅改修内訳明細書_（サンプル）山田様_/);
-for (const t of ['内訳書　様式', 'Ｐ－1', 'Ｐ－2', '1時間2,500円', '<v>59604</v>', '<v>53724</v>', '<rowBreaks count="1"']) {
+assert.equal(kx.name, '（サンプル）山田様住宅改修見積書.xlsx');
+for (const t of ['内訳書　様式', 'Ｐ－1', 'Ｐ－2', '1時間2,500円', '<v>59600</v>', '<v>53720</v>', '<rowBreaks count="1"']) {
   assert.ok(kx.sheet.includes(t), `Excel（広域連合用）に「${t}」がない`);
 }
 assert.equal(await page.getByRole('heading', {level: 1}).count(), 0); // 一覧のまま（見積書は開かない）

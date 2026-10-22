@@ -6,7 +6,7 @@ import {useEffect, useState} from 'react';
 import {downloadBlob} from '../util.ts';
 import {XLSX_TYPE} from '../estimateXlsx.ts';
 import {photoNumbers} from '../estimateForms.ts';
-import {getPhotos} from '../photos.ts';
+import {brightPhoto, getPhotos} from '../photos.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {fillShinseiFiles, SHINSEI, shinseiFileName, shinseiValues} from '../shinsei.ts';
 import type {Files, PhotoImages} from '../shinsei.ts';
@@ -79,7 +79,9 @@ async function photoImagesOf(job: Job, s: Settings): Promise<{images: Record<num
       }
       // 同じ写真番号の箇所が2つ（写真番号を手で同じにした）なら、先の箇所の写真
       if (images[n]?.[slot]) continue;
-      images[n] = {...images[n], [slot]: {bytes: new Uint8Array(await photo.blob.arrayBuffer()), w: photo.w, h: photo.h, edit: p.photoEdits?.[slot]}};
+      // 暗い写真は明るさを補正して貼る（画面と同じ。`brightPhoto`）
+      const blob = await brightPhoto(id, photo.blob);
+      images[n] = {...images[n], [slot]: {bytes: new Uint8Array(await blob.arrayBuffer()), w: photo.w, h: photo.h, edit: p.photoEdits?.[slot]}};
     }
   }
   return {images, missing};

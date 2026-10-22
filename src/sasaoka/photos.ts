@@ -85,6 +85,7 @@ export async function prunePhotos(keep: Set<string>, before: number): Promise<nu
       if (!keep.has(p.id) && p.created < before) {
         cur.delete();
         urlCache.delete(p.id);
+        brightCache.delete(p.id);
         removed++;
       }
       cur.continue();
@@ -196,7 +197,74 @@ export async function preparePhoto(file: Blob): Promise<{blob: Blob; w: number; 
   }
 }
 
-/** 写真を画面に出す URL（一度作ったものは覚えておく）。この端末にない写真（ほかの端末で入れた・バックアップから戻した様邸）は null */
+// ---------------------------------------------------------------- 明るさの補正
+
+/** 明るさの補正のめやす：平均の明るさ（0〜255）をここまで上げる。これより明るい写真は直さない */
+const BRIGHT_TARGET = 145;
+/** いちばん強く明るくするとき（ガンマ）。これより強くすると暗い所のざらつきが目立つ */
+const BRIGHT_MAX_GAMMA = 1.8;
+
+/**
+ * 暗い写真を明るくする表（0〜255 → 0〜255）。直さなくてよい写真は null。
+ * ユーザーの指示（2026-10-22）「画像は少し暗いので、適宜明るさの調整をおこない、エクセルにおとす」：
+ * 平均の明るさ（Y＝0.299R＋0.587G＋0.114B を step 画素おきに）が BRIGHT_TARGET より暗ければ、平均がおよそ BRIGHT_TARGET になるガンマで
+ * 暗い所・中ほどを持ち上げる（真っ白・真っ黒はそのまま＝窓や白い壁・日付の文字を白く飛ばさない）。data は RGBA の並び
+ */
+export function brightLut(data: Uint8ClampedArray | number[], step = 4): number[] | null {
+  let sum = 0;
+  let n = 0;
+  for (let i = 0; i + 2 < data.length; i += 4 * step) {
+    sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    n++;
+  }
+  const mean = n ? sum / n : 255;
+  if (mean <= 1 || mean >= BRIGHT_TARGET) return null;
+  const gamma = Math.min(BRIGHT_MAX_GAMMA, Math.log(mean / 255) / Math.log(BRIGHT_TARGET / 255));
+  if (gamma < 1.05) return null;
+  return Array.from({length: 256}, (_, v) => Math.round(255 * (v / 255) ** (1 / gamma)));
+}
+
+/** 明るさを補正した写真（番号ごとに一度だけ作る）。直さなくてよい写真・読めない写真はそのまま */
+const brightCache = new Map<string, Promise<Blob>>();
+
+export function brightPhoto(id: string, blob: Blob): Promise<Blob> {
+  let p = brightCache.get(id);
+  if (!p) {
+    p = brighten(blob).catch(() => blob);
+    brightCache.set(id, p);
+  }
+  return p;
+}
+
+async function brighten(blob: Blob): Promise<Blob> {
+  const src = await decode(blob);
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = src.width;
+    canvas.height = src.height;
+    const ctx = canvas.getContext('2d', {willReadFrequently: true});
+    if (!ctx) return blob;
+    src.draw(ctx, src.width, src.height);
+    const img = ctx.getImageData(0, 0, src.width, src.height);
+    const lut = brightLut(img.data);
+    if (!lut) return blob;
+    const d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      d[i] = lut[d[i]];
+      d[i + 1] = lut[d[i + 1]];
+      d[i + 2] = lut[d[i + 2]];
+    }
+    ctx.putImageData(img, 0, 0);
+    return await new Promise<Blob>((resolve) => canvas.toBlob((b) => resolve(b ?? blob), 'image/jpeg', 0.9));
+  } finally {
+    src.done();
+  }
+}
+
+/**
+ * 写真を画面に出す URL（一度作ったものは覚えておく）。この端末にない写真（ほかの端末で入れた・バックアップから戻した様邸）は null。
+ * 画面（写真の欄・プレビュー）も Excel と同じく、暗い写真は明るさを補正したもの（`brightPhoto`）
+ */
 const urlCache = new Map<string, PhotoUrl | null>();
 
 export type PhotoUrl = {url: string; w: number; h: number};
@@ -209,16 +277,15 @@ export function usePhotoUrls(ids: string[]): Record<string, PhotoUrl | null> {
     const missing = key ? key.split(',').filter((id) => !urlCache.has(id)) : [];
     if (missing.length === 0) return;
     let alive = true;
-    void getPhotos(missing).then(
-      (found) => {
-        for (const id of missing) {
-          const p = found.get(id);
-          if (!urlCache.has(id)) urlCache.set(id, p ? {url: URL.createObjectURL(p.blob), w: p.w, h: p.h} : null);
+    void getPhotos(missing)
+      .then(async (found) => {
+        const shown = await Promise.all(missing.map(async (id) => [id, found.get(id), found.has(id) ? await brightPhoto(id, found.get(id)!.blob) : null] as const));
+        for (const [id, p, blob] of shown) {
+          if (!urlCache.has(id)) urlCache.set(id, p && blob ? {url: URL.createObjectURL(blob), w: p.w, h: p.h} : null);
         }
         if (alive) setTick((n) => n + 1);
-      },
-      () => undefined,
-    );
+      })
+      .catch(() => undefined);
     return () => {
       alive = false;
     };
@@ -231,7 +298,9 @@ export function usePhotoUrls(ids: string[]): Record<string, PhotoUrl | null> {
   return out;
 }
 
-/** 入れたばかりの写真を、読み直さずに出せるように覚えておく */
+/** 入れたばかりの写真を、読み直さずに出せるように覚えておく（明るさを補正してから） */
 export function rememberPhotoUrl(id: string, blob: Blob, w: number, h: number): void {
-  if (!urlCache.has(id)) urlCache.set(id, {url: URL.createObjectURL(blob), w, h});
+  void brightPhoto(id, blob).then((b) => {
+    if (!urlCache.has(id)) urlCache.set(id, {url: URL.createObjectURL(b), w, h});
+  });
 }

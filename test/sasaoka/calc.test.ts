@@ -5,6 +5,7 @@ import {
   estimateAmount,
   estimatePlaceLines,
   estimateQty,
+  estimateSums,
   estimateTotals,
   estimateUnitPrice,
   jobName,
@@ -224,20 +225,27 @@ test('見積：部材のすぐ下に続く手間の行を「同上施工費」1�
   assert.equal((estimatePlaceLines({rows: [lab(1000, 1)]}, S)[0] as {afterMaterial: boolean}).afterMaterial, false);
 });
 
-test('見積の合計：小計＝部材＋施工費、諸経費＝小計×0.1、消費税＝（小計＋諸経費）×0.1（どれも切り捨て）', () => {
+test('見積の合計：小計＝部材＋施工費、諸経費＝小計×0.1（合計の末尾が0になるよう端数調整）、消費税＝（小計＋諸経費）×0.1（どれも切り捨て）', () => {
   const j = job([
     [mat(10000, 1, '木製手すり', {listPrice: 20000, lengthCm: 60, pieceLengthM: 4}), lab(1000, 2), mat(1500, 2, 'ブラケット', {listPrice: 2100})],
     [mat(7800, 1, 'L型手すり', {listPrice: 11000}), lab(1500, 2, 'タイル'), mat(300, 2, 'エンドキャップ', {listPrice: 450})],
   ]);
   const t = estimateTotals(j, S);
-  // 2,400＋3,360＋8,800＋720＝15,280／施工費（笹岡工務店 2,000＋3,000）×1.5＝7,500／小計 22,780・諸経費 2,278・消費税 2,505（2,505.8）・合計 27,563
-  const sums = {subtotal: 22780, overhead: 2278, tax: 2505, total: 27563};
+  // 2,400＋3,360＋8,800＋720＝15,280／施工費（笹岡工務店 2,000＋3,000）×1.5＝7,500／小計 22,780・
+  // 諸経費 2,278 では合計 27,563 なので、末尾が0になる 2,275（消費税 2,505・合計 27,560）
+  const sums = {subtotal: 22780, overhead: 2275, tax: 2505, total: 27560};
   assert.deepEqual(t, {material: 15280, work: 7500, all: sums, target: sums, excluded: 0});
   // 仕切り計算表は仕切価格で計算する（見積の定価・掛率は使わない）。切って使う手すりは見積と同じ 0.15本（10,000×0.15＝1,500）
   assert.equal(jobTotals(j, S).material, 1500 + 3000 + 7800 + 600);
-  // 元の見積書（苅田町・行橋市・みやこ町用）の記入例（施工費 8,000円はそのまま）：小計 27,440 → 諸経費 2,744・消費税 3,018・合計 33,202
+  // 元の見積書（苅田町・行橋市・みやこ町用）の記入例（施工費 8,000円はそのまま）：小計 27,440 → 諸経費 2,744 では合計 33,202 → 2,742・消費税 3,018・合計 33,200
   const ex = estimateTotals(job([[mat(0, 1, 'TOTO 32インテリアバー', {listPrice: 24300}), lab(8000, 1, '施工費')]]), S1);
-  assert.deepEqual(ex.all, {subtotal: 27440, overhead: 2744, tax: 3018, total: 33202});
+  assert.deepEqual(ex.all, {subtotal: 27440, overhead: 2742, tax: 3018, total: 33200});
+  // ユーザーの例（2026-10-22）：小計 37,568 → 諸経費 3,751・消費税 4,131・合計 45,450
+  assert.deepEqual(estimateSums(37568, S1), {subtotal: 37568, overhead: 3751, tax: 4131, total: 45450});
+  // 末尾がもともと0なら下げない。小計 0 は 0
+  assert.deepEqual(estimateSums(15000, S1), {subtotal: 15000, overhead: 1500, tax: 1650, total: 18150});
+  assert.deepEqual(estimateSums(0, S1), {subtotal: 0, overhead: 0, tax: 0, total: 0});
+  for (let sub = 1000; sub < 60000; sub += 37) assert.equal(estimateSums(sub, S1).total % 10, 0, String(sub));
 });
 
 test('介護保険の対象外：全体には入り、対象の小計からは外す。部材のすぐ下の施工費は部材に合わせる', () => {
@@ -274,12 +282,12 @@ test('見積の諸経費は手で直せる（端数の調整）。対象外の�
   const t = estimateTotals(job(rows, {overhead: 2700}), S1);
   assert.deepEqual(t.all, {subtotal: 27440, overhead: 2700, tax: 3014, total: 33154});
   assert.deepEqual(t.target, t.all);
-  // 手で入れていなければ 小計×0.1
-  assert.equal(estimateTotals(job(rows, {overhead: null}), S1).all.overhead, 2744);
+  // 手で入れていなければ 小計×0.1（合計の末尾が0になるよう 2,744 → 2,742）
+  assert.equal(estimateTotals(job(rows, {overhead: null}), S1).all.overhead, 2742);
   // 対象外の行があるとき、介護保険の対象の諸経費は overheadTarget（なければ 対象の小計×0.1）
   const ex = [[...rows[0], mat(0, 1, '対象外', {listPrice: 10000, excluded: true})]];
   const t2 = estimateTotals(job(ex, {overhead: 3500}), S1);
-  assert.deepEqual([t2.all.subtotal, t2.all.overhead, t2.target.subtotal, t2.target.overhead], [35440, 3500, 27440, 2744]);
+  assert.deepEqual([t2.all.subtotal, t2.all.overhead, t2.target.subtotal, t2.target.overhead], [35440, 3500, 27440, 2742]);
   assert.equal(estimateTotals(job(ex, {overhead: 3500, overheadTarget: 2700}), S1).target.total, 33154);
   // 仕切り計算表の④諸経費は一律の式のまま（見積の諸経費を直しても変わらない）
   assert.equal(jobTotals(job(rows, {overhead: 2700}), S).overhead, jobTotals(job(rows), S).overhead);
