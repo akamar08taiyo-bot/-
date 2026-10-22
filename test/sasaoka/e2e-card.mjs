@@ -174,11 +174,21 @@ log('新規作成 OK');
 //   画面をクリックしてから Ctrl+V で貼り付けても読む（「クリックしてから挿入で貼り付け」）。字を打つ欄での Ctrl+V は、ふつうの貼り付けのまま
 const cardBtn = page.getByRole('button', {name: '🪪 介護保険証から入れる'});
 const tablist = page.getByRole('tablist', {name: '住宅改修申請書・特定福祉用具申請書・工事見積書・理由書'});
+/** 見えている間の位置（タブを替えている途中＝前の画面が消えて次の画面が出る間は待つ） */
+const boxOf = async (loc) => {
+  for (let i = 0; i < 50; i++) {
+    const box = await loc.boundingBox();
+    if (box) return box;
+    await page.waitForTimeout(100);
+  }
+  throw new Error('見えない');
+};
 const lefts = [];
 for (const name of ['📝 住宅改修申請書', '🛁 特定福祉用具申請書', '📋 工事見積書', '📄 理由書']) {
   await page.getByRole('tab', {name}).click();
-  await cardBtn.waitFor();
-  const [t, b] = [await tablist.boundingBox(), await cardBtn.boundingBox()];
+  // 特定福祉用具申請書のタブを離れるときは、中のアプリの保存を待ってから替わる（flushTokutei）ので、選ばれるまで待つ
+  await page.waitForFunction((n) => [...document.querySelectorAll('[role="tab"]')].some((x) => x.textContent === n && x.getAttribute('aria-selected') === 'true'), name);
+  const [t, b] = [await boxOf(tablist), await boxOf(cardBtn)];
   assert.ok(b.x >= t.x + t.width && b.x - (t.x + t.width) < 24, `${name}：タブのすぐ右 ${JSON.stringify({t, b})}`);
   assert.ok(Math.abs(b.y + b.height / 2 - (t.y + t.height / 2)) < 6, `${name}：タブと同じ段 ${JSON.stringify({t, b})}`);
   lefts.push(Math.round(b.x));
