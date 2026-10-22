@@ -66,8 +66,6 @@ assert.deepEqual(handoff, {
     insurer: 'yukuhashi',
     careOffice: '',
     careManager: '',
-    bodyState: '', // 理由書の利用者の身体状況・介護状況（特定福祉用具の理由の文例に使う。まだ入れていない）
-    careState: '',
   },
 });
 // 中の枠は画面の下まで（画面ごとはスクロールしない。特定福祉用具のアプリの中だけスクロールする）
