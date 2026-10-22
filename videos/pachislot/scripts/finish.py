@@ -69,7 +69,8 @@ r = run(['ffmpeg', '-hide_banner', '-i', mix, '-af',
 m = json.loads(r.stderr[r.stderr.rindex('{'):r.stderr.rindex('}') + 1])
 af = (f"loudnorm=I={TARGET['I']}:TP={TARGET['TP']}:LRA={TARGET['LRA']}:measured_I={m['input_i']}:"
       f"measured_TP={m['input_tp']}:measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:"
-      f"offset={m['target_offset']}:linear=true:print_format=json,aresample=48000")
+      f"offset={m['target_offset']}:linear=true:print_format=json,"
+      "alimiter=limit=0.84:attack=3:release=60:level=false,aresample=48000")  # 線形の正規化でピークが出た分を −1.5 dBFS で抑える
 # 2) 映像と重ねる（映像はイラスト向けの設定で圧縮し直す。crf 22 でアプリで送れる 25MB 前後、見た目はほぼ同じ）
 run(['ffmpeg', '-y', '-hide_banner', '-i', silent, '-i', mix, '-af', af, '-map', '0:v', '-map', '1:a',
      '-c:v', 'libx264', '-preset', 'slow', '-tune', 'animation', '-crf', '22', '-pix_fmt', 'yuv420p',
