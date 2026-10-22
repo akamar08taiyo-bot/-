@@ -377,11 +377,14 @@ export function RiyuEditor({job, data, update, onBack, tabs}: {job: Job; data: A
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-        <div className="flex flex-wrap items-center gap-2">
+        {/* 一覧へ戻る・様邸のタブは1段目に横いっぱい（4つのタブは左の列に入りきらない。どのタブでも同じ位置） */}
+        <div className="flex flex-wrap items-center gap-2 lg:col-span-3">
           <Btn color="white" onClick={onBack}>
             ← 一覧へ戻る
           </Btn>
           {tabs}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-lg font-bold text-[#14532d]">{job.customer.trim() ? jobName(job) : '新しい理由書'}</h1>
           {insurer && <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-900">{INSURER_INFO[insurer].name}</span>}
         </div>

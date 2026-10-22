@@ -1,4 +1,4 @@
-// 理由書を確かめる：様邸の画面のまん中のタブ「📄 理由書」（ユーザーの指示「必要に応じて住宅改修の理由書にも飛べるようにする。入力できる項目を全て転記されるようにする」）。
+// 理由書を確かめる：様邸の画面のいちばん右のタブ「📄 理由書」（ユーザーの指示「必要に応じて住宅改修の理由書にも飛べるようにする。入力できる項目を全て転記されるようにする」）。
 //   左に原本の上からの順の一覧、右にプレビュー（原本の1枚のシートの2ページ）。申請書と同じ欄（氏名・番号・生年月日・性別・要介護・郵便番号・住所・作成者）は
 //   どちらで直しても両方に出る。④改修項目は見積書の箇所から。「📗 理由書をExcelで保存」で原本に転記した Excel（1シート2ページ）を保存する。
 //   URL のうしろは #…&view=riyu（読み直しても理由書のタブ）。スマホの幅（390px）でも横にはみ出さない
@@ -24,9 +24,9 @@ await page.goto(`${site}/jutaku-mitsumori/index.html`);
 await page.getByRole('button', {name: /サンプルで試す/}).click();
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 
-// ---------------- タブ：申請書・理由書・見積書
-const tablist = page.getByRole('tablist', {name: '申請書・理由書・見積書'});
-assert.deepEqual(await tablist.getByRole('tab').allInnerTexts(), ['📝 申請書', '📄 理由書', '📋 見積書']);
+// ---------------- タブ：住宅改修申請書・特定福祉用具申請書・工事見積書・理由書
+const tablist = page.getByRole('tablist', {name: '住宅改修申請書・特定福祉用具申請書・工事見積書・理由書'});
+assert.deepEqual(await tablist.getByRole('tab').allInnerTexts(), ['📝 住宅改修申請書', '🛁 特定福祉用具申請書', '📋 工事見積書', '📄 理由書']);
 await page.getByRole('tab', {name: '📄 理由書'}).click();
 const form = page.getByRole('form', {name: '理由書'});
 await form.waitFor();
@@ -109,7 +109,7 @@ await preview.getByRole('button', {name: '介護状況', exact: true}).first().c
 assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), '介護状況');
 
 // ---------------- 申請書のタブにも同じ値（氏名・番号・生年月日・性別・要介護・郵便番号・住所）
-await page.getByRole('tab', {name: '📝 申請書'}).click();
+await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
 const sform = page.getByRole('form', {name: '申請書'});
 await sform.waitFor();
 assert.equal(await sform.getByLabel('被保険者氏名', {exact: true}).inputValue(), '見本　花子');

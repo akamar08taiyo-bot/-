@@ -1,4 +1,4 @@
-// 申請書を確かめる：様邸の画面の2つのタブ（左に「📝 申請書」、右に「📋 見積書」）。申請書のタブは、左に申請書の順番の一覧（入れる所）、右にプレビュー
+// 申請書を確かめる：様邸の画面のタブ（左から「📝 住宅改修申請書」「🛁 特定福祉用具申請書」「📋 工事見積書」「📄 理由書」）。申請書のタブは、左に申請書の順番の一覧（入れる所）、右にプレビュー
 //   （原本の様式のまま。ユーザーの指示「一覧から入力をメインとする。プレビューをみながら入力」）。Enter で次の欄、入れている項目はプレビューで囲み、
 //   プレビューの欄を押すと一覧のその欄へ。性別・元号・要介護状態区分・改修状況は一覧のボタンか、プレビューの申請書の文字を押すと丸。
 //   同じ様邸なので、見積書で入れた氏名・番号・住所・改修の内容・金額（改修予定費用）がすぐ申請書に出て、申請書で入れた氏名なども見積書に出る。
@@ -58,10 +58,10 @@ const typeIn = async (k, text, end = 'Enter') => {
 const tds = async (text) => (await sheet.locator('.form-page tr', {hasText: text}).first().locator('td').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
 
 // ---------------- 様邸の画面のタブ：左に申請書、まん中に理由書（e2e-riyu.mjs）、右に見積書。見積書のある様邸は、一覧から見積書のタブで開く
-const tablist = page.getByRole('tablist', {name: '申請書・理由書・見積書'});
-assert.deepEqual(await tablist.getByRole('tab').allInnerTexts(), ['📝 申請書', '📄 理由書', '📋 見積書']);
-const shinseiTab = page.getByRole('tab', {name: '📝 申請書'});
-const estimateTab = page.getByRole('tab', {name: '📋 見積書'});
+const tablist = page.getByRole('tablist', {name: '住宅改修申請書・特定福祉用具申請書・工事見積書・理由書'});
+assert.deepEqual(await tablist.getByRole('tab').allInnerTexts(), ['📝 住宅改修申請書', '🛁 特定福祉用具申請書', '📋 工事見積書', '📄 理由書']);
+const shinseiTab = page.getByRole('tab', {name: '📝 住宅改修申請書'});
+const estimateTab = page.getByRole('tab', {name: '📋 工事見積書'});
 assert.equal(await estimateTab.getAttribute('aria-selected'), 'true');
 await typeIn('job:insuredNo', '0000366989');
 // Enter で下の工事場所（住所）の欄に移っているので、そのまま打ち込む
@@ -766,7 +766,7 @@ ipad.on('dialog', (d) => d.accept());
 await ipad.goto(`${site}/jutaku-mitsumori/index.html`);
 await ipad.getByRole('button', {name: /サンプルで試す/}).click();
 await ipad.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
-await ipad.getByRole('tab', {name: '📝 申請書'}).click();
+await ipad.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
 const board2 = ipad.getByRole('region', {name: '写真'});
 await board2.waitFor();
 const [chooser3] = await Promise.all([ipad.waitForEvent('filechooser'), board2.getByRole('button', {name: '📷 写真を選ぶ'}).tap()]);

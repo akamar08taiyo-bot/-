@@ -25,6 +25,7 @@ import {EstimateHome, EstimateList, newEstimate} from './estimate/EstimateList.t
 import {OrderPage} from './estimate/OrderPage.tsx';
 import {RiyuEditor} from './estimate/RiyuEditor.tsx';
 import {ShinseiEditor} from './estimate/ShinseiEditor.tsx';
+import {TokuteiEditor} from './estimate/TokuteiEditor.tsx';
 import {hasShinseiInfo} from './estimateForms.ts';
 import {APP_TITLE, PORTAL_URL, readHash, writeHash} from './links.ts';
 import type {JobView, MainTab} from './links.ts';
@@ -33,6 +34,7 @@ import {PrintView} from './print/PrintView.tsx';
 import type {PrintRequest} from './print/PrintView.tsx';
 import {hasRiyuInfo} from './riyu.ts';
 import {EXAMPLE_KIT_ID, exampleKit} from './samples.ts';
+import {flushTokutei} from './tokuteiLink.ts';
 import type {Insurer, Job, Row} from './types.ts';
 import {useNewVersion} from './update.ts';
 import {useStore} from './useStore.ts';
@@ -71,17 +73,24 @@ function loadMonth(): string {
 }
 
 /**
- * 様邸の画面のタブ：左に申請書、まん中に理由書、右に見積書（ユーザーの指示「新規作成で、保険者を選んだら、2種類、タブを作る。左側に、申請書、右側に見積もり」・「必要に応じて住宅改修の理由書にも飛べるようにする」）。
- * 同じ様邸の内容（氏名・住所・被保険者番号・改修の箇所・金額）なので、どちらで直しても、もう一方にすぐ出る
+ * 様邸の画面のタブ：左から 住宅改修申請書・特定福祉用具申請書・工事見積書・理由書（ユーザーの指示「上のタブのところに、住宅改修申請書、特定福祉用具申請書、工事見積書、理由書の順番で、並べてください」、2026-10-22。
+ * その前は「新規作成で、保険者を選んだら、2種類、タブを作る。左側に、申請書、右側に見積もり」・「必要に応じて住宅改修の理由書にも飛べるようにする」）。
+ * 同じ様邸の内容（氏名・住所・被保険者番号・改修の箇所・金額）なので、どれで直しても、ほかにすぐ出る。特定福祉用具申請書は、特定福祉用具のアプリをお客様の情報を渡して中に出す（TokuteiEditor.tsx）
  */
 function JobTabs({view, onView}: {view: JobView; onView: (v: JobView) => void}) {
   const tabs: [JobView, string][] = [
-    ['shinsei', '📝 申請書'],
+    ['shinsei', '📝 住宅改修申請書'],
+    ['tokutei', '🛁 特定福祉用具申請書'],
+    ['estimate', '📋 工事見積書'],
     ['riyu', '📄 理由書'],
-    ['estimate', '📋 見積書'],
   ];
   return (
-    <div role="tablist" aria-label="申請書・理由書・見積書" className="inline-flex overflow-hidden rounded-lg border-2 border-[#14532d] bg-white shadow-sm">
+    // スマホ・タブレットの縦の幅では2つずつ2段に並べる（4つを1段にすると名前が折り返して読みにくい）。線はすき間（gap-px）から見える枠の色
+    <div
+      role="tablist"
+      aria-label="住宅改修申請書・特定福祉用具申請書・工事見積書・理由書"
+      className="grid w-full grid-cols-2 gap-px overflow-hidden rounded-lg border-2 border-[#14532d] bg-[#14532d] shadow-sm md:inline-flex md:w-auto md:gap-0 md:bg-white"
+    >
       {tabs.map(([v, text]) => (
         <button
           key={v}
@@ -89,7 +98,7 @@ function JobTabs({view, onView}: {view: JobView; onView: (v: JobView) => void}) 
           role="tab"
           aria-selected={view === v}
           onClick={() => onView(v)}
-          className={`px-5 py-2 text-[15px] font-bold transition ${view === v ? 'bg-[#14532d] text-white' : 'text-[#14532d] hover:bg-emerald-50'}`}
+          className={`whitespace-nowrap px-2 py-2 text-sm font-bold transition md:px-5 md:text-[15px] ${view === v ? 'bg-[#14532d] text-white' : 'bg-white text-[#14532d] hover:bg-emerald-50'}`}
         >
           {text}
         </button>
@@ -227,7 +236,13 @@ export default function App({start}: {start: MainTab}) {
   const removeIfEmpty = (job: Job | null) => {
     if (job && isEmpty(job)) store.update('jobs', (list) => list.filter((j) => j.id !== job.id));
   };
-  const goTab = (t: MainTab) => {
+  // 特定福祉用具申請書のタブを離れるときは、中の特定福祉用具のアプリの保存が終わってから（枠を消すと保存が途中で止まる。tokuteiLink.ts）
+  const leaveTokutei = (go: () => void) => {
+    if (tab === 'estimate' && estimateJob && jobView === 'tokutei') void flushTokutei().then(go);
+    else go();
+  };
+  const goTab = (t: MainTab) => leaveTokutei(() => openTab(t));
+  const openTab = (t: MainTab) => {
     // 同じタブをもう一度押したら、そのタブの最初の画面に戻る
     if (t === tab) {
       if (t === 'estimate') {
@@ -263,7 +278,7 @@ export default function App({start}: {start: MainTab}) {
     setEstimateId(id);
     setJobView(j && !j.estDate && !hasEstimateRows(j) ? 'shinsei' : 'estimate');
   };
-  const tabs = <JobTabs view={jobView} onView={setJobView} />;
+  const tabs = <JobTabs view={jobView} onView={(v) => leaveTokutei(() => setJobView(v))} />;
   // 見積書と請求書（仕切り計算表）を行き来する（同じ様邸を開く）
   const openEstimate = (id: string) => {
     setEstimateId(id);
@@ -287,7 +302,7 @@ export default function App({start}: {start: MainTab}) {
           このアプリの新しい版が出ています。
           <button
             type="button"
-            onClick={() => void store.flush().then(() => location.reload())}
+            onClick={() => void Promise.all([store.flush(), flushTokutei()]).then(() => location.reload())}
             className="rounded-md border border-slate-900/20 bg-white px-3 py-1.5 font-bold text-slate-900 shadow-sm hover:bg-amber-50"
           >
             ⟳ 読み込み直す
@@ -346,6 +361,19 @@ export default function App({start}: {start: MainTab}) {
                   setEstimateId(null);
                   setJobView('estimate');
                 }}
+                tabs={tabs}
+              />
+            ) : estimateJob && jobView === 'tokutei' ? (
+              <TokuteiEditor
+                key={estimateJob.id}
+                job={estimateJob}
+                onBack={() =>
+                  leaveTokutei(() => {
+                    removeIfEmpty(estimateJob);
+                    setEstimateId(null);
+                    setJobView('estimate');
+                  })
+                }
                 tabs={tabs}
               />
             ) : estimateJob && jobView === 'riyu' ? (

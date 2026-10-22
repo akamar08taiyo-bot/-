@@ -23,7 +23,7 @@ page.on('dialog', (d) => d.accept());
 await page.goto(`${site}/jutaku-mitsumori/index.html`);
 await page.getByRole('button', {name: /サンプルで試す/}).click(); // 部材リスト（★お気に入り）と取付手間の単価
 await page.getByRole('button', {name: '＋ 行橋市', exact: true}).click(); // 保険者（苅田町・行橋市・みやこ町は同じ書式）
-await page.getByRole('tab', {name: '📋 見積書'}).click(); // 新規作成は申請書のタブから開く
+await page.getByRole('tab', {name: '📋 工事見積書'}).click(); // 新規作成は申請書のタブから開く
 
 const sheet = page.getByRole('region', {name: '見積書', exact: true});
 await sheet.waitFor();

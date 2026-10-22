@@ -55,7 +55,7 @@ log('仕切り計算で直す → 開いたままの見積書に入るOK');
 // ---------------- ほぼ同時に保存：見積書で新しい見積書を作り、すぐに仕切り計算で備考を書く（どちらも保存を待たない）
 await est.getByRole('button', {name: '← 一覧へ戻る'}).click();
 await est.getByRole('button', {name: '＋ 広域連合', exact: true}).click();
-await est.getByRole('tab', {name: '📋 見積書'}).click(); // 新規作成は申請書のタブから開く
+await est.getByRole('tab', {name: '📋 工事見積書'}).click(); // 新規作成は申請書のタブから開く
 await est.getByPlaceholder('例：山田').fill('同時 一郎');
 // 見積書に行を入れると請求書に入る（行のないうちは「請求書に入れる」は出ない）
 await est.locator('[data-edit="new:text"]').first().click();

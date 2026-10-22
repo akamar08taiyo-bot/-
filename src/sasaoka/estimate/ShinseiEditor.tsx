@@ -346,11 +346,14 @@ export function ShinseiEditor({
       {/* Excel で保存は画面のまん中（ユーザーの指示「Excelの印刷、保存ボタンを中央にもってくる」2026-10-22。見積書のタブの保存・Excel・印刷も同じ所）。
           広い画面は 左・まん中・右 の3つに分け、まん中を画面のまん中にそろえる。狭い画面はまん中のボタンだけの行にして、そのまん中に */}
       <div className="flex flex-wrap items-center gap-2 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-        <div className="flex flex-wrap items-center gap-2">
+        {/* 一覧へ戻る・様邸のタブは1段目に横いっぱい（4つのタブは左の列に入りきらない。どのタブでも同じ位置） */}
+        <div className="flex flex-wrap items-center gap-2 lg:col-span-3">
           <Btn color="white" onClick={onBack}>
             ← 一覧へ戻る
           </Btn>
           {tabs}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-lg font-bold text-[#14532d]">{job.customer.trim() ? jobName(job) : '新しい申請書'}</h1>
           {insurer && <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-900">{INSURER_INFO[insurer].name}</span>}
         </div>
