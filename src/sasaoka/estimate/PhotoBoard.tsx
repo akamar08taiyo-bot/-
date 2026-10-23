@@ -87,13 +87,27 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
   const swapPlaces = (a: string, b: string) => setJob((j) => ({...j, places: swapPhotoNumbers(j.places, a, b)}));
   /**
    * 写真の日付（撮影日時・写っている日付）を入れる：その写真の枠と、同じ改修前・改修後で写真のまだない枠に。
-   * 日付を読んでいる間に写真を差し替えた・消したときは入れない
+   * 日付を読んでいる間に写真を差し替えた・消したとき、撮影日を手で入れたとき（写真を入れたときに、その枠の撮影日は空にしている）は入れない
    */
-  const setPhotoDate = (key: PhotoKey, id: string, date: string) =>
+  const setPhotoDate = (id: string, slot: PhotoSlot, date: string) =>
     setJob((j) => {
-      if (j.places.find((p) => p.id === key.placeId)?.photos?.[key.slot] !== id) return j;
+      const target = j.places.find((p) => p.photos?.[slot] === id);
+      if (!target || target.photoDates?.[slot]) return j;
       const nos = photoNumbers(j, rates);
-      return {...j, places: j.places.map((p) => (p.id === key.placeId || (nos.has(p.id) && !p.photos?.[key.slot]) ? withSlot(p, 'photoDates', key.slot, date) : p))};
+      return {...j, places: j.places.map((p) => (p.id === target.id || (nos.has(p.id) && !p.photos?.[slot]) ? withSlot(p, 'photoDates', slot, date) : p))};
+    });
+  /**
+   * 入れた写真を枠に置く：first は選んだ枠（start。写真があれば差し替え）、そのほかは start のあとの写真番号の空いた枠。
+   * 枠はそのときの様邸で決める（前は写真を読み始めたときの様邸で決めていて、読んでいる間に別の写真を入れると同じ枠に重ねていた）
+   */
+  const placePhoto = (id: string, slot: PhotoSlot, start: PhotoKey | undefined, first: boolean) =>
+    setJob((j) => {
+      const list = photoPlaces(j, rates);
+      const at = start ? list.findIndex((x) => x.place.id === start.placeId) : -1;
+      const free = list.slice(at + 1).find(({place}) => !place.photos?.[slot]);
+      const key = first && start && at >= 0 ? start : free ? {placeId: free.place.id, slot} : null;
+      if (!key) return j;
+      return {...j, places: j.places.map((p) => (p.id === key.placeId ? withPhoto(p, key.slot, id, undefined, undefined) : p))};
     });
   /** 写真のファイル（PDF はページごとに写真にする）を入れる：start の枠から（なければ①の改修前から）、改修前の空いた枠に順に */
   const put = async (files: File[], start?: PhotoKey) => {
@@ -123,30 +137,26 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
       setBusy((n) => n - 1);
     }
     if (images.length === 0) return;
-    // 入れる枠：選んだ枠と、そのあとの写真番号の同じ種類（改修前・改修後）の空いた枠
+    // 入れる枠：選んだ枠と、そのあとの写真番号の同じ種類（改修前・改修後）の空いた枠（ここでは足りるかを見るだけ。置く枠は placePhoto で決める）
     const list = photoPlaces(job, rates);
     const slot = start?.slot ?? 'before';
     const from = start ? list.findIndex((x) => x.place.id === start.placeId) + 1 : 0;
-    const empty = list
-      .slice(from)
-      .filter(({place}) => !place.photos?.[slot])
-      .map(({place}) => ({placeId: place.id, slot}));
-    const targets: PhotoKey[] = start ? [start, ...empty] : empty;
-    if (targets.length === 0) {
+    const room = (start ? 1 : 0) + list.slice(from).filter(({place}) => !place.photos?.[slot]).length;
+    if (room === 0) {
       toast('写真を入れる空いた枠がありません（写真を押して差し替えます）', 'error');
       return;
     }
-    const used = images.slice(0, targets.length);
+    const used = images.slice(0, room);
     setBusy((n) => n + used.length);
     for (const [i, {file, name}] of used.entries()) {
       try {
         const [taken, {blob, w, h}] = await Promise.all([photoTakenDate(file), preparePhoto(file)]);
         const id = await putPhoto({blob, w, h});
         rememberPhotoUrl(id, blob, w, h);
-        setPhoto(targets[i], id, undefined);
+        placePhoto(id, slot, start, i === 0);
         // 撮影日：写真の撮影日時、なければ写真に写っている日付（読むのに少しかかるので、写真を入れてから）。どちらもなければ入れない
-        if (taken) setPhotoDate(targets[i], id, taken);
-        else void readStampDate(blob).then((day) => day && setPhotoDate(targets[i], id, day));
+        if (taken) setPhotoDate(id, slot, taken);
+        else void readStampDate(blob).then((day) => day && setPhotoDate(id, slot, day));
       } catch {
         toast(`「${name}」を読めませんでした`, 'error');
       } finally {
