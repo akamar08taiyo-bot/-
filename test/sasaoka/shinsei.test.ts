@@ -176,6 +176,12 @@ test('苅田町の申請書：事前申請書の氏名・住所・被保険者�
   assert.equal(strip(pre), strip(orig.byName.get('事前申請書')!)); // 欄のほか（罫線・結合・印刷の範囲など）はそのまま
 });
 
+test('苅田町の原本：事後申請書の被保険者番号（事前申請書を参照する式）に、前の方の番号の数字が残っていない（式の値はどれも 0）', () => {
+  const xml = sheets(KANDA).byName.get('事後申請書')!;
+  const cached = ['W', 'X', 'Y', 'Z', 'AA', 'AB', 'AC', 'AD', 'AE', 'AF'].map((c) => /<v>([^<]*)<\/v>/.exec(cell(xml, `${c}6`))?.[1]);
+  assert.deepEqual(cached, Array(10).fill('0'));
+});
+
 test('苅田町の写真の用紙：改修箇所・実施した工事種類の□は、その写真番号の箇所・改修の種類を■に（一覧にない場所は「■勝手口」）。撮影日も書く', () => {
   const j = job({places: [...job().places, place('勝手口', [mat('L型手すり')], {photoDates: {before: '2026-10-01', after: '2026-11-20'}})]});
   const {files, byName} = sheets(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(j, RATES)));
