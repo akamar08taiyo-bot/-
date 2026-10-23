@@ -83,6 +83,16 @@ assert.equal(await page.getByLabel('笹岡工務店の請求書に入れる').is
 assert.equal(await page.getByRole('button', {name: '🛒 発注書を作成'}).isDisabled(), false); // 発注書も作れる
 log('改修内容・改修場所・内容（候補から）・数量 60cm＝0.15本・行を入れると請求書に入るOK');
 
+// 1行目を入れた直後も、Ctrl+Z 1回で1つ前に戻る（前は見積もり作成日の付いた見積書を外の変更とみて、2回押さないと戻らなかった）
+await undoKey(); // 数量 60cm
+await undoKey(); // 内容（木の手すり）
+await undoKey(); // 改修場所「浴室」
+assert.equal(await sheet.locator('.form-page', {hasText: '浴室'}).count(), 0);
+for (let i = 0; i < 3; i++) await page.keyboard.press('ControlOrMeta+y');
+rail = await tds('木の手すり 35φ 4m');
+assert.deepEqual(rail.slice(0, 7), ['手すりの取り付け', '①浴室', 'サンプル S-TS35 木の手すり 35φ 4m', '0.15', '本', '16,000', '2,400'], rail.join('|'));
+log('1行目のあとの Ctrl+Z（1回で1つ前）OK');
+
 // ---------------- 同上施工費：内容に打って、単価に金額
 await typeIn('new:text', '同上施工費', 'Tab');
 assert.equal(await selected(), '単価');
@@ -126,6 +136,11 @@ await page.keyboard.press('ControlOrMeta+z');
 assert.equal((await tds('手すりカバー'))[3], '2');
 log('F2・Esc・Delete OK');
 
+// 諸経費の欄を F2 で開いてそのまま Enter：手で入れた金額にしない（このあと行を足すと、諸経費も変わる）
+await cell('overhead:all').click();
+await page.keyboard.press('F2');
+await page.keyboard.press('Enter');
+
 // ---------------- 空いた行を押すと、打ち込める行の同じ列が選ばれる。改修場所を打つと箇所が増える（写真番号は次の番号）
 await sheet.locator('.form-page tr[data-blank]').nth(3).locator('td').nth(1).click();
 assert.equal(await selected(), '改修場所（箇所名）');
@@ -135,7 +150,9 @@ await page.keyboard.type('L型');
 await page.keyboard.press('ArrowDown');
 await page.keyboard.press('Enter');
 assert.deepEqual((await tds('L型手すり')).slice(0, 7), ['手すりの取り付け', '②トイレ', 'サンプル S-TL01 L型手すり', '1', '本', '8,800', '8,800']);
-log('空いた行・新しい箇所OK');
+// 9,200＋8,800＝18,000 → 諸経費 1,800（上で F2・Enter した諸経費も自動のまま。前は 919 のままで合計 20,810）→ 消費税 1,980 → 合計 21,780
+assert.deepEqual(await totals(), ['合計', '21,780', '21,780']);
+log('空いた行・新しい箇所・諸経費は自動のままOK');
 
 // ---------------- 行の左の「挿入」：下に1行入れる → 打ち込む／介護保険の対象外（スペース）／行の左の「✕」で消す
 await sheet.getByRole('button', {name: 'サンプル S-TL01 L型手すりの行の下に1行入れる'}).click();
