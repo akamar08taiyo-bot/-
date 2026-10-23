@@ -122,6 +122,23 @@ if (withTokutei) {
   log('読み直し・案件は1つ OK');
 }
 
+// ---------------- 新規作成してすぐ特定福祉用具申請書のタブを開き、住宅改修には何も入れずに一覧へ戻っても、様邸は消さない
+//（中のアプリの案件はこの様邸の id につながる。前は空の様邸とみて消し、作り直すと特定福祉用具の案件が2つになった）
+await page.goto(`${site}/jutaku-mitsumori/index.html`);
+await page.getByRole('region', {name: '新規作成'}).getByRole('button', {name: '＋ 苅田町', exact: true}).click();
+await form.waitFor();
+const emptyId = await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get('job'));
+await page.getByRole('tab', {name: '🛁 特定福祉用具申請書'}).click();
+await page.waitForFunction(() => location.hash.includes('view=tokutei'));
+await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
+await page.waitForFunction(() => !location.hash.includes('job='));
+await page.waitForTimeout(1200); // 自動保存（0.4秒後）
+await page.goto(`${site}/jutaku-mitsumori/index.html#tab=estimate&job=${encodeURIComponent(emptyId)}`);
+await page.reload();
+await page.getByRole('tablist', {name: '住宅改修申請書・特定福祉用具申請書・工事見積書・理由書'}).waitFor({timeout: 5000});
+assert.equal(await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get('job')), emptyId);
+log('特定福祉用具申請書のタブを開いた様邸は、空でも消さない OK');
+
 // ---------------- スマホの幅（390px）：横にはみ出さない
 await page.setViewportSize({width: 390, height: 844});
 await page.getByRole('tab', {name: '🛁 特定福祉用具申請書'}).click();

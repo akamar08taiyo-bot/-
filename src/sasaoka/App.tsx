@@ -10,7 +10,7 @@
 //                       部材＋施工費（常用）のセット（よく使う部材と施工費の組み合わせ）
 //   設定
 
-import {useEffect, useMemo, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 import {hasEstimateRows} from './calc.ts';
 import {JobEditor} from './components/JobEditor.tsx';
 import {JobsPage} from './components/JobsPage.tsx';
@@ -152,6 +152,12 @@ export default function App({start}: {start: MainTab}) {
   useEffect(() => {
     if (loaded && !estimateJob) setJobView('estimate');
   }, [loaded, estimateJob?.id]);
+  // 🛁 特定福祉用具申請書のタブを開いた様邸。中のアプリの案件はこの様邸の id につながるので、そちらにだけ入れた（住宅改修は空の）様邸も
+  // 離れるときに消さない（前は消えて、特定福祉用具の案件が行き先のない id につながったままになり、作り直すと案件が2つになった）
+  const tokuteiOpened = useRef(new Set<string>());
+  useEffect(() => {
+    if (estimateJob && jobView === 'tokutei') tokuteiOpened.current.add(estimateJob.id);
+  }, [estimateJob?.id, jobView]);
   useEffect(() => {
     document.title = APP_TITLE;
   }, []);
@@ -234,7 +240,7 @@ export default function App({start}: {start: MainTab}) {
 
   const theme = THEME[tab];
   const removeIfEmpty = (job: Job | null) => {
-    if (job && isEmpty(job)) store.update('jobs', (list) => list.filter((j) => j.id !== job.id));
+    if (job && isEmpty(job) && !tokuteiOpened.current.has(job.id)) store.update('jobs', (list) => list.filter((j) => j.id !== job.id));
   };
   // 特定福祉用具申請書のタブを離れるときは、中の特定福祉用具のアプリの保存が終わってから（枠を消すと保存が途中で止まる。tokuteiLink.ts）
   const leaveTokutei = (go: () => void) => {
