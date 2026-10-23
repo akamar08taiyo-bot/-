@@ -220,9 +220,18 @@ const shownQty = (r: Row) => (cutToLength(r) ? Math.round(estimateQty(r) * 1000)
 /** 広域連合用の時間の欄に出す時間（施工費のまとまりの金額÷1時間の単価。小数2けた） */
 const shownHours = (amount: number, hourRate: number) => (hourRate > 0 ? Math.round((amount / hourRate) * 100) / 100 : 1);
 
-/** 申請書のタブで入れた内容（寸法・写真・写真に書く内容・申請書の文）がある箇所 */
+/** 申請書のタブで入れた内容（写真・撮影日・寸法・申請書に書く内容・写真に書く内容）がある箇所（申請書の一覧の ✕ で聞いてから消す箇所と同じ） */
 const hasShinseiData = (p: Place) =>
-  !!(p.shinseiText?.trim() || p.shinseiLine?.trim() || p.photoNote?.trim() || p.photos?.before || p.photos?.after || Object.values(p.dims ?? {}).some((v) => v?.trim()));
+  !!(
+    p.photos?.before ||
+    p.photos?.after ||
+    p.photoDates?.before ||
+    p.photoDates?.after ||
+    Object.values(p.dims ?? {}).some((v) => v?.trim()) ||
+    p.shinseiLine !== undefined ||
+    p.shinseiText?.trim() ||
+    p.photoNote?.trim()
+  );
 
 /** いちばん下の空いた行が入る箇所：最後の箇所に行がなければその箇所（なければ null。打ち込むと新しく作る） */
 export function pendingPlace(job: Pick<Job, 'places'>): Place | null {

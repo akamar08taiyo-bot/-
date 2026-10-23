@@ -449,6 +449,11 @@ test('申請書のタブで寸法・写真を入れた箇所は、見積書の �
   assert.deepEqual(moved.places.map((p) => [p.name, p.rows.length]), [['玄関', 2], ['浴室', 1]]);
   const plain = {...emptyJob(), places: [entry, newPlace('トイレ', [materialRow(bar, 1)])]};
   assert.deepEqual(deleteLine(plain, plain.places[1].rows[0].id).places.map((p) => p.name), ['玄関']);
+  // 撮影日だけ・手で直した申請書の文だけの箇所も残す（申請書の一覧の ✕ で聞く箇所と同じ）
+  for (const extra of [{photoDates: {before: '2026-10-01'}}, {shinseiLine: ''}]) {
+    const kept = {...emptyJob(), places: [entry, {...newPlace('トイレ', [materialRow(bar, 1)]), ...extra}]};
+    assert.deepEqual(deleteLine(kept, kept.places[1].rows[0].id).places.map((p) => p.name), ['玄関', 'トイレ']);
+  }
 });
 
 test('白紙に戻す：見積書の内容と、申請書の項目・理由書（お客様のこと）を消す。保険者・担当・請求書に入れるかは残す', () => {
