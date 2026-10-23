@@ -6,7 +6,8 @@ import {defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {estimateFileName, estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import type {Job, Place, Row} from '../../src/sasaoka/types.ts';
 import {manualRow} from '../../src/sasaoka/rows.ts';
-import {wordLines} from '../../src/sasaoka/print/fit.ts';
+import {fitLines, fitName, fitText, wordLines} from '../../src/sasaoka/print/fit.ts';
+import {KK, KK_ROWS, YK, YK_ROW} from '../../src/sasaoka/print/formLayout.ts';
 import {readXlsx} from '../../src/sasaoka/xlsx.ts';
 import {colName, SheetBuilder, writeXlsx} from '../../src/sasaoka/xlsxWrite.ts';
 
@@ -307,4 +308,40 @@ test('長い商品名は言葉の切れ目で改行する（印刷・Excel と�
   const j = job({places: [place('廊下', [mat('マツ六 BD-132 35アッシュ丸棒 ディンプル付 Mオーク 2m', 12000)])]});
   const x = open(estimateXlsx(j, S, '2026-10-22').bytes);
   assert.equal(x.text('C9'), 'マツ六 BD-132 35アッシュ丸棒\nディンプル付 Mオーク 2m');
+});
+
+test('Excel の欄の文字は印刷と同じ大きさ・同じ改行（長い備考・改修場所・品名も切れない）', () => {
+  const note = '定価123,456円（税抜）×0.8　メーカーの見積書（2026年10月20日付）の金額で、運賃・梱包費を含む';
+  const name = 'TOTO EWT24KR68#NW1 インテリア・バーF Lタイプ 600×800mm ホワイト 浴室用（ステンレス芯・樹脂被覆）';
+  const longPlace = '玄関から廊下にかけて（上がり框の横）';
+  const places = [place(longPlace, [mat(name, 123456, {maker: '', estNote: note})])];
+  /** マスの字の大きさ（styles.xml の font の sz） */
+  const sizeOf = (x: ReturnType<typeof open>, ref: string) => {
+    const styles = strFromU8(x.files['xl/styles.xml']);
+    const fonts = [...styles.matchAll(/<font>([\s\S]*?)<\/font>/g)].map((m) => Number(/<sz val="([\d.]+)"/.exec(m[1])?.[1]));
+    const xfs = [.../<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/.exec(styles)![1].matchAll(/<xf [^>]*fontId="(\d+)"/g)].map((m) => Number(m[1]));
+    return fonts[xfs[x.cells.get(ref)?.s ?? 0]];
+  };
+  // 苅田町・行橋市・みやこ町用（9行目）：改修場所 B・内容 C・備考 M
+  const y = open(estimateXlsx(job({places}), S, '2026-10-22').bytes);
+  for (const [ref, f] of [
+    ['B9', fitText(`①${longPlace}`, YK.B, YK_ROW, 11)],
+    ['C9', fitName(name, YK.C, YK_ROW, 9, 2)],
+    ['M9', fitText(note, YK.M, YK_ROW, 11)],
+  ] as const) {
+    assert.equal(y.text(ref), f.lines.join('\n'), ref);
+    assert.equal(sizeOf(y, ref), f.pt, ref);
+  }
+  assert.ok(String(y.text('M9')).includes('\n')); // 長い備考は折り返す（前は1行の小さな字）
+  // 広域連合用（5行目）：改修箇所 A・内容 D・算出根拠 Q
+  const k = open(estimateXlsx(job({form: 'kouiki', places}), S, '2026-10-22').bytes);
+  for (const [ref, f] of [
+    ['A5', fitText(longPlace, KK.A, KK_ROWS[0], 11, 2)],
+    ['D5', fitName(name, KK.D, KK_ROWS[0], 9, 3)],
+    ['Q5', fitLines([note], KK.Q + KK.R, KK_ROWS[0], 10)],
+  ] as const) {
+    assert.equal(k.text(ref), f.lines.join('\n'), ref);
+    assert.equal(sizeOf(k, ref), f.pt, ref);
+  }
+  assert.ok(sizeOf(k, 'Q5') >= 4.5); // 前は 2.5pt でも入らず、欄の右で切れていた
 });

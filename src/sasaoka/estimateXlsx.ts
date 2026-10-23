@@ -7,10 +7,11 @@ import {estimateTotals, rounddown} from './calc.ts';
 import type {EstimateSums, EstimateTotals} from './calc.ts';
 import {circled, FORM_INFO, formLines, jobForm, KINDS, lineNote, paginate, reiwa, TOTAL_ROWS} from './estimateForms.ts';
 import type {FormLine} from './estimateForms.ts';
-import {fitLinesPt, fitText, wordLines} from './print/fit.ts';
-import {issuerLines, KK, KK_FOOT, KK_NOTE_1, KK_NOTE_2, KK_ROWS, NOTE_KIND, NOTE_MARK, NOTE_PHOTO, totalRows, YK, YK_ROW} from './print/formLayout.ts';
+import {fitLines, fitName, fitText} from './print/fit.ts';
+import type {Fit} from './print/fit.ts';
+import {issuerLines, KK, KK_FOOT, KK_LEFT, KK_NOTE_1, KK_NOTE_2, KK_RIGHT, KK_ROWS, NOTE_KIND, NOTE_MARK, NOTE_PHOTO, totalRows, YK, YK_ROW} from './print/formLayout.ts';
 import type {Job, Settings} from './types.ts';
-import {customerFilePart} from './util.ts';
+import {customerFilePart, num, yen} from './util.ts';
 import {cellRef, SheetBuilder, writeXlsx} from './xlsxWrite.ts';
 import type {XEdges, XSheet, XStyle} from './xlsxWrite.ts';
 
@@ -44,19 +45,21 @@ function align(cls: string): XStyle['h'] {
   return has.has('r') ? 'right' : has.has('c') ? 'center' : undefined;
 }
 
-/** 文字の大きさ。折り返してよい欄（lines が2以上）は印刷と同じ大きさで折り返す。1行の欄は Excel の「縮小して全体を表示」 */
-function fit(text: string, w: number, h: number, maxPt: number, lines = 1): XStyle {
-  return lines > 1 ? {size: fitText(text, w, h, maxPt, lines).pt, wrap: true} : {size: maxPt, shrink: true};
+/**
+ * 欄の文字と書式：印刷と同じ大きさ・同じ改行（`fitText`・`fitLines`・`fitName`。印刷と同じ計算）。折り返す欄は改行を入れて折り返しの書式。
+ * 1行の欄は「縮小して全体を表示」も付ける（Excel の字体が少し広くても切れない）。前は1行の欄を Excel の縮小に任せ、
+ * 印刷では折り返す長い改修場所・備考が Excel では1行の小さな字になり、品名・備考の大きさも印刷と違っていた
+ */
+function fitted(f: Fit): {v: string | null; st: XStyle} {
+  const v = f.lines.join('\n');
+  return {v: v || null, st: f.lines.length > 1 ? {size: f.pt, wrap: true} : {size: f.pt, shrink: true}};
 }
+/** 1つの文字の欄（`fitText`） */
+const fit = (text: string, w: number, h: number, maxPt: number, lines = 1) => fitted(fitText(text, w, h, maxPt, lines));
 
-/** 内容（品名）の欄：長い商品名は言葉の切れ目で改行した行（`wordLines`）が入る大きさ。印刷と同じ */
-function nameFit(text: string, w: number, h: number, maxPt: number, lines: number): XStyle {
-  const parts = wordLines(text, w, h, maxPt, lines);
-  return parts.length > 1 ? {size: fitLinesPt(parts, w, h, maxPt), wrap: true} : fit(text, w, h, maxPt, lines);
-}
-
-const money = (size: number): XStyle => ({size, numFmt: MONEY, shrink: true});
-const count = (size: number): XStyle => ({size, shrink: true});
+/** 金額・数量の欄：印刷と同じ大きさ（Excel の書式 #,##0 と同じ「12,345」の幅で） */
+const money = (v: number, w: number, h: number, maxPt = 11): XStyle => ({size: fitText(yen(v), w, h, maxPt).pt, numFmt: MONEY, shrink: true});
+const count = (q: number, w: number, h: number, maxPt = 9): XStyle => ({size: fitText(num(q, 3), w, h, maxPt).pt, shrink: true});
 /** 数量は印刷と同じく小数3けたまで */
 const qty3 = (n: number) => Math.round(n * 1000) / 1000;
 const pct = (rate: number) => Math.round(rate * 1000) / 10;
@@ -107,11 +110,14 @@ function yukuhashiSheet(job: Job, s: Settings, date: string): XSheet {
     b.put(title, 0, `①　${FORM_INFO.yukuhashi.title}`, {size: 24, h: 'center'}, {}, 1, 13);
     const [r2, r3, r4, r5] = [b.row(5.82), b.row(7.67), b.row(7.67), b.row(7.67)];
     b.put(r2, 7, pi === 0 ? issuer.join('\n') : null, {size: issuerPt, h: 'left', v: 'bottom', wrap: true}, {}, 4, 6);
-    b.put(r3, 0, name || null, {size: 18, h: 'center', shrink: true}, edges('bb', false), 1, 2);
+    const nm = fit(name, YK.A + YK.B, 7.67, 18);
+    b.put(r3, 0, nm.v, {...nm.st, h: 'center'}, edges('bb', false), 1, 2);
     b.put(r3, 2, '様邸　住宅改修', {size: 12});
     b.put(r4, 0, pi === 0 ? `介護保険被保険者番号（${job.insuredNo.trim() || '　　　　　　　　　　'}）` : null, {size: 12, shrink: true}, edges('bb', false), 1, 3);
-    b.put(r5, 0, '工事場所（住所）', {size: 12, shrink: true}, edges('bt bb', false));
-    b.put(r5, 1, job.address || null, {size: 11, shrink: true}, edges('bt bb', false), 1, 2);
+    const label = fit('工事場所（住所）', YK.A, 7.67, 12);
+    b.put(r5, 0, label.v, label.st, edges('bt bb', false));
+    const address = fit(job.address, YK.B + YK.C, 7.67, 11);
+    b.put(r5, 1, address.v, address.st, edges('bt bb', false), 1, 2);
     b.row(5.03);
 
     const [h1, h2] = [b.row(10.53), b.row(5.03)];
@@ -151,11 +157,11 @@ function yukuhashiSheet(job: Job, s: Settings, date: string): XSheet {
         put(3, null, 'nr');
         put(4, null, 'nl');
         put(5, null, '');
-        put(6, all, 'r mr', money(11), fAll[ti]);
+        put(6, all, 'r mr', money(all, YK.G, YK_ROW), fAll[ti]);
         put(7, null, 'nr');
         put(8, null, 'nl');
         put(9, null, '');
-        put(10, target, 'r mr', money(11), fTarget[ti]);
+        put(10, target, 'r mr', money(target, YK.K, YK_ROW), fTarget[ti]);
         put(11, null, 'mr');
         put(12, null, 'mr');
         continue;
@@ -190,27 +196,33 @@ function ykLine(l: FormLine, r: number, put: Put) {
   const q = qty3(l.qty);
   const [D, F, G] = [cellRef(r, 3), cellRef(r, 5), cellRef(r, 6)];
   const place = `${circled(l.photo)}${l.placeName}`;
-  put(0, l.first ? l.work || null : null, 'ml', fit(l.work, YK.A, YK_ROW, 11));
-  put(1, l.first ? place : null, '', fit(place, YK.B, YK_ROW, 11));
+  const work = fit(l.work, YK.A, YK_ROW, 11);
+  const pl = fit(place, YK.B, YK_ROW, 11);
+  put(0, l.first ? work.v : null, 'ml', work.st);
+  put(1, l.first ? pl.v : null, '', pl.st);
   if (l.blank) {
     // 空白の行（何も入っていない部材の行）は、罫線だけの行
     ['', 'r nr', 'nl', 'r', 'r mr', 'r nr', 'nl', 'r', 'r mr', 'r mr', 'mr'].forEach((cls, i) => put(i + 2, null, cls));
     return;
   }
-  put(2, l.text ? wordLines(l.text, YK.C, YK_ROW, 9, 2).join('\n') : null, '', nameFit(l.text, YK.C, YK_ROW, 9, 2));
-  put(3, open ? null : q, 'r nr', count(9));
-  put(4, l.unit || null, 'nl', fit(l.unit, YK.E, YK_ROW, 11));
-  put(5, l.unitPrice, 'r', money(11));
-  put(6, open ? null : l.amount, 'r mr', money(11), open ? undefined : amountFormula(q, l.unitPrice, l.amount, D, F));
+  const name = fitted(fitName(l.text, YK.C, YK_ROW, 9, 2));
+  put(2, l.text ? name.v : null, '', name.st);
+  put(3, open ? null : q, 'r nr', count(q, YK.D, YK_ROW));
+  const unit = fit(l.unit, YK.E, YK_ROW, 11);
+  put(4, unit.v, 'nl', unit.st);
+  put(5, l.unitPrice, 'r', money(l.unitPrice, YK.F, YK_ROW));
+  put(6, open ? null : l.amount, 'r mr', money(l.amount, YK.G, YK_ROW), open ? undefined : amountFormula(q, l.unitPrice, l.amount, D, F));
   // 介護保険対象部分は左の数量・単価・金額と同じ（左を直せば、こちらも変わる）
-  put(7, target && !open ? q : null, 'r nr', count(9), target && !open ? D : undefined);
-  put(8, target ? l.unit || null : null, 'nl', fit(l.unit, YK.I, YK_ROW, 11));
-  put(9, target ? l.unitPrice : null, 'r', money(11), target ? F : undefined);
-  put(10, target && !open ? l.amount : null, 'r mr', money(11), target && !open ? G : undefined);
-  put(11, target || open ? null : l.amount, 'r mr', money(11), target || open ? undefined : G);
+  put(7, target && !open ? q : null, 'r nr', count(q, YK.H, YK_ROW), target && !open ? D : undefined);
+  const unit2 = fit(l.unit, YK.I, YK_ROW, 11);
+  put(8, target ? unit2.v : null, 'nl', unit2.st);
+  put(9, target ? l.unitPrice : null, 'r', money(l.unitPrice, YK.J, YK_ROW), target ? F : undefined);
+  put(10, target && !open ? l.amount : null, 'r mr', money(l.amount, YK.K, YK_ROW), target && !open ? G : undefined);
+  put(11, target || open ? null : l.amount, 'r mr', money(l.amount, YK.L, YK_ROW), target || open ? undefined : G);
   // 備考（定価等）：「定価8,000円（税抜）×0.8」。切って使う部材は「定価20,000円（4m）×0.8」と「600mm÷4000mm＝0.15」の2行
   const note = lineNote(l, 'yukuhashi', 0);
-  put(12, note.join('\n') || null, 'mr', note.length > 1 ? {size: fitLinesPt(note, YK.M, YK_ROW, 11), wrap: true} : fit(note[0] ?? '', YK.M, YK_ROW, 11));
+  const nt = note.length > 1 ? fitted(fitLines(note, YK.M, YK_ROW, 11)) : fit(note[0] ?? '', YK.M, YK_ROW, 11);
+  put(12, nt.v, 'mr', nt.st);
 }
 
 // ================================================================ 広域連合用「住宅改修内訳明細書」（福岡県介護保険広域連合の様式）
@@ -231,10 +243,13 @@ function kouikiSheet(job: Job, s: Settings): XSheet {
     if (pi > 0) b.pageBreak();
     const r1 = b.row(4.35);
     b.put(r1, 0, '内訳書　様式', {font: MINCHO, size: 9, h: 'center'}, edges('box', false), 1, 2);
-    b.put(r1, 11, NOTE_PHOTO, {font: MINCHO, size: 8, shrink: true}, {}, 1, 7);
+    const photoNote = fit(NOTE_PHOTO, KK_RIGHT, 4.35, 8);
+    b.put(r1, 11, photoNote.v, {font: MINCHO, ...photoNote.st}, {}, 1, 7);
     const r2 = b.row(4.6);
-    b.put(r2, 0, NOTE_MARK, {font: MINCHO, size: 8, shrink: true}, {}, 1, 11);
-    b.put(r2, 11, NOTE_KIND, {font: MINCHO, size: 8, shrink: true}, {}, 1, 7);
+    const markNote = fit(NOTE_MARK, KK_LEFT, 4.6, 8);
+    const kindNote = fit(NOTE_KIND, KK_RIGHT, 4.6, 8);
+    b.put(r2, 0, markNote.v, {font: MINCHO, ...markNote.st}, {}, 1, 11);
+    b.put(r2, 11, kindNote.v, {font: MINCHO, ...kindNote.st}, {}, 1, 7);
 
     const th = (r: number, c: number, text: string | null, cls: string, st: XStyle = {}, cs = 1) =>
       b.put(r, c, text, {font: MINCHO, size: 9, h: 'center', wrap: true, ...st}, edges(cls, true), 1, cs);
@@ -291,14 +306,14 @@ function kouikiSheet(job: Job, s: Settings): XSheet {
         put(5, isTax ? tax : null, 'r ml', {size: 11});
         put(6, isTax ? '％' : null, '', {size: 11});
         put(7, null, '');
-        put(8, all, 'r mr', money(11), fAll[ti]);
+        put(8, all, 'r mr', money(all, KK.I, height), fAll[ti]);
         put(9, null, 'gap');
         put(10, null, 'ml');
         put(11, null, '');
         put(12, isTax ? tax : null, 'r ml', {size: 11});
         put(13, isTax ? '％' : null, '', {size: 11});
         put(14, null, '');
-        put(15, target, 'r mr', money(11), fTarget[ti]);
+        put(15, target, 'r mr', money(target, KK.P, height), fTarget[ti]);
         b.put(r, 16, null, {font: MINCHO}, edges(`ml mr${bottom}`, true), 1, 2);
         return;
       }
@@ -337,38 +352,47 @@ function kkLine(l: FormLine, r: number, height: number, bottom: string, hourRate
   const [F, H, I] = [cellRef(r, 5), cellRef(r, 7), cellRef(r, 8)];
   const photo = circled(l.photo);
   const kind = circled(l.kind);
-  put(0, l.first ? l.placeName || null : null, 'c ml', fit(l.placeName, KK.A, height, 11, 2));
-  put(1, l.first ? l.work || null : null, 'c', fit(l.work, KK.B, height, 11, 2));
+  const pl = fit(l.placeName, KK.A, height, 11, 2);
+  const work = fit(l.work, KK.B, height, 11, 2);
+  const ph = fit(photo, KK.K, height, 11);
+  const kd = fit(kind, KK.L, height, 11);
+  put(0, l.first ? pl.v : null, 'c ml', pl.st);
+  put(1, l.first ? work.v : null, 'c', work.st);
   if (l.blank) {
     // 空白の行（何も入っていない部材の行）は、箇所の欄のほかは罫線だけ
     ['', 'mr', 'gap', 'ml', '', '', 'mr', 'gap'].forEach((cls, i) => put(i + 2, null, cls));
-    put(10, l.first ? photo : null, 'c ml', fit(photo, KK.K, height, 11));
-    put(11, l.first ? kind : null, 'c', fit(kind, KK.L, height, 11));
+    put(10, l.first ? ph.v : null, 'c ml', ph.st);
+    put(11, l.first ? kd.v : null, 'c', kd.st);
     ['ml', '', '', 'mr', 'ml', 'mr'].forEach((cls, i) => put(i + 12, null, cls));
     return;
   }
   put(2, l.mark, 'mark', {v: 'bottom'});
-  put(3, l.text ? wordLines(l.text, KK.D, height, 9, 3).join('\n') : null, 'mr gothic', nameFit(l.text, KK.D, height, 9, 3));
+  const name = fitted(fitName(l.text, KK.D, height, 9, 3));
+  put(3, l.text ? name.v : null, 'mr gothic', name.st);
   put(4, null, 'gap');
-  put(5, open ? null : q, 'r ml gothic', count(9));
-  put(6, l.unit || null, 'gothic', fit(l.unit, KK.G, height, 11));
-  put(7, l.unitPrice, 'r gothic', money(11));
-  put(8, open ? null : l.amount, 'r mr gothic', money(11), open ? undefined : amountFormula(q, l.unitPrice, l.amount, F, H));
+  put(5, open ? null : q, 'r ml gothic', count(q, KK.F, height));
+  const unit = fit(l.unit, KK.G, height, 11);
+  put(6, unit.v, 'gothic', unit.st);
+  put(7, l.unitPrice, 'r gothic', money(l.unitPrice, KK.H, height));
+  put(8, open ? null : l.amount, 'r mr gothic', money(l.amount, KK.I, height), open ? undefined : amountFormula(q, l.unitPrice, l.amount, F, H));
   put(9, null, 'gap');
-  put(10, l.first ? photo : null, 'c ml', fit(photo, KK.K, height, 11));
-  put(11, l.first ? kind : null, 'c', fit(kind, KK.L, height, 11));
+  put(10, l.first ? ph.v : null, 'c ml', ph.st);
+  put(11, l.first ? kd.v : null, 'c', kd.st);
   // 対象工事部分は左の全改修工事部分と同じ（左を直せば、こちらも変わる）
-  put(12, target && !open ? q : null, 'r ml gothic', count(9), target && !open ? F : undefined);
-  put(13, target ? l.unit || null : null, 'gothic', fit(l.unit, KK.N, height, 11));
-  put(14, target ? l.unitPrice : null, 'r gothic', money(11), target ? H : undefined);
-  put(15, target && !open ? l.amount : null, 'r mr gothic', money(11), target && !open ? I : undefined);
+  put(12, target && !open ? q : null, 'r ml gothic', count(q, KK.M, height), target && !open ? F : undefined);
+  const unit2 = fit(l.unit, KK.N, height, 11);
+  put(13, target ? unit2.v : null, 'gothic', unit2.st);
+  put(14, target ? l.unitPrice : null, 'r gothic', money(l.unitPrice, KK.O, height), target ? H : undefined);
+  put(15, target && !open ? l.amount : null, 'r mr gothic', money(l.amount, KK.P, height), target && !open ? I : undefined);
   // 算出根拠：「定価8,000円（税抜）×0.8」。施工費は「1時間2,500円」、切って使う部材は「定価20,000円（4m）×0.8」と「600mm÷4000mm＝0.15」の2行
   const note = lineNote(l, 'kouiki', hourRate);
   const basis = edges(`ml mr${bottom}`, true);
   if (note.length === 1 && l.hourly && l.note === null) {
-    b.put(r, 16, note[0], {font: MINCHO, h: 'center', ...fit(note[0], KK.Q + KK.R, height, 11)}, basis, 1, 2);
+    const hourly = fit(note[0], KK.Q + KK.R, height, 11);
+    b.put(r, 16, hourly.v, {font: MINCHO, h: 'center', ...hourly.st}, basis, 1, 2);
   } else if (note.length > 0) {
-    b.put(r, 16, note.join('\n'), {font: GOTHIC, size: fitLinesPt(note, KK.Q + KK.R, height, 10), wrap: true}, basis, 1, 2);
+    const nt = fitted(fitLines(note, KK.Q + KK.R, height, 10));
+    b.put(r, 16, nt.v, {font: GOTHIC, ...nt.st}, basis, 1, 2);
   } else {
     put(16, null, 'ml');
     put(17, null, 'mr');

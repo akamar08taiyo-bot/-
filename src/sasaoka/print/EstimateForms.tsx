@@ -10,35 +10,39 @@
 //   「貼付」（data-paste：コピーした行をこの行の下に貼り付け）を出し、コピーした行には data-copied を付ける。
 // 何も入っていない部材の行（line.blank）は、印刷でも空白の行（数量・単価・金額も出さない）
 
-import type {ReactNode} from 'react';
+import type {CSSProperties, ReactNode} from 'react';
 import {estimateTotals} from '../calc.ts';
 import {circled, FORM_INFO, formLines, KINDS, lineNote, paginate, reiwa, sheetNewLine, TOTAL_ROWS} from '../estimateForms.ts';
 import type {FormLine} from '../estimateForms.ts';
 import type {Job, Settings} from '../types.ts';
 import {num, yen} from '../util.ts';
-import {fitLinesStyle, fitStyle, wordLines} from './fit.ts';
+import {fitCss, fitLines, fitName, fitText} from './fit.ts';
+import type {Fit} from './fit.ts';
 import {issuerLines, KK, KK_FOOT, KK_LEFT, KK_NOTE_1, KK_NOTE_2, KK_RIGHT, KK_ROWS, NOTE_KIND, NOTE_MARK, NOTE_PHOTO, totalRows, YK, YK_ROW} from './formLayout.ts';
 
+/** fit.ts で決めた欄の文字：1行ならその文字、折り返すときは1行ずつ（Excel と同じ改行。ブラウザに折り返させない） */
+function fitBody(f: Fit): ReactNode {
+  return f.lines.length > 1 ? f.lines.map((t, i) => <div key={i}>{t}</div>) : f.lines[0];
+}
+
 /**
- * 内容（品名）の欄：長い商品名は言葉の切れ目で行を分けて書く（`wordLines`。「マツ六 BD-132 35アッシュ丸棒」／「ディンプル付 Mオーク 2m」）。
+ * 内容（品名）の欄：長い商品名は言葉の切れ目で行を分けて書く（`fitName`・`wordLines`。「マツ六 BD-132 35アッシュ丸棒」／「ディンプル付 Mオーク 2m」）。
  * 1行に入る商品名は前と同じ（入らなければ欄の幅で折り返す）
  */
 function nameCell(text: string, w: number, h: number, pt: number, cls: string, edit: string, lines: number, editable: boolean): ReactNode {
-  const parts = text ? wordLines(text, w, h, pt, lines) : [''];
-  if (parts.length < 2) {
-    return (
-      <td className={cls} style={text ? fitStyle(text, w, h, pt, lines) : undefined} {...ed(editable, edit)}>
-        {text}
-      </td>
-    );
-  }
+  const f = text ? fitName(text, w, h, pt, lines) : null;
   return (
-    <td className={cls} style={fitLinesStyle(parts, w, h, pt)} {...ed(editable, edit)}>
-      {parts.map((t, i) => (
-        <div key={i}>{t}</div>
-      ))}
+    <td className={cls} style={f ? fitCss(f) : undefined} {...ed(editable, edit)}>
+      {f ? fitBody(f) : text}
     </td>
   );
+}
+
+/** 欄の大きさに合わせた文字（`fitText`）の style と中身 */
+function fitted(text: string, w: number, h: number, pt: number, lines = 1): {style: CSSProperties | undefined; body: ReactNode} {
+  if (!text) return {style: undefined, body: text};
+  const f = fitText(text, w, h, pt, lines);
+  return {style: fitCss(f), body: fitBody(f)};
 }
 
 const qtyText = (n: number) => num(n, 3);
@@ -156,16 +160,19 @@ export function YukuhashiForm({
                   <td colSpan={7} />
                   <td colSpan={6} rowSpan={4} className="yk-issuer">
                     {pi === 0 &&
-                      issuer.map((l) => (
-                        <div key={l} style={fitStyle(l, issuerW, 5, 11)}>
-                          {l}
-                        </div>
-                      ))}
+                      issuer.map((l) => {
+                        const f = fitText(l, issuerW, 5, 11);
+                        return (
+                          <div key={l} style={fitCss(f)}>
+                            {fitBody(f)}
+                          </div>
+                        );
+                      })}
                   </td>
                 </tr>
                 <tr style={{height: '7.67mm'}}>
-                  <td colSpan={2} className="c bb" style={fitStyle(name, YK.A + YK.B, 7.67, 18)} {...ed(editable, 'job:customer')}>
-                    {name}
+                  <td colSpan={2} className="c bb" style={fitted(name, YK.A + YK.B, 7.67, 18).style} {...ed(editable, 'job:customer')}>
+                    {fitted(name, YK.A + YK.B, 7.67, 18).body}
                   </td>
                   <td style={{fontSize: '12pt'}}>様邸　住宅改修</td>
                   <td colSpan={4} />
@@ -177,11 +184,11 @@ export function YukuhashiForm({
                   <td colSpan={4} />
                 </tr>
                 <tr style={{height: '7.67mm'}}>
-                  <td className="bt bb" style={fitStyle('工事場所（住所）', YK.A, 7.67, 12)}>
-                    工事場所（住所）
+                  <td className="bt bb" style={fitted('工事場所（住所）', YK.A, 7.67, 12).style}>
+                    {fitted('工事場所（住所）', YK.A, 7.67, 12).body}
                   </td>
-                  <td colSpan={2} className="bt bb" style={fitStyle(job.address, YK.B + YK.C, 7.67, 11)} {...ed(editable, 'job:address')}>
-                    {job.address}
+                  <td colSpan={2} className="bt bb" style={fitted(job.address, YK.B + YK.C, 7.67, 11).style} {...ed(editable, 'job:address')}>
+                    {fitted(job.address, YK.B + YK.C, 7.67, 11).body}
                   </td>
                   <td colSpan={10} />
                 </tr>
@@ -245,14 +252,14 @@ export function YukuhashiForm({
                         <td className={`nr${bottom}`} />
                         <td className={`nl${bottom}`} />
                         <td className={bottom} />
-                        <td className={`r mr${bottom}`} {...ed(editable && label === '諸経費', 'overhead:all')}>
-                          {yen(all)}
+                        <td className={`r mr${bottom}`} style={fitted(yen(all), YK.G, YK_ROW, 11).style} {...ed(editable && label === '諸経費', 'overhead:all')}>
+                          {fitted(yen(all), YK.G, YK_ROW, 11).body}
                         </td>
                         <td className={`nr${bottom}`} />
                         <td className={`nl${bottom}`} />
                         <td className={bottom} />
-                        <td className={`r mr${bottom}`} {...ed(editable && label === '諸経費', 'overhead:target')}>
-                          {yen(target)}
+                        <td className={`r mr${bottom}`} style={fitted(yen(target), YK.K, YK_ROW, 11).style} {...ed(editable && label === '諸経費', 'overhead:target')}>
+                          {fitted(yen(target), YK.K, YK_ROW, 11).body}
                         </td>
                         <td className={`mr${bottom}`} />
                         <td className={`mr${bottom}`} />
@@ -274,12 +281,15 @@ export function YukuhashiForm({
 }
 
 function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined; bottom: string; editable: boolean; sheet: SheetOpts | null}) {
-  const cell = (text: string, w: number, pt: number, cls = '', edit: string | null = null, lines = 1, extra: ReactNode = null): ReactNode => (
-    <td className={cls + bottom} style={text ? fitStyle(text, w, YK_ROW, pt, lines) : undefined} {...ed(editable, edit)}>
-      {text}
-      {extra}
-    </td>
-  );
+  const cell = (text: string, w: number, pt: number, cls = '', edit: string | null = null, lines = 1, extra: ReactNode = null): ReactNode => {
+    const f = fitted(text, w, YK_ROW, pt, lines);
+    return (
+      <td className={cls + bottom} style={f.style} {...ed(editable, edit)}>
+        {f.body}
+        {extra}
+      </td>
+    );
+  };
   if (!l) {
     return (
       <tr className="g" style={{height: `${YK_ROW}mm`}} {...(sheet ? {'data-blank': ''} : {})}>
@@ -340,10 +350,8 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
       {cell(target ? amount : '', YK.K, 11, 'r mr', excl)}
       {cell(target || l.blank ? '' : amount, YK.L, 11, 'r mr', excl)}
       {note.length > 1 ? (
-        <td className={`mr${bottom}`} style={fitLinesStyle(note, YK.M, YK_ROW, 11)} {...ed(editable, k('note'))}>
-          {note.map((t, i) => (
-            <div key={i}>{t}</div>
-          ))}
+        <td className={`mr${bottom}`} style={fitCss(fitLines(note, YK.M, YK_ROW, 11))} {...ed(editable, k('note'))}>
+          {fitBody(fitLines(note, YK.M, YK_ROW, 11))}
         </td>
       ) : (
         cell(note[0] ?? '', YK.M, 11, 'mr', k('note'))
@@ -378,16 +386,16 @@ export function KouikiForm({job, settings: s, sheet = null}: {job: Job; settings
                     内訳書　様式
                   </td>
                   <td colSpan={9} />
-                  <td colSpan={7} style={fitStyle(NOTE_PHOTO, KK_RIGHT, 4.35, 8)}>
-                    {NOTE_PHOTO}
+                  <td colSpan={7} style={fitted(NOTE_PHOTO, KK_RIGHT, 4.35, 8).style}>
+                    {fitted(NOTE_PHOTO, KK_RIGHT, 4.35, 8).body}
                   </td>
                 </tr>
                 <tr style={{height: '4.6mm'}}>
-                  <td colSpan={11} style={fitStyle(NOTE_MARK, KK_LEFT, 4.6, 8)}>
-                    {NOTE_MARK}
+                  <td colSpan={11} style={fitted(NOTE_MARK, KK_LEFT, 4.6, 8).style}>
+                    {fitted(NOTE_MARK, KK_LEFT, 4.6, 8).body}
                   </td>
-                  <td colSpan={7} style={fitStyle(NOTE_KIND, KK_RIGHT, 4.6, 8)}>
-                    {NOTE_KIND}
+                  <td colSpan={7} style={fitted(NOTE_KIND, KK_RIGHT, 4.6, 8).style}>
+                    {fitted(NOTE_KIND, KK_RIGHT, 4.6, 8).body}
                   </td>
                 </tr>
                 <tr className="g" style={{height: '7.74mm'}}>
@@ -411,7 +419,7 @@ export function KouikiForm({job, settings: s, sheet = null}: {job: Job; settings
                   </th>
                   <th className="mb">改修箇所毎工事名称</th>
                   <th className="mb" />
-                  <th className="mb mr" style={{...fitStyle('部材・仕様・・・・（材料）', KK.D, 10, 9), textAlign: 'left'}}>
+                  <th className="mb mr" style={{...fitCss(fitText('部材・仕様・・・・（材料）', KK.D, 10, 9)), textAlign: 'left'}}>
                     部材・仕様・・・・（材料）
                     <br />
                     付属品を含めた単価を記入。
@@ -427,7 +435,7 @@ export function KouikiForm({job, settings: s, sheet = null}: {job: Job; settings
                   <th className="ml mb" style={{lineHeight: 1.15}}>
                     写<br />真<br />番<br />号
                   </th>
-                  <th className="mb" style={{...fitStyle(`${circled(1)}${KINDS[0]}`, KK.L, 4, 9), textAlign: 'left', fontWeight: 700}}>
+                  <th className="mb" style={{...fitCss(fitText(`${circled(1)}${KINDS[0]}`, KK.L, 4, 9)), textAlign: 'left', fontWeight: 700}}>
                     改修の種類
                     {KINDS.map((k, i) => (
                       <div key={k}>
@@ -462,8 +470,8 @@ export function KouikiForm({job, settings: s, sheet = null}: {job: Job; settings
                         <td className={`r ml${bottom}`}>{isTax ? tax : ''}</td>
                         <td className={bottom}>{isTax ? '％' : ''}</td>
                         <td className={bottom} />
-                        <td className={`r mr${bottom}`} {...ed(editable && label === '諸経費', 'overhead:all')}>
-                          {yen(all)}
+                        <td className={`r mr${bottom}`} style={fitted(yen(all), KK.I, h, 11).style} {...ed(editable && label === '諸経費', 'overhead:all')}>
+                          {fitted(yen(all), KK.I, h, 11).body}
                         </td>
                         <td className={`gap${bottom}`} />
                         <td className={`ml${bottom}`} />
@@ -471,8 +479,8 @@ export function KouikiForm({job, settings: s, sheet = null}: {job: Job; settings
                         <td className={`r ml${bottom}`}>{isTax ? tax : ''}</td>
                         <td className={bottom}>{isTax ? '％' : ''}</td>
                         <td className={bottom} />
-                        <td className={`r mr${bottom}`} {...ed(editable && label === '諸経費', 'overhead:target')}>
-                          {yen(target)}
+                        <td className={`r mr${bottom}`} style={fitted(yen(target), KK.P, h, 11).style} {...ed(editable && label === '諸経費', 'overhead:target')}>
+                          {fitted(yen(target), KK.P, h, 11).body}
                         </td>
                         <td colSpan={2} className={`ml mr${bottom}`} />
                       </tr>
@@ -523,12 +531,15 @@ function KkLine({
   editable: boolean;
   sheet: SheetOpts | null;
 }) {
-  const cell = (text: string, w: number, pt: number, cls = '', edit: string | null = null, lines = 1, extra: ReactNode = null): ReactNode => (
-    <td className={cls + bottom} style={text ? fitStyle(text, w, height, pt, lines) : undefined} {...ed(editable, edit)}>
-      {text}
-      {extra}
-    </td>
-  );
+  const cell = (text: string, w: number, pt: number, cls = '', edit: string | null = null, lines = 1, extra: ReactNode = null): ReactNode => {
+    const f = fitted(text, w, height, pt, lines);
+    return (
+      <td className={cls + bottom} style={f.style} {...ed(editable, edit)}>
+        {f.body}
+        {extra}
+      </td>
+    );
+  };
   if (!l) {
     return (
       <tr className="g" style={{height: `${height}mm`}} {...(sheet ? {'data-blank': ''} : {})}>
@@ -584,16 +595,14 @@ function KkLine({
   let basis: ReactNode;
   if (note.length === 1 && l.hourly && l.note === null) {
     basis = (
-      <td colSpan={2} className={`c ml mr${bottom}`} style={fitStyle(note[0], KK.Q + KK.R, height, 11)} {...ed(editable, k('note'))}>
-        {note[0]}
+      <td colSpan={2} className={`c ml mr${bottom}`} style={fitted(note[0], KK.Q + KK.R, height, 11).style} {...ed(editable, k('note'))}>
+        {fitted(note[0], KK.Q + KK.R, height, 11).body}
       </td>
     );
   } else if (note.length > 0) {
     basis = (
-      <td colSpan={2} className={`ml mr gothic${bottom}`} style={fitLinesStyle(note, KK.Q + KK.R, height, 10)} {...ed(editable, k('note'))}>
-        {note.map((t, i) => (
-          <div key={i}>{t}</div>
-        ))}
+      <td colSpan={2} className={`ml mr gothic${bottom}`} style={fitCss(fitLines(note, KK.Q + KK.R, height, 10))} {...ed(editable, k('note'))}>
+        {fitBody(fitLines(note, KK.Q + KK.R, height, 10))}
       </td>
     );
   } else {
