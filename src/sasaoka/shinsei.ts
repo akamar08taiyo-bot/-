@@ -976,7 +976,8 @@ function wrapRows(lines: string[], w: number, h: number, pt: number): number {
 
 /** 書式（cellXfs の番号）の文字の大きさだけを pt にした書式を足して、その番号を返す（同じものがあればそれ） */
 function sizedStyle(files: Files, style: number, pt: number): number {
-  const {fonts, xfs} = styleParts(files);
+  const parts = styleParts(files);
+  const {fonts, xfs} = parts;
   const xf = xfs[style];
   if (xf === undefined) return style;
   const font = fonts[numOf(attrOf(xf, 'fontId'), 0)] ?? '<font/>';
@@ -997,13 +998,18 @@ function sizedStyle(files: Files, style: number, pt: number): number {
     xml = xml.replace('</cellXfs>', `${next}</cellXfs>`);
     count('cellXfs', xfs.length + 1);
   }
-  files['xl/styles.xml'] = strToU8(xml);
+  if (fontId === fonts.length || id === xfs.length) {
+    files['xl/styles.xml'] = strToU8(xml);
+    // 足した字体・書式だけ覚えたものに足す（書式を足すたびに styles.xml を読み直すと、長い文字の多い理由書のプレビューが遅くなる）
+    styleCache.set(files['xl/styles.xml'], {...parts, fonts: fontId === fonts.length ? [...fonts, sized] : fonts, xfs: id === xfs.length ? [...xfs, next] : xfs});
+  }
   return id;
 }
 
 /** 書式（cellXfs の番号）の配置（alignment）の属性を替えた書式を足して、その番号を返す（同じものがあればそれ）。値が null の属性は外す */
 function alignedStyle(files: Files, style: number, attrs: Record<string, string | null>): number {
-  const {xfs} = styleParts(files);
+  const parts = styleParts(files);
+  const {xfs} = parts;
   const xf = xfs[style];
   if (xf === undefined) return style;
   const found = /<alignment\b[^>]*?(?:\/>|>[\s\S]*?<\/alignment>)/.exec(xf)?.[0];
@@ -1021,6 +1027,7 @@ function alignedStyle(files: Files, style: number, attrs: Record<string, string 
     id = xfs.length;
     xml = xml.replace('</cellXfs>', `${next}</cellXfs>`).replace(/<cellXfs\b([^>]*?)\scount="\d+"/, `<cellXfs$1 count="${xfs.length + 1}"`);
     files['xl/styles.xml'] = strToU8(xml);
+    styleCache.set(files['xl/styles.xml'], {...parts, xfs: [...xfs, next]});
   }
   return id;
 }
@@ -1069,8 +1076,8 @@ function fitLines(files: Files, sheet: ShinseiSheet, v: ShinseiValues): void {
 // ---------------------------------------------------------------- 長い文字も欄の中に全部見せる
 // ユーザーの指示「文字のはみ出しであったりだとか、途中で横が切れていたりとか…しっかり見てください」（2026-10-23）：
 // 転記した文字が欄（結合した範囲・となりの空いた欄へはみ出せる幅）に入らないときは、欄の大きさは原本のまま、文字を欄に収める。
-// ・2行以上入る高さの欄は、折り返したほうが字が大きく（1.25倍以上）なれば、折り返して入る大きさにする（住所・改修場所など）
-// ・ほかは「縮小して全体を表示する」（Excel もプレビューも、欄の幅に縮める）
+// ・1行のままだと字が3/4より小さくなる長い文字で、2行以上入る高さの欄は、折り返したほうが字が大きく（1.2倍以上）なれば折り返して入る大きさにする（住所・改修場所など）
+// ・ほかは「縮小して全体を表示する」（Excel もプレビューも、欄の幅に縮める。少しはみ出すだけなら少し縮むだけ）
 // ・結合していない欄で、となりの空いた欄へはみ出して見える文字は、はみ出せる幅に入る大きさにする（縮小にすると、その欄の幅だけに縮まる）
 // 氏名・フリガナ・電話番号・日付は折り返さない（名前の途中で行が変わらないように）。式でこの欄を出している欄（ほかのシートの氏名・住所など）も、その欄の大きさで同じように
 
@@ -1122,13 +1129,14 @@ function fitTexts(files: Files, sheet: ShinseiSheet, cells: Map<string, CellValu
   }
   for (const [p, list] of byPath) {
     if (!files[p]) continue;
-    let xml = strFromU8(files[p]);
-    const lay = sheetLayout(xml);
+    const before = strFromU8(files[p]);
+    const lay = sheetLayout(before);
+    let xml = before;
     for (const {ref, text, oneLine: single} of list) {
       const style = fitStyle(files, xml, lay, ref, text, single);
       if (style !== null) xml = setStyle(xml, ref, String(style));
     }
-    files[p] = strToU8(xml);
+    if (xml !== before) files[p] = strToU8(xml);
   }
 }
 
@@ -1150,13 +1158,17 @@ function fitStyle(files: Files, xml: string, lay: SheetLayout, ref: string, text
     const pt = fitLinesSize(lines, box.w, box.h, st.size);
     return pt < st.size ? sizedStyle(files, s, pt) : null;
   }
-  // 1行の欄（折り返さない欄の改行は、Excel もプレビューも1行につなげて出す）。結合していない欄は、となりの空いた欄へはみ出せる
+  // 1行の欄（折り返さない欄の改行は、Excel もプレビューも1行につなげて出す）。結合していない欄は、となりの空いた欄へはみ出せる。
+  // 入るかどうかは原本の字体の幅で見る（ＭＳ Ｐ明朝の「（）・」は半分ほど。少し大きめに数える emOf だと、入る文字まで縮めていた）
   const px = (st.size * 4) / 3;
-  const need = emOf(text.replace(/\n/g, '')) * px + CELL_PAD;
+  const proportional = /[ＰP]/.test(st.font);
+  const need = [...text.replace(/\n/g, '')].reduce((n, ch) => n + charWidth(ch, proportional), 0) * px + CELL_PAD;
   let avail = box.w;
   if (!merge) {
     const maxCol = colNum(/<dimension ref="[A-Z]+\d+:([A-Z]+)\d+"/.exec(xml)?.[1] ?? 'A') || c;
-    const empty = (cc: number) => cc >= 1 && cc <= maxCol && !mergeOf(cc, r) && !/<v>[^<]|<is>/.test(cellRe(`${colName(cc)}${r}`).exec(xml)?.[2] ?? '');
+    const row = new RegExp(`<row r="${r}"[^>]*>([\\s\\S]*?)</row>`).exec(xml)?.[1] ?? '';
+    const filled = new Set([...row.matchAll(/<c r="([A-Z]+)\d+"[^>]*?(?:\/>|>([\s\S]*?)<\/c>)/g)].filter((m) => /<v>[^<]|<is>/.test(m[2] ?? '')).map((m) => colNum(m[1])));
+    const empty = (cc: number) => cc >= 1 && cc <= maxCol && !mergeOf(cc, r) && !filled.has(cc);
     let [left, right] = [c, c];
     if (st.horizontal === 'general' || st.horizontal === 'left') while (empty(right + 1)) right++;
     else if (st.horizontal === 'right') while (empty(left - 1)) left--;
@@ -1167,17 +1179,26 @@ function fitStyle(files: Files, xml: string, lay: SheetLayout, ref: string, text
       }
     for (let cc = left; cc <= right; cc++) if (cc !== c) avail += lay.colW(cc);
   }
-  if (need <= avail) return null;
-  const small = Math.max(3, Math.floor(((st.size * (avail - CELL_PAD)) / (need - CELL_PAD)) * 2) / 2);
-  // 折り返し：はみ出さない欄（結合した欄など）で、2行以上入る高さがあって、字が1.25倍以上大きくなるときだけ
-  if (!oneLine && avail === box.w) {
+  const safe = emOf(text.replace(/\n/g, '')) * px; // どの字体でも入るように少し大きめに数えた幅
+  // はみ出せる欄に入れる大きさ（どの字体でも入るように safe で）
+  const spillSize = () => {
+    const pt = Math.max(3, Math.floor(((st.size * (avail - CELL_PAD)) / safe) * 2) / 2);
+    return pt < st.size ? sizedStyle(files, s, pt) : null;
+  };
+  // 原本の字体なら入る：ほかの字体（原本の字体のない端末）でも入るように、はみ出さない欄は「縮小して全体を表示する」だけ（入れば Excel は縮めない）、
+  // はみ出せる欄は少しだけ小さく
+  if (need <= avail) return safe + CELL_PAD <= avail ? null : avail === box.w ? alignedStyle(files, s, {shrinkToFit: '1'}) : spillSize();
+  // 1行で入る大きさ（原本の字体の幅で）
+  const small = (st.size * (avail - CELL_PAD)) / (need - CELL_PAD);
+  // 折り返し：はみ出さない欄（結合した欄など）で、1行だと3/4より小さくなり、2行以上入る高さがあって、字が1.2倍以上大きくなるときだけ
+  if (!oneLine && avail === box.w && small < st.size * 0.75) {
     const pt = fitLinesSize(lines, box.w, box.h, st.size);
-    if (wrapRows(lines, box.w, box.h, pt) > 1 && pt >= small * 1.25) {
+    if (wrapRows(lines, box.w, box.h, pt) > 1 && pt >= small * 1.2) {
       const wrapped = alignedStyle(files, s, {wrapText: '1', shrinkToFit: null});
       return pt < st.size ? sizedStyle(files, wrapped, pt) : wrapped;
     }
   }
-  return avail === box.w ? alignedStyle(files, s, {shrinkToFit: '1'}) : sizedStyle(files, s, small);
+  return avail === box.w ? alignedStyle(files, s, {shrinkToFit: '1'}) : spillSize();
 }
 
 /** 欄の書式（s）を替える（欄があるときだけ） */

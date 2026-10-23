@@ -122,6 +122,21 @@ test('理由書の現地確認日・④：申請書と同じく見積書に出�
   assert.deepEqual(['AL48', 'AL50', 'AL52'].map((r) => v.cells[r]), ['②浴室', '①トイレ', undefined]);
 });
 
+test('理由書の長い氏名・住所・④の箇所も欄の中に全部見せる（氏名・住所は1行のまま縮める。④は2行入るので折り返す）', () => {
+  const longPlace = '勝手口（屋外・コンクリートスロープ新設）';
+  const j = job({customer: '見本長谷川原　美千代子', address: '福岡県行橋市大字流末1234番地56　見本マンション行橋駅前東館1203号室', places: [place(longPlace, [mat('手すり')]), place('トイレ', [mat('L型手すり')])]});
+  const {files} = sheetOf(fillShinsei(RIYU, RIYU_MAP, riyuValues(j, RATES, '2026-10-22')));
+  const xml = strFromU8(files['xl/worksheets/sheet1.xml']);
+  const st = strFromU8(files['xl/styles.xml']);
+  const xfs = [...(/<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/.exec(st)?.[1] ?? '').matchAll(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g)].map((m) => m[0]);
+  const xfOf = (ref: string) => xfs[Number(new RegExp(`<c r="${ref}"[^>]*?\\ss="(\\d+)"`).exec(xml)?.[1] ?? 0)];
+  assert.match(xfOf('C6'), /shrinkToFit="1"/); // 氏名（C6:J7）は2行入る高さでも折り返さない
+  assert.doesNotMatch(xfOf('C6'), /wrapText="1"/);
+  assert.match(xfOf('C9'), /shrinkToFit="1"/); // 住所（C9:P9。1行の高さ）
+  assert.match(xfOf('AL48'), /wrapText="1"/); // ④の①勝手口（AL48:AO49。2行の高さ）
+  assert.doesNotMatch(xfOf('AL50'), /wrapText="1"|shrinkToFit="1"/); // 入る「②トイレ」は原本のまま
+});
+
 test('ほかのソフトから貼り付けた制御文字（Word の Shift+Enter＝U+000B・改ページ U+000C など）は、改行にするか消す（Excel が修復しないで開ける XML）', () => {
   const j = job({riyu: {...RIYU_INFO, body: '右片麻痺あり\u000B杖歩行', care: '妻が介護\u000Cしている', wish: 'トイレ\u0007に行きたい￾'}});
   const {files, text} = sheetOf(fillShinsei(RIYU, RIYU_MAP, riyuValues(j, RATES, '2026-10-22')));

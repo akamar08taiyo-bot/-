@@ -91,6 +91,34 @@ function VerticalText({t}: {t: PvText}) {
   );
 }
 
+/**
+ * 欄の文字を欄の中に全部見せる大きさ（倍率）。1行の欄は幅に入るまで（縮小して全体を表示する欄と同じ）、折り返しの欄は高さに入る行の数になるまで縮める。
+ * 転記した文字は Excel でも欄に収めてある（shinsei.ts の fitTexts）が、原本の字体のない端末（スマホ・タブレットなど）は字の幅が違うので、
+ * Excel では入っている原本の文字（理由書の「（Ｐ１）」など）も欄の端で切れていた（ユーザーの指示「途中で横が切れていたり…しっかり見てください」2026-10-23）
+ */
+function fitScale(t: PvText): number {
+  const avail = t.w - 4 - t.indent;
+  if (avail <= 0 || t.runs.length === 0) return 1;
+  if (!t.wrap) {
+    const need = t.runs.reduce((n, r) => n + textWidth(r.text, r.font), 0);
+    return need > avail && need > 0 ? Math.max(0.3, avail / need) : 1;
+  }
+  // 折り返し：行ごとの幅（改行で分ける）から、折り返した行の数を数える（1文字ずつ折り返すので、1行に1文字分の余りを見る）
+  const size = Math.max(...t.runs.map((r) => r.font.size));
+  const widths = [0];
+  for (const r of t.runs) {
+    r.text.split(/\r?\n/).forEach((part, i) => {
+      if (i > 0) widths.push(0);
+      widths[widths.length - 1] += textWidth(part, r.font);
+    });
+  }
+  for (let k = 1; k > 0.3; k -= 0.05) {
+    const rows = widths.reduce((n, w) => n + Math.max(1, Math.ceil((w * k) / Math.max(1, avail - size * k))), 0);
+    if (rows * size * k * 1.2 <= t.h) return k;
+  }
+  return 0.3;
+}
+
 function TextView({t}: {t: PvText}) {
   if (t.vertical) return <VerticalText t={t} />;
   if (t.marked) {
@@ -113,12 +141,7 @@ function TextView({t}: {t: PvText}) {
       </div>
     );
   }
-  let k = 1;
-  if (t.shrink) {
-    const need = t.runs.reduce((n, r) => n + textWidth(r.text, r.font), 0);
-    const avail = t.w - 4 - t.indent;
-    if (need > avail && need > 0) k = Math.max(0.3, avail / need);
-  }
+  const k = fitScale(t);
   const distributed = t.align === 'distributed';
   return (
     <div

@@ -6,6 +6,7 @@ import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import {DEFAULT_PLACES, defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {boxLabels, checkBoxes, fillShinsei, fitLinesSize, insuredBoxes, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, placeBox, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
+import {shinseiPreview} from '../../src/sasaoka/shinseiPreview.ts';
 import type {Insurer, Job, Place, Row, ShinseiInfo, ShinseiMarks} from '../../src/sasaoka/types.ts';
 
 const RATES = {estimateRate: 0.8, estimateLaborRate: 1.5, estimateOverheadRate: 0.1, taxRate: 0.1};
@@ -335,6 +336,53 @@ test('改修の内容が10箇所・12箇所でも欄からはみ出さない：�
   assert.equal(fitLinesSize(['あ'], 300, 100, 11), 11);
   assert.equal(fitLinesSize(Array(12).fill('①玄関　手すりの取り付け'), 300, 126, 11), 6);
   assert.ok(fitLinesSize(['①玄関　手すりの取り付け　L=600×850mm H=800mm　とても長い説明の文がつづく'], 120, 40, 11) < 11);
+});
+
+test('長い住所・改修場所・氏名も欄の中に全部見せる：長くて2行入る欄は折り返し、ほかは縮小して全体を表示（はみ出せる欄は小さく）。氏名は折り返さない。短い値は原本のまま', () => {
+  // 欄の書式：文字の大きさ（pt）・折り返し・縮小して全体を表示
+  const styleOf = (files: Record<string, Uint8Array>, xml: string, ref: string) => {
+    const st = strFromU8(files['xl/styles.xml']);
+    const list = (outer: string, inner: string) => [...(new RegExp(`<${outer}\\b[^>]*>([\\s\\S]*?)</${outer}>`).exec(st)?.[1] ?? '').matchAll(new RegExp(`<${inner}\\b[^>]*?(?:/>|>[\\s\\S]*?</${inner}>)`, 'g'))].map((m) => m[0]);
+    const s = /\ss="(\d+)"/.exec(cell(xml, ref))?.[1] ?? '0';
+    const xf = list('cellXfs', 'xf')[Number(s)];
+    const font = list('fonts', 'font')[Number(/fontId="(\d+)"/.exec(xf)?.[1] ?? 0)];
+    return {s, size: Number(/<sz val="([\d.]+)"/.exec(font)?.[1]), wrap: /wrapText="1"/.test(xf), shrink: /shrinkToFit="1"/.test(xf)};
+  };
+  const longPlace = '玄関から廊下にかけて（上がり框の横）';
+  const longJob = (insurer: Insurer, address: string) =>
+    job({insurer, address, customer: '見本長谷川原　美千代子', places: [place(longPlace, [mat('L型手すり')])]});
+  // みやこ町：承認届出書の住所（I9:V9。2行入る高さ）は折り返して小さく。式で同じ住所を出す欄（支給申請書など）も収める
+  const my = sheets(fillShinsei(MIYAKO, SHINSEI.miyako!, shinseiValues(longJob('miyako', '福岡県京都郡みやこ町犀川大坂1234番地5　見本コーポ犀川第三203号室'), RATES)));
+  const myMain = styleOf(my.files, my.byName.get('住宅改修承認届出書')!, 'I9');
+  assert.ok(myMain.wrap && myMain.size < 11, JSON.stringify(myMain));
+  let copies = 0;
+  for (const [name, xml] of my.byName) {
+    for (const m of xml.matchAll(/<c r="([A-Z]+\d+)"[^>]*?><f>([^<]*)<\/f>/g)) {
+      if (!/^IF\((?:住宅改修承認届出書!)?I9=/.test(m[2])) continue; // =IF(I9="","",I9)・=IF(住宅改修承認届出書!I9="","",…)
+      const st = styleOf(my.files, xml, m[1]);
+      assert.ok(st.wrap || st.shrink || st.size < 11, `${name}!${m[1]} ${JSON.stringify(st)}`);
+      copies++;
+    }
+  }
+  assert.ok(copies > 0);
+  // 写真の用紙の改修箇所（B5:B6。16pt の高い欄）は折り返す
+  assert.equal(styleOf(my.files, my.byName.get('写真 (1)')!, 'B5').wrap, true);
+  // 広域連合：承認申請書の住所（J10:W10。1行の高さ）は縮小して全体を表示（折り返さない）
+  const ko = sheets(fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(longJob('kouiki', '福岡県築上郡築上町大字椎田1234番地56　見本レジデンス椎田南第一101号'), RATES)));
+  assert.deepEqual([styleOf(ko.files, ko.byName.get('様式第2号（住宅改修承認申請書）')!, 'J10').shrink, styleOf(ko.files, ko.byName.get('様式第2号（住宅改修承認申請書）')!, 'J10').wrap], [true, false]);
+  // 行橋市：写真添付用紙の改修場所（E4。結合していない欄で、となりの空いた欄へはみ出して見える）は、はみ出せる幅に入る大きさに
+  const yk = sheets(fillShinsei(YUKUHASHI, SHINSEI.yukuhashi!, shinseiValues(longJob('yukuhashi', '福岡県行橋市中央1-1'), RATES)));
+  const e4 = styleOf(yk.files, yk.byName.get('住改・写真 ①')!, 'E4');
+  assert.ok(!e4.shrink && !e4.wrap && e4.size < 11 && e4.size >= 8, JSON.stringify(e4));
+  // 短い住所は原本の書式のまま
+  const short = sheets(fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(longJob('kouiki', '福岡県築上郡築上町椎田1-1'), RATES)));
+  const orig = sheets(KOUIKI);
+  assert.equal(styleOf(short.files, short.byName.get('様式第2号（住宅改修承認申請書）')!, 'J10').s, styleOf(orig.files, orig.byName.get('様式第2号（住宅改修承認申請書）')!, 'J10').s);
+  // プレビューも同じ（縮小の欄は画面の幅で縮める・折り返しの欄は折り返す）
+  const pv = shinseiPreview(unzipSync(KOUIKI), SHINSEI.kouiki!, shinseiValues(longJob('kouiki', '福岡県築上郡築上町大字椎田1234番地56　見本レジデンス椎田南第一101号'), RATES));
+  assert.equal(pv.find((p) => p.sheet === '様式第2号（住宅改修承認申請書）')?.texts.find((t) => t.ref === 'J10')?.shrink, true);
+  const pvMy = shinseiPreview(unzipSync(MIYAKO), SHINSEI.miyako!, shinseiValues(longJob('miyako', '福岡県京都郡みやこ町犀川大坂1234番地5　見本コーポ犀川第三203号室'), RATES));
+  assert.equal(pvMy.find((p) => p.sheet === '住宅改修承認届出書')?.texts.find((t) => t.ref === 'I9')?.wrap, true);
 });
 
 test('改修箇所の□の一覧：同じ名前・言いかえ・名前に入っている項目に■。一覧にない場所は「その他」の所を「■名前」に', () => {
