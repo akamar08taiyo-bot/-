@@ -158,9 +158,10 @@ export function ShinseiEditor({
   const save = () => {
     if (!insurer) return;
     void saveShinsei(job, insurer, s).then(
-      ({fileName, missingPhotos}) => {
+      ({fileName, missingPhotos, unreadablePhotos}) => {
         toast(`「${fileName}」を保存しました`);
         if (missingPhotos) toast(`写真${missingPhotos}枚はこの端末にないので貼っていません`, 'error');
+        if (unreadablePhotos) toast(`写真${unreadablePhotos}枚は読めなかったので貼っていません`, 'error');
       },
       () => toast('申請書を作れませんでした', 'error'),
     );
