@@ -1,4 +1,4 @@
-import {useMemo, useState} from 'react';
+import {useMemo, useRef, useState} from 'react';
 import {
   alignToHeader,
   columnCount,
@@ -98,6 +98,9 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
   const [nth, setNth] = useState(1);
   const [listNth, setListNth] = useState(0);
   const [maker, setMaker] = useState('');
+  // ファイルから推測したメーカー名。手で打ったメーカー名だけを次のファイルにも使い、推測したものはファイルを変えたら推測し直す
+  // （前は「別のファイルにする」で TOTO の表にしても、前の表から推測したマツ六のままだった）
+  const guessedMaker = useRef('');
   const [overrides, setOverrides] = useState<Record<string, Override>>({});
   const [query, setQuery] = useState('');
   const [pricesOnly, setPricesOnly] = useState(false);
@@ -145,8 +148,12 @@ export function ImportDialog({materials, onDone, onClose}: {materials: Material[
     const lns = next.kind === 'pdf' ? next.lines : next.kind === 'paste' ? textToLines(next.text) : g.map((r) => r.join('  '));
     const ln = detectListNth(lns);
     setListNth(ln);
-    const mk = maker || guessMaker([name, ...g.slice(0, 8).map((r) => r.join(' '))]) || makerFromFileName(name);
-    if (!maker) setMaker(mk);
+    const typed = maker.trim() && maker !== guessedMaker.current ? maker : '';
+    const mk = typed || guessMaker([name, ...g.slice(0, 8).map((r) => r.join(' '))]) || makerFromFileName(name);
+    if (!typed) {
+      guessedMaker.current = mk;
+      setMaker(mk);
+    }
     const first =
       next.kind === 'xlsx' && firstSheet === ALL
         ? sheetsCandidates(next.sheets, mk.trim())
