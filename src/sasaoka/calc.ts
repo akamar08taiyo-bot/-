@@ -40,6 +40,11 @@ export function taxAmount(subtotal: number, taxRate: number, mode: TaxMode): num
   }
 }
 
+/** 仕切り計算表の ⑤ 消費税の式（「⑦×0.1－1」）。画面と印刷で同じものを出す */
+export function taxFormula(s: {taxRate: number; taxMode: TaxMode}): string {
+  return `⑦×${s.taxRate}${s.taxMode === 'original' ? '－1' : ''}`;
+}
+
 // 定価が空欄の部材（ご指示）：定価は 仕切価格×1.25（＝25%を足す。見積の単価 定価×0.8 で仕切価格と同じ金額になる）。
 // 仕切価格が空欄でも、定価からは計算しない（ユーザーの指示「仕切り価格は0.8ではありません」。仕切りの率はメーカーごとに違う）
 export const LIST_FROM_SHIKIRI = 1.25;

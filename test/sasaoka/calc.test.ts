@@ -19,6 +19,7 @@ import {
   shikiriPrice,
   sortJobs,
   taxAmount,
+  taxFormula,
 } from '../../src/sasaoka/calc.ts';
 import type {Job, Row, Settings} from '../../src/sasaoka/types.ts';
 
@@ -74,6 +75,9 @@ test('taxAmount の各モード', () => {
   assert.equal(taxAmount(133215, 0.1, 'round'), 13322);
   assert.equal(taxAmount(133211, 0.1, 'ceil'), 13322);
   assert.equal(taxAmount(-1005, 0.1, 'floor'), -100); // マイナス（値引き）は0に向けて切り捨て
+  // ⑤の式（仕切り計算表の画面と印刷で同じ）
+  assert.equal(taxFormula({taxRate: 0.1, taxMode: 'original'}), '⑦×0.1－1');
+  assert.equal(taxFormula({taxRate: 0.1, taxMode: 'floor'}), '⑦×0.1');
 });
 
 test('rowAmount と placeTotals（玄関の例：手すり10,000＋ブラケット1,500×2＋木2箇所）', () => {

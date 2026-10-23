@@ -1,5 +1,5 @@
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
-import {cutToLength, jobName, jobTotals, placeTotals, rowAmount} from '../calc.ts';
+import {cutToLength, jobName, jobTotals, placeTotals, rowAmount, taxFormula} from '../calc.ts';
 import type {JobTotals} from '../calc.ts';
 import {cutCalc} from '../estimateForms.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
@@ -548,7 +548,7 @@ export function SummaryBox({totals: t, settings: s}: {totals: JobTotals; setting
     ['②', '取付手間合計', t.labor, false],
     ['③', `部材上乗せ（①×${rate}）`, t.markup, false],
     ['④', `諸経費（①＋②＋③）×${rate}`, t.overhead, false],
-    ['⑤', `消費税（⑦×${s.taxRate}${s.taxMode === 'original' ? '－1' : ''}）`, t.tax, false],
+    ['⑤', `消費税（${taxFormula(s)}）`, t.tax, false],
     ['⑥', '合計', t.total, true],
     ['⑦', '税抜合計', t.subtotal, true],
   ];

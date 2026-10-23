@@ -1,6 +1,6 @@
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
-import {cutToLength, estimateQty, isBlankRow, jobName, jobTotals, monthSummary, placeTotals, rowAmount, shikiriPrice} from '../calc.ts';
+import {cutToLength, estimateQty, isBlankRow, jobName, jobTotals, monthSummary, placeTotals, rowAmount, shikiriPrice, taxFormula} from '../calc.ts';
 import type {MonthSummary} from '../calc.ts';
 import {cutCalc, FORM_INFO, insurerLabel, jobForm} from '../estimateForms.ts';
 import type {AppData, Job, Settings} from '../types.ts';
@@ -309,7 +309,7 @@ function JobDoc({job, settings: s}: {job: Job; settings: Settings}) {
     ['②', '取付手間合計', t.labor, false],
     ['③', `部材上乗せ（①×${rate}）`, t.markup, false],
     ['④', `諸経費（①＋②＋③）×${rate}`, t.overhead, false],
-    ['⑤', `消費税　⑦×${s.taxRate}`, t.tax, false],
+    ['⑤', `消費税　${taxFormula(s)}`, t.tax, false],
     ['⑥', '合計', t.total, true],
     ['⑦', '税抜合計', t.subtotal, true],
   ];
