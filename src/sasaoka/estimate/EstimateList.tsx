@@ -368,7 +368,16 @@ export function EstimateList({
                       <Btn small color="softGreen" className="ml-1.5" onClick={() => saveEstimateExcel(job, s, toast)}>
                         📗 Excel
                       </Btn>
-                      <Btn small color="white" className="ml-1.5" onClick={() => onOpen(duplicateEstimate(job, update, toast).id)}>
+                      <Btn
+                        small
+                        color="white"
+                        className="ml-1.5"
+                        onClick={() => {
+                          // 開くタブは複製したもので決める（申請書だけなら申請書のタブ。行を押したときと同じ）。onOpen はまだ複製の入っていないデータから探すので、見積書のタブになっていた
+                          const c = duplicateEstimate(job, update, toast);
+                          (!c.estDate && !hasEstimateRows(c) ? onOpenShinsei : onOpen)(c.id);
+                        }}
+                      >
                         複製
                       </Btn>
                       <Btn small color="white" className="ml-1.5" onClick={() => removeEstimate(job, label, update, toast)}>
