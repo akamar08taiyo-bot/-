@@ -25,6 +25,7 @@ export type ShinseiSheet = {
   insuredNo?: string[]; // 被保険者番号の10マス（左から）
   works?: string; // 改修の内容・箇所及び規模（折り返しの欄。1行に1箇所）
   kinds?: {places: string; works: string}[]; // 改修の種類（①手すりの取り付け〜⑥付帯工事）ごとの行の、箇所の欄と工事内容の欄（住宅改修内訳明細書）
+  oneLine?: string[]; // 折り返さない欄（長い文字は縮めて1行に。氏名・フリガナなどのほかに。理由書の電話番号・日付）
   // 写真貼付用紙：原本の写真番号の欄（①・写真番号①・№①）を読み、その写真番号の改修場所を改修箇所の欄（place）に入れ、
   // その写真番号の箇所の写真を改修前・改修後の枠（番地の範囲。before・after）に貼る（同じ写真番号の用紙が2枚あれば、最初の用紙だけ）。
   // 苅田町の写真の用紙は、改修箇所・実施した工事種類が□の一覧（placeChecks・kindChecks。その写真番号の箇所の□を■に）と、撮影日の欄（dates）。
@@ -776,6 +777,7 @@ export function fillShinseiFiles(files: Files, map: ShinseiMap, v: ShinseiValues
  */
 export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void {
   const pasted = new Set<number>(); // 写真を貼った写真番号（同じ番号の用紙が2枚＝広域連合なら、最初の用紙だけに貼る）
+  const copies = formulaCopies(files);
   for (const sheet of map.sheets) {
     const photo = sheet.photoPlace ? photoNumberOf(readCell(files, sheet.sheet, sheet.photoPlace.photo)) : 0;
     const cells = shinseiCells(sheet, v, photo);
@@ -784,6 +786,7 @@ export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void
     writeCells(files, sheet.sheet, cells);
     wrapKinds(files, sheet, v);
     fitLines(files, sheet, v);
+    fitTexts(files, sheet, cells, copies);
     drawMarks(files, sheet, v.marks);
     if (sheet.photoPlace?.kindCircles) drawKindCircle(files, sheet, photo > 0 && v.photos[photo] !== undefined ? (v.photoKinds?.[photo] ?? 0) : 0);
     if (sheet.legend?.box) drawLegend(files, sheet, v.works);
@@ -960,12 +963,15 @@ const emOf = (s: string) => [...s].reduce((n, ch) => n + (/[ -~｡-ﾟ]/.test(ch
  * （4.5pt：内訳明細書の改修の種類の行＝2行分の高さに、同じ種類の12箇所が入る大きさ。見積書の印刷の小さい文字と同じ）
  */
 export function fitLinesSize(lines: string[], w: number, h: number, base: number, minPt = 4.5): number {
-  for (let pt = base; pt > minPt; pt -= 0.5) {
-    const px = (pt * 4) / 3;
-    const rows = lines.reduce((n, l) => n + Math.max(1, Math.ceil((emOf(l) * px) / Math.max(1, w - 6))), 0);
-    if (rows * px * LINE_K <= h - 4) return pt;
-  }
+  for (let pt = base; pt > minPt; pt -= 0.5) if (wrapRows(lines, w, h, pt) > 0) return pt;
   return minPt;
+}
+
+/** 幅 w・高さ h（画素）の折り返しの欄に、lines を pt の大きさで入れたときの行数（入らなければ 0） */
+function wrapRows(lines: string[], w: number, h: number, pt: number): number {
+  const px = (pt * 4) / 3;
+  const rows = lines.reduce((n, l) => n + Math.max(1, Math.ceil((emOf(l) * px) / Math.max(1, w - 6))), 0);
+  return rows * px * LINE_K <= h - 4 ? rows : 0;
 }
 
 /** 書式（cellXfs の番号）の文字の大きさだけを pt にした書式を足して、その番号を返す（同じものがあればそれ） */
@@ -992,6 +998,30 @@ function sizedStyle(files: Files, style: number, pt: number): number {
     count('cellXfs', xfs.length + 1);
   }
   files['xl/styles.xml'] = strToU8(xml);
+  return id;
+}
+
+/** 書式（cellXfs の番号）の配置（alignment）の属性を替えた書式を足して、その番号を返す（同じものがあればそれ）。値が null の属性は外す */
+function alignedStyle(files: Files, style: number, attrs: Record<string, string | null>): number {
+  const {xfs} = styleParts(files);
+  const xf = xfs[style];
+  if (xf === undefined) return style;
+  const found = /<alignment\b[^>]*?(?:\/>|>[\s\S]*?<\/alignment>)/.exec(xf)?.[0];
+  let align = found ?? '<alignment/>';
+  for (const [k, v] of Object.entries(attrs)) {
+    align = align.replace(new RegExp(`\\s${k}="[^"]*"`), '');
+    if (v !== null) align = align.replace(/^<alignment\b/, `<alignment ${k}="${v}"`);
+  }
+  // alignment は xf の最初の子（protection より前）
+  let next = found ? xf.replace(found, align) : /\/>$/.test(xf) ? xf.replace(/\s*\/>$/, `>${align}</xf>`) : xf.replace(/^(<xf\b[^>]*>)/, `$1${align}`);
+  next = /\sapplyAlignment=/.test(next) ? next.replace(/\sapplyAlignment="[^"]*"/, ' applyAlignment="1"') : next.replace(/^<xf\b/, '<xf applyAlignment="1"');
+  let id = xfs.indexOf(next);
+  if (id < 0) {
+    let xml = strFromU8(files['xl/styles.xml']);
+    id = xfs.length;
+    xml = xml.replace('</cellXfs>', `${next}</cellXfs>`).replace(/<cellXfs\b([^>]*?)\scount="\d+"/, `<cellXfs$1 count="${xfs.length + 1}"`);
+    files['xl/styles.xml'] = strToU8(xml);
+  }
   return id;
 }
 
@@ -1036,6 +1066,120 @@ function fitLines(files: Files, sheet: ShinseiSheet, v: ShinseiValues): void {
   }
 }
 
+// ---------------------------------------------------------------- 長い文字も欄の中に全部見せる
+// ユーザーの指示「文字のはみ出しであったりだとか、途中で横が切れていたりとか…しっかり見てください」（2026-10-23）：
+// 転記した文字が欄（結合した範囲・となりの空いた欄へはみ出せる幅）に入らないときは、欄の大きさは原本のまま、文字を欄に収める。
+// ・2行以上入る高さの欄は、折り返したほうが字が大きく（1.25倍以上）なれば、折り返して入る大きさにする（住所・改修場所など）
+// ・ほかは「縮小して全体を表示する」（Excel もプレビューも、欄の幅に縮める）
+// ・結合していない欄で、となりの空いた欄へはみ出して見える文字は、はみ出せる幅に入る大きさにする（縮小にすると、その欄の幅だけに縮まる）
+// 氏名・フリガナ・電話番号・日付は折り返さない（名前の途中で行が変わらないように）。式でこの欄を出している欄（ほかのシートの氏名・住所など）も、その欄の大きさで同じように
+
+/** 文字のまわりのすき間（画素。左右あわせて） */
+const CELL_PAD = 6;
+/** 折り返さない欄（転記する欄のうち、氏名・フリガナ・郵便番号・電話番号・日付・金額。ShinseiSheet.oneLine も） */
+function oneLineRefs(sheet: ShinseiSheet): Set<string> {
+  const keys: (keyof ShinseiTexts)[] = ['kana', 'zip', 'phone', 'reasonName', 'era', 'y', 'm', 'd', 'start', 'end', 'cost'];
+  const out = new Set<string>(sheet.oneLine ?? []);
+  if (sheet.name) out.add(sheet.name);
+  for (const t of sheet.texts ?? []) if (placeholders(t.format).some((k) => keys.includes(k))) out.add(t.cell);
+  return out;
+}
+
+/** 式でほかの欄を出している欄（シートのファイルごとに覚えておく）：番地・出している欄のシート名と番地 */
+const copyCache = new WeakMap<Uint8Array, {ref: string; sheet: string; target: string}[]>();
+/** 'シート名!番地' → その欄を式で出している欄（シートのファイル・番地。苅田町の事後申請書・みやこ町の支給申請書の住所など） */
+function formulaCopies(files: Files): Map<string, {path: string; ref: string}[]> {
+  const out = new Map<string, {path: string; ref: string}[]>();
+  for (const [name, path] of sheetPaths(files)) {
+    const f = files[path];
+    if (!f) continue;
+    let list = copyCache.get(f);
+    if (!list) {
+      list = [];
+      for (const m of strFromU8(f).matchAll(/<c r="([A-Z]+\d+)"[^>]*?><f>([^<]*)<\/f>/g)) {
+        const t = formulaRef(m[2], name);
+        if (t) list.push({ref: m[1], sheet: t.sheet, target: t.ref});
+      }
+      copyCache.set(f, list);
+    }
+    for (const c of list) out.set(`${c.sheet}!${c.target}`, [...(out.get(`${c.sheet}!${c.target}`) ?? []), {path, ref: c.ref}]);
+  }
+  return out;
+}
+
+/** 転記した文字（と、それを式で出している欄）を欄に収める。丸で囲む欄・被保険者番号のマスは原本のまま（丸の位置は文字の大きさから決めている） */
+function fitTexts(files: Files, sheet: ShinseiSheet, cells: Map<string, CellValue>, copies: Map<string, {path: string; ref: string}[]>): void {
+  const path = sheetPaths(files).get(sheet.sheet);
+  if (!path) return;
+  const skip = new Set([...(sheet.marks ?? []).map((m) => m.cell), ...(sheet.insuredNo ?? [])]);
+  const oneLine = oneLineRefs(sheet);
+  const byPath = new Map<string, {ref: string; text: string; oneLine: boolean}[]>();
+  const add = (p: string, item: {ref: string; text: string; oneLine: boolean}) => byPath.set(p, [...(byPath.get(p) ?? []), item]);
+  for (const [ref, text] of cells) {
+    if (typeof text !== 'string' || !text.trim() || skip.has(ref)) continue;
+    add(path, {ref, text, oneLine: oneLine.has(ref)});
+    for (const c of copies.get(`${sheet.sheet.trim()}!${ref}`) ?? []) add(c.path, {ref: c.ref, text, oneLine: oneLine.has(ref)});
+  }
+  for (const [p, list] of byPath) {
+    if (!files[p]) continue;
+    let xml = strFromU8(files[p]);
+    const lay = sheetLayout(xml);
+    for (const {ref, text, oneLine: single} of list) {
+      const style = fitStyle(files, xml, lay, ref, text, single);
+      if (style !== null) xml = setStyle(xml, ref, String(style));
+    }
+    files[p] = strToU8(xml);
+  }
+}
+
+/** 欄に文字が入らないときの書式（入るときは null） */
+function fitStyle(files: Files, xml: string, lay: SheetLayout, ref: string, text: string, oneLine: boolean): number | null {
+  const found = cellRe(ref).exec(xml);
+  const at = /^([A-Z]+)(\d+)$/.exec(ref);
+  if (!found || !at) return null;
+  const [c, r] = [colNum(at[1]), Number(at[2])];
+  const mergeOf = (cc: number, rr: number) => lay.merges.find((m) => m[0] <= cc && cc <= m[2] && m[1] <= rr && rr <= m[3]);
+  const merge = mergeOf(c, r);
+  if (merge && (merge[0] !== c || merge[1] !== r)) return null; // 結合した欄は左上の欄の文字だけが出る
+  const st = cellStyle(files, xml, ref);
+  if (st.shrink || st.rotation) return null; // 原本が縮小（Excel もプレビューも縮める）・縦書きの欄はそのまま
+  const s = numOf(attrOf(found[1], 's'), 0);
+  const box = rangeBox(lay, merge ? `${colName(merge[0])}${merge[1]}:${colName(merge[2])}${merge[3]}` : ref);
+  const lines = text.split('\n');
+  if (st.wrap || st.horizontal === 'distributed' || st.horizontal === 'justify') {
+    const pt = fitLinesSize(lines, box.w, box.h, st.size);
+    return pt < st.size ? sizedStyle(files, s, pt) : null;
+  }
+  // 1行の欄（折り返さない欄の改行は、Excel もプレビューも1行につなげて出す）。結合していない欄は、となりの空いた欄へはみ出せる
+  const px = (st.size * 4) / 3;
+  const need = emOf(text.replace(/\n/g, '')) * px + CELL_PAD;
+  let avail = box.w;
+  if (!merge) {
+    const maxCol = colNum(/<dimension ref="[A-Z]+\d+:([A-Z]+)\d+"/.exec(xml)?.[1] ?? 'A') || c;
+    const empty = (cc: number) => cc >= 1 && cc <= maxCol && !mergeOf(cc, r) && !/<v>[^<]|<is>/.test(cellRe(`${colName(cc)}${r}`).exec(xml)?.[2] ?? '');
+    let [left, right] = [c, c];
+    if (st.horizontal === 'general' || st.horizontal === 'left') while (empty(right + 1)) right++;
+    else if (st.horizontal === 'right') while (empty(left - 1)) left--;
+    else if (st.horizontal === 'center')
+      while (empty(left - 1) && empty(right + 1)) {
+        left--;
+        right++;
+      }
+    for (let cc = left; cc <= right; cc++) if (cc !== c) avail += lay.colW(cc);
+  }
+  if (need <= avail) return null;
+  const small = Math.max(3, Math.floor(((st.size * (avail - CELL_PAD)) / (need - CELL_PAD)) * 2) / 2);
+  // 折り返し：はみ出さない欄（結合した欄など）で、2行以上入る高さがあって、字が1.25倍以上大きくなるときだけ
+  if (!oneLine && avail === box.w) {
+    const pt = fitLinesSize(lines, box.w, box.h, st.size);
+    if (wrapRows(lines, box.w, box.h, pt) > 1 && pt >= small * 1.25) {
+      const wrapped = alignedStyle(files, s, {wrapText: '1', shrinkToFit: null});
+      return pt < st.size ? sizedStyle(files, wrapped, pt) : wrapped;
+    }
+  }
+  return avail === box.w ? alignedStyle(files, s, {shrinkToFit: '1'}) : sizedStyle(files, s, small);
+}
+
 /** 欄の書式（s）を替える（欄があるときだけ） */
 function setStyle(xml: string, ref: string, style: string): string {
   const found = cellRe(ref).exec(xml);
@@ -1078,7 +1222,7 @@ export function sheetLayout(xml: string): SheetLayout {
   return {colW: (c) => cols.find((x) => x.min <= c && c <= x.max)?.px ?? defW, rowH: (r) => rows.get(r) ?? defH, merges};
 }
 
-type CellStyle = {size: number; font: string; horizontal: string; vertical: string; shrink: boolean; indent: number};
+type CellStyle = {size: number; font: string; horizontal: string; vertical: string; shrink: boolean; indent: number; wrap: boolean; rotation: number};
 
 /** styles.xml の中身（字体・塗り・罫線・書式の XML を番号の順に。表示形式の番号 → 書き方。決まった色の番号の色を替えていればその色） */
 export type StyleParts = {fonts: string[]; fills: string[]; borders: string[]; xfs: string[]; numFmts: Map<number, string>; palette: string[]};
@@ -1112,6 +1256,8 @@ function cellStyle(files: Files, xml: string, ref: string): CellStyle {
     vertical: attrOf(align, 'vertical') ?? 'bottom',
     shrink: attrOf(align, 'shrinkToFit') === '1',
     indent: numOf(attrOf(align, 'indent'), 0),
+    wrap: attrOf(align, 'wrapText') === '1',
+    rotation: numOf(attrOf(align, 'textRotation'), 0),
   };
 }
 

@@ -360,6 +360,7 @@ export const RIYU_MAP: ShinseiMap = {
         {cell: 'AH6', format: '{reasonOffice}'},
         {cell: 'AH8', format: '{reasonName}'},
       ],
+      oneLine: [RIYU_CELL.age, RIYU_CELL.checkDate, RIYU_CELL.madeDate, RIYU_CELL.careTerm, RIYU_CELL.tel],
       riyu: true,
       pages: RIYU_PAGES,
       links: riyuLinks(),
