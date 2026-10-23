@@ -32,6 +32,7 @@ export type TokuteiFields = {
   careFrom?: string; // 認定の有効期間のはじめ 'YYYY-MM-DD'
   careTo?: string; // 認定の有効期間のおわり
   insurerNo?: string; // 保険者番号（6けた）
+  welfare?: boolean; // 生活保護（介護ソフトの画面の給付情報が「生保」。生活保護のときだけ渡す。特定福祉用具の Sale の welfare。2026-10-23）
 };
 
 export function tokuteiFields(job: Job): TokuteiFields {
@@ -54,6 +55,7 @@ export function tokuteiFields(job: Job): TokuteiFields {
     ...(info.careFrom ? {careFrom: info.careFrom} : {}),
     ...(info.careTo ? {careTo: info.careTo} : {}),
     ...(info.insurerNo.trim() ? {insurerNo: info.insurerNo.trim()} : {}),
+    ...(info.welfare ? {welfare: true} : {}),
   };
 }
 

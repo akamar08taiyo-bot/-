@@ -1,7 +1,9 @@
 // 介護保険証から読んだ値を様邸に入れる（cardApply.ts）。値はすべて架空
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {applyCard, birthText, currentOf, defaultPicks, fieldText, termText} from '../../src/sasaoka/cardApply.ts';
+import {applyCard, applyExtra, birthText, currentExtra, currentOf, defaultPicks, EXTRA_FIELDS, extraPicks, extraText, fieldText, NO_EXTRA, softRead, staffMatch, termText} from '../../src/sasaoka/cardApply.ts';
+import type {ExtraInfo} from '../../src/sasaoka/cardApply.ts';
+import {NO_SOFT} from '../../src/sasaoka/careSoft.ts';
 import {NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {NO_CARD} from '../../src/sasaoka/hokensho.ts';
 import type {CardInfo} from '../../src/sasaoka/hokensho.ts';
@@ -98,4 +100,64 @@ test('保険証の値：今の住所が読んだ住所で始まる（建物名�
   assert.ok(!defaultPicks(j, READ, []).has('address'));
   // ちがう住所なら入れる行
   assert.ok(defaultPicks(job({address: '京都郡苅田町富久町二丁目2番2号'}), READ, []).has('address'));
+});
+
+// ---------------------------------------------------------------- 介護ソフトの画面から（2026-10-23。値はすべて架空）
+
+test('介護ソフトの画面から読んだ結果を確かめる画面の形に（保険証の項目と、保険証にない項目）', () => {
+  const r = softRead({
+    info: {
+      ...NO_SOFT, name: '見本　春子', kana: 'ミホン　ハルコ', era: '昭和', birthY: '17', birthM: '5', birthD: '6', age: '84', gender: '女', staff: '見本太郎',
+      zip: '824-0000', address: '福岡県行橋市見本町1丁目2-3', phone: '0930-00-0000', office: '見本ケアプランセンター', manager: '見本　一郎', officeTel: '0930-00-1111',
+      care: '要介護2', careFrom: '2025-10-22', careTo: '2026-10-31', insurerName: '行橋市', insurer: 'yukuhashi', insuredNo: '0000987654', kind: '生保', rate: '90', burden: '1', welfare: 'yes',
+    },
+    unsure: ['kana', 'manager', 'address'],
+    score: 10,
+  });
+  assert.equal(r.info.name, '見本　春子');
+  assert.equal(r.info.office, '見本ケアプランセンター');
+  assert.equal(r.info.insurerNo, ''); // 介護ソフトの画面には保険者番号はない
+  assert.deepEqual(r.unsure, ['kana', 'address']);
+  assert.deepEqual(r.kinds, []);
+  assert.deepEqual(r.soft, {extra: {phone: '0930-00-0000', staff: '見本太郎', reasonName: '見本　一郎', reasonTel: '0930-00-1111', welfare: 'yes'}, unsure: ['reasonName']});
+});
+
+test('担当は担当者の候補と同じ名前のときだけ（空白のちがい・前のごみは気にしない）', () => {
+  const list = ['見本 太郎', '試験 次郎'];
+  assert.equal(staffMatch('見本太郎', list), '見本 太郎');
+  assert.equal(staffMatch('業 見本 太郎', list), '見本 太郎');
+  assert.equal(staffMatch('見本', list), '');
+  assert.equal(staffMatch('', list), '');
+});
+
+test('保険証にない項目のはじめのチェック：今とちがい、今が空か読めた値がたしかなとき。電話はハイフンのちがいは同じ', () => {
+  const v: ExtraInfo = {phone: '0930-00-0000', staff: '見本 太郎', reasonName: '見本　一郎', reasonTel: '0930-00-1111', welfare: 'yes'};
+  assert.deepEqual([...extraPicks(job(), v, [])].sort(), ['phone', 'reasonName', 'reasonTel', 'staff', 'welfare']);
+  // 今の値があって、読めた値がたしかでなければ入れない（読み違いで上書きしない）
+  const filled = job({staff: '試験 次郎', shinsei: {...NO_SHINSEI, phone: '0930-11-1111', reasonName: '試験　花子'}});
+  assert.deepEqual([...extraPicks(filled, v, ['phone', 'reasonName', 'staff'])].sort(), ['reasonTel', 'welfare']);
+  assert.deepEqual([...extraPicks(filled, v, [])].sort(), ['phone', 'reasonName', 'reasonTel', 'staff', 'welfare']);
+  // 同じ値（電話のハイフンなし・生活保護でない＝なし）は入れない
+  const same = job({shinsei: {...NO_SHINSEI, phone: '0930000000'}});
+  assert.deepEqual([...extraPicks(same, {...NO_EXTRA, phone: '0930-00-0000', welfare: 'no'}, [])], []);
+  // 担当の候補にない名前（v.staff は空にして渡す）は入れない
+  assert.deepEqual([...extraPicks(job(), {...NO_EXTRA, staff: ''}, [])], []);
+});
+
+test('保険証にない項目を様邸に入れる：申請書の電話番号・理由書の作成者の氏名と連絡先・担当（候補にあるときだけ）・生活保護', () => {
+  const v: ExtraInfo = {phone: '0930-00-0000', staff: '見本太郎', reasonName: '見本　一郎', reasonTel: '0930-00-1111', welfare: 'yes'};
+  const all = new Set(EXTRA_FIELDS.map((f) => f.field));
+  const j = applyExtra(job(), v, all, ['見本 太郎']);
+  assert.equal(j.shinsei?.phone, '0930-00-0000');
+  assert.equal(j.shinsei?.reasonName, '見本　一郎');
+  assert.equal(j.shinsei?.welfare, true);
+  assert.equal(j.riyu?.tel, '0930-00-1111');
+  assert.equal(j.staff, '見本 太郎');
+  // 候補にない担当は入れない。生活保護でなければ持たない
+  const k = applyExtra(job({staff: '試験 次郎', shinsei: {...NO_SHINSEI, welfare: true}}), {...v, staff: '見本太郎', welfare: 'no'}, all, ['試験 次郎']);
+  assert.equal(k.staff, '試験 次郎');
+  assert.equal(k.shinsei?.welfare, undefined);
+  // 今の値（保険証にない項目）
+  assert.deepEqual(currentExtra(j), {phone: '0930-00-0000', staff: '見本 太郎', reasonName: '見本　一郎', reasonTel: '0930-00-1111', welfare: 'yes'});
+  assert.equal(extraText(currentExtra(k), 'welfare'), 'なし');
 });

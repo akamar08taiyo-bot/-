@@ -34,6 +34,12 @@ test('特定福祉用具に渡すお客様の情報：特定福祉用具の案�
   });
 });
 
+test('生活保護（介護ソフトの画面の給付情報が「生保」）は、生活保護のときだけ welfare: true を渡す', () => {
+  assert.equal(tokuteiFields(job({shinsei: {...job().shinsei, welfare: true}})).welfare, true);
+  assert.ok(!('welfare' in tokuteiFields(job())));
+  assert.ok(!('welfare' in tokuteiFields(job({shinsei: {...job().shinsei, welfare: false}}))));
+});
+
 test('介護保険証から入れた認定の有効期間・保険者番号も渡す（入っていなければ渡さない）', () => {
   const f = tokuteiFields(job({shinsei: {...job().shinsei, careFrom: '2024-04-01', careTo: '2027-03-31', insurerNo: ' 409999 '}}));
   assert.deepEqual([f.careFrom, f.careTo, f.insurerNo], ['2024-04-01', '2027-03-31', '409999']);

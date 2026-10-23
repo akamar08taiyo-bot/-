@@ -387,6 +387,7 @@ function cleanShinsei(raw: unknown, legacyMarks: unknown): ShinseiInfo {
   out.careTo = isoDate(src.careTo);
   out.insurerNo = str(src.insurerNo).normalize('NFKC').replace(/\D/g, '').slice(0, 8); // 全角の数字も（\D は半角の数字のほかを消す）
   out.burden = ['1', '2', '3'].includes(str(src.burden)) ? (str(src.burden) as ShinseiInfo['burden']) : '';
+  if (src.welfare === true) out.welfare = true; // 生活保護（介護ソフトの画面から。2026-10-23）
   return out;
 }
 

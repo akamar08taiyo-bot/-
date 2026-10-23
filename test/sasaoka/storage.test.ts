@@ -106,6 +106,9 @@ test('見積書の項目：前のデータ（項目なし）も読める', () =>
   const [n] = cleanJobs([{shinsei: {kana: 'ヤマダ', birthY: 23, phone: '0930-00-0000', start: '2026-11-05', end: 'x', cost: '198000', gender: '男'}, places: [{name: '玄関', shinseiText: ' 木製手すり '}, {name: 'トイレ', shinseiText: ''}]}]);
   assert.deepEqual(n.shinsei, {...NO_SHINSEI, kana: 'ヤマダ', birthY: '23', phone: '0930-00-0000', start: '2026-11-05', cost: 198000, gender: '男'});
   assert.deepEqual(n.places.map((p) => p.shinseiText), [' 木製手すり ', undefined]); // 申請書に書く文は空なら持たない
+  // 生活保護（介護ソフトの画面から）は true のときだけ残す
+  assert.equal(cleanJobs([{shinsei: {welfare: true}}])[0].shinsei?.welfare, true);
+  assert.ok(!('welfare' in (cleanJobs([{shinsei: {welfare: 'yes'}}])[0].shinsei ?? {})));
 });
 
 test('前のデータの行・部材にも、定価・長さ・見積の単価が入る', () => {
