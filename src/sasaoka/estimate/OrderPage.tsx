@@ -62,6 +62,9 @@ export function OrderPage({
   const [picking, setPicking] = useState(false);
   const name = jobName(job);
   const ordered = orderedLines(lines);
+  // No. は印刷と同じく発注する行（数が 0 でない行）だけに付ける
+  let n = 0;
+  const nos = lines.map((l) => (l.qty > 0 ? ++n : 0));
 
   const setEdits = (fn: (e: OrderEdits) => OrderEdits) =>
     update('jobs', (list) => list.map((j) => (j.id === job.id ? {...j, order: fn(j.order ?? emptyOrderEdits()), updatedAt: Date.now()} : j)));
@@ -164,7 +167,7 @@ export function OrderPage({
             {lines.map((l, i) => (
               <OrderRow
                 key={l.key}
-                no={i + 1}
+                no={nos[i]}
                 line={l}
                 onQty={(q) => setEdits((e) => setOrderQty(e, l, q))}
                 onReset={() => setEdits((e) => setOrderQty(e, l, l.calc))}
@@ -221,7 +224,7 @@ function OrderRow({line: l, no, onQty, onReset, onRemove}: {line: OrderLine; no:
   const changed = !l.key.startsWith('add:') && Math.abs(l.qty - l.calc) > 1e-6;
   return (
     <li className={`grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 px-4 py-3 sm:grid-cols-[2rem_minmax(0,1fr)_auto_auto] sm:items-center ${l.qty > 0 ? '' : 'bg-slate-50'}`}>
-      <div className="hidden text-sm tabular-nums text-slate-400 sm:block">{no}</div>
+      <div className="hidden text-sm tabular-nums text-slate-400 sm:block">{no > 0 ? no : ''}</div>
       <div className="min-w-0">
         <div className="break-words text-[15px] font-bold leading-snug text-slate-800">{label}</div>
         <div className="text-xs text-slate-500">
