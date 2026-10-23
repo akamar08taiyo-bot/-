@@ -24,22 +24,38 @@ export function CardDrop({onRead, children, className = '', big = false}: {onRea
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const [progress, setProgress] = useState<CardProgress | null>(null);
+  // 読んでいるのをやめる（読み取りの部品をネットから取ってこられずに止まったときも、閉じられるように）
+  const running = useRef<AbortController | null>(null);
   const read = async (list: FileList | File[] | null) => {
     const files = [...(list ?? [])].filter(isCardFile);
     if (files.length === 0) {
       if (list && list.length) toast('画像（写真・スキャン）か PDF を入れてください', 'error');
       return;
     }
+    const ac = new AbortController();
+    running.current = ac;
     setProgress({step: 'ファイルを開いています', page: 0, pages: 0});
     try {
-      const r = await readCards(files, setProgress);
+      const r = await readCards(files, (p) => !ac.signal.aborted && setProgress(p), ac.signal);
+      if (ac.signal.aborted) return;
+      // 開けないファイルは飛ばして、ほかのファイルを読む
+      if (r.skipped.length) toast(`開けないファイルがありました：${r.skipped.join('、')}（iPhone の写真の HEIC・パスワードのある PDF は開けないことがあります。JPEG・PNG か、パスワードのない PDF で入れてください）`, 'error');
+      if (r.skipped.length && r.thumbs.length === 0) return;
       if (Object.values(r.read.info).every((v) => !v)) toast('介護保険証の字が読めませんでした。明るく、まっすぐに写した画像で試してください', 'error');
       onRead(r);
     } catch {
-      toast('介護保険証を読めませんでした（はじめて使うときは、読み取りの部品をネットから取ってきます。ネットにつながっているか確かめてください）', 'error');
+      if (!ac.signal.aborted) toast('介護保険証を読めませんでした（はじめて使うときは、読み取りの部品をネットから取ってきます。ネットにつながっているか確かめてください）', 'error');
     } finally {
-      setProgress(null);
+      if (running.current === ac) {
+        running.current = null;
+        setProgress(null);
+      }
     }
+  };
+  const cancel = () => {
+    running.current?.abort();
+    running.current = null;
+    setProgress(null);
   };
   const onDrop = (e: DragEvent) => {
     e.preventDefault();
@@ -91,7 +107,15 @@ export function CardDrop({onRead, children, className = '', big = false}: {onRea
       </button>
       <input ref={input} type="file" accept="image/*,application/pdf,.pdf" multiple className="hidden" aria-label="介護保険証のファイル" onChange={(e) => void read(e.target.files).finally(() => (e.target.value = ''))} />
       {progress && (
-        <Modal title="🪪 介護保険証を読んでいます" onClose={() => undefined}>
+        <Modal
+          title="🪪 介護保険証を読んでいます"
+          onClose={cancel}
+          footer={
+            <Btn color="white" onClick={cancel}>
+              やめる
+            </Btn>
+          }
+        >
           <div role="status" aria-label="介護保険証を読んでいます" className="space-y-3 py-2 text-sm text-slate-700">
             <div className="flex items-center gap-3">
               <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-sky-600 border-t-transparent" aria-hidden />

@@ -8,14 +8,39 @@ let engine: Promise<Worker> | null = null;
 let idle: ReturnType<typeof setTimeout> | undefined;
 let queue: Promise<unknown> = Promise.resolve();
 
+/** 読み取りの部品ができるまで待つ時間。ネットが止まったままのときに、いつまでも待たない（同じ部品を使う写真の日付の読み取りも待たせつづける） */
+export const ENGINE_TIMEOUT = 180_000;
+
+/**
+ * 部品を作って、できるのを待つ。日本語のデータを取ってこられなかったとき、tesseract.js の createWorker は失敗を握りつぶして、いつまでも終わらない。
+ * そのとき呼ばれる errorHandler（onError）か時間切れで失敗にする（できたあとの読み取りの失敗は recognize の失敗になるので、ここでは何もしない）。
+ * 時間切れのあとでできあがった部品は片付ける
+ */
+export async function settleWorker<W extends {terminate: () => Promise<unknown>}>(make: (onError: (e: unknown) => void) => Promise<W>, ms: number): Promise<W> {
+  let fail: (e: unknown) => void = () => undefined;
+  const failed = new Promise<never>((_, reject) => (fail = reject));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error('読み取りの部品を用意できませんでした（時間切れ）')), ms)));
+  const worker = make((e) => fail(e));
+  try {
+    return await Promise.race([worker, failed, late]);
+  } catch (e) {
+    void worker.then((w) => w.terminate()).catch(() => undefined);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function getEngine(): Promise<Worker> {
   if (!engine) {
-    engine = (async () => {
+    const made: Promise<Worker> = (async () => {
       const {createWorker, OEM} = await import('tesseract.js');
-      return createWorker('jpn', OEM.LSTM_ONLY, {errorHandler: () => undefined});
+      return settleWorker((onError) => createWorker('jpn', OEM.LSTM_ONLY, {errorHandler: onError}), ENGINE_TIMEOUT);
     })();
-    engine.catch(() => {
-      engine = null; // ネットにつながらなかったときは、次にまた試す
+    engine = made;
+    made.catch(() => {
+      if (engine === made) engine = null; // ネットにつながらなかったときは、次にまた試す
     });
   }
   return engine;

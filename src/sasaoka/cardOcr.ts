@@ -33,19 +33,29 @@ async function grayOfBlob(b: Blob): Promise<Gray> {
   }
 }
 
-/** ファイルの画像（PDF はページごと。裏の白いページは読まない） */
-async function imagesOf(files: File[]): Promise<Gray[]> {
-  const out: Gray[] = [];
+/**
+ * ファイルの画像（PDF はページごと。裏の白いページは読まない）。開けないファイル（Chrome の HEIC・パスワードのある PDF・こわれたファイル）は
+ * 飛ばして名前を返し、ほかのファイルは読む（1つのために全部を読めなくしない）
+ */
+async function imagesOf(files: File[]): Promise<{images: Gray[]; skipped: string[]}> {
+  const images: Gray[] = [];
+  const skipped: string[] = [];
   for (const f of files) {
-    if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
-      const {pdfToImages} = await import('./pdfText.ts');
-      for (const page of await pdfToImages(new Uint8Array(await f.arrayBuffer()), 2400, 8)) {
-        const g = await grayOfBlob(page);
-        if (!blank(g)) out.push(g);
-      }
-    } else out.push(await grayOfBlob(f));
+    try {
+      const got: Gray[] = [];
+      if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
+        const {pdfToImages} = await import('./pdfText.ts');
+        for (const page of await pdfToImages(new Uint8Array(await f.arrayBuffer()), 2400, 8)) {
+          const g = await grayOfBlob(page);
+          if (!blank(g)) got.push(g);
+        }
+      } else got.push(await grayOfBlob(f));
+      images.push(...got);
+    } catch {
+      skipped.push(f.name || '貼り付けた画像');
+    }
   }
-  return out;
+  return {images, skipped};
 }
 
 /** ほとんど白いページ（スキャンした裏の面） */
@@ -97,21 +107,35 @@ async function recognizeWith(worker: Worker, img: Gray, mode: OcrMode): Promise<
 
 export type CardProgress = {step: string; page: number; pages: number};
 
+/** やめるを押したか（押していたら、次の読み取りの前で止める） */
+const stopIf = (signal?: AbortSignal) => {
+  if (signal?.aborted) throw new DOMException('介護保険証を読むのをやめました', 'AbortError');
+};
+
 /**
  * 介護保険証のファイル（画像・PDF。何枚でも＝被保険者証と負担割合証、表と裏）を読む。
- * 返すのは、取り出した項目と、確かめる画面に出す画像（向きを直したもの）
+ * 返すのは、取り出した項目と、確かめる画面に出す画像（向きを直したもの）と、開けなかったファイルの名前。
+ * signal：やめる（読み取りの部品は写真の日付と1つずつ使い回すので、途中でやめたら次の読み取りの前で止めて、ほかを待たせない）
  */
-export async function readCards(files: File[], onProgress: (p: CardProgress) => void = () => undefined): Promise<{read: CardRead; thumbs: string[]}> {
+export async function readCards(files: File[], onProgress: (p: CardProgress) => void = () => undefined, signal?: AbortSignal): Promise<{read: CardRead; thumbs: string[]; skipped: string[]}> {
   onProgress({step: 'ファイルを開いています', page: 0, pages: 0});
-  const images = await imagesOf(files);
+  const {images, skipped} = await imagesOf(files);
   const pages: OcrPage[] = [];
   const thumbs: string[] = [];
   for (let i = 0; i < images.length; i++) {
+    stopIf(signal);
     const res = await withOcr((worker) =>
-      readCardImage(images[i], (img, mode) => recognizeWith(worker, img, mode), (step) => onProgress({step, page: i + 1, pages: images.length})),
+      readCardImage(
+        images[i],
+        async (img, mode) => {
+          stopIf(signal);
+          return recognizeWith(worker, img, mode);
+        },
+        (step) => onProgress({step, page: i + 1, pages: images.length}),
+      ),
     );
     pages.push(...res.pages);
     thumbs.push(thumbOf(res.image));
   }
-  return {read: parseCard(pages), thumbs};
+  return {read: parseCard(pages), thumbs, skipped};
 }
