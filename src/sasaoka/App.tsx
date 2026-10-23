@@ -225,9 +225,16 @@ export default function App({start}: {start: MainTab}) {
 
   // どの様邸からも使われなくなった写真（写真を消した・差し替えた・様邸を消した）を、この端末から消す。開いたときに一度。
   // ほかのタブで入れたばかりの写真（まだ様邸に保存されていないかもしれない）を消さないように、1時間より前に入れた写真だけ
+  // 残すのは様邸のどこかに書いてある番号すべて（箇所の写真のほか、あとから足した項目の写真も消さない）
   useEffect(() => {
     if (!data) return;
-    const keep = new Set(data.jobs.flatMap((j) => j.places.flatMap((p) => [p.photos?.before ?? '', p.photos?.after ?? ''])).filter(Boolean));
+    const keep = new Set<string>();
+    const walk = (v: unknown): void => {
+      if (typeof v === 'string') keep.add(v);
+      else if (Array.isArray(v)) v.forEach(walk);
+      else if (v && typeof v === 'object') Object.values(v).forEach(walk);
+    };
+    walk(data.jobs);
     prunePhotos(keep, Date.now() - 60 * 60 * 1000).catch(() => undefined);
   }, [loaded]);
 
@@ -314,7 +321,8 @@ export default function App({start}: {start: MainTab}) {
           このアプリの新しい版が出ています。
           <button
             type="button"
-            onClick={() => void Promise.all([store.flush(), flushTokutei()]).then(() => location.reload())}
+            // 保存できなかったときは読み込み直さない（読み込み直すと、直したところが消える。保存できなかったことは画面の上に出る）
+            onClick={() => void Promise.all([store.flush(), flushTokutei()]).then(([saved]) => saved && location.reload())}
             className="rounded-md border border-slate-900/20 bg-white px-3 py-1.5 font-bold text-slate-900 shadow-sm hover:bg-amber-50"
           >
             ⟳ 読み込み直す
