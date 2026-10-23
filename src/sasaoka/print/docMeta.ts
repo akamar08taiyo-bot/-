@@ -11,7 +11,8 @@ const CHANGED = 'sasaoka-app:doc-meta-changed';
 function readMeta(key: string, defaultDate: () => string): DocMeta {
   try {
     const all = JSON.parse(localStorage.getItem(META_KEY) || '{}');
-    if (all && all[key]) return {date: '', number: '', due: '', ...all[key]};
+    // 請求日を覚えていなければ（請求書番号・お支払期限だけ入れた）初期値
+    if (all && all[key]) return {date: defaultDate(), number: '', due: '', ...all[key]};
   } catch {
     /* 初期値にする */
   }
@@ -28,7 +29,17 @@ function readDocDate(key: string): string {
   }
 }
 
-function writeMeta(key: string, meta: DocMeta) {
+/** 請求日を覚えているか（前に手で変えたか） */
+function hasSavedDate(key: string): boolean {
+  try {
+    const all = JSON.parse(localStorage.getItem(META_KEY) || '{}');
+    return !!all && !!all[key] && typeof all[key].date === 'string';
+  } catch {
+    return false;
+  }
+}
+
+function writeMeta(key: string, meta: Partial<DocMeta>) {
   if (!key) return;
   try {
     const all = JSON.parse(localStorage.getItem(META_KEY) || '{}') || {};
@@ -49,15 +60,14 @@ export function estimateDateOf(job: Pick<Job, 'id' | 'estDate' | 'createdAt'>): 
 
 /**
  * 請求書の請求日・請求書番号・お支払期限は月ごとに覚えておく（次に開いたときも同じものが入る）。key は 'YYYY-MM'（'' なら覚えない）。
+ * 覚えるのは手で直したときだけ（開いただけでは覚えない）：開いた日の初期値（月の途中なら当日）を覚えると、
+ * 月が明けてから印刷した請求書の請求日が、月末ではなく前に開いた日になっていた。
  * 見積書の作成日は様邸（Job.estDate）に持つ
  */
 export function useDocMeta(key: string, defaultDate: () => string) {
   const dflt = useRef(defaultDate);
   dflt.current = defaultDate;
   const [meta, setState] = useState<DocMeta>(() => readMeta(key, defaultDate));
-  useEffect(() => {
-    writeMeta(key, meta);
-  }, [key, meta]);
   useEffect(() => {
     const onChanged = (e: Event) => {
       if ((e as CustomEvent<string>).detail === key) setState(readMeta(key, dflt.current));
@@ -67,7 +77,9 @@ export function useDocMeta(key: string, defaultDate: () => string) {
   }, [key]);
   const setMeta = (next: DocMeta) => {
     setState(next);
-    writeMeta(key, next);
+    // 請求日は手で変えたときだけ覚える（請求書番号・お支払期限だけ入れたときに、初期値の日まで覚えない）
+    const {date: _date, ...rest} = next;
+    writeMeta(key, next.date !== meta.date || hasSavedDate(key) ? next : rest);
     window.dispatchEvent(new CustomEvent(CHANGED, {detail: key}));
   };
   return [meta, setMeta] as const;

@@ -41,8 +41,9 @@ function useFitScale(pageMm: number) {
 
 export function PrintView({request, data, onClose}: {request: PrintRequest; data: AppData; onClose: () => void}) {
   const month = request.kind === 'invoice' ? request.month : data.jobs.find((j) => j.id === request.jobId)?.month ?? '';
-  // 請求日など（請求書は月ごとに覚える）。見積書の作成日は様邸に持つ見積もり作成日（見積書の画面で入れる）
-  const [meta, setMeta] = useDocMeta(request.kind === 'estimate' ? '' : month, () => {
+  // 請求日など（請求書は月ごとに覚える）。見積書の作成日は様邸に持つ見積もり作成日（見積書の画面で入れる）。
+  // 請求日を出すのは請求書だけ：明細・発注書の印刷では覚えない（月の途中に明細を印刷した日が、その月の請求書の請求日になっていた）
+  const [meta, setMeta] = useDocMeta(request.kind === 'invoice' ? month : '', () => {
     const today = todayIso();
     return today.slice(0, 7) > month ? monthEnd(month) : today;
   });
