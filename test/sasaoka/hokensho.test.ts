@@ -486,3 +486,94 @@ test('住所：2行目から（建物名・部屋番号）も、次の項目の�
   const k = page([[[40, '住所 〒 824-0001']], [[150, '行橋市中央一丁目 1 番 1 号']], [[150, 'ミホン ハナコ']], [[150, '見本 花子']]]);
   assert.equal(parseCard([k]).info.address, '行橋市中央一丁目1番1号');
 });
+
+test('要介護度：選んだ有効期間の保険証のページの読みのうち、多く読めた値（切り出して読んだ1回で決めない。読みがちがえば、たしかでない）', () => {
+  const read = (care: string, term = true, source?: number) => ({
+    ...page([[[40, `要介護状態区分等 ${care}`]], ...(term ? [[[40, '認定の有効期間 令和 6 年 4 月 1 日 ～ 令和 9 年 3 月 31 日']] as [number, string][]] : [])]),
+    source,
+  });
+  let r = parseCard([read('要介護 3'), read('要介護 2'), read('要介護 2')]);
+  assert.equal(r.info.care, '要介護2');
+  assert.ok(!r.unsure.includes('care'));
+  r = parseCard([read('要介護 3'), read('要介護 2')]);
+  assert.ok(r.unsure.includes('care'));
+  // 1枚の画像：切り出して読んだページ（期間なし）と全体のページで要介護度がちがう → たしかでない
+  r = parseCard([read('要介護 3', false, 0), read('要介護 2', true, 0)]);
+  assert.ok(r.unsure.includes('care'));
+  // 古い保険証（1枚目）と新しい保険証（2枚目）：新しい方の画像のページ（期間の読めなかったページも）だけ
+  const old = {...page([[[40, '要介護状態区分等 要介護 1']], [[40, '認定の有効期間 令和 3 年 4 月 1 日 ～ 令和 6 年 3 月 31 日']]]), source: 0};
+  r = parseCard([old, old, read('要支援 2', false, 1), read('要支援 2', true, 1)]);
+  assert.deepEqual([r.info.careTo, r.info.care], ['2027-03-31', '要支援2']);
+  assert.ok(!r.unsure.includes('care'));
+});
+
+test('有効期間：同じ保険証の何回かの読みは多い方（1回の読み違いの「おわり」を新しい保険証にしない）。ちがう保険証どうしは新しい方', () => {
+  const read = (to: string, care = '要介護 2', source?: number, from = '令和 6 年 4 月 1 日') => ({...page([[[40, `要介護状態区分等 ${care}`]], [[40, `認定の有効期間 ${from} ～ ${to}`]]]), source});
+  let r = parseCard([read('令和 9 年 3 月 31 日'), read('令和 9 年 3 月 31 日'), read('令和 9 年 8 月 31 日', '要介護 3')]);
+  assert.deepEqual([r.info.careFrom, r.info.careTo, r.info.care], ['2024-04-01', '2027-03-31', '要介護2']);
+  assert.ok(!r.unsure.includes('careTo') && !r.unsure.includes('care'));
+  // 2回の読みが1回ずつ → たしかでない
+  r = parseCard([read('令和 9 年 3 月 31 日'), read('令和 9 年 8 月 31 日')]);
+  assert.ok(r.unsure.includes('careFrom') && r.unsure.includes('careTo'));
+  // 同じ画像なら、はじめの日がちがって読めても同じ保険証（新しい方を選ばない）
+  r = parseCard([read('令和 9 年 3 月 31 日', '要介護 2', 0), read('令和 9 年 3 月 31 日', '要介護 2', 0), read('令和 9 年 8 月 31 日', '要介護 2', 0, '令和 6 年 9 月 1 日')]);
+  assert.equal(r.info.careTo, '2027-03-31');
+  // ちがう画像の古い保険証（読めた回数が多くても）と新しい保険証 → 新しい方
+  const old = read('令和 6 年 3 月 31 日', '要介護 1', 0, '令和 3 年 4 月 1 日');
+  r = parseCard([old, old, old, read('令和 9 年 3 月 31 日', '要支援 1', 1)]);
+  assert.deepEqual([r.info.careFrom, r.info.careTo, r.info.care], ['2024-04-01', '2027-03-31', '要支援1']);
+});
+
+test('負担割合証：割合と適用期間は組。今日をふくむ期間（なければ一番新しい期間）の割合', () => {
+  const futan = (rows: [number, string][][], source?: number) => ({...page([[[40, '介護保険負担割合証']], [[40, '番号 0000123456']], [[40, '利用者負担の割合'], [400, '適用期間']], ...rows]), source});
+  // 年度の途中で割合が変わった（2つ目のますも書かれている）
+  const two = futan([
+    [[60, '2 割'], [400, '開始年月日 令和 7 年 8 月 1 日']],
+    [[400, '終了年月日 令和 7 年 12 月 31 日']],
+    [[60, '1 割'], [400, '開始年月日 令和 8 年 1 月 1 日']],
+    [[400, '終了年月日 令和 8 年 7 月 31 日']],
+  ]);
+  let r = parseCard([two, two], '2026-10-23');
+  assert.deepEqual([r.info.burden, r.info.burdenFrom, r.info.burdenTo], ['1', '2026-01-01', '2026-07-31']);
+  r = parseCard([two, two], '2025-10-01');
+  assert.deepEqual([r.info.burden, r.info.burdenFrom, r.info.burdenTo], ['2', '2025-08-01', '2025-12-31']);
+  // 去年の負担割合証を3回、今年のを2回読んだ → 今年の（今日をふくむ）
+  const year = (v: string, y: number) => futan([[[60, v], [400, `開始年月日 令和 ${y} 年 8 月 1 日`]], [[400, `終了年月日 令和 ${y + 1} 年 7 月 31 日`]]]);
+  const last = year('2 割', 7);
+  const now = year('1 割', 8);
+  r = parseCard([last, last, last, now, now], '2026-10-23');
+  assert.deepEqual([r.info.burden, r.info.burdenFrom, r.info.burdenTo], ['1', '2026-08-01', '2027-07-31']);
+  assert.ok(!r.unsure.includes('burden'));
+  // 画像ごと：切り出して読んだページ（期間なし）の割合は、同じ画像の期間のもの
+  const crop = (v: string, source: number) => ({...page([[[40, `利用者負担の割合 ${v}`]]]), source});
+  r = parseCard([crop('2 割', 0), {...last, source: 0}, crop('1 割', 1), {...now, source: 1}], '2026-10-23');
+  assert.deepEqual([r.info.burden, r.info.burdenTo], ['1', '2027-07-31']);
+  // 切り出して読んだページに、ちがう割合がいくつも（2つのますを読んだ）→ そのページの割合は使わない
+  const both = {...page([[[40, '利用者負担の割合 2 割']], [[40, '利用者負担の割合 1 割']]]), source: 0};
+  r = parseCard([both, {...two, source: 0}], '2026-10-23');
+  assert.equal(r.info.burden, '1');
+  assert.ok(!r.unsure.includes('burden'));
+});
+
+test('番号は画像ごとに数える：被保険者証とちがう番号の負担割合証（ほかの方）は、氏名などに使わず、負担の割合はたしかでない', () => {
+  const card = (source?: number) => ({...page([[[100, '介護保険被保険者証']], [[40, '番号 0000123456']], [[40, '氏名 見本 花子']], [[40, '要介護状態区分等 要介護 2']]]), source});
+  const futan = (no: string, name: string, v: string, source?: number) => ({
+    ...page([[[40, '介護保険負担割合証']], [[40, `番号 ${no}`]], [[40, `氏名 ${name}`]], [[40, '利用者負担の割合'], [400, '適用期間']], [[60, v], [400, '開始年月日 令和 8 年 8 月 1 日']], [[400, '終了年月日 令和 9 年 7 月 31 日']]]),
+    source,
+  });
+  // 1枚の画像から2〜3ページ（切り出して読んだページ・全体を読んだページ）
+  let r = parseCard([card(0), card(0), futan('0000999999', '見本 太郎', '3 割', 1), futan('0000999999', '見本 太郎', '3 割', 1), futan('0000999999', '見本 太郎', '3 割', 1)], '2026-10-23');
+  assert.deepEqual([r.info.insuredNo, r.info.name, r.info.burden], ['0000123456', '見本　花子', '3']);
+  assert.ok(r.unsure.includes('insuredNo') && r.unsure.includes('burden'));
+  assert.ok(!r.unsure.includes('name'));
+  // その方の負担割合証もあれば、そちらの割合（ほかの方の分は使わない）
+  r = parseCard([card(0), card(0), futan('0000999999', '見本 太郎', '3 割', 1), futan('0000999999', '見本 太郎', '3 割', 1), futan('0000123456', '見本 花子', '1 割', 2), futan('0000123456', '見本 花子', '1 割', 2)], '2026-10-23');
+  assert.equal(r.info.burden, '1');
+  assert.ok(!r.unsure.includes('burden'));
+  // 画像の分からないページ（テスト）はページごとに数える
+  r = parseCard([card(), futan('0000999999', '見本 太郎', '3 割')], '2026-10-23');
+  assert.ok(r.unsure.includes('insuredNo') && r.unsure.includes('burden'));
+  // 同じ方の被保険者証と負担割合証は、たしか
+  r = parseCard([card(0), card(0), futan('0000123456', '見本 花子', '1 割', 1), futan('0000123456', '見本 花子', '1 割', 1)], '2026-10-23');
+  assert.ok(!r.unsure.includes('insuredNo') && !r.unsure.includes('burden'));
+});

@@ -134,7 +134,8 @@ export async function readCards(files: File[], onProgress: (p: CardProgress) => 
         (step) => onProgress({step, page: i + 1, pages: images.length}),
       ),
     );
-    pages.push(...res.pages);
+    // 何枚目の画像のページか（parseCard は番号・有効期間を画像ごとに数える）
+    pages.push(...res.pages.map((p) => ({...p, source: i})));
     thumbs.push(thumbOf(res.image));
   }
   return {read: parseCard(pages), thumbs, skipped};

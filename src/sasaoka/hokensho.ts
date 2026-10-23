@@ -15,7 +15,7 @@ export type OcrWord = {text: string; x0: number; y0: number; x1: number; y1: num
 /** 読み取った1行 */
 export type OcrLine = {words: OcrWord[]; doubt?: boolean}; // doubt：読めなかった字がありそう（cardRead.ts の missedStroke）
 /** 読み取った1枚（画像の1ページ） */
-export type OcrPage = {lines: OcrLine[]; conf?: number}; // conf：読み取りの自信（0〜100）
+export type OcrPage = {lines: OcrLine[]; conf?: number; source?: number}; // conf：読み取りの自信（0〜100）。source：何枚目の画像から読んだページか（cardOcr.ts）
 
 export type CardEra = '明治' | '大正' | '昭和' | '平成';
 export type CardCare = '' | '要支援1' | '要支援2' | '要介護1' | '要介護2' | '要介護3' | '要介護4' | '要介護5';
@@ -705,21 +705,48 @@ function parsePage(page: OcrPage, today: string): {info: Partial<CardInfo>; unsu
     unsure.add('office');
   }
 
-  // 利用者負担の割合（「1割」。ラベルの「負担割合」の「割合」は取らない）と適用期間
+  // 利用者負担の割合（「1割」。ラベルの「負担割合」の「割合」は取らない）と適用期間。割合と期間は組で読む（年度の途中で割合が変わると、
+  // 2つ目のますにも割合と期間が書かれる）：今日をふくむ期間の組、なければ一番新しい期間の組（終わった期間の割合を入れない）
   if (kinds.includes('futan')) {
-    const b = /([123一二三])\s*割(?!合)/.exec(all.replace(/負担\s*割\s*合/g, ''));
-    if (b) info.burden = ({'1': '1', '2': '2', '3': '3', 一: '1', 二: '2', 三: '3'} as const)[b[1] as '1'];
     // 開始・終了のラベルのうしろの日付（同じ行に、ほかの面の日付＝区分支給限度基準額の期間などがあっても）
     const START = /開\s*始/;
     const END = /終\s*了/;
-    const iso = (r: Row | undefined, label: RegExp) => {
-      const m = r && new RegExp(DATE).exec(r.text.slice(Math.max(0, r.text.search(label))));
+    const dateAfter = (r: Row, label: RegExp) => {
+      const m = new RegExp(DATE).exec(r.text.slice(Math.max(0, r.text.search(label))));
       return m ? warekiIso(m[1], m[2], m[3], m[4]) : '';
     };
-    const start = rows.find((r) => START.test(r.text) && iso(r, START));
-    const end = rows.find((r) => END.test(r.text) && iso(r, END));
-    if (iso(start, START)) info.burdenFrom = iso(start, START);
-    if (iso(end, END)) info.burdenTo = iso(end, END);
+    const hOf = (r: Row) => Math.max(8, r.y1 - r.y0);
+    const starts = byY.filter((r) => START.test(r.text) && dateAfter(r, START));
+    const ends = byY.filter((r) => END.test(r.text) && dateAfter(r, END));
+    // 期間：開始の行と、その行から下（次の開始の行より上）の終了の行
+    const periods = starts.length
+      ? starts.map((st, i) => {
+          const e = ends.find((x) => x.y0 >= st.y0 - hOf(st) * 0.3 && (!starts[i + 1] || x.y0 < starts[i + 1].y0 - hOf(st) * 0.3));
+          return {from: dateAfter(st, START), to: e ? dateAfter(e, END) : '', y: (st.y0 + (e ?? st).y1) / 2, burden: '' as CardInfo['burden']};
+        })
+      : ends.slice(0, 1).map((e) => ({from: '', to: dateAfter(e, END), y: (e.y0 + e.y1) / 2, burden: '' as CardInfo['burden']}));
+    const RATIO = {'1': '1', '2': '2', '3': '3', 一: '1', 二: '2', 三: '3'} as const;
+    const ratios = byY.flatMap((r) =>
+      [...r.text.replace(/負担\s*割\s*合/g, '').matchAll(/([123一二三])\s*割(?!合)/g)].map((m) => ({v: RATIO[m[1] as '1'], y: (r.y0 + r.y1) / 2, h: hOf(r)})),
+    );
+    if (periods.length > 1) {
+      // 割合のますは開始と終了の2行の高さ：割合の行にいちばん近い期間の割合
+      for (const r of ratios) {
+        const near = periods.reduce((x, y) => (Math.abs(y.y - r.y) < Math.abs(x.y - r.y) ? y : x));
+        if (!near.burden && Math.abs(near.y - r.y) < r.h * 4) near.burden = r.v;
+      }
+    } else if (periods.length === 1) periods[0].burden = ratios[0]?.v ?? '';
+    const covers = (x: {from: string; to: string}) => !!x.from && !!x.to && x.from <= today && today <= x.to;
+    const chosen = periods.find(covers) ?? [...periods].sort((x, y) => (y.to || y.from).localeCompare(x.to || x.from))[0];
+    if (chosen) {
+      if (chosen.burden) info.burden = chosen.burden;
+      if (chosen.from) info.burdenFrom = chosen.from;
+      if (chosen.to) info.burdenTo = chosen.to;
+    } else {
+      // 期間のないページ（切り出して読んだページ）：割合がみな同じときだけ（ちがう割合がいくつも読めたら、どの期間のものか分からない）
+      const vs = [...new Set(ratios.map((r) => r.v))];
+      if (vs.length === 1) info.burden = vs[0];
+    }
   }
 
   // ラベルが読めなかった項目は、位置から（生年月日の行から上へ。cardRead.ts で切り出して読み直す前の、全体を読んだページ）
@@ -818,13 +845,15 @@ function parsePage(page: OcrPage, today: string): {info: Partial<CardInfo>; unsu
 
 /**
  * 何回か読んだ結果（切り出して読んだページ・全体を読んだページ、保険証と負担割合証）をまとめる：項目ごとに、
- * 決まった形に合う値のうち一番多く読めた値（同じ数なら先のページ＝切り出して読んだ方）。形に合う値がなければ、合わない値から同じように
+ * 決まった形に合う値のうち一番多く読めた値（同じ数なら先のページ＝切り出して読んだ方）。形に合う値がなければ、合わない値から同じように。
+ * ページの source は何枚目の画像か（1枚の画像から2〜3ページできる。ないときは、ページごとに別の画像とみなす）。today：負担割合の適用期間を選ぶ日
  */
 export function parseCard(pages: OcrPage[], today = todayIso()): CardRead {
   const info: CardInfo = {...NO_CARD};
   const unsure = new Set<CardKey>();
   const kinds: CardKind[] = [];
-  const parsed = pages.map((pg) => parsePage(pg, today));
+  const parsed = pages.map((pg, i) => ({...parsePage(pg, today), src: pg.source === undefined ? `p${i}` : `s${pg.source}`}));
+  type Parsed = (typeof parsed)[number];
   for (const p of parsed) for (const k of p.kinds) if (!kinds.includes(k)) kinds.push(k);
   // 被保険者証を先に（負担割合証の住所・生年月日より、被保険者証の方が欄が分かれていて読みやすい）
   const order = parsed.map((p, i) => ({p, i})).sort((a, b) => Number(futanOnly(a.p.kinds)) - Number(futanOnly(b.p.kinds)) || a.i - b.i);
@@ -836,56 +865,106 @@ export function parseCard(pages: OcrPage[], today = todayIso()): CardRead {
   const newestDate = dated.reduce((a, e) => (e.date > a ? e.date : a), '');
   const newestNames = new Set(dated.filter((e) => e.date === newestDate).map((e) => e.name));
   const oldNames = new Set(dated.filter((e) => e.date < newestDate && !newestNames.has(e.name)).map((e) => e.name));
-  for (const g of groups) {
-    const votes = new Map<string, {n: number; first: number; sure: boolean; weak: boolean; doubt: boolean; conf: number; values: Partial<CardInfo>}>();
+
+  // 被保険者番号は画像ごとに数える（1枚の画像の2〜3ページを何回にも数えない）。被保険者証の画像の番号とちがう、負担割合証だけの画像
+  // （ほかの方の負担割合証がまざった）は使わない（負担の割合は、その方の負担割合証が読めないときだけ、たしかでない値として）
+  const srcs = [...new Set(parsed.map((p) => p.src))];
+  const noOf = new Map<string, string>();
+  const top = (xs: string[]) => [...xs.reduce((m, x) => m.set(x, (m.get(x) ?? 0) + 1), new Map<string, number>())].sort((a, b) => b[1] - a[1])[0]?.[0];
+  for (const s of srcs) {
+    const no = top(parsed.filter((p) => p.src === s && p.info.insuredNo?.length === 10).map((p) => p.info.insuredNo!));
+    if (no) noOf.set(s, no);
+  }
+  const cardSrc = (s: string) => parsed.some((p) => p.src === s && p.kinds.includes('card'));
+  const numbered = srcs.filter((s) => noOf.has(s));
+  const refNo = top((numbered.some(cardSrc) ? numbered.filter(cardSrc) : numbered).map((s) => noOf.get(s)!));
+  const foreign = new Set(numbered.filter((s) => noOf.get(s) !== refNo && !cardSrc(s)));
+  const own = (p: Parsed) => !foreign.has(p.src);
+
+  type Vote = {n: number; first: number; sure: boolean; weak: boolean; doubt: boolean; conf: number; values: Partial<CardInfo>; srcs: Set<string>};
+  const tally = (g: CardKey[], use: (p: Parsed) => boolean): Vote[] => {
+    const votes = new Map<string, Vote>();
     order.forEach(({p}, rank) => {
-      if (!g.every((k) => p.info[k])) return;
+      if (!use(p) || !g.every((k) => p.info[k])) return;
       if (g[0] === 'office' && oldNames.has(p.info.office ?? '')) return;
       const sure = !g.some((k) => p.unsure.has(k));
       const key = g.map((k) => p.info[k]).join('|') + (sure ? '' : '?');
-      const v = votes.get(key) ?? {n: 0, first: rank, sure, weak: true, doubt: false, conf: 0, values: Object.fromEntries(g.map((k) => [k, p.info[k]]))};
+      const v = votes.get(key) ?? {n: 0, first: rank, sure, weak: true, doubt: false, conf: 0, values: Object.fromEntries(g.map((k) => [k, p.info[k]])), srcs: new Set<string>()};
       v.n++;
+      v.srcs.add(p.src);
       if (!g.some((k) => p.weak.has(k))) v.weak = false;
       if (g.some((k) => p.doubt.has(k))) v.doubt = true;
       v.conf = Math.max(v.conf, ...g.map((k) => p.conf[k] ?? 0));
       votes.set(key, v);
     });
-    // 形に合う値 → 多く読めた値 → 自信の高い値 → 先に読んだ値。
-    // 有効期間は、古い保険証もいっしょに読んだとき（期間のちがう保険証が何枚か）は、おわりの一番新しいもの
-    const latest = g[0] === 'careFrom' || g[0] === 'burdenFrom';
-    const best = [...votes.values()].sort(
-      (a, b) =>
-        Number(b.sure) - Number(a.sure) ||
-        (latest ? String(b.values[g[1]]).localeCompare(String(a.values[g[1]])) : 0) ||
-        b.n - a.n ||
-        Math.round(b.conf / 5) - Math.round(a.conf / 5) ||
-        a.first - b.first,
-    )[0];
-    if (!best) continue;
+    return [...votes.values()];
+  };
+  // 形に合う値 → 多く読めた値 → 自信の高い値 → 先に読んだ値
+  const better = (a: Vote, b: Vote) => Number(b.sure) - Number(a.sure) || b.n - a.n || Math.round(b.conf / 5) - Math.round(a.conf / 5) || a.first - b.first;
+  /** 選んだ値を入れる。peers：比べる読み（同じ保険証の読み） */
+  const take = (g: CardKey[], best: Vote | undefined, peers: Vote[]) => {
+    if (!best) return;
     Object.assign(info, best.values);
     // 1回だけ・自信の低い読みは、たしかでない
     if (!best.sure || (best.weak && best.n < 2) || best.doubt) for (const k of g) unsure.add(k);
     // 同じ値の、読めなかった字がありそうな読み（形の合わない読みとして別にまとめた分も）
-    if ([...votes.values()].some((x) => x.doubt && g.every((k) => x.values[k] === best.values[k]))) for (const k of g) unsure.add(k);
+    if (peers.some((x) => x.doubt && g.every((k) => x.values[k] === best.values[k]))) for (const k of g) unsure.add(k);
     // ちがう形の合う値が同じ数だけあるときは、たしかでない（どちらが正しいか分からない）
-    const rivals = [...votes.values()].filter((v) => v !== best && v.sure === best.sure && v.n === best.n);
-    if (rivals.length) for (const k of g) unsure.add(k);
-  }
-  // 要介護度は、選んだ有効期間を読んだページのもの（古い保険証の要介護度を入れない）
-  if (info.careTo) {
-    const same = parsed.find((p) => p.info.careTo === info.careTo && p.info.care);
-    if (same?.info.care) {
-      info.care = same.info.care;
-      if (same.unsure.has('care')) unsure.add('care');
-      else unsure.delete('care');
-    } else if (parsed.some((p) => p.info.careTo && p.info.careTo !== info.careTo)) {
-      // 期間のちがう保険証があって、新しい方の要介護度が読めないときは、たしかでない
-      if (info.care) unsure.add('care');
+    if (peers.some((v) => v !== best && v.sure === best.sure && v.n === best.n)) for (const k of g) unsure.add(k);
+  };
+  const vote = (g: CardKey[], use: (p: Parsed) => boolean) => {
+    const votes = tally(g, use);
+    take(g, [...votes].sort(better)[0], votes);
+  };
+  /**
+   * 期間の組（認定の有効期間・負担割合の適用期間）：同じ保険証の読み（はじめの日が同じか、同じ画像）は多く読めた値（1回の読み違いで、おわりの日だけ
+   * ちがう期間を選ばない）。ちがう保険証のあいだ（古い保険証もいっしょに読んだ）は newer で選ぶ
+   */
+  const pickTerm = (g: CardKey[], newer: (a: Vote, b: Vote) => number, use: (p: Parsed) => boolean) => {
+    const cards: Vote[][] = [];
+    for (const v of tally(g, use)) {
+      const same = cards.filter((c) => c.some((x) => x.values[g[0]] === v.values[g[0]] || [...x.srcs].some((s) => v.srcs.has(s))));
+      for (const c of same) cards.splice(cards.indexOf(c), 1);
+      cards.push([v, ...same.flat()]);
     }
+    const heads = cards.map((c) => [...c].sort(better)[0]);
+    const best = heads.sort((a, b) => Number(b.sure) - Number(a.sure) || newer(a, b) || better(a, b))[0];
+    take(g, best, cards.find((c) => c.includes(best)) ?? []);
+  };
+  /** ページが、選んだ期間の保険証のものか（期間の読めなかったページ＝切り出して読んだページは、同じ画像に選んだ期間があるか、ほかの期間がないとき） */
+  const belongs = (p: Parsed, g: CardKey[]) => {
+    const read = g.filter((k) => p.info[k]);
+    if (read.length) return read.every((k) => p.info[k] === info[k]);
+    return parsed.some((q) => q.src === p.src && g.every((k) => q.info[k] === info[k])) || !parsed.some((q) => g.some((k) => q.info[k] && q.info[k] !== info[k]));
+  };
+  const later = (k: CardKey) => (a: Vote, b: Vote) => String(b.values[k]).localeCompare(String(a.values[k]));
+
+  for (const g of groups) {
+    if (g[0] === 'care' || g[0] === 'burden' || g[0] === 'burdenFrom') continue; // 期間を選んでから
+    if (g[0] === 'careFrom') pickTerm(g, later('careTo'), own);
+    else vote(g, own);
   }
-  // 2つのページ（保険証と負担割合証）の番号がちがうときは、たしかでない
-  const nos = new Set(parsed.map((p) => p.info.insuredNo).filter((n): n is string => !!n && n.length === 10 && true));
-  if (nos.size > 1 && parsed.filter((p) => p.info.insuredNo === info.insuredNo).length < 2) unsure.add('insuredNo');
+  // 要介護度：選んだ有効期間の保険証のページの読みのうち多く読めた値（古い保険証の要介護度を入れない。読みがちがえば、たしかでない）
+  const careOf = (p: Parsed) => own(p) && (!info.careTo || belongs(p, ['careFrom', 'careTo']));
+  if (tally(['care'], careOf).length) vote(['care'], careOf);
+  else {
+    vote(['care'], own);
+    // 期間のちがう保険証があって、新しい方の要介護度が読めないときは、たしかでない
+    if (info.care && parsed.some((p) => p.info.careTo && p.info.careTo !== info.careTo)) unsure.add('care');
+  }
+  // 負担の割合と適用期間：今日をふくむ期間（なければ一番新しい期間）と、その期間の負担割合証のページの読み
+  const covers = (v: Vote) => String(v.values.burdenFrom) <= today && today <= String(v.values.burdenTo);
+  const burdenOf = (use: (p: Parsed) => boolean) => {
+    pickTerm(['burdenFrom', 'burdenTo'], (a, b) => Number(covers(b)) - Number(covers(a)) || later('burdenTo')(a, b), use);
+    vote(['burden'], (p) => use(p) && (!info.burdenTo || belongs(p, ['burdenFrom', 'burdenTo'])));
+  };
+  burdenOf(own);
+  if (!info.burden && !info.burdenTo && foreign.size) {
+    burdenOf(() => true);
+    for (const k of ['burden', 'burdenFrom', 'burdenTo'] as const) unsure.add(k);
+  }
+  // 画像ごとの番号がちがうとき（ほかの方の保険証・負担割合証がまざった、または読み違い）は、たしかでない
+  if (new Set(noOf.values()).size > 1) unsure.add('insuredNo');
   if (info.insuredNo && info.insuredNo.length !== 10) unsure.add('insuredNo');
   return {info, unsure: keys.filter((k) => unsure.has(k) && info[k]), kinds};
 }
