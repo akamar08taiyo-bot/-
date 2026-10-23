@@ -5,7 +5,7 @@ import test from 'node:test';
 import {despeckle, inkAdaptive, otsu, removeLines, rotateGray, scaleGray, textIsVertical, valueRect, verticalLines} from '../../src/sasaoka/cardImage.ts';
 import type {Gray} from '../../src/sasaoka/cardImage.ts';
 import {findLabels, missedStroke} from '../../src/sasaoka/cardRead.ts';
-import {cardScore, fixOcr, insurerOfName, latestOffice, locateValues, officeEntries, parseCard, plausibleTerm, warekiIso} from '../../src/sasaoka/hokensho.ts';
+import {cardScore, fixOcr, insurerOfName, latestOffice, locateValues, officeEntries, parseCard, plausibleBirth, plausibleTerm, warekiIso} from '../../src/sasaoka/hokensho.ts';
 import type {OcrLine, OcrPage} from '../../src/sasaoka/hokensho.ts';
 
 /**
@@ -406,4 +406,62 @@ test('和暦：元号の期間にない日付は読み違い（昭和73年・昭
   assert.deepEqual([r.info.era, r.info.birthY], ['', '']);
   const t = parseCard([page([[[40, '認定の有効期間 平成 33 年 4 月 1 日 ～ 平成 36 年 3 月 31 日']]])]);
   assert.deepEqual([t.info.careFrom, t.info.careTo], ['', '']);
+});
+
+test('A4 に被保険者証と負担割合証を並べたスキャン：両方として読む（認定の有効期間も負担の割合も）', () => {
+  const rows: [number, string][][] = [
+    [[100, '介護保険被保険者証'], [900, '要介護状態区分等 要介護 3'], [2400, '介護保険負担割合証']],
+    [[40, '番号 0000123456'], [900, '認定年月日 令和 6 年 3 月 1 日'], [2400, '番号 0000123456']],
+    [[40, '住所 〒 824-0001'], [900, '認定の有効期間 令和 6 年 4 月 1 日 ～ 令和 9 年 3 月 31 日'], [2400, '利用者負担の割合'], [2800, '適用期間']],
+    [[150, '行橋市中央一丁目 1 番 1 号'], [2400, '1 割'], [2800, '開始年月日 令和 8 年 8 月 1 日']],
+    [[40, 'フリガナ ミホン ハナコ'], [900, '区分支給限度基準額 令和 6 年 4 月 1 日 ～ 令和 9 年 3 月 31 日'], [2800, '終了年月日 令和 9 年 7 月 31 日']],
+    [[40, '氏名 見本 花子']],
+    [[40, '生年月日 昭和 13 年 4 月 14 日'], [560, '女']],
+  ];
+  const r = parseCard([page(rows), page(rows)], '2026-10-23');
+  assert.deepEqual(r.kinds, ['card', 'futan']);
+  assert.deepEqual([r.info.care, r.info.careFrom, r.info.careTo], ['要介護3', '2024-04-01', '2027-03-31']);
+  assert.deepEqual([r.info.burden, r.info.burdenFrom, r.info.burdenTo], ['1', '2026-08-01', '2027-07-31']);
+  // 負担割合証だけの画像の、切り出して読んだページ（適用期間の行に「認定の有効期間」のラベルが付くことがある）は、有効期間にしない
+  const crop = page([[[40, '利用者負担の割合 1 割']], [[40, '認定の有効期間 令和 8 年 8 月 1 日 ～ 令和 9 年 7 月 31 日']]]);
+  const f = parseCard([crop]);
+  assert.deepEqual(f.kinds, ['futan']);
+  assert.deepEqual([f.info.careFrom, f.info.careTo, f.info.burden], ['', '', '1']);
+});
+
+test('生年月日：ラベルの行か、年齢としてありうる日付（古い保険証の認定年月日「平成30年」を生年月日にしない）', () => {
+  assert.equal(plausibleBirth('昭和', '13', '2026-10-23'), true);
+  assert.equal(plausibleBirth('昭和', '62', '2026-10-23'), true); // 今年で39歳
+  assert.equal(plausibleBirth('平成', '元', '2026-10-23'), false);
+  assert.equal(plausibleBirth('平成', '30', '2026-10-23'), false);
+  assert.equal(plausibleBirth('明治', '30', '2026-10-23'), false); // 129歳
+  // 古い保険証：（二）の面の日付（平成）が（一）の面の上の行と同じ行に読めた
+  const old = page([
+    [[100, '介護保険被保険者証'], [900, '要介護状態区分等 要介護 3']],
+    [[40, '番号 0000123456'], [900, '認定年月日 平成 30 年 3 月 1 日']],
+    [[40, '住所 〒 824-0001'], [900, '認定の有効期間 平成 30 年 4 月 1 日 ～ 令和 3 年 3 月 31 日']],
+    [[150, '行橋市中央一丁目 1 番 1 号']],
+    [[40, 'フリガナ ミホン ハナコ']],
+    [[40, '氏名 見本 花子']],
+    [[40, '生年月日 昭和 13 年 4 月 14 日'], [560, '女']],
+  ]);
+  assert.equal(locateValues(old, '2026-10-23')?.values.birth?.text, '昭和 13 年 4 月 14 日');
+  // （一）と（二）の面が別の行に読めて、（二）の面の行が上にあるとき
+  const sep = page(
+    [[[40, '番号 0000123456']], [[40, '住所 〒 824-0001']], [[40, 'フリガナ ミホン ハナコ']], [[40, '氏名 見本 花子']], [[40, '生年月日 昭和 13 年 4 月 14 日'], [560, '女']], [[900, '認定年月日 平成 30 年 3 月 1 日']]],
+    [48, 96, 144, 192, 240, 40],
+  );
+  assert.equal(locateValues(sep, '2026-10-23')?.values.birth?.text, '昭和 13 年 4 月 14 日');
+  // 切り出して読んだ行に、まちがえて認定年月日が入っても（ラベルは生年月日）、たしかでない値として、全体を読んだ方の生年月日
+  const crop = page([[[40, '生年月日'], [400, '平成 30 年 3 月 1 日']]], undefined, 95);
+  const r = parseCard([crop, old], '2026-10-23');
+  assert.deepEqual([r.info.era, r.info.birthY, r.info.birthM, r.info.birthD], ['昭和', '13', '4', '14']);
+  assert.ok(!r.unsure.includes('birthY'));
+  // ラベルが読めないとき：年齢としてありうる日付の行
+  const noLabel = parseCard([page([[[900, '認定年月日 平成 30 年 3 月 1 日']], [[40, '昭和 13 年 4 月 14 日 女']]])], '2026-10-23');
+  assert.deepEqual([noLabel.info.era, noLabel.info.birthY, noLabel.info.gender], ['昭和', '13', '女']);
+  // ラベルの行でも、年齢としてありえない日付は、たしかでない
+  const young = parseCard([page([[[40, '生年月日 平成 13 年 4 月 14 日 女']]])], '2026-10-23');
+  assert.equal(young.info.era, '平成');
+  assert.ok(young.unsure.includes('era') && young.unsure.includes('birthY'));
 });

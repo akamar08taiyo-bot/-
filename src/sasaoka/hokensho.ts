@@ -8,6 +8,8 @@
 // 決まった形（番号10けた・日付・要介護1〜5）に合わないものは「たしかでない」として、画面で確かめてもらう（cardOcr.ts・CardDialog）。
 // 画像・読んだ文字・取り出した値は、どこにも送らず、保存もしない（入れた値だけが様邸に残る）
 
+import {todayIso} from './util.ts';
+
 /** 読み取った1語（画素の位置） */
 export type OcrWord = {text: string; x0: number; y0: number; x1: number; y1: number; conf?: number; chars?: {text: string; x0: number; y0: number; x1: number; y1: number}[]};
 /** 読み取った1行 */
@@ -166,14 +168,14 @@ export type Located = {
   values: Partial<Record<ValueKey, {text: string; box: {x0: number; y0: number; x1: number; y1: number}; room: {y0: number; y1: number}}>>;
 };
 
-const BIRTH_START = /(明治|大正|昭和|平成)\s*(\d{1,2}|元)\s*年/;
+const BIRTH_START = /(明治|大正|昭和|平成)\s*(\d{1,2}|元)\s*年/g;
 
 /**
  * 保険証の（一）の面は、値の欄の左がそろっている（番号・〒と住所・フリガナ・氏名・生年月日）。ラベルが読めなくても、
  * 生年月日（明治〜平成の日付は保険証にこれだけ）の行を手がかりに、その左の位置から始まる行を上へたどる：
  * すぐ上が氏名、その上がフリガナ、その上が住所（〒の行とその下）、その上が番号。性別は生年月日の行の右の「男」「女」
  */
-export function locateValues(page: OcrPage): Located | null {
+export function locateValues(page: OcrPage, today = todayIso()): Located | null {
   const rows = page.lines
     .map((l) => ({chars: charsOf(l.words)}))
     .filter((r) => r.chars.length > 0)
@@ -183,10 +185,11 @@ export function locateValues(page: OcrPage): Located | null {
   let start = -1;
   for (const r of rows) {
     const t = fixOcr(r.chars.map((c) => c.c).join(''));
-    const m = BIRTH_START.exec(t);
+    // 生年月日のラベルのすぐうしろの日付か、年齢としてありうる日付（古い保険証の（二）の面の認定年月日「平成30年3月1日」を手がかりにしない）
+    const m = [...t.matchAll(BIRTH_START)].find((x) => /生年月日.{0,3}$/.test(t.slice(0, x.index)) || plausibleBirth(x[1], x[2], today));
     if (!m) continue;
     // 直したあとの字の位置は、もとの字の位置とほぼ同じ（元号の2字は2字のまま）
-    start = Math.min(m.index, r.chars.length - 1);
+    start = Math.min(m.index ?? 0, r.chars.length - 1);
     birth = r;
     break;
   }
@@ -293,6 +296,17 @@ export function warekiIso(era: string, y: string, m: string, d: string): string 
   const iso = `${year}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
   const [start, end] = ERA_SPAN[era];
   return iso >= start && iso <= end ? iso : '';
+}
+
+/**
+ * 生年月日として、ありうるか：今年で 39〜125 歳（介護保険の被保険者は40歳から）。認定年月日・交付年月日（平成12年から）は生年月日にならない
+ * （古い保険証の「平成30年3月1日」を生年月日にしない）
+ */
+export function plausibleBirth(era: string, y: string, today: string): boolean {
+  const base = ERA_BASE[era];
+  if (base === undefined) return false;
+  const age = Number(today.slice(0, 4)) - base - (y === '元' ? 1 : Number(y));
+  return age >= 39 && age <= 125;
 }
 
 /**
@@ -467,11 +481,24 @@ function officesOf(byY: Row[], kind: 'card' | 'futan' | null, useLabel = true): 
   return out;
 }
 
+const FUTAN_WORDS = /負担割合証|利用者負担の割合|利用者負担|適用期間/;
+const CARD_WORDS = /被保険者証|要介護状態|要介護|認定の有効|有効期間|居宅介護支援|区分支給/;
+/** 被保険者証にしかない字（切り出して読んだページに付けるラベルの「認定の有効期間」「居宅介護支援事業者」は、負担割合証の行にも付くことがあるので入れない） */
+const CARD_ONLY = /被保険者証|要介護|認定年月日|区分支給/;
+type CardKind = 'card' | 'futan';
+/** ページに写っているもの（空白をつめた字から）。A4 に被保険者証と負担割合証を並べたスキャンは両方 */
+function kindsOf(flat: string): CardKind[] {
+  if (FUTAN_WORDS.test(flat)) return CARD_ONLY.test(flat) ? ['card', 'futan'] : ['futan'];
+  return CARD_WORDS.test(flat) ? ['card'] : [];
+}
+/** 負担割合証だけのページ */
+const futanOnly = (kinds: CardKind[]) => kinds.includes('futan') && !kinds.includes('card');
+
 /** 読んだページの居宅介護支援事業者の欄（上から順に） */
 export function officeEntries(page: OcrPage): OfficeEntry[] {
   const rows = rowsOf(page).sort((a, b) => a.y0 - b.y0);
   const flat = squeeze(rows.map((r) => r.text).join(''));
-  return officesOf(rows, /負担割合証|利用者負担の割合|利用者負担|適用期間/.test(flat) ? 'futan' : 'card');
+  return officesOf(rows, futanOnly(kindsOf(flat)) ? 'futan' : 'card');
 }
 
 /**
@@ -485,7 +512,7 @@ export function latestOffice(entries: OfficeEntry[]): OfficeEntry | undefined {
 }
 
 /** ページ1枚から取り出す（読めた項目だけ） */
-function parsePage(page: OcrPage): {info: Partial<CardInfo>; unsure: Set<CardKey>; weak: Set<CardKey>; doubt: Set<CardKey>; kind: 'card' | 'futan' | null; conf: Partial<Record<CardKey, number>>; offices: OfficeEntry[]} {
+function parsePage(page: OcrPage, today: string): {info: Partial<CardInfo>; unsure: Set<CardKey>; weak: Set<CardKey>; doubt: Set<CardKey>; kinds: CardKind[]; conf: Partial<Record<CardKey, number>>; offices: OfficeEntry[]} {
   const rows = rowsOf(page);
   const all = rows.map((r) => r.text).join('\n');
   const flat = squeeze(all);
@@ -493,7 +520,8 @@ function parsePage(page: OcrPage): {info: Partial<CardInfo>; unsure: Set<CardKey
   const unsure = new Set<CardKey>();
   // 読めなかった字がありそうな値（同じ値をほかで形どおりに読めても、確かめてもらう）
   const doubtKeys = new Set<CardKey>();
-  const kind = /負担割合証|利用者負担の割合|利用者負担|適用期間/.test(flat) ? 'futan' : /被保険者証|要介護状態|要介護|認定の有効|有効期間|居宅介護支援|区分支給/.test(flat) ? 'card' : null;
+  const kinds = kindsOf(flat);
+  const kind = futanOnly(kinds) ? 'futan' : kinds.length ? 'card' : null;
 
   // 被保険者番号：「番号」の行の10けた（数字の間の空白はつめる）。なければ、どこかの10けた
   const noRow = rows.find((r) => /番\s*号/.test(r.text) && !/保険者番号/.test(squeeze(r.text)) && /\d{4}/.test(r.text));
@@ -584,19 +612,32 @@ function parsePage(page: OcrPage): {info: Partial<CardInfo>; unsure: Set<CardKey
   }
   if (info.name && info.name.replace(/　/g, '').length < 2) delete info.name;
 
-  // 生年月日（明治・大正・昭和・平成）と性別（同じ行の「男」「女」）
-  const birthRe = /(明治|大正|昭和|平成)\s*(\d{1,2}|元)\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})/;
-  const birthRow = rows.find((r) => /生\s*年\s*月\s*日/.test(r.text) && birthRe.test(r.text)) ?? rows.find((r) => birthRe.test(r.text));
-  if (birthRow) {
-    const m = birthRe.exec(birthRow.text)!;
+  // 生年月日（明治・大正・昭和・平成）と性別（同じ行の「男」「女」）。ラベルのある行（ラベルのうしろの日付）、なければ年齢としてありうる日付の行
+  // （古い保険証の（二）の面の認定年月日「平成30年3月1日」を生年月日にしない）
+  const birthRe = /(明治|大正|昭和|平成)\s*(\d{1,2}|元)\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})/g;
+  const BIRTH_LABEL = /生\s*年\s*月\s*日/;
+  const birthIn = (r: Row) => {
+    const at = r.text.search(BIRTH_LABEL);
+    const t = at >= 0 ? r.text.slice(at) : r.text;
+    const ms = [...t.matchAll(birthRe)];
+    const m = ms.find((x) => plausibleBirth(x[1], x[2], today)) ?? ms[0];
+    return m ? {t, m, ok: plausibleBirth(m[1], m[2], today)} : null;
+  };
+  const labeled = rows.filter((r) => BIRTH_LABEL.test(r.text) && birthIn(r));
+  const birthRow = labeled.find((r) => birthIn(r)?.ok) ?? labeled[0] ?? rows.find((r) => birthIn(r)?.ok);
+  const birth = birthRow && birthIn(birthRow);
+  if (birthRow && birth) {
+    const {t, m} = birth;
     if (warekiIso(m[1], m[2], m[3], m[4])) {
       if (birthRow.doubt) for (const k of ['era', 'birthY', 'birthM', 'birthD'] as const) doubtKeys.add(k);
+      // ラベルの行でも、年齢としてありえない日付（昭和を平成と読み違えた など）は、たしかでない
+      if (!birth.ok) for (const k of ['era', 'birthY', 'birthM', 'birthD'] as const) unsure.add(k);
       info.era = m[1] as CardEra;
       info.birthY = m[2] === '元' ? '1' : String(Number(m[2]));
       info.birthM = String(Number(m[3]));
       info.birthD = String(Number(m[4]));
     }
-    const after = birthRow.text.slice(m.index + m[0].length);
+    const after = t.slice((m.index ?? 0) + m[0].length);
     const g = /男|女/.exec(after) ?? /男|女/.exec(birthRow.text.replace(/生\s*年\s*月\s*日/, ''));
     if (g) info.gender = g[0] as '男' | '女';
   }
@@ -647,21 +688,24 @@ function parsePage(page: OcrPage): {info: Partial<CardInfo>; unsure: Set<CardKey
   }
 
   // 利用者負担の割合（「1割」。ラベルの「負担割合」の「割合」は取らない）と適用期間
-  if (kind === 'futan') {
+  if (kinds.includes('futan')) {
     const b = /([123一二三])\s*割(?!合)/.exec(all.replace(/負担\s*割\s*合/g, ''));
     if (b) info.burden = ({'1': '1', '2': '2', '3': '3', 一: '1', 二: '2', 三: '3'} as const)[b[1] as '1'];
-    const start = rows.find((r) => /開\s*始/.test(r.text) && new RegExp(DATE).test(r.text));
-    const end = rows.find((r) => /終\s*了/.test(r.text) && new RegExp(DATE).test(r.text));
-    const iso = (r?: Row) => {
-      const m = r && new RegExp(DATE).exec(r.text);
+    // 開始・終了のラベルのうしろの日付（同じ行に、ほかの面の日付＝区分支給限度基準額の期間などがあっても）
+    const START = /開\s*始/;
+    const END = /終\s*了/;
+    const iso = (r: Row | undefined, label: RegExp) => {
+      const m = r && new RegExp(DATE).exec(r.text.slice(Math.max(0, r.text.search(label))));
       return m ? warekiIso(m[1], m[2], m[3], m[4]) : '';
     };
-    if (iso(start)) info.burdenFrom = iso(start);
-    if (iso(end)) info.burdenTo = iso(end);
+    const start = rows.find((r) => START.test(r.text) && iso(r, START));
+    const end = rows.find((r) => END.test(r.text) && iso(r, END));
+    if (iso(start, START)) info.burdenFrom = iso(start, START);
+    if (iso(end, END)) info.burdenTo = iso(end, END);
   }
 
   // ラベルが読めなかった項目は、位置から（生年月日の行から上へ。cardRead.ts で切り出して読み直す前の、全体を読んだページ）
-  const loc = locateValues(page);
+  const loc = locateValues(page, today);
   if (loc) {
     const v = loc.values;
     if (!info.insuredNo && v.number) {
@@ -751,21 +795,21 @@ function parsePage(page: OcrPage): {info: Partial<CardInfo>; unsure: Set<CardKey
     const cs = r?.words.map((w) => w.conf).filter((c): c is number => typeof c === 'number') ?? [];
     if (cs.length) conf[k] = cs.reduce((a, b) => a + b, 0) / cs.length;
   }
-  return {info, unsure, weak, doubt: doubtKeys, kind, conf, offices};
+  return {info, unsure, weak, doubt: doubtKeys, kinds, conf, offices};
 }
 
 /**
  * 何回か読んだ結果（切り出して読んだページ・全体を読んだページ、保険証と負担割合証）をまとめる：項目ごとに、
  * 決まった形に合う値のうち一番多く読めた値（同じ数なら先のページ＝切り出して読んだ方）。形に合う値がなければ、合わない値から同じように
  */
-export function parseCard(pages: OcrPage[]): CardRead {
+export function parseCard(pages: OcrPage[], today = todayIso()): CardRead {
   const info: CardInfo = {...NO_CARD};
   const unsure = new Set<CardKey>();
-  const kinds: ('card' | 'futan')[] = [];
-  const parsed = pages.map(parsePage);
-  for (const p of parsed) if (p.kind && !kinds.includes(p.kind)) kinds.push(p.kind);
+  const kinds: CardKind[] = [];
+  const parsed = pages.map((pg) => parsePage(pg, today));
+  for (const p of parsed) for (const k of p.kinds) if (!kinds.includes(k)) kinds.push(k);
   // 被保険者証を先に（負担割合証の住所・生年月日より、被保険者証の方が欄が分かれていて読みやすい）
-  const order = parsed.map((p, i) => ({p, i})).sort((a, b) => (a.p.kind === 'futan' ? 1 : 0) - (b.p.kind === 'futan' ? 1 : 0) || a.i - b.i);
+  const order = parsed.map((p, i) => ({p, i})).sort((a, b) => Number(futanOnly(a.p.kinds)) - Number(futanOnly(b.p.kinds)) || a.i - b.i);
   const keys = Object.keys(NO_CARD) as CardKey[];
   // 生年月日・有効期間は、項目をばらばらにせず組で選ぶ
   const groups: CardKey[][] = [['era', 'birthY', 'birthM', 'birthD'], ['careFrom', 'careTo'], ['burdenFrom', 'burdenTo'], ['insurer', 'insurerName'], ['zip'], ['address'], ...keys.filter((k) => !['era', 'birthY', 'birthM', 'birthD', 'careFrom', 'careTo', 'burdenFrom', 'burdenTo', 'insurer', 'insurerName', 'zip', 'address'].includes(k)).map((k) => [k])];

@@ -346,7 +346,9 @@ export async function readCardImage(src: Gray, recognize: Recognize, onStep: (st
   if (L.number && !done.has('number')) add(withLabel('番号', L.number, await readRect(clean, cell(L.number, band(L.number, 0.5, 0.5)), 'digits', recognize, lhOf(L.number), OK.number)));
   if (L.kana && !done.has('kana')) add(withLabel('フリガナ', L.kana, await readRect(clean, cell(L.kana, band(L.kana, 0.6, 0.6)), 'kana', recognize, lhOf(L.kana), OK.kana)));
   if (L.name && !done.has('name')) add(withLabel('氏名', L.name, await readRect(clean, cell(L.name, band(L.name, 0.7, 0.7)), 'line', recognize, lhOf(L.name), OK.name)));
-  if (L.birth && !done.has('birth')) {
+  // 位置から読んだ生年月日がラベルの行でないとき（ほかの日付を手がかりにした・ラベルの行が読めなかった）も、ラベルの右を読み直す
+  const birthOnLabel = !!(L.birth && loc?.values.birth && loc.values.birth.box.y0 < L.birth.y1 && loc.values.birth.box.y1 > L.birth.y0);
+  if (L.birth && (!done.has('birth') || !birthOnLabel)) {
     const b = band(L.birth, 0.5, 0.5);
     const birth = doubt(await readRect(clean, cell(L.birth, b), 'date', recognize, lhOf(L.birth), OK.birth));
     const gender = await readRect(clean, cell(L.birth, b, 1, lhOf(L.birth) * 4), 'line', recognize, lhOf(L.birth));
