@@ -39,11 +39,12 @@
 
 - 設計と、販売受注簿・見積書・住宅改修アプリなど既存アプリの読み取りメモ：`docs/tokutei/DESIGN.md`・`docs/tokutei/EXISTING_APPS.md`
 - コード：`src/tokutei/`（計算は `calc.ts`、種目の判定は `category.ts`、仕切り一覧表の読み取りは `import/`、
-  申請書（行橋市・苅田町・みやこ町の Excel の原本 `shinsei/` に書き込む）は `shinsei.ts`・`xlsxEdit.ts`）
+  申請書（行橋市・苅田町・みやこ町・広域連合の Excel の原本 `shinsei/` に書き込む）は `shinsei.ts`・`xlsxEdit.ts`）
 - 保存：この端末の IndexedDB（`taiyo-tokutei`）だけ。設定からバックアップ（JSON）・商品マスタの CSV 書き出し
 - 見積書の印刷（PDF）は A4縦1枚。品目や備考が多くて入りきらないときは、中身を縮めて1枚に収める（Excel の「1ページに収める」と同じ。`print/EstimateDoc.tsx` の `useFitToPage`）
 - 見積書は印刷（PDF）のほか、同じ形の Excel（.xlsx）でも保存できる（`src/tokutei/print/estimateXlsx.ts`。金額・消費税・合計・介護保険の内訳は Excel の計算式。書体は BIZ UDP明朝 Medium・BIZ UDPゴシック。A4縦1枚に収める印刷設定つき）
-- 申請書は行橋市・苅田町・みやこ町の原本に書き込む（広域連合は様式をいただいてから）
+- 申請書は行橋市・苅田町・みやこ町・広域連合（築上町・豊前市・上毛町・吉富町）の原本に書き込む。広域連合は支給申請書だけの様式で、
+  支払方法で受領委任払用（委任状つき）か償還払い用に書き、写真貼付用紙にも書く（2026-10-23。欄は DESIGN.md 5.2）
 - 申請書の画面：案件の画面の「📄 申請書」（またはタブ「📄 申請書（行橋市）」など）で、左で入れながら右で申請書の原本の形のまま見る（住宅改修の申請書と同じ。
   ユーザーの指示「特定福祉用具購入の申請書も、住宅改修の申請書と同じくプレビューを見ながら入力することができる」2026-10-22）。
   プレビューの欄を押すと左のその入れる所へ、入れている所の欄は囲む、まだ入っていない所は薄い黄色（`shinseiPreview.ts`・`components/ShinseiPreview.tsx`）
@@ -52,7 +53,7 @@
   受け取りは受注簿ツールの `src/main.jsx` の jutaku-import-begin〜end。形を変えるときは両方を直す。DESIGN.md 5.3）
 - 住宅改修のアプリ（ポータルの `jutaku-mitsumori/`・`sasaoka/`）の様邸の画面の「🛁 特定福祉用具申請書」のタブの中にも出る（ユーザーの指示「特定福祉用具アプリを出す」、2026-10-22）。
   住宅改修はお客様の情報を localStorage `taiyo-tokutei-from-jutaku-v1` に書いてから `tokutei/index.html#jutaku=<様邸の id>&embed=1` を開く。
-  このアプリはその様邸の案件を開き（なければ作る）、住宅改修で変わった値だけ入れ直す（ここで手で直した値はそのまま。`src/tokutei/jutaku.ts`）。embed=1 のときは題名の段を出さない。
+  このアプリはその様邸の案件を開き（なければ作る）、住宅改修で変わった値だけ入れ直す（ここで手で直した値はそのまま。生活保護も。`src/tokutei/jutaku.ts`）。embed=1 のときは題名の段を出さない。
   住宅改修がタブを替える前に `window.__taiyoTokuteiFlush`（保存の途中ならそれも待つ）で保存を待つ。受け渡しの形を変えるときは住宅改修の `src/sasaoka/tokuteiLink.ts` も直す
 
 ```

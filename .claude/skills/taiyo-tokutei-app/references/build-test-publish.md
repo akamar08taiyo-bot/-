@@ -25,8 +25,8 @@ npm run -s build:tokutei  # dist-tokutei/index.html（1ファイル、約2.8MB�
 PLAYWRIGHT=/opt/node-tools/node_modules/playwright/index.mjs timeout 600 node test/tokutei/e2e.mjs <出力フォルダ>
 ```
 
-- `e2e.mjs` はビルドのあとに動かす。中で 5191番の小さなサーバーを立てて `/tokutei/` を開く。Playwright はリポジトリの依存に入れていないので、場所は環境変数 `PLAYWRIGHT`（既定は `/opt/node22/lib/node_modules/playwright/index.mjs`。無ければ上のように指定）。
-  流れ：取り込み → ★ → 見積もり（42,944円・4,295円・38,649円）→ 印刷 → Excel の保存（ファイル名と値）→ 読み直し → 390px で横にはみ出さない。PDF のページ数は `pdfinfo` で見る。
+- `e2e.mjs` はビルドのあとに動かす。中で 5191番（環境変数 `E2E_PORT` で替えられる）の小さなサーバーを立てて `/tokutei/` を開く。Playwright はリポジトリの依存に入れていないので、場所は環境変数 `PLAYWRIGHT`（既定は `/opt/node22/lib/node_modules/playwright/index.mjs`。無ければ上のように指定）。
+  流れ：取り込み → ★ → 見積もり（42,944円・4,295円・38,649円）→ 申請書（行橋市の Excel・プレビュー。広域連合に替えて受領委任払用・償還払い用・Excel・390px）→ 印刷 → Excel の保存（ファイル名と値）→ 読み直し → 390px で横にはみ出さない。PDF のページ数は `pdfinfo` で見る。
 - 見た目を変えたら、パソコンとスマホ（390px）のスクリーンショットを撮って自分の目で見る。
 - 販売受注簿への転記：受注簿ツール（`akamar08taiyo-bot/taiyo-hacchu-scan`、`/home/user/taiyo-hacchu-scan`）を `npm ci && npm run build` してから
   `node test/tokutei/e2e-hacchu.mjs /home/user/taiyo-hacchu-scan/dist <出力フォルダ>`（5193番で `/tokutei/` と `/taiyo-hacchu-scan/` を同じサイトに置く）。
@@ -42,8 +42,8 @@ PLAYWRIGHT=/opt/node-tools/node_modules/playwright/index.mjs timeout 600 node te
 
 ### 申請書（`shinsei.ts`）の確かめ方
 
-1. 単体テスト（`shinsei.test.ts`）：3つの保険者の欄・丸の数・式の答え・アプリに入れた原本が空か。
-2. 架空の案件で3つの申請書を作り（Node で `fillShinsei` を呼ぶ。`fflate` は絶対パス）、`taiyo-excel-export` の `setup-fonts.sh` のあと LibreOffice で PDF → 画像にして、
+1. 単体テスト（`shinsei.test.ts`）：4つの保険者の欄・丸の数・式の答え・アプリに入れた原本が空か（広域連合は外部リンク・保存した場所・プロパティも）。
+2. 架空の案件で4つの申請書を作り（Node で `fillShinsei` を呼ぶ。`fflate` は絶対パス。広域連合は受領委任払い・償還払いの両方）、`taiyo-excel-export` の `setup-fonts.sh` のあと LibreOffice で PDF → 画像にして、
    丸（元号・性別・要介護度・みやこ町の届出）が字の上にあるか、長い商品名・理由が欄に入っているかを見る。
    原本は LibreOffice だと1枚に入りきらず右の列が次のページに出ることがある → 見るだけの写しで「1ページに収める」（`<pageSetUpPr fitToPage="1"/>` と `fitToWidth="1" fitToHeight="1"`）にすると見やすい。
 3. 前の方の記入が原本に残っていないか（`shinsei.test.ts` の最後のテスト）。原本を替えたら、氏名・番号・写真・丸・共有の文字の表を必ず見る。

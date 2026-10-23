@@ -31,6 +31,10 @@ alias_xml() { # $1＝Windows の字体の名前、$2…＝代わりの字体（�
   alias_xml 'ＭＳ ゴシック' 'IPAGothic' 'Noto Sans CJK JP'
   alias_xml 'MS Mincho' 'IPAMincho' 'IPAGothic' 'Noto Sans CJK JP'
   alias_xml 'MS Gothic' 'IPAGothic' 'Noto Sans CJK JP'
+  # 広域連合の特定福祉用具の様式（ＭＳ Ｐ明朝・HGP明朝E）。無いと英字の字体になる。IPA P明朝が無ければ字の幅が同じ IPA Pゴシック
+  alias_xml 'ＭＳ Ｐ明朝' 'IPAPMincho' 'IPAPGothic' 'Noto Sans CJK JP'
+  alias_xml 'MS PMincho' 'IPAPMincho' 'IPAPGothic' 'Noto Sans CJK JP'
+  alias_xml 'HGP明朝E' 'IPAPMincho' 'IPAPGothic' 'Noto Sans CJK JP'
   alias_xml '游ゴシック' 'Liberation Sans' 'IPAPGothic' 'Noto Sans CJK JP'
   alias_xml 'Yu Gothic' 'Liberation Sans' 'IPAPGothic' 'Noto Sans CJK JP'
   printf '</fontconfig>\n'
