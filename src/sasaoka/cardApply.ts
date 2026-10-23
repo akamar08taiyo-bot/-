@@ -92,6 +92,8 @@ export function defaultPicks(job: Job, read: CardInfo, unsure: CardKey[]): Set<C
     const now = fieldText(cur, field);
     if (sameText(now, v)) continue;
     if (field === 'insurer' && job.insurer) continue;
+    // 今の住所が読んだ住所で始まる（建物名・部屋番号まで入っている）ときは、短くしない
+    if (field === 'address' && now.normalize('NFKC').replace(/\s/g, '').startsWith(v.normalize('NFKC').replace(/\s/g, ''))) continue;
     const sure = !keys.some((k) => unsure.includes(k));
     if (!now || sure) out.add(field);
   }

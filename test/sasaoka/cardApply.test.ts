@@ -92,3 +92,10 @@ test('保険証の値：確かめる画面で全角の数字で打ち直した�
   assert.equal(next.insuredNo, '0000123456');
   assert.equal(next.shinsei.insurerNo, '409999');
 });
+
+test('保険証の値：今の住所が読んだ住所で始まる（建物名まで入っている）ときは、はじめから入れる行にしない', () => {
+  const j = job({address: '京都郡苅田町富久町一丁目1番1号 見本ハイツ101号'});
+  assert.ok(!defaultPicks(j, READ, []).has('address'));
+  // ちがう住所なら入れる行
+  assert.ok(defaultPicks(job({address: '京都郡苅田町富久町二丁目2番2号'}), READ, []).has('address'));
+});

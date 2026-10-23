@@ -551,20 +551,38 @@ function parsePage(page: OcrPage, today: string): {info: Partial<CardInfo>; unsu
       const rest = c.text.slice(m.index + m[0].length).trim();
       const isAddr = (t: string) => /[市町村郡]|丁目|番地/.test(t) && squeeze(t).replace(/[^一-鿿々ぁ-ゖァ-ヺ]/g, '').length >= 3;
       let addr = isAddr(rest) ? rest : '';
+      const zipX = c.x0 + ((c.x1 - c.x0) * m.index) / Math.max(1, c.text.length) - lh * 2;
+      const inColumn = (cc: Cell) => cc.x1 > zipX && cc.x0 < zipX + lh * 6;
+      let line: Cell | null = addr ? c : null; // 住所の1行目の欄
       if (!addr) {
-        const zipX = c.x0 + ((c.x1 - c.x0) * m.index) / Math.max(1, c.text.length) - lh * 2;
         const below = byY.flatMap((x) => x.cells).filter((cc) => cc !== c && cc.y0 >= c.y0 + lh * 0.5 && cc.y0 <= c.y1 + lh * 3).sort((a, b) => a.y0 - b.y0);
         for (const cc of below) {
-          const cand = cc.x1 > zipX && cc.x0 < zipX + lh * 6 && isAddr(cc.text) ? cc : null;
+          const cand = inColumn(cc) && isAddr(cc.text) ? cc : null;
           if (cand) {
             addr = cand.text;
+            line = cand;
             break;
           }
         }
       }
+      // 2行目から（「見本ハイツ 101 号」など）：すぐ下の行の、同じ列から始まる欄を、次の項目のラベル（フリガナ・氏名…）の前まで。
+      // 番地・部屋の番号のない行（ラベルの読めなかったフリガナ・氏名の行）と日付の行は入れない
+      const lines = addr ? [addr] : [];
+      for (let prev = line; prev && lines.length < 3; ) {
+        const p0 = prev;
+        const next = byY
+          .flatMap((x) => x.cells)
+          .filter((cc) => cc.y0 >= p0.y0 + lh * 0.5 && cc.y0 <= p0.y1 + lh * 1.5 && (p0 === c ? inColumn(cc) : Math.abs(cc.x0 - p0.x0) < lh * 2))
+          .sort((a, b) => a.y0 - b.y0)[0];
+        const ok =
+          next && !/フ\s*リ|氏\s*名|生\s*年|性\s*別|交\s*付|番\s*号|保険者/.test(next.text) && /\d|号|棟|階|室|丁目|番地/.test(next.text) && !/年\s*\d{1,2}\s*月/.test(next.text);
+        if (!ok) break;
+        lines.push(next.text);
+        prev = next;
+      }
       if (addr) {
-        // 住所の字の間の空白はつめる（「1 番 1 号」→「1番1号」）。ラベルの字（住所・被・保・険・者）を除く
-        info.address = squeeze(addr.replace(/住\s*所/, '').replace(/^[被保険者]\s+/, '')).replace(/^[^一-鿿ぁ-ヿ]+/, '');
+        // 住所の字の間の空白はつめる（「1 番 1 号」→「1番1号」）。ラベルの字（住所・被・保・険・者）を除く。行の間は全角の空白
+        info.address = [squeeze(addr.replace(/住\s*所/, '').replace(/^[被保険者]\s+/, '')).replace(/^[^一-鿿ぁ-ヿ]+/, ''), ...lines.slice(1).map(squeeze)].join('　');
         if (!/[市町村郡]/.test(info.address)) unsure.add('address');
       }
       break;
