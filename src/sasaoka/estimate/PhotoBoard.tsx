@@ -237,10 +237,10 @@ export function PhotoBoard({
   const holding = useRef(false); // 箇所をつかんでいる（指で動かしても画面をスクロールしない）
   const swallowClick = useRef(false); // 動かし終わったときの click（離した所の写真を選ぶ）を捨てる
   const sectionRef = useRef<HTMLElement>(null);
-  const dragging = useFileDragging(); // ファイルを画面の上でドラッグしている：枠をみな薄い緑に
+  const fileDrag = useFileDragging(); // ファイルを画面の上でドラッグしている：枠をみな薄い緑に
   useEffect(() => {
-    if (!dragging) setOver(''); // 枠の外で離した・やめたとき
-  }, [dragging]);
+    if (!fileDrag) setOver(''); // 枠の外で離した・やめたとき
+  }, [fileDrag]);
   const lastSheet = sheetNos && sheetNos.size ? Math.max(...sheetNos) : 0;
   const same = (a: PhotoKey | null, b: PhotoKey) => !!a && a.placeId === b.placeId && a.slot === b.slot;
   const pick = onPick;
@@ -522,6 +522,7 @@ export function PhotoBoard({
                                 aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}`}
                                 aria-pressed={same(selected, key)}
                                 data-photo-slot={k}
+                                data-drop={over === k ? 'over' : fileDrag ? 'ready' : undefined}
                                 onDragOver={(e) => {
                                   if (!draggable(e)) return;
                                   e.preventDefault();
@@ -540,8 +541,8 @@ export function PhotoBoard({
                                     : over === k
                                       ? 'ring-4 ring-emerald-500'
                                       : id
-                                        ? `bg-slate-100 hover:ring-2 hover:ring-emerald-500 ${dragging ? 'ring-2 ring-emerald-400' : 'ring-1 ring-slate-300'}`
-                                        : `border-2 border-dashed hover:border-emerald-500 hover:bg-emerald-50 ${dragging ? 'border-emerald-500 bg-emerald-50 text-emerald-900' : 'border-slate-400 text-slate-600'}`
+                                        ? `bg-slate-100 hover:ring-2 hover:ring-emerald-500 ${fileDrag ? 'ring-2 ring-emerald-400' : 'ring-1 ring-slate-300'}`
+                                        : `border-2 border-dashed hover:border-emerald-500 hover:bg-emerald-50 ${fileDrag ? 'border-emerald-500 bg-emerald-50 text-emerald-900' : 'border-slate-400 text-slate-600'}`
                                 } ${selected && !same(selected, key) ? 'cursor-copy' : ''}`}
                               >
                                 {photo ? (

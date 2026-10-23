@@ -305,7 +305,7 @@ export const useFileDragging = () => useSyncExternalStore(subscribeDrag, () => f
 /** ファイルを重ねているときの「ここに離す」（落とせる所の上にかぶせる） */
 export function DropOverlay({text = 'ここに離す'}: {text?: string}) {
   return (
-    <span aria-hidden className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-emerald-100/95 px-1 text-sm font-bold text-emerald-900">
+    <span aria-hidden className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-emerald-100 px-1 text-sm font-bold text-emerald-900">
       {text}
     </span>
   );
@@ -342,6 +342,7 @@ export function DropArea({
       aria-label={name}
       {...rest}
       onClick={onPick}
+      data-drop={over ? 'over' : dragging ? 'ready' : undefined}
       onDragEnter={onDragOver}
       onDragOver={onDragOver}
       onDragLeave={(e) => {

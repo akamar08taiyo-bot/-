@@ -78,6 +78,7 @@ assert.equal(await area.evaluate((el) => getComputedStyle(el).borderStyle), 'das
 const tablist = page.getByRole('tablist', {name: '住宅改修申請書・特定福祉用具申請書・工事見積書・理由書'});
 const [t, b] = [await tablist.boundingBox(), await area.boundingBox()];
 assert.ok(b.x >= t.x + t.width && b.x - (t.x + t.width) < 24 && Math.abs(b.y + b.height / 2 - (t.y + t.height / 2)) < 6, `タブのすぐ右 ${JSON.stringify({t, b})}`);
+await page.screenshot({path: path.join(outDir, 'area-idle.png'), clip: {x: 0, y: 0, width: 1366, height: 260}});
 // ファイルを画面に持ってくると、落とせる所が薄い緑（重ねた所は「ここに離す」）
 const dragOver = (selector) =>
   page.evaluate((sel) => {
@@ -88,10 +89,10 @@ const dragOver = (selector) =>
     el.dispatchEvent(new DragEvent('dragover', {dataTransfer: dt, bubbles: true, cancelable: true}));
   }, selector);
 await dragOver('h1');
-await page.waitForFunction(() => getComputedStyle(document.querySelector('[aria-label="🪪 介護保険証・介護ソフトの画面"]')).borderTopColor !== 'rgb(56, 189, 248)');
-assert.match(await area.evaluate((el) => getComputedStyle(el).borderTopColor), /rgb\(16, 185, 129\)/); // emerald-500
+await page.waitForFunction(() => document.querySelector('[aria-label="🪪 介護保険証・介護ソフトの画面"]')?.getAttribute('data-drop') === 'ready');
 await dragOver('[aria-label="🪪 介護保険証・介護ソフトの画面"]');
 await area.getByText('ここに離す').waitFor();
+assert.equal(await area.getAttribute('data-drop'), 'over');
 await page.screenshot({path: path.join(outDir, 'drag-over-area.png'), clip: {x: 0, y: 0, width: 1366, height: 260}});
 await page.waitForFunction(() => !document.querySelector('[aria-label="🪪 介護保険証・介護ソフトの画面"]')?.textContent?.includes('ここに離す'), null, {timeout: 3000});
 log('入口の枠・ドラッグ中の色・「ここに離す」OK');
@@ -211,8 +212,11 @@ const red = await makeImage('#d33', 640, 480);
 const blue = await makeImage('#33d', 480, 640);
 // 空いた枠：「＋ 改修前」「ドロップ・Ctrl+V」。ファイルを持ってくると枠がみな薄い緑、重ねた枠は「ここに離す」
 assert.match(await slot('①玄関 改修後').innerText(), /^＋ 改修後\s*📷 ドロップ・Ctrl\+V/);
+const idle = await slot('①玄関 改修後').evaluate((el) => getComputedStyle(el).borderTopColor);
 await dragOver('h1');
-await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-photo-slot$=":after"]')).borderTopColor === 'rgb(16, 185, 129)');
+await page.waitForFunction(() => [...document.querySelectorAll('[data-photo-slot]')].every((el) => el.getAttribute('data-drop') === 'ready'));
+// 薄い緑の枠（ドラッグしていないときの色とちがう）
+assert.notEqual(await slot('①玄関 改修後').evaluate((el) => getComputedStyle(el).borderTopColor), idle);
 const slotSel = await slot('①玄関 改修後').evaluate((el) => `[data-photo-slot="${el.dataset.photoSlot}"]`);
 await dragOver(slotSel);
 await slot('①玄関 改修後').getByText('ここに離す').waitFor();

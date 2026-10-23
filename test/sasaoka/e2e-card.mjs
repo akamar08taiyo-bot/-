@@ -1,7 +1,7 @@
 // 介護保険証から入れるを確かめる（ユーザーの指示「介護保険証をドラッグ＆ドロップで添付したら、全ての情報…入力必要項目が全て入力される」2026-10-22）：
 //   架空の保険証（cardFixture.mjs。スキャンのような白黒・ざらつき・90°横向き）と負担割合証を、
 //   1. 申請書のタブの「🪪 介護保険証から入れる」で選ぶ（画像2枚）→ 確かめる画面（読めた値・今の値）→ 入れる → 申請書・理由書・見積書に出る
-//   2. 見積もりの入口の「🪪 介護保険証から新規作成」にドロップ（PDF）→ 保険者も保険証から → 新しい様邸の申請書のタブ
+//   2. 見積もりの入口の「🪪 介護保険証・介護ソフトの画面から新規作成」にドロップ（PDF）→ 保険者も保険証から → 新しい様邸の申請書のタブ
 //   3. ボタンは4つのタブのどれでもタブのすぐ右。画面をクリックしてから Ctrl+V（貼り付け）でも読む（字を打つ欄では読まない）
 //   読み取りの部品（tesseract.js・日本語のデータ）は手元の node_modules から（ネットにつながない）
 // usage: node e2e-card.mjs <サイトのURL> <出力フォルダ>
@@ -139,12 +139,12 @@ assert.equal(handoff.fields.burdenRatio, 1);
 assert.equal(handoff.fields.insurer, 'yukuhashi');
 assert.deepEqual([handoff.fields.careFrom, handoff.fields.careTo], ['2024-04-01', '2027-03-31']);
 // 特定福祉用具申請書のタブにも「🪪 介護保険証から入れる」（入れると中の特定福祉用具のアプリを開き直す）
-assert.equal(await page.getByRole('button', {name: '🪪 介護保険証から入れる'}).isVisible(), true);
+assert.equal(await page.getByRole('button', {name: '🪪 介護保険証・介護ソフトの画面'}).isVisible(), true);
 log('申請書・理由書・見積書・特定福祉用具に出た OK');
 
 // ---------------- 2. 見積もりの入口に PDF をドロップして新規作成（保険者も保険証から）
 await page.getByRole('button', {name: /見積もり・申請書を作成する/}).first().click();
-const drop = page.getByRole('button', {name: /介護保険証から新規作成/});
+const drop = page.getByRole('button', {name: /介護保険証・介護ソフトの画面から新規作成/});
 await drop.waitFor();
 const dt = await page.evaluateHandle(async (b64) => {
   const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -176,7 +176,7 @@ log('新規作成 OK');
 
 // ---------------- 3. 「🪪 介護保険証から入れる」は4つのタブのどれでも、1段目のタブのすぐ右（ユーザーの指示「上のタブの近辺に」）。
 //   画面をクリックしてから Ctrl+V で貼り付けても読む（「クリックしてから挿入で貼り付け」）。字を打つ欄での Ctrl+V は、ふつうの貼り付けのまま
-const cardBtn = page.getByRole('button', {name: '🪪 介護保険証から入れる'});
+const cardBtn = page.getByRole('button', {name: '🪪 介護保険証・介護ソフトの画面'});
 const tablist = page.getByRole('tablist', {name: '住宅改修申請書・特定福祉用具申請書・工事見積書・理由書'});
 /** 見えている間の位置（タブを替えている途中＝前の画面が消えて次の画面が出る間は待つ） */
 const boxOf = async (loc) => {

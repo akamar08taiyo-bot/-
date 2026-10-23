@@ -238,11 +238,12 @@ export function cleanKana(raw: string): string {
   // 濁点・半濁点が離れて読めたとき（カ゛→ガ）
   t = t.replace(/([ァ-ヺ])\s*[゛゙]/g, (_, c: string) => (c + '゙').normalize('NFC')).replace(/([ァ-ヺ])\s*[゜゚]/g, (_, c: string) => (c + '゚').normalize('NFC'));
   t = t.replace(/[一―-]/g, 'ー').replace(/口/g, 'ロ').replace(/工/g, 'エ').replace(/力/g, 'カ').replace(/夕/g, 'タ').replace(/卜/g, 'ト').replace(/二/g, 'ニ').replace(/八/g, 'ハ');
+  // 長音だけの語（となりの行の線・字の端が「ーー」に読めたもの）は除く
   return t
     .replace(/[^ァ-ヺー\s]/g, ' ')
     .trim()
     .split(/\s+/)
-    .filter(Boolean)
+    .filter((p) => p && !/^ー+$/.test(p))
     .join('　');
 }
 

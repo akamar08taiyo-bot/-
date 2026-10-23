@@ -225,6 +225,7 @@ test('フリガナ：全角カタカナ（半角・ひらがな・離れた濁�
   assert.equal(cleanKana('みほん はるこ'), 'ミホン　ハルコ');
   assert.equal(cleanKana('ミホン ケ゛ンソ゛ウ'), 'ミホン　ゲンゾウ');
   assert.equal(cleanKana('ミホン 八ル口'), 'ミホン　ハルロ');
+  assert.equal(cleanKana('ミホン アキラ ーー'), 'ミホン　アキラ');
   const w = (text: string, x0: number, x1: number): OcrWord => ({text, x0, x1, y0: 0, y1: 20});
   // 字ごとに分かれて読めても、一番大きなすき間で分ける
   assert.equal(kanaOfWords([w('ミホ', 0, 40), w('ン', 42, 60), w('ハル', 80, 120), w('コ', 122, 140)]), 'ミホン　ハルコ');
