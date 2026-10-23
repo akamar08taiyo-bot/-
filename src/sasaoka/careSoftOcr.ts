@@ -118,8 +118,8 @@ export async function readSoftScreen(file: File, onProgress: (p: CardProgress) =
   const ctx = src.getContext('2d', {willReadFrequently: true}) as CanvasRenderingContext2D;
   if (!screenLike(ctx.getImageData(0, 0, src.width, src.height).data)) return null;
   const today = todayIso();
-  // 画面の字（9〜16px）は小さいので大きくして読む（長い辺 3200 画素・3倍まで）
-  const scale = Math.min(3, Math.max(1, 3200 / Math.max(src.width, src.height)));
+  // 画面の字（9〜16px）は小さいので大きくして読む（長い辺 2400 画素・3倍まで。大きな画像＝保険証のスキャンなどは大きくしない）
+  const scale = Math.min(3, Math.max(1, 2400 / Math.max(src.width, src.height)));
   return withOcr(async (worker) => {
     stopIf(signal);
     onProgress({step: '介護ソフトの画面か調べています', page: 1, pages: 1});

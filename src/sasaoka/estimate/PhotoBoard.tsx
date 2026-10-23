@@ -14,11 +14,14 @@
 // 箇所をつかんで（見出しでも写真の上でも）ほかの箇所に重ねて離すか（ユーザーの指示「クリックしてそのままドロップしたら入れ替え」）、◀ ▶ で隣と入れ替える
 // （写真・撮影日・向きは箇所と一緒に動く）。指（iPad）でも動くようにポインターで動かす
 // 向き（ユーザーの指示「写真の方向転換」「iPad でもくるっとすぐに回転」）：写真の右上の ↻ で右に 90°。大きさと細かい向きはプレビューの写真で直す
+// ドロップ・貼り付けが分かるように（ユーザーの指示「完了写真もドラッグ＆ドロップや貼付けしやすいようにする…認識しやすいように、見やすいように」2026-10-23）：
+// 空いた枠に「ドロップ・Ctrl+V」、ファイルを画面に持ってくると枠がみな薄い緑、重ねた枠は「ここに離す」。Ctrl+V は選んでいる枠（押した・Tab で移った枠、
+// 箇所の中のボタンにいるときはその箇所の空いた枠）に貼る。枠を選んでいないときの Ctrl+V は、介護保険証・介護ソフトの画面の読み取り（CardReader.tsx）のまま
 
 import {useEffect, useRef, useState} from 'react';
 import type {DragEvent, PointerEvent as ReactPointerEvent} from 'react';
 import type {EstimateRates} from '../calc.ts';
-import {Btn, useToast} from '../components/ui.tsx';
+import {Btn, DropArea, DropOverlay, pastedFiles, useFileDragging, useToast} from '../components/ui.tsx';
 import {circled, photoNumbers, swapPhotoNumbers} from '../estimateForms.ts';
 import {cleanEdit, turn} from '../photoEdit.ts';
 import {photoTakenDate, preparePhoto, putPhoto, rememberPhotoUrl, usePhotoUrls} from '../photos.ts';
@@ -234,6 +237,10 @@ export function PhotoBoard({
   const holding = useRef(false); // 箇所をつかんでいる（指で動かしても画面をスクロールしない）
   const swallowClick = useRef(false); // 動かし終わったときの click（離した所の写真を選ぶ）を捨てる
   const sectionRef = useRef<HTMLElement>(null);
+  const dragging = useFileDragging(); // ファイルを画面の上でドラッグしている：枠をみな薄い緑に
+  useEffect(() => {
+    if (!dragging) setOver(''); // 枠の外で離した・やめたとき
+  }, [dragging]);
   const lastSheet = sheetNos && sheetNos.size ? Math.max(...sheetNos) : 0;
   const same = (a: PhotoKey | null, b: PhotoKey) => !!a && a.placeId === b.placeId && a.slot === b.slot;
   const pick = onPick;
@@ -250,6 +257,44 @@ export function PhotoBoard({
     actions.swapPlaces(a, b);
     setSelected(null);
   };
+
+  // Ctrl+V：選んでいる枠に写真を貼る（字を打つ欄・ほかの画面が開いているときは、ふつうの貼り付け）。
+  // 写真の欄の中で枠を選んでいないときは何もしない（介護保険証・介護ソフトの画面の読み取りへ）。ほかの貼り付けより先に受ける（capture）
+  const pasteTo = useRef<() => {start?: PhotoKey} | null>(() => null);
+  pasteTo.current = () => {
+    const active = document.activeElement instanceof HTMLElement && sectionRef.current?.contains(document.activeElement) ? document.activeElement : null;
+    const slotKey = active?.closest<HTMLElement>('[data-photo-slot]')?.dataset.photoSlot;
+    if (slotKey) {
+      const at = slotKey.lastIndexOf(':');
+      return {start: {placeId: slotKey.slice(0, at), slot: slotKey.slice(at + 1) as PhotoSlot}};
+    }
+    if (selected) return {start: selected};
+    if (active?.closest('[data-photo-pick]')) return {}; // 「📷 写真を選ぶ」：①から改修前の空いた枠に
+    const cardId = active?.closest<HTMLElement>('[data-photo-card]')?.dataset.photoCard;
+    const place = cardId ? list.find((x) => x.place.id === cardId)?.place : undefined;
+    const slot = place ? (['before', 'after'] as const).find((x) => !place.photos?.[x]) : undefined;
+    return place && slot ? {start: {placeId: place.id, slot}} : null;
+  };
+  const putLatest = useRef(actions.put);
+  putLatest.current = actions.put;
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      if (!e.clipboardData) return;
+      const t = e.target instanceof Element ? e.target : null;
+      if (t?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
+      if (document.querySelector('[role="dialog"]')) return;
+      const to = pasteTo.current();
+      if (!to) return;
+      const files = pastedFiles(e.clipboardData, (f) => f.type.startsWith('image/') || f.type === 'application/pdf' || /\.(jpe?g|png|gif|webp|heic|heif|pdf)$/i.test(f.name));
+      if (files.length === 0) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      setSelected(null);
+      void putLatest.current(files, to.start);
+    };
+    document.addEventListener('paste', onPaste, true);
+    return () => document.removeEventListener('paste', onPaste, true);
+  }, []);
 
   // 指で箇所をつかんでいるあいだは画面をスクロールさせない（touchmove を止める。iPad の Safari でも効くように、はじめから passive でない形で付けておく）
   useEffect(() => {
@@ -367,9 +412,7 @@ export function PhotoBoard({
     >
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-sm font-bold text-slate-700">📷 写真</h2>
-        <Btn small color="white" onClick={() => pick()} disabled={list.length === 0}>
-          📷 写真を選ぶ
-        </Btn>
+        <DropArea name="📷 写真を選ぶ" label="📷 写真を選ぶ" data-photo-pick onPick={() => pick()} onFiles={(files) => void actions.put(files)} disabled={list.length === 0} className="disabled:opacity-50" />
         {actions.busy > 0 && (
           <span role="status" className="text-xs text-slate-500">
             写真を入れています…
@@ -478,6 +521,7 @@ export function PhotoBoard({
                                 type="button"
                                 aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}`}
                                 aria-pressed={same(selected, key)}
+                                data-photo-slot={k}
                                 onDragOver={(e) => {
                                   if (!draggable(e)) return;
                                   e.preventDefault();
@@ -490,14 +534,14 @@ export function PhotoBoard({
                                   setSelected(null);
                                 }}
                                 onClick={() => press(key, !!id)}
-                                className={`relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-md text-xs transition ${
+                                className={`relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-md text-xs transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 ${
                                   same(selected, key)
                                     ? 'ring-4 ring-sky-500'
                                     : over === k
                                       ? 'ring-4 ring-emerald-500'
                                       : id
-                                        ? 'bg-slate-100 ring-1 ring-slate-300 hover:ring-2 hover:ring-emerald-500'
-                                        : 'border-2 border-dashed border-slate-300 text-slate-500 hover:border-emerald-500 hover:bg-emerald-50'
+                                        ? `bg-slate-100 hover:ring-2 hover:ring-emerald-500 ${dragging ? 'ring-2 ring-emerald-400' : 'ring-1 ring-slate-300'}`
+                                        : `border-2 border-dashed hover:border-emerald-500 hover:bg-emerald-50 ${dragging ? 'border-emerald-500 bg-emerald-50 text-emerald-900' : 'border-slate-400 text-slate-600'}`
                                 } ${selected && !same(selected, key) ? 'cursor-copy' : ''}`}
                               >
                                 {photo ? (
@@ -507,9 +551,14 @@ export function PhotoBoard({
                                 ) : id ? (
                                   '…'
                                 ) : (
-                                  `＋ ${SLOT_LABEL[slot]}`
+                                  // 空いた枠：ドロップ・貼り付けができることが分かるように（狭い画面＝スマホは押して選ぶだけなので出さない）
+                                  <span className="flex flex-col items-center gap-0.5">
+                                    <span className="text-sm font-bold">＋ {SLOT_LABEL[slot]}</span>
+                                    <span className="text-[11px] max-sm:hidden">📷 ドロップ・Ctrl+V</span>
+                                  </span>
                                 )}
                                 {id && <span className="absolute left-1 top-1 rounded bg-white/85 px-1 text-[10px] font-bold text-slate-700">{SLOT_LABEL[slot]}</span>}
+                                {over === k && <DropOverlay text={id ? 'ここに離す（差し替え）' : 'ここに離す'} />}
                               </button>
                               {/* 右に 90°回す（押すたびに。iPad でもすぐに。続けて押しても画面が拡大しないように touch-manipulation） */}
                               {id && (
