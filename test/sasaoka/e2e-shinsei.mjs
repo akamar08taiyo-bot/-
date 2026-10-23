@@ -872,9 +872,13 @@ log('iPad・スマホ（指で見出し・写真の上を押したままドラ�
 
 // ---------------- 苅田町：保険者を替えると苅田町の申請書。丸は残る（もう一度押すと外れる）。事後申請書は式で同じ内容
 await shinseiTab.click();
+assert.equal(await page.getByRole('button', {name: /^保険者を.*にする$/}).count(), 0);
 await page.getByRole('combobox', {name: '保険者'}).selectOption('kanda');
 await pageOf('事前申請書').waitFor();
 assert.deepEqual(await pageNames(), ['事前申請書', '平面図  (2)', '1 ', '1  (3)']);
+// 工事場所の住所（行橋市）と違う保険者を選ぶと、見積書のタブと同じく知らせる（変えるのはボタンで）
+assert.ok((await page.getByText('工事場所の住所は「行橋市」です。').count()) > 0);
+assert.equal(await page.getByRole('button', {name: '保険者を行橋市にする'}).count(), 1);
 // 一覧は苅田町の申請書の順番。ただし被保険者氏名はフリガナのすぐ下（ユーザーの指示）。完了予定日だけ（着工予定日は空白）
 assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '完了予定日', '改修予定費用']);
 assert.equal(await form.getByLabel('完了予定日').inputValue(), '2026-11-20');

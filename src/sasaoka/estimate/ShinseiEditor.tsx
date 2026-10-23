@@ -9,7 +9,7 @@ import {Fragment, useDeferredValue, useEffect, useMemo, useRef, useState} from '
 import type {InputHTMLAttributes, KeyboardEvent, ReactNode} from 'react';
 import {isBlankRow, jobName} from '../calc.ts';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
-import {circled, eraOf, INSURER_IDS, INSURER_INFO, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, photoNumbers} from '../estimateForms.ts';
+import {circled, eraOf, INSURER_IDS, INSURER_INFO, insurerForAddress, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, photoNumbers} from '../estimateForms.ts';
 import {placeFromDims, withBrackets} from '../cutLink.ts';
 import {manualRow, newPlace} from '../rows.ts';
 import {usePhotoUrls} from '../photos.ts';
@@ -90,6 +90,7 @@ export function ShinseiEditor({
   const setJob = (fn: (j: Job) => Job) => update('jobs', (list) => list.map((j) => (j.id === job.id ? {...fn(j), updatedAt: Date.now()} : j)));
   const setInfo = (patch: Partial<ShinseiInfo>) => setJob((j) => ({...j, shinsei: {...NO_SHINSEI, ...j.shinsei, ...patch}}));
   const setInsurer = (i: Insurer) => setJob((j) => ({...j, insurer: i, form: INSURER_INFO[i].form}));
+  const byAddress = insurerForAddress(job.address);
   const cost = shinseiCost(job, s);
   const lines = shinseiWorks(job, s);
 
@@ -388,6 +389,15 @@ export function ShinseiEditor({
             ))}
           </select>
         </label>
+        {/* 工事場所の市町村が保険者と違うときは知らせる（見積書のタブと同じ。違う保険者を選んだまま、その申請書を作らないように。変えるのはボタンで） */}
+        {byAddress && byAddress !== insurer && (
+          <div className="flex w-full flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-900">
+            工事場所の住所は「{INSURER_INFO[byAddress].name}」です。
+            <Btn small color="white" onClick={() => setInsurer(byAddress)}>
+              保険者を{INSURER_INFO[byAddress].name}にする
+            </Btn>
+          </div>
+        )}
         {insurer && (
           <div role="status" aria-label="入っていない欄" className="flex flex-wrap items-center gap-1.5 text-sm">
             {todo.length === 0 ? (
