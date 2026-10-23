@@ -598,7 +598,18 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
     focusPlace.current = null;
     row.querySelector<HTMLInputElement>(want.field === 'dim' ? 'input[data-dim]' : 'input[aria-label="改修場所"]')?.focus();
   });
-  const remove = (id: string) => setJob((j) => ({...j, places: j.places.filter((p) => p.id !== id)}));
+  // 写真・撮影日・寸法・手で直した文などの入った箇所は、消す前に聞く（一度押しただけで写真ごと消えて、元に戻せなかった）
+  const remove = (p: Place) => {
+    const has = [
+      p.photos?.before || p.photos?.after ? '写真' : '',
+      p.photoDates?.before || p.photoDates?.after ? '撮影日' : '',
+      Object.values(p.dims ?? {}).some((v) => v?.trim()) ? '寸法' : '',
+      p.shinseiLine !== undefined || p.shinseiText?.trim() ? '申請書に書く内容' : '',
+      p.photoNote?.trim() ? '写真に書く内容' : '',
+    ].filter(Boolean);
+    if (has.length && !confirm(`「${p.name.trim() || '箇所'}」と、その${has.join('・')}を消します。元に戻せません。よろしいですか？`)) return;
+    setJob((j) => ({...j, places: j.places.filter((x) => x.id !== p.id)}));
+  };
   // 申請書に書く内容を手で直す（ユーザーの指示「手入力でも編集できるようにする」）。自動の文と同じに戻したら、手で直していないことにする
   // （寸法・そのほかを変えると、また自動で変わる）。↺ で自動の文に戻す
   const items = workItems(job, s);
@@ -643,7 +654,7 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
                   {used ? (
                     <span className="w-7" />
                   ) : (
-                    <button type="button" onClick={() => remove(p.id)} className="w-7 rounded py-1 text-slate-400 hover:bg-rose-50 hover:text-rose-700" aria-label={`${p.name || '箇所'}を消す`}>
+                    <button type="button" onClick={() => remove(p)} className="w-7 rounded py-1 text-slate-400 hover:bg-rose-50 hover:text-rose-700" aria-label={`${p.name || '箇所'}を消す`}>
                       ✕
                     </button>
                   )}

@@ -158,6 +158,8 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
   /** 2つの枠の写真を入れ替える（片方が空なら移す）。撮影日・向きと大きさも一緒に */
   const swap = (a: PhotoKey, b: PhotoKey) =>
     setJob((j) => {
+      // どちらかの箇所がもうない（選んだあとで箇所を消した）ときは何もしない（前は押した写真が消えていた）
+      if (!j.places.some((x) => x.id === a.placeId) || !j.places.some((x) => x.id === b.placeId)) return j;
       const get = (k: PhotoKey) => {
         const p = j.places.find((x) => x.id === k.placeId);
         return [p?.photos?.[k.slot], p?.photoDates?.[k.slot], p?.photoEdits?.[k.slot]] as const;
@@ -213,7 +215,9 @@ export function PhotoBoard({
 }) {
   const list = photoPlaces(job, rates);
   const urls = usePhotoUrls(list.flatMap(({place}) => [place.photos?.before ?? '', place.photos?.after ?? '']));
-  const [selected, setSelected] = useState<PhotoKey | null>(null);
+  const [selectedKey, setSelected] = useState<PhotoKey | null>(null);
+  // 選んだ写真の箇所がなくなった（申請書の一覧で消した）ら、選んでいないことにする（そのまま別の写真を押すと、入れ替えで押した写真が消えていた）
+  const selected = selectedKey && list.some((x) => x.place.id === selectedKey.placeId) ? selectedKey : null;
   const [over, setOver] = useState<string>(''); // 写真のファイルをドラッグして重ねている枠
   // 箇所をつかんでいるとき：動かしている箇所・ずらした量・重ねている箇所
   const [cardDrag, setCardDrag] = useState<{id: string; dx: number; dy: number; over: string | null} | null>(null);

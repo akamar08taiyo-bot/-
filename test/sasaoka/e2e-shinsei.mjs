@@ -1117,7 +1117,19 @@ assert.deepEqual(await where(), ['②トイレ', '長さ（mm）']);
 // 「＋ そのほか」は改修場所の名前から（試したら消す）
 await works.getByRole('button', {name: '＋ そのほか', exact: true}).click();
 assert.deepEqual(await where(), ['③改修場所', '改修場所']);
+// 何も入れていない箇所は聞かずに消す。寸法・写真などを入れた箇所は聞いてから消す（一度押しただけで写真ごと消えて、元に戻せなかった）
+const asked = [];
+const ask = (d) => asked.push(d.message());
+page.on('dialog', ask);
 await works.getByRole('button', {name: '箇所を消す', exact: true}).click();
+assert.deepEqual(asked, []);
+await works.getByRole('button', {name: '＋ そのほか', exact: true}).click();
+await page.keyboard.type('物置');
+await works.getByRole('listitem', {name: '③物置'}).getByLabel('長さ（mm）').fill('600');
+await works.getByRole('button', {name: '物置を消す', exact: true}).click();
+assert.match(asked.join('\n'), /^「物置」と、その寸法を消します。元に戻せません/);
+assert.equal(await works.getByRole('listitem', {name: '③物置'}).count(), 0);
+page.off('dialog', ask);
 const g1 = works.getByRole('listitem', {name: '①玄関'});
 assert.equal(await g1.getByLabel('長さ（mm）').inputValue(), '800');
 await g1.getByLabel('高さ（mm）').fill('750');
