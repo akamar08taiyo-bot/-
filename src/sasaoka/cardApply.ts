@@ -2,8 +2,9 @@
 // 被保険者番号・氏名・住所は見積書・申請書・理由書の共通の欄、フリガナ・生年月日・性別・郵便番号・要介護・認定有効期間・保険者番号・負担割合・
 // 居宅介護支援事業所（理由書の作成者の事業所）は申請書の項目（ShinseiInfo）。特定福祉用具へは tokuteiLink.ts で同じ値を渡す
 
-import {INSURER_INFO, NO_SHINSEI} from './estimateForms.ts';
+import {eraOf, INSURER_INFO, NO_SHINSEI} from './estimateForms.ts';
 import type {CardInfo, CardKey} from './hokensho.ts';
+import {warekiText} from './riyu.ts';
 import type {Insurer, Job, ShinseiInfo} from './types.ts';
 
 /** 確かめる画面の1行（いくつかの項目をまとめたもの＝生年月日・認定有効期間） */
@@ -28,14 +29,8 @@ export const CARD_FIELDS: {field: CardField; label: string; keys: CardKey[]}[] =
 /** 和暦の生年月日の文字（「昭和13年4月14日」） */
 export const birthText = (v: Pick<CardInfo, 'era' | 'birthY' | 'birthM' | 'birthD'>) => (v.era && v.birthY ? `${v.era}${v.birthY}年${v.birthM}月${v.birthD}日` : '');
 
-const ymd = (iso: string) => {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  if (!m) return '';
-  const y = Number(m[1]);
-  const [era, base] = y >= 2019 ? ['令和', 2018] : ['平成', 1988];
-  return `${era}${y - base === 1 ? '元' : y - base}年${Number(m[2])}月${Number(m[3])}日`;
-};
-export const termText = (from: string, to: string) => (from || to ? `${ymd(from)}～${ymd(to)}` : '');
+// 和暦は理由書と同じ（令和は2019年5月1日から。2019年1〜4月は平成31年）
+export const termText = (from: string, to: string) => (from || to ? `${warekiText(from)}～${warekiText(to)}` : '');
 
 /** 様邸の今の値（確かめる画面で、読んだ値と並べる） */
 export function currentOf(job: Job): CardInfo {
@@ -49,7 +44,8 @@ export function currentOf(job: Job): CardInfo {
     name: job.customer,
     zip: s.zip,
     address: job.address,
-    era: s.era,
+    // 元号を選んでいない生年月日は、申請書と同じく昭和（空のままだと「今の値なし」になり、たしかでない読みで上書きしていた）
+    era: s.birthY ? eraOf(s) : s.era,
     birthY: s.birthY,
     birthM: s.birthM,
     birthD: s.birthD,
@@ -110,7 +106,8 @@ export function applyCard(job: Job, v: CardInfo, picks: Set<CardField>): Job {
   for (const f of picks) {
     switch (f) {
       case 'insuredNo':
-        next.insuredNo = v.insuredNo.replace(/\D/g, '');
+        // 全角の数字（確かめる画面で日本語入力のまま打ち直した「０００…」）も数字に
+        next.insuredNo = v.insuredNo.normalize('NFKC').replace(/\D/g, '');
         break;
       case 'name':
         next.customer = v.name.trim();
@@ -142,7 +139,7 @@ export function applyCard(job: Job, v: CardInfo, picks: Set<CardField>): Job {
         sh.careTo = v.careTo;
         break;
       case 'insurerNo':
-        sh.insurerNo = v.insurerNo.replace(/\D/g, '').slice(0, 8);
+        sh.insurerNo = v.insurerNo.normalize('NFKC').replace(/\D/g, '').slice(0, 8);
         break;
       case 'office':
         sh.reasonOffice = v.office.trim();

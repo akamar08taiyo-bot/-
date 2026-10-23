@@ -70,3 +70,25 @@ test('保険証の値：様邸に入れる（申請書・理由書・見積書�
   assert.equal(cur.insurerName, '苅田町');
   assert.equal(cur.office, '見本ケアプランセンター');
 });
+
+test('保険証の値：2019年1〜4月の日付は平成（令和は5月1日から）', () => {
+  assert.equal(termText('2019-04-01', '2023-03-31'), '平成31年4月1日～令和5年3月31日');
+  assert.equal(termText('2019-04-30', '2019-05-01'), '平成31年4月30日～令和元年5月1日');
+});
+
+test('保険証の値：元号を選んでいない生年月日（申請書では昭和）は今の値があることにする。たしかでない読みで上書きしない', () => {
+  const j = job({shinsei: {...NO_SHINSEI, era: '', birthY: '13', birthM: '4', birthD: '14'}});
+  assert.equal(fieldText(currentOf(j), 'birth'), '昭和13年4月14日');
+  const unsureBirth = {...READ, birthY: '18'};
+  assert.ok(!defaultPicks(j, unsureBirth, ['era', 'birthY', 'birthM', 'birthD']).has('birth'));
+  // 同じ生年月日を読んだときは、入れる行にしない（同じ）
+  assert.ok(!defaultPicks(j, READ, []).has('birth'));
+  // 生年月日がまだないときは、元号も空のまま（今の値なし）
+  assert.equal(fieldText(currentOf(job()), 'birth'), '');
+});
+
+test('保険証の値：確かめる画面で全角の数字で打ち直した番号も数字で入れる', () => {
+  const next = applyCard(job({insuredNo: '0000999999'}), {...READ, insuredNo: '００００１２３４５６', insurerNo: '４０９９９９'}, new Set(['insuredNo', 'insurerNo'] as const));
+  assert.equal(next.insuredNo, '0000123456');
+  assert.equal(next.shinsei.insurerNo, '409999');
+});
