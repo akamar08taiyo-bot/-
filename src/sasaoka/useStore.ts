@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {cleanKey, DATA_KEYS, loadAllStamped, loadKeyStamped, loadStamps, saveKeySynced, saveLocal} from './storage.ts';
+import {cleanKey, DATA_KEYS, loadAllStamped, loadKeyStamped, loadStamps, saveKeySynced} from './storage.ts';
 import type {DataKey} from './storage.ts';
 import {mergeKey} from './sync.ts';
 import type {AppData} from './types.ts';
@@ -72,8 +72,12 @@ export function useStore() {
           });
         }
         channel.current?.postMessage({from: ME, key, stamp: res.stamp});
-      } catch {
-        saveLocal(key, value); // 失敗したら下で警告を出す
+      } catch (e) {
+        // IndexedDB に書けなかった（空き容量がないなど）。localStorage に書いても、次に開くときは IndexedDB の前のデータを読むので
+        // 保存できたことにしない（下で警告を出す）。まだ保存していない変更として残し、次の保存（入力・💾・画面を閉じるとき）でもう一度書く。
+        // IndexedDB を使えない端末は saveKeySynced が localStorage に保存している（そこでも失敗したときだけここに来る）
+        if (!pending.current.has(key)) pending.current.set(key, value);
+        throw e;
       } finally {
         inFlight.current.delete(key);
       }
