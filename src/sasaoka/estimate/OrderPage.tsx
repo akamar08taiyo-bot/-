@@ -34,7 +34,12 @@ import {num, todayIso} from '../util.ts';
 
 /** 販売受注簿作成ツールの場所（太陽ポータルと同じサイト。同じサイトなので、部材はこの端末の localStorage で渡せる） */
 export function hacchuUrl(): string {
-  return new URL(`${HACCHU_PATH}?from=jutaku`, location.origin).href;
+  try {
+    return new URL(`${HACCHU_PATH}?from=jutaku`, location.origin).href;
+  } catch {
+    // ファイルを開いたとき（file://）に origin が "null" になるブラウザ（Firefox など）では URL にできず、画面ごと消えていた。となりのフォルダの販売受注簿にする
+    return '../taiyo-hacchu-scan/?from=jutaku';
+  }
 }
 
 /** 見積書から作った発注書の行と、手で直したところを重ねたもの */
