@@ -34,7 +34,16 @@ export type XSheet = {
   font: {name: string; size: number}; // ふだんの文字（列の幅の単位もこの文字で決まる）
 };
 
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+// XML に書けない制御文字は消す（Word・PowerPoint の Shift+Enter の改行 U+000B・改ページ U+000C は改行にする）。
+// 残すと Excel が「修復しますか」と聞いて、その欄の中身を捨てる（申請書の shinsei.ts の esc と同じ決まり）
+const esc = (s: string) =>
+  s
+    .replace(/[\v\f]/g, '\n')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]/g, '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 
 /** 列の番号（0から）→ A, B, …, Z, AA … */
 export function colName(c: number): string {

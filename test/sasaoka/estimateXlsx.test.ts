@@ -345,3 +345,18 @@ test('Excel の欄の文字は印刷と同じ大きさ・同じ改行（長い�
   }
   assert.ok(sizeOf(k, 'Q5') >= 4.5); // 前は 2.5pt でも入らず、欄の右で切れていた
 });
+
+test('品名・備考に貼り付けた制御文字（Word の Shift+Enter の改行 U+000B など）があっても、開ける Excel になる', () => {
+  const j = job({customer: '山田\u0001', places: [place('浴室\u000c', [mat('手すり\u000bL型', 9000, {estNote: '定価\u0001 9,000円\u0002'})])]});
+  const {bytes} = estimateXlsx(j, S, '2026-10-22');
+  const x = open(bytes);
+  // XML に書けない制御文字はどこにも残らない（残ると Excel が修復して欄の中身を捨てる）
+  for (const [name, data] of Object.entries(x.files)) {
+    if (name.endsWith('.xml') || name.endsWith('.rels')) assert.doesNotMatch(strFromU8(data), /[\x00-\x08\x0B\x0C\x0E-\x1F￾￿]/, name);
+  }
+  // U+000B・U+000C は改行、ほかの制御文字は消す
+  assert.equal(x.text('C9'), '手すり\nL型');
+  assert.equal(x.text('M9'), '定価 9,000円');
+  assert.ok(String(x.text('B9')).startsWith('①浴室'));
+  assert.equal(readXlsx(bytes)[0].name, '山田様');
+});
