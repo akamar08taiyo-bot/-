@@ -284,12 +284,16 @@ function kouikiCells(v: ShinseiValues, c: KouikiCells, birth: string | null): [s
     // 合計：様式の行に書いた商品の購入金額の合計（行より多い商品は画面で知らせる）
     ...when(shown.length, [[c.total, shown.reduce((n, i) => n + i.total, 0)]]),
     ...when(reasonText(v), [[c.reason, reasonText(v)]]),
-    ...when(v.office, [[c.plan, `${KOUIKI_PLAN}\n 居宅の事業所名　${v.office}`]]),
     ...dateRow(v.applyDate, c.date),
   ];
 }
 
-const kouikiFit = (c: KouikiCells) => [c.name, ...rowsOf('B', c.rows), ...rowsOf('I', c.rows), c.reason, c.plan];
+const kouikiFit = (c: KouikiCells) => [c.name, ...rowsOf('B', c.rows), ...rowsOf('I', c.rows), c.reason];
+/**
+ * 居宅サービス計画の届出の行と居宅の事業所名：アプリで改行を入れ、入る大きさにして書く（みやこ町の理由の欄と同じ block。
+ * 行が決まっているので、有・無の丸の位置と、プレビューの1文字ずつの位置が Excel の折り返しに左右されない）
+ */
+const kouikiPlan = (c: KouikiCells, v: ShinseiValues): SheetWrite['block'] => ({cell: c.plan, head: [KOUIKI_PLAN], body: ` 居宅の事業所名${v.office ? `　${v.office}` : ''}`, tail: []});
 const kouikiPlanMark = (cell: string, v: ShinseiValues): Mark => ({cell, needles: ['有', '無'], pick: v.carePlan ? pick(['有', '無'], v.carePlan) : -1, after: '居宅サービス計画の届出'});
 
 /** 受領委任払用（様式第8号）：申請者は会社（受領委任事業者。原本のまま）。下の委任状の被保険者氏名も書く。口座の欄・広域連合の記入欄は書かない */
@@ -298,6 +302,7 @@ function kouikiJuryo(v: ShinseiValues): SheetWrite {
   return {
     sheet: KOUIKI_SHEETS.juryo,
     cells: [...kouikiCells(v, c, birthChoice(v, '明 ・ 大 ・ 昭　')), ['Z9', v.tel], ...when(v.name, [['L38', `被保険者氏名　　${v.name}`]])],
+    block: kouikiPlan(c, v),
     fit: kouikiFit(c),
     fitWidth: ['G2', 'G9', 'Z9'], // フリガナ・住所・電話の行は低い（字の大きさとほぼ同じ）
     marks: [ERA('G6', v), GENDER('W6', v), kouikiPlanMark('J21', v)],
@@ -312,6 +317,7 @@ function kouikiShokan(v: ShinseiValues): SheetWrite {
     sheet: KOUIKI_SHEETS.shokan,
     // 申請者（本人）の住所・氏名・電話は、下線の左の欄に書く（右の空いた欄へはみ出して出る）
     cells: [...kouikiCells(v, c, b ? `${b.era}${b.y}年${b.m}月${b.d}日生` : null), ['J32', v.address], ['J34', v.name], ['Y34', v.tel]],
+    block: kouikiPlan(c, v),
     fit: kouikiFit(c),
     fitWidth: ['I11'], // フリガナ（I4）は結合していない1つの欄なので小さくしない（右の空いた欄へはみ出す）
     marks: [GENDER('W8', v), kouikiPlanMark('I23', v)],

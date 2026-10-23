@@ -84,7 +84,7 @@ function VerticalText({t}: {t: PvText}) {
 function TextView({t}: {t: PvText}) {
   if (t.vertical) return <VerticalText t={t} />;
   if (t.marked) {
-    // 丸で囲む欄（男・女、要介護度など）：1文字ずつ、丸と同じ計算の位置に置く
+    // 丸で囲む欄（男・女、要介護度など）：1文字ずつ、丸と同じ計算の位置に置く（何行もある欄は行ごとの高さ＝c.cy）
     const font = t.runs[0]?.font;
     return (
       <div style={{position: 'absolute', left: t.x, top: t.y, width: t.w, height: t.h, overflow: 'hidden'}}>
@@ -94,7 +94,7 @@ function TextView({t}: {t: PvText}) {
             <span
               key={i}
               aria-hidden="true"
-              style={{position: 'absolute', left: c.x - t.x, top: t.marked!.cy - t.y, width: c.w, textAlign: 'center', transform: 'translateY(-50%)', lineHeight: 1, whiteSpace: 'pre', ...(font ? fontCss(font) : {}), fontSize: t.marked!.em}}
+              style={{position: 'absolute', left: c.x - t.x, top: c.cy - t.y, width: c.w, textAlign: 'center', transform: 'translateY(-50%)', lineHeight: 1, whiteSpace: 'pre', ...(font ? fontCss(font) : {}), fontSize: t.marked!.em}}
             >
               {c.ch}
             </span>
@@ -129,7 +129,8 @@ function TextView({t}: {t: PvText}) {
         style={{
           textAlign: distributed ? 'justify' : (t.align as 'left' | 'center' | 'right'),
           textAlignLast: distributed ? 'justify' : undefined,
-          whiteSpace: t.wrap ? (distributed ? 'normal' : 'pre-wrap') : 'pre',
+          // 均等割り付けは改行を残して空白はまとめる（pre-line。Excel も Alt+Enter の改行で行を分ける。広域連合の福祉用具名・製造事業者名の2行）
+          whiteSpace: t.wrap ? (distributed ? 'pre-line' : 'pre-wrap') : 'pre',
           wordBreak: 'break-all',
           lineHeight: 1.2,
           // 行の高さは、この箱の文字の大きさ（ないと画面の 16px）の 1.2 倍より低くならないので、欄の文字の大きさにそろえる

@@ -134,6 +134,10 @@ test('プレビュー：広域連合は支払方法の様式（償還払いな�
   assert.equal(juryo.shapes.filter((s) => s.kind === 'ellipse').length, 3);
   assert.ok(juryo.texts.some((t) => t.marked && t.marked.chars.some((c) => c.ch === '昭')));
   assert.ok(juryo.fields.some((f) => f.field === 'customer' && f.ref === 'L38'));
+  // 届出の欄（2行：届出の有・無と居宅の事業所名）も1文字ずつ、丸と同じ計算の位置に（行ごとの高さ）
+  const plan = juryo.texts.find((t) => t.ref === 'J21');
+  const ys = new Set(plan?.marked?.chars.filter((c) => c.ch.trim()).map((c) => Math.round(c.cy)));
+  assert.ok(plan?.marked?.chars.some((c) => c.ch === '有') && plan.marked.chars.some((c) => c.ch === '業') && ys.size === 2, JSON.stringify(plan?.marked?.chars.length));
 });
 
 test('プレビュー：書き込む欄はどれも、押すと入れる所へ行く（SHINSEI_LINKS にもれがない）', () => {

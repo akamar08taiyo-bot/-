@@ -27,8 +27,10 @@ const server = createServer((req, res) => {
     res.end();
   }
 });
-await new Promise((r) => server.listen(5191, r));
-const url = 'http://localhost:5191/tokutei/';
+// 番号は環境変数 E2E_PORT で替えられる（ほかの作業と同じ番号を使わないように）
+const port = Number(process.env.E2E_PORT ?? 5191);
+await new Promise((r) => server.listen(port, r));
+const url = `http://localhost:${port}/tokutei/`;
 
 const TABLE = [
   ['品番', '商品名', 'メーカー', 'TAISコード', '定価(税抜)', '仕切価格', '税区分'],
@@ -191,6 +193,66 @@ try {
   // 申請書（Excel）もこの画面から作れる
   await page.getByRole('button', {name: '📄 申請書（Excel）を作る'}).waitFor();
   await page.screenshot({path: `${out}/04c-sale-shinsei-preview.png`});
+
+  // ---- 広域連合（築上町など）：保険者を替えると申請書のタブも替わる。支給申請書だけの様式で、支払方法で受領委任払用・償還払い用。
+  // 要介護度の欄はなく、居宅サービス計画の届出（有・無）がある（みやこ町と同じ入れる所が出る）
+  const KOUIKI_JURYO = '様式第8号（福祉用具購入費支給申請書（受領委任払用））';
+  const KOUIKI_SHOKAN = '福祉用具購入費支給申請書（償還払い用）';
+  const KOUIKI_PHOTO = '写真貼付用紙(任意様式でも可）';
+  const groups = () => preview.getByRole('group').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+  await page.getByLabel('保険者', {exact: true}).selectOption('kouiki');
+  await page.getByRole('tab', {name: '📄 申請書（広域連合）'}).waitFor();
+  await preview.getByRole('group', {name: KOUIKI_JURYO, exact: true}).waitFor();
+  assert.deepEqual(await groups(), [KOUIKI_JURYO, KOUIKI_PHOTO]);
+  const kv = () => preview.getByRole('group', {name: KOUIKI_JURYO, exact: true}).innerText();
+  assert.match(await kv(), /山田 花子/);
+  assert.match(await kv(), /被保険者氏名\s*山田 花子/); // 委任状
+  assert.match(await kv(), /居宅の事業所名\s*見本居宅介護支援事業所/);
+  await page.waitForTimeout(300);
+  await preview.getByRole('group', {name: KOUIKI_JURYO, exact: true}).screenshot({path: `${out}/04f-shinsei-kouiki-juryo.png`});
+  // （1つ目のボタンは包んでいる label の名前になるので、文字で探す）
+  assert.equal(await page.locator('[role=radiogroup][aria-label="居宅サービス計画の届出"] [role=radio][aria-checked="true"]').textContent(), '有');
+  // 様式の題名を押すと支払方法へ。償還払いにすると償還払い用（申請者は本人）
+  await preview.getByRole('button', {name: '支払方法（受領委任払用・償還払い用）'}).first().click();
+  assert.equal(await page.evaluate(() => document.activeElement?.closest('[data-field]')?.getAttribute('data-field')), 'payMethod');
+  await page.getByRole('radio', {name: '償還払い'}).click();
+  await preview.getByRole('group', {name: KOUIKI_SHOKAN, exact: true}).waitFor();
+  assert.deepEqual(await groups(), [KOUIKI_SHOKAN, KOUIKI_PHOTO]);
+  assert.match(await preview.getByRole('group', {name: KOUIKI_SHOKAN, exact: true}).innerText(), /昭和15年3月15日生/);
+  await preview.getByRole('button', {name: '居宅介護支援事業所・ケアマネジャー'}).first().click();
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), '居宅介護支援事業所');
+  await page.waitForTimeout(300);
+  await page.screenshot({path: `${out}/04d-sale-shinsei-kouiki.png`});
+  await preview.getByRole('group', {name: KOUIKI_SHOKAN, exact: true}).screenshot({path: `${out}/04e-shinsei-kouiki-sheet.png`});
+  const [kouikiFile] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📄 申請書（Excel）を作る'}).click()]);
+  assert.equal(kouikiFile.suggestedFilename(), '山田花子様特定福祉用具申請書.xlsx');
+  await kouikiFile.saveAs(`${out}/shinsei-kouiki.xlsx`);
+  {
+    const {readCell, ellipseCount} = await import('../../src/tokutei/xlsxEdit.ts');
+    const f = unzipSync(new Uint8Array(readFileSync(`${out}/shinsei-kouiki.xlsx`)));
+    assert.equal(readCell(f, KOUIKI_SHOKAN, 'I6'), '山田 花子');
+    assert.equal(['W6', 'X6', 'Y6', 'Z6', 'AA6', 'AB6', 'AC6', 'AD6', 'AE6', 'AF6'].map((r) => readCell(f, KOUIKI_SHOKAN, r)).join(''), '0123456789');
+    assert.equal(readCell(f, KOUIKI_SHOKAN, 'I8'), '昭和15年3月15日生');
+    assert.equal(readCell(f, KOUIKI_SHOKAN, 'B14'), '入浴補助用具（入浴用いす）\nシャワーベンチ FSフィット');
+    assert.equal(readCell(f, KOUIKI_SHOKAN, 'R20'), String(30800 + 12144)); // 合計＝見積書の購入金額
+    assert.equal(readCell(f, KOUIKI_SHOKAN, 'J34'), '山田 花子');
+    assert.equal(ellipseCount(f, KOUIKI_SHOKAN), 2); // 性別・届出（有）
+    assert.equal(readCell(f, KOUIKI_JURYO, 'G3'), '');
+    assert.equal(readCell(f, KOUIKI_PHOTO, 'B3'), '山田 花子');
+  }
+  // スマホの幅でも横にはみ出さない（プレビューは下に）
+  await page.setViewportSize({width: 390, height: 844});
+  await preview.getByRole('group', {name: KOUIKI_SHOKAN, exact: true}).waitFor();
+  await page.waitForTimeout(300);
+  assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1, 'スマホの幅の広域連合の申請書で横にはみ出している');
+  await preview.screenshot({path: `${out}/07c-phone-shinsei-kouiki.png`});
+  await page.setViewportSize({width: 1366, height: 900});
+  // もとに戻す（行橋市・受領委任払い。このあとの見積書の確かめは行橋市のまま）
+  await page.locator('[role=radiogroup][aria-label="支払方法"] [role=radio]', {hasText: '受領委任払い'}).click();
+  await page.getByLabel('保険者', {exact: true}).selectOption('yukuhashi');
+  await page.getByRole('tab', {name: '📄 申請書（行橋市）'}).waitFor();
+  await preview.getByRole('group', {name: '用具・受領委任払', exact: true}).waitFor();
+
   // 見積もりの画面に戻る（金額のまとめ）
   await page.getByRole('tab', {name: '📋 見積もり'}).click();
   assert.match(await page.locator('aside').first().innerText(), /利用者負担（1割）\s*4,295円/);

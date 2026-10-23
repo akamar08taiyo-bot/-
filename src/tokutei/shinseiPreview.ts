@@ -244,7 +244,7 @@ export type PvText = Rect & {
   vertical: boolean; // 縦書き
   indent: number; // 画素
   // 丸で囲む欄（男・女 など）：1文字ずつの位置（丸の位置と同じ計算。原本の字体のない端末でも丸と文字をそろえる）
-  marked?: {chars: {ch: string; x: number; w: number}[]; cy: number; em: number};
+  marked?: {chars: {ch: string; x: number; w: number; cy: number}[]; cy: number; em: number};
 };
 export type PvLine = {x1: number; y1: number; x2: number; y2: number; width: number; dash: string; color: string; double: boolean};
 export type PvShape = Rect & {
@@ -742,7 +742,7 @@ function buildPage(
   sheet: string,
   own: [ShinseiField, string[]][],
   links: Map<string, ShinseiField>,
-  marked: {ref: string; chars: {ch: string; x: number; w: number}[]; cy: number; em: number}[],
+  marked: {ref: string; chars: {ch: string; x: number; w: number; cy: number}[]; cy: number; em: number}[],
 ): PvPage {
   const xml = strFromU8(files[path]);
   const xfs = xfsOf(files);
@@ -852,7 +852,7 @@ function buildPage(
   // 丸で囲む欄は、丸と同じ計算の文字の位置で描く
   for (const m of marked) {
     const t = texts.find((x) => x.ref === m.ref);
-    if (t) t.marked = {chars: m.chars.map((c) => ({ch: c.ch, x: c.x - ox, w: c.w})), cy: m.cy - oy, em: m.em};
+    if (t) t.marked = {chars: m.chars.map((c) => ({ch: c.ch, x: c.x - ox, w: c.w, cy: c.cy - oy})), cy: m.cy - oy, em: m.em};
   }
 
   // 塗り
