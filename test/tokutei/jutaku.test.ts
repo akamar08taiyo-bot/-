@@ -98,3 +98,33 @@ test('保存してある案件の jutakuJob・jutakuSync は読み込みで残�
   assert.equal(back[0].jutakuSync?.customer, '山田 花子');
   assert.equal(cleanSales([{id: 's1', customer: 'A'}])[0].jutakuJob, undefined); // 住宅改修から開いていない案件
 });
+
+test('生活保護（welfare）：住宅改修で入れたら入る。変わったときだけ入れ直し、ここで選んだ値はそのまま', () => {
+  const settings = defaultSettings();
+  // true・false のほかは捨てる（渡されなければ項目なし）
+  assert.equal(readJutaku(JSON.stringify({job: 'j1', fields: {...fields, welfare: true}}), 'j1')?.fields.welfare, true);
+  assert.equal(readJutaku(JSON.stringify({job: 'j1', fields: {...fields, welfare: 'true'}}), 'j1')?.fields.welfare, undefined);
+  assert.equal('welfare' in (readJutaku(JSON.stringify({job: 'j1', fields}), 'j1')?.fields ?? {}), false);
+  // 作るとき
+  const made = applyJutaku([], settings, {job: 'j1', fields: {customer: '見本 花子', welfare: true}}, 1000).sales[0];
+  assert.deepEqual([made.welfare, made.jutakuSync?.welfare], [true, true]);
+  // 開いた案件：住宅改修で生活保護にした → 入る。住宅改修で外した → 外れる
+  const first = applyJutaku([], settings, {job: 'j2', fields: {customer: '見本 太郎'}}, 1000);
+  assert.equal(first.sales[0].welfare, false);
+  const on = applyJutaku(first.sales, settings, {job: 'j2', fields: {customer: '見本 太郎', welfare: true}}, 2000).sales;
+  assert.equal(on[0].welfare, true);
+  const off = applyJutaku(on, settings, {job: 'j2', fields: {customer: '見本 太郎', welfare: false}}, 3000).sales;
+  assert.equal(off[0].welfare, false);
+  // ここで生活保護を選んだ → 住宅改修が前と同じ「なし」を渡しても外さない
+  const edited = off.map((s) => ({...s, welfare: true}));
+  const kept = applyJutaku(edited, settings, {job: 'j2', fields: {customer: '見本 太郎', welfare: false}}, 4000);
+  assert.equal(kept.sales[0].welfare, true);
+  assert.equal(kept.sales, edited); // 変わらなければそのまま
+  // 住宅改修がまだ生活保護を渡さない版のとき（項目なし）は、ここの値のまま
+  assert.equal(applyJutaku(edited, settings, {job: 'j2', fields: {customer: '見本 太郎'}}, 5000).sales[0].welfare, true);
+  // 生活保護を受け取る前に作った案件（jutakuSync に welfare がない）：ここで選んでいなければ入る
+  const old = first.sales.map((s) => ({...s, jutakuSync: {customer: '見本 太郎'}}));
+  assert.equal(applyJutaku(old, settings, {job: 'j2', fields: {customer: '見本 太郎', welfare: true}}, 6000).sales[0].welfare, true);
+  // 読み込みでも残す
+  assert.equal(cleanSales(JSON.parse(JSON.stringify(on)))[0].jutakuSync?.welfare, true);
+});

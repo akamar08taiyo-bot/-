@@ -97,9 +97,9 @@ export type Sale = {
   jutakuSync?: JutakuFields; // 前に住宅改修から受け取ったお客様の情報（住宅改修で変わった値だけ入れ直すため）
 };
 
-/** 住宅改修のアプリから受け取るお客様の情報（jutaku.ts。案件の項目の名前で） */
+/** 住宅改修のアプリから受け取るお客様の情報（jutaku.ts。案件の項目の名前で。生活保護 welfare は 2026-10-23 から） */
 export type JutakuFields = Partial<
-  Pick<Sale, 'customer' | 'kana' | 'insuredNo' | 'birthDate' | 'gender' | 'zip' | 'address' | 'tel' | 'careLevel' | 'insurer' | 'burdenRatio' | 'careOffice' | 'careManager'>
+  Pick<Sale, 'customer' | 'kana' | 'insuredNo' | 'birthDate' | 'gender' | 'zip' | 'address' | 'tel' | 'careLevel' | 'insurer' | 'burdenRatio' | 'careOffice' | 'careManager' | 'welfare'>
 >;
 
 /** 見積書の発行元（営業所） */

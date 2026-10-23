@@ -15,7 +15,7 @@ export type JutakuHandoff = {job: string; fields: JutakuFields};
 
 const TEXT = ['customer', 'kana', 'insuredNo', 'zip', 'address', 'tel', 'careOffice', 'careManager'] as const;
 /** 住宅改修から受け取る項目（JutakuFields）の全部 */
-const KEYS = [...TEXT, 'birthDate', 'gender', 'careLevel', 'insurer', 'burdenRatio'] as const;
+const KEYS = [...TEXT, 'birthDate', 'gender', 'careLevel', 'insurer', 'burdenRatio', 'welfare'] as const;
 
 /** 受け取った値を案件の値に直す（そのまま入れられない値は捨てる。保存してある jutakuSync を読み込むときも） */
 export function cleanJutakuFields(raw: Record<string, unknown>): JutakuFields {
@@ -29,6 +29,8 @@ export function cleanJutakuFields(raw: Record<string, unknown>): JutakuFields {
   }
   if (typeof raw.insurer === 'string' && INSURERS.some((i) => i.key === raw.insurer && i.key !== 'other')) out.insurer = raw.insurer;
   if (raw.burdenRatio === 1 || raw.burdenRatio === 2 || raw.burdenRatio === 3) out.burdenRatio = raw.burdenRatio as BurdenRatio;
+  // 生活保護（介護扶助）：住宅改修が渡すのは入っているときだけ（welfare?: boolean）。true・false のほかは捨てる
+  if (typeof raw.welfare === 'boolean') out.welfare = raw.welfare;
   return out;
 }
 
@@ -68,7 +70,9 @@ export function applyJutaku(sales: Sale[], settings: Settings, h: JutakuHandoff,
     sale.jutakuSync = syncedValues(sale);
     return {sales: [sale, ...sales], id: sale.id};
   }
-  const prev = linked.jutakuSync ?? {};
+  // 生活保護は 2026-10-23 から受け取る。それより前に作った案件の jutakuSync には無いので、初めの値（なし）を受け取ったものとみなす
+  // （ここでまだ選んでいなければ、住宅改修で入れた生活保護が入る。ここで選んだ値はそのまま）
+  const prev: JutakuFields = {welfare: false, ...linked.jutakuSync};
   const patch: Partial<Sale> = {};
   for (const key of Object.keys(h.fields) as (keyof JutakuFields)[]) {
     const value = h.fields[key];
