@@ -400,7 +400,7 @@ export function RiyuEditor({job, data, update, onBack, tabs}: {job: Job; data: A
             ← 一覧へ戻る
           </Btn>
           {tabs}
-          <CardFill job={job} setJob={setJob} />
+          <CardFill job={job} setJob={setJob} staffList={s.staffList} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-lg font-bold text-[#14532d]">{job.customer.trim() ? jobName(job) : '新しい理由書'}</h1>

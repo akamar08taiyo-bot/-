@@ -812,3 +812,19 @@ export function kanaRect(page: OcrPage): Box | null {
   if (bottom - top < n2.h * 0.3) return null;
   return {x0: Math.max(0, n2.x0 - n2.h * 0.3), y0: top, x1: n2.x0 + Math.max((n2.x1 - n2.x0) * 1.6, n2.h * 14), y1: bottom};
 }
+
+/**
+ * 画面のスクリーンショットらしいか（画素 RGBA）：地の色が平ら（16段にまとめた色で、一番多い色が 35% から・多い3色で 60% から）。
+ * スマホで写した保険証の写真は光のむらで色が散らばるので、介護ソフトとしては読まない（すぐに介護保険証として読む）
+ */
+export function screenLike(rgba: Uint8ClampedArray | Uint8Array): boolean {
+  const counts = new Map<number, number>();
+  let n = 0;
+  for (let i = 0; i + 2 < rgba.length; i += 12) {
+    const key = ((rgba[i] >> 4) << 8) | ((rgba[i + 1] >> 4) << 4) | (rgba[i + 2] >> 4);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+    n++;
+  }
+  const top = [...counts.values()].sort((a, b) => b - a);
+  return n > 0 && top[0] / n >= 0.35 && (top[0] + (top[1] ?? 0) + (top[2] ?? 0)) / n >= 0.6;
+}

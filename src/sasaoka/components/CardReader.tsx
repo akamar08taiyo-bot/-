@@ -4,25 +4,30 @@
 // 画面をクリックしてから Ctrl+V で貼り付けてもよい（ユーザーの指示「上のタブの近辺に…ドラッグアンドドロップでも添付、もしくはクリックしてから挿入で貼り付け」2026-10-22。
 // スクリーンショットや、デスクトップでコピーしたファイル）。字を打つ欄にいるときの Ctrl+V は、ふつうの貼り付けのまま
 // 保険証の画像は保存せず、どこにも送らない（確かめる画面に出すだけ）
+// 同じ入口に、介護ソフトのお客様の欄のスクリーンショットも入れられる（ユーザーの指示「介護ソフトの…部分をスクリーンショットで切り取り、貼り付けたら、
+// 同様の情報が自動的に入力される」2026-10-23。careSoftOcr.ts がどちらか決めて読む）。確かめる画面は同じで、保険証にない項目（電話番号・担当・ケアマネジャー・
+// 居宅の電話・生活保護）の行は読めたときだけ出す。入口は点線の枠に「ここにドロップ・Ctrl+V」（ドロップできることが分かるように。ui.tsx の DropArea）
 
 import {useEffect, useRef, useState} from 'react';
-import type {DragEvent, ReactNode} from 'react';
-import {applyCard, birthText, CARD_FIELDS, currentOf, defaultPicks, fieldText, sameText} from '../cardApply.ts';
-import type {CardField} from '../cardApply.ts';
-import {isCardFile, readCards} from '../cardOcr.ts';
+import type {ReactNode} from 'react';
+import {applyCard, applyExtra, birthText, CARD_FIELDS, currentExtra, currentOf, defaultPicks, EXTRA_FIELDS, extraPicks, extraText, fieldText, sameExtra, sameText, staffMatch} from '../cardApply.ts';
+import type {CardField, ExtraField, ExtraInfo, ReadResult} from '../cardApply.ts';
+import {isCardFile} from '../cardOcr.ts';
 import type {CardProgress} from '../cardOcr.ts';
+import {readCardOrScreen} from '../careSoftOcr.ts';
 import {INSURER_IDS, INSURER_INFO, MARK_INFO, NO_SHINSEI} from '../estimateForms.ts';
-import type {CardInfo, CardRead} from '../hokensho.ts';
+import type {CardInfo} from '../hokensho.ts';
+import {riyuOf} from '../riyu.ts';
 import type {Insurer, Job} from '../types.ts';
-import {Btn, Modal, TextInput, useToast} from './ui.tsx';
+import {Btn, DropArea, Modal, TextInput, useToast} from './ui.tsx';
 
 /**
- * 介護保険証のボタン（押すとファイルを選ぶ。ファイルをこのボタンにドロップしても、画面で Ctrl+V で貼り付けてもよい）。読めたら onRead
+ * 介護保険証・介護ソフトの画面の入口（点線の枠。押すとファイルを選ぶ。ファイルをこの枠にドロップしても、画面で Ctrl+V で貼り付けてもよい）。読めたら onRead。
+ * children：枠の言葉（読み上げの名前にも）、hint：その下の小さな言葉
  */
-export function CardDrop({onRead, children, className = '', big = false}: {onRead: (r: {read: CardRead; thumbs: string[]}) => void; children: ReactNode; className?: string; big?: boolean}) {
+export function CardDrop({onRead, children, hint, className = '', big = false}: {onRead: (r: {read: ReadResult; thumbs: string[]}) => void; children: string; hint?: ReactNode; className?: string; big?: boolean}) {
   const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
-  const [over, setOver] = useState(false);
   const [progress, setProgress] = useState<CardProgress | null>(null);
   // 読んでいるのをやめる（読み取りの部品をネットから取ってこられずに止まったときも、閉じられるように）
   const running = useRef<AbortController | null>(null);
@@ -36,7 +41,7 @@ export function CardDrop({onRead, children, className = '', big = false}: {onRea
     running.current = ac;
     setProgress({step: 'ファイルを開いています', page: 0, pages: 0});
     try {
-      const r = await readCards(files, (p) => !ac.signal.aborted && setProgress(p), ac.signal);
+      const r = await readCardOrScreen(files, (p) => !ac.signal.aborted && setProgress(p), ac.signal);
       if (ac.signal.aborted) return;
       // 開けないファイルは飛ばして、ほかのファイルを読む
       if (r.skipped.length) toast(`開けないファイルがありました：${r.skipped.join('、')}（iPhone の写真の HEIC・パスワードのある PDF は開けないことがあります。JPEG・PNG か、パスワードのない PDF で入れてください）`, 'error');
@@ -56,12 +61,6 @@ export function CardDrop({onRead, children, className = '', big = false}: {onRea
     running.current?.abort();
     running.current = null;
     setProgress(null);
-  };
-  const onDrop = (e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setOver(false);
-    void read(e.dataTransfer.files);
   };
   // 画面で Ctrl+V：クリップボードの画像・PDF（files にないときは items から）を読む。読んでいるあいだ・字を打つ欄では何もしない
   const reading = useRef(false);
@@ -90,21 +89,7 @@ export function CardDrop({onRead, children, className = '', big = false}: {onRea
   }, []);
   return (
     <>
-      <button
-        type="button"
-        onClick={() => input.current?.click()}
-        onDragOver={(e) => {
-          if ([...e.dataTransfer.types].includes('Files')) {
-            e.preventDefault();
-            setOver(true);
-          }
-        }}
-        onDragLeave={() => setOver(false)}
-        onDrop={onDrop}
-        className={`rounded-lg border-2 border-dashed font-bold transition ${over ? 'border-sky-500 bg-sky-50 text-sky-900' : 'border-sky-300 bg-white text-sky-800 hover:bg-sky-50'} ${big ? 'px-4 py-4 text-base' : 'px-3 py-1.5 text-sm'} ${className}`}
-      >
-        {children}
-      </button>
+      <DropArea name={children} label={children} hint={hint} big={big} className={className} onPick={() => input.current?.click()} onFiles={(files) => void read(files)} />
       <input ref={input} type="file" accept="image/*,application/pdf,.pdf" multiple className="hidden" aria-label="介護保険証のファイル" onChange={(e) => void read(e.target.files).finally(() => (e.target.value = ''))} />
       {progress && (
         <Modal
@@ -204,11 +189,36 @@ function FieldInput({field, v, set}: {field: CardField; v: CardInfo; set: (patch
   }
 }
 
+/** 保険証にない項目（介護ソフトの画面から）の値を直す欄。担当は担当者の候補から選ぶ */
+function ExtraInput({field, v, set, staffList}: {field: ExtraField; v: ExtraInfo; set: (patch: Partial<ExtraInfo>) => void; staffList: string[]}) {
+  const cls = 'h-9 rounded-md border border-slate-300 bg-white px-2 text-sm';
+  const label = EXTRA_FIELDS.find((x) => x.field === field)?.label ?? field;
+  if (field === 'staff')
+    return (
+      <select value={v.staff} onChange={(e) => set({staff: e.target.value})} className={cls} aria-label="担当（読んだ値）">
+        <option value="" />
+        {staffList.map((x) => (
+          <option key={x}>{x}</option>
+        ))}
+      </select>
+    );
+  if (field === 'welfare')
+    return (
+      <select value={v.welfare} onChange={(e) => set({welfare: e.target.value as ExtraInfo['welfare']})} className={cls} aria-label="生活保護（読んだ値）">
+        <option value="" />
+        <option value="yes">あり（生保）</option>
+        <option value="no">なし</option>
+      </select>
+    );
+  return <TextInput value={v[field]} onChange={(t) => set({[field]: t} as Partial<ExtraInfo>)} className="w-full min-w-0" aria-label={`${label}（読んだ値）`} inputMode={field === 'phone' || field === 'reasonTel' ? 'tel' : undefined} />;
+}
+
 /**
- * 確かめる画面：左に保険証の画像（向きを直したもの）、右に読めた値（直せる）と今の値。チェックした行だけ入れる。
- * job：入れる様邸（新規作成のときは、保険者を選んでから作る空の様邸）。newJob：新規作成（保険者を選ぶまで入れられない）
+ * 確かめる画面：左に保険証の画像（向きを直したもの）・介護ソフトの画面、右に読めた値（直せる）と今の値。チェックした行だけ入れる。
+ * job：入れる様邸（新規作成のときは、保険者を選んでから作る空の様邸）。newJob：新規作成（保険者を選ぶまで入れられない）。
+ * staffList：担当者の候補（介護ソフトの画面の担当は、候補にある名前のときだけ入れる）
  */
-export function CardDialog({job, read, thumbs, onApply, onClose, newJob = false}: {job: Job; read: CardRead; thumbs: string[]; onApply: (next: Job) => void; onClose: () => void; newJob?: boolean}) {
+export function CardDialog({job, read, thumbs, onApply, onClose, newJob = false, staffList}: {job: Job; read: ReadResult; thumbs: string[]; onApply: (next: Job) => void; onClose: () => void; newJob?: boolean; staffList?: string[]}) {
   const [v, setV] = useState<CardInfo>(read.info);
   const [picks, setPicks] = useState<Set<CardField>>(() => {
     const p = defaultPicks(job, read.info, read.unsure);
@@ -216,7 +226,29 @@ export function CardDialog({job, read, thumbs, onApply, onClose, newJob = false}
     return p;
   });
   const [big, setBig] = useState<string | null>(null);
+  // 介護ソフトの画面から読んだときの、保険証にない項目（担当は担当者の候補の名前にしてから。候補になければ空）
+  const soft = read.soft;
+  const staff = staffList ?? [];
+  const exRead: ExtraInfo | null = soft ? {...soft.extra, staff: staffMatch(soft.extra.staff, staff)} : null;
+  const [ex, setEx] = useState<ExtraInfo | null>(exRead);
+  const [exPicks, setExPicks] = useState<Set<ExtraField>>(() => (soft && exRead ? extraPicks(job, exRead, soft.unsure) : new Set<ExtraField>()));
+  // 担当の行は、担当者の候補を渡されたときだけ（特定福祉用具申請書のタブには候補がない）
+  const exRows = soft ? EXTRA_FIELDS.filter(({field}) => extraText(soft.extra, field) && (field !== 'staff' || staffList)) : [];
+  // 介護ソフトの画面には保険者番号がない（行を出さない）
+  const fields = soft ? CARD_FIELDS.filter((f) => f.field !== 'insurerNo') : CARD_FIELDS;
   const cur = currentOf(job);
+  const curEx = currentExtra(job);
+  const setExField = (field: ExtraField) => (patch: Partial<ExtraInfo>) => {
+    setEx((x) => (x ? {...x, ...patch} : x));
+    setExPicks((p) => new Set(p).add(field));
+  };
+  const toggleEx = (field: ExtraField, on: boolean) =>
+    setExPicks((p) => {
+      const n = new Set(p);
+      if (on) n.add(field);
+      else n.delete(field);
+      return n;
+    });
   const set = (field: CardField) => (patch: Partial<CardInfo>) => {
     setV((x) => ({...x, ...patch}));
     setPicks((p) => new Set(p).add(field));
@@ -230,15 +262,17 @@ export function CardDialog({job, read, thumbs, onApply, onClose, newJob = false}
     });
   const insurerChange = !newJob && picks.has('insurer') && v.insurer && job.insurer && v.insurer !== job.insurer;
   const needInsurer = newJob && !v.insurer;
-  const found = CARD_FIELDS.filter((f) => fieldText(read.info, f.field)).length;
+  const found = fields.filter((f) => fieldText(read.info, f.field)).length + exRows.length;
+  const count = picks.size + exPicks.size;
   const apply = () => {
     const p = new Set(picks);
     for (const f of [...p]) if (!fieldText(v, f) && f !== 'insurer') p.delete(f);
-    onApply(applyCard(job, v, p));
+    const next = applyCard(job, v, p);
+    onApply(ex ? applyExtra(next, ex, new Set([...exPicks].filter((f) => extraText(ex, f) && exRows.some((r) => r.field === f))), staff) : next);
   };
   return (
     <Modal
-      title="🪪 介護保険証から入れる"
+      title={soft ? '🪪 介護ソフトの画面から入れる' : '🪪 介護保険証から入れる'}
       onClose={onClose}
       wide
       footer={
@@ -247,8 +281,8 @@ export function CardDialog({job, read, thumbs, onApply, onClose, newJob = false}
           <Btn color="white" onClick={onClose}>
             キャンセル
           </Btn>
-          <Btn color="emerald" onClick={apply} disabled={needInsurer || picks.size === 0}>
-            {newJob ? 'この内容で新規作成' : `チェックした ${picks.size} 項目を入れる`}
+          <Btn color="emerald" onClick={apply} disabled={needInsurer || count === 0}>
+            {newJob ? 'この内容で新規作成' : `チェックした ${count} 項目を入れる`}
           </Btn>
         </div>
       }
@@ -256,11 +290,11 @@ export function CardDialog({job, read, thumbs, onApply, onClose, newJob = false}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
         <div className="space-y-2">
           {thumbs.map((t, i) => (
-            <button key={i} type="button" onClick={() => setBig(t)} className="block w-full overflow-hidden rounded border border-slate-300 bg-white" aria-label={`保険証の画像 ${i + 1}枚目（押すと大きく）`}>
+            <button key={i} type="button" onClick={() => setBig(t)} className="block w-full overflow-hidden rounded border border-slate-300 bg-white" aria-label={`${soft ? '画面' : '保険証'}の画像 ${i + 1}枚目（押すと大きく）`}>
               <img src={t} alt="" className="block w-full" />
             </button>
           ))}
-          <p className="text-xs text-slate-500">読み取りはこの端末の中だけで行い、保険証の画像は保存も送信もしません。</p>
+          <p className="text-xs text-slate-500">読み取りはこの端末の中だけで行い、{soft ? '画面' : '保険証'}の画像は保存も送信もしません。</p>
         </div>
         <div className="min-w-0">
           <p className="mb-2 text-sm text-slate-700">
@@ -274,7 +308,7 @@ export function CardDialog({job, read, thumbs, onApply, onClose, newJob = false}
               <div role="columnheader" className="px-2 py-1.5">読んだ値</div>
               <div role="columnheader" className="px-2 py-1.5">{newJob ? '' : '今の値'}</div>
             </div>
-            {CARD_FIELDS.map(({field, label, keys}) => {
+            {fields.map(({field, label, keys}) => {
               const unsure = keys.some((k) => read.unsure.includes(k));
               const value = fieldText(v, field);
               const now = fieldText(cur, field);
@@ -303,7 +337,38 @@ export function CardDialog({job, read, thumbs, onApply, onClose, newJob = false}
                 </div>
               );
             })}
+            {soft &&
+              ex &&
+              exRows.map(({field, label}) => {
+                const unsure = soft.unsure.includes(field);
+                const value = extraText(ex, field);
+                const now = extraText(curEx, field);
+                return (
+                  <div key={field} role="row" aria-label={label} className={`grid grid-cols-[2rem_minmax(0,1fr)] items-center gap-x-1 border-t border-slate-200 py-1 sm:grid-cols-[2rem_8.5rem_minmax(0,1fr)_minmax(0,12rem)] ${unsure && value ? 'bg-amber-50' : !value ? 'bg-slate-50' : ''}`}>
+                    <div className="px-2">
+                      <input type="checkbox" checked={exPicks.has(field)} onChange={(e) => toggleEx(field, e.target.checked)} aria-label={`${label}を入れる`} className="h-4 w-4 accent-emerald-700" />
+                    </div>
+                    <div className="px-1 font-bold text-slate-700">
+                      {label}
+                      {unsure && value && <span className="ml-1 text-xs font-normal text-amber-800">（確かめて）</span>}
+                    </div>
+                    <div className="col-span-2 min-w-0 px-2 sm:col-span-1">
+                      <ExtraInput field={field} v={ex} set={setExField(field)} staffList={staff} />
+                      {field === 'staff' && !value && <div className="text-xs text-slate-500">担当者の候補にない名前：{soft.extra.staff}</div>}
+                      {field === 'reasonName' && <div className="text-xs text-slate-500">理由書の作成者の氏名に入れます</div>}
+                      {field === 'reasonTel' && <div className="text-xs text-slate-500">理由書の作成者の連絡先に入れます</div>}
+                    </div>
+                    {!newJob && (
+                      <div className="col-span-2 truncate px-2 text-xs text-slate-500 sm:col-span-1" title={now}>
+                        {now ? `今：${now}` : '今：（空）'}
+                        {now && value && sameExtra(field, now, value) && <span className="ml-1 text-emerald-700">（同じ）</span>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
           </div>
+          {soft && <p className="mt-2 text-xs text-slate-500">読んだもの：介護ソフトの画面</p>}
           {read.kinds.length > 0 && (
             <p className="mt-2 text-xs text-slate-500">
               読んだもの：{read.kinds.map((k) => (k === 'card' ? '被保険者証' : '負担割合証')).join('・')}
@@ -322,24 +387,35 @@ export function CardDialog({job, read, thumbs, onApply, onClose, newJob = false}
   );
 }
 
-/** 様邸の画面（申請書・理由書のタブ）の「🪪 介護保険証から入れる」：読んで、確かめて、この様邸に入れる */
-export function CardFill({job, setJob}: {job: Job; setJob: (fn: (j: Job) => Job) => void}) {
+/** 様邸の画面（4つのタブのすぐ右）の「🪪 介護保険証・介護ソフトの画面」：読んで、確かめて、この様邸に入れる。staffList：担当者の候補 */
+export function CardFill({job, setJob, staffList}: {job: Job; setJob: (fn: (j: Job) => Job) => void; staffList?: string[]}) {
   const toast = useToast();
-  const [got, setGot] = useState<{read: CardRead; thumbs: string[]} | null>(null);
+  const [got, setGot] = useState<{read: ReadResult; thumbs: string[]} | null>(null);
   return (
     <>
-      <CardDrop onRead={setGot}>🪪 介護保険証から入れる</CardDrop>
+      <CardDrop onRead={setGot}>🪪 介護保険証・介護ソフトの画面</CardDrop>
       {got && (
         <CardDialog
           job={job}
           read={got.read}
           thumbs={got.thumbs}
+          staffList={staffList}
           onClose={() => setGot(null)}
           onApply={(next) => {
-            // 確かめているあいだに直した欄（申請書の一覧など）は、入れる項目のほかはそのまま
-            setJob((j) => ({...j, insuredNo: next.insuredNo, customer: next.customer, address: next.address, insurer: next.insurer, form: next.form, shinsei: {...NO_SHINSEI, ...j.shinsei, ...diffShinsei(job, next)}}));
+            // 確かめているあいだに直した欄（申請書の一覧など）は、入れる項目のほかはそのまま（担当・理由書の作成者の連絡先は、介護ソフトの画面から入れたときだけ変わる）
+            setJob((j) => ({
+              ...j,
+              insuredNo: next.insuredNo,
+              customer: next.customer,
+              address: next.address,
+              insurer: next.insurer,
+              form: next.form,
+              staff: next.staff === job.staff ? j.staff : next.staff,
+              ...(next.riyu !== job.riyu ? {riyu: {...riyuOf(j), tel: riyuOf(next).tel}} : {}),
+              shinsei: {...NO_SHINSEI, ...j.shinsei, ...diffShinsei(job, next)},
+            }));
             setGot(null);
-            toast('介護保険証の内容を入れました（申請書・理由書・見積書に出ます）');
+            toast(got.read.soft ? '介護ソフトの画面の内容を入れました（申請書・理由書・見積書に出ます）' : '介護保険証の内容を入れました（申請書・理由書・見積書に出ます）');
           }}
         />
       )}

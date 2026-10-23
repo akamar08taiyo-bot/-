@@ -2,7 +2,7 @@
 // 文字は読み取り（tesseract.js）の出力のまね。値はどれも架空（見本・0000。ユーザーにいただいた画面の値は使わない）
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {cleanKana, findLabel, kanaOfWords, kanaRect, mergeSoft, NO_SOFT, parseSoft, parseSoftPage, phoneText, pickKana, rereadInfo, softRows, softScore} from '../../src/sasaoka/careSoft.ts';
+import {cleanKana, findLabel, kanaOfWords, kanaRect, mergeSoft, NO_SOFT, parseSoft, parseSoftPage, phoneText, pickKana, rereadInfo, screenLike, softRows, softScore} from '../../src/sasaoka/careSoft.ts';
 import type {OcrPage, OcrWord} from '../../src/sasaoka/hokensho.ts';
 
 const TODAY = '2026-10-23';
@@ -277,4 +277,23 @@ test('数字の欄の位置（読み直す所）とフリガナの行の切り�
   const rect = kanaRect(p)!;
   assert.ok(rect.y0 >= busho.y1 && rect.y1 <= name2.y0, JSON.stringify({rect, busho: busho.y1, name2: name2.y0}));
   assert.ok(rect.x1 > rect.x0 + 100);
+});
+
+test('画面のスクリーンショットらしいか：地の色が平らな画像だけ（写真のような色の散らばった画像は介護保険証として読む）', () => {
+  const px = (n: number, f: (i: number) => [number, number, number]) => {
+    const a = new Uint8ClampedArray(n * 4);
+    for (let i = 0; i < n; i++) {
+      const [r, g, b] = f(i);
+      a.set([r, g, b, 255], i * 4);
+    }
+    return a;
+  };
+  // 白い地に字（灰色）が少し
+  assert.equal(screenLike(px(10000, (i) => (i % 9 === 0 ? [90, 90, 90] : [255, 255, 255]))), true);
+  // JPEG のざらつき（白の ±3）も平ら
+  assert.equal(screenLike(px(10000, (i) => [252 + (i % 4), 253, 251 + (i % 5)])), true);
+  // 光のむら（明るさがなだらかに変わる写真）
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 255;
+  assert.equal(screenLike(px(10000, (i) => [((i / 10000) * 200 + rnd() * 0.2) | 0, ((i / 10000) * 180 + 30) | 0, rnd() | 0])), false);
 });

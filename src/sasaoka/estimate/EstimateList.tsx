@@ -5,7 +5,7 @@ import {CardDialog, CardDrop} from '../components/CardReader.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm} from '../estimateForms.ts';
 import {estimateXlsx, XLSX_TYPE} from '../estimateXlsx.ts';
-import type {CardRead} from '../hokensho.ts';
+import type {ReadResult} from '../cardApply.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {addSamples, hasSamples} from '../samples.ts';
@@ -104,7 +104,7 @@ export function EstimateHome({
   goMaterials: () => void;
 }) {
   const all = useEstimates(data, data.settings);
-  const [card, setCard] = useState<{read: CardRead; thumbs: string[]} | null>(null);
+  const [card, setCard] = useState<{read: ReadResult; thumbs: string[]} | null>(null);
   const month = thisMonth();
   const inMonth = all.filter((e) => e.job.month === month).length;
   return (
@@ -128,10 +128,9 @@ export function EstimateHome({
                 ＋ {INSURER_INFO.kouiki.name}
               </Btn>
             </div>
-            {/* 介護保険証（画像・PDF）を入れると、保険者・番号・氏名・生年月日・要介護・有効期間などを入れた様邸を作る */}
-            <CardDrop onRead={setCard} big className="w-full">
-              🪪 介護保険証から新規作成
-              <span className="block text-xs font-normal text-sky-700">保険証の画像・PDF をここにドロップ（押して選んでもよい）。保険者も保険証から</span>
+            {/* 介護保険証（画像・PDF）・介護ソフトの画面のスクリーンショットを入れると、保険者・番号・氏名・生年月日・要介護・有効期間などを入れた様邸を作る */}
+            <CardDrop onRead={setCard} big className="w-full" hint="画像・PDF をここにドロップ・Ctrl+V（押して選んでもよい）。保険者も読んだものから">
+              🪪 介護保険証・介護ソフトの画面から新規作成
             </CardDrop>
           </div>
         </section>
@@ -140,6 +139,7 @@ export function EstimateHome({
             job={newEstimate(card.read.info.insurer || 'yukuhashi')}
             read={card.read}
             thumbs={card.thumbs}
+            staffList={data.settings.staffList}
             newJob
             onClose={() => setCard(null)}
             onApply={(job) => {

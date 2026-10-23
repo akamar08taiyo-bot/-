@@ -1,5 +1,5 @@
-import {createContext, useContext, useEffect, useRef, useState} from 'react';
-import type {ButtonHTMLAttributes, InputHTMLAttributes, ReactNode} from 'react';
+import {createContext, useContext, useEffect, useRef, useState, useSyncExternalStore} from 'react';
+import type {ButtonHTMLAttributes, DragEvent as ReactDragEvent, InputHTMLAttributes, ReactNode} from 'react';
 
 // 色は機能ごとに1色（見積・提案書作成アプリのデザイン規約と同じ使い分け）
 const COLORS = {
@@ -246,4 +246,135 @@ export function Star({on, onClick, label}: {on: boolean; onClick: () => void; la
       {on ? '★' : '☆'}
     </button>
   );
+}
+
+// ---------------------------------------------------------------- ファイルを落とせる所（2026-10-23）
+// ユーザーの指示「完了写真もドラッグ＆ドロップや貼付けしやすいようにする。介護保険証もそうです。スクリーンショットもそうです。
+// ドラッグドロップで貼り付けれるっていうことが認識しやすいように、見やすいようにしてください」：点線の枠と「ここにドロップ・Ctrl+V」、
+// ファイルを画面に持ってきたら落とせる所をみな薄い緑に、重ねている所は緑で「ここに離す」
+
+let fileDragging = false;
+let dragTimer: ReturnType<typeof setTimeout> | undefined;
+const dragListeners = new Set<() => void>();
+const hasFiles = (e: {dataTransfer: DataTransfer | null}) => [...(e.dataTransfer?.types ?? [])].includes('Files');
+function setFileDragging(on: boolean) {
+  clearTimeout(dragTimer);
+  if (fileDragging === on) return;
+  fileDragging = on;
+  for (const l of dragListeners) l();
+}
+// ファイルを画面の上で動かしているあいだは dragover が続く（画面の外へ出た・やめたときは来なくなる）
+const onWindowDragOver = (e: DragEvent) => {
+  if (!hasFiles(e)) return;
+  setFileDragging(true);
+  dragTimer = setTimeout(() => setFileDragging(false), 300);
+};
+const onWindowDragEnd = () => setFileDragging(false);
+// 落とせる所の外で離したファイルを、ブラウザが開いて（アプリから離れて）しまわないように
+const guardOver = (e: DragEvent) => {
+  if (!hasFiles(e) || e.defaultPrevented || !e.dataTransfer) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'none';
+};
+const guardDrop = (e: DragEvent) => {
+  if (hasFiles(e) && !e.defaultPrevented) e.preventDefault();
+};
+function subscribeDrag(fn: () => void) {
+  dragListeners.add(fn);
+  if (dragListeners.size === 1) {
+    window.addEventListener('dragover', onWindowDragOver, true);
+    window.addEventListener('drop', onWindowDragEnd, true);
+    window.addEventListener('dragend', onWindowDragEnd, true);
+    window.addEventListener('dragover', guardOver);
+    window.addEventListener('drop', guardDrop);
+  }
+  return () => {
+    dragListeners.delete(fn);
+    if (dragListeners.size) return;
+    window.removeEventListener('dragover', onWindowDragOver, true);
+    window.removeEventListener('drop', onWindowDragEnd, true);
+    window.removeEventListener('dragend', onWindowDragEnd, true);
+    window.removeEventListener('dragover', guardOver);
+    window.removeEventListener('drop', guardDrop);
+  };
+}
+
+/** ファイル（エクスプローラーの写真・画像など）を画面の上でドラッグしているか（落とせる所をみな目立たせる） */
+export const useFileDragging = () => useSyncExternalStore(subscribeDrag, () => fileDragging, () => false);
+
+/** ファイルを重ねているときの「ここに離す」（落とせる所の上にかぶせる） */
+export function DropOverlay({text = 'ここに離す'}: {text?: string}) {
+  return (
+    <span aria-hidden className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] bg-emerald-100/95 px-1 text-sm font-bold text-emerald-900">
+      {text}
+    </span>
+  );
+}
+
+/**
+ * ファイルを落とせる所：点線の枠・言葉（label）・小さな言葉（hint。ふつうは「ここにドロップ・Ctrl+V」）。
+ * 押す・Enter でファイルを選ぶ（onPick）。name は読み上げの名前（見える言葉が「ここに離す」に変わっても同じ）
+ */
+export function DropArea({
+  name,
+  label,
+  hint = 'ここにドロップ・Ctrl+V',
+  onFiles,
+  onPick,
+  big = false,
+  className = '',
+  ...rest
+}: Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onDrop' | 'onClick' | 'children'> & {name: string; label: ReactNode; hint?: ReactNode; onFiles: (files: File[]) => void; onPick?: () => void; big?: boolean}) {
+  const [over, setOver] = useState(false);
+  const dragging = useFileDragging();
+  useEffect(() => {
+    if (!dragging) setOver(false);
+  }, [dragging]);
+  const onDragOver = (e: ReactDragEvent) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setOver(true);
+  };
+  return (
+    <button
+      type="button"
+      aria-label={name}
+      {...rest}
+      onClick={onPick}
+      onDragEnter={onDragOver}
+      onDragOver={onDragOver}
+      onDragLeave={(e) => {
+        if (!(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget))) setOver(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setOver(false);
+        setFileDragging(false);
+        const files = [...e.dataTransfer.files];
+        if (files.length) onFiles(files);
+      }}
+      className={`relative rounded-lg border-2 border-dashed text-center transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 ${
+        over ? 'border-emerald-600 bg-emerald-50 text-emerald-900' : dragging ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-[0_0_0_3px_rgba(16,185,129,0.25)]' : 'border-sky-400 bg-white text-sky-900 hover:border-emerald-500 hover:bg-emerald-50/60'
+      } ${big ? 'px-4 py-3' : 'px-3 py-1'} ${className}`}
+    >
+      <span className={`block font-bold ${big ? 'text-base' : 'text-sm'}`}>{label}</span>
+      {hint && <span className={`block font-normal opacity-80 ${big ? 'text-xs' : 'text-[11px] leading-tight max-sm:hidden'}`}>{hint}</span>}
+      {over && <DropOverlay />}
+    </button>
+  );
+}
+
+/**
+ * 貼り付け（Ctrl+V）のファイル：画像・PDF（files になければ items から）。文字もあるとき（Excel の表をコピーすると、文字と一緒に表の絵も入る）は貼り付けない。
+ * ただし文字がファイルの名前だけのとき（Mac でファイルをコピーすると名前も入る）は、ファイルの貼り付け（CardReader.tsx の CardDrop と同じ決まり）
+ */
+export function pastedFiles(data: DataTransfer, accept: (f: File) => boolean): File[] {
+  const fromItems = [...data.items].filter((i) => i.kind === 'file').map((i) => i.getAsFile());
+  const files = (data.files.length ? [...data.files] : fromItems.filter((f): f is File => f !== null)).filter(accept);
+  if (files.length === 0) return [];
+  const text = data.getData('text/plain').trim();
+  if (text && !text.split(/\r?\n/).every((line) => files.some((f) => f.name === line.trim()))) return [];
+  return files;
 }
