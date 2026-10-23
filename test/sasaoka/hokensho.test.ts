@@ -359,3 +359,51 @@ test('読めなかった字がありそう：字と字の間の縦の画（細�
   assert.ok(r.unsure.includes('birthY'));
   assert.ok(!parseCard([read(false)]).unsure.includes('birthY'));
 });
+
+// ---------------------------------------------------------------- 見直しで見つかった読み違い（2026-10-23）
+
+test('読み違いを直す：元号は日付の中（うしろに「6 年」）だけ。氏名・事業所の名前の「合 和」「信和」は令和にしない', () => {
+  const card = (name: string) => page([[[40, '番号 0000123456']], [[40, `氏名 ${name}`]], [[40, '生年月日 照和 13 年 4 月 14 日 女']]]);
+  for (const n of ['河合 和子', '落合 利夫', '今 和子', '見本 信和']) {
+    const r = parseCard([card(n), card(n)]);
+    assert.equal(r.info.name, n.replace(' ', '　'));
+    assert.equal(r.info.era, '昭和'); // 日付の「照和 13 年」は直す
+  }
+  assert.equal(fixOcr('医療法人信和会 信和居宅介護支援事業所'), '医療法人信和会 信和居宅介護支援事業所');
+  assert.equal(fixOcr('信和 6 年 4 月 1 日'), '令和 6 年 4 月 1 日');
+  assert.equal(fixOcr('今和元年5月1日'), '令和元年5月1日');
+  assert.equal(fixOcr('令 和 6 年'), '令和 6 年');
+  assert.equal(fixOcr('念和 1O 年'), '令和 10 年'); // 数字を直してから元号
+});
+
+test('氏名：「被保険者」のラベルの字は1字だけ離れているときだけ除く（「保坂」「保田」の「保」は名前）', () => {
+  const card = (name: string) => page([[[40, '番号 0000123456']], [[40, `氏名 ${name}`]]]);
+  assert.equal(parseCard([card('保坂 花子')]).info.name, '保坂　花子');
+  assert.equal(parseCard([card('保田 一郎')]).info.name, '保田　一郎');
+  assert.equal(parseCard([card('保 険 見本 花子')]).info.name, '見本　花子');
+});
+
+test('郵便番号：数字の間の「ｰ」「ー」「一」は区切り（全角半角をそろえたあとで直す）', () => {
+  for (const z of ['824ｰ0001', '824ー0001', '824一0001', '824 ー 0001']) {
+    const r = parseCard([page([[[40, '番号 0000123456']], [[40, `住所 〒 ${z} 行橋市中央一丁目 1 番 1 号`]], [[40, '氏名 見本 花子']]])]);
+    assert.equal(r.info.zip, '824-0001', z);
+    assert.equal(r.info.address, '行橋市中央一丁目1番1号', z);
+  }
+  // 住所の漢数字（「中央一丁目」）は変えない
+  assert.equal(fixOcr('中央一丁目1ー2'), '中央一丁目1-2');
+});
+
+test('和暦：元号の期間にない日付は読み違い（昭和73年・昭和64年1月8日・平成元年1月7日・令和元年4月1日・令和0年）', () => {
+  for (const [e, y, m, d] of [['昭和', '73', '4', '14'], ['昭和', '64', '1', '8'], ['平成', '元', '1', '7'], ['令和', '元', '4', '1'], ['平成', '35', '3', '31'], ['大正', '20', '1', '1'], ['令和', '0', '4', '1']])
+    assert.equal(warekiIso(e, y, m, d), '', `${e}${y}年${m}月${d}日`);
+  assert.equal(warekiIso('昭和', '64', '1', '7'), '1989-01-07');
+  assert.equal(warekiIso('平成', '元', '1', '8'), '1989-01-08');
+  assert.equal(warekiIso('平成', '31', '4', '30'), '2019-04-30');
+  assert.equal(warekiIso('令和', '元', '5', '1'), '2019-05-01');
+  assert.equal(warekiIso('大正', '15', '12', '24'), '1926-12-24');
+  assert.equal(warekiIso('昭和', '元', '12', '25'), '1926-12-25');
+  const r = parseCard([page([[[40, '氏名 見本 花子']], [[40, '生年月日 昭和 73 年 4 月 14 日 女']]])]);
+  assert.deepEqual([r.info.era, r.info.birthY], ['', '']);
+  const t = parseCard([page([[[40, '認定の有効期間 平成 33 年 4 月 1 日 ～ 平成 36 年 3 月 31 日']]])]);
+  assert.deepEqual([t.info.careFrom, t.info.careTo], ['', '']);
+});

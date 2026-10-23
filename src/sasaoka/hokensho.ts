@@ -73,21 +73,31 @@ export const NO_CARD: CardInfo = {
 // ---------------------------------------------------------------- 読み違いを直す
 
 const CJK = /[々〆ぁ-ゖァ-ヺー一-鿿]/;
-/** 元号の読み違い（令和→念和・信和・今和・合和・令利、昭和→照和・昭利 など） */
+/** 日付の元号のうしろ（「6 年」「元年」）。元号の読み違いは、ここだけ直す */
+const ERA_DATE = String.raw`(?=\s*(?:\d{1,2}|元)\s*年)`;
+/**
+ * 元号の読み違い（令和→念和・信和・今和・合和・令利、昭和→照和・昭利 など）。日付の中（うしろに「6 年」）だけで、空白をまたがない
+ * （氏名・事業所の名前の「河合 和子」「見本 信和」「信和会」を「令和」にしない）。正しい2字の間の空白だけはつめる
+ */
 const ERA_FIX: [RegExp, string][] = [
-  [/[令今念信合命]\s*[和利知]/g, '令和'],
-  [/[昭照招哲晒]\s*[和利知]/g, '昭和'],
-  [/平\s*[成戌]/g, '平成'],
-  [/大\s*[正止]/g, '大正'],
-  [/明\s*[治冶]/g, '明治'],
+  [new RegExp(`(?:[令今念信合命][和利知]|令\\s+和)${ERA_DATE}`, 'g'), '令和'],
+  [new RegExp(`(?:[昭照招哲晒][和利知]|昭\\s+和)${ERA_DATE}`, 'g'), '昭和'],
+  [new RegExp(`平\\s*[成戌]${ERA_DATE}`, 'g'), '平成'],
+  [new RegExp(`大\\s*[正止]${ERA_DATE}`, 'g'), '大正'],
+  [new RegExp(`明\\s*[治冶]${ERA_DATE}`, 'g'), '明治'],
 ];
 
 /** 全角半角をそろえ（半角カナも全角に）、数字のまわりの読み違い（O→0、l・I・|→1）と元号の読み違いを直す */
 export function fixOcr(s: string): string {
-  let t = s.normalize('NFKC').replace(/[‐‑‒–—―−ｰ]/g, '-');
-  for (const [re, v] of ERA_FIX) t = t.replace(re, v);
+  // 数字の間の長音・「一」は区切りの「-」（半角の「ｰ」は NFKC で「ー」になるので、そろえたあとで。「〒824ｰ0001」）
+  let t = s
+    .normalize('NFKC')
+    .replace(/[‐‑‒–—―−]/g, '-')
+    .replace(/(?<=\d\s?)[ー一](?=\s?\d)/g, '-');
   // 数字にはさまれた・数字のとなりの O o 〇 は 0、l I | は 1（字の中の「ロ」「口」は変えない）
   t = t.replace(/(?<=\d)[Oo〇](?=[\d\s]|$)|(?<=^|[\s\d])[Oo〇](?=\d)/g, '0').replace(/(?<=\d)[lI|](?=\d)|(?<=[\s])[lI|](?=\d{2})/g, '1');
+  // 元号は数字を直したあと（うしろの「6 年」で日付と分かる）
+  for (const [re, v] of ERA_FIX) t = t.replace(re, v);
   // 「1割」の 1 が ] | l に読めたとき
   t = t.replace(/(?<![\d])[\]\[|lIi!」｣丨亅](?=\s*割(?!合))/g, '1');
   return t;
@@ -260,16 +270,29 @@ export function locateValues(page: OcrPage): Located | null {
 const DATE = String.raw`(令和|平成|昭和)\s*(\d{1,2}|元)\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?`;
 const ERA_BASE: Record<string, number> = {明治: 1867, 大正: 1911, 昭和: 1925, 平成: 1988, 令和: 2018};
 
+/** 元号の最初の日と最後の日（この間にない日付＝昭和73年・令和元年4月1日・令和0年などは読み違い） */
+const ERA_SPAN: Record<string, [string, string]> = {
+  明治: ['1868-01-01', '1912-07-29'],
+  大正: ['1912-07-30', '1926-12-24'],
+  昭和: ['1926-12-25', '1989-01-07'],
+  平成: ['1989-01-08', '2019-04-30'],
+  令和: ['2019-05-01', '9999-12-31'],
+};
+
 /** 和暦 → 'YYYY-MM-DD'（ない日付は ''） */
 export function warekiIso(era: string, y: string, m: string, d: string): string {
   const base = ERA_BASE[era];
   if (base === undefined) return '';
-  const year = base + (y === '元' ? 1 : Number(y));
+  const n = y === '元' ? 1 : Number(y);
+  if (!(n >= 1)) return '';
+  const year = base + n;
   const mm = Number(m);
   const dd = Number(d);
   const at = new Date(year, mm - 1, dd);
   if (!(mm >= 1 && mm <= 12) || at.getMonth() !== mm - 1 || at.getDate() !== dd) return '';
-  return `${year}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+  const iso = `${year}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+  const [start, end] = ERA_SPAN[era];
+  return iso >= start && iso <= end ? iso : '';
 }
 
 /**
@@ -324,7 +347,8 @@ function labelCells(text: string, label: RegExp): {cells: string[]; at: number} 
 /** 氏名・フリガナの値：ラベル（氏名・フリガナ・被保険者の字）とごみを除き、姓と名の間を全角の空白1つに */
 function personName(raw: string, kana: boolean): string {
   const t = raw
-    .replace(/フ\s*リ\s*[ガカ]\s*ナ|氏\s*名|^[被保険者\s]+/g, ' ')
+    // 被保険者の字は、1字だけ離れているときだけラベル（「保坂 花子」の「保」は名前）
+    .replace(/フ\s*リ\s*[ガカ]\s*ナ|氏\s*名|^\s*(?:[被保険者](?:\s+|$))+/g, ' ')
     .replace(kana ? /[^ァ-ヺー\s]/g : /[^々〆ぁ-ゖァ-ヺー一-鿿\s]/g, ' ')
     .replace(/様$/, '')
     .trim();
