@@ -127,6 +127,36 @@ test('前のデータの行・部材にも、定価・長さ・見積の単価�
   assert.deepEqual(cleanKits([{name: '一式', rows: [{kind: 'labor', name: '木', price: 1000, qty: 2}]}, 'x']).map((k) => [k.name, k.rows.length]), [['一式', 1]]);
 });
 
+test('新しい版が足した項目は消さない（前の版を開いたままのタブが保存し直しても、新しい版で入れたもの・写真の番号が残る）', () => {
+  const [j] = cleanJobs([
+    {
+      id: 'j1',
+      month: 'x',
+      customer: '山田',
+      caseNo: 'A-12', // この版の知らない項目
+      work: '前の工事名称', // 前の版の項目は捨てる
+      shinseiMarks: {gender: '女'},
+      shinsei: {kana: 'ヤマダ', careFrom: '2026-04-01', newMark: '有'},
+      places: [{id: 'p1', name: '玄関', work: '手すり', photoNote: ' ', photoSet: {during: 'ph-1'}, rows: [{id: 'r1', name: '手すり', qty: '2', supplier: '問屋A'}]}],
+    },
+  ]);
+  const any = (x: object) => x as Record<string, unknown>;
+  assert.equal(any(j).caseNo, 'A-12');
+  assert.equal(any(j.shinsei!).newMark, '有');
+  assert.deepEqual(any(j.places[0]).photoSet, {during: 'ph-1'});
+  assert.equal(any(j.places[0].rows[0]).supplier, '問屋A');
+  // この版の知っている項目は今までどおり整える（数は数字に、空の写真に書く内容は持たない、前の版の項目は捨てる）
+  assert.deepEqual([j.places[0].rows[0].qty, j.shinsei!.kana, j.shinsei!.careFrom, j.shinsei!.gender], [2, 'ヤマダ', '2026-04-01', '']);
+  assert.match(j.month, /^\d{4}-\d{2}$/);
+  for (const [obj, key] of [[j, 'work'], [j, 'shinseiMarks'], [j.places[0], 'work'], [j.places[0], 'photoNote']] as const) assert.equal(key in obj, false, key);
+  // そのまま保存できる形（IndexedDB に入れられる）。もう一度整えても同じ
+  assert.deepEqual(cleanJobs(structuredClone([j])), [j]);
+  // 部材リスト・部材＋施工費（常用）も
+  assert.equal(any(cleanMaterials([{name: '手すり', supplier: '問屋A'}])[0]).supplier, '問屋A');
+  const [kit] = cleanKits([{name: '一式', color: 'blue', rows: [{name: '木', memo2: 'x'}]}]);
+  assert.deepEqual([any(kit).color, any(kit.rows[0]).memo2], ['blue', 'x']);
+});
+
 test('笹岡工務店の請求書に入れるか：前の版の様邸は入れる。見積書作成アプリで入れないままの見積書は入れない', () => {
   assert.equal(cleanJobs([{id: 'a'}])[0].shikiri, true);
   assert.equal(cleanJobs([{id: 'a', shikiri: true}])[0].shikiri, true);

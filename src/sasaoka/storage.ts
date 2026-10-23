@@ -171,9 +171,26 @@ const optNum = (v: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+/**
+ * この版が知らない項目（新しい版が足した項目）は、消さずにそのまま持っておく。新しい版を開いたあとで、前の版を開いたままの
+ * タブが保存しても、新しい版で入れたもの（とその写真の番号）を消さないように。clean が読まなかった項目＝この版が知らない項目。
+ * 読んだ項目は clean の結果のとおり（直す・空なら持たない）。項目の一覧を持たないので、項目を足しても直さなくてよい。
+ * old は前の版の項目（もう読まない。持っておかずに捨てる）
+ */
+function keepNewer<R, T extends object>(raw: R, clean: (r: R) => T, old: readonly string[] = []): T {
+  if (!isObj(raw)) return clean(raw);
+  const read = new Set<PropertyKey>(old);
+  const seen = new Proxy(raw, {
+    get: (t, k) => (read.add(k), Reflect.get(t, k)),
+    has: (t, k) => (read.add(k), Reflect.has(t, k)),
+  });
+  const out = clean(seen);
+  return {...Object.fromEntries(Object.entries(raw).filter(([k]) => !read.has(k))), ...out};
+}
+
 export function cleanMaterials(raw: unknown): Material[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter(isObj).map((m) => ({
+  return raw.filter(isObj).map((rec) => keepNewer(rec, (m) => ({
     id: str(m.id) || uid('m'),
     name: str(m.name),
     price: numv(m.price),
@@ -185,7 +202,7 @@ export function cleanMaterials(raw: unknown): Material[] {
     unit: str(m.unit),
     favorite: m.favorite === true,
     updatedAt: numv(m.updatedAt, Date.now()),
-  }));
+  })));
 }
 
 /** 最初の単価表の見積の単価（見積の単価がなかった前の版の単価表に入れる） */
@@ -236,7 +253,7 @@ function rowLength(r: Record<string, unknown>, piece: number): {lengthCm: number
   return {lengthCm: Math.round(((lengthCm * piece) / saved) * 1000) / 1000, pieceLengthM: piece};
 }
 
-const cleanRow = (r: Record<string, unknown>): Row => ({
+const cleanRow = (raw: Record<string, unknown>): Row => keepNewer(raw, (r) => ({
   id: str(r.id) || uid('r'),
   kind: r.kind === 'labor' ? 'labor' : 'material',
   refId: typeof r.refId === 'string' ? r.refId : null,
@@ -253,13 +270,13 @@ const cleanRow = (r: Record<string, unknown>): Row => ({
   estText: typeof r.estText === 'string' ? r.estText : null,
   estNote: typeof r.estNote === 'string' ? r.estNote : null,
   estAmount: optNum(r.estAmount),
-});
+}));
 
 const KINDS = [1, 2, 3, 4, 5, 6]; // 見積書の改修の種類（①〜⑥）
 const FORMS: EstimateForm[] = ['yukuhashi', 'kouiki'];
 const INSURERS: Insurer[] = ['kanda', 'yukuhashi', 'miyako', 'kouiki'];
 
-const cleanPlace = (p: Record<string, unknown>): Place => ({
+const cleanPlace = (raw: Record<string, unknown>): Place => keepNewer(raw, (p) => ({
   id: str(p.id) || uid('p'),
   name: str(p.name),
   rows: Array.isArray(p.rows) ? p.rows.filter(isObj).map(cleanRow) : [],
@@ -273,7 +290,7 @@ const cleanPlace = (p: Record<string, unknown>): Place => ({
   ...cleanPhotoDates(p.photoDates),
   ...(str(p.photoNote).trim() ? {photoNote: str(p.photoNote)} : {}), // 写真に書く内容の追加
   ...cleanPhotoEdits(p.photoEdits),
-});
+}), ['work']);
 
 /** 改修の内容の寸法（打ったままの文字）。どれもなければ持たない */
 function cleanDims(raw: unknown): {dims?: PlaceDims} {
@@ -375,7 +392,7 @@ function cleanShinsei(raw: unknown, legacyMarks: unknown): ShinseiInfo {
 
 export function cleanJobs(raw: unknown): Job[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter(isObj).map((j) => {
+  return raw.filter(isObj).map((rec) => keepNewer(rec, (j) => {
     const form: EstimateForm | '' = FORMS.includes(j.form as EstimateForm) ? (j.form as EstimateForm) : '';
     const address = str(j.address);
     return {
@@ -397,22 +414,22 @@ export function cleanJobs(raw: unknown): Job[] {
       shikiri: j.shikiri !== false, // 見積書作成アプリができる前の様邸は、どれも仕切り計算・請求書アプリで作ったもの
       places: Array.isArray(j.places) ? j.places.filter(isObj).map(cleanPlace) : [],
       order: cleanOrder(j.order),
-      shinsei: cleanShinsei(j.shinsei, j.shinseiMarks),
+      shinsei: keepNewer(j.shinsei, (s) => cleanShinsei(s, j.shinseiMarks)),
       ...(isObj(j.riyu) ? {riyu: cleanRiyu(j.riyu)} : {}),
       createdAt: numv(j.createdAt, Date.now()),
       updatedAt: numv(j.updatedAt, Date.now()),
     };
-  });
+  }, ['work'])); // 前の版の工事名称（work）は様邸にもあった
 }
 
 export function cleanKits(raw: unknown): Kit[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter(isObj).map((k) => ({
+  return raw.filter(isObj).map((rec) => keepNewer(rec, (k) => ({
     id: str(k.id) || uid('k'),
     name: str(k.name),
     rows: Array.isArray(k.rows) ? k.rows.filter(isObj).map(cleanRow) : [],
     updatedAt: numv(k.updatedAt, Date.now()),
-  }));
+  })));
 }
 
 /** 名前の候補の並び（空・重複を除く） */
