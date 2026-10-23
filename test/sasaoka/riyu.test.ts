@@ -107,6 +107,13 @@ test('理由書に転記：基本情報・作成者・総合的状況・福祉�
   assert.deepEqual([text('AJ47'), text('AL48'), text('AL50'), text('AJ56'), text('AL57'), text('AJ63')], ['■　手摺取付', '①廊下', '②トイレ', '■　段差の解消', '③玄関', '□　引き戸等への扉の取替え']);
 });
 
+test('ほかのソフトから貼り付けた制御文字（Word の Shift+Enter＝U+000B・改ページ U+000C など）は、改行にするか消す（Excel が修復しないで開ける XML）', () => {
+  const j = job({riyu: {...RIYU_INFO, body: '右片麻痺あり\u000B杖歩行', care: '妻が介護\u000Cしている', wish: 'トイレ\u0007に行きたい￾'}});
+  const {files, text} = sheetOf(fillShinsei(RIYU, RIYU_MAP, riyuValues(j, RATES, '2026-10-22')));
+  for (const [name, f] of Object.entries(files)) if (name.endsWith('.xml')) assert.doesNotMatch(strFromU8(f), /[\x00-\x08\x0B\x0C\x0E-\x1F￾￿]/, name);
+  assert.deepEqual([text('H18'), text('H24'), text('H29')], ['右片麻痺あり\n杖歩行', '妻が介護\nしている', 'トイレに行きたい']);
+});
+
 test('理由書：何も入れていなければ原本のまま（□・空欄）。④ の行が足りなければ最後の行に「・」でつなぐ', () => {
   const blank = job({shinsei: {...NO_SHINSEI}, insuredNo: '', customer: '', address: '', places: []});
   const {text, drawing} = sheetOf(fillShinsei(RIYU, RIYU_MAP, riyuValues(blank, RATES, '2026-10-22')));

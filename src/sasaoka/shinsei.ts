@@ -514,8 +514,17 @@ export function shinseiFileName(_map: Pick<ShinseiMap, 'title'> | null, job: Pic
 /** 開いた xlsx の中身（ファイルの名前 → 中身）。書きかえるときは中身を置きかえる（もとの Uint8Array は変えない＝原本を覚えておいて何度も使える） */
 export type Files = Record<string, Uint8Array>;
 
-// 改行は &#10; で書く（そのままの改行は LibreOffice などが読み飛ばし、1行につながる。Excel はどちらでも改行する）
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\r?\n/g, '&#10;');
+// 改行は &#10; で書く（そのままの改行は LibreOffice などが読み飛ばし、1行につながる。Excel はどちらでも改行する）。
+// XML に書けない制御文字は消す（Word・PowerPoint の Shift+Enter の改行 U+000B・改ページ U+000C は改行にする）。
+// 残すと Excel が「修復しますか」と聞いて、その欄の中身を捨てる
+const esc = (s: string) =>
+  s
+    .replace(/[\v\f]/g, '\n')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]/g, '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\r?\n/g, '&#10;');
 export const unesc = (s: string) =>
   s.replace(/&(lt|gt|quot|apos|amp|#(\d+)|#x([0-9a-f]+));/gi, (m, name: string, dec?: string, hex?: string) =>
     dec ? String.fromCodePoint(Number(dec)) : hex ? String.fromCodePoint(parseInt(hex, 16)) : ({lt: '<', gt: '>', quot: '"', apos: "'", amp: '&'} as Record<string, string>)[name.toLowerCase()] ?? m,
