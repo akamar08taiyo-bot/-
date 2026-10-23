@@ -4,9 +4,9 @@
 // 申請書と同じ欄（被保険者番号・氏名・住所・郵便番号・生年月日・要介護・理由書の作成者）は申請書の仕組み（SHINSEI と同じ ShinseiMap）で書き、
 // 理由書だけの欄（□を■にする所・総合的状況・P2 の活動・④改修項目）は riyuCells で書く（fillFiles の sheet.riyu）
 
-import type {EstimateSettings} from './calc.ts';
+import type {EstimateRates, EstimateSettings} from './calc.ts';
 import {circled, eraOf, NO_SHINSEI} from './estimateForms.ts';
-import {colName, shinseiValues, workItems} from './shinsei.ts';
+import {colName, firstPhotoDay, shinseiValues, workItems} from './shinsei.ts';
 import type {MarkCell, ShinseiMap, ShinseiValues} from './shinsei.ts';
 import type {RiyuField} from './shinseiPreview.ts';
 import type {Job, RiyuAct, RiyuActKey, RiyuInfo, ShinseiInfo} from './types.ts';
@@ -154,13 +154,14 @@ export function hasRiyuInfo(r: RiyuInfo | undefined): boolean {
 
 /**
  * 入れていない項目を、ほかの項目から決めたもの（画面と原本で同じ）：
- * 住宅状況は、申請書の住宅の所有者との関係が「本人」なら持ち家。現地確認日は、改修前の写真の撮影日（写真番号の順で最初のもの。写真の日付がなければ空）
+ * 住宅状況は、申請書の住宅の所有者との関係が「本人」なら持ち家。現地確認日は、改修前の写真の撮影日（写真番号の順で最初のもの。写真の日付がなければ空）。
+ * 現地確認日は申請書の改修前日付と同じ箇所から（見積書に出る箇所だけ・写真番号の順。前は箇所の並びの順で、見積書から消した箇所の日付も使っていた）
  */
-export function riyuShown(job: Pick<Job, 'riyu' | 'shinsei' | 'places'>): RiyuInfo {
+export function riyuShown(job: Pick<Job, 'riyu' | 'shinsei' | 'places'>, rates: EstimateRates): RiyuInfo {
   const r = riyuOf(job);
   const relation = job.shinsei?.relation ?? '';
   const housing = r.housing || (/本人/.test(relation) ? '持ち家' : '');
-  const checkDate = r.checkDate || (job.places.map((p) => p.photoDates?.before ?? '').find(Boolean) ?? '');
+  const checkDate = r.checkDate || firstPhotoDay(job, rates, 'before');
   return {...r, housing, checkDate};
 }
 
@@ -248,7 +249,7 @@ export type RiyuValues = {cells: Record<string, string>; checks: Record<string, 
  */
 export function riyuCells(job: Job, s: EstimateSettings, today = todayIso()): RiyuValues {
   const info: ShinseiInfo = {...NO_SHINSEI, ...job.shinsei};
-  const r = riyuShown(job);
+  const r = riyuShown(job, s);
   const cells: Record<string, string> = {};
   const checks: Record<string, RiyuCheck> = {};
   const age = ageAt(birthIso(info), r.madeDate || today);
@@ -288,10 +289,10 @@ export function riyuCells(job: Job, s: EstimateSettings, today = todayIso()): Ri
     if (v.purposes.includes(RIYU_PURPOSES.length - 1) || v.purposeOther.trim()) checks[otherCell] = {pick: 0, fill: v.purposeOther.trim()};
     if (v.policy.trim()) cells[a.policy] = v.policy.trim();
   }
-  // ④ 改修項目（改修箇所）：見積書の箇所の改修の種類ごと
+  // ④ 改修項目（改修箇所）：見積書の箇所の改修の種類ごと（申請書の改修の内容の行を空にした箇所は、申請書と同じく書かない）
   const byKind = new Map<number, string[]>();
   for (const w of workItems(job, s)) {
-    if (!w.name) continue;
+    if (!w.name || !w.line) continue;
     byKind.set(w.kind, [...(byKind.get(w.kind) ?? []), `${circled(w.photo)}${w.name}`]);
   }
   RIYU_KINDS.forEach((k, i) => {

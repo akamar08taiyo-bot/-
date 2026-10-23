@@ -107,6 +107,21 @@ test('理由書に転記：基本情報・作成者・総合的状況・福祉�
   assert.deepEqual([text('AJ47'), text('AL48'), text('AL50'), text('AJ56'), text('AL57'), text('AJ63')], ['■　手摺取付', '①廊下', '②トイレ', '■　段差の解消', '③玄関', '□　引き戸等への扉の取替え']);
 });
 
+test('理由書の現地確認日・④：申請書と同じく見積書に出る箇所だけ。日付は写真番号の順で最初のもの、申請書の行を空にした箇所は ④ に書かない', () => {
+  const j = job({
+    riyu: {...NO_RIYU},
+    places: [
+      place('浴室', [mat('手すり')], {photo: 2, photoDates: {before: '2026-09-01'}}), // 先に並んでいるが写真番号は②
+      place('トイレ', [mat('手すり')], {photo: 1, photoDates: {before: '2026-10-05'}}),
+      place('廊下', [], {photoDates: {before: '2026-08-15'}}), // 行がない＝見積書・申請書に出ない
+      place('物置', [mat('手すり')], {photo: 3, shinseiLine: ''}), // 申請書の改修の内容の行を空にした
+    ],
+  });
+  const v = riyuCells(j, RATES, '2026-10-22');
+  assert.equal(v.cells.AH4, '令和8年10月5日'); // 申請書の改修前日付と同じ（トイレ①の日付）
+  assert.deepEqual(['AL48', 'AL50', 'AL52'].map((r) => v.cells[r]), ['②浴室', '①トイレ', undefined]);
+});
+
 test('ほかのソフトから貼り付けた制御文字（Word の Shift+Enter＝U+000B・改ページ U+000C など）は、改行にするか消す（Excel が修復しないで開ける XML）', () => {
   const j = job({riyu: {...RIYU_INFO, body: '右片麻痺あり\u000B杖歩行', care: '妻が介護\u000Cしている', wish: 'トイレ\u0007に行きたい￾'}});
   const {files, text} = sheetOf(fillShinsei(RIYU, RIYU_MAP, riyuValues(j, RATES, '2026-10-22')));

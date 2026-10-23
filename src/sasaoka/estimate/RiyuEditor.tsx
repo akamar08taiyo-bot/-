@@ -85,7 +85,7 @@ export function RiyuEditor({job, data, update, onBack, tabs}: {job: Job; data: A
   const s = data.settings;
   const insurer = jobInsurer(job);
   const info: ShinseiInfo = {...NO_SHINSEI, ...job.shinsei};
-  const r = riyuShown(job);
+  const r = riyuShown(job, s);
   const setJob = (fn: (j: Job) => Job) => update('jobs', (list) => list.map((j) => (j.id === job.id ? {...fn(j), updatedAt: Date.now()} : j)));
   const setInfo = (patch: Partial<ShinseiInfo>) => setJob((j) => ({...j, shinsei: {...NO_SHINSEI, ...j.shinsei, ...patch}}));
   const setRiyu = (patch: Partial<RiyuInfo>) => setJob((j) => ({...j, riyu: {...riyuOf(j), ...patch}}));

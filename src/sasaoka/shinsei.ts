@@ -422,11 +422,17 @@ function photoPlacesOf(job: Pick<Job, 'places'>, rates: EstimateRates): Map<numb
  * 日付入り写真を入れると、その写真の日付が箇所に入る＝こちらが優先。2026-10-22）
  */
 export function photoDay(job: Pick<Job, 'places'>, rates: EstimateRates, slot: 'before' | 'after', today = todayIso()): string {
-  const first = [...photoPlacesOf(job, rates)]
-    .sort(([a], [b]) => a - b)
-    .map(([, p]) => p.photoDates?.[slot])
-    .find((d) => !!d);
-  return first ?? (slot === 'before' ? today : '');
+  return firstPhotoDay(job, rates, slot) || (slot === 'before' ? today : '');
+}
+
+/** 写真番号の順で最初に入っている撮影日（見積書に出る箇所だけ）。なければ空（理由書の現地確認日も、申請書と同じ箇所の日付にする） */
+export function firstPhotoDay(job: Pick<Job, 'places'>, rates: EstimateRates, slot: 'before' | 'after'): string {
+  return (
+    [...photoPlacesOf(job, rates)]
+      .sort(([a], [b]) => a - b)
+      .map(([, p]) => p.photoDates?.[slot])
+      .find((d) => !!d) ?? ''
+  );
 }
 
 /** 写真番号 → 改修前・改修後の日付：その箇所に入っている日付（その写真の日付）、なければ photoDay（写真のまだない枠も同じ日付） */
