@@ -6,7 +6,7 @@
 // あわせて、押すと案件の画面のその入れる所へ行く欄（お客様名・商品・理由…）の位置も返す（式で同じ値を出している欄＝支給申請書の氏名なども押せる）
 
 import {strFromU8} from 'fflate';
-import {fillShinseiFiles} from './shinsei.ts';
+import {fillShinseiFiles, KOUIKI_SHEETS} from './shinsei.ts';
 import type {ShinseiForm, ShinseiKey, ShinseiValues} from './shinsei.ts';
 import {attrOf, boxes, colName, colNum, EMU, formulaRef, markLayouts, numOf, sheetLayout, sheetPaths, unesc} from './xlsxEdit.ts';
 import type {Files, SheetLayout} from './xlsxEdit.ts';
@@ -28,6 +28,7 @@ export type ShinseiField =
   | 'carePlan'
   | 'staff'
   | 'burdenRatio'
+  | 'payMethod'
   | 'applyDate'
   | 'deliveryDate'
   | 'claimDate';
@@ -49,6 +50,7 @@ export const FIELD_LABEL: Record<ShinseiField, string> = {
   carePlan: '居宅サービス計画の届出',
   staff: '担当',
   burdenRatio: '負担割合（保険給付額）',
+  payMethod: '支払方法（受領委任払用・償還払い用）',
   applyDate: '申請日',
   deliveryDate: '納品日（購入日）',
   claimDate: '支給申請日',
@@ -94,6 +96,10 @@ const PHOTO: SheetLinks = {
 };
 const MIYAKO_ROWS = [12, 14, 16, 18];
 const MIYAKO_PHOTOS = ['納品確認写真用紙', '納品確認写真用紙 (2)', '納品確認写真用紙 (3)', '納品確認写真用紙 (4)'];
+// 広域連合：結合していない1つの欄に書いて右へはみ出す欄（申請者の住所・氏名など）は、はみ出す先の欄までつなぐ（押せる所を広く）。
+// 様式の題名を押すと支払方法へ（受領委任払用・償還払い用のどちらに書くかは支払方法で決まる）
+const KOUIKI_JURYO_ROWS = [12, 14, 16];
+const KOUIKI_SHOKAN_ROWS = [14, 16, 18];
 
 export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
   yukuhashi: [{sheet: '用具・受領委任払', links: preLinks(7)}, PROXY, PHOTO],
@@ -149,9 +155,57 @@ export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
       ] as [ShinseiField, string[]][],
     })),
   ],
+  kouiki: [
+    {
+      sheet: KOUIKI_SHEETS.juryo,
+      links: [
+        ['payMethod', ['B1']],
+        ['kana', ['G2']],
+        ['customer', ['G3', ...boxes('L', 20, 38)]], // 委任状の被保険者氏名（L38 に「被保険者氏名　　見本 花子」）
+        ['insuredNo', boxes('W', 10, 4)],
+        ['birthDate', ['G6']],
+        ['gender', ['W6']],
+        ['zip', ['G8']],
+        ['address', ['G9']],
+        ['tel', ['Z9']],
+        ['items', [...rows(['B', 'I', 'R'], KOUIKI_JURYO_ROWS), 'R18']],
+        ['deliveryDate', rows(['Y'], KOUIKI_JURYO_ROWS)],
+        ['reason', ['J20']],
+        ['recorder', ['J21']], // 居宅サービス計画の届出（有・無）と居宅の事業所名
+        ['applyDate', boxes('C', 11, 27)],
+      ],
+    },
+    {
+      sheet: KOUIKI_SHEETS.shokan,
+      links: [
+        ['payMethod', ['A2']],
+        ['kana', boxes('I', 9, 4)],
+        ['customer', ['I6', ...boxes('J', 10, 34)]],
+        ['insuredNo', boxes('W', 10, 6)],
+        ['birthDate', ['I8']],
+        ['gender', ['W8']],
+        ['zip', ['I10']],
+        ['address', ['I11', ...boxes('J', 23, 32)]],
+        ['tel', boxes('Y', 8, 34)],
+        ['items', [...rows(['B', 'I', 'R'], KOUIKI_SHOKAN_ROWS), 'R20']],
+        ['deliveryDate', rows(['Y'], KOUIKI_SHOKAN_ROWS)],
+        ['reason', ['I22']],
+        ['recorder', ['I23']],
+        ['applyDate', boxes('H', 10, 30)],
+      ],
+    },
+    {
+      sheet: KOUIKI_SHEETS.photo,
+      links: [
+        ['customer', ['B3']],
+        ['insuredNo', boxes('G', 10, 3)],
+        ['items', ['B4']],
+      ],
+    },
+  ],
 };
 
-/** まだ入っていない入れる所（プレビューの欄を薄い黄色に。shinsei.ts の shinseiChecks と同じ考え。支給申請日は納品のあと） */
+/** まだ入っていない入れる所（プレビューの欄を薄い黄色に。shinsei.ts の shinseiChecks と同じ考え。支給申請日は納品のあと。広域連合は要介護度の欄がなく、届出の有・無がある） */
 export function missingFields(v: ShinseiValues, key: ShinseiKey): Set<ShinseiField> {
   const out = new Set<ShinseiField>();
   const need = (ok: unknown, f: ShinseiField) => !ok && out.add(f);
@@ -163,16 +217,14 @@ export function missingFields(v: ShinseiValues, key: ShinseiKey): Set<ShinseiFie
   need(v.zip, 'zip');
   need(v.address, 'address');
   need(v.tel, 'tel');
-  need(v.care, 'careLevel');
+  if (key !== 'kouiki') need(v.care, 'careLevel'); // 広域連合の様式には要介護状態区分の欄がない
   need(v.items.length, 'items');
   need(v.items.length && v.items.every((i) => i.reason), 'reason');
-  need(v.recorder, 'recorder');
+  need(key === 'kouiki' ? v.office : v.recorder, 'recorder'); // 広域連合は居宅の事業所名だけ
   need(v.applyDate, 'applyDate');
   need(v.deliveryDate, 'deliveryDate');
-  if (key === 'miyako') {
-    need(v.carePlan, 'carePlan');
-    need(v.staff, 'staff');
-  }
+  if (key === 'miyako' || key === 'kouiki') need(v.carePlan, 'carePlan');
+  if (key === 'miyako') need(v.staff, 'staff');
   return out;
 }
 

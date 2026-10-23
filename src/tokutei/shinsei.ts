@@ -1,5 +1,5 @@
 // 介護保険の申請書（保険者ごとにいただいた Excel の原本）に、案件の内容を書き込む。
-// どの欄に何を書くかは、いただいた3つの様式（行橋市・苅田町・みやこ町）のすべての欄を調べて決めた（docs/tokutei/DESIGN.md の 5.2）。
+// どの欄に何を書くかは、いただいた4つの様式（行橋市・苅田町・みやこ町・広域連合）のすべての欄を調べて決めた（docs/tokutei/DESIGN.md の 5.2）。
 // ユーザーの指示「入力できるところ、連動できる部分は徹底的に分析し、無駄を省けるようにする」（2026-10-22）：
 // 案件で1回入れた値（お客様・商品・日付）と計算した値（購入金額・保険給付額）を、事前申請書・支給申請書・委任状・写真の用紙のすべてに入れる。
 // 原本の式でつながっている欄（支給申請書・写真の用紙が事前申請書を参照）は式のまま使い、書くのは決めた欄だけ（原本のシート・空欄・図形は消さない）。
@@ -8,7 +8,7 @@
 import {saleTotals} from './calc.ts';
 import {docLabel} from './category.ts';
 import {CARE_LEVELS} from './defaults.ts';
-import type {CarePlan, Gender, Sale, Settings} from './types.ts';
+import type {CarePlan, Gender, PayMethod, Sale, Settings} from './types.ts';
 import {warekiLabel, warekiOf} from './wareki.ts';
 import type {Wareki} from './wareki.ts';
 import {
@@ -31,7 +31,7 @@ import type {CellValue, Files, Mark} from './xlsxEdit.ts';
 import {zipLabel} from './zip.ts';
 
 /** 申請書の原本がある保険者 */
-export type ShinseiKey = 'yukuhashi' | 'kanda' | 'miyako';
+export type ShinseiKey = 'yukuhashi' | 'kanda' | 'miyako' | 'kouiki';
 
 /** 申請書の明細の1行 */
 export type ShinseiItem = {
@@ -58,12 +58,14 @@ export type ShinseiValues = {
   care: string; // 要支援1〜要介護5
   items: ShinseiItem[];
   recorder: string; // 記載者 事業所・氏名：居宅介護支援事業所　ケアマネジャー
+  office: string; // 居宅介護支援事業所だけ（広域連合の「居宅の事業所名」）
   carePlan: CarePlan; // 居宅サービス計画の届出（みやこ町）
   applyDate: string; // 申請日（'YYYY-MM-DD'）
   deliveryDate: string; // 納品日＝購入（予定）日・撮影日
   claimDate: string; // 支給申請日
   benefit: number; // 保険給付額（保険者負担）
   staff: string; // 担当（みやこ町の届出者）
+  payMethod: PayMethod; // 支払方法（広域連合は、受領委任払用・償還払い用のどちらの様式に書くか）
 };
 
 /** 被保険者番号を10けたに（数字だけ。足りない左は 0。ユーザーの指示「5桁なら、残りの空白部分は0でうめる」） */
@@ -105,12 +107,14 @@ export function shinseiValues(sale: Sale, s: Settings): ShinseiValues {
     care: sale.careLevel,
     items,
     recorder: [sale.careOffice.trim(), sale.careManager.trim()].filter(Boolean).join('　'),
+    office: sale.careOffice.trim(),
     carePlan: carePlanOf(sale),
     applyDate: sale.applyDate,
     deliveryDate: sale.deliveryDate,
     claimDate: sale.claimDate,
     benefit: saleTotals(sale, s).insurerBurden,
     staff: sale.staff.trim(),
+    payMethod: sale.payMethod,
   };
 }
 
@@ -130,6 +134,7 @@ export type SheetWrite = {
   newStyles?: [string, string][]; // 欄がないときに足す書式：番地 → 同じ書式にする欄（日付の数字を「年」と同じ字体に）
   same?: string[][]; // 明細の行の欄の文字の大きさ・配置を、最初の欄にそろえる（原本は行ごとにちがう）
   fit?: string[]; // 入りきらなければ文字を小さくする欄
+  fitWidth?: string[]; // 折り返さない1行の欄で、行が字の大きさぎりぎりに低いもの：幅に入らないときだけ小さくする
   marks?: Mark[];
   hideZeros?: boolean; // 式が空の欄を参照して 0 と出るシート
   block?: {cell: string; head: string[]; body: string; tail: string[]}; // 理由のかたまり（みやこ町）：head の行・body（理由。欄の幅で折り返す）・tail の行を、入る大きさにして書く
@@ -247,6 +252,77 @@ function dateRow(iso: string, cells: {era: string; y: string; m: string; d: stri
 const MIYAKO_ROWS = [12, 14, 16, 18];
 const MIYAKO_PHOTOS = ['納品確認写真用紙', '納品確認写真用紙 (2)', '納品確認写真用紙 (3)', '納品確認写真用紙 (4)'];
 
+/**
+ * 広域連合（福岡県介護保険広域連合の福祉用具購入申請関係様式集。築上町・豊前市・上毛町・吉富町）：事前の申請はなく、購入のあとの支給申請書だけ。
+ * 様式集の説明「支払方法に応じて受領委任払用又は償還払い用のどちらかを提出」なので、案件の支払方法の様式に書く（もう片方は空のまま）。
+ * 要介護状態区分の欄はない。理由の欄の下に「居宅サービス計画の届出　有・無／居宅の事業所名」（みやこ町と同じく有・無を丸で囲む）と、ケアマネジャーの署名（空ける）
+ */
+export const KOUIKI_SHEETS = {
+  juryo: '様式第8号（福祉用具購入費支給申請書（受領委任払用））',
+  shokan: '福祉用具購入費支給申請書（償還払い用）',
+  photo: '写真貼付用紙(任意様式でも可）',
+} as const;
+const KOUIKI_JURYO_ROWS = [12, 14, 16];
+const KOUIKI_SHOKAN_ROWS = [14, 16, 18];
+
+/** 広域連合の2つの申請書で同じ書き方の欄（番地は様式ごと） */
+type KouikiCells = {kana: string; name: string; insured: [string, number]; birth: string; gender: string; zip: string; address: string; rows: number[]; total: string; reason: string; plan: string; date: {era: string; y: string; m: string; d: string}};
+
+/** 居宅サービス計画の届出の行（原本の文のまま）と、居宅の事業所名（居宅介護支援事業所） */
+const KOUIKI_PLAN = ' 居宅サービス計画の届出　　　有　・　無';
+
+function kouikiCells(v: ShinseiValues, c: KouikiCells, birth: string | null): [string, CellValue][] {
+  const shown = v.items.slice(0, c.rows.length);
+  return [
+    [c.kana, v.kana],
+    [c.name, v.name],
+    ...insuredCells(c.insured[0], c.insured[1], v),
+    ...when(birth, [[c.birth, birth ?? '']]),
+    ...when(v.zip, [[c.zip, `〒${v.zip}`]]),
+    [c.address, v.address],
+    ...itemCells(v, c.rows, {label: 'B', maker: 'I', total: 'R', date: 'Y'}),
+    // 合計：様式の行に書いた商品の購入金額の合計（行より多い商品は画面で知らせる）
+    ...when(shown.length, [[c.total, shown.reduce((n, i) => n + i.total, 0)]]),
+    ...when(reasonText(v), [[c.reason, reasonText(v)]]),
+    ...when(v.office, [[c.plan, `${KOUIKI_PLAN}\n 居宅の事業所名　${v.office}`]]),
+    ...dateRow(v.applyDate, c.date),
+  ];
+}
+
+const kouikiFit = (c: KouikiCells) => [c.name, ...rowsOf('B', c.rows), ...rowsOf('I', c.rows), c.reason, c.plan];
+const kouikiPlanMark = (cell: string, v: ShinseiValues): Mark => ({cell, needles: ['有', '無'], pick: v.carePlan ? pick(['有', '無'], v.carePlan) : -1, after: '居宅サービス計画の届出'});
+
+/** 受領委任払用（様式第8号）：申請者は会社（受領委任事業者。原本のまま）。下の委任状の被保険者氏名も書く。口座の欄・広域連合の記入欄は書かない */
+function kouikiJuryo(v: ShinseiValues): SheetWrite {
+  const c: KouikiCells = {kana: 'G2', name: 'G3', insured: ['W', 4], birth: 'G6', gender: 'W6', zip: 'G8', address: 'G9', rows: KOUIKI_JURYO_ROWS, total: 'R18', reason: 'J20', plan: 'J21', date: {era: 'C27', y: 'F27', m: 'I27', d: 'L27'}};
+  return {
+    sheet: KOUIKI_SHEETS.juryo,
+    cells: [...kouikiCells(v, c, birthChoice(v, '明 ・ 大 ・ 昭　')), ['Z9', v.tel], ...when(v.name, [['L38', `被保険者氏名　　${v.name}`]])],
+    fit: kouikiFit(c),
+    fitWidth: ['G2', 'G9', 'Z9'], // フリガナ・住所・電話の行は低い（字の大きさとほぼ同じ）
+    marks: [ERA('G6', v), GENDER('W6', v), kouikiPlanMark('J21', v)],
+  };
+}
+
+/** 償還払い用：元号の字がないので「昭和31年6月10日生」。申請者は本人（住所・氏名・電話）。届出者・口座の欄は書かない */
+function kouikiShokan(v: ShinseiValues): SheetWrite {
+  const c: KouikiCells = {kana: 'I4', name: 'I6', insured: ['W', 6], birth: 'I8', gender: 'W8', zip: 'I10', address: 'I11', rows: KOUIKI_SHOKAN_ROWS, total: 'R20', reason: 'I22', plan: 'I23', date: {era: 'H30', y: 'J30', m: 'M30', d: 'P30'}};
+  const b = v.birth;
+  return {
+    sheet: KOUIKI_SHEETS.shokan,
+    // 申請者（本人）の住所・氏名・電話は、下線の左の欄に書く（右の空いた欄へはみ出して出る）
+    cells: [...kouikiCells(v, c, b ? `${b.era}${b.y}年${b.m}月${b.d}日生` : null), ['J32', v.address], ['J34', v.name], ['Y34', v.tel]],
+    fit: kouikiFit(c),
+    fitWidth: ['I11'], // フリガナ（I4）は結合していない1つの欄なので小さくしない（右の空いた欄へはみ出す）
+    marks: [GENDER('W8', v), kouikiPlanMark('I23', v)],
+  };
+}
+
+/** 写真貼付用紙（1枚）：氏名・被保険者番号・商品名（2つ以上なら「、」でつなぐ。行橋市の完了写真と同じ） */
+function kouikiPhoto(v: ShinseiValues): SheetWrite {
+  return {sheet: KOUIKI_SHEETS.photo, cells: [['B3', v.name], ...insuredCells('G', 3, v), ['B4', v.items.map((i) => i.product).join('、')]], fit: ['B3', 'B4']};
+}
+
 export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
   yukuhashi: {
     key: 'yukuhashi',
@@ -334,6 +410,12 @@ export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
       ];
     },
   },
+  kouiki: {
+    key: 'kouiki',
+    title: '広域連合',
+    rows: 3,
+    sheets: (v) => [v.payMethod === '償還払い' ? kouikiShokan(v) : kouikiJuryo(v), kouikiPhoto(v)],
+  },
 };
 
 export const shinseiForm = (insurer: string): ShinseiForm | null => SHINSEI[insurer as ShinseiKey] ?? null;
@@ -374,6 +456,7 @@ export function fillShinseiFiles(files: Files, form: ShinseiForm, v: ShinseiValu
   }
   for (const w of sheets) for (const refs of w.same ?? []) sameStyle(files, w.sheet, refs);
   for (const w of sheets) for (const ref of w.fit ?? []) fitCell(files, w.sheet, ref);
+  for (const w of sheets) for (const ref of w.fitWidth ?? []) fitCell(files, w.sheet, ref, true);
   for (const w of sheets) if (w.marks?.length) drawMarks(files, w.sheet, w.marks);
   dropCalcChain(files);
 }
@@ -400,14 +483,17 @@ export function shinseiChecks(sale: Sale, s: Settings): {missing: string[]; over
   need(v.zip, '郵便番号');
   need(v.address, '住所');
   need(v.tel, '電話');
-  need(v.care, '要介護度');
+  const kouiki = form?.key === 'kouiki';
+  if (!kouiki) need(v.care, '要介護度'); // 広域連合の様式には要介護状態区分の欄がない
   need(v.items.length, '商品');
   const noReason = v.items.filter((i) => !i.reason).length;
   if (v.items.length && noReason) missing.push(noReason === v.items.length ? '福祉用具が必要な理由' : `福祉用具が必要な理由（${noReason}つ）`);
-  need(v.recorder, '居宅介護支援事業所・ケアマネジャー（理由の記載者）');
+  // 広域連合は「居宅の事業所名」だけ（ケアマネジャーは署名の欄なので書かない）
+  if (kouiki) need(v.office, '居宅介護支援事業所（居宅の事業所名）');
+  else need(v.recorder, '居宅介護支援事業所・ケアマネジャー（理由の記載者）');
   need(v.applyDate, '申請日');
-  need(v.deliveryDate, '納品日（購入予定日）');
-  if (form?.key === 'miyako') need(v.carePlan, '居宅サービス計画の届出（有・無）');
+  need(v.deliveryDate, kouiki ? '納品日（購入日）' : '納品日（購入予定日）');
+  if (form?.key === 'miyako' || kouiki) need(v.carePlan, '居宅サービス計画の届出（有・無）');
   const overflow = form && v.items.length > form.rows ? `${form.title}の申請書の商品の欄は${form.rows}行です。${form.rows + 1}つ目からの商品（${v.items.slice(form.rows).map((i) => i.product).join('、')}）は入りません。` : '';
   return {missing, overflow};
 }

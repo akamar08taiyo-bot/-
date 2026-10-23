@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {strFromU8, unzipSync} from 'fflate';
 import {defaultSettings} from '../../src/tokutei/defaults.ts';
-import {carePlanOf, excelDate, fillShinsei, padInsuredNo, reasonText, SHINSEI, shinseiChecks, shinseiFileName, shinseiValues} from '../../src/tokutei/shinsei.ts';
+import {carePlanOf, excelDate, fillShinsei, KOUIKI_SHEETS, padInsuredNo, reasonText, SHINSEI, shinseiChecks, shinseiFileName, shinseiValues} from '../../src/tokutei/shinsei.ts';
 import type {ShinseiKey} from '../../src/tokutei/shinsei.ts';
 import type {Sale, SaleItem} from '../../src/tokutei/types.ts';
 import {cellFormula, ellipseCount, readCell, sheetPaths} from '../../src/tokutei/xlsxEdit.ts';
@@ -77,7 +77,7 @@ function sale(over: Partial<Sale> = {}): Sale {
   };
 }
 
-const TEMPLATE_FILES: Record<ShinseiKey, string> = {yukuhashi: 'yukuhashi.xltx', kanda: 'kanda.xltx', miyako: 'miyako.xlsx'};
+const TEMPLATE_FILES: Record<ShinseiKey, string> = {yukuhashi: 'yukuhashi.xltx', kanda: 'kanda.xltx', miyako: 'miyako.xlsx', kouiki: 'kouiki.xlsx'};
 const template = (key: ShinseiKey): Files => unzipSync(new Uint8Array(readFileSync(new URL(`../../src/tokutei/shinsei/${TEMPLATE_FILES[key]}`, import.meta.url))));
 const fill = (key: ShinseiKey, over: Partial<Sale> = {}): Files => unzipSync(fillShinsei(template(key), SHINSEI[key], shinseiValues(sale({insurer: key, ...over}), S)));
 
@@ -193,8 +193,75 @@ test('みやこ町：承認申請書・支給申請書・写真の用紙（1枚�
   assert.equal(readCell(f, '納品確認写真用紙 (3)', 'J5'), '');
 });
 
+test('広域連合：支払方法が受領委任払いなら受領委任払用（支給申請書と委任状）・写真貼付用紙に書く', () => {
+  const f = fill('kouiki', {zip: '8290301', address: '築上郡築上町大字椎田1-2-3'});
+  const sh = KOUIKI_SHEETS.juryo;
+  assert.equal(readCell(f, sh, 'G2'), 'ミホン ハナコ');
+  assert.equal(readCell(f, sh, 'G3'), '見本 花子');
+  assert.equal(['W4', 'X4', 'Y4', 'Z4', 'AA4', 'AB4', 'AC4', 'AD4', 'AE4', 'AF4'].map((r) => readCell(f, sh, r)).join(''), '0001234567');
+  assert.equal(['AA2', 'AB2', 'AC2', 'AD2', 'AE2', 'AF2'].map((r) => readCell(f, sh, r)).join(''), '406470'); // 保険者番号は原本のまま
+  assert.equal(readCell(f, sh, 'G6'), '明 ・ 大 ・ 昭　　15年3月15日生');
+  assert.equal(readCell(f, sh, 'G8'), '〒829-0301');
+  assert.equal(readCell(f, sh, 'G9'), '築上郡築上町大字椎田1-2-3');
+  assert.equal(readCell(f, sh, 'Z9'), '0930-00-0000');
+  assert.equal(readCell(f, sh, 'B12'), '入浴補助用具（入浴用いす）\nシャワーチェア 見本A');
+  assert.equal(readCell(f, sh, 'I14'), '見本製作所\n太陽シルバーサービス株式会社');
+  assert.equal(readCell(f, sh, 'R12'), '28160');
+  assert.equal(readCell(f, sh, 'Y14'), '令和8年10月30日'); // 購入日＝納品日
+  assert.equal(readCell(f, sh, 'R18'), String(28160 + 27808)); // 合計
+  assert.equal(readCell(f, sh, 'R16'), ''); // 使わない行は空のまま
+  assert.match(readCell(f, sh, 'J20'), /^入浴用いす：浴室の床からの立ち座りが困難なため。\n浴槽用手すり：/);
+  assert.equal(readCell(f, sh, 'J21'), ' 居宅サービス計画の届出　　　有　・　無\n 居宅の事業所名　見本居宅介護支援事業所');
+  // 申請日（事前の申請のない様式なので、案件の申請日）
+  assert.deepEqual(['C27', 'F27', 'I27', 'L27'].map((r) => readCell(f, sh, r)), ['令和', '8', '10', '22']);
+  assert.equal(readCell(f, sh, 'M30'), '太陽シルバーサービス株式会社行橋営業所'); // 申請者（受領委任事業者）は原本のまま
+  assert.equal(['Z33', 'AA33', 'AB33'].map((r) => readCell(f, sh, r)).join(''), '802'); // 受領委任契約番号も原本のまま
+  assert.equal(readCell(f, sh, 'L38'), '被保険者氏名　　見本 花子'); // 委任状
+  assert.equal(readCell(f, sh, 'G40'), ''); // 口座の欄は書かない
+  assert.equal(ellipseCount(f, sh), 3); // 元号（昭）・性別・居宅サービス計画の届出（有）
+  // 償還払い用は空のまま
+  assert.equal(readCell(f, KOUIKI_SHEETS.shokan, 'I6'), '');
+  assert.equal(ellipseCount(f, KOUIKI_SHEETS.shokan), 0);
+  // 写真貼付用紙：氏名・番号・商品名（2つ以上なら「、」でつなぐ）
+  const ph = KOUIKI_SHEETS.photo;
+  assert.equal(readCell(f, ph, 'B3'), '見本 花子');
+  assert.equal(['G3', 'H3', 'I3', 'J3', 'K3', 'L3', 'M3', 'N3', 'O3', 'P3'].map((r) => readCell(f, ph, r)).join(''), '0001234567');
+  assert.equal(readCell(f, ph, 'B4'), 'シャワーチェア 見本A / SC-01、浴槽手すり 見本B');
+  assert.match(strFromU8(f['xl/workbook.xml']), /fullCalcOnLoad="1"/);
+  assert.equal(sheetPaths(f).size, 5); // 収録様式一覧・説明用シートも消さない
+});
+
+test('広域連合：償還払いなら償還払い用（申請者は本人）に書く。届出の無・平成生まれ・事業所なし', () => {
+  const f = fill('kouiki', {payMethod: '償還払い', zip: '8290301', address: '築上郡築上町大字椎田1-2-3'});
+  const sh = KOUIKI_SHEETS.shokan;
+  assert.equal(readCell(f, sh, 'I4'), 'ミホン ハナコ');
+  assert.equal(readCell(f, sh, 'I6'), '見本 花子');
+  assert.equal(['W6', 'X6', 'Y6', 'Z6', 'AA6', 'AB6', 'AC6', 'AD6', 'AE6', 'AF6'].map((r) => readCell(f, sh, r)).join(''), '0001234567');
+  assert.equal(readCell(f, sh, 'I8'), '昭和15年3月15日生'); // 元号の字がない様式なので元号を書く
+  assert.equal(readCell(f, sh, 'I10'), '〒829-0301');
+  assert.equal(readCell(f, sh, 'I11'), '築上郡築上町大字椎田1-2-3');
+  assert.equal(readCell(f, sh, 'B16'), '入浴補助用具（浴槽用手すり）\n浴槽手すり 見本B（2個）');
+  assert.equal(readCell(f, sh, 'R14'), '28160');
+  assert.equal(readCell(f, sh, 'Y16'), '令和8年10月30日');
+  assert.equal(readCell(f, sh, 'R20'), String(28160 + 27808));
+  assert.match(readCell(f, sh, 'I22'), /^入浴用いす：/);
+  assert.match(readCell(f, sh, 'I23'), /居宅の事業所名　見本居宅介護支援事業所$/);
+  assert.deepEqual(['H30', 'J30', 'M30', 'P30'].map((r) => readCell(f, sh, r)), ['令和', '8', '10', '22']);
+  assert.deepEqual(['J32', 'J34', 'Y34'].map((r) => readCell(f, sh, r)), ['築上郡築上町大字椎田1-2-3', '見本 花子', '0930-00-0000']); // 申請者（本人）
+  assert.equal(readCell(f, sh, 'J36'), ''); // 届出者は書かない
+  assert.equal(ellipseCount(f, sh), 2); // 性別・届出（有）
+  assert.equal(readCell(f, KOUIKI_SHEETS.juryo, 'G3'), ''); // 受領委任払用は空のまま
+  assert.equal(ellipseCount(f, KOUIKI_SHEETS.juryo), 0);
+  // 居宅介護支援事業所がなければ届出も空（丸なし）・事業所名は原本のまま。「無」を選べば無に丸。平成生まれは元号を書く（丸なし）
+  const g = fill('kouiki', {careOffice: '', careManager: '', birthDate: '1990-05-01'});
+  assert.match(readCell(g, KOUIKI_SHEETS.juryo, 'J21'), /^ 居宅サービス計画の届出　+有　・　無\r?\n 居宅の事業所名$/); // 原本の文のまま
+  assert.equal(readCell(g, KOUIKI_SHEETS.juryo, 'G6'), '平成2年5月1日生');
+  assert.equal(ellipseCount(g, KOUIKI_SHEETS.juryo), 1); // 性別だけ
+  assert.equal(ellipseCount(fill('kouiki', {carePlan: '無'}), KOUIKI_SHEETS.juryo), 3);
+});
+
 test('アプリに入れた原本は空（前の方の記入・写真・丸が残っていない）', () => {
-  for (const key of ['yukuhashi', 'kanda', 'miyako'] as ShinseiKey[]) {
+  for (const key of ['yukuhashi', 'kanda', 'miyako', 'kouiki'] as ShinseiKey[]) {
     const f = template(key);
     assert.equal(Object.keys(f).filter((n) => n.startsWith('xl/media/')).length, 0, key);
     for (const n of Object.keys(f).filter((x) => /^xl\/drawings\/drawing\d+\.xml$/.test(x))) assert.doesNotMatch(strFromU8(f[n]), /prst="ellipse"|<xdr:pic>/, `${key} ${n}`);
@@ -206,11 +273,23 @@ test('アプリに入れた原本は空（前の方の記入・写真・丸が�
   for (const sh of ['納品確認写真用紙', '納品確認写真用紙 (2)', '納品確認写真用紙 (3)', '納品確認写真用紙 (4)']) {
     assert.equal(['J5', 'Y5', 'J7'].map((r) => readCell(m, sh, r)).join(''), '', sh);
   }
+  // 広域連合：被保険者番号・生年月日・写真の用紙の氏名と商品名・口座の欄。外部リンク・プリンターの設定・保存した場所・文書のプロパティの名前もない
+  const k2 = template('kouiki');
+  const ju = KOUIKI_SHEETS.juryo;
+  assert.equal(['W4', 'X4', 'Y4', 'Z4', 'AA4', 'AB4', 'AC4', 'AD4', 'AE4', 'AF4', 'G40', 'O40'].map((r) => readCell(k2, ju, r)).join(''), '');
+  assert.doesNotMatch(readCell(k2, ju, 'G6'), /\d/);
+  assert.equal(['B3', 'G3', 'H3', 'P3', 'B4'].map((r) => readCell(k2, KOUIKI_SHEETS.photo, r)).join(''), '');
+  assert.equal(Object.keys(k2).filter((n) => /^xl\/(externalLinks|printerSettings)\//.test(n)).length, 0);
+  assert.doesNotMatch(strFromU8(k2['xl/workbook.xml']), /absPath|externalReference|#REF!|\[\d+\]/);
+  assert.doesNotMatch(strFromU8(k2['docProps/core.xml']), /<dc:creator>[^<]|<cp:lastModifiedBy>[^<]|lastPrinted/);
+  assert.doesNotMatch(strFromU8(k2['docProps/app.xml']), /<Company>[^<]/);
   // 共有の文字の表に、どの欄からも使われない文字（消した記入の名残り）がない
-  const used = new Set<number>();
-  for (const p of sheetPaths(m).values()) for (const x of strFromU8(m[p]).matchAll(/<c r="[A-Z]+\d+"[^>]*?\st="s"[^>]*>\s*<v>(\d+)<\/v>/g)) used.add(Number(x[1]));
-  const count = (strFromU8(m['xl/sharedStrings.xml']).match(/<si>/g) ?? []).length;
-  assert.equal(used.size, count);
+  for (const [key, book] of [['miyako', m], ['kouiki', k2]] as const) {
+    const used = new Set<number>();
+    for (const p of sheetPaths(book).values()) for (const x of strFromU8(book[p]).matchAll(/<c r="[A-Z]+\d+"[^>]*?\st="s"[^>]*>\s*<v>(\d+)<\/v>/g)) used.add(Number(x[1]));
+    const count = (strFromU8(book['xl/sharedStrings.xml']).match(/<si>/g) ?? []).length;
+    assert.equal(used.size, count, key);
+  }
 });
 
 test('作る前に確かめる：まだ入っていない欄・様式の行より多い商品', () => {
@@ -223,6 +302,10 @@ test('作る前に確かめる：まだ入っていない欄・様式の行よ�
   assert.ok(thin.missing.includes('福祉用具が必要な理由（1つ）'));
   assert.match(thin.overflow, /3行です。4つ目からの商品/);
   assert.equal(shinseiChecks(sale({insurer: 'miyako', careOffice: ''}), S).missing.includes('居宅サービス計画の届出（有・無）'), true);
+  // 広域連合：要介護度の欄はない。居宅の事業所名（居宅介護支援事業所）と届出の有・無
+  assert.deepEqual(shinseiChecks(sale({insurer: 'kouiki', careLevel: ''}), S).missing, []);
+  assert.deepEqual(shinseiChecks(sale({insurer: 'kouiki', careOffice: ''}), S).missing, ['居宅介護支援事業所（居宅の事業所名）', '居宅サービス計画の届出（有・無）']);
+  assert.match(shinseiChecks(sale({insurer: 'kouiki', items: [0, 1, 2, 3].map((k) => item({id: `k${k}`, name: `見本の杖${k}`, reason: '見本'}))}), S).overflow, /^広域連合の申請書の商品の欄は3行です。/);
 });
 
 test('ファイル名：「見本花子様特定福祉用具申請書.xlsx」', () => {

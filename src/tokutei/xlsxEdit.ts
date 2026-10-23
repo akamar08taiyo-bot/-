@@ -371,14 +371,17 @@ export function cellBox(files: Files, sheet: string, ref: string): {box: Box; st
   return {box: rangeBox(sheetLayout(xml), ref), style: cellStyle(files, xml, ref)};
 }
 
-/** 欄（結合した範囲）に今の文字が入るように、文字を小さくした書式にする（入るときはそのまま）。小さくしたら pt を返す */
-export function fitCell(files: Files, sheet: string, ref: string): number | null {
+/**
+ * 欄（結合した範囲）に今の文字が入るように、文字を小さくした書式にする（入るときはそのまま）。小さくしたら pt を返す。
+ * widthOnly：幅だけを見る（折り返さない1行の欄で、行の高さが字の大きさとほぼ同じもの＝広域連合の住所の行。高さで見ると入るのに小さくなるため）
+ */
+export function fitCell(files: Files, sheet: string, ref: string, widthOnly = false): number | null {
   const xml = strFromU8(files[sheetPath(files, sheet)]);
   const text = cellText(xml, ref, sharedStrings(files));
   if (!cellRe(ref).test(xml) || !text.trim()) return null;
   const box = rangeBox(sheetLayout(xml), ref);
   const st = cellStyle(files, xml, ref);
-  const pt = fitSize(text.split('\n'), box.w, box.h, st.size, st.wrap);
+  const pt = fitSize(text.split('\n'), box.w, widthOnly ? Infinity : box.h, st.size, st.wrap);
   if (pt >= st.size) return null;
   sizeCell(files, sheet, ref, pt);
   return pt;

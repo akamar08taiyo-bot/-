@@ -360,7 +360,7 @@ export function SaleEditor({
                   ]}
                 />
               </Field>
-              <Field label="支払方法">
+              <Field label="支払方法" field="payMethod">
                 <Segmented<PayMethod>
                   ariaLabel="支払方法"
                   value={sale.payMethod}
@@ -394,8 +394,8 @@ export function SaleEditor({
                   生活保護
                 </label>
               </div>
-              {sale.insurer === 'miyako' && (
-                <Field label="居宅サービス計画の届出（みやこ町の申請書）" field="carePlan" warn={warn('carePlan')}>
+              {(sale.insurer === 'miyako' || sale.insurer === 'kouiki') && (
+                <Field label="居宅サービス計画の届出（申請書）" field="carePlan" warn={warn('carePlan')}>
                   <Segmented<CarePlan>
                     ariaLabel="居宅サービス計画の届出"
                     value={carePlanOf(sale)}
