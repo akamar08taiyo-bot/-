@@ -345,6 +345,10 @@ test('行橋市の申請書：住改・受領委任払の氏名・住所・被�
   assert.match(cell(main, 'Z7'), /<t[^>]*>0<\/t>/);
   assert.match(cell(main, 'AI7'), /<t[^>]*>9<\/t>/);
   assert.match(cell(main, 'F14'), /①浴室　手すりの取り付け　L=600mm/);
+  // 写真添付用紙の工事種類（M4）：その写真番号の箇所の改修の種類（原本の1枚目の「手すり取り付け」は消した）。箇所のない写真番号の用紙は空
+  assert.match(cell(byName.get('住改・写真 ①')!, 'M4'), /<t[^>]*>手すりの取り付け<\/t>/);
+  assert.match(cell(byName.get('住改・写真③')!, 'M4'), /<t[^>]*>段差の解消<\/t>/);
+  assert.doesNotMatch(cell(byName.get('住改・写真②')!, 'M4'), /<t|<v/);
   // 書き込んだ申請書から読む（申請書から見積書を作るとき）。どの保険者の申請書かはシートで見分ける。うしろの文は書いたまま（全角のすき間も）
   const places = [
     {photo: 1, name: '浴室', kind: 1, text: '手すりの取り付け　L=600mm'},

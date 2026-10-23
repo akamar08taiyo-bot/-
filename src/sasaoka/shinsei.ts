@@ -29,8 +29,9 @@ export type ShinseiSheet = {
   // その写真番号の箇所の写真を改修前・改修後の枠（番地の範囲。before・after）に貼る（同じ写真番号の用紙が2枚あれば、最初の用紙だけ）。
   // 苅田町の写真の用紙は、改修箇所・実施した工事種類が□の一覧（placeChecks・kindChecks。その写真番号の箇所の□を■に）と、撮影日の欄（dates）。
   // みやこ町の写真の用紙も撮影日の欄がある（原本は「撮影日」とだけ書いた欄なので、label のうしろに日付）。
-  // みやこ町・広域連合の写真貼付用紙の改修の種別（①〜⑥の欄の範囲 kindCircles）は、その写真番号の箇所の改修の種類を楕円で囲む
-  photoPlace?: {photo: string; place?: string; before?: string; after?: string; placeChecks?: string; kindChecks?: string; kindCircles?: string[]; dates?: {before: string; after: string; label?: string}};
+  // みやこ町・広域連合の写真貼付用紙の改修の種別（①〜⑥の欄の範囲 kindCircles）は、その写真番号の箇所の改修の種類を楕円で囲む。
+  // 行橋市の写真添付用紙の工事種類（kind）は、その写真番号の箇所の改修の種類の名前（「手すりの取り付け」）を書く
+  photoPlace?: {photo: string; place?: string; kind?: string; before?: string; after?: string; placeChecks?: string; kindChecks?: string; kindCircles?: string[]; dates?: {before: string; after: string; label?: string}};
   // 平面図：写真番号の順の工事内容（改修の内容と同じ行「玄関① 木製L字手すり L=600×850㎜」）を空いた所に書く（ユーザーの指示）。
   // cell＝折り返しの欄に書く（みやこ町の下の欄）、box＝その範囲にテキストボックスを置く（前の申請の平面図と同じ）。平面図そのものはユーザーが Excel で描く
   legend?: {cell?: string; box?: string};
@@ -93,9 +94,12 @@ const MIYAKO_PHOTO = {...PHOTO_SHEET, photoPlace: {...PHOTO_SHEET.photoPlace, da
  */
 const KANDA_PHOTO_SHEETS = ['1 ', '1  (3)', '1  (2)', ...[4, 5, 6, 7, 8, 9].map((n) => `1  (${n})`)];
 const KANDA_PHOTO = {photoPlace: {photo: 'G42', before: 'A7:H22', after: 'A24:H40', placeChecks: 'B2', kindChecks: 'B4', dates: {before: 'D6', after: 'D23'}}};
-/** 行橋市の写真添付用紙（№①〜⑧は M2）：改修場所（E4。「改 修 場 所 ：」のうしろ）・改修前の写真（B7:O28）・改修後（B30:O51） */
+/**
+ * 行橋市の写真添付用紙（№①〜⑧は M2）：改修場所（E4。「改 修 場 所 ：」のうしろ）・工事種類（M4。「工 事 種 類 ：」のうしろ）・改修前の写真（B7:O28）・改修後（B30:O51）。
+ * 工事種類は、原本の1枚目にだけ「手すり取り付け」と書いてあって②〜⑧は空いていたので、原本の字は消して、その写真番号の箇所の改修の種類を書く
+ */
 const YUKUHASHI_PHOTO_SHEETS = ['住改・写真 ①', '住改・写真②', '住改・写真③', '住改・写真④', '住改・写真④ (3)', '住改・写真④ (4)', '住改・写真④ (5)', '住改・写真④ (2)'];
-const YUKUHASHI_PHOTO = {photoPlace: {photo: 'M2', place: 'E4', before: 'B7:O28', after: 'B30:O51'}};
+const YUKUHASHI_PHOTO = {photoPlace: {photo: 'M2', place: 'E4', kind: 'M4', before: 'B7:O28', after: 'B30:O51'}};
 // 丸で囲む欄（原本の書き方）
 const GENDER = (cell: string): MarkCell => ({key: 'gender', cell, needles: ['男', '女']});
 const ERA = (cell: string): MarkCell => ({key: 'era', cell, needles: ['明', '大', '昭']});
@@ -666,6 +670,7 @@ export function shinseiCells(sheet: ShinseiSheet, v: ShinseiValues, photo = 0): 
     out.set(k.works, v.kinds[i]?.works.join('\n') ?? '');
   });
   if (sheet.photoPlace?.place) out.set(sheet.photoPlace.place, (photo > 0 && v.photos[photo]) || '');
+  if (sheet.photoPlace?.kind) out.set(sheet.photoPlace.kind, photo > 0 && v.photos[photo] !== undefined ? (KINDS[(v.photoKinds?.[photo] ?? 0) - 1] ?? '') : '');
   if (sheet.legend?.cell) out.set(sheet.legend.cell, v.works.join('\n'));
   for (const t of sheet.texts ?? []) {
     const keys = placeholders(t.format);
