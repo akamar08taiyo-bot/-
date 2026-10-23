@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {estimateTotals, jobTotals} from '../../src/sasaoka/calc.ts';
 import {formLines} from '../../src/sasaoka/estimateForms.ts';
-import {applySheet, deleteLine, insertBlankAfter, lineRows, parseKind, parseLengthCm, parseListNote, parseNum, parsePlace, pasteLines, setWorkAmount, sheetValue, toggleExcluded} from '../../src/sasaoka/sheetEdit.ts';
-import type {Job, Material, Row, Settings} from '../../src/sasaoka/types.ts';
+import {placeFromDims, withBrackets} from '../../src/sasaoka/cutLink.ts';
+import {laborRow, manualRow, materialRow, newPlace} from '../../src/sasaoka/rows.ts';
+import {applySheet, clearedSheet, deleteLine, insertBlankAfter, lineRows, parseKind, parseLengthCm, parseListNote, parseNum, parsePlace, pasteLines, setWorkAmount, sheetValue, toggleExcluded} from '../../src/sasaoka/sheetEdit.ts';
+import type {Job, Material, Place, Row, Settings} from '../../src/sasaoka/types.ts';
 
 const S = {
   rate: 0.07,
@@ -320,4 +322,139 @@ test('行を切り取って貼り付け：貼り付けた所に移る（もと�
   job = moved.job;
   assert.deepEqual(job.places.map((p) => [p.name, p.rows.map((r) => r.name)]), [['トイレ', ['木の手すり 35φ 4m', 'インテリアバー']]]);
   assert.equal(moved.rowId, job.places[0].rows[1].id);
+});
+
+// ---------------------------------------------------------------- レビューで見つかった不具合（2026-10-23）
+
+/** 欄を F2 で開いて、何も変えずに確定する（見積書の画面は入れないが、同じ値を打ち込んで確定したときも変えない） */
+const reconfirm = (job: Job, key: string, ctx: {settings: typeof S; form: 'yukuhashi' | 'kouiki'; materials?: Material[]} = yk) => applySheet(job, key, sheetValue(job, key, ctx), ctx).job;
+
+test('諸経費：出ている自動の金額のまま確定しても手で入れたことにしない（行を足すと諸経費も変わる）。介護保険対象の諸経費も', () => {
+  let {job} = type(emptyJob(), [['new:text', '木の手すり 35φ 4m', rail]]);
+  assert.equal(estimateTotals(job, S).all.overhead, 1600);
+  job = reconfirm(job, 'overhead:all');
+  job = reconfirm(job, 'overhead:target');
+  assert.deepEqual([job.overhead, job.overheadTarget], [null, null]);
+  ({job} = type(job, [['new:text', '別の手すり 4m', {...rail, id: 'm9', code: 'X-1', name: '別の手すり 4m', listPrice: 30000, price: 15000}]]));
+  assert.deepEqual([estimateTotals(job, S).all.subtotal, estimateTotals(job, S).all.overhead, estimateTotals(job, S).all.total], [40000, 4000, 48400]);
+  // 2行目を対象外にすると、対象の諸経費は対象の小計から（前は全体の 4,000円のままだった）
+  job = toggleExcluded(job, job.places[0].rows[1].id);
+  assert.deepEqual([estimateTotals(job, S).target.subtotal, estimateTotals(job, S).target.overhead, estimateTotals(job, S).target.total], [16000, 1600, 19360]);
+  // 自動と違う金額を入れれば手で入れた金額
+  job = applySheet(job, 'overhead:target', '1500', yk).job;
+  assert.equal(job.overheadTarget, 1500);
+});
+
+test('数量：出ている数量のまま確定しても、切って使う手すり・申請書の長さ・中間のブラケットを書き直さない', () => {
+  const bd134: Material = {id: 'm134', name: 'BAUHAUS 35丸棒 Mオーク 4m', price: 9000, listPrice: 15000, pieceLengthM: 4, maker: 'マツ六', code: 'BD-134', unit: '本', favorite: false, updatedAt: 1};
+  const bd01g: Material = {id: 'm01g', name: '35ブラケット横型カバー付 ゴールド', price: 900, listPrice: 1500, pieceLengthM: 0, maker: 'マツ六', code: 'BD-01G', unit: '個', favorite: false, updatedAt: 1};
+  const ctx = {...yk, materials: [bd134, bd01g]};
+  // 600mm×2本（0.3 と出る）：前は 1200mm×1本になり、BD-01G が1個入った
+  const twice = {...materialRow(bd134, 2), lengthCm: 60};
+  let job: Job = {...emptyJob(), places: [newPlace('玄関', [twice])]};
+  assert.equal(sheetValue(job, `line:${twice.id}:qty`, ctx), '0.3');
+  assert.equal(reconfirm(job, `line:${twice.id}:qty`, ctx), job);
+  // 4000mm（「1」と出る）：前は切らない1本になり、発注書の 4000mm＋2000mm が 4000mm だけになった
+  const whole = {...materialRow(bd134, 1), lengthCm: 400};
+  job = {...emptyJob(), places: [newPlace('廊下', [whole])]};
+  assert.equal(reconfirm(job, `line:${whole.id}:qty`, ctx), job);
+  // 申請書の L=1250（0.313 と出る）：前は 1252mm になり、申請書の長さが消えた
+  let p: Place = {...newPlace('玄関', [materialRow(bd134, 1)]), dims: {l: '1250'}};
+  p = withBrackets(p, placeFromDims(p), ctx.materials);
+  job = {...emptyJob(), places: [p]};
+  const id = job.places[0].rows[0].id;
+  assert.equal(sheetValue(job, `line:${id}:qty`, ctx), '0.313');
+  assert.equal(reconfirm(job, `line:${id}:qty`, ctx), job);
+  // 違う数量を入れれば今までどおり
+  job = applySheet(job, `line:${id}:qty`, '0.4', ctx).job;
+  assert.equal(job.places[0].rows[0].lengthCm, 160);
+  // 広域連合用の時間（金額÷1時間の単価を小数2けたに丸めて出す）：そのまま確定しても金額は変えない
+  const odd = {...laborRow({id: 'l1', name: '木', price: 1000, estPrice: 3333, note: ''}, 1)};
+  job = {...emptyJob(), places: [newPlace('玄関', [materialRow(rail, 1), odd])]};
+  assert.equal(sheetValue(job, `line:${odd.id}:qty`, kk), '1.33');
+  assert.equal(reconfirm(job, `line:${odd.id}:qty`, kk), job);
+});
+
+test('挿入した空白の行に「同上施工費」と単価を打つと施工費の行（仕切りの取付手間・広域連合用の時間も、いちばん下の行と同じ）', () => {
+  let {job} = type(emptyJob(), [['new:text', '木の手すり 35φ 4m', rail]], kk);
+  const ins = insertBlankAfter(job, job.places[0].rows[0].id);
+  const res = applySheet(ins.job, `line:${ins.rowId}:text`, '同上施工費', kk);
+  assert.equal(res.key, `line:${ins.rowId}:text`);
+  job = applySheet(res.job, `line:${ins.rowId}:price`, '3000', kk).job;
+  assert.deepEqual(job.places[0].rows.map((r) => [r.kind, r.price]), [['material', 10000], ['labor', 3000]]);
+  const lines = formLines(job, S, 'kouiki');
+  assert.deepEqual([lines[1].mark, lines[1].text, lines[1].qty, lines[1].unit, lines[1].amount], ['手', '同上施工費', 1.2, '時間', 3000]);
+  assert.equal(jobTotals(job, S).labor, 3000);
+  assert.equal(formLines(job, S, 'yukuhashi')[1].unit, '式');
+  // 上に施工費があれば、そのまとまり（見積書では1行）に入る。名前を打った施工費は内容の欄に出る
+  const ins2 = insertBlankAfter(job, job.places[0].rows[0].id);
+  const res2 = applySheet(ins2.job, `line:${ins2.rowId}:text`, '手すり取付施工費', kk);
+  assert.equal(res2.key, `line:${job.places[0].rows[1].id}:text`);
+  assert.equal(formLines(res2.job, S, 'kouiki').length, 2);
+});
+
+test('広域連合用：いちばん下の行を「手」にして時間を打つと、その分だけ施工費が増える（上の同上施工費を打った金額にしない）', () => {
+  const wood = {id: 'l1', name: '木', price: 1000, estPrice: 1500, note: ''};
+  let job: Job = {...emptyJob(), form: 'kouiki', places: [newPlace('玄関', [materialRow(rail, 1), laborRow(wood, 2)])]};
+  assert.equal(estimateTotals(job, S).all.subtotal, 19000);
+  job = applySheet(job, 'new:qty', '0.8', {...kk, labor: true}).job;
+  assert.equal(estimateTotals(job, S).all.subtotal, 21000);
+  const added = job.places[0].rows[2];
+  assert.deepEqual([added.kind, added.price, added.estPrice, added.qty], ['labor', 2000, 2000, 1]); // 仕切りも同じ金額
+  assert.equal(jobTotals(job, S).labor, 4000);
+  // 上のまとまりの金額を手で直してあれば、その金額に足す
+  job = {...job, places: [{...job.places[0], rows: setWorkAmount(job.places[0].rows.slice(0, 2), 1, 2500, S)}]};
+  job = applySheet(job, 'new:price', '1000', {...kk, labor: true}).job;
+  assert.deepEqual(formLines(job, S, 'kouiki').map((l) => l.amount), [16000, 3500]);
+});
+
+test('貼り付けた文字：Excel の2つのセル・2行はつなげて読まない。−500・ー500 は負の数', () => {
+  assert.equal(parseNum('1,500\t1,200'), null);
+  assert.equal(parseNum('1\n2'), null);
+  assert.equal(parseNum('3,000\n'), 3000); // Excel の1つのセル（うしろに改行が付く）
+  assert.equal(parseNum('−500'), -500);
+  assert.equal(parseNum('ー500'), -500);
+  assert.equal(parseNum('ｰ500'), -500);
+  const {job} = type(emptyJob(), [['new:text', '手すり受け'], ['line:@:price', '1,500\t1,200\n']]);
+  assert.equal(formLines(job, S, 'yukuhashi')[0].unitPrice, 0);
+});
+
+test('内容の欄で、1本の長さのない部材に選び直したら前の使う長さは消す（「（長さ60cm）」と出ない）', () => {
+  const end: Material = {id: 'm08g', name: '35エンドブラケット ゴールド', price: 1000, listPrice: 1800, pieceLengthM: 0, maker: 'マツ六', code: 'BD-08G', unit: '個', favorite: false, updatedAt: 1};
+  let {job} = type(emptyJob(), [['new:text', '木の手すり 35φ 4m', rail], ['line:@:qty', '600mm']]);
+  const id = job.places[0].rows[0].id;
+  ({job} = type(job, [[`line:${id}:text`, 'マツ六 BD-08G 35エンドブラケット ゴールド', end]]));
+  const [l] = formLines(job, S, 'yukuhashi');
+  assert.deepEqual([l.text, l.qty, l.unit], ['マツ六 BD-08G 35エンドブラケット ゴールド', 1, '個']);
+  // 1本の長さのある部材に選び直したときは、使う長さのまま
+  ({job} = type(job, [[`line:${id}:qty`, '1']]));
+  ({job} = type(job, [[`line:${id}:text`, '木の手すり 35φ 4m', rail], [`line:${id}:qty`, '60cm'], [`line:${id}:text`, '別の手すり 4m', {...rail, id: 'm9', name: '別の手すり 4m'}]]));
+  assert.equal(job.places[0].rows[0].lengthCm, 60);
+});
+
+test('申請書のタブで寸法・写真を入れた箇所は、見積書の ✕・切り取りで行がなくなっても消さない（空白の行にして残す）', () => {
+  const bath = {...newPlace('浴室', [manualRow('material', {qty: 1})]), dims: {l: '800', h: '750'}, photos: {before: 'ph_before_1', after: 'ph_after_1'}, photoNote: '縦手すり'};
+  const entry = newPlace('玄関', [materialRow(rail, 1)]);
+  let job: Job = {...emptyJob(), places: [entry, bath]};
+  // 空白の行の ✕：何もしない（前は箇所ごと寸法・写真まで消えた）
+  assert.equal(deleteLine(job, bath.rows[0].id), job);
+  // 行を入れてから ✕：箇所は空白の行にして残す
+  job = {...job, places: [entry, {...bath, rows: [materialRow(bar, 1)]}]};
+  job = deleteLine(job, job.places[1].rows[0].id);
+  assert.deepEqual([job.places.length, job.places[1].rows.length, job.places[1].photos?.before, job.places[1].dims?.l], [2, 1, 'ph_before_1', '800']);
+  assert.ok(formLines(job, S, 'yukuhashi')[1].blank);
+  // 切り取って玄関に貼り付けても残る。申請書の内容のない箇所は今までどおり消える
+  job = {...job, places: [entry, {...bath, rows: [materialRow(bar, 1)]}]};
+  const moved = pasteLines(job, `line:${entry.rows[0].id}:text`, lineRows(job, job.places[1].rows[0].id) ?? [], [job.places[1].rows[0].id]).job;
+  assert.deepEqual(moved.places.map((p) => [p.name, p.rows.length]), [['玄関', 2], ['浴室', 1]]);
+  const plain = {...emptyJob(), places: [entry, newPlace('トイレ', [materialRow(bar, 1)])]};
+  assert.deepEqual(deleteLine(plain, plain.places[1].rows[0].id).places.map((p) => p.name), ['玄関']);
+});
+
+test('白紙に戻す：見積書の内容と、申請書の項目・理由書（お客様のこと）を消す。保険者・担当・請求書に入れるかは残す', () => {
+  const {job} = type({...emptyJob(), customer: '前の方', staff: '久保', address: '福岡県行橋市中央1丁目', insurer: 'yukuhashi'}, [['new:text', '木の手すり 35φ 4m', rail]]);
+  const full: Job = {...job, shinsei: {...job.shinsei, kana: 'マエノカタ'} as Job['shinsei'], riyu: {body: '前の方の身体状況'} as unknown as Job['riyu']};
+  const blank = clearedSheet(full, S);
+  assert.deepEqual([blank.customer, blank.address, blank.places.length, blank.riyu, blank.shinsei?.kana], ['', '', 0, undefined, '']);
+  assert.deepEqual([blank.staff, blank.insurer, blank.shikiri], ['久保', 'yukuhashi', true]);
 });

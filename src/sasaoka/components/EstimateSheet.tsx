@@ -10,6 +10,7 @@
 
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ChangeEvent, ClipboardEvent as ReactClipboardEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent} from 'react';
+import {startEstimate} from '../calc.ts';
 import {circled, KINDS, materialText} from '../estimateForms.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {KouikiForm, YukuhashiForm} from '../print/EstimateForms.tsx';
@@ -24,7 +25,8 @@ const PAGE_W = (300 / 25.4) * 96;
 const PAD = 12;
 
 type Sel = {key: string; occ: number};
-type Edit = {mode: 'enter' | 'edit'; value: string};
+/** 打ち込んでいる欄。initial：F2・ダブルクリックで開いたときの欄の値（そのまま確定したら入れない） */
+type Edit = {mode: 'enter' | 'edit'; value: string; initial?: string};
 type Dir = 'up' | 'down' | 'left' | 'right' | 'next' | 'prev';
 type Box = {x: number; y: number; w: number; h: number; font: string; family: string; align: string};
 
@@ -96,7 +98,9 @@ export function EstimateSheet({
     if (job === seen.current) return;
     const prev = seen.current;
     seen.current = job;
-    const mine = own.current !== null && sameJob(job, own.current);
+    // 見積書を書きはじめた1行目は、見積もり作成日などが付いて戻ってくる（EstimateEditor の setJob の startEstimate）。それもこの欄の変更
+    //（前は外の変更とみて、Ctrl+Z を2回押さないと戻らなかった）
+    const mine = own.current !== null && (sameJob(job, own.current) || sameJob(job, startEstimate(prev, own.current)));
     own.current = null;
     jobRef.current = job;
     if (mine || sameJob(job, prev)) return;
@@ -314,7 +318,12 @@ export function EstimateSheet({
   const commit = (value: string, pick: Material | null, then: Dir | null, keepSel = false) => {
     if (!sel) return;
     const key = sel.key;
-    if (key === 'date') {
+    // F2・ダブルクリックで開いて何も変えずに確定したとき（Enter・Tab・ほかの欄を押す・💾保存）は入れない。入れると、諸経費が手で入れた金額になって
+    // 行を足しても変わらない・切って使う手すり（600mm×2本）が丸めた数量の長さ（1200mm×1本）になる、などが起きていた
+    const unchanged = edit?.mode === 'edit' && !pick && value === edit.initial;
+    if (unchanged) {
+      // 何もしない（下で欄を閉じて、動く向きだけ入れる）
+    } else if (key === 'date') {
       const d = parseDate(value);
       if (d !== null) change({...jobRef.current, estDate: d || todayIso()}); // 消したら当日
     } else if (key === 'new:mark') {
@@ -343,7 +352,8 @@ export function EstimateSheet({
       toggle();
       return;
     }
-    setEdit({mode, value: mode === 'edit' ? sheetValue(jobRef.current, sel.key, ctx, estDate) : ''});
+    const value = mode === 'edit' ? sheetValue(jobRef.current, sel.key, ctx, estDate) : '';
+    setEdit(mode === 'edit' ? {mode, value, initial: value} : {mode, value});
     setHl(-1);
   };
 
@@ -586,7 +596,9 @@ export function EstimateSheet({
   const pasteAt = (key: string) => {
     const c = getClip();
     if (!c) return;
-    const res = pasteLines(jobRef.current, key, c.rows, c.cut && c.jobId === jobRef.current.id ? c.sourceIds : []);
+    // ほかの見積書で切り取った行は、もとの見積書から消せないので貼り付けるだけ（前は「移しました」と出て、もとの見積書にも行が残り、請求書に2回入った）
+    const move = c.cut && c.jobId === jobRef.current.id;
+    const res = pasteLines(jobRef.current, key, c.rows, move ? c.sourceIds : []);
     if (!res.rowId) {
       toast('貼り付ける行を選んでください', 'error');
       return;
@@ -595,7 +607,7 @@ export function EstimateSheet({
     setSel({key: `line:${res.rowId}:text`, occ: 0});
     setEdit(null);
     if (c.cut) setClip(null);
-    toast(c.cut ? `「${c.label}」を移しました` : `「${c.label}」を貼り付けました`);
+    toast(move ? `「${c.label}」を移しました` : c.cut ? `「${c.label}」を貼り付けました（もとの見積書の行は残っています）` : `「${c.label}」を貼り付けました`);
     inputRef.current?.focus({preventScroll: true});
   };
   const pasteTarget = () => {
@@ -610,7 +622,12 @@ export function EstimateSheet({
     inputRef.current?.focus({preventScroll: true});
   };
   const deleteRow = (rowId: string) => {
-    change(deleteLine(jobRef.current, rowId));
+    const next = deleteLine(jobRef.current, rowId);
+    if (next === jobRef.current) {
+      toast('申請書に入れた箇所は、申請書のタブで消せます'); // 寸法・写真などを入れた箇所の空白の行（`deleteLine`）
+      return;
+    }
+    change(next);
     setSel(null);
     toast('行を消しました');
   };

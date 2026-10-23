@@ -68,11 +68,19 @@ export function insertRowsAt(rows: Row[], add: Row[], at: string | null): Row[] 
   return [...rows.slice(0, end), ...add, ...rows.slice(end)];
 }
 
-/** 部材を選ぶ画面の −：同じ部材の数量を1つ減らす。0 になったら行を消す（すぐ下の施工費の行はそのまま） */
+/**
+ * 部材を選ぶ画面の −：同じ部材の数量を1つ減らす。0 になったら行を消す。
+ * すぐ下の施工費（同上施工費）は、上の部材の同上施工費としてそのまま残す（手すり・ブラケット・エンドのあとの施工費など）。
+ * ただし上が施工費の行のときは一緒に消す（見積書の ✕ と同じ）：残すと上の施工費のまとまりに入り、手で直した見積の金額には入らないまま
+ * 仕切り計算表にだけ残って、見積書と請求書が合わなくなった
+ */
 export function removeOneMaterial(rows: Row[], refId: string): Row[] {
-  const same = rows.find((r) => r.kind === 'material' && r.refId === refId);
-  if (!same) return rows;
-  return same.qty > 1 ? rows.map((r) => (r === same ? {...r, qty: r.qty - 1} : r)) : rows.filter((r) => r !== same);
+  const at = rows.findIndex((r) => r.kind === 'material' && r.refId === refId);
+  if (at < 0) return rows;
+  const same = rows[at];
+  if (same.qty > 1) return rows.map((r) => (r === same ? {...r, qty: r.qty - 1} : r));
+  const end = at > 0 && rows[at - 1].kind === 'labor' ? workRange(rows, at)[1] : at + 1;
+  return [...rows.slice(0, at), ...rows.slice(end)];
 }
 
 /** 取付手間の行。仕切り（笹岡工務店）と見積の単価を書き写す */

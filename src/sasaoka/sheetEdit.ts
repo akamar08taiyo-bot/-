@@ -9,7 +9,7 @@
 
 import {cutToLength, estimateAmount, estimatePlaceLines, estimateQty, estimateUnitPrice, isBlankRow, listPriceOf, overheadAuto, estimateTotals, rounddown} from './calc.ts';
 import type {EstimateRates} from './calc.ts';
-import {KINDS, autoNote, formLines, lineNote, materialText, noteText, rowUnit} from './estimateForms.ts';
+import {KINDS, autoNote, formLines, jobForm, jobInsurer, lineNote, materialText, NO_SHINSEI, noteText, rowUnit} from './estimateForms.ts';
 import {fillAdded, placeAfterQty, withBrackets} from './cutLink.ts';
 import {guessPieceLengthM} from './priceImport.ts';
 import {copyRows, manualRow, materialRow, newPlace} from './rows.ts';
@@ -40,9 +40,13 @@ const ADJUST_NAME = '施工費（調整）'; // 前の版で、見積書で直�
 
 // ---------------------------------------------------------------- 打ち込んだ文字を読む
 
-/** 数字（3,800・￥3800・3800円・全角も） */
+/**
+ * 数字（3,800・￥3800・3800円・全角も。−500・ー500 も負の数）。
+ * Excel の2つのセル（「1,500⇥1,200」）・2行（「1↵2」）を貼り付けた文字は読まない（前は 15001200・12 とつなげて読んでいた）
+ */
 export function parseNum(input: string): number | null {
-  const s = input.normalize('NFKC').replace(/[,\s円￥¥]/g, '').replace(/^定価[:：]?/, '');
+  if (/\d[\t\r\n]+\S/.test(input.trim())) return null;
+  const s = input.normalize('NFKC').replace(/[,\s円￥¥]/g, '').replace(/^定価[:：]?/, '').replace(/^[−ー]/, '-');
   if (s === '' || !/^-?\d+(\.\d+)?$/.test(s)) return null;
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
@@ -195,7 +199,7 @@ export function sheetValue(job: Job, key: string, ctx: SheetCtx, date = ''): str
   if (r.kind === 'labor') {
     const amount = workAmount(found.place, r.id, rates);
     if (field === 'text') return r.estText ?? '';
-    if (field === 'qty') return ctx.settings.estimateHourRate > 0 ? String(Math.round((amount / ctx.settings.estimateHourRate) * 100) / 100) : '1';
+    if (field === 'qty') return String(shownHours(amount, ctx.settings.estimateHourRate));
     if (field === 'price') return String(amount);
     if (field === 'note') return noteOf(job, r.id, ctx)?.shown ?? r.estNote ?? '';
     return '';
@@ -203,12 +207,22 @@ export function sheetValue(job: Job, key: string, ctx: SheetCtx, date = ''): str
   // 何も入っていない行（挿入した行など）は見積書では空白なので、書き直すときも空から（前は内容の欄に「材料費」と出た。ユーザーの指摘、2026-10-21）
   if (isBlankRow(r)) return '';
   if (field === 'text') return r.estText ?? materialText(r);
-  if (field === 'qty') return String(cutToLength(r) ? Math.round(estimateQty(r) * 1000) / 1000 : r.qty);
+  if (field === 'qty') return String(shownQty(r));
   if (field === 'unit') return rowUnit(r);
   if (field === 'price') return String(estimateUnitPrice(r, rates));
   if (field === 'note') return noteOf(job, r.id, ctx)?.shown ?? r.estNote ?? '';
   return '';
 }
+
+/** 見積書の数量の欄に出す数量（切って使う部材は 使う長さ÷1本の長さ。小数3けた） */
+const shownQty = (r: Row) => (cutToLength(r) ? Math.round(estimateQty(r) * 1000) / 1000 : r.qty);
+
+/** 広域連合用の時間の欄に出す時間（施工費のまとまりの金額÷1時間の単価。小数2けた） */
+const shownHours = (amount: number, hourRate: number) => (hourRate > 0 ? Math.round((amount / hourRate) * 100) / 100 : 1);
+
+/** 申請書のタブで入れた内容（寸法・写真・写真に書く内容・申請書の文）がある箇所 */
+const hasShinseiData = (p: Place) =>
+  !!(p.shinseiText?.trim() || p.shinseiLine?.trim() || p.photoNote?.trim() || p.photos?.before || p.photos?.after || Object.values(p.dims ?? {}).some((v) => v?.trim()));
 
 /** いちばん下の空いた行が入る箇所：最後の箇所に行がなければその箇所（なければ null。打ち込むと新しく作る） */
 export function pendingPlace(job: Pick<Job, 'places'>): Place | null {
@@ -232,7 +246,11 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
   if (kind === 'overhead') {
     const n = parseNum(trimmed);
     if (trimmed !== '' && n === null) return {job, key};
-    return {job: {...job, [id === 'target' ? 'overheadTarget' : 'overhead']: n === null ? null : Math.round(n)}, key};
+    // 自動の諸経費（小計×率の端数調整）と同じ金額なら、手で入れたことにしない（行を足しても諸経費が前の金額のままになっていた）
+    const t = estimateTotals(job, rates);
+    const target = id === 'target';
+    const auto = overheadAuto(target ? t.target.subtotal : t.all.subtotal, rates);
+    return {job: {...job, [target ? 'overheadTarget' : 'overhead']: n === null || Math.round(n) === auto ? null : Math.round(n)}, key};
   }
   if (kind === 'place') {
     const pi = job.places.findIndex((p) => p.id === id);
@@ -258,6 +276,8 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
       // 広域連合用の時間の欄は 時間×1時間の単価、金額の欄はその金額。空にしたら自動（笹岡工務店の手間×施工費の率）に戻す
       const n = parseNum(trimmed);
       if (n === null && trimmed !== '') return {job, key};
+      // 出ている時間のまま確定したら何もしない（時間は小数2けたに丸めて出すので、入れ直すと金額が変わってしまう）
+      if (field === 'qty' && n !== null && n === shownHours(workAmount(found.place, headRow.id, rates), ctx.settings.estimateHourRate)) return {job, key};
       const amount = n === null ? null : field === 'qty' ? rounddown(n * ctx.settings.estimateHourRate) : Math.round(n);
       return {job: setPlaceRows(job, found.pi, setWorkAmount(found.place.rows, head, amount, ctx.settings)), key};
     }
@@ -271,15 +291,24 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
   // 部材の行
   if (field === 'text') {
     if (ctx.pick) {
-      const picked = patchRow(job, found, {...materialFields(ctx.pick), estText: null, estNote: null, estPrice: null});
+      const fields = materialFields(ctx.pick);
+      // 1本の長さのない部材（ブラケットなど）に選び直したら、前の部材の使う長さは消す（「（長さ60cm）」と出ていた）
+      const picked = patchRow(job, found, {...fields, estText: null, estNote: null, estPrice: null, ...(fields.pieceLengthM ? {} : {lengthCm: 0})});
       return {job: withPlace(picked, found.pi, (p) => withBrackets(found.place, fillAdded(p, new Set([r.id])), ctx.materials ?? [])), key};
     }
     if (trimmed === (isBlankRow(r) ? '' : (r.estText ?? materialText(r)))) return {job, key};
+    // 挿入した空白の行に「同上施工費」などと打ったら、施工費の行にする（いちばん下の行と同じ。前は部材の行になり、仕切りの取付手間に入らなかった）
+    if (isBlankRow(r) && isLaborText(trimmed)) return laborFromBlank(job, found, trimmed);
     if (trimmed === '') return {job: patchRow(job, found, {name: '', maker: '', code: '', estText: null}), key};
     return {job: patchRow(job, found, {name: trimmed, maker: '', code: '', estText: null, pieceLengthM: r.pieceLengthM || guessPieceLengthM(trimmed)}), key};
   }
   // 切って使う手すり・ベースプレートは、同じ箇所のもう一方と申請書の長さにもつなぐ。手すりの長さが変わったら中間のブラケットの数も（`cutLink.ts`）
   if (field === 'qty') {
+    // 出ている数量のまま確定したら何もしない（0.3 と出ている 600mm×2本 が 1200mm×1本に、申請書の L=1250 が 0.313本＝1252mm に、
+    // 4000mm の「1」が切らない1本に書き直されていた）。小数を入れて切って使う長さにする行（まだ長さがない）はのぞく
+    const n = parseNum(trimmed);
+    const cuts = r.pieceLengthM > 0 && !(r.lengthCm > 0) && n !== null && !Number.isInteger(n);
+    if (n !== null && n === shownQty(r) && !cuts) return {job, key};
     const typed = patchRow(job, found, qtyPatch(r, trimmed));
     return {job: withPlace(typed, found.pi, (p) => withBrackets(found.place, placeAfterQty(found.place, p, r.id), ctx.materials ?? [])), key};
   }
@@ -369,6 +398,17 @@ function sameNote(a: string, b: string): boolean {
   return norm(a) === norm(b);
 }
 
+/**
+ * 空白の行（挿入した行など）を、打ち込んだ内容（「同上施工費」など）の施工費の行にする。いちばん下の行に打ったときと同じく、
+ * 上の部材の同上施工費（上に施工費があればそのまとまり）になる。返す欄は、そのまとまりの内容の欄
+ */
+function laborFromBlank(job: Job, found: Found, text: string): SheetResult {
+  const rows = found.place.rows.map((x, i) => (i === found.ri ? {...x, kind: 'labor' as const, name: text, price: 0, qty: 1} : x));
+  const head = rows[workHead(rows, found.ri)];
+  const own = head.id === found.row.id && text !== '同上施工費' && text !== '施工費';
+  return {job: setPlaceRows(job, found.pi, own ? rows.map((x) => (x.id === head.id ? {...x, estText: text} : x)) : rows), key: `line:${head.id}:text`};
+}
+
 /** いちばん下の空いた行に打ち込んだとき */
 function applyNew(job: Job, field: string, text: string, ctx: SheetCtx): SheetResult {
   const trimmed = text.trim();
@@ -402,8 +442,41 @@ function applyNew(job: Job, field: string, text: string, ctx: SheetCtx): SheetRe
     }
     return {job: j, key: `line:${lineId}:text`};
   }
+  if (labor && (field === 'qty' || field === 'price')) {
+    // 施工費の時間・金額：打った金額は増えた行だけに入れる（仕切りも同じ金額。あとで直せる）。上の同上施工費のまとまりに入っても、
+    // まとまりの金額を打った金額に置きかえない（前は上の施工費 3,000円が 2,000円になっていた）。まとまりの金額を手で直してあれば、その金額に足す
+    const n = parseNum(trimmed);
+    if (n === null) return {job: j, key: `line:${lineId}:${field}`};
+    const amount = field === 'qty' ? rounddown(n * ctx.settings.estimateHourRate) : Math.round(n);
+    const head = rows.find((r) => r.id === lineId);
+    const bump = lineId !== row.id && head?.estAmount != null ? head.estAmount + amount : null;
+    const next = rows.map((r) => (r.id === row.id ? {...r, price: amount, qty: 1, estPrice: amount} : bump !== null && r.id === lineId ? {...r, estAmount: bump} : r));
+    return {job: setPlaceRows(j, pi, next), key: `line:${lineId}:${field}`};
+  }
   const res = applySheet(j, `line:${lineId}:${field}`, text, {...ctx, pick: null});
   return {job: res.job, key: `line:${lineId}:${field}`};
+}
+
+/**
+ * 「📄 白紙に戻す」の様邸：見積書に打ち込んだ内容（お客様名・被保険者番号・工事場所・明細・諸経費）と発注書で直したところ、
+ * お客様のこと（申請書の項目・理由書）を消す（前は理由書が残り、前のお客様の身体状況などが次の方の理由書に出た）。
+ * 保険者（書式）・担当・請求書に入れるかは残す
+ */
+export function clearedSheet(job: Job, s: Pick<Settings, 'estimateForm'>): Job {
+  return {
+    ...job,
+    insurer: jobInsurer(job),
+    form: jobForm(job, s),
+    customer: '',
+    insuredNo: '',
+    address: '',
+    places: [],
+    overhead: null,
+    overheadTarget: null,
+    order: null,
+    shinsei: {...NO_SHINSEI},
+    riyu: undefined,
+  };
 }
 
 /** 見積書の諸経費（手で入れていなければ 小計×率） */
@@ -425,15 +498,18 @@ function unitRange(rows: Row[], ri: number): [number, number] {
 
 /**
  * 見積書の1行を消す：部材の行はその部材と同上施工費、施工費の行はそのまとまり。
- * 箇所の行がなくなったら箇所も消す（改修内容・改修場所も消えて、その行が空白になる）
+ * 箇所の行がなくなったら箇所も消す（改修内容・改修場所も消えて、その行が空白になる）。
+ * ただし申請書のタブで寸法・写真などを入れた箇所は残して空白の行にする（前は申請書の寸法・写真まで消えていた。箇所は申請書のタブの ✕ で消す）。
+ * その空白の行を消そうとしたときは何もしない（同じ job を返す）
  */
 export function deleteLine(job: Job, rowId: string): Job {
   const found = findRow(job, rowId);
   if (!found) return job;
   const [a, b] = unitRange(found.place.rows, found.ri);
   const rows = [...found.place.rows.slice(0, a), ...found.place.rows.slice(b)];
-  if (rows.length === 0) return {...job, places: job.places.filter((_, i) => i !== found.pi)};
-  return setPlaceRows(job, found.pi, rows);
+  if (rows.length > 0) return setPlaceRows(job, found.pi, rows);
+  if (!hasShinseiData(found.place)) return {...job, places: job.places.filter((_, i) => i !== found.pi)};
+  return b - a === 1 && isBlankRow(found.row) ? job : setPlaceRows(job, found.pi, [manualRow('material', {qty: 1})]);
 }
 
 /**
@@ -485,7 +561,9 @@ export function pasteLines(job: Job, key: string, rows: Row[], removeIds: string
   const targetId = j.places[pi].id;
   if (removeIds.length > 0) {
     const gone = new Set(removeIds);
-    j = {...j, places: j.places.map((p) => ({...p, rows: p.rows.filter((r) => !gone.has(r.id))})).filter((p) => p.rows.length > 0 || p.id === targetId)};
+    // 行がなくなった箇所は消す。申請書の寸法・写真などを入れた箇所は空白の行にして残す（`deleteLine` と同じ）
+    const left = j.places.map((p) => ({...p, rows: p.rows.filter((r) => !gone.has(r.id))}));
+    j = {...j, places: left.flatMap((p) => (p.rows.length > 0 || p.id === targetId ? [p] : hasShinseiData(p) ? [{...p, rows: [manualRow('material', {qty: 1})]}] : []))};
   }
   // 貼り付けた最初の行の見積書の1行（施工費は、まとまりの最初の手間の行）
   const place = j.places.find((p) => p.id === targetId);

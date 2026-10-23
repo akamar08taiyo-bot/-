@@ -26,6 +26,11 @@ test('申請書の長さの読み方：「600×1800」「600, 1800」「600+1800
   assert.deepEqual(dimsLengths('６００＋１８００'), [600, 1800]);
   assert.deepEqual(dimsLengths('2,400mm'), [2400]);
   assert.deepEqual(dimsLengths(''), []);
+  // 「600×2」「600mm×2本」は 600mm を2本（前は 602mm と読んでいた）。× のうしろでも 100 以上は長さ
+  assert.deepEqual(dimsLengths('600×2'), [600, 600]);
+  assert.deepEqual(dimsLengths('600mm×2本'), [600, 600]);
+  assert.deepEqual(dimsLengths('600×1'), [600]);
+  assert.deepEqual(qtys(placeFromDims(place([rail()], {dims: {l: '600×2'}}))), {rail: 0.6}); // 1200mm÷2000mm
   // 長さで数える行：使う長さがあるか、2m・4m の材でまだ1本以下。ブラケット・2本の本数で入れた行はのぞく
   assert.deepEqual([cutRow(rail()), cutRow(plate({qty: 0})), cutRow(bracket), cutRow(rail({qty: 2}))], [true, true, false, false]);
 });

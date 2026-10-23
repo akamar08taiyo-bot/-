@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {addMaterial, insertRowsAt, kitFromRows, kitRows, laborCount, laborRange, laborRow, laborSpot, manualRow, materialRow, replaceRange, setLaborCount, workRange} from '../../src/sasaoka/rows.ts';
+import {addMaterial, insertRowsAt, kitFromRows, kitRows, laborCount, laborRange, laborRow, laborSpot, manualRow, materialRow, removeOneMaterial, replaceRange, setLaborCount, workRange} from '../../src/sasaoka/rows.ts';
 import type {LaborItem, Material} from '../../src/sasaoka/types.ts';
 
 const wood: LaborItem = {id: 'l01', name: '木', price: 1000, estPrice: null, note: ''};
@@ -118,4 +118,19 @@ test('部材＋施工費（常用）：登録したときの行を、今の仕�
   assert.notEqual(kitRows(kit, newer, [wood])[0].id, rows[0].id);
   // 部材リストから消えた部材は、登録したときの単価のまま
   assert.equal(kitRows(kit, [], [])[0].price, 10000);
+});
+
+test('部材を選ぶ画面の −：0 になったら部材を消す。上が施工費なら同上施工費も一緒に消す（見積書と請求書が合わなくなっていた）。上が部材ならその同上施工費として残す', () => {
+  const end: Material = {...bracket, id: 'm3', name: 'エンド', code: 'EN'};
+  // ブラケット＋同上施工費、手すり＋同上施工費：手すりを消すと手すりの同上施工費も消える
+  const bw = laborRow(wood, 2);
+  let rows = removeOneMaterial([materialRow(bracket, 2), bw, materialRow(rail, 1), laborRow(wood, 1)], rail.id);
+  assert.deepEqual(rows.map((r) => r.name), ['ブラケット', '木']);
+  assert.equal(rows[1], bw);
+  // 手すり・ブラケット・エンドのあとの施工費：エンドを消しても施工費は残る（ブラケットの同上施工費になる）
+  rows = removeOneMaterial([materialRow(rail, 1), materialRow(bracket, 2), materialRow(end, 1), laborRow(tile, 1)], end.id);
+  assert.deepEqual(rows.map((r) => r.name), ['木製手すり 4m', 'ブラケット', 'タイル']);
+  // 1つ減らすだけなら数量
+  rows = removeOneMaterial([materialRow(bracket, 2), laborRow(wood, 1)], bracket.id);
+  assert.deepEqual(rows.map((r) => [r.name, r.qty]), [['ブラケット', 1], ['木', 1]]);
 });

@@ -7,13 +7,14 @@ import {LaborPickerFor, missingShikiri, ShikiriPriceDialog} from '../components/
 import {KitPicker} from '../components/Kits.tsx';
 import {MaterialPicker} from '../components/Pickers.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
-import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerForAddress, jobForm, jobInsurer, NO_SHINSEI} from '../estimateForms.ts';
+import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerForAddress, jobForm, jobInsurer} from '../estimateForms.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {fillAdded, withBrackets} from '../cutLink.ts';
 import {addMaterial, insertRowsAt, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
 import type {AppData, Insurer, Job, Kit, Material, NameSuffix, Place} from '../types.ts';
 import type {Update} from '../useStore.ts';
+import {clearedSheet} from '../sheetEdit.ts';
 import {staffFull, thisMonth, todayIso} from '../util.ts';
 import {duplicateEstimate, removeEstimate, saveEstimateExcel} from './EstimateList.tsx';
 
@@ -102,12 +103,11 @@ export function EstimateEditor({
   const removeJob = () => {
     if (removeEstimate(job, name, update, toast)) onBack();
   };
-  // 白紙に戻す：見積書に打ち込んだ内容（お客様名・被保険者番号・工事場所・明細・諸経費）と発注書で直したところを消す。
-  // いきなり消えると困るので確かめてから（消したあとも Ctrl+Z で戻せる）。保険者（書式）・担当・請求書に入れるかは残す
+  // 白紙に戻す（`clearedSheet`）。いきなり消えると困るので確かめてから（消したあとも Ctrl+Z で戻せる）
   const blank = !job.customer.trim() && !job.insuredNo.trim() && !job.address.trim() && job.places.length === 0 && job.overhead === null && job.overheadTarget === null;
   const clearSheet = () => {
     if (!confirm('見積書を白紙に戻しますか？\n打ち込んだ内容（お客様名・工事場所・明細など）がすべて消えます。')) return;
-    setJob((j) => ({...j, insurer: jobInsurer(j), form: jobForm(j, s), customer: '', insuredNo: '', address: '', places: [], overhead: null, overheadTarget: null, order: null, shinsei: {...NO_SHINSEI}}));
+    setJob((j) => clearedSheet(j, s));
     toast('白紙に戻しました');
   };
   const duplicate = () => onOpen(duplicateEstimate(job, update, toast).id);
