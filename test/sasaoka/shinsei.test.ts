@@ -5,7 +5,7 @@ import {strFromU8, unzipSync, zipSync} from 'fflate';
 import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import {DEFAULT_PLACES, defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
-import {boxLabels, checkBoxes, fillShinsei, fitLinesSize, insuredBoxes, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, placeBox, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems} from '../../src/sasaoka/shinsei.ts';
+import {boxLabels, checkBoxes, fillShinsei, fitLinesSize, insuredBoxes, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, placeBox, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
 import type {Insurer, Job, Place, Row, ShinseiInfo, ShinseiMarks} from '../../src/sasaoka/types.ts';
 
 const RATES = {estimateRate: 0.8, estimateLaborRate: 1.5, estimateOverheadRate: 0.1, taxRate: 0.1};
@@ -119,6 +119,16 @@ test('改修の内容・箇所及び規模：「①浴室　手すりの取り�
   assert.deepEqual(shinseiKinds(sized, RATES)[1].works, ['②屋外　段差の解消　W600mm D350mm H150mm', '④浴室　段差の解消　W700mm']); // 内訳明細書も同じ
   // 「1,600」は3けた区切り（長さ1つ）、「600,850」は長さ2つ
   assert.deepEqual(shinseiWorks(job({places: [place('廊下', [mat('L型手すり')], {dims: {l: '1,600'}}), place('居室', [mat('L型手すり')], {dims: {l: '600,850'}})]}), RATES), ['①廊下　手すりの取り付け　L=1600mm', '②居室　手すりの取り付け　L=600×850mm']);
+  // cm・m で打った数は mm に。前に打った「L=」「H=」は外す（「L=60cmmm」「L=L=600mm」にしない）
+  const dims = (d: Place['dims'], kind = 1) => workText({kind, rows: [], dims: d});
+  assert.equal(dims({l: '60cm', h: '80cm'}), '手すりの取り付け　L=600mm H=800mm');
+  assert.equal(dims({l: '0.6m', h: 'H=８００ｍｍ'}), '手すりの取り付け　L=600mm H=800mm');
+  assert.equal(dims({l: 'L=600'}), '手すりの取り付け　L=600mm');
+  assert.equal(dims({l: '60 cm×85cm'}), '手すりの取り付け　L=600×850mm');
+  assert.equal(dims({l: '60×85cm'}), '手すりの取り付け　L=600×850mm'); // 単位が最後にだけあれば全部 cm
+  assert.equal(dims({l: '６０センチ'}), '手すりの取り付け　L=600mm');
+  assert.equal(dims({w: '60cm', d: 'D350', h: '15 cm'}, 2), '段差の解消　W600mm D350mm H150mm');
+  assert.equal(dims({l: '600〜700mm'}), '手すりの取り付け　L=600〜700mm'); // 数でないものは打ったまま（うしろの mm は外す）
 });
 
 test('苅田町の申請書：事前申請書の氏名・住所・被保険者番号（10マス）・改修の内容に入れる。ほかのシート・欄は原本のまま', () => {

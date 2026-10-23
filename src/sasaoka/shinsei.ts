@@ -307,15 +307,34 @@ function workLine(p: Place, photo: number): string {
 
 /**
  * 寸法（mm）の数：打ったまま（全角は半角、うしろの mm は外す）。長さ（many）は区切り（, 、 x * すき間）を「×」に。
- * ただし「1,600」のような3けた区切り（前が1〜2けた）は区切りにしない
+ * ただし「1,600」のような3けた区切り（前が1〜2けた）は区切りにしない。
+ * cm・m で打った数は mm にする（「60cm」→「600」・「0.6m」→「600」。単位が最後の数にだけあれば「60×85cm」の全部を cm と見る）。
+ * 前に打った「L=」「H=」なども外す（書くときに「L=600mm」と付ける。そのままだと「L=L=600mm」「L=60cmmm」になっていた）
  */
+const UNIT = /(mm|cm|m|ミリ(?:メートル)?|センチ(?:メートル)?|メートル)$/i;
 function mmText(v: string | undefined, many = false): string {
-  const t = (v ?? '').normalize('NFKC').trim().replace(/\s*mm$/i, '');
-  return many
-    ? t
-        .replace(/(^|\D)(\d{1,2}),(\d{3})(?!\d)/g, '$1$2$3')
-        .replace(/\s*[,、xX*×\s]+\s*/g, '×')
-    : t;
+  const t = (v ?? '')
+    .normalize('NFKC')
+    .trim()
+    .replace(/^[LHWD]\s*=?\s*(?=\d)/i, '')
+    .replace(/(\d)\s+(?=(?:mm|cm|m)(?![a-z])|ミリ|センチ|メートル)/gi, '$1');
+  if (!many) return mmOf(t);
+  const parts = t
+    .replace(/(^|\D)(\d{1,2}),(\d{3})(?!\d)/g, '$1$2$3')
+    .split(/\s*[,、xX*×\s]+\s*/)
+    .filter(Boolean);
+  const last = UNIT.exec(parts.at(-1) ?? '')?.[1];
+  const unit = last && parts.slice(0, -1).every((x) => /^\d+(\.\d+)?$/.test(x)) ? last : undefined;
+  return parts.map((x) => mmOf(x, unit)).join('×');
+}
+
+/** 1つの寸法（「600」「600mm」「60cm」「0.6m」）→ mm の数。数でなければ打ったまま */
+function mmOf(t: string, unit?: string): string {
+  const m = /^(\d+(?:\.\d+)?)(mm|cm|m|ミリ(?:メートル)?|センチ(?:メートル)?|メートル)?$/i.exec(t);
+  if (!m) return t.replace(/\s*mm$/i, '');
+  const u = (m[2] ?? unit ?? 'mm').toLowerCase();
+  const scale = u === 'cm' || u.startsWith('センチ') ? 10 : u === 'm' || u === 'メートル' ? 1000 : 1;
+  return scale === 1 ? m[1] : String(Math.round(Number(m[1]) * scale));
 }
 
 /** 見積書の手すりの使う長さ（mm。切って使う部材など長さの入った部材。補強板・ベースプレートはのぞく。2本以上は「600×850」） */
