@@ -118,6 +118,24 @@ await doc.screenshot({path: path.join(outDir, '71-order-doc.png')});
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
 log('発注書の印刷OK');
 
+// 数が 0 の行には No. を付けない（印刷は発注する行だけに番号を付けるので、画面も同じ番号にする）
+const bracketQty = list.getByLabel('ブラケットの発注する数', {exact: true});
+const stepBracket = async (name, want) => {
+  await list.getByRole('button', {name: `ブラケットの発注する数を1${name}`}).click();
+  for (let i = 0; i < 30 && (await bracketQty.inputValue()) !== want; i++) await page.waitForTimeout(100);
+  assert.equal(await bracketQty.inputValue(), want);
+};
+for (const want of ['2', '1', '0']) await stepBracket('減らす', want);
+rows = await items();
+assert.match(rows[2], /^ブラケット .*0 なので発注しません/, rows[2]);
+assert.match(rows[3], /^3 L型手すり /, rows[3]);
+await page.getByRole('button', {name: '🖨 発注書を印刷'}).click();
+await doc.waitFor();
+assert.equal((await doc.locator('tbody tr').nth(2).innerText()).replace(/\s+/g, ' ').trim(), '3 サンプル S-TL01 L型手すり 2 本 ②');
+await page.getByRole('button', {name: '✕ 閉じる'}).click();
+for (const want of ['1', '2', '3']) await stepBracket('増やす', want);
+log('数が 0 の行には No. を付けない（画面と印刷で同じ番号）OK');
+
 // 販売受注簿に転記：同じサイトの /taiyo-hacchu-scan/ を新しいタブで開き、部材を渡す
 const [tab] = await Promise.all([ctx.waitForEvent('page'), page.getByRole('link', {name: '📤 販売受注簿に転記'}).click()]);
 await tab.waitForLoadState('domcontentloaded');
