@@ -157,6 +157,20 @@ test('新しい版が足した項目は消さない（前の版を開いたま�
   assert.deepEqual([any(kit).color, any(kit.rows[0]).memo2], ['blue', 'x']);
 });
 
+test('月のない様邸はこの端末の日付の月（日本の1日の朝9時前も、その月）。保険者番号は全角の数字も読む', (t) => {
+  const tz = process.env.TZ;
+  process.env.TZ = 'Asia/Tokyo';
+  t.mock.timers.enable({apis: ['Date'], now: Date.parse('2026-11-01T05:00:00+09:00')});
+  try {
+    assert.deepEqual(cleanJobs([{customer: '山田'}, {month: '2026-09'}]).map((j) => j.month), ['2026-11', '2026-09']);
+  } finally {
+    t.mock.timers.reset();
+    if (tz === undefined) delete process.env.TZ;
+    else process.env.TZ = tz;
+  }
+  assert.equal(cleanJobs([{shinsei: {insurerNo: '４００１２３'}}])[0].shinsei!.insurerNo, '400123');
+});
+
 test('笹岡工務店の請求書に入れるか：前の版の様邸は入れる。見積書作成アプリで入れないままの見積書は入れない', () => {
   assert.equal(cleanJobs([{id: 'a'}])[0].shikiri, true);
   assert.equal(cleanJobs([{id: 'a', shikiri: true}])[0].shikiri, true);

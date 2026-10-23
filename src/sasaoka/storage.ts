@@ -11,7 +11,7 @@ import {jobInsurer, MARK_INFO, MARK_KEYS, NO_SHINSEI} from './estimateForms.ts';
 import {cleanEdit} from './photoEdit.ts';
 import {cleanRiyu} from './riyu.ts';
 import type {AppData, EstimateForm, Insurer, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, PlaceDims, PlacePhotoEdits, PlacePhotos, Rounding, Row, Settings, ShinseiInfo, TaxMode} from './types.ts';
-import {uid} from './util.ts';
+import {todayIso, uid} from './util.ts';
 
 const DB_NAME = 'taiyo-sasaoka-shikiri';
 const STORE = 'kv';
@@ -385,7 +385,7 @@ function cleanShinsei(raw: unknown, legacyMarks: unknown): ShinseiInfo {
   // 介護保険証から入れた項目（2026-10-22。前の版のデータにはない＝空）
   out.careFrom = isoDate(src.careFrom);
   out.careTo = isoDate(src.careTo);
-  out.insurerNo = str(src.insurerNo).replace(/\D/g, '').slice(0, 8);
+  out.insurerNo = str(src.insurerNo).normalize('NFKC').replace(/\D/g, '').slice(0, 8); // 全角の数字も（\D は半角の数字のほかを消す）
   out.burden = ['1', '2', '3'].includes(str(src.burden)) ? (str(src.burden) as ShinseiInfo['burden']) : '';
   return out;
 }
@@ -397,7 +397,7 @@ export function cleanJobs(raw: unknown): Job[] {
     const address = str(j.address);
     return {
       id: str(j.id) || uid('j'),
-      month: /^\d{4}-\d{2}$/.test(str(j.month)) ? str(j.month) : new Date().toISOString().slice(0, 7),
+      month: /^\d{4}-\d{2}$/.test(str(j.month)) ? str(j.month) : todayIso().slice(0, 7), // この端末の日付の月（toISOString は世界時なので、日本では1日の0時〜9時が前の月になる）
       customer: str(j.customer),
       suffix: SUFFIXES.includes(j.suffix as NameSuffix) ? (j.suffix as NameSuffix) : '様邸',
       staff: str(j.staff),
