@@ -731,3 +731,70 @@ test('色の記号を付けずに取り込んだ前の部材（品番「HD5-4000
     ],
   );
 });
+
+const readRows = (tsv: string, maker = 'テスト') => {
+  const g = textToGrid(tsv);
+  return gridCandidates(g, detectMapping(g), maker).map((c) => [c.maker, c.listPrice, c.price]);
+};
+
+test('「希望小売価格」「小売価格」は定価の列（「売価」が入っていても仕切価格にしない）。「メーカー希望小売価格」はメーカーの列でもない。「仕入先」はメーカーの列', () => {
+  assert.deepEqual(readRows('品番\t品名\t希望小売価格\t掛率\nAB-1\t手すり I型 600mm\t10,000\t0.6\n'), [['テスト', 10000, 6000]]); // 仕切価格は 定価×掛率
+  assert.deepEqual(readRows('品番\t品名\t小売価格\nAB-1\t手すり I型 600mm\t10,000\n'), [['テスト', 10000, null]]); // 仕切価格は空欄のまま
+  assert.deepEqual(readRows('品番\t商品名\tメーカー希望小売価格\t仕切価格\nAB-1\t手すり I型 600mm\t12,000\t6,000\n'), [['テスト', 12000, 6000]]);
+  assert.deepEqual(readRows('品番\t品名\tメーカー希望小売価格(税抜)\t掛率\nAB-1\t手すり I型 600mm\t10,000\t0.6\n'), [['テスト', 10000, 6000]]);
+  assert.deepEqual(readRows('品番\t商品名\t仕入先\t定価\t単価\nAB-1\t手すり I型 600mm\t○○商事\t10,000\t6,000\n'), [['○○商事', 10000, 6000]]);
+  // 定価と売価の言葉が両方ある見出しは、今までどおり仕切価格
+  assert.deepEqual(readRows('品番\t商品名\t定価\t販売価格\nAB-1\t手すり I型 600mm\t10,000\t6,000\n'), [['テスト', 10000, 6000]]);
+});
+
+test('税抜と税込の列が両方あれば税抜の方（2行の見出しの「希望小売価格」の下の「税抜」「税込」も）', () => {
+  const want = [['テスト', 10000, 6000]];
+  assert.deepEqual(readRows('品番\t商品名\t定価(税抜)\t定価(税込)\t仕切価格\nAB-1\t手すり I型 600mm\t10,000\t11,000\t6,000\n'), want);
+  assert.deepEqual(readRows('品番\t商品名\t定価（税込）\t定価（税別）\t仕切価格\nAB-1\t手すり I型 600mm\t11,000\t10,000\t6,000\n'), want);
+  assert.deepEqual(readRows('品番\t商品名\t希望小売価格\t\t仕切価格\n\t\t税抜\t税込\t\nAB-1\t手すり I型 600mm\t10,000\t11,000\t6,000\n'), want);
+  assert.deepEqual(readRows('品番\t商品名\t定価\t仕切価格(税抜)\t仕切価格(税込)\nAB-1\t手すり I型 600mm\t10,000\t6,000\t6,600\n'), want);
+  assert.deepEqual(readRows('品番\t商品名\t定価\t本体価格\t税込価格\nAB-1\t手すり I型 600mm\t10,000\t6,000\t6,600\n'), want);
+});
+
+test('品番のハイフンの字の違い（‐ − ー）と空白は同じ品番。品番と仕切価格だけの表は、メーカー名が空なら部材リストに1つだけの品番に入れる', () => {
+  const existing: Material[] = [{id: 'm1', name: '手すり 丸棒 4000mm', price: 0, listPrice: 12000, pieceLengthM: 4, maker: 'マツ六', code: 'BD-134', unit: '本', favorite: true, updatedAt: 0}];
+  for (const code of ['BD‐134', 'BD−134', 'BDー134', 'BD 134']) {
+    const g = textToGrid(`品番\t商品名\t定価\t仕切価格\n${code}\t手すり 丸棒 4000mm\t12,000\t6,000\n`);
+    const c = gridCandidates(g, detectMapping(g), 'マツ六');
+    assert.equal(matchedCount(existing, c, {pricesOnly: true}), 1, code);
+    const r = mergeMaterials(existing, c, 1);
+    assert.deepEqual([r.added, r.updated, r.list.length, r.list[0].price], [0, 1, 1, 6000], code);
+  }
+  const g = textToGrid('品番\t仕切価格\nBD-134\t6,000\n');
+  for (const opts of [{}, {pricesOnly: true}]) {
+    const r = mergeMaterials(existing, gridCandidates(g, detectMapping(g), ''), 1, opts);
+    assert.deepEqual([r.added, r.updated, r.list[0].price, r.list[0].maker], [0, 1, 6000, 'マツ六']);
+  }
+  // ほかのメーカー名を入れたときは、今までどおり入れない（だけ更新のときはメーカー名の入れ方の違いとみなして入れる）
+  const toto = gridCandidates(g, detectMapping(g), 'TOTO');
+  assert.deepEqual([mergeMaterials(existing, toto, 1).updated, mergeMaterials(existing, toto, 1, {pricesOnly: true}).updated], [0, 1]);
+});
+
+test('1本の長さ：3けたごとのコンマ（「1,820mm」「4,000mm」「L=1,820」）も読む', () => {
+  assert.equal(guessPieceLengthM('補強板 t12×90×1,820mm'), 1.82);
+  assert.equal(guessPieceLengthM('手すり 丸棒 φ35 4,000mm'), 4);
+  assert.equal(guessPieceLengthM('手すり 長さ2,000mm'), 2);
+  assert.equal(guessPieceLengthM('ディスタンスバー L=1,820'), 1.82);
+  assert.equal(guessPieceLengthM('ディスタンスバー L=4000,W=35'), 4); // コンマで区切った寸法の L= は今までどおり
+  // 幅・高さなどの寸法は今までどおり長さにしない
+  assert.equal(guessPieceLengthM('棚板 幅1,200mm'), 0);
+  assert.equal(guessPieceLengthM('収納棚 D600×W800×H1,200mm'), 0);
+  assert.equal(guessPieceLengthM('BH-412 木製ベースプレート 120mm幅 Mブラウン 2m'), 2);
+});
+
+test('Excel の「Unicode テキスト」（UTF-16・BOM付き）の文字', () => {
+  const text = '品番\t商品名\t定価\t仕切価格\r\nAB-100\t手すり I型 600mm\t12,000\t6,000\r\n';
+  const units = Array.from(text, (ch) => ch.charCodeAt(0));
+  const le = new Uint8Array([0xff, 0xfe, ...units.flatMap((u) => [u & 0xff, u >> 8])]);
+  const be = new Uint8Array([0xfe, 0xff, ...units.flatMap((u) => [u >> 8, u & 0xff])]);
+  for (const bytes of [le, be]) {
+    assert.equal(decodeText(bytes), text);
+    const g = textToGrid(decodeText(bytes), 'csv');
+    assert.deepEqual(gridCandidates(g, detectMapping(g), 'TOTO').map((c) => [c.code, c.listPrice, c.price]), [['AB-100', 12000, 6000]]);
+  }
+});

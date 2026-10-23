@@ -28,21 +28,22 @@ export function parsePrice(s: unknown): number | null {
  * 幅・厚み・径・高さ・奥行の寸法（「120mm幅」「幅120mm」「W=120mm」「φ35mm」「35mm丸」「厚み15mm」「t12mm」「H=800mm」「出幅75mm」）は長さにしない。
  * 前は最初の「○mm」を長さにしていたので、マツ六「BH-412 木製ベースプレート 120mm幅 Mブラウン 2m」を 0.12m と読み、
  * 備考が「定価○円（0.12m）」「144mm÷120mm＝1.2」になっていた（ユーザーの指摘、2026-10-22）。
- * 長さの候補が2つ以上なら、L=・長さ の付いたもの、なければいちばん長いもの。20cm より短いものは1本の長さにしない（幅・厚みの書き方のゆれよけ）
+ * 長さの候補が2つ以上なら、L=・長さ の付いたもの、なければいちばん長いもの。20cm より短いものは1本の長さにしない（幅・厚みの書き方のゆれよけ）。
+ * 3けたごとのコンマ（「1,820mm」「L=1,820」）も読む（前は「1,820mm」を 0.82m、「4,000mm」を 0 と読んでいた）
  */
 export function guessPieceLengthM(name: string): number {
   const s = normalize(name).toLowerCase();
   const found: {m: number; explicit: boolean}[] = [];
-  for (const x of s.matchAll(/(\d+(?:\.\d+)?) ?(mm|cm|m)(?![a-z])/g)) {
+  for (const x of s.matchAll(/((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?) ?(mm|cm|m)(?![a-z])/g)) {
     const start = x.index ?? 0;
     if (start > 0 && /[\d.]/.test(s[start - 1])) continue;
     const before = s.slice(0, start);
     const after = s.slice(start + x[0].length);
     if (sizeBefore(before) || SIZE_AFTER.test(after)) continue;
-    const n = Number(x[1]);
+    const n = Number(x[1].replace(/,/g, ''));
     found.push({m: x[2] === 'mm' ? Math.round(n) / 1000 : x[2] === 'cm' ? n / 100 : n, explicit: LENGTH_BEFORE.test(before)});
   }
-  for (const x of s.matchAll(/(?:^|[^a-z])l ?[=:]? ?(\d{3,5})(?![\d.]|mm|cm|m(?![a-z]))/g)) found.push({m: Number(x[1]) / 1000, explicit: true});
+  for (const x of s.matchAll(/(?:^|[^a-z])l ?[=:]? ?(\d{1,2},\d{3}|\d{3,5})(?![\d.]|mm|cm|m(?![a-z]))/g)) found.push({m: Number(x[1].replace(/,/g, '')) / 1000, explicit: true});
   const lengths = found.filter((f) => f.m >= 0.2);
   const pick = lengths.filter((f) => f.explicit).length > 0 ? lengths.filter((f) => f.explicit) : lengths;
   return pick.reduce((max, f) => Math.max(max, f.m), 0);
@@ -78,8 +79,10 @@ export function parseLengthM(v: unknown, header: unknown = ''): number {
   return n >= 100 ? n / 1000 : n;
 }
 
-/** 文字コードを判定して文字にする（UTF-8 でなければ Shift_JIS とみなす） */
+/** 文字コードを判定して文字にする（UTF-8 でなければ Shift_JIS とみなす。先頭に FF FE・FE FF があれば UTF-16＝Excel の「Unicode テキスト」） */
 export function decodeText(bytes: Uint8Array): string {
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(bytes);
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder('utf-16be').decode(bytes);
   try {
     return new TextDecoder('utf-8', {fatal: true}).decode(bytes).replace(/^﻿/, '');
   } catch {
@@ -197,7 +200,7 @@ const NAME_KEYS: [string, number][] = [
 ];
 const MAKER_KEYS = ['メーカー', '製造元', '仕入先'];
 const UNIT_KEYS = ['単位', '入数'];
-const LIST_KEYS = ['定価', '希望小売', '標準価格', '上代', 'ガイド価格'];
+const LIST_KEYS = ['定価', '希望小売', '小売価格', '標準価格', '上代', 'ガイド価格'];
 const SPEC_KEYS = ['色', 'カラー', '規格', '仕様', 'サイズ'];
 const LEN_KEYS = ['1本の長さ', '長さ', '全長'];
 // 仕切り価格らしい見出しほど高い点（「定価」と「仕切」が両方あれば仕切を選ぶ）。「掛率」「UP率」など「率」の列は価格にしない。
@@ -228,8 +231,15 @@ const has = (cell: string, keys: string[]) => {
   const c = compact(cell);
   return keys.some((k) => c.includes(k));
 };
-const priceScore = (cell: string) => (normalize(cell).includes('率') ? 0 : keyScore(cell, PRICE_KEYS));
-const isListHeader = (cell: string) => has(cell, LIST_KEYS) && keyScore(cell, PRICE_KEYS) < 5; // 「定価・売価」のように仕切価格の言葉もあれば定価にしない
+// 仕切価格の言葉の点。「小売価格」には「売価」、「仕入先」（メーカーの列）には「仕入」が入っているので、除いてから数える
+const priceKeyScore = (cell: string) => keyScore(compact(cell).replace(/(?:希望)?小売(?:価格)?|仕入先/g, ''), PRICE_KEYS);
+const priceScore = (cell: string) => (normalize(cell).includes('率') ? 0 : priceKeyScore(cell));
+const isListHeader = (cell: string) => has(cell, LIST_KEYS) && priceKeyScore(cell) < 5; // 「定価・売価」のように仕切価格の言葉もあれば定価にしない
+// 税込の列と、その税抜（税別・本体）の列（「定価(税抜)」「定価(税込)」・2行の見出し「希望小売価格」の下の「税抜」「税込」）。
+// 両方あれば税抜の方を使う（部材リストの金額は税抜）
+const TAX_WORDS = /[()[\]]|税込み?|税抜き?|税別|本体/g;
+const taxInSibling = (cell: string, other: string | undefined) =>
+  other !== undefined && /税込/.test(compact(cell)) && /税抜|税別|本体/.test(compact(other)) && compact(cell).replace(TAX_WORDS, '') === compact(other).replace(TAX_WORDS, '');
 // 掛率の列（「UP率」（値上げの率）は掛率ではない）
 const RATE_HEADER = /掛け?率|仕切り?率|卸率/;
 
@@ -239,7 +249,7 @@ export function columnCount(grid: Grid): number {
 
 /** 見出しの続きの行に入る言葉（定価・単価・掛率 など） */
 const SUB_WORDS = /定価|単価|価格|売価|仕切|納価|掛|率|税|入数|単位|数量|金額|上代|下代|ネット|net/i;
-const hasRole = (s: string) => keyScore(s, PRICE_KEYS) > 0 || has(s, LIST_KEYS) || RATE_HEADER.test(compact(s));
+const hasRole = (s: string) => priceKeyScore(s) > 0 || has(s, LIST_KEYS) || RATE_HEADER.test(compact(s));
 
 /**
  * 見出しが2行に分かれた表の、下の行（マツ六の価格改定一覧：「現行価格」「価格改定価格」の下に「定価・単価・掛率」）。
@@ -333,13 +343,13 @@ export function detectMapping(grid: Grid): Mapping {
           name = c;
         }
         return;
-      } else if (maker < 0 && has(cell, MAKER_KEYS)) maker = c;
+      } else if (maker < 0 && has(cell, MAKER_KEYS) && !has(cell, LIST_KEYS) && priceKeyScore(cell) === 0) maker = c; // 「メーカー希望小売価格」は定価の列
       else if (unit < 0 && has(cell, UNIT_KEYS)) unit = c;
       else if (len < 0 && has(cell, LEN_KEYS)) len = c;
       else if (has(cell, SPEC_KEYS)) spec = c; // 色の列が2つ（色の記号・色の名前）なら右の方
-      if (has(cell, LIST_KEYS)) list = c;
+      if (has(cell, LIST_KEYS) && !taxInSibling(cell, labels[list])) list = c;
       const s = isListHeader(cell) ? 0 : priceScore(cell);
-      if (s > 2 && s >= score) {
+      if (s > 2 && s >= score && !taxInSibling(cell, labels[price])) {
         score = s;
         price = c;
       }
@@ -788,7 +798,12 @@ export function detectListNth(lines: string[]): number {
 // ---------------------------------------------------------------- 部材リストへの取り込み
 
 const norm = (s: string) => normalize(s).toLowerCase();
-const codeKey = (maker: string, code: string) => `${norm(maker)}|${norm(code)}`;
+/**
+ * 品番を比べる形。見積書の行（rows.ts の codeKey）と同じく空白とハイフンの字の違いを除く（PDF の品番の「‐」（U+2010）・「−」（U+2212）、
+ * 手で打った「ー」も）。前は字が違うと部材リストにない商品になり、ふつうに取り込むと同じ品番の部材が2つになっていた
+ */
+const codeNorm = (code: string) => norm(code).replace(/[\s\-‐－ー―−]/g, '');
+const codeKey = (maker: string, code: string) => `${norm(maker)}|${codeNorm(code)}`;
 const nameKey = (maker: string, name: string) => `${norm(maker)}|${norm(name)}`;
 
 export type MergeResult = {list: Material[]; added: number; updated: number; unchanged: number; skipped: number};
@@ -814,7 +829,7 @@ function materialFinder(list: Material[], incoming: Candidate[], loose: boolean)
   const remember = (m: Material, i: number) => {
     if (m.code) {
       byCode.set(codeKey(m.maker, m.code), [...(byCode.get(codeKey(m.maker, m.code)) ?? []), i]);
-      anyMaker.set(norm(m.code), [...(anyMaker.get(norm(m.code)) ?? []), i]);
+      anyMaker.set(codeNorm(m.code), [...(anyMaker.get(codeNorm(m.code)) ?? []), i]);
     } else byName.set(nameKey(m.maker, m.name), i);
   };
   list.forEach(remember);
@@ -828,7 +843,16 @@ function materialFinder(list: Material[], incoming: Candidate[], loose: boolean)
   const find = (c: Candidate): number | undefined => {
     if (!c.code) return byName.get(nameKey(c.maker, c.name));
     const same = byCode.get(codeKey(c.maker, c.code)) ?? [];
-    if (!c.name) return same.length === 1 ? same[0] : undefined;
+    // メーカーを問わず、品番が部材リストに1つだけの部材
+    const anyOne = () => {
+      const other = anyMaker.get(codeNorm(c.code)) ?? [];
+      return other.length === 1 ? other[0] : undefined;
+    };
+    if (!c.name) {
+      if (same.length > 0) return same.length === 1 ? same[0] : undefined;
+      // 品番と仕切価格だけの表で、メーカー名を入れていない（だけ更新のときはメーカー名が違っても）
+      return loose || !c.maker.trim() ? anyOne() : undefined;
+    }
     const exact = same.find((i) => norm(list[i].name) === norm(c.name));
     if (exact !== undefined) return exact;
     // 商品名だけ変わった（同じ品番の部材が1つだけで、表の中でもその品番は1種類）なら、その部材を書き換える
@@ -840,11 +864,7 @@ function materialFinder(list: Material[], incoming: Candidate[], loose: boolean)
       const old = (byCode.get(codeKey(c.maker, c.code.slice(0, at))) ?? []).find((i) => norm(list[i].name) === norm(c.name));
       if (old !== undefined) return old;
     }
-    if (loose) {
-      const other = anyMaker.get(norm(c.code)) ?? [];
-      if (other.length === 1) return other[0];
-    }
-    return undefined;
+    return loose ? anyOne() : undefined;
   };
   return {find, remember};
 }
