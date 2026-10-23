@@ -16,6 +16,7 @@ import {
   setOrderQty,
   unitTotals,
 } from '../../src/sasaoka/order.ts';
+import {placeFromDims} from '../../src/sasaoka/cutLink.ts';
 import {laborRow, materialRow, newPlace} from '../../src/sasaoka/rows.ts';
 import type {Job, Material, Row} from '../../src/sasaoka/types.ts';
 
@@ -155,6 +156,71 @@ test('2000mmだけで足りるときは2000mmの品だけを発注する。部�
   assert.equal(noHalf[0].name, 'BAUHAUS 35アッシュ丸棒 ディンプル付 φ35×2000mm Mオーク');
   assert.match(noHalf[0].warn, /2000mmの品が部材リストにありません/);
   assert.deepEqual([noHalf[0].price, noHalf[0].listPrice], [0, 0]);
+});
+
+test('申請書の長さ（L=2100×2100）の合計が入った手すり・ベースプレートは、区切りごとに1本ずつ切って数える（2100mm×2 は 4000mm 2本）', () => {
+  // 申請書で長さを入れると、見積書の手すり・ベースプレートの行（1行ずつ）に合計が入る（`placeFromDims`：4200mm＝1.05本）
+  const withDims = (l: string, kind = 1) => {
+    const j = job(['廊下', [materialRow(BD134, 1), materialRow(PLATE4, 1)]]);
+    j.places[0] = placeFromDims({...j.places[0], kind, dims: {l}});
+    return j;
+  };
+  const j = withDims('2100×2100');
+  assert.deepEqual(j.places[0].rows.map((r) => [r.lengthCm, r.qty]), [[420, 1], [420, 1]]);
+  // 合計の 4200mm を継いで数えると 4000mm 1本＋2000mm 1本になるが、2100mm は 2000mm からは切れない
+  assert.deepEqual(brief(orderBaseLines(j, [BD134, BD132, PLATE4, PLATE2], RATE)), [
+    ['BD-134', 2, '本'],
+    ['BP-80-4000', 2, '枚'],
+  ]);
+  // 1本ずつ別の行に入れたときと同じ
+  const sep = job(['廊下', [cut(BD134, 210), cut(BD134, 210)]]);
+  assert.deepEqual(brief(orderBaseLines(sep, [BD134, BD132], RATE)), [['BD-134', 2, '本']]);
+  // 2200mm＋1900mm は 4000mm から 2200mm、2000mm から 1900mm
+  assert.deepEqual(brief(orderBaseLines(withDims('2200×1900'), [BD134, BD132, PLATE4, PLATE2], RATE)), [
+    ['BD-134', 1, '本'],
+    ['BD-132', 1, '本'],
+    ['BP-80-4000', 1, '枚'],
+    ['BP-80-2000', 1, '枚'],
+  ]);
+  // 600mm＋1800mm は今までどおり 4000mm 1本から切る
+  assert.deepEqual(brief(orderBaseLines(withDims('600×1800'), [BD134, BD132, PLATE4, PLATE2], RATE)), [
+    ['BD-134', 1, '本'],
+    ['BP-80-4000', 1, '枚'],
+  ]);
+  // 見積書の長さが申請書の合計と違う（見積書で直した）ときは、見積書の長さのまま
+  const edited = withDims('2100×2100');
+  edited.places[0].rows = edited.places[0].rows.map((r) => ({...r, lengthCm: 300}));
+  assert.deepEqual(brief(orderBaseLines(edited, [BD134, BD132, PLATE4, PLATE2], RATE)), [
+    ['BD-134', 1, '本'],
+    ['BP-80-4000', 1, '枚'],
+  ]);
+  // 手すりの取り付け（改修の種類 1）でない箇所の寸法は、手すりの長さにしない
+  const other = withDims('2100×2100');
+  other.places[0].kind = 2;
+  assert.deepEqual(brief(orderBaseLines(other, [BD134, BD132, PLATE4, PLATE2], RATE)), [
+    ['BD-134', 1, '本'],
+    ['BD-132', 1, '本'],
+    ['BP-80-4000', 1, '枚'],
+    ['BP-80-2000', 1, '枚'],
+  ]);
+});
+
+test('同じ2000mmの品（BD-132 をそのまま使う箇所と、BD-134 を切った残りを2000mmにした箇所）は1行にまとめる', () => {
+  const j = job(['玄関', [cut(BD134, 160)]], ['トイレ', [materialRow(BD132, 1)]]);
+  const lines = orderBaseLines(j, [BD134, BD132], RATE);
+  assert.deepEqual(brief(lines), [['BD-132', 2, '本']]);
+  assert.deepEqual([lines[0].calc, lines[0].photos, lines[0].lengthMm, lines[0].refId], [2, [1, 2], 2000, BD132.id]);
+  // 部材リストから足すと、その行の数が増える（同じ品の2行目はない）
+  const edits = bumpOrderQty(emptyOrderEdits(), lines[0], 1);
+  assert.deepEqual(brief(applyOrderEdits(lines, edits)), [['BD-132', 3, '本']]);
+  // 販売受注簿にも1行で渡す
+  assert.deepEqual(hacchuImport(j, lines, null).items.map((i) => [i.modelNumber, i.quantity]), [['BD-132', 2]]);
+  // 長さの違う品（4000mm）とはまとめない
+  const k = job(['玄関', [cut(BD134, 380)]], ['トイレ', [materialRow(BD132, 1)]]);
+  assert.deepEqual(brief(orderBaseLines(k, [BD134, BD132], RATE)), [
+    ['BD-134', 1, '本'],
+    ['BD-132', 2, '本'],
+  ]);
 });
 
 test('施工費・何も入っていない行・金額だけの行は発注しない。規格品は見積書の数量のまま', () => {

@@ -13,6 +13,7 @@
 
 import {cutToLength, isBlankRow, listPriceOf, shikiriPrice} from './calc.ts';
 import type {EstimateRates} from './calc.ts';
+import {dimsLengths} from './cutLink.ts';
 import {circled, photoNumbers} from './estimateForms.ts';
 import {normalize} from './priceImport.ts';
 import type {Job, Material, OrderEdits, OrderLine, Row} from './types.ts';
@@ -167,6 +168,9 @@ export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[], 
   const photoOf = photoNumbers(job, rates);
   for (const place of job.places) {
     const photo = photoOf.get(place.id) ?? 0;
+    // 申請書の長さ（手すりの取り付けの箇所の L=2100×2100）。区切りごとに1本の手すり
+    const dims = place.kind === 1 ? dimsLengths(place.dims?.l) : [];
+    const dimsTotal = dims.reduce((a, b) => a + b, 0);
     for (const r of place.rows) {
       if (r.kind !== 'material' || isBlankRow(r)) continue;
       if (!r.name.trim() && !r.code.trim()) continue; // 金額だけの行（値引きなど）は発注しない
@@ -181,7 +185,10 @@ export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[], 
       if (photo > 0) g.photos.add(photo);
       if (cutToLength(r)) {
         const len = Math.round(r.lengthCm * 100) / 10;
-        g.pieces.set(len, (g.pieces.get(len) ?? 0) + r.qty);
+        // 申請書の長さの合計を1行に入れた手すり・ベースプレート（L=2100×2100 → 4200mm。`placeFromDims`）は、区切りごとに1本ずつ切る
+        // （中間のブラケットの数え方 `railRuns` と同じ。合計の 4200mm を継いで数えると 4000mm＋2000mm になるが、2100mm は 2000mm からは切れない）
+        if (dims.length > 0 && Math.abs(dimsTotal - len * r.qty) < 1) for (const mm of dims) g.pieces.set(mm, (g.pieces.get(mm) ?? 0) + 1);
+        else g.pieces.set(len, (g.pieces.get(len) ?? 0) + r.qty);
       } else {
         g.whole += r.qty;
       }
@@ -252,7 +259,31 @@ export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[], 
       out.push(hl);
     }
   }
-  return out;
+  return mergeSameLines(out);
+}
+
+/**
+ * 同じ部材（メーカー・品番・品名・単位・長さが同じ）の行を1行にまとめる（数を足し、写真番号は両方）。
+ * ある箇所で 2000mm の品（BD-132）をそのまま使い、別の箇所で切る 4000mm（BD-134）の残りを 2000mm にしたとき、BD-132 が2行に分かれていた
+ */
+function mergeSameLines(lines: OrderLine[]): OrderLine[] {
+  const byItem = new Map<string, OrderLine>();
+  for (const l of lines) {
+    const k = `${[l.maker, l.code, l.name, l.unit].map(norm).join('|')}|${l.lengthMm}`;
+    const same = byItem.get(k);
+    if (!same) {
+      byItem.set(k, l);
+      continue;
+    }
+    byItem.set(k, {
+      ...same,
+      qty: same.qty + l.qty,
+      calc: same.calc + l.calc,
+      photos: [...new Set([...same.photos, ...l.photos])].sort((a, b) => a - b),
+      warn: same.warn || l.warn,
+    });
+  }
+  return [...byItem.values()];
 }
 
 // ---------------------------------------------------------------- 手で直したところを重ねる
