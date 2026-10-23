@@ -249,6 +249,12 @@ try {
   await page.setViewportSize({width: 1366, height: 900});
   // もとに戻す（行橋市・受領委任払い。このあとの見積書の確かめは行橋市のまま）
   await page.locator('[role=radiogroup][aria-label="支払方法"] [role=radio]', {hasText: '受領委任払い'}).click();
+  // みやこ町のプレビューも描ける（何行もある理由の欄：届出の有・無の丸と、字を1文字ずつ丸の位置に）
+  await page.getByLabel('保険者', {exact: true}).selectOption('miyako');
+  await preview.getByRole('group', {name: '福祉用具購入受領委任払申請書', exact: true}).waitFor();
+  assert.match(await preview.getByRole('group', {name: '福祉用具購入受領委任払申請書', exact: true}).innerText(), /居宅サービス計画の届出/);
+  await page.waitForTimeout(300);
+  await preview.getByRole('group', {name: '福祉用具購入受領委任払申請書', exact: true}).screenshot({path: `${out}/04g-shinsei-miyako.png`});
   await page.getByLabel('保険者', {exact: true}).selectOption('yukuhashi');
   await page.getByRole('tab', {name: '📄 申請書（行橋市）'}).waitFor();
   await preview.getByRole('group', {name: '用具・受領委任払', exact: true}).waitFor();
