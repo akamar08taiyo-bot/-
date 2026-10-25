@@ -168,8 +168,8 @@ export default function App() {
           </nav>
         </header>
 
-        {/* 住宅改修のタブの中の申請書は、画面の幅いっぱい（プレビューを大きく） */}
-        <main className={`no-print mx-auto px-3 py-4 sm:px-4 ${embed && embedView === 'shinsei' ? 'max-w-none' : 'max-w-6xl'}`}>
+        {/* 住宅改修のタブの中（申請書・販売見積書）は、画面の幅いっぱい（プレビューを大きく） */}
+        <main className={`no-print mx-auto px-3 py-4 sm:px-4 ${embed && embedView ? 'max-w-none' : 'max-w-6xl'}`}>
           {tab === 'sales' &&
             (sale ? (
               <SaleEditor key={sale.id} sale={sale} data={data} update={store.update} onBack={() => setSaleId(null)} onOpen={setSaleId} onPrint={setPrintId} fixedView={embedView} />

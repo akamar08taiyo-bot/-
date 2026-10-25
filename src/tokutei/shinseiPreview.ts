@@ -262,10 +262,10 @@ export type PvShape = Rect & {
   inset: {l: number; t: number; r: number; b: number};
 };
 export type PvHeader = {left: PvRun[]; center: PvRun[]; right: PvRun[]};
-/** 押すと案件の画面のその入れる所へ行く欄 */
-export type PvField = Rect & {field: ShinseiField; ref: string};
+/** 押すと案件の画面のその入れる所へ行く欄（F：入れる所の名前。申請書は ShinseiField、見積書は estimateBook.ts の EstimateField） */
+export type PvField<F extends string = ShinseiField> = Rect & {field: F; ref: string};
 /** 申請書の1枚（原本の1つのシート） */
-export type PvPage = {
+export type PvPage<F extends string = ShinseiField> = {
   sheet: string;
   width: number;
   height: number;
@@ -275,7 +275,7 @@ export type PvPage = {
   shapes: PvShape[];
   header: PvHeader | null;
   footer: PvHeader | null;
-  fields: PvField[];
+  fields: PvField<F>[];
 };
 
 /**
@@ -303,6 +303,18 @@ export function shinseiPreview(template: Files, form: ShinseiForm, v: ShinseiVal
     pages.push(buildPage(files, path, template[path], w.sheet, own, links, marked));
   }
   return pages;
+}
+
+/**
+ * 書き込んだブック（filled）の1枚のシートを描く材料（見積書など、申請書のほかの原本。estimateBook.ts）。
+ * template は書き込む前の原本（描く範囲を決めるのに使う）、own はそのシートの欄 → 入れる所
+ */
+export function sheetPreview<F extends string>(filled: Files, template: Files, sheet: string, own: [F, string[]][]): PvPage<F> | null {
+  const path = sheetPaths(filled).get(sheet);
+  if (!path || !filled[path] || !template[path]) return null;
+  const links = new Map<string, F>();
+  for (const [field, refs] of own) for (const ref of refs) links.set(`${sheet.trim()}!${ref}`, field);
+  return buildPage(filled, path, template[path], sheet, own, links, []);
 }
 
 // ---------------------------------------------------------------- 書式（色・字体・罫線・表示形式）
@@ -735,15 +747,15 @@ function printRange(files: Files, sheetName: string): Range | null {
   return null;
 }
 
-function buildPage(
+function buildPage<F extends string>(
   files: Files,
   path: string,
   templateSheet: Uint8Array,
   sheet: string,
-  own: [ShinseiField, string[]][],
-  links: Map<string, ShinseiField>,
+  own: [F, string[]][],
+  links: Map<string, F>,
   marked: {ref: string; chars: {ch: string; x: number; w: number; cy: number}[]; cy: number; em: number}[],
-): PvPage {
+): PvPage<F> {
   const xml = strFromU8(files[path]);
   const xfs = xfsOf(files);
   const st = stylesOf(files);
@@ -922,8 +934,8 @@ function joinLines(list: (PvLine & {style: string})[]): PvLine[] {
 }
 
 /** 押すと入れられる欄：書く欄と、それを式で参照している欄。となり合う同じ項目の欄（被保険者番号の10マス）は1つに */
-function pageFields(sheet: string, own: [ShinseiField, string[]][], cells: Map<string, Cell>, links: Map<string, ShinseiField>, refRect: (ref: string) => Rect | null): PvField[] {
-  const refs: {field: ShinseiField; ref: string}[] = own.flatMap(([field, list]) => list.map((ref) => ({field, ref})));
+function pageFields<F extends string>(sheet: string, own: [F, string[]][], cells: Map<string, Cell>, links: Map<string, F>, refRect: (ref: string) => Rect | null): PvField<F>[] {
+  const refs: {field: F; ref: string}[] = own.flatMap(([field, list]) => list.map((ref) => ({field, ref})));
   const seen = new Set(refs.map((f) => f.ref));
   for (const [key, cell] of cells) {
     const formula = /<f>([^<]*)<\/f>/.exec(cell.inner)?.[1];
@@ -937,7 +949,7 @@ function pageFields(sheet: string, own: [ShinseiField, string[]][], cells: Map<s
       seen.add(ref);
     }
   }
-  const out: PvField[] = [];
+  const out: PvField<F>[] = [];
   for (const {field, ref} of refs) {
     const rect = refRect(ref);
     if (!rect) continue;
@@ -985,12 +997,6 @@ function readShapes(files: Files, sheetPath: string, xml: string, lay: SheetLayo
   for (const m of d.matchAll(/<xdr:(twoCellAnchor|oneCellAnchor|absoluteAnchor)\b[^>]*>([\s\S]*?)<\/xdr:\1>/g)) {
     const body = m[2];
     if (/<xdr:clientData\b[^>]*fPrintsWithSheet="0"/.test(body)) continue;
-    const sp = /<xdr:(sp|cxnSp)\b[\s\S]*?<\/xdr:\1>/.exec(body)?.[0];
-    if (!sp || /<xdr:cNvPr\b[^>]*hidden="1"/.test(sp)) continue;
-    const prst = /<a:prstGeom prst="(\w+)"/.exec(sp)?.[1] ?? '';
-    const kind: PvShape['kind'] | null =
-      prst === 'ellipse' ? 'ellipse' : prst === 'rect' ? 'rect' : prst === 'roundRect' ? 'roundRect' : prst === 'bracketPair' ? 'bracketPair' : /line|Connector/i.test(prst) || sp.startsWith('<xdr:cxnSp') ? 'line' : null;
-    if (!kind) continue;
     let x = 0;
     let y = 0;
     let w = 0;
@@ -1015,8 +1021,36 @@ function readShapes(files: Files, sheetPath: string, xml: string, lay: SheetLayo
     }
     x -= ox;
     y -= oy;
-    if (x + w / 2 < 0 || y + h / 2 < 0 || x + w / 2 > width || y + h / 2 > height) continue;
-    if (kind === 'line' ? Math.abs(w) < 0.5 && Math.abs(h) < 0.5 : w < 0.5 || h < 0.5) continue;
+    // 図形をまとめた枠（グループ。見積書の印の枠など）：中の図形を、グループの中の位置（chOff・chExt）から枠の中の位置にする
+    const grp = /<xdr:grpSp>[\s\S]*?<xdr:grpSpPr>[\s\S]*?<a:xfrm\b[^>]*>([\s\S]*?)<\/a:xfrm>/.exec(body)?.[1];
+    if (grp) {
+      const v = (tag: string, a: string) => Number(new RegExp(`<a:${tag}\\b[^>]*\\s${a}="(-?\\d+)"`).exec(grp)?.[1] ?? 0);
+      const [chX, chY, chW, chH] = [v('chOff', 'x'), v('chOff', 'y'), v('chExt', 'cx'), v('chExt', 'cy')];
+      for (const c of body.matchAll(/<xdr:(sp|cxnSp)\b[\s\S]*?<\/xdr:\1>/g)) {
+        const cx = /<a:xfrm\b[^>]*>([\s\S]*?)<\/a:xfrm>/.exec(c[0])?.[1] ?? '';
+        const off = /<a:off x="(-?\d+)" y="(-?\d+)"/.exec(cx);
+        const ext2 = /<a:ext cx="(\d+)" cy="(\d+)"/.exec(cx);
+        if (!off || !ext2 || !chW || !chH) continue;
+        const kx = w / chW;
+        const ky = h / chH;
+        shapeOf(c[0], x + (Number(off[1]) - chX) * kx, y + (Number(off[2]) - chY) * ky, Number(ext2[1]) * kx, Number(ext2[2]) * ky);
+      }
+      continue;
+    }
+    const sp = /<xdr:(sp|cxnSp)\b[\s\S]*?<\/xdr:\1>/.exec(body)?.[0];
+    if (sp) shapeOf(sp, x, y, w, h);
+  }
+  return out;
+
+  /** 図形1つ（位置はページの画素） */
+  function shapeOf(sp: string, x: number, y: number, w: number, h: number) {
+    if (/<xdr:cNvPr\b[^>]*hidden="1"/.test(sp)) return;
+    const prst = /<a:prstGeom prst="(\w+)"/.exec(sp)?.[1] ?? '';
+    const kind: PvShape['kind'] | null =
+      prst === 'ellipse' ? 'ellipse' : prst === 'rect' ? 'rect' : prst === 'roundRect' ? 'roundRect' : prst === 'bracketPair' ? 'bracketPair' : /line|Connector/i.test(prst) || sp.startsWith('<xdr:cxnSp') ? 'line' : null;
+    if (!kind) return;
+    if (x + w / 2 < 0 || y + h / 2 < 0 || x + w / 2 > width || y + h / 2 > height) return;
+    if (kind === 'line' ? Math.abs(w) < 0.5 && Math.abs(h) < 0.5 : w < 0.5 || h < 0.5) return;
     const spPr = /<xdr:spPr\b[^>]*>([\s\S]*?)<\/xdr:spPr>/.exec(sp)?.[1] ?? '';
     const style = /<xdr:style>([\s\S]*?)<\/xdr:style>/.exec(sp)?.[1] ?? '';
     const ln = /<a:ln\b([^>]*)(?:\/>|>([\s\S]*?)<\/a:ln>)/.exec(spPr);
@@ -1080,7 +1114,6 @@ function readShapes(files: Files, sheetPath: string, xml: string, lay: SheetLayo
       inset: {l: ins('lIns', 91440), t: ins('tIns', 45720), r: ins('rIns', 91440), b: ins('bIns', 45720)},
     });
   }
-  return out;
 }
 
 // ---------------------------------------------------------------- ヘッダー・フッター

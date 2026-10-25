@@ -43,22 +43,23 @@ const TABLE = [
   .map((r) => r.join('\t'))
   .join('\n');
 
-/**
- * 印刷イメージの見積書が A4 1枚に収まっているか：いちばん下の備考が、下の余白（14mm）より上にある（画面と印刷の両方。
- * mm は .est の幅 210mm から）。印刷の media のままで戻る。縮めた割合（1＝縮めていない）を返す
- */
+/** 書き込んだ Excel の欄（式の欄は保存しておいた答え・文字の欄はその文字） */
+function cellOf(sheetXml, ref) {
+  const m = new RegExp(`<c r="${ref}"[^>]*>([\\s\\S]*?)</c>`).exec(sheetXml);
+  return m ? (/<v>([^<]*)<\/v>/.exec(m[1]) ?? /<t[^>]*>([^<]*)<\/t>/.exec(m[1]))?.[1] ?? '' : '';
+}
+
+/** 印刷イメージの見積書（原本の A4 縦の紙）からはみ出さない：中身（ページの絵）が紙の内側にある（画面と印刷の両方） */
 async function assertFits(page, label) {
   for (const media of ['screen', 'print']) {
     await page.emulateMedia({media});
-    const bottom = await page.evaluate(() => {
-      const est = document.querySelector('.est').getBoundingClientRect();
-      const last = document.querySelector('.est-remarks').getBoundingClientRect();
-      return ((last.bottom - est.top) / est.width) * 210;
+    const over = await page.evaluate(() => {
+      const sheet = document.querySelector('.est-sheet').getBoundingClientRect();
+      const paper = document.querySelector('.est-sheet [role="group"]').getBoundingClientRect();
+      return Math.max(paper.right - sheet.right, paper.bottom - sheet.bottom);
     });
-    assert.ok(bottom <= 296 - 14 + 0.2, `${label}（${media}）：備考の下が ${bottom.toFixed(1)}mm で、A4 からはみ出している`);
+    assert.ok(over <= 0.5, `${label}（${media}）：見積書が紙から ${over.toFixed(1)}px はみ出している`);
   }
-  const t = await page.locator('.est-body').evaluate((e) => e.style.transform);
-  return t ? Number(/scale\(([\d.]+)\)/.exec(t)[1]) : 1;
 }
 
 /** PDF のページ数（pdfinfo がなくても数えられるように、ページのオブジェクトを数える） */
@@ -103,7 +104,7 @@ try {
   // ---- 見積もり：行橋市で新しく作り、★から2つ選ぶ
   await page.getByRole('button', {name: '📝 見積もり・申請'}).click();
   await page.getByRole('button', {name: '＋ 行橋市'}).click();
-  await page.getByLabel('お客様名').fill('山田 花子');
+  await page.getByRole('textbox', {name: 'お客様名', exact: true}).fill('山田 花子');
   await page.getByLabel('被保険者番号').fill('0123456789');
   await page.getByRole('button', {name: '★ 商品を選ぶ'}).click();
   await page.getByRole('button', {name: 'シャワーベンチ FSフィットを入れる'}).click();
@@ -263,44 +264,53 @@ try {
   await page.getByRole('tab', {name: '📋 見積もり'}).click();
   assert.match(await page.locator('aside').first().innerText(), /利用者負担（1割）\s*4,295円/);
 
-  // ---- 見積書
+  // ---- 見積書（会社の見積書の原本の形。TSS の Excel に書き込んだもの）
   await page.getByRole('button', {name: '🖨 見積書を印刷'}).first().click();
-  await page.locator('.est').waitFor();
-  const doc = await page.locator('.est').innerText();
-  for (const s of ['御　見　積　書', '山田 花子', '行橋営業所', 'T1290001044462', '¥42,944', '入浴補助用具（入浴用いす）', '定価35,000円（税抜）×0.8', '¥4,295', '¥38,649']) {
+  await page.locator('.est-sheet [role="group"]').waitFor();
+  const doc = await page.locator('.est-sheet').innerText();
+  for (const s of ['御　見　積　書', '山田 花子　様', '行橋営業所', 'T1290001044462', '42,944', 'シャワーベンチ FSフィット', '利用者負担（1割）4,295円', '保険者負担（9割）38,649円', 'お支払いいただく金額 4,295円']) {
     assert.ok(doc.includes(s), `見積書に「${s}」がない`);
   }
   await page.screenshot({path: `${out}/05-estimate.png`});
-  await page.locator('.est').screenshot({path: `${out}/05b-estimate-doc.png`});
-  // Excel で保存：印刷と同じ金額（式の値）が入った .xlsx が、PDF と同じ名前で保存される
+  await page.locator('.est-sheet').screenshot({path: `${out}/05b-estimate-doc.png`});
+  // Excel で保存：原本に書き込んだ .xlsx が、PDF と同じ名前で保存される（御見積合計は式のまま・答えも入れておく）
   const [download] = await Promise.all([page.waitForEvent('download'), page.locator('.print-toolbar').getByRole('button', {name: '📗 Excelで保存'}).click()]);
   assert.equal(download.suggestedFilename(), '御見積書_山田 花子様.xlsx');
   await download.saveAs(`${out}/estimate.xlsx`);
-  const sheet = strFromU8(unzipSync(readFileSync(`${out}/estimate.xlsx`))['xl/worksheets/sheet1.xml']);
-  for (const v of ['42944', '4295', '38649']) assert.ok(sheet.includes(`<v>${v}</v>`), `Excel に ${v} がない`);
-  // 印刷（PDF）は A4縦 1枚で、下が切れない（入りきらなければ縮める）
+  const book = unzipSync(readFileSync(`${out}/estimate.xlsx`));
+  const sheet = strFromU8(book['xl/worksheets/sheet1.xml']);
+  assert.equal(cellOf(sheet, 'E21'), '42944');
+  assert.match(sheet, /<c r="E21"[^>]*><f>/);
+  assert.match(cellOf(sheet, 'A6'), /山田 花子　様/);
+  assert.match(cellOf(sheet, 'A60'), /利用者負担（1割）4,295円/);
+  assert.ok(!Object.keys(book).some((k) => k.startsWith('xl/media/')), '原本の印影の画像が入っている');
+  // 印刷（PDF）は A4縦 1枚
   await assertFits(page, '2品');
   await page.pdf({path: `${out}/estimate.pdf`, preferCSSPageSize: true, printBackground: true});
   assert.equal(pdfPages(`${out}/estimate.pdf`), 1);
   await page.emulateMedia({media: 'screen'});
   await page.getByRole('button', {name: '閉じる'}).click();
 
-  // ---- 品目と備考が多くて A4 1枚に入らない見積書は、縮めて1枚に収める（下が切れない。ユーザーの答え「縮めます」）
+  // ---- 品目が多くても原本の明細（20行）の中に入って、A4 1枚のまま。備考は3行まで（入らない行は画面で知らせる）
   // 手で入れた品目は価格が空（0円）なので、合計（42,944円）は変わらない
   for (let n = 1; n <= 8; n++) {
     await page.getByRole('button', {name: '＋ 手で入れる'}).click();
     await page.getByLabel('商品名').last().fill(`見本の商品 ${n}`);
   }
-  await page.getByLabel('備考').fill(['デモ機の貸し出しがあります。', 'ご不明な点は担当までお問い合わせください。', '納品の前にお電話いたします。', '見本の備考 4', '見本の備考 5'].join('\n'));
+  await page.getByRole('textbox', {name: '備考', exact: true}).fill(['デモ機の貸し出しがあります。', 'ご不明な点は担当までお問い合わせください。', '納品の前にお電話いたします。'].join('\n'));
+  await page.getByText('見積書の備考は3行までです').waitFor();
   await page.getByRole('button', {name: '🖨 見積書を印刷'}).first().click();
-  await page.locator('.est').waitFor();
-  const scale = await assertFits(page, '10品・備考5行');
-  assert.ok(scale < 0.85, `10品なのに ${scale} までしか縮めていない`);
+  await page.locator('.est-sheet [role="group"]').waitFor();
+  const longDoc = await page.locator('.est-sheet').innerText();
+  for (const s of ['見本の商品 1', '見本の商品 8', 'デモ機の貸し出しがあります。', '42,944']) assert.ok(longDoc.includes(s), `10品の見積書に「${s}」がない`);
+  assert.ok(!longDoc.includes('納品の前にお電話いたします。'));
+  await assertFits(page, '10品');
   await page.pdf({path: `${out}/estimate-long.pdf`, preferCSSPageSize: true, printBackground: true});
   assert.equal(pdfPages(`${out}/estimate-long.pdf`), 1);
   await page.emulateMedia({media: 'screen'});
-  await page.locator('.est').screenshot({path: `${out}/05c-estimate-long.png`});
+  await page.locator('.est-sheet').screenshot({path: `${out}/05c-estimate-long.png`});
   await page.getByRole('button', {name: '閉じる'}).click();
+  await page.getByRole('textbox', {name: '備考', exact: true}).fill('デモ機の貸し出しがあります。');
 
   // ---- 読み直しても残っている（IndexedDB）
   await page.waitForTimeout(1200);

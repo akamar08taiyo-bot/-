@@ -44,9 +44,10 @@ React 19 + TypeScript + Vite（`vite.tokutei.config.ts` で1ファイルの `dis
 | `useStore.ts`・`sync.ts` | 変更の 0.4秒後に自動保存・タブ間でまとめて保存。`flush` は保存の途中ならそれが終わるまで待つ（住宅改修のタブの中の枠が消える前に待つため） |
 | `update.ts` | `version.json` を見て「⟳ 読み込み直す」を出す |
 | `components/` | `SalesPage`（一覧）・`SaleEditor`（案件の画面。「📗 Excelで保存」）・`ShinseiPanel`（「📄 申請書（Excel）を作る」と未入力の欄）・`ShinseiPreview`（申請書のプレビューを描く。押すと入れる所へ）・`CustomerPicker`・`BirthInput`・`ReasonField`・`Suggest`・`ProductsPage`・`ProductPicker`・`CategorySelect`（種目を選ぶ）・`ImportDialog`・`SettingsPage`・`ui.tsx`（ボタンの色。Excel は `excel`＝薄い緑） |
-| `print/EstimateDoc.tsx` | 印刷の御見積書（A4縦） |
-| `print/PrintView.tsx` | 印刷の画面（画面の幅に合わせて縮めて見せる。「🖨 印刷する」「📗 Excelで保存」「閉じる」。PDF の名前は document.title「御見積書_〇〇様」） |
-| `tokutei.css` | `@media print` で `.est{height:296mm; overflow:hidden}`（1枚に固定。行が多いと下が切れる） |
+| `estimateBook.ts` | 販売見積書：会社の見積書の原本に書く `fillEstimateFiles`・`fillEstimate`（.xlsx）・`estimatePreview`（プレビューの1枚）・`estimateNotes`（備考の3行）・`estimateFileName`・`estimateOverflow`／`estimateNoteOverflow`（入らない明細・備考）・`EstimateField`／`ESTIMATE_LABEL`（押すと入れる所へ） |
+| `print/mitsumori.xltx`・`print/estimateFiles.ts` | 見積書の原本（TSS。印影の画像は消した）と、開く `openEstimateTemplate`・`useEstimateTemplate`・保存する `saveEstimateBook` |
+| `print/PrintView.tsx` | 印刷の画面（原本の絵を紙の余白の中に収まる大きさで。「🖨 印刷する」「📗 Excelで保存」「閉じる」。PDF の名前は document.title「御見積書_〇〇様」） |
+| `tokutei.css` | `.est-sheet`（A4 の紙。余白は原本と同じ）。`@media print` で `height:296mm`（1枚に固定） |
 
 ## Excel（`print/`）
 
@@ -54,10 +55,9 @@ React 19 + TypeScript + Vite（`vite.tokutei.config.ts` で1ファイルの `dis
   書体の定数 `XL_MINCHO`（BIZ UDP明朝 Medium）・`XL_GOTHIC`（BIZ UDPゴシック）、`XL_PT_MM`、`xlRef`・`xlRange`、字の幅 `xlTextEm`・`xlTextMm`、行数の見積もり `xlLineCount`。
   `fullCalcOnLoad`（開いたときに計算し直す）・印刷範囲・A4縦・1枚に収める設定。
   見積・提案書作成・消耗品売上管理の Excel 保存と同じ作り（このアプリは独立しているので写して使っている）。
-- `estimateXlsx.ts`：`buildEstimateXlsx(sale, settings)`（Uint8Array）・`saveEstimateXlsx`（ダウンロード）・`estimateXlsxName`。
-  頭の部分（宛名・題名・見積番号・日付・会社の枠・印の枠）は印刷と同じ位置に置き、列と行の境目を集めて結合セルにする。品目の表と介護保険の内訳は式。
+  **いまはアプリで使っていない**（見積書は原本に書く `estimateBook.ts` になった。`taiyo-excel-export` スキルの見本として残す）。
 
 ## テスト（`test/tokutei/`）
 
-`calc.test.ts`（計算の例）・`category.test.ts`・`priceImport.test.ts`・`estimateXlsx.test.ts`（式とキャッシュの値が `saleTotals` と同じか、超えた分・個別切り上げ・生活保護・償還払い・非課税、宛名・印刷設定・ファイル名）・
+`calc.test.ts`（計算の例）・`category.test.ts`・`priceImport.test.ts`・`estimateBook.test.ts`（原本の欄・式とその答えが `saleTotals` と同じか・非課税・備考の3行・明細の書式・プレビュー・原本に印影がないか・ファイル名）・
 `shinsei.test.ts`（4つの申請書の欄・丸の数・式の答え・広域連合の支払方法・原本に前の方の記入が残っていないか）・`shinseiPreview.test.ts`（プレビューのシート・SHINSEI_LINKS のもれ・まだ入っていない所）・`link.test.ts`（生年月日・郵便番号・前のお客様・今年度の残り・理由）・`jutaku.test.ts`（住宅改修からの受け渡し：開いた様邸のものだけ・案件を作る／開く・変わった値だけ入れ直す・保険者と個別切り上げ・読み込みで残す）・`handoff.test.ts`（販売受注簿へ渡す内容・限度額を超えるとき・生活保護・個別切り上げ・3割、3000通りの見積もりで内訳の合計が見積書と同じ）・`e2e-hacchu.mjs`（受注簿ツールと同じサイトに置いて、転記 → 受注簿に入れる → ページの給付内訳 → 印刷 → 直したらふつうの計算）・`e2e.mjs`（ブラウザで通し。申請書の Excel を落として欄を読む）。

@@ -14,7 +14,9 @@ import type {Update} from '../useStore.ts';
 import {todayIso, yen} from '../util.ts';
 import {fiscalYearOf} from '../wareki.ts';
 import {addressOfZip, zipCandidates, zipLabel} from '../zip.ts';
-import {saveEstimateXlsx} from '../print/estimateXlsx.ts';
+import {ESTIMATE_LABEL, estimateNoteOverflow, estimateOverflow, estimatePreview} from '../estimateBook.ts';
+import type {EstimateField} from '../estimateBook.ts';
+import {saveEstimateBook, useEstimateTemplate} from '../print/estimateFiles.ts';
 import {BirthInput} from './BirthInput.tsx';
 import {CategorySelect} from './CategorySelect.tsx';
 import {CustomerPicker} from './CustomerPicker.tsx';
@@ -30,9 +32,10 @@ const STATUSES: SaleStatus[] = ['見積', '申請', '承認', '納品', '集金'
 // 状態を進めたとき、その日付が空なら今日を入れる
 const STATUS_DATE: Partial<Record<SaleStatus, keyof Sale>> = {申請: 'applyDate', 承認: 'approveDate', 納品: 'deliveryDate', 集金: 'collectDate'};
 
-function Card({title, children, right}: {title: string; children: ReactNode; right?: ReactNode}) {
+/** まとまり。field は見積書のプレビューの欄とつなぐ名前（data-field） */
+function Card({title, children, right, field}: {title: string; children: ReactNode; right?: ReactNode; field?: EstimateField}) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-field={field}>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-bold text-teal-800">{title}</h3>
         {right && <div className="ml-auto flex flex-wrap gap-2">{right}</div>}
@@ -42,9 +45,10 @@ function Card({title, children, right}: {title: string; children: ReactNode; rig
   );
 }
 
-function Field({label, children, wide = false}: {label: string; children: ReactNode; wide?: boolean}) {
+/** 入れる所。field は見積書のプレビューの欄とつなぐ名前（data-field） */
+function Field({label, children, wide = false, field}: {label: string; children: ReactNode; wide?: boolean; field?: EstimateField}) {
   return (
-    <label className={`grid min-w-0 content-start gap-1 text-xs font-bold text-slate-600 ${wide ? 'sm:col-span-2' : ''}`}>
+    <label className={`grid min-w-0 content-start gap-1 text-xs font-bold text-slate-600 ${wide ? 'sm:col-span-2' : ''}`} data-field={field}>
       {label}
       {children}
     </label>
@@ -119,6 +123,35 @@ export function SaleEditor({
     el.scrollIntoView({behavior: 'smooth', block: 'center'});
     el.querySelector<HTMLElement>('input:not([type="hidden"]):not([type="checkbox"]), select, textarea, [role="radio"], button')?.focus({preventScroll: true});
   };
+
+  // 見積書の画面：右に会社の見積書の原本の形のままのプレビュー（ユーザーの指示「見積書の原本はこのような形にする。プレビューを見ながら入力」）
+  const estTemplate = useEstimateTemplate(!onShinsei);
+  const estPages = useMemo(() => (!onShinsei && estTemplate ? estimatePreview(estTemplate, shown, s) : null), [onShinsei, estTemplate, shown, s]);
+  const estMissing = useMemo(() => {
+    const out = new Set<EstimateField>();
+    if (!sale.customer.trim()) out.add('customer');
+    if (sale.items.length === 0) out.add('items');
+    return out;
+  }, [sale.customer, sale.items.length]);
+  const [estActive, setEstActive] = useState<EstimateField | null>(null);
+  const quoteRef = useRef<HTMLDivElement>(null);
+  const estBox = useRef<HTMLElement>(null);
+  const onFocusEstimate = (e: FocusEvent<HTMLElement>) => {
+    const f = (e.target as HTMLElement).closest('[data-field]')?.getAttribute('data-field');
+    if (f && f in ESTIMATE_LABEL) setEstActive(f as EstimateField);
+  };
+  const goEstField = (f: EstimateField) => {
+    const el = quoteRef.current?.querySelector<HTMLElement>(`[data-field="${f}"]`);
+    if (!el) return;
+    setEstActive(f);
+    el.scrollIntoView({behavior: 'smooth', block: 'center'});
+    el.querySelector<HTMLElement>('input:not([type="hidden"]):not([type="checkbox"]), select, textarea, button')?.focus({preventScroll: true});
+  };
+  const saveExcel = () =>
+    void saveEstimateBook(sale, s).then(
+      (name) => toast(`${name} を保存しました`),
+      (e: unknown) => toast(`見積書を保存できませんでした：${e instanceof Error ? e.message : String(e)}`, 'error'),
+    );
 
   const change = (patch: Partial<Sale>) =>
     update('sales', (list) => list.map((x) => (x.id === sale.id ? {...x, ...patch, updatedAt: Date.now()} : x)));
@@ -197,7 +230,7 @@ export function SaleEditor({
             <Btn color="sky" onClick={() => onPrint(sale.id)}>
               🖨 見積書を印刷
             </Btn>
-            <Btn color="excel" onClick={() => saveEstimateXlsx(sale, data.settings)}>
+            <Btn color="excel" onClick={saveExcel}>
               📗 Excelで保存
             </Btn>
             {form && !fixedView && (
@@ -275,8 +308,9 @@ export function SaleEditor({
           </div>
         </div>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="min-w-0 space-y-4">
+        // 見積書の画面：左に入れる所、右に見積書のプレビュー（画面の高さで止まり中だけ動く）と金額のまとめ
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div ref={quoteRef} className="min-w-0 space-y-4" onFocusCapture={onFocusEstimate}>
             <Card
               title="お客様"
               right={
@@ -286,7 +320,7 @@ export function SaleEditor({
               }
             >
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="お客様名（様は付けない）">
+                <Field label="お客様名（様は付けない）" field="customer">
                   <TextInput value={sale.customer} onChange={(customer) => change({customer})} placeholder="例：山田 花子" aria-label="お客様名" />
                 </Field>
                 <Field label="フリガナ">
@@ -450,6 +484,7 @@ export function SaleEditor({
 
             <Card
               title="商品"
+              field="items"
               right={
                 <>
                   <Btn color="teal" onClick={() => setPicking(true)}>
@@ -583,10 +618,10 @@ export function SaleEditor({
                     onPick={(careManager) => change({careManager})}
                   />
                 </Field>
-                <Field label="見積番号">
+                <Field label="見積番号" field="quoteNo">
                   <TextInput value={sale.quoteNo} onChange={(quoteNo) => change({quoteNo})} aria-label="見積番号" />
                 </Field>
-                <Field label="見積日">
+                <Field label="見積日" field="estimateDate">
                   <input type="date" value={sale.estimateDate} onChange={(e) => change({estimateDate: e.target.value})} className={dateInput} aria-label="見積日" />
                 </Field>
                 <Field label="状態">
@@ -606,7 +641,7 @@ export function SaleEditor({
                 </Field>
               </div>
               <div className="mt-3">
-                <Field label="見積書の備考に足す文（デモ機など）">
+                <Field label="見積書の備考に足す文（デモ機など）" field="note">
                   <textarea
                     value={sale.note}
                     onChange={(e) => change({note: e.target.value})}
@@ -619,7 +654,18 @@ export function SaleEditor({
             </Card>
           </div>
 
-            <aside className="space-y-3 lg:sticky lg:top-3 lg:self-start">
+            <aside ref={estBox} className="min-w-0 space-y-3 lg:sticky lg:top-3 lg:max-h-[calc(100vh-1.5rem)] lg:self-start lg:overflow-y-auto" style={{scrollbarGutter: 'stable'}}>
+              <section className="rounded-xl bg-slate-200/70 p-2">
+                {estimateOverflow(sale) > 0 && <p className="mb-2 rounded-md bg-rose-50 p-2 text-xs font-bold text-rose-700">見積書の明細は20行までです（{estimateOverflow(sale)}点が入りません）</p>}
+                {estimateNoteOverflow(sale, s) > 0 && (
+                  <p className="mb-2 rounded-md bg-rose-50 p-2 text-xs font-bold text-rose-700">見積書の備考は3行までです（介護保険の内訳とあわせて。{estimateNoteOverflow(sale, s)}行が入りません）</p>
+                )}
+                {estPages === null ? (
+                  <p className="p-6 text-center text-sm text-slate-500">見積書を開いています…</p>
+                ) : (
+                  <ShinseiPages<EstimateField> pages={estPages} missing={estMissing} active={estActive} label={(f) => ESTIMATE_LABEL[f]} onOpen={goEstField} scrollBox={estBox} title="見積書のプレビュー" />
+                )}
+              </section>
               <section className="rounded-xl border border-teal-200 bg-white p-4 shadow-sm">
                 <div className="text-xs font-bold text-slate-500">購入金額（税込）</div>
                 <div className="text-3xl font-bold tabular-nums text-slate-900">{yen(t.total)}円</div>

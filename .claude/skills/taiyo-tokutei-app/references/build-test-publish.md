@@ -34,7 +34,7 @@ PLAYWRIGHT=/opt/node-tools/node_modules/playwright/index.mjs timeout 600 node te
 
 ## 3. Excel の確かめ方（この環境に Excel はない）
 
-1. 単体テスト（`estimateXlsx.test.ts`）：式と、開いた時点の値（キャッシュ）が `saleTotals` と同じか。XML の `&amp;` などを戻してから比べる。
+1. 単体テスト（`estimateBook.test.ts`）：原本の式と、開いた時点の値（キャッシュ）が `saleTotals` と同じか。XML の `&amp;` などを戻してから比べる。
 2. 見本を何通りか作る（ふつう・限度額を超える・生活保護・個別切り上げ・単価を手で入れた行）。ブラウザの外で作るときは esbuild で CJS にまとめる
    （`NODE_PATH=<作業ツリー>/node_modules npx esbuild … --bundle --platform=node --format=cjs --define:process.env.NODE_ENV='"production"'`）。
 3. `taiyo-excel-export` スキルの手順で、XSD の検査（ALL VALID）・LibreOffice で計算し直して式の答えが同じか（2026-10 は 65 の式が一致）・PDF→画像にして印刷と並べて見比べる（どちらも1ページ）。

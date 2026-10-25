@@ -225,30 +225,36 @@ function HeaderView({h, top, width, height}: {h: PvHeader; top: number; width: n
 const bandHeight = (h: PvHeader | null) => (h ? Math.max(...[...h.left, ...h.center, ...h.right].map((r) => r.font.size), 12) * 1.5 + 8 : 0);
 
 /** 1枚の大きさ（紙。画素） */
-function paper(page: PvPage) {
+function paper(page: PvPage<string>) {
   const head = bandHeight(page.header);
   const foot = bandHeight(page.footer);
   return {width: page.width + PAD * 2, height: page.height + head + foot + PAD * 2, head, foot};
 }
 
-export function ShinseiPages({
+export function ShinseiPages<F extends string = ShinseiField>({
   pages,
   missing,
   active,
   label,
   onOpen,
   scrollBox,
+  title = '申請書のプレビュー',
+  print = false,
+  fixedScale,
 }: {
-  pages: PvPage[];
-  missing: Set<ShinseiField>;
-  active: ShinseiField | null; // 左で入れている所（その欄を囲む）
-  label: (f: ShinseiField) => string;
-  onOpen: (f: ShinseiField) => void; // 欄を押したとき（左のその入れる所へ）
+  pages: PvPage<F>[];
+  missing: Set<F>;
+  active: F | null; // 左で入れている所（その欄を囲む）
+  label: (f: F) => string;
+  onOpen: (f: F) => void; // 欄を押したとき（左のその入れる所へ）
   scrollBox?: RefObject<HTMLElement | null>; // プレビューを入れた枠（左の横に並べて、枠の中で動くとき）
+  title?: string; // プレビューの名前（見積書は「見積書のプレビュー」）
+  print?: boolean; // 印刷：押す欄・色を出さない
+  fixedScale?: number; // 決まった大きさで描く（印刷。画面の幅に合わせない）
 }) {
   const [wrapRef, wrapWidth] = useWidth<HTMLDivElement>();
   const widest = Math.max(...pages.map((p) => paper(p).width), 1);
-  const scale = wrapWidth ? Math.min(MAX_SCALE, wrapWidth / widest) : 1;
+  const scale = fixedScale ?? (wrapWidth ? Math.min(MAX_SCALE, wrapWidth / widest) : 1);
 
   // 入れている所の欄（同じ所が2枚目にもあるとき＝式で同じ値を出している欄は、最初に出てくる欄）が見えるように、プレビューの枠の中を動かす。
   // 縦に並べた狭い画面（枠が動かない）では、画面ごと動かさない（入れている所が見えなくなるので）
@@ -266,13 +272,13 @@ export function ShinseiPages({
   let firstDone = false;
 
   return (
-    <div ref={wrapRef} className="space-y-4" aria-label="申請書のプレビュー">
+    <div ref={wrapRef} className={print ? 'print-pages' : 'space-y-4'} aria-label={title}>
       {pages.map((page) => {
         const pp = paper(page);
         return (
           <div key={page.sheet} className="relative mx-auto" style={{width: pp.width * scale, height: pp.height * scale}}>
             <div
-              className="absolute left-0 top-0 origin-top-left bg-white shadow-[0_1px_4px_rgba(0,0,0,0.25)]"
+              className={`absolute left-0 top-0 origin-top-left bg-white ${print ? '' : 'shadow-[0_1px_4px_rgba(0,0,0,0.25)]'}`}
               style={{width: pp.width, height: pp.height, transform: `scale(${scale})`}}
               role="group"
               aria-label={page.sheet}
@@ -327,7 +333,7 @@ export function ShinseiPages({
                   ))}
                 </svg>
                 {/* 押すと左のその入れる所へ（まだ入っていない欄は薄い黄色、入れている所は囲む） */}
-                {page.fields.map((f, i) => {
+                {!print && page.fields.map((f, i) => {
                   const on = active === f.field;
                   const first = on && !firstDone;
                   if (first) firstDone = true;
