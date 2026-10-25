@@ -57,8 +57,10 @@ export function newSale(sales: Sale[], settings: Settings, insurer: string, now 
 /** 案件を写す（同じお客様に別の見積もり・似た見積もりを作るとき）。日付と状態は新しくする */
 export function copySale(sale: Sale, sales: Sale[], now = Date.now()): Sale {
   const date = todayIso();
+  // 販売受注簿の中身（受注番号・入荷日など）は写さない（商品の id も新しくなるので、受注簿は見積書から作り直す）
+  const {hacchu: _hacchu, ...rest} = sale;
   return {
-    ...sale,
+    ...rest,
     id: uid('s'),
     quoteNo: nextQuoteNo(sales, date),
     estimateDate: date,

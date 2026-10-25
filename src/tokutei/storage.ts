@@ -257,6 +257,8 @@ export function cleanSales(raw: unknown): Sale[] {
       updatedAt: numv(s.updatedAt),
       // 住宅改修の様邸から開いた案件（jutaku.ts）
       ...(str(s.jutakuJob) ? {jutakuJob: str(s.jutakuJob), jutakuSync: isObj(s.jutakuSync) ? cleanJutakuFields(s.jutakuSync) : {}} : {}),
+      // 販売見積書の中の販売受注簿の中身（受注簿ツールが読む。中身はここでは見ない）
+      ...(isObj(s.hacchu) ? {hacchu: s.hacchu} : {}),
     };
   });
 }

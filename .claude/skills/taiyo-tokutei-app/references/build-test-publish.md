@@ -28,7 +28,7 @@ PLAYWRIGHT=/opt/node-tools/node_modules/playwright/index.mjs timeout 600 node te
 - `e2e.mjs` はビルドのあとに動かす。中で 5191番（環境変数 `E2E_PORT` で替えられる）の小さなサーバーを立てて `/tokutei/` を開く。Playwright はリポジトリの依存に入れていないので、場所は環境変数 `PLAYWRIGHT`（既定は `/opt/node22/lib/node_modules/playwright/index.mjs`。無ければ上のように指定）。
   流れ：取り込み → ★ → 見積もり（42,944円・4,295円・38,649円）→ 申請書（行橋市の Excel・プレビュー。広域連合に替えて受領委任払用・償還払い用・Excel・390px）→ 印刷 → Excel の保存（ファイル名と値）→ 読み直し → 390px で横にはみ出さない。PDF のページ数は `pdfinfo` で見る。
 - 見た目を変えたら、パソコンとスマホ（390px）のスクリーンショットを撮って自分の目で見る。
-- 販売受注簿への転記：受注簿ツール（`akamar08taiyo-bot/taiyo-hacchu-scan`、`/home/user/taiyo-hacchu-scan`）を `npm ci && npm run build` してから
+- 販売見積書の中の販売受注簿：受注簿ツール（`akamar08taiyo-bot/taiyo-hacchu-scan`、`/home/user/taiyo-hacchu-scan`。2026-10-25 はブランチ `claude/tokutei-embed`）を `npm ci && npm run build` してから
   `node test/tokutei/e2e-hacchu.mjs /home/user/taiyo-hacchu-scan/dist <出力フォルダ>`（5193番で `/tokutei/` と `/taiyo-hacchu-scan/` を同じサイトに置く）。
   受注簿ツールの単体テストは `node --test "test/*.test.mjs"` と `node test/run-scan-tests.js`（受け取りは `test/tokutei-import.test.mjs`・`test/jutaku-import.test.mjs`）。
 
@@ -60,7 +60,7 @@ cd /home/user/taiyo-portal && git add tokutei/index.html tokutei/version.json in
 ```
 
 - 先にアプリのブランチを commit・push してから、ポータルを commit・push する。ポータルの `git fetch` で、ほかのセッションの公開が先に入っていないか見る。
-- 販売受注簿への転記を含む版は、**受注簿ツールを先に公開する**（taiyo-hacchu-scan の master に入れて `docs/` を作り直す。手順はそのリポジトリの CLAUDE.md。
+- 販売受注簿への転記・販売見積書の中の販売受注簿を含む版は、**受注簿ツールを先に公開する**（taiyo-hacchu-scan の master に入れて `docs/` を作り直す。手順はそのリポジトリの CLAUDE.md。
   デプロイは repo `taiyo-hacchu-scan` の「pages build and deployment」）。今の受注簿ツールは知らない kind を黙って消すので、逆だと転記した商品が消える。
 - タイルの文を直したら `<script>` が壊れていないか確かめる（`taiyo-portal` スキル）。
 - デプロイの確かめ：github.io はこの作業環境から見えない。GitHub MCP の `actions_list`（`list_workflow_runs`、owner `akamar08taiyo-bot`、repo `taiyo-portal`、perPage 3）で、

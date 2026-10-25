@@ -1,6 +1,7 @@
 // 販売受注簿作成ツール（太陽ポータルと同じサイトの /taiyo-hacchu-scan/）へ渡す内容（DESIGN.md 5.3）。
-// 同じサイトなので、この端末の localStorage（taiyo-hacchu-import-v1）に置いてから受注簿を新しいタブで開く
-// （住宅改修のアプリの「📤 販売受注簿に転記」と同じ口。受注簿ツールの src/main.jsx の jutaku-import-begin〜end が kind で見分けて読む）。
+// 2026-10-23 から、受注簿ツールを販売見積書のページの中に出し（?embed=tokutei）、この内容を案件を直すたびに postMessage で送る（hacchuLive.ts）。
+// 受注簿ツールの src/main.jsx の tokutei-live-begin〜end が、jutaku-import-begin〜end の tokuteiImportPages でページにする
+// （前の「📤 販売受注簿に転記」＝ localStorage の taiyo-hacchu-import-v1 に置いて新しいタブで開く口も、受注簿ツールに残っている）。
 // 受注簿は商品1点が1ページで、ページごとに給付内訳を出す。ページごとに切り上げると合計が見積書と1円ずれることがあるので、
 // 給付の内訳もここで商品ごとに分けて渡す（合計は saleTotals と同じ）。送る形を変えるときは、受注簿ツールの受け取りも直す。
 
@@ -22,6 +23,7 @@ export type HacchuBenefit = {
 };
 
 export type HacchuItem = {
+  id: string; // 見積書の商品の id（受注簿のページとつなぐ。受注簿で直した値をこの商品に戻す）
   productName: string;
   maker: string;
   modelNumber: string; // 品番
@@ -106,6 +108,7 @@ export function hacchuImport(sale: Sale, s: Pick<Settings, 'markupRate' | 'limit
         benefit.aid > 0 && `生活保護（${t.ratio}割の ${yen(benefit.aid)}円は介護扶助）`,
       ].filter(Boolean);
       return {
+        id: l.item.id,
         productName: l.item.name.trim(),
         maker: l.item.maker.trim(),
         modelNumber: l.item.code.trim(),
@@ -126,7 +129,5 @@ export function hacchuImport(sale: Sale, s: Pick<Settings, 'markupRate' | 'limit
   };
 }
 
-/** 受注簿を開く URL（受け取り口は ?from=tokutei で、リンクから開いたことを知る） */
-export function hacchuUrl(): string {
-  return new URL(`${HACCHU_PATH}?from=tokutei`, location.origin).href;
-}
+/** 販売見積書の中に出す受注簿の URL（同じサイト） */
+export const hacchuEmbedUrl = () => `${HACCHU_PATH}?embed=tokutei`;
