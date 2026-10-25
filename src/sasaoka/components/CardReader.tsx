@@ -10,7 +10,7 @@
 
 import {useEffect, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
-import {applyCard, applyExtra, birthText, CARD_FIELDS, currentExtra, currentOf, defaultPicks, EXTRA_FIELDS, extraPicks, extraText, fieldText, sameExtra, sameText, staffMatch} from '../cardApply.ts';
+import {applyCard, applyExtra, birthText, CARD_FIELDS, currentExtra, currentOf, defaultPicks, EXTRA_FIELDS, extraPicks, extraText, fieldText, sameExtra, sameText, staffGuess} from '../cardApply.ts';
 import type {CardField, ExtraField, ExtraInfo, ReadResult} from '../cardApply.ts';
 import {isCardFile} from '../cardOcr.ts';
 import type {CardProgress} from '../cardOcr.ts';
@@ -229,9 +229,12 @@ export function CardDialog({job, read, thumbs, onApply, onClose, newJob = false,
   // 介護ソフトの画面から読んだときの、保険証にない項目（担当は担当者の候補の名前にしてから。候補になければ空）
   const soft = read.soft;
   const staff = staffList ?? [];
-  const exRead: ExtraInfo | null = soft ? {...soft.extra, staff: staffMatch(soft.extra.staff, staff)} : null;
+  // 候補の名前に近いだけ（小さな字の読み違い）のときは、その人を選んで黄色（確かめてもらう）
+  const staffPick = soft ? staffGuess(soft.extra.staff, staff) : null;
+  const exRead: ExtraInfo | null = soft ? {...soft.extra, staff: staffPick?.name ?? ''} : null;
+  const exUnsure: ExtraField[] = soft ? [...soft.unsure, ...(staffPick?.name && !staffPick.exact ? (['staff'] as const) : [])] : [];
   const [ex, setEx] = useState<ExtraInfo | null>(exRead);
-  const [exPicks, setExPicks] = useState<Set<ExtraField>>(() => (soft && exRead ? extraPicks(job, exRead, soft.unsure) : new Set<ExtraField>()));
+  const [exPicks, setExPicks] = useState<Set<ExtraField>>(() => (soft && exRead ? extraPicks(job, exRead, exUnsure) : new Set<ExtraField>()));
   // 担当の行は、担当者の候補を渡されたときだけ（特定福祉用具申請書のタブには候補がない）
   const exRows = soft ? EXTRA_FIELDS.filter(({field}) => extraText(soft.extra, field) && (field !== 'staff' || staffList)) : [];
   // 介護ソフトの画面には保険者番号がない（行を出さない）
@@ -340,7 +343,7 @@ export function CardDialog({job, read, thumbs, onApply, onClose, newJob = false,
             {soft &&
               ex &&
               exRows.map(({field, label}) => {
-                const unsure = soft.unsure.includes(field);
+                const unsure = exUnsure.includes(field);
                 const value = extraText(ex, field);
                 const now = extraText(curEx, field);
                 return (
@@ -355,6 +358,7 @@ export function CardDialog({job, read, thumbs, onApply, onClose, newJob = false,
                     <div className="col-span-2 min-w-0 px-2 sm:col-span-1">
                       <ExtraInput field={field} v={ex} set={setExField(field)} staffList={staff} />
                       {field === 'staff' && !value && <div className="text-xs text-slate-500">担当者の候補にない名前：{soft.extra.staff}</div>}
+                      {field === 'staff' && value && staffPick && !staffPick.exact && <div className="text-xs text-slate-500">読んだ名前：{soft.extra.staff}（候補の近い名前にしました）</div>}
                       {field === 'reasonName' && <div className="text-xs text-slate-500">理由書の作成者の氏名に入れます</div>}
                       {field === 'reasonTel' && <div className="text-xs text-slate-500">理由書の作成者の連絡先に入れます</div>}
                     </div>

@@ -2,6 +2,7 @@
 // 被保険者番号・氏名・住所は見積書・申請書・理由書の共通の欄、フリガナ・生年月日・性別・郵便番号・要介護・認定有効期間・保険者番号・負担割合・
 // 居宅介護支援事業所（理由書の作成者の事業所）は申請書の項目（ShinseiInfo）。特定福祉用具へは tokuteiLink.ts で同じ値を渡す
 
+import {editDistance} from './careSoft.ts';
 import type {SoftKey, SoftRead} from './careSoft.ts';
 import {eraOf, INSURER_INFO, NO_SHINSEI} from './estimateForms.ts';
 import {NO_CARD} from './hokensho.ts';
@@ -223,10 +224,25 @@ export function softRead(s: SoftRead): ReadResult {
 
 /** 担当者の候補のうち、読んだ名前のもの（空白のちがいは同じ。読んだ字の前後のごみは気にしない＝候補のフルネームが読んだ字の中にあれば） */
 export function staffMatch(read: string, list: string[]): string {
+  return staffGuess(read, list).exact ? staffGuess(read, list).name : '';
+}
+
+/**
+ * 担当者の候補から、読んだ名前の人を選ぶ。exact：候補のフルネームが読んだ字の中にある。
+ * そうでなくても、姓の1字目が同じで、ちがう字が候補の字の半分まで・ほかの候補より近ければ、その人（小さな字の読み違い。久保 区中 → 久保 匠史。確かめてもらう）
+ */
+export function staffGuess(read: string, list: string[]): {name: string; exact: boolean} {
   const r = read.normalize('NFKC').replace(/\s/g, '');
-  if (!r) return '';
+  if (!r) return {name: '', exact: false};
   const key = (x: string) => x.normalize('NFKC').replace(/\s/g, '');
-  return list.filter((x) => key(x).length >= 2 && r.includes(key(x))).sort((a, b) => key(b).length - key(a).length)[0] ?? '';
+  const exact = list.filter((x) => key(x).length >= 2 && r.includes(key(x))).sort((a, b) => key(b).length - key(a).length)[0];
+  if (exact) return {name: exact, exact: true};
+  const near = list
+    .filter((x) => key(x).length >= 2 && key(x)[0] === r[0])
+    .map((x) => ({x, d: editDistance(r, key(x))}))
+    .filter((c) => c.d <= Math.floor(key(c.x).length / 2))
+    .sort((a, b) => a.d - b.d);
+  return near.length && (near.length === 1 || near[0].d < near[1].d) ? {name: near[0].x, exact: false} : {name: '', exact: false};
 }
 
 /** 様邸の今の値（保険証にない項目。生活保護は入っていなければ「なし」） */
@@ -278,7 +294,7 @@ export function applyExtra(job: Job, v: ExtraInfo, picks: Set<ExtraField>, staff
         if (v.welfare) s.welfare = v.welfare === 'yes' ? true : undefined;
         break;
       case 'staff': {
-        const m = staffList.includes(v.staff) ? v.staff : staffMatch(v.staff, staffList);
+        const m = staffList.includes(v.staff) ? v.staff : staffGuess(v.staff, staffList).name;
         if (m) next.staff = m;
         break;
       }

@@ -1,7 +1,7 @@
 // 介護保険証から読んだ値を様邸に入れる（cardApply.ts）。値はすべて架空
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {applyCard, applyExtra, birthText, currentExtra, currentOf, defaultPicks, EXTRA_FIELDS, extraPicks, extraText, fieldText, NO_EXTRA, softRead, staffMatch, termText} from '../../src/sasaoka/cardApply.ts';
+import {applyCard, applyExtra, birthText, currentExtra, currentOf, defaultPicks, EXTRA_FIELDS, extraPicks, extraText, fieldText, NO_EXTRA, softRead, staffGuess, staffMatch, termText} from '../../src/sasaoka/cardApply.ts';
 import type {ExtraInfo} from '../../src/sasaoka/cardApply.ts';
 import {NO_SOFT} from '../../src/sasaoka/careSoft.ts';
 import {NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
@@ -128,6 +128,15 @@ test('担当は担当者の候補と同じ名前のときだけ（空白のち�
   assert.equal(staffMatch('業 見本 太郎', list), '見本 太郎');
   assert.equal(staffMatch('見本', list), '');
   assert.equal(staffMatch('', list), '');
+});
+
+test('担当：候補の名前に近い読み違い（姓の1字目が同じ・ちがう字が半分まで・ほかより近い）は、その人を選んで確かめてもらう', () => {
+  const list = ['見本 太郎', '試験 次郎', '見本 花子'];
+  assert.deepEqual(staffGuess('見本 太朗', list), {name: '見本 太郎', exact: false});
+  assert.deepEqual(staffGuess('見本 区中', list), {name: '', exact: false}); // 見本 太郎・見本 花子 のどちらとも同じくらい
+  assert.deepEqual(staffGuess('試験 区中', list), {name: '試験 次郎', exact: false});
+  assert.deepEqual(staffGuess('見本太郎', list), {name: '見本 太郎', exact: true});
+  assert.deepEqual(staffGuess('区中 太郎', list), {name: '', exact: false}); // 姓の1字目がちがう
 });
 
 test('保険証にない項目のはじめのチェック：今とちがい、今が空か読めた値がたしかなとき。電話はハイフンのちがいは同じ', () => {

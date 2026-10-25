@@ -108,7 +108,7 @@ export function fixSoft(s: string): string {
 }
 
 /** 2つの文字の、ちがう字・ぬけた字・よけいな字の数 */
-function editDistance(a: string, b: string): number {
+export function editDistance(a: string, b: string): number {
   const d = Array.from({length: b.length + 1}, (_, j) => j);
   for (let i = 1; i <= a.length; i++) {
     let prev = d[0];
@@ -212,7 +212,8 @@ function wordAt(r: SoftRow, sqIndex: number): number {
 
 const BIRTH = /(明治|大正|昭和|平成)(\d{1,2}|元)年(\d{1,2})月(\d{1,2})日/;
 const DATE_G = /(令和|平成)(\d{1,2}|元)年(\d{1,2})月(\d{1,2})日/g;
-const ZIP = /(?<!\d)(\d{3})-?(\d{4})(?!\d)/;
+// 郵便番号：電話番号の一部（090-1234-5678 の 090-1234）は除く
+const ZIP = /(?<!\d)(?<!\d-)(\d{3})-?(\d{4})(?!\d)(?!-\d)/;
 const PHONE_G = /0\d{1,4}-\d{1,4}-\d{3,4}|0\d{9,10}/g;
 const CARE = /要\s*(支援|介護)\s*([1-5])/;
 const OFFICE_END = /(センター|事業所|ステーション|ケアプラン|支援室|相談所|サービス|ホーム|プラザ|サポート|苑|園|会|所)$/;
@@ -248,21 +249,57 @@ export function cleanKana(raw: string): string {
 }
 
 /**
- * 切り出して読んだフリガナの行の語から、フリガナの文字（姓と名の間＝字の間で一番大きなすき間に全角の空白）。
- * 横に引きのばして読むと、字ごとに語に分かれることがあるので、読み取りの空白ではなく、すき間の大きさで分ける
+ * 切り出して読んだフリガナの行の語から、フリガナの文字（姓と名の間に全角の空白）。splitX：画素で見た姓と名の間の位置（blankSplit）があれば、
+ * そこより左の字が姓。なければ字の間で一番大きなすき間。横に引きのばして読むと、字ごとに語に分かれることがあるので、読み取りの空白は使わない
  */
-export function kanaOfWords(words: OcrWord[]): string {
+export function kanaOfWords(words: OcrWord[], splitX: number | null = null): string {
   const chars = words
     .flatMap((w) => (w.chars?.length ? w.chars : [{text: w.text, x0: w.x0, x1: w.x1, y0: w.y0, y1: w.y1}]))
     .map((c) => ({...c, t: cleanKana(c.text).replace(/　/g, '')}))
     .filter((c) => c.t); // 字の順は読み取りの順のまま（字の四角は前後にはみ出すことがある）
   if (chars.length === 0) return '';
+  const text = chars.map((c) => c.t);
+  if (splitX !== null) {
+    const at = chars.filter((c) => (c.x0 + c.x1) / 2 < splitX).length;
+    if (at > 0 && at < chars.length) return `${text.slice(0, at).join('')}　${text.slice(at).join('')}`;
+  }
   const gaps = chars.slice(1).map((c, i) => c.x0 - chars[i].x1);
   const order = gaps.map((g, i) => [g, i] as const).sort((a, b) => b[0] - a[0]);
   const h = median(chars.map((c) => c.y1 - c.y0));
   const split = order.length && order[0][0] > h * 0.25 && (order.length === 1 || order[0][0] > Math.max(order[1][0], 0) * 1.6) ? order[0][1] : -1;
-  const text = chars.map((c) => c.t);
   return split < 0 ? text.join('') : `${text.slice(0, split + 1).join('')}　${text.slice(split + 1).join('')}`;
+}
+
+/**
+ * フリガナの行の、姓と名の間の位置（x）：rect の中で字のない列が一番長く続く所のまん中。ほかの字の間のすき間の 1.6 倍から・3画素から。なければ null。
+ * lum：明るさ（1画素1つ）、w：画像の幅。横の線（rect の幅の6割から濃い行）は字に数えない
+ */
+export function blankSplit(lum: ArrayLike<number>, w: number, rect: Box, dark = 170): number | null {
+  const x0 = Math.max(0, Math.floor(rect.x0));
+  const x1 = Math.min(w, Math.ceil(rect.x1));
+  const y0 = Math.max(0, Math.floor(rect.y0));
+  const y1 = Math.min(Math.floor(lum.length / w), Math.ceil(rect.y1));
+  const rows: number[] = [];
+  for (let y = y0; y < y1; y++) {
+    let n = 0;
+    for (let x = x0; x < x1; x++) if (lum[y * w + x] < dark) n++;
+    if (n <= (x1 - x0) * 0.6) rows.push(y);
+  }
+  const ink: boolean[] = [];
+  for (let x = x0; x < x1; x++) ink.push(rows.some((y) => lum[y * w + x] < dark));
+  const first = ink.indexOf(true);
+  const last = ink.lastIndexOf(true);
+  if (first < 0) return null;
+  const gaps: {at: number; len: number}[] = [];
+  for (let i = first; i <= last; i++) {
+    if (ink[i]) continue;
+    const s0 = i;
+    while (i <= last && !ink[i]) i++;
+    gaps.push({at: s0, len: i - s0});
+  }
+  gaps.sort((a, b) => b.len - a.len);
+  if (!gaps.length || gaps[0].len < 3 || (gaps[1] && gaps[0].len < gaps[1].len * 1.6)) return null;
+  return x0 + gaps[0].at + gaps[0].len / 2;
 }
 
 /** フリガナとしてたしかか：姓と名の2つ・どれも2字から（名前のフリガナに長音はまずない） */
@@ -272,18 +309,27 @@ const kanaOk = (k: string) => {
 };
 
 /**
- * 何回か読んだフリガナ（切り出して字をしぼって読んだもの）から1つ選ぶ：同じ読みが2回あり、どちらも自信が高ければ（70から）たしか。
- * なければ自信の高い方（たしかでない）。小さな半角カタカナは、似た読み違いを2回することがあるので、自信も見る
+ * 何回か（下ごしらえ・引きのばし方を変えて）読んだフリガナから、一番多い読みを選ぶ（空白を除いた字でかぞえ、姓と名の分け方はその中で多い方）。
+ * たしか：2回から同じで、読んだ回数の半分から・自信の平均が70から・姓と名の2つ。同じ読みがなければ自信の一番高い読み（たしかでない）。
+ * 小さな半角カタカナは、似た読み違いを2回することがあるので、自信も見る
  */
 export function pickKana(reads: {text: string; conf: number}[]): {kana: string; sure: boolean} {
   const cands = reads.map((r) => ({kana: cleanKana(r.text), conf: r.conf})).filter((r) => r.kana.replace(/　/g, '').length >= 2);
   if (cands.length === 0) return {kana: '', sure: false};
+  const groups = new Map<string, {kana: string; conf: number}[]>();
   for (const c of cands) {
-    const same = cands.filter((x) => x.kana === c.kana);
-    if (same.length >= 2) return {kana: c.kana, sure: kanaOk(c.kana) && same.every((x) => x.conf >= 70)};
+    const key = c.kana.replace(/　/g, '');
+    groups.set(key, [...(groups.get(key) ?? []), c]);
   }
-  const best = [...cands].sort((a, b) => b.conf - a.conf)[0];
-  return {kana: best.kana, sure: false};
+  const best = [...groups.values()].sort((a, b) => b.length - a.length || b.reduce((s, x) => s + x.conf, 0) - a.reduce((s, x) => s + x.conf, 0))[0];
+  if (best.length >= 2) {
+    const ways = new Map<string, number>();
+    for (const c of best) ways.set(c.kana, (ways.get(c.kana) ?? 0) + (c.kana.includes('　') ? 1.5 : 1));
+    const kana = [...ways.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    const avg = best.reduce((s, x) => s + x.conf, 0) / best.length;
+    return {kana, sure: kanaOk(kana) && best.length >= cands.length / 2 && avg >= 70};
+  }
+  return {kana: [...cands].sort((a, b) => b.conf - a.conf)[0].kana, sure: false};
 }
 
 /** 人の名前を語から：姓と名の間（語の間で一番大きなすき間。ほかより大きいときだけ）を全角の空白1つに。字のほかは除く */
@@ -309,6 +355,90 @@ function nameOfText(raw: string): {name: string; clean: boolean} {
   return {name: parts.length === 2 ? parts.join('　') : parts.join(''), clean: clean && parts.length > 0 && parts.length <= 2};
 }
 
+// ---------------------------------------------------------------- 小さなラベル・「様」
+
+/** 「様」の読み違い（名前のうしろの小さな灰色の「様」が、似た形の字に読めたもの） */
+const SAMA_LIKE = /^[様樣栓疹拓稼椋榛棲標]$/;
+/**
+ * 小さなラベルの語か：行の語の高さのまんなかの 0.75 倍より低い。
+ * 値は大きな字、ラベル（様・居宅・Tel・電話番号など）は小さな灰色の字（2026-10-23 にいただいた2つめの画面の形）
+ */
+const smallWord = (w: OcrWord, rowH: number) => w.y1 - w.y0 < rowH * 0.75;
+/** 読み取りの自信が低い語（小さなラベルが別の字に読めたものに多い）。自信の分からない語は低くない */
+const lowConf = (w: OcrWord) => w.conf !== undefined && w.conf < 50;
+
+/**
+ * 行の左から、人の名前の語：小さな語（「様」のラベル）・字のない語・大きく離れた語（右のボタン・ご本人の欄）で止める。
+ * 「様」から右と、3つめからの1字の「様」の読み違いも除く
+ */
+function leadNameWords(r: SoftRow, words: OcrWord[] = r.words): OcrWord[] {
+  const out: OcrWord[] = [];
+  for (const w of words) {
+    const t = fixSoft(w.text).replace(/\s/g, '');
+    const sama = t.indexOf('様');
+    const keep = (sama >= 0 ? t.slice(0, sama) : t).replace(new RegExp(`[^${CJK}]`, 'g'), '');
+    // 名前の語のあいだは全角の空白くらいまで。それより離れた語（右のボタン・ご本人の欄）は名前ではない
+    if (out.length && w.x0 - out[out.length - 1].x1 > r.h * 1.5) break;
+    if (smallWord(w, r.h) || !keep) {
+      if (out.length) break;
+      continue;
+    }
+    out.push({...w, text: keep});
+    if (sama >= 0) break;
+  }
+  if (out.length >= 3 && SAMA_LIKE.test(out[out.length - 1].text)) out.pop();
+  return out;
+}
+
+/** 1行目の、生年月日より左の語（生年月日と同じ語に読めた名前の字も） */
+function leftOfBirth(r: SoftRow): OcrWord[] {
+  const m = BIRTH.exec(r.sq);
+  if (!m) return [];
+  const bi = wordAt(r, m.index);
+  const bt = fixSoft(r.words[bi].text);
+  const pre = bt.slice(0, Math.max(0, bt.search(/明治|大正|昭和|平成/)));
+  return [...r.words.slice(0, bi), ...(pre ? [{...r.words[bi], text: pre}] : [])];
+}
+
+/** 名前の字が同じくらいか（3字からは1字ちがいまで） */
+const nearName = (a: string, b: string) => a.length >= 2 && b.length >= 2 && editDistance(a, b) <= (Math.min(a.length, b.length) >= 3 ? 1 : 0);
+/** カタカナ（フリガナ）の多い字か */
+const kanaLike = (s: string) => cleanKana(s).replace(/　/g, '').length >= Math.max(2, s.replace(/\s/g, '').length * 0.5);
+
+/** 〒の行：郵便番号（電話番号の一部でない 3けた-4けた）のうしろに住所の字 */
+const ZIP_ROW = new RegExp(`${ZIP.source}.*[${CJK}]`);
+
+/** 上の欄の行：1行目・部署・〒・2つめの氏名（とその名前の語）・フリガナ */
+type TopRows = {name1?: SoftRow; name1Words: OcrWord[]; busho?: SoftRow; zipRow?: SoftRow; name2?: SoftRow; name2Words: OcrWord[]; kanaRow?: SoftRow};
+
+/**
+ * 上の欄の行を見分ける。2つめの氏名は、部署の行より下・〒の行より上で、1行目の名前と同じ（1字ちがいまで）行、
+ * なければ「様」のある行、なければ〒のすぐ上の行（右にボタン「レンタル納品」など・ご本人の欄があっても、左の名前だけを見る）
+ */
+function topRows(rows: SoftRow[]): TopRows {
+  const name1 = rows.find((r) => BIRTH.test(r.sq));
+  const name1Words = name1 ? leadNameWords(name1, leftOfBirth(name1)) : [];
+  const i1 = name1 ? rows.indexOf(name1) : -1;
+  // 部署の行：1行目のすぐ下（1行目が読めなければ上の方）
+  const busho = rows.slice(i1 + 1, i1 + (i1 < 0 ? 5 : 3)).find((r) => /営業所/.test(r.sq) || findLabel(r.sq, '部署', 0) !== null);
+  const above = busho ?? name1;
+  const zipRow = rows.find((r) => r !== name1 && r !== busho && (!above || r.y0 > above.y0) && ZIP_ROW.test(r.sq) && !/電話|Tel|TEL/.test(r.sq.slice(0, 6)));
+  const name1Flat = name1Words.map((w) => w.text).join('');
+  const cands = rows
+    .filter((r) => r !== name1 && r !== busho && !BIRTH.test(r.sq) && (!above || r.y0 > above.y0 + above.h * 0.5) && (!zipRow || r.y0 < zipRow.y0))
+    .slice(0, zipRow ? undefined : 4)
+    .map((r) => {
+      const ws = leadNameWords(r);
+      return {r, ws, flat: ws.map((w) => w.text).join('')};
+    })
+    .filter((c) => c.flat.length >= 2 && c.flat.length <= 10 && !kanaLike(c.flat));
+  const pick = cands.find((c) => name1Flat && nearName(c.flat, name1Flat)) ?? cands.find((c) => /様/.test(c.r.sq)) ?? (zipRow ? cands[cands.length - 1] : undefined);
+  const name2 = pick?.r;
+  // フリガナの行：上の行と2つめの氏名の間の、カタカナの多い行
+  const kanaRow = name2 ? rows.find((r) => r !== name1 && r !== busho && r.y1 <= name2.y0 + name2.h * 0.3 && (!above || r.y0 >= above.y1 - above.h * 0.3) && kanaLike(r.text)) : undefined;
+  return {name1, name1Words, busho, zipRow, name2, name2Words: pick?.ws ?? [], kanaRow};
+}
+
 /** 今日の満年齢 */
 function ageOn(birthIso: string, today: string): number | null {
   const b = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birthIso);
@@ -327,14 +457,19 @@ const OTHER_LABELS = ['受注情報', '受注残', '入金情報', '長期滞納
 
 type InfoKind = 'kyotaku' | 'nintei' | 'hokensha' | 'kyufu' | 'tel';
 
-/** 給付情報の種類（少しの読み違いは許す） */
+/**
+ * 給付情報の種類（少しの読み違いは許す）。「高額所得対象２割」は2割負担・「高額所得対象３割」は3割負担（ユーザーの指示「高額所得対象2割の場合は、2割負担
+ * 高額所得対象３割の場合は、３割負担として認識する」2026-10-23。前の画面の「高額２割」「高額３割」も同じ）。「N割」の数字を一番の手がかりにして、
+ * 「高額」「所得」「対象」の字が読み違えられても割合は取る（「割」が読めなければ、それらの字のすぐうしろの数字）。たしか：「高額」か「所得対象」と「N割」が続けて読めたとき
+ */
 function kindOf(sq: string): {kind: SoftKind; exact: boolean} {
-  const high = /高.{0,2}?([23２３])割/.exec(sq);
-  if (high) return {kind: high[1] === '2' || high[1] === '２' ? '高額２割' : '高額３割', exact: /高額[23]割/.test(sq)};
+  const high = /([23])[割剖]/.exec(sq) ?? /(?:高額|所得|対象).{0,4}?([23])(?!\d)/.exec(sq);
+  if (high) return {kind: high[1] === '2' ? '高額２割' : '高額３割', exact: /(?:高額|所得対象)[23]割/.test(sq)};
   const single = findLabel(sq, '保険単独');
   if (single) return {kind: '保険単独', exact: single.dist === 0};
   if (/生保/.test(sq)) return {kind: '生保', exact: true};
   if (/[牛主]保/.test(sq) && !/保険/.test(sq.replace(/保険給付率?/, ''))) return {kind: '生保', exact: false};
+  if (/(?<!\d)1[割剖]/.test(sq)) return {kind: '保険単独', exact: false};
   return {kind: '', exact: false};
 }
 
@@ -347,9 +482,9 @@ function infoScore(r: SoftRow, kind: InfoKind): number {
     case 'nintei':
       return lab('認定情報') + lab('認定期間') + (CARE.test(r.sq) ? 2 : 0) + ((r.sq.match(DATE_G) ?? []).length ? 1 : 0);
     case 'hokensha':
-      return lab('保険者情報') + lab('被保険者番号') + (insurerOfName(r.sq).insurer ? 2 : 0) + (/(?<!\d)\d{10}(?!\d)/.test(r.sq) ? 1 : 0);
+      return lab('保険者情報') + lab('被保険者番号') + (insurerFuzzy(r.sq).insurer ? 2 : 0) + (/(?<!\d)\d{10}(?!\d)/.test(r.sq) ? 1 : 0);
     case 'kyufu':
-      return lab('給付情報') + lab('保険給付率') + (kindOf(r.sq).kind ? 2 : 0) + (/[1-9]0%/.test(r.sq) ? 1 : 0);
+      return lab('給付情報') + lab('保険給付率') + (kindOf(r.sq).kind ? 2 : 0) + (RATE.test(r.sq) ? 1 : 0);
     case 'tel':
       return lab('電話番号') + lab('携帯電話') + (/^Te[lI1]/i.test(r.sq) ? 1 : 0) + (/(?<!\d)0\d{9,10}(?!\d)/.test(r.sq.replace(/-/g, '')) ? 1 : 0);
   }
@@ -360,7 +495,9 @@ const SCORE_LABELS = [...INFO_LABELS.filter((l) => l !== '被保険者番号'), 
 /** 介護ソフトの画面らしさ：線で区切った行などのラベルがいくつ見つかったか */
 export function softScore(rows: SoftRow[]): number {
   const all = rows.map((r) => r.sq);
-  return SCORE_LABELS.filter((l) => all.some((sq) => findLabel(sq, l))).length;
+  // 上の欄だけのスクリーンショット（ラベルの少ない所）も：1行目の「…日生84歳」（保険証にはない形）は2つ分
+  const top = all.some((sq) => /日生\d{1,3}歳/.test(sq)) ? 2 : 0;
+  return SCORE_LABELS.filter((l) => all.some((sq) => findLabel(sq, l))).length + top;
 }
 
 // ---------------------------------------------------------------- 取り出す
@@ -391,6 +528,130 @@ function insurerFuzzy(sq: string): {insurer: CardInsurer; name: string; exact: b
   return {insurer: '', name: '', exact: false};
 }
 
+/** 行の sq の範囲 [from, to) にかかる語（はみ出す語は、その中の字だけ）と、その sq の位置 */
+function wordsIn(r: SoftRow, from: number, to: number): {w: OcrWord; s: number; e: number; t: string}[] {
+  const out: {w: OcrWord; s: number; e: number; t: string}[] = [];
+  let p = 0;
+  for (const w of r.words) {
+    const t = fixSoft(w.text).replace(/\s/g, '');
+    const [s, e] = [p, p + t.length];
+    p = e;
+    const [a, b] = [Math.max(s, from), Math.min(e, to, r.sq.length)];
+    if (b > a) out.push({w, s: a, e: b, t: t.slice(a - s, b - s)});
+  }
+  return out;
+}
+
+/** 事業所の名前の終わりの言葉（このうしろに支店の名前が続くときは全角の空白を入れる） */
+const OFFICE_BREAK = /(サービス|センター|ステーション|事業所|ケアプラン)$/;
+const OFFICE_WORD = /サービス|センター|ステーション|事業所|ケアプラン|支援|介護/;
+const hasCjk = (s: string) => new RegExp(`[${CJK}]`).test(s);
+/** ケアマネジャーの姓・名らしい字（漢字だけ1〜4字。事業所の名前の終わりの言葉でない） */
+const kanjiName = (t: string) => /^[一-鿿々〆ヶ]{1,4}$/.test(t) && !OFFICE_END.test(t);
+
+/**
+ * 居宅情報の行から、事業所（理由書の作成者の所属事業所）とケアマネジャー（理由書の作成者）を分ける（telAt：居宅の電話の始まり＝sq の位置）。
+ * 欄の形：「居宅情報」「居宅」か「委託先居宅」（小さなラベル）・事業所の名前（うしろに支店の名前のこともある）・姓・名・「Tel」・電話。
+ * ユーザーの例の形「居宅 ○○介護保険サービス　○○（支店） 姓　名 Tel …」では、事業所は「○○介護保険サービス　○○」、ケアマネジャーは「姓　名」（2026-10-23）
+ */
+function kyotakuParts(kyo: SoftRow, telAt: number): {office: string; manager: string; officeUnsure: boolean; managerUnsure: boolean} {
+  // ラベル：「居宅情報」（読めなければ、はじめの6字の中の「報」まで）と「委託先居宅」
+  const reportAt = kyo.sq.slice(0, 6).indexOf('報');
+  const head = findLabel(kyo.sq, '居宅情報') ?? (reportAt >= 0 ? {start: 0, end: reportAt + 1, dist: 9} : null);
+  const inner = findLabel(kyo.sq, '委託先居宅');
+  const from = Math.max(head?.end ?? 0, inner?.end ?? 0);
+  let officeUnsure = false;
+  // 語ごとに：ラベルのうしろの最初のかたまり（大きなすき間までの語）が小さなラベル（居宅・委託先居宅。小さな字・自信の低いごみ・「先」のある短い字）なら除く。
+  // うしろの「Tel」のラベル・ごみも除く
+  const ws = wordsIn(kyo, from, telAt);
+  const firstGap = ws.findIndex((x, i) => i > 0 && x.w.x0 - ws[i - 1].w.x1 >= kyo.h * 0.7);
+  if (firstGap > 0) {
+    const seg = ws.slice(0, firstGap);
+    const t = seg.map((x) => x.t).join('');
+    const tiny = seg.every((x) => smallWord(x.w, kyo.h) || lowConf(x.w) || !hasCjk(x.t));
+    if (t.replace(new RegExp(`[^${CJK}]`, 'g'), '').length <= 5 && (tiny || /先/.test(t) || findLabel(t, '居宅', 1) || findLabel(t, '委託先居宅'))) ws.splice(0, firstGap);
+  }
+  while (ws.length && (smallWord(ws[0].w, kyo.h) || !hasCjk(ws[0].t))) ws.shift();
+  while (ws.length && (smallWord(ws[ws.length - 1].w, kyo.h) || !hasCjk(ws[ws.length - 1].t))) ws.pop();
+  let region = ws.length ? kyo.text.slice(textAt(kyo, ws[0].s), textEnd(kyo, ws[ws.length - 1].e)) : '';
+  region = region.replace(/[\sA-Za-z0-9:：.。、・,'"|]+$/, '').replace(new RegExp(`^[^${CJK}]+`), '');
+  // 語に分かれずに残ったラベルの読み違い：「委託先居宅」（放先局・計旗先居宅 など。「先」とそのあとの2字まで）、「居宅」（居才 など。うしろが「介護」の居宅介護支援… は事業所の名前）、
+  // 数字・英字のまじったごみ（品5 など）
+  const cut = (n: number) => {
+    let seen = 0;
+    let i = 0;
+    while (i < region.length && seen < n) {
+      if (!/\s/.test(region[i])) seen++;
+      i++;
+    }
+    region = region.slice(i).replace(/^\s+/, '');
+  };
+  const flat = () => region.replace(/\s/g, '');
+  const sen = inner ? null : /^[^\t]{0,3}?先[居局語記詞導宅字宇上計言證証天]{0,2}/.exec(region.replace(/ /g, ''));
+  if (sen) {
+    cut(sen[0].length);
+    officeUnsure = true;
+  }
+  const kyoLabel = /^居([宅才老室窄字守宇定它毛モ七])(?!介護|支援)(?=.)/.exec(flat());
+  if (kyoLabel) {
+    cut(2);
+    if (kyoLabel[1] !== '宅') officeUnsure = true;
+  }
+  const junk = new RegExp(`^[${CJK}]{0,2}[0-9A-Za-z]+(?=[${CJK}])`).exec(flat());
+  if (junk) {
+    cut(junk[0].length);
+    officeUnsure = true;
+  }
+  const tokens = region
+    .split(/\s+/)
+    .map((t) => t.replace(new RegExp(`[^${CJK}A-Za-z0-9・()]`, 'g'), ''))
+    .filter(hasCjk);
+  // ケアマネジャー：うしろから漢字だけの語を2つまで（姓・名。あわせて6字まで）。支店の名前とくっついた姓（おばせ高崎）は分ける
+  const tail: string[] = [];
+  let k = tokens.length;
+  while (k > 0 && tail.length < 2) {
+    const t = tokens[k - 1];
+    if (kanjiName(t) && tail.join('').length + t.length <= 6) {
+      tail.unshift(t);
+      k--;
+      continue;
+    }
+    const glued = /^(.*[ぁ-ゖァ-ヺー])([一-鿿々]{1,4})$/.exec(t);
+    if (glued && tail.length === 1) {
+      tokens[k - 1] = glued[1];
+      tail.unshift(glued[2]);
+    }
+    break;
+  }
+  let manager = '';
+  let managerUnsure = false;
+  if (tail.length === 2 && k > 0) manager = tail.join('　');
+  else if (tail.length === 2) {
+    // 漢字の語が2つだけ：前が事業所、うしろが名前（どちらか分からないので確かめる）
+    manager = tail[1];
+    k = 1;
+    managerUnsure = true;
+  } else if (tail.length === 1 && k > 0 && (tail[0].length >= 3 || !kanjiName(tokens[k - 1]))) {
+    manager = tail[0];
+    managerUnsure = true;
+  } else k += tail.length;
+  // 事業所：語をつなぐ。事業所の名前の終わりの言葉のうしろに支店の名前（事業所の言葉のない短い語）が続くときだけ全角の空白
+  const rest = tokens.slice(0, k);
+  let office = rest.map((t, i) => (i && OFFICE_BREAK.test(rest[i - 1]) && !OFFICE_WORD.test(t) && !/^[ァ-ヺー]/.test(t) && t.length <= 8 ? '　' : '') + t).join('');
+  // 区切りなしで読めたとき：事業所の名前と名前がくっついている（…サービスおばせ高崎博幸）なら、うしろのかな・漢字の切れ目で名前を分ける
+  if (!manager && tail.length === 0) {
+    const m = new RegExp(`^(.*[ぁ-ゖァ-ヺー])([一-鿿々]{3,6})$`).exec(office) ?? new RegExp(`^(.*(?:センター|事業所|ステーション|ケアプラン|支援室|相談所|サービス|苑|園))([${CJK}]{2,6})$`).exec(office);
+    if (m && m[1].length >= 3) {
+      office = m[1];
+      manager = m[2];
+      managerUnsure = true;
+    }
+  }
+  // 支店の名前（ひらがな）がくっついて読めたとき（…サービスおばせ）も、事業所の名前の終わりの言葉のうしろに全角の空白
+  office = office.replace(/(サービス|センター|ステーション|事業所|ケアプラン(?!センター))(?=[ぁ-ゖ][^　]*$)/, (w, _x, at: number, all: string) => (OFFICE_WORD.test(all.slice(at + w.length)) ? w : `${w}　`));
+  return {office, manager, officeUnsure, managerUnsure};
+}
+
 /** 1回読んだ画面（1ページ）から項目を取り出す。today：年齢の確かめに使う日 'YYYY-MM-DD' */
 export function parseSoftPage(page: OcrPage, today: string): SoftRead {
   const rows = softRows(page);
@@ -399,8 +660,9 @@ export function parseSoftPage(page: OcrPage, today: string): SoftRead {
   const spots: Partial<Record<SoftSpot, Box>> = {};
   const used = new Set<SoftRow>();
 
-  // 1行目：氏名 様 生年月日生 年齢歳 性別
-  const name1 = rows.find((r) => BIRTH.test(r.sq));
+  // 上の欄の行：1行目（氏名 様 生年月日生 年齢歳 性別）・部署・フリガナ・2つめの氏名・〒
+  const top = topRows(rows);
+  const {name1, busho, zipRow, name2, kanaRow} = top;
   let names: {name: string; clean: boolean}[] = [];
   if (name1) {
     used.add(name1);
@@ -413,18 +675,12 @@ export function parseSoftPage(page: OcrPage, today: string): SoftRead {
     if (g) info.gender = g[1] as '男' | '女';
     const ageAt = after.search(/歳/);
     spots.birth = spanBox(name1, m.index, m.index + m[0].length + (ageAt >= 0 ? ageAt + 1 : 0));
-    // 名前：生年月日より左の語（生年月日と同じ語に読めた名前の字も。「様」から右は除く）
-    const bi = wordAt(name1, m.index);
-    const bt = fixSoft(name1.words[bi].text);
-    const pre = bt.slice(0, Math.max(0, bt.search(/明治|大正|昭和|平成/)));
-    const left = [...name1.words.slice(0, bi), ...(pre ? [{...name1.words[bi], text: pre}] : [])];
-    const n = nameOfWords(left.map((w) => ({...w, text: fixSoft(w.text).replace(/様.*$/, '')})).filter((w) => w.text.trim()), name1.h);
+    // 名前：生年月日より左の語（小さな「様」とその読み違いは除く）
+    const n = nameOfWords(top.name1Words, name1.h);
     if (n.name) names.push(n);
   }
 
-  // 部署の行（営業所の名前・営業の担当）：1行目のすぐ下（1行目が読めなければ上の方）
-  const i1 = name1 ? rows.indexOf(name1) : -1;
-  const busho = rows.slice(i1 + 1, i1 + (i1 < 0 ? 5 : 3)).find((r) => /営業所/.test(r.sq) || findLabel(r.sq, '部署', 0) !== null);
+  // 部署の行（営業所の名前・営業の担当）
   if (busho) {
     used.add(busho);
     const label = /営業(?!所)/g;
@@ -445,33 +701,32 @@ export function parseSoftPage(page: OcrPage, today: string): SoftRead {
     }
   }
 
-  // 2つめの氏名（フリガナの下。「様」で終わる）と、その上のフリガナの行
-  const name2 = rows.find((r) => !used.has(r) && (!name1 || r.y0 > name1.y0) && /様$/.test(r.sq) && !BIRTH.test(r.sq) && r.sq.length <= 14);
+  // 2つめの氏名（フリガナの下。右にボタン・ご本人の欄があっても、左の名前だけ）と、その上のフリガナの行
   if (name2) {
     used.add(name2);
-    const n = nameOfWords(name2.words.map((w) => ({...w, text: fixSoft(w.text).replace(/様.*$/, '')})), name2.h);
+    const n = nameOfWords(top.name2Words, name2.h);
     if (n.name) names.push(n);
-    const above = rows.filter((r) => !used.has(r) && r.y1 <= name2.y0 + name2.h * 0.3 && (!busho || r.y0 >= busho.y1 - busho.h * 0.3) && (!name1 || r.y0 >= name1.y1 - name1.h * 0.3));
-    const kanaRow = above.find((r) => cleanKana(r.text).replace(/　/g, '').length >= 2);
-    if (kanaRow) {
-      used.add(kanaRow);
-      info.kana = cleanKana(kanaRow.text);
-    }
   }
-  // 氏名：2つ読めて同じならたしか。ちがえば大きい方（フリガナの下）で、たしかでない
+  if (kanaRow) {
+    used.add(kanaRow);
+    info.kana = cleanKana(kanaRow.text);
+  }
+  // 氏名：2つ読めて同じならたしか。片方のうしろに1字多い（「様」の読み違い）ときは短い方。ほかにちがえば大きい方（フリガナの下）で、たしかでない
   names = names.filter((n) => n.name.replace(/　/g, '').length >= 2);
   if (names.length) {
+    const flatOf = (n: {name: string}) => n.name.replace(/　/g, '');
+    const [a, b] = names.length === 2 ? [...names].sort((x, y) => flatOf(x).length - flatOf(y).length) : [names[0], names[0]];
+    if (names.length === 2 && flatOf(b).length === flatOf(a).length + 1 && flatOf(b).startsWith(flatOf(a)) && SAMA_LIKE.test(flatOf(b).slice(-1))) names = [a];
     const spaced = names.find((n) => n.name.includes('　'));
-    const flat = new Set(names.map((n) => n.name.replace(/　/g, '')));
+    const flat = new Set(names.map(flatOf));
     const pick = names[names.length - 1];
-    info.name = spaced && spaced.name.replace(/　/g, '') === pick.name.replace(/　/g, '') ? spaced.name : pick.name;
+    info.name = spaced && flatOf(spaced) === flatOf(pick) ? spaced.name : pick.name;
     if (flat.size > 1 || !names.every((n) => n.clean)) unsure.add('name');
   }
   // 全体を読んだときのフリガナは字が小さくて読み違いが多いので、いつも確かめてもらう（切り出して読み直したものは parseSoft で）
   if (info.kana) unsure.add('kana');
 
   // 〒 郵便番号 住所（地図のボタンが字に読めたもの・欄の切れ目のうしろの短いごみは除く）
-  const zipRow = rows.find((r) => !used.has(r) && ZIP.test(r.sq) && new RegExp(`\\d{4}.*[${CJK}]`).test(r.sq) && !/電話|Tel|TEL/.test(r.sq.slice(0, 6)));
   if (zipRow) {
     used.add(zipRow);
     const m = ZIP.exec(zipRow.sq)!;
@@ -502,6 +757,28 @@ export function parseSoftPage(page: OcrPage, today: string): SoftRead {
   cands.sort((a, b) => b.s - a.s);
   const got = new Map<InfoKind, SoftRow>();
   for (const c of cands) if (!got.has(c.k) && ![...got.values()].includes(c.r)) got.set(c.k, c.r);
+  // ラベルが読めずに点の足りない行は、線で区切った行の順番（居宅情報・認定情報・保険者情報・給付情報）で、見つかった行のとなりから
+  // （小さな灰色のラベルが読めず、苅田町も別の字に読めると、番号だけでは点が足りなかった。2026-10-23）
+  const ORDER: InfoKind[] = ['kyotaku', 'nintei', 'hokensha', 'kyufu'];
+  for (let round = 0; round < ORDER.length; round++)
+    for (const [p, k] of ORDER.entries()) {
+      if (got.has(k)) continue;
+      for (const [q, f] of ORDER.entries()) {
+        const fr = got.get(f);
+        const r = fr ? rows[rows.indexOf(fr) + p - q] : undefined;
+        if (r && rest.includes(r) && ![...got.values()].includes(r) && infoScore(r, k) >= 1) {
+          got.set(k, r);
+          break;
+        }
+      }
+    }
+  // 電話番号の行：「Tel」「電話番号」の小さなラベルが読めなくても、〒の行（なければ2つめの氏名）より下・線で区切った行より上の、電話番号の形のある行
+  if (!got.has('tel')) {
+    const firstInfo = Math.min(Infinity, ...[...got.values()].map((r) => r.y0));
+    const after = zipRow ?? name2;
+    const r = rest.find((x) => ![...got.values()].includes(x) && (!after || x.y0 > after.y0) && x.y1 <= firstInfo && new RegExp(PHONE_G.source).test(x.sq) && !/[年月日]/.test(x.sq));
+    if (r) got.set('tel', r);
+  }
 
   const tel = got.get('tel');
   if (tel) {
@@ -522,58 +799,11 @@ export function parseSoftPage(page: OcrPage, today: string): SoftRead {
       if (!phoneOk(info.officeTel)) unsure.add('officeTel');
       spots.officeTel = spanBox(kyo, telAt.index!, telAt.index! + telAt[0].length);
     }
-    const head = findLabel(kyo.sq, '居宅情報');
-    const inner = findLabel(kyo.sq, '委託先居宅');
-    const ends = [head, inner].filter((x): x is NonNullable<typeof x> => !!x).map((l) => l.end);
-    const from = ends.length ? textEnd(kyo, Math.max(...ends)) : 0;
-    let region = kyo.text.slice(from, telAt ? textAt(kyo, telAt.index!) : kyo.text.length);
-    // 「Tel」のラベル（読み違えて rs・ra・Te1 など）と、まわりのごみ
-    region = region.replace(/[\sA-Za-z0-9:：.。、・,'"|]+$/, '').replace(new RegExp(`^[^${CJK}]+`), '');
-    // 「委託先居宅」のラベルが読めなかったとき（放先局・計旗先居宅 などに読めた）：「先」とそのあとの2字までがラベル
-    if (!inner) {
-      const lab = /^[^\t]{0,3}?先[居局語記詞導宅字宇上計言證証]{0,2}/.exec(region.replace(/ /g, ''));
-      if (lab) {
-        let n = 0;
-        let cut = 0;
-        while (cut < region.length && n < lab[0].length) {
-          if (region[cut] !== ' ') n++;
-          cut++;
-        }
-        region = region.slice(cut).replace(/^\s+/, '');
-        unsure.add('office');
-      }
-    }
-    const cells = region
-      .split('\t')
-      .map((c) => c.trim())
-      .filter(Boolean);
-    let office = region;
-    let manager = '';
-    const last = cells.length >= 2 ? nameOfText(cells[cells.length - 1]) : null;
-    if (last && last.name && PERSON.test(last.name.replace(/　/g, '')) && !OFFICE_END.test(last.name)) {
-      manager = last.name;
-      office = cells.slice(0, -1).join(' ');
-    } else {
-      // 欄の切れ目がないとき：事業所の名前の終わりの言葉（センター・事業所…）のうしろが名前
-      const tokens = region.split(/\s+/).filter(Boolean);
-      const at = tokens.map((t) => OFFICE_END.test(t)).lastIndexOf(true);
-      if (at >= 0 && at < tokens.length - 1) {
-        office = tokens.slice(0, at + 1).join(' ');
-        manager = nameOfText(tokens.slice(at + 1).join(' ')).name;
-      } else {
-        const flat = region.replace(/\s+/g, '');
-        const m = new RegExp(`^(.*(?:センター|事業所|ステーション|ケアプラン|支援室|相談所|サービス|苑|園))([${CJK}]{2,6})$`).exec(flat);
-        if (m) {
-          office = m[1];
-          manager = m[2];
-          unsure.add('manager');
-        }
-      }
-    }
-    info.office = office.replace(/\s+/g, '');
-    info.manager = manager;
-    if (!info.office || info.office.length < 3 || new RegExp(`[^${CJK}A-Za-z0-9・()]`).test(info.office)) unsure.add('office');
-    if (info.manager && (info.manager.split('　').length !== 2 || !PERSON.test(info.manager.replace(/　/g, '')))) unsure.add('manager');
+    const parts = kyotakuParts(kyo, telAt ? telAt.index! : kyo.sq.length);
+    info.office = parts.office;
+    info.manager = parts.manager;
+    if (parts.officeUnsure || !info.office || info.office.length < 3 || new RegExp(`[^${CJK}A-Za-z0-9・()　]`).test(info.office)) unsure.add('office');
+    if (info.manager && (parts.managerUnsure || info.manager.split('　').length !== 2 || !PERSON.test(info.manager.replace(/　/g, '')))) unsure.add('manager');
   }
 
   const nin = got.get('nintei');
@@ -645,7 +875,8 @@ export function parseSoftPage(page: OcrPage, today: string): SoftRead {
   return {info, unsure: (Object.keys(info) as SoftKey[]).filter((k) => unsure.has(k) && info[k]), score: softScore(rows), spots};
 }
 
-const RATE = /([1-9]0)\d?%/;
+/** 保険給付率（「80%」の「%」が「96」に読めたときも） */
+const RATE = /([1-9]0)(?:\d?%|96(?!\d))/;
 
 /** 生年月日と年齢（「昭和17年5月6日生84歳」）：年齢が生年月日と合えばたしか */
 function birthOf(sq: string, today: string): {info: Pick<SoftInfo, 'era' | 'birthY' | 'birthM' | 'birthD' | 'age'>; sure: boolean} {
@@ -800,18 +1031,62 @@ export function parseSoft(pages: OcrPage[], today: string, extra: {kana?: {text:
  */
 export function kanaRect(page: OcrPage): Box | null {
   const rows = softRows(page);
-  const name1 = rows.findIndex((r) => BIRTH.test(r.sq));
-  const name2 = rows.findIndex((r, i) => i > name1 && /様$/.test(r.sq) && !BIRTH.test(r.sq) && r.sq.length <= 14);
-  if (name2 < 0) return null;
-  const n2 = rows[name2];
-  // 上の行：フリガナらしい行（2つめの氏名のすぐ上でカタカナの多い行）があればそのさらに上
-  let upper = name2 - 1;
-  while (upper >= 0 && upper > name1 && rows[upper].y0 > n2.y0 - n2.h * 2.2 && cleanKana(rows[upper].text).replace(/　/g, '').length >= Math.max(1, rows[upper].sq.length * 0.5)) upper--;
-  // 上下は、となりの行の字にかからないように（大きな氏名の字の頭が入ると読み違える）。左は欄の線が入らないように少しだけ
-  const top = upper >= 0 ? rows[upper].y1 + 1 : Math.max(0, n2.y0 - n2.h * 1.6);
-  const bottom = n2.y0 - 1;
-  if (bottom - top < n2.h * 0.3) return null;
-  return {x0: Math.max(0, n2.x0 - n2.h * 0.3), y0: top, x1: n2.x0 + Math.max((n2.x1 - n2.x0) * 1.6, n2.h * 14), y1: bottom};
+  const t = topRows(rows);
+  const ws = t.name2Words;
+  if (!t.name2 || ws.length === 0) return null;
+  // 2つめの氏名は名前の語だけで測る（右のボタン・ご本人の欄は入れない）
+  const n = {x0: Math.min(...ws.map((w) => w.x0)), y0: Math.min(...ws.map((w) => w.y0)), x1: Math.max(...ws.map((w) => w.x1)), h: Math.max(4, median(ws.map((w) => w.y1 - w.y0)))};
+  // 上の行（部署の行、なければ1行目）との間。フリガナの行が別の字に読めても（YYtト 名9 など）その行は入れる。上の行がなければ、フリガナらしい行のさらに上
+  const above = t.busho ?? t.name1;
+  let top: number;
+  if (above) top = Math.max(above.y1 + 1, n.y0 - n.h * 2.4);
+  else {
+    let upper = rows.indexOf(t.name2) - 1;
+    while (upper >= 0 && rows[upper].y0 > n.y0 - n.h * 2.2 && cleanKana(rows[upper].text).replace(/　/g, '').length >= Math.max(1, rows[upper].sq.length * 0.5)) upper--;
+    // 上下は、となりの行の字にかからないように（大きな氏名の字の頭が入ると読み違える）
+    top = upper >= 0 ? rows[upper].y1 + 1 : Math.max(0, n.y0 - n.h * 1.6);
+  }
+  const bottom = n.y0 - 1;
+  if (bottom - top < n.h * 0.3) return null;
+  return {x0: Math.max(0, n.x0 - n.h * 0.3), y0: top, x1: n.x0 + Math.max((n.x1 - n.x0) * 1.6, n.h * 14), y1: bottom};
+}
+
+/**
+ * 画面の字の行（上下の位置）を、画素の濃さから探す（読み取りに頼らないので、1回目に読めなかった行も切り出せる）。
+ * lum：明るさ（0〜255。1画素1つ。色の付いた所は白くしてあるもの）、w・h：画像の幅・高さ。
+ * 縦の線（欄の枠。高さの6割から濃い列）と横の線（幅の6割から濃い行）は字に数えない。濃い画素が3つからある行のつながりが字の行（すき間1画素はつなぐ、高さ3画素からの行）
+ */
+export function inkLines(lum: ArrayLike<number>, w: number, h: number, dark = 170): {y0: number; y1: number}[] {
+  const col = new Uint32Array(w);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (lum[y * w + x] < dark) col[x]++;
+  const rowCount = new Uint32Array(h);
+  for (let y = 0; y < h; y++) {
+    let n = 0;
+    for (let x = 0; x < w; x++) if (col[x] <= h * 0.6 && lum[y * w + x] < dark) n++;
+    rowCount[y] = n > w * 0.6 ? 0 : n;
+  }
+  const need = Math.max(3, Math.round(w * 0.003));
+  const runs: {y0: number; y1: number}[] = [];
+  for (let y = 0; y < h; y++) {
+    if (rowCount[y] < need) continue;
+    const last = runs[runs.length - 1];
+    if (last && y - last.y1 <= 2) last.y1 = y + 1;
+    else runs.push({y0: y, y1: y + 1});
+  }
+  // 高すぎる行（となりの行と字がふれてつながったもの）は、行の中ほどの一番うすい所で分ける
+  const split = (r: {y0: number; y1: number}, med: number): {y0: number; y1: number}[] => {
+    if (r.y1 - r.y0 < med * 1.6) return [r];
+    let at = -1;
+    let max = 0;
+    for (let y = r.y0; y < r.y1; y++) max = Math.max(max, rowCount[y]);
+    for (let y = r.y0 + Math.round(med * 0.5); y < r.y1 - Math.round(med * 0.5); y++) if (at < 0 || rowCount[y] < rowCount[at]) at = y;
+    if (at < 0 || rowCount[at] > max * 0.2) return [r];
+    return [...split({y0: r.y0, y1: at}, med), ...split({y0: at + 1, y1: r.y1}, med)];
+  };
+  const ok = runs.filter((r) => r.y1 - r.y0 >= 3);
+  const hs = ok.map((r) => r.y1 - r.y0).sort((a, b) => a - b);
+  const med = hs[Math.floor((hs.length - 1) / 2)] ?? 0; // 低い方のまんなか（つながった行は高い）
+  return ok.flatMap((r) => split(r, med)).filter((r) => r.y1 - r.y0 >= 3);
 }
 
 /**

@@ -2,6 +2,8 @@
 // 介護ソフトの画面か介護保険証かもここで決める：画面らしい平らな地の画像1枚だけ、まず介護ソフトの画面として読み、
 // 介護ソフトのラベル（認定情報・保険者情報・給付情報・委託先居宅 など）が見つからなければ、介護保険証として読む（cardOcr.ts）。
 // 画面の小さな字は大きくしてから読み、数字の欄は切り出して数字だけにしぼって、フリガナ（小さな半角カタカナ）は横に引きのばして読み直す。
+// 1回で読めない所があっても、画面を1行ずつ切り出して大きくして読み直し、まだ足りなければ下ごしらえを変えてもう1回読む（ユーザーの指示
+// 「読み取れない場合でも何度も繰り返し考える」2026-10-23）。色の付いた所（名前の右のボタン・タスクの緑の帯・カレンダーの赤や青の字）は白くしてから読む。
 // 取り出し方は careSoft.ts。tesseract.js の worker は ocrEngine.ts の withOcr で介護保険証・写真の日付と使い回す。画像・読んだ文字は保存せず、どこにも送らない
 
 import type {Worker} from 'tesseract.js';
@@ -9,8 +11,8 @@ import {softRead} from './cardApply.ts';
 import type {ReadResult} from './cardApply.ts';
 import {readCards} from './cardOcr.ts';
 import type {CardProgress} from './cardOcr.ts';
-import {kanaOfWords, kanaRect, mergeSoft, parseSoft, parseSoftPage, screenLike} from './careSoft.ts';
-import type {SoftSpot} from './careSoft.ts';
+import {blankSplit, inkLines, kanaOfWords, kanaRect, mergeSoft, parseSoft, parseSoftPage, screenLike} from './careSoft.ts';
+import type {SoftKey, SoftRead, SoftSpot} from './careSoft.ts';
 import type {OcrPage} from './hokensho.ts';
 import {withOcr} from './ocrEngine.ts';
 import {todayIso} from './util.ts';
@@ -27,6 +29,9 @@ const SPOT_CHARS: Record<SoftSpot, string> = {
   insuredNo: '0123456789',
   careTerm: '0123456789令和平成元年月日~-',
 };
+
+/** 色の付いた画素（赤・青・緑・紫・だいだい。字の黒・灰色・白はちがう） */
+const colorful = (r: number, g: number, b: number) => Math.max(r, g, b) - Math.min(r, g, b) > 60;
 
 const isPdf = (f: File) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
 /** やめるを押したか（押していたら、次の読み取りの前で止める。cardOcr.ts と同じ） */
@@ -54,9 +59,9 @@ async function canvasOfFile(file: Blob): Promise<HTMLCanvasElement> {
 
 /**
  * 読む画像を作る：rect の所（なければ全体）を、灰色にして scale 倍（横は sx 倍も）に大きくし、まわりに白い余白（pad）。
- * gamma：薄い灰色の小さなラベルを濃く
+ * 色の付いた所（ボタン・帯の地と白い字）は白くする（字は黒・灰色だけ）。gamma：薄い灰色の小さなラベルを濃く、binary：白黒の2色に
  */
-function prepared(src: HTMLCanvasElement, rect: Box | null, scale: number, opt: {gamma?: boolean; sx?: number; pad?: number} = {}): {canvas: HTMLCanvasElement; map: (x: number, y: number) => [number, number]} {
+function prepared(src: HTMLCanvasElement, rect: Box | null, scale: number, opt: {gamma?: boolean; sx?: number; pad?: number; binary?: boolean} = {}): {canvas: HTMLCanvasElement; map: (x: number, y: number) => [number, number]} {
   const r = rect ?? {x0: 0, y0: 0, x1: src.width, y1: src.height};
   const x0 = Math.max(0, Math.floor(r.x0));
   const y0 = Math.max(0, Math.floor(r.y0));
@@ -74,8 +79,9 @@ function prepared(src: HTMLCanvasElement, rect: Box | null, scale: number, opt: 
   ctx.drawImage(src, x0, y0, w, h, pad, pad, c.width - pad * 2, c.height - pad * 2);
   const d = ctx.getImageData(0, 0, c.width, c.height);
   for (let i = 0; i < d.data.length; i += 4) {
-    let y = 0.299 * d.data[i] + 0.587 * d.data[i + 1] + 0.114 * d.data[i + 2];
+    let y = colorful(d.data[i], d.data[i + 1], d.data[i + 2]) ? 255 : 0.299 * d.data[i] + 0.587 * d.data[i + 1] + 0.114 * d.data[i + 2];
     if (opt.gamma) y = 255 * Math.pow(Math.min(1, y / 235), 2.2);
+    if (opt.binary) y = y < 175 ? 0 : 255;
     d.data[i] = d.data[i + 1] = d.data[i + 2] = y;
   }
   ctx.putImageData(d, 0, 0);
@@ -109,6 +115,100 @@ function thumbOf(src: HTMLCanvasElement): string {
   return c.toDataURL('image/jpeg', 0.85);
 }
 
+/** 画像の明るさ（1画素1つ。色の付いた所は白） */
+function lumOf(src: HTMLCanvasElement): Uint8Array {
+  const g = prepared(src, null, 1);
+  const px = (g.canvas.getContext('2d', {willReadFrequently: true}) as CanvasRenderingContext2D).getImageData(0, 0, g.canvas.width, g.canvas.height).data;
+  const lum = new Uint8Array(px.length / 4);
+  for (let i = 0; i < lum.length; i++) lum[i] = px[i * 4];
+  return lum;
+}
+
+/** 足りない（読めない・たしかでない）と、もう1回読み直す項目 */
+const NEED: SoftKey[] = ['name', 'kana', 'era', 'birthY', 'zip', 'address', 'phone', 'office', 'manager', 'officeTel', 'care', 'careFrom', 'careTo', 'insurer', 'insuredNo', 'burden'];
+const lacking = (r: SoftRead) => NEED.filter((k) => !r.info[k] || r.unsure.includes(k));
+
+/**
+ * 画面を1行ずつ切り出して（画素の濃さで探した字の行）、大きくして読む。行の字の高さを h 画素ほどにする。読んだ語の位置はもとの画像の位置
+ */
+async function readLines(worker: Worker, src: HTMLCanvasElement, h: number, opt: {gamma?: boolean; binary?: boolean}, signal?: AbortSignal): Promise<OcrPage> {
+  const lum = lumOf(src);
+  const lines: OcrPage['lines'] = [];
+  const found = inkLines(lum, src.width, src.height);
+  for (const [i, l] of found.entries()) {
+    stopIf(signal);
+    const lh = l.y1 - l.y0;
+    const pad = Math.max(2, lh * 0.35);
+    // 上下の余白は、となりの行との間のまん中まで（となりの行の字の端が入ると、その字も読んでまざる）
+    const y0 = Math.max(l.y0 - pad, i ? (found[i - 1].y1 + l.y0) / 2 : 0);
+    const y1 = Math.min(l.y1 + pad, i + 1 < found.length ? (l.y1 + found[i + 1].y0) / 2 : src.height);
+    const r = await recognize(worker, prepared(src, {x0: 0, y0, x1: src.width, y1}, Math.min(6, Math.max(1, h / lh)), {...opt, pad: 12}), '7');
+    lines.push(...r.lines);
+  }
+  return {lines};
+}
+
+/**
+ * 画面の画像を、足りない所がなくなるまで（多くて5回）読む：全体を2回（ページの分け方を変えて）→ 1行ずつ大きくして → 数字の欄・フリガナを切り出して →
+ * まだ足りなければ、1行ずつを下ごしらえを変えて（濃さそのまま・白黒）もう2回まで。何回か読んだ結果は、項目ごとに同じ読みの多い方・たしかな方にまとめる（mergeSoft）。
+ * 介護ソフトのラベルが見つからないときは null（介護保険証として読む）
+ */
+export async function readSoftCanvas(worker: Worker, src: HTMLCanvasElement, today: string, onProgress: (p: CardProgress) => void = () => undefined, signal?: AbortSignal): Promise<{read: SoftRead; pages: OcrPage[]} | null> {
+  // 画面の字（9〜16px）は小さいので大きくして読む（長い辺 2400 画素・3倍まで。大きな画像＝保険証のスキャンなどは大きくしない）
+  const scale = Math.min(3, Math.max(1, 2400 / Math.max(src.width, src.height)));
+  stopIf(signal);
+  onProgress({step: '介護ソフトの画面か調べています', page: 1, pages: 1});
+  const a = await recognize(worker, prepared(src, null, scale, {gamma: true}), '6');
+  const first = parseSoftPage(a, today);
+  if (first.score < 2) return null;
+  stopIf(signal);
+  onProgress({step: '介護ソフトの画面を読んでいます', page: 1, pages: 1});
+  const pages: OcrPage[] = [a, await recognize(worker, prepared(src, null, scale), '4')];
+  onProgress({step: '1行ずつ読み直しています', page: 1, pages: 1});
+  pages.push(await readLines(worker, src, 44, {gamma: true}, signal));
+  // 数字の欄（生年月日・郵便番号・電話・番号・認定期間）を切り出して、数字だけにしぼって読み直す
+  const spots = mergeSoft(pages.map((p) => parseSoftPage(p, today))).spots ?? {};
+  const rereads: {spot: SoftSpot; text: string}[] = [];
+  for (const [spot, s] of Object.entries(spots) as [SoftSpot, Box][]) {
+    stopIf(signal);
+    const h = s.y1 - s.y0;
+    const rect = {x0: s.x0 - h * 0.5, y0: s.y0 - h * 0.3, x1: s.x1 + h * 0.5, y1: s.y1 + h * 0.3};
+    const r = await recognize(worker, prepared(src, rect, Math.min(6, Math.max(2, 48 / (rect.y1 - rect.y0))), {pad: 16}), '7', SPOT_CHARS[spot]);
+    rereads.push({spot, text: r.text});
+  }
+  // フリガナ（小さな半角カタカナ）：横に引きのばすと全角の字の形に近くなって読める。引きのばし方・大きさ・濃さを変えて何回か読み、一番多い読みを選ぶ（pickKana）
+  const kana: {text: string; conf: number}[] = [];
+  const kr = pages.map((p) => kanaRect(p)).find((x) => x);
+  // 姓と名の間は、画素で見た字のない所（読み取りの字の位置より確か）
+  const lum = kr ? lumOf(src) : null;
+  const splitX = kr && lum ? blankSplit(lum, src.width, kr) : null;
+  const readKana = async (ways: {sx: number; h: number; gamma?: boolean; any?: boolean}[]) => {
+    if (!kr) return;
+    const rect = {...kr, y0: kr.y0 - 2, y1: kr.y1 + 2};
+    for (const w of ways) {
+      stopIf(signal);
+      const r = await recognize(worker, prepared(src, rect, Math.min(8, Math.max(2, w.h / (rect.y1 - rect.y0))), {sx: w.sx, pad: 20, gamma: w.gamma}), '7', w.any ? '' : KATAKANA);
+      kana.push({text: kanaOfWords(r.lines.flatMap((l) => l.words), splitX), conf: r.conf ?? 0});
+    }
+  };
+  await readKana([{sx: 1.6, h: 44}, {sx: 1.6, h: 56}, {sx: 1.6, h: 72}, {sx: 2, h: 96, gamma: true}, {sx: 1.45, h: 56}, {sx: 1.6, h: 56, any: true}]);
+  let read = parseSoft(pages, today, {kana, rereads});
+  // 足りない所があれば、下ごしらえを変えてもう1回（2回まで）。フリガナもほかの大きさで
+  const more: {h: number; opt: {gamma?: boolean; binary?: boolean}}[] = [
+    {h: 60, opt: {}},
+    {h: 36, opt: {binary: true}},
+  ];
+  for (const [i, m] of more.entries()) {
+    if (lacking(read).length === 0) break;
+    stopIf(signal);
+    onProgress({step: `読めなかった所をもう一度読んでいます（${i + 2}回目）`, page: 1, pages: 1});
+    pages.push(await readLines(worker, src, m.h, m.opt, signal));
+    if (read.unsure.includes('kana') || !read.info.kana) await readKana(i === 0 ? [{sx: 1.8, h: 72}, {sx: 2, h: 56, gamma: true}] : [{sx: 1.6, h: 96}, {sx: 1.3, h: 64}]);
+    read = parseSoft(pages, today, {kana, rereads});
+  }
+  return {read, pages};
+}
+
 /**
  * 介護ソフトの画面のスクリーンショット1枚を読む。画面らしくない（写真など）・介護ソフトのラベルが見つからないときは null（介護保険証として読む）。
  * signal：やめる（次の読み取りの前で止める）
@@ -118,39 +218,9 @@ export async function readSoftScreen(file: File, onProgress: (p: CardProgress) =
   const ctx = src.getContext('2d', {willReadFrequently: true}) as CanvasRenderingContext2D;
   if (!screenLike(ctx.getImageData(0, 0, src.width, src.height).data)) return null;
   const today = todayIso();
-  // 画面の字（9〜16px）は小さいので大きくして読む（長い辺 2400 画素・3倍まで。大きな画像＝保険証のスキャンなどは大きくしない）
-  const scale = Math.min(3, Math.max(1, 2400 / Math.max(src.width, src.height)));
   return withOcr(async (worker) => {
-    stopIf(signal);
-    onProgress({step: '介護ソフトの画面か調べています', page: 1, pages: 1});
-    const a = await recognize(worker, prepared(src, null, scale, {gamma: true}), '6');
-    const first = parseSoftPage(a, today);
-    if (first.score < 2) return null;
-    stopIf(signal);
-    onProgress({step: '介護ソフトの画面を読んでいます', page: 1, pages: 1});
-    const b = await recognize(worker, prepared(src, null, scale), '4');
-    // 数字の欄（生年月日・郵便番号・電話・番号・認定期間）を切り出して、数字だけにしぼって読み直す
-    const spots = mergeSoft([first, parseSoftPage(b, today)]).spots ?? {};
-    const rereads: {spot: SoftSpot; text: string}[] = [];
-    for (const [spot, s] of Object.entries(spots) as [SoftSpot, Box][]) {
-      stopIf(signal);
-      const h = s.y1 - s.y0;
-      const rect = {x0: s.x0 - h * 0.5, y0: s.y0 - h * 0.3, x1: s.x1 + h * 0.5, y1: s.y1 + h * 0.3};
-      const r = await recognize(worker, prepared(src, rect, Math.min(6, Math.max(2, 48 / (rect.y1 - rect.y0))), {pad: 16}), '7', SPOT_CHARS[spot]);
-      rereads.push({spot, text: r.text});
-    }
-    // フリガナ（小さな半角カタカナ）：横に引きのばすと全角の字の形に近くなって読める。2つの引きのばし方で読み、同じならたしか
-    const kana: {text: string; conf: number}[] = [];
-    const kr = kanaRect(a) ?? kanaRect(b);
-    if (kr) {
-      const rect = {...kr, y0: kr.y0 - 2, y1: kr.y1 + 2};
-      for (const sx of [1.6, 1.45]) {
-        stopIf(signal);
-        const r = await recognize(worker, prepared(src, rect, Math.min(8, Math.max(2, 56 / (rect.y1 - rect.y0))), {sx, pad: 20}), '7', KATAKANA);
-        kana.push({text: kanaOfWords(r.lines.flatMap((l) => l.words)), conf: r.conf ?? 0});
-      }
-    }
-    return {read: softRead(parseSoft([a, b], today, {kana, rereads})), thumbs: [thumbOf(src)]};
+    const r = await readSoftCanvas(worker, src, today, onProgress, signal);
+    return r ? {read: softRead(r.read), thumbs: [thumbOf(src)]} : null;
   });
 }
 

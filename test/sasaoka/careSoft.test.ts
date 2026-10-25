@@ -2,13 +2,14 @@
 // 文字は読み取り（tesseract.js）の出力のまね。値はどれも架空（見本・0000。ユーザーにいただいた画面の値は使わない）
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {cleanKana, findLabel, kanaOfWords, kanaRect, mergeSoft, NO_SOFT, parseSoft, parseSoftPage, phoneText, pickKana, rereadInfo, screenLike, softRows, softScore} from '../../src/sasaoka/careSoft.ts';
+import {blankSplit, cleanKana, findLabel, inkLines, kanaOfWords, kanaRect, mergeSoft, NO_SOFT, parseSoft, parseSoftPage, phoneText, pickKana, rereadInfo, screenLike, softRows, softScore} from '../../src/sasaoka/careSoft.ts';
 import type {OcrPage, OcrWord} from '../../src/sasaoka/hokensho.ts';
 
 const TODAY = '2026-10-23';
 
 /**
- * 読み取りの1ページを作る：1行ずつ。語は空白（小さなすき間）、「 | 」は大きなすき間（欄の切れ目）、「·」はすき間なし（読み取りが語を分けただけ）
+ * 読み取りの1ページを作る：1行ずつ。語は空白（小さなすき間）、「 | 」は大きなすき間（欄の切れ目）、「·」はすき間なし（読み取りが語を分けただけ）。
+ * 語のうしろの「^8」はその語の字の高さ（小さなラベル。字の下はそろえる）、「@30」は読み取りの自信
  */
 function page(text: string, h = 14): OcrPage {
   const lines = text
@@ -22,10 +23,13 @@ function page(text: string, h = 14): OcrPage {
         if (j) x += h * 1.6;
         for (const [k, word] of cell.split(' ').filter(Boolean).entries()) {
           if (k) x += h * 0.6;
-          for (const [m, part] of word.split('·').entries()) {
+          for (const [m, raw] of word.split('·').entries()) {
             if (m) x += h * 0.05;
-            const w = [...part].length * h;
-            words.push({text: part, x0: x, y0, x1: x + w, y1: y0 + h});
+            const mark = /^(.*?)(?:\^(\d+))?(?:@(\d+))?$/.exec(raw)!;
+            const part = mark[1];
+            const wh = mark[2] ? Number(mark[2]) : h;
+            const w = [...part].length * wh;
+            words.push({text: part, x0: x, y0: y0 + h - wh, x1: x + w, y1: y0 + h, ...(mark[3] ? {conf: Number(mark[3])} : {})});
             x += w;
           }
         }
@@ -297,4 +301,116 @@ test('画面のスクリーンショットらしいか：地の色が平らな�
   let seed = 7;
   const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) * 255;
   assert.equal(screenLike(px(10000, (i) => [((i / 10000) * 200 + rnd() * 0.2) | 0, ((i / 10000) * 180 + 30) | 0, rnd() | 0])), false);
+});
+
+// ---------------------------------------------------------------- もう1つの形の画面（2026-10-23。値はどれも架空）
+
+// 2つめの画面の形をきれいに読めたとき：「様」は小さな灰色、居宅のラベルは「居宅」だけ、事業所の名前のうしろに支店の名前、給付情報は「高額所得対象２割」
+const GRAY = `
+見本 春子 | 様^7 | 昭和17年05月06日生 84歳 女
+部署^7 行橋営業所 行橋営業所 | 営業^7 見本 太郎
+ﾐﾎﾝ ﾊﾙｺ
+見本 春子 様^7 | レンタル納品 販売納品 請求書 領収書 | ご本人
+〒^7 800-0000 福岡県京都郡苅田町見本1丁目2-3
+Tel^7 電話番号^7 090-0000-1111 携帯電話^7
+メモ
+モニタリング | 前回実施^7 26/09 次回予定^7 無し 周期^7 12ヶ月ごと
+居宅情報 | 居宅^7 | 見本介護サービス みほん | 試験 一郎 Tel^7 0930-00-1111
+認定情報 | 要介護1 認定期間^7 | 令和07年11月01日 〜 令和08年10月31日
+保険者情報 | 苅田町 被保険者番号^7 0000001234
+給付情報 | 高額所得対象２割 保険給付率^7 80%
+`;
+
+test('もう1つの形の画面：小さな「様」・名前の右のボタン・居宅のラベル・事業所の支店の名前・高額所得対象２割', () => {
+  const r = parseSoftPage(page(GRAY), TODAY);
+  const i = r.info;
+  assert.deepEqual(
+    [i.name, i.kana, i.staff, i.zip, i.address, i.phone, i.office, i.manager, i.officeTel, i.care, i.careFrom, i.careTo, i.insurer, i.insuredNo, i.kind, i.burden, i.welfare],
+    ['見本　春子', 'ミホン　ハルコ', '見本　太郎', '800-0000', '福岡県京都郡苅田町見本1丁目2-3', '090-0000-1111', '見本介護サービス　みほん', '試験　一郎', '0930-00-1111', '要介護1', '2025-11-01', '2026-10-31', 'kanda', '0000001234', '高額２割', '2', 'no'],
+  );
+  assert.deepEqual(r.unsure, ['kana']);
+  // フリガナの切り出し：名前の右のボタン・ご本人の欄は入れない
+  const rect = kanaRect(page(GRAY))!;
+  assert.ok(rect && rect.x1 < 14 * 30, JSON.stringify(rect));
+});
+
+test('高額所得対象３割は3割負担、２割は2割負担。「割」が読めなくても「対象」のうしろの数字、「%」が「96」に読めても', () => {
+  const kyufu = (line: string) => parseSoftPage(page(`保険者情報 | 苅田町 被保険者番号 0000001234\n${line}`), TODAY).info;
+  assert.deepEqual((({kind, burden, rate}) => [kind, burden, rate])(kyufu('給付情報 | 高額所得対象３割 保険給付率 70%')), ['高額３割', '3', '70']);
+  assert.deepEqual((({kind, burden, rate}) => [kind, burden, rate])(kyufu('給付情報 | 高額所得対象2割 保険給付率 80%')), ['高額２割', '2', '80']);
+  assert.deepEqual((({kind, burden, rate}) => [kind, burden, rate])(kyufu('給付情報 | 高額所答対象2天 タめそ粗 8096')), ['高額２割', '2', '80']);
+  const unsure = parseSoftPage(page('給付情報 | 高額所答対象2天 保険給付率 80%'), TODAY);
+  assert.equal(unsure.unsure.includes('burden'), false); // 割合は給付率と合う
+});
+
+test('「様」の読み違い（栓・疹）は名前に入れない。名前の右のボタンがあっても2つめの氏名とフリガナの行が分かる', () => {
+  const r = parseSoftPage(page('見本 春子 | 栓 | 昭和17年05月06日生 84歳 女\n部署 行橋営業所 | 営業 見本 太郎\nﾐﾎﾝ ﾊﾙｺ\n見本 春子 疹 | レンタル納品 販売納品 | ご本人\n〒 800-0000 福岡県京都郡苅田町見本1丁目2-3'), TODAY);
+  assert.deepEqual([r.info.name, r.info.kana], ['見本　春子', 'ミホン　ハルコ']);
+  assert.ok(!r.unsure.includes('name'));
+  // 「様」がなくても、1行目と同じ名前の行が2つめの氏名（フリガナが別の字に読めても切り出せる）
+  const p = page('見本 春子 | 様 | 昭和17年05月06日生 84歳 女\n部署 行橋営業所 | 営業 見本 太郎\nYYtト 名9\n見本 春子\n〒 800-0000 福岡県京都郡苅田町見本1丁目2-3');
+  assert.ok(kanaRect(p));
+});
+
+test('居宅情報：「居宅」のラベル（小さな字・自信の低い読み違い・くっついた「居才」）は事業所に入れない。ケアマネジャーは最後の2つの語', () => {
+  const kyo = (line: string) => (({office, manager}) => ({office, manager}))(parseSoftPage(page(line), TODAY).info);
+  assert.deepEqual(kyo('居宅情報 | 提^7 も@30 | 見本介護サービス みほん | 試験 一郎 Tel^7 0930-00-1111'), {office: '見本介護サービス　みほん', manager: '試験　一郎'});
+  assert.deepEqual(kyo('居宅情報 | 居才見本介護サービスみほん 試験 一郎 | 0930-00-1111'), {office: '見本介護サービス　みほん', manager: '試験　一郎'});
+  assert.deepEqual(kyo('居宅情報 | 品5見本介護サービス | みほん 試験 一郎 | 0930-00-1111'), {office: '見本介護サービス　みほん', manager: '試験　一郎'});
+  // 支店の名前と姓がくっついて読めても
+  assert.deepEqual(kyo('居宅情報 | 居宅 | 見本介護サービス みほん試験 一郎 | 0930-00-1111'), {office: '見本介護サービス　みほん', manager: '試験　一郎'});
+  // 「居宅介護支援…」は事業所の名前（ラベルではない）
+  assert.deepEqual(kyo('居宅情報 | 居宅介護支援事業所見本 | 試験 花子 | 0930-00-1111'), {office: '居宅介護支援事業所見本', manager: '試験　花子'});
+  // ケアプランセンターは1つの名前（空白を入れない）
+  assert.deepEqual(kyo('居宅情報 | 委託先居宅 | 見本ケアプラン センター | 見本 一郎 | 0930-00-1111'), {office: '見本ケアプランセンター', manager: '見本　一郎'});
+});
+
+test('ラベルが読めない行：電話番号の行（〒の下）・保険者情報と給付情報（認定情報のとなりの順番）。郵便番号は電話番号の一部を取らない', () => {
+  const r = parseSoftPage(
+    page(`
+〒 800-0000 福岡県京都郡苅田町見本1丁目2-3
+rm | sss | 090-0000-1111 | xsss
+居宅情報 | 委託先居宅 | 見本ケアプランセンター | 見本 一郎 Tel 0930-00-1111
+認定情報 | 要介護1 認定期間 | 令和07年11月01日 〜 令和08年10月31日
+全壮痢憶経 刻田町 はな角き 0000001234
+給付信内 高額所答対象2天 タめそ粗 8096
+`),
+    TODAY,
+  );
+  assert.deepEqual([r.info.phone, r.info.insurer, r.info.insuredNo, r.info.burden], ['090-0000-1111', 'kanda', '0000001234', '2']);
+  assert.equal(parseSoftPage(page('ェ 090-0000-1111 下川きち'), TODAY).info.zip, '');
+});
+
+test('上の欄だけのスクリーンショットも介護ソフトの画面（「…日生84歳」）', () => {
+  assert.ok(softScore(softRows(page('見本 春子 | 様 | 昭和17年05月06日生 84歳 女\n部署 行橋営業所 | 営業 見本 太郎'))) >= 2);
+});
+
+test('フリガナ：何回か読んだ中で一番多い読み。姓と名の間は画素で見た字のない所', () => {
+  const r = (text: string, conf: number) => ({text, conf});
+  assert.deepEqual(pickKana([r('ミホン　ハルコ', 83), r('ミホン　ハルコ', 85), r('ミン　ハルコ', 68), r('ミホンハルコ', 56)]), {kana: 'ミホン　ハルコ', sure: true});
+  assert.deepEqual(pickKana([r('ミキンカコ', 27), r('ミキンカコ', 27), r('ミホンカキコ', 72)]), {kana: 'ミキンカコ', sure: false});
+  const w = (text: string, x0: number, x1: number): OcrWord => ({text, x0, x1, y0: 0, y1: 20});
+  // 字の間のすき間（ロとウの間）が広くても、画素で見た間（トとタの間）で分ける
+  assert.equal(kanaOfWords([w('ヤ', 0, 10), w('マ', 11, 21), w('モ', 22, 32), w('ト', 33, 43), w('タ', 50, 60), w('ロ', 61, 71), w('ウ', 80, 86)], 46), 'ヤマモト　タロウ');
+  // 明るさの画像：字の列（濃い）のあいだの、一番長い字のない列
+  const W = 40;
+  const lum = new Uint8Array(W * 10).fill(255);
+  for (const x of [2, 3, 5, 6, 8, 9, 20, 21, 23, 24]) for (let y = 2; y < 8; y++) lum[y * W + x] = 0;
+  assert.equal(blankSplit(lum, W, {x0: 0, y0: 0, x1: W, y1: 10}), 15);
+});
+
+test('字の行を画素の濃さから探す：縦の線・横の線は数えない、つながった2つの行は中ほどのうすい所で分ける', () => {
+  const W = 100;
+  const H = 60;
+  const lum = new Uint8Array(W * H).fill(255);
+  const ink = (y0: number, y1: number) => {
+    for (let y = y0; y < y1; y++) for (let x = 10; x < 60; x += 2) lum[y * W + x] = 0;
+  };
+  ink(5, 15);
+  ink(30, 40);
+  ink(41, 51); // すぐ下の行（すき間1画素）
+  for (let y = 0; y < H; y++) lum[y * W] = 0; // 縦の線
+  for (let x = 0; x < W; x++) lum[22 * W + x] = 0; // 横の線
+  const lines = inkLines(lum, W, H);
+  assert.deepEqual(lines.map((l) => [l.y0, l.y1]), [[5, 15], [30, 40], [41, 51]]);
 });
