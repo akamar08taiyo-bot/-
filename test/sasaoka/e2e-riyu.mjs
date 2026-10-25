@@ -36,13 +36,12 @@ await preview.waitFor();
 assert.deepEqual(await preview.getByRole('group').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')).filter((n) => /ページ/.test(n))), ['住宅改修理由書（1ページ）', '住宅改修理由書（2ページ）']);
 log('タブ・2ページのプレビュー OK');
 
-// 入っていない欄の一覧（押すとその欄へ）
-const status = page.getByRole('status', {name: '入っていない欄'});
-const chips = () => status.getByRole('button').allInnerTexts();
-assert.ok((await chips()).includes('被保険者番号'));
-assert.ok((await chips()).includes('利用者の身体状況'));
-await status.getByRole('button', {name: '被保険者番号'}).click();
-assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), '被保険者番号');
+// 上の「まだ入っていない欄：」の一覧は出さない（ユーザーの指示「全体的にシンプルにしたいので、今回はなくしてください。すべて」2026-10-26）。
+// まだ入っていない欄は、プレビューの薄い黄色のまま
+assert.equal(await page.getByRole('status', {name: '入っていない欄'}).count(), 0);
+const missingSpots = () => preview.locator('[role="button"][class*="bg-amber-300"]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+assert.ok((await missingSpots()).includes('被保険者番号'));
+assert.ok((await missingSpots()).includes('利用者の身体状況'));
 
 // ---------------- 基本情報（申請書と同じ欄）
 const fill = async (label, value) => {
@@ -102,7 +101,7 @@ log('一覧に入れた OK');
 // プレビューに出る（少し遅れて描く）
 const pvHas = (t) => page.waitForFunction((x) => document.querySelector('[aria-label="理由書のプレビュー"]')?.innerText.includes(x), t, {timeout: 5000});
 for (const t of ['見本　花子', '福岡県行橋市中央1-1', '見本居宅介護支援事業所', '膝が痛く、立ち座りがつらい', '廊下に手すりがなく、ふらつく', '居間から寝室への移動', '令和7年4月1日～令和10年3月31日', 'シャワーチェア']) await pvHas(t);
-assert.ok((await status.innerText()).includes('すべて入っています'), await status.innerText());
+await page.waitForFunction(() => !document.querySelector('[aria-label="理由書のプレビュー"] [role="button"][class*="bg-amber-300"]')); // 薄い黄色の欄がなくなる
 await page.screenshot({path: path.join(outDir, 'riyu-1366.png'), fullPage: true});
 log('プレビュー OK');
 

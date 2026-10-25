@@ -124,6 +124,8 @@ const spot = async (label, where = preview) => {
 const mark = (value) => preview.getByRole('button', {name: `${value}に丸をつける`}).first();
 const pressed = () => preview.locator('button[aria-pressed="true"]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label').replace('に丸をつける', '')));
 const status = page.getByRole('status', {name: '入っていない欄'});
+/** プレビューで、まだ入っていない（薄い黄色の）欄の名前 */
+const missingSpots = () => preview.locator('[role="button"][class*="bg-amber-300"]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
 const focused = () => page.evaluate(() => document.activeElement?.getAttribute('aria-label'));
 /** 欄の XML（文字でない欄・原本のままの欄を見るとき） */
 const cellOf = (xml, ref) => new RegExp(`<c r="${ref}"[^>]*?(?:/>|>([\\s\\S]*?)</c>)`).exec(xml)?.[0] ?? '';
@@ -167,10 +169,12 @@ let pv = await preview.innerText();
 for (const t of ['介護保険居宅（ 介護・介護予防 ）住宅改修費受領委任払い申請書', '被保険者氏名', '（サンプル）山田', '福岡県行橋市中央1-1', '①玄関　手すりの取り付け　L=600mm', '②トイレ　手すりの取り付け', '26,950']) {
   assert.ok(pv.includes(t), `プレビューに「${t}」がない`);
 }
-// まだ入っていない欄は上に出て、押すと一覧のその欄へ。着工・完成の日は数えない
-for (const t of ['フリガナ', '生年月日', '性別', '郵便番号', '電話番号', '要介護状態区分', '住宅の所有者']) assert.ok((await status.innerText()).includes(t), t);
-assert.ok(!/被保険者氏名|着工|完成/.test(await status.innerText()));
-await status.getByRole('button', {name: 'フリガナ'}).click();
+// 上の「まだ入っていない欄：」の一覧は出さない（ユーザーの指示「全体的にシンプルにしたいので、今回はなくしてください。すべて」2026-10-26）。
+// まだ入っていない欄は、プレビューの薄い黄色のまま（着工・完成の日は数えない）
+assert.equal(await status.count(), 0);
+assert.ok((await missingSpots()).includes('フリガナ'));
+assert.ok(!(await missingSpots()).some((n) => /被保険者氏名|着工|完成/.test(n)));
+await form.getByLabel('フリガナ', {exact: true}).click();
 assert.equal(await focused(), 'フリガナ');
 await page.keyboard.type('サンプル　ヤマダ');
 await page.keyboard.press('Enter');
@@ -1301,7 +1305,7 @@ await t2.getByLabel('高さ（mm）').fill('150');
 assert.equal(await t2.getByLabel('長さ（mm）').count(), 0); // 段差の解消は幅・奥行・高さ
 await form.getByLabel('完了予定日').fill('2026-12-10');
 await form.getByLabel('改修予定費用').fill('120000');
-await status.filter({hasText: 'すべて入っています'}).waitFor();
+await page.waitForFunction(() => !document.querySelector('[aria-label="申請書のプレビュー"] [role="button"][class*="bg-amber-300"]')); // 薄い黄色の欄がなくなる
 assert.deepEqual(await pressed(), ['昭和', '男', '要支援2']);
 const NEW_WORKS = '①玄関　手すりの取り付け　L=800mm H=750mm\n②トイレ　段差の解消　W600mm D350mm H150mm';
 await pvHas('②トイレ　段差の解消　W600mm D350mm H150mm');

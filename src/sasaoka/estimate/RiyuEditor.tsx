@@ -96,7 +96,7 @@ export function RiyuEditor({job, data, update, onBack, tabs}: {job: Job; data: A
   const toggle = (list: number[], i: number, on: boolean) => (on ? [...new Set([...list, i])].sort((a, b) => a - b) : list.filter((x) => x !== i));
   const age = ageAt(birthIso(info), r.madeDate || todayIso());
 
-  // まだ入っていない欄（色を付けて、上に一覧で出す。理由書を書くのにまず要る欄だけ）
+  // まだ入っていない欄（一覧とプレビューの欄を薄い黄色に。理由書を書くのにまず要る欄だけ。上の「まだ入っていない欄：」の一覧は 2026-10-26 に外した）
   const missing: Partial<Record<Field, boolean>> = {
     insuredNo: !job.insuredNo.trim(),
     name: !job.customer.trim(),
@@ -112,7 +112,6 @@ export function RiyuEditor({job, data, update, onBack, tabs}: {job: Job; data: A
     careState: !r.care.trim(),
     wish: !r.wish.trim(),
   };
-  const todo = SECTIONS.flatMap((x) => x.fields).filter((f) => missing[f]);
 
   // プレビュー：原本に今の内容を転記して描く（申請書と同じ描き方。1枚のシートを P1・P2 の2ページに）
   const template = useTemplate('riyu');
@@ -414,20 +413,6 @@ export function RiyuEditor({job, data, update, onBack, tabs}: {job: Job; data: A
         <div />
       </div>
 
-      <section role="status" aria-label="入っていない欄" className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
-        {todo.length === 0 ? (
-          <span className="font-bold text-emerald-800">✓ 理由書の欄はすべて入っています</span>
-        ) : (
-          <>
-            <span className="text-slate-700">まだ入っていない欄：</span>
-            {todo.map((f) => (
-              <button key={f} type="button" onClick={() => goField(f)} className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 font-bold text-amber-900 hover:bg-amber-100">
-                {label(f)}
-              </button>
-            ))}
-          </>
-        )}
-      </section>
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]">
         <div role="form" aria-label="理由書" onKeyDown={nextOnEnter} className="min-w-0 overflow-hidden rounded-lg border-2 border-slate-700 bg-white shadow-sm">

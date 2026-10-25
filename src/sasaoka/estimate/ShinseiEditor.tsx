@@ -1,6 +1,7 @@
 // 申請書のタブ（様邸の画面の左のタブ。右は見積書）：保険者の申請書の項目を、申請書の上からの順番に並べた一覧で入れ、横のプレビュー（原本の様式のまま）で確かめる
 // （ユーザーの指示「一覧から入力をメインとする。プレビューをみながら入力」）。Enter で次の欄。入れている項目はプレビューで囲み、プレビューの欄を押すと一覧のその項目へ。
-// 丸で囲む項目（性別・要介護状態区分など）は一覧のボタンか、プレビューの申請書の文字を押す。まだ入っていない欄は薄い黄色にし、上にも並べる。
+// 丸で囲む項目（性別・要介護状態区分など）は一覧のボタンか、プレビューの申請書の文字を押す。まだ入っていない欄は薄い黄色（上の「まだ入っていない欄：」の一覧は、
+// ユーザーの指示「全体的にシンプルにしたいので、今回はなくしてください。すべて」2026-10-26 で外した）。
 // 見積書と同じ様邸（Job）：氏名・住所・被保険者番号・改修の箇所は見積書と同じ欄、改修予定費用は見積書の金額なので、どちらで直してもすぐ両方に出る。
 // 申請書だけ・見積書だけでもよい（見積書がないときは、改修の箇所と寸法を入れ、改修費用を手で入れる）。
 // 写真（PhotoBoard）：写真番号の箇所ごとに改修前・改修後の写真を入れ、入れ替える。プレビューの写真貼付用紙にも出し、Excel の写真貼付用紙に貼る
@@ -94,7 +95,7 @@ export function ShinseiEditor({
   const cost = shinseiCost(job, s);
   const lines = shinseiWorks(job, s);
 
-  // まだ入っていない欄（色を付けて、上に一覧で出す）。着工・完了の日は数えない（苅田町・行橋市の着工予定日は空白のまま。みやこ町・広域連合の着工日・完成日は工事のあと）
+  // まだ入っていない欄（一覧とプレビューの欄を薄い黄色に）。着工・完了の日は数えない（苅田町・行橋市の着工予定日は空白のまま。みやこ町・広域連合の着工日・完成日は工事のあと）
   const missing: Partial<Record<Field, boolean>> = {
     kana: !info.kana.trim(),
     name: !job.customer.trim(),
@@ -114,7 +115,6 @@ export function ShinseiEditor({
     photoDates: false, // 改修前は当日、改修後は空でよい
   };
   const fields = insurer ? FIELDS[insurer] : [];
-  const todo = fields.filter((f) => missing[f]);
 
   // 申請書のプレビュー：原本に今の内容を転記して描く（打つたびに作り直す。打つのを待たせないように少し遅れてよい）
   const template = useTemplate(insurer);
@@ -345,8 +345,7 @@ export function ShinseiEditor({
   };
 
   const marks: ShinseiMarks = {gender: info.gender, era: eraOf(info), care: info.care, renovated: info.renovated};
-  const shortLabel = (f: Field) => (f === 'reason' ? '理由書作成者' : f === 'works' ? '改修の内容' : insurer ? label(f, insurer) : f);
-  // 入っていない欄・プレビューの欄を押したとき：一覧のその項目の最初の欄へ
+  // プレビューの欄を押したとき：一覧のその項目の最初の欄へ
   const goField = (f: Field) => {
     setActive(f);
     document.querySelector<HTMLElement>(`[data-field="${f}"] input, [data-field="${f}"] select, [data-field="${f}"] button`)?.focus();
@@ -404,27 +403,6 @@ export function ShinseiEditor({
             <Btn small color="white" onClick={() => setInsurer(byAddress)}>
               保険者を{INSURER_INFO[byAddress].name}にする
             </Btn>
-          </div>
-        )}
-        {insurer && (
-          <div role="status" aria-label="入っていない欄" className="flex flex-wrap items-center gap-1.5 text-sm">
-            {todo.length === 0 ? (
-              <span className="font-bold text-emerald-800">✓ 申請書の欄はすべて入っています</span>
-            ) : (
-              <>
-                <span className="text-slate-700">まだ入っていない欄：</span>
-                {todo.map((f) => (
-                  <button
-                    key={f}
-                    type="button"
-                    onClick={() => goField(f)}
-                    className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 font-bold text-amber-900 hover:bg-amber-100"
-                  >
-                    {shortLabel(f)}
-                  </button>
-                ))}
-              </>
-            )}
           </div>
         )}
       </section>
