@@ -236,6 +236,21 @@ for ref in [f'{c}6' for c in 'ABCDE'] + ['A45', 'B45', 'A46', 'B46', 'C45', 'D45
     unbold(ref)
 styles = styles.replace(fonts_block.group(0), f'<fonts count="{len(font_list) + len(extra_fonts)}"{fonts_block.group(2)}>{fonts_block.group(3)}{"".join(extra_fonts)}</fonts>')
 
+# ---- 3d. 一番下の備考（60〜62行。介護保険の内訳・お支払いいただく金額・備考に足す文）は左寄せ（ユーザーの指示「一番下の備考欄の部分、中央揃えじゃなくて
+#    左詰めにしてください」2026-10-26）。枠の線に字がつかないよう字下げ 1。縮小して全体を表示はそのまま
+left_xf = {}
+for r in (60, 61, 62):
+    for c in 'ABCDEFGHIJK':
+        m = re.search(r'<c r="%s%d"(?=[\s/>])[^>]*?(?:/>|>.*?</c>)' % (c, r), sheet, re.S)
+        if not m:
+            continue
+        sid = int(re.search(r'\ss="(\d+)"', m.group(0)).group(1))
+        if sid not in left_xf:
+            xf = xf_of(sid)
+            assert 'horizontal="center"' in xf, (c, r, xf)
+            left_xf[sid] = add_xf(xf.replace('horizontal="center"', 'horizontal="left" indent="1"', 1))
+        set_cell(f'{c}{r}', re.sub(r'\ss="\d+"', f' s="{left_xf[sid]}"', m.group(0)))
+
 # ---- 4. 明細を16行に（39〜42行を隠す）。印の枠の下にすき間（20行目を高く）
 for r in range(39, 43):
     m = row_xml(r)

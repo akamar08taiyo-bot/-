@@ -353,6 +353,10 @@ test('見積書のバランスの直し（2026-10-26）：備考の列を広く�
   const bold = page.texts.filter((x) => x.runs.some((r) => r.font.bold && r.text.trim())).map((x) => x.runs.map((r) => r.text).join(''));
   const tt = saleTotals(sale(), S);
   assert.deepEqual(bold.sort(), [...[tt.amount, tt.tax, tt.total].map((n) => n.toLocaleString('ja-JP')), '円'].sort());
+  // 一番下の備考は左寄せ（ユーザーの指示「一番下の備考欄の部分、中央揃えじゃなくて左詰めにしてください」）
+  const notes = page.texts.filter((x) => /^A6[0-2]$/.test(x.ref) && x.runs.some((r) => r.text.trim()));
+  assert.ok(notes.length >= 2);
+  for (const n of notes) assert.equal(n.align, 'left', n.ref);
   // 印刷しない赤い枠・「赤枠内は編集不可です」のメモは原本から消した（スマホで開くと金額の列に赤い線が出た）。印の枠は残す
   const drawing = strFromU8(t['xl/drawings/drawing1.xml']);
   assert.ok(!/fPrintsWithSheet="0"/.test(drawing));

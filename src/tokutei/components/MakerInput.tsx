@@ -43,6 +43,7 @@ export function MakerInput({
     return () => {
       window.removeEventListener('scroll', moved, true);
       window.removeEventListener('resize', place);
+      setAt(null); // 次に開いたとき、前の場所に一瞬出ないように
     };
   }, [open]);
   const q = makerKey(value);

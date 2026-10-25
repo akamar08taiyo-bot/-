@@ -315,6 +315,7 @@ try {
   // 「見積もりが水色で入力しているとわかるようにしてある色も水色なので、わかりづらい。入力項目は、住宅改修などと同じ色にする」2026-10-26）
   const maker = page.getByRole('combobox', {name: 'メーカー'}).last();
   await page.getByRole('button', {name: 'メーカーを候補から選ぶ'}).last().click();
+  await page.getByRole('listbox', {name: 'メーカーの候補'}).getByRole('option').first().waitFor();
   const makerOpts = await page.getByRole('listbox', {name: 'メーカーの候補'}).getByRole('option').allInnerTexts();
   assert.deepEqual(makerOpts.slice(0, 2), ['パナソニックエイジフリー（株）', 'アロン化成（株）']);
   await page.getByRole('option', {name: 'アロン化成（株）'}).click();
