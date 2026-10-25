@@ -117,6 +117,8 @@ github.io はこの作業環境から見えない（403）。GitHub MCP で確�
 - 見た目を変えたら、1366px とスマホ（390×844、deviceScaleFactor 2）のスクリーンショットを撮って自分で見る。横にはみ出していないか（`document.documentElement.scrollWidth`）も見る。
   文字が欄からはみ出していないかも、プレビュー・印刷の欄を Playwright でページの中から全部調べて数える（2026-10-23 に申請書・理由書・見積書を4つの保険者とも 1366px・390px で 0 にした。
   390px の印刷の画面は縮めて見せている＝zoom なので、その倍率を戻して測る）。ユーザーの指示「文字のはみ出し…しっかり見て」。
+  道具：`node test/sasaoka/stress-data.mjs /tmp/stress.json`（長い値の架空の様邸を4つの保険者ぶん）→ サイトを配信して
+  `node test/sasaoka/overflow-check.mjs <サイトのURL> /tmp/stress.json <出力フォルダ> [1366|390]`。帳票ごとの件数と、はみ出した文字・箱が出る（0 件が目標。みやこ町の申請書の 1 件は、行の折り返しの全角スペースが 2px 出るだけで字は切れていない）。帳票の欄や文字の入れ方を直したら流す。
 - 写真のファイル：ボタンで選ぶのは `const [chooser] = await Promise.all([page.waitForEvent('filechooser'), ボタン.click()]); await chooser.setFiles({name, mimeType, buffer})`。
   画像はブラウザの canvas で作れる（`e2e-shinsei.mjs` の `makeImage`。大きさを変えておくと、Excel の JPEG の大きさでどの写真か分かる）。
   エクスプローラーからのドロップは、ページの中で `new DataTransfer()` に `File` を入れて `dragenter`・`dragover`・`drop` の `DragEvent` を出す（`dropFile`）。
