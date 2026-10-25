@@ -31,13 +31,13 @@ import {TokuteiEditor} from './estimate/TokuteiEditor.tsx';
 import {hasShinseiInfo} from './estimateForms.ts';
 import {APP_TITLE, PORTAL_URL, readHash, writeHash} from './links.ts';
 import type {JobView, MainTab} from './links.ts';
-import {prunePhotos} from './photos.ts';
+import {photoIdsInUse, prunePhotos} from './photos.ts';
 import {PrintView} from './print/PrintView.tsx';
 import type {PrintRequest} from './print/PrintView.tsx';
 import {hasRiyuInfo} from './riyu.ts';
 import {EXAMPLE_KIT_ID, exampleKit} from './samples.ts';
 import {flushTokutei} from './tokuteiLink.ts';
-import {isTrashed, liveJobs, referencedStrings} from './trash.ts';
+import {isTrashed, liveJobs} from './trash.ts';
 import type {Insurer, Job, Row} from './types.ts';
 import {useNewVersion} from './update.ts';
 import {useStore} from './useStore.ts';
@@ -116,8 +116,9 @@ function JobTabs({view, onView}: {view: JobView; onView: (v: JobView) => void}) 
   );
 }
 
-/** 何も入れていない見積書・様邸・申請書（作ってすぐ戻ったもの。残さない） */
-const isEmpty = (j: Job) => !j.customer.trim() && !j.staff && j.places.length === 0 && !j.address && !j.insuredNo && !j.date && !j.note && !hasShinseiInfo(j.shinsei) && !hasRiyuInfo(j.riyu);
+/** 何も入れていない見積書・様邸・申請書（作ってすぐ戻ったもの。残さない）。平面図の図だけ入れた様邸は残す */
+const isEmpty = (j: Job) =>
+  !j.customer.trim() && !j.staff && j.places.length === 0 && !j.address && !j.insuredNo && !j.date && !j.note && !hasShinseiInfo(j.shinsei) && !hasRiyuInfo(j.riyu) && !j.planPhoto;
 
 export default function App({start}: {start: MainTab}) {
   const store = useStore();
@@ -241,11 +242,12 @@ export default function App({start}: {start: MainTab}) {
 
   // どの様邸からも使われなくなった写真（写真を消した・差し替えた・様邸を完全に削除した）を、この端末から消す。開いたときと、ゴミ箱で完全に削除して保存できたあと。
   // ほかのタブで入れたばかりの写真（まだ様邸に保存されていないかもしれない）を消さないように、1時間より前に入れた写真だけ
-  // 残すのは様邸のどこかに書いてある番号すべて（箇所の写真のほか、あとから足した項目の写真も消さない）。ゴミ箱の様邸の写真も残す（完全に削除するまで）
+  // 残すのは様邸のどこかに書いてある番号すべて（箇所の写真・平面図の図のほか、あとから足した項目の写真も消さない。`photoIdsInUse`）。
+  // ゴミ箱の様邸の写真も残す（完全に削除するまで）
   const [pruneTick, setPruneTick] = useState(0);
   useEffect(() => {
     if (!all) return;
-    prunePhotos(referencedStrings(all.jobs), Date.now() - 60 * 60 * 1000).catch(() => undefined);
+    prunePhotos(photoIdsInUse(all.jobs), Date.now() - 60 * 60 * 1000).catch(() => undefined);
   }, [loaded, pruneTick]);
   // ゴミ箱で完全に削除したら、保存できてから写真の掃除（保存のときにほかのタブで元に戻した様邸とまとめたら、それは残っているので写真も消さない）。
   // 保存はこの描画のあと（update の中身は描画のときに動くので、押したすぐあとに flush しても、まだ保存するものがない）

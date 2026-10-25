@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {brightLut, exifDate} from '../../src/sasaoka/photos.ts';
+import {brightLut, exifDate, photoIdsInUse} from '../../src/sasaoka/photos.ts';
 
 /** Exif の入った JPEG の先頭（撮影日時 DateTimeOriginal を Exif の IFD に、tag0132 の日時を最初の IFD に） */
 function jpeg({original = '', dateTime = '', big = false}: {original?: string; dateTime?: string; big?: boolean}): DataView {
@@ -58,4 +58,14 @@ test('暗い写真だけ明るくする表（ユーザーの指示「画像は�
   // とても暗い写真も、明るくしすぎない（ガンマ 1.8 まで）
   const dark = brightLut(px(10, 10, 10))!;
   assert.equal(dark[10], Math.round(255 * (10 / 255) ** (1 / 1.8)));
+});
+
+test('使っている写真の番号（古い写真を消すときに残すもの）：箇所の写真のほか、平面図の図・この版の知らない項目の写真も', () => {
+  const keep = photoIdsInUse([
+    {id: 'j1', planPhoto: 'ph-plan', places: [{id: 'p1', photos: {before: 'ph-1', after: 'ph-2'}}]},
+    {id: 'j2', places: [], future: {photos: ['ph-3']}},
+  ]);
+  for (const id of ['ph-plan', 'ph-1', 'ph-2', 'ph-3']) assert.ok(keep.has(id), id);
+  assert.equal(keep.has('ph-x'), false);
+  assert.equal(photoIdsInUse(undefined).size, 0);
 });

@@ -63,16 +63,7 @@ export function purgeTrash(jobs: Job[], ids: Iterable<string>): Job[] {
   return next.length === jobs.length ? jobs : next;
 }
 
-/**
- * 様邸のどこかに書いてある文字すべて（写真の番号を残すため）。写真の項目だけを拾わないのは、あとの版で写真の項目を足しても消さないように。
- * 写真の掃除（prunePhotos）は、ゴミ箱の様邸も含めた全部の様邸からこれを作る
- */
-export function referencedStrings(v: unknown, out = new Set<string>()): Set<string> {
-  if (typeof v === 'string') out.add(v);
-  else if (Array.isArray(v)) for (const x of v) referencedStrings(x, out);
-  else if (v && typeof v === 'object') for (const x of Object.values(v)) referencedStrings(x, out);
-  return out;
-}
+// 写真の掃除（prunePhotos）に渡す使っている番号は、ゴミ箱の様邸も含めた全部の様邸から photos.ts の photoIdsInUse で作る（App.tsx）
 
 // ---------------------------------------------------------------- Ctrl+Z で、さっきのゴミ箱に移す・元に戻すをやめる
 

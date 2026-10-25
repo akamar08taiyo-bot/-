@@ -5,7 +5,7 @@ import {strFromU8, unzipSync, zipSync} from 'fflate';
 import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import {DEFAULT_PLACES, defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
-import {boxLabels, checkBoxes, fillShinsei, fitLinesSize, insuredBoxes, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, placeBox, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
+import {boxLabels, checkBoxes, fillShinsei, fitLinesSize, insuredBoxes, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
 import {shinseiPreview} from '../../src/sasaoka/shinseiPreview.ts';
 import type {Insurer, Job, Place, Row, ShinseiInfo, ShinseiMarks} from '../../src/sasaoka/types.ts';
 
@@ -899,19 +899,30 @@ test('写真の用紙の写真の横（下）に書く欄：縦の写真は左�
   assert.ok(Math.abs(tall.photo.w - (((300 - 8) * 900) / 1600 + 8)) < 0.01, JSON.stringify(tall));
   assert.ok(tall.note && Math.abs(tall.note.x - tall.photo.w) < 0.01 && tall.note.w > 250 && tall.note.h === 300 && tall.photo.h === 300);
   assert.equal(tall.align, 'left');
-  // 横の写真：上に写真、そのすぐ下に書く欄（枠の高さの 16〜32%）。文字は中央ぞろえ
+  // 横の写真：上に写真、その下に NOTE_GAP あけて書く欄（あけた分もふくめて枠の高さの 16〜32%）。文字は中央ぞろえ
+  // （ユーザーの指示「写真と文字の位置を少しだけずらす。（文字をもう少し下にする）」2026-10-25。前は写真のすぐ下）
   const wide = photoNoteLayout(frame, {w: 1600, h: 1200}, lines);
-  assert.ok(wide.note && wide.photo.y === 0 && wide.note.w === 600 && wide.note.h >= 48 && wide.note.h <= 96, JSON.stringify(wide));
-  assert.ok(Math.abs(wide.note.y - wide.photo.h) < 0.01 && Math.abs(wide.photo.h + wide.note.h - 300) < 0.01);
+  assert.ok(wide.note && wide.photo.y === 0 && wide.note.w === 600 && wide.note.h + NOTE_GAP >= 48 && wide.note.h + NOTE_GAP <= 96, JSON.stringify(wide));
+  assert.ok(Math.abs(wide.note.y - wide.photo.h - NOTE_GAP) < 0.01 && Math.abs(wide.photo.h + NOTE_GAP + wide.note.h - 300) < 0.01);
   assert.equal(wide.align, 'center');
-  // 枠より横に長い写真は、写真の高さまでが写真の所で、書く欄はそのすぐ下から（あいだを空けない）
+  assert.ok(NOTE_GAP >= 6 && NOTE_GAP <= 12); // 少しだけ（字の半行ほど）
+  // 枠より横に長い写真は、写真の高さまでが写真の所で、書く欄は NOTE_GAP あけたその下から（余った高さは書く欄に）
   const pano = photoNoteLayout(frame, {w: 3200, h: 1000}, lines);
-  assert.ok(Math.abs(pano.photo.h - ((600 - 8) * 1000) / 3200 - 8) < 0.01 && pano.note!.y === pano.photo.h, JSON.stringify(pano));
-  // 横の写真を 90°回すと縦の写真と同じ。写真のない枠は下に書く欄
+  assert.ok(Math.abs(pano.photo.h - ((600 - 8) * 1000) / 3200 - 8) < 0.01 && pano.note!.y === pano.photo.h + NOTE_GAP && pano.note!.y + pano.note!.h === 300, JSON.stringify(pano));
+  // 横の写真を 90°回すと縦の写真と同じ（縦の写真の右の書く欄は、あけない）。写真のない枠は下に書く欄
   const turned = photoNoteLayout(frame, {w: 1600, h: 900, rot: 90}, lines);
   assert.ok(Math.abs(turned.photo.w - tall.photo.w) < 0.01 && turned.note!.y === 0);
   const none = photoNoteLayout(frame, null, lines);
-  assert.ok(none.photo.y === 0 && none.note!.y === none.photo.h && none.note!.y > 200);
+  assert.ok(none.photo.y === 0 && none.note!.y === none.photo.h + NOTE_GAP && none.note!.y > 200);
+  // 写真の下の端から書く欄の文字の上まで：写真の余白（4画素）＋あけた分＋書く欄の上の余白。前の 7画素より NOTE_GAP 下。どれも枠の中
+  for (const [size, l] of [[{w: 1600, h: 1200}, wide], [{w: 3200, h: 1000}, pano]] as const) {
+    const pic = photoPlacement(l.photo, size.w, size.h);
+    assert.ok(Math.abs(l.note!.y + NOTE_INSET.y - (pic.y + pic.h) - (7 + NOTE_GAP)) < 0.01, JSON.stringify([pic, l.note]));
+    assert.ok(l.note!.y + l.note!.h <= frame.y + frame.h + 1e-9 && pic.y + pic.h <= l.photo.y + l.photo.h);
+  }
+  // 低い枠・行の多い書く欄でも、書く欄はなくならず、字は入る大きさ（6pt まで小さく）
+  const many = photoNoteLayout({x: 0, y: 0, w: 600, h: 120}, {w: 1600, h: 1200}, [...lines, ...lines, ...lines]);
+  assert.ok(many.note!.h > 20 && many.note!.y + many.note!.h === 120 && photoNotePt(many.note!, [...lines, ...lines, ...lines]) >= 6, JSON.stringify(many));
   // 書く内容：自動の文（改修の種類・寸法）のあとに、手で足した行（空の行は書かない）
   assert.deepEqual(photoNoteLines({kind: 1, rows: [], dims: {l: '800', h: '600'}, photoNote: 'ベースプレート　L=800mm\n\n 補強板 '}), ['手すりの取り付け　L=800mm H=600mm', 'ベースプレート　L=800mm', '補強板']);
   assert.deepEqual(photoNoteLines({kind: 2, rows: [], dims: {w: '600', d: '350', h: '150'}}), ['段差の解消　W600mm D350mm H150mm']);
@@ -956,4 +967,152 @@ test('写真の用紙（Excel）：改修前の写真の横（上）の書く欄
   // 画面のプレビュー（photoImages なし）では書かない（画面は枠に重ねて描く）
   const pv = unzipSync(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(j, RATES)));
   assert.ok(!anchorsOf(strFromU8(pv[drawingPath(pv, '1 ')!] ?? new Uint8Array())).some(isNote));
+});
+
+test('平面図の図：表題と工事内容のあいだの範囲に、縦横の比のまま・範囲に収まるだけ大きく貼る（図形のいちばんうしろ）。図がなければ貼らない（4つの保険者）', () => {
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 9, 0xff, 0xd9]); // 写真のファイルはそのまま入る
+  for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki'] as const) {
+    const map = SHINSEI[insurer]!;
+    const sheet = map.sheets.find((x) => x.plan)!;
+    assert.ok(sheet?.legend, insurer); // 工事内容を書く平面図のシート
+    for (const [w, h] of [
+      [1600, 1131], // A4 横の図
+      [1131, 1600], // A4 縦の図
+      [40, 30], // 小さい図も範囲いっぱいに（ただし範囲より大きくしない）
+    ]) {
+      const files = unzipSync(fillShinsei(TEMPLATES[insurer], map, {...shinseiValues(job({insurer}), RATES), planImage: {bytes: jpeg, w, h}}));
+      const path = drawingPath(files, sheet.sheet);
+      const anchors = anchorsOf(strFromU8(files[path]));
+      const pics = anchors.filter((a) => a.includes('<xdr:pic>'));
+      assert.equal(pics.length, 1, insurer);
+      assert.equal(anchors[0], pics[0], `${insurer}：図は図形のいちばんうしろ（工事内容・あとから描く線が上に出る）`);
+      assert.match(pics[0], /<xdr:cNvPr id="\d+" name="平面図 \d+"\/>/);
+      assert.match(pics[0], /<a:picLocks noChangeAspect="1"\/>/);
+      // 写真のファイルとつながり
+      const rid = /<a:blip r:embed="([^"]+)"/.exec(pics[0])![1];
+      const rels = strFromU8(files[path.replace(/([^/]+)$/, '_rels/$1.rels')]);
+      const media = new RegExp(`Id="${rid}"[^>]*Type="[^"]*/image"[^>]*Target="\\.\\./media/([^"]+)"`).exec(rels)?.[1];
+      assert.deepEqual(files[`xl/media/${media}`], jpeg, insurer);
+      assert.match(strFromU8(files['[Content_Types].xml']), /<Default Extension="jpeg" ContentType="image\/jpeg"\/>/);
+      // 位置と大きさ：画面のプレビューと同じ計算（planPlacement）。範囲の中・縦横の比はそのまま
+      const lay = sheetLayout(strFromU8(files[sheetPath(files, sheet.sheet)]));
+      const frame = rangeBox(lay, sheet.plan!);
+      const want = planPlacement(frame, w, h);
+      const [ox, oy, cx, cy] = /<a:off x="(-?\d+)" y="(-?\d+)"\/><a:ext cx="(\d+)" cy="(\d+)"\/>/.exec(pics[0])!.slice(1).map((n) => Number(n) / 9525);
+      assert.ok(Math.abs(ox - want.x) < 0.01 && Math.abs(oy - want.y) < 0.01 && Math.abs(cx - want.w) < 0.01 && Math.abs(cy - want.h) < 0.01, `${insurer} ${[ox, oy, cx, cy]}`);
+      assert.ok(Math.abs(cx / cy - w / h) < 0.01, insurer);
+      assert.ok(ox >= frame.x && oy >= frame.y && ox + cx <= frame.x + frame.w + 0.01 && oy + cy <= frame.y + frame.h + 0.01, insurer);
+      assert.ok(Math.abs(cx - (frame.w - 8)) < 0.01 || Math.abs(cy - (frame.h - 8)) < 0.01, `${insurer}：範囲いっぱいでない`);
+      const {from, to} = anchorOf(pics[0]);
+      const [c1, r1, c2, r2] = cellsOf(sheet.plan!);
+      assert.ok(from[0] >= c1 && from[2] >= r1 && to[0] <= c2 + 1 && to[2] <= r2 + 1, `${insurer} ${from} ${to}`);
+      // 図形の番号は重ならない
+      const ids = [...anchors.join('').matchAll(/<xdr:cNvPr\b[^>]*\sid="(\d+)"/g)].map((m) => m[1]);
+      assert.equal(new Set(ids).size, ids.length, insurer);
+      // 範囲は表題の下・工事内容（テキストボックス・みやこ町は下の欄）の上（重ならない）
+      const title = rangeBox(lay, sheet.name!);
+      const legend = rangeBox(lay, sheet.legend!.box ?? sheet.legend!.cell!);
+      assert.ok(frame.y >= title.y + title.h && frame.y + frame.h <= legend.y, `${insurer} ${JSON.stringify([title, frame, legend])}`);
+      assert.ok(readShinsei(zipSync(files)), insurer); // 開き直せる
+    }
+    // 図がなければ足さない（原本の図形のまま。工事内容だけ）
+    const plain = unzipSync(fillShinsei(TEMPLATES[insurer], map, shinseiValues(job({insurer}), RATES)));
+    assert.ok(!anchorsOf(strFromU8(plain[drawingPath(plain, sheet.sheet)])).some((a) => a.includes('<xdr:pic>')), insurer);
+  }
+  // 範囲は平面図のシートだけ（写真貼付用紙・様式には平面図の範囲はない）
+  for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki'] as const) assert.equal(SHINSEI[insurer]!.sheets.filter((x) => x.plan).length, 1);
+});
+
+/** 欄の字の大きさと太字（styles.xml の書式から） */
+const fontOf = (files: Record<string, Uint8Array>, xml: string, ref: string) => {
+  const {fonts, xfs} = styleParts(files);
+  const s = Number(/\ss="(\d+)"/.exec(cell(xml, ref))?.[1] ?? 0);
+  const font = fonts[Number(/fontId="(\d+)"/.exec(xfs[s])?.[1] ?? 0)];
+  return {size: Number(/<sz val="([\d.]+)"/.exec(font)?.[1]), bold: /<b\/>/.test(font), name: /<name val="([^"]+)"/.exec(font)?.[1]};
+};
+
+test('□の一覧の欄を1行ずつに：苅田町の写真の用紙の実施した工事種類（B4）は、原本の2行がそれぞれ1行に入る 9.5pt（行の高さ・欄の大きさは原本のまま）。改修箇所（B2）は 11pt のまま。長い改修場所は小さく', () => {
+  // ユーザーの指示「申請書の枠が込みの部分が無駄に行替えがされているため、修正する」（2026-10-25）：B4 の2行が欄の幅を数文字こえて、Excel で「…床材の変」「更」の4行になっていた
+  const w = 675; // B4:H4 の幅（画素）
+  const line1 = '■手すりの取り付け　□(2)段差の解消　□(3)滑り防止及び移動の円滑化のための床材の変更';
+  const line2 = '□(4)引戸等への扉の取替　□(5)洋式便器等への便器の取替　□(6)その他(1)～(5)に付帯する工事';
+  // 原本の 11pt の太字では入らない（Excel でも折り返した）。9.5pt なら2行とも入る。太字でなければ少し大きくても入る
+  assert.ok(oneRowPt([line1], w, 11, true) < 11 && oneRowPt([line2], w, 11, true) < 11);
+  assert.equal(oneRowPt([line1, line2], w, 11, true), 9.5);
+  assert.ok(oneRowPt([line1, line2], w, 11, false) >= 9.5);
+  // 改修箇所の1行目（全角40字）は 11pt の太字で入る。入らないほど長ければ 6pt まで
+  assert.equal(oneRowPt(['□廊下　□階段　□台所　□居間・食堂　□寝室　□洗面・脱衣室　□浴室　□トイレ'], w, 11, true), 11);
+  assert.equal(oneRowPt(['あ'.repeat(200)], w, 11, true), 6);
+  // 原本（9枚の写真の用紙）：B4 は 9.5pt の太字（字体は原本のまま）、B2 は 11pt。欄の大きさ（行の高さ）は原本のまま
+  const orig = unzipSync(KANDA);
+  const kandaSheets = SHINSEI.kanda!.sheets.filter((x) => x.photoPlace);
+  assert.equal(kandaSheets.length, 9);
+  for (const sheet of kandaSheets) {
+    const xml = strFromU8(orig[sheetPath(orig, sheet.sheet)]);
+    assert.deepEqual(fontOf(orig, xml, 'B4'), {size: 9.5, bold: true, name: 'HGSｺﾞｼｯｸM'}, sheet.sheet);
+    assert.deepEqual(fontOf(orig, xml, 'B2'), {size: 11, bold: true, name: 'HGSｺﾞｼｯｸM'}, sheet.sheet);
+    const lay = sheetLayout(xml);
+    assert.deepEqual([rangeBox(lay, 'B4').w, rangeBox(lay, 'B4').h, rangeBox(lay, 'B2').h], [w, 70, 70], sheet.sheet);
+  }
+  // 書いた申請書：どの改修の種類を■にしても1行ずつ入る（9.5pt のまま。■と□は同じ幅）
+  for (const kind of [1, 2, 3, 4, 5, 6]) {
+    const j = job({insurer: 'kanda', places: [place('浴室', [mat('木の手すり 35φ 4m', {lengthCm: 60, pieceLengthM: 4})], {kind})]});
+    const files = unzipSync(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(j, RATES)));
+    const xml = strFromU8(files[sheetPath(files, '1 ')]);
+    const lines = txt(xml, 'B4').split('\n');
+    assert.equal(lines.length, 2);
+    assert.equal(lines[kind <= 3 ? 0 : 1].includes('■'), true, `${kind}`);
+    assert.equal(fontOf(files, xml, 'B4').size, 9.5, `${kind}`);
+    assert.equal(oneRowPt(lines, w, 9.5, true), 9.5, `${kind}`);
+  }
+  // 一覧にない長い改修場所（「■名前」）で改修箇所の2行目が入らなければ、その欄だけ小さく（行の高さは原本のまま）
+  const long = '勝手口から車庫までの屋外通路と物置前の段差のある所と駐車場の間の通路';
+  const lf = unzipSync(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(job({insurer: 'kanda', places: [place(long, [mat('手すり')])]}), RATES)));
+  const lx = strFromU8(lf[sheetPath(lf, '1 ')]);
+  const b2 = txt(lx, 'B2').split('\n');
+  assert.ok(b2[1].includes(`■${long}`), b2[1]);
+  const pt = fontOf(lf, lx, 'B2').size;
+  assert.ok(pt < 11 && oneRowPt(b2, w, pt, true) === pt, `${pt}`);
+  assert.equal(fontOf(lf, lx, 'B4').size, 9.5);
+});
+
+/** XML が整った形か（開きと閉じのタグが合っている）。合わなければその所 */
+function xmlProblem(xml: string): string {
+  const stack: string[] = [];
+  for (const m of xml.replace(/<\?[\s\S]*?\?>/g, '').matchAll(/<(\/?)([\w:.-]+)((?:\s+[\w:.-]+="[^"]*")*)\s*(\/?)>|<|>/g)) {
+    if (m[0] === '<' || m[0] === '>') return `ばらの ${m[0]}（${m.index}）`;
+    if (m[4]) continue;
+    if (!m[1]) stack.push(m[2]);
+    else if (stack.pop() !== m[2]) return `</${m[2]}>（${m.index}）`;
+  }
+  return stack.length ? `閉じていない <${stack.at(-1)}>` : '';
+}
+
+test('写真・平面図に Excel で描く図形・線のはじめの形（原本のテーマ）：図形は茶色の太い枠線（6pt・塗りなし）、線は黄色の少し細い線（2.25pt）（4つの保険者）', () => {
+  // ユーザーの指示「写真の線の細さをデフォルトの線を補足する。デフォルトの色は枠が込みの場合は、茶色、横棒のみの場合は黄色がデフォルトにする」（2026-10-25）：
+  // Excel で図形（四角・丸）を描くと茶色の太い枠、線を描くと黄色の線。線は「少し細い」（ユーザーの答え。茶色の太い枠の中に引く線）
+  for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki'] as const) {
+    for (const [label, bytes] of [
+      ['原本', TEMPLATES[insurer]],
+      ['書いた申請書', fillShinsei(TEMPLATES[insurer], SHINSEI[insurer]!, shinseiValues(job({insurer}), RATES))],
+    ] as const) {
+      const theme = strFromU8(unzipSync(bytes)['xl/theme/theme1.xml']);
+      assert.equal(xmlProblem(theme), '', `${insurer} ${label}`);
+      assert.equal((theme.match(/<a:objectDefaults\b/g) ?? []).length, 1);
+      // 置き場所：themeElements のうしろ、extraClrSchemeLst の前（DrawingML の決まった順）
+      assert.match(theme, /<\/a:themeElements><a:objectDefaults>[\s\S]*<\/a:objectDefaults><a:extraClrSchemeLst\/>/, `${insurer} ${label}`);
+      const od = /<a:objectDefaults>([\s\S]*?)<\/a:objectDefaults>/.exec(theme)![1];
+      const sp = /^<a:spDef>([\s\S]*?)<\/a:spDef><a:lnDef>([\s\S]*?)<\/a:lnDef>$/.exec(od);
+      assert.ok(sp, `${insurer}：spDef・lnDef の順`);
+      const [spDef, lnDef] = [sp[1], sp[2]];
+      // spPr・bodyPr・lstStyle・style の順（CT_DefaultShapeDefinition）
+      for (const d of [spDef, lnDef]) assert.match(d, /^<a:spPr>[\s\S]*<\/a:spPr><a:bodyPr\b[^>]*\/><a:lstStyle\/><a:style><a:lnRef\b[\s\S]*<\/a:lnRef><a:fillRef\b[\s\S]*<\/a:fillRef><a:effectRef\b[\s\S]*<\/a:effectRef><a:fontRef\b[\s\S]*<\/a:fontRef><\/a:style>$/);
+      // 図形：塗りなし（写真が透ける）・茶色の 6pt（76200 EMU）の枠線
+      assert.match(spDef, /^<a:spPr><a:noFill\/><a:ln w="76200"[^>]*><a:solidFill><a:srgbClr val="993300"\/><\/a:solidFill>/);
+      // 線：黄色の少し細い 2.25pt（28575 EMU。端は丸く）。図形の枠より細い
+      assert.match(lnDef, /^<a:spPr><a:ln w="28575" cap="rnd"[^>]*><a:solidFill><a:srgbClr val="FFFF00"\/><\/a:solidFill>/);
+    }
+  }
+  // 調べ方の確かめ：閉じていないタグは見つける
+  assert.notEqual(xmlProblem('<a:x><a:y></a:x>'), '');
 });

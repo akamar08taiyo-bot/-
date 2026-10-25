@@ -9,7 +9,7 @@ import {photoNumbers} from '../estimateForms.ts';
 import {brightPhoto, getPhotos} from '../photos.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {fillShinseiFiles, SHINSEI, shinseiFileName, shinseiValues} from '../shinsei.ts';
-import type {Files, PhotoImages} from '../shinsei.ts';
+import type {Files, PhotoImage, PhotoImages} from '../shinsei.ts';
 import type {Insurer, Job, Settings} from '../types.ts';
 import kanda from '../shinsei/kanda.xltx?inline';
 import kouiki from '../shinsei/kouiki.xltx?inline';
@@ -98,15 +98,37 @@ async function photoImagesOf(job: Job, s: Settings): Promise<{images: Record<num
   return {images, missing, unreadable};
 }
 
-/** 見積書の内容を転記した申請書（Excel）を保存する（ダウンロード）。保存したファイル名と、この端末になくて貼れなかった写真・読めなくて貼れなかった写真の枚数を返す */
-export async function saveShinsei(job: Job, insurer: Insurer, s: Settings): Promise<{fileName: string; missingPhotos: number; unreadablePhotos: number}> {
+/**
+ * 平面図の図（Job.planPhoto。写真と同じくこの端末に入れたもの）。画面と同じく、暗い図は明るさを補正したもの。
+ * 図のない様邸は image なし。missing＝この端末にない（ほかの端末で入れた）、unreadable＝この端末にあるのに読めなかった
+ */
+async function planImageOf(job: Job): Promise<{image?: PhotoImage; missing: boolean; unreadable: boolean}> {
+  const id = job.planPhoto;
+  if (!id) return {missing: false, unreadable: false};
+  const found = await getPhotos([id]).catch(() => null);
+  const photo = found?.get(id);
+  if (!found || !photo) return {missing: !!found, unreadable: !found};
+  try {
+    const blob = await brightPhoto(id, photo.blob);
+    return {image: {bytes: new Uint8Array(await blob.arrayBuffer()), w: photo.w, h: photo.h}, missing: false, unreadable: false};
+  } catch {
+    return {missing: false, unreadable: true};
+  }
+}
+
+/**
+ * 見積書の内容を転記した申請書（Excel）を保存する（ダウンロード）。保存したファイル名と、この端末になくて貼れなかった写真・読めなくて貼れなかった写真の枚数、
+ * 平面図の図を貼れなかったか（この端末にない・読めない）を返す
+ */
+export async function saveShinsei(job: Job, insurer: Insurer, s: Settings): Promise<{fileName: string; missingPhotos: number; unreadablePhotos: number; planMissing: boolean}> {
   const map = SHINSEI[insurer];
   if (!map) throw new Error('この保険者の申請書の原本がありません');
   const photos = await photoImagesOf(job, s);
-  const bytes = fillShinseiFiles({...(await openTemplate(insurer))}, map, {...shinseiValues(job, s), photoImages: photos.images});
+  const plan = await planImageOf(job);
+  const bytes = fillShinseiFiles({...(await openTemplate(insurer))}, map, {...shinseiValues(job, s), photoImages: photos.images, planImage: plan.image});
   const fileName = shinseiFileName(map, job, estimateDateOf(job));
   downloadBlob(new Blob([bytes], {type: XLSX_TYPE}), fileName);
-  return {fileName, missingPhotos: photos.missing, unreadablePhotos: photos.unreadable};
+  return {fileName, missingPhotos: photos.missing, unreadablePhotos: photos.unreadable, planMissing: plan.missing || plan.unreadable};
 }
 
 /** 住宅改修が必要な理由書（Excel）を保存する（ダウンロード）。保存したファイル名を返す（「山田花子様住宅改修理由書.xlsx」） */

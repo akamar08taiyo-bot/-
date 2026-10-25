@@ -470,6 +470,162 @@ await page.waitForFunction(
 assert.ok((await photoIds()).length >= 3); // 使っている3枚は残る（入れ替えた古い写真は、1時間たつまで消さない）
 log('写真（選ぶ・ドロップ・押して入れ替え・押して移す・削除・差し替え・プレビューの枠にドロップ・Excel の写真貼付用紙・読み直し・古い写真を消す）OK');
 
+// ---------------- 平面図の図（ユーザーの指示「平面図に画像をドロップ・貼り付け」2026-10-25）：プレビューの平面図の表題と工事内容のあいだの枠に、
+// ドロップ・Ctrl+V・押して選ぶ（PDF も）。写真の枠と同じ見た目（点線・「ドロップ・Ctrl+V」・ファイルを持ってくると薄い緑・重ねると「ここに離す」）。
+// 図は縦横の比のまま枠に収める（Excel と同じ位置）。押して選ぶと差し替え・削除（確かめてから）。Excel の平面図に貼る。読み直しても残る
+{
+  const planPage = pageOf('平面図  (2)');
+  const planSlot = preview.getByRole('button', {name: '平面図', exact: true});
+  await planPage.scrollIntoViewIfNeeded();
+  assert.match(await planSlot.innerText(), /^＋ 平面図\s*ドロップ・Ctrl\+V$/);
+  assert.equal(await planSlot.evaluate((el) => getComputedStyle(el).borderStyle), 'dashed');
+  // 枠は平面図のページの中、表題（氏名）の下・工事内容の上
+  const [pg, sl, title, legend] = await Promise.all([planPage.boundingBox(), planSlot.boundingBox(), planPage.getByText('（サンプル）山田', {exact: true}).boundingBox(), planPage.getByText(/①玄関　手すりの取り付け/).boundingBox()]);
+  assert.ok(sl.x >= pg.x && sl.x + sl.width <= pg.x + pg.width && sl.y >= title.y + title.height && sl.y + sl.height <= legend.y, `平面図の枠の位置 ${JSON.stringify({pg, sl, title, legend})}`);
+  assert.ok(sl.width > pg.width * 0.7 && sl.height > pg.height * 0.5, JSON.stringify(sl));
+  await planPage.screenshot({path: path.join(outDir, '84a-plan-empty.png')});
+  // ファイルを持ってくると薄い緑、重ねると「ここに離す」
+  const dragOver = (selector) =>
+    page.evaluate((sel) => {
+      const dt = new DataTransfer();
+      dt.items.add(new File(['x'], 'x.png', {type: 'image/png'}));
+      const el = document.querySelector(sel);
+      el.dispatchEvent(new DragEvent('dragenter', {dataTransfer: dt, bubbles: true, cancelable: true}));
+      el.dispatchEvent(new DragEvent('dragover', {dataTransfer: dt, bubbles: true, cancelable: true}));
+    }, selector);
+  await page.mouse.move(1, 1); // 枠の上にマウスがあると、ふだんも緑（hover）
+  const idleColor = await planSlot.evaluate((el) => getComputedStyle(el).backgroundColor);
+  await dragOver('h1');
+  await page.waitForFunction(() => document.querySelector('[data-plan-slot]')?.getAttribute('data-drop') === 'ready');
+  assert.notEqual(await planSlot.evaluate((el) => getComputedStyle(el).backgroundColor), idleColor); // 薄い緑
+  await planPage.screenshot({path: path.join(outDir, '84b-plan-drag-ready.png')});
+  await dragOver('[data-plan-slot]');
+  await planSlot.getByText('ここに離す').waitFor();
+  assert.equal(await planSlot.getAttribute('data-drop'), 'over');
+  await planPage.screenshot({path: path.join(outDir, '84c-plan-drag-over.png')});
+  await page.waitForFunction(() => !document.querySelector('[data-plan-slot]')?.getAttribute('data-drop'), null, {timeout: 3000});
+  // ドロップ：横長の図（2000×1414 → 縮めて 1600×1131）。縦横の比のまま、枠の幅いっぱい・上下のまん中
+  const planA = await makeImage('#7f8c8d', 2000, 1414);
+  await dropFile(planSlot, planA, 'plan.png');
+  const planImg = planSlot.locator('img');
+  await planImg.waitFor();
+  const [box, img] = [await planSlot.boundingBox(), await planImg.boundingBox()];
+  assert.ok(Math.abs(img.width / img.height - 1600 / 1131) < 0.02, `縦横の比 ${JSON.stringify(img)}`);
+  assert.ok(img.x >= box.x && img.y >= box.y && img.x + img.width <= box.x + box.width + 0.5 && img.y + img.height <= box.y + box.height + 0.5, '図が枠からはみ出す');
+  assert.ok(box.width - img.width < box.width * 0.03 && Math.abs(img.y + img.height / 2 - (box.y + box.height / 2)) < 2, `枠いっぱい・まん中 ${JSON.stringify({box, img})}`);
+  assert.equal(await page.getByRole('status', {name: '介護保険証を読んでいます'}).count(), 0);
+  const srcA = await planImg.getAttribute('src');
+  await planPage.screenshot({path: path.join(outDir, '84d-plan-image.png')});
+  // 枠を押して選び（道具：差し替え・削除・完了）、Ctrl+V で差し替え（縦長の図 900×1600）。介護保険証の読み取り・写真の欄には入らない
+  await planSlot.click();
+  assert.equal(await planSlot.getAttribute('aria-pressed'), 'true');
+  const tools = preview.getByRole('toolbar', {name: '平面図の図'});
+  assert.deepEqual(await tools.getByRole('button').allInnerTexts(), ['差し替え', '削除', '完了']);
+  await planPage.screenshot({path: path.join(outDir, '84e-plan-selected.png')});
+  const photoCount = (await photoIds()).length;
+  await page.evaluate((b64) => {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const d = new DataTransfer();
+    d.items.add(new File([bytes], 'image.png', {type: 'image/png'}));
+    (document.activeElement ?? document.body).dispatchEvent(new ClipboardEvent('paste', {clipboardData: d, bubbles: true, cancelable: true}));
+  }, blue.toString('base64'));
+  await page.waitForFunction((old) => document.querySelector('[data-plan-slot] img')?.getAttribute('src') !== old, srcA);
+  const tall = await planImg.boundingBox();
+  assert.ok(Math.abs(tall.width / tall.height - 900 / 1600) < 0.02 && box.height - tall.height < box.height * 0.03, `縦長の図は枠の高さいっぱい ${JSON.stringify(tall)}`);
+  assert.equal(await page.getByRole('status', {name: '介護保険証を読んでいます'}).count(), 0);
+  assert.equal((await photoIds()).length, photoCount + 1); // 写真と同じ所に1枚（写真の枠には入らない）
+  assert.equal(await slot('②', 'トイレ', '改修後').locator('img').count(), 1);
+  // 差し替え（ファイルを選ぶ）：PDF は1ページ目を図にする（縦長の1ページの PDF → 長い辺 1600 の縦長の図）
+  await planSlot.click();
+  const [planChooser] = await Promise.all([page.waitForEvent('filechooser'), tools.getByRole('button', {name: '差し替え'}).click()]);
+  assert.equal(await planChooser.isMultiple(), false);
+  const srcTall = await planImg.getAttribute('src');
+  await planChooser.setFiles({name: 'plan.pdf', mimeType: 'application/pdf', buffer: await pdfOf(await datedJpeg('#95a5a6', '2026:10:05 09:30:00'))});
+  await page.waitForFunction((old) => !!document.querySelector('[data-plan-slot] img') && document.querySelector('[data-plan-slot] img').getAttribute('src') !== old, srcTall);
+  // Excel：平面図のシートに図（縦横の比のまま・平面図の表題と工事内容のあいだ）
+  const planBook = sheetsOf((await saveExcel()).bytes);
+  const planRid = /<drawing r:id="([^"]+)"/.exec(planBook.sheets.get('平面図  (2)'))[1];
+  const planDrawing = new RegExp(`Id="${planRid}"[^>]*Target="\\.\\./drawings/([^"]+)"`).exec(strFromU8(planBook.files[planBook.paths.get('平面図  (2)').replace(/([^/]+)$/, '_rels/$1.rels')]))[1];
+  const pd = strFromU8(planBook.files[`xl/drawings/${planDrawing}`]);
+  const planPic = /<xdr:twoCellAnchor editAs="oneCell">(?:(?!<\/xdr:twoCellAnchor>)[\s\S])*name="平面図 \d+"[\s\S]*?<\/xdr:twoCellAnchor>/.exec(pd)?.[0];
+  assert.ok(planPic, '平面図の図がない');
+  const planEmbed = /r:embed="([^"]+)"/.exec(planPic)[1];
+  const planMedia = new RegExp(`Id="${planEmbed}"[^>]*Target="\\.\\./media/([^"]+)"`).exec(strFromU8(planBook.files[`xl/drawings/_rels/${planDrawing}.rels`]))[1];
+  const [pw, ph] = jpegSize(planBook.files[`xl/media/${planMedia}`]).split('x').map(Number);
+  assert.ok(ph === 1600 && pw < ph, `PDF の図の大きさ ${pw}x${ph}`);
+  // 図形の置き場所の縦横の比も図のまま
+  const [pcx, pcy] = /<a:ext cx="(\d+)" cy="(\d+)"\/>/.exec(planPic).slice(1).map(Number);
+  assert.ok(Math.abs(pcx / pcy - pw / ph) < 0.01, `${pcx}/${pcy}`);
+  const fromRow = Number(/<xdr:from>[\s\S]*?<xdr:row>(\d+)<\/xdr:row>/.exec(planPic)[1]) + 1;
+  const toRow = Number(/<xdr:to>[\s\S]*?<xdr:row>(\d+)<\/xdr:row>/.exec(planPic)[1]) + 1;
+  assert.ok(fromRow >= 8 && toRow <= 53, `平面図の図の行 ${fromRow}〜${toRow}`); // C8:AQ52（工事内容は54行目から）
+  // 読み直しても残る。使っている図は、古い写真を消すときも消さない
+  await page.waitForTimeout(1200);
+  const planId = await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const req = indexedDB.open('taiyo-sasaoka-shikiri');
+        req.onsuccess = () => {
+          const db = req.result;
+          const names = [...db.objectStoreNames];
+          const tx = db.transaction(names, 'readonly');
+          const out = [];
+          for (const n of names) {
+            const all = tx.objectStore(n).getAll();
+            all.onsuccess = () => out.push(...all.result);
+          }
+          tx.oncomplete = () => resolve(JSON.stringify(out).match(/"planPhoto":"([^"]+)"/)?.[1] ?? '');
+        };
+      }),
+  );
+  assert.ok(planId && (await photoIds()).includes(planId), `保存した平面図の図の番号 ${planId}`);
+  await page.reload();
+  await shinseiTab.waitFor();
+  if ((await shinseiTab.getAttribute('aria-selected')) !== 'true') await shinseiTab.click();
+  await planImg.waitFor();
+  assert.ok((await photoIds()).includes(planId));
+  // スマホの幅（390px）：枠は画面の中（横にはみ出さない）
+  await page.setViewportSize({width: 390, height: 844});
+  await planSlot.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  const narrow = await planSlot.boundingBox();
+  assert.ok(narrow.x >= 0 && narrow.x + narrow.width <= 390 && (await page.evaluate(() => document.documentElement.scrollWidth)) <= 390, JSON.stringify(narrow));
+  await pageOf('平面図  (2)').screenshot({path: path.join(outDir, '84f-plan-390.png')});
+  await page.setViewportSize({width: 1366, height: 900});
+  await page.waitForTimeout(300);
+  // 削除：確かめてから（「いいえ」なら消さない）
+  await page.evaluate(() => {
+    window.__asked = [];
+    window.__answer = false;
+    window.__confirm = window.confirm;
+    window.confirm = (m) => (window.__asked.push(m), window.__answer);
+  });
+  await planSlot.click();
+  await tools.getByRole('button', {name: '削除'}).click();
+  assert.deepEqual(await page.evaluate(() => window.__asked), ['平面図の図を削除しますか？']);
+  assert.equal(await planImg.count(), 1);
+  await page.evaluate(() => (window.__answer = true));
+  await tools.getByRole('button', {name: '削除'}).click();
+  await planImg.waitFor({state: 'detached'});
+  assert.match(await planSlot.innerText(), /^＋ 平面図/);
+  await page.evaluate(() => (window.confirm = window.__confirm));
+  // 空いた枠を Tab で選んで（フォーカス）Ctrl+V でも入る。消してもう一度入れた図は、次の Excel にも貼る（あとで消す）
+  await planSlot.focus();
+  await page.evaluate((b64) => {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const d = new DataTransfer();
+    d.items.add(new File([bytes], 'image.png', {type: 'image/png'}));
+    (document.activeElement ?? document.body).dispatchEvent(new ClipboardEvent('paste', {clipboardData: d, bubbles: true, cancelable: true}));
+  }, green.toString('base64'));
+  await planImg.waitFor();
+  await page.evaluate(() => (window.confirm = () => true));
+  await planSlot.click();
+  await tools.getByRole('button', {name: '削除'}).click();
+  await planImg.waitFor({state: 'detached'});
+  await page.evaluate(() => (window.confirm = window.__confirm));
+}
+log('平面図の図（枠・ドラッグ中の色・ここに離す・ドロップ・Ctrl+V・差し替え（PDF）・Excel の平面図・読み直し・スマホの幅・削除は確かめてから）OK');
+
 // ---------------- 写真に書く内容（ユーザーの指示「写真をめいいっぱいにしない。縦写真の場合、写真を左に寄せてスペースをつくる。横写真の場合、上にスペースをあけて
 // 入力スペースをつくる」「自動入力 手すり L=800mm H=600mm、追加 手入力例 ベースプレート L=800mm」）：写真の欄の箇所ごとに、自動の文（改修の種類・寸法）と手で足す行。
 // 改修前の枠だけに書く（「改修後には入れる必要はありません。改修前の時に、工務店さんの方に見積もり依頼…内容を伝える時に、見やすく分かりやすく伝えるもの」）。

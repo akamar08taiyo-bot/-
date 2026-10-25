@@ -4,14 +4,17 @@
 // まだ入っていない欄は薄い黄色。写真貼付用紙は、改修前・改修後の枠に写真を重ねて出す（枠に写真のファイルをドロップ、押して選ぶ）。
 // 写真を押すと、向き・大きさを直せる（ユーザーの指示「写真の方向転換」「画像の角っこを持ち上げて縮小・拡大」「iPad でもくるっと回転」）：
 // 角のつまみで大きさ（枠より大きくはしない）、上の丸いつまみでくるくる回す（90°の近くはそろう）、↺ ↻ で 90°ずつ、2本の指でひねる・つまむ（iPad）
+// 平面図は、表題と工事内容のあいだに平面図の図を入れる枠（ドロップ・Ctrl+V・押して選ぶ。PlanSlotView）
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import type {CSSProperties, DragEvent, PointerEvent as ReactPointerEvent, RefObject} from 'react';
 import type {PvFont, PvHeader, PvPage, PvPhotoSlot, PvShape, PvText, Rect, ShinseiField} from '../shinseiPreview.ts';
+import {Btn, DropArea, DropOverlay, pastedFiles, useFileDragging} from '../components/ui.tsx';
 import {circled} from '../estimateForms.ts';
 import {clampOff, clampScale, normRot, ROT_SNAP, turn} from '../photoEdit.ts';
-import {NOTE_INSET, photoNoteLayout, photoNotePt, photoPlacement, photoSlack} from '../shinsei.ts';
+import {NOTE_INSET, photoNoteLayout, photoNotePt, photoPlacement, photoSlack, planPlacement} from '../shinsei.ts';
 import {familyOf} from '../shinseiPreview.ts';
 import type {PhotoEdit, ShinseiMarks} from '../types.ts';
+import {isPhotoFile} from './PhotoBoard.tsx';
 
 const PAD = 18; // 紙の余白（画素）
 const MAX_SCALE = 1.3; // 広い画面では少し大きく
@@ -553,6 +556,167 @@ function PhotoSlotView({
   );
 }
 
+/** 平面図の図（画面の URL と大きさ。図がなければ undefined、読み込むまで・この端末にない図は null）と、図を入れる（差し替える）・ファイルを選ぶ・消す */
+export type PreviewPlan = {
+  image: {url: string; w: number; h: number} | null | undefined;
+  missing: boolean; // この端末にない図（ほかの端末で入れた・バックアップから戻した様邸）
+  busy: boolean; // 図を入れているところ（PDF を図にしているなど）
+  onFiles: (files: File[]) => void;
+  onPick: () => void;
+  onRemove: () => void;
+};
+
+/**
+ * 平面図の図を入れる枠（ユーザーの指示「平面図に画像をドロップ・貼り付け」2026-10-25）：平面図の表題と工事内容のあいだの空いた所（Excel で図を貼る範囲と同じ）。
+ * 写真の枠と同じく、空いた枠は点線に「ドロップ・Ctrl+V」、ファイルを画面に持ってくると薄い緑、重ねると「ここに離す」。押すとファイルを選ぶ。
+ * 図は Excel と同じ位置・大きさ（planPlacement。縦横の比はそのまま、枠より大きくしない）。図を押すと選んで、差し替え・削除（確かめてから）・完了。
+ * 枠を押した（選んだ・Tab で移った）あとの Ctrl+V は、この枠に貼る（写真の欄・介護保険証の読み取りより先に受ける）。
+ * 字が小さくならないように、紙を縮めて見せていても枠は画面の大きさで描く（slot は紙の画素、scale は縮めた割合、left・top は画面での紙の左上）
+ */
+function PlanSlotView({slot, scale, left, top, plan}: {slot: Rect; scale: number; left: number; top: number; plan: PreviewPlan}) {
+  const [selected, setSelected] = useState(false);
+  const [over, setOver] = useState(false);
+  const dragging = useFileDragging();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selectedRef = useRef(false);
+  selectedRef.current = selected;
+  const onFiles = useRef(plan.onFiles);
+  onFiles.current = plan.onFiles;
+  useEffect(() => {
+    if (!dragging) setOver(false); // 枠の外で離した・やめたとき
+  }, [dragging]);
+  // ほかの所を押す・Esc で選ぶのをやめる
+  useEffect(() => {
+    if (!selected) return;
+    const outside = (e: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setSelected(false);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelected(false);
+    };
+    document.addEventListener('pointerdown', outside, true);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('pointerdown', outside, true);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [selected]);
+  // Ctrl+V：この枠を選んでいる・フォーカスがあるときは、貼り付けた画像・PDF を平面図に（字を打つ欄・ほかの画面が開いているときは、ふつうの貼り付け）
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      if (!e.clipboardData) return;
+      const t = e.target instanceof Element ? e.target : null;
+      if (t?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
+      if (document.querySelector('[role="dialog"]')) return;
+      if (!selectedRef.current && !(rootRef.current && rootRef.current.contains(document.activeElement))) return;
+      const files = pastedFiles(e.clipboardData, isPhotoFile);
+      if (files.length === 0) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      setSelected(false);
+      onFiles.current(files);
+    };
+    document.addEventListener('paste', onPaste, true);
+    return () => document.removeEventListener('paste', onPaste, true);
+  }, []);
+  const remove = () => {
+    if (!window.confirm('平面図の図を削除しますか？')) return;
+    setSelected(false);
+    plan.onRemove();
+  };
+  const frame: CSSProperties = {left: left + slot.x * scale, top: top + slot.y * scale, width: slot.w * scale, height: slot.h * scale};
+  const image = plan.image;
+  if (image === undefined)
+    return (
+      <div ref={rootRef} className="absolute" style={frame}>
+        <DropArea
+          name="平面図"
+          label={plan.busy ? '平面図を入れています…' : '＋ 平面図'}
+          hint="ドロップ・Ctrl+V"
+          data-plan-slot
+          onPointerDown={(e) => e.currentTarget.focus()} // Safari は押してもフォーカスしないので（押したあとの Ctrl+V をこの枠に）
+          onPick={plan.onPick}
+          onFiles={(files) => plan.onFiles(files)}
+          className="flex h-full w-full flex-col items-center justify-center"
+        />
+      </div>
+    );
+  // 図の位置（紙の画素で Excel と同じ計算をして、画面の大きさに）
+  const box = image ? planPlacement({x: 0, y: 0, w: slot.w, h: slot.h}, image.w, image.h) : null;
+  const onDragOver = (e: DragEvent) => {
+    if (![...e.dataTransfer.types].includes('Files')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setOver(true);
+  };
+  return (
+    <div ref={rootRef} className="absolute" style={{...frame, zIndex: selected ? 20 : undefined}}>
+      <button
+        type="button"
+        aria-label="平面図"
+        aria-pressed={selected}
+        title={selected ? '平面図の図' : '平面図の図（押すと差し替え・削除）'}
+        data-plan-slot
+        data-drop={over ? 'over' : dragging ? 'ready' : undefined}
+        onPointerDown={(e) => e.currentTarget.focus()}
+        onClick={() => setSelected(true)}
+        onKeyDown={(e) => {
+          if (selected && (e.key === 'Delete' || e.key === 'Backspace')) {
+            e.preventDefault();
+            remove();
+          }
+        }}
+        onDragEnter={onDragOver}
+        onDragOver={onDragOver}
+        onDragLeave={(e) => {
+          if (!(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget))) setOver(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOver(false);
+          setSelected(false);
+          const files = [...e.dataTransfer.files];
+          if (files.length) plan.onFiles(files);
+        }}
+        className={`absolute inset-0 cursor-pointer rounded-md transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 ${
+          selected
+            ? 'ring-4 ring-sky-500'
+            : over
+              ? 'ring-4 ring-emerald-500'
+              : dragging
+                ? 'bg-emerald-50/60 ring-2 ring-emerald-400'
+                : image
+                  ? 'hover:ring-2 hover:ring-emerald-500'
+                  : 'border-2 border-dashed border-slate-400 hover:border-emerald-500'
+        }`}
+      >
+        {image && box ? (
+          <img src={image.url} alt="" draggable={false} className="absolute block max-w-none select-none" style={{left: box.x * scale, top: box.y * scale, width: box.w * scale, height: box.h * scale}} />
+        ) : (
+          plan.missing && <span className="absolute inset-0 flex items-center justify-center px-2 text-sm text-amber-800">この端末にない平面図</span>
+        )}
+        {plan.busy && <span className="absolute inset-x-0 top-1 text-center text-xs font-bold text-slate-600">平面図を入れています…</span>}
+        {over && <DropOverlay text="ここに離す（差し替え）" />}
+      </button>
+      {selected && (
+        // 道具は図にかぶらないように枠の下の端
+        <div role="toolbar" aria-label="平面図の図" className="absolute bottom-1 left-1/2 flex -translate-x-1/2 gap-1 rounded-lg bg-white/95 p-1 shadow-lg ring-1 ring-slate-300">
+          <Btn small color="white" onClick={plan.onPick}>
+            差し替え
+          </Btn>
+          <Btn small color="white" onClick={remove}>
+            削除
+          </Btn>
+          <Btn small color="white" onClick={() => setSelected(false)}>
+            完了
+          </Btn>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HeaderView({h, top, width, height}: {h: PvHeader; top: number; width: number; height: number}) {
   const part = (runs: PvHeader['left'], align: 'left' | 'center' | 'right') => (
     <div style={{flex: 1, textAlign: align, whiteSpace: 'pre'}}>
@@ -590,6 +754,7 @@ export function ShinseiPages({
   onOpen,
   onToggle,
   photos,
+  plan,
   scrollBox,
   title = '申請書のプレビュー',
 }: {
@@ -601,6 +766,7 @@ export function ShinseiPages({
   onOpen: (f: ShinseiField) => void; // 欄を押したとき（一覧のその項目へ）
   onToggle: (key: keyof ShinseiMarks, option: string) => void;
   photos?: PreviewPhotos; // 写真貼付用紙の写真（ないときは枠を出さない）
+  plan?: PreviewPlan; // 平面図の図（ないときは枠を出さない）
   scrollBox?: RefObject<HTMLElement | null>; // プレビューを入れた枠（一覧の横に並べて、枠の中で動くとき）
   title?: string; // プレビューの名前（理由書は「理由書のプレビュー」）
 }) {
@@ -738,6 +904,8 @@ export function ShinseiPages({
                 ))}
               </div>
             </div>
+            {/* 平面図の図を入れる枠（紙の上に、画面の大きさで） */}
+            {plan && page.planSlot && <PlanSlotView slot={page.planSlot} scale={scale} left={PAD * scale} top={(PAD + pp.head) * scale} plan={plan} />}
           </div>
         );
       })}

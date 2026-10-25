@@ -476,9 +476,10 @@ test('申請書のタブで寸法・写真を入れた箇所は、見積書の �
 
 test('白紙に戻す：見積書の内容と、申請書の項目・理由書（お客様のこと）を消す。保険者・担当・請求書に入れるかは残す', () => {
   const {job} = type({...emptyJob(), customer: '前の方', staff: '久保', address: '福岡県行橋市中央1丁目', insurer: 'yukuhashi'}, [['new:text', '木の手すり 35φ 4m', rail]]);
-  const full: Job = {...job, shinsei: {...job.shinsei, kana: 'マエノカタ'} as Job['shinsei'], riyu: {body: '前の方の身体状況'} as unknown as Job['riyu']};
+  const full: Job = {...job, shinsei: {...job.shinsei, kana: 'マエノカタ'} as Job['shinsei'], riyu: {body: '前の方の身体状況'} as unknown as Job['riyu'], planPhoto: 'ph-plan'};
   const blank = clearedSheet(full, S);
   assert.deepEqual([blank.customer, blank.address, blank.places.length, blank.riyu, blank.shinsei?.kana], ['', '', 0, undefined, '']);
+  assert.equal('planPhoto' in blank, false); // 平面図の図もお宅のもの（箇所の写真と同じく消す）
   assert.deepEqual([blank.staff, blank.insurer, blank.shikiri], ['久保', 'yukuhashi', true]);
 });
 

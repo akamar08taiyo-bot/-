@@ -9,12 +9,12 @@ import {
   liveData,
   moveToTrash,
   purgeTrash,
-  referencedStrings,
   rememberTrashAction,
   restoreFromTrash,
   trashedJobs,
   undoTrashAction,
 } from '../../src/sasaoka/trash.ts';
+import {photoIdsInUse} from '../../src/sasaoka/photos.ts';
 import type {AppData, Job} from '../../src/sasaoka/types.ts';
 
 // 見本の様邸（名前は見本だけ）。写真の番号を持つ箇所を1つ
@@ -110,11 +110,11 @@ test('2つのアプリ（タブ）：元に戻す・完全に削除と、もう�
 
 test('写真の掃除：ゴミ箱の様邸の写真の番号も残す（完全に削除するまで）', () => {
   const all = moveToTrash(jobs(), ['j1'], 100);
-  const keep = referencedStrings(all);
+  const keep = photoIdsInUse(all);
   assert.ok(keep.has('ph-1') && keep.has('ph-2'));
   // 画面に出すデータ（ゴミ箱を除く）から作ると残らない＝写真の掃除はゴミ箱も入ったデータから作ること
-  assert.equal(referencedStrings(liveData(data(all)).jobs).has('ph-1'), false);
-  assert.equal(referencedStrings(purgeTrash(all, ['j1'])).has('ph-1'), false);
+  assert.equal(photoIdsInUse(liveData(data(all)).jobs).has('ph-1'), false);
+  assert.equal(photoIdsInUse(purgeTrash(all, ['j1'])).has('ph-1'), false);
 });
 
 test('Ctrl+Z：さっきのゴミ箱に移す・元に戻すをやめる（元に戻したのをやめると、前の削除した日のままゴミ箱へ）', () => {

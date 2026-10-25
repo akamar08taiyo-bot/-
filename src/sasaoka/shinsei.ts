@@ -12,6 +12,7 @@ import type {EstimateRates, EstimateSettings} from './calc.ts';
 import {BASE_PLATE} from './cutLink.ts';
 import {circled, eraOf, jobInsurer, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa} from './estimateForms.ts';
 import {clampOff, clampScale, normRot} from './photoEdit.ts';
+import {textEm} from './print/fit.ts';
 import type {RiyuValues} from './riyu.ts';
 import type {Insurer, Job, PhotoEdit, Place, PlacePhotos, ShinseiInfo, ShinseiMarks} from './types.ts';
 import {customerFilePart, todayIso} from './util.ts';
@@ -36,6 +37,8 @@ export type ShinseiSheet = {
   // 平面図：写真番号の順の工事内容（改修の内容と同じ行「玄関① 木製L字手すり L=600×850㎜」）を空いた所に書く（ユーザーの指示）。
   // cell＝折り返しの欄に書く（みやこ町の下の欄）、box＝その範囲にテキストボックスを置く（前の申請の平面図と同じ）。平面図そのものはユーザーが Excel で描く
   legend?: {cell?: string; box?: string};
+  // 平面図の図（ユーザーがドロップ・貼り付けした平面図の画像）を貼る範囲：表題と工事内容のあいだの空いた所（ユーザーの指示「平面図に画像をドロップ・貼り付け」2026-10-25）
+  plan?: string;
   marks?: MarkCell[]; // 丸で囲む欄（性別「男　　・　　女」など）
   texts?: TextCell[]; // 申請書の画面で入れた項目（フリガナ・生年月日・電話番号など）を書く欄と書き方
   riyu?: boolean; // 住宅改修が必要な理由書のシート：理由書だけの欄（ShinseiValues の riyu。riyu.ts の riyuCells）も書く
@@ -142,8 +145,9 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
         ],
       },
       {sheet: '事後申請書', marks: [ERA('I9'), GENDER('V9'), CARE('I12')]},
-      // 平面図の表題は「（氏名）　様邸　平面図」（氏名は C2:AB6、「様邸　平面図」は原本の AC2）。工事内容は下の空いた所にテキストボックスで
-      {sheet: '平面図  (2)', name: 'C2', nameFormat: '{name}', legend: {box: 'C54:AQ68'}},
+      // 平面図の表題は「（氏名）　様邸　平面図」（氏名は C2:AB6、「様邸　平面図」は原本の AC2）。工事内容は下の空いた所にテキストボックスで。
+      // 平面図の図は表題の線（6行目の下）と工事内容（54行目から）のあいだに、1行ずつあけて
+      {sheet: '平面図  (2)', name: 'C2', nameFormat: '{name}', legend: {box: 'C54:AQ68'}, plan: 'C8:AQ52'},
       ...KANDA_PHOTO_SHEETS.map((sheet) => ({sheet, ...KANDA_PHOTO})),
     ],
   },
@@ -168,7 +172,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
           T('F20', '{cost}', 'number'),
         ],
       },
-      {sheet: '平面図  (2)', name: 'C2', nameFormat: '{name}', legend: {box: 'C54:AQ68'}},
+      {sheet: '平面図  (2)', name: 'C2', nameFormat: '{name}', legend: {box: 'C54:AQ68'}, plan: 'C8:AQ52'},
       ...YUKUHASHI_PHOTO_SHEETS.map((sheet) => ({sheet, ...YUKUHASHI_PHOTO})),
     ],
   },
@@ -195,7 +199,8 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
       // フリガナ・生年月日・住所・住宅の所有者・改修費用は承認届出書を参照する式。電話番号と着工日・完成日（日付の欄）は書く
       {sheet: '住宅改修費支給申請書(受領委任払用)', name: 'J6', marks: [GENDER('AB8'), RENOVATED('X18')], texts: [T('AA10', '{phone}'), T('J16', '{start}', 'date'), T('X16', '{end}', 'date')]},
       {sheet: '住宅改修内訳明細書', kinds: KIND_ROWS},
-      {sheet: '平面図', name: 'A1', nameFormat: '{name}　邸　平面図', legend: {cell: 'M48'}}, // 下の M48:AW48 は左上にそろえて折り返す空いた欄
+      // 下の M48:AW48 は左上にそろえて折り返す空いた欄。平面図の図は表題（A1:AZ6）と下の欄のあいだ
+      {sheet: '平面図', name: 'A1', nameFormat: '{name}　邸　平面図', legend: {cell: 'M48'}, plan: 'B8:AY46'},
       ...[1, 2, 3, 4].map((n) => ({sheet: `写真 (${n})`, ...MIYAKO_PHOTO})),
     ],
   },
@@ -239,7 +244,8 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
         ],
       },
       {sheet: '様式第2号別紙（住宅改修内訳明細書）', name: 'I6', insuredNo: boxes('W', 10, 7), kinds: KIND_ROWS, texts: [T('I5', '{kana}')]},
-      {sheet: '平面図 (2)', name: 'A1', nameFormat: '　{name}　様　邸　平面図', legend: {box: 'B37:H52'}}, // 前の申請と同じく、平面図の下にテキストボックス
+      // 前の申請と同じく、平面図の下にテキストボックス。平面図の図は表題（A1:I4）とテキストボックスのあいだ（印刷の1ページの幅＝A〜H）
+      {sheet: '平面図 (2)', name: 'A1', nameFormat: '　{name}　様　邸　平面図', legend: {box: 'B37:H52'}, plan: 'A6:H35'},
       ...KOUIKI_PHOTO_SHEETS.map((sheet) => ({sheet, ...PHOTO_SHEET})),
     ],
   },
@@ -265,6 +271,7 @@ export type ShinseiValues = {
   start: string; // 着工・完了の日（'YYYY-MM-DD'。日付で書く欄）
   end: string;
   photoImages?: Record<number, PhotoImages>; // 写真番号 → 写真貼付用紙に貼る写真（Excel に保存するときだけ。画面のプレビューは写真を別に重ねる）
+  planImage?: PhotoImage; // 平面図の図（Excel に保存するときだけ。画面のプレビューは図を別に重ねる）
   riyu?: RiyuValues; // 理由書だけの欄（理由書のシートに書く）
 };
 
@@ -787,9 +794,12 @@ export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void
     wrapKinds(files, sheet, v);
     fitLines(files, sheet, v);
     fitTexts(files, sheet, cells, copies);
+    fitCheckRows(files, sheet);
     drawMarks(files, sheet, v.marks);
     if (sheet.photoPlace?.kindCircles) drawKindCircle(files, sheet, photo > 0 && v.photos[photo] !== undefined ? (v.photoKinds?.[photo] ?? 0) : 0);
     if (sheet.legend?.box) drawLegend(files, sheet, v.works);
+    // 平面図の図（Excel に保存するときだけ。画面のプレビューは図を枠に重ねて描く）
+    if (sheet.plan && v.planImage) drawPlan(files, sheet, v.planImage);
     // Excel に保存するとき（photoImages があるとき）：箇所のある写真番号の最初の用紙に、写真と、写真の横（上）に書く内容を入れる
     //（画面のプレビューは、写真と書く内容を枠に重ねて描く）
     if (v.photoImages && photo > 0 && v.photos[photo] !== undefined && !pasted.has(photo)) {
@@ -1210,6 +1220,53 @@ function setStyle(xml: string, ref: string, style: string): string {
   return xml.slice(0, found.index) + head + attrs + found[0].slice(head.length + found[1].length) + xml.slice(found.index + found[0].length);
 }
 
+// ---------------------------------------------------------------- □の一覧の欄は、1行ずつ折り返さずに
+// ユーザーの指示「申請書の枠が込みの部分が無駄に行替えがされているため、修正する」（2026-10-25）：苅田町の写真の用紙の実施した工事種類（B4）は、
+// 原本の2行（「■手すりの取り付け　□(2)段差の解消　□(3)…床材の変更」「□(4)引戸等への扉の取替　…□(6)その他(1)～(5)に付帯する工事」）が
+// それぞれ欄の幅を数文字こえていて、Excel で「…床材の変」「更」のように4行に折り返していた。行の高さ・欄の大きさは原本のまま、入る大きさの字にする
+
+/** 太字の字が太くなる分（画素。字体に太字のない HGSｺﾞｼｯｸM・ＭＳ Ｐゴシックの太字は、Windows が字ごとに1画素ほど太らせて描く） */
+const BOLD_PX = 1;
+/** 1行に入るかの余裕（パソコンの拡大率・字体のちがいで少し広く描かれても折り返さないように） */
+const ROW_SAFE = 0.97;
+
+/**
+ * 字の幅（全角＝1）：半角の英数字・記号は見積書と同じ字ごとの幅（print/fit.ts の textEm）。ただし 0.55 より狭くは数えない
+ * （HGSｺﾞｼｯｸM などの半角のかっこは ＭＳ Ｐゴシックより広い。狭く数えると、原本の 11pt でも入ることになってしまう）
+ */
+const rowEm = (s: string) => [...s].reduce((n, ch) => n + (/[ -~｡-ﾟ]/.test(ch) ? Math.max(0.55, textEm(ch)) : 1), 0);
+
+/**
+ * 幅 w（画素）の欄に、lines を1行ずつ（折り返さずに）入れる文字の大きさ（pt。0.5pt きざみで base から小さく）。いちばん小さくて minPt。
+ * 太字は字ごとに BOLD_PX 広く数える。行の数は数えない（行の高さは原本のまま。原本の2行の欄に2行）
+ */
+export function oneRowPt(lines: string[], w: number, base: number, bold = false, minPt = 6): number {
+  const avail = (w - CELL_PAD) * ROW_SAFE;
+  const fits = (pt: number) => lines.every((l) => (rowEm(l) * pt * 4) / 3 + (bold ? [...l].length * BOLD_PX : 0) <= avail);
+  for (let pt = base; pt > minPt; pt -= 0.5) if (fits(pt)) return pt;
+  return minPt;
+}
+
+/**
+ * □の一覧の欄（苅田町の写真の用紙の改修箇所・実施した工事種類）を、1行ずつ欄の幅に入る大きさにする（入るときは原本のまま）。
+ * 箇所のない写真番号の用紙（原本の文字のまま）も同じ。原本の文字の一部に大きさのついた所（改修箇所の□の Segoe UI Symbol）は、その大きさのまま
+ */
+function fitCheckRows(files: Files, sheet: ShinseiSheet): void {
+  const pp = sheet.photoPlace;
+  const path = sheetPaths(files).get(sheet.sheet);
+  if (!pp || !path || !files[path]) return;
+  for (const ref of [pp.placeChecks, pp.kindChecks]) {
+    if (!ref) continue;
+    const xml = strFromU8(files[path]);
+    const found = cellRe(ref).exec(xml);
+    const text = cellText(xml, ref, sharedStrings(files));
+    if (!found || !text.trim()) continue;
+    const st = cellStyle(files, xml, ref);
+    const pt = oneRowPt(text.replace(/\r/g, '').split('\n'), rangeBox(sheetLayout(xml), ref).w, st.size, st.bold);
+    if (pt < st.size) files[path] = strToU8(setStyle(xml, ref, String(sizedStyle(files, numOf(attrOf(found[1], 's'), 0), pt))));
+  }
+}
+
 // ---------------------------------------------------------------- 丸で囲む（性別・元号・要介護状態区分・改修状況）
 // 欄の文字の位置を、列の幅・行の高さ・文字の大きさ・横の配置（中央・左）から計算して、楕円の図形を置く（前の申請の手書きの丸と同じ図形）。
 // 画素は Excel の画面（100%）と同じ数え方：列の幅は標準の文字の数字の幅（8画素。4つの原本の図形の位置で確かめた）から、文字は 11pt＝15画素。
@@ -1243,7 +1300,7 @@ export function sheetLayout(xml: string): SheetLayout {
   return {colW: (c) => cols.find((x) => x.min <= c && c <= x.max)?.px ?? defW, rowH: (r) => rows.get(r) ?? defH, merges};
 }
 
-type CellStyle = {size: number; font: string; horizontal: string; vertical: string; shrink: boolean; indent: number; wrap: boolean; rotation: number};
+type CellStyle = {size: number; font: string; bold: boolean; horizontal: string; vertical: string; shrink: boolean; indent: number; wrap: boolean; rotation: number};
 
 /** styles.xml の中身（字体・塗り・罫線・書式の XML を番号の順に。表示形式の番号 → 書き方。決まった色の番号の色を替えていればその色） */
 export type StyleParts = {fonts: string[]; fills: string[]; borders: string[]; xfs: string[]; numFmts: Map<number, string>; palette: string[]};
@@ -1273,6 +1330,7 @@ function cellStyle(files: Files, xml: string, ref: string): CellStyle {
   return {
     size: numOf(/<sz val="([\d.]+)"/.exec(font)?.[1], 11),
     font: unesc(/<name val="([^"]*)"/.exec(font)?.[1] ?? ''),
+    bold: /<b(?:\s+val="(?:1|true)")?\s*\/>/.test(font),
     horizontal: attrOf(align, 'horizontal') ?? 'general',
     vertical: attrOf(align, 'vertical') ?? 'bottom',
     shrink: attrOf(align, 'shrinkToFit') === '1',
@@ -1561,6 +1619,11 @@ export const NOTE_PT = 10.5;
 const NOTE_MIN_PT = 6;
 /** 書く欄のまわりの余白（画素）：左右・上下 */
 export const NOTE_INSET = {x: 5, y: 3};
+/**
+ * 横の写真の下に書くとき、写真の所と書く欄のあいだにあける画素（文字の半行ほど）。ユーザーの指示「写真と文字の位置を少しだけずらす。
+ * （文字をもう少し下にする）」（2026-10-25）：前は写真のすぐ下（写真の下の端から字の上まで 9画素ほど）で、文字が写真にくっついて見えた
+ */
+export const NOTE_GAP = 8;
 
 /** 写真の枠を、写真の所（photo）と書く欄（note）に分けた四角。書くことがなければ note は null（写真は枠いっぱい）。align は書く欄の文字のそろえ方 */
 export type PhotoNoteLayout = {photo: Box; note: Box | null; align: 'left' | 'center'};
@@ -1569,9 +1632,9 @@ export type PhotoNoteLayout = {photo: Box; note: Box | null; align: 'left' | 'ce
  * 写真の枠を、写真の所と書く欄に分ける（ユーザーの指示「写真をめいいっぱいにしない。縦写真の場合、写真を左に寄せてスペースをつくる。
  * 横写真の場合、上にスペースをあけて入力スペースをつくるなど、バランスよく」、2026-10-21）。
  * 縦長の写真（回したあとで）：枠の高さに合わせた写真の幅（枠の幅の 62% まで）を左に、残りの右を書く欄に（左ぞろえ）。
- * 横長の写真・写真のない枠：上に写真、そのすぐ下に書く欄（行の数に合わせて、枠の高さの 16〜32%。写真の高さが余れば写真のすぐ下から）。
+ * 横長の写真・写真のない枠：上に写真、その下に NOTE_GAP あけて書く欄（あけた分もふくめて、行の数に合わせて枠の高さの 16〜32%。写真の高さが余れば写真の下から）。
  * 書く欄の文字は中央ぞろえ（ユーザーの指示「画像を上にもってきて、画像の下に寸法をもってくる」「文字については、中央ぞろえにする」2026-10-22。前は書く欄が上）。
- * 画面のプレビューと Excel で同じ計算を使う
+ * どれも枠の中。画面のプレビューと Excel で同じ計算を使う
  */
 export function photoNoteLayout(frame: Box, size: {w: number; h: number; rot?: number} | null, lines: string[], pad = 4): PhotoNoteLayout {
   if (lines.length === 0) return {photo: frame, note: null, align: 'left'};
@@ -1587,9 +1650,10 @@ export function photoNoteLayout(frame: Box, size: {w: number; h: number; rot?: n
     ratio = bh / bw;
   }
   const line = ((NOTE_PT * 4) / 3) * LINE_K;
-  const nh = Math.min(frame.h * 0.32, Math.max(frame.h * 0.16, lines.length * line + 2 * NOTE_INSET.y + 2));
+  const nh = Math.min(frame.h * 0.32, Math.max(frame.h * 0.16, lines.length * line + 2 * NOTE_INSET.y + 2 + NOTE_GAP));
   const ph = ratio > 0 ? Math.min(frame.h - nh, (frame.w - 2 * pad) * ratio + 2 * pad) : frame.h - nh;
-  return {photo: {x: frame.x, y: frame.y, w: frame.w, h: ph}, note: {x: frame.x, y: frame.y + ph, w: frame.w, h: frame.h - ph}, align: 'center'};
+  const gap = Math.min(NOTE_GAP, (frame.h - ph) / 2); // とても低い枠でも、書く欄がなくならないように
+  return {photo: {x: frame.x, y: frame.y, w: frame.w, h: ph}, note: {x: frame.x, y: frame.y + ph + gap, w: frame.w, h: frame.h - ph - gap}, align: 'center'};
 }
 
 /** 書く欄の文字の大きさ（pt）：欄（余白の内側）に入る大きさ */
@@ -1602,10 +1666,9 @@ function drawPhotos(files: Files, sheet: ShinseiSheet, images: PhotoImages, note
   if (!place || !path || !files[path]) return;
   const lay = sheetLayout(strFromU8(files[path]));
   const drawing = drawingOf(files, path);
-  let d = drawing && files[drawing] ? strFromU8(files[drawing]) : '';
+  const d = drawing && files[drawing] ? strFromU8(files[drawing]) : '';
   if (!drawing || !d.includes('</xdr:wsDr>')) return;
-  const relsPath = drawing.replace(/([^/]+)$/, '_rels/$1.rels');
-  let rels = files[relsPath] ? strFromU8(files[relsPath]) : '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+  const media = pictures(files, drawing);
   let id = nextShapeId(d);
   const pics: string[] = [];
   const texts: string[] = [];
@@ -1623,30 +1686,68 @@ function drawPhotos(files: Files, sheet: ShinseiSheet, images: PhotoImages, note
     }
     if (!img) continue;
     const box = photoPlacement(parts.photo, img.w, img.h, img.edit);
-    let n = 1;
-    while (files[`xl/media/image${n}.jpeg`]) n++;
-    files[`xl/media/image${n}.jpeg`] = img.bytes;
-    let k = 1;
-    while (rels.includes(`Id="rId${k}"`)) k++;
-    rels = rels.replace('</Relationships>', `<Relationship Id="rId${k}" Type="${REL_IMAGE}" Target="../media/image${n}.jpeg"/></Relationships>`);
-    const name = slot === 'before' ? '改修前' : '改修後';
-    pics.push(
-      `<xdr:twoCellAnchor editAs="oneCell">${fromTo(lay, anchorBox(box, box.rot))}<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${id}" name="${name} ${id}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>` +
-        `<xdr:blipFill><a:blip r:embed="rId${k}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>` +
-        `<xdr:spPr>${xfrm(box, box.rot)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor>`,
-    );
+    pics.push(media.pic(lay, img.bytes, box, box.rot, id, slot === 'before' ? '改修前' : '改修後'));
     id++;
   }
-  if (pics.length === 0) {
-    if (texts.length) files[drawing] = strToU8(d.replace('</xdr:wsDr>', `${texts.join('')}</xdr:wsDr>`));
-    return;
-  }
-  files[relsPath] = strToU8(rels);
-  const root = /<xdr:wsDr\b[^>]*>/.exec(d)?.[0] ?? '';
-  if (root && !/\sxmlns:r=/.test(root)) d = d.replace(root, root.replace('<xdr:wsDr', `<xdr:wsDr xmlns:r="${NS_R}"`));
-  files[drawing] = strToU8(d.replace('</xdr:wsDr>', `${pics.join('')}${texts.join('')}</xdr:wsDr>`));
-  const ct = strFromU8(files['[Content_Types].xml']);
-  if (!/<Default\b[^>]*Extension="jpeg"/i.test(ct)) files['[Content_Types].xml'] = strToU8(ct.replace(/(<Types\b[^>]*>)/, '$1<Default Extension="jpeg" ContentType="image/jpeg"/>'));
+  media.done(d.replace('</xdr:wsDr>', `${pics.join('')}${texts.join('')}</xdr:wsDr>`));
+}
+
+const EMPTY_RELS = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+
+/**
+ * 図形のファイル（drawing）に写真（JPEG）を足す道具：pic で写真を xl/media に入れ、図形のファイルからのつながり（rId）を足して写真の図形の XML を返す。
+ * done で図形のファイルを書き込む（写真を足したときは、つながり・図形のファイルの r: の名前空間・[Content_Types] の jpeg も）
+ */
+function pictures(files: Files, drawing: string) {
+  const relsPath = drawing.replace(/([^/]+)$/, '_rels/$1.rels');
+  let rels = files[relsPath] ? strFromU8(files[relsPath]) : EMPTY_RELS;
+  let added = 0;
+  return {
+    /** 写真の図形：box は回す前の四角、rot は右回りの角度（置き場所の from・to は anchorBox）。縦横の比を変えない設定。名前は「改修前 3」「平面図 5」 */
+    pic(lay: SheetLayout, bytes: Uint8Array, box: Box, rot: number, id: number, name: string): string {
+      let n = 1;
+      while (files[`xl/media/image${n}.jpeg`]) n++;
+      files[`xl/media/image${n}.jpeg`] = bytes;
+      let k = 1;
+      while (rels.includes(`Id="rId${k}"`)) k++;
+      rels = rels.replace('</Relationships>', `<Relationship Id="rId${k}" Type="${REL_IMAGE}" Target="../media/image${n}.jpeg"/></Relationships>`);
+      added++;
+      return (
+        `<xdr:twoCellAnchor editAs="oneCell">${fromTo(lay, anchorBox(box, rot))}<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${id}" name="${name} ${id}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>` +
+        `<xdr:blipFill><a:blip r:embed="rId${k}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>` +
+        `<xdr:spPr>${xfrm(box, rot)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor>`
+      );
+    },
+    done(d: string): void {
+      if (added) {
+        files[relsPath] = strToU8(rels);
+        const root = /<xdr:wsDr\b[^>]*>/.exec(d)?.[0] ?? '';
+        if (root && !/\sxmlns:r=/.test(root)) d = d.replace(root, root.replace('<xdr:wsDr', `<xdr:wsDr xmlns:r="${NS_R}"`));
+        const ct = strFromU8(files['[Content_Types].xml']);
+        if (!/<Default\b[^>]*Extension="jpeg"/i.test(ct)) files['[Content_Types].xml'] = strToU8(ct.replace(/(<Types\b[^>]*>)/, '$1<Default Extension="jpeg" ContentType="image/jpeg"/>'));
+      }
+      files[drawing] = strToU8(d);
+    },
+  };
+}
+
+/** 平面図の図を置く位置：平面図の範囲（plan）に、縦横の比はそのまま・範囲に収まるだけ大きく・まん中に（写真と同じ photoPlacement。範囲より大きくしない）。画面のプレビューと Excel で同じ */
+export const planPlacement = (frame: Box, w: number, h: number): Box => photoFit(frame, w, h);
+
+/**
+ * 平面図の図（ユーザーの指示「平面図に画像をドロップ・貼り付け」2026-10-25）：平面図の範囲に写真の図形で貼る（Excel で動かしたり、上に線を描いたりできる）。
+ * 図形のいちばん下（うしろ）に入れる：工事内容のテキストボックスや、あとから Excel で描く線・図形が図の上に出るように
+ */
+function drawPlan(files: Files, sheet: ShinseiSheet, img: PhotoImage): void {
+  const path = sheetPaths(files).get(sheet.sheet);
+  if (!sheet.plan || !path || !files[path]) return;
+  const lay = sheetLayout(strFromU8(files[path]));
+  const drawing = drawingOf(files, path);
+  const d = drawing && files[drawing] ? strFromU8(files[drawing]) : '';
+  if (!drawing || !/<xdr:wsDr\b[^>]*>/.test(d)) return;
+  const media = pictures(files, drawing);
+  const pic = media.pic(lay, img.bytes, planPlacement(rangeBox(lay, sheet.plan), img.w, img.h), 0, nextShapeId(d), '平面図');
+  media.done(d.replace(/<xdr:wsDr\b[^>]*>/, (root) => root + pic));
 }
 
 /**

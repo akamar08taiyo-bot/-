@@ -20,7 +20,7 @@ import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
 import type {AppData, Insurer, Job, Material, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {toKatakana, yen} from '../util.ts';
-import {PhotoBoard, photoPlaces, SLOT_LABEL, usePhotoActions} from './PhotoBoard.tsx';
+import {PhotoBoard, photoPlaces, SLOT_LABEL, usePhotoActions, usePlanActions} from './PhotoBoard.tsx';
 import type {PhotoKey, PhotoSlot} from './PhotoBoard.tsx';
 import {canMakeShinsei, saveShinsei, useTemplate} from './shinseiFiles.ts';
 import {ShinseiPages} from './ShinseiPreview.tsx';
@@ -155,14 +155,22 @@ export function ShinseiEditor({
     const url = id ? photoUrls[id] : null;
     return url ? {...url, edit: place?.photoEdits?.[slot]} : null;
   };
+  // 平面図の図（プレビューの平面図の枠に、ドロップ・Ctrl+V・押して選ぶ。Excel の平面図に貼る）
+  const planActions = usePlanActions(setJob);
+  const planUrls = usePhotoUrls([job.planPhoto ?? '']);
+  const planInput = useRef<HTMLInputElement>(null);
+  // 図の URL：読み込むまでは undefined、この端末にない図は null
+  const planUrl = job.planPhoto ? planUrls[job.planPhoto] : undefined;
+  const pickPlan = () => planInput.current?.click();
 
   const save = () => {
     if (!insurer) return;
     void saveShinsei(job, insurer, s).then(
-      ({fileName, missingPhotos, unreadablePhotos}) => {
+      ({fileName, missingPhotos, unreadablePhotos, planMissing}) => {
         toast(`「${fileName}」を保存しました`);
         if (missingPhotos) toast(`写真${missingPhotos}枚はこの端末にないので貼っていません`, 'error');
         if (unreadablePhotos) toast(`写真${unreadablePhotos}枚は読めなかったので貼っていません`, 'error');
+        if (planMissing) toast('平面図の図はこの端末にないので貼っていません', 'error');
       },
       () => toast('申請書を作れませんでした', 'error'),
     );
@@ -463,6 +471,18 @@ export function ShinseiEditor({
                 if (files.length) void photoActions.put(files, key);
               }}
             />
+            <input
+              ref={planInput}
+              type="file"
+              accept="image/*,application/pdf,.pdf"
+              className="hidden"
+              aria-label="平面図のファイル"
+              onChange={(e) => {
+                const files = [...(e.target.files ?? [])];
+                e.target.value = '';
+                if (files.length) void planActions.put(files);
+              }}
+            />
             <PhotoBoard job={job} rates={s} sheetNos={sheetNos} dates={!!map?.sheets.some((x) => x.photoPlace?.dates)} actions={photoActions} onPick={pickPhoto} />
           </div>
           {/* スクロールバーの場所はいつも空けておく（scrollbar-gutter）。空けないと、中身の高さが箱とほぼ同じ窓の大きさで、スクロールバーが出る → 幅が狭くなり
@@ -498,6 +518,14 @@ export function ShinseiEditor({
                     const key = photoKey(no, slot);
                     if (key) photoActions.setEdit(key, edit);
                   },
+                }}
+                plan={{
+                  image: job.planPhoto ? (planUrl ?? null) : undefined,
+                  missing: planUrl === null,
+                  busy: planActions.busy,
+                  onFiles: (files) => void planActions.put(files),
+                  onPick: pickPlan,
+                  onRemove: planActions.remove,
                 }}
               />
             ) : null}

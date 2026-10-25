@@ -419,6 +419,7 @@ export function cleanJobs(raw: unknown): Job[] {
       ...(isObj(j.riyu) ? {riyu: cleanRiyu(j.riyu)} : {}),
       // ゴミ箱に移した時刻（trash.ts）。時刻でなければ（元に戻した・前の版のデータ）持たない＝ゴミ箱に入っていない
       ...(numv(j.trashedAt) > 0 ? {trashedAt: numv(j.trashedAt)} : {}),
+      ...(typeof j.planPhoto === 'string' && j.planPhoto ? {planPhoto: j.planPhoto} : {}), // 平面図の図（写真と同じ番号＝文字。2026-10-25）
       createdAt: numv(j.createdAt, Date.now()),
       updatedAt: numv(j.updatedAt, Date.now()),
     };

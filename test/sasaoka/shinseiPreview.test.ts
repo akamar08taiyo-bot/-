@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
-import {unzipSync} from 'fflate';
+import {strFromU8, unzipSync} from 'fflate';
 import {hasEstimateRows, startEstimate} from '../../src/sasaoka/calc.ts';
 import {NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
-import {SHINSEI, shinseiValues} from '../../src/sasaoka/shinsei.ts';
+import {rangeBox, SHINSEI, sheetLayout, sheetPaths, shinseiValues} from '../../src/sasaoka/shinsei.ts';
 import {formatNumber, shinseiPreview} from '../../src/sasaoka/shinseiPreview.ts';
 import type {PvPage} from '../../src/sasaoka/shinseiPreview.ts';
 import type {Insurer, Job, Place, Row} from '../../src/sasaoka/types.ts';
@@ -103,6 +103,24 @@ test('プレビュー：様式のうしろに平面図（空いた所に工事�
   // 箇所がなければ、平面図までで写真貼付用紙は出さない。様式・平面図のページに写真の枠はない
   assert.deepEqual(kinds('kanda', job('kanda', {places: []})), ['form:事前申請書', 'plan:平面図  (2)']);
   assert.ok(preview('kanda').filter((p) => p.kind !== 'photo').every((p) => p.photoSlots.length === 0));
+});
+
+test('プレビュー：平面図の図を入れる枠は、Excel で図を貼る範囲（ShinseiSheet.plan）と同じ所。表題の下・工事内容の上で、ページの中（4つの保険者）。ほかのページにはない', () => {
+  for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki'] as const) {
+    const pages = preview(insurer, job(insurer, {planPhoto: 'ph-plan'}));
+    const plan = pages.find((p) => p.kind === 'plan')!;
+    const s = plan.planSlot!;
+    const sheet = SHINSEI[insurer]!.sheets.find((x) => x.plan)!;
+    // 平面図のページは原本の A1 から（印刷の範囲・1ページ目）なので、範囲の画素がそのままページの位置
+    const lay = sheetLayout(strFromU8(TEMPLATES[insurer][sheetPaths(TEMPLATES[insurer]).get(sheet.sheet)!]));
+    assert.deepEqual(s, rangeBox(lay, sheet.plan!), insurer);
+    assert.ok(s.x >= 0 && s.y >= 0 && s.x + s.w <= plan.width + 1 && s.y + s.h <= plan.height + 1 && s.w > 500 && s.h > 450, `${insurer} ${JSON.stringify(s)}`);
+    // 表題（氏名の入った欄）の下、工事内容（文字の枠・みやこ町は下の欄）の上
+    const title = plan.texts.find((t) => t.runs.some((r) => r.text.includes('山田 太郎')))!;
+    const legend = plan.shapes.find((x) => x.text.startsWith('①')) ?? plan.texts.find((t) => t.ref === 'M48')!;
+    assert.ok(s.y >= title.y + title.h - 0.5 && s.y + s.h <= legend.y + 0.5, `${insurer} ${JSON.stringify([title, s, legend])}`);
+    assert.ok(pages.filter((p) => p.kind !== 'plan').every((p) => p.planSlot === null), insurer);
+  }
 });
 
 test('プレビュー：転記した内容（Excel に保存するときと同じ書き込み）と、式で同じ値を出す欄・丸（楕円）が出る', () => {

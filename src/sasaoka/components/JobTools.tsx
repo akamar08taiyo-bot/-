@@ -12,7 +12,8 @@ import {Btn, Modal, NumberInput} from './ui.tsx';
 
 export function copyJob(job: Job): Job {
   const now = Date.now();
-  const {trashedAt: _trashedAt, ...rest} = job; // 複製はゴミ箱に入れない（ゴミ箱の様邸は複製できないが、念のため）
+  // 複製はゴミ箱に入れない（ゴミ箱の様邸は複製できないが、念のため）。平面図の図もそのお宅のもの（写真と同じ）なので、複製には入れない
+  const {trashedAt: _trashedAt, planPhoto: _plan, ...rest} = job;
   return {
     ...rest,
     id: uid('j'),

@@ -114,8 +114,7 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
     });
   /** 写真のファイル（PDF はページごとに写真にする）を入れる：start の枠から（なければ①の改修前から）、改修前の空いた枠に順に */
   const put = async (files: File[], start?: PhotoKey) => {
-    const isPdf = (f: File) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
-    const chosen = files.filter((f) => isPdf(f) || f.type.startsWith('image/') || /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(f.name));
+    const chosen = files.filter(isPhotoFile);
     if (chosen.length === 0) {
       if (files.length) toast('写真（画像）か PDF のファイルを選んでください', 'error');
       return;
@@ -190,6 +189,46 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
     if (e.dataTransfer.files.length) void put([...e.dataTransfer.files], target);
   };
   return {put, swap, remove, drop, setDate, setNote, setEdit, swapPlaces, busy};
+}
+
+/** 写真（画像）か PDF のファイルか（写真の枠・平面図の枠に入れられるもの） */
+const isPdf = (f: File) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+export const isPhotoFile = (f: File) => isPdf(f) || f.type.startsWith('image/') || /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(f.name);
+
+/**
+ * 平面図の図を入れる・消す（ユーザーの指示「平面図に画像をドロップ・貼り付け」2026-10-25）。写真と同じく縮めた JPEG をこの端末に入れ（photos.ts）、
+ * 様邸には番号だけ（Job.planPhoto）。PDF は1ページ目を図にする。入れると前の図と差し替え（前の図は、使われなくなった写真と同じく prunePhotos があとで消す）
+ */
+export function usePlanActions(setJob: (fn: (j: Job) => Job) => void) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const put = async (files: File[]) => {
+    const file = files.find(isPhotoFile);
+    if (!file) {
+      if (files.length) toast('写真（画像）か PDF のファイルを選んでください', 'error');
+      return;
+    }
+    setBusy(true);
+    try {
+      let src: Blob = file;
+      if (isPdf(file)) {
+        const {pdfToImages} = await import('../pdfText.ts');
+        const [first] = await pdfToImages(new Uint8Array(await file.arrayBuffer()), 1600, 1);
+        if (!first) throw new Error('PDF のページがありません');
+        src = first;
+      }
+      const {blob, w, h} = await preparePhoto(src);
+      const id = await putPhoto({blob, w, h});
+      rememberPhotoUrl(id, blob, w, h);
+      setJob((j) => ({...j, planPhoto: id}));
+    } catch {
+      toast(`「${file.name}」を読めませんでした`, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const remove = () => setJob(({planPhoto: _old, ...j}) => j);
+  return {put, remove, busy};
 }
 
 /** ドラッグしているものが写真のファイルか */
@@ -283,6 +322,8 @@ export function PhotoBoard({
       const t = e.target instanceof Element ? e.target : null;
       if (t?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
       if (document.querySelector('[role="dialog"]')) return;
+      // 平面図の枠を選んでいるときは平面図へ（ShinseiPreview.tsx の PlanSlotView。写真の欄で写真を選んだままでも）
+      if (document.activeElement?.closest('[data-plan-slot]')) return;
       const to = pasteTo.current();
       if (!to) return;
       const files = pastedFiles(e.clipboardData, (f) => f.type.startsWith('image/') || f.type === 'application/pdf' || /\.(jpe?g|png|gif|webp|heic|heif|pdf)$/i.test(f.name));

@@ -160,6 +160,19 @@ test('新しい版が足した項目は消さない（前の版を開いたま�
   assert.deepEqual([any(kit).color, any(kit.rows[0]).memo2], ['blue', 'x']);
 });
 
+test('平面図の図（Job.planPhoto。写真と同じ番号）：読み直しても残る。文字でない値・空は持たない。もう一度整えても同じ', () => {
+  const [a, b, c] = cleanJobs([
+    {id: 'j1', customer: '見本', planPhoto: 'ph-plan', places: [{id: 'p1', name: '玄関', photos: {before: 'ph-1'}}]},
+    {id: 'j2', customer: '見本', planPhoto: 12},
+    {id: 'j3', customer: '見本', planPhoto: ''},
+  ]);
+  assert.equal(a.planPhoto, 'ph-plan');
+  assert.deepEqual(a.places[0].photos, {before: 'ph-1'});
+  assert.equal('planPhoto' in b, false);
+  assert.equal('planPhoto' in c, false);
+  assert.deepEqual(cleanJobs(structuredClone([a])), [a]);
+});
+
 test('月のない様邸はこの端末の日付の月（日本の1日の朝9時前も、その月）。保険者番号は全角の数字も読む', (t) => {
   const tz = process.env.TZ;
   process.env.TZ = 'Asia/Tokyo';

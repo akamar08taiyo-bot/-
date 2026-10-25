@@ -71,6 +71,21 @@ export async function getPhotos(ids: string[]): Promise<Map<string, StoredPhoto>
   return out;
 }
 
+/**
+ * 様邸のどこかに書いてある文字すべて（使っている写真の番号）。箇所の写真（Place.photos）・平面図の図（Job.planPhoto）のほか、
+ * この版の知らない項目（新しい版が足した項目）の写真も消さないように、項目の名前では選ばずに文字をみな数える
+ */
+export function photoIdsInUse(jobs: unknown): Set<string> {
+  const keep = new Set<string>();
+  const walk = (v: unknown): void => {
+    if (typeof v === 'string') keep.add(v);
+    else if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') Object.values(v).forEach(walk);
+  };
+  walk(jobs);
+  return keep;
+}
+
 /** どの様邸からも使われていない写真を消す（keep にない、before より前に入れたもの。ほかのタブで入れたばかりの写真は消さない） */
 export async function prunePhotos(keep: Set<string>, before: number): Promise<number> {
   const db = await openDb();

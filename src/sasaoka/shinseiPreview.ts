@@ -75,6 +75,7 @@ export type PvPage = {
   kind: 'form' | 'plan' | 'photo'; // 申請書の様式・平面図・写真貼付用紙
   photo: number; // 写真貼付用紙の写真番号（ほかは 0）
   photoSlots: PvPhotoSlot[];
+  planSlot: Rect | null; // 平面図の図を入れる所（平面図だけ。Excel で図を貼る範囲＝ShinseiSheet.plan と同じ）
   width: number;
   height: number;
   fills: (Rect & {color: string})[];
@@ -758,12 +759,15 @@ function buildPage(files: Files, path: string, templateSheet: Uint8Array, sheet:
     const b = rangeBox(lay, ref);
     photoSlots.push({slot, x: b.x - ox, y: b.y - oy, w: b.w, h: b.h});
   }
+  // 平面図の図を入れる所（ページの位置）
+  const pb = kind === 'plan' && sheet.plan ? rangeBox(lay, sheet.plan) : null;
 
   return {
     sheet: sheet.sheet,
     kind,
     photo,
     photoSlots,
+    planSlot: pb ? {x: pb.x - ox, y: pb.y - oy, w: pb.w, h: pb.h} : null,
     width: xs[c2 + 1],
     height: ys[r2 + 1],
     fills,

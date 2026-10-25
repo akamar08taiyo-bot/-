@@ -151,6 +151,8 @@ export type Job = {
   // ゴミ箱に移した時刻（ミリ秒）。あればゴミ箱のタブだけに出し、ほかの画面（一覧・請求書・発注書・探す・件数）には出さない（trash.ts）。
   // 元に戻すと持たない。複製には引き継がない
   trashedAt?: number;
+  // 申請書の平面図の図（ドロップ・貼り付けした平面図の画像）。写真と同じく、この端末の IndexedDB（photos.ts）の番号だけを持つ。複製では引き継がない
+  planPhoto?: string;
   createdAt: number;
   updatedAt: number;
 };

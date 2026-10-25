@@ -501,8 +501,9 @@ function applyNew(job: Job, field: string, text: string, ctx: SheetCtx): SheetRe
  * 保険者（書式）・担当・請求書に入れるかは残す
  */
 export function clearedSheet(job: Job, s: Pick<Settings, 'estimateForm'>): Job {
+  const {planPhoto: _plan, ...rest} = job; // 平面図の図もお宅のもの（箇所の写真と同じく消す。Ctrl+Z で戻る）
   return {
-    ...job,
+    ...rest,
     insurer: jobInsurer(job),
     form: jobForm(job, s),
     customer: '',
