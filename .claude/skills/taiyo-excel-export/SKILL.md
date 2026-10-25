@@ -26,6 +26,7 @@ description: 太陽ポータルの業務アプリ（見積・提案書作成、�
 | 消耗品売上管理（taiyo-uriage-bunseki） | `src/index.html` の `createXlsxBook()`・`xlLetterSpace`。fflate | `buildDocXlsx(kind, m)`（見積書・発注書） |
 | チラシ作成（消耗品）（taiyo-shohin-chirashi） | `assets/xlsx.js`（`window.TssXlsx`。zip も自前＝無圧縮＋CRC-32） | `quote.html` の `buildQuoteXlsx(d)` |
 | 特定福祉用具（`-` のブランチ `claude/care-insurance-auto-transfer-3z0c9n`） | `src/tokutei/print/xlsxBook.ts`（TypeScript。いちばん読みやすい見本。アプリでは使わなくなった） | 2026-10-23 から見積書は会社の原本に書く `estimateBook.ts`（申請書と同じ `xlsxEdit.ts`）。前の `estimateXlsx.ts` の `buildEstimateXlsx` は git の履歴に |
+| 販売受注簿作成ツール（taiyo-hacchu-scan。2026-10-25 はブランチ `claude/tokutei-embed`） | `src/lib/xlsxBook.mjs`（特定福祉用具の xlsxBook.ts を写した JS。**画像**（`ws.picture`。xl/drawings の oneCellAnchor）・拡大縮小（scale）・手動の改ページ・印刷タイトル・用紙の向きを足した。zip は無圧縮で自前） | `src/lib/orderXlsx.mjs`（受注簿。画面の印刷に出ている欄を DOM から読む。A4 横・1点ごとに改ページ・貼り付けた画像も）・`src/lib/estimateXlsx.mjs`（見積書。別ウィンドウの中身を `opener.__taiyoXlsx` で読む。式は見積書の表示と同じときだけ。明細の見出しを印刷タイトルに） |
 | 住宅改修（`-` のブランチ `claude/sasaoka-shikiri-app`） | **別の作り**：`src/sasaoka/xlsxWrite.ts`（`writeXlsx`・`SheetBuilder`。書体は ＭＳ Ｐゴシック、列幅は数字の幅 8px で 1/100 に丸める、文字は inlineStr で xml:space をいつも付ける、印刷は scale と手動の改ページ、calcPr なし）。申請書は**役所の原本（xltx）を開いてセルを書きかえる**（`shinsei.ts`） | 見積書・申請書 |
 
 新しいアプリに付けるときは、近いアプリの部品を写して使う（アプリ同士は独立しているので共有しない）。部品の中身は `references/ooxml-writer.md`。
@@ -84,4 +85,7 @@ python3 $S/side-by-side.py <出力>/見積_pdf-1.png <出力>/見積_xlsx-1.png 
 - fflate は jsPDF の依存として入っていることが多い。直接使うなら package.json に書く（`npm install fflate --save` で別のロックファイルの項目が消えたことがある → 差分を見る）。
 - ブラウザの外で帳票の関数を動かして見本を作るとき：esbuild は CJS にまとめる（ESM だと「Dynamic require of util」）、`--node-paths` はないので環境変数 `NODE_PATH`、
   一時の .ts から `fflate` が見つからないときは絶対パス（`…/node_modules/fflate/esm/index.mjs`）。
+- 帳票の文字の空白をまとめるのに JS の `\s` を使うと、**全角の空白（U+3000）もまとめてしまう**（「御　見　積　書」→「御 見 積 書」。販売受注簿作成ツール、2026-10-25）。`[ \t\n\r\f\v\u00a0]` のように半角だけを書く。
+- 画像を入れるとき（販売受注簿作成ツールの `ws.picture`）：oneCellAnchor の `from` のずれ（colOff・rowOff）は、そのセルの幅・高さより小さくする（列・行を歩いて、置く所のセルを決める）。JPEG は透明を持てないので、canvas で白を塗ってから描く。`[Content_Types].xml` に `Default Extension="jpeg"` を足す。validate.py で drawing も検査できる。
+- 別ウィンドウ（blob の URL）で開く帳票は、受注簿の画面（opener）の関数でその窓の `document` を読み、**その窓で**保存する（`downloadXlsx(bytes, name, doc)`。PDF の `__taiyoPdfLibs` と同じ形）。Playwright では `popup.waitForEvent('download')` で受ける。
 - LibreOffice は列の幅を代わりの字体で計算するので、細かい位置（半字ほど）は Excel と違うことがある。合否は計算・結合・ページ数・明らかな切れで決め、細かいずれは原本や印刷の位置と数値で比べる。
