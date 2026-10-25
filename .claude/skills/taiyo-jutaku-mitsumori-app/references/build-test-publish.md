@@ -50,6 +50,7 @@ console.error はアプリの誤りではないので数えない（`appError`�
 | `e2e-card.mjs` | `<サイト>` | 介護保険証から入れる（入口の名前は「🪪 介護保険証・介護ソフトの画面」「…から新規作成」）：架空の保険証（`cardFixture.mjs`。白黒・ざらつき・横向き）と負担割合証の画像2枚を選ぶ → 確かめる画面（番号・生年月日・性別・〒・住所・要介護・有効期間・保険者・負担割合が読める・直すとチェック・今の値）→ 申請書・理由書・見積書・特定福祉用具の受け渡しに出る。PDF を入口にドロップして新規作成（保険者も保険証から・生年月日は読めたか確かめてもらう）。ボタンは4つのタブのどれでもタブのすぐ右（同じ位置）。画面をクリックしてから Ctrl+V で貼り付けても読む（字を打つ欄では読まない）。居宅介護支援事業者は2件で、届出年月日の新しい方（見本ケアプランセンター）が理由書に入る。読み取りの部品は node_modules から（1回 20 秒ほど）。**架空の保険証は BIZ UD明朝で描くので、その字体があるかどうかで読み方が変わる**（このセッションの環境は `~/.fonts` に BIZ UD がある。ないと代わりの字体で描かれ、届出年月日の「1」が欠けるなど）。保険証の読み取りを直したら、`HOME=<空のフォルダ>` を付けて BIZ UD なしでも動かす（`HOME=/tmp/nohome PORT=5193 node serve.mjs …`） |
 | `e2e-tokutei.mjs` | `<サイト>` | 特定福祉用具申請書のタブ：4つのタブの順番・URL の view=tokutei・localStorage の受け渡し（項目の名前と値）・中の枠は画面の下まで。`<サイト>/tokutei/` に特定福祉用具のビルドを置くと、中のアプリに案件ができてお客様の情報が入る・題名の段を出さない・特定福祉用具で直した値は残り住宅改修で直した値は入れ直す・直してすぐタブを替えても消えない（`flushTokutei`）・読み直し・案件は1つ・スマホの幅・🛁 のタブを開いた新しい様邸は空でも消さない |
 | `e2e-caresoft.mjs` | `<サイト>` | 介護ソフトの画面から入れる：架空の介護ソフトのお客様の欄（`careSoftFixture.mjs`。見本・0000 の値だけ）を描いた PNG を、申請書のタブで Ctrl+V（ファイルの入った貼り付け）→ 確かめる画面 → 申請書・理由書・見積書・特定福祉用具の受け渡し。入口の「…から新規作成」の枠にドロップ（生保・苅田町・携帯だけ・担当の候補にない営業）→ 新しい様邸（保険者も画面から・生活保護）。入口の枠と写真の枠：ファイルを持ってくると薄い緑・重ねると「ここに離す」・空いた枠にドロップ・枠を選んで Ctrl+V（差し替え）。1366px とスマホの幅。読み取りの部品は node_modules から（e2e-card.mjs と同じ） |
+| `e2e-trash.mjs` | `<サイト>` | ゴミ箱：行の削除（やめる・Ctrl+Z）・もう1つのアプリにすぐ出る・チェックして「削除する」・探す／件数／請求書に出ない・読み直し・写真は完全に削除まで残る・元に戻す・完全に削除（1件ずつ・まとめて）・見積書／請求書の画面から削除・スマホの幅（タブ3段） |
 | `e2e-data.mjs` | `<サイト>` | 保存と取り込み：IndexedDB に書けないときは「保存しました」にせず警告、書けるようになったら保存／この版の知らない項目（新しい版が足した項目）は、この版のタブで直して保存しても消さない／仕切り表の取り込みで「別のファイルにする」と推測したメーカー名は推測し直す（手で打った名前はそのまま） |
 
 サイトは太陽ポータルと同じ形にする（`<サイト>/sasaoka/`・`<サイト>/jutaku-mitsumori/`、特定福祉用具申請書のタブの中まで通すなら `<サイト>/tokutei/` に特定福祉用具のビルド（ブランチ `claude/care-insurance-auto-transfer-3z0c9n` の `npm run -s build:tokutei` → `dist-tokutei/`）、販売受注簿まで通すなら `<サイト>/taiyo-hacchu-scan/` に taiyo-hacchu-scan の `docs/` か `dist/`）。
@@ -61,7 +62,9 @@ mkdir -p $SITE/sasaoka $SITE/jutaku-mitsumori
 cp dist-sasaoka/index.html dist-sasaoka/version.json $SITE/sasaoka/
 cp dist-jutaku/index.html dist-jutaku/version.json $SITE/jutaku-mitsumori/
 node <スキル>/scripts/serve.mjs $SITE node test/sasaoka/e2e-sheet.mjs http://localhost:5190 <出力フォルダ>
-node <スキル>/scripts/serve.mjs $SITE sh <スキル>/scripts/run-e2e.sh <出力フォルダ>   # 9つ（e2e・settings・sheet・estimate・sync・order・shinsei・riyu・card）。bracket・tokutei・caresoft・data は1つずつ
+node <スキル>/scripts/serve.mjs $SITE sh <スキル>/scripts/run-e2e.sh <出力フォルダ>   # 9つ（e2e・settings・sheet・estimate・sync・order・shinsei・riyu・card）。bracket・tokutei・caresoft・data・trash は1つずつ
+# card・caresoft は、特定福祉用具申請書のタブの中のアプリ（<サイト>/tokutei/）がないと 404 で落ちる。ポータルの tokutei/ を写しておく。
+# いくつかの作業を同時に動かすときは、PORT=5191 などで分け、サイトのフォルダもそれぞれにする（同じフォルダのビルドを上書きし合った。2026-10-23）
 ```
 
 ## 3. ビルドと公開（taiyo-portal）

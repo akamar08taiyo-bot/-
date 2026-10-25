@@ -132,3 +132,16 @@ React 19 ＋ TypeScript ＋ Vite（Tailwind）。リポジトリにはほかの�
 
 画面の作りの決まり：ボタンの色は機能ごと（`components/ui.tsx` の `COLORS`：emerald＝新規・追加、blue＝保存、rose＝削除、sky＝印刷、teal＝一覧・管理・転記、purple＝取り込み）。
 お知らせは `useToast()`（エラーは 'error'）。モーダルは `Modal`。数の増減は `Stepper`、数字の欄は `NumberInput`（type=text・inputMode=decimal なので Playwright では getByLabel で探す）。
+
+## 2026-10-23 に足したもの
+
+| ファイル | 中身 |
+|---|---|
+| `trash.ts`・`components/TrashPage.tsx` | ゴミ箱：様邸の `trashedAt`。`moveToTrash`・`restoreFromTrash`・`purgeTrash`・`liveData`（ゴミ箱を除いたデータ）・`trashedJobs`・Ctrl+Z の `rememberTrashAction`／`undoTrashAction`。画面は `TrashPage`、聞く `askTrash`、名前 `trashLabel`、Ctrl+Z の `useTrashUndo` |
+| `sheetEdit.ts` の `toolPlace`・`isEmptyPlace`・`dropEmptyPlaces` | 見積書の上のボタンで入れる箇所・中身のない箇所を消す |
+| `print/PrintView.tsx`・`sasaoka.css` | 印刷の画面の「🖨 印刷する」を用紙の右の上に（狭い画面は上の帯） |
+| `shinsei.ts` の `planPlacement`・`NOTE_GAP`・`oneRowPt`・`fitCheckRows`、`SHINSEI` の `plan` | 平面図の図の位置・写真に書く内容のすき間・苅田町 B4 の大きさ |
+| `estimate/ShinseiPreview.tsx` の `PreviewPlan`・`PlanSlotView`・`usePlanActions`、`shinseiPreview.ts` の `PvPage.planSlot` | 平面図の図の枠（ドロップ・Ctrl+V・差し替え・削除） |
+| `photos.ts` の `photoIdsInUse` | 写真の掃除で残す番号（様邸に書いてある文字すべて。ゴミ箱の様邸も） |
+| `estimate/shinseiFiles.ts` の `pictures()` | 写真・平面図の図を Excel のシートに足す共通の処理 |
+
