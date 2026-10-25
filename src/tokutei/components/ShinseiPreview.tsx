@@ -231,6 +231,11 @@ function paper(page: PvPage<string>) {
   return {width: page.width + PAD * 2, height: page.height + head + foot + PAD * 2, head, foot};
 }
 
+const TONE = {
+  sky: {on: 'bg-sky-400/15 outline outline-2 outline-sky-600', hover: 'hover:outline hover:outline-2 hover:outline-teal-600', hoverBg: 'hover:bg-teal-400/10'},
+  green: {on: 'bg-[#217346]/15 outline outline-[3px] outline-[#217346]', hover: 'hover:outline hover:outline-2 hover:outline-[#217346]', hoverBg: 'hover:bg-[#217346]/10'},
+};
+
 export function ShinseiPages<F extends string = ShinseiField>({
   pages,
   missing,
@@ -241,6 +246,7 @@ export function ShinseiPages<F extends string = ShinseiField>({
   title = '申請書のプレビュー',
   print = false,
   fixedScale,
+  tone = 'sky',
 }: {
   pages: PvPage<F>[];
   missing: Set<F>;
@@ -251,6 +257,9 @@ export function ShinseiPages<F extends string = ShinseiField>({
   title?: string; // プレビューの名前（見積書は「見積書のプレビュー」）
   print?: boolean; // 印刷：押す欄・色を出さない
   fixedScale?: number; // 決まった大きさで描く（印刷。画面の幅に合わせない）
+  // 入れている所・押せる所の色：申請書（白い様式）は水色。見積書は様式が水色なので、住宅改修の見積書と同じ Excel の緑（ユーザーの指示
+  // 「見積もりが水色で入力しているとわかるようにしてある色も水色なので、わかりづらい。入力項目は、住宅改修などと同じ色にする」2026-10-26）
+  tone?: 'sky' | 'green';
 }) {
   const [wrapRef, wrapWidth] = useWidth<HTMLDivElement>();
   const widest = Math.max(...pages.map((p) => paper(p).width), 1);
@@ -349,7 +358,7 @@ export function ShinseiPages<F extends string = ShinseiField>({
                       data-pv-field={f.field}
                       onClick={() => onOpen(f.field)}
                       className={`absolute cursor-pointer rounded-[2px] transition-colors ${
-                        on ? 'bg-sky-400/15 outline outline-2 outline-sky-600' : missing.has(f.field) ? 'bg-amber-300/35 hover:outline hover:outline-2 hover:outline-teal-600' : 'hover:bg-teal-400/10 hover:outline hover:outline-2 hover:outline-teal-600'
+                        on ? TONE[tone].on : missing.has(f.field) ? `bg-amber-300/35 ${TONE[tone].hover}` : `${TONE[tone].hoverBg} ${TONE[tone].hover}`
                       }`}
                       style={{left: f.x, top: f.y, width: f.w, height: f.h}}
                     />

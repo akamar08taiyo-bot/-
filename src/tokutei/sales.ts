@@ -1,6 +1,6 @@
 // 案件（お客様1件の販売）を作る・写す・商品マスタから明細を入れる部品。画面から呼ぶ（計算は calc.ts）
 
-import {INSURERS} from './defaults.ts';
+import {DEFAULT_MAKERS, INSURERS} from './defaults.ts';
 import type {Product, Sale, SaleItem, Settings} from './types.ts';
 import {todayIso, uid} from './util.ts';
 import {fiscalYearOf} from './wareki.ts';
@@ -130,7 +130,8 @@ export function customerLabel(sale: Sale): string {
   return sale.customer.trim() ? `${sale.customer.trim()} 様` : '（お客様名未入力）';
 }
 
-/** 印刷・申請の前に確かめてほしいこと（種目が決まっていない・価格がない・仕切がない商品など） */
+/** 印刷・申請の前に確かめてほしいこと（種目が決まっていない・価格がない商品など）。
+ * 仕切は任意（ユーザーの指示「仕切りは（任意）」2026-10-26）なので、入っていなくても知らせない */
 export function saleWarnings(sale: Sale): string[] {
   const out: string[] = [];
   const named = (i: SaleItem) => i.name.trim() || '（商品名なし）';
@@ -138,13 +139,35 @@ export function saleWarnings(sale: Sale): string[] {
   if (noCat.length) out.push(`種目が決まっていない商品：${noCat.map(named).join('、')}`);
   const noPrice = sale.items.filter((i) => i.unitPrice === null && i.listPrice <= 0 && i.cost <= 0);
   if (noPrice.length) out.push(`価格が入っていない商品：${noPrice.map(named).join('、')}`);
-  const noCost = sale.items.filter((i) => i.cost <= 0);
-  if (noCost.length) out.push(`仕切が入っていない商品（利益が分かりません）：${noCost.map(named).join('、')}`);
   if (!sale.insurer || (sale.insurer === 'other' && !sale.insurerName.trim())) out.push('保険者が選ばれていません');
   return out;
 }
 
 // ---------------------------------------------------------------- 前に入れたものを使い回す（ユーザーの指示「無駄を省けるようにする」）
+
+/** メーカー名の見分け（「アロン化成」「アロン化成（株）」「アロン化成株式会社」、全角・半角・すき間のちがいは同じ） */
+export const makerKey = (v: string) => v.normalize('NFKC').replace(/株式会社|有限会社|\((?:株|有)\)|㈱|㈲|\s/g, '');
+
+/**
+ * メーカー名の候補：はじめにパナソニックエイジフリー（株）・アロン化成（株）（DEFAULT_MAKERS）、そのあとに商品マスタと見積もりで使ったメーカー（多い順）。
+ * 同じメーカーの書き方ちがいは1つにする（はじめの2つと同じなら、はじめの2つの書き方）
+ */
+export function makerChoices(products: Pick<Product, 'maker'>[], sales: Pick<Sale, 'items'>[], limit = 40): string[] {
+  const count = new Map<string, {name: string; n: number}>();
+  const add = (v: string) => {
+    const name = v.trim();
+    const k = makerKey(name);
+    if (!k) return;
+    const c = count.get(k);
+    if (c) c.n += 1;
+    else count.set(k, {name, n: 1});
+  };
+  for (const p of products) add(p.maker);
+  for (const s of sales) for (const i of s.items) add(i.maker);
+  const first = new Set(DEFAULT_MAKERS.map(makerKey));
+  const rest = [...count.entries()].filter(([k]) => !first.has(k)).sort((a, b) => b[1].n - a[1].n || a[1].name.localeCompare(b[1].name, 'ja'));
+  return [...DEFAULT_MAKERS, ...rest.slice(0, limit).map(([, c]) => c.name)];
+}
 
 /** 同じお客様かの見分け：被保険者番号（10けたにそろえる）、なければ 名前＋生年月日 */
 export function customerKey(sale: Pick<Sale, 'insuredNo' | 'customer' | 'birthDate'>): string {

@@ -4,6 +4,7 @@ import {CATALOG_SITES, EMPTY_SCAN, itemFromScan, SCAN_PATH, scanDraft} from '../
 import type {ScanDraft} from '../scanItem.ts';
 import type {SaleItem, Settings, TaxType} from '../types.ts';
 import {CategorySelect} from './CategorySelect.tsx';
+import {MakerInput} from './MakerInput.tsx';
 import {Btn, btnClass, Modal, NumberInput, TextInput, useToast} from './ui.tsx';
 
 /** 画像（スクリーンショット）のファイル。貼り付け・落としたものの中の最初の1枚 */
@@ -16,7 +17,7 @@ const imageOf = (items: Iterable<{kind?: string; type: string; getAsFile?: () =>
  * 販売見積書の「📷 スクショから自動認識」（scanItem.ts）。左に受注簿ツールの読み取り（画像の欄だけ）、右に読み取った商品。
  * カタログの商品の画面を切り取って貼り付けると、商品名・型番・定価・仕切りが右に入る。直して「見積書に入れる」（閉じるまで続けて入れられる）
  */
-export function ScanDialog({settings, onAdd, onClose}: {settings: Settings; onAdd: (item: SaleItem) => void; onClose: () => void}) {
+export function ScanDialog({settings, makers, onAdd, onClose}: {settings: Settings; makers: string[]; onAdd: (item: SaleItem) => void; onClose: () => void}) {
   const toast = useToast();
   const frame = useRef<HTMLIFrameElement>(null);
   const [draft, setDraft] = useState<ScanDraft>(EMPTY_SCAN);
@@ -99,7 +100,7 @@ export function ScanDialog({settings, onAdd, onClose}: {settings: Settings; onAd
             <div className="grid grid-cols-2 gap-2">
               <label className={label}>
                 メーカー
-                <TextInput value={draft.maker} onChange={(maker) => set({maker})} className="w-full min-w-0" aria-label="読み取ったメーカー" />
+                <MakerInput value={draft.maker} onChange={(maker) => set({maker})} choices={makers} className="w-full" ariaLabel="読み取ったメーカー" placeholder="" />
               </label>
               <label className={label}>
                 型番
@@ -110,7 +111,7 @@ export function ScanDialog({settings, onAdd, onClose}: {settings: Settings; onAd
                 <NumberInput value={draft.listPrice} onChange={(listPrice) => set({listPrice})} ariaLabel="読み取った定価" blankZero className="w-full min-w-0" />
               </label>
               <label className={label}>
-                仕切り（税抜）
+                仕切り（税抜・任意）
                 <NumberInput value={draft.cost} onChange={(cost) => set({cost})} ariaLabel="読み取った仕切り" blankZero className="w-full min-w-0" />
               </label>
               <label className={label}>

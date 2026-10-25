@@ -2,12 +2,14 @@ import {useMemo, useState} from 'react';
 import type {ReactNode} from 'react';
 import {unitPriceOf} from '../calc.ts';
 import {CATEGORIES, docLabel} from '../category.ts';
+import {makerChoices} from '../sales.ts';
 import {productsCsv} from '../storage.ts';
 import type {AppData, Product, Settings, TaxType} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {downloadBlob, matchesAll, todayIso, uid, yen} from '../util.ts';
 import {CategorySelect} from './CategorySelect.tsx';
 import {ImportDialog} from './ImportDialog.tsx';
+import {MakerInput} from './MakerInput.tsx';
 import {Btn, Modal, NumberInput, Star, TextInput, useToast} from './ui.tsx';
 
 const PAGE = 200;
@@ -225,6 +227,7 @@ export function ProductsPage({data, update}: {data: AppData; update: Update}) {
         <ProductEditModal
           product={editing}
           settings={s}
+          makers={makerChoices(data.products, data.sales)}
           onClose={() => setEditing(null)}
           onSave={(p) => {
             update('products', (list) => (p.id && list.some((x) => x.id === p.id) ? list.map((x) => (x.id === p.id ? p : x)) : [...list, {...p, id: uid('p')}]));
@@ -247,7 +250,7 @@ function Field({label, children}: {label: string; children: ReactNode}) {
 }
 
 /** 商品の全部の項目を直す（手で足すときも） */
-export function ProductEditModal({product, settings, onSave, onClose}: {product: Product; settings: Settings; onSave: (p: Product) => void; onClose: () => void}) {
+export function ProductEditModal({product, settings, makers, onSave, onClose}: {product: Product; settings: Settings; makers: string[]; onSave: (p: Product) => void; onClose: () => void}) {
   const [p, setP] = useState(product);
   const set = (change: Partial<Product>) => setP((x) => ({...x, ...change}));
   const {price, rate} = productPrice(p, settings);
@@ -273,7 +276,7 @@ export function ProductEditModal({product, settings, onSave, onClose}: {product:
           </Field>
         </div>
         <Field label="メーカー名（製造事業者名）">
-          <TextInput value={p.maker} onChange={(maker) => set({maker})} />
+          <MakerInput value={p.maker} onChange={(maker) => set({maker})} choices={makers} ariaLabel="メーカー名" placeholder="" />
         </Field>
         <Field label="品番・型番">
           <TextInput value={p.code} onChange={(code) => set({code})} />
@@ -293,7 +296,7 @@ export function ProductEditModal({product, settings, onSave, onClose}: {product:
         <Field label="定価（税抜）">
           <NumberInput value={p.listPrice} onChange={(listPrice) => set({listPrice})} min={0} blankZero />
         </Field>
-        <Field label="仕切（税抜）">
+        <Field label="仕切（税抜・任意）">
           <NumberInput value={p.cost} onChange={(cost) => set({cost})} min={0} blankZero />
         </Field>
         <Field label="税区分">

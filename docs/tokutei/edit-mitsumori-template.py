@@ -1,5 +1,6 @@
 # 販売見積書の原本（src/tokutei/print/mitsumori.xltx）を直したときの手順（2026-10-25。一度だけ動かしたもの。直し方の記録として残す）。
-# ユーザーの指示：「見積もりの色がグレー系で暗いので、薄い水色系にする」「社名の部分が全体的に小さい。そして、社名は所長印、担当の上にもってくる」（2026-10-26）「見積もりでは、担当名をいれる」「会社住所の下に、電話番号とFAX番号を記載する」
+# ユーザーの指示：「見積もりの色がグレー系で暗いので、薄い水色系にする」「社名の部分が全体的に小さい。そして、社名は所長印、担当の上にもってくる」
+# 「他にも見積もりのバランスで違和感のある部分などがあればバランスをとって調整する」（2026-10-26）「見積もりでは、担当名をいれる」「会社住所の下に、電話番号とFAX番号を記載する」
 # 「見積もりの行数は4行ぐらい減らしていい」「会社名や社長名などの部分は、左寄せを統一して見やすくする」「税率の横に、備考を入れて、算出根拠をいれる」。
 #   python3 docs/tokutei/edit-mitsumori-template.py src/tokutei/print/mitsumori.xltx
 # 1. 灰色の塗り（fill 2＝背景色の15%暗い色）を薄い水色に
@@ -114,7 +115,9 @@ def inline(ref, s, text):
 
 
 # ---- 2. 列の幅（文字の幅の単位）。前：A 13.75・B 14.25・I 15.5・J 12.375（合計 101.875）
-widths = {1: 10.5, 2: 9, 3: 7.75, 4: 7.75, 5: 6.875, 6: 7.75, 7: 5.5, 8: 10.375, 9: 12, 10: 8, 11: 16.5}
+#    2026-10-26（ユーザーの指示「他にも見積もりのバランスで違和感のある部分などがあればバランスをとって調整する」）：備考（K）の字が縮んで小さかったので、
+#    単価（H 10.375→9.5）・金額（I 12→10.5）・税率（J 8→7）を少し細くして K を 16.5→19.875 に。題名の枠（D〜I）も用紙のまん中にそろう（全体の幅は同じ）
+widths = {1: 10.5, 2: 9, 3: 7.75, 4: 7.75, 5: 6.875, 6: 7.75, 7: 5.5, 8: 9.5, 9: 10.5, 10: 7, 11: 19.875}
 cols = ''.join(f'<col min="{c}" max="{c}" width="{w}" style="26" customWidth="1"/>' for c, w in widths.items())
 sheet = re.sub(r'<cols>.*?</cols>', f'<cols>{cols}<col min="12" max="16384" width="9" style="26"/></cols>', sheet, flags=re.S)
 
@@ -130,7 +133,7 @@ for r in range(22, 43):
     if sj is None:
         continue
     set_cell(f'J{r}', re.sub(r'\ss="\d+"', f' s="{with_right_thin(sj)}"', re.search(r'<c r="J%d"(?=[\s/>])[^>]*?(?:/>|>.*?</c>)' % r, sheet, re.S).group(0)))
-    k_style[r] = sj if r == 22 else with_align(sj, '<alignment horizontal="left" vertical="center" shrinkToFit="1"/>', font=24)
+    k_style[r] = sj if r == 22 else with_align(sj, '<alignment horizontal="left" vertical="center" shrinkToFit="1"/>', font=18)  # 10pt（2026-10-26 に 9pt から）
 # 合計の横の「消費税について」（45〜51行）・備考（59〜62行）の枠：J は枠の中（I と同じ書式）、K が右の端
 for r in list(range(45, 52)) + list(range(59, 63)):
     si, sj = cell_style(f'I{r}'), cell_style(f'J{r}')
@@ -231,12 +234,23 @@ drawing = drawing[: grp.start()] + anchor + drawing[grp.end():]
 heights = [22.5, 22.5, 3.75, 20.25, 20.25, 15, 15, 20.25, 17.25, 3, 18, 18, 18, 18, 18, 18]  # 1〜16行（pt。11・12・15・16行は上で 15→18）
 top = sum(heights) * 96 / 72 + 10
 drawing = drawing.replace('<a:off x="6233157" y="2962275"/>', f'<a:off x="{round(left * EMU)}" y="{round(top * EMU)}"/>', 1)
-# 赤い枠：合計の金額（C〜F）・金額の列（I）・消費税について（H〜K）。メモの文字の枠は1列右
+# 赤い枠：合計の金額（C〜F）・金額の列（H の右の端〜I）・消費税について（H〜K）。メモの文字の枠は1列右
+drawing = drawing.replace('<xdr:from><xdr:col>7</xdr:col><xdr:colOff>752475</xdr:colOff>', f'<xdr:from><xdr:col>7</xdr:col><xdr:colOff>{(px[8] - 4) * EMU}</xdr:colOff>', 1)
 drawing = drawing.replace('<xdr:col>1</xdr:col><xdr:colOff>1066798</xdr:colOff>', f'<xdr:col>1</xdr:col><xdr:colOff>{(px[2] - 7) * EMU}</xdr:colOff>', 1)
 drawing = drawing.replace('<xdr:col>8</xdr:col><xdr:colOff>1143000</xdr:colOff>', f'<xdr:col>8</xdr:col><xdr:colOff>{(px[9] - 4) * EMU}</xdr:colOff>', 1)
 drawing = drawing.replace('<xdr:col>10</xdr:col><xdr:colOff>466724</xdr:colOff>', '<xdr:col>11</xdr:col><xdr:colOff>466724</xdr:colOff>', 1)
 drawing = drawing.replace('<xdr:col>16</xdr:col><xdr:colOff>371475</xdr:colOff>', '<xdr:col>17</xdr:col><xdr:colOff>371475</xdr:colOff>', 1)
 drawing = drawing.replace('<xdr:col>10</xdr:col><xdr:colOff>28575</xdr:colOff>', '<xdr:col>11</xdr:col><xdr:colOff>28575</xdr:colOff>', 1)
+
+# ---- 見積日（I5）：表示形式を「2026年10月25日」に決める（原本は組み込みの 31 番＝日本語の Excel だけ年月日。ほかの環境・スマホでは「10/25/2026」と出た）
+nf_block = re.search(r'<numFmts count="(\d+)">(.*?)</numFmts>', styles, re.S)
+nf_id = max(int(x) for x in re.findall(r'numFmtId="(\d+)"', nf_block.group(2))) + 1
+styles = styles.replace(nf_block.group(0), f'<numFmts count="{int(nf_block.group(1)) + 1}">{nf_block.group(2)}<numFmt numFmtId="{nf_id}" formatCode="yyyy&quot;年&quot;m&quot;月&quot;d&quot;日&quot;"/></numFmts>')
+s_date = add_xf(re.sub(r'numFmtId="\d+"', f'numFmtId="{nf_id}"', xf_of(cell_style('I5'))))
+for c in 'IJK':
+    m = re.search(r'<c r="%s5"(?=[\s/>])[^>]*?(?:/>|>.*?</c>)' % c, sheet, re.S)
+    if m:
+        set_cell(f'{c}5', re.sub(r'\ss="\d+"', f' s="{s_date}"', m.group(0)))
 
 # ---- 書式の数を直して書き出す
 styles = styles.replace(xfs_block.group(0), f'<cellXfs count="{len(xfs) + len(new_xfs)}">{xfs_block.group(2)}{"".join(new_xfs)}</cellXfs>')

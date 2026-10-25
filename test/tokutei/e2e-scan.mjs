@@ -134,7 +134,7 @@ try {
   assert.match(name, /シャワーベンチ/);
   assert.equal(await dialog.getByLabel('読み取った仕切り').inputValue(), '21,000');
   assert.equal(await dialog.getByLabel('読み取った型番').inputValue(), 'SB-01');
-  assert.equal(await dialog.getByLabel('読み取ったメーカー').inputValue(), '見本化成');
+  assert.equal(await dialog.getByRole('combobox', {name: '読み取ったメーカー'}).inputValue(), '見本化成');
   assert.equal(await dialog.getByLabel('読み取った種目').inputValue(), '入浴補助用具|入浴用いす');
   assert.equal(await scan.getByText('右の欄に入れました').count(), 1);
   await page.screenshot({path: `${out}/scan-2-read.png`});

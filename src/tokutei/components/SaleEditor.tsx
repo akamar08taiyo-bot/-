@@ -3,7 +3,7 @@ import type {FocusEvent, MouseEvent} from 'react';
 import {saleTotals} from '../calc.ts';
 import {insurerLabel} from '../defaults.ts';
 import {HACCHU_IMPORT_KEY, hacchuImport, hacchuUrl, queueHacchu} from '../handoff.ts';
-import {blankItem, copySale, customerLabel, customerPatch, itemFromProduct, markUsed, sameYearSales, saleWarnings} from '../sales.ts';
+import {blankItem, copySale, customerLabel, customerPatch, itemFromProduct, makerChoices, markUsed, sameYearSales, saleWarnings} from '../sales.ts';
 import {shinseiForm, shinseiValues} from '../shinsei.ts';
 import {useTemplate} from '../shinseiFiles.ts';
 import {FIELD_LABEL, missingFields, shinseiPreview} from '../shinseiPreview.ts';
@@ -329,7 +329,7 @@ export function SaleEditor({
                 {estPages === null ? (
                   <p className="p-6 text-center text-sm text-slate-500">見積書を開いています…</p>
                 ) : (
-                  <ShinseiPages<EstimateField> pages={estPages} missing={estMissing} active={estActive} label={(f) => ESTIMATE_LABEL[f]} onOpen={goEstField} scrollBox={estBox} title="見積書のプレビュー" />
+                  <ShinseiPages<EstimateField> pages={estPages} missing={estMissing} active={estActive} label={(f) => ESTIMATE_LABEL[f]} onOpen={goEstField} scrollBox={estBox} title="見積書のプレビュー" tone="green" />
                 )}
               </section>
               <section className="rounded-xl border border-teal-200 bg-white p-4 shadow-sm">
@@ -390,6 +390,7 @@ export function SaleEditor({
       {scanning && (
         <ScanDialog
           settings={s}
+          makers={makerChoices(data.products, data.sales)}
           onAdd={(item) => update('sales', (list) => list.map((x) => (x.id === sale.id ? {...x, items: [...x.items, item], updatedAt: Date.now()} : x)))}
           onClose={() => setScanning(false)}
         />

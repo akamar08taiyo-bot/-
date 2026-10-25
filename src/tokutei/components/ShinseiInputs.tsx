@@ -1,11 +1,12 @@
 // 申請書の画面の左の入れる所：申請書の上からの順に1行ずつ（住宅改修の申請書のタブと同じ形。ユーザーの指示「住宅改修と同様に、申請書のページをメインに大きくおいてください」2026-10-23）。
 // 右のプレビュー（ShinseiPreview.tsx）の欄を押すと、ここのその行へ（data-field）。まだ入っていない行は薄い黄色。
 // 値は案件（Sale）のまま（見積書と同じ値。金額は見積書の側で入れる。ここでは購入金額を出すだけ）
+import {useMemo} from 'react';
 import type {ReactNode, RefObject} from 'react';
 import type {FocusEvent} from 'react';
 import type {Line} from '../calc.ts';
 import {CARE_LEVELS, INSURERS} from '../defaults.ts';
-import {frequentValues} from '../sales.ts';
+import {frequentValues, makerChoices} from '../sales.ts';
 import {carePlanOf, padInsuredNo} from '../shinsei.ts';
 import type {ShinseiKey} from '../shinsei.ts';
 import type {ShinseiField} from '../shinseiPreview.ts';
@@ -15,6 +16,7 @@ import {zipLabel} from '../zip.ts';
 import type {ZipHit} from '../zip.ts';
 import {BirthInput} from './BirthInput.tsx';
 import {CategorySelect} from './CategorySelect.tsx';
+import {MakerInput} from './MakerInput.tsx';
 import {ReasonField} from './ReasonField.tsx';
 import {Suggest} from './Suggest.tsx';
 import {Btn, Segmented, TextInput} from './ui.tsx';
@@ -58,6 +60,7 @@ export function ShinseiInputs({
   onAddItem: () => void;
   onPickCustomer: () => void;
 }) {
+  const makers = useMemo(() => makerChoices(data.products, data.sales), [data.products, data.sales]);
   const s = data.settings;
   /** 1行（左に申請書の言葉、右に入れる所。field があればプレビューの欄とつなぐ） */
   const row = (label: ReactNode, children: ReactNode, field?: ShinseiField, warn = field ? missing.has(field) : false) => (
@@ -212,7 +215,7 @@ export function ShinseiInputs({
                   <TextInput value={i.name} onChange={(name) => changeItem(i.id, {name})} placeholder="商品名" className="min-w-0 flex-1" aria-label="商品名" />
                   <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => changeItem(i.id, {category, sub})} ariaLabel="種目" />
                   {i.productId === null ? (
-                    <TextInput value={i.maker} onChange={(maker) => changeItem(i.id, {maker})} placeholder="メーカー" className="w-32" aria-label="メーカー" />
+                    <MakerInput value={i.maker} onChange={(maker) => changeItem(i.id, {maker})} choices={makers} className="w-56" />
                   ) : (
                     i.maker && <span className="text-xs text-slate-500">{i.maker}</span>
                   )}

@@ -1,14 +1,16 @@
 // 見積書の画面の左の入れる所：見積書の上からの順に1行ずつ（申請書の画面の ShinseiInputs と同じ形。ユーザーの指示「見積書は、住宅改修申請書や、特定福祉用具申請書みたいに、
 // プレビューも見ながら入力しやすいようにする。入力の感じはにせる」「入力項目も、行を見やすくして、入力しやすいようにする」2026-10-25）。
-// 右の見積書のプレビューの欄を押すと、ここのその行へ（data-field）。まだ入っていない行は薄い黄色、入れている行は青い枠。
+// 右の見積書のプレビューの欄を押すと、ここのその行へ（data-field）。まだ入っていない行は薄い黄色、入れている行は緑の枠（見積書の水色と分かれるよう、住宅改修の見積書と同じ Excel の緑。
+// 見出しの地は申請書・住宅改修の入れる所と同じ薄い灰色。ユーザーの指示「見積もりが水色で入力しているとわかるようにしてある色も水色なので、わかりづらい。入力項目は、住宅改修などと同じ色にする」2026-10-26）。
 // 下の「お客様・申請」の行は見積書には出ないが、申請書と販売受注簿に使う（申請書の画面と同じ値）
+import {useMemo} from 'react';
 import type {FocusEvent, ReactNode, RefObject} from 'react';
 import {basisNote, priceNote} from '../calc.ts';
 import type {Line, Totals} from '../calc.ts';
 import {docLabel} from '../category.ts';
 import {CARE_LEVELS, INSURERS} from '../defaults.ts';
 import type {EstimateField} from '../estimateBook.ts';
-import {frequentValues} from '../sales.ts';
+import {frequentValues, makerChoices} from '../sales.ts';
 import {carePlanOf, padInsuredNo} from '../shinsei.ts';
 import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Sale, SaleItem, SaleStatus, TaxType} from '../types.ts';
 import {yen} from '../util.ts';
@@ -16,6 +18,7 @@ import {zipLabel} from '../zip.ts';
 import type {ZipHit} from '../zip.ts';
 import {BirthInput} from './BirthInput.tsx';
 import {CategorySelect} from './CategorySelect.tsx';
+import {MakerInput} from './MakerInput.tsx';
 import {ReasonField} from './ReasonField.tsx';
 import {Suggest} from './Suggest.tsx';
 import {Btn, NumberInput, OptionalNumberInput, Segmented, Stepper, TextInput} from './ui.tsx';
@@ -64,14 +67,15 @@ export function EstimateInputs({
   onPickCustomer: () => void;
   withShinsei: boolean; // 下の「お客様・申請」の行も出す（住宅改修の販売見積書のタブの中では、お客様の情報は住宅改修と特定福祉用具申請書のタブで入れるので出さない）
 }) {
+  const makers = useMemo(() => makerChoices(data.products, data.sales), [data.products, data.sales]);
   const s = data.settings;
   /** 1行（左に見積書の言葉、右に入れる所。field があればプレビューの欄とつなぐ） */
   const row = (label: ReactNode, children: ReactNode, field?: EstimateField, warn = field ? missing.has(field) : false) => (
     <div
       data-field={field}
-      className={`border-b border-slate-300 last:border-b-0 sm:grid sm:grid-cols-[8.5rem_1fr] ${field && active === field ? 'relative z-[1] outline outline-2 -outline-offset-2 outline-sky-500' : ''}`}
+      className={`border-b border-slate-300 last:border-b-0 sm:grid sm:grid-cols-[8.5rem_1fr] ${field && active === field ? 'relative z-[1] outline outline-2 -outline-offset-2 outline-[#217346]' : ''}`}
     >
-      <div className="flex items-center border-b border-slate-200 bg-sky-50 px-3 py-1.5 text-sm font-bold text-slate-700 sm:border-b-0 sm:border-r sm:border-slate-300 sm:py-2">{label}</div>
+      <div className="flex items-center border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-bold text-slate-700 sm:border-b-0 sm:border-r sm:border-slate-300 sm:py-2">{label}</div>
       <div className={`flex min-w-0 flex-wrap items-center gap-2 px-3 py-2 ${warn ? 'bg-amber-50' : ''}`}>{children}</div>
     </div>
   );
@@ -112,7 +116,7 @@ export function EstimateInputs({
           '商品',
           <div className="w-full space-y-3">
             {t.lines.map((l, idx) => (
-              <ItemBlock key={l.item.id} line={l} no={idx + 1} change={(patch) => changeItem(l.item.id, patch)} remove={() => change({items: sale.items.filter((x) => x.id !== l.item.id)})} />
+              <ItemBlock key={l.item.id} line={l} no={idx + 1} makers={makers} change={(patch) => changeItem(l.item.id, patch)} remove={() => change({items: sale.items.filter((x) => x.id !== l.item.id)})} />
             ))}
             {t.lines.length === 0 && <p className="text-sm text-slate-500">「★ 商品を選ぶ」から商品を入れてください。</p>}
             <div className="flex flex-wrap gap-2">
@@ -335,7 +339,7 @@ export function EstimateInputs({
  * 商品1点：見積書の明細の1行と同じ並び（品名／数量・単位・単価・金額・税率・備考）。1行目に品名、2行目に値段、3行目に備考（算出根拠）。
  * 種目・メーカー・品番（手で入れた商品）は下の小さい行
  */
-function ItemBlock({line: l, no, change, remove}: {line: Line; no: number; change: (patch: Partial<SaleItem>) => void; remove: () => void}) {
+function ItemBlock({line: l, no, makers, change, remove}: {line: Line; no: number; makers: string[]; change: (patch: Partial<SaleItem>) => void; remove: () => void}) {
   const i = l.item;
   const manual = i.productId === null;
   const auto = basisNote(l);
@@ -413,10 +417,10 @@ function ItemBlock({line: l, no, change, remove}: {line: Line; no: number; chang
         <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => change({category, sub})} ariaLabel="種目" />
         {manual ? (
           <>
-            <TextInput value={i.maker} onChange={(maker) => change({maker})} placeholder="メーカー" className="w-32" aria-label="メーカー" />
+            <MakerInput value={i.maker} onChange={(maker) => change({maker})} choices={makers} className="w-56" />
             <TextInput value={i.code} onChange={(code) => change({code})} placeholder="品番" className="w-28" aria-label="品番" />
             <label className="flex items-center gap-1 font-bold text-slate-600">
-              仕切（税抜）
+              仕切（税抜・任意）
               <NumberInput value={i.cost} onChange={(cost) => change({cost})} min={0} blankZero className="w-24" ariaLabel="仕切" />
             </label>
           </>

@@ -309,6 +309,19 @@ try {
     await page.getByRole('button', {name: '＋ 手で入れる'}).click();
     await page.getByLabel('商品名').last().fill(`見本の商品 ${n}`);
   }
+  // メーカー名は候補から選べる（はじめにパナソニックエイジフリー（株）・アロン化成（株））・ほかも打てる・仕切は任意・入れている所は緑の枠（見積書の水色と分かれる）
+  // （ユーザーの指示「メーカー名は、パナソニックエイジフリー（株）とアロン化成（株）はデフォルトにする。それ以外でも選べるようにする」「仕切りは（任意）」
+  // 「見積もりが水色で入力しているとわかるようにしてある色も水色なので、わかりづらい。入力項目は、住宅改修などと同じ色にする」2026-10-26）
+  const maker = page.getByRole('combobox', {name: 'メーカー'}).last();
+  await page.getByRole('button', {name: 'メーカーを候補から選ぶ'}).last().click();
+  const makerOpts = await page.getByRole('listbox', {name: 'メーカーの候補'}).getByRole('option').allInnerTexts();
+  assert.deepEqual(makerOpts.slice(0, 2), ['パナソニックエイジフリー（株）', 'アロン化成（株）']);
+  await page.getByRole('option', {name: 'アロン化成（株）'}).click();
+  assert.equal(await maker.inputValue(), 'アロン化成（株）');
+  await maker.fill('見本工業');
+  assert.equal(await maker.inputValue(), '見本工業');
+  await page.getByText('仕切（税抜・任意）').last().waitFor();
+  await page.waitForFunction(() => document.querySelector('[aria-label="見積書のプレビュー"] [data-pv-field="items"]')?.className.includes('outline-[#217346]'));
   await page.getByRole('textbox', {name: '備考', exact: true}).fill(['ご不明な点は担当までお問い合わせください。', '納品の前にお電話いたします。'].join('\n'));
   await page.getByText('見積書の備考は3行までです').waitFor();
   await page.getByRole('button', {name: '🖨 見積書を印刷'}).first().click();

@@ -111,7 +111,10 @@ URL は `#jutaku=<様邸の id>&embed=1`：その様邸の案件を開き（な�
   行の属性は `r` のすぐあとに足す（`<row hidden="1" r=…` にすると `<row r="N"` の正規表現が当たらない）。`ht=` を置きかえる正規表現は `(?<=\s)ht=`（`customHeight=` に当たって XSD に反した）。
   原本の I26〜I42 の「共有の式」は、原本の側でふつうの式にした（コードでも明細の20行をすべて書く）。
 - **備考（算出根拠）**：`calc.ts` の `basisNote`（「定価28,000円の20%引き」。単価を手で入れて割引率が整数にならないときは「定価28,000円」だけ、定価のない商品は空）・`itemNote`（手で直した `SaleItem.basisNote` があればそれ。空の文字も「書かない」として残す・null で自動に戻す）。
-- **見積書の入れる所は `components/EstimateInputs.tsx`**（申請書の `ShinseiInputs` と同じ形：薄い水色の見出し・1行ずつ・プレビューの欄を押すとその行へ。ユーザーの指示「入力の感じはにせる」）。
+- **見積書の入れる所は `components/EstimateInputs.tsx`**（申請書の `ShinseiInputs` と同じ形：薄い灰色の見出し・1行ずつ・プレビューの欄を押すとその行へ。ユーザーの指示「入力の感じはにせる」）。
+  見積書のプレビューの入れている所は Excel の緑（`ShinseiPages` の `tone="green"`。見積書の地が水色なので、水色の枠だと分からないと言われた 2026-10-26）。
+  メーカー名は `MakerInput`（パナソニックエイジフリー（株）・アロン化成（株）が先頭。`makerChoices`）。e2e では `getByRole('combobox', {name: 'メーカー'})`（「▼」のボタン・候補の名前にも「メーカー」が入る）。
+  仕切は任意（「仕切（税抜・任意）」・`saleWarnings` で知らせない）。
   見積書のプレビューに「担当」の押せる欄（I16）ができたので、e2e で `getByLabel('担当')` は2つに当たる → `getByRole('combobox', {name: '担当'})`。
 - **販売受注簿への自動の送り**：状態を承認・納品にしたとき1回だけ列 `taiyo-hacchu-import-queue-v1` に入れる（`handoff.ts` の `queueHacchu`・案件の `hacchuSentAt`。受注簿ツールの `readJutakuImport` が列を読む）。DESIGN.md 5.3。
   受注簿ツールに入力途中の受注簿があると「前回の入力は消えて…」と確かめが出る（e2e は dialog を受ける）。

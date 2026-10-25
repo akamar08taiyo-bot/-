@@ -318,6 +318,31 @@ test('会社の欄の場所と大きさ（ユーザーの指示「社名の部�
   assert.ok(addr.shrink && addr.x + addr.w <= name.x + name.w + 1);
 });
 
+test('見積書のバランスの直し（2026-10-26）：備考の列を広く・10pt、題名の枠は用紙のまん中、見積日は「2026年10月22日」の形', () => {
+  const t = template();
+  const xml = strFromU8(t['xl/worksheets/sheet1.xml']);
+  const styles = strFromU8(t['xl/styles.xml']);
+  const width = (c: number) => Number(new RegExp(`<col min="${c}" max="${c}" width="([\\d.]+)"`).exec(xml)?.[1]);
+  const px = (c: number) => Math.floor(8 * width(c) + 0.5);
+  const total = Array.from({length: 11}, (_, i) => px(i + 1)).reduce((a, b) => a + b, 0);
+  assert.equal(total, 816); // 全体の幅は前と同じ（印刷の大きさが変わらない）
+  assert.ok(px(11) >= 155, `備考の列 ${px(11)}px`);
+  const left = [1, 2, 3].reduce((a, c) => a + px(c), 0);
+  const right = left + [4, 5, 6, 7, 8, 9].reduce((a, c) => a + px(c), 0);
+  assert.ok(Math.abs((left + right) / 2 - total / 2) <= 3, `題名の枠（D〜I）のまん中 ${(left + right) / 2} と用紙のまん中 ${total / 2}`);
+  // 見積日：組み込みの 31 番（日本語の Excel だけ年月日）ではなく、決めた形
+  const nf = /<numFmt numFmtId="(\d+)" formatCode="yyyy&quot;年&quot;m&quot;月&quot;d&quot;日&quot;"\/>/.exec(styles);
+  assert.ok(nf);
+  const s5 = Number(/<c r="I5" s="(\d+)"/.exec(xml)?.[1]);
+  const xf = [...(/<cellXfs count="\d+">(.*?)<\/cellXfs>/s.exec(styles)?.[1] ?? '').matchAll(/<xf [^>]*?(?:\/>|>.*?<\/xf>)/gs)][s5][0];
+  assert.match(xf, new RegExp(`numFmtId="${nf[1]}"`));
+  const page = estimatePreview(t, sale(), S)[0];
+  assert.ok(page.texts.some((x) => x.runs.map((r) => r.text).join('') === '2026年10月22日'));
+  // 備考（算出根拠）は 10pt
+  const k = page.texts.find((x) => x.runs.map((r) => r.text).join('') === '定価32,000円の20%引き')!;
+  assert.equal(Math.round((k.runs[0].font.size * 72) / 96), 10);
+});
+
 test('会社の欄：設定の営業所の値（ほかの営業所でも、TEL・FAX・所長・登録番号）。担当がいなければ空', () => {
   const kokura = settingsForOffice(S, '小倉営業所');
   const f = unzipSync(fillEstimate(template(), sale({staff: ''}), kokura));
