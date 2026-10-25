@@ -99,7 +99,6 @@ test('販売受注簿へ渡す内容：受注区分「給付」の1点1ページ
     },
   );
   assert.deepEqual(h.items[0], {
-    id: 'a', // 見積書の商品の id（販売見積書の中の受注簿のページとつなぐ）
     productName: 'シャワーチェア 見本A',
     maker: '見本メーカー',
     modelNumber: 'A-100',

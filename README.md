@@ -49,12 +49,9 @@
 - 申請書の画面：案件の画面の「📄 申請書」（またはタブ「📄 申請書（行橋市）」など）で、左で入れながら右で申請書の原本の形のまま見る（住宅改修の申請書と同じ。
   ユーザーの指示「特定福祉用具購入の申請書も、住宅改修の申請書と同じくプレビューを見ながら入力することができる」2026-10-22）。
   プレビューの欄を押すと左のその入れる所へ、入れている所の欄は囲む、まだ入っていない所は薄い黄色（`shinseiPreview.ts`・`components/ShinseiPreview.tsx`）
-- 販売受注簿：見積もりの画面の「📋 見積書」「📦 販売受注簿」の切り替えで、販売受注簿作成ツール（taiyo-hacchu-scan）を中に出す（`/taiyo-hacchu-scan/?embed=tokutei` の iframe。
-  `components/HacchuFrame.tsx`・`src/tokutei/hacchuLive.ts`。ユーザーの指示「販売見積書のページ内にある、販売受注簿に飛べるようにする」2026-10-23）。
-  見積書のお客様（名前・フリガナ・住所・電話）・担当・商品が、商品1点ずつ受注区分「給付」のページになって入り、見積書を直すたびに入れ直す（postMessage。送る内容は `handoff.ts` の `hacchuImport`）。
-  受注簿で直した商品名・型番・定価・仕切り、足した商品（「📷 カタログから商品を自動認識」で読み取って「商品を追加」）・消したページは見積書にも入る。
-  受注番号などの受注簿の中身は案件に保存（`Sale.hacchu`）。ページごとの給付内訳は、合計が見積書と同じになるようにこのアプリで分けて送る。
-  受け取りは受注簿ツールの `src/main.jsx` の tokutei-live-begin〜end。形を変えるときは両方を直す。DESIGN.md 5.3）
+- 販売受注簿への転記：見積もりの画面の「📤 販売受注簿に転記」で、販売受注簿作成ツール（taiyo-hacchu-scan）を新しいタブで開き、商品1点ずつ受注区分「給付」のページにする
+  （同じサイトの localStorage `taiyo-hacchu-import-v1`、kind `taiyo-tokutei-order`。`src/tokutei/handoff.ts`。ページごとの給付内訳は、合計が見積書と同じになるようにこのアプリで分けて送る。
+  受け取りは受注簿ツールの `src/main.jsx` の jutaku-import-begin〜end。形を変えるときは両方を直す。DESIGN.md 5.3）
 - 住宅改修のアプリ（ポータルの `jutaku-mitsumori/`・`sasaoka/`）の様邸の画面の「🛁 特定福祉用具申請書」のタブの中にも出る（ユーザーの指示「特定福祉用具アプリを出す」、2026-10-22）。
   住宅改修はお客様の情報を localStorage `taiyo-tokutei-from-jutaku-v1` に書いてから `tokutei/index.html#jutaku=<様邸の id>&embed=1` を開く。
   このアプリはその様邸の案件を開き（なければ作る）、住宅改修で変わった値だけ入れ直す（ここで手で直した値はそのまま。生活保護も。`src/tokutei/jutaku.ts`）。embed=1 のときは題名の段を出さない。
@@ -65,7 +62,7 @@ npm run -s test:tokutei     # 単体テスト（計算・種目・取り込み�
 npm run -s lint             # 型チェック
 npm run -s build:tokutei    # dist-tokutei/index.html（1ファイル）と version.json
 node test/tokutei/e2e.mjs <出力フォルダ>   # ブラウザで通しで確かめる（Playwright。ビルドのあと）
-node test/tokutei/e2e-hacchu.mjs <受注簿ツールの dist> <出力フォルダ>   # 販売見積書の中の販売受注簿を通しで（受注簿ツールも npm run build のあと）
+node test/tokutei/e2e-hacchu.mjs <受注簿ツールの dist> <出力フォルダ>   # 販売受注簿への転記を通しで（受注簿ツールも npm run build のあと）
 ```
 
 公開先は太陽ポータル（taiyo-portal、master）の `tokutei/`：https://akamar08taiyo-bot.github.io/taiyo-portal/tokutei/ 。

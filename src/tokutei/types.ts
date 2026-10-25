@@ -95,7 +95,6 @@ export type Sale = {
   updatedAt: number;
   jutakuJob?: string; // 住宅改修のアプリの様邸の画面（🛁 特定福祉用具申請書のタブ）から開いた案件：その様邸の id（jutaku.ts）
   jutakuSync?: JutakuFields; // 前に住宅改修から受け取ったお客様の情報（住宅改修で変わった値だけ入れ直すため）
-  hacchu?: Record<string, unknown>; // 販売見積書の中の販売受注簿の中身（受注簿ツールが送ってくるものをそのまま。受注番号・読み取った画像など。hacchuLive.ts）
 };
 
 /** 住宅改修のアプリから受け取るお客様の情報（jutaku.ts。案件の項目の名前で。生活保護 welfare は 2026-10-23 から） */
