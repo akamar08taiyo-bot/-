@@ -25,7 +25,7 @@ description: 太陽ポータルの業務アプリ（見積・提案書作成、�
 | 見積・提案書作成（taiyo-mitsumori、ブランチ `claude/excel-export`） | `src/index.html` の `createXlsxBook()`（`// ===== Excel（.xlsx）出力`）。zip は fflate。グリッドではなく列を決めた作り（`xlDocColumns`・`xlDocHeader`） | `buildQuoteXlsx`・`buildKaiteiXlsx`・`buildInternalXlsx`・`buildEstimateDocXlsx`（グラフ・条件付き書式・図形も） |
 | 消耗品売上管理（taiyo-uriage-bunseki） | `src/index.html` の `createXlsxBook()`・`xlLetterSpace`。fflate | `buildDocXlsx(kind, m)`（見積書・発注書） |
 | チラシ作成（消耗品）（taiyo-shohin-chirashi） | `assets/xlsx.js`（`window.TssXlsx`。zip も自前＝無圧縮＋CRC-32） | `quote.html` の `buildQuoteXlsx(d)` |
-| 特定福祉用具（`-` のブランチ `claude/care-insurance-auto-transfer-3z0c9n`） | `src/tokutei/print/xlsxBook.ts`（TypeScript。いちばん読みやすい見本） | `print/estimateXlsx.ts` の `buildEstimateXlsx` |
+| 特定福祉用具（`-` のブランチ `claude/care-insurance-auto-transfer-3z0c9n`） | `src/tokutei/print/xlsxBook.ts`（TypeScript。いちばん読みやすい見本。アプリでは使わなくなった） | 2026-10-23 から見積書は会社の原本に書く `estimateBook.ts`（申請書と同じ `xlsxEdit.ts`）。前の `estimateXlsx.ts` の `buildEstimateXlsx` は git の履歴に |
 | 住宅改修（`-` のブランチ `claude/sasaoka-shikiri-app`） | **別の作り**：`src/sasaoka/xlsxWrite.ts`（`writeXlsx`・`SheetBuilder`。書体は ＭＳ Ｐゴシック、列幅は数字の幅 8px で 1/100 に丸める、文字は inlineStr で xml:space をいつも付ける、印刷は scale と手動の改ページ、calcPr なし）。申請書は**役所の原本（xltx）を開いてセルを書きかえる**（`shinsei.ts`） | 見積書・申請書 |
 
 新しいアプリに付けるときは、近いアプリの部品を写して使う（アプリ同士は独立しているので共有しない）。部品の中身は `references/ooxml-writer.md`。
@@ -62,7 +62,7 @@ python3 $S/side-by-side.py <出力>/見積_pdf-1.png <出力>/見積_xlsx-1.png 
 - 見本は**架空のデータ**で作る（見本 花子・見本の里・医療法人 見本会 など）。お客様・価格表の本物は使わない。
 - 印刷の PDF は Playwright で `page.emulateMedia({media: 'print'})` のあと `page.pdf({format: 'A4', margin: 0, printBackground: true, preferCSSPageSize: true})`。
 - 1つの HTML のアプリ（src/index.html）は、テストで帳票の関数の範囲を切り出して `new Function` で動かせる（消耗品売上管理の `docXlsx.test.mjs`）。
-- アプリのテストで、式とキャッシュ値が印刷の計算（アプリの計算の関数）と同じことを確かめる（`docXlsx.test.mjs`・`estimateXlsx.test.ts` など）。式を XML から読むときは `&lt;` `&gt;` `&quot;` を戻し、最後に `&amp;` を戻してから比べる。
+- アプリのテストで、式とキャッシュ値が印刷の計算（アプリの計算の関数）と同じことを確かめる（`docXlsx.test.mjs`・`estimateBook.test.ts` など）。式を XML から読むときは `&lt;` `&gt;` `&quot;` を戻し、最後に `&amp;` を戻してから比べる。
 - ブラウザで「Excelで保存」を押してダウンロードを確かめる（Playwright。`chromium.launch({env: {...process.env, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8'}})` にしないと日本語のファイル名が「download」になる）。
 - 印刷が変わっていないこと：変える前と後の印刷の HTML（`#print-content-holder` など）を比べる。
 - この環境に Microsoft Excel はない。最後はユーザーに見本の .xlsx と印刷と並べた画像を送り、会社の Excel で一度開いてもらう（警告が出ないか・字が切れないか）。
