@@ -1,5 +1,6 @@
-// 特定福祉用具申請書のタブを確かめる：様邸の画面のタブは 左から「📝 住宅改修申請書」「🛁 特定福祉用具申請書」「📋 工事見積書」「📄 理由書」
-//   （ユーザーの指示「上のタブのところに、住宅改修申請書、特定福祉用具申請書、工事見積書、理由書の順番で、並べてください」「特定福祉用具アプリを出す」、2026-10-22）。
+// 特定福祉用具申請書・販売見積書のタブを確かめる：様邸の画面のタブは 左から「📝 住宅改修申請書」「📋 工事見積書」「🛁 特定福祉用具申請書」「🏷 販売見積書」「📄 理由書」
+//   （ユーザーの指示「住宅改修申請書、工事見積書、特定福祉用具申請書、販売見積書の順にする」2026-10-23。前は「特定福祉用具アプリを出す」2026-10-22）。
+//   特定福祉用具申請書のタブは申請書だけ（view=shinsei）、販売見積書のタブは見積書だけ（view=quote）。申請書で入れた商品は販売見積書にも出る（同じ案件）。
 //   特定福祉用具申請書のタブは、特定福祉用具のアプリ（<サイト>/tokutei/）を中に出し、住宅改修申請書で入れたお客様の情報を渡す（tokuteiLink.ts）。
 //   <サイト>/tokutei/index.html があれば（特定福祉用具のビルドを置いたとき）、中のアプリでその様邸の案件が開いてお客様の情報が入っていること・
 //   特定福祉用具で直した値は残り、住宅改修で直した値は入れ直されること・上の題名の段を出さないことも確かめる
@@ -30,8 +31,8 @@ await form.waitFor();
 // 画面の上・ブラウザのタブの題名は「申請書・見積書作成」（太陽ポータルのタイルと同じ名前。ユーザーの答え「変える」、2026-10-22）
 assert.equal(await page.title(), '申請書・見積書作成');
 assert.equal(await page.locator('header').getByText('申請書・見積書作成', {exact: true}).count(), 1);
-const tablist = page.getByRole('tablist', {name: '住宅改修申請書・特定福祉用具申請書・工事見積書・理由書'});
-assert.deepEqual(await tablist.getByRole('tab').allInnerTexts(), ['📝 住宅改修申請書', '🛁 特定福祉用具申請書', '📋 工事見積書', '📄 理由書']);
+const tablist = page.getByRole('tablist', {name: '住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書'});
+assert.deepEqual(await tablist.getByRole('tab').allInnerTexts(), ['📝 住宅改修申請書', '📋 工事見積書', '🛁 特定福祉用具申請書', '🏷 販売見積書', '📄 理由書']);
 assert.equal(await page.getByRole('tab', {name: '📝 住宅改修申請書'}).getAttribute('aria-selected'), 'true');
 // フリガナ → 被保険者氏名 → 被保険者番号 → 生年月日の年・月・日 → 郵便番号 → 住所 → 電話番号（架空の方）
 for (const t of ['みほん　はなこ', '見本 花子', '366989', '13', '4', '14', '824-0001', '福岡県行橋市中央1-1', '0930-00-0000']) {
@@ -49,7 +50,7 @@ await page.waitForFunction(() => location.hash.includes('view=tokutei'));
 assert.equal(await page.getByRole('tab', {name: '🛁 特定福祉用具申請書'}).getAttribute('aria-selected'), 'true');
 assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '見本 花子様邸');
 const frameEl = page.locator('iframe[title="特定福祉用具 購入申請書・見積もり作成"]');
-assert.equal(await frameEl.getAttribute('src'), `../tokutei/index.html#jutaku=${encodeURIComponent(jobId)}&embed=1`);
+assert.equal(await frameEl.getAttribute('src'), `../tokutei/index.html#jutaku=${encodeURIComponent(jobId)}&embed=1&view=shinsei`);
 const handoff = JSON.parse(await page.evaluate(() => localStorage.getItem('taiyo-tokutei-from-jutaku-v1')));
 assert.deepEqual(handoff, {
   job: jobId,
@@ -76,7 +77,8 @@ log('タブの順番・URL・受け渡し OK');
 
 if (withTokutei) {
   const tk = page.frameLocator('iframe[title="特定福祉用具 購入申請書・見積もり作成"]');
-  const field = (name) => tk.getByLabel(name, {exact: true});
+  // 入れる所（申請書のプレビューの欄も同じ名前なので、入れる欄だけ）
+  const field = (name) => tk.locator(`input[aria-label="${name}"], select[aria-label="${name}"], textarea[aria-label="${name}"]`).first();
   await field('お客様名').waitFor();
   assert.equal(await field('お客様名').inputValue(), '見本 花子');
   assert.equal(await field('フリガナ').inputValue(), 'ミホン　ハナコ');
@@ -92,7 +94,31 @@ if (withTokutei) {
   assert.equal(await tk.getByRole('heading', {name: '特定福祉用具 購入申請書・見積もり作成'}).isVisible(), false);
   assert.equal(await tk.getByRole('link', {name: '業務アプリポータルへ'}).isVisible(), false);
   assert.ok(await tk.getByRole('button', {name: '📦 商品マスタ'}).isVisible());
+  // 申請書だけ：右に申請書のプレビュー（大きく）。見積もりのタブ・見積書のボタンは出さない（販売見積書のタブにある）
+  const pv = tk.getByLabel('申請書のプレビュー');
+  await pv.getByRole('group', {name: '用具・受領委任払', exact: true}).waitFor();
+  assert.equal(await tk.getByRole('tab', {name: '📋 見積もり'}).count(), 0);
+  assert.equal(await tk.getByRole('button', {name: '🖨 見積書を印刷'}).count(), 0);
+  const formBox = await tk.getByRole('form', {name: '申請書に入れる所'}).boundingBox();
+  const pvBox = await pv.boundingBox();
+  assert.ok(formBox && pvBox && formBox.x + formBox.width < pvBox.x && pvBox.width > formBox.width, `${JSON.stringify(formBox)} ${JSON.stringify(pvBox)}`);
+  // 申請書で商品を入れると、販売見積書のタブにも出る（同じ案件）
+  await tk.getByRole('button', {name: '＋ 手で入れる'}).click();
+  await tk.getByLabel('商品名').last().fill('見本の多点杖');
+  await page.waitForFunction(() => document.querySelector('iframe')?.contentDocument?.querySelector('[aria-label="申請書のプレビュー"]')?.textContent?.includes('見本の多点杖'));
   await page.screenshot({path: path.join(outDir, 'tokutei-1-tab.png')});
+  await page.getByRole('tab', {name: '🏷 販売見積書'}).click();
+  await page.waitForFunction(() => location.hash.includes('view=hanbai'));
+  assert.equal(await frameEl.getAttribute('src'), `../tokutei/index.html#jutaku=${encodeURIComponent(jobId)}&embed=1&view=quote`);
+  await tk.getByRole('button', {name: '🖨 見積書を印刷'}).first().waitFor();
+  assert.equal(await tk.getByLabel('商品名').last().inputValue(), '見本の多点杖');
+  assert.equal(await field('お客様名').inputValue(), '見本 花子');
+  assert.equal(await tk.getByRole('tab', {name: /^📄 申請書/}).count(), 0);
+  assert.equal(await tk.getByRole('button', {name: '📄 申請書（Excel）を作る'}).count(), 0);
+  await page.screenshot({path: path.join(outDir, 'tokutei-1b-hanbai.png')});
+  await page.getByRole('tab', {name: '🛁 特定福祉用具申請書'}).click();
+  await field('お客様名').waitFor();
+  log('申請書だけ・販売見積書だけ・申請書の商品が販売見積書に出る OK');
 
   // 特定福祉用具で電話を直して、すぐ住宅改修申請書のタブへ（直した値は消えない）
   await field('電話').fill('090-1111-2222');
@@ -135,7 +161,7 @@ await page.waitForFunction(() => !location.hash.includes('job='));
 await page.waitForTimeout(1200); // 自動保存（0.4秒後）
 await page.goto(`${site}/jutaku-mitsumori/index.html#tab=estimate&job=${encodeURIComponent(emptyId)}`);
 await page.reload();
-await page.getByRole('tablist', {name: '住宅改修申請書・特定福祉用具申請書・工事見積書・理由書'}).waitFor({timeout: 5000});
+await page.getByRole('tablist', {name: '住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書'}).waitFor({timeout: 5000});
 assert.equal(await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get('job')), emptyId);
 log('特定福祉用具申請書のタブを開いた様邸は、空でも消さない OK');
 

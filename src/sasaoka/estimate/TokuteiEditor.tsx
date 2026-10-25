@@ -1,4 +1,5 @@
-// 様邸の画面の「🛁 特定福祉用具申請書」のタブ：特定福祉用具のアプリ（太陽ポータルの tokutei/）を、この様邸のお客様の情報を渡して中に出す（tokuteiLink.ts）
+// 様邸の画面の「🛁 特定福祉用具申請書」「🏷 販売見積書」のタブ：特定福祉用具のアプリ（太陽ポータルの tokutei/）を、この様邸のお客様の情報を渡して中に出す（tokuteiLink.ts）。
+// 申請書のタブは申請書だけ（view=shinsei）、販売見積書のタブは見積書だけ（view=quote）。どちらも同じ特定福祉用具の案件（ユーザーの指示「申請書の中の商品名を入力したら、隣のタブの販売見積書に自動転記」）
 
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
@@ -7,13 +8,14 @@ import {CardFill} from '../components/CardReader.tsx';
 import {Btn} from '../components/ui.tsx';
 import {INSURER_INFO, jobInsurer} from '../estimateForms.ts';
 import {flushTokutei, tokuteiUrl, writeTokutei} from '../tokuteiLink.ts';
+import type {TokuteiView} from '../tokuteiLink.ts';
 import type {Job} from '../types.ts';
 import type {Update} from '../useStore.ts';
 
 const MIN_HEIGHT = 560;
 const BOTTOM = 16; // 下の余白（main の py-4）
 
-export function TokuteiEditor({job, onBack, tabs, update}: {job: Job; onBack: () => void; tabs: ReactNode; update?: Update}) {
+export function TokuteiEditor({job, view, onBack, tabs, update}: {job: Job; view: TokuteiView; onBack: () => void; tabs: ReactNode; update?: Update}) {
   const insurer = jobInsurer(job);
   // タブを開くたびに今のお客様の情報を渡す（住宅改修申請書・理由書で直した氏名・住所なども入る）。iframe が読み込むより前に書く
   useState(() => writeTokutei(job));
@@ -53,7 +55,7 @@ export function TokuteiEditor({job, onBack, tabs, update}: {job: Job; onBack: ()
         {tabs}
         {/* 介護保険証から入れるは、ほかのタブと同じくタブのすぐ右 */}
         {update && <CardFill job={job} setJob={setJob} />}
-        <h1 className="text-lg font-bold text-[#14532d]">{job.customer.trim() ? jobName(job) : '新しい特定福祉用具申請書'}</h1>
+        <h1 className="text-lg font-bold text-[#14532d]">{job.customer.trim() ? jobName(job) : view === 'shinsei' ? '新しい特定福祉用具申請書' : '新しい販売見積書'}</h1>
         {insurer && <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-900">{INSURER_INFO[insurer].name}</span>}
       </div>
       <iframe
@@ -61,7 +63,7 @@ export function TokuteiEditor({job, onBack, tabs, update}: {job: Job; onBack: ()
         ref={frame}
         data-tokutei
         title="特定福祉用具 購入申請書・見積もり作成"
-        src={tokuteiUrl(job.id)}
+        src={tokuteiUrl(job.id, view)}
         style={height ? {height} : undefined}
         className="block h-[calc(100vh-12rem)] w-full rounded-xl border border-slate-200 bg-white shadow-sm"
       />

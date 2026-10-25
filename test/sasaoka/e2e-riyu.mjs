@@ -24,9 +24,9 @@ await page.goto(`${site}/jutaku-mitsumori/index.html`);
 await page.getByRole('button', {name: /サンプルで試す/}).click();
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 
-// ---------------- タブ：住宅改修申請書・特定福祉用具申請書・工事見積書・理由書
-const tablist = page.getByRole('tablist', {name: '住宅改修申請書・特定福祉用具申請書・工事見積書・理由書'});
-assert.deepEqual(await tablist.getByRole('tab').allInnerTexts(), ['📝 住宅改修申請書', '🛁 特定福祉用具申請書', '📋 工事見積書', '📄 理由書']);
+// ---------------- タブ：住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書
+const tablist = page.getByRole('tablist', {name: '住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書'});
+assert.deepEqual(await tablist.getByRole('tab').allInnerTexts(), ['📝 住宅改修申請書', '📋 工事見積書', '🛁 特定福祉用具申請書', '🏷 販売見積書', '📄 理由書']);
 await page.getByRole('tab', {name: '📄 理由書'}).click();
 const form = page.getByRole('form', {name: '理由書'});
 await form.waitFor();

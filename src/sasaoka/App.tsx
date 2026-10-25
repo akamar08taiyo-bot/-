@@ -73,22 +73,25 @@ function loadMonth(): string {
 }
 
 /**
- * 様邸の画面のタブ：左から 住宅改修申請書・特定福祉用具申請書・工事見積書・理由書（ユーザーの指示「上のタブのところに、住宅改修申請書、特定福祉用具申請書、工事見積書、理由書の順番で、並べてください」、2026-10-22。
+ * 様邸の画面のタブ：左から 住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書（ユーザーの指示「住宅改修申請書、工事見積書、特定福祉用具申請書、販売見積書の順にする」、2026-10-23。
+ * その前は「上のタブのところに、住宅改修申請書、特定福祉用具申請書、工事見積書、理由書の順番で、並べてください」、2026-10-22。
  * その前は「新規作成で、保険者を選んだら、2種類、タブを作る。左側に、申請書、右側に見積もり」・「必要に応じて住宅改修の理由書にも飛べるようにする」）。
  * 同じ様邸の内容（氏名・住所・被保険者番号・改修の箇所・金額）なので、どれで直しても、ほかにすぐ出る。特定福祉用具申請書は、特定福祉用具のアプリをお客様の情報を渡して中に出す（TokuteiEditor.tsx）
  */
 function JobTabs({view, onView}: {view: JobView; onView: (v: JobView) => void}) {
+  // ユーザーの指示「住宅改修申請書、工事見積書、特定福祉用具申請書、販売見積書の順にする」（2026-10-23）。理由書は最後
   const tabs: [JobView, string][] = [
     ['shinsei', '📝 住宅改修申請書'],
-    ['tokutei', '🛁 特定福祉用具申請書'],
     ['estimate', '📋 工事見積書'],
+    ['tokutei', '🛁 特定福祉用具申請書'],
+    ['hanbai', '🏷 販売見積書'],
     ['riyu', '📄 理由書'],
   ];
   return (
-    // スマホ・タブレットの縦の幅では2つずつ2段に並べる（4つを1段にすると名前が折り返して読みにくい）。線はすき間（gap-px）から見える枠の色
+    // スマホ・タブレットの縦の幅では2つずつ並べる（5つ目の理由書は1段まるごと。1段にすると名前が折り返して読みにくい）。線はすき間（gap-px）から見える枠の色
     <div
       role="tablist"
-      aria-label="住宅改修申請書・特定福祉用具申請書・工事見積書・理由書"
+      aria-label="住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書"
       className="grid w-full grid-cols-2 gap-px overflow-hidden rounded-lg border-2 border-[#14532d] bg-[#14532d] shadow-sm md:inline-flex md:w-auto md:gap-0 md:bg-white"
     >
       {tabs.map(([v, text]) => (
@@ -98,7 +101,7 @@ function JobTabs({view, onView}: {view: JobView; onView: (v: JobView) => void}) 
           role="tab"
           aria-selected={view === v}
           onClick={() => onView(v)}
-          className={`whitespace-nowrap px-2 py-2 text-sm font-bold transition md:px-5 md:text-[15px] ${view === v ? 'bg-[#14532d] text-white' : 'bg-white text-[#14532d] hover:bg-emerald-50'}`}
+          className={`whitespace-nowrap px-2 py-2 text-sm font-bold transition last:col-span-2 md:px-4 md:text-[15px] ${view === v ? 'bg-[#14532d] text-white' : 'bg-white text-[#14532d] hover:bg-emerald-50'}`}
         >
           {text}
         </button>
@@ -156,7 +159,7 @@ export default function App({start}: {start: MainTab}) {
   // 離れるときに消さない（前は消えて、特定福祉用具の案件が行き先のない id につながったままになり、作り直すと案件が2つになった）
   const tokuteiOpened = useRef(new Set<string>());
   useEffect(() => {
-    if (estimateJob && jobView === 'tokutei') tokuteiOpened.current.add(estimateJob.id);
+    if (estimateJob && (jobView === 'tokutei' || jobView === 'hanbai')) tokuteiOpened.current.add(estimateJob.id);
   }, [estimateJob?.id, jobView]);
   useEffect(() => {
     document.title = APP_TITLE;
@@ -251,7 +254,7 @@ export default function App({start}: {start: MainTab}) {
   };
   // 特定福祉用具申請書のタブを離れるときは、中の特定福祉用具のアプリの保存が終わってから（枠を消すと保存が途中で止まる。tokuteiLink.ts）
   const leaveTokutei = (go: () => void) => {
-    if (tab === 'estimate' && estimateJob && jobView === 'tokutei') void flushTokutei().then(go);
+    if (tab === 'estimate' && estimateJob && (jobView === 'tokutei' || jobView === 'hanbai')) void flushTokutei().then(go);
     else go();
   };
   const goTab = (t: MainTab) => leaveTokutei(() => openTab(t));
@@ -383,10 +386,12 @@ export default function App({start}: {start: MainTab}) {
                 }}
                 tabs={tabs}
               />
-            ) : estimateJob && jobView === 'tokutei' ? (
+            ) : estimateJob && (jobView === 'tokutei' || jobView === 'hanbai') ? (
+              // 特定福祉用具申請書は申請書だけ、販売見積書は見積書だけを出す（同じ特定福祉用具の案件。申請書で入れた商品は見積書にも出る）
               <TokuteiEditor
-                key={estimateJob.id}
+                key={`${estimateJob.id}:${jobView}`}
                 job={estimateJob}
+                view={jobView === 'tokutei' ? 'shinsei' : 'quote'}
                 update={store.update}
                 onBack={() =>
                   leaveTokutei(() => {

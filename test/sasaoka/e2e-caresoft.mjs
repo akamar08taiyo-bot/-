@@ -75,7 +75,7 @@ await form.waitFor();
 const area = page.getByRole('button', {name: '🪪 介護保険証・介護ソフトの画面'});
 assert.match(await area.innerText(), /介護保険証・介護ソフトの画面\s*ここにドロップ・Ctrl\+V/);
 assert.equal(await area.evaluate((el) => getComputedStyle(el).borderStyle), 'dashed');
-const tablist = page.getByRole('tablist', {name: '住宅改修申請書・特定福祉用具申請書・工事見積書・理由書'});
+const tablist = page.getByRole('tablist', {name: '住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書'});
 const [t, b] = [await tablist.boundingBox(), await area.boundingBox()];
 assert.ok(b.x >= t.x + t.width && b.x - (t.x + t.width) < 24 && Math.abs(b.y + b.height / 2 - (t.y + t.height / 2)) < 6, `タブのすぐ右 ${JSON.stringify({t, b})}`);
 await page.screenshot({path: path.join(outDir, 'area-idle.png'), clip: {x: 0, y: 0, width: 1366, height: 260}});

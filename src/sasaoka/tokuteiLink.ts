@@ -1,6 +1,6 @@
 // 様邸の画面の「🛁 特定福祉用具申請書」のタブ：特定福祉用具のアプリ（太陽ポータルの tokutei/）を、この様邸のお客様の情報を渡して中に出す
 // （ユーザーの指示「上のタブのところに、住宅改修申請書、特定福祉用具申請書、工事見積書、理由書の順番で、並べてください」「特定福祉用具アプリを出す」、2026-10-22）。
-//   localStorage の TOKUTEI_KEY にお客様の情報（特定福祉用具の案件の項目の名前で）を書いてから、../tokutei/index.html#jutaku=<様邸の id>&embed=1 を開く。
+//   localStorage の TOKUTEI_KEY にお客様の情報（特定福祉用具の案件の項目の名前で）を書いてから、../tokutei/index.html#jutaku=<様邸の id>&embed=1&view=shinsei（販売見積書のタブは view=quote）を開く。
 //   特定福祉用具は、その様邸の案件を開く（なければ作る）。住宅改修で変わった値だけ入れ直し、特定福祉用具で手で直した値はそのまま。
 //   2つのアプリはコードもデータも分けている（ユーザーの指示「全く別物として作成」）。受け渡しの形を変えるときは、
 //   特定福祉用具（同じリポジトリのブランチ claude/care-insurance-auto-transfer-3z0c9n）の src/tokutei/jutaku.ts も直す
@@ -60,7 +60,9 @@ export function tokuteiFields(job: Job): TokuteiFields {
 }
 
 /** タブの中に出す特定福祉用具のアプリの URL（その様邸の案件を開く。上の題名の段は出さない） */
-export const tokuteiUrl = (jobId: string) => `${TOKUTEI_URL}#jutaku=${encodeURIComponent(jobId)}&embed=1`;
+/** 中に出す画面：申請書だけ（🛁 特定福祉用具申請書のタブ）・見積書だけ（🏷 販売見積書のタブ） */
+export type TokuteiView = 'shinsei' | 'quote';
+export const tokuteiUrl = (jobId: string, view: TokuteiView = 'shinsei') => `${TOKUTEI_URL}#jutaku=${encodeURIComponent(jobId)}&embed=1&view=${view}`;
 
 /**
  * 特定福祉用具申請書のタブを離れる（タブを替える・一覧へ戻る）前に、中の特定福祉用具のアプリに、まだ保存していない変更を保存させて待つ。

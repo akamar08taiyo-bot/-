@@ -58,7 +58,7 @@ const typeIn = async (k, text, end = 'Enter') => {
 const tds = async (text) => (await sheet.locator('.form-page tr', {hasText: text}).first().locator('td').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
 
 // ---------------- 様邸の画面のタブ：左に申請書、まん中に理由書（e2e-riyu.mjs）、右に見積書。見積書のある様邸は、一覧から見積書のタブで開く
-const tablist = page.getByRole('tablist', {name: '住宅改修申請書・特定福祉用具申請書・工事見積書・理由書'});
+const tablist = page.getByRole('tablist', {name: '住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書'});
 assert.deepEqual(await tablist.getByRole('tab').allInnerTexts(), ['📝 住宅改修申請書', '🛁 特定福祉用具申請書', '📋 工事見積書', '📄 理由書']);
 const shinseiTab = page.getByRole('tab', {name: '📝 住宅改修申請書'});
 const estimateTab = page.getByRole('tab', {name: '📋 工事見積書'});

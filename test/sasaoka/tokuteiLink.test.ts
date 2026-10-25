@@ -54,7 +54,8 @@ test('まだ入っていない様邸：空のまま渡す。保険者・負担�
 });
 
 test('タブの中に出す URL と localStorage の受け渡し（その様邸の id で）', () => {
-  assert.equal(tokuteiUrl('j 1'), '../tokutei/index.html#jutaku=j%201&embed=1');
+  assert.equal(tokuteiUrl('j 1'), '../tokutei/index.html#jutaku=j%201&embed=1&view=shinsei');
+  assert.equal(tokuteiUrl('j 1', 'quote'), '../tokutei/index.html#jutaku=j%201&embed=1&view=quote'); // 販売見積書のタブ
   const store = new Map<string, string>();
   const g = globalThis as {localStorage?: unknown};
   const before = g.localStorage;
