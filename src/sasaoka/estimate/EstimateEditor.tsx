@@ -63,12 +63,25 @@ export function EstimateEditor({
       ...j,
       places: j.places.map((p) => (p.id === placeId ? fn(p) : p)),
     }));
-  /** 箇所を選んでいないとき（いちばん下の行）は、新しい箇所を作ってそこに入れる */
+  /**
+   * 箇所がまだないとき（null）だけ、新しい箇所を作ってそこに入れる。箇所があれば見積書が入れる箇所を決めて渡す（`toolPlace`。
+   * 前は欄を選んでいないと新しい箇所を作り、上の部材と同じ箇所に入れたい施工費が②になった）
+   */
+  const created = useRef<string | null>(null);
   const placeFor = (placeId: string | null): string => {
     if (placeId) return placeId;
     const p = makePlace('');
+    created.current = p.id;
     setJob((j) => ({...j, places: [...j.places, p]}));
     return p.id;
+  };
+  // 作った箇所に何も入れずに閉じたら、その箇所は消す（空の箇所を残すと、いちばん下の行がその箇所になる）
+  const closePicker = () => {
+    const id = created.current;
+    created.current = null;
+    setPicker(null);
+    const unused = (p: Place) => p.id === id && p.rows.length === 0 && !p.name.trim();
+    if (id && job.places.some(unused)) setJob((j) => ({...j, places: j.places.filter((p) => !unused(p))}));
   };
 
   const name = job.customer.trim() ? jobName(job) : '新しい見積書';
@@ -301,7 +314,7 @@ export function EstimateEditor({
           onRemoveOne={(refId) => setPlace(pickPlace.id, (p) => ({...p, rows: removeOneMaterial(p.rows, refId)}))}
           onToggleFavorite={toggleFavorite}
           onAddToMaster={addToMaster}
-          onClose={() => setPicker(null)}
+          onClose={closePicker}
         />
       )}
       {picker && pickPlace && picker.kind === 'labor' && (
@@ -310,7 +323,7 @@ export function EstimateEditor({
           rowId={picker.rowId}
           data={data}
           onRows={(rows) => setPlace(pickPlace.id, (p) => ({...p, rows}))}
-          onClose={() => setPicker(null)}
+          onClose={closePicker}
         />
       )}
       {picker && pickPlace && picker.kind === 'kit' && (
@@ -324,6 +337,7 @@ export function EstimateEditor({
           onInsert={(rows) => {
             const at = picker.at;
             setPlace(pickPlace.id, (p) => withBrackets(p, fillAdded({...p, rows: insertRowsAt(p.rows, rows, at)}, new Set(rows.map((r) => r.id))), data.materials));
+            created.current = null; // 行を入れたので、作った箇所は残す
             setPicker(null);
             toast(`部材＋施工費（常用）の${rows.length}行を「${pickPlace.name || '箇所'}」に入れました`);
           }}
@@ -332,11 +346,11 @@ export function EstimateEditor({
           onManage={
             onManageKits &&
             (() => {
-              setPicker(null);
+              closePicker();
               onManageKits();
             })
           }
-          onClose={() => setPicker(null)}
+          onClose={closePicker}
         />
       )}
     </div>

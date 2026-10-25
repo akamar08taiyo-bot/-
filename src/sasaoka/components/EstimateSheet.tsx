@@ -14,7 +14,7 @@ import {startEstimate} from '../calc.ts';
 import {circled, KINDS, materialText} from '../estimateForms.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {KouikiForm, YukuhashiForm} from '../print/EstimateForms.tsx';
-import {applySheet, deleteLine, insertBlankAfter, lineRows, parseDate, parsePlace, pasteLines, sheetTarget, sheetValue, toggleExcluded} from '../sheetEdit.ts';
+import {applySheet, deleteLine, dropEmptyPlaces, insertBlankAfter, lineRows, parseDate, parsePlace, pasteLines, sheetTarget, sheetValue, toggleExcluded, toolPlace} from '../sheetEdit.ts';
 import {getClip, setClip, useClip} from '../sheetClip.ts';
 import type {EstimateForm, Job, Material, Settings} from '../types.ts';
 import {matchesAll, todayIso, yen} from '../util.ts';
@@ -65,7 +65,7 @@ export function EstimateSheet({
   form: EstimateForm;
   materials: Material[];
   setJob: (fn: (j: Job) => Job) => void;
-  onPickMaterial: (placeId: string | null, rowId: string | null) => void; // null：新しい箇所に。rowId：選んでいる行（そこに入れる）
+  onPickMaterial: (placeId: string | null, rowId: string | null) => void; // null：箇所がまだない（新しい箇所に）。rowId：選んでいる行（そこに入れる）
   onPickLabor: (placeId: string | null, rowId: string | null) => void; // rowId：選んでいる行（部材ならその同上施工費・空白の行ならその行に。`laborSpot`）。null：箇所の施工費
   onPickKit: (placeId: string | null, rowId: string | null) => void;
   onPrint: () => void;
@@ -92,6 +92,7 @@ export function EstimateSheet({
   const seen = useRef(job); // 最後に画面に出した見積書
   const own = useRef<Job | null>(null); // この見積書の欄で入れた変更（保存のときに updatedAt だけが付いて戻ってくる）
   const lastOutside = useRef(0);
+  const lastPlace = useRef<string | null>(null); // 最後に選んだ欄の箇所（ツールバーから入れる箇所。`toolPlace`）
   // 見積書の外（部材リストから入れる・保険者・担当・請求書に入れる など）で変わったときも、Ctrl+Z でその前に戻せるようにする
   //（戻すのは見積書の全体なので、記録しないと Ctrl+Z でそちらの変更まで消えてしまう）。続けて変わったもの（打ち込みなど）は1回にまとめる
   useLayoutEffect(() => {
@@ -312,6 +313,13 @@ export function EstimateSheet({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // 開いたときに、何も入っていない箇所を外す（前の版の「🔧 施工費から入れる」などが残した空の箇所。いちばん下の行がその箇所になり、
+  // そこに打った施工費が②になった。`dropEmptyPlaces`）。開いただけの直しなので、Ctrl+Z の対象にしない（put）
+  useEffect(() => {
+    const next = dropEmptyPlaces(jobRef.current);
+    if (next !== jobRef.current) put(next);
   }, []);
 
   /** 打ち込んだ値を入れる。then：入れたあとに動く向き。keepSel：選んでいる欄を変えない（見積書の外を押したとき。そちらに文字が入るように） */
@@ -689,7 +697,12 @@ export function EstimateSheet({
 
   // ---------------------------------------------------------------- ツールバー（部材・施工費を入れる。行を入れる・消すは行の左の「挿入」「✕」）
   const row = target.row;
-  const place = target.place;
+  // 入れる箇所：選んでいる欄の箇所。欄を選んでいない（空白の行に部材を入れて、選んでいた欄がなくなったときなど）・お客様名などの欄のときは、
+  // 最後に選んだ箇所（なければいちばん下の箇所）。新しい箇所は作らない（前は作って、施工費が②になった。`toolPlace`）
+  const place = toolPlace(job, sel?.key ?? null, lastPlace.current);
+  useEffect(() => {
+    if (target.place) lastPlace.current = target.place.id;
+  }, [target.place?.id]);
 
   // 打ち込む欄の位置・文字の大きさ（見積書の欄と同じ）
   const editing = edit !== null;

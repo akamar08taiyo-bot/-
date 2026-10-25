@@ -4,7 +4,25 @@ import {estimateTotals, jobTotals} from '../../src/sasaoka/calc.ts';
 import {formLines} from '../../src/sasaoka/estimateForms.ts';
 import {placeFromDims, withBrackets} from '../../src/sasaoka/cutLink.ts';
 import {laborRow, manualRow, materialRow, newPlace} from '../../src/sasaoka/rows.ts';
-import {applySheet, clearedSheet, deleteLine, insertBlankAfter, lineRows, parseKind, parseLengthCm, parseListNote, parseNum, parsePlace, pasteLines, setWorkAmount, sheetValue, toggleExcluded} from '../../src/sasaoka/sheetEdit.ts';
+import {
+  applySheet,
+  clearedSheet,
+  deleteLine,
+  dropEmptyPlaces,
+  insertBlankAfter,
+  isEmptyPlace,
+  lineRows,
+  parseKind,
+  parseLengthCm,
+  parseListNote,
+  parseNum,
+  parsePlace,
+  pasteLines,
+  setWorkAmount,
+  sheetValue,
+  toggleExcluded,
+  toolPlace,
+} from '../../src/sasaoka/sheetEdit.ts';
 import type {Job, Material, Place, Row, Settings} from '../../src/sasaoka/types.ts';
 
 const S = {
@@ -462,4 +480,85 @@ test('白紙に戻す：見積書の内容と、申請書の項目・理由書�
   const blank = clearedSheet(full, S);
   assert.deepEqual([blank.customer, blank.address, blank.places.length, blank.riyu, blank.shinsei?.kana], ['', '', 0, undefined, '']);
   assert.deepEqual([blank.staff, blank.insurer, blank.shikiri], ['久保', 'yukuhashi', true]);
+});
+
+// ユーザーの指摘「施工費を入力したら、勝手に②になってしまった」（2026-10-25）：①廊下の部材（手すり・ベースプレート・ブラケット）のあとに入れる施工費は、
+// 同じ①廊下の行（同上施工費）。新しい箇所②を作らない。部材は見本の品番・架空の価格
+const mazroc = (id: string, code: string, name: string, list: number, pieceLengthM = 0): Material => ({
+  id, name, code, maker: 'マツ六', unit: '', price: Math.round(list * 0.6), listPrice: list, pieceLengthM, favorite: false, updatedAt: 1,
+});
+const hallway = (): Job => {
+  const rows = [
+    {...materialRow(mazroc('x1', 'BD-134', '35アッシュ丸棒 見本 4m', 10000, 4)), lengthCm: 240},
+    {...materialRow(mazroc('x2', 'BH-444', '木製ベースプレート 見本 4m', 5000, 4)), lengthCm: 240},
+    materialRow(mazroc('x3', 'BD-08G', '35エンドブラケット 見本', 1000), 2),
+    materialRow(mazroc('x4', 'BD-18G', '35エンドキャップ 見本', 400), 1),
+    materialRow(mazroc('x5', 'BD-01G', '35ブラケット横型 見本', 800), 1),
+  ];
+  return {...emptyJob(), places: [newPlace('廊下', rows)]};
+};
+
+test('いちばん下の行の改修内容・改修場所に「施工費」と打っても新しい箇所を作らず、最後の箇所の施工費（同上施工費）にする。読めない改修内容では箇所を作らない', () => {
+  for (const field of ['work', 'name']) {
+    const {job, keys} = type(hallway(), [
+      [`new:${field}`, '施工費'],
+      ['line:@:price', '12000'],
+    ]);
+    assert.equal(job.places.length, 1, field); // 前は空の箇所②ができ、施工費がそこに入った
+    const rows = job.places[0].rows;
+    assert.equal(rows.length, 6);
+    assert.deepEqual([rows[5].kind, rows[5].name], ['labor', '施工費']);
+    assert.equal(keys[0], `line:${rows[5].id}:text`); // 打った施工費の行を選ぶ
+    const lines = formLines(job, S, 'yukuhashi');
+    assert.deepEqual(
+      lines.map((l) => [l.photo, l.first ? l.placeName : '', l.text, l.amount]).slice(-2),
+      [
+        [1, '', 'マツ六 BD-01G 35ブラケット横型 見本', 640],
+        [1, '', '同上施工費', 12000],
+      ],
+    );
+  }
+  // 改修の種類・写真番号として読めない文字：何も変えない（前は空の箇所②ができ、いちばん下の行がその箇所になった）
+  const start = hallway();
+  assert.equal(applySheet(start, 'new:work', 'あいう', yk).job, start);
+  assert.equal(applySheet(start, 'new:photo', 'あ', kk).job, start);
+  // 改修の種類・改修場所を打てば、今までどおり新しい箇所
+  assert.equal(applySheet(start, 'new:work', '段差', yk).job.places.length, 2);
+  assert.equal(applySheet(start, 'new:name', 'トイレ', yk).job.places.length, 2);
+});
+
+test('ツールバーから入れる箇所（toolPlace）：選んでいる欄の箇所。欄を選んでいない・お客様名などなら最後に選んだ箇所、なければいちばん下の箇所。箇所がなければ null', () => {
+  const entry = newPlace('玄関', [materialRow(rail, 1)]);
+  const hall = hallway().places[0];
+  const job: Job = {...emptyJob(), places: [entry, hall]};
+  assert.equal(toolPlace(job, `line:${entry.rows[0].id}:text`, null)?.id, entry.id);
+  assert.equal(toolPlace(job, `place:${entry.id}:name`, hall.id)?.id, entry.id);
+  assert.equal(toolPlace(job, 'new:text', entry.id)?.id, hall.id); // いちばん下の行は最後の箇所
+  // 空白の行に部材を入れて、選んでいた欄がなくなった（その行のIDがない）：最後に選んだ箇所（前は新しい箇所を作った）
+  assert.equal(toolPlace(job, 'line:r_gone:text', entry.id)?.id, entry.id);
+  assert.equal(toolPlace(job, null, entry.id)?.id, entry.id);
+  assert.equal(toolPlace(job, 'job:customer', null)?.id, hall.id);
+  assert.equal(toolPlace(job, null, 'p_gone')?.id, hall.id);
+  assert.equal(toolPlace(emptyJob(), null, null), null); // 箇所がまだない → 新しく作る
+});
+
+test('何も入っていない箇所（前の版の施工費のボタンなどが残した空の箇所）は外す。名前・行・写真番号・改修の種類・申請書の内容のある箇所は残す', () => {
+  const job = hallway();
+  const empty = newPlace('');
+  const kept = [
+    {...newPlace(''), kind: 2}, // いちばん下の行で改修の種類を選んだ
+    {...newPlace(''), photo: 3},
+    newPlace('トイレ'),
+    {...newPlace(''), dims: {l: '600'}},
+    {...newPlace(''), photos: {before: 'ph_1'}},
+    newPlace('', [manualRow('material', {qty: 1})]), // 申請書のタブで足した箇所（空白の行がある）
+  ];
+  assert.ok(isEmptyPlace(empty));
+  assert.ok(kept.every((p) => !isEmptyPlace(p)));
+  const dropped = dropEmptyPlaces({...job, places: [...job.places, empty, ...kept, {...empty, id: 'p_empty2'}]});
+  assert.deepEqual(
+    dropped.places.map((p) => p.id),
+    [job.places[0].id, ...kept.map((p) => p.id)],
+  );
+  assert.equal(dropEmptyPlaces(job), job); // なければ同じ job（保存しない）
 });

@@ -239,6 +239,29 @@ export function pendingPlace(job: Pick<Job, 'places'>): Place | null {
   return last && last.rows.length === 0 ? last : null;
 }
 
+/**
+ * 何も入っていない箇所：名前・行・写真番号・申請書のタブで入れた内容がなく、改修の種類も最初のまま（①）。
+ * 前の版の「🔧 施工費から入れる」などは、見積書の欄を選んでいないと空の箇所を作り、何も入れずに閉じるとそのまま残った。
+ * 見積書には出ないが、いちばん下の行がその箇所になり、そこに打った施工費が新しい箇所②になった（ユーザーの指摘「施工費を入力したら、勝手に②になってしまった」2026-10-25）
+ */
+export const isEmptyPlace = (p: Place): boolean => !p.name.trim() && p.rows.length === 0 && p.kind === 1 && !(p.photo > 0) && !hasShinseiData(p);
+
+/** 何も入っていない箇所を外す（見積書を開いたとき）。なければ同じ job */
+export function dropEmptyPlaces(job: Job): Job {
+  return job.places.some(isEmptyPlace) ? {...job, places: job.places.filter((p) => !isEmptyPlace(p))} : job;
+}
+
+/**
+ * ツールバー（部材リスト・施工費・部材＋施工費（常用）から入れる）が入れる箇所：選んでいる欄の箇所（いちばん下の行なら最後の箇所）。
+ * 欄を選んでいない・お客様名などの欄のときは、最後に選んだ箇所（remembered）、それもなければいちばん下の箇所。箇所がなければ null（新しく作る）。
+ * 空白の行を選んで部材リストから入れると、その行が部材になって選んでいた欄がなくなる。前はそのあとの「🔧 施工費から入れる」が
+ * 新しい箇所（②）を作り、そこに「施工費」を入れていた（上の部材と同じ箇所に入るのが正しい。2026-10-25）
+ */
+export function toolPlace(job: Job, key: string | null, remembered: string | null): Place | null {
+  const here = key ? sheetTarget(job, key).place : null;
+  return here ?? job.places.find((p) => p.id === remembered) ?? job.places[job.places.length - 1] ?? null;
+}
+
 // ---------------------------------------------------------------- 打ち込んだ値を入れる
 
 export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx): SheetResult {
@@ -424,10 +447,16 @@ function applyNew(job: Job, field: string, text: string, ctx: SheetCtx): SheetRe
   if (trimmed === '' && !(field === 'text' && ctx.pick)) return {job, key: `new:${field}`};
   // 箇所の欄：最後の箇所に行がなければその箇所に、あれば新しい箇所を作って入れる
   if (field === 'name' || field === 'work' || field === 'kind' || field === 'photo') {
+    // 「施工費」などは改修内容・改修場所ではないので、内容の欄に打ったのと同じにする（最後の箇所の施工費。
+    // 前は改修内容の欄に打つと空の箇所②ができ、続けて打った施工費がそこに入った。ユーザーの指摘「施工費を入力したら、勝手に②になってしまった」2026-10-25）
+    if (isLaborText(trimmed)) return applyNew(job, 'text', text, ctx);
+    const patch = placePatch(field, text);
+    // 改修の種類・写真番号として読めない文字では箇所を作らない（前は何も入らない空の箇所ができて、次に打った行がそこに入った）
+    if (Object.keys(patch).length === 0) return {job, key: `new:${field}`};
     let j = job;
     if (!pendingPlace(j)) j = {...j, places: [...j.places, {...newPlace(''), kind: j.places[j.places.length - 1]?.kind ?? 1}]};
     const pi = j.places.length - 1;
-    return {job: patchPlace(j, pi, placePatch(field, text)), key: `new:${field}`};
+    return {job: patchPlace(j, pi, patch), key: `new:${field}`};
   }
   // 明細の欄：最後の箇所（なければ作る）の最後に行を足して、そこに入れる
   let j = job;

@@ -360,6 +360,96 @@ await sheet.locator('.form-page tr', {hasText: '同上施工費'}).last().getByR
 assert.equal(await lines(), pickBefore);
 log('押している行に入れる（部材リストから入れる・続けて入れる・空白の行・施工費）OK');
 
+// ---------------- 施工費を入れても、勝手に新しい箇所を作らない（ユーザーの指摘「施工費を入力したら、勝手に②になってしまった」2026-10-25）
+const placeNames = async () => (await sheet.locator('[data-edit^="place:"][data-edit$=":name"]').allInnerTexts()).map((t) => t.trim());
+const lastWork = async () => (await sheet.locator('.form-page tr', {hasText: '同上施工費'}).last().locator('td').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
+const linesBefore = await lines();
+assert.deepEqual(await placeNames(), ['①浴室', '②トイレ']);
+// ①浴室の空白の行を選んで部材リストから入れる → 空白の行がブラケットになり、選んでいた欄がなくなる →
+// 「🔧 施工費から入れる」は ①浴室 のいちばん下（前は新しい箇所③の「施工費」になった）
+await sheet.getByRole('button', {name: 'サンプル S-TS35 木の手すり 35φ 4mの行の下に1行入れる'}).click();
+await pickAdd(/ブラケット/);
+assert.equal(await bar(), '　'); // 選んでいる欄がない
+await sheet.getByRole('button', {name: '🔧 施工費から入れる'}).click();
+await page.getByRole('dialog').getByText('「浴室」の取付手間').waitFor();
+await page.getByRole('button', {name: '木の箇所数を1増やす', exact: true}).click();
+await page.getByRole('button', {name: '数え終わったら閉じる'}).click();
+assert.deepEqual(await placeNames(), ['①浴室', '②トイレ']);
+let texts = await order();
+assert.deepEqual(texts.slice(texts.indexOf('サンプル S-BK01 ブラケット'), texts.indexOf('サンプル S-TL01 L型手すり')), ['サンプル S-BK01 ブラケット', '同上施工費']);
+assert.equal(await lines(), linesBefore + 2);
+// お客様名の欄を選んでいても同じ（最後に選んだ箇所＝①浴室に入る。新しい箇所は作らない）
+await cell('job:customer').click();
+await sheet.getByRole('button', {name: '🔧 施工費から入れる'}).click();
+await page.getByRole('dialog').getByText('「浴室」の取付手間').waitFor();
+await page.getByRole('button', {name: '数え終わったら閉じる'}).click();
+assert.deepEqual(await placeNames(), ['①浴室', '②トイレ']);
+await page.screenshot({path: path.join(outDir, '47-sheet-labor-same-place.png')});
+// いちばん下の行の改修内容に「施工費」と打つ：最後の箇所（②トイレ）の同上施工費（前は空の箇所③ができ、そこに入った）。続けて単価
+await cell('new:work').click();
+await page.keyboard.type('施工費');
+await page.keyboard.press('Tab');
+assert.equal(await selected(), '単価');
+await page.keyboard.type('12000');
+await page.keyboard.press('Enter');
+assert.deepEqual(await placeNames(), ['①浴室', '②トイレ']);
+texts = await order();
+assert.equal(texts[texts.length - 1], '同上施工費');
+assert.deepEqual((await lastWork()).slice(0, 7), ['', '', '同上施工費', '1', '式', '12,000', '12,000']);
+assert.equal(await lines(), linesBefore + 3);
+// 読めない改修内容では箇所を作らない（いちばん下の行は空のまま）
+await cell('new:work').click();
+await page.keyboard.type('あいう');
+await page.keyboard.press('Enter');
+assert.equal(await cell('new:work').innerText(), '');
+assert.equal(await lines(), linesBefore + 3);
+log('施工費を入れても新しい箇所を作らない（空白の行に部材を入れたあとのボタン・お客様名の欄・いちばん下の行に打つ）OK');
+
+// 申請書のタブにも箇所は2つ（写真番号・改修の内容に③が出ない）
+await page.waitForTimeout(1200); // 自動保存
+const shinseiTab = page.getByRole('tab', {name: '📝 住宅改修申請書'});
+const shinseiPlaces = () => page.getByRole('list', {name: '改修の箇所'}).getByRole('listitem');
+await shinseiTab.click();
+await page.getByRole('form', {name: '申請書'}).waitFor();
+assert.deepEqual(await shinseiPlaces().evaluateAll((els) => els.map((e) => e.getAttribute('aria-label'))), ['①浴室', '②トイレ']);
+// 前の版が残した空の箇所（何も入っていない箇所）は、見積書を開いたときに外す（いちばん下の行がその箇所になり、打った施工費が②になっていた）
+await page.evaluate(async () => {
+  const db = await new Promise((res, rej) => {
+    const r = indexedDB.open('taiyo-sasaoka-shikiri', 1);
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+  const jobs = await new Promise((res) => {
+    const g = db.transaction('kv').objectStore('kv').get('jobs');
+    g.onsuccess = () => res(g.result);
+  });
+  const j = jobs.find((x) => x.customer === '見本 太郎');
+  j.places.push({id: 'p_empty_old', name: '', rows: [], kind: 1, photo: 0});
+  const stamp = 'old-' + Date.now();
+  await new Promise((res) => {
+    const tx = db.transaction('kv', 'readwrite');
+    tx.objectStore('kv').put(jobs, 'jobs');
+    tx.objectStore('kv').put(stamp, 'stamp:jobs');
+    tx.oncomplete = res;
+  });
+  db.close();
+  new BroadcastChannel('taiyo-sasaoka-shikiri').postMessage({from: 'old-tab', key: 'jobs', stamp});
+});
+await page.waitForFunction(() => document.querySelectorAll('[aria-label="改修の箇所"] [role="listitem"]').length === 3);
+await page.getByRole('tab', {name: '📋 工事見積書'}).click();
+await sheet.waitFor();
+assert.equal(await cell('new:work').innerText(), ''); // いちばん下の行は空の箇所にならない
+await shinseiTab.click();
+await page.getByRole('form', {name: '申請書'}).waitFor();
+assert.deepEqual(await shinseiPlaces().evaluateAll((els) => els.map((e) => e.getAttribute('aria-label'))), ['①浴室', '②トイレ']);
+await page.getByRole('tab', {name: '📋 工事見積書'}).click();
+await sheet.waitFor();
+log('申請書のタブの箇所も2つ・前の版が残した空の箇所は見積書を開くと外れるOK');
+// 片づけ（ブラケットは同上施工費ごと消える）
+await drop('サンプル S-BK01 ブラケット');
+await sheet.locator('.form-page tr', {hasText: '同上施工費'}).last().getByRole('button', {name: /の行を消す$/}).click();
+assert.equal(await lines(), linesBefore);
+
 // ---------------- 改修場所：欄の「▼」（Alt+↓）で箇所の名前の候補から選ぶ。打ち込んでもよい（打った文字で絞る）
 await cell(await key('木の手すり 35φ 4m', 'name')).click();
 await sheet.getByRole('button', {name: '改修場所（箇所名）を候補から選ぶ'}).click();
