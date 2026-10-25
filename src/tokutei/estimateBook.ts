@@ -1,6 +1,6 @@
 // 販売見積書：いただいた会社の見積書の原本（TSS の Excel。src/tokutei/print/mitsumori.xltx）に案件を書き込む
 // （ユーザーの指示「見積書の原本はこのような形にする。プレビューを見ながら入力できるようにする」2026-10-23）。
-// 書く欄：宛名（A6）・見積番号（I4）・見積日（I5）・会社の欄（H8〜H16：会社名／営業所　所長／〒／住所／TEL／FAX／登録番号／担当。設定の営業所から）・件名（B14）・
+// 書く欄：宛名（A6）・見積番号（I4）・見積日（I5）・会社の欄（I8〜I16。所長印・担当印の枠の上：会社名／営業所　所長／〒／住所／TEL／FAX／登録番号／担当。設定の営業所から）・件名（B14）・
 // 明細（23〜38行：品名 A・数量 F・単位 G・単価（税抜）H・金額 I＝式・税率 J・備考 K＝算出根拠）・備考（60〜62行：介護保険の内訳と見積書の備考に足す文）。
 // 原本は 2026-10-25 にユーザーの指示で直した（灰色→薄い水色・会社の欄を左寄せ・TEL と FAX を別の行に・担当・明細を16行に・税率の右に備考の列。
 // docs/tokutei/edit-mitsumori-template.py）。
@@ -36,7 +36,7 @@ const PAGE1_LAST = 62;
 const HEAD_ROWS = [1, 2, 3, 4, 5, 6, 7];
 const ITEM_HEAD_ROW = 22;
 /** 2・3ページ目の明細の行の数（1ページ目と同じ高さに入るだけ：(1〜62行（隠した53〜57行は入れない） − 頭の7行 − 見出し) ÷ 明細の1行。テストで原本から確かめる） */
-export const CONT_ROWS = 41;
+export const CONT_ROWS = 42;
 export const MAX_PAGES = 3;
 /** 見積書に入る商品の数（1ページ目 16＋つづき CONT_ROWS×2） */
 export const ESTIMATE_CAPACITY = ESTIMATE_ROWS.length + CONT_ROWS * (MAX_PAGES - 1);
@@ -78,7 +78,7 @@ const links = (items: number): [EstimateField, string[]][] => {
     ['customer', tops.map((t) => `A${t + 5}`)],
     ['quoteNo', tops.map((t) => `I${t + 3}`)],
     ['estimateDate', tops.map((t) => `I${t + 4}`)],
-    ['staff', ['H16']],
+    ['staff', ['I16']],
     ['items', itemRows(pages).slice(0, items + 1).flatMap((r) => ['A', 'F', 'G', 'H', 'I', 'J', 'K'].map((c) => `${c}${r}`))],
     ['note', NOTE_ROWS.map((r) => `A${r}`)],
   ];
@@ -137,24 +137,25 @@ export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
   put('I4', `№　${sale.quoteNo.trim()}`);
   const serial = excelDate(sale.estimateDate);
   if (serial) put('I5', serial);
-  // 会社の欄（ユーザーの指示「会社名や社長名などの部分は、左寄せを統一」「会社住所の下に、電話番号とFAX番号」「担当名をいれる」）。
+  // 会社の欄（ユーザーの指示「会社名や社長名などの部分は、左寄せを統一」「会社住所の下に、電話番号とFAX番号」「担当名をいれる」、
+  // 「社名の部分が全体的に小さい。そして、社名は所長印、担当の上にもってくる」2026-10-26。原本の I〜K の結合。長いときは縮めて入れる）。
   // 設定の営業所の値（設定で営業所を選ぶと入る。defaults.ts の OFFICES）。空の欄は原本の値（行橋営業所）のまま
   const office = OFFICES.find((o) => o.name === s.officeName.trim());
   const of = (v: string, d: string | undefined) => v.trim() || d || '';
-  if (s.company.trim()) put('H8', s.company.trim());
+  if (s.company.trim()) put('I8', s.company.trim());
   const officeName = s.officeName.trim();
   const manager = of(s.manager, office?.manager).replace(/\s+/, '　');
-  if (officeName) put('H9', [officeName, manager && `所長　${manager}`].filter(Boolean).join('　'));
+  if (officeName) put('I9', [officeName, manager && `所長　${manager}`].filter(Boolean).join('　'));
   const postal = of(s.postal, office?.postal);
-  if (postal) put('H11', `〒${postal}`);
+  if (postal) put('I11', `〒${postal}`);
   const address = of(s.address, office?.address);
-  if (address) put('H12', address);
+  if (address) put('I12', address);
   const tel = of(s.tel, office?.tel);
-  if (tel) put('H13', `TEL：${tel}`);
+  if (tel) put('I13', `TEL：${tel}`);
   const fax = of(s.fax, office?.fax);
-  if (fax) put('H14', `FAX：${fax}`);
-  if (s.regNo.trim()) put('H15', `登録番号：${s.regNo.trim()}`);
-  put('H16', sale.staff.trim() ? `担当：${sale.staff.trim()}` : '');
+  if (fax) put('I14', `FAX：${fax}`);
+  if (s.regNo.trim()) put('I15', `登録番号：${s.regNo.trim()}`);
+  put('I16', sale.staff.trim() ? `担当：${sale.staff.trim()}` : '');
   put('B14', ESTIMATE_SUBJECT);
   // 明細の品名の欄の書式は、どの行も1行目と同じにする（原本は2行目が10pt・3行目が赤の太字14pt＝書いた例の名残り。いちばん下の行は下の罫線がちがうのでそのまま）
   for (const c of ['A', 'B', 'C', 'D', 'E']) {

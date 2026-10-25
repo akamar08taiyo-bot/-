@@ -1,11 +1,12 @@
 # 販売見積書の原本（src/tokutei/print/mitsumori.xltx）を直したときの手順（2026-10-25。一度だけ動かしたもの。直し方の記録として残す）。
-# ユーザーの指示：「見積もりの色がグレー系で暗いので、薄い水色系にする」「見積もりでは、担当名をいれる」「会社住所の下に、電話番号とFAX番号を記載する」
+# ユーザーの指示：「見積もりの色がグレー系で暗いので、薄い水色系にする」「社名の部分が全体的に小さい。そして、社名は所長印、担当の上にもってくる」（2026-10-26）「見積もりでは、担当名をいれる」「会社住所の下に、電話番号とFAX番号を記載する」
 # 「見積もりの行数は4行ぐらい減らしていい」「会社名や社長名などの部分は、左寄せを統一して見やすくする」「税率の横に、備考を入れて、算出根拠をいれる」。
 #   python3 docs/tokutei/edit-mitsumori-template.py src/tokutei/print/mitsumori.xltx
 # 1. 灰色の塗り（fill 2＝背景色の15%暗い色）を薄い水色に
 # 2. 税率（J）の右に「備考」の列（K）。名前の列（A・B）と金額（I）・税率（J）を細くして、全体の幅は前とほぼ同じ（印刷の大きさが変わらない）
 #    表・合計の横の「消費税について」・備考の枠の右の端を K に。題名の枠（C1:H2）は1列右（D1:I2）にして、まん中のまま
-# 3. 会社の欄（H8〜）は全部左寄せ・同じ字下げなし：会社名／営業所　所長　氏名／〒／住所／TEL／FAX／登録番号／担当（式をやめて、アプリが値を書く）
+# 3. 会社の欄は全部左寄せ・同じ字下げなし：会社名／営業所　所長　氏名／〒／住所／TEL／FAX／登録番号／担当（式をやめて、アプリが値を書く）。
+#    2026-10-26 から印の枠の上の I〜K に、字を大きく（会社名 14pt・営業所 12pt・ほか 11pt。前は H 列に 11pt・10pt）
 #    印の枠（グループ化 1）は2行下・右の端へ
 # 4. 明細は20行→16行（39〜42行を隠す。合計の式の範囲 J23:J42 はそのまま。表の下の線は43行目の上の線）
 import re
@@ -150,19 +151,43 @@ for r in (1, 2):
         set_cell(f'{c}{r}', body)
     set_cell(f'C{r}', styled(f'C{r}', st['B']))
 
-# ---- 3. 会社の欄：左寄せ・字下げなし。会社名・営業所は 11pt、ほかは 10pt
-s_head = with_align(33, '<alignment horizontal="left" vertical="center"/>')  # 11pt
-s_line = with_align(80, '<alignment horizontal="left" vertical="center"/>')  # 10pt
-set_cell('H8', re.sub(r'\ss="\d+"', f' s="{s_head}"', re.search(r'<c r="H8"[^>]*?(?:/>|>.*?</c>)', sheet, re.S).group(0)))
-set_cell('H9', inline('H9', s_head, '行橋営業所　所長　久保　匠史'))
-set_cell('I9', styled('I9', 33))
-lines = {11: '〒824-0043', 12: '福岡県行橋市大字流末1327番地', 13: 'TEL：0930-26-9640', 14: 'FAX：0930-26-9641', 15: '登録番号：T1290001044462', 16: ''}
+# ---- 3. 会社の欄：左寄せ・字下げなし。印の枠（所長印・担当印）の上の I〜K に1行ずつ（ユーザーの指示「社名の部分が全体的に小さい。そして、社名は所長印、担当の上にもってくる」2026-10-26）。
+#    会社名 14pt・営業所　所長 12pt・ほかは 11pt（前は H 列に 11pt・10pt）。行ごとに I:K を結合し、縮小して全体を表示（長い住所の営業所でも K の右の端を越えない）
+fonts_block = re.search(r'<fonts count="(\d+)"([^>]*)>(.*?)</fonts>', styles, re.S)
+n_fonts = int(fonts_block.group(1))
+font_xml = lambda sz: f'<font><sz val="{sz}"/><name val="BIZ UDP明朝 Medium"/><family val="1"/><charset val="128"/></font>'
+styles = styles.replace(fonts_block.group(0), f'<fonts count="{n_fonts + 3}"{fonts_block.group(2)}>{fonts_block.group(3)}{font_xml(14)}{font_xml(12)}{font_xml(11)}</fonts>')
+FIT = '<alignment horizontal="left" vertical="center" shrinkToFit="1"/>'
+s_company = with_align(33, FIT, font=n_fonts)  # 14pt
+s_office = with_align(33, FIT, font=n_fonts + 1)  # 12pt
+s_line = with_align(33, FIT, font=n_fonts + 2)  # 11pt
+company = re.search(r'<c r="H8"[^>]*?(?:/>|>.*?</c>)', sheet, re.S).group(0)  # 会社名（共有の文字）
+lines = {8: None, 9: '行橋営業所　所長　久保　匠史', 11: '〒824-0043', 12: '福岡県行橋市大字流末1327番地', 13: 'TEL：0930-26-9640', 14: 'FAX：0930-26-9641', 15: '登録番号：T1290001044462', 16: ''}
 for r, text in lines.items():
-    set_cell(f'H{r}', inline(f'H{r}', s_line, text) if text else styled(f'H{r}', s_line))
-    for c in 'IJ':
-        if cell_style(f'{c}{r}') is not None:
-            set_cell(f'{c}{r}', styled(f'{c}{r}', 33))
+    s = s_company if r == 8 else s_office if r == 9 else s_line
+    set_cell(f'H{r}', styled(f'H{r}', 33))
+    if r == 8:
+        set_cell('I8', company.replace('r="H8"', 'r="I8"').replace(re.search(r'\ss="\d+"', company).group(0), f' s="{s}"'))
+    else:
+        set_cell(f'I{r}', inline(f'I{r}', s, text) if text else styled(f'I{r}', s))
+    for c in 'JK':
+        set_cell(f'{c}{r}', styled(f'{c}{r}', s))
+    sheet = sheet.replace('</mergeCells>', f'<mergeCell ref="I{r}:K{r}"/></mergeCells>', 1)
 sheet = sheet.replace('<mergeCell ref="H11:I11"/>', '')
+# 〒・住所・登録番号・担当の行も TEL・FAX と同じ 18pt の高さに（11pt の字が行の高さで縮まないように）
+for r in (11, 12, 15, 16):
+    head = re.match(r'<row\b[^>]*>', row_xml(r).group(0)).group(0)
+    assert 'ht="15"' in head, r
+    sheet = sheet.replace(head, head.replace('ht="15"', 'ht="18"', 1), 1)
+# 「リストから営業所を選択してください」のメモ（H9 のコメント）と、H9 の営業所の一覧（入力の規則）は、営業所の一覧から選ぶ式をやめたので消す
+ext = re.search(r'<ext uri="\{CCE6A557-97BC-4b89-ADB6-D9C93CAAB3DF\}".*?</ext>', sheet, re.S)
+assert ext and '<xm:sqref>H9</xm:sqref>' in ext.group(0) and ext.group(0).count('<x14:dataValidation ') == 1
+sheet = sheet.replace(ext.group(0), '', 1).replace('<extLst></extLst>', '')
+sheet = re.sub(r'<legacyDrawing r:id="(rId\d+)"/>', '', sheet)
+for n in ('xl/comments1.xml', 'xl/drawings/vmlDrawing1.vml'):
+    files.pop(n, None)
+files['xl/worksheets/_rels/sheet1.xml.rels'] = re.sub(rb'<Relationship\b[^>]*(?:comments|vmlDrawing)[^>]*/>', b'', files['xl/worksheets/_rels/sheet1.xml.rels'])
+files['[Content_Types].xml'] = re.sub(rb'<Override\b[^>]*comments1\.xml[^>]*/>', b'', files['[Content_Types].xml'])
 
 # ---- 4. 明細を16行に（39〜42行を隠す）。印の枠の下にすき間（20行目を高く）
 for r in range(39, 43):
@@ -203,7 +228,7 @@ grp = re.search(r'<xdr:twoCellAnchor><xdr:from>.*?</xdr:to><xdr:grpSp>', drawing
 anchor = (f'<xdr:twoCellAnchor><xdr:from><xdr:col>{c_from - 1}</xdr:col><xdr:colOff>{round((left - x_of(c_from)) * EMU)}</xdr:colOff><xdr:row>16</xdr:row><xdr:rowOff>95250</xdr:rowOff></xdr:from>'
           f'<xdr:to><xdr:col>{c_to - 1}</xdr:col><xdr:colOff>{round((right - x_of(c_to)) * EMU)}</xdr:colOff><xdr:row>19</xdr:row><xdr:rowOff>190500</xdr:rowOff></xdr:to><xdr:grpSp>')
 drawing = drawing[: grp.start()] + anchor + drawing[grp.end():]
-heights = [22.5, 22.5, 3.75, 20.25, 20.25, 15, 15, 20.25, 17.25, 3, 15, 15, 18, 18, 15, 15]  # 1〜16行（pt）
+heights = [22.5, 22.5, 3.75, 20.25, 20.25, 15, 15, 20.25, 17.25, 3, 18, 18, 18, 18, 18, 18]  # 1〜16行（pt。11・12・15・16行は上で 15→18）
 top = sum(heights) * 96 / 72 + 10
 drawing = drawing.replace('<a:off x="6233157" y="2962275"/>', f'<a:off x="{round(left * EMU)}" y="{round(top * EMU)}"/>', 1)
 # 赤い枠：合計の金額（C〜F）・金額の列（I）・消費税について（H〜K）。メモの文字の枠は1列右

@@ -88,7 +88,7 @@ test('販売見積書：宛名・見積番号・見積日・営業所・件名�
   assert.equal(readCell(f, SH, 'I4'), '№　20261022-1');
   assert.equal(readCell(f, SH, 'I5'), '46317'); // 2026-10-22（Excel の日付の数）
   // 会社の欄（ユーザーの指示「会社名や社長名などの部分は、左寄せを統一」「会社住所の下に、電話番号とFAX番号」「担当名をいれる」）：1行ずつ・式ではなく値
-  assert.deepEqual(['H8', 'H9', 'H11', 'H12', 'H13', 'H14', 'H15', 'H16'].map((r) => readCell(f, SH, r)), [
+  assert.deepEqual(['I8', 'I9', 'I11', 'I12', 'I13', 'I14', 'I15', 'I16'].map((r) => readCell(f, SH, r)), [
     '太陽シルバーサービス株式会社',
     '行橋営業所　所長　久保　匠史',
     '〒824-0043',
@@ -98,8 +98,8 @@ test('販売見積書：宛名・見積番号・見積日・営業所・件名�
     '登録番号：T1290001044462',
     '担当：土居 翔太',
   ]);
-  assert.equal(cellFormula(f, SH, 'H12'), '');
-  assert.equal(readCell(f, SH, 'I9'), '');
+  assert.equal(cellFormula(f, SH, 'I12'), '');
+  for (const r of [8, 9, 12, 16]) assert.equal(readCell(f, SH, `H${r}`), ''); // 前の場所（H）は空
   assert.equal(readCell(f, SH, 'B14'), '特定福祉用具の購入');
   // 1行目：シャワーチェア 見本A（品番）・1台・32,000×0.8＝25,600円・10%・備考に算出根拠
   assert.deepEqual(['A23', 'F23', 'G23', 'H23', 'I23', 'J23', 'K23'].map((r) => readCell(f, SH, r)), ['シャワーチェア 見本A　SC-01', '1', '台', '25600', '25600', '0.1', '定価32,000円の20%引き']);
@@ -167,7 +167,7 @@ test('販売見積書の原本：所長の印影の画像・作った人・パ�
   assert.ok(!/absPath|OneDrive/.test(strFromU8(t['xl/workbook.xml'])));
   // 作った人・コメントを書いた人（パソコンの名前）も消した
   assert.match(strFromU8(t['docProps/core.xml']), /<dc:creator><\/dc:creator><cp:lastModifiedBy><\/cp:lastModifiedBy>/);
-  assert.match(strFromU8(t['xl/comments1.xml']), /<authors><author><\/author><\/authors>/);
+  assert.ok(!t['xl/comments1.xml']); // 「リストから営業所を選択してください」のメモも消した（営業所の一覧から選ぶ式をやめたので。2026-10-26）
   assert.equal(estimateFileName(sale()), '御見積書_見本 花子様.xlsx');
   assert.equal(estimateFileName(sale({customer: ''})), '御見積書_（お客様名未入力）.xlsx');
   assert.equal(ESTIMATE_ROWS.length, 16); // ユーザーの指示「見積もりの行数は4行ぐらい減らしていい」
@@ -185,8 +185,9 @@ test('3ページまで（ユーザーの指示「ページは3ページまでい
   assert.equal(CONT_ROWS, Math.floor((h(1, 62) - h(1, 7) - lay.rowH(22)) / lay.rowH(23)));
   assert.equal(ESTIMATE_CAPACITY, 16 + CONT_ROWS * 2);
   assert.deepEqual([0, 1, 16, 17, 16 + CONT_ROWS, 17 + CONT_ROWS, ESTIMATE_CAPACITY, ESTIMATE_CAPACITY + 5].map(estimatePages), [1, 1, 1, 2, 2, 3, 3, 3]);
-  // 1ページ目が1枚に入る倍率（原本の「1ページに収める」と同じ。明細を16行にして縦が短くなったので前の 76% より大きい）
-  assert.equal(fitScale(xml), 82);
+  // 1ページ目が1枚に入る倍率（原本の「1ページに収める」と同じ。明細を16行にして縦が短くなったので前の 76% より大きい。
+  // 2026-10-26 に会社の欄の行を高くして 82% → 81%）
+  assert.equal(fitScale(xml), 81);
 });
 
 test('2ページ（25点）：つづきに題名・番号・日付・宛名と明細。合計の式は2ページ目も足す。手動の改ページ・印刷の範囲・倍率', () => {
@@ -221,7 +222,7 @@ test('2ページ（25点）：つづきに題名・番号・日付・宛名と�
   for (const [i, a] of merges.entries()) for (const b of merges.slice(i + 1)) assert.ok(a[2] < b[0] || b[2] < a[0] || a[3] < b[1] || b[3] < a[1], `結合が重なる ${a} ${b}`);
   assert.equal(Number(/<mergeCells count="(\d+)">/.exec(xml)?.[1]), merges.length);
   assert.match(xml, /<pageSetUpPr fitToPage="0"\/>/);
-  assert.match(xml, /<pageSetup\b[^>]*\sscale="82"/);
+  assert.match(xml, /<pageSetup\b[^>]*\sscale="81"/);
   assert.match(xml, /<rowBreaks count="1" manualBreakCount="1"><brk id="62" max="16383" man="1"\/><\/rowBreaks><colBreaks count="1" manualBreakCount="1"><brk id="11"/);
   assert.match(strFromU8(f['xl/workbook.xml']), new RegExp(`見積書!\\$A\\$1:\\$K\\$${rows.at(-1)}<`));
   assert.match(xml, new RegExp(`<dimension ref="A1:K${rows.at(-1)}"/>`));
@@ -269,8 +270,8 @@ test('販売見積書の原本（2026-10-25 の直し）：薄い水色・明細
   assert.match(strFromU8(t['xl/workbook.xml']), /見積書!\$A\$1:\$K\$62</);
   assert.ok(!/t="shared"/.test(xml));
   // 会社の欄は式をやめて値（アプリが設定の営業所の値を書く）。TEL と FAX は別の行
-  assert.equal(readCell(t, SH, 'H13'), 'TEL：0930-26-9640');
-  assert.equal(readCell(t, SH, 'H14'), 'FAX：0930-26-9641');
+  assert.equal(readCell(t, SH, 'I13'), 'TEL：0930-26-9640');
+  assert.equal(readCell(t, SH, 'I14'), 'FAX：0930-26-9641');
   assert.ok(!/VLOOKUP/.test(xml));
 });
 
@@ -289,8 +290,36 @@ test('算出根拠（税率の右の備考）：定価×割引・手で入れた
   assert.equal(readCell(f, SH, 'K23'), 'お試し価格');
 });
 
+test('会社の欄の場所と大きさ（ユーザーの指示「社名の部分が全体的に小さい。そして、社名は所長印、担当の上にもってくる」2026-10-26）', () => {
+  const xml = strFromU8(template()['xl/worksheets/sheet1.xml']);
+  for (const r of [8, 9, 11, 12, 13, 14, 15, 16]) assert.ok(xml.includes(`<mergeCell ref="I${r}:K${r}"/>`), `I${r}:K${r}`);
+  assert.ok(!/legacyDrawing|<xm:sqref>H9</.test(xml)); // H9 の営業所の一覧・メモはもうない
+  const page = estimatePreview(template(), sale(), S)[0];
+  const at = (s: string) => page.texts.find((x) => x.runs.map((r) => r.text).join('') === s);
+  const name = at('太陽シルバーサービス株式会社')!;
+  const office = at('行橋営業所　所長　久保　匠史')!;
+  const lines = ['〒824-0043', '福岡県行橋市大字流末1327番地', 'TEL：0930-26-9640', 'FAX：0930-26-9641', '登録番号：T1290001044462', '担当：土居 翔太'].map((x) => at(x)!);
+  // 字の大きさ（画素）：会社名 14pt・営業所 12pt・ほか 11pt（前は 11pt・10pt）
+  assert.deepEqual([name, office, lines[0]].map((x) => Math.round((x.runs[0].font.size * 72) / 96)), [14, 12, 11]);
+  // どの行も同じ左の端（I 列）で、縮めて K の右の端まで（はみ出さない）
+  for (const x of [office, ...lines]) assert.equal(x.x, name.x);
+  for (const x of [name, office, ...lines]) assert.ok(x.shrink, x.ref);
+  // 印の枠（所長印・担当印）は会社の欄の下、会社の欄の左右の中
+  const stamps = page.shapes.filter((x) => x.kind === 'rect' && !x.text);
+  assert.equal(stamps.length, 2);
+  const last = lines[lines.length - 1];
+  for (const b of stamps) {
+    assert.ok(b.y >= last.y + last.h - 1, `印の枠が会社の欄の下にない：${b.y} < ${last.y + last.h}`);
+    assert.ok(b.x >= name.x && b.x + b.w <= name.x + name.w + 1, `印の枠が会社の欄の左右の中にない：${b.x}〜${b.x + b.w}（会社の欄 ${name.x}〜${name.x + name.w}）`);
+  }
+  // 長い住所の営業所（熊本営業所）でも I〜K の中（縮めて入れる）
+  const kumamoto = estimatePreview(template(), sale(), settingsForOffice(S, '熊本営業所'))[0];
+  const addr = kumamoto.texts.find((x) => x.runs.map((r) => r.text).join('').startsWith('熊本県'))!;
+  assert.ok(addr.shrink && addr.x + addr.w <= name.x + name.w + 1);
+});
+
 test('会社の欄：設定の営業所の値（ほかの営業所でも、TEL・FAX・所長・登録番号）。担当がいなければ空', () => {
   const kokura = settingsForOffice(S, '小倉営業所');
   const f = unzipSync(fillEstimate(template(), sale({staff: ''}), kokura));
-  assert.deepEqual(['H9', 'H11', 'H13', 'H14', 'H16'].map((r) => readCell(f, SH, r)), ['小倉営業所　所長　森口　賢一', '〒802-0011', 'TEL：093-952-1616', 'FAX：093-952-1627', '']);
+  assert.deepEqual(['I9', 'I11', 'I13', 'I14', 'I16'].map((r) => readCell(f, SH, r)), ['小倉営業所　所長　森口　賢一', '〒802-0011', 'TEL：093-952-1616', 'FAX：093-952-1627', '']);
 });
