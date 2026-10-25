@@ -5,6 +5,7 @@ import type {MonthSummary} from '../calc.ts';
 import {cutCalc, FORM_INFO, insurerLabel, jobForm} from '../estimateForms.ts';
 import type {AppData, Job, Settings} from '../types.ts';
 import {dateLabel, monthEnd, monthLabel, num, shortDate, staffShort, todayIso, yen} from '../util.ts';
+import {Btn} from '../components/ui.tsx';
 import {estimateDateOf, useDocMeta} from './docMeta.ts';
 import type {DocMeta} from './docMeta.ts';
 import {KouikiForm, YukuhashiForm} from './EstimateForms.tsx';
@@ -18,25 +19,43 @@ export type PrintRequest =
 
 /** 用紙の幅（A4縦 210mm・横 297mm）＋まわりの余白。画面がこれより狭いと、用紙全体が見えるように縮めて見せる */
 const pagePx = (mm: number) => (mm / 25.4) * 96 + 16;
+/** 用紙の右に置く「印刷する」の列の幅（ボタン＋左右のすき間。sasaoka.css の .print-side と同じ） */
+const SIDE_PX = 184;
 
-/** 印刷イメージを画面の幅に合わせる倍率（1＝原寸） */
-function useFitScale(pageMm: number) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+/** 大きさが変わったら measure を呼ぶ（ResizeObserver のないブラウザは画面の大きさ） */
+function useResize(ref: {current: HTMLElement | null}, measure: (el: HTMLElement) => void, deps: unknown[]) {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const measure = () => setScale(Math.min(1, el.clientWidth / pagePx(pageMm)));
-    measure();
+    const run = () => measure(el);
+    run();
     if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', measure);
-      return () => window.removeEventListener('resize', measure);
+      window.addEventListener('resize', run);
+      return () => window.removeEventListener('resize', run);
     }
-    const ro = new ResizeObserver(measure);
+    const ro = new ResizeObserver(run);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [pageMm]);
-  return [ref, scale] as const;
+  }, deps);
+}
+
+/**
+ * 印刷イメージを画面の幅に合わせる倍率（1＝原寸）と、用紙の右に「印刷する」を置けるか（side。原寸の用紙の右にボタンの列が入る幅があるとき。
+ * スマホなど狭い画面は上の帯に置く）
+ */
+function useFitScale(pageMm: number) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [fit, setFit] = useState({scale: 1, side: false});
+  useResize(
+    ref,
+    (el) => {
+      const w = el.clientWidth;
+      const next = {scale: Math.min(1, w / pagePx(pageMm)), side: w >= pagePx(pageMm) + SIDE_PX};
+      setFit((f) => (f.scale === next.scale && f.side === next.side ? f : next));
+    },
+    [pageMm],
+  );
+  return [ref, fit.scale, fit.side] as const;
 }
 
 export function PrintView({request, data, onClose}: {request: PrintRequest; data: AppData; onClose: () => void}) {
@@ -50,9 +69,20 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
   // 見積書は A4横（元の Excel と同じ）
   const estJob = request.kind === 'estimate' ? data.jobs.find((j) => j.id === request.jobId) : undefined;
   const form = estJob ? jobForm(estJob, data.settings) : null;
-  const [overlayRef, fitScale] = useFitScale(request.kind === 'estimate' ? 297 : 210);
+  const [overlayRef, fitScale, side] = useFitScale(request.kind === 'estimate' ? 297 : 210);
   const [actualSize, setActualSize] = useState(false);
   const zoom = actualSize ? 1 : fitScale;
+  // 上の帯の高さ（用紙の右の「印刷する」を、帯のすぐ下に止めておく）
+  const barRef = useRef<HTMLDivElement>(null);
+  const [barH, setBarH] = useState(60);
+  useResize(barRef, (el) => setBarH(el.offsetHeight), []);
+  // 「印刷する」は見やすい所に大きく（ユーザーの指示「発注書の印刷ボタンは見やすい位置に置く」2026-10-25。前は濃い紺の帯の右上で目立たなかった）：
+  // 広い画面は用紙の右の灰色の所の上（スクロールしても見える）、狭い画面（スマホ）は用紙の右に場所がないので上の帯。見積書・請求書の印刷も同じ
+  const printButton = (
+    <Btn color="softSky" onClick={() => window.print()} className={side ? '!rounded-xl !px-6 !py-4 !text-xl shadow-lg' : '!px-5 !text-base'}>
+      🖨 印刷する
+    </Btn>
+  );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -106,7 +136,7 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
     <div className="print-overlay" ref={overlayRef}>
       {/* 見積書は A4横で印刷する（この画面を開いているあいだだけ） */}
       {form && <style>{'@media print { @page { size: A4 landscape; margin: 0; } }'}</style>}
-      <div className="print-toolbar">
+      <div className="print-toolbar" ref={barRef}>
         <div className="text-sm font-bold">
           {form && estJob ? `見積書（A4横）・${insurerLabel(estJob, data.settings)}「${FORM_INFO[form].title}」` : request.kind === 'order' ? '発注書（A4縦）' : '印刷イメージ（A4縦）'}
           <span className="ml-2 hidden font-normal text-slate-300 sm:inline">印刷の画面で「PDFに保存」を選ぶとPDFにできます</span>
@@ -127,7 +157,7 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
             </label>
           </div>
         )}
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           {fitScale < 1 && (
             <button
               type="button"
@@ -137,17 +167,23 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
               {actualSize ? '全体を表示' : '🔍 拡大'}
             </button>
           )}
-          <button type="button" onClick={() => window.print()} className="rounded-md bg-sky-600 px-4 py-2 text-sm font-bold text-white shadow hover:bg-sky-700">
-            🖨 印刷する
-          </button>
-          <button type="button" onClick={onClose} className="rounded-md bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow hover:bg-slate-100">
+          {!side && printButton}
+          {/* 閉じるは今までどおり右上（印刷するを用紙の右に移しても、探さなくてよいように） */}
+          <Btn color="white" onClick={onClose} className="!px-5 !text-base">
             ✕ 閉じる
-          </button>
+          </Btn>
         </div>
       </div>
-      {/* 画面の幅が足りないときは zoom で縮める（印刷するときは CSS で原寸に戻す） */}
-      <div className="print-root" style={zoom < 1 ? {zoom} : undefined}>
-        {sheets}
+      <div className={side ? 'print-body side' : 'print-body'}>
+        {/* 画面の幅が足りないときは zoom で縮める（印刷するときは CSS で原寸に戻す） */}
+        <div className="print-root" style={zoom < 1 ? {zoom} : undefined}>
+          {sheets}
+        </div>
+        {side && (
+          <div className="print-side" style={{top: barH + 16}}>
+            {printButton}
+          </div>
+        )}
       </div>
     </div>
   );

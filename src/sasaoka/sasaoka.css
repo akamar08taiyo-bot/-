@@ -33,6 +33,23 @@ body {
 .print-root {
   padding: 16px 8px 40px;
 }
+/* 広い画面：用紙をまん中に、右の灰色の所の上に「印刷する」（ユーザーの指示「発注書の印刷ボタンは見やすい位置に置く」）。
+   右の列はボタンの幅（PrintView.tsx の SIDE_PX）より狭くしない（足りなければ用紙が少し左に寄る）。
+   ボタンは用紙の上の端にそろえ、スクロールしても上の帯のすぐ下に止まる（top は帯の高さから PrintView.tsx で決める） */
+.print-body.side {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(184px, 1fr);
+}
+.print-body.side > .print-root {
+  grid-column: 2;
+}
+.print-side {
+  position: sticky;
+  grid-column: 3;
+  align-self: start;
+  justify-self: start;
+  margin: 16px 16px 0 8px;
+}
 
 /* ---------------------------------------------------------------- 入力の欄が狭いとき（スマホ・見積書を横に並べたとき）：箇所の行を縦に並べる
    （JobEditor が入力の欄の幅を見て rows-narrow を付ける。表のままだと横にはみ出す） */
@@ -790,8 +807,12 @@ table.fm .yk-issuer {
     overflow: visible;
     background: none;
   }
-  .print-toolbar {
+  .print-toolbar,
+  .print-side {
     display: none !important;
+  }
+  .print-body {
+    display: block !important;
   }
   .print-root {
     padding: 0;

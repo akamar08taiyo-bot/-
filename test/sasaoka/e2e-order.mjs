@@ -115,6 +115,26 @@ assert.deepEqual(
 );
 assert.equal(await page.title(), '発注書_（サンプル）山田様');
 await doc.screenshot({path: path.join(outDir, '71-order-doc.png')});
+// 「🖨 印刷する」は見やすい所に（ユーザーの指示「発注書の印刷ボタンは見やすい位置に置く」2026-10-25）：広い画面は用紙の右の灰色の所の上に大きく、
+// スクロールしても見える。✕ 閉じるは今までどおり上の帯の右
+const printBtn = page.getByRole('button', {name: '🖨 印刷する'});
+const toolbar = page.locator('.print-toolbar');
+await page.locator('.print-overlay').evaluate((el) => el.scrollTo(0, 0)); // 用紙のスクリーンショットで動いた分を戻す
+await page.waitForTimeout(100);
+const paper = await doc.boundingBox();
+let pb = await printBtn.boundingBox();
+assert.ok(pb.x >= paper.x + paper.width && pb.x + pb.width <= 1366, `印刷するが用紙の右にない: ${JSON.stringify({pb, paper})}`);
+assert.ok(Math.abs(pb.y - paper.y) < 30, `印刷するが用紙の上の端にない: ${JSON.stringify({pb, paper})}`);
+assert.ok((await printBtn.evaluate((e) => parseFloat(getComputedStyle(e).fontSize))) >= 20);
+assert.equal(await toolbar.getByRole('button', {name: '🖨 印刷する'}).count(), 0);
+assert.equal(await toolbar.getByRole('button', {name: '✕ 閉じる'}).count(), 1);
+await page.screenshot({path: path.join(outDir, '71-order-print-wide.png')});
+await page.locator('.print-overlay').evaluate((el) => el.scrollTo(0, el.scrollHeight));
+await page.waitForTimeout(100);
+pb = await printBtn.boundingBox();
+const bar = await toolbar.boundingBox();
+assert.ok(pb.y >= bar.y + bar.height && pb.y + pb.height <= 900, `スクロールすると印刷するが見えない: ${JSON.stringify({pb, bar})}`);
+await page.screenshot({path: path.join(outDir, '71-order-print-wide-scrolled.png')});
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
 log('発注書の印刷OK');
 
@@ -172,6 +192,18 @@ const box = await list.getByRole('button', {name: 'ブラケットを発注書�
 assert.ok(box && box.x + box.width <= 390, `✕ が画面からはみ出している: ${JSON.stringify(box)}`);
 assert.ok((await page.evaluate(() => document.documentElement.scrollWidth)) <= 390, '横にはみ出している');
 await page.screenshot({path: path.join(outDir, '72-order-phone.png'), fullPage: true});
+// スマホの印刷イメージ：用紙の右に場所がないので「🖨 印刷する」は上の帯（スクロールしても見える）
+await page.getByRole('button', {name: '🖨 発注書を印刷'}).click();
+await doc.waitFor();
+assert.equal(await toolbar.getByRole('button', {name: '🖨 印刷する'}).count(), 1);
+assert.equal(await page.locator('.print-side').count(), 0);
+await page.locator('.print-overlay').evaluate((el) => el.scrollTo(0, el.scrollHeight));
+await page.waitForTimeout(100);
+const phoneBtn = await printBtn.boundingBox();
+assert.ok(phoneBtn.y >= 0 && phoneBtn.y + phoneBtn.height <= 844 && phoneBtn.x + phoneBtn.width <= 390, `スマホで印刷するが見えない: ${JSON.stringify(phoneBtn)}`);
+assert.ok((await page.locator('.print-overlay').evaluate((el) => el.scrollWidth)) <= 390, '印刷イメージが横にはみ出している');
+await page.screenshot({path: path.join(outDir, '73-order-print-phone.png')});
+await page.getByRole('button', {name: '✕ 閉じる'}).click();
 log('スマホの幅OK');
 
 console.log('\nERRORS:', errors.length ? errors : 'なし');

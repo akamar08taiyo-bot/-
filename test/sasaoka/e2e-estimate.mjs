@@ -185,6 +185,10 @@ const totalLine = async (where, label) => (await where.locator('tr', {hasText: l
 assert.deepEqual(await totalLine(printed, '小計'), ['小計', '49,260', '49,260']);
 assert.deepEqual(await totalLine(printed, '合計'), ['合計', '59,600', '59,600']);
 await page.screenshot({path: path.join(outDir, '51-print-yukuhashi.png')});
+// 「🖨 印刷する」は用紙（A4横）の右の上に大きく（発注書の印刷と同じ。2026-10-25）
+const printBox = await page.getByRole('button', {name: '🖨 印刷する'}).boundingBox();
+const paperBox = await printed.boundingBox();
+assert.ok(printBox.x >= paperBox.x + paperBox.width && printBox.x + printBox.width <= 1366 && Math.abs(printBox.y - paperBox.y) < 30, JSON.stringify({printBox, paperBox}));
 await page.emulateMedia({media: 'print'});
 await page.pdf({path: path.join(outDir, 'estimate-yukuhashi.pdf'), printBackground: true, preferCSSPageSize: true});
 await page.emulateMedia({media: 'screen'});
