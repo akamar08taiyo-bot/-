@@ -101,7 +101,7 @@ try {
   await page.getByLabel('フリガナ').fill('ミホン ハナコ');
   await page.getByLabel('住所').fill('福岡県行橋市中央1-1');
   await page.getByLabel('電話').fill('0930-00-0000');
-  await page.getByLabel('担当').selectOption('土居 翔太');
+  await page.getByRole('combobox', {name: '担当'}).selectOption('土居 翔太');
   await page.getByRole('button', {name: '★ 商品を選ぶ'}).click();
   await page.getByRole('button', {name: 'シャワーチェア 見本Aを入れる'}).click();
   await page.getByRole('button', {name: '浴槽台 見本Bを入れる'}).click();
@@ -175,6 +175,45 @@ try {
   await order.locator('section[aria-label="販売受注簿入力"]').first().getByLabel('数量', {exact: true}).fill('2');
   await order.waitForFunction(() => document.querySelector('section[aria-label="販売受注簿入力"] .benefitBreakdown').innerText.includes('27,808円'));
   assert.equal((await benefit(order))['利用者負担額(1割・税込)'], '2,781円');
+  await order.close();
+
+  // ---- 状態を「承認」にすると、販売受注簿へ自動で送る（ユーザーの指示「販売受注簿にも自動で転記する」2026-10-25）。1回だけ。
+  // 受注簿ツールをふつうに開くと「受注簿に入れる」が出る（列 taiyo-hacchu-import-queue-v1 から。入れたら列から消える）
+  await page.goto(`${site}/tokutei/`);
+  await page.getByRole('button', {name: '📝 見積もり・申請'}).click();
+  await page.getByRole('button', {name: '＋ 行橋市'}).click();
+  await page.getByRole('textbox', {name: 'お客様名', exact: true}).fill('見本 次郎');
+  await page.getByRole('button', {name: '★ 商品を選ぶ'}).click();
+  await page.getByRole('button', {name: 'シャワーチェア 見本Aを入れる'}).click();
+  await page.getByRole('button', {name: '閉じる'}).last().click();
+  await page.getByText('13,904円').first().waitFor();
+  const queue = () => page.evaluate(() => JSON.parse(localStorage.getItem('taiyo-hacchu-import-queue-v1') ?? '[]'));
+  assert.deepEqual(await queue(), []);
+  await page.getByRole('radiogroup', {name: '状態'}).getByRole('radio', {name: '承認'}).click();
+  await page.getByText('販売受注簿へ送りました').waitFor();
+  const queued = await queue();
+  assert.equal(queued.length, 1);
+  assert.equal(queued[0].kind, 'taiyo-tokutei-order');
+  assert.equal(queued[0].customerName, '見本 次郎');
+  await page.waitForTimeout(800); // 保存（送った時刻 hacchuSentAt）
+  // 納品にしても、もう送らない
+  await page.getByRole('radiogroup', {name: '状態'}).getByRole('radio', {name: '納品'}).click();
+  await page.waitForTimeout(300);
+  assert.equal((await queue()).length, 1);
+
+  const auto = await ctx.newPage();
+  auto.on('pageerror', (e) => errors.push(`受注簿（自動）: ${e}`));
+  auto.on('dialog', (d) => d.accept()); // 「前回の入力は消えて…置き換わります」（上で入れた受注簿がこの端末に残っている）
+  await auto.goto(`${site}/taiyo-hacchu-scan/`);
+  const autoDrawer = auto.getByLabel('特定福祉用具の見積もりから');
+  await autoDrawer.getByRole('heading', {name: '特定福祉用具の見積もりから商品が届いています'}).waitFor();
+  assert.match(await autoDrawer.innerText(), /見本 次郎様 特定福祉用具 の商品 1点です/);
+  await auto.screenshot({path: `${out}/hacchu-5-auto-drawer.png`});
+  await autoDrawer.getByRole('button', {name: '受注簿に入れる'}).click();
+  await auto.getByText('特定福祉用具1点を入れました').waitFor();
+  assert.equal(await auto.evaluate(() => localStorage.getItem('taiyo-hacchu-import-queue-v1')), null); // 列が空になったら消す
+  assert.equal(await cellValue(auto, '顧客名'), '見本 次郎');
+  await auto.close();
 
   assert.deepEqual(errors, []);
   console.log('ok: 見積もり → 📤 販売受注簿に転記 → 受注簿に入れる（給付・1点1ページ・給付内訳は見積書と同じ合計）→ 印刷 → 直したらふつうの計算');
