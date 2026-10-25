@@ -49,6 +49,10 @@
 - 申請書の画面：案件の画面の「📄 申請書」（またはタブ「📄 申請書（行橋市）」など）で、左で入れながら右で申請書の原本の形のまま見る（住宅改修の申請書と同じ。
   ユーザーの指示「特定福祉用具購入の申請書も、住宅改修の申請書と同じくプレビューを見ながら入力することができる」2026-10-22）。
   プレビューの欄を押すと左のその入れる所へ、入れている所の欄は囲む、まだ入っていない所は薄い黄色（`shinseiPreview.ts`・`components/ShinseiPreview.tsx`）
+- 「📷 スクショから自動認識」（見積もりの画面・申請書の画面の商品の欄。ユーザーの指示「スクショから切り取って作成にすると、自動認識を使えるようにする。
+  ケアマックスとウェルファンのカタログにも飛べるように、リンクも準備」2026-10-25）：窓の中に販売受注簿作成ツールの読み取り（`/taiyo-hacchu-scan/?embed=scan`。画像の欄だけ）を出し、
+  カタログの商品の画面を切り取って貼り付けると、商品名・メーカー・型番・定価・仕切りが右の欄に入る。直して「見積書に入れる」。窓の上に「🔗 ケアマックス（介援隊）のカタログを開く」
+  「🔗 ウェルファンのカタログを開く」（`src/tokutei/scanItem.ts`・`components/ScanDialog.tsx`）
 - 販売受注簿への転記：見積もりの画面の「📤 販売受注簿に転記」で、販売受注簿作成ツール（taiyo-hacchu-scan）を新しいタブで開き、商品1点ずつ受注区分「給付」のページにする
   （同じサイトの localStorage `taiyo-hacchu-import-v1`、kind `taiyo-tokutei-order`。`src/tokutei/handoff.ts`。ページごとの給付内訳は、合計が見積書と同じになるようにこのアプリで分けて送る。
   受け取りは受注簿ツールの `src/main.jsx` の jutaku-import-begin〜end。形を変えるときは両方を直す。DESIGN.md 5.3）
@@ -63,6 +67,7 @@ npm run -s lint             # 型チェック
 npm run -s build:tokutei    # dist-tokutei/index.html（1ファイル）と version.json
 node test/tokutei/e2e.mjs <出力フォルダ>   # ブラウザで通しで確かめる（Playwright。ビルドのあと）
 node test/tokutei/e2e-hacchu.mjs <受注簿ツールの dist> <出力フォルダ>   # 販売受注簿への転記を通しで（受注簿ツールも npm run build のあと）
+ENG_DATA=<eng.traineddata.gz のフォルダ> node test/tokutei/e2e-scan.mjs <受注簿ツールの dist> <出力フォルダ>   # スクショから自動認識を本物の読み取りで
 ```
 
 公開先は太陽ポータル（taiyo-portal、master）の `tokutei/`：https://akamar08taiyo-bot.github.io/taiyo-portal/tokutei/ 。

@@ -30,6 +30,10 @@ PLAYWRIGHT=/opt/node-tools/node_modules/playwright/index.mjs timeout 600 node te
 - 見た目を変えたら、パソコンとスマホ（390px）のスクリーンショットを撮って自分の目で見る。
 - 販売受注簿への転記：受注簿ツール（`akamar08taiyo-bot/taiyo-hacchu-scan`、`/home/user/taiyo-hacchu-scan`）を `npm ci && npm run build` してから
   `node test/tokutei/e2e-hacchu.mjs /home/user/taiyo-hacchu-scan/dist <出力フォルダ>`（5193番で `/tokutei/` と `/taiyo-hacchu-scan/` を同じサイトに置く）。
+- スクショから自動認識：受注簿ツール（ブランチ `claude/tokutei-embed`）を `npm run build` してから
+  `ENG_DATA=<フォルダ> node test/tokutei/e2e-scan.mjs /home/user/taiyo-hacchu-scan/dist <出力フォルダ>`（5194番）。読み取りの部品は jsDelivr から取れないので、
+  node_modules の tesseract.js・tesseract.js-core・@tesseract.js-data/jpn と、英語のデータ（受注簿ツールは jpn+eng で読む。`npm pack @tesseract.js-data/eng@1.0.0` を開いた
+  `package/4.0.0_best_int`）を Playwright で返す。画像は表示倍率 2 で作る（倍率 1 だと「35,000」の「,」を「.」と読み、定価が入らない。受注簿ツールの Learnings.md 第36項）。
   受注簿ツールの単体テストは `node --test "test/*.test.mjs"` と `node test/run-scan-tests.js`（受け取りは `test/tokutei-import.test.mjs`・`test/jutaku-import.test.mjs`）。
 
 ## 3. Excel の確かめ方（この環境に Excel はない）

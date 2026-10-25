@@ -36,6 +36,7 @@ export function ShinseiInputs({
   changeZip,
   zips,
   onPickProduct,
+  onScan,
   onAddItem,
   onPickCustomer,
 }: {
@@ -53,6 +54,7 @@ export function ShinseiInputs({
   changeZip: (zip: string) => void;
   zips: ZipHit[];
   onPickProduct: () => void;
+  onScan: () => void; // 「📷 スクショから自動認識」の窓を開く（scanItem.ts）
   onAddItem: () => void;
   onPickCustomer: () => void;
 }) {
@@ -230,6 +232,9 @@ export function ShinseiInputs({
             <div className="flex flex-wrap gap-2">
               <Btn color="teal" small onClick={onPickProduct}>
                 ★ 商品を選ぶ
+              </Btn>
+              <Btn color="purple" small onClick={onScan}>
+                📷 スクショから自動認識
               </Btn>
               <Btn color="white" small onClick={onAddItem}>
                 ＋ 手で入れる

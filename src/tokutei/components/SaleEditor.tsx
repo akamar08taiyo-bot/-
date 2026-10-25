@@ -22,6 +22,7 @@ import {CategorySelect} from './CategorySelect.tsx';
 import {CustomerPicker} from './CustomerPicker.tsx';
 import {ProductPicker} from './ProductPicker.tsx';
 import {ReasonField} from './ReasonField.tsx';
+import {ScanDialog} from './ScanDialog.tsx';
 import {ShinseiInputs} from './ShinseiInputs.tsx';
 import {ShinseiPanel} from './ShinseiPanel.tsx';
 import {ShinseiPages} from './ShinseiPreview.tsx';
@@ -78,6 +79,8 @@ export function SaleEditor({
   const toast = useToast();
   const [picking, setPicking] = useState(false);
   const [pickingCustomer, setPickingCustomer] = useState(false);
+  // 「📷 スクショから自動認識」の窓（scanItem.ts）
+  const [scanning, setScanning] = useState(false);
   // 住所から自動で入れた郵便番号（手で直した番号は、住所を直しても変えない）
   const autoZip = useRef('');
   const s = data.settings;
@@ -291,6 +294,7 @@ export function SaleEditor({
             changeZip={changeZip}
             zips={zips}
             onPickProduct={() => setPicking(true)}
+            onScan={() => setScanning(true)}
             onAddItem={() => change({items: [...sale.items, blankItem(s)]})}
             onPickCustomer={() => setPickingCustomer(true)}
           />
@@ -489,6 +493,9 @@ export function SaleEditor({
                 <>
                   <Btn color="teal" onClick={() => setPicking(true)}>
                     ★ 商品を選ぶ
+                  </Btn>
+                  <Btn color="purple" onClick={() => setScanning(true)}>
+                    📷 スクショから自動認識
                   </Btn>
                   <Btn color="white" onClick={() => change({items: [...sale.items, blankItem(s)]})}>
                     ＋ 手で入れる
@@ -721,6 +728,13 @@ export function SaleEditor({
         </div>
       )}
 
+      {scanning && (
+        <ScanDialog
+          settings={s}
+          onAdd={(item) => update('sales', (list) => list.map((x) => (x.id === sale.id ? {...x, items: [...x.items, item], updatedAt: Date.now()} : x)))}
+          onClose={() => setScanning(false)}
+        />
+      )}
       {pickingCustomer && <CustomerPicker sales={data.sales} current={sale} onPick={pickCustomer} onClose={() => setPickingCustomer(false)} />}
       {picking && (
         <ProductPicker

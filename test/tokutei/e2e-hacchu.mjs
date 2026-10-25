@@ -53,7 +53,7 @@ const cellValue = (page, label) =>
   page.evaluate((label) => {
     const sheet = document.querySelector('section[aria-label="販売受注簿入力"]');
     const cell = [...sheet.querySelectorAll('.sheetCell')].find((c) => c.querySelector('b')?.textContent.trim() === label);
-    const input = cell?.querySelector('input:not([type=radio]), textarea, select');
+    const input = cell?.querySelector('input:not([type=radio]):not([aria-label="フリガナ"]), textarea, select');
     return input ? input.value : null;
   }, label);
 /** 受注簿の見えているページで選ばれているラジオ（受注区分・給付割合） */
@@ -97,7 +97,7 @@ try {
   // ---- 見積もり（行橋市・架空のお客様）
   await page.getByRole('button', {name: '📝 見積もり・申請'}).click();
   await page.getByRole('button', {name: '＋ 行橋市'}).click();
-  await page.getByLabel('お客様名').fill('見本 花子');
+  await page.getByRole('textbox', {name: 'お客様名', exact: true}).fill('見本 花子');
   await page.getByLabel('フリガナ').fill('ミホン ハナコ');
   await page.getByLabel('住所').fill('福岡県行橋市中央1-1');
   await page.getByLabel('電話').fill('0930-00-0000');
@@ -143,6 +143,8 @@ try {
   assert.equal(await cellValue(order, 'SMARTれん太の販売分類'), '特定福祉用具');
   assert.equal(await cellValue(order, '営業担当'), '土居');
   assert.equal(await cellValue(order, '顧客名'), '見本 花子');
+  // 顧客名の上にフリガナ（ユーザーの指示「読みなど、全て飛べるようにする」）
+  assert.equal(await order.locator('section[aria-label="販売受注簿入力"]').first().getByLabel('フリガナ').inputValue(), 'ミホン ハナコ');
   assert.equal(await cellValue(order, '住所（任意）'), '福岡県行橋市中央1-1');
   // 商品の欄（商品名・型番・仕切り・販売単価など）は入力欄の値で見る
   const fields = await fieldValues(order);
