@@ -187,7 +187,7 @@ try {
   await page.getByRole('textbox', {name: '電話'}).fill('');
   await page.getByRole('textbox', {name: 'お客様名'}).focus(); // 入れている所は囲むほうが先なので、ほかへ
   await page.waitForFunction(() => document.querySelector('[aria-label="申請書のプレビュー"] [data-pv-field="tel"]')?.className.includes('bg-amber'));
-  assert.match((await page.locator('label[data-field="tel"]').getAttribute('class')) ?? '', /bg-amber-50/);
+  assert.match((await page.locator('[data-field="tel"] > div').nth(1).getAttribute('class')) ?? '', /bg-amber-50/);
   await page.getByRole('textbox', {name: '電話'}).fill('0930-00-0000');
   await page.waitForFunction(() => !document.querySelector('[aria-label="申請書のプレビュー"] [data-pv-field="tel"]')?.className.includes('bg-amber'));
   // 申請書（Excel）もこの画面から作れる

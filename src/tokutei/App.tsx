@@ -25,9 +25,10 @@ const PORTAL_URL = 'https://akamar08taiyo-bot.github.io/taiyo-portal/';
 
 /**
  * URL のうしろ（#tab=sales&sale=…&print=1）。読み直しても同じ画面を開く。
- * 住宅改修のアプリの「🛁 特定福祉用具申請書」のタブの中では #jutaku=<様邸の id>&embed=1（jutaku.ts）
+ * 住宅改修のアプリの「🛁 特定福祉用具申請書」のタブの中では #jutaku=<様邸の id>&embed=1&view=shinsei（申請書だけ）、
+ * 「販売見積書」のタブの中では view=quote（見積書だけ）（jutaku.ts）
  */
-function readHash(): {tab?: Tab; sale?: string; print?: boolean; jutaku?: string; embed?: boolean} {
+function readHash(): {tab?: Tab; sale?: string; print?: boolean; jutaku?: string; embed?: boolean; view?: EmbedView} {
   const p = new URLSearchParams(location.hash.replace(/^#/, ''));
   const tab = p.get('tab');
   return {
@@ -36,14 +37,19 @@ function readHash(): {tab?: Tab; sale?: string; print?: boolean; jutaku?: string
     print: p.get('print') === '1',
     jutaku: p.get('jutaku') || undefined,
     embed: p.get('embed') === '1',
+    view: p.get('view') === 'shinsei' || p.get('view') === 'quote' ? (p.get('view') as EmbedView) : undefined,
   };
 }
 
-function writeHash(tab: Tab, sale: string | null, print: boolean, embed: boolean) {
+/** 住宅改修のタブの中で出す画面（申請書だけ／見積書だけ） */
+type EmbedView = 'shinsei' | 'quote';
+
+function writeHash(tab: Tab, sale: string | null, print: boolean, embed: boolean, view: EmbedView | undefined) {
   const p = new URLSearchParams({tab});
   if (sale) p.set('sale', sale);
   if (print) p.set('print', '1');
   if (embed) p.set('embed', '1'); // 住宅改修のタブの中で読み直しても、上の段を出さないまま
+  if (embed && view) p.set('view', view);
   try {
     history.replaceState(null, '', `#${p.toString()}`);
   } catch {
@@ -60,6 +66,7 @@ export default function App() {
   const [printId, setPrintId] = useState<string | null>(initial.print ? (initial.sale ?? null) : null);
   const [embed] = useState(initial.embed === true);
   const [jutaku] = useState(initial.jutaku ?? null);
+  const [embedView] = useState(initial.embed ? initial.view : undefined);
   const linked = useRef(false);
   const data = store.data;
 
@@ -67,8 +74,8 @@ export default function App() {
   const printSale = data?.sales.find((x) => x.id === printId) ?? null;
 
   useEffect(() => {
-    if (data) writeHash(tab, tab === 'sales' ? (sale?.id ?? null) : null, !!printSale, embed);
-  }, [data, tab, sale?.id, printSale, embed]);
+    if (data) writeHash(tab, tab === 'sales' ? (sale?.id ?? null) : null, !!printSale, embed, embedView);
+  }, [data, tab, sale?.id, printSale, embed, embedView]);
 
   // 住宅改修の様邸から開いたとき：その様邸の案件を開く（なければ作る。お客様の情報は住宅改修が localStorage に書いたもの）
   useEffect(() => {
@@ -161,10 +168,11 @@ export default function App() {
           </nav>
         </header>
 
-        <main className="no-print mx-auto max-w-6xl px-3 py-4 sm:px-4">
+        {/* 住宅改修のタブの中の申請書は、画面の幅いっぱい（プレビューを大きく） */}
+        <main className={`no-print mx-auto px-3 py-4 sm:px-4 ${embed && embedView === 'shinsei' ? 'max-w-none' : 'max-w-6xl'}`}>
           {tab === 'sales' &&
             (sale ? (
-              <SaleEditor key={sale.id} sale={sale} data={data} update={store.update} onBack={() => setSaleId(null)} onOpen={setSaleId} onPrint={setPrintId} />
+              <SaleEditor key={sale.id} sale={sale} data={data} update={store.update} onBack={() => setSaleId(null)} onOpen={setSaleId} onPrint={setPrintId} fixedView={embedView} />
             ) : (
               <SalesPage data={data} update={store.update} onOpen={setSaleId} onPrint={setPrintId} />
             ))}
