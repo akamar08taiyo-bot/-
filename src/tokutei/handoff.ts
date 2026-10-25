@@ -10,6 +10,12 @@ import type {Sale, Settings, TaxType} from './types.ts';
 import {staffShort, yen} from './util.ts';
 
 export const HACCHU_IMPORT_KEY = 'taiyo-hacchu-import-v1';
+/**
+ * 状態を「承認」にした見積もりを、販売受注簿へ自動で送る列（ユーザーの指示「販売受注簿にも自動で転記する」2026-10-25）。
+ * 受注簿ツールは開いたときに、HACCHU_IMPORT_KEY がなければこの列の古いものから1つずつ「受注簿に入れる」を出す（受注簿ツールの src/main.jsx の jutaku-import-begin）。
+ * 同じ案件は1つだけ（saleId）。30件まで
+ */
+export const HACCHU_QUEUE_KEY = 'taiyo-hacchu-import-queue-v1';
 /** 販売受注簿作成ツール（太陽ポータルと同じサイト） */
 export const HACCHU_PATH = '/taiyo-hacchu-scan/';
 
@@ -124,6 +130,22 @@ export function hacchuImport(sale: Sale, s: Pick<Settings, 'markupRate' | 'limit
       };
     }),
   };
+}
+
+export type HacchuQueued = HacchuImport & {saleId: string};
+
+/** 販売受注簿へ自動で送る列に入れる（同じ案件の前のものは置きかえる）。商品がなければ入れない */
+export function queueHacchu(sale: Sale, s: Pick<Settings, 'markupRate' | 'limit' | 'minProfitRate'>, store: Pick<Storage, 'getItem' | 'setItem'> = localStorage, now = Date.now()): boolean {
+  if (sale.items.length === 0) return false;
+  let list: unknown;
+  try {
+    list = JSON.parse(store.getItem(HACCHU_QUEUE_KEY) || '[]');
+  } catch {
+    list = [];
+  }
+  const keep = (Array.isArray(list) ? list : []).filter((x): x is HacchuQueued => typeof x === 'object' && x !== null && (x as HacchuQueued).saleId !== sale.id);
+  store.setItem(HACCHU_QUEUE_KEY, JSON.stringify([...keep, {...hacchuImport(sale, s, now), saleId: sale.id}].slice(-30)));
+  return true;
 }
 
 /** 受注簿を開く URL（受け取り口は ?from=tokutei で、リンクから開いたことを知る） */

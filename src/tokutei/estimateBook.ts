@@ -1,7 +1,9 @@
 // 販売見積書：いただいた会社の見積書の原本（TSS の Excel。src/tokutei/print/mitsumori.xltx）に案件を書き込む
 // （ユーザーの指示「見積書の原本はこのような形にする。プレビューを見ながら入力できるようにする」2026-10-23）。
-// 書く欄：宛名（A6）・見積番号（I4）・見積日（I5）・営業所（H9。所長・〒・住所・TEL は原本の式＝マスタのシートから）・件名（B14）・
-// 明細（23〜42行：品名 A・数量 F・単位 G・単価（税抜）H・金額 I＝式・税率 J）・備考（60〜62行：介護保険の内訳と見積書の備考に足す文）。
+// 書く欄：宛名（A6）・見積番号（I4）・見積日（I5）・会社の欄（H8〜H16：会社名／営業所　所長／〒／住所／TEL／FAX／登録番号／担当。設定の営業所から）・件名（B14）・
+// 明細（23〜38行：品名 A・数量 F・単位 G・単価（税抜）H・金額 I＝式・税率 J・備考 K＝算出根拠）・備考（60〜62行：介護保険の内訳と見積書の備考に足す文）。
+// 原本は 2026-10-25 にユーザーの指示で直した（灰色→薄い水色・会社の欄を左寄せ・TEL と FAX を別の行に・担当・明細を16行に・税率の右に備考の列。
+// docs/tokutei/edit-mitsumori-template.py）。
 // 合計・税率ごとの内訳・消費税は原本の式のまま（開いたときに Excel が計算する）。画面のプレビュー・スマホのために、式の答えも同じ計算で入れておく。
 // 原本は所長の印影の画像だけ消した（アプリは誰でも開けるページなので。印の枠は残す）
 // 明細が20行に入らないときは3ページまで（ユーザーの指示「ページは3ページまでいけるようにする」2026-10-25）：原本の1ページ目（1〜62行）の下に、
@@ -9,7 +11,7 @@
 // 合計・消費税・備考は1ページ目のまま（式は2・3ページ目の明細も足す）。改ページは手動、印刷の大きさは1ページ目が1枚に入る倍率（原本は「1ページに収める」）。
 
 import {strFromU8, strToU8} from 'fflate';
-import {saleTotals} from './calc.ts';
+import {itemNote, saleTotals} from './calc.ts';
 import type {Totals} from './calc.ts';
 import {OFFICES} from './defaults.ts';
 import {customerLabel} from './sales.ts';
@@ -22,17 +24,21 @@ import {attrOf, cellRe, dropCalcChain, esc, finishWorkbook, numOf, setCell, setS
 import type {CellValue, Files} from './xlsxEdit.ts';
 
 export const ESTIMATE_SHEET = '見積書';
-/** 1ページ目の明細の行（原本は20行） */
-export const ESTIMATE_ROWS = Array.from({length: 20}, (_, i) => 23 + i);
+/** 1ページ目の明細の行（原本は20行。ユーザーの指示「見積もりの行数は4行ぐらい減らしていい」で16行に。39〜42行は原本で隠してある） */
+export const ESTIMATE_ROWS = Array.from({length: 16}, (_, i) => 23 + i);
+/** 原本の明細の行（隠した行も。金額の欄の式を書く） */
+const TEMPLATE_ITEM_ROWS = Array.from({length: 20}, (_, i) => 23 + i);
+/** 列の数（A〜K。K は備考＝算出根拠） */
+const LAST_COL = 11;
 /** 1ページ目の終わり（原本の印刷の範囲 A1:J62） */
 const PAGE1_LAST = 62;
 /** 2・3ページ目に写す、1ページ目の頭の行（題名・見積番号・見積日・宛名）と明細の見出しの行 */
 const HEAD_ROWS = [1, 2, 3, 4, 5, 6, 7];
 const ITEM_HEAD_ROW = 22;
 /** 2・3ページ目の明細の行の数（1ページ目と同じ高さに入るだけ：(1〜62行（隠した53〜57行は入れない） − 頭の7行 − 見出し) ÷ 明細の1行。テストで原本から確かめる） */
-export const CONT_ROWS = 44;
+export const CONT_ROWS = 41;
 export const MAX_PAGES = 3;
-/** 見積書に入る商品の数（1ページ目 20＋つづき 44×2） */
+/** 見積書に入る商品の数（1ページ目 16＋つづき CONT_ROWS×2） */
 export const ESTIMATE_CAPACITY = ESTIMATE_ROWS.length + CONT_ROWS * (MAX_PAGES - 1);
 
 /** n ページ目（2・3）の行：上の行・見出しの行・明細の行 */
@@ -43,23 +49,24 @@ export function contBlock(page: number): {top: number; head: number; rows: numbe
 }
 /** 商品の数で何ページか（1〜3） */
 export const estimatePages = (items: number) => (items <= ESTIMATE_ROWS.length ? 1 : Math.min(MAX_PAGES, 1 + Math.ceil((items - ESTIMATE_ROWS.length) / CONT_ROWS)));
-/** 商品の行（前から：1ページ目の20行 → 2ページ目 → 3ページ目） */
+/** 商品の行（前から：1ページ目の16行 → 2ページ目 → 3ページ目） */
 export function itemRows(pages: number): number[] {
   const rows = [...ESTIMATE_ROWS];
   for (let p = 2; p <= pages; p++) rows.push(...contBlock(p).rows);
   return rows;
 }
-/** 備考の行（59行目の「備　　考」の下の3行。A〜J を1つにした欄） */
+/** 備考の行（59行目の「備　　考」の下の3行。A〜K を1つにした欄） */
 const NOTE_ROWS = [60, 61, 62];
 /** 件名（原本は空欄） */
 export const ESTIMATE_SUBJECT = '特定福祉用具の購入';
 
 /** 見積書のプレビューで押すと案件の画面のその入れる所へ行く欄 */
-export type EstimateField = 'customer' | 'quoteNo' | 'estimateDate' | 'items' | 'note';
+export type EstimateField = 'customer' | 'quoteNo' | 'estimateDate' | 'staff' | 'items' | 'note';
 export const ESTIMATE_LABEL: Record<EstimateField, string> = {
   customer: 'お客様名',
   quoteNo: '見積番号',
   estimateDate: '見積日',
+  staff: '担当',
   items: '商品',
   note: '見積書の備考に足す文',
 };
@@ -71,7 +78,8 @@ const links = (items: number): [EstimateField, string[]][] => {
     ['customer', tops.map((t) => `A${t + 5}`)],
     ['quoteNo', tops.map((t) => `I${t + 3}`)],
     ['estimateDate', tops.map((t) => `I${t + 4}`)],
-    ['items', itemRows(pages).slice(0, items + 1).flatMap((r) => ['A', 'F', 'G', 'H', 'I', 'J'].map((c) => `${c}${r}`))],
+    ['staff', ['H16']],
+    ['items', itemRows(pages).slice(0, items + 1).flatMap((r) => ['A', 'F', 'G', 'H', 'I', 'J', 'K'].map((c) => `${c}${r}`))],
     ['note', NOTE_ROWS.map((r) => `A${r}`)],
   ];
 };
@@ -129,9 +137,24 @@ export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
   put('I4', `№　${sale.quoteNo.trim()}`);
   const serial = excelDate(sale.estimateDate);
   if (serial) put('I5', serial);
+  // 会社の欄（ユーザーの指示「会社名や社長名などの部分は、左寄せを統一」「会社住所の下に、電話番号とFAX番号」「担当名をいれる」）。
+  // 設定の営業所の値（設定で営業所を選ぶと入る。defaults.ts の OFFICES）。空の欄は原本の値（行橋営業所）のまま
   const office = OFFICES.find((o) => o.name === s.officeName.trim());
-  if (s.officeName.trim()) put('H9', s.officeName.trim());
+  const of = (v: string, d: string | undefined) => v.trim() || d || '';
   if (s.company.trim()) put('H8', s.company.trim());
+  const officeName = s.officeName.trim();
+  const manager = of(s.manager, office?.manager).replace(/\s+/, '　');
+  if (officeName) put('H9', [officeName, manager && `所長　${manager}`].filter(Boolean).join('　'));
+  const postal = of(s.postal, office?.postal);
+  if (postal) put('H11', `〒${postal}`);
+  const address = of(s.address, office?.address);
+  if (address) put('H12', address);
+  const tel = of(s.tel, office?.tel);
+  if (tel) put('H13', `TEL：${tel}`);
+  const fax = of(s.fax, office?.fax);
+  if (fax) put('H14', `FAX：${fax}`);
+  if (s.regNo.trim()) put('H15', `登録番号：${s.regNo.trim()}`);
+  put('H16', sale.staff.trim() ? `担当：${sale.staff.trim()}` : '');
   put('B14', ESTIMATE_SUBJECT);
   // 明細の品名の欄の書式は、どの行も1行目と同じにする（原本は2行目が10pt・3行目が赤の太字14pt＝書いた例の名残り。いちばん下の行は下の罫線がちがうのでそのまま）
   for (const c of ['A', 'B', 'C', 'D', 'E']) {
@@ -142,9 +165,9 @@ export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
   const pages = estimatePages(sale.items.length);
   if (pages > 1) xml = addContinuation(xml, tpl, pages);
   const rows = itemRows(pages);
-  // 明細の金額の欄は、どの行もふつうの式にする（原本の26〜42行は「共有の式」で、親の26行目を書きかえると下の行の式がこわれる）
+  // 明細の金額の欄は、どの行もふつうの式にする（前の原本の26〜42行は「共有の式」で、親の26行目を書きかえると下の行の式がこわれた。隠した行も）
   const amountStyle = /\ss="(\d+)"/.exec(cellRe('I26').exec(xml)?.[1] ?? '')?.[1];
-  for (const r of rows) xml = setFormula(xml, `I${r}`, `IF(F${r}*H${r},F${r}*H${r},"")`, '', amountStyle);
+  for (const r of new Set([...TEMPLATE_ITEM_ROWS, ...rows])) xml = setFormula(xml, `I${r}`, `IF(F${r}*H${r},F${r}*H${r},"")`, '', amountStyle);
   // 明細：前から3ページまで（金額は 数量×単価 の式。単価のない品目（手で入れて値段がまだ）は単価を空に）
   const sums: Record<string, number> = {};
   t.lines.slice(0, rows.length).forEach((l, k) => {
@@ -155,6 +178,7 @@ export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
     put(`G${r}`, i.unit || '個');
     put(`H${r}`, l.unitPrice || '');
     put(`J${r}`, RATE[i.taxType]);
+    put(`K${r}`, itemNote(l));
     const amount = l.amount;
     xml = setFormula(xml, `I${r}`, `IF(F${r}*H${r},F${r}*H${r},"")`, amount || '', amountStyle);
     const key = String(RATE[i.taxType]);
@@ -199,12 +223,6 @@ export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
     ['E21', c46 + e46],
   ] as [string, number][])
     xml = setCached(xml, ref, v);
-  if (office) {
-    xml = setCached(xml, 'I9', `所長　${office.manager.replace(/\s+/, '　')}`);
-    xml = setCached(xml, 'H11', `〒${office.postal}`);
-    xml = setCached(xml, 'H12', office.address);
-    xml = setCached(xml, 'H13', `TEL：${office.tel}　FAX：${office.fax}`);
-  }
   files[path] = strToU8(xml);
   if (pages > 1) setPrintArea(files, pages);
   dropCalcChain(files);
@@ -224,7 +242,7 @@ function blankItemRow(template: string, r: number, last: boolean): string {
   const row = rowRe(src).exec(template)?.[0] ?? '';
   const head = /^<row\b[^>]*>/.exec(row)?.[0] ?? `<row r="${src}">`;
   const style = (c: string, rr: number) => /\ss="(\d+)"/.exec(cellRe(`${c}${rr}`).exec(template)?.[1] ?? '')?.[1];
-  const cells = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'].map((c) => {
+  const cells = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'].map((c) => {
     // 品名の欄（A〜E）はいちばん下の行のほかは 23行目の書式、金額の欄（I）は 26行目（式のある行）の書式
     const s = style(c, !last && 'ABCDE'.includes(c) ? 23 : c === 'I' && !last ? 26 : src);
     return `<c r="${c}${r}"${s !== undefined ? ` s="${s}"` : ''}/>`;
@@ -247,7 +265,7 @@ function addContinuation(xml: string, tpl: string, pages: number): string {
     }
     add += copyRow(rowRe(ITEM_HEAD_ROW).exec(tpl)?.[0] ?? '', ITEM_HEAD_ROW, head);
     rows.forEach((r, i) => (add += blankItemRow(tpl, r, i === rows.length - 1)));
-    merges.push(`C${top}:H${top + 1}`, `I${top + 3}:J${top + 3}`, `I${top + 4}:J${top + 4}`, `A${top + 5}:E${top + 6}`, `A${head}:E${head}`, ...rows.map((r) => `A${r}:E${r}`));
+    merges.push(`D${top}:I${top + 1}`, `I${top + 3}:K${top + 3}`, `I${top + 4}:K${top + 4}`, `A${top + 5}:E${top + 6}`, `A${head}:E${head}`, ...rows.map((r) => `A${r}:E${r}`));
     valid.push(`J${rows[0]}:J${rows.at(-1)}`);
   }
   xml = xml.replace('</sheetData>', `${add}</sheetData>`);
@@ -259,7 +277,7 @@ function addContinuation(xml: string, tpl: string, pages: number): string {
   xml = xml.replace(/<mergeCells count="\d+">/, `<mergeCells count="${all}">`).replace('</mergeCells>', `${merges.map((m) => `<mergeCell ref="${m}"/>`).join('')}</mergeCells>`);
   xml = xml.replace(/(<dataValidation\b[^>]*\ssqref=")J23:J42"/, `$1J23:J42 ${valid.join(' ')}"`);
   const last = contBlock(pages).rows.at(-1)!;
-  xml = xml.replace(/<dimension ref="[^"]*"\/>/, `<dimension ref="A1:J${last}"/>`);
+  xml = xml.replace(/<dimension ref="[^"]*"\/>/, `<dimension ref="A1:K${last}"/>`);
   // 印刷：手動の改ページ（1ページに収めるをやめる。Excel は「1ページに収める」だと手動の改ページを使わない）・1ページ目が1枚に入る倍率
   const breaks = Array.from({length: pages - 1}, (_, i) => (i === 0 ? PAGE1_LAST : contBlock(i + 1).rows.at(-1)!)); // 1ページ目・2ページ目の終わり
   xml = xml.replace(/<pageSetUpPr fitToPage="1"\/>/, '<pageSetUpPr fitToPage="0"/>');
@@ -268,7 +286,7 @@ function addContinuation(xml: string, tpl: string, pages: number): string {
   return xml;
 }
 
-/** 原本の1ページ目（1〜62行・A〜J列）が A4 縦の余白の内側に入る倍率（%。原本の「1ページに収める」と同じ大きさ） */
+/** 原本の1ページ目（1〜62行・A〜K列）が A4 縦の余白の内側に入る倍率（%。原本の「1ページに収める」と同じ大きさ） */
 export function fitScale(tpl: string): number {
   const lay = sheetLayout(tpl);
   const m = /<pageMargins\b[^>]*>/.exec(tpl)?.[0] ?? '';
@@ -276,7 +294,7 @@ export function fitScale(tpl: string): number {
   const pageW = (210 / 25.4) * 96 - inch('left', 0.7) - inch('right', 0.7);
   const pageH = (297 / 25.4) * 96 - inch('top', 0.75) - inch('bottom', 0.75);
   let w = 0;
-  for (let c = 1; c <= 10; c++) w += lay.colW(c);
+  for (let c = 1; c <= LAST_COL; c++) w += lay.colW(c);
   let h = 0;
   for (let r = 1; r <= PAGE1_LAST; r++) h += lay.rowH(r);
   return Math.floor(Math.min(pageW / w, pageH / h) * 100);
@@ -286,7 +304,7 @@ export function fitScale(tpl: string): number {
 function setPrintArea(files: Files, pages: number) {
   const last = contBlock(pages).rows.at(-1)!;
   const wb = strFromU8(files['xl/workbook.xml']);
-  files['xl/workbook.xml'] = strToU8(wb.replace(/(<definedName name="_xlnm\.Print_Area"[^>]*>[^<!]*!\$A\$1:\$J\$)\d+/, `$1${last}`));
+  files['xl/workbook.xml'] = strToU8(wb.replace(/(<definedName name="_xlnm\.Print_Area"[^>]*>[^<!]*!\$A\$1:\$K\$)\d+/, `$1${last}`));
 }
 
 /** 販売見積書の Excel（.xlsx のバイト列） */
@@ -301,8 +319,8 @@ export function estimatePreview(template: Files, sale: Sale, s: Settings): PvPag
   const files: Files = {...template};
   fillEstimateFiles(files, sale, s);
   const pages = estimatePages(sale.items.length);
-  const ranges: (Range | null)[] = [pages > 1 ? [1, 1, 10, PAGE1_LAST] : null];
-  for (let p = 2; p <= pages; p++) ranges.push([1, contBlock(p).top, 10, contBlock(p).rows.at(-1)!]);
+  const ranges: (Range | null)[] = [pages > 1 ? [1, 1, LAST_COL, PAGE1_LAST] : null];
+  for (let p = 2; p <= pages; p++) ranges.push([1, contBlock(p).top, LAST_COL, contBlock(p).rows.at(-1)!]);
   return sheetPreviewPages(files, template, ESTIMATE_SHEET, links(sale.items.length), ranges);
 }
 

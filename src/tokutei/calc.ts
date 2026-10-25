@@ -126,6 +126,22 @@ export function rateText(discountRate: number): string {
   return String(Math.round(r * 100) / 100);
 }
 
+/**
+ * 見積書の税率の右の「備考」に書く算出根拠（ユーザーの指示「税率の横に、備考を入れて、算出根拠をいれる。例えば税抜定価が28000円で20%引きするのであれば、その旨を記載」2026-10-25）。
+ * 定価×割引：「定価28,000円の20%引き」。手で単価を入れた行は、定価からちょうど何%引きなら同じ書き方、そうでなければ「定価28,000円」。
+ * 定価のない商品（仕切×125% など）は書かない（仕入れの値段をお客様に見せない）
+ */
+export function basisNote(line: Line): string {
+  const list = toYen(line.item.listPrice);
+  if (list <= 0 || line.basis === 'cost' || line.basis === 'none') return '';
+  const base = `定価${Math.round(list).toLocaleString('ja-JP')}円`;
+  const off = line.basis === 'list' ? Math.round(line.item.discountRate) : Math.round((1 - line.unitPrice / list) * 1000) / 10;
+  if (line.basis === 'manual' && (!Number.isInteger(off) || Math.floor((list * (100 - off)) / 100) !== line.unitPrice)) return base;
+  return off > 0 ? `${base}の${off}%引き` : base;
+}
+/** 見積書の備考の欄に出す文（手で直していればそれ。手で空にしたら空） */
+export const itemNote = (line: Line): string => (typeof line.item.basisNote === 'string' ? line.item.basisNote.trim() : basisNote(line));
+
 /** 見積書の品目の下の行：「定価32,000円（税抜）×0.8」。手で単価を入れた行は ×0.8 を付けない */
 export function priceNote(line: Line): string {
   const list = toYen(line.item.listPrice);

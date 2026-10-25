@@ -303,18 +303,18 @@ try {
   await page.emulateMedia({media: 'screen'});
   await page.getByRole('button', {name: '閉じる'}).click();
 
-  // ---- 品目が多くても原本の明細（20行）の中に入って、A4 1枚のまま。備考は3行まで（入らない行は画面で知らせる）
+  // ---- 品目が多くても原本の明細（16行）の中に入って、A4 1枚のまま。備考は3行まで（入らない行は画面で知らせる）
   // 手で入れた品目は価格が空（0円）なので、合計（42,944円）は変わらない
   for (let n = 1; n <= 8; n++) {
     await page.getByRole('button', {name: '＋ 手で入れる'}).click();
     await page.getByLabel('商品名').last().fill(`見本の商品 ${n}`);
   }
-  await page.getByRole('textbox', {name: '備考', exact: true}).fill(['デモ機の貸し出しがあります。', 'ご不明な点は担当までお問い合わせください。', '納品の前にお電話いたします。'].join('\n'));
+  await page.getByRole('textbox', {name: '備考', exact: true}).fill(['ご不明な点は担当までお問い合わせください。', '納品の前にお電話いたします。'].join('\n'));
   await page.getByText('見積書の備考は3行までです').waitFor();
   await page.getByRole('button', {name: '🖨 見積書を印刷'}).first().click();
   await page.locator('.est-sheet [role="group"]').waitFor();
   const longDoc = await page.locator('.est-sheet').innerText();
-  for (const s of ['見本の商品 1', '見本の商品 8', 'デモ機の貸し出しがあります。', '42,944']) assert.ok(longDoc.includes(s), `10品の見積書に「${s}」がない`);
+  for (const s of ['見本の商品 1', '見本の商品 8', 'ご不明な点は担当までお問い合わせください。', '42,944']) assert.ok(longDoc.includes(s), `10品の見積書に「${s}」がない`);
   assert.ok(!longDoc.includes('納品の前にお電話いたします。'));
   await assertFits(page, '10品');
   await page.pdf({path: `${out}/estimate-long.pdf`, preferCSSPageSize: true, printBackground: true});
@@ -322,10 +322,10 @@ try {
   await page.emulateMedia({media: 'screen'});
   await page.locator('.est-sheet').screenshot({path: `${out}/05c-estimate-long.png`});
   await page.getByRole('button', {name: '閉じる'}).click();
-  await page.getByRole('textbox', {name: '備考', exact: true}).fill('デモ機の貸し出しがあります。');
+  await page.getByRole('textbox', {name: '備考', exact: true}).fill('ご不明な点は担当までお問い合わせください。');
 
-  // ---- 20点を超えると2ページ目（明細のつづき）。3ページまで（ユーザーの指示「ページは3ページまでいけるようにする」）
-  // 23点：1ページ目に20点（★の2つ＋見本の商品 1〜18）、2ページ目に見本の商品 19〜21
+  // ---- 16点を超えると2ページ目（明細のつづき）。3ページまで（ユーザーの指示「ページは3ページまでいけるようにする」。1ページ目は「行数は4行ぐらい減らしていい」で16行）
+  // 23点：1ページ目に16点（★の2つ＋見本の商品 1〜14）、2ページ目に見本の商品 15〜21
   for (let n = 9; n <= 21; n++) {
     await page.getByRole('button', {name: '＋ 手で入れる'}).click();
     await page.getByLabel('商品名').last().fill(`見本の商品 ${n}`);
@@ -335,8 +335,8 @@ try {
   assert.equal(await page.locator('.est-sheet').count(), 2);
   const page1 = await page.locator('.est-sheet').nth(0).innerText();
   const page2 = await page.locator('.est-sheet').nth(1).innerText();
-  assert.ok(page1.includes('見本の商品 18') && !page1.includes('見本の商品 19') && page1.includes('1／2') && page1.includes('42,944'));
-  for (const s of ['御　見　積　書', '山田 花子　様', '2／2（明細のつづき）', '見本の商品 19', '見本の商品 21']) assert.ok(page2.includes(s), `2ページ目に「${s}」がない`);
+  assert.ok(page1.includes('見本の商品 14') && !page1.includes('見本の商品 15') && page1.includes('1／2') && page1.includes('42,944'));
+  for (const s of ['御　見　積　書', '山田 花子　様', '2／2（明細のつづき）', '見本の商品 15', '見本の商品 21']) assert.ok(page2.includes(s), `2ページ目に「${s}」がない`);
   await assertFits(page, '23品');
   await page.pdf({path: `${out}/estimate-2pages.pdf`, preferCSSPageSize: true, printBackground: true});
   assert.equal(pdfPages(`${out}/estimate-2pages.pdf`), 2);
@@ -351,7 +351,7 @@ try {
   const [download2] = await Promise.all([page.waitForEvent('download'), page.locator('.print-toolbar').getByRole('button', {name: '📗 Excelで保存'}).click()]);
   await download2.saveAs(`${out}/estimate-2pages.xlsx`);
   const sheet2 = strFromU8(unzipSync(readFileSync(`${out}/estimate-2pages.xlsx`))['xl/worksheets/sheet1.xml']);
-  assert.equal(cellOf(sheet2, 'A71'), '見本の商品 19'); // 2ページ目の明細の1行目（63行目から：頭の7行・見出し）
+  assert.equal(cellOf(sheet2, 'A71'), '見本の商品 15'); // 2ページ目の明細の1行目（63行目から：頭の7行・見出し）
   assert.equal(cellOf(sheet2, 'E21'), '42944');
   assert.match(sheet2, /<rowBreaks count="1" manualBreakCount="1"><brk id="62"/);
   await page.getByRole('button', {name: '閉じる'}).click();

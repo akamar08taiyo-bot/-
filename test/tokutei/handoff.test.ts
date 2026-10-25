@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {saleTotals} from '../../src/tokutei/calc.ts';
-import {benefitSplit, HACCHU_IMPORT_KEY, HACCHU_PATH, hacchuImport} from '../../src/tokutei/handoff.ts';
+import {benefitSplit, HACCHU_IMPORT_KEY, HACCHU_PATH, HACCHU_QUEUE_KEY, hacchuImport, queueHacchu} from '../../src/tokutei/handoff.ts';
 import type {Sale, SaleItem, TaxType} from '../../src/tokutei/types.ts';
 
 const S = {markupRate: 25, limit: 100000, minProfitRate: 20};
@@ -199,4 +199,24 @@ test('どんな見積もりでも、商品ごとの内訳を足すと見積書�
       assert.ok(r.benefit.insurerBurden >= 0 && r.benefit.target <= t.lines[i].total);
     });
   }
+});
+
+test('承認にした見積もりを販売受注簿へ自動で送る列（同じ案件は1つ・商品がなければ入れない・受注簿ツールと同じキー）', () => {
+  const store = new Map<string, string>();
+  const ls = {getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v)};
+  assert.equal(HACCHU_QUEUE_KEY, 'taiyo-hacchu-import-queue-v1');
+  const a = sale([item({name: '見本の杖', listPrice: 10000})], {id: 'a', customer: '見本 花子'});
+  const b = sale([item({name: '見本の台', listPrice: 20000})], {id: 'b', customer: '見本 太郎'});
+  assert.equal(queueHacchu(a, S, ls, 1), true);
+  assert.equal(queueHacchu(b, S, ls, 2), true);
+  assert.equal(queueHacchu({...a, note: '直した'}, S, ls, 3), true); // 同じ案件は置きかえる（後ろへ）
+  const q = JSON.parse(store.get(HACCHU_QUEUE_KEY) ?? '[]');
+  assert.deepEqual(q.map((x: {saleId: string; createdAt: number}) => [x.saleId, x.createdAt]), [['b', 2], ['a', 3]]);
+  assert.equal(q[1].kind, 'taiyo-tokutei-order');
+  assert.equal(q[1].items[0].productName, '見本の杖');
+  assert.equal(queueHacchu(sale([], {id: 'c'}), S, ls, 4), false);
+  // こわれた列は作り直す
+  store.set(HACCHU_QUEUE_KEY, '{');
+  assert.equal(queueHacchu(a, S, ls, 5), true);
+  assert.equal(JSON.parse(store.get(HACCHU_QUEUE_KEY) ?? '[]').length, 1);
 });

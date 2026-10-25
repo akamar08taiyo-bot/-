@@ -12,6 +12,7 @@ import {SettingsPage} from './components/SettingsPage.tsx';
 import {ToastProvider} from './components/ui.tsx';
 import {applyJutaku, JUTAKU_KEY, readJutaku} from './jutaku.ts';
 import {PrintView} from './print/PrintView.tsx';
+import {writeSalesSummary} from './salesSummary.ts';
 import {useNewVersion} from './update.ts';
 import {useStore} from './useStore.ts';
 
@@ -94,6 +95,13 @@ export default function App() {
     setTab('sales');
     setSaleId(r.id);
   }, [data, jutaku, store]);
+
+  // 売上見込み（住宅改修のアプリの「📈 売上見込みを確認する」）に、案件ごとの金額のまとめを渡す（salesSummary.ts）。案件・設定が変わるたびに書き直す
+  const sales = data?.sales;
+  const settings = data?.settings;
+  useEffect(() => {
+    if (sales && settings) writeSalesSummary(sales, settings);
+  }, [sales, settings]);
 
   // 住宅改修のタブの中（embed）では、住宅改修がタブを替える・一覧へ戻る前にこれを呼んで、保存が終わるのを待つ
   // （枠が消えると保存が途中で止まるため。住宅改修の src/sasaoka/tokuteiLink.ts の flushTokutei）

@@ -212,6 +212,7 @@ function cleanItem(i: Record<string, unknown>): SaleItem {
     discountRate: Math.min(100, Math.max(0, numv(i.discountRate, 20))),
     unitPrice: optNum(i.unitPrice),
     reason: str(i.reason),
+    ...(typeof i.basisNote === 'string' ? {basisNote: i.basisNote} : {}),
   };
 }
 
@@ -257,6 +258,7 @@ export function cleanSales(raw: unknown): Sale[] {
       updatedAt: numv(s.updatedAt),
       // 住宅改修の様邸から開いた案件（jutaku.ts）
       ...(str(s.jutakuJob) ? {jutakuJob: str(s.jutakuJob), jutakuSync: isObj(s.jutakuSync) ? cleanJutakuFields(s.jutakuSync) : {}} : {}),
+      ...(numv(s.hacchuSentAt) > 0 ? {hacchuSentAt: numv(s.hacchuSentAt)} : {}),
     };
   });
 }
