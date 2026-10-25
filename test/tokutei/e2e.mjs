@@ -8,6 +8,7 @@ import {createServer} from 'node:http';
 import {mkdirSync, readFileSync} from 'node:fs';
 import {join} from 'node:path';
 import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
 import {strFromU8, unzipSync} from 'fflate';
 
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node22/lib/node_modules/playwright/index.mjs');
@@ -53,13 +54,24 @@ function cellOf(sheetXml, ref) {
 async function assertFits(page, label) {
   for (const media of ['screen', 'print']) {
     await page.emulateMedia({media});
-    const over = await page.evaluate(() => {
-      const sheet = document.querySelector('.est-sheet').getBoundingClientRect();
-      const paper = document.querySelector('.est-sheet [role="group"]').getBoundingClientRect();
-      return Math.max(paper.right - sheet.right, paper.bottom - sheet.bottom);
-    });
+    // どのページも（明細が多いときは3ページまで）
+    const over = await page.evaluate(() =>
+      Math.max(
+        ...[...document.querySelectorAll('.est-sheet')].map((el) => {
+          const sheet = el.getBoundingClientRect();
+          const paper = el.querySelector('[role="group"]').getBoundingClientRect();
+          return Math.max(paper.right - sheet.right, paper.bottom - sheet.bottom);
+        }),
+      ),
+    );
     assert.ok(over <= 0.5, `${label}（${media}）：見積書が紙から ${over.toFixed(1)}px はみ出している`);
   }
+}
+
+/** PDF の n ページ目の文字（pdftotext があるとき。なければ null） */
+function pdfText(file, n) {
+  const r = spawnSync('pdftotext', ['-f', String(n), '-l', String(n), '-layout', file, '-'], {encoding: 'utf8'});
+  return r.status === 0 ? r.stdout : null;
 }
 
 /** PDF のページ数（pdfinfo がなくても数えられるように、ページのオブジェクトを数える） */
@@ -311,6 +323,38 @@ try {
   await page.locator('.est-sheet').screenshot({path: `${out}/05c-estimate-long.png`});
   await page.getByRole('button', {name: '閉じる'}).click();
   await page.getByRole('textbox', {name: '備考', exact: true}).fill('デモ機の貸し出しがあります。');
+
+  // ---- 20点を超えると2ページ目（明細のつづき）。3ページまで（ユーザーの指示「ページは3ページまでいけるようにする」）
+  // 23点：1ページ目に20点（★の2つ＋見本の商品 1〜18）、2ページ目に見本の商品 19〜21
+  for (let n = 9; n <= 21; n++) {
+    await page.getByRole('button', {name: '＋ 手で入れる'}).click();
+    await page.getByLabel('商品名').last().fill(`見本の商品 ${n}`);
+  }
+  await page.getByRole('button', {name: '🖨 見積書を印刷'}).first().click();
+  await page.locator('.est-sheet [role="group"]').first().waitFor();
+  assert.equal(await page.locator('.est-sheet').count(), 2);
+  const page1 = await page.locator('.est-sheet').nth(0).innerText();
+  const page2 = await page.locator('.est-sheet').nth(1).innerText();
+  assert.ok(page1.includes('見本の商品 18') && !page1.includes('見本の商品 19') && page1.includes('1／2') && page1.includes('42,944'));
+  for (const s of ['御　見　積　書', '山田 花子　様', '2／2（明細のつづき）', '見本の商品 19', '見本の商品 21']) assert.ok(page2.includes(s), `2ページ目に「${s}」がない`);
+  await assertFits(page, '23品');
+  await page.pdf({path: `${out}/estimate-2pages.pdf`, preferCSSPageSize: true, printBackground: true});
+  assert.equal(pdfPages(`${out}/estimate-2pages.pdf`), 2);
+  // 1ページ目の下（合計・備考）まで紙に出る（前は印刷の transform のせいで、紙の下のほうの字が消えた）
+  const pdf1 = pdfText(`${out}/estimate-2pages.pdf`, 1);
+  if (pdf1 !== null) {
+    for (const s of ['39,040', '10%対象', '介護保険（受領委任払い）', 'お支払いいただく金額 4,295円']) assert.ok(pdf1.includes(s), `PDF の1ページ目に「${s}」がない`);
+    assert.ok(pdfText(`${out}/estimate-2pages.pdf`, 2).includes('見本の商品 21'));
+  }
+  await page.emulateMedia({media: 'screen'});
+  await page.locator('.est-sheet').nth(1).screenshot({path: `${out}/05d-estimate-page2.png`});
+  const [download2] = await Promise.all([page.waitForEvent('download'), page.locator('.print-toolbar').getByRole('button', {name: '📗 Excelで保存'}).click()]);
+  await download2.saveAs(`${out}/estimate-2pages.xlsx`);
+  const sheet2 = strFromU8(unzipSync(readFileSync(`${out}/estimate-2pages.xlsx`))['xl/worksheets/sheet1.xml']);
+  assert.equal(cellOf(sheet2, 'A71'), '見本の商品 19'); // 2ページ目の明細の1行目（63行目から：頭の7行・見出し）
+  assert.equal(cellOf(sheet2, 'E21'), '42944');
+  assert.match(sheet2, /<rowBreaks count="1" manualBreakCount="1"><brk id="62"/);
+  await page.getByRole('button', {name: '閉じる'}).click();
 
   // ---- 読み直しても残っている（IndexedDB）
   await page.waitForTimeout(1200);

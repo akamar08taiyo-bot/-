@@ -6,9 +6,9 @@ import test from 'node:test';
 import {strFromU8, unzipSync} from 'fflate';
 import {saleTotals} from '../../src/tokutei/calc.ts';
 import {defaultSettings} from '../../src/tokutei/defaults.ts';
-import {ESTIMATE_ROWS, estimateFileName, estimateNotes, estimateOverflow, estimatePreview, fillEstimate} from '../../src/tokutei/estimateBook.ts';
+import {CONT_ROWS, contBlock, ESTIMATE_CAPACITY, ESTIMATE_ROWS, estimateFileName, estimateNotes, estimateOverflow, estimatePages, estimatePreview, fillEstimate, fitScale} from '../../src/tokutei/estimateBook.ts';
 import type {Sale, SaleItem} from '../../src/tokutei/types.ts';
-import {cellFormula, readCell} from '../../src/tokutei/xlsxEdit.ts';
+import {cellFormula, readCell, sheetLayout} from '../../src/tokutei/xlsxEdit.ts';
 import type {Files} from '../../src/tokutei/xlsxEdit.ts';
 
 // 見本の案件（架空の方。本当のお客様の情報は使わない）
@@ -161,5 +161,84 @@ test('販売見積書の原本：所長の印影の画像・作った人・パ�
   assert.equal(estimateFileName(sale()), '御見積書_見本 花子様.xlsx');
   assert.equal(estimateFileName(sale({customer: ''})), '御見積書_（お客様名未入力）.xlsx');
   assert.equal(ESTIMATE_ROWS.length, 20);
-  assert.equal(estimateOverflow(sale({items: Array.from({length: 22}, (_, i) => item({id: `x${i}`, name: `見本 ${i}`}))})), 2);
+  assert.equal(estimateOverflow(sale({items: many(22)})), 0); // 3ページまで入る
+  assert.equal(estimateOverflow(sale({items: many(ESTIMATE_CAPACITY + 2)})), 2);
+});
+
+/** 架空の商品 n 点（定価 10,000円・課税） */
+const many = (n: number) => Array.from({length: n}, (_, i) => item({id: `x${i}`, name: `見本の商品 ${i + 1}`, listPrice: 10000, cost: 6000}));
+
+test('3ページまで（ユーザーの指示「ページは3ページまでいけるようにする」）：2・3ページ目の明細の行の数は、1ページ目と同じ高さに入るだけ', () => {
+  const xml = strFromU8(template()['xl/worksheets/sheet1.xml']);
+  const lay = sheetLayout(xml);
+  const h = (a: number, b: number) => Array.from({length: b - a + 1}, (_, i) => lay.rowH(a + i)).reduce((x, y) => x + y, 0);
+  assert.equal(CONT_ROWS, Math.floor((h(1, 62) - h(1, 7) - lay.rowH(22)) / lay.rowH(23)));
+  assert.equal(ESTIMATE_CAPACITY, 20 + CONT_ROWS * 2);
+  assert.deepEqual([0, 1, 20, 21, 20 + CONT_ROWS, 21 + CONT_ROWS, ESTIMATE_CAPACITY, ESTIMATE_CAPACITY + 5].map(estimatePages), [1, 1, 1, 2, 2, 3, 3, 3]);
+  // 1ページ目が1枚に入る倍率（原本の「1ページに収める」と同じ）
+  assert.equal(fitScale(xml), 76);
+});
+
+test('2ページ（25点）：つづきに題名・番号・日付・宛名と明細。合計の式は2ページ目も足す。手動の改ページ・印刷の範囲・倍率', () => {
+  const v = sale({items: many(25)});
+  const f = unzipSync(fillEstimate(template(), v, S));
+  const xml = strFromU8(f['xl/worksheets/sheet1.xml']);
+  const {top, head, rows} = contBlock(2);
+  assert.equal(top, 63);
+  assert.equal(readCell(f, SH, `C${top}`), '御　見　積　書');
+  assert.equal(readCell(f, SH, `I${top + 3}`), '№　20261022-1');
+  assert.equal(readCell(f, SH, `I${top + 4}`), '46317');
+  assert.equal(readCell(f, SH, `A${top + 5}`), '見本 花子　様');
+  assert.equal(readCell(f, SH, `A${head}`), '品名');
+  assert.equal(readCell(f, SH, 'A4'), '1／2');
+  assert.equal(readCell(f, SH, `A${top + 3}`), '2／2（明細のつづき）');
+  // 21点目から2ページ目
+  assert.equal(readCell(f, SH, 'A42'), '見本の商品 20');
+  assert.deepEqual(['A', 'F', 'H', 'I', 'J'].map((c) => readCell(f, SH, `${c}${rows[0]}`)), ['見本の商品 21', '1', '8000', '8000', '0.1']);
+  assert.equal(cellFormula(f, SH, `I${rows[0]}`), `IF(F${rows[0]}*H${rows[0]},F${rows[0]}*H${rows[0]},"")`);
+  assert.equal(readCell(f, SH, `A${rows[5]}`), '');
+  // 合計：25点×8,000円＝200,000円＋税20,000円。式は1ページ目と2ページ目の明細を足す
+  const t = saleTotals(v, S);
+  assert.equal(Number(readCell(f, SH, 'E21')), t.total);
+  assert.equal(t.total, 220000);
+  assert.equal(cellFormula(f, SH, 'C47'), `SUMIF($J$23:$J$42,A53,$I$23:$I$42)+SUMIF($J$${rows[0]}:$J$${rows.at(-1)},A53,$I$${rows[0]}:$I$${rows.at(-1)})`);
+  // 金額の欄に「共有の式」を残さない（原本の26〜42行。親を書きかえると下の行がこわれる）
+  assert.ok(!/t="shared"/.test(xml));
+  // 結合は重ならない・印刷：手動の改ページ（62行のあと）・1ページに収めるをやめて倍率・印刷の範囲は2ページ目の下まで
+  const merges = [...xml.matchAll(/<mergeCell ref="([A-Z]+)(\d+):([A-Z]+)(\d+)"\/>/g)].map((m) => [m[1].charCodeAt(0), Number(m[2]), m[3].charCodeAt(0), Number(m[4])]);
+  for (const [i, a] of merges.entries()) for (const b of merges.slice(i + 1)) assert.ok(a[2] < b[0] || b[2] < a[0] || a[3] < b[1] || b[3] < a[1], `結合が重なる ${a} ${b}`);
+  assert.equal(Number(/<mergeCells count="(\d+)">/.exec(xml)?.[1]), merges.length);
+  assert.match(xml, /<pageSetUpPr fitToPage="0"\/>/);
+  assert.match(xml, /<pageSetup\b[^>]*\sscale="76"/);
+  assert.match(xml, /<rowBreaks count="1" manualBreakCount="1"><brk id="62" max="16383" man="1"\/><\/rowBreaks><colBreaks/);
+  assert.match(strFromU8(f['xl/workbook.xml']), new RegExp(`見積書!\\$A\\$1:\\$J\\$${rows.at(-1)}<`));
+  assert.match(xml, new RegExp(`<dimension ref="A1:J${rows.at(-1)}"/>`));
+  assert.match(xml, new RegExp(`sqref="J23:J42 J${rows[0]}:J${rows.at(-1)}"`));
+  // 1ページ（20点まで）は原本のまま「1ページに収める」。共有の式も残さない
+  const one = strFromU8(unzipSync(fillEstimate(template(), sale(), S))['xl/worksheets/sheet1.xml']);
+  assert.match(one, /<pageSetUpPr fitToPage="1"\/>/);
+  assert.ok(!/<rowBreaks/.test(one));
+  assert.ok(!/t="shared"/.test(one));
+});
+
+test('3ページ（80点）：3ページ目まで書く。プレビューも3枚（印の枠は1枚目だけ・押すと入れる所へ）', () => {
+  const v = sale({items: many(80)});
+  const f = unzipSync(fillEstimate(template(), v, S));
+  const p3 = contBlock(3);
+  assert.equal(readCell(f, SH, `A${p3.rows[0]}`), `見本の商品 ${21 + CONT_ROWS}`);
+  assert.equal(readCell(f, SH, `A${p3.top + 3}`), '3／3（明細のつづき）');
+  assert.equal(readCell(f, SH, `A${contBlock(2).top + 3}`), '2／3（明細のつづき）');
+  assert.equal(Number(readCell(f, SH, 'E21')), saleTotals(v, S).total);
+  assert.equal(cellFormula(f, SH, 'C47').split('SUMIF').length - 1, 3);
+  assert.match(strFromU8(f['xl/worksheets/sheet1.xml']), new RegExp(`<rowBreaks count="2" manualBreakCount="2"><brk id="62" max="16383" man="1"/><brk id="${contBlock(2).rows.at(-1)}" max="16383" man="1"/></rowBreaks>`));
+  const pages = estimatePreview(template(), v, S);
+  assert.equal(pages.length, 3);
+  const text = (i: number) => pages[i].texts.map((x) => x.runs.map((r) => r.text).join('')).join('\n');
+  assert.ok(text(0).includes('見本の商品 20') && !text(0).includes('見本の商品 21'));
+  assert.ok(text(1).includes('見本の商品 21') && text(1).includes('2／3（明細のつづき）') && text(1).includes('御　見　積　書') && text(1).includes('見本 花子　様'));
+  assert.ok(text(2).includes('見本の商品 80'));
+  assert.equal(pages[0].shapes.filter((x) => x.kind === 'rect' && !x.text).length, 2);
+  assert.equal(pages[1].shapes.length, 0);
+  assert.deepEqual([...new Set(pages[2].fields.map((x) => x.field))].sort(), ['customer', 'estimateDate', 'items', 'quoteNo']);
+  assert.ok(pages[1].height <= pages[0].height);
 });

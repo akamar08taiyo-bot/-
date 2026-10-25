@@ -43,7 +43,7 @@ export function PrintView({sale, settings, onClose}: {sale: Sale; settings: Sett
       window.removeEventListener('keydown', onKey);
     };
   }, [sale, onClose]);
-  // 1枚に収まる大きさ（紙の余白の内側。プレビューの紙の余白の分もふくめて）
+  // 1枚に収まる大きさ（紙の余白の内側。プレビューの紙の余白の分もふくめて。2・3ページ目も1ページ目と同じ大きさ）
   const page = pages?.[0];
   const scale = page ? Math.min(INNER.w / (page.width + 36), INNER.h / (page.height + 36)) : 1;
   return (
@@ -61,9 +61,12 @@ export function PrintView({sale, settings, onClose}: {sale: Sale; settings: Sett
         </button>
       </div>
       <div className="print-root" style={{zoom}}>
-        <div className="est-sheet" aria-label="見積書の印刷">
-          {pages && <ShinseiPages<EstimateField> pages={pages} missing={NONE} active={null} label={() => ''} onOpen={() => undefined} title="見積書" print fixedScale={scale} />}
-        </div>
+        {/* 1ページずつ A4 の紙に（明細が多いときは3ページまで。estimateBook.ts） */}
+        {(pages ?? [null]).map((p, i) => (
+          <div key={i} className="est-sheet" aria-label={i === 0 ? '見積書の印刷' : `見積書の印刷（${i + 1}ページ目）`}>
+            {p && <ShinseiPages<EstimateField> pages={[p]} missing={NONE} active={null} label={() => ''} onOpen={() => undefined} title="見積書" print fixedScale={scale} />}
+          </div>
+        ))}
       </div>
     </div>
   );

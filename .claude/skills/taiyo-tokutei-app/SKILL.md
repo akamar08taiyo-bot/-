@@ -84,7 +84,7 @@ URL は `#jutaku=<様邸の id>&embed=1`：その様邸の案件を開き（な�
 - 原本の明細の品名の欄は、2行目が 10pt・3行目が赤の太字 14pt（書いた例の名残り）→ 24〜41行を 23行目の書式にそろえる（42行目は下の罫線がちがうのでそのまま）。値段のない品目は単価を空に。
 - プレビューは申請書と同じ `shinseiPreview.ts` の `sheetPreview`（型は欄の名前 `EstimateField` で汎用）と `ShinseiPages`。
   グループの図形（印の枠）も描き、印刷しない図形（`fPrintsWithSheet="0"`。原本の赤い枠・説明）は描かない。印刷の画面（`PrintView.tsx`）も同じ絵を、紙の余白（上14・下8・左17・右10mm）の中に収まる大きさで描く。
-- 直したら `test/tokutei/estimateBook.test.ts` と e2e（`.est-sheet` の文字・Excel の E21／A60・PDF 1枚）、LibreOffice で PDF にして見比べる（マスタのシートも印刷されて4ページになるが、見積書は1ページ）。
+- 直したら `test/tokutei/estimateBook.test.ts` と e2e（`.est-sheet` の文字・Excel の E21／A60・PDF 1枚、23点で2ページ）、`taiyo-excel-export` の validate.py・recalc.py（空の金額の欄の「None と ''」の違いは問題ない）、LibreOffice で PDF にして見比べる（マスタのシートも印刷される）。
 
 ## ユーザーの好み（このアプリで言われたこと）
 
@@ -98,8 +98,16 @@ URL は `#jutaku=<様邸の id>&embed=1`：その様邸の案件を開き（な�
 - **作業ツリーを取り違えない。** 住宅改修（`claude/sasaoka-shikiri-app`）と同じリポジトリ。コミット・push の前に `git branch --show-current` を見る。
   リポジトリの名前が「-」なので、`cd -` は「前のフォルダに戻る」になってしまう。必ず `/home/user/-` と書く。
   リポジトリの `.github/workflows/deploy.yml` は main の健康管理アプリ用で、このアプリとは関係ない（このアプリはポータルに置いて公開）。
-- **印刷は A4縦1枚に固定**（`tokutei.css` の `@media print` で `.est-sheet{height:296mm}`）。原本の形なので明細は20行より増えない（縮めて入れることはしない）。
-  e2e の `assertFits` で、画面と印刷の両方で見積書の絵が紙（`.est-sheet`）からはみ出さないことを確かめる。
+- **見積書は3ページまで**（ユーザーの指示「ページは3ページまでいけるようにする」2026-10-25。`estimateBook.ts` の `contBlock`・`estimatePages`）：
+  1ページ目は原本のまま（1〜62行・明細20行）。21点目からは原本の下（63行目から）に「明細のつづき」を足す：1〜7行目の写し（題名・見積番号・見積日・宛名）＋22行目の写し（見出し）＋明細 `CONT_ROWS`＝44行
+  （1ページ目の高さに入るだけ。**原本の53〜57行は隠した行**なので高さに入れない。最初に隠した行を数えて48行にしてしまった）。左上に「1／3」「2／3（明細のつづき）」。
+  合計の式（C47〜C51 の SUMIF）に2・3ページ目の範囲を足す。印刷は手動の改ページ（62行のあと・2ページ目の終わり）にして、`fitToPage` を 0、`scale` を1ページ目が1枚に入る倍率（`fitScale`＝76。
+  Excel は「1ページに収める」だと手動の改ページを使わない）。印刷の範囲・dimension・税率の入力の規則（J 列）も広げる。1ページ（20点まで）は原本のまま（1ページに収める）。
+  LibreOffice で PDF にすると、代わりの字体で列が広くなり J 列（税率）だけ別の紙に出る（Excel は数字の幅 8px で 815px×76%＝619px＜692px なので入る）。
+- **原本の 26〜42行の金額（I）は「共有の式」**（I26 が親 `<f t="shared" ref="I26:I42">`）。親の I26 を書きかえると I27〜I42 の式がこわれる（Excel が「修復」）→ 明細の行の金額はどの行もふつうの式に書きかえる（`setFormula`）。
+- **印刷の画面（`PrintView.tsx`）は1ページずつ `.est-sheet`**（A4。`break-after: page`）。中の絵は印刷のときだけ `zoom` で縮める（`ShinseiPages` の `print`）：`transform: scale` だと、
+  印刷でページに分けるときに縮める前の位置で分けられて、2ページ目のある見積書で1ページ目の合計・備考の字が消えた（線は SVG 1つなので残る）。e2e は pdftotext があれば PDF の字も見る。
+  e2e の `assertFits` で、画面と印刷の両方で見積書の絵がどの紙（`.est-sheet`）からもはみ出さないことを確かめる。
 - e2e で `getByLabel('お客様名')`・`getByLabel('備考')` は、見積書のプレビューの押せる欄（`role=button`・同じ aria-label）にも当たる → `getByRole('textbox', {name, exact: true})` を使う。
 - テストで Excel の式を読むとき：XML の `&amp;` `&quot;` `&gt;` を戻してから比べる（文字をつなぐ式 `"合計（税込）　¥"&TEXT(…)` が合わなかった）。
   正規表現は式全体に合わせる（`^CEILING\(MIN\(` が利用者負担と「お支払い」の2つの式に当たった → `^CEILING\(MIN\([A-Z]+\d+,100000\)\*1\/10,1\)$`）。

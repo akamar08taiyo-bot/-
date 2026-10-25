@@ -46,6 +46,11 @@ body {
   overflow: hidden;
 }
 
+/* 2・3ページ目（明細のつづき）。1ページずつ紙に */
+.est-sheet + .est-sheet {
+  margin-top: 8mm;
+}
+
 /* ---------------------------------------------------------------- 印刷するとき */
 @media print {
   @page {
@@ -75,5 +80,14 @@ body {
     height: 296mm;
     margin: 0;
     box-shadow: none;
+    break-after: page;
+  }
+
+  .est-sheet:last-child {
+    break-after: auto;
+  }
+
+  .est-sheet + .est-sheet {
+    margin-top: 0;
   }
 }

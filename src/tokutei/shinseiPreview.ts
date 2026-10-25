@@ -310,11 +310,19 @@ export function shinseiPreview(template: Files, form: ShinseiForm, v: ShinseiVal
  * template は書き込む前の原本（描く範囲を決めるのに使う）、own はそのシートの欄 → 入れる所
  */
 export function sheetPreview<F extends string>(filled: Files, template: Files, sheet: string, own: [F, string[]][]): PvPage<F> | null {
+  return sheetPreviewPages(filled, template, sheet, own, [null])[0] ?? null;
+}
+
+/**
+ * 1つのシートを、行の範囲ごとに何枚かに分けて描く（見積書の2・3ページ目＝同じシートの下に足した明細のつづき。estimateBook.ts）。
+ * 範囲が null の枚は印刷の範囲（なければ罫線・文字のある四角）
+ */
+export function sheetPreviewPages<F extends string>(filled: Files, template: Files, sheet: string, own: [F, string[]][], ranges: (Range | null)[]): PvPage<F>[] {
   const path = sheetPaths(filled).get(sheet);
-  if (!path || !filled[path] || !template[path]) return null;
+  if (!path || !filled[path] || !template[path]) return [];
   const links = new Map<string, F>();
   for (const [field, refs] of own) for (const ref of refs) links.set(`${sheet.trim()}!${ref}`, field);
-  return buildPage(filled, path, template[path], sheet, own, links, []);
+  return ranges.map((range) => buildPage(filled, path, template[path], sheet, own, links, [], range ?? undefined));
 }
 
 // ---------------------------------------------------------------- 書式（色・字体・罫線・表示形式）
@@ -695,7 +703,7 @@ function richShared(files: Files): RichRun[][] {
 // ---------------------------------------------------------------- 1枚を作る
 
 type Cell = {s: number | null; t: string; inner: string};
-type Range = [number, number, number, number]; // 左の列・上の行・右の列・下の行（1始まり）
+export type Range = [number, number, number, number]; // 左の列・上の行・右の列・下の行（1始まり）
 const rangeCache = new WeakMap<Uint8Array, Range>();
 
 const cellsRe = /<c r="([A-Z]+)(\d+)"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g;
@@ -755,6 +763,7 @@ function buildPage<F extends string>(
   own: [F, string[]][],
   links: Map<string, F>,
   marked: {ref: string; chars: {ch: string; x: number; w: number; cy: number}[]; cy: number; em: number}[],
+  only?: Range, // 描く範囲（なければ印刷の範囲）
 ): PvPage<F> {
   const xml = strFromU8(files[path]);
   const xfs = xfsOf(files);
@@ -762,7 +771,7 @@ function buildPage<F extends string>(
   const theme = themeOf(files);
   const lay = sheetLayout(xml);
   // 範囲：印刷の範囲（なければ罫線・文字のある四角）
-  let range = rangeCache.get(templateSheet);
+  let range = only ?? rangeCache.get(templateSheet);
   if (!range) {
     range = printRange(files, sheet) ?? formRange(strFromU8(templateSheet), xfs);
     rangeCache.set(templateSheet, range);
@@ -906,7 +915,8 @@ function buildPage<F extends string>(
     fills,
     texts,
     lines: joinLines([...edges.values()]),
-    shapes: readShapes(files, path, xml, lay, ox, oy, xs[c2 + 1], ys[r2 + 1], theme),
+    // 範囲の外の図形は描かない（同じシートを何枚かに分けたとき、ほかの枚の図形）
+    shapes: readShapes(files, path, xml, lay, ox, oy, xs[c2 + 1], ys[r2 + 1], theme).filter((sh) => sh.y + sh.h > 0 && sh.y < ys[r2 + 1] && sh.x + sh.w > 0 && sh.x < xs[c2 + 1]),
     header: headerFooter(/<oddHeader>([\s\S]*?)<\/oddHeader>/.exec(xml)?.[1], xfs[0]?.font, sheet),
     footer: headerFooter(/<oddFooter>([\s\S]*?)<\/oddFooter>/.exec(xml)?.[1], xfs[0]?.font, sheet),
     fields: pageFields(sheet, own, cells, links, refRect),

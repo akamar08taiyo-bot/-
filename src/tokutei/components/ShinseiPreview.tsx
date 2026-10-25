@@ -273,13 +273,14 @@ export function ShinseiPages<F extends string = ShinseiField>({
 
   return (
     <div ref={wrapRef} className={print ? 'print-pages' : 'space-y-4'} aria-label={title}>
-      {pages.map((page) => {
+      {pages.map((page, pageNo) => {
         const pp = paper(page);
         return (
-          <div key={page.sheet} className="relative mx-auto" style={{width: pp.width * scale, height: pp.height * scale}}>
+          <div key={`${page.sheet}:${pageNo}`} className="relative mx-auto" style={{width: pp.width * scale, height: pp.height * scale}}>
             <div
               className={`absolute left-0 top-0 origin-top-left bg-white ${print ? '' : 'shadow-[0_1px_4px_rgba(0,0,0,0.25)]'}`}
-              style={{width: pp.width, height: pp.height, transform: `scale(${scale})`}}
+              // 印刷は zoom（transform だと、印刷でページに分けるときに縮める前の位置で分けられ、紙の下より下に描いた字が次の紙に送られて消えた。2ページ目のある見積書）
+              style={print ? {width: pp.width, height: pp.height, zoom: scale} : {width: pp.width, height: pp.height, transform: `scale(${scale})`}}
               role="group"
               aria-label={page.sheet}
             >
