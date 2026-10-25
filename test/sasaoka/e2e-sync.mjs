@@ -89,9 +89,9 @@ await shi.getByRole('cell', {name: '同時 一郎様邸', exact: true}).waitFor(
 assert.equal(await shi.getByRole('cell', {name: '（サンプル）山田様邸', exact: true}).count(), 1);
 await est.getByRole('cell', {name: /同時 一郎/}).click();
 await est.getByLabel('笹岡工務店の請求書に入れる').uncheck();
-// 一覧には ☐ で残る（見積書のある様邸。☑ で請求書に戻せる・次月に回せる。2026-10-25）。請求書に入れる件数は1件に
+// 一覧には ☐ で残る（見積書のある様邸。☑ で請求書に戻せる・次月に回せる。2026-10-25）。☑ は1件に
 const box = shi.getByRole('checkbox', {name: '同時 一郎様邸を請求書に入れる'});
-await shi.waitForFunction(() => document.querySelector('main')?.textContent?.includes('請求書に入れる 1件'), null, {timeout: 5000});
+await shi.waitForFunction(() => document.querySelectorAll('main tbody input[type=checkbox]:checked').length === 1, null, {timeout: 5000});
 assert.equal(await box.isChecked(), false);
 await est.getByRole('button', {name: '← 一覧へ戻る'}).click();
 log('新しい見積書は行を入れると仕切り計算の一覧に入り、外すと ☐ になるOK');

@@ -220,12 +220,8 @@ export function JobsPage({
               </Btn>
             </div>
           )}
-          <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-            <span>請求書に入れる {jobs.length}件</span>
-            <span>税抜合計 {yen(summary.invoice.subtotal)}円</span>
-            <span>
-              消費税 {yen(summary.invoice.tax)}円{monthly ? '（すべての様邸の合計に消費税率をかけています）' : '（様邸ごとの消費税の合計）'}
-            </span>
+          {/* 下はご請求金額だけ（件数・税抜合計・消費税と説明は「不要」とユーザーの指示 2026-10-26。内訳は請求書の印刷に） */}
+          <div className="flex flex-wrap items-center justify-end border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm">
             <span className="text-lg font-bold text-[#0c315e]">ご請求金額（税込） {yen(summary.invoice.total)}円</span>
           </div>
         </div>

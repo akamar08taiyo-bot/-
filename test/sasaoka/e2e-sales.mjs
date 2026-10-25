@@ -115,7 +115,8 @@ const nav = page.getByRole('navigation');
 const main = page.locator('main');
 const nameCell = (name) => page.getByRole('cell', {name, exact: true});
 const box = (name) => page.getByRole('checkbox', {name: `${name}を請求書に入れる`});
-const footer = () => main.locator('div', {hasText: /^請求書に入れる/}).last().innerText();
+const footer = () => main.getByText(/^ご請求金額（税込）/).innerText();
+const checkedCount = () => main.locator('tbody input[type=checkbox]:checked').count();
 
 // ---------------- 請求書の一覧：〇〇様邸と ☑ だけ（☐ の見本三も出す）
 await nameCell('見本一様邸').waitFor();
@@ -126,17 +127,19 @@ assert.equal(await box('見本一様邸').isChecked(), true);
 assert.equal(await box('見本二様邸').isChecked(), true);
 assert.equal(await box('見本三様邸').isChecked(), false);
 const f1 = await footer();
-assert.match(f1, /請求書に入れる 2件/);
+assert.equal(await checkedCount(), 2);
+// 一覧の下はご請求金額だけ（件数・税抜合計・消費税と説明は出さない。ユーザーの指示「上記の説明の部分は不要になります」2026-10-26）
+assert.equal(await main.getByText(/請求書に入れる \d+件|税抜合計|消費税 [\d,]+円|すべての様邸の合計に消費税率|様邸ごとの消費税の合計/).count(), 0);
 await page.screenshot({path: path.join(outDir, 'sales-01-invoice-list.png'), fullPage: true});
 
 // ☐ にすると合計と印刷から外れる。☑ で戻る
 const total = (t) => yenOf(/ご請求金額（税込） ([\d,]+)円/.exec(t)[1]);
 await box('見本二様邸').uncheck();
-await page.waitForFunction(() => document.querySelector('main')?.textContent?.includes('請求書に入れる 1件'));
+await page.waitForFunction(() => document.querySelectorAll('main tbody input[type=checkbox]:checked').length === 1);
 const f2 = await footer();
 assert.ok(total(f2) < total(f1), `☐ にしても合計が減らない：${f1} → ${f2}`);
 await box('見本三様邸').check();
-await page.waitForFunction(() => document.querySelector('main')?.textContent?.includes('請求書に入れる 2件'));
+await page.waitForFunction(() => document.querySelectorAll('main tbody input[type=checkbox]:checked').length === 2);
 await page.getByRole('button', {name: '🖨 請求書を印刷'}).click();
 const printed = await page.locator('.print-root').innerText();
 assert.ok(printed.includes('見本一') && printed.includes('見本三') && !printed.includes('見本二'), '請求書の印刷に ☑ の様邸だけが出ていない');

@@ -35,7 +35,8 @@ const row = await page.getByRole('row', {name: /（サンプル）山田様邸/}
 assert.ok(row.includes('20,119'), `一覧に 20,119 がない: ${row}`);
 for (const v of ['12,900', '1,316']) assert.ok(!row.includes(v), `一覧に内訳の ${v} が出ている: ${row}`);
 assert.ok((await page.getByText(/ご請求金額（税込）/).innerText()).includes('22,130'));
-assert.ok((await page.getByText(/すべての様邸の合計に消費税率をかけています/).innerText()).includes('2,011'));
+// 一覧の下はご請求金額だけ（消費税と説明は出さない。2026-10-26）。22,130＝20,119＋消費税 2,011（すべての様邸の合計にかける）
+assert.equal(await page.getByText(/すべての様邸の合計に消費税率をかけています/).count(), 0);
 log('サンプルの金額OK（消費税は全様邸の合計にかける）');
 
 // CSV
