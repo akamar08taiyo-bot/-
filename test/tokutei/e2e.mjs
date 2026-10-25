@@ -322,6 +322,15 @@ try {
   assert.equal(await maker.inputValue(), '見本工業');
   await page.getByText('仕切（税抜・任意）').last().waitFor();
   await page.waitForFunction(() => document.querySelector('[aria-label="見積書のプレビュー"] [data-pv-field="items"]')?.className.includes('outline-[#217346]'));
+  // 「自己負担額を表示」をオンにすると、明細の最後の商品の2行下に「自己負担額（1割負担）　○円」（ユーザーの指示「自己負担額を表示のオンオフっていうチェック項目を入れ」2026-10-26）
+  const selfPay = page.getByRole('checkbox', {name: '自己負担額を表示'});
+  assert.equal(await selfPay.isChecked(), false);
+  await selfPay.check();
+  const estPreview = page.locator('[aria-label="見積書のプレビュー"]');
+  await estPreview.getByText(/^自己負担額（1割負担）　[\d,]+円$/).waitFor();
+  await page.screenshot({path: `${out}/05e-self-pay.png`});
+  await selfPay.uncheck();
+  await estPreview.getByText(/^自己負担額（/).waitFor({state: 'detached'});
   await page.getByRole('textbox', {name: '備考', exact: true}).fill(['ご不明な点は担当までお問い合わせください。', '納品の前にお電話いたします。'].join('\n'));
   await page.getByText('見積書の備考は3行までです').waitFor();
   await page.getByRole('button', {name: '🖨 見積書を印刷'}).first().click();

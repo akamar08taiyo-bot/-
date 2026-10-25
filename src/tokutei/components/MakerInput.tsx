@@ -1,6 +1,6 @@
 // メーカー名の欄：打ち込めて、「▼」か打った字で候補から選べる（ユーザーの指示「メーカー名は、パナソニックエイジフリー（株）とアロン化成（株）はデフォルトにする。
 // それ以外でも選べるようにする」2026-10-26）。候補ははじめの2つ＋商品マスタ・見積もりで使ったメーカー（sales.ts の makerChoices）。
-// ブラウザの datalist は環境で見た目・動きが変わるので使わず、自分で候補を出す。候補は画面に固定して出す（入れる所の枠の overflow で切れないように。動かしたら閉じる）
+// ブラウザの datalist は環境で見た目・動きが変わるので使わず、自分で候補を出す。候補は画面に固定して出す（入れる所の枠の overflow で切れないように。画面を動かしたら、ついて動く）
 import {useEffect, useId, useRef, useState} from 'react';
 import {makerKey} from '../sales.ts';
 
@@ -28,17 +28,21 @@ export function MakerInput({
   const [at, setAt] = useState<{left: number; top: number; width: number} | null>(null);
   useEffect(() => {
     if (!open) return;
-    const r = boxRef.current?.getBoundingClientRect();
-    if (r) setAt({left: r.left, top: r.bottom + 4, width: r.width});
-    const close = (e: Event) => {
-      if (e.target instanceof Element && e.target.closest('[role=listbox]')) return; // 候補の中のスクロール
-      setOpen(false);
+    const place = () => {
+      const r = boxRef.current?.getBoundingClientRect();
+      if (r) setAt({left: r.left, top: r.bottom + 4, width: r.width});
     };
-    window.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
+    place();
+    // 欄のまわり（画面・入れる所の枠）が動いたら、候補もついて動く（ほかの所＝見積書のプレビューの枠などが動いても閉じない）
+    const moved = (e: Event) => {
+      const t = e.target;
+      if (t === document || (t instanceof Node && boxRef.current && t.contains(boxRef.current))) place();
+    };
+    window.addEventListener('scroll', moved, true);
+    window.addEventListener('resize', place);
     return () => {
-      window.removeEventListener('scroll', close, true);
-      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', moved, true);
+      window.removeEventListener('resize', place);
     };
   }, [open]);
   const q = makerKey(value);

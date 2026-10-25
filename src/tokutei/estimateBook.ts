@@ -55,24 +55,44 @@ export function itemRows(pages: number): number[] {
   for (let p = 2; p <= pages; p++) rows.push(...contBlock(p).rows);
   return rows;
 }
+/**
+ * 自己負担額の行の文（ユーザーの指示「自己負担額を表示のオンオフっていうチェック項目を入れ、オンにした場合は…商品の列の最後の2行下ぐらいに、自己負担額〇〇円みたいな形で表示する。
+ * …1割負担、2割負担だと…自動的に、自己負担額を記入するようにする」2026-10-26）。お客様のお支払い（利用者負担＋限度額を超えた分。生活保護なら負担割合の分は介護扶助）。出さないときは ''
+ */
+export function selfPayText(sale: Sale, t: Pick<Totals, 'ratio' | 'userPay'>): string {
+  if (!sale.showSelfPay || sale.items.length === 0) return '';
+  return `自己負担額（${sale.welfare ? '生活保護' : `${t.ratio}割負担`}）　${yen(t.userPay)}円`;
+}
+/** 明細の何番目（0始まり）に自己負担額を書くか：最後の商品の2行下（1行あける）。そのページに入らなければすぐ下、それも入らなければ次のページの1行目。出さない・入らないときは -1 */
+export function selfPayIndex(items: number, show: boolean): number {
+  if (!show || items === 0) return -1;
+  const pageOf = (i: number) => (i < ESTIMATE_ROWS.length ? 1 : 2 + Math.floor((i - ESTIMATE_ROWS.length) / CONT_ROWS));
+  if (items + 1 < ESTIMATE_CAPACITY && pageOf(items + 1) === pageOf(items - 1)) return items + 1;
+  return items < ESTIMATE_CAPACITY ? items : -1;
+}
+/** 明細の行を何行使うか（商品と自己負担額の行。ページの数を決める） */
+const usedRows = (sale: Sale) => Math.max(sale.items.length, selfPayIndex(sale.items.length, !!sale.showSelfPay) + 1);
 /** 備考の行（59行目の「備　　考」の下の3行。A〜K を1つにした欄） */
 const NOTE_ROWS = [60, 61, 62];
 /** 件名（原本は空欄） */
 export const ESTIMATE_SUBJECT = '特定福祉用具の購入';
 
 /** 見積書のプレビューで押すと案件の画面のその入れる所へ行く欄 */
-export type EstimateField = 'customer' | 'quoteNo' | 'estimateDate' | 'staff' | 'items' | 'note';
+export type EstimateField = 'customer' | 'quoteNo' | 'estimateDate' | 'staff' | 'items' | 'selfPay' | 'note';
 export const ESTIMATE_LABEL: Record<EstimateField, string> = {
   customer: 'お客様名',
   quoteNo: '見積番号',
   estimateDate: '見積日',
   staff: '担当',
   items: '商品',
+  selfPay: '自己負担額',
   note: '見積書の備考に足す文',
 };
-/** 押せる欄（明細は入っている行と、次に入る1行） */
-const links = (items: number): [EstimateField, string[]][] => {
-  const pages = estimatePages(items + 1);
+/** 押せる欄（明細は入っている行と、次に入る1行。自己負担額の行） */
+const links = (sale: Sale): [EstimateField, string[]][] => {
+  const items = sale.items.length;
+  const pages = estimatePages(Math.max(items + 1, usedRows(sale)));
+  const self = selfPayIndex(items, !!sale.showSelfPay);
   const tops = [1, ...Array.from({length: pages - 1}, (_, i) => contBlock(i + 2).top)];
   return [
     ['customer', tops.map((t) => `A${t + 5}`)],
@@ -80,6 +100,7 @@ const links = (items: number): [EstimateField, string[]][] => {
     ['estimateDate', tops.map((t) => `I${t + 4}`)],
     ['staff', ['I16']],
     ['items', itemRows(pages).slice(0, items + 1).flatMap((r) => ['A', 'F', 'G', 'H', 'I', 'J', 'K'].map((c) => `${c}${r}`))],
+    ['selfPay', self >= 0 ? [`A${itemRows(pages)[self]}`] : []],
     ['note', NOTE_ROWS.map((r) => `A${r}`)],
   ];
 };
@@ -163,7 +184,7 @@ export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
     if (st) for (const r of ESTIMATE_ROWS.slice(1, -1)) xml = setStyle(xml, `${c}${r}`, st);
   }
   // 2・3ページ目（明細のつづき）を足す（1ページ目の頭の行は、宛名・番号・日付を書いたあとの写し）
-  const pages = estimatePages(sale.items.length);
+  const pages = estimatePages(usedRows(sale));
   if (pages > 1) xml = addContinuation(xml, tpl, pages);
   const rows = itemRows(pages);
   // 明細の金額の欄は、どの行もふつうの式にする（前の原本の26〜42行は「共有の式」で、親の26行目を書きかえると下の行の式がこわれた。隠した行も）
@@ -185,6 +206,9 @@ export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
     const key = String(RATE[i.taxType]);
     sums[key] = (sums[key] ?? 0) + amount;
   });
+  // 自己負担額（明細の最後の商品の2行下。品名の欄に文で。金額の欄・税率は空なので合計には入らない）
+  const self = selfPayIndex(t.lines.length, !!sale.showSelfPay);
+  if (self >= 0) put(`A${rows[self]}`, selfPayText(sale, t));
   // 備考
   const notes = estimateNotes(sale, t);
   NOTE_ROWS.forEach((r, k) => put(`A${r}`, notes[k] ?? ''));
@@ -319,10 +343,10 @@ export function fillEstimate(template: Files, sale: Sale, s: Settings): Uint8Arr
 export function estimatePreview(template: Files, sale: Sale, s: Settings): PvPage<EstimateField>[] {
   const files: Files = {...template};
   fillEstimateFiles(files, sale, s);
-  const pages = estimatePages(sale.items.length);
+  const pages = estimatePages(usedRows(sale));
   const ranges: (Range | null)[] = [pages > 1 ? [1, 1, LAST_COL, PAGE1_LAST] : null];
   for (let p = 2; p <= pages; p++) ranges.push([1, contBlock(p).top, LAST_COL, contBlock(p).rows.at(-1)!]);
-  return sheetPreviewPages(files, template, ESTIMATE_SHEET, links(sale.items.length), ranges);
+  return sheetPreviewPages(files, template, ESTIMATE_SHEET, links(sale), ranges);
 }
 
 /** 保存する名前：印刷の PDF と同じ「御見積書_山田 花子様.xlsx」（お客様名がなければ「御見積書_（お客様名未入力）.xlsx」） */

@@ -6,7 +6,7 @@ import test from 'node:test';
 import {strFromU8, unzipSync} from 'fflate';
 import {basisNote, itemNote, saleTotals} from '../../src/tokutei/calc.ts';
 import {defaultSettings, settingsForOffice} from '../../src/tokutei/defaults.ts';
-import {CONT_ROWS, contBlock, ESTIMATE_CAPACITY, ESTIMATE_ROWS, estimateFileName, estimateNotes, estimateOverflow, estimatePages, estimatePreview, fillEstimate, fitScale} from '../../src/tokutei/estimateBook.ts';
+import {CONT_ROWS, contBlock, ESTIMATE_CAPACITY, ESTIMATE_ROWS, estimateFileName, estimateNotes, estimateOverflow, estimatePages, estimatePreview, fillEstimate, fitScale, selfPayIndex, selfPayText} from '../../src/tokutei/estimateBook.ts';
 import type {Sale, SaleItem} from '../../src/tokutei/types.ts';
 import {cellFormula, readCell, sheetLayout} from '../../src/tokutei/xlsxEdit.ts';
 import type {Files} from '../../src/tokutei/xlsxEdit.ts';
@@ -341,6 +341,43 @@ test('見積書のバランスの直し（2026-10-26）：備考の列を広く�
   // 備考（算出根拠）は 10pt
   const k = page.texts.find((x) => x.runs.map((r) => r.text).join('') === '定価32,000円の20%引き')!;
   assert.equal(Math.round((k.runs[0].font.size * 72) / 96), 10);
+});
+
+test('自己負担額を表示（ユーザーの指示「自己負担額を表示のオンオフっていうチェック項目を入れ…商品の列の最後の2行下ぐらいに、自己負担額〇〇円」2026-10-26）', () => {
+  const one = [item({id: 'a', name: '見本の台', listPrice: 30000})]; // 24,000円＋税 2,400円＝26,400円 → 1割 2,640円・2割 5,280円
+  // 書く場所：最後の商品の2行下（1行あける）。ページの終わりならすぐ下、それも入らなければ次のページの1行目
+  assert.equal(selfPayIndex(1, true), 2);
+  assert.equal(selfPayIndex(1, false), -1);
+  assert.equal(selfPayIndex(0, true), -1);
+  assert.equal(selfPayIndex(14, true), 15); // 1ページ目の最後の行（38行目）
+  assert.equal(selfPayIndex(15, true), 15); // すぐ下（1ページ目の最後の行）
+  assert.equal(selfPayIndex(16, true), 16); // 1ページ目がいっぱい → 2ページ目の1行目
+  assert.equal(selfPayIndex(ESTIMATE_CAPACITY, true), -1);
+  // オフ（はじめ）：書かない
+  const off = unzipSync(fillEstimate(template(), sale({items: one}), S));
+  assert.equal(readCell(off, SH, 'A25'), '');
+  // オン：1割 → A25（23行目の2つ下）に「自己負担額（1割負担）　2,640円」。金額の欄・税率は空で、合計は変わらない
+  const on = sale({items: one, showSelfPay: true});
+  const f = unzipSync(fillEstimate(template(), on, S));
+  assert.equal(readCell(f, SH, 'A25'), '自己負担額（1割負担）　2,640円');
+  assert.equal(readCell(f, SH, 'A24'), '');
+  assert.equal(readCell(f, SH, 'J25'), '');
+  assert.equal(readCell(f, SH, 'I25'), '');
+  assert.equal(readCell(f, SH, 'E21'), readCell(off, SH, 'E21'));
+  // 2割・生活保護・限度額を超えた分（お客様のお支払い）
+  assert.equal(selfPayText(sale({items: one, showSelfPay: true, burdenRatio: 2}), saleTotals(sale({items: one, burdenRatio: 2}), S)), '自己負担額（2割負担）　5,280円');
+  assert.equal(selfPayText(sale({items: one, showSelfPay: true, welfare: true}), saleTotals(sale({items: one, welfare: true}), S)), '自己負担額（生活保護）　0円');
+  assert.equal(selfPayText(sale({items: one, showSelfPay: true, remaining: 6400}), saleTotals(sale({items: one, remaining: 6400}), S)), '自己負担額（1割負担）　20,640円'); // 6,400円の1割 640円＋超えた分 20,000円
+  // プレビューにも出て、押すと「自己負担額」の行へ
+  const page = estimatePreview(template(), on, S)[0];
+  assert.ok(page.texts.some((x) => x.runs.map((r) => r.text).join('') === '自己負担額（1割負担）　2,640円'));
+  assert.ok(page.fields.some((x) => x.field === 'selfPay'));
+  // 16点：1ページ目がいっぱいなので、2ページ目の1行目に書く（2ページになる）
+  const p16 = sale({items: many(16), showSelfPay: true});
+  const g = unzipSync(fillEstimate(template(), p16, S));
+  assert.match(readCell(g, SH, `A${contBlock(2).rows[0]}`), /^自己負担額（1割負担）　[\d,]+円$/);
+  assert.equal(estimatePreview(template(), p16, S).length, 2);
+  assert.equal(estimatePreview(template(), sale({items: many(16)}), S).length, 1);
 });
 
 test('会社の欄：設定の営業所の値（ほかの営業所でも、TEL・FAX・所長・登録番号）。担当がいなければ空', () => {
