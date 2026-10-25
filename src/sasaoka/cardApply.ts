@@ -306,3 +306,57 @@ export function applyExtra(job: Job, v: ExtraInfo, picks: Set<ExtraField>, staff
   next.shinsei = s;
   return next;
 }
+
+// ---------------------------------------------------------------- 追加で読み取る（2026-10-23）
+// 1回で読めなかった所を、確かめる画面に2枚目のスクリーンショット（画面の別の所）・保険証を入れて足す
+// （ユーザーの指示「１回でよみ取れない場合は、追加で読み取れるようにもする」）
+
+/**
+ * 追加で読んだ値を足すか：空の欄は足す。たしかでない欄は、たしかな読みに替える（同じ読みが2回でもたしか）。たしかな欄・手で直した欄（呼ぶ側で除く）はそのまま。
+ * take：値を替える、sure：足したあとのたしかさ。null：何もしない
+ */
+function addOne(now: string, nowSure: boolean, add: string, addSure: boolean, same: (a: string, b: string) => boolean): {take: boolean; sure: boolean} | null {
+  if (!add) return null;
+  if (!now) return {take: true, sure: addSure};
+  if (nowSure) return null;
+  if (same(now, add)) return {take: false, sure: true};
+  return addSure ? {take: true, sure: true} : null;
+}
+
+/** 追加で読んだ結果を、確かめる画面の値（保険証にもある項目）に足す。edited：手で直した欄（変えない）。changed：値・たしかさの変わった欄 */
+export function addCardRead(cur: CardInfo, unsure: CardKey[], edited: ReadonlySet<CardField>, add: CardRead): {info: CardInfo; unsure: CardKey[]; changed: CardField[]} {
+  const info: CardInfo = {...cur};
+  let un = [...unsure];
+  const changed: CardField[] = [];
+  for (const {field, keys} of CARD_FIELDS) {
+    if (edited.has(field)) continue;
+    const r = addOne(fieldText(cur, field), !keys.some((k) => unsure.includes(k)), fieldText(add.info, field), !keys.some((k) => add.unsure.includes(k)), sameText);
+    if (!r) continue;
+    if (r.take) {
+      for (const k of keys) (info as Record<string, unknown>)[k] = add.info[k];
+      if (field === 'insurer') info.insurerName = add.info.insurerName;
+      if (field === 'burden') [info.burdenFrom, info.burdenTo] = [add.info.burdenFrom, add.info.burdenTo];
+    }
+    un = un.filter((k) => !keys.includes(k));
+    if (!r.sure) un.push(...keys);
+    changed.push(field);
+  }
+  return {info, unsure: un, changed};
+}
+
+/** 追加で読んだ、保険証にない項目（介護ソフトの画面）を足す。edited：手で直した欄（変えない） */
+export function addExtraRead(cur: ExtraInfo, unsure: ExtraField[], edited: ReadonlySet<ExtraField>, add: {extra: ExtraInfo; unsure: ExtraField[]}): {extra: ExtraInfo; unsure: ExtraField[]; changed: ExtraField[]} {
+  const extra: ExtraInfo = {...cur};
+  let un = [...unsure];
+  const changed: ExtraField[] = [];
+  for (const {field} of EXTRA_FIELDS) {
+    if (edited.has(field)) continue;
+    const r = addOne(extraText(cur, field), !unsure.includes(field), extraText(add.extra, field), !add.unsure.includes(field), (a, b) => sameExtra(field, a, b));
+    if (!r) continue;
+    if (r.take) (extra as Record<string, unknown>)[field] = add.extra[field];
+    un = un.filter((k) => k !== field);
+    if (!r.sure) un.push(field);
+    changed.push(field);
+  }
+  return {extra, unsure: un, changed};
+}

@@ -1,11 +1,9 @@
 import {useEffect, useMemo, useState} from 'react';
 import {estimateTotals, hasEstimateRows, jobName} from '../calc.ts';
 import {copyJob} from '../components/JobTools.tsx';
-import {CardDialog, CardDrop} from '../components/CardReader.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm} from '../estimateForms.ts';
 import {estimateXlsx, XLSX_TYPE} from '../estimateXlsx.ts';
-import type {ReadResult} from '../cardApply.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {addSamples, hasSamples} from '../samples.ts';
@@ -87,24 +85,25 @@ function useEstimates(data: AppData, s: Settings) {
   );
 }
 
-/** 見積もり・申請書を作成する：最初に「新規作成」か「一覧から作成」かを選ぶ */
+/**
+ * 見積もり・申請書を作成する：最初に「新規作成」か「一覧から作成」かを選ぶ。
+ * 介護保険証・介護ソフトの画面は、ここ（メイン画面）ではなく様邸の画面の左の大きな欄に入れる（ユーザーの指示「各保険者のこの画面のこの辺に貼り付け欄を大きく設置し、
+ * 貼り付けるようにする。メイン画面で貼り付けるのではなく」2026-10-23。CardReader.tsx の CardFill）
+ */
 export function EstimateHome({
   data,
   update,
   onNew,
-  onNewJob,
   onList,
   goMaterials,
 }: {
   data: AppData;
   update: Update;
   onNew: (insurer: Insurer) => void; // 新しい様邸（申請書と見積書のタブ）を開く
-  onNewJob: (job: Job) => void; // 介護保険証から作った様邸を開く
   onList: () => void;
   goMaterials: () => void;
 }) {
   const all = useEstimates(data, data.settings);
-  const [card, setCard] = useState<{read: ReadResult; thumbs: string[]} | null>(null);
   const month = thisMonth();
   const inMonth = all.filter((e) => e.job.month === month).length;
   return (
@@ -128,26 +127,8 @@ export function EstimateHome({
                 ＋ {INSURER_INFO.kouiki.name}
               </Btn>
             </div>
-            {/* 介護保険証（画像・PDF）・介護ソフトの画面のスクリーンショットを入れると、保険者・番号・氏名・生年月日・要介護・有効期間などを入れた様邸を作る */}
-            <CardDrop onRead={setCard} big className="w-full" hint="画像・PDF をここにドロップ・Ctrl+V（押して選んでもよい）。保険者も読んだものから">
-              🪪 介護保険証・介護ソフトの画面から新規作成
-            </CardDrop>
           </div>
         </section>
-        {card && (
-          <CardDialog
-            job={newEstimate(card.read.info.insurer || 'yukuhashi')}
-            read={card.read}
-            thumbs={card.thumbs}
-            staffList={data.settings.staffList}
-            newJob
-            onClose={() => setCard(null)}
-            onApply={(job) => {
-              setCard(null);
-              onNewJob(job);
-            }}
-          />
-        )}
         <section className="rounded-xl border-2 border-slate-300 bg-white p-5 shadow-sm" aria-label="一覧から作成">
           <h2 className="text-xl font-bold text-slate-800">📋 一覧から作成</h2>
           <div className="mt-4 flex flex-wrap items-center gap-3">

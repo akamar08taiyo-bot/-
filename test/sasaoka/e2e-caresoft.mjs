@@ -3,7 +3,8 @@
 //   「完了写真もドラッグ＆ドロップや貼付けしやすいようにする。介護保険証もそうです。スクリーンショットもそうです」2026-10-23）：
 //   架空の介護ソフトのお客様の欄（careSoftFixture.mjs。見本・0000 の値だけ）を描いてスクリーンショット（PNG）にし、
 //   1. 様邸の申請書のタブで Ctrl+V（ファイルの入った貼り付け）→「介護ソフトの画面から入れる」の確かめる画面 → 入れる → 申請書・理由書・見積書の担当・特定福祉用具の受け渡し
-//   2. 見積もりの入口の「…から新規作成」の枠にドロップ（生保・苅田町・携帯だけ・担当の候補にない営業）→ 新しい様邸（保険者も画面から）・生活保護を特定福祉用具へ
+//   2. 広い画面の様邸の画面の左の大きな欄にドロップ（生保・苅田町・携帯だけ・担当の候補にない営業）・見積もりの入口（メイン画面）には欄を出さない。
+//      もう1つの形の画面を2枚に分け、上の欄を貼り付け → 確かめる画面の「＋ 追加で読み取る」に下の欄 → 足りない所が入る
 //   3. 写真の枠：ファイルを持ってくると枠が薄い緑・重ねると「ここに離す」、空いた枠にドロップ、枠を選んで Ctrl+V（介護保険証の読み取りにはならない）
 //   4. 1366px とスマホ（390px）で横にはみ出さない（スクリーンショットを保存）
 //   読み取りの部品（tesseract.js・日本語のデータ）は手元の node_modules から（ネットにつながない。e2e-card.mjs と同じ）
@@ -12,7 +13,7 @@ const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_
 import assert from 'node:assert/strict';
 import {readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
-import {softHtml} from './careSoftFixture.mjs';
+import {softHtml, softHtmlGray} from './careSoftFixture.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -53,7 +54,7 @@ await routeOcr(ctx);
 await ctx.addInitScript(() => localStorage.setItem('taiyo_portal_session', JSON.stringify({office: '行橋営業所'})));
 const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
-page.on('console', (m) => appError(m) && errors.push('console: ' + m.text()));
+page.on('console', (m) => appError(m) && errors.push('console: ' + m.text() + ' ' + JSON.stringify(m.location())));
 page.on('dialog', (d) => d.accept());
 await page.goto(`${site}/jutaku-mitsumori/index.html`);
 
@@ -245,12 +246,31 @@ assert.match(await photoBoard.getByRole('button', {name: '📷 写真を選ぶ'}
 await photoBoard.screenshot({path: path.join(outDir, 'photo-board.png')});
 log('写真の枠：ドラッグ中の色・ここに離す・ドロップ・Ctrl+V（選んだ枠・差し替え）OK');
 
-// ---------------- 2. 見積もりの入口の新規作成の枠にドロップ（生保・苅田町・携帯だけ・候補にない営業）
+// ---------------- 2. 広い画面：様邸の画面の左の大きな欄にドロップ（生保・苅田町・携帯だけ・候補にない営業）。見積もりの入口（メイン画面）には読み取りの欄を出さない
 await page.getByRole('navigation').getByRole('button', {name: /見積もり・申請書を作成する/}).click();
-const big = page.getByRole('button', {name: '🪪 介護保険証・介護ソフトの画面から新規作成'});
-await big.waitFor();
-assert.match(await big.innerText(), /ここにドロップ・Ctrl\+V/);
-await big.evaluate((el, bytes) => {
+await page.getByRole('region', {name: '新規作成'}).waitFor();
+assert.equal(await page.getByRole('button', {name: /介護保険証・介護ソフトの画面/}).count(), 0);
+await page.getByRole('region', {name: '新規作成'}).getByRole('button', {name: '＋ 苅田町'}).click();
+await page.getByRole('form', {name: '申請書'}).waitFor();
+await page.setViewportSize({width: 2000, height: 1000});
+const side = page.getByRole('button', {name: '🪪 介護保険証・介護ソフトの画面'});
+// 広い画面では、タブの右の小さな欄のかわりに左の大きな欄（1つだけ。Ctrl+V を2回読まない）
+await page.waitForFunction(() => {
+  const all = document.querySelectorAll('[aria-label="🪪 介護保険証・介護ソフトの画面"]');
+  return all.length === 1 && all[0].getBoundingClientRect().height > 300;
+});
+const sideBox = await side.boundingBox();
+const mainBox = await page.locator('main').boundingBox();
+// 左の余白の縦長の欄（本文にかからない）。タブを替えても同じ所
+assert.ok(sideBox.height > 400 && sideBox.x + sideBox.width <= mainBox.x + 16 && sideBox.width >= 120, JSON.stringify({sideBox, mainBox}));
+assert.match(await side.innerText(), /ここにドロップ・Ctrl\+V/);
+await page.getByRole('tab', {name: '📋 工事見積書'}).click();
+await page.getByRole('region', {name: '見積書', exact: true}).waitFor();
+assert.deepEqual(await side.boundingBox(), sideBox);
+await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
+await page.getByRole('form', {name: '申請書'}).waitFor();
+await page.screenshot({path: path.join(outDir, 'side-drop.png')});
+await side.evaluate((el, bytes) => {
   const dt = new DataTransfer();
   dt.items.add(new File([new Uint8Array(bytes)], '画面.png', {type: 'image/png'}));
   for (const ev of ['dragenter', 'dragover', 'drop']) el.dispatchEvent(new DragEvent(ev, {dataTransfer: dt, bubbles: true, cancelable: true}));
@@ -270,10 +290,9 @@ assert.equal(await val2('要介護状態区分').inputValue(), '要支援1');
 assert.equal(await val2('担当').inputValue(), '');
 assert.match(await row2('担当').innerText(), /担当者の候補にない名前/);
 assert.equal(await row2('担当').getByLabel('担当を入れる').isChecked(), false);
-const name2 = await val2('氏名').inputValue();
-assert.equal(name2, '試験　次郎');
-await dialog2.getByRole('button', {name: 'この内容で新規作成'}).click();
-await page.getByRole('form', {name: '申請書'}).waitFor();
+assert.equal(await val2('氏名').inputValue(), '試験　次郎');
+await dialog2.getByRole('button', {name: /項目を入れる$/}).click();
+await dialog2.waitFor({state: 'detached'});
 const form2 = page.getByRole('form', {name: '申請書'});
 assert.equal(await form2.getByLabel('被保険者氏名', {exact: true}).inputValue(), '試験　次郎');
 assert.equal(await form2.getByLabel('電話番号', {exact: true}).inputValue(), '090-0000-0000');
@@ -282,7 +301,51 @@ await page.getByRole('tab', {name: '🛁 特定福祉用具申請書'}).click();
 await page.waitForFunction(() => JSON.parse(localStorage.getItem('taiyo-tokutei-from-jutaku-v1') || '{}').fields?.customer === '試験　次郎');
 const handoff2 = JSON.parse(await page.evaluate(() => localStorage.getItem('taiyo-tokutei-from-jutaku-v1')));
 assert.deepEqual([handoff2.fields.welfare, handoff2.fields.burdenRatio, handoff2.fields.insurer], [true, 1, 'kanda']);
-log('入口の新規作成にドロップ → 新しい様邸（苅田町・生活保護）OK');
+log('広い画面の左の大きな欄にドロップ → この様邸に（苅田町・生活保護）OK・メイン画面には読み取りの欄なし');
+
+// ---------------- 2b. もう1つの形の画面を2枚に分けて：上の欄だけ貼り付け → 確かめる画面の「＋ 追加で読み取る」に下の欄（Ctrl+V）→ 足りない所が入る
+const grayPage = await browser.newPage({deviceScaleFactor: 1.25});
+await grayPage.setContent(softHtmlGray({}, {buttons: true}));
+const gp = await grayPage.locator('.panel').boundingBox();
+const firstInfo = await grayPage.locator('.info').first().boundingBox();
+const topPng = await grayPage.screenshot({clip: {x: gp.x, y: gp.y, width: gp.width, height: firstInfo.y - gp.y}});
+const bottomPng = await grayPage.screenshot({clip: {x: gp.x, y: firstInfo.y, width: gp.width, height: gp.y + gp.height - firstInfo.y}});
+await grayPage.close();
+await writeFile(path.join(outDir, 'gray-top.png'), topPng);
+await writeFile(path.join(outDir, 'gray-bottom.png'), bottomPng);
+await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
+await page.getByRole('form', {name: '申請書'}).waitFor();
+await page.locator('h1').first().click();
+await paste(topPng, 'image.png');
+const dialog3 = page.getByRole('dialog').filter({hasText: '介護ソフトの画面から入れる'});
+await dialog3.getByRole('table', {name: '読んだ値'}).waitFor({timeout: 240_000});
+const row3 = (label) => dialog3.getByRole('row', {name: label, exact: true});
+const val3 = (label) => row3(label).getByLabel(`${label}（読んだ値）`);
+assert.equal(await val3('氏名').inputValue(), '見本　春子');
+assert.equal(await val3('電話番号').inputValue(), '090-0000-1111');
+assert.match(await row3('被保険者番号').innerText(), /読めず/);
+await page.screenshot({path: path.join(outDir, 'add-before.png')});
+// 確かめる画面を開いたまま Ctrl+V：追加で読み取る（入口の欄では読まない）
+await paste(bottomPng, 'image.png');
+await dialog3.getByRole('status', {name: '追加で読み取っています'}).waitFor();
+await dialog3.getByRole('status', {name: '追加で読み取っています'}).waitFor({state: 'detached', timeout: 240_000});
+await page.getByText(/追加で読み取りました/).waitFor();
+assert.equal(await val3('被保険者番号').inputValue(), '0000001234');
+assert.equal(await val3('保険者').inputValue(), 'kanda');
+assert.equal(await val3('利用者負担の割合').inputValue(), '2');
+assert.equal(await val3('居宅介護支援事業所').inputValue(), '見本介護サービス　みほん');
+assert.equal(await val3('ケアマネジャー').inputValue(), '試験　一郎');
+assert.equal(await val3('居宅の電話').inputValue(), '0930-00-1111');
+assert.equal(await val3('氏名').inputValue(), '見本　春子'); // 上の欄の値はそのまま
+assert.equal(await row3('被保険者番号').getByLabel('被保険者番号を入れる').isChecked(), true);
+assert.equal(await dialog3.getByRole('button', {name: /画面の画像 \d枚目/}).count(), 2);
+await page.screenshot({path: path.join(outDir, 'add-after.png')});
+// 追加の欄はドロップもできる（点線の枠）
+assert.match(await dialog3.getByRole('button', {name: '追加で読み取る'}).innerText(), /追加で読み取る\s*ここにドロップ・Ctrl\+V/);
+await dialog3.getByRole('button', {name: 'キャンセル'}).click();
+await dialog3.waitFor({state: 'detached'});
+log('上の欄だけ → 追加で読み取る（下の欄）→ 番号・保険者・2割・事業所・ケアマネジャー・居宅の電話 OK');
+await page.setViewportSize({width: 1366, height: 900});
 
 // ---------------- 4. スマホの幅（390px）：横にはみ出さない
 await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
@@ -293,7 +356,7 @@ assert.ok((await page.evaluate(() => document.documentElement.scrollWidth)) <= 3
 await page.screenshot({path: path.join(outDir, 'phone-shinsei.png')});
 await page.getByRole('region', {name: '写真'}).screenshot({path: path.join(outDir, 'phone-photos.png')});
 await page.getByRole('navigation').getByRole('button', {name: /見積もり・申請書を作成する/}).click();
-await page.getByRole('button', {name: '🪪 介護保険証・介護ソフトの画面から新規作成'}).waitFor();
+await page.getByRole('region', {name: '新規作成'}).waitFor();
 assert.ok((await page.evaluate(() => document.documentElement.scrollWidth)) <= 390, `入口 ${await page.evaluate(() => document.documentElement.scrollWidth)}`);
 await page.screenshot({path: path.join(outDir, 'phone-entry.png')});
 log('スマホの幅 OK');

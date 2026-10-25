@@ -1,7 +1,7 @@
 // 介護保険証から入れるを確かめる（ユーザーの指示「介護保険証をドラッグ＆ドロップで添付したら、全ての情報…入力必要項目が全て入力される」2026-10-22）：
 //   架空の保険証（cardFixture.mjs。スキャンのような白黒・ざらつき・90°横向き）と負担割合証を、
 //   1. 申請書のタブの「🪪 介護保険証から入れる」で選ぶ（画像2枚）→ 確かめる画面（読めた値・今の値）→ 入れる → 申請書・理由書・見積書に出る
-//   2. 見積もりの入口の「🪪 介護保険証・介護ソフトの画面から新規作成」にドロップ（PDF）→ 保険者も保険証から → 新しい様邸の申請書のタブ
+//   2. 新規作成（行橋市）の様邸の「🪪 介護保険証・介護ソフトの画面」にドロップ（PDF）→ 新しい様邸に入る（見積もりの入口＝メイン画面には読み取りの欄を出さない。2026-10-23）
 //   3. ボタンは4つのタブのどれでもタブのすぐ右。画面をクリックしてから Ctrl+V（貼り付け）でも読む（字を打つ欄では読まない）
 //   読み取りの部品（tesseract.js・日本語のデータ）は手元の node_modules から（ネットにつながない）
 // usage: node e2e-card.mjs <サイトのURL> <出力フォルダ>
@@ -142,9 +142,13 @@ assert.deepEqual([handoff.fields.careFrom, handoff.fields.careTo], ['2024-04-01'
 assert.equal(await page.getByRole('button', {name: '🪪 介護保険証・介護ソフトの画面'}).isVisible(), true);
 log('申請書・理由書・見積書・特定福祉用具に出た OK');
 
-// ---------------- 2. 見積もりの入口に PDF をドロップして新規作成（保険者も保険証から）
+// ---------------- 2. 新規作成の様邸に PDF をドロップ（見積もりの入口には読み取りの欄を出さない）
 await page.getByRole('button', {name: /見積もり・申請書を作成する/}).first().click();
-const drop = page.getByRole('button', {name: /介護保険証・介護ソフトの画面から新規作成/});
+await page.getByRole('region', {name: '新規作成'}).waitFor();
+assert.equal(await page.getByRole('button', {name: /介護保険証・介護ソフトの画面/}).count(), 0);
+await page.getByRole('region', {name: '新規作成'}).getByRole('button', {name: '＋ 行橋市'}).click();
+await page.getByRole('form', {name: '申請書'}).waitFor();
+const drop = page.getByRole('button', {name: '🪪 介護保険証・介護ソフトの画面'});
 await drop.waitFor();
 const dt = await page.evaluateHandle(async (b64) => {
   const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -164,11 +168,9 @@ assert.match(await dialog2.getByRole('row', {name: '被保険者番号', exact: 
 const birthRow2 = dialog2.getByRole('row', {name: '生年月日', exact: true});
 const y2 = await birthRow2.getByLabel('生年月日の年（読んだ値）').inputValue();
 assert.ok(y2 === '13' || /確かめて/.test(await birthRow2.innerText()), `生年月日の年 ${y2}`);
-// 新規作成では保険者は必ず入れる（チェックを外せない）
-assert.equal(await dialog2.getByRole('row', {name: '保険者', exact: true}).getByLabel('保険者を入れる').isDisabled(), true);
 await dialog2.getByRole('row', {name: '氏名', exact: true}).getByLabel('氏名（読んだ値）').fill('見本　次郎');
-await dialog2.getByRole('button', {name: 'この内容で新規作成'}).click();
-await page.getByRole('form', {name: '申請書'}).waitFor();
+await dialog2.getByRole('button', {name: /項目を入れる$/}).click();
+await dialog2.waitFor({state: 'detached'});
 assert.equal(await page.getByRole('form', {name: '申請書'}).getByLabel('被保険者氏名', {exact: true}).inputValue(), '見本　次郎');
 assert.match(await page.locator('h1').first().innerText(), /見本　次郎/);
 await page.screenshot({path: path.join(outDir, 'card-new.png'), fullPage: false});

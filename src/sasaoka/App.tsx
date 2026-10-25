@@ -284,12 +284,6 @@ export default function App({start}: {start: MainTab}) {
     setEstimateId(j.id);
     setJobView('shinsei');
   };
-  // 介護保険証から作った様邸（保険者・番号・氏名などを入れたもの）を、申請書のタブで開く
-  const newFromCard = (j: Job) => {
-    store.update('jobs', (jobs) => [...jobs, j]);
-    setEstimateId(j.id);
-    setJobView('shinsei');
-  };
   const openShinsei = (id: string) => {
     setEstimateId(id);
     setJobView('shinsei');
@@ -438,7 +432,6 @@ export default function App({start}: {start: MainTab}) {
                 data={data}
                 update={store.update}
                 onNew={newOne}
-                onNewJob={newFromCard}
                 onList={() => setEstimateView('list')}
                 goMaterials={() => goMaster()}
               />

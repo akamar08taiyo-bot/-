@@ -1,12 +1,12 @@
 // 介護保険証から読んだ値を様邸に入れる（cardApply.ts）。値はすべて架空
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {applyCard, applyExtra, birthText, currentExtra, currentOf, defaultPicks, EXTRA_FIELDS, extraPicks, extraText, fieldText, NO_EXTRA, softRead, staffGuess, staffMatch, termText} from '../../src/sasaoka/cardApply.ts';
+import {addCardRead, addExtraRead, applyCard, applyExtra, birthText, currentExtra, currentOf, defaultPicks, EXTRA_FIELDS, extraPicks, extraText, fieldText, NO_EXTRA, softRead, staffGuess, staffMatch, termText} from '../../src/sasaoka/cardApply.ts';
 import type {ExtraInfo} from '../../src/sasaoka/cardApply.ts';
 import {NO_SOFT} from '../../src/sasaoka/careSoft.ts';
 import {NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {NO_CARD} from '../../src/sasaoka/hokensho.ts';
-import type {CardInfo} from '../../src/sasaoka/hokensho.ts';
+import type {CardInfo, CardKey} from '../../src/sasaoka/hokensho.ts';
 import type {Job} from '../../src/sasaoka/types.ts';
 
 const job = (extra: Partial<Job> = {}): Job => ({
@@ -169,4 +169,26 @@ test('保険証にない項目を様邸に入れる：申請書の電話番号�
   // 今の値（保険証にない項目）
   assert.deepEqual(currentExtra(j), {phone: '0930-00-0000', staff: '見本 太郎', reasonName: '見本　一郎', reasonTel: '0930-00-1111', welfare: 'yes'});
   assert.equal(extraText(currentExtra(k), 'welfare'), 'なし');
+});
+
+test('追加で読み取る：空いた欄は足す・黄色の欄はたしかな読み（か同じ読み）で替える・たしかな欄と手で直した欄はそのまま', () => {
+  const cur: CardInfo = {...NO_CARD, name: '見本　春子', kana: 'ミキン　カコ', insuredNo: '', care: '要介護1', burden: ''};
+  const add = {info: {...NO_CARD, name: '見本　春美', kana: 'ミホン　ハルコ', insuredNo: '0000001234', insurer: 'kanda' as const, insurerName: '苅田町', burden: '2' as const, care: '要介護2' as const}, unsure: [] as CardKey[], kinds: [] as ('card' | 'futan')[]};
+  const r = addCardRead(cur, ['kana'], new Set(), add);
+  assert.deepEqual([r.info.name, r.info.kana, r.info.insuredNo, r.info.insurer, r.info.insurerName, r.info.burden, r.info.care], ['見本　春子', 'ミホン　ハルコ', '0000001234', 'kanda', '苅田町', '2', '要介護1']);
+  assert.deepEqual(r.unsure, []);
+  assert.deepEqual(r.changed.sort(), ['burden', 'insuredNo', 'insurer', 'kana']);
+  // 手で直した欄は変えない。追加の読みもたしかでなければ、黄色の欄は替えない（空の欄は黄色で足す）
+  const r2 = addCardRead(cur, ['kana'], new Set(['insuredNo']), {...add, unsure: ['kana', 'burden']});
+  assert.deepEqual([r2.info.kana, r2.info.insuredNo, r2.info.burden], ['ミキン　カコ', '', '2']);
+  assert.deepEqual(r2.unsure.sort(), ['burden', 'kana']);
+  // 同じ読みが2回なら、たしかに
+  const r3 = addCardRead(cur, ['kana'], new Set(), {...add, info: {...NO_CARD, kana: 'ミキン　カコ'}, unsure: ['kana']});
+  assert.deepEqual([r3.info.kana, r3.unsure, r3.changed], ['ミキン　カコ', [], ['kana']]);
+});
+
+test('追加で読み取る（保険証にない項目）：電話はハイフンのちがいは同じ読み', () => {
+  const cur: ExtraInfo = {...NO_EXTRA, phone: '0900000111', reasonName: ''};
+  const r = addExtraRead(cur, ['phone'], new Set(), {extra: {...NO_EXTRA, phone: '090-000-0111', reasonName: '試験　一郎', reasonTel: '0930-00-1111'}, unsure: []});
+  assert.deepEqual([r.extra.phone, r.extra.reasonName, r.extra.reasonTel, r.unsure], ['0900000111', '試験　一郎', '0930-00-1111', []]);
 });

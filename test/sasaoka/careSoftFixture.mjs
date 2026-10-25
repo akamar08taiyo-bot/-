@@ -82,6 +82,8 @@ export function softHtml(values = {}, opt = {}) {
 export const SOFT_SAMPLE_GRAY = {
   ...SOFT_SAMPLE,
   birth: '昭和17年05月06日生',
+  zip: '800-0000',
+  address: '福岡県京都郡苅田町見本1丁目2-3',
   tel: '090-0000-1111',
   careLabel: '居宅',
   careOffice: '見本介護サービス　みほん',
