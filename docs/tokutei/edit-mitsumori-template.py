@@ -1,6 +1,6 @@
 # 販売見積書の原本（src/tokutei/print/mitsumori.xltx）を直したときの手順（2026-10-25。一度だけ動かしたもの。直し方の記録として残す）。
 # ユーザーの指示：「見積もりの色がグレー系で暗いので、薄い水色系にする」「社名の部分が全体的に小さい。そして、社名は所長印、担当の上にもってくる」
-# 「他にも見積もりのバランスで違和感のある部分などがあればバランスをとって調整する」（2026-10-26）「見積もりでは、担当名をいれる」「会社住所の下に、電話番号とFAX番号を記載する」
+# 「他にも見積もりのバランスで違和感のある部分などがあればバランスをとって調整する」「（題名の）違和感があれば…きれいに直して」（2026-10-26）「見積もりでは、担当名をいれる」「会社住所の下に、電話番号とFAX番号を記載する」
 # 「見積もりの行数は4行ぐらい減らしていい」「会社名や社長名などの部分は、左寄せを統一して見やすくする」「税率の横に、備考を入れて、算出根拠をいれる」。
 #   python3 docs/tokutei/edit-mitsumori-template.py src/tokutei/print/mitsumori.xltx
 # 1. 灰色の塗り（fill 2＝背景色の15%暗い色）を薄い水色に
@@ -192,6 +192,50 @@ for n in ('xl/comments1.xml', 'xl/drawings/vmlDrawing1.vml'):
 files['xl/worksheets/_rels/sheet1.xml.rels'] = re.sub(rb'<Relationship\b[^>]*(?:comments|vmlDrawing)[^>]*/>', b'', files['xl/worksheets/_rels/sheet1.xml.rels'])
 files['[Content_Types].xml'] = re.sub(rb'<Override\b[^>]*comments1\.xml[^>]*/>', b'', files['[Content_Types].xml'])
 
+# ---- 3b. 題名（2026-10-26。ユーザーの指示「見積もりの部分、なんか見た目…もし何か違和感があれば、ちょっと修正してください。何か別のいい方法っていうのがあれば、
+#    ちょっときれいに直してください」）：黒い太い枠をやめて、薄い水色の帯の下に紺の二重線。字は太字をやめて紺の 22pt（太字は使いすぎない）
+fonts_block = re.search(r'<fonts count="(\d+)"([^>]*)>(.*?)</fonts>', styles, re.S)
+title_font = int(fonts_block.group(1))
+NAVY = '<color rgb="FF1F3864"/>'
+styles = styles.replace(fonts_block.group(0), f'<fonts count="{title_font + 1}"{fonts_block.group(2)}>{fonts_block.group(3)}<font><sz val="22"/>{NAVY}<name val="BIZ UDP明朝 Medium"/><family val="1"/><charset val="128"/></font></fonts>')
+title_border = {1: add_border('<border><left/><right/><top/><bottom/><diagonal/></border>'), 2: add_border(f'<border><left/><right/><top/><bottom style="double">{NAVY}</bottom><diagonal/></border>')}
+title_xf = {}
+for r in (1, 2):
+    for c in 'DEFGHI':
+        m = re.search(r'<c r="%s%d"(?=[\s/>])[^>]*?(?:/>|>.*?</c>)' % (c, r), sheet, re.S)
+        if r not in title_xf:
+            xf = xf_of(int(re.search(r'\ss="(\d+)"', m.group(0)).group(1)))
+            xf = re.sub(r'borderId="\d+"', f'borderId="{title_border[r]}"', re.sub(r'fontId="\d+"', f'fontId="{title_font}"', xf))
+            title_xf[r] = add_xf(xf)
+        set_cell(f'{c}{r}', re.sub(r'\ss="\d+"', f' s="{title_xf[r]}"', m.group(0)))
+
+# ---- 3c. 太字は使いすぎない（題名を太字でなくしたので、宛名・合計の表の見出し・「消費税について」・「備考」の見出しも太字をやめる。
+#    残す強調は、御見積合計の金額（E21・H21）と、税率ごとの合計の表の合計の行（C46・E46）だけ）
+fonts_block = re.search(r'<fonts count="(\d+)"([^>]*)>(.*?)</fonts>', styles, re.S)
+font_list = re.findall(r'<font\b.*?</font>|<font/>', fonts_block.group(3), re.S)
+plain_font = {}
+extra_fonts = []
+plain_xf = {}
+def unbold(ref):
+    m = re.search(r'<c r="%s"(?=[\s/>])[^>]*?(?:/>|>.*?</c>)' % ref, sheet, re.S)
+    if not m:
+        return
+    sid = int(re.search(r'\ss="(\d+)"', m.group(0)).group(1))
+    if sid not in plain_xf:
+        xf = xf_of(sid)
+        fid = int(re.search(r'fontId="(\d+)"', xf).group(1))
+        if '<b/>' not in font_list[fid]:
+            plain_xf[sid] = sid
+        else:
+            if fid not in plain_font:
+                extra_fonts.append(font_list[fid].replace('<b/>', ''))
+                plain_font[fid] = len(font_list) + len(extra_fonts) - 1
+            plain_xf[sid] = add_xf(re.sub(r'fontId="\d+"', f'fontId="{plain_font[fid]}"', xf))
+    set_cell(ref, re.sub(r'\ss="\d+"', f' s="{plain_xf[sid]}"', m.group(0)))
+for ref in [f'{c}6' for c in 'ABCDE'] + ['A45', 'B45', 'A46', 'B46', 'C45', 'D45', 'E45', 'F45'] + [f'{c}{r}' for r in (45, 46) for c in 'HIJK'] + [f'{c}59' for c in 'ABCDEFGHIJK']:
+    unbold(ref)
+styles = styles.replace(fonts_block.group(0), f'<fonts count="{len(font_list) + len(extra_fonts)}"{fonts_block.group(2)}>{fonts_block.group(3)}{"".join(extra_fonts)}</fonts>')
+
 # ---- 4. 明細を16行に（39〜42行を隠す）。印の枠の下にすき間（20行目を高く）
 for r in range(39, 43):
     m = row_xml(r)
@@ -241,6 +285,12 @@ drawing = drawing.replace('<xdr:col>8</xdr:col><xdr:colOff>1143000</xdr:colOff>'
 drawing = drawing.replace('<xdr:col>10</xdr:col><xdr:colOff>466724</xdr:colOff>', '<xdr:col>11</xdr:col><xdr:colOff>466724</xdr:colOff>', 1)
 drawing = drawing.replace('<xdr:col>16</xdr:col><xdr:colOff>371475</xdr:colOff>', '<xdr:col>17</xdr:col><xdr:colOff>371475</xdr:colOff>', 1)
 drawing = drawing.replace('<xdr:col>10</xdr:col><xdr:colOff>28575</xdr:colOff>', '<xdr:col>11</xdr:col><xdr:colOff>28575</xdr:colOff>', 1)
+
+# 印刷しない赤い枠と「赤枠内は編集不可です」のメモ（原本の Excel で手で直すときの目印）は消す（2026-10-26。印刷には出ないが、スマホなどで開くと
+# 金額の列の上に赤い線が出て見た目がわるい。式の欄はシートの保護で直せないので、目印がなくても困らない）。印の枠（グループ）は残す
+n_before = drawing.count('<xdr:twoCellAnchor')
+drawing = re.sub(r'<xdr:twoCellAnchor\b(?:(?!</xdr:twoCellAnchor>).)*?fPrintsWithSheet="0"(?:(?!</xdr:twoCellAnchor>).)*?</xdr:twoCellAnchor>', '', drawing, flags=re.S)
+assert n_before - drawing.count('<xdr:twoCellAnchor') == 4 and 'grpSp' in drawing, (n_before, drawing.count('<xdr:twoCellAnchor'))
 
 # ---- 見積日（I5）：表示形式を「2026年10月25日」に決める（原本は組み込みの 31 番＝日本語の Excel だけ年月日。ほかの環境・スマホでは「10/25/2026」と出た）
 nf_block = re.search(r'<numFmts count="(\d+)">(.*?)</numFmts>', styles, re.S)

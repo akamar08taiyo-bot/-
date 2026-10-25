@@ -341,6 +341,22 @@ test('見積書のバランスの直し（2026-10-26）：備考の列を広く�
   // 備考（算出根拠）は 10pt
   const k = page.texts.find((x) => x.runs.map((r) => r.text).join('') === '定価32,000円の20%引き')!;
   assert.equal(Math.round((k.runs[0].font.size * 72) / 96), 10);
+  // 題名（ユーザーの指示「見積もりの部分、なんか見た目…きれいに直して」）：黒い太い枠をやめて、薄い水色の帯の下に紺の二重線。字は太字でない紺の 22pt
+  const title = page.texts.find((x) => x.runs.map((r) => r.text).join('') === '御　見　積　書')!;
+  assert.equal(title.runs[0].font.bold, false);
+  assert.equal(Math.round((title.runs[0].font.size * 72) / 96), 22);
+  assert.match(title.runs[0].font.color, /1f3864/i);
+  const under = page.lines.filter((l) => l.double && l.y1 === l.y2 && Math.abs(l.y1 - (title.y + title.h)) <= 2);
+  assert.ok(under.length > 0, '題名の下に二重線がない');
+  assert.ok(!page.lines.some((l) => l.x1 === l.x2 && l.y1 <= title.y + 1 && l.y2 >= title.y + title.h - 1 && Math.abs(l.x1 - title.x) <= 2), '題名の枠の左の線が残っている');
+  // 太字は使いすぎない：残すのは御見積合計の金額と、税率ごとの合計の表の合計の行だけ（宛名・見出しは太字でない）
+  const bold = page.texts.filter((x) => x.runs.some((r) => r.font.bold && r.text.trim())).map((x) => x.runs.map((r) => r.text).join(''));
+  const tt = saleTotals(sale(), S);
+  assert.deepEqual(bold.sort(), [...[tt.amount, tt.tax, tt.total].map((n) => n.toLocaleString('ja-JP')), '円'].sort());
+  // 印刷しない赤い枠・「赤枠内は編集不可です」のメモは原本から消した（スマホで開くと金額の列に赤い線が出た）。印の枠は残す
+  const drawing = strFromU8(t['xl/drawings/drawing1.xml']);
+  assert.ok(!/fPrintsWithSheet="0"/.test(drawing));
+  assert.ok(drawing.includes('<xdr:grpSp>'));
 });
 
 test('自己負担額を表示（ユーザーの指示「自己負担額を表示のオンオフっていうチェック項目を入れ…商品の列の最後の2行下ぐらいに、自己負担額〇〇円」2026-10-26）', () => {
