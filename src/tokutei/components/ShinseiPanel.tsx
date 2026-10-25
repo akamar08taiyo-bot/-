@@ -5,7 +5,8 @@ import type {Sale, Settings} from '../types.ts';
 import {Btn, useToast} from './ui.tsx';
 
 /**
- * 申請書（保険者の Excel の原本に書き込んだもの）を作る。作る前に、まだ入っていない欄と、様式の行に入らない商品を出す（空欄のまま作ってもよい）。
+ * 申請書（保険者の Excel の原本に書き込んだもの）を作る。作る前に、様式の行に入らない商品を出す（まだ入っていない欄は空欄のまま作る。「未入力」の一覧は
+ * ユーザーの指示「全体的にシンプルにしたいので、今回はなくしてください。すべて」2026-10-26 で外した。入っていない欄はプレビューの薄い黄色で分かる）。
  * 1つのファイルに 事前申請書・支給申請書・委任状・写真の用紙 が入る（納品のあとに作り直すと、購入日・撮影日も入る。広域連合は支給申請書と写真の用紙）。
  * 原本のない保険者（そのほか）は出さない。画面に説明文は置かない（ユーザーの好み。説明は README とタイルの使い方の文）
  */
@@ -14,7 +15,7 @@ export function ShinseiPanel({sale, settings}: {sale: Sale; settings: Settings})
   const [busy, setBusy] = useState(false);
   const form = shinseiForm(sale.insurer);
   if (!form) return null;
-  const {missing, overflow} = shinseiChecks(sale, settings);
+  const {overflow} = shinseiChecks(sale, settings);
   const make = async () => {
     setBusy(true);
     try {
@@ -33,12 +34,6 @@ export function ShinseiPanel({sale, settings}: {sale: Sale; settings: Settings})
         {busy ? '作っています…' : '📄 申請書（Excel）を作る'}
       </Btn>
       {overflow && <p className="mt-2 rounded-md bg-rose-50 p-2 text-xs font-bold text-rose-700">{overflow}</p>}
-      {missing.length > 0 && (
-        <div className="mt-2 rounded-md bg-amber-50 p-2 text-xs text-amber-900">
-          <div className="font-bold">未入力（空欄のまま作ります）</div>
-          <div>{missing.join('・')}</div>
-        </div>
-      )}
     </section>
   );
 }

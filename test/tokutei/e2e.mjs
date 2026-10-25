@@ -129,8 +129,9 @@ try {
   assert.match(aside, /保険者負担（9割）\s*38,649円/);
   await page.screenshot({path: `${out}/04-sale.png`, fullPage: true});
 
-  // ---- 申請書：まだ入っていない欄が出る → 入れる（生年月日は和暦で・郵便番号は住所から自動・理由は文例のボタン）→ Excel を作る
-  await page.getByText('未入力（空欄のまま作ります）').waitFor();
+  // ---- 申請書：入れる（生年月日は和暦で・郵便番号は住所から自動・理由は文例のボタン）→ Excel を作る。
+  // 「未入力（空欄のまま作ります）」の一覧は出さない（ユーザーの指示「全体的にシンプルにしたいので、今回はなくしてください。すべて」2026-10-26）
+  assert.equal(await page.getByText('未入力（空欄のまま作ります）').count(), 0);
   await page.getByLabel('フリガナ').fill('ヤマダ ハナコ');
   await page.getByLabel('生年月日').fill('S15.3.15');
   await page.getByText('昭和15年3月15日（1940年）').waitFor();
