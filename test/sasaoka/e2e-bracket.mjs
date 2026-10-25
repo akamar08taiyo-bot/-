@@ -35,7 +35,7 @@ await page.getByRole('region', {name: '新規作成'}).getByRole('button', {name
 const form = page.getByRole('form', {name: '申請書'});
 await form.waitFor();
 const works = form.locator('[data-field="works"]');
-await works.getByRole('button', {name: '＋ 廊下', exact: true}).click();
+await works.getByRole('combobox', {name: '箇所を足す'}).selectOption({label: '廊下'});
 const length = works.getByRole('listitem', {name: '①廊下'}).getByLabel('長さ（mm）');
 await page.keyboard.type('600×1800');
 assert.equal(await length.inputValue(), '600×1800');

@@ -1273,13 +1273,17 @@ assert.deepEqual([await listDate('改修前').inputValue(), await listDate('改�
 // 改修の内容：箇所を足して、手すりは長さ・高さ、段差の解消は幅・奥行・高さ（ユーザーの指示の書き方）。
 // 箇所を足すと、その箇所の長さの欄にすぐ打ち込める（ユーザーの指示「廊下、玄関など選択すると、長さの部分をすぐに入力できるようにする」）
 const where = () => page.evaluate(() => [document.activeElement?.closest('[role="listitem"]')?.getAttribute('aria-label'), document.activeElement?.getAttribute('aria-label')]);
-await works.getByRole('button', {name: '＋ 玄関', exact: true}).click();
+// 箇所を足すはプルダウン1つ（前の「＋ 廊下」などのボタンは並べない）。はじめは「＋ 箇所を足す」、候補は写真の用紙の改修箇所の順＋そのほか
+const placeSelect = works.getByRole('combobox', {name: '箇所を足す'});
+assert.equal(await works.getByRole('button', {name: /^＋ /}).count(), 0);
+assert.deepEqual(await placeSelect.locator('option').allInnerTexts(), ['＋ 箇所を足す', '廊下', '階段', '台所', '居間・食堂', '寝室', '洗面・脱衣室', '浴室', 'トイレ', '玄関', '玄関～道路', 'そのほか（名前を打つ）']);
+await works.getByRole('combobox', {name: '箇所を足す'}).selectOption({label: '玄関'});
 assert.deepEqual(await where(), ['①玄関', '長さ（mm）']);
 await page.keyboard.type('800');
-await works.getByRole('button', {name: '＋ トイレ', exact: true}).click();
+await works.getByRole('combobox', {name: '箇所を足す'}).selectOption({label: 'トイレ'});
 assert.deepEqual(await where(), ['②トイレ', '長さ（mm）']);
-// 「＋ そのほか」は改修場所の名前から（試したら消す）
-await works.getByRole('button', {name: '＋ そのほか', exact: true}).click();
+// 「そのほか」は改修場所の名前から（試したら消す）。箇所はプルダウンで足す（ユーザーの指示「プルダウン形式にしてください」2026-10-26）
+await works.getByRole('combobox', {name: '箇所を足す'}).selectOption({label: 'そのほか（名前を打つ）'});
 assert.deepEqual(await where(), ['③改修場所', '改修場所']);
 // 何も入れていない箇所は聞かずに消す。寸法・写真などを入れた箇所は聞いてから消す（一度押しただけで写真ごと消えて、元に戻せなかった）
 const asked = [];
@@ -1287,7 +1291,7 @@ const ask = (d) => asked.push(d.message());
 page.on('dialog', ask);
 await works.getByRole('button', {name: '箇所を消す', exact: true}).click();
 assert.deepEqual(asked, []);
-await works.getByRole('button', {name: '＋ そのほか', exact: true}).click();
+await works.getByRole('combobox', {name: '箇所を足す'}).selectOption({label: 'そのほか（名前を打つ）'});
 await page.keyboard.type('物置');
 await works.getByRole('listitem', {name: '③物置'}).getByLabel('長さ（mm）').fill('600');
 await works.getByRole('button', {name: '物置を消す', exact: true}).click();
@@ -1332,8 +1336,7 @@ assert.equal(await shinseiTab.getAttribute('aria-selected'), 'true');
 await pvHas('②トイレ　段差の解消　W600mm D350mm H150mm');
 assert.equal(await works.getByRole('listitem', {name: '①玄関'}).getByLabel('高さ（mm）').inputValue(), '750');
 // 改修の内容が10箇所でも欄からはみ出さない（ユーザーの指示「6箇所以上になった場合、はみ出ている」）。小さくした文字に行の間もそろえる
-const addPlace = works.getByRole('button', {name: /^＋ /});
-for (let i = 0; i < 8; i++) await addPlace.nth(i).click();
+for (const name of ['廊下', '階段', '台所', '居間・食堂', '寝室', '洗面・脱衣室', '浴室', 'トイレ']) await placeSelect.selectOption({label: name});
 await pvHas('⑩');
 const fit = await pageOf('事前申請書').evaluate((pg) => {
   const box = [...pg.querySelectorAll('div')].find((d) => d.children.length > 0 && [...d.children].every((c) => c.tagName === 'SPAN') && /^①[\s\S]*⑩/.test(d.textContent ?? ''));
@@ -1367,7 +1370,7 @@ await form.waitFor();
 await form.getByLabel('被保険者氏名').fill('見本 次郎');
 await form.getByLabel('理由書作成者の事業所名').fill('見本居宅介護支援事業所');
 await form.getByLabel('理由書作成者の氏名').fill('見本 三郎');
-await works.getByRole('button', {name: '＋ 浴室', exact: true}).click();
+await works.getByRole('combobox', {name: '箇所を足す'}).selectOption({label: '浴室'});
 await works.getByRole('listitem', {name: '①浴室'}).getByLabel('長さ（mm）').fill('600');
 await form.getByLabel('改修費用（介護保険対象分）').fill('80000');
 await pvHas('①浴室　手すりの取り付け　L=600mm');
@@ -1411,6 +1414,8 @@ assert.ok(paperBox && paperBox.width <= 390, JSON.stringify(paperBox));
 assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true); // 横にはみ出さない
 await form.getByLabel('フリガナ').focus();
 await page.screenshot({path: path.join(outDir, '83-shinsei-phone.png')});
+await works.scrollIntoViewIfNeeded();
+await page.screenshot({path: path.join(outDir, '83b-shinsei-phone-works.png')}); // 改修の内容（箇所を足すのプルダウン）
 const photoBoardPhone = page.getByRole('region', {name: '写真'});
 await photoBoardPhone.scrollIntoViewIfNeeded();
 await photoBoardPhone.screenshot({path: path.join(outDir, '87-photo-board-phone.png')});

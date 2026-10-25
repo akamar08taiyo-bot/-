@@ -71,6 +71,9 @@ const FORM_TITLE: Record<Insurer, string> = {
   kouiki: '住宅改修承認申請書（様式第2号）・住宅改修費支給申請書（様式第7号）',
 };
 
+/** 箇所を足すのプルダウンの「そのほか」（名前を打つ箇所） */
+const OTHER_PLACE = '__other';
+
 export function ShinseiEditor({
   job,
   data,
@@ -699,17 +702,25 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
           })}
         </div>
       )}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-xs font-bold text-slate-600">箇所を足す：</span>
+      {/* 箇所を足す：プルダウンで選ぶ（前はボタンを全部並べていた。ユーザーの指示「一覧形式で全て出す形にしてますが、少し全体すっきりさせたいので、
+          プルダウン形式にしてください」2026-10-26）。選ぶと足して、その箇所の長さの欄へ（「そのほか」は改修場所の名前の欄へ） */}
+      <select
+        value=""
+        onChange={(e) => {
+          const v = e.target.value;
+          if (v) add(v === OTHER_PLACE ? '' : v);
+        }}
+        aria-label="箇所を足す"
+        className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+      >
+        <option value="">＋ 箇所を足す</option>
         {s.placePresets.map((name) => (
-          <Btn key={name} small color="white" onClick={() => add(name)}>
-            ＋ {name}
-          </Btn>
+          <option key={name} value={name}>
+            {name}
+          </option>
         ))}
-        <Btn small color="white" onClick={() => add('')}>
-          ＋ そのほか
-        </Btn>
-      </div>
+        <option value={OTHER_PLACE}>そのほか（名前を打つ）</option>
+      </select>
       {/* 申請書に書く内容（みやこ町・広域連合は内訳明細書の改修の種類の行）。1行ずつ手で直せる */}
       {items.length > 0 &&
         (twoForms(insurer) ? (
