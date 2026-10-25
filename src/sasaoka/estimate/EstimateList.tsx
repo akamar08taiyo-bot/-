@@ -1,6 +1,7 @@
 import {useEffect, useMemo, useState} from 'react';
 import {estimateTotals, hasEstimateRows, jobName} from '../calc.ts';
 import {copyJob} from '../components/JobTools.tsx';
+import {askTrash, trashLabel, useTrashUndo} from '../components/TrashPage.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm} from '../estimateForms.ts';
 import {estimateXlsx, XLSX_TYPE} from '../estimateXlsx.ts';
@@ -42,13 +43,12 @@ export function newEstimate(insurer: Insurer): Job {
   };
 }
 
-/** 見積書を削除する（確かめてから）。笹岡工務店の請求書に入れていれば、そこからも消えると知らせる。消したら true */
-export function removeEstimate(job: Job, label: string, update: Update, toast: (text: string) => void): boolean {
-  const also = job.shikiri ? `笹岡工務店の請求書（${monthLabel(job.month)}分）からも消えます。` : '';
-  if (!confirm(`「${label}」の見積書を削除します。${also}元に戻せません。よろしいですか？`)) return false;
-  update('jobs', (list) => list.filter((j) => j.id !== job.id));
-  toast(`「${label}」を削除しました`);
-  return true;
+/**
+ * 見積書（様邸）を削除する＝ゴミ箱に移す（確かめてから「○○様邸をゴミ箱に移しますか？」）。笹岡工務店の請求書・発注書からも外れる。
+ * 完全に消すのはゴミ箱のタブから（ユーザーの指示「一時的に削除したデータを残せるようにする」2026-10-25）。移したら true
+ */
+export function removeEstimate(job: Job, s: Settings, update: Update, toast: (text: string) => void): boolean {
+  return askTrash([job.id], trashLabel(job, s), update, toast);
 }
 
 /** 見積書を複製する（お客様名に「（コピー）」。見積書を作ってあれば今月分の笹岡工務店の請求書に入れる。申請書だけなら申請書だけ）。複製したものを返す */
@@ -104,6 +104,7 @@ export function EstimateHome({
   goMaterials: () => void;
 }) {
   const all = useEstimates(data, data.settings);
+  useTrashUndo(update); // 見積書の画面で削除（ゴミ箱へ）して戻ってきたとき、Ctrl+Z で戻す
   const month = thisMonth();
   const inMonth = all.filter((e) => e.job.month === month).length;
   return (
@@ -177,10 +178,11 @@ function GettingStarted({data, update, goMaterials, onSample}: {data: AppData; u
           <Btn
             color="white"
             onClick={() => {
+              // 足したものだけを今の並びのうしろに（data はゴミ箱の様邸を除いたものなので、並びごと置きかえるとゴミ箱が空になる）
               const r = addSamples(data, thisMonth());
-              update('materials', () => r.materials);
-              update('jobs', () => r.jobs);
-              update('kits', () => r.kits);
+              update('materials', (list) => [...list, ...r.materials]);
+              update('jobs', (list) => [...list, ...r.jobs]);
+              update('kits', (list) => [...list, ...r.kits]);
               toast('サンプルの部材5件と「（サンプル）山田様邸」の見積書・部材＋施工費（常用）1件を入れました。設定画面からまとめて消せます。');
               onSample?.();
             }}
@@ -248,6 +250,12 @@ export function EstimateList({
     toast(`${ids.size}件を${searching ? (dir === 1 ? '次の月' : '前の月') : monthLabel(addMonths(month, dir))}に回しました`);
     setChecked(new Set());
   };
+  // チェックした様邸をまとめてゴミ箱に移す（ユーザーの指示。確かめは「N件をゴミ箱に移しますか？」）
+  const trashChecked = () => {
+    const ids = shown.filter(({job}) => checked.has(job.id)).map(({job}) => job.id);
+    if (askTrash(ids, null, update, toast)) setChecked(new Set());
+  };
+  useTrashUndo(update); // さっきゴミ箱に移した様邸を Ctrl+Z で戻す
 
   return (
     <div className="space-y-4">
@@ -287,6 +295,9 @@ export function EstimateList({
           <Btn small color="white" onClick={() => moveMonth(1)}>
             次月に回す ▶
           </Btn>
+          <Btn small color="white" onClick={trashChecked}>
+            削除する
+          </Btn>
           <Btn small color="white" onClick={() => setChecked(new Set())}>
             やめる
           </Btn>
@@ -318,8 +329,6 @@ export function EstimateList({
             </thead>
             <tbody>
               {shown.map(({job, date, t}) => {
-                // お客様名のない見積書は、作成日と金額でどれか分かるようにする
-                const label = job.customer.trim() ? jobName(job) : `お客様名なし・${dateText(date)}・${yen(t.all.total)}円`;
                 const estimated = hasEstimateRows(job); // 見積書を作った様邸（申請書だけの様邸は、請求書・発注書に入らない）
                 return (
                   <tr key={job.id} className={`cursor-pointer border-t border-slate-100 hover:bg-emerald-50/60 ${checked.has(job.id) ? 'bg-sky-50' : ''}`} onClick={() => onOpen(job.id)}>
@@ -361,7 +370,7 @@ export function EstimateList({
                       >
                         複製
                       </Btn>
-                      <Btn small color="white" className="ml-1.5" onClick={() => removeEstimate(job, label, update, toast)}>
+                      <Btn small color="white" className="ml-1.5" onClick={() => removeEstimate(job, s, update, toast)}>
                         削除
                       </Btn>
                     </td>

@@ -148,6 +148,9 @@ export type Job = {
   order?: OrderEdits | null; // 発注書で手で直したところ（なければ見積書から計算したまま）
   shinsei?: ShinseiInfo; // 申請書だけに書く項目（申請書の画面で入れる）
   riyu?: RiyuInfo; // 住宅改修が必要な理由書だけに書く項目（理由書の画面で入れる。riyu.ts）
+  // ゴミ箱に移した時刻（ミリ秒）。あればゴミ箱のタブだけに出し、ほかの画面（一覧・請求書・発注書・探す・件数）には出さない（trash.ts）。
+  // 元に戻すと持たない。複製には引き継がない
+  trashedAt?: number;
   createdAt: number;
   updatedAt: number;
 };

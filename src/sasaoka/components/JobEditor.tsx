@@ -10,6 +10,7 @@ import {staffFull, uid, yen} from '../util.ts';
 import {copyJob, LaborPickerFor} from './JobTools.tsx';
 import {KitPicker} from './Kits.tsx';
 import {MaterialPicker} from './Pickers.tsx';
+import {askTrash, trashLabel} from './TrashPage.tsx';
 import {Btn, KindBadge, NumberInput, Stepper, TextInput, useToast} from './ui.tsx';
 
 type Picker = {placeId: string; kind: 'material'} | {placeId: string; kind: 'labor'} | {placeId: string; kind: 'kit'};
@@ -94,16 +95,9 @@ export function JobEditor({
     if (place.rows.length > 0 && !confirm(`「${place.name || '箇所'}」と、その中の${place.rows.length}行を削除します。よろしいですか？`)) return;
     setJob((j) => ({...j, places: j.places.filter((p) => p.id !== place.id)}));
   };
+  // 削除＝ゴミ箱に移す（見積書も一緒。完全に消すのはゴミ箱のタブから。TrashPage.tsx）。この請求書に入れないだけなら「請求書から外す」
   const removeJob = () => {
-    if (
-      !confirm(
-        `「${jobName(job)}」を削除します。見積書からも消えます。元に戻せません。よろしいですか？\n（この請求書に入れないだけなら「請求書から外す」を押してください）`,
-      )
-    )
-      return;
-    update('jobs', (list) => list.filter((j) => j.id !== job.id));
-    toast(`「${jobName(job)}」を削除しました`);
-    onBack();
+    if (askTrash([job.id], trashLabel(job, s), update, toast)) onBack();
   };
   // 見積書は残して、この請求書にだけ入れない
   const leaveInvoice = () => {

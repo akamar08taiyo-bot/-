@@ -260,7 +260,7 @@ for (const t of ['内訳書　様式', 'Ｐ－1', 'Ｐ－2', '1時間2,500円', 
 assert.equal(await page.getByRole('heading', {level: 1}).count(), 0); // 一覧のまま（見積書は開かない）
 log('一覧からExcelで保存（広域連合用）OK');
 
-// ---------------- 複製（今月分の請求書に入れて作る）→ 削除
+// ---------------- 複製（今月分の請求書に入れて作る）→ 削除（ゴミ箱に移る。完全に消すのはゴミ箱のタブから＝e2e-trash.mjs）
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 await page.getByRole('button', {name: '複製', exact: true}).click();
 await page.getByRole('heading', {level: 1, name: '（サンプル）山田（コピー）様邸'}).waitFor();
@@ -272,7 +272,8 @@ assert.ok((await sampleRow.innerText()).includes(thisMonthLabel));
 await page.getByRole('cell', {name: /（コピー）/}).click();
 await page.getByRole('button', {name: '削除', exact: true}).click();
 assert.equal(await page.locator('tbody tr').count(), 1);
-log('複製・削除OK');
+assert.equal((await page.getByRole('navigation').getByRole('button', {name: /ゴミ箱/}).innerText()).replace(/\s+/g, ' ').trim(), '🗑 ゴミ箱 1');
+log('複製・削除（ゴミ箱へ）OK');
 
 // ---------------- 部材・施工費マスタ（請求書と同じ部材リスト）：Excel の「定価」の列も読む。施工費（笹岡工務店の手間）も同じタブ
 await page.getByRole('navigation').getByRole('button', {name: /部材・施工費マスタ/}).click();

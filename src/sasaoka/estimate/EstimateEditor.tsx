@@ -113,8 +113,9 @@ export function EstimateEditor({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+  // 削除＝ゴミ箱に移す（確かめてから。完全に消すのはゴミ箱のタブから）
   const removeJob = () => {
-    if (removeEstimate(job, name, update, toast)) onBack();
+    if (removeEstimate(job, s, update, toast)) onBack();
   };
   // 白紙に戻す（`clearedSheet`）。いきなり消えると困るので確かめてから（消したあとも Ctrl+Z で戻せる）
   const blank = !job.customer.trim() && !job.insuredNo.trim() && !job.address.trim() && job.places.length === 0 && job.overhead === null && job.overheadTarget === null;

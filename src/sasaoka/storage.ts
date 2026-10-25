@@ -417,6 +417,8 @@ export function cleanJobs(raw: unknown): Job[] {
       order: cleanOrder(j.order),
       shinsei: keepNewer(j.shinsei, (s) => cleanShinsei(s, j.shinseiMarks)),
       ...(isObj(j.riyu) ? {riyu: cleanRiyu(j.riyu)} : {}),
+      // ゴミ箱に移した時刻（trash.ts）。時刻でなければ（元に戻した・前の版のデータ）持たない＝ゴミ箱に入っていない
+      ...(numv(j.trashedAt) > 0 ? {trashedAt: numv(j.trashedAt)} : {}),
       createdAt: numv(j.createdAt, Date.now()),
       updatedAt: numv(j.updatedAt, Date.now()),
     };

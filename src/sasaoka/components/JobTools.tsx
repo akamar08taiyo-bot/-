@@ -12,8 +12,9 @@ import {Btn, Modal, NumberInput} from './ui.tsx';
 
 export function copyJob(job: Job): Job {
   const now = Date.now();
+  const {trashedAt: _trashedAt, ...rest} = job; // 複製はゴミ箱に入れない（ゴミ箱の様邸は複製できないが、念のため）
   return {
-    ...job,
+    ...rest,
     id: uid('j'),
     customer: job.customer + '（コピー）',
     // 写真（写真貼付用紙）とその撮影日・向き・大きさはそのお宅の写真なので、複製には入れない

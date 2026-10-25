@@ -9,6 +9,7 @@
 //   部材・施工費マスタ：部材リスト（メーカーの仕切価格・定価）と、施工費（笹岡工務店の取付手間の単価）と、
 //                       部材＋施工費（常用）のセット（よく使う部材と施工費の組み合わせ）
 //   設定
+//   ゴミ箱：削除した様邸（見積書・申請書）。元に戻す・完全に削除（trash.ts・components/TrashPage.tsx）
 
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {hasEstimateRows} from './calc.ts';
@@ -18,6 +19,7 @@ import {KitsPage} from './components/KitsPage.tsx';
 import {LaborPage} from './components/LaborPage.tsx';
 import {MaterialsPage} from './components/MaterialsPage.tsx';
 import {SettingsPage} from './components/SettingsPage.tsx';
+import {TrashPage} from './components/TrashPage.tsx';
 import {ToastProvider} from './components/ui.tsx';
 import {LABOR_REV} from './defaults.ts';
 import {EstimateEditor} from './estimate/EstimateEditor.tsx';
@@ -35,6 +37,7 @@ import type {PrintRequest} from './print/PrintView.tsx';
 import {hasRiyuInfo} from './riyu.ts';
 import {EXAMPLE_KIT_ID, exampleKit} from './samples.ts';
 import {flushTokutei} from './tokuteiLink.ts';
+import {isTrashed, liveJobs, referencedStrings} from './trash.ts';
 import type {Insurer, Job, Row} from './types.ts';
 import {useNewVersion} from './update.ts';
 import {useStore} from './useStore.ts';
@@ -45,14 +48,17 @@ const TABS: {id: MainTab; label: string}[] = [
   {id: 'invoice', label: '🧾 請求書を確認する'},
   {id: 'master', label: '📦 部材・施工費マスタ'},
   {id: 'settings', label: '⚙ 設定'},
+  {id: 'trash', label: '🗑 ゴミ箱'}, // 設定のタブの横（ユーザーの指示「設定のタブの横にゴミ箱をつくり」2026-10-25）
 ];
 
-// タブごとの色（見積書は緑、請求書は紺、部材・施工費マスタは紫、設定は灰）。選んでいるタブは下の画面と同じ色にしてつなげる
-const THEME: Record<MainTab, {head: string; page: string; active: string; sub: string}> = {
-  estimate: {head: 'bg-[#14532d]', page: 'bg-[#f2f6f4]', active: 'bg-[#f2f6f4] text-[#14532d]', sub: 'text-green-100'},
-  invoice: {head: 'bg-[#0c315e]', page: 'bg-[#f3f6fa]', active: 'bg-[#f3f6fa] text-[#0c315e]', sub: 'text-blue-100'},
-  master: {head: 'bg-[#3b1f6b]', page: 'bg-[#f6f4fa]', active: 'bg-[#f6f4fa] text-[#3b1f6b]', sub: 'text-purple-100'},
-  settings: {head: 'bg-[#334155]', page: 'bg-[#f4f5f7]', active: 'bg-[#f4f5f7] text-[#334155]', sub: 'text-slate-200'},
+// タブごとの色（見積書は緑、請求書は紺、部材・施工費マスタは紫、設定は灰、ゴミ箱は茶色がかった灰）。選んでいるタブは下の画面と同じ色にしてつなげ、
+// 広い画面ではタブの上に色の帯（accent）を付けて、どれを選んでいるか分かるようにする
+const THEME: Record<MainTab, {head: string; page: string; active: string; sub: string; accent: string}> = {
+  estimate: {head: 'bg-[#14532d]', page: 'bg-[#f2f6f4]', active: 'bg-[#f2f6f4] text-[#14532d]', sub: 'text-green-100', accent: 'lg:border-emerald-500'},
+  invoice: {head: 'bg-[#0c315e]', page: 'bg-[#f3f6fa]', active: 'bg-[#f3f6fa] text-[#0c315e]', sub: 'text-blue-100', accent: 'lg:border-blue-500'},
+  master: {head: 'bg-[#3b1f6b]', page: 'bg-[#f6f4fa]', active: 'bg-[#f6f4fa] text-[#3b1f6b]', sub: 'text-purple-100', accent: 'lg:border-purple-500'},
+  settings: {head: 'bg-[#334155]', page: 'bg-[#f4f5f7]', active: 'bg-[#f4f5f7] text-[#334155]', sub: 'text-slate-200', accent: 'lg:border-slate-500'},
+  trash: {head: 'bg-[#44403c]', page: 'bg-[#f5f5f4]', active: 'bg-[#f5f5f4] text-[#44403c]', sub: 'text-stone-200', accent: 'lg:border-stone-500'},
 };
 // 画面の幅（ヘッダー・タブ・中身）はどのタブも同じ。前は見積もりのタブだけ広く（1600px、ほかは 1400px）、広い画面で見積もりのタブを選ぶと
 // 全体が左に 100px 動いていた（ユーザーの報告「申請書・見積書を作成するのタブを選んだときのみ、左にぐっと動く」）
@@ -139,7 +145,14 @@ export default function App({start}: {start: MainTab}) {
     }
   }, [month]);
 
-  const data = store.data;
+  const all = store.data; // ゴミ箱の様邸も入ったデータ（保存・写真の掃除・設定のバックアップ・ゴミ箱のタブ）
+  // 画面に出すデータ：ゴミ箱の様邸を除く（見積もりの一覧・請求書・発注書・探す・件数・印刷に出さない。trash.ts）。
+  // 様邸の一覧を書きかえるときの update は、ゴミ箱の様邸も入った今の並びを受け取る（並びごと置きかえないこと。サンプルを入れるときなど）
+  // 様邸の並びが変わったときだけ作り直す（部材・設定を直しただけなら、一覧・請求書の計算に同じ並びを渡す）
+  const allJobs = all?.jobs;
+  const live = useMemo(() => (allJobs ? liveJobs(allJobs) : null), [allJobs]);
+  const data = useMemo(() => (all && live ? (live === all.jobs ? all : {...all, jobs: live}) : null), [all, live]);
+  const trashCount = allJobs && live ? allJobs.length - live.length : 0;
   const estimateJob = useMemo(() => (data && estimateId ? (data.jobs.find((j) => j.id === estimateId) ?? null) : null), [data, estimateId]);
   // 請求書に入れていない見積書（「笹岡工務店の請求書に入れる」を外したもの）は、請求書の画面では開かない
   const invoiceJob = useMemo(() => (data && invoiceId ? (data.jobs.find((j) => j.id === invoiceId && j.shikiri) ?? null) : null), [data, invoiceId]);
@@ -226,31 +239,32 @@ export default function App({start}: {start: MainTab}) {
     store.update('settings', (s) => ({...s, tesuri: true}));
   }, [loaded]);
 
-  // どの様邸からも使われなくなった写真（写真を消した・差し替えた・様邸を消した）を、この端末から消す。開いたときに一度。
+  // どの様邸からも使われなくなった写真（写真を消した・差し替えた・様邸を完全に削除した）を、この端末から消す。開いたときと、ゴミ箱で完全に削除して保存できたあと。
   // ほかのタブで入れたばかりの写真（まだ様邸に保存されていないかもしれない）を消さないように、1時間より前に入れた写真だけ
-  // 残すのは様邸のどこかに書いてある番号すべて（箇所の写真のほか、あとから足した項目の写真も消さない）
+  // 残すのは様邸のどこかに書いてある番号すべて（箇所の写真のほか、あとから足した項目の写真も消さない）。ゴミ箱の様邸の写真も残す（完全に削除するまで）
+  const [pruneTick, setPruneTick] = useState(0);
   useEffect(() => {
-    if (!data) return;
-    const keep = new Set<string>();
-    const walk = (v: unknown): void => {
-      if (typeof v === 'string') keep.add(v);
-      else if (Array.isArray(v)) v.forEach(walk);
-      else if (v && typeof v === 'object') Object.values(v).forEach(walk);
-    };
-    walk(data.jobs);
-    prunePhotos(keep, Date.now() - 60 * 60 * 1000).catch(() => undefined);
-  }, [loaded]);
+    if (!all) return;
+    prunePhotos(referencedStrings(all.jobs), Date.now() - 60 * 60 * 1000).catch(() => undefined);
+  }, [loaded, pruneTick]);
+  // ゴミ箱で完全に削除したら、保存できてから写真の掃除（保存のときにほかのタブで元に戻した様邸とまとめたら、それは残っているので写真も消さない）。
+  // 保存はこの描画のあと（update の中身は描画のときに動くので、押したすぐあとに flush しても、まだ保存するものがない）
+  const [purgeTick, setPurgeTick] = useState(0);
+  useEffect(() => {
+    if (purgeTick) void store.flush().then((ok) => ok && setPruneTick((n) => n + 1));
+  }, [purgeTick]);
 
   if (store.loadError) {
     return <div className="p-8 text-rose-700">データを読み込めませんでした：{store.loadError}</div>;
   }
-  if (!data) {
+  if (!data || !all) {
     return <div className="p-8 text-slate-500">読み込んでいます…</div>;
   }
 
   const theme = THEME[tab];
+  // ゴミ箱に移した様邸は消さない（何も入れていない様邸でも、削除を押したならゴミ箱に残す）
   const removeIfEmpty = (job: Job | null) => {
-    if (job && isEmpty(job) && !tokuteiOpened.current.has(job.id)) store.update('jobs', (list) => list.filter((j) => j.id !== job.id));
+    if (job && isEmpty(job) && !tokuteiOpened.current.has(job.id)) store.update('jobs', (list) => list.filter((j) => j.id !== job.id || isTrashed(j)));
   };
   // 特定福祉用具申請書のタブを離れるときは、中の特定福祉用具のアプリの保存が終わってから（枠を消すと保存が途中で止まる。tokuteiLink.ts）
   const leaveTokutei = (go: () => void) => {
@@ -309,6 +323,24 @@ export default function App({start}: {start: MainTab}) {
     setMasterTab(t);
     setTab('master');
   };
+  const tabButton = (t: (typeof TABS)[number]) => {
+    const on = tab === t.id;
+    return (
+      <button
+        key={t.id}
+        type="button"
+        onClick={() => goTab(t.id)}
+        aria-current={on ? 'page' : undefined}
+        className={`flex min-h-11 flex-auto items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-[15px] font-bold transition sm:text-base lg:min-h-[3.25rem] lg:flex-none lg:rounded-b-none lg:rounded-t-xl lg:border-t-4 lg:px-5 xl:px-6 xl:text-[17px] ${
+          on ? `${theme.active} ${theme.accent}` : 'bg-white/10 text-white hover:bg-white/20 lg:border-transparent'
+        }`}
+      >
+        {t.label}
+        {/* ゴミ箱に入っている件数 */}
+        {t.id === 'trash' && trashCount > 0 && <span className={`rounded-full px-2 text-[13px] leading-5 tabular-nums ${on ? 'bg-stone-200' : 'bg-white/20'}`}>{trashCount}</span>}
+      </button>
+    );
+  };
 
   return (
     <ToastProvider>
@@ -348,18 +380,14 @@ export default function App({start}: {start: MainTab}) {
               </a>
             </div>
           </div>
-          <nav className={`mx-auto flex ${PAGE_WIDTH} gap-1 overflow-x-auto px-3`}>
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => goTab(t.id)}
-                aria-current={tab === t.id ? 'page' : undefined}
-                className={`whitespace-nowrap rounded-t-lg px-5 py-2.5 text-[15px] font-bold transition ${tab === t.id ? theme.active : `${theme.sub} hover:bg-white/10`}`}
-              >
-                {t.label}
-              </button>
-            ))}
+          {/* 上のタブ：字を大きく・高く（ユーザーの指示「ここらへんのタブももう少し大きく見やすくする」2026-10-25）。選んでいないタブも薄い白の地で、タブと分かるように。
+              広い画面（lg 以上）は1段に並べ、選んでいるタブは下の画面と同じ色＋上の色の帯でつなげる。
+              狭い画面は折り返して並べる（横にスクロールさせると、右のタブ（ゴミ箱）が画面の外に隠れる）。字の幅で並べ、段ごとに横いっぱいに広げる。
+              設定とゴミ箱は1つのまとまりにして、いつも同じ段に並べる（ゴミ箱だけが1段に横長に残らないように。広い画面では lg:contents でまとまりを消す）。
+              スマホの幅 390px では 見積もり・申請書を作成する／請求書を確認する・部材・施工費マスタ／設定・ゴミ箱 の3段 */}
+          <nav className={`mx-auto flex ${PAGE_WIDTH} flex-wrap gap-1.5 px-3 pb-3 lg:flex-nowrap lg:pb-0`}>
+            {TABS.slice(0, 3).map(tabButton)}
+            <div className="flex flex-auto gap-1.5 lg:contents">{TABS.slice(3).map(tabButton)}</div>
           </nav>
         </header>
 
@@ -512,7 +540,15 @@ export default function App({start}: {start: MainTab}) {
               {masterTab === 'kits' && <KitsPage data={data} update={store.update} />}
             </div>
           )}
-          {tab === 'settings' && <SettingsPage data={data} update={store.update} />}
+          {/* 設定はゴミ箱の様邸も入ったデータ（バックアップ（すべて）に入れて、なくさない。読み込んでもゴミ箱のまま） */}
+          {tab === 'settings' && <SettingsPage data={all} update={store.update} />}
+          {tab === 'trash' && (
+            <TrashPage
+              data={all}
+              update={store.update}
+              onPurged={() => setPurgeTick((n) => n + 1)}
+            />
+          )}
         </main>
       </div>
       {print && <PrintView request={print} data={data} onClose={() => setPrint(null)} />}

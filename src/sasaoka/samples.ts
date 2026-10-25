@@ -9,6 +9,7 @@ import {uid} from './util.ts';
 export const SAMPLE_MAKER = 'サンプル';
 export const SAMPLE_PREFIX = '（サンプル）';
 
+/** サンプルの部材・様邸・部材＋施工費（常用）（足すものだけ） */
 export function addSamples(data: AppData, month: string): {materials: Material[]; jobs: Job[]; kits: Kit[]} {
   const now = Date.now();
   const mk = (name: string, price: number, listPrice: number, code: string, unit: string): Material => ({
@@ -55,10 +56,11 @@ export function addSamples(data: AppData, month: string): {materials: Material[]
     updatedAt: now,
   };
   const kit = kitFromRows(SAMPLE_PREFIX + 'I型手すり（木の下地）', [materialRow(handrail, 1), labor('木', 2), materialRow(bracket, 2), materialRow(cap, 2)]);
+  // 足すものだけを返す（呼ぶ側で今の並びのうしろに足す。画面の data はゴミ箱の様邸を除いたものなので、並びごと置きかえるとゴミ箱が空になる）
   return {
-    materials: [...data.materials, handrail, bracket, lHandrail, cap, board],
-    jobs: [...data.jobs, job],
-    kits: [...data.kits, kit],
+    materials: [handrail, bracket, lHandrail, cap, board],
+    jobs: [job],
+    kits: [kit],
   };
 }
 

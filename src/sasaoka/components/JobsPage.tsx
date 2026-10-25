@@ -5,6 +5,7 @@ import {addSamples, hasSamples} from '../samples.ts';
 import type {AppData, Job} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {addMonths, downloadBlob, monthLabel, shortDate, staffShort, uid, yen} from '../util.ts';
+import {useTrashUndo} from './TrashPage.tsx';
 import {Btn, useToast} from './ui.tsx';
 
 export function newJob(month: string): Job {
@@ -49,6 +50,7 @@ export function JobsPage({
   goEstimate: () => void;
 }) {
   const toast = useToast();
+  useTrashUndo(update); // 様邸の画面で削除（ゴミ箱へ）して戻ってきたとき、Ctrl+Z で戻す
   const jobs = useMemo(() => data.jobs.filter((j) => j.shikiri && j.month === month), [data.jobs, month]);
   const summary = useMemo(() => monthSummary(jobs, data.settings), [jobs, data.settings]);
   const monthly = data.settings.invoiceTaxMode === 'monthly';
@@ -81,10 +83,11 @@ export function JobsPage({
   };
 
   const trySample = () => {
+    // 足したものだけを今の並びのうしろに（data はゴミ箱の様邸を除いたものなので、並びごと置きかえるとゴミ箱が空になる）
     const r = addSamples(data, month);
-    update('materials', () => r.materials);
-    update('jobs', () => r.jobs);
-    update('kits', () => r.kits);
+    update('materials', (list) => [...list, ...r.materials]);
+    update('jobs', (list) => [...list, ...r.jobs]);
+    update('kits', (list) => [...list, ...r.kits]);
     toast('サンプルの部材5件と「（サンプル）山田様邸」・部材＋施工費（常用）1件を入れました。設定画面からまとめて消せます。');
   };
 
