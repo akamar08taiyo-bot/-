@@ -9,8 +9,8 @@ export const PORTAL_URL = 'https://akamar08taiyo-bot.github.io/taiyo-portal/';
 export const APP_TITLE = '申請書・見積書作成';
 
 // trash：ゴミ箱（設定のタブの右。削除した様邸を残しておく所。trash.ts）
-export type MainTab = 'estimate' | 'invoice' | 'master' | 'settings' | 'trash';
-const TABS: MainTab[] = ['estimate', 'invoice', 'master', 'settings', 'trash'];
+export type MainTab = 'estimate' | 'invoice' | 'sales' | 'master' | 'settings' | 'trash';
+const TABS: MainTab[] = ['estimate', 'invoice', 'sales', 'master', 'settings', 'trash'];
 
 /** 見積もり・申請書を作成するのタブで、様邸のどの画面を開いているか（工事見積書・発注書・住宅改修申請書・特定福祉用具申請書・販売見積書・理由書） */
 export type JobView = 'estimate' | 'order' | 'shinsei' | 'tokutei' | 'hanbai' | 'riyu';

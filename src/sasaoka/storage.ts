@@ -420,6 +420,7 @@ export function cleanJobs(raw: unknown): Job[] {
       // ゴミ箱に移した時刻（trash.ts）。時刻でなければ（元に戻した・前の版のデータ）持たない＝ゴミ箱に入っていない
       ...(numv(j.trashedAt) > 0 ? {trashedAt: numv(j.trashedAt)} : {}),
       ...(typeof j.planPhoto === 'string' && j.planPhoto ? {planPhoto: j.planPhoto} : {}), // 平面図の図（写真と同じ番号＝文字。2026-10-25）
+      ...(/^\d{4}-\d{2}$/.test(str(j.salesMonth)) ? {salesMonth: str(j.salesMonth)} : {}), // 売上見込みの月（2026-10-25）
       createdAt: numv(j.createdAt, Date.now()),
       updatedAt: numv(j.updatedAt, Date.now()),
     };
@@ -484,6 +485,9 @@ export function cleanSettings(raw: unknown): Settings {
   s.laborEst = raw.laborEst === true;
   s.laborRev = numv(raw.laborRev, 0); // 前の版で保存した設定は 0（取付手間の見積の単価を直す）
   s.tesuri = raw.tesuri === true;
+  s.tokuteiSalesMonths = isObj(raw.tokuteiSalesMonths)
+    ? Object.fromEntries(Object.entries(raw.tokuteiSalesMonths).filter((e): e is [string, string] => typeof e[1] === 'string' && /^\d{4}-\d{2}$/.test(e[1])))
+    : {};
   // 版2より前の設定：請求書の消費税は「すべての様邸の合計に最後に消費税率をかける」形に直す
   if (numv(raw.rev, 1) < 2) s.invoiceTaxMode = 'monthly';
   // 版4より前の設定：名字だけの担当者の候補をフルネームにする（見積書に出す）

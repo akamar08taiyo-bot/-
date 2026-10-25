@@ -14,7 +14,9 @@ React 19 ＋ TypeScript ＋ Vite（Tailwind）。リポジトリにはほかの�
 
 | ファイル | 何をするか |
 |---|---|
-| `App.tsx` | 4つのタブ（📝 見積もり・申請書を作成する／🧾 請求書を確認する／📦 部材・施工費マスタ／⚙ 設定）、新しい版の帯、印刷の画面の開閉、発注書の画面の開閉 |
+| `App.tsx` | 6つのタブ（📝 見積もり・申請書を作成する／🧾 請求書を確認する／📈 売上見込みを確認する／📦 部材・施工費マスタ／⚙ 設定／🗑 ゴミ箱）、新しい版の帯、印刷の画面の開閉、発注書の画面の開閉 |
+| `salesPlan.ts`・`components/SalesPlanPage.tsx` | 売上見込み（2026-10-25）：`planRows`（住宅改修＝見積書のある様邸、特定福祉用具＝`taiyo-tokutei-sales-v1` のまとめ）・`monthPlan`・`jutakuSalesMonth`（`Job.salesMonth` か請求する月）・次月に回す（`Job.salesMonth`・`Settings.tokuteiSalesMonths`）・印刷（`PrintView` の kind 'sales'）・受注残・進捗管理へのリンク（`PROGRESS_APP_URL`） |
+| `components/JobsPage.tsx` | 請求書の一覧（2026-10-25 から 〇〇様邸・☑（shikiri）・金額（税抜）・次月へ だけ。☐ の見積書のある様邸も出す） |
 | `noZoom.ts` | iPhone・iPad で欄を押したときに画面を拡大しない（viewport に maximum-scale=1。`main.tsx`・`estimate/main.tsx` で読み込む） |
 | `links.ts` | URL のうしろの `#tab=…&job=…&view=order`（読み直しても同じ所を開く）、ポータルの URL |
 | `types.ts` | データの形（Material・LaborItem・Row・Place・Kit・Job・OrderLine・OrderEdits・Settings・Insurer…） |

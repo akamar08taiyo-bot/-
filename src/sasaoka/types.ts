@@ -153,6 +153,8 @@ export type Job = {
   trashedAt?: number;
   // 申請書の平面図の図（ドロップ・貼り付けした平面図の画像）。写真と同じく、この端末の IndexedDB（photos.ts）の番号だけを持つ。複製では引き継がない
   planPhoto?: string;
+  // 売上見込みの月 'YYYY-MM'（「📈 売上見込みを確認する」で次月に回したとき。なければ請求する月 month。salesPlan.ts）
+  salesMonth?: string;
   createdAt: number;
   updatedAt: number;
 };
@@ -285,6 +287,8 @@ export type Settings = {
   laborEst: boolean; // 前に作った見積書の取付手間の行に、見積の単価（取付手間のマスタ）を入れたか
   laborRev: number; // 取付手間の見積の単価を直した版（defaults.ts の LABOR_REV より古ければ、空のままの見積の単価を直す）
   tesuri: boolean; // 前に保存した部材リスト・施工費・常用のセット・見積書の行の名前の「手摺」を「手すり」にしたか（一度だけ。ユーザーの指示）
+  // 売上見込みで次月に回した特定福祉用具の案件（案件の id → 'YYYY-MM'）。特定福祉用具のデータは書きかえず、ここに持つ（salesPlan.ts）
+  tokuteiSalesMonths: Record<string, string>;
   rev: number; // 設定の版（古い版で保存した設定を読み込むときの直し方に使う）
 };
 

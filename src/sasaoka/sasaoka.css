@@ -530,6 +530,14 @@ body {
   font-size: 8.5pt;
   text-align: right;
 }
+
+/* 売上見込みの印刷：住宅改修・特定福祉用具の見出し（salesPlan.ts） */
+.sheet .plan-title {
+  margin: 6mm 0 2mm;
+  font-size: 11.5pt;
+  font-weight: 500;
+  color: #115e59;
+}
 .sheet .bank {
   margin-top: 5mm;
   padding: 1.5mm 0;

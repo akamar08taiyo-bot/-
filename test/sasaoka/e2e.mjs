@@ -169,9 +169,9 @@ log('再読み込み後も保存されているOK');
 await page.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click();
 await page.getByRole('button', {name: '次の月'}).click();
 await page.getByRole('button', {name: /サンプルで試す/}).click();
-await page.getByRole('cell', {name: /（サンプル）山田様邸/}).waitFor();
+await page.getByRole('cell', {name: '（サンプル）山田様邸', exact: true}).waitFor();
 await shot(page, '11-sample.png');
-await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
+await page.getByRole('cell', {name: '（サンプル）山田様邸', exact: true}).click();
 await shot(page, '12-sample-editor.png');
 
 // 広い画面でタブを切り替えても、タブの列と中身の左の位置は動かない（ユーザーの報告「申請書・見積書を作成するのタブを選んだときのみ、左にぐっと動く」。

@@ -133,6 +133,7 @@ export function defaultSettings(): Settings {
     laborEst: false,
     laborRev: LABOR_REV,
     tesuri: false,
+    tokuteiSalesMonths: {},
     rev: SETTINGS_REV,
   };
   return settingsForOffice(base, portalOffice() || '行橋営業所');

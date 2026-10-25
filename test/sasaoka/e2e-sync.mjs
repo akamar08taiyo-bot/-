@@ -28,7 +28,7 @@ await est.waitForTimeout(800); // 自動保存を待つ
 const shi = await ctx.newPage();
 watch(shi, '仕切り');
 await shi.goto(`${site}/sasaoka/index.html`);
-await shi.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
+await shi.getByRole('cell', {name: '（サンプル）山田様邸', exact: true}).click();
 const shiTotal = () => shi.locator('aside table').innerText();
 assert.ok((await shiTotal()).includes('12,900')); // ①部材代：手すり60cm 10,000×0.15＝1,500＋3,000＋7,800＋600
 
@@ -83,15 +83,18 @@ assert.equal(await shi.getByRole('textbox', {name: 'タイルの数量'}).inputV
 await shi.screenshot({path: path.join(outDir, '60-sync-shikiri.png'), fullPage: true});
 log('ほぼ同時に保存しても両方残るOK');
 
-// ---------------- 新しい見積書（同時 一郎）は、行を入れたときに仕切り計算の一覧に入る。「請求書に入れる」を外すと一覧から消える
+// ---------------- 新しい見積書（同時 一郎）は、行を入れたときに仕切り計算の一覧に入る。「請求書に入れる」を外すと一覧の ☐ になる
 await shi.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click(); // 様邸の画面の左上は「← 見積もりへ戻る」。一覧へはタブで戻る
-await shi.getByRole('cell', {name: /同時 一郎/}).waitFor();
-assert.equal(await shi.getByRole('cell', {name: /（サンプル）山田様邸/}).count(), 1);
+await shi.getByRole('cell', {name: '同時 一郎様邸', exact: true}).waitFor();
+assert.equal(await shi.getByRole('cell', {name: '（サンプル）山田様邸', exact: true}).count(), 1);
 await est.getByRole('cell', {name: /同時 一郎/}).click();
 await est.getByLabel('笹岡工務店の請求書に入れる').uncheck();
-await shi.waitForFunction(() => !document.querySelector('main')?.textContent?.includes('同時 一郎'), null, {timeout: 5000});
+// 一覧には ☐ で残る（見積書のある様邸。☑ で請求書に戻せる・次月に回せる。2026-10-25）。請求書に入れる件数は1件に
+const box = shi.getByRole('checkbox', {name: '同時 一郎様邸を請求書に入れる'});
+await shi.waitForFunction(() => document.querySelector('main')?.textContent?.includes('請求書に入れる 1件'), null, {timeout: 5000});
+assert.equal(await box.isChecked(), false);
 await est.getByRole('button', {name: '← 一覧へ戻る'}).click();
-log('新しい見積書は行を入れると仕切り計算の一覧に入り、外すと消えるOK');
+log('新しい見積書は行を入れると仕切り計算の一覧に入り、外すと ☐ になるOK');
 
 // ---------------- 知らせ（BroadcastChannel）が届かないブラウザでも、古いままのタブで保存したときに、前の変更を消さない
 // 知らせを出せないタブ（見積書）でエンドキャップを3個に → 仕切り計算（古いまま）で木を3箇所に → 読み直すと両方残る
@@ -109,7 +112,7 @@ await qs.locator(`[data-edit="${capKey}"]`).click();
 await quiet.keyboard.type('3');
 await quiet.keyboard.press('Enter');
 await quiet.waitForTimeout(1000);
-await shi.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
+await shi.getByRole('cell', {name: '（サンプル）山田様邸', exact: true}).click();
 await shi.getByRole('button', {name: '木の数量を1増やす'}).click();
 await shi.waitForTimeout(1000);
 await shi.reload();

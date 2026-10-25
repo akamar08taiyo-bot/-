@@ -20,7 +20,7 @@ const page = await ctx.newPage();
 watch(page);
 await page.goto(url);
 await page.getByRole('button', {name: /サンプルで試す/}).click();
-await page.getByRole('cell', {name: /（サンプル）山田様邸/}).waitFor();
+await page.getByRole('cell', {name: '（サンプル）山田様邸', exact: true}).waitFor();
 const toast = page.getByText('サンプルの部材5件と');
 assert.equal(await toast.count(), 1);
 await page.waitForTimeout(4200);
@@ -30,8 +30,10 @@ log('お知らせは数秒で消えるOK');
 // サンプルの金額（玄関：手すり60cm 10,000×0.15＋1,500×2＋木1,000×2／トイレ：7,800＋300×2＋タイル1,500×2）
 // ① 12,900 ② 5,000 ③ 903 ④ round(18,803×0.07=1,316.21)=1,316 ⑦ 20,119
 // 請求書の消費税は すべての様邸の合計×0.1 を切り捨て：2,011.9 → 2,011、ご請求金額 22,130
+// 一覧は〇〇様邸と金額（税抜）だけ（ユーザーの指示「請求書を作成する一覧については、シンプルにする」2026-10-25）。①〜④は様邸を開いた画面と印刷に
 const row = await page.getByRole('row', {name: /（サンプル）山田様邸/}).innerText();
-for (const v of ['12,900', '5,000', '903', '1,316', '20,119']) assert.ok(row.includes(v), `一覧に ${v} がない: ${row}`);
+assert.ok(row.includes('20,119'), `一覧に 20,119 がない: ${row}`);
+for (const v of ['12,900', '1,316']) assert.ok(!row.includes(v), `一覧に内訳の ${v} が出ている: ${row}`);
 assert.ok((await page.getByText(/ご請求金額（税込）/).innerText()).includes('22,130'));
 assert.ok((await page.getByText(/すべての様邸の合計に消費税率をかけています/).innerText()).includes('2,011'));
 log('サンプルの金額OK（消費税は全様邸の合計にかける）');
@@ -66,7 +68,7 @@ await staffArea.press('Enter');
 await staffArea.pressSequentially('山本');
 assert.equal(await staffArea.inputValue(), '久保 匠史\n土居 翔太\n宮村 茉莉花\n信田 裕太\n藤田 知美\n山本');
 await page.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click();
-await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
+await page.getByRole('cell', {name: '（サンプル）山田様邸', exact: true}).click();
 const staffSelect = page.locator('label', {hasText: '担当'}).locator('select');
 assert.deepEqual(await staffSelect.locator('option').allInnerTexts(), ['（選ぶ）', '久保 匠史', '土居 翔太', '宮村 茉莉花', '信田 裕太', '藤田 知美', '山本']);
 await staffSelect.selectOption('土居 翔太');
@@ -124,7 +126,7 @@ await p2.locator('input[type=file][accept*=json]').setInputFiles(bkPath);
 await p2.getByText(/部材 5件・取付手間 17件・様邸（見積書）1件・部材＋施工費（常用） 2件・設定/).waitFor();
 await p2.getByRole('button', {name: '今のデータを置き換える'}).click();
 await p2.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click();
-await p2.getByRole('cell', {name: /（サンプル）山田様邸/}).waitFor();
+await p2.getByRole('cell', {name: '（サンプル）山田様邸', exact: true}).waitFor();
 log('別のブラウザにバックアップを読み込めたOK');
 
 // 狭い画面（タブレット縦・スマホ）
@@ -133,7 +135,7 @@ for (const [w, h, name] of [
   [390, 844, '24-phone.png'],
 ]) {
   await p2.setViewportSize({width: w, height: h});
-  await p2.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
+  await p2.getByRole('cell', {name: '（サンプル）山田様邸', exact: true}).click();
   await p2.waitForTimeout(300);
   await p2.screenshot({path: path.join(outDir, name), fullPage: true});
   await p2.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click(); // 様邸の画面の左上は「← 見積もりへ戻る」。一覧へはタブで戻る

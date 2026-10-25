@@ -1,10 +1,10 @@
 import {useMemo} from 'react';
-import {jobName, monthSummary} from '../calc.ts';
+import {hasEstimateRows, jobName, monthSummary, sortJobs} from '../calc.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {addSamples, hasSamples} from '../samples.ts';
 import type {AppData, Job} from '../types.ts';
 import type {Update} from '../useStore.ts';
-import {addMonths, downloadBlob, monthLabel, shortDate, staffShort, uid, yen} from '../util.ts';
+import {addMonths, downloadBlob, monthLabel, staffShort, uid, yen} from '../util.ts';
 import {useTrashUndo} from './TrashPage.tsx';
 import {Btn, useToast} from './ui.tsx';
 
@@ -51,9 +51,23 @@ export function JobsPage({
 }) {
   const toast = useToast();
   useTrashUndo(update); // 様邸の画面で削除（ゴミ箱へ）して戻ってきたとき、Ctrl+Z で戻す
-  const jobs = useMemo(() => data.jobs.filter((j) => j.shikiri && j.month === month), [data.jobs, month]);
+  // この月の様邸：☑（請求書に入れる＝shikiri）の様邸と、見積書はあるが外した様邸（☐。請求書に入れない。☑ で戻せる・次月に回せる）
+  // （ユーザーの指示「請求書を作成する一覧については、シンプルにする。〇〇様邸、（開いてから詳細）☑︎ボックスを作成して、チェックしたものだけ、請求書にのせるようにする」
+  // 「☑︎して次月に回せるようにもする」2026-10-25）。部材代などの内訳は様邸を開いた画面と印刷に
+  const listed = useMemo(() => sortJobs(data.jobs.filter((j) => j.month === month && (j.shikiri || hasEstimateRows(j)))), [data.jobs, month]);
+  const jobs = useMemo(() => listed.filter((j) => j.shikiri), [listed]);
   const summary = useMemo(() => monthSummary(jobs, data.settings), [jobs, data.settings]);
+  const totalsOf = useMemo(() => new Map(monthSummary(listed, data.settings).rows.map((r) => [r.job.id, r.totals])), [listed, data.settings]);
   const monthly = data.settings.invoiceTaxMode === 'monthly';
+  const unchecked = listed.filter((j) => !j.shikiri);
+  const setShikiri = (id: string, shikiri: boolean) => update('jobs', (list) => list.map((j) => (j.id === id ? {...j, shikiri, updatedAt: Date.now()} : j)));
+  /** 次の月の請求書へ（請求する月を1か月あとに。☐ の様邸は ☑ にして、次の月の請求書に入れる） */
+  const toNextMonth = (ids: string[]) => {
+    const next = addMonths(month, 1);
+    const set = new Set(ids);
+    update('jobs', (list) => list.map((j) => (set.has(j.id) ? {...j, month: next, shikiri: true, updatedAt: Date.now()} : j)));
+    toast(`${ids.length}件を${monthLabel(next)}分に回しました`);
+  };
 
   const add = () => {
     const j = newJob(month);
@@ -99,12 +113,12 @@ export function JobsPage({
             ◀
           </button>
           <label className="flex items-center gap-2 px-1">
-            <span className="text-lg font-bold text-[#0c315e]">{monthLabel(month)}分</span>
+            <span className="whitespace-nowrap text-lg font-bold text-[#0c315e]">{monthLabel(month)}分</span>
             <input
               type="month"
               value={month}
               onChange={(e) => e.target.value && setMonth(e.target.value)}
-              className="h-8 w-[9.5rem] rounded border border-slate-300 px-1 text-sm"
+              className="h-8 w-[8.5rem] rounded border border-slate-300 px-1 text-sm sm:w-[9.5rem]"
               aria-label="請求する月"
             />
           </label>
@@ -128,7 +142,7 @@ export function JobsPage({
         </div>
       </div>
 
-      {jobs.length === 0 ? (
+      {listed.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm leading-7 text-slate-600">
           <p className="text-base font-bold text-slate-800">{monthLabel(month)}分の様邸はまだありません。</p>
           <ol className="mt-2 list-decimal space-y-1 pl-6">
@@ -158,73 +172,56 @@ export function JobsPage({
           )}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-          <table className="w-full min-w-[1040px] text-sm">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <table className="w-full text-sm">
             <thead className="bg-slate-100 text-xs text-slate-600">
               <tr>
-                <th className="px-2 py-2 text-center">No.</th>
-                <th className="px-2 py-2 text-left">施工日</th>
+                <th className="w-14 whitespace-nowrap px-2 py-2 text-center">請求書</th>
+                <th className="w-10 px-1 py-2 text-center">No.</th>
                 <th className="px-2 py-2 text-left">お客様名</th>
-                <th className="px-2 py-2 text-left">担当</th>
-                <th className="px-2 py-2 text-right">① 部材代</th>
-                <th className="px-2 py-2 text-right">② 取付手間</th>
-                <th className="px-2 py-2 text-right">③ 部材上乗せ</th>
-                <th className="px-2 py-2 text-right">④ 諸経費</th>
-                <th className="px-2 py-2 text-right">⑦ 税抜計</th>
-                {!monthly && <th className="px-2 py-2 text-right">⑤ 消費税</th>}
-                {!monthly && <th className="px-2 py-2 text-right">⑥ 合計</th>}
-                <th className="px-2 py-2" />
+                <th className="px-2 py-2 text-right">金額（税抜）</th>
+                <th className="w-24 px-2 py-2" />
               </tr>
             </thead>
             <tbody>
-              {summary.rows.map(({job, totals: t}, i) => (
-                <tr key={job.id} className="cursor-pointer border-t border-slate-100 hover:bg-blue-50/60" onClick={() => onOpen(job.id)}>
-                  <td className="px-2 py-2 text-center tabular-nums">{i + 1}</td>
-                  <td className="px-2 py-2 tabular-nums">{shortDate(job.date) || '—'}</td>
-                  <td className="px-2 py-2 font-bold text-slate-800">
-                    {jobName(job)}
-                    <span className="ml-2 text-xs font-normal text-slate-500">{job.places.map((p) => p.name || '（箇所名なし）').join('・')}</span>
+              {listed.map((job, i) => (
+                <tr key={job.id} className={`cursor-pointer border-t border-slate-100 hover:bg-blue-50/60 ${job.shikiri ? '' : 'bg-slate-50 text-slate-400'}`} onClick={() => onOpen(job.id)}>
+                  <td className="px-2 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" checked={job.shikiri} onChange={(e) => setShikiri(job.id, e.target.checked)} aria-label={`${jobName(job)}を請求書に入れる`} className="h-5 w-5 align-middle" />
                   </td>
-                  <td className="whitespace-nowrap px-2 py-2">{staffShort(job.staff) || <span className="text-slate-400">—</span>}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{yen(t.material)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{yen(t.labor)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{yen(t.markup)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{yen(t.overhead)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{yen(t.subtotal)}</td>
-                  {!monthly && <td className="px-2 py-2 text-right tabular-nums">{yen(t.tax)}</td>}
-                  {!monthly && <td className="px-2 py-2 text-right font-bold tabular-nums">{yen(t.total)}</td>}
-                  <td className="px-2 py-1.5 text-right">
-                    <Btn
-                      small
-                      color="white"
+                  <td className="px-1 py-2 text-center tabular-nums">{i + 1}</td>
+                  <td className="px-2 py-2">
+                    <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onPrint({kind: 'job', jobId: job.id});
+                        onOpen(job.id);
                       }}
+                      className={`block w-full text-left text-base font-bold hover:underline ${job.shikiri ? 'text-slate-800 hover:text-blue-800' : 'text-slate-400'}`}
                     >
-                      明細を印刷
+                      {jobName(job)}
+                    </button>
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums">{yen(totalsOf.get(job.id)?.subtotal ?? 0)}</td>
+                  <td className="px-2 py-1.5 text-right" onClick={(e) => e.stopPropagation()}>
+                    <Btn small color="white" onClick={() => toNextMonth([job.id])} aria-label={`${jobName(job)}を次月に回す`}>
+                      次月へ
                     </Btn>
                   </td>
                 </tr>
               ))}
             </tbody>
-            <tfoot className="border-t-2 border-slate-300 bg-slate-50 font-bold">
-              <tr>
-                <td colSpan={4} className="px-2 py-2 text-right">
-                  {monthLabel(month)}分 合計（{summary.rows.length}件）
-                </td>
-                <td className="px-2 py-2 text-right tabular-nums">{yen(summary.sum.material)}</td>
-                <td className="px-2 py-2 text-right tabular-nums">{yen(summary.sum.labor)}</td>
-                <td className="px-2 py-2 text-right tabular-nums">{yen(summary.sum.markup)}</td>
-                <td className="px-2 py-2 text-right tabular-nums">{yen(summary.sum.overhead)}</td>
-                <td className="px-2 py-2 text-right tabular-nums">{yen(summary.sum.subtotal)}</td>
-                {!monthly && <td className="px-2 py-2 text-right tabular-nums">{yen(summary.sum.tax)}</td>}
-                {!monthly && <td className="px-2 py-2 text-right tabular-nums text-[#0c315e]">{yen(summary.sum.total)}</td>}
-                <td />
-              </tr>
-            </tfoot>
           </table>
-          <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 border-t border-slate-200 px-4 py-3 text-sm">
+          {unchecked.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 px-4 py-2 text-sm text-slate-600">
+              <span>☐ {unchecked.length}件は今月の請求書に入れません</span>
+              <Btn small color="white" onClick={() => toNextMonth(unchecked.map((j) => j.id))}>
+                ☐ の様邸をまとめて次月へ
+              </Btn>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+            <span>請求書に入れる {jobs.length}件</span>
             <span>税抜合計 {yen(summary.invoice.subtotal)}円</span>
             <span>
               消費税 {yen(summary.invoice.tax)}円{monthly ? '（すべての様邸の合計に消費税率をかけています）' : '（様邸ごとの消費税の合計）'}

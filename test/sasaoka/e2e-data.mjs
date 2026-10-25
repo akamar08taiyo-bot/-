@@ -72,7 +72,7 @@ const status = (page) => page.locator('header').innerText();
 {
   const {ctx, page} = await open(`${site}/sasaoka/index.html`);
   await page.getByRole('button', {name: /サンプルで試す/}).click();
-  await page.getByRole('cell', {name: /（サンプル）山田様邸/}).waitFor();
+  await page.getByRole('cell', {name: '（サンプル）山田様邸', exact: true}).waitFor();
   await page.waitForTimeout(800);
   // 新しい版のタブ（同じ端末のほかのタブ）が、この版の知らない項目を保存したとする
   const raw = await ctx.newPage();
@@ -117,7 +117,7 @@ const status = (page) => page.locator('header').innerText();
   });
   await page.waitForTimeout(500);
   // この版のタブで同じ様邸を直す
-  await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
+  await page.getByRole('cell', {name: '（サンプル）山田様邸', exact: true}).click();
   await page.getByRole('button', {name: 'タイルの数量を1増やす'}).click();
   await page.waitForTimeout(1200);
   const {jobs, stamp} = await readJobs();

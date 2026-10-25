@@ -6,6 +6,7 @@
 //                       （苅田町・行橋市・みやこ町用「工事費見積書兼工事費内訳書」・広域連合用「住宅改修内訳明細書」）の形のまま打ち込む。
 //                       見積書に打ち込んだ内容は、そのまま笹岡工務店の仕切り計算表・請求書に入る（入れない見積書は外せる）
 //   請求書を確認する：請求する月ごとの様邸（仕切り計算表）と、1か月分の御請求書
+//   売上見込みを確認する：月ごとの売上の見込み（住宅改修と特定福祉用具を別々に。salesPlan.ts・components/SalesPlanPage.tsx）
 //   部材・施工費マスタ：部材リスト（メーカーの仕切価格・定価）と、施工費（笹岡工務店の取付手間の単価）と、
 //                       部材＋施工費（常用）のセット（よく使う部材と施工費の組み合わせ）
 //   設定
@@ -18,6 +19,7 @@ import {JobsPage} from './components/JobsPage.tsx';
 import {KitsPage} from './components/KitsPage.tsx';
 import {LaborPage} from './components/LaborPage.tsx';
 import {MaterialsPage} from './components/MaterialsPage.tsx';
+import {SalesPlanPage} from './components/SalesPlanPage.tsx';
 import {SettingsPage} from './components/SettingsPage.tsx';
 import {TrashPage} from './components/TrashPage.tsx';
 import {ToastProvider} from './components/ui.tsx';
@@ -46,16 +48,18 @@ import {tesuri, thisMonth} from './util.ts';
 const TABS: {id: MainTab; label: string}[] = [
   {id: 'estimate', label: '📝 見積もり・申請書を作成する'},
   {id: 'invoice', label: '🧾 請求書を確認する'},
+  {id: 'sales', label: '📈 売上見込みを確認する'}, // 請求書を確認するの横（ユーザーの指示「請求書を作成するの横に、売上見込みを確認するとつくる」2026-10-25）
   {id: 'master', label: '📦 部材・施工費マスタ'},
   {id: 'settings', label: '⚙ 設定'},
   {id: 'trash', label: '🗑 ゴミ箱'}, // 設定のタブの横（ユーザーの指示「設定のタブの横にゴミ箱をつくり」2026-10-25）
 ];
 
-// タブごとの色（見積書は緑、請求書は紺、部材・施工費マスタは紫、設定は灰、ゴミ箱は茶色がかった灰）。選んでいるタブは下の画面と同じ色にしてつなげ、
+// タブごとの色（見積書は緑、請求書は紺、売上見込みは青緑、部材・施工費マスタは紫、設定は灰、ゴミ箱は茶色がかった灰）。選んでいるタブは下の画面と同じ色にしてつなげ、
 // 広い画面ではタブの上に色の帯（accent）を付けて、どれを選んでいるか分かるようにする
 const THEME: Record<MainTab, {head: string; page: string; active: string; sub: string; accent: string}> = {
   estimate: {head: 'bg-[#14532d]', page: 'bg-[#f2f6f4]', active: 'bg-[#f2f6f4] text-[#14532d]', sub: 'text-green-100', accent: 'lg:border-emerald-500'},
   invoice: {head: 'bg-[#0c315e]', page: 'bg-[#f3f6fa]', active: 'bg-[#f3f6fa] text-[#0c315e]', sub: 'text-blue-100', accent: 'lg:border-blue-500'},
+  sales: {head: 'bg-[#115e59]', page: 'bg-[#f1f7f6]', active: 'bg-[#f1f7f6] text-[#115e59]', sub: 'text-teal-100', accent: 'lg:border-teal-500'},
   master: {head: 'bg-[#3b1f6b]', page: 'bg-[#f6f4fa]', active: 'bg-[#f6f4fa] text-[#3b1f6b]', sub: 'text-purple-100', accent: 'lg:border-purple-500'},
   settings: {head: 'bg-[#334155]', page: 'bg-[#f4f5f7]', active: 'bg-[#f4f5f7] text-[#334155]', sub: 'text-slate-200', accent: 'lg:border-slate-500'},
   trash: {head: 'bg-[#44403c]', page: 'bg-[#f5f5f4]', active: 'bg-[#f5f5f4] text-[#44403c]', sub: 'text-stone-200', accent: 'lg:border-stone-500'},
@@ -135,6 +139,7 @@ export default function App({start}: {start: MainTab}) {
   const [jobView, setJobView] = useState<JobView>(estimateId ? initial.view : 'estimate');
   const [estimateMonth, setEstimateMonth] = useState(thisMonth);
   const [month, setMonth] = useState(loadMonth); // 請求書を確認する：請求する月
+  const [salesMonth, setSalesMonth] = useState(thisMonth); // 売上見込みを確認する：売上の月
   const [masterTab, setMasterTab] = useState<MasterTab>('materials');
   const [print, setPrint] = useState<PrintRequest | null>(null);
 
@@ -317,6 +322,12 @@ export default function App({start}: {start: MainTab}) {
     setJobView('estimate');
     setTab('estimate');
   };
+  // 売上見込みから開く：住宅改修は工事見積書、特定福祉用具は販売見積書のタブ
+  const openFromSales = (id: string, view: 'estimate' | 'hanbai') => {
+    setEstimateId(id);
+    setJobView(view);
+    setTab('estimate');
+  };
   const openInvoice = (id: string) => {
     setInvoiceId(id);
     setTab('invoice');
@@ -386,10 +397,10 @@ export default function App({start}: {start: MainTab}) {
               広い画面（lg 以上）は1段に並べ、選んでいるタブは下の画面と同じ色＋上の色の帯でつなげる。
               狭い画面は折り返して並べる（横にスクロールさせると、右のタブ（ゴミ箱）が画面の外に隠れる）。字の幅で並べ、段ごとに横いっぱいに広げる。
               設定とゴミ箱は1つのまとまりにして、いつも同じ段に並べる（ゴミ箱だけが1段に横長に残らないように。広い画面では lg:contents でまとまりを消す）。
-              スマホの幅 390px では 見積もり・申請書を作成する／請求書を確認する・部材・施工費マスタ／設定・ゴミ箱 の3段 */}
+              スマホの幅 390px では 見積もり・申請書を作成する／請求書を確認する／売上見込みを確認する／部材・施工費マスタ・設定・ゴミ箱 の4段 */}
           <nav className={`mx-auto flex ${PAGE_WIDTH} flex-wrap gap-1.5 px-3 pb-3 lg:flex-nowrap lg:pb-0`}>
-            {TABS.slice(0, 3).map(tabButton)}
-            <div className="flex flex-auto gap-1.5 lg:contents">{TABS.slice(3).map(tabButton)}</div>
+            {TABS.slice(0, 4).map(tabButton)}
+            <div className="flex flex-auto gap-1.5 lg:contents">{TABS.slice(4).map(tabButton)}</div>
           </nav>
         </header>
 
@@ -513,6 +524,7 @@ export default function App({start}: {start: MainTab}) {
                 goEstimate={() => goTab('estimate')}
               />
             ))}
+          {tab === 'sales' && <SalesPlanPage data={data} update={store.update} month={salesMonth} setMonth={setSalesMonth} onOpenJob={openFromSales} onPrint={setPrint} />}
           {tab === 'master' && (
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2" role="tablist" aria-label="部材・施工費マスタ">

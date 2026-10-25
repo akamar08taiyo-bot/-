@@ -1,3 +1,4 @@
+import type {MonthPlan, PlanRow, PlanSums} from '../salesPlan.ts';
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
 import {cutToLength, estimateQty, isBlankRow, jobName, jobTotals, monthSummary, placeTotals, rowAmount, shikiriPrice, taxFormula} from '../calc.ts';
@@ -15,7 +16,8 @@ export type PrintRequest =
   | {kind: 'invoice'; month: string; withDetails: boolean}
   | {kind: 'job'; jobId: string}
   | {kind: 'estimate'; jobId: string}
-  | {kind: 'order'; jobId: string}; // 見積書の部材の発注書（A4縦）
+  | {kind: 'order'; jobId: string} // 見積書の部材の発注書（A4縦）
+  | {kind: 'sales'; month: string; plan: MonthPlan}; // 売上見込み（A4縦。salesPlan.ts）
 
 /** 用紙の幅（A4縦 210mm・横 297mm）＋まわりの余白。画面がこれより狭いと、用紙全体が見えるように縮めて見せる */
 const pagePx = (mm: number) => (mm / 25.4) * 96 + 16;
@@ -59,7 +61,7 @@ function useFitScale(pageMm: number) {
 }
 
 export function PrintView({request, data, onClose}: {request: PrintRequest; data: AppData; onClose: () => void}) {
-  const month = request.kind === 'invoice' ? request.month : data.jobs.find((j) => j.id === request.jobId)?.month ?? '';
+  const month = request.kind === 'invoice' || request.kind === 'sales' ? request.month : data.jobs.find((j) => j.id === request.jobId)?.month ?? '';
   // 請求日など（請求書は月ごとに覚える）。見積書の作成日は様邸に持つ見積もり作成日（見積書の画面で入れる）。
   // 請求日を出すのは請求書だけ：明細・発注書の印刷では覚えない（月の途中に明細を印刷した日が、その月の請求書の請求日になっていた）
   const [meta, setMeta] = useDocMeta(request.kind === 'invoice' ? month : '', () => {
@@ -92,6 +94,7 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
     const title = document.title;
     // PDFに保存するときのファイル名になる
     if (request.kind === 'invoice') document.title = `${data.settings.clientName}様_御請求書_${monthLabel(request.month)}分`;
+    else if (request.kind === 'sales') document.title = `売上見込み_${monthLabel(request.month)}`;
     else {
       const j = data.jobs.find((x) => x.id === request.jobId);
       if (j && request.kind === 'estimate') document.title = `${FORM_INFO[jobForm(j, data.settings)].title}_${j.customer.trim() || 'お客様'}様`;
@@ -108,7 +111,9 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
   const summary = useMemo(() => monthSummary(jobs, data.settings), [jobs, data.settings]);
 
   let sheets: ReactNode;
-  if (request.kind === 'invoice') {
+  if (request.kind === 'sales') {
+    sheets = <SalesPlanDoc month={request.month} plan={request.plan} settings={data.settings} />;
+  } else if (request.kind === 'invoice') {
     sheets = (
       <>
         <InvoiceDoc month={request.month} summary={summary} settings={data.settings} meta={meta} />
@@ -185,6 +190,79 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** 売上見込み（住宅改修・特定福祉用具を別々に。税抜・消費税・税込） */
+function SalesPlanDoc({month, plan, settings: s}: {month: string; plan: MonthPlan; settings: Settings}) {
+  const table = (title: string, rows: PlanRow[], sums: PlanSums, status: boolean) => (
+    <>
+      <h3 className="plan-title">
+        {title}（{sums.count}件）
+      </h3>
+      <table className="items invoice">
+        <colgroup>
+          <col style={{width: '5%'}} />
+          <col style={{width: status ? '33%' : '43%'}} />
+          {status && <col style={{width: '10%'}} />}
+          <col style={{width: '10%'}} />
+          <col style={{width: '14%'}} />
+          <col style={{width: '12%'}} />
+          <col style={{width: '16%'}} />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th>お客様名</th>
+            {status && <th>状態</th>}
+            <th>担当</th>
+            <th>税抜</th>
+            <th>消費税</th>
+            <th>税込</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={r.id}>
+              <td className="c">{i + 1}</td>
+              <td className="name">{r.name}</td>
+              {status && <td className="c">{r.status}</td>}
+              <td className="c staff">{staffShort(r.staff)}</td>
+              <td className="num">{yen(r.amount)}</td>
+              <td className="num">{yen(r.tax)}</td>
+              <td className="num strong">{yen(r.total)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colSpan={status ? 4 : 3} className="r">
+              合計
+            </td>
+            <td className="num">{yen(sums.amount)}</td>
+            <td className="num">{yen(sums.tax)}</td>
+            <td className="num strong">{yen(sums.total)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </>
+  );
+  return (
+    <div className="sheet">
+      <div className="doc-title">売上見込み</div>
+      <p className="subject">
+        {monthLabel(month)}　{s.officeName}
+      </p>
+      <div className="amount-box">
+        <div className="k">合計（税込）</div>
+        <div className="v">¥{yen(plan.all.total)}-</div>
+      </div>
+      <p className="breakdown">
+        税抜 {yen(plan.all.amount)}円　消費税 {yen(plan.all.tax)}円（住宅改修 {plan.jutakuSum.count}件・特定福祉用具 {plan.tokuteiSum.count}件）
+      </p>
+      {table('住宅改修', plan.jutaku, plan.jutakuSum, false)}
+      {table('特定福祉用具', plan.tokutei, plan.tokuteiSum, true)}
     </div>
   );
 }

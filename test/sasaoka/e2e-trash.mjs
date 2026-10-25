@@ -119,11 +119,11 @@ const tabBtn = (name) => nav.getByRole('button', {name});
 const trashTab = tabBtn(/ゴミ箱/);
 await trashTab.waitFor();
 
-// ---------------- 上のタブ：5つ（設定の右にゴミ箱）・大きさ・選んでいるタブ・広い画面で1段・タブを替えても動かない
+// ---------------- 上のタブ：6つ（請求書の右に売上見込み、設定の右にゴミ箱）・大きさ・選んでいるタブ・広い画面で1段・タブを替えても動かない
 const tabNames = await nav.getByRole('button').allInnerTexts();
 assert.deepEqual(
   tabNames.map((t) => t.trim()),
-  ['📝 見積もり・申請書を作成する', '🧾 請求書を確認する', '📦 部材・施工費マスタ', '⚙ 設定', '🗑 ゴミ箱'],
+  ['📝 見積もり・申請書を作成する', '🧾 請求書を確認する', '📈 売上見込みを確認する', '📦 部材・施工費マスタ', '⚙ 設定', '🗑 ゴミ箱'],
 );
 const tabBoxes = async () => nav.getByRole('button').evaluateAll((els) => els.map((e) => {
   const r = e.getBoundingClientRect();
@@ -132,7 +132,7 @@ const tabBoxes = async () => nav.getByRole('button').evaluateAll((els) => els.ma
 const first = await tabBoxes();
 assert.ok(first.every((b) => b.y === first[0].y), `1段に並んでいない: ${JSON.stringify(first)}`);
 assert.ok(first.every((b) => b.h >= 48 && b.font >= 16), `タブが小さい: ${JSON.stringify(first)}`);
-for (const name of ['🧾 請求書を確認する', '📦 部材・施工費マスタ', '⚙ 設定', '🗑 ゴミ箱', '📝 見積もり・申請書を作成する']) {
+for (const name of ['🧾 請求書を確認する', '📈 売上見込みを確認する', '📦 部材・施工費マスタ', '⚙ 設定', '🗑 ゴミ箱', '📝 見積もり・申請書を作成する']) {
   await tabBtn(name).click();
   assert.equal(await tabBtn(name).getAttribute('aria-current'), 'page');
   assert.equal(await nav.locator('[aria-current=page]').count(), 1);
@@ -147,11 +147,11 @@ for (const name of ['🧾 請求書を確認する', '📦 部材・施工費マ
   await noOverflow(page, name);
 }
 await page.screenshot({path: path.join(outDir, 'trash-01-tabs-1366.png'), clip: {x: 0, y: 0, width: 1366, height: 200}});
-log('上のタブ（5つ・大きさ・選んでいるタブ・1段・動かない）OK');
+log('上のタブ（6つ・大きさ・選んでいるタブ・1段・動かない）OK');
 
 // もう1つのアプリ（請求書のタブ）を開いたままにしておく（ゴミ箱に移すと、こちらの一覧からも消える）
 const inv = await newPage(ctx, `${site}/sasaoka/index.html`, '請求書');
-await inv.getByRole('cell', {name: '見本一様邸'}).waitFor();
+await inv.getByRole('cell', {name: '見本一様邸', exact: true}).waitFor();
 assert.equal(await inv.locator('tbody tr', {hasText: '見本'}).count(), 4);
 
 // ---------------- 一覧の行の「削除」→ ゴミ箱へ
@@ -174,7 +174,7 @@ assert.equal(await rows.count(), 3);
 assert.equal(await row('見本一様邸').count(), 0);
 assert.equal((await trashTab.innerText()).replace(/\s+/g, ' ').trim(), '🗑 ゴミ箱 1');
 // 開いたままの請求書のアプリからも消える
-await inv.getByRole('cell', {name: '見本一様邸'}).waitFor({state: 'detached'});
+await inv.getByRole('cell', {name: '見本一様邸', exact: true}).waitFor({state: 'detached'});
 assert.equal(await inv.locator('tbody tr', {hasText: '見本'}).count(), 3);
 // Ctrl+Z で戻る → もう一度削除
 await page.locator('body').click({position: {x: 5, y: 600}});
@@ -212,13 +212,13 @@ await page.getByRole('textbox', {name: '見積書を探す'}).fill('');
 await tabBtn('📝 見積もり・申請書を作成する').click();
 assert.match(await page.locator('main').innerText(), /全部で 1件/);
 await tabBtn('🧾 請求書を確認する').click();
-await page.getByRole('cell', {name: '見本四様邸'}).waitFor();
+await page.getByRole('cell', {name: '見本四様邸', exact: true}).waitFor();
 assert.equal(await page.locator('main tbody tr', {hasText: '見本'}).count(), 1);
 await page.getByRole('button', {name: '🖨 請求書を印刷'}).click();
 const printed = await page.locator('.print-root').innerText();
 assert.ok(printed.includes('見本四') && !/見本[一二三]/.test(printed), '請求書の印刷にゴミ箱の様邸が出ている');
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
-await inv.getByRole('cell', {name: '見本三様邸'}).waitFor({state: 'detached'});
+await inv.getByRole('cell', {name: '見本三様邸', exact: true}).waitFor({state: 'detached'});
 assert.equal(await inv.locator('tbody tr', {hasText: '見本'}).count(), 1);
 log('チェックしてまとめてゴミ箱（確かめ・2件）・探す・件数・請求書・印刷・もう1つのアプリに出ないOK');
 
@@ -262,7 +262,7 @@ log('読み直してもゴミ箱に残る・ゴミ箱の様邸の写真も残る
 await page.getByRole('button', {name: '見本二様邸を元に戻す'}).click();
 await page.locator('[aria-live] > div', {hasText: '見本二様邸を元に戻しました'}).waitFor();
 await page.getByRole('heading', {name: '🗑 ゴミ箱（2件）'}).waitFor();
-await inv.getByRole('cell', {name: '見本二様邸'}).waitFor(); // 開いたままの請求書のアプリにも戻る
+await inv.getByRole('cell', {name: '見本二様邸', exact: true}).waitFor(); // 開いたままの請求書のアプリにも戻る
 await tabBtn('📝 見積もり・申請書を作成する').click();
 assert.match(await page.locator('main').innerText(), /全部で 2件/);
 await trashTab.click();
@@ -320,7 +320,7 @@ assert.equal(asked.pop(), '見本四様邸をゴミ箱に移しますか？');
 await row('見本二様邸').waitFor();
 assert.equal(await rows.count(), 1);
 await tabBtn('🧾 請求書を確認する').click();
-await page.getByRole('cell', {name: '見本二様邸'}).click();
+await page.getByRole('cell', {name: '見本二様邸', exact: true}).click();
 await page.getByRole('heading', {level: 1, name: '見本二様邸'}).waitFor();
 await page.getByRole('button', {name: '削除', exact: true}).first().click(); // 上の段の様邸の削除（箇所の「削除」より前）
 assert.equal(asked.pop(), '見本二様邸をゴミ箱に移しますか？');
@@ -328,7 +328,7 @@ await trashTab.click();
 await page.getByRole('heading', {name: '🗑 ゴミ箱（2件）'}).waitFor();
 log('見積書の画面・請求書の様邸の削除もゴミ箱へOK');
 
-// ---------------- スマホの幅（390px）：タブは3段・横にはみ出さない。一覧の選んだ帯・ゴミ箱
+// ---------------- スマホの幅（390px）：タブは4段（売上見込みのタブを足した 2026-10-25 から）・横にはみ出さない。一覧の選んだ帯・ゴミ箱
 const phone = await browser.newContext({viewport: {width: 390, height: 844}, deviceScaleFactor: 2, locale: 'ja-JP', hasTouch: true, isMobile: true});
 await phone.addInitScript(() => localStorage.setItem('taiyo_portal_session', JSON.stringify({office: '行橋営業所'})));
 const sp = await newPage(phone, `${site}/jutaku-mitsumori/index.html`, 'スマホ');
@@ -341,8 +341,8 @@ const rowsOf = async () => {
   const ys = await spNav.getByRole('button').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().y)));
   return [...new Set(ys)].length;
 };
-assert.equal(await rowsOf(), 3);
-for (const name of ['🧾 請求書を確認する', '📦 部材・施工費マスタ', '⚙ 設定', '🗑 ゴミ箱', '📝 見積もり・申請書を作成する']) {
+assert.equal(await rowsOf(), 4);
+for (const name of ['🧾 請求書を確認する', '📈 売上見込みを確認する', '📦 部材・施工費マスタ', '⚙ 設定', '🗑 ゴミ箱', '📝 見積もり・申請書を作成する']) {
   await spNav.getByRole('button', {name}).click();
   await sp.waitForTimeout(250);
   await noOverflow(sp, `スマホ ${name}`);
