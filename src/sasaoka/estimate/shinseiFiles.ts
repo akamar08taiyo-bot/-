@@ -121,14 +121,19 @@ async function planImageOf(job: Job): Promise<{image?: PhotoImage; missing: bool
  * 平面図の図を貼れなかったか（この端末にない・読めない）を返す
  */
 export async function saveShinsei(job: Job, insurer: Insurer, s: Settings): Promise<{fileName: string; missingPhotos: number; unreadablePhotos: number; planMissing: boolean}> {
+  const {bytes, ...rest} = await shinseiBook(job, insurer, s);
+  downloadBlob(new Blob([bytes], {type: XLSX_TYPE}), rest.fileName);
+  return rest;
+}
+
+/** 申請書（Excel）を作る（保存はしない。「まとめて保存」でも使う）。中身と、貼れなかった写真・平面図 */
+export async function shinseiBook(job: Job, insurer: Insurer, s: Settings): Promise<{bytes: Uint8Array; fileName: string; missingPhotos: number; unreadablePhotos: number; planMissing: boolean}> {
   const map = SHINSEI[insurer];
   if (!map) throw new Error('この保険者の申請書の原本がありません');
   const photos = await photoImagesOf(job, s);
   const plan = await planImageOf(job);
   const bytes = fillShinseiFiles({...(await openTemplate(insurer))}, map, {...shinseiValues(job, s), photoImages: photos.images, planImage: plan.image});
-  const fileName = shinseiFileName(map, job, estimateDateOf(job));
-  downloadBlob(new Blob([bytes], {type: XLSX_TYPE}), fileName);
-  return {fileName, missingPhotos: photos.missing, unreadablePhotos: photos.unreadable, planMissing: plan.missing || plan.unreadable};
+  return {bytes, fileName: shinseiFileName(map, job, estimateDateOf(job)), missingPhotos: photos.missing, unreadablePhotos: photos.unreadable, planMissing: plan.missing || plan.unreadable};
 }
 
 /** 住宅改修が必要な理由書（Excel）を保存する（ダウンロード）。保存したファイル名を返す（「山田花子様住宅改修理由書.xlsx」） */

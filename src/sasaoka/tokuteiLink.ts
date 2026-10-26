@@ -89,3 +89,51 @@ export function writeTokutei(job: Job): boolean {
     return false;
   }
 }
+
+/** 特定福祉用具が書いた案件ごとの金額のまとめ（売上見込み用。salesPlan.ts と同じ localStorage）に、この様邸の商品のある案件があるか */
+export function tokuteiHasItems(jobId: string): boolean {
+  try {
+    const raw = JSON.parse(localStorage.getItem('taiyo-tokutei-sales-v1') ?? 'null') as {rows?: {jutakuJob?: string}[]} | null;
+    return !!raw?.rows?.some((r) => r.jutakuJob === jobId);
+  } catch {
+    return false;
+  }
+}
+
+export type TokuteiBook = {name: string; bytes: Uint8Array};
+type FilesWindow = Window & {__taiyoTokuteiFiles?: (kinds: TokuteiView[]) => Promise<TokuteiBook[]>};
+const filesOf = (frame: HTMLIFrameElement | null) => {
+  try {
+    return (frame?.contentWindow as FilesWindow | null | undefined)?.__taiyoTokuteiFiles;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * この様邸の特定福祉用具の申請書（shinsei）・販売見積書（quote）の Excel を、特定福祉用具のアプリに作ってもらう（「まとめて保存」。
+ * ユーザーの指示「住宅改修申請書・特定福祉用具申請書・住宅改修見積もり・特定福祉用具販売見積もりを一括で保存できる機能をつける」2026-10-26）。
+ * 特定福祉用具のタブを開いていればその枠に、なければ見えない枠でその様邸の案件を開いて頼む（特定福祉用具の App.tsx の __taiyoTokuteiFiles）。
+ * 開くまで長くても20秒待つ。作れなければ例外
+ */
+export async function tokuteiFiles(job: Job, kinds: TokuteiView[]): Promise<TokuteiBook[]> {
+  const open = document.querySelector<HTMLIFrameElement>('iframe[data-tokutei]');
+  if (open && filesOf(open)) return filesOf(open)!(kinds);
+  writeTokutei(job);
+  const frame = document.createElement('iframe');
+  frame.src = tokuteiUrl(job.id, 'shinsei');
+  frame.title = '特定福祉用具（まとめて保存）';
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:1200px;height:800px;border:0;visibility:hidden';
+  document.body.appendChild(frame);
+  try {
+    const started = Date.now();
+    while (!filesOf(frame)) {
+      if (Date.now() - started > 20000) throw new Error('特定福祉用具のアプリを開けませんでした');
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    return await filesOf(frame)!(kinds);
+  } finally {
+    frame.remove();
+  }
+}

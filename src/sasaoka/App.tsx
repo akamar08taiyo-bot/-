@@ -39,6 +39,7 @@ import type {PrintRequest} from './print/PrintView.tsx';
 import {hasRiyuInfo} from './riyu.ts';
 import {EXAMPLE_KIT_ID, exampleKit} from './samples.ts';
 import {flushTokutei} from './tokuteiLink.ts';
+import {BatchSave} from './components/BatchSave.tsx';
 import {isTrashed, liveJobs} from './trash.ts';
 import type {Insurer, Job, Row} from './types.ts';
 import {useNewVersion} from './update.ts';
@@ -315,7 +316,13 @@ export default function App({start}: {start: MainTab}) {
     setEstimateId(id);
     setJobView(j && !j.estDate && !hasEstimateRows(j) ? 'shinsei' : 'estimate');
   };
-  const tabs = <JobTabs view={jobView} onView={(v) => leaveTokutei(() => setJobView(v))} />;
+  // タブのすぐ右に「📦 まとめて保存」（どのタブからも同じ。BatchSave.tsx）。保存の前に、開いている特定福祉用具のタブの変更と、この様邸の変更を保存させる
+  const tabs = (
+    <>
+      <JobTabs view={jobView} onView={(v) => leaveTokutei(() => setJobView(v))} />
+      {estimateJob && <BatchSave job={estimateJob} s={data.settings} onBeforeSave={() => Promise.all([flushTokutei(), store.flush()])} />}
+    </>
+  );
   // 見積書と請求書（仕切り計算表）を行き来する（同じ様邸を開く）
   const openEstimate = (id: string) => {
     setEstimateId(id);

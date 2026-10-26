@@ -83,13 +83,15 @@ if (withTokutei) {
   assert.equal(await field('お客様名').inputValue(), '見本 花子');
   assert.equal(await field('フリガナ').inputValue(), 'ミホン　ハナコ');
   assert.equal(await field('被保険者番号').inputValue(), '0000366989');
-  assert.equal(await field('生年月日').inputValue(), '昭和13年4月14日');
-  assert.equal(await field('要介護度').inputValue(), '要介護2');
+  // 生年月日は元号の丸と年・月・日、要介護状態区分・性別は丸のボタン（住宅改修と同じ入れ方。ユーザーの指示「生年月日なども含め、入力の仕方や色など、住宅改修と同じ入力方法にする」2026-10-26）
+  assert.equal(await tk.getByRole('group', {name: '元号'}).getByRole('button', {name: '昭和'}).getAttribute('aria-pressed'), 'true');
+  assert.deepEqual([await field('生年月日の年').inputValue(), await field('生年月日の月').inputValue(), await field('生年月日の日').inputValue()], ['13', '4', '14']);
+  assert.equal(await tk.getByRole('group', {name: '要介護状態区分'}).getByRole('button', {name: '要介護2'}).getAttribute('aria-pressed'), 'true');
   assert.equal(await field('郵便番号').inputValue(), '824-0001');
   assert.equal(await field('住所').inputValue(), '福岡県行橋市中央1-1');
   assert.equal(await field('電話').inputValue(), '0930-00-0000');
   assert.equal(await field('保険者').inputValue(), 'yukuhashi');
-  assert.equal(await tk.getByRole('radiogroup', {name: '性別'}).getByRole('radio', {name: '女'}).getAttribute('aria-checked'), 'true');
+  assert.equal(await tk.getByRole('group', {name: '性別'}).getByRole('button', {name: '女'}).getAttribute('aria-pressed'), 'true');
   // 上の題名・ポータルへのリンクの段は出さない（住宅改修の画面の上にある）。特定福祉用具のタブ（見積もり・申請／商品マスタ／設定）は出す
   assert.equal(await tk.getByRole('heading', {name: '特定福祉用具 購入申請書・見積もり作成'}).isVisible(), false);
   assert.equal(await tk.getByRole('link', {name: '業務アプリポータルへ'}).isVisible(), false);
@@ -103,8 +105,11 @@ if (withTokutei) {
   const pvBox = await pv.boundingBox();
   assert.ok(formBox && pvBox && formBox.x + formBox.width < pvBox.x && pvBox.width > formBox.width, `${JSON.stringify(formBox)} ${JSON.stringify(pvBox)}`);
   // 申請書で商品を入れると、販売見積書のタブにも出る（同じ案件）
-  await tk.getByRole('button', {name: '＋ 手で入れる'}).click();
+  // 商品がないときも手で入れる欄が1つ開いている（「＋ 追加」は2つ目から。ユーザーの指示「基本は手で入れるのがデフォルトなので開いておく」2026-10-26）
+  assert.equal(await tk.getByRole('button', {name: '＋ 追加'}).count(), 0);
+  await tk.getByLabel('種目').first().selectOption('歩行補助つえ');
   await tk.getByLabel('商品名').last().fill('見本の多点杖');
+  await tk.getByRole('button', {name: '＋ 追加'}).waitFor();
   await page.waitForFunction(() => document.querySelector('iframe')?.contentDocument?.querySelector('[aria-label="申請書のプレビュー"]')?.textContent?.includes('見本の多点杖'));
   await page.screenshot({path: path.join(outDir, 'tokutei-1-tab.png')});
   await page.getByRole('tab', {name: '🏷 販売見積書'}).click();
@@ -146,6 +151,30 @@ if (withTokutei) {
   await tk.getByText('見本 花子').first().waitFor();
   assert.equal(await tk.getByText('見本 花子', {exact: false}).count(), 1);
   log('読み直し・案件は1つ OK');
+
+  // ---------------- 📦 まとめて保存：チェックしたものだけを1つずつ保存（ユーザーの指示「住宅改修申請書・特定福祉用具申請書・住宅改修見積もり・特定福祉用具販売見積もりを
+  // 一括で保存できる機能をつける　チェック項目のみ一括で保存する」2026-10-26）。工事見積書は行がないので選べない。特定福祉用具は見えない枠で作る（ほかのタブからでも）
+  await page.getByRole('tab', {name: '📄 理由書'}).click();
+  await page.getByRole('button', {name: '📦 まとめて保存'}).click();
+  const dlg = page.getByRole('dialog');
+  assert.equal(await dlg.getByText('工事見積書').locator('..').getByRole('checkbox').isDisabled(), true);
+  assert.equal(await dlg.getByText('（見積書に行がありません）').count(), 1);
+  const boxes = dlg.getByRole('group', {name: '保存する書類'}).getByRole('checkbox');
+  assert.deepEqual(await boxes.evaluateAll((els) => els.map((e) => [e.checked, e.disabled])), [[true, false], [false, true], [true, false], [true, false]]);
+  // 販売見積書だけ外す → 住宅改修申請書と特定福祉用具申請書の2つ
+  await boxes.nth(3).uncheck();
+  const names = [];
+  page.on('download', (d) => names.push(d.suggestedFilename()));
+  await dlg.getByRole('button', {name: '📗 2つ保存する'}).click();
+  await page.waitForFunction(() => !document.querySelector('[role="dialog"]'), null, {timeout: 30000});
+  await page.waitForTimeout(800);
+  assert.deepEqual(names.sort(), ['見本花子様特定福祉用具申請書.xlsx', '見本花子様住宅改修申請書.xlsx'].sort());
+  assert.equal(await page.locator('iframe[title="特定福祉用具（まとめて保存）"]').count(), 0); // 見えない枠は消す
+  // 選んだものは覚えている（次に開くと販売見積書は外れたまま）
+  await page.getByRole('button', {name: '📦 まとめて保存'}).click();
+  assert.deepEqual(await boxes.evaluateAll((els) => els.map((e) => e.checked)), [true, false, true, false]);
+  await dlg.getByRole('button', {name: 'やめる'}).click();
+  log('まとめて保存 OK');
 }
 
 // ---------------- 新規作成してすぐ特定福祉用具申請書のタブを開き、住宅改修には何も入れずに一覧へ戻っても、様邸は消さない
