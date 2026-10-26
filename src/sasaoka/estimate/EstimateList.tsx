@@ -1,5 +1,6 @@
 import {useEffect, useMemo, useState} from 'react';
 import {estimateTotals, hasEstimateRows, jobName} from '../calc.ts';
+import {copyJob} from '../components/JobTools.tsx';
 import {askTrash, trashLabel, useTrashUndo} from '../components/TrashPage.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm} from '../estimateForms.ts';
@@ -50,7 +51,17 @@ export function removeEstimate(job: Job, s: Settings, update: Update, toast: (te
   return askTrash([job.id], trashLabel(job, s), update, toast);
 }
 
-// 見積書の複製は、ユーザーの指示「見積り申請書を作成するの、複製ボタンは不要」（2026-10-26）で外した（一覧の行・見積書の上の段とも）
+/**
+ * 見積書を複製する（お客様名に「（コピー）」。見積書を作ってあれば今月分の工務店の請求書に入れる。申請書だけなら申請書だけ）。複製したものを返す。
+ * 一度「複製ボタンは不要」（2026-10-26）で外したが、ユーザーの指示「複製するボタン削除してもらいましたが、やはり残してください」（2026-10-26）で戻した
+ */
+export function duplicateEstimate(job: Job, update: Update, toast: (text: string) => void): Job {
+  const estimated = hasEstimateRows(job);
+  const c = {...copyJob(job), estDate: estimated ? todayIso() : '', shikiri: estimated, month: thisMonth()};
+  update('jobs', (list) => [...list, c]);
+  toast('複製しました。お客様名などを書き換えてください。');
+  return c;
+}
 
 /**
  * 見積書を Excel ファイル（.xlsx）で保存する（ダウンロード）。印刷する見積書と同じ書式・同じ数字。作成日は見積もり作成日（印刷と同じ）
@@ -349,6 +360,18 @@ export function EstimateList({
                       </Btn>
                       <Btn small color="softGreen" className="ml-1.5" onClick={() => saveEstimateExcel(job, s, toast)}>
                         📗 Excel
+                      </Btn>
+                      <Btn
+                        small
+                        color="white"
+                        className="ml-1.5"
+                        onClick={() => {
+                          // 開くタブは複製したもので決める（申請書だけなら申請書のタブ。行を押したときと同じ）。onOpen はまだ複製の入っていないデータから探すので、見積書のタブになっていた
+                          const c = duplicateEstimate(job, update, toast);
+                          (!c.estDate && !hasEstimateRows(c) ? onOpenShinsei : onOpen)(c.id);
+                        }}
+                      >
+                        複製
                       </Btn>
                       <Btn small color="white" className="ml-1.5" onClick={() => removeEstimate(job, s, update, toast)}>
                         削除

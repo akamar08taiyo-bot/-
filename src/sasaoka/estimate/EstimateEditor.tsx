@@ -16,7 +16,7 @@ import type {AppData, Insurer, Job, Kit, Material, NameSuffix, Place} from '../t
 import type {Update} from '../useStore.ts';
 import {clearedSheet} from '../sheetEdit.ts';
 import {staffFull, thisMonth, todayIso} from '../util.ts';
-import {removeEstimate, saveEstimateExcel} from './EstimateList.tsx';
+import {duplicateEstimate, removeEstimate, saveEstimateExcel} from './EstimateList.tsx';
 
 // at：見積書で選んでいた（タップしていた）行。部材・部材＋施工費（常用）はそこに入れる（`insertRowsAt`）
 type Picker =
@@ -124,6 +124,7 @@ export function EstimateEditor({
     setJob((j) => clearedSheet(j, s));
     toast('白紙に戻しました');
   };
+  const duplicate = () => onOpen(duplicateEstimate(job, update, toast).id);
 
   const toggleFavorite = (id: string) => update('materials', (list) => list.map((m) => (m.id === id ? {...m, favorite: !m.favorite} : m)));
   const addToMaster = (m: Material) => update('materials', (list) => [...list, m]);
@@ -145,7 +146,7 @@ export function EstimateEditor({
   return (
     <div className="space-y-3">
       {/* 保存・Excel・印刷は画面のまん中（ユーザーの指示「Excelの印刷、保存ボタンを中央にもってくる」2026-10-22。申請書のタブの Excel も同じ所）。
-          広い画面は 左・まん中・右 の3つに分け、まん中を画面のまん中にそろえる。白紙に戻す・発注書・削除は右（複製はユーザーの指示「見積り申請書を作成するの、複製ボタンは不要」2026-10-26 で外した）。狭い画面はまん中のボタンだけの行にして、そのまん中に */}
+          広い画面は 左・まん中・右 の3つに分け、まん中を画面のまん中にそろえる。白紙に戻す・発注書・複製・削除は右（複製は一度外したが「やはり残してください」2026-10-26 で戻した）。狭い画面はまん中のボタンだけの行にして、そのまん中に */}
       <div className="flex flex-wrap items-center gap-2 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
         {/* 一覧へ戻る・様邸のタブは1段目に横いっぱい（4つのタブは左の列に入りきらない。どのタブでも同じ位置）。
             介護保険証から入れるはタブのすぐ右（ユーザーの指示「上のタブの近辺に」） */}
@@ -179,6 +180,9 @@ export function EstimateEditor({
           </Btn>
           <Btn color="white" onClick={onOpenOrder} disabled={!estimated} title={estimated ? undefined : '見積書に部材を入れると作れます'}>
             🛒 発注書を作成
+          </Btn>
+          <Btn color="white" onClick={duplicate}>
+            複製
           </Btn>
           <Btn color="white" onClick={removeJob}>
             削除

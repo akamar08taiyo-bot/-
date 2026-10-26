@@ -1406,7 +1406,7 @@ await preview.waitFor();
 await estimateTab.click();
 assert.equal(await inInvoice.count(), 0);
 assert.equal(await orderBtn.isDisabled(), true);
-// 見積書のタブも、保存・Excel・印刷は上の段のまん中（白紙に戻す・発注書・削除は右。複製はない）
+// 見積書のタブも、保存・Excel・印刷は上の段のまん中（白紙に戻す・発注書・複製・削除は右）
 assert.ok((await offCenter('📗 Excelで保存')) < 2);
 await page.screenshot({path: path.join(outDir, '81c-header-center-estimate.png'), clip: {x: 0, y: 0, width: 1366, height: 240}});
 await shinseiTab.click();
