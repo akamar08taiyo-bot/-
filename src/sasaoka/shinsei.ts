@@ -793,6 +793,8 @@ export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void
     drawMarks(files, sheet, v.marks);
     if (sheet.photoPlace?.kindCircles) drawKindCircle(files, sheet, photo > 0 && v.photos[photo] !== undefined ? (v.photoKinds?.[photo] ?? 0) : 0);
     if (sheet.legend?.box) drawLegend(files, sheet, v.works);
+    // A4 から少しはみ出すシートは、印刷を「1ページに合わせる」に（Excel で印刷して2〜4枚に分かれないように）
+    fitPrintPage(files, sheet.sheet);
     // 平面図の図（Excel に保存するときだけ。画面のプレビューは図を枠に重ねて描く）
     if (sheet.plan && v.planImage) drawPlan(files, sheet, v.planImage);
     // Excel に保存するとき（photoImages があるとき）：箇所のある写真番号の最初の用紙に、写真と、写真の横（上）に書く内容を入れる
@@ -1293,6 +1295,59 @@ export function sheetLayout(xml: string): SheetLayout {
   }
   const merges = [...xml.matchAll(/<mergeCell ref="([A-Z]+)(\d+):([A-Z]+)(\d+)"/g)].map((m) => [colNum(m[1]), Number(m[2]), colNum(m[3]), Number(m[4])]);
   return {colW: (c) => cols.find((x) => x.min <= c && c <= x.max)?.px ?? defW, rowH: (r) => rows.get(r) ?? defH, merges};
+}
+
+// ---------------------------------------------------------------- 印刷で1枚に入れる（特定福祉用具の xlsxEdit.ts の fitPrintPage と同じ）
+
+const A4_IN = {w: 210 / 25.4, h: 297 / 25.4};
+
+/**
+ * シートの印刷の大きさ：印刷の範囲（Print_Area。なければシートの使っている範囲）が、今の倍率で A4 の余白の内側の何倍か（幅・高さの大きい方）。
+ * 1 より大きいと Excel で印刷したときに2枚以上に分かれる。手動の改ページ・「ページに合わせる」があれば null（原本の決めたとおりに印刷する）
+ */
+export function printOverflow(files: Files, sheet: string): number | null {
+  const path = sheetPaths(files).get(sheet);
+  if (!path || !files[path]) return null;
+  const xml = strFromU8(files[path]);
+  if (/<pageSetUpPr\b[^>]*fitToPage="(?:1|true)"/.test(xml) || /<(?:rowBreaks|colBreaks)\b/.test(xml)) return null;
+  const wb = strFromU8(files['xl/workbook.xml']);
+  const index = [...wb.matchAll(/<sheet\b[^>]*>/g)].findIndex((m) => unesc(attrOf(m[0], 'name') ?? '') === sheet);
+  const area = new RegExp(`<definedName\\b[^>]*name="_xlnm\\.Print_Area"[^>]*localSheetId="${index}"[^>]*>([^<]*)</definedName>`).exec(wb)?.[1] ?? '';
+  const range = /\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)(?!.*\$?[A-Z]+\$?\d+:)/.exec(unesc(area)) ?? /<dimension ref="([A-Z]+)(\d+):([A-Z]+)(\d+)"/.exec(xml);
+  if (!range) return null;
+  const [c1, r1, c2, r2] = [colNum(range[1]), Number(range[2]), colNum(range[3]), Number(range[4])];
+  const lay = sheetLayout(xml);
+  let w = 0;
+  for (let c = c1; c <= c2; c++) w += lay.colW(c);
+  let h = 0;
+  for (let r = r1; r <= r2; r++) h += lay.rowH(r);
+  const margins = /<pageMargins\b[^>]*>/.exec(xml)?.[0] ?? '';
+  const m = (k: string, d: number) => numOf(attrOf(margins, k), d);
+  const setup = /<pageSetup\b[^>]*>/.exec(xml)?.[0] ?? '';
+  const paper = attrOf(setup, 'orientation') === 'landscape' ? {w: A4_IN.h, h: A4_IN.w} : A4_IN;
+  const scale = numOf(attrOf(setup, 'scale'), 100) / 100;
+  const availW = (paper.w - m('left', 0.7) - m('right', 0.7)) * 96;
+  const availH = (paper.h - m('top', 0.75) - m('bottom', 0.75)) * 96;
+  return Math.max((w * scale) / availW, (h * scale) / availH);
+}
+
+/**
+ * 印刷で少しだけはみ出すシートは「1ページに合わせる」にする（広域連合の様式第2号・第7号・内訳明細書・写真貼付用紙などは、原本のままだと Excel で印刷すると
+ * 2〜4枚に分かれた 2026-10-26）。縮めるのは入りきらないときだけ（大きくはしない）。大きくはみ出すシート（maxOver より大きい）・手動の改ページのあるシートはそのまま
+ */
+export function fitPrintPage(files: Files, sheet: string, maxOver = 1.35): boolean {
+  const over = printOverflow(files, sheet);
+  if (over === null || over <= 1.001 || over > maxOver) return false;
+  const path = sheetPaths(files).get(sheet)!;
+  let xml = strFromU8(files[path]);
+  if (/<pageSetUpPr\b/.test(xml)) xml = xml.replace(/<pageSetUpPr\b([^>]*?)\s*(\/?)>/, (_, attrs: string, close: string) => `<pageSetUpPr${attrs.replace(/\sfitToPage="[^"]*"/, '')} fitToPage="1"${close}>`);
+  else if (/<sheetPr\b[^>]*\/>/.test(xml)) xml = xml.replace(/<sheetPr\b([^>]*?)\s*\/>/, '<sheetPr$1><pageSetUpPr fitToPage="1"/></sheetPr>');
+  else if (/<sheetPr\b/.test(xml)) xml = xml.replace('</sheetPr>', '<pageSetUpPr fitToPage="1"/></sheetPr>');
+  else xml = xml.replace(/(<worksheet\b[^>]*>)/, '$1<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>');
+  xml = xml.replace(/<pageSetup\b[^>]*?\/?>/, (tag) => tag.replace(/\s(?:fitToWidth|fitToHeight)="[^"]*"/g, '').replace(/<pageSetup\b/, '<pageSetup fitToWidth="1" fitToHeight="1"'));
+  if (!/<pageSetup\b/.test(xml)) xml = xml.replace(/(<pageMargins\b[^>]*\/>)/, '$1<pageSetup paperSize="9" fitToWidth="1" fitToHeight="1"/>');
+  files[path] = strToU8(xml);
+  return true;
 }
 
 type CellStyle = {size: number; font: string; bold: boolean; horizontal: string; vertical: string; shrink: boolean; indent: number; wrap: boolean; rotation: number};

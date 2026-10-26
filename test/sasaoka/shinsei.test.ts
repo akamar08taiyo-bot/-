@@ -1111,3 +1111,17 @@ test('写真・平面図に Excel で描く図形・線のはじめの形（原�
   // 調べ方の確かめ：閉じていないタグは見つける
   assert.notEqual(xmlProblem('<a:x><a:y></a:x>'), '');
 });
+
+test('印刷：A4 から少しはみ出す原本のシート（広域連合の様式・苅田町の事後申請書・行橋市の平面図・みやこ町の支給申請書）は「1ページに合わせる」にする。入るシート・改ページのある理由書はそのまま', () => {
+  const fitted = (bytes: Uint8Array, name: string) => {
+    const {byName} = sheets(bytes);
+    return /<pageSetUpPr\b[^>]*fitToPage="1"/.test(byName.get(name)!) && /<pageSetup\b[^>]*fitToWidth="1"[^>]*fitToHeight="1"/.test(byName.get(name)!);
+  };
+  const k = fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(job({insurer: 'kouiki', form: 'kouiki'}), RATES));
+  for (const name of ['様式第2号（住宅改修承認申請書）', '様式第7号（住宅改修費支給申請書（受領委任払用）', '様式第2号別紙（住宅改修内訳明細書）', '写真貼付用紙']) assert.ok(fitted(k, name), name);
+  const kanda = fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(job({insurer: 'kanda'}), RATES));
+  assert.ok(fitted(kanda, '事後申請書'));
+  const y = fillShinsei(YUKUHASHI, SHINSEI.yukuhashi!, shinseiValues(job({insurer: 'yukuhashi'}), RATES));
+  assert.ok(fitted(y, '平面図  (2)'));
+  assert.equal(fitted(y, '住改・受領委任払'), false); // 原本の倍率で入る
+});
