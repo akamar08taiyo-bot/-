@@ -287,7 +287,7 @@ export function cleanSales(raw: unknown): Sale[] {
       updatedAt: numv(s.updatedAt),
       // 住宅改修の様邸から開いた案件（jutaku.ts）
       ...(str(s.jutakuJob) ? {jutakuJob: str(s.jutakuJob), jutakuSync: isObj(s.jutakuSync) ? cleanJutakuFields(s.jutakuSync) : {}} : {}),
-      ...(s.showSelfPay === true ? {showSelfPay: true} : {}),
+      ...(typeof s.showSelfPay === 'boolean' ? {showSelfPay: s.showSelfPay} : {}), // 初めは出す（外したら false を残す）
       ...(numv(s.hacchuSentAt) > 0 ? {hacchuSentAt: numv(s.hacchuSentAt)} : {}),
     };
   });

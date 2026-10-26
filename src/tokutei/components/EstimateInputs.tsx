@@ -8,7 +8,7 @@ import type {FocusEvent, ReactNode, RefObject} from 'react';
 import {basisNote, lineOf, priceNote} from '../calc.ts';
 import type {Line, Totals} from '../calc.ts';
 import {CARE_LEVELS, INSURERS} from '../defaults.ts';
-import {selfPayText} from '../estimateBook.ts';
+import {showsSelfPay, userBurdenLine} from '../estimateBook.ts';
 import type {EstimateField} from '../estimateBook.ts';
 import {blankItem, frequentValues, makerChoices, unregisteredItems} from '../sales.ts';
 import {carePlanOf} from '../shinsei.ts';
@@ -232,15 +232,16 @@ export function EstimateInputs({
             </label>
           </div>,
         )}
-        {/* オンにすると、見積書の明細の最後の商品の2行下に「自己負担額（1割負担）　○円」（負担割合から自動で。ユーザーの指示「自己負担額を表示のオンオフっていうチェック項目を入れ」2026-10-26） */}
+        {/* オンにすると、見積書の明細の最後の商品の2行下から介護保険の内訳（介護保険の対象・利用者負担＝赤字・保険者負担）を1行ずつ（ユーザーの指示「自己負担額を表示のオンオフっていうチェック項目を入れ」
+            「この部分のみ記載する形で良い　利用者負担額の部分のみ赤字で記載する」2026-10-26）。初めはオン */}
         {row(
           '自己負担額',
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-700">
             <label className="flex items-center gap-1.5">
-              <input type="checkbox" checked={!!sale.showSelfPay} onChange={(e) => change({showSelfPay: e.target.checked})} />
+              <input type="checkbox" checked={sale.showSelfPay !== false} onChange={(e) => change({showSelfPay: e.target.checked})} />
               自己負担額を表示
             </label>
-            {sale.showSelfPay && sale.items.length > 0 && <span className="tabular-nums text-slate-600">{selfPayText(sale, t)}</span>}
+            {showsSelfPay(sale) && t.covered > 0 && <span className="tabular-nums text-red-600">{userBurdenLine(t)}</span>}
           </div>,
           'selfPay',
         )}

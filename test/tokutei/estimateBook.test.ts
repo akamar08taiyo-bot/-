@@ -6,7 +6,7 @@ import test from 'node:test';
 import {strFromU8, unzipSync} from 'fflate';
 import {basisNote, itemNote, saleTotals} from '../../src/tokutei/calc.ts';
 import {defaultSettings, settingsForOffice} from '../../src/tokutei/defaults.ts';
-import {CONT_ROWS, contBlock, ESTIMATE_CAPACITY, ESTIMATE_ROWS, estimateFileName, estimateNotes, estimateOverflow, estimatePages, estimatePreview, fillEstimate, fitScale, selfPayIndex, selfPayText} from '../../src/tokutei/estimateBook.ts';
+import {CONT_ROWS, contBlock, ESTIMATE_CAPACITY, ESTIMATE_ROWS, estimateFileName, estimateNotes, estimateOverflow, insuranceLines, estimatePages, estimatePreview, fillEstimate, fitScale, selfPayIndex, belowItemLines} from '../../src/tokutei/estimateBook.ts';
 import type {Sale, SaleItem} from '../../src/tokutei/types.ts';
 import {cellFormula, readCell, sheetLayout} from '../../src/tokutei/xlsxEdit.ts';
 import type {Files} from '../../src/tokutei/xlsxEdit.ts';
@@ -134,19 +134,38 @@ test('販売見積書：合計は原本の式（税率ごとの合計・切り�
   assert.deepEqual([readCell(g, SH, 'C47'), readCell(g, SH, 'C50'), readCell(g, SH, 'E21')], ['', '8000', '8000']);
 });
 
-test('販売見積書の備考：介護保険の内訳（受領委任払い・償還払い）と見積書の備考に足す文（3行まで）', () => {
+test('介護保険の内訳は明細の下に1行ずつ（「備考欄に記載している部分を上にずらす」「行を変えて見やすくする」「この部分のみ記載する形で良い　利用者負担額の部分のみ赤字で記載する」2026-10-26）。備考は足す文だけ（3行まで）', () => {
   const v = sale({note: '納品の前にお電話いたします。\nご不明な点は担当までお問い合わせください。'});
   const t = saleTotals(v, S);
-  const notes = estimateNotes(v, t);
-  assert.equal(notes.length, 3);
-  assert.match(notes[0], /^介護保険（受領委任払い）：介護保険の対象 55,968円　利用者負担（1割）5,597円　保険者負担（9割）50,371円$/);
-  assert.equal(notes[1], 'お支払いいただく金額 5,597円');
-  assert.equal(notes[2], '納品の前にお電話いたします。');
-  const back = estimateNotes(sale({payMethod: '償還払い'}), saleTotals(sale({payMethod: '償還払い'}), S));
-  assert.equal(back[1], 'いったんお支払いいただく金額 55,968円（あとで保険者から 50,371円が払い戻されます）');
+  assert.deepEqual(insuranceLines(v, t), ['介護保険（受領委任払い）', '介護保険の対象　55,968円', '利用者負担（1割）　5,597円', '保険者負担（9割）　50,371円']);
+  const back = sale({payMethod: '償還払い'});
+  assert.deepEqual(insuranceLines(back, saleTotals(back, S)).slice(-2), ['いったんお支払いいただく金額　55,968円', '（あとで保険者から 50,371円が払い戻されます）']);
+  assert.deepEqual(estimateNotes(v), ['納品の前にお電話いたします。', 'ご不明な点は担当までお問い合わせください。']);
   const f = unzipSync(fillEstimate(template(), v, S));
   assert.equal(readCell(f, SH, 'A59'), '備　　考'); // 見出しはそのまま
-  assert.deepEqual(['A60', 'A61', 'A62'].map((r) => readCell(f, SH, r)), notes);
+  assert.deepEqual(['A60', 'A61', 'A62'].map((r) => readCell(f, SH, r)), ['納品の前にお電話いたします。', 'ご不明な点は担当までお問い合わせください。', '']);
+  // 2点（23・24行目）→ 1行あけて 26〜29行目。金額の欄・税率は空で、合計は変わらない
+  const at = (r: number) => readCell(f, SH, `A${r}`);
+  assert.equal(at(25), '');
+  assert.deepEqual([26, 27, 28, 29].map(at), insuranceLines(v, t));
+  assert.equal(at(30), '');
+  assert.equal(readCell(f, SH, 'I27'), '');
+  assert.equal(readCell(f, SH, 'J27'), '');
+  // 利用者負担（自己負担額）の行だけ赤
+  const xml = strFromU8(f['xl/worksheets/sheet1.xml']);
+  const styles = strFromU8(f['xl/styles.xml']);
+  const fontOf = (ref: string) => {
+    const st = Number(/\ss="(\d+)"/.exec(new RegExp(`<c r="${ref}"[^>]*`).exec(xml)?.[0] ?? '')?.[1] ?? 0);
+    const xf = [...(/<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/.exec(styles)?.[1] ?? '').matchAll(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g)][st]?.[0] ?? '';
+    return [...(/<fonts[^>]*>([\s\S]*?)<\/fonts>/.exec(styles)?.[1] ?? '').matchAll(/<font\b[^>]*?(?:\/>|>[\s\S]*?<\/font>)/g)][Number(/fontId="(\d+)"/.exec(xf)?.[1] ?? 0)]?.[0] ?? '';
+  };
+  assert.match(fontOf('A28'), /<color rgb="FFFF0000"\/>/);
+  for (const r of ['A26', 'A27', 'A29']) assert.doesNotMatch(fontOf(r), /FFFF0000/, r);
+  // プレビューでも赤
+  const page = estimatePreview(template(), v, S)[0];
+  const red = page.texts.find((x) => x.runs.map((r) => r.text).join('') === '利用者負担（1割）　5,597円');
+  assert.ok(red && /^#?ff0000$/i.test(red.runs[0].font.color), JSON.stringify(red?.runs[0].font));
+  assert.equal(page.texts.find((x) => x.runs.map((r) => r.text).join('') === '保険者負担（9割）　50,371円')?.runs[0].font.color.replace(/^#/, '').toLowerCase() === 'ff0000', false);
 });
 
 test('販売見積書のプレビュー：原本の1枚。欄を押すと入れる所へ（宛名・番号・日付・明細・備考）', () => {
@@ -154,9 +173,15 @@ test('販売見積書のプレビュー：原本の1枚。欄を押すと入れ�
   assert.equal(pages.length, 1);
   const text = pages[0].texts.map((x) => x.runs.map((r) => r.text).join('')).join('\n');
   for (const s of ['御　見　積　書', '見本 花子　様', 'シャワーチェア 見本A　SC-01', '55,968', '太陽シルバーサービス株式会社', '登録番号：T1290001044462', 'TEL：0930-26-9640', 'FAX：0930-26-9641', '担当：土居 翔太', '定価32,000円の20%引き', '備考']) assert.ok(text.includes(s), s);
-  assert.deepEqual([...new Set(pages[0].fields.map((x) => x.field))].sort(), ['customer', 'estimateDate', 'items', 'note', 'quoteNo', 'staff']);
-  // 印の枠（グループの中の2つの四角）は描く。赤い枠・説明の文字（印刷しない図形）は描かない
-  assert.equal(pages[0].shapes.filter((x) => x.kind === 'rect' && !x.text).length, 2);
+  assert.deepEqual([...new Set(pages[0].fields.map((x) => x.field))].sort(), ['customer', 'estimateDate', 'items', 'note', 'quoteNo', 'selfPay', 'staff']);
+  // 印の枠（グループの中の2つの四角）は描く。その上に小さな枠で「所長印」「担当印」（左・右。「□の印鑑欄の上に小さく横□で囲み…」2026-10-26）。
+  // 赤い枠・説明の文字（印刷しない図形）は描かない
+  const stamps = pages[0].shapes.filter((x) => x.kind === 'rect' && !x.text);
+  assert.equal(stamps.length, 2);
+  const labels = ['所長印', '担当印'].map((t) => pages[0].shapes.find((x) => x.text === t));
+  assert.ok(labels.every(Boolean));
+  const [left, right] = [...stamps].sort((a, b) => a.x - b.x);
+  assert.ok(Math.abs(labels[0]!.x - left.x) < 1 && Math.abs(labels[1]!.x - right.x) < 1 && Math.abs(labels[0]!.y + labels[0]!.h - left.y) < 1, '名前の枠が印の枠の上にない');
   assert.ok(!text.includes('赤枠内は編集不可です'));
 });
 
@@ -255,7 +280,7 @@ test('3ページ（80点）：3ページ目まで書く。プレビューも3枚
   assert.ok(text(2).includes('見本の商品 80'));
   assert.equal(pages[0].shapes.filter((x) => x.kind === 'rect' && !x.text).length, 2);
   assert.equal(pages[1].shapes.length, 0);
-  assert.deepEqual([...new Set(pages[2].fields.map((x) => x.field))].sort(), ['customer', 'estimateDate', 'items', 'quoteNo']); // 担当は1ページ目の会社の欄だけ
+  assert.deepEqual([...new Set(pages[2].fields.map((x) => x.field))].sort(), ['customer', 'estimateDate', 'items', 'quoteNo', 'selfPay']); // 担当は1ページ目の会社の欄だけ。自己負担額は3ページ目の最後の商品の下
   assert.ok(pages[1].height <= pages[0].height);
 });
 
@@ -357,7 +382,8 @@ test('見積書のバランスの直し（2026-10-26）：備考の列を広く�
   const tt = saleTotals(sale(), S);
   assert.deepEqual(bold.sort(), [...[tt.amount, tt.tax, tt.total].map((n) => n.toLocaleString('ja-JP')), '円'].sort());
   // 一番下の備考は左寄せ（ユーザーの指示「一番下の備考欄の部分、中央揃えじゃなくて左詰めにしてください」）
-  const notes = page.texts.filter((x) => /^A6[0-2]$/.test(x.ref) && x.runs.some((r) => r.text.trim()));
+  const withNote = estimatePreview(t, sale({note: '納品の前にお電話いたします。\nご不明な点は担当までお問い合わせください。'}), S)[0];
+  const notes = withNote.texts.filter((x) => /^A6[0-2]$/.test(x.ref) && x.runs.some((r) => r.text.trim()));
   assert.ok(notes.length >= 2);
   for (const n of notes) assert.equal(n.align, 'left', n.ref);
   // 印刷しない赤い枠・「赤枠内は編集不可です」のメモは原本から消した（スマホで開くと金額の列に赤い線が出た）。印の枠は残す
@@ -366,41 +392,43 @@ test('見積書のバランスの直し（2026-10-26）：備考の列を広く�
   assert.ok(drawing.includes('<xdr:grpSp>'));
 });
 
-test('自己負担額を表示（ユーザーの指示「自己負担額を表示のオンオフっていうチェック項目を入れ…商品の列の最後の2行下ぐらいに、自己負担額〇〇円」2026-10-26）', () => {
-  const one = [item({id: 'a', name: '見本の台', listPrice: 30000})]; // 24,000円＋税 2,400円＝26,400円 → 1割 2,640円・2割 5,280円
-  // 書く場所：最後の商品の2行下（1行あける）。ページの終わりならすぐ下、それも入らなければ次のページの1行目
-  assert.equal(selfPayIndex(1, true), 2);
-  assert.equal(selfPayIndex(1, false), -1);
-  assert.equal(selfPayIndex(0, true), -1);
-  assert.equal(selfPayIndex(14, true), 15); // 1ページ目の最後の行（38行目）
-  assert.equal(selfPayIndex(15, true), 15); // すぐ下（1ページ目の最後の行）
-  assert.equal(selfPayIndex(16, true), 16); // 1ページ目がいっぱい → 2ページ目の1行目
-  assert.equal(selfPayIndex(ESTIMATE_CAPACITY, true), -1);
-  // オフ（はじめ）：書かない
-  const off = unzipSync(fillEstimate(template(), sale({items: one}), S));
-  assert.equal(readCell(off, SH, 'A25'), '');
-  // オン：1割 → A25（23行目の2つ下）に「自己負担額（1割負担）　2,640円」。金額の欄・税率は空で、合計は変わらない
-  const on = sale({items: one, showSelfPay: true});
+test('自己負担額を表示（初めからオン）：外すと明細の下の介護保険の内訳を書かない。置き場所はページに入るように', () => {
+  const one = [item({id: 'a', name: '見本の台', listPrice: 30000})]; // 24,000円＋税 2,400円＝26,400円 → 1割 2,640円
+  // 書く場所：最後の商品の2行下（1行あける）から。ページの終わりならすぐ下、それも入らなければ次のページの1行目
+  assert.equal(selfPayIndex(1, 4), 2);
+  assert.equal(selfPayIndex(1, 0), -1);
+  assert.equal(selfPayIndex(0, 4), -1);
+  assert.equal(selfPayIndex(11, 4), 12); // 12〜15（1ページ目の最後の行＝38行目まで）
+  assert.equal(selfPayIndex(12, 4), 12); // すぐ下から
+  assert.equal(selfPayIndex(13, 4), ESTIMATE_ROWS.length); // 1ページ目に入らない → 2ページ目の1行目
+  assert.equal(selfPayIndex(16, 4), 16);
+  assert.equal(selfPayIndex(ESTIMATE_CAPACITY - 2, 4), -1);
+  // 初め（空）：A25〜A28 に内訳
+  const on = sale({items: one});
   const f = unzipSync(fillEstimate(template(), on, S));
-  assert.equal(readCell(f, SH, 'A25'), '自己負担額（1割負担）　2,640円');
+  assert.deepEqual(['A25', 'A26', 'A27', 'A28'].map((r) => readCell(f, SH, r)), ['介護保険（受領委任払い）', '介護保険の対象　26,400円', '利用者負担（1割）　2,640円', '保険者負担（9割）　23,760円']);
   assert.equal(readCell(f, SH, 'A24'), '');
-  assert.equal(readCell(f, SH, 'J25'), '');
-  assert.equal(readCell(f, SH, 'I25'), '');
+  // 外す（false）：書かない。合計は変わらない
+  const off = unzipSync(fillEstimate(template(), sale({items: one, showSelfPay: false}), S));
+  assert.equal(readCell(off, SH, 'A25'), '');
   assert.equal(readCell(f, SH, 'E21'), readCell(off, SH, 'E21'));
-  // 2割・生活保護・限度額を超えた分（お客様のお支払い）
-  assert.equal(selfPayText(sale({items: one, showSelfPay: true, burdenRatio: 2}), saleTotals(sale({items: one, burdenRatio: 2}), S)), '自己負担額（2割負担）　5,280円');
-  assert.equal(selfPayText(sale({items: one, showSelfPay: true, welfare: true}), saleTotals(sale({items: one, welfare: true}), S)), '自己負担額（生活保護）　0円');
-  assert.equal(selfPayText(sale({items: one, showSelfPay: true, remaining: 6400}), saleTotals(sale({items: one, remaining: 6400}), S)), '自己負担額（1割負担）　20,640円'); // 6,400円の1割 640円＋超えた分 20,000円
+  // 生活保護・限度額を超えた分
+  const w = sale({items: one, welfare: true});
+  assert.deepEqual(belowItemLines(w, S).lines.slice(2, 4), ['利用者負担（1割）　0円', '介護扶助（1割）　2,640円']);
+  const over = sale({items: one, remaining: 6400});
+  assert.ok(belowItemLines(over, S).lines.includes('限度額を超えた分　20,000円'));
+  assert.deepEqual(belowItemLines(sale({items: []}), S).lines, []);
   // プレビューにも出て、押すと「自己負担額」の行へ
   const page = estimatePreview(template(), on, S)[0];
-  assert.ok(page.texts.some((x) => x.runs.map((r) => r.text).join('') === '自己負担額（1割負担）　2,640円'));
-  assert.ok(page.fields.some((x) => x.field === 'selfPay'));
-  // 16点：1ページ目がいっぱいなので、2ページ目の1行目に書く（2ページになる）
-  const p16 = sale({items: many(16), showSelfPay: true});
+  assert.ok(page.texts.some((x) => x.runs.map((r) => r.text).join('') === '利用者負担（1割）　2,640円'));
+  assert.equal(page.fields.filter((x) => x.field === 'selfPay').length, 4);
+  // 16点：1ページ目がいっぱいなので、2ページ目の1行目から書く（2ページになる）。外せば1ページ。12点なら1ページに入る
+  const p16 = sale({items: many(16)});
   const g = unzipSync(fillEstimate(template(), p16, S));
-  assert.match(readCell(g, SH, `A${contBlock(2).rows[0]}`), /^自己負担額（1割負担）　[\d,]+円$/);
+  assert.equal(readCell(g, SH, `A${contBlock(2).rows[0]}`), '介護保険（受領委任払い）');
   assert.equal(estimatePreview(template(), p16, S).length, 2);
-  assert.equal(estimatePreview(template(), sale({items: many(16)}), S).length, 1);
+  assert.equal(estimatePreview(template(), sale({items: many(16), showSelfPay: false}), S).length, 1);
+  assert.equal(estimatePreview(template(), sale({items: many(11)}), S).length, 1);
 });
 
 test('会社の欄：設定の営業所の値（ほかの営業所でも、TEL・FAX・所長・登録番号）。担当がいなければ空', () => {

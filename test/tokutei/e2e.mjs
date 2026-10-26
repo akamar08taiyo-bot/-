@@ -293,7 +293,7 @@ try {
   await page.getByRole('button', {name: '🖨 見積書を印刷'}).first().click();
   await page.locator('.est-sheet [role="group"]').waitFor();
   const doc = await page.locator('.est-sheet').innerText();
-  for (const s of ['御　見　積　書', '山田 花子　様', '行橋営業所', 'T1290001044462', '42,944', 'シャワーベンチ FSフィット', '利用者負担（1割）4,295円', '保険者負担（9割）38,649円', 'お支払いいただく金額 4,295円']) {
+  for (const s of ['御　見　積　書', '山田 花子　様', '行橋営業所', 'T1290001044462', '42,944', 'シャワーベンチ FSフィット', '介護保険（受領委任払い）', '介護保険の対象　42,944円', '利用者負担（1割）　4,295円', '保険者負担（9割）　38,649円']) {
     assert.ok(doc.includes(s), `見積書に「${s}」がない`);
   }
   await page.screenshot({path: `${out}/05-estimate.png`});
@@ -307,7 +307,9 @@ try {
   assert.equal(cellOf(sheet, 'E21'), '42944');
   assert.match(sheet, /<c r="E21"[^>]*><f>/);
   assert.match(cellOf(sheet, 'A6'), /山田 花子　様/);
-  assert.match(cellOf(sheet, 'A60'), /利用者負担（1割）4,295円/);
+  // 介護保険の内訳は明細の自己負担額の下に1行ずつ（「備考欄に記載している部分を上にずらす」「行を変えて見やすくする」2026-10-26）。下の備考の欄には書かない
+  assert.ok(sheet.includes('利用者負担（1割）　4,295円'));
+  assert.doesNotMatch(cellOf(sheet, 'A60'), /利用者負担/);
   assert.ok(!Object.keys(book).some((k) => k.startsWith('xl/media/')), '原本の印影の画像が入っている');
   // 印刷（PDF）は A4縦 1枚
   await assertFits(page, '2品');
@@ -336,16 +338,18 @@ try {
   assert.equal(await maker.inputValue(), '見本工業');
   await page.getByText('仕切（税抜・任意）').last().waitFor();
   await page.waitForFunction(() => document.querySelector('[aria-label="見積書のプレビュー"] [data-pv-field="items"]')?.className.includes('outline-amber-500'));
-  // 「自己負担額を表示」をオンにすると、明細の最後の商品の2行下に「自己負担額（1割負担）　○円」（ユーザーの指示「自己負担額を表示のオンオフっていうチェック項目を入れ」2026-10-26）
+  // 「自己負担額を表示」は初めからオン：明細の最後の商品の2行下から介護保険の内訳（利用者負担は赤字）（ユーザーの指示「自己負担額を表示のオンオフっていうチェック項目を入れ」
+  // 「この部分のみ記載する形で良い　利用者負担額の部分のみ赤字で記載する」2026-10-26）。外すと消える
   const selfPay = page.getByRole('checkbox', {name: '自己負担額を表示'});
-  assert.equal(await selfPay.isChecked(), false);
-  await selfPay.check();
+  assert.equal(await selfPay.isChecked(), true);
   const estPreview = page.locator('[aria-label="見積書のプレビュー"]');
-  await estPreview.getByText(/^自己負担額（1割負担）　[\d,]+円$/).waitFor();
+  await estPreview.getByText(/^利用者負担（1割）　[\d,]+円$/).waitFor();
   await page.screenshot({path: `${out}/05e-self-pay.png`});
   await selfPay.uncheck();
-  await estPreview.getByText(/^自己負担額（/).waitFor({state: 'detached'});
-  await page.getByRole('textbox', {name: '備考', exact: true}).fill(['ご不明な点は担当までお問い合わせください。', '納品の前にお電話いたします。'].join('\n'));
+  await estPreview.getByText('介護保険（受領委任払い）', {exact: true}).waitFor({state: 'detached'});
+  await selfPay.check();
+  await estPreview.getByText('介護保険（受領委任払い）', {exact: true}).waitFor();
+  await page.getByRole('textbox', {name: '備考', exact: true}).fill(['ご不明な点は担当までお問い合わせください。', '見本の2行目です。', '見本の3行目です。', '納品の前にお電話いたします。'].join('\n'));
   await page.getByText('見積書の備考は3行までです').waitFor();
   await page.getByRole('button', {name: '🖨 見積書を印刷'}).first().click();
   await page.locator('.est-sheet [role="group"]').waitFor();
@@ -379,8 +383,10 @@ try {
   // 1ページ目の下（合計・備考）まで紙に出る（前は印刷の transform のせいで、紙の下のほうの字が消えた）
   const pdf1 = pdfText(`${out}/estimate-2pages.pdf`, 1);
   if (pdf1 !== null) {
-    for (const s of ['39,040', '10%対象', '介護保険（受領委任払い）', 'お支払いいただく金額 4,295円']) assert.ok(pdf1.includes(s), `PDF の1ページ目に「${s}」がない`);
-    assert.ok(pdfText(`${out}/estimate-2pages.pdf`, 2).includes('見本の商品 21'));
+    for (const s of ['39,040', '10%対象', 'ご不明な点は担当までお問い合わせください。']) assert.ok(pdf1.includes(s), `PDF の1ページ目に「${s}」がない`);
+    // 介護保険の内訳は明細の下（23品なら2ページ目の最後の商品の下）
+    const pdf2 = pdfText(`${out}/estimate-2pages.pdf`, 2);
+    for (const s of ['見本の商品 21', '介護保険（受領委任払い）', '利用者負担（1割）', '4,295円']) assert.ok(pdf2.includes(s), `PDF の2ページ目に「${s}」がない`);
   }
   await page.emulateMedia({media: 'screen'});
   await page.locator('.est-sheet').nth(1).screenshot({path: `${out}/05d-estimate-page2.png`});

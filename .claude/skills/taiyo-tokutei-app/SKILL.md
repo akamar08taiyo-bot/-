@@ -116,7 +116,7 @@ URL は `#jutaku=<様邸の id>&embed=1`：その様邸の案件を開き（な�
   メーカー名は `MakerInput`（パナソニックエイジフリー（株）・アロン化成（株）が先頭。`makerChoices`）。e2e では `getByRole('combobox', {name: 'メーカー'})`（「▼」のボタン・候補の名前にも「メーカー」が入る）。
   仕切は任意（「仕切（税抜・任意）」・`saleWarnings` で知らせない）。
   題名は太字・黒い枠をやめて水色の帯＋紺の二重線、太字は御見積合計の金額と合計の行だけ、印刷しない赤い枠とメモは消した（2026-10-26。テストが太字の欄を数える）。
-  「自己負担額を表示」（`Sale.showSelfPay`）：明細の最後の商品の2行下に「自己負担額（1割負担）　○円」（`selfPayText`・`selfPayIndex`。ページの数は `usedRows`＝商品と自己負担額の行で決める）。DESIGN.md 5.1。
+  「自己負担額を表示」（`Sale.showSelfPay`。空なら出す）：明細の最後の商品の2行下から介護保険の内訳を1行ずつ（利用者負担は赤字。`insuranceLines`・`belowItemLines`・`selfPayIndex`。ページの数は `usedRows`＝商品と内訳の行で決める）。下の備考の欄は備考に足す文だけ。DESIGN.md 5.1。
   `MakerInput` の候補は画面に固定して出す（入れる所の枠の overflow で切れないように）。どこかが動くたびに閉じる作りにしたら、欄を押したときに見積書のプレビューの枠が動いて、すぐ閉じた → 欄のまわりが動いたときだけついて動く。
   見積書のプレビューに「担当」の押せる欄（I16）ができたので、e2e で `getByLabel('担当')` は2つに当たる → `getByRole('combobox', {name: '担当'})`。
 - **販売受注簿への自動の送り**：状態を承認・納品にしたとき1回だけ列 `taiyo-hacchu-import-queue-v1` に入れる（`handoff.ts` の `queueHacchu`・案件の `hacchuSentAt`。受注簿ツールの `readJutakuImport` が列を読む）。DESIGN.md 5.3。

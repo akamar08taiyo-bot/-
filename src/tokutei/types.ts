@@ -97,7 +97,7 @@ export type Sale = {
   updatedAt: number;
   jutakuJob?: string; // 住宅改修のアプリの様邸の画面（🛁 特定福祉用具申請書のタブ）から開いた案件：その様邸の id（jutaku.ts）
   jutakuSync?: JutakuFields; // 前に住宅改修から受け取ったお客様の情報（住宅改修で変わった値だけ入れ直すため）
-  showSelfPay?: boolean; // 見積書の明細の最後の商品の2行下に「自己負担額（1割負担）　○円」を出す（見積もりの画面の「自己負担額を表示」。estimateBook.ts の selfPayText）
+  showSelfPay?: boolean; // 見積書の明細の最後の商品の2行下から介護保険の内訳（利用者負担＝自己負担額は赤字）を出すか。空なら出す・false なら出さない（見積もりの画面の「自己負担額を表示」。estimateBook.ts の belowItemLines）
   hacchuSentAt?: number; // 販売受注簿へ送った時刻（「📤 販売受注簿に転記」か、状態を承認にしたときの自動。自動で送るのは1回だけ。handoff.ts の queueHacchu）
 };
 

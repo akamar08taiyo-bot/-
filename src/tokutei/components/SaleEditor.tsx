@@ -349,8 +349,8 @@ export function SaleEditor({
             <aside ref={estBox} className="min-w-0 space-y-3 lg:sticky lg:top-3 lg:max-h-[calc(100vh-1.5rem)] lg:self-start lg:overflow-y-auto" style={{scrollbarGutter: 'stable'}}>
               <section className="rounded-xl bg-slate-200/70 p-2">
                 {estimateOverflow(sale) > 0 && <p className="mb-2 rounded-md bg-rose-50 p-2 text-xs font-bold text-rose-700">見積書の明細は3ページ・{ESTIMATE_CAPACITY}点までです（{estimateOverflow(sale)}点が入りません）</p>}
-                {estimateNoteOverflow(sale, s) > 0 && (
-                  <p className="mb-2 rounded-md bg-rose-50 p-2 text-xs font-bold text-rose-700">見積書の備考は3行までです（介護保険の内訳とあわせて。{estimateNoteOverflow(sale, s)}行が入りません）</p>
+                {estimateNoteOverflow(sale) > 0 && (
+                  <p className="mb-2 rounded-md bg-rose-50 p-2 text-xs font-bold text-rose-700">見積書の備考は3行までです（{estimateNoteOverflow(sale)}行が入りません）</p>
                 )}
                 {estPages === null ? (
                   <p className="p-6 text-center text-sm text-slate-500">見積書を開いています…</p>

@@ -20,7 +20,7 @@ import type {PvPage, Range} from './shinseiPreview.ts';
 import type {Sale, Settings, TaxType} from './types.ts';
 import {yen} from './util.ts';
 import {excelDate} from './shinsei.ts';
-import {attrOf, cellRe, dropCalcChain, esc, finishWorkbook, numOf, setCell, setStyle, sheetLayout, sheetPath} from './xlsxEdit.ts';
+import {attrOf, cellRe, colorStyle, dropCalcChain, esc, finishWorkbook, numOf, setCell, setStyle, sheetLayout, sheetPath} from './xlsxEdit.ts';
 import type {CellValue, Files} from './xlsxEdit.ts';
 
 export const ESTIMATE_SHEET = '見積書';
@@ -56,22 +56,54 @@ export function itemRows(pages: number): number[] {
   return rows;
 }
 /**
- * 自己負担額の行の文（ユーザーの指示「自己負担額を表示のオンオフっていうチェック項目を入れ、オンにした場合は…商品の列の最後の2行下ぐらいに、自己負担額〇〇円みたいな形で表示する。
- * …1割負担、2割負担だと…自動的に、自己負担額を記入するようにする」2026-10-26）。お客様のお支払い（利用者負担＋限度額を超えた分。生活保護なら負担割合の分は介護扶助）。出さないときは ''
+ * 明細の下に介護保険の内訳（利用者負担＝自己負担額を赤字）を出すか（「自己負担額を表示」。ユーザーの指示「自己負担額を表示のオンオフっていうチェック項目を入れ」2026-10-26。
+ * 初めから出す。外すと false）
  */
-export function selfPayText(sale: Sale, t: Pick<Totals, 'ratio' | 'userPay'>): string {
-  if (!sale.showSelfPay || sale.items.length === 0) return '';
-  return `自己負担額（${sale.welfare ? '生活保護' : `${t.ratio}割負担`}）　${yen(t.userPay)}円`;
-}
-/** 明細の何番目（0始まり）に自己負担額を書くか：最後の商品の2行下（1行あける）。そのページに入らなければすぐ下、それも入らなければ次のページの1行目。出さない・入らないときは -1 */
-export function selfPayIndex(items: number, show: boolean): number {
-  if (!show || items === 0) return -1;
+export const showsSelfPay = (sale: Pick<Sale, 'showSelfPay' | 'items'>) => sale.showSelfPay !== false && sale.items.length > 0;
+/**
+ * 明細の何番目（0始まり）から介護保険の内訳を書くか：最後の商品の2行下（1行あける）。そのページに入らなければすぐ下、それも入らなければ次のページの1行目。
+ * 出さない・入らないときは -1（n は行の数）
+ */
+export function selfPayIndex(items: number, n: number): number {
+  if (n <= 0 || items === 0) return -1;
   const pageOf = (i: number) => (i < ESTIMATE_ROWS.length ? 1 : 2 + Math.floor((i - ESTIMATE_ROWS.length) / CONT_ROWS));
-  if (items + 1 < ESTIMATE_CAPACITY && pageOf(items + 1) === pageOf(items - 1)) return items + 1;
-  return items < ESTIMATE_CAPACITY ? items : -1;
+  const fits = (start: number) => start + n <= ESTIMATE_CAPACITY && pageOf(start + n - 1) === pageOf(items - 1);
+  if (fits(items + 1)) return items + 1;
+  if (fits(items)) return items;
+  const next = ESTIMATE_ROWS.length + (pageOf(items - 1) - 1) * CONT_ROWS; // 次のページの1行目
+  return next + n <= ESTIMATE_CAPACITY ? next : -1;
 }
-/** 明細の行を何行使うか（商品と自己負担額の行。ページの数を決める） */
-const usedRows = (sale: Sale) => Math.max(sale.items.length, selfPayIndex(sale.items.length, !!sale.showSelfPay) + 1);
+/** 利用者負担の行（自己負担額。見積書では赤字。見積もりの画面の「自己負担額を表示」の横にも出す） */
+export const userBurdenLine = (t: Pick<Totals, 'ratio' | 'userBurden'>) => `利用者負担（${t.ratio}割）　${yen(t.userBurden)}円`;
+/**
+ * 介護保険の内訳：明細の最後の商品の2行下から1行ずつ「介護保険（受領委任払い）」「介護保険の対象　○円」「利用者負担（1割）　○円」「保険者負担（9割）　○円」
+ * （ユーザーの指示「備考欄に記載している部分を上にずらす」「行を変えて見やすくする」「この部分のみ記載する形で良い　利用者負担額の部分のみ赤字で記載する」2026-10-26。
+ * 前は下の備考の欄に2行でまとめ、そのあと一度「自己負担額（1割負担）」〜「（3割負担）」の3行と「お支払いいただく金額」も書いていた）。
+ * 生活保護の介護扶助・限度額を超えた分はあるときだけ。償還払いは、いったん全額を払うことが大事なので「いったんお支払いいただく金額」と払い戻しの行も。介護保険の対象がなければ []
+ */
+export function insuranceLines(sale: Sale, t: Totals): string[] {
+  if (t.covered <= 0) return [];
+  const out = [`介護保険（${sale.payMethod}）`, `介護保険の対象　${yen(t.covered)}円`, userBurdenLine(t)];
+  if (t.aid > 0) out.push(`介護扶助（${t.ratio}割）　${yen(t.aid)}円`);
+  out.push(`保険者負担（${10 - t.ratio}割）　${yen(t.insurerBurden)}円`);
+  if (t.excess > 0) out.push(`限度額を超えた分　${yen(t.excess)}円`);
+  if (sale.payMethod === '償還払い') out.push(`いったんお支払いいただく金額　${yen(t.total)}円`, `（あとで保険者から ${yen(t.insurerBurden)}円が払い戻されます）`);
+  return out;
+}
+/** 明細の商品の下に書く行（介護保険の内訳）と、赤字にする行（利用者負担）。出さない・商品がなければ [] */
+export function belowItemLines(sale: Sale, s: Settings): {lines: string[]; red: number} {
+  if (!showsSelfPay(sale)) return {lines: [], red: -1};
+  const t = saleTotals(sale, s);
+  const lines = insuranceLines(sale, t);
+  return {lines, red: lines.indexOf(userBurdenLine(t))};
+}
+const belowCount = (sale: Sale, s: Settings) => belowItemLines(sale, s).lines.length;
+/** 明細の行を何行使うか（商品と、その下の自己負担額・介護保険の内訳の行。ページの数を決める） */
+const usedRows = (sale: Sale, s: Settings) => {
+  const n = belowCount(sale, s);
+  const self = selfPayIndex(sale.items.length, n);
+  return Math.max(sale.items.length, self >= 0 ? self + n : 0);
+};
 /** 備考の行（59行目の「備　　考」の下の3行。A〜K を1つにした欄） */
 const NOTE_ROWS = [60, 61, 62];
 /** 件名（原本は空欄） */
@@ -89,10 +121,11 @@ export const ESTIMATE_LABEL: Record<EstimateField, string> = {
   note: '見積書の備考に足す文',
 };
 /** 押せる欄（明細は入っている行と、次に入る1行。自己負担額の行） */
-const links = (sale: Sale): [EstimateField, string[]][] => {
+const links = (sale: Sale, s: Settings): [EstimateField, string[]][] => {
   const items = sale.items.length;
-  const pages = estimatePages(Math.max(items + 1, usedRows(sale)));
-  const self = selfPayIndex(items, !!sale.showSelfPay);
+  const pages = estimatePages(Math.max(items + 1, usedRows(sale, s)));
+  const n = belowCount(sale, s);
+  const self = selfPayIndex(items, n);
   const tops = [1, ...Array.from({length: pages - 1}, (_, i) => contBlock(i + 2).top)];
   return [
     ['customer', tops.map((t) => `A${t + 5}`)],
@@ -100,7 +133,7 @@ const links = (sale: Sale): [EstimateField, string[]][] => {
     ['estimateDate', tops.map((t) => `I${t + 4}`)],
     ['staff', ['I16']],
     ['items', itemRows(pages).slice(0, items + 1).flatMap((r) => ['A', 'F', 'G', 'H', 'I', 'J', 'K'].map((c) => `${c}${r}`))],
-    ['selfPay', self >= 0 ? [`A${itemRows(pages)[self]}`] : []],
+    ['selfPay', self >= 0 ? itemRows(pages).slice(self, self + n).map((r) => `A${r}`) : []],
     ['note', NOTE_ROWS.map((r) => `A${r}`)],
   ];
 };
@@ -108,22 +141,9 @@ const links = (sale: Sale): [EstimateField, string[]][] => {
 /** 税率の欄の値（原本の下の合計の欄が、この値で税率ごとに分ける。A53〜A57 と同じ値） */
 const RATE: Record<TaxType, CellValue> = {'10%': 0.1, '8%': '軽減税率8%', 非課税: '非課税'};
 
-/** 備考の行：介護保険の内訳（見積書の金額から）と、見積書の備考に足す文（原本の3行まで） */
-export const estimateNotes = (sale: Sale, t: Totals): string[] => noteLines(sale, t).slice(0, NOTE_ROWS.length);
-
-function noteLines(sale: Sale, t: Totals): string[] {
-  const out: string[] = [];
-  if (t.covered > 0) {
-    const parts = [`介護保険（${sale.payMethod}）：介護保険の対象 ${yen(t.covered)}円`, `利用者負担（${t.ratio}割）${yen(t.userBurden)}円`];
-    if (t.aid > 0) parts.push(`介護扶助（${t.ratio}割）${yen(t.aid)}円`);
-    parts.push(`保険者負担（${10 - t.ratio}割）${yen(t.insurerBurden)}円`);
-    if (t.excess > 0) parts.push(`限度額を超えた分 ${yen(t.excess)}円`);
-    out.push(parts.join('　'));
-    out.push(sale.payMethod === '償還払い' ? `いったんお支払いいただく金額 ${yen(t.total)}円（あとで保険者から ${yen(t.insurerBurden)}円が払い戻されます）` : `お支払いいただく金額 ${yen(t.userPay)}円`);
-  }
-  for (const line of sale.note.split(/\r?\n/)) if (line.trim()) out.push(line.trim());
-  return out;
-}
+/** 備考の行：見積書の備考に足す文（原本の3行まで。介護保険の内訳は明細の下へ移した＝insuranceLines。2026-10-26） */
+const noteLines = (sale: Pick<Sale, 'note'>) => sale.note.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+export const estimateNotes = (sale: Pick<Sale, 'note'>): string[] => noteLines(sale).slice(0, NOTE_ROWS.length);
 
 /** 式の欄の保存しておく答え（式はそのまま。答えの文字は t="str"） */
 function setCached(xml: string, ref: string, value: CellValue): string {
@@ -185,7 +205,7 @@ export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
     if (st) for (const r of ESTIMATE_ROWS.slice(1, -1)) xml = setStyle(xml, `${c}${r}`, st);
   }
   // 2・3ページ目（明細のつづき）を足す（1ページ目の頭の行は、宛名・番号・日付を書いたあとの写し）
-  const pages = estimatePages(usedRows(sale));
+  const pages = estimatePages(usedRows(sale, s));
   if (pages > 1) xml = addContinuation(xml, tpl, pages);
   const rows = itemRows(pages);
   // 明細の金額の欄は、どの行もふつうの式にする（前の原本の26〜42行は「共有の式」で、親の26行目を書きかえると下の行の式がこわれた。隠した行も）
@@ -207,11 +227,18 @@ export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
     const key = String(RATE[i.taxType]);
     sums[key] = (sums[key] ?? 0) + amount;
   });
-  // 自己負担額（明細の最後の商品の2行下。品名の欄に文で。金額の欄・税率は空なので合計には入らない）
-  const self = selfPayIndex(t.lines.length, !!sale.showSelfPay);
-  if (self >= 0) put(`A${rows[self]}`, selfPayText(sale, t));
+  // 明細の最後の商品の2行下から介護保険の内訳を1行ずつ。利用者負担（自己負担額）は赤字（ユーザーの指示「利用者負担額の部分のみ赤字で記載する」2026-10-26）。
+  // 品名の欄に文で。金額の欄・税率は空なので合計には入らない
+  const below = belowItemLines(sale, s);
+  const self = selfPayIndex(t.lines.length, below.lines.length);
+  if (self >= 0)
+    below.lines.forEach((text, k) => {
+      const ref = `A${rows[self + k]}`;
+      put(ref, text);
+      if (k === below.red) xml = setStyle(xml, ref, String(colorStyle(files, numOf(attrOf(cellRe(ref).exec(xml)?.[1] ?? '', 's'), 0), 'FFFF0000')));
+    });
   // 備考
-  const notes = estimateNotes(sale, t);
+  const notes = estimateNotes(sale);
   NOTE_ROWS.forEach((r, k) => put(`A${r}`, notes[k] ?? ''));
   // 2・3ページ目の明細も足す（税率ごとの合計の式）
   if (pages > 1) {
@@ -344,10 +371,10 @@ export function fillEstimate(template: Files, sale: Sale, s: Settings): Uint8Arr
 export function estimatePreview(template: Files, sale: Sale, s: Settings): PvPage<EstimateField>[] {
   const files: Files = {...template};
   fillEstimateFiles(files, sale, s);
-  const pages = estimatePages(usedRows(sale));
+  const pages = estimatePages(usedRows(sale, s));
   const ranges: (Range | null)[] = [pages > 1 ? [1, 1, LAST_COL, PAGE1_LAST] : null];
   for (let p = 2; p <= pages; p++) ranges.push([1, contBlock(p).top, LAST_COL, contBlock(p).rows.at(-1)!]);
-  return sheetPreviewPages(files, template, ESTIMATE_SHEET, links(sale), ranges);
+  return sheetPreviewPages(files, template, ESTIMATE_SHEET, links(sale, s), ranges);
 }
 
 /**
@@ -363,5 +390,5 @@ export const estimateFileName = (sale: Pick<Sale, 'customer'>): string => `${est
 /** 3ページの明細の行より多い商品（見積書に入らない） */
 export const estimateOverflow = (sale: Sale) => Math.max(0, sale.items.length - ESTIMATE_CAPACITY);
 
-/** 備考の3行に入らない行の数（介護保険の内訳で2行使う） */
-export const estimateNoteOverflow = (sale: Sale, s: Settings) => Math.max(0, noteLines(sale, saleTotals(sale, s)).length - NOTE_ROWS.length);
+/** 備考の3行に入らない行の数 */
+export const estimateNoteOverflow = (sale: Pick<Sale, 'note'>) => Math.max(0, noteLines(sale).length - NOTE_ROWS.length);

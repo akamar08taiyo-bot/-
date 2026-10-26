@@ -206,7 +206,7 @@ export function cellStyle(files: Files, xml: string, ref: string): CellStyle {
  * 書式（cellXfs の番号）の文字の大きさ（pt）・配置（alignment の XML）だけを替えた書式を足して、その番号を返す（同じものがあればそれ）。
  * 罫線・塗り・表示形式はもとの書式のまま
  */
-function variantStyle(files: Files, style: number, change: {pt?: number; alignment?: string}): number {
+function variantStyle(files: Files, style: number, change: {pt?: number; alignment?: string; color?: string}): number {
   const {fonts, xfs} = styleParts(files);
   const xf = xfs[style];
   if (xf === undefined) return style;
@@ -222,6 +222,21 @@ function variantStyle(files: Files, style: number, change: {pt?: number; alignme
     if (fontId < 0) {
       fontId = fonts.length;
       xml = xml.replace('</fonts>', `${sized}</fonts>`);
+      count('fonts', fonts.length + 1);
+    }
+    next = /\sfontId=/.test(next) ? next.replace(/\sfontId="\d+"/, ` fontId="${fontId}"`) : next.replace(/^<xf\b/, `<xf fontId="${fontId}"`);
+    next = /\sapplyFont=/.test(next) ? next.replace(/\sapplyFont="[^"]*"/, ' applyFont="1"') : next.replace(/^<xf\b/, '<xf applyFont="1"');
+  }
+  if (change.color !== undefined) {
+    // 字の色（rgb。例 FFFF0000＝赤）
+    const font = fonts[numOf(attrOf(next, 'fontId'), 0)] ?? '<font/>';
+    const colored = /<color\b[^>]*\/>/.test(font)
+      ? font.replace(/<color\b[^>]*\/>/, `<color rgb="${change.color}"/>`)
+      : font.replace(/^<font\b([^>]*?)\s*(\/?)>/, (_, a: string, close: string) => `<font${a}><color rgb="${change.color}"/>${close ? '</font>' : ''}`);
+    let fontId = fonts.indexOf(colored);
+    if (fontId < 0) {
+      fontId = fonts.length;
+      xml = xml.replace('</fonts>', `${colored}</fonts>`);
       count('fonts', fonts.length + 1);
     }
     next = /\sfontId=/.test(next) ? next.replace(/\sfontId="\d+"/, ` fontId="${fontId}"`) : next.replace(/^<xf\b/, `<xf fontId="${fontId}"`);
@@ -243,6 +258,9 @@ function variantStyle(files: Files, style: number, change: {pt?: number; alignme
   files['xl/styles.xml'] = strToU8(xml);
   return id;
 }
+
+/** 字の色だけ変えた書式（なければ足す）。新しい書式の番号 */
+export const colorStyle = (files: Files, style: number, rgb: string): number => variantStyle(files, style, {color: rgb});
 
 /** 欄の書式の配置（alignment の XML。なければ空） */
 function alignmentOf(files: Files, xml: string, ref: string): string {
