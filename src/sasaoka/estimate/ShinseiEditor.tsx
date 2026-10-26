@@ -14,8 +14,7 @@ import {circled, eraOf, INSURER_IDS, INSURER_INFO, insurerForAddress, jobInsurer
 import {placeFromDims, withBrackets} from '../cutLink.ts';
 import {manualRow, newPlace} from '../rows.ts';
 import {usePhotoUrls} from '../photos.ts';
-import {costIsTotal, estimateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLines, photoSheets, SHINSEI, shinseiCost, shinseiKinds, shinseiValues, shinseiWorks, workItems} from '../shinsei.ts';
-import type {WorkItem} from '../shinsei.ts';
+import {costIsTotal, estimateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLines, photoSheets, SHINSEI, shinseiCost, shinseiValues, shinseiWorks} from '../shinsei.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
 import type {AppData, Insurer, Job, Material, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
@@ -623,31 +622,12 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
       p.photos?.before || p.photos?.after ? '写真' : '',
       p.photoDates?.before || p.photoDates?.after ? '撮影日' : '',
       Object.values(p.dims ?? {}).some((v) => v?.trim()) ? '寸法' : '',
-      p.shinseiLine !== undefined || p.shinseiText?.trim() ? '申請書に書く内容' : '',
+      p.shinseiText?.trim() ? 'そのほか' : '',
       p.photoNote?.trim() ? '写真に書く内容' : '',
     ].filter(Boolean);
     if (has.length && !confirm(`「${p.name.trim() || '箇所'}」と、その${has.join('・')}を消します。元に戻せません。よろしいですか？`)) return;
     setJob((j) => ({...j, places: j.places.filter((x) => x.id !== p.id)}));
   };
-  // 申請書に書く内容を手で直す（ユーザーの指示「手入力でも編集できるようにする」）。自動の文と同じに戻したら、手で直していないことにする
-  // （寸法・そのほかを変えると、また自動で変わる）。↺ で自動の文に戻す
-  const items = workItems(job, s);
-  const setLine = (w: WorkItem, text: string) =>
-    setPlace(w.id, ({shinseiLine: _old, ...rest}) => (text === w.auto ? rest : {...rest, shinseiLine: text}));
-  const resetLine = (id: string) => setPlace(id, ({shinseiLine: _old, ...rest}) => rest);
-  const lineInput = (w: WorkItem) => (
-    <div key={w.id} className="flex items-center gap-1">
-      <span className="w-5 shrink-0 text-center">{circled(w.photo)}</span>
-      <TextInput value={w.text} onChange={(t) => setLine(w, t)} className="min-w-0 flex-1" aria-label={`${circled(w.photo)}${w.name}の申請書に書く内容`} data-nav />
-      {w.edited ? (
-        <button type="button" onClick={() => resetLine(w.id)} className="w-7 shrink-0 rounded py-1 text-slate-500 hover:bg-slate-100" title="自動の文に戻す" aria-label={`${circled(w.photo)}${w.name}の申請書に書く内容を自動の文に戻す`}>
-          ↺
-        </button>
-      ) : (
-        <span className="w-7 shrink-0" />
-      )}
-    </div>
-  );
   return (
     <div className="w-full space-y-2">
       {job.places.length > 0 && (
@@ -721,33 +701,6 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
         ))}
         <option value={OTHER_PLACE}>そのほか（名前を打つ）</option>
       </select>
-      {/* 申請書に書く内容（みやこ町・広域連合は内訳明細書の改修の種類の行）。1行ずつ手で直せる */}
-      {items.length > 0 &&
-        (twoForms(insurer) ? (
-          <table className="w-full border border-slate-300 text-sm" aria-label="住宅改修内訳明細書に書く内容">
-            <caption className="bg-slate-50 px-2 py-1 text-left text-xs font-bold text-slate-600">住宅改修内訳明細書（様式第2号別紙）に書く内容</caption>
-            <tbody>
-              {shinseiKinds(job, s).map((k, i) => {
-                // 手で空にした行も、打ち直せるように欄は出す
-                const mine = items.filter((w) => w.kind === i + 1);
-                return mine.length === 0 ? null : (
-                  <tr key={i} className="border-t border-slate-200 align-top">
-                    <td className="w-36 border-r border-slate-200 px-2 py-1 font-bold">
-                      {circled(i + 1)} {KINDS[i]}
-                      <div className="text-xs font-normal text-slate-600">{k.places}</div>
-                    </td>
-                    <td className="space-y-1 px-2 py-1">{mine.map(lineInput)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        ) : (
-          <div className="rounded border border-slate-300 text-sm" aria-label="申請書に書く内容">
-            <div className="bg-slate-50 px-2 py-1 text-xs font-bold text-slate-600">申請書に書く内容</div>
-            <div className="space-y-1 px-2 py-1.5">{items.map(lineInput)}</div>
-          </div>
-        ))}
     </div>
   );
 }

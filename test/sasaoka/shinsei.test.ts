@@ -430,30 +430,25 @@ test('行橋市の申請書：住改・受領委任払の氏名・住所・被�
   assert.equal(readShinsei(new Uint8Array([1, 2, 3])), null);
 });
 
-test('改修の内容を手で直す（Place.shinseiLine）：直した文を写真番号のうしろに書く（申請書・内訳明細書・平面図とも）。空にした行は書かない', () => {
+test('改修の内容はいつも自動の文（寸法・そのほかから作る）：前の版で手で直した文（Place.shinseiLine）が残っていても使わない（ユーザーの指示「申請書に書く内容という部分はなくす」2026-10-26）', () => {
   const base = job();
   const at = (i: number, extra: Partial<Place>) => job({places: base.places.map((p, k) => (k === i ? {...p, ...extra} : p))});
-  const edited = at(0, {shinseiLine: '浴室　手すりの取り付け　L=650mm　木製 '});
-  assert.deepEqual(shinseiWorks(edited, RATES), ['①浴室　手すりの取り付け　L=650mm　木製', '⑤玄関　手すりの取り付け　L=400×600×600mm', '③トイレ　段差の解消']);
-  // 画面の欄：直した行は打ったまま（edited）、ほかは自動の文。auto は自動の文（同じに戻したら手で直していないことにする）
+  const auto = shinseiWorks(base, RATES);
+  assert.deepEqual(auto, ['①浴室　手すりの取り付け　L=600mm', '⑤玄関　手すりの取り付け　L=400×600×600mm', '③トイレ　段差の解消']);
+  for (const extra of [{shinseiLine: '浴室　手すりの取り付け　L=650mm　木製 '}, {shinseiLine: '  '}, {shinseiLine: ''}]) {
+    const old = at(0, extra);
+    assert.deepEqual(shinseiWorks(old, RATES), auto);
+    assert.deepEqual(shinseiKinds(old, RATES), shinseiKinds(base, RATES));
+    assert.equal(txt(sheets(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(old, RATES))).byName.get('事前申請書')!, 'J14').split('\n')[0], '①浴室　手すりの取り付け　L=600mm');
+  }
   assert.deepEqual(
-    workItems(edited, RATES).map((w) => [w.photo, w.edited, w.text, w.auto]),
+    workItems(base, RATES).map((w) => [w.photo, w.line]),
     [
-      [1, true, '浴室　手すりの取り付け　L=650mm　木製 ', '浴室　手すりの取り付け　L=600mm'],
-      [5, false, '玄関　手すりの取り付け　L=400×600×600mm', '玄関　手すりの取り付け　L=400×600×600mm'],
-      [3, false, 'トイレ　段差の解消', 'トイレ　段差の解消'],
+      [1, '①浴室　手すりの取り付け　L=600mm'],
+      [5, '⑤玄関　手すりの取り付け　L=400×600×600mm'],
+      [3, '③トイレ　段差の解消'],
     ],
   );
-  assert.deepEqual(shinseiKinds(edited, RATES)[0].works, ['①浴室　手すりの取り付け　L=650mm　木製', '⑤玄関　手すりの取り付け　L=400×600×600mm']);
-  const pre = sheets(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(edited, RATES))).byName.get('事前申請書')!;
-  assert.equal(txt(pre, 'J14').split('\n')[0], '①浴室　手すりの取り付け　L=650mm　木製');
-  // 写真番号は見積書の番号のまま（文の中に打っても付けない）
-  assert.deepEqual(shinseiWorks(at(3, {photo: 7, shinseiLine: 'トイレ　スロープ'}), RATES).slice(-1), ['⑦トイレ　スロープ']);
-  // 空にした行は申請書に書かない（欄は出す）。改修の種類の行の箇所にも入れない
-  const empty = at(3, {shinseiLine: '  '});
-  assert.deepEqual(shinseiWorks(empty, RATES), ['①浴室　手すりの取り付け　L=600mm', '⑤玄関　手すりの取り付け　L=400×600×600mm']);
-  assert.deepEqual(shinseiKinds(empty, RATES)[1], {places: '', works: []});
-  assert.equal(workItems(empty, RATES).length, 3);
 });
 
 test('改修の内容の1行から、写真番号・改修場所・改修の種類を読む', () => {

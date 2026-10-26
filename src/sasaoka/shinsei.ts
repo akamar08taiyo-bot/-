@@ -280,12 +280,11 @@ export type PhotoImage = {bytes: Uint8Array; w: number; h: number; edit?: PhotoE
 export type PhotoImages = {before?: PhotoImage; after?: PhotoImage};
 
 /**
- * 改修の内容の行（見積書に出る箇所ごと）：改修の種類（1〜6）・改修場所・写真番号と、申請書に書く1行（line）。
- * auto は写真番号のうしろの自動の文、text は画面の欄の文（手で直していればその文。edited）。
- * 申請書のタブで手で直せる（ユーザーの指示「手入力でも編集できるようにする」、2026-10-21。直した文は `Place.shinseiLine`）。
- * 手で空にした行は申請書に書かない（line は空）
+ * 改修の内容の行（見積書に出る箇所ごと）：改修の種類（1〜6）・改修場所・写真番号と、申請書に書く1行（line。「①玄関　手すりの取り付け　L=600mm」）。
+ * 前は申請書のタブの「申請書に書く内容」で1行ずつ手で直せた（`Place.shinseiLine`）が、ユーザーの指示「申請書に書く内容という部分はなくす」2026-10-26 で
+ * 欄を外したので、いつも自動の文（寸法・そのほかから作る）にする。前に手で直した文は残っていても使わない（直せない文が出つづけないように）
  */
-export type WorkItem = {id: string; kind: number; name: string; photo: number; auto: string; text: string; edited: boolean; line: string};
+export type WorkItem = {id: string; kind: number; name: string; photo: number; line: string};
 
 /** 見積書に出る箇所ごとの改修の内容の行。見積書に出ない箇所（行のない箇所）は入れない */
 export function workItems(job: Pick<Job, 'places'>, rates: EstimateRates): WorkItem[] {
@@ -294,11 +293,7 @@ export function workItems(job: Pick<Job, 'places'>, rates: EstimateRates): WorkI
   for (const p of job.places) {
     const photo = photos.get(p.id);
     if (photo === undefined) continue;
-    const no = circled(photo);
-    const auto = workLine(p, photo).slice(no.length);
-    const edited = p.shinseiLine !== undefined;
-    const typed = (p.shinseiLine ?? '').trim();
-    out.push({id: p.id, kind: p.kind, name: p.name.trim(), photo, auto, text: edited ? (p.shinseiLine ?? '') : auto, edited, line: edited ? (typed ? no + typed : '') : no + auto});
+    out.push({id: p.id, kind: p.kind, name: p.name.trim(), photo, line: workLine(p, photo)});
   }
   return out;
 }

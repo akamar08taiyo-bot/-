@@ -200,20 +200,16 @@ assert.equal(await genkan.getByLabel('長さ（mm）').getAttribute('placeholder
 assert.equal(await works.getByLabel('幅（mm）').count(), 0);
 await genkan.getByLabel('高さ（mm）').fill('800');
 await pvHas('①玄関　手すりの取り付け　L=600mm H=800mm');
-// 申請書に書く内容は1行ずつの欄（写真番号のうしろ）。手で直せて、↺ で自動の文に戻る（ユーザーの指示「手入力でも編集できるようにする」）
-const workLines = () => works.getByLabel('申請書に書く内容').locator('input').evaluateAll((els) => els.map((e) => e.value));
-assert.deepEqual(await workLines(), ['玄関　手すりの取り付け　L=600mm H=800mm', 'トイレ　手すりの取り付け']);
-const line1 = works.getByLabel('①玄関の申請書に書く内容', {exact: true});
-await line1.fill('玄関　手すりの取り付け　L=600mm H=800mm　木製');
-await pvHas('①玄関　手すりの取り付け　L=600mm H=800mm　木製');
-await genkan.getByLabel('高さ（mm）').fill('850'); // 手で直した行は、寸法を変えても直した文のまま
-await page.waitForTimeout(300);
-assert.equal(await line1.inputValue(), '玄関　手すりの取り付け　L=600mm H=800mm　木製');
-await works.getByRole('button', {name: '①玄関の申請書に書く内容を自動の文に戻す'}).click();
-assert.equal(await line1.inputValue(), '玄関　手すりの取り付け　L=600mm H=850mm');
+// 「申請書に書く内容」の欄はない（ユーザーの指示「申請書に書く内容という部分はなくす」2026-10-26）。改修の内容は寸法・そのほかから自動の文
+assert.equal(await form.getByLabel('申請書に書く内容').count(), 0);
+assert.equal(await form.getByText('申請書に書く内容').count(), 0);
+await genkan.getByLabel('高さ（mm）').fill('850');
+await pvHas('①玄関　手すりの取り付け　L=600mm H=850mm');
+await genkan.getByLabel('そのほか').fill('木製');
+await pvHas('①玄関　手すりの取り付け　L=600mm H=850mm　木製');
+await genkan.getByLabel('そのほか').fill('');
 await genkan.getByLabel('高さ（mm）').fill('800');
 await pvHas('①玄関　手すりの取り付け　L=600mm H=800mm');
-assert.equal(await works.getByRole('button', {name: /自動の文に戻す/}).count(), 0);
 // 丸：プレビューの申請書の「女」「昭」「要介護２」を押す（一覧のボタンにも出る）
 const yk = await make(['女', '昭和', '要介護2'], '81-shinsei-preview.png');
 pv = await preview.innerText();
