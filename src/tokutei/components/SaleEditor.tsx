@@ -1,4 +1,4 @@
-import {useDeferredValue, useMemo, useRef, useState} from 'react';
+import {useCallback, useDeferredValue, useEffect, useMemo, useRef, useState} from 'react';
 import type {FocusEvent, MouseEvent} from 'react';
 import {saleTotals} from '../calc.ts';
 import {insurerLabel} from '../defaults.ts';
@@ -8,6 +8,7 @@ import {shinseiForm, shinseiValues} from '../shinsei.ts';
 import {saveShinsei, useTemplate} from '../shinseiFiles.ts';
 import {FIELD_LABEL, missingFields, shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField} from '../shinseiPreview.ts';
+import type {CatalogAsk} from '../jutaku.ts';
 import type {AppData, Sale, SaleItem, SaleStatus} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {todayIso, yen} from '../util.ts';
@@ -17,6 +18,7 @@ import {ESTIMATE_CAPACITY, ESTIMATE_LABEL, estimateNoteOverflow, estimateOverflo
 import type {EstimateField} from '../estimateBook.ts';
 import {saveEstimateBook, useEstimateTemplate} from '../print/estimateFiles.ts';
 import {CatalogPrintView} from '../print/CatalogPrint.tsx';
+import {CatalogViewer} from '../print/CatalogViewer.tsx';
 import {ShinseiPrintView} from '../print/PrintView.tsx';
 import {CustomerPicker} from './CustomerPicker.tsx';
 import {EstimateInputs} from './EstimateInputs.tsx';
@@ -38,6 +40,7 @@ export function SaleEditor({
   onOpen,
   onPrint,
   fixedView,
+  catalogAsk,
 }: {
   sale: Sale;
   data: AppData;
@@ -47,6 +50,7 @@ export function SaleEditor({
   onPrint: (id: string) => void;
   // 住宅改修のタブの中：申請書だけ（🛁 特定福祉用具申請書のタブ）・見積書だけ（販売見積書のタブ）。見積もり・申請書のタブは出さない
   fixedView?: 'quote' | 'shinsei';
+  catalogAsk?: CatalogAsk | null; // 住宅改修の様邸の画面の左の「📖 カタログを表示」「🖨 カタログを印刷」（App.tsx）
 }) {
   const toast = useToast();
   const [picking, setPicking] = useState(false);
@@ -197,6 +201,14 @@ export function SaleEditor({
   };
   // 介援隊のカタログの印刷（catalog.ts。見積もりの商品が載っているページに初めからチェック）
   const [printingCatalog, setPrintingCatalog] = useState(false);
+  // カタログの窓（print/CatalogViewer.tsx）。「カタログから検索」に打った字で開く
+  const [catalogView, setCatalogView] = useState<{query: string} | null>(null);
+  useEffect(() => {
+    if (!catalogAsk) return;
+    if (catalogAsk.action === 'print') setPrintingCatalog(true);
+    else setCatalogView((c) => c ?? {query: ''});
+  }, [catalogAsk]);
+  const closeCatalog = useCallback(() => setCatalogView(null), []);
   const remove = () => {
     if (!window.confirm(`「${customerLabel(sale)}」の見積もりを消します。元に戻せません。よろしいですか？`)) return;
     update('sales', (list) => list.filter((x) => x.id !== sale.id));
@@ -307,6 +319,7 @@ export function SaleEditor({
             zips={zips}
             onPickProduct={() => setPicking(true)}
             onScan={() => setScanning(true)}
+            onCatalog={(query) => setCatalogView({query})}
             onAddItem={(item) => change({items: [...sale.items, item ?? blankItem(s)]})}
             onPickCustomer={() => setPickingCustomer(true)}
             onFavorite={(id) => favorite([id])}
@@ -344,6 +357,7 @@ export function SaleEditor({
             usedYear={prevYear.length ? {count: prevYear.length, used: usedYear, label: `${fy ?? ''}年度`} : null}
             onPickProduct={() => setPicking(true)}
             onScan={() => setScanning(true)}
+            onCatalog={(query) => setCatalogView({query})}
             onAddItem={(item) => change({items: [...sale.items, item ?? blankItem(s)]})}
             onPickCustomer={() => setPickingCustomer(true)}
             onFavorite={(id) => favorite([id])}
@@ -442,6 +456,7 @@ export function SaleEditor({
           }
         />
       )}
+      {catalogView && <CatalogViewer sale={sale} query={catalogView.query} onClose={closeCatalog} onPrint={() => setPrintingCatalog(true)} />}
       {printingCatalog && <CatalogPrintView sale={sale} onClose={() => setPrintingCatalog(false)} />}
       {pickingCustomer && <CustomerPicker sales={data.sales} current={sale} onPick={pickCustomer} onClose={() => setPickingCustomer(false)} />}
       {picking && (

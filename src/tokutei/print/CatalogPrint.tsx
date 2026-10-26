@@ -8,7 +8,8 @@ import {useFitZoom} from './PrintView.tsx';
 
 /**
  * 介援隊のカタログの印刷（catalog.ts）。カタログのページを A4 縦の紙で並べ、チェックしたページだけ印刷する。
- * 初めは見積もりの商品が載っているページにチェック（品番・細目・商品名で。申請書の印刷と同じく、外したページは画面では薄く、印刷には出さない）
+ * 初めは見積もりの商品が載っているページにチェック（品番・細目・商品名で）。画面にもチェックしたページだけを出す（ユーザーの指示「チェックを入れたら、
+ * 該当のカタログページを一番上にもってくる」「該当のページのみ印刷プレビューに表示する」2026-10-26。前は全部のページを並べ、外したページを薄くしていた）
  */
 export function CatalogPrintView({sale, onClose}: {sale: Sale; onClose: () => void}) {
   const zoom = useFitZoom();
@@ -85,10 +86,12 @@ export function CatalogPrintView({sale, onClose}: {sale: Sale; onClose: () => vo
         </button>
       </div>
       <div className="print-root" style={{zoom}}>
+        {picked.size === 0 && <p className="p-10 text-center text-sm text-white/80">印刷するページにチェックを入れてください</p>}
         {CATALOG.map((p, i) => {
           const pg = pages[i];
+          if (!picked.has(i)) return null;
           return (
-            <div key={p.file} className={`est-sheet cat-sheet ${picked.has(i) ? '' : 'est-skip'} ${i === last ? 'est-last' : ''}`} aria-label={`カタログ ${catalogLabel(p)}`}>
+            <div key={p.file} className={`est-sheet cat-sheet ${i === last ? 'est-last' : ''}`} aria-label={`カタログ ${catalogLabel(p)}`}>
               {pg && pg !== 'error' ? (
                 <img src={pg.url} alt={catalogLabel(p)} />
               ) : (

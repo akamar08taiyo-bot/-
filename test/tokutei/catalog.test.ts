@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import {existsSync, readFileSync} from 'node:fs';
 import test from 'node:test';
-import {CATALOG, catalogPicks, catalogTitle, codeKey, pageCodes} from '../../src/tokutei/catalog.ts';
+import {CATALOG, catalogMatches, catalogPicks, catalogTitle, codeKey, pageCodes} from '../../src/tokutei/catalog.ts';
 
 const item = (o: Partial<{name: string; maker: string; code: string; sub: string}>) => ({name: '', maker: '', code: '', sub: '', ...o});
 const page = (n: number) => CATALOG.findIndex((p) => p.page === n);
@@ -51,6 +51,19 @@ test('品番がカタログのページにあれば、そのページだけ（�
   // 短い品番・金額の数字は見くらべに使わない
   assert.deepEqual([...pageCodes('130 35,000 ¥35,000 各 535-458')], ['535458']);
   assert.deepEqual([...catalogPicks([item({code: '130'})], [new Set(['130'])])], []);
+});
+
+test('カタログから検索：ページの名前・ページの文字・品番（全角・ハイフン・空白のちがいは同じ。語はどれも）', () => {
+  const at = (page: number) => CATALOG.findIndex((p) => p.page === page);
+  const texts = CATALOG.map((p) => (p.page === 40 ? 'シ ャ ワ ー チ ェ ア 品 番 261-S1063' : p.page === 172 ? '家 具 調 ト イ レ 533-685' : ''));
+  assert.deepEqual(catalogMatches('', texts), CATALOG.map((_, i) => i)); // 空なら全部
+  assert.deepEqual(catalogMatches('２６１Ｓ１０６３', texts), [at(40)]);
+  assert.deepEqual(catalogMatches('533 685', texts), [at(172)]); // 語に分けても、どちらもページの文字にある
+  assert.deepEqual(catalogMatches('533-685', texts), [at(172)]);
+  assert.ok(catalogMatches('浴槽台', texts).includes(at(43)) && catalogMatches('浴槽台', texts).includes(at(44)));
+  assert.deepEqual(catalogMatches('浴槽台 安寿', texts), [at(44)]);
+  assert.deepEqual(catalogMatches('シャワーチェア', texts), [at(40)]);
+  assert.deepEqual(catalogMatches('見つからない語', texts), []);
 });
 
 test('印刷の画面の題（PDF に保存するときの名前の元）', () => {

@@ -20,7 +20,7 @@ import type {ZipHit} from '../zip.ts';
 import {CategorySelect} from './CategorySelect.tsx';
 import {MakerInput} from './MakerInput.tsx';
 import {ReasonField} from './ReasonField.tsx';
-import {AddItemButton, Circles, EraBirthInput, InsuredNoInput, KanaInput, nextOnEnter} from './ShinseiParts.tsx';
+import {AddItemButton, CatalogSearch, Circles, EraBirthInput, InsuredNoInput, KanaInput, nextOnEnter} from './ShinseiParts.tsx';
 import {Suggest} from './Suggest.tsx';
 import {Btn, NumberInput, Stepper, TextInput} from './ui.tsx';
 
@@ -42,6 +42,7 @@ export function ShinseiInputs({
   zips,
   onPickProduct,
   onScan,
+  onCatalog,
   onAddItem,
   onPickCustomer,
   onFavorite,
@@ -61,6 +62,7 @@ export function ShinseiInputs({
   zips: ZipHit[];
   onPickProduct: () => void;
   onScan: () => void; // 「📷 スクショから自動認識」の窓を開く（scanItem.ts）
+  onCatalog: (query: string) => void; // 右にカタログの窓を開く（print/CatalogViewer.tsx）
   onAddItem: (item?: SaleItem) => void; // 手で入れる商品を足す（item があればその商品＝最初から開いている欄に打ったもの）
   onPickCustomer: () => void;
   onFavorite: (itemId: string) => void; // 手で入れた商品を商品マスタの★お気に入りに
@@ -304,6 +306,7 @@ export function ShinseiInputs({
               <Btn color="purple" small onClick={onScan}>
                 📷 スクショから自動認識
               </Btn>
+              <CatalogSearch onOpen={onCatalog} />
             </div>
           </div>,
           'items',

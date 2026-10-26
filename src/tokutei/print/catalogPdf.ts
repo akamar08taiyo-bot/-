@@ -7,7 +7,7 @@ import {openPdf} from '../import/pdfText.ts';
 /** 印刷の細かさ（A4 で 200dpi ＝ 1654×2339 ほど） */
 const DPI = 200;
 
-export type CatalogImage = {url: string; codes: Set<string>};
+export type CatalogImage = {url: string; codes: Set<string>; text: string}; // text：ページの文字（カタログから検索に使う）
 
 /** catalog/ の PDF の場所（住宅改修のタブの中の枠でも、このアプリの index.html の隣） */
 export const catalogUrl = (file: string) => new URL(`catalog/${file}`, document.baseURI).href;
@@ -31,7 +31,7 @@ export async function loadCatalogPage(file: string): Promise<CatalogImage> {
     await page.render({canvas, canvasContext: ctx, viewport}).promise;
     const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/jpeg', 0.9));
     if (!blob) throw new Error('image');
-    return {url: URL.createObjectURL(blob), codes: pageCodes(text)};
+    return {url: URL.createObjectURL(blob), codes: pageCodes(text), text};
   } finally {
     await task.destroy();
   }

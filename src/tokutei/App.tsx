@@ -10,7 +10,8 @@ import {SaleEditor} from './components/SaleEditor.tsx';
 import {SalesPage} from './components/SalesPage.tsx';
 import {SettingsPage} from './components/SettingsPage.tsx';
 import {ToastProvider} from './components/ui.tsx';
-import {applyJutaku, JUTAKU_KEY, jutakuChanges, readJutaku, syncedValues, TO_JUTAKU} from './jutaku.ts';
+import {applyJutaku, FROM_JUTAKU_CATALOG, JUTAKU_KEY, jutakuChanges, readJutaku, syncedValues, TO_JUTAKU} from './jutaku.ts';
+import type {CatalogAsk} from './jutaku.ts';
 import type {JutakuFields} from './types.ts';
 import {estimateBook} from './print/estimateFiles.ts';
 import {PrintView} from './print/PrintView.tsx';
@@ -155,6 +156,21 @@ export default function App() {
     };
   }, [linkedSale, data, store.flush]);
 
+  // 住宅改修の「📖 カタログを表示」「🖨 カタログを印刷」：開いている案件の画面で、カタログの窓・カタログの印刷を出す（案件が開く前に届いても、開いたら出す）
+  const [catalogAsk, setCatalogAsk] = useState<CatalogAsk | null>(null);
+  useEffect(() => {
+    if (!embed) return;
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin !== location.origin || e.source !== window.parent) return;
+      const m = e.data as {type?: unknown; action?: unknown} | null;
+      if (m?.type !== FROM_JUTAKU_CATALOG || (m.action !== 'show' && m.action !== 'print')) return;
+      const action = m.action;
+      setCatalogAsk((c) => ({action, n: (c?.n ?? 0) + 1}));
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [embed]);
+
   const closePrint = useCallback(() => setPrintId(null), []);
 
   if (store.loadError)
@@ -229,7 +245,7 @@ export default function App() {
         <main className={`no-print mx-auto px-3 py-4 sm:px-4 ${embed && embedView ? 'max-w-none' : 'max-w-6xl'}`}>
           {tab === 'sales' &&
             (sale ? (
-              <SaleEditor key={sale.id} sale={sale} data={data} update={store.update} onBack={() => setSaleId(null)} onOpen={setSaleId} onPrint={setPrintId} fixedView={embedView} />
+              <SaleEditor key={sale.id} sale={sale} data={data} update={store.update} onBack={() => setSaleId(null)} onOpen={setSaleId} onPrint={setPrintId} fixedView={embedView} catalogAsk={catalogAsk} />
             ) : (
               <SalesPage data={data} update={store.update} onOpen={setSaleId} onPrint={setPrintId} />
             ))}

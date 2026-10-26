@@ -173,6 +173,37 @@ export function AddItemButton({next, noun, onAdd}: {next: number; noun: string; 
   );
 }
 
+/**
+ * 「カタログから検索」の欄（ユーザーの指示「商品を入力する際、カタログから検索という欄を入力して、右のスペースにカタログを開くことができる。
+ * カタログを見ながら商品を入力できるようにする」2026-10-26）。★ 商品を選ぶ・📷 の右。商品名・品番を打って Enter か「📖 カタログ」で、
+ * 右にカタログの窓（print/CatalogViewer.tsx）を開く。空のまま押すと、見積もりの商品の載っているページを出す
+ */
+export function CatalogSearch({onOpen}: {onOpen: (query: string) => void}) {
+  const [q, setQ] = useState('');
+  return (
+    <span className="flex min-w-0 flex-1 basis-56 items-center gap-1">
+      <input
+        type="search"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => {
+          // 申請書の入れる所の Enter（次の欄へ）にしない
+          if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+          e.preventDefault();
+          e.stopPropagation();
+          onOpen(q);
+        }}
+        placeholder="カタログから検索"
+        aria-label="カタログから検索"
+        className="h-8 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 text-sm"
+      />
+      <button type="button" onClick={() => onOpen(q)} className="h-8 shrink-0 rounded-md border border-slate-300 bg-white px-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+        📖 カタログ
+      </button>
+    </span>
+  );
+}
+
 /** Enter で次の欄へ（data-nav のある欄・選ぶ欄。日本語の変換中は動かさない。住宅改修の申請書のタブと同じ） */
 export function nextOnEnter(e: KeyboardEvent<HTMLElement>) {
   if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return;

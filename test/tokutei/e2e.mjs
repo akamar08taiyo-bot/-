@@ -286,6 +286,13 @@ try {
   await page.getByLabel('保険者', {exact: true}).selectOption('yukuhashi');
   await page.getByRole('tab', {name: '📄 申請書（行橋市）'}).waitFor();
   await preview.getByRole('group', {name: '用具・受領委任払', exact: true}).waitFor();
+  // 申請書の画面にも「カタログから検索」。Enter は次の欄へ移らず、カタログの窓を開く
+  await page.getByRole('searchbox', {name: 'カタログから検索'}).fill('浴槽台');
+  await page.getByRole('searchbox', {name: 'カタログから検索'}).press('Enter');
+  await page.getByRole('dialog', {name: 'カタログ'}).waitFor();
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'カタログから検索');
+  await page.getByRole('dialog', {name: 'カタログ'}).getByRole('button', {name: 'カタログを閉じる'}).click();
+  await page.getByRole('searchbox', {name: 'カタログから検索'}).fill('');
 
   // 見積もりの画面に戻る（金額のまとめ）
   await page.getByRole('tab', {name: '📋 見積もり'}).click();
@@ -342,12 +349,14 @@ try {
     'p.178 ポータブルトイレ FX-30（安寿）',
     'p.179 据置式便座・ポータブルトイレ（安寿）',
   ]);
+  // 品番は全部のページを読んでから見くらべる（それまでは細目とメーカーで選んだページ）
+  await page.waitForFunction(() => [...document.querySelectorAll('[aria-label="印刷するページ"] input')].map((x) => (x.checked ? 1 : 0)).join('') === '100110000000', null, {timeout: 60000});
+  // 画面にもチェックしたページだけ（ユーザーの指示「該当のページのみ印刷プレビューに表示する」2026-10-26）
   await page.waitForFunction(() => {
     const imgs = [...document.querySelectorAll('.cat-sheet img')];
-    return imgs.length === 12 && imgs.every((i) => i.complete && i.naturalWidth > 1500);
+    return imgs.length === 3 && imgs.every((i) => i.complete && i.naturalWidth > 1500);
   }, null, {timeout: 60000});
-  // 品番は全部のページを読んでから見くらべる（それまでは細目とメーカーで選んだページ）
-  await page.waitForFunction(() => [...document.querySelectorAll('[aria-label="印刷するページ"] input')].map((x) => (x.checked ? 1 : 0)).join('') === '100110000000');
+  assert.deepEqual(await page.locator('.cat-sheet').evaluateAll((xs) => xs.map((x) => x.getAttribute('aria-label'))), ['カタログ p.37 シャワーベンチ（安寿）', 'カタログ p.44 浴槽台・浴槽手すり（安寿）', 'カタログ p.45 浴槽手すり・バスボード']);
   // 品番の載っているページ：シャワーベンチ FSフィット（536-057）は p.37、浴槽台（536-480）は p.44、入浴グリップ（PN-L12211D）は p.45
   const checkedPages = async () => (await catPages.getByRole('checkbox').evaluateAll((xs) => xs.map((x) => (x.checked ? x.parentElement.textContent.split(' ')[0] : '')))).filter(Boolean);
   assert.deepEqual(await checkedPages(), ['p.37', 'p.44', 'p.45']);
@@ -369,6 +378,79 @@ try {
   await page.getByRole('button', {name: '閉じる'}).click();
   await page.getByRole('button', {name: '見本の入浴グリップを消す'}).click();
   await page.locator('aside').getByRole('button', {name: '📖 カタログを印刷'}).waitFor();
+
+  // ---- カタログの窓（ユーザーの指示「商品を入力する際、カタログから検索という欄を入力して、右のスペースにカタログを開くことができる。
+  // カタログを見ながら商品を入力できるようにする。カタログのポップは位置を移動したり、大きさを変更できるようにする」2026-10-26）
+  const catSearch = page.getByRole('searchbox', {name: 'カタログから検索'});
+  await catSearch.fill('261s1063'); // p.40 の品番（ハイフン・小文字のちがいは同じ）
+  await catSearch.press('Enter');
+  const viewer = page.getByRole('dialog', {name: 'カタログ'});
+  await viewer.waitFor();
+  const viewerChips = viewer.getByRole('group', {name: 'カタログのページ'}).getByRole('button');
+  await page.waitForFunction(() => [...document.querySelectorAll('[aria-label="カタログのページ"] button')].map((b) => b.textContent).join('|') === 'p.40 シャワーチェア（パナソニック ユクリア）', null, {timeout: 60000});
+  await page.waitForFunction(() => {
+    const img = document.querySelector('[aria-label="カタログのページの絵"] img');
+    return img?.getAttribute('alt') === 'p.40 シャワーチェア（パナソニック ユクリア）' && img.complete && img.naturalWidth > 1500;
+  }, null, {timeout: 60000});
+  // 右のスペース（見積書のプレビューの所）に出る。入れる所は隠さない
+  const vw = page.viewportSize().width;
+  const vBox = await viewer.boundingBox();
+  assert.ok(Math.abs(vBox.x + vBox.width - (vw - 16)) < 2, JSON.stringify(vBox));
+  const inputsBox = await page.getByRole('searchbox', {name: 'カタログから検索'}).first().boundingBox();
+  assert.ok(inputsBox.x + inputsBox.width <= vBox.x + 1, `入れる所にかぶる ${JSON.stringify(inputsBox)} ${JSON.stringify(vBox)}`);
+  await page.screenshot({path: `${out}/05d-catalog-viewer.png`});
+  // 上の帯をつかむと動く・右下の角で大きさが変わる
+  const grip = await viewer.getByText('📖 カタログ', {exact: true}).boundingBox();
+  await page.mouse.move(grip.x + 10, grip.y + 5);
+  await page.mouse.down();
+  await page.mouse.move(grip.x - 290, grip.y - 45, {steps: 5});
+  await page.mouse.up();
+  const moved = await viewer.boundingBox();
+  assert.ok(Math.abs(moved.x - (vBox.x - 300)) < 2 && Math.abs(moved.y - (vBox.y - 50)) < 2, `動かない ${JSON.stringify(moved)}`);
+  // 画面の外へは出さない（右下の角をつかめるように）
+  await page.mouse.move(grip.x - 290, grip.y - 45);
+  await page.mouse.down();
+  await page.mouse.move(grip.x - 290, grip.y + 400, {steps: 3});
+  await page.mouse.up();
+  const low = await viewer.boundingBox();
+  assert.ok(Math.abs(low.y + low.height - page.viewportSize().height) < 2, `画面の外へ出た ${JSON.stringify(low)}`);
+  await page.mouse.move(grip.x - 290, low.y + 5);
+  await page.mouse.down();
+  await page.mouse.move(grip.x - 290, moved.y + 5, {steps: 3});
+  await page.mouse.up();
+  const corner = await viewer.getByRole('button', {name: 'カタログの窓の大きさ'}).boundingBox();
+  await page.mouse.move(corner.x + 12, corner.y + 12);
+  await page.mouse.down();
+  await page.mouse.move(corner.x + 12 - 120, corner.y + 12 - 90, {steps: 5});
+  await page.mouse.up();
+  const sized = await viewer.boundingBox();
+  assert.ok(Math.abs(sized.width - (moved.width - 120)) < 2 && Math.abs(sized.height - (moved.height - 90)) < 2 && Math.abs(sized.x - moved.x) < 2, `大きさが変わらない ${JSON.stringify(sized)}`);
+  // 窓の中でも検索し直せる（空にすると全部のページ）。ページを押すとそのページ
+  await viewer.getByRole('searchbox', {name: 'カタログから検索'}).fill('');
+  assert.equal(await viewerChips.count(), 12);
+  await viewerChips.filter({hasText: 'p.172'}).click();
+  await page.waitForFunction(() => document.querySelector('[aria-label="カタログのページの絵"] img')?.getAttribute('alt') === 'p.172 家具調トイレ（安寿）', null, {timeout: 60000});
+  // 拡大（＋）すると絵が窓より広くなり、窓の中でスクロールする
+  const imgW = async () => (await viewer.getByRole('img').boundingBox()).width;
+  const w0 = await imgW();
+  await viewer.getByRole('button', {name: '大きく'}).click();
+  assert.ok((await imgW()) > w0 * 1.15);
+  // 🖨 印刷 はカタログの印刷の画面。Esc で印刷の画面だけ閉じる（窓は残る）
+  await viewer.getByRole('button', {name: '🖨 印刷'}).click();
+  await page.getByRole('group', {name: '印刷するページ'}).waitFor();
+  await page.keyboard.press('Escape');
+  await page.locator('.print-overlay').waitFor({state: 'detached'});
+  assert.equal(await viewer.isVisible(), true);
+  await viewer.getByRole('button', {name: 'カタログを閉じる'}).click();
+  await viewer.waitFor({state: 'detached'});
+  // 開き直すと、前に置いた所・大きさ（この端末で覚える）
+  await page.getByRole('button', {name: '📖 カタログ', exact: true}).click();
+  await viewer.waitFor();
+  const again = await viewer.boundingBox();
+  assert.ok(Math.abs(again.x - sized.x) < 2 && Math.abs(again.y - sized.y) < 2 && Math.abs(again.width - sized.width) < 2, `覚えていない ${JSON.stringify(again)}`);
+  await page.keyboard.press('Escape');
+  await viewer.waitFor({state: 'detached'});
+  await catSearch.fill('');
 
   // ---- 品目が多くても原本の明細（16行）の中に入って、A4 1枚のまま。備考は3行まで（入らない行は画面で知らせる）
   // 手で入れた品目は価格が空（0円）なので、合計（42,944円）は変わらない
@@ -566,7 +648,8 @@ try {
   assert.ok(catBox && Math.abs(catBox.width - xlBox.width) < 1 && Math.abs(catBox.height - xlBox.height) < 1, JSON.stringify(catBox));
   await page.getByRole('button', {name: '📖 カタログを印刷'}).click();
   await page.getByRole('group', {name: '印刷するページ'}).waitFor();
-  await page.waitForFunction(() => document.querySelectorAll('.cat-sheet img').length === 12, null, {timeout: 60000});
+  await page.getByText('印刷するページにチェックを入れてください').waitFor(); // 多点杖のページはないので、チェックなし・ページも出さない
+  assert.equal(await page.locator('.cat-sheet').count(), 0);
   await page.getByRole('button', {name: '閉じる'}).click();
   await page.getByRole('button', {name: '🖨 印刷', exact: true}).click();
   assert.match(dialogs[0] ?? '', /手で入れた商品をお気に入り（★）に登録しますか？\n・見本の多点杖 ワイド/);

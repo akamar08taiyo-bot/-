@@ -97,6 +97,13 @@ export function applyJutaku(sales: Sale[], settings: Settings, h: JutakuHandoff,
 
 export const TO_JUTAKU = 'taiyo-tokutei-to-jutaku';
 
+/**
+ * 住宅改修の様邸の画面の左（🪪 介護保険証の枠の下）の「📖 カタログを表示」「🖨 カタログを印刷」から届く（ユーザーの指示「赤枠の部分にカタログを表示と
+ * カタログを印刷という２つのボタンを設置する」2026-10-26）。住宅改修は 🛁 のタブを開いてから送る（住宅改修の src/sasaoka/tokuteiLink.ts の CATALOG_MSG）
+ */
+export const FROM_JUTAKU_CATALOG = 'taiyo-tokutei-catalog';
+export type CatalogAsk = {action: 'show' | 'print'; n: number};
+
 const empty = (v: unknown) => v === undefined || v === null || v === '';
 
 /**

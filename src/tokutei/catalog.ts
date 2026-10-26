@@ -50,6 +50,25 @@ export const codeKey = (s: string) =>
     .toUpperCase()
     .replace(/[\s\-‐‑–—―ー−]/g, '');
 
+const plain = (s: string) => (s || '').normalize('NFKC').replace(/\s+/g, '').toUpperCase();
+
+/**
+ * 「カタログから検索」（print/CatalogViewer.tsx）：打った語のどれもが、ページの名前・ページの文字・品番のどれかにあるページ。空なら全部。
+ * pdf.js のページの文字は1字ずつ空白で区切られることがあるので、空白を除いて見くらべる。品番は全角・ハイフンのちがいも同じ（4字以上のとき）
+ */
+export function catalogMatches(query: string, texts: readonly (string | null)[]): number[] {
+  const words = (query || '').normalize('NFKC').split(/\s+/).filter(Boolean);
+  const all = CATALOG.map((_, i) => i);
+  return all.filter((i) =>
+    words.every((w) => {
+      const q = plain(w);
+      const code = codeKey(w);
+      const text = texts[i] ?? '';
+      return plain(catalogLabel(CATALOG[i])).includes(q) || plain(text).includes(q) || (code.length >= 4 && codeKey(text).includes(code));
+    }),
+  );
+}
+
 /** ページの文字から品番らしい語（英字か数字を4字以上ふくむ語。金額の「35,000」は除く）を集める（見くらべ用） */
 export function pageCodes(text: string): Set<string> {
   const out = new Set<string>();
