@@ -5,9 +5,9 @@
 //   2つのアプリはコードもデータも分けている（ユーザーの指示「全く別物として作成」）。受け渡しの形を変えるときは、
 //   特定福祉用具（同じリポジトリのブランチ claude/care-insurance-auto-transfer-3z0c9n）の src/tokutei/jutaku.ts も直す
 
-import {jobInsurer, NO_SHINSEI} from './estimateForms.ts';
+import {INSURER_IDS, INSURER_INFO, jobInsurer, NO_SHINSEI} from './estimateForms.ts';
 import {birthIso} from './riyu.ts';
-import type {Job} from './types.ts';
+import type {Insurer, Job, ShinseiInfo} from './types.ts';
 
 export const TOKUTEI_KEY = 'taiyo-tokutei-from-jutaku-v1';
 /** 特定福祉用具のアプリ（ポータルでは jutaku-mitsumori/・sasaoka/ のとなりの tokutei/） */
@@ -57,6 +57,75 @@ export function tokuteiFields(job: Job): TokuteiFields {
     ...(info.insurerNo.trim() ? {insurerNo: info.insurerNo.trim()} : {}),
     ...(info.welfare ? {welfare: true} : {}),
   };
+}
+
+// ---------------------------------------------------------------- 特定福祉用具から住宅改修へ（⇔）
+// ユーザーの指示「特定福祉用具の申請書を入力した場合であっても、住宅改修申請書、理由書、見積もりなどに、名前や住所なども転記されるようにする。⇔
+// ただし、金額などを入れていない場合は、請求書や受注残にいれない」（2026-10-26）。
+// 中の特定福祉用具のアプリが、お客様の情報を直したとき（直した項目だけ）と開いたとき（住宅改修で空の項目に、そこで入れてある値）に
+// postMessage（TO_JUTAKU）で送ってくる（特定福祉用具の src/tokutei/jutaku.ts の jutakuChanges）。この様邸に入れる（申請書・理由書・見積書は同じ欄を読む）。
+// 請求書に入れる（shikiri）・見積もり作成日は変えない＝見積書に行がなければ、請求書・売上見込み・受注残には入らない（hasEstimateRows）
+
+export const TO_JUTAKU = 'taiyo-tokutei-to-jutaku';
+
+/** 受け取った postMessage を読む（形がちがう・知らない値は捨てる） */
+export function readFromTokutei(data: unknown): {job: string; fields: Partial<TokuteiFields>} | null {
+  if (!data || typeof data !== 'object') return null;
+  const o = data as Record<string, unknown>;
+  if (o.type !== TO_JUTAKU || typeof o.job !== 'string' || !o.job || !o.fields || typeof o.fields !== 'object') return null;
+  const f = o.fields as Record<string, unknown>;
+  const out: Partial<TokuteiFields> = {};
+  for (const k of ['customer', 'kana', 'insuredNo', 'zip', 'address', 'tel', 'careOffice', 'careManager', 'careLevel'] as const) if (typeof f[k] === 'string') out[k] = f[k] as string;
+  if (typeof f.birthDate === 'string' && /^(\d{4}-\d{2}-\d{2})?$/.test(f.birthDate)) out.birthDate = f.birthDate;
+  if (f.gender === '' || f.gender === '男' || f.gender === '女') out.gender = f.gender;
+  if (typeof f.insurer === 'string' && (INSURER_IDS as readonly string[]).includes(f.insurer)) out.insurer = f.insurer;
+  if (f.burdenRatio === 1 || f.burdenRatio === 2 || f.burdenRatio === 3) out.burdenRatio = f.burdenRatio;
+  if (typeof f.welfare === 'boolean') out.welfare = f.welfare;
+  return {job: o.job, fields: out};
+}
+
+const ERA_FROM: [Exclude<ShinseiInfo['era'], ''>, string, number][] = [
+  ['昭和', '1926-12-25', 1925],
+  ['大正', '1912-07-30', 1911],
+  ['明治', '1868-01-01', 1867],
+];
+/** 'YYYY-MM-DD' → 申請書の生年月日（元号・年・月・日）。空・平成からの日付・読めない日付は空 */
+function birthParts(iso: string): Pick<ShinseiInfo, 'era' | 'birthY' | 'birthM' | 'birthD'> {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  const era = m && iso < '1989-01-08' ? ERA_FROM.find(([, from]) => iso >= from) : undefined;
+  if (!m || !era) return {era: '', birthY: '', birthM: '', birthD: ''};
+  return {era: era[0], birthY: String(Number(m[1]) - era[2]), birthM: String(Number(m[2])), birthD: String(Number(m[3]))};
+}
+
+/** 特定福祉用具で直したお客様の情報を様邸に入れる（変わらなければ同じ job を返す） */
+export function withTokuteiFields(job: Job, f: Partial<TokuteiFields>): Job {
+  const info: ShinseiInfo = {...NO_SHINSEI, ...job.shinsei};
+  const next: Job = {...job};
+  const si: ShinseiInfo = {...info};
+  if (f.customer !== undefined) next.customer = f.customer;
+  if (f.insuredNo !== undefined) next.insuredNo = f.insuredNo;
+  if (f.address !== undefined) next.address = f.address;
+  if (f.insurer && f.insurer !== jobInsurer(job)) {
+    next.insurer = f.insurer as Insurer;
+    next.form = INSURER_INFO[f.insurer as Insurer].form;
+  }
+  if (f.kana !== undefined) si.kana = f.kana;
+  if (f.birthDate !== undefined && f.birthDate !== birthIso(info)) Object.assign(si, birthParts(f.birthDate));
+  if (f.gender !== undefined) si.gender = f.gender;
+  if (f.zip !== undefined) si.zip = f.zip;
+  if (f.tel !== undefined) si.phone = f.tel;
+  if (f.careLevel !== undefined && /^(要支援[12]|要介護[1-5])?$/.test(f.careLevel)) si.care = f.careLevel as ShinseiInfo['care'];
+  if (f.burdenRatio !== undefined) si.burden = String(f.burdenRatio) as ShinseiInfo['burden'];
+  if (f.careOffice !== undefined) si.reasonOffice = f.careOffice;
+  if (f.careManager !== undefined) si.reasonName = f.careManager;
+  if (f.welfare !== undefined) {
+    if (f.welfare) si.welfare = true;
+    else delete si.welfare;
+  }
+  const changedInfo = JSON.stringify(si) !== JSON.stringify(info);
+  const same = !changedInfo && next.customer === job.customer && next.insuredNo === job.insuredNo && next.address === job.address && next.insurer === job.insurer && next.form === job.form;
+  if (same) return job;
+  return {...next, ...(changedInfo ? {shinsei: si} : {}), updatedAt: Date.now()};
 }
 
 /** タブの中に出す特定福祉用具のアプリの URL（その様邸の案件を開く。上の題名の段は出さない） */

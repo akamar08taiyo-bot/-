@@ -130,6 +130,8 @@ if (withTokutei) {
   // 特定福祉用具で電話を直して、すぐ住宅改修申請書のタブへ（直した値は消えない）
   await field('電話').fill('090-1111-2222');
   await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
+  // 特定福祉用具で直した値は住宅改修申請書にも入る（⇔。ユーザーの指示「特定福祉用具の申請書を入力した場合であっても、住宅改修申請書、理由書、見積もりなどに、名前や住所なども転記されるようにする」2026-10-26）
+  await page.waitForFunction(() => document.querySelector('[aria-label="電話番号"]')?.value === '090-1111-2222', null, {timeout: 5000});
   await form.getByLabel('住所').fill('福岡県行橋市大橋1-1');
   await form.getByLabel('住所').blur();
   await page.waitForTimeout(1200); // 自動保存（0.4秒後）
@@ -191,14 +193,16 @@ if (withTokutei) {
   // 特定福祉用具申請書だけを作っている様邸（ユーザーの指示「特定福祉用具の申請書を作成途中の場合も、こちらの一覧には表示されるようにする」2026-10-26）
   const name2 = page.frameLocator('iframe[title="特定福祉用具 購入申請書・見積もり作成"]').locator('input[aria-label="お客様名"]').first();
   await name2.waitFor();
-  await name2.fill('見本 特定');
-  await page.waitForTimeout(1200);
   // まとめて保存：何も入っていない住宅改修申請書は選べない（ユーザーの指示「全くの白紙の申請書や見積もりはチェックから外す」2026-10-26）
   await page.getByRole('button', {name: '📦 まとめて保存'}).click();
   const dlg2 = page.getByRole('dialog');
   assert.equal(await dlg2.getByText('住宅改修申請書', {exact: true}).locator('..').getByRole('checkbox').isDisabled(), true);
   assert.equal(await dlg2.getByText('（何も入っていません）').count(), 1);
   await dlg2.getByRole('button', {name: 'やめる'}).click();
+  // 特定福祉用具で入れたお客様名は住宅改修の様邸にも入る（⇔）。見積書に行がないので請求書には入れない
+  await name2.fill('見本 特定');
+  await page.getByRole('heading', {level: 1, name: /見本 特定/}).waitFor({timeout: 5000}).catch(() => undefined);
+  await page.waitForTimeout(1200);
 }
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
 await page.waitForFunction(() => !location.hash.includes('job='));
@@ -208,7 +212,7 @@ if (withTokutei) {
   await page.getByRole('region', {name: '一覧から作成'}).getByRole('button', {name: '📋 見積書の一覧を開く'}).click();
   const row2 = page.getByRole('row', {name: /見本 特定様邸/});
   await row2.waitFor();
-  assert.match(await row2.innerText(), /見本 特定様邸\s*特定福祉用具/);
+  assert.match(await row2.innerText(), /申請書だけ/); // 金額がないので請求書に入れない（ユーザーの指示「金額などを入れていない場合は、請求書や受注残にいれない」）
   await page.getByPlaceholder(/お客様名・住所で探す/).fill('見本 特定');
   await row2.waitFor();
   await page.getByPlaceholder(/お客様名・住所で探す/).fill('');

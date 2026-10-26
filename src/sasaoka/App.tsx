@@ -38,7 +38,7 @@ import {PrintView} from './print/PrintView.tsx';
 import type {PrintRequest} from './print/PrintView.tsx';
 import {hasRiyuInfo} from './riyu.ts';
 import {EXAMPLE_KIT_ID, exampleKit} from './samples.ts';
-import {flushTokutei, tokuteiNames} from './tokuteiLink.ts';
+import {flushTokutei, readFromTokutei, tokuteiNames, withTokuteiFields, writeTokutei} from './tokuteiLink.ts';
 import {BatchSave} from './components/BatchSave.tsx';
 import {isTrashed, liveJobs} from './trash.ts';
 import {writeJutakuSalesSummary} from './salesPlan.ts';
@@ -256,6 +256,25 @@ export default function App({start}: {start: MainTab}) {
   // ほかのタブで入れたばかりの写真（まだ様邸に保存されていないかもしれない）を消さないように、1時間より前に入れた写真だけ
   // 残すのは様邸のどこかに書いてある番号すべて（箇所の写真・平面図の図のほか、あとから足した項目の写真も消さない。`photoIdsInUse`）。
   // ゴミ箱の様邸の写真も残す（完全に削除するまで）
+  // 特定福祉用具のタブ（中のアプリ）で直したお客様の情報を、この様邸にも入れる（⇔。tokuteiLink.ts の withTokuteiFields。請求書に入れるか・見積もり作成日は変えない）。
+  // 次に開くときに古い値を渡さないよう、受け渡しの localStorage も新しくする
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin !== location.origin) return;
+      const m = readFromTokutei(e.data);
+      if (!m) return;
+      store.update('jobs', (list) =>
+        list.map((j) => {
+          if (j.id !== m.job || isTrashed(j)) return j;
+          const next = withTokuteiFields(j, m.fields);
+          if (next !== j) writeTokutei(next);
+          return next;
+        }),
+      );
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [store.update]);
   const [pruneTick, setPruneTick] = useState(0);
   useEffect(() => {
     if (!all) return;

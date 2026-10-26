@@ -76,3 +76,32 @@ test('タブの中に出す URL と localStorage の受け渡し（その様邸�
     g.localStorage = before;
   }
 });
+
+test('特定福祉用具から住宅改修へ（⇔）：中のアプリが送った項目を様邸に入れる。請求書に入れるか・見積もり作成日は変えない', async () => {
+  const {readFromTokutei, withTokuteiFields, TO_JUTAKU} = await import('../../src/sasaoka/tokuteiLink.ts');
+  // ユーザーの指示「特定福祉用具の申請書を入力した場合であっても、住宅改修申請書、理由書、見積もりなどに、名前や住所なども転記されるようにする。⇔」2026-10-26
+  const blank = job({customer: '', address: '', insuredNo: '', shikiri: false, estDate: '', shinsei: {...NO_SHINSEI}});
+  const m = readFromTokutei({
+    type: TO_JUTAKU,
+    job: 'j1',
+    fields: {customer: '見本 次郎', kana: 'ミホン　ジロウ', insuredNo: '0000000001', birthDate: '1938-04-14', gender: '男', zip: '800-0300', address: '福岡県京都郡苅田町富久町1-1', tel: '093-000-0000', careLevel: '要介護2', burdenRatio: 3, careOffice: '見本居宅', careManager: '見本 三郎', insurer: 'kanda', welfare: true},
+  });
+  assert.ok(m);
+  const next = withTokuteiFields(blank, m!.fields);
+  assert.deepEqual([next.customer, next.address, next.insuredNo, next.insurer, next.form], ['見本 次郎', '福岡県京都郡苅田町富久町1-1', '0000000001', 'kanda', 'yukuhashi']);
+  const si = next.shinsei!;
+  assert.deepEqual([si.kana, si.era, si.birthY, si.birthM, si.birthD, si.gender, si.zip, si.phone, si.care, si.burden, si.reasonOffice, si.reasonName, si.welfare], ['ミホン　ジロウ', '昭和', '13', '4', '14', '男', '800-0300', '093-000-0000', '要介護2', '3', '見本居宅', '見本 三郎', true]);
+  // 金額のない様邸は請求書に入れない（shikiri・見積もり作成日はそのまま）
+  assert.equal(next.shikiri, false);
+  assert.equal(next.estDate, '');
+  // 同じ値なら同じ様邸（保存し直さない）。生年月日は同じ日なら元号の書き方を変えない
+  assert.equal(withTokuteiFields(next, m!.fields), next);
+  const j0 = job(); // 生年月日は「昭和１３年」（全角）で入っている
+  assert.equal(withTokuteiFields(j0, {birthDate: '1938-04-14'}), j0);
+  // 大正・明治も。平成からの日付・空は空に
+  assert.deepEqual(['era', 'birthY'].map((k) => (withTokuteiFields(blank, {birthDate: '1920-01-02'}).shinsei as unknown as Record<string, string>)[k]), ['大正', '9']);
+  assert.equal(withTokuteiFields(blank, {birthDate: '1990-01-01'}).shinsei?.birthY ?? '', '');
+  // 形のちがう・知らない値は捨てる
+  assert.equal(readFromTokutei({type: 'other', job: 'j1', fields: {}}), null);
+  assert.deepEqual(readFromTokutei({type: TO_JUTAKU, job: 'j1', fields: {customer: 1, insurer: 'other', burdenRatio: 4, gender: 'X', birthDate: 'S13'}})?.fields, {});
+});
