@@ -97,7 +97,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
   return (
     <div className="max-w-5xl space-y-4">
       <Section title="請求先">
-        <Field label="請求先（工務店）の名前　※請求書には「○○　御中」と出ます">{text('clientName', '笹岡工務店')}</Field>
+        <Field label="請求先（工務店）の名前　※請求書には「○○　御中」と出ます">{text('clientName', '例：○○工務店')}</Field>
       </Section>
 
       <Section

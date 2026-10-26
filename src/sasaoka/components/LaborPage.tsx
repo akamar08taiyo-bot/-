@@ -29,7 +29,7 @@ export function LaborPage({data, update}: {data: AppData; update: Update}) {
           <Btn
             color="white"
             onClick={() => {
-              if (!confirm('取付手間の単価を、最初の「笹岡手間」の表の内容に戻します。追加・変更した項目は消えます。よろしいですか？')) return;
+              if (!confirm('取付手間の単価を、最初の単価表の内容に戻します。追加・変更した項目は消えます。よろしいですか？')) return;
               update('labor', () => DEFAULT_LABOR.map((l) => ({...l})));
               toast('最初の単価表に戻しました');
             }}
@@ -47,7 +47,7 @@ export function LaborPage({data, update}: {data: AppData; update: Update}) {
             <tr>
               <th className="w-12 px-2 py-2">No.</th>
               <th className="px-2 py-2 text-left">項目</th>
-              <th className="w-36 px-2 py-2 pr-4 text-right">仕切り（笹岡工務店）</th>
+              <th className="w-36 px-2 py-2 pr-4 text-right">仕切り（工務店）</th>
               {/* 見積書に入れる単価。入れていなければ 仕切り×率（薄い字で出す） */}
               <th className="w-36 px-2 py-2 pr-4 text-right">見積</th>
               <th className="px-2 py-2 text-left">メモ</th>

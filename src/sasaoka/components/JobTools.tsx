@@ -115,7 +115,7 @@ export function ShikiriPriceDialog({
       }
     >
       <p className="mb-2 text-xs text-slate-600">
-        見積書に入れた部材のうち、仕切価格（笹岡工務店への請求に使う価格）がまだ入っていないものです。入れるとすぐ請求書に入ります。
+        見積書に入れた部材のうち、仕切価格（工務店への請求に使う価格）がまだ入っていないものです。入れるとすぐ請求書に入ります。
       </p>
       <table className="w-full text-sm">
         <thead className="text-xs text-slate-500">

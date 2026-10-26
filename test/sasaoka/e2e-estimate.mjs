@@ -292,6 +292,9 @@ log('定価の取り込みOK');
 // ---------------- 施工費（笹岡工務店の手間）：部材・施工費マスタのもう1つのタブ
 await page.getByRole('tab', {name: /^施工費（/}).click();
 assert.ok((await page.locator('main').innerText()).includes('取付手間の単価'));
+// 施工費は笹岡工務店に限らない（「仕切り（工務店）」。ユーザーの指示「笹岡工務店を使っているところ以外でも一緒にみんなが使えるように…金額などはそのまま」2026-10-26）
+assert.ok((await page.locator('main').innerText()).includes('仕切り（工務店）'));
+assert.ok(!(await page.locator('main').innerText()).includes('笹岡'));
 // 仕切り（笹岡工務店）と見積の両方の単価を持つ。踏台 木 の見積は 2,000円（ユーザーの指示）。見積を消すと 仕切り×1.5 を薄く出す
 assert.deepEqual([await page.getByLabel('木の単価', {exact: true}).inputValue(), await page.getByLabel('木の見積の単価', {exact: true}).inputValue()], ['1,000', '1,500']);
 assert.deepEqual([await page.getByLabel('タイルの単価', {exact: true}).inputValue(), await page.getByLabel('タイルの見積の単価', {exact: true}).inputValue()], ['1,500', '2,000']);

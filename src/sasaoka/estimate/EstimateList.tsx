@@ -162,7 +162,7 @@ function GettingStarted({data, update, goMaterials, onSample}: {data: AppData; u
           {s.estimateRate} になります。
         </li>
         <li>
-          見積書に行を入れると、笹岡工務店の仕切り計算表と請求書（「請求書を確認する」）に入って自動で計算され、発注書も作れます。申請書だけの様邸（ほかの工務店の工事）は、請求書・発注書に入りません（笹岡工務店の工事でない見積書は、見積書の上の「笹岡工務店の請求書に入れる」を外します）。
+          見積書に行を入れると、{s.clientName || '工務店'}の仕切り計算表と請求書（「請求書を確認する」）に入って自動で計算され、発注書も作れます。申請書だけの様邸（ほかの工務店の工事）は、請求書・発注書に入りません（{s.clientName || '工務店'}の工事でない見積書は、見積書の上の「{s.clientName || '工務店'}の請求書に入れる」を外します）。
         </li>
       </ol>
       {!hasSamples(data) && (
@@ -315,7 +315,7 @@ export function EstimateList({
                 <th className="px-2 py-2 text-left">作成日</th>
                 <th className="px-2 py-2 text-left">お客様名</th>
                 <th className="px-2 py-2 text-right">見積の合計（税込）</th>
-                <th className="px-2 py-2 text-left">笹岡工務店の請求書</th>
+                <th className="px-2 py-2 text-left">{s.clientName || '工務店'}の請求書</th>
                 <th className="px-2 py-2" />
               </tr>
             </thead>

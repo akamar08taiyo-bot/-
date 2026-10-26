@@ -373,7 +373,8 @@ function ShikiriFields({
   onOpenInvoice: () => void;
 }) {
   const missing = missingShikiri(job);
-  const client = data.settings.clientName || '笹岡工務店';
+  // 請求先は設定の名前（笹岡工務店に決め打ちしない。ユーザーの指示「笹岡工務店を使っているところ以外でも一緒にみんなが使えるように」2026-10-26）
+  const client = data.settings.clientName || '工務店';
   return (
     <>
       <label className="inline-flex h-11 cursor-pointer items-center gap-2 text-base font-bold text-[#0c315e]">

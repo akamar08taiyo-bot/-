@@ -154,7 +154,7 @@ export function JobsPage({
               」で、メーカーの仕切り表（Excel・CSV・PDF）を取り込み、よく使う部材をお気に入り（★）にします。
             </li>
             <li>「＋ 様邸を追加」で○○様邸を作り、玄関・トイレなどの箇所ごとに部材と取付手間（箇所数）を入れます。</li>
-            <li>月の分がそろったら「請求書を印刷」で1か月分の一覧を印刷し、笹岡工務店さまへお渡しします。</li>
+            <li>月の分がそろったら「請求書を印刷」で1か月分の一覧を印刷し、{data.settings.clientName || '工務店'}さまへお渡しします。</li>
             <li>
               見積書は「
               <button type="button" className="font-bold text-emerald-800 underline" onClick={goEstimate}>

@@ -102,8 +102,11 @@ export const SETTINGS_REV = 5;
 export const LABOR_REV = 2;
 
 export function defaultSettings(): Settings {
+  const office = portalOffice() || '行橋営業所';
   const base: Settings = {
-    clientName: '笹岡工務店',
+    // 請求先（工務店）は営業所ごとに設定で入れる。行橋営業所だけ初めから笹岡工務店（ほかの営業所は空。
+    // ユーザーの指示「笹岡工務店を使っているところ以外でも一緒にみんなが使えるようにしたいので、限定的になるのはやめて」2026-10-26）
+    clientName: office === '行橋営業所' ? '笹岡工務店' : '',
     company: '太陽シルバーサービス株式会社',
     officeName: '',
     manager: '',
@@ -136,5 +139,5 @@ export function defaultSettings(): Settings {
     tokuteiSalesMonths: {},
     rev: SETTINGS_REV,
   };
-  return settingsForOffice(base, portalOffice() || '行橋営業所');
+  return settingsForOffice(base, office);
 }
