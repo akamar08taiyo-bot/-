@@ -73,6 +73,12 @@ export const eraOf = (info: Pick<ShinseiInfo, 'era'>): Exclude<ShinseiInfo['era'
 /** 申請書の項目が1つでも入っているか */
 export const hasShinseiInfo = (info: ShinseiInfo | undefined) =>
   !!info && Object.entries(info).some(([k, v]) => (k === 'cost' ? v !== null : typeof v === 'string' && v.trim() !== ''));
+/**
+ * 住宅改修申請書に何も入っていない（お客様の情報・改修の箇所・申請書の項目・平面図の図がない）。「📦 まとめて保存」では選べないようにする
+ * （ユーザーの指示「まとめて保存の場合でも、全くの白紙の申請書や見積もりはチェックから外す」2026-10-26。特定福祉用具の申請書だけ作っている様邸など）
+ */
+export const isBlankShinsei = (job: Pick<Job, 'customer' | 'insuredNo' | 'address' | 'places' | 'shinsei' | 'planPhoto'>) =>
+  !job.customer.trim() && !job.insuredNo.trim() && !job.address.trim() && job.places.length === 0 && !hasShinseiInfo(job.shinsei) && !job.planPhoto;
 
 /** 住所の市町村から保険者を決める。分からなければ null */
 export function insurerForAddress(address: string): Insurer | null {

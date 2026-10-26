@@ -80,7 +80,7 @@ function Check({on, onChange, children, label: aria}: {on: boolean; onChange: (v
   );
 }
 
-export function RiyuEditor({job, data, update, onBack, tabs}: {job: Job; data: AppData; update: Update; onBack: () => void; tabs: ReactNode}) {
+export function RiyuEditor({job, data, update, onBack, tabs, batch}: {job: Job; data: AppData; update: Update; onBack: () => void; tabs: ReactNode; batch?: ReactNode}) {
   const toast = useToast();
   const s = data.settings;
   const insurer = jobInsurer(job);
@@ -410,6 +410,7 @@ export function RiyuEditor({job, data, update, onBack, tabs}: {job: Job; data: A
           <Btn color="softGreen" onClick={save}>
             📗 理由書をExcelで保存
           </Btn>
+          {batch}
         </div>
         <div />
       </div>

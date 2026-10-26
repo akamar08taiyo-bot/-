@@ -34,6 +34,7 @@ export function EstimateEditor({
   onOpenInvoice,
   onOpenOrder,
   tabs,
+  batch,
   onPrint,
   onSave,
   onManageKits,
@@ -46,6 +47,7 @@ export function EstimateEditor({
   onOpenInvoice: (id: string) => void; // 「請求書を確認する」で同じ様邸の仕切り計算表を開く
   onOpenOrder: () => void; // この見積書の部材の発注書を開く
   tabs: ReactNode; // 申請書・見積書のタブ（氏名・番号・住所・改修の箇所・金額は申請書と同じ）
+  batch?: ReactNode; // 「📦 まとめて保存」（保存・Excel・印刷と並べる。App.tsx の BatchSave）
   onPrint: (r: PrintRequest) => void;
   onSave: () => Promise<boolean>; // まだ保存していない変更をすぐ保存する（保存できたら true）
   onManageKits?: () => void; // 部材・施工費マスタの「部材＋施工費（常用）」を開く
@@ -170,6 +172,7 @@ export function EstimateEditor({
           <Btn color="softGreen" onClick={() => saveEstimateExcel(job, s, toast)}>
             📗 Excelで保存
           </Btn>
+          {batch}
           <Btn color="softSky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
             🖨 見積書を印刷
           </Btn>

@@ -38,7 +38,7 @@ import {PrintView} from './print/PrintView.tsx';
 import type {PrintRequest} from './print/PrintView.tsx';
 import {hasRiyuInfo} from './riyu.ts';
 import {EXAMPLE_KIT_ID, exampleKit} from './samples.ts';
-import {flushTokutei} from './tokuteiLink.ts';
+import {flushTokutei, tokuteiNames} from './tokuteiLink.ts';
 import {BatchSave} from './components/BatchSave.tsx';
 import {isTrashed, liveJobs} from './trash.ts';
 import {writeJutakuSalesSummary} from './salesPlan.ts';
@@ -278,7 +278,8 @@ export default function App({start}: {start: MainTab}) {
   const theme = THEME[tab];
   // ゴミ箱に移した様邸は消さない（何も入れていない様邸でも、削除を押したならゴミ箱に残す）
   const removeIfEmpty = (job: Job | null) => {
-    if (job && isEmpty(job) && !tokuteiOpened.current.has(job.id)) store.update('jobs', (list) => list.filter((j) => j.id !== job.id || isTrashed(j)));
+    // 特定福祉用具申請書だけを作っている様邸（特定福祉用具の方にお客様名がある）は空でも消さない（前に開いたときの案件が、次に開いて戻ると消えていた）
+    if (job && isEmpty(job) && !tokuteiOpened.current.has(job.id) && !tokuteiNames().has(job.id)) store.update('jobs', (list) => list.filter((j) => j.id !== job.id || isTrashed(j)));
   };
   // 特定福祉用具申請書のタブを離れるときは、中の特定福祉用具のアプリの保存が終わってから（枠を消すと保存が途中で止まる。tokuteiLink.ts）
   const leaveTokutei = (go: () => void) => {
@@ -322,16 +323,15 @@ export default function App({start}: {start: MainTab}) {
     setEstimateId(id);
     setJobView(j && !j.estDate && !hasEstimateRows(j) ? 'shinsei' : 'estimate');
   };
-  // タブの段の右に「📦 まとめて保存」（どのタブからも同じ。BatchSave.tsx）。保存の前に、開いている特定福祉用具のタブの変更と、この様邸の変更を保存させる。
-  // 段の最後（order-last）：タブのすぐ右は「🪪 介護保険証・介護ソフトの画面」のまま（ユーザーの指示「上のタブの近辺に」。前はまとめて保存がその間に入っていた）
-  const tabs = (
+  // 「📦 まとめて保存」（どのタブからも同じ。BatchSave.tsx）。保存の前に、開いている特定福祉用具のタブの変更と、この様邸の変更を保存させる。
+  // 住宅改修申請書・工事見積書・理由書のタブは、上の段のまん中の Excel で保存・印刷と並べる（ユーザーの指示「申請書を保存、まとめて保存、印刷ボタンを並びで表示する」2026-10-26）。
+  // 特定福祉用具の2つのタブ（中は別のアプリ）は、今までどおりタブの段の最後（order-last。タブのすぐ右は「🪪 介護保険証・介護ソフトの画面」のまま）
+  const batch = estimateJob && <BatchSave job={estimateJob} s={data.settings} onBeforeSave={() => Promise.all([flushTokutei(), store.flush()])} />;
+  const tabs = <JobTabs view={jobView} onView={(v) => leaveTokutei(() => setJobView(v))} />;
+  const tabsWithBatch = (
     <>
-      <JobTabs view={jobView} onView={(v) => leaveTokutei(() => setJobView(v))} />
-      {estimateJob && (
-        <div className="order-last">
-          <BatchSave job={estimateJob} s={data.settings} onBeforeSave={() => Promise.all([flushTokutei(), store.flush()])} />
-        </div>
-      )}
+      {tabs}
+      {batch && <div className="order-last">{batch}</div>}
     </>
   );
   // 見積書と請求書（仕切り計算表）を行き来する（同じ様邸を開く）
@@ -438,6 +438,7 @@ export default function App({start}: {start: MainTab}) {
                   setJobView('estimate');
                 }}
                 tabs={tabs}
+                batch={batch}
               />
             ) : estimateJob && (jobView === 'tokutei' || jobView === 'hanbai') ? (
               // 特定福祉用具申請書は申請書だけ、販売見積書は見積書だけを出す（同じ特定福祉用具の案件。申請書で入れた商品は見積書にも出る）
@@ -453,7 +454,7 @@ export default function App({start}: {start: MainTab}) {
                     setJobView('estimate');
                   })
                 }
-                tabs={tabs}
+                tabs={tabsWithBatch}
               />
             ) : estimateJob && jobView === 'riyu' ? (
               <RiyuEditor
@@ -467,6 +468,7 @@ export default function App({start}: {start: MainTab}) {
                   setJobView('estimate');
                 }}
                 tabs={tabs}
+                batch={batch}
               />
             ) : estimateJob ? (
               <EstimateEditor
@@ -482,6 +484,7 @@ export default function App({start}: {start: MainTab}) {
                 onOpenInvoice={openInvoice}
                 onOpenOrder={() => setJobView('order')}
                 tabs={tabs}
+                batch={batch}
                 onPrint={setPrint}
                 onSave={store.flush}
                 onManageKits={() => goMaster('kits')}

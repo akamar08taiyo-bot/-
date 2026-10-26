@@ -100,6 +100,23 @@ export function tokuteiHasItems(jobId: string): boolean {
   }
 }
 
+/**
+ * 特定福祉用具が書いた、様邸から開いた案件のお客様名（様邸の id → お客様名。商品のない作りかけもふくむ。salesSummary.ts の linked）。
+ * 特定福祉用具申請書だけを作っている様邸（住宅改修の方にお客様名がない）も、一覧に名前を出す
+ * （ユーザーの指示「特定福祉用具の申請書を作成途中の場合も、こちらの一覧には表示されるようにする」2026-10-26）
+ */
+export function tokuteiNames(): Map<string, string> {
+  const out = new Map<string, string>();
+  try {
+    const raw = JSON.parse(localStorage.getItem('taiyo-tokutei-sales-v1') ?? 'null') as {rows?: {jutakuJob?: string; customer?: string}[]; linked?: {job?: string; customer?: string}[]} | null;
+    for (const r of raw?.rows ?? []) if (r.jutakuJob && r.customer?.trim()) out.set(r.jutakuJob, r.customer.trim());
+    for (const r of raw?.linked ?? []) if (r.job && r.customer?.trim()) out.set(r.job, r.customer.trim());
+  } catch {
+    /* 読めなければ名前なし */
+  }
+  return out;
+}
+
 export type TokuteiBook = {name: string; bytes: Uint8Array};
 type FilesWindow = Window & {__taiyoTokuteiFiles?: (kinds: TokuteiView[]) => Promise<TokuteiBook[]>};
 const filesOf = (frame: HTMLIFrameElement | null) => {

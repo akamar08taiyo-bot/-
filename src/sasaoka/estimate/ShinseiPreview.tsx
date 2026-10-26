@@ -560,6 +560,41 @@ function PhotoSlotView({
   );
 }
 
+/** 印刷の画面の写真貼付用紙の写真（PhotoSlotView と同じ位置・向き・大きさ・書く内容。押せる所・つまみ・空いた枠の「＋ 改修前」は出さない） */
+function PhotoPrintView({slot, no, photos}: {slot: PvPhotoSlot; no: number; photos: PreviewPhotos}) {
+  const photo = photos.of(no, slot.slot);
+  const lines = slot.slot === 'before' ? (photos.note?.(no) ?? []) : [];
+  const parts = photoNoteLayout({x: 0, y: 0, w: slot.w, h: slot.h}, photo ? {w: photo.w, h: photo.h, rot: photo.edit?.rot ?? 0} : null, lines);
+  const box = photo ? photoPlacement(parts.photo, photo.w, photo.h, photo.edit ?? {rot: 0, scale: 1}) : null;
+  return (
+    <div className="absolute overflow-hidden" style={{left: slot.x, top: slot.y, width: slot.w, height: slot.h}}>
+      {photo && box && (
+        <div className="absolute" style={{left: box.x, top: box.y, width: box.w, height: box.h, transform: box.rot ? `rotate(${box.rot}deg)` : undefined}}>
+          <img src={photo.url} alt="" className="block h-full w-full max-w-none" />
+        </div>
+      )}
+      {parts.note && (
+        <div
+          className="absolute overflow-hidden"
+          style={{left: parts.note.x, top: parts.note.y, width: parts.note.w, height: parts.note.h, padding: `${NOTE_INSET.y}px ${NOTE_INSET.x}px`, fontFamily: familyOf(''), fontSize: (photoNotePt(parts.note, lines) * 4) / 3, lineHeight: 1.25, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#000', textAlign: parts.align}}
+        >
+          {lines.join('\n')}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 印刷の画面の平面図の図（PlanSlotView と同じ位置・大きさ。枠・道具は出さない） */
+function PlanPrintView({slot, scale, left, top, image}: {slot: Rect; scale: number; left: number; top: number; image: {url: string; w: number; h: number}}) {
+  const box = planPlacement({x: 0, y: 0, w: slot.w, h: slot.h}, image.w, image.h);
+  return (
+    <div className="absolute" style={{left: left + slot.x * scale, top: top + slot.y * scale, width: slot.w * scale, height: slot.h * scale}}>
+      <img src={image.url} alt="" className="absolute block max-w-none" style={{left: box.x * scale, top: box.y * scale, width: box.w * scale, height: box.h * scale}} />
+    </div>
+  );
+}
+
 /** 平面図の図（画面の URL と大きさ。図がなければ undefined、読み込むまで・この端末にない図は null）と、図を入れる（差し替える）・ファイルを選ぶ・消す */
 export type PreviewPlan = {
   image: {url: string; w: number; h: number} | null | undefined;
@@ -742,8 +777,8 @@ function HeaderView({h, top, width, height}: {h: PvHeader; top: number; width: n
 
 const bandHeight = (h: PvHeader | null) => (h ? Math.max(...[...h.left, ...h.center, ...h.right].map((r) => r.font.size), 12) * 1.5 + 8 : 0);
 
-/** 1枚の大きさ（紙。画素） */
-function paper(page: PvPage) {
+/** 1枚の大きさ（紙。画素）。印刷の画面（ShinseiPrint.tsx）も、この大きさで A4 に入る倍率を決める */
+export function paper(page: PvPage) {
   const head = bandHeight(page.header);
   const foot = bandHeight(page.footer);
   return {width: page.width + PAD * 2, height: page.height + head + foot + PAD * 2, head, foot};
@@ -761,6 +796,8 @@ export function ShinseiPages({
   plan,
   scrollBox,
   title = '申請書のプレビュー',
+  print = false,
+  fixedScale,
 }: {
   pages: PvPage[];
   missing: Partial<Record<ShinseiField, boolean>>;
@@ -773,10 +810,12 @@ export function ShinseiPages({
   plan?: PreviewPlan; // 平面図の図（ないときは枠を出さない）
   scrollBox?: RefObject<HTMLElement | null>; // プレビューを入れた枠（一覧の横に並べて、枠の中で動くとき）
   title?: string; // プレビューの名前（理由書は「理由書のプレビュー」）
+  print?: boolean; // 印刷の画面（ShinseiPrint.tsx）：押せる所・黄色・写真のつまみを出さず、写真と平面図の図は印刷のとおりに描くだけ
+  fixedScale?: number; // 印刷の画面の大きさ（A4 の紙の余白の内側に入る大きさ。なければ枠の幅に合わせる）
 }) {
   const [wrapRef, wrapWidth] = useWidth<HTMLDivElement>();
   const widest = Math.max(...pages.map((p) => paper(p).width), 1);
-  const scale = wrapWidth ? Math.min(MAX_SCALE, wrapWidth / widest) : 1;
+  const scale = fixedScale ?? (wrapWidth ? Math.min(MAX_SCALE, wrapWidth / widest) : 1);
   // 向き・大きさを直している写真（写真番号:改修前／改修後）
   const [editing, setEditing] = useState('');
 
@@ -802,7 +841,7 @@ export function ShinseiPages({
         return (
           <div key={page.sheet} className="relative mx-auto" style={{width: pp.width * scale, height: pp.height * scale}}>
             <div
-              className="absolute left-0 top-0 origin-top-left bg-white shadow-[0_1px_4px_rgba(0,0,0,0.25)]"
+              className={`absolute left-0 top-0 origin-top-left bg-white ${print ? '' : 'shadow-[0_1px_4px_rgba(0,0,0,0.25)]'}`}
               style={{width: pp.width, height: pp.height, transform: `scale(${scale})`}}
               role="group"
               aria-label={page.sheet}
@@ -856,8 +895,8 @@ export function ShinseiPages({
                     <ShapeView key={i} s={s} />
                   ))}
                 </svg>
-                {/* 押すと一覧のその項目へ（まだ入っていない欄は薄い黄色、入れている項目は囲む） */}
-                {page.fields.map((f, i) => {
+                {/* 押すと一覧のその項目へ（まだ入っていない欄は薄い黄色、入れている項目は囲む）。印刷の画面には出さない */}
+                {!print && page.fields.map((f, i) => {
                   const on = active === f.field;
                   const first = on && !firstDone;
                   if (first) firstDone = true;
@@ -879,6 +918,10 @@ export function ShinseiPages({
                 })}
                 {/* 写真貼付用紙の写真の枠 */}
                 {photos &&
+                  print &&
+                  page.photoSlots.map((slot) => <PhotoPrintView key={slot.slot} slot={slot} no={page.photo} photos={photos} />)}
+                {photos &&
+                  !print &&
                   page.photoSlots.map((slot) => {
                     const key = `${page.photo}:${slot.slot}`;
                     return (
@@ -894,7 +937,7 @@ export function ShinseiPages({
                     );
                   })}
                 {/* 押すと丸がつく値 */}
-                {page.options.map((o, i) => (
+                {!print && page.options.map((o, i) => (
                   <button
                     key={`o${i}`}
                     type="button"
@@ -909,7 +952,8 @@ export function ShinseiPages({
               </div>
             </div>
             {/* 平面図の図を入れる枠（紙の上に、画面の大きさで） */}
-            {plan && page.planSlot && <PlanSlotView slot={page.planSlot} scale={scale} left={PAD * scale} top={(PAD + pp.head) * scale} plan={plan} />}
+            {plan && page.planSlot && !print && <PlanSlotView slot={page.planSlot} scale={scale} left={PAD * scale} top={(PAD + pp.head) * scale} plan={plan} />}
+            {plan?.image && page.planSlot && print && <PlanPrintView slot={page.planSlot} scale={scale} left={PAD * scale} top={(PAD + pp.head) * scale} image={plan.image} />}
           </div>
         );
       })}

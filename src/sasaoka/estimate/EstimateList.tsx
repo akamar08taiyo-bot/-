@@ -2,6 +2,7 @@ import {useEffect, useMemo, useState} from 'react';
 import {estimateTotals, hasEstimateRows, jobName} from '../calc.ts';
 import {copyJob} from '../components/JobTools.tsx';
 import {askTrash, trashLabel, useTrashUndo} from '../components/TrashPage.tsx';
+import {tokuteiNames} from '../tokuteiLink.ts';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm} from '../estimateForms.ts';
 import {estimateXlsx, XLSX_TYPE} from '../estimateXlsx.ts';
@@ -225,13 +226,15 @@ export function EstimateList({
   const [query, setQuery] = useState('');
   const [limit, setLimit] = useState(SHOW_LIMIT);
   const all = useEstimates(data, s);
+  // 特定福祉用具申請書だけを作っている様邸のお客様名（住宅改修の方に名前がないとき。tokuteiLink.ts）
+  const names = useMemo(() => tokuteiNames(), [data.jobs]);
   const searching = query.trim() !== '';
   const list = useMemo(
     () =>
       searching
-        ? all.filter(({job, insurer}) => matchesAll(`${job.customer} ${job.address} ${job.staff} ${insurer} ${job.places.map((p) => p.name).join(' ')}`, query))
+        ? all.filter(({job, insurer}) => matchesAll(`${job.customer} ${names.get(job.id) ?? ''} ${job.address} ${job.staff} ${insurer} ${job.places.map((p) => p.name).join(' ')}`, query))
         : all.filter((e) => e.job.month === month),
-    [all, query, searching, month],
+    [all, query, searching, month, names],
   );
   const total = list.reduce((n, e) => n + e.t.all.total, 0);
   const shown = list.slice(0, limit);
@@ -340,7 +343,18 @@ export function EstimateList({
                     </td>
                     <td className="whitespace-nowrap px-2 py-2 tabular-nums">{dateText(date)}</td>
                     {/* 改修場所（玄関・トイレ…）・保険者・担当は出さない（ユーザーの指示「詳細や、保険者名、担当名などは不要」） */}
-                    <td className="px-2 py-2 font-bold text-slate-800">{job.customer.trim() ? jobName(job) : <span className="text-slate-400">（お客様名なし）</span>}</td>
+                    <td className="px-2 py-2 font-bold text-slate-800">
+                      {job.customer.trim() ? (
+                        jobName(job)
+                      ) : names.get(job.id) ? (
+                        <>
+                          {jobName({...job, customer: names.get(job.id)!})}
+                          <span className="ml-1.5 text-xs font-normal text-slate-500">特定福祉用具</span>
+                        </>
+                      ) : (
+                        <span className="text-slate-400">（お客様名なし）</span>
+                      )}
+                    </td>
                     <td className="px-2 py-2 text-right font-bold tabular-nums text-emerald-900">{estimated ? yen(t.all.total) : <span className="font-normal text-slate-400">—</span>}</td>
                     <td className="whitespace-nowrap px-2 py-2 text-xs">
                       {job.shikiri ? (

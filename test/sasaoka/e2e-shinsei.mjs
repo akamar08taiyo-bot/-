@@ -1413,6 +1413,50 @@ await shinseiTab.click();
 await preview.waitFor();
 log('申請書だけ（みやこ町。見積書なしで Excel・請求書に入れない・一覧から申請書のタブで開く）OK');
 
+// ---------------- 上の段のまん中は 申請書をExcelで保存・まとめて保存・印刷 の並び（ユーザーの指示「申請書を保存、まとめて保存、印刷ボタンを並びで表示する」2026-10-26）。右に白紙に戻す
+const centerButtons = await page
+  .getByRole('button', {name: '📗 申請書をExcelで保存', exact: true})
+  .evaluate((b) => [...b.parentElement.querySelectorAll('button')].map((x) => x.textContent.trim()));
+assert.deepEqual(centerButtons, ['📗 申請書をExcelで保存', '📦 まとめて保存', '🖨 申請書を印刷']);
+assert.ok((await offCenter('📗 申請書をExcelで保存')) < 2);
+await page.screenshot({path: path.join(outDir, '81d-header-shinsei-buttons.png'), clip: {x: 0, y: 0, width: 1366, height: 240}});
+// 🖨 申請書を印刷：プレビューと同じページを A4 に。初めは1枚目だけ印刷し、チェックで足せる。紙（PDF）の枚数で確かめる
+await page.getByRole('button', {name: '🖨 申請書を印刷', exact: true}).click();
+const printPages = page.getByRole('group', {name: '印刷するページ'});
+await printPages.waitFor();
+const checks = await printPages.getByRole('checkbox').evaluateAll((xs) => xs.map((x) => x.checked));
+assert.ok(checks.length >= 2 && checks[0] && checks.slice(1).every((x) => !x), JSON.stringify(checks));
+assert.equal(await page.locator('.shinsei-sheet').count(), checks.length);
+assert.equal(await page.title(), '見本次郎様住宅改修申請書');
+const sheetPdfPages = async () => {
+  await page.emulateMedia({media: 'print'});
+  const pdf = await page.pdf({preferCSSPageSize: true});
+  await page.emulateMedia({media: 'screen'});
+  return (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length;
+};
+assert.equal(await sheetPdfPages(), 1);
+await page.screenshot({path: path.join(outDir, '81e-shinsei-print.png')});
+await printPages.getByRole('checkbox', {name: '2枚目'}).check();
+assert.equal(await sheetPdfPages(), 2);
+// 申請書の中の字は印刷にも出る（プレビューと同じ書き込み）。押せる所の黄色・枠は出さない
+assert.ok((await page.locator('.shinsei-sheet').first().innerText()).includes('見本'));
+assert.equal(await page.locator('.shinsei-sheet [role="button"]').count(), 0);
+await page.getByRole('button', {name: '✕ 閉じる'}).click();
+await page.locator('.print-overlay').waitFor({state: 'detached'});
+// 📄 白紙に戻す（ユーザーの指示「白紙に戻すボタンをつける」2026-10-26）：確かめてから消し（ダイアログは OK）、字を打つ欄の外の Ctrl+Z で戻す
+const blankBtn = page.getByRole('button', {name: '📄 白紙に戻す', exact: true});
+assert.equal(await blankBtn.isDisabled(), false);
+await blankBtn.click();
+await page.getByRole('heading', {level: 1, name: '新しい申請書'}).waitFor();
+assert.equal(await form.getByLabel('被保険者氏名').inputValue(), '');
+assert.equal(await blankBtn.isDisabled(), true);
+await page.locator('body').click({position: {x: 5, y: 300}});
+await page.keyboard.press('ControlOrMeta+z');
+await page.getByRole('heading', {level: 1, name: /見本 次郎/}).waitFor();
+assert.equal(await form.getByLabel('被保険者氏名').inputValue(), '見本 次郎');
+await pvHas('見本 次郎');
+log('申請書を保存・まとめて保存・印刷の並び・申請書の印刷（1枚目だけ→足す）・白紙に戻す（Ctrl+Z で戻す）OK');
+
 // ---------------- スマホの幅：一覧の下にプレビュー（縦に並べる）。プレビューは画面の幅に縮める。横にはみ出さない
 await page.setViewportSize({width: 390, height: 844});
 await page.waitForTimeout(300);

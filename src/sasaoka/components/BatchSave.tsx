@@ -4,7 +4,7 @@
 // 特定福祉用具の2つは特定福祉用具のアプリに作ってもらう（tokuteiLink.ts の tokuteiFiles）。作れない書類（見積書に行がない・特定福祉用具の商品がない）は選べない
 import {useState} from 'react';
 import {hasEstimateRows} from '../calc.ts';
-import {jobInsurer} from '../estimateForms.ts';
+import {isBlankShinsei, jobInsurer} from '../estimateForms.ts';
 import {XLSX_TYPE, estimateXlsx} from '../estimateXlsx.ts';
 import {canMakeShinsei, shinseiBook} from '../estimate/shinseiFiles.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
@@ -43,7 +43,7 @@ export function BatchSave({job, s, onBeforeSave}: {job: Job; s: Settings; onBefo
   const insurer = jobInsurer(job);
   const tokutei = tokuteiHasItems(job.id);
   const why: Record<Kind, string> = {
-    shinsei: canMakeShinsei(insurer) ? '' : '保険者の申請書がありません',
+    shinsei: !canMakeShinsei(insurer) ? '保険者の申請書がありません' : isBlankShinsei(job) ? '何も入っていません' : '',
     estimate: hasEstimateRows(job) ? '' : '見積書に行がありません',
     tokutei: tokutei ? '' : '特定福祉用具の商品がありません',
     hanbai: tokutei ? '' : '特定福祉用具の商品がありません',

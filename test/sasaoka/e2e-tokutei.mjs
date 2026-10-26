@@ -187,14 +187,37 @@ await form.waitFor();
 const emptyId = await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get('job'));
 await page.getByRole('tab', {name: '🛁 特定福祉用具申請書'}).click();
 await page.waitForFunction(() => location.hash.includes('view=tokutei'));
+if (withTokutei) {
+  // 特定福祉用具申請書だけを作っている様邸（ユーザーの指示「特定福祉用具の申請書を作成途中の場合も、こちらの一覧には表示されるようにする」2026-10-26）
+  const name2 = page.frameLocator('iframe[title="特定福祉用具 購入申請書・見積もり作成"]').locator('input[aria-label="お客様名"]').first();
+  await name2.waitFor();
+  await name2.fill('見本 特定');
+  await page.waitForTimeout(1200);
+  // まとめて保存：何も入っていない住宅改修申請書は選べない（ユーザーの指示「全くの白紙の申請書や見積もりはチェックから外す」2026-10-26）
+  await page.getByRole('button', {name: '📦 まとめて保存'}).click();
+  const dlg2 = page.getByRole('dialog');
+  assert.equal(await dlg2.getByText('住宅改修申請書', {exact: true}).locator('..').getByRole('checkbox').isDisabled(), true);
+  assert.equal(await dlg2.getByText('（何も入っていません）').count(), 1);
+  await dlg2.getByRole('button', {name: 'やめる'}).click();
+}
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
 await page.waitForFunction(() => !location.hash.includes('job='));
 await page.waitForTimeout(1200); // 自動保存（0.4秒後）
+if (withTokutei) {
+  // 一覧には特定福祉用具の方のお客様名（印は「特定福祉用具」）。探すときも見つかる
+  await page.getByRole('region', {name: '一覧から作成'}).getByRole('button', {name: '📋 見積書の一覧を開く'}).click();
+  const row2 = page.getByRole('row', {name: /見本 特定様邸/});
+  await row2.waitFor();
+  assert.match(await row2.innerText(), /見本 特定様邸\s*特定福祉用具/);
+  await page.getByPlaceholder(/お客様名・住所で探す/).fill('見本 特定');
+  await row2.waitFor();
+  await page.getByPlaceholder(/お客様名・住所で探す/).fill('');
+}
 await page.goto(`${site}/jutaku-mitsumori/index.html#tab=estimate&job=${encodeURIComponent(emptyId)}`);
 await page.reload();
 await page.getByRole('tablist', {name: '住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書'}).waitFor({timeout: 5000});
 assert.equal(await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get('job')), emptyId);
-log('特定福祉用具申請書のタブを開いた様邸は、空でも消さない OK');
+log('特定福祉用具申請書のタブを開いた様邸は、空でも消さない・一覧にお客様名・白紙の申請書はまとめて保存で選べない OK');
 
 // ---------------- スマホの幅（390px）：横にはみ出さない
 await page.setViewportSize({width: 390, height: 844});
