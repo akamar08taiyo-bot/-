@@ -67,7 +67,7 @@ export function CatalogPrintView({sale, onClose}: {sale: Sale; onClose: () => vo
           type="button"
           onClick={() => window.print()}
           disabled={!ready}
-          className="rounded-md bg-sky-500 px-4 py-2 text-sm font-bold text-white shadow hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-md bg-sky-100 px-4 py-2 text-sm font-bold text-sky-900 shadow hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-40"
         >
           🖨 印刷する
         </button>

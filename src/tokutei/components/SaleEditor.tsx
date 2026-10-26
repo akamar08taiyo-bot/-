@@ -3,7 +3,7 @@ import type {FocusEvent, MouseEvent} from 'react';
 import {saleTotals} from '../calc.ts';
 import {insurerLabel} from '../defaults.ts';
 import {HACCHU_IMPORT_KEY, hacchuImport, hacchuUrl, queueHacchu} from '../handoff.ts';
-import {addFavorites, blankItem, copySale, customerLabel, customerPatch, itemFromProduct, makerChoices, markUsed, sameYearSales, saleWarnings, unregisteredItems} from '../sales.ts';
+import {addFavorites, blankItem, customerLabel, customerPatch, itemFromProduct, makerChoices, markUsed, sameYearSales, saleWarnings, unregisteredItems} from '../sales.ts';
 import {shinseiForm, shinseiValues} from '../shinsei.ts';
 import {saveShinsei, useTemplate} from '../shinseiFiles.ts';
 import {FIELD_LABEL, missingFields, shinseiPreview} from '../shinseiPreview.ts';
@@ -204,13 +204,6 @@ export function SaleEditor({
     onBack();
   };
 
-  const duplicate = () => {
-    const c = copySale(sale, data.sales);
-    update('sales', (list) => [...list, c]);
-    toast('複製しました');
-    onOpen(c.id);
-  };
-
   // 販売受注簿作成ツールを新しいタブで開く（リンクなので、ポップアップを止める設定でも開く）。開く前に商品を置いておく（handoff.ts）
   const transfer = (ev: MouseEvent<HTMLAnchorElement>) => {
     if (sale.items.length === 0) {
@@ -254,9 +247,6 @@ export function SaleEditor({
             <a href={hacchuUrl()} target="_blank" onClick={transfer} className={btnClass('white')}>
               📤 販売受注簿に転記
             </a>
-            <Btn color="white" onClick={duplicate}>
-              複製
-            </Btn>
             <Btn color="rose" onClick={remove}>
               削除
             </Btn>

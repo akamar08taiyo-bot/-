@@ -1,7 +1,7 @@
 import {useEffect, useMemo, useState} from 'react';
 import {saleTotals} from '../calc.ts';
 import {INSURERS, insurerLabel} from '../defaults.ts';
-import {copySale, customerLabel, newSale} from '../sales.ts';
+import {customerLabel, newSale} from '../sales.ts';
 import type {AppData, Sale, SaleStatus} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {dateLabel, matchesAll, yen} from '../util.ts';
@@ -12,7 +12,7 @@ const STATUS_COLOR: Record<SaleStatus, string> = {
   申請: 'bg-amber-100 text-amber-800',
   承認: 'bg-sky-100 text-sky-800',
   納品: 'bg-emerald-100 text-emerald-800',
-  集金: 'bg-teal-600 text-white',
+  集金: 'bg-teal-200 text-teal-900',
 };
 
 /** 見積もりの最初の画面：新しく作る（保険者を選ぶ）と、作った見積もりの一覧 */
@@ -141,17 +141,6 @@ export function SalesPage({data, update, onOpen, onPrint}: {data: AppData; updat
                   </Btn>
                   <Btn small color="sky" onClick={() => onPrint(x.id)}>
                     印刷
-                  </Btn>
-                  <Btn
-                    small
-                    color="white"
-                    onClick={() => {
-                      const c = copySale(x, data.sales);
-                      update('sales', (list) => [...list, c]);
-                      toast('複製しました');
-                    }}
-                  >
-                    複製
                   </Btn>
                   <Btn small color="white" onClick={() => remove(x)} aria-label={`${customerLabel(x)}を消す`}>
                     ✕

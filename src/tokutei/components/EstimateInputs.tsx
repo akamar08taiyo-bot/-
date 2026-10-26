@@ -75,7 +75,7 @@ export function EstimateInputs({
   const row = (label: ReactNode, children: ReactNode, field?: EstimateField, warn = field ? missing.has(field) : false) => (
     <div
       data-field={field}
-      className={`border-b border-slate-300 last:border-b-0 sm:grid sm:grid-cols-[8.5rem_1fr] ${field && active === field ? 'relative z-[1] bg-amber-50/60 outline outline-2 -outline-offset-2 outline-amber-500' : ''}`}
+      className={`border-b border-slate-300 last:border-b-0 sm:grid sm:grid-cols-[8.5rem_1fr] ${field && active === field ? 'relative z-[1] bg-amber-50/60 outline outline-2 -outline-offset-2 outline-amber-300' : ''}`}
     >
       <div className="flex items-center border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-bold text-slate-700 sm:border-b-0 sm:border-r sm:border-slate-300 sm:py-2">{label}</div>
       <div className={`flex min-w-0 flex-wrap items-center gap-2 px-3 py-2 ${warn ? 'bg-amber-50' : ''}`}>{children}</div>
@@ -321,13 +321,17 @@ export function EstimateInputs({
                 />,
               )}
             {row(
-              '居宅・ケアマネジャー',
-              <div className="grid w-full gap-2 sm:grid-cols-[minmax(0,1fr)_11rem]">
+              // 見出しは「・」の後ろで折り返す（前は「居宅・ケアマネジ／ャー」と折れていた）。事業所名は行いっぱい、ケアマネジャーはその下（申請書のタブと同じ）
+              <span>
+                居宅・<wbr />
+                ケアマネジャー
+              </span>,
+              <div className="grid w-full gap-2">
                 <div className="grid min-w-0 gap-1">
                   <TextInput value={sale.careOffice} onChange={(careOffice) => change({careOffice})} placeholder="居宅介護支援事業所" className="w-full" aria-label="居宅介護支援事業所" />
                   <Suggest values={frequentValues(data.sales, (x) => x.careOffice)} current={sale.careOffice} onPick={(careOffice) => change({careOffice})} />
                 </div>
-                <div className="grid min-w-0 gap-1">
+                <div className="grid min-w-0 gap-1 sm:w-64">
                   <TextInput value={sale.careManager} onChange={(careManager) => change({careManager})} placeholder="ケアマネジャー" className="w-full" aria-label="ケアマネジャー" />
                   <Suggest
                     values={frequentValues(data.sales, (x) => x.careManager, (x) => !sale.careOffice.trim() || x.careOffice.trim() === sale.careOffice.trim())}
@@ -360,8 +364,9 @@ export function EstimateInputs({
 }
 
 /**
- * 商品1点：見積書の明細の1行と同じ並び（品名／数量・単位・単価・金額・税率・備考）。1行目に品名、2行目に値段、3行目に備考（算出根拠）。
- * 種目は品名の前（種目 → 商品名の順）。メーカー・品番（手で入れた商品）は下の小さい行
+ * 商品1点。申請書のタブの福祉用具の欄と同じ形にそろえる：1行目に番号・種目・✕、その下に商品名（横いっぱい）、メーカー・品番、
+ * 左に見出し・右に入れる所の表（定価・割引率・単価・数量と単位・税率・備考（算出根拠）・仕切）、いちばん下に金額。
+ * 前は見積書の明細の1行と同じ並びを4列に詰めていて、定価（135,000）・税率（10%）・品番が欄の幅で切れ、「定価（税抜）」の見出しが2行に折れていた（2026-10-26 のデバッグで見つけた）
  */
 function ItemBlock({
   line: l,
@@ -381,100 +386,94 @@ function ItemBlock({
   const i = l.item;
   const manual = i.productId === null;
   const auto = basisNote(l);
-  const field = 'grid min-w-0 gap-0.5 text-[11px] font-bold text-slate-500';
   return (
-    <div data-item={i.id} className="rounded-lg border border-slate-300 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-2 py-1.5">
+    <div data-item={i.id} className="grid gap-2 rounded-md border border-slate-200 bg-white p-2">
+      {/* 種目 → 商品名の順（申請書のタブと同じ。ユーザーの指示「入力順は、種目、商品名の順」2026-10-26）。消すのは右上 */}
+      <div className="flex min-w-0 items-center gap-2">
         <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-teal-100 text-xs font-bold text-teal-800">{no}</span>
-        {/* 種目 → 商品名の順（申請書のタブと同じ。ユーザーの指示「入力順は、種目、商品名の順」2026-10-26）。商品名は狭くならないよう、種目と同じ段の右いっぱい */}
-        <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => change({category, sub})} ariaLabel="種目" className="w-36 shrink-0" />
-        <TextInput value={i.name} onChange={(name) => change({name})} placeholder="商品名" className="min-w-[8rem] flex-1" aria-label="商品名" />
+        <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => change({category, sub})} ariaLabel="種目" className="w-48" />
         {remove && (
-          <button type="button" onClick={remove} className="rounded px-2 py-1 text-rose-500 hover:bg-rose-50" aria-label={`${i.name || '商品'}を消す`} title="消す">
+          <button type="button" onClick={remove} className="ml-auto rounded px-2 py-1 text-rose-500 hover:bg-rose-50" aria-label={`${i.name || '商品'}を消す`} title="消す">
             ✕
           </button>
         )}
       </div>
-      {/* 広い画面の4列は、1列目（数量の −・＋）を中身の幅に（4等分だと ＋ が単位の欄の下に隠れていた。2026-10-26 のデバッグで見つけた） */}
-      <div className="grid grid-cols-2 gap-x-3 gap-y-2 px-3 py-2 sm:grid-cols-[auto_repeat(3,minmax(0,1fr))]">
-        <label className={field}>
-          数量
-          <Stepper value={i.qty} onChange={(qty) => change({qty: Math.max(1, Math.round(qty))})} ariaLabel={`${i.name}の数量`} />
-        </label>
-        <label className={field}>
-          単位
-          <TextInput value={i.unit} onChange={(unit) => change({unit})} placeholder="台" className="w-full" aria-label="単位" />
-        </label>
-        <label className={field}>
-          定価（税抜）
-          <NumberInput value={i.listPrice} onChange={(listPrice) => change({listPrice})} min={0} blankZero className="w-full" ariaLabel="定価" />
-        </label>
-        <label className={field}>
-          割引（%）
-          <NumberInput value={i.discountRate} onChange={(discountRate) => change({discountRate: Math.min(100, discountRate)})} min={0} className="w-full" ariaLabel="割引率" />
-        </label>
-        <label className={field}>
-          単価（税抜）
-          <div className="flex items-center gap-1">
-            <NumberInput value={l.unitPrice} onChange={(unitPrice) => change({unitPrice})} min={0} className={`w-full ${i.unitPrice !== null ? 'bg-amber-50' : ''}`} ariaLabel="販売単価" />
-            {i.unitPrice !== null && (
-              <button type="button" onClick={() => change({unitPrice: null})} className="rounded px-1.5 py-1 text-slate-500 hover:bg-slate-100" title="定価×割引に戻す" aria-label="販売単価を自動に戻す">
-                ↺
-              </button>
-            )}
-          </div>
-        </label>
-        <label className={field}>
-          税率
-          <select value={i.taxType} onChange={(e) => change({taxType: e.target.value as TaxType})} className="h-9 w-full rounded-md border border-slate-300 px-1 text-sm" aria-label="税区分">
-            <option value="10%">10%</option>
-            <option value="8%">軽減 8%</option>
-            <option value="非課税">非課税</option>
-          </select>
-        </label>
-        <div className="col-span-2 grid content-end text-right">
-          <div className="text-[11px] tabular-nums text-slate-500">
-            金額 {yen(l.amount)}円 ＋ 税 {yen(l.tax)}円
-          </div>
-          <div className="text-base font-bold tabular-nums text-slate-900">{yen(l.total)}円</div>
-        </div>
-        <label className={`${field} col-span-2 sm:col-span-4`}>
-          備考（算出根拠）
-          <div className="flex items-center gap-1">
-            <TextInput
-              value={typeof i.basisNote === 'string' ? i.basisNote : auto}
-              onChange={(v) => change({basisNote: v === auto ? null : v})}
-              placeholder="定価28,000円の20%引き"
-              className="min-w-0 flex-1"
-              aria-label="算出根拠"
-            />
-            {typeof i.basisNote === 'string' && (
-              <button type="button" onClick={() => change({basisNote: null})} className="rounded px-1.5 py-1 text-slate-500 hover:bg-slate-100" title="定価と割引から書き直す" aria-label="算出根拠を自動に戻す">
-                ↺
-              </button>
-            )}
-          </div>
-        </label>
-      </div>
-      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-3 py-1.5 text-xs text-slate-500">
+      <TextInput value={i.name} onChange={(name) => change({name})} placeholder="商品名" className="ml-8 min-w-0" aria-label="商品名" />
+      <div className="flex min-w-0 flex-wrap items-center gap-2 pl-8 text-xs text-slate-500">
         {manual ? (
           <>
             <MakerInput value={i.maker} onChange={(maker) => change({maker})} choices={makers} className="w-56" />
-            <TextInput value={i.code} onChange={(code) => change({code})} placeholder="品番" className="w-28" aria-label="品番" />
-            <label className="flex items-center gap-1 font-bold text-slate-600">
-              仕切（税抜・任意）
-              <NumberInput value={i.cost} onChange={(cost) => change({cost})} min={0} blankZero className="w-24" ariaLabel="仕切" />
-            </label>
+            <TextInput value={i.code} onChange={(code) => change({code})} placeholder="品番" className="w-48" aria-label="品番" />
           </>
         ) : (
           <span>{[i.maker, i.code, i.tais && `TAIS ${i.tais}`].filter(Boolean).join('　')}</span>
         )}
-        {favorite && (
-          <Btn color="white" small onClick={favorite} aria-label={`${i.name}をお気に入りに登録`}>
-            ☆ お気に入りに登録
-          </Btn>
+      </div>
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1.5 pl-8 text-xs font-bold text-slate-500">
+        定価（税抜）
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <NumberInput value={i.listPrice} onChange={(listPrice) => change({listPrice})} min={0} blankZero className="w-28" ariaLabel="定価" />
+          {favorite && (
+            <Btn color="white" small onClick={favorite} aria-label={`${i.name}をお気に入りに登録`}>
+              ☆ お気に入りに登録
+            </Btn>
+          )}
+        </div>
+        割引率
+        <div className="flex items-center gap-1">
+          <NumberInput value={i.discountRate} onChange={(discountRate) => change({discountRate: Math.min(100, discountRate)})} min={0} className="w-16" ariaLabel="割引率" />%
+        </div>
+        単価（税抜）
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <NumberInput value={l.unitPrice} onChange={(unitPrice) => change({unitPrice})} min={0} className={`w-28 ${i.unitPrice !== null ? 'bg-amber-50' : ''}`} ariaLabel="販売単価" />
+          {i.unitPrice !== null && (
+            <button type="button" onClick={() => change({unitPrice: null})} className="rounded px-1.5 py-1 text-slate-500 hover:bg-slate-100" title="定価×割引に戻す" aria-label="販売単価を自動に戻す">
+              ↺
+            </button>
+          )}
+        </div>
+        数量
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <Stepper value={i.qty} onChange={(qty) => change({qty: Math.max(1, Math.round(qty))})} ariaLabel={`${i.name}の数量`} />
+          <TextInput value={i.unit} onChange={(unit) => change({unit})} placeholder="台" className="w-16" aria-label="単位" />
+        </div>
+        税率
+        <select value={i.taxType} onChange={(e) => change({taxType: e.target.value as TaxType})} className="h-9 w-28 rounded-md border border-slate-300 bg-white px-2 text-sm font-normal text-slate-800" aria-label="税区分">
+          <option value="10%">10%</option>
+          <option value="8%">軽減 8%</option>
+          <option value="非課税">非課税</option>
+        </select>
+        {manual && (
+          <>
+            仕切（税抜・任意）
+            <NumberInput value={i.cost} onChange={(cost) => change({cost})} min={0} blankZero className="w-28" ariaLabel="仕切" />
+          </>
         )}
-        <span className="ml-auto">{priceNote(l)}</span>
+      </div>
+      {/* 備考（算出根拠）は横いっぱい（表の右の列だとスマホの幅で「定価135,000円の20%引き」が切れた） */}
+      <div className="grid gap-0.5 pl-8 text-xs font-bold text-slate-500">
+        備考（算出根拠）
+        <div className="flex min-w-0 items-center gap-1">
+          <TextInput
+            value={typeof i.basisNote === 'string' ? i.basisNote : auto}
+            onChange={(v) => change({basisNote: v === auto ? null : v})}
+            placeholder="定価28,000円の20%引き"
+            className="min-w-0 flex-1"
+            aria-label="算出根拠"
+          />
+          {typeof i.basisNote === 'string' && (
+            <button type="button" onClick={() => change({basisNote: null})} className="rounded px-1.5 py-1 text-slate-500 hover:bg-slate-100" title="定価と割引から書き直す" aria-label="算出根拠を自動に戻す">
+              ↺
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-baseline justify-end gap-x-3 gap-y-0.5 pl-8 tabular-nums">
+        <span className="text-[11px] text-slate-500">{priceNote(l)}</span>
+        <span className="text-xs text-slate-500">
+          金額 {yen(l.amount)}円 ＋ 税 {yen(l.tax)}円
+        </span>
+        <span className="text-base font-bold text-slate-900">{yen(l.total)}円</span>
       </div>
     </div>
   );

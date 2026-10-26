@@ -66,7 +66,7 @@ export function ProductPicker({
                   setView(id);
                   setTab('');
                 }}
-                className={`rounded-md px-3 py-1.5 text-sm font-bold ${view === id ? 'bg-teal-600 text-white' : 'text-slate-600 hover:bg-teal-50'}`}
+                className={`rounded-md px-3 py-1.5 text-sm font-bold ${view === id ? 'bg-teal-100 text-teal-900 ring-1 ring-inset ring-teal-300' : 'text-slate-600 hover:bg-teal-50'}`}
               >
                 {label}
               </button>
@@ -81,7 +81,7 @@ export function ProductPicker({
                 key={t || 'all'}
                 type="button"
                 onClick={() => setTab(t)}
-                className={`rounded-full border px-3 py-1 text-xs font-bold ${tab === t ? 'border-teal-600 bg-teal-600 text-white' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'}`}
+                className={`rounded-full border px-3 py-1 text-xs font-bold ${tab === t ? 'border-teal-400 bg-teal-100 text-teal-900' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'}`}
               >
                 {t || 'すべての種目'}
               </button>

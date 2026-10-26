@@ -322,12 +322,13 @@ export function ShinseiInputs({
         )}
         {row(
           kouiki ? '居宅介護支援事業所' : '記載者（事業所・氏名）',
-          <div className="grid w-full gap-2 sm:grid-cols-[minmax(0,1fr)_9rem]">
+          // 事業所名は長い（「社会福祉法人○○会 ○○居宅介護支援事業所」）ので行いっぱい、ケアマネジャーはその下（前は横に並べて事業所名が切れていた。2026-10-26 のデバッグ）
+          <div className="grid w-full gap-2">
             <div className="grid min-w-0 gap-1">
               <TextInput value={sale.careOffice} onChange={(careOffice) => change({careOffice})} placeholder="居宅介護支援事業所" className="w-full" aria-label="居宅介護支援事業所" data-nav />
               <Suggest values={frequentValues(data.sales, (x) => x.careOffice)} current={sale.careOffice} onPick={(careOffice) => change({careOffice})} />
             </div>
-            <div className="grid min-w-0 gap-1">
+            <div className="grid min-w-0 gap-1 sm:w-64">
               <TextInput value={sale.careManager} onChange={(careManager) => change({careManager})} placeholder="ケアマネジャー" className="w-full" aria-label="ケアマネジャー" data-nav />
               <Suggest
                 values={frequentValues(data.sales, (x) => x.careManager, (x) => !sale.careOffice.trim() || x.careOffice.trim() === sale.careOffice.trim())}

@@ -18,7 +18,8 @@ function Card({title, children}: {title: string; children: ReactNode}) {
 
 function Field({label, children, wide = false}: {label: string; children: ReactNode; wide?: boolean}) {
   return (
-    <label className={`grid min-w-0 content-start gap-1 text-xs font-bold text-slate-600 ${wide ? 'sm:col-span-2' : ''}`}>
+    // 入力欄は欄いっぱい（幅を決めていないと、字の大きさで決まる幅になって隣の欄に重なった。2026-10-26 のデバッグ）
+    <label className={`grid min-w-0 content-start gap-1 text-xs font-bold text-slate-600 [&>input]:w-full [&>input]:min-w-0 [&>select]:w-full ${wide ? 'sm:col-span-2' : ''}`}>
       {label}
       {children}
     </label>

@@ -51,7 +51,7 @@ export function PrintView({sale, settings, onClose}: {sale: Sale; settings: Sett
     <div className="print-overlay">
       <div className="print-toolbar">
         <span className="font-bold">見積書（A4縦）</span>
-        <button type="button" onClick={() => window.print()} className="rounded-md bg-sky-500 px-4 py-2 text-sm font-bold text-white shadow hover:bg-sky-600">
+        <button type="button" onClick={() => window.print()} className="rounded-md bg-sky-100 px-4 py-2 text-sm font-bold text-sky-900 shadow hover:bg-sky-200">
           🖨 印刷する
         </button>
         <button type="button" onClick={() => void saveEstimateBook(sale, settings)} className="rounded-md bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-800 shadow hover:bg-emerald-100">
@@ -114,7 +114,7 @@ export function ShinseiPrintView({pages, title, onClose, onExcel}: {pages: PvPag
           type="button"
           onClick={() => window.print()}
           disabled={picked.size === 0}
-          className="rounded-md bg-sky-500 px-4 py-2 text-sm font-bold text-white shadow hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-md bg-sky-100 px-4 py-2 text-sm font-bold text-sky-900 shadow hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-40"
         >
           🖨 印刷する
         </button>
