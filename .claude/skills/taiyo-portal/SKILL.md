@@ -6,7 +6,8 @@ description: 太陽シルバーサービス㈱（行橋営業所）の「太陽�
 # 太陽ポータルと業務アプリ（共通）
 
 太陽シルバーサービス㈱の業務アプリをタイルで並べたポータル。依頼してくるのは行橋営業所の担当者（プログラマーではない。スマホ・パソコン・iPad で使い、スクリーンショットに丸を付けて「ここを〜に」と頼む。返事は短い）。
-このスキルは 2026年10月のセッションまでの、アプリ全体に共通の知識をまとめたもの。アプリごとの細かいことは各アプリのスキルを読む。
+このスキルは 2026年10月のセッションまでの、アプリ全体に共通の知識をまとめたもの（2026-10-26 に、住宅改修・特定福祉用具・受注残をまたいだ受け渡しを足した）。アプリごとの細かいことは各アプリのスキルを読む。
+**写しが2つある**（`-` の2つのブランチ `claude/sasaoka-shikiri-app`・`claude/care-insurance-auto-transfer-3z0c9n` の `.claude/skills/taiyo-portal/`）。直したら、ほかの写しにも同じ中身を置く（2026-10-26 に食いちがっていた2つを1つにした）。
 
 ## アプリの一覧（2026-10-21 の時点。タイルの並びの順）
 
@@ -17,7 +18,7 @@ description: 太陽シルバーサービス㈱（行橋営業所）の「太陽�
 | 販売受注簿作成ツール | …/taiyo-hacchu-scan/ | `taiyo-hacchu-scan`（master の `docs/`） | `taiyo-jutaku-mitsumori-app` の references/hacchu-scan.md |
 | 売上伝票発行依頼書 | …/taiyo-uriage-denpyo/ | `taiyo-uriage-denpyo` | — |
 | 消耗品売上管理 | …/taiyo-uriage-bunseki/ | `taiyo-uriage-bunseki`（main） | `taiyo-uriage-bunseki-app` |
-| 受注残・進捗管理 | …/solar-silver-progress-app/ | `solar-silver-progress-app` | — |
+| 受注残・進捗管理 | …/solar-silver-progress-app/ | `solar-silver-progress-app`（**main が本番**。作業はブランチ、2026-10 は `claude/taiyo-link-dedupe`） | `taiyo-progress-app`（そのリポジトリの作業のブランチ） |
 | 居宅カレンダー | …/taiyo-calendar/ | `taiyo-calendar` | — |
 | 営業月報 | …/taiyo-eigyo-geppou/ | `taiyo-eigyo-geppou` | — |
 | チラシ作成（レンタル） | …/taiyo-chirashi/ | `taiyo-chirashi`（ケアマネジャー様向け） | — |
@@ -44,6 +45,22 @@ description: 太陽シルバーサービス㈱（行橋営業所）の「太陽�
 - 全部のアプリが同じサイト（akamar08taiyo-bot.github.io）なので、localStorage・IndexedDB を共有する（受け渡しに使える。キーにはアプリごとの接頭辞を付ける。容量も分け合う）。
 - ポータルのフォルダに置くアプリ（住宅改修・特定福祉用具）は `index.html`（1ファイルにビルドしたもの）と `version.json`（ビルドした時刻）を置く。アプリは `version.json` を見て新しい版を「⟳ 読み込み直す」で知らせる。
 
+## アプリ間の受け渡し（同じサイトの localStorage・postMessage。形を変えるときは読む側・書く側の両方を直す）
+
+| 何を | 書く側 → 読む側 | 中身 |
+|---|---|---|
+| `taiyo-tokutei-from-jutaku-v1`（localStorage） | 住宅改修（`tokuteiLink.ts` の `writeTokutei`）→ 特定福祉用具（`jutaku.ts` の `readJutaku`・`applyJutaku`） | `{job, fields}`：お客様の情報・保険者・負担割合・居宅・ケアマネ・介護保険証の値・生活保護・担当（2026-10-26） |
+| `taiyo-tokutei-to-jutaku`（postMessage、中の枠 → 親） | 特定福祉用具（`App.tsx`・`jutakuChanges`）→ 住宅改修（`App.tsx`・`readFromTokutei`・`withTokuteiFields`） | `{type, job, fields}`：特定福祉用具で直したお客様の情報・担当（⇔。2026-10-26）。送った値は特定福祉用具の `jutakuSync` にもする |
+| `taiyo-tokutei-catalog`（postMessage、親 → 中の枠） | 住宅改修（`TokuteiEditor.tsx`）→ 特定福祉用具（`App.tsx` → `SaleEditor` の `catalogAsk`） | `{type, action: 'show'｜'print'}`：様邸の画面の左の「📖 カタログを表示」「🖨 カタログを印刷」 |
+| `window.__taiyoTokuteiFlush`・`__taiyoTokuteiFiles` | 特定福祉用具が置く → 住宅改修が呼ぶ | 枠を消す前に保存を待つ・まとめて保存の Excel を作る |
+| `taiyo-tokutei-sales-v1`（localStorage） | 特定福祉用具（`salesSummary.ts`）→ 住宅改修の売上見込み・一覧の名前（`linked`）・受注残（taiyo-link） | `{v, updatedAt, rows, linked}`：案件ごとの金額（税抜）・月（納品日など）・担当・居宅・営業所 |
+| `taiyo-jutaku-sales-v1`（localStorage） | 住宅改修（`salesPlan.ts`）→ 受注残（taiyo-link） | `{v, updatedAt, rows, tokuteiMonths}`：見積書のある様邸ごとの金額・売上月・担当・居宅・営業所、このアプリで月を変えた特定福祉用具の案件の月 |
+| `taiyo-hacchu-import-v1`・`taiyo-hacchu-import-queue-v1`（localStorage） | 住宅改修の発注書・特定福祉用具 → 販売受注簿作成ツール | kind で分ける。**受け取る側を先に公開**（知らない kind は黙って消す） |
+| `taiyo-hacchu-scanned`・`taiyo-scan-image`（postMessage） | 販売受注簿作成ツールの `?embed=scan` ⇔ 特定福祉用具の「📷 スクショから自動認識」 | 読み取った商品・貼り付けた画像 |
+
+- 受け渡しは**同じ端末・同じブラウザ**のあいだだけ（localStorage はその端末にしかない）。受注残（Firestore）は営業所の全員で同じデータだが、「申請書・見積書作成から届いています」は見積書を作った端末で開いたときに出る。
+- 送るのは画面に出す値だけ（仕切・利益は入れない）。受け取る側は知らない項目を無視する作りにして、読む側を先に公開する。
+
 ## 公開の流れ（共通）
 
 **本番に出すのは、ユーザーが「公開して」と言ってから。** 本番＝ポータルの master への push と、ほかのアプリの公開するブランチへの push（GitHub Pages がすぐ配信する。多くは main、taiyo-hacchu-scan は master の docs/、FAX は claude/fax-cover-sheet-app）。
@@ -62,6 +79,9 @@ description: 太陽シルバーサービス㈱（行橋営業所）の「太陽�
 6. 報告：スマホで古い画面が出たら「⟳ 読み込み直す」（ポータルのフォルダのアプリ）か、読み込み直し（Ctrl+F5・アプリの強制再読込）。
 
 新しいセッションでのリポジトリの用意：`add_repo`（owner・repo。push するなら access "push"）→ `git clone https://github.com/akamar08taiyo-bot/<名前> /home/user/<名前>` → `register_repo_root`。
+clone が1つのブランチだけを取ってくる設定（`remote.origin.fetch` が main だけ）のことがある。作業のブランチを push しても `origin/<ブランチ>` ができず、終わりの確かめ（stop hook）が
+「push していない・リモートのブランチがない」と言う → `git fetch origin <ブランチ>:refs/remotes/origin/<ブランチ>`（push 済みかは `git ls-remote origin <ブランチ>`）。
+GitHub Pages のデプロイは `gh run list --repo akamar08taiyo-bot/<名前> --limit 3 --json headSha,status,conclusion,name` でも見られる（2026-10-26 は gh で見た）。
 スクラッチパッド（/tmp）は次のセッションに残らない。くり返し使う検証のスクリプトはスキルの `scripts/` に入れる。
 
 ## ユーザーの好み（これまでの指摘から）
@@ -76,7 +96,7 @@ description: 太陽シルバーサービス㈱（行橋営業所）の「太陽�
 - 依頼の例に書き間違いがあることもある → 意図を一般のルールにして作り、報告で「こう解釈した」と書く。細かいことを何度も聞き返すより、筋の通った解釈で進めて見せる。ただし、データを消す・外に送る・本番に出すなど取り返しのつかないことは確かめる。
 - 進み具合を短く知らせる（長く黙らない）。
 
-## 2026-10-22 の時点の公開の状態（Excel で保存）
+## 公開の記録（2026-10-22〜26）
 
 - 5つとも公開済み：住宅改修・消耗品売上管理・チラシ作成（消耗品）（2026-10-21）、見積・提案書作成（main e742ff6）・特定福祉用具（ポータル e901963）（2026-10-22、ユーザーの「3つとも公開して」）。
   タイルの使い方の文にも5つとも Excel 保存を書いた。チラシ作成（消耗品）の見積書の金額は円単位（四捨五入）・特定福祉用具の印刷は入りきらなければ縮めて1枚、も同じ日に公開。
@@ -88,6 +108,10 @@ description: 太陽シルバーサービス㈱（行橋営業所）の「太陽�
   住宅改修 81a89da（`claude/sasaoka-shikiri-app` の 2326b64：4つのタブ・🛁 特定福祉用具申請書のタブ・題名「申請書・見積書作成」・理由書）を公開。
   タイルは住宅改修の4つのタブの版が出てから入れる順にした（先にまとめると特定福祉用具に行けなくなるため）。2つのセッションで相談して、
   住宅改修の公開は住宅改修のセッション、tokutei/ とタイル（index.html）は特定福祉用具のセッションが受け持った。
+- 2026-10-26（1つのセッションが住宅改修・特定福祉用具・受注残をまとめて受け持った）：ポータル bfc14bf → c41bfbf → df33fa3（住宅改修 9b1d6aa・特定福祉用具 1d2f772 のビルド。
+  一覧の売上月・担当 ⇔・カタログの窓・申請書の印刷など）と、受注残 main 3ba7cdf（重ねて入れない・担当の名前でつなぐ・売上月）。どれもデプロイの成功を確かめた。
+  そのあとの住宅改修 3c7fd22（売上月は請求する月と同じが基本）・受注残 49efb60（すき間のない名前を姓で）は、まだ公開していない。
+  **いま公開している版は、スキルの記録ではなく git で確かめる**（ポータルの `git log -- <フォルダ>` のコミット文に「アプリの … のビルド」とビルドしたコミットを書いている。別リポジトリのアプリは公開するブランチの `git log`）。
 - 2026-10-22（夜）：特定福祉用具の「📤 販売受注簿に転記」を公開（ユーザーの答え「公開する」）。受け取る側を先に：販売受注簿作成ツール
   `taiyo-hacchu-scan` の master 025f5ee（ブランチ `claude/care-insurance-auto-transfer-3z0c9n` の dca8321 のビルドを docs/ に）→ デプロイの成功を見てから
   ポータル 55ad813（特定福祉用具 e901714 のビルド・タイル「申請書・見積書作成」と「販売受注簿作成ツール」の使い方の文。住宅改修のセッションに頼まれた
@@ -103,6 +127,8 @@ description: 太陽シルバーサービス㈱（行橋営業所）の「太陽�
 日本語・やさしい言葉で、①できたこと ②使い方（番号付き） ③確かめてほしいこと（解釈したところ・ユーザーのデータに要るもの） ④テストと公開の結果。
 見た目を変えたら、スクリーンショット（パソコンとスマホ）を送る。Excel・帳票は、架空のデータの見本と印刷と並べた画像を送り、会社の Excel・プリンターで一度見てもらう。
 まだ返事をもらっていない質問は、最後に短く並べる。
+まとまった作業が終わったら、そのセッションで分かったこと（決めたこと・ユーザーの答え・作り・確かめ方・落とし穴・公開の状態）を各アプリのスキルとこのスキルに書き足す
+（ユーザーの指示「完成したらセッションの内容全てスキル化もしくは、スキルに加えてください」2026-10-26。スキルのないアプリは新しく作る。スキルは作業のブランチに入れ、本番のブランチには公開のときに）。
 
 ## コミット・リポジトリの決まり
 

@@ -19,14 +19,17 @@ cd /home/user/tokutei-wt && npm ci --no-audit --no-fund
 ## 2. テスト
 
 ```sh
-npm run -s test:tokutei   # 単体テスト（node --test "test/tokutei/*.test.ts"。TypeScript をそのまま動かすので Node 22.18 以上）。2026-10 で 31件
+npm run -s test:tokutei   # 単体テスト（node --test "test/tokutei/*.test.ts"。TypeScript をそのまま動かすので Node 22.18 以上）。2026-10-26 で 93件
 npm run -s lint           # 型チェック（tsc --noEmit）
 npm run -s build:tokutei  # dist-tokutei/index.html（1ファイル、約2.8MB）と version.json
-PLAYWRIGHT=/opt/node-tools/node_modules/playwright/index.mjs timeout 600 node test/tokutei/e2e.mjs <出力フォルダ>
+E2E_PORT=5194 PLAYWRIGHT=/opt/node-tools/node_modules/playwright/index.mjs timeout 900 node test/tokutei/e2e.mjs <出力フォルダ>   # 10分ほど
 ```
 
 - `e2e.mjs` はビルドのあとに動かす。中で 5191番（環境変数 `E2E_PORT` で替えられる）の小さなサーバーを立てて `/tokutei/` を開く。Playwright はリポジトリの依存に入れていないので、場所は環境変数 `PLAYWRIGHT`（既定は `/opt/node22/lib/node_modules/playwright/index.mjs`。無ければ上のように指定）。
   流れ：取り込み → ★ → 見積もり（42,944円・4,295円・38,649円）→ 申請書（行橋市の Excel・プレビュー。広域連合に替えて受領委任払用・償還払い用・Excel・390px）→ 印刷 → Excel の保存（ファイル名と値）→ 読み直し → 390px で横にはみ出さない。PDF のページ数は `pdfinfo` で見る。
+- 2026-10-26 から e2e.mjs は、文例の見出し・種目の並び・カタログの12ページと初めのチェック（品番を読んでから `100110000000`）・チェックしたページだけの印刷（PDF のページ数）・
+  カタログの窓（開く・動かす・大きさ・覚える・印刷・Esc・申請書の画面の Enter）・複製・1行の名前も見る。
+- 住宅改修のタブの中（embed）・⇔・担当・カタログを表示／印刷は、住宅改修のブラウザのテスト `e2e-tokutei.mjs`（住宅改修のスキル）で確かめる：dist-tokutei/ を丸ごと（catalog/ も）住宅改修のテストのサイトの `tokutei/` に写して動かす。
 - 見た目を変えたら、パソコンとスマホ（390px）のスクリーンショットを撮って自分の目で見る。
 - 販売受注簿への転記：受注簿ツール（`akamar08taiyo-bot/taiyo-hacchu-scan`、`/home/user/taiyo-hacchu-scan`）を `npm ci && npm run build` してから
   `node test/tokutei/e2e-hacchu.mjs /home/user/taiyo-hacchu-scan/dist <出力フォルダ>`（5193番で `/tokutei/` と `/taiyo-hacchu-scan/` を同じサイトに置く）。

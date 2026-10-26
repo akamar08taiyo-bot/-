@@ -29,9 +29,14 @@ React 19 + TypeScript + Vite（`vite.tokutei.config.ts` で1ファイルの `dis
 | ファイル | 役割 |
 |---|---|
 | `App.tsx` | 3つのタブ（📝 見積もり・申請／📦 商品マスタ／⚙ 設定）。URL の `#tab=…&sale=…&print=1`。住宅改修のタブの中では `#jutaku=<様邸の id>&embed=1`（題名の段を出さない・`window.__taiyoTokuteiFlush` を出す） |
-| `jutaku.ts` | 住宅改修のアプリから開いたとき：localStorage `taiyo-tokutei-from-jutaku-v1`（`{job, fields}`）を読む `readJutaku`・値を確かめる `cleanJutakuFields`・その様邸の案件を開く（なければ作る）`applyJutaku`（`Sale.jutakuJob`・前に受け取った値 `jutakuSync` とちがう値だけ、まだ手で直していない項目に入れる。生活保護 `welfare` も（2026-10-23。前の jutakuSync に無ければ「なし」とみなす）。`jutakuSync` は作ったときの値から始めるので、初めの値のままの負担割合1割・保険者も、あとで住宅改修で入れた値が入る。保険者が変わったら個別切り上げも）。形は住宅改修の `src/sasaoka/tokuteiLink.ts` と同じにする |
+| `jutaku.ts` | 住宅改修のアプリから開いたとき：localStorage `taiyo-tokutei-from-jutaku-v1`（`{job, fields}`）を読む `readJutaku`・値を確かめる `cleanJutakuFields`・その様邸の案件を開く（なければ作る）`applyJutaku`（`Sale.jutakuJob`・前に受け取った値 `jutakuSync` とちがう値だけ、まだ手で直していない項目に入れる。生活保護 `welfare` も（2026-10-23。前の jutakuSync に無ければ「なし」とみなす）。`jutakuSync` は作ったときの値から始めるので、初めの値のままの負担割合1割・保険者も、あとで住宅改修で入れた値が入る。保険者が変わったら個別切り上げも）。形は住宅改修の `src/sasaoka/tokuteiLink.ts` と同じにする。2026-10-26：担当 `staff` も受け取る（空なら受け取らない）・逆向き（⇔）の `TO_JUTAKU`・`jutakuChanges`・`syncedValues`・
+親からのカタログの頼み `FROM_JUTAKU_CATALOG`・`CatalogAsk` |
 | `handoff.ts` | 販売受注簿作成ツールへ渡す内容（DESIGN.md 5.3）：`hacchuImport(sale, s)`（kind `taiyo-tokutei-order`。お客様・担当の名字・納品日・給付割合・生活保護・商品ごとの値と見積書と同じ金額）・`benefitSplit`（給付内訳を商品ごとに：今年度の残りは前の商品から順に、利用者負担は切り上げから後ろの商品で1円ずつ減らして合計を見積書に合わせる）・`hacchuUrl`・`queueHacchu`（承認・納品で1回だけ自動で列 `taiyo-hacchu-import-queue-v1` へ。2026-10-25）。受け取りは受注簿ツールの jutaku-import-begin〜end |
-| `salesSummary.ts` | 住宅改修の「📈 売上見込みを確認する」へ渡す案件ごとの金額（localStorage `taiyo-tokutei-sales-v1`。`salesMonthOf`＝納品日→承認日→申請日→見積日→作った日の月。仕切・利益は入れない。App.tsx が書く。2026-10-25） |
+| `salesSummary.ts` | 住宅改修の「📈 売上見込みを確認する」・受注残・進捗管理へ渡す案件ごとの金額（localStorage `taiyo-tokutei-sales-v1`＝`{v, updatedAt, rows, linked}`。`salesMonthOf`＝納品日→承認日→申請日→見積日→作った日の月・担当・居宅・営業所 office。
+仕切・利益は入れない。`linked`＝住宅改修の様邸から開いた案件のお客様名（商品のない作りかけも。住宅改修の一覧に名前を出す）。App.tsx が書く。2026-10-25〜26） |
+| `catalog.ts`・`print/catalogPdf.ts`・`print/CatalogPrint.tsx`・`print/CatalogViewer.tsx` | 介援隊のカタログ：ページの表 `CATALOG`（12ページ）・`catalogLabel`・品番の見くらべ `codeKey`・`pageCodes`・初めのチェック `catalogPicks`・検索 `catalogMatches`・題 `catalogTitle`。
+PDF を pdf.js で 200dpi の JPEG と文字（`CatalogImage`＝url・codes・text）に。印刷の画面（チェックしたページだけ）と、浮かぶ窓（動かす・大きさ・検索・印刷。置いた所は `taiyo-tokutei-catalog-window-v1`） |
+| `components/ShinseiParts.tsx` | 申請書・見積書の入れる所の部品（丸のボタン `Circles`・フリガナ `KanaInput`・被保険者番号の10マス・生年月日の元号と年月日・「＋ 2つ目の…を追加」`AddItemButton`・Enter で次の欄 `nextOnEnter`・「カタログから検索」`CatalogSearch`） |
 | `scanItem.ts`・`components/ScanDialog.tsx` | 「📷 スクショから自動認識」の窓：左に受注簿ツールの読み取り（`SCAN_PATH`＝`/taiyo-hacchu-scan/?embed=scan`）、右に読み取った商品。`scanDraft`（届いた値 → 右の欄）・`itemFromScan`（見積書の1行）・`CATALOG_SITES`（ケアマックス（介援隊）・ウェルファン）。受け取るのは同じ origin の iframe の window からの `taiyo-hacchu-scanned` だけ。窓の上の貼り付け・落とした画像は `taiyo-scan-image` で渡す |
 | `defaults.ts` | 営業所（OFFICES、19か所）・担当・保険者（INSURERS。みやこ町は `perItem`）・`defaultSettings()`。営業所はポータルの localStorage `taiyo_portal_session` から |
 | `sales.ts` | 見積番号 `nextQuoteNo`・`newSale`・`copySale`・`itemFromProduct`・`blankItem`・`customerLabel`・`saleWarnings`。使い回し：`customerKey`（同じお客様＝被保険者番号10けた、なければ名前＋生年月日）・`pastCustomers`・`customerPatch`（前のお客様から入れる）・`sameYearSales`（今年度の残り）・`frequentValues`（居宅・ケアマネの候補） |
@@ -40,7 +45,7 @@ React 19 + TypeScript + Vite（`vite.tokutei.config.ts` で1ファイルの `dis
 | `shinsei/` | 申請書の原本（`yukuhashi.xltx`・`kanda.xltx`・`miyako.xlsx`・`kouiki.xlsx`）。いただいた様式から前の方の記入・写真・丸を消したもの（式の誤りも2つ直した。広域連合は外部リンク・保存した場所・プロパティも外し、明細の書式を直した。DESIGN.md 5.2）。`shinseiFiles.ts` が `?inline` で中に入れて開く |
 | `shinseiPreview.ts` | 申請書のプレビューの材料：`shinseiPreview`（原本に `fillShinseiFiles` で書いたシートの列・行・結合・罫線・塗り・文字・図形・丸を画素に）・`SHINSEI_LINKS`（欄 → 入れる所。式で参照している欄もつなぐ）・`missingFields`。住宅改修の `shinseiPreview.ts` を写したもの |
 | `xlsxEdit.ts` | 原本の XML を直接書きかえる部品（住宅改修の `shinsei.ts` から写した）：`writeCells`（式の答えも合わせる）・`fitCell`・`sameStyle`・`drawMarks`（楕円。何行もある欄も）・`hideZeros`・`dropCalcChain`・`finishWorkbook` |
-| `wareki.ts`・`zip.ts`（`zipData.ts`＝福岡県の郵便番号）・`reasons.ts` | 生年月日の読み取り（和暦・西暦）・住所 ⇔ 郵便番号・理由の文例 |
+| `wareki.ts`・`zip.ts`（`zipData.ts`＝福岡県の郵便番号）・`reasons.ts` | 生年月日の読み取り（和暦・西暦）・住所 ⇔ 郵便番号・理由の文例（細目ごとの見出し `ReasonGroup`・`reasonExamples`・`pastReasons`） |
 | `import/` | 仕切り一覧表の取り込み（`priceImport.ts`・`xlsx.ts`・`pdfText.ts`。住宅改修のアプリから写したもの） |
 | `storage.ts` | IndexedDB `taiyo-tokutei`（使えないときは localStorage `tokutei-app:`）。読み込みは `cleanProducts`・`cleanSales`・`cleanSettings`（項目を足したらここも）。バックアップ JSON `backupJson`・`parseBackup`・`mergeById` |
 | `useStore.ts`・`sync.ts` | 変更の 0.4秒後に自動保存・タブ間でまとめて保存。`flush` は保存の途中ならそれが終わるまで待つ（住宅改修のタブの中の枠が消える前に待つため） |
