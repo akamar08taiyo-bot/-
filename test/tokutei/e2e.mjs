@@ -114,9 +114,9 @@ try {
   await page.getByRole('button', {name: '商品マスタに取り込む（4件）'}).click();
   await page.getByText('全4件').waitFor();
   const cats = await page.locator('select[aria-label$="の種目"]').evaluateAll((els) => els.map((e) => e.value));
-  // 種目の欄は種目だけ（ユーザーの指示「リストはシンプルに、入浴補助用具、腰掛便座などシンプルで良い」2026-10-26）
+  // 種目の欄は種目だけ（ユーザーの指示「リストはシンプルに、入浴補助用具、腰掛便座などシンプルで良い」2026-10-26）。並びはよく出る順（「一番上に入浴補助用具、次に腰掛け便座、その後に歩行補助杖、歩行器、固定用スロープ」2026-10-26）
   assert.deepEqual(cats.sort(), ['入浴補助用具', '入浴補助用具', '入浴補助用具', '歩行補助つえ'].sort());
-  assert.deepEqual(await page.locator('select[aria-label$="の種目"]').first().locator('option').allInnerTexts(), ['種目を選ぶ', '腰掛便座', '自動排泄処理装置の交換可能部品', '排泄予測支援機器', '入浴補助用具', '簡易浴槽', '移動用リフトのつり具の部分', '固定用スロープ', '歩行器', '歩行補助つえ']);
+  assert.deepEqual(await page.locator('select[aria-label$="の種目"]').first().locator('option').allInnerTexts(), ['種目を選ぶ', '入浴補助用具', '腰掛便座', '歩行補助つえ', '歩行器', '固定用スロープ', '自動排泄処理装置の交換可能部品', '排泄予測支援機器', '簡易浴槽', '移動用リフトのつり具の部分']);
   await page.screenshot({path: `${out}/03-products.png`, fullPage: true});
 
   // ---- 見積もり：行橋市で新しく作り、★から2つ選ぶ
