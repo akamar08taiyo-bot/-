@@ -59,8 +59,9 @@ PLAYWRIGHT=/opt/node-tools/node_modules/playwright/index.mjs timeout 600 node te
 ```sh
 cd /home/user/tokutei-wt && npm run -s build:tokutei
 cp dist-tokutei/index.html dist-tokutei/version.json /home/user/taiyo-portal/tokutei/
+cp -r dist-tokutei/catalog /home/user/taiyo-portal/tokutei/   # 介援隊のカタログの PDF（変えたときだけ。catalog.ts）
 # タイルの使い方の文：taiyo-portal/index.html の APPS の name:'特定福祉用具 購入申請書・見積もり作成'
-cd /home/user/taiyo-portal && git add tokutei/index.html tokutei/version.json index.html && git commit … && git push -u origin master
+cd /home/user/taiyo-portal && git add tokutei/index.html tokutei/version.json tokutei/catalog/*.pdf index.html && git commit … && git push -u origin master
 ```
 
 - 先にアプリのブランチを commit・push してから、ポータルを commit・push する。ポータルの `git fetch` で、ほかのセッションの公開が先に入っていないか見る。

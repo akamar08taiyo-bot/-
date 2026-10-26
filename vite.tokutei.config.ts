@@ -42,6 +42,8 @@ function htmlAsIndex(): Plugin {
 export default defineConfig({
   plugins: [react(), tailwindcss(), viteSingleFile(), htmlAsIndex(), appVersion()],
   base: './',
+  // 介援隊のカタログの PDF（1ページずつ。catalog.ts）。index.html には入れず、隣の catalog/ に置く（印刷するときだけ読む）
+  publicDir: 'public-tokutei',
   define: {__APP_BUILD__: JSON.stringify(APP_BUILD)},
   // PDFの日本語の文字を読むための対応表（pdf.js の CMap）をファイルとして同梱する
   // xltx・xlsx：申請書の原本（?inline で中に入れる。src/tokutei/shinseiFiles.ts）

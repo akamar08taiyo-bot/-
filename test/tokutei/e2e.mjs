@@ -20,10 +20,12 @@ mkdirSync(out, {recursive: true});
 const dist = new URL('../../dist-tokutei/', import.meta.url).pathname;
 const server = createServer((req, res) => {
   const path = (req.url ?? '/').split('?')[0];
-  const file = path.endsWith('/version.json') ? 'version.json' : 'index.html';
+  // 介援隊のカタログの PDF（dist-tokutei/catalog/。ポータルの tokutei/catalog/）
+  const catalog = /\/catalog\/([\w.-]+\.pdf)$/.exec(path);
+  const file = catalog ? join('catalog', catalog[1]) : path.endsWith('/version.json') ? 'version.json' : 'index.html';
   try {
     const body = readFileSync(join(dist, file));
-    res.writeHead(200, {'content-type': file.endsWith('.json') ? 'application/json' : 'text/html; charset=utf-8'});
+    res.writeHead(200, {'content-type': catalog ? 'application/pdf' : file.endsWith('.json') ? 'application/json' : 'text/html; charset=utf-8'});
     res.end(body);
   } catch {
     res.writeHead(404);
@@ -318,6 +320,44 @@ try {
   await page.emulateMedia({media: 'screen'});
   await page.getByRole('button', {name: '閉じる'}).click();
 
+  // ---- 介援隊のカタログの印刷（ユーザーの指示「販売見積書、申請書を作成するとき…カタログの PDF の印刷…各項目ごとに印刷がしやすいように」2026-10-26）。
+  // カタログのページを A4 で並べ、チェックしたページだけ印刷する。初めは見積もりの商品が載っているページにチェック（品番がページにあれば、そのページ）
+  await page.getByRole('button', {name: ADD_ITEM}).click();
+  await page.getByLabel('商品名').last().fill('見本の入浴グリップ');
+  await page.getByLabel('品番').last().fill('pn-l12211d'); // p.45 の品番（小文字・ハイフンのちがいは同じに見る）
+  await page.locator('aside').getByRole('button', {name: '📖 カタログを印刷'}).click();
+  const catPages = page.getByRole('group', {name: '印刷するページ'});
+  await catPages.waitFor();
+  assert.deepEqual(await catPages.getByRole('checkbox').evaluateAll((xs) => xs.map((x) => x.parentElement.textContent)), [
+    'p.45 浴槽手すり・バスボード',
+    'p.47 すべり止めマット',
+    'p.50 シャワーキャリー',
+    'p.173 ポータブルトイレ（安寿）',
+    'p.177 ポータブルトイレ（パナソニック）',
+  ]);
+  await page.waitForFunction(() => {
+    const imgs = [...document.querySelectorAll('.cat-sheet img')];
+    return imgs.length === 5 && imgs.every((i) => i.complete && i.naturalWidth > 1500);
+  }, null, {timeout: 60000});
+  await page.waitForFunction(() => document.querySelector('[aria-label="印刷するページ"] input').checked);
+  // シャワーベンチ・浴槽台のページはまだないので、品番の載っている p.45 だけ
+  assert.deepEqual(await catPages.getByRole('checkbox').evaluateAll((xs) => xs.map((x) => x.checked)), [true, false, false, false, false]);
+  assert.equal(await page.title(), '山田 花子様 カタログ');
+  await page.screenshot({path: `${out}/05c-catalog.png`});
+  const catPrint = page.locator('.print-toolbar').getByRole('button', {name: '🖨 印刷する'});
+  await catPages.getByRole('checkbox', {name: 'p.45 浴槽手すり・バスボード'}).uncheck();
+  assert.equal(await catPrint.isDisabled(), true);
+  await catPages.getByRole('checkbox', {name: 'p.45 浴槽手すり・バスボード'}).check();
+  await catPages.getByRole('checkbox', {name: 'p.177 ポータブルトイレ（パナソニック）'}).check();
+  assert.equal(await catPrint.isDisabled(), false);
+  await page.emulateMedia({media: 'print'});
+  await page.pdf({path: `${out}/catalog.pdf`, preferCSSPageSize: true});
+  await page.emulateMedia({media: 'screen'});
+  assert.equal(pdfPages(`${out}/catalog.pdf`), 2);
+  await page.getByRole('button', {name: '閉じる'}).click();
+  await page.getByRole('button', {name: '見本の入浴グリップを消す'}).click();
+  await page.locator('aside').getByRole('button', {name: '📖 カタログを印刷'}).waitFor();
+
   // ---- 品目が多くても原本の明細（16行）の中に入って、A4 1枚のまま。備考は3行まで（入らない行は画面で知らせる）
   // 手で入れた品目は価格が空（0円）なので、合計（42,944円）は変わらない
   for (let n = 1; n <= 8; n++) {
@@ -492,6 +532,13 @@ try {
   const panelBox = await page.getByRole('button', {name: '📄 申請書（Excel）を作る'}).locator('xpath=..').boundingBox();
   assert.ok(xlBox && prBox && panelBox && Math.abs(xlBox.width - prBox.width) < 1 && Math.abs(xlBox.height - prBox.height) < 1 && Math.abs(xlBox.y - prBox.y) < 1, `${JSON.stringify(xlBox)} ${JSON.stringify(prBox)}`);
   assert.ok(Math.abs(xlBox.x - panelBox.x - (panelBox.x + panelBox.width - (prBox.x + prBox.width))) < 2, `まん中にない ${JSON.stringify(panelBox)}`);
+  // 📖 カタログを印刷 も同じ大きさ（入らなければ次の段のまん中）
+  const catBox = await page.getByRole('button', {name: '📖 カタログを印刷'}).boundingBox();
+  assert.ok(catBox && Math.abs(catBox.width - xlBox.width) < 1 && Math.abs(catBox.height - xlBox.height) < 1, JSON.stringify(catBox));
+  await page.getByRole('button', {name: '📖 カタログを印刷'}).click();
+  await page.getByRole('group', {name: '印刷するページ'}).waitFor();
+  await page.waitForFunction(() => document.querySelectorAll('.cat-sheet img').length === 5, null, {timeout: 60000});
+  await page.getByRole('button', {name: '閉じる'}).click();
   await page.getByRole('button', {name: '🖨 印刷', exact: true}).click();
   assert.match(dialogs[0] ?? '', /手で入れた商品をお気に入り（★）に登録しますか？\n・見本の多点杖 ワイド/);
   await page.locator('.print-overlay').waitFor();

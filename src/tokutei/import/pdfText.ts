@@ -49,13 +49,14 @@ export class NoTextError extends Error {
 /** 1語ごとの文字と左右の位置（表の列をそろえるのに使う） */
 export type PdfWord = {s: string; x0: number; x1: number};
 
-export async function pdfToLines(data: Uint8Array): Promise<{lines: string[]; words: PdfWord[][]; pages: number}> {
+/** PDF を開く（文字を読む・カタログのページを絵にする。print/catalogPdf.ts） */
+export async function openPdf(data: Uint8Array) {
   // worker の本体を先に読み込んでおくと、pdf.js はそれを使って画面の中で処理する。
   // 新しい版の pdf.js は最新のブラウザにしかない機能（Map.getOrInsertComputed など）を使うため、
   // 足りない機能を補ってある legacy 版を使う（会社のパソコンのブラウザが少し古くても読める）
   await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs');
   const pdfjs = (await import('pdfjs-dist/legacy/build/pdf.min.mjs')) as typeof import('pdfjs-dist');
-  const task = pdfjs.getDocument({
+  return pdfjs.getDocument({
     data,
     cMapUrl: 'bundled://cmaps/',
     cMapPacked: true,
@@ -65,6 +66,10 @@ export async function pdfToLines(data: Uint8Array): Promise<{lines: string[]; wo
     isEvalSupported: false,
     disableFontFace: true,
   } as Parameters<typeof pdfjs.getDocument>[0]);
+}
+
+export async function pdfToLines(data: Uint8Array): Promise<{lines: string[]; words: PdfWord[][]; pages: number}> {
+  const task = await openPdf(data);
   const doc = await task.promise;
 
   const lines: string[] = [];

@@ -16,6 +16,7 @@ import {addressOfZip, zipCandidates, zipLabel} from '../zip.ts';
 import {ESTIMATE_CAPACITY, ESTIMATE_LABEL, estimateNoteOverflow, estimateOverflow, estimatePreview} from '../estimateBook.ts';
 import type {EstimateField} from '../estimateBook.ts';
 import {saveEstimateBook, useEstimateTemplate} from '../print/estimateFiles.ts';
+import {CatalogPrintView} from '../print/CatalogPrint.tsx';
 import {ShinseiPrintView} from '../print/PrintView.tsx';
 import {CustomerPicker} from './CustomerPicker.tsx';
 import {EstimateInputs} from './EstimateInputs.tsx';
@@ -194,6 +195,8 @@ export function SaleEditor({
     askFavorites();
     setPrintingShinsei(true);
   };
+  // 介援隊のカタログの印刷（catalog.ts。見積もりの商品が載っているページに初めからチェック）
+  const [printingCatalog, setPrintingCatalog] = useState(false);
   const remove = () => {
     if (!window.confirm(`「${customerLabel(sale)}」の見積もりを消します。元に戻せません。よろしいですか？`)) return;
     update('sales', (list) => list.filter((x) => x.id !== sale.id));
@@ -308,7 +311,7 @@ export function SaleEditor({
             onFavorite={(id) => favorite([id])}
           />
           <div className="min-w-0 space-y-3 lg:sticky lg:top-3 lg:self-start">
-            <ShinseiPanel sale={sale} settings={s} onPrint={pages && pages.length ? printShinsei : undefined} />
+            <ShinseiPanel sale={sale} settings={s} onPrint={pages && pages.length ? printShinsei : undefined} onCatalog={() => setPrintingCatalog(true)} />
             <div ref={previewBox} className="min-w-0 rounded-xl bg-slate-200/70 p-2 lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto" style={{scrollbarGutter: 'stable'}}>
               {!form ? (
                 <p className="p-6 text-center text-sm text-slate-500">この保険者の申請書の原本はまだありません</p>
@@ -389,9 +392,13 @@ export function SaleEditor({
                     </dd>
                   </div>
                 </dl>
-                <div className="mt-4">
+                <div className="mt-4 grid gap-2">
                   <Btn color="sky" className="w-full" onClick={print}>
                     🖨 見積書を印刷
+                  </Btn>
+                  {/* 介援隊のカタログのページを選んで印刷（ユーザーの指示「販売見積書…を作成するとき…カタログの PDF の印刷」2026-10-26） */}
+                  <Btn color="white" className="w-full" onClick={() => setPrintingCatalog(true)}>
+                    📖 カタログを印刷
                   </Btn>
                 </div>
               </section>
@@ -434,6 +441,7 @@ export function SaleEditor({
           }
         />
       )}
+      {printingCatalog && <CatalogPrintView sale={sale} onClose={() => setPrintingCatalog(false)} />}
       {pickingCustomer && <CustomerPicker sales={data.sales} current={sale} onPick={pickCustomer} onClose={() => setPickingCustomer(false)} />}
       {picking && (
         <ProductPicker

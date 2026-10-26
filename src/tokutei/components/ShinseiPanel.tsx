@@ -10,7 +10,7 @@ import {Btn, useToast} from './ui.tsx';
  * 1つのファイルに 事前申請書・支給申請書・委任状・写真の用紙 が入る（納品のあとに作り直すと、購入日・撮影日も入る。広域連合は支給申請書と写真の用紙）。
  * 原本のない保険者（そのほか）は出さない。画面に説明文は置かない（ユーザーの好み。説明は README とタイルの使い方の文）
  */
-export function ShinseiPanel({sale, settings, onPrint}: {sale: Sale; settings: Settings; onPrint?: () => void}) {
+export function ShinseiPanel({sale, settings, onPrint, onCatalog}: {sale: Sale; settings: Settings; onPrint?: () => void; onCatalog?: () => void}) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const form = shinseiForm(sale.insurer);
@@ -39,6 +39,12 @@ export function ShinseiPanel({sale, settings, onPrint}: {sale: Sale; settings: S
         {onPrint && (
           <Btn color="sky" className="w-full sm:w-60" onClick={onPrint}>
             🖨 印刷
+          </Btn>
+        )}
+        {/* 介援隊のカタログのページを選んで印刷（catalog.ts。ユーザーの指示「申請書を作成するとき…カタログの PDF の印刷」2026-10-26） */}
+        {onCatalog && (
+          <Btn color="white" className="w-full sm:w-60" onClick={onCatalog}>
+            📖 カタログを印刷
           </Btn>
         )}
       </div>

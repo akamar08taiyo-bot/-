@@ -13,7 +13,7 @@ const MM = 96 / 25.4;
 /** 原本の印刷の余白（左 17mm・右 10mm・上 14mm・下 8mm）の内側に、1枚に収まる大きさで描く */
 const INNER = {w: (210 - 17 - 10) * MM, h: (297 - 14 - 8) * MM};
 
-function useFitZoom(): number {
+export function useFitZoom(): number {
   const calc = () => Math.min(1, Math.max(0.3, (window.innerWidth - 16) / A4_WIDTH_PX));
   const [zoom, setZoom] = useState(calc);
   useEffect(() => {

@@ -51,6 +51,17 @@ body {
   opacity: 0.35;
 }
 
+/* 介援隊のカタログのページ（PDF を絵にしたもの。catalog.ts）。カタログの紙に余白があるので、紙いっぱいに */
+.cat-sheet {
+  padding: 0;
+}
+.cat-sheet img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 /* 2・3ページ目（明細のつづき）。1ページずつ紙に */
 .est-sheet + .est-sheet {
   margin-top: 8mm;
