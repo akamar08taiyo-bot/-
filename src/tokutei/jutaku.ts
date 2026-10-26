@@ -51,7 +51,7 @@ export function readJutaku(raw: string | null, job: string): JutakuHandoff | nul
 const sameValue = (a: unknown, b: unknown) => (a ?? '') === (b ?? '');
 
 /** 案件の今の値（受け取る項目だけ）。作ったときに、受け取らなかった項目の初めの値（負担割合1割・保険者など）も「住宅改修から入れたまま」とみなすため */
-function syncedValues(sale: Sale): JutakuFields {
+export function syncedValues(sale: Sale): JutakuFields {
   const out: JutakuFields = {};
   for (const k of KEYS) Object.assign(out, {[k]: sale[k]});
   return out;
@@ -87,4 +87,31 @@ export function applyJutaku(sales: Sale[], settings: Settings, h: JutakuHandoff,
   if (Object.keys(patch).length === 0 && synced) return {sales, id: linked.id};
   const next: Sale = {...linked, ...patch, jutakuSync: sync, updatedAt: Object.keys(patch).length ? now : linked.updatedAt};
   return {sales: sales.map((s) => (s.id === linked.id ? next : s)), id: linked.id};
+}
+
+// ---------------------------------------------------------------- このアプリから住宅改修へ（⇔）
+// ユーザーの指示「特定福祉用具の申請書を入力した場合であっても、住宅改修申請書、理由書、見積もりなどに、名前や住所なども転記されるようにする。⇔
+// ただし、金額などを入れていない場合は、請求書や受注残にいれない」（2026-10-26）。住宅改修のタブの中で開いたとき、
+// お客様の情報を直したら、直した項目だけを住宅改修に送る（postMessage。住宅改修の src/sasaoka/tokuteiLink.ts の readFromTokutei・withTokuteiFields）。
+// 開いたときは、住宅改修で空の項目に、ここで入れてある値を送る（住宅改修の値は上書きしない）。請求書・受注残に入れるかは住宅改修が決める（見積書の行）
+
+export const TO_JUTAKU = 'taiyo-tokutei-to-jutaku';
+
+const empty = (v: unknown) => v === undefined || v === null || v === '';
+
+/**
+ * 住宅改修に送る項目：sent（前に送った・開いたときの値）があれば、そこから変わった項目。なければ（開いたとき）、
+ * 住宅改修から受け取った値（given）が空で、ここで入れてある項目
+ */
+export function jutakuChanges(sale: Sale, sent: JutakuFields | null, given: JutakuFields | null): JutakuFields {
+  const now = syncedValues(sale);
+  const out: JutakuFields = {};
+  for (const k of KEYS) {
+    if (sent) {
+      if (!sameValue(now[k], sent[k])) Object.assign(out, {[k]: now[k] ?? ''});
+    } else if (given && empty(given[k]) && !empty(now[k]) && k !== 'welfare' && !sameValue(now[k], sale.jutakuSync?.[k])) {
+      Object.assign(out, {[k]: now[k]});
+    }
+  }
+  return out;
 }

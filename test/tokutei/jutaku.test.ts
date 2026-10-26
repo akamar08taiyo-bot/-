@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {defaultSettings} from '../../src/tokutei/defaults.ts';
-import {applyJutaku, JUTAKU_KEY, readJutaku} from '../../src/tokutei/jutaku.ts';
+import {applyJutaku, JUTAKU_KEY, jutakuChanges, readJutaku, syncedValues} from '../../src/tokutei/jutaku.ts';
 import {cleanSales} from '../../src/tokutei/storage.ts';
 
 // 住宅改修のアプリの様邸の画面の「🛁 特定福祉用具申請書」のタブから開いたとき（ユーザーの指示「特定福祉用具アプリを出す」、2026-10-22）
@@ -127,4 +127,21 @@ test('生活保護（welfare）：住宅改修で入れたら入る。変わっ�
   assert.equal(applyJutaku(old, settings, {job: 'j2', fields: {customer: '見本 太郎', welfare: true}}, 6000).sales[0].welfare, true);
   // 読み込みでも残す
   assert.equal(cleanSales(JSON.parse(JSON.stringify(on)))[0].jutakuSync?.welfare, true);
+});
+
+test('住宅改修へ返す（⇔）：開いたときは住宅改修で空の項目に、ここで入れた値だけ。そのあとは直した項目だけ', () => {
+  // ユーザーの指示「特定福祉用具の申請書を入力した場合であっても、住宅改修申請書、理由書、見積もりなどに、名前や住所なども転記されるようにする。⇔」2026-10-26
+  const settings = defaultSettings();
+  const given = {customer: '', kana: '', insuredNo: '', birthDate: '', gender: '' as const, zip: '', address: '', tel: '', careLevel: '', careOffice: '', careManager: ''};
+  const h = {job: 'j1', fields: given};
+  const sale = applyJutaku([], settings, h, 1000).sales[0];
+  // 作ったままなら返さない（負担割合1割・保険者などの初めの値も返さない）
+  assert.deepEqual(jutakuChanges(sale, null, given), {});
+  // ここでお客様名・住所を入れてあれば、開いたときに返す（住宅改修で入っている項目は返さない）
+  const typed = {...sale, customer: '見本 次郎', address: '見本町1-1', tel: '0930-00-0000', burdenRatio: 3 as const};
+  assert.deepEqual(jutakuChanges(typed, null, {...given, tel: '0930-11-1111'}), {customer: '見本 次郎', address: '見本町1-1', burdenRatio: 3});
+  // 開いたあとは、前に返した値から変わった項目だけ（空にしたら空を返す）
+  const sent = syncedValues(typed);
+  assert.deepEqual(jutakuChanges({...typed, kana: 'ミホン　ジロウ', address: ''}, sent, given), {kana: 'ミホン　ジロウ', address: ''});
+  assert.deepEqual(jutakuChanges(typed, sent, given), {});
 });

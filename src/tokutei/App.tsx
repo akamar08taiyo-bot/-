@@ -10,7 +10,8 @@ import {SaleEditor} from './components/SaleEditor.tsx';
 import {SalesPage} from './components/SalesPage.tsx';
 import {SettingsPage} from './components/SettingsPage.tsx';
 import {ToastProvider} from './components/ui.tsx';
-import {applyJutaku, JUTAKU_KEY, readJutaku} from './jutaku.ts';
+import {applyJutaku, JUTAKU_KEY, jutakuChanges, readJutaku, syncedValues, TO_JUTAKU} from './jutaku.ts';
+import type {JutakuFields} from './types.ts';
 import {estimateBook} from './print/estimateFiles.ts';
 import {PrintView} from './print/PrintView.tsx';
 import {writeSalesSummary} from './salesSummary.ts';
@@ -72,6 +73,7 @@ export default function App() {
   const [jutaku] = useState(initial.jutaku ?? null);
   const [embedView] = useState(initial.embed ? initial.view : undefined);
   const linked = useRef(false);
+  const given = useRef<JutakuFields | null>(null); // 住宅改修から受け取ったお客様の情報（開いたとき）
   const data = store.data;
 
   const sale = data?.sales.find((x) => x.id === saleId) ?? null;
@@ -93,6 +95,7 @@ export default function App() {
     }
     const handoff = readJutaku(raw, jutaku);
     if (!handoff) return;
+    given.current = handoff.fields;
     const r = applyJutaku(data.sales, data.settings, handoff);
     if (r.sales !== data.sales) store.update('sales', () => r.sales);
     setTab('sales');
@@ -121,6 +124,19 @@ export default function App() {
   // ユーザーの指示「住宅改修申請書・特定福祉用具申請書・住宅改修見積もり・特定福祉用具販売見積もりを一括で保存できる機能をつける」2026-10-26）。
   // 様邸の案件ができてから置く（できる前に呼ばれて空を返さないように）。商品のない案件は何も作らない
   const linkedSale = embed && jutaku && data ? [...data.sales].filter((x) => x.jutakuJob === jutaku).sort((a, b) => b.updatedAt - a.updatedAt)[0] : undefined;
+  // ここで直したお客様の情報を住宅改修の様邸にも送る（⇔。jutaku.ts の jutakuChanges。開いたときは、住宅改修で空の項目だけ）
+  const sent = useRef<JutakuFields | null>(null);
+  useEffect(() => {
+    if (!linkedSale || !jutaku || window.parent === window || !linked.current) return;
+    const fields = jutakuChanges(linkedSale, sent.current, given.current);
+    sent.current = syncedValues(linkedSale);
+    if (Object.keys(fields).length === 0) return;
+    try {
+      window.parent.postMessage({type: TO_JUTAKU, job: jutaku, fields}, location.origin);
+    } catch {
+      /* 住宅改修に送れなくても、ここでは使える */
+    }
+  }, [linkedSale, jutaku]);
   useEffect(() => {
     if (!linkedSale || !data) return;
     type Book = {name: string; bytes: Uint8Array};
