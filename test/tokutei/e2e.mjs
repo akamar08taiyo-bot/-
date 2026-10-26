@@ -495,6 +495,22 @@ try {
   await shinseiForm.getByLabel('種目', {exact: true}).selectOption('歩行補助つえ');
   await shinseiForm.getByLabel('商品名').fill('見本の多点杖 ワイド');
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), '商品名'); // 打っている欄から外れない
+  // 長い商品名・メーカー名も、申請書の名前の欄では1つの名前が1行（ユーザーの指示「商品名が長いときに行が中途半端に2行になったり、メーカー名が2列になる。１行でおさめる」2026-10-26）
+  await shinseiForm.getByLabel('商品名').fill('見本シャワーチェア Air ミドルワンタッチ ブルー');
+  await shinseiForm.getByLabel('メーカー').first().fill('見本エイジフリーケアサービス（株）');
+  const oneRow = (text) =>
+    page.waitForFunction(
+      (t) => {
+        const span = [...document.querySelectorAll('[aria-label="申請書のプレビュー"] span')].find((x) => x.textContent === t);
+        return span && span.getClientRects().length === 1;
+      },
+      text,
+      {timeout: 5000},
+    );
+  await oneRow('見本シャワーチェア Air ミドルワンタッチ ブルー');
+  await oneRow('見本エイジフリーケアサービス㈱');
+  await shinseiForm.getByLabel('メーカー').first().fill('');
+  await shinseiForm.getByLabel('商品名').fill('見本の多点杖 ワイド');
   await shinseiForm.getByLabel('定価').fill('9000');
   // 定価の下に割引率（変えられる）と販売金額（＝定価×(100−割引率)%。打ち直せて ↺ で戻す）。右の金額は申請書の購入予定金額（税込）
   // （ユーザーの指示「定価の下に、販売金額を記載する」「定価の下に割引率を表示、変更できるようにする」2026-10-26）

@@ -92,6 +92,14 @@ const FIT_MARGIN = 1.05;
 function fitScale(t: PvText): number {
   const avail = t.w - 4 - t.indent;
   if (avail <= 0 || t.runs.length === 0) return 1;
+  if (t.oneLine) {
+    // 名前の欄：どの行も幅に入り、行の数が高さに入る大きさ（折り返さない）
+    const size = Math.max(...t.runs.map((r) => r.font.size));
+    const rows = textLines(t);
+    const widest = Math.max(...rows.map((l) => l.reduce((n, r) => n + textWidth(r.text, r.font), 0) * FIT_MARGIN), 0);
+    const k = Math.min(1, widest > avail ? avail / widest : 1, t.h / (rows.length * size * 1.2));
+    return Math.max(0.3, k);
+  }
   if (!t.wrap) {
     const need = t.runs.reduce((n, r) => n + textWidth(r.text, r.font), 0) * FIT_MARGIN;
     return need > avail && need > 0 ? Math.max(0.3, avail / need) : 1;
@@ -110,6 +118,18 @@ function fitScale(t: PvText): number {
     if (rows * size * k * 1.2 <= t.h) return k;
   }
   return 0.3;
+}
+
+/** 欄の文字を改行で行に分ける（行ごとに字体ごとのかたまり） */
+function textLines(t: PvText): PvText['runs'][] {
+  const rows: PvText['runs'][] = [[]];
+  for (const r of t.runs) {
+    r.text.split(/\r?\n/).forEach((part, i) => {
+      if (i > 0) rows.push([]);
+      if (part) rows[rows.length - 1].push({...r, text: part});
+    });
+  }
+  return rows;
 }
 
 function TextView({t}: {t: PvText}) {
@@ -165,11 +185,22 @@ function TextView({t}: {t: PvText}) {
           paddingRight: t.align === 'right' || distributed ? t.indent : 0,
         }}
       >
-        {t.runs.map((r, i) => (
-          <span key={i} style={fontCss(r.font, k)}>
-            {r.text}
-          </span>
-        ))}
+        {t.oneLine
+          ? // 名前の欄は1行ずつ、折り返さない（均等割り付けの欄も1行の中で割り付ける）
+            textLines(t).map((row, i) => (
+              <div key={i} style={{whiteSpace: distributed ? 'nowrap' : 'pre', minHeight: '1.2em'}}>
+                {row.map((r, j) => (
+                  <span key={j} style={fontCss(r.font, k)}>
+                    {r.text}
+                  </span>
+                ))}
+              </div>
+            ))
+          : t.runs.map((r, i) => (
+              <span key={i} style={fontCss(r.font, k)}>
+                {r.text}
+              </span>
+            ))}
       </div>
     </div>
   );

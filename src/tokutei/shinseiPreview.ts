@@ -243,6 +243,9 @@ export type PvText = Rect & {
   shrink: boolean; // 縮小して全体を表示する
   vertical: boolean; // 縦書き
   indent: number; // 画素
+  // 名前の欄（種目及び商品名・製造事業者名及び販売事業者名。ShinseiSheet.oneLine）：改行で分けた行のまま折り返さず、どの行も幅に入る大きさにする
+  // （ユーザーの指示「商品名が長いときに行が中途半端に2行になったり、メーカー名が2列になる。１行でおさめる」2026-10-26。前は高さに入れば折り返していた）
+  oneLine?: boolean;
   // 丸で囲む欄（男・女 など）：1文字ずつの位置（丸の位置と同じ計算。原本の字体のない端末でも丸と文字をそろえる）
   marked?: {chars: {ch: string; x: number; w: number; cy: number}[]; cy: number; em: number};
 };
@@ -300,7 +303,10 @@ export function shinseiPreview(template: Files, form: ShinseiForm, v: ShinseiVal
     if (!path || !files[path] || !template[path]) continue;
     const own = sheetLinks.find((s) => s.sheet === w.sheet)?.links ?? [];
     const marked = w.marks?.length ? markLayouts(files, w.sheet, w.marks) : [];
-    pages.push(buildPage(files, path, template[path], w.sheet, own, links, marked));
+    const page = buildPage(files, path, template[path], w.sheet, own, links, marked);
+    const one = new Set(writes.filter((x) => x.sheet === w.sheet).flatMap((x) => x.oneLine ?? []));
+    if (one.size) page.texts = page.texts.map((t) => (one.has(t.ref) ? {...t, oneLine: true} : t));
+    pages.push(page);
   }
   return pages;
 }
