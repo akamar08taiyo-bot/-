@@ -10,7 +10,7 @@ import {Btn, useToast} from './ui.tsx';
  * 1つのファイルに 事前申請書・支給申請書・委任状・写真の用紙 が入る（納品のあとに作り直すと、購入日・撮影日も入る。広域連合は支給申請書と写真の用紙）。
  * 原本のない保険者（そのほか）は出さない。画面に説明文は置かない（ユーザーの好み。説明は README とタイルの使い方の文）
  */
-export function ShinseiPanel({sale, settings}: {sale: Sale; settings: Settings}) {
+export function ShinseiPanel({sale, settings, onPrint}: {sale: Sale; settings: Settings; onPrint?: () => void}) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const form = shinseiForm(sale.insurer);
@@ -30,9 +30,17 @@ export function ShinseiPanel({sale, settings}: {sale: Sale; settings: Settings})
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
       <h3 className="mb-2 font-bold text-teal-800">📄 申請書（{form.title}）</h3>
-      <Btn color="excel" className="w-full" onClick={make} disabled={busy}>
-        {busy ? '作っています…' : '📄 申請書（Excel）を作る'}
-      </Btn>
+      {/* Excel の横に印刷（ユーザーの指示「申請書をEXCEL保存の横に、印刷ボタンを設置する」2026-10-26） */}
+      <div className={`grid gap-2 ${onPrint ? 'sm:grid-cols-[1fr_auto]' : ''}`}>
+        <Btn color="excel" className="w-full" onClick={make} disabled={busy}>
+          {busy ? '作っています…' : '📄 申請書（Excel）を作る'}
+        </Btn>
+        {onPrint && (
+          <Btn color="sky" onClick={onPrint}>
+            🖨 印刷
+          </Btn>
+        )}
+      </div>
       {overflow && <p className="mt-2 rounded-md bg-rose-50 p-2 text-xs font-bold text-rose-700">{overflow}</p>}
     </section>
   );

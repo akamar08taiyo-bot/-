@@ -36,7 +36,6 @@ export type ShinseiKey = 'yukuhashi' | 'kanda' | 'miyako' | 'kouiki';
 /** 申請書の明細の1行 */
 export type ShinseiItem = {
   label: string; // 福祉用具名（種目及び商品名）：「入浴補助用具（入浴用いす）」と商品名の2行
-  labelLine: string; // 同じ内容を1つの段落に（欄の小さいみやこ町。行は Excel が折り返す）
   makerSeller: string; // 製造事業者名及び販売事業者名：メーカー名と会社名の2行
   total: number; // 購入金額（税込）
   tais: string;
@@ -80,14 +79,22 @@ const usedLines = (sale: Sale, s: Settings) => saleTotals(sale, s).lines.filter(
 /** 居宅サービス計画の届出：選んでいなければ、居宅介護支援事業所が入っていれば「有」 */
 export const carePlanOf = (sale: Pick<Sale, 'carePlan' | 'careOffice'>): CarePlan => sale.carePlan || (sale.careOffice.trim() ? '有' : '');
 
+/** 会社の名前を短く：株式会社・（株）・(株) → ㈱、有限会社・（有） → ㈲（前後のすき間も詰める） */
+export function corpShort(name: string): string {
+  return name
+    .trim()
+    .replace(/[\s　]*(?:株式会社|[（(]株[)）])[\s　]*/g, '㈱')
+    .replace(/[\s　]*(?:有限会社|[（(]有[)）])[\s　]*/g, '㈲');
+}
+
 export function shinseiValues(sale: Sale, s: Settings): ShinseiValues {
   const items = usedLines(sale, s).map((l): ShinseiItem => {
     const i = l.item;
     const qty = i.qty !== 1 ? `（${Math.round(i.qty * 100) / 100}${i.unit || '個'}）` : '';
     return {
       label: [docLabel(i.category, i.sub), `${i.name.trim()}${qty}`].filter(Boolean).join('\n'),
-      labelLine: [docLabel(i.category, i.sub), `${i.name.trim()}${qty}`].filter(Boolean).join('　'),
-      makerSeller: [i.maker.trim(), s.company.trim()].filter(Boolean).join('\n'),
+      // メーカー名と会社名は1行ずつ。株式会社・（株）は㈱にして短く（ユーザーの指示「会社名や商品名は、1行から増えないようにする　太陽シルバーサービス㈱などでも良い」2026-10-26）
+      makerSeller: [corpShort(i.maker), corpShort(s.company)].filter(Boolean).join('\n'),
       total: l.total,
       tais: i.tais.trim(),
       product: [i.name.trim(), i.code.trim()].filter(Boolean).join(' / '),
@@ -135,6 +142,7 @@ export type SheetWrite = {
   same?: string[][]; // 明細の行の欄の文字の大きさ・配置を、最初の欄にそろえる（原本は行ごとにちがう）
   fit?: string[]; // 入りきらなければ文字を小さくする欄
   fitWidth?: string[]; // 折り返さない1行の欄で、行が字の大きさぎりぎりに低いもの：幅に入らないときだけ小さくする
+  oneLine?: string[]; // 名前の欄（種目及び商品名・製造事業者名及び販売事業者名）：1つの名前が2行に折り返さないよう、どの行も幅に入る大きさにする
   marks?: Mark[];
   hideZeros?: boolean; // 式が空の欄を参照して 0 と出るシート
   block?: {cell: string; head: string[]; body: string; tail: string[]}; // 理由のかたまり（みやこ町）：head の行・body（理由。欄の幅で折り返す）・tail の行を、入る大きさにして書く
@@ -173,11 +181,11 @@ const insuredCells = (start: string, row: number, v: ShinseiValues): [string, Ce
 };
 
 /** 明細の行（rows の行に、前から書く。様式の行より多い分は書かない＝画面で知らせる） */
-function itemCells(v: ShinseiValues, rows: number[], cols: {label: string; maker: string; total: string; date?: string; tais?: string; oneLine?: boolean}): [string, CellValue][] {
+function itemCells(v: ShinseiValues, rows: number[], cols: {label: string; maker: string; total: string; date?: string; tais?: string}): [string, CellValue][] {
   const out: [string, CellValue][] = [];
   v.items.slice(0, rows.length).forEach((it, k) => {
     const r = rows[k];
-    out.push([`${cols.label}${r}`, cols.oneLine ? it.labelLine : it.label], [`${cols.maker}${r}`, it.makerSeller], [`${cols.total}${r}`, it.total]);
+    out.push([`${cols.label}${r}`, it.label], [`${cols.maker}${r}`, it.makerSeller], [`${cols.total}${r}`, it.total]);
     if (cols.tais) out.push([`${cols.tais}${r}`, it.tais]);
     // 日付は令和の文字で書く（みやこ町の支給申請書の購入日は日付の表示形式の欄だが、英語の表示・欄に入らない「###」にならないように）
     if (cols.date && v.deliveryDate) out.push([`${cols.date}${r}`, warekiLabel(v.deliveryDate)]);
@@ -227,9 +235,10 @@ function preCells(v: ShinseiValues, insuredRow: number): [string, CellValue][] {
   ];
 }
 
-const PRE_FIT = ['F4', 'F5', 'F11', 'Y10', 'A15', 'A16', 'A17', 'L15', 'L16', 'L17', 'E18', 'L20'];
+const PRE_FIT = ['F4', 'F5', 'F11', 'Y10', 'E18', 'L20'];
 const PRE_ROWS = [15, 16, 17];
 const PRE_SAME = [rowsOf('A', PRE_ROWS), rowsOf('L', PRE_ROWS)];
+const PRE_ONE_LINE = [...rowsOf('A', PRE_ROWS), ...rowsOf('L', PRE_ROWS)];
 
 /** 令和の日付の数字（「令和」と年・月・日の数） */
 function reiwaParts(iso: string): {era: string; y: number; m: number; d: number} | null {
@@ -288,7 +297,8 @@ function kouikiCells(v: ShinseiValues, c: KouikiCells, birth: string | null): [s
   ];
 }
 
-const kouikiFit = (c: KouikiCells) => [c.name, ...rowsOf('B', c.rows), ...rowsOf('I', c.rows), c.reason];
+const kouikiFit = (c: KouikiCells) => [c.name, c.reason];
+const kouikiOneLine = (c: KouikiCells) => [...rowsOf('B', c.rows), ...rowsOf('I', c.rows)];
 /**
  * 居宅サービス計画の届出の行と居宅の事業所名：アプリで改行を入れ、入る大きさにして書く（みやこ町の理由の欄と同じ block。
  * 行が決まっているので、有・無の丸の位置と、プレビューの1文字ずつの位置が Excel の折り返しに左右されない）
@@ -304,6 +314,7 @@ function kouikiJuryo(v: ShinseiValues): SheetWrite {
     cells: [...kouikiCells(v, c, birthChoice(v, '明 ・ 大 ・ 昭　')), ['Z9', v.tel], ...when(v.name, [['L38', `被保険者氏名　　${v.name}`]])],
     block: kouikiPlan(c, v),
     fit: kouikiFit(c),
+    oneLine: kouikiOneLine(c),
     fitWidth: ['G2', 'G9', 'Z9'], // フリガナ・住所・電話の行は低い（字の大きさとほぼ同じ）
     marks: [ERA('G6', v), GENDER('W6', v), kouikiPlanMark('J21', v)],
   };
@@ -319,6 +330,7 @@ function kouikiShokan(v: ShinseiValues): SheetWrite {
     cells: [...kouikiCells(v, c, b ? `${b.era}${b.y}年${b.m}月${b.d}日生` : null), ['J32', v.address], ['J34', v.name], ['Y34', v.tel]],
     block: kouikiPlan(c, v),
     fit: kouikiFit(c),
+    oneLine: kouikiOneLine(c),
     fitWidth: ['I11'], // フリガナ（I4）は結合していない1つの欄なので小さくしない（右の空いた欄へはみ出す）
     marks: [GENDER('W8', v), kouikiPlanMark('I23', v)],
   };
@@ -335,7 +347,7 @@ export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
     title: '行橋市',
     rows: 3,
     sheets: (v) => [
-      {sheet: '用具・受領委任払', cells: preCells(v, 7), same: PRE_SAME, fit: PRE_FIT, marks: [ERA('F9', v), GENDER('Y9', v), CARE('F12', v)]},
+      {sheet: '用具・受領委任払', cells: preCells(v, 7), same: PRE_SAME, fit: PRE_FIT, oneLine: PRE_ONE_LINE, marks: [ERA('F9', v), GENDER('Y9', v), CARE('F12', v)]},
       {sheet: '委任状', cells: proxyCells(v)},
       {sheet: '完了写真', cells: photoCells(v), fit: ['B3'], hideZeros: true},
     ],
@@ -346,7 +358,7 @@ export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
     rows: 3,
     sheets: (v) => [
       // 事前申請書の申請者は本人（住所 K28・氏名 K29 は原本の式）。電話番号 K30 にお客様の電話
-      {sheet: '用具・受領委任払', cells: [...preCells(v, 4), ['K30', v.tel]], same: PRE_SAME, fit: PRE_FIT, marks: [ERA('F9', v), GENDER('Y9', v), CARE('F12', v)]},
+      {sheet: '用具・受領委任払', cells: [...preCells(v, 4), ['K30', v.tel]], same: PRE_SAME, fit: PRE_FIT, oneLine: PRE_ONE_LINE, marks: [ERA('F9', v), GENDER('Y9', v), CARE('F12', v)]},
       // 支給申請書：ほとんどの欄は事前申請書を参照する式。性別（式でない）・購入日・申請日だけ書く。丸は同じ位置に
       {
         sheet: '用具・支給申請　受領委任払 (2)',
@@ -356,6 +368,7 @@ export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
         ],
         same: PRE_SAME,
         fit: PRE_FIT,
+        oneLine: PRE_ONE_LINE,
         marks: [ERA('F9', v), GENDER('Y9', v), CARE('F12', v)],
         hideZeros: true,
       },
@@ -381,7 +394,7 @@ export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
             ['I8', v.zip ? `〒${v.zip}` : ''],
             ['I9', v.address],
             ['Z9', v.tel],
-            ...itemCells(v, MIYAKO_ROWS, {label: 'B', maker: 'I', total: 'R', tais: 'Y', oneLine: true}),
+            ...itemCells(v, MIYAKO_ROWS, {label: 'B', maker: 'I', total: 'R', tais: 'Y'}),
             ...dateRow(v.applyDate, {era: 'D30', y: 'F30', m: 'I30', d: 'L30'}),
             ['I34', v.name],
             ['I36', v.staff],
@@ -390,15 +403,17 @@ export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
           // 届出の行を1行目にする（有・無の丸の位置を、理由の長さによらず決められるように）
           block: {cell: 'I20', head: ['（居宅サービス計画の届出　　有・無）'], body: reasonText(v), tail: ['']},
           same: [rowsOf('B', MIYAKO_ROWS), rowsOf('I', MIYAKO_ROWS), rowsOf('Y', MIYAKO_ROWS)],
-          fit: ['I4', 'I5', 'I9', 'Z9', ...rowsOf('B', MIYAKO_ROWS), ...rowsOf('I', MIYAKO_ROWS)],
+          fit: ['I4', 'I5', 'I9', 'Z9'],
+          oneLine: [...rowsOf('B', MIYAKO_ROWS), ...rowsOf('I', MIYAKO_ROWS)],
           marks: [GENDER('AA7', v), {cell: 'I20', needles: ['有', '無'], pick: v.carePlan ? pick(['有', '無'], v.carePlan) : -1, after: '居宅サービス計画の届出'}],
         },
         {
           sheet: '福祉用具支給申請(受領委任）',
-          cells: [...itemCells(v, MIYAKO_ROWS, {label: 'B', maker: 'I', total: 'P', date: 'V', oneLine: true}), ...dateRow(v.claimDate, {era: 'H25', y: 'J25', m: 'M25', d: 'P25'})],
+          cells: [...itemCells(v, MIYAKO_ROWS, {label: 'B', maker: 'I', total: 'P', date: 'V'}), ...dateRow(v.claimDate, {era: 'H25', y: 'J25', m: 'M25', d: 'P25'})],
           newStyles: ['H25', 'J25', 'M25', 'P25'].map((ref) => [ref, 'K25'] as [string, string]),
           same: [rowsOf('B', MIYAKO_ROWS), rowsOf('I', MIYAKO_ROWS), rowsOf('V', MIYAKO_ROWS)],
-          fit: ['I4', 'I5', 'I9', 'Z9', ...rowsOf('B', MIYAKO_ROWS), ...rowsOf('I', MIYAKO_ROWS), ...rowsOf('V', MIYAKO_ROWS)],
+          fit: ['I4', 'I5', 'I9', 'Z9', ...rowsOf('V', MIYAKO_ROWS)],
+          oneLine: [...rowsOf('B', MIYAKO_ROWS), ...rowsOf('I', MIYAKO_ROWS)],
           marks: [GENDER('AA7', v)],
         },
         // 納品確認写真用紙：1枚に1つの商品（使わない用紙は空のまま）
@@ -463,6 +478,7 @@ export function fillShinseiFiles(files: Files, form: ShinseiForm, v: ShinseiValu
   for (const w of sheets) for (const refs of w.same ?? []) sameStyle(files, w.sheet, refs);
   for (const w of sheets) for (const ref of w.fit ?? []) fitCell(files, w.sheet, ref);
   for (const w of sheets) for (const ref of w.fitWidth ?? []) fitCell(files, w.sheet, ref, true);
+  for (const w of sheets) for (const ref of w.oneLine ?? []) fitCell(files, w.sheet, ref, false, true);
   for (const w of sheets) if (w.marks?.length) drawMarks(files, w.sheet, w.marks);
   dropCalcChain(files);
 }

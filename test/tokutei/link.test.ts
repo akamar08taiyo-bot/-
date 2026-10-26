@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {docLabel} from '../../src/tokutei/category.ts';
+import {CATEGORIES, docLabel} from '../../src/tokutei/category.ts';
 import {defaultSettings} from '../../src/tokutei/defaults.ts';
 import {pastReasons, reasonExamples} from '../../src/tokutei/reasons.ts';
 import {customerKey, customerPatch, frequentValues, newSale, pastCustomers, sameYearSales} from '../../src/tokutei/sales.ts';
@@ -48,10 +48,10 @@ test('住所から郵便番号（福岡県）。大字・郡は省いて書い�
   assert.equal(zipLabel('８２４００４３'), '824-0043');
 });
 
-test('書類の種目：腰掛便座の長い細目はふだんの呼び名', () => {
-  assert.equal(docLabel('腰掛便座', '移動できる便器（ポータブルトイレ）'), '腰掛便座（ポータブルトイレ）');
-  assert.equal(docLabel('腰掛便座', '洋式便器の高さを補うもの'), '腰掛便座（補高便座）');
-  assert.equal(docLabel('入浴補助用具', '入浴用いす'), '入浴補助用具（入浴用いす）');
+test('書類の種目は種目だけ（細目は書かない。ユーザーの指示「リストはシンプルに、入浴補助用具、腰掛便座などシンプルで良い」）', () => {
+  assert.equal(docLabel('腰掛便座', '移動できる便器（ポータブルトイレ）'), '腰掛便座');
+  assert.equal(docLabel('入浴補助用具', '入浴用いす'), '入浴補助用具');
+  assert.equal(docLabel('歩行器', ''), '歩行器');
 });
 
 const S = defaultSettings();
@@ -105,3 +105,20 @@ test('よく使う値・前に書いた理由', () => {
 function newItem() {
   return {id: 'i', productId: null, name: 'x', maker: '', code: '', tais: '', category: '', sub: '', unit: '台', supplier: '', taxType: '10%' as const, listPrice: 0, cost: 0, qty: 1, discountRate: 20, unitPrice: null, reason: ''};
 }
+
+test('理由の文例：種目（細目）ごとに5つ・約100字（ユーザーの指示「各種目（シャワーチェア、浴槽台、浴槽手すり等）ごとに５種類ぐらい作成する。１００文字程度」）', () => {
+  for (const c of CATEGORIES) {
+    const keys = c.subs.length && c.name !== '歩行補助つえ' ? c.subs.map((s) => [c.name, s] as const) : [[c.name, ''] as const];
+    for (const [cat, sub] of keys) {
+      const list = reasonExamples(cat, sub);
+      assert.ok(list.length >= 5, `${cat} ${sub}：${list.length}`);
+      for (const t of list) assert.ok(t.length >= 85 && t.length <= 115, `${cat} ${sub}：${t.length}字「${t.slice(0, 12)}…」`);
+      assert.equal(new Set(list).size, list.length);
+    }
+  }
+  // 種目だけ選んだ手入れの商品は、商品名から細目を見る（シャワーチェア → 入浴用いす、浴槽台 → 浴槽内いす）
+  assert.deepEqual(reasonExamples('入浴補助用具', '', '見本のシャワーチェア'), reasonExamples('入浴補助用具', '入浴用いす'));
+  assert.deepEqual(reasonExamples('入浴補助用具', '', '浴槽台 見本'), reasonExamples('入浴補助用具', '浴槽内いす'));
+  // 商品名から分からなければ、細目ごとの1つめの文例を並べる
+  assert.equal(reasonExamples('入浴補助用具', '', '見本の用具').length, 7);
+});

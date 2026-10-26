@@ -110,14 +110,16 @@ try {
   await page.getByRole('button', {name: '商品マスタに取り込む（4件）'}).click();
   await page.getByText('全4件').waitFor();
   const cats = await page.locator('select[aria-label$="の種目"]').evaluateAll((els) => els.map((e) => e.value));
-  assert.deepEqual(cats.sort(), ['入浴補助用具|入浴用いす', '入浴補助用具|浴槽内いす', '入浴補助用具|浴槽用手すり', '歩行補助つえ|多点杖'].sort());
+  // 種目の欄は種目だけ（ユーザーの指示「リストはシンプルに、入浴補助用具、腰掛便座などシンプルで良い」2026-10-26）
+  assert.deepEqual(cats.sort(), ['入浴補助用具', '入浴補助用具', '入浴補助用具', '歩行補助つえ'].sort());
+  assert.deepEqual(await page.locator('select[aria-label$="の種目"]').first().locator('option').allInnerTexts(), ['種目を選ぶ', '腰掛便座', '自動排泄処理装置の交換可能部品', '排泄予測支援機器', '入浴補助用具', '簡易浴槽', '移動用リフトのつり具の部分', '固定用スロープ', '歩行器', '歩行補助つえ']);
   await page.screenshot({path: `${out}/03-products.png`, fullPage: true});
 
   // ---- 見積もり：行橋市で新しく作り、★から2つ選ぶ
   await page.getByRole('button', {name: '📝 見積もり・申請'}).click();
   await page.getByRole('button', {name: '＋ 行橋市'}).click();
   await page.getByRole('textbox', {name: 'お客様名', exact: true}).fill('山田 花子');
-  await page.getByLabel('被保険者番号').fill('0123456789');
+  await page.getByLabel('被保険者番号', {exact: true}).fill('0123456789');
   await page.getByRole('button', {name: '★ 商品を選ぶ'}).click();
   await page.getByRole('button', {name: 'シャワーベンチ FSフィットを入れる'}).click();
   await page.getByRole('button', {name: '浴槽台 ユクリアを入れる'}).click();
@@ -132,16 +134,24 @@ try {
   // ---- 申請書：入れる（生年月日は和暦で・郵便番号は住所から自動・理由は文例のボタン）→ Excel を作る。
   // 「未入力（空欄のまま作ります）」の一覧は出さない（ユーザーの指示「全体的にシンプルにしたいので、今回はなくしてください。すべて」2026-10-26）
   assert.equal(await page.getByText('未入力（空欄のまま作ります）').count(), 0);
-  await page.getByLabel('フリガナ').fill('ヤマダ ハナコ');
-  await page.getByLabel('生年月日').fill('S15.3.15');
-  await page.getByText('昭和15年3月15日（1940年）').waitFor();
-  await page.getByRole('radio', {name: '女'}).click();
-  await page.getByLabel('要介護度').selectOption('要介護2');
+  // 入れ方は住宅改修と同じ（ユーザーの指示「生年月日なども含め、入力の仕方や色など、住宅改修と同じ入力方法にする」2026-10-26）：
+  // フリガナはひらがなで打ってもカタカナ、生年月日は元号（初めは昭和）と年・月・日、性別・要介護状態区分は丸のボタン
+  await page.getByLabel('フリガナ').fill('やまだ はなこ');
+  assert.equal(await page.getByLabel('フリガナ').inputValue(), 'ヤマダ ハナコ');
+  assert.equal(await page.getByRole('group', {name: '元号'}).getByRole('button', {name: '昭和'}).getAttribute('aria-pressed'), 'true');
+  await page.getByLabel('生年月日の年').fill('15');
+  await page.getByLabel('生年月日の月').fill('3');
+  await page.getByLabel('生年月日の日').fill('15');
+  await page.getByRole('group', {name: '性別'}).getByRole('button', {name: '女'}).click();
+  await page.getByRole('group', {name: '要介護状態区分'}).getByRole('button', {name: '要介護2'}).click();
   await page.getByLabel('住所').fill('行橋市大字流末1327番地');
   assert.equal(await page.getByLabel('郵便番号').inputValue(), '824-0043');
   await page.getByLabel('電話').fill('0930-00-0000');
-  await page.getByRole('button', {name: /^文例：下肢筋力が低下し、浴室の床/}).click();
-  await page.getByLabel('浴槽台 ユクリアが必要な理由').fill('浴槽内での立ち座りが困難なため。');
+  // 文例はプルダウン（種目ごとに5つ・約100字。ユーザーの指示「文例は、各種目…ごとに５種類ぐらい作成する。１００文字程度」2026-10-26）
+  const examples = page.getByLabel('シャワーベンチ FSフィットが必要な理由の文例');
+  assert.equal(await examples.locator('optgroup[label="文例"] option').count(), 5);
+  await examples.selectOption(await examples.locator('optgroup[label="文例"] option').first().getAttribute('value'));
+  await page.getByLabel('浴槽台 ユクリアが必要な理由', {exact: true}).fill('浴槽内での立ち座りが困難なため。');
   await page.getByLabel('居宅介護支援事業所').fill('見本居宅介護支援事業所');
   await page.getByLabel('ケアマネジャー').fill('見本 太郎');
   await page.getByLabel('申請日', {exact: true}).fill('2026-10-22');
@@ -161,9 +171,9 @@ try {
     assert.equal(['Z7', 'AA7', 'AB7', 'AC7', 'AD7', 'AE7', 'AF7', 'AG7', 'AH7', 'AI7'].map((r) => readCell(f, sh, r)).join(''), '0123456789');
     assert.equal(readCell(f, sh, 'F9'), '明・大・昭　15年3月15日生');
     assert.equal(readCell(f, sh, 'G10'), '824-0043');
-    assert.equal(readCell(f, sh, 'A15'), '入浴補助用具（入浴用いす）\nシャワーベンチ FSフィット');
+    assert.equal(readCell(f, sh, 'A15'), '入浴補助用具\nシャワーベンチ FSフィット');
     assert.equal(readCell(f, sh, 'V15'), '30800');
-    assert.match(readCell(f, sh, 'E18'), /^入浴用いす：下肢筋力が低下し/);
+    assert.match(readCell(f, sh, 'E18'), /^入浴用いす：下肢筋力の低下により、浴室の床/);
     assert.match(readCell(f, sh, 'E18'), /\n浴槽内いす：浴槽内での立ち座りが困難なため。$/);
     assert.equal(readCell(f, sh, 'L20'), '見本居宅介護支援事業所　見本 太郎');
     assert.equal(readCell(f, sh, 'C26'), '令和8年10月22日');
@@ -225,11 +235,11 @@ try {
   await page.waitForTimeout(300);
   await preview.getByRole('group', {name: KOUIKI_JURYO, exact: true}).screenshot({path: `${out}/04f-shinsei-kouiki-juryo.png`});
   // （1つ目のボタンは包んでいる label の名前になるので、文字で探す）
-  assert.equal(await page.locator('[role=radiogroup][aria-label="居宅サービス計画の届出"] [role=radio][aria-checked="true"]').textContent(), '有');
+  assert.equal(await page.locator('[role=group][aria-label="居宅サービス計画の届出"] button[aria-pressed="true"]').textContent(), '有');
   // 様式の題名を押すと支払方法へ。償還払いにすると償還払い用（申請者は本人）
   await preview.getByRole('button', {name: '支払方法（受領委任払用・償還払い用）'}).first().click();
   assert.equal(await page.evaluate(() => document.activeElement?.closest('[data-field]')?.getAttribute('data-field')), 'payMethod');
-  await page.getByRole('radio', {name: '償還払い'}).click();
+  await page.getByRole('group', {name: '支払方法'}).getByRole('button', {name: '償還払い'}).click();
   await preview.getByRole('group', {name: KOUIKI_SHOKAN, exact: true}).waitFor();
   assert.deepEqual(await groups(), [KOUIKI_SHOKAN, KOUIKI_PHOTO]);
   assert.match(await preview.getByRole('group', {name: KOUIKI_SHOKAN, exact: true}).innerText(), /昭和15年3月15日生/);
@@ -247,7 +257,7 @@ try {
     assert.equal(readCell(f, KOUIKI_SHOKAN, 'I6'), '山田 花子');
     assert.equal(['W6', 'X6', 'Y6', 'Z6', 'AA6', 'AB6', 'AC6', 'AD6', 'AE6', 'AF6'].map((r) => readCell(f, KOUIKI_SHOKAN, r)).join(''), '0123456789');
     assert.equal(readCell(f, KOUIKI_SHOKAN, 'I8'), '昭和15年3月15日生');
-    assert.equal(readCell(f, KOUIKI_SHOKAN, 'B14'), '入浴補助用具（入浴用いす）\nシャワーベンチ FSフィット');
+    assert.equal(readCell(f, KOUIKI_SHOKAN, 'B14'), '入浴補助用具\nシャワーベンチ FSフィット');
     assert.equal(readCell(f, KOUIKI_SHOKAN, 'R20'), String(30800 + 12144)); // 合計＝見積書の購入金額
     assert.equal(readCell(f, KOUIKI_SHOKAN, 'J34'), '山田 花子');
     assert.equal(ellipseCount(f, KOUIKI_SHOKAN), 2); // 性別・届出（有）
@@ -262,7 +272,7 @@ try {
   await preview.screenshot({path: `${out}/07c-phone-shinsei-kouiki.png`});
   await page.setViewportSize({width: 1366, height: 900});
   // もとに戻す（行橋市・受領委任払い。このあとの見積書の確かめは行橋市のまま）
-  await page.locator('[role=radiogroup][aria-label="支払方法"] [role=radio]', {hasText: '受領委任払い'}).click();
+  await page.getByRole('group', {name: '支払方法'}).getByRole('button', {name: '受領委任払い'}).click();
   // みやこ町のプレビューも描ける（何行もある理由の欄：届出の有・無の丸と、字を1文字ずつ丸の位置に）
   await page.getByLabel('保険者', {exact: true}).selectOption('miyako');
   await preview.getByRole('group', {name: '福祉用具購入受領委任払申請書', exact: true}).waitFor();
@@ -307,10 +317,10 @@ try {
   // ---- 品目が多くても原本の明細（16行）の中に入って、A4 1枚のまま。備考は3行まで（入らない行は画面で知らせる）
   // 手で入れた品目は価格が空（0円）なので、合計（42,944円）は変わらない
   for (let n = 1; n <= 8; n++) {
-    await page.getByRole('button', {name: '＋ 手で入れる'}).click();
+    await page.getByRole('button', {name: '＋ 追加'}).click();
     await page.getByLabel('商品名').last().fill(`見本の商品 ${n}`);
   }
-  // メーカー名は候補から選べる（はじめにパナソニックエイジフリー（株）・アロン化成（株））・ほかも打てる・仕切は任意・入れている所は緑の枠（見積書の水色と分かれる）
+  // メーカー名は候補から選べる（はじめにパナソニックエイジフリー（株）・アロン化成（株））・ほかも打てる・仕切は任意・入れている所は薄い黄色（見積書の水色と分かれる）
   // （ユーザーの指示「メーカー名は、パナソニックエイジフリー（株）とアロン化成（株）はデフォルトにする。それ以外でも選べるようにする」「仕切りは（任意）」
   // 「見積もりが水色で入力しているとわかるようにしてある色も水色なので、わかりづらい。入力項目は、住宅改修などと同じ色にする」2026-10-26）
   const maker = page.getByRole('combobox', {name: 'メーカー'}).last();
@@ -323,7 +333,7 @@ try {
   await maker.fill('見本工業');
   assert.equal(await maker.inputValue(), '見本工業');
   await page.getByText('仕切（税抜・任意）').last().waitFor();
-  await page.waitForFunction(() => document.querySelector('[aria-label="見積書のプレビュー"] [data-pv-field="items"]')?.className.includes('outline-[#217346]'));
+  await page.waitForFunction(() => document.querySelector('[aria-label="見積書のプレビュー"] [data-pv-field="items"]')?.className.includes('outline-amber-500'));
   // 「自己負担額を表示」をオンにすると、明細の最後の商品の2行下に「自己負担額（1割負担）　○円」（ユーザーの指示「自己負担額を表示のオンオフっていうチェック項目を入れ」2026-10-26）
   const selfPay = page.getByRole('checkbox', {name: '自己負担額を表示'});
   assert.equal(await selfPay.isChecked(), false);
@@ -351,7 +361,7 @@ try {
   // ---- 16点を超えると2ページ目（明細のつづき）。3ページまで（ユーザーの指示「ページは3ページまでいけるようにする」。1ページ目は「行数は4行ぐらい減らしていい」で16行）
   // 23点：1ページ目に16点（★の2つ＋見本の商品 1〜14）、2ページ目に見本の商品 15〜21
   for (let n = 9; n <= 21; n++) {
-    await page.getByRole('button', {name: '＋ 手で入れる'}).click();
+    await page.getByRole('button', {name: '＋ 追加'}).click();
     await page.getByLabel('商品名').last().fill(`見本の商品 ${n}`);
   }
   await page.getByRole('button', {name: '🖨 見積書を印刷'}).first().click();
@@ -411,8 +421,47 @@ try {
     await page.screenshot({path: `${out}/${file}`, fullPage: true});
   }
 
-  // ---- 設定：発行元はポータルで選んだ営業所（行橋営業所）
+  // ---- 新しい見積もり：福祉用具の欄は最初から1つ開いている（打つとその商品になる。「＋ 追加」は2つ目から。ユーザーの指示「基本は手で入れるのがデフォルトなので開いておく」）。
+  // 手で入れた商品は「☆ お気に入りに登録」で商品マスタの★に。申請書の「🖨 印刷」は、印刷の前にまだ登録していない手入れの商品を登録するか聞く。一覧はチェックしてまとめて削除
   await page.setViewportSize({width: 1366, height: 900});
+  await page.getByRole('button', {name: '📝 見積もり・申請'}).click();
+  if (!(await page.getByRole('button', {name: '＋ 苅田町'}).count())) await page.getByRole('button', {name: '📝 見積もり・申請'}).click(); // 2回目で一覧へ
+  await page.getByRole('button', {name: '＋ 苅田町'}).click();
+  await page.getByRole('button', {name: '📄 申請書', exact: true}).click();
+  const shinseiForm = page.getByRole('form', {name: '申請書に入れる所'});
+  await shinseiForm.waitFor();
+  assert.equal(await shinseiForm.getByRole('button', {name: '＋ 追加'}).count(), 0);
+  await shinseiForm.getByLabel('種目', {exact: true}).selectOption('歩行補助つえ');
+  await shinseiForm.getByLabel('商品名').fill('見本の多点杖 ワイド');
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), '商品名'); // 打っている欄から外れない
+  await shinseiForm.getByLabel('定価').fill('9000');
+  await shinseiForm.getByRole('button', {name: '＋ 追加'}).waitFor();
+  assert.equal(await shinseiForm.getByLabel('見本の多点杖 ワイドが必要な理由の文例').locator('optgroup[label="文例"] option').count(), 5); // 商品名から多点杖の文例
+  const dialogs = [];
+  page.removeAllListeners('dialog');
+  page.on('dialog', (d) => {
+    dialogs.push(d.message());
+    void d.accept();
+  });
+  await page.getByRole('button', {name: '🖨 印刷', exact: true}).click();
+  assert.match(dialogs[0] ?? '', /手で入れた商品をお気に入り（★）に登録しますか？\n・見本の多点杖 ワイド/);
+  await page.locator('.print-overlay').waitFor();
+  assert.ok((await page.locator('.print-overlay .est-sheet').count()) >= 3); // 事前申請書・支給申請書・委任状・完了写真
+  await page.locator('.print-overlay').screenshot({path: `${out}/10-shinsei-print.png`});
+  await page.getByRole('button', {name: '閉じる'}).click();
+  await page.getByRole('button', {name: '📦 商品マスタ'}).click();
+  await page.waitForFunction(() => [...document.querySelectorAll('input, td, span, div')].some((el) => ('value' in el ? el.value : el.textContent) === '見本の多点杖 ワイド'));
+  await page.getByRole('button', {name: '📝 見積もり・申請'}).click();
+  if (!(await page.getByRole('button', {name: '＋ 苅田町'}).count())) await page.getByRole('button', {name: '📝 見積もり・申請'}).click();
+  const before = await page.getByRole('checkbox', {name: /を選ぶ$/}).count();
+  await page.getByRole('checkbox', {name: /を選ぶ$/}).first().check();
+  await page.getByRole('checkbox', {name: /を選ぶ$/}).nth(1).check();
+  await page.getByRole('status', {name: '選んだ見積もり'}).getByText('2件を選んでいます').waitFor();
+  await page.getByRole('button', {name: 'まとめて削除'}).click();
+  assert.match(dialogs.at(-1) ?? '', /^2件の見積もりを消します/);
+  await page.waitForFunction((n) => document.querySelectorAll('input[type=checkbox][aria-label$="を選ぶ"]').length === n, before - 2);
+
+  // ---- 設定：発行元はポータルで選んだ営業所（行橋営業所）
   await page.getByRole('button', {name: '⚙ 設定'}).click();
   assert.equal(await page.getByLabel('営業所').inputValue(), '行橋営業所');
   await page.getByRole('button', {name: '⬇ すべてをファイルに保存'}).waitFor();

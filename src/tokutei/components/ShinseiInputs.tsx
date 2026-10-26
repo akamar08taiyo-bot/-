@@ -1,25 +1,28 @@
 // 申請書の画面の左の入れる所：申請書の上からの順に1行ずつ（住宅改修の申請書のタブと同じ形。ユーザーの指示「住宅改修と同様に、申請書のページをメインに大きくおいてください」2026-10-23）。
+// 入れ方・色も住宅改修と同じ（ユーザーの指示「生年月日なども含め、入力の仕方や色など、住宅改修と同じ入力方法にする」2026-10-26。ShinseiParts.tsx）：
+// 上に保険者と申請書の名前、選ぶ所は丸のボタン、フリガナはカタカナに、被保険者番号は10マス、生年月日は元号と年月日、Enter で次の欄。
 // 右のプレビュー（ShinseiPreview.tsx）の欄を押すと、ここのその行へ（data-field）。まだ入っていない行は薄い黄色。
 // 値は案件（Sale）のまま（見積書と同じ値。金額は見積書の側で入れる。ここでは購入金額を出すだけ）
-import {useMemo} from 'react';
+import {useMemo, useState} from 'react';
 import type {ReactNode, RefObject} from 'react';
 import type {FocusEvent} from 'react';
+import {lineOf} from '../calc.ts';
 import type {Line} from '../calc.ts';
 import {CARE_LEVELS, INSURERS} from '../defaults.ts';
-import {frequentValues, makerChoices} from '../sales.ts';
-import {carePlanOf, padInsuredNo} from '../shinsei.ts';
+import {blankItem, frequentValues, makerChoices, unregisteredItems} from '../sales.ts';
+import {carePlanOf, shinseiForm} from '../shinsei.ts';
 import type {ShinseiKey} from '../shinsei.ts';
 import type {ShinseiField} from '../shinseiPreview.ts';
 import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Sale, SaleItem} from '../types.ts';
 import {yen} from '../util.ts';
 import {zipLabel} from '../zip.ts';
 import type {ZipHit} from '../zip.ts';
-import {BirthInput} from './BirthInput.tsx';
 import {CategorySelect} from './CategorySelect.tsx';
 import {MakerInput} from './MakerInput.tsx';
 import {ReasonField} from './ReasonField.tsx';
+import {Circles, EraBirthInput, InsuredNoInput, KanaInput, nextOnEnter} from './ShinseiParts.tsx';
 import {Suggest} from './Suggest.tsx';
-import {Btn, Segmented, TextInput} from './ui.tsx';
+import {Btn, NumberInput, TextInput} from './ui.tsx';
 
 const dateInput = 'h-9 rounded-md border border-slate-300 bg-white px-2 text-sm outline-none focus:border-blue-500';
 
@@ -41,6 +44,7 @@ export function ShinseiInputs({
   onScan,
   onAddItem,
   onPickCustomer,
+  onFavorite,
 }: {
   sale: Sale;
   data: AppData;
@@ -57,8 +61,9 @@ export function ShinseiInputs({
   zips: ZipHit[];
   onPickProduct: () => void;
   onScan: () => void; // 「📷 スクショから自動認識」の窓を開く（scanItem.ts）
-  onAddItem: () => void;
+  onAddItem: (item?: SaleItem) => void; // 手で入れる商品を足す（item があればその商品＝最初から開いている欄に打ったもの）
   onPickCustomer: () => void;
+  onFavorite: (itemId: string) => void; // 手で入れた商品を商品マスタの★お気に入りに
 }) {
   const makers = useMemo(() => makerChoices(data.products, data.sales), [data.products, data.sales]);
   const s = data.settings;
@@ -66,13 +71,21 @@ export function ShinseiInputs({
   const row = (label: ReactNode, children: ReactNode, field?: ShinseiField, warn = field ? missing.has(field) : false) => (
     <div
       data-field={field}
-      className={`border-b border-slate-300 last:border-b-0 sm:grid sm:grid-cols-[8.5rem_1fr] ${field && active === field ? 'relative z-[1] outline outline-2 -outline-offset-2 outline-sky-500' : ''}`}
+      className={`border-b border-slate-300 last:border-b-0 sm:grid sm:grid-cols-[9.5rem_1fr] ${field && active === field ? 'relative z-[1] outline outline-2 -outline-offset-2 outline-sky-500' : ''}`}
     >
-      <div className="flex items-center border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-bold text-slate-700 sm:border-b-0 sm:border-r sm:border-slate-300 sm:py-2">{label}</div>
+      <div className="flex flex-wrap items-center border-b border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-bold text-slate-700 sm:border-b-0 sm:border-r sm:border-slate-300 sm:py-2">{label}</div>
       <div className={`flex min-w-0 flex-wrap items-center gap-2 px-3 py-2 ${warn ? 'bg-amber-50' : ''}`}>{children}</div>
     </div>
   );
   const kouiki = formKey === 'kouiki';
+  // 商品がないときも、手で入れる欄を1つ開いておく（ふだんは手で入れるので。ユーザーの指示「手でいれるではなく、基本は手で入れるのがデフォルトなので開いておく
+  // ２商品名以降は追加する」2026-10-26）。打つとその商品ができる（id を同じにして、打っている欄から外れないように）
+  const [draft] = useState(() => blankItem(s));
+  const rows: Line[] = lines.length ? lines : [lineOf(draft, s)];
+  const changeRow = (id: string, patch: Partial<SaleItem>) => (lines.length ? changeItem(id, patch) : onAddItem({...draft, ...patch}));
+  const unregistered = new Set(unregisteredItems(sale, data.products).map((i) => i.id));
+  const title = shinseiForm(sale.insurer)?.title;
+  const insurerName = INSURERS.find((i) => i.key === sale.insurer)?.label;
   return (
     <div ref={inputsRef} onFocusCapture={onFocusField} className="min-w-0 space-y-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -80,7 +93,12 @@ export function ShinseiInputs({
           👤 前のお客様から入れる
         </Btn>
       </div>
-      <div role="form" aria-label="申請書に入れる所" className="overflow-hidden rounded-xl border-2 border-slate-400 bg-white shadow-sm">
+      <div role="form" aria-label="申請書に入れる所" onKeyDown={nextOnEnter} className="overflow-hidden rounded-lg border-2 border-slate-700 bg-white shadow-sm">
+        {title && (
+          <div className="border-b-2 border-slate-700 px-4 py-2.5 text-center text-base font-bold text-slate-800">
+            {insurerName}　{title}
+          </div>
+        )}
         {row(
           '保険者',
           <select
@@ -101,28 +119,25 @@ export function ShinseiInputs({
             ))}
           </select>,
         )}
-        {row('フリガナ', <TextInput value={sale.kana} onChange={(kana) => change({kana})} placeholder="ヤマダ ハナコ" className="w-full" aria-label="フリガナ" />, 'kana')}
-        {row('被保険者氏名', <TextInput value={sale.customer} onChange={(customer) => change({customer})} placeholder="山田 花子" className="w-full" aria-label="お客様名" />, 'customer')}
         {row(
-          '被保険者番号',
-          <TextInput
-            value={sale.insuredNo}
-            onChange={(insuredNo) => change({insuredNo: insuredNo.normalize('NFKC').replace(/[^\d]/g, '').slice(0, 10)})}
-            onBlur={() => sale.insuredNo && sale.insuredNo !== padInsuredNo(sale.insuredNo) && change({insuredNo: padInsuredNo(sale.insuredNo)})}
-            inputMode="numeric"
-            placeholder="10けた（足りない分は左に0）"
-            className="w-56"
-            aria-label="被保険者番号"
-          />,
-          'insuredNo',
+          <span>
+            フリガナ
+            {/* 住宅改修と同じ注記（ユーザーの指示「振り仮名の横に括弧で、ひらがな入力でも自動的にカタカナに変換…を記載する」）。見出しが縦に並ばないよう下の行に */}
+            <span className="block text-xs font-normal text-slate-500">（ひらがなで入力してもカタカナになります）</span>
+          </span>,
+          <KanaInput value={sale.kana} onChange={(kana) => change({kana})} placeholder="ヤマダ　ハナコ" className="w-full max-w-md" aria-label="フリガナ" data-nav />,
+          'kana',
         )}
-        {row('生年月日', <BirthInput value={sale.birthDate} onChange={(birthDate) => change({birthDate})} />, 'birthDate')}
+        {row('被保険者氏名', <TextInput value={sale.customer} onChange={(customer) => change({customer})} placeholder="山田　花子" className="w-full max-w-md text-base font-bold" aria-label="お客様名" data-nav />, 'customer')}
+        {row('被保険者番号', <InsuredNoInput value={sale.insuredNo} onChange={(insuredNo) => change({insuredNo})} />, 'insuredNo')}
+        {row('生年月日', <EraBirthInput value={sale.birthDate} onChange={(birthDate) => change({birthDate})} />, 'birthDate')}
         {row(
           '性別',
-          <Segmented<Gender>
-            ariaLabel="性別"
+          <Circles<Gender>
+            label="性別"
             value={sale.gender}
-            onChange={(gender) => change({gender})}
+            onPick={(gender) => change({gender})}
+            clearable
             options={[
               ['男', '男'],
               ['女', '女'],
@@ -133,7 +148,10 @@ export function ShinseiInputs({
         {row(
           '郵便番号',
           <>
-            <TextInput value={sale.zip} onChange={changeZip} onBlur={() => sale.zip && change({zip: zipLabel(sale.zip)})} inputMode="numeric" placeholder="824-0043" className="w-32" aria-label="郵便番号" />
+            <span className="inline-flex items-center gap-1">
+              〒
+              <TextInput value={sale.zip} onChange={changeZip} onBlur={() => sale.zip && change({zip: zipLabel(sale.zip)})} inputMode="numeric" placeholder="824-0000" className="w-32" aria-label="郵便番号" data-nav />
+            </span>
             {zips.length > 1 &&
               zips.map((z) => (
                 <button key={z.zip} type="button" onClick={() => change({zip: z.zip})} className="text-[11px] text-slate-500 underline decoration-dotted hover:text-teal-700">
@@ -148,27 +166,20 @@ export function ShinseiInputs({
           </>,
           'zip',
         )}
-        {row('住所', <TextInput value={sale.address} onChange={changeAddress} placeholder="行橋市大字流末1327番地" className="w-full" aria-label="住所" />, 'address')}
-        {row('電話番号', <TextInput value={sale.tel} onChange={(tel) => change({tel})} inputMode="tel" className="w-44" aria-label="電話" />, 'tel')}
+        {row('住所', <TextInput value={sale.address} onChange={changeAddress} placeholder="福岡県…" className="w-full" aria-label="住所" data-nav />, 'address')}
+        {row('電話番号', <TextInput type="tel" value={sale.tel} onChange={(tel) => change({tel})} placeholder="0930-00-0000" className="w-48" aria-label="電話" data-nav />, 'tel')}
         {!kouiki &&
           row(
             '要介護状態区分',
-            <select value={sale.careLevel} onChange={(e) => change({careLevel: e.target.value})} className="h-9 w-40 min-w-0 rounded-md border border-slate-300 px-2 text-sm" aria-label="要介護度">
-              <option value="">—</option>
-              {CARE_LEVELS.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>,
+            <Circles<string> label="要介護状態区分" value={sale.careLevel} onPick={(careLevel) => change({careLevel})} clearable options={CARE_LEVELS.map((c) => [c, c] as const)} />,
             'careLevel',
           )}
         {row(
           '負担割合',
-          <Segmented<BurdenRatio>
-            ariaLabel="負担割合"
+          <Circles<BurdenRatio>
+            label="負担割合"
             value={sale.burdenRatio}
-            onChange={(burdenRatio) => change({burdenRatio})}
+            onPick={(burdenRatio) => burdenRatio && change({burdenRatio})}
             options={[
               [1, '1割'],
               [2, '2割'],
@@ -179,10 +190,10 @@ export function ShinseiInputs({
         )}
         {row(
           '支払方法',
-          <Segmented<PayMethod>
-            ariaLabel="支払方法"
+          <Circles<PayMethod>
+            label="支払方法"
             value={sale.payMethod}
-            onChange={(payMethod) => change({payMethod})}
+            onPick={(payMethod) => payMethod && change({payMethod})}
             options={[
               ['受領委任払い', '受領委任払い'],
               ['償還払い', '償還払い'],
@@ -193,10 +204,10 @@ export function ShinseiInputs({
         {(formKey === 'miyako' || kouiki) &&
           row(
             '居宅サービス計画の届出',
-            <Segmented<CarePlan>
-              ariaLabel="居宅サービス計画の届出"
+            <Circles<CarePlan>
+              label="居宅サービス計画の届出"
               value={carePlanOf(sale)}
-              onChange={(carePlan) => change({carePlan})}
+              onPick={(carePlan) => carePlan && change({carePlan})}
               options={[
                 ['有', '有'],
                 ['無', '無'],
@@ -207,28 +218,50 @@ export function ShinseiInputs({
         {row(
           '福祉用具',
           <div className="w-full space-y-2">
-            {lines.map((l, idx) => {
+            {rows.map((l, idx) => {
               const i = l.item;
+              const changeItem = changeRow;
               return (
-                <div key={i.id} className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 p-2">
-                  <span className="grid h-6 w-6 place-items-center rounded-full bg-teal-100 text-xs font-bold text-teal-800">{idx + 1}</span>
-                  <TextInput value={i.name} onChange={(name) => changeItem(i.id, {name})} placeholder="商品名" className="min-w-0 flex-1" aria-label="商品名" />
-                  <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => changeItem(i.id, {category, sub})} ariaLabel="種目" />
-                  {i.productId === null ? (
-                    <MakerInput value={i.maker} onChange={(maker) => changeItem(i.id, {maker})} choices={makers} className="w-56" />
-                  ) : (
-                    i.maker && <span className="text-xs text-slate-500">{i.maker}</span>
-                  )}
-                  <span className="ml-auto text-sm font-bold tabular-nums text-slate-800">{yen(l.total)}円</span>
-                  <button
-                    type="button"
-                    onClick={() => change({items: sale.items.filter((x) => x.id !== i.id)})}
-                    className="rounded px-2 py-1 text-rose-500 hover:bg-rose-50"
-                    aria-label={`${i.name || '商品'}を消す`}
-                    title="消す"
-                  >
-                    ✕
-                  </button>
+                <div key={i.id} className="grid gap-2 rounded-md border border-slate-200 p-2">
+                  {/* 1行目：種目 → 商品名（申請書の「種目名及び商品名」と同じ順。ユーザーの指示「入力順は、種目、商品名の順」2026-10-26）。2行目：メーカー・金額 */}
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-teal-100 text-xs font-bold text-teal-800">{idx + 1}</span>
+                    <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => changeItem(i.id, {category, sub})} ariaLabel="種目" className="w-48" />
+                  </div>
+                  <TextInput value={i.name} onChange={(name) => changeItem(i.id, {name})} placeholder="商品名" className="ml-8 min-w-0" aria-label="商品名" data-nav />
+                  <div className="flex min-w-0 flex-wrap items-center gap-2 pl-8">
+                    {i.productId === null ? (
+                      <>
+                        <MakerInput value={i.maker} onChange={(maker) => changeItem(i.id, {maker})} choices={makers} className="w-56" />
+                        {/* 手で入れる商品は定価もここで（割引・単価は販売見積書で） */}
+                        <label className="flex items-center gap-1 text-xs font-bold text-slate-500">
+                          定価（税抜）
+                          <NumberInput value={i.listPrice} onChange={(listPrice) => changeItem(i.id, {listPrice})} min={0} blankZero className="w-28" ariaLabel="定価" />
+                        </label>
+                      </>
+                    ) : (
+                      i.maker && <span className="text-xs text-slate-500">{i.maker}</span>
+                    )}
+                    {unregistered.has(i.id) && (
+                      <Btn color="white" small onClick={() => onFavorite(i.id)} aria-label={`${i.name}をお気に入りに登録`}>
+                        ☆ お気に入りに登録
+                      </Btn>
+                    )}
+                    <span className="ml-auto text-sm font-bold tabular-nums text-slate-800">{yen(l.total)}円</span>
+                    {lines.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => change({items: sale.items.filter((x) => x.id !== i.id)})}
+                        className="rounded px-2 py-1 text-rose-500 hover:bg-rose-50"
+                        aria-label={`${i.name || '商品'}を消す`}
+                        title="消す"
+                      >
+                        ✕
+                      </button>
+                    ) : (
+                      <span className="w-8" />
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -239,9 +272,11 @@ export function ShinseiInputs({
               <Btn color="purple" small onClick={onScan}>
                 📷 スクショから自動認識
               </Btn>
-              <Btn color="white" small onClick={onAddItem}>
-                ＋ 手で入れる
-              </Btn>
+              {lines.length > 0 && (
+                <Btn color="white" small onClick={() => onAddItem()}>
+                  ＋ 追加
+                </Btn>
+              )}
             </div>
           </div>,
           'items',
@@ -260,13 +295,13 @@ export function ShinseiInputs({
         )}
         {row(
           kouiki ? '居宅介護支援事業所' : '記載者（事業所・氏名）',
-          <div className="grid w-full gap-2 sm:grid-cols-2">
+          <div className="grid w-full gap-2 sm:grid-cols-[minmax(0,1fr)_11rem]">
             <div className="grid min-w-0 gap-1">
-              <TextInput value={sale.careOffice} onChange={(careOffice) => change({careOffice})} placeholder="居宅介護支援事業所" className="w-full" aria-label="居宅介護支援事業所" />
+              <TextInput value={sale.careOffice} onChange={(careOffice) => change({careOffice})} placeholder="居宅介護支援事業所" className="w-full" aria-label="居宅介護支援事業所" data-nav />
               <Suggest values={frequentValues(data.sales, (x) => x.careOffice)} current={sale.careOffice} onPick={(careOffice) => change({careOffice})} />
             </div>
             <div className="grid min-w-0 gap-1">
-              <TextInput value={sale.careManager} onChange={(careManager) => change({careManager})} placeholder="ケアマネジャー" className="w-full" aria-label="ケアマネジャー" />
+              <TextInput value={sale.careManager} onChange={(careManager) => change({careManager})} placeholder="ケアマネジャー" className="w-full" aria-label="ケアマネジャー" data-nav />
               <Suggest
                 values={frequentValues(data.sales, (x) => x.careManager, (x) => !sale.careOffice.trim() || x.careOffice.trim() === sale.careOffice.trim())}
                 current={sale.careManager}
@@ -288,9 +323,9 @@ export function ShinseiInputs({
           </select>,
           'staff',
         )}
-        {row('申請日', <input type="date" value={sale.applyDate} onChange={(e) => change({applyDate: e.target.value})} className={dateInput} aria-label="申請日" />, 'applyDate')}
-        {row('納品日（購入日）', <input type="date" value={sale.deliveryDate} onChange={(e) => change({deliveryDate: e.target.value})} className={dateInput} aria-label="納品日" />, 'deliveryDate')}
-        {row('支給申請日', <input type="date" value={sale.claimDate} onChange={(e) => change({claimDate: e.target.value})} className={dateInput} aria-label="支給申請日" />, 'claimDate')}
+        {row('申請日', <input type="date" value={sale.applyDate} onChange={(e) => change({applyDate: e.target.value})} className={dateInput} aria-label="申請日" data-nav />, 'applyDate')}
+        {row('納品日（購入日）', <input type="date" value={sale.deliveryDate} onChange={(e) => change({deliveryDate: e.target.value})} className={dateInput} aria-label="納品日" data-nav />, 'deliveryDate')}
+        {row('支給申請日', <input type="date" value={sale.claimDate} onChange={(e) => change({claimDate: e.target.value})} className={dateInput} aria-label="支給申請日" data-nav />, 'claimDate')}
       </div>
     </div>
   );

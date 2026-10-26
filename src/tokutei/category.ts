@@ -104,18 +104,11 @@ export function categoryLabel(category: string, sub: string): string {
 }
 
 /**
- * 書類（見積書・申請書）に書く種目：細目の名前が長い腰掛便座は、ふだんの呼び名にする
- * （「腰掛便座（移動できる便器（ポータブルトイレ））」は申請書の欄に入りきらない → 「腰掛便座（ポータブルトイレ）」）
+ * 書類に書く種目は種目だけ（「入浴補助用具」「腰掛便座」）。ユーザーの指示「リストはシンプルに、入浴補助用具、腰掛便座などシンプルで良い」（2026-10-26）で、
+ * 前の「入浴補助用具（入浴用いす）」の細目を外した（選ぶ欄も種目だけ。細目は理由の頭の呼び名に残す）
  */
-const DOC_SUB: Record<string, string> = {
-  和式便器を腰掛式にするもの: '据置式便座',
-  洋式便器の高さを補うもの: '補高便座',
-  立ち上がりを補助するもの: '昇降便座',
-  '移動できる便器（ポータブルトイレ）': 'ポータブルトイレ',
-};
-
-export function docLabel(category: string, sub: string): string {
-  return categoryLabel(category, DOC_SUB[sub] ?? sub);
+export function docLabel(category: string, _sub: string): string {
+  return category;
 }
 
 /** 種目の短い呼び名（商品を選ぶ画面のタブ） */

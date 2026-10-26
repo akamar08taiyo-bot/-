@@ -97,6 +97,51 @@ export function itemFromProduct(p: Product, settings: Pick<Settings, 'discountRa
   };
 }
 
+/**
+ * 手で入れた商品（商品マスタにない）で、商品名のあるもの。同じ名前・メーカーの商品がもう商品マスタにあれば入れない
+ * （ユーザーの指示「商品名や金額を一度入力したら、お気に入り登録として追加できるようにする。印刷の前に、お気に入り登録するか否かの確認」2026-10-26）
+ */
+export function unregisteredItems(sale: Pick<Sale, 'items'>, products: Pick<Product, 'name' | 'maker'>[]): SaleItem[] {
+  const key = (name: string, maker: string) => `${name.normalize('NFKC').replace(/\s+/g, '')}|${makerKey(maker)}`;
+  const known = new Set(products.map((p) => key(p.name, p.maker)));
+  return sale.items.filter((i) => i.productId === null && i.name.trim() && !known.has(key(i.name, i.maker)));
+}
+
+/**
+ * 手で入れた商品を、商品マスタの★お気に入りにする（商品名・メーカー・品番・種目・定価・仕切など、入れた値のまま）。
+ * 明細はその商品につなぐ（商品マスタから選んだのと同じになる）。返すのは新しい商品マスタと明細
+ */
+export function addFavorites(products: Product[], items: SaleItem[], ids: Set<string>, now = Date.now()): {products: Product[]; items: SaleItem[]} {
+  const added: Product[] = [];
+  const next = items.map((i) => {
+    if (!ids.has(i.id) || i.productId !== null || !i.name.trim()) return i;
+    const p: Product = {
+      id: uid('p'),
+      name: i.name.trim(),
+      maker: i.maker.trim(),
+      code: i.code.trim(),
+      tais: i.tais.trim(),
+      jan: '',
+      category: i.category,
+      sub: i.sub,
+      categoryByHand: !!i.category,
+      listPrice: i.listPrice,
+      cost: i.cost,
+      taxType: i.taxType,
+      unit: i.unit,
+      supplier: i.supplier,
+      favorite: true,
+      useCount: 1,
+      lastUsedAt: now,
+      source: '手入力',
+      updatedAt: now,
+    };
+    added.push(p);
+    return {...i, productId: p.id};
+  });
+  return {products: [...products, ...added], items: next};
+}
+
 /** 手で入れる明細（商品マスタにない商品） */
 export function blankItem(settings: Pick<Settings, 'discountRate'>): SaleItem {
   return {

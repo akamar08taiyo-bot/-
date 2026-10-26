@@ -81,6 +81,37 @@ function VerticalText({t}: {t: PvText}) {
   );
 }
 
+// 測った幅に足す余裕：Windows の ＭＳ 明朝・ＭＳ ゴシックは小さい字で、画面に出る字の幅が測った幅より少し広いことがあり、
+// ぎりぎりに縮めた見出しの終わりが欄の線で切れた（「記載者 事業所・氏名」。ユーザーの指示「文字がはみ出ていないか確認」2026-10-26）
+const FIT_MARGIN = 1.05;
+
+/**
+ * 欄の文字を欄の中に全部見せる大きさ（倍率。住宅改修の estimate/ShinseiPreview.tsx の fitScale と同じ）。1行の欄は幅に入るまで（縮小して全体を表示する欄と同じ）、
+ * 折り返しの欄は高さに入る行の数になるまで縮める。原本の字体のない端末（スマホ・タブレットなど）は字の幅が違うので、Excel では入っている原本の文字も切れるため
+ */
+function fitScale(t: PvText): number {
+  const avail = t.w - 4 - t.indent;
+  if (avail <= 0 || t.runs.length === 0) return 1;
+  if (!t.wrap) {
+    const need = t.runs.reduce((n, r) => n + textWidth(r.text, r.font), 0) * FIT_MARGIN;
+    return need > avail && need > 0 ? Math.max(0.3, avail / need) : 1;
+  }
+  // 折り返し：行ごとの幅（改行で分ける）から、折り返した行の数を数える（1文字ずつ折り返すので、1行に1文字分の余りを見る）
+  const size = Math.max(...t.runs.map((r) => r.font.size));
+  const widths = [0];
+  for (const r of t.runs) {
+    r.text.split(/\r?\n/).forEach((part, i) => {
+      if (i > 0) widths.push(0);
+      widths[widths.length - 1] += textWidth(part, r.font) * FIT_MARGIN;
+    });
+  }
+  for (let k = 1; k > 0.3; k -= 0.05) {
+    const rows = widths.reduce((n, w) => n + Math.max(1, Math.ceil((w * k) / Math.max(1, avail - size * k))), 0);
+    if (rows * size * k * 1.2 <= t.h) return k;
+  }
+  return 0.3;
+}
+
 function TextView({t}: {t: PvText}) {
   if (t.vertical) return <VerticalText t={t} />;
   if (t.marked) {
@@ -103,12 +134,7 @@ function TextView({t}: {t: PvText}) {
       </div>
     );
   }
-  let k = 1;
-  if (t.shrink) {
-    const need = t.runs.reduce((n, r) => n + textWidth(r.text, r.font), 0);
-    const avail = t.w - 4 - t.indent;
-    if (need > avail && need > 0) k = Math.max(0.3, avail / need);
-  }
+  const k = fitScale(t);
   const distributed = t.align === 'distributed';
   return (
     <div
@@ -233,7 +259,8 @@ function paper(page: PvPage<string>) {
 
 const TONE = {
   sky: {on: 'bg-sky-400/15 outline outline-2 outline-sky-600', hover: 'hover:outline hover:outline-2 hover:outline-teal-600', hoverBg: 'hover:bg-teal-400/10'},
-  green: {on: 'bg-[#217346]/15 outline outline-[3px] outline-[#217346]', hover: 'hover:outline hover:outline-2 hover:outline-[#217346]', hoverBg: 'hover:bg-[#217346]/10'},
+  // 見積書（地が水色）：入れている所は薄い黄色（ユーザーの指示「入力欄では、緑ではなく薄い黄色。特定福祉用具や住宅改修と同様」2026-10-26。前は緑）
+  yellow: {on: 'bg-amber-200/50 outline outline-[3px] outline-amber-500', hover: 'hover:outline hover:outline-2 hover:outline-amber-500', hoverBg: 'hover:bg-amber-200/30'},
 };
 
 export function ShinseiPages<F extends string = ShinseiField>({
@@ -257,9 +284,9 @@ export function ShinseiPages<F extends string = ShinseiField>({
   title?: string; // プレビューの名前（見積書は「見積書のプレビュー」）
   print?: boolean; // 印刷：押す欄・色を出さない
   fixedScale?: number; // 決まった大きさで描く（印刷。画面の幅に合わせない）
-  // 入れている所・押せる所の色：申請書（白い様式）は水色。見積書は様式が水色なので、住宅改修の見積書と同じ Excel の緑（ユーザーの指示
-  // 「見積もりが水色で入力しているとわかるようにしてある色も水色なので、わかりづらい。入力項目は、住宅改修などと同じ色にする」2026-10-26）
-  tone?: 'sky' | 'green';
+  // 入れている所・押せる所の色：申請書（白い様式）は水色。見積書は様式が水色なので薄い黄色（ユーザーの指示
+  // 「見積もりが水色で入力しているとわかるようにしてある色も水色なので、わかりづらい」「入力欄では、緑ではなく薄い黄色」2026-10-26）
+  tone?: 'sky' | 'yellow';
 }) {
   const [wrapRef, wrapWidth] = useWidth<HTMLDivElement>();
   const widest = Math.max(...pages.map((p) => paper(p).width), 1);

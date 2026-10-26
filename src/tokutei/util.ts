@@ -69,3 +69,11 @@ export function downloadBlob(blob: Blob, fileName: string) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/**
+ * フリガナ：ひらがな・半角カタカナを全角カタカナにする（ユーザーの指示「特定福祉用具の申請書のフリガナは、ひらがなでうってもカタカナに自動変換」2026-10-26。
+ * 住宅改修の src/sasaoka/util.ts の toKatakana と同じ）
+ */
+export function toKatakana(s: string): string {
+  return s.replace(/[\u3041-\u3096\u309d\u309e]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60)).replace(/[\uff66-\uff9f]+/g, (h) => h.normalize('NFKC'));
+}

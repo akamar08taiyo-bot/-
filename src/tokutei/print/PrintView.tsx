@@ -1,8 +1,10 @@
 import {useEffect, useMemo, useState} from 'react';
+import {createPortal} from 'react-dom';
 import {ShinseiPages} from '../components/ShinseiPreview.tsx';
 import {estimatePreview} from '../estimateBook.ts';
 import type {EstimateField} from '../estimateBook.ts';
 import {customerLabel} from '../sales.ts';
+import type {PvPage, ShinseiField} from '../shinseiPreview.ts';
 import type {Sale, Settings} from '../types.ts';
 import {saveEstimateBook, useEstimateTemplate} from './estimateFiles.ts';
 
@@ -69,5 +71,53 @@ export function PrintView({sale, settings, onClose}: {sale: Sale; settings: Sett
         ))}
       </div>
     </div>
+  );
+}
+
+const NO_FIELDS = new Set<ShinseiField>();
+
+/**
+ * 申請書の印刷イメージ（ユーザーの指示「申請書をEXCEL保存の横に、印刷ボタンを設置する」2026-10-26）。画面のプレビューと同じページ（Excel に保存するときと同じ書き込みをしたシート）を、
+ * 1ページずつ A4 縦の紙の余白の内側に入る大きさで描く。ブラウザの印刷で、そのまま紙・PDF にできる
+ */
+export function ShinseiPrintView({pages, title, onClose, onExcel}: {pages: PvPage[]; title: string; onClose: () => void; onExcel: () => void}) {
+  const zoom = useFitZoom();
+  useEffect(() => {
+    // PDF に保存するときのファイル名の元になる
+    const before = document.title;
+    document.title = title;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.title = before;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [title, onClose]);
+  // 案件の画面（印刷しない main の中）から開くので、body の直下に出す（main ごと印刷から外れないように）
+  return createPortal(
+    <div className="print-overlay">
+      <div className="print-toolbar">
+        <span className="font-bold">申請書（A4縦）</span>
+        <button type="button" onClick={() => window.print()} className="rounded-md bg-sky-500 px-4 py-2 text-sm font-bold text-white shadow hover:bg-sky-600">
+          🖨 印刷する
+        </button>
+        <button type="button" onClick={onExcel} className="rounded-md bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-800 shadow hover:bg-emerald-100">
+          📗 Excelで保存
+        </button>
+        <button type="button" onClick={onClose} className="rounded-md border border-white/40 px-4 py-2 text-sm font-bold text-white hover:bg-white/10">
+          閉じる
+        </button>
+      </div>
+      <div className="print-root" style={{zoom}}>
+        {pages.map((p, i) => (
+          <div key={i} className="est-sheet" aria-label={`申請書の印刷（${i + 1}ページ目）`}>
+            <ShinseiPages pages={[p]} missing={NO_FIELDS} active={null} label={() => ''} onOpen={() => undefined} title="申請書" print fixedScale={Math.min(INNER.w / (p.width + 36), INNER.h / (p.height + 36))} />
+          </div>
+        ))}
+      </div>
+    </div>,
+    document.body,
   );
 }

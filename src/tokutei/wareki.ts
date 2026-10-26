@@ -35,7 +35,7 @@ export function warekiOf(iso: string): Wareki | null {
 }
 
 /** 和暦の年（「元」は1年） → 'YYYY-MM-DD'。その元号の期間にない日なら null */
-function fromWareki(eraKey: string, y: number, m: number, d: number): string | null {
+export function fromWareki(eraKey: string, y: number, m: number, d: number): string | null {
   const era = ERAS.find((e) => e.name === eraKey || e.short === eraKey || e.alpha === eraKey.toUpperCase());
   if (!era || y < 1) return null;
   const iso = validIso(Number(era.start.slice(0, 4)) + y - 1, m, d);

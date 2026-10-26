@@ -189,7 +189,7 @@ try {
   await page.getByText('13,904円').first().waitFor();
   const queue = () => page.evaluate(() => JSON.parse(localStorage.getItem('taiyo-hacchu-import-queue-v1') ?? '[]'));
   assert.deepEqual(await queue(), []);
-  await page.getByRole('radiogroup', {name: '状態'}).getByRole('radio', {name: '承認'}).click();
+  await page.getByRole('group', {name: '状態'}).getByRole('button', {name: '承認'}).click();
   await page.getByText('販売受注簿へ送りました').waitFor();
   const queued = await queue();
   assert.equal(queued.length, 1);
@@ -197,7 +197,7 @@ try {
   assert.equal(queued[0].customerName, '見本 次郎');
   await page.waitForTimeout(800); // 保存（送った時刻 hacchuSentAt）
   // 納品にしても、もう送らない
-  await page.getByRole('radiogroup', {name: '状態'}).getByRole('radio', {name: '納品'}).click();
+  await page.getByRole('group', {name: '状態'}).getByRole('button', {name: '納品'}).click();
   await page.waitForTimeout(300);
   assert.equal((await queue()).length, 1);
 

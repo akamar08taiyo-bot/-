@@ -3,9 +3,9 @@ import type {FocusEvent, MouseEvent} from 'react';
 import {saleTotals} from '../calc.ts';
 import {insurerLabel} from '../defaults.ts';
 import {HACCHU_IMPORT_KEY, hacchuImport, hacchuUrl, queueHacchu} from '../handoff.ts';
-import {blankItem, copySale, customerLabel, customerPatch, itemFromProduct, makerChoices, markUsed, sameYearSales, saleWarnings} from '../sales.ts';
+import {addFavorites, blankItem, copySale, customerLabel, customerPatch, itemFromProduct, makerChoices, markUsed, sameYearSales, saleWarnings, unregisteredItems} from '../sales.ts';
 import {shinseiForm, shinseiValues} from '../shinsei.ts';
-import {useTemplate} from '../shinseiFiles.ts';
+import {saveShinsei, useTemplate} from '../shinseiFiles.ts';
 import {FIELD_LABEL, missingFields, shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField} from '../shinseiPreview.ts';
 import type {AppData, Sale, SaleItem, SaleStatus} from '../types.ts';
@@ -16,6 +16,7 @@ import {addressOfZip, zipCandidates, zipLabel} from '../zip.ts';
 import {ESTIMATE_CAPACITY, ESTIMATE_LABEL, estimateNoteOverflow, estimateOverflow, estimatePreview} from '../estimateBook.ts';
 import type {EstimateField} from '../estimateBook.ts';
 import {saveEstimateBook, useEstimateTemplate} from '../print/estimateFiles.ts';
+import {ShinseiPrintView} from '../print/PrintView.tsx';
 import {CustomerPicker} from './CustomerPicker.tsx';
 import {EstimateInputs} from './EstimateInputs.tsx';
 import {ProductPicker} from './ProductPicker.tsx';
@@ -171,6 +172,28 @@ export function SaleEditor({
     change(patch);
   };
 
+  // 手で入れた商品を商品マスタの★お気に入りに（次からは「★ 商品を選ぶ」で選べる）。印刷の前にも、まだ登録していない商品があれば聞く
+  // （ユーザーの指示「商品名や金額を一度入力したら、お気に入り登録として追加できるようにする。印刷の前に、商品名や金額をお気に入り登録するか否かの確認」2026-10-26）
+  const favorite = (ids: string[]) => {
+    const r = addFavorites(data.products, sale.items, new Set(ids));
+    update('products', () => r.products);
+    change({items: r.items});
+    toast(ids.length > 1 ? `${ids.length}点をお気に入りに登録しました` : 'お気に入りに登録しました');
+  };
+  const askFavorites = () => {
+    const list = unregisteredItems(sale, data.products);
+    if (list.length && window.confirm(`手で入れた商品をお気に入り（★）に登録しますか？\n${list.map((i) => `・${i.name.trim()}`).join('\n')}`)) favorite(list.map((i) => i.id));
+  };
+  const print = () => {
+    askFavorites();
+    onPrint(sale.id);
+  };
+  // 申請書の印刷（プレビューと同じページを A4 に）
+  const [printingShinsei, setPrintingShinsei] = useState(false);
+  const printShinsei = () => {
+    askFavorites();
+    setPrintingShinsei(true);
+  };
   const remove = () => {
     if (!window.confirm(`「${customerLabel(sale)}」の見積もりを消します。元に戻せません。よろしいですか？`)) return;
     update('sales', (list) => list.filter((x) => x.id !== sale.id));
@@ -214,7 +237,7 @@ export function SaleEditor({
         {/* 申請書だけの画面（住宅改修の申請書のタブの中）には、見積書のボタンを出さない（販売見積書のタブにある） */}
         {fixedView !== 'shinsei' && (
           <div className="ml-auto flex flex-wrap gap-2">
-            <Btn color="sky" onClick={() => onPrint(sale.id)}>
+            <Btn color="sky" onClick={print}>
               🖨 見積書を印刷
             </Btn>
             <Btn color="excel" onClick={saveExcel}>
@@ -261,8 +284,9 @@ export function SaleEditor({
       )}
 
       {onShinsei ? (
-        // 申請書の画面：左に申請書の順の入れる所（狭く）、右に申請書のプレビュー（大きく。画面の高さで止まり中だけ動く）
-        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)]">
+        // 申請書の画面：左に申請書の順の入れる所、右に申請書のプレビュー（大きく。画面の高さで止まり中だけ動く）。
+        // 入れる所は広めに（ユーザーの指示「福祉用具が必要な理由の入力欄が狭すぎる」2026-10-26。前は 30rem）
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,40rem)_minmax(0,1fr)]">
           <ShinseiInputs
             sale={sale}
             data={data}
@@ -279,11 +303,12 @@ export function SaleEditor({
             zips={zips}
             onPickProduct={() => setPicking(true)}
             onScan={() => setScanning(true)}
-            onAddItem={() => change({items: [...sale.items, blankItem(s)]})}
+            onAddItem={(item) => change({items: [...sale.items, item ?? blankItem(s)]})}
             onPickCustomer={() => setPickingCustomer(true)}
+            onFavorite={(id) => favorite([id])}
           />
           <div className="min-w-0 space-y-3 lg:sticky lg:top-3 lg:self-start">
-            <ShinseiPanel sale={sale} settings={s} />
+            <ShinseiPanel sale={sale} settings={s} onPrint={pages && pages.length ? printShinsei : undefined} />
             <div ref={previewBox} className="min-w-0 rounded-xl bg-slate-200/70 p-2 lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto" style={{scrollbarGutter: 'stable'}}>
               {!form ? (
                 <p className="p-6 text-center text-sm text-slate-500">この保険者の申請書の原本はまだありません</p>
@@ -297,7 +322,7 @@ export function SaleEditor({
         </div>
       ) : (
         // 見積書の画面：左に見積書の順の入れる所（申請書の画面と同じ形。狭く）、右に見積書のプレビュー（大きく。画面の高さで止まり中だけ動く）と金額のまとめ
-        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]">
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,38rem)_minmax(0,1fr)]">
           <EstimateInputs
             sale={sale}
             data={data}
@@ -315,8 +340,9 @@ export function SaleEditor({
             usedYear={prevYear.length ? {count: prevYear.length, used: usedYear, label: `${fy ?? ''}年度`} : null}
             onPickProduct={() => setPicking(true)}
             onScan={() => setScanning(true)}
-            onAddItem={() => change({items: [...sale.items, blankItem(s)]})}
+            onAddItem={(item) => change({items: [...sale.items, item ?? blankItem(s)]})}
             onPickCustomer={() => setPickingCustomer(true)}
+            onFavorite={(id) => favorite([id])}
             withShinsei={fixedView !== 'quote'}
           />
 
@@ -329,7 +355,7 @@ export function SaleEditor({
                 {estPages === null ? (
                   <p className="p-6 text-center text-sm text-slate-500">見積書を開いています…</p>
                 ) : (
-                  <ShinseiPages<EstimateField> pages={estPages} missing={estMissing} active={estActive} label={(f) => ESTIMATE_LABEL[f]} onOpen={goEstField} scrollBox={estBox} title="見積書のプレビュー" tone="green" />
+                  <ShinseiPages<EstimateField> pages={estPages} missing={estMissing} active={estActive} label={(f) => ESTIMATE_LABEL[f]} onOpen={goEstField} scrollBox={estBox} title="見積書のプレビュー" tone="yellow" />
                 )}
               </section>
               <section className="rounded-xl border border-teal-200 bg-white p-4 shadow-sm">
@@ -364,7 +390,7 @@ export function SaleEditor({
                   </div>
                 </dl>
                 <div className="mt-4">
-                  <Btn color="sky" className="w-full" onClick={() => onPrint(sale.id)}>
+                  <Btn color="sky" className="w-full" onClick={print}>
                     🖨 見積書を印刷
                   </Btn>
                 </div>
@@ -393,6 +419,19 @@ export function SaleEditor({
           makers={makerChoices(data.products, data.sales)}
           onAdd={(item) => update('sales', (list) => list.map((x) => (x.id === sale.id ? {...x, items: [...x.items, item], updatedAt: Date.now()} : x)))}
           onClose={() => setScanning(false)}
+        />
+      )}
+      {printingShinsei && pages && pages.length > 0 && (
+        <ShinseiPrintView
+          pages={pages}
+          title={`特定福祉用具申請書_${customerLabel(sale).replace(/\s+様$/, '様')}`}
+          onClose={() => setPrintingShinsei(false)}
+          onExcel={() =>
+            void saveShinsei(sale, s).then(
+              (name) => toast(`${name} を保存しました`),
+              (e) => toast(`申請書を作れませんでした：${e instanceof Error ? e.message : String(e)}`, 'error'),
+            )
+          }
         />
       )}
       {pickingCustomer && <CustomerPicker sales={data.sales} current={sale} onPick={pickCustomer} onClose={() => setPickingCustomer(false)} />}

@@ -1,4 +1,4 @@
-import {useMemo, useState} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {saleTotals} from '../calc.ts';
 import {INSURERS, insurerLabel} from '../defaults.ts';
 import {copySale, customerLabel, newSale} from '../sales.ts';
@@ -44,6 +44,26 @@ export function SalesPage({data, update, onOpen, onPrint}: {data: AppData; updat
     update('sales', (list) => list.filter((x) => x.id !== sale.id));
     toast('消しました');
   };
+  // 先頭のチェックで選んで、まとめて消す（ユーザーの指示「一括で削除ボタンをつくる」2026-10-26。住宅改修の見積もりの一覧の「N件を選んでいます…削除する」と同じ形）。
+  // 消す前にいつも確かめる（元に戻せない）。検索・状態の絞りを変えたら選んだものは外す
+  const [checked, setChecked] = useState<Set<string>>(() => new Set());
+  useEffect(() => setChecked(new Set()), [query, status]);
+  const picked = shown.filter((x) => checked.has(x.id));
+  const allChecked = shown.length > 0 && picked.length === shown.length;
+  const toggle = (id: string) =>
+    setChecked((c) => {
+      const next = new Set(c);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const removeChecked = () => {
+    const ids = new Set(picked.map((x) => x.id));
+    if (ids.size === 0 || !window.confirm(`${ids.size}件の見積もりを消します。元に戻せません。よろしいですか？`)) return;
+    update('sales', (list) => list.filter((x) => !ids.has(x.id)));
+    setChecked(new Set());
+    toast(`${ids.size}件を消しました`);
+  };
 
   return (
     <div className="space-y-4">
@@ -60,6 +80,12 @@ export function SalesPage({data, update, onOpen, onPrint}: {data: AppData; updat
       </section>
 
       <div className="flex flex-wrap items-center gap-2">
+        {shown.length > 0 && (
+          <label className="flex items-center gap-1.5 px-1 text-sm text-slate-600">
+            <input type="checkbox" checked={allChecked} onChange={() => setChecked(allChecked ? new Set() : new Set(shown.map((x) => x.id)))} className="h-4 w-4" aria-label="すべて選ぶ" />
+            すべて
+          </label>
+        )}
         <TextInput value={query} onChange={setQuery} placeholder="お客様名・商品名・ケアマネで検索" className="w-64" aria-label="見積もりを検索" />
         <select value={status} onChange={(e) => setStatus(e.target.value as SaleStatus | '')} className="h-9 rounded-md border border-slate-300 px-2 text-sm" aria-label="状態で絞る">
           <option value="">すべての状態</option>
@@ -71,6 +97,17 @@ export function SalesPage({data, update, onOpen, onPrint}: {data: AppData; updat
         </select>
         <span className="ml-auto text-sm text-slate-500">{shown.length}件</span>
       </div>
+      {picked.length > 0 && (
+        <div role="status" aria-label="選んだ見積もり" className="flex flex-wrap items-center gap-2 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-900">
+          <span className="font-bold">{picked.length}件を選んでいます</span>
+          <Btn small color="white" onClick={removeChecked}>
+            まとめて削除
+          </Btn>
+          <Btn small color="white" onClick={() => setChecked(new Set())}>
+            やめる
+          </Btn>
+        </div>
+      )}
 
       {shown.length === 0 ? (
         <p className="rounded-xl border-2 border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">{data.sales.length === 0 ? 'まだ見積もりがありません。' : '見つかりませんでした。'}</p>
@@ -80,7 +117,8 @@ export function SalesPage({data, update, onOpen, onPrint}: {data: AppData; updat
             const t = saleTotals(x, data.settings);
             const first = x.items[0]?.name ?? '';
             return (
-              <li key={x.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+              <li key={x.id} className={`flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border p-3 shadow-sm ${checked.has(x.id) ? 'border-sky-300 bg-sky-50' : 'border-slate-200 bg-white'}`}>
+                <input type="checkbox" checked={checked.has(x.id)} onChange={() => toggle(x.id)} className="h-4 w-4 shrink-0" aria-label={`${customerLabel(x)}を選ぶ`} />
                 <button type="button" onClick={() => onOpen(x.id)} className="min-w-0 flex-1 text-left">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`rounded px-2 py-0.5 text-xs font-bold ${STATUS_COLOR[x.status]}`}>{x.status}</span>
