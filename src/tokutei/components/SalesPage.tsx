@@ -1,7 +1,7 @@
 import {useEffect, useMemo, useState} from 'react';
 import {saleTotals} from '../calc.ts';
 import {INSURERS, insurerLabel} from '../defaults.ts';
-import {customerLabel, newSale} from '../sales.ts';
+import {copySale, customerLabel, newSale} from '../sales.ts';
 import type {AppData, Sale, SaleStatus} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {dateLabel, matchesAll, yen} from '../util.ts';
@@ -141,6 +141,17 @@ export function SalesPage({data, update, onOpen, onPrint}: {data: AppData; updat
                   </Btn>
                   <Btn small color="sky" onClick={() => onPrint(x.id)}>
                     印刷
+                  </Btn>
+                  <Btn
+                    small
+                    color="white"
+                    onClick={() => {
+                      const c = copySale(x, data.sales);
+                      update('sales', (list) => [...list, c]);
+                      toast('複製しました');
+                    }}
+                  >
+                    複製
                   </Btn>
                   <Btn small color="white" onClick={() => remove(x)} aria-label={`${customerLabel(x)}を消す`}>
                     ✕

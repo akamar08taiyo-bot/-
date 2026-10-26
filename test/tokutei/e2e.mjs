@@ -571,10 +571,15 @@ try {
   await pagesGroup.getByRole('checkbox', {name: '2枚目'}).uncheck();
   await page.locator('.print-overlay').screenshot({path: `${out}/10-shinsei-print.png`});
   await page.getByRole('button', {name: '閉じる'}).click();
+  assert.equal(await page.getByRole('button', {name: '複製', exact: true}).count(), 1); // 見積もりの上の段の複製
   await page.getByRole('button', {name: '📦 商品マスタ'}).click();
   await page.waitForFunction(() => [...document.querySelectorAll('input, td, span, div')].some((el) => ('value' in el ? el.value : el.textContent) === '見本の多点杖 ワイド'));
   await page.getByRole('button', {name: '📝 見積もり・申請'}).click();
   if (!(await page.getByRole('button', {name: '＋ 苅田町'}).count())) await page.getByRole('button', {name: '📝 見積もり・申請'}).click();
+  // 一覧の行の「複製」で1件増える（一度外したが、ユーザーの指示「複製するボタン削除してもらいましたが、やはり残してください」2026-10-26 で戻した）
+  const listed = await page.getByRole('checkbox', {name: /を選ぶ$/}).count();
+  await page.getByRole('button', {name: '複製', exact: true}).first().click();
+  await page.waitForFunction((n) => document.querySelectorAll('input[type=checkbox][aria-label$="を選ぶ"]').length === n, listed + 1);
   const before = await page.getByRole('checkbox', {name: /を選ぶ$/}).count();
   await page.getByRole('checkbox', {name: /を選ぶ$/}).first().check();
   await page.getByRole('checkbox', {name: /を選ぶ$/}).nth(1).check();
