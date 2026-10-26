@@ -133,6 +133,10 @@ test('行橋市：事前申請書・委任状・完了写真に書く', () => {
   assert.equal(ellipseCount(f, sh), 3); // 元号（昭）・性別・要介護度
   // 委任状
   assert.match(readCell(f, '委任状', 'B23'), /50,371円$/);
+  // 保険給付額は大きく（ユーザーの指示「委任状に転記されているが、金額の部分の文字が小さすぎる。大きく表示する」2026-10-26）。
+  // 「円」の右の端は原本の 11pt のときと同じ所（全角28字分）
+  assert.equal(cellBox(f, '委任状', 'B23').style.size, 14);
+  assert.ok(Math.abs((emOf(readCell(f, '委任状', 'B23')) * 14) / 11 - 28) < 1, readCell(f, '委任状', 'B23'));
   assert.match(readCell(f, '委任状', 'A29'), /令和8年10月22日$/);
   assert.match(readCell(f, '委任状', 'A32'), /住　所　　行橋市中央1丁目2-3$/);
   assert.match(readCell(f, '委任状', 'A36'), /氏　名　　見本 花子　+㊞/);

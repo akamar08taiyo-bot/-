@@ -20,7 +20,7 @@ import type {PvPage, Range} from './shinseiPreview.ts';
 import type {Sale, Settings, TaxType} from './types.ts';
 import {yen} from './util.ts';
 import {excelDate} from './shinsei.ts';
-import {attrOf, cellRe, colorStyle, dropCalcChain, esc, finishWorkbook, numOf, setCell, setStyle, sheetLayout, sheetPath} from './xlsxEdit.ts';
+import {attrOf, cellRe, colorStyle, dropCalcChain, esc, finishWorkbook, numOf, setCell, setStyle, sheetLayout, sheetPath, sizeCell} from './xlsxEdit.ts';
 import type {CellValue, Files} from './xlsxEdit.ts';
 
 export const ESTIMATE_SHEET = '見積書';
@@ -165,6 +165,9 @@ function setFormula(xml: string, ref: string, formula: string, value: CellValue,
   return xml.slice(0, m.index) + cell + xml.slice(m.index + m[0].length);
 }
 
+/** 題（御　見　積　書）の文字の大きさ（pt） */
+export const TITLE_PT = 26;
+
 /** 原本（開いたもの）の写しに案件を書く。書いたブック（files をそのまま書きかえる） */
 export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
   const t = saleTotals(sale, s);
@@ -277,6 +280,8 @@ export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
   ] as [string, number][])
     xml = setCached(xml, ref, v);
   files[path] = strToU8(xml);
+  // 題の「御　見　積　書」は少し大きく（ユーザーの指示「御見積書の部分は、少し文字を大きくする」2026-10-26。原本は 22pt。D1:I2 の結合に入る大きさ）
+  sizeCell(files, ESTIMATE_SHEET, 'D1', TITLE_PT);
   if (pages > 1) setPrintArea(files, pages);
   dropCalcChain(files);
 }
