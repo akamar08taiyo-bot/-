@@ -12,6 +12,7 @@ import {estimateDateOf} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {fillAdded, withBrackets} from '../cutLink.ts';
 import {addMaterial, insertRowsAt, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
+import {jutakuSalesMonth, withBillMonth, withSalesMonth} from '../salesPlan.ts';
 import type {AppData, Insurer, Job, Kit, Material, NameSuffix, Place} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {clearedSheet} from '../sheetEdit.ts';
@@ -410,9 +411,22 @@ function ShikiriFields({
             <input
               type="month"
               value={job.month}
-              onChange={(e) => e.target.value && setJob((j) => ({...j, month: e.target.value}))}
+              onChange={(e) => e.target.value && setJob((j) => withBillMonth(j, e.target.value))}
               className="h-11 rounded-md border border-slate-300 px-2 text-base font-normal"
               aria-label="請求する月"
+            />
+          </label>
+          {/* 売上月（受注残・売上見込みの月）：初めは請求する月と同じで、請求する月を変えると一緒に変わる。まれにちがう月にするときだけ直す
+              （ユーザーの話「請求月と販売月は基本的には同じです。まれに違うことがあります」2026-10-26。ちがうときは薄い黄色） */}
+          <label className="grid gap-1 text-sm font-bold text-slate-600">
+            売上月
+            <input
+              type="month"
+              value={jutakuSalesMonth(job)}
+              onChange={(e) => e.target.value && setJob((j) => withSalesMonth(j, e.target.value))}
+              className={`h-11 rounded-md border px-2 text-base font-normal ${jutakuSalesMonth(job) !== job.month ? 'border-amber-300 bg-amber-50' : 'border-slate-300'}`}
+              aria-label="売上月"
+              title={jutakuSalesMonth(job) !== job.month ? '請求する月とちがう月です' : '請求する月と同じ（請求する月を変えると一緒に変わります）'}
             />
           </label>
           <Btn color="white" onClick={onOpenInvoice} className="!h-11 !text-base">

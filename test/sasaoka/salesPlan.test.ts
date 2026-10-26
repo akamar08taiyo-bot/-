@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {estimateTotals} from '../../src/sasaoka/calc.ts';
-import {JUTAKU_SALES_KEY, jutakuSalesMonth, jutakuSalesSummary, monthPlan, planRows, readTokuteiSales, rowSalesMonth, shiftSalesMonth, TOKUTEI_SALES_KEY, writeJutakuSalesSummary} from '../../src/sasaoka/salesPlan.ts';
+import {JUTAKU_SALES_KEY, jutakuSalesMonth, jutakuSalesSummary, monthPlan, planRows, readTokuteiSales, rowSalesMonth, shiftSalesMonth, TOKUTEI_SALES_KEY, withBillMonth, withSalesMonth, writeJutakuSalesSummary} from '../../src/sasaoka/salesPlan.ts';
 import type {Job, Row} from '../../src/sasaoka/types.ts';
 
 const S = {estimateRate: 0.8, estimateLaborRate: 1.5, estimateOverheadRate: 0.1, taxRate: 0.1, tokuteiSalesMonths: {} as Record<string, string>};
@@ -77,13 +77,23 @@ test('一覧の売上月（ユーザーの指示「何月分かっていうの�
   assert.equal(rowSalesMonth(b, tokutei, S), '2026-12');
   assert.equal(rowSalesMonth(b, tokutei, {tokuteiSalesMonths: {s2: '2027-01'}}), '2027-01');
   assert.equal(rowSalesMonth(c, tokutei, S), '2026-11');
-  // ずらす：様邸の月（一覧・請求する月）と売上見込みの月をそろえ、この様邸の特定福祉用具の案件も同じ月に（ほかの様邸の案件は動かさない）
+  // ずらす：様邸の月（一覧・請求する月）と売上月を一緒に動かし、この様邸の特定福祉用具の案件も同じ月に（ほかの様邸の案件は動かさない）。
+  // 売上月は請求する月と同じなら持たない（ユーザーの話「請求月と販売月は基本的には同じです。まれに違うことがあります」）
   const r = shiftSalesMonth(a, tokutei, S, 1, 9);
-  assert.deepEqual([r.job.month, r.job.salesMonth, r.job.updatedAt], ['2026-11', '2026-11', 9]);
+  assert.deepEqual([r.job.month, r.job.salesMonth, r.job.updatedAt], ['2026-11', undefined, 9]);
   assert.deepEqual(r.tokuteiMonths, {s1: '2026-11'});
   assert.deepEqual(shiftSalesMonth(b, tokutei, S, -1).tokuteiMonths, {s2: '2026-11'});
   assert.equal(shiftSalesMonth(b, tokutei, S, -1).job.month, '2026-11');
-  assert.equal(shiftSalesMonth(c, tokutei, S, 1).job.month, '2026-12'); // 売上見込みの月から
+  // 売上月を請求する月とちがう月にしてあれば、そのちがいのまま両方を動かす
+  assert.deepEqual([shiftSalesMonth(c, tokutei, S, 1).job.month, shiftSalesMonth(c, tokutei, S, 1).job.salesMonth], ['2026-11', '2026-12']);
+  // 売上月を直す：請求する月と同じにしたら持たない（請求する月を変えると一緒に変わる）
+  assert.equal(withSalesMonth(a, '2026-12').salesMonth, '2026-12');
+  assert.equal(withSalesMonth(c, '2026-10').salesMonth, undefined);
+  assert.equal(jutakuSalesMonth({...withSalesMonth(a, '2026-10'), month: '2026-11'}), '2026-11');
+  // 請求する月を変える（請求書の「次月へ」・請求する月の欄）：売上月が同じなら一緒に、ちがう月にしてあればそのまま、同じになったら持たない
+  assert.deepEqual([withBillMonth(a, '2026-11').month, jutakuSalesMonth(withBillMonth(a, '2026-11'))], ['2026-11', '2026-11']);
+  assert.equal(jutakuSalesMonth(withBillMonth(c, '2026-12')), '2026-11');
+  assert.equal(withBillMonth(c, '2026-11').salesMonth, undefined);
   assert.equal(shiftSalesMonth(job('D', [], {month: '2026-12'}), [], S, 1).job.month, '2027-01');
   // 受注残に渡すまとめ：住宅改修の月はずらした月、特定福祉用具はこのアプリで変えた月（tokuteiMonths）
   const sum = jutakuSalesSummary([r.job], {...S, officeName: '行橋営業所', tokuteiSalesMonths: {s1: '2026-11', x: 'こわれた'}});

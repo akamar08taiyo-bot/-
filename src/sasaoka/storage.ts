@@ -420,7 +420,8 @@ export function cleanJobs(raw: unknown): Job[] {
       // ゴミ箱に移した時刻（trash.ts）。時刻でなければ（元に戻した・前の版のデータ）持たない＝ゴミ箱に入っていない
       ...(numv(j.trashedAt) > 0 ? {trashedAt: numv(j.trashedAt)} : {}),
       ...(typeof j.planPhoto === 'string' && j.planPhoto ? {planPhoto: j.planPhoto} : {}), // 平面図の図（写真と同じ番号＝文字。2026-10-25）
-      ...(/^\d{4}-\d{2}$/.test(str(j.salesMonth)) ? {salesMonth: str(j.salesMonth)} : {}), // 売上見込みの月（2026-10-25）
+      // 売上見込みの月＝売上月（2026-10-25）。請求する月と同じなら持たない（請求する月と一緒に変わるように。前の版は一覧の ◀ ▶ で同じ月も持った。2026-10-26）
+      ...(/^\d{4}-\d{2}$/.test(str(j.salesMonth)) && str(j.salesMonth) !== str(j.month) ? {salesMonth: str(j.salesMonth)} : {}),
       createdAt: numv(j.createdAt, Date.now()),
       updatedAt: numv(j.updatedAt, Date.now()),
     };

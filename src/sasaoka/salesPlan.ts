@@ -31,8 +31,19 @@ const MONTH = /^\d{4}-\d{2}$/;
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : 0);
 const str = (v: unknown) => (typeof v === 'string' ? v : '');
 
-/** 住宅改修の様邸の売上見込みの月 */
+/** 住宅改修の様邸の売上見込みの月（売上月） */
 export const jutakuSalesMonth = (job: Pick<Job, 'month' | 'salesMonth'>) => (job.salesMonth && MONTH.test(job.salesMonth) ? job.salesMonth : job.month);
+
+/**
+ * 売上月を m にした様邸。請求する月と同じなら持たない（ユーザーの話「請求月と販売月は基本的には同じです。まれに違うことがあります」2026-10-26。
+ * 持たなければ売上月は請求する月で、請求する月を変えると一緒に変わる。ちがう月にしたときだけ持つ）
+ */
+export const withSalesMonth = <J extends Pick<Job, 'month' | 'salesMonth'>>(job: J, m: string): J => ({...job, salesMonth: m && m !== job.month ? m : undefined});
+/** 請求する月を m にした様邸：売上月が請求する月と同じ（持たない）なら一緒に変わり、ちがう月にしてあればその月のまま（同じ月になったら持たない） */
+export const withBillMonth = <J extends Pick<Job, 'month' | 'salesMonth'>>(job: J, m: string): J => {
+  const next = {...job, month: m};
+  return job.salesMonth && MONTH.test(job.salesMonth) ? withSalesMonth(next, job.salesMonth) : {...next, salesMonth: undefined};
+};
 
 /** 特定福祉用具の案件の売上の月（このアプリで月を変えたときはその月。受注残にもこの月で入る） */
 export const tokuteiSalesMonth = (r: Pick<TokuteiSale, 'id' | 'month'>, s: Pick<Settings, 'tokuteiSalesMonths'>) => (MONTH.test(s.tokuteiSalesMonths[r.id] ?? '') ? s.tokuteiSalesMonths[r.id] : r.month);
@@ -49,13 +60,17 @@ export function rowSalesMonth(job: Pick<Job, 'id' | 'month' | 'salesMonth' | 'pl
 }
 
 /**
- * 売上月を dir か月ずらす：様邸の月（一覧の月・請求する月）と売上見込みの月をそろえて動かし、この様邸の特定福祉用具の案件の月も同じ月にする
- * （受注残・売上見込み・請求書が同じ月になる）。返すのは直した様邸と、特定福祉用具の案件の月（設定の tokuteiSalesMonths に足す分）
+ * 売上月を dir か月ずらす：様邸の月（一覧の月・請求する月）と売上月を一緒に動かし（売上月を請求する月とちがう月にしてあれば、そのちがいのまま）、
+ * この様邸の特定福祉用具の案件の月も新しい売上月にする（受注残・売上見込み・請求書が一緒に移る）。特定福祉用具だけの様邸は、その案件の月に様邸の月をそろえる。
+ * 返すのは直した様邸と、特定福祉用具の案件の月（設定の tokuteiSalesMonths に足す分）
  */
 export function shiftSalesMonth(job: Job, tokutei: TokuteiSale[], s: Pick<Settings, 'tokuteiSalesMonths'>, dir: number, now = Date.now()): {job: Job; tokuteiMonths: Record<string, string>} {
   const next = addMonths(rowSalesMonth(job, tokutei, s), dir);
-  const tokuteiMonths = Object.fromEntries(tokutei.filter((r) => r.jutakuJob === job.id).map((r) => [r.id, next]));
-  return {job: {...job, month: next, salesMonth: next, updatedAt: now}, tokuteiMonths};
+  const linked = tokutei.filter((r) => r.jutakuJob === job.id);
+  const tokuteiMonths = Object.fromEntries(linked.map((r) => [r.id, next]));
+  if (!hasEstimateRows(job) && linked.length) return {job: {...job, month: next, salesMonth: undefined, updatedAt: now}, tokuteiMonths};
+  const moved = {...job, month: addMonths(job.month, dir), updatedAt: now};
+  return {job: withSalesMonth(moved, next), tokuteiMonths};
 }
 
 /** 特定福祉用具のまとめを読む（こわれていれば空） */

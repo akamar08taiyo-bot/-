@@ -1,6 +1,7 @@
 import {useMemo} from 'react';
 import {hasEstimateRows, jobName, monthSummary, sortJobs} from '../calc.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
+import {withBillMonth} from '../salesPlan.ts';
 import {addSamples, hasSamples} from '../samples.ts';
 import type {AppData, Job} from '../types.ts';
 import type {Update} from '../useStore.ts';
@@ -65,7 +66,8 @@ export function JobsPage({
   const toNextMonth = (ids: string[]) => {
     const next = addMonths(month, 1);
     const set = new Set(ids);
-    update('jobs', (list) => list.map((j) => (set.has(j.id) ? {...j, month: next, shikiri: true, updatedAt: Date.now()} : j)));
+    // 売上月（受注残の月）は、請求する月と同じなら一緒に移る（ちがう月にしてあればそのまま。salesPlan.ts の withBillMonth）
+    update('jobs', (list) => list.map((j) => (set.has(j.id) ? {...withBillMonth(j, next), shikiri: true, updatedAt: Date.now()} : j)));
     toast(`${ids.length}件を${monthLabel(next)}分に回しました`);
   };
 

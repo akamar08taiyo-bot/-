@@ -8,7 +8,7 @@ import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm} from '../es
 import {estimateXlsx, XLSX_TYPE} from '../estimateXlsx.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
-import {readTokuteiSales, rowSalesMonth, shiftSalesMonth, TOKUTEI_SALES_KEY} from '../salesPlan.ts';
+import {jutakuSalesMonth, readTokuteiSales, rowSalesMonth, shiftSalesMonth, TOKUTEI_SALES_KEY} from '../salesPlan.ts';
 import type {TokuteiSale} from '../salesPlan.ts';
 import {addSamples, hasSamples} from '../samples.ts';
 import type {AppData, Insurer, Job, Settings} from '../types.ts';
@@ -366,6 +366,8 @@ export function EstimateList({
                 const estimated = hasEstimateRows(job); // 見積書を作った様邸（申請書だけの様邸は、請求書・発注書に入らない）
                 const name = job.customer.trim() ? jobName(job) : names.get(job.id) ? jobName({...job, customer: names.get(job.id)!}) : 'お客様名なし';
                 const sales = rowSalesMonth(job, tokutei, s);
+                // 請求書に入れていて、売上月を請求する月とちがう月にしてある（まれ）：薄い黄色（見積書の上の「売上月」で直した月）
+                const apart = estimated && job.shikiri && jutakuSalesMonth(job) !== job.month;
                 const arrow = 'h-8 w-8 rounded text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-800';
                 return (
                   <tr key={job.id} className={`cursor-pointer border-t border-slate-100 hover:bg-emerald-50/60 ${checked.has(job.id) ? 'bg-sky-50' : ''}`} onClick={() => onOpen(job.id)}>
@@ -380,7 +382,12 @@ export function EstimateList({
                     {/* 売上月（工事・販売の月）。見積もり作成日とは別。◀ ▶ で前の月・次の月へ（受注残・売上見込み・請求書もこの月）。
                         名前は「売上月」だけ（お客様名を入れると、お客様名で行のセルを探すときに2つ見つかる） */}
                     <td className="whitespace-nowrap px-1 py-1" onClick={(e) => e.stopPropagation()}>
-                      <span role="group" aria-label="売上月" title={`${name}の売上月`} className="inline-flex items-center rounded-md border border-slate-200 bg-white">
+                      <span
+                        role="group"
+                        aria-label="売上月"
+                        title={apart ? `${name}の売上月（請求する月とちがう月）` : `${name}の売上月`}
+                        className={`inline-flex items-center rounded-md border ${apart ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white'}`}
+                      >
                         <button type="button" className={arrow} onClick={() => moveOne(job, name, -1)} aria-label="売上月を前月に">
                           ◀
                         </button>

@@ -4,6 +4,7 @@ import type {JobTotals} from '../calc.ts';
 import {cutCalc} from '../estimateForms.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {addMaterial, copyRows, kitFromRows, manualRow, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
+import {withBillMonth} from '../salesPlan.ts';
 import type {AppData, Job, Kit, Material, NameSuffix, Place, Row, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {staffFull, uid, yen} from '../util.ts';
@@ -227,7 +228,7 @@ export function JobEditor({
               <input
                 type="month"
                 value={job.month}
-                onChange={(e) => e.target.value && setJob((j) => ({...j, month: e.target.value}))}
+                onChange={(e) => e.target.value && setJob((j) => withBillMonth(j, e.target.value))}
                 className="h-9 rounded-md border border-slate-300 px-2 text-sm"
               />
             </label>

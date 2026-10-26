@@ -4,7 +4,7 @@
 // まとめを新しくする（特定福祉用具のアプリは開くたびに書き直す。書いたら storage のできごとで読み直す）
 import {useEffect, useMemo, useState} from 'react';
 import type {PrintRequest} from '../print/PrintView.tsx';
-import {monthPlan, planRows, readTokuteiSales, TOKUTEI_SALES_KEY} from '../salesPlan.ts';
+import {monthPlan, planRows, readTokuteiSales, TOKUTEI_SALES_KEY, withSalesMonth} from '../salesPlan.ts';
 import type {PlanRow, PlanSums} from '../salesPlan.ts';
 import {TOKUTEI_URL} from '../tokuteiLink.ts';
 import type {AppData} from '../types.ts';
@@ -67,7 +67,7 @@ export function SalesPlanPage({
     const next = addMonths(month, 1);
     const jobIds = new Set(picked.filter((r) => r.kind === 'jutaku').map((r) => r.id));
     const tokuIds = picked.filter((r) => r.kind === 'tokutei').map((r) => r.id);
-    if (jobIds.size) update('jobs', (list) => list.map((j) => (jobIds.has(j.id) ? {...j, salesMonth: next, updatedAt: Date.now()} : j)));
+    if (jobIds.size) update('jobs', (list) => list.map((j) => (jobIds.has(j.id) ? {...withSalesMonth(j, next), updatedAt: Date.now()} : j)));
     if (tokuIds.length) update('settings', (s) => ({...s, tokuteiSalesMonths: {...s.tokuteiSalesMonths, ...Object.fromEntries(tokuIds.map((id) => [id, next]))}}));
     setChecked(new Set());
     toast(`${picked.length}件を${monthLabel(next)}に回しました`);

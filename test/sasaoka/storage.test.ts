@@ -256,3 +256,14 @@ test('箇所の候補は写真の用紙の改修箇所の名前（ユーザー�
   assert.deepEqual(cleanSettings({rev: 4, placePresets: ['玄関', '自分の箇所']}).placePresets, ['玄関', '自分の箇所']);
   assert.deepEqual(cleanSettings({rev: 5, placePresets: OLD_DEFAULT_PLACES}).placePresets, OLD_DEFAULT_PLACES); // 新しい版で選び直したもの
 });
+
+test('売上月（salesMonth）：請求する月とちがうときだけ持つ（同じなら請求する月と一緒に変わる。ユーザーの話「請求月と販売月は基本的には同じです。まれに違うことがあります」）', () => {
+  const [same, apart, bad] = cleanJobs([
+    {id: 'a', month: '2026-11', salesMonth: '2026-11', places: []},
+    {id: 'b', month: '2026-11', salesMonth: '2026-12', places: []},
+    {id: 'c', month: '2026-11', salesMonth: 'あ', places: []},
+  ]);
+  assert.equal('salesMonth' in same, false);
+  assert.equal(apart.salesMonth, '2026-12');
+  assert.equal('salesMonth' in bad, false);
+});

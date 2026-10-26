@@ -81,6 +81,23 @@ log('行ごとの売上月（◀ ▶）：請求する月・受注残に渡す�
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 const sheet = page.getByRole('region', {name: '見積書', exact: true});
 await sheet.waitFor();
+// 見積書の上の「売上月」（ユーザーの話「請求月と販売月は基本的には同じです。まれに違うことがあります」2026-10-26）：初めは請求する月と同じで、
+// 請求する月を変えると一緒に変わる。ちがう月にしたときだけ別（薄い黄色）で、受注残に渡す月もその月
+const salesField = page.getByLabel('売上月', {exact: true});
+const billField = page.getByLabel('請求する月', {exact: true});
+const summaryMonth = () => page.evaluate(() => JSON.parse(localStorage.getItem('taiyo-jutaku-sales-v1') || '{}').rows?.find((r) => r.customer.includes('山田'))?.month);
+assert.deepEqual([await billField.inputValue(), await salesField.inputValue()], [ym(now), ym(now)]);
+await billField.fill(ym(next));
+await page.waitForFunction((m) => document.querySelector('[aria-label="売上月"]')?.value === m, ym(next));
+await salesField.fill(ym(now)); // 売上月だけ今月に（まれにちがうとき）
+await page.waitForFunction((m) => document.querySelector('[aria-label="請求する月"]')?.value === m, ym(next));
+assert.match(await salesField.getAttribute('class'), /amber/);
+await page.waitForFunction((m) => JSON.parse(localStorage.getItem('taiyo-jutaku-sales-v1') || '{}').rows?.find((r) => r.customer.includes('山田'))?.month === m, ym(now));
+await billField.fill(ym(now)); // 請求する月も今月に戻すと、また同じ（一緒に変わる）
+await salesField.waitFor();
+assert.doesNotMatch(await salesField.getAttribute('class'), /amber/);
+assert.equal(await summaryMonth(), ym(now));
+log('見積書の上の売上月：請求する月と一緒に変わる・まれにちがう月にできる OK');
 const cell = (k) => sheet.locator(`[data-edit="${k}"]`).first();
 const tds = async (text) => (await sheet.locator('.form-page tr', {hasText: text}).first().locator('td').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
 const key = async (text, field) => sheet.locator('.form-page tr', {hasText: text}).first().locator(`[data-edit$=":${field}"]`).first().getAttribute('data-edit');
