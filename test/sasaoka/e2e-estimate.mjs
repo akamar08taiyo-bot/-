@@ -260,20 +260,23 @@ for (const t of ['内訳書　様式', 'Ｐ－1', 'Ｐ－2', '1時間2,500円', 
 assert.equal(await page.getByRole('heading', {level: 1}).count(), 0); // 一覧のまま（見積書は開かない）
 log('一覧からExcelで保存（広域連合用）OK');
 
-// ---------------- 複製（今月分の請求書に入れて作る）→ 削除（ゴミ箱に移る。完全に消すのはゴミ箱のタブから＝e2e-trash.mjs）
+// ---------------- 見積書の上の段に「複製」はない（ユーザーの指示「見積り申請書を作成するの、複製ボタンは不要」2026-10-26）。
+// 削除（ゴミ箱に移る。完全に消すのはゴミ箱のタブから＝e2e-trash.mjs）：新しく作った様邸を見積書の上の段の「削除」で消す
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
-await page.getByRole('button', {name: '複製', exact: true}).click();
-await page.getByRole('heading', {level: 1, name: '（サンプル）山田（コピー）様邸'}).waitFor();
-assert.equal(await page.getByLabel('笹岡工務店の請求書に入れる').isChecked(), true);
+await page.getByRole('heading', {level: 1}).waitFor();
+assert.equal(await page.getByRole('button', {name: '複製', exact: true}).count(), 0);
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
-const copyRow = page.getByRole('row', {name: /（コピー）/});
-assert.ok((await copyRow.innerText()).includes(thisMonthLabel)); // 笹岡工務店の請求書（今月分）に入る
 assert.ok((await sampleRow.innerText()).includes(thisMonthLabel));
-await page.getByRole('cell', {name: /（コピー）/}).click();
+await page.getByRole('button', {name: /^＋ 苅田町/}).first().click(); // 一覧の上の新規作成
+await page.getByRole('textbox', {name: '被保険者氏名'}).fill('見本削除');
+await page.getByRole('tab', {name: '📋 工事見積書', exact: true}).click();
+await page.getByRole('heading', {level: 1, name: '見本削除様邸'}).waitFor();
+await page.waitForTimeout(1200); // 自動保存
 await page.getByRole('button', {name: '削除', exact: true}).click();
+await page.getByRole('row', {name: /見本削除/}).waitFor({state: 'detached'});
 assert.equal(await page.locator('tbody tr').count(), 1);
 assert.equal((await page.getByRole('navigation').getByRole('button', {name: /ゴミ箱/}).innerText()).replace(/\s+/g, ' ').trim(), '🗑 ゴミ箱 1');
-log('複製・削除（ゴミ箱へ）OK');
+log('複製はない・削除（ゴミ箱へ）OK');
 
 // ---------------- 部材・施工費マスタ（請求書と同じ部材リスト）：Excel の「定価」の列も読む。施工費（笹岡工務店の手間）も同じタブ
 await page.getByRole('navigation').getByRole('button', {name: /部材・施工費マスタ/}).click();

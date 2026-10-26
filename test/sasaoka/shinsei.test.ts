@@ -322,7 +322,8 @@ test('改修の内容が10箇所・12箇所でも欄からはみ出さない：�
     assert.ok(fits(files, pre, 'J14', n), `事前申請書 ${n}箇所`);
     assert.ok(fits(files, post, 'I14', n), `事後申請書 ${n}箇所`); // =事前申請書!J14 の式の欄も
     const base = sizeOf(orig.files, orig.byName.get('事前申請書')!, 'J14');
-    if (n === 3) assert.equal(sizeOf(files, pre, 'J14'), base); // 入るときは原本の大きさのまま
+    // 入るときは原本の大きさのまま（1行ずつ欄の幅に入るかは、はみ出さない側に数えるので、長めの行だと 0.5pt だけ小さくなる）
+    if (n === 3) assert.ok(sizeOf(files, pre, 'J14') >= base - 0.5 && sizeOf(files, pre, 'J14') <= base, `3箇所 ${sizeOf(files, pre, 'J14')}pt`);
     else assert.ok(sizeOf(files, pre, 'J14') < base && sizeOf(files, pre, 'J14') >= 5, `${n}箇所 ${sizeOf(files, pre, 'J14')}pt`);
     // 平面図の工事内容の枠（12pt。入らなければ小さく）
     const legend = strFromU8(files['xl/drawings/drawing4.xml']);
@@ -333,8 +334,33 @@ test('改修の内容が10箇所・12箇所でも欄からはみ出さない：�
   assert.ok(fits(yk.files, yk.byName.get('住改・受領委任払')!, 'F14', 12));
   const my = sheets(fillShinsei(MIYAKO, SHINSEI.miyako!, shinseiValues(many(12, 'miyako'), RATES)));
   assert.ok(fits(my.files, my.byName.get('住宅改修内訳明細書')!, 'K14', 12));
-  // 大きさの決め方：入るときは base、入らなければ 0.5pt ずつ小さく（長い行は折り返した行数で数える）
+  // 1つの箇所は2行にしない（ユーザーの指示「改修の内容・箇所及び規模では、一つの項目、例 廊下 で2行にならないようにする」2026-10-26）：
+  // 欄の幅より長い行は、1行で入る大きさにする（前は折り返して「mm」だけ次の行に出ていた）。1箇所だけでも
+  const base0 = sizeOf(orig.files, orig.byName.get('事前申請書')!, 'J14');
+  for (const places of [
+    [place('玄関から廊下にかけて（上がり框の横）', [mat('L型手すり')], {dims: {l: '600×1800', h: '800'}}), place('廊下', [mat('I型手すり')], {dims: {l: '3600', h: '800'}})],
+    [place('玄関から廊下にかけて（上がり框の横）', [mat('L型手すり')], {dims: {l: '600×1800', h: '800'}})],
+  ]) {
+    const lf = sheets(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(job({insurer: 'kanda', places}), RATES)));
+    for (const [name, ref] of [['事前申請書', 'J14'], ['事後申請書', 'I14']] as const) {
+      const xml = lf.byName.get(name)!;
+      const pt = sizeOf(lf.files, xml, ref);
+      const lines = txt(lf.byName.get('事前申請書')!, 'J14').split('\n');
+      assert.ok(pt < base0, `${name} ${places.length}箇所 ${pt}pt`);
+      // 折り返しの数え方は申請書の計算と同じ（半角 0.55・全角 1 の幅。はみ出さない側に数える）
+      const em = (t: string) => [...t].reduce((k, ch) => k + (/[ -~｡-ﾟ]/.test(ch) ? 0.55 : 1), 0);
+      const w = rangeBox(sheetLayout(xml), ref).w;
+      assert.ok(lines.every((l) => (em(l) * pt * 4) / 3 <= w - 6), `${name} ${places.length}箇所：${pt}pt で1行ずつ欄の幅に入る`);
+    }
+  }
+  // 短い行の1箇所は原本の大きさのまま
+  {
+    const short = sheets(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(job({insurer: 'kanda', places: [place('廊下', [mat('I型手すり')], {dims: {l: '3600', h: '800'}})]}), RATES)));
+    assert.equal(sizeOf(short.files, short.byName.get('事前申請書')!, 'J14'), base0);
+  }
+  // 大きさの決め方：入るときは base、入らなければ 0.5pt ずつ小さく（長い行は折り返した行数で数える。oneRow なら1行ずつ折り返さずに入る大きさ）
   assert.equal(fitLinesSize(['あ'], 300, 100, 11), 11);
+  assert.ok(fitLinesSize(['あ'.repeat(40)], 300, 100, 11, 4.5, true) < fitLinesSize(['あ'.repeat(40)], 300, 100, 11));
   assert.equal(fitLinesSize(Array(12).fill('①玄関　手すりの取り付け'), 300, 126, 11), 6);
   assert.ok(fitLinesSize(['①玄関　手すりの取り付け　L=600×850mm H=800mm　とても長い説明の文がつづく'], 120, 40, 11) < 11);
 });

@@ -9,6 +9,18 @@ body {
   font-family: 'Yu Gothic UI', 'Meiryo', 'BIZ UDPGothic', 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif;
 }
 
+/* 入力欄の字は、まわりの見出し（小さい太字・灰色の文字）を受け継がず、どの画面でも同じ大きさ・太さ・色にする
+   （2026-10-26 のデバッグ。商品の定価・割引率・数量や設定の欄が 12px の太字・灰色になっていた。ユーザーの指示「入力項目とかの統一感」）。
+   base の層に書くので、大きさ・太さ・色を決めてある欄（text-sm・font-bold など）はそのまま。日付の欄（写真の撮影日など小さい所がある）は除く */
+@layer base {
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='date'], [type='file'], [type='color']),
+  select {
+    font-size: 1rem;
+    font-weight: 400;
+    color: #1e293b;
+  }
+}
+
 /* ---------------------------------------------------------------- 印刷イメージ（画面） */
 .print-overlay {
   position: fixed;

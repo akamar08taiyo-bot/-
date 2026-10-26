@@ -215,7 +215,7 @@ export function RiyuEditor({job, data, update, onBack, tabs}: {job: Job; data: A
         return (
           <>
             <Circles label="住宅状況" options={['持ち家', '借家', '借間', 'その他']} value={r.housing} onPick={(housing) => setRiyu({housing: housing as RiyuInfo['housing']})} />
-            {r.housing === 'その他' && <TextInput value={r.housingOther} onChange={(housingOther) => setRiyu({housingOther})} className="w-48" aria-label="住宅状況のその他" data-nav />}
+            {r.housing === 'その他' && <TextInput value={r.housingOther} onChange={(housingOther) => setRiyu({housingOther})} className="min-w-[12rem] flex-1" aria-label="住宅状況のその他" data-nav />}
           </>
         );
       case 'checkDate':
@@ -237,20 +237,21 @@ export function RiyuEditor({job, data, update, onBack, tabs}: {job: Job; data: A
       case 'reason':
         return (
           <>
-            <span className="inline-flex items-center gap-1">
+            {/* 事業所名は長い（「社会福祉法人○○会 ○○居宅介護支援事業所」）ので行いっぱい、氏名はその下（前は w-56 で切れていた。2026-10-26 のデバッグ） */}
+            <span className="flex w-full min-w-0 items-center gap-1">
               所属事業所
-              <TextInput value={info.reasonOffice} onChange={(reasonOffice) => setInfo({reasonOffice})} className="w-56" aria-label="作成者の所属事業所" data-nav />
+              <TextInput value={info.reasonOffice} onChange={(reasonOffice) => setInfo({reasonOffice})} className="min-w-0 flex-1" aria-label="作成者の所属事業所" data-nav />
             </span>
             <span className="inline-flex items-center gap-1">
               氏名
-              <TextInput value={info.reasonName} onChange={(reasonName) => setInfo({reasonName})} className="w-40" aria-label="作成者の氏名" data-nav />
+              <TextInput value={info.reasonName} onChange={(reasonName) => setInfo({reasonName})} className="w-48" aria-label="作成者の氏名" data-nav />
             </span>
           </>
         );
       case 'qualification':
-        return <TextInput value={r.qualification} onChange={(qualification) => setRiyu({qualification})} className="w-56" aria-label="作成者の資格" data-nav />;
+        return <TextInput value={r.qualification} onChange={(qualification) => setRiyu({qualification})} className="w-full" aria-label="作成者の資格" data-nav />;
       case 'tel':
-        return <TextInput type="tel" value={r.tel} onChange={(tel) => setRiyu({tel})} placeholder="0930-00-0000" className="w-48" aria-label="作成者の連絡先" data-nav />;
+        return <TextInput type="tel" value={r.tel} onChange={(tel) => setRiyu({tel})} placeholder="0930-00-0000" className="w-72 max-w-full" aria-label="作成者の連絡先" data-nav />;
       case 'body':
         return <TextArea value={r.body} onChange={(body) => setRiyu({body})} label="利用者の身体状況" />;
       case 'careState':

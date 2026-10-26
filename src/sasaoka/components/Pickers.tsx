@@ -101,7 +101,7 @@ export function MaterialPicker({
               key={id}
               type="button"
               onClick={() => setTab(id)}
-              className={`rounded-md px-3 py-1.5 text-sm font-bold ${tab === id ? 'bg-purple-600 text-white' : 'text-slate-600 hover:bg-purple-50'}`}
+              className={`rounded-md px-3 py-1.5 text-sm font-bold ${tab === id ? 'bg-violet-100 text-violet-900 ring-1 ring-inset ring-violet-300' : 'text-slate-600 hover:bg-violet-50'}`}
             >
               {label}
             </button>

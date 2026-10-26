@@ -110,7 +110,8 @@ export function ShinseiEditor({
     care: !info.care,
     owner: !info.owner.trim() || !info.relation.trim(),
     reason: !info.reasonOffice.trim() || !info.reasonName.trim(),
-    works: lines.length === 0,
+    // 手すりの長さは必須（入れていなくて見積書にも使う長さがなければ、まだ入っていない。2026-10-26）
+    works: lines.length === 0 || job.places.some((p) => p.kind === 1 && !p.dims?.l?.trim() && !estimateLength(p)),
     cost: cost === null,
     renovated: !info.renovated,
     dates: false,
@@ -257,7 +258,7 @@ export function ShinseiEditor({
             <TextInput value={info.owner} onChange={(owner) => setInfo({owner})} className="w-48" aria-label="住宅の所有者" data-nav />
             <span className="inline-flex items-center gap-1 whitespace-nowrap">
               本人との関係（
-              <TextInput value={info.relation} onChange={(relation) => setInfo({relation})} className="w-24" aria-label="本人との関係" data-nav />）
+              <TextInput value={info.relation} onChange={(relation) => setInfo({relation})} className="w-36" aria-label="本人との関係" data-nav />）
             </span>
             <Btn small color="white" onClick={() => setInfo({owner: job.customer.trim(), relation: '本人'})}>
               本人の家
@@ -267,13 +268,14 @@ export function ShinseiEditor({
       case 'reason':
         return (
           <>
-            <span className="inline-flex items-center gap-1">
+            {/* 事業所名は行いっぱい、氏名はその下（理由書のタブと同じ。2026-10-26 のデバッグ） */}
+            <span className="flex w-full min-w-0 items-center gap-1">
               事業所名
-              <TextInput value={info.reasonOffice} onChange={(reasonOffice) => setInfo({reasonOffice})} className="w-56" aria-label="理由書作成者の事業所名" data-nav />
+              <TextInput value={info.reasonOffice} onChange={(reasonOffice) => setInfo({reasonOffice})} className="min-w-0 flex-1" aria-label="理由書作成者の事業所名" data-nav />
             </span>
             <span className="inline-flex items-center gap-1">
               氏名
-              <TextInput value={info.reasonName} onChange={(reasonName) => setInfo({reasonName})} className="w-40" aria-label="理由書作成者の氏名" data-nav />
+              <TextInput value={info.reasonName} onChange={(reasonName) => setInfo({reasonName})} className="w-48" aria-label="理由書作成者の氏名" data-nav />
             </span>
           </>
         );
@@ -570,12 +572,44 @@ export function KanaInput({value, onChange, ...rest}: {value: string; onChange: 
   );
 }
 
-/** 寸法の欄（mm。打ったまま。全角でもよい）。長さは「600×850」のように2つ以上も（区切りは × のほか , 、 すき間） */
-function Dim({label, value, placeholder, wide, onChange}: {label: string; value: string; placeholder: string; wide: boolean; onChange: (v: string) => void}) {
+/**
+ * 寸法の欄（mm。打ったまま。全角でもよい）。長さは「600×850」のように2つ以上も（区切りは × のほか , 、 すき間）。
+ * optional：見出しに小さく「（任意）」。missing：まだ入っていない（薄い黄色。ほかの入れる所と同じ）
+ */
+function Dim({
+  label,
+  value,
+  placeholder,
+  wide,
+  optional = false,
+  missing = false,
+  autoFocus = false,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  wide: boolean;
+  optional?: boolean;
+  missing?: boolean;
+  autoFocus?: boolean;
+  onChange: (v: string) => void;
+}) {
   return (
     <label className="inline-flex items-center gap-1 whitespace-nowrap">
       {label}
-      <TextInput value={value} onChange={onChange} inputMode={wide ? undefined : 'numeric'} placeholder={placeholder} className={`${wide ? 'w-28' : 'w-16'} text-right`} aria-label={`${label}（mm）`} data-nav data-dim />
+      {optional && <span className="-ml-0.5 text-[11px] text-slate-400">（任意）</span>}
+      <TextInput
+        value={value}
+        onChange={onChange}
+        inputMode={wide ? undefined : 'numeric'}
+        placeholder={placeholder}
+        className={`${wide ? 'w-28' : 'w-16'} text-right ${missing ? 'bg-amber-50' : ''}`}
+        aria-label={`${label}（mm）`}
+        autoFocus={autoFocus}
+        data-nav
+        data-dim
+      />
       <span className="text-xs text-slate-500">mm</span>
     </label>
   );
@@ -604,6 +638,14 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
   // 「＋ そのほか」は改修場所の名前から
   const list = useRef<HTMLDivElement>(null);
   const focusPlace = useRef<{id: string; field: 'dim' | 'name'} | null>(null);
+  // ＋ で開く欄（手すりの高さ・そのほか）を開いた所（「箇所のid:h」「箇所のid:other」）と、開いてすぐ打てるようにする所
+  const [openKeys, setOpenKeys] = useState<Set<string>>(() => new Set());
+  const [opened, setOpened] = useState<string | null>(null);
+  const openField = (key: string) => {
+    setOpenKeys((o) => new Set(o).add(key));
+    setOpened(key);
+  };
+  const plusBtn = 'rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-700';
   const add = (name: string) => {
     const place = newPlace(name, [manualRow('material')]);
     focusPlace.current = {id: place.id, field: name ? 'dim' : 'name'};
@@ -635,14 +677,17 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
           {job.places.map((p) => {
             const n = photos.get(p.id);
             const used = p.rows.some((r) => !isBlankRow(r)); // 見積書に行のある箇所は、見積書で消す
-            const dim = (key: keyof PlaceDims, text: string, wide = false, placeholder = '') => (
-              <Dim label={text} value={p.dims?.[key] ?? ''} placeholder={placeholder} wide={wide} onChange={(v) => setDim(p.id, key, v)} />
+            const dim = (key: keyof PlaceDims, text: string, o: {wide?: boolean; placeholder?: string; optional?: boolean; missing?: boolean; autoFocus?: boolean} = {}) => (
+              <Dim label={text} value={p.dims?.[key] ?? ''} placeholder={o.placeholder ?? ''} wide={o.wide ?? false} optional={o.optional} missing={o.missing} autoFocus={o.autoFocus} onChange={(v) => setDim(p.id, key, v)} />
             );
+            const showOther = openKeys.has(`${p.id}:other`) || !!p.shinseiText?.trim();
+            const showHeight = openKeys.has(`${p.id}:h`) || !!p.dims?.h?.trim();
             return (
               <div key={p.id} data-place={p.id} role="listitem" aria-label={`${n ? circled(n) : ''}${p.name || '改修場所'}`} className="border-t border-slate-100 py-2 first:border-t-0 first:pt-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="w-7 text-center text-base">{n ? circled(n) : '—'}</span>
-                  <TextInput value={p.name} onChange={(name) => setPlace(p.id, (x) => ({...x, name}))} placeholder="改修場所" className="w-28" aria-label="改修場所" data-nav />
+                  {/* 改修場所は行の残りいっぱい（前は w-28 で「玄関から廊下に…」「洗面所兼脱衣所」が切れていた。2026-10-26 のデバッグ） */}
+                  <TextInput value={p.name} onChange={(name) => setPlace(p.id, (x) => ({...x, name}))} placeholder="改修場所" className="min-w-[7rem] flex-1" aria-label="改修場所" data-nav />
                   <select value={p.kind} onChange={(e) => setPlace(p.id, (x) => ({...x, kind: Number(e.target.value)}))} className="h-9 w-40 rounded-md border border-slate-300 px-1 text-sm" aria-label="改修の種類" data-nav>
                     {KINDS.map((k, i) => (
                       <option key={k} value={i + 1}>
@@ -661,8 +706,16 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-9">
                   {p.kind === 1 && (
                     <>
-                      {dim('l', '長さ', true, estimateLength(p))}
-                      {dim('h', '高さ')}
+                      {/* 手すりの長さは必須（入っていなければ薄い黄色。入れなければ見積書の使う長さ＝薄い字を書く）、高さは任意で ＋ を押すと開いて入れる
+                          （ユーザーの指示「手すりの取り付けの高さが任意、長さは必須。手すりの取り付けの高さも、プラスで開いてから入力できるようにする。（任意）」2026-10-26） */}
+                      {dim('l', '長さ', {wide: true, placeholder: estimateLength(p), missing: !p.dims?.l?.trim() && !estimateLength(p)})}
+                      {showHeight ? (
+                        dim('h', '高さ', {optional: true, autoFocus: opened === `${p.id}:h`})
+                      ) : (
+                        <button type="button" onClick={() => openField(`${p.id}:h`)} className={plusBtn}>
+                          ＋ 高さ（任意）
+                        </button>
+                      )}
                     </>
                   )}
                   {p.kind === 2 && (
@@ -672,10 +725,17 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
                       {dim('h', '高さ')}
                     </>
                   )}
-                  <label className="flex min-w-[9rem] flex-1 items-center gap-1 whitespace-nowrap">
-                    そのほか
-                    <TextInput value={p.shinseiText ?? ''} onChange={(t) => setPlace(p.id, (x) => ({...x, shinseiText: t}))} className="min-w-0 flex-1" aria-label="そのほか" data-nav />
-                  </label>
+                  {/* 「そのほか」は ＋ を押すと開いて入れる（ユーザーの指示「そのほかの部分は、プラスかで、開くと入力できるようにする」2026-10-26）。文字が入っていれば開いたまま */}
+                  {showOther ? (
+                    <label className="flex min-w-[9rem] flex-1 items-center gap-1 whitespace-nowrap">
+                      そのほか
+                      <TextInput value={p.shinseiText ?? ''} onChange={(t) => setPlace(p.id, (x) => ({...x, shinseiText: t}))} className="min-w-0 flex-1" aria-label="そのほか" autoFocus={opened === `${p.id}:other`} data-nav />
+                    </label>
+                  ) : (
+                    <button type="button" onClick={() => openField(`${p.id}:other`)} className={plusBtn}>
+                      ＋ そのほか
+                    </button>
+                  )}
                 </div>
               </div>
             );

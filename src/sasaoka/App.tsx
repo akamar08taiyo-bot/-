@@ -377,7 +377,7 @@ export default function App({start}: {start: MainTab}) {
     <ToastProvider>
       {newVersion && (
         // 新しい版が出ている（スマホなどで前の版が出たままのとき）。打ち込んだ内容を保存してから読み込み直す
-        <div role="status" className="no-print sticky top-0 z-50 flex flex-wrap items-center justify-center gap-3 bg-amber-300 px-4 py-2 text-sm font-bold text-slate-900 shadow">
+        <div role="status" className="no-print sticky top-0 z-50 flex flex-wrap items-center justify-center gap-3 border-b border-amber-300 bg-amber-100 px-4 py-2 text-sm font-bold text-slate-900 shadow">
           このアプリの新しい版が出ています。
           <button
             type="button"

@@ -198,6 +198,13 @@ const works = form.locator('[data-field="works"]');
 const genkan = works.getByRole('listitem', {name: '①玄関'});
 assert.equal(await genkan.getByLabel('長さ（mm）').getAttribute('placeholder'), '600');
 assert.equal(await works.getByLabel('幅（mm）').count(), 0);
+// 手すりの長さは必須（「（任意）」は付けない）、高さは任意で ＋ を押すと開く（ユーザーの指示「手すりの取り付けの高さが任意、長さは必須。
+// 手すりの取り付けの高さも、プラスで開いてから入力できるようにする。（任意）」2026-10-26）
+assert.doesNotMatch((await genkan.locator('label', {has: page.getByLabel('長さ（mm）')}).innerText()).replace(/\s+/g, ''), /任意/);
+assert.equal(await genkan.getByLabel('高さ（mm）').count(), 0);
+await genkan.getByRole('button', {name: '＋ 高さ（任意）'}).click();
+assert.ok(await genkan.getByLabel('高さ（mm）').evaluate((el) => el === document.activeElement), '開いたらすぐ打てる');
+assert.match((await genkan.locator('label', {has: page.getByLabel('高さ（mm）')}).innerText()).replace(/\s+/g, ''), /高さ（任意）/);
 await genkan.getByLabel('高さ（mm）').fill('800');
 await pvHas('①玄関　手すりの取り付け　L=600mm H=800mm');
 // 「申請書に書く内容」の欄はない（ユーザーの指示「申請書に書く内容という部分はなくす」2026-10-26）。改修の内容は寸法・そのほかから自動の文
@@ -205,6 +212,10 @@ assert.equal(await form.getByLabel('申請書に書く内容').count(), 0);
 assert.equal(await form.getByText('申請書に書く内容').count(), 0);
 await genkan.getByLabel('高さ（mm）').fill('850');
 await pvHas('①玄関　手すりの取り付け　L=600mm H=850mm');
+// そのほかは ＋ を押すと開いて入れる（「そのほかの部分は、プラスかで、開くと入力できるようにする」2026-10-26）
+assert.equal(await genkan.getByLabel('そのほか').count(), 0);
+await genkan.getByRole('button', {name: '＋ そのほか'}).click();
+assert.ok(await genkan.getByLabel('そのほか').evaluate((el) => el === document.activeElement), '開いたらすぐ打てる');
 await genkan.getByLabel('そのほか').fill('木製');
 // そのほかは次の行（「そのほかの部分の記載は、行替えして表示するようにする」2026-10-26）
 await pvHas('木製');
@@ -1298,6 +1309,7 @@ assert.equal(await works.getByRole('listitem', {name: '③物置'}).count(), 0);
 page.off('dialog', ask);
 const g1 = works.getByRole('listitem', {name: '①玄関'});
 assert.equal(await g1.getByLabel('長さ（mm）').inputValue(), '800');
+if (await g1.getByRole('button', {name: '＋ 高さ（任意）'}).count()) await g1.getByRole('button', {name: '＋ 高さ（任意）'}).click(); // 高さは ＋ で開く（入っていれば開いたまま）
 await g1.getByLabel('高さ（mm）').fill('750');
 const t2 = works.getByRole('listitem', {name: '②トイレ'});
 await t2.getByLabel('改修の種類').selectOption('2');
@@ -1394,7 +1406,7 @@ await preview.waitFor();
 await estimateTab.click();
 assert.equal(await inInvoice.count(), 0);
 assert.equal(await orderBtn.isDisabled(), true);
-// 見積書のタブも、保存・Excel・印刷は上の段のまん中（白紙に戻す・発注書・複製・削除は右）
+// 見積書のタブも、保存・Excel・印刷は上の段のまん中（白紙に戻す・発注書・削除は右。複製はない）
 assert.ok((await offCenter('📗 Excelで保存')) < 2);
 await page.screenshot({path: path.join(outDir, '81c-header-center-estimate.png'), clip: {x: 0, y: 0, width: 1366, height: 240}});
 await shinseiTab.click();

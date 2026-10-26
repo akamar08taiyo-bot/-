@@ -979,8 +979,12 @@ const emOf = (s: string) => [...s].reduce((n, ch) => n + (/[ -~｡-ﾟ]/.test(ch
  * 入らなければ 0.5pt ずつ小さくする（欄の幅より長い行は、折り返した行数で数える）。いちばん小さくて minPt
  * （4.5pt：内訳明細書の改修の種類の行＝2行分の高さに、同じ種類の12箇所が入る大きさ。見積書の印刷の小さい文字と同じ）
  */
-export function fitLinesSize(lines: string[], w: number, h: number, base: number, minPt = 4.5): number {
-  for (let pt = base; pt > minPt; pt -= 0.5) if (wrapRows(lines, w, h, pt) > 0) return pt;
+export function fitLinesSize(lines: string[], w: number, h: number, base: number, minPt = 4.5, oneRow = false): number {
+  // oneRow：1行ずつ折り返さずに入る大きさ（折り返した行数が行の数と同じ）
+  for (let pt = base; pt > minPt; pt -= 0.5) {
+    const rows = wrapRows(lines, w, h, pt);
+    if (rows > 0 && (!oneRow || rows === lines.length)) return pt;
+  }
   return minPt;
 }
 
@@ -1049,15 +1053,19 @@ function alignedStyle(files: Files, style: number, attrs: Record<string, string 
   return id;
 }
 
-/** 欄（結合した範囲）に lines が入るように、文字を小さくした書式にする（入るときはそのまま） */
-function fitCell(files: Files, path: string, ref: string, lines: string[]): void {
+/**
+ * 欄（結合した範囲）に lines が入るように、文字を小さくした書式にする（入るときはそのまま）。
+ * oneRow：1行ずつ欄の幅に入る大きさにもする（改修の内容は1つの箇所が2行にならないように。ユーザーの指示「改修の内容・箇所及び規模では、
+ * 一つの項目、例 廊下 で2行にならないようにする」2026-10-26。前は長い行が折り返して「mm」だけ次の行に出ていた。そのほかは前の指示どおり次の行）
+ */
+function fitCell(files: Files, path: string, ref: string, lines: string[], oneRow = false): void {
   if (lines.length === 0 || !files[path]) return;
   const xml = strFromU8(files[path]);
   const found = cellRe(ref).exec(xml);
   if (!found) return;
   const box = rangeBox(sheetLayout(xml), ref);
   const st = cellStyle(files, xml, ref);
-  const pt = fitLinesSize(lines, box.w, box.h, st.size);
+  const pt = fitLinesSize(lines, box.w, box.h, st.size, 4.5, oneRow);
   if (pt >= st.size) return;
   files[path] = strToU8(setStyle(xml, ref, String(sizedStyle(files, numOf(attrOf(found[1], 's'), 0), pt))));
 }
@@ -1067,14 +1075,15 @@ function fitLines(files: Files, sheet: ShinseiSheet, v: ShinseiValues): void {
   const paths = sheetPaths(files);
   const path = paths.get(sheet.sheet);
   if (!path) return;
-  const targets: [string, string[]][] = [];
-  if (sheet.works) targets.push([sheet.works, v.works]);
-  if (sheet.legend?.cell) targets.push([sheet.legend.cell, v.works]);
+  // [欄, 行, 1行ずつ欄の幅に入れるか（改修の内容の行）]
+  const targets: [string, string[], boolean][] = [];
+  if (sheet.works) targets.push([sheet.works, v.works, true]);
+  if (sheet.legend?.cell) targets.push([sheet.legend.cell, v.works, true]);
   sheet.kinds?.forEach((k, i) => {
-    targets.push([k.works, v.kinds[i]?.works ?? []]);
-    if (v.kinds[i]?.places) targets.push([k.places, [v.kinds[i].places]]);
+    targets.push([k.works, v.kinds[i]?.works ?? [], true]);
+    if (v.kinds[i]?.places) targets.push([k.places, [v.kinds[i].places], false]);
   });
-  if (!targets.some(([, lines]) => lines.length > 1)) return;
+  if (!targets.some(([, lines]) => lines.length > 0)) return;
   // 式でこのシートの欄を出している欄（苅田町の事後申請書の改修の内容＝事前申請書!J14）：シート → [番地, 出している欄]
   const copies: [string, string, string][] = [];
   for (const [name, other] of paths) {
@@ -1084,9 +1093,9 @@ function fitLines(files: Files, sheet: ShinseiSheet, v: ShinseiValues): void {
       if (target && target.sheet === sheet.sheet.trim()) copies.push([other, m[1], target.ref]);
     }
   }
-  for (const [ref, lines] of targets) {
-    fitCell(files, path, ref, lines);
-    for (const [other, at, target] of copies) if (target === ref) fitCell(files, other, at, lines);
+  for (const [ref, lines, oneRow] of targets) {
+    fitCell(files, path, ref, lines, oneRow);
+    for (const [other, at, target] of copies) if (target === ref) fitCell(files, other, at, lines, oneRow);
   }
 }
 

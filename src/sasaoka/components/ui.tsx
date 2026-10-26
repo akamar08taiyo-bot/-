@@ -1,16 +1,17 @@
 import {createContext, useContext, useEffect, useRef, useState, useSyncExternalStore} from 'react';
 import type {ButtonHTMLAttributes, DragEvent as ReactDragEvent, InputHTMLAttributes, ReactNode} from 'react';
 
-// 色は機能ごとに1色（見積・提案書作成アプリのデザイン規約と同じ使い分け）
+// 色は機能ごとに1色（見積・提案書作成アプリのデザイン規約と同じ使い分け）。どれも薄い地に濃い字・細い枠
+// （ユーザーの指示「ガツンと濃い色だけは、目がチカチカするんで、少し控えて」2026-10-26。前は濃い地に白い字。削除は白い地に赤い字）
 const COLORS = {
-  emerald: 'bg-emerald-600 hover:bg-emerald-700 text-white', // 新規・追加
-  blue: 'bg-blue-600 hover:bg-blue-700 text-white', // 保存・決定
-  rose: 'bg-rose-600 hover:bg-rose-700 text-white', // 削除
-  sky: 'bg-sky-600 hover:bg-sky-700 text-white', // 印刷
-  cyan: 'bg-cyan-800 hover:bg-cyan-900 text-white', // まとめて印刷
-  teal: 'bg-teal-600 hover:bg-teal-700 text-white', // 一覧・管理
-  purple: 'bg-purple-600 hover:bg-purple-700 text-white', // メーカー・取り込み
-  amber: 'bg-amber-500 hover:bg-amber-600 text-white',
+  emerald: 'bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300', // 新規・追加
+  blue: 'bg-blue-100 hover:bg-blue-200 text-blue-900 border border-blue-300', // 保存・決定
+  rose: 'bg-white hover:bg-rose-50 text-rose-700 border border-rose-300', // 削除
+  sky: 'bg-sky-100 hover:bg-sky-200 text-sky-900 border border-sky-300', // 印刷
+  cyan: 'bg-cyan-100 hover:bg-cyan-200 text-cyan-900 border border-cyan-300', // まとめて印刷
+  teal: 'bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300', // 一覧・管理
+  purple: 'bg-violet-50 hover:bg-violet-100 text-violet-800 border border-violet-300', // メーカー・取り込み
+  amber: 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300',
   white: 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-300',
   // 薄い色（ユーザーの指示：色を付けるのは保存・Excel・印刷くらいにして、濃い色にしない。削除・白紙に戻す・発注書などは白）
   softBlue: 'bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200', // 保存
@@ -225,11 +226,11 @@ export function ToastProvider({children}: {children: ReactNode}) {
 export const useToast = () => useContext(ToastCtx);
 
 export function KindBadge({kind, label}: {kind: 'material' | 'labor'; label?: string}) {
-  // 元の仕切り計算表の色（商品＝黄、施工費＝青）に合わせる
+  // 元の仕切り計算表の色（商品＝黄、施工費＝青）に合わせる。色は少し薄く（「ガツンと濃い色だけは…控えて」2026-10-26。前は bg-sky-500・bg-yellow-300）
   return kind === 'labor' ? (
-    <span className="inline-block whitespace-nowrap rounded bg-sky-500 px-1.5 py-0.5 text-[11px] font-bold text-white">{label ?? '手間'}</span>
+    <span className="inline-block whitespace-nowrap rounded bg-sky-200 px-1.5 py-0.5 text-[11px] font-bold text-sky-900">{label ?? '手間'}</span>
   ) : (
-    <span className="inline-block rounded bg-yellow-300 px-1.5 py-0.5 text-[11px] font-bold text-slate-800">部材</span>
+    <span className="inline-block rounded bg-yellow-200 px-1.5 py-0.5 text-[11px] font-bold text-slate-800">部材</span>
   );
 }
 
