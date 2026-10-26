@@ -8,6 +8,8 @@
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import path from 'node:path';
+// 2つ目からの商品を足すボタン（「＋ 2つ目の福祉用具を追加」「＋ 3つ目の商品を追加」。ユーザーの指示「追加のボタンはもう少しわかりやすいように」2026-10-26）
+const ADD_ITEM = /^＋ \d+つ目の(福祉用具|商品)を追加$/;
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -105,11 +107,11 @@ if (withTokutei) {
   const pvBox = await pv.boundingBox();
   assert.ok(formBox && pvBox && formBox.x + formBox.width < pvBox.x && pvBox.width > formBox.width, `${JSON.stringify(formBox)} ${JSON.stringify(pvBox)}`);
   // 申請書で商品を入れると、販売見積書のタブにも出る（同じ案件）
-  // 商品がないときも手で入れる欄が1つ開いている（「＋ 追加」は2つ目から。ユーザーの指示「基本は手で入れるのがデフォルトなので開いておく」2026-10-26）
-  assert.equal(await tk.getByRole('button', {name: '＋ 追加'}).count(), 0);
+  // 商品がないときも手で入れる欄が1つ開いている（「＋ 2つ目の福祉用具を追加」は2つ目から。ユーザーの指示「基本は手で入れるのがデフォルトなので開いておく」2026-10-26）
+  assert.equal(await tk.getByRole('button', {name: ADD_ITEM}).count(), 0);
   await tk.getByLabel('種目').first().selectOption('歩行補助つえ');
   await tk.getByLabel('商品名').last().fill('見本の多点杖');
-  await tk.getByRole('button', {name: '＋ 追加'}).waitFor();
+  await tk.getByRole('button', {name: ADD_ITEM}).waitFor();
   await page.waitForFunction(() => document.querySelector('iframe')?.contentDocument?.querySelector('[aria-label="申請書のプレビュー"]')?.textContent?.includes('見本の多点杖'));
   await page.screenshot({path: path.join(outDir, 'tokutei-1-tab.png')});
   await page.getByRole('tab', {name: '🏷 販売見積書'}).click();
