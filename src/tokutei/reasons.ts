@@ -297,15 +297,16 @@ function groupsOf(category: string, sub: string): ReasonGroup[] {
 }
 
 /**
- * この種目（細目）の文例（見出しごと）。細目が空なら商品名から細目を見る（手で入れた商品。種目の欄は種目だけを選ぶので）。
- * 商品名から別の種目と分かるとき（シャワーチェアを腰掛便座にしていたなど）は、商品名の細目の文例を先に出す
+ * この種目（細目）の文例（見出しごと）。**選んだ種目の文例だけ**を出す（ユーザーの指示「歩行補助杖を選択したのに、シャワーチェアの文例がでる。腰掛便座の文例か」2026-10-26。
+ * 前は商品名から別の種目と分かるとき、商品名の用具の文例を先に出していた）。細目が空なら、商品名から推した細目がその種目のものなら使う（手で入れた商品。種目の欄は種目だけを選ぶので）。
+ * 細目がその種目のものでなければ（前の種目の細目が残っていた）使わない。種目を選んでいなければ、商品名から推した種目の文例
  */
 export function reasonExamples(category: string, sub: string, name = ''): ReasonGroup[] {
-  const g = !sub && name ? guessCategory(name) : null;
-  if (g && g.category && g.category !== category && (BY_SUB[g.sub] || BY_CATEGORY[g.category])) {
-    return [...groupsOf(g.category, g.sub), ...(category ? groupsOf(category, '') : [])];
-  }
-  return groupsOf(category, sub || (g ? g.sub : ''));
+  const subs = (c: string) => CATEGORIES.find((x) => x.name === c)?.subs ?? [];
+  const g = name && (!sub || !category) ? guessCategory(name) : null;
+  if (!category) return g?.category ? groupsOf(g.category, g.sub) : [];
+  const own = sub && (subs(category).includes(sub) || !CATEGORIES.some((x) => x.name === category)) ? sub : '';
+  return groupsOf(category, own || (g && g.category === category ? g.sub : ''));
 }
 
 /** 前に同じ種目（細目）で書いた理由（新しい順・同じ文は1つ。文例と同じものは除く） */
