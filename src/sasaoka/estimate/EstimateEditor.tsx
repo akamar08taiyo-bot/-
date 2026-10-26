@@ -339,8 +339,7 @@ export function EstimateEditor({
             const at = picker.at;
             setPlace(pickPlace.id, (p) => withBrackets(p, fillAdded({...p, rows: insertRowsAt(p.rows, rows, at)}, new Set(rows.map((r) => r.id))), data.materials));
             created.current = null; // 行を入れたので、作った箇所は残す
-            setPicker(null);
-            toast(`部材＋施工費（常用）の${rows.length}行を「${pickPlace.name || '箇所'}」に入れました`);
+            setPicker(null); // 入れた行は見積書に見えるので、お知らせは出さない（ユーザーの指示「行を消しましたという文言は不要」2026-10-26）
           }}
           onRename={(id, n) => update('kits', (list) => list.map((k) => (k.id === id ? {...k, name: n, updatedAt: Date.now()} : k)))}
           onRemove={removeKit}

@@ -596,7 +596,7 @@ export function EstimateSheet({
         })
         .catch(() => undefined);
     }
-    toast(`${cut ? '切り取りました' : 'コピーしました'}：「${label}」`);
+    // お知らせは出さない（上の「📋 コピー中」と行の印で分かる。ユーザーの指示「行を消しましたという文言は不要」2026-10-26。行の操作はみな同じ）
     return true;
   };
 
@@ -615,7 +615,6 @@ export function EstimateSheet({
     setSel({key: `line:${res.rowId}:text`, occ: 0});
     setEdit(null);
     if (c.cut) setClip(null);
-    toast(move ? `「${c.label}」を移しました` : c.cut ? `「${c.label}」を貼り付けました（もとの見積書の行は残っています）` : `「${c.label}」を貼り付けました`);
     inputRef.current?.focus({preventScroll: true});
   };
   const pasteTarget = () => {
@@ -637,7 +636,6 @@ export function EstimateSheet({
     }
     change(next);
     setSel(null);
-    toast('行を消しました');
   };
 
   // ---------------------------------------------------------------- マウス

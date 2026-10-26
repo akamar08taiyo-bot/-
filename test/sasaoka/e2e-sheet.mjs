@@ -183,7 +183,9 @@ assert.equal(await sheet.locator('.sheet-del').count(), before); // 明細の行
 await sheet.getByRole('button', {name: 'サンプル S-TL01 L型手すりの行を消す'}).click();
 assert.equal(await sheet.locator('.form-page tr', {hasText: 'L型手すり'}).count(), 0);
 assert.deepEqual((await tds('エンドキャップ')).slice(0, 2), ['手すりの取り付け', '②トイレ']); // 箇所の名前は次の行に
-await page.locator('[aria-live] > div', {hasText: '行を消しました'}).first().waitFor();
+// 行の操作のお知らせ（「行を消しました」など）は出さない（ユーザーの指示「行を消しましたという文言は不要」2026-10-26）
+await page.waitForTimeout(300);
+assert.equal(await page.locator('[aria-live] > div', {hasText: /行を消しました|コピーしました|貼り付けました|移しました/}).count(), 0);
 await sheet.getByRole('button', {name: 'サンプル S-EC01 エンドキャップの行を消す'}).click();
 assert.equal(await sheet.locator('.form-page tr', {hasText: 'エンドキャップ'}).count(), 0);
 assert.equal(await sheet.locator('.form-page', {hasText: 'トイレ'}).count(), 0); // 箇所ごと消えて、空白の行になる
