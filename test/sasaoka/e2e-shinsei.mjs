@@ -206,7 +206,9 @@ assert.equal(await form.getByText('申請書に書く内容').count(), 0);
 await genkan.getByLabel('高さ（mm）').fill('850');
 await pvHas('①玄関　手すりの取り付け　L=600mm H=850mm');
 await genkan.getByLabel('そのほか').fill('木製');
-await pvHas('①玄関　手すりの取り付け　L=600mm H=850mm　木製');
+// そのほかは次の行（「そのほかの部分の記載は、行替えして表示するようにする」2026-10-26）
+await pvHas('木製');
+assert.ok(!(await preview.innerText()).includes('H=850mm　木製'), 'そのほかが同じ行にある');
 await genkan.getByLabel('そのほか').fill('');
 await genkan.getByLabel('高さ（mm）').fill('800');
 await pvHas('①玄関　手すりの取り付け　L=600mm H=800mm');

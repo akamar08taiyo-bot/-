@@ -305,7 +305,10 @@ export function workItems(job: Pick<Job, 'places'>, rates: EstimateRates): WorkI
  * 寸法は申請書のタブで入れる（`Place.dims`）：手すりは長さ（L=）と高さ（H=。任意）、段差の解消は幅・奥行・高さ（「W600mm D350mm H150mm」）
  */
 function workLine(p: Place, photo: number): string {
-  return [`${circled(photo)}${p.name.trim()}`, workText(p)].filter(Boolean).join('　');
+  // そのほか（`Place.shinseiText`）は次の行に、全角のすき間1つ下げて（ユーザーの指示「そのほかの部分の記載は、行替えして表示するようにする」2026-10-26）。
+  // 行の一覧にするとき（shinseiWorks・shinseiKinds）は改行で分ける。Excel から読むときは、下げた行を前の行のつづきにする（workLinesOf）
+  const [head = '', ...rest] = workTextLines(p);
+  return [[`${circled(photo)}${p.name.trim()}`, head].filter(Boolean).join('　'), ...rest.map((r) => `　${r}`)].join('\n');
 }
 
 /**
@@ -371,9 +374,16 @@ function dimsText(p: Pick<Place, 'kind' | 'rows' | 'dims'>): string {
     .join(' ');
 }
 
-/** 改修の内容の文（写真番号・改修場所のうしろ）：改修の種類の名前・寸法・そのほか（`Place.shinseiText`。うしろに足す）。「手すりの取り付け　L=600mm H=800mm」 */
+/**
+ * 改修の内容の文の行（写真番号・改修場所のうしろ）：1行目は改修の種類の名前・寸法「手すりの取り付け　L=600mm H=800mm」、そのほか（`Place.shinseiText`）は2行目
+ * （ユーザーの指示「そのほかの部分の記載は、行替えして表示するようにする」2026-10-26。前は1行目のうしろに足していた）
+ */
+export function workTextLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText'>): string[] {
+  return [[KINDS[p.kind - 1] ?? '', dimsText(p)].filter(Boolean).join('　'), p.shinseiText?.trim() ?? ''].filter(Boolean);
+}
+/** 改修の内容の文を1行で（写真の欄の見出しなど、画面の1行に出すところ） */
 export function workText(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText'>): string {
-  return [KINDS[p.kind - 1] ?? '', dimsText(p), p.shinseiText?.trim() ?? ''].filter(Boolean).join('　');
+  return workTextLines(p).join('　');
 }
 
 /**
@@ -382,13 +392,13 @@ export function workText(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText'
  */
 export function photoNoteLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText' | 'photoNote'>): string[] {
   const added = (p.photoNote ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  return [workText(p), ...added].filter(Boolean);
+  return [...workTextLines(p), ...added];
 }
 
 /** 改修の内容・箇所及び規模（苅田町・行橋市の申請書の欄）・平面図の工事内容：箇所ごとに1行「①玄関　手すりの取り付け　L=600mm」。写真番号・改修場所は見積書と同じ */
 export function shinseiWorks(job: Pick<Job, 'places'>, rates: EstimateRates): string[] {
   return workItems(job, rates)
-    .map((w) => w.line)
+    .flatMap((w) => w.line.split('\n'))
     .filter(Boolean);
 }
 
@@ -397,7 +407,7 @@ export function shinseiKinds(job: Pick<Job, 'places'>, rates: EstimateRates): Sh
   const lines = workItems(job, rates).filter((w) => w.line);
   return KINDS.map((_, i) => {
     const mine = lines.filter((w) => w.kind === i + 1);
-    return {places: [...new Set(mine.map((w) => w.name).filter(Boolean))].join('・'), works: mine.map((w) => w.line)};
+    return {places: [...new Set(mine.map((w) => w.name).filter(Boolean))].join('・'), works: mine.flatMap((w) => w.line.split('\n'))};
   });
 }
 
@@ -2022,11 +2032,15 @@ function readTexts(sheet: ShinseiSheet, get: (ref: string) => string, info: Part
   }
 }
 
-const linesOf = (text: string) =>
-  text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
+/** 改修の内容の欄の行：全角のすき間で下げた行（そのほか。workLine）は前の行のつづき */
+const workLinesOf = (text: string) =>
+  text.split(/\r?\n/).reduce<string[]>((out, raw) => {
+    const l = raw.trim();
+    if (!l) return out;
+    if (/^[ 　]/.test(raw) && out.length > 0 && !/^[①-⑳(（]/.test(l)) out[out.length - 1] += `　${l}`;
+    else out.push(l);
+    return out;
+  }, []);
 
 /**
  * 書き込んだ申請書（Excel）から読む。どの保険者の申請書かは最初のシートの名前で見分ける。申請書でなければ null。
@@ -2055,11 +2069,11 @@ export function readShinsei(bytes: Uint8Array): ShinseiRead | null {
       if (!out.name && sheet.name && !sheet.nameFormat) out.name = get(sheet.name);
       if (!out.address && sheet.address) out.address = get(sheet.address);
       if (!out.insuredNo && sheet.insuredNo) out.insuredNo = sheet.insuredNo.map((ref) => get(ref).normalize('NFKC').replace(/\D/g, '')).join('');
-      if (out.places.length === 0 && sheet.works) out.places = linesOf(get(sheet.works)).map((l) => parseWorkLine(l));
+      if (out.places.length === 0 && sheet.works) out.places = workLinesOf(get(sheet.works)).map((l) => parseWorkLine(l));
       if (out.places.length === 0 && sheet.kinds) {
         // 改修の種類の行ごと：工事内容の行から読む。工事内容が空で箇所だけ書いてあれば、箇所の名前から
         sheet.kinds.forEach((k, i) => {
-          const lines = linesOf(get(k.works));
+          const lines = workLinesOf(get(k.works));
           if (lines.length > 0) out.places.push(...lines.map((l) => parseWorkLine(l, i + 1)));
           else
             out.places.push(

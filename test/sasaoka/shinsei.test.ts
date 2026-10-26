@@ -102,7 +102,7 @@ test('改修の内容・箇所及び規模：「①浴室　手すりの取り�
     shinseiKinds(more, RATES).map((k) => k.works),
     [['①廊下　手すりの取り付け　L=1600mm', '③浴室　手すりの取り付け'], ['②玄関　段差の解消'], ['④居室　床材の変更'], [], [], []],
   );
-  // 申請書のタブで入れた寸法（ユーザーの指示）：手すりは長さ（見積書の長さより先）・高さ（任意）、段差の解消は「W600mm D350mm H150mm」。そのほかはうしろに足す
+  // 申請書のタブで入れた寸法（ユーザーの指示）：手すりは長さ（見積書の長さより先）・高さ（任意）、段差の解消は「W600mm D350mm H150mm」。そのほかは次の行
   const sized = job({
     places: [
       place('玄関', [mat('木の手すり 35φ 4m', {lengthCm: 60, pieceLengthM: 4})], {dims: {l: '800', h: '750'}}),
@@ -114,7 +114,8 @@ test('改修の内容・箇所及び規模：「①浴室　手すりの取り�
   assert.deepEqual(shinseiWorks(sized, RATES), [
     '①玄関　手すりの取り付け　L=800mm H=750mm',
     '②屋外　段差の解消　W600mm D350mm H150mm',
-    '③トイレ　手すりの取り付け　L=600×850mm　木製',
+    '③トイレ　手すりの取り付け　L=600×850mm',
+    '　木製', // そのほかは次の行に下げて（「そのほかの部分の記載は、行替えして表示するようにする」2026-10-26）
     '④浴室　段差の解消　W700mm',
   ]);
   assert.deepEqual(shinseiKinds(sized, RATES)[1].works, ['②屋外　段差の解消　W600mm D350mm H150mm', '④浴室　段差の解消　W700mm']); // 内訳明細書も同じ
@@ -421,6 +422,12 @@ test('行橋市の申請書：住改・受領委任払の氏名・住所・被�
   ];
   assert.deepEqual(readShinsei(out), {insurer: 'yukuhashi', name: v.name, address: v.address, insuredNo: v.insuredNo, places, info: {}});
   assert.equal(readShinsei(fillShinsei(KANDA, SHINSEI.kanda!, v))?.insurer, 'kanda');
+  // そのほかは次の行に下げて書き、読み戻すと前の行のつづき（「そのほかの部分の記載は、行替えして表示するようにする」2026-10-26）
+  const extra = shinseiValues(job({insurer: 'yukuhashi', places: [place('廊下', [mat('L型手すり')], {dims: {l: '2400'}, shinseiText: 'ベースプレート　L=2400mm'})]}), RATES);
+  assert.deepEqual(extra.works, ['①廊下　手すりの取り付け　L=2400mm', '　ベースプレート　L=2400mm']);
+  const back = fillShinsei(YUKUHASHI, SHINSEI.yukuhashi!, extra);
+  assert.match(cell(sheets(back).byName.get('住改・受領委任払')!, 'F14'), /①廊下　手すりの取り付け　L=2400mm(&#10;|\n)　ベースプレート　L=2400mm/);
+  assert.deepEqual(readShinsei(back)?.places, [{photo: 1, name: '廊下', kind: 1, text: '手すりの取り付け　L=2400mm　ベースプレート　L=2400mm'}]);
   // 原本のまま（何も書いていない）なら空
   for (const [insurer, bytes] of [['kanda', KANDA], ['miyako', MIYAKO], ['kouiki', KOUIKI]] as const) {
     assert.deepEqual(readShinsei(bytes), {insurer, name: '', address: '', insuredNo: '', places: [], info: {}});
