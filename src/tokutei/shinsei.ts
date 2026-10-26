@@ -306,12 +306,15 @@ const kouikiOneLine = (c: KouikiCells) => [...rowsOf('B', c.rows), ...rowsOf('I'
 const kouikiPlan = (c: KouikiCells, v: ShinseiValues): SheetWrite['block'] => ({cell: c.plan, head: [KOUIKI_PLAN], body: ` 居宅の事業所名${v.office ? `　${v.office}` : ''}`, tail: []});
 const kouikiPlanMark = (cell: string, v: ShinseiValues): Mark => ({cell, needles: ['有', '無'], pick: v.carePlan ? pick(['有', '無'], v.carePlan) : -1, after: '居宅サービス計画の届出'});
 
-/** 受領委任払用（様式第8号）：申請者は会社（受領委任事業者。原本のまま）。下の委任状の被保険者氏名も書く。口座の欄・広域連合の記入欄は書かない */
+/**
+ * 受領委任払用（様式第8号）：申請者は会社（受領委任事業者。原本のまま）。口座の欄・広域連合の記入欄は書かない（口座はユーザーの答え「空のままでよい」2026-10-26）。
+ * 下の委任状の被保険者氏名は書かない（自署。ユーザーの答え「空けて自署にする」2026-10-26。前は「被保険者氏名　　山田 花子」と書いていた）
+ */
 function kouikiJuryo(v: ShinseiValues): SheetWrite {
   const c: KouikiCells = {kana: 'G2', name: 'G3', insured: ['W', 4], birth: 'G6', gender: 'W6', zip: 'G8', address: 'G9', rows: KOUIKI_JURYO_ROWS, total: 'R18', reason: 'J20', plan: 'J21', date: {era: 'C27', y: 'F27', m: 'I27', d: 'L27'}};
   return {
     sheet: KOUIKI_SHEETS.juryo,
-    cells: [...kouikiCells(v, c, birthChoice(v, '明 ・ 大 ・ 昭　')), ['Z9', v.tel], ...when(v.name, [['L38', `被保険者氏名　　${v.name}`]])],
+    cells: [...kouikiCells(v, c, birthChoice(v, '明 ・ 大 ・ 昭　')), ['Z9', v.tel]],
     block: kouikiPlan(c, v),
     fit: kouikiFit(c),
     oneLine: kouikiOneLine(c),

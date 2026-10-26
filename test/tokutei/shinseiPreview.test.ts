@@ -129,11 +129,11 @@ test('プレビュー：広域連合は支払方法の様式（償還払いな�
   // はみ出す1つの欄（申請者の氏名）は、下線の欄まで1つの押せる所に
   const name = pages[0].fields.find((f) => f.field === 'customer' && f.ref === 'J34');
   assert.ok(name && name.w > 150, JSON.stringify(name));
-  // 受領委任払用：元号（昭）にも丸。委任状の氏名も押せる
+  // 受領委任払用：元号（昭）にも丸。委任状の氏名は自署なので押せる欄にしない
   const juryo = shinseiPreview(template('kouiki'), SHINSEI.kouiki, shinseiValues(sale({insurer: 'kouiki'}), S))[0];
   assert.equal(juryo.shapes.filter((s) => s.kind === 'ellipse').length, 3);
   assert.ok(juryo.texts.some((t) => t.marked && t.marked.chars.some((c) => c.ch === '昭')));
-  assert.ok(juryo.fields.some((f) => f.field === 'customer' && f.ref === 'L38'));
+  assert.ok(!juryo.fields.some((f) => f.ref === 'L38'));
   // 届出の欄（2行：届出の有・無と居宅の事業所名）も1文字ずつ、丸と同じ計算の位置に（行ごとの高さ）
   const plan = juryo.texts.find((t) => t.ref === 'J21');
   const ys = new Set(plan?.marked?.chars.filter((c) => c.ch.trim()).map((c) => Math.round(c.cy)));

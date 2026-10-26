@@ -161,7 +161,7 @@ export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
       links: [
         ['payMethod', ['B1']],
         ['kana', ['G2']],
-        ['customer', ['G3', ...boxes('L', 20, 38)]], // 委任状の被保険者氏名（L38 に「被保険者氏名　　見本 花子」）
+        ['customer', ['G3']], // 委任状の被保険者氏名（L38）は自署なので書かない・押せる欄にしない（2026-10-26）
         ['insuredNo', boxes('W', 10, 4)],
         ['birthDate', ['G6']],
         ['gender', ['W6']],

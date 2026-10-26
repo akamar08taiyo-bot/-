@@ -2,7 +2,8 @@
 // その次の売上を集計、確認できるようにする。（税抜、税込）」2026-10-25）に渡す、案件ごとの金額のまとめ。
 // 同じサイト（太陽ポータル）なので、この端末の localStorage（taiyo-tokutei-sales-v1）に書く。読むのは住宅改修の src/sasaoka/salesPlan.ts。
 // 案件が変わるたびに書き直す（App.tsx）。お客様名・担当・居宅・金額（税抜・税込・お客様のお支払い）だけ。仕切・利益は入れない。
-// 形を変えるときは、住宅改修の salesPlan.ts の読み取りも直す。
+// 受注残・進捗管理（solar-silver-progress-app の index.html の taiyo-link）も読む（受注残の「受注残に入れる」。2026-10-26。営業所 office でその営業所の画面だけに出す）。
+// 形を変えるときは、住宅改修の salesPlan.ts と受注残の taiyo-link の読み取りも直す。
 import {saleTotals} from './calc.ts';
 import type {Sale, Settings} from './types.ts';
 
@@ -21,6 +22,7 @@ export type SalesSummaryRow = {
   tax: number;
   total: number; // 購入金額（税込）
   userPay: number; // お客様のお支払い（受領委任払いなら利用者負担、償還払いなら全額）
+  office: string; // 営業所（設定の営業所。受注残・進捗管理がその営業所の画面だけに出す）
 };
 
 export type SalesSummary = {v: 1; updatedAt: number; rows: SalesSummaryRow[]};
@@ -33,7 +35,7 @@ export function salesMonthOf(sale: Pick<Sale, 'deliveryDate' | 'approveDate' | '
 }
 
 /** 商品のある案件だけ（作りかけの空の案件は売上に入れない） */
-export function salesSummary(sales: Sale[], s: Pick<Settings, 'markupRate' | 'limit' | 'minProfitRate'>, now = Date.now()): SalesSummary {
+export function salesSummary(sales: Sale[], s: Pick<Settings, 'markupRate' | 'limit' | 'minProfitRate' | 'officeName'>, now = Date.now()): SalesSummary {
   const rows = sales
     .filter((x) => x.items.length > 0)
     .map((x): SalesSummaryRow => {
@@ -51,13 +53,14 @@ export function salesSummary(sales: Sale[], s: Pick<Settings, 'markupRate' | 'li
         tax: t.tax,
         total: t.total,
         userPay: x.payMethod === '償還払い' ? t.total : t.userPay,
+        office: s.officeName.trim(),
       };
     });
   return {v: 1, updatedAt: now, rows};
 }
 
 /** 書く（書けなくても困らない：売上見込みに特定福祉用具が出ないだけ） */
-export function writeSalesSummary(sales: Sale[], s: Pick<Settings, 'markupRate' | 'limit' | 'minProfitRate'>, store: Pick<Storage, 'setItem'> = localStorage): void {
+export function writeSalesSummary(sales: Sale[], s: Pick<Settings, 'markupRate' | 'limit' | 'minProfitRate' | 'officeName'>, store: Pick<Storage, 'setItem'> = localStorage): void {
   try {
     store.setItem(SALES_SUMMARY_KEY, JSON.stringify(salesSummary(sales, s)));
   } catch {

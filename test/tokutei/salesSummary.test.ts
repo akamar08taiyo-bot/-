@@ -25,7 +25,7 @@ test('まとめ：商品のある案件だけ。金額は見積書と同じ（�
   assert.deepEqual(sum.rows.map((r) => r.id), ['a', 'c']);
   const t = saleTotals(a, S);
   const r = sum.rows[0];
-  assert.deepEqual([r.customer, r.month, r.amount, r.tax, r.total, r.userPay], ['見本 花子', '2026-10', t.amount, t.tax, t.total, t.userPay]);
+  assert.deepEqual([r.customer, r.month, r.amount, r.tax, r.total, r.userPay, r.office], ['見本 花子', '2026-10', t.amount, t.tax, t.total, t.userPay, S.officeName.trim()]); // 営業所は受注残・進捗管理がその営業所の画面に出すため
   assert.equal(t.total, 42944);
   assert.equal(sum.rows[1].userPay, t.total); // 償還払いは全額いったんお支払い
   assert.ok(!/cost|profit|21000/.test(JSON.stringify(sum)));

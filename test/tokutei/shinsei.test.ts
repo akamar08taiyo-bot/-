@@ -218,7 +218,7 @@ test('広域連合：支払方法が受領委任払いなら受領委任払用�
   assert.deepEqual(['C27', 'F27', 'I27', 'L27'].map((r) => readCell(f, sh, r)), ['令和', '8', '10', '22']);
   assert.equal(readCell(f, sh, 'M30'), '太陽シルバーサービス株式会社行橋営業所'); // 申請者（受領委任事業者）は原本のまま
   assert.equal(['Z33', 'AA33', 'AB33'].map((r) => readCell(f, sh, r)).join(''), '802'); // 受領委任契約番号も原本のまま
-  assert.equal(readCell(f, sh, 'L38'), '被保険者氏名　　見本 花子'); // 委任状
+  assert.equal(readCell(f, sh, 'L38'), '被保険者氏名'); // 委任状の氏名は自署（原本のまま。「空けて自署にする」2026-10-26）
   assert.equal(readCell(f, sh, 'G40'), ''); // 口座の欄は書かない
   assert.equal(ellipseCount(f, sh), 3); // 元号（昭）・性別・居宅サービス計画の届出（有）
   // 償還払い用は空のまま
