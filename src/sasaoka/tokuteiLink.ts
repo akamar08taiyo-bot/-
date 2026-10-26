@@ -130,6 +130,28 @@ export function withTokuteiFields(job: Job, f: Partial<TokuteiFields>): Job {
 
 /** タブの中に出す特定福祉用具のアプリの URL（その様邸の案件を開く。上の題名の段は出さない） */
 /** 中に出す画面：申請書だけ（🛁 特定福祉用具申請書のタブ）・見積書だけ（🏷 販売見積書のタブ） */
+// ---------------------------------------------------------------- カタログ（様邸の画面の左の「📖 カタログを表示」「🖨 カタログを印刷」）
+// ユーザーの指示「赤枠の部分にカタログを表示とカタログを印刷という２つのボタンを設置する」（2026-10-26。🪪 介護保険証・介護ソフトの画面の枠の下）。
+// 介援隊のカタログ（PDF と、それを読む部品）は特定福祉用具のアプリにあるので、🛁 のタブを開いて中のアプリに頼む
+// （postMessage。特定福祉用具の src/tokutei/jutaku.ts の FROM_JUTAKU_CATALOG。中のアプリは見積もりの商品の載っているページを出す）
+
+export const CATALOG_MSG = 'taiyo-tokutei-catalog';
+export const CATALOG_EVENT = 'taiyo-sasaoka-catalog';
+export type CatalogAction = 'show' | 'print';
+let pendingCatalog: CatalogAction | null = null;
+
+/** ボタンから：頼みを置いて知らせる（App.tsx が 🛁 のタブを開き、TokuteiEditor.tsx が中のアプリが出てから送る） */
+export function askCatalog(action: CatalogAction) {
+  pendingCatalog = action;
+  window.dispatchEvent(new Event(CATALOG_EVENT));
+}
+/** 置いてある頼みを1回だけ取る */
+export function takeCatalog(): CatalogAction | null {
+  const a = pendingCatalog;
+  pendingCatalog = null;
+  return a;
+}
+
 export type TokuteiView = 'shinsei' | 'quote';
 export const tokuteiUrl = (jobId: string, view: TokuteiView = 'shinsei') => `${TOKUTEI_URL}#jutaku=${encodeURIComponent(jobId)}&embed=1&view=${view}`;
 

@@ -38,7 +38,7 @@ import {PrintView} from './print/PrintView.tsx';
 import type {PrintRequest} from './print/PrintView.tsx';
 import {hasRiyuInfo} from './riyu.ts';
 import {EXAMPLE_KIT_ID, exampleKit} from './samples.ts';
-import {flushTokutei, readFromTokutei, tokuteiNames, withTokuteiFields, writeTokutei} from './tokuteiLink.ts';
+import {CATALOG_EVENT, flushTokutei, readFromTokutei, tokuteiNames, withTokuteiFields, writeTokutei} from './tokuteiLink.ts';
 import {BatchSave} from './components/BatchSave.tsx';
 import {isTrashed, liveJobs} from './trash.ts';
 import {writeJutakuSalesSummary} from './salesPlan.ts';
@@ -275,6 +275,13 @@ export default function App({start}: {start: MainTab}) {
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
   }, [store.update]);
+  // 様邸の画面の左の「📖 カタログを表示」「🖨 カタログを印刷」：カタログは特定福祉用具のアプリにあるので、🛁 のタブを開く（販売見積書のタブならそのまま）。
+  // 頼みは TokuteiEditor.tsx が中のアプリに渡す（tokuteiLink.ts の askCatalog）
+  useEffect(() => {
+    const onCatalog = () => setJobView((v) => (v === 'tokutei' || v === 'hanbai' ? v : 'tokutei'));
+    window.addEventListener(CATALOG_EVENT, onCatalog);
+    return () => window.removeEventListener(CATALOG_EVENT, onCatalog);
+  }, []);
   const [pruneTick, setPruneTick] = useState(0);
   useEffect(() => {
     if (!all) return;

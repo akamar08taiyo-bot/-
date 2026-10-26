@@ -18,6 +18,7 @@ import {readCardOrScreen} from '../careSoftOcr.ts';
 import {INSURER_IDS, INSURER_INFO, MARK_INFO, NO_SHINSEI} from '../estimateForms.ts';
 import type {CardInfo} from '../hokensho.ts';
 import {riyuOf} from '../riyu.ts';
+import {askCatalog} from '../tokuteiLink.ts';
 import type {Insurer, Job} from '../types.ts';
 import {Btn, DropArea, Modal, pastedFiles, TextInput, useToast} from './ui.tsx';
 
@@ -545,11 +546,11 @@ export function CardFill({job, setJob, staffList}: {job: Job; setJob: (fn: (j: J
   return (
     <>
       {side ? (
-        <div className="no-print fixed top-[120px] z-10 flex h-[min(62vh,640px)]" style={{width: 'min(260px, calc((100vw - 1600px) / 2 - 20px))', left: 'max(8px, calc((100vw - 1600px) / 2 - min(260px, calc((100vw - 1600px) / 2 - 20px)) - 4px))'}}>
+        <div className="no-print fixed top-[120px] z-10 flex flex-col gap-2" style={{width: 'min(260px, calc((100vw - 1600px) / 2 - 20px))', left: 'max(8px, calc((100vw - 1600px) / 2 - min(260px, calc((100vw - 1600px) / 2 - 20px)) - 4px))'}}>
           <CardDrop
             onRead={setGot}
             big
-            className="flex h-full w-full flex-col items-center justify-center gap-3 !px-2"
+            className="flex h-[min(62vh,640px)] w-full flex-col items-center justify-center gap-3 !px-2"
             label={
               <>
                 <span className="block text-5xl" aria-hidden>
@@ -566,6 +567,13 @@ export function CardFill({job, setJob, staffList}: {job: Job; setJob: (fn: (j: J
           >
             🪪 介護保険証・介護ソフトの画面
           </CardDrop>
+          {/* 介援隊のカタログ（ユーザーの指示「赤枠の部分にカタログを表示とカタログを印刷という２つのボタンを設置する」2026-10-26。🛁 のタブの中で開く。tokuteiLink.ts） */}
+          <Btn color="white" className="w-full !text-base" onClick={() => askCatalog('show')}>
+            📖 カタログを表示
+          </Btn>
+          <Btn color="softSky" className="w-full !text-base" onClick={() => askCatalog('print')}>
+            🖨 カタログを印刷
+          </Btn>
         </div>
       ) : (
         <CardDrop onRead={setGot}>🪪 介護保険証・介護ソフトの画面</CardDrop>

@@ -7,7 +7,7 @@ import {jobName} from '../calc.ts';
 import {CardFill} from '../components/CardReader.tsx';
 import {Btn} from '../components/ui.tsx';
 import {INSURER_INFO, jobInsurer} from '../estimateForms.ts';
-import {flushTokutei, tokuteiUrl, writeTokutei} from '../tokuteiLink.ts';
+import {CATALOG_EVENT, CATALOG_MSG, flushTokutei, takeCatalog, tokuteiUrl, writeTokutei} from '../tokuteiLink.ts';
 import type {TokuteiView} from '../tokuteiLink.ts';
 import type {Job} from '../types.ts';
 import type {Update} from '../useStore.ts';
@@ -71,6 +71,19 @@ export function TokuteiEditor({job, view, onBack, tabs, update}: {job: Job; view
     }, 300);
     return () => window.clearInterval(timer);
   }, [frameKey]);
+  // 左の「📖 カタログを表示」「🖨 カタログを印刷」（tokuteiLink.ts の askCatalog）：中のアプリが出てから頼む（このタブを開く前に押したときも）
+  useEffect(() => {
+    if (!ready) return;
+    const send = () => {
+      const w = frame.current?.contentWindow;
+      if (!w || !frameReady(frame.current)) return;
+      const action = takeCatalog();
+      if (action) w.postMessage({type: CATALOG_MSG, action}, location.origin);
+    };
+    send();
+    window.addEventListener(CATALOG_EVENT, send);
+    return () => window.removeEventListener(CATALOG_EVENT, send);
+  }, [ready]);
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">

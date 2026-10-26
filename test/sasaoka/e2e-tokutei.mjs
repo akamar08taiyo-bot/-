@@ -223,6 +223,46 @@ await page.getByRole('tablist', {name: '住宅改修申請書・工事見積書�
 assert.equal(await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get('job')), emptyId);
 log('特定福祉用具申請書のタブを開いた様邸は、空でも消さない・一覧にお客様名・白紙の申請書はまとめて保存で選べない OK');
 
+if (withTokutei) {
+  // ---------------- 広い画面：左の 🪪 の枠の下に「📖 カタログを表示」「🖨 カタログを印刷」（ユーザーの指示「赤枠の部分にカタログを表示とカタログを印刷という
+  // ２つのボタンを設置する」2026-10-26）。カタログは特定福祉用具のアプリにあるので、🛁 のタブを開いて中にカタログの窓・カタログの印刷を出す（販売見積書のタブならそのまま）
+  await page.setViewportSize({width: 2000, height: 1000});
+  await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
+  const showCat = page.getByRole('button', {name: '📖 カタログを表示'});
+  const printCat = page.getByRole('button', {name: '🖨 カタログを印刷'});
+  await showCat.waitFor();
+  const drop = showCat.locator('xpath=../*[1]'); // 🪪 の枠（同じ箱の最初）
+  const [dropBox, showBox, printBox] = [await drop.boundingBox(), await showCat.boundingBox(), await printCat.boundingBox()];
+  assert.match(await drop.innerText(), /介護保険証・\s*介護ソフトの画面/);
+  assert.ok(Math.abs(showBox.x - dropBox.x) < 1 && Math.abs(showBox.width - dropBox.width) < 1 && showBox.y >= dropBox.y + dropBox.height && printBox.y >= showBox.y + showBox.height, `${JSON.stringify(dropBox)} ${JSON.stringify(showBox)} ${JSON.stringify(printBox)}`);
+  assert.ok(printBox.y + printBox.height <= 1000, '画面の下にはみ出す');
+  await page.screenshot({path: path.join(outDir, 'tokutei-3-catalog-buttons.png')});
+  const tkf = page.frameLocator('iframe[title="特定福祉用具 購入申請書・見積もり作成"]');
+  await showCat.click();
+  await page.waitForFunction(() => location.hash.includes('view=tokutei'));
+  await tkf.getByRole('dialog', {name: 'カタログ'}).waitFor({timeout: 30000});
+  await page.waitForTimeout(1500);
+  await page.screenshot({path: path.join(outDir, 'tokutei-4-catalog-show.png')});
+  await tkf.getByRole('dialog', {name: 'カタログ'}).getByRole('button', {name: 'カタログを閉じる'}).click();
+  // 販売見積書のタブでは、そのタブのまま印刷の画面
+  await page.getByRole('tab', {name: '🏷 販売見積書'}).click();
+  await page.waitForFunction(() => location.hash.includes('view=hanbai'));
+  await tkf.locator('input[aria-label="お客様名"]').first().waitFor();
+  await printCat.click();
+  await tkf.getByRole('group', {name: '印刷するページ'}).waitFor({timeout: 30000});
+  assert.equal(await page.getByRole('tab', {name: '🏷 販売見積書'}).getAttribute('aria-selected'), 'true');
+  await tkf.getByRole('button', {name: '閉じる', exact: true}).click();
+  // 工事見積書のタブからは 🛁 のタブを開いて印刷の画面
+  await page.getByRole('tab', {name: '📋 工事見積書'}).click();
+  await page.waitForFunction(() => !location.hash.includes('view=')); // 工事見積書のタブは view を書かない
+  await printCat.click();
+  await page.waitForFunction(() => location.hash.includes('view=tokutei'));
+  await tkf.getByRole('group', {name: '印刷するページ'}).waitFor({timeout: 30000});
+  await tkf.getByRole('button', {name: '閉じる', exact: true}).click();
+  await page.setViewportSize({width: 1366, height: 900});
+  log('左の「📖 カタログを表示」「🖨 カタログを印刷」 OK');
+}
+
 // ---------------- スマホの幅（390px）：横にはみ出さない
 await page.setViewportSize({width: 390, height: 844});
 await page.getByRole('tab', {name: '🛁 特定福祉用具申請書'}).click();
