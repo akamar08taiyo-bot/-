@@ -115,6 +115,8 @@ test('理由の文例：よく使う用具は10ずつ・ほかは5つ・約100�
       for (const g of groups) {
         assert.ok(g.texts.length >= 5, `${cat} ${sub} ${g.label}：${g.texts.length}`);
         for (const t of g.texts) assert.ok(t.length >= 85 && t.length <= 115, `${g.label}：${t.length}字「${t.slice(0, 12)}…」`);
+        // 当たり障りのない、みんなが使える文（ユーザーの指示「文例は当たり障りのないみんなが使えるものにする」2026-10-26）：病名・家族の事情を書かない
+        for (const t of g.texts) assert.doesNotMatch(t, /麻痺|円背|心肺|認知|家族|退院|夫|妻|娘|息子/, `${g.label}「${t.slice(0, 12)}…」`);
       }
       assert.equal(new Set(all(groups)).size, all(groups).length);
     }

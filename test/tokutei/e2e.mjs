@@ -591,6 +591,11 @@ try {
     );
   await oneRow('見本シャワーチェア Air ミドルワンタッチ ブルー');
   await oneRow('見本エイジフリーケアサービス㈱');
+  // 歩行補助つえを選んでいれば、商品名がシャワーチェアでも歩行補助つえの文例だけ（ユーザーの指示「歩行補助杖を選択したのに、シャワーチェアの文例がでる」2026-10-26）
+  assert.deepEqual(
+    await shinseiForm.getByLabel('見本シャワーチェア Air ミドルワンタッチ ブルーが必要な理由の文例').locator('optgroup').evaluateAll((l) => l.map((g) => `${g.label}${g.children.length}`)),
+    ['歩行補助つえ5'],
+  );
   await shinseiForm.getByLabel('メーカー').first().fill('');
   await shinseiForm.getByLabel('商品名').fill('見本の多点杖 ワイド');
   await shinseiForm.getByLabel('定価').fill('9000');
