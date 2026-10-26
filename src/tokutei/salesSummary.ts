@@ -25,7 +25,14 @@ export type SalesSummaryRow = {
   office: string; // 営業所（設定の営業所。受注残・進捗管理がその営業所の画面だけに出す）
 };
 
-export type SalesSummary = {v: 1; updatedAt: number; rows: SalesSummaryRow[]};
+/**
+ * 住宅改修の様邸から開いた案件のお客様名（商品のない作りかけもふくむ。売上には入れない）。住宅改修の「見積もり・申請書を作成する」の一覧で、
+ * 特定福祉用具申請書だけを作っている様邸にもお客様名を出すため（ユーザーの指示「特定福祉用具の申請書を作成途中の場合も、こちらの一覧には表示されるようにする」2026-10-26）。
+ * rows を読むアプリ（住宅改修の salesPlan.ts・受注残の taiyo-link）は読まない
+ */
+export type SalesSummaryLinked = {job: string; customer: string};
+
+export type SalesSummary = {v: 1; updatedAt: number; rows: SalesSummaryRow[]; linked: SalesSummaryLinked[]};
 
 /** 売上の月：納品日（購入日）の月。まだなければ 承認日 → 申請日 → 見積日 → 作った日 の月（売上見込みの初めの月。住宅改修のアプリで次月に回せる） */
 export function salesMonthOf(sale: Pick<Sale, 'deliveryDate' | 'approveDate' | 'applyDate' | 'estimateDate' | 'createdAt'>): string {
@@ -56,7 +63,8 @@ export function salesSummary(sales: Sale[], s: Pick<Settings, 'markupRate' | 'li
         office: s.officeName.trim(),
       };
     });
-  return {v: 1, updatedAt: now, rows};
+  const linked = sales.filter((x) => x.jutakuJob && x.customer.trim()).map((x) => ({job: x.jutakuJob!, customer: x.customer.trim()}));
+  return {v: 1, updatedAt: now, rows, linked};
 }
 
 /** 書く（書けなくても困らない：売上見込みに特定福祉用具が出ないだけ） */

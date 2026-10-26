@@ -29,6 +29,10 @@ test('まとめ：商品のある案件だけ。金額は見積書と同じ（�
   assert.equal(t.total, 42944);
   assert.equal(sum.rows[1].userPay, t.total); // 償還払いは全額いったんお支払い
   assert.ok(!/cost|profit|21000/.test(JSON.stringify(sum)));
+  // 住宅改修の様邸から開いた案件は、商品のない作りかけもお客様名だけ（住宅改修の一覧に名前を出す。売上の rows には入れない）
+  const linked = salesSummary([{...empty, jutakuJob: 'j1'}, {...a, jutakuJob: 'j2'}, {...empty, id: 'd', customer: ' ', jutakuJob: 'j3'}], S);
+  assert.deepEqual(linked.linked, [{job: 'j1', customer: '見本 空子'}, {job: 'j2', customer: '見本 花子'}]);
+  assert.deepEqual(linked.rows.map((r) => r.id), ['a']);
   const store = new Map<string, string>();
   writeSalesSummary([a], S, {setItem: (k, v) => void store.set(k, v)});
   assert.equal(JSON.parse(store.get(SALES_SUMMARY_KEY) ?? '{}').rows.length, 1);
