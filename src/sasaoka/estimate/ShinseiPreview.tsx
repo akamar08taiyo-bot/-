@@ -99,11 +99,15 @@ function VerticalText({t}: {t: PvText}) {
  * 転記した文字は Excel でも欄に収めてある（shinsei.ts の fitTexts）が、原本の字体のない端末（スマホ・タブレットなど）は字の幅が違うので、
  * Excel では入っている原本の文字（理由書の「（Ｐ１）」など）も欄の端で切れていた（ユーザーの指示「途中で横が切れていたり…しっかり見てください」2026-10-23）
  */
+// 測った幅に足す余裕：Windows の ＭＳ 明朝・ＭＳ ゴシックは小さい字で、画面に出る字の幅が測った幅より少し広いことがあり、
+// ぎりぎりに縮めた見出しの終わりが欄の線で切れた（特定福祉用具の「記載者 事業所・氏名」2026-10-26）
+const FIT_MARGIN = 1.05;
+
 function fitScale(t: PvText): number {
   const avail = t.w - 4 - t.indent;
   if (avail <= 0 || t.runs.length === 0) return 1;
   if (!t.wrap) {
-    const need = t.runs.reduce((n, r) => n + textWidth(r.text, r.font), 0);
+    const need = t.runs.reduce((n, r) => n + textWidth(r.text, r.font), 0) * FIT_MARGIN;
     return need > avail && need > 0 ? Math.max(0.3, avail / need) : 1;
   }
   // 折り返し：行ごとの幅（改行で分ける）から、折り返した行の数を数える（1文字ずつ折り返すので、1行に1文字分の余りを見る）
@@ -112,7 +116,7 @@ function fitScale(t: PvText): number {
   for (const r of t.runs) {
     r.text.split(/\r?\n/).forEach((part, i) => {
       if (i > 0) widths.push(0);
-      widths[widths.length - 1] += textWidth(part, r.font);
+      widths[widths.length - 1] += textWidth(part, r.font) * FIT_MARGIN;
     });
   }
   for (let k = 1; k > 0.3; k -= 0.05) {

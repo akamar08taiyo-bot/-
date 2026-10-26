@@ -414,7 +414,8 @@ export function RiyuEditor({job, data, update, onBack, tabs}: {job: Job; data: A
       </div>
 
 
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]">
+      {/* 入れる所は申請書のタブより広く（文を書く欄が多い。ユーザーの指示「入力欄がやや狭い」2026-10-26） */}
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,44rem)_minmax(0,1fr)]">
         <div role="form" aria-label="理由書" onKeyDown={nextOnEnter} className="min-w-0 overflow-hidden rounded-lg border-2 border-slate-700 bg-white shadow-sm">
           <div className="border-b-2 border-slate-700 px-4 py-2.5 text-center text-base font-bold text-slate-800">住宅改修が必要な理由書</div>
           {SECTIONS.map((sec) => (

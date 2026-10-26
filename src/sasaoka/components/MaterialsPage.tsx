@@ -119,7 +119,8 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
             addDraft();
           }}
         >
-          <TextInput value={draft.name} onChange={(name) => setDraft({...draft, name})} placeholder="商品名" className="min-w-[16rem] flex-1" />
+          {/* 商品名の欄は広げすぎない（ユーザーの指示「マスタの商品名の欄がよこ広すぎる」2026-10-26） */}
+          <TextInput value={draft.name} onChange={(name) => setDraft({...draft, name})} placeholder="商品名" className="w-80 max-w-full" />
           <TextInput value={draft.code} onChange={(code) => setDraft({...draft, code})} placeholder="品番" className="w-32" />
           <TextInput value={draft.maker} onChange={(m) => setDraft({...draft, maker: m})} placeholder="メーカー" className="w-36" list="maker-list" />
           <datalist id="maker-list">
@@ -196,13 +197,13 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-          <table className="w-full min-w-[1080px] text-sm">
+          <table className="min-w-[1080px] text-sm">
             <thead className="bg-slate-100 text-xs text-slate-600">
               <tr>
                 <th className="w-10 px-1 py-2">★</th>
                 <th className="px-2 py-2 text-left">メーカー</th>
                 <th className="px-2 py-2 text-left">品番</th>
-                <th className="px-2 py-2 text-left">商品名</th>
+                <th className="w-[22rem] px-2 py-2 text-left">商品名</th>
                 <th className="w-20 px-2 py-2 text-left">単位</th>
                 <th className="w-32 px-2 py-2 pr-4 text-right">定価</th>
                 <th className="w-32 px-2 py-2 pr-4 text-right">仕切価格</th>
@@ -224,7 +225,7 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
                     <TextInput value={m.code} onChange={(v) => setMat(m.id, {code: v})} className="w-32" />
                   </td>
                   <td className="px-2 py-1">
-                    <TextInput value={m.name} onChange={(v) => setMat(m.id, {name: v})} className="w-full min-w-[16rem]" />
+                    <TextInput value={m.name} onChange={(v) => setMat(m.id, {name: v})} className="w-[22rem]" />
                   </td>
                   <td className="px-2 py-1">
                     <TextInput value={m.unit} onChange={(v) => setMat(m.id, {unit: v})} className="w-16" />
