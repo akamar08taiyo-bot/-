@@ -116,7 +116,15 @@ export default function App() {
 
   const closePrint = useCallback(() => setPrintId(null), []);
 
-  if (store.loadError) return <p className="p-6 text-rose-700">読み込めませんでした：{store.loadError}</p>;
+  if (store.loadError)
+    return (
+      <div role="alert" className="m-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+        <p className="font-bold">読み込めませんでした：{store.loadError}</p>
+        <button type="button" onClick={() => location.reload()} className="mt-3 rounded-md border border-rose-300 bg-white px-4 py-2 font-bold text-rose-800 hover:bg-rose-100">
+          ⟳ 読み込み直す
+        </button>
+      </div>
+    );
   if (!data) return <p className="p-6 text-slate-500">読み込んでいます…</p>;
 
   const goTab = (t: Tab) => {

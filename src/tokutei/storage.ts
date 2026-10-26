@@ -17,6 +17,34 @@ export type DataKey = keyof AppData;
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
+/**
+ * 読み込みが終わらないとき（ほかのタブ・前の枠がこのアプリの保存場所をつかんだまま止まっていると、こちらは待ちつづける。
+ * 「特定福祉用具申請書・販売見積書が読み込み中で開かない」2026-10-26。ブラウザのテストで、ほかのタブが保存の途中で止まると同じになることを確かめた）。
+ * このときは localStorage の古い値・空で始めない（始めると、あとで空のまま保存して消してしまう）。画面で知らせて読み込み直してもらう
+ */
+export const LOAD_TIMEOUT_MS = 8000;
+export class LoadTimeout extends Error {
+  constructor() {
+    super('保存場所を開けませんでした（ほかのタブで開いていたら、閉じてから読み込み直してください）');
+    this.name = 'LoadTimeout';
+  }
+}
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new LoadTimeout()), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
+}
+
 function openDb(): Promise<IDBDatabase> {
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
@@ -30,6 +58,7 @@ function openDb(): Promise<IDBDatabase> {
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error ?? new Error('IndexedDB を開けません'));
+      req.onblocked = () => reject(new LoadTimeout());
     });
     dbPromise.catch(() => {
       dbPromise = null;
@@ -300,13 +329,16 @@ export function cleanKey<K extends DataKey>(key: K, raw: unknown): AppData[K] {
   return clean[key](raw);
 }
 
-/** すべての項目と、その印を読む（1つのトランザクションで読むので、読んでいるあいだのほかの保存とまざらない） */
-export async function loadAllStamped(): Promise<{data: AppData; stamps: Stamps}> {
+/**
+ * すべての項目と、その印を読む（1つのトランザクションで読むので、読んでいるあいだのほかの保存とまざらない）。
+ * timeoutMs までに読めなければ LoadTimeout（IndexedDB を使えないときは、今までどおり localStorage を見る）
+ */
+export async function loadAllStamped(timeoutMs = LOAD_TIMEOUT_MS): Promise<{data: AppData; stamps: Stamps}> {
   const raw: Partial<Record<DataKey, unknown>> = {};
   const stamps: Stamps = {};
   try {
-    const db = await openDb();
-    await new Promise<void>((resolve, reject) => {
+    const db = await withTimeout(openDb(), timeoutMs);
+    const read = new Promise<void>((resolve, reject) => {
       const tx = db.transaction(STORE, 'readonly');
       const store = tx.objectStore(STORE);
       for (const k of DATA_KEYS) {
@@ -321,8 +353,11 @@ export async function loadAllStamped(): Promise<{data: AppData; stamps: Stamps}>
       }
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error ?? new Error('読み込みが中断されました'));
     });
-  } catch {
+    await withTimeout(read, timeoutMs);
+  } catch (e) {
+    if (e instanceof LoadTimeout) throw e;
     /* localStorage を見る */
   }
   for (const k of DATA_KEYS) if (raw[k] === undefined) raw[k] = lsGet(k);
