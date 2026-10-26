@@ -22,7 +22,7 @@ import {MakerInput} from './MakerInput.tsx';
 import {ReasonField} from './ReasonField.tsx';
 import {AddItemButton, Circles, EraBirthInput, InsuredNoInput, KanaInput, nextOnEnter} from './ShinseiParts.tsx';
 import {Suggest} from './Suggest.tsx';
-import {Btn, NumberInput, TextInput} from './ui.tsx';
+import {Btn, NumberInput, Stepper, TextInput} from './ui.tsx';
 
 const dateInput = 'h-9 rounded-md border border-slate-300 bg-white px-2 text-sm outline-none focus:border-blue-500';
 
@@ -246,7 +246,7 @@ export function ShinseiInputs({
                   </div>
                   {/* 定価の下に割引率と販売金額（ユーザーの指示「定価の下に、販売金額を記載する」「定価の下に割引率を表示、変更できるようにする」2026-10-26）。
                       販売金額は 定価×(100−割引率)%（打ち直したら薄い黄色で、↺ で戻す。販売見積書の単価と同じ値）。割引率を変えたら販売金額は計算し直す。
-                      右の金額は 販売金額×数量＋税（申請書の購入予定金額）。数量が1でないときは「× 2台」 */}
+                      その下に数量（− ＋。ユーザーの指示「数量を追加」2026-10-26。販売見積書の数量と同じ値）。右の金額は 販売金額×数量＋税（申請書の購入予定金額） */}
                   <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1.5 pl-8 text-xs font-bold text-slate-500">
                     定価（税抜）
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -273,12 +273,13 @@ export function ShinseiInputs({
                           ↺
                         </button>
                       )}
-                      {i.qty !== 1 && (
-                        <span className="tabular-nums">
-                          × {i.qty}
-                          {i.unit}
-                        </span>
-                      )}
+                    </div>
+                    数量
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        <Stepper value={i.qty} onChange={(qty) => changeItem(i.id, {qty: Math.max(1, Math.round(qty))})} ariaLabel={`${i.name}の数量`} />
+                        {i.unit}
+                      </div>
                       <span className="ml-auto pr-1 text-sm font-bold tabular-nums text-slate-800">{yen(l.total)}円</span>
                     </div>
                   </div>

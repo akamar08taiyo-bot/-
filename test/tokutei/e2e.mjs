@@ -461,6 +461,12 @@ try {
   await shinseiForm.getByLabel('割引率').fill(String(rate));
   await shinseiForm.getByLabel('割引率').blur();
   await shinseiForm.getByText(`${Math.floor((9000 * (100 - rate)) / 100 * 1.1).toLocaleString('ja-JP')}円`).waitFor();
+  // 販売金額の下に数量（− ＋。ユーザーの指示「数量を追加」2026-10-26）。右の金額は 販売金額×数量×1.1。販売見積書の数量と同じ値
+  await shinseiForm.getByRole('button', {name: '見本の多点杖 ワイドの数量を1増やす'}).click();
+  await page.waitForFunction(() => document.querySelector('[aria-label="見本の多点杖 ワイドの数量"]')?.value === '2');
+  await shinseiForm.getByText(`${Math.floor(((9000 * (100 - rate)) / 100) * 2 * 1.1).toLocaleString('ja-JP')}円`).waitFor();
+  await shinseiForm.getByRole('button', {name: '見本の多点杖 ワイドの数量を1減らす'}).click();
+  await shinseiForm.getByText(`${Math.floor((9000 * (100 - rate)) / 100 * 1.1).toLocaleString('ja-JP')}円`).waitFor();
   // 2つ目からは、最後の商品のすぐ下の横いっぱいの点線の枠。押すと足した商品の種目の欄へ移る（消して元に戻す）
   const addItem = shinseiForm.getByRole('button', {name: ADD_ITEM});
   assert.equal((await addItem.textContent())?.trim(), '＋ 2つ目の福祉用具を追加');
