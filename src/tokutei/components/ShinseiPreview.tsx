@@ -259,8 +259,11 @@ function paper(page: PvPage<string>) {
 
 const TONE = {
   sky: {on: 'bg-sky-400/15 outline outline-2 outline-sky-600', hover: 'hover:outline hover:outline-2 hover:outline-teal-600', hoverBg: 'hover:bg-teal-400/10'},
-  // 見積書（地が水色）：入れている所は薄い黄色（ユーザーの指示「入力欄では、緑ではなく薄い黄色。特定福祉用具や住宅改修と同様」2026-10-26。前は緑）
-  yellow: {on: 'bg-amber-200/50 outline outline-[3px] outline-amber-500', hover: 'hover:outline hover:outline-2 hover:outline-amber-500', hoverBg: 'hover:bg-amber-200/30'},
+  // 見積書（地が水色）：入れている所は薄い黄色（ユーザーの指示「入力欄では、緑ではなく薄い黄色。特定福祉用具や住宅改修と同様」2026-10-26。前は緑）。
+  // 地の色は住宅改修の申請書の黄色（入れる所の bg-amber-50・プレビューのまだ入っていない欄の bg-amber-300/35）のあいだの薄さ、枠は細く
+  // （「黄色の部分の色がちょっと濃すぎて、チカチカして見にくいので色は薄く…住宅改修の申請書などで、入力しているときに黄色くしている…それと同じぐらいの色合いに」
+  // 2026-10-26。前は bg-amber-200/50 と 3px のオレンジの枠）
+  yellow: {on: 'bg-amber-300/25 outline outline-1 outline-amber-400', hover: 'hover:outline hover:outline-1 hover:outline-amber-400', hoverBg: 'hover:bg-amber-300/15'},
 };
 
 export function ShinseiPages<F extends string = ShinseiField>({

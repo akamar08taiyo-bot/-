@@ -377,7 +377,8 @@ try {
   await maker.fill('見本工業');
   assert.equal(await maker.inputValue(), '見本工業');
   await page.getByText('仕切（税抜・任意）').last().waitFor();
-  await page.waitForFunction(() => document.querySelector('[aria-label="見積書のプレビュー"] [data-pv-field="items"]')?.className.includes('outline-amber-500'));
+  // 入れている所は住宅改修の申請書と同じ薄い黄色・細い枠（「黄色の部分の色がちょっと濃すぎて、チカチカして見にくい」2026-10-26）
+  await page.waitForFunction(() => /bg-amber-300\/25 .*outline-1 .*outline-amber-400/.test(document.querySelector('[aria-label="見積書のプレビュー"] [data-pv-field="items"]')?.className ?? ''));
   // 「自己負担額を表示」は初めからオン：明細の最後の商品の2行下から介護保険の内訳（利用者負担は赤字）（ユーザーの指示「自己負担額を表示のオンオフっていうチェック項目を入れ」
   // 「この部分のみ記載する形で良い　利用者負担額の部分のみ赤字で記載する」2026-10-26）。外すと消える
   const selfPay = page.getByRole('checkbox', {name: '自己負担額を表示'});
