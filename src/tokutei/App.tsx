@@ -11,8 +11,11 @@ import {SalesPage} from './components/SalesPage.tsx';
 import {SettingsPage} from './components/SettingsPage.tsx';
 import {ToastProvider} from './components/ui.tsx';
 import {applyJutaku, JUTAKU_KEY, readJutaku} from './jutaku.ts';
+import {estimateBook} from './print/estimateFiles.ts';
 import {PrintView} from './print/PrintView.tsx';
 import {writeSalesSummary} from './salesSummary.ts';
+import {shinseiForm} from './shinsei.ts';
+import {shinseiBook} from './shinseiFiles.ts';
 import {useNewVersion} from './update.ts';
 import {useStore} from './useStore.ts';
 
@@ -113,6 +116,28 @@ export default function App() {
       delete w.__taiyoTokuteiFlush;
     };
   }, [embed, store.flush]);
+
+  // 住宅改修の様邸の画面の「まとめて保存」：この様邸の案件の申請書・販売見積書の Excel を作って渡す（住宅改修の src/sasaoka/tokuteiLink.ts の tokuteiFiles。
+  // ユーザーの指示「住宅改修申請書・特定福祉用具申請書・住宅改修見積もり・特定福祉用具販売見積もりを一括で保存できる機能をつける」2026-10-26）。
+  // 様邸の案件ができてから置く（できる前に呼ばれて空を返さないように）。商品のない案件は何も作らない
+  const linkedSale = embed && jutaku && data ? [...data.sales].filter((x) => x.jutakuJob === jutaku).sort((a, b) => b.updatedAt - a.updatedAt)[0] : undefined;
+  useEffect(() => {
+    if (!linkedSale || !data) return;
+    type Book = {name: string; bytes: Uint8Array};
+    const w = window as Window & {__taiyoTokuteiFiles?: (kinds: string[]) => Promise<Book[]>};
+    const settings = data.settings;
+    w.__taiyoTokuteiFiles = async (kinds) => {
+      await store.flush();
+      if (linkedSale.items.length === 0) return [];
+      const out: Book[] = [];
+      if (kinds.includes('shinsei') && shinseiForm(linkedSale.insurer)) out.push(await shinseiBook(linkedSale, settings));
+      if (kinds.includes('quote')) out.push(await estimateBook(linkedSale, settings));
+      return out;
+    };
+    return () => {
+      delete w.__taiyoTokuteiFiles;
+    };
+  }, [linkedSale, data, store.flush]);
 
   const closePrint = useCallback(() => setPrintId(null), []);
 

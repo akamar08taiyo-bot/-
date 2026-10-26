@@ -285,8 +285,8 @@ export function SaleEditor({
 
       {onShinsei ? (
         // 申請書の画面：左に申請書の順の入れる所、右に申請書のプレビュー（大きく。画面の高さで止まり中だけ動く）。
-        // 入れる所は広めに（ユーザーの指示「福祉用具が必要な理由の入力欄が狭すぎる」2026-10-26。前は 30rem）
-        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,40rem)_minmax(0,1fr)]">
+        // 入れる所は広めに（ユーザーの指示「福祉用具が必要な理由の入力欄が狭すぎる」2026-10-26。前は 30rem。プレビューの方を大きいままにするため 36rem）
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,36rem)_minmax(0,1fr)]">
           <ShinseiInputs
             sale={sale}
             data={data}

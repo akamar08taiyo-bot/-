@@ -295,7 +295,7 @@ export function ShinseiInputs({
         )}
         {row(
           kouiki ? '居宅介護支援事業所' : '記載者（事業所・氏名）',
-          <div className="grid w-full gap-2 sm:grid-cols-[minmax(0,1fr)_11rem]">
+          <div className="grid w-full gap-2 sm:grid-cols-[minmax(0,1fr)_9rem]">
             <div className="grid min-w-0 gap-1">
               <TextInput value={sale.careOffice} onChange={(careOffice) => change({careOffice})} placeholder="居宅介護支援事業所" className="w-full" aria-label="居宅介護支援事業所" data-nav />
               <Suggest values={frequentValues(data.sales, (x) => x.careOffice)} current={sale.careOffice} onPick={(careOffice) => change({careOffice})} />

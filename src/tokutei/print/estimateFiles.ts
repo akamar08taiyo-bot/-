@@ -40,7 +40,12 @@ export function useEstimateTemplate(on: boolean): Files | null {
 
 /** 販売見積書（Excel）を保存する。名前は「御見積書_山田 花子様.xlsx」（印刷の PDF と同じ） */
 export async function saveEstimateBook(sale: Sale, s: Settings): Promise<string> {
-  const name = estimateFileName(sale);
-  downloadBlob(new Blob([fillEstimate(await openEstimateTemplate(), sale, s)], {type: XLSX_TYPE}), name);
+  const {name, bytes} = await estimateBook(sale, s);
+  downloadBlob(new Blob([bytes], {type: XLSX_TYPE}), name);
   return name;
+}
+
+/** 見積書（Excel）を作る（ファイル名と中身。住宅改修の「まとめて保存」にも渡す） */
+export async function estimateBook(sale: Sale, s: Settings): Promise<{name: string; bytes: Uint8Array}> {
+  return {name: estimateFileName(sale), bytes: fillEstimate(await openEstimateTemplate(), sale, s)};
 }

@@ -45,12 +45,16 @@ export function useTemplate(key: ShinseiKey | null): Files | null {
   return files && files.key === key ? files.files : null;
 }
 
-/** 申請書（Excel）を作って保存する。保存したファイル名を返す */
-export async function saveShinsei(sale: Sale, s: Settings): Promise<string> {
+/** 申請書（Excel）を作る（ファイル名と中身。住宅改修の「まとめて保存」にも渡す） */
+export async function shinseiBook(sale: Sale, s: Settings): Promise<{name: string; bytes: Uint8Array}> {
   const form = shinseiForm(sale.insurer);
   if (!form) throw new Error('この保険者の申請書の原本がまだありません');
-  const bytes = fillShinsei({...(await openTemplate(form.key))}, form, shinseiValues(sale, s));
-  const name = shinseiFileName(sale);
+  return {name: shinseiFileName(sale), bytes: fillShinsei({...(await openTemplate(form.key))}, form, shinseiValues(sale, s))};
+}
+
+/** 申請書（Excel）を作って保存する。保存したファイル名を返す */
+export async function saveShinsei(sale: Sale, s: Settings): Promise<string> {
+  const {name, bytes} = await shinseiBook(sale, s);
   downloadBlob(new Blob([bytes], {type: XLSX_TYPE}), name);
   return name;
 }
