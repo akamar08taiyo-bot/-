@@ -179,3 +179,15 @@ test('まだ入っていない所（プレビューの欄を薄い黄色に）�
   const noReason = sale({items: [item({id: 'a', name: '見本の杖', reason: ''})]});
   assert.deepEqual([...missingFields(shinseiValues(noReason, S), 'yukuhashi')], ['reason']);
 });
+
+test('プレビュー：見出しは自分の欄の中に出す（行橋市の完了写真の「被保険者番号」が左の氏名の欄＝式の欄にずれていた 2026-10-26）', () => {
+  for (const s of [sale(), sale({customer: '', insuredNo: ''})]) {
+    const pages = shinseiPreview(template('yukuhashi'), SHINSEI.yukuhashi, shinseiValues(s, S));
+    const photo = pages.find((p) => p.texts.some((t) => t.runs.map((r) => r.text).join('').includes('納品確認写真用紙')))!;
+    const at = (ref: string) => photo.texts.find((t) => t.ref === ref)!;
+    const label = at('C2');
+    const name = photo.fields.find((f) => f.field === 'customer' && f.ref === 'B2')!;
+    assert.ok(label.x >= name.x + name.w - 0.5, `被保険者番号の見出し（x=${label.x}）が氏名の欄（右の端 ${name.x + name.w}）にかぶる`);
+    assert.ok(Math.abs(label.x + label.w / 2 - (at('A2').x + at('A2').w + name.w + label.w / 2)) < 1); // 自分の欄のまん中
+  }
+});

@@ -840,7 +840,10 @@ function buildPage<F extends string>(
     const runs = display(cell, xf).filter((run) => run.text !== '');
     if (runs.length) textAt.set(key, {runs, xf, number: cell.t === 'n' && /<v>/.test(cell.inner)});
   }
-  const empty = (r: number, c: number) => !textAt.has(`${r},${c}`) && !mergeAt.has(`${r},${c}`);
+  // はみ出せる「空いた欄」：字も式もない欄（式の答えが空・0 で見えない欄にも、Excel ははみ出さない。前は行橋市の完了写真で、
+  // 被保険者番号の見出しが左の氏名の欄（式）にずれて出た 2026-10-26）
+  const filled = new Set([...cells].filter(([, cell]) => /<f\b|<v>|<is>/.test(cell.inner)).map(([key]) => key));
+  const empty = (r: number, c: number) => !textAt.has(`${r},${c}`) && !filled.has(`${r},${c}`) && !mergeAt.has(`${r},${c}`);
   const texts: PvText[] = [];
   for (const [key, {runs, xf, number}] of textAt) {
     const [r, c] = key.split(',').map(Number);
@@ -863,6 +866,12 @@ function buildPage<F extends string>(
         while (right < c2 && empty(r, right + 1) && xfs[styleAt(r, right + 1)]?.align === 'centerContinuous') right++;
       }
       rect = {x: xs[left], y: rect.y, w: xs[right + 1] - xs[left], h: rect.h};
+      // 中央ぞろえは、もとの欄のまん中のまま左右に同じだけ広げる（となりの欄の幅がちがっても、字がどちらかへずれない）
+      if (h === 'center' && (left < c || right > c)) {
+        const mid = (xs[c] + xs[c + 1]) / 2;
+        const half = Math.min(mid - xs[left], xs[right + 1] - mid);
+        rect = {x: mid - half, y: rect.y, w: half * 2, h: rect.h};
+      }
     }
     const align: PvText['align'] = h === 'center' || h === 'centerContinuous' ? 'center' : h === 'right' ? 'right' : h === 'distributed' || h === 'justify' ? 'distributed' : 'left';
     const valign: PvText['valign'] = xf.valign === 'top' ? 'top' : xf.valign === 'bottom' ? 'bottom' : 'center';
