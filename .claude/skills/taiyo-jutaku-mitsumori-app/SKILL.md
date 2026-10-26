@@ -189,7 +189,8 @@ description: 太陽シルバーサービス行橋営業所の業務アプリ「�
   特定福祉用具は `taiyo-tokutei-sales-v1` に営業所 office を足した）に書くだけ。受注残（リポジトリ `solar-silver-progress-app`、main が本番。index.html の taiyo-link-begin〜end）が、
   開いたときに読んで「申請書・見積書作成から届いています」を出し、「受注残に入れる」で Firestore の orders に足す（taiyoLink・taiyoSynced。金額などが変わったら、手で直していない項目だけ直す。売上済・担当・月はそのまま。消さない）。
   受注残のテストはにせの Firestore（`test/harness/`。本番の Firebase につながない）：`sh test/harness/setup.sh /tmp/progress-harness` → `node test/e2e-taiyo-link.mjs /tmp/progress-harness <出力>`、`node --test test/taiyoLink.test.mjs`。
-  受注残は全部の営業所が使うので、main（本番）に入れるのはユーザーの「公開して」のあと。作業のブランチは `claude/taiyo-link`。まとめの形を変えるときは受注残の taiyo-link も直す。
+  受注残は全部の営業所が使うので、main（本番）に入れるのはユーザーの「公開して」のあと（2026-10-26 にユーザーの「公開して」で main bc41364 に入れて公開。ポータルのタイルの文は fb5a6a1）。
+  まとめの形を変えるときは受注残の taiyo-link も直す。受注残の index.html は CDN（esm.sh・gstatic・unpkg・Tailwind）から読む1ファイル（ビルドなし）。
   （答えをもらったもの 2026-10-25：① Windows の拡大率は 125% にできる。② 給付情報の「生保」は1割負担でよい。④ 電話のハイフンは今のまま。⑤ 406470 は豊前市・上毛町・吉富町も同じ。
   ③ ケアマネジャー＝理由書の作成者・事業所＝理由書の作成事業所・居宅の Tel＝作成者の連絡先、は 2026-10-23 に決まり）
 - 仕切りの取り込み（2026-10-21）：ユーザーの3つのダミー（形を読むためだけ。取り込まない・リポジトリに入れない）と矢崎の PDF を調べた。
