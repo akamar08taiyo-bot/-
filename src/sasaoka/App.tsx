@@ -316,11 +316,16 @@ export default function App({start}: {start: MainTab}) {
     setEstimateId(id);
     setJobView(j && !j.estDate && !hasEstimateRows(j) ? 'shinsei' : 'estimate');
   };
-  // タブのすぐ右に「📦 まとめて保存」（どのタブからも同じ。BatchSave.tsx）。保存の前に、開いている特定福祉用具のタブの変更と、この様邸の変更を保存させる
+  // タブの段の右に「📦 まとめて保存」（どのタブからも同じ。BatchSave.tsx）。保存の前に、開いている特定福祉用具のタブの変更と、この様邸の変更を保存させる。
+  // 段の最後（order-last）：タブのすぐ右は「🪪 介護保険証・介護ソフトの画面」のまま（ユーザーの指示「上のタブの近辺に」。前はまとめて保存がその間に入っていた）
   const tabs = (
     <>
       <JobTabs view={jobView} onView={(v) => leaveTokutei(() => setJobView(v))} />
-      {estimateJob && <BatchSave job={estimateJob} s={data.settings} onBeforeSave={() => Promise.all([flushTokutei(), store.flush()])} />}
+      {estimateJob && (
+        <div className="order-last">
+          <BatchSave job={estimateJob} s={data.settings} onBeforeSave={() => Promise.all([flushTokutei(), store.flush()])} />
+        </div>
+      )}
     </>
   );
   // 見積書と請求書（仕切り計算表）を行き来する（同じ様邸を開く）
