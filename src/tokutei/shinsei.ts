@@ -19,6 +19,7 @@ import {
   emOf,
   finishWorkbook,
   fitCell,
+  fitPrintPage,
   hideZeros,
   LINE_K,
   sameStyle,
@@ -480,6 +481,8 @@ export function fillShinseiFiles(files: Files, form: ShinseiForm, v: ShinseiValu
   for (const w of sheets) for (const ref of w.fitWidth ?? []) fitCell(files, w.sheet, ref, true);
   for (const w of sheets) for (const ref of w.oneLine ?? []) fitCell(files, w.sheet, ref, false, true);
   for (const w of sheets) if (w.marks?.length) drawMarks(files, w.sheet, w.marks);
+  // 4. 書いたシートが A4 から少しはみ出すなら、印刷を「1ページに合わせる」に（Excel で印刷して2〜4枚に分かれないように）
+  for (const w of sheets) fitPrintPage(files, w.sheet);
   dropCalcChain(files);
 }
 

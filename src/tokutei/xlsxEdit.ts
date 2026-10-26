@@ -680,3 +680,57 @@ export function finishWorkbook(files: Files): Uint8Array {
   files['[Content_Types].xml'] = strToU8(ct.replace('spreadsheetml.template.main+xml', 'spreadsheetml.sheet.main+xml'));
   return zipSync(files, {level: 6});
 }
+
+// ---------------------------------------------------------------- 印刷で1枚に入れる
+
+const A4_IN = {w: 210 / 25.4, h: 297 / 25.4};
+
+/**
+ * シートの印刷の大きさ：印刷の範囲（Print_Area。なければシートの使っている範囲）が、今の倍率で A4 の余白の内側の何倍か（幅・高さの大きい方）。
+ * 1 より大きいと Excel で印刷したときに2枚以上に分かれる。手動の改ページ・「ページに合わせる」があれば null（原本の決めたとおりに印刷する）
+ */
+export function printOverflow(files: Files, sheet: string): number | null {
+  const path = sheetPath(files, sheet);
+  const xml = strFromU8(files[path]);
+  if (/<pageSetUpPr\b[^>]*fitToPage="(?:1|true)"/.test(xml) || /<(?:rowBreaks|colBreaks)\b/.test(xml)) return null;
+  const wb = strFromU8(files['xl/workbook.xml']);
+  const index = [...wb.matchAll(/<sheet\b[^>]*>/g)].findIndex((m) => unesc(attrOf(m[0], 'name') ?? '') === sheet);
+  const area = new RegExp(`<definedName\\b[^>]*name="_xlnm\\.Print_Area"[^>]*localSheetId="${index}"[^>]*>([^<]*)</definedName>`).exec(wb)?.[1] ?? '';
+  const range = /\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)(?!.*\$?[A-Z]+\$?\d+:)/.exec(unesc(area)) ?? /<dimension ref="([A-Z]+)(\d+):([A-Z]+)(\d+)"/.exec(xml);
+  if (!range) return null;
+  const [c1, r1, c2, r2] = [colNum(range[1]), Number(range[2]), colNum(range[3]), Number(range[4])];
+  const lay = sheetLayout(xml);
+  let w = 0;
+  for (let c = c1; c <= c2; c++) w += lay.colW(c);
+  let h = 0;
+  for (let r = r1; r <= r2; r++) h += lay.rowH(r);
+  const margins = /<pageMargins\b[^>]*>/.exec(xml)?.[0] ?? '';
+  const m = (k: string, d: number) => numOf(attrOf(margins, k), d);
+  const setup = /<pageSetup\b[^>]*>/.exec(xml)?.[0] ?? '';
+  const landscape = attrOf(setup, 'orientation') === 'landscape';
+  const paper = landscape ? {w: A4_IN.h, h: A4_IN.w} : A4_IN;
+  const scale = numOf(attrOf(setup, 'scale'), 100) / 100;
+  const availW = (paper.w - m('left', 0.7) - m('right', 0.7)) * 96;
+  const availH = (paper.h - m('top', 0.75) - m('bottom', 0.75)) * 96;
+  return Math.max((w * scale) / availW, (h * scale) / availH);
+}
+
+/**
+ * 印刷で少しだけはみ出すシート（原本のままだと Excel で印刷すると2〜4枚に分かれる。広域連合の様式第8号は A4 の縦にも横にも少しはみ出していた 2026-10-26）は、
+ * 「1ページに合わせる」にする（縮めるのは入りきらないときだけ。大きくはしない）。原本が2枚にするつもりらしい大きくはみ出すシート（maxOver より大きい）・
+ * 手動の改ページのあるシートはそのまま。変えたら true
+ */
+export function fitPrintPage(files: Files, sheet: string, maxOver = 1.35): boolean {
+  const over = printOverflow(files, sheet);
+  if (over === null || over <= 1.001 || over > maxOver) return false;
+  const path = sheetPath(files, sheet);
+  let xml = strFromU8(files[path]);
+  if (/<pageSetUpPr\b/.test(xml)) xml = xml.replace(/<pageSetUpPr\b([^>]*?)\s*(\/?)>/, (_, attrs: string, close: string) => `<pageSetUpPr${attrs.replace(/\sfitToPage="[^"]*"/, '')} fitToPage="1"${close}>`);
+  else if (/<sheetPr\b[^>]*\/>/.test(xml)) xml = xml.replace(/<sheetPr\b([^>]*?)\s*\/>/, '<sheetPr$1><pageSetUpPr fitToPage="1"/></sheetPr>');
+  else if (/<sheetPr\b/.test(xml)) xml = xml.replace('</sheetPr>', '<pageSetUpPr fitToPage="1"/></sheetPr>');
+  else xml = xml.replace(/(<worksheet\b[^>]*>)/, '$1<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>');
+  xml = xml.replace(/<pageSetup\b[^>]*?\/?>/, (tag) => tag.replace(/\s(?:fitToWidth|fitToHeight)="[^"]*"/g, '').replace(/<pageSetup\b/, '<pageSetup fitToWidth="1" fitToHeight="1"'));
+  if (!/<pageSetup\b/.test(xml)) xml = xml.replace(/(<pageMargins\b[^>]*\/>)/, '$1<pageSetup paperSize="9" fitToWidth="1" fitToHeight="1"/>');
+  files[path] = strToU8(xml);
+  return true;
+}

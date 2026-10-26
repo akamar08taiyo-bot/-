@@ -6,7 +6,7 @@ import {defaultSettings} from '../../src/tokutei/defaults.ts';
 import {carePlanOf, corpShort, excelDate, fillShinsei, KOUIKI_SHEETS, padInsuredNo, reasonText, SHINSEI, shinseiChecks, shinseiFileName, shinseiValues} from '../../src/tokutei/shinsei.ts';
 import type {ShinseiKey} from '../../src/tokutei/shinsei.ts';
 import type {Sale, SaleItem} from '../../src/tokutei/types.ts';
-import {cellBox, cellFormula, ellipseCount, emOf, readCell, sheetPaths} from '../../src/tokutei/xlsxEdit.ts';
+import {cellBox, cellFormula, ellipseCount, emOf, printOverflow, readCell, sheetPaths} from '../../src/tokutei/xlsxEdit.ts';
 import type {Files} from '../../src/tokutei/xlsxEdit.ts';
 
 // 見本の案件（架空の方。本当のお客様の情報は使わない）
@@ -339,4 +339,20 @@ test('会社の名前は㈱に短く・名前の欄は1つの名前が2行に折
     }
     assert.match(readCell(f, sheet, refs[1]), /パナソニックエイジフリー㈱\n太陽シルバーサービス㈱/);
   }
+});
+
+test('印刷：A4 から少しはみ出す原本のシート（広域連合の様式第8号・償還払い用・写真貼付用紙）は「1ページに合わせる」にする。入るシートはそのまま', () => {
+  for (const pay of ['受領委任払い', '償還払い'] as const) {
+    const f = fill('kouiki', {payMethod: pay});
+    for (const sh of [pay === '償還払い' ? KOUIKI_SHEETS.shokan : KOUIKI_SHEETS.juryo, KOUIKI_SHEETS.photo]) {
+      const xml = strFromU8(f[sheetPaths(f).get(sh)!]);
+      assert.match(xml, /<pageSetUpPr\b[^>]*fitToPage="1"/, sh);
+      assert.match(xml, /<pageSetup\b[^>]*fitToWidth="1"[^>]*fitToHeight="1"/, sh);
+      assert.equal(printOverflow(f, sh), null); // もう「ページに合わせる」
+    }
+  }
+  const y = fill('yukuhashi');
+  const pre = strFromU8(y[sheetPaths(y).get('用具・受領委任払')!]);
+  assert.doesNotMatch(pre, /fitToPage="1"/); // 原本の倍率で入る
+  assert.ok((printOverflow(y, '用具・受領委任払') ?? 9) < 1);
 });
