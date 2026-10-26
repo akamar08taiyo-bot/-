@@ -151,10 +151,10 @@ try {
   await page.getByLabel('住所').fill('行橋市大字流末1327番地');
   assert.equal(await page.getByLabel('郵便番号').inputValue(), '824-0043');
   await page.getByLabel('電話').fill('0930-00-0000');
-  // 文例はプルダウン（種目ごとに5つ・約100字。ユーザーの指示「文例は、各種目…ごとに５種類ぐらい作成する。１００文字程度」2026-10-26）
+  // 文例はプルダウン（用具ごとの見出しに10ずつ・約100字。ユーザーの指示「シャワーチェアで10個、浴槽台で10個…」2026-10-26）
   const examples = page.getByLabel('シャワーベンチ FSフィットが必要な理由の文例');
-  assert.equal(await examples.locator('optgroup[label="文例"] option').count(), 5);
-  await examples.selectOption(await examples.locator('optgroup[label="文例"] option').first().getAttribute('value'));
+  assert.deepEqual(await examples.locator('optgroup').evaluateAll((l) => l.map((g) => `${g.label}${g.children.length}`)), ['シャワーチェア10']);
+  await examples.selectOption(await examples.locator('optgroup[label="シャワーチェア"] option').first().getAttribute('value'));
   await page.getByLabel('浴槽台 ユクリアが必要な理由', {exact: true}).fill('浴槽内での立ち座りが困難なため。');
   await page.getByLabel('居宅介護支援事業所').fill('見本居宅介護支援事業所');
   await page.getByLabel('ケアマネジャー').fill('見本 太郎');
@@ -520,7 +520,7 @@ try {
   await page.screenshot({path: `${out}/10-add-item.png`});
   await shinseiForm.getByRole('button', {name: '商品を消す', exact: true}).click();
   assert.equal(await shinseiForm.locator('[data-item]').count(), 1);
-  assert.equal(await shinseiForm.getByLabel('見本の多点杖 ワイドが必要な理由の文例').locator('optgroup[label="文例"] option').count(), 5); // 商品名から多点杖の文例
+  assert.equal(await shinseiForm.getByLabel('見本の多点杖 ワイドが必要な理由の文例').locator('optgroup[label="多点杖"] option').count(), 5); // 商品名から多点杖の文例
   const dialogs = [];
   page.removeAllListeners('dialog');
   page.on('dialog', (d) => {
