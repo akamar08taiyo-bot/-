@@ -87,9 +87,11 @@ test('被保険者番号は10けた（足りない左は0）', () => {
   assert.equal(padInsuredNo(''), '');
 });
 
-test('理由：用具が2つ以上なら用具ごとに頭に名前を付ける', () => {
+test('理由：用具ごとに1行。頭に種目の名前は付けない（「固定用スロープという文言は不要」2026-10-26）。同じ文は1回', () => {
   const v = shinseiValues(sale(), S);
-  assert.equal(reasonText(v), '入浴用いす：浴室の床からの立ち座りが困難なため。\n浴槽用手すり：浴槽の出入りでふらつくため。');
+  assert.equal(reasonText(v), '浴室の床からの立ち座りが困難なため。\n浴槽の出入りでふらつくため。');
+  const same = shinseiValues(sale({items: sale().items.map((i) => ({...i, reason: '屋内の段差でつまずくため。'}))}), S);
+  assert.equal(reasonText(same), '屋内の段差でつまずくため。');
   const one = shinseiValues(sale({items: [sale().items[0]]}), S);
   assert.equal(reasonText(one), '浴室の床からの立ち座りが困難なため。');
 });
@@ -99,7 +101,7 @@ test('申請書に書く値：福祉用具名・製造事業者名及び販売�
   assert.equal(v.items[0].label, '入浴補助用具\nシャワーチェア 見本A');
   assert.equal(v.items[0].makerSeller, '見本工業\n太陽シルバーサービス㈱');
   assert.equal(v.items[0].total, 28160); // 32,000×0.8＝25,600 ＋ 税 2,560
-  assert.equal(v.items[1].label, '入浴補助用具\n浴槽手すり 見本B（2個）');
+  assert.equal(v.items[1].label, '入浴補助用具\n浴槽手すり 見本B'); // 数量（「（2個）」）は書かない（「2台　などの文言は不要」2026-10-26）
   assert.equal(v.items[1].total, 27808); // 12,640×2＝25,280 ＋ 税 2,528
   assert.equal(v.benefit, 55968 - Math.ceil(55968 / 10));
   assert.equal(v.recorder, '見本居宅介護支援事業所　見本 太郎');
@@ -124,7 +126,7 @@ test('行橋市：事前申請書・委任状・完了写真に書く', () => {
   assert.equal(readCell(f, sh, 'V15'), '28160');
   assert.equal(readCell(f, sh, 'AB15'), '令和8年10月30日');
   assert.equal(readCell(f, sh, 'AB17'), '　　　年　　月　　日'); // 使わない行は原本のまま
-  assert.match(readCell(f, sh, 'E18'), /^入浴用いす：/);
+  assert.match(readCell(f, sh, 'E18'), /^浴室の床からの立ち座りが困難なため。/);
   assert.equal(readCell(f, sh, 'L20'), '見本居宅介護支援事業所　見本 太郎');
   assert.equal(readCell(f, sh, 'C26'), '令和8年10月22日');
   assert.match(readCell(f, sh, 'G29'), /久保/); // 申請者（会社）は原本のまま
@@ -155,7 +157,7 @@ test('苅田町：支給申請書は事前申請書を参照する式。丸は�
   assert.equal(readCell(f, pre, 'K30'), '0930-00-0000'); // 申請者（本人）の電話
   assert.equal(readCell(f, pre, 'K29'), '見本 花子'); // 申請者の氏名は式（=F5）
   assert.equal(readCell(f, post, 'F5'), '見本 花子');
-  assert.equal(readCell(f, post, 'A16'), '入浴補助用具\n浴槽手すり 見本B（2個）');
+  assert.equal(readCell(f, post, 'A16'), '入浴補助用具\n浴槽手すり 見本B');
   assert.equal(readCell(f, post, 'AB15'), '令和8年10月30日'); // 購入日＝納品日
   assert.equal(readCell(f, post, 'C26'), '令和8年11月2日'); // 支給申請日
   assert.equal(ellipseCount(f, pre), 3);
@@ -174,7 +176,7 @@ test('みやこ町：承認申請書・支給申請書・写真の用紙（1枚�
   assert.equal(readCell(f, a, 'Y12'), '00001-000001');
   assert.equal(readCell(f, a, 'R14'), '27808');
   // 届出の行が1行目、理由、署名の空いた行
-  assert.equal(readCell(f, a, 'I20'), '（居宅サービス計画の届出　　有・無）\n入浴用いす：浴室の床からの立ち座りが困難なため。\n浴槽用手すり：浴槽の出入りでふらつくため。\n');
+  assert.equal(readCell(f, a, 'I20'), '（居宅サービス計画の届出　　有・無）\n浴室の床からの立ち座りが困難なため。\n浴槽の出入りでふらつくため。\n');
   assert.equal(readCell(f, a, 'B12'), '入浴補助用具\nシャワーチェア 見本A'); // 種目と商品名を1行ずつ（名前は折り返さない大きさに）
   assert.deepEqual(['D30', 'F30', 'I30', 'L30'].map((r) => readCell(f, a, r)), ['令和', '8', '10', '22']);
   assert.equal(readCell(f, a, 'I34'), '見本 花子');
@@ -210,7 +212,7 @@ test('広域連合：支払方法が受領委任払いなら受領委任払用�
   assert.equal(readCell(f, sh, 'Y14'), '令和8年10月30日'); // 購入日＝納品日
   assert.equal(readCell(f, sh, 'R18'), String(28160 + 27808)); // 合計
   assert.equal(readCell(f, sh, 'R16'), ''); // 使わない行は空のまま
-  assert.match(readCell(f, sh, 'J20'), /^入浴用いす：浴室の床からの立ち座りが困難なため。\n浴槽用手すり：/);
+  assert.match(readCell(f, sh, 'J20'), /^浴室の床からの立ち座りが困難なため。\n浴槽の出入りでふらつくため。/);
   assert.equal(readCell(f, sh, 'J21'), ' 居宅サービス計画の届出　　　有　・　無\n 居宅の事業所名　見本居宅介護支援事業所');
   // 申請日（事前の申請のない様式なので、案件の申請日）
   assert.deepEqual(['C27', 'F27', 'I27', 'L27'].map((r) => readCell(f, sh, r)), ['令和', '8', '10', '22']);
@@ -240,11 +242,11 @@ test('広域連合：償還払いなら償還払い用（申請者は本人）�
   assert.equal(readCell(f, sh, 'I8'), '昭和15年3月15日生'); // 元号の字がない様式なので元号を書く
   assert.equal(readCell(f, sh, 'I10'), '〒829-0301');
   assert.equal(readCell(f, sh, 'I11'), '築上郡築上町大字椎田1-2-3');
-  assert.equal(readCell(f, sh, 'B16'), '入浴補助用具\n浴槽手すり 見本B（2個）');
+  assert.equal(readCell(f, sh, 'B16'), '入浴補助用具\n浴槽手すり 見本B');
   assert.equal(readCell(f, sh, 'R14'), '28160');
   assert.equal(readCell(f, sh, 'Y16'), '令和8年10月30日');
   assert.equal(readCell(f, sh, 'R20'), String(28160 + 27808));
-  assert.match(readCell(f, sh, 'I22'), /^入浴用いす：/);
+  assert.match(readCell(f, sh, 'I22'), /^浴室の床からの立ち座りが困難なため。/);
   assert.match(readCell(f, sh, 'I23'), /居宅の事業所名　見本居宅介護支援事業所$/);
   assert.deepEqual(['H30', 'J30', 'M30', 'P30'].map((r) => readCell(f, sh, r)), ['令和', '8', '10', '22']);
   assert.deepEqual(['J32', 'J34', 'Y34'].map((r) => readCell(f, sh, r)), ['築上郡築上町大字椎田1-2-3', '見本 花子', '0930-00-0000']); // 申請者（本人）

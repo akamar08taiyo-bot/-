@@ -84,7 +84,7 @@ const SH = '見積書';
 
 test('販売見積書：宛名・見積番号・見積日・営業所・件名・明細（品名・数量・単位・単価・金額の式・税率）', () => {
   const f = unzipSync(fillEstimate(template(), sale(), S));
-  assert.equal(readCell(f, SH, 'A6'), '見本 花子　様');
+  assert.equal(readCell(f, SH, 'A6'), '　見本 花子　様');
   assert.equal(readCell(f, SH, 'I4'), '№　20261022-1');
   assert.equal(readCell(f, SH, 'I5'), '46317'); // 2026-10-22（Excel の日付の数）
   // 会社の欄（ユーザーの指示「会社名や社長名などの部分は、左寄せを統一」「会社住所の下に、電話番号とFAX番号」「担当名をいれる」）：1行ずつ・式ではなく値
@@ -168,8 +168,11 @@ test('販売見積書の原本：所長の印影の画像・作った人・パ�
   // 作った人・コメントを書いた人（パソコンの名前）も消した
   assert.match(strFromU8(t['docProps/core.xml']), /<dc:creator><\/dc:creator><cp:lastModifiedBy><\/cp:lastModifiedBy>/);
   assert.ok(!t['xl/comments1.xml']); // 「リストから営業所を選択してください」のメモも消した（営業所の一覧から選ぶ式をやめたので。2026-10-26）
-  assert.equal(estimateFileName(sale()), '御見積書_見本 花子様.xlsx');
-  assert.equal(estimateFileName(sale({customer: ''})), '御見積書_（お客様名未入力）.xlsx');
+  // ユーザーの指示「保存のときの名前は、木村 米子様 販売見積書 とする」2026-10-26（名前のすき間は全角でも半角1つ）
+  assert.equal(estimateFileName(sale()), '見本 花子様 販売見積書.xlsx');
+  assert.equal(estimateFileName(sale({customer: '見本　花子'})), '見本 花子様 販売見積書.xlsx');
+  assert.equal(estimateFileName(sale({customer: '見本花子 様'})), '見本花子様 販売見積書.xlsx');
+  assert.equal(estimateFileName(sale({customer: ''})), '販売見積書.xlsx');
   assert.equal(ESTIMATE_ROWS.length, 16); // ユーザーの指示「見積もりの行数は4行ぐらい減らしていい」
   assert.equal(estimateOverflow(sale({items: many(22)})), 0); // 3ページまで入る
   assert.equal(estimateOverflow(sale({items: many(ESTIMATE_CAPACITY + 2)})), 2);
@@ -199,7 +202,7 @@ test('2ページ（25点）：つづきに題名・番号・日付・宛名と�
   assert.equal(readCell(f, SH, `D${top}`), '御　見　積　書');
   assert.equal(readCell(f, SH, `I${top + 3}`), '№　20261022-1');
   assert.equal(readCell(f, SH, `I${top + 4}`), '46317');
-  assert.equal(readCell(f, SH, `A${top + 5}`), '見本 花子　様');
+  assert.equal(readCell(f, SH, `A${top + 5}`), '　見本 花子　様');
   assert.equal(readCell(f, SH, `A${head}`), '品名');
   assert.equal(readCell(f, SH, 'A4'), '1／2');
   assert.equal(readCell(f, SH, `A${top + 3}`), '2／2（明細のつづき）');

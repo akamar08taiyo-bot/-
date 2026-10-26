@@ -1,9 +1,8 @@
 import {useEffect, useMemo, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {ShinseiPages} from '../components/ShinseiPreview.tsx';
-import {estimatePreview} from '../estimateBook.ts';
+import {estimateBaseName, estimatePreview} from '../estimateBook.ts';
 import type {EstimateField} from '../estimateBook.ts';
-import {customerLabel} from '../sales.ts';
 import type {PvPage, ShinseiField} from '../shinseiPreview.ts';
 import type {Sale, Settings} from '../types.ts';
 import {saveEstimateBook, useEstimateTemplate} from './estimateFiles.ts';
@@ -33,9 +32,9 @@ export function PrintView({sale, settings, onClose}: {sale: Sale; settings: Sett
   const template = useEstimateTemplate(true);
   const pages = useMemo(() => (template ? estimatePreview(template, sale, settings) : null), [template, sale, settings]);
   useEffect(() => {
-    // PDF に保存するときのファイル名の元になる（「御見積書_山田 花子様」）
+    // PDF に保存するときのファイル名の元になる（「山田 花子様 販売見積書」。Excel と同じ）
     const before = document.title;
-    document.title = `御見積書_${customerLabel(sale).replace(/\s+様$/, '様')}`;
+    document.title = estimateBaseName(sale);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
@@ -95,14 +94,40 @@ export function ShinseiPrintView({pages, title, onClose, onExcel}: {pages: PvPag
       window.removeEventListener('keydown', onKey);
     };
   }, [title, onClose]);
+  // 印刷するページ：初めは1枚目（事前申請書）だけ（ユーザーの指示「申請書印刷の場合は、１枚目のみ印刷、デフォルトは」2026-10-26）。
+  // ほかのページもチェックで足せる。外したページは画面では薄く、印刷には出さない
+  const [picked, setPicked] = useState<Set<number>>(() => new Set([0]));
+  const last = Math.max(-1, ...picked);
+  const toggle = (i: number) =>
+    setPicked((c) => {
+      const next = new Set(c);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
   // 案件の画面（印刷しない main の中）から開くので、body の直下に出す（main ごと印刷から外れないように）
   return createPortal(
     <div className="print-overlay">
       <div className="print-toolbar">
         <span className="font-bold">申請書（A4縦）</span>
-        <button type="button" onClick={() => window.print()} className="rounded-md bg-sky-500 px-4 py-2 text-sm font-bold text-white shadow hover:bg-sky-600">
+        <button
+          type="button"
+          onClick={() => window.print()}
+          disabled={picked.size === 0}
+          className="rounded-md bg-sky-500 px-4 py-2 text-sm font-bold text-white shadow hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-40"
+        >
           🖨 印刷する
         </button>
+        {pages.length > 1 && (
+          <span role="group" aria-label="印刷するページ" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            {pages.map((p, i) => (
+              <label key={i} className="flex items-center gap-1" title={p.sheet}>
+                <input type="checkbox" checked={picked.has(i)} onChange={() => toggle(i)} className="h-4 w-4" />
+                {i + 1}枚目
+              </label>
+            ))}
+          </span>
+        )}
         <button type="button" onClick={onExcel} className="rounded-md bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-800 shadow hover:bg-emerald-100">
           📗 Excelで保存
         </button>
@@ -112,7 +137,7 @@ export function ShinseiPrintView({pages, title, onClose, onExcel}: {pages: PvPag
       </div>
       <div className="print-root" style={{zoom}}>
         {pages.map((p, i) => (
-          <div key={i} className="est-sheet" aria-label={`申請書の印刷（${i + 1}ページ目）`}>
+          <div key={i} className={`est-sheet ${picked.has(i) ? '' : 'est-skip'} ${i === last ? 'est-last' : ''}`} aria-label={`申請書の印刷（${i + 1}ページ目）`}>
             <ShinseiPages pages={[p]} missing={NO_FIELDS} active={null} label={() => ''} onOpen={() => undefined} title="申請書" print fixedScale={Math.min(INNER.w / (p.width + 36), INNER.h / (p.height + 36))} />
           </div>
         ))}

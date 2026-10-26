@@ -46,6 +46,11 @@ body {
   overflow: hidden;
 }
 
+/* 申請書の印刷で、印刷するページから外したページ（画面では薄く、印刷には出さない） */
+.est-skip {
+  opacity: 0.35;
+}
+
 /* 2・3ページ目（明細のつづき）。1ページずつ紙に */
 .est-sheet + .est-sheet {
   margin-top: 8mm;
@@ -62,6 +67,11 @@ body {
     background: #fff !important;
   }
   .no-print {
+    display: none !important;
+  }
+  /* 申請書の印刷は body の直下に出す（createPortal）ので、うしろのアプリの画面（min-h-screen の枠）を紙に出さない。
+     出すと1枚目が白紙になっていた（2026-10-26 のデバッグで見つけた） */
+  body:has(> .print-overlay) > :not(.print-overlay) {
     display: none !important;
   }
   .print-overlay {
@@ -82,9 +92,20 @@ body {
     box-shadow: none;
     break-after: page;
   }
+  /* 地の色（題名・見出しの水色など）も、画面のプレビューのとおりに印刷する（ブラウザはふつう地の色を印刷しない。
+     ユーザーの指示「印刷するとき、カラーになっていない　プレビュー通りの印刷にする」2026-10-26） */
+  .est-sheet,
+  .est-sheet * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 
-  .est-sheet:last-child {
+  .est-sheet:last-child,
+  .est-sheet.est-last {
     break-after: auto;
+  }
+  .est-sheet.est-skip {
+    display: none !important;
   }
 
   .est-sheet + .est-sheet {

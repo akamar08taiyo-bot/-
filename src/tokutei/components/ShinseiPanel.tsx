@@ -30,13 +30,14 @@ export function ShinseiPanel({sale, settings, onPrint}: {sale: Sale; settings: S
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
       <h3 className="mb-2 font-bold text-teal-800">📄 申請書（{form.title}）</h3>
-      {/* Excel の横に印刷（ユーザーの指示「申請書をEXCEL保存の横に、印刷ボタンを設置する」2026-10-26） */}
-      <div className={`grid gap-2 ${onPrint ? 'sm:grid-cols-[1fr_auto]' : ''}`}>
-        <Btn color="excel" className="w-full" onClick={make} disabled={busy}>
+      {/* Excel の横に印刷（ユーザーの指示「申請書をEXCEL保存の横に、印刷ボタンを設置する」2026-10-26）。2つは同じ大きさで、まん中にそろえる
+          （「申請書をつくると、印刷ボタンは統一の大きさで中央揃え」2026-10-26）。狭い画面は1つずつ横いっぱい */}
+      <div className="flex flex-wrap justify-center gap-2">
+        <Btn color="excel" className="w-full sm:w-60" onClick={make} disabled={busy}>
           {busy ? '作っています…' : '📄 申請書（Excel）を作る'}
         </Btn>
         {onPrint && (
-          <Btn color="sky" onClick={onPrint}>
+          <Btn color="sky" className="w-full sm:w-60" onClick={onPrint}>
             🖨 印刷
           </Btn>
         )}

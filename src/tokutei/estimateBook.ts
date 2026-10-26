@@ -154,7 +154,8 @@ export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
   const put = (ref: string, v: CellValue) => {
     xml = setCell(xml, ref, v);
   };
-  put('A6', `${customerLabel(sale).replace(/\s*様$/, '')}　様`);
+  // 宛名は左に詰めず、全角のすき間1つあける（ユーザーの指示「名前の部分は左に詰めるのではなく、スペース一つ分あける」2026-10-26）
+  put('A6', `　${customerLabel(sale).replace(/\s*様$/, '')}　様`);
   put('I4', `№　${sale.quoteNo.trim()}`);
   const serial = excelDate(sale.estimateDate);
   if (serial) put('I5', serial);
@@ -349,10 +350,15 @@ export function estimatePreview(template: Files, sale: Sale, s: Settings): PvPag
   return sheetPreviewPages(files, template, ESTIMATE_SHEET, links(sale), ranges);
 }
 
-/** 保存する名前：印刷の PDF と同じ「御見積書_山田 花子様.xlsx」（お客様名がなければ「御見積書_（お客様名未入力）.xlsx」） */
-export function estimateFileName(sale: Sale): string {
-  return `御見積書_${customerLabel(sale).replace(/\s+様$/, '様')}.xlsx`.replace(/[\\/:*?"<>|\r\n]/g, '_');
+/**
+ * 保存する名前（ユーザーの指示「保存のときの名前は、木村 米子様 販売見積書 とする」2026-10-26。前は「御見積書_木村　米子様」）：「山田 花子様 販売見積書」。
+ * 名前の中のすき間（全角・半角）は半角1つに。お客様名がなければ「販売見積書」。Excel は .xlsx を付け、印刷の PDF（PrintView の題名）も同じ名前
+ */
+export function estimateBaseName(sale: Pick<Sale, 'customer'>): string {
+  const name = sale.customer.replace(/\s+/g, ' ').trim().replace(/\s*様$/, '').replace(/[\\/:*?"<>|]/g, '_');
+  return name ? `${name}様 販売見積書` : '販売見積書';
 }
+export const estimateFileName = (sale: Pick<Sale, 'customer'>): string => `${estimateBaseName(sale)}.xlsx`;
 
 /** 3ページの明細の行より多い商品（見積書に入らない） */
 export const estimateOverflow = (sale: Sale) => Math.max(0, sale.items.length - ESTIMATE_CAPACITY);

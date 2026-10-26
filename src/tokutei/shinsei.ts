@@ -41,7 +41,6 @@ export type ShinseiItem = {
   total: number; // 購入金額（税込）
   tais: string;
   product: string; // 納品名（写真の用紙）：商品名 / 品番
-  short: string; // 理由の頭に付ける呼び名（細目・種目）
   reason: string;
 };
 
@@ -91,15 +90,14 @@ export function corpShort(name: string): string {
 export function shinseiValues(sale: Sale, s: Settings): ShinseiValues {
   const items = usedLines(sale, s).map((l): ShinseiItem => {
     const i = l.item;
-    const qty = i.qty !== 1 ? `（${Math.round(i.qty * 100) / 100}${i.unit || '個'}）` : '';
     return {
-      label: [docLabel(i.category, i.sub), `${i.name.trim()}${qty}`].filter(Boolean).join('\n'),
+      // 数量（「（2台）」）は書かない（ユーザーの指示「2台　などの文言は不要」2026-10-26。金額は数量分）
+      label: [docLabel(i.category, i.sub), i.name.trim()].filter(Boolean).join('\n'),
       // メーカー名と会社名は1行ずつ。株式会社・（株）は㈱にして短く（ユーザーの指示「会社名や商品名は、1行から増えないようにする　太陽シルバーサービス㈱などでも良い」2026-10-26）
       makerSeller: [corpShort(i.maker), corpShort(s.company)].filter(Boolean).join('\n'),
       total: l.total,
       tais: i.tais.trim(),
       product: [i.name.trim(), i.code.trim()].filter(Boolean).join(' / '),
-      short: i.sub || i.category || i.name.trim(),
       reason: i.reason.trim(),
     };
   });
@@ -126,11 +124,12 @@ export function shinseiValues(sale: Sale, s: Settings): ShinseiValues {
   };
 }
 
-/** 理由の欄の文：用具が2つ以上なら「入浴用いす：…」と用具ごとに1行（様式の注意書き「個々の用具ごとに記載」） */
+/**
+ * 理由の欄の文：用具ごとに1行（様式の注意書き「個々の用具ごとに記載」）。前は用具が2つ以上なら頭に「固定用スロープ：」と付けていたが、
+ * ユーザーの指示「固定用スロープという文言は不要」（2026-10-26）で付けない。同じ文の理由（同じ用具の大きさ違いなど）は1回だけ
+ */
 export function reasonText(v: Pick<ShinseiValues, 'items'>): string {
-  const withReason = v.items.filter((i) => i.reason);
-  if (v.items.length < 2) return withReason.map((i) => i.reason).join('\n');
-  return withReason.map((i) => `${i.short}：${i.reason}`).join('\n');
+  return [...new Set(v.items.map((i) => i.reason).filter(Boolean))].join('\n');
 }
 
 // ---------------------------------------------------------------- 様式ごとの欄

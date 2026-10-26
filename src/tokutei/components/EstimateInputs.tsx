@@ -19,7 +19,7 @@ import type {ZipHit} from '../zip.ts';
 import {CategorySelect} from './CategorySelect.tsx';
 import {MakerInput} from './MakerInput.tsx';
 import {ReasonField} from './ReasonField.tsx';
-import {Circles, EraBirthInput, InsuredNoInput, KanaInput} from './ShinseiParts.tsx';
+import {AddItemButton, Circles, EraBirthInput, InsuredNoInput, KanaInput} from './ShinseiParts.tsx';
 import {Suggest} from './Suggest.tsx';
 import {Btn, NumberInput, OptionalNumberInput, Stepper, TextInput} from './ui.tsx';
 
@@ -132,6 +132,17 @@ export function EstimateInputs({
               />
             ))}
             {t.lines.length === 0 && <ItemBlock key={draft.id} line={lineOf(draft, s)} no={1} makers={makers} change={(patch) => onAddItem({...draft, ...patch})} />}
+            {t.lines.length > 0 && (
+              <AddItemButton
+                next={t.lines.length + 1}
+                noun="商品"
+                onAdd={() => {
+                  const item = blankItem(s);
+                  onAddItem(item);
+                  return item.id;
+                }}
+              />
+            )}
             <div className="flex flex-wrap gap-2">
               <Btn color="teal" small onClick={onPickProduct}>
                 ★ 商品を選ぶ
@@ -139,11 +150,6 @@ export function EstimateInputs({
               <Btn color="purple" small onClick={onScan}>
                 📷 スクショから自動認識
               </Btn>
-              {t.lines.length > 0 && (
-                <Btn color="white" small onClick={() => onAddItem()}>
-                  ＋ 追加
-                </Btn>
-              )}
             </div>
           </div>,
           'items',
@@ -376,7 +382,7 @@ function ItemBlock({
   const auto = basisNote(l);
   const field = 'grid min-w-0 gap-0.5 text-[11px] font-bold text-slate-500';
   return (
-    <div className="rounded-lg border border-slate-300 bg-white shadow-sm">
+    <div data-item={i.id} className="rounded-lg border border-slate-300 bg-white shadow-sm">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-2 py-1.5">
         <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-teal-100 text-xs font-bold text-teal-800">{no}</span>
         {/* 種目 → 商品名の順（申請書のタブと同じ。ユーザーの指示「入力順は、種目、商品名の順」2026-10-26）。商品名は狭くならないよう、種目と同じ段の右いっぱい */}
@@ -388,7 +394,8 @@ function ItemBlock({
           </button>
         )}
       </div>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-2 px-3 py-2 sm:grid-cols-4">
+      {/* 広い画面の4列は、1列目（数量の −・＋）を中身の幅に（4等分だと ＋ が単位の欄の下に隠れていた。2026-10-26 のデバッグで見つけた） */}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2 px-3 py-2 sm:grid-cols-[auto_repeat(3,minmax(0,1fr))]">
         <label className={field}>
           数量
           <Stepper value={i.qty} onChange={(qty) => change({qty: Math.max(1, Math.round(qty))})} ariaLabel={`${i.name}の数量`} />

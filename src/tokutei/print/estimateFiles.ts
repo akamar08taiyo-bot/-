@@ -38,7 +38,7 @@ export function useEstimateTemplate(on: boolean): Files | null {
   return files;
 }
 
-/** 販売見積書（Excel）を保存する。名前は「御見積書_山田 花子様.xlsx」（印刷の PDF と同じ） */
+/** 販売見積書（Excel）を保存する。名前は「山田 花子様 販売見積書.xlsx」（印刷の PDF と同じ） */
 export async function saveEstimateBook(sale: Sale, s: Settings): Promise<string> {
   const {name, bytes} = await estimateBook(sale, s);
   downloadBlob(new Blob([bytes], {type: XLSX_TYPE}), name);

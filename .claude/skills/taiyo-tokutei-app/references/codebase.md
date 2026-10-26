@@ -48,7 +48,7 @@ React 19 + TypeScript + Vite（`vite.tokutei.config.ts` で1ファイルの `dis
 | `components/` | `SalesPage`（一覧）・`SaleEditor`（案件の画面。「📗 Excelで保存」）・`ShinseiPanel`（「📄 申請書（Excel）を作る」と未入力の欄）・`ShinseiPreview`（申請書のプレビューを描く。押すと入れる所へ）・`EstimateInputs`（販売見積書の入れる所。申請書の入れる所と同じ形・商品ごとの箱・備考（算出根拠）。2026-10-25）・`CustomerPicker`・`BirthInput`・`ReasonField`・`Suggest`・`ProductsPage`・`ProductPicker`・`CategorySelect`（種目を選ぶ）・`ImportDialog`・`SettingsPage`・`ui.tsx`（ボタンの色。Excel は `excel`＝薄い緑） |
 | `estimateBook.ts` | 販売見積書：会社の見積書の原本に書く `fillEstimateFiles`・`fillEstimate`（.xlsx）・`estimatePreview`（プレビューの1〜3枚。`shinseiPreview.ts` の `sheetPreviewPages` で行の範囲ごとに）・3ページまで（`contBlock`・`estimatePages`・`itemRows`・`fitScale`・`ESTIMATE_CAPACITY`）・`estimateNotes`（備考の3行）・`estimateFileName`・`estimateOverflow`／`estimateNoteOverflow`（入らない明細・備考）・`EstimateField`／`ESTIMATE_LABEL`（押すと入れる所へ） |
 | `print/mitsumori.xltx`・`print/estimateFiles.ts` | 見積書の原本（TSS。印影の画像は消した）と、開く `openEstimateTemplate`・`useEstimateTemplate`・保存する `saveEstimateBook` |
-| `print/PrintView.tsx` | 印刷の画面（原本の絵を紙の余白の中に収まる大きさで。「🖨 印刷する」「📗 Excelで保存」「閉じる」。PDF の名前は document.title「御見積書_〇〇様」） |
+| `print/PrintView.tsx` | 印刷の画面（原本の絵を紙の余白の中に収まる大きさで。「🖨 印刷する」「📗 Excelで保存」「閉じる」。PDF の名前は document.title「〇〇 〇〇様 販売見積書」＝`estimateBaseName`） |
 | `tokutei.css` | `.est-sheet`（A4 の紙。余白は原本と同じ）。`@media print` で `height:296mm`（1枚に固定） |
 
 ## Excel（`print/`）

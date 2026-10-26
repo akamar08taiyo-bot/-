@@ -12,6 +12,8 @@ import {spawnSync} from 'node:child_process';
 import {strFromU8, unzipSync} from 'fflate';
 
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node22/lib/node_modules/playwright/index.mjs');
+// 2つ目からの商品を足すボタン（「＋ 2つ目の福祉用具を追加」「＋ 3つ目の商品を追加」。ユーザーの指示「追加のボタンはもう少しわかりやすいように」2026-10-26）
+const ADD_ITEM = /^＋ \d+つ目の(福祉用具|商品)を追加$/;
 const out = process.argv[2] ?? 'e2e-out';
 mkdirSync(out, {recursive: true});
 
@@ -173,8 +175,8 @@ try {
     assert.equal(readCell(f, sh, 'G10'), '824-0043');
     assert.equal(readCell(f, sh, 'A15'), '入浴補助用具\nシャワーベンチ FSフィット');
     assert.equal(readCell(f, sh, 'V15'), '30800');
-    assert.match(readCell(f, sh, 'E18'), /^入浴用いす：下肢筋力の低下により、浴室の床/);
-    assert.match(readCell(f, sh, 'E18'), /\n浴槽内いす：浴槽内での立ち座りが困難なため。$/);
+    assert.match(readCell(f, sh, 'E18'), /^下肢筋力の低下により、浴室の床/);
+    assert.match(readCell(f, sh, 'E18'), /\n浴槽内での立ち座りが困難なため。$/); // 頭に種目の名前は付けない（2026-10-26）
     assert.equal(readCell(f, sh, 'L20'), '見本居宅介護支援事業所　見本 太郎');
     assert.equal(readCell(f, sh, 'C26'), '令和8年10月22日');
     assert.equal(ellipseCount(f, sh), 3);
@@ -298,7 +300,7 @@ try {
   await page.locator('.est-sheet').screenshot({path: `${out}/05b-estimate-doc.png`});
   // Excel で保存：原本に書き込んだ .xlsx が、PDF と同じ名前で保存される（御見積合計は式のまま・答えも入れておく）
   const [download] = await Promise.all([page.waitForEvent('download'), page.locator('.print-toolbar').getByRole('button', {name: '📗 Excelで保存'}).click()]);
-  assert.equal(download.suggestedFilename(), '御見積書_山田 花子様.xlsx');
+  assert.equal(download.suggestedFilename(), '山田 花子様 販売見積書.xlsx');
   await download.saveAs(`${out}/estimate.xlsx`);
   const book = unzipSync(readFileSync(`${out}/estimate.xlsx`));
   const sheet = strFromU8(book['xl/worksheets/sheet1.xml']);
@@ -317,7 +319,7 @@ try {
   // ---- 品目が多くても原本の明細（16行）の中に入って、A4 1枚のまま。備考は3行まで（入らない行は画面で知らせる）
   // 手で入れた品目は価格が空（0円）なので、合計（42,944円）は変わらない
   for (let n = 1; n <= 8; n++) {
-    await page.getByRole('button', {name: '＋ 追加'}).click();
+    await page.getByRole('button', {name: ADD_ITEM}).click();
     await page.getByLabel('商品名').last().fill(`見本の商品 ${n}`);
   }
   // メーカー名は候補から選べる（はじめにパナソニックエイジフリー（株）・アロン化成（株））・ほかも打てる・仕切は任意・入れている所は薄い黄色（見積書の水色と分かれる）
@@ -361,7 +363,7 @@ try {
   // ---- 16点を超えると2ページ目（明細のつづき）。3ページまで（ユーザーの指示「ページは3ページまでいけるようにする」。1ページ目は「行数は4行ぐらい減らしていい」で16行）
   // 23点：1ページ目に16点（★の2つ＋見本の商品 1〜14）、2ページ目に見本の商品 15〜21
   for (let n = 9; n <= 21; n++) {
-    await page.getByRole('button', {name: '＋ 追加'}).click();
+    await page.getByRole('button', {name: ADD_ITEM}).click();
     await page.getByLabel('商品名').last().fill(`見本の商品 ${n}`);
   }
   await page.getByRole('button', {name: '🖨 見積書を印刷'}).first().click();
@@ -421,7 +423,7 @@ try {
     await page.screenshot({path: `${out}/${file}`, fullPage: true});
   }
 
-  // ---- 新しい見積もり：福祉用具の欄は最初から1つ開いている（打つとその商品になる。「＋ 追加」は2つ目から。ユーザーの指示「基本は手で入れるのがデフォルトなので開いておく」）。
+  // ---- 新しい見積もり：福祉用具の欄は最初から1つ開いている（打つとその商品になる。「＋ 2つ目の福祉用具を追加」は2つ目から。ユーザーの指示「基本は手で入れるのがデフォルトなので開いておく」）。
   // 手で入れた商品は「☆ お気に入りに登録」で商品マスタの★に。申請書の「🖨 印刷」は、印刷の前にまだ登録していない手入れの商品を登録するか聞く。一覧はチェックしてまとめて削除
   await page.setViewportSize({width: 1366, height: 900});
   await page.getByRole('button', {name: '📝 見積もり・申請'}).click();
@@ -430,12 +432,41 @@ try {
   await page.getByRole('button', {name: '📄 申請書', exact: true}).click();
   const shinseiForm = page.getByRole('form', {name: '申請書に入れる所'});
   await shinseiForm.waitFor();
-  assert.equal(await shinseiForm.getByRole('button', {name: '＋ 追加'}).count(), 0);
+  assert.equal(await shinseiForm.getByRole('button', {name: ADD_ITEM}).count(), 0);
   await shinseiForm.getByLabel('種目', {exact: true}).selectOption('歩行補助つえ');
   await shinseiForm.getByLabel('商品名').fill('見本の多点杖 ワイド');
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), '商品名'); // 打っている欄から外れない
   await shinseiForm.getByLabel('定価').fill('9000');
-  await shinseiForm.getByRole('button', {name: '＋ 追加'}).waitFor();
+  // 定価の下に割引率（変えられる）と販売金額（＝定価×(100−割引率)%。打ち直せて ↺ で戻す）。右の金額は申請書の購入予定金額（税込）
+  // （ユーザーの指示「定価の下に、販売金額を記載する」「定価の下に割引率を表示、変更できるようにする」2026-10-26）
+  const rate = Number((await shinseiForm.getByLabel('割引率').inputValue()).replace(/,/g, ''));
+  await shinseiForm.getByLabel('定価').blur();
+  assert.equal(await shinseiForm.getByLabel('販売金額', {exact: true}).inputValue(), (9000 * (100 - rate) / 100).toLocaleString('ja-JP'));
+  await shinseiForm.getByLabel('割引率').fill('30');
+  await shinseiForm.getByLabel('割引率').blur();
+  await page.waitForFunction(() => document.querySelector('[aria-label="販売金額"]')?.value === '6,300');
+  await shinseiForm.getByText('6,930円').waitFor();
+  await page.waitForFunction(() => document.querySelector('[aria-label="申請書のプレビュー"]')?.textContent?.includes('6,930'));
+  await shinseiForm.getByLabel('販売金額', {exact: true}).fill('7000');
+  await shinseiForm.getByLabel('販売金額', {exact: true}).blur();
+  await shinseiForm.getByText('7,700円').waitFor();
+  await shinseiForm.getByRole('button', {name: '販売金額を自動に戻す'}).click();
+  await shinseiForm.getByText('6,930円').waitFor();
+  await shinseiForm.getByLabel('割引率').fill(String(rate));
+  await shinseiForm.getByLabel('割引率').blur();
+  await shinseiForm.getByText(`${Math.floor((9000 * (100 - rate)) / 100 * 1.1).toLocaleString('ja-JP')}円`).waitFor();
+  // 2つ目からは、最後の商品のすぐ下の横いっぱいの点線の枠。押すと足した商品の種目の欄へ移る（消して元に戻す）
+  const addItem = shinseiForm.getByRole('button', {name: ADD_ITEM});
+  assert.equal((await addItem.textContent())?.trim(), '＋ 2つ目の福祉用具を追加');
+  const addBox = await addItem.boundingBox();
+  const firstBox = await shinseiForm.locator('[data-item]').first().boundingBox();
+  assert.ok(addBox && firstBox && addBox.width >= firstBox.width - 2 && addBox.y > firstBox.y + firstBox.height - 1, `${JSON.stringify(addBox)} ${JSON.stringify(firstBox)}`);
+  await addItem.click();
+  await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '種目' && document.activeElement.closest('[data-item]') === [...document.querySelectorAll('form [data-item], [role=form] [data-item]')].at(-1));
+  assert.equal((await addItem.textContent())?.trim(), '＋ 3つ目の福祉用具を追加');
+  await page.screenshot({path: `${out}/10-add-item.png`});
+  await shinseiForm.getByRole('button', {name: '商品を消す', exact: true}).click();
+  assert.equal(await shinseiForm.locator('[data-item]').count(), 1);
   assert.equal(await shinseiForm.getByLabel('見本の多点杖 ワイドが必要な理由の文例').locator('optgroup[label="文例"] option').count(), 5); // 商品名から多点杖の文例
   const dialogs = [];
   page.removeAllListeners('dialog');
@@ -443,10 +474,29 @@ try {
     dialogs.push(d.message());
     void d.accept();
   });
+  // 申請書（Excel）を作る と 🖨 印刷 は同じ大きさで、まん中にそろえる（「申請書をつくると、印刷ボタンは統一の大きさで中央揃え」2026-10-26）
+  const xlBox = await page.getByRole('button', {name: '📄 申請書（Excel）を作る'}).boundingBox();
+  const prBox = await page.getByRole('button', {name: '🖨 印刷', exact: true}).boundingBox();
+  const panelBox = await page.getByRole('button', {name: '📄 申請書（Excel）を作る'}).locator('xpath=..').boundingBox();
+  assert.ok(xlBox && prBox && panelBox && Math.abs(xlBox.width - prBox.width) < 1 && Math.abs(xlBox.height - prBox.height) < 1 && Math.abs(xlBox.y - prBox.y) < 1, `${JSON.stringify(xlBox)} ${JSON.stringify(prBox)}`);
+  assert.ok(Math.abs(xlBox.x - panelBox.x - (panelBox.x + panelBox.width - (prBox.x + prBox.width))) < 2, `まん中にない ${JSON.stringify(panelBox)}`);
   await page.getByRole('button', {name: '🖨 印刷', exact: true}).click();
   assert.match(dialogs[0] ?? '', /手で入れた商品をお気に入り（★）に登録しますか？\n・見本の多点杖 ワイド/);
   await page.locator('.print-overlay').waitFor();
   assert.ok((await page.locator('.print-overlay .est-sheet').count()) >= 3); // 事前申請書・支給申請書・委任状・完了写真
+  // 印刷するのは初めは1枚目だけ（「申請書印刷の場合は、１枚目のみ印刷、デフォルトは」2026-10-26）。チェックでほかのページも足せる。紙（PDF）の枚数で確かめる
+  const pagesGroup = page.getByRole('group', {name: '印刷するページ'});
+  assert.deepEqual(await pagesGroup.getByRole('checkbox').evaluateAll((xs) => xs.map((x) => x.checked)).then((v) => v.slice(0, 3)), [true, false, false]);
+  const printedPages = async (name) => {
+    await page.emulateMedia({media: 'print'});
+    await page.pdf({path: `${out}/${name}.pdf`, preferCSSPageSize: true});
+    await page.emulateMedia({media: 'screen'});
+    return pdfPages(`${out}/${name}.pdf`);
+  };
+  assert.equal(await printedPages('shinsei-print-1'), 1);
+  await pagesGroup.getByRole('checkbox', {name: '2枚目'}).check();
+  assert.equal(await printedPages('shinsei-print-2'), 2);
+  await pagesGroup.getByRole('checkbox', {name: '2枚目'}).uncheck();
   await page.locator('.print-overlay').screenshot({path: `${out}/10-shinsei-print.png`});
   await page.getByRole('button', {name: '閉じる'}).click();
   await page.getByRole('button', {name: '📦 商品マスタ'}).click();

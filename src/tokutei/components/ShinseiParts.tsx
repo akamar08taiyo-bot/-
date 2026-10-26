@@ -147,6 +147,32 @@ export function EraBirthInput({value, onChange}: {value: string; onChange: (iso:
   );
 }
 
+/**
+ * 2つ目からの商品を足すボタン。前は小さな白い「＋ 追加」で、★ 商品を選ぶ・📷 スクショから自動認識の色のボタンに並んで見つけにくかった
+ * （ユーザーの指示「追加のボタンはもう少しわかりやすいようにしてください」2026-10-26）→ 最後の商品のすぐ下に、横いっぱいの点線の枠で「＋ 2つ目の福祉用具を追加」。
+ * 押したら、足した商品の種目の欄へ移る（足したことが分かるように）。onAdd は足した商品の id を返す（商品の枠に data-item）
+ */
+export function AddItemButton({next, noun, onAdd}: {next: number; noun: string; onAdd: () => string}) {
+  const [focusId, setFocusId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!focusId) return;
+    const el = document.querySelector<HTMLElement>(`[data-item="${CSS.escape(focusId)}"] select`);
+    if (!el) return;
+    setFocusId(null);
+    el.focus();
+    el.scrollIntoView({block: 'nearest'});
+  });
+  return (
+    <button
+      type="button"
+      onClick={() => setFocusId(onAdd())}
+      className="w-full rounded-md border-2 border-dashed border-teal-400 bg-teal-50/60 px-3 py-2 text-sm font-bold text-teal-800 transition hover:border-teal-500 hover:bg-teal-50"
+    >
+      ＋ {next}つ目の{noun}を追加
+    </button>
+  );
+}
+
 /** Enter で次の欄へ（data-nav のある欄・選ぶ欄。日本語の変換中は動かさない。住宅改修の申請書のタブと同じ） */
 export function nextOnEnter(e: KeyboardEvent<HTMLElement>) {
   if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return;
