@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {estimateTotals} from '../../src/sasaoka/calc.ts';
-import {jutakuSalesMonth, monthPlan, planRows, readTokuteiSales, TOKUTEI_SALES_KEY} from '../../src/sasaoka/salesPlan.ts';
+import {JUTAKU_SALES_KEY, jutakuSalesMonth, jutakuSalesSummary, monthPlan, planRows, readTokuteiSales, TOKUTEI_SALES_KEY, writeJutakuSalesSummary} from '../../src/sasaoka/salesPlan.ts';
 import type {Job, Row} from '../../src/sasaoka/types.ts';
 
 const S = {estimateRate: 0.8, estimateLaborRate: 1.5, estimateOverheadRate: 0.1, taxRate: 0.1, tokuteiSalesMonths: {} as Record<string, string>};
@@ -47,4 +47,21 @@ test('特定福祉用具：まとめを読む（こわれていれば空）。�
   assert.equal(oct.all.total, oct.jutakuSum.total + 42944);
   assert.equal(oct.all.amount, oct.jutakuSum.amount + 39040);
   assert.equal(monthPlan(rows, '2026-11').tokuteiSum.total, 1100);
+});
+
+test('受注残・進捗管理に渡すまとめ（taiyo-jutaku-sales-v1）：見積書のある様邸だけ。金額は売上見込みと同じ、事業所名は理由書の作成者の事業所、営業所は設定', () => {
+  const a = job('A', [mat(30000)], {staff: '見本 次郎', salesMonth: '2026-11', shinsei: {reasonOffice: ' 見本地域包括支援センター ', reasonName: '見本 三郎'} as Job['shinsei']});
+  const none = job('C', []);
+  const sum = jutakuSalesSummary([a, none], {...S, officeName: '行橋営業所'}, 7);
+  assert.equal(sum.updatedAt, 7);
+  const t = estimateTotals(a, S).all;
+  assert.deepEqual(sum.rows, [{id: 'A', customer: '見本A', staff: '見本 次郎', careOffice: '見本地域包括支援センター', careManager: '見本 三郎', month: '2026-11', amount: t.subtotal + t.overhead, tax: t.tax, total: t.total, office: '行橋営業所'}]);
+  // 理由書の作成者がなければ事業所名は空
+  assert.equal(jutakuSalesSummary([job('B', [mat(10000)])], {...S, officeName: '行橋営業所'}).rows[0].careOffice, '');
+  // 書く（仕切・利益は入れない）
+  const store = new Map<string, string>();
+  writeJutakuSalesSummary([a], {...S, officeName: '行橋営業所'}, {setItem: (k, v) => void store.set(k, v)});
+  assert.equal(JUTAKU_SALES_KEY, 'taiyo-jutaku-sales-v1');
+  assert.equal(JSON.parse(store.get(JUTAKU_SALES_KEY) ?? '{}').rows.length, 1);
+  assert.ok(!/price|cost|profit|shikiri/i.test(store.get(JUTAKU_SALES_KEY) ?? ''));
 });

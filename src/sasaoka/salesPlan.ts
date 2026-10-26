@@ -94,3 +94,41 @@ export function monthPlan(rows: PlanRow[], month: string): MonthPlan {
   const tokutei = rows.filter((r) => r.kind === 'tokutei' && r.month === month).sort((a, b) => a.name.localeCompare(b.name, 'ja'));
   return {jutaku, tokutei, jutakuSum: sum(jutaku), tokuteiSum: sum(tokutei), all: sum([...jutaku, ...tokutei])};
 }
+
+/**
+ * 受注残・進捗管理（太陽ポータルの solar-silver-progress-app。taiyo-link）に渡す、見積書のある様邸ごとのまとめ
+ * （ユーザーの指示「ゆくゆくは作成したら、自動的に受注残の連動して、金額が自動で入るようにする。当然包括、居宅、名前なども連動」2026-10-25、
+ *  「今の内容が崩れたりだとか、使えなくなったりだとかしないように」2026-10-26）。同じサイトなので、この端末の localStorage（taiyo-jutaku-sales-v1）に書く。
+ * 形は特定福祉用具の salesSummary（taiyo-tokutei-sales-v1）と同じ。受注残の画面が読んで「受注残に入れる」を出す（受注残のデータはこのアプリから書かない）。
+ * 金額は売上見込みと同じ（税抜＝小計＋諸経費）、月は売上見込みの月、事業所名は理由書の作成者の事業所（居宅・包括）。仕切・利益は入れない。形を変えるときは受注残の index.html の taiyo-link も直す
+ */
+export const JUTAKU_SALES_KEY = 'taiyo-jutaku-sales-v1';
+export type JutakuSalesRow = {id: string; customer: string; staff: string; careOffice: string; careManager: string; month: string; amount: number; tax: number; total: number; office: string};
+export function jutakuSalesSummary(jobs: Job[], s: EstimateSettings & Pick<Settings, 'officeName'>, now = Date.now()): {v: 1; updatedAt: number; rows: JutakuSalesRow[]} {
+  const rows = jobs
+    .filter((j) => hasEstimateRows(j))
+    .map((j): JutakuSalesRow => {
+      const t = estimateTotals(j, s).all;
+      return {
+        id: j.id,
+        customer: j.customer.trim(),
+        staff: j.staff,
+        careOffice: (j.shinsei?.reasonOffice ?? '').trim(),
+        careManager: (j.shinsei?.reasonName ?? '').trim(),
+        month: jutakuSalesMonth(j),
+        amount: t.subtotal + t.overhead,
+        tax: t.tax,
+        total: t.total,
+        office: s.officeName.trim(),
+      };
+    });
+  return {v: 1, updatedAt: now, rows};
+}
+/** 書く（書けなくても困らない：受注残に住宅改修が届かないだけ）。ゴミ箱の様邸は渡さない（呼ぶ所でゴミ箱を除いた様邸を渡す） */
+export function writeJutakuSalesSummary(jobs: Job[], s: EstimateSettings & Pick<Settings, 'officeName'>, store: Pick<Storage, 'setItem'> = localStorage): void {
+  try {
+    store.setItem(JUTAKU_SALES_KEY, JSON.stringify(jutakuSalesSummary(jobs, s)));
+  } catch {
+    /* 容量がいっぱい・使えないとき */
+  }
+}

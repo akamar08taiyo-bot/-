@@ -41,6 +41,7 @@ import {EXAMPLE_KIT_ID, exampleKit} from './samples.ts';
 import {flushTokutei} from './tokuteiLink.ts';
 import {BatchSave} from './components/BatchSave.tsx';
 import {isTrashed, liveJobs} from './trash.ts';
+import {writeJutakuSalesSummary} from './salesPlan.ts';
 import type {Insurer, Job, Row} from './types.ts';
 import {useNewVersion} from './update.ts';
 import {useStore} from './useStore.ts';
@@ -160,6 +161,11 @@ export default function App({start}: {start: MainTab}) {
   const live = useMemo(() => (allJobs ? liveJobs(allJobs) : null), [allJobs]);
   const data = useMemo(() => (all && live ? (live === all.jobs ? all : {...all, jobs: live}) : null), [all, live]);
   const trashCount = allJobs && live ? allJobs.length - live.length : 0;
+  // 受注残・進捗管理に、見積書のある様邸ごとの金額のまとめを渡す（salesPlan.ts の writeJutakuSalesSummary。ゴミ箱の様邸は渡さない）。様邸・設定が変わるたびに書き直す
+  const liveSettings = all?.settings;
+  useEffect(() => {
+    if (live && liveSettings) writeJutakuSalesSummary(live, liveSettings);
+  }, [live, liveSettings]);
   const estimateJob = useMemo(() => (data && estimateId ? (data.jobs.find((j) => j.id === estimateId) ?? null) : null), [data, estimateId]);
   // 請求書に入れていない見積書（「笹岡工務店の請求書に入れる」を外したもの）は、請求書の画面では開かない
   const invoiceJob = useMemo(() => (data && invoiceId ? (data.jobs.find((j) => j.id === invoiceId && j.shikiri) ?? null) : null), [data, invoiceId]);
