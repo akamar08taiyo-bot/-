@@ -105,3 +105,15 @@ test('特定福祉用具から住宅改修へ（⇔）：中のアプリが送�
   assert.equal(readFromTokutei({type: 'other', job: 'j1', fields: {}}), null);
   assert.deepEqual(readFromTokutei({type: TO_JUTAKU, job: 'j1', fields: {customer: 1, insurer: 'other', burdenRatio: 4, gender: 'X', birthDate: 'S13'}})?.fields, {});
 });
+
+test('担当（ユーザーの指示「受注残に入れるとき当然担当名のところ、紐付けて受注残に飛ばせるように」2026-10-26）：様邸の担当を渡す・特定福祉用具で選び直した担当を様邸に入れる', async () => {
+  const {readFromTokutei, withTokuteiFields, TO_JUTAKU} = await import('../../src/sasaoka/tokuteiLink.ts');
+  assert.equal(tokuteiFields(job({staff: ' 見本 太郎 '})).staff, '見本 太郎');
+  assert.ok(!('staff' in tokuteiFields(job()))); // 担当がなければ渡さない（特定福祉用具の案件の担当のまま）
+  const m = readFromTokutei({type: TO_JUTAKU, job: 'j1', fields: {staff: '見本 次郎'}});
+  assert.deepEqual(m?.fields, {staff: '見本 次郎'});
+  const j0 = job({staff: '見本 太郎'});
+  assert.equal(withTokuteiFields(j0, m!.fields).staff, '見本 次郎');
+  assert.equal(withTokuteiFields(j0, {staff: '見本 太郎'}), j0); // 同じなら変えない
+  assert.deepEqual(readFromTokutei({type: TO_JUTAKU, job: 'j1', fields: {staff: ' '}})?.fields, {}); // 空の担当では消さない
+});

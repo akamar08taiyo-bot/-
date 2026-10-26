@@ -179,6 +179,40 @@ if (withTokutei) {
   assert.deepEqual(await boxes.evaluateAll((els) => els.map((e) => e.checked)), [true, false, true, false]);
   await dlg.getByRole('button', {name: 'やめる'}).click();
   log('まとめて保存 OK');
+
+  // ---------------- 担当（ユーザーの指示「受注残に入れるとき当然担当名のところ、紐付けて受注残に飛ばせるようにしてください」2026-10-26）：
+  // 特定福祉用具で選んだ担当は様邸の担当にも入る（⇔）。様邸の担当は特定福祉用具の案件にも入る（受注残には案件の担当で入る）
+  await page.getByRole('tab', {name: '🛁 特定福祉用具申請書'}).click();
+  await field('担当').waitFor();
+  await field('担当').selectOption('土居 翔太');
+  await page.getByRole('tab', {name: '📋 工事見積書'}).click();
+  await page.getByRole('region', {name: '見積書', exact: true}).waitFor();
+  const staffSel = page.locator('label', {hasText: /^担当/}).first().locator('select');
+  await page.waitForFunction(() => [...document.querySelectorAll('label')].find((l) => /^担当/.test(l.textContent))?.querySelector('select')?.value === '土居 翔太', null, {timeout: 5000});
+  await staffSel.selectOption('宮村 茉莉花');
+  await page.waitForTimeout(1200);
+  await page.getByRole('tab', {name: '🛁 特定福祉用具申請書'}).click();
+  await field('担当').waitFor();
+  await page.waitForFunction(() => document.querySelector('iframe')?.contentDocument?.querySelector('select[aria-label="担当"]')?.value === '宮村 茉莉花', null, {timeout: 10000});
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('taiyo-tokutei-sales-v1') || '{}').rows?.some((r) => r.customer === '見本 花子' && r.staff === '宮村 茉莉花'), null, {timeout: 10000});
+  log('担当：特定福祉用具 ⇔ 様邸 OK');
+
+  // ---------------- 一覧の売上月：特定福祉用具だけの様邸は、その案件の月。▶ で次の月にすると、受注残に渡す月（tokuteiMonths）も次の月
+  await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
+  await page.waitForFunction(() => !location.hash.includes('job='));
+  const now = new Date();
+  const ym = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const nextM = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const saleId = await page.evaluate(() => JSON.parse(localStorage.getItem('taiyo-tokutei-sales-v1') || '{}').rows?.find((r) => r.customer === '見本 花子')?.id);
+  assert.ok(saleId);
+  const hanako = page.getByRole('row', {name: /見本 花子様邸/}).getByRole('group', {name: '売上月'});
+  await hanako.getByRole('button', {name: '売上月を次月に'}).click();
+  await page.waitForFunction((id) => JSON.parse(localStorage.getItem('taiyo-jutaku-sales-v1') || '{}').tokuteiMonths?.[id], saleId);
+  assert.equal(await page.evaluate((id) => JSON.parse(localStorage.getItem('taiyo-jutaku-sales-v1')).tokuteiMonths[id], saleId), ym(nextM));
+  await page.getByRole('button', {name: '次の月'}).click();
+  assert.equal((await hanako.innerText()).replace(/\s+/g, ''), `◀${nextM.getFullYear() === now.getFullYear() ? `${nextM.getMonth() + 1}月` : `${nextM.getFullYear()}年${nextM.getMonth() + 1}月`}▶`);
+  await page.getByRole('button', {name: '前の月'}).click();
+  log('一覧の売上月：特定福祉用具の案件の月も移る（受注残に渡す月）OK');
 }
 
 // ---------------- 新規作成してすぐ特定福祉用具申請書のタブを開き、住宅改修には何も入れずに一覧へ戻っても、様邸は消さない

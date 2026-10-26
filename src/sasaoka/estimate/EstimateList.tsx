@@ -8,6 +8,8 @@ import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm} from '../es
 import {estimateXlsx, XLSX_TYPE} from '../estimateXlsx.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
+import {readTokuteiSales, rowSalesMonth, shiftSalesMonth, TOKUTEI_SALES_KEY} from '../salesPlan.ts';
+import type {TokuteiSale} from '../salesPlan.ts';
 import {addSamples, hasSamples} from '../samples.ts';
 import type {AppData, Insurer, Job, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
@@ -199,7 +201,19 @@ function GettingStarted({data, update, goMaterials, onSample}: {data: AppData; u
   );
 }
 
-/** 見積書の一覧（作成日の月ごと）。探すときは、すべての月から探す */
+/** 特定福祉用具のアプリが書いた案件のまとめ（売上月に使う。読めなければ空） */
+function tokuteiSales(): TokuteiSale[] {
+  try {
+    return readTokuteiSales(localStorage.getItem(TOKUTEI_SALES_KEY)).rows;
+  } catch {
+    return [];
+  }
+}
+
+/** 売上月の短い書き方：一覧の月と同じ年なら「11月」、ちがえば「2027年1月」 */
+const shortMonth = (m: string, base: string) => (m.slice(0, 4) === base.slice(0, 4) ? `${Number(m.slice(5, 7))}月` : monthLabel(m));
+
+/** 見積書の一覧（売上月＝様邸の月ごと。初めは作った月）。探すときは、すべての月から探す */
 export function EstimateList({
   data,
   update,
@@ -228,6 +242,7 @@ export function EstimateList({
   const all = useEstimates(data, s);
   // 特定福祉用具申請書だけを作っている様邸のお客様名（住宅改修の方に名前がないとき。tokuteiLink.ts）
   const names = useMemo(() => tokuteiNames(), [data.jobs]);
+  const tokutei = useMemo(() => tokuteiSales(), [data.jobs, s.tokuteiSalesMonths]);
   const searching = query.trim() !== '';
   const list = useMemo(
     () =>
@@ -239,7 +254,9 @@ export function EstimateList({
   const total = list.reduce((n, e) => n + e.t.all.total, 0);
   const shown = list.slice(0, limit);
   // 一覧の先頭のチェック：選んだ様邸を次の月・前の月の一覧に回す（ユーザーの指示「先頭にチェックマークをつくり、次月にまわす、前月に回せるようにする」）。
-  // 一覧の月は様邸の月（Job.month）。笹岡工務店の請求書に入れている様邸は、請求する月も一緒に移る
+  // 行ごとの「売上月」の ◀ ▶ も同じ（ユーザーの指示「何月分かっていうのを簡単に切り替えができるように一覧表の中で…切り替えた分に関しては受注残に飛ばすときにも、
+  // その月の該当の月の受注残に含める」2026-10-26）。一覧の月は様邸の月（Job.month）。請求する月・売上見込みの月・この様邸の特定福祉用具の案件の月も一緒に移る
+  // （salesPlan.ts の shiftSalesMonth。受注残には、移した月で入る）
   const [checked, setChecked] = useState<Set<string>>(() => new Set());
   useEffect(() => setChecked(new Set()), [month, query]);
   const allChecked = shown.length > 0 && shown.every(({job}) => checked.has(job.id));
@@ -250,11 +267,20 @@ export function EstimateList({
       else next.add(id);
       return next;
     });
+  const shift = (ids: Set<string>, dir: 1 | -1) => {
+    const months: Record<string, string> = {};
+    for (const j of data.jobs) if (ids.has(j.id)) Object.assign(months, shiftSalesMonth(j, tokutei, s, dir).tokuteiMonths);
+    update('jobs', (jobs) => jobs.map((j) => (ids.has(j.id) ? shiftSalesMonth(j, tokutei, s, dir).job : j)));
+    if (Object.keys(months).length) update('settings', (st) => ({...st, tokuteiSalesMonths: {...st.tokuteiSalesMonths, ...months}}));
+  };
   const moveMonth = (dir: 1 | -1) => {
-    const ids = checked;
-    update('jobs', (jobs) => jobs.map((j) => (ids.has(j.id) ? {...j, month: addMonths(j.month, dir), updatedAt: Date.now()} : j)));
-    toast(`${ids.size}件を${searching ? (dir === 1 ? '次の月' : '前の月') : monthLabel(addMonths(month, dir))}に回しました`);
+    shift(checked, dir);
+    toast(`${checked.size}件を${searching ? (dir === 1 ? '次の月' : '前の月') : monthLabel(addMonths(month, dir))}に回しました`);
     setChecked(new Set());
+  };
+  const moveOne = (job: Job, name: string, dir: 1 | -1) => {
+    shift(new Set([job.id]), dir);
+    toast(`${name}を${monthLabel(addMonths(rowSalesMonth(job, tokutei, s), dir))}分にしました`);
   };
   // チェックした様邸をまとめてゴミ箱に移す（ユーザーの指示。確かめは「N件をゴミ箱に移しますか？」）
   const trashChecked = () => {
@@ -314,7 +340,7 @@ export function EstimateList({
         <GettingStarted data={data} update={update} goMaterials={goMaterials} />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-emerald-200 bg-white shadow-sm">
-          <table className="w-full min-w-[1120px] text-sm">
+          <table className="w-full min-w-[1200px] text-sm">
             <thead className="bg-emerald-50 text-xs text-emerald-900">
               <tr>
                 <th className="w-8 px-2 py-2">
@@ -326,7 +352,9 @@ export function EstimateList({
                     aria-label="すべて選ぶ"
                   />
                 </th>
-                <th className="px-2 py-2 text-left">作成日</th>
+                {/* 作成日・売上月は中身の幅だけ（スマホでもお客様名が見えるように） */}
+                <th className="w-px whitespace-nowrap px-2 py-2 text-left">作成日</th>
+                <th className="w-px whitespace-nowrap px-2 py-2 text-left">売上月</th>
                 <th className="px-2 py-2 text-left">お客様名</th>
                 <th className="px-2 py-2 text-right">見積の合計（税込）</th>
                 <th className="px-2 py-2 text-left">{s.clientName || '工務店'}の請求書</th>
@@ -336,12 +364,32 @@ export function EstimateList({
             <tbody>
               {shown.map(({job, date, t}) => {
                 const estimated = hasEstimateRows(job); // 見積書を作った様邸（申請書だけの様邸は、請求書・発注書に入らない）
+                const name = job.customer.trim() ? jobName(job) : names.get(job.id) ? jobName({...job, customer: names.get(job.id)!}) : 'お客様名なし';
+                const sales = rowSalesMonth(job, tokutei, s);
+                const arrow = 'h-8 w-8 rounded text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-800';
                 return (
                   <tr key={job.id} className={`cursor-pointer border-t border-slate-100 hover:bg-emerald-50/60 ${checked.has(job.id) ? 'bg-sky-50' : ''}`} onClick={() => onOpen(job.id)}>
                     <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={checked.has(job.id)} onChange={() => toggle(job.id)} className="h-4 w-4 align-middle" aria-label="選ぶ" />
                     </td>
-                    <td className="whitespace-nowrap px-2 py-2 tabular-nums">{dateText(date)}</td>
+                    <td className="whitespace-nowrap px-2 py-2 tabular-nums">
+                      {/* スマホは年を出さない（売上月の ◀ ▶ とお客様名を見えるように） */}
+                      <span className="hidden sm:inline">{dateText(date).replace(/\/.*$/, '/')}</span>
+                      {dateText(date).replace(/^\d+\//, '')}
+                    </td>
+                    {/* 売上月（工事・販売の月）。見積もり作成日とは別。◀ ▶ で前の月・次の月へ（受注残・売上見込み・請求書もこの月）。
+                        名前は「売上月」だけ（お客様名を入れると、お客様名で行のセルを探すときに2つ見つかる） */}
+                    <td className="whitespace-nowrap px-1 py-1" onClick={(e) => e.stopPropagation()}>
+                      <span role="group" aria-label="売上月" title={`${name}の売上月`} className="inline-flex items-center rounded-md border border-slate-200 bg-white">
+                        <button type="button" className={arrow} onClick={() => moveOne(job, name, -1)} aria-label="売上月を前月に">
+                          ◀
+                        </button>
+                        <span className="min-w-[3rem] px-1 text-center font-bold tabular-nums text-slate-800">{shortMonth(sales, searching ? thisMonth() : month)}</span>
+                        <button type="button" className={arrow} onClick={() => moveOne(job, name, 1)} aria-label="売上月を次月に">
+                          ▶
+                        </button>
+                      </span>
+                    </td>
                     {/* 改修場所（玄関・トイレ…）・保険者・担当は出さない（ユーザーの指示「詳細や、保険者名、担当名などは不要」） */}
                     <td className="px-2 py-2 font-bold text-slate-800">
                       {job.customer.trim() ? (
@@ -398,7 +446,7 @@ export function EstimateList({
             {list.length > 0 && (
               <tfoot>
                 <tr className="border-t border-slate-200 bg-emerald-50/60 text-sm">
-                  <td colSpan={3} className="px-2 py-2 text-right font-bold text-emerald-900">
+                  <td colSpan={4} className="px-2 py-2 text-right font-bold text-emerald-900">
                     {searching ? `「${query}」の見積書` : `${monthLabel(month)}の見積書`}（{list.length}件）
                   </td>
                   <td className="px-2 py-2 text-right font-bold tabular-nums text-emerald-900">{yen(total)}</td>

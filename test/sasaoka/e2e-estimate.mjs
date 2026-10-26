@@ -56,6 +56,28 @@ await page.getByRole('button', {name: '前の月'}).click();
 assert.ok((await sampleRow.innerText()).includes(thisMonthLabel));
 log('一覧の先頭のチェックで次月・前月に回すOK');
 
+// ---------------- 行ごとの売上月（ユーザーの指示「見積もり作成日と、請求月というか販売月というか工事が発生する月っていうのは大きく異なります…
+// 何月分かっていうのを簡単に切り替えができるように一覧表の中で」「切り替えた分に関しては受注残に飛ばすときにも、その月の該当の月の受注残に含める」2026-10-26）。
+// ▶ で次の月へ（請求する月・売上見込みの月・受注残に渡す月も）。作成日はそのまま
+const ym = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+const salesGroup = sampleRow.getByRole('group', {name: '売上月'});
+assert.equal((await salesGroup.innerText()).replace(/\s+/g, ''), `◀${now.getMonth() + 1}月▶`);
+const dateBefore = await sampleRow.locator('td').nth(1).innerText();
+await salesGroup.getByRole('button', {name: '売上月を次月に'}).click();
+await page.locator('[aria-live] > div', {hasText: `（サンプル）山田様邸を${nextMonth}分にしました`}).waitFor();
+assert.equal(await sampleRow.count(), 0);
+const sentMonth = await page.evaluate(() => JSON.parse(localStorage.getItem('taiyo-jutaku-sales-v1') || '{}').rows?.find((r) => r.customer.includes('山田'))?.month);
+assert.equal(sentMonth, ym(next)); // 受注残に渡す月
+await page.getByRole('button', {name: '次の月'}).click();
+assert.ok((await sampleRow.innerText()).includes(`${nextMonth}分に入れる`));
+assert.equal(await sampleRow.locator('td').nth(1).innerText(), dateBefore); // 作成日は変えない
+await page.screenshot({path: path.join(outDir, '51a-list-sales-month.png')});
+await salesGroup.getByRole('button', {name: '売上月を前月に'}).click();
+await page.getByRole('button', {name: '前の月'}).click();
+await sampleRow.waitFor();
+assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('taiyo-jutaku-sales-v1') || '{}').rows?.find((r) => r.customer.includes('山田'))?.month), ym(now));
+log('行ごとの売上月（◀ ▶）：請求する月・受注残に渡す月も移る・作成日はそのまま OK');
+
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 const sheet = page.getByRole('region', {name: '見積書', exact: true});
 await sheet.waitFor();

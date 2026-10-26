@@ -33,6 +33,9 @@ export type TokuteiFields = {
   careTo?: string; // 認定の有効期間のおわり
   insurerNo?: string; // 保険者番号（6けた）
   welfare?: boolean; // 生活保護（介護ソフトの画面の給付情報が「生保」。生活保護のときだけ渡す。特定福祉用具の Sale の welfare。2026-10-23）
+  // 担当（入っていなければ渡さない。特定福祉用具の案件の担当も様邸と同じ人に＝受注残にその担当で入る。ユーザーの指示「受注残に入れるとき当然担当名のところ、
+  // 紐付けて受注残に飛ばせるようにしてください」2026-10-26。特定福祉用具で直した担当も様邸に返る）
+  staff?: string;
 };
 
 export function tokuteiFields(job: Job): TokuteiFields {
@@ -56,6 +59,7 @@ export function tokuteiFields(job: Job): TokuteiFields {
     ...(info.careTo ? {careTo: info.careTo} : {}),
     ...(info.insurerNo.trim() ? {insurerNo: info.insurerNo.trim()} : {}),
     ...(info.welfare ? {welfare: true} : {}),
+    ...(job.staff.trim() ? {staff: job.staff.trim()} : {}),
   };
 }
 
@@ -76,6 +80,7 @@ export function readFromTokutei(data: unknown): {job: string; fields: Partial<To
   const f = o.fields as Record<string, unknown>;
   const out: Partial<TokuteiFields> = {};
   for (const k of ['customer', 'kana', 'insuredNo', 'zip', 'address', 'tel', 'careOffice', 'careManager', 'careLevel'] as const) if (typeof f[k] === 'string') out[k] = f[k] as string;
+  if (typeof f.staff === 'string' && f.staff.trim()) out.staff = f.staff.trim(); // 担当は空では消さない
   if (typeof f.birthDate === 'string' && /^(\d{4}-\d{2}-\d{2})?$/.test(f.birthDate)) out.birthDate = f.birthDate;
   if (f.gender === '' || f.gender === '男' || f.gender === '女') out.gender = f.gender;
   if (typeof f.insurer === 'string' && (INSURER_IDS as readonly string[]).includes(f.insurer)) out.insurer = f.insurer;
@@ -105,6 +110,7 @@ export function withTokuteiFields(job: Job, f: Partial<TokuteiFields>): Job {
   if (f.customer !== undefined) next.customer = f.customer;
   if (f.insuredNo !== undefined) next.insuredNo = f.insuredNo;
   if (f.address !== undefined) next.address = f.address;
+  if (f.staff) next.staff = f.staff;
   if (f.insurer && f.insurer !== jobInsurer(job)) {
     next.insurer = f.insurer as Insurer;
     next.form = INSURER_INFO[f.insurer as Insurer].form;
@@ -123,13 +129,11 @@ export function withTokuteiFields(job: Job, f: Partial<TokuteiFields>): Job {
     else delete si.welfare;
   }
   const changedInfo = JSON.stringify(si) !== JSON.stringify(info);
-  const same = !changedInfo && next.customer === job.customer && next.insuredNo === job.insuredNo && next.address === job.address && next.insurer === job.insurer && next.form === job.form;
+  const same = !changedInfo && next.customer === job.customer && next.insuredNo === job.insuredNo && next.address === job.address && next.staff === job.staff && next.insurer === job.insurer && next.form === job.form;
   if (same) return job;
   return {...next, ...(changedInfo ? {shinsei: si} : {}), updatedAt: Date.now()};
 }
 
-/** タブの中に出す特定福祉用具のアプリの URL（その様邸の案件を開く。上の題名の段は出さない） */
-/** 中に出す画面：申請書だけ（🛁 特定福祉用具申請書のタブ）・見積書だけ（🏷 販売見積書のタブ） */
 // ---------------------------------------------------------------- カタログ（様邸の画面の左の「📖 カタログを表示」「🖨 カタログを印刷」）
 // ユーザーの指示「赤枠の部分にカタログを表示とカタログを印刷という２つのボタンを設置する」（2026-10-26。🪪 介護保険証・介護ソフトの画面の枠の下）。
 // 介援隊のカタログ（PDF と、それを読む部品）は特定福祉用具のアプリにあるので、🛁 のタブを開いて中のアプリに頼む
@@ -152,6 +156,8 @@ export function takeCatalog(): CatalogAction | null {
   return a;
 }
 
+/** タブの中に出す特定福祉用具のアプリの URL（その様邸の案件を開く。上の題名の段は出さない） */
+/** 中に出す画面：申請書だけ（🛁 特定福祉用具申請書のタブ）・見積書だけ（🏷 販売見積書のタブ） */
 export type TokuteiView = 'shinsei' | 'quote';
 export const tokuteiUrl = (jobId: string, view: TokuteiView = 'shinsei') => `${TOKUTEI_URL}#jutaku=${encodeURIComponent(jobId)}&embed=1&view=${view}`;
 

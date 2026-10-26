@@ -6,6 +6,7 @@
 import {estimateTotals, hasEstimateRows, jobName} from './calc.ts';
 import type {EstimateSettings} from './calc.ts';
 import type {Job, Settings} from './types.ts';
+import {addMonths} from './util.ts';
 
 export const TOKUTEI_SALES_KEY = 'taiyo-tokutei-sales-v1';
 
@@ -32,6 +33,30 @@ const str = (v: unknown) => (typeof v === 'string' ? v : '');
 
 /** 住宅改修の様邸の売上見込みの月 */
 export const jutakuSalesMonth = (job: Pick<Job, 'month' | 'salesMonth'>) => (job.salesMonth && MONTH.test(job.salesMonth) ? job.salesMonth : job.month);
+
+/** 特定福祉用具の案件の売上の月（このアプリで月を変えたときはその月。受注残にもこの月で入る） */
+export const tokuteiSalesMonth = (r: Pick<TokuteiSale, 'id' | 'month'>, s: Pick<Settings, 'tokuteiSalesMonths'>) => (MONTH.test(s.tokuteiSalesMonths[r.id] ?? '') ? s.tokuteiSalesMonths[r.id] : r.month);
+
+/**
+ * 見積もり・申請書の一覧の行の「売上月」（ユーザーの指示「見積もり作成日と、請求月というか販売月というか工事が発生する月っていうのは大きく異なります。
+ * 10月末に見積もり作った分は、でも11月に売り上げになることがありますので、何月分かっていうのを簡単に切り替えができるように」2026-10-26）。
+ * 住宅改修の見積書があるか、特定福祉用具の案件がない様邸は、様邸の売上見込みの月。特定福祉用具だけの様邸は、その案件の月
+ */
+export function rowSalesMonth(job: Pick<Job, 'id' | 'month' | 'salesMonth' | 'places'>, tokutei: TokuteiSale[], s: Pick<Settings, 'tokuteiSalesMonths'>): string {
+  const linked = tokutei.filter((r) => r.jutakuJob === job.id);
+  if (hasEstimateRows(job) || linked.length === 0) return jutakuSalesMonth(job);
+  return tokuteiSalesMonth(linked[0], s);
+}
+
+/**
+ * 売上月を dir か月ずらす：様邸の月（一覧の月・請求する月）と売上見込みの月をそろえて動かし、この様邸の特定福祉用具の案件の月も同じ月にする
+ * （受注残・売上見込み・請求書が同じ月になる）。返すのは直した様邸と、特定福祉用具の案件の月（設定の tokuteiSalesMonths に足す分）
+ */
+export function shiftSalesMonth(job: Job, tokutei: TokuteiSale[], s: Pick<Settings, 'tokuteiSalesMonths'>, dir: number, now = Date.now()): {job: Job; tokuteiMonths: Record<string, string>} {
+  const next = addMonths(rowSalesMonth(job, tokutei, s), dir);
+  const tokuteiMonths = Object.fromEntries(tokutei.filter((r) => r.jutakuJob === job.id).map((r) => [r.id, next]));
+  return {job: {...job, month: next, salesMonth: next, updatedAt: now}, tokuteiMonths};
+}
 
 /** 特定福祉用具のまとめを読む（こわれていれば空） */
 export function readTokuteiSales(raw: string | null): {rows: TokuteiSale[]; updatedAt: number} {
@@ -71,7 +96,7 @@ export function planRows(jobs: Job[], s: EstimateSettings & Pick<Settings, 'toku
       kind: 'tokutei',
       id: r.id,
       name: `${r.customer || '（お客様名未入力）'}様`,
-      month: MONTH.test(s.tokuteiSalesMonths[r.id] ?? '') ? s.tokuteiSalesMonths[r.id] : r.month,
+      month: tokuteiSalesMonth(r, s),
       amount: r.amount,
       tax: r.tax,
       total: r.total,
@@ -100,11 +125,17 @@ export function monthPlan(rows: PlanRow[], month: string): MonthPlan {
  * （ユーザーの指示「ゆくゆくは作成したら、自動的に受注残の連動して、金額が自動で入るようにする。当然包括、居宅、名前なども連動」2026-10-25、
  *  「今の内容が崩れたりだとか、使えなくなったりだとかしないように」2026-10-26）。同じサイトなので、この端末の localStorage（taiyo-jutaku-sales-v1）に書く。
  * 形は特定福祉用具の salesSummary（taiyo-tokutei-sales-v1）と同じ。受注残の画面が読んで「受注残に入れる」を出す（受注残のデータはこのアプリから書かない）。
- * 金額は売上見込みと同じ（税抜＝小計＋諸経費）、月は売上見込みの月、事業所名は理由書の作成者の事業所（居宅・包括）。仕切・利益は入れない。形を変えるときは受注残の index.html の taiyo-link も直す
+ * 金額は売上見込みと同じ（税抜＝小計＋諸経費）、月は売上見込みの月、事業所名は理由書の作成者の事業所（居宅・包括）。仕切・利益は入れない。形を変えるときは受注残の index.html の taiyo-link も直す。
+ * tokuteiMonths：このアプリで月を変えた特定福祉用具の案件（案件の id → 月）。受注残は特定福祉用具のまとめ（taiyo-tokutei-sales-v1）の月より、こちらを使う
+ * （一覧の売上月・売上見込みの次月に回すで変えた月で受注残に入るように。2026-10-26）
  */
 export const JUTAKU_SALES_KEY = 'taiyo-jutaku-sales-v1';
 export type JutakuSalesRow = {id: string; customer: string; staff: string; careOffice: string; careManager: string; month: string; amount: number; tax: number; total: number; office: string};
-export function jutakuSalesSummary(jobs: Job[], s: EstimateSettings & Pick<Settings, 'officeName'>, now = Date.now()): {v: 1; updatedAt: number; rows: JutakuSalesRow[]} {
+export function jutakuSalesSummary(
+  jobs: Job[],
+  s: EstimateSettings & Pick<Settings, 'officeName'> & Partial<Pick<Settings, 'tokuteiSalesMonths'>>,
+  now = Date.now(),
+): {v: 1; updatedAt: number; rows: JutakuSalesRow[]; tokuteiMonths: Record<string, string>} {
   const rows = jobs
     .filter((j) => hasEstimateRows(j))
     .map((j): JutakuSalesRow => {
@@ -122,10 +153,11 @@ export function jutakuSalesSummary(jobs: Job[], s: EstimateSettings & Pick<Setti
         office: s.officeName.trim(),
       };
     });
-  return {v: 1, updatedAt: now, rows};
+  const tokuteiMonths = Object.fromEntries(Object.entries(s.tokuteiSalesMonths ?? {}).filter(([, m]) => MONTH.test(m)));
+  return {v: 1, updatedAt: now, rows, tokuteiMonths};
 }
 /** 書く（書けなくても困らない：受注残に住宅改修が届かないだけ）。ゴミ箱の様邸は渡さない（呼ぶ所でゴミ箱を除いた様邸を渡す） */
-export function writeJutakuSalesSummary(jobs: Job[], s: EstimateSettings & Pick<Settings, 'officeName'>, store: Pick<Storage, 'setItem'> = localStorage): void {
+export function writeJutakuSalesSummary(jobs: Job[], s: EstimateSettings & Pick<Settings, 'officeName'> & Partial<Pick<Settings, 'tokuteiSalesMonths'>>, store: Pick<Storage, 'setItem'> = localStorage): void {
   try {
     store.setItem(JUTAKU_SALES_KEY, JSON.stringify(jutakuSalesSummary(jobs, s)));
   } catch {
