@@ -71,7 +71,8 @@ export function CatalogPrintView({sale, onClose}: {sale: Sale; onClose: () => vo
         >
           🖨 印刷する
         </button>
-        <span role="group" aria-label="印刷するページ" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+        {/* スマホはページが12あると上の帯が画面の半分になるので、帯の中でスクロールする高さまで */}
+        <span role="group" aria-label="印刷するページ" className="flex max-h-[7.5rem] flex-wrap items-center gap-x-3 gap-y-1 overflow-y-auto text-sm sm:max-h-none sm:overflow-visible">
           {CATALOG.map((p, i) => (
             <label key={p.file} className="flex items-center gap-1">
               <input type="checkbox" checked={picked.has(i)} onChange={() => toggle(i)} className="h-4 w-4" />

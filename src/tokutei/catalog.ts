@@ -11,18 +11,34 @@ export type CatalogPage = {
   page: number; // カタログのページ番号
   title: string;
   subs?: string[]; // この細目の商品があれば、初めから印刷するページに入れる
-  maker?: RegExp; // 細目で選ぶのは、このメーカーの商品（か、メーカーが空の商品）だけ
-  words?: RegExp; // 商品名にこの言葉があれば入れる
+  maker?: RegExp; // このメーカーの商品（か、メーカーが空の商品）だけ
+  words?: RegExp; // 商品名にこの言葉があれば、このページだけ（同じ細目のほかのページは入れない）
 };
 
 const PORTABLE_TOILET = '移動できる便器（ポータブルトイレ）';
+const ANJU = /アロン|安寿/;
 
+/** ページの並び（印刷の画面のチェックの順）。入浴の用具 → 腰掛便座。2026-10-26 にユーザーから p.37・40・43・44・172・178・179 をいただいて足した */
 export const CATALOG: CatalogPage[] = [
+  {file: 'kaientai-p037.pdf', page: 37, title: 'シャワーベンチ（安寿）', subs: ['入浴用いす'], maker: ANJU},
+  {file: 'kaientai-p040.pdf', page: 40, title: 'シャワーチェア（パナソニック ユクリア）', subs: ['入浴用いす'], maker: /パナソニック|panasonic|ユクリア/i},
+  {file: 'kaientai-p043.pdf', page: 43, title: '浴槽台（パナソニック ユクリア）', subs: ['浴槽内いす'], maker: /パナソニック|panasonic|ユクリア/i},
+  {file: 'kaientai-p044.pdf', page: 44, title: '浴槽台・浴槽手すり（安寿）', subs: ['浴槽内いす', '浴槽用手すり'], maker: ANJU},
   {file: 'kaientai-p045.pdf', page: 45, title: '浴槽手すり・バスボード', subs: ['浴槽用手すり', '入浴台']},
   {file: 'kaientai-p047.pdf', page: 47, title: 'すべり止めマット', words: /すべり止め|滑り止め/},
   {file: 'kaientai-p050.pdf', page: 50, title: 'シャワーキャリー', words: /シャワーキャリー/},
-  {file: 'kaientai-p173.pdf', page: 173, title: 'ポータブルトイレ（安寿）', subs: [PORTABLE_TOILET], maker: /アロン|安寿/},
+  {file: 'kaientai-p172.pdf', page: 172, title: '家具調トイレ（安寿）', subs: [PORTABLE_TOILET], maker: ANJU},
+  {file: 'kaientai-p173.pdf', page: 173, title: '家具調トイレ セレクトS（安寿）', subs: [PORTABLE_TOILET], maker: ANJU},
   {file: 'kaientai-p177.pdf', page: 177, title: 'ポータブルトイレ（パナソニック）', subs: [PORTABLE_TOILET], maker: /パナソニック|panasonic/i},
+  {file: 'kaientai-p178.pdf', page: 178, title: 'ポータブルトイレ FX-30（安寿）', maker: ANJU, words: /FX-?30|マルチアシスト/i},
+  {
+    file: 'kaientai-p179.pdf',
+    page: 179,
+    title: '据置式便座・ポータブルトイレ（安寿）',
+    subs: ['和式便器を腰掛式にするもの'],
+    maker: /アロン|安寿|新輝/,
+    words: /サニタリエース|据置(式)?便座|楽立|FX-?CP|ポータブルトイレ\s*S型/i,
+  },
 ];
 
 export const catalogLabel = (p: CatalogPage) => `p.${p.page} ${p.title}`;
@@ -46,25 +62,22 @@ export function pageCodes(text: string): Set<string> {
 }
 
 /**
- * 見積もりの商品が載っているページ（初めから印刷するページ）。品番がページにあればそのページ、なければ細目（種目の中の分類）と
- * メーカー、商品名の言葉で選ぶ。codes は、ページごとの品番（pageCodes。読めていないページは null）
+ * 見積もりの商品が載っているページ（初めから印刷するページ）。品番がページにあればそのページ。なければ商品名の言葉（FX-30・サニタリエース など
+ * そのページにしかない名前）で選び、それもなければ細目（種目の中の分類）とメーカーで選ぶ。codes は、ページごとの品番（pageCodes。読めていないページは null）
  */
 export function catalogPicks(items: Pick<SaleItem, 'name' | 'maker' | 'code' | 'sub'>[], codes: (Set<string> | null)[] = []): Set<number> {
   const picks = new Set<number>();
+  const all = CATALOG.map((_, i) => i);
   for (const it of items) {
     const code = codeKey(it.code);
-    const byCode = code.length >= 4 ? CATALOG.map((_, i) => i).filter((i) => codes[i]?.has(code)) : [];
-    if (byCode.length) {
-      for (const i of byCode) picks.add(i);
-      continue;
-    }
+    const byCode = code.length >= 4 ? all.filter((i) => codes[i]?.has(code)) : [];
     const name = (it.name || '').normalize('NFKC');
     const sub = it.sub || guessCategory(it.name).sub;
     const maker = (it.maker || '').normalize('NFKC');
-    CATALOG.forEach((p, i) => {
-      if (p.words?.test(name)) picks.add(i);
-      else if (sub && p.subs?.includes(sub) && (!p.maker || !maker || p.maker.test(maker) || p.maker.test(name))) picks.add(i);
-    });
+    const makerOk = (p: CatalogPage) => !p.maker || !maker || p.maker.test(maker) || p.maker.test(name);
+    const byWords = all.filter((i) => CATALOG[i].words?.test(name) && makerOk(CATALOG[i]));
+    const bySub = sub ? all.filter((i) => CATALOG[i].subs?.includes(sub) && makerOk(CATALOG[i])) : [];
+    for (const i of byCode.length ? byCode : byWords.length ? byWords : bySub) picks.add(i);
   }
   return picks;
 }
