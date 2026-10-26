@@ -145,3 +145,27 @@ test('住宅改修へ返す（⇔）：開いたときは住宅改修で空の�
   assert.deepEqual(jutakuChanges({...typed, kana: 'ミホン　ジロウ', address: ''}, sent, given), {kana: 'ミホン　ジロウ', address: ''});
   assert.deepEqual(jutakuChanges(typed, sent, given), {});
 });
+
+test('担当（ユーザーの指示「受注残に入れるとき当然担当名のところ、紐付けて」2026-10-26）：住宅改修の様邸の担当が入る。空なら案件の担当のまま。ここで選び直した担当はそのまま', () => {
+  const settings = {...defaultSettings(), staffList: ['見本 太郎', '見本 次郎', '見本 三郎']};
+  // 作るとき：住宅改修の担当（なければ担当者の候補の1人目）
+  const made = applyJutaku([], settings, {job: 'j1', fields: {customer: '見本 花子', staff: '見本 次郎'}}, 1000);
+  assert.equal(made.sales[0].staff, '見本 次郎');
+  assert.equal(applyJutaku([], settings, {job: 'j2', fields: {customer: '見本 花子', staff: ''}}, 1000).sales[0].staff, '見本 太郎');
+  assert.equal(applyJutaku([], settings, {job: 'j3', fields: {customer: '見本 花子'}}, 1000).sales[0].staff, '見本 太郎');
+  // 住宅改修で担当を変えた → 入れ直す。空にしても消さない
+  let r = applyJutaku(made.sales, settings, {job: 'j1', fields: {customer: '見本 花子', staff: '見本 三郎'}}, 2000);
+  assert.equal(r.sales[0].staff, '見本 三郎');
+  assert.equal(applyJutaku(r.sales, settings, {job: 'j1', fields: {customer: '見本 花子', staff: ''}}, 3000).sales[0].staff, '見本 三郎');
+  // ここで選び直した担当は、住宅改修の担当が変わっていなければそのまま
+  const picked = r.sales.map((s) => ({...s, staff: '見本 太郎'}));
+  assert.equal(applyJutaku(picked, settings, {job: 'j1', fields: {customer: '見本 花子', staff: '見本 三郎'}}, 4000).sales[0].staff, '見本 太郎');
+  // 前の版で作った案件（受け取った担当がない）：作ったときの担当（1人目）のままなら入る。選び直してあればそのまま
+  const old = {...r.sales[0], staff: '見本 太郎', jutakuSync: {customer: '見本 花子'}};
+  assert.equal(applyJutaku([old], settings, {job: 'j1', fields: {customer: '見本 花子', staff: '見本 次郎'}}, 5000).sales[0].staff, '見本 次郎');
+  assert.equal(applyJutaku([{...old, staff: '見本 三郎'}], settings, {job: 'j1', fields: {customer: '見本 花子', staff: '見本 次郎'}}, 5000).sales[0].staff, '見本 三郎');
+  // 住宅改修へ返す：開いたときは送らない（1人目の担当を住宅改修の担当にしない）。ここで選び直したら送る
+  const sale = made.sales[0];
+  assert.deepEqual(jutakuChanges({...sale, staff: '見本 太郎'}, null, {customer: '見本 花子', staff: ''}), {});
+  assert.deepEqual(jutakuChanges({...sale, staff: '見本 太郎'}, syncedValues(sale), null), {staff: '見本 太郎'});
+});

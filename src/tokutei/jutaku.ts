@@ -13,7 +13,8 @@ export const JUTAKU_KEY = 'taiyo-tokutei-from-jutaku-v1';
 
 export type JutakuHandoff = {job: string; fields: JutakuFields};
 
-const TEXT = ['customer', 'kana', 'insuredNo', 'zip', 'address', 'tel', 'careOffice', 'careManager'] as const;
+// 担当（staff）も受け取る（住宅改修の様邸の担当＝受注残に入る担当。入っていなければ住宅改修は渡さない。2026-10-26）
+const TEXT = ['customer', 'kana', 'insuredNo', 'zip', 'address', 'tel', 'careOffice', 'careManager', 'staff'] as const;
 /** 住宅改修から受け取る項目（JutakuFields）の全部 */
 const KEYS = [...TEXT, 'birthDate', 'gender', 'careLevel', 'insurer', 'burdenRatio', 'welfare'] as const;
 
@@ -64,6 +65,11 @@ export function syncedValues(sale: Sale): JutakuFields {
  * 同じ様邸の案件が2つ以上なら（「写す」で作った）いちばん新しいもの
  */
 export function applyJutaku(sales: Sale[], settings: Settings, h: JutakuHandoff, now = Date.now()): {sales: Sale[]; id: string} {
+  // 担当は空では入れない（住宅改修で担当を選んでいなければ、この案件の担当のまま）
+  if (h.fields.staff !== undefined && !h.fields.staff.trim()) {
+    const {staff: _blank, ...rest} = h.fields;
+    h = {...h, fields: rest};
+  }
   const linked = sales.filter((s) => s.jutakuJob === h.job).sort((a, b) => b.updatedAt - a.updatedAt)[0];
   if (!linked) {
     const sale: Sale = {...newSale(sales, settings, h.fields.insurer ?? INSURERS[0].key, now), ...h.fields, jutakuJob: h.job};
@@ -72,7 +78,8 @@ export function applyJutaku(sales: Sale[], settings: Settings, h: JutakuHandoff,
   }
   // 生活保護は 2026-10-23 から受け取る。それより前に作った案件の jutakuSync には無いので、初めの値（なし）を受け取ったものとみなす
   // （ここでまだ選んでいなければ、住宅改修で入れた生活保護が入る。ここで選んだ値はそのまま）
-  const prev: JutakuFields = {welfare: false, ...linked.jutakuSync};
+  // 担当も 2026-10-26 から受け取る。それより前に作った案件は、作ったときの担当（担当者の候補の1人目）を受け取ったものとみなす（ここで選び直した担当はそのまま）
+  const prev: JutakuFields = {welfare: false, staff: settings.staffList[0] ?? '', ...linked.jutakuSync};
   const patch: Partial<Sale> = {};
   for (const key of Object.keys(h.fields) as (keyof JutakuFields)[]) {
     const value = h.fields[key];
@@ -89,6 +96,13 @@ export function applyJutaku(sales: Sale[], settings: Settings, h: JutakuHandoff,
   return {sales: sales.map((s) => (s.id === linked.id ? next : s)), id: linked.id};
 }
 
+/**
+ * 住宅改修の様邸の画面の左（🪪 介護保険証の枠の下）の「📖 カタログを表示」「🖨 カタログを印刷」から届く（ユーザーの指示「赤枠の部分にカタログを表示と
+ * カタログを印刷という２つのボタンを設置する」2026-10-26）。住宅改修は 🛁 のタブを開いてから送る（住宅改修の src/sasaoka/tokuteiLink.ts の CATALOG_MSG）
+ */
+export const FROM_JUTAKU_CATALOG = 'taiyo-tokutei-catalog';
+export type CatalogAsk = {action: 'show' | 'print'; n: number};
+
 // ---------------------------------------------------------------- このアプリから住宅改修へ（⇔）
 // ユーザーの指示「特定福祉用具の申請書を入力した場合であっても、住宅改修申請書、理由書、見積もりなどに、名前や住所なども転記されるようにする。⇔
 // ただし、金額などを入れていない場合は、請求書や受注残にいれない」（2026-10-26）。住宅改修のタブの中で開いたとき、
@@ -96,13 +110,6 @@ export function applyJutaku(sales: Sale[], settings: Settings, h: JutakuHandoff,
 // 開いたときは、住宅改修で空の項目に、ここで入れてある値を送る（住宅改修の値は上書きしない）。請求書・受注残に入れるかは住宅改修が決める（見積書の行）
 
 export const TO_JUTAKU = 'taiyo-tokutei-to-jutaku';
-
-/**
- * 住宅改修の様邸の画面の左（🪪 介護保険証の枠の下）の「📖 カタログを表示」「🖨 カタログを印刷」から届く（ユーザーの指示「赤枠の部分にカタログを表示と
- * カタログを印刷という２つのボタンを設置する」2026-10-26）。住宅改修は 🛁 のタブを開いてから送る（住宅改修の src/sasaoka/tokuteiLink.ts の CATALOG_MSG）
- */
-export const FROM_JUTAKU_CATALOG = 'taiyo-tokutei-catalog';
-export type CatalogAsk = {action: 'show' | 'print'; n: number};
 
 const empty = (v: unknown) => v === undefined || v === null || v === '';
 
@@ -116,7 +123,8 @@ export function jutakuChanges(sale: Sale, sent: JutakuFields | null, given: Juta
   for (const k of KEYS) {
     if (sent) {
       if (!sameValue(now[k], sent[k])) Object.assign(out, {[k]: now[k] ?? ''});
-    } else if (given && empty(given[k]) && !empty(now[k]) && k !== 'welfare' && !sameValue(now[k], sale.jutakuSync?.[k])) {
+    } else if (given && empty(given[k]) && !empty(now[k]) && k !== 'welfare' && k !== 'staff' && !sameValue(now[k], sale.jutakuSync?.[k])) {
+      // 開いたときは担当を送らない（作ったときの担当＝担当者の候補の1人目を、住宅改修の担当にしてしまわないように。ここで選び直したら送る）
       Object.assign(out, {[k]: now[k]});
     }
   }

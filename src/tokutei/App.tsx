@@ -136,8 +136,13 @@ export default function App() {
       window.parent.postMessage({type: TO_JUTAKU, job: jutaku, fields}, location.origin);
     } catch {
       /* 住宅改修に送れなくても、ここでは使える */
+      return;
     }
-  }, [linkedSale, jutaku]);
+    // 住宅改修にも同じ値が入るので、住宅改修から受け取った値（jutakuSync）にもする。しないと、ここで直した項目を「手で直した」とみなして、
+    // あとで住宅改修で直した値（担当など）が入らなかった（2026-10-26）
+    const id = linkedSale.id;
+    store.update('sales', (list) => list.map((x) => (x.id === id ? {...x, jutakuSync: {...x.jutakuSync, ...fields}} : x)));
+  }, [linkedSale, jutaku, store]);
   useEffect(() => {
     if (!linkedSale || !data) return;
     type Book = {name: string; bytes: Uint8Array};
