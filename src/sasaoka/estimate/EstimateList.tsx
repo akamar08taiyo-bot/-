@@ -136,10 +136,11 @@ export function EstimateHome({
             </div>
           </div>
         </section>
-        <section className="rounded-xl border-2 border-slate-300 bg-white p-5 shadow-sm" aria-label="一覧から作成">
-          <h2 className="text-xl font-bold text-slate-800">📋 一覧から作成</h2>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Btn color="white" className="!px-5 !py-4 !text-base" onClick={onList}>
+        {/* 新規作成（薄い緑）と同じ形で、薄い水色に色づけて分かるように（ユーザーの指示「一覧から作成の方も、薄く色づけてわかるようにする」2026-10-27。前は白い枠に白いボタン） */}
+        <section className="rounded-xl border-2 border-sky-600 bg-white p-5 shadow-sm" aria-label="一覧から作成">
+          <h2 className="text-xl font-bold text-sky-900">📋 一覧から作成</h2>
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-sky-200 bg-sky-50/60 p-3">
+            <Btn color="sky" className="!px-5 !py-4 !text-base" onClick={onList}>
               📋 見積書の一覧を開く
             </Btn>
             <span className="text-sm text-slate-600">
