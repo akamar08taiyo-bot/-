@@ -478,8 +478,14 @@ export function SaleEditor({
                   </Btn>
                 </div>
               </section>
+              {/* ふつうに開いたとき（住宅改修のタブの中でないとき）は、見積もりの画面からも申請書（Excel）を作れる（前からの近道） */}
               {fixedView !== 'quote' && (
-                <div id="shinsei-panel">
+                <div id="shinsei-panel" className="space-y-2">
+                  {form && (
+                    <Btn color="excel" className="w-full" onClick={() => void shinseiExcel.make()} disabled={shinseiExcel.busy}>
+                      {shinseiExcel.busy ? '作っています…' : '📗 申請書をExcelで保存'}
+                    </Btn>
+                  )}
                   <ShinseiPanel sale={sale} settings={s} />
                 </div>
               )}

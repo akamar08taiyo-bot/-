@@ -655,7 +655,11 @@ try {
   const catBox = await page.getByRole('button', {name: '📖 カタログを印刷'}).boundingBox();
   assert.ok(nameBox && xlBox && prBox && catBox, 'ボタンがない');
   assert.ok(xlBox.x > nameBox.x + nameBox.width && xlBox.x - (nameBox.x + nameBox.width) < 160 && Math.abs(xlBox.y + xlBox.height / 2 - (nameBox.y + nameBox.height / 2)) < 8, `${JSON.stringify(nameBox)} ${JSON.stringify(xlBox)}`);
-  assert.ok(prBox.x > xlBox.x && Math.abs(prBox.y - xlBox.y) < 1 && catBox.x > prBox.x + prBox.width + 100, `${JSON.stringify(prBox)} ${JSON.stringify(catBox)}`);
+  assert.ok(prBox.x > xlBox.x && Math.abs(prBox.y - xlBox.y) < 1 && catBox.x > prBox.x + prBox.width, `${JSON.stringify(prBox)} ${JSON.stringify(catBox)}`);
+  // 右のかたまり（カタログ・複製・削除）は行の右に寄せる
+  const rightEnd = await page.getByRole('button', {name: '削除', exact: true}).boundingBox();
+  const rowBox = await page.locator('h2').first().locator('xpath=..').boundingBox();
+  assert.ok(rightEnd && rowBox && Math.abs(rightEnd.x + rightEnd.width - (rowBox.x + rowBox.width)) < 2, `${JSON.stringify(rightEnd)} ${JSON.stringify(rowBox)}`);
   assert.equal(await page.getByRole('button', {name: '📄 申請書（Excel）を作る'}).count(), 0);
   await page.getByRole('button', {name: '📖 カタログを印刷'}).click();
   await page.getByRole('group', {name: '印刷するページ'}).waitFor();
