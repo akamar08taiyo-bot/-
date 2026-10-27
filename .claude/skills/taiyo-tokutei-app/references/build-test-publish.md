@@ -33,6 +33,9 @@ E2E_PORT=5194 PLAYWRIGHT=/opt/node-tools/node_modules/playwright/index.mjs timeo
 - 見た目を変えたら、パソコンとスマホ（390px）のスクリーンショットを撮って自分の目で見る。
 - 販売受注簿への転記：受注簿ツール（`akamar08taiyo-bot/taiyo-hacchu-scan`、`/home/user/taiyo-hacchu-scan`）を `npm ci && npm run build` してから
   `node test/tokutei/e2e-hacchu.mjs /home/user/taiyo-hacchu-scan/dist <出力フォルダ>`（5193番で `/tokutei/` と `/taiyo-hacchu-scan/` を同じサイトに置く）。
+  売上伝票発行依頼書（2026-10-27）：売上伝票のリポジトリ（`/home/user/taiyo-uriage-denpyo`）で `npm run build` のあと `node test/tokutei/e2e-uriage.mjs /home/user/taiyo-uriage-denpyo/dist <出力フォルダ>`（5195番で `/tokutei/` と `/taiyo-uriage-denpyo/` を同じサイトに）。
+  売上伝票は Tailwind を CDN から読むので、見た目も見るときは `npx tailwindcss@3`（content に売上伝票の index.html と src/）で作った CSS を `TW_CSS` に渡す。
+  負担割合は新しい案件では未選択なので、ブラウザのテストで金額（利用者負担）を見る前に「負担割合」の 1割 などを押す（e2e.mjs・e2e-hacchu.mjs）。
 - スクショから自動認識：受注簿ツール（ブランチ `claude/tokutei-embed`）を `npm run build` してから
   `ENG_DATA=<フォルダ> node test/tokutei/e2e-scan.mjs /home/user/taiyo-hacchu-scan/dist <出力フォルダ>`（5194番）。読み取りの部品は jsDelivr から取れないので、
   node_modules の tesseract.js・tesseract.js-core・@tesseract.js-data/jpn と、英語のデータ（受注簿ツールは jpn+eng で読む。`npm pack @tesseract.js-data/eng@1.0.0` を開いた
