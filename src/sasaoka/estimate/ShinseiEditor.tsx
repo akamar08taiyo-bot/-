@@ -29,6 +29,7 @@ import {ShinseiPrint} from './ShinseiPrint.tsx';
 import {clearedSheet} from '../sheetEdit.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {CardFill} from '../components/CardReader.tsx';
+import {JobHeader, JobTitle} from './JobHeader.tsx';
 
 /** 欄の順番：保険者ごとの申請書の上からの順番（原本を見て決めた。みやこ町・広域連合は承認の申請書の順番で、支給申請書だけの着工日・完成日は最後）。
  *  ただし被保険者氏名はどの保険者もフリガナのすぐ下（ユーザーの指示「ふりがなの下に、名前をもってくる」、2026-10-21。苅田町・みやこ町は原本では番号が先） */
@@ -429,42 +430,34 @@ export function ShinseiEditor({
 
   return (
     <div className="space-y-3">
-      {/* Excel で保存は画面のまん中（ユーザーの指示「Excelの印刷、保存ボタンを中央にもってくる」2026-10-22。見積書のタブの保存・Excel・印刷も同じ所）。
-          広い画面は 左・まん中・右 の3つに分け、まん中を画面のまん中にそろえる。狭い画面はまん中のボタンだけの行にして、そのまん中に */}
-      <div className="flex flex-wrap items-center gap-2 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-        {/* 一覧へ戻る・様邸のタブは1段目に横いっぱい（4つのタブは左の列に入りきらない。どのタブでも同じ位置）。
-            介護保険証から入れるはタブのすぐ右（ユーザーの指示「上のタブの近辺に」） */}
-        <div className="flex flex-wrap items-center gap-2 lg:col-span-3">
-          <Btn color="white" onClick={onBack}>
-            ← 一覧へ戻る
-          </Btn>
-          {tabs}
-          <CardFill job={job} setJob={setJob} staffList={s.staffList} />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-lg font-bold text-[#14532d]">{job.customer.trim() ? jobName(job) : '新しい申請書'}</h1>
-          {insurer && <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-900">{INSURER_INFO[insurer].name}</span>}
-        </div>
-        {/* 申請書を保存・まとめて保存・印刷を並べる（ユーザーの指示「申請書を保存、まとめて保存、印刷ボタンを並びで表示する」2026-10-26） */}
-        <div className="flex flex-wrap justify-center gap-2 max-lg:basis-full">
-          {canMakeShinsei(insurer) && (
-            <Btn color="softGreen" onClick={save}>
-              📗 申請書をExcelで保存
-            </Btn>
-          )}
-          {batch}
-          {canMakeShinsei(insurer) && (
-            <Btn color="softSky" onClick={() => setPrinting(true)} disabled={!pages?.length}>
-              🖨 申請書を印刷
-            </Btn>
-          )}
-        </div>
-        <div className="flex flex-wrap justify-end gap-2">
+      {/* 上の2段（一覧へ戻る・タブ・介護保険証から入れる／名前・Excel・まとめて保存・印刷・白紙に戻す）はどのタブでも同じ形（JobHeader.tsx） */}
+      <JobHeader
+        onBack={onBack}
+        tabs={tabs}
+        extra={<CardFill job={job} setJob={setJob} staffList={s.staffList} />}
+        title={<JobTitle name={job.customer.trim() ? jobName(job) : '新しい申請書'} badge={insurer ? INSURER_INFO[insurer].name : undefined} />}
+        // 申請書を保存・まとめて保存・印刷を並べる（ユーザーの指示「申請書を保存、まとめて保存、印刷ボタンを並びで表示する」2026-10-26）
+        center={
+          <>
+            {canMakeShinsei(insurer) && (
+              <Btn color="softGreen" onClick={save}>
+                📗 申請書をExcelで保存
+              </Btn>
+            )}
+            {batch}
+            {canMakeShinsei(insurer) && (
+              <Btn color="softSky" onClick={() => setPrinting(true)} disabled={!pages?.length}>
+                🖨 申請書を印刷
+              </Btn>
+            )}
+          </>
+        }
+        right={
           <Btn color="white" onClick={clearAll} disabled={blank}>
             📄 白紙に戻す
           </Btn>
-        </div>
-      </div>
+        }
+      />
       {printing && pages && map && (
         <ShinseiPrint pages={pages} title={shinseiFileName(map, job, estimateDateOf(job)).replace(/\.xlsx$/, '')} photos={previewPhotos} plan={previewPlan} onClose={() => setPrinting(false)} />
       )}

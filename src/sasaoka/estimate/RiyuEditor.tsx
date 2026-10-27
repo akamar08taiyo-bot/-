@@ -19,6 +19,7 @@ import {saveRiyu, useTemplate} from './shinseiFiles.ts';
 import {Circles, Note} from './ShinseiEditor.tsx';
 import {ShinseiPages} from './ShinseiPreview.tsx';
 import {CardFill} from '../components/CardReader.tsx';
+import {JobHeader, JobTitle} from './JobHeader.tsx';
 
 type Field = ShinseiField;
 
@@ -392,28 +393,21 @@ export function RiyuEditor({job, data, update, onBack, tabs, batch}: {job: Job; 
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-        {/* 一覧へ戻る・様邸のタブは1段目に横いっぱい（4つのタブは左の列に入りきらない。どのタブでも同じ位置）。
-            介護保険証から入れるはタブのすぐ右（ユーザーの指示「上のタブの近辺に」） */}
-        <div className="flex flex-wrap items-center gap-2 lg:col-span-3">
-          <Btn color="white" onClick={onBack}>
-            ← 一覧へ戻る
-          </Btn>
-          {tabs}
-          <CardFill job={job} setJob={setJob} staffList={s.staffList} />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-lg font-bold text-[#14532d]">{job.customer.trim() ? jobName(job) : '新しい理由書'}</h1>
-          {insurer && <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-900">{INSURER_INFO[insurer].name}</span>}
-        </div>
-        <div className="flex flex-wrap justify-center gap-2 max-lg:basis-full">
-          <Btn color="softGreen" onClick={save}>
-            📗 理由書をExcelで保存
-          </Btn>
-          {batch}
-        </div>
-        <div />
-      </div>
+      {/* 上の2段はどのタブでも同じ形（JobHeader.tsx） */}
+      <JobHeader
+        onBack={onBack}
+        tabs={tabs}
+        extra={<CardFill job={job} setJob={setJob} staffList={s.staffList} />}
+        title={<JobTitle name={job.customer.trim() ? jobName(job) : '新しい理由書'} badge={insurer ? INSURER_INFO[insurer].name : undefined} />}
+        center={
+          <>
+            <Btn color="softGreen" onClick={save}>
+              📗 理由書をExcelで保存
+            </Btn>
+            {batch}
+          </>
+        }
+      />
 
 
       {/* 入れる所は申請書のタブより広く（文を書く欄が多い。ユーザーの指示「入力欄がやや狭い」2026-10-26） */}

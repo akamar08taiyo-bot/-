@@ -6,6 +6,7 @@ import type {ReactNode} from 'react';
 import {jobName} from '../calc.ts';
 import {CardFill} from '../components/CardReader.tsx';
 import {Btn} from '../components/ui.tsx';
+import {BackButton} from './JobHeader.tsx';
 import {INSURER_INFO, jobInsurer} from '../estimateForms.ts';
 import {CATALOG_EVENT, CATALOG_MSG, flushTokutei, takeCatalog, tokuteiUrl, writeTokutei} from '../tokuteiLink.ts';
 import type {TokuteiView} from '../tokuteiLink.ts';
@@ -87,9 +88,8 @@ export function TokuteiEditor({job, view, onBack, tabs, update}: {job: Job; view
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Btn color="white" onClick={onBack}>
-          ← 一覧へ戻る
-        </Btn>
+        {/* ほかのタブと同じ大きさ（JobHeader.tsx。違うと、すぐ右のタブの位置がずれる） */}
+        <BackButton onClick={onBack} />
         {tabs}
         {/* 介護保険証から入れるは、ほかのタブと同じくタブのすぐ右 */}
         {update && <CardFill job={job} setJob={setJob} />}

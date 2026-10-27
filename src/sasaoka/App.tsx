@@ -113,7 +113,8 @@ function JobTabs({view, onView}: {view: JobView; onView: (v: JobView) => void}) 
           role="tab"
           aria-selected={view === v}
           onClick={() => onView(v)}
-          className={`whitespace-nowrap px-2 py-2 text-sm font-bold transition last:col-span-2 md:px-4 md:text-[15px] ${view === v ? 'bg-[#14532d] text-white' : 'bg-white text-[#14532d] hover:bg-emerald-50'}`}
+          // 広い画面は少し大きく（ユーザーの指示「このタブの部分をもう少し大きくする」2026-10-27）。md の幅は今の大きさのまま（大きくすると1段に入らない）
+          className={`whitespace-nowrap px-2 py-2 text-sm font-bold transition last:col-span-2 md:px-4 md:text-[15px] lg:px-5 lg:py-2.5 lg:text-[17px] ${view === v ? 'bg-[#14532d] text-white' : 'bg-white text-[#14532d] hover:bg-emerald-50'}`}
         >
           {text}
         </button>

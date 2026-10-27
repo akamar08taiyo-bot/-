@@ -2,6 +2,7 @@ import {useEffect, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
 import {hasEstimateRows, jobName, startEstimate} from '../calc.ts';
 import {CardFill} from '../components/CardReader.tsx';
+import {JobHeader, JobTitle} from './JobHeader.tsx';
 import {EstimateSheet} from '../components/EstimateSheet.tsx';
 import {LaborPickerFor, missingShikiri, ShikiriPriceDialog} from '../components/JobTools.tsx';
 import {KitPicker} from '../components/Kits.tsx';
@@ -148,51 +149,45 @@ export function EstimateEditor({
 
   return (
     <div className="space-y-3">
-      {/* 保存・Excel・印刷は画面のまん中（ユーザーの指示「Excelの印刷、保存ボタンを中央にもってくる」2026-10-22。申請書のタブの Excel も同じ所）。
-          広い画面は 左・まん中・右 の3つに分け、まん中を画面のまん中にそろえる。白紙に戻す・発注書・複製・削除は右（複製は一度外したが「やはり残してください」2026-10-26 で戻した）。狭い画面はまん中のボタンだけの行にして、そのまん中に */}
-      <div className="flex flex-wrap items-center gap-2 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-        {/* 一覧へ戻る・様邸のタブは1段目に横いっぱい（4つのタブは左の列に入りきらない。どのタブでも同じ位置）。
-            介護保険証から入れるはタブのすぐ右（ユーザーの指示「上のタブの近辺に」） */}
-        <div className="flex flex-wrap items-center gap-2 lg:col-span-3">
-          <Btn color="white" onClick={onBack}>
-            ← 一覧へ戻る
-          </Btn>
-          {tabs}
-          <CardFill job={job} setJob={setJob} staffList={s.staffList} />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-lg font-bold text-[#14532d]">{name}</h1>
-          <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-900">
-            {insurer ? INSURER_INFO[insurer].name : FORM_INFO[form].name}「{FORM_INFO[form].title}」
-          </span>
-        </div>
-        <div className="flex flex-wrap justify-center gap-2 max-lg:basis-full">
-          <Btn color="softBlue" onClick={save}>
-            💾 保存
-          </Btn>
-          <Btn color="softGreen" onClick={() => saveEstimateExcel(job, s, toast)}>
-            📗 Excelで保存
-          </Btn>
-          {batch}
-          <Btn color="softSky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
-            🖨 見積書を印刷
-          </Btn>
-        </div>
-        <div className="flex flex-wrap justify-end gap-2">
-          <Btn color="white" onClick={clearSheet} disabled={blank}>
-            📄 白紙に戻す
-          </Btn>
-          <Btn color="white" onClick={onOpenOrder} disabled={!estimated} title={estimated ? undefined : '見積書に部材を入れると作れます'}>
-            🛒 発注書を作成
-          </Btn>
-          <Btn color="white" onClick={duplicate}>
-            複製
-          </Btn>
-          <Btn color="white" onClick={removeJob}>
-            削除
-          </Btn>
-        </div>
-      </div>
+      {/* 上の2段はどのタブでも同じ形（JobHeader.tsx）。保存・Excel・印刷は上のタブのまん中、白紙に戻す・発注書・複製・削除は右
+          （複製は一度外したが「やはり残してください」2026-10-26 で戻した）。
+          名前の横は保険者だけ（「苅田町「工事費見積書兼工事費内訳書」」の書式の名前は「この部分の説明は不要」2026-10-27） */}
+      <JobHeader
+        onBack={onBack}
+        tabs={tabs}
+        extra={<CardFill job={job} setJob={setJob} staffList={s.staffList} />}
+        title={<JobTitle name={name} badge={insurer ? INSURER_INFO[insurer].name : FORM_INFO[form].name} />}
+        center={
+          <>
+            <Btn color="softBlue" onClick={save}>
+              💾 保存
+            </Btn>
+            <Btn color="softGreen" onClick={() => saveEstimateExcel(job, s, toast)}>
+              📗 Excelで保存
+            </Btn>
+            {batch}
+            <Btn color="softSky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
+              🖨 見積書を印刷
+            </Btn>
+          </>
+        }
+        right={
+          <>
+            <Btn color="white" onClick={clearSheet} disabled={blank}>
+              📄 白紙に戻す
+            </Btn>
+            <Btn color="white" onClick={onOpenOrder} disabled={!estimated} title={estimated ? undefined : '見積書に部材を入れると作れます'}>
+              🛒 発注書を作成
+            </Btn>
+            <Btn color="white" onClick={duplicate}>
+              複製
+            </Btn>
+            <Btn color="white" onClick={removeJob}>
+              削除
+            </Btn>
+          </>
+        }
+      />
 
       {/* 見積書の欄にないものだけ（苅田町・行橋市・みやこ町用は、お客様名・被保険者番号・工事場所・作成日を見積書の欄に打ち込む）。
           説明の文は置かない（ユーザーの指示）。笹岡工務店の請求書に入れるかも同じ枠に並べる。
