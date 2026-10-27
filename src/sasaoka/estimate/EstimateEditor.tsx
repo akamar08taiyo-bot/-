@@ -19,6 +19,7 @@ import type {Update} from '../useStore.ts';
 import {clearedSheet} from '../sheetEdit.ts';
 import {staffFull, thisMonth, todayIso} from '../util.ts';
 import {duplicateEstimate, removeEstimate, saveEstimateExcel} from './EstimateList.tsx';
+import {UriageDialog} from './UriageDialog.tsx';
 
 // at：見積書で選んでいた（タップしていた）行。部材・部材＋施工費（常用）はそこに入れる（`insertRowsAt`）
 type Picker =
@@ -60,6 +61,7 @@ export function EstimateEditor({
   const insurer = jobInsurer(job);
   const [picker, setPicker] = useState<Picker | null>(null);
   const [fixPrices, setFixPrices] = useState(false);
+  const [uriageOpen, setUriageOpen] = useState(false);
 
   const setJob = (fn: (j: Job) => Job) => update('jobs', (list) => list.map((j) => (j.id === job.id ? startEstimate(j, {...fn(j), updatedAt: Date.now()}) : j)));
   const setPlace = (placeId: string, fn: (p: Place) => Place) =>
@@ -168,6 +170,10 @@ export function EstimateEditor({
             {batch}
             <Btn color="softSky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
               🖨 見積書を印刷
+            </Btn>
+            {/* 売上伝票発行依頼書（ユーザーと決めたこと「見積書のタブの上の段」2026-10-27。足りない所は窓で入れてから開く。UriageDialog.tsx） */}
+            <Btn color="white" onClick={() => setUriageOpen(true)}>
+              🧾 売上伝票
             </Btn>
           </>
         }
@@ -298,6 +304,7 @@ export function EstimateEditor({
       />
 
       {fixPrices && <ShikiriPriceDialog job={job} materials={data.materials} setJob={setJob} update={update} onClose={() => setFixPrices(false)} />}
+      {uriageOpen && <UriageDialog job={job} s={s} setJob={setJob} onClose={() => setUriageOpen(false)} />}
       {picker && pickPlace && picker.kind === 'material' && (
         <MaterialPicker
           place={pickPlace}

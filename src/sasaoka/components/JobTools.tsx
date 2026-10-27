@@ -13,7 +13,7 @@ import {Btn, Modal, NumberInput} from './ui.tsx';
 export function copyJob(job: Job): Job {
   const now = Date.now();
   // 複製はゴミ箱に入れない（ゴミ箱の様邸は複製できないが、念のため）。平面図の図もそのお宅のもの（写真と同じ）なので、複製には入れない
-  const {trashedAt: _trashedAt, planPhoto: _plan, salesMonth: _salesMonth, ...rest} = job; // 売上見込みの月も、複製した見積書は請求する月から
+  const {trashedAt: _trashedAt, planPhoto: _plan, salesMonth: _salesMonth, uriage: _uriage, ...rest} = job; // 売上見込みの月も、複製した見積書は請求する月から
   return {
     ...rest,
     id: uid('j'),

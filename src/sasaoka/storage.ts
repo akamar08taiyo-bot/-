@@ -391,6 +391,14 @@ function cleanShinsei(raw: unknown, legacyMarks: unknown): ShinseiInfo {
   return out;
 }
 
+/** 売上伝票の顧客区分・請求区分（uriage.ts）。知らない値は捨てる */
+function cleanUriage(u: Record<string, unknown>): NonNullable<Job['uriage']> {
+  return {
+    ...(u.customer === 'new' || u.customer === 'existing' ? {customer: u.customer} : {}),
+    ...(u.billing === 'receipt' || u.billing === 'reimbursement' ? {billing: u.billing} : {}),
+  };
+}
+
 export function cleanJobs(raw: unknown): Job[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter(isObj).map((rec) => keepNewer(rec, (j) => {
@@ -422,6 +430,7 @@ export function cleanJobs(raw: unknown): Job[] {
       ...(typeof j.planPhoto === 'string' && j.planPhoto ? {planPhoto: j.planPhoto} : {}), // 平面図の図（写真と同じ番号＝文字。2026-10-25）
       // 売上見込みの月＝売上月（2026-10-25）。請求する月と同じなら持たない（請求する月と一緒に変わるように。前の版は一覧の ◀ ▶ で同じ月も持った。2026-10-26）
       ...(/^\d{4}-\d{2}$/.test(str(j.salesMonth)) && str(j.salesMonth) !== str(j.month) ? {salesMonth: str(j.salesMonth)} : {}),
+      ...(isObj(j.uriage) ? {uriage: cleanUriage(j.uriage)} : {}), // 売上伝票の顧客区分・請求区分（2026-10-27）
       createdAt: numv(j.createdAt, Date.now()),
       updatedAt: numv(j.updatedAt, Date.now()),
     };

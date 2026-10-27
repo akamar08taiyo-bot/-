@@ -16,7 +16,7 @@ description: 太陽シルバーサービス㈱（行橋営業所）の「太陽�
 | 見積・提案書作成 | https://akamar08taiyo-bot.github.io/taiyo-mitsumori/ | `taiyo-mitsumori`（main が本番） | `taiyo-mitsumori-app` |
 | 福祉用具相談報告書 | …/taiyo-fukushi-report/ | `taiyo-fukushi-report` | — |
 | 販売受注簿作成ツール | …/taiyo-hacchu-scan/ | `taiyo-hacchu-scan`（master の `docs/`） | `taiyo-jutaku-mitsumori-app` の references/hacchu-scan.md |
-| 売上伝票発行依頼書 | …/taiyo-uriage-denpyo/ | `taiyo-uriage-denpyo` | — |
+| 売上伝票発行依頼書 | …/taiyo-uriage-denpyo/ | `taiyo-uriage-denpyo`（**master の `docs/` が本番**。`npm run build` の dist を docs/ に置く。2026-10-27 から申請書・見積書作成の「🧾 売上伝票」から中身の入った状態で開く＝受け取り口 `src/lib/importRequest.js`） | `taiyo-tokutei-app`・`taiyo-jutaku-mitsumori-app` の「🧾 売上伝票」 |
 | 消耗品売上管理 | …/taiyo-uriage-bunseki/ | `taiyo-uriage-bunseki`（main） | `taiyo-uriage-bunseki-app` |
 | 受注残・進捗管理 | …/solar-silver-progress-app/ | `solar-silver-progress-app`（**main が本番**。作業はブランチ、2026-10 は `claude/taiyo-link-dedupe`） | `taiyo-progress-app`（そのリポジトリの作業のブランチ） |
 | 居宅カレンダー | …/taiyo-calendar/ | `taiyo-calendar` | — |
