@@ -121,7 +121,7 @@ if (withTokutei) {
   assert.equal(await tk.getByLabel('商品名').last().inputValue(), '見本の多点杖');
   assert.equal(await field('お客様名').inputValue(), '見本 花子');
   assert.equal(await tk.getByRole('tab', {name: /^📄 申請書/}).count(), 0);
-  assert.equal(await tk.getByRole('button', {name: '📄 申請書（Excel）を作る'}).count(), 0);
+  assert.equal(await tk.getByRole('button', {name: '📗 申請書をExcelで保存'}).count(), 0);
   await page.screenshot({path: path.join(outDir, 'tokutei-1b-hanbai.png')});
   await page.getByRole('tab', {name: '🛁 特定福祉用具申請書'}).click();
   await field('お客様名').waitFor();
