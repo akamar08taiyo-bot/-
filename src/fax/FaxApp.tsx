@@ -3,6 +3,7 @@ import type {ReactNode, Ref} from 'react';
 import {AlertTriangle, Check, ChevronDown, Minus, Plus, Printer, RotateCcw, Save, Settings2, Trash2} from 'lucide-react';
 import {SHEET_FONTS, fontPreviewStyle, sanitizeFont} from './fonts';
 import type {SheetFont} from './fonts';
+import {OFFICE_GROUPS, findOffice} from './offices';
 import {describeRecipient, recipientSuggestions, rememberRecipient} from './recipient';
 import {FaxSheet} from './sheets';
 import type {SheetData} from './sheets';
@@ -509,114 +510,64 @@ export function FaxApp() {
         </main>
 
         <div className="mx-auto max-w-[1440px] space-y-3 px-4 pb-8">
-          <details className="group rounded-2xl border border-slate-200 bg-white shadow-sm">
-            {/* 1行目に見出しと「変更する」ボタン、2行目にいまの設定（右端まで使う） */}
-            <summary className="grid cursor-pointer list-none grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 rounded-2xl px-4 py-3 hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
-              <Settings2 className="mt-0.5 h-4 w-4 text-slate-500" aria-hidden />
-              {/* スマホで折り返すときは「設定」と「（差出人・保存した宛先）」のあいだで折り返す */}
-              <span className="text-sm font-bold text-slate-800">
-                設定<span className="inline-block">（差出人・保存した宛先）</span>
-              </span>
-              {/* 押すと開くことがわかるよう、ボタンの形で「変更する／閉じる」と出す */}
-              <span className="flex items-center gap-1 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700">
-                <span className="group-open:hidden">変更する</span>
-                <span className="hidden group-open:inline">閉じる</span>
-                <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" aria-hidden />
-              </span>
-              {/*
-                閉じているときも、いまの設定を項目名つきで出す（開くと下の入力欄に同じ内容が出るので隠す）。
-                1行目に営業所名と担当、2行目にその営業所の住所・TEL・FAX、3行目に保存した宛先の件数
-              */}
-              <span className="col-span-2 col-start-2 mt-1 grid gap-y-0.5 text-sm text-slate-800 group-open:hidden">
-                <span className="flex flex-wrap gap-x-4 gap-y-0.5">
-                  <span>
-                    <span className="text-slate-500">差出人：</span>
-                    {/* 会社名と「営業部名 営業所名」は、それぞれの途中で折り返さない */}
-                    {[sender.company, [sender.department, sender.office].filter(Boolean).join(' ')]
-                      .filter(Boolean)
-                      .map((part, i) => (
-                        <Fragment key={i}>
-                          {i > 0 && ' '}
-                          <span className="inline-block">{part}</span>
-                        </Fragment>
-                      ))}
-                    {!sender.company && !sender.department && !sender.office && '未設定'}
-                  </span>
-                  {sender.person && (
-                    <span className="whitespace-nowrap">
-                      <span className="text-slate-500">担当：</span>
-                      {sender.person}
-                    </span>
-                  )}
+          {/*
+            差出人。営業所と担当はいつも見えるところで選ぶ（営業所を選ぶと、住所・TEL・FAXもその営業所のものになる）。
+            会社名などの直接入力と保存した宛先は、下の「詳しい設定」を開いたときだけ出す
+          */}
+          <section aria-label="差出人" className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <SenderBar sender={sender} onChange={setSender} />
+            <details className="group border-t border-slate-100">
+              <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 rounded-b-2xl px-4 py-2 hover:bg-slate-50 group-open:rounded-none [&::-webkit-details-marker]:hidden">
+                <span className="text-xs text-slate-600">
+                  詳しい設定（会社名・住所などの直接入力）・
+                  <span className="inline-block">保存した宛先 {savedRecipients.length}件</span>
                 </span>
-                {(sender.postal || sender.address || sender.tel || sender.fax) && (
-                  <span className="flex flex-wrap gap-x-4 gap-y-0.5">
-                    {(sender.postal || sender.address) && (
-                      <span>
-                        <span className="text-slate-500">住所：</span>
-                        {sender.postal && <span className="inline-block">〒{sender.postal}</span>}
-                        {sender.postal && sender.address && ' '}
-                        {sender.address}
-                      </span>
-                    )}
-                    {sender.tel && (
-                      <span className="whitespace-nowrap">
-                        <span className="text-slate-500">TEL：</span>
-                        {sender.tel}
-                      </span>
-                    )}
-                    {sender.fax && (
-                      <span className="whitespace-nowrap">
-                        <span className="text-slate-500">FAX：</span>
-                        {sender.fax}
-                      </span>
-                    )}
-                  </span>
-                )}
-                <span className="whitespace-nowrap">
-                  <span className="text-slate-500">保存した宛先：</span>
-                  {savedRecipients.length}件
+                {/* 押すと開くことがわかるよう、ボタンの形で「開く／閉じる」と出す */}
+                <span className="flex items-center gap-1 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                  <span className="group-open:hidden">開く</span>
+                  <span className="hidden group-open:inline">閉じる</span>
+                  <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" aria-hidden />
                 </span>
-              </span>
-            </summary>
-            <div className="grid gap-4 border-t border-slate-100 p-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-              <section>
-                <h3 className="mb-2 text-xs font-bold text-slate-700">差出人（自社）</h3>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {SENDER_FIELDS.map((f) => (
-                    <Labeled key={f.key} label={f.label}>
-                      {(id) => (
-                        <input
-                          id={id}
-                          type="text"
-                          value={sender[f.key]}
-                          onChange={(e) => setSender((prev) => ({...prev, [f.key]: e.target.value}))}
-                          className={inputClass}
-                        />
-                      )}
-                    </Labeled>
-                  ))}
-                </div>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs text-slate-500">変更はこのパソコン（ブラウザ）に自動で保存されます。</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (window.confirm('差出人の設定を最初の内容に戻しますか？')) setSender(DEFAULT_SENDER);
-                    }}
-                    className={secondaryButtonClass}
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" aria-hidden />
-                    最初の内容に戻す
-                  </button>
-                </div>
-              </section>
-              <SavedRecipientList
-                saved={savedRecipients}
-                onForget={(id) => setSavedRecipients((list) => list.filter((r) => r.id !== id))}
-              />
-            </div>
-          </details>
+              </summary>
+              <div className="grid gap-4 border-t border-slate-100 p-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+                <section>
+                  <h3 className="mb-2 text-xs font-bold text-slate-700">差出人（自社）</h3>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {SENDER_FIELDS.map((f) => (
+                      <Labeled key={f.key} label={f.label}>
+                        {(id) => (
+                          <input
+                            id={id}
+                            type="text"
+                            value={sender[f.key]}
+                            onChange={(e) => setSender((prev) => ({...prev, [f.key]: e.target.value}))}
+                            className={inputClass}
+                          />
+                        )}
+                      </Labeled>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs text-slate-500">変更はこのパソコン（ブラウザ）に自動で保存されます。</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm('差出人の設定を最初の内容に戻しますか？')) setSender(DEFAULT_SENDER);
+                      }}
+                      className={secondaryButtonClass}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+                      最初の内容に戻す
+                    </button>
+                  </div>
+                </section>
+                <SavedRecipientList
+                  saved={savedRecipients}
+                  onForget={(id) => setSavedRecipients((list) => list.filter((r) => r.id !== id))}
+                />
+              </div>
+            </details>
+          </section>
           <p className="text-xs leading-relaxed text-slate-500">
             入力した内容はこのパソコン（ブラウザ）の中だけで使い、外部には送信しません。ご利用者名などの記入内容は保存されず、画面を閉じると消えます。
           </p>
@@ -754,6 +705,116 @@ function FontPicker({value, onChange}: {value: SheetFont; onChange: (v: SheetFon
           </option>
         ))}
       </select>
+    </div>
+  );
+}
+
+const ADDRESS_FIELDS = [
+  {key: 'postal', label: '郵便番号'},
+  {key: 'address', label: '住所'},
+  {key: 'tel', label: 'TEL'},
+  {key: 'fax', label: 'FAX'},
+] as const;
+
+/**
+ * 画面下の「差出人」の帯。営業所（営業部ごとの一覧）と担当をいつも見えるところで選べるようにし、
+ * その下に、印刷される差出人（会社名・営業部名・営業所名・住所・TEL・FAX）を出す。
+ * 営業所を選ぶと、営業部名・郵便番号・住所・TEL・FAX がまとめてその営業所の内容になる。
+ */
+function SenderBar({
+  sender,
+  onChange,
+}: {
+  sender: SenderInfo;
+  onChange: (update: (prev: SenderInfo) => SenderInfo) => void;
+}) {
+  const officeId = useId();
+  const personId = useId();
+  const current = findOffice(sender.office);
+  const missing = ADDRESS_FIELDS.filter((f) => !sender[f.key]).map((f) => f.label);
+  const labelClass = 'whitespace-nowrap text-[length:var(--fx-label-text)] font-medium text-slate-600';
+  return (
+    <div className="px-4 py-3">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800">
+          <Settings2 className="h-4 w-4 text-slate-500" aria-hidden />
+          差出人
+        </h2>
+        <div className="flex items-center gap-1.5">
+          <label htmlFor={officeId} className={labelClass}>
+            営業所
+          </label>
+          <select
+            id={officeId}
+            value={current ? current.office : ''}
+            onChange={(e) => {
+              const office = findOffice(e.target.value);
+              if (office) onChange((prev) => ({...prev, ...office}));
+            }}
+            className={`${fieldClass} cursor-pointer pr-1`}
+          >
+            {/* 一覧にない営業所名を「詳しい設定」で入れたときは、その名前をそのまま出す */}
+            {!current && <option value="">{sender.office || '選んでください'}</option>}
+            {OFFICE_GROUPS.map((g) => (
+              <optgroup key={g.department} label={g.department}>
+                {g.offices.map((o) => (
+                  <option key={o.office} value={o.office}>
+                    {o.office}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <label htmlFor={personId} className={labelClass}>
+            担当
+          </label>
+          <input
+            id={personId}
+            type="text"
+            value={sender.person}
+            placeholder="例）山田　太郎"
+            onChange={(e) => onChange((prev) => ({...prev, person: e.target.value}))}
+            className={`w-40 ${fieldClass}`}
+          />
+        </div>
+      </div>
+      <p className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-slate-800">
+        {/* 会社名と「営業部名 営業所名」は、それぞれの途中で折り返さない */}
+        <span>
+          {[sender.company, [sender.department, sender.office].filter(Boolean).join(' ')]
+            .filter(Boolean)
+            .map((part, i) => (
+              <Fragment key={i}>
+                {i > 0 && ' '}
+                <span className="inline-block">{part}</span>
+              </Fragment>
+            ))}
+        </span>
+        {(sender.postal || sender.address) && (
+          <span>
+            {sender.postal && <span className="inline-block">〒{sender.postal}</span>}
+            {sender.postal && sender.address && ' '}
+            {sender.address}
+          </span>
+        )}
+        {sender.tel && (
+          <span className="whitespace-nowrap">
+            <span className="text-slate-500">TEL：</span>
+            {sender.tel}
+          </span>
+        )}
+        {sender.fax && (
+          <span className="whitespace-nowrap">
+            <span className="text-slate-500">FAX：</span>
+            {sender.fax}
+          </span>
+        )}
+        {missing.length > 0 && (
+          <span className="text-amber-700">{missing.join('・')}が未入力です（下の「詳しい設定」で入力できます）</span>
+        )}
+      </p>
     </div>
   );
 }
