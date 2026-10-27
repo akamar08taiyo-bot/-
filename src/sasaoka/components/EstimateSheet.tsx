@@ -9,7 +9,7 @@
 // 日本語入力（IME）がそのまま使えるように、選んだ欄の上にいつも見えない入力欄を置いておき、打ち始めたら見えるようにする。
 
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import type {ChangeEvent, ClipboardEvent as ReactClipboardEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent} from 'react';
+import type {ChangeEvent, ClipboardEvent as ReactClipboardEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode} from 'react';
 import {startEstimate} from '../calc.ts';
 import {circled, KINDS, materialText} from '../estimateForms.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
@@ -59,6 +59,7 @@ export function EstimateSheet({
   onPickLabor,
   onPickKit,
   onPrint,
+  between,
 }: {
   job: Job;
   settings: Settings;
@@ -69,6 +70,8 @@ export function EstimateSheet({
   onPickLabor: (placeId: string | null, rowId: string | null) => void; // rowId：選んでいる行（部材ならその同上施工費・空白の行ならその行に。`laborSpot`）。null：箇所の施工費
   onPickKit: (placeId: string | null, rowId: string | null) => void;
   onPrint: () => void;
+  // 「部材リストから入れる」などの行のすぐ下に出すもの（工事見積書の保険者・担当・作成日・請求書の行。EstimateEditor.tsx）
+  between?: ReactNode;
 }) {
   const estDate = estimateDateOf(job); // 見積もり作成日（右上の作成日）
   const toast = useToast();
@@ -760,6 +763,7 @@ export function EstimateSheet({
           ＋ 部材＋施工費（常用）から入れる
         </button>
       </div>
+      {between}
       {clip && (
         <div className="flex flex-wrap items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900" role="status">
           <span className="font-bold">

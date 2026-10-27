@@ -261,14 +261,16 @@ await page.waitForFunction(() => {
 });
 const sideBox = await side.boundingBox();
 const mainBox = await page.locator('main').boundingBox();
-// 左の余白の縦長の欄（本文にかからない）。タブを替えても同じ所
+// 左の余白の縦長の欄（本文にかからない）
 assert.ok(sideBox.height > 400 && sideBox.x + sideBox.width <= mainBox.x + 16 && sideBox.width >= 120, JSON.stringify({sideBox, mainBox}));
 assert.match(await side.innerText(), /ここにドロップ・Ctrl\+V/);
+// 工事見積書のタブには出さない（ユーザーの指示 2026-10-27）。住宅改修申請書のタブに戻ると同じ所
 await page.getByRole('tab', {name: '📋 工事見積書'}).click();
 await page.getByRole('region', {name: '見積書', exact: true}).waitFor();
-assert.deepEqual(await side.boundingBox(), sideBox);
+assert.equal(await side.count(), 0);
 await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
 await page.getByRole('form', {name: '申請書'}).waitFor();
+assert.deepEqual(await side.boundingBox(), sideBox);
 await page.screenshot({path: path.join(outDir, 'side-drop.png')});
 await side.evaluate((el, bytes) => {
   const dt = new DataTransfer();

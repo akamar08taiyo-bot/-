@@ -1,7 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
 import {hasEstimateRows, jobName, startEstimate} from '../calc.ts';
-import {CardFill} from '../components/CardReader.tsx';
 import {JobHeader, JobTitle} from './JobHeader.tsx';
 import {EstimateSheet} from '../components/EstimateSheet.tsx';
 import {LaborPickerFor, missingShikiri, ShikiriPriceDialog} from '../components/JobTools.tsx';
@@ -149,58 +148,13 @@ export function EstimateEditor({
   // 工事場所の市町村が保険者と違うときは知らせる（打っている途中で勝手に変わらないように、変えるのはボタンで）
   const byAddress = insurerForAddress(job.address);
 
-  return (
-    <div className="space-y-3">
-      {/* 上の2段はどのタブでも同じ形（JobHeader.tsx）。保存・Excel・印刷は上のタブのまん中、白紙に戻す・発注書・複製・削除は右
-          （複製は一度外したが「やはり残してください」2026-10-26 で戻した）。
-          名前の横は保険者だけ（「苅田町「工事費見積書兼工事費内訳書」」の書式の名前は「この部分の説明は不要」2026-10-27） */}
-      <JobHeader
-        onBack={onBack}
-        tabs={tabs}
-        extra={<CardFill job={job} setJob={setJob} staffList={s.staffList} />}
-        title={<JobTitle name={name} badge={insurer ? INSURER_INFO[insurer].name : FORM_INFO[form].name} />}
-        center={
-          <>
-            <Btn color="softBlue" onClick={save}>
-              💾 保存
-            </Btn>
-            <Btn color="softGreen" onClick={() => saveEstimateExcel(job, s, toast)}>
-              📗 Excelで保存
-            </Btn>
-            {batch}
-            <Btn color="softSky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
-              🖨 見積書を印刷
-            </Btn>
-          </>
-        }
-        right={
-          <>
-            {/* 売上伝票発行依頼書（ユーザーと決めたこと「見積書のタブの上の段」2026-10-27。足りない所は窓で入れてから開く。UriageDialog.tsx）。
-                まん中のかたまり（保存・Excel・印刷）に入れると幅が広がり、上のタブのまん中にそろえられなくなるので、右のかたまりの先頭。
-                名前は「売上伝票依頼書」（ユーザーの指示「売上伝票ではなく、売上伝票を依頼書に変更」2026-10-27） */}
-            <Btn color="white" onClick={() => setUriageOpen(true)}>
-              🧾 売上伝票依頼書
-            </Btn>
-            <Btn color="white" onClick={clearSheet} disabled={blank}>
-              📄 白紙に戻す
-            </Btn>
-            <Btn color="white" onClick={onOpenOrder} disabled={!estimated} title={estimated ? undefined : '見積書に部材を入れると作れます'}>
-              🛒 発注書を作成
-            </Btn>
-            <Btn color="white" onClick={duplicate}>
-              複製
-            </Btn>
-            <Btn color="white" onClick={removeJob}>
-              削除
-            </Btn>
-          </>
-        }
-      />
-
+  // 保険者・担当・作成日・請求書の行。見積書の枠の中の「部材リストから入れる」などの行のすぐ下に出す（EstimateSheet の between）
+  const settingsRow = (
+    <>
       {/* 見積書の欄にないものだけ（苅田町・行橋市・みやこ町用は、お客様名・被保険者番号・工事場所・作成日を見積書の欄に打ち込む）。
           説明の文は置かない（ユーザーの指示）。笹岡工務店の請求書に入れるかも同じ枠に並べる。
           欄・文字はほかの画面より大きめ（ユーザーの指示「ここの部分はもう少し大きくする」、2026-10-21） */}
-      <section className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      <div className="flex flex-wrap items-end gap-3 border-b border-slate-200 bg-white px-4 py-3" role="group" aria-label="保険者・担当・作成日・請求書">
         {form === 'kouiki' && (
           <>
             <label className="grid min-w-[14rem] flex-[2_1_0%] gap-1 text-sm font-bold text-slate-600">
@@ -291,7 +245,58 @@ export function EstimateEditor({
             </Btn>
           </div>
         )}
-      </section>
+      </div>
+
+    </>
+  );
+
+  return (
+    <div className="space-y-3">
+      {/* 上の2段はどのタブでも同じ形（JobHeader.tsx）。保存・Excel・印刷は上のタブのまん中、白紙に戻す・発注書・複製・削除は右
+          （複製は一度外したが「やはり残してください」2026-10-26 で戻した）。
+          名前の横は保険者だけ（「苅田町「工事費見積書兼工事費内訳書」」の書式の名前は「この部分の説明は不要」2026-10-27）。
+          介護保険証・介護ソフトの画面の欄とカタログのボタン（CardFill）は出さない（ユーザーの指示「工事費見積書作成のときは、このカタログ部分や介護保険証貼り付け部分は不要なのでなくす」2026-10-27） */}
+      <JobHeader
+        onBack={onBack}
+        tabs={tabs}
+        title={<JobTitle name={name} badge={insurer ? INSURER_INFO[insurer].name : FORM_INFO[form].name} />}
+        center={
+          <>
+            <Btn color="softBlue" onClick={save}>
+              💾 保存
+            </Btn>
+            <Btn color="softGreen" onClick={() => saveEstimateExcel(job, s, toast)}>
+              📗 Excelで保存
+            </Btn>
+            {batch}
+            <Btn color="softSky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
+              🖨 見積書を印刷
+            </Btn>
+          </>
+        }
+        right={
+          <>
+            {/* 売上伝票発行依頼書（ユーザーと決めたこと「見積書のタブの上の段」2026-10-27。足りない所は窓で入れてから開く。UriageDialog.tsx）。
+                まん中のかたまり（保存・Excel・印刷）に入れると幅が広がり、上のタブのまん中にそろえられなくなるので、右のかたまりの先頭。
+                名前は「売上伝票依頼書」（ユーザーの指示「売上伝票ではなく、売上伝票を依頼書に変更」2026-10-27） */}
+            <Btn color="white" onClick={() => setUriageOpen(true)}>
+              🧾 売上伝票依頼書
+            </Btn>
+            <Btn color="white" onClick={clearSheet} disabled={blank}>
+              📄 白紙に戻す
+            </Btn>
+            <Btn color="white" onClick={onOpenOrder} disabled={!estimated} title={estimated ? undefined : '見積書に部材を入れると作れます'}>
+              🛒 発注書を作成
+            </Btn>
+            <Btn color="white" onClick={duplicate}>
+              複製
+            </Btn>
+            <Btn color="white" onClick={removeJob}>
+              削除
+            </Btn>
+          </>
+        }
+      />
 
       <EstimateSheet
         job={job}
@@ -303,6 +308,7 @@ export function EstimateEditor({
         onPickLabor={(placeId, rowId) => setPicker({placeId: placeFor(placeId), kind: 'labor', rowId})}
         onPickKit={(placeId, rowId) => setPicker({placeId: placeFor(placeId), kind: 'kit', at: placeId ? rowId : null})}
         onPrint={() => onPrint({kind: 'estimate', jobId: job.id})}
+        between={settingsRow}
       />
 
       {fixPrices && <ShikiriPriceDialog job={job} materials={data.materials} setJob={setJob} update={update} onClose={() => setFixPrices(false)} />}

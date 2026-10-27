@@ -286,9 +286,14 @@ if (withTokutei) {
   await tkf.getByRole('group', {name: '印刷するページ'}).waitFor({timeout: 30000});
   assert.equal(await page.getByRole('tab', {name: '🏷 販売見積書'}).getAttribute('aria-selected'), 'true');
   await tkf.getByRole('button', {name: '閉じる', exact: true}).click();
-  // 工事見積書のタブからは 🛁 のタブを開いて印刷の画面
+  // 工事見積書のタブには出さない（ユーザーの指示「工事費見積書作成のときは、このカタログ部分や介護保険証貼り付け部分は不要なのでなくす」2026-10-27）
   await page.getByRole('tab', {name: '📋 工事見積書'}).click();
   await page.waitForFunction(() => !location.hash.includes('view=')); // 工事見積書のタブは view を書かない
+  await page.getByRole('region', {name: '見積書', exact: true}).waitFor();
+  assert.equal(await printCat.count(), 0);
+  // 住宅改修申請書のタブからは 🛁 のタブを開いて印刷の画面
+  await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
+  await page.getByRole('form', {name: '申請書'}).waitFor();
   await printCat.click();
   await page.waitForFunction(() => location.hash.includes('view=tokutei'));
   await tkf.getByRole('group', {name: '印刷するページ'}).waitFor({timeout: 30000});

@@ -194,6 +194,12 @@ for (const name of ['📝 住宅改修申請書', '📋 工事見積書', '🛁 
   await page.getByRole('tab', {name}).click();
   // 特定福祉用具申請書のタブを離れるときは、中のアプリの保存を待ってから替わる（flushTokutei）ので、選ばれるまで待つ
   await page.waitForFunction((n) => [...document.querySelectorAll('[role="tab"]')].some((x) => x.textContent === n && x.getAttribute('aria-selected') === 'true'), name);
+  // 工事見積書・理由書のタブには出さない（ユーザーの指示「工事費見積書作成のときは、このカタログ部分や介護保険証貼り付け部分は不要なのでなくす」「理由書作成のときも同様に」2026-10-27）
+  if (name === '📋 工事見積書' || name === '📄 理由書') {
+    await page.waitForTimeout(300);
+    assert.equal(await cardBtn.count(), 0, `${name}：🪪 の欄を出さない`);
+    continue;
+  }
   const [t, b] = [await boxOf(tablist), await boxOf(cardBtn)];
   assert.ok(b.x >= t.x + t.width && b.x - (t.x + t.width) < 24, `${name}：タブのすぐ右 ${JSON.stringify({t, b})}`);
   assert.ok(Math.abs(b.y + b.height / 2 - (t.y + t.height / 2)) < 6, `${name}：タブと同じ段 ${JSON.stringify({t, b})}`);
@@ -214,8 +220,16 @@ const pasteCard = (withText = '') =>
     },
     {b64: cardRot.toString('base64'), withText},
   );
-// 工事見積書のタブで、字を打つ欄にいるときは読まない
+// 工事見積書のタブには 🪪 の欄がないので、画面をクリックしてから Ctrl+V しても読まない
 await page.getByRole('tab', {name: '📋 工事見積書'}).click();
+await page.getByRole('region', {name: '見積書', exact: true}).waitFor();
+await page.locator('h1').first().click();
+await pasteCard('保険証.png');
+await page.waitForTimeout(800);
+assert.equal(await page.getByRole('status', {name: '介護保険証を読んでいます'}).count(), 0);
+// 住宅改修申請書のタブで、字を打つ欄にいるときは読まない
+await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
+await page.getByRole('form', {name: '申請書'}).waitFor();
 await page.locator('main input:visible').first().focus();
 assert.equal(await page.evaluate(() => document.activeElement?.tagName), 'INPUT');
 await pasteCard();
