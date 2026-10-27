@@ -154,7 +154,7 @@ await shinseiTab.click();
 await form.waitFor();
 await preview.waitFor();
 // 申請書の様式・平面図・写真番号の箇所（玄関①・トイレ②）の写真貼付用紙
-assert.deepEqual(await pageNames(), ['住改・受領委任払', '平面図  (2)', '住改・写真 ①', '住改・写真②']);
+assert.deepEqual(await pageNames(), ['住改・受領委任払', '委任状', '平面図  (2)', '住改・写真 ①', '住改・写真②']); // 委任状は特定福祉用具と同じ（2026-10-27）
 // 一覧とプレビューは横に並ぶ（見ながら入れる）。入れ方の切り替え・欄の下に出る入れる所はない
 const formBox = await form.boundingBox();
 const previewBox = await preview.boundingBox();
@@ -1044,7 +1044,7 @@ await shinseiTab.click();
 assert.equal(await page.getByRole('button', {name: /^保険者を.*にする$/}).count(), 0);
 await page.getByRole('combobox', {name: '保険者'}).selectOption('kanda');
 await pageOf('事前申請書').waitFor();
-assert.deepEqual(await pageNames(), ['事前申請書', '平面図  (2)', '1 ', '1  (3)']);
+assert.deepEqual(await pageNames(), ['事前申請書', '委任状', '平面図  (2)', '1 ', '1  (3)']);
 // 工事場所の住所（行橋市）と違う保険者を選ぶと、見積書のタブと同じく知らせる（変えるのはボタンで）
 assert.ok((await page.getByText('工事場所の住所は「行橋市」です。').count()) > 0);
 assert.equal(await page.getByRole('button', {name: '保険者を行橋市にする'}).count(), 1);

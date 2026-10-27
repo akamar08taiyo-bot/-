@@ -47,7 +47,7 @@ export type ShinseiSheet = {
 };
 
 /** 申請書の画面で入れた項目の文字（書き方の {名前} に入れる値） */
-export type ShinseiTexts = Record<'kana' | 'zip' | 'phone' | 'owner' | 'relation' | 'reasonOffice' | 'reasonName' | 'era' | 'y' | 'm' | 'd' | 'start' | 'end' | 'cost', string>;
+export type ShinseiTexts = Record<'kana' | 'zip' | 'phone' | 'owner' | 'relation' | 'reasonOffice' | 'reasonName' | 'era' | 'y' | 'm' | 'd' | 'start' | 'end' | 'cost' | 'address', string>;
 
 /**
  * 申請書の画面で入れた項目を書く欄：format の {名前}（ShinseiTexts）に値を入れて書く（「本人との関係（{relation}）」）。
@@ -112,6 +112,13 @@ const RENOVATED = (cell: string): MarkCell => ({key: 'renovated', cell, needles:
 const CARE = (cell: string, support = ['要支援１', '要支援２']): MarkCell => ({key: 'care', cell, needles: [...support, '要介護１', '要介護２', '要介護３', '要介護４', '要介護５']});
 
 /**
+ * 委任状（苅田町・行橋市）：特定福祉用具の申請書と同じ委任状のシート（ユーザーの指示「住宅改修の申請書の中にも、特定福祉用具と全く同じ委任状をいれて、
+ * 住所のみ連動するようにする。（とりあえず苅田町・行橋市）」2026-10-27。原本の委任状のシートを、特定福祉用具の原本の委任状のシートに入れかえた）。
+ * 書くのは委任者の住所だけ（原本は「委任者　住　所＋すき間」の1つの欄なので、すき間のかわりに住所）。氏名は自筆・保険給付額と日付は書かない
+ */
+const PROXY: ShinseiSheet = {sheet: '委任状', texts: [T('A32', '　　　　委任者　住　所　　{address}')]};
+
+/**
  * 保険者ごとの申請書の原本と、転記する欄（原本を見て決めた）。
  * 苅田町：「事前申請書」のシート。事後申請書は事前申請書を参照する式なので、同じ内容になる（丸は事後申請書にもつける）
  * 行橋市：「住改・受領委任払」のシート
@@ -145,6 +152,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
         ],
       },
       {sheet: '事後申請書', marks: [ERA('I9'), GENDER('V9'), CARE('I12')]},
+      PROXY,
       // 平面図の表題は「（氏名）　様邸　平面図」（氏名は C2:AB6、「様邸　平面図」は原本の AC2）。工事内容は下の空いた所にテキストボックスで。
       // 平面図の図は表題の線（6行目の下）と工事内容（54行目から）のあいだに、1行ずつあけて
       {sheet: '平面図  (2)', name: 'C2', nameFormat: '{name}', legend: {box: 'C54:AQ68'}, plan: 'C8:AQ52'},
@@ -172,6 +180,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
           T('F20', '{cost}', 'number'),
         ],
       },
+      PROXY,
       {sheet: '平面図  (2)', name: 'C2', nameFormat: '{name}', legend: {box: 'C54:AQ68'}, plan: 'C8:AQ52'},
       ...YUKUHASHI_PHOTO_SHEETS.map((sheet) => ({sheet, ...YUKUHASHI_PHOTO})),
     ],
@@ -512,6 +521,7 @@ export function shinseiValues(job: Job, s: EstimateSettings, today = todayIso())
       start: reiwaText(info.start),
       end: reiwaText(info.end),
       cost: cost ? cost.toLocaleString('en-US') : '',
+      address: job.address.trim(), // 委任状の委任者の住所（「住所＋すき間」の1つの欄に書く）
     },
     cost,
     start: info.start,
@@ -758,7 +768,7 @@ export const EMPTY_SHINSEI: ShinseiValues = {
   kinds: KINDS.map(() => ({places: '', works: []})),
   photos: {},
   marks: NO_MARKS,
-  texts: {kana: '', zip: '', phone: '', owner: '', relation: '', reasonOffice: '', reasonName: '', era: '', y: '', m: '', d: '', start: '', end: '', cost: ''},
+  texts: {kana: '', zip: '', phone: '', owner: '', relation: '', reasonOffice: '', reasonName: '', era: '', y: '', m: '', d: '', start: '', end: '', cost: '', address: ''},
   cost: null,
   start: '',
   end: '',

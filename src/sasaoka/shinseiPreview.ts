@@ -137,6 +137,7 @@ const TEXT_FIELD: Record<keyof ShinseiTexts, ShinseiField> = {
   start: 'dates',
   end: 'dates',
   cost: 'cost',
+  address: 'address',
 };
 const MARK_FIELD: Record<keyof ShinseiMarks, ShinseiField> = {gender: 'gender', era: 'birth', care: 'care', renovated: 'renovated'};
 

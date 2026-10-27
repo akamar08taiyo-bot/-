@@ -156,7 +156,8 @@ test('苅田町の申請書：事前申請書の氏名・住所・被保険者�
   const changed = Object.keys(files).filter((k) => strFromU8(files[k]) !== strFromU8(orig.files[k] ?? new Uint8Array()));
   // 平面図（sheet6）は表題の氏名と、下の空いた所の工事内容のテキストボックス（drawing4）。
   // 事前申請書・事後申請書の図形（drawing1・2）は元号の丸（選んでいなければ昭和。ユーザーの指示「昭和がデフォルトにする」）。
-  // 写真番号①③⑤の写真の用紙（sheet7・9・11）は、改修箇所・実施した工事種類の□（その写真番号の箇所を■）
+  // 写真番号①③⑤の写真の用紙（sheet7・9・11）は、改修箇所・実施した工事種類の□（その写真番号の箇所を■）。
+  // 委任状（sheet5。特定福祉用具と同じ委任状）は委任者の住所だけ（2026-10-27）
   assert.deepEqual(changed.sort(), [
     '[Content_Types].xml',
     'xl/drawings/drawing1.xml',
@@ -166,10 +167,14 @@ test('苅田町の申請書：事前申請書の氏名・住所・被保険者�
     'xl/worksheets/sheet1.xml',
     'xl/worksheets/sheet11.xml',
     'xl/worksheets/sheet2.xml',
+    'xl/worksheets/sheet5.xml',
     'xl/worksheets/sheet6.xml',
     'xl/worksheets/sheet7.xml',
     'xl/worksheets/sheet9.xml',
   ]);
+  const proxy = byName.get('委任状')!;
+  assert.equal(txt(proxy, 'A32'), '　　　　委任者　住　所　　福岡県京都郡苅田町富久町1-1');
+  assert.equal(txt(proxy, 'A36'), txt(orig.byName.get('委任状')!, 'A36')); // 氏名は自筆（原本のまま）
   assert.equal(txt(byName.get('平面図  (2)')!, 'C2'), '山田 太郎');
   const legend = strFromU8(files['xl/drawings/drawing4.xml']);
   assert.match(legend, /<xdr:cNvSpPr txBox="1"\/>/);

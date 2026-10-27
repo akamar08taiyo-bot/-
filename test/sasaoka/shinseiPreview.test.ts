@@ -58,8 +58,9 @@ test('表示形式：3けた区切り・円・日付・元号（申請書の原�
 
 test('プレビュー：保険者ごとに申請書の様式のシートを1枚ずつ（事後申請書は出さない）。表題がヘッダーの行橋市はヘッダーも', () => {
   const forms = (insurer: Insurer) => preview(insurer).filter((p) => p.kind === 'form').map((p) => p.sheet);
-  assert.deepEqual(forms('kanda'), ['事前申請書']);
-  assert.deepEqual(forms('yukuhashi'), ['住改・受領委任払']);
+  // 苅田町・行橋市は委任状も（特定福祉用具と同じ委任状。委任者の住所だけ書く。2026-10-27）
+  assert.deepEqual(forms('kanda'), ['事前申請書', '委任状']);
+  assert.deepEqual(forms('yukuhashi'), ['住改・受領委任払', '委任状']);
   assert.deepEqual(forms('miyako'), ['住宅改修承認届出書', '住宅改修費支給申請書(受領委任払用)', '住宅改修内訳明細書']);
   assert.deepEqual(forms('kouiki'), ['様式第2号（住宅改修承認申請書）', '様式第7号（住宅改修費支給申請書（受領委任払用）', '様式第2号別紙（住宅改修内訳明細書）']);
   const [yk] = preview('yukuhashi');
@@ -69,14 +70,14 @@ test('プレビュー：保険者ごとに申請書の様式のシートを1枚�
   assert.ok(yk.header!.center[0].font.size > 20); // 16pt
   for (const p of [...preview('kanda'), ...preview('kouiki')].filter((x) => x.kind === 'form')) {
     assert.ok(p.width > 600 && p.width < 800 && p.height > 700 && p.height < 1200, `${p.sheet} ${p.width}x${p.height}`); // A4 の様式（画素）
-    assert.ok(p.lines.length > 20, p.sheet);
+    assert.ok(p.lines.length > (p.sheet === '委任状' ? 5 : 20), p.sheet); // 委任状は大きな枠だけ
   }
 });
 
 test('プレビュー：様式のうしろに平面図（空いた所に工事内容）と、写真番号の箇所の写真貼付用紙（改修前・改修後の枠）', () => {
   const kinds = (insurer: Insurer, j?: Job) => preview(insurer, j).map((p) => `${p.kind}:${p.sheet}${p.photo ? `:${p.photo}` : ''}`);
-  assert.deepEqual(kinds('kanda'), ['form:事前申請書', 'plan:平面図  (2)', 'photo:1 :1', 'photo:1  (3):2']);
-  assert.deepEqual(kinds('yukuhashi'), ['form:住改・受領委任払', 'plan:平面図  (2)', 'photo:住改・写真 ①:1', 'photo:住改・写真②:2']);
+  assert.deepEqual(kinds('kanda'), ['form:事前申請書', 'form:委任状', 'plan:平面図  (2)', 'photo:1 :1', 'photo:1  (3):2']);
+  assert.deepEqual(kinds('yukuhashi'), ['form:住改・受領委任払', 'form:委任状', 'plan:平面図  (2)', 'photo:住改・写真 ①:1', 'photo:住改・写真②:2']);
   assert.deepEqual(kinds('miyako').slice(3), ['plan:平面図', 'photo:写真 (1):1', 'photo:写真 (2):2']);
   // 広域連合は同じ写真番号の用紙が2枚ずつ。写真を貼る最初の用紙だけ
   assert.deepEqual(kinds('kouiki').slice(3), ['plan:平面図 (2)', 'photo:写真貼付用紙:1', 'photo:写真貼付用紙 (2):2']);
@@ -101,7 +102,7 @@ test('プレビュー：様式のうしろに平面図（空いた所に工事�
     }
   }
   // 箇所がなければ、平面図までで写真貼付用紙は出さない。様式・平面図のページに写真の枠はない
-  assert.deepEqual(kinds('kanda', job('kanda', {places: []})), ['form:事前申請書', 'plan:平面図  (2)']);
+  assert.deepEqual(kinds('kanda', job('kanda', {places: []})), ['form:事前申請書', 'form:委任状', 'plan:平面図  (2)']);
   assert.ok(preview('kanda').filter((p) => p.kind !== 'photo').every((p) => p.photoSlots.length === 0));
 });
 
