@@ -539,6 +539,7 @@ await typeIn('new:qty', '1.2');
 // 部材（取付金具）のすぐ下なので同上施工費。1.2時間×2,500円＝3,000円
 const hours = (await sheet.locator('.form-page tr:not([data-new])', {has: page.locator('td.mark', {hasText: '手'})}).last().locator('td').allInnerTexts()).map((t) => t.trim());
 assert.deepEqual(hours.slice(2, 9).filter((t) => t !== ''), ['手', '同上施工費', '1.2', '時間', '2,500', '3,000'], hours.join('|'));
+assert.ok(hours.some((t) => /^1時間2,500円\s*×1\.2時間$/.test(t)), hours.join('|')); // 算出根拠（「1時間2500円×1.2時間みたいな感じで記載」2026-10-27）
 await page.screenshot({path: path.join(outDir, '41-sheet-kouiki.png')});
 log('広域連合用：材／手・時間OK');
 

@@ -190,7 +190,7 @@ test('見積書だけの内容・備考・施工費の金額（右に映す見�
   // 広域連合用：2,500円は 1時間×2,500円 と書ける
   const k = formLines(job, S, 'kouiki');
   assert.deepEqual([k[2].qty, k[2].unit, k[2].unitPrice, k[2].amount, k[2].hourly], [1, '時間', 2500, 2500, true]);
-  assert.deepEqual(lineNote(k[2], 'kouiki', 2500), ['1時間2,500円']);
+  assert.deepEqual(lineNote(k[2], 'kouiki', 2500), ['1時間2,500円×1時間']); // 「1時間2500円×1.2時間みたいな感じ」2026-10-27
   // 算出根拠も備考と同じ書き方（定価○円（4m）×0.8、2行目に長さの計算）
   assert.deepEqual(autoNote(k[0], 'kouiki', 2500), ['定価20,000円（4m）×0.8', '600mm÷4000mm＝0.15']);
   assert.deepEqual(autoNote(k[1], 'kouiki', 2500), ['定価450円（税抜）×0.8']);

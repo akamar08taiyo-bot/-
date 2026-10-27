@@ -345,14 +345,21 @@ export function sheetNewLine(job: Pick<Job, 'places'>, lines: FormLine[], form: 
  * 手で直していないときの備考（定価等・苅田町・行橋市・みやこ町用）／算出根拠（広域連合用）。1行ずつ。
  * 部材は「定価8,000円（税抜）×0.8」（見積の単価を手で入れた行は ×0.8 を付けない）。
  * 切って使う部材は「定価20,000円（4m）×0.8」（かっこは1本の長さ）と、2行目に「600mm÷4000mm＝0.15」。
- * 算出根拠は対象工事部分の欄なので、介護保険の対象外の行は空。時間で書いた施工費は「1時間2,500円」
+ * 算出根拠は対象工事部分の欄なので、介護保険の対象外の行は空。時間で書いた施工費は「1時間2,500円×1.2時間」
+ * （ユーザーの指示「広域連合の見積もりでは、備考欄、例 1時間2500円×1.2時間みたいな感じで記載」2026-10-27。前は「1時間2,500円」だけ）
  */
 export function autoNote(l: FormLine, form: EstimateForm, hourRate: number): string[] {
   if (form === 'kouiki' && l.excluded) return [];
-  if (form === 'kouiki' && l.hourly) return [`1時間${yen(hourRate)}円`];
+  if (form === 'kouiki' && l.hourly) return [`1時間${yen(hourRate)}円×${num(l.qty)}時間`];
   const list = l.listPrice > 0 ? `定価${yen(l.listPrice)}円（${l.piece > 0 ? `${num(l.piece, 3)}m` : '税抜'}）${l.rate !== null ? `×${l.rate}` : ''}` : '';
   return [list, l.cut].filter(Boolean);
 }
+
+/**
+ * 時間で書いた施工費の算出根拠を欄に出す形：「1時間2,500円」と「×1.2時間」の2行（1行だと欄の幅に入れるため 6.5pt ほどに小さくなる。
+ * 2行なら前の「1時間2,500円」と同じ 11pt ほど）。印刷と Excel で同じ
+ */
+export const hourlyBasis = (text: string): string => text.replace('×', '\n×');
 
 /** 見積書に出す備考・算出根拠（手で直していればそれ。改行で行を分ける） */
 export function lineNote(l: FormLine, form: EstimateForm, hourRate: number): string[] {

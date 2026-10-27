@@ -5,7 +5,7 @@
 
 import {estimateTotals, rounddown} from './calc.ts';
 import type {EstimateSums, EstimateTotals} from './calc.ts';
-import {circled, FORM_INFO, formLines, jobForm, KINDS, lineNote, paginate, reiwa, TOTAL_ROWS} from './estimateForms.ts';
+import {circled, FORM_INFO, formLines, hourlyBasis, jobForm, KINDS, lineNote, paginate, reiwa, TOTAL_ROWS} from './estimateForms.ts';
 import type {FormLine} from './estimateForms.ts';
 import {fitLines, fitName, fitText} from './print/fit.ts';
 import type {Fit} from './print/fit.ts';
@@ -384,11 +384,11 @@ function kkLine(l: FormLine, r: number, height: number, bottom: string, hourRate
   put(13, target ? unit2.v : null, 'gothic', unit2.st);
   put(14, target ? l.unitPrice : null, 'r gothic', money(l.unitPrice, KK.O, height), target ? H : undefined);
   put(15, target && !open ? l.amount : null, 'r mr gothic', money(l.amount, KK.P, height), target && !open ? I : undefined);
-  // 算出根拠：「定価8,000円（税抜）×0.8」。施工費は「1時間2,500円」、切って使う部材は「定価20,000円（4m）×0.8」と「600mm÷4000mm＝0.15」の2行
+  // 算出根拠：「定価8,000円（税抜）×0.8」。施工費は「1時間2,500円×1.2時間」、切って使う部材は「定価20,000円（4m）×0.8」と「600mm÷4000mm＝0.15」の2行
   const note = lineNote(l, 'kouiki', hourRate);
   const basis = edges(`ml mr${bottom}`, true);
   if (note.length === 1 && l.hourly && l.note === null) {
-    const hourly = fit(note[0], KK.Q + KK.R, height, 11);
+    const hourly = fit(hourlyBasis(note[0]), KK.Q + KK.R, height, 11, 2);
     b.put(r, 16, hourly.v, {font: MINCHO, h: 'center', ...hourly.st}, basis, 1, 2);
   } else if (note.length > 0) {
     const nt = fitted(fitLines(note, KK.Q + KK.R, height, 10));

@@ -12,7 +12,7 @@
 
 import type {CSSProperties, ReactNode} from 'react';
 import {estimateTotals} from '../calc.ts';
-import {circled, FORM_INFO, formLines, KINDS, lineNote, paginate, reiwa, sheetNewLine, TOTAL_ROWS} from '../estimateForms.ts';
+import {circled, FORM_INFO, formLines, hourlyBasis, KINDS, lineNote, paginate, reiwa, sheetNewLine, TOTAL_ROWS} from '../estimateForms.ts';
 import type {FormLine} from '../estimateForms.ts';
 import type {Job, Settings} from '../types.ts';
 import {num, yen} from '../util.ts';
@@ -590,13 +590,13 @@ function KkLine({
   const amount = l.blank || open ? '' : yen(l.amount);
   const k = (field: string) => `line:${l.rowId}:${field}`;
   const excl = `excl:${l.excludeId}`;
-  // 算出根拠：「定価8,000円（税抜）×0.8」。施工費は「1時間2,500円」、切って使う部材は「定価20,000円（4m）×0.8」と「600mm÷4000mm＝0.15」の2行
+  // 算出根拠：「定価8,000円（税抜）×0.8」。施工費は「1時間2,500円×1.2時間」、切って使う部材は「定価20,000円（4m）×0.8」と「600mm÷4000mm＝0.15」の2行
   const note = lineNote(l, 'kouiki', hourRate);
   let basis: ReactNode;
   if (note.length === 1 && l.hourly && l.note === null) {
     basis = (
-      <td colSpan={2} className={`c ml mr${bottom}`} style={fitted(note[0], KK.Q + KK.R, height, 11).style} {...ed(editable, k('note'))}>
-        {fitted(note[0], KK.Q + KK.R, height, 11).body}
+      <td colSpan={2} className={`c ml mr${bottom}`} style={fitted(hourlyBasis(note[0]), KK.Q + KK.R, height, 11, 2).style} {...ed(editable, k('note'))}>
+        {fitted(hourlyBasis(note[0]), KK.Q + KK.R, height, 11, 2).body}
       </td>
     );
   } else if (note.length > 0) {

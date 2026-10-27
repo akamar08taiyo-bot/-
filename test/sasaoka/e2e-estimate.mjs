@@ -186,8 +186,10 @@ await typeIn('job:insuredNo', '0000366989');
 log('保存（ボタン・Ctrl+S・読み直しても同じ）OK');
 
 // ---------------- Excel で保存：印刷する見積書と同じ形の .xlsx（金額は式。計算済みの値も入っている）
-const download = async (click) => {
+/** save：出力フォルダにも置く名前（LibreOffice で描いて印刷と見比べるとき） */
+const download = async (click, save) => {
   const [dl] = await Promise.all([page.waitForEvent('download'), click()]);
+  if (save) await dl.saveAs(path.join(outDir, save));
   const files = unzipSync(new Uint8Array(await readFile(await dl.path())));
   return {name: dl.suggestedFilename(), sheet: strFromU8(files['xl/worksheets/sheet1.xml'])};
 };
@@ -279,7 +281,7 @@ await typeIn(await key('L型手すり', 'kind'), '5');
 await page.getByRole('button', {name: '🖨 見積書を印刷'}).click();
 await page.locator('.print-overlay').waitFor();
 const kdoc = await page.locator('.print-root').innerText();
-for (const t of ['内訳書　様式', '全改修工事部分', '対象工事部分', '1時間2,500円', '福岡県介護保険広域連合', '定価20,000円（4m）×0.8', '定価11,000円（税抜）×0.8', 'トイレ\t便器取替\t材', '⑤']) {
+for (const t of ['内訳書　様式', '全改修工事部分', '対象工事部分', '1時間2,500円\n×1.2時間', '福岡県介護保険広域連合', '定価20,000円（4m）×0.8', '定価11,000円（税抜）×0.8', 'トイレ\t便器取替\t材', '⑤']) {
   assert.ok(kdoc.includes(t), `広域連合の書式に「${t}」がない`);
 }
 const pages = page.locator('.print-root .form-page');
@@ -313,9 +315,9 @@ await search.fill('');
 log('一覧の書式・探すOK');
 
 // ---------------- 一覧の「📗 Excel」：広域連合用の .xlsx（2ページ。介護保険の対象は対象外を除いた金額）
-const kx = await download(() => sampleRow.getByRole('button', {name: '📗 Excel'}).click());
+const kx = await download(() => sampleRow.getByRole('button', {name: '📗 Excel'}).click(), 'estimate-kouiki.xlsx');
 assert.equal(kx.name, '（サンプル）山田様住宅改修見積書.xlsx');
-for (const t of ['内訳書　様式', 'Ｐ－1', 'Ｐ－2', '1時間2,500円', '<v>59600</v>', '<v>53720</v>', '<rowBreaks count="1"']) {
+for (const t of ['内訳書　様式', 'Ｐ－1', 'Ｐ－2', '1時間2,500円', '×1.2時間', '<v>59600</v>', '<v>53720</v>', '<rowBreaks count="1"']) {
   assert.ok(kx.sheet.includes(t), `Excel（広域連合用）に「${t}」がない`);
 }
 assert.equal(await page.getByRole('heading', {level: 1}).count(), 0); // 一覧のまま（見積書は開かない）
