@@ -523,25 +523,54 @@ export function FaxApp() {
                 <span className="hidden group-open:inline">閉じる</span>
                 <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" aria-hidden />
               </span>
-              {/* 閉じているときは、いまの設定を項目名つきで出す（開くと下の入力欄に同じ内容が出るので隠す） */}
-              <span className="col-span-2 col-start-2 mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-800 group-open:hidden">
-                <span>
-                  <span className="text-slate-500">差出人：</span>
-                  {/* 会社名と「営業部名 営業所名」は、それぞれの途中で折り返さない */}
-                  {[sender.company, [sender.department, sender.office].filter(Boolean).join(' ')]
-                    .filter(Boolean)
-                    .map((part, i) => (
-                      <Fragment key={i}>
-                        {i > 0 && ' '}
-                        <span className="inline-block">{part}</span>
-                      </Fragment>
-                    ))}
-                  {!sender.company && !sender.department && !sender.office && '未設定'}
+              {/*
+                閉じているときも、いまの設定を項目名つきで出す（開くと下の入力欄に同じ内容が出るので隠す）。
+                1行目に営業所名と担当、2行目にその営業所の住所・TEL・FAX、3行目に保存した宛先の件数
+              */}
+              <span className="col-span-2 col-start-2 mt-1 grid gap-y-0.5 text-sm text-slate-800 group-open:hidden">
+                <span className="flex flex-wrap gap-x-4 gap-y-0.5">
+                  <span>
+                    <span className="text-slate-500">差出人：</span>
+                    {/* 会社名と「営業部名 営業所名」は、それぞれの途中で折り返さない */}
+                    {[sender.company, [sender.department, sender.office].filter(Boolean).join(' ')]
+                      .filter(Boolean)
+                      .map((part, i) => (
+                        <Fragment key={i}>
+                          {i > 0 && ' '}
+                          <span className="inline-block">{part}</span>
+                        </Fragment>
+                      ))}
+                    {!sender.company && !sender.department && !sender.office && '未設定'}
+                  </span>
+                  {sender.person && (
+                    <span className="whitespace-nowrap">
+                      <span className="text-slate-500">担当：</span>
+                      {sender.person}
+                    </span>
+                  )}
                 </span>
-                {sender.person && (
-                  <span className="whitespace-nowrap">
-                    <span className="text-slate-500">担当：</span>
-                    {sender.person}
+                {(sender.postal || sender.address || sender.tel || sender.fax) && (
+                  <span className="flex flex-wrap gap-x-4 gap-y-0.5">
+                    {(sender.postal || sender.address) && (
+                      <span>
+                        <span className="text-slate-500">住所：</span>
+                        {sender.postal && <span className="inline-block">〒{sender.postal}</span>}
+                        {sender.postal && sender.address && ' '}
+                        {sender.address}
+                      </span>
+                    )}
+                    {sender.tel && (
+                      <span className="whitespace-nowrap">
+                        <span className="text-slate-500">TEL：</span>
+                        {sender.tel}
+                      </span>
+                    )}
+                    {sender.fax && (
+                      <span className="whitespace-nowrap">
+                        <span className="text-slate-500">FAX：</span>
+                        {sender.fax}
+                      </span>
+                    )}
                   </span>
                 )}
                 <span className="whitespace-nowrap">
