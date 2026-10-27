@@ -89,6 +89,9 @@ try {
     await page.getByRole('button', {name: '＋ 行橋市'}).click();
     await page.getByRole('textbox', {name: 'お客様名', exact: true}).fill('見本 花子');
     await page.getByLabel('住所').fill('福岡県行橋市中央1-1');
+    await page.getByLabel('居宅介護支援事業所').fill('見本居宅介護支援事業所');
+    await page.getByLabel('ケアマネジャー').fill('見本 太郎');
+    await page.getByLabel('納品日').fill('2026-10-30');
     const staff = await page.getByRole('combobox', {name: '担当'}).evaluate((el) => [...el.options].map((o) => o.value).find(Boolean));
     await page.getByRole('combobox', {name: '担当'}).selectOption(staff);
     await page.getByRole('button', {name: '★ 商品を選ぶ'}).click();
@@ -129,6 +132,27 @@ try {
     assert.equal(await slip.getByPlaceholder('担当者名を入力').inputValue(), staff);
     assert.deepEqual(await slip.getByPlaceholder('金額(税込)').evaluateAll((l) => l.map((x) => x.value)), ['13904', '13904']);
     const text = await slip.locator('main').innerText();
+    // 伝票（印刷の形）に、見積もりで入れたものがすべて入っている（ユーザーの問い「全て転記された内容が記載されていますか？」2026-10-27）
+    const printed = (await slip.locator('.uriage-print').textContent()).replace(/\s+/g, ' ');
+    for (const t of [
+      'サービス区分特定福祉用具',
+      '施工（納品予定日）2026-10-30',
+      '種目シャワーチェア、浴槽台',
+      `担当者${staff}`,
+      '顧客区分新規',
+      '顧客名見本 花子',
+      '住所福岡県行橋市中央1-1',
+      '居宅名見本居宅介護支援事業所',
+      '担当ケアマネージャー見本 太郎',
+      '請求区分受領委任払い',
+      '介護度介護２',
+      '負担割合2割',
+      '1シャワーチェア 見本A¥13,904',
+      '2浴槽台 見本B¥13,904',
+      '総合計（税込）¥27,808',
+    ]) {
+      assert.ok(printed.includes(t), `伝票に「${t}」がない：${printed}`);
+    }
     assert.match(text, /対象内利用者負担額（2割・切り上げ）\s*¥5,562/);
     assert.match(text, /保険者負担額（8割・切り下げ）\s*¥22,246/);
     await slip.screenshot({path: `${out}/uriage-03-slip-${tag}.png`, fullPage: true});

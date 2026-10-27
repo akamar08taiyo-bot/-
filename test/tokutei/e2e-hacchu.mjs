@@ -101,6 +101,7 @@ try {
   await page.getByLabel('フリガナ').fill('ミホン ハナコ');
   await page.getByLabel('住所').fill('福岡県行橋市中央1-1');
   await page.getByLabel('電話').fill('0930-00-0000');
+  await page.getByLabel('納品日').fill('2026-10-30');
   await page.getByRole('combobox', {name: '担当'}).selectOption('土居 翔太');
   await page.getByRole('button', {name: '★ 商品を選ぶ'}).click();
   await page.getByRole('button', {name: 'シャワーチェア 見本Aを入れる'}).click();
@@ -149,6 +150,9 @@ try {
   // 顧客名の上にフリガナ（ユーザーの指示「読みなど、全て飛べるようにする」）
   assert.equal(await order.locator('section[aria-label="販売受注簿入力"]').first().getByLabel('フリガナ').inputValue(), 'ミホン ハナコ');
   assert.equal(await cellValue(order, '住所（任意）'), '福岡県行橋市中央1-1');
+  // 見積もりで入れたものは全部入る（ユーザーの問い「全て転記された内容が記載されていますか？」2026-10-27）。依頼者名・売上日・受注番号・発注番号・入荷日は受注簿で入れる欄
+  assert.equal(await cellValue(order, '電話番号（任意）'), '0930-00-0000');
+  assert.equal(await cellValue(order, '納品予定日'), '2026-10-30');
   // 商品の欄（商品名・型番・仕切り・販売単価など）は入力欄の値で見る
   const fields = await fieldValues(order);
   for (const v of ['シャワーチェア 見本A', 'A-100', '1', '15800', '9480', '12640', '20']) assert.ok(fields.includes(v), `1ページ目に「${v}」がない：${fields.join('／')}`);
