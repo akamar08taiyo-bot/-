@@ -168,7 +168,7 @@ try {
   await page.waitForTimeout(600);
   assert.equal(await page.getByText('未入力（空欄のまま作ります）').count(), 0);
   await page.screenshot({path: `${out}/04b-sale-shinsei.png`, fullPage: true});
-  const [shinseiFile] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📄 申請書（Excel）を作る'}).click()]);
+  const [shinseiFile] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📗 申請書をExcelで保存'}).click()]);
   assert.equal(shinseiFile.suggestedFilename(), '山田花子様特定福祉用具申請書.xlsx');
   await shinseiFile.saveAs(`${out}/shinsei.xlsx`);
   {
@@ -224,7 +224,7 @@ try {
   await page.getByRole('textbox', {name: '電話'}).fill('0930-00-0000');
   await page.waitForFunction(() => !document.querySelector('[aria-label="申請書のプレビュー"] [data-pv-field="tel"]')?.className.includes('bg-amber'));
   // 申請書（Excel）もこの画面から作れる
-  await page.getByRole('button', {name: '📄 申請書（Excel）を作る'}).waitFor();
+  await page.getByRole('button', {name: '📗 申請書をExcelで保存'}).waitFor();
   await page.screenshot({path: `${out}/04c-sale-shinsei-preview.png`});
 
   // ---- 広域連合（築上町など）：保険者を替えると申請書のタブも替わる。支給申請書だけの様式で、支払方法で受領委任払用・償還払い用。
@@ -257,7 +257,7 @@ try {
   await page.waitForTimeout(300);
   await page.screenshot({path: `${out}/04d-sale-shinsei-kouiki.png`});
   await preview.getByRole('group', {name: KOUIKI_SHOKAN, exact: true}).screenshot({path: `${out}/04e-shinsei-kouiki-sheet.png`});
-  const [kouikiFile] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📄 申請書（Excel）を作る'}).click()]);
+  const [kouikiFile] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📗 申請書をExcelで保存'}).click()]);
   assert.equal(kouikiFile.suggestedFilename(), '山田花子様特定福祉用具申請書.xlsx');
   await kouikiFile.saveAs(`${out}/shinsei-kouiki.xlsx`);
   {
@@ -647,21 +647,22 @@ try {
     dialogs.push(d.message());
     void d.accept();
   });
-  // 申請書（Excel）を作る と 🖨 印刷 は同じ大きさで、まん中にそろえる（「申請書をつくると、印刷ボタンは統一の大きさで中央揃え」2026-10-26）
-  const xlBox = await page.getByRole('button', {name: '📄 申請書（Excel）を作る'}).boundingBox();
-  const prBox = await page.getByRole('button', {name: '🖨 印刷', exact: true}).boundingBox();
-  const panelBox = await page.getByRole('button', {name: '📄 申請書（Excel）を作る'}).locator('xpath=..').boundingBox();
-  assert.ok(xlBox && prBox && panelBox && Math.abs(xlBox.width - prBox.width) < 1 && Math.abs(xlBox.height - prBox.height) < 1 && Math.abs(xlBox.y - prBox.y) < 1, `${JSON.stringify(xlBox)} ${JSON.stringify(prBox)}`);
-  assert.ok(Math.abs(xlBox.x - panelBox.x - (panelBox.x + panelBox.width - (prBox.x + prBox.width))) < 2, `まん中にない ${JSON.stringify(panelBox)}`);
-  // 📖 カタログを印刷 も同じ大きさ（入らなければ次の段のまん中）
+  // 上の段は住宅改修の申請書のタブと同じ形：名前のすぐ右に 📗 申請書をExcelで保存・🖨 申請書を印刷、📖 カタログを印刷は右
+  // （ユーザーの指示「特定福祉用具の印刷ボタンなどの位置を住宅改修などと統一する」2026-10-27。前はプレビューの上の枠のまん中に同じ大きさで並べていた）
+  const nameBox = await page.locator('h2').first().boundingBox();
+  const xlBox = await page.getByRole('button', {name: '📗 申請書をExcelで保存'}).boundingBox();
+  const prBox = await page.getByRole('button', {name: '🖨 申請書を印刷', exact: true}).boundingBox();
   const catBox = await page.getByRole('button', {name: '📖 カタログを印刷'}).boundingBox();
-  assert.ok(catBox && Math.abs(catBox.width - xlBox.width) < 1 && Math.abs(catBox.height - xlBox.height) < 1, JSON.stringify(catBox));
+  assert.ok(nameBox && xlBox && prBox && catBox, 'ボタンがない');
+  assert.ok(xlBox.x > nameBox.x + nameBox.width && xlBox.x - (nameBox.x + nameBox.width) < 160 && Math.abs(xlBox.y + xlBox.height / 2 - (nameBox.y + nameBox.height / 2)) < 8, `${JSON.stringify(nameBox)} ${JSON.stringify(xlBox)}`);
+  assert.ok(prBox.x > xlBox.x && Math.abs(prBox.y - xlBox.y) < 1 && catBox.x > prBox.x + prBox.width + 100, `${JSON.stringify(prBox)} ${JSON.stringify(catBox)}`);
+  assert.equal(await page.getByRole('button', {name: '📄 申請書（Excel）を作る'}).count(), 0);
   await page.getByRole('button', {name: '📖 カタログを印刷'}).click();
   await page.getByRole('group', {name: '印刷するページ'}).waitFor();
   await page.getByText('印刷するページにチェックを入れてください').waitFor(); // 多点杖のページはないので、チェックなし・ページも出さない
   assert.equal(await page.locator('.cat-sheet').count(), 0);
   await page.getByRole('button', {name: '閉じる'}).click();
-  await page.getByRole('button', {name: '🖨 印刷', exact: true}).click();
+  await page.getByRole('button', {name: '🖨 申請書を印刷', exact: true}).click();
   assert.match(dialogs[0] ?? '', /手で入れた商品をお気に入り（★）に登録しますか？\n・見本の多点杖 ワイド/);
   await page.locator('.print-overlay').waitFor();
   assert.ok((await page.locator('.print-overlay .est-sheet').count()) >= 3); // 事前申請書・支給申請書・委任状・完了写真

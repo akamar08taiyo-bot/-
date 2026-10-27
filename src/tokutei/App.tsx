@@ -210,7 +210,9 @@ export default function App() {
         </div>
       )}
       <div className={`min-h-screen text-slate-800 ${printSale ? 'no-print' : ''}`}>
-        <header className={`no-print bg-[#0f4c5c] text-white ${embed ? 'pt-1.5' : ''}`}>
+        {/* 住宅改修のタブの中（embed）では、濃い帯を出さない：住宅改修の部材・施工費マスタのタブと同じ、白い地に枠のある大きめのタブ
+            （ユーザーの指示「この部分の色合いも調整する。ボタンも大きくする」2026-10-27。前は濃い青緑の帯に小さめのタブ） */}
+        <header className={`no-print ${embed ? 'px-3 pt-3 sm:px-4' : 'bg-[#0f4c5c] text-white'}`}>
           {/* 住宅改修のタブの中（embed）では、題名・ポータルへのリンクの段は出さない（住宅改修の画面の上にある） */}
           <div className={`mx-auto max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 ${embed ? 'hidden' : 'flex'}`}>
             <div className="flex items-center gap-3">
@@ -231,14 +233,18 @@ export default function App() {
               </a>
             </div>
           </div>
-          <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-3">
+          <nav className={`flex overflow-x-auto ${embed ? 'gap-1.5 sm:gap-2' : 'mx-auto max-w-6xl gap-1 px-3'}`}>
             {TABS.map((t) => (
               <button
                 key={t.id}
                 type="button"
                 onClick={() => goTab(t.id)}
                 aria-current={tab === t.id ? 'page' : undefined}
-                className={`whitespace-nowrap rounded-t-lg px-5 py-2.5 text-[15px] font-bold transition ${tab === t.id ? 'bg-[#f2f7f7] text-[#0f4c5c]' : 'text-teal-100 hover:bg-white/10'}`}
+                className={
+                  embed
+                    ? `whitespace-nowrap rounded-lg border-2 px-3 py-2 text-sm font-bold shadow-sm transition sm:px-5 sm:py-2.5 sm:text-base lg:text-[17px] ${tab === t.id ? 'border-[#14532d] bg-emerald-50 text-[#14532d]' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`
+                    : `whitespace-nowrap rounded-t-lg px-5 py-2.5 text-[15px] font-bold transition ${tab === t.id ? 'bg-[#f2f7f7] text-[#0f4c5c]' : 'text-teal-100 hover:bg-white/10'}`
+                }
               >
                 {t.label}
               </button>

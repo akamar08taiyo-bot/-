@@ -25,7 +25,7 @@ import {EstimateInputs} from './EstimateInputs.tsx';
 import {ProductPicker} from './ProductPicker.tsx';
 import {ScanDialog} from './ScanDialog.tsx';
 import {ShinseiInputs} from './ShinseiInputs.tsx';
-import {ShinseiPanel} from './ShinseiPanel.tsx';
+import {ShinseiPanel, useShinseiExcel} from './ShinseiPanel.tsx';
 import {ShinseiPages} from './ShinseiPreview.tsx';
 import {UriageDialog} from './UriageDialog.tsx';
 import {Btn, btnClass, useToast} from './ui.tsx';
@@ -202,6 +202,8 @@ export function SaleEditor({
     askFavorites();
     onPrint(sale.id);
   };
+  // 申請書（Excel）を作る（ShinseiPanel.tsx の useShinseiExcel）
+  const shinseiExcel = useShinseiExcel(sale, s);
   // 申請書の印刷（プレビューと同じページを A4 に）
   const [printingShinsei, setPrintingShinsei] = useState(false);
   const printShinsei = () => {
@@ -260,42 +262,71 @@ export function SaleEditor({
 
   return (
     <div className="space-y-4">
+      {/* 上の段は住宅改修の様邸の画面と同じ形（ユーザーの指示「特定福祉用具の印刷ボタンなどの位置を住宅改修などと統一する」「同様に色合い調整やボタンの位置の調整をおこなう」2026-10-27）：
+          名前・保険者のすぐ右に Excel で保存・印刷（薄い緑・薄い水色、広い画面は少し大きく）、そのほかは右に寄せる（白）。
+          前は申請書の画面ではプレビューの上の枠（ShinseiPanel）に、見積もりの画面では全部右に並べていた */}
       <div className="flex flex-wrap items-center gap-2">
-        <Btn color="white" onClick={onBack}>
+        <Btn color="white" onClick={onBack} className="lg:!text-base">
           ← 見積もりの一覧へ
         </Btn>
-        <h2 className="text-lg font-bold text-slate-800">{customerLabel(sale)}</h2>
+        <h2 className="text-lg font-bold text-slate-800 lg:text-xl">{customerLabel(sale)}</h2>
         <span className="text-sm text-slate-500">{insurerLabel(sale.insurer, sale.insurerName) || '保険者未選択'}</span>
-        {/* 申請書だけの画面（住宅改修の申請書のタブの中）には、見積書のボタンを出さない（販売見積書のタブにある） */}
-        {fixedView !== 'shinsei' && (
-          <div className="ml-auto flex flex-wrap gap-2">
-            <Btn color="sky" onClick={print}>
-              🖨 見積書を印刷
-            </Btn>
-            <Btn color="excel" onClick={saveExcel}>
-              📗 Excelで保存
-            </Btn>
-            {/* 売上伝票発行依頼書（ユーザーと決めたこと「見積書のタブの上の段」2026-10-27。足りない所は窓で入れてから開く）。
-                名前は「売上伝票依頼書」（ユーザーの指示「売上伝票ではなく、売上伝票を依頼書に変更」2026-10-27。住宅改修の工事見積書も同じ） */}
-            <Btn color="white" onClick={() => setUriageOpen(true)}>
-              🧾 売上伝票依頼書
-            </Btn>
-            {form && !fixedView && (
-              <Btn color="white" onClick={() => setView('shinsei')}>
-                📄 申請書
+        <div role="group" aria-label="保存・印刷" className="flex flex-wrap gap-2 sm:ml-4 lg:[&>*]:!text-base">
+          {onShinsei ? (
+            <>
+              <Btn color="excel" onClick={() => void shinseiExcel.make()} disabled={shinseiExcel.busy || !form}>
+                {shinseiExcel.busy ? '作っています…' : '📗 申請書をExcelで保存'}
               </Btn>
-            )}
-            <a href={hacchuUrl()} target="_blank" onClick={transfer} className={btnClass('white')}>
-              📤 販売受注簿に転記
-            </a>
-            <Btn color="white" onClick={duplicate}>
-              複製
+              <Btn color="softSky" onClick={printShinsei} disabled={!pages || pages.length === 0}>
+                🖨 申請書を印刷
+              </Btn>
+            </>
+          ) : (
+            <>
+              <Btn color="excel" onClick={saveExcel}>
+                📗 Excelで保存
+              </Btn>
+              <Btn color="softSky" onClick={print}>
+                🖨 見積書を印刷
+              </Btn>
+            </>
+          )}
+        </div>
+        <div className="flex flex-wrap justify-end gap-2 lg:ml-auto">
+          {onShinsei ? (
+            // 介援隊のカタログのページを選んで印刷（catalog.ts。ユーザーの指示「申請書を作成するとき…カタログの PDF の印刷」2026-10-26）
+            <Btn color="white" onClick={() => setPrintingCatalog(true)}>
+              📖 カタログを印刷
             </Btn>
-            <Btn color="rose" onClick={remove}>
-              削除
-            </Btn>
-          </div>
-        )}
+          ) : (
+            <>
+              {/* 売上伝票発行依頼書（ユーザーと決めたこと「見積書のタブの上の段」2026-10-27。足りない所は窓で入れてから開く）。
+                  名前は「売上伝票依頼書」（ユーザーの指示「売上伝票ではなく、売上伝票を依頼書に変更」2026-10-27。住宅改修の工事見積書も同じ） */}
+              <Btn color="white" onClick={() => setUriageOpen(true)}>
+                🧾 売上伝票依頼書
+              </Btn>
+              {form && !fixedView && (
+                <Btn color="white" onClick={() => setView('shinsei')}>
+                  📄 申請書
+                </Btn>
+              )}
+              <a href={hacchuUrl()} target="_blank" onClick={transfer} className={btnClass('white')}>
+                📤 販売受注簿に転記
+              </a>
+            </>
+          )}
+          {/* 申請書だけの画面（住宅改修の申請書のタブの中）には、複製・削除を出さない（販売見積書のタブにある） */}
+          {fixedView !== 'shinsei' && (
+            <>
+              <Btn color="white" onClick={duplicate}>
+                複製
+              </Btn>
+              <Btn color="rose" onClick={remove}>
+                削除
+              </Btn>
+            </>
+          )}
+        </div>
       </div>
 
       {form && !fixedView && (
@@ -346,7 +377,7 @@ export function SaleEditor({
             onFavorite={(id) => favorite([id])}
           />
           <div className="min-w-0 space-y-3 lg:sticky lg:top-3 lg:self-start">
-            <ShinseiPanel sale={sale} settings={s} onPrint={pages && pages.length ? printShinsei : undefined} onCatalog={() => setPrintingCatalog(true)} />
+            <ShinseiPanel sale={sale} settings={s} />
             <div ref={previewBox} className="min-w-0 rounded-xl bg-slate-200/70 p-2 lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto" style={{scrollbarGutter: 'stable'}}>
               {!form ? (
                 <p className="p-6 text-center text-sm text-slate-500">この保険者の申請書の原本はまだありません</p>

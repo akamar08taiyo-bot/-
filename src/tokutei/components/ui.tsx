@@ -9,6 +9,7 @@ const COLORS = {
   blue: 'bg-blue-100 hover:bg-blue-200 text-blue-900 border border-blue-300', // 保存・決定
   rose: 'bg-white hover:bg-rose-50 text-rose-700 border border-rose-300', // 削除
   sky: 'bg-sky-100 hover:bg-sky-200 text-sky-900 border border-sky-300', // 印刷
+  softSky: 'bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300', // 上の段の印刷（住宅改修の様邸の画面の softSky と同じ）
   excel: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300', // Excel で保存（薄い緑）
   cyan: 'bg-cyan-100 hover:bg-cyan-200 text-cyan-900 border border-cyan-300', // まとめて印刷
   teal: 'bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300', // 一覧・管理
