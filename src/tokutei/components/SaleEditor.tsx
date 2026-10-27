@@ -210,7 +210,7 @@ export function SaleEditor({
   };
   // 介援隊のカタログの印刷（catalog.ts。見積もりの商品が載っているページに初めからチェック）
   const [printingCatalog, setPrintingCatalog] = useState(false);
-  // 「🧾 売上伝票」の窓（UriageDialog.tsx）
+  // 「🧾 売上伝票依頼書」の窓（UriageDialog.tsx）
   const [uriageOpen, setUriageOpen] = useState(false);
   // カタログの窓（print/CatalogViewer.tsx）。「カタログから検索」に打った字で開く
   const [catalogView, setCatalogView] = useState<{query: string} | null>(null);
@@ -275,9 +275,10 @@ export function SaleEditor({
             <Btn color="excel" onClick={saveExcel}>
               📗 Excelで保存
             </Btn>
-            {/* 売上伝票発行依頼書（ユーザーと決めたこと「見積書のタブの上の段」2026-10-27。足りない所は窓で入れてから開く） */}
+            {/* 売上伝票発行依頼書（ユーザーと決めたこと「見積書のタブの上の段」2026-10-27。足りない所は窓で入れてから開く）。
+                名前は「売上伝票依頼書」（ユーザーの指示「売上伝票ではなく、売上伝票を依頼書に変更」2026-10-27。住宅改修の工事見積書も同じ） */}
             <Btn color="white" onClick={() => setUriageOpen(true)}>
-              🧾 売上伝票
+              🧾 売上伝票依頼書
             </Btn>
             {form && !fixedView && (
               <Btn color="white" onClick={() => setView('shinsei')}>

@@ -1,4 +1,4 @@
-// 売上伝票発行依頼書をブラウザで通しで確かめる（Playwright）：販売見積書の上の段の「🧾 売上伝票」→ 足りない所（負担割合・介護度・新規／既存）を窓で入れる →
+// 売上伝票発行依頼書をブラウザで通しで確かめる（Playwright）：販売見積書の上の段の「🧾 売上伝票依頼書」→ 足りない所（負担割合・介護度・新規／既存）を窓で入れる →
 // 「🧾 売上伝票発行依頼書を開く」→ 新しいタブで売上伝票のアプリが中身の入った状態で開く（金額・負担額は見積もりと同じ）。生活保護なら自己負担は出さない。
 // ユーザーと決めたこと（2026-10-27）：見積書のタブの上の段・負担割合を選ぶまで自己負担額は出さない・生活保護にチェックしたら自己負担は出さない。
 // 使い方：npm run -s build:tokutei と、売上伝票発行依頼書（akamar08taiyo-bot/taiyo-uriage-denpyo）の npm run build のあと
@@ -101,11 +101,11 @@ try {
     await page.getByText('負担割合を選ぶと、自己負担額が出ます').waitFor();
     assert.ok(!(await page.locator('aside').first().innerText()).includes('利用者負担'));
 
-    // ---- 🧾 売上伝票：上の段（印刷・Excel の右）
-    const bar = await page.getByRole('button', {name: '🧾 売上伝票'}).boundingBox();
+    // ---- 🧾 売上伝票依頼書：上の段（印刷・Excel の右）
+    const bar = await page.getByRole('button', {name: '🧾 売上伝票依頼書', exact: true}).boundingBox();
     const excel = await page.getByRole('button', {name: '📗 Excelで保存'}).boundingBox();
     assert.ok(bar && excel && (bar.x > excel.x || bar.y > excel.y), `${JSON.stringify(bar)} ${JSON.stringify(excel)}`);
-    await page.getByRole('button', {name: '🧾 売上伝票'}).click();
+    await page.getByRole('button', {name: '🧾 売上伝票依頼書', exact: true}).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByText('まだ入っていません：負担割合・介護度・新規・既存').waitFor();
     assert.equal(await dialog.getByRole('link', {name: '🧾 売上伝票発行依頼書を開く'}).count(), 0);
@@ -137,7 +137,7 @@ try {
     await page.getByText(/利用者負担（2割）/).first().waitFor();
 
     // ---- 生活保護：窓でチェック → 売上伝票は自己負担を出さない
-    await page.getByRole('button', {name: '🧾 売上伝票'}).click();
+    await page.getByRole('button', {name: '🧾 売上伝票依頼書', exact: true}).click();
     await dialog.getByRole('group', {name: '伝票の顧客区分'}).waitFor();
     assert.equal(await dialog.getByRole('group', {name: '伝票の顧客区分'}).getByRole('button', {name: '新規'}).getAttribute('aria-pressed'), 'true'); // 覚えている
     await dialog.getByLabel('生活保護（自己負担は出さない）').check();
@@ -152,7 +152,7 @@ try {
     await ctx.close();
   }
   assert.deepEqual(errors, []);
-  console.log('ok: 負担割合は未選択から → 🧾 売上伝票（足りない所を窓で）→ 売上伝票が中身の入った状態で開く → 生活保護（1366px・390px）');
+  console.log('ok: 負担割合は未選択から → 🧾 売上伝票依頼書（足りない所を窓で）→ 売上伝票が中身の入った状態で開く → 生活保護（1366px・390px）');
 } finally {
   await browser.close();
   server.close();
