@@ -1,8 +1,10 @@
 // カタログの窓（ユーザーの指示「商品を入力する際、カタログから検索という欄を入力して、右のスペースにカタログを開くことができる。
 // カタログを見ながら商品を入力できるようにする。カタログのポップは位置を移動したり、大きさを変更できるようにする」2026-10-26）。
 // 画面の右に浮かぶ窓で、上の帯をつかむと動き、右下の角をつかむと大きさが変わる（マウスでも指でも）。置いた所・大きさはこの端末で覚える。
-// 「カタログから検索」に商品名・品番（261-S1063 など）を打つと、その字のあるページだけを並べる。ページを押すとそのページを出す
-import {useEffect, useMemo, useState} from 'react';
+// 「カタログから検索」に商品名・品番（261-S1063 など）を打つと、その字のあるページだけを並べる。ページを押すとそのページを出す。
+// ページの絵は、マウスのホイールで大きく・小さく（マウスのある所を中心に）、つかんで動かせる（ユーザーの指示「カタログではアップしたときにとぎれてしまうため、
+// 画像内をうごかせるようにする。スクロールでアップと縮小をできるようにする」2026-10-27。前は −・＋ のボタンだけで、大きくすると窓の中で切れて見えた）
+import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {PointerEvent as ReactPointerEvent} from 'react';
 import {CATALOG, catalogLabel, catalogMatches, catalogPicks} from '../catalog.ts';
 import type {Sale} from '../types.ts';
@@ -11,6 +13,8 @@ import type {CatalogImage} from './catalogPdf.ts';
 
 const KEY = 'taiyo-tokutei-catalog-window-v1'; // 窓の位置・大きさ（この端末だけ）
 const MIN = {w: 320, h: 260};
+const ZOOM = {min: 0.5, max: 4};
+const clampZoom = (z: number) => Math.min(ZOOM.max, Math.max(ZOOM.min, Math.round(z * 100) / 100));
 
 /** 読んだページ（窓を閉じても覚えておく。開くたびに読み直さない） */
 const loaded = new Map<string, Promise<CatalogImage | null>>();
@@ -52,6 +56,68 @@ export function CatalogViewer({sale, query: initial, onClose, onPrint}: {sale: S
   const [texts, setTexts] = useState<(string | null)[]>(() => CATALOG.map(() => null));
   const [images, setImages] = useState<(CatalogImage | null | undefined)[]>(() => CATALOG.map(() => undefined));
   const [zoom, setZoom] = useState(1);
+  // ページの絵の枠（ホイールで拡大・縮小、つかんで動かす）
+  const viewRef = useRef<HTMLDivElement>(null);
+  const zoomRef = useRef(1);
+  // 拡大・縮小したあと、マウスのあった所（px, py）の絵が同じ所に残るように動かす（cx, cy は前の大きさでの絵の上の位置）
+  const anchor = useRef<{px: number; py: number; cx: number; cy: number; ratio: number} | null>(null);
+  const [panning, setPanning] = useState(false);
+  /** factor 倍にする。clientX・clientY（マウスの所）を中心に。なければ枠のまん中 */
+  const zoomBy = (factor: number, clientX?: number, clientY?: number) => {
+    const el = viewRef.current;
+    const old = zoomRef.current;
+    const next = clampZoom(old * factor);
+    if (!el || next === old) return;
+    const r = el.getBoundingClientRect();
+    const px = clientX === undefined ? r.width / 2 : clientX - r.left;
+    const py = clientY === undefined ? r.height / 2 : clientY - r.top;
+    anchor.current = {px, py, cx: el.scrollLeft + px, cy: el.scrollTop + py, ratio: next / old};
+    zoomRef.current = next;
+    setZoom(next);
+  };
+  const resetZoom = () => zoomBy(1 / zoomRef.current);
+  useLayoutEffect(() => {
+    const a = anchor.current;
+    const el = viewRef.current;
+    if (!a || !el) return;
+    anchor.current = null;
+    el.scrollLeft = a.cx * a.ratio - a.px;
+    el.scrollTop = a.cy * a.ratio - a.py;
+  }, [zoom]);
+  // ホイールで拡大・縮小（ページを動かすのは、つかんで。ホイールの1目盛りで約 1.15 倍。トラックパッドは細かく）
+  useEffect(() => {
+    const el = viewRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const step = e.deltaMode === 1 ? e.deltaY * 0.05 : e.deltaY * 0.0015;
+      zoomBy(Math.min(1.25, Math.max(0.8, Math.exp(-step))), e.clientX, e.clientY);
+    };
+    el.addEventListener('wheel', onWheel, {passive: false});
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+  /** ページの絵をつかんで動かす（マウス。指は今までどおりの指で動かす） */
+  const pan = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    const el = e.currentTarget;
+    e.preventDefault();
+    el.setPointerCapture(e.pointerId);
+    const start = {x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop};
+    setPanning(true);
+    const move = (ev: PointerEvent) => {
+      el.scrollLeft = start.left - (ev.clientX - start.x);
+      el.scrollTop = start.top - (ev.clientY - start.y);
+    };
+    const up = () => {
+      setPanning(false);
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', up);
+    };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+  };
   // 初めに出すページ：見積もりの商品が載っているページ（なければ1ページ目）
   const [current, setCurrent] = useState(() => [...catalogPicks(sale.items)][0] ?? 0);
   useEffect(() => setQuery(initial), [initial]);
@@ -140,10 +206,14 @@ export function CatalogViewer({sale, query: initial, onClose, onPrint}: {sale: S
           aria-label="カタログから検索"
           className="h-8 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 text-sm"
         />
-        <button type="button" className={tool} onClick={() => setZoom((z) => Math.max(0.6, Math.round((z - 0.2) * 10) / 10))} aria-label="小さく">
+        <button type="button" className={tool} onClick={() => zoomBy(1 / 1.2)} aria-label="小さく">
           −
         </button>
-        <button type="button" className={tool} onClick={() => setZoom((z) => Math.min(3, Math.round((z + 0.2) * 10) / 10))} aria-label="大きく">
+        {/* 今の大きさ。押すともとの大きさ（窓の幅いっぱい） */}
+        <button type="button" className={`${tool} tabular-nums`} onClick={resetZoom} aria-label="もとの大きさ" title="もとの大きさに戻す">
+          {Math.round(zoom * 100)}%
+        </button>
+        <button type="button" className={tool} onClick={() => zoomBy(1.2)} aria-label="大きく">
           ＋
         </button>
         <button type="button" className={`${tool} !border-sky-300 !bg-sky-50 !text-sky-900`} onClick={onPrint}>
@@ -167,7 +237,13 @@ export function CatalogViewer({sale, query: initial, onClose, onPrint}: {sale: S
           </button>
         ))}
       </div>
-      <div className="relative min-h-0 flex-1 overflow-auto bg-slate-200" aria-label="カタログのページの絵">
+      <div
+        ref={viewRef}
+        onPointerDown={pan}
+        className={`relative min-h-0 flex-1 overflow-auto bg-slate-200 ${img ? (panning ? 'cursor-grabbing select-none' : 'cursor-grab') : ''}`}
+        aria-label="カタログのページの絵"
+        title="ホイールで大きく・小さく、つかんで動かす"
+      >
         {img ? (
           <img src={img.url} alt={catalogLabel(CATALOG[current])} className="block max-w-none" style={{width: `${zoom * 100}%`}} draggable={false} />
         ) : (

@@ -440,6 +440,26 @@ try {
   const w0 = await imgW();
   await viewer.getByRole('button', {name: '大きく'}).click();
   assert.ok((await imgW()) > w0 * 1.15);
+  assert.equal((await viewer.getByRole('button', {name: 'もとの大きさ'}).textContent())?.trim(), '120%');
+  // ホイールで大きく・小さく（マウスの所を中心に）、つかんで動かせる（ユーザーの指示「画像内をうごかせるようにする。スクロールでアップと縮小をできるようにする」2026-10-27）
+  const pageArea = viewer.getByLabel('カタログのページの絵');
+  const area = await pageArea.boundingBox();
+  await page.mouse.move(area.x + area.width * 0.7, area.y + area.height * 0.6);
+  const w1 = await imgW();
+  for (let k = 0; k < 4; k++) await page.mouse.wheel(0, -100);
+  await page.waitForFunction((w) => document.querySelector('[aria-label="カタログのページの絵"] img').getBoundingClientRect().width > w * 1.5, w1);
+  const scrolled = () => pageArea.evaluate((el) => ({left: el.scrollLeft, top: el.scrollTop}));
+  const s0 = await scrolled();
+  assert.ok(s0.left > 0 && s0.top > 0, JSON.stringify(s0)); // マウスの所を中心に大きくしたので、右下へ動いている
+  await page.mouse.down();
+  await page.mouse.move(area.x + area.width * 0.7 - 80, area.y + area.height * 0.6 - 60, {steps: 5});
+  await page.mouse.up();
+  const s1 = await scrolled();
+  assert.ok(Math.abs(s1.left - (s0.left + 80)) < 3 && Math.abs(s1.top - (s0.top + 60)) < 3, `${JSON.stringify(s0)} ${JSON.stringify(s1)}`);
+  for (let k = 0; k < 4; k++) await page.mouse.wheel(0, 100);
+  await page.waitForFunction((w) => document.querySelector('[aria-label="カタログのページの絵"] img').getBoundingClientRect().width < w * 1.2, w1);
+  await viewer.getByRole('button', {name: 'もとの大きさ'}).click();
+  assert.ok(Math.abs((await imgW()) - w0) < 2);
   // 🖨 印刷 はカタログの印刷の画面。Esc で印刷の画面だけ閉じる（窓は残る）
   await viewer.getByRole('button', {name: '🖨 印刷'}).click();
   await page.getByRole('group', {name: '印刷するページ'}).waitFor();
