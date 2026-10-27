@@ -263,7 +263,8 @@ export function SaleEditor({
   return (
     <div className="space-y-4">
       {/* 上の段は住宅改修の様邸の画面と同じ形（ユーザーの指示「特定福祉用具の印刷ボタンなどの位置を住宅改修などと統一する」「同様に色合い調整やボタンの位置の調整をおこなう」2026-10-27）：
-          名前・保険者のすぐ右に Excel で保存・印刷（薄い緑・薄い水色、広い画面は少し大きく）、そのほかは右に寄せる（白）。
+          名前・保険者のすぐ右に Excel で保存・印刷（薄い緑・薄い水色、広い画面は少し大きく）、そのほか（白）もそのすぐ右に続ける
+          （ユーザーの指示「この位置を赤枠を左にずらす」2026-10-27。前は右に寄せていて、名前から遠かった）。
           前は申請書の画面ではプレビューの上の枠（ShinseiPanel）に、見積もりの画面では全部右に並べていた */}
       <div className="flex flex-wrap items-center gap-2">
         <Btn color="white" onClick={onBack} className="lg:!text-base">
@@ -292,7 +293,7 @@ export function SaleEditor({
             </>
           )}
         </div>
-        <div className="flex flex-wrap justify-end gap-2 lg:ml-auto">
+        <div className="flex flex-wrap gap-2 lg:[&>*]:!text-base">
           {onShinsei ? (
             // 介援隊のカタログのページを選んで印刷（catalog.ts。ユーザーの指示「申請書を作成するとき…カタログの PDF の印刷」2026-10-26）
             <Btn color="white" onClick={() => setPrintingCatalog(true)}>
