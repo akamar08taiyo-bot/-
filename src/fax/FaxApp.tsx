@@ -464,6 +464,22 @@ export function FaxApp() {
                 </p>
               )}
             </StepCard>
+
+            {/*
+              印刷ボタンは③のすぐ下。横並びの画面で①〜③が画面に収まらないときは、画面の下端に付いて見え続ける
+              （下端に付いたときは、後ろの文字が透けないよう背景色の帯ごと付く。上の -mt-2 で③との間隔は他と同じ）
+            */}
+            <div className="flex lg:sticky lg:bottom-0 lg:-mt-2 lg:bg-slate-50 lg:py-2">
+              <button
+                type="button"
+                onClick={handlePrint}
+                title="印刷画面でプリンター（PC-FAXならFAX用、PDFにするなら「PDFに保存」）を選びます。用紙はA4・縦、倍率は100%のままで。"
+                className={`${primaryButtonClass} w-full`}
+              >
+                <Printer className="h-5 w-5" aria-hidden />
+                印刷する
+              </button>
+            </div>
           </div>
 
           <aside className="lg:sticky lg:top-3" aria-label="印刷イメージ">
@@ -487,15 +503,6 @@ export function FaxApp() {
                 <ScaledPreview>
                   <FaxSheet data={sheetData} layout={layout} font={font} preview onOverflowChange={setOverflowing} />
                 </ScaledPreview>
-                <button
-                  type="button"
-                  onClick={handlePrint}
-                  title="印刷画面でプリンター（PC-FAXならFAX用、PDFにするなら「PDFに保存」）を選びます。用紙はA4・縦、倍率は100%のままで。"
-                  className={`${primaryButtonClass} mt-3 w-full`}
-                >
-                  <Printer className="h-5 w-5" aria-hidden />
-                  印刷する
-                </button>
               </div>
             </div>
           </aside>
