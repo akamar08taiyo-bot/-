@@ -171,14 +171,15 @@ export function EstimateEditor({
             <Btn color="softSky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
               🖨 見積書を印刷
             </Btn>
-            {/* 売上伝票発行依頼書（ユーザーと決めたこと「見積書のタブの上の段」2026-10-27。足りない所は窓で入れてから開く。UriageDialog.tsx） */}
-            <Btn color="white" onClick={() => setUriageOpen(true)}>
-              🧾 売上伝票
-            </Btn>
           </>
         }
         right={
           <>
+            {/* 売上伝票発行依頼書（ユーザーと決めたこと「見積書のタブの上の段」2026-10-27。足りない所は窓で入れてから開く。UriageDialog.tsx）。
+                まん中のかたまり（保存・Excel・印刷）に入れると幅が広がり、上のタブのまん中にそろえられなくなるので、右のかたまりの先頭 */}
+            <Btn color="white" onClick={() => setUriageOpen(true)}>
+              🧾 売上伝票
+            </Btn>
             <Btn color="white" onClick={clearSheet} disabled={blank}>
               📄 白紙に戻す
             </Btn>

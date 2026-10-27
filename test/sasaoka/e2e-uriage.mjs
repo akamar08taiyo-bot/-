@@ -40,12 +40,13 @@ try {
     if ((await estimateTab.getAttribute('aria-selected')) !== 'true') await estimateTab.click();
     await page.getByRole('button', {name: '🧾 売上伝票'}).waitFor();
 
-    // 上の段のまん中のかたまり（保存・Excel・印刷）の、印刷のすぐ右
+    // 上の段：まん中のかたまり（保存・Excel・印刷）のすぐ右の、右のかたまりの先頭（まん中は上のタブのまん中にそろえるので、幅を変えない）
     const order = await page.evaluate(() => {
       const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === '🧾 売上伝票');
-      return [...b.parentElement.children].map((x) => x.textContent.trim());
+      return {right: [...b.parentElement.children].map((x) => x.textContent.trim()), before: [...b.parentElement.previousElementSibling.querySelectorAll('button')].map((x) => x.textContent.trim()).at(-1)};
     });
-    assert.equal(order[order.indexOf('🧾 売上伝票') - 1], '🖨 見積書を印刷', order.join(' / '));
+    assert.equal(order.right[0], '🧾 売上伝票', order.right.join(' / '));
+    assert.equal(order.before, '🖨 見積書を印刷');
 
     await page.getByRole('button', {name: '🧾 売上伝票'}).click();
     const dialog = page.getByRole('dialog');
