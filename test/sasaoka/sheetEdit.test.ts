@@ -76,10 +76,11 @@ test('打ち込んだ文字を読む：数字・長さ・定価・改修の種�
   assert.equal(parseLengthCm('0.6m'), 60);
   assert.equal(parseLengthCm('６０ｃｍ'), 60);
   assert.equal(parseLengthCm('60'), null);
-  assert.deepEqual(parseListNote('8000'), {list: 8000, pieceM: null});
-  assert.deepEqual(parseListNote('定価8,000円（税抜）×0.8'), {list: 8000, pieceM: null});
-  assert.deepEqual(parseListNote('定価20,000円（4m）×0.8'), {list: 20000, pieceM: 4});
-  assert.deepEqual(parseListNote('定価：￥24,300'), {list: 24300, pieceM: null});
+  assert.deepEqual(parseListNote('8000'), {list: 8000, pieceM: null, rate: null});
+  assert.deepEqual(parseListNote('定価8,000円（税抜）×0.8'), {list: 8000, pieceM: null, rate: 0.8});
+  assert.deepEqual(parseListNote('定価20,000円（4m）×0.8'), {list: 20000, pieceM: 4, rate: 0.8});
+  assert.deepEqual(parseListNote('定価8,000円（税抜）×０．７'), {list: 8000, pieceM: null, rate: 0.7}); // 全角でも
+  assert.deepEqual(parseListNote('定価：￥24,300'), {list: 24300, pieceM: null, rate: null});
   assert.equal(parseListNote('ご支給品'), null);
   assert.equal(parseKind('2'), 2);
   assert.equal(parseKind('⑤'), 5);
@@ -127,12 +128,23 @@ test('備考に定価を入れると、単価は 定価×0.8（数式と同じ�
   // そのまま確定しても自動の文のまま（手で直した備考にしない）
   ({job} = type(job, [[`line:${id}:note`, '定価11,000円（税抜）×0.8']]));
   assert.equal(job.places[0].rows[0].estNote, null);
-  // 単価を手で入れる → ×0.8 はやめる。定価×0.8 と同じ金額を入れたら自動のまま
+  // 単価を手で入れる → 備考の率は 単価÷定価（「単価の金額を変更すると、例 備考欄の0.8が0.7になったり、0.6になったり逆な連動したりする」2026-10-27）。
+  // 定価×率で割り切れない単価は率を書かない。定価×0.8 と同じ金額を入れたら自動のまま
+  ({job} = type(job, [[`line:${id}:price`, '7700']]));
+  [l] = formLines(job, S, 'yukuhashi');
+  assert.deepEqual([l.unitPrice, l.rate], [7700, 0.7]);
+  assert.equal(sheetValue(job, `line:${id}:note`, yk), '定価11,000円（税抜）×0.7');
   ({job} = type(job, [[`line:${id}:price`, '8000']]));
   [l] = formLines(job, S, 'yukuhashi');
   assert.deepEqual([l.unitPrice, l.rate], [8000, null]);
   ({job} = type(job, [[`line:${id}:price`, '8800']]));
   assert.equal(job.places[0].rows[0].estPrice, null);
+  // 逆に、備考の率を直すと単価が 定価×率 になる（0.6 → 6,600円）。設定の率（0.8）に戻すと自動の単価
+  ({job} = type(job, [[`line:${id}:note`, '定価11,000円（税抜）×0.6']]));
+  [l] = formLines(job, S, 'yukuhashi');
+  assert.deepEqual([l.unitPrice, l.rate, l.amount, job.places[0].rows[0].estNote], [6600, 0.6, 6600, null]);
+  ({job} = type(job, [[`line:${id}:note`, '定価11,000円（税抜）×0.8']]));
+  assert.deepEqual([job.places[0].rows[0].estPrice, formLines(job, S, 'yukuhashi')[0].unitPrice], [null, 8800]);
   // 定価をもう一度入れると、手で入れた単価はやめて 定価×0.8
   ({job} = type(job, [[`line:${id}:price`, '7000'], [`line:${id}:note`, '定価12,000円（税抜）×0.8']]));
   [l] = formLines(job, S, 'yukuhashi');

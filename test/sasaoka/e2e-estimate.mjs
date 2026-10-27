@@ -120,11 +120,19 @@ assert.ok(rail[12].includes('定価20,000円（4m）×0.8') && rail[12].includes
 assert.deepEqual(await totals(), ['合計', '29,860', '29,860']); // 小計 24,680＋諸経費 2,466（端数調整）＋消費税 2,714
 log('切って使う部材：120cm÷4m＝0.3本×16,000＝4,800 OK');
 
-// ---------------- 見積の単価を手で入れる（備考の ×0.8 が消える）→ 消すと 定価×0.8 に戻る
+// ---------------- 見積の単価を手で入れる → 備考の率が 単価÷定価 に（1,470円 → ×0.7。割り切れない 1,500円 は率を書かない）。
+// 逆に備考の率を直すと単価が 定価×率 に（×0.6 → 1,260円）。単価を消すと 定価×0.8 に戻る（ユーザーの指示「単価の金額を変更すると、例 備考欄の0.8が0.7になったり、
+// 0.6になったり逆な連動したりするようになる」2026-10-27）
 const bracketPrice = await key('ブラケット', 'price');
-await typeIn(bracketPrice, '1500');
+await typeIn(bracketPrice, '1470');
 let bk = await tds('ブラケット');
+assert.deepEqual([bk[5], bk[6], bk[12]], ['1,470', '2,940', '定価2,100円（税抜）×0.7'], bk.join('|'));
+await typeIn(bracketPrice, '1500');
+bk = await tds('ブラケット');
 assert.deepEqual([bk[5], bk[6], bk[12]], ['1,500', '3,000', '定価2,100円（税抜）'], bk.join('|'));
+await typeIn(await key('ブラケット', 'note'), '定価2,100円（税抜）×0.6');
+bk = await tds('ブラケット');
+assert.deepEqual([bk[5], bk[6], bk[12]], ['1,260', '2,520', '定価2,100円（税抜）×0.6'], bk.join('|'));
 await cell(bracketPrice).click();
 await page.keyboard.press('Delete');
 bk = await tds('ブラケット');
@@ -281,7 +289,7 @@ await typeIn(await key('L型手すり', 'kind'), '5');
 await page.getByRole('button', {name: '🖨 見積書を印刷'}).click();
 await page.locator('.print-overlay').waitFor();
 const kdoc = await page.locator('.print-root').innerText();
-for (const t of ['内訳書　様式', '全改修工事部分', '対象工事部分', '1時間2,500円\n×1.2時間', '福岡県介護保険広域連合', '定価20,000円（4m）×0.8', '定価11,000円（税抜）×0.8', 'トイレ\t便器取替\t材', '⑤']) {
+for (const t of ['内訳書　様式', '全改修工事部分', '対象工事部分', '1時間2,500円×1.2時間', '福岡県介護保険広域連合', '定価20,000円（4m）×0.8', '定価11,000円（税抜）×0.8', 'トイレ\t便器取替\t材', '⑤']) {
   assert.ok(kdoc.includes(t), `広域連合の書式に「${t}」がない`);
 }
 const pages = page.locator('.print-root .form-page');
@@ -317,7 +325,7 @@ log('一覧の書式・探すOK');
 // ---------------- 一覧の「📗 Excel」：広域連合用の .xlsx（2ページ。介護保険の対象は対象外を除いた金額）
 const kx = await download(() => sampleRow.getByRole('button', {name: '📗 Excel'}).click(), 'estimate-kouiki.xlsx');
 assert.equal(kx.name, '（サンプル）山田様住宅改修見積書.xlsx');
-for (const t of ['内訳書　様式', 'Ｐ－1', 'Ｐ－2', '1時間2,500円', '×1.2時間', '<v>59600</v>', '<v>53720</v>', '<rowBreaks count="1"']) {
+for (const t of ['内訳書　様式', 'Ｐ－1', 'Ｐ－2', '1時間2,500円×1.2時間', '<v>59600</v>', '<v>53720</v>', '<rowBreaks count="1"']) {
   assert.ok(kx.sheet.includes(t), `Excel（広域連合用）に「${t}」がない`);
 }
 assert.equal(await page.getByRole('heading', {level: 1}).count(), 0); // 一覧のまま（見積書は開かない）

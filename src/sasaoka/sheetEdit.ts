@@ -65,13 +65,14 @@ export function parseLengthCm(input: string): number | null {
  * 備考（算出根拠）に入れた定価：「8000」「8,000円」「定価8,000円（税抜）×0.8」「定価20,000円（4m）」など。
  * かっこの中が長さなら1本の長さ。定価でなければ null（ふつうの備考として入れる）
  */
-export function parseListNote(input: string): {list: number; pieceM: number | null} | null {
+export function parseListNote(input: string): {list: number; pieceM: number | null; rate: number | null} | null {
   const s = input.normalize('NFKC').replace(/\s+/g, '');
-  const m = /^(?:定価[:：]?)?[￥¥]?(\d[\d,]*(?:\.\d+)?)円?(?:\((?:税抜|税込|税別|(\d+(?:\.\d+)?)m)\))?(?:×\d+(?:\.\d+)?)?$/.exec(s);
+  const m = /^(?:定価[:：]?)?[￥¥]?(\d[\d,]*(?:\.\d+)?)円?(?:\((?:税抜|税込|税別|(\d+(?:\.\d+)?)m)\))?(?:[×x*](\d*\.?\d+))?$/.exec(s);
   if (!m) return null;
   const list = Number(m[1].replace(/,/g, ''));
   if (!Number.isFinite(list)) return null;
-  return {list, pieceM: m[2] ? Number(m[2]) : null};
+  const rate = m[3] ? Number(m[3]) : null;
+  return {list, pieceM: m[2] ? Number(m[2]) : null, rate: rate !== null && Number.isFinite(rate) && rate > 0 ? rate : null};
 }
 
 /** 改修の種類：1〜6・①〜⑥・「手すり」「段差」など。分からなければ null */
@@ -353,7 +354,7 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
   }
   if (field === 'note') {
     // 1本の長さ（定価○円（4m））を入れて使う長さが決まったときも、中間のブラケットの数を入れ直す
-    const noted = patchRow(job, found, notePatch(r, text, noteOf(job, r.id, ctx)?.auto ?? ''));
+    const noted = patchRow(job, found, notePatch(r, text, noteOf(job, r.id, ctx)?.auto ?? '', rates));
     return {job: withPlace(noted, found.pi, (p) => withBrackets(found.place, p, ctx.materials ?? [])), key};
   }
   return {job, key};
@@ -398,18 +399,20 @@ function qtyPatch(r: Row, trimmed: string): Partial<Row> {
   return {qty: n, lengthCm: 0};
 }
 
-/** 備考（算出根拠）：定価を入れたら単価は 定価×0.8（手で入れた単価はやめる）。定価でない文字はそのまま備考に。
+/** 備考（算出根拠）：定価を入れたら単価は 定価×率（「×0.7」と書けば 定価×0.7、率を書かないか設定の率（0.8）なら自動の単価。
+ *  ユーザーの指示「単価の金額を変更すると…備考欄の0.8が0.7になったり…逆な連動したりする」2026-10-27）。定価でない文字はそのまま備考に。
  *  1本の長さ（4m）も入れたら、先に入れてあった小数の数量（0.15）は切って使う長さにする（数量の欄と同じ）。
  *  欄には備考の全文（「定価12,000円（2m）×0.8」と「2400mm÷2000mm＝1.2」の2行）が出るので、そのまま確定したら自動の文のまま。
  *  1行目の定価・1本の長さだけ直して2行目（長さの計算）がそのままなら、定価を直したとみなす（計算の行は自動で書き直す） */
-function notePatch(r: Row, text: string, auto: string): Partial<Row> {
+function notePatch(r: Row, text: string, auto: string, rates: EstimateRates): Partial<Row> {
   const trimmed = text.trim();
   if (trimmed === '') return {listPrice: 0, estNote: null};
   if (sameNote(trimmed, auto)) return {estNote: null};
   const [first, ...rest] = trimmed.split('\n');
   const p = parseListNote(first.trim());
   if (!p || (rest.length > 0 && !sameNote(rest.join('\n'), auto.split('\n').slice(1).join('\n')))) return {estNote: text.replace(/\s+$/, '')};
-  const patch: Partial<Row> = {listPrice: p.list, estNote: null, estPrice: null};
+  const estPrice = p.rate !== null && p.rate !== rates.estimateRate ? rounddown(p.list * p.rate) : null;
+  const patch: Partial<Row> = {listPrice: p.list, estNote: null, estPrice};
   if (!p.pieceM) return patch;
   const cut = !(r.lengthCm > 0) && r.qty > 0 && !Number.isInteger(r.qty);
   return {...patch, pieceLengthM: p.pieceM, ...(cut ? {lengthCm: Math.round(r.qty * p.pieceM * 100 * 1000) / 1000, qty: 1} : {})};

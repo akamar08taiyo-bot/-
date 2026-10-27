@@ -191,6 +191,19 @@ export function estimateUnitPrice(row: Row, rates: EstimateRates): number {
 }
 
 /**
+ * 手で入れた見積の単価を、定価の何倍か（備考の「×0.7」）で表す（ユーザーの指示「単価の金額を変更すると、例 備考欄の0.8が0.7になったり、0.6になったり
+ * 逆な連動したりするようになる」2026-10-27）。小数3けたまでで 定価×率（1円未満切り捨て。自動の単価と同じ）＝単価 になるときだけ。ならなければ null
+ */
+export function priceRate(list: number, price: number): number | null {
+  if (!(list > 0) || !(price > 0)) return null;
+  for (const d of [100, 1000]) {
+    const rate = Math.round((price / list) * d) / d;
+    if (rate > 0 && rounddown(list * rate) === price) return rate;
+  }
+  return null;
+}
+
+/**
  * 何も入っていない部材の行（見積書の「挿入」で入れた行など）。見積書では空白の行になり、金額は0。
  * 品名などを打ち込めば、ふつうの部材の行になる
  */

@@ -162,9 +162,14 @@ test('部材の内容の書き方・切って使う部材の数量の計算', ()
   assert.equal(cutCalc({...rail, lengthCm: 130}), '1300mm÷4000mm＝0.325');
   assert.equal(cutCalc({...rail, lengthCm: 62.5, pieceLengthM: 3.6}), '625mm÷3600mm＝0.174'); // 割り切れない数量は小数3けたまで書く
   assert.equal(cutCalc({...rail, lengthCm: 0}), ''); // 規格品そのまま
-  // 見積の単価を手で入れた行は「×0.8」を書かない
+  // 見積の単価を手で入れた行は、掛け率を 単価÷定価 にする（「単価の金額を変更すると…備考欄の0.8が0.7になったり」2026-10-27）
   const [line] = formLines({places: [place('玄関', [{...rail, estPrice: 15000}])]}, S, 'yukuhashi');
-  assert.deepEqual([line.rate, line.unitPrice, line.amount], [null, 15000, 2250]);
+  assert.deepEqual([line.rate, line.unitPrice, line.amount], [0.75, 15000, 2250]);
+  assert.deepEqual(autoNote(line, 'yukuhashi', 2500), ['定価20,000円（4m）×0.75', '600mm÷4000mm＝0.15']);
+  // 定価×率（1円未満切り捨て）で割り切れない単価は率を書かない
+  const [odd] = formLines({places: [place('玄関', [{...rail, estPrice: 15555}])]}, S, 'yukuhashi');
+  assert.equal(odd.rate, null);
+  assert.deepEqual(autoNote(odd, 'yukuhashi', 2500), ['定価20,000円（4m）', '600mm÷4000mm＝0.15']);
 });
 
 test('見積書だけの内容・備考・施工費の金額（右に映す見積書で直したもの）', () => {
@@ -180,8 +185,10 @@ test('見積書だけの内容・備考・施工費の金額（右に映す見�
   assert.deepEqual([c.text, c.autoText], ['エンドキャップ（木口用）', 'エンドキャップ']);
   assert.deepEqual(lineNote(c, 'yukuhashi', 2500), ['定価450円', '（税抜）']);
   assert.deepEqual(autoNote(c, 'yukuhashi', 2500), ['定価450円（税抜）×0.8']);
-  // 見積の単価を手で入れた行は ×0.8 を付けない
-  assert.deepEqual(autoNote(formLines({places: [place('玄関', [{...cap, estPrice: 400, estNote: null}])]}, S, 'yukuhashi')[0], 'yukuhashi', 2500), ['定価450円（税抜）']);
+  // 見積の単価を手で入れた行は 単価÷定価 の率（315円 → ×0.7。400円 → 450×0.89＝400.5 の切り捨てで ×0.89）
+  const capAt = (estPrice: number) => autoNote(formLines({places: [place('玄関', [{...cap, estPrice, estNote: null}])]}, S, 'yukuhashi')[0], 'yukuhashi', 2500);
+  assert.deepEqual(capAt(315), ['定価450円（税抜）×0.7']);
+  assert.deepEqual(capAt(400), ['定価450円（税抜）×0.89']);
   // 1本の長さが小数でも（3.6m の手すりを 90cm）
   const rail36 = formLines({places: [place('玄関', [mat('手すり 3.6m', 18000, {lengthCm: 90, pieceLengthM: 3.6})])]}, S, 'yukuhashi')[0];
   assert.deepEqual(autoNote(rail36, 'yukuhashi', 2500), ['定価18,000円（3.6m）×0.8', '900mm÷3600mm＝0.25']);
