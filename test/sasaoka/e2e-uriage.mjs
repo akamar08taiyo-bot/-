@@ -1,4 +1,4 @@
-// 売上伝票発行依頼書を通しで確かめる：工事見積書のタブの上の段の「🧾 売上伝票」→ 足りない所（負担割合・介護度・新規／既存）を窓で入れる →
+// 売上伝票発行依頼書を通しで確かめる：工事見積書のタブの上の段の「🧾 売上伝票依頼書」→ 足りない所（負担割合・介護度・新規／既存）を窓で入れる →
 // 「🧾 売上伝票発行依頼書を開く」→ 新しいタブで売上伝票のアプリが「住宅改修工事」1行（見積書の合計・仕切り計算表の合計）の入った状態で開く。生活保護も。
 // ユーザーと決めたこと（2026-10-27）：見積書のタブの上の段・住宅改修は工事1行・生活保護にチェックしたら自己負担は出さない。
 // usage: node e2e-uriage.mjs <サイトのURL> <出力フォルダ>
@@ -38,17 +38,17 @@ try {
     await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
     const estimateTab = page.getByRole('tab', {name: /工事見積書/});
     if ((await estimateTab.getAttribute('aria-selected')) !== 'true') await estimateTab.click();
-    await page.getByRole('button', {name: '🧾 売上伝票'}).waitFor();
+    await page.getByRole('button', {name: '🧾 売上伝票依頼書', exact: true}).waitFor();
 
     // 上の段：まん中のかたまり（保存・Excel・印刷）のすぐ右の、右のかたまりの先頭（まん中は上のタブのまん中にそろえるので、幅を変えない）
     const order = await page.evaluate(() => {
-      const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === '🧾 売上伝票');
+      const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === '🧾 売上伝票依頼書');
       return {right: [...b.parentElement.children].map((x) => x.textContent.trim()), before: [...b.parentElement.previousElementSibling.querySelectorAll('button')].map((x) => x.textContent.trim()).at(-1)};
     });
-    assert.equal(order.right[0], '🧾 売上伝票', order.right.join(' / '));
+    assert.equal(order.right[0], '🧾 売上伝票依頼書', order.right.join(' / '));
     assert.equal(order.before, '🖨 見積書を印刷');
 
-    await page.getByRole('button', {name: '🧾 売上伝票'}).click();
+    await page.getByRole('button', {name: '🧾 売上伝票依頼書', exact: true}).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByText('まだ入っていません：負担割合・介護度・新規・既存').waitFor();
     assert.equal(await dialog.getByRole('button', {name: '🧾 売上伝票発行依頼書を開く'}).isDisabled(), true);
@@ -80,7 +80,7 @@ try {
     log(`${tag}: 売上伝票が工事1行・仕切り ${cost}円で開いた`);
 
     // 生活保護：もう一度開く（新規・既存・負担割合は覚えている）
-    await page.getByRole('button', {name: '🧾 売上伝票'}).click();
+    await page.getByRole('button', {name: '🧾 売上伝票依頼書', exact: true}).click();
     assert.equal(await dialog.getByRole('group', {name: '伝票の顧客区分'}).getByRole('button', {name: '既存'}).getAttribute('aria-pressed'), 'true');
     assert.equal(await dialog.getByRole('group', {name: '伝票の負担割合'}).getByRole('button', {name: '1割'}).getAttribute('aria-pressed'), 'true');
     await dialog.getByLabel('生活保護（自己負担は出さない）').check();
@@ -99,7 +99,7 @@ try {
     await ctx.close();
   }
   assert.deepEqual(errors, []);
-  console.log('ok: 工事見積書の 🧾 売上伝票 → 足りない所を窓で → 売上伝票（住宅改修工事1行）→ 生活保護（1366px・390px）');
+  console.log('ok: 工事見積書の 🧾 売上伝票依頼書 → 足りない所を窓で → 売上伝票（住宅改修工事1行）→ 生活保護（1366px・390px）');
 } finally {
   await browser.close();
 }

@@ -176,9 +176,10 @@ export function EstimateEditor({
         right={
           <>
             {/* 売上伝票発行依頼書（ユーザーと決めたこと「見積書のタブの上の段」2026-10-27。足りない所は窓で入れてから開く。UriageDialog.tsx）。
-                まん中のかたまり（保存・Excel・印刷）に入れると幅が広がり、上のタブのまん中にそろえられなくなるので、右のかたまりの先頭 */}
+                まん中のかたまり（保存・Excel・印刷）に入れると幅が広がり、上のタブのまん中にそろえられなくなるので、右のかたまりの先頭。
+                名前は「売上伝票依頼書」（ユーザーの指示「売上伝票ではなく、売上伝票を依頼書に変更」2026-10-27） */}
             <Btn color="white" onClick={() => setUriageOpen(true)}>
-              🧾 売上伝票
+              🧾 売上伝票依頼書
             </Btn>
             <Btn color="white" onClick={clearSheet} disabled={blank}>
               📄 白紙に戻す

@@ -155,7 +155,7 @@ export type Job = {
   planPhoto?: string;
   // 売上見込みの月 'YYYY-MM'（「📈 売上見込みを確認する」で次月に回したとき。なければ請求する月 month。salesPlan.ts）
   salesMonth?: string;
-  // 売上伝票発行依頼書（「🧾 売上伝票」の窓。uriage.ts）で選んだ顧客区分・請求区分。次に出すときに選び直さなくてよいように覚える。複製では引き継がない
+  // 売上伝票発行依頼書（「🧾 売上伝票依頼書」の窓。uriage.ts）で選んだ顧客区分・請求区分。次に出すときに選び直さなくてよいように覚える。複製では引き継がない
   uriage?: {customer?: 'new' | 'existing'; billing?: 'receipt' | 'reimbursement'};
   createdAt: number;
   updatedAt: number;

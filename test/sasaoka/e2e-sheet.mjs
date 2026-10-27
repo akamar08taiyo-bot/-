@@ -604,8 +604,8 @@ log('中間のブラケット：2400mm → BD-01G 2個・900mm で外す・Ctrl+
 // ---------------- 「📄 白紙に戻す」（印刷の横）：確かめてから、見積書に打ち込んだ内容を全部消す。やめれば何も消えない。
 // 保険者（書式）・担当は残す。Ctrl+Z で戻せる
 const headButtons = (await page.locator('main button').allInnerTexts()).map((t) => t.trim());
-// 印刷のすぐ右は右のかたまりの「🧾 売上伝票」（2026-10-27。売上伝票発行依頼書）、その次が「📄 白紙に戻す」
-assert.deepEqual(headButtons.slice(headButtons.indexOf('🖨 見積書を印刷') + 1, headButtons.indexOf('🖨 見積書を印刷') + 3), ['🧾 売上伝票', '📄 白紙に戻す'], headButtons.slice(0, 12).join('|'));
+// 印刷のすぐ右は右のかたまりの「🧾 売上伝票依頼書」（2026-10-27。売上伝票発行依頼書。「売上伝票ではなく、売上伝票を依頼書に変更」）、その次が「📄 白紙に戻す」
+assert.deepEqual(headButtons.slice(headButtons.indexOf('🖨 見積書を印刷') + 1, headButtons.indexOf('🖨 見積書を印刷') + 3), ['🧾 売上伝票依頼書', '📄 白紙に戻す'], headButtons.slice(0, 12).join('|'));
 const clearBtn = page.getByRole('button', {name: '📄 白紙に戻す'});
 page.removeAllListeners('dialog');
 let asked = '';
