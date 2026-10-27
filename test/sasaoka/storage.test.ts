@@ -99,6 +99,33 @@ test('見積書の項目：前のデータ（項目なし）も読める', () =>
     e.places.map((p) => p.photoEdits),
     [{before: {rot: 90, scale: 0.5}}, {after: {rot: 270, scale: 1}}, undefined],
   );
+  // 写真への書き込み：そろえて読み（位置は 0〜1・四角形は左上→右下・色は大文字）、こわれたもの・文字のないテキストボックスは捨てる。どれもなければ持たない
+  const [pm] = cleanJobs([
+    {
+      places: [
+        {
+          name: '玄関',
+          photoMarks: {
+            before: [
+              {id: 'a', kind: 'line', x1: 0.1, y1: 0.9, x2: 1.4, y2: 0.2, line: 'ff0000', width: 2.25, dash: 'dash', end: true},
+              {id: 'b', kind: 'rect', x1: 0.6, y1: 0.5, x2: 0.2, y2: 0.1, line: '', width: 1, dash: 'x', fill: '#ffff00', rot: 450},
+              {id: 'c', kind: 'text', x1: 0, y1: 0, x2: 0.3, y2: 0.1, text: '  '},
+              {id: 'd', kind: 'star', x1: 0, y1: 0, x2: 1, y2: 1},
+            ],
+            after: 'x',
+          },
+        },
+        {name: 'トイレ', photoMarks: {before: []}},
+      ],
+    },
+  ]);
+  assert.deepEqual(pm.places[0].photoMarks, {
+    before: [
+      {id: 'a', kind: 'line', x1: 0.1, y1: 0.9, x2: 1, y2: 0.2, line: 'FF0000', width: 2.25, dash: 'dash', end: true, fill: '', size: 11, color: '000000'},
+      {id: 'b', kind: 'rect', x1: 0.2, y1: 0.1, x2: 0.6, y2: 0.5, rot: 90, line: '', width: 1, dash: 'solid', fill: 'FFFF00', size: 11, color: '000000'},
+    ],
+  });
+  assert.equal('photoMarks' in pm.places[1], false);
   // 申請書の項目：前のデータ（項目なし）は空。丸で囲む項目は選べる値のほかは空にする。前の版の丸（shinseiMarks）も読む
   assert.deepEqual(j.shinsei, NO_SHINSEI);
   const [m] = cleanJobs([{shinseiMarks: {gender: '女', era: '平成', care: '要介護2', renovated: 1}}]);

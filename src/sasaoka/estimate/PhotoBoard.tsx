@@ -14,6 +14,8 @@
 // 箇所をつかんで（見出しでも写真の上でも）ほかの箇所に重ねて離すか（ユーザーの指示「クリックしてそのままドロップしたら入れ替え」）、◀ ▶ で隣と入れ替える
 // （写真・撮影日・向きは箇所と一緒に動く）。指（iPad）でも動くようにポインターで動かす
 // 向き（ユーザーの指示「写真の方向転換」「iPad でもくるっとすぐに回転」）：写真の右上の ↻ で右に 90°。大きさと細かい向きはプレビューの写真で直す
+// 書き込み（ユーザーの指示「申請書の写真に書き込んで、手すりの位置や踏み台の位置など…徹底的にExcelに似せて」2026-10-27）：写真の右上の ✏️ で、
+// Excel と同じ操作の書き込みの画面（PhotoMarkEditor.tsx）。書き込みは写真と一緒に動き（入れ替え・90°回す）、写真を差し替える・消すと消える
 // ドロップ・貼り付けが分かるように（ユーザーの指示「完了写真もドラッグ＆ドロップや貼付けしやすいようにする…認識しやすいように、見やすいように」2026-10-23）：
 // 空いた枠に「ドロップ・Ctrl+V」、ファイルを画面に持ってくると枠がみな薄い緑、重ねた枠は「ここに離す」。Ctrl+V は選んでいる枠（押した・Tab で移った枠、
 // 箇所の中のボタンにいるときはその箇所の空いた枠）に貼る。枠を選んでいないときの Ctrl+V は、介護保険証・介護ソフトの画面の読み取り（CardReader.tsx）のまま
@@ -24,10 +26,12 @@ import type {EstimateRates} from '../calc.ts';
 import {Btn, DropArea, DropOverlay, pastedFiles, useFileDragging, useToast} from '../components/ui.tsx';
 import {circled, photoNumbers, swapPhotoNumbers} from '../estimateForms.ts';
 import {cleanEdit, turn} from '../photoEdit.ts';
+import {photoBounds, turnMarks} from '../photoMarks.ts';
 import {photoTakenDate, preparePhoto, putPhoto, rememberPhotoUrl, usePhotoUrls} from '../photos.ts';
 import {photoDay, photoPlacement, workText} from '../shinsei.ts';
 import {readStampDate} from '../stampDate.ts';
-import type {Job, PhotoEdit, Place, PlacePhotoEdits, PlacePhotos} from '../types.ts';
+import type {Job, PhotoEdit, PhotoMark, Place, PlacePhotoEdits, PlacePhotoMarks, PlacePhotos} from '../types.ts';
+import {MarkLayer} from './MarkLayer.tsx';
 
 export type PhotoSlot = 'before' | 'after';
 export type PhotoKey = {placeId: string; slot: PhotoSlot};
@@ -35,21 +39,21 @@ export const SLOT_LABEL: Record<PhotoSlot, string> = {before: '改修前', after
 /** 指で写真の上を押したまま、この時間（ミリ秒）たってから動かすと箇所をつかむ（すぐに動かしたときは画面のスクロール） */
 const HOLD_MS = 280;
 
-type SlotFields = {photos: PlacePhotos; photoDates: PlacePhotos; photoEdits: PlacePhotoEdits};
+type SlotFields = {photos: PlacePhotos; photoDates: PlacePhotos; photoEdits: PlacePhotoEdits; photoMarks: PlacePhotoMarks};
 
-/** 改修前・改修後の1つを替える（空なら外す。どちらもなければ持たない） */
+/** 改修前・改修後の1つを替える（空なら外す。どちらもなければ持たない。書き込みは1つもなければ空） */
 function withSlot<F extends keyof SlotFields>(p: Place, field: F, slot: PhotoSlot, v: SlotFields[F][PhotoSlot] | undefined): Place {
   const next = {...p[field], [slot]: v} as SlotFields[F];
-  if (!v) delete next[slot];
+  if (!v || (Array.isArray(v) && v.length === 0)) delete next[slot];
   const out: Record<string, unknown> = {...p};
   if (next.before || next.after) out[field] = next;
   else delete out[field];
   return out as Place;
 }
 
-/** 枠の写真・撮影日・向きと大きさを替える */
-const withPhoto = (p: Place, slot: PhotoSlot, id: string | undefined, date: string | undefined, edit: PhotoEdit | undefined): Place =>
-  withSlot(withSlot(withSlot(p, 'photos', slot, id), 'photoDates', slot, date), 'photoEdits', slot, edit);
+/** 枠の写真・撮影日・向きと大きさ・書き込みを替える */
+const withPhoto = (p: Place, slot: PhotoSlot, id: string | undefined, date: string | undefined, edit: PhotoEdit | undefined, marks?: PhotoMark[]): Place =>
+  withSlot(withSlot(withSlot(withSlot(p, 'photos', slot, id), 'photoDates', slot, date), 'photoEdits', slot, edit), 'photoMarks', slot, marks);
 
 /** 写真の番号の箇所（写真番号の順）。写真番号のない箇所（見積書に出ない箇所）は入らない */
 export function photoPlaces(job: Pick<Job, 'places'>, rates: EstimateRates): {place: Place; no: number}[] {
@@ -83,9 +87,22 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
         return note ? {...rest, photoNote: note} : rest;
       }),
     }));
-  /** 写真の向き・大きさを直す（そのままに戻したら持たない） */
-  const setEdit = (key: PhotoKey, edit: PhotoEdit | undefined) =>
-    setJob((j) => ({...j, places: j.places.map((p) => (p.id === key.placeId ? withSlot(p, 'photoEdits', key.slot, cleanEdit(edit)) : p))}));
+  /**
+   * 写真の向き・大きさを直す（そのままに戻したら持たない）。size＝写真の画素の大きさ：90°の倍数で回したときは、書き込みも写真と一緒に回す（turnMarks）
+   */
+  const setEdit = (key: PhotoKey, edit: PhotoEdit | undefined, size?: {w: number; h: number}) =>
+    setJob((j) => ({
+      ...j,
+      places: j.places.map((p) => {
+        if (p.id !== key.placeId) return p;
+        const marks = p.photoMarks?.[key.slot];
+        const out = withSlot(p, 'photoEdits', key.slot, cleanEdit(edit));
+        return marks?.length && size ? withSlot(out, 'photoMarks', key.slot, turnMarks(marks, size, p.photoEdits?.[key.slot]?.rot ?? 0, edit?.rot ?? 0)) : out;
+      }),
+    }));
+  /** 写真への書き込みを入れる（なければ持たない） */
+  const setMarks = (key: PhotoKey, marks: PhotoMark[]) =>
+    setJob((j) => ({...j, places: j.places.map((p) => (p.id === key.placeId ? withSlot(p, 'photoMarks', key.slot, marks.length ? marks : undefined) : p))}));
   /** 2つの箇所の写真番号を入れ替える（写真・撮影日・向きは箇所と一緒に動く） */
   const swapPlaces = (a: string, b: string) => setJob((j) => ({...j, places: swapPhotoNumbers(j.places, a, b)}));
   /**
@@ -167,18 +184,18 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
     }
     if (images.length > used.length) toast(`写真番号の枠が足りないので、${images.length - used.length}枚は入れませんでした`, 'error');
   };
-  /** 2つの枠の写真を入れ替える（片方が空なら移す）。撮影日・向きと大きさも一緒に */
+  /** 2つの枠の写真を入れ替える（片方が空なら移す）。撮影日・向きと大きさ・書き込みも一緒に */
   const swap = (a: PhotoKey, b: PhotoKey) =>
     setJob((j) => {
       // どちらかの箇所がもうない（選んだあとで箇所を消した）ときは何もしない（前は押した写真が消えていた）
       if (!j.places.some((x) => x.id === a.placeId) || !j.places.some((x) => x.id === b.placeId)) return j;
       const get = (k: PhotoKey) => {
         const p = j.places.find((x) => x.id === k.placeId);
-        return [p?.photos?.[k.slot], p?.photoDates?.[k.slot], p?.photoEdits?.[k.slot]] as const;
+        return [p?.photos?.[k.slot], p?.photoDates?.[k.slot], p?.photoEdits?.[k.slot], p?.photoMarks?.[k.slot]] as const;
       };
-      const [[ia, da, ea], [ib, db, eb]] = [get(a), get(b)];
-      let places = j.places.map((p) => (p.id === a.placeId ? withPhoto(p, a.slot, ib, db, eb) : p));
-      places = places.map((p) => (p.id === b.placeId ? withPhoto(p, b.slot, ia, da, ea) : p));
+      const [[ia, da, ea, ma], [ib, db, eb, mb]] = [get(a), get(b)];
+      let places = j.places.map((p) => (p.id === a.placeId ? withPhoto(p, a.slot, ib, db, eb, mb) : p));
+      places = places.map((p) => (p.id === b.placeId ? withPhoto(p, b.slot, ia, da, ea, ma) : p));
       return {...j, places};
     });
   const remove = (key: PhotoKey) => setPhoto(key, undefined, undefined);
@@ -188,7 +205,7 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
     e.stopPropagation();
     if (e.dataTransfer.files.length) void put([...e.dataTransfer.files], target);
   };
-  return {put, swap, remove, drop, setDate, setNote, setEdit, swapPlaces, busy};
+  return {put, swap, remove, drop, setDate, setNote, setEdit, setMarks, swapPlaces, busy};
 }
 
 /** 写真（画像）か PDF のファイルか（写真の枠・平面図の枠に入れられるもの） */
@@ -236,17 +253,41 @@ const draggable = (e: DragEvent) => [...e.dataTransfer.types].includes('Files');
 
 export type PhotoActions = ReturnType<typeof usePhotoActions>;
 
-/** 写真の欄の枠の中の写真：写真貼付用紙と同じく、向き・大きさを直した形で（枠は 4:3。％で置く） */
-function Thumb({url, w, h, edit}: {url: string; w: number; h: number; edit?: PhotoEdit}) {
+/**
+ * 写真の欄の枠の中の写真：写真貼付用紙と同じく、向き・大きさを直した形で（枠は 4:3。％で置く）。書き込みも重ねる
+ * （paper＝写真貼付用紙の上の写真の大きさ（画素）。線の太さ・文字の大きさを、申請書と同じ割合に縮めて描く）
+ */
+function Thumb({url, w, h, edit, marks, paper}: {url: string; w: number; h: number; edit?: PhotoEdit; marks?: PhotoMark[]; paper?: {w: number; h: number} | null}) {
   const b = photoPlacement({x: 0, y: 0, w: 400, h: 300}, w, h, edit, 0);
+  const vb = photoBounds(b);
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !marks?.length) return;
+    setWidth(el.clientWidth);
+    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [marks?.length]);
+  // 写真貼付用紙の大きさが分からないとき（原本にその写真番号の用紙がない）は、幅 500 画素ほどの写真として描く
+  const real = paper ?? {w: 500, h: (500 * vb.h) / (vb.w || 1)};
+  const k = (vb.w * (width / 400)) / (real.w || 1);
   return (
-    <img
-      src={url}
-      alt=""
-      draggable={false}
-      className="absolute max-w-none"
-      style={{left: `${b.x / 4}%`, top: `${b.y / 3}%`, width: `${b.w / 4}%`, height: `${b.h / 3}%`, transform: b.rot ? `rotate(${b.rot}deg)` : undefined, WebkitTouchCallout: 'none'}}
-    />
+    <>
+      <img
+        src={url}
+        alt=""
+        draggable={false}
+        className="absolute max-w-none"
+        style={{left: `${b.x / 4}%`, top: `${b.y / 3}%`, width: `${b.w / 4}%`, height: `${b.h / 3}%`, transform: b.rot ? `rotate(${b.rot}deg)` : undefined, WebkitTouchCallout: 'none'}}
+      />
+      {marks?.length ? (
+        <div ref={ref} className="pointer-events-none absolute inset-0">
+          {width > 0 && <MarkLayer marks={marks} w={real.w} h={real.h} k={k} style={{left: (vb.x / 400) * width, top: (vb.y / 400) * width}} />}
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -257,6 +298,8 @@ export function PhotoBoard({
   dates,
   actions,
   onPick,
+  onMark,
+  paperSize,
 }: {
   job: Job;
   rates: EstimateRates;
@@ -264,6 +307,8 @@ export function PhotoBoard({
   dates: boolean; // 写真の用紙に撮影日の欄がある（苅田町）：枠の下に撮影日の欄を出す
   actions: PhotoActions;
   onPick: (key?: PhotoKey) => void; // 写真のファイルを選ぶ（枠を決めるときは key）
+  onMark?: (key: PhotoKey) => void; // 写真に書き込む（PhotoMarkEditor.tsx）
+  paperSize?: (key: PhotoKey) => {w: number; h: number} | null; // 写真貼付用紙の上の写真の大きさ（書き込みを同じ割合で描く）
 }) {
   const list = photoPlaces(job, rates);
   const urls = usePhotoUrls(list.flatMap(({place}) => [place.photos?.before ?? '', place.photos?.after ?? '']));
@@ -587,7 +632,7 @@ export function PhotoBoard({
                                 } ${selected && !same(selected, key) ? 'cursor-copy' : ''}`}
                               >
                                 {photo ? (
-                                  <Thumb url={photo.url} w={photo.w} h={photo.h} edit={edit} />
+                                  <Thumb url={photo.url} w={photo.w} h={photo.h} edit={edit} marks={place.photoMarks?.[slot]} paper={paperSize?.(key)} />
                                 ) : photo === null ? (
                                   <span className="px-2 text-amber-800">この端末にない写真</span>
                                 ) : id ? (
@@ -607,12 +652,25 @@ export function PhotoBoard({
                                 <button
                                   type="button"
                                   data-no-drag
-                                  onClick={() => actions.setEdit(key, turn(edit, 1))}
+                                  onClick={() => actions.setEdit(key, turn(edit, 1), photo ?? undefined)}
                                   className="absolute right-1 top-1 flex h-8 w-8 touch-manipulation items-center justify-center rounded-full bg-white/90 text-lg leading-none text-slate-700 shadow ring-1 ring-slate-300 hover:bg-white hover:text-emerald-700"
                                   title="右に回す"
                                   aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}を右に回す`}
                                 >
                                   ↻
+                                </button>
+                              )}
+                              {/* 書き込み（直線・矢印・四角形・楕円・テキストボックス。Excel と同じ操作） */}
+                              {id && photo && onMark && (
+                                <button
+                                  type="button"
+                                  data-no-drag
+                                  onClick={() => onMark(key)}
+                                  className="absolute right-10 top-1 flex h-8 w-8 touch-manipulation items-center justify-center rounded-full bg-white/90 text-base leading-none text-slate-700 shadow ring-1 ring-slate-300 hover:bg-white hover:text-emerald-700"
+                                  title="写真に書き込む"
+                                  aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}に書き込む`}
+                                >
+                                  ✏️
                                 </button>
                               )}
                             </div>

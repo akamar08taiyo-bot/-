@@ -7,7 +7,7 @@ import {DEFAULT_PLACES, defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {boxLabels, checkBoxes, fillShinsei, fitLinesSize, insuredBoxes, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
 import {shinseiPreview} from '../../src/sasaoka/shinseiPreview.ts';
-import type {Insurer, Job, Place, Row, ShinseiInfo, ShinseiMarks} from '../../src/sasaoka/types.ts';
+import type {Insurer, Job, PhotoMark, Place, Row, ShinseiInfo, ShinseiMarks} from '../../src/sasaoka/types.ts';
 
 const RATES = {estimateRate: 0.8, estimateLaborRate: 1.5, estimateOverheadRate: 0.1, taxRate: 0.1};
 const blank = {code: '', maker: '', unit: '', price: 0, listPrice: 0, lengthCm: 0, pieceLengthM: 0, estPrice: null, excluded: false, estText: null, estNote: null, estAmount: null};
@@ -1000,6 +1000,56 @@ test('写真の用紙（Excel）：改修前の写真の横（上）の書く欄
   // 画面のプレビュー（photoImages なし）では書かない（画面は枠に重ねて描く）
   const pv = unzipSync(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(j, RATES)));
   assert.ok(!anchorsOf(strFromU8(pv[drawingPath(pv, '1 ')!] ?? new Uint8Array())).some(isNote));
+});
+
+test('写真への書き込み（Excel）：写真のすぐ上に Excel の図形で。位置は写真の見えている四角の中の割合のとおり（直線は向きを flipH・flipV、回した四角形は置き場所の縦横を入れかえ）', () => {
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 7, 0xff, 0xd9]);
+  const base = {line: 'FF0000', width: 2.25, dash: 'solid', fill: '', size: 11, color: '000000'} as const;
+  const marks: PhotoMark[] = [
+    {...base, id: 'a', kind: 'line', x1: 0.1, y1: 0.9, x2: 0.6, y2: 0.2, end: true, dash: 'sysDot', line: '0070C0', width: 4.5},
+    {...base, id: 'b', kind: 'rect', x1: 0.2, y1: 0.3, x2: 0.6, y2: 0.5, rot: 90, fill: 'FFFF00'},
+    {...base, id: 'c', kind: 'text', x1: 0.5, y1: 0.05, x2: 0.95, y2: 0.25, text: '手すり L=800mm\n\nH=750 <&>', size: 14, color: '00B050', bold: true, fill: 'FFFFFF', line: ''},
+    {...base, id: 'd', kind: 'ellipse', x1: 0.7, y1: 0.6, x2: 0.9, y2: 0.8},
+  ];
+  const j = job({insurer: 'kanda'});
+  const files = unzipSync(fillShinsei(KANDA, SHINSEI.kanda!, {...shinseiValues(j, RATES), photoImages: {1: {before: {bytes: jpeg, w: 1600, h: 1200, marks}}}}));
+  const anchors = anchorsOf(strFromU8(files[drawingPath(files, '1 ')!]));
+  const at = anchors.findIndex((a) => a.includes('<xdr:pic>'));
+  const shapes = anchors.slice(at + 1, at + 5);
+  assert.deepEqual(shapes.map((a) => /name="([^"]+?) \d+"/.exec(a)![1]), ['直線矢印コネクタ', '正方形/長方形', 'テキスト ボックス', '楕円']);
+  const [line, rect, text, ellipse] = shapes;
+  // 写真の見えている四角（Excel の写真と同じ計算）
+  const sheet = SHINSEI.kanda!.sheets.find((x) => x.sheet === '1 ')!;
+  const lay = sheetLayout(strFromU8(files[sheetPath(files, '1 ')]));
+  const parts = photoNoteLayout(rangeBox(lay, sheet.photoPlace!.before!), {w: 1600, h: 1200}, photoNoteLines(j.places[0]));
+  const vb = photoPlacement(parts.photo, 1600, 1200);
+  const xf = (a: string) => /<a:off x="(-?\d+)" y="(-?\d+)"\/><a:ext cx="(\d+)" cy="(\d+)"\/>/.exec(a)!.slice(1).map((n) => Number(n) / 9525);
+  const close = (got: number[], want: number[]) => assert.ok(got.every((v, i) => Math.abs(v - want[i]) < 0.5), `${got} / ${want}`);
+  // 直線：始点（左下）→ 終点（右上）なので上下を反転（flipV）。四角は始点・終点を囲む四角
+  close(xf(line), [vb.x + 0.1 * vb.w, vb.y + 0.2 * vb.h, 0.5 * vb.w, 0.7 * vb.h]);
+  assert.match(line, /<xdr:cxnSp macro=""><xdr:nvCxnSpPr>/);
+  assert.match(line, /<a:xfrm flipV="1">/);
+  assert.match(line, /<a:prstGeom prst="straightConnector1">/);
+  assert.match(line, /<a:ln w="57150" cap="rnd"><a:solidFill><a:srgbClr val="0070C0"\/><\/a:solidFill><a:prstDash val="sysDot"\/><a:tailEnd type="triangle" w="med" len="med"\/><\/a:ln>/);
+  // 回した四角形：xfrm は回す前の四角、置き場所（from・to）は縦横を入れかえた四角
+  close(xf(rect), [vb.x + 0.2 * vb.w, vb.y + 0.3 * vb.h, 0.4 * vb.w, 0.2 * vb.h]);
+  assert.match(rect, /<a:xfrm rot="5400000">/);
+  assert.match(rect, /<a:solidFill><a:srgbClr val="FFFF00"\/><\/a:solidFill><a:ln w="28575"><a:solidFill><a:srgbClr val="FF0000"\/>/);
+  const {from, to} = anchorOf(rect);
+  const [fx, fy, tx, ty] = [posPx(from[0], from[1], lay.colW), posPx(from[2], from[3], lay.rowH), posPx(to[0], to[1], lay.colW), posPx(to[2], to[3], lay.rowH)];
+  close([tx - fx, ty - fy], [0.2 * vb.h, 0.4 * vb.w]);
+  // テキストボックス：段落ごと（空の行も）・大きさ・色・太字・文字の高さに合わせる・枠線なし。& < > は書けるように
+  assert.match(text, /<xdr:cNvSpPr txBox="1"\/>/);
+  assert.match(text, /<a:noFill\/><\/a:ln>|<a:ln><a:noFill\/><\/a:ln>/);
+  assert.deepEqual([...text.matchAll(/<a:p>(.*?)<\/a:p>/g)].map((m) => /<a:t>([^<]*)<\/a:t>/.exec(m[1])?.[1] ?? ''), ['手すり L=800mm', '', 'H=750 &lt;&amp;&gt;']);
+  assert.match(text, /<a:rPr lang="ja-JP" altLang="en-US" sz="1400" b="1"><a:solidFill><a:srgbClr val="00B050"\/><\/a:solidFill><\/a:rPr>/);
+  assert.match(text, /anchor="t"><a:spAutoFit\/><\/a:bodyPr>/);
+  assert.match(text, /<a:fontRef idx="minor">/);
+  assert.match(ellipse, /prst="ellipse"/);
+  assert.doesNotMatch(ellipse, /<xdr:txBody>/); // 文字のない図形には文字の欄を書かない
+  // 図形の番号は重ならない
+  const ids = [...strFromU8(files[drawingPath(files, '1 ')!]).matchAll(/<xdr:cNvPr\b[^>]*\sid="(\d+)"/g)].map((m) => m[1]);
+  assert.equal(new Set(ids).size, ids.length);
 });
 
 test('平面図の図：表題と工事内容のあいだの範囲に、縦横の比のまま・範囲に収まるだけ大きく貼る（図形のいちばんうしろ）。図がなければ貼らない（4つの保険者）', () => {

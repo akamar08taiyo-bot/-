@@ -12,9 +12,10 @@ import type {EstimateRates, EstimateSettings} from './calc.ts';
 import {BASE_PLATE} from './cutLink.ts';
 import {circled, eraOf, jobInsurer, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa} from './estimateForms.ts';
 import {clampOff, clampScale, normRot} from './photoEdit.ts';
+import {lineEnds, MARK_INSET, photoBounds, shapeBox} from './photoMarks.ts';
 import {textEm} from './print/fit.ts';
 import type {RiyuValues} from './riyu.ts';
-import type {Insurer, Job, PhotoEdit, Place, PlacePhotos, ShinseiInfo, ShinseiMarks} from './types.ts';
+import type {Insurer, Job, PhotoEdit, PhotoMark, Place, PlacePhotos, ShinseiInfo, ShinseiMarks} from './types.ts';
 import {customerFilePart, todayIso} from './util.ts';
 
 /** 申請書の原本の、1つのシートで転記する欄（番地）。ないものは書かない */
@@ -285,7 +286,7 @@ export type ShinseiValues = {
 };
 
 /** 写真貼付用紙に貼る写真（JPEG のバイト列と、縦横の画素） */
-export type PhotoImage = {bytes: Uint8Array; w: number; h: number; edit?: PhotoEdit}; // edit＝向き・大きさ（photoEdit.ts）
+export type PhotoImage = {bytes: Uint8Array; w: number; h: number; edit?: PhotoEdit; marks?: PhotoMark[]}; // edit＝向き・大きさ（photoEdit.ts）、marks＝写真への書き込み（photoMarks.ts）
 export type PhotoImages = {before?: PhotoImage; after?: PhotoImage};
 
 /**
@@ -1767,6 +1768,8 @@ function drawPhotos(files: Files, sheet: ShinseiSheet, images: PhotoImages, note
     const box = photoPlacement(parts.photo, img.w, img.h, img.edit);
     pics.push(media.pic(lay, img.bytes, box, box.rot, id, slot === 'before' ? '改修前' : '改修後'));
     id++;
+    // 写真への書き込み：写真のすぐ上（前面）に Excel の図形で（Excel で開いて、そのまま動かす・直すことができる）
+    for (const m of img.marks ?? []) pics.push(markShapeXml(lay, photoBounds(box), m, id++));
   }
   media.done(d.replace('</xdr:wsDr>', `${pics.join('')}${texts.join('')}</xdr:wsDr>`));
 }
@@ -1844,6 +1847,59 @@ function noteBoxXml(lay: SheetLayout, box: Box, lines: string[], pt: number, id:
     `<xdr:spPr>${xfrm(box)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln w="9525"><a:noFill/></a:ln></xdr:spPr>` +
     `<xdr:style><a:lnRef idx="0">${none}</a:lnRef><a:fillRef idx="0">${none}</a:fillRef><a:effectRef idx="0">${none}</a:effectRef><a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef></xdr:style>` +
     `<xdr:txBody><a:bodyPr wrap="square" lIns="${ix}" tIns="${iy}" rIns="${ix}" bIns="${iy}" rtlCol="0" anchor="t"/><a:lstStyle/>${paras}</xdr:txBody></xdr:sp><xdr:clientData/></xdr:twoCellAnchor>`
+  );
+}
+
+const MARK_NONE = '<a:scrgbClr r="0" g="0" b="0"/>';
+const solid = (hex: string) => `<a:solidFill><a:srgbClr val="${hex}"/></a:solidFill>`;
+
+/** 写真への書き込みの線（Excel の「図形の枠線」：色・太さ・実線／点線・矢印） */
+function markLineXml(m: PhotoMark): string {
+  if (!m.line) return '<a:ln><a:noFill/></a:ln>';
+  const arrow = (tag: string, on?: boolean) => (on ? `<a:${tag} type="triangle" w="med" len="med"/>` : '');
+  const dash = m.dash === 'solid' ? '' : `<a:prstDash val="${m.dash}"/>`;
+  return `<a:ln w="${Math.round(m.width * 12700)}"${m.dash === 'sysDot' ? ' cap="rnd"' : ''}>${solid(m.line)}${dash}${arrow('headEnd', m.start)}${arrow('tailEnd', m.end)}</a:ln>`;
+}
+
+/** 図形の中の文字（段落ごとに。テキストボックスは左上から、四角形・楕円はまん中に） */
+function markTextXml(m: PhotoMark): string {
+  const sz = Math.round(m.size * 100);
+  const ppr = m.kind === 'text' ? '' : '<a:pPr algn="ctr"/>';
+  const rpr = `lang="ja-JP" altLang="en-US" sz="${sz}"${m.bold ? ' b="1"' : ''}`;
+  const paras = (m.text ?? '')
+    .split(/\r?\n/)
+    .map((l) => (l ? `<a:p>${ppr}<a:r><a:rPr ${rpr}>${solid(m.color)}</a:rPr><a:t>${esc(l)}</a:t></a:r></a:p>` : `<a:p>${ppr}<a:endParaRPr ${rpr}/></a:p>`))
+    .join('');
+  const [ix, iy] = [Math.round(MARK_INSET.x * EMU), Math.round(MARK_INSET.y * EMU)];
+  // テキストボックスは Excel と同じく「テキストに合わせて図形のサイズを調整する」（直すと高さが文字に合う）
+  const fit = m.kind === 'text' ? '<a:spAutoFit/>' : '';
+  return `<xdr:txBody><a:bodyPr vertOverflow="overflow" horzOverflow="overflow" wrap="square" lIns="${ix}" tIns="${iy}" rIns="${ix}" bIns="${iy}" rtlCol="0" anchor="${m.kind === 'text' ? 't' : 'ctr'}">${fit}</a:bodyPr><a:lstStyle/>${paras}</xdr:txBody>`;
+}
+
+/**
+ * 写真への書き込み1つを Excel の図形に（vb＝写真の見えている四角。シートの左上からの画素）：直線は直線コネクタ（矢印は頭・尾の三角）、
+ * 四角形・楕円・テキストボックスは図形（回していれば置き場所は anchorBox）。名前は Excel で挿入したときと同じ（「直線矢印コネクタ 5」「テキスト ボックス 6」）
+ */
+function markShapeXml(lay: SheetLayout, vb: Box, m: PhotoMark, id: number): string {
+  if (m.kind === 'line') {
+    const e = lineEnds(m, vb);
+    const box = {x: Math.min(e.x1, e.x2), y: Math.min(e.y1, e.y2), w: Math.abs(e.x2 - e.x1), h: Math.abs(e.y2 - e.y1)};
+    const flip = `${e.x2 < e.x1 ? ' flipH="1"' : ''}${e.y2 < e.y1 ? ' flipV="1"' : ''}`;
+    const name = m.start || m.end ? '直線矢印コネクタ' : '直線コネクタ';
+    return (
+      `<xdr:twoCellAnchor>${fromTo(lay, box)}<xdr:cxnSp macro=""><xdr:nvCxnSpPr><xdr:cNvPr id="${id}" name="${name} ${id}"/><xdr:cNvCxnSpPr/></xdr:nvCxnSpPr>` +
+      `<xdr:spPr><a:xfrm${flip}><a:off x="${emu(box.x)}" y="${emu(box.y)}"/><a:ext cx="${emu(box.w)}" cy="${emu(box.h)}"/></a:xfrm>` +
+      `<a:prstGeom prst="straightConnector1"><a:avLst/></a:prstGeom>${markLineXml(m)}</xdr:spPr></xdr:cxnSp><xdr:clientData/></xdr:twoCellAnchor>`
+    );
+  }
+  const b = shapeBox(m, vb);
+  const name = m.kind === 'text' ? 'テキスト ボックス' : m.kind === 'ellipse' ? '楕円' : '正方形/長方形';
+  const fill = m.fill ? solid(m.fill) : '<a:noFill/>';
+  return (
+    `<xdr:twoCellAnchor>${fromTo(lay, anchorBox(b, b.rot))}<xdr:sp macro="" textlink=""><xdr:nvSpPr><xdr:cNvPr id="${id}" name="${name} ${id}"/><xdr:cNvSpPr${m.kind === 'text' ? ' txBox="1"' : ''}/></xdr:nvSpPr>` +
+    `<xdr:spPr>${xfrm(b, b.rot)}<a:prstGeom prst="${m.kind === 'ellipse' ? 'ellipse' : 'rect'}"><a:avLst/></a:prstGeom>${fill}${markLineXml(m)}</xdr:spPr>` +
+    `<xdr:style><a:lnRef idx="0">${MARK_NONE}</a:lnRef><a:fillRef idx="0">${MARK_NONE}</a:fillRef><a:effectRef idx="0">${MARK_NONE}</a:effectRef><a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef></xdr:style>` +
+    `${m.text ? markTextXml(m) : ''}</xdr:sp><xdr:clientData/></xdr:twoCellAnchor>`
   );
 }
 

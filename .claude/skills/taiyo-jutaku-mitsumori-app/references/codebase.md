@@ -77,6 +77,8 @@ React 19 ＋ TypeScript ＋ Vite（Tailwind）。リポジトリにはほかの�
   shinseiLine?（申請書の改修の内容を手で直した文＝写真番号のうしろ。空の文字も持つ＝空にした行。読み込みは `cleanPlace`、複製でも引き継ぐ）・
   photos?（写真貼付用紙の写真＝`photos.ts` の番号。`{before?, after?}`。読み込みは `cleanPhotos`、複製では引き継がない）・photoDates?（撮影日 'YYYY-MM-DD'。`{before?, after?}`。`cleanPhotoDates`、複製では引き継がない）・
   photoEdits?（写真の向き・大きさ `{before?, after?}` の `PhotoEdit`。`cleanPhotoEdits`、複製では引き継がない）・
+  photoMarks?（写真への書き込み `{before?, after?}` の `PhotoMark[]`。位置は写真の見えている四角の中の割合、太さ・文字は pt。`photoMarks.ts` の `cleanMarks`＝`storage.ts` の `cleanPhotoMarks`、複製では引き継がない。
+  写真と一緒に `withPhoto` で動き、写真を入れ替えると消える。90°回すと `setEdit` が `turnMarks` で一緒に回す）・
   photoNote?（写真貼付用紙の改修前の写真に書く内容の追加の行。改行で区切る。空なら持たない。`cleanPlace`、工事の内容なので複製でも引き継ぐ）。
   写真番号の入れ替えは `swapPhotoNumbers`（`estimateForms.ts`）：箇所の順番と手で入れた番号（photo）の両方を入れ替える（写真・撮影日・向きは箇所が持っているので一緒に動き、見積書・申請書の改修の内容・平面図の番号もそろう）。
 - `Row`（行）：kind（material／labor）・refId（部材リスト・手間のID）・name・code・maker・unit・price（仕切価格）・qty・listPrice・lengthCm（使う長さ）・pieceLengthM（1本の長さ）・
@@ -151,6 +153,7 @@ React 19 ＋ TypeScript ＋ Vite（Tailwind）。リポジトリにはほかの�
 | `print/PrintView.tsx`・`sasaoka.css` | 印刷の画面の「🖨 印刷する」を用紙の右の上に（狭い画面は上の帯） |
 | `shinsei.ts` の `planPlacement`・`NOTE_GAP`・`oneRowPt`・`fitCheckRows`、`SHINSEI` の `plan` | 平面図の図の位置・写真に書く内容のすき間・苅田町 B4 の大きさ |
 | `estimate/ShinseiPreview.tsx` の `PreviewPlan`・`PlanSlotView`・`usePlanActions`、`shinseiPreview.ts` の `PvPage.planSlot` | 平面図の図の枠（ドロップ・Ctrl+V・差し替え・削除） |
+| `photoMarks.ts`・`estimate/PhotoMarkEditor.tsx`・`estimate/MarkLayer.tsx`・`shinsei.ts` の `markShapeXml` | 写真への書き込み（データ・Excel の色と太さの一覧・回したときの `turnMarks`／Excel の「図形の書式」と同じリボンの書き込みの画面／プレビュー・印刷・写真の欄で描く／Excel の図形）。開くのは写真の欄の ✏️・プレビューの道具の「✏️ 書き込み」・写真のダブルクリック（`ShinseiEditor.tsx` の `marking`。大きさは `paperSize`＝プレビューと同じ計算の写真の見えている四角） |
 | `photos.ts` の `photoIdsInUse` | 写真の掃除で残す番号（様邸に書いてある文字すべて。ゴミ箱の様邸も） |
 | `estimate/shinseiFiles.ts` の `pictures()` | 写真・平面図の図を Excel のシートに足す共通の処理 |
 

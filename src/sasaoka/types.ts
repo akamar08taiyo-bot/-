@@ -70,6 +70,7 @@ export type Place = {
   photoDates?: PlacePhotos; // 写真の撮影日（'YYYY-MM-DD'。改修前・改修後。苅田町の写真の用紙の「撮影日」に書く）
   photoEdits?: PlacePhotoEdits; // 写真の向き・大きさ（なければ そのまま・枠いっぱい。photoEdit.ts）
   photoNote?: string; // 写真貼付用紙の改修前の写真の横（上）に書く内容の追加（手で打つ。1行ずつ。「ベースプレート　L=800mm」）。自動の文（改修の種類・寸法）の下に書く
+  photoMarks?: PlacePhotoMarks; // 写真への書き込み（直線・矢印・四角形・楕円・テキストボックス。photoMarks.ts）。写真と一緒に動き、写真を差し替えると消える
 };
 
 /** 改修の内容の寸法（mm。打ったまま）：l 長さ（手すり。空なら見積書の使う長さ）・h 高さ・w 幅・d 奥行 */
@@ -85,6 +86,35 @@ export type PlacePhotos = {before?: string; after?: string}; // 改修前・改�
  */
 export type PhotoEdit = {rot: number; scale: number; x?: number; y?: number};
 export type PlacePhotoEdits = {before?: PhotoEdit; after?: PhotoEdit};
+
+/** 線の種類（Excel の「図形の枠線 → 実線／点線」と同じ。値は Excel の prstDash） */
+export type PhotoMarkDash = 'solid' | 'sysDot' | 'sysDash' | 'dash' | 'dashDot' | 'lgDash' | 'lgDashDot' | 'lgDashDotDot';
+
+/**
+ * 写真への書き込み1つ（ユーザーの指示「申請書の写真に書き込んで、手すりの位置や踏み台の位置など…徹底的にExcelに似せて」2026-10-27）。
+ * 位置は写真の見えている四角（向き・大きさを直したあと）の中の割合（0〜1）：直線は始点 x1・y1 と終点 x2・y2、四角形・楕円・テキストボックスは回す前の四角の左上と右下。
+ * rot＝右回りの角度（度。四角形・楕円・テキストボックス）。色は 'RRGGBB'（空＝なし）、線の太さ・文字の大きさは紙の上の pt（Excel と同じ）
+ */
+export type PhotoMark = {
+  id: string;
+  kind: 'line' | 'rect' | 'ellipse' | 'text';
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  rot?: number;
+  line: string; // 枠線（直線）の色。空なら枠線なし
+  width: number; // 線の太さ（pt）
+  dash: PhotoMarkDash;
+  start?: boolean; // 始点に矢印（直線）
+  end?: boolean; // 終点に矢印（直線）
+  fill: string; // 塗りつぶしの色。空なら塗りつぶしなし
+  text?: string; // 図形の中の文字（改行で段落）
+  size: number; // 文字の大きさ（pt）
+  color: string; // 文字の色
+  bold?: boolean;
+};
+export type PlacePhotoMarks = {before?: PhotoMark[]; after?: PhotoMark[]};
 
 export type NameSuffix = '様邸' | '様' | '';
 

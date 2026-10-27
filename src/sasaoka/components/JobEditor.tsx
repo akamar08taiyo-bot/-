@@ -82,13 +82,13 @@ export function JobEditor({
       [places[i], places[k]] = [places[k], places[i]];
       return {...j, places};
     });
-  // 複製は名前はそのまま（見積書の写真番号は付け直す）。写真（写真貼付用紙）とその撮影日・向き・大きさ、手で直した申請書の改修の内容の文は
+  // 複製は名前はそのまま（見積書の写真番号は付け直す）。写真（写真貼付用紙）とその撮影日・向き・大きさ・書き込み、手で直した申請書の改修の内容の文は
   // その箇所のものなので入れない（別の写真番号に同じ写真・文が出ていた）
   const copyPlace = (place: Place) =>
     setJob((j) => {
       const i = j.places.findIndex((p) => p.id === place.id);
       const places = [...j.places];
-      const {photos: _photos, photoDates: _dates, photoEdits: _edits, shinseiLine: _line, ...rest} = place;
+      const {photos: _photos, photoDates: _dates, photoEdits: _edits, photoMarks: _marks, shinseiLine: _line, ...rest} = place;
       places.splice(i + 1, 0, {...rest, id: uid('p'), rows: copyRows(place.rows), photo: 0});
       return {...j, places};
     });

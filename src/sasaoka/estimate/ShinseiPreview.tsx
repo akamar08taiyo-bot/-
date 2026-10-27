@@ -4,6 +4,7 @@
 // まだ入っていない欄は薄い黄色。写真貼付用紙は、改修前・改修後の枠に写真を重ねて出す（枠に写真のファイルをドロップ、押して選ぶ）。
 // 写真を押すと、向き・大きさを直せる（ユーザーの指示「写真の方向転換」「画像の角っこを持ち上げて縮小・拡大」「iPad でもくるっと回転」）：
 // 角のつまみで大きさ（枠より大きくはしない）、上の丸いつまみでくるくる回す（90°の近くはそろう）、↺ ↻ で 90°ずつ、2本の指でひねる・つまむ（iPad）
+// 写真への書き込み（直線・矢印・四角形・楕円・テキストボックス）は写真の上に重ねて描き、写真を押したときの道具の「✏️ 書き込み」（写真をダブルクリックでも）で書き込みの画面へ
 // 平面図は、表題と工事内容のあいだに平面図の図を入れる枠（ドロップ・Ctrl+V・押して選ぶ。PlanSlotView）
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import type {CSSProperties, DragEvent, PointerEvent as ReactPointerEvent, RefObject} from 'react';
@@ -11,9 +12,11 @@ import type {PvFont, PvHeader, PvPage, PvPhotoSlot, PvShape, PvText, Rect, Shins
 import {Btn, DropArea, DropOverlay, pastedFiles, useFileDragging} from '../components/ui.tsx';
 import {circled} from '../estimateForms.ts';
 import {clampOff, clampScale, normRot, ROT_SNAP, turn} from '../photoEdit.ts';
+import {photoBounds} from '../photoMarks.ts';
 import {NOTE_INSET, photoNoteLayout, photoNotePt, photoPlacement, photoSlack, planPlacement} from '../shinsei.ts';
 import {familyOf} from '../shinseiPreview.ts';
-import type {PhotoEdit, ShinseiMarks} from '../types.ts';
+import type {PhotoEdit, PhotoMark, ShinseiMarks} from '../types.ts';
+import {MarkLayer} from './MarkLayer.tsx';
 import {isPhotoFile} from './PhotoBoard.tsx';
 
 const PAD = 18; // 紙の余白（画素）
@@ -245,10 +248,11 @@ function ShapeText({s}: {s: PvShape}) {
 
 /** 写真貼付用紙の写真（画面の URL・大きさ・向きと大きさ）と、枠にドロップ・写真を選ぶ・向きと大きさを直したとき */
 export type PreviewPhotos = {
-  of: (no: number, slot: PvPhotoSlot['slot']) => {url: string; w: number; h: number; edit?: PhotoEdit} | null;
+  of: (no: number, slot: PvPhotoSlot['slot']) => {url: string; w: number; h: number; edit?: PhotoEdit; marks?: PhotoMark[]} | null;
   onDrop: (no: number, slot: PvPhotoSlot['slot'], e: DragEvent) => void;
   onPick: (no: number, slot: PvPhotoSlot['slot']) => void;
   onEdit: (no: number, slot: PvPhotoSlot['slot'], edit: PhotoEdit | undefined) => void;
+  onMark?: (no: number, slot: PvPhotoSlot['slot']) => void; // 写真に書き込む（PhotoMarkEditor.tsx）
   note?: (no: number) => string[]; // 改修前の写真の横（上）に書く内容（自動の文と手で足した行。photoNoteLines）
 };
 
@@ -459,6 +463,7 @@ function PhotoSlotView({
             aria-pressed={selected}
             title={selected ? 'ドラッグで位置' : `${SLOT_NAME[slot.slot]}の写真（押すと向き・大きさ・位置）`}
             onClick={() => onSelect(true)}
+            onDoubleClick={() => photos.onMark?.(no, slot.slot)}
             onPointerDown={touchDown}
             onPointerMove={touchMove}
             onPointerUp={touchUp}
@@ -470,6 +475,7 @@ function PhotoSlotView({
               <img src={photo.url} alt="" draggable={false} className="block h-full w-full max-w-none select-none" style={{WebkitTouchCallout: 'none'}} />
             </div>
           </button>
+          {photo.marks?.length ? <SlotMarks marks={photo.marks} box={box} /> : null}
           {selected && (
             <>
               {/* つまみ（写真と一緒に回る） */}
@@ -523,6 +529,11 @@ function PhotoSlotView({
                 <button type="button" className={tool} onClick={() => photos.onPick(no, slot.slot)}>
                   差し替え
                 </button>
+                {photos.onMark && (
+                  <button type="button" className={tool} title="写真に書き込む" onClick={() => photos.onMark?.(no, slot.slot)}>
+                    ✏️ 書き込み
+                  </button>
+                )}
                 <button type="button" className={`${tool} border-sky-600 text-sky-800`} onClick={() => onSelect(false)}>
                   完了
                 </button>
@@ -560,6 +571,12 @@ function PhotoSlotView({
   );
 }
 
+/** 写真への書き込み（写真の見えている四角に重ねる。紙の画素のまま＝プレビューの紙と一緒に縮む） */
+function SlotMarks({marks, box}: {marks: PhotoMark[]; box: {x: number; y: number; w: number; h: number; rot: number}}) {
+  const vb = photoBounds(box);
+  return <MarkLayer marks={marks} w={vb.w} h={vb.h} style={{left: vb.x, top: vb.y}} />;
+}
+
 /** 印刷の画面の写真貼付用紙の写真（PhotoSlotView と同じ位置・向き・大きさ・書く内容。押せる所・つまみ・空いた枠の「＋ 改修前」は出さない） */
 function PhotoPrintView({slot, no, photos}: {slot: PvPhotoSlot; no: number; photos: PreviewPhotos}) {
   const photo = photos.of(no, slot.slot);
@@ -573,6 +590,7 @@ function PhotoPrintView({slot, no, photos}: {slot: PvPhotoSlot; no: number; phot
           <img src={photo.url} alt="" className="block h-full w-full max-w-none" />
         </div>
       )}
+      {photo?.marks?.length && box ? <SlotMarks marks={photo.marks} box={box} /> : null}
       {parts.note && (
         <div
           className="absolute overflow-hidden"

@@ -9,8 +9,9 @@ import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES, 
 import {guessPieceLengthM} from './priceImport.ts';
 import {jobInsurer, MARK_INFO, MARK_KEYS, NO_SHINSEI} from './estimateForms.ts';
 import {cleanEdit} from './photoEdit.ts';
+import {cleanMarks} from './photoMarks.ts';
 import {cleanRiyu} from './riyu.ts';
-import type {AppData, EstimateForm, Insurer, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, PlaceDims, PlacePhotoEdits, PlacePhotos, Rounding, Row, Settings, ShinseiInfo, TaxMode} from './types.ts';
+import type {AppData, EstimateForm, Insurer, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, PlaceDims, PlacePhotoEdits, PlacePhotoMarks, PlacePhotos, Rounding, Row, Settings, ShinseiInfo, TaxMode} from './types.ts';
 import {todayIso, uid} from './util.ts';
 
 const DB_NAME = 'taiyo-sasaoka-shikiri';
@@ -290,6 +291,7 @@ const cleanPlace = (raw: Record<string, unknown>): Place => keepNewer(raw, (p) =
   ...cleanPhotoDates(p.photoDates),
   ...(str(p.photoNote).trim() ? {photoNote: str(p.photoNote)} : {}), // 写真に書く内容の追加
   ...cleanPhotoEdits(p.photoEdits),
+  ...cleanPhotoMarks(p.photoMarks),
 }), ['work']);
 
 /** 改修の内容の寸法（打ったままの文字）。どれもなければ持たない */
@@ -328,6 +330,17 @@ function cleanPhotoEdits(raw: unknown): {photoEdits?: PlacePhotoEdits} {
     if (clean) edits[slot] = clean;
   }
   return edits.before || edits.after ? {photoEdits: edits} : {};
+}
+
+/** 写真への書き込み（photoMarks.ts の cleanMarks）。改修前・改修後とも書き込みがなければ持たない */
+function cleanPhotoMarks(raw: unknown): {photoMarks?: PlacePhotoMarks} {
+  if (!isObj(raw)) return {};
+  const marks: PlacePhotoMarks = {};
+  for (const slot of ['before', 'after'] as const) {
+    const list = cleanMarks(raw[slot]);
+    if (list.length) marks[slot] = list;
+  }
+  return marks.before || marks.after ? {photoMarks: marks} : {};
 }
 
 const SUFFIXES: NameSuffix[] = ['様邸', '様', ''];

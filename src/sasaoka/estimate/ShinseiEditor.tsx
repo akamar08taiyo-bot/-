@@ -4,7 +4,8 @@
 // ユーザーの指示「全体的にシンプルにしたいので、今回はなくしてください。すべて」2026-10-26 で外した）。
 // 見積書と同じ様邸（Job）：氏名・住所・被保険者番号・改修の箇所は見積書と同じ欄、改修予定費用は見積書の金額なので、どちらで直してもすぐ両方に出る。
 // 申請書だけ・見積書だけでもよい（見積書がないときは、改修の箇所と寸法を入れ、改修費用を手で入れる）。
-// 写真（PhotoBoard）：写真番号の箇所ごとに改修前・改修後の写真を入れ、入れ替える。プレビューの写真貼付用紙にも出し、Excel の写真貼付用紙に貼る
+// 写真（PhotoBoard）：写真番号の箇所ごとに改修前・改修後の写真を入れ、入れ替える。プレビューの写真貼付用紙にも出し、Excel の写真貼付用紙に貼る。
+// 写真への書き込み（✏️。PhotoMarkEditor.tsx）は、写真貼付用紙の上の写真の大きさ（paperSize）で開く（線の太さ・文字の大きさが紙の上と同じ割合になるように）
 
 import {Fragment, useDeferredValue, useEffect, useMemo, useRef, useState} from 'react';
 import type {InputHTMLAttributes, KeyboardEvent, ReactNode} from 'react';
@@ -14,13 +15,15 @@ import {circled, eraOf, INSURER_IDS, INSURER_INFO, insurerForAddress, isBlankShi
 import {placeFromDims, withBrackets} from '../cutLink.ts';
 import {manualRow, newPlace} from '../rows.ts';
 import {usePhotoUrls} from '../photos.ts';
-import {costIsTotal, estimateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLines, photoSheets, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
+import {photoBounds} from '../photoMarks.ts';
+import {costIsTotal, estimateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
 import type {AppData, Insurer, Job, Material, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {toKatakana, yen} from '../util.ts';
 import {PhotoBoard, photoPlaces, SLOT_LABEL, usePhotoActions, usePlanActions} from './PhotoBoard.tsx';
+import {PhotoMarkEditor} from './PhotoMarkEditor.tsx';
 import type {PhotoKey, PhotoSlot} from './PhotoBoard.tsx';
 import {canMakeShinsei, saveShinsei, useTemplate} from './shinseiFiles.ts';
 import {ShinseiPages} from './ShinseiPreview.tsx';
@@ -163,8 +166,26 @@ export function ShinseiEditor({
     const place = photoList.find((p) => p.no === no)?.place;
     const id = place?.photos?.[slot];
     const url = id ? photoUrls[id] : null;
-    return url ? {...url, edit: place?.photoEdits?.[slot]} : null;
+    return url ? {...url, edit: place?.photoEdits?.[slot], marks: place?.photoMarks?.[slot]} : null;
   };
+  /**
+   * 写真貼付用紙の上の写真の見えている四角の大きさ（画素）：プレビューと同じ計算（写真に書く内容の分け方・向き・大きさ）。
+   * 原本にその写真番号の用紙がないときは、横 560・縦 420 画素の枠に置いた大きさ
+   */
+  const paperSize = (key: PhotoKey): {w: number; h: number} | null => {
+    const x = photoList.find((p) => p.place.id === key.placeId);
+    const ph = x ? photoOf(x.no, key.slot) : null;
+    if (!x || !ph) return null;
+    const frame = pages?.find((pg) => pg.photo === x.no)?.photoSlots.find((f) => f.slot === key.slot) ?? {w: 560, h: 420};
+    const lines = key.slot === 'before' ? photoNoteLines(x.place) : [];
+    const parts = photoNoteLayout({x: 0, y: 0, w: frame.w, h: frame.h}, {w: ph.w, h: ph.h, rot: ph.edit?.rot ?? 0}, lines);
+    const vb = photoBounds(photoPlacement(parts.photo, ph.w, ph.h, ph.edit));
+    return {w: vb.w, h: vb.h};
+  };
+  // 書き込みの画面（写真の欄・プレビューの ✏️）
+  const [marking, setMarking] = useState<PhotoKey | null>(null);
+  const markPlace = marking ? photoList.find((p) => p.place.id === marking.placeId) : undefined;
+  const markPhoto = marking && markPlace ? photoOf(markPlace.no, marking.slot) : null;
   // 平面図の図（プレビューの平面図の枠に、ドロップ・Ctrl+V・押して選ぶ。Excel の平面図に貼る）
   const planActions = usePlanActions(setJob);
   const planUrls = usePhotoUrls([job.planPhoto ?? '']);
@@ -190,8 +211,9 @@ export function ShinseiEditor({
     },
     onEdit: (no, slot, edit) => {
       const key = photoKey(no, slot);
-      if (key) photoActions.setEdit(key, edit);
+      if (key) photoActions.setEdit(key, edit, photoOf(no, slot) ?? undefined);
     },
+    onMark: (no, slot) => setMarking(photoKey(no, slot)),
   };
   const previewPlan: PreviewPlan = {
     image: job.planPhoto ? (planUrl ?? null) : undefined,
@@ -544,7 +566,18 @@ export function ShinseiEditor({
                 if (files.length) void planActions.put(files);
               }}
             />
-            <PhotoBoard job={job} rates={s} sheetNos={sheetNos} dates={!!map?.sheets.some((x) => x.photoPlace?.dates)} actions={photoActions} onPick={pickPhoto} />
+            <PhotoBoard job={job} rates={s} sheetNos={sheetNos} dates={!!map?.sheets.some((x) => x.photoPlace?.dates)} actions={photoActions} onPick={pickPhoto} onMark={setMarking} paperSize={paperSize} />
+            {marking && markPlace && markPhoto && (
+              <PhotoMarkEditor
+                key={`${marking.placeId}:${marking.slot}`}
+                title={`${circled(markPlace.no)}${markPlace.place.name || '改修場所'}の${SLOT_LABEL[marking.slot]}`}
+                photo={{url: markPhoto.url, w: markPhoto.w, h: markPhoto.h, rot: markPhoto.edit?.rot ?? 0}}
+                size={paperSize(marking) ?? {w: 560, h: 420}}
+                marks={markPhoto.marks ?? []}
+                onChange={(marks) => photoActions.setMarks(marking, marks)}
+                onClose={() => setMarking(null)}
+              />
+            )}
           </div>
           {/* スクロールバーの場所はいつも空けておく（scrollbar-gutter）。空けないと、中身の高さが箱とほぼ同じ窓の大きさで、スクロールバーが出る → 幅が狭くなり
               プレビューが縮む → スクロールバーが消える → 幅が戻って大きくなる…をくり返して、プレビューがふるえた（ユーザーの報告「右側の部分がふるえる」） */}

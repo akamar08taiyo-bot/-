@@ -89,7 +89,7 @@ async function photoImagesOf(job: Job, s: Settings): Promise<{images: Record<num
       // 暗い写真は明るさを補正して貼る（画面と同じ。`brightPhoto`）
       try {
         const blob = await brightPhoto(id, photo.blob);
-        images[n] = {...images[n], [slot]: {bytes: new Uint8Array(await blob.arrayBuffer()), w: photo.w, h: photo.h, edit: p.photoEdits?.[slot]}};
+        images[n] = {...images[n], [slot]: {bytes: new Uint8Array(await blob.arrayBuffer()), w: photo.w, h: photo.h, edit: p.photoEdits?.[slot], marks: p.photoMarks?.[slot]}};
       } catch {
         unreadable++;
       }
