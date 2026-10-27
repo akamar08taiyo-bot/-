@@ -39,6 +39,16 @@ try {
     const estimateTab = page.getByRole('tab', {name: /工事見積書/});
     if ((await estimateTab.getAttribute('aria-selected')) !== 'true') await estimateTab.click();
     await page.getByRole('button', {name: '🧾 売上伝票依頼書', exact: true}).waitFor();
+    // 住所（見積書の工事場所）・居宅とケアマネ（理由書の作成者）も入れておく（伝票に全部入るか確かめる）
+    const sheet = page.getByRole('region', {name: '見積書', exact: true});
+    await sheet.locator('[data-edit="job:address"]').click();
+    await page.keyboard.type('福岡県行橋市中央1-1');
+    await page.keyboard.press('Enter');
+    await page.getByRole('tab', {name: /理由書/}).click();
+    await page.getByLabel('作成者の所属事業所').fill('見本居宅介護支援事業所');
+    await page.getByLabel('作成者の氏名').fill('見本 太郎');
+    await page.getByRole('tab', {name: /工事見積書/}).click();
+    await page.getByRole('button', {name: '🧾 売上伝票依頼書', exact: true}).waitFor();
 
     // 上の段：まん中のかたまり（保存・Excel・印刷）のすぐ右の、右のかたまりの先頭（まん中は上のタブのまん中にそろえるので、幅を変えない）
     const order = await page.evaluate(() => {
@@ -75,6 +85,25 @@ try {
     const text = await slip.locator('main').innerText();
     assert.match(text, /対象内利用者負担額（1割・切り上げ）\s*¥2,695/);
     assert.match(text, /保険者負担額（9割・切り下げ）\s*¥24,255/);
+    // 伝票（印刷の形）に、見積書で入れたものがすべて入っている（ユーザーの問い「全て転記された内容が記載されていますか？」2026-10-27）
+    const printed = (await slip.locator('.uriage-print').textContent()).replace(/\s+/g, ' ');
+    for (const t of [
+      'サービス区分住宅改修',
+      '担当者久保 匠史',
+      '顧客区分既存',
+      '顧客名（サンプル）山田',
+      '住所福岡県行橋市中央1-1',
+      '居宅名見本居宅介護支援事業所',
+      '担当ケアマネージャー見本 太郎',
+      '施工業者笹岡工務店',
+      '請求区分受領委任払い',
+      '介護度介護１',
+      '負担割合1割',
+      '¥26,950',
+      `¥${cost.toLocaleString('ja-JP')}`,
+    ]) {
+      assert.ok(printed.includes(t), `伝票に「${t}」がない：${printed}`);
+    }
     await slip.screenshot({path: `${outDir}/uriage-03-slip-${tag}.png`, fullPage: true});
     await slip.close();
     log(`${tag}: 売上伝票が工事1行・仕切り ${cost}円で開いた`);
