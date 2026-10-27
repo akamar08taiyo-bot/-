@@ -196,6 +196,13 @@ try {
   const preview = page.getByLabel('申請書のプレビュー');
   await preview.getByRole('group', {name: '用具・受領委任払', exact: true}).waitFor();
   assert.deepEqual(await preview.getByRole('group').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label'))), ['用具・受領委任払', '委任状', '完了写真']);
+  // 委任状：保険給付額は大きく、委任者の氏名は自筆なので書かない（ユーザーの指示「委任状では、名前の部分は自筆となるため、印字しない」
+  // 「委任状の金額部分は、もう少し大きくする」2026-10-27）
+  const proxy = preview.getByRole('group', {name: '委任状', exact: true});
+  assert.match(await proxy.innerText(), /38,649円/);
+  assert.ok(!(await proxy.innerText()).includes('山田'), await proxy.innerText());
+  await proxy.scrollIntoViewIfNeeded();
+  await proxy.screenshot({path: `${out}/04h-shinsei-proxy.png`});
   const pv = () => preview.getByRole('group', {name: '用具・受領委任払', exact: true}).innerText();
   assert.match(await pv(), /山田 花子/);
   assert.match(await pv(), /ヤマダ ハナコ/);

@@ -84,7 +84,7 @@ const PROXY: SheetLinks = {
     ['burdenRatio', ['B23']],
     ['applyDate', ['A29']],
     ['address', ['A32']],
-    ['customer', ['A36']],
+    // 委任者の氏名（A36）は自筆なので書かない・押せる欄にしない（2026-10-27）
   ],
 };
 const PHOTO: SheetLinks = {

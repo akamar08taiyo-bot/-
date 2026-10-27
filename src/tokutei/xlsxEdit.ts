@@ -362,6 +362,15 @@ export function sizeCell(files: Files, sheet: string, ref: string, pt: number): 
   files[path] = strToU8(setStyle(xml, ref, String(variantStyle(files, numOf(attrOf(found[1], 's'), 0), {pt}))));
 }
 
+/** 行の高さ（pt）を決める（大きくした字が入るように）。原本にその行がなければ何もしない */
+export function setRowHeight(files: Files, sheet: string, row: number, pt: number): void {
+  const path = sheetPath(files, sheet);
+  const xml = strFromU8(files[path]);
+  files[path] = strToU8(
+    xml.replace(new RegExp(`<row\\b(?=[^>]*\\sr="${row}")[^>]*>`), (tag) => tag.replace(/\s(?:ht|customHeight)="[^"]*"/g, '').replace(/^<row\b/, `<row ht="${pt}" customHeight="1"`)),
+  );
+}
+
 /**
  * 明細の行の欄をそろえる（原本は行ごとに文字の大きさ・配置がちがう：みやこ町の支給申請書の2行目からは均等割り付け、など）。
  * refs の最初の欄の配置にそろえ、文字の大きさはいちばん小さいものにそろえる（罫線はそれぞれの欄のまま）

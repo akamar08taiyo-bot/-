@@ -23,6 +23,7 @@ import {
   hideZeros,
   LINE_K,
   sameStyle,
+  setRowHeight,
   sizeCell,
   styleIdOf,
   wrapText,
@@ -147,6 +148,7 @@ export type SheetWrite = {
   fitWidth?: string[]; // 折り返さない1行の欄で、行が字の大きさぎりぎりに低いもの：幅に入らないときだけ小さくする
   oneLine?: string[]; // 名前の欄（種目及び商品名・製造事業者名及び販売事業者名）：1つの名前が2行に折り返さないよう、どの行も幅に入る大きさにする
   sizes?: [string, number][]; // 文字の大きさ（pt）を変える欄（委任状の保険給付額）
+  heights?: [number, number][]; // 高さ（pt）を変える行（大きくした字が入るように）：[行, 高さ]
   marks?: Mark[];
   hideZeros?: boolean; // 式が空の欄を参照して 0 と出るシート
   block?: {cell: string; head: string[]; body: string; tail: string[]}; // 理由のかたまり（みやこ町）：head の行・body（理由。欄の幅で折り返す）・tail の行を、入る大きさにして書く
@@ -200,14 +202,26 @@ function itemCells(v: ShinseiValues, rows: number[], cols: {label: string; maker
 /** 明細の行の列（refs）：rows の行ごとの番地 */
 const rowsOf = (col: string, rows: number[]) => rows.map((r) => `${col}${r}`);
 
-/** 委任状の保険給付額の文字の大きさ（ユーザーの指示「委任状に転記されているが、金額の部分の文字が小さすぎる。大きく表示する」2026-10-26。原本は 11pt） */
-const PROXY_AMOUNT_PT = 14;
+/**
+ * 委任状の保険給付額の文字の大きさ（原本は 11pt。ユーザーの指示「委任状に転記されているが、金額の部分の文字が小さすぎる。大きく表示する」2026-10-26 で 14pt、
+ * 「委任状の金額部分は、もう少し大きくする」2026-10-27 で 18pt）
+ */
+const PROXY_AMOUNT_PT = 18;
+/**
+ * 18pt の字は原本の行（既定の 18.75pt）に入らないので、保険給付額の行（23行）を高くし、すぐ下の空いた行（24行）を同じだけ低くする
+ * （日付・委任者の住所・氏名の位置と、用紙の中の収まりは変えない）。[行, 高さ pt]
+ */
+const PROXY_AMOUNT_ROWS: [number, number][] = [
+  [23, 24],
+  [24, 13.5],
+];
 /** 原本の 11pt で、欄の左から「円」の右の端まで（全角の文字の数） */
 const PROXY_AMOUNT_EM = 28;
 
 /**
- * 委任状（行橋市・苅田町は同じ様式）：保険給付額・日付・委任者の住所と氏名。
- * 原本は「すき間＋円」「すき間＋㊞」の1つの文字なので、円・㊞の位置が変わらないように、すき間を減らして書く。
+ * 委任状（行橋市・苅田町は同じ様式）：保険給付額・日付・委任者の住所。
+ * 委任者の氏名は書かない（自筆。ユーザーの指示「委任状では、名前の部分は自筆となるため、印字しない」2026-10-27。広域連合の委任状と同じ。原本の「氏　名　…㊞」のまま）。
+ * 原本は「すき間＋円」の1つの文字なので、円の位置が変わらないように、すき間を減らして書く。
  * 保険給付額は大きく（PROXY_AMOUNT_PT）して、「円」の右の端が原本の 11pt のときと同じ所に来るよう、すき間をその大きさで数える
  */
 function proxyCells(v: ShinseiValues): [string, CellValue][] {
@@ -217,7 +231,6 @@ function proxyCells(v: ShinseiValues): [string, CellValue][] {
     ...when(amount, [['B23', `${space((PROXY_AMOUNT_EM * 11) / PROXY_AMOUNT_PT - 1 - emOf(amount))}${amount}円`]]),
     ...when(v.applyDate, [['A29', `${'　'.repeat(5)}${warekiLabel(v.applyDate)}`]]),
     ...when(v.address, [['A32', `　　　　委任者　住　所　　${v.address}`]]),
-    ...when(v.name, [['A36', `　　　　　　　氏　名　　${v.name}${space(19 - emOf(v.name))}㊞　　`]]),
   ];
 }
 
@@ -361,7 +374,7 @@ export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
     rows: 3,
     sheets: (v) => [
       {sheet: '用具・受領委任払', cells: preCells(v, 7), same: PRE_SAME, fit: PRE_FIT, oneLine: PRE_ONE_LINE, marks: [ERA('F9', v), GENDER('Y9', v), CARE('F12', v)]},
-      {sheet: '委任状', cells: proxyCells(v), sizes: v.benefit > 0 ? [['B23', PROXY_AMOUNT_PT]] : []},
+      {sheet: '委任状', cells: proxyCells(v), ...(v.benefit > 0 ? {sizes: [['B23', PROXY_AMOUNT_PT]], heights: PROXY_AMOUNT_ROWS} : {})},
       {sheet: '完了写真', cells: photoCells(v), fit: ['B3'], hideZeros: true},
     ],
   },
@@ -385,7 +398,7 @@ export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
         marks: [ERA('F9', v), GENDER('Y9', v), CARE('F12', v)],
         hideZeros: true,
       },
-      {sheet: '委任状', cells: proxyCells(v), sizes: v.benefit > 0 ? [['B23', PROXY_AMOUNT_PT]] : []},
+      {sheet: '委任状', cells: proxyCells(v), ...(v.benefit > 0 ? {sizes: [['B23', PROXY_AMOUNT_PT]], heights: PROXY_AMOUNT_ROWS} : {})},
       {sheet: '完了写真', cells: photoCells(v), fit: ['B3'], hideZeros: true},
     ],
   },
@@ -489,6 +502,7 @@ export function fillShinseiFiles(files: Files, form: ShinseiForm, v: ShinseiValu
     if (w.hideZeros) hideZeros(files, w.sheet);
   }
   for (const w of sheets) for (const [ref, pt] of w.sizes ?? []) sizeCell(files, w.sheet, ref, pt);
+  for (const w of sheets) for (const [row, pt] of w.heights ?? []) setRowHeight(files, w.sheet, row, pt);
   for (const w of sheets) for (const refs of w.same ?? []) sameStyle(files, w.sheet, refs);
   for (const w of sheets) for (const ref of w.fit ?? []) fitCell(files, w.sheet, ref);
   for (const w of sheets) for (const ref of w.fitWidth ?? []) fitCell(files, w.sheet, ref, true);

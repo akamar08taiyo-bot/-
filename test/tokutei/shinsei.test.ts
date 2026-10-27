@@ -6,7 +6,7 @@ import {defaultSettings} from '../../src/tokutei/defaults.ts';
 import {carePlanOf, corpShort, excelDate, fillShinsei, KOUIKI_SHEETS, padInsuredNo, reasonText, SHINSEI, shinseiChecks, shinseiFileName, shinseiValues} from '../../src/tokutei/shinsei.ts';
 import type {ShinseiKey} from '../../src/tokutei/shinsei.ts';
 import type {Sale, SaleItem} from '../../src/tokutei/types.ts';
-import {cellBox, cellFormula, ellipseCount, emOf, printOverflow, readCell, sheetPaths} from '../../src/tokutei/xlsxEdit.ts';
+import {cellBox, cellFormula, ellipseCount, emOf, printOverflow, readCell, sheetPath, sheetPaths} from '../../src/tokutei/xlsxEdit.ts';
 import type {Files} from '../../src/tokutei/xlsxEdit.ts';
 
 // 見本の案件（架空の方。本当のお客様の情報は使わない）
@@ -133,13 +133,18 @@ test('行橋市：事前申請書・委任状・完了写真に書く', () => {
   assert.equal(ellipseCount(f, sh), 3); // 元号（昭）・性別・要介護度
   // 委任状
   assert.match(readCell(f, '委任状', 'B23'), /50,371円$/);
-  // 保険給付額は大きく（ユーザーの指示「委任状に転記されているが、金額の部分の文字が小さすぎる。大きく表示する」2026-10-26）。
-  // 「円」の右の端は原本の 11pt のときと同じ所（全角28字分）
-  assert.equal(cellBox(f, '委任状', 'B23').style.size, 14);
-  assert.ok(Math.abs((emOf(readCell(f, '委任状', 'B23')) * 14) / 11 - 28) < 1, readCell(f, '委任状', 'B23'));
+  // 保険給付額は大きく（ユーザーの指示「…金額の部分の文字が小さすぎる。大きく表示する」2026-10-26、「委任状の金額部分は、もう少し大きくする」2026-10-27）。
+  // 「円」の右の端は原本の 11pt のときと同じ所（全角28字分）。行は字が入る高さに、すぐ下の空いた行を同じだけ低く（下の欄の位置は変わらない）
+  assert.equal(cellBox(f, '委任状', 'B23').style.size, 18);
+  assert.ok(Math.abs((emOf(readCell(f, '委任状', 'B23')) * 18) / 11 - 28) < 1, readCell(f, '委任状', 'B23'));
+  const proxyXml = strFromU8(f[sheetPath(f, '委任状')]);
+  const rowHt = (r: number) => Number(new RegExp(`<row\\b[^>]*\\sr="${r}"[^>]*>`).exec(proxyXml)?.[0].match(/\sht="([^"]+)"/)?.[1] ?? 18.75);
+  assert.ok(rowHt(23) >= 18 * 1.3 - 0.01 && rowHt(23) + rowHt(24) === 18.75 * 2, `${rowHt(23)} ${rowHt(24)}`);
   assert.match(readCell(f, '委任状', 'A29'), /令和8年10月22日$/);
   assert.match(readCell(f, '委任状', 'A32'), /住　所　　行橋市中央1丁目2-3$/);
-  assert.match(readCell(f, '委任状', 'A36'), /氏　名　　見本 花子　+㊞/);
+  // 委任者の氏名は自筆（ユーザーの指示「委任状では、名前の部分は自筆となるため、印字しない」2026-10-27）：原本の「氏　名　…㊞」のまま
+  assert.equal(readCell(f, '委任状', 'A36'), readCell(template('yukuhashi'), '委任状', 'A36'));
+  assert.ok(!readCell(f, '委任状', 'A36').includes('見本'));
   // 完了写真：氏名・番号は式（答えも合わせる）。式の誤り（G2 が AD7）は直してある。納品名・撮影日は書く
   assert.equal(readCell(f, '完了写真', 'B2'), '見本 花子');
   assert.equal(cellFormula(f, '完了写真', 'G2'), '用具・受領委任払!AC7');
