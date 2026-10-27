@@ -132,7 +132,7 @@ export function SalesPage({data, update, onOpen, onPrint}: {data: AppData; updat
                 <div className="text-right">
                   <div className="font-bold tabular-nums text-slate-900">{yen(t.total)}円</div>
                   <div className="text-[11px] tabular-nums text-slate-500">
-                    利用者 {yen(t.userPay)}円・{x.burdenRatio}割
+                    {t.ratioSet ? `利用者 ${yen(t.userPay)}円・${x.burdenRatio}割` : '負担割合 未選択'}
                   </div>
                 </div>
                 <div className="flex gap-1.5">

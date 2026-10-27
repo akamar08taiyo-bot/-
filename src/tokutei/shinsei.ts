@@ -62,7 +62,8 @@ export type ShinseiValues = {
   applyDate: string; // 申請日（'YYYY-MM-DD'）
   deliveryDate: string; // 納品日＝購入（予定）日・撮影日
   claimDate: string; // 支給申請日
-  benefit: number; // 保険給付額（保険者負担）
+  benefit: number; // 保険給付額（保険者負担）。負担割合を選んでいなければ 0（委任状の金額は空欄）
+  ratioSet: boolean; // 負担割合を選んであるか
   staff: string; // 担当（みやこ町の届出者）
   payMethod: PayMethod; // 支払方法（広域連合は、受領委任払用・償還払い用のどちらの様式に書くか）
 };
@@ -88,6 +89,7 @@ export function corpShort(name: string): string {
 }
 
 export function shinseiValues(sale: Sale, s: Settings): ShinseiValues {
+  const t = saleTotals(sale, s);
   const items = usedLines(sale, s).map((l): ShinseiItem => {
     const i = l.item;
     return {
@@ -118,7 +120,8 @@ export function shinseiValues(sale: Sale, s: Settings): ShinseiValues {
     applyDate: sale.applyDate,
     deliveryDate: sale.deliveryDate,
     claimDate: sale.claimDate,
-    benefit: saleTotals(sale, s).insurerBurden,
+    benefit: t.ratioSet ? t.insurerBurden : 0,
+    ratioSet: t.ratioSet,
     staff: sale.staff.trim(),
     payMethod: sale.payMethod,
   };
@@ -526,6 +529,7 @@ export function shinseiChecks(sale: Sale, s: Settings): {missing: string[]; over
   // 広域連合は「居宅の事業所名」だけ（ケアマネジャーは署名の欄なので書かない）
   if (kouiki) need(v.office, '居宅介護支援事業所（居宅の事業所名）');
   else need(v.recorder, '居宅介護支援事業所・ケアマネジャー（理由の記載者）');
+  need(v.ratioSet, '負担割合');
   need(v.applyDate, '申請日');
   need(v.deliveryDate, kouiki ? '納品日（購入日）' : '納品日（購入予定日）');
   if (form?.key === 'miyako' || kouiki) need(v.carePlan, '居宅サービス計画の届出（有・無）');

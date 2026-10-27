@@ -27,6 +27,7 @@ import {ScanDialog} from './ScanDialog.tsx';
 import {ShinseiInputs} from './ShinseiInputs.tsx';
 import {ShinseiPanel} from './ShinseiPanel.tsx';
 import {ShinseiPages} from './ShinseiPreview.tsx';
+import {UriageDialog} from './UriageDialog.tsx';
 import {Btn, btnClass, useToast} from './ui.tsx';
 
 // 状態を進めたとき、その日付が空なら今日を入れる
@@ -133,8 +134,24 @@ export function SaleEditor({
       (e: unknown) => toast(`見積書を保存できませんでした：${e instanceof Error ? e.message : String(e)}`, 'error'),
     );
 
-  const change = (patch: Partial<Sale>) =>
+  // 承認（か納品）にした見積もりを販売受注簿へ自動で送る（1回だけ）。負担割合を選んでいなければ送らず、選んだときに送る
+  // （受注簿の給付内訳は負担割合で決まるので。2026-10-27 から新しい案件の負担割合は未選択）
+  const queueIfReady = (next: Sale, patch: Partial<Sale>) => {
+    if ((next.status !== '承認' && next.status !== '納品') || next.hacchuSentAt || next.items.length === 0 || next.burdenRatio === null) return;
+    try {
+      if (queueHacchu(next, s)) {
+        patch.hacchuSentAt = Date.now();
+        toast('販売受注簿へ送りました');
+      }
+    } catch {
+      toast('販売受注簿へ送れませんでした（この端末のブラウザに保存できません）', 'error');
+    }
+  };
+  const change = (input: Partial<Sale>) => {
+    const patch = {...input};
+    if (sale.burdenRatio === null && patch.burdenRatio) queueIfReady({...sale, ...patch}, patch);
     update('sales', (list) => list.map((x) => (x.id === sale.id ? {...x, ...patch, updatedAt: Date.now()} : x)));
+  };
   const changeItem = (id: string, patch: Partial<SaleItem>) => change({items: sale.items.map((i) => (i.id === id ? {...i, ...patch} : i))});
 
   /** 住所を打つと、郵便番号が1つに決まれば入れる（郵便番号が空か、前に自動で入れた番号のとき） */
@@ -164,16 +181,8 @@ export function SaleEditor({
     const key = STATUS_DATE[status];
     const patch: Partial<Sale> = {status, ...(key && !sale[key] ? {[key]: todayIso()} : {})};
     // 承認（か納品）にしたら、販売受注簿へ自動で送る（ユーザーの指示「販売受注簿にも自動で転記する」。1回だけ。受注簿ツールを開くと「受注簿に入れる」が出る）
-    if ((status === '承認' || status === '納品') && !sale.hacchuSentAt && sale.items.length > 0) {
-      try {
-        if (queueHacchu({...sale, ...patch}, s)) {
-          patch.hacchuSentAt = Date.now();
-          toast('販売受注簿へ送りました');
-        }
-      } catch {
-        toast('販売受注簿へ送れませんでした（この端末のブラウザに保存できません）', 'error');
-      }
-    }
+    queueIfReady({...sale, ...patch}, patch);
+    if ((status === '承認' || status === '納品') && !sale.hacchuSentAt && sale.items.length > 0 && sale.burdenRatio === null) toast('負担割合を選ぶと、販売受注簿へ送ります');
     change(patch);
   };
 
@@ -201,6 +210,8 @@ export function SaleEditor({
   };
   // 介援隊のカタログの印刷（catalog.ts。見積もりの商品が載っているページに初めからチェック）
   const [printingCatalog, setPrintingCatalog] = useState(false);
+  // 「🧾 売上伝票」の窓（UriageDialog.tsx）
+  const [uriageOpen, setUriageOpen] = useState(false);
   // カタログの窓（print/CatalogViewer.tsx）。「カタログから検索」に打った字で開く
   const [catalogView, setCatalogView] = useState<{query: string} | null>(null);
   useEffect(() => {
@@ -231,6 +242,11 @@ export function SaleEditor({
       toast('商品がありません', 'error');
       return;
     }
+    if (sale.burdenRatio === null) {
+      ev.preventDefault();
+      toast('負担割合を選んでください', 'error');
+      return;
+    }
     try {
       localStorage.setItem(HACCHU_IMPORT_KEY, JSON.stringify(hacchuImport(sale, s)));
       change({hacchuSentAt: Date.now()}); // 承認にしたときに、もう一度自動で送らない
@@ -258,6 +274,10 @@ export function SaleEditor({
             </Btn>
             <Btn color="excel" onClick={saveExcel}>
               📗 Excelで保存
+            </Btn>
+            {/* 売上伝票発行依頼書（ユーザーと決めたこと「見積書のタブの上の段」2026-10-27。足りない所は窓で入れてから開く） */}
+            <Btn color="white" onClick={() => setUriageOpen(true)}>
+              🧾 売上伝票
             </Btn>
             {form && !fixedView && (
               <Btn color="white" onClick={() => setView('shinsei')}>
@@ -384,15 +404,24 @@ export function SaleEditor({
                 </div>
                 <dl className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-sm">
                   <Row label="介護保険の対象" value={t.covered} />
-                  <Row label={`利用者負担（${t.ratio}割）`} value={t.userBurden} />
-                  {t.aid > 0 && <Row label={`介護扶助（${t.ratio}割）`} value={t.aid} />}
-                  <Row label={`保険者負担（${10 - t.ratio}割）`} value={t.insurerBurden} />
+                  {/* 負担割合を選ぶまで、割合で決まる金額は出さない（ユーザーの指示 2026-10-27） */}
+                  {t.ratioSet ? (
+                    <>
+                      <Row label={`利用者負担（${t.ratio}割）`} value={t.userBurden} />
+                      {t.aid > 0 && <Row label={`介護扶助（${t.ratio}割）`} value={t.aid} />}
+                      <Row label={`保険者負担（${10 - t.ratio}割）`} value={t.insurerBurden} />
+                    </>
+                  ) : (
+                    <p className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-800">負担割合を選ぶと、自己負担額が出ます</p>
+                  )}
                   {t.excess > 0 && <Row label="限度額を超えた分" value={t.excess} warn />}
-                  <div className="mt-2 flex items-baseline justify-between rounded-lg bg-amber-50 px-2 py-1.5">
-                    <dt className="font-bold text-slate-700">{sale.payMethod === '償還払い' ? 'いったんお支払い' : 'お客様のお支払い'}</dt>
-                    <dd className="text-lg font-bold tabular-nums text-slate-900">{yen(sale.payMethod === '償還払い' ? t.total : t.userPay)}円</dd>
-                  </div>
-                  {sale.payMethod === '償還払い' && <p className="text-xs text-slate-500">あとで保険者から {yen(t.insurerBurden)}円 が払い戻されます。</p>}
+                  {(t.ratioSet || sale.payMethod === '償還払い') && (
+                    <div className="mt-2 flex items-baseline justify-between rounded-lg bg-amber-50 px-2 py-1.5">
+                      <dt className="font-bold text-slate-700">{sale.payMethod === '償還払い' ? 'いったんお支払い' : 'お客様のお支払い'}</dt>
+                      <dd className="text-lg font-bold tabular-nums text-slate-900">{yen(sale.payMethod === '償還払い' ? t.total : t.userPay)}円</dd>
+                    </div>
+                  )}
+                  {sale.payMethod === '償還払い' && t.ratioSet && <p className="text-xs text-slate-500">あとで保険者から {yen(t.insurerBurden)}円 が払い戻されます。</p>}
                 </dl>
                 <p className="mt-2 text-[11px] text-slate-500">
                   {t.remainingBlank ? `今年度の残りは空欄なので ${yen(t.limit)}円 として計算` : `今年度の残り ${yen(t.remaining)}円`}
@@ -458,6 +487,7 @@ export function SaleEditor({
       )}
       {catalogView && <CatalogViewer sale={sale} query={catalogView.query} onClose={closeCatalog} onPrint={() => setPrintingCatalog(true)} />}
       {printingCatalog && <CatalogPrintView sale={sale} onClose={() => setPrintingCatalog(false)} />}
+      {uriageOpen && <UriageDialog sale={sale} settings={s} change={change} onClose={() => setUriageOpen(false)} />}
       {pickingCustomer && <CustomerPicker sales={data.sales} current={sale} onPick={pickCustomer} onClose={() => setPickingCustomer(false)} />}
       {picking && (
         <ProductPicker

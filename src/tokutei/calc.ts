@@ -62,7 +62,8 @@ export type Totals = {
   remainingBlank: boolean;
   covered: number; // 介護保険の対象（購入金額と残りの小さい方）
   excess: number; // 残りを超えた分（全額自己負担）
-  ratio: number; // 負担割合（1・2・3割）
+  ratio: number; // 負担割合（1・2・3割）。未選択なら 1割として計算するが、画面・帳票には出さない（ratioSet）
+  ratioSet: boolean; // 負担割合を選んであるか。false なら 利用者負担・介護扶助・保険者負担・お支払い は出さない
   share: number; // 対象のうち負担割合の分（利用者負担。生活保護なら介護扶助）
   userBurden: number; // 利用者負担（生活保護なら 0）
   aid: number; // 介護扶助（生活保護のときの負担割合の分）
@@ -86,6 +87,7 @@ export function saleTotals(sale: Sale, s: Pick<Settings, 'markupRate' | 'limit' 
   const remaining = remainingBlank ? limit : Math.max(0, Math.round(sale.remaining as number));
   const covered = Math.min(total, remaining);
   const excess = total - covered;
+  const ratioSet = sale.burdenRatio === 1 || sale.burdenRatio === 2 || sale.burdenRatio === 3;
   const ratio = sale.burdenRatio === 2 ? 2 : sale.burdenRatio === 3 ? 3 : 1;
   // 個別切り上げは、超えた分がなく、明細が2つ以上のときだけ（1つなら合計で計算しても同じ）
   const perItemApplied = sale.perItem && excess === 0 && lines.filter((l) => l.total > 0).length >= 2;
@@ -107,6 +109,7 @@ export function saleTotals(sale: Sale, s: Pick<Settings, 'markupRate' | 'limit' 
     covered,
     excess,
     ratio,
+    ratioSet,
     share,
     userBurden,
     aid,

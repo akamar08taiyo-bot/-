@@ -107,6 +107,9 @@ try {
   await page.getByRole('button', {name: '浴槽台 見本Bを入れる'}).click();
   await page.getByRole('button', {name: '閉じる'}).last().click();
   await page.getByText('27,808円').first().waitFor();
+  // 負担割合は未選択から（2026-10-27）。選ぶまで「📤 販売受注簿に転記」は送らない
+  await page.getByRole('group', {name: '負担割合', exact: true}).first().getByRole('button', {name: '1割'}).click();
+  await page.getByText(/利用者負担（1割）/).first().waitFor();
   const aside = await page.locator('aside').first().innerText();
   assert.match(aside, /利用者負担（1割）\s*2,781円/);
   assert.match(aside, /保険者負担（9割）\s*25,027円/);
@@ -189,7 +192,11 @@ try {
   await page.getByText('13,904円').first().waitFor();
   const queue = () => page.evaluate(() => JSON.parse(localStorage.getItem('taiyo-hacchu-import-queue-v1') ?? '[]'));
   assert.deepEqual(await queue(), []);
+  // 負担割合を選んでいないうちは送らず、選んだときに送る（受注簿の給付内訳は負担割合で決まる。2026-10-27）
   await page.getByRole('group', {name: '状態'}).getByRole('button', {name: '承認'}).click();
+  await page.getByText('負担割合を選ぶと、販売受注簿へ送ります').waitFor();
+  assert.deepEqual(await queue(), []);
+  await page.getByRole('group', {name: '負担割合', exact: true}).first().getByRole('button', {name: '1割'}).click();
   await page.getByText('販売受注簿へ送りました').waitFor();
   const queued = await queue();
   assert.equal(queued.length, 1);

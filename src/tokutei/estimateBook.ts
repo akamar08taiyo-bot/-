@@ -83,11 +83,16 @@ export const userBurdenLine = (t: Pick<Totals, 'ratio' | 'userBurden'>) => `利�
  */
 export function insuranceLines(sale: Sale, t: Totals): string[] {
   if (t.covered <= 0) return [];
-  const out = [`介護保険（${sale.payMethod}）`, `介護保険の対象　${yen(t.covered)}円`, userBurdenLine(t)];
-  if (t.aid > 0) out.push(`介護扶助（${t.ratio}割）　${yen(t.aid)}円`);
-  out.push(`保険者負担（${10 - t.ratio}割）　${yen(t.insurerBurden)}円`);
+  // 負担割合を選んでいなければ、割合で決まる行（利用者負担・介護扶助・保険者負担・払い戻し）は出さない
+  // （ユーザーの指示「（負担割合を選ぶまで自己負担額は）出さない」2026-10-27）
+  const out = [`介護保険（${sale.payMethod}）`, `介護保険の対象　${yen(t.covered)}円`];
+  if (t.ratioSet) {
+    out.push(userBurdenLine(t));
+    if (t.aid > 0) out.push(`介護扶助（${t.ratio}割）　${yen(t.aid)}円`);
+    out.push(`保険者負担（${10 - t.ratio}割）　${yen(t.insurerBurden)}円`);
+  }
   if (t.excess > 0) out.push(`限度額を超えた分　${yen(t.excess)}円`);
-  if (sale.payMethod === '償還払い') out.push(`いったんお支払いいただく金額　${yen(t.total)}円`, `（あとで保険者から ${yen(t.insurerBurden)}円が払い戻されます）`);
+  if (sale.payMethod === '償還払い') out.push(`いったんお支払いいただく金額　${yen(t.total)}円`, ...(t.ratioSet ? [`（あとで保険者から ${yen(t.insurerBurden)}円が払い戻されます）`] : []));
   return out;
 }
 /** 明細の商品の下に書く行（介護保険の内訳）と、赤字にする行（利用者負担）。出さない・商品がなければ [] */

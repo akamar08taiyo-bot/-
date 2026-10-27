@@ -74,7 +74,9 @@ export type Sale = {
   careLevel: string; // 要支援1〜要介護5
   insurer: string; // 保険者（defaults.ts の INSURERS の key。そのほかは 'other' と insurerName）
   insurerName: string;
-  burdenRatio: BurdenRatio;
+  // 負担割合。null ＝ まだ選んでいない（ユーザーの指示「負担割合が分からないと売上伝票の発行はできない」「（選ぶまで自己負担額は）出さない」2026-10-27。
+  // 新しい案件は未選択から。前は初めから1割で、2割の方を確かめないまま1割で出すおそれがあった。前からの案件の値はそのまま）
+  burdenRatio: BurdenRatio | null;
   payMethod: PayMethod;
   remaining: number | null; // 今年度の残り（円）。null（空欄）なら限度額（10万円）として計算
   perItem: boolean; // 個別切り上げ（品目ごとに利用者負担を切り上げる。みやこ町）
@@ -98,6 +100,7 @@ export type Sale = {
   jutakuJob?: string; // 住宅改修のアプリの様邸の画面（🛁 特定福祉用具申請書のタブ）から開いた案件：その様邸の id（jutaku.ts）
   jutakuSync?: JutakuFields; // 前に住宅改修から受け取ったお客様の情報（住宅改修で変わった値だけ入れ直すため）
   showSelfPay?: boolean; // 見積書の明細の最後の商品の2行下から介護保険の内訳（利用者負担＝自己負担額は赤字）を出すか。空なら出す・false なら出さない（見積もりの画面の「自己負担額を表示」。estimateBook.ts の belowItemLines）
+  uriageCustomer?: 'new' | 'existing'; // 売上伝票発行依頼書の顧客区分（新規・既存）。「🧾 売上伝票」の窓で選んだもの（uriage.ts）
   hacchuSentAt?: number; // 販売受注簿へ送った時刻（「📤 販売受注簿に転記」か、状態を承認にしたときの自動。自動で送るのは1回だけ。handoff.ts の queueHacchu）
 };
 

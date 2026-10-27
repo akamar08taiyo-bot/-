@@ -30,7 +30,7 @@ export function newSale(sales: Sale[], settings: Settings, insurer: string, now 
     careLevel: '',
     insurer,
     insurerName: '',
-    burdenRatio: 1,
+    burdenRatio: null, // 未選択（負担割合証で確かめて選ぶ。選ぶまで自己負担額は出さない）
     payMethod: '受領委任払い',
     remaining: null,
     perItem: INSURERS.find((i) => i.key === insurer)?.perItem ?? false,

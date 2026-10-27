@@ -221,6 +221,7 @@ export function missingFields(v: ShinseiValues, key: ShinseiKey): Set<ShinseiFie
   need(v.items.length, 'items');
   need(v.items.length && v.items.every((i) => i.reason), 'reason');
   need(key === 'kouiki' ? v.office : v.recorder, 'recorder'); // 広域連合は居宅の事業所名だけ
+  need(v.ratioSet, 'burdenRatio');
   need(v.applyDate, 'applyDate');
   need(v.deliveryDate, 'deliveryDate');
   if (key === 'miyako' || key === 'kouiki') need(v.carePlan, 'carePlan');

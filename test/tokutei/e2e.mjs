@@ -130,6 +130,11 @@ try {
   await page.getByRole('button', {name: '閉じる'}).last().click();
   // 35,000×0.8＝28,000＋税2,800＝30,800、13,800×0.8＝11,040＋税1,104＝12,144 → 42,944円。1割：4,295円（切り上げ）・保険者 38,649円
   await page.getByText('42,944円').first().waitFor();
+  // 負担割合は未選択から。選ぶまで自己負担額は出さない（ユーザーの指示 2026-10-27）
+  assert.ok(!(await page.locator('aside').first().innerText()).includes('利用者負担'));
+  await page.getByText('負担割合を選ぶと、自己負担額が出ます').waitFor();
+  await page.getByRole('group', {name: '負担割合', exact: true}).first().getByRole('button', {name: '1割'}).click();
+  await page.getByText(/利用者負担（1割）/).first().waitFor();
   const aside = await page.locator('aside').first().innerText();
   assert.match(aside, /利用者負担（1割）\s*4,295円/);
   assert.match(aside, /保険者負担（9割）\s*38,649円/);

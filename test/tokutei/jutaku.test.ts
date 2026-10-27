@@ -72,13 +72,13 @@ test('住宅改修で変わった値だけ入れ直す。特定福祉用具で�
   assert.deepEqual([m.insurer, m.perItem], ['miyako', true]);
 });
 
-test('初めの値のままの項目（負担割合1割・保険者）は、あとで住宅改修で入れた値が入る。ここで選び直した値はそのまま', () => {
+test('初めの値のままの項目（負担割合は未選択・保険者）は、あとで住宅改修で入れた値が入る。ここで選び直した値はそのまま', () => {
   const settings = defaultSettings();
   const {customer, kana} = fields;
   // 住宅改修で負担割合・保険者がまだ分からないときに開いた
   const first = applyJutaku([], settings, {job: 'j1', fields: {customer, kana}}, 1000);
   const made = first.sales[0];
-  assert.equal(made.burdenRatio, 1);
+  assert.equal(made.burdenRatio, null); // 負担割合は未選択から（2026-10-27。前は1割）
   // 住宅改修で負担割合（2割）と保険者（みやこ町）を入れてから、また開いた
   const later = applyJutaku(first.sales, settings, {job: 'j1', fields: {customer, kana, burdenRatio: 2, insurer: 'miyako'}}, 2000);
   const s = later.sales[0];

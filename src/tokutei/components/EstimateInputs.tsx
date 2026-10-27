@@ -193,6 +193,8 @@ export function EstimateInputs({
               [3, '3割'],
             ]}
           />,
+          undefined,
+          sale.burdenRatio === null, // 未選択なら薄い黄色（選ぶまで自己負担額は出さない）
         )}
         {row(
           '支払方法',
@@ -244,7 +246,7 @@ export function EstimateInputs({
               <input type="checkbox" checked={sale.showSelfPay !== false} onChange={(e) => change({showSelfPay: e.target.checked})} />
               自己負担額を表示
             </label>
-            {showsSelfPay(sale) && t.covered > 0 && <span className="tabular-nums text-red-600">{userBurdenLine(t)}</span>}
+            {showsSelfPay(sale) && t.covered > 0 && t.ratioSet && <span className="tabular-nums text-red-600">{userBurdenLine(t)}</span>}
           </div>,
           'selfPay',
         )}
