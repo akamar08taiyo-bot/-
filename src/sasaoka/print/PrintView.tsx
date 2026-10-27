@@ -60,6 +60,58 @@ function useFitScale(pageMm: number) {
   return [ref, fit.scale, fit.side] as const;
 }
 
+/** 見積書の用紙（A4横）の端から中身までの余白（mm）。プリンターが印刷できない端（3〜5mm ほど）で切れないように少し残す */
+const FORM_EDGE_MM = 6;
+/**
+ * 見積書を A4 の用紙いっぱいに（ユーザーの指示「工事見積書を印刷するときはA４用紙いっぱいに拡大する。余白部分を最低限狭くする（とぎれないようにはする）」2026-10-27）。
+ * 前は元の Excel の余白（左 15mm・上 20mm など）のままで、表が用紙の 9 割ほどだった。
+ * 用紙ごとに中身（作成日・表・ページ番号）の外の四角を測り、縦横同じ倍率で、用紙の端から FORM_EDGE_MM まで大きくして、まん中に置く
+ * （横長の表なので、ふつうは左右が FORM_EDGE_MM になり、上下は同じだけあく）。字の形は変えない。印刷の画面（プレビュー）にも同じように出す。
+ * 位置は mm で書く（画面の幅に合わせて縮める zoom と関係なく、印刷と同じになるように）
+ */
+function useFillFormPages(root: {current: HTMLElement | null}, deps: unknown[]) {
+  useLayoutEffect(() => {
+    const pages = root.current ? [...root.current.querySelectorAll<HTMLElement>('.form-page')] : [];
+    for (const page of pages) {
+      const kids = [...page.children].filter((c): c is HTMLElement => c instanceof HTMLElement);
+      for (const k of kids) {
+        k.style.transform = '';
+        k.style.transformOrigin = '';
+      }
+      if (!page.offsetWidth || kids.length === 0) continue;
+      const mm = 297 / page.offsetWidth; // 1px が何 mm か（用紙の幅は 297mm）
+      const pageH = page.offsetHeight * mm;
+      // ページ番号の段（.fm-foot）は用紙の幅いっぱいの箱なので、箱ではなく字のある所を測る（箱で測ると幅が 297mm になり、大きくならない）
+      const pageBox = page.getBoundingClientRect();
+      const px = page.offsetWidth / (pageBox.width || 1); // 画面に合わせて縮めた（zoom）分を戻す
+      const boxes = kids.map((k) => {
+        if (k.offsetWidth < page.offsetWidth * 0.9) return {l: k.offsetLeft, t: k.offsetTop, r: k.offsetLeft + k.offsetWidth, b: k.offsetTop + k.offsetHeight};
+        const range = document.createRange();
+        range.selectNodeContents(k);
+        const r = range.getBoundingClientRect();
+        if (!r.width) return null;
+        return {l: (r.left - pageBox.left) * px, t: (r.top - pageBox.top) * px, r: (r.right - pageBox.left) * px, b: (r.bottom - pageBox.top) * px};
+      });
+      const used = boxes.filter((b): b is NonNullable<typeof b> => b !== null);
+      if (used.length === 0) continue;
+      const x0 = Math.min(...used.map((b) => b.l)) * mm;
+      const y0 = Math.min(...used.map((b) => b.t)) * mm;
+      const w = Math.max(...used.map((b) => b.r)) * mm - x0;
+      const h = Math.max(...used.map((b) => b.b)) * mm - y0;
+      if (w <= 0 || h <= 0) continue;
+      const scale = Math.min((297 - 2 * FORM_EDGE_MM) / w, (pageH - 2 * FORM_EDGE_MM) / h);
+      // 中身の左上 (x0, y0) を、大きくしたあと用紙のまん中に来る所へ
+      const tx = (297 - w * scale) / 2 - x0 * scale;
+      const ty = (pageH - h * scale) / 2 - y0 * scale;
+      for (const k of kids) {
+        k.style.transformOrigin = `${-k.offsetLeft * mm}mm ${-k.offsetTop * mm}mm`;
+        k.style.transform = `translate(${tx}mm, ${ty}mm) scale(${scale})`;
+      }
+      page.dataset.fill = scale.toFixed(3);
+    }
+  }, deps); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
 export function PrintView({request, data, onClose}: {request: PrintRequest; data: AppData; onClose: () => void}) {
   const month = request.kind === 'invoice' || request.kind === 'sales' ? request.month : data.jobs.find((j) => j.id === request.jobId)?.month ?? '';
   // 請求日など（請求書は月ごとに覚える）。見積書の作成日は様邸に持つ見積もり作成日（見積書の画面で入れる）。
@@ -74,6 +126,9 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
   const [overlayRef, fitScale, side] = useFitScale(request.kind === 'estimate' ? 297 : 210);
   const [actualSize, setActualSize] = useState(false);
   const zoom = actualSize ? 1 : fitScale;
+  // 見積書は A4 の用紙いっぱいに（useFillFormPages）
+  const rootRef = useRef<HTMLDivElement>(null);
+  useFillFormPages(rootRef, [request, data.jobs, data.settings, form]);
   // 上の帯の高さ（用紙の右の「印刷する」を、帯のすぐ下に止めておく）
   const barRef = useRef<HTMLDivElement>(null);
   const [barH, setBarH] = useState(60);
@@ -181,7 +236,7 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
       </div>
       <div className={side ? 'print-body side' : 'print-body'}>
         {/* 画面の幅が足りないときは zoom で縮める（印刷するときは CSS で原寸に戻す） */}
-        <div className="print-root" style={zoom < 1 ? {zoom} : undefined}>
+        <div ref={rootRef} className="print-root" style={zoom < 1 ? {zoom} : undefined}>
           {sheets}
         </div>
         {side && (

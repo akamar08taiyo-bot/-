@@ -220,9 +220,30 @@ for (const t of [
 ]) {
   assert.ok(doc.includes(t), `見積書に「${t}」がない`);
 }
+// 印刷は A4 の用紙いっぱいに（ユーザーの指示 2026-10-27）：どの用紙も 1 倍より大きく、字・罫線は用紙の端から 5mm より内（切れない）。縦が長い用紙は上下が 6mm
+const paperFill = async () =>
+  page.locator('.print-root .form-page').evaluateAll((ps) =>
+    ps.map((p) => {
+      const pr = p.getBoundingClientRect();
+      const mm = 297 / pr.width;
+      let l = 1e9, t = 1e9, r = -1e9, b = -1e9;
+      for (const k of p.children) {
+        const range = document.createRange();
+        range.selectNodeContents(k);
+        const x = k.getBoundingClientRect().width > pr.width * 0.9 ? range.getBoundingClientRect() : k.getBoundingClientRect();
+        if (!x.width) continue;
+        [l, t, r, b] = [Math.min(l, x.left), Math.min(t, x.top), Math.max(r, x.right), Math.max(b, x.bottom)];
+      }
+      return {fill: Number(p.dataset.fill), edge: Math.min(l - pr.left, t - pr.top, pr.right - r, pr.bottom - b) * mm};
+    }),
+  );
+const assertFilled = async () => {
+  for (const f of await paperFill()) assert.ok(f.fill > 1 && f.edge >= 5 && f.edge <= 7, JSON.stringify(f)); // いちばん近い端（左右か上下）が 6mm ほど
+};
 const totalLine = async (where, label) => (await where.locator('tr', {hasText: label}).last().locator('td').allInnerTexts()).filter(Boolean);
 assert.deepEqual(await totalLine(printed, '小計'), ['小計', '49,260', '49,260']);
 assert.deepEqual(await totalLine(printed, '合計'), ['合計', '59,600', '59,600']);
+await assertFilled();
 await page.screenshot({path: path.join(outDir, '51-print-yukuhashi.png')});
 // 「🖨 印刷する」は用紙（A4横）の右の上に大きく（発注書の印刷と同じ。2026-10-25）
 const printBox = await page.getByRole('button', {name: '🖨 印刷する'}).boundingBox();
@@ -272,6 +293,7 @@ assert.deepEqual(wood.slice(0, 5), ['手', '同上施工費', '1.2', '時間', '
 const kbk = (await kk.locator('tr', {hasText: 'ブラケット'}).first().locator('td').allInnerTexts()).filter(Boolean);
 assert.deepEqual(kbk.slice(2), ['2', '個', '1,680', '3,360'], kbk.join('|')); // 対象外：全改修工事部分だけ
 assert.deepEqual(await totalLine(pages.last(), '合計'), ['合計', '59,600', '53,720']);
+await assertFilled();
 await page.screenshot({path: path.join(outDir, '52-print-kouiki.png')});
 await page.emulateMedia({media: 'print'});
 await page.pdf({path: path.join(outDir, 'estimate-kouiki.pdf'), printBackground: true, preferCSSPageSize: true});
