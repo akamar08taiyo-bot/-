@@ -36,7 +36,9 @@ test('細目・メーカー・商品名で選ぶ（品番が見つからない�
   assert.deepEqual(picks(item({name: '見本の据置式便座'})), [179]);
   assert.deepEqual(picks(item({name: '見本の便座', sub: '和式便器を腰掛式にするもの'})), [179]);
   assert.deepEqual(picks(item({name: '見本の補高便座', sub: '洋式便器の高さを補うもの'})), []); // 補高便座のページはまだない
-  assert.deepEqual(picks(item({name: '見本の段差スロープ'})), []);
+  // 固定用スロープは p.214（2026-10-28）
+  assert.deepEqual(picks(item({name: '見本の段差スロープ'})), [214]);
+  assert.deepEqual(picks(item({name: '見本の段差解消 ゴム', maker: '見本工業', sub: ''})), [214]);
   assert.deepEqual(picks(), []);
 });
 
@@ -86,6 +88,7 @@ test('カタログの PDF：ファイルがあり、品番を読める（pdf.js�
     177: ['PN-L30205B', '261-T0819'],
     178: ['532-950', '261-T1188'],
     179: ['533-554', '261-T0043'],
+    214: ['04740', '261-R1043', 'TM-999-A15', '261-R0102'], // 段差解消スロープ（品番・申込番号）
   };
   assert.deepEqual(CATALOG.map((p) => p.page), Object.keys(expect).map(Number)); // ページの順に並ぶ
   assert.equal(new Set(CATALOG.map((p) => p.file)).size, CATALOG.length);

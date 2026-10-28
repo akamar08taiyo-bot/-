@@ -18,7 +18,7 @@ export type CatalogPage = {
 const PORTABLE_TOILET = '移動できる便器（ポータブルトイレ）';
 const ANJU = /アロン|安寿/;
 
-/** ページの並び（印刷の画面のチェックの順）。入浴の用具 → 腰掛便座。2026-10-26 にユーザーから p.37・40・43・44・172・178・179 をいただいて足した */
+/** ページの並び（印刷の画面のチェックの順）。入浴の用具 → 腰掛便座 → 固定用スロープ。2026-10-26 にユーザーから p.37・40・43・44・172・178・179、2026-10-28 に p.214 をいただいて足した */
 export const CATALOG: CatalogPage[] = [
   {file: 'kaientai-p037.pdf', page: 37, title: 'シャワーベンチ（安寿）', subs: ['入浴用いす'], maker: ANJU},
   {file: 'kaientai-p040.pdf', page: 40, title: 'シャワーチェア（パナソニック ユクリア）', subs: ['入浴用いす'], maker: /パナソニック|panasonic|ユクリア/i},
@@ -40,6 +40,9 @@ export const CATALOG: CatalogPage[] = [
     maker: /アロン|安寿|新輝/,
     words: /サニタリエース|据置(式)?便座|楽立|FX-?CP|ポータブルトイレ\s*S型/i,
   },
+  // 固定用スロープ（2024年4月から特定福祉用具にも。段差解消スロープ）。ユーザーの指示「スロープのカタログも追加してください」2026-10-28。
+  // 品番・申込番号がページにあればこのページ（catalogPicks）。なければ商品名に「スロープ」「段差解消」があればこのページ（ダンスロープ・インタースロープ・エコ段差スロープ など）
+  {file: 'kaientai-p214.pdf', page: 214, title: '段差解消スロープ', words: /スロープ|段差解消/},
 ];
 
 export const catalogLabel = (p: CatalogPage) => `p.${p.page} ${p.title}`;

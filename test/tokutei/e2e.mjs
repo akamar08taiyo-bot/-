@@ -361,9 +361,10 @@ try {
     'p.177 ポータブルトイレ（パナソニック）',
     'p.178 ポータブルトイレ FX-30（安寿）',
     'p.179 据置式便座・ポータブルトイレ（安寿）',
+    'p.214 段差解消スロープ',
   ]);
   // 品番は全部のページを読んでから見くらべる（それまでは細目とメーカーで選んだページ）
-  await page.waitForFunction(() => [...document.querySelectorAll('[aria-label="印刷するページ"] input')].map((x) => (x.checked ? 1 : 0)).join('') === '100110000000', null, {timeout: 60000});
+  await page.waitForFunction(() => [...document.querySelectorAll('[aria-label="印刷するページ"] input')].map((x) => (x.checked ? 1 : 0)).join('') === '1001100000000', null, {timeout: 60000});
   // 画面にもチェックしたページだけ（ユーザーの指示「該当のページのみ印刷プレビューに表示する」2026-10-26）
   await page.waitForFunction(() => {
     const imgs = [...document.querySelectorAll('.cat-sheet img')];
@@ -441,7 +442,7 @@ try {
   assert.ok(Math.abs(sized.width - (moved.width - 120)) < 2 && Math.abs(sized.height - (moved.height - 90)) < 2 && Math.abs(sized.x - moved.x) < 2, `大きさが変わらない ${JSON.stringify(sized)}`);
   // 窓の中でも検索し直せる（空にすると全部のページ）。ページを押すとそのページ
   await viewer.getByRole('searchbox', {name: 'カタログから検索'}).fill('');
-  assert.equal(await viewerChips.count(), 12);
+  assert.equal(await viewerChips.count(), 13);
   await viewerChips.filter({hasText: 'p.172'}).click();
   await page.waitForFunction(() => document.querySelector('[aria-label="カタログのページの絵"] img')?.getAttribute('alt') === 'p.172 家具調トイレ（安寿）', null, {timeout: 60000});
   // 拡大（＋）すると絵が窓より広くなり、窓の中でスクロールする
