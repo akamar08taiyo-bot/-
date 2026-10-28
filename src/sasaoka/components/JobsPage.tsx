@@ -143,7 +143,7 @@ export function JobsPage({
           <Btn color="softSky" disabled={jobs.length === 0} onClick={() => onPrint({kind: 'invoice', month, withDetails: true})}>
             🖨 請求書＋各様邸の明細
           </Btn>
-          <Btn color="white" disabled={jobs.length === 0} onClick={saveCsv}>
+          <Btn color="softBlue" disabled={jobs.length === 0} onClick={saveCsv}>
             CSVで保存
           </Btn>
         </div>

@@ -1,6 +1,9 @@
 import {useLayoutEffect, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
-import {Btn} from '../components/ui.tsx';
+import {Btn, useToast} from '../components/ui.tsx';
+import type {Job, Settings} from '../types.ts';
+import type {Update} from '../useStore.ts';
+import {removeEstimate} from './EstimateList.tsx';
 
 /** 様邸の名前と、まん中のボタン（保存・Excel・印刷）のあいだに、少なくともあける幅（px） */
 const MIN_GAP = 16;
@@ -12,6 +15,19 @@ export function BackButton({onClick}: {onClick: () => void}) {
   return (
     <Btn color="white" onClick={onClick} className="lg:!text-base">
       ← 一覧へ戻る
+    </Btn>
+  );
+}
+
+/**
+ * 様邸の「削除」（ゴミ箱に移す。確かめてから。完全に消すのはゴミ箱のタブから）。住宅改修申請書・工事見積書・理由書のどのタブでも同じボタン・同じ色（白）
+ * （ユーザーの指示「住宅改修申請書、販売申請書、理由書、工事見積書全てに削除ボタンを設置する。ボタンの色は統一する」2026-10-28。前は工事見積書のタブだけ）
+ */
+export function RemoveJobButton({job, settings, update, onBack}: {job: Job; settings: Settings; update: Update; onBack: () => void}) {
+  const toast = useToast();
+  return (
+    <Btn color="white" onClick={() => removeEstimate(job, settings, update, toast) && onBack()}>
+      削除
     </Btn>
   );
 }

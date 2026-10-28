@@ -50,7 +50,7 @@ export function KitPicker({
               📦 部材・施工費マスタで登録・直す
             </Btn>
           )}
-          <Btn color="blue" onClick={onClose}>
+          <Btn color="white" onClick={onClose}>
             閉じる
           </Btn>
         </>

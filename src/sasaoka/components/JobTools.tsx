@@ -110,7 +110,7 @@ export function ShikiriPriceDialog({
       title="仕切価格を入れる（請求書の部材代）"
       onClose={onClose}
       footer={
-        <Btn color="blue" onClick={onClose}>
+        <Btn color="white" onClick={onClose}>
           閉じる
         </Btn>
       }

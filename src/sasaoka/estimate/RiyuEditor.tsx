@@ -18,7 +18,7 @@ import {todayIso} from '../util.ts';
 import {saveRiyu, useTemplate} from './shinseiFiles.ts';
 import {Circles, Note} from './ShinseiEditor.tsx';
 import {ShinseiPages} from './ShinseiPreview.tsx';
-import {JobHeader, JobTitle} from './JobHeader.tsx';
+import {JobHeader, JobTitle, RemoveJobButton} from './JobHeader.tsx';
 
 type Field = ShinseiField;
 
@@ -406,6 +406,7 @@ export function RiyuEditor({job, data, update, onBack, tabs, batch}: {job: Job; 
             {batch}
           </>
         }
+        right={<RemoveJobButton job={job} settings={data.settings} update={update} onBack={onBack} />}
       />
 
 

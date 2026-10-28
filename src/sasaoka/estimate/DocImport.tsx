@@ -109,7 +109,7 @@ export function useDocImport(data: AppData, update: Update, onImported: (month: 
               <Btn color="white" onClick={close}>
                 やめる
               </Btn>
-              <Btn color="softBlue" disabled={count === 0} onClick={run}>
+              <Btn color="purple" disabled={count === 0} onClick={run}>
                 取り込む（{count}件）
               </Btn>
             </>

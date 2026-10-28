@@ -32,7 +32,7 @@ import {ShinseiPrint} from './ShinseiPrint.tsx';
 import {clearedSheet} from '../sheetEdit.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {CardFill} from '../components/CardReader.tsx';
-import {JobHeader, JobTitle} from './JobHeader.tsx';
+import {JobHeader, JobTitle, RemoveJobButton} from './JobHeader.tsx';
 
 /** 欄の順番：保険者ごとの申請書の上からの順番（原本を見て決めた。みやこ町・広域連合は承認の申請書の順番で、支給申請書だけの着工日・完成日は最後）。
  *  ただし被保険者氏名はどの保険者もフリガナのすぐ下（ユーザーの指示「ふりがなの下に、名前をもってくる」、2026-10-21。苅田町・みやこ町は原本では番号が先） */
@@ -475,9 +475,12 @@ export function ShinseiEditor({
           </>
         }
         right={
-          <Btn color="white" onClick={clearAll} disabled={blank}>
-            📄 白紙に戻す
-          </Btn>
+          <>
+            <Btn color="white" onClick={clearAll} disabled={blank}>
+              📄 白紙に戻す
+            </Btn>
+            <RemoveJobButton job={job} settings={s} update={update} onBack={onBack} />
+          </>
         }
       />
       {printing && pages && map && (

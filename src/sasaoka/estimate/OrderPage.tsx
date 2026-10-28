@@ -126,7 +126,7 @@ export function OrderPage({
             href={hacchuUrl()}
             target="_blank"
             onClick={transfer}
-            className="inline-flex items-center justify-center gap-1.5 rounded-md border border-teal-300 bg-teal-50 px-3.5 py-2.5 text-sm font-bold text-teal-800 shadow-sm transition hover:bg-teal-100"
+            className="inline-flex items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
           >
             📤 販売受注簿に転記
           </a>

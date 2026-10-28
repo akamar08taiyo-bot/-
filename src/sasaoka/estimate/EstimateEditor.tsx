@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
 import {hasEstimateRows, jobName, startEstimate} from '../calc.ts';
-import {JobHeader, JobTitle} from './JobHeader.tsx';
+import {JobHeader, JobTitle, RemoveJobButton} from './JobHeader.tsx';
 import {EstimateSheet} from '../components/EstimateSheet.tsx';
 import {LaborPickerFor, missingShikiri, ShikiriPriceDialog} from '../components/JobTools.tsx';
 import {KitPicker} from '../components/Kits.tsx';
@@ -17,7 +17,7 @@ import type {AppData, Insurer, Job, Kit, Material, NameSuffix, Place} from '../t
 import type {Update} from '../useStore.ts';
 import {clearedSheet} from '../sheetEdit.ts';
 import {staffFull, thisMonth, todayIso} from '../util.ts';
-import {duplicateEstimate, removeEstimate, saveEstimateExcel} from './EstimateList.tsx';
+import {duplicateEstimate, saveEstimateExcel} from './EstimateList.tsx';
 import {UriageDialog} from './UriageDialog.tsx';
 
 // at：見積書で選んでいた（タップしていた）行。部材・部材＋施工費（常用）はそこに入れる（`insertRowsAt`）
@@ -118,10 +118,6 @@ export function EstimateEditor({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-  // 削除＝ゴミ箱に移す（確かめてから。完全に消すのはゴミ箱のタブから）
-  const removeJob = () => {
-    if (removeEstimate(job, s, update, toast)) onBack();
-  };
   // 白紙に戻す（`clearedSheet`）。いきなり消えると困るので確かめてから（消したあとも Ctrl+Z で戻せる）
   const blank = !job.customer.trim() && !job.insuredNo.trim() && !job.address.trim() && job.places.length === 0 && job.overhead === null && job.overheadTarget === null;
   const clearSheet = () => {
@@ -291,9 +287,7 @@ export function EstimateEditor({
             <Btn color="white" onClick={duplicate}>
               複製
             </Btn>
-            <Btn color="white" onClick={removeJob}>
-              削除
-            </Btn>
+            <RemoveJobButton job={job} settings={s} update={update} onBack={onBack} />
           </>
         }
       />

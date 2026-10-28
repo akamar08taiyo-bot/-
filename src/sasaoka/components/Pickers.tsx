@@ -84,7 +84,7 @@ export function MaterialPicker({
       }
       onClose={onClose}
       footer={
-        <Btn color="blue" onClick={onClose}>
+        <Btn color="white" onClick={onClose}>
           選び終わったら閉じる
         </Btn>
       }
@@ -276,7 +276,7 @@ export function LaborCounter({
       }
       onClose={onClose}
       footer={
-        <Btn color="blue" onClick={onClose}>
+        <Btn color="white" onClick={onClose}>
           数え終わったら閉じる
         </Btn>
       }

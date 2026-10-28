@@ -1,7 +1,10 @@
 import {createContext, useContext, useEffect, useRef, useState, useSyncExternalStore} from 'react';
 import type {ButtonHTMLAttributes, DragEvent as ReactDragEvent, InputHTMLAttributes, ReactNode} from 'react';
 
-// 色は機能ごとに1色（見積・提案書作成アプリのデザイン規約と同じ使い分け）。どれも薄い地に濃い字・細い枠
+// 色は機能ごとに1色（見積・提案書作成アプリのデザイン規約と同じ使い分け）。どれも薄い地に濃い字・細い枠。
+// 同じ働きのボタンは、どの画面でも・特定福祉用具のアプリ（src/tokutei の ui.tsx）でも同じ色（ユーザーの指示「同じ内容でボタンの色が違う場合は統一する」2026-10-28）：
+//   保存（バックアップ・CSV も）＝softBlue、Excel で保存＝softGreen、印刷＝softSky、取り込む＝purple、新規・追加＝emerald、
+//   削除・複製・閉じる・やめる・戻る・販売受注簿に転記・売上伝票依頼書・白紙に戻すなど＝white
 // （ユーザーの指示「ガツンと濃い色だけは、目がチカチカするんで、少し控えて」2026-10-26。前は濃い地に白い字。削除は白い地に赤い字）
 const COLORS = {
   emerald: 'bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300', // 新規・追加

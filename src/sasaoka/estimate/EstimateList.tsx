@@ -343,7 +343,7 @@ export function EstimateList({
             ＋ {INSURER_INFO[i].name}
           </Btn>
         ))}
-        <Btn color="white" className="!text-base" onClick={docs.pick} title="申請書・見積書・理由書の Excel（.xlsx）を取り込む">
+        <Btn color="purple" className="!text-base" onClick={docs.pick} title="申請書・見積書・理由書の Excel（.xlsx）を取り込む">
           📥 取り込む
         </Btn>
         {docs.element}

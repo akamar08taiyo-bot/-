@@ -268,10 +268,10 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
           部材リスト・手間単価・部材＋施工費（常用）だけを保存したファイルは、ほかの人に渡して読み込んでもらえます。
         </p>
         <div className="flex flex-wrap gap-2">
-          <Btn color="blue" onClick={exportAll}>
+          <Btn color="softBlue" onClick={exportAll}>
             バックアップを保存（すべて）
           </Btn>
-          <Btn color="teal" onClick={exportMaster}>
+          <Btn color="softBlue" onClick={exportMaster}>
             部材リスト・手間単価・部材＋施工費（常用）だけ保存（ほかの人に渡す用）
           </Btn>
           <label className="inline-flex cursor-pointer items-center rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50">
