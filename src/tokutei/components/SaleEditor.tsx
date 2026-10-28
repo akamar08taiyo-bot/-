@@ -267,9 +267,12 @@ export function SaleEditor({
           （ユーザーの指示「この位置を赤枠を左にずらす」2026-10-27。前は右に寄せていて、名前から遠かった）。
           前は申請書の画面ではプレビューの上の枠（ShinseiPanel）に、見積もりの画面では全部右に並べていた */}
       <div className="flex flex-wrap items-center gap-2">
-        <Btn color="white" onClick={onBack} className="lg:!text-base">
-          ← 見積もりの一覧へ
-        </Btn>
+        {/* 住宅改修の様邸のタブの中（fixedView）には「← 見積もりの一覧へ」を出さない（その様邸の案件だけを見る所。ユーザーの指示「赤枠の部分は不要です」2026-10-28） */}
+        {!fixedView && (
+          <Btn color="white" onClick={onBack} className="lg:!text-base">
+            ← 見積もりの一覧へ
+          </Btn>
+        )}
         <h2 className="text-lg font-bold text-slate-800 lg:text-xl">{customerLabel(sale)}</h2>
         <span className="text-sm text-slate-500">{insurerLabel(sale.insurer, sale.insurerName) || '保険者未選択'}</span>
         <div role="group" aria-label="保存・印刷" className="flex flex-wrap gap-2 sm:ml-4 lg:[&>*]:!text-base">
@@ -374,7 +377,7 @@ export function SaleEditor({
             onScan={() => setScanning(true)}
             onCatalog={(query) => setCatalogView({query})}
             onAddItem={(item) => change({items: [...sale.items, item ?? blankItem(s)]})}
-            onPickCustomer={() => setPickingCustomer(true)}
+            onPickCustomer={fixedView ? undefined : () => setPickingCustomer(true)}
             onFavorite={(id) => favorite([id])}
           />
           <div className="min-w-0 space-y-3 lg:sticky lg:top-3 lg:self-start">
@@ -412,7 +415,7 @@ export function SaleEditor({
             onScan={() => setScanning(true)}
             onCatalog={(query) => setCatalogView({query})}
             onAddItem={(item) => change({items: [...sale.items, item ?? blankItem(s)]})}
-            onPickCustomer={() => setPickingCustomer(true)}
+            onPickCustomer={fixedView ? undefined : () => setPickingCustomer(true)}
             onFavorite={(id) => favorite([id])}
             withShinsei={fixedView !== 'quote'}
           />

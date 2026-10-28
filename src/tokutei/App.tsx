@@ -177,6 +177,15 @@ export default function App() {
   }, [embed]);
 
   const closePrint = useCallback(() => setPrintId(null), []);
+  // 住宅改修の様邸のタブの中には一覧へ戻るボタンがない（ユーザーの指示「赤枠の部分は不要です」2026-10-28）。「削除」のあとも一覧は出さず、
+  // タブを開いたときと同じく、その様邸の新しい案件を開く（住宅改修が書いたお客様の情報で。上の「住宅改修の様邸から開いたとき」をもう一度）
+  const back = useCallback(() => {
+    if (embed && jutaku) {
+      linked.current = false;
+      sent.current = null;
+    }
+    setSaleId(null);
+  }, [embed, jutaku]);
 
   if (store.loadError)
     return (
@@ -256,7 +265,7 @@ export default function App() {
         <main className={`no-print mx-auto px-3 py-4 sm:px-4 ${embed && embedView ? 'max-w-none' : 'max-w-6xl'}`}>
           {tab === 'sales' &&
             (sale ? (
-              <SaleEditor key={sale.id} sale={sale} data={data} update={store.update} onBack={() => setSaleId(null)} onOpen={setSaleId} onPrint={setPrintId} fixedView={embedView} catalogAsk={catalogAsk} />
+              <SaleEditor key={sale.id} sale={sale} data={data} update={store.update} onBack={back} onOpen={setSaleId} onPrint={setPrintId} fixedView={embedView} catalogAsk={catalogAsk} />
             ) : (
               <SalesPage data={data} update={store.update} onOpen={setSaleId} onPrint={setPrintId} />
             ))}

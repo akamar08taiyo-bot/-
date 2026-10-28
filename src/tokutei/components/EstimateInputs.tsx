@@ -67,7 +67,7 @@ export function EstimateInputs({
   onScan: () => void; // 「📷 スクショから自動認識」の窓を開く（scanItem.ts）
   onCatalog: (query: string) => void; // 右にカタログの窓を開く（print/CatalogViewer.tsx）
   onAddItem: (item?: SaleItem) => void; // 手で入れる商品を足す（item があればその商品＝最初から開いている欄に打ったもの）
-  onPickCustomer: () => void;
+  onPickCustomer?: () => void; // 住宅改修の様邸のタブの中では渡さない（お客様の情報は様邸から入る。ユーザーの指示「赤枠の部分は不要です」2026-10-28）
   onFavorite: (itemId: string) => void; // 手で入れた商品を商品マスタの★お気に入りに
   withShinsei: boolean; // 下の「お客様・申請」の行も出す（住宅改修の販売見積書のタブの中では、お客様の情報は住宅改修と特定福祉用具申請書のタブで入れるので出さない）
 }) {
@@ -91,11 +91,13 @@ export function EstimateInputs({
   const unregistered = new Set(unregisteredItems(sale, data.products).map((i) => i.id));
   return (
     <div ref={inputsRef} onFocusCapture={onFocusField} className="min-w-0 space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <Btn color="white" small onClick={onPickCustomer}>
-          👤 前のお客様から入れる
-        </Btn>
-      </div>
+      {onPickCustomer && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Btn color="white" small onClick={onPickCustomer}>
+            👤 前のお客様から入れる
+          </Btn>
+        </div>
+      )}
       <div role="form" aria-label="見積書に入れる所" className="overflow-hidden rounded-xl border-2 border-slate-400 bg-white shadow-sm">
         {row(
           '宛名（お客様名）',

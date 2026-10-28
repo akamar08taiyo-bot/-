@@ -64,7 +64,7 @@ export function ShinseiInputs({
   onScan: () => void; // 「📷 スクショから自動認識」の窓を開く（scanItem.ts）
   onCatalog: (query: string) => void; // 右にカタログの窓を開く（print/CatalogViewer.tsx）
   onAddItem: (item?: SaleItem) => void; // 手で入れる商品を足す（item があればその商品＝最初から開いている欄に打ったもの）
-  onPickCustomer: () => void;
+  onPickCustomer?: () => void; // 住宅改修の様邸のタブの中では渡さない（お客様の情報は様邸から入る。ユーザーの指示「赤枠の部分は不要です」2026-10-28）
   onFavorite: (itemId: string) => void; // 手で入れた商品を商品マスタの★お気に入りに
 }) {
   const makers = useMemo(() => makerChoices(data.products, data.sales), [data.products, data.sales]);
@@ -90,11 +90,13 @@ export function ShinseiInputs({
   const insurerName = INSURERS.find((i) => i.key === sale.insurer)?.label;
   return (
     <div ref={inputsRef} onFocusCapture={onFocusField} className="min-w-0 space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <Btn color="white" small onClick={onPickCustomer}>
-          👤 前のお客様から入れる
-        </Btn>
-      </div>
+      {onPickCustomer && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Btn color="white" small onClick={onPickCustomer}>
+            👤 前のお客様から入れる
+          </Btn>
+        </div>
+      )}
       <div role="form" aria-label="申請書に入れる所" onKeyDown={nextOnEnter} className="overflow-hidden rounded-lg border-2 border-slate-700 bg-white shadow-sm">
         {title && (
           <div className="border-b-2 border-slate-700 px-4 py-2.5 text-center text-base font-bold text-slate-800">
