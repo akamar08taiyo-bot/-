@@ -24,6 +24,10 @@ const COLORS = {
 
 export type BtnColor = keyof typeof COLORS;
 
+/** ボタンの見た目（リンクをボタンと同じ形で出すときにも使う） */
+export const btnClass = (color: BtnColor = 'blue', small = false) =>
+  `${COLORS[color]} ${small ? 'px-2.5 py-1.5 text-xs' : 'px-3.5 py-2.5 text-sm'} inline-flex items-center justify-center gap-1.5 rounded-md font-bold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-40`;
+
 export function Btn({
   color = 'blue',
   small = false,
@@ -31,11 +35,10 @@ export function Btn({
   children,
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & {color?: BtnColor; small?: boolean}) {
-  const size = small ? 'px-2.5 py-1.5 text-xs' : 'px-3.5 py-2.5 text-sm';
   return (
     <button
       type="button"
-      className={`${COLORS[color]} ${size} inline-flex items-center justify-center gap-1.5 rounded-md font-bold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
+      className={`${btnClass(color, small)} ${className}`}
       {...rest}
     >
       {children}

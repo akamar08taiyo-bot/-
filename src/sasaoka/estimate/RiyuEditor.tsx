@@ -3,12 +3,12 @@
 // 被保険者番号・氏名・生年月日・性別・要介護・郵便番号・住所・作成者の事業所と氏名は申請書と同じ欄なので、どちらで直してもすぐ両方に出る。
 // ④改修項目は見積書・申請書の改修の箇所から（ここでは直さない）
 
-import {useDeferredValue, useMemo, useRef, useState} from 'react';
+import {useCallback, useDeferredValue, useMemo, useRef, useState} from 'react';
 import type {KeyboardEvent, ReactNode} from 'react';
 import {jobName} from '../calc.ts';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {circled, eraOf, INSURER_INFO, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI} from '../estimateForms.ts';
-import {ageAt, birthIso, RIYU_ACTS, RIYU_EQUIPMENT, RIYU_MAP, RIYU_PURPOSES, riyuOf, riyuShown, riyuValues} from '../riyu.ts';
+import {ageAt, birthIso, RIYU_ACTS, RIYU_EQUIPMENT, RIYU_MAP, RIYU_PURPOSES, riyuFileName, riyuOf, riyuShown, riyuValues} from '../riyu.ts';
 import {insuredBoxes, padInsuredNo, workItems} from '../shinsei.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField} from '../shinseiPreview.ts';
@@ -19,6 +19,7 @@ import {saveRiyu, useTemplate} from './shinseiFiles.ts';
 import {Circles, Note} from './ShinseiEditor.tsx';
 import {ShinseiPages} from './ShinseiPreview.tsx';
 import {JobHeader, JobTitle, RemoveJobButton} from './JobHeader.tsx';
+import {ShinseiPrint} from './ShinseiPrint.tsx';
 
 type Field = ShinseiField;
 
@@ -134,6 +135,9 @@ export function RiyuEditor({job, data, update, onBack, tabs, batch}: {job: Job; 
     document.querySelector<HTMLElement>(`[data-riyu-field="${f}"] input, [data-riyu-field="${f}"] textarea, [data-riyu-field="${f}"] button`)?.focus();
   };
 
+  // 理由書の印刷（申請書の印刷と同じ ShinseiPrint.tsx。プレビューと同じ2ページを A4 に）
+  const [printing, setPrinting] = useState(false);
+  const closePrint = useCallback(() => setPrinting(false), []);
   const save = () =>
     void saveRiyu(job, s).then(
       (fileName) => toast(`「${fileName}」を保存しました`),
@@ -398,16 +402,20 @@ export function RiyuEditor({job, data, update, onBack, tabs, batch}: {job: Job; 
         onBack={onBack}
         tabs={tabs}
         title={<JobTitle name={job.customer.trim() ? jobName(job) : '新しい理由書'} badge={insurer ? INSURER_INFO[insurer].name : undefined} />}
-        center={
+        primary={
           <>
             <Btn color="softGreen" onClick={save}>
               📗 理由書をExcelで保存
             </Btn>
-            {batch}
+            <Btn color="softSky" onClick={() => setPrinting(true)} disabled={!pages?.length}>
+              🖨 理由書を印刷
+            </Btn>
+            <RemoveJobButton job={job} settings={data.settings} update={update} onBack={onBack} />
           </>
         }
-        right={<RemoveJobButton job={job} settings={data.settings} update={update} onBack={onBack} />}
+        secondary={batch}
       />
+      {printing && pages && <ShinseiPrint pages={pages} title={riyuFileName(job).replace(/\.xlsx$/, '')} book="理由書" all onClose={closePrint} />}
 
 
       {/* 入れる所は申請書のタブより広く（文を書く欄が多い。ユーザーの指示「入力欄がやや狭い」2026-10-26） */}

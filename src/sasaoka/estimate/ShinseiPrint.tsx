@@ -17,10 +17,30 @@ const A4_PX = 210 * MM;
 
 const NO_MARKS = {} as ShinseiMarks;
 
-export function ShinseiPrint({pages, title, photos, plan, onClose}: {pages: PvPage[]; title: string; photos: PreviewPhotos; plan?: PreviewPlan; onClose: () => void}) {
+/**
+ * book は書類の名前（見出し・各ページの名前）。理由書のタブの印刷にも使う（ユーザーの指示「基本的な並びは、申請書をEXCELで保存、申請書（見積書を印刷）、削除」2026-10-28）。
+ * 理由書は2ページで1つの書類なので、初めから全部のページを印刷する（all）
+ */
+export function ShinseiPrint({
+  pages,
+  title,
+  photos,
+  plan,
+  onClose,
+  book = '申請書',
+  all = false,
+}: {
+  pages: PvPage[];
+  title: string;
+  photos?: PreviewPhotos;
+  plan?: PreviewPlan;
+  onClose: () => void;
+  book?: string;
+  all?: boolean;
+}) {
   const fit = () => Math.min(1, Math.max(0.3, (window.innerWidth - 16) / A4_PX));
   const [zoom, setZoom] = useState(fit);
-  const [picked, setPicked] = useState<Set<number>>(() => new Set([0]));
+  const [picked, setPicked] = useState<Set<number>>(() => new Set(all ? pages.map((_, i) => i) : [0]));
   useEffect(() => {
     // PDF に保存するときのファイル名の元になる（「山田花子様住宅改修申請書」。Excel と同じ）
     const before = document.title;
@@ -52,7 +72,7 @@ export function ShinseiPrint({pages, title, photos, plan, onClose}: {pages: PvPa
   return createPortal(
     <div className="print-overlay">
       <div className="print-toolbar">
-        <div className="text-sm font-bold">申請書（A4縦）</div>
+        <div className="text-sm font-bold">{book}（A4縦）</div>
         {pages.length > 1 && (
           <span role="group" aria-label="印刷するページ" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
             {pages.map((p, i) => (
@@ -77,8 +97,8 @@ export function ShinseiPrint({pages, title, photos, plan, onClose}: {pages: PvPa
           const pp = paper(p);
           const scale = Math.min(INNER.w / pp.width, INNER.h / pp.height);
           return (
-            <div key={p.sheet} className={`shinsei-sheet ${picked.has(i) ? '' : 'shinsei-skip'} ${i === last ? 'shinsei-last' : ''}`} aria-label={`申請書の印刷（${i + 1}枚目）`}>
-              <ShinseiPages pages={[p]} missing={{}} active={null} marks={NO_MARKS} label={() => ''} onOpen={() => undefined} onToggle={() => undefined} photos={photos} plan={plan} title="申請書" print fixedScale={scale} />
+            <div key={p.sheet} className={`shinsei-sheet ${picked.has(i) ? '' : 'shinsei-skip'} ${i === last ? 'shinsei-last' : ''}`} aria-label={`${book}の印刷（${i + 1}枚目）`}>
+              <ShinseiPages pages={[p]} missing={{}} active={null} marks={NO_MARKS} label={() => ''} onOpen={() => undefined} onToggle={() => undefined} photos={photos} plan={plan} title={book} print fixedScale={scale} />
             </div>
           );
         })}

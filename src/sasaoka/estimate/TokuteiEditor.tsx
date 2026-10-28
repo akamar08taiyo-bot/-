@@ -5,8 +5,9 @@ import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
 import {jobName} from '../calc.ts';
 import {CardFill} from '../components/CardReader.tsx';
-import {Btn} from '../components/ui.tsx';
-import {BackButton} from './JobHeader.tsx';
+import {Btn, btnClass} from '../components/ui.tsx';
+import {JobHeader, JobTitle} from './JobHeader.tsx';
+import {HACCHU_PATH} from '../order.ts';
 import {INSURER_INFO, jobInsurer} from '../estimateForms.ts';
 import {linkedTokutei, readTokuteiSales, TOKUTEI_SALES_KEY, tokuteiSalesMonth, withTokuteiSalesMonth} from '../salesPlan.ts';
 import type {TokuteiSale} from '../salesPlan.ts';
@@ -16,6 +17,10 @@ import type {Job, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
 
 const MIN_HEIGHT = 560;
+/** 特定福祉用具のアプリ（tokutei の SaleEditor.tsx）に頼めること。同じ名前を向こうでも使う */
+type TokuteiCmd = 'excel' | 'print' | 'delete' | 'catalog' | 'uriage' | 'hacchu';
+/** 販売受注簿作成ツール（特定福祉用具から開く口。tokutei の handoff.ts の hacchuUrl と同じ） */
+const HACCHU_URL = `${HACCHU_PATH}?from=tokutei`;
 const BOTTOM = 16; // 下の余白（main の py-4）
 const SLOW_MS = 10000; // これより長く中のアプリが出なければ「⟳ 読み込み直す」を出す
 
@@ -42,6 +47,7 @@ export function TokuteiEditor({
   view,
   onBack,
   tabs,
+  batch,
   update,
   settings,
 }: {
@@ -49,6 +55,7 @@ export function TokuteiEditor({
   view: TokuteiView;
   onBack: () => void;
   tabs: ReactNode;
+  batch?: ReactNode; // 📦 まとめて保存（3段目の初め。ほかのタブと同じ）
   update?: Update;
   settings?: Pick<Settings, 'tokuteiSalesMonths'>; // 販売見積書のタブの「売上月」（このアプリで変えた特定福祉用具の案件の月）
 }) {
@@ -128,19 +135,64 @@ export function TokuteiEditor({
     window.addEventListener(CATALOG_EVENT, send);
     return () => window.removeEventListener(CATALOG_EVENT, send);
   }, [ready]);
+  // 上の段のボタン（どのタブとも同じ JobHeader.tsx の形）を押したら、中のアプリ（SaleEditor.tsx の cmds）に頼む。中のアプリがまだ出ていなければ何もしない
+  const cmd = (c: TokuteiCmd): boolean => {
+    try {
+      const run = (frame.current?.contentWindow as (Window & {__taiyoTokuteiCmd?: (c: TokuteiCmd) => boolean}) | null | undefined)?.__taiyoTokuteiCmd;
+      return typeof run === 'function' ? run(c) === true : false;
+    } catch {
+      return false;
+    }
+  };
+  const book = view === 'shinsei' ? '申請書' : '見積書';
   return (
     <div className="space-y-3">
-      <div ref={head} className="flex flex-wrap items-center gap-2">
-        {/* ほかのタブと同じ大きさ（JobHeader.tsx。違うと、すぐ右のタブの位置がずれる） */}
-        <BackButton onClick={onBack} />
-        {tabs}
-        {/* 介護保険証から入れるは、ほかのタブと同じくタブのすぐ右 */}
-        {update && <CardFill job={job} setJob={setJob} />}
-        <h1 className="text-lg font-bold text-[#14532d]">{job.customer.trim() ? jobName(job) : view === 'shinsei' ? '新しい特定福祉用具申請書' : '新しい販売見積書'}</h1>
-        {insurer && <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-900">{INSURER_INFO[insurer].name}</span>}
-        {/* 売上月（工事見積書の「売上月」と同じ。仕入れの月は出さない＝ユーザーの指示「仕入れの月は不要」2026-10-28）。販売見積書のタブで、商品を入れた案件だけ。
-            画面だけの値で、中のアプリの見積書・申請書・Excel・印刷には出ない */}
-        {view === 'quote' && update && settings && linked.length > 0 && <TokuteiSalesMonth rows={linked} settings={settings} update={update} />}
+      <div ref={head}>
+        <JobHeader
+          onBack={onBack}
+          tabs={tabs}
+          // 介護保険証から入れるは、ほかのタブと同じくタブのすぐ右
+          extra={update && <CardFill job={job} setJob={setJob} />}
+          // お客様名がまだないときの名前は、ほかのタブ（新しい申請書・新しい見積書・新しい理由書）と同じ長さに（長いと2段目のボタンが右へずれ、タブごとに位置が変わる）
+          title={<JobTitle name={job.customer.trim() ? jobName(job) : view === 'shinsei' ? '新しい申請書' : '新しい見積書'} badge={insurer ? INSURER_INFO[insurer].name : undefined} />}
+          primary={
+            <>
+              <Btn color="softGreen" onClick={() => cmd('excel')}>
+                📗 {book}をExcelで保存
+              </Btn>
+              <Btn color="softSky" onClick={() => cmd('print')}>
+                🖨 {book}を印刷
+              </Btn>
+              {/* 削除は特定福祉用具の案件（申請書・販売見積書）を消す。消したあとは、この様邸の新しい案件が開く */}
+              <Btn color="white" onClick={() => cmd('delete')}>
+                削除
+              </Btn>
+            </>
+          }
+          secondary={
+            <>
+              {batch}
+              {view === 'shinsei' ? (
+                <Btn color="softSky" onClick={() => cmd('catalog')}>
+                  🖨 カタログを印刷
+                </Btn>
+              ) : (
+                <>
+                  <Btn color="white" onClick={() => cmd('uriage')}>
+                    🧾 売上伝票依頼書
+                  </Btn>
+                  {/* 販売受注簿作成ツールを新しいタブで開く。リンクなので、ポップアップを止める設定でも開く。開く前に中のアプリが商品を置く（置けなければ開かない） */}
+                  <a href={HACCHU_URL} target="_blank" onClick={(e) => cmd('hacchu') || e.preventDefault()} className={btnClass('white')}>
+                    📤 販売受注簿に転記
+                  </a>
+                  {/* 売上月（工事見積書の「売上月」と同じ。仕入れの月は出さない＝ユーザーの指示「仕入れの月は不要」2026-10-28）。商品を入れた案件だけ。
+                      画面だけの値で、中のアプリの見積書・申請書・Excel・印刷には出ない */}
+                  {update && settings && linked.length > 0 && <TokuteiSalesMonth rows={linked} settings={settings} update={update} />}
+                </>
+              )}
+            </>
+          }
+        />
       </div>
       <div className="relative">
         <iframe
@@ -173,7 +225,7 @@ function TokuteiSalesMonth({rows, settings, update}: {rows: TokuteiSale[]; setti
   const month = tokuteiSalesMonth(rows[0], settings);
   const apart = month !== rows[0].month;
   return (
-    <label className="inline-flex items-center gap-2 text-sm font-bold text-slate-600 sm:ml-2">
+    <label className="inline-flex items-center gap-2 text-sm font-bold text-slate-600">
       売上月
       <input
         type="month"

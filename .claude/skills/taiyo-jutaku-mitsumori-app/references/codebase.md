@@ -43,7 +43,8 @@ React 19 ＋ TypeScript ＋ Vite（Tailwind）。リポジトリにはほかの�
 `TokuteiEditor.tsx` は中のアプリが出たら（`ready`）`takeCatalog` を送る。
 2026-10-28：販売見積書のタブ（view=quote）だけ、名前・保険者の右に「売上月」（`TokuteiSalesMonth`。まとめ `taiyo-tokutei-sales-v1` にこの様邸の案件があるときだけ。storage のできごとで読み直す。
 直すと `Settings.tokuteiSalesMonths`）。上の段の高さが変わったら枠の高さも合わせる（ResizeObserver） |
-| `estimate/EstimateEditor.tsx` | 見積書のタブ（💾 保存・📗 Excel・🖨 印刷・📄 白紙に戻す・🛒 発注書を作成・保険者・担当・見積もり作成日・笹岡工務店の請求書に入れる・請求する月（`withBillMonth`）・売上月（`withSalesMonth`。ちがう月は薄い黄色））。`setJob` で `startEstimate` を通す |
+| `estimate/JobHeader.tsx` | 様邸の画面の5つのタブに共通の上の段（`JobHeader`：1段目＝← 一覧へ戻る・タブ・extra、2段目＝名前（左）と `primary`＝〇〇をExcelで保存・〇〇を印刷・削除、3段目＝`secondary`＝まとめて保存とタブごとの機能。2段目・3段目はタブのまん中にそろえる＝`shift`）、`RemoveJobButton`（ゴミ箱へ）・`JobTitle`・`BackButton` |
+| `estimate/EstimateEditor.tsx` | 見積書のタブ（📗 見積書をExcelで保存・🖨 見積書を印刷・削除／💾 保存・🧾 売上伝票依頼書・🛒 発注書を作成・複製（上の段は `JobHeader.tsx`）・保険者・担当・見積もり作成日・笹岡工務店の請求書に入れる・請求する月（`withBillMonth`）・売上月（`withSalesMonth`。ちがう月は薄い黄色））。`setJob` で `startEstimate` を通す |
 | `estimate/ShinseiPrint.tsx` | 住宅改修申請書の印刷（2026-10-26）：プレビューと同じページ（`ShinseiPages` の `print`・`fixedScale`）を1ページずつ `.shinsei-sheet`（高さ 270mm・overflow hidden）に。初めは1枚目だけ・チェックで足す。開いているあいだ `<html class="shinsei-printing">`（#root を印刷しない）・document.title＝「○○様住宅改修申請書」 |
 | `components/BatchSave.tsx` | 📦 まとめて保存（4つの書類のうちチェックしたものだけ。選んだものは覚える。何も入っていない書類は外して押せない＝`why`）。保存の前に `onBeforeSave`（特定福祉用具の保存と、この様邸の保存を待つ） |
 | `shinsei.ts` | 申請書：保険者ごとの転記する欄（`SHINSEI`。シートごとに 氏名・住所・番号の10マス・改修の内容・改修の種類の行・写真の改修箇所・平面図の表題・丸で囲む欄 `marks`・申請書の画面の項目の欄と書き方 `texts`）、改修費用（`shinseiCost`。苅田町・行橋市は見積書の合計、みやこ町・広域連合は介護保険対象分＝`costIsTotal`）、改修の内容の文（`workText`・`Place.shinseiText`。箇所ごとの行と手で直した文は `workItems`＝`Place.shinseiLine`）、転記する内容（`shinseiValues`。写真番号の改修の種類 `photoKinds`・撮影日 `photoDates` も）、原本のセルを書きかえる（`setCell`・`fillShinsei`＝開いて `fillFiles`→zip。式の答えも `updateRefs`。②〜⑥の行の折り返し `wrapKinds`。行が多い改修の内容の欄の文字を小さくする `fitLines`／`fitCell`／`fitLinesSize`（小さい文字の書式を styles.xml に足す `sizedStyle`）。苅田町の写真の用紙の□と撮影日 `photoBoxes`（`checkBoxes`・`boxLabels`・`placeBox`）。みやこ町・広域連合の写真貼付用紙の改修の種別の丸 `drawKindCircle`（`photoPlace.kindCircles`。原本の丸は消して、その写真番号の改修の種類に楕円。置き場所の画素は `anchorRect`）。丸の楕円 `drawMarks`・`markBox`（文字の位置は `textLayout`。プレビュー用に `markTexts`・`markOptions`）・図形のファイルを足す `drawingOf`・平面図の工事内容のテキストボックス `drawLegend`（`legend.box`。みやこ町は欄 `legend.cell`）・写真貼付用紙の写真 `drawPhotos`（`photoPlace` の枠を `photoNoteLayout` で写真の所と書く所に分け、写真の所に `photoPlacement`＝向き・大きさ `PhotoEdit` も。回す前の四角を置いて `<a:xfrm rot>` で回す。置き場所の from・to は `anchorBox`＝45〜135°・225〜315° は縦横を入れかえた四角（Excel の決まり）。`xl/media` の JPEG・図形のファイルの関係・`[Content_Types]` の jpeg。改修前の枠の書く所には写真に書く内容 `photoNoteLines` のテキストボックス `noteBoxXml`＝名前「改修前の説明」・文字の大きさ `photoNotePt`・字体は `<xdr:style>` のテーマの字体（改修後の枠は写真を枠いっぱい）。`photoImages` を渡したとき＝Excel で保存のときだけ）・写真番号の用紙 `photoSheets`・範囲の位置 `rangeBox`）、読む（`readShinsei`・`parseWorkLine`） |
@@ -120,7 +121,7 @@ React 19 ＋ TypeScript ＋ Vite（Tailwind）。リポジトリにはほかの�
   見積書の外での変更（部材リストから入れる・保険者・担当・請求書に入れる）も `useLayoutEffect` で見分けて積む（戻すのは Job の全体なので、積まないと Ctrl+Z でそれらまで消える）。
   自分の変更は、保存で `updatedAt` だけが付いて戻ってくるので `sameJob` で除く。続けての変更（打ち込み）は1秒以内なら1回にまとめる。
   Ctrl+Z／Y は欄を選んでいなくても `window` の keydown で効く（文字を打つ欄・ダイアログ・印刷の画面の中では効かない）。ボタンは置かない（ユーザーの指示）。
-- 白紙に戻す（`estimate/EstimateEditor.tsx` の `clearSheet`。ボタンは「🖨 見積書を印刷」の横）：`confirm` で確かめてから customer・insuredNo・address・places・overhead・
+- 白紙に戻す（**2026-10-28 に画面から外した**。中身の `sheetEdit.ts` の `clearedSheet` は残してある。下は外す前の作り。`estimate/EstimateEditor.tsx` の `clearSheet`。ボタンは「🖨 見積書を印刷」の横）：`confirm` で確かめてから customer・insuredNo・address・places・overhead・
   overheadTarget・order を空にする。保険者と書式は `jobInsurer`／`jobForm` の値で固定して残す（住所から決まっていた古い見積書でも書式が変わらないように）。
   見積書の外での変更なので、上のしくみで Ctrl+Z で戻せる。選んでいた欄がなくなったら、選択の枠の `useLayoutEffect` でお客様名の欄を選び直す（すぐ打ち込める）。
 - **行の左のボタンを足すときの決まり**：

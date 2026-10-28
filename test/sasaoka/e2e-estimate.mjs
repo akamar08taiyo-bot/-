@@ -201,7 +201,7 @@ const download = async (click, save) => {
   const files = unzipSync(new Uint8Array(await readFile(await dl.path())));
   return {name: dl.suggestedFilename(), sheet: strFromU8(files['xl/worksheets/sheet1.xml'])};
 };
-const yx = await download(() => page.getByRole('button', {name: '📗 Excelで保存'}).click());
+const yx = await download(() => page.getByRole('button', {name: '📗 見積書をExcelで保存'}).click());
 assert.equal(yx.name, '（サンプル）山田様住宅改修見積書.xlsx');
 for (const t of ['（サンプル）山田', '介護保険被保険者番号（0000366989）', '1200mm÷4000mm＝0.3', '<f>ROUNDDOWN(D9*F9,0)</f><v>4800</v>', '<v>49260</v>', '<v>59600</v>', '令和']) {
   assert.ok(yx.sheet.includes(t), `Excel に「${t}」がない`);
@@ -410,27 +410,14 @@ assert.ok(settings.includes('自社の情報（請求書の発行元・見積書
 assert.ok(settings.includes('請求先（工務店）の名前') && settings.includes('③部材上乗せ・④諸経費の率'), settings);
 log('設定OK');
 
-// ---------------- 苅田町・行橋市・みやこ町用で「📄 白紙に戻す」：明細もお客様名も消え、お客様名の欄が選ばれてそのまま打ち込める。Ctrl+Z で戻る
+// ---------------- 「📄 白紙に戻す」は外した（ユーザーの指示「基本的な並びは…削除（白紙に戻すは不要）」2026-10-28）
 await page.getByRole('navigation').getByRole('button', {name: /見積もり・申請書を作成する/}).click();
 const sampleCell = page.getByRole('cell', {name: /（サンプル）山田様邸/});
 await Promise.race([sheet.waitFor(), sampleCell.waitFor()]); // 開いていた見積書に戻るか、一覧
 if ((await sheet.count()) === 0) await sampleCell.click();
 await sheet.waitFor();
-assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '（サンプル）山田様邸');
-await page.getByRole('combobox', {name: '保険者'}).selectOption('yukuhashi'); // 上で広域連合用にしたので戻す（お客様名の欄は苅田町・行橋市・みやこ町用の見積書にある）
-const filled = await sheet.locator('.form-page tr[data-rows]').count();
-await cell(await sheet.locator('.form-page tr', {hasText: 'ブラケット'}).first().locator('[data-edit$=":qty"]').first().getAttribute('data-edit')).click();
-await page.getByRole('button', {name: '📄 白紙に戻す'}).click(); // 確かめのダイアログは「OK」
-assert.equal(await sheet.locator('.form-page tr[data-rows]').count(), 0);
-assert.equal(await sheet.locator('textarea.sheet-input').getAttribute('aria-label'), 'お客様名');
-await page.keyboard.type('白紙 次郎');
-await page.keyboard.press('Enter');
-assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '白紙 次郎様邸');
-await page.keyboard.press('ControlOrMeta+z'); // お客様名を戻す
-await page.keyboard.press('ControlOrMeta+z'); // 白紙に戻す前に戻す
-assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '（サンプル）山田様邸');
-assert.equal(await sheet.locator('.form-page tr[data-rows]').count(), filled);
-log('白紙に戻す（お客様名の欄から打ち込める・Ctrl+Z で戻る）OK');
+assert.equal(await page.getByRole('button', {name: '📄 白紙に戻す'}).count(), 0);
+log('白紙に戻すはない OK');
 
 // ---------------- iPhone で見積書の欄を押しても画面が拡大されない（viewport に maximum-scale=1。iPhone・iPad だけ）
 const iphone = await browser.newContext({viewport: {width: 390, height: 844}, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1', isMobile: true, hasTouch: true, locale: 'ja-JP'});

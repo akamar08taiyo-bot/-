@@ -9,9 +9,9 @@
 
 import {Fragment, useDeferredValue, useEffect, useMemo, useRef, useState} from 'react';
 import type {InputHTMLAttributes, KeyboardEvent, ReactNode} from 'react';
-import {hasEstimateRows, isBlankRow, jobName} from '../calc.ts';
+import {isBlankRow, jobName} from '../calc.ts';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
-import {circled, eraOf, INSURER_IDS, INSURER_INFO, insurerForAddress, isBlankShinsei, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, photoNumbers} from '../estimateForms.ts';
+import {circled, eraOf, INSURER_IDS, INSURER_INFO, insurerForAddress, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, photoNumbers} from '../estimateForms.ts';
 import {placeFromDims, withBrackets} from '../cutLink.ts';
 import {manualRow, newPlace} from '../rows.ts';
 import {usePhotoUrls} from '../photos.ts';
@@ -30,7 +30,6 @@ import {canMakeShinsei, saveShinsei, useTemplate} from './shinseiFiles.ts';
 import {ShinseiPages} from './ShinseiPreview.tsx';
 import type {PreviewPhotos, PreviewPlan} from './ShinseiPreview.tsx';
 import {ShinseiPrint} from './ShinseiPrint.tsx';
-import {clearedSheet} from '../sheetEdit.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {CardFill} from '../components/CardReader.tsx';
 import {JobHeader, JobTitle, RemoveJobButton} from './JobHeader.tsx';
@@ -234,41 +233,7 @@ export function ShinseiEditor({
   };
   // 申請書の印刷（ShinseiPrint.tsx。プレビューと同じページを A4 に）
   const [printing, setPrinting] = useState(false);
-  // 白紙に戻す（ユーザーの指示「白紙に戻すボタンをつける」2026-10-26）：工事見積書の「📄 白紙に戻す」と同じ clearedSheet（同じ様邸なので、
-  // お客様のこと・改修の内容・写真の番号・平面図・理由書、見積書の明細も消える。保険者・担当・請求書に入れるかは残す）。いきなり消えると困るので確かめてから。
-  // 消したあと、字を打つ欄の外で Ctrl+Z を押すと元に戻る（白紙のまま何も打っていないあいだだけ）
-  const beforeBlank = useRef<Job | null>(null);
-  const blank = isBlankShinsei(job) && !job.riyu;
-  const clearAll = () => {
-    const more = hasEstimateRows(job) ? '\n同じ様邸の工事見積書の明細も消えます。' : '';
-    if (!confirm(`申請書を白紙に戻しますか？\n打ち込んだ内容（お客様の情報・改修の内容・写真など）がすべて消えます。${more}`)) return;
-    beforeBlank.current = job;
-    setJob((j) => clearedSheet(j, s));
-    toast('白紙に戻しました');
-  };
-  useEffect(() => {
-    if (!blank) beforeBlank.current = null; // 白紙のあとに打ちはじめたら、戻すのはやめる（打った分が消えないように）
-  }, [blank]);
-  const undoBlank = useRef<() => boolean>(() => false);
-  undoBlank.current = () => {
-    const prev = beforeBlank.current;
-    if (!prev) return false;
-    beforeBlank.current = null;
-    setJob(() => prev);
-    toast('元に戻しました');
-    return true;
-  };
-  useEffect(() => {
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.defaultPrevented || !(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.isComposing || e.key.toLowerCase() !== 'z') return;
-      const t = e.target instanceof HTMLElement ? e.target : null;
-      if (t?.closest('textarea, input, select, [contenteditable="true"]')) return;
-      if (document.querySelector('[role="dialog"], .print-overlay')) return;
-      if (undoBlank.current()) e.preventDefault();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  // 白紙に戻すは外した（ユーザーの指示「削除（白紙に戻すは不要）」2026-10-28。前は 2026-10-26 から上の段の右にあった）
 
   const save = () => {
     if (!insurer) return;
@@ -461,36 +426,25 @@ export function ShinseiEditor({
 
   return (
     <div className="space-y-3">
-      {/* 上の2段（一覧へ戻る・タブ・介護保険証から入れる／名前・Excel・まとめて保存・印刷・白紙に戻す）はどのタブでも同じ形（JobHeader.tsx） */}
+      {/* 上の段（一覧へ戻る・タブ・介護保険証から入れる／名前・Excelで保存・印刷・削除／まとめて保存）はどのタブでも同じ形（JobHeader.tsx） */}
       <JobHeader
         onBack={onBack}
         tabs={tabs}
         extra={<CardFill job={job} setJob={setJob} staffList={s.staffList} />}
         title={<JobTitle name={job.customer.trim() ? jobName(job) : '新しい申請書'} badge={insurer ? INSURER_INFO[insurer].name : undefined} />}
-        // 申請書を保存・まとめて保存・印刷を並べる（ユーザーの指示「申請書を保存、まとめて保存、印刷ボタンを並びで表示する」2026-10-26）
-        center={
+        // 2段目は Excelで保存・印刷・削除、3段目はまとめて保存（どのタブも同じ並び。JobHeader.tsx）。保険者を選ぶまで（原本がないので）Excel・印刷は押せない
+        primary={
           <>
-            {canMakeShinsei(insurer) && (
-              <Btn color="softGreen" onClick={save}>
-                📗 申請書をExcelで保存
-              </Btn>
-            )}
-            {batch}
-            {canMakeShinsei(insurer) && (
-              <Btn color="softSky" onClick={() => setPrinting(true)} disabled={!pages?.length}>
-                🖨 申請書を印刷
-              </Btn>
-            )}
-          </>
-        }
-        right={
-          <>
-            <Btn color="white" onClick={clearAll} disabled={blank}>
-              📄 白紙に戻す
+            <Btn color="softGreen" onClick={save} disabled={!canMakeShinsei(insurer)}>
+              📗 申請書をExcelで保存
+            </Btn>
+            <Btn color="softSky" onClick={() => setPrinting(true)} disabled={!canMakeShinsei(insurer) || !pages?.length}>
+              🖨 申請書を印刷
             </Btn>
             <RemoveJobButton job={job} settings={s} update={update} onBack={onBack} />
           </>
         }
+        secondary={batch}
       />
       {printing && pages && map && (
         <ShinseiPrint pages={pages} title={shinseiFileName(map, job, estimateDateOf(job)).replace(/\.xlsx$/, '')} photos={previewPhotos} plan={previewPlan} onClose={() => setPrinting(false)} />

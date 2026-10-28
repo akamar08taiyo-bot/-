@@ -602,35 +602,14 @@ await midRow().first().waitFor();
 assert.ok((await tds('BD-134')).join('|').includes('2400mm÷4000mm＝0.6'), (await tds('BD-134')).join('|'));
 log('中間のブラケット：2400mm → BD-01G 2個・900mm で外す・Ctrl+Z で戻る OK');
 
-// ---------------- 「📄 白紙に戻す」（印刷の横）：確かめてから、見積書に打ち込んだ内容を全部消す。やめれば何も消えない。
-// 保険者（書式）・担当は残す。Ctrl+Z で戻せる
-const headButtons = (await page.locator('main button').allInnerTexts()).map((t) => t.trim());
-// 印刷のすぐ右は右のかたまりの「🧾 売上伝票依頼書」（2026-10-27。売上伝票発行依頼書。「売上伝票ではなく、売上伝票を依頼書に変更」）、その次が「📄 白紙に戻す」
-assert.deepEqual(headButtons.slice(headButtons.indexOf('🖨 見積書を印刷') + 1, headButtons.indexOf('🖨 見積書を印刷') + 3), ['🧾 売上伝票依頼書', '📄 白紙に戻す'], headButtons.slice(0, 12).join('|'));
-const clearBtn = page.getByRole('button', {name: '📄 白紙に戻す'});
-page.removeAllListeners('dialog');
-let asked = '';
-let answer = false;
-page.on('dialog', (d) => {
-  asked = d.message();
-  void (answer ? d.accept() : d.dismiss());
-});
-const rowsBefore = await lines();
-await clearBtn.click();
-assert.match(asked, /白紙に戻しますか/);
-assert.equal(await lines(), rowsBefore); // 「キャンセル」なら消えない
-answer = true;
-await clearBtn.click();
-assert.equal(await lines(), 0);
-assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '新しい見積書');
-assert.equal(await insurer.inputValue(), 'kouiki');
-assert.equal(await staffSelect.inputValue(), '土居 翔太');
-assert.ok(await clearBtn.isDisabled()); // もう白紙
-await page.locator('header').first().click({position: {x: 4, y: 4}});
-await undoKey();
-assert.equal(await lines(), rowsBefore);
-assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '見本 太郎様邸');
-log('白紙に戻す（確かめる・やめる・Ctrl+Z で戻す）OK');
+// ---------------- 上の段：見積書をExcelで保存・見積書を印刷・削除、その真下に まとめて保存・保存・売上伝票依頼書・発注書・複製。白紙に戻すはない
+// （ユーザーの指示「基本的な並びは、申請書をEXCELで保存、申請書（見積書を印刷）、削除（白紙に戻すは不要） それ以外の独自の機能…は行を変えて、真下に統一して設置する」2026-10-28）
+const row1 = (await page.getByRole('group', {name: '保存・印刷・削除'}).getByRole('button').allInnerTexts()).map((t) => t.trim());
+const row2 = (await page.getByRole('group', {name: 'そのほかの機能'}).getByRole('button').allInnerTexts()).map((t) => t.trim());
+assert.deepEqual(row1, ['📗 見積書をExcelで保存', '🖨 見積書を印刷', '削除']);
+assert.deepEqual(row2, ['📦 まとめて保存', '💾 保存', '🧾 売上伝票依頼書', '🛒 発注書を作成', '複製']);
+assert.equal(await page.getByRole('button', {name: '📄 白紙に戻す'}).count(), 0);
+log('上の段の並び（Excel・印刷・削除／真下にまとめて保存など）・白紙に戻すはない OK');
 
 console.log('\nERRORS:', errors.length ? errors : 'なし');
 await browser.close();

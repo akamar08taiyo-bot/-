@@ -5,10 +5,8 @@ import type {Job, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {removeEstimate} from './EstimateList.tsx';
 
-/** 様邸の名前と、まん中のボタン（保存・Excel・印刷）のあいだに、少なくともあける幅（px） */
+/** 様邸の名前と、2段目のボタン（Excelで保存・印刷・削除）のあいだに、少なくともあける幅（px） */
 const MIN_GAP = 16;
-/** 2段目の gap-2（px）。まん中のボタンの左の余白は、この分を引いて付ける */
-const ROW_GAP = 8;
 
 /** 様邸の画面の「← 一覧へ戻る」。どのタブでも同じ大きさにする（大きさが違うと、すぐ右のタブの位置がタブごとにずれる） */
 export function BackButton({onClick}: {onClick: () => void}) {
@@ -33,71 +31,82 @@ export function RemoveJobButton({job, settings, update, onBack}: {job: Job; sett
 }
 
 /**
- * 様邸の画面（住宅改修申請書・工事見積書・理由書のタブ）の上の2段。どのタブでも同じ形・同じ位置にする。
- * 1段目：← 一覧へ戻る・様邸のタブ・介護保険証から入れる（extra。タブのすぐ右。ユーザーの指示「上のタブの近辺に」）。
- * 2段目：様邸の名前（title）・保存／Excel／印刷（center）・白紙に戻すなど（right。右に寄せる）。
- * center は上のタブのまん中にそろえる（ユーザーの指示「少し左にずらして、上のタブとあわせるか中央揃えにする」2026-10-27。
- * その前は画面のまん中「Excelの印刷、保存ボタンを中央にもってくる」2026-10-22）。名前が長くて重なるときは、名前のすぐ右。
- * タブ・名前・まん中のボタンは少し大きく（「このタブの部分をもう少し大きくする」2026-10-27。右のボタンは今までどおり）。
- * 狭い画面（lg 未満）は今までどおり：center だけの行にして、その行のまん中に。
+ * 様邸の画面（5つのタブ：住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書）の上の段。どのタブでも同じ形・同じ位置・同じ大きさ・同じ色
+ * （ユーザーの指示「各タブでEXCEL印刷や保存など、表記の方法やタブの大きさ、順番を統一する。…基本的な並びは、申請書をEXCELで保存、申請書（見積書を印刷）、削除（白紙に戻すは不要）
+ * それ以外の独自の機能（例えば、売上伝票発行依頼書や発注書を作成、カタログを印刷など）は行を変えて、真下に統一して設置する。タブを切り替えても、位置や大きさ、色などは変えない、
+ * 同じ機能であればボタンの名前も変えない）行の位置も変えない（基本的に中央揃え）」2026-10-28）。
+ * 1段目：← 一覧へ戻る・様邸のタブ・介護保険証から入れる（extra。タブのすぐ右）。
+ * 2段目：様邸の名前（title。左）と、上のタブのまん中にそろえた「〇〇をExcelで保存・〇〇を印刷・削除」（primary。どのタブも同じ幅＝書類の名前はどれも3字）。
+ * 3段目：その真下に、まとめて保存とタブごとの機能（secondary。同じまん中にそろえる）。名前は2段目の高さだけを使うので、3段目は名前の下まで広げてよい。
+ * 名前が長くて2段目に重なるときは、2段目・3段目とも名前の右へずらす（まん中は2段目・3段目で同じ）。
+ * 狭い画面（lg 未満）は、名前・2段目・3段目をそれぞれ1行にして、行のまん中に。extra はその下（どのタブでもボタンの段の高さを変えない）。
  */
 export function JobHeader({
   onBack,
   tabs,
   extra,
   title,
-  center,
-  right,
+  primary,
+  secondary,
 }: {
   onBack: () => void;
   tabs: ReactNode;
   extra?: ReactNode;
   title: ReactNode;
-  center?: ReactNode;
-  right?: ReactNode;
+  primary: ReactNode;
+  secondary?: ReactNode;
 }) {
   const top = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLDivElement>(null);
   const name = useRef<HTMLDivElement>(null);
-  const mid = useRef<HTMLDivElement>(null);
-  // まん中のボタンの左の余白（px）。null は狭い画面（行のまん中に置く）
-  const [shift, setShift] = useState<number | null>(null);
+  const row1 = useRef<HTMLDivElement>(null);
+  const row2 = useRef<HTMLDivElement>(null);
+  // 2段目・3段目の左の余白（px）。null は狭い画面（行のまん中に置く）
+  const [shift, setShift] = useState<{a: number; b: number} | null>(null);
   useLayoutEffect(() => {
     const tablist = top.current?.querySelector<HTMLElement>('[role="tablist"]');
     const place = () => {
-      if (!tablist || !name.current || !mid.current || !window.matchMedia('(min-width: 1024px)').matches) {
+      if (!tablist || !box.current || !name.current || !row1.current || !window.matchMedia('(min-width: 1024px)').matches) {
         setShift(null);
         return;
       }
+      const left = box.current.getBoundingClientRect().left;
       const t = tablist.getBoundingClientRect();
-      const m = mid.current.getBoundingClientRect();
       const n = name.current.getBoundingClientRect();
-      // ボタンのまん中をタブのまん中に。名前の右からの距離にして、MIN_GAP より近くしない
-      setShift(Math.max(MIN_GAP, Math.round(t.left + t.width / 2 - m.width / 2 - n.right)) - ROW_GAP);
+      const w1 = row1.current.getBoundingClientRect().width;
+      const w2 = row2.current?.getBoundingClientRect().width ?? 0;
+      // まん中はタブのまん中。2段目が名前に MIN_GAP より近づくなら右へ
+      const center = Math.max(t.left + t.width / 2, n.right + MIN_GAP + w1 / 2) - left;
+      setShift({a: Math.round(center - w1 / 2), b: Math.max(0, Math.round(center - w2 / 2))});
     };
     place();
-    // 画面の幅・タブの大きさ・名前（打ち込むと変わる）・ボタンの数が変わったら置き直す
+    // 画面の幅（box の幅）・タブの大きさ・名前（打ち込むと変わる）・ボタンの数が変わったら置き直す
     const ro = new ResizeObserver(place);
-    for (const el of [top.current, tablist, name.current, mid.current]) if (el) ro.observe(el);
+    for (const el of [box.current, tablist, name.current, row1.current, row2.current]) if (el) ro.observe(el);
     return () => ro.disconnect();
-  }, [!!center]);
+  }, [!!secondary]);
+  // まとめて保存の確かめる画面（Modal）のボタンまで大きくしないよう、すぐ下のボタンだけ
+  const row = 'flex flex-wrap items-center gap-2 lg:w-max lg:flex-nowrap lg:[&>*]:!text-base max-lg:justify-center';
+  // 1つの折り返す箱に、1段目（← 一覧へ戻る・タブ・extra）と、2段目より下（box。いつも1行まるごと）を入れる。
+  // 狭い画面は extra（介護保険証の欄。タブによって出したり出さなかったりする）を最後に回す：前はタブの下に入って、その分だけボタンの段が
+  // タブごとに上下にずれた（「タブを切り替えても、位置や大きさ、色などは変えない」）
   return (
-    <div className="space-y-2">
-      <div ref={top} className="flex flex-wrap items-center gap-2">
-        <BackButton onClick={onBack} />
-        {tabs}
-        {extra}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <div ref={name} className="flex flex-wrap items-center gap-2">
+    <div ref={top} className="flex flex-wrap items-center gap-2">
+      <BackButton onClick={onBack} />
+      {tabs}
+      {extra && <div className="max-lg:order-last">{extra}</div>}
+      <div ref={box} className="relative w-full space-y-2">
+        <div ref={name} className="flex flex-wrap items-center gap-2 max-lg:justify-center lg:absolute lg:left-0 lg:top-0 lg:h-[2.625rem] lg:w-max">
           {title}
         </div>
-        {center && (
-          // まとめて保存の確かめる画面（Modal）のボタンまで大きくしないよう、すぐ下のボタンだけ
-          <div ref={mid} className="flex flex-wrap justify-center gap-2 max-lg:basis-full lg:[&>button]:!text-base" style={shift === null ? undefined : {marginLeft: shift}}>
-            {center}
+        <div ref={row1} role="group" aria-label="保存・印刷・削除" className={row} style={shift ? {marginLeft: shift.a} : undefined}>
+          {primary}
+        </div>
+        {secondary && (
+          <div ref={row2} role="group" aria-label="そのほかの機能" className={row} style={shift ? {marginLeft: shift.b} : undefined}>
+            {secondary}
           </div>
         )}
-        {right && <div className="flex flex-wrap justify-end gap-2 lg:ml-auto">{right}</div>}
       </div>
     </div>
   );

@@ -15,7 +15,6 @@ import {addMaterial, insertRowsAt, newPlace as makePlace, removeOneMaterial} fro
 import {jutakuSalesMonth, withBillMonth, withSalesMonth} from '../salesPlan.ts';
 import type {AppData, Insurer, Job, Kit, Material, NameSuffix, Place} from '../types.ts';
 import type {Update} from '../useStore.ts';
-import {clearedSheet} from '../sheetEdit.ts';
 import {staffFull, thisMonth, todayIso} from '../util.ts';
 import {duplicateEstimate, saveEstimateExcel} from './EstimateList.tsx';
 import {UriageDialog} from './UriageDialog.tsx';
@@ -118,13 +117,7 @@ export function EstimateEditor({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-  // 白紙に戻す（`clearedSheet`）。いきなり消えると困るので確かめてから（消したあとも Ctrl+Z で戻せる）
-  const blank = !job.customer.trim() && !job.insuredNo.trim() && !job.address.trim() && job.places.length === 0 && job.overhead === null && job.overheadTarget === null;
-  const clearSheet = () => {
-    if (!confirm('見積書を白紙に戻しますか？\n打ち込んだ内容（お客様名・工事場所・明細など）がすべて消えます。')) return;
-    setJob((j) => clearedSheet(j, s));
-    toast('白紙に戻しました');
-  };
+  // 白紙に戻すは外した（ユーザーの指示「削除（白紙に戻すは不要）」2026-10-28）
   const duplicate = () => onOpen(duplicateEstimate(job, update, toast).id);
 
   const toggleFavorite = (id: string) => update('materials', (list) => list.map((m) => (m.id === id ? {...m, favorite: !m.favorite} : m)));
@@ -248,38 +241,35 @@ export function EstimateEditor({
 
   return (
     <div className="space-y-3">
-      {/* 上の2段はどのタブでも同じ形（JobHeader.tsx）。保存・Excel・印刷は上のタブのまん中、白紙に戻す・発注書・複製・削除は右
-          （複製は一度外したが「やはり残してください」2026-10-26 で戻した）。
+      {/* 上の段はどのタブでも同じ形（JobHeader.tsx）：2段目は 見積書をExcelで保存・見積書を印刷・削除、3段目は まとめて保存・保存・売上伝票依頼書・発注書を作成・複製
+          （ユーザーの指示「基本的な並びは、申請書をEXCELで保存、申請書（見積書を印刷）、削除（白紙に戻すは不要）それ以外の独自の機能（例えば、売上伝票発行依頼書や
+          発注書を作成、カタログを印刷など）は行を変えて、真下に統一して設置する」2026-10-28）。複製は一度外したが「やはり残してください」2026-10-26 で戻した。
           名前の横は保険者だけ（「苅田町「工事費見積書兼工事費内訳書」」の書式の名前は「この部分の説明は不要」2026-10-27）。
           介護保険証・介護ソフトの画面の欄とカタログのボタン（CardFill）は出さない（ユーザーの指示「工事費見積書作成のときは、このカタログ部分や介護保険証貼り付け部分は不要なのでなくす」2026-10-27） */}
       <JobHeader
         onBack={onBack}
         tabs={tabs}
         title={<JobTitle name={name} badge={insurer ? INSURER_INFO[insurer].name : FORM_INFO[form].name} />}
-        center={
+        primary={
           <>
-            <Btn color="softBlue" onClick={save}>
-              💾 保存
-            </Btn>
             <Btn color="softGreen" onClick={() => saveEstimateExcel(job, s, toast)}>
-              📗 Excelで保存
+              📗 見積書をExcelで保存
             </Btn>
-            {batch}
             <Btn color="softSky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
               🖨 見積書を印刷
             </Btn>
+            <RemoveJobButton job={job} settings={s} update={update} onBack={onBack} />
           </>
         }
-        right={
+        secondary={
           <>
-            {/* 売上伝票発行依頼書（ユーザーと決めたこと「見積書のタブの上の段」2026-10-27。足りない所は窓で入れてから開く。UriageDialog.tsx）。
-                まん中のかたまり（保存・Excel・印刷）に入れると幅が広がり、上のタブのまん中にそろえられなくなるので、右のかたまりの先頭。
-                名前は「売上伝票依頼書」（ユーザーの指示「売上伝票ではなく、売上伝票を依頼書に変更」2026-10-27） */}
+            {batch}
+            <Btn color="softBlue" onClick={save}>
+              💾 保存
+            </Btn>
+            {/* 売上伝票発行依頼書（足りない所は窓で入れてから開く。UriageDialog.tsx）。名前は「売上伝票依頼書」（ユーザーの指示「売上伝票ではなく、売上伝票を依頼書に変更」2026-10-27） */}
             <Btn color="white" onClick={() => setUriageOpen(true)}>
               🧾 売上伝票依頼書
-            </Btn>
-            <Btn color="white" onClick={clearSheet} disabled={blank}>
-              📄 白紙に戻す
             </Btn>
             <Btn color="white" onClick={onOpenOrder} disabled={!estimated} title={estimated ? undefined : '見積書に部材を入れると作れます'}>
               🛒 発注書を作成
@@ -287,7 +277,6 @@ export function EstimateEditor({
             <Btn color="white" onClick={duplicate}>
               複製
             </Btn>
-            <RemoveJobButton job={job} settings={s} update={update} onBack={onBack} />
           </>
         }
       />

@@ -358,16 +358,9 @@ export default function App({start}: {start: MainTab}) {
     setJobView(j && !j.estDate && !hasEstimateRows(j) ? 'shinsei' : 'estimate');
   };
   // 「📦 まとめて保存」（どのタブからも同じ。BatchSave.tsx）。保存の前に、開いている特定福祉用具のタブの変更と、この様邸の変更を保存させる。
-  // 住宅改修申請書・工事見積書・理由書のタブは、上の段のまん中の Excel で保存・印刷と並べる（ユーザーの指示「申請書を保存、まとめて保存、印刷ボタンを並びで表示する」2026-10-26）。
-  // 特定福祉用具の2つのタブ（中は別のアプリ）は、今までどおりタブの段の最後（order-last。タブのすぐ右は「🪪 介護保険証・介護ソフトの画面」のまま）
+  // 5つのタブとも、上の段（JobHeader.tsx）の3段目の初め（「〇〇をExcelで保存・〇〇を印刷・削除」の真下。ユーザーの指示「…それ以外の独自の機能…は行を変えて、真下に統一して設置する」2026-10-28）
   const batch = estimateJob && <BatchSave job={estimateJob} s={data.settings} onBeforeSave={() => Promise.all([flushTokutei(), store.flush()])} />;
   const tabs = <JobTabs view={jobView} onView={(v) => leaveTokutei(() => setJobView(v))} />;
-  const tabsWithBatch = (
-    <>
-      {tabs}
-      {batch && <div className="order-last">{batch}</div>}
-    </>
-  );
   // 見積書と請求書（仕切り計算表）を行き来する（同じ様邸を開く）
   const openEstimate = (id: string) => {
     setEstimateId(id);
@@ -491,7 +484,8 @@ export default function App({start}: {start: MainTab}) {
                     setJobView('estimate');
                   })
                 }
-                tabs={tabsWithBatch}
+                tabs={tabs}
+                batch={batch}
               />
             ) : estimateJob && jobView === 'riyu' ? (
               <RiyuEditor
