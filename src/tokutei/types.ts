@@ -139,6 +139,7 @@ export type Settings = {
   delivery: string; // 見積書の「納期」
   remarks: string; // 見積書の備考（はじめの文）
   rev: number; // 設定の版（古い版で保存した設定を読み込むときの直し方に使う）
+  hiddenSuggest?: string[]; // 居宅介護支援事業所・ケアマネジャーの候補（▼のリスト）から消した値（Suggest.tsx。前の案件の値はそのまま）
 };
 
 export type AppData = {

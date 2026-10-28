@@ -163,6 +163,17 @@ export function SaleEditor({
       change({address, zip: hits[0].zip});
     } else change({address});
   };
+  // 住所だけ入っていて郵便番号が空なら、住所から1つに決まる番号を入れる（住宅改修から受け取った住所・前から入っている住所も。
+  // ユーザーの指示「住所のみ入力した場合、逆に郵便番号を自動で入力される」2026-10-28。前はこの画面で住所を打ったときだけ）。
+  // 住所が変わったとき・開いたときだけ（郵便番号を消したら、住所を直すまでそのまま）
+  useEffect(() => {
+    if (sale.zip.trim() || !sale.address.trim()) return;
+    const hits = zipCandidates(sale.address);
+    if (hits.length !== 1) return;
+    autoZip.current = hits[0].zip;
+    change({zip: hits[0].zip});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sale.address]);
   /** 郵便番号を先に打つと、住所が空なら住所の頭（市区町村・町域）を入れる */
   const changeZip = (zip: string) => {
     const head = sale.address.trim() ? '' : addressOfZip(zip);
@@ -222,6 +233,8 @@ export function SaleEditor({
     else setCatalogView((c) => c ?? {query: ''});
   }, [catalogAsk]);
   const closeCatalog = useCallback(() => setCatalogView(null), []);
+  // 居宅介護支援事業所・ケアマネジャーの▼のリストから消す（前の案件の値はそのまま。ユーザーの指示「リスト一覧になった場合も消せるようにする」2026-10-28）
+  const hideSuggest = (v: string) => update('settings', (st) => ({...st, hiddenSuggest: [...new Set([...(st.hiddenSuggest ?? []), v])]}));
   const remove = () => {
     if (!window.confirm(`「${customerLabel(sale)}」の特定福祉用具の見積もり・申請書を消します。元に戻せません。よろしいですか？`)) return;
     update('sales', (list) => list.filter((x) => x.id !== sale.id));
@@ -379,6 +392,7 @@ export function SaleEditor({
             onAddItem={(item) => change({items: [...sale.items, item ?? blankItem(s)]})}
             onPickCustomer={fixedView ? undefined : () => setPickingCustomer(true)}
             onFavorite={(id) => favorite([id])}
+            onHideSuggest={hideSuggest}
           />
           <div className="min-w-0 space-y-3 lg:sticky lg:top-3 lg:self-start">
             <ShinseiPanel sale={sale} settings={s} />
@@ -417,6 +431,7 @@ export function SaleEditor({
             onAddItem={(item) => change({items: [...sale.items, item ?? blankItem(s)]})}
             onPickCustomer={fixedView ? undefined : () => setPickingCustomer(true)}
             onFavorite={(id) => favorite([id])}
+            onHideSuggest={hideSuggest}
             withShinsei={fixedView !== 'quote'}
           />
 

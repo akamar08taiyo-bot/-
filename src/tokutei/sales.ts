@@ -273,6 +273,14 @@ export function sameYearSales(sales: Sale[], current: Sale): Sale[] {
   return sales.filter((s) => s.id !== current.id && s.status !== '見積' && customerKey(s) === key && fiscalYearOf(saleDay(s)) === year);
 }
 
+/** 入力欄の▼のリストの候補（多い順。設定で消した値は除く。Suggest.tsx の SuggestInput） */
+export function suggestValues(sales: Sale[], hidden: string[] | undefined, pick: (s: Sale) => string, where: (s: Sale) => boolean = () => true, limit = 20): string[] {
+  const off = new Set(hidden ?? []);
+  return frequentValues(sales, pick, where, Infinity)
+    .filter((v) => !off.has(v))
+    .slice(0, limit);
+}
+
 /** よく使う値（多い順。居宅介護支援事業所など）。where を付けると、その案件の中だけ */
 export function frequentValues(sales: Sale[], pick: (s: Sale) => string, where: (s: Sale) => boolean = () => true, limit = 6): string[] {
   const count = new Map<string, number>();

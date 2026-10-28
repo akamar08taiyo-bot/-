@@ -224,6 +224,10 @@ export default function App() {
         <header className={`no-print ${embed ? 'px-3 pt-3 sm:px-4' : 'bg-[#0f4c5c] text-white'}`}>
           {/* 住宅改修のタブの中（embed）では、題名・ポータルへのリンクの段は出さない（住宅改修の画面の上にある） */}
           <div className={`mx-auto max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 ${embed ? 'hidden' : 'flex'}`}>
+            {/* 業務アプリポータルへ戻るボタンは左上（全アプリ共通の形 .taiyo-portal-back。ユーザーの指示「太陽ポータルに戻るボタンは左上に設置」2026-10-28。前は右上） */}
+            <a href={PORTAL_URL} className="taiyo-portal-back">
+              ← 業務アプリポータルへ戻る
+            </a>
             <div className="flex items-center gap-3">
               <div className="grid h-9 w-9 place-items-center rounded-lg bg-white/15 text-lg font-black">特</div>
               <div>
@@ -237,9 +241,6 @@ export default function App() {
               ) : (
                 <span>{store.savedAt ? 'この端末に自動保存しました' : 'この端末に自動保存します'}</span>
               )}
-              <a href={PORTAL_URL} className="rounded-md border border-white/30 px-2.5 py-1.5 font-bold text-white hover:bg-white/10">
-                業務アプリポータルへ
-              </a>
             </div>
           </div>
           <nav className={`flex overflow-x-auto ${embed ? 'gap-1.5 sm:gap-2' : 'mx-auto max-w-6xl gap-1 px-3'}`}>

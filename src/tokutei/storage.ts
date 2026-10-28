@@ -319,6 +319,7 @@ export function cleanSettings(raw: unknown): Settings {
     delivery: text('delivery'),
     remarks: text('remarks'),
     rev: SETTINGS_REV,
+    ...(Array.isArray(raw.hiddenSuggest) ? {hiddenSuggest: list(raw.hiddenSuggest, [])} : {}),
   };
 }
 

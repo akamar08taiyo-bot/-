@@ -24,7 +24,8 @@ export const CATALOG: CatalogPage[] = [
   {file: 'kaientai-p040.pdf', page: 40, title: 'シャワーチェア（パナソニック ユクリア）', subs: ['入浴用いす'], maker: /パナソニック|panasonic|ユクリア/i},
   {file: 'kaientai-p043.pdf', page: 43, title: '浴槽台（パナソニック ユクリア）', subs: ['浴槽内いす'], maker: /パナソニック|panasonic|ユクリア/i},
   {file: 'kaientai-p044.pdf', page: 44, title: '浴槽台・浴槽手すり（安寿）', subs: ['浴槽内いす', '浴槽用手すり'], maker: ANJU},
-  {file: 'kaientai-p045.pdf', page: 45, title: '浴槽手すり・バスボード', subs: ['浴槽用手すり', '入浴台']},
+  // 浴槽手すりがパナソニック（入浴グリップ ユクリア）と分かるように（ユーザーの指示「浴槽手すりがパナソニックであることがわかるようにする」2026-10-28）
+  {file: 'kaientai-p045.pdf', page: 45, title: '浴槽手すり・バスボード（パナソニック）', subs: ['浴槽用手すり', '入浴台']},
   {file: 'kaientai-p047.pdf', page: 47, title: 'すべり止めマット', words: /すべり止め|滑り止め/},
   {file: 'kaientai-p050.pdf', page: 50, title: 'シャワーキャリー', words: /シャワーキャリー/},
   {file: 'kaientai-p172.pdf', page: 172, title: '家具調トイレ（安寿）', subs: [PORTABLE_TOILET], maker: ANJU},

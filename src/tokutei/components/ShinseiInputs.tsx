@@ -9,7 +9,7 @@ import type {FocusEvent} from 'react';
 import {lineOf} from '../calc.ts';
 import type {Line} from '../calc.ts';
 import {CARE_LEVELS, INSURERS} from '../defaults.ts';
-import {blankItem, frequentValues, makerChoices, unregisteredItems} from '../sales.ts';
+import {blankItem, makerChoices, suggestValues, unregisteredItems} from '../sales.ts';
 import {carePlanOf, shinseiForm} from '../shinsei.ts';
 import type {ShinseiKey} from '../shinsei.ts';
 import type {ShinseiField} from '../shinseiPreview.ts';
@@ -21,7 +21,7 @@ import {CategorySelect} from './CategorySelect.tsx';
 import {MakerInput} from './MakerInput.tsx';
 import {ReasonField} from './ReasonField.tsx';
 import {AddItemButton, CatalogSearch, Circles, EraBirthInput, InsuredNoInput, KanaInput, nextOnEnter} from './ShinseiParts.tsx';
-import {Suggest} from './Suggest.tsx';
+import {SuggestInput} from './Suggest.tsx';
 import {Btn, NumberInput, Stepper, TextInput} from './ui.tsx';
 
 const dateInput = 'h-9 rounded-md border border-slate-300 bg-white px-2 text-sm outline-none focus:border-blue-500';
@@ -46,6 +46,7 @@ export function ShinseiInputs({
   onAddItem,
   onPickCustomer,
   onFavorite,
+  onHideSuggest,
 }: {
   sale: Sale;
   data: AppData;
@@ -66,6 +67,7 @@ export function ShinseiInputs({
   onAddItem: (item?: SaleItem) => void; // 手で入れる商品を足す（item があればその商品＝最初から開いている欄に打ったもの）
   onPickCustomer?: () => void; // 住宅改修の様邸のタブの中では渡さない（お客様の情報は様邸から入る。ユーザーの指示「赤枠の部分は不要です」2026-10-28）
   onFavorite: (itemId: string) => void; // 手で入れた商品を商品マスタの★お気に入りに
+  onHideSuggest: (v: string) => void; // 居宅介護支援事業所・ケアマネジャーの▼のリストから消す（設定の hiddenSuggest）
 }) {
   const makers = useMemo(() => makerChoices(data.products, data.sales), [data.products, data.sales]);
   const s = data.settings;
@@ -329,16 +331,22 @@ export function ShinseiInputs({
           kouiki ? '居宅介護支援事業所' : '記載者（事業所・氏名）',
           // 事業所名は長い（「社会福祉法人○○会 ○○居宅介護支援事業所」）ので行いっぱい、ケアマネジャーはその下（前は横に並べて事業所名が切れていた。2026-10-26 のデバッグ）
           <div className="grid w-full gap-2">
-            <div className="grid min-w-0 gap-1">
-              <TextInput value={sale.careOffice} onChange={(careOffice) => change({careOffice})} placeholder="居宅介護支援事業所" className="w-full" aria-label="居宅介護支援事業所" data-nav />
-              <Suggest values={frequentValues(data.sales, (x) => x.careOffice)} current={sale.careOffice} onPick={(careOffice) => change({careOffice})} />
-            </div>
-            <div className="grid min-w-0 gap-1 sm:w-64">
-              <TextInput value={sale.careManager} onChange={(careManager) => change({careManager})} placeholder="ケアマネジャー" className="w-full" aria-label="ケアマネジャー" data-nav />
-              <Suggest
-                values={frequentValues(data.sales, (x) => x.careManager, (x) => !sale.careOffice.trim() || x.careOffice.trim() === sale.careOffice.trim())}
-                current={sale.careManager}
-                onPick={(careManager) => change({careManager})}
+            <SuggestInput
+              value={sale.careOffice}
+              onChange={(careOffice) => change({careOffice})}
+              values={suggestValues(data.sales, data.settings.hiddenSuggest, (x) => x.careOffice)}
+              onHide={onHideSuggest}
+              placeholder="居宅介護支援事業所"
+              label="居宅介護支援事業所" data-nav
+            />
+            <div className="min-w-0 sm:w-64">
+              <SuggestInput
+                value={sale.careManager}
+                onChange={(careManager) => change({careManager})}
+                values={suggestValues(data.sales, data.settings.hiddenSuggest, (x) => x.careManager, (x) => !sale.careOffice.trim() || x.careOffice.trim() === sale.careOffice.trim())}
+                onHide={onHideSuggest}
+                placeholder="ケアマネジャー"
+                label="ケアマネジャー" data-nav
               />
             </div>
           </div>,

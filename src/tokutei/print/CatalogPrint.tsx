@@ -64,19 +64,24 @@ export function CatalogPrintView({sale, onClose}: {sale: Sale; onClose: () => vo
     <div className="print-overlay">
       <div className="print-toolbar">
         <span className="font-bold">カタログ（介援隊）</span>
+        {/* 広い画面（xl）では「印刷する」は左の空いた所に大きく（下の cat-print-side）。狭い画面はここ（ページの左に置く所がない） */}
         <button
           type="button"
           onClick={() => window.print()}
           disabled={!ready}
-          className="rounded-md bg-sky-100 px-4 py-2 text-sm font-bold text-sky-900 shadow hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-md bg-sky-100 px-5 py-2.5 text-base font-bold text-sky-900 shadow hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-40 xl:hidden"
         >
           🖨 印刷する
         </button>
-        {/* スマホはページが12あると上の帯が画面の半分になるので、帯の中でスクロールする高さまで */}
-        <span role="group" aria-label="印刷するページ" className="flex max-h-[7.5rem] flex-wrap items-center gap-x-3 gap-y-1 overflow-y-auto text-sm sm:max-h-none sm:overflow-visible">
+        {/* ページの名前は大きく、押せる所を広く（ユーザーの指示「チラシリスト（例浴槽手すり、浴槽台）などの文字は大きくして選びやすくする」2026-10-28。前は 14px の字とチェックだけ）。
+            スマホはページが12あると上の帯が画面の半分になるので、帯の中でスクロールする高さまで */}
+        <span role="group" aria-label="印刷するページ" className="flex max-h-[10rem] flex-wrap items-center gap-x-1.5 gap-y-1 overflow-y-auto sm:max-h-none sm:overflow-visible">
           {CATALOG.map((p, i) => (
-            <label key={p.file} className="flex items-center gap-1">
-              <input type="checkbox" checked={picked.has(i)} onChange={() => toggle(i)} className="h-4 w-4" />
+            <label
+              key={p.file}
+              className={`flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-base sm:text-[17px] ${picked.has(i) ? 'bg-white/20 ring-1 ring-white/60' : 'hover:bg-white/10'}`}
+            >
+              <input type="checkbox" checked={picked.has(i)} onChange={() => toggle(i)} className="h-5 w-5 shrink-0" />
               {catalogLabel(p)}
             </label>
           ))}
@@ -85,6 +90,17 @@ export function CatalogPrintView({sale, onClose}: {sale: Sale; onClose: () => vo
           閉じる
         </button>
       </div>
+      {/* 「印刷する」を左の空いた所に大きく（ユーザーの指示「印刷ボタンをこちらに大きくもってくる」2026-10-28。前は上の帯の題名の横の小さなボタン）。
+          紙（A4 の幅 794px）の左に 240px ほど空く広い画面（xl・1280px〜）だけ */}
+      <button
+        type="button"
+        onClick={() => window.print()}
+        disabled={!ready}
+        className="cat-print-side fixed left-6 top-1/2 z-[2] hidden h-36 w-44 -translate-y-1/2 flex-col items-center justify-center gap-2 rounded-xl bg-sky-100 text-xl font-bold text-sky-900 shadow-lg hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-40 xl:flex"
+      >
+        <span aria-hidden="true" className="text-4xl leading-none">🖨</span>
+        <span className="sr-only">🖨 </span>印刷する
+      </button>
       <div className="print-root" style={{zoom}}>
         {picked.size === 0 && <p className="p-10 text-center text-sm text-white/80">印刷するページにチェックを入れてください</p>}
         {CATALOG.map((p, i) => {

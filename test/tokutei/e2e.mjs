@@ -352,7 +352,7 @@ try {
     'p.40 シャワーチェア（パナソニック ユクリア）',
     'p.43 浴槽台（パナソニック ユクリア）',
     'p.44 浴槽台・浴槽手すり（安寿）',
-    'p.45 浴槽手すり・バスボード',
+    'p.45 浴槽手すり・バスボード（パナソニック）',
     'p.47 すべり止めマット',
     'p.50 シャワーキャリー',
     'p.172 家具調トイレ（安寿）',
@@ -368,15 +368,16 @@ try {
     const imgs = [...document.querySelectorAll('.cat-sheet img')];
     return imgs.length === 3 && imgs.every((i) => i.complete && i.naturalWidth > 1500);
   }, null, {timeout: 60000});
-  assert.deepEqual(await page.locator('.cat-sheet').evaluateAll((xs) => xs.map((x) => x.getAttribute('aria-label'))), ['カタログ p.37 シャワーベンチ（安寿）', 'カタログ p.44 浴槽台・浴槽手すり（安寿）', 'カタログ p.45 浴槽手すり・バスボード']);
+  assert.deepEqual(await page.locator('.cat-sheet').evaluateAll((xs) => xs.map((x) => x.getAttribute('aria-label'))), ['カタログ p.37 シャワーベンチ（安寿）', 'カタログ p.44 浴槽台・浴槽手すり（安寿）', 'カタログ p.45 浴槽手すり・バスボード（パナソニック）']);
   // 品番の載っているページ：シャワーベンチ FSフィット（536-057）は p.37、浴槽台（536-480）は p.44、入浴グリップ（PN-L12211D）は p.45
   const checkedPages = async () => (await catPages.getByRole('checkbox').evaluateAll((xs) => xs.map((x) => (x.checked ? x.parentElement.textContent.split(' ')[0] : '')))).filter(Boolean);
   assert.deepEqual(await checkedPages(), ['p.37', 'p.44', 'p.45']);
   assert.equal(await page.title(), '山田 花子様 カタログ');
   await page.screenshot({path: `${out}/05c-catalog.png`});
-  const catPrint = page.locator('.print-toolbar').getByRole('button', {name: '🖨 印刷する'});
+  // 広い画面（xl）は左の空いた所の大きいボタン、狭い画面は上の帯のボタン（見えている方。ユーザーの指示「印刷ボタンをこちらに大きくもってくる」2026-10-28）
+  const catPrint = page.locator('.print-overlay').getByRole('button', {name: '🖨 印刷する'}).filter({visible: true});
   // チェックを全部外すと印刷できない
-  const ticked = ['p.37 シャワーベンチ（安寿）', 'p.44 浴槽台・浴槽手すり（安寿）', 'p.45 浴槽手すり・バスボード'];
+  const ticked = ['p.37 シャワーベンチ（安寿）', 'p.44 浴槽台・浴槽手すり（安寿）', 'p.45 浴槽手すり・バスボード（パナソニック）'];
   for (const name of ticked) await catPages.getByRole('checkbox', {name}).uncheck();
   assert.equal(await catPrint.isDisabled(), true);
   for (const name of ticked) await catPages.getByRole('checkbox', {name}).check();
