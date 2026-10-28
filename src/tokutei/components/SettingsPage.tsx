@@ -151,10 +151,10 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
 
       <Card title="バックアップ（この端末だけに保存しています）">
         <div className="flex flex-wrap gap-2">
-          <Btn color="blue" onClick={() => downloadBlob(new Blob([backupJson(data)], {type: 'application/json'}), `特定福祉用具_バックアップ_${todayIso()}.json`)}>
+          <Btn color="softBlue" onClick={() => downloadBlob(new Blob([backupJson(data)], {type: 'application/json'}), `特定福祉用具_バックアップ_${todayIso()}.json`)}>
             ⬇ すべてをファイルに保存
           </Btn>
-          <Btn color="teal" disabled={data.products.length === 0} onClick={() => downloadBlob(new Blob([productsJson(data.products)], {type: 'application/json'}), `特定福祉用具_商品マスタ_${todayIso()}.json`)}>
+          <Btn color="softBlue" disabled={data.products.length === 0} onClick={() => downloadBlob(new Blob([productsJson(data.products)], {type: 'application/json'}), `特定福祉用具_商品マスタ_${todayIso()}.json`)}>
             ⬇ 商品マスタだけ保存（ほかの端末へ）
           </Btn>
           <Btn color="white" onClick={() => fileRef.current?.click()}>

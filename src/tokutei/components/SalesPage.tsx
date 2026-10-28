@@ -139,7 +139,7 @@ export function SalesPage({data, update, onOpen, onPrint}: {data: AppData; updat
                   <Btn small color="teal" onClick={() => onOpen(x.id)}>
                     開く
                   </Btn>
-                  <Btn small color="sky" onClick={() => onPrint(x.id)}>
+                  <Btn small color="softSky" onClick={() => onPrint(x.id)}>
                     印刷
                   </Btn>
                   <Btn

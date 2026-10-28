@@ -44,7 +44,7 @@ export function ProductPicker({
       title="商品を選ぶ"
       onClose={onClose}
       footer={
-        <Btn color="blue" onClick={onClose}>
+        <Btn color="white" onClick={onClose}>
           閉じる
         </Btn>
       }

@@ -140,7 +140,7 @@ export function ScanDialog({settings, makers, onAdd, onClose}: {settings: Settin
               発注先
               <TextInput value={draft.supplier} onChange={(supplier) => set({supplier})} className="w-full min-w-0" aria-label="読み取った発注先" />
             </label>
-            <Btn color="blue" className="w-full" disabled={!draft.name.trim()} onClick={add}>
+            <Btn color="emerald" className="w-full" disabled={!draft.name.trim()} onClick={add}>
               見積書に入れる
             </Btn>
           </section>

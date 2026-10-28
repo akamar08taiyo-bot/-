@@ -103,7 +103,7 @@ export function ProductsPage({data, update}: {data: AppData; update: Update}) {
           ＋ 商品を手で足す
         </Btn>
         <Btn
-          color="teal"
+          color="softBlue"
           disabled={data.products.length === 0}
           onClick={() => downloadBlob(new Blob([productsCsv(sortProducts(data.products))], {type: 'text/csv'}), `商品マスタ_${todayIso()}.csv`)}
         >
@@ -263,7 +263,7 @@ export function ProductEditModal({product, settings, makers, onSave, onClose}: {
           <Btn color="white" onClick={onClose}>
             やめる
           </Btn>
-          <Btn color="blue" disabled={!p.name.trim()} onClick={() => onSave({...p, name: p.name.trim(), updatedAt: Date.now()})}>
+          <Btn color="softBlue" disabled={!p.name.trim()} onClick={() => onSave({...p, name: p.name.trim(), updatedAt: Date.now()})}>
             保存する
           </Btn>
         </>

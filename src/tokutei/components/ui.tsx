@@ -3,13 +3,17 @@ import type {ButtonHTMLAttributes, InputHTMLAttributes, ReactNode} from 'react';
 
 // 画面の部品。住宅改修 見積書アプリの src/sasaoka/components/ui.tsx（2026-10-20 の版）を写したもの（同じ見た目・同じ操作感にそろえる）
 // 色は機能ごとに1色（見積・提案書作成アプリのデザイン規約と同じ使い分け）。どれも薄い地に濃い字・細い枠
-// （ユーザーの指示「ガツンと濃い色だけは、目がチカチカするんで、少し控えて」2026-10-26。前は濃い地に白い字。削除は白い地に赤い字）
+// （ユーザーの指示「ガツンと濃い色だけは、目がチカチカするんで、少し控えて」2026-10-26。前は濃い地に白い字。削除は白い地に赤い字）。
+// 同じ働きのボタンは、どの画面でも・住宅改修のアプリ（src/sasaoka の ui.tsx）でも同じ色（ユーザーの指示「同じ内容でボタンの色が違う場合は統一する」2026-10-28）：
+//   保存（バックアップ・CSV も）＝softBlue、Excel で保存＝excel（住宅改修の softGreen と同じ）、印刷＝softSky、取り込む・スクショから自動認識＝purple、新規・追加・入れる＝emerald、
+//   削除・複製・閉じる・やめる・戻る・販売受注簿に転記・売上伝票依頼書など＝white（rose は使わない＝前の販売見積書の削除）
 const COLORS = {
   emerald: 'bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300', // 新規・追加
   blue: 'bg-blue-100 hover:bg-blue-200 text-blue-900 border border-blue-300', // 保存・決定
   rose: 'bg-white hover:bg-rose-50 text-rose-700 border border-rose-300', // 削除
   sky: 'bg-sky-100 hover:bg-sky-200 text-sky-900 border border-sky-300', // 印刷
-  softSky: 'bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300', // 上の段の印刷（住宅改修の様邸の画面の softSky と同じ）
+  softSky: 'bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300', // 印刷（住宅改修の softSky と同じ）
+  softBlue: 'bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200', // 保存（住宅改修の softBlue と同じ）
   excel: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300', // Excel で保存（薄い緑）
   cyan: 'bg-cyan-100 hover:bg-cyan-200 text-cyan-900 border border-cyan-300', // まとめて印刷
   teal: 'bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300', // 一覧・管理

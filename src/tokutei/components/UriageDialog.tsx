@@ -53,11 +53,11 @@ export function UriageDialog({sale, settings, change, onClose}: {sale: Sale; set
             閉じる
           </Btn>
           {ready ? (
-            <a href={uriageUrl()} target="_blank" onClick={open} className={btnClass('blue')}>
+            <a href={uriageUrl()} target="_blank" onClick={open} className={btnClass('softBlue')}>
               🧾 売上伝票発行依頼書を開く
             </a>
           ) : (
-            <Btn color="blue" disabled title={[...fix, ...elsewhere].join('・')}>
+            <Btn color="softBlue" disabled title={[...fix, ...elsewhere].join('・')}>
               🧾 売上伝票発行依頼書を開く
             </Btn>
           )}

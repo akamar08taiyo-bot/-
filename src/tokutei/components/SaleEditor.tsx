@@ -223,7 +223,7 @@ export function SaleEditor({
   }, [catalogAsk]);
   const closeCatalog = useCallback(() => setCatalogView(null), []);
   const remove = () => {
-    if (!window.confirm(`「${customerLabel(sale)}」の見積もりを消します。元に戻せません。よろしいですか？`)) return;
+    if (!window.confirm(`「${customerLabel(sale)}」の特定福祉用具の見積もり・申請書を消します。元に戻せません。よろしいですか？`)) return;
     update('sales', (list) => list.filter((x) => x.id !== sale.id));
     toast('消しました');
     onBack();
@@ -295,9 +295,10 @@ export function SaleEditor({
         </div>
         <div className="flex flex-wrap gap-2 lg:[&>*]:!text-base">
           {onShinsei ? (
-            // 介援隊のカタログのページを選んで印刷（catalog.ts。ユーザーの指示「申請書を作成するとき…カタログの PDF の印刷」2026-10-26）
-            <Btn color="white" onClick={() => setPrintingCatalog(true)}>
-              📖 カタログを印刷
+            // 介援隊のカタログのページを選んで印刷（catalog.ts。ユーザーの指示「申請書を作成するとき…カタログの PDF の印刷」2026-10-26）。
+            // 印刷なので薄い水色（住宅改修の様邸の画面の「🖨 カタログを印刷」と同じ色・同じ名前。2026-10-28）
+            <Btn color="softSky" onClick={() => setPrintingCatalog(true)}>
+              🖨 カタログを印刷
             </Btn>
           ) : (
             <>
@@ -316,17 +317,16 @@ export function SaleEditor({
               </a>
             </>
           )}
-          {/* 申請書だけの画面（住宅改修の申請書のタブの中）には、複製・削除を出さない（販売見積書のタブにある） */}
+          {/* 申請書だけの画面（住宅改修の申請書のタブの中）には複製は出さない（販売見積書のタブにある）。削除はどのタブにも出す
+              （ユーザーの指示「住宅改修申請書、販売申請書、理由書、工事見積書全てに削除ボタンを設置する。ボタンの色は統一する」2026-10-28。前は赤い字の rose。住宅改修と同じ白） */}
           {fixedView !== 'shinsei' && (
-            <>
-              <Btn color="white" onClick={duplicate}>
-                複製
-              </Btn>
-              <Btn color="rose" onClick={remove}>
-                削除
-              </Btn>
-            </>
+            <Btn color="white" onClick={duplicate}>
+              複製
+            </Btn>
           )}
+          <Btn color="white" onClick={remove}>
+            削除
+          </Btn>
         </div>
       </div>
 
@@ -470,12 +470,12 @@ export function SaleEditor({
                   </div>
                 </dl>
                 <div className="mt-4 grid gap-2">
-                  <Btn color="sky" className="w-full" onClick={print}>
+                  <Btn color="softSky" className="w-full" onClick={print}>
                     🖨 見積書を印刷
                   </Btn>
                   {/* 介援隊のカタログのページを選んで印刷（ユーザーの指示「販売見積書…を作成するとき…カタログの PDF の印刷」2026-10-26） */}
-                  <Btn color="white" className="w-full" onClick={() => setPrintingCatalog(true)}>
-                    📖 カタログを印刷
+                  <Btn color="softSky" className="w-full" onClick={() => setPrintingCatalog(true)}>
+                    🖨 カタログを印刷
                   </Btn>
                 </div>
               </section>
