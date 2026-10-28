@@ -61,6 +61,7 @@ if (withTokutei) {
     assert.equal(await frame.getByRole('button', {name: '📖 カタログを印刷'}).count(), 0, tab);
     assert.equal(await frame.getByRole('button', {name: '← 見積もりの一覧へ'}).count(), 0, tab);
     assert.equal(await frame.getByRole('button', {name: '👤 前のお客様から入れる'}).count(), 0, tab);
+    assert.equal(await frame.getByRole('button', {name: '複製', exact: true}).count(), 0, tab); // 様邸のタブの中には複製を出さない（「ここの複製ボタンは不要」2026-10-28）
   }
   await page.screenshot({path: path.join(outDir, 'delete-01-hanbai.png')});
   log('特定福祉用具申請書・販売見積書に白い「削除」・カタログを印刷は薄い水色・一覧へ／前のお客様から入れるはなし OK');

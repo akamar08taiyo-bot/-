@@ -96,7 +96,7 @@ if (withTokutei) {
   assert.equal(await tk.getByRole('group', {name: '性別'}).getByRole('button', {name: '女'}).getAttribute('aria-pressed'), 'true');
   // 上の題名・ポータルへのリンクの段は出さない（住宅改修の画面の上にある）。特定福祉用具のタブ（見積もり・申請／商品マスタ／設定）は出す
   assert.equal(await tk.getByRole('heading', {name: '特定福祉用具 購入申請書・見積もり作成'}).isVisible(), false);
-  assert.equal(await tk.getByRole('link', {name: '業務アプリポータルへ'}).isVisible(), false);
+  assert.equal(await tk.getByRole('link', {name: '← 業務アプリポータルへ戻る'}).isVisible(), false);
   assert.ok(await tk.getByRole('button', {name: '📦 商品マスタ'}).isVisible());
   // 申請書だけ：右に申請書のプレビュー（大きく）。見積もりのタブ・見積書のボタンは出さない（販売見積書のタブにある）
   const pv = tk.getByLabel('申請書のプレビュー');

@@ -427,6 +427,10 @@ export default function App({start}: {start: MainTab}) {
       <div className={`min-h-screen ${theme.page} text-slate-800 ${print ? 'no-print' : ''}`}>
         <header className={`no-print ${theme.head} text-white transition-colors`}>
           <div className={`mx-auto flex ${PAGE_WIDTH} flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3`}>
+            {/* 業務アプリポータルへ戻るボタンは左上（全アプリ共通の形 .taiyo-portal-back。ユーザーの指示「太陽ポータルに戻るボタンは左上に設置」2026-10-28。前は右上） */}
+            <a href={PORTAL_URL} className="taiyo-portal-back">
+              ← 業務アプリポータルへ戻る
+            </a>
             <div className="flex items-center gap-3">
               <div className="grid h-9 w-9 place-items-center rounded-lg bg-white/15 text-lg font-black">住</div>
               <div>
@@ -441,9 +445,6 @@ export default function App({start}: {start: MainTab}) {
               ) : (
                 <span>{store.savedAt ? 'この端末に自動保存しました' : 'この端末に自動保存します'}</span>
               )}
-              <a href={PORTAL_URL} className="rounded-md border border-white/30 px-2.5 py-1.5 font-bold text-white hover:bg-white/10">
-                業務アプリポータルへ
-              </a>
             </div>
           </div>
           {/* 上のタブ：字を大きく・高く（ユーザーの指示「ここらへんのタブももう少し大きく見やすくする」2026-10-25）。選んでいないタブも薄い白の地で、タブと分かるように。

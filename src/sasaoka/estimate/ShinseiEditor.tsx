@@ -22,6 +22,7 @@ import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
 import type {AppData, Insurer, Job, Material, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {toKatakana, yen} from '../util.ts';
+import {zipCandidates} from '../zip.ts';
 import {PhotoBoard, photoPlaces, SLOT_LABEL, usePhotoActions, usePlanActions} from './PhotoBoard.tsx';
 import {PhotoMarkEditor} from './PhotoMarkEditor.tsx';
 import type {PhotoKey, PhotoSlot} from './PhotoBoard.tsx';
@@ -104,6 +105,14 @@ export function ShinseiEditor({
   const setInfo = (patch: Partial<ShinseiInfo>) => setJob((j) => ({...j, shinsei: {...NO_SHINSEI, ...j.shinsei, ...patch}}));
   const setInsurer = (i: Insurer) => setJob((j) => ({...j, insurer: i, form: INSURER_INFO[i].form}));
   const byAddress = insurerForAddress(job.address);
+  // 前から住所だけ入っている様邸：開いたときに、郵便番号が空なら住所から1つに決まる番号を入れる（住所を入れ直したときは useStore の withAddressZip。
+  // ユーザーの指示「住所のみ入力した場合、逆に郵便番号を自動で入力される」2026-10-28）
+  useEffect(() => {
+    if (info.zip.trim() || !job.address.trim()) return;
+    const hits = zipCandidates(job.address);
+    if (hits.length === 1) setInfo({zip: hits[0].zip});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job.id]);
   const cost = shinseiCost(job, s);
   const lines = shinseiWorks(job, s);
 

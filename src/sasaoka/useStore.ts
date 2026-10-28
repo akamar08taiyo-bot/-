@@ -4,6 +4,7 @@ import type {DataKey} from './storage.ts';
 import {mergeKey} from './sync.ts';
 import type {AppData} from './types.ts';
 import {uid} from './util.ts';
+import {withAddressZip} from './zip.ts';
 
 /** 見積書作成・仕切り計算の両アプリ（とそのタブ）に「保存しました」を知らせる */
 const CHANNEL = 'taiyo-sasaoka-shikiri';
@@ -102,7 +103,10 @@ export function useStore() {
   const update = useCallback(<K extends DataKey>(key: K, fn: (prev: AppData[K]) => AppData[K]) => {
     setData((prev) => {
       if (!prev) return prev;
-      const nextValue = fn(prev[key]);
+      const raw = fn(prev[key]);
+      // 様邸の住所が変わったら、申請書の郵便番号が空なら住所から入れる（どの画面で住所を入れても。zip.ts の withAddressZip。
+      // ユーザーの指示「住所のみ入力した場合、逆に郵便番号を自動で入力される」2026-10-28）
+      const nextValue = (key === 'jobs' ? withAddressZip(prev.jobs, raw as AppData['jobs']) : raw) as AppData[K];
       if (nextValue === prev[key]) return prev;
       pending.current.set(key, nextValue);
       schedule.current();
