@@ -117,7 +117,11 @@ if (withTokutei) {
   await page.getByRole('tab', {name: '🏷 販売見積書'}).click();
   await page.waitForFunction(() => location.hash.includes('view=hanbai'));
   assert.equal(await frameEl.getAttribute('src'), `../tokutei/index.html#jutaku=${encodeURIComponent(jobId)}&embed=1&view=quote`);
-  await tk.getByRole('button', {name: '🖨 見積書を印刷'}).first().waitFor();
+  await tk.getByLabel('見積書のプレビュー').waitFor();
+  // 右下の金額のまとめ・利益・印刷の欄は出さない（ユーザーの指示「この部分は全て不要です」2026-10-28。印刷は上の段）
+  assert.equal(await tk.getByText('購入金額（税込）').count(), 0);
+  assert.equal(await tk.getByText('利益', {exact: true}).count(), 0);
+  assert.equal(await tk.getByRole('button', {name: '🖨 見積書を印刷'}).count(), 0);
   assert.equal(await tk.getByLabel('商品名').last().inputValue(), '見本の多点杖');
   assert.equal(await field('お客様名').inputValue(), '見本 花子');
   assert.equal(await tk.getByRole('tab', {name: /^📄 申請書/}).count(), 0);
@@ -290,7 +294,7 @@ if (withTokutei) {
   await page.setViewportSize({width: 2000, height: 1000});
   await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
   const showCat = page.getByRole('button', {name: '📖 カタログを表示'});
-  const printCat = page.getByRole('button', {name: '🖨 カタログを印刷'});
+  const printCat = page.getByRole('button', {name: '🖨 カタログを印刷'}).first(); // 左の欄（特定福祉用具の2つのタブでは上の段の2段目にもある）
   await showCat.waitFor();
   const drop = showCat.locator('xpath=../*[1]'); // 🪪 の枠（同じ箱の最初）
   const [dropBox, showBox, printBox] = [await drop.boundingBox(), await showCat.boundingBox(), await printCat.boundingBox()];

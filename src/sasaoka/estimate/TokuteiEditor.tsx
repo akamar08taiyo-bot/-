@@ -172,11 +172,12 @@ export function TokuteiEditor({
           secondary={
             <>
               {batch}
-              {view === 'shinsei' ? (
-                <Btn color="softSky" onClick={() => cmd('catalog')}>
-                  🖨 カタログを印刷
-                </Btn>
-              ) : (
+              {/* カタログを印刷は2つのタブとも同じ所（まとめて保存のすぐ右）。販売見積書のタブは、前は中のアプリの右の欄（金額のまとめの下）にあった
+                  （その欄はユーザーの指示「この部分は全て不要です」2026-10-28 で外した） */}
+              <Btn color="softSky" onClick={() => cmd('catalog')}>
+                🖨 カタログを印刷
+              </Btn>
+              {view === 'quote' && (
                 <>
                   <Btn color="white" onClick={() => cmd('uriage')}>
                     🧾 売上伝票依頼書

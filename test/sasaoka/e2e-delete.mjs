@@ -61,8 +61,8 @@ if (withTokutei) {
     await frame.getByLabel('商品名').first().waitFor({timeout: 15000});
     assert.equal(await frame.getByRole('button', {name: '削除', exact: true}).count(), 0, tab);
     assert.equal(await frame.getByRole('group', {name: '保存・印刷・削除'}).count(), 0, tab);
-    // 申請書のタブは上の段の2段目（Excel・印刷・削除の真下）、販売見積書のタブは中のアプリの右の欄
-    const cat = tab === '🛁 特定福祉用具申請書' ? page.getByRole('group', {name: 'そのほかの機能'}).getByRole('button', {name: '🖨 カタログを印刷'}) : frame.getByRole('button', {name: '🖨 カタログを印刷'}).first();
+    // 2つのタブとも上の段の3段目（Excel・印刷・削除の真下）
+    const cat = page.getByRole('group', {name: 'そのほかの機能'}).getByRole('button', {name: '🖨 カタログを印刷'});
     assert.match(await cat.getAttribute('class'), /bg-sky-50/, tab);
     assert.equal(await frame.getByRole('button', {name: '📖 カタログを印刷'}).count(), 0, tab);
     assert.equal(await frame.getByRole('button', {name: '← 見積もりの一覧へ'}).count(), 0, tab);
