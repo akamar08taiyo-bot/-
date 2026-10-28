@@ -4,7 +4,7 @@
 // 受注簿は商品1点が1ページで、ページごとに給付内訳を出す。ページごとに切り上げると合計が見積書と1円ずれることがあるので、
 // 給付の内訳もここで商品ごとに分けて渡す（合計は saleTotals と同じ）。送る形を変えるときは、受注簿ツールの受け取りも直す。
 
-import {saleTotals} from './calc.ts';
+import {actualDiscount, saleTotals} from './calc.ts';
 import type {Totals} from './calc.ts';
 import type {Sale, Settings, TaxType} from './types.ts';
 import {staffShort, yen} from './util.ts';
@@ -121,7 +121,8 @@ export function hacchuImport(sale: Sale, s: Pick<Settings, 'markupRate' | 'limit
         listPrice: Math.max(0, Math.round(l.item.listPrice)),
         cost: Math.max(0, Math.round(l.item.cost)),
         taxType: l.item.taxType,
-        discountRate: Math.round(l.item.discountRate),
+        // 手で単価を入れた行は、割引率の欄ではなく定価と単価から（欄が前の値のままでも受注簿は実際の割引率。2026-10-28 のユーザーの指摘）
+        discountRate: actualDiscount(l),
         saleUnitPrice: l.unitPrice,
         totalTaxIn: l.total,
         careInsuranceBalance: balance,

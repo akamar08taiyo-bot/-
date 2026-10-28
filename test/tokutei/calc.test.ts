@@ -169,3 +169,21 @@ test('数量をかける・見積書の品目の下の行', () => {
   assert.equal(priceNote(lineOf(item({listPrice: 2100, unitPrice: 1500}), S)), '定価2,100円（税抜）');
   assert.equal(priceNote(lineOf(item({cost: 1000}), S)), '');
 });
+
+// 単価を手で入れても割引率の欄が前のまま（35）で、販売受注簿に35%と渡っていた（ユーザーの指摘「販売受注簿に転機した場合に、なぜか割引率が35%になっている」2026-10-28）
+test('手で入れた単価から割引率：ちょうど何%引きならその%・でなければ null／単価を入れたら割引率もそろえる／販売受注簿へは実際の割引率', async () => {
+  const {actualDiscount, impliedDiscount, unitPricePatch} = await import('../../src/tokutei/calc.ts');
+  assert.equal(impliedDiscount(33000, 23100), 30);
+  assert.equal(impliedDiscount(33000, 21450), 35);
+  assert.equal(impliedDiscount(15800, 12640), 20);
+  assert.equal(impliedDiscount(33000, 23000), null); // 30.3%引き
+  assert.equal(impliedDiscount(0, 23100), null); // 定価がない
+  assert.deepEqual(unitPricePatch({listPrice: 33000}, 23100), {unitPrice: 23100, discountRate: 30});
+  assert.deepEqual(unitPricePatch({listPrice: 33000}, 23000), {unitPrice: 23000}); // ちょうどでなければ割引率はそのまま
+  assert.deepEqual(unitPricePatch({listPrice: 33000}, null), {unitPrice: null});
+  const S = {markupRate: 25};
+  const it = (over) => ({id: 'i', productId: null, name: '見本', maker: '', code: '', tais: '', category: '', sub: '', unit: '台', supplier: '', taxType: '10%', listPrice: 33000, cost: 0, qty: 1, discountRate: 35, unitPrice: null, reason: '', ...over});
+  assert.equal(actualDiscount(lineOf(it({unitPrice: 23100}), S)), 30); // 割引率の欄は35のまま、単価は30%引き
+  assert.equal(actualDiscount(lineOf(it({unitPrice: 23000}), S)), 30.3);
+  assert.equal(actualDiscount(lineOf(it({}), S)), 35); // 定価×割引
+});

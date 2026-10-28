@@ -6,7 +6,7 @@
 import {useMemo, useState} from 'react';
 import type {ReactNode, RefObject} from 'react';
 import type {FocusEvent} from 'react';
-import {lineOf} from '../calc.ts';
+import {lineOf, unitPricePatch} from '../calc.ts';
 import type {Line} from '../calc.ts';
 import {CARE_LEVELS, INSURERS} from '../defaults.ts';
 import {blankItem, makerChoices, suggestValues, unregisteredItems} from '../sales.ts';
@@ -273,7 +273,7 @@ export function ShinseiInputs({
                     </div>
                     販売金額（税抜）
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <NumberInput value={l.unitPrice} onChange={(unitPrice) => changeItem(i.id, {unitPrice})} min={0} className={`w-28 ${i.unitPrice !== null ? 'bg-amber-50' : ''}`} ariaLabel="販売金額" />
+                      <NumberInput value={l.unitPrice} onChange={(unitPrice) => changeItem(i.id, unitPricePatch(i, unitPrice))} min={0} className={`w-28 ${i.unitPrice !== null ? 'bg-amber-50' : ''}`} ariaLabel="販売金額" />
                       {i.unitPrice !== null && (
                         <button type="button" onClick={() => changeItem(i.id, {unitPrice: null})} className="rounded px-1.5 py-1 text-slate-500 hover:bg-slate-100" title="定価×割引率に戻す" aria-label="販売金額を自動に戻す">
                           ↺

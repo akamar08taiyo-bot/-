@@ -32,6 +32,34 @@ export function unitPriceOf(item: Pick<SaleItem, 'unitPrice' | 'listPrice' | 'co
   return {price: 0, basis: 'none'};
 }
 
+/**
+ * 定価と販売単価（税抜）から割引率（%）。定価×(100−%)% の切り捨て（unitPriceOf と同じ）がちょうどその単価になる整数の%なら、その%。でなければ null
+ */
+export function impliedDiscount(listPrice: number, unitPrice: number): number | null {
+  const list = Math.round(toYen(listPrice) * 100);
+  if (list <= 0 || !Number.isFinite(unitPrice)) return null;
+  const off = Math.round((1 - (unitPrice * 100) / list) * 100);
+  if (off < 0 || off > 100) return null;
+  return Math.floor((list * (100 - off)) / 10000) === Math.floor(unitPrice) ? off : null;
+}
+
+/**
+ * 販売単価を手で入れたときの直し：ちょうど何%引きの単価なら、割引率の欄もその%にする（割引率・単価・備考・販売受注簿をそろえる。
+ * ユーザーの指摘「販売受注簿に転機した場合に、なぜか割引率が35%になっている」2026-10-28：単価を手で入れても割引率の欄は前の値のままで、それが受注簿に渡っていた）
+ */
+export function unitPricePatch(item: Pick<SaleItem, 'listPrice'>, unitPrice: number | null): Partial<SaleItem> {
+  if (unitPrice === null) return {unitPrice};
+  const off = impliedDiscount(item.listPrice, unitPrice);
+  return off === null ? {unitPrice} : {unitPrice, discountRate: off};
+}
+
+/** 実際の割引率（%。販売受注簿に渡す）：定価×割引の行はその割引率、手で単価を入れた行は定価と単価から（整数でなければ小数1けた）、定価がなければ割引率の欄のまま */
+export function actualDiscount(line: Pick<Line, 'item' | 'unitPrice' | 'basis'>): number {
+  const list = toYen(line.item.listPrice);
+  if (line.basis !== 'manual' || list <= 0) return Math.round(line.item.discountRate);
+  return impliedDiscount(list, line.unitPrice) ?? Math.round((1 - line.unitPrice / list) * 1000) / 10;
+}
+
 export type Line = {
   item: SaleItem;
   unitPrice: number; // 販売単価（税抜）

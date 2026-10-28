@@ -3,6 +3,8 @@ import test from 'node:test';
 import {saleTotals} from '../../src/tokutei/calc.ts';
 import {benefitSplit, HACCHU_IMPORT_KEY, HACCHU_PATH, HACCHU_QUEUE_KEY, hacchuImport, queueHacchu} from '../../src/tokutei/handoff.ts';
 import type {Sale, SaleItem, TaxType} from '../../src/tokutei/types.ts';
+import {newSale} from '../../src/tokutei/sales.ts';
+import {defaultSettings} from '../../src/tokutei/defaults.ts';
 
 const S = {markupRate: 25, limit: 100000, minProfitRate: 20};
 
@@ -126,6 +128,10 @@ test('販売受注簿へ渡す内容：受注区分「給付」の1点1ページ
   assert.equal(h.items.reduce((n, i) => n + i.benefit.insurerBurden, 0), t.insurerBurden);
   // 名前がなければ「特定福祉用具」だけ。担当がいなければ空（受注簿の初めの値のまま）
   assert.deepEqual([hacchuImport(sale(two()), S).title, hacchuImport(sale(two()), S).sales], ['特定福祉用具', '']);
+  // 納品日は初め空白のまま。空白でも販売受注簿へ渡せる（受注簿の納品予定日は空のまま。ユーザーの指示「納品日はデフォルトは空白で良い。空白でも販売受注簿を作成できるようにする」2026-10-28）
+  assert.equal(newSale([], defaultSettings(), 'yukuhashi').deliveryDate, ''); // 新しい見積もりの納品日は空白
+  assert.equal(hacchuImport(sale(two()), S).deliveryDate, '');
+  assert.equal(hacchuImport(sale(two()), S).items.length, 2);
 });
 
 test('今年度の残りを超えるとき：前の商品から順に残りを使い、超えた分は備考に（残りがない商品は全額自己負担）', () => {

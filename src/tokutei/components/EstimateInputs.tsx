@@ -5,7 +5,7 @@
 // 下の「お客様・申請」の行は見積書には出ないが、申請書と販売受注簿に使う（申請書の画面と同じ値）
 import {useMemo, useState} from 'react';
 import type {FocusEvent, ReactNode, RefObject} from 'react';
-import {basisNote, lineOf, priceNote} from '../calc.ts';
+import {basisNote, lineOf, priceNote, unitPricePatch} from '../calc.ts';
 import type {Line, Totals} from '../calc.ts';
 import {CARE_LEVELS, INSURERS} from '../defaults.ts';
 import {showsSelfPay, userBurdenLine} from '../estimateBook.ts';
@@ -436,11 +436,12 @@ function ItemBlock({
         </div>
         割引率
         <div className="flex items-center gap-1">
-          <NumberInput value={i.discountRate} onChange={(discountRate) => change({discountRate: Math.min(100, discountRate)})} min={0} className="w-16" ariaLabel="割引率" />%
+          {/* 割引率を変えたら単価は定価×割引に戻す（申請書の画面と同じ。前はここだけ手で入れた単価のままで、割引率を変えても単価が変わらなかった） */}
+          <NumberInput value={i.discountRate} onChange={(discountRate) => change({discountRate: Math.min(100, discountRate), unitPrice: null})} min={0} className="w-16" ariaLabel="割引率" />%
         </div>
         単価（税抜）
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <NumberInput value={l.unitPrice} onChange={(unitPrice) => change({unitPrice})} min={0} className={`w-28 ${i.unitPrice !== null ? 'bg-amber-50' : ''}`} ariaLabel="販売単価" />
+          <NumberInput value={l.unitPrice} onChange={(unitPrice) => change(unitPricePatch(i, unitPrice))} min={0} className={`w-28 ${i.unitPrice !== null ? 'bg-amber-50' : ''}`} ariaLabel="販売単価" />
           {i.unitPrice !== null && (
             <button type="button" onClick={() => change({unitPrice: null})} className="rounded px-1.5 py-1 text-slate-500 hover:bg-slate-100" title="定価×割引に戻す" aria-label="販売単価を自動に戻す">
               ↺
