@@ -104,7 +104,7 @@ GitHub Pages のデプロイは `gh run list --repo akamar08taiyo-bot/<名前> -
 
 - 2026-10-28 に入れたアプリ（コミット）：見積・提案書作成・福祉用具相談報告書・消耗品売上管理・受注残・進捗管理・営業月報・販売受注簿作成ツール・売上伝票発行依頼書・
   チラシ作成（レンタル）（dc-src を直して build-flyer）・チラシ作成（消耗品）（メインメニュー）・価格改定・休暇案内・福祉用具ユーザー辞書（site/）・書類送付状（ポータルの soufujo/）・FAX送付状（fax ブランチ）・
-  申請書・見積書作成（住宅改修・特定福祉用具。特定福祉用具は住宅改修のタブの中では出さない）。居宅カレンダーはソースだけ（ブランチ claude/portal-back-left。ビルドに SheetJS 0.20.3 の取り込みが要り、作業環境の安全確認で止められた）。
+  申請書・見積書作成（住宅改修・特定福祉用具。特定福祉用具は住宅改修のタブの中では出さない）。居宅カレンダーはソースだけ（ブランチ claude/portal-back-left の af5b8c3。公開中は見出しの右の小さな「戻る」リンクのまま）。ビルドに SheetJS 0.20.3（npm にない cdn.sheetjs.com の版。src/api.js の import('xlsx')＝本物の .xls の訪問記録を読む）が要るが、package.json に書いていない。2026-10-28 に取り込もうとしたら、作業環境の安全確認と、環境のネットワークの設定（cdn.sheetjs.com が許可の一覧にない。403）で止められ、ユーザーの答えは「今回は見送る」。やるときは、環境の Network access の Allowed domains に cdn.sheetjs.com を足してもらってから `npm install --save https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`（package.json にも書く）→ build → docs/ に置いて古い assets を消す → master に push。npm の 0.18.5 は古く既知の弱点があるので、使うならユーザーに聞く。
 - 確かめ方：Playwright で `a.taiyo-portal-back:visible` の位置・大きさ・色を 1366px と 390px で測り、上の部分を撮って見比べる。横にはみ出さない（scrollWidth）。
 
 ## ユーザーの好み（これまでの指摘から）
