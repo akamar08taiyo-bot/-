@@ -720,6 +720,19 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
     setOpenKeys((o) => new Set(o).add(key));
     setOpened(key);
   };
+  // 開いた欄は ✕ で閉じる（入れた値は消す。値が入っていれば消す前に確かめる）。ユーザーの指示「任意の高さは、一度開いても閉じることができるようにする」2026-10-28。
+  // 「そのほか」も同じ作り
+  const closeField = (key: string, label: string, value: string, clear: () => void) => {
+    if (value.trim() && !confirm(`${label}（${value.trim()}）を消して閉じますか？`)) return;
+    clear();
+    setOpenKeys((o) => {
+      const next = new Set(o);
+      next.delete(key);
+      return next;
+    });
+    setOpened(null);
+  };
+  const closeBtn = 'rounded px-1.5 py-0.5 text-sm text-slate-400 hover:bg-slate-100 hover:text-slate-700';
   const plusBtn = 'rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-700';
   const add = (name: string) => {
     const place = newPlace(name, [manualRow('material')]);
@@ -785,7 +798,12 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
                           （ユーザーの指示「手すりの取り付けの高さが任意、長さは必須。手すりの取り付けの高さも、プラスで開いてから入力できるようにする。（任意）」2026-10-26） */}
                       {dim('l', '長さ', {wide: true, placeholder: estimateLength(p), missing: !p.dims?.l?.trim() && !estimateLength(p)})}
                       {showHeight ? (
-                        dim('h', '高さ', {optional: true, autoFocus: opened === `${p.id}:h`})
+                        <span className="inline-flex items-center gap-0.5">
+                          {dim('h', '高さ', {optional: true, autoFocus: opened === `${p.id}:h`})}
+                          <button type="button" onClick={() => closeField(`${p.id}:h`, '高さ', p.dims?.h ?? '', () => setDim(p.id, 'h', ''))} className={closeBtn} aria-label="高さを閉じる" title="高さを閉じる（入れた高さは消えます）">
+                            ✕
+                          </button>
+                        </span>
                       ) : (
                         <button type="button" onClick={() => openField(`${p.id}:h`)} className={plusBtn}>
                           ＋ 高さ（任意）
@@ -805,6 +823,15 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
                     <label className="flex min-w-[9rem] flex-1 items-center gap-1 whitespace-nowrap">
                       そのほか
                       <TextInput value={p.shinseiText ?? ''} onChange={(t) => setPlace(p.id, (x) => ({...x, shinseiText: t}))} className="min-w-0 flex-1" aria-label="そのほか" autoFocus={opened === `${p.id}:other`} data-nav />
+                      <button
+                        type="button"
+                        onClick={() => closeField(`${p.id}:other`, 'そのほか', p.shinseiText ?? '', () => setPlace(p.id, ({shinseiText: _t, ...x}) => x))}
+                        className={closeBtn}
+                        aria-label="そのほかを閉じる"
+                        title="そのほかを閉じる（入れた文は消えます）"
+                      >
+                        ✕
+                      </button>
                     </label>
                   ) : (
                     <button type="button" onClick={() => openField(`${p.id}:other`)} className={plusBtn}>

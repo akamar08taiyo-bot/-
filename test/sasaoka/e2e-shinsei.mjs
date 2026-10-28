@@ -213,14 +213,35 @@ assert.equal(await form.getByText('申請書に書く内容').count(), 0);
 await genkan.getByLabel('高さ（mm）').fill('850');
 await pvHas('①玄関　手すりの取り付け　L=600mm H=850mm');
 // そのほかは ＋ を押すと開いて入れる（「そのほかの部分は、プラスかで、開くと入力できるようにする」2026-10-26）
-assert.equal(await genkan.getByLabel('そのほか').count(), 0);
+assert.equal(await genkan.getByLabel('そのほか', {exact: true}).count(), 0);
 await genkan.getByRole('button', {name: '＋ そのほか'}).click();
-assert.ok(await genkan.getByLabel('そのほか').evaluate((el) => el === document.activeElement), '開いたらすぐ打てる');
-await genkan.getByLabel('そのほか').fill('木製');
+assert.ok(await genkan.getByLabel('そのほか', {exact: true}).evaluate((el) => el === document.activeElement), '開いたらすぐ打てる');
+await genkan.getByLabel('そのほか', {exact: true}).fill('木製');
 // そのほかは次の行（「そのほかの部分の記載は、行替えして表示するようにする」2026-10-26）
 await pvHas('木製');
 assert.ok(!(await preview.innerText()).includes('H=850mm　木製'), 'そのほかが同じ行にある');
-await genkan.getByLabel('そのほか').fill('');
+// 開いた欄は ✕ で閉じられる（入れた値は消える。値があれば聞いてから）。ユーザーの指示「任意の高さは、一度開いても閉じることができるようにする」2026-10-28
+const closeAsked = [];
+const closeAsk = (d) => closeAsked.push(d.message());
+page.on('dialog', closeAsk);
+await genkan.getByRole('button', {name: 'そのほかを閉じる'}).click();
+await genkan.getByRole('button', {name: '＋ そのほか'}).waitFor();
+assert.equal(await genkan.getByLabel('そのほか', {exact: true}).count(), 0);
+await genkan.getByRole('button', {name: '高さを閉じる'}).click();
+await genkan.getByRole('button', {name: '＋ 高さ（任意）'}).waitFor();
+assert.equal(await genkan.getByLabel('高さ（mm）').count(), 0);
+assert.deepEqual(closeAsked, ['そのほか（木製）を消して閉じますか？', '高さ（850）を消して閉じますか？']);
+await page.waitForFunction(() => {
+  const t = document.querySelector('[aria-label="申請書のプレビュー"]')?.textContent ?? '';
+  return t.includes('①玄関　手すりの取り付け　L=600mm') && !t.includes('H=850mm') && !t.includes('木製');
+});
+// 何も入れていなければ聞かずに閉じる
+await genkan.getByRole('button', {name: '＋ 高さ（任意）'}).click();
+await genkan.getByRole('button', {name: '高さを閉じる'}).click();
+await genkan.getByRole('button', {name: '＋ 高さ（任意）'}).waitFor();
+assert.equal(closeAsked.length, 2);
+page.off('dialog', closeAsk);
+await genkan.getByRole('button', {name: '＋ 高さ（任意）'}).click();
 await genkan.getByLabel('高さ（mm）').fill('800');
 await pvHas('①玄関　手すりの取り付け　L=600mm H=800mm');
 // 丸：プレビューの申請書の「女」「昭」「要介護２」を押す（一覧のボタンにも出る）
