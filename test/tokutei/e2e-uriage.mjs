@@ -104,10 +104,10 @@ try {
     await page.getByText('負担割合を選ぶと、自己負担額が出ます').waitFor();
     assert.ok(!(await page.locator('aside').first().innerText()).includes('利用者負担'));
 
-    // ---- 🧾 売上伝票依頼書：上の段（印刷・Excel の右）
+    // ---- 🧾 売上伝票依頼書：上の段（Excel・印刷・削除の真下の段。2026-10-28）
     const bar = await page.getByRole('button', {name: '🧾 売上伝票依頼書', exact: true}).boundingBox();
-    const excel = await page.getByRole('button', {name: '📗 Excelで保存'}).boundingBox();
-    assert.ok(bar && excel && (bar.x > excel.x || bar.y > excel.y), `${JSON.stringify(bar)} ${JSON.stringify(excel)}`);
+    const excel = await page.getByRole('button', {name: '📗 見積書をExcelで保存'}).boundingBox();
+    assert.ok(bar && excel && bar.y > excel.y + excel.height - 1 && Math.abs(bar.x - excel.x) < 1, `${JSON.stringify(bar)} ${JSON.stringify(excel)}`);
     await page.getByRole('button', {name: '🧾 売上伝票依頼書', exact: true}).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByText('まだ入っていません：負担割合・介護度・新規・既存').waitFor();

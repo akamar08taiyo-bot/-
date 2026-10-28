@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from 'react';
+import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {CATALOG, catalogLabel, catalogPicks, catalogTitle} from '../catalog.ts';
 import type {Sale} from '../types.ts';
@@ -58,11 +58,25 @@ export function CatalogPrintView({sale, onClose}: {sale: Sale; onClose: () => vo
       return next;
     });
   };
+  // 左の大きな「印刷する」は画面のまん中の高さ。ただし上の帯（ページの名前）より下に（住宅改修のタブの中の低い枠では、まん中だと上の帯の「閉じる」にかぶった）
+  const bar = useRef<HTMLDivElement>(null);
+  const [sideTop, setSideTop] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const place = () => setSideTop(Math.round(Math.max((bar.current?.getBoundingClientRect().bottom ?? 0) + 16, window.innerHeight / 2 - 72)));
+    place();
+    const ro = new ResizeObserver(place);
+    if (bar.current) ro.observe(bar.current);
+    window.addEventListener('resize', place);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', place);
+    };
+  }, []);
   const last = Math.max(-1, ...picked);
   const ready = picked.size > 0 && [...picked].every((i) => pages[i] && pages[i] !== 'error');
   return createPortal(
     <div className="print-overlay">
-      <div className="print-toolbar">
+      <div ref={bar} className="print-toolbar">
         <span className="font-bold">カタログ（介援隊）</span>
         {/* 広い画面（xl）では「印刷する」は左の空いた所に大きく（下の cat-print-side）。狭い画面はここ（ページの左に置く所がない） */}
         <button
@@ -96,7 +110,8 @@ export function CatalogPrintView({sale, onClose}: {sale: Sale; onClose: () => vo
         type="button"
         onClick={() => window.print()}
         disabled={!ready}
-        className="cat-print-side fixed left-6 top-1/2 z-[2] hidden h-36 w-44 -translate-y-1/2 flex-col items-center justify-center gap-2 rounded-xl bg-sky-100 text-xl font-bold text-sky-900 shadow-lg hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-40 xl:flex"
+        style={sideTop === null ? undefined : {top: sideTop}}
+        className="cat-print-side fixed left-6 top-1/2 z-[2] hidden h-36 w-44 flex-col items-center justify-center gap-2 rounded-xl bg-sky-100 text-xl font-bold text-sky-900 shadow-lg hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-40 xl:flex"
       >
         <span aria-hidden="true" className="text-4xl leading-none">🖨</span>
         <span className="sr-only">🖨 </span>印刷する

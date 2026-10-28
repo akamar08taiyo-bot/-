@@ -675,19 +675,19 @@ try {
     dialogs.push(d.message());
     void d.accept();
   });
-  // 上の段は住宅改修の申請書のタブと同じ形：名前のすぐ右に 📗 申請書をExcelで保存・🖨 申請書を印刷、🖨 カタログを印刷はそのすぐ右
-  // （ユーザーの指示「特定福祉用具の印刷ボタンなどの位置を住宅改修などと統一する」2026-10-27。前はプレビューの上の枠のまん中に同じ大きさで並べていた）
+  // 上の段は住宅改修の様邸の画面と同じ並び：名前の右に 📗 申請書をExcelで保存・🖨 申請書を印刷・削除、その真下に 🖨 カタログを印刷・複製
+  // （ユーザーの指示「基本的な並びは、申請書をEXCELで保存、申請書（見積書を印刷）、削除 それ以外の独自の機能…は行を変えて、真下に統一して設置する」2026-10-28）
   const nameBox = await page.locator('h2').first().boundingBox();
   const xlBox = await page.getByRole('button', {name: '📗 申請書をExcelで保存'}).boundingBox();
   const prBox = await page.getByRole('button', {name: '🖨 申請書を印刷', exact: true}).boundingBox();
+  const delBox = await page.getByRole('group', {name: '保存・印刷・削除'}).getByRole('button', {name: '削除', exact: true}).boundingBox();
   const catBox = await page.getByRole('button', {name: '🖨 カタログを印刷'}).boundingBox();
-  assert.ok(nameBox && xlBox && prBox && catBox, 'ボタンがない');
-  assert.ok(xlBox.x > nameBox.x + nameBox.width && xlBox.x - (nameBox.x + nameBox.width) < 160 && Math.abs(xlBox.y + xlBox.height / 2 - (nameBox.y + nameBox.height / 2)) < 8, `${JSON.stringify(nameBox)} ${JSON.stringify(xlBox)}`);
-  assert.ok(prBox.x > xlBox.x && Math.abs(prBox.y - xlBox.y) < 1, `${JSON.stringify(prBox)} ${JSON.stringify(xlBox)}`);
-  // そのほか（カタログ・複製・削除）も右に寄せず、すぐ右に続ける（ユーザーの指示「この位置を赤枠を左にずらす」2026-10-27）
+  assert.ok(nameBox && xlBox && prBox && delBox && catBox, 'ボタンがない');
+  assert.ok(xlBox.x > nameBox.x + nameBox.width && Math.abs(xlBox.y + xlBox.height / 2 - (nameBox.y + nameBox.height / 2)) < 8, `${JSON.stringify(nameBox)} ${JSON.stringify(xlBox)}`);
+  assert.ok(prBox.x > xlBox.x && Math.abs(prBox.y - xlBox.y) < 1 && delBox.x > prBox.x && Math.abs(delBox.y - xlBox.y) < 1, `${JSON.stringify(prBox)} ${JSON.stringify(delBox)}`);
   const copyBox = await page.getByRole('button', {name: '複製', exact: true}).boundingBox();
-  assert.ok(catBox.x > prBox.x + prBox.width && catBox.x - (prBox.x + prBox.width) < 24 && Math.abs(catBox.y - prBox.y) < 1, `${JSON.stringify(prBox)} ${JSON.stringify(catBox)}`);
-  assert.ok(copyBox && copyBox.x > catBox.x + catBox.width && copyBox.x - (catBox.x + catBox.width) < 24, `${JSON.stringify(catBox)} ${JSON.stringify(copyBox)}`);
+  assert.ok(Math.abs(catBox.x - xlBox.x) < 1 && catBox.y > xlBox.y + xlBox.height - 1, `${JSON.stringify(xlBox)} ${JSON.stringify(catBox)}`);
+  assert.ok(copyBox && copyBox.x > catBox.x + catBox.width && Math.abs(copyBox.y - catBox.y) < 1, `${JSON.stringify(catBox)} ${JSON.stringify(copyBox)}`);
   assert.equal(await page.getByRole('button', {name: '📄 申請書（Excel）を作る'}).count(), 0);
   await page.getByRole('button', {name: '🖨 カタログを印刷'}).click();
   await page.getByRole('group', {name: '印刷するページ'}).waitFor();
