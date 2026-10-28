@@ -205,6 +205,8 @@ if (withTokutei) {
   const nextM = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const saleId = await page.evaluate(() => JSON.parse(localStorage.getItem('taiyo-tokutei-sales-v1') || '{}').rows?.find((r) => r.customer === '見本 花子')?.id);
   assert.ok(saleId);
+  // 行の先頭の印：特定福祉用具の案件に商品がある＝「特福」（ユーザーの指示「住改・特福のマークを先頭の赤枠の部分につける」2026-10-27）
+  assert.match(await page.getByRole('row', {name: /見本 花子様邸/}).locator('td').first().innerText(), /特福/);
   const hanako = page.getByRole('row', {name: /見本 花子様邸/}).getByRole('group', {name: '売上月'});
   await hanako.getByRole('button', {name: '売上月を次月に'}).click();
   await page.waitForFunction((id) => JSON.parse(localStorage.getItem('taiyo-jutaku-sales-v1') || '{}').tokuteiMonths?.[id], saleId);
@@ -247,6 +249,7 @@ if (withTokutei) {
   const row2 = page.getByRole('row', {name: /見本 特定様邸/});
   await row2.waitFor();
   assert.match(await row2.innerText(), /申請書だけ/); // 金額がないので請求書に入れない（ユーザーの指示「金額などを入れていない場合は、請求書や受注残にいれない」）
+  assert.equal((await row2.locator('td').first().innerText()).trim(), '特福'); // 住宅改修には何も入れていない（住改の印なし）
   await page.getByPlaceholder(/お客様名・住所で探す/).fill('見本 特定');
   await row2.waitFor();
   await page.getByPlaceholder(/お客様名・住所で探す/).fill('');

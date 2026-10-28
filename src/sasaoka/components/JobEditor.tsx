@@ -145,7 +145,7 @@ export function JobEditor({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        {/* 一覧へは上の「🧾 請求書を確認する」のタブで戻る（ユーザーの指示：「一覧へ戻るではなく、見積もりへ戻るへ変更」） */}
+        {/* 一覧へは上の「🧾 工務店請求書を確認する」のタブで戻る（ユーザーの指示：「一覧へ戻るではなく、見積もりへ戻るへ変更」） */}
         <Btn color="white" onClick={onBackToEstimate}>
           ← 見積もりへ戻る
         </Btn>

@@ -73,7 +73,7 @@ export function KitsPage({data, update}: {data: AppData; update: Update}) {
       </p>
       {data.kits.length === 0 && (
         <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm leading-6 text-slate-500">
-          まだ登録していません。「＋ 新しいセットを登録」で作れます（請求書を確認するの様邸で「この箇所を部材＋施工費（常用）に登録」を押しても登録できます）。
+          まだ登録していません。「＋ 新しいセットを登録」で作れます（工務店請求書を確認するの様邸で「この箇所を部材＋施工費（常用）に登録」を押しても登録できます）。
         </p>
       )}
       {data.kits.map((kit) => (

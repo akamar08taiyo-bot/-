@@ -2,7 +2,7 @@ import {useEffect, useMemo, useState} from 'react';
 import {estimateTotals, hasEstimateRows, jobName} from '../calc.ts';
 import {copyJob} from '../components/JobTools.tsx';
 import {askTrash, trashLabel, useTrashUndo} from '../components/TrashPage.tsx';
-import {tokuteiNames} from '../tokuteiLink.ts';
+import {tokuteiItemJobs, tokuteiNames} from '../tokuteiLink.ts';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm} from '../estimateForms.ts';
 import {estimateXlsx, XLSX_TYPE} from '../estimateXlsx.ts';
@@ -177,7 +177,7 @@ function GettingStarted({data, update, goMaterials, onSample}: {data: AppData; u
           {s.estimateRate} になります。
         </li>
         <li>
-          見積書に行を入れると、{s.clientName || '工務店'}の仕切り計算表と請求書（「請求書を確認する」）に入って自動で計算され、発注書も作れます。申請書だけの様邸（ほかの工務店の工事）は、請求書・発注書に入りません（{s.clientName || '工務店'}の工事でない見積書は、見積書の上の「{s.clientName || '工務店'}の請求書に入れる」を外します）。
+          見積書に行を入れると、{s.clientName || '工務店'}の仕切り計算表と請求書（「工務店請求書を確認する」）に入って自動で計算され、発注書も作れます。申請書だけの様邸（ほかの工務店の工事）は、請求書・発注書に入りません（{s.clientName || '工務店'}の工事でない見積書は、見積書の上の「{s.clientName || '工務店'}の請求書に入れる」を外します）。
         </li>
       </ol>
       {!hasSamples(data) && (
@@ -225,11 +225,13 @@ export function EstimateList({
   onNew,
   onPrint,
   goMaterials,
+  onBack,
 }: {
   data: AppData;
   update: Update;
   month: string;
   setMonth: (m: string) => void;
+  onBack?: () => void; // 「← 戻る」：見積もりの入口（新規作成・一覧から作成）へ
   onOpen: (id: string) => void;
   onOpenShinsei: (id: string) => void; // 様邸の申請書の画面を開く
   onNew: (insurer: Insurer) => void;
@@ -243,6 +245,8 @@ export function EstimateList({
   const all = useEstimates(data, s);
   // 特定福祉用具申請書だけを作っている様邸のお客様名（住宅改修の方に名前がないとき。tokuteiLink.ts）
   const names = useMemo(() => tokuteiNames(), [data.jobs]);
+  // 特定福祉用具の案件に商品の入っている様邸（行の先頭の「特福」の印）
+  const tokuteiJobs = useMemo(() => tokuteiItemJobs(), [data.jobs]);
   const tokutei = useMemo(() => tokuteiSales(), [data.jobs, s.tokuteiSalesMonths]);
   const searching = query.trim() !== '';
   const list = useMemo(
@@ -293,6 +297,12 @@ export function EstimateList({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
+        {/* 見積もりの入口（新規作成・一覧から作成）へ（ユーザーの指示「戻るボタンを設置。（新規作成と一覧のページ）」2026-10-27。前は上の「見積もり・申請書を作成する」のタブを押し直すだけ） */}
+        {onBack && (
+          <Btn color="white" className="!text-base" onClick={onBack}>
+            ← 戻る
+          </Btn>
+        )}
         <div className={`flex items-center gap-1 rounded-lg border border-slate-300 bg-white p-1 shadow-sm ${searching ? 'opacity-50' : ''}`}>
           <button type="button" className="rounded-md px-3 py-1.5 text-lg font-bold text-slate-600 hover:bg-slate-100" onClick={() => setMonth(addMonths(month, -1))} aria-label="前の月">
             ◀
@@ -303,7 +313,7 @@ export function EstimateList({
               type="month"
               value={month}
               onChange={(e) => e.target.value && setMonth(e.target.value)}
-              className="h-8 w-[9.5rem] rounded border border-slate-300 px-1 text-sm"
+              className="h-8 w-[8.5rem] rounded border border-slate-300 px-1 text-sm sm:h-9 sm:w-[9.5rem] sm:text-base"
               aria-label="一覧の月"
             />
           </label>
@@ -311,13 +321,13 @@ export function EstimateList({
             ▶
           </button>
         </div>
-        <span className="text-sm font-bold text-slate-600">＋ 新規作成：</span>
+        <span className="text-base font-bold text-slate-600">＋ 新規作成：</span>
         {INSURER_IDS.map((i) => (
-          <Btn key={i} color="emerald" onClick={() => onNew(i)} title={`${INSURER_INFO[i].area}の見積書（${FORM_INFO[INSURER_INFO[i].form].name}「${FORM_INFO[INSURER_INFO[i].form].title}」）`}>
+          <Btn key={i} color="emerald" className="!text-base" onClick={() => onNew(i)} title={`${INSURER_INFO[i].area}の見積書（${FORM_INFO[INSURER_INFO[i].form].name}「${FORM_INFO[INSURER_INFO[i].form].title}」）`}>
             ＋ {INSURER_INFO[i].name}
           </Btn>
         ))}
-        <TextInput value={query} onChange={setQuery} placeholder="お客様名・住所で探す（すべての月）" className="ml-auto w-72 text-sm" aria-label="見積書を探す" />
+        <TextInput value={query} onChange={setQuery} placeholder="お客様名・住所で探す（すべての月）" className="ml-auto w-56 min-w-[14rem] max-w-[20rem] flex-1 text-base" aria-label="見積書を探す" />
       </div>
       {checked.size > 0 && (
         <div role="status" aria-label="選んだ見積書" className="flex flex-wrap items-center gap-2 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-900">
@@ -341,22 +351,24 @@ export function EstimateList({
         <GettingStarted data={data} update={update} goMaterials={goMaterials} />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-emerald-200 bg-white shadow-sm">
-          <table className="w-full min-w-[1200px] text-sm">
-            <thead className="bg-emerald-50 text-xs text-emerald-900">
+          {/* 文字はひとまわり大きく（ユーザーの指示「全体の文字を少しだけ大きくする」2026-10-27。前は 本文 14px・見出し 12px） */}
+          <table className="w-full min-w-[1200px] text-base">
+            <thead className="bg-emerald-50 text-sm text-emerald-900">
               <tr>
+                <th className="w-px whitespace-nowrap px-2 py-2 text-left">種類</th>
                 <th className="w-8 px-2 py-2">
                   <input
                     type="checkbox"
                     checked={allChecked}
                     onChange={() => setChecked(allChecked ? new Set() : new Set(shown.map(({job}) => job.id)))}
-                    className="h-4 w-4 align-middle"
+                    className="h-5 w-5 align-middle"
                     aria-label="すべて選ぶ"
                   />
                 </th>
                 {/* 作成日・売上月は中身の幅だけ（スマホでもお客様名が見えるように） */}
                 <th className="w-px whitespace-nowrap px-2 py-2 text-left">作成日</th>
                 <th className="w-px whitespace-nowrap px-2 py-2 text-left">売上月</th>
-                <th className="px-2 py-2 text-left">お客様名</th>
+                <th className="min-w-[11rem] px-2 py-2 text-left">お客様名</th>
                 <th className="px-2 py-2 text-right">見積の合計（税込）</th>
                 <th className="px-2 py-2 text-left">{s.clientName || '工務店'}の請求書</th>
                 <th className="px-2 py-2" />
@@ -365,15 +377,34 @@ export function EstimateList({
             <tbody>
               {shown.map(({job, date, t}) => {
                 const estimated = hasEstimateRows(job); // 見積書を作った様邸（申請書だけの様邸は、請求書・発注書に入らない）
+                const housing = estimated || job.places.some((p) => p.name.trim()); // 住宅改修の見積書か申請書（改修の箇所）を作っている
                 const name = job.customer.trim() ? jobName(job) : names.get(job.id) ? jobName({...job, customer: names.get(job.id)!}) : 'お客様名なし';
                 const sales = rowSalesMonth(job, tokutei, s);
                 // 請求書に入れていて、売上月を請求する月とちがう月にしてある（まれ）：薄い黄色（見積書の上の「売上月」で直した月）
                 const apart = estimated && job.shikiri && jutakuSalesMonth(job) !== job.month;
-                const arrow = 'h-8 w-8 rounded text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-800';
+                const arrow = 'h-9 w-9 rounded text-base text-slate-500 hover:bg-slate-100 hover:text-slate-800';
                 return (
                   <tr key={job.id} className={`cursor-pointer border-t border-slate-100 hover:bg-emerald-50/60 ${checked.has(job.id) ? 'bg-sky-50' : ''}`} onClick={() => onOpen(job.id)}>
+                    {/* 何を作っているか（ユーザーの指示「何の申請書を作成しているかわからないので、住改・特福のマークを先頭の赤枠の部分につける。ただし、基本的に住所・名前などは
+                        連動していると思うので、見積書作成（住宅改修）見積書（特定福祉用具）を作成途中のものを前提とする」2026-10-27）：
+                        住改＝住宅改修の見積書に行がある（見積書がなくても改修の箇所を入れた申請書）、特福＝特定福祉用具の案件に商品がある（申請書と見積書は同じ商品）か、
+                        特定福祉用具の案件があって住宅改修の方は何も作っていない（特定福祉用具申請書だけを作っている。お客様名は両方に連動するので名前では分けない）。両方なら両方 */}
+                    <td className="whitespace-nowrap px-2 py-2">
+                      <span className="inline-flex gap-1">
+                        {housing && (
+                          <span className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-sm text-emerald-800" title="住宅改修">
+                            住改
+                          </span>
+                        )}
+                        {(tokuteiJobs.has(job.id) || (!housing && names.has(job.id))) && (
+                          <span className="rounded border border-violet-300 bg-violet-50 px-1.5 py-0.5 text-sm text-violet-800" title="特定福祉用具">
+                            特福
+                          </span>
+                        )}
+                      </span>
+                    </td>
                     <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                      <input type="checkbox" checked={checked.has(job.id)} onChange={() => toggle(job.id)} className="h-4 w-4 align-middle" aria-label="選ぶ" />
+                      <input type="checkbox" checked={checked.has(job.id)} onChange={() => toggle(job.id)} className="h-5 w-5 align-middle" aria-label="選ぶ" />
                     </td>
                     <td className="whitespace-nowrap px-2 py-2 tabular-nums">
                       {/* スマホは年を出さない（売上月の ◀ ▶ とお客様名を見えるように） */}
@@ -405,14 +436,14 @@ export function EstimateList({
                       ) : names.get(job.id) ? (
                         <>
                           {jobName({...job, customer: names.get(job.id)!})}
-                          <span className="ml-1.5 text-xs font-normal text-slate-500">特定福祉用具</span>
+                          <span className="ml-1.5 text-sm font-normal text-slate-500">特定福祉用具</span>
                         </>
                       ) : (
                         <span className="text-slate-400">（お客様名なし）</span>
                       )}
                     </td>
                     <td className="px-2 py-2 text-right font-bold tabular-nums text-emerald-900">{estimated ? yen(t.all.total) : <span className="font-normal text-slate-400">—</span>}</td>
-                    <td className="whitespace-nowrap px-2 py-2 text-xs">
+                    <td className="whitespace-nowrap px-2 py-2 text-sm">
                       {job.shikiri ? (
                         <span className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 font-bold text-[#0c315e]">{monthLabel(job.month)}分に入れる</span>
                       ) : estimated ? (
@@ -421,7 +452,8 @@ export function EstimateList({
                         <span className="text-slate-500">申請書だけ</span>
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-2 py-1.5 text-right" onClick={(e) => e.stopPropagation()}>
+                    {/* 行のボタン（申請書・印刷・Excel・複製・削除）：右の端から少し左へ（ユーザーの指示「赤枠の部分を少しだけ中央（左に寄せる）」2026-10-27）。字は 14px */}
+                    <td className="whitespace-nowrap py-1.5 pl-2 pr-2 text-right xl:pr-28 [&_button]:!text-sm" onClick={(e) => e.stopPropagation()}>
                       <Btn small color="white" onClick={() => onOpenShinsei(job.id)}>
                         📝 申請書
                       </Btn>
@@ -453,8 +485,8 @@ export function EstimateList({
             </tbody>
             {list.length > 0 && (
               <tfoot>
-                <tr className="border-t border-slate-200 bg-emerald-50/60 text-sm">
-                  <td colSpan={4} className="px-2 py-2 text-right font-bold text-emerald-900">
+                <tr className="border-t border-slate-200 bg-emerald-50/60 text-base">
+                  <td colSpan={5} className="px-2 py-2 text-right font-bold text-emerald-900">
                     {searching ? `「${query}」の見積書` : `${monthLabel(month)}の見積書`}（{list.length}件）
                   </td>
                   <td className="px-2 py-2 text-right font-bold tabular-nums text-emerald-900">{yen(total)}</td>
@@ -464,7 +496,7 @@ export function EstimateList({
             )}
           </table>
           {list.length === 0 && (
-            <p className="px-4 py-6 text-center text-sm text-slate-500">
+            <p className="px-4 py-6 text-center text-base text-slate-500">
               {searching ? `「${query}」の見積書は見つかりませんでした。` : `${monthLabel(month)}の見積書はありません。◀ ▶ でほかの月を見られます。`}
             </p>
           )}

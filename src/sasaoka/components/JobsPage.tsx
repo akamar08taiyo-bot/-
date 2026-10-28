@@ -109,29 +109,34 @@ export function JobsPage({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white p-1 shadow-sm">
-          <button type="button" className="rounded-md px-3 py-1.5 text-lg font-bold text-slate-600 hover:bg-slate-100" onClick={() => setMonth(addMonths(month, -1))} aria-label="前の月">
-            ◀
-          </button>
-          <label className="flex items-center gap-2 px-1">
-            <span className="whitespace-nowrap text-lg font-bold text-[#0c315e]">{monthLabel(month)}分</span>
-            <input
-              type="month"
-              value={month}
-              onChange={(e) => e.target.value && setMonth(e.target.value)}
-              className="h-8 w-[8.5rem] rounded border border-slate-300 px-1 text-sm sm:w-[9.5rem]"
-              aria-label="請求する月"
-            />
-          </label>
-          <button type="button" className="rounded-md px-3 py-1.5 text-lg font-bold text-slate-600 hover:bg-slate-100" onClick={() => setMonth(addMonths(month, 1))} aria-label="次の月">
-            ▶
-          </button>
+      {/* 上の段：左に請求する月・様邸を追加、まん中に印刷・CSV（ユーザーの指示「赤枠の部分を中央にもってくる」2026-10-27。前は右の端。
+          見積書・申請書のタブの保存・Excel・印刷と同じく、よく使うボタンはまん中）。狭い画面は前と同じく折り返して並べる */}
+      {/* 広い画面（xl）は 左・まん中・右 の3つに分け、まん中に置く。左の月・様邸を追加は折り返さない（入りきらなければ、まん中のボタンは左のすぐ右）*/}
+      <div className="flex flex-wrap items-center gap-2 xl:grid xl:grid-cols-[minmax(max-content,1fr)_auto_1fr] xl:gap-x-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white p-1 shadow-sm">
+            <button type="button" className="rounded-md px-3 py-1.5 text-lg font-bold text-slate-600 hover:bg-slate-100" onClick={() => setMonth(addMonths(month, -1))} aria-label="前の月">
+              ◀
+            </button>
+            <label className="flex items-center gap-2 px-1">
+              <span className="whitespace-nowrap text-lg font-bold text-[#0c315e]">{monthLabel(month)}分</span>
+              <input
+                type="month"
+                value={month}
+                onChange={(e) => e.target.value && setMonth(e.target.value)}
+                className="h-8 w-[8.5rem] rounded border border-slate-300 px-1 text-sm sm:w-[9.5rem]"
+                aria-label="請求する月"
+              />
+            </label>
+            <button type="button" className="rounded-md px-3 py-1.5 text-lg font-bold text-slate-600 hover:bg-slate-100" onClick={() => setMonth(addMonths(month, 1))} aria-label="次の月">
+              ▶
+            </button>
+          </div>
+          <Btn color="emerald" onClick={add}>
+            ＋ 様邸を追加
+          </Btn>
         </div>
-        <Btn color="emerald" onClick={add}>
-          ＋ 様邸を追加
-        </Btn>
-        <div className="ml-auto flex flex-wrap gap-2">
+        <div role="group" aria-label="請求書の印刷・保存" className="flex flex-wrap gap-2 lg:ml-6 xl:ml-0 xl:justify-center">
           <Btn color="softSky" disabled={jobs.length === 0} onClick={() => onPrint({kind: 'invoice', month, withDetails: false})}>
             🖨 請求書を印刷
           </Btn>

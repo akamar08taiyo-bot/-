@@ -5,7 +5,7 @@
 //                       申請書は保険者の Excel の様式のまま画面に出して、欄を押して入れる。見積書はいただいた見積書
 //                       （苅田町・行橋市・みやこ町用「工事費見積書兼工事費内訳書」・広域連合用「住宅改修内訳明細書」）の形のまま打ち込む。
 //                       見積書に打ち込んだ内容は、そのまま笹岡工務店の仕切り計算表・請求書に入る（入れない見積書は外せる）
-//   請求書を確認する：請求する月ごとの様邸（仕切り計算表）と、1か月分の御請求書
+//   工務店請求書を確認する：請求する月ごとの様邸（仕切り計算表）と、1か月分の御請求書
 //   売上見込みを確認する：月ごとの売上の見込み（住宅改修と特定福祉用具を別々に。salesPlan.ts・components/SalesPlanPage.tsx）
 //   部材・施工費マスタ：部材リスト（メーカーの仕切価格・定価）と、施工費（笹岡工務店の取付手間の単価）と、
 //                       部材＋施工費（常用）のセット（よく使う部材と施工費の組み合わせ）
@@ -49,8 +49,10 @@ import {tesuri, thisMonth} from './util.ts';
 
 const TABS: {id: MainTab; label: string}[] = [
   {id: 'estimate', label: '📝 見積もり・申請書を作成する'},
-  {id: 'invoice', label: '🧾 請求書を確認する'},
-  {id: 'sales', label: '📈 売上見込みを確認する'}, // 請求書を確認するの横（ユーザーの指示「請求書を作成するの横に、売上見込みを確認するとつくる」2026-10-25）
+  // 売上見込みは見積もりのすぐ右、工務店の請求書はその右（ユーザーの指示「請求書を確認するではなく、工務店請求書を確認するに変更」
+  // 「売上見込みを確認すると、工務店請求書を確認するの位置をいれかえる」2026-10-27。売上見込みは 2026-10-25 に請求書の右に足した）
+  {id: 'sales', label: '📈 売上見込みを確認する'},
+  {id: 'invoice', label: '🧾 工務店請求書を確認する'},
   {id: 'master', label: '📦 部材・施工費マスタ'},
   {id: 'settings', label: '⚙ 設定'},
   {id: 'trash', label: '🗑 ゴミ箱'}, // 設定のタブの横（ユーザーの指示「設定のタブの横にゴミ箱をつくり」2026-10-25）
@@ -141,7 +143,7 @@ export default function App({start}: {start: MainTab}) {
   // 見積書の画面か、そこから開いた発注書・申請書か（見積書を閉じると見積書の画面にもどる）
   const [jobView, setJobView] = useState<JobView>(estimateId ? initial.view : 'estimate');
   const [estimateMonth, setEstimateMonth] = useState(thisMonth);
-  const [month, setMonth] = useState(loadMonth); // 請求書を確認する：請求する月
+  const [month, setMonth] = useState(loadMonth); // 工務店請求書を確認する：請求する月
   const [salesMonth, setSalesMonth] = useState(thisMonth); // 売上見込みを確認する：売上の月
   const [masterTab, setMasterTab] = useState<MasterTab>('materials');
   const [print, setPrint] = useState<PrintRequest | null>(null);
@@ -381,6 +383,7 @@ export default function App({start}: {start: MainTab}) {
     setMasterTab(t);
     setTab('master');
   };
+  // 広い画面（lg 以上）は1段：タブの名前を「工務店請求書を確認する」にして長くなったので（2026-10-27）、1024〜1279px は余白と字を少し詰める（ゴミ箱が右にはみ出していた）
   const tabButton = (t: (typeof TABS)[number]) => {
     const on = tab === t.id;
     return (
@@ -389,7 +392,7 @@ export default function App({start}: {start: MainTab}) {
         type="button"
         onClick={() => goTab(t.id)}
         aria-current={on ? 'page' : undefined}
-        className={`flex min-h-11 flex-auto items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-[15px] font-bold transition sm:text-base lg:min-h-[3.25rem] lg:flex-none lg:rounded-b-none lg:rounded-t-xl lg:border-t-4 lg:px-5 xl:px-6 xl:text-[17px] ${
+        className={`flex min-h-11 flex-auto items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-[15px] font-bold transition sm:text-base lg:min-h-[3.25rem] lg:flex-none lg:rounded-b-none lg:rounded-t-xl lg:border-t-4 lg:px-2.5 lg:text-[15px] xl:px-5 xl:text-[17px] ${
           on ? `${theme.active} ${theme.accent}` : 'bg-white/10 text-white hover:bg-white/20 lg:border-transparent'
         }`}
       >
@@ -442,7 +445,7 @@ export default function App({start}: {start: MainTab}) {
               広い画面（lg 以上）は1段に並べ、選んでいるタブは下の画面と同じ色＋上の色の帯でつなげる。
               狭い画面は折り返して並べる（横にスクロールさせると、右のタブ（ゴミ箱）が画面の外に隠れる）。字の幅で並べ、段ごとに横いっぱいに広げる。
               設定とゴミ箱は1つのまとまりにして、いつも同じ段に並べる（ゴミ箱だけが1段に横長に残らないように。広い画面では lg:contents でまとまりを消す）。
-              スマホの幅 390px では 見積もり・申請書を作成する／請求書を確認する／売上見込みを確認する／部材・施工費マスタ・設定・ゴミ箱 の4段 */}
+              スマホの幅 390px では 見積もり・申請書を作成する／売上見込みを確認する／工務店請求書を確認する／部材・施工費マスタ・設定・ゴミ箱 の4段 */}
           <nav className={`mx-auto flex ${PAGE_WIDTH} flex-wrap gap-1.5 px-3 pb-3 lg:flex-nowrap lg:pb-0`}>
             {TABS.slice(0, 4).map(tabButton)}
             <div className="flex flex-auto gap-1.5 lg:contents">{TABS.slice(4).map(tabButton)}</div>
@@ -535,6 +538,7 @@ export default function App({start}: {start: MainTab}) {
                 onNew={newOne}
                 onPrint={setPrint}
                 goMaterials={() => goMaster()}
+                onBack={() => setEstimateView('home')}
               />
             ))}
           {tab === 'invoice' &&

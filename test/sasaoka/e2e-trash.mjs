@@ -119,11 +119,11 @@ const tabBtn = (name) => nav.getByRole('button', {name});
 const trashTab = tabBtn(/ゴミ箱/);
 await trashTab.waitFor();
 
-// ---------------- 上のタブ：6つ（請求書の右に売上見込み、設定の右にゴミ箱）・大きさ・選んでいるタブ・広い画面で1段・タブを替えても動かない
+// ---------------- 上のタブ：6つ（見積もりの右に売上見込み・その右に工務店請求書＝ユーザーの指示 2026-10-27、設定の右にゴミ箱）・大きさ・選んでいるタブ・広い画面で1段・タブを替えても動かない
 const tabNames = await nav.getByRole('button').allInnerTexts();
 assert.deepEqual(
   tabNames.map((t) => t.trim()),
-  ['📝 見積もり・申請書を作成する', '🧾 請求書を確認する', '📈 売上見込みを確認する', '📦 部材・施工費マスタ', '⚙ 設定', '🗑 ゴミ箱'],
+  ['📝 見積もり・申請書を作成する', '📈 売上見込みを確認する', '🧾 工務店請求書を確認する', '📦 部材・施工費マスタ', '⚙ 設定', '🗑 ゴミ箱'],
 );
 const tabBoxes = async () => nav.getByRole('button').evaluateAll((els) => els.map((e) => {
   const r = e.getBoundingClientRect();
@@ -132,7 +132,7 @@ const tabBoxes = async () => nav.getByRole('button').evaluateAll((els) => els.ma
 const first = await tabBoxes();
 assert.ok(first.every((b) => b.y === first[0].y), `1段に並んでいない: ${JSON.stringify(first)}`);
 assert.ok(first.every((b) => b.h >= 48 && b.font >= 16), `タブが小さい: ${JSON.stringify(first)}`);
-for (const name of ['🧾 請求書を確認する', '📈 売上見込みを確認する', '📦 部材・施工費マスタ', '⚙ 設定', '🗑 ゴミ箱', '📝 見積もり・申請書を作成する']) {
+for (const name of ['🧾 工務店請求書を確認する', '📈 売上見込みを確認する', '📦 部材・施工費マスタ', '⚙ 設定', '🗑 ゴミ箱', '📝 見積もり・申請書を作成する']) {
   await tabBtn(name).click();
   assert.equal(await tabBtn(name).getAttribute('aria-current'), 'page');
   assert.equal(await nav.locator('[aria-current=page]').count(), 1);
@@ -161,6 +161,20 @@ const rows = page.locator('main tbody tr');
 const row = (name) => page.getByRole('row', {name: new RegExp(name)});
 await row('見本一様邸').waitFor();
 assert.equal(await rows.count(), 4);
+// 一覧の文字はひとまわり大きく（本文 16px・行のボタン 14px）、行のボタンは右の端から少し左（ユーザーの指示「全体の文字を少しだけ大きくする」
+// 「赤枠の部分を少しだけ中央（左に寄せる）」2026-10-27）
+const look = await row('見本一様邸').evaluate((tr) => {
+  const table = tr.closest('table').getBoundingClientRect();
+  const buttons = [...tr.querySelectorAll('button')].filter((b) => /削除/.test(b.textContent));
+  return {font: parseFloat(getComputedStyle(tr.cells[4]).fontSize), button: parseFloat(getComputedStyle(buttons[0]).fontSize), gap: table.right - buttons[0].getBoundingClientRect().right};
+});
+assert.ok(look.font >= 16 && look.button >= 14 && look.gap >= 90, JSON.stringify(look));
+// 行の先頭の印：住宅改修の見積書がある様邸は「住改」
+assert.equal((await row('見本一様邸').locator('td').first().innerText()).trim(), '住改');
+// 「← 戻る」で見積もりの入口（新規作成・一覧から作成）へ（ユーザーの指示「戻るボタンを設置。（新規作成と一覧のページ）」2026-10-27）
+await page.getByRole('button', {name: '← 戻る', exact: true}).click();
+await page.getByRole('button', {name: '📋 見積書の一覧を開く'}).click();
+await row('見本一様邸').waitFor();
 // 確かめでキャンセルしたら消さない
 answer = false;
 await row('見本一様邸').getByRole('button', {name: '削除', exact: true}).click();
@@ -211,8 +225,24 @@ await page.getByRole('textbox', {name: '見積書を探す'}).fill('');
 // 件数（最初の画面の「全部で」）・請求書のタブ（一覧・印刷）にも出ない
 await tabBtn('📝 見積もり・申請書を作成する').click();
 assert.match(await page.locator('main').innerText(), /全部で 1件/);
-await tabBtn('🧾 請求書を確認する').click();
+await tabBtn('🧾 工務店請求書を確認する').click();
 await page.getByRole('cell', {name: '見本四様邸', exact: true}).waitFor();
+// 請求書の印刷・CSV のボタンは上の段のまん中（ユーザーの指示「赤枠の部分を中央にもってくる」2026-10-27。前は右の端）
+// 1366px では左の月の欄にかぶらない所まで（まん中から 100px 以内）、広い画面（1920px）ではちょうどまん中
+const midOf = () =>
+  page.getByRole('group', {name: '請求書の印刷・保存'}).evaluate((g) => {
+    const b = g.parentElement.getBoundingClientRect();
+    const kids = [...g.children].map((c) => c.getBoundingClientRect());
+    const left = Math.max(...[...g.parentElement.children[0].children].map((c) => c.getBoundingClientRect().right));
+    return {kids: (Math.min(...kids.map((k) => k.left)) + Math.max(...kids.map((k) => k.right))) / 2, row: (b.left + b.right) / 2, gap: Math.min(...kids.map((k) => k.left)) - left};
+  });
+let mid = await midOf();
+assert.ok(Math.abs(mid.kids - mid.row) < 100 && mid.gap > 0 && mid.gap < 60, JSON.stringify(mid));
+await page.setViewportSize({width: 1920, height: 900});
+await page.waitForTimeout(200);
+mid = await midOf();
+assert.ok(Math.abs(mid.kids - mid.row) < 30, JSON.stringify(mid));
+await page.setViewportSize({width: 1366, height: 900});
 assert.equal(await page.locator('main tbody tr', {hasText: '見本'}).count(), 1);
 await page.getByRole('button', {name: '🖨 請求書を印刷'}).click();
 const printed = await page.locator('.print-root').innerText();
@@ -319,7 +349,7 @@ await page.getByRole('button', {name: '削除', exact: true}).click();
 assert.equal(asked.pop(), '見本四様邸をゴミ箱に移しますか？');
 await row('見本二様邸').waitFor();
 assert.equal(await rows.count(), 1);
-await tabBtn('🧾 請求書を確認する').click();
+await tabBtn('🧾 工務店請求書を確認する').click();
 await page.getByRole('cell', {name: '見本二様邸', exact: true}).click();
 await page.getByRole('heading', {level: 1, name: '見本二様邸'}).waitFor();
 await page.getByRole('button', {name: '削除', exact: true}).first().click(); // 上の段の様邸の削除（箇所の「削除」より前）
@@ -342,7 +372,7 @@ const rowsOf = async () => {
   return [...new Set(ys)].length;
 };
 assert.equal(await rowsOf(), 4);
-for (const name of ['🧾 請求書を確認する', '📈 売上見込みを確認する', '📦 部材・施工費マスタ', '⚙ 設定', '🗑 ゴミ箱', '📝 見積もり・申請書を作成する']) {
+for (const name of ['🧾 工務店請求書を確認する', '📈 売上見込みを確認する', '📦 部材・施工費マスタ', '⚙ 設定', '🗑 ゴミ箱', '📝 見積もり・申請書を作成する']) {
   await spNav.getByRole('button', {name}).click();
   await sp.waitForTimeout(250);
   await noOverflow(sp, `スマホ ${name}`);

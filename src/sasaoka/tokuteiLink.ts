@@ -198,6 +198,18 @@ export function tokuteiHasItems(jobId: string): boolean {
 }
 
 /**
+ * 特定福祉用具の案件に商品の入っている様邸（id の集まり）。一覧の「特福」の印（tokuteiHasItems をまとめて。行ごとに localStorage を読まないように）
+ */
+export function tokuteiItemJobs(): Set<string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem('taiyo-tokutei-sales-v1') ?? 'null') as {rows?: {jutakuJob?: string}[]} | null;
+    return new Set((raw?.rows ?? []).map((r) => r.jutakuJob ?? '').filter(Boolean));
+  } catch {
+    return new Set();
+  }
+}
+
+/**
  * 特定福祉用具が書いた、様邸から開いた案件のお客様名（様邸の id → お客様名。商品のない作りかけもふくむ。salesSummary.ts の linked）。
  * 特定福祉用具申請書だけを作っている様邸（住宅改修の方にお客様名がない）も、一覧に名前を出す
  * （ユーザーの指示「特定福祉用具の申請書を作成途中の場合も、こちらの一覧には表示されるようにする」2026-10-26）

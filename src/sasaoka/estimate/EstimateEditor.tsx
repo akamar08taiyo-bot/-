@@ -46,7 +46,7 @@ export function EstimateEditor({
   update: Update;
   onBack: () => void;
   onOpen: (id: string) => void;
-  onOpenInvoice: (id: string) => void; // 「請求書を確認する」で同じ様邸の仕切り計算表を開く
+  onOpenInvoice: (id: string) => void; // 「工務店請求書を確認する」で同じ様邸の仕切り計算表を開く
   onOpenOrder: () => void; // この見積書の部材の発注書を開く
   tabs: ReactNode; // 申請書・見積書のタブ（氏名・番号・住所・改修の箇所・金額は申請書と同じ）
   batch?: ReactNode; // 「📦 まとめて保存」（保存・Excel・印刷と並べる。App.tsx の BatchSave）

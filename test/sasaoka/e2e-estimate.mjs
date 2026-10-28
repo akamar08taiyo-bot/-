@@ -62,7 +62,7 @@ log('一覧の先頭のチェックで次月・前月に回すOK');
 const ym = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 const salesGroup = sampleRow.getByRole('group', {name: '売上月'});
 assert.equal((await salesGroup.innerText()).replace(/\s+/g, ''), `◀${now.getMonth() + 1}月▶`);
-const dateBefore = await sampleRow.locator('td').nth(1).innerText();
+const dateBefore = await sampleRow.locator('td').nth(2).innerText(); // 先頭は種類（住改・特福）、次に選ぶ
 await salesGroup.getByRole('button', {name: '売上月を次月に'}).click();
 await page.locator('[aria-live] > div', {hasText: `（サンプル）山田様邸を${nextMonth}分にしました`}).waitFor();
 assert.equal(await sampleRow.count(), 0);
@@ -70,7 +70,7 @@ const sentMonth = await page.evaluate(() => JSON.parse(localStorage.getItem('tai
 assert.equal(sentMonth, ym(next)); // 受注残に渡す月
 await page.getByRole('button', {name: '次の月'}).click();
 assert.ok((await sampleRow.innerText()).includes(`${nextMonth}分に入れる`));
-assert.equal(await sampleRow.locator('td').nth(1).innerText(), dateBefore); // 作成日は変えない
+assert.equal(await sampleRow.locator('td').nth(2).innerText(), dateBefore); // 作成日は変えない
 await page.screenshot({path: path.join(outDir, '51a-list-sales-month.png')});
 await salesGroup.getByRole('button', {name: '売上月を前月に'}).click();
 await page.getByRole('button', {name: '前の月'}).click();
@@ -351,7 +351,7 @@ log('複製・削除（ゴミ箱へ）OK');
 
 // ---------------- 部材・施工費マスタ（請求書と同じ部材リスト）：Excel の「定価」の列も読む。施工費（笹岡工務店の手間）も同じタブ
 await page.getByRole('navigation').getByRole('button', {name: /部材・施工費マスタ/}).click();
-assert.ok((await page.locator('main').innerText()).includes('見積書（見積もり・申請書を作成する）と請求書（請求書を確認する）の両方で使います'));
+assert.ok((await page.locator('main').innerText()).includes('見積書（見積もり・申請書を作成する）と請求書（工務店請求書を確認する）の両方で使います'));
 await page.getByRole('button', {name: /メーカーの仕切り表を取り込む/}).click();
 await page.locator('[role=dialog] input[type=file]').setInputFiles(path.join(FIX, 'maker-list.xlsx'));
 await page.getByRole('button', {name: '部材リストに取り込む（5件）'}).click();
