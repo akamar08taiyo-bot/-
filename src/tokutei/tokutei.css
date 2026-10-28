@@ -29,12 +29,14 @@ body {
   overflow: auto;
   background: #525659;
 }
+/* 上の帯の中身はまん中に寄せる（住宅改修の申請書の印刷と同じ。ユーザーの指示「赤枠の部分を中央にもってくる」2026-10-28） */
 .print-toolbar {
   position: sticky;
   top: 0;
   z-index: 1;
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
   gap: 8px 16px;
   padding: 10px 16px;
