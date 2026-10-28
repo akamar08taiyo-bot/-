@@ -364,9 +364,8 @@ export function ShinseiInputs({
           </select>,
           'staff',
         )}
-        {row('申請日', <input type="date" value={sale.applyDate} onChange={(e) => change({applyDate: e.target.value})} className={dateInput} aria-label="申請日" data-nav />, 'applyDate')}
-        {row('納品日（購入日）', <input type="date" value={sale.deliveryDate} onChange={(e) => change({deliveryDate: e.target.value})} className={dateInput} aria-label="納品日" data-nav />, 'deliveryDate')}
-        {row('支給申請日', <input type="date" value={sale.claimDate} onChange={(e) => change({claimDate: e.target.value})} className={dateInput} aria-label="支給申請日" data-nav />, 'claimDate')}
+        {/* 申請日・納品日（購入日）・支給申請日の欄は外した（申請書には書かない。Excel に保存してから手で入れる。shinsei.ts の shinseiValues）。
+            ユーザーの指示「特定福祉用具申請書の赤枠部分は、連動すると都合が悪いため、すべてなくす。入力が必要なときは、EXCELにおとして、手入力します」2026-10-28 */}
       </div>
     </div>
   );

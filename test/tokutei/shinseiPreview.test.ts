@@ -125,7 +125,7 @@ test('プレビュー：広域連合は支払方法の様式（償還払いな�
   assert.ok(pages[0].shapes.filter((s) => s.kind === 'ellipse').length === 2); // 性別・届出の有
   assert.ok(pages[0].texts.some((t) => t.marked && t.marked.chars.some((c) => c.ch === '女')));
   const fields = new Set(pages[0].fields.map((f) => f.field));
-  for (const f of ['payMethod', 'kana', 'customer', 'insuredNo', 'birthDate', 'gender', 'zip', 'address', 'tel', 'items', 'deliveryDate', 'reason', 'recorder', 'applyDate'] as const) assert.ok(fields.has(f), f);
+  for (const f of ['payMethod', 'kana', 'customer', 'insuredNo', 'birthDate', 'gender', 'zip', 'address', 'tel', 'items', 'reason', 'recorder'] as const) assert.ok(fields.has(f), f);
   // はみ出す1つの欄（申請者の氏名）は、下線の欄まで1つの押せる所に
   const name = pages[0].fields.find((f) => f.field === 'customer' && f.ref === 'J34');
   assert.ok(name && name.w > 150, JSON.stringify(name));
@@ -158,7 +158,9 @@ test('プレビュー：式で事前申請書の値を出している欄（苅�
   const pages = shinseiPreview(template('kanda'), SHINSEI.kanda, shinseiValues(sale({insurer: 'kanda'}), S));
   const claim = pages.find((p) => p.sheet === '用具・支給申請　受領委任払 (2)')!;
   const fields = new Set(claim.fields.map((f) => f.field));
-  for (const f of ['customer', 'kana', 'insuredNo', 'address', 'items', 'claimDate'] as const) assert.ok(fields.has(f), f);
+  for (const f of ['customer', 'kana', 'insuredNo', 'address', 'items'] as const) assert.ok(fields.has(f), f);
+  // 日付の欄は押せない（入れる所がない。2026-10-28）
+  for (const f of ['applyDate', 'deliveryDate', 'claimDate'] as const) assert.ok(!fields.has(f), f);
   // 式の値も出る（事前申請書の氏名）
   assert.ok(textOf(claim).includes('見本 花子'));
   // 欄の位置はページの中
@@ -167,7 +169,7 @@ test('プレビュー：式で事前申請書の値を出している欄（苅�
 
 test('まだ入っていない所（プレビューの欄を薄い黄色に）：みやこ町は居宅サービス計画の届出・担当も', () => {
   const blank = sale({customer: '', kana: '', insuredNo: '', birthDate: '', gender: '', zip: '', address: '', tel: '', careLevel: '', careOffice: '', careManager: '', applyDate: '', deliveryDate: '', staff: '', items: []});
-  const all = ['customer', 'kana', 'insuredNo', 'birthDate', 'gender', 'zip', 'address', 'tel', 'careLevel', 'items', 'reason', 'recorder', 'applyDate', 'deliveryDate'];
+  const all = ['customer', 'kana', 'insuredNo', 'birthDate', 'gender', 'zip', 'address', 'tel', 'careLevel', 'items', 'reason', 'recorder'];
   assert.deepEqual([...missingFields(shinseiValues(blank, S), 'yukuhashi')].sort(), [...all].sort());
   assert.deepEqual([...missingFields(shinseiValues({...blank, insurer: 'miyako'}, S), 'miyako')].sort(), [...all, 'carePlan', 'staff'].sort());
   assert.deepEqual([...missingFields(shinseiValues(sale({carePlan: '有'}), S), 'miyako')], []);

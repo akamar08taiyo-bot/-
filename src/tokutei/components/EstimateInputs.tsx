@@ -368,9 +368,8 @@ export function EstimateInputs({
                 ))}
               </div>,
             )}
-            {row('申請日', <input type="date" value={sale.applyDate} onChange={(e) => change({applyDate: e.target.value})} className={dateInput} aria-label="申請日" />)}
+            {/* 申請日・支給申請日は外した（申請書には書かない。Excel で手入力。ユーザーの指示「…連動すると都合が悪いため、すべてなくす」2026-10-28。shinsei.ts の shinseiValues） */}
             {row('承認日', <input type="date" value={sale.approveDate} onChange={(e) => change({approveDate: e.target.value})} className={dateInput} aria-label="承認日" />)}
-            {row('支給申請日', <input type="date" value={sale.claimDate} onChange={(e) => change({claimDate: e.target.value})} className={dateInput} aria-label="支給申請日" />)}
           </>
         )}
       </div>

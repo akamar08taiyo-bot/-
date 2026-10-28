@@ -490,56 +490,60 @@ export function SaleEditor({
                   <ShinseiPages<EstimateField> pages={estPages} missing={estMissing} active={estActive} label={(f) => ESTIMATE_LABEL[f]} onOpen={goEstField} scrollBox={estBox} title="見積書のプレビュー" tone="yellow" />
                 )}
               </section>
-              <section className="rounded-xl border border-teal-200 bg-white p-4 shadow-sm">
-                <div className="text-xs font-bold text-slate-500">購入金額（税込）</div>
-                <div className="text-3xl font-bold tabular-nums text-slate-900">{yen(t.total)}円</div>
-                <div className="mt-1 text-xs tabular-nums text-slate-500">
-                  金額 {yen(t.amount)}円 ＋ 消費税 {yen(t.tax)}円
-                </div>
-                <dl className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-sm">
-                  <Row label="介護保険の対象" value={t.covered} />
-                  {/* 負担割合を選ぶまで、割合で決まる金額は出さない（ユーザーの指示 2026-10-27） */}
-                  {t.ratioSet ? (
-                    <>
-                      <Row label={`利用者負担（${t.ratio}割）`} value={t.userBurden} />
-                      {t.aid > 0 && <Row label={`生活保護（${t.ratio}割）`} value={t.aid} />}
-                      <Row label={`保険者負担（${10 - t.ratio}割）`} value={t.insurerBurden} />
-                    </>
-                  ) : (
-                    <p className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-800">負担割合を選ぶと、自己負担額が出ます</p>
-                  )}
-                  {t.excess > 0 && <Row label="限度額を超えた分" value={t.excess} warn />}
-                  {(t.ratioSet || sale.payMethod === '償還払い') && (
-                    <div className="mt-2 flex items-baseline justify-between rounded-lg bg-amber-50 px-2 py-1.5">
-                      <dt className="font-bold text-slate-700">{sale.payMethod === '償還払い' ? 'いったんお支払い' : 'お客様のお支払い'}</dt>
-                      <dd className="text-lg font-bold tabular-nums text-slate-900">{yen(sale.payMethod === '償還払い' ? t.total : t.userPay)}円</dd>
-                    </div>
-                  )}
-                  {sale.payMethod === '償還払い' && t.ratioSet && <p className="text-xs text-slate-500">あとで保険者から {yen(t.insurerBurden)}円 が払い戻されます。</p>}
-                </dl>
-                <p className="mt-2 text-[11px] text-slate-500">
-                  {t.remainingBlank ? `今年度の残りは空欄なので ${yen(t.limit)}円 として計算` : `今年度の残り ${yen(t.remaining)}円`}
-                  {t.perItemApplied && '・個別切り上げ'}
-                </p>
-                <dl className="mt-3 space-y-1 border-t border-slate-100 pt-3 text-sm">
-                  <Row label="仕切の合計" value={t.costTotal} />
-                  <div className="flex items-baseline justify-between">
-                    <dt className="text-slate-600">利益</dt>
-                    <dd className={`tabular-nums ${t.lowProfit ? 'font-bold text-rose-600' : 'text-slate-800'}`}>
-                      {yen(t.profit)}円（{t.amount > 0 ? Math.round(t.profitRate * 100) : 0}%）
-                    </dd>
+              {/* 金額のまとめ・利益・印刷のボタン。住宅改修の様邸のタブの中（fixedView）には出さない（ユーザーの指示「この部分は全て不要です」2026-10-28。
+                  見積書を印刷・カタログを印刷は住宅改修の上の段にある。自己負担額は左の「自己負担額」の行に出る）。ひとりで開いたときは残す */}
+              {!fixedView && (
+                <section className="rounded-xl border border-teal-200 bg-white p-4 shadow-sm">
+                  <div className="text-xs font-bold text-slate-500">購入金額（税込）</div>
+                  <div className="text-3xl font-bold tabular-nums text-slate-900">{yen(t.total)}円</div>
+                  <div className="mt-1 text-xs tabular-nums text-slate-500">
+                    金額 {yen(t.amount)}円 ＋ 消費税 {yen(t.tax)}円
                   </div>
-                </dl>
-                <div className="mt-4 grid gap-2">
-                  <Btn color="softSky" className="w-full" onClick={print}>
-                    🖨 見積書を印刷
-                  </Btn>
-                  {/* 介援隊のカタログのページを選んで印刷（ユーザーの指示「販売見積書…を作成するとき…カタログの PDF の印刷」2026-10-26） */}
-                  <Btn color="softSky" className="w-full" onClick={() => setPrintingCatalog(true)}>
-                    🖨 カタログを印刷
-                  </Btn>
-                </div>
-              </section>
+                  <dl className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-sm">
+                    <Row label="介護保険の対象" value={t.covered} />
+                    {/* 負担割合を選ぶまで、割合で決まる金額は出さない（ユーザーの指示 2026-10-27） */}
+                    {t.ratioSet ? (
+                      <>
+                        <Row label={`利用者負担（${t.ratio}割）`} value={t.userBurden} />
+                        {t.aid > 0 && <Row label={`生活保護（${t.ratio}割）`} value={t.aid} />}
+                        <Row label={`保険者負担（${10 - t.ratio}割）`} value={t.insurerBurden} />
+                      </>
+                    ) : (
+                      <p className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-800">負担割合を選ぶと、自己負担額が出ます</p>
+                    )}
+                    {t.excess > 0 && <Row label="限度額を超えた分" value={t.excess} warn />}
+                    {(t.ratioSet || sale.payMethod === '償還払い') && (
+                      <div className="mt-2 flex items-baseline justify-between rounded-lg bg-amber-50 px-2 py-1.5">
+                        <dt className="font-bold text-slate-700">{sale.payMethod === '償還払い' ? 'いったんお支払い' : 'お客様のお支払い'}</dt>
+                        <dd className="text-lg font-bold tabular-nums text-slate-900">{yen(sale.payMethod === '償還払い' ? t.total : t.userPay)}円</dd>
+                      </div>
+                    )}
+                    {sale.payMethod === '償還払い' && t.ratioSet && <p className="text-xs text-slate-500">あとで保険者から {yen(t.insurerBurden)}円 が払い戻されます。</p>}
+                  </dl>
+                  <p className="mt-2 text-[11px] text-slate-500">
+                    {t.remainingBlank ? `今年度の残りは空欄なので ${yen(t.limit)}円 として計算` : `今年度の残り ${yen(t.remaining)}円`}
+                    {t.perItemApplied && '・個別切り上げ'}
+                  </p>
+                  <dl className="mt-3 space-y-1 border-t border-slate-100 pt-3 text-sm">
+                    <Row label="仕切の合計" value={t.costTotal} />
+                    <div className="flex items-baseline justify-between">
+                      <dt className="text-slate-600">利益</dt>
+                      <dd className={`tabular-nums ${t.lowProfit ? 'font-bold text-rose-600' : 'text-slate-800'}`}>
+                        {yen(t.profit)}円（{t.amount > 0 ? Math.round(t.profitRate * 100) : 0}%）
+                      </dd>
+                    </div>
+                  </dl>
+                  <div className="mt-4 grid gap-2">
+                    <Btn color="softSky" className="w-full" onClick={print}>
+                      🖨 見積書を印刷
+                    </Btn>
+                    {/* 介援隊のカタログのページを選んで印刷（ユーザーの指示「販売見積書…を作成するとき…カタログの PDF の印刷」2026-10-26） */}
+                    <Btn color="softSky" className="w-full" onClick={() => setPrintingCatalog(true)}>
+                      🖨 カタログを印刷
+                    </Btn>
+                  </div>
+                </section>
+              )}
               {/* ふつうに開いたとき（住宅改修のタブの中でないとき）は、見積もりの画面からも申請書（Excel）を作れる（前からの近道） */}
               {fixedView !== 'quote' && (
                 <div id="shinsei-panel" className="space-y-2">

@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {strFromU8, unzipSync} from 'fflate';
 import {defaultSettings} from '../../src/tokutei/defaults.ts';
-import {carePlanOf, corpShort, excelDate, fillShinsei, KOUIKI_SHEETS, padInsuredNo, reasonText, SHINSEI, shinseiChecks, shinseiFileName, shinseiValues} from '../../src/tokutei/shinsei.ts';
+import {carePlanOf, corpShort, fillShinsei, KOUIKI_SHEETS, padInsuredNo, reasonText, SHINSEI, shinseiChecks, shinseiFileName, shinseiValues} from '../../src/tokutei/shinsei.ts';
 import type {ShinseiKey} from '../../src/tokutei/shinsei.ts';
 import type {Sale, SaleItem} from '../../src/tokutei/types.ts';
 import {cellBox, cellFormula, ellipseCount, emOf, printOverflow, readCell, sheetPath, sheetPaths} from '../../src/tokutei/xlsxEdit.ts';
@@ -124,11 +124,11 @@ test('行橋市：事前申請書・委任状・完了写真に書く', () => {
   assert.equal(readCell(f, sh, 'A15'), '入浴補助用具\nシャワーチェア 見本A');
   assert.equal(readCell(f, sh, 'L16'), '見本製作所\n太陽シルバーサービス㈱');
   assert.equal(readCell(f, sh, 'V15'), '28160');
-  assert.equal(readCell(f, sh, 'AB15'), '令和8年10月30日');
+  assert.doesNotMatch(readCell(f, sh, 'AB15') ?? '', /令和8年/); // 日付は書かない（Excel で手入力。2026-10-28）
   assert.equal(readCell(f, sh, 'AB17'), '　　　年　　月　　日'); // 使わない行は原本のまま
   assert.match(readCell(f, sh, 'E18'), /^浴室の床からの立ち座りが困難なため。/);
   assert.equal(readCell(f, sh, 'L20'), '見本居宅介護支援事業所　見本 太郎');
-  assert.equal(readCell(f, sh, 'C26'), '令和8年10月22日');
+  assert.doesNotMatch(readCell(f, sh, 'C26') ?? '', /令和8年/); // 日付は書かない（Excel で手入力。2026-10-28）
   assert.match(readCell(f, sh, 'G29'), /久保/); // 申請者（会社）は原本のまま
   assert.equal(ellipseCount(f, sh), 3); // 元号（昭）・性別・要介護度
   // 委任状
@@ -140,17 +140,17 @@ test('行橋市：事前申請書・委任状・完了写真に書く', () => {
   const proxyXml = strFromU8(f[sheetPath(f, '委任状')]);
   const rowHt = (r: number) => Number(new RegExp(`<row\\b[^>]*\\sr="${r}"[^>]*>`).exec(proxyXml)?.[0].match(/\sht="([^"]+)"/)?.[1] ?? 18.75);
   assert.ok(rowHt(23) >= 18 * 1.3 - 0.01 && rowHt(23) + rowHt(24) === 18.75 * 2, `${rowHt(23)} ${rowHt(24)}`);
-  assert.match(readCell(f, '委任状', 'A29'), /令和8年10月22日$/);
+  assert.doesNotMatch(readCell(f, '委任状', 'A29') ?? '', /令和8年/); // 日付は書かない（Excel で手入力。2026-10-28）
   assert.match(readCell(f, '委任状', 'A32'), /住　所　　行橋市中央1丁目2-3$/);
   // 委任者の氏名は自筆（ユーザーの指示「委任状では、名前の部分は自筆となるため、印字しない」2026-10-27）：原本の「氏　名　…㊞」のまま
   assert.equal(readCell(f, '委任状', 'A36'), readCell(template('yukuhashi'), '委任状', 'A36'));
   assert.ok(!readCell(f, '委任状', 'A36').includes('見本'));
-  // 完了写真：氏名・番号は式（答えも合わせる）。式の誤り（G2 が AD7）は直してある。納品名・撮影日は書く
+  // 完了写真：氏名・番号は式（答えも合わせる）。式の誤り（G2 が AD7）は直してある。納品名は書く（撮影日は書かない。Excel で手入力。2026-10-28）
   assert.equal(readCell(f, '完了写真', 'B2'), '見本 花子');
   assert.equal(cellFormula(f, '完了写真', 'G2'), '用具・受領委任払!AC7');
   assert.equal(['D2', 'E2', 'F2', 'G2', 'H2', 'I2', 'J2', 'K2', 'L2', 'M2'].map((r) => readCell(f, '完了写真', r)).join(''), '0001234567');
   assert.equal(readCell(f, '完了写真', 'B3'), 'シャワーチェア 見本A / SC-01、浴槽手すり 見本B');
-  assert.equal(readCell(f, '完了写真', 'B4'), String(excelDate('2026-10-30')));
+  assert.equal(readCell(f, '完了写真', 'B4') ?? '', '');
   // 雛形 → ふつうのブック、開いたときに計算し直す、計算の順番の表は外す
   assert.match(strFromU8(f['[Content_Types].xml']), /spreadsheetml\.sheet\.main\+xml/);
   assert.match(strFromU8(f['xl/workbook.xml']), /fullCalcOnLoad="1"/);
@@ -167,8 +167,8 @@ test('苅田町：支給申請書は事前申請書を参照する式。丸は�
   assert.equal(readCell(f, pre, 'K29'), '見本 花子'); // 申請者の氏名は式（=F5）
   assert.equal(readCell(f, post, 'F5'), '見本 花子');
   assert.equal(readCell(f, post, 'A16'), '入浴補助用具\n浴槽手すり 見本B');
-  assert.equal(readCell(f, post, 'AB15'), '令和8年10月30日'); // 購入日＝納品日
-  assert.equal(readCell(f, post, 'C26'), '令和8年11月2日'); // 支給申請日
+  assert.doesNotMatch(readCell(f, post, 'AB15') ?? '', /令和8年/); // 日付は書かない（Excel で手入力。2026-10-28）
+  assert.doesNotMatch(readCell(f, post, 'C26') ?? '', /令和8年/); // 日付は書かない（Excel で手入力。2026-10-28）
   assert.equal(ellipseCount(f, pre), 3);
   assert.equal(ellipseCount(f, post), 3);
   assert.match(strFromU8(f[sheetPaths(f).get(post) ?? '']), /<sheetView showZeros="0"/);
@@ -187,15 +187,15 @@ test('みやこ町：承認申請書・支給申請書・写真の用紙（1枚�
   // 届出の行が1行目、理由、署名の空いた行
   assert.equal(readCell(f, a, 'I20'), '（居宅サービス計画の届出　　有・無）\n浴室の床からの立ち座りが困難なため。\n浴槽の出入りでふらつくため。\n');
   assert.equal(readCell(f, a, 'B12'), '入浴補助用具\nシャワーチェア 見本A'); // 種目と商品名を1行ずつ（名前は折り返さない大きさに）
-  assert.deepEqual(['D30', 'F30', 'I30', 'L30'].map((r) => readCell(f, a, r)), ['令和', '8', '10', '22']);
+  assert.ok(['D30', 'F30', 'I30', 'L30'].slice(1).every((r) => !/\d/.test(readCell(f, a, r) ?? ''))); // 日付は書かない（Excel で手入力。2026-10-28）
   assert.equal(readCell(f, a, 'I34'), '見本 花子');
   assert.equal(readCell(f, a, 'I36'), '土居 翔太');
   assert.equal(ellipseCount(f, a), 2); // 性別・届出の有
-  // 支給申請書：氏名などは式。明細・購入日・申請日は書く
+  // 支給申請書：氏名などは式。明細は書く（購入日・申請日は書かない）
   assert.equal(readCell(f, b, 'I5'), '見本 花子');
   assert.equal(readCell(f, b, 'B12'), '入浴補助用具\nシャワーチェア 見本A');
-  assert.equal(readCell(f, b, 'V14'), '令和8年10月30日');
-  assert.deepEqual(['H25', 'J25', 'M25', 'P25'].map((r) => readCell(f, b, r)), ['令和', '8', '11', '2']);
+  assert.doesNotMatch(readCell(f, b, 'V14') ?? '', /令和8年/); // 日付は書かない（Excel で手入力。2026-10-28）
+  assert.ok(['H25', 'J25', 'M25', 'P25'].slice(1).every((r) => !/\d/.test(readCell(f, b, r) ?? ''))); // 日付は書かない（Excel で手入力。2026-10-28）
   assert.equal(cellFormula(f, b, 'AA14'), 'IF(福祉用具購入受領委任払申請書!Y14="","",福祉用具購入受領委任払申請書!Y14)');
   assert.equal(ellipseCount(f, b), 1);
   // 写真の用紙：商品の数だけ
@@ -218,13 +218,13 @@ test('広域連合：支払方法が受領委任払いなら受領委任払用�
   assert.equal(readCell(f, sh, 'B12'), '入浴補助用具\nシャワーチェア 見本A');
   assert.equal(readCell(f, sh, 'I14'), '見本製作所\n太陽シルバーサービス㈱');
   assert.equal(readCell(f, sh, 'R12'), '28160');
-  assert.equal(readCell(f, sh, 'Y14'), '令和8年10月30日'); // 購入日＝納品日
+  assert.doesNotMatch(readCell(f, sh, 'Y14') ?? '', /令和8年/); // 日付は書かない（Excel で手入力。2026-10-28）
   assert.equal(readCell(f, sh, 'R18'), String(28160 + 27808)); // 合計
   assert.equal(readCell(f, sh, 'R16'), ''); // 使わない行は空のまま
   assert.match(readCell(f, sh, 'J20'), /^浴室の床からの立ち座りが困難なため。\n浴槽の出入りでふらつくため。/);
   assert.equal(readCell(f, sh, 'J21'), ' 居宅サービス計画の届出　　　有　・　無\n 居宅の事業所名　見本居宅介護支援事業所');
-  // 申請日（事前の申請のない様式なので、案件の申請日）
-  assert.deepEqual(['C27', 'F27', 'I27', 'L27'].map((r) => readCell(f, sh, r)), ['令和', '8', '10', '22']);
+  // 申請日も書かない（Excel で手入力）
+  assert.ok(['C27', 'F27', 'I27', 'L27'].slice(1).every((r) => !/\d/.test(readCell(f, sh, r) ?? ''))); // 日付は書かない（Excel で手入力。2026-10-28）
   assert.equal(readCell(f, sh, 'M30'), '太陽シルバーサービス株式会社行橋営業所'); // 申請者（受領委任事業者）は原本のまま
   assert.equal(['Z33', 'AA33', 'AB33'].map((r) => readCell(f, sh, r)).join(''), '802'); // 受領委任契約番号も原本のまま
   assert.equal(readCell(f, sh, 'L38'), '被保険者氏名'); // 委任状の氏名は自署（原本のまま。「空けて自署にする」2026-10-26）
@@ -253,11 +253,11 @@ test('広域連合：償還払いなら償還払い用（申請者は本人）�
   assert.equal(readCell(f, sh, 'I11'), '築上郡築上町大字椎田1-2-3');
   assert.equal(readCell(f, sh, 'B16'), '入浴補助用具\n浴槽手すり 見本B');
   assert.equal(readCell(f, sh, 'R14'), '28160');
-  assert.equal(readCell(f, sh, 'Y16'), '令和8年10月30日');
+  assert.doesNotMatch(readCell(f, sh, 'Y16') ?? '', /令和8年/); // 日付は書かない（Excel で手入力。2026-10-28）
   assert.equal(readCell(f, sh, 'R20'), String(28160 + 27808));
   assert.match(readCell(f, sh, 'I22'), /^浴室の床からの立ち座りが困難なため。/);
   assert.match(readCell(f, sh, 'I23'), /居宅の事業所名　見本居宅介護支援事業所$/);
-  assert.deepEqual(['H30', 'J30', 'M30', 'P30'].map((r) => readCell(f, sh, r)), ['令和', '8', '10', '22']);
+  assert.ok(['H30', 'J30', 'M30', 'P30'].slice(1).every((r) => !/\d/.test(readCell(f, sh, r) ?? ''))); // 日付は書かない（Excel で手入力。2026-10-28）
   assert.deepEqual(['J32', 'J34', 'Y34'].map((r) => readCell(f, sh, r)), ['築上郡築上町大字椎田1-2-3', '見本 花子', '0930-00-0000']); // 申請者（本人）
   assert.equal(readCell(f, sh, 'J36'), ''); // 届出者は書かない
   assert.equal(ellipseCount(f, sh), 2); // 性別・届出（有）

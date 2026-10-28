@@ -73,16 +73,13 @@ const preLinks = (insuredRow: number): [ShinseiField, string[]][] => [
   ['address', ['F11']],
   ['tel', ['Y10']],
   ['items', rows(['A', 'L', 'V'], [15, 16, 17])],
-  ['deliveryDate', rows(['AB'], [15, 16, 17])],
   ['reason', ['E18']],
   ['recorder', ['L20']],
-  ['applyDate', ['C26']],
 ];
 const PROXY: SheetLinks = {
   sheet: '委任状',
   links: [
     ['burdenRatio', ['B23']],
-    ['applyDate', ['A29']],
     ['address', ['A32']],
     // 委任者の氏名（A36）は自筆なので書かない・押せる欄にしない（2026-10-27）
   ],
@@ -91,7 +88,6 @@ const PHOTO: SheetLinks = {
   sheet: '完了写真',
   links: [
     ['items', ['B3']],
-    ['deliveryDate', ['B4']],
   ],
 };
 const MIYAKO_ROWS = [12, 14, 16, 18];
@@ -112,8 +108,6 @@ export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
         ['birthDate', ['F9']],
         ['gender', ['Y9']],
         ['careLevel', ['F12']],
-        ['deliveryDate', rows(['AB'], [15, 16, 17])],
-        ['claimDate', ['C26']],
       ],
     },
     PROXY,
@@ -133,7 +127,6 @@ export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
         ['tel', ['Z9']],
         ['items', rows(['B', 'I', 'R', 'Y'], MIYAKO_ROWS)],
         ['reason', ['I20']],
-        ['applyDate', ['D30', 'F30', 'I30', 'L30']],
         ['staff', ['I36']],
       ],
     },
@@ -142,8 +135,6 @@ export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
       links: [
         ['gender', ['AA7']],
         ['items', rows(['B', 'I', 'P'], MIYAKO_ROWS)],
-        ['deliveryDate', rows(['V'], MIYAKO_ROWS)],
-        ['claimDate', ['H25', 'J25', 'M25', 'P25']],
       ],
     },
     ...MIYAKO_PHOTOS.map((sheet) => ({
@@ -169,10 +160,8 @@ export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
         ['address', ['G9']],
         ['tel', ['Z9']],
         ['items', [...rows(['B', 'I', 'R'], KOUIKI_JURYO_ROWS), 'R18']],
-        ['deliveryDate', rows(['Y'], KOUIKI_JURYO_ROWS)],
         ['reason', ['J20']],
         ['recorder', ['J21']], // 居宅サービス計画の届出（有・無）と居宅の事業所名
-        ['applyDate', boxes('C', 11, 27)],
       ],
     },
     {
@@ -188,10 +177,8 @@ export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
         ['address', ['I11', ...boxes('J', 23, 32)]],
         ['tel', boxes('Y', 8, 34)],
         ['items', [...rows(['B', 'I', 'R'], KOUIKI_SHOKAN_ROWS), 'R20']],
-        ['deliveryDate', rows(['Y'], KOUIKI_SHOKAN_ROWS)],
         ['reason', ['I22']],
         ['recorder', ['I23']],
-        ['applyDate', boxes('H', 10, 30)],
       ],
     },
     {
@@ -222,8 +209,6 @@ export function missingFields(v: ShinseiValues, key: ShinseiKey): Set<ShinseiFie
   need(v.items.length && v.items.every((i) => i.reason), 'reason');
   need(key === 'kouiki' ? v.office : v.recorder, 'recorder'); // 広域連合は居宅の事業所名だけ
   need(v.ratioSet, 'burdenRatio');
-  need(v.applyDate, 'applyDate');
-  need(v.deliveryDate, 'deliveryDate');
   if (key === 'miyako' || key === 'kouiki') need(v.carePlan, 'carePlan');
   if (key === 'miyako') need(v.staff, 'staff');
   return out;

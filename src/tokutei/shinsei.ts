@@ -118,9 +118,13 @@ export function shinseiValues(sale: Sale, s: Settings): ShinseiValues {
     recorder: [sale.careOffice.trim(), sale.careManager.trim()].filter(Boolean).join('　'),
     office: sale.careOffice.trim(),
     carePlan: carePlanOf(sale),
-    applyDate: sale.applyDate,
-    deliveryDate: sale.deliveryDate,
-    claimDate: sale.claimDate,
+    // 申請書の日付（申請日・購入日＝納品日・支給申請日・完了写真の撮影日）は書かない（空欄）。Excel に保存してから手で入れる
+    // （ユーザーの指示「特定福祉用具申請書の赤枠部分は、連動すると都合が悪いため、すべてなくす。入力が必要なときは、EXCELにおとして、手入力します」2026-10-28。
+    // 前は案件の applyDate・deliveryDate・claimDate を書いていた。状態の「申請」「納品」で入る日付・販売見積書の納品日がそのまま申請書に出て困った）。
+    // 戻すときは、ここを sale.applyDate などに戻し、ShinseiInputs.tsx の入れる所と、確かめ（shinseiChecks・missingFields）・プレビューの押せる欄（shinseiPreview.ts）を足す
+    applyDate: '',
+    deliveryDate: '',
+    claimDate: '',
     benefit: t.ratioSet ? t.insurerBurden : 0,
     ratioSet: t.ratioSet,
     staff: sale.staff.trim(),
@@ -544,8 +548,6 @@ export function shinseiChecks(sale: Sale, s: Settings): {missing: string[]; over
   if (kouiki) need(v.office, '居宅介護支援事業所（居宅の事業所名）');
   else need(v.recorder, '居宅介護支援事業所・ケアマネジャー（理由の記載者）');
   need(v.ratioSet, '負担割合');
-  need(v.applyDate, '申請日');
-  need(v.deliveryDate, kouiki ? '納品日（購入日）' : '納品日（購入予定日）');
   if (form?.key === 'miyako' || kouiki) need(v.carePlan, '居宅サービス計画の届出（有・無）');
   const overflow = form && v.items.length > form.rows ? `${form.title}の申請書の商品の欄は${form.rows}行です。${form.rows + 1}つ目からの商品（${v.items.slice(form.rows).map((i) => i.product).join('、')}）は入りません。` : '';
   return {missing, overflow};

@@ -163,7 +163,8 @@ try {
   await page.getByLabel('浴槽台 ユクリアが必要な理由', {exact: true}).fill('浴槽内での立ち座りが困難なため。');
   await page.getByLabel('居宅介護支援事業所').fill('見本居宅介護支援事業所');
   await page.getByLabel('ケアマネジャー').fill('見本 太郎');
-  await page.getByLabel('申請日', {exact: true}).fill('2026-10-22');
+  // 申請日・支給申請日の欄はない（申請書には書かない。Excel で手入力。2026-10-28）。状態の納品日は残す（売上月・販売受注簿に使う。申請書には書かない）
+  for (const l of ['申請日', '支給申請日']) assert.equal(await page.getByLabel(l, {exact: true}).count(), 0, l);
   await page.getByLabel('納品日').fill('2026-10-30');
   await page.waitForTimeout(600);
   assert.equal(await page.getByText('未入力（空欄のまま作ります）').count(), 0);
@@ -185,7 +186,7 @@ try {
     assert.match(readCell(f, sh, 'E18'), /^下肢筋力の低下により、浴室の床/);
     assert.match(readCell(f, sh, 'E18'), /\n浴槽内での立ち座りが困難なため。$/); // 頭に種目の名前は付けない（2026-10-26）
     assert.equal(readCell(f, sh, 'L20'), '見本居宅介護支援事業所　見本 太郎');
-    assert.equal(readCell(f, sh, 'C26'), '令和8年10月22日');
+    assert.doesNotMatch(readCell(f, sh, 'C26') ?? '', /令和8年/); // 申請日は書かない
     assert.equal(ellipseCount(f, sh), 3);
     assert.match(readCell(f, '委任状', 'B23'), /38,649円$/);
   }
