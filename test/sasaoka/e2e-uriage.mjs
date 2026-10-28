@@ -113,12 +113,12 @@ try {
     assert.equal(await dialog.getByRole('group', {name: '伝票の顧客区分'}).getByRole('button', {name: '既存'}).getAttribute('aria-pressed'), 'true');
     assert.equal(await dialog.getByRole('group', {name: '伝票の負担割合'}).getByRole('button', {name: '1割'}).getAttribute('aria-pressed'), 'true');
     await dialog.getByLabel('生活保護（自己負担は出さない）').check();
-    await dialog.getByText('介護扶助（1割）2,695円').waitFor();
+    await dialog.getByText('利用者負担（生活保護・1割）2,695円').waitFor(); // 「介護扶助」とは書かない（ユーザーの指示 2026-10-28）
     const [slip2] = await Promise.all([ctx.waitForEvent('page'), dialog.getByRole('link', {name: '🧾 売上伝票発行依頼書を開く'}).click()]);
     await slip2.getByText('申請書・見積書作成から読み込みました。').waitFor();
     const text2 = await slip2.locator('main').innerText();
-    assert.ok(!text2.includes('対象内利用者負担額'), text2);
-    assert.match(text2, /介護扶助（生活保護・1割・切り上げ）\s*¥2,695/);
+    assert.ok(!text2.includes('介護扶助'), text2);
+    assert.match(text2, /対象内利用者負担額（生活保護・1割・切り上げ）\s*¥2,695/);
     assert.match(text2, /ご利用者お支払い合計\s*¥0/);
     await slip2.close();
     // 窓で選んだ負担割合・介護度は申請書の項目にも入っている（住宅改修申請書のタブの一覧）

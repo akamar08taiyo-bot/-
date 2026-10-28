@@ -155,7 +155,8 @@ export function UriageDialog({job, s, setJob, onClose}: {job: Job; s: Settings; 
       </div>
       {si.burden && a.total > 0 && (
         <p className="mt-3 text-sm tabular-nums text-slate-700">
-          {si.welfare ? `介護扶助（${si.burden}割）` : `利用者負担（${si.burden}割）`}
+          {/* 生活保護でも「介護扶助」とは書かない（ユーザーの指示「生活保護のときは、介護扶助という文言は不要」2026-10-28。売上伝票の伝票と同じ） */}
+          {si.welfare ? `利用者負担（生活保護・${si.burden}割）` : `利用者負担（${si.burden}割）`}
           {yen(share)}円{a.total > covered && `・実費 ${yen(a.total - covered)}円`}
         </p>
       )}
