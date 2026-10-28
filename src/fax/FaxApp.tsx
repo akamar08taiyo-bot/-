@@ -249,7 +249,12 @@ export function FaxApp() {
       <div className="fx-screen min-h-screen bg-slate-50 text-slate-900">
         <header className="border-b border-slate-200 bg-white">
           <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2">
-            <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+              {/* 業務アプリポータルへ戻る（太陽ポータルの全アプリ共通の形・左上。ユーザーの指示「太陽ポータルに戻るボタンは左上に設置。太陽ポータル全アプリ共通にする。
+                  色や大きさも含めて統一する」2026-10-28。書式は fax.css の .taiyo-portal-back） */}
+              <a href="https://akamar08taiyo-bot.github.io/taiyo-portal/" className="taiyo-portal-back">
+                ← 業務アプリポータルへ戻る
+              </a>
               <h1 className="text-lg font-bold tracking-tight">FAX送付状 かんたん作成</h1>
               <p className="text-xs text-slate-500">送るFAXにチェックを入れ、宛名とご利用者名を入れて印刷するだけ</p>
             </div>
