@@ -5,7 +5,8 @@
 import {strFromU8, unzipSync} from 'fflate';
 import type {Grid} from './priceImport.ts';
 
-export type Sheet = {name: string; rows: Grid};
+/** header：印刷のときのヘッダー（oddHeader。見積書の右上の「作成日　令和8年10月21日」など）の文字。&R などの書式の印は除く */
+export type Sheet = {name: string; rows: Grid; header?: string};
 
 const decodeXml = (s: string) =>
   s.replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (_, e: string) => {
@@ -82,10 +83,20 @@ export function readXlsx(bytes: Uint8Array): Sheet[] {
     const path = rels.get(rid);
     const xml = path ? read(path) : '';
     if (!xml) continue;
-    sheets.push({name, rows: readSheet(xml, shared)});
+    const head = /<oddHeader>([\s\S]*?)<\/oddHeader>/.exec(xml)?.[1];
+    sheets.push({name, rows: readSheet(xml, shared), ...(head ? {header: headerText(decodeXml(head))} : {})});
   }
   return sheets;
 }
+
+/** ヘッダー・フッターの書式の印（&L &C &R、&P &N、&"字体"、&9 などの大きさ）を除いた文字 */
+const headerText = (s: string) =>
+  s
+    .replace(/&"[^"]*"/g, '')
+    .replace(/&\d+/g, '')
+    .replace(/&[LCRPNDTZFAKBIUSEXY]/g, ' ')
+    .replace(/&&/g, '&')
+    .trim();
 
 function readSheet(sheetXml: string, shared: string[]): Grid {
   // 中身のない行（<row r="5"/>）は先に除く。残すと次の行と混ざって1行ずれる

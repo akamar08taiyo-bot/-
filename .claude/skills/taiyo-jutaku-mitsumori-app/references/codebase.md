@@ -14,8 +14,9 @@ React 19 ＋ TypeScript ＋ Vite（Tailwind）。リポジトリにはほかの�
 
 | ファイル | 何をするか |
 |---|---|
-| `App.tsx` | 6つのタブ（📝 見積もり・申請書を作成する／🧾 請求書を確認する／📈 売上見込みを確認する／📦 部材・施工費マスタ／⚙ 設定／🗑 ゴミ箱）、新しい版の帯、印刷の画面の開閉、発注書の画面の開閉 |
-| `salesPlan.ts`・`components/SalesPlanPage.tsx` | 売上見込み（2026-10-25）：`planRows`（住宅改修＝見積書のある様邸、特定福祉用具＝`taiyo-tokutei-sales-v1` のまとめ）・`monthPlan`・`jutakuSalesMonth`（`Job.salesMonth` か請求する月）・次月に回す（`Job.salesMonth`・`Settings.tokuteiSalesMonths`）・印刷（`PrintView` の kind 'sales'）・受注残・進捗管理へのリンク（`PROGRESS_APP_URL`）。
+| `App.tsx` | 6つのタブ（📝 見積もり・申請書を作成する／📈 売上見込みを確認する／🧾 工務店請求書を確認する／📦 部材・施工費マスタ／⚙ 設定／🗑 ゴミ箱。2026-10-27 に名前と順番を変えた）、新しい版の帯、印刷の画面の開閉、発注書の画面の開閉 |
+| `importDocs.ts`・`estimate/DocImport.tsx` | 申請書・見積書・理由書の Excel の取り込み（2026-10-28）：読む `readDoc`（申請書＝`readShinseiBook`・理由書＝`riyu.ts` の `readRiyuBook`・このアプリの見積書の2つの書式＝`parseYukuhashi`／`parseKouiki`（合計が合うときだけ行にする）・ほかの形の見積書＝ラベルの右の値と「合計」の数）、名字でまとめる `planImport`（`surnameOf`。同じ名字の様邸に足す・同じファイルは `Job.imported` の hash で2回入れない）、様邸に入れる `applyImport`（空いた項目だけ埋める・見積書の箇所は足す・諸経費も足す・`shikiri: false`）。画面は `useDocImport`（確かめの画面）と `DocImportDrop`（入口のドロップ）。申請書だけの箇所は空白の行を1つ持たせる（行のない箇所は申請書・見積書に出ない） |
+| `salesPlan.ts`・`components/SalesPlanPage.tsx` | 売上見込み（2026-10-25）：住宅改修の金額は `jutakuSales`（見積書の行→取り込んだ見積書の合計→申請書の改修費用。`hasJutakuSales`）。`planRows`（住宅改修＝売上のある様邸、特定福祉用具＝`taiyo-tokutei-sales-v1` のまとめ）・`monthPlan`・`jutakuSalesMonth`（`Job.salesMonth` か請求する月）・次月に回す（`Job.salesMonth`・`Settings.tokuteiSalesMonths`）・印刷（`PrintView` の kind 'sales'）・受注残・進捗管理へのリンク（`PROGRESS_APP_URL`）。
 売上月（2026-10-26）：`withSalesMonth`（請求する月と同じなら持たない）・`withBillMonth`（請求する月を変える。売上月が同じなら一緒に）・`tokuteiSalesMonth`（このアプリで変えた月）・`rowSalesMonth`（一覧の行の売上月）・`shiftSalesMonth`（一覧の ◀ ▶）。
 受注残へのまとめ `jutakuSalesSummary`・`writeJutakuSalesSummary`（localStorage `taiyo-jutaku-sales-v1`＝`{v, updatedAt, rows, tokuteiMonths}`。App.tsx が様邸・設定が変わるたびに書く） |
 | `components/JobsPage.tsx` | 請求書の一覧（2026-10-25 から 〇〇様邸・☑（shikiri）・金額（税抜）・次月へ だけ。☐ の見積書のある様邸も出す） |

@@ -187,9 +187,18 @@ export type Job = {
   salesMonth?: string;
   // 売上伝票発行依頼書（「🧾 売上伝票依頼書」の窓。uriage.ts）で選んだ顧客区分・請求区分。次に出すときに選び直さなくてよいように覚える。複製では引き継がない
   uriage?: {customer?: 'new' | 'existing'; billing?: 'receipt' | 'reimbursement'};
+  // 取り込んだ申請書・見積書・理由書の Excel（見積書の一覧の「📥 取り込む」。importDocs.ts）。同じファイルを2回取り込まないための目印と、読んだ金額。複製では引き継がない
+  imported?: ImportedDoc[];
   createdAt: number;
   updatedAt: number;
 };
+
+/**
+ * 取り込んだ書類1つ。hash＝ファイルの中身の目印（同じファイルは2回取り込まない）。
+ * 見積書：total・tax＝見積書の合計（税込）と消費税。rows＝明細を様邸の行にしたか（したなら売上は行から計算し、total は使わない）。
+ * 申請書の改修費用は申請書の項目（shinsei.cost）に入れる。理由書は金額なし
+ */
+export type ImportedDoc = {kind: 'shinsei' | 'estimate' | 'riyu'; file: string; hash: string; total: number | null; tax: number | null; rows: boolean; at: number};
 
 /** 申請書で丸で囲む項目（申請書を作るときに選ぶ。空なら丸をつけない）。どの保険者の申請書にどの項目があるかは shinsei.ts の SHINSEI */
 export type ShinseiMarks = {

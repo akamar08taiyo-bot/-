@@ -1,0 +1,603 @@
+// 申請書・見積書・理由書（Excel）の取り込み（見積書の一覧の「📥 取り込む」。ユーザーの指示「申請書や見積もり・理由書の取り込みをできるようにする。
+// 前提条件として、名字が同じ人の場合は同一人物とみなし、〇〇様に合算できるようにする。それ以外は、そのまま取り込んで、申請書や見積書（合計）金額を認識し、
+// 売上見込みや受注残などに計上するようにする」2026-10-27）。
+// 読めるもの（.xlsx。.xls は Excel で .xlsx に保存し直してもらう）：
+//   申請書：4つの保険者の原本の形（このアプリで作った申請書と同じ様式。readShinseiBook）。氏名・住所・番号・改修の箇所・申請書の項目・改修費用
+//   理由書：国の様式（このアプリの原本 riyu.xltx の形。readRiyuBook）
+//   見積書：このアプリの2つの書式（苅田町・行橋市・みやこ町用／広域連合用）は、明細を様邸の行にする（読んだ行の合計が見積書の合計と同じときだけ）。
+//           ほかの形（ほかの工務店の見積書など）と、合計が合わない見積書は、お客様名・住所と合計の金額だけを読む
+// 売上見込み・受注残の金額は salesPlan.ts の jutakuSales（見積書の行 → 取り込んだ見積書の合計 → 申請書の改修費用）。工務店の請求書には入れない（shikiri: false）
+
+import {estimateTotals, hasEstimateRows, isBlankRow, overheadAuto} from './calc.ts';
+import type {EstimateSettings} from './calc.ts';
+import {jobInsurer, KINDS, NO_SHINSEI} from './estimateForms.ts';
+import {readRiyuBook, NO_RIYU} from './riyu.ts';
+import {manualRow, newPlace} from './rows.ts';
+import {isLaborText, parseKind, parseListNote, parsePlace} from './sheetEdit.ts';
+import {padInsuredNo, readShinseiBook} from './shinsei.ts';
+import type {ShinseiPlace} from './shinsei.ts';
+import type {ImportedDoc, Insurer, Job, Place, PlaceDims, RiyuInfo, Row, ShinseiInfo} from './types.ts';
+import {isoDate, todayIso, uid} from './util.ts';
+import {isXlsx, readXlsx} from './xlsx.ts';
+import type {Sheet} from './xlsx.ts';
+
+export type DocKind = ImportedDoc['kind'];
+export const DOC_LABEL: Record<DocKind, string> = {shinsei: '申請書', estimate: '見積書', riyu: '理由書'};
+
+/** 読んだ書類1つ */
+export type ReadDoc = {
+  file: string;
+  hash: string;
+  kind: DocKind;
+  name: string; // お客様名（被保険者氏名。「様」「様邸」は除く）
+  address: string;
+  insuredNo: string;
+  insurer: Insurer | '';
+  date: string; // 書類の日付 'YYYY-MM-DD'（見積書の作成日・申請書の完了予定日か着工予定日・理由書の作成日）。なければ ''
+  places: Place[]; // 申請書の改修の箇所（行なし）か、見積書の明細（行あり＝rows）
+  rows: boolean;
+  overhead: number | null; // 見積書の明細を行にしたときの、見積書の諸経費（全体・介護保険の対象）
+  overheadTarget: number | null;
+  info: Partial<ShinseiInfo>;
+  riyu: Partial<RiyuInfo> | null;
+  total: number | null; // 見積書の合計（税込）／申請書の改修費用
+  tax: number | null; // 見積書の消費税（分かれば）
+};
+
+// ---------------------------------------------------------------- 文字・数
+
+/** 比べるときの名前（すき間を除く。全角の英数字は半角に） */
+export const compactName = (s: string) => s.normalize('NFKC').replace(/\s+/g, '');
+/** お客様名の「様」「様邸」「殿」と前後のすき間を除く */
+export const cleanName = (s: string) =>
+  s
+    .trim()
+    .replace(/[\s　]*(様邸|様|殿)$/, '')
+    .replace(/[\s　]+/g, (gap) => (gap.includes('　') ? '　' : ' '))
+    .trim();
+
+/** 数の欄（「12,345」「￥12,345」「12,345円」）。数でなければ null */
+function numOf(v: string | undefined): number | null {
+  const t = (v ?? '').normalize('NFKC').replace(/[,円￥¥\s]/g, '');
+  if (!/^-?\d+(\.\d+)?$/.test(t)) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+const money = (v: string | undefined) => {
+  const n = numOf(v);
+  return n === null ? null : Math.round(n);
+};
+/** 丸数字（①〜⑳）→ 番号。なければ 0 */
+const circledNo = (v: string | undefined) => {
+  const m = /[①-⑳]/.exec(v ?? '');
+  return m ? m[0].charCodeAt(0) - 0x2460 + 1 : 0;
+};
+
+/** 日付の文字（令和8年10月21日・R8.10.21・2026/10/21・2026年10月21日・Excel の日付の数）→ 'YYYY-MM-DD'。読めなければ '' */
+export function dateOf(text: string): string {
+  const t = text.normalize('NFKC').replace(/\s/g, '');
+  const pad = (n: string | number) => String(n).padStart(2, '0');
+  const ok = (y: number, m: number, d: number) => (y > 2000 && y < 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31 ? `${y}-${pad(m)}-${pad(d)}` : '');
+  const w = /(令和|R)(元|\d+)[年.\-/](\d+)[月.\-/](\d+)日?/.exec(t);
+  if (w) return ok(2018 + (w[2] === '元' ? 1 : Number(w[2])), Number(w[3]), Number(w[4]));
+  const g = /(\d{4})[年.\-/](\d{1,2})[月.\-/](\d{1,2})日?/.exec(t);
+  if (g) return ok(Number(g[1]), Number(g[2]), Number(g[3]));
+  if (/^\d{5}$/.test(t)) {
+    // Excel の日付の数（1900年1月1日＝1。うるう年のまちがいの分で 1899-12-30 から数える）
+    const d = new Date(Date.UTC(1899, 11, 30) + Number(t) * 86400000);
+    return ok(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+  }
+  return '';
+}
+
+/** ファイルの中身の目印（同じファイルを2回取り込まない。FNV-1a） */
+export function hashOf(bytes: Uint8Array): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < bytes.length; i++) {
+    h ^= bytes[i];
+    h = Math.imul(h, 0x01000193);
+  }
+  return `${bytes.length.toString(36)}-${(h >>> 0).toString(36)}`;
+}
+
+// ---------------------------------------------------------------- 申請書・理由書
+
+/**
+ * 申請書の改修の内容の1行（「①玄関　手すりの取り付け　L=600mm H=800mm」を readShinseiBook が分けたもの）を箇所にする：
+ * 改修の種類の名前のうしろの寸法は申請書のタブの寸法の欄（dims）、残りは「そのほか」（shinseiText）
+ */
+export function placeFromShinsei(sp: ShinseiPlace): Place {
+  const kindName = KINDS[sp.kind - 1] ?? '';
+  let rest = sp.text.trim();
+  if (kindName && rest.startsWith(kindName)) rest = rest.slice(kindName.length);
+  const dims: PlaceDims = {};
+  // 寸法「L=600mm」「W600mm」（全角の文字でも）。そのほかの文の全角のすき間はそのまま残す（NFKC で半角にしない）
+  const take = (letter: string, eq: boolean, key: keyof PlaceDims) => {
+    const re = new RegExp(`(^|[\\s　])[${letter}${String.fromCharCode(letter.charCodeAt(0) + 0xfee0)}][\\s　]*[=＝]${eq ? '' : '?'}[\\s　]*([0-9０-９]+(?:[.．][0-9０-９]+)?)[\\s　]*(mm|ｍｍ|㎜)`, 'i');
+    const m = re.exec(rest);
+    if (!m) return;
+    dims[key] = m[2].normalize('NFKC');
+    rest = rest.replace(m[0], m[1]);
+  };
+  if (sp.kind === 1) {
+    take('L', true, 'l');
+    take('H', true, 'h');
+  }
+  if (sp.kind === 2) {
+    take('W', false, 'w');
+    take('D', false, 'd');
+    take('H', false, 'h');
+  }
+  const other = rest.replace(/^[\s　]+|[\s　]+$/g, '').replace(/[\s　]{2,}/g, '　');
+  // 空白の行を1つ（申請書のタブで足した箇所と同じ。ShinseiEditor.tsx。行のない箇所は申請書・見積書に出ない）
+  return {...newPlace(sp.name, [manualRow('material')]), kind: sp.kind || 1, photo: sp.photo, ...(Object.keys(dims).length ? {dims} : {}), ...(other ? {shinseiText: other} : {})};
+}
+
+const base = (file: string, hash: string, kind: DocKind): ReadDoc => ({
+  file,
+  hash,
+  kind,
+  name: '',
+  address: '',
+  insuredNo: '',
+  insurer: '',
+  date: '',
+  places: [],
+  rows: false,
+  overhead: null,
+  overheadTarget: null,
+  info: {},
+  riyu: null,
+  total: null,
+  tax: null,
+});
+
+/** 申請書の項目のうち、読んだもの（空でない文字の項目） */
+const filledInfo = (info: Partial<ShinseiInfo>): Partial<ShinseiInfo> => Object.fromEntries(Object.entries(info).filter(([, v]) => (typeof v === 'string' ? v.trim() !== '' : v != null))) as Partial<ShinseiInfo>;
+
+// ---------------------------------------------------------------- 見積書
+
+type Grid = string[][];
+const cell = (r: string[] | undefined, c: number) => (r?.[c] ?? '').trim();
+const TOTAL_LABELS = ['小計', '諸経費', '消費税', '合計'] as const;
+type TotalLabel = (typeof TOTAL_LABELS)[number];
+type Totals = Partial<Record<TotalLabel, {all: number | null; target: number | null}>>;
+
+/** 見積書の明細の1行を、様邸の行（部材か施工費）にする。金額は見積書の金額になるように（単価・数量・備考の定価と切って使う長さ） */
+function lineRow(text: string, qtyText: string, unit: string, priceText: string, amountText: string, note: string, excluded: boolean, labor: boolean): Row | null {
+  const name = text.replace(/\s*\n\s*/g, ' ').trim();
+  const amount = money(amountText);
+  const price = numOf(priceText);
+  const qty = numOf(qtyText);
+  const notes = note
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (!name && amount === null && price === null && qty === null && notes.length === 0) return null;
+  if (labor) {
+    // 施工費のまとまり：見積書の金額を見積の単価×1（見積書で打ち込んだ施工費と同じ。sheetEdit.ts の setWorkAmount）。自動の名前（施工費・同上施工費）は持たない
+    const auto = name === '' || name === '施工費' || name === '同上施工費';
+    const hours = /^1時間[\d,]+円×[\d.]+時間$/.test(notes.join('').normalize('NFKC')); // 広域連合用の自動の算出根拠
+    const value = amount ?? 0;
+    return manualRow('labor', {name: auto ? '施工費' : name, qty: 1, price: value, estPrice: value, estText: auto ? null : name, estNote: notes.length && !hours ? notes.join('\n') : null, excluded});
+  }
+  // 部材：備考の1行目が定価（「定価20,000円（4m）×0.8」）、2行目が切って使う長さ（「600mm÷4000mm＝0.15」「600mm÷4000mm×2＝0.3」）
+  const list = parseListNote(notes[0] ?? '');
+  const cut = /^(\d+(?:\.\d+)?)mm÷(\d+(?:\.\d+)?)mm(?:×(\d+(?:\.\d+)?))?＝/.exec((notes[1] ?? '').normalize('NFKC').replace(/=/g, '＝'));
+  const row = manualRow('material', {
+    name,
+    unit: unit.trim(),
+    qty: qty ?? 0,
+    listPrice: list?.list ?? 0,
+    estPrice: price,
+    estNote: list ? (notes.length > (cut ? 2 : 1) ? notes.join('\n') : null) : notes.length ? notes.join('\n') : null,
+    excluded,
+  });
+  if (cut) {
+    row.lengthCm = Number(cut[1]) / 10;
+    row.pieceLengthM = Number(cut[2]) / 1000;
+    row.qty = cut[3] ? Number(cut[3]) : 1;
+  } else if (list?.pieceM) row.pieceLengthM = list.pieceM;
+  return row;
+}
+
+/** 合計の欄の行（小計・諸経費・消費税・合計）の金額 */
+function putTotal(totals: Totals, label: string, all: string, target: string): boolean {
+  const l = label.replace(/[\s　]/g, '') as TotalLabel;
+  if (!TOTAL_LABELS.includes(l)) return false;
+  totals[l] = {all: money(all), target: money(target)};
+  return true;
+}
+
+/** 苅田町・行橋市・みやこ町用「工事費見積書兼工事費内訳書」（estimateXlsx.ts の yukuhashiSheet と同じ列） */
+function parseYukuhashi(rows: Grid): {places: Place[]; totals: Totals} | null {
+  const isHead = (r: string[]) => cell(r, 0).startsWith('改修内容') && cell(r, 3) === '数量' && cell(r, 6) === '金額';
+  if (!rows.some(isHead)) return null;
+  const places: Place[] = [];
+  const totals: Totals = {};
+  let open = false;
+  let place: Place | null = null;
+  for (const r of rows) {
+    if (isHead(r)) {
+      open = true;
+      continue;
+    }
+    if (!open) continue;
+    if (cell(r, 7) === '数量' && cell(r, 9) === '単価') continue; // 見出しの2段目
+    if (/工事費見積書/.test(cell(r, 0))) {
+      open = false; // 次のページの題名
+      continue;
+    }
+    if (putTotal(totals, cell(r, 2), cell(r, 6), cell(r, 10))) continue;
+    const [work, where] = [cell(r, 0), cell(r, 1)];
+    if (work || where) {
+      const p = parsePlace(where);
+      place = {...newPlace(p.name), kind: parseKind(work) ?? 1, photo: p.photo ?? 0};
+      places.push(place);
+    }
+    const excluded = cell(r, 11) !== '' && cell(r, 10) === '';
+    const text = cell(r, 2);
+    const labor = isLaborText(text) || ['式', '時間'].includes(cell(r, 4));
+    const row = lineRow(text, cell(r, 3), cell(r, 4), cell(r, 5), cell(r, 6), r[12] ?? '', excluded, labor);
+    if (!row) continue;
+    if (!place) places.push((place = newPlace('')));
+    place.rows.push(row);
+  }
+  return {places, totals};
+}
+
+/** 広域連合用「住宅改修内訳明細書」（estimateXlsx.ts の kouikiSheet と同じ列） */
+function parseKouiki(rows: Grid): {places: Place[]; totals: Totals} | null {
+  const isHead = (r: string[]) => cell(r, 0).startsWith('改修箇所') && cell(r, 5) === '数量' && cell(r, 8) === '金額';
+  if (!rows.some(isHead)) return null;
+  const places: Place[] = [];
+  const totals: Totals = {};
+  let open = false;
+  let place: Place | null = null;
+  for (const r of rows) {
+    if (isHead(r)) {
+      open = true;
+      continue;
+    }
+    if (!open) continue;
+    if (cell(r, 0) === '内訳書　様式' || cell(r, 1).startsWith('※')) {
+      open = false; // 下の注意書き・次のページ
+      continue;
+    }
+    if (putTotal(totals, cell(r, 3), cell(r, 8), cell(r, 15))) continue;
+    const [where, work, photo, kind] = [cell(r, 0), cell(r, 1), cell(r, 10), cell(r, 11)];
+    if (where || work || photo || kind) {
+      place = {...newPlace(where), kind: circledNo(kind) || parseKind(work) || 1, photo: circledNo(photo)};
+      places.push(place);
+    }
+    const excluded = cell(r, 8) !== '' && cell(r, 15) === '';
+    const labor = cell(r, 2) === '手' || isLaborText(cell(r, 3));
+    const row = lineRow(r[3] ?? '', cell(r, 5), cell(r, 6), cell(r, 7), cell(r, 8), r[16] ?? '', excluded, labor);
+    if (!row) continue;
+    if (!place) places.push((place = newPlace('')));
+    place.rows.push(row);
+  }
+  return {places, totals};
+}
+
+/** 会社・事業所の名前（お客様名ではない） */
+const COMPANY = /株式会社|有限会社|㈱|㈲|\(株\)|（株）|営業所|工務店|事業所|御中/;
+
+/** 表の中の、ラベルの右（なければ下）の値 */
+function rightOf(rows: Grid, test: (label: string) => boolean, accept: (v: string) => boolean): string {
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    for (let c = 0; c < r.length; c++) {
+      if (!test(compactName(cell(r, c)))) continue;
+      for (let k = c + 1; k < r.length; k++) if (cell(r, k) && accept(cell(r, k))) return cell(r, k);
+      if (accept(cell(rows[i + 1], c))) return cell(rows[i + 1], c);
+    }
+  }
+  return '';
+}
+
+/** ラベルの行の、右にある数のいちばん大きいもの（合計・消費税）。なければ下の欄の数 */
+function amountsOf(rows: Grid, test: (label: string) => boolean): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    for (let c = 0; c < r.length; c++) {
+      if (!test(compactName(cell(r, c)))) continue;
+      const nums = r.slice(c + 1).map((v) => money(v)).filter((n): n is number => n !== null && n > 0);
+      const below = money(cell(rows[i + 1], c));
+      if (nums.length) out.push(Math.max(...nums));
+      else if (below !== null && below > 0) out.push(below);
+    }
+  }
+  return out.filter((n) => n < 1e8);
+}
+
+/** ほかの形の見積書・申請書：お客様名（被保険者氏名・お客様名の右、「〇〇 様」の欄）。会社の名前は除く */
+function nameIn(rows: Grid): string {
+  const label = rightOf(rows, (l) => /^(被保険者)?(氏名|お名前)$|^お客様名$|^施主(名|様)?$|^ご?依頼者(名)?$/.test(l), (v) => !COMPANY.test(v) && !/^\d/.test(v));
+  if (label) return cleanName(label);
+  for (const r of rows)
+    for (let c = 0; c < r.length; c++) {
+      const v = cell(r, c);
+      if (COMPANY.test(v)) continue;
+      const m = /^(.+?)[\s　]*(様邸|様)([\s　]|$)/.exec(v);
+      if (m && m[1].length <= 20) return cleanName(m[1]);
+      // 「様邸　住宅改修」「様」だけの欄：左の欄が名前（このアプリの見積書の書き方）
+      if (/^(様邸|様)/.test(v)) {
+        const left = r
+          .slice(0, c)
+          .map((x) => x.trim())
+          .filter(Boolean)
+          .pop();
+        if (left && !COMPANY.test(left) && left.length <= 20) return cleanName(left);
+      }
+    }
+  return '';
+}
+
+/**
+ * 見積書（Excel）を読む。このアプリの2つの書式なら明細も（読んだ行の合計が見積書の合計と同じときだけ行にする）。
+ * ほかの形はお客様名・住所・番号・日付・合計・消費税だけ。合計の金額のない表は見積書としない（null）
+ */
+function readEstimate(sheets: Sheet[], file: string, hash: string, s: EstimateSettings): ReadDoc | null {
+  const doc = base(file, hash, 'estimate');
+  const rows = sheets.flatMap((sh) => sh.rows);
+  for (const sh of sheets) {
+    const own = parseYukuhashi(sh.rows) ?? parseKouiki(sh.rows);
+    if (!own) continue;
+    const kouiki = !parseYukuhashi(sh.rows);
+    const t = own.totals;
+    doc.total = t.合計?.all ?? null;
+    doc.tax = t.消費税?.all ?? null;
+    if (kouiki) doc.insurer = 'kouiki';
+    // 行にした明細で見積書の合計になるか（諸経費は見積書の金額。対象外の行があれば介護保険の対象の諸経費も）
+    const places = own.places.filter((p) => p.name || p.rows.some((r) => !isBlankRow(r)));
+    const trial = {places, overhead: t.諸経費?.all ?? null, overheadTarget: t.諸経費?.target ?? null};
+    const got = estimateTotals(trial, s);
+    if (doc.total !== null && got.all.total === doc.total && got.all.subtotal === (t.小計?.all ?? got.all.subtotal) && (got.excluded === 0 || t.合計?.target == null || got.target.total === t.合計.target)) {
+      doc.places = places;
+      doc.rows = places.some((p) => p.rows.length > 0);
+      doc.overhead = trial.overhead;
+      doc.overheadTarget = got.excluded > 0 ? trial.overheadTarget : null;
+    }
+    break;
+  }
+  // お客様名：このアプリの見積書は「〇〇　様邸　住宅改修」の欄・シートの名前（「〇〇様」。広域連合用は表に名前の欄がない）、ほかの形はラベル・「様」の欄
+  const sheetName = sheets.map((sh) => /^(.+?)様$/.exec(sh.name.trim())?.[1] ?? '').find((n) => n && !/^(見積書|Sheet\d*)$/.test(n)) ?? '';
+  doc.name = nameIn(rows) || cleanName(sheetName) || cleanName(/^(.+?)様/.exec(file.replace(/\.[^.]+$/, ''))?.[1] ?? '');
+  const insured = rows.flat().map((v) => /被保険者番号[^0-9０-９]*([0-9０-９]{6,10})/.exec(v)?.[1]).find(Boolean);
+  doc.insuredNo = insured ? padInsuredNo(insured.normalize('NFKC')) : '';
+  doc.address = rightOf(rows, (l) => /^(工事場所(\(住所\))?|工事場所（住所）|工事住所|施工場所|現場住所|住所)$/.test(l), (v) => !COMPANY.test(v) && /[都道府県市区町村郡]/.test(v));
+  const head = sheets.map((sh) => sh.header ?? '').find((h) => /作成日|見積日|日付/.test(h)) ?? '';
+  doc.date = dateOf(head.replace(/^.*?(作成日|見積日|日付)/, '')) || dateOf(rightOf(rows, (l) => /^(見積|作成|発行)(年月)?日$|^日付$|^見積もり作成日$/.test(l), (v) => dateOf(v) !== ''));
+  if (doc.total === null) {
+    const totals = amountsOf(rows, (l) => /^(御?見積)?(総?合計|合計金額|総額|見積金額)(\(税込\)|（税込）)?$|^税込合計$|^御見積金額$/.test(l));
+    doc.total = totals.length ? Math.max(...totals) : null;
+    const taxes = amountsOf(rows, (l) => /^消費税(額|等)?(\(\d+%\)|（\d+％）)?$/.test(l));
+    doc.tax = taxes.length && doc.total !== null ? Math.max(...taxes.filter((n) => n < doc.total!), 0) || null : null;
+  }
+  if (doc.total === null) return null;
+  return doc;
+}
+
+/** ほかの形の申請書（題名に「申請書」があり、改修費用の欄がある）：お客様名・住所・費用だけ */
+function readOtherShinsei(sheets: Sheet[], file: string, hash: string): ReadDoc | null {
+  const rows = sheets.flatMap((sh) => sh.rows);
+  const top = rows.slice(0, 6).flat().join(' ');
+  if (!/申請書/.test(top) || /見積/.test(top)) return null;
+  const doc = base(file, hash, 'shinsei');
+  const costs = amountsOf(rows, (l) => /^(住宅)?改修(予定)?費用|^工事(予定)?費用?$|^改修に要した費用/.test(l));
+  doc.total = costs.length ? Math.max(...costs) : null;
+  doc.name = nameIn(rows);
+  if (!doc.name) return null;
+  doc.address = rightOf(rows, (l) => /^住所$/.test(l), (v) => /[都道府県市区町村郡]/.test(v) && !COMPANY.test(v));
+  if (doc.total) doc.info = {cost: doc.total};
+  return doc;
+}
+
+/**
+ * Excel のファイルを読む（申請書・理由書・見積書のどれか）。読めなければ null（.xls・表でないファイル・どの書類でもない表）。
+ * modified はファイルの更新時刻（見積書の作成日がないとき、書類の日付に使う）
+ */
+export function readDoc(bytes: Uint8Array, file: string, s: EstimateSettings, modified = 0): ReadDoc | null {
+  if (!isXlsx(bytes)) return null;
+  const hash = hashOf(bytes);
+  const fileDate = modified > 0 ? isoDate(modified) : '';
+  const sh = readShinseiBook(bytes);
+  if (sh) {
+    const doc = base(file, hash, 'shinsei');
+    const info = filledInfo(sh.info);
+    if (sh.cost) info.cost = sh.cost;
+    return {
+      ...doc,
+      name: cleanName(sh.name),
+      address: sh.address,
+      insuredNo: /[1-9]/.test(sh.insuredNo) ? sh.insuredNo : '',
+      insurer: sh.insurer,
+      date: sh.info.end || sh.info.start || fileDate,
+      places: sh.places.filter((p) => p.name || p.text).map(placeFromShinsei),
+      info,
+      total: sh.cost,
+    };
+  }
+  const ry = readRiyuBook(bytes);
+  if (ry) {
+    const doc = base(file, hash, 'riyu');
+    return {...doc, name: cleanName(ry.name), address: ry.address, insuredNo: /[1-9]/.test(ry.insuredNo) ? ry.insuredNo : '', date: ry.riyu.madeDate || fileDate, info: filledInfo(ry.info), riyu: ry.riyu};
+  }
+  let sheets: Sheet[];
+  try {
+    sheets = readXlsx(bytes);
+  } catch {
+    return null;
+  }
+  const doc = readEstimate(sheets, file, hash, s) ?? readOtherShinsei(sheets, file, hash);
+  if (doc && !doc.date) doc.date = fileDate;
+  return doc;
+}
+
+// ---------------------------------------------------------------- 名字でまとめる
+
+/**
+ * 名字：すき間のある名前は最初の語（「見本 花子」→「見本」）。すき間のない名前は、ほかの書類・様邸の名字（known）で始まればその名字、
+ * なければ最初の2字（「見本花子」→「見本」。3字より短い名前はそのまま）
+ */
+export function surnameOf(name: string, known: Iterable<string> = []): string {
+  const n = cleanName(name);
+  const parts = n.split(/[\s　]+/).filter(Boolean);
+  if (parts.length > 1) return parts[0];
+  let best = '';
+  for (const k of known) if (k && n.startsWith(k) && k.length < n.length && k.length > best.length) best = k;
+  if (best) return best;
+  return n.length >= 3 ? n.slice(0, 2) : n;
+}
+
+/** 取り込みの1まとまり（同じ名字の書類）。target＝足す様邸の id（空なら新しく作る）、done＝前に取り込んだ書類（入れない） */
+export type ImportGroup = {key: string; surname: string; name: string; docs: ReadDoc[]; done: {doc: ReadDoc; jobId: string}[]; target: string; candidates: string[]; month: string};
+
+const knownSurnames = (names: string[]) =>
+  new Set(
+    names
+      .map((n) => cleanName(n).split(/[\s　]+/).filter(Boolean))
+      .filter((p) => p.length > 1)
+      .map((p) => p[0]),
+  );
+
+/**
+ * 読んだ書類を名字でまとめ、足す様邸を決める（ユーザーの指示「名字が同じ人の場合は同一人物とみなし、〇〇様に合算できるようにする」）。
+ * まとめた書類の名前がみな同じならその名前、ちがえば名字だけ（「山田様」）。同じ名字の様邸（ゴミ箱を除く）があれば、そこに足す（同じ名前の様邸があればそれ、
+ * なければいちばん新しく直した様邸）。名前の読めない書類は1つずつ。前に取り込んだ書類（同じファイル）は done（もう一度は入れない）
+ */
+export function planImport(docs: ReadDoc[], jobs: Job[], today = todayIso()): ImportGroup[] {
+  const live = jobs.filter((j) => !j.trashedAt);
+  const known = knownSurnames([...docs.map((d) => d.name), ...live.map((j) => j.customer)]);
+  const seen = new Map<string, string>();
+  for (const j of live) for (const d of j.imported ?? []) seen.set(d.hash, j.id);
+  const groups = new Map<string, ImportGroup>();
+  const once = new Set<string>();
+  for (const d of docs) {
+    if (once.has(d.hash)) continue; // 同じファイルを2つ選んだ
+    once.add(d.hash);
+    const surname = d.name ? surnameOf(d.name, known) : '';
+    const key = surname ? `name:${surname}` : `file:${d.hash}`;
+    const g = groups.get(key) ?? {key, surname, name: '', docs: [], done: [], target: '', candidates: [], month: ''};
+    const at = seen.get(d.hash);
+    if (at) g.done.push({doc: d, jobId: at});
+    else g.docs.push(d);
+    groups.set(key, g);
+  }
+  return [...groups.values()].map((g) => {
+    const all = [...g.docs, ...g.done.map((x) => x.doc)];
+    const names = [...new Map(all.filter((d) => d.name).map((d) => [compactName(d.name), d.name])).values()];
+    const spaced = (n: string) => /[\s　]/.test(n);
+    g.name = names.length === 1 ? names[0] : names.length > 1 ? g.surname : '';
+    if (names.length === 1) g.name = all.map((d) => d.name).find((n) => compactName(n) === compactName(names[0]) && spaced(n)) ?? names[0];
+    const same = g.surname ? live.filter((j) => j.customer.trim() && surnameOf(j.customer, known) === g.surname).sort((a, b) => b.updatedAt - a.updatedAt) : [];
+    g.candidates = same.map((j) => j.id);
+    const exact = same.find((j) => compactName(cleanName(j.customer)) === compactName(g.name));
+    g.target = g.done[0]?.jobId ?? exact?.id ?? same[0]?.id ?? '';
+    const dated = [...g.docs.filter((d) => d.kind === 'estimate'), ...g.docs].find((d) => d.date);
+    g.month = (dated?.date ?? today).slice(0, 7);
+    return g;
+  });
+}
+
+// ---------------------------------------------------------------- 様邸に入れる
+
+/** 取り込みで作る様邸（工務店の請求書には入れない。入れるときは見積書の上の「請求書に入れる」） */
+function blankJob(month: string, now: number): Job {
+  return {
+    id: uid('j'),
+    month,
+    customer: '',
+    suffix: '様邸',
+    staff: '',
+    date: '',
+    address: '',
+    note: '',
+    insuredNo: '',
+    form: '',
+    overhead: null,
+    overheadTarget: null,
+    shikiri: false,
+    places: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+const samePlace = (a: Place, b: Place) => compactName(a.name) === compactName(b.name) && (a.photo === 0 || b.photo === 0 || a.photo === b.photo);
+const hasRows = (p: Place) => p.rows.some((r) => !isBlankRow(r));
+
+/** 空いている項目だけを埋める（入っている項目は変えない） */
+function fill<T extends object>(cur: T, add: Partial<T>): T {
+  const out = {...cur};
+  for (const [k, v] of Object.entries(add) as [keyof T, T[keyof T]][]) {
+    const now = out[k];
+    const empty = now === undefined || now === null || (typeof now === 'string' && now.trim() === '');
+    if (empty && v !== undefined && v !== null && !(typeof v === 'string' && v.trim() === '')) out[k] = v;
+  }
+  return out;
+}
+
+/**
+ * 書類を様邸に入れる（base がなければ新しい様邸。name はお客様名＝planImport の名前）。入っている項目は変えず、空いた項目だけ埋める。
+ * 見積書の明細（行にした見積書）は箇所ごと足す（同じ名前の行のない箇所＝申請書の箇所があれば、そこに入れる）。2つ目からの見積書は合算（諸経費も足す）。
+ * 申請書の箇所は、同じ名前の箇所に寸法・そのほかを入れ、なければ足す。申請書の改修費用は、見積書の行がないときだけ（2つ目の申請書は足す）。
+ * 取り込んだ書類は imported に（目印・金額）
+ */
+export function applyImport(baseJob: Job | null, docs: ReadDoc[], name: string, month: string, s: EstimateSettings, now = Date.now()): Job {
+  let job: Job = baseJob ? {...baseJob, places: [...baseJob.places]} : {...blankJob(month, now), customer: name};
+  if (!job.customer.trim()) job.customer = name;
+  const before = baseJob ? estimateTotals(baseJob, s) : null;
+  const hadRows = baseJob ? hasEstimateRows(baseJob) : false;
+  let overhead = hadRows && before ? before.all.overhead : 0;
+  let overheadTarget = hadRows && before ? before.target.overhead : 0;
+  let addedRows = false;
+  let costs = 0;
+  const order: DocKind[] = ['estimate', 'shinsei', 'riyu'];
+  const sorted = [...docs].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
+  for (const d of sorted) {
+    job = fill(job, {address: d.address, insuredNo: d.insuredNo, insurer: d.insurer || undefined, estDate: d.kind === 'estimate' ? d.date : undefined});
+    if (d.rows) {
+      for (const p of d.places) {
+        const i = job.places.findIndex((q) => !hasRows(q) && samePlace(q, p));
+        if (i >= 0) job.places[i] = {...job.places[i], rows: p.rows, kind: p.kind, photo: job.places[i].photo || p.photo};
+        else job.places.push(p);
+      }
+      overhead += d.overhead ?? 0;
+      overheadTarget += d.overheadTarget ?? d.overhead ?? 0;
+      addedRows = true;
+    } else if (d.kind === 'shinsei') {
+      for (const p of d.places) {
+        const i = job.places.findIndex((q) => samePlace(q, p));
+        if (i < 0) job.places.push(p);
+        else job.places[i] = fill(job.places[i], {dims: p.dims, shinseiText: p.shinseiText, photo: job.places[i].photo ? undefined : p.photo});
+      }
+      if (d.total) costs += d.total;
+    }
+    const {cost: _cost, ...info} = d.info;
+    job.shinsei = fill({...NO_SHINSEI, ...job.shinsei}, info);
+    if (d.riyu) {
+      const cur = job.riyu ?? NO_RIYU;
+      const acts = {...cur.acts};
+      for (const [k, v] of Object.entries(d.riyu.acts ?? {})) {
+        const key = k as keyof RiyuInfo['acts'];
+        acts[key] = fill(acts[key], {trouble: v.trouble, policy: v.policy});
+      }
+      const {acts: _acts, ...rest} = d.riyu;
+      job.riyu = {...fill(cur, rest), acts};
+    }
+  }
+  if (addedRows) {
+    // 諸経費：取り込んだ見積書の諸経費の合計（前からの行の諸経費も足す）。自動の諸経費（端数調整）と同じなら手で入れたことにしない
+    const t = estimateTotals({...job, overhead: null, overheadTarget: null}, s);
+    job.overhead = overhead === overheadAuto(t.all.subtotal, s) ? null : overhead;
+    job.overheadTarget = t.excluded === 0 || overheadTarget === overheadAuto(t.target.subtotal, s) ? null : overheadTarget;
+  }
+  if (costs > 0 && !hasEstimateRows(job)) job.shinsei = {...NO_SHINSEI, ...job.shinsei, cost: (job.shinsei?.cost ?? 0) + costs};
+  if (!job.insurer) job.insurer = jobInsurer({insurer: '', form: '', address: job.address}) || '';
+  job.imported = [...(job.imported ?? []), ...sorted.map((d): ImportedDoc => ({kind: d.kind, file: d.file, hash: d.hash, total: d.kind === 'estimate' ? d.total : d.kind === 'shinsei' ? d.total : null, tax: d.kind === 'estimate' ? d.tax : null, rows: d.rows, at: now}))];
+  job.updatedAt = now;
+  return job;
+}

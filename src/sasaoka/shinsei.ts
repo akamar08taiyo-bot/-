@@ -4,7 +4,7 @@
 // 改修の内容は①②（写真番号）ごとに1行。性別・元号・要介護状態区分・改修状況は、選んだものを丸（楕円の図形）で囲む。
 // 原本のほかのシート（事後申請書・承諾書・委任状・平面図・写真）・空欄・罫線・図形はそのまま残す（決めた欄の文字だけを書きかえる。足すのは丸・平面図の工事内容・写真）。
 // 事後申請書など、転記した欄を参照する式は、Excel で開いたときに計算し直す（保存しておく答えも同じ値にしておく）。
-// 書き込んだ申請書（Excel）から 氏名・住所・被保険者番号・改修の箇所 を読むこともできる（readShinsei。いまはテストで使う）。
+// 書き込んだ申請書（Excel）から 氏名・住所・被保険者番号・改修の箇所・改修費用 を読むこともできる（readShinseiBook。一覧の「📥 取り込む」＝importDocs.ts）。
 
 import {strFromU8, strToU8, unzipSync, zipSync} from 'fflate';
 import {estimateTotals, isBlankRow} from './calc.ts';
@@ -2117,11 +2117,25 @@ const workLinesOf = (text: string) =>
     return out;
   }, []);
 
+/** 改修費用の欄（{cost}。数の欄か「12,345円」の文字）の金額。書いていなければ null */
+function readCost(sheet: ShinseiSheet, get: (ref: string) => string): number | null {
+  for (const t of sheet.texts ?? []) {
+    if (!placeholders(t.format).includes('cost')) continue;
+    const raw = t.as === 'number' ? get(t.cell) : (unformat(t.format, get(t.cell))?.cost ?? '');
+    const n = Number(raw.normalize('NFKC').replace(/[,円￥¥\s]/g, ''));
+    if (raw.trim() && Number.isFinite(n) && n > 0) return Math.round(n);
+  }
+  return null;
+}
+
+/** 申請書・理由書（ShinseiMap の様式）から読んだもの。cost は改修費用の欄（なければ null）、get は最初のシートの欄の文字（理由書だけの欄を読むとき） */
+export type ShinseiBook<K extends string = Insurer> = Omit<ShinseiRead, 'insurer'> & {insurer: K; cost: number | null; get: (ref: string) => string};
+
 /**
- * 書き込んだ申請書（Excel）から読む。どの保険者の申請書かは最初のシートの名前で見分ける。申請書でなければ null。
- * 見積もりの入口の「申請書（Excel）から作る」はユーザーの指示（「不要」2026-10-21）で外したので、いまは書いた申請書を読み戻すテストで使う
+ * 書き込んだ様式（申請書・理由書）を読む。どの様式かは最初のシートの名前で見分ける（maps の順に）。どれでもなければ null。
+ * 氏名・住所・番号・改修の箇所・申請書の画面の項目・改修費用
  */
-export function readShinsei(bytes: Uint8Array): ShinseiRead | null {
+export function readMapped<K extends string>(bytes: Uint8Array, maps: [K, ShinseiMap][]): ShinseiBook<K> | null {
   let files: Files;
   try {
     files = unzipSync(bytes);
@@ -2131,10 +2145,11 @@ export function readShinsei(bytes: Uint8Array): ShinseiRead | null {
   if (!files['xl/workbook.xml']) return null;
   const paths = sheetPaths(files);
   const shared = sharedStrings(files);
-  for (const [insurer, map] of Object.entries(SHINSEI) as [Insurer, ShinseiMap][]) {
+  for (const [insurer, map] of maps) {
     const first = paths.get(map.sheets[0]?.sheet ?? '');
     if (!first || !files[first]) continue;
-    const out: ShinseiRead = {insurer, name: '', address: '', insuredNo: '', places: [], info: {}};
+    const firstXml = strFromU8(files[first]);
+    const out: ShinseiBook<K> = {insurer, name: '', address: '', insuredNo: '', places: [], info: {}, cost: null, get: (ref) => cellText(firstXml, ref, shared).trim()};
     for (const sheet of map.sheets) {
       const path = paths.get(sheet.sheet);
       if (!path || !files[path]) continue;
@@ -2160,10 +2175,27 @@ export function readShinsei(bytes: Uint8Array): ShinseiRead | null {
         });
       }
       readTexts(sheet, get, out.info);
+      out.cost ??= readCost(sheet, get);
     }
     return out;
   }
   return null;
+}
+
+/** 書き込んだ申請書（4つの保険者の申請書）。改修費用・最初のシートの欄の文字も */
+export function readShinseiBook(bytes: Uint8Array): ShinseiBook | null {
+  return readMapped(bytes, Object.entries(SHINSEI) as [Insurer, ShinseiMap][]);
+}
+
+/**
+ * 書き込んだ申請書（Excel）から読む。どの保険者の申請書かは最初のシートの名前で見分ける。申請書でなければ null。
+ * 一覧の「📥 取り込む」（importDocs.ts）は readShinseiBook（改修費用も読む）を使う。これは書いた申請書を読み戻すテストで使う
+ */
+export function readShinsei(bytes: Uint8Array): ShinseiRead | null {
+  const b = readShinseiBook(bytes);
+  if (!b) return null;
+  const {cost: _cost, get: _get, ...read} = b;
+  return read;
 }
 
 

@@ -1,6 +1,7 @@
 // 売上見込み（タブ「📈 売上見込みを確認する」。ユーザーの指示「請求書を作成するの横に、売上見込みを確認するとつくる。開くと住宅改修と特定福祉用具を別々に、
 // その次の売上を集計、確認できるようにする。（税抜、税込）当然印刷も。☑︎して次月に回せるようにもする」2026-10-25）。
-// 住宅改修：見積書のある様邸（見積書の金額。税抜＝小計＋諸経費、税込＝合計）。月は売上見込みの月（Job.salesMonth。なければ請求する月）。
+// 住宅改修：売上のある様邸（見積書の金額。税抜＝小計＋諸経費、税込＝合計。見積書の行がなければ取り込んだ見積書の合計か申請書の改修費用＝jutakuSales）。
+// 月は売上見込みの月（Job.salesMonth。なければ請求する月）。
 // 特定福祉用具：特定福祉用具のアプリ（太陽ポータルの tokutei/）が、同じサイトの localStorage（taiyo-tokutei-sales-v1）に書いた案件ごとの金額のまとめを読む
 // （特定福祉用具の src/tokutei/salesSummary.ts。2つのアプリはデータを分けているので、特定福祉用具のデータは書きかえない。次月に回した月はこのアプリの設定に持つ）。
 import {estimateTotals, hasEstimateRows, jobName} from './calc.ts';
@@ -31,6 +32,44 @@ const MONTH = /^\d{4}-\d{2}$/;
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : 0);
 const str = (v: unknown) => (typeof v === 'string' ? v : '');
 
+type SalesJob = Pick<Job, 'places' | 'overhead' | 'overheadTarget' | 'imported' | 'shinsei'>;
+
+/** 取り込んだ見積書のうち、明細を様邸の行にしなかったもの（ほかの工務店の見積書など）で、合計の金額があるもの */
+const importedTotals = (job: Pick<Job, 'imported'>) => (job.imported ?? []).filter((d) => d.kind === 'estimate' && !d.rows && (d.total ?? 0) > 0);
+
+/** 住宅改修の売上がある様邸（見積書の行・取り込んだ見積書の合計・申請書の改修費用のどれかがある）。jutakuSales が null でない */
+export const hasJutakuSales = (job: SalesJob) => hasEstimateRows(job) || importedTotals(job).length > 0 || (job.shinsei?.cost ?? 0) > 0;
+
+/**
+ * 住宅改修の様邸の売上（税抜・消費税・税込）。ユーザーの指示「申請書や見積書（合計）金額を認識し、売上見込みや受注残などに計上するようにする」2026-10-27。
+ * 見積書の行があれば見積書の金額（税抜＝小計＋諸経費）に、取り込んだほかの形の見積書の合計を足す（同じ名字の方にまとめた＝合算）。
+ * 見積書の行も取り込んだ見積書もなければ、申請書の改修費用（取り込んだ申請書・申請書の画面で入れた金額。税込として 税抜＝四捨五入(費用÷(1＋税率))）。
+ * どれもなければ null（売上見込み・受注残に入れない）。工務店の請求書には入れない（請求書は見積書の行だけ）
+ */
+export function jutakuSales(job: SalesJob, s: EstimateSettings): {amount: number; tax: number; total: number} | null {
+  if (!hasJutakuSales(job)) return null;
+  const out = {amount: 0, tax: 0, total: 0};
+  if (hasEstimateRows(job)) {
+    const t = estimateTotals(job, s).all;
+    out.amount += t.subtotal + t.overhead;
+    out.tax += t.tax;
+    out.total += t.total;
+  }
+  for (const d of importedTotals(job)) {
+    const total = d.total ?? 0;
+    const tax = d.tax ?? total - Math.round(total / (1 + s.taxRate));
+    out.amount += total - tax;
+    out.tax += tax;
+    out.total += total;
+  }
+  if (out.total === 0 && (job.shinsei?.cost ?? 0) > 0) {
+    const cost = job.shinsei!.cost!;
+    const amount = Math.round(cost / (1 + s.taxRate));
+    return {amount, tax: cost - amount, total: cost};
+  }
+  return out;
+}
+
 /** 住宅改修の様邸の売上見込みの月（売上月） */
 export const jutakuSalesMonth = (job: Pick<Job, 'month' | 'salesMonth'>) => (job.salesMonth && MONTH.test(job.salesMonth) ? job.salesMonth : job.month);
 
@@ -53,9 +92,9 @@ export const tokuteiSalesMonth = (r: Pick<TokuteiSale, 'id' | 'month'>, s: Pick<
  * 10月末に見積もり作った分は、でも11月に売り上げになることがありますので、何月分かっていうのを簡単に切り替えができるように」2026-10-26）。
  * 住宅改修の見積書があるか、特定福祉用具の案件がない様邸は、様邸の売上見込みの月。特定福祉用具だけの様邸は、その案件の月
  */
-export function rowSalesMonth(job: Pick<Job, 'id' | 'month' | 'salesMonth' | 'places'>, tokutei: TokuteiSale[], s: Pick<Settings, 'tokuteiSalesMonths'>): string {
+export function rowSalesMonth(job: Pick<Job, 'id' | 'month' | 'salesMonth'> & SalesJob, tokutei: TokuteiSale[], s: Pick<Settings, 'tokuteiSalesMonths'>): string {
   const linked = tokutei.filter((r) => r.jutakuJob === job.id);
-  if (hasEstimateRows(job) || linked.length === 0) return jutakuSalesMonth(job);
+  if (hasJutakuSales(job) || linked.length === 0) return jutakuSalesMonth(job);
   return tokuteiSalesMonth(linked[0], s);
 }
 
@@ -68,7 +107,7 @@ export function shiftSalesMonth(job: Job, tokutei: TokuteiSale[], s: Pick<Settin
   const next = addMonths(rowSalesMonth(job, tokutei, s), dir);
   const linked = tokutei.filter((r) => r.jutakuJob === job.id);
   const tokuteiMonths = Object.fromEntries(linked.map((r) => [r.id, next]));
-  if (!hasEstimateRows(job) && linked.length) return {job: {...job, month: next, salesMonth: undefined, updatedAt: now}, tokuteiMonths};
+  if (!hasJutakuSales(job) && linked.length) return {job: {...job, month: next, salesMonth: undefined, updatedAt: now}, tokuteiMonths};
   const moved = {...job, month: addMonths(job.month, dir), updatedAt: now};
   return {job: withSalesMonth(moved, next), tokuteiMonths};
 }
@@ -97,14 +136,12 @@ export function readTokuteiSales(raw: string | null): {rows: TokuteiSale[]; upda
   }
 }
 
-/** 売上見込みの行（住宅改修は見積書のある様邸、特定福祉用具はまとめの案件。月はすべて） */
+/** 売上見込みの行（住宅改修は売上のある様邸＝jutakuSales、特定福祉用具はまとめの案件。月はすべて） */
 export function planRows(jobs: Job[], s: EstimateSettings & Pick<Settings, 'tokuteiSalesMonths'>, tokutei: TokuteiSale[]): PlanRow[] {
-  const jutaku = jobs
-    .filter((j) => hasEstimateRows(j))
-    .map((j): PlanRow => {
-      const t = estimateTotals(j, s).all;
-      return {kind: 'jutaku', id: j.id, name: jobName(j), month: jutakuSalesMonth(j), amount: t.subtotal + t.overhead, tax: t.tax, total: t.total, status: '', staff: j.staff, jobId: j.id};
-    });
+  const jutaku = jobs.flatMap((j): PlanRow[] => {
+    const t = jutakuSales(j, s);
+    return t ? [{kind: 'jutaku', id: j.id, name: jobName(j), month: jutakuSalesMonth(j), ...t, status: '', staff: j.staff, jobId: j.id}] : [];
+  });
   const ids = new Set(jobs.map((j) => j.id));
   const toku = tokutei.map(
     (r): PlanRow => ({
@@ -136,7 +173,7 @@ export function monthPlan(rows: PlanRow[], month: string): MonthPlan {
 }
 
 /**
- * 受注残・進捗管理（太陽ポータルの solar-silver-progress-app。taiyo-link）に渡す、見積書のある様邸ごとのまとめ
+ * 受注残・進捗管理（太陽ポータルの solar-silver-progress-app。taiyo-link）に渡す、売上のある様邸ごとのまとめ（jutakuSales。見積書・取り込んだ見積書・申請書の改修費用）
  * （ユーザーの指示「ゆくゆくは作成したら、自動的に受注残の連動して、金額が自動で入るようにする。当然包括、居宅、名前なども連動」2026-10-25、
  *  「今の内容が崩れたりだとか、使えなくなったりだとかしないように」2026-10-26）。同じサイトなので、この端末の localStorage（taiyo-jutaku-sales-v1）に書く。
  * 形は特定福祉用具の salesSummary（taiyo-tokutei-sales-v1）と同じ。受注残の画面が読んで「受注残に入れる」を出す（受注残のデータはこのアプリから書かない）。
@@ -151,23 +188,22 @@ export function jutakuSalesSummary(
   s: EstimateSettings & Pick<Settings, 'officeName'> & Partial<Pick<Settings, 'tokuteiSalesMonths'>>,
   now = Date.now(),
 ): {v: 1; updatedAt: number; rows: JutakuSalesRow[]; tokuteiMonths: Record<string, string>} {
-  const rows = jobs
-    .filter((j) => hasEstimateRows(j))
-    .map((j): JutakuSalesRow => {
-      const t = estimateTotals(j, s).all;
-      return {
+  const rows = jobs.flatMap((j): JutakuSalesRow[] => {
+    const t = jutakuSales(j, s);
+    if (!t) return [];
+    return [
+      {
         id: j.id,
         customer: j.customer.trim(),
         staff: j.staff,
         careOffice: (j.shinsei?.reasonOffice ?? '').trim(),
         careManager: (j.shinsei?.reasonName ?? '').trim(),
         month: jutakuSalesMonth(j),
-        amount: t.subtotal + t.overhead,
-        tax: t.tax,
-        total: t.total,
+        ...t,
         office: s.officeName.trim(),
-      };
-    });
+      },
+    ];
+  });
   const tokuteiMonths = Object.fromEntries(Object.entries(s.tokuteiSalesMonths ?? {}).filter(([, m]) => MONTH.test(m)));
   return {v: 1, updatedAt: now, rows, tokuteiMonths};
 }

@@ -143,6 +143,11 @@ export default function App({start}: {start: MainTab}) {
   // 見積書の画面か、そこから開いた発注書・申請書か（見積書を閉じると見積書の画面にもどる）
   const [jobView, setJobView] = useState<JobView>(estimateId ? initial.view : 'estimate');
   const [estimateMonth, setEstimateMonth] = useState(thisMonth);
+  // 申請書・見積書・理由書を取り込んだら、その月の見積書の一覧を出す（DocImport.tsx）
+  const showImported = (m: string) => {
+    setEstimateMonth(m);
+    setEstimateView('list');
+  };
   const [month, setMonth] = useState(loadMonth); // 工務店請求書を確認する：請求する月
   const [salesMonth, setSalesMonth] = useState(thisMonth); // 売上見込みを確認する：売上の月
   const [masterTab, setMasterTab] = useState<MasterTab>('materials');
@@ -525,6 +530,7 @@ export default function App({start}: {start: MainTab}) {
                 update={store.update}
                 onNew={newOne}
                 onList={() => setEstimateView('list')}
+                onImported={showImported}
                 goMaterials={() => goMaster()}
               />
             ) : (
@@ -539,6 +545,7 @@ export default function App({start}: {start: MainTab}) {
                 onPrint={setPrint}
                 goMaterials={() => goMaster()}
                 onBack={() => setEstimateView('home')}
+                onImported={showImported}
               />
             ))}
           {tab === 'invoice' &&

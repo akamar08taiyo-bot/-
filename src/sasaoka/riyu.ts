@@ -6,8 +6,8 @@
 
 import type {EstimateRates, EstimateSettings} from './calc.ts';
 import {circled, eraOf, NO_SHINSEI} from './estimateForms.ts';
-import {colName, firstPhotoDay, shinseiValues, workItems} from './shinsei.ts';
-import type {MarkCell, ShinseiMap, ShinseiValues} from './shinsei.ts';
+import {colName, firstPhotoDay, readMapped, shinseiValues, workItems} from './shinsei.ts';
+import type {MarkCell, ShinseiBook, ShinseiMap, ShinseiValues} from './shinsei.ts';
 import type {RiyuField} from './shinseiPreview.ts';
 import type {Job, RiyuAct, RiyuActKey, RiyuInfo, ShinseiInfo} from './types.ts';
 import {customerFilePart, todayIso} from './util.ts';
@@ -375,3 +375,39 @@ export function riyuValues(job: Job, s: EstimateSettings, today = todayIso()): S
 
 /** ファイル名：「山田花子様住宅改修理由書.xlsx」（申請書・見積書と同じ形） */
 export const riyuFileName = (job: Pick<Job, 'customer'>) => `${customerFilePart(job.customer)}住宅改修理由書.xlsx`;
+
+// ---------------------------------------------------------------- 書き込んだ理由書を読む（一覧の「📥 取り込む」。importDocs.ts）
+
+/** 「令和8年10月21日」「令和元年5月1日」（warekiText の書き方）→ 'YYYY-MM-DD'。読めなければ '' */
+export function isoFromWareki(text: string): string {
+  const m = /^(明治|大正|昭和|平成|令和)(元|\d+)年(\d+)月(\d+)日$/.exec(text.normalize('NFKC').replace(/\s/g, ''));
+  if (!m) return '';
+  const y = ERA_START[m[1] as keyof typeof ERA_START] + (m[2] === '元' ? 1 : Number(m[2]));
+  return `${y}-${m[3].padStart(2, '0')}-${m[4].padStart(2, '0')}`;
+}
+
+/**
+ * 書き込んだ理由書（このアプリの原本 riyu.xltx の形）を読む。理由書でなければ null。
+ * 申請書と同じ欄（氏名・住所・番号・郵便番号・生年月日・作成者）は readMapped、理由書だけの欄は文字の欄（身体状況・介護状況・どう変えたいか・
+ * 作成者の資格と連絡先・現地確認日・作成日・活動の困難な状況と改修の方針）だけ（□を■にした所は読まない）
+ */
+export function readRiyuBook(bytes: Uint8Array): (ShinseiBook<'riyu'> & {riyu: Partial<RiyuInfo>}) | null {
+  const b = readMapped(bytes, [['riyu', RIYU_MAP]]);
+  if (!b) return null;
+  const riyu: Partial<RiyuInfo> = {};
+  for (const k of ['body', 'care', 'wish', 'tel', 'qualification'] as const) {
+    const v = b.get(RIYU_CELL[k]);
+    if (v) riyu[k] = v;
+  }
+  for (const k of ['checkDate', 'madeDate'] as const) {
+    const v = isoFromWareki(b.get(RIYU_CELL[k]));
+    if (v) riyu[k] = v;
+  }
+  const acts: Partial<Record<RiyuActKey, RiyuAct>> = {};
+  for (const a of RIYU_ACTS) {
+    const [trouble, policy] = [b.get(a.trouble), b.get(a.policy)];
+    if (trouble || policy) acts[a.key] = {...emptyAct(), trouble, policy};
+  }
+  if (Object.keys(acts).length) riyu.acts = {...NO_RIYU.acts, ...acts};
+  return {...b, riyu};
+}

@@ -7,8 +7,9 @@ import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm} from '../estimateForms.ts';
 import {estimateXlsx, XLSX_TYPE} from '../estimateXlsx.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
+import {DocImportDrop, useDocImport} from './DocImport.tsx';
 import type {PrintRequest} from '../print/PrintView.tsx';
-import {jutakuSalesMonth, readTokuteiSales, rowSalesMonth, shiftSalesMonth, TOKUTEI_SALES_KEY} from '../salesPlan.ts';
+import {jutakuSales, jutakuSalesMonth, readTokuteiSales, rowSalesMonth, shiftSalesMonth, TOKUTEI_SALES_KEY} from '../salesPlan.ts';
 import type {TokuteiSale} from '../salesPlan.ts';
 import {addSamples, hasSamples} from '../samples.ts';
 import type {AppData, Insurer, Job, Settings} from '../types.ts';
@@ -101,15 +102,18 @@ export function EstimateHome({
   update,
   onNew,
   onList,
+  onImported,
   goMaterials,
 }: {
   data: AppData;
   update: Update;
   onNew: (insurer: Insurer) => void; // 新しい様邸（申請書と見積書のタブ）を開く
   onList: () => void;
+  onImported: (month: string) => void; // 取り込んだあと（その月の一覧を開く）
   goMaterials: () => void;
 }) {
   const all = useEstimates(data, data.settings);
+  const docs = useDocImport(data, update, onImported);
   useTrashUndo(update); // 見積書の画面で削除（ゴミ箱へ）して戻ってきたとき、Ctrl+Z で戻す
   const month = thisMonth();
   const inMonth = all.filter((e) => e.job.month === month).length;
@@ -147,6 +151,11 @@ export function EstimateHome({
               {monthLabel(month)}：{inMonth}件　／　全部で {all.length}件
             </span>
           </div>
+          {/* 申請書・見積書・理由書の Excel を取り込む（ユーザーの指示「申請書や見積もり・理由書の取り込みをできるようにする」2026-10-27。DocImport.tsx） */}
+          <div className="mt-3">
+            <DocImportDrop onFiles={docs.start} onPick={docs.pick} />
+          </div>
+          {docs.element}
         </section>
       </div>
       {all.length === 0 && <GettingStarted data={data} update={update} goMaterials={goMaterials} onSample={onList} />}
@@ -226,12 +235,14 @@ export function EstimateList({
   onPrint,
   goMaterials,
   onBack,
+  onImported,
 }: {
   data: AppData;
   update: Update;
   month: string;
   setMonth: (m: string) => void;
   onBack?: () => void; // 「← 戻る」：見積もりの入口（新規作成・一覧から作成）へ
+  onImported?: (month: string) => void; // 取り込んだあと（その月の一覧にする）
   onOpen: (id: string) => void;
   onOpenShinsei: (id: string) => void; // 様邸の申請書の画面を開く
   onNew: (insurer: Insurer) => void;
@@ -249,6 +260,10 @@ export function EstimateList({
   const tokuteiJobs = useMemo(() => tokuteiItemJobs(), [data.jobs]);
   const tokutei = useMemo(() => tokuteiSales(), [data.jobs, s.tokuteiSalesMonths]);
   const searching = query.trim() !== '';
+  const docs = useDocImport(data, update, (m) => {
+    setQuery('');
+    (onImported ?? setMonth)(m);
+  });
   const list = useMemo(
     () =>
       searching
@@ -256,7 +271,8 @@ export function EstimateList({
         : all.filter((e) => e.job.month === month),
     [all, query, searching, month, names],
   );
-  const total = list.reduce((n, e) => n + e.t.all.total, 0);
+  // 見積の合計：見積書の行がなければ、取り込んだ見積書の合計か申請書の改修費用（売上見込み・受注残と同じ金額。salesPlan.ts の jutakuSales）
+  const total = list.reduce((n, e) => n + (jutakuSales(e.job, s)?.total ?? 0), 0);
   const shown = list.slice(0, limit);
   // 一覧の先頭のチェック：選んだ様邸を次の月・前の月の一覧に回す（ユーザーの指示「先頭にチェックマークをつくり、次月にまわす、前月に回せるようにする」）。
   // 行ごとの「売上月」の ◀ ▶ も同じ（ユーザーの指示「何月分かっていうのを簡単に切り替えができるように一覧表の中で…切り替えた分に関しては受注残に飛ばすときにも、
@@ -327,7 +343,11 @@ export function EstimateList({
             ＋ {INSURER_INFO[i].name}
           </Btn>
         ))}
-        <TextInput value={query} onChange={setQuery} placeholder="お客様名・住所で探す（すべての月）" className="ml-auto w-56 min-w-[14rem] max-w-[20rem] flex-1 text-base" aria-label="見積書を探す" />
+        <Btn color="white" className="!text-base" onClick={docs.pick} title="申請書・見積書・理由書の Excel（.xlsx）を取り込む">
+          📥 取り込む
+        </Btn>
+        {docs.element}
+        <TextInput value={query} onChange={setQuery} placeholder="お客様名・住所で探す" title="すべての月から探します" className="ml-auto w-44 min-w-[10.5rem] max-w-[20rem] flex-1 text-base" aria-label="見積書を探す" />
       </div>
       {checked.size > 0 && (
         <div role="status" aria-label="選んだ見積書" className="flex flex-wrap items-center gap-2 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-900">
@@ -377,9 +397,10 @@ export function EstimateList({
             <tbody>
               {shown.map(({job, date, t}) => {
                 const estimated = hasEstimateRows(job); // 見積書を作った様邸（申請書だけの様邸は、請求書・発注書に入らない）
+                const sales = jutakuSales(job, s); // 見積の合計（見積書の行がなければ、取り込んだ見積書の合計か申請書の改修費用）
                 const housing = estimated || job.places.some((p) => p.name.trim()); // 住宅改修の見積書か申請書（改修の箇所）を作っている
                 const name = job.customer.trim() ? jobName(job) : names.get(job.id) ? jobName({...job, customer: names.get(job.id)!}) : 'お客様名なし';
-                const sales = rowSalesMonth(job, tokutei, s);
+                const salesMonth = rowSalesMonth(job, tokutei, s);
                 // 請求書に入れていて、売上月を請求する月とちがう月にしてある（まれ）：薄い黄色（見積書の上の「売上月」で直した月）
                 const apart = estimated && job.shikiri && jutakuSalesMonth(job) !== job.month;
                 const arrow = 'h-9 w-9 rounded text-base text-slate-500 hover:bg-slate-100 hover:text-slate-800';
@@ -423,7 +444,7 @@ export function EstimateList({
                         <button type="button" className={arrow} onClick={() => moveOne(job, name, -1)} aria-label="売上月を前月に">
                           ◀
                         </button>
-                        <span className="min-w-[3rem] px-1 text-center font-bold tabular-nums text-slate-800">{shortMonth(sales, searching ? thisMonth() : month)}</span>
+                        <span className="min-w-[3rem] px-1 text-center font-bold tabular-nums text-slate-800">{shortMonth(salesMonth, searching ? thisMonth() : month)}</span>
                         <button type="button" className={arrow} onClick={() => moveOne(job, name, 1)} aria-label="売上月を次月に">
                           ▶
                         </button>
@@ -442,7 +463,9 @@ export function EstimateList({
                         <span className="text-slate-400">（お客様名なし）</span>
                       )}
                     </td>
-                    <td className="px-2 py-2 text-right font-bold tabular-nums text-emerald-900">{estimated ? yen(t.all.total) : <span className="font-normal text-slate-400">—</span>}</td>
+                    <td className="px-2 py-2 text-right font-bold tabular-nums text-emerald-900" title={sales && !estimated ? (job.imported?.some((d) => d.kind === 'estimate' && !d.rows) ? '取り込んだ見積書の合計' : '申請書の改修費用') : undefined}>
+                      {sales ? yen(sales.total) : <span className="font-normal text-slate-400">—</span>}
+                    </td>
                     <td className="whitespace-nowrap px-2 py-2 text-sm">
                       {job.shikiri ? (
                         <span className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 font-bold text-[#0c315e]">{monthLabel(job.month)}分に入れる</span>

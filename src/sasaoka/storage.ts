@@ -11,7 +11,7 @@ import {jobInsurer, MARK_INFO, MARK_KEYS, NO_SHINSEI} from './estimateForms.ts';
 import {cleanEdit} from './photoEdit.ts';
 import {cleanMarks} from './photoMarks.ts';
 import {cleanRiyu} from './riyu.ts';
-import type {AppData, EstimateForm, Insurer, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, PlaceDims, PlacePhotoEdits, PlacePhotoMarks, PlacePhotos, Rounding, Row, Settings, ShinseiInfo, TaxMode} from './types.ts';
+import type {AppData, EstimateForm, ImportedDoc, Insurer, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, PlaceDims, PlacePhotoEdits, PlacePhotoMarks, PlacePhotos, Rounding, Row, Settings, ShinseiInfo, TaxMode} from './types.ts';
 import {todayIso, uid} from './util.ts';
 
 const DB_NAME = 'taiyo-sasaoka-shikiri';
@@ -412,6 +412,16 @@ function cleanUriage(u: Record<string, unknown>): NonNullable<Job['uriage']> {
   };
 }
 
+/** 取り込んだ書類（importDocs.ts）。目印（hash）のないものは捨てる */
+function cleanImported(raw: unknown[]): ImportedDoc[] {
+  const money = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : null);
+  return raw.filter(isObj).flatMap((d): ImportedDoc[] => {
+    const kind = d.kind === 'shinsei' || d.kind === 'estimate' || d.kind === 'riyu' ? d.kind : null;
+    if (!kind || !str(d.hash)) return [];
+    return [{kind, file: str(d.file), hash: str(d.hash), total: money(d.total), tax: money(d.tax), rows: d.rows === true, at: numv(d.at)}];
+  });
+}
+
 export function cleanJobs(raw: unknown): Job[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter(isObj).map((rec) => keepNewer(rec, (j) => {
@@ -444,6 +454,7 @@ export function cleanJobs(raw: unknown): Job[] {
       // 売上見込みの月＝売上月（2026-10-25）。請求する月と同じなら持たない（請求する月と一緒に変わるように。前の版は一覧の ◀ ▶ で同じ月も持った。2026-10-26）
       ...(/^\d{4}-\d{2}$/.test(str(j.salesMonth)) && str(j.salesMonth) !== str(j.month) ? {salesMonth: str(j.salesMonth)} : {}),
       ...(isObj(j.uriage) ? {uriage: cleanUriage(j.uriage)} : {}), // 売上伝票の顧客区分・請求区分（2026-10-27）
+      ...(Array.isArray(j.imported) ? {imported: cleanImported(j.imported)} : {}), // 取り込んだ書類（2026-10-28。importDocs.ts）
       createdAt: numv(j.createdAt, Date.now()),
       updatedAt: numv(j.updatedAt, Date.now()),
     };
