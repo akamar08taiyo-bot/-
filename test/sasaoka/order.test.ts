@@ -16,6 +16,7 @@ import {
   setOrderQty,
   unitTotals,
 } from '../../src/sasaoka/order.ts';
+import {NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {placeFromDims} from '../../src/sasaoka/cutLink.ts';
 import {laborRow, materialRow, newPlace} from '../../src/sasaoka/rows.ts';
 import type {Job, Material, Row} from '../../src/sasaoka/types.ts';
@@ -290,4 +291,8 @@ test('販売受注簿へ渡す内容（数量は1以上の整数・営業担当�
   ]);
   const half = {...base[0], qty: 0.5};
   assert.equal(hacchuImport(j, [half], null).items[0].quantity, 1);
+  // フリガナ・電話番号・依頼者名（ケアマネジャー＝理由書の作成者）・納品予定日（施工日）も渡す（ユーザーの答え「すべてお願いします」2026-10-28）
+  assert.deepEqual([payload.furigana, payload.tel, payload.requester, payload.deliveryDate], ['', '', '', '']);
+  const full = hacchuImport({...j, date: '2026-11-05', shinsei: {...NO_SHINSEI, kana: 'ヤマダ　タロウ', phone: '０９３０－００－００００', reasonName: '見本 次郎'}}, lines, e);
+  assert.deepEqual([full.furigana, full.tel, full.requester, full.deliveryDate], ['ヤマダ　タロウ', '0930-00-0000', '見本 次郎', '2026-11-05']);
 });

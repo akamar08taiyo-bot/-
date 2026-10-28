@@ -400,13 +400,21 @@ export type HacchuImport = {
   createdAt: number;
   title: string; // 何の発注か（「山田様邸 住宅改修」）
   customerName: string;
+  furigana: string; // フリガナ（申請書の欄）
   address: string;
+  tel: string; // 電話番号（申請書の欄）
+  requester: string; // 依頼者名＝ケアマネジャー（理由書の作成者の氏名）
+  deliveryDate: string; // 納品予定日＝施工日 'YYYY-MM-DD'（なければ空）
   sales: string; // 営業担当（名字）
   supplier: string; // 発注先
   items: HacchuItem[];
 };
 
-export function hacchuImport(job: Pick<Job, 'customer' | 'suffix' | 'address' | 'staff'>, lines: OrderLine[], edits: OrderEdits | null | undefined): HacchuImport {
+/**
+ * 販売受注簿へ渡す内容。お客様のフリガナ・電話番号・依頼者名（ケアマネジャー）・納品予定日（施工日）も渡す
+ * （ユーザーの答え「すべてお願いします」2026-10-28。受け取る側は taiyo-hacchu-scan の jutakuImportPages。前の版の受注簿は知らない項目を使わないだけ）
+ */
+export function hacchuImport(job: Pick<Job, 'customer' | 'suffix' | 'address' | 'staff'> & Partial<Pick<Job, 'date' | 'shinsei'>>, lines: OrderLine[], edits: OrderEdits | null | undefined): HacchuImport {
   const customer = job.customer.trim();
   return {
     kind: 'taiyo-jutaku-order',
@@ -414,7 +422,11 @@ export function hacchuImport(job: Pick<Job, 'customer' | 'suffix' | 'address' | 
     createdAt: Date.now(),
     title: `${customer ? `${customer}${job.suffix || '様'} ` : ''}住宅改修`,
     customerName: customer,
+    furigana: (job.shinsei?.kana ?? '').trim(),
     address: job.address.trim(),
+    tel: (job.shinsei?.phone ?? '').normalize('NFKC').trim(),
+    requester: (job.shinsei?.reasonName ?? '').trim(),
+    deliveryDate: /^\d{4}-\d{2}-\d{2}$/.test(job.date ?? '') ? job.date! : '',
     sales: staffShort(job.staff),
     supplier: edits?.supplier.trim() ?? '',
     items: orderedLines(lines).map((l) => ({
