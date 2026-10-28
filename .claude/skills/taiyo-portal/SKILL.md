@@ -84,6 +84,29 @@ clone が1つのブランチだけを取ってくる設定（`remote.origin.fetc
 GitHub Pages のデプロイは `gh run list --repo akamar08taiyo-bot/<名前> --limit 3 --json headSha,status,conclusion,name` でも見られる（2026-10-26 は gh で見た）。
 スクラッチパッド（/tmp）は次のセッションに残らない。くり返し使う検証のスクリプトはスキルの `scripts/` に入れる。
 
+## 「← 業務アプリポータルへ戻る」ボタン（全アプリ共通。2026-10-28）
+
+ユーザーの指示「太陽ポータルに戻るボタンは左上に設置。太陽ポータル全アプリ共通にする。色や大きさも含めて統一する」。どのアプリも同じ形・同じ所に置く：
+
+- 中身：`<a href="https://akamar08taiyo-bot.github.io/taiyo-portal/" class="taiyo-portal-back">← 業務アプリポータルへ戻る</a>`（React は className）。字・行き先はどのアプリも同じ（ポータルの中のアプリも絶対 URL）。
+- 置き場所：画面のいちばん上の段の左（題名・ロゴより左）。左の帯（サイドバー）のあるアプリ（消耗品売上管理・居宅カレンダー・営業月報）は広い画面では帯のいちばん上、スマホでは見出しの上の1行。
+  1つの画面に1つだけ（狭い画面用と広い画面用で2つ置くときは、片方を必ず隠す）。印刷には出さない。
+- 書式（アプリの書式に負けないよう !important。アプリの CSS か最初の <style> に入れる）。測ると 201×34px・白い地・字は #334155・500 13px：
+
+```css
+/* 業務アプリポータルへ戻るボタン（太陽ポータルの全アプリ共通。色・大きさ・字はどのアプリでも同じにするため、アプリの書式に負けないよう !important。
+   ユーザーの指示「太陽ポータルに戻るボタンは左上に設置。太陽ポータル全アプリ共通にする。色や大きさも含めて統一する」2026-10-28。決まりは taiyo-portal スキル） */
+.taiyo-portal-back{display:inline-flex!important;align-items:center!important;gap:4px;box-sizing:border-box!important;height:34px!important;margin:0;padding:0 12px!important;border:1px solid #cbd5e1!important;border-radius:8px!important;background:#fff!important;color:#334155!important;font:500 13px/1 "Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Yu Gothic","Meiryo",sans-serif!important;letter-spacing:0!important;text-decoration:none!important;white-space:nowrap!important;flex:none!important;box-shadow:0 1px 2px rgba(15,23,42,.08)!important}
+.taiyo-portal-back:hover{background:#f1f5f9!important;color:#0f172a!important}
+.taiyo-portal-back:focus-visible{outline:2px solid #64748b!important;outline-offset:2px}
+@media print{.taiyo-portal-back{display:none!important}}
+```
+
+- 2026-10-28 に入れたアプリ（コミット）：見積・提案書作成・福祉用具相談報告書・消耗品売上管理・受注残・進捗管理・営業月報・販売受注簿作成ツール・売上伝票発行依頼書・
+  チラシ作成（レンタル）（dc-src を直して build-flyer）・チラシ作成（消耗品）（メインメニュー）・価格改定・休暇案内・福祉用具ユーザー辞書（site/）・書類送付状（ポータルの soufujo/）・FAX送付状（fax ブランチ）・
+  申請書・見積書作成（住宅改修・特定福祉用具。特定福祉用具は住宅改修のタブの中では出さない）。居宅カレンダーはソースだけ（ブランチ claude/portal-back-left。ビルドに SheetJS 0.20.3 の取り込みが要り、作業環境の安全確認で止められた）。
+- 確かめ方：Playwright で `a.taiyo-portal-back:visible` の位置・大きさ・色を 1366px と 390px で測り、上の部分を撮って見比べる。横にはみ出さない（scrollWidth）。
+
 ## ユーザーの好み（これまでの指摘から）
 
 ボタンの色と説明文の話は、住宅改修のアプリで言われたこと。見積・提案書作成など、ほかのアプリには今も濃い色のボタンがある → 新しく作る所はこの好みに合わせ、今ある所は頼まれたら合わせる。
@@ -91,10 +114,16 @@ GitHub Pages のデプロイは `gh run list --repo akamar08taiyo-bot/<名前> -
 
 - 画面に説明文を入れない（「この説明は不要」と言われて消した）。説明は README とタイルの使い方の文へ。お知らせ（トースト）も「保存しました」のように短く。
 - ボタンの色は控えめに（「色付けで目がチカチカする。色付けは Excel に保存と印刷くらいにして、濃い色は要らない」）。保存＝薄い青、Excel＝薄い緑、印刷＝薄い水色、ほかは白（削除も白。消す前の確かめで守る）。
+  **同じ働きのボタンは同じ色**（「同じ内容でボタンの色が違う場合は統一する」2026-10-28）。取り込む＝薄い紫、新規・追加＝薄い緑（emerald）、削除・閉じる・転記など＝白。アプリをまたいでも（住宅改修と特定福祉用具など）そろえる。
+- ほかのアプリの画面の色・書体も、まとめて使うアプリにそろえる（売上伝票発行依頼書を申請書・見積書作成と同じ濃い緑・同じ書体に。2026-10-28）。
 - 消す操作は確かめてから（「全部いきなり消えてしまうと結構困る」）。元に戻せるとなお良い。
 - 帳票は「何を・いくつ・いくら」だけ。頼まれていない欄・説明の行を足さない。役所・メーカー・会社の様式は形を変えない（枠の大きさも）。
 - 依頼の例に書き間違いがあることもある → 意図を一般のルールにして作り、報告で「こう解釈した」と書く。細かいことを何度も聞き返すより、筋の通った解釈で進めて見せる。ただし、データを消す・外に送る・本番に出すなど取り返しのつかないことは確かめる。
 - 進み具合を短く知らせる（長く黙らない）。
+- **会社のメールのソフトは Thunderbird**（2026-10-27 の答え。はじめは「Outlook」と答えていた）。タブレットからもメールを送る。
+  添付つきのメールをワンタッチで作るときは、パソコンは .eml（`X-Unsent: 1`。Thunderbird 91 以降・Outlook とも送信前のメールで開く）、
+  スマホ・タブレットは共有メニュー（`navigator.share`）。作りは売上伝票発行依頼書の `src/lib/mailDraft.js`（販売受注簿作成ツールの `src/lib/mailDraft.mjs` は写し。
+  落とし穴は taiyo-hacchu-scan の Learnings.md 第42・43項）。
 
 ## 公開の記録（2026-10-22〜26）
 
