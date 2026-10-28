@@ -15,6 +15,8 @@ import {jobInsurer, KINDS, NO_SHINSEI} from './estimateForms.ts';
 import {readRiyuBook, NO_RIYU} from './riyu.ts';
 import {manualRow, newPlace} from './rows.ts';
 import {isLaborText, parseKind, parseListNote, parsePlace} from './sheetEdit.ts';
+import {readShinseiPhotos} from './photoImport.ts';
+import type {FramePhotos} from './photoImport.ts';
 import {padInsuredNo, readShinseiBook} from './shinsei.ts';
 import type {ShinseiPlace} from './shinsei.ts';
 import type {ImportedDoc, Insurer, Job, Place, PlaceDims, RiyuInfo, Row, ShinseiInfo} from './types.ts';
@@ -43,6 +45,7 @@ export type ReadDoc = {
   riyu: Partial<RiyuInfo> | null;
   total: number | null; // 見積書の合計（税込）／申請書の改修費用
   tax: number | null; // 見積書の消費税（分かれば）
+  photos: FramePhotos[]; // 申請書の写真貼付用紙・平面図の写真と書き込み（photoImport.ts。date は 'YYYY-MM-DD'）。様邸に入れるのは DocImport.tsx（写真は端末の中だけ）
 };
 
 // ---------------------------------------------------------------- 文字・数
@@ -155,6 +158,7 @@ const base = (file: string, hash: string, kind: DocKind): ReadDoc => ({
   riyu: null,
   total: null,
   tax: null,
+  photos: [],
 });
 
 /** 申請書の項目のうち、読んだもの（空でない文字の項目） */
@@ -425,6 +429,8 @@ export function readDoc(bytes: Uint8Array, file: string, s: EstimateSettings, mo
       places: sh.places.filter((p) => p.name || p.text).map(placeFromShinsei),
       info,
       total: sh.cost,
+      // 写真貼付用紙・平面図の写真も一緒に（ユーザーの指示「申請書などを取り込んだときに、一括で写真などもと取り込めるようにする」2026-10-28）
+      photos: readShinseiPhotos(bytes, sh.insurer).map((f) => ({...f, date: dateOf(f.date)})),
     };
   }
   const ry = readRiyuBook(bytes);

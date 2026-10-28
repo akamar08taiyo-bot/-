@@ -3,6 +3,8 @@
 // 様邸の箇所には写真の番号（id）だけを持つ（Place.photos）。どの様邸からも使われなくなった写真は、開いたときに消す（prunePhotos）
 
 import {useEffect, useState} from 'react';
+import type {FramePic} from './photoImport.ts';
+import type {Box} from './shinsei.ts';
 import {uid} from './util.ts';
 
 const DB_NAME = 'taiyo-sasaoka-photos';
@@ -209,6 +211,47 @@ export async function preparePhoto(file: Blob): Promise<{blob: Blob; w: number; 
     return {blob, w, h};
   } finally {
     src.done();
+  }
+}
+
+/**
+ * 取り込んだ申請書（Excel）の枠の写真を1枚にまとめる（photoImport.ts の frameLayout の範囲 region。シートの画素）。写真ごとに切り抜き・左右上下の反転・回転をして、
+ * Excel と同じ位置に描く（写真のない所は白）。大きさは写真のもとの細かさに合わせ、長い辺は MAX_SIDE まで（preparePhoto と同じ）。どの写真も読めなければ null
+ */
+export async function composeFrame(region: Box, pics: FramePic[]): Promise<{blob: Blob; w: number; h: number} | null> {
+  const loaded: {pic: FramePic; bmp: ImageBitmap}[] = [];
+  for (const pic of pics) {
+    try {
+      loaded.push({pic, bmp: await createImageBitmap(new Blob([pic.bytes as BlobPart], {type: pic.type}), {imageOrientation: 'from-image'})});
+    } catch {
+      // 読めない写真（壊れた画像など）は飛ばす
+    }
+  }
+  if (loaded.length === 0) return null;
+  try {
+    const fine = Math.max(1, ...loaded.map(({pic, bmp}) => (bmp.width * (1 - pic.crop.l - pic.crop.r)) / Math.max(1, pic.box.w)));
+    const k = Math.min(fine, MAX_SIDE / Math.max(region.w, region.h, 1));
+    const [w, h] = [Math.max(1, Math.round(region.w * k)), Math.max(1, Math.round(region.h * k))];
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, w, h);
+    for (const {pic, bmp} of loaded) {
+      const {l, t, r, b} = pic.crop;
+      ctx.save();
+      ctx.translate((pic.box.x + pic.box.w / 2 - region.x) * k, (pic.box.y + pic.box.h / 2 - region.y) * k);
+      ctx.rotate((pic.rot * Math.PI) / 180);
+      ctx.scale(pic.flipH ? -1 : 1, pic.flipV ? -1 : 1);
+      ctx.drawImage(bmp, bmp.width * l, bmp.height * t, bmp.width * (1 - l - r), bmp.height * (1 - t - b), (-pic.box.w * k) / 2, (-pic.box.h * k) / 2, pic.box.w * k, pic.box.h * k);
+      ctx.restore();
+    }
+    const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((x) => (x ? resolve(x) : reject(new Error('写真を読めませんでした'))), 'image/jpeg', 0.85));
+    return {blob, w, h};
+  } finally {
+    for (const {bmp} of loaded) bmp.close();
   }
 }
 

@@ -1,11 +1,16 @@
 // 見積書の一覧・見積もりの入口の「📥 取り込む」：申請書・見積書・理由書の Excel を選ぶ／ドロップすると、名字ごとにまとめた確かめの画面を出し、
-// 「取り込む」で様邸を作る（同じ名字の様邸があれば、そこに足す＝合算）。読み取り・まとめ方は importDocs.ts
+// 「取り込む」で様邸を作る（同じ名字の様邸があれば、そこに足す＝合算）。読み取り・まとめ方は importDocs.ts。
+// 申請書の写真貼付用紙・平面図の写真と書き込みも一緒に入れる（枠ごとに1枚にまとめて端末に保存。photoImport.ts・photos.ts の composeFrame）。
+// 前に取り込んだ申請書でも、まだ入っていない写真があれば「写真を取り込む」（ユーザーの指示「申請書などを取り込んだときに、一括で写真などもと取り込めるようにする」2026-10-28）
 import {useRef, useState} from 'react';
 import type {ReactNode} from 'react';
 import {jobName} from '../calc.ts';
 import {Btn, DropArea, Modal, TextInput, useToast} from '../components/ui.tsx';
 import {applyImport, DOC_LABEL, planImport, readDoc} from '../importDocs.ts';
 import type {ImportGroup, ReadDoc} from '../importDocs.ts';
+import {frameLayout, missingFrames, withImportedPhotos} from '../photoImport.ts';
+import type {FramePhotos, StoredFrame} from '../photoImport.ts';
+import {composeFrame, putPhoto} from '../photos.ts';
 import type {AppData, Job} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {monthLabel, todayIso, yen} from '../util.ts';
@@ -34,6 +39,7 @@ export function useDocImport(data: AppData, update: Update, onImported: (month: 
   const input = useRef<HTMLInputElement>(null);
   const [drafts, setDrafts] = useState<Draft[] | null>(null);
   const [bad, setBad] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
   const s = data.settings;
 
   const start = async (files: File[]) => {
@@ -57,31 +63,86 @@ export function useDocImport(data: AppData, update: Update, onImported: (month: 
   };
   const patch = (key: string, p: Partial<Draft>) => setDrafts((ds) => ds && ds.map((d) => (d.key === key ? {...d, ...p} : d)));
   const live = new Map(data.jobs.filter((j) => !j.trashedAt).map((j) => [j.id, j]));
-  const count = (drafts ?? []).reduce((n, d) => n + d.docs.length, 0);
+  /** 前に取り込んだ申請書のうち、様邸にまだ入っていない写真（写真だけ取り込む） */
+  const photosToAdd = (doc: ReadDoc, jobId: string): FramePhotos[] => {
+    const job = live.get(jobId);
+    return job ? missingFrames(job, doc.photos, s) : [];
+  };
+  const photoOnly = (drafts ?? []).flatMap((g) => g.done.filter((x) => photosToAdd(x.doc, x.jobId).length > 0));
+  const count = (drafts ?? []).reduce((n, d) => n + d.docs.length, 0) + photoOnly.length;
 
-  const run = () => {
-    if (!drafts) return;
+  const run = async () => {
+    if (!drafts || busy) return;
     const now = Date.now();
     const made: Job[] = [];
     const changed = new Map<string, Job>();
+    // 写真を入れる様邸：書類ごとに、入れた様邸の id と、その書類の写真
+    const photoJobs: {jobId: string; frames: FramePhotos[]}[] = [];
     for (const g of drafts) {
+      for (const x of g.done) {
+        const frames = photosToAdd(x.doc, x.jobId);
+        if (frames.length) photoJobs.push({jobId: x.jobId, frames});
+      }
       if (g.docs.length === 0) continue;
       const name = g.name.trim();
       if (g.separate) {
         // 1つずつ（まとめない）：書類ごとに新しい様邸
-        for (const d of g.docs) made.push(applyImport(null, [d], d.name || name, g.month, s, now));
+        for (const d of g.docs) {
+          const job = applyImport(null, [d], d.name || name, g.month, s, now);
+          made.push(job);
+          if (d.photos.length) photoJobs.push({jobId: job.id, frames: d.photos});
+        }
         continue;
       }
       const target = g.target ? (changed.get(g.target) ?? live.get(g.target) ?? null) : null;
       const job = applyImport(target, g.docs, name, g.month, s, now);
       if (target) changed.set(target.id, job);
       else made.push(job);
+      for (const d of g.docs) if (d.photos.length) photoJobs.push({jobId: job.id, frames: d.photos});
+    }
+    // 写真：枠ごとに1枚にまとめて端末に保存し、写真番号の箇所（平面図は平面図の図）の空いた所に入れる（入っている写真は変えない）
+    let photos = 0;
+    if (photoJobs.length) {
+      setBusy(true);
+      toast('写真を取り込んでいます');
+      const stored = new Map<string, StoredFrame[]>();
+      for (const {jobId, frames} of photoJobs) {
+        for (const f of frames) {
+          try {
+            const {region, marks} = frameLayout(f);
+            const img = await composeFrame(region, f.pics);
+            if (!img) continue;
+            const id = await putPhoto(img);
+            stored.set(jobId, [...(stored.get(jobId) ?? []), {photo: f.photo, slot: f.slot, id, marks, date: f.date}]);
+          } catch {
+            // 保存できなかった写真は飛ばす（ほかの写真・書類は入れる）
+          }
+        }
+      }
+      const add = (job: Job) => {
+        const frames = stored.get(job.id);
+        if (!frames) return job;
+        const next = withImportedPhotos(job, frames, s);
+        photos += frames.length;
+        return next;
+      };
+      for (let i = 0; i < made.length; i++) made[i] = add(made[i]);
+      for (const [id, job] of changed) changed.set(id, add(job));
+      for (const jobId of stored.keys()) {
+        const job = live.get(jobId);
+        if (job && !changed.has(jobId) && !made.some((j) => j.id === jobId)) changed.set(jobId, {...add(job), updatedAt: now});
+      }
+      setBusy(false);
     }
     update('jobs', (jobs) => [...jobs.map((j) => changed.get(j.id) ?? j), ...made]);
-    toast(`${count}件を取り込みました`);
+    toast(photos ? `${count}件を取り込みました（写真 ${photos}枚）` : `${count}件を取り込みました`);
     const first = drafts.find((g) => g.docs.length > 0);
     close();
     if (first) onImported(first.target && !first.separate ? (live.get(first.target)?.month ?? first.month) : first.month);
+    else {
+      const month = photoJobs[0] && live.get(photoJobs[0].jobId)?.month; // 写真だけ取り込んだ：その様邸の月の一覧に
+      if (month) onImported(month);
+    }
   };
 
   const element = (
@@ -109,8 +170,8 @@ export function useDocImport(data: AppData, update: Update, onImported: (month: 
               <Btn color="white" onClick={close}>
                 やめる
               </Btn>
-              <Btn color="purple" disabled={count === 0} onClick={run}>
-                取り込む（{count}件）
+              <Btn color="purple" disabled={count === 0 || busy} onClick={() => void run()}>
+                {busy ? '写真を取り込んでいます…' : `取り込む（${count}件）`}
               </Btn>
             </>
           }
@@ -162,6 +223,7 @@ export function useDocImport(data: AppData, update: Update, onImported: (month: 
                         <span className="text-slate-800">{d.file}</span>
                         {d.name && d.name !== g.name && <span className="text-slate-500">（{d.name}）</span>}
                         <span className="tabular-nums text-slate-700">{amountText(d)}</span>
+                        {d.photos.length > 0 && <span className="text-slate-600">写真 {d.photos.length}枚</span>}
                       </li>
                     ))}
                     {g.done.map(({doc, jobId}) => (
@@ -169,6 +231,7 @@ export function useDocImport(data: AppData, update: Update, onImported: (month: 
                         <span className="rounded border border-slate-200 px-1.5 py-0.5">{DOC_LABEL[doc.kind]}</span>
                         <span>{doc.file}</span>
                         <span>取り込み済み（{live.get(jobId) ? jobName(live.get(jobId)!) : ''}）</span>
+                        {photosToAdd(doc, jobId).length > 0 && <span className="text-slate-700">まだ入っていない写真 {photosToAdd(doc, jobId).length}枚を取り込む</span>}
                       </li>
                     ))}
                   </ul>

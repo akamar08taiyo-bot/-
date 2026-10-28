@@ -1602,7 +1602,7 @@ function ellipseXml(lay: SheetLayout, box: Box, id: number): string {
 }
 
 /** 相対の場所（../drawings/drawing1.xml）→ ファイルの名前（xl/drawings/drawing1.xml） */
-function resolvePath(from: string, target: string): string {
+export function resolvePath(from: string, target: string): string {
   if (target.startsWith('/')) return target.slice(1);
   const parts = from.split('/').slice(0, -1);
   for (const seg of target.split('/')) {
