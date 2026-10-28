@@ -27,6 +27,7 @@ export type ShinseiField =
   | 'renovated'
   | 'dates'
   | 'photoDates'
+  | 'burden'
   | RiyuField;
 /** 理由書だけの項目（理由書の画面の一覧の項目。riyu.ts の RIYU_LINKS で欄と結ぶ） */
 export type RiyuField = 'careTerm' | 'housing' | 'checkDate' | 'madeDate' | 'qualification' | 'tel' | 'body' | 'careState' | 'wish' | 'equipment' | 'act:toilet' | 'act:bath' | 'act:out' | 'act:home';
@@ -138,6 +139,7 @@ const TEXT_FIELD: Record<keyof ShinseiTexts, ShinseiField> = {
   end: 'dates',
   cost: 'cost',
   address: 'address',
+  benefit: 'burden', // 委任状の保険給付額を押すと負担割合へ
 };
 const MARK_FIELD: Record<keyof ShinseiMarks, ShinseiField> = {gender: 'gender', era: 'birth', care: 'care', renovated: 'renovated'};
 

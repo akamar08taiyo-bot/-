@@ -61,6 +61,7 @@ React 19 ＋ TypeScript ＋ Vite（Tailwind）。リポジトリにはほかの�
 | `estimate/EstimateList.tsx` | 見積もり・申請書の最初の画面（新規作成＝保険者を選ぶ／一覧から作成）、月ごとの一覧（一覧の月＝`Job.month`。作成日・売上月（行ごとの ◀ ▶＝`moveOne`。2026-10-26）・お客様名（特定福祉用具だけの様邸は `tokuteiNames` の名前と印）・見積の合計・請求書の印。先頭のチェックで選んで `moveMonth`＝次月・前月に回す。どちらも `shiftSalesMonth`）、`newEstimate(insurer)`（見積もり作成日は空・請求書に入れない。見積書に行を入れたときに入る）、Excel 保存・複製・削除 |
 | `estimate/OrderPage.tsx` | 発注書の画面（数の直し・消す・戻す・足す・印刷・販売受注簿に転記） |
 | `order.ts` | 発注する数の計算（切って使う部材の本数・2000mm の品・余り0.1本）、手で直したところの重ね方、販売受注簿へ渡す JSON |
+| `careLines.ts` | 見積書の明細の下の介護保険の内訳（`careLines`・`withCareLines`＝明細の行のあとに memo の行を足す。1行あけ・合計の上に入らなければ次のページ）・金額（`careAmounts`。委任状の保険給付額も）・取り込みで見分ける `CARE_LINE`・「自己負担額を表示」`showsCareLines`。memo の行は `FormLine.memo`（画面・印刷は `print/EstimateForms.tsx` の YkLine・KkLine、Excel は `estimateXlsx.ts`。赤は `XStyle.color`） |
 | `estimateXlsx.ts`・`xlsxWrite.ts` | 見積書を同じ形の .xlsx にする（列幅＝mm×96/25.4/8、固定の倍率で印刷、金額は式＋計算済みの値） |
 | `components/JobEditor.tsx` ほか | 請求書のタブの様邸（仕切り計算表）、部材を選ぶ画面（`Pickers.tsx`）、施工費を数える画面（`JobTools.tsx`）、`KitsPage.tsx`（部材＋施工費（常用）） |
 | `priceImport.ts`・`xlsx.ts`・`pdfText.ts` | メーカーの価格表（Excel・CSV・PDF・貼り付けた表）の取り込み。`pdfText.ts` の `pdfToImages` は PDF のページを写真（JPEG）にする（写真の枠に PDF を入れたとき） |

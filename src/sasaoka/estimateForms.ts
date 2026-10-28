@@ -223,6 +223,7 @@ export type FormLine = {
   manualAmount: boolean; // 施工費の金額を見積書で手で直した
   blank: boolean; // 何も入っていない部材の行（空白の行として出す。数量・単価・金額も出さない）
   isNew?: boolean; // 見積書に直接入力するときの、いちばん下の空いた行
+  memo?: {text: string; red: boolean}; // 明細の下の介護保険の内訳の行（careLines.ts）。文字だけを左の欄に書く。red は赤字（利用者負担）
 };
 
 /** all：金額のない施工費の行も出す（見積書に直接入力するとき。まだ金額を入れていない行も直せるように） */

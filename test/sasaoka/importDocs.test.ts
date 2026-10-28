@@ -12,7 +12,7 @@ import {applyImport, cleanName, dateOf, placeFromShinsei, planImport, readDoc, s
 import {NO_RIYU, RIYU_MAP, riyuValues} from '../../src/sasaoka/riyu.ts';
 import {laborRow, manualRow, newPlace} from '../../src/sasaoka/rows.ts';
 import {jutakuSales, jutakuSalesSummary, planRows} from '../../src/sasaoka/salesPlan.ts';
-import {fillShinsei, SHINSEI, shinseiValues} from '../../src/sasaoka/shinsei.ts';
+import {fillShinsei, SHINSEI, shinseiValues, shinseiWorks} from '../../src/sasaoka/shinsei.ts';
 import {cleanJobs} from '../../src/sasaoka/storage.ts';
 import type {Insurer, Job, Place} from '../../src/sasaoka/types.ts';
 
@@ -282,4 +282,17 @@ test('日付・申請書の改修の内容の1行', () => {
   assert.equal(dateOf('なし'), '');
   const p = placeFromShinsei({photo: 3, name: '廊下', kind: 1, text: '手すりの取り付け　L=2400mm H=750mm　ベースプレート'});
   assert.deepEqual([p.name, p.photo, p.kind, p.dims, p.shinseiText], ['廊下', 3, 1, {l: '2400', h: '750'}, 'ベースプレート']);
+
+  // 長さが2本以上（「L=700mm×1100mm×2000mm」「L=600×850mm」）も全部長さに。前は「×1100mm×2000mm」をそのほかにして、改修の内容が2段になった（2026-10-28）
+  for (const [text, l] of [
+    ['手すりの取り付け　L=700mm×1100mm×2000mm', '700×1100×2000'],
+    ['手すりの取り付け　L=600mm ×600mm', '600×600'],
+    ['手すりの取り付け　L=600×850mm H=750mm', '600×850'],
+    ['手すりの取り付け　Ｌ＝６００ｍｍ×８５０ｍｍ', '600×850'],
+  ]) {
+    const q = placeFromShinsei({photo: 1, name: '屋外', kind: 1, text});
+    assert.equal(q.dims?.l, l, text);
+    assert.equal(q.shinseiText, undefined, text);
+    assert.deepEqual(shinseiWorks({places: [q]}, defaultSettings()), [`①屋外　手すりの取り付け　L=${l}mm${q.dims?.h ? ` H=${q.dims.h}mm` : ''}`]); // 1行（横一列）
+  }
 });

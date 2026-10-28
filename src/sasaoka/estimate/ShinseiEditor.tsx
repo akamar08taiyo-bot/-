@@ -37,11 +37,13 @@ import {JobHeader, JobTitle, RemoveJobButton} from './JobHeader.tsx';
 /** 欄の順番：保険者ごとの申請書の上からの順番（原本を見て決めた。みやこ町・広域連合は承認の申請書の順番で、支給申請書だけの着工日・完成日は最後）。
  *  ただし被保険者氏名はどの保険者もフリガナのすぐ下（ユーザーの指示「ふりがなの下に、名前をもってくる」、2026-10-21。苅田町・みやこ町は原本では番号が先） */
 const FIELDS: Record<Insurer, Field[]> = {
-  kanda: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'owner', 'photoDates', 'works', 'dates', 'cost'],
-  yukuhashi: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'owner', 'photoDates', 'works', 'dates', 'cost'],
-  miyako: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'owner', 'reason', 'photoDates', 'works', 'cost', 'renovated', 'dates'],
-  kouiki: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'owner', 'reason', 'photoDates', 'works', 'cost', 'renovated', 'dates'], // 郵便番号はユーザーの指示で足した（2026-10-21）
+  kanda: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'dates', 'cost'],
+  yukuhashi: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'dates', 'cost'],
+  miyako: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'cost', 'renovated', 'dates'],
+  kouiki: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'cost', 'renovated', 'dates'], // 郵便番号はユーザーの指示で足した（2026-10-21）
 };
+// 負担割合は要介護状態区分のすぐ下（みやこ町・広域連合は電話番号の下）。申請書の原本に欄はないが、委任状の保険給付額・見積書の介護保険の内訳に使い、
+// 特定福祉用具の負担割合と同じ値（どちらで選んでも両方に入る。tokuteiLink.ts）。ユーザーの指示「住宅改修の申請書にも負担割合を設置。住宅改修⇔特定福祉用具などで連動して数字に繋げる」2026-10-28
 // 改修前日付・改修後日付（写真の日付）は、改修の内容のすぐ上（ユーザーの指示「この部分に改修前日付・改修後日付を入力欄となるようにする」2026-10-22）
 
 /** みやこ町・広域連合：改修の内容は内訳明細書（別紙）、着工日・完成日は支給申請書（工事のあと）に書く */
@@ -62,6 +64,7 @@ function label(f: Field, i: Insurer): string {
     address: '住所',
     phone: '電話番号',
     care: '要介護状態区分',
+    burden: '負担割合',
     owner: '住宅の所有者',
     reason: '住宅改修が必要な理由書作成者',
     works: '改修の内容・箇所及び規模',
@@ -126,6 +129,7 @@ export function ShinseiEditor({
     address: !job.address.trim(),
     phone: !info.phone.trim(),
     care: !info.care,
+    burden: !info.burden,
     owner: !info.owner.trim() || !info.relation.trim(),
     reason: !info.reasonOffice.trim() || !info.reasonName.trim(),
     // 手すりの長さは必須（入れていなくて見積書にも使う長さがなければ、まだ入っていない。2026-10-26）
@@ -321,6 +325,8 @@ export function ShinseiEditor({
         );
       case 'care':
         return <Circles label="要介護状態区分" options={MARK_INFO.care.options} value={info.care} onPick={(care) => setInfo({care} as Partial<ShinseiInfo>)} />;
+      case 'burden':
+        return <BurdenPicker info={info} setInfo={setInfo} />;
       case 'owner':
         return (
           <>
@@ -573,6 +579,22 @@ export function ShinseiEditor({
 
 export function Note({children}: {children: ReactNode}) {
   return <span className="text-xs text-slate-500">{children}</span>;
+}
+
+/**
+ * 負担割合（1割・2割・3割）と生活保護。住宅改修申請書のタブと工事見積書のタブで同じもの（どちらも job.shinsei の burden・welfare。特定福祉用具とも同じ値）。
+ * 生活保護なら見積書の内訳は「生活保護（1割）」と書く（利用者負担の赤字の行は出さない。careLines.ts）
+ */
+export function BurdenPicker({info, setInfo}: {info: ShinseiInfo; setInfo: (patch: Partial<ShinseiInfo>) => void}) {
+  return (
+    <>
+      <Circles label="負担割合" options={['1割', '2割', '3割']} value={info.burden ? `${info.burden}割` : ''} onPick={(v) => setInfo({burden: (v ? v[0] : '') as ShinseiInfo['burden']})} />
+      <label className="flex items-center gap-1.5 text-sm text-slate-700">
+        <input type="checkbox" checked={info.welfare === true} onChange={(e) => setInfo({welfare: e.target.checked || undefined})} />
+        生活保護
+      </label>
+    </>
+  );
 }
 
 /** 丸で囲む項目（申請書と同じ「男　・　女」の形。押すと丸がつき、もう一度押すと外れる） */

@@ -78,6 +78,14 @@ test('見積書の項目：前のデータ（項目なし）も読める', () =>
   ]);
   // 前の版の工事名称（work）は読まない（見積書の改修内容・工事名称は改修の種類から）
   assert.equal('work' in k.places[0], false);
+  // 前の版の取り込みで「×1100mm×2000mm」がそのほかに入った手すりは、長さのつづきに戻す（改修の内容が2段になった。2026-10-28）
+  const [tail] = cleanJobs([{places: [{kind: 1, dims: {l: '700'}, shinseiText: '×1100mm×2000mm'}, {kind: 1, dims: {l: '600'}, shinseiText: '　×600mm'}, {kind: 1, dims: {l: '600'}, shinseiText: 'ベースプレート'}, {kind: 2, dims: {w: '600'}, shinseiText: '×300mm'}]}]);
+  assert.deepEqual(tail.places.map((p) => [p.dims, p.shinseiText]), [
+    [{l: '700×1100×2000'}, undefined],
+    [{l: '600×600'}, undefined],
+    [{l: '600'}, 'ベースプレート'],
+    [{w: '600'}, '×300mm'],
+  ]);
   // 申請書の改修の内容を手で直した文は残す（空にしたものも、空のまま）。文字でなければ持たない
   const [w] = cleanJobs([{places: [{name: '玄関', shinseiLine: '玄関　手すりの取り付け　L=650mm'}, {name: 'トイレ', shinseiLine: ''}, {name: '浴室', shinseiLine: 3}, {name: '居室'}]}]);
   assert.deepEqual(

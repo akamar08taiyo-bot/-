@@ -187,6 +187,9 @@ export type Job = {
   salesMonth?: string;
   // 売上伝票発行依頼書（「🧾 売上伝票依頼書」の窓。uriage.ts）で選んだ顧客区分・請求区分。次に出すときに選び直さなくてよいように覚える。複製では引き継がない
   uriage?: {customer?: 'new' | 'existing'; billing?: 'receipt' | 'reimbursement'};
+  // 見積書の明細の下に介護保険の内訳（介護保険の対象・利用者負担＝赤字・保険者負担）を書くか（「自己負担額を表示」。careLines.ts）。
+  // 空なら書く・false なら書かない（特定福祉用具の販売見積書と同じ。ユーザーの指示「工事見積書にも販売見積書と同様に記載する」2026-10-28）。複製では引き継ぐ
+  showSelfPay?: boolean;
   // 取り込んだ申請書・見積書・理由書の Excel（見積書の一覧の「📥 取り込む」。importDocs.ts）。同じファイルを2回取り込まないための目印と、読んだ金額。複製では引き継がない
   imported?: ImportedDoc[];
   createdAt: number;

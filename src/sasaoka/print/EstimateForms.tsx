@@ -9,9 +9,11 @@
 //   「コピー」（data-copy：部材は同上施工費ごと、施工費はそのまとまりをコピー）を出す。コピーしているあいだは「コピー」の代わりに
 //   「貼付」（data-paste：コピーした行をこの行の下に貼り付け）を出し、コピーした行には data-copied を付ける。
 // 何も入っていない部材の行（line.blank）は、印刷でも空白の行（数量・単価・金額も出さない）
+// 明細の下の介護保険の内訳（line.memo。careLines.ts）は左の欄をまとめた1行の文字（data-care）。利用者負担は赤字
 
 import type {CSSProperties, ReactNode} from 'react';
 import {estimateTotals} from '../calc.ts';
+import {CARE_RED, withCareLines} from '../careLines.ts';
 import {circled, FORM_INFO, formLines, KINDS, lineNote, paginate, reiwa, sheetNewLine, TOTAL_ROWS} from '../estimateForms.ts';
 import type {FormLine} from '../estimateForms.ts';
 import type {Job, Settings} from '../types.ts';
@@ -129,7 +131,7 @@ export function YukuhashiForm({
 }) {
   const editable = sheet !== null;
   const per = FORM_INFO.yukuhashi.perPage;
-  const pages = paginate(sheetLines(job, s, 'yukuhashi', sheet), per);
+  const pages = paginate(withCareLines(sheetLines(job, s, 'yukuhashi', sheet), job, s, per), per);
   const totals = totalRows(estimateTotals(job, s));
   const d = reiwa(date);
   const issuer = issuerLines(job, s);
@@ -305,6 +307,20 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
       </tr>
     );
   }
+  if (l.memo) {
+    // 明細の下の介護保険の内訳（careLines.ts）：改修内容〜内容の3つの欄をまとめて1行の文字。利用者負担は赤字
+    const f = fitted(l.memo.text, YK.A + YK.B + YK.C, YK_ROW, 10);
+    return (
+      <tr className="g" style={{height: `${YK_ROW}mm`}} data-care="">
+        <td colSpan={3} className={`ml${bottom}`} style={{...f.style, ...(l.memo.red ? {color: CARE_RED} : {})}}>
+          {f.body}
+        </td>
+        {['nr', 'nl', '', 'mr', 'nr', 'nl', '', 'mr', 'mr', 'mr'].map((c, i) => (
+          <td key={i} className={c + bottom} />
+        ))}
+      </tr>
+    );
+  }
   if (l.isNew) {
     // 打ち込める空いた行。最後の箇所に行がまだなければ、その箇所の改修内容・改修場所を出す
     const nk = (field: string) => `new:${field}`;
@@ -365,7 +381,7 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
 export function KouikiForm({job, settings: s, sheet = null}: {job: Job; settings: Settings; sheet?: SheetOpts | null}) {
   const editable = sheet !== null;
   const per = FORM_INFO.kouiki.perPage;
-  const pages = paginate(sheetLines(job, s, 'kouiki', sheet), per);
+  const pages = paginate(withCareLines(sheetLines(job, s, 'kouiki', sheet), job, s, per), per);
   const totals = totalRows(estimateTotals(job, s));
   const tax = pct(s.taxRate);
   return (
@@ -552,6 +568,20 @@ function KkLine({
             <td key={i} className={c + bottom} />
           ),
         )}
+      </tr>
+    );
+  }
+  if (l.memo) {
+    // 明細の下の介護保険の内訳（careLines.ts）：改修箇所〜部材・仕様の4つの欄をまとめて1行の文字。利用者負担は赤字
+    const f = fitted(l.memo.text, KK.A + KK.B + KK.C + KK.D, height, 11);
+    return (
+      <tr className="g" style={{height: `${height}mm`}} data-care="">
+        <td colSpan={4} className={`ml mr${bottom}`} style={{...f.style, ...(l.memo.red ? {color: CARE_RED} : {})}}>
+          {f.body}
+        </td>
+        {['gap', 'ml', '', '', 'mr', 'gap', 'ml', '', 'ml', '', '', 'mr', 'ml', 'mr'].map((c, i) => (
+          <td key={i} className={c + bottom} />
+        ))}
       </tr>
     );
   }

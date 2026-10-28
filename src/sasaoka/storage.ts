@@ -284,15 +284,27 @@ const cleanPlace = (raw: Record<string, unknown>): Place => keepNewer(raw, (p) =
   kind: KINDS.includes(numv(p.kind, 1)) ? numv(p.kind, 1) : 1,
   photo: Math.max(0, Math.floor(numv(p.photo))),
   // 前の版の「工事名称」（work）は読まない。見積書の改修内容・工事名称は改修の種類から
-  ...(str(p.shinseiText).trim() ? {shinseiText: str(p.shinseiText)} : {}),
+  ...lengthTail(numv(p.kind, 1), cleanDims(p.dims), str(p.shinseiText)),
   ...(typeof p.shinseiLine === 'string' ? {shinseiLine: p.shinseiLine} : {}), // 手で直した改修の内容（空にしたのも、そのまま）
-  ...cleanDims(p.dims),
   ...cleanPhotos(p.photos),
   ...cleanPhotoDates(p.photoDates),
   ...(str(p.photoNote).trim() ? {photoNote: str(p.photoNote)} : {}), // 写真に書く内容の追加
   ...cleanPhotoEdits(p.photoEdits),
   ...cleanPhotoMarks(p.photoMarks),
 }), ['work']);
+
+/**
+ * 寸法とそのほか。前の版の取り込み（importDocs.ts）は「L=700mm×1100mm×2000mm」の「L=700mm」だけを長さにして、残りの「×1100mm×2000mm」を
+ * そのほかにしていた（申請書の改修の内容が2段になった。ユーザーの指摘 2026-10-28）。手すりで、そのほかが「×数mm」だけなら長さのつづきに戻す
+ */
+function lengthTail(kind: number, d: {dims?: PlaceDims}, text: string): {dims?: PlaceDims; shinseiText?: string} {
+  const tail = /^[\s　]*((?:[×xX*＊ｘＸ][\s　]*[0-9０-９]+(?:[.．][0-9０-９]+)?[\s　]*(?:mm|ｍｍ|㎜)?[\s　]*)+)$/i.exec(text);
+  if (kind === 1 && d.dims?.l && tail) {
+    const more = tail[1].normalize('NFKC').replace(/\s*mm\s*/gi, '').replace(/\s*[×xX*]\s*/g, '×');
+    return {dims: {...d.dims, l: `${d.dims.l.replace(/\s*mm\s*$/i, '')}${more}`}};
+  }
+  return {...d, ...(text.trim() ? {shinseiText: text} : {})};
+}
 
 /** 改修の内容の寸法（打ったままの文字）。どれもなければ持たない */
 function cleanDims(raw: unknown): {dims?: PlaceDims} {
@@ -454,6 +466,7 @@ export function cleanJobs(raw: unknown): Job[] {
       // 売上見込みの月＝売上月（2026-10-25）。請求する月と同じなら持たない（請求する月と一緒に変わるように。前の版は一覧の ◀ ▶ で同じ月も持った。2026-10-26）
       ...(/^\d{4}-\d{2}$/.test(str(j.salesMonth)) && str(j.salesMonth) !== str(j.month) ? {salesMonth: str(j.salesMonth)} : {}),
       ...(isObj(j.uriage) ? {uriage: cleanUriage(j.uriage)} : {}), // 売上伝票の顧客区分・請求区分（2026-10-27）
+      ...(j.showSelfPay === false ? {showSelfPay: false} : {}), // 見積書に介護保険の内訳を書かない（2026-10-28。careLines.ts。書くときは持たない）
       ...(Array.isArray(j.imported) ? {imported: cleanImported(j.imported)} : {}), // 取り込んだ書類（2026-10-28。importDocs.ts）
       createdAt: numv(j.createdAt, Date.now()),
       updatedAt: numv(j.updatedAt, Date.now()),

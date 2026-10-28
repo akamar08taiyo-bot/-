@@ -71,7 +71,8 @@ export function ShinseiPrint({
   // 様邸の画面（印刷しない main の中）から開くので、body の直下に出す（main ごと印刷から外れないように）
   return createPortal(
     <div className="print-overlay">
-      <div className="print-toolbar">
+      {/* 上の帯の中身はまん中に寄せる（ユーザーの指示「赤枠の部分を中央にもってくる」2026-10-28。前は 申請書（A4縦）・ページのチェックが左の端、印刷する・閉じるが右の端） */}
+      <div className="print-toolbar justify-center">
         <div className="text-sm font-bold">{book}（A4縦）</div>
         {pages.length > 1 && (
           <span role="group" aria-label="印刷するページ" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
@@ -83,7 +84,7 @@ export function ShinseiPrint({
             ))}
           </span>
         )}
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Btn color="softSky" onClick={() => window.print()} disabled={picked.size === 0} className="!px-5 !text-base">
             🖨 印刷する
           </Btn>

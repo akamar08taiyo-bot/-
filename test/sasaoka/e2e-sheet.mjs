@@ -237,8 +237,9 @@ assert.equal(await lines(), copyBefore + 2);
 assert.deepEqual((await order()).slice(-3), ['サンプル S-EC01 エンドキャップ', 'サンプル S-TS35 木の手すり 35φ 4m', '同上施工費']);
 await sheet.getByRole('button', {name: /L型手すりの行の下に貼り付け$/}).click(); // 続けて貼り付けられる
 assert.equal(await lines(), copyBefore + 4);
-// 下の空いた行の左にも「貼付」が出る（どの空いた行からでも、いちばん下に貼り付ける）
-const blankPaste = sheet.locator('.form-page tr[data-blank]').nth(2).getByRole('button', {name: 'いちばん下に貼り付け'});
+// 下の空いた行の左にも「貼付」が出る（どの空いた行からでも、いちばん下に貼り付ける）。明細の下の介護保険の内訳（data-care）の行には出さない
+assert.equal(await sheet.locator('.form-page tr[data-care] [data-paste]').count(), 0);
+const blankPaste = sheet.locator('.form-page tr[data-blank]').last().getByRole('button', {name: 'いちばん下に貼り付け'});
 await blankPaste.click();
 assert.equal(await lines(), copyBefore + 6);
 assert.deepEqual((await order()).slice(-4), ['サンプル S-TS35 木の手すり 35φ 4m', '同上施工費', 'サンプル S-TS35 木の手すり 35φ 4m', '同上施工費']);

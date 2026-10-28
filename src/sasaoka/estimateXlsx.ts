@@ -4,6 +4,7 @@
 // 式ではアプリと同じ金額にならない行（割り切れない長さの部材など）は、アプリの金額をそのまま書く。
 
 import {estimateTotals, rounddown} from './calc.ts';
+import {CARE_RED_XLSX, withCareLines} from './careLines.ts';
 import type {EstimateSums, EstimateTotals} from './calc.ts';
 import {circled, FORM_INFO, formLines, jobForm, KINDS, lineNote, paginate, reiwa, TOTAL_ROWS} from './estimateForms.ts';
 import type {FormLine} from './estimateForms.ts';
@@ -95,7 +96,7 @@ function manualTargetOverhead(job: Job, t: EstimateTotals): boolean {
 function yukuhashiSheet(job: Job, s: Settings, date: string): XSheet {
   const b = new SheetBuilder();
   const per = FORM_INFO.yukuhashi.perPage;
-  const pages = paginate(formLines(job, s, 'yukuhashi'), per);
+  const pages = paginate(withCareLines(formLines(job, s, 'yukuhashi'), job, s, per), per);
   const t = estimateTotals(job, s);
   const totals = totalRows(t);
   const name = job.customer.trim();
@@ -171,6 +172,13 @@ function yukuhashiSheet(job: Job, s: Settings, date: string): XSheet {
         ['ml', '', '', 'nr', 'nl', '', 'mr', 'nr', 'nl', '', 'mr', 'mr', 'mr'].forEach((cls, c) => put(c, null, cls));
         continue;
       }
+      if (l.memo) {
+        // 明細の下の介護保険の内訳（careLines.ts）：改修内容〜内容の3つの欄を結合して1行の文字。利用者負担は赤字（印刷と同じ）
+        const m = fit(l.memo.text, YK.A + YK.B + YK.C, YK_ROW, 10);
+        b.put(r, 0, m.v, {...m.st, h: 'left', ...(l.memo.red ? {color: CARE_RED_XLSX} : {})}, edges(`ml${bottom}`, true), 1, 3);
+        ['nr', 'nl', '', 'mr', 'nr', 'nl', '', 'mr', 'mr', 'mr'].forEach((cls, c) => put(c + 3, null, cls));
+        continue;
+      }
       ykLine(l, r, put);
     }
   });
@@ -230,7 +238,7 @@ function ykLine(l: FormLine, r: number, put: Put) {
 function kouikiSheet(job: Job, s: Settings): XSheet {
   const b = new SheetBuilder();
   const per = FORM_INFO.kouiki.perPage;
-  const pages = paginate(formLines(job, s, 'kouiki'), per);
+  const pages = paginate(withCareLines(formLines(job, s, 'kouiki'), job, s, per), per);
   const t = estimateTotals(job, s);
   const totals = totalRows(t);
   const tax = pct(s.taxRate);
@@ -320,6 +328,13 @@ function kouikiSheet(job: Job, s: Settings): XSheet {
       const l = page[i];
       if (!l) {
         ['ml', '', '', 'mr', 'gap', 'ml', '', '', 'mr', 'gap', 'ml', '', 'ml', '', '', 'mr', 'ml', 'mr'].forEach((cls, c) => put(c, null, cls));
+        return;
+      }
+      if (l.memo) {
+        // 明細の下の介護保険の内訳（careLines.ts）：改修箇所〜部材・仕様の4つの欄を結合して1行の文字。利用者負担は赤字（印刷と同じ）
+        const m = fit(l.memo.text, KK.A + KK.B + KK.C + KK.D, height, 11);
+        b.put(r, 0, m.v, {font: MINCHO, ...m.st, h: 'left', ...(l.memo.red ? {color: CARE_RED_XLSX} : {})}, edges(`ml mr${bottom}`, true), 1, 4);
+        ['gap', 'ml', '', '', 'mr', 'gap', 'ml', '', 'ml', '', '', 'mr', 'ml', 'mr'].forEach((cls, c) => put(c + 4, null, cls));
         return;
       }
       kkLine(l, r, height, bottom, s.estimateHourRate, put, b);

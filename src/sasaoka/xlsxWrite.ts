@@ -10,6 +10,7 @@ export type XStyle = {
   font?: string; // フォント名（ＭＳ Ｐゴシック など）
   size?: number; // 文字の大きさ（pt）
   bold?: boolean;
+  color?: string; // 文字の色（'C00000' など。RGB の16進数6けた。なければ黒）
   h?: 'left' | 'center' | 'right';
   v?: 'top' | 'center' | 'bottom';
   wrap?: boolean; // 折り返して全体を表示（改行も）
@@ -83,7 +84,7 @@ class Styles {
   private font(s: XStyle) {
     return this.index(
       this.fonts,
-      `<font>${s.bold ? '<b/>' : ''}<sz val="${s.size ?? this.base.size}"/><name val="${esc(s.font ?? this.base.name)}"/><family val="3"/><charset val="128"/></font>`,
+      `<font>${s.bold ? '<b/>' : ''}<sz val="${s.size ?? this.base.size}"/>${s.color ? `<color rgb="FF${s.color}"/>` : ''}<name val="${esc(s.font ?? this.base.name)}"/><family val="3"/><charset val="128"/></font>`,
     );
   }
   xf(s: XStyle | undefined): number {

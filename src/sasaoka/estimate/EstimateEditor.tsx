@@ -7,13 +7,15 @@ import {LaborPickerFor, missingShikiri, ShikiriPriceDialog} from '../components/
 import {KitPicker} from '../components/Kits.tsx';
 import {MaterialPicker} from '../components/Pickers.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
-import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerForAddress, jobForm, jobInsurer} from '../estimateForms.ts';
+import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerForAddress, jobForm, jobInsurer, NO_SHINSEI} from '../estimateForms.ts';
+import {CARE_RED, careLines, showsCareLines} from '../careLines.ts';
+import {BurdenPicker} from './ShinseiEditor.tsx';
 import {estimateDateOf} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {fillAdded, withBrackets} from '../cutLink.ts';
 import {addMaterial, insertRowsAt, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
 import {jutakuSalesMonth, withBillMonth, withSalesMonth} from '../salesPlan.ts';
-import type {AppData, Insurer, Job, Kit, Material, NameSuffix, Place} from '../types.ts';
+import type {AppData, Insurer, Job, Kit, Material, NameSuffix, Place, ShinseiInfo} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {staffFull, thisMonth, todayIso} from '../util.ts';
 import {duplicateEstimate, saveEstimateExcel} from './EstimateList.tsx';
@@ -62,6 +64,10 @@ export function EstimateEditor({
   const [uriageOpen, setUriageOpen] = useState(false);
 
   const setJob = (fn: (j: Job) => Job) => update('jobs', (list) => list.map((j) => (j.id === job.id ? startEstimate(j, {...fn(j), updatedAt: Date.now()}) : j)));
+  // 負担割合・生活保護（申請書の項目。住宅改修申請書のタブ・特定福祉用具と同じ値）
+  const info: ShinseiInfo = {...NO_SHINSEI, ...job.shinsei};
+  const setInfo = (patch: Partial<ShinseiInfo>) => setJob((j) => ({...j, shinsei: {...NO_SHINSEI, ...j.shinsei, ...patch}}));
+  const care = careLines(job, s);
   const setPlace = (placeId: string, fn: (p: Place) => Place) =>
     setJob((j) => ({
       ...j,
@@ -225,6 +231,23 @@ export function EstimateEditor({
             aria-label="見積もり作成日"
           />
         </label>
+        {/* 負担割合（住宅改修申請書のタブ・特定福祉用具と同じ値）と「自己負担額を表示」：見積書の明細の下に介護保険の内訳（介護保険の対象・利用者負担＝赤字・保険者負担）を書くか
+            （ユーザーの指示「工事見積書にも販売見積書と同様に記載する。記載する、記載しないは販売見積もりと同様に選択できるようにする」2026-10-28。初めは書く。careLines.ts） */}
+        <div className="grid gap-1 text-sm font-bold text-slate-600" role="group" aria-label="負担割合・自己負担額">
+          負担割合
+          <div className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 font-normal">
+            <BurdenPicker info={info} setInfo={setInfo} />
+            <label className="flex items-center gap-1.5 text-sm text-slate-700">
+              <input type="checkbox" checked={showsCareLines(job)} onChange={(e) => setJob((j) => ({...j, showSelfPay: e.target.checked ? undefined : false}))} />
+              自己負担額を表示
+            </label>
+            {showsCareLines(job) && care.red >= 0 && (
+              <span className="tabular-nums" style={{color: CARE_RED}}>
+                {care.lines[care.red]}
+              </span>
+            )}
+          </div>
+        </div>
         {(estimated || job.shikiri) && <ShikiriFields job={job} data={data} setJob={setJob} onFix={() => setFixPrices(true)} onOpenInvoice={() => onOpenInvoice(job.id)} />}
         {byAddress && byAddress !== insurer && (
           <div className="flex w-full flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-900">

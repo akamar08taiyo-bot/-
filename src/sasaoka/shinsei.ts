@@ -9,6 +9,7 @@
 import {strFromU8, strToU8, unzipSync, zipSync} from 'fflate';
 import {estimateTotals, isBlankRow} from './calc.ts';
 import type {EstimateRates, EstimateSettings} from './calc.ts';
+import {careAmounts} from './careLines.ts';
 import {BASE_PLATE} from './cutLink.ts';
 import {circled, eraOf, jobInsurer, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa} from './estimateForms.ts';
 import {clampOff, clampScale, normRot} from './photoEdit.ts';
@@ -45,10 +46,12 @@ export type ShinseiSheet = {
   riyu?: boolean; // 住宅改修が必要な理由書のシート：理由書だけの欄（ShinseiValues の riyu。riyu.ts の riyuCells）も書く
   pages?: string[]; // プレビューでページに分ける範囲（1枚のシートに2ページある理由書。なければシートで1枚）
   links?: {ref: string; field: string}[]; // プレビューで押すと一覧のその項目へ行く欄（上の欄のほかに。理由書だけの項目）
+  // 書いたときだけ字を大きくする欄（委任状の保険給付額。cell の字を pt に、rows の行の高さ [行, pt] を変える）
+  enlarge?: {cell: string; pt: number; rows: [number, number][]};
 };
 
 /** 申請書の画面で入れた項目の文字（書き方の {名前} に入れる値） */
-export type ShinseiTexts = Record<'kana' | 'zip' | 'phone' | 'owner' | 'relation' | 'reasonOffice' | 'reasonName' | 'era' | 'y' | 'm' | 'd' | 'start' | 'end' | 'cost' | 'address', string>;
+export type ShinseiTexts = Record<'kana' | 'zip' | 'phone' | 'owner' | 'relation' | 'reasonOffice' | 'reasonName' | 'era' | 'y' | 'm' | 'd' | 'start' | 'end' | 'cost' | 'address' | 'benefit', string>;
 
 /**
  * 申請書の画面で入れた項目を書く欄：format の {名前}（ShinseiTexts）に値を入れて書く（「本人との関係（{relation}）」）。
@@ -112,12 +115,28 @@ const RENOVATED = (cell: string): MarkCell => ({key: 'renovated', cell, needles:
 /** 要介護状態区分。行橋市は「要支援　１・２」と書いてあるので、要支援は数字だけを囲む */
 const CARE = (cell: string, support = ['要支援１', '要支援２']): MarkCell => ({key: 'care', cell, needles: [...support, '要介護１', '要介護２', '要介護３', '要介護４', '要介護５']});
 
+/** 委任状の保険給付額の字の大きさ（特定福祉用具の委任状と同じ 18pt。原本は 11pt） */
+const PROXY_AMOUNT_PT = 18;
+/** 18pt の字は原本の行（18.75pt）に入らないので、保険給付額の行（23行）を高くし、すぐ下の空いた行（24行）を同じだけ低くする（特定福祉用具と同じ） */
+const PROXY_AMOUNT_ROWS: [number, number][] = [
+  [23, 24],
+  [24, 13.5],
+];
+/** 原本の 11pt で、保険給付額の欄の左から「円」の右の端まで（全角の文字の数） */
+const PROXY_AMOUNT_EM = 28;
+
 /**
  * 委任状（苅田町・行橋市）：特定福祉用具の申請書と同じ委任状のシート（ユーザーの指示「住宅改修の申請書の中にも、特定福祉用具と全く同じ委任状をいれて、
  * 住所のみ連動するようにする。（とりあえず苅田町・行橋市）」2026-10-27。原本の委任状のシートを、特定福祉用具の原本の委任状のシートに入れかえた）。
- * 書くのは委任者の住所だけ（原本は「委任者　住　所＋すき間」の1つの欄なので、すき間のかわりに住所）。氏名は自筆・保険給付額と日付は書かない
+ * 書くのは委任者の住所（原本は「委任者　住　所＋すき間」の1つの欄なので、すき間のかわりに住所）と保険給付額。氏名は自筆・日付は書かない。
+ * 保険給付額（B23。原本は「すき間＋円」）は、負担割合を選んでいれば 介護保険の対象（20万円まで）−負担割合の分（ユーザーの指示「住宅改修の委任状の保険給付額の部分が
+ * 連動されていない」2026-10-28。careLines.ts の careAmounts。見積書の内訳と同じ計算）。特定福祉用具の委任状と同じく 18pt で、円の右の端は原本の位置
  */
-const PROXY: ShinseiSheet = {sheet: '委任状', texts: [T('A32', '　　　　委任者　住　所　　{address}')]};
+const PROXY: ShinseiSheet = {
+  sheet: '委任状',
+  texts: [T('A32', '　　　　委任者　住　所　　{address}'), T('B23', '{benefit}円')],
+  enlarge: {cell: 'B23', pt: PROXY_AMOUNT_PT, rows: PROXY_AMOUNT_ROWS},
+};
 
 /**
  * 保険者ごとの申請書の原本と、転記する欄（原本を見て決めた）。
@@ -492,6 +511,13 @@ export function reiwaText(iso: string): string {
   return r ? `令和${r.y === 1 ? '元' : r.y}年${r.m}月${r.d}日` : '';
 }
 
+/** 委任状の保険給付額の欄の文字（「円」の前まで）：18pt で円の右の端が原本の 11pt のときと同じ所に来るよう、前にすき間。0 なら ''（原本のまま） */
+function proxyAmount(benefit: number): string {
+  if (benefit <= 0) return '';
+  const amount = benefit.toLocaleString('ja-JP');
+  return '　'.repeat(Math.max(1, Math.round((PROXY_AMOUNT_EM * 11) / PROXY_AMOUNT_PT - 1 - emOf(amount)))) + amount;
+}
+
 export function shinseiValues(job: Job, s: EstimateSettings, today = todayIso()): ShinseiValues {
   const info: ShinseiInfo = {...NO_SHINSEI, ...job.shinsei};
   const cost = shinseiCost(job, s);
@@ -523,6 +549,7 @@ export function shinseiValues(job: Job, s: EstimateSettings, today = todayIso())
       end: reiwaText(info.end),
       cost: cost ? cost.toLocaleString('en-US') : '',
       address: job.address.trim(), // 委任状の委任者の住所（「住所＋すき間」の1つの欄に書く）
+      benefit: proxyAmount(careAmounts(job, s).benefit), // 委任状の保険給付額（すき間＋金額。円は書き方の方）
     },
     cost,
     start: info.start,
@@ -769,7 +796,7 @@ export const EMPTY_SHINSEI: ShinseiValues = {
   kinds: KINDS.map(() => ({places: '', works: []})),
   photos: {},
   marks: NO_MARKS,
-  texts: {kana: '', zip: '', phone: '', owner: '', relation: '', reasonOffice: '', reasonName: '', era: '', y: '', m: '', d: '', start: '', end: '', cost: '', address: ''},
+  texts: {kana: '', zip: '', phone: '', owner: '', relation: '', reasonOffice: '', reasonName: '', era: '', y: '', m: '', d: '', start: '', end: '', cost: '', address: '', benefit: ''},
   cost: null,
   start: '',
   end: '',
@@ -810,6 +837,7 @@ export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void
     wrapKinds(files, sheet, v);
     fitLines(files, sheet, v);
     fitTexts(files, sheet, cells, copies);
+    if (sheet.enlarge && cells.has(sheet.enlarge.cell)) enlargeCell(files, sheet.sheet, sheet.enlarge);
     fitCheckRows(files, sheet);
     drawMarks(files, sheet, v.marks);
     if (sheet.photoPlace?.kindCircles) drawKindCircle(files, sheet, photo > 0 && v.photos[photo] !== undefined ? (v.photoKinds?.[photo] ?? 0) : 0);
@@ -1239,6 +1267,20 @@ function fitStyle(files: Files, xml: string, lay: SheetLayout, ref: string, text
 }
 
 /** 欄の書式（s）を替える（欄があるときだけ） */
+/** 欄の字を pt にして、行の高さを変える（委任状の保険給付額。ShinseiSheet の enlarge） */
+function enlargeCell(files: Files, sheetName: string, e: NonNullable<ShinseiSheet['enlarge']>): void {
+  const path = sheetPaths(files).get(sheetName);
+  if (!path || !files[path]) return;
+  let xml = strFromU8(files[path]);
+  const found = cellRe(e.cell).exec(xml);
+  if (!found) return;
+  xml = setStyle(xml, e.cell, String(sizedStyle(files, numOf(attrOf(found[1], 's'), 0), e.pt)));
+  for (const [r, ht] of e.rows) {
+    xml = xml.replace(new RegExp(`<row r="${r}"(?=[\\s/>])([^>]*?)(/?)>`), (_, attrs: string, close: string) => `<row r="${r}"${attrs.replace(/\s(?:ht|customHeight)="[^"]*"/g, '')} ht="${ht}" customHeight="1"${close}>`);
+  }
+  files[path] = strToU8(xml);
+}
+
 function setStyle(xml: string, ref: string, style: string): string {
   const found = cellRe(ref).exec(xml);
   if (!found) return xml;

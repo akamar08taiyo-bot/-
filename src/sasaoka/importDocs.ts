@@ -9,6 +9,7 @@
 // 売上見込み・受注残の金額は salesPlan.ts の jutakuSales（見積書の行 → 取り込んだ見積書の合計 → 申請書の改修費用）。工務店の請求書には入れない（shikiri: false）
 
 import {estimateTotals, hasEstimateRows, isBlankRow, overheadAuto} from './calc.ts';
+import {CARE_LINE} from './careLines.ts';
 import type {EstimateSettings} from './calc.ts';
 import {jobInsurer, KINDS, NO_SHINSEI} from './estimateForms.ts';
 import {readRiyuBook, NO_RIYU} from './riyu.ts';
@@ -111,16 +112,20 @@ export function placeFromShinsei(sp: ShinseiPlace): Place {
   let rest = sp.text.trim();
   if (kindName && rest.startsWith(kindName)) rest = rest.slice(kindName.length);
   const dims: PlaceDims = {};
-  // 寸法「L=600mm」「W600mm」（全角の文字でも）。そのほかの文の全角のすき間はそのまま残す（NFKC で半角にしない）
-  const take = (letter: string, eq: boolean, key: keyof PlaceDims) => {
-    const re = new RegExp(`(^|[\\s　])[${letter}${String.fromCharCode(letter.charCodeAt(0) + 0xfee0)}][\\s　]*[=＝]${eq ? '' : '?'}[\\s　]*([0-9０-９]+(?:[.．][0-9０-９]+)?)[\\s　]*(mm|ｍｍ|㎜)`, 'i');
+  // 寸法「L=600mm」「W600mm」（全角の文字でも）。そのほかの文の全角のすき間はそのまま残す（NFKC で半角にしない）。
+  // 手すりの長さは2本以上もある（「L=700mm×1100mm×2000mm」「L=600×850mm」）：× でつないだ数を全部長さにする。前は「L=700mm」だけを読み、
+  // 残りの「×1100mm×2000mm」を「そのほか」にしたので、申請書の改修の内容が2段になった（ユーザーの指摘「長さが２段になっている。横一列で入っていない」2026-10-28）
+  const take = (letter: string, eq: boolean, key: keyof PlaceDims, many = false) => {
+    const num = '[0-9０-９]+(?:[.．][0-9０-９]+)?';
+    const seq = many ? `((?:${num}[\\s　]*(?:mm|ｍｍ|㎜)?[\\s　]*[×xX*＊ｘＸ][\\s　]*)*${num})` : `(${num})`;
+    const re = new RegExp(`(^|[\\s　])[${letter}${String.fromCharCode(letter.charCodeAt(0) + 0xfee0)}][\\s　]*[=＝]${eq ? '' : '?'}[\\s　]*${seq}[\\s　]*(mm|ｍｍ|㎜)`, 'i');
     const m = re.exec(rest);
     if (!m) return;
-    dims[key] = m[2].normalize('NFKC');
+    dims[key] = m[2].normalize('NFKC').replace(/\s*mm\s*/gi, '').replace(/\s*[×xX*]\s*/g, '×');
     rest = rest.replace(m[0], m[1]);
   };
   if (sp.kind === 1) {
-    take('L', true, 'l');
+    take('L', true, 'l', true);
     take('H', true, 'h');
   }
   if (sp.kind === 2) {
@@ -229,6 +234,7 @@ function parseYukuhashi(rows: Grid): {places: Place[]; totals: Totals} | null {
       continue;
     }
     if (putTotal(totals, cell(r, 2), cell(r, 6), cell(r, 10))) continue;
+    if (CARE_LINE.test(cell(r, 0))) continue; // 明細の下の介護保険の内訳（careLines.ts）
     const [work, where] = [cell(r, 0), cell(r, 1)];
     if (work || where) {
       const p = parsePlace(where);
@@ -265,6 +271,7 @@ function parseKouiki(rows: Grid): {places: Place[]; totals: Totals} | null {
       continue;
     }
     if (putTotal(totals, cell(r, 3), cell(r, 8), cell(r, 15))) continue;
+    if (CARE_LINE.test(cell(r, 0))) continue; // 明細の下の介護保険の内訳（careLines.ts）
     const [where, work, photo, kind] = [cell(r, 0), cell(r, 1), cell(r, 10), cell(r, 11)];
     if (where || work || photo || kind) {
       place = {...newPlace(where), kind: circledNo(kind) || parseKind(work) || 1, photo: circledNo(photo)};

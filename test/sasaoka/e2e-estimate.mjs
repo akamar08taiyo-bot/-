@@ -293,10 +293,12 @@ for (const t of ['内訳書　様式', '全改修工事部分', '対象工事部
   assert.ok(kdoc.includes(t), `広域連合の書式に「${t}」がない`);
 }
 const pages = page.locator('.print-root .form-page');
-assert.equal(await pages.count(), 2); // 1ページ14行：玄関4行・トイレ7行・合計4行は入らないので、トイレを2ページ目に送る
+// 1ページ14行：玄関4行・トイレ7行のあとの介護保険の内訳（3行）と合計4行は入らないので、内訳と合計を2ページ目に送る（箇所の途中では分けない）
+assert.equal(await pages.count(), 2);
 assert.ok((await pages.first().innerText()).includes('Ｐ－1'));
 assert.ok((await pages.last().innerText()).includes('Ｐ－2'));
-assert.ok((await pages.last().innerText()).includes('トイレ\t便器取替'));
+assert.ok((await pages.first().innerText()).includes('トイレ\t便器取替'));
+assert.match(await pages.last().innerText(), /介護保険（受領委任払い）[\s\S]*介護保険の対象外[\s\S]*合計/);
 const kk = pages.first();
 const wood = (await kk.locator('tr', {hasText: '同上施工費'}).first().locator('td').allInnerTexts()).filter(Boolean);
 assert.deepEqual(wood.slice(0, 5), ['手', '同上施工費', '1.2', '時間', '2,500'], wood.join('|')); // 木 2箇所＝見積 3,000円
