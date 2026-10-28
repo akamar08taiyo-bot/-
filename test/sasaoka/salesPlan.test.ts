@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {estimateTotals} from '../../src/sasaoka/calc.ts';
-import {JUTAKU_SALES_KEY, jutakuSalesMonth, jutakuSalesSummary, monthPlan, planRows, readTokuteiSales, rowSalesMonth, shiftSalesMonth, TOKUTEI_SALES_KEY, withBillMonth, withSalesMonth, writeJutakuSalesSummary} from '../../src/sasaoka/salesPlan.ts';
+import {JUTAKU_SALES_KEY, jutakuSalesMonth, jutakuSalesSummary, linkedTokutei, monthPlan, planRows, readTokuteiSales, rowSalesMonth, shiftSalesMonth, TOKUTEI_SALES_KEY, tokuteiSalesMonth, withBillMonth, withSalesMonth, withTokuteiSalesMonth, writeJutakuSalesSummary} from '../../src/sasaoka/salesPlan.ts';
 import type {Job, Row} from '../../src/sasaoka/types.ts';
 
 const S = {estimateRate: 0.8, estimateLaborRate: 1.5, estimateOverheadRate: 0.1, taxRate: 0.1, tokuteiSalesMonths: {} as Record<string, string>};
@@ -99,4 +99,28 @@ test('一覧の売上月（ユーザーの指示「何月分かっていうの�
   const sum = jutakuSalesSummary([r.job], {...S, officeName: '行橋営業所', tokuteiSalesMonths: {s1: '2026-11', x: 'こわれた'}});
   assert.equal(sum.rows[0].month, '2026-11');
   assert.deepEqual(sum.tokuteiMonths, {s1: '2026-11'});
+});
+
+test('販売見積書の売上月（ユーザーの指示「特定福祉用具に関しても、売上を10月にいれるのか、11月にするのかを選択できるようにする。仕入れの月は不要」2026-10-28）', () => {
+  const toku = (id: string, jutakuJob: string, month: string) => ({id, customer: '見本', jutakuJob, staff: '', status: '見積', month, amount: 1000, tax: 100, total: 1100});
+  const tokutei = [toku('s1', 'A', '2026-10'), toku('s2', 'B', '2026-10')];
+  const linked = linkedTokutei('A', tokutei);
+  assert.deepEqual(linked.map((r) => r.id), ['s1']);
+  // 直していない（前からの）案件は、これまでどおり案件の月（納品日など）
+  assert.equal(tokuteiSalesMonth(linked[0], S), '2026-10');
+  // 11月にする：この様邸の案件だけ。売上見込み・一覧・受注残に渡す月もその月
+  const nov = withTokuteiSalesMonth({}, linked, '2026-11');
+  assert.deepEqual(nov, {s1: '2026-11'});
+  const set = {...S, tokuteiSalesMonths: nov};
+  assert.deepEqual(planRows([], set, tokutei).map((r) => [r.id, r.month]), [['s1', '2026-11'], ['s2', '2026-10']]);
+  assert.equal(monthPlan(planRows([], set, tokutei), '2026-11').tokuteiSum.total, 1100);
+  assert.equal(rowSalesMonth(job('A', []), tokutei, set), '2026-11');
+  assert.deepEqual(jutakuSalesSummary([], {...set, officeName: '行橋営業所'}).tokuteiMonths, {s1: '2026-11'});
+  // 案件の月に戻したら持たない（納品日を変えると一緒に変わる）。ほかの案件の月はそのまま
+  assert.deepEqual(withTokuteiSalesMonth({s1: '2026-11', s2: '2026-12'}, linked, '2026-10'), {s2: '2026-12'});
+  // 空・こわれた月は何もしない
+  assert.deepEqual(withTokuteiSalesMonth({s1: '2026-11'}, linked, ''), {s1: '2026-11'});
+  // 住宅改修の様邸の月（請求する月・売上月）は変えない
+  const a = job('A', [mat(30000)]);
+  assert.equal(planRows([a], set, tokutei).find((r) => r.kind === 'jutaku')?.month, '2026-10');
 });

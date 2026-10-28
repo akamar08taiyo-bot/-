@@ -87,13 +87,31 @@ export const withBillMonth = <J extends Pick<Job, 'month' | 'salesMonth'>>(job: 
 /** 特定福祉用具の案件の売上の月（このアプリで月を変えたときはその月。受注残にもこの月で入る） */
 export const tokuteiSalesMonth = (r: Pick<TokuteiSale, 'id' | 'month'>, s: Pick<Settings, 'tokuteiSalesMonths'>) => (MONTH.test(s.tokuteiSalesMonths[r.id] ?? '') ? s.tokuteiSalesMonths[r.id] : r.month);
 
+/** この様邸から作った特定福祉用具の案件（まとめの行＝商品のある案件。ふつうは1つ） */
+export const linkedTokutei = (jobId: string, tokutei: TokuteiSale[]) => tokutei.filter((r) => r.jutakuJob === jobId);
+
+/**
+ * 特定福祉用具の案件の売上月を m にした tokuteiSalesMonths（販売見積書のタブの「売上月」。ユーザーの指示「特定福祉用具に関しても、売上を10月にいれるのか、
+ * 11月にするのかを選択できるようにする。仕入れの月は不要」2026-10-28）。住宅改修の withSalesMonth と同じく、案件の月（納品日など＝特定福祉用具の salesMonthOf）と
+ * 同じなら持たない：持たなければ前と同じく納品日などの月で、納品日を変えると一緒に変わる。ちがう月にしたときだけ持つ。特定福祉用具のデータは書きかえない
+ */
+export function withTokuteiSalesMonth(months: Record<string, string>, rows: Pick<TokuteiSale, 'id' | 'month'>[], m: string): Record<string, string> {
+  if (!MONTH.test(m)) return months;
+  const next = {...months};
+  for (const r of rows) {
+    if (m === r.month) delete next[r.id];
+    else next[r.id] = m;
+  }
+  return next;
+}
+
 /**
  * 見積もり・申請書の一覧の行の「売上月」（ユーザーの指示「見積もり作成日と、請求月というか販売月というか工事が発生する月っていうのは大きく異なります。
  * 10月末に見積もり作った分は、でも11月に売り上げになることがありますので、何月分かっていうのを簡単に切り替えができるように」2026-10-26）。
  * 住宅改修の見積書があるか、特定福祉用具の案件がない様邸は、様邸の売上見込みの月。特定福祉用具だけの様邸は、その案件の月
  */
 export function rowSalesMonth(job: Pick<Job, 'id' | 'month' | 'salesMonth'> & SalesJob, tokutei: TokuteiSale[], s: Pick<Settings, 'tokuteiSalesMonths'>): string {
-  const linked = tokutei.filter((r) => r.jutakuJob === job.id);
+  const linked = linkedTokutei(job.id, tokutei);
   if (hasJutakuSales(job) || linked.length === 0) return jutakuSalesMonth(job);
   return tokuteiSalesMonth(linked[0], s);
 }
@@ -105,7 +123,7 @@ export function rowSalesMonth(job: Pick<Job, 'id' | 'month' | 'salesMonth'> & Sa
  */
 export function shiftSalesMonth(job: Job, tokutei: TokuteiSale[], s: Pick<Settings, 'tokuteiSalesMonths'>, dir: number, now = Date.now()): {job: Job; tokuteiMonths: Record<string, string>} {
   const next = addMonths(rowSalesMonth(job, tokutei, s), dir);
-  const linked = tokutei.filter((r) => r.jutakuJob === job.id);
+  const linked = linkedTokutei(job.id, tokutei);
   const tokuteiMonths = Object.fromEntries(linked.map((r) => [r.id, next]));
   if (!hasJutakuSales(job) && linked.length) return {job: {...job, month: next, salesMonth: undefined, updatedAt: now}, tokuteiMonths};
   const moved = {...job, month: addMonths(job.month, dir), updatedAt: now};
