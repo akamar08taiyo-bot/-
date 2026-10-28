@@ -191,6 +191,23 @@ assert.match(cards[2], /合計（3件）/);
 const rowInc = (await jutaku.locator('li').allInnerTexts()).map((t) => yenOf(/税込 ([\d,]+)円/.exec(t)[1]));
 assert.equal(rowInc.reduce((a, b) => a + b, 0), inc[0]);
 assert.equal(await page.getByRole('link', {name: '📊 受注残・進捗管理を開く'}).getAttribute('href'), 'https://akamar08taiyo-bot.github.io/solar-silver-progress-app/');
+// 印刷・受注残のボタンは上の段のまん中（ユーザーの指示「位置を少し中央にずらす」2026-10-28。前は右の端）
+//   1366px では左の月の欄・次月に回すにかぶらない所まで（まん中から 100px 以内）、ユーザーの画面の幅（1600px）ではちょうどまん中
+const midOf = () =>
+  page.getByRole('group', {name: '売上見込みの印刷・受注残'}).evaluate((g) => {
+    const b = g.parentElement.getBoundingClientRect();
+    const kids = [...g.children].map((c) => c.getBoundingClientRect());
+    const left = Math.max(...[...g.parentElement.children[0].children].map((c) => c.getBoundingClientRect().right));
+    return {kids: (Math.min(...kids.map((k) => k.left)) + Math.max(...kids.map((k) => k.right))) / 2, row: (b.left + b.right) / 2, gap: Math.min(...kids.map((k) => k.left)) - left, top: Math.max(...kids.map((k) => k.top)) - b.top};
+  });
+let mid = await midOf();
+assert.ok(Math.abs(mid.kids - mid.row) < 100 && mid.gap > 0 && mid.top < 10, JSON.stringify(mid));
+await page.setViewportSize({width: 1600, height: 900});
+await page.waitForTimeout(200);
+mid = await midOf();
+assert.ok(Math.abs(mid.kids - mid.row) < 30 && mid.top < 10, JSON.stringify(mid));
+await page.screenshot({path: path.join(outDir, 'sales-02b-plan-1600.png')});
+await page.setViewportSize({width: 1366, height: 900});
 await page.screenshot({path: path.join(outDir, 'sales-02-plan-1366.png'), fullPage: true});
 await noOverflow(page, '売上見込み');
 log('売上見込み：住宅改修と特定福祉用具を別々に・税抜・税込の合計・受注残へのリンクOK');

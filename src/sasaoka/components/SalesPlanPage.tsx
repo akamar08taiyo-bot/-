@@ -77,23 +77,26 @@ export function SalesPlanPage({
     <div className="space-y-4">
       {/* 特定福祉用具のまとめを新しくする（見えない枠。特定福祉用具のアプリが開くとまとめを書く） */}
       <iframe src={`${TOKUTEI_URL}#embed=1`} title="特定福祉用具の金額を読む" className="hidden" aria-hidden="true" tabIndex={-1} />
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white p-1 shadow-sm">
-          <button type="button" className="rounded-md px-3 py-1.5 text-lg font-bold text-slate-600 hover:bg-slate-100" onClick={() => setMonth(addMonths(month, -1))} aria-label="前の月">
-            ◀
-          </button>
-          <label className="flex items-center gap-2 px-1">
-            <span className="whitespace-nowrap text-lg font-bold text-[#115e59]">{monthLabel(month)}</span>
-            <input type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} className="h-8 w-[8.5rem] rounded border border-slate-300 px-1 text-sm sm:w-[9.5rem]" aria-label="売上の月" />
-          </label>
-          <button type="button" className="rounded-md px-3 py-1.5 text-lg font-bold text-slate-600 hover:bg-slate-100" onClick={() => setMonth(addMonths(month, 1))} aria-label="次の月">
-            ▶
-          </button>
+      {/* 上の段：月・次月に回す（左）／印刷・受注残（まん中。ユーザーの指示「位置を少し中央にずらす」2026-10-28。前は右の端）。工務店請求書の上の段と同じ grid */}
+      <div className="flex flex-wrap items-center gap-2 lg:grid lg:grid-cols-[minmax(max-content,1fr)_auto_1fr] lg:gap-x-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white p-1 shadow-sm">
+            <button type="button" className="rounded-md px-3 py-1.5 text-lg font-bold text-slate-600 hover:bg-slate-100" onClick={() => setMonth(addMonths(month, -1))} aria-label="前の月">
+              ◀
+            </button>
+            <label className="flex items-center gap-2 px-1">
+              <span className="whitespace-nowrap text-lg font-bold text-[#115e59]">{monthLabel(month)}</span>
+              <input type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} className="h-8 w-[8.5rem] rounded border border-slate-300 px-1 text-sm sm:w-[9.5rem]" aria-label="売上の月" />
+            </label>
+            <button type="button" className="rounded-md px-3 py-1.5 text-lg font-bold text-slate-600 hover:bg-slate-100" onClick={() => setMonth(addMonths(month, 1))} aria-label="次の月">
+              ▶
+            </button>
+          </div>
+          <Btn color="white" disabled={picked.length === 0} onClick={moveNext}>
+            ☑ したものを次月に回す{picked.length > 0 ? `（${picked.length}件）` : ''}
+          </Btn>
         </div>
-        <Btn color="white" disabled={picked.length === 0} onClick={moveNext}>
-          ☑ したものを次月に回す{picked.length > 0 ? `（${picked.length}件）` : ''}
-        </Btn>
-        <div className="ml-auto flex flex-wrap gap-2">
+        <div role="group" aria-label="売上見込みの印刷・受注残" className="ml-auto flex flex-wrap gap-2 lg:ml-0 lg:justify-center">
           <Btn color="softSky" disabled={plan.all.count === 0} onClick={() => onPrint({kind: 'sales', month, plan})}>
             🖨 印刷
           </Btn>
