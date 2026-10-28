@@ -151,9 +151,13 @@ if (withTokutei) {
   assert.equal(await page.getByRole('tab', {name: '🛁 特定福祉用具申請書'}).getAttribute('aria-selected'), 'true');
   await field('お客様名').waitFor();
   assert.equal(await field('電話').inputValue(), '090-1111-2222');
-  await tk.getByRole('button', {name: '← 見積もりの一覧へ'}).click();
-  await tk.getByText('見本 花子').first().waitFor();
-  assert.equal(await tk.getByText('見本 花子', {exact: false}).count(), 1);
+  // 様邸のタブの中には「← 見積もりの一覧へ」「👤 前のお客様から入れる」は出さない（ユーザーの指示「赤枠の部分は不要です」2026-10-28）。
+  // 案件が1つだけかは、特定福祉用具が書くまとめ（taiyo-tokutei-sales-v1 の linked＝様邸から開いた案件）で数える
+  assert.equal(await tk.getByRole('button', {name: '← 見積もりの一覧へ'}).count(), 0);
+  assert.equal(await tk.getByRole('button', {name: '👤 前のお客様から入れる'}).count(), 0);
+  await page.waitForTimeout(800);
+  const linkedCount = await page.evaluate(() => JSON.parse(localStorage.getItem('taiyo-tokutei-sales-v1') ?? '{}').linked?.filter((l) => l.customer === '見本 花子').length);
+  assert.equal(linkedCount, 1);
   log('読み直し・案件は1つ OK');
 
   // ---------------- 📦 まとめて保存：チェックしたものだけを1つずつ保存（ユーザーの指示「住宅改修申請書・特定福祉用具申請書・住宅改修見積もり・特定福祉用具販売見積もりを

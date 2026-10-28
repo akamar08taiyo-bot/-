@@ -3,6 +3,8 @@
 //   住宅改修申請書・工事見積書・理由書の「削除」は様邸をゴミ箱に移す（「○○様邸をゴミ箱に移しますか？」）。
 //   特定福祉用具申請書・販売見積書のタブ（中は特定福祉用具のアプリ）の「削除」は、その特定福祉用具の見積もり・申請書を消す（白。前の販売見積書は赤い字）。
 //   特定福祉用具のアプリの「🖨 カタログを印刷」は印刷の色（薄い水色）
+//   特定福祉用具の2つのタブには「← 見積もりの一覧へ」「👤 前のお客様から入れる」を出さない（ユーザーの指示「赤枠の部分は不要です」2026-10-28）。
+//   販売見積書の「削除」のあとも一覧は出さず、その様邸の新しい案件（お客様の名前は様邸から）を開く
 // usage: node e2e-delete.mjs <サイトのURL> <出力フォルダ>
 //   サイトは太陽ポータルと同じ形（<サイト>/jutaku-mitsumori/index.html・<サイト>/tokutei/index.html。tokutei がなければ住宅改修のタブだけ確かめる）
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
@@ -57,9 +59,23 @@ if (withTokutei) {
     const cat = frame.getByRole('button', {name: '🖨 カタログを印刷'}).first();
     assert.match(await cat.getAttribute('class'), /bg-sky-50/, tab);
     assert.equal(await frame.getByRole('button', {name: '📖 カタログを印刷'}).count(), 0, tab);
+    assert.equal(await frame.getByRole('button', {name: '← 見積もりの一覧へ'}).count(), 0, tab);
+    assert.equal(await frame.getByRole('button', {name: '👤 前のお客様から入れる'}).count(), 0, tab);
   }
   await page.screenshot({path: path.join(outDir, 'delete-01-hanbai.png')});
-  log('特定福祉用具申請書・販売見積書に白い「削除」・カタログを印刷は薄い水色 OK');
+  log('特定福祉用具申請書・販売見積書に白い「削除」・カタログを印刷は薄い水色・一覧へ／前のお客様から入れるはなし OK');
+
+  // 販売見積書の「削除」→ 確かめ → 一覧ではなく、この様邸の新しい案件（名前は様邸から）
+  await frame.getByLabel('商品名').first().fill('見本の杖');
+  await page.waitForTimeout(800);
+  await frame.getByRole('button', {name: '削除', exact: true}).click();
+  for (let i = 0; i < 50 && !asked.some((m) => m.includes('特定福祉用具')); i++) await page.waitForTimeout(100);
+  assert.match(asked.at(-1), /特定福祉用具の見積もり・申請書を消します/);
+  await frame.getByRole('button', {name: '削除', exact: true}).waitFor();
+  assert.equal(await frame.getByRole('textbox', {name: '見積もりを検索'}).count(), 0); // 一覧ではない
+  assert.equal(await frame.getByLabel('商品名').first().inputValue(), '');
+  assert.match(await frame.locator('h2').first().innerText(), /見本 五郎/);
+  log('販売見積書の「削除」のあとは様邸の新しい案件（一覧は出さない）OK');
 }
 
 // 理由書のタブの「削除」→ 確かめてゴミ箱へ → 一覧に戻る
