@@ -155,7 +155,8 @@ export function UriageDialog({sale, settings, change, onClose}: {sale: Sale; set
       </div>
       {t.ratioSet && t.total > 0 && (
         <p className="mt-3 text-sm tabular-nums text-slate-700">
-          {sale.welfare ? `介護扶助（${t.ratio}割）${yen(t.aid)}円` : `利用者負担（${t.ratio}割）${yen(t.userBurden)}円`}・保険者負担 {yen(t.insurerBurden)}円
+          {/* 生活保護でも「介護扶助」とは書かない（ユーザーの指示 2026-10-28。住宅改修の窓・売上伝票の伝票と同じ） */}
+          {sale.welfare ? `利用者負担（生活保護・${t.ratio}割）${yen(t.aid)}円` : `利用者負担（${t.ratio}割）${yen(t.userBurden)}円`}・保険者負担 {yen(t.insurerBurden)}円
           {t.excess > 0 && `・限度額を超えた分 ${yen(t.excess)}円`}
         </p>
       )}

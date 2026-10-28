@@ -79,7 +79,7 @@ export const userBurdenLine = (t: Pick<Totals, 'ratio' | 'userBurden'>) => `利�
  * 介護保険の内訳：明細の最後の商品の2行下から1行ずつ「介護保険（受領委任払い）」「介護保険の対象　○円」「利用者負担（1割）　○円」「保険者負担（9割）　○円」
  * （ユーザーの指示「備考欄に記載している部分を上にずらす」「行を変えて見やすくする」「この部分のみ記載する形で良い　利用者負担額の部分のみ赤字で記載する」2026-10-26。
  * 前は下の備考の欄に2行でまとめ、そのあと一度「自己負担額（1割負担）」〜「（3割負担）」の3行と「お支払いいただく金額」も書いていた）。
- * 生活保護の介護扶助・限度額を超えた分はあるときだけ。償還払いは、いったん全額を払うことが大事なので「いったんお支払いいただく金額」と払い戻しの行も。介護保険の対象がなければ []
+ * 生活保護の分（負担割合の分。「介護扶助」とは書かない）・限度額を超えた分はあるときだけ。償還払いは、いったん全額を払うことが大事なので「いったんお支払いいただく金額」と払い戻しの行も。介護保険の対象がなければ []
  */
 export function insuranceLines(sale: Sale, t: Totals): string[] {
   if (t.covered <= 0) return [];
@@ -88,7 +88,8 @@ export function insuranceLines(sale: Sale, t: Totals): string[] {
   const out = [`介護保険（${sale.payMethod}）`, `介護保険の対象　${yen(t.covered)}円`];
   if (t.ratioSet) {
     out.push(userBurdenLine(t));
-    if (t.aid > 0) out.push(`介護扶助（${t.ratio}割）　${yen(t.aid)}円`);
+    // 生活保護のときの負担割合の分は「生活保護（1割）」と書く（ユーザーの指示「生活保護のときは、介護扶助という文言は不要」、見積書からも「外します」2026-10-28）
+    if (t.aid > 0) out.push(`生活保護（${t.ratio}割）　${yen(t.aid)}円`);
     out.push(`保険者負担（${10 - t.ratio}割）　${yen(t.insurerBurden)}円`);
   }
   if (t.excess > 0) out.push(`限度額を超えた分　${yen(t.excess)}円`);

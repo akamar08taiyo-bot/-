@@ -165,14 +165,23 @@ try {
     await dialog.getByRole('group', {name: '伝票の顧客区分'}).waitFor();
     assert.equal(await dialog.getByRole('group', {name: '伝票の顧客区分'}).getByRole('button', {name: '新規'}).getAttribute('aria-pressed'), 'true'); // 覚えている
     await dialog.getByLabel('生活保護（自己負担は出さない）').check();
-    await dialog.getByText('介護扶助（2割）5,562円・保険者負担 22,246円').waitFor();
+    await dialog.getByText('利用者負担（生活保護・2割）5,562円・保険者負担 22,246円').waitFor(); // 「介護扶助」とは書かない（2026-10-28）
+    assert.ok(!(await dialog.innerText()).includes('介護扶助'));
     const [slip2] = await Promise.all([ctx.waitForEvent('page'), dialog.getByRole('link', {name: '🧾 売上伝票発行依頼書を開く'}).click()]);
     await slip2.getByText('申請書・見積書作成から読み込みました。').waitFor();
     const text2 = await slip2.locator('main').innerText();
-    assert.ok(!text2.includes('対象内利用者負担額'), text2);
-    assert.match(text2, /介護扶助（生活保護・2割・切り上げ）\s*¥5,562/);
+    assert.ok(!text2.includes('介護扶助'), text2);
+    assert.match(text2, /対象内利用者負担額（生活保護・2割・切り上げ）\s*¥5,562/);
     assert.match(text2, /ご利用者お支払い合計\s*¥0/);
     await slip2.close();
+    await page.screenshot({path: `${out}/uriage-04-welfare-dialog-${tag}.png`});
+    // 見積もりの画面・見積書のプレビューも「生活保護（2割）」（「介護扶助」と書かない。ユーザーの指示 2026-10-28）
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({state: 'detached'});
+    await page.getByText('生活保護（2割）').first().waitFor();
+    assert.ok(!(await page.locator('main').innerText()).includes('介護扶助'));
+    await page.getByText('生活保護（2割）　5,562円').first().scrollIntoViewIfNeeded();
+    await page.screenshot({path: `${out}/uriage-05-welfare-estimate-${tag}.png`});
     await ctx.close();
   }
   assert.deepEqual(errors, []);

@@ -42,7 +42,7 @@ export type HacchuItem = {
   totalTaxIn: number; // 購入金額（税込）。見積書・申請書と同じ
   careInsuranceBalance: number; // この商品より前の商品の分を引いた今年度の残り（受注簿でページを直したときの計算に使う。0 なら全額自己負担）
   benefit: HacchuBenefit;
-  note: string; // 受注簿の備考（限度額を超えた分・介護扶助のときだけ）
+  note: string; // 受注簿の備考（限度額を超えた分・生活保護のときだけ）
 };
 
 export type HacchuImport = {
@@ -109,7 +109,7 @@ export function hacchuImport(sale: Sale, s: Pick<Settings, 'markupRate' | 'limit
       const note = [
         over > 0 && benefit.target > 0 && `限度額を超えた分 ${yen(over)}円は全額自己負担`,
         over > 0 && benefit.target === 0 && '限度額を超えるので全額自己負担',
-        benefit.aid > 0 && `生活保護（${t.ratio}割の ${yen(benefit.aid)}円は介護扶助）`,
+        benefit.aid > 0 && `生活保護（${t.ratio}割 ${yen(benefit.aid)}円）`, // 「介護扶助」とは書かない（ユーザーの指示 2026-10-28）
       ].filter(Boolean);
       return {
         productName: l.item.name.trim(),

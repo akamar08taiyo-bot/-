@@ -414,7 +414,7 @@ test('自己負担額を表示（初めからオン）：外すと明細の下�
   assert.equal(readCell(f, SH, 'E21'), readCell(off, SH, 'E21'));
   // 生活保護・限度額を超えた分
   const w = sale({items: one, welfare: true});
-  assert.deepEqual(belowItemLines(w, S).lines.slice(2, 4), ['利用者負担（1割）　0円', '介護扶助（1割）　2,640円']);
+  assert.deepEqual(belowItemLines(w, S).lines.slice(2, 4), ['利用者負担（1割）　0円', '生活保護（1割）　2,640円']);
   const over = sale({items: one, remaining: 6400});
   assert.ok(belowItemLines(over, S).lines.includes('限度額を超えた分　20,000円'));
   assert.deepEqual(belowItemLines(sale({items: []}), S).lines, []);

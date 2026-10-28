@@ -441,7 +441,7 @@ export function SaleEditor({
                   {t.ratioSet ? (
                     <>
                       <Row label={`利用者負担（${t.ratio}割）`} value={t.userBurden} />
-                      {t.aid > 0 && <Row label={`介護扶助（${t.ratio}割）`} value={t.aid} />}
+                      {t.aid > 0 && <Row label={`生活保護（${t.ratio}割）`} value={t.aid} />}
                       <Row label={`保険者負担（${10 - t.ratio}割）`} value={t.insurerBurden} />
                     </>
                   ) : (
