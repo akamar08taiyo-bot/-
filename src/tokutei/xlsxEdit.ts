@@ -261,6 +261,8 @@ function variantStyle(files: Files, style: number, change: {pt?: number; alignme
 
 /** 字の色だけ変えた書式（なければ足す）。新しい書式の番号 */
 export const colorStyle = (files: Files, style: number, rgb: string): number => variantStyle(files, style, {color: rgb});
+/** 字の大きさ（pt）だけ変えた書式（styles.xml に足す。同じものがあればそれ）。sizeCell とちがい、書いている途中のシートの XML に使う */
+export const sizeStyle = (files: Files, style: number, pt: number): number => variantStyle(files, style, {pt});
 
 /** 欄の書式の配置（alignment の XML。なければ空） */
 function alignmentOf(files: Files, xml: string, ref: string): string {

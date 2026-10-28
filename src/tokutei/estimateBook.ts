@@ -20,7 +20,7 @@ import type {PvPage, Range} from './shinseiPreview.ts';
 import type {Sale, Settings, TaxType} from './types.ts';
 import {yen} from './util.ts';
 import {excelDate} from './shinsei.ts';
-import {attrOf, cellRe, colorStyle, dropCalcChain, esc, finishWorkbook, numOf, setCell, setStyle, sheetLayout, sheetPath, sizeCell} from './xlsxEdit.ts';
+import {attrOf, cellRe, colorStyle, dropCalcChain, esc, finishWorkbook, numOf, setCell, setStyle, sheetLayout, sheetPath, sizeCell, sizeStyle} from './xlsxEdit.ts';
 import type {CellValue, Files} from './xlsxEdit.ts';
 
 export const ESTIMATE_SHEET = '見積書';
@@ -173,6 +173,8 @@ function setFormula(xml: string, ref: string, formula: string, value: CellValue,
 
 /** 題（御　見　積　書）の文字の大きさ（pt） */
 export const TITLE_PT = 26;
+/** 宛名（A6）の字の大きさ（pt）。原本は 16pt */
+export const NAME_PT = 20;
 
 /** 原本（開いたもの）の写しに案件を書く。書いたブック（files をそのまま書きかえる） */
 export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
@@ -185,6 +187,9 @@ export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
   };
   // 宛名は左に詰めず、全角のすき間1つあける（ユーザーの指示「名前の部分は左に詰めるのではなく、スペース一つ分あける」2026-10-26）
   put('A6', `　${customerLabel(sale).replace(/\s*様$/, '')}　様`);
+  // 宛名の字は原本（16pt）より2段大きく（ユーザーの指示「名前の部分は2段階ぐらい大きくする」2026-10-28。A6:E7 の結合＝高さ30pt に入る。長い名前は原本どおり縮めて入れる）。
+  // 2・3ページ目の宛名は、ここで書いたあとの写しなので同じ大きさ
+  xml = setStyle(xml, 'A6', String(sizeStyle(files, numOf(attrOf(cellRe('A6').exec(xml)?.[1] ?? '', 's'), 0), NAME_PT)));
   put('I4', `№　${sale.quoteNo.trim()}`);
   const serial = excelDate(sale.estimateDate);
   if (serial) put('I5', serial);

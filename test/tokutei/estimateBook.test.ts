@@ -161,6 +161,8 @@ test('介護保険の内訳は明細の下に1行ずつ（「備考欄に記載�
   };
   assert.match(fontOf('A28'), /<color rgb="FFFF0000"\/>/);
   for (const r of ['A26', 'A27', 'A29']) assert.doesNotMatch(fontOf(r), /FFFF0000/, r);
+  // 宛名は原本（16pt）より2段大きく 20pt（ユーザーの指示「名前の部分は2段階ぐらい大きくする」2026-10-28）
+  assert.match(fontOf('A6'), /<sz val="20"\/>/);
   // プレビューでも赤
   const page = estimatePreview(template(), v, S)[0];
   const red = page.texts.find((x) => x.runs.map((r) => r.text).join('') === '利用者負担（1割）　5,597円');
