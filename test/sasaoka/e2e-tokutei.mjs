@@ -215,6 +215,26 @@ if (withTokutei) {
   assert.equal((await hanako.innerText()).replace(/\s+/g, ''), `◀${nextM.getFullYear() === now.getFullYear() ? `${nextM.getMonth() + 1}月` : `${nextM.getFullYear()}年${nextM.getMonth() + 1}月`}▶`);
   await page.getByRole('button', {name: '前の月'}).click();
   log('一覧の売上月：特定福祉用具の案件の月も移る（受注残に渡す月）OK');
+
+  // ---------------- 販売見積書のタブの売上月（ユーザーの指示「特定福祉用具に関しても、売上を10月にいれるのか、11月にするのかを選択できるようにする。仕入れの月は不要」2026-10-28）：
+  // 一覧で次の月にした月が出て（案件の月とちがうので薄い黄色）、案件の月に戻すと持たない・また次の月にすると受注残に渡す月も次の月。特定福祉用具申請書のタブには出さない
+  await page.waitForTimeout(1200); // 自動保存（0.4秒後）を待ってから読み直す
+  await page.goto(`${site}/jutaku-mitsumori/index.html#tab=estimate&job=${encodeURIComponent(jobId)}&view=hanbai`);
+  await page.reload();
+  const salesMonth = page.getByLabel('売上月', {exact: true});
+  await salesMonth.waitFor({timeout: 15000});
+  assert.equal(await salesMonth.inputValue(), ym(nextM));
+  assert.match(await salesMonth.getAttribute('class'), /bg-amber-50/);
+  await salesMonth.fill(ym(now));
+  await page.waitForFunction((id) => !(id in (JSON.parse(localStorage.getItem('taiyo-jutaku-sales-v1') || '{}').tokuteiMonths ?? {})), saleId);
+  assert.doesNotMatch(await salesMonth.getAttribute('class'), /bg-amber-50/);
+  await salesMonth.fill(ym(nextM));
+  await page.waitForFunction(([id, m]) => JSON.parse(localStorage.getItem('taiyo-jutaku-sales-v1') || '{}').tokuteiMonths?.[id] === m, [saleId, ym(nextM)]);
+  await page.screenshot({path: path.join(outDir, 'tokutei-4-sales-month.png')});
+  await page.getByRole('tab', {name: '🛁 特定福祉用具申請書'}).click();
+  await page.waitForFunction(() => location.hash.includes('view=tokutei'));
+  assert.equal(await page.getByLabel('売上月', {exact: true}).count(), 0);
+  log('販売見積書の売上月（案件の月に戻すと持たない・受注残に渡す月）OK');
 }
 
 // ---------------- 新規作成してすぐ特定福祉用具申請書のタブを開き、住宅改修には何も入れずに一覧へ戻っても、様邸は消さない

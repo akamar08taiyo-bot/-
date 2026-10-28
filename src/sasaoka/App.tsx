@@ -477,6 +477,7 @@ export default function App({start}: {start: MainTab}) {
                 job={estimateJob}
                 view={jobView === 'tokutei' ? 'shinsei' : 'quote'}
                 update={store.update}
+                settings={data.settings}
                 onBack={() =>
                   leaveTokutei(() => {
                     removeIfEmpty(estimateJob);
