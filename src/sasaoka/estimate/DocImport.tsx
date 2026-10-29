@@ -22,11 +22,13 @@ const KIND_STYLE: Record<ReadDoc['kind'], string> = {
   shinsei: 'border-emerald-300 bg-emerald-50 text-emerald-800',
   estimate: 'border-sky-300 bg-sky-50 text-sky-800',
   riyu: 'border-amber-300 bg-amber-50 text-amber-800',
+  tokutei: 'border-violet-300 bg-violet-50 text-violet-800',
 };
 
 function amountText(d: ReadDoc): string {
   if (d.kind === 'estimate' && d.total) return `合計 ${yen(d.total)}円`;
   if (d.kind === 'shinsei' && d.total) return `改修費用 ${yen(d.total)}円`;
+  if (d.kind === 'tokutei' && d.total) return `福祉用具 ${d.tokutei.length}点 ${yen(d.total)}円`;
   return '';
 }
 

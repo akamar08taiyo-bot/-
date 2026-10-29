@@ -430,10 +430,20 @@ function cleanUriage(u: Record<string, unknown>): NonNullable<Job['uriage']> {
 function cleanImported(raw: unknown[]): ImportedDoc[] {
   const money = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : null);
   return raw.filter(isObj).flatMap((d): ImportedDoc[] => {
-    const kind = d.kind === 'shinsei' || d.kind === 'estimate' || d.kind === 'riyu' ? d.kind : null;
+    const kind = d.kind === 'shinsei' || d.kind === 'estimate' || d.kind === 'riyu' || d.kind === 'tokutei' ? d.kind : null;
     if (!kind || !str(d.hash)) return [];
     return [{kind, file: str(d.file), hash: str(d.hash), total: money(d.total), tax: money(d.tax), rows: d.rows === true, at: numv(d.at)}];
   });
+}
+
+/** 取り込んだ特定福祉用具の申請書の福祉用具（importDocs.ts の readTokutei。2026-10-29）。福祉用具がなければ持たない */
+function cleanTokuteiImport(raw: unknown): Job['tokuteiImport'] {
+  if (!isObj(raw) || !Array.isArray(raw.items) || !str(raw.key)) return undefined;
+  const items = raw.items.filter(isObj).flatMap((it) => {
+    const amount = typeof it.amount === 'number' && Number.isFinite(it.amount) && it.amount > 0 ? Math.round(it.amount) : 0;
+    return amount && str(it.name) ? [{category: str(it.category), name: str(it.name), code: str(it.code), maker: str(it.maker), amount, taxIn: it.taxIn !== false}] : [];
+  });
+  return items.length ? {items: items.slice(0, 20), key: str(raw.key)} : undefined;
 }
 
 export function cleanJobs(raw: unknown): Job[] {
@@ -470,6 +480,7 @@ export function cleanJobs(raw: unknown): Job[] {
       ...(isObj(j.uriage) ? {uriage: cleanUriage(j.uriage)} : {}), // 売上伝票の顧客区分・請求区分（2026-10-27）
       ...(j.showSelfPay === false ? {showSelfPay: false} : {}), // 見積書に介護保険の内訳を書かない（2026-10-28。careLines.ts。書くときは持たない）
       ...(Array.isArray(j.imported) ? {imported: cleanImported(j.imported)} : {}), // 取り込んだ書類（2026-10-28。importDocs.ts）
+      ...((t) => (t ? {tokuteiImport: t} : {}))(cleanTokuteiImport(j.tokuteiImport)), // 取り込んだ特定福祉用具の申請書の福祉用具（2026-10-29）
       createdAt: numv(j.createdAt, Date.now()),
       updatedAt: numv(j.updatedAt, Date.now()),
     };

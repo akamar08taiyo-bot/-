@@ -117,3 +117,20 @@ test('担当（ユーザーの指示「受注残に入れるとき当然担当�
   assert.equal(withTokuteiFields(j0, {staff: '見本 太郎'}), j0); // 同じなら変えない
   assert.deepEqual(readFromTokutei({type: TO_JUTAKU, job: 'j1', fields: {staff: ' '}})?.fields, {}); // 空の担当では消さない
 });
+
+test('取り込んだ特定福祉用具の申請書の福祉用具も渡す（items・itemsKey）。なければ今までどおり', () => {
+  const store = new Map<string, string>();
+  const g = globalThis as {localStorage?: unknown};
+  const before = g.localStorage;
+  g.localStorage = {setItem: (k: string, v: string) => store.set(k, v)};
+  try {
+    const items = [{category: '入浴補助用具', name: 'シャワーチェア 見本A', code: '', maker: '見本工業', amount: 28160, taxIn: true}];
+    writeTokutei({...job(), tokuteiImport: {items, key: 'h1'}});
+    const saved = JSON.parse(store.get(TOKUTEI_KEY) ?? '{}');
+    assert.deepEqual([saved.items, saved.itemsKey], [items, 'h1']);
+    writeTokutei(job());
+    assert.equal(JSON.parse(store.get(TOKUTEI_KEY) ?? '{}').items, undefined);
+  } finally {
+    g.localStorage = before;
+  }
+});

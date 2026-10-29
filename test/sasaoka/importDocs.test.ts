@@ -296,3 +296,127 @@ test('日付・申請書の改修の内容の1行', () => {
     assert.deepEqual(shinseiWorks({places: [q]}, defaultSettings()), [`①屋外　手すりの取り付け　L=${l}mm${q.dims?.h ? ` H=${q.dims.h}mm` : ''}`]); // 1行（横一列）
   }
 });
+
+// ---------------------------------------------------------------- 特定福祉用具の申請書（ユーザーの報告「申請書を読み込めないことがある」2026-10-29）
+
+/** 表の欄を列の番号で置いた Excel（シートの名前と、行ごとの {列: 値}）。特定福祉用具の様式の並びをまねる（値はどれも架空） */
+function gridBook(sheets: [string, Record<number, string>[]][]): Uint8Array {
+  const colName = (c: number): string => (c < 26 ? String.fromCharCode(65 + c) : colName(Math.floor(c / 26) - 1) + String.fromCharCode(65 + (c % 26)));
+  const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const sheetXml = (rows: Record<number, string>[]) =>
+    `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rows
+      .map((r, i) => `<row r="${i + 1}">${Object.entries(r).map(([c, v]) => `<c r="${colName(Number(c))}${i + 1}" t="inlineStr"><is><t xml:space="preserve">${esc(v)}</t></is></c>`).join('')}</row>`)
+      .join('')}</sheetData></worksheet>`;
+  const files: Record<string, Uint8Array> = {
+    '[Content_Types].xml': strToU8('<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>'),
+    'xl/workbook.xml': strToU8(`<workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map(([n], i) => `<sheet name="${n}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`),
+    'xl/_rels/workbook.xml.rels': strToU8(`<Relationships>${sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}</Relationships>`),
+  };
+  sheets.forEach(([, rows], i) => (files[`xl/worksheets/sheet${i + 1}.xml`] = strToU8(sheetXml(rows))));
+  return zipSync(files);
+}
+
+test('特定福祉用具の申請書（行橋市の受領委任払の様式の並び）：お客様・保険者・福祉用具（種目・商品名・製造事業者・税込の金額）を読む', () => {
+  const book = gridBook([
+    [
+      '用具・受領委任払',
+      [
+        {0: 'フ  リ  ガ  ナ', 5: 'ミホン ハナコ', 19: '事業者番号', 25: '4', 26: '0'},
+        {0: '被保険者氏名', 5: '見本 花子', 19: '保険者番号', 29: '4', 30: '0'},
+        {19: '被保険者番号', 25: '0', 26: '0', 27: '0', 28: '0', 29: '0', 30: '1', 31: '2', 32: '3', 33: '4', 34: '5'},
+        {0: '生　年　月　日', 5: '明・大・昭　15年3月15日生', 19: '性　　別', 24: '男　　・　　女'},
+        {0: '住　　　　所', 5: '〒', 6: '824-0005', 22: '電話\r\n番号', 24: '0930-00-0000'},
+        {5: '行橋市中央1丁目2-3'},
+        {0: '福　祉　用　具　名', 11: '製造事業者名及び', 21: '購入予定金額', 27: '購　入　予　定　日'},
+        {0: '（種目及び商品名）', 11: '販 売 事 業 者 名'},
+        {0: '入浴補助用具\nシャワーチェア 見本A', 11: '見本工業\n見本福祉㈱', 21: '28160', 26: '円'},
+        {0: '腰掛便座\nポータブルトイレ 見本C\nPT-02', 11: '見本製作所\n見本福祉㈱', 21: '33,000', 26: '円'},
+        {26: '円'},
+        {0: '福祉用具が\r\n\r\n必要な理由', 4: '立ち座りが困難なため。'},
+        {0: '　行橋市長　様'},
+        {0: '　上記のとおり関係書類を添えて居宅介護（介護予防）福祉用具購入費受領委任払いの申請をします。'},
+        {0: '申請者', 2: '住　　所', 6: '行橋市大字見本1番地'},
+        {2: '氏　　名', 6: '見本福祉株式会社'},
+      ],
+    ],
+    ['委任状', [{0: '委任状'}, {0: '（介護保険福祉用具購入費及び住宅改修費に係る受領委任払い用）'}]],
+  ]);
+  const d = read(book, '見本花子　行橋市福祉購入受領委任.xlsx');
+  assert.deepEqual([d.kind, d.name, d.address, d.insuredNo, d.insurer, d.total], ['tokutei', '見本 花子', '行橋市中央1丁目2-3', '0000012345', 'yukuhashi', 61160]);
+  assert.deepEqual(d.info, {kana: 'ミホン ハナコ', zip: '824-0005', phone: '0930-00-0000'}); // 元号は丸（図形）なので読まない
+  assert.deepEqual(d.tokutei, [
+    {category: '入浴補助用具', name: 'シャワーチェア 見本A', code: '', maker: '見本工業', amount: 28160, taxIn: true},
+    {category: '腰掛便座', name: 'ポータブルトイレ 見本C', code: 'PT-02', maker: '見本製作所', amount: 33000, taxIn: true},
+  ]);
+  // 様邸に入れる：お客様の情報と、特定福祉用具に渡す福祉用具。住宅改修の売上（見積書・改修費用）には入れない
+  const job = applyImport(null, [d], '見本 花子', '2026-10', S, 5);
+  assert.deepEqual([job.customer, job.address, job.insuredNo, job.insurer, job.shinsei?.kana, job.shinsei?.cost], ['見本 花子', '行橋市中央1丁目2-3', '0000012345', 'yukuhashi', 'ミホン ハナコ', null]);
+  assert.deepEqual(job.tokuteiImport, {items: d.tokutei, key: d.hash});
+  assert.deepEqual(jutakuSales(job, S), null);
+  assert.deepEqual(job.imported?.map((x) => [x.kind, x.total]), [['tokutei', 61160]]);
+  // 保存して読み直しても残る（複製には入れない）
+  const back = cleanJobs(JSON.parse(JSON.stringify([job])))[0];
+  assert.deepEqual(back.tokuteiImport, job.tokuteiImport);
+  assert.deepEqual(back.imported?.map((x) => x.kind), ['tokutei']);
+});
+
+test('特定福祉用具の申請書（北九州市・福岡市の様式の並び）：値がラベルの上の行・1字ずつのラベル・概要書の税抜の金額・種目の番号・あて先の保険者', () => {
+  // 北九州市：支給申請書は種目ごとの金額だけ。商品は概要書（税抜）。氏名・住所はラベルの上の行、「住」「所」は別の欄
+  const kk = gridBook([
+    [
+      '支給申請書',
+      [
+        {0: '介護保険居宅介護（予防）福祉用具購入費支給申請書（受領委任払用）'},
+        {3: 'ﾌ　ﾘ　ｶﾞ　 ﾅ'},
+        {23: 'ミホン タロウ', 55: '福祉用具購入月'},
+        {23: '見本 太郎', 79: '年'},
+        {55: '領収書記載日'},
+        {1: '被保険者氏名'},
+        {55: '被保険者番号', 68: '0', 72: '0', 76: '0', 78: '0', 80: '0', 84: '5', 88: '4', 91: '3', 94: '2', 99: '1'},
+        {23: '北九州市小倉北区見本町1-1'},
+        {5: '住', 15: '所'},
+        {64: '電話番号', 75: '093-000-0000'},
+        {12: '歩行器', 36: '20000', 51: '円'},
+        {2: '北九州市長　様'},
+        {0: '※特定福祉用具概要書を添付してください。'},
+      ],
+    ],
+    [
+      '概要書',
+      [
+        {15: '特 定 福 祉 用 具 概 要 書'},
+        {2: '被保険者氏名'},
+        {3: '見本 太郎'},
+        {4: '種', 9: '目', 16: '品目、形式等', 33: '概', 37: '要（特長等）', 50: '金', 53: '額'},
+        {1: '歩行器', 14: '歩行器 見本D\nWK-03', 47: '20000'},
+        {0: '※パンフレット（品名、概要等がわかるもの）を添付してください。'},
+      ],
+    ],
+  ]);
+  const k = read(kk, 'kk.xlsx');
+  assert.deepEqual([k.kind, k.name, k.address, k.insuredNo, k.insurer, k.total, k.info.kana, k.info.phone], ['tokutei', '見本 太郎', '北九州市小倉北区見本町1-1', '0000054321', 'kitakyushu', 22000, 'ミホン タロウ', '093-000-0000']);
+  assert.deepEqual(k.tokutei, [{category: '歩行器', name: '歩行器 見本D', code: 'WK-03', maker: '', amount: 20000, taxIn: false}]);
+  // 福岡市：種目は番号、生年月日は分かれた欄（元号が1つなら読む）。注意書きの「北九州市」ではなく、あて先の区長で福岡市
+  const fk = gridBook([
+    [
+      '申請書',
+      [
+        {2: '介護保険福祉用具購入費支給申請書', 13: '【受領委任払用】'},
+        {37: '※受任者は福岡県又は福岡市・北九州市・久留米市のいずれかによる指定を受けた特定福祉用具販売事業者であること。'},
+        {2: '被保険者', 3: 'フリガナ', 4: 'ミホン ジロウ'},
+        {3: '氏名', 4: '見本 次郎'},
+        {13: '被保険者番号', 16: '0', 18: '0', 20: '0', 22: '0', 24: '0', 26: '0', 28: '7', 30: '7', 32: '7', 34: '7'},
+        {3: '生年月日', 4: '昭', 7: '20', 8: '年', 9: '1', 10: '月', 11: '2', 12: '日　'},
+        {2: '種目※', 3: '商品名', 9: '製造事業者名', 16: '購入金額', 25: '購入日'},
+        {2: '9', 3: '多点杖 見本E', 9: '見本工業', 16: '11000', 23: '円'},
+        {9: '購入金額合計', 16: '11000', 23: '円'},
+        {3: '福岡市　　　　区長', 7: '申請者　', 9: '住　所', 11: '福岡市中央区見本1-1'},
+      ],
+    ],
+  ]);
+  const f = read(fk, 'fk.xlsx');
+  assert.deepEqual([f.name, f.insuredNo, f.insurer, f.total, f.info.era, f.info.birthY, f.info.birthM, f.info.birthD], ['見本 次郎', '0000007777', 'fukuoka', 11000, '昭和', '20', '1', '2']);
+  assert.deepEqual(f.tokutei, [{category: '歩行補助つえ', name: '多点杖 見本E', code: '', maker: '見本工業', amount: 11000, taxIn: true}]);
+  // 住宅改修の申請書（委任状に「福祉用具購入費及び住宅改修費」とある）・ほかの表は特定福祉用具の申請書としない
+  assert.notEqual(readDoc(gridBook([['委任状', [{0: '委任状'}, {0: '（介護保険福祉用具購入費及び住宅改修費に係る受領委任払い用）'}, {0: '被保険者氏名', 5: '見本 花子'}]]]), 'x.xlsx', S)?.kind, 'tokutei');
+});

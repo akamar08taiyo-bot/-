@@ -177,10 +177,14 @@ export function flushTokutei(): Promise<void> {
   return Promise.race([saving.then(() => undefined, () => undefined), new Promise<void>((done) => setTimeout(done, 2000))]);
 }
 
-/** お客様の情報を特定福祉用具に渡す（localStorage に書く。書けなければ false＝特定福祉用具は一覧から） */
+/**
+ * お客様の情報を特定福祉用具に渡す（localStorage に書く。書けなければ false＝特定福祉用具は一覧から）。
+ * 取り込んだ特定福祉用具の申請書の福祉用具（job.tokuteiImport）も items で渡す。特定福祉用具は、案件に福祉用具がまだなく、同じ itemsKey をまだ入れていなければ入れる
+ */
 export function writeTokutei(job: Job): boolean {
   try {
-    localStorage.setItem(TOKUTEI_KEY, JSON.stringify({job: job.id, fields: tokuteiFields(job)}));
+    const imp = job.tokuteiImport;
+    localStorage.setItem(TOKUTEI_KEY, JSON.stringify({job: job.id, fields: tokuteiFields(job), ...(imp?.items.length ? {items: imp.items, itemsKey: imp.key} : {})}));
     return true;
   } catch {
     return false;

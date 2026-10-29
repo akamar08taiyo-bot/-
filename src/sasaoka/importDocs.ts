@@ -19,13 +19,13 @@ import {readShinseiPhotos} from './photoImport.ts';
 import type {FramePhotos} from './photoImport.ts';
 import {padInsuredNo, readShinseiBook} from './shinsei.ts';
 import type {ShinseiPlace} from './shinsei.ts';
-import type {ImportedDoc, Insurer, Job, Place, PlaceDims, RiyuInfo, Row, ShinseiInfo} from './types.ts';
+import type {ImportedDoc, Insurer, Job, Place, PlaceDims, RiyuInfo, Row, ShinseiInfo, TokuteiImportItem} from './types.ts';
 import {isoDate, todayIso, uid} from './util.ts';
 import {isXlsx, readXlsx} from './xlsx.ts';
 import type {Sheet} from './xlsx.ts';
 
 export type DocKind = ImportedDoc['kind'];
-export const DOC_LABEL: Record<DocKind, string> = {shinsei: '申請書', estimate: '見積書', riyu: '理由書'};
+export const DOC_LABEL: Record<DocKind, string> = {shinsei: '申請書', estimate: '見積書', riyu: '理由書', tokutei: '特定福祉用具申請書'};
 
 /** 読んだ書類1つ */
 export type ReadDoc = {
@@ -46,6 +46,7 @@ export type ReadDoc = {
   total: number | null; // 見積書の合計（税込）／申請書の改修費用
   tax: number | null; // 見積書の消費税（分かれば）
   photos: FramePhotos[]; // 申請書の写真貼付用紙・平面図の写真と書き込み（photoImport.ts。date は 'YYYY-MM-DD'）。様邸に入れるのは DocImport.tsx（写真は端末の中だけ）
+  tokutei: TokuteiImportItem[]; // 特定福祉用具の申請書の福祉用具（readTokutei。ほかの書類は空）
 };
 
 // ---------------------------------------------------------------- 文字・数
@@ -159,6 +160,7 @@ const base = (file: string, hash: string, kind: DocKind): ReadDoc => ({
   total: null,
   tax: null,
   photos: [],
+  tokutei: [],
 });
 
 /** 申請書の項目のうち、読んだもの（空でない文字の項目） */
@@ -444,8 +446,179 @@ export function readDoc(bytes: Uint8Array, file: string, s: EstimateSettings, mo
   } catch {
     return null;
   }
-  const doc = readEstimate(sheets, file, hash, s) ?? readOtherShinsei(sheets, file, hash);
+  const doc = readTokutei(sheets, file, hash) ?? readEstimate(sheets, file, hash, s) ?? readOtherShinsei(sheets, file, hash);
   if (doc && !doc.date) doc.date = fileDate;
+  return doc;
+}
+
+// ---------------------------------------------------------------- 特定福祉用具の申請書
+
+// 特定福祉用具（福祉用具購入費）の申請書（ユーザーの報告「申請書を読み込めないことがある」2026-10-29：行橋市の福祉用具購入の受領委任払の申請書が読めなかった）。
+// 6つの保険者の様式（特定福祉用具のアプリと同じ様式）とも、ラベルの近くの値を読む：お客様（氏名・フリガナ・被保険者番号・住所・郵便番号・電話番号・生年月日）と、
+// 福祉用具（種目・商品名・製造事業者・金額）。福祉用具は 🛁 特定福祉用具申請書のタブで、特定福祉用具の案件に入れる（tokuteiLink.ts）。
+// 住宅改修の売上見込み・受注残には入れない（特定福祉用具の案件の金額で入る）
+
+/** 特定福祉用具の種目（福岡市の申請書の種目の番号の順：１．腰掛便座 … ９．歩行補助つえ） */
+const TK_KINDS = ['腰掛便座', '自動排泄処理装置の交換可能部品', '入浴補助用具', '簡易浴槽', '移動用リフトのつり具の部分', '排泄予測支援機器', '固定用スロープ', '歩行器', '歩行補助つえ'];
+const tkKind = (v: string) => {
+  const t = compactName(v).replace(/^スロープ$/, '固定用スロープ');
+  return TK_KINDS.find((k) => t === k || t === compactName(k)) ?? '';
+};
+/** 特定福祉用具の申請書のシート（題名・文の言い回し。住宅改修の申請書の委任状の「福祉用具購入費及び住宅改修費」は除く） */
+const TK_SHEET = /福祉用具購入費?(の)?(支給)?(事前)?(承認)?申請|福祉用具購入費受領委任払い?の申請|福祉用具購入費の支給を申請|福祉用具購入の承認を申請|福祉用具名|特定福祉用具概要書/;
+/** ラベルらしい文字（値として読まない） */
+const LABELISH = /(番号|記載日|年月日|購入月|フリガナ|氏名|住所|電話|性別|区分|円|様|長|殿|申請|日)$|^[年月日]$|^[(（※]/;
+type At = {r: number; c: number};
+
+/** ラベルの欄（すき間を除いた文字で。「住」「所」のように1字ずつの欄に分かれたラベルも） */
+function findLabel(rows: Grid, test: RegExp): At | null {
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    for (let c = 0; c < row.length; c++) {
+      const v = compactName(cell(row, c));
+      if (!v) continue;
+      if (test.test(v)) return {r, c};
+      if (v.length !== 1) continue;
+      let joined = v;
+      for (let k = c + 1; k < row.length && joined.length < 6; k++) {
+        const w = compactName(cell(row, k));
+        if (!w) continue;
+        if (w.length !== 1) break;
+        joined += w;
+        if (test.test(joined)) return {r, c};
+      }
+    }
+  }
+  return null;
+}
+/** ラベルの近くの値：同じ行の右 → 上と下の行（近い順・ラベルの列から右）。北九州市の様式は値がラベルの上の行にある */
+function nearValue(rows: Grid, at: At | null, accept: (v: string) => boolean, span = 3): string {
+  if (!at) return '';
+  const row = rows[at.r] ?? [];
+  for (let c = at.c + 1; c < row.length; c++) if (cell(row, c) && accept(cell(row, c))) return cell(row, c);
+  for (let d = 1; d <= span; d++)
+    for (const r of [at.r - d, at.r + d]) {
+      const rr = rows[r];
+      if (!rr) continue;
+      for (let c = at.c; c < rr.length; c++) if (cell(rr, c) && accept(cell(rr, c))) return cell(rr, c);
+    }
+  return '';
+}
+const isNameLike = (v: string) => v.length <= 25 && !/[0-9０-９〒]/.test(v) && !COMPANY.test(v) && !LABELISH.test(compactName(v)) && !/.{2,}[都道府県市区町村郡].{2,}/.test(v);
+const isKana = (v: string) => /^[ァ-ヶーｦ-ﾟぁ-ゖ\s　・]+$/.test(v) && /[ァ-ヶｦ-ﾟぁ-ゖ]/.test(v);
+const isAddress = (v: string) => /[都道府県市区町村郡]/.test(v) && /[0-9０-９]|丁目|番地|大字/.test(v) && !COMPANY.test(v) && !/^〒/.test(v.trim());
+const isTel = (v: string) => /^[0-9０-９()（）\-－ー‐\s]{10,}$/.test(v.trim());
+
+/** ラベルの行の、ラベルの右の数字の欄（1字ずつのマスも）をつなぐ（被保険者番号） */
+function digitsRight(rows: Grid, at: At | null): string {
+  if (!at) return '';
+  const row = rows[at.r] ?? [];
+  let out = '';
+  for (let c = at.c + 1; c < row.length; c++) {
+    const v = cell(row, c).normalize('NFKC');
+    if (!v) continue;
+    if (!/^\d+$/.test(v)) {
+      if (out) break;
+      continue;
+    }
+    out += v;
+  }
+  return out;
+}
+
+/** 生年月日（「昭和15年3月15日生」）。元号が1つに決まらない（「明・大・昭」の丸は図形）ときは読まない */
+function birthOf(rows: Grid, at: At | null): Partial<ShinseiInfo> {
+  if (!at) return {};
+  const row = rows[at.r] ?? [];
+  const parts: string[] = [];
+  for (let c = at.c + 1; c < row.length; c++) {
+    const v = cell(row, c);
+    if (!v) continue;
+    if (/性別/.test(compactName(v))) break;
+    parts.push(v);
+  }
+  const t = parts.join('').normalize('NFKC').replace(/\s/g, '');
+  const m = /(\d{1,2})年(\d{1,2})月(\d{1,2})日/.exec(t);
+  if (!m) return {};
+  const full = (['明治', '大正', '昭和'] as const).filter((e) => t.includes(e));
+  const short = (['明', '大', '昭'] as const).filter((e) => t.includes(e));
+  const era = full.length === 1 ? full[0] : full.length === 0 && short.length === 1 ? ({明: '明治', 大: '大正', 昭: '昭和'} as const)[short[0]] : '';
+  return era ? {era, birthY: String(Number(m[1])), birthM: String(Number(m[2])), birthD: String(Number(m[3]))} : {};
+}
+
+/** 福祉用具の行：見出し（福祉用具名・商品名・品目 と 金額）の下の行。種目・商品名・品番・製造事業者・金額 */
+function tokuteiItems(rows: Grid, taxIn: boolean): TokuteiImportItem[] {
+  const head = rows.findIndex((r) => r.some((v) => /福祉用具名|^商品名$|品目/.test(compactName(v))) && (r.some((v) => /金額$/.test(compactName(v))) || /金額/.test(r.map(compactName).join(''))));
+  if (head < 0) return [];
+  const hr = rows[head];
+  const colOf = (test: RegExp) => hr.findIndex((v) => test.test(compactName(v)));
+  const nameCol = colOf(/福祉用具名|^商品名$|品目/);
+  let amountCol = colOf(/金額$/);
+  if (amountCol < 0) amountCol = hr.findIndex((v, c) => compactName(v) === '金' && hr.slice(c + 1).some((w) => compactName(w) === '額'));
+  let kindCol = colOf(/^種目※?$/);
+  if (kindCol < 0) kindCol = hr.findIndex((v, c) => compactName(v) === '種' && hr.slice(c + 1).some((w) => compactName(w) === '目'));
+  const makerCol = colOf(/製造事業者/);
+  const inRange = (r: string[], from: number, to: number) => r.slice(Math.max(0, from), Math.max(0, to)).map((v) => v.trim());
+  const out: TokuteiImportItem[] = [];
+  for (let i = head + 1; i < Math.min(rows.length, head + 16); i++) {
+    const r = rows[i];
+    const first = r.map((v) => compactName(v)).find(Boolean) ?? '';
+    if (/合計|理由|上記|^※|消費税/.test(first)) break;
+    const amounts = inRange(r, amountCol - 4, amountCol + 5)
+      .map(money)
+      .filter((n): n is number => n !== null && n > 0);
+    const text = inRange(r, nameCol - 3, nameCol + 3).find((v) => v && money(v) === null) ?? '';
+    if (!amounts.length || !text) continue;
+    let lines = text.split(/\r?\n/).map((v) => v.trim()).filter(Boolean);
+    let category = tkKind(lines[0] ?? '');
+    if (category) lines = lines.slice(1);
+    if (!category && kindCol >= 0) {
+      const k = inRange(r, kindCol - 4, kindCol + 2).find(Boolean) ?? '';
+      const no = Number(k.normalize('NFKC'));
+      category = no >= 1 && no <= 9 && /^\d$/.test(k.normalize('NFKC')) ? TK_KINDS[no - 1] : tkKind(k);
+    }
+    const code = lines.length > 1 && /^[A-Za-z0-9０-９Ａ-Ｚａ-ｚ\-‐－_/]+$/.test(lines[lines.length - 1]) ? lines.pop()! : '';
+    const maker = makerCol >= 0 ? (inRange(r, makerCol - 1, makerCol + 3).find((v) => v && money(v) === null) ?? '').split(/\r?\n/)[0].trim() : '';
+    out.push({category, name: lines.join(' '), code, maker: COMPANY.test(maker) ? '' : maker, amount: amounts[0], taxIn});
+  }
+  return out;
+}
+
+/** 申請書のあて先（「行橋市長　様」「福岡県介護保険広域連合長」など）から保険者 */
+function tokuteiInsurer(text: string): Insurer | '' {
+  // あて先で見分ける（福岡市の様式の注意書きに「福岡県又は福岡市・北九州市…の指定」とあるので、市の名前だけでは見分けない）
+  if (/北九州市長/.test(text)) return 'kitakyushu';
+  if (/福岡市.{0,4}区長|福岡市長/.test(text)) return 'fukuoka';
+  if (/広域連合/.test(text)) return 'kouiki';
+  if (/行橋市長/.test(text)) return 'yukuhashi';
+  if (/苅田町長/.test(text)) return 'kanda';
+  if (/みやこ町長/.test(text)) return 'miyako';
+  return '';
+}
+
+/** 特定福祉用具の申請書を読む（読めなければ null：特定福祉用具の申請書でない・お客様の名前がない） */
+function readTokutei(sheets: Sheet[], file: string, hash: string): ReadDoc | null {
+  const textOf = (sh: Sheet) => compactName(sh.rows.flat().join(''));
+  const main = sheets.find((sh) => TK_SHEET.test(textOf(sh)) && !/様式集|収録様式|説明用/.test(textOf(sh).slice(0, 80)) && isNameLike(nearValue(sh.rows, findLabel(sh.rows, /^(被保険者)?氏名$/), isNameLike)));
+  if (!main) return null;
+  const rows = main.rows;
+  const doc = base(file, hash, 'tokutei');
+  doc.name = cleanName(nearValue(rows, findLabel(rows, /^(被保険者)?氏名$/), isNameLike));
+  const addressAt = findLabel(rows, /^住所$/);
+  doc.address = nearValue(rows, addressAt, isAddress);
+  const zip = nearValue(rows, addressAt, (v) => /^〒?[\s　]*\d{3}-?\d{4}$/.test(v.normalize('NFKC').trim()), 1).normalize('NFKC').replace(/[^\d]/g, '');
+  const insured = digitsRight(rows, findLabel(rows, /^被保険者番号$/));
+  doc.insuredNo = /[1-9]/.test(insured) && insured.length <= 10 ? padInsuredNo(insured) : '';
+  doc.insurer = tokuteiInsurer(sheets.map(textOf).join(''));
+  const kana = nearValue(rows, findLabel(rows, /^フリガナ$|^ふりがな$/), isKana);
+  const phone = nearValue(rows, findLabel(rows, /^電話番号$/), isTel);
+  doc.info = filledInfo({kana: kana.normalize('NFKC').replace(/\s+/g, ' ').trim(), zip: zip.length === 7 ? `${zip.slice(0, 3)}-${zip.slice(3)}` : '', phone: phone.trim(), ...birthOf(rows, findLabel(rows, /^生年月日$/))});
+  // 福祉用具：申請書の表（消費税込みの金額）。北九州市は概要書（税抜の金額）
+  const gaiyo = sheets.find((sh) => sh !== main && /特定福祉用具概要書/.test(compactName(sh.rows.slice(0, 6).flat().join(''))));
+  const items = tokuteiItems(rows, true);
+  doc.tokutei = items.length ? items : gaiyo ? tokuteiItems(gaiyo.rows, false) : [];
+  const sum = doc.tokutei.reduce((n, it) => n + (it.taxIn ? it.amount : Math.floor(it.amount * 1.1)), 0);
+  doc.total = sum > 0 ? sum : null;
   return doc;
 }
 
@@ -568,7 +741,7 @@ export function applyImport(baseJob: Job | null, docs: ReadDoc[], name: string, 
   let overheadTarget = hadRows && before ? before.target.overhead : 0;
   let addedRows = false;
   let costs = 0;
-  const order: DocKind[] = ['estimate', 'shinsei', 'riyu'];
+  const order: DocKind[] = ['estimate', 'shinsei', 'riyu', 'tokutei'];
   const sorted = [...docs].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
   for (const d of sorted) {
     job = fill(job, {address: d.address, insuredNo: d.insuredNo, insurer: d.insurer || undefined, estDate: d.kind === 'estimate' ? d.date : undefined});
@@ -589,6 +762,8 @@ export function applyImport(baseJob: Job | null, docs: ReadDoc[], name: string, 
       }
       if (d.total) costs += d.total;
     }
+    // 特定福祉用具の申請書の福祉用具：🛁 特定福祉用具申請書のタブで特定福祉用具の案件に入れる（あとから取り込んだ申請書のもの）
+    if (d.kind === 'tokutei' && d.tokutei.length) job.tokuteiImport = {items: d.tokutei, key: d.hash};
     const {cost: _cost, ...info} = d.info;
     job.shinsei = fill({...NO_SHINSEI, ...job.shinsei}, info);
     if (d.riyu) {
@@ -610,7 +785,7 @@ export function applyImport(baseJob: Job | null, docs: ReadDoc[], name: string, 
   }
   if (costs > 0 && !hasEstimateRows(job)) job.shinsei = {...NO_SHINSEI, ...job.shinsei, cost: (job.shinsei?.cost ?? 0) + costs};
   if (!job.insurer) job.insurer = jobInsurer({insurer: '', form: '', address: job.address}) || '';
-  job.imported = [...(job.imported ?? []), ...sorted.map((d): ImportedDoc => ({kind: d.kind, file: d.file, hash: d.hash, total: d.kind === 'estimate' ? d.total : d.kind === 'shinsei' ? d.total : null, tax: d.kind === 'estimate' ? d.tax : null, rows: d.rows, at: now}))];
+  job.imported = [...(job.imported ?? []), ...sorted.map((d): ImportedDoc => ({kind: d.kind, file: d.file, hash: d.hash, total: d.kind === 'estimate' || d.kind === 'shinsei' || d.kind === 'tokutei' ? d.total : null, tax: d.kind === 'estimate' ? d.tax : null, rows: d.rows, at: now}))];
   job.updatedAt = now;
   return job;
 }

@@ -195,6 +195,8 @@ export type Job = {
   showSelfPay?: boolean;
   // 取り込んだ申請書・見積書・理由書の Excel（見積書の一覧の「📥 取り込む」。importDocs.ts）。同じファイルを2回取り込まないための目印と、読んだ金額。複製では引き継がない
   imported?: ImportedDoc[];
+  // 取り込んだ特定福祉用具の申請書の福祉用具（key は申請書のファイルの目印。特定福祉用具は、同じ key の福祉用具を2回入れない）。複製では引き継がない
+  tokuteiImport?: {items: TokuteiImportItem[]; key: string};
   createdAt: number;
   updatedAt: number;
 };
@@ -204,7 +206,12 @@ export type Job = {
  * 見積書：total・tax＝見積書の合計（税込）と消費税。rows＝明細を様邸の行にしたか（したなら売上は行から計算し、total は使わない）。
  * 申請書の改修費用は申請書の項目（shinsei.cost）に入れる。理由書は金額なし
  */
-export type ImportedDoc = {kind: 'shinsei' | 'estimate' | 'riyu'; file: string; hash: string; total: number | null; tax: number | null; rows: boolean; at: number};
+export type ImportedDoc = {kind: 'shinsei' | 'estimate' | 'riyu' | 'tokutei'; file: string; hash: string; total: number | null; tax: number | null; rows: boolean; at: number};
+/**
+ * 取り込んだ特定福祉用具の申請書の福祉用具（2026-10-29。importDocs.ts の readTokutei）。🛁 特定福祉用具申請書のタブを開いたとき、
+ * 特定福祉用具の案件に福祉用具がまだなければ入れてもらう（tokuteiLink.ts）。amount は申請書の金額（taxIn＝消費税込み。北九州市の概要書は税抜）
+ */
+export type TokuteiImportItem = {category: string; name: string; code: string; maker: string; amount: number; taxIn: boolean};
 
 /** 申請書で丸で囲む項目（申請書を作るときに選ぶ。空なら丸をつけない）。どの保険者の申請書にどの項目があるかは shinsei.ts の SHINSEI */
 export type ShinseiMarks = {
