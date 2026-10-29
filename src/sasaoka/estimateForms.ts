@@ -132,10 +132,26 @@ export function jobForm(job: Pick<Job, 'insurer' | 'form' | 'address'>, s: Pick<
   return job.form || formForAddress(job.address) || s.estimateForm;
 }
 
+/**
+ * 営業所のある市の保険者（北九州市・福岡市の営業所。設定の営業所の住所から）。ほかの営業所は null。
+ * 北九州市・福岡市の見積書は苅田町・行橋市・みやこ町と同じ書式なので、その営業所では書式の名前をその市の名前で出す
+ * （ユーザーの指示「北九州の事業所の場合は、デフォルトが北九州と広域の様式」2026-10-29。前は北九州の営業所でも「苅田町・行橋市・みやこ町用」と出ていた）
+ */
+export function officeInsurer(s: Partial<Pick<Settings, 'address'>>): Insurer | null {
+  const i = insurerForAddress(s.address ?? '');
+  return i === 'kitakyushu' || i === 'fukuoka' ? i : null;
+}
+
+/** 書式の名前（北九州市・福岡市の営業所では、苅田町・行橋市・みやこ町用の書式を「北九州市用」「福岡市用」と出す） */
+export function formLabel(form: EstimateForm, s: Partial<Pick<Settings, 'address'>>): string {
+  const o = officeInsurer(s);
+  return form === 'yukuhashi' && o ? `${INSURER_INFO[o].name}用` : FORM_INFO[form].name;
+}
+
 /** 一覧などに出す保険者の名前（分からなければ書式の名前） */
-export function insurerLabel(job: Pick<Job, 'insurer' | 'form' | 'address'>, s: Pick<Settings, 'estimateForm'>): string {
+export function insurerLabel(job: Pick<Job, 'insurer' | 'form' | 'address'>, s: Pick<Settings, 'estimateForm'> & Partial<Pick<Settings, 'address'>>): string {
   const i = jobInsurer(job);
-  return i ? INSURER_INFO[i].name : FORM_INFO[jobForm(job, s)].name;
+  return i ? INSURER_INFO[i].name : formLabel(jobForm(job, s), s);
 }
 
 /** ①〜⑳（21からは (21)） */

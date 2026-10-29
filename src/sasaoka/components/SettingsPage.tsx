@@ -3,7 +3,7 @@ import type {ReactNode} from 'react';
 import {DEFAULT_PLACES, DEFAULT_STAFF, OFFICES, settingsForOffice} from '../defaults.ts';
 import {hasSamples, withoutSamples} from '../samples.ts';
 import {backupJson, cleanList, masterJson, mergeById, parseBackup} from '../storage.ts';
-import {FORM_IDS, FORM_INFO} from '../estimateForms.ts';
+import {FORM_IDS, formLabel} from '../estimateForms.ts';
 import type {AppData, EstimateForm, InvoiceTaxMode, Rounding, Settings, TaxMode} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {downloadBlob, todayIso} from '../util.ts';
@@ -228,7 +228,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
           >
             {FORM_IDS.map((f) => (
               <option key={f} value={f}>
-                {FORM_INFO[f].name}
+                {formLabel(f, s)}
               </option>
             ))}
           </select>

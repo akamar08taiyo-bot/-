@@ -19,6 +19,9 @@ import {
   placeWork,
   reiwa,
   rowUnit,
+  FORM_IDS,
+  formLabel,
+  officeInsurer,
 } from '../../src/sasaoka/estimateForms.ts';
 import {isBlankRow} from '../../src/sasaoka/calc.ts';
 import {manualRow} from '../../src/sasaoka/rows.ts';
@@ -66,6 +69,18 @@ test('保険者：苅田町・行橋市・みやこ町は同じ書式（苅田�
   assert.equal(jobInsurer({insurer: '', form: 'yukuhashi', address: ''}), '');
   assert.equal(insurerLabel({insurer: 'kanda', form: 'yukuhashi', address: ''}, S), '苅田町');
   assert.equal(insurerLabel({insurer: '', form: 'yukuhashi', address: ''}, S), '苅田町・行橋市・みやこ町用'); // 分からなければ書式の名前
+});
+
+test('北九州市・福岡市の営業所：書式の名前はその市の名前（同じ書式）。ほかの営業所はそのまま（ユーザーの指示「北九州の事業所の場合は、デフォルトが北九州と広域の様式」2026-10-29）', () => {
+  const kokura = {address: '福岡県北九州市小倉北区見本町1-1'};
+  assert.equal(officeInsurer(kokura), 'kitakyushu');
+  assert.equal(officeInsurer({address: '福岡県福岡市東区見本1-1'}), 'fukuoka');
+  assert.equal(officeInsurer({address: '福岡県行橋市大字見本1'}), null);
+  assert.equal(officeInsurer({}), null);
+  assert.deepEqual(FORM_IDS.map((f) => formLabel(f, kokura)), ['北九州市用', '広域連合用']);
+  assert.deepEqual(FORM_IDS.map((f) => formLabel(f, {address: '福岡県行橋市大字見本1'})), ['苅田町・行橋市・みやこ町用', '広域連合用']);
+  assert.equal(insurerLabel({insurer: '', form: 'yukuhashi', address: ''}, {...S, ...kokura}), '北九州市用');
+  assert.equal(insurerLabel({insurer: 'kanda', form: 'yukuhashi', address: ''}, {...S, ...kokura}), '苅田町'); // 選んだ保険者はそのまま
 });
 
 test('広域連合用：施工費は 時間×2,500円、部材は メーカー 品番 品名・定価は算出根拠に', () => {

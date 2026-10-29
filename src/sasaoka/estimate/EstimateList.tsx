@@ -4,7 +4,7 @@ import {copyJob} from '../components/JobTools.tsx';
 import {askTrash, trashLabel, useTrashUndo} from '../components/TrashPage.tsx';
 import {tokuteiItemJobs, tokuteiNames} from '../tokuteiLink.ts';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
-import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm} from '../estimateForms.ts';
+import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm, officeInsurer} from '../estimateForms.ts';
 import {estimateXlsx, XLSX_TYPE} from '../estimateXlsx.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {DocImportDrop, useDocImport} from './DocImport.tsx';
@@ -126,7 +126,10 @@ export function EstimateHome({
             {/* 苅田町・行橋市・みやこ町は見積書が同じ書式。申請書は保険者ごとに違うので、保険者を分けて選ぶ */}
             <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
               <div className="grid gap-2 sm:grid-cols-3">
-                {INSURER_IDS.filter((i) => INSURER_INFO[i].form === 'yukuhashi').map((i) => (
+                {/* 北九州市・福岡市の営業所は、その市をいちばん初めに（ユーザーの指示「北九州の事業所の場合は、デフォルトが北九州と広域の様式」2026-10-29） */}
+                {INSURER_IDS.filter((i) => INSURER_INFO[i].form === 'yukuhashi')
+                  .sort((a, b) => Number(b === officeInsurer(data.settings)) - Number(a === officeInsurer(data.settings)))
+                  .map((i) => (
                   <Btn key={i} color="emerald" className="!px-4 !py-4 !text-base" onClick={() => onNew(i)}>
                     ＋ {INSURER_INFO[i].name}
                   </Btn>

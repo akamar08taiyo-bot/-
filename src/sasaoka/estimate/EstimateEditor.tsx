@@ -7,7 +7,7 @@ import {LaborPickerFor, missingShikiri, ShikiriPriceDialog} from '../components/
 import {KitPicker} from '../components/Kits.tsx';
 import {MaterialPicker} from '../components/Pickers.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
-import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerForAddress, jobForm, jobInsurer, NO_SHINSEI} from '../estimateForms.ts';
+import {FORM_INFO, formLabel, INSURER_IDS, INSURER_INFO, insurerForAddress, jobForm, jobInsurer, NO_SHINSEI} from '../estimateForms.ts';
 import {CARE_RED, careLines, showsCareLines} from '../careLines.ts';
 import {BurdenPicker} from './ShinseiEditor.tsx';
 import {estimateDateOf} from '../print/docMeta.ts';
@@ -272,7 +272,7 @@ export function EstimateEditor({
       <JobHeader
         onBack={onBack}
         tabs={tabs}
-        title={<JobTitle name={name} badge={insurer ? INSURER_INFO[insurer].name : FORM_INFO[form].name} />}
+        title={<JobTitle name={name} badge={insurer ? INSURER_INFO[insurer].name : formLabel(form, s)} />}
         primary={
           <>
             <Btn color="softGreen" onClick={() => saveEstimateExcel(job, s, toast)}>
