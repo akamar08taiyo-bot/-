@@ -97,6 +97,39 @@ assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - wind
 await page.screenshot({path: path.join(outDir, 'kitakyushu-5-phone.png')});
 log('スマホの幅 OK');
 
+// ---------------- 郵便番号を入れると、住所が空なら住所（大字も）が入る（ユーザーの指示「郵便番号を入力したら住所がでる、福岡県行橋市大字流松（流末）」2026-10-29）。
+//   Enter で住所の欄へ移って番地を打つと、入った住所のうしろに続く。郵便番号を打ち直すと、手を加えていない住所は新しい番号の住所に
+await page.getByRole('button', {name: /見積もり・申請書を作成する/}).first().click();
+await page.getByRole('region', {name: '新規作成'}).getByRole('button', {name: '＋ 北九州市', exact: true}).click();
+const form2 = page.getByRole('form', {name: '申請書'});
+await form2.waitFor();
+const zipBox = form2.getByLabel('郵便番号');
+const addrBox = form2.getByLabel('住所', {exact: true});
+await zipBox.click();
+await zipBox.pressSequentially('8240005');
+await page.waitForFunction(() => document.querySelector('[aria-label="住所"]')?.value === '福岡県行橋市中央', null, {timeout: 5000});
+await zipBox.fill('');
+await zipBox.pressSequentially('8240043'); // 打ち間違えて直した（住所はそのまま＝前の番号の住所）
+await page.waitForFunction(() => document.querySelector('[aria-label="住所"]')?.value === '福岡県行橋市大字流末', null, {timeout: 5000});
+await zipBox.press('Enter');
+assert.equal(await addrBox.evaluate((el) => el === document.activeElement), true);
+await page.keyboard.type('1-1');
+assert.equal(await addrBox.inputValue(), '福岡県行橋市大字流末1-1');
+// 番地まで入れたあとに郵便番号を替えても、住所は変えない
+await zipBox.fill('824-0005');
+await page.waitForTimeout(300);
+assert.equal(await addrBox.inputValue(), '福岡県行橋市大字流末1-1');
+await page.screenshot({path: path.join(outDir, 'kitakyushu-6-zip-address.png')});
+// 頭が入ったあとに、いつものように住所を頭から全部打っても、2回にならない
+await addrBox.fill('');
+await zipBox.fill('');
+await zipBox.pressSequentially('8000300');
+await page.waitForFunction(() => document.querySelector('[aria-label="住所"]')?.value === '福岡県京都郡苅田町', null, {timeout: 5000});
+await zipBox.press('Enter');
+await page.keyboard.type('福岡県京都郡苅田町富久町2-2');
+assert.equal(await addrBox.inputValue(), '福岡県京都郡苅田町富久町2-2');
+log('郵便番号 → 住所（福岡県行橋市大字流末）・Enter で住所の欄へ・番地はうしろに・打ち直し・頭から全部打っても2回にならない OK');
+
 console.log('\nERRORS:', errors.length ? errors : 'なし');
 await browser.close();
 if (errors.length) process.exit(1);
