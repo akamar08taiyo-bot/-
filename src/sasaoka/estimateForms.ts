@@ -28,13 +28,15 @@ export const KINDS = ['手すりの取り付け', '段差の解消', '床材の�
 const KIND_WORK = ['手すり取付', '段差解消', '床材変更', '扉取替', '便器取替', '付帯工事'];
 
 /** 保険者（申請書を出す先）。苅田町・行橋市・みやこ町は見積書の書式が同じ。申請書は保険者ごとに違う */
-export const INSURER_IDS: Insurer[] = ['kanda', 'yukuhashi', 'miyako', 'kouiki'];
+export const INSURER_IDS: Insurer[] = ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'fukuoka'];
 
 export const INSURER_INFO: Record<Insurer, {name: string; form: EstimateForm; area: string}> = {
   kanda: {name: '苅田町', form: 'yukuhashi', area: '苅田町'},
   yukuhashi: {name: '行橋市', form: 'yukuhashi', area: '行橋市'},
   miyako: {name: 'みやこ町', form: 'yukuhashi', area: 'みやこ町'},
   kouiki: {name: '広域連合', form: 'kouiki', area: '築上町・豊前市・上毛町・吉富町'}, // 福岡県介護保険広域連合
+  // 福岡市（2026-10-29。様式第21号・第22号の2。見積書は書式の決まりがない＝「見積書（工事費内訳書）」なので、苅田町・行橋市・みやこ町と同じ書式）
+  fukuoka: {name: '福岡市', form: 'yukuhashi', area: '福岡市'},
 };
 
 /** 申請書で丸で囲む項目の名前と、選べる値（申請書に並んでいる順） */
@@ -87,6 +89,7 @@ export function insurerForAddress(address: string): Insurer | null {
   if (/行橋市/.test(a)) return 'yukuhashi';
   if (/みやこ町/.test(a)) return 'miyako';
   if (/築上町|豊前市|上毛町|吉富町/.test(a)) return 'kouiki';
+  if (/福岡市/.test(a)) return 'fukuoka';
   return null;
 }
 

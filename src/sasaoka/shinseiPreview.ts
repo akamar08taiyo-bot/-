@@ -5,7 +5,7 @@
 // あわせて、押すと入れられる欄（フリガナ・生年月日…）と、押すと丸がつく値（男・女…）の位置も返す（式で同じ値を出している欄＝支給申請書の氏名なども押せる）
 
 import {strFromU8} from 'fflate';
-import {attrOf, colName, colNum, EMU, fillFiles, formulaRef, markOptions, markTexts, numOf, photoSheets, placeholders, rangeBox, sheetLayout, sheetPaths, styleParts, unesc} from './shinsei.ts';
+import {attrOf, colName, colNum, EMU, fillFiles, formulaRef, markOptions, markTexts, numOf, photoSlotEntries, placeholders, rangeBox, sheetLayout, sheetPaths, styleParts, unesc} from './shinsei.ts';
 import type {Files, SheetLayout, ShinseiMap, ShinseiSheet, ShinseiTexts, ShinseiValues, StyleParts} from './shinsei.ts';
 import type {ShinseiMarks} from './types.ts';
 
@@ -64,7 +64,7 @@ export type PvShape = Rect & {
   inset: {l: number; t: number; r: number; b: number}; // 文字のまわりの余白（画素）
 };
 /** 写真貼付用紙の写真の枠（改修前・改修後） */
-export type PvPhotoSlot = Rect & {slot: 'before' | 'after'};
+export type PvPhotoSlot = Rect & {slot: 'before' | 'after'; photo: number; memo: boolean}; // photo：写真番号（福岡市は1枚に2つ）。memo：写真に書く内容はメモの欄（枠には書かない）
 export type PvHeader = {left: PvRun[]; center: PvRun[]; right: PvRun[]};
 /** 押すと入れられる欄（field の入れる所を開く） */
 export type PvField = Rect & {field: ShinseiField; ref: string};
@@ -113,10 +113,16 @@ export function shinseiPreview(template: Files, map: ShinseiMap, v: ShinseiValue
     else add(sheet, 'form');
   }
   for (const sheet of map.sheets.filter((s) => s.legend)) add(sheet, 'plan');
-  const sheets = photoSheets(template, map);
+  // 写真貼付用紙：箇所のある写真番号の枠がある用紙を1枚ずつ（写真番号の順。福岡市は施工前・施工後の用紙が別で、1枚に写真番号が2つ）
+  const slots = photoSlotEntries(template, map).filter((x) => v.photos[x.photo] !== undefined);
+  const shown = new Set<string>();
   for (const n of Object.keys(v.photos).map(Number).sort((a, b) => a - b)) {
-    const sheet = sheets.get(n);
-    if (sheet) add(sheet, 'photo', n);
+    for (const {entry} of slots.filter((x) => x.photo === n)) {
+      if (shown.has(entry.sheet)) continue;
+      shown.add(entry.sheet);
+      const path = paths.get(entry.sheet);
+      if (path && files[path] && template[path]) pages.push(buildPage(files, path, template[path], entry, links, 'photo', n, undefined, slots.filter((x) => x.entry.sheet === entry.sheet)));
+    }
   }
   return pages;
 }
@@ -140,6 +146,21 @@ const TEXT_FIELD: Record<keyof ShinseiTexts, ShinseiField> = {
   cost: 'cost',
   address: 'address',
   benefit: 'burden', // 委任状の保険給付額を押すと負担割合へ
+  name: 'name',
+  ward: 'address', // 福岡市：あて先の区長・住所の区は住所から
+  street: 'address',
+  startY: 'dates',
+  startM: 'dates',
+  startD: 'dates',
+  endY: 'dates',
+  endM: 'dates',
+  endD: 'dates',
+  // 改修施工者（受任者）は設定の会社・営業所（申請書の一覧には入れる所がない）。押すと改修の内容の欄へ
+  builder: 'works',
+  builderZip: 'works',
+  builderAddress: 'works',
+  builderTel: 'works',
+  builderRep: 'works',
 };
 const MARK_FIELD: Record<keyof ShinseiMarks, ShinseiField> = {gender: 'gender', era: 'birth', care: 'care', renovated: 'renovated'};
 
@@ -153,9 +174,10 @@ function fieldRefs(sheet: ShinseiSheet): {field: ShinseiField; ref: string}[] {
   for (const k of sheet.kinds ?? []) out.push({field: 'works', ref: k.places}, {field: 'works', ref: k.works});
   for (const t of sheet.texts ?? []) {
     const key = placeholders(t.format)[0];
-    if (key) out.push({field: TEXT_FIELD[key], ref: t.cell});
+    // 改修施工者（受任者。福岡市）は設定の会社・営業所なので、押せる欄にしない
+    if (key && !key.startsWith('builder')) out.push({field: TEXT_FIELD[key], ref: t.cell});
   }
-  for (const m of sheet.marks ?? []) out.push({field: MARK_FIELD[m.key], ref: m.cell});
+  for (const m of sheet.marks ?? []) if ('key' in m) out.push({field: MARK_FIELD[m.key], ref: m.cell});
   for (const l of sheet.links ?? []) out.push({field: l.field as ShinseiField, ref: l.ref});
   // 写真の用紙の撮影日（苅田町・みやこ町）：一覧の「改修前日付・改修後日付」
   const dates = sheet.photoPlace?.dates;
@@ -610,7 +632,17 @@ function firstPage(xml: string, lay: SheetLayout): Range {
   return [1, 1, Math.max(1, c - 1), Math.max(1, r - 1)];
 }
 
-function buildPage(files: Files, path: string, templateSheet: Uint8Array, sheet: ShinseiSheet, links: Map<string, ShinseiField>, kind: PvPage['kind'], photo: number, pageRange?: Range): PvPage {
+function buildPage(
+  files: Files,
+  path: string,
+  templateSheet: Uint8Array,
+  sheet: ShinseiSheet,
+  links: Map<string, ShinseiField>,
+  kind: PvPage['kind'],
+  photo: number,
+  pageRange?: Range,
+  slots: {entry: ShinseiSheet; photo: number; slot: 'before' | 'after'}[] = [],
+): PvPage {
   const xml = strFromU8(files[path]);
   const xfs = xfsOf(files);
   const st = styleParts(files);
@@ -765,11 +797,11 @@ function buildPage(files: Files, path: string, templateSheet: Uint8Array, sheet:
 
   // 写真の枠（ページの位置）
   const photoSlots: PvPhotoSlot[] = [];
-  for (const slot of ['before', 'after'] as const) {
-    const ref = kind === 'photo' ? sheet.photoPlace?.[slot] : undefined;
+  for (const s of kind === 'photo' ? slots : []) {
+    const ref = s.entry.photoPlace?.[s.slot];
     if (!ref) continue;
     const b = rangeBox(lay, ref);
-    photoSlots.push({slot, x: b.x - ox, y: b.y - oy, w: b.w, h: b.h});
+    photoSlots.push({slot: s.slot, photo: s.photo, memo: !!s.entry.photoPlace?.memo, x: b.x - ox, y: b.y - oy, w: b.w, h: b.h});
   }
   // 平面図の図を入れる所（ページの位置）
   const pb = kind === 'plan' && sheet.plan ? rangeBox(lay, sheet.plan) : null;

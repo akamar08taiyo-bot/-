@@ -298,7 +298,7 @@ export type EstimateForm = 'yukuhashi' | 'kouiki';
  * 苅田町・行橋市・みやこ町は見積書が同じ書式（苅田町・行橋市・みやこ町用）、
  * kouiki ＝ 福岡県介護保険広域連合（築上町・豊前市・上毛町・吉富町）は広域連合用の書式
  */
-export type Insurer = 'kanda' | 'yukuhashi' | 'miyako' | 'kouiki';
+export type Insurer = 'kanda' | 'yukuhashi' | 'miyako' | 'kouiki' | 'fukuoka';
 
 export type Settings = {
   clientName: string; // 請求先（笹岡工務店）

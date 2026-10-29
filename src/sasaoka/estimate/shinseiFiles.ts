@@ -11,6 +11,7 @@ import {estimateDateOf} from '../print/docMeta.ts';
 import {fillShinseiFiles, SHINSEI, shinseiFileName, shinseiValues} from '../shinsei.ts';
 import type {Files, PhotoImage, PhotoImages} from '../shinsei.ts';
 import type {Insurer, Job, Settings} from '../types.ts';
+import fukuoka from '../shinsei/fukuoka.xltx?inline';
 import kanda from '../shinsei/kanda.xltx?inline';
 import kouiki from '../shinsei/kouiki.xltx?inline';
 import miyako from '../shinsei/miyako.xltx?inline';
@@ -20,7 +21,7 @@ import {RIYU_MAP, riyuFileName, riyuValues} from '../riyu.ts';
 
 /** 原本：保険者ごとの申請書と、住宅改修が必要な理由書（国の様式。どの保険者も同じ） */
 export type TemplateKey = Insurer | 'riyu';
-const TEMPLATES: Partial<Record<TemplateKey, string>> = {kanda, yukuhashi, miyako, kouiki, riyu};
+const TEMPLATES: Partial<Record<TemplateKey, string>> = {kanda, yukuhashi, miyako, kouiki, fukuoka, riyu};
 
 /** この保険者の申請書を作れるか（原本をいただいた保険者だけ） */
 export const canMakeShinsei = (insurer: Insurer | '') => !!insurer && !!TEMPLATES[insurer] && !!SHINSEI[insurer];

@@ -299,7 +299,7 @@ function PhotoSlotView({
   const edit: PhotoEdit = draft ?? photo?.edit ?? {rot: 0, scale: 1};
   // 改修前の枠だけ、書く内容があれば写真を左（横の写真は上）に寄せて空いた所に書く（Excel と同じ photoNoteLayout。改修後の写真は枠いっぱい）。
   // 回している間（draft）は回す前の向きで分けたまま（縦・横が変わるたびに写真のまん中が動くと回しにくい）。離すと分け直す
-  const lines = slot.slot === 'before' ? (photos.note?.(no) ?? []) : [];
+  const lines = slot.slot === 'before' && !slot.memo ? (photos.note?.(no) ?? []) : []; // メモの欄のある用紙（福岡市）は枠に書かない
   const parts = photoNoteLayout({x: 0, y: 0, w: slot.w, h: slot.h}, photo ? {w: photo.w, h: photo.h, rot: photo.edit?.rot ?? 0} : null, lines);
   const box = photo ? photoPlacement(parts.photo, photo.w, photo.h, edit) : null;
   const name = `写真貼付用紙${circled(no)}の${SLOT_NAME[slot.slot]}`;
@@ -580,7 +580,7 @@ function SlotMarks({marks, box}: {marks: PhotoMark[]; box: {x: number; y: number
 /** 印刷の画面の写真貼付用紙の写真（PhotoSlotView と同じ位置・向き・大きさ・書く内容。押せる所・つまみ・空いた枠の「＋ 改修前」は出さない） */
 function PhotoPrintView({slot, no, photos}: {slot: PvPhotoSlot; no: number; photos: PreviewPhotos}) {
   const photo = photos.of(no, slot.slot);
-  const lines = slot.slot === 'before' ? (photos.note?.(no) ?? []) : [];
+  const lines = slot.slot === 'before' && !slot.memo ? (photos.note?.(no) ?? []) : []; // メモの欄のある用紙（福岡市）は枠に書かない
   const parts = photoNoteLayout({x: 0, y: 0, w: slot.w, h: slot.h}, photo ? {w: photo.w, h: photo.h, rot: photo.edit?.rot ?? 0} : null, lines);
   const box = photo ? photoPlacement(parts.photo, photo.w, photo.h, photo.edit ?? {rot: 0, scale: 1}) : null;
   return (
@@ -937,16 +937,16 @@ export function ShinseiPages({
                 {/* 写真貼付用紙の写真の枠 */}
                 {photos &&
                   print &&
-                  page.photoSlots.map((slot) => <PhotoPrintView key={slot.slot} slot={slot} no={page.photo} photos={photos} />)}
+                  page.photoSlots.map((slot) => <PhotoPrintView key={`${slot.photo}:${slot.slot}`} slot={slot} no={slot.photo} photos={photos} />)}
                 {photos &&
                   !print &&
                   page.photoSlots.map((slot) => {
-                    const key = `${page.photo}:${slot.slot}`;
+                    const key = `${slot.photo}:${slot.slot}`;
                     return (
                       <PhotoSlotView
-                        key={slot.slot}
+                        key={key}
                         slot={slot}
-                        no={page.photo}
+                        no={slot.photo}
                         photos={photos}
                         selected={editing === key}
                         onSelect={(on) => setEditing((cur) => (on ? key : cur === key ? '' : cur))}

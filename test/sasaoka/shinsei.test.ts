@@ -5,7 +5,7 @@ import {strFromU8, unzipSync, zipSync} from 'fflate';
 import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import {DEFAULT_PLACES, defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
-import {boxLabels, checkBoxes, fillShinsei, fitLinesSize, insuredBoxes, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
+import {boxLabels, checkBoxes, fillShinsei, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
 import {shinseiPreview} from '../../src/sasaoka/shinseiPreview.ts';
 import type {Insurer, Job, PhotoMark, Place, Row, ShinseiInfo, ShinseiMarks} from '../../src/sasaoka/types.ts';
 
@@ -46,6 +46,7 @@ const KANDA = new Uint8Array(readFileSync(new URL('../../src/sasaoka/shinsei/kan
 const YUKUHASHI = new Uint8Array(readFileSync(new URL('../../src/sasaoka/shinsei/yukuhashi.xltx', import.meta.url)));
 const MIYAKO = new Uint8Array(readFileSync(new URL('../../src/sasaoka/shinsei/miyako.xltx', import.meta.url)));
 const KOUIKI = new Uint8Array(readFileSync(new URL('../../src/sasaoka/shinsei/kouiki.xltx', import.meta.url)));
+const FUKUOKA = new Uint8Array(readFileSync(new URL('../../src/sasaoka/shinsei/fukuoka.xltx', import.meta.url)));
 
 /** シート名 → そのシートの XML */
 function sheets(bytes: Uint8Array): {files: Record<string, Uint8Array>; byName: Map<string, string>} {
@@ -612,7 +613,7 @@ function ellipses(bytes: Uint8Array, sheet: string): {from: number[]; to: number
     .map(anchorOf);
 }
 const marksOf = (m: Partial<ShinseiMarks>): ShinseiMarks => ({gender: '', era: '', care: '', renovated: '', ...m});
-const TEMPLATES: Record<Insurer, Uint8Array> = {kanda: KANDA, yukuhashi: YUKUHASHI, miyako: MIYAKO, kouiki: KOUIKI};
+const TEMPLATES: Record<Insurer, Uint8Array> = {kanda: KANDA, yukuhashi: YUKUHASHI, miyako: MIYAKO, kouiki: KOUIKI, fukuoka: FUKUOKA};
 
 test('申請書の丸：選んだ性別・元号・要介護状態区分・改修状況を楕円で囲む（苅田町は事前申請書と事後申請書の両方）。選ばなければ囲まない', () => {
   assert.deepEqual(shinseiMarkKeys('kanda'), ['gender', 'era', 'care']);
@@ -636,8 +637,10 @@ test('申請書の丸：選んだ性別・元号・要介護状態区分・改�
   // 保険者・項目・値のどれでも：値の欄の行に1つ。左の値ほど左（申請書に並んでいる順）。元号のほかは、選ばなくても出る昭和の丸を数えない
   for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki'] as const) {
     for (const sheet of SHINSEI[insurer]!.sheets.filter((x) => x.marks)) {
+      if (sheet.marks!.some((m) => !('key' in m))) continue; // いつも同じものを囲む欄（福岡市）は別のテスト
       const base = new Set(ellipses(fillShinsei(TEMPLATES[insurer], SHINSEI[insurer]!, shinseiValues(job(), RATES)), sheet.sheet).map((e) => JSON.stringify(e)));
       for (const mark of sheet.marks!) {
+        if (!('key' in mark)) continue;
         const row = Number(/\d+$/.exec(mark.cell)![0]) - 1;
         let last = [-1, 0];
         for (const value of MARK_INFO[mark.key].options) {
@@ -853,11 +856,14 @@ test('写真貼付用紙：写真番号の用紙の改修前・改修後の枠�
     yukuhashi: ['住改・写真 ①:before:1', '住改・写真 ①:after:2', '住改・写真④ (3):before:3'],
     miyako: ['写真 (1):before:1', '写真 (1):after:2'],
     kouiki: ['写真貼付用紙:before:1', '写真貼付用紙:after:2', '写真貼付用紙 (5):before:3'],
+    // 福岡市：施工前と施工後は別の用紙・1枚に写真番号2つ（⑤は施工前の3枚目の上）
+    fukuoka: ['写真貼付台紙（事前）:before:1', '写真貼付台紙（完了）:after:2', '写真貼付台紙（事前） (3):before:3'],
   };
-  for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki'] as const) {
+  for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'fukuoka'] as const) {
     const files = unzipSync(fillShinsei(TEMPLATES[insurer], SHINSEI[insurer]!, {...shinseiValues(job({insurer}), RATES), photoImages}));
     const got: string[] = [];
-    for (const sheet of SHINSEI[insurer]!.sheets.filter((x) => x.photoPlace)) {
+    const entries = SHINSEI[insurer]!.sheets.filter((x) => x.photoPlace);
+    for (const sheet of entries.filter((x, i) => entries.findIndex((y) => y.sheet === x.sheet) === i)) {
       const path = drawingPath(files, sheet.sheet);
       if (!path) continue;
       const d = strFromU8(files[path]);
@@ -870,10 +876,13 @@ test('写真貼付用紙：写真番号の用紙の改修前・改修後の枠�
         const bytes = files[`xl/media/${target}`];
         // どちらの枠か：写真の左上・右下が枠の中
         const {from, to} = anchorOf(a);
-        const slot = (['before', 'after'] as const).find((k) => {
-          const [c1, r1, c2, r2] = cellsOf(sheet.photoPlace![k]!);
-          return from[0] >= c1 && from[2] >= r1 && to[0] <= c2 && to[2] <= r2;
-        });
+        const slot = (['before', 'after'] as const).find((k) =>
+          entries.some((e) => {
+            if (e.sheet !== sheet.sheet || !e.photoPlace![k]) return false;
+            const [c1, r1, c2, r2] = cellsOf(e.photoPlace![k]!);
+            return from[0] >= c1 && from[2] >= r1 && to[0] <= c2 && to[2] <= r2;
+          }),
+        );
         got.push(`${sheet.sheet}:${slot}:${bytes[4]}`);
         // 縦横の比はそのまま（1600×1200 → 4:3、900×1600、1200×1200）・比を変えない設定
         const [cx, cy] = /<a:ext cx="(\d+)" cy="(\d+)"\/>/.exec(a)!.slice(1).map(Number);
@@ -1212,4 +1221,84 @@ test('印刷：A4 から少しはみ出す原本のシート（広域連合の�
   const y = fillShinsei(YUKUHASHI, SHINSEI.yukuhashi!, shinseiValues(job({insurer: 'yukuhashi'}), RATES));
   assert.ok(fitted(y, '平面図  (2)'));
   assert.equal(fitted(y, '住改・受領委任払'), false); // 原本の倍率で入る
+});
+
+// ---------------------------------------------------------------- 福岡市（2026-10-29。様式第21号・第22号の2・写真貼付台紙。架空の見本 山田 太郎）
+const FUKUOKA_S = {...RATES, company: '太陽シルバーサービス株式会社', officeName: '福岡西営業所', manager: '見本 次郎', postal: '814-0000', address: '福岡県福岡市早良区見本1-1', tel: '092-000-0000'};
+const fukuokaJob = (extra: Partial<Job> = {}) =>
+  job({
+    insurer: 'fukuoka',
+    address: '福岡県福岡市早良区小田部1丁目2-3',
+    shinsei: {...NO_SHINSEI, kana: 'ヤマダ タロウ', birthY: '15', birthM: '3', birthD: '15', phone: '092-111-2222', owner: '山田 太郎', relation: '本人', start: '2026-11-02', end: '2026-11-05'},
+    ...extra,
+  });
+
+test('福岡市：保険者番号は区ごと（4013＋区の番号＋検証番号）。住所の区とそのうしろ', () => {
+  assert.equal(insurerCheckDigit('40647'), 0); // 広域連合の様式の 406470
+  assert.equal(insurerCheckDigit('40133'), 1); // 福岡市の記載例（中央区）401331
+  const nos = ['東区', '博多区', '中央区', '南区', '西区', '城南区', '早良区'].map((w) => fukuokaInsurerNo(`福岡市${w}見本1-1`));
+  assert.deepEqual(nos, ['401315', '401323', '401331', '401349', '401356', '401364', '401372']);
+  assert.equal(fukuokaInsurerNo('福岡県京都郡苅田町富久町1-1'), '');
+  assert.deepEqual(fukuokaWard('福岡県福岡市 城南区 七隈1-1'), {ward: '城南', street: '七隈1-1'});
+});
+
+test('福岡市：申請書（様式第21号）・完了届出書（第22号の2）に書く。改修の内容は種類ごとの行に箇所を並べ、書かない種類は「－」。丸は元号・在宅・受領委任払を利用する', () => {
+  const out = fillShinsei(FUKUOKA, SHINSEI.fukuoka!, shinseiValues(fukuokaJob(), FUKUOKA_S));
+  const {byName} = sheets(out);
+  const a = byName.get('様式第21号')!;
+  const at = (ref: string) => txt(a, ref);
+  assert.equal(at('E6'), 'ヤマダ タロウ');
+  assert.equal(at('E7'), '山田 太郎');
+  assert.equal(['P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y'].map((c) => cell(a, `${c}8`).match(/<v>(\d)<\/v>|<t[^>]*>(\d)<\/t>/)?.slice(1).find(Boolean) ?? '').join(''), '0000366989');
+  // 保険者番号：原本の 4013 のうしろに早良区の 72
+  assert.deepEqual(['X6', 'Y6'].map((r) => cell(a, r).match(/<v>(\d)<\/v>|<t[^>]*>(\d)<\/t>/)?.slice(1).find(Boolean)), ['7', '2']);
+  assert.deepEqual([at('H9'), at('J9'), at('L9')], ['15', '3', '15']);
+  // 手すりの取付け：浴室①・玄関⑤を1行に（「手すりの取り付け」は行の見出しなので書かない）。段差の解消：トイレ③。ほかは「－」
+  assert.match(at('G11'), /^①浴室/);
+  assert.match(at('G11'), /⑤玄関/);
+  assert.doesNotMatch(at('G11'), /手すりの取り付け/);
+  assert.match(at('G12'), /^③トイレ/);
+  assert.deepEqual([at('G13'), at('G14'), at('G15')], ['－', '－', '－']);
+  assert.equal(at('G16'), '山田 太郎');
+  assert.match(at('O16'), /本人との続柄　（　本人$/);
+  assert.match(at('G18'), /^[\d,]+円$/);
+  assert.equal(at('G19'), '太陽シルバーサービス株式会社　福岡西営業所');
+  assert.deepEqual([at('E25'), at('N25'), at('P25'), at('L26')], ['早良', '早良', '小田部1丁目2-3', '山田 太郎']);
+  assert.match(at('O27'), /092-111-2222/);
+  assert.doesNotMatch(at('Q17'), /\d/); // 着工予定日は原本のまま（書かない）
+  assert.equal(ellipses(out, '様式第21号').length, 3); // 元号（昭）・在宅・１．利用する
+  // 完了届出書：改修施工者（受任者）＝設定の会社・営業所、着工日・完成日（令和）、代表者は「○○営業所所長　氏名」。振込先は書かない
+  const b = byName.get('完了届出書（受領委任用)')!;
+  const bt = (ref: string) => txt(b, ref);
+  assert.equal(bt('F16'), '太陽シルバーサービス株式会社　福岡西営業所');
+  assert.deepEqual([bt('P16'), bt('V16'), bt('X16'), bt('P17'), bt('V17'), bt('X17')], ['令和　8', '11', '2', '令和　8', '11', '5']);
+  assert.deepEqual([bt('F27'), bt('F28'), bt('E29'), bt('P29')], ['814-0000', '福岡県福岡市早良区見本1-1', '太陽シルバーサービス株式会社　福岡西営業所', '福岡西営業所所長　見本 次郎']);
+  assert.match(bt('O28'), /092-000-0000/);
+  assert.equal(bt('E31'), '');
+  assert.equal(ellipses(out, '完了届出書（受領委任用)').length, 1); // 元号だけ
+  // 写真貼付台紙：浴室①は施工前の1枚目の上、玄関⑤は3枚目の上（「■玄関・道路までの通路」）、トイレ③は2枚目の上（「■便所」）
+  const p1 = byName.get('写真貼付台紙（事前）')!;
+  assert.equal(txt(p1, 'D3'), '山田 太郎');
+  assert.match(txt(p1, 'N6'), /■浴室/);
+  assert.match(txt(p1, 'D6'), /□玄関/);
+  assert.match(txt(byName.get('写真貼付台紙（事前） (3)')!, 'D6'), /■玄関・道路までの通路/);
+  assert.match(txt(byName.get('写真貼付台紙（事前） (2)')!, 'D7'), /■便所/);
+  assert.match(txt(byName.get('写真貼付台紙（完了）')!, 'N6'), /■浴室/);
+  // 一覧にない場所は「■その他（勝手口）」
+  const other = sheets(fillShinsei(FUKUOKA, SHINSEI.fukuoka!, shinseiValues(fukuokaJob({places: [place('勝手口', [mat('手すり')])]}), FUKUOKA_S))).byName.get('写真貼付台紙（事前）')!;
+  assert.match(txt(other, 'F7'), /^■その他（勝手口/);
+  // 読み戻せる（一覧の「📥 取り込む」）：保険者・氏名・住所（区から）・番号・箇所
+  const back = readShinsei(out)!;
+  assert.equal(back.insurer, 'fukuoka');
+  assert.equal(back.name, '山田 太郎');
+  assert.equal(back.address, '福岡市早良区小田部1丁目2-3');
+  assert.equal(back.insuredNo, '0000366989');
+  assert.deepEqual(
+    back.places.map((p) => [p.photo, p.name, p.kind]),
+    [
+      [1, '浴室', 1],
+      [5, '玄関', 1],
+      [3, 'トイレ', 2],
+    ],
+  );
 });
