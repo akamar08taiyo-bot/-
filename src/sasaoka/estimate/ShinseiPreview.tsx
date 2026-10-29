@@ -989,7 +989,8 @@ export function ShinseiPages({
                 {photos &&
                   !print &&
                   page.photoSlots.map((slot) => {
-                    const key = `${slot.photo}:${slot.slot}`;
+                    // 選ぶのは押した用紙の枠だけ（北九州市は同じ改修後の写真が内容報告書のイメージ図と完了報告書の2か所にある）
+                    const key = `${page.sheet}:${slot.photo}:${slot.slot}`;
                     return (
                       <PhotoSlotView
                         key={key}

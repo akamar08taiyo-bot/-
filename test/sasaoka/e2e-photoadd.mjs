@@ -81,8 +81,10 @@ const natural = (img) =>
   const shownOne = await pv.locator('div').first().boundingBox();
   // プレビューの写真を押す → 道具の「＋ 追加」
   await pv.click();
-  const tools = page.getByRole('toolbar', {name: '写真貼付用紙①の改修後の向き・大きさ'});
+  // 北九州市は改修後の写真が内容報告書（写真）の「改修後のイメージ図」にも出る。道具は押した完了報告書の枠だけに出る
+  const tools = done.getByRole('toolbar', {name: '写真貼付用紙①の改修後の向き・大きさ'});
   await tools.waitFor();
+  assert.equal(await page.getByRole('toolbar', {name: '写真貼付用紙①の改修後の向き・大きさ'}).count(), 1);
   await page.screenshot({path: path.join(outDir, 'photoadd-1-tools.png')});
   {
     const [ch] = await Promise.all([page.waitForEvent('filechooser'), tools.getByRole('button', {name: '＋ 追加'}).click()]);
@@ -188,7 +190,7 @@ const natural = (img) =>
   await pv.locator('img').waitFor();
   await pv.scrollIntoViewIfNeeded();
   await pv.click();
-  const add = page.getByRole('toolbar', {name: '写真貼付用紙①の改修後の向き・大きさ'}).getByRole('button', {name: '＋ 追加'});
+  const add = preview.getByRole('group', {name: '完了報告書（写真）', exact: true}).getByRole('toolbar', {name: '写真貼付用紙①の改修後の向き・大きさ'}).getByRole('button', {name: '＋ 追加'});
   await add.waitFor();
   await add.scrollIntoViewIfNeeded();
   const b = await add.boundingBox();
