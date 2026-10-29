@@ -6,7 +6,8 @@
 //   閉じると写真の欄・プレビュー・印刷の写真に重なり、読み直しても残り、Excel の写真貼付用紙には Excel の図形（直線矢印コネクタ・正方形/長方形・テキスト ボックス）で入る。
 //   写真を 90°回すと書き込みも一緒に回り、写真を差し替えると消える。スマホ（390px）・iPad でも描ける。
 //   2026-10-29：開いたときは直線・描いても道具はそのまま（続けて描く）・線の端に吸い付く（L字）・折れ線・手書きのペン（長押しでまっすぐ・ぐしゃぐしゃで消す）・
-//   補強板（茶色）・番号（①②）・選択。線は黄色・枠囲みは茶色が初め。リボンは大きく、まん中。
+//   番号（①②）・選択。線は黄色・枠囲みは茶色が初め。リボンは大きく、まん中。補強板の道具は外した（ユーザーの指示「茶色の斜線の…機能は不要」2026-10-29）。
+//   写真を回すのは上の帯の「左へ回す」「右へ回す」（ユーザーの指示「写真回転がわかりづらい」2026-10-29。前は書式の欄の ↺ ↻）。
 //   消しゴム（なぞった線・図形を消す。1回で戻せる）・上の「戻る」「進む」は文字付き（ユーザーの指示「消しゴム機能をつける。戻る、進むボタンはもう少しわかりやすく」2026-10-29）
 // usage: node e2e-photomark.mjs <サイトのURL> <出力フォルダ>
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
@@ -540,24 +541,24 @@ log('ペン（手書き・長押しでまっすぐ・ぐしゃぐしゃで消す
 }
 log('消しゴム（なぞった線を消す・戻る・進む）OK');
 
-// ---------------- 補強板（四角と斜めの線・茶色）・番号（①②）
-await ribbon.getByRole('button', {name: /^補強板/}).click();
+// ---------------- 四角形（枠囲み・茶色）・番号（①②）。補強板の道具はない（ユーザーの指示「茶色の斜線の…機能は不要」2026-10-29）
+assert.equal(await ribbon.getByRole('button', {name: /^補強板/}).count(), 0);
+await ribbon.getByRole('button', {name: '正方形/長方形'}).click();
 await dragOn([0.55, 0.55], [0.75, 0.7]);
-assert.equal((await kinds()).at(-1), 'board');
+assert.equal((await kinds()).at(-1), 'rect');
 assert.equal((await svgOf(5, 'rect')).stroke, '#996633');
-assert.equal((await svgOf(5, 'polyline')).points.trim().split(/\s+/).length, 2);
 await ribbon.getByRole('button', {name: /^番号/}).click();
 await clickOn(0.85, 0.15);
 await clickOn(0.85, 0.85);
 assert.deepEqual(await marks().evaluateAll((els) => els.slice(-2).map((e) => e.querySelector('[data-mark-text]')?.textContent)), ['①', '②']);
 await page.screenshot({path: path.join(outDir, 'mark-06-pen-board-num.png')});
-// 選択：押して選ぶ（補強板）
+// 選択：押して選ぶ（四角形の枠）
 await ribbon.getByRole('button', {name: '選択', exact: true}).click();
 await clickOn(0.55, 0.62);
 assert.deepEqual(await selected(), [(await ids())[5]]);
-log('補強板・番号・選択 OK');
+log('四角形・番号・選択（補強板の道具はない）OK');
 
-// ---------------- 書式の欄（写真の横にいつも出す）：選んだ補強板の線の色・太さ（ユーザーの指示「線の太さや色などは空いたスペースに常時表示する」）
+// ---------------- 書式の欄（写真の横にいつも出す）：選んだ四角形の線の色・太さ（ユーザーの指示「線の太さや色などは空いたスペースに常時表示する」）
 const panel = dlg.getByRole('complementary', {name: '書式'});
 {
   const [pb, sb] = [await panel.boundingBox(), await stage.boundingBox()];
@@ -576,7 +577,11 @@ log('書式の欄（線の色・太さ・線の種類）OK');
 // ---------------- 写真を回す（書き込みも一緒に回る）
 {
   const b0 = await stage.boundingBox();
-  await panel.getByRole('button', {name: '写真を右に回す'}).click();
+  // 回すボタンは上の帯（閉じるの右）。絵と「右へ回す」の文字
+  const turnR = dlg.getByRole('button', {name: '写真を右へ回す'});
+  assert.equal((await turnR.innerText()).replace(/\s+/g, ''), '右へ回す');
+  assert.equal(await panel.getByRole('button', {name: /回す/}).count(), 0);
+  await turnR.click();
   await page.waitForFunction((r) => {
     const el = document.querySelector('[role="dialog"] [data-photo-stage]');
     const b = el?.getBoundingClientRect();
@@ -584,7 +589,7 @@ log('書式の欄（線の色・太さ・線の種類）OK');
   }, b0.height / b0.width);
   assert.equal(await marks().count(), 8);
   await page.screenshot({path: path.join(outDir, 'mark-07-turned.png')});
-  await panel.getByRole('button', {name: '写真を左に回す'}).click();
+  await dlg.getByRole('button', {name: '写真を左へ回す'}).click();
   await page.waitForFunction((r) => {
     const el = document.querySelector('[role="dialog"] [data-photo-stage]');
     const b = el?.getBoundingClientRect();
@@ -722,7 +727,7 @@ for (const [name, vp, touch] of [
   if (name === 'phone') {
     const aside = d2.getByRole('complementary', {name: '書式'});
     assert.equal(await aside.evaluate((el) => el.scrollWidth <= el.clientWidth + 1), true, 'スマホの書式の欄が横にはみ出す');
-    for (const label of ['線の色を選ぶ', '線の太さを選ぶ', '写真を右に回す']) {
+    for (const label of ['線の色を選ぶ', '線の太さを選ぶ', '写真を左へ回す', '写真を右へ回す', '閉じる']) {
       const r = await d2.getByRole('button', {name: label, exact: true}).boundingBox();
       assert.ok(r && r.x >= 0 && r.x + r.width <= vp.width, `${label} ${JSON.stringify(r)}`);
     }
