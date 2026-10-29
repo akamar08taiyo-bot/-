@@ -130,6 +130,27 @@ await page.keyboard.type('福岡県京都郡苅田町富久町2-2');
 assert.equal(await addrBox.inputValue(), '福岡県京都郡苅田町富久町2-2');
 log('郵便番号 → 住所（福岡県行橋市大字流末）・Enter で住所の欄へ・番地はうしろに・打ち直し・頭から全部打っても2回にならない OK');
 
+// ---------------- 住所から郵便番号：1字ずつ打っても、町名まで打つとその番号（途中の「福岡県京都郡苅田町」で入った町の番号 800-0300 のままにしない）。
+// 郵便番号はハイフンなし・全角で打っても「800-0333」に（ユーザーの指示「郵便番号は、ハイフンなしでもありでも自動計算、住所から逆算して郵便番号を割り出すこともできる」2026-10-29）
+await addrBox.fill('');
+await zipBox.fill('');
+await addrBox.click();
+await addrBox.pressSequentially('福岡県京都郡苅田町');
+await page.waitForFunction(() => document.querySelector('[aria-label="郵便番号"]')?.value === '800-0300', null, {timeout: 5000});
+await addrBox.pressSequentially('大字黒添');
+await page.waitForFunction(() => document.querySelector('[aria-label="郵便番号"]')?.value === '800-0333', null, {timeout: 5000});
+await addrBox.pressSequentially('1-1');
+await page.waitForTimeout(300);
+assert.equal(await zipBox.inputValue(), '800-0333');
+await page.screenshot({path: path.join(outDir, 'kitakyushu-7-address-zip.png')});
+await addrBox.fill('');
+await zipBox.fill('');
+await zipBox.click();
+await zipBox.pressSequentially('８０００３３３');
+await page.waitForFunction(() => document.querySelector('[aria-label="郵便番号"]')?.value === '800-0333', null, {timeout: 5000});
+assert.equal(await addrBox.inputValue(), '福岡県京都郡苅田町大字黒添');
+log('住所を1字ずつ打っても町名までの郵便番号（800-0333）・全角でハイフンなしの郵便番号も「800-0333」に OK');
+
 console.log('\nERRORS:', errors.length ? errors : 'なし');
 await browser.close();
 if (errors.length) process.exit(1);

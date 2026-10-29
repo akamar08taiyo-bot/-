@@ -43,11 +43,16 @@ assert.equal(await zip.inputValue(), '');
 // 住所を直すと入れ直す
 await address.fill('行橋市中央1-1');
 await page.waitForFunction(() => document.querySelector('[aria-label="郵便番号"]')?.value === '824-0005', null, {timeout: 5000});
-// 郵便番号が入っていれば、住所を直しても変えない
+// 住所から入った郵便番号は、住所を別の町に直すと、その町の番号に（ユーザーの指示「住所から逆算して郵便番号を割り出す」2026-10-29。前は入っていれば変えなかった）
 await address.fill('苅田町大字新津2番地2');
+await page.waitForFunction(() => document.querySelector('[aria-label="郵便番号"]')?.value === '800-0344', null, {timeout: 5000});
+// 手で入れた郵便番号（住所の番号でない）は、住所を直しても変えない
+await zip.fill('824-0005');
+await page.waitForTimeout(300);
+await address.fill('苅田町大字新津3番地3');
 await page.waitForTimeout(800);
 assert.equal(await zip.inputValue(), '824-0005');
-log('消したらそのまま・住所を直すと入れ直す・入っていれば変えない OK');
+log('消したらそのまま・住所を直すと入れ直す・住所から入った番号は住所に合わせる・手で入れた番号は変えない OK');
 await page.waitForTimeout(1200); // 自動保存（0.4秒後）
 
 if (withTokutei) {

@@ -138,27 +138,36 @@ export function withZipAddress(prev: Job[], next: Job[]): Job[] {
       changed = true;
       return {...j, address: a};
     }
+    // 7けたを打ち終わったら「824-0043」の形に（ハイフンなし・全角で打っても。ユーザーの指示「郵便番号は、ハイフンなしでもありでも自動計算」2026-10-29）
+    const shown = zip.normalize('NFKC').replace(/\D/g, '').length === 7 ? zipLabel(zip) : zip;
+    const withZip = shown === zip ? j : {...j, shinsei: {...NO_SHINSEI, ...j.shinsei, zip: shown}};
+    if (withZip !== j) changed = true;
     const addr = addressOfZip(zip);
-    if (!addr || addr === j.address) return j;
-    if (j.address.trim() && !isZipHead(j.address)) return j;
+    if (!addr || addr === j.address) return withZip;
+    if (j.address.trim() && !isZipHead(j.address)) return withZip;
     changed = true;
-    return {...j, address: addr};
+    return {...withZip, address: addr};
   });
   return changed ? out : next;
 }
 
 /**
- * 様邸の住所が変わった（新しい様邸も）とき、申請書の郵便番号が空なら、住所から1つに決まる郵便番号を入れる。
- * 住所が変わらなければ何もしない（郵便番号を消したら、そのまま）。変わらなければ同じ配列を返す
+ * 様邸の住所が変わった（新しい様邸も）とき、住所から1つに決まる郵便番号を入れる：申請書の郵便番号が空のときと、
+ * 前の住所から入れたままのとき（前の住所の郵便番号と同じ）。住所を打っている途中の「福岡県京都郡苅田町」で町の番号（800-0300）が入り、
+ * 「大字黒添」まで打っても 800-0333 にならなかった（ユーザーの指示「住所から逆算して郵便番号を割り出すこともできる」2026-10-29）。
+ * 手で入れた郵便番号（前の住所の番号でない）は変えない。住所が変わらなければ何もしない（郵便番号を消したら、そのまま）。変わらなければ同じ配列を返す
  */
 export function withAddressZip(prev: Job[], next: Job[]): Job[] {
   if (next === prev) return next;
   const before = new Map(prev.map((j) => [j.id, j.address]));
   let changed = false;
   const out = next.map((j) => {
-    if (!j.address.trim() || before.get(j.id) === j.address || (j.shinsei?.zip ?? '').trim()) return j;
+    const was = before.get(j.id);
+    if (!j.address.trim() || was === j.address) return j;
+    const zip = zipLabel(j.shinsei?.zip ?? '');
+    if (zip && !(was && zipCandidates(was).some((h) => h.zip === zip))) return j;
     const hits = zipCandidates(j.address);
-    if (hits.length !== 1) return j;
+    if (hits.length !== 1 || hits[0].zip === zip) return j;
     changed = true;
     return {...j, shinsei: {...NO_SHINSEI, ...j.shinsei, zip: hits[0].zip}};
   });

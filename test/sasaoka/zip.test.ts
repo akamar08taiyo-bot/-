@@ -59,9 +59,33 @@ test('withZipAddress：郵便番号が変わって住所が空なら入れる・
   assert.equal(withZipAddress([job('f', '福岡県行橋市中央1-1', '824-0005')], [job('f', '福岡県行橋市中央1-1', '824-0043')])[0].address, '福岡県行橋市中央1-1');
   // 変わらなければ同じ配列
   assert.equal(withZipAddress(after, after), after);
-  // 住所から郵便番号（withAddressZip）とつないでも、入れた郵便番号は変わらない
+  // 住所から郵便番号（withAddressZip）とつないでも、入れた郵便番号は変わらない（7けたは「824-0043」の形に）
   const both = withAddressZip(before, withZipAddress(before, after));
-  assert.equal(both[0].shinsei?.zip, '8240043');
+  assert.equal(both[0].shinsei?.zip, '824-0043');
+});
+
+// ユーザーの指示「郵便番号は、ハイフンなしでもありでも自動計算、住所から逆算して郵便番号を割り出すこともできる」2026-10-29
+test('郵便番号はハイフンなし・あり・全角でも、7けたを打ち終わると「800-0333」の形にして住所を入れる', () => {
+  for (const typed of ['8000333', '800-0333', '８００－０３３３', '８０００３３３']) {
+    const [j] = withZipAddress([job('z', '', '')], [job('z', '', typed)]);
+    assert.deepEqual([j.shinsei?.zip, j.address], ['800-0333', '福岡県京都郡苅田町大字黒添'], typed);
+  }
+  // 打っている途中（7けたでない）はそのまま
+  assert.equal(withZipAddress([job('z', '', '')], [job('z', '', '800-03')])[0].shinsei?.zip, '800-03');
+});
+
+test('住所から郵便番号：打っている途中で町の番号（800-0300）が入っても、大字・町名まで打つとその番号に。手で入れた番号は変えない', () => {
+  // 「福岡県京都郡苅田町」まで打った（町の番号が入った）→「大字黒添」まで打った
+  const typing = withAddressZip([job('t', '福岡県京都郡苅田町', '800-0300')], [job('t', '福岡県京都郡苅田町大字黒添', '800-0300')]);
+  assert.equal(typing[0].shinsei?.zip, '800-0333');
+  // 番地を足しても同じ番号のまま
+  assert.equal(withAddressZip(typing, [job('t', '福岡県京都郡苅田町大字黒添1-1', '800-0333')])[0].shinsei?.zip, '800-0333');
+  // 手で入れた番号（前の住所の番号でない）は変えない
+  assert.equal(withAddressZip([job('m', '福岡県京都郡苅田町大字黒添', '824-0001')], [job('m', '福岡県京都郡苅田町大字黒添1-1', '824-0001')])[0].shinsei?.zip, '824-0001');
+  // 住所を別の町に打ち直した（前の住所の番号のまま）→ 新しい町の番号
+  assert.equal(withAddressZip([job('r', '苅田町黒添', '800-0333')], [job('r', '行橋市中央1-1', '800-0333')])[0].shinsei?.zip, '824-0005');
+  // 1つに決まらない住所は、入っている番号のまま
+  assert.equal(withAddressZip([job('n', '福岡県京都郡苅田町', '800-0300')], [job('n', '福岡県京都郡', '800-0300')])[0].shinsei?.zip, '800-0300');
 });
 
 test('郵便番号から入れた住所のうしろに、住所を頭から打ち直したら、入れた頭を外す（2回にしない）・番地を足したときはそのまま', () => {
