@@ -293,6 +293,12 @@ description: 太陽シルバーサービス行橋営業所の業務アプリ「�
   取り込みの「L=700mm×1100mm×2000mm」の × のつづきを「そのほか」にすると改修の内容が2段になる（`placeFromShinsei`・`storage.ts` の `lengthTail`）。
 - **画面の Ctrl+V で画像を読む（介護保険証・介護ソフトの画面）ときは、文字のある貼り付けを除く。** Excel のセルをコピーすると、文字と一緒に表の絵も入る（それを保険証として読んでしまう）。
   ただし文字がファイルの名前だけのとき（Mac でファイルをコピー）は読む。字を打つ欄・ほかの画面（確かめる画面など）が開いているときも読まない（`CardDrop`）。写真の枠を選んでいる（フォーカスがある）ときの Ctrl+V は写真の枠に貼る（`PhotoBoard.tsx`）。
+- **スキャンした PDF は、pdf.js の画像の部品（WebAssembly）がないと真っ白になる**（2026-10-29）。複合機・FAX の白黒のスキャンは CCITT・JBIG2 の圧縮で、
+  pdf.js は jbig2.wasm を取りに来る（JPEG 2000 は openjpeg.wasm）。同梱していなかったので、介護保険証の PDF が「字が読めませんでした」（ユーザーの報告）。`pdfText.ts` の `WASM_FILES` で
+  CMap と同じく中に入れて渡す（vite の `assetsInclude` に `**/*.wasm`）。pdf.js を上げたら、`test/sasaoka/fixtures/card-fax.pdf`（架空の保険証を G4 に。作り方は `make-fax-pdf.py`）を e2e-card で読む。
+  いただいた本物の PDF は、開発用のサーバー（`vite --config vite.jutaku.config.ts`）で `/src/sasaoka/cardRead.ts` などを直接呼んで、読み取りの途中を画面に出して調べた（値はどこにも書かない）。
+- **e2e の `getByRole('combobox', {name: '保険者'})` は `exact: true`**（2026-10-29）。申請書の一覧に「保険者番号」の欄ができ、名前の一部が同じで2つに当たった。
+- **Enter で次の欄へ進む順番（`data-nav`）に、1つしか選べない欄（disabled）を入れない**（2026-10-29）。押せない欄で止まり、被保険者番号のあとに進まなかった（保険者番号は住所から選ぶので Enter では飛ばす）。
 
 ## これからやること（ユーザーと約束したこと）
 
