@@ -472,6 +472,27 @@ assert.equal((await svgOf(4, 'polyline')).stroke, '#FFFF00');
 assert.equal(await pressed('選択'), 'true'); // 1つ描いたら「選択」に戻る
 assert.equal(await dlg.getByRole('button', {name: '✕ 四角をやめる'}).count(), 0);
 await page.screenshot({path: path.join(outDir, 'mark-04c-quad.png')});
+// 描いた四角（選んだまま）の中の、線のない所を押してドラッグ：そのまま動く（ユーザーの指示「この図形を、そのまま位置の変更をできるようにする」2026-10-29。
+// 前は細い線の上を押さないとつかめず、中を押すと選ぶのが外れた）。戻るで戻る
+{
+  const pts0 = (await svgOf(4, 'polyline')).points.trim().split(/\s+/).map((q) => q.split(',').map(Number));
+  const c = await at(0.25, 0.25); // 四角のまん中（線から離れた所）
+  await page.mouse.move(c.x, c.y);
+  await page.mouse.down();
+  await page.mouse.move(c.x + 40, c.y + 30, {steps: 6});
+  await page.mouse.up();
+  const pts1 = (await svgOf(4, 'polyline')).points.trim().split(/\s+/).map((q) => q.split(',').map(Number));
+  assert.equal(pts1.length, pts0.length);
+  pts0.forEach(([x, y], i) => assert.ok(Math.abs((pts1[i][0] - x) * k - 40) < 1.5 && Math.abs((pts1[i][1] - y) * k - 30) < 1.5, `動いた ${pts0[i]} → ${pts1[i]}`));
+  assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen', 'pen']); // 増えない
+  assert.equal((await selected()).length, 1); // 選んだまま
+  await page.screenshot({path: path.join(outDir, 'mark-04d-quad-moved.png')});
+  // 枠の外（何もない所）を押すと選ぶのが外れる
+  await clickOn(0.9, 0.9);
+  assert.equal((await selected()).length, 0);
+  await dlg.getByRole('button', {name: '戻る', exact: true}).click();
+  assert.deepEqual((await svgOf(4, 'polyline')).points.trim().split(/\s+/).map((q) => q.split(',').map(Number)), pts0);
+}
 // 3つ押して「✕ 四角をやめる」：描かない
 await ribbon.getByRole('button', {name: /^四角（角を4つ/}).click();
 for (const [fx, fy] of [

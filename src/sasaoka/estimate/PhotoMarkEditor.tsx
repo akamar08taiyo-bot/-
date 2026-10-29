@@ -260,6 +260,21 @@ function hitMark(m: PhotoMark, p: Pt, W: number, H: number, tol: number): 0 | 1 
   if (Math.abs(Math.abs(lx) - hw) <= edge || Math.abs(Math.abs(ly) - hh) <= edge) return 2;
   return solid ? 2 : 1;
 }
+/**
+ * 押した所が、選んでいる図形の枠（選んだときに出る四角。回した図形は回した四角）の中か。直線は線の上だけ（hitMark）。
+ * 手書きの線・折れ線・四角（角を4つ）は線が細く、線の上を押さないとつかめなかった（ユーザーの指示「この図形を、そのまま位置の変更をできるようにする」2026-10-29）
+ */
+function inSelBox(marks: PhotoMark[], sel: string[], p: Pt, W: number, H: number, tol: number): boolean {
+  const V = {x: 0, y: 0, w: W, h: H};
+  return marks.some((m) => {
+    if (!sel.includes(m.id)) return false;
+    if (m.kind === 'line') return hitMark(m, p, W, H, tol) === 2;
+    const b = shapeBox(m, V);
+    const c = center(b);
+    const q = rotP(p, c, -b.rot);
+    return Math.abs(q.x - c.x) <= b.w / 2 + tol && Math.abs(q.y - c.y) <= b.h / 2 + tol;
+  });
+}
 /** 押した所のいちばん前の図形（線・枠を先に。塗りのない図形の中は、ほかに当たらないときだけ） */
 function topHit(marks: PhotoMark[], p: Pt, W: number, H: number, tol: number): PhotoMark | null {
   let weak: PhotoMark | null = null;
@@ -1188,6 +1203,12 @@ export function PhotoMarkEditor({
       return;
     }
     const hit = topHit(marks, p, W, H, tolOf(e));
+    // 選んでいる図形の枠の中：線の上でなくても、つかんでそのまま動かす（ほかの図形の線・枠の上を押したときは、そちらを選ぶ。選んでいる図形の上は下の「動かす」と同じ）
+    const onOther = !!hit && !sel.includes(hit.id) && hitMark(hit, p, W, H, tolOf(e)) === 2;
+    if (sel.length && !onOther && !(hit && sel.includes(hit.id)) && inSelBox(marks, sel, p, W, H, tolOf(e))) {
+      drag.current = {type: 'move', p0: p, base: marks.filter((m) => sel.includes(m.id)), ids: sel, moved: false, copy: e.ctrlKey || e.metaKey, toggle: null};
+      return;
+    }
     if (!hit) {
       if (!e.shiftKey && !e.ctrlKey && !e.metaKey) setSel([]);
       drag.current = null;
