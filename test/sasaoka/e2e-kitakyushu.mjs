@@ -22,7 +22,11 @@ await ctx.route(/^https?:\/\/(?!localhost)/, (r) => r.abort());
 await ctx.addInitScript(() => localStorage.setItem('taiyo_portal_session', JSON.stringify({office: '行橋営業所'})));
 const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
-page.on('dialog', (d) => void d.accept());
+const dialogs = [];
+page.on('dialog', (d) => {
+  dialogs.push(d.message());
+  void d.accept();
+});
 await page.goto(`${site}/jutaku-mitsumori/index.html`);
 await page.getByRole('button', {name: /サンプルで試す/}).click();
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
@@ -156,6 +160,21 @@ assert.equal(new Set([...naiyoPics, ...kanryoPics].map(bytesOf)).size, 1, '改�
 assert.equal(sheets.size, 19); // 事前届出書2・支給申請書の表と裏・内容報告書10・完了報告書5（平面図はない）
 assert.ok(![...sheets.keys()].some((n) => /平面図/.test(n)));
 log('Excel（事前届出書・支給申請書・写真の報告書）OK');
+
+// ---------------- 写真の右上の × で削除（ユーザーの指示「一度貼り付けた写真をけせるように。小さくバツマーク右隅に」2026-10-29）。確かめてから。
+//   改修前をそのまま写した改修後（北九州市）は一緒に消えるので、そのことも聞く
+{
+  const del = board.getByRole('button', {name: '①玄関 改修前の写真を削除', exact: true});
+  const fb = await board.getByRole('button', {name: '①玄関 改修前', exact: true}).boundingBox();
+  const xb = await del.boundingBox();
+  assert.ok(xb.x + xb.width > fb.x + fb.width - 2 && xb.y < fb.y + 2, `× は右上の隅 ${JSON.stringify([fb, xb])}`);
+  await del.click();
+  assert.equal(dialogs.at(-1), 'この写真を削除しますか？（改修後の同じ写真も消えます）');
+  await board.getByRole('button', {name: '①玄関 改修後に書き込む', exact: true}).waitFor({state: 'detached'});
+  assert.equal(await board.getByRole('button', {name: '①玄関 改修前の写真を削除', exact: true}).count(), 0);
+  assert.equal(await board.getByRole('button', {name: '①玄関 改修後の写真を削除', exact: true}).count(), 0);
+}
+log('写真の右上の × で削除（確かめてから・改修後の同じ写真も）OK');
 
 // ---------------- スマホの幅でも横にはみ出さない
 await page.setViewportSize({width: 390, height: 844});

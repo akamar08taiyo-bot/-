@@ -28,7 +28,7 @@ import type {EstimateRates} from '../calc.ts';
 import {Btn, DropArea, DropOverlay, Modal, pastedFiles, useFileDragging, useToast} from '../components/ui.tsx';
 import {circled, photoNumbers, swapPhotoNumbers} from '../estimateForms.ts';
 import {cleanEdit, normRot, turn} from '../photoEdit.ts';
-import {pairJob} from '../photoPair.ts';
+import {afterMirrors, pairJob, pairsPhotos} from '../photoPair.ts';
 import {marksBetween, photoBounds, turnMarks} from '../photoMarks.ts';
 import {composeTiles, getPhotos, photoTakenDate, preparePhoto, putPhoto, rememberPhotoUrl, usePhotoUrls} from '../photos.ts';
 import {bestTiling, MAX_TILES} from '../photoTile.ts';
@@ -570,6 +570,14 @@ export function PhotoBoard({
     actions.remove(selected);
     setSelected(null);
   };
+  // 写真の右上の × ：その枠の写真を削除（確かめてから。ユーザーの指示「一度貼り付けた写真をけせるように。小さくバツマーク右隅に」2026-10-29）。
+  // 北九州市で改修後が改修前をそのまま写したものなら、改修後の同じ写真も一緒に消える（photoPair.ts）ので、そのことも聞く
+  const removeOne = (place: Place, key: PhotoKey) => {
+    const both = key.slot === 'before' && pairsPhotos(job) && afterMirrors(place);
+    if (!window.confirm(both ? 'この写真を削除しますか？（改修後の同じ写真も消えます）' : 'この写真を削除しますか？')) return;
+    actions.remove(key);
+    if (same(selected, key)) setSelected(null);
+  };
   useEffect(() => {
     if (!selected) return;
     const onKey = (e: KeyboardEvent) => {
@@ -883,7 +891,7 @@ export function PhotoBoard({
                                   type="button"
                                   data-no-drag
                                   onClick={() => actions.setEdit(key, turn(edit, 1), photo ?? undefined)}
-                                  className="absolute right-1 top-1 flex h-8 w-8 touch-manipulation items-center justify-center rounded-full bg-white/90 text-lg touch:h-10 touch:w-10 touch:text-xl leading-none text-slate-700 shadow ring-1 ring-slate-300 hover:bg-white hover:text-emerald-700"
+                                  className="absolute right-1 top-7 flex h-8 w-8 touch-manipulation items-center justify-center rounded-full bg-white/90 text-lg touch:h-10 touch:w-10 touch:text-xl leading-none text-slate-700 shadow ring-1 ring-slate-300 hover:bg-white hover:text-emerald-700"
                                   title="右に回す"
                                   aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}を右に回す`}
                                 >
@@ -896,11 +904,24 @@ export function PhotoBoard({
                                   type="button"
                                   data-no-drag
                                   onClick={() => onMark(key)}
-                                  className="absolute right-10 top-1 flex h-8 w-8 touch-manipulation items-center justify-center rounded-full bg-white/90 text-base touch:right-12 touch:h-10 touch:w-10 touch:text-lg leading-none text-slate-700 shadow ring-1 ring-slate-300 hover:bg-white hover:text-emerald-700"
+                                  className="absolute right-10 top-7 flex h-8 w-8 touch-manipulation items-center justify-center rounded-full bg-white/90 text-base touch:right-12 touch:h-10 touch:w-10 touch:text-lg leading-none text-slate-700 shadow ring-1 ring-slate-300 hover:bg-white hover:text-emerald-700"
                                   title="写真に書き込む"
                                   aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}に書き込む`}
                                 >
                                   ✏️
+                                </button>
+                              )}
+                              {/* 写真を消す：右上の隅の小さな ×（枠の角に重ねる。押すと確かめてから削除。removeOne）。↻・✏️ は × と左上の「改修前」に重ならないよう少し下（top-7） */}
+                              {id && (
+                                <button
+                                  type="button"
+                                  data-no-drag
+                                  onClick={() => removeOne(place, key)}
+                                  className="absolute -right-1.5 -top-1.5 z-[1] flex h-6 w-6 touch-manipulation items-center justify-center rounded-full bg-white text-sm leading-none text-slate-600 shadow ring-1 ring-slate-400 hover:bg-slate-100 hover:text-slate-900 touch:h-7 touch:w-7 touch:text-base"
+                                  title="写真を削除"
+                                  aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}の写真を削除`}
+                                >
+                                  ×
                                 </button>
                               )}
                             </div>
