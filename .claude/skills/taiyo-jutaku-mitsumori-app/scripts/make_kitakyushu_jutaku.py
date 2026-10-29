@@ -1,10 +1,11 @@
 # 北九州市の住宅改修の原本（アプリに入れる .xltx）を、市の Word の様式から作る（2026-10-29）：
 #   介護保険住宅改修事前届出書（1枚目＝提出用・2枚目＝通知用）・介護保険居宅介護（予防）住宅改修費支給申請書（受領委任払用。表・裏）・
-#   平面図（苅田町の原本の平面図と同じ形）・住宅改修内容報告書（写真）10枚（写真番号①〜⑩）・住宅改修完了報告書（写真）5枚（1枚に2つ＝①〜⑩）。
+#   住宅改修内容報告書（写真）10枚（写真番号①〜⑩）・住宅改修完了報告書（写真）5枚（1枚に2つ＝①〜⑩）。
+# 平面図は入れない（2026-10-29。市の要項で要らない＝改修後のイメージ図は内容報告書（写真）の下の欄。前の版は苅田町の原本の平面図を写していた）。
 # 工事費見積書は市の様式（①工事費見積書）がアプリの見積書（苅田町・行橋市・みやこ町用）と同じ表なので、見積書のタブで作る。
 # Word → PDF は LibreOffice（Word の「行数を指定」のグリッドを外すと Word と同じ所で改ページする。ＭＳ ゴシックは IPA ゴシックで描く）、
 # PDF → Excel は pdf_form_xlsx.py（線と文字の位置から同じ形のシートにする）。アプリが書く欄（fields）は、見出しの文字の位置から決める。
-# usage: python3 make_kitakyushu_jutaku.py <事前届出書.doc> <支給申請書.doc> <内容報告書.doc> <完了報告書.doc> <苅田町.xltx> <出力.xltx>
+# usage: python3 make_kitakyushu_jutaku.py <事前届出書.doc> <支給申請書.doc> <内容報告書.doc> <完了報告書.doc> <出力.xltx>
 import json
 import os
 import shutil
@@ -17,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import pdf_form_xlsx as conv  # noqa: E402
 
-todoke_doc, shikyu_doc, naiyo_doc, kanryo_doc, kanda_xltx, out = [os.path.abspath(p) for p in sys.argv[1:7]]
+todoke_doc, shikyu_doc, naiyo_doc, kanryo_doc, out = [os.path.abspath(p) for p in sys.argv[1:6]]
 work = tempfile.mkdtemp(prefix='kk-jutaku-')
 
 # ---------------------------------------------------------------- Word → PDF
@@ -75,11 +76,6 @@ todoke = word_pdf(todoke_doc, 'todoke')
 shikyu = word_pdf(shikyu_doc, 'shikyu')
 naiyo = word_pdf(naiyo_doc, 'naiyo')
 kanryo = word_pdf(kanryo_doc, 'kanryo')
-# 平面図は苅田町の原本（Excel）の平面図のシートを PDF にして写す
-kanda = os.path.join(work, 'kanda.xlsx')
-shutil.copy(kanda_xltx, kanda)
-soffice(['--convert-to', 'pdf', '--outdir', work, kanda], IPA)
-kanda_pdf = os.path.join(work, 'kanda.pdf')
 
 # ---------------------------------------------------------------- 欄の場所（見出しの文字から）
 
@@ -317,14 +313,6 @@ sheets.append(s3)
 # 裏：LibreOffice では委任状の枠の下に注意書きが重なるので、注意書きを枠の下に離す（Word の記入例と同じ）
 s4 = {'name': '支給申請書（裏）', 'pdf': shikyu, 'segs': [[1, None, 373], [1, 372.6, 440, 8]], **GOTHIC, 'bold': ['委　　任　　状']}
 sheets.append(s4)
-# 平面図：苅田町の原本と同じ（表題の左に氏名、下に工事内容のテキストボックス、あいだに平面図の図）
-pg7 = next(i for i in range(30) if '平面図' in ''.join(c['text'] for c in __import__('pdfplumber').open(kanda_pdf).pages[i].chars))
-s5 = {'name': '平面図', 'pdf': kanda_pdf, 'segs': [[pg7, None, None]], 'font': 'ＭＳ Ｐゴシック', 'fonts': {'IPAPGothic': 'ＭＳ Ｐゴシック'}, 'drop': [[40, 400, 60, 500]]}
-title = Page(s5).find('様邸')
-s5['fields'] = [F('name', [45, title['top'] - 3, title['x0'] - 2, title['bottom'] + 3], h='right', size=20, shrink=True),
-                # 図の枠は用紙の 6.5割ほど・下に工事内容（ユーザーの指示「平面図の入力欄が大きすぎるので、画面全体の6.5割程度におさえて、下に文字を入力できるようにする」2026-10-29）
-                F('plan', [45, 115, 549, 600], merge=False), F('legend', [45, 610, 549, 800], merge=False)]
-sheets.append(s5)
 for n in range(10):
     s = {'name': '内容報告書（写真）' + (f' ({n + 1})' if n else ''), 'pdf': naiyo, 'segs': [[0, None, None]], **MARU, 'bold': ['住宅改修内容報告書（写真）']}
     s['fields'] = photo_fields(Page(s), n, False)
@@ -385,7 +373,7 @@ def cells_of(sheet):
     return out
 
 
-SHEETS = {'todoke': '事前届出書', 'notice': '事前届出書（通知用）', 'shikyu': '支給申請書', 'plan': '平面図', 'naiyo': '内容報告書（写真）', 'kanryo': '完了報告書（写真）'}
+SHEETS = {'todoke': '事前届出書', 'notice': '事前届出書（通知用）', 'shikyu': '支給申請書', 'naiyo': '内容報告書（写真）', 'kanryo': '完了報告書（写真）'}
 cells_ts = os.environ.get('KK_CELLS_TS')
 if cells_ts:
     body = ',\n'.join(f'  {key}: {json.dumps(cells_of(name), ensure_ascii=False)}' for key, name in SHEETS.items())

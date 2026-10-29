@@ -1,6 +1,7 @@
 // 北九州市の住宅改修の申請書を確かめる（2026-10-29。ユーザーの指示「北九州市と福岡市の書式で、全く同じ形の連動型の申請書…」）：
 //   サンプルの様邸の工事場所を北九州市小倉北区にすると「保険者を北九州市にする」→ 申請書のタブは北九州市の様式（市の Word の様式から作った原本）。
-//   プレビューは 事前届出書（提出用・通知用）・支給申請書・平面図・内容報告書（写真。1枚に写真番号1つ）・完了報告書（写真。1枚に2つ）。
+//   プレビューは 事前届出書（提出用・通知用）・支給申請書・内容報告書（写真。1枚に写真番号1つ）・完了報告書（写真。1枚に2つ）。
+//   平面図は出さない（市の要項で要らない。改修後のイメージ図は内容報告書（写真）の下の欄。2026-10-29）。
 //   「📗 申請書をExcelで保存」で、氏名・郵便番号と電話番号（「－」の前後）・改修の種類と箇所の□→■・施工予定業者（設定の営業所）・支給申請書の着工日・完成日
 // usage: node e2e-kitakyushu.mjs <サイトのURL> <出力フォルダ>
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
@@ -36,13 +37,13 @@ await form.getByLabel('住所', {exact: true}).fill('福岡県北九州市小倉
 await page.getByRole('button', {name: '保険者を北九州市にする'}).click();
 const pageOf = (name) => preview.getByRole('group', {name, exact: true});
 await pageOf('事前届出書').waitFor();
-await pageOf('平面図').waitFor();
+await pageOf('内容報告書（写真）').waitFor();
 await page.waitForTimeout(800);
 const pageNames = () => preview.getByRole('group').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
 const names = await pageNames();
 // 写真番号①②（玄関・トイレ）：内容報告書は1枚に1つ（2枚）、完了報告書は1枚に2つ（1枚）。写真の用紙は写真番号の順（①の内容報告書・完了報告書、②の内容報告書）
 // 支給申請書の裏（代理人の委任状・注意書き）は書く欄がないのでプレビューには出さない（Excel には入る）
-assert.deepEqual(names, ['事前届出書', '事前届出書（通知用）', '支給申請書', '平面図', '内容報告書（写真）', '完了報告書（写真）', '内容報告書（写真） (2)']);
+assert.deepEqual(names, ['事前届出書', '事前届出書（通知用）', '支給申請書', '内容報告書（写真）', '完了報告書（写真）', '内容報告書（写真） (2)']);
 const rowLabels = async () => (await form.locator(':scope > div[data-field] > div:first-child').allInnerTexts()).map((t) => t.replace(/\s*（ひらがなで入力してもカタカナになります）$/, ''));
 assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '保険者番号', '郵便番号', '住所', '電話番号', '負担割合', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '工事費見積金額（介護保険対象分）', '着工日・完成日']);
 const pv = await preview.innerText();
@@ -87,7 +88,8 @@ assert.deepEqual([s.startY, s.startM, s.startD, s.endY, s.endM, s.endD].map((r) 
 assert.deepEqual([text('支給申請書', s.telA), text('支給申請書', s.telB)], ['093', '111-2222']);
 assert.equal(text('内容報告書（写真）', KK_CELLS.naiyo.place0), '玄関');
 assert.equal(text('完了報告書（写真）', KK_CELLS.kanryo.place1), 'トイレ');
-assert.equal(sheets.size, 20);
+assert.equal(sheets.size, 19); // 事前届出書2・支給申請書の表と裏・内容報告書10・完了報告書5（平面図はない）
+assert.ok(![...sheets.keys()].some((n) => /平面図/.test(n)));
 log('Excel（事前届出書・支給申請書・写真の報告書）OK');
 
 // ---------------- スマホの幅でも横にはみ出さない
