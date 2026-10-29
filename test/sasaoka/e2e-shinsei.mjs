@@ -550,11 +550,11 @@ log('写真（選ぶ・ドロップ・押して入れ替え・押して移す・
   assert.equal(await page.getByRole('status', {name: '介護保険証を読んでいます'}).count(), 0);
   const srcA = await planImg.getAttribute('src');
   await planPage.screenshot({path: path.join(outDir, '84d-plan-image.png')});
-  // 枠を押して選び（道具：差し替え・削除・完了）、Ctrl+V で差し替え（縦長の図 900×1600）。介護保険証の読み取り・写真の欄には入らない
+  // 枠を押して選び（道具：差し替え・✏️ 書き込み・削除・完了）、Ctrl+V で差し替え（縦長の図 900×1600）。介護保険証の読み取り・写真の欄には入らない
   await planSlot.click();
   assert.equal(await planSlot.getAttribute('aria-pressed'), 'true');
   const tools = preview.getByRole('toolbar', {name: '平面図の図'});
-  assert.deepEqual(await tools.getByRole('button').allInnerTexts(), ['差し替え', '削除', '完了']);
+  assert.deepEqual(await tools.getByRole('button').allInnerTexts(), ['差し替え', '✏️ 書き込み', '削除', '完了']);
   await planPage.screenshot({path: path.join(outDir, '84e-plan-selected.png')});
   const photoCount = (await photoIds()).length;
   await page.evaluate((b64) => {
@@ -804,9 +804,9 @@ const full = await sizeOf(pvPic);
 await photoBoard.getByRole('button', {name: '①玄関 改修前を右に回す'}).click();
 assert.equal(await rotOf(thumb('①', '玄関', '改修前')), 90);
 assert.equal(await rotOf(pvPic), 90);
-// 横長の写真を立てると、枠の高さに合わせて小さくなり（枠からはみ出さない）、縦の写真なので左に寄る（写真に書く内容は上から右へ）
+// 横長の写真を立てると、枠の高さに合わせて小さくなり（枠からはみ出さない）、縦の写真なのでまん中（写真に書く内容は上から右の空いた所へ。2026-10-29）
 const turned = await sizeOf(pvPic);
-assert.ok(turned.w < full.w && turned.x < full.x, '回して縦になった写真が左に寄っていない');
+assert.ok(turned.w < full.w && Math.abs(turned.x - full.x) < full.w * 0.05, `回して縦になった写真がまん中にない ${JSON.stringify([full, turned])}`);
 const [turnedImg, rightNote] = [await pvPhoto.locator('img').boundingBox(), await pvNote(p1, '写真貼付用紙①の改修前', 'L=600mm H=800mm').boundingBox()];
 assert.ok(rightNote.x >= turnedImg.x + turnedImg.width - 1, `回して縦になった写真の右に書いていない ${JSON.stringify([turnedImg, rightNote])}`);
 /** Excel の写真貼付用紙①の改修前の写真の向き・位置・大きさ（EMU） */

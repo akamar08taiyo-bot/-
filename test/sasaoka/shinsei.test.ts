@@ -1171,6 +1171,32 @@ test('平面図の図：表題と工事内容のあいだの範囲に、縦横�
   for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki'] as const) assert.equal(SHINSEI[insurer]!.sheets.filter((x) => x.plan).length, 1);
 });
 
+test('平面図の図への書き込み（Excel）：図のすぐ上に Excel の図形で（①②の番号・線。位置は図の見えている四角の中の割合のとおり。4つの保険者）', () => {
+  // ユーザーの指示「平面図に①②の番号・線などを書き込める」（2026-10-29）
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 9, 0xff, 0xd9]);
+  const base = {line: 'FF0000', width: 2.25, dash: 'solid', fill: '', size: 14, color: 'FF0000'} as const;
+  const marks: PhotoMark[] = [
+    {...base, id: 'n1', kind: 'ellipse', x1: 0.1, y1: 0.1, x2: 0.16, y2: 0.18, text: '①'},
+    {...base, id: 'l1', kind: 'line', x1: 0.2, y1: 0.5, x2: 0.7, y2: 0.5},
+  ];
+  for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki'] as const) {
+    const map = SHINSEI[insurer]!;
+    const sheet = map.sheets.find((x) => x.plan)!;
+    const files = unzipSync(fillShinsei(TEMPLATES[insurer], map, {...shinseiValues(job({insurer}), RATES), planImage: {bytes: jpeg, w: 1600, h: 1131, marks}}));
+    const anchors = anchorsOf(strFromU8(files[drawingPath(files, sheet.sheet)]));
+    assert.ok(anchors[0].includes('<xdr:pic>'), insurer); // 図はいちばんうしろのまま
+    assert.deepEqual(anchors.slice(1, 3).map((a) => /name="([^"]+?) \d+"/.exec(a)![1]), ['楕円', '直線コネクタ'], insurer); // 書き込みは図のすぐ上
+    assert.match(anchors[1], /<a:t>①<\/a:t>/);
+    const lay = sheetLayout(strFromU8(files[sheetPath(files, sheet.sheet)]));
+    const vb = planPlacement(rangeBox(lay, sheet.plan!), 1600, 1131);
+    const [ox, oy, cx] = /<a:off x="(-?\d+)" y="(-?\d+)"\/><a:ext cx="(\d+)" cy="(\d+)"\/>/.exec(anchors[2])!.slice(1).map((n) => Number(n) / 9525);
+    assert.ok(Math.abs(ox - (vb.x + 0.2 * vb.w)) < 0.5 && Math.abs(oy - (vb.y + 0.5 * vb.h)) < 0.5 && Math.abs(cx - 0.5 * vb.w) < 0.5, `${insurer} ${[ox, oy, cx]}`);
+    const ids = [...anchors.join('').matchAll(/<xdr:cNvPr\b[^>]*\sid="(\d+)"/g)].map((m) => m[1]);
+    assert.equal(new Set(ids).size, ids.length, insurer);
+    assert.ok(readShinsei(zipSync(files)), insurer);
+  }
+});
+
 /** 欄の字の大きさと太字（styles.xml の書式から） */
 const fontOf = (files: Record<string, Uint8Array>, xml: string, ref: string) => {
   const {fonts, xfs} = styleParts(files);

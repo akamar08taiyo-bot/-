@@ -510,6 +510,77 @@ log('写真を回す（書き込みも一緒に）OK');
 await dlg.getByRole('button', {name: '閉じる'}).click();
 assert.equal(await pvSlot.locator('[data-mark]').count(), 8);
 
+// ---------------- 平面図の図にも書き込める（ユーザーの指示「平面図に①②の番号・線などを書き込める」2026-10-29）：道具の「✏️ 書き込み」・プレビュー・印刷・Excel。図を差し替えると消える
+{
+  const planSlot = preview.locator('[data-plan-slot]');
+  await planSlot.scrollIntoViewIfNeeded();
+  const [pc] = await Promise.all([page.waitForEvent('filechooser'), planSlot.click()]);
+  await pc.setFiles([{name: 'plan.png', mimeType: 'image/png', buffer: await makePhoto(1600, 1131)}]);
+  await planSlot.locator('img').waitFor();
+  await planSlot.click();
+  await preview.getByRole('toolbar', {name: '平面図の図'}).getByRole('button', {name: '✏️ 書き込み'}).click();
+  const pd = page.getByRole('dialog', {name: '平面図の図に書き込む'});
+  await pd.waitFor();
+  const pst = pd.locator('[data-photo-stage]');
+  const pAt = async (fx, fy) => {
+    const b = await pst.boundingBox();
+    return {x: b.x + b.width * fx, y: b.y + b.height * fy};
+  };
+  const pr = pd.getByRole('toolbar', {name: '図形の書式'});
+  await pr.getByRole('button', {name: /^番号/}).click();
+  for (const [fx, fy] of [[0.2, 0.3], [0.6, 0.3]]) {
+    const q = await pAt(fx, fy);
+    await page.mouse.click(q.x, q.y);
+  }
+  await pr.getByRole('button', {name: '直線', exact: true}).click();
+  {
+    const [a, b] = [await pAt(0.2, 0.6), await pAt(0.7, 0.6)];
+    await page.mouse.move(a.x, a.y);
+    await page.mouse.down();
+    for (let i = 1; i <= 8; i++) await page.mouse.move(a.x + ((b.x - a.x) * i) / 8, a.y);
+    await page.mouse.up();
+  }
+  assert.equal(await pd.locator('[data-photo-stage] [data-mark]').count(), 3);
+  await page.screenshot({path: path.join(outDir, 'mark-08-plan-editor.png')});
+  await pd.getByRole('button', {name: '閉じる'}).click();
+  await pd.waitFor({state: 'detached'});
+  assert.equal(await planSlot.locator('[data-mark]').count(), 3, 'プレビューの平面図に書き込みが重なる');
+  assert.deepEqual(await planSlot.locator('[data-mark-text]').allTextContents(), ['①', '②']);
+  await planSlot.screenshot({path: path.join(outDir, 'mark-09-plan-preview.png')});
+  // ダブルクリックでも開く
+  await planSlot.dblclick();
+  await pd.waitFor();
+  await pd.getByRole('button', {name: '閉じる'}).click();
+  // Excel：平面図の図のすぐ上に Excel の図形で
+  const [pdl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📗 申請書をExcelで保存'}).click()]);
+  const pfile = path.join(outDir, 'plan-' + pdl.suggestedFilename());
+  await pdl.saveAs(pfile);
+  const pf = unzipSync(new Uint8Array(await readFile(pfile)));
+  const planDrawing = Object.keys(pf).filter((k) => /^xl\/drawings\/drawing\d+\.xml$/.test(k)).map((k) => strFromU8(pf[k])).find((x) => /name="平面図 \d+"/.test(x));
+  assert.ok(planDrawing, 'Excel に平面図の図');
+  const pa = [...planDrawing.matchAll(/<xdr:twoCellAnchor\b[\s\S]*?<\/xdr:twoCellAnchor>/g)].map((x) => x[0]);
+  const at0 = pa.findIndex((a) => /name="平面図 \d+"/.test(a));
+  const over = pa.slice(at0 + 1, at0 + 4);
+  assert.equal(over.filter((a) => /<a:t>①<\/a:t>/.test(a)).length, 1, 'Excel の平面図に①');
+  assert.equal(over.filter((a) => /<a:t>②<\/a:t>/.test(a)).length, 1, 'Excel の平面図に②');
+  assert.equal(over.filter((a) => /name="直線コネクタ \d+"/.test(a)).length, 1, 'Excel の平面図に直線');
+  // 印刷：平面図にも重なる
+  await page.getByRole('button', {name: '🖨 申請書を印刷', exact: true}).click();
+  const pp = page.locator('.print-overlay .shinsei-sheet').filter({has: page.locator('[data-marks="3"]')});
+  const allBoxes = page.getByRole('group', {name: '印刷するページ'}).getByRole('checkbox');
+  for (let i = 0; i < (await allBoxes.count()); i++) await allBoxes.nth(i).check();
+  await pp.first().waitFor();
+  assert.ok((await pp.count()) >= 1, '印刷の平面図に書き込み');
+  await page.keyboard.press('Escape');
+  await page.locator('.print-overlay').waitFor({state: 'detached'});
+  // 図を差し替えると書き込みは消える（写真と同じ）
+  await planSlot.click();
+  const [pc2] = await Promise.all([page.waitForEvent('filechooser'), preview.getByRole('toolbar', {name: '平面図の図'}).getByRole('button', {name: '差し替え'}).click()]);
+  await pc2.setFiles([{name: 'plan2.png', mimeType: 'image/png', buffer: await makePhoto(1131, 1600)}]);
+  await page.waitForFunction(() => document.querySelectorAll('[data-plan-slot] [data-mark]').length === 0);
+}
+log('平面図の図に書き込む（道具・ダブルクリック・プレビュー・Excel・印刷・差し替えで消える）OK');
+
 // ---------------- スマホ（390px）・iPad：リボンは横に動かせて、写真は画面の幅いっぱい
 for (const [name, vp, touch] of [
   ['phone', {width: 390, height: 844}, true],

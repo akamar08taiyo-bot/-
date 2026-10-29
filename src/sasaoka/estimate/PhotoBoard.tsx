@@ -237,15 +237,17 @@ export function usePlanActions(setJob: (fn: (j: Job) => Job) => void) {
       const {blob, w, h} = await preparePhoto(src);
       const id = await putPhoto({blob, w, h});
       rememberPhotoUrl(id, blob, w, h);
-      setJob((j) => ({...j, planPhoto: id}));
+      setJob(({planMarks: _marks, ...j}) => ({...j, planPhoto: id})); // 差し替えたら前の図への書き込みは消す（写真と同じ）
     } catch {
       toast(`「${file.name}」を読めませんでした`, 'error');
     } finally {
       setBusy(false);
     }
   };
-  const remove = () => setJob(({planPhoto: _old, ...j}) => j);
-  return {put, remove, busy};
+  const remove = () => setJob(({planPhoto: _old, planMarks: _marks, ...j}) => j);
+  // 図への書き込み（PhotoMarkEditor.tsx）。書き込みがなくなったら持たない
+  const setMarks = (marks: PhotoMark[]) => setJob(({planMarks: _old, ...j}) => (marks.length ? {...j, planMarks: marks} : j));
+  return {put, remove, setMarks, busy};
 }
 
 /** ドラッグしているものが写真のファイルか */

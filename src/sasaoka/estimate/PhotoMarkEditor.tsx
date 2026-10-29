@@ -404,6 +404,7 @@ export function PhotoMarkEditor({
   onChange,
   onClose,
   onRotate,
+  what = '写真',
 }: {
   title: string;
   photo: {url: string; w: number; h: number; rot: number};
@@ -412,6 +413,7 @@ export function PhotoMarkEditor({
   onChange: (marks: PhotoMark[]) => void;
   onClose: () => void;
   onRotate?: (dir: 1 | -1) => void; // 写真を 90°回す（書き込みも一緒に回して、marks・photo.rot・size を渡し直してもらう）
+  what?: string; // 何に書き込むか（画面の名前「…の写真に書き込む」。平面図は「図」）
 }) {
   const W = Math.max(1, size.w);
   const H = Math.max(1, size.h);
@@ -1622,7 +1624,7 @@ export function PhotoMarkEditor({
   const textCss: CSSProperties | undefined = editMark ? markTextCss(editMark, k) : undefined;
 
   return (
-    <div role="dialog" aria-modal="true" aria-label={`${title}の写真に書き込む`} className="fixed inset-0 z-[60] flex flex-col bg-slate-100 text-slate-800">
+    <div role="dialog" aria-modal="true" aria-label={`${title}の${what}に書き込む`} className="fixed inset-0 z-[60] flex flex-col bg-slate-100 text-slate-800">
       {/* 上の帯：元に戻す・やり直し（Excel のクイック アクセス ツール バー）・題名・閉じる（まん中。ユーザーの指示「閉じるボタンは中央にもってくる」2026-10-29） */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-slate-200 bg-white px-2 py-1">
         <div className="flex min-w-0 items-center gap-1">

@@ -208,6 +208,20 @@ test('平面図の図（Job.planPhoto。写真と同じ番号）：読み直し�
   assert.deepEqual(cleanJobs(structuredClone([a])), [a]);
 });
 
+test('平面図の図への書き込み（Job.planMarks）：図があれば読み直しても残る。図がない・書き込みが空なら持たない', () => {
+  const mark = {id: 'm1', kind: 'ellipse', x1: 0.1, y1: 0.1, x2: 0.2, y2: 0.2, line: 'FF0000', width: 2.25, dash: 'solid', fill: '', text: '①', size: 14, color: 'FF0000'};
+  const [a, b, c] = cleanJobs([
+    {id: 'j1', customer: '見本', planPhoto: 'ph-plan', planMarks: [mark]},
+    {id: 'j2', customer: '見本', planMarks: [mark]},
+    {id: 'j3', customer: '見本', planPhoto: 'ph-plan', planMarks: []},
+  ]);
+  assert.equal(a.planMarks?.length, 1);
+  assert.equal(a.planMarks?.[0].text, '①');
+  assert.equal('planMarks' in b, false);
+  assert.equal('planMarks' in c, false);
+  assert.deepEqual(cleanJobs(structuredClone([a])), [a]);
+});
+
 test('月のない様邸はこの端末の日付の月（日本の1日の朝9時前も、その月）。保険者番号は全角の数字も読む', (t) => {
   const tz = process.env.TZ;
   process.env.TZ = 'Asia/Tokyo';

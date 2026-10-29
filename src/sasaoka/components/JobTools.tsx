@@ -14,7 +14,7 @@ export function copyJob(job: Job): Job {
   const now = Date.now();
   // 複製はゴミ箱に入れない（ゴミ箱の様邸は複製できないが、念のため）。平面図の図もそのお宅のもの（写真と同じ）なので、複製には入れない
   // 売上見込みの月も、複製した見積書は請求する月から。取り込んだ書類の金額は元の様邸のもの（複製に入れると売上見込み・受注残に2回入る）
-  const {trashedAt: _trashedAt, planPhoto: _plan, salesMonth: _salesMonth, uriage: _uriage, imported: _imported, tokuteiImport: _tokutei, ...rest} = job;
+  const {trashedAt: _trashedAt, planPhoto: _plan, planMarks: _planMarks, salesMonth: _salesMonth, uriage: _uriage, imported: _imported, tokuteiImport: _tokutei, ...rest} = job;
   return {
     ...rest,
     id: uid('j'),

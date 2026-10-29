@@ -112,7 +112,7 @@ async function planImageOf(job: Job): Promise<{image?: PhotoImage; missing: bool
   if (!found || !photo) return {missing: !!found, unreadable: !found};
   try {
     const blob = await brightPhoto(id, photo.blob);
-    return {image: {bytes: new Uint8Array(await blob.arrayBuffer()), w: photo.w, h: photo.h}, missing: false, unreadable: false};
+    return {image: {bytes: new Uint8Array(await blob.arrayBuffer()), w: photo.w, h: photo.h, ...(job.planMarks?.length ? {marks: job.planMarks} : {})}, missing: false, unreadable: false};
   } catch {
     return {missing: false, unreadable: true};
   }

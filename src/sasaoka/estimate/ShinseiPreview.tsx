@@ -526,11 +526,11 @@ function PhotoSlotView({
                   </span>
                 </div>
               </div>
-              {/* 道具（紙を縮めていても同じ大きさ）。写真にかぶらないように枠のすぐ下 */}
+              {/* 道具（紙を縮めていても同じ大きさ）。写真にかぶらないように枠のすぐ下。スマホの幅では2段に折り返す（画面から出さない） */}
               <div
                 role="toolbar"
                 aria-label={`${name}の向き・大きさ`}
-                className="absolute left-1/2 top-full flex w-max gap-1 whitespace-nowrap rounded-lg bg-white/95 p-1 shadow-lg ring-1 ring-slate-300"
+                className="absolute left-1/2 top-full flex w-max max-w-[calc(100vw-1.5rem)] flex-wrap justify-center gap-1 whitespace-nowrap rounded-lg bg-white/95 p-1 shadow-lg ring-1 ring-slate-300"
                 style={{transform: `translate(-50%, ${6 * z}px) scale(${z})`, transformOrigin: 'top center'}}
               >
                 <button type="button" className={tool} title="左に回す" aria-label="左に回す" onClick={() => photos.onEdit(no, slot.slot, turn(edit, -1))}>
@@ -625,11 +625,12 @@ function PhotoPrintView({slot, no, photos}: {slot: PvPhotoSlot; no: number; phot
 }
 
 /** 印刷の画面の平面図の図（PlanSlotView と同じ位置・大きさ。枠・道具は出さない） */
-function PlanPrintView({slot, scale, left, top, image}: {slot: Rect; scale: number; left: number; top: number; image: {url: string; w: number; h: number}}) {
+function PlanPrintView({slot, scale, left, top, image, marks}: {slot: Rect; scale: number; left: number; top: number; image: {url: string; w: number; h: number}; marks?: PhotoMark[]}) {
   const box = planPlacement({x: 0, y: 0, w: slot.w, h: slot.h}, image.w, image.h);
   return (
     <div className="absolute" style={{left: left + slot.x * scale, top: top + slot.y * scale, width: slot.w * scale, height: slot.h * scale}}>
       <img src={image.url} alt="" className="absolute block max-w-none" style={{left: box.x * scale, top: box.y * scale, width: box.w * scale, height: box.h * scale}} />
+      {marks?.length ? <MarkLayer marks={marks} w={box.w} h={box.h} k={scale} style={{left: box.x * scale, top: box.y * scale}} /> : null}
     </div>
   );
 }
@@ -642,6 +643,8 @@ export type PreviewPlan = {
   onFiles: (files: File[]) => void;
   onPick: () => void;
   onRemove: () => void;
+  marks?: PhotoMark[]; // 図への書き込み（①②の番号・線など。位置は図の見えている四角の中の割合）
+  onMark?: () => void; // 図に書き込む（PhotoMarkEditor.tsx）
 };
 
 /**
@@ -738,6 +741,7 @@ function PlanSlotView({slot, scale, left, top, plan}: {slot: Rect; scale: number
         data-drop={over ? 'over' : dragging ? 'ready' : undefined}
         onPointerDown={(e) => e.currentTarget.focus()}
         onClick={() => setSelected(true)}
+        onDoubleClick={() => image && plan.onMark?.()} // 写真と同じく、ダブルクリックで書き込みの画面
         onKeyDown={(e) => {
           if (selected && (e.key === 'Delete' || e.key === 'Backspace')) {
             e.preventDefault();
@@ -770,7 +774,10 @@ function PlanSlotView({slot, scale, left, top, plan}: {slot: Rect; scale: number
         }`}
       >
         {image && box ? (
-          <img src={image.url} alt="" draggable={false} className="absolute block max-w-none select-none" style={{left: box.x * scale, top: box.y * scale, width: box.w * scale, height: box.h * scale}} />
+          <>
+            <img src={image.url} alt="" draggable={false} className="absolute block max-w-none select-none" style={{left: box.x * scale, top: box.y * scale, width: box.w * scale, height: box.h * scale}} />
+            {plan.marks?.length ? <MarkLayer marks={plan.marks} w={box.w} h={box.h} k={scale} style={{left: box.x * scale, top: box.y * scale}} /> : null}
+          </>
         ) : (
           plan.missing && <span className="absolute inset-0 flex items-center justify-center px-2 text-sm text-amber-800">この端末にない平面図</span>
         )}
@@ -779,10 +786,23 @@ function PlanSlotView({slot, scale, left, top, plan}: {slot: Rect; scale: number
       </button>
       {selected && (
         // 道具は図にかぶらないように枠の下の端
-        <div role="toolbar" aria-label="平面図の図" className="absolute bottom-1 left-1/2 flex -translate-x-1/2 gap-1 rounded-lg bg-white/95 p-1 shadow-lg ring-1 ring-slate-300">
+        <div role="toolbar" aria-label="平面図の図" className="absolute bottom-1 left-1/2 flex w-max max-w-[calc(100vw-1.5rem)] -translate-x-1/2 flex-wrap justify-center gap-1 rounded-lg bg-white/95 p-1 shadow-lg ring-1 ring-slate-300">
           <Btn small color="white" onClick={plan.onPick}>
             差し替え
           </Btn>
+          {plan.onMark && (
+            <Btn
+              small
+              color="white"
+              title="図に①②の番号・線などを書き込む"
+              onClick={() => {
+                setSelected(false);
+                plan.onMark?.();
+              }}
+            >
+              ✏️ 書き込み
+            </Btn>
+          )}
           <Btn small color="white" onClick={remove}>
             削除
           </Btn>
@@ -992,7 +1012,7 @@ export function ShinseiPages({
             </div>
             {/* 平面図の図を入れる枠（紙の上に、画面の大きさで） */}
             {plan && page.planSlot && !print && <PlanSlotView slot={page.planSlot} scale={scale} left={PAD * scale} top={(PAD + pp.head) * scale} plan={plan} />}
-            {plan?.image && page.planSlot && print && <PlanPrintView slot={page.planSlot} scale={scale} left={PAD * scale} top={(PAD + pp.head) * scale} image={plan.image} />}
+            {plan?.image && page.planSlot && print && <PlanPrintView slot={page.planSlot} scale={scale} left={PAD * scale} top={(PAD + pp.head) * scale} image={plan.image} marks={plan.marks} />}
           </div>
         );
       })}

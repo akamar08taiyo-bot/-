@@ -534,7 +534,8 @@ export function withImportedPhotos(job: Job, frames: StoredFrame[], rates: Estim
   let out = job;
   for (const f of missingFrames(job, frames, rates)) {
     if (f.slot === 'plan') {
-      out = {...out, planPhoto: f.id};
+      const {planMarks: _marks, ...rest} = out; // 前の図の書き込みは残さない
+      out = {...rest, planPhoto: f.id};
       continue;
     }
     const slot = f.slot;

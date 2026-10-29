@@ -2482,8 +2482,12 @@ function drawPlan(files: Files, sheet: ShinseiSheet, img: PhotoImage): void {
   const d = drawing && files[drawing] ? strFromU8(files[drawing]) : '';
   if (!drawing || !/<xdr:wsDr\b[^>]*>/.test(d)) return;
   const media = pictures(files, drawing);
-  const pic = media.pic(lay, img.bytes, planPlacement(rangeBox(lay, sheet.plan), img.w, img.h), 0, nextShapeId(d), '平面図');
-  media.done(d.replace(/<xdr:wsDr\b[^>]*>/, (root) => root + pic));
+  const box = planPlacement(rangeBox(lay, sheet.plan), img.w, img.h);
+  let id = nextShapeId(d);
+  const pic = media.pic(lay, img.bytes, box, 0, id++, '平面図');
+  // 図への書き込み（①②の番号・線など）：図のすぐ上に Excel の図形で（写真への書き込みと同じ。Excel で開いて動かす・直すことができる）
+  const marks = (img.marks ?? []).map((m) => markShapeXml(lay, box, m, id++)).join('');
+  media.done(d.replace(/<xdr:wsDr\b[^>]*>/, (root) => root + pic + marks));
 }
 
 /**

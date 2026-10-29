@@ -11,7 +11,7 @@ import {jobInsurer, MARK_INFO, MARK_KEYS, NO_SHINSEI} from './estimateForms.ts';
 import {cleanEdit} from './photoEdit.ts';
 import {cleanMarks} from './photoMarks.ts';
 import {cleanRiyu} from './riyu.ts';
-import type {AppData, EstimateForm, ImportedDoc, Insurer, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, PlaceDims, PlacePhotoEdits, PlacePhotoMarks, PlacePhotos, Rounding, Row, Settings, ShinseiInfo, TaxMode} from './types.ts';
+import type {AppData, EstimateForm, ImportedDoc, Insurer, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, PhotoMark, PlaceDims, PlacePhotoEdits, PlacePhotoMarks, PlacePhotos, Rounding, Row, Settings, ShinseiInfo, TaxMode} from './types.ts';
 import {todayIso, uid} from './util.ts';
 
 const DB_NAME = 'taiyo-sasaoka-shikiri';
@@ -344,6 +344,12 @@ function cleanPhotoEdits(raw: unknown): {photoEdits?: PlacePhotoEdits} {
   return edits.before || edits.after ? {photoEdits: edits} : {};
 }
 
+/** 平面図の図への書き込み。図がない・書き込みがなければ持たない（図がなくてもいつも読む：読まない項目は keepNewer がそのまま残すので） */
+function cleanPlanMarks(j: Record<string, unknown>): {planMarks?: PhotoMark[]} {
+  const marks = cleanMarks(j.planMarks);
+  return typeof j.planPhoto === 'string' && j.planPhoto && marks.length ? {planMarks: marks} : {};
+}
+
 /** 写真への書き込み（photoMarks.ts の cleanMarks）。改修前・改修後とも書き込みがなければ持たない */
 function cleanPhotoMarks(raw: unknown): {photoMarks?: PlacePhotoMarks} {
   if (!isObj(raw)) return {};
@@ -475,6 +481,7 @@ export function cleanJobs(raw: unknown): Job[] {
       // ゴミ箱に移した時刻（trash.ts）。時刻でなければ（元に戻した・前の版のデータ）持たない＝ゴミ箱に入っていない
       ...(numv(j.trashedAt) > 0 ? {trashedAt: numv(j.trashedAt)} : {}),
       ...(typeof j.planPhoto === 'string' && j.planPhoto ? {planPhoto: j.planPhoto} : {}), // 平面図の図（写真と同じ番号＝文字。2026-10-25）
+      ...cleanPlanMarks(j), // 平面図の図への書き込み（図があるときだけ。2026-10-29）
       // 売上見込みの月＝売上月（2026-10-25）。請求する月と同じなら持たない（請求する月と一緒に変わるように。前の版は一覧の ◀ ▶ で同じ月も持った。2026-10-26）
       ...(/^\d{4}-\d{2}$/.test(str(j.salesMonth)) && str(j.salesMonth) !== str(j.month) ? {salesMonth: str(j.salesMonth)} : {}),
       ...(isObj(j.uriage) ? {uriage: cleanUriage(j.uriage)} : {}), // 売上伝票の顧客区分・請求区分（2026-10-27）

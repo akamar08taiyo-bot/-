@@ -18,7 +18,7 @@ import {usePhotoUrls} from '../photos.ts';
 import {turn} from '../photoEdit.ts';
 import {INSURER_AREAS, INSURER_GROUP, insurerNoOf} from '../insurerNumbers.ts';
 import {photoBounds} from '../photoMarks.ts';
-import {costIsTotal, estimateLength, insuredBoxes, kindNamesOf, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
+import {costIsTotal, estimateLength, insuredBoxes, kindNamesOf, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, planPlacement, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
 import type {AppData, Insurer, Job, Material, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
@@ -217,6 +217,14 @@ export function ShinseiEditor({
   // 図の URL：読み込むまでは undefined、この端末にない図は null
   const planUrl = job.planPhoto ? planUrls[job.planPhoto] : undefined;
   const pickPlan = () => planInput.current?.click();
+  // 平面図の図への書き込み（①②の番号・線など。写真と同じ書き込みの画面を、紙の上の図の大きさで開く）
+  const [planMarking, setPlanMarking] = useState(false);
+  const planSize = (): {w: number; h: number} => {
+    const slot = pages?.find((pg) => pg.planSlot)?.planSlot;
+    if (!slot || !planUrl) return {w: 560, h: 420};
+    const box = planPlacement({x: 0, y: 0, w: slot.w, h: slot.h}, planUrl.w, planUrl.h);
+    return {w: box.w, h: box.h};
+  };
 
   // プレビューの写真貼付用紙の写真と平面図の図（印刷の画面にも同じものを出す）
   const previewPhotos: PreviewPhotos = {
@@ -250,6 +258,8 @@ export function ShinseiEditor({
     onFiles: (files) => void planActions.put(files),
     onPick: pickPlan,
     onRemove: planActions.remove,
+    marks: job.planMarks,
+    onMark: () => setPlanMarking(true),
   };
   // 申請書の印刷（ShinseiPrint.tsx。プレビューと同じページを A4 に）
   const [printing, setPrinting] = useState(false);
@@ -324,7 +334,7 @@ export function ShinseiEditor({
             disabled={areas.length < 2 && !odd}
             className="h-10 w-full max-w-md rounded-md border border-slate-300 bg-white px-2 text-base disabled:bg-slate-50 disabled:text-slate-700"
             aria-label="保険者番号"
-            data-nav
+            // Enter では飛ばす（住所から選ぶので、打ち込む流れ（被保険者番号 → 生年月日）を止めない）
           >
             {!cur && <option value="">選んでください</option>}
             {odd && <option value={cur}>{cur}（介護保険証の番号）</option>}
@@ -603,6 +613,18 @@ export function ShinseiEditor({
                 onChange={(marks) => photoActions.setMarks(marking, marks)}
                 onClose={() => setMarking(null)}
                 onRotate={(dir) => photoActions.setEdit(marking, turn(markPhoto.edit, dir), {w: markPhoto.w, h: markPhoto.h})}
+              />
+            )}
+            {planMarking && planUrl && (
+              <PhotoMarkEditor
+                key={`plan:${job.planPhoto}`}
+                title="平面図"
+                what="図"
+                photo={{url: planUrl.url, w: planUrl.w, h: planUrl.h, rot: 0}}
+                size={planSize()}
+                marks={job.planMarks ?? []}
+                onChange={planActions.setMarks}
+                onClose={() => setPlanMarking(false)}
               />
             )}
           </div>
