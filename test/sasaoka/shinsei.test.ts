@@ -872,8 +872,9 @@ test('写真貼付用紙：写真番号の用紙の改修前・改修後の枠�
     kouiki: ['写真貼付用紙:before:1', '写真貼付用紙:after:2', '写真貼付用紙 (5):before:3'],
     // 福岡市：施工前と施工後は別の用紙・1枚に写真番号2つ（⑤は施工前の3枚目の上）
     fukuoka: ['写真貼付台紙（事前）:before:1', '写真貼付台紙（完了）:after:2', '写真貼付台紙（事前） (3):before:3'],
-    // 北九州市：内容報告書（改修前）は1枚に写真番号1つ（⑤は5枚目）、完了報告書（改修後）は1枚に2つ
-    kitakyushu: ['内容報告書（写真）:before:1', '完了報告書（写真）:after:2', '内容報告書（写真） (5):before:3'],
+    // 北九州市：内容報告書（改修前）は1枚に写真番号1つ（⑤は5枚目）、完了報告書（改修後）は1枚に2つ。
+    // 改修後の写真は内容報告書の「改修後のイメージ図」にも貼る（改修前と同じ写真に線を書き込んだもの。photoPair.ts）
+    kitakyushu: ['内容報告書（写真）:before:1', '内容報告書（写真）:after:2', '完了報告書（写真）:after:2', '内容報告書（写真） (5):before:3'],
   };
   for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu'] as const) {
     const files = unzipSync(fillShinsei(TEMPLATES[insurer], SHINSEI[insurer]!, {...shinseiValues(job({insurer}), RATES), photoImages}));

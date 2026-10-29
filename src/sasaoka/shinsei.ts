@@ -60,6 +60,9 @@ export type ShinseiSheet = {
     kindChecks?: string;
     kindCircles?: string[];
     dates?: {before: string; after: string; label?: string};
+    // 同じ写真番号・同じ枠（改修前／改修後）の写真は最初の用紙だけに貼るが、組（group）がちがえば両方に貼る
+    //（北九州市の内容報告書の「改修後のイメージ図」と、完了報告書の改修後の写真。広域連合の同じ番号の2枚めの用紙は貼らない）
+    group?: string;
   };
   // 平面図：写真番号の順の工事内容（改修の内容と同じ行「玄関① 木製L字手すり L=600×850㎜」）を空いた所に書く（ユーザーの指示）。
   // cell＝折り返しの欄に書く（みやこ町の下の欄）、box＝その範囲にテキストボックスを置く（前の申請の平面図と同じ）。平面図そのものはユーザーが Excel で描く
@@ -248,13 +251,17 @@ function kitakyushuTodoke(sheet: string, c: (typeof KK_CELLS)['todoke'] | (typeo
 }
 const KK_SHIKYU = KK_CELLS.shikyu;
 /**
- * 北九州市の写真の報告書：内容報告書（写真）は1枚に写真番号1つ（改修前の写真・改修場所・改修の内容。改修後のイメージ図は手で）を10枚、
- * 完了報告書（写真）は1枚に写真番号2つ（改修後の写真・改修場所）を5枚。写真番号は原本の「Ｎｏ．」の欄（①〜⑩）
+ * 北九州市の写真の報告書：内容報告書（写真）は1枚に写真番号1つ（改修前の写真・改修場所・改修の内容・改修後のイメージ図）を10枚、
+ * 完了報告書（写真）は1枚に写真番号2つ（改修後の写真・改修場所）を5枚。写真番号は原本の「Ｎｏ．」の欄（①〜⑩）。
+ * 改修後のイメージ図の欄には改修後の写真（書き込みつき）を入れる：北九州市は改修前と同じ写真を改修後にも入れ、線を書き込んでイメージ図にする
+ * （ユーザーの指示「北九州では、改修前と改修後には、同じ写真を入れ、改修後の写真に線を書き込むため…」2026-10-29。photoPair.ts）
  */
+/** 内容報告書（写真）の「改修後のイメージ図」の枠（原本の結合セル H14:AE14。左の見出しは A14「改修後のイメージ図」） */
+export const KK_NAIYO_IMAGE = 'H14:AE14';
 const KITAKYUSHU_PHOTO_SHEETS: ShinseiSheet[] = [
   ...Array.from({length: 10}, (_, k): ShinseiSheet => {
     const c = KK_CELLS.naiyo;
-    return {sheet: `内容報告書（写真）${k ? ` (${k + 1})` : ''}`, name: c.name, texts: [T(c.insured, '{insured}')], photoPlace: {photo: c.photo0, place: c.place0, before: c.frame0, memo: c.memo0}};
+    return {sheet: `内容報告書（写真）${k ? ` (${k + 1})` : ''}`, name: c.name, texts: [T(c.insured, '{insured}')], photoPlace: {photo: c.photo0, place: c.place0, before: c.frame0, after: KK_NAIYO_IMAGE, memo: c.memo0, group: 'naiyo'}};
   }),
   ...Array.from({length: 5}, (_, k): ShinseiSheet[] => {
     const c = KK_CELLS.kanryo;
@@ -1265,12 +1272,17 @@ export function fillShinseiFiles(files: Files, map: ShinseiMap, v: ShinseiValues
   return zipSync(files, {level: 6});
 }
 
+/** 写真を貼る枠の重なりを見る印（写真番号・改修前／改修後・組）：同じ印の枠は最初の用紙だけに貼る */
+const slotKey = (sheet: ShinseiSheet, photo: number, slot: 'before' | 'after') => `${photo}:${slot}:${sheet.photoPlace?.group ?? ''}`;
+
 /**
  * 開いた原本（unzipSync したもの）のシートに転記する（Excel に保存するときと、画面のプレビューで同じ書き込みをする）。
  * ファイルの中身は置きかえるだけなので、原本を開いたものを {...files} で写してから渡せば、原本は何度でも使える
  */
 export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void {
-  const pasted = new Set<string>(); // 写真を貼った写真番号と枠（「3:before」。同じ番号の用紙が2枚＝広域連合なら、最初の用紙だけに貼る。福岡市は施工前・完了が別の用紙）
+  // 写真を貼った写真番号と枠（「3:before:」。同じ番号の用紙が2枚＝広域連合なら、最初の用紙だけに貼る。福岡市は施工前・完了が別の用紙。
+  // 北九州市の改修後の写真は、組のちがう内容報告書（イメージ図）と完了報告書の両方に貼る＝slotKey）
+  const pasted = new Set<string>();
   const copies = formulaCopies(files);
   for (const sheet of map.sheets) {
     const photo = sheet.photoPlace ? photoNumberOf(readCell(files, sheet.sheet, sheet.photoPlace.photo)) : 0;
@@ -1300,13 +1312,13 @@ export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void
     // Excel に保存するとき（photoImages があるとき）：箇所のある写真番号の最初の用紙に、写真と、写真の横（上）に書く内容を入れる
     //（画面のプレビューは、写真と書く内容を枠に重ねて描く）
     if (v.photoImages && photo > 0 && v.photos[photo] !== undefined) {
-      const slots = (['before', 'after'] as const).filter((slot) => sheet.photoPlace?.[slot] && !pasted.has(`${photo}:${slot}`));
+      const slots = (['before', 'after'] as const).filter((slot) => sheet.photoPlace?.[slot] && !pasted.has(slotKey(sheet, photo, slot)));
       const all = v.photoImages[photo] ?? {};
       const images: PhotoImages = Object.fromEntries(slots.flatMap((slot) => (all[slot] ? [[slot, all[slot]]] : [])));
       // 写真に書く内容は、メモの欄のある用紙（福岡市）では写真の枠に書かない
       const notes = slots.includes('before') && !sheet.photoPlace?.memo ? (v.photoNotes?.[photo] ?? []) : [];
       if (images.before || images.after || notes.length) {
-        for (const slot of slots) pasted.add(`${photo}:${slot}`);
+        for (const slot of slots) pasted.add(slotKey(sheet, photo, slot));
         drawPhotos(files, sheet, images, notes);
       }
     }
@@ -1529,8 +1541,8 @@ export function photoSlotEntries(files: Files, map: ShinseiMap): {entry: Shinsei
     const photo = photoNumberOf(readCell(files, entry.sheet, entry.photoPlace.photo));
     if (photo <= 0) continue;
     for (const slot of ['before', 'after'] as const) {
-      if (!entry.photoPlace[slot] || seen.has(`${photo}:${slot}`)) continue;
-      seen.add(`${photo}:${slot}`);
+      if (!entry.photoPlace[slot] || seen.has(slotKey(entry, photo, slot))) continue;
+      seen.add(slotKey(entry, photo, slot));
       out.push({entry, photo, slot});
     }
   }

@@ -28,6 +28,7 @@ import type {EstimateRates} from '../calc.ts';
 import {Btn, DropArea, DropOverlay, Modal, pastedFiles, useFileDragging, useToast} from '../components/ui.tsx';
 import {circled, photoNumbers, swapPhotoNumbers} from '../estimateForms.ts';
 import {cleanEdit, normRot, turn} from '../photoEdit.ts';
+import {pairJob} from '../photoPair.ts';
 import {marksBetween, photoBounds, turnMarks} from '../photoMarks.ts';
 import {composeTiles, getPhotos, photoTakenDate, preparePhoto, putPhoto, rememberPhotoUrl, usePhotoUrls} from '../photos.ts';
 import {bestTiling, MAX_TILES} from '../photoTile.ts';
@@ -72,7 +73,9 @@ export function photoPlaces(job: Pick<Job, 'places'>, rates: EstimateRates): {pl
 }
 
 /** 写真を入れる・入れ替える・消す（様邸の箇所の写真の番号を書きかえる） */
-export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void, rates: EstimateRates) {
+export function usePhotoActions(job: Job, setJobRaw: (fn: (j: Job) => Job) => void, rates: EstimateRates) {
+  // 北九州市は改修前と改修後に同じ写真（改修後に線を書き込んで「改修後のイメージ図」にする）：写真の枠を直すたびに改修前と改修後を合わせる（photoPair.ts）
+  const setJob = (fn: (j: Job) => Job) => setJobRaw((j) => pairJob(j, fn(j)));
   const toast = useToast();
   const [busy, setBusy] = useState(0);
   // 何枚かまとめて入れるときの、貼る順番を選ぶ画面（PhotoOrderDialog）。選んだ順（写真の番号の並び）か、やめたら null を返す

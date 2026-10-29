@@ -50,12 +50,43 @@ const pv = await preview.innerText();
 for (const t of ['介護保険住宅改修事前届出書', '介護保険居宅介護（予防）住宅改修費支給申請書（受領委任払用）', '住宅改修内容報告書（写真）', '住宅改修完了報告書（写真）', '小倉北区見本町1-2-3', '太陽シルバーサービス']) assert.ok(pv.includes(t), `プレビューに「${t}」がない`);
 assert.equal(await pageOf('内容報告書（写真）').getByRole('button', {name: /改修前/}).count(), 1);
 assert.equal(await pageOf('完了報告書（写真）').getByRole('button', {name: /改修後/}).count(), 2);
+// 内容報告書の「改修後のイメージ図」の欄も、改修後の写真の枠
+assert.equal(await pageOf('内容報告書（写真）').getByRole('button', {name: /改修後/}).count(), 1);
 await page.waitForTimeout(400);
 await page.screenshot({path: path.join(outDir, 'kitakyushu-1-shinsei.png')});
 await pageOf('事前届出書').screenshot({path: path.join(outDir, 'kitakyushu-2-todoke.png')});
 await pageOf('支給申請書').screenshot({path: path.join(outDir, 'kitakyushu-3-shikyu.png')});
 await pageOf('内容報告書（写真）').screenshot({path: path.join(outDir, 'kitakyushu-4-photo.png')});
 log('北九州市の申請書のタブ（プレビュー・一覧の順番・写真の報告書）OK');
+
+// ---------------- 写真を改修前に入れると、改修後にも同じ写真（ユーザーの指示「北九州では、改修前と改修後には、同じ写真を入れ、
+//   改修後の写真に線を書き込むため、写真を選択した場合は前後に同じ写真を組み込む」2026-10-29）。改修後の写真は内容報告書の「改修後のイメージ図」と完了報告書に
+const board = page.getByRole('region', {name: '写真'});
+{
+  const png = await page.evaluate(async () => {
+    const c = document.createElement('canvas');
+    [c.width, c.height] = [1200, 900];
+    const g = c.getContext('2d');
+    g.fillStyle = '#2563eb';
+    g.fillRect(0, 0, 1200, 900);
+    const b = await new Promise((r) => c.toBlob(r, 'image/png'));
+    return [...new Uint8Array(await b.arrayBuffer())];
+  });
+  const [ch] = await Promise.all([page.waitForEvent('filechooser'), board.getByRole('button', {name: '①玄関 改修前', exact: true}).click()]);
+  await ch.setFiles([{name: 'before1.png', mimeType: 'image/png', buffer: Buffer.from(png)}]);
+}
+const naiyoImg = (slot) => pageOf('内容報告書（写真）').getByRole('button', {name: `写真貼付用紙①の${slot}`, exact: true}).locator('img');
+await naiyoImg('改修前').waitFor();
+await naiyoImg('改修後').waitFor();
+await pageOf('完了報告書（写真）').getByRole('button', {name: '写真貼付用紙①の改修後', exact: true}).locator('img').waitFor();
+const srcs = await Promise.all([naiyoImg('改修前'), naiyoImg('改修後')].map((x) => x.getAttribute('src')));
+assert.equal(srcs[0], srcs[1], '改修前と改修後（イメージ図）が同じ写真でない');
+// 写真の欄の①玄関の改修後にも同じ写真。②トイレの改修後は空のまま
+assert.equal(await board.getByRole('button', {name: '①玄関 改修後に書き込む', exact: true}).count(), 1);
+assert.equal(await board.getByRole('button', {name: '②トイレ 改修後に書き込む', exact: true}).count(), 0);
+await page.waitForTimeout(400);
+await pageOf('内容報告書（写真）').screenshot({path: path.join(outDir, 'kitakyushu-4b-photo-pair.png')});
+log('改修前に入れた写真が改修後（内容報告書の改修後のイメージ図・完了報告書）にも入る OK');
 
 // ---------------- 入れる：フリガナ・郵便番号・電話・負担割合・着工日・完成日
 await form.getByLabel('フリガナ', {exact: true}).fill('サンプル　ヤマダ');
@@ -88,6 +119,22 @@ assert.deepEqual([s.startY, s.startM, s.startD, s.endY, s.endM, s.endD].map((r) 
 assert.deepEqual([text('支給申請書', s.telA), text('支給申請書', s.telB)], ['093', '111-2222']);
 assert.equal(text('内容報告書（写真）', KK_CELLS.naiyo.place0), '玄関');
 assert.equal(text('完了報告書（写真）', KK_CELLS.kanryo.place1), 'トイレ');
+// 写真：内容報告書の改修前とイメージ図、完了報告書の改修後に同じ写真（3枚とも同じ画像のファイル）
+const picsOf = (name) => {
+  const rid = [...wb.matchAll(/<sheet [^>]*name="([^"]*)"[^>]*r:id="([^"]+)"/g)].find((m) => m[1] === name)[2];
+  const target = new RegExp(`Id="${rid}"[^>]*Target="([^"]+)"`).exec(rels)[1];
+  const sRels = strFromU8(files[`xl/${target.replace(/([^/]+)$/, '_rels/$1.rels')}`]);
+  const drawing = /Target="\.\.\/drawings\/([^"]+)"/.exec(sRels)[1];
+  const dRels = strFromU8(files[`xl/drawings/_rels/${drawing}.rels`]);
+  const d = strFromU8(files[`xl/drawings/${drawing}`]);
+  return [...d.matchAll(/<xdr:pic>[\s\S]*?<a:blip r:embed="([^"]+)"/g)].map((m) => new RegExp(`Id="${m[1]}"[^>]*Target="\\.\\./media/([^"]+)"`).exec(dRels)[1]);
+};
+const naiyoPics = picsOf('内容報告書（写真）');
+const kanryoPics = picsOf('完了報告書（写真）');
+assert.equal(naiyoPics.length, 2, '内容報告書（写真）の写真は改修前とイメージ図の2枚');
+assert.equal(kanryoPics.length, 1, '完了報告書（写真）の写真は①の改修後の1枚');
+const bytesOf = (n) => Buffer.from(files[`xl/media/${n}`]).toString('base64');
+assert.equal(new Set([...naiyoPics, ...kanryoPics].map(bytesOf)).size, 1, '改修前・イメージ図・完了報告書が同じ写真でない');
 assert.equal(sheets.size, 19); // 事前届出書2・支給申請書の表と裏・内容報告書10・完了報告書5（平面図はない）
 assert.ok(![...sheets.keys()].some((n) => /平面図/.test(n)));
 log('Excel（事前届出書・支給申請書・写真の報告書）OK');
