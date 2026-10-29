@@ -81,16 +81,79 @@ export const MARK_INSET = {x: 9.6, y: 4.8};
 /** 図形の中の文字の行の高さ（文字の大きさの何倍か） */
 export const MARK_LINE_K = 1.2;
 
-export type MarkStyle = Pick<PhotoMark, 'line' | 'width' | 'dash' | 'fill' | 'color' | 'size'> & {bold?: boolean};
-/** 新しい図形の書式（直線・矢印・四角形・楕円）：写真の上で見えるように赤の 2.25pt・塗りつぶしなし */
-export const SHAPE_STYLE: MarkStyle = {line: 'FF0000', width: 2.25, dash: 'solid', fill: '', color: 'FF0000', size: 11};
+/**
+ * 文字のフォント（ユーザーの指示「文字のフォントはメイリオみたいなやつがデフォルトで、一応３０種類ぐらい選べるようにする」2026-10-29）：
+ * 会社の Windows・Office に入っている日本語のフォントを中心に 30。name は Excel のフォントの名前（Excel の図形の文字にそのまま書く）、
+ * css は画面で探す英語の名前。iPad など、そのフォントのない端末では近いフォント（ゴシック・明朝）で出す
+ */
+export const MARK_FONTS: {name: string; css: string[]; serif?: boolean}[] = [
+  {name: 'メイリオ', css: ['Meiryo']},
+  {name: 'Meiryo UI', css: ['Meiryo UI']},
+  {name: '游ゴシック', css: ['Yu Gothic', 'YuGothic']},
+  {name: '游明朝', css: ['Yu Mincho', 'YuMincho'], serif: true},
+  {name: 'BIZ UDPゴシック', css: ['BIZ UDPGothic']},
+  {name: 'BIZ UDゴシック', css: ['BIZ UDGothic']},
+  {name: 'BIZ UDP明朝 Medium', css: ['BIZ UDPMincho Medium', 'BIZ UDPMincho'], serif: true},
+  {name: 'BIZ UD明朝 Medium', css: ['BIZ UDMincho Medium', 'BIZ UDMincho'], serif: true},
+  {name: 'ＭＳ Ｐゴシック', css: ['MS PGothic']},
+  {name: 'ＭＳ ゴシック', css: ['MS Gothic']},
+  {name: 'ＭＳ Ｐ明朝', css: ['MS PMincho'], serif: true},
+  {name: 'ＭＳ 明朝', css: ['MS Mincho'], serif: true},
+  {name: 'MS UI Gothic', css: ['MS UI Gothic']},
+  {name: 'UD デジタル 教科書体 N-R', css: ['UD Digi Kyokasho N-R'], serif: true},
+  {name: 'UD デジタル 教科書体 NP-R', css: ['UD Digi Kyokasho NP-R'], serif: true},
+  {name: 'UD デジタル 教科書体 NK-R', css: ['UD Digi Kyokasho NK-R'], serif: true},
+  {name: 'HG丸ｺﾞｼｯｸM-PRO', css: ['HGMaruGothicMPRO']},
+  {name: 'HG創英角ｺﾞｼｯｸUB', css: ['HGSoeiKakugothicUB']},
+  {name: 'HG創英角ﾎﾟｯﾌﾟ体', css: ['HGSoeiKakupoptai']},
+  {name: 'HGｺﾞｼｯｸE', css: ['HGGothicE']},
+  {name: 'HG明朝E', css: ['HGMinchoE'], serif: true},
+  {name: 'HG明朝B', css: ['HGMinchoB'], serif: true},
+  {name: 'HG正楷書体-PRO', css: ['HGSeikaishotaiPRO'], serif: true},
+  {name: 'HG行書体', css: ['HGGyoshotai'], serif: true},
+  {name: 'HG教科書体', css: ['HGKyokashotai'], serif: true},
+  {name: 'HG創英ﾌﾟﾚｾﾞﾝｽEB', css: ['HGSoeiPresenceEB'], serif: true},
+  {name: 'Arial', css: []},
+  {name: 'Calibri', css: []},
+  {name: 'Segoe UI', css: []},
+  {name: 'Times New Roman', css: [], serif: true},
+];
+export const MARK_FONT_DEFAULT = 'メイリオ';
+const FONT_OF = new Map(MARK_FONTS.map((f) => [f.name, f]));
+const SANS_NEAR = '"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "YuGothic", "Noto Sans JP", "Noto Sans CJK JP", "IPAPGothic", sans-serif';
+const SERIF_NEAR = '"Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif JP", "Noto Serif CJK JP", serif';
+/** 画面の font-family（そのフォント → 英語の名前 → 近いフォント）。知らない名前は null */
+export function markFontCss(name: string): string | null {
+  const f = FONT_OF.get(name);
+  if (!f) return null;
+  return [f.name, ...f.css].map((n) => `"${n}"`).join(', ') + ', ' + (f.serif ? SERIF_NEAR : SANS_NEAR);
+}
+
+export type MarkStyle = Pick<PhotoMark, 'line' | 'width' | 'dash' | 'fill' | 'color' | 'size'> & {bold?: boolean; font?: string};
+/** 新しい図形の書式（直線・矢印・楕円）：黄色の 2.25pt・塗りつぶしなし（ユーザーの指示「初期の色は黄色」2026-10-29。前は赤） */
+export const SHAPE_STYLE: MarkStyle = {line: 'FFFF00', width: 2.25, dash: 'solid', fill: '', color: 'FF0000', size: 11, font: MARK_FONT_DEFAULT};
 /** 新しいテキストボックスの書式：白地に赤の 11pt・枠線なし（写真の上でも読めるように） */
-export const TEXT_STYLE: MarkStyle = {line: '', width: 0.75, dash: 'solid', fill: 'FFFFFF', color: 'FF0000', size: 11};
+export const TEXT_STYLE: MarkStyle = {line: '', width: 0.75, dash: 'solid', fill: 'FFFFFF', color: 'FF0000', size: 11, font: MARK_FONT_DEFAULT};
+/** 手書きのペンの書式：黄色の 3pt（ユーザーの指示「ペンの細さや色を変更できる（デフォルトは黄色）」2026-10-29） */
+export const PEN_STYLE: MarkStyle = {line: 'FFFF00', width: 3, dash: 'solid', fill: '', color: 'FFFF00', size: 11, font: MARK_FONT_DEFAULT};
+/** 枠囲み（正方形/長方形）と補強板（四角＋斜めの線）の書式：茶色の 2.25pt（ユーザーの指示「□で枠囲みするときは茶色がデフォルト」2026-10-29） */
+export const BOARD_STYLE: MarkStyle = {line: '996633', width: 2.25, dash: 'solid', fill: '', color: 'FF0000', size: 11, font: MARK_FONT_DEFAULT};
+/** 番号（①②…。平面図・写真に置く）：赤の 16pt・塗りつぶしと枠線なし */
+export const NUM_STYLE: MarkStyle = {line: '', width: 0.75, dash: 'solid', fill: '', color: 'FF0000', size: 16, font: MARK_FONT_DEFAULT};
 
 export const isBoxKind = (k: PhotoMark['kind']) => k !== 'line';
+/** 図形の中に文字を打てる種類（四角形・楕円・テキストボックス。手書きの線・補強板には打たない） */
+export const hasText = (k: PhotoMark['kind']) => k === 'rect' || k === 'ellipse' || k === 'text';
+/** 点（pts）を持つ種類 */
+export const hasPts = (k: PhotoMark['kind']) => k === 'pen' || k === 'board';
+/** 補強板の斜めの線（左下から右上） */
+export const BOARD_PTS: [number, number][] = [
+  [0, 1],
+  [1, 0],
+];
 
 const DASH_KEYS = new Set(DASHES.map((d) => d.key));
-const KINDS = new Set(['line', 'rect', 'ellipse', 'text']);
+const KINDS = new Set(['line', 'rect', 'ellipse', 'text', 'pen', 'board']);
 const HEX = /^[0-9A-F]{6}$/;
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -117,8 +180,11 @@ export function cleanMarks(raw: unknown): PhotoMark[] {
     let [x1, y1, x2, y2] = [unit(m.x1), unit(m.y1), unit(m.x2), unit(m.y2)];
     if (kind !== 'line') [x1, x2, y1, y2] = [Math.min(x1, x2), Math.max(x1, x2), Math.min(y1, y2), Math.max(y1, y2)];
     if (kind === 'line' ? Math.hypot(x2 - x1, y2 - y1) < 0.0005 : x2 - x1 < 0.0005 || y2 - y1 < 0.0005) continue;
-    const text = typeof m.text === 'string' ? m.text.slice(0, 2000) : '';
+    const text = hasText(kind) && typeof m.text === 'string' ? m.text.slice(0, 2000) : '';
     if (kind === 'text' && !text.trim()) continue;
+    // 手書きの線・補強板の点（2つ以上。多すぎる点は間引く）。補強板に点がなければ左下から右上の斜め
+    const pts = hasPts(kind) ? cleanPts(m.pts) : [];
+    if (kind === 'pen' && pts.length < 2) continue;
     let id = typeof m.id === 'string' && m.id ? m.id : markId();
     if (ids.has(id)) id = markId();
     ids.add(id);
@@ -138,14 +204,92 @@ export function cleanMarks(raw: unknown): PhotoMark[] {
       dash: DASH_KEYS.has(m.dash as PhotoMarkDash) ? (m.dash as PhotoMarkDash) : 'solid',
       ...(kind === 'line' && m.start === true ? {start: true} : {}),
       ...(kind === 'line' && m.end === true ? {end: true} : {}),
-      fill: kind === 'line' ? '' : hexOf(m.fill),
-      ...(kind !== 'line' && text ? {text} : {}),
+      fill: kind === 'line' || kind === 'pen' ? '' : hexOf(m.fill),
+      ...(text ? {text} : {}),
+      ...(hasPts(kind) ? {pts: pts.length >= 2 ? pts : BOARD_PTS} : {}),
       size: Number.isFinite(size) && size > 0 ? Math.round(clamp(size, 1, 400) * 10) / 10 : SHAPE_STYLE.size,
       color: hexOf(m.color) || '000000',
       ...(m.bold === true ? {bold: true} : {}),
+      ...(hasText(kind) && typeof m.font === 'string' && FONT_OF.has(m.font) ? {font: m.font} : {}),
     });
   }
   return out;
+}
+
+/** 点（[x, y] の 0〜1）をそろえる：数でないものは捨て、4けたに丸め、多ければ間引く（4000点まで） */
+function cleanPts(raw: unknown): [number, number][] {
+  if (!Array.isArray(raw)) return [];
+  const pts = raw.filter((p): p is [unknown, unknown] => Array.isArray(p) && p.length >= 2).map(([x, y]) => [unit(x), unit(y)] as [number, number]);
+  if (pts.length <= 4000) return pts;
+  const step = pts.length / 4000;
+  return Array.from({length: 4000}, (_, i) => pts[Math.min(pts.length - 1, Math.round(i * step))]);
+}
+
+type P = {x: number; y: number};
+/** 手書きの線を間引く（ダグラス・ポイカー。tol＝線からのずれの許し＝紙の画素）：見た目は同じで、保存と Excel の図形が軽くなる */
+export function simplifyStroke(pts: P[], tol: number): P[] {
+  if (pts.length <= 2) return pts;
+  const keep = new Uint8Array(pts.length);
+  keep[0] = keep[pts.length - 1] = 1;
+  const stack: [number, number][] = [[0, pts.length - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop()!;
+    const [ax, ay, bx, by] = [pts[a].x, pts[a].y, pts[b].x, pts[b].y];
+    const len = Math.hypot(bx - ax, by - ay);
+    let [best, at] = [-1, -1];
+    for (let i = a + 1; i < b; i++) {
+      const d = len ? Math.abs((bx - ax) * (ay - pts[i].y) - (ax - pts[i].x) * (by - ay)) / len : Math.hypot(pts[i].x - ax, pts[i].y - ay);
+      if (d > best) [best, at] = [d, i];
+    }
+    if (best > tol && at > 0) {
+      keep[at] = 1;
+      stack.push([a, at], [at, b]);
+    }
+  }
+  return pts.filter((_, i) => keep[i]);
+}
+
+/**
+ * ぐしゃぐしゃに描いた線か（iPhone のメモと同じく、上から消すしぐさ）：線の長さが外側の四角の対角線の 2.5倍より長く、
+ * 向きが大きく折り返す（120°より鋭く曲がる）所が4つ以上。小さすぎる線（対角線 12画素まで）は消すしぐさとみない
+ */
+export function isScribble(pts: P[]): boolean {
+  if (pts.length < 6) return false;
+  const xs = pts.map((p) => p.x);
+  const ys = pts.map((p) => p.y);
+  const diag = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  if (diag < 12) return false;
+  let len = 0;
+  for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+  if (len < diag * 2.5) return false;
+  // 細かいふるえを数えないように、少し間引いてから向きを見る
+  const s = simplifyStroke(pts, Math.max(2, diag * 0.04));
+  let turns = 0;
+  for (let i = 1; i < s.length - 1; i++) {
+    const [ux, uy, vx, vy] = [s[i].x - s[i - 1].x, s[i].y - s[i - 1].y, s[i + 1].x - s[i].x, s[i + 1].y - s[i].y];
+    const n = Math.hypot(ux, uy) * Math.hypot(vx, vy);
+    if (n > 0 && (ux * vx + uy * vy) / n < -0.5) turns++;
+  }
+  return turns >= 4;
+}
+
+/** 次に置く番号（①②…。書き込みにある番号のいちばん大きい数の次。20 より上は「(21)」） */
+export function nextNumberText(marks: PhotoMark[]): string {
+  let max = 0;
+  for (const m of marks) {
+    const t = (m.text ?? '').trim();
+    const c = t.length === 1 ? t.charCodeAt(0) - 0x2460 + 1 : 0;
+    const n = c >= 1 && c <= 20 ? c : Number(/^\((\d+)\)$/.exec(t)?.[1] ?? 0);
+    if (m.kind === 'text' && n > max) max = n;
+  }
+  const next = max + 1;
+  return next <= 20 ? String.fromCharCode(0x2460 + next - 1) : `(${next})`;
+}
+
+/** 手書きの線・補強板の斜めの線の紙の上の点（回す前。回すときは shapeBox の rot でまん中のまわりに） */
+export function markPts(m: PhotoMark, vb: MarkBox): P[] {
+  const b = shapeBox(m, vb);
+  return (m.pts ?? (m.kind === 'board' ? BOARD_PTS : [])).map(([x, y]) => ({x: b.x + x * b.w, y: b.y + y * b.h}));
 }
 
 /** 回した四角（rot＝右回りの度。まん中で回る）の外側の四角 */
@@ -231,9 +375,13 @@ export function turnMarks(marks: PhotoMark[], photo: {w: number; h: number}, fro
       if (m.kind === 'line') return {...m, x1: unit(1 - m.y1), y1: unit(m.x1), x2: unit(1 - m.y2), y2: unit(m.x2)};
       const [cx, cy] = [(m.x1 + m.x2) / 2, (m.y1 + m.y2) / 2];
       const [w, h] = [Math.abs(m.x2 - m.x1), Math.abs(m.y2 - m.y1)];
-      const [nw, nh] = m.kind === 'text' ? [Math.min(1, w * a), Math.min(1, h / a)] : [h, w];
+      // 手書きの線・補強板は、大きさ（紙の上）はそのままで、図形を 90°回す（中の線も一緒に回る）
+      const keep = m.kind === 'text' || hasPts(m.kind);
+      const [nw, nh] = keep ? [Math.min(1, w * a), Math.min(1, h / a)] : [h, w];
       const [ncx, ncy] = [clamp(1 - cy, nw / 2, 1 - nw / 2), clamp(cx, nh / 2, 1 - nh / 2)];
-      return {...m, x1: unit(ncx - nw / 2), y1: unit(ncy - nh / 2), x2: unit(ncx + nw / 2), y2: unit(ncy + nh / 2)};
+      const rot = hasPts(m.kind) ? (((m.rot ?? 0) + 90) % 360) : m.rot;
+      const {rot: _r, ...rest} = m;
+      return {...rest, ...(rot ? {rot} : {}), x1: unit(ncx - nw / 2), y1: unit(ncy - nh / 2), x2: unit(ncx + nw / 2), y2: unit(ncy + nh / 2)};
     });
     rot += 90;
   }

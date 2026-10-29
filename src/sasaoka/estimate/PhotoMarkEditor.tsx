@@ -12,23 +12,35 @@
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import type {CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode} from 'react';
 import {
+  BOARD_PTS,
+  BOARD_STYLE,
   cleanMarks,
   cmToPx,
   colorName,
   DASHES,
   FONT_SIZES,
-  isBoxKind,
+  hasPts,
+  hasText,
+  isScribble,
   LINE_WIDTHS,
   lineEnds,
+  MARK_FONT_DEFAULT,
+  MARK_FONTS,
+  markFontCss,
   MARK_INSET,
   MARK_LINE_K,
   markBounds,
   markId,
+  markPts,
+  nextNumberText,
+  NUM_STYLE,
+  PEN_STYLE,
   PT_PX,
   pxToCm,
   rotatedBounds,
   SHAPE_STYLE,
   shapeBox,
+  simplifyStroke,
   STANDARD_COLORS,
   TEXT_STYLE,
   THEME_COLORS,
@@ -38,28 +50,87 @@ import type {PhotoMark, PhotoMarkDash} from '../types.ts';
 import {MarkLayer, markTextCss} from './MarkLayer.tsx';
 
 type Pt = {x: number; y: number};
-type Tool = 'line' | 'arrow' | 'arrow2' | 'rect' | 'ellipse' | 'text';
+type Tool = 'pen' | 'poly' | 'line' | 'arrow' | 'arrow2' | 'rect' | 'ellipse' | 'text' | 'board' | 'num';
+/**
+ * 書式を覚える種類（新しい図形に使う）：shape＝直線・矢印・楕円（黄色）、rect＝枠囲み（正方形/長方形）・補強板（茶色）、pen＝手書き・折れ線（黄色）、
+ * text＝テキストボックス、num＝番号
+ */
+type StyleKey = 'shape' | 'rect' | 'pen' | 'text' | 'num';
+type Styles = Record<StyleKey, MarkStyle>;
+const styleKeyOf = (k: PhotoMark['kind']): StyleKey => (k === 'text' ? 'text' : k === 'pen' ? 'pen' : k === 'board' || k === 'rect' ? 'rect' : 'shape');
+const toolStyleKey = (t: Tool): StyleKey => (t === 'text' ? 'text' : t === 'num' ? 'num' : t === 'pen' || t === 'poly' ? 'pen' : t === 'rect' || t === 'board' ? 'rect' : 'shape');
 type RBox = MarkBox & {rot: number};
 type Drag =
   | {type: 'create'; tool: Tool; p0: Pt; id: string; ctrl: boolean}
   | {type: 'move'; p0: Pt; base: PhotoMark[]; ids: string[]; moved: boolean; copy: boolean; toggle: string | null}
   | {type: 'resize'; id: string; hx: number; hy: number; base: PhotoMark}
   | {type: 'rotate'; id: string; base: PhotoMark; a0: number}
-  | {type: 'end'; id: string; which: 1 | 2; base: PhotoMark};
-type Menu = {name: 'fill' | 'line' | 'color' | 'size' | 'front' | 'back' | 'rotate'; x: number; y: number} | {name: 'context'; x: number; y: number; on: boolean};
+  | {type: 'end'; id: string; which: 1 | 2; base: PhotoMark}
+  // 手書き：pts＝描いた点（紙の画素）。straight＝長押しでまっすぐにした（そのあとは終わりの点を動かす）
+  | {type: 'pen'; id: string; pts: Pt[]; straight: boolean}
+  // 直線をまん中のまわりに回す（直線の ↻ のつまみ）
+  | {type: 'rotline'; id: string; base: PhotoMark; a0: number; c: Pt};
+type Menu = {name: 'fill' | 'line' | 'color' | 'size' | 'font' | 'front' | 'back' | 'rotate'; x: number; y: number} | {name: 'context'; x: number; y: number; on: boolean};
 
 /** 図形の挿入のボタン（Excel の「図形」の線・四角形・基本図形の並び） */
+// 手書きのペン・補強板・番号（ユーザーの指示「写真に、手書きなので、線を引ける機能…ベースプレート、木の補強板…四角の斜め」「平面図の中に、①②のように番号を」2026-10-29）
 const TOOLS: {key: Tool; label: string}[] = [
+  {key: 'pen', label: 'ペン（手書き。長押しでまっすぐ・ぐしゃぐしゃで消す）'},
+  {key: 'poly', label: '折れ線（押すたびに角。ダブルクリック・Enter で終わる）'},
   {key: 'line', label: '直線'},
   {key: 'arrow', label: '矢印'},
   {key: 'arrow2', label: '双方向矢印'},
   {key: 'rect', label: '正方形/長方形'},
   {key: 'ellipse', label: '楕円'},
+  {key: 'board', label: '補強板（四角と斜めの線）'},
   {key: 'text', label: 'テキスト ボックス'},
+  {key: 'num', label: '番号（①②…。押すたびに次の番号）'},
+];
+/**
+ * 描いたあとも道具をそのままにするもの（続けて描く・番号を続けて置く。ユーザーの指示「連続で線を引くことができない」2026-10-29）。
+ * やめるときは「選択」・同じ道具をもう一度・Esc
+ */
+const KEEP_TOOL = new Set<Tool>(['pen', 'poly', 'line', 'arrow', 'arrow2', 'rect', 'ellipse', 'board', 'num']);
+const TOOL_KEY = 'taiyo-sasaoka-mark-tool-v1'; // この端末で最後に使った描く道具（開いたときにその道具。初めは直線）
+/** 開いたときの道具：前に使った描く道具（続けて描く道具だけ）。初めは直線（ユーザーの指示「デフォルトは棒線にする」2026-10-29） */
+function loadTool(): Tool {
+  try {
+    const t = localStorage.getItem(TOOL_KEY) as Tool | null;
+    return t && KEEP_TOOL.has(t) ? t : 'line';
+  } catch {
+    return 'line';
+  }
+}
+const LONG_PRESS = 550; // 手書きの線を、止めてからまっすぐにするまでの時間（ミリ秒。iPhone のメモと同じぐらい）
+
+/** 書式の欄の色（よく使う色。黄＝線・ペン、茶＝枠囲み・補強板の初めの色） */
+const PANEL_COLORS: [string, string][] = [
+  ['FFFF00', '黄'],
+  ['996633', '茶'],
+  ['FF0000', '赤'],
+  ['FFC000', 'オレンジ'],
+  ['92D050', '薄い緑'],
+  ['00B050', '緑'],
+  ['00B0F0', '薄い青'],
+  ['0070C0', '青'],
+  ['7030A0', '紫'],
+  ['FFFFFF', '白'],
+  ['808080', '灰色'],
+  ['000000', '黒'],
 ];
 
+/** 書式の欄のひとまとまり（見出しと中身） */
+function PanelSection({label, children}: {label: string; children: ReactNode}) {
+  return (
+    <div role="group" aria-label={label} className="shrink-0">
+      <div className="pb-1 text-[13px] text-slate-500">{label}</div>
+      <div className="flex gap-1 md:flex-wrap">{children}</div>
+    </div>
+  );
+}
+
 const MIN = 2; // 図形のいちばん小さい大きさ（紙の画素）
-const STYLE_KEY = 'taiyo-sasaoka-mark-style'; // この端末で最後に選んだ書式（新しい図形に使う。Excel の「既定の図形に設定」のかわり）
+const STYLE_KEY = 'taiyo-sasaoka-mark-style-v2'; // v2：線は黄色・枠囲みは茶色を初めの色に（2026-10-29。前の版で覚えた赤を引き継がない） // この端末で最後に選んだ書式（新しい図形に使う。Excel の「既定の図形に設定」のかわり）
 const r5 = (v: number) => Math.round(v * 100000) / 100000;
 const normDeg = (d: number) => (Math.round((((d % 360) + 360) % 360) * 10) / 10) % 360;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -82,17 +153,24 @@ const segDist = (p: Pt, a: Pt, b: Pt) => {
   return Math.hypot(p.x - (a.x + t * vx), p.y - (a.y + t * vy));
 };
 
-/** この端末で最後に選んだ書式（新しい図形・テキストボックス）。読めなければ最初の書式 */
-function loadStyles(): {shape: MarkStyle; text: MarkStyle} {
+/** この端末で最後に選んだ書式（新しい図形・テキストボックス・ペン・補強板・番号）。読めなければ最初の書式 */
+function loadStyles(): Styles {
   const pick = (raw: unknown, base: MarkStyle, kind: PhotoMark['kind']): MarkStyle => {
     const m = cleanMarks([{kind, x1: 0, y1: 0, x2: 1, y2: 1, text: 'a', ...base, ...(raw && typeof raw === 'object' ? raw : {})}])[0];
-    return m ? {line: m.line, width: m.width, dash: m.dash, fill: m.fill, color: m.color, size: m.size, bold: !!m.bold} : base;
+    return m ? {line: m.line, width: m.width, dash: m.dash, fill: m.fill, color: m.color, size: m.size, bold: !!m.bold, ...(m.font ? {font: m.font} : {})} : base;
   };
+  const base: Styles = {shape: SHAPE_STYLE, rect: BOARD_STYLE, pen: PEN_STYLE, text: TEXT_STYLE, num: NUM_STYLE};
   try {
-    const raw = JSON.parse(localStorage.getItem(STYLE_KEY) ?? 'null') as {shape?: unknown; text?: unknown} | null;
-    return {shape: pick(raw?.shape, SHAPE_STYLE, 'rect'), text: pick(raw?.text, TEXT_STYLE, 'text')};
+    const raw = JSON.parse(localStorage.getItem(STYLE_KEY) ?? 'null') as Partial<Record<StyleKey, unknown>> | null;
+    return {
+      shape: pick(raw?.shape, SHAPE_STYLE, 'rect'),
+      rect: pick(raw?.rect, BOARD_STYLE, 'rect'),
+      pen: pick(raw?.pen, PEN_STYLE, 'rect'),
+      text: pick(raw?.text, TEXT_STYLE, 'text'),
+      num: pick(raw?.num, NUM_STYLE, 'text'),
+    };
   } catch {
-    return {shape: SHAPE_STYLE, text: TEXT_STYLE};
+    return base;
   }
 }
 
@@ -147,6 +225,12 @@ function hitMark(m: PhotoMark, p: Pt, W: number, H: number, tol: number): 0 | 1 
   const b = shapeBox(m, V);
   const c = center(b);
   const q = rotP(p, c, -b.rot);
+  // 手書きの線・折れ線・補強板の斜めの線：点をつないだ線の上（手書きの線はそれだけ。補強板は下の四角も）
+  if (hasPts(m.kind)) {
+    const pts = markPts(m, V);
+    for (let i = 1; i < pts.length; i++) if (segDist(q, pts[i - 1], pts[i]) <= tol + sw) return 2;
+    if (m.kind === 'pen') return 0;
+  }
   const [lx, ly, hw, hh] = [q.x - c.x, q.y - c.y, b.w / 2, b.h / 2];
   const edge = tol + sw;
   const solid = m.kind === 'text' || !!m.fill || !!m.text;
@@ -202,7 +286,7 @@ function resizeBox(b: RBox, hx: number, hy: number, p: Pt, keep: boolean, fromCe
 
 /** 書き込みの道具の小さな絵（Excel のリボンの絵に近い形） */
 function Icon({name, color}: {name: string; color?: string}) {
-  const s = {width: 20, height: 20, viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, 'aria-hidden': true} as const;
+  const s = {width: 24, height: 24, viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, 'aria-hidden': true} as const;
   // 矢印の先（x・y が先、dx・dy は線の向き）
   const arrow = (x: number, y: number, dx: number, dy: number) => {
     const a = Math.atan2(dy, dx);
@@ -210,6 +294,16 @@ function Icon({name, color}: {name: string; color?: string}) {
     return <polygon points={`${x},${y} ${p(0.45)} ${p(-0.45)}`} fill="currentColor" stroke="none" />;
   };
   switch (name) {
+    case 'select':
+      return <svg {...s}><path d="M5 2.5 V15.5 L8.3 12.4 L10.6 17.5 L12.6 16.6 L10.3 11.6 H14.8 Z" fill="white" strokeLinejoin="round" /></svg>;
+    case 'pen':
+      return <svg {...s}><path d="M2.5 15 C5 9 7.5 16 10 11 S14.5 6 17.5 4.5" strokeLinecap="round" /></svg>;
+    case 'poly':
+      return <svg {...s}><path d="M3 16.5 L3 7 L11 7 L11 13 L17.5 13" strokeLinejoin="round" /><circle cx="3" cy="7" r="1.3" fill="currentColor" /><circle cx="11" cy="7" r="1.3" fill="currentColor" /><circle cx="11" cy="13" r="1.3" fill="currentColor" /></svg>;
+    case 'board':
+      return <svg {...s}><rect x="2.5" y="4.5" width="15" height="11" stroke="#996633" /><path d="M2.5 15.5 L17.5 4.5" stroke="#996633" /></svg>;
+    case 'num':
+      return <svg {...s}><circle cx="10" cy="10" r="7.5" /><path d="M8.3 7.3 L10.3 6 V14.3 M8.2 14.3 H12.3" strokeLinecap="round" /></svg>;
     case 'line':
       return <svg {...s}><line x1="3" y1="17" x2="17" y2="3" /></svg>;
     case 'arrow':
@@ -250,14 +344,14 @@ function Icon({name, color}: {name: string; color?: string}) {
 /** リボンのひとまとまり（Excel と同じく、下に小さな名前） */
 function Group({label, children}: {label: string; children: ReactNode}) {
   return (
-    <div role="group" aria-label={label} className="flex shrink-0 flex-col border-r border-slate-200 px-1.5 pt-1">
+    <div role="group" aria-label={label} className="flex shrink-0 flex-col border-r border-slate-200 px-2 pt-1 last:border-r-0">
       <div className="flex flex-1 items-start gap-0.5">{children}</div>
-      <div className="whitespace-nowrap pb-0.5 pt-0.5 text-center text-[11px] text-slate-500">{label}</div>
+      <div className="whitespace-nowrap pb-1 pt-0.5 text-center text-[13px] text-slate-500">{label}</div>
     </div>
   );
 }
 
-const RB = 'flex h-9 min-w-9 shrink-0 touch-manipulation items-center justify-center gap-1 rounded px-1.5 text-[13px] text-slate-700 hover:bg-slate-100 disabled:pointer-events-none disabled:opacity-35';
+const RB = 'flex h-11 min-w-11 shrink-0 touch-manipulation items-center justify-center gap-1 rounded px-2 text-[15px] text-slate-700 hover:bg-slate-100 disabled:pointer-events-none disabled:opacity-35';
 
 /** 色を選ぶ（Excel の色のメニュー：テーマの色 10×6・標準の色・なし・その他の色） */
 function ColorPicker({value, none, onPick}: {value: string; none?: string; onPick: (hex: string) => void}) {
@@ -309,6 +403,7 @@ export function PhotoMarkEditor({
   marks: initial,
   onChange,
   onClose,
+  onRotate,
 }: {
   title: string;
   photo: {url: string; w: number; h: number; rot: number};
@@ -316,6 +411,7 @@ export function PhotoMarkEditor({
   marks: PhotoMark[];
   onChange: (marks: PhotoMark[]) => void;
   onClose: () => void;
+  onRotate?: (dir: 1 | -1) => void; // 写真を 90°回す（書き込みも一緒に回して、marks・photo.rot・size を渡し直してもらう）
 }) {
   const W = Math.max(1, size.w);
   const H = Math.max(1, size.h);
@@ -323,16 +419,16 @@ export function PhotoMarkEditor({
   const [marks, setMarks] = useState<PhotoMark[]>(initial);
   const [draft, setDraft] = useState<PhotoMark[] | null>(null);
   const [sel, setSel] = useState<string[]>([]);
-  const [tool, setTool] = useState<Tool | null>(null);
+  const [tool, setTool] = useState<Tool | null>(loadTool);
   const [editing, setEditing] = useState<string | null>(null);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [sub, setSub] = useState<'width' | 'dash' | 'arrow' | null>(null);
-  const [styles, setStyles] = useState(loadStyles);
+  const [styles, setStyles] = useState<Styles>(loadStyles);
   const [armKey, setArmKey] = useState(0); // 文字を打つ所を作り直す（元に戻したときなど、打つ所の文字を今の文字にそろえる）
   const [fontText, setFontText] = useState<string | null>(null); // フォント サイズの欄に打っている途中の文字
   const [sizeText, setSizeText] = useState<{h?: string; w?: string}>({});
   // 塗りつぶし・枠線・文字の色のボタンの下の色（最後に選んだ色。ボタンを押すとその色に。Excel と同じ）
-  const [recent, setRecent] = useState(() => ({fill: styles.shape.fill || 'FFFFFF', line: styles.shape.line || 'FF0000', color: styles.text.color}));
+  const [recent, setRecent] = useState(() => ({fill: styles.shape.fill || 'FFFFFF', line: styles[toolStyleKey(loadTool())].line || SHAPE_STYLE.line, color: styles.text.color}));
   const shown = draft ?? marks;
   const latest = useRef({marks, editing});
   latest.current = {marks, editing};
@@ -340,6 +436,8 @@ export function PhotoMarkEditor({
   const future = useRef<PhotoMark[][]>([]);
   const editStart = useRef<PhotoMark[] | null>(null);
   const drag = useRef<Drag | null>(null);
+  const poly = useRef<{id: string; pts: Pt[]} | null>(null); // 折れ線を描いている途中（押した角の点。紙の画素）
+  const press = useRef<{timer: number; at: Pt} | null>(null); // 手書きの線の長押し（止めた所）
   const lastTap = useRef<{id: string; t: number; x: number; y: number} | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const areaRef = useRef<HTMLDivElement>(null);
@@ -370,6 +468,19 @@ export function PhotoMarkEditor({
     };
   }, []);
 
+  // 写真を回したら、回した書き込み（親が写真と一緒に回したもの）を読み直す。元に戻すは、回す前の書き込みに戻せないので空にする
+  const rotSeen = useRef(photo.rot);
+  useEffect(() => {
+    if (rotSeen.current === photo.rot) return;
+    rotSeen.current = photo.rot;
+    setMarks(initial);
+    latest.current.marks = initial;
+    past.current = [];
+    future.current = [];
+    setSel([]);
+    setDraft(null);
+  }, [photo.rot, initial]);
+
   const byId = (id: string, list = shown) => list.find((m) => m.id === id);
   const selected = shown.filter((m) => sel.includes(m.id));
   const single = selected.length === 1 ? selected[0] : null;
@@ -383,20 +494,26 @@ export function PhotoMarkEditor({
     onChange(next);
   };
   /** 書式を直す（選んだ図形と、これから描く図形に） */
-  const restyle = (patch: Partial<MarkStyle>, target: 'shape' | 'text' | 'auto' = 'auto') => {
+  const restyle = (patch: Partial<MarkStyle>, target: StyleKey | 'auto' = 'auto') => {
     const ids = new Set(sel);
     if (ids.size) {
       const next = marks.map((m) => {
         if (!ids.has(m.id)) return m;
-        const {fill: _fill, ...forLine} = patch; // 直線に塗りつぶしはない
-        const n = {...m, ...(m.kind === 'line' ? forLine : patch)} as PhotoMark;
-        return n.kind === 'text' && (patch.size !== undefined || patch.bold !== undefined) ? fitText(n) : n;
+        const {fill: _fill, ...forLine} = patch; // 直線・手書きの線に塗りつぶしはない
+        const n = {...m, ...(m.kind === 'line' || m.kind === 'pen' ? forLine : patch)} as PhotoMark;
+        return n.kind === 'text' && (patch.size !== undefined || patch.bold !== undefined || patch.font !== undefined) ? fitText(n) : n;
       });
       commit(next);
     }
-    const kinds = ids.size ? new Set(selected.map((m) => (m.kind === 'text' ? 'text' : 'shape'))) : new Set([target === 'auto' ? 'shape' : target]);
+    // 覚える書式：選んだ図形の種類の書式。選んでいなければ、描いている道具の書式（ペンなら黄色のペンの色・太さが変わる）
+    const kinds: Set<StyleKey> = ids.size
+      ? new Set(selected.map((m) => styleKeyOf(m.kind)))
+      : new Set([target === 'text' ? (tool === 'num' ? 'num' : 'text') : tool ? toolStyleKey(tool) : target === 'auto' ? 'shape' : target]);
+    // 塗りつぶしは、選んだ図形を塗ったときは覚えない（次の枠囲みまで塗りつぶされて写真が隠れないように）。何も選ばずに選んだときだけ、次に描く図形に
+    const {fill: _f, ...keep} = patch;
+    const remember = ids.size ? keep : patch;
     setStyles((s) => {
-      const out = {shape: kinds.has('shape') ? {...s.shape, ...patch} : s.shape, text: kinds.has('text') ? {...s.text, ...patch} : s.text};
+      const out = Object.fromEntries((Object.keys(s) as StyleKey[]).map((key) => [key, kinds.has(key) ? {...s[key], ...remember} : s[key]])) as Styles;
       try {
         localStorage.setItem(STYLE_KEY, JSON.stringify(out));
       } catch {
@@ -417,7 +534,7 @@ export function PhotoMarkEditor({
   // ---------------------------------------------------------------- 文字を打つ
   const startEdit = (id: string) => {
     const m = byId(id, marks);
-    if (!m || !isBoxKind(m.kind)) return;
+    if (!m || !hasText(m.kind)) return;
     editStart.current = marks;
     setSel([id]);
     setEditing(id);
@@ -555,6 +672,10 @@ export function PhotoMarkEditor({
         const c = {x: (e.x1 + e.x2) / 2, y: (e.y1 + e.y2) / 2};
         const f = (p: Pt): Pt => (how === 'right' ? rotP(p, c, 90) : how === 'left' ? rotP(p, c, -90) : how === 'flipH' ? {x: 2 * c.x - p.x, y: p.y} : {x: p.x, y: 2 * c.y - p.y});
         n = withLine(m, W, H, f({x: e.x1, y: e.y1}), f({x: e.x2, y: e.y2}));
+      } else if (hasPts(m.kind) && (how === 'flipH' || how === 'flipV')) {
+        // 手書きの線・補強板の反転：中の点を鏡に（角度は逆向き）
+        const b = shapeBox(m, V);
+        n = withBox({...m, pts: (m.pts ?? BOARD_PTS).map(([x, y]) => (how === 'flipH' ? [r5(1 - x), y] : [x, r5(1 - y)]) as [number, number])}, W, H, {...b, rot: -b.rot});
       } else {
         const b = shapeBox(m, V);
         const rot = how === 'right' ? b.rot + 90 : how === 'left' ? b.rot - 90 : how === 'flipH' ? -b.rot : 180 - b.rot;
@@ -598,12 +719,16 @@ export function PhotoMarkEditor({
     const onButton = t && t !== editRef.current && t.closest('button, [role="menu"], [role="toolbar"]');
     const ctrl = e.ctrlKey || e.metaKey;
     const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-    if (e.key === 'Escape') {
+    if (e.key === 'Escape' || (e.key === 'Enter' && poly.current)) {
       e.preventDefault();
-      if (editing) endEdit();
+      // 折れ線の途中：そこまでの線で終える（Excel のフリーフォームと同じ）。もう一度 Esc で道具をやめる
+      if (poly.current) finishPoly();
+      else if (editing) endEdit();
       else if (menu) setMenu(null);
-      else if (tool) setTool(null);
-      else if (sel.length) setSel([]);
+      else if (tool) {
+        setTool(null);
+        setSel([]);
+      } else if (sel.length) setSel([]);
       else onClose();
       return;
     }
@@ -635,7 +760,7 @@ export function PhotoMarkEditor({
       setSel([marks[n].id]);
       return;
     }
-    if ((e.key === 'Enter' || e.key === 'F2') && single && isBoxKind(single.kind)) {
+    if ((e.key === 'Enter' || e.key === 'F2') && single && hasText(single.kind)) {
       e.preventDefault();
       startEdit(single.id);
       return;
@@ -679,7 +804,7 @@ export function PhotoMarkEditor({
       return;
     }
     // 図形を選んで、そのまま文字を打つと、その図形の文字に（打つ所に入る＝armed のとき。日本語の入力もそのまま）
-    if (!armed && single && isBoxKind(single.kind) && e.key.length === 1 && !e.altKey) {
+    if (!armed && single && hasText(single.kind) && e.key.length === 1 && !e.altKey) {
       startEdit(single.id);
     }
   };
@@ -699,8 +824,8 @@ export function PhotoMarkEditor({
   const rotGap = 26 / (k || 1);
 
   const newMark = (t: Tool, a: Pt, b: Pt): PhotoMark => {
-    const kind: PhotoMark['kind'] = t === 'line' || t === 'arrow' || t === 'arrow2' ? 'line' : t;
-    const st = kind === 'text' ? styles.text : styles.shape;
+    const kind: PhotoMark['kind'] = t === 'line' || t === 'arrow' || t === 'arrow2' ? 'line' : t === 'num' ? 'text' : t === 'poly' ? 'pen' : t;
+    const st = styles[toolStyleKey(t)];
     const base: PhotoMark = {
       id: markId(),
       kind,
@@ -711,12 +836,14 @@ export function PhotoMarkEditor({
       line: st.line,
       width: st.width,
       dash: st.dash,
-      fill: kind === 'line' ? '' : st.fill,
+      fill: kind === 'line' || kind === 'pen' ? '' : st.fill,
       size: st.size,
       color: st.color,
       ...(st.bold ? {bold: true} : {}),
+      ...(hasText(kind) && st.font ? {font: st.font} : {}),
       ...(t === 'arrow' || t === 'arrow2' ? {end: true} : {}),
       ...(t === 'arrow2' ? {start: true} : {}),
+      ...(kind === 'board' ? {pts: BOARD_PTS} : {}),
     };
     // 線は線の色が「なし」だと見えないので、なしのときは最初の色
     if (kind === 'line' && !base.line) base.line = SHAPE_STYLE.line;
@@ -755,6 +882,179 @@ export function PhotoMarkEditor({
     return [p0, {x: p0.x + dx * sx, y: p0.y + dy * sy}];
   };
 
+  const clampP = (p: Pt): Pt => ({x: clamp(p.x, 0, W), y: clamp(p.y, 0, H)});
+  /**
+   * 線の端に吸い付く（画面で 10画素まで）：直線・矢印・折れ線・手書きの線の端につなげて描ける（L字・続けて描く線。
+   * ユーザーの指示「L字に曲げることができない」「連続で線を引くことができない」2026-10-29）。吸い付かなければ p のまま
+   */
+  const snapEnd = (p: Pt, except?: string): Pt => {
+    let [best, bd] = [p, 10 / (k || 1)];
+    for (const m of latest.current.marks) {
+      if (m.id === except) continue;
+      let ends: Pt[] = [];
+      if (m.kind === 'line') {
+        const e = lineEnds(m, V);
+        ends = [
+          {x: e.x1, y: e.y1},
+          {x: e.x2, y: e.y2},
+        ];
+      } else if (m.kind === 'pen') {
+        const b = shapeBox(m, V);
+        const pts = markPts(m, V);
+        ends = [pts[0], pts[pts.length - 1]].filter(Boolean).map((q) => rotP(q, center(b), b.rot));
+      }
+      for (const q of ends) {
+        const d = Math.hypot(q.x - p.x, q.y - p.y);
+        if (d < bd) [best, bd] = [q, d];
+      }
+    }
+    return best;
+  };
+  /** 線の向き：Shift で 15°ずつ。押さなくても、横・縦から 4°までは横・縦にそろえる（まっすぐな L字を指でも描けるように） */
+  const aim = (p0: Pt, p: Pt, shift: boolean): Pt => {
+    if (shift) return clampP(snap15(p0, p));
+    const [dx, dy] = [p.x - p0.x, p.y - p0.y];
+    const len = Math.hypot(dx, dy);
+    const a = (Math.atan2(dy, dx) * 180) / Math.PI;
+    const near = Math.round(a / 90) * 90;
+    if (Math.abs(a - near) > 4 || len * k < 12) return p;
+    const r = (near * Math.PI) / 180;
+    return clampP({x: p0.x + len * Math.cos(r), y: p0.y + len * Math.sin(r)});
+  };
+  /** 線の終わりの点：ほかの線の端に吸い付く。吸い付かなければ向きをそろえる */
+  const endOf = (p0: Pt, p: Pt, shift: boolean, except?: string): Pt => {
+    const s = snapEnd(p, except);
+    return s !== p ? s : aim(p0, p, shift);
+  };
+  /** 手書きの線・折れ線の点（紙の画素）から図形を作る：点を囲む四角（細い線でも MIN の幅）と、その中の割合の点。点が1つなら null */
+  const penMark = (raw: Pt[], id: string): PhotoMark | null => {
+    const pts = simplifyStroke(
+      raw.filter((q, i) => i === 0 || Math.hypot(q.x - raw[i - 1].x, q.y - raw[i - 1].y) > 0.01),
+      0.6 / (k || 1),
+    );
+    if (pts.length < 2) return null;
+    const xs = pts.map((q) => q.x);
+    const ys = pts.map((q) => q.y);
+    let [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+    if (x1 - x0 < MIN) [x0, x1] = [Math.max(0, (x0 + x1) / 2 - MIN / 2), Math.min(W, (x0 + x1) / 2 + MIN / 2)];
+    if (y1 - y0 < MIN) [y0, y1] = [Math.max(0, (y0 + y1) / 2 - MIN / 2), Math.min(H, (y0 + y1) / 2 + MIN / 2)];
+    const st = styles.pen;
+    return {
+      id,
+      kind: 'pen',
+      x1: r5(x0 / W),
+      y1: r5(y0 / H),
+      x2: r5(x1 / W),
+      y2: r5(y1 / H),
+      line: st.line || PEN_STYLE.line,
+      width: st.width,
+      dash: st.dash,
+      fill: '',
+      size: st.size,
+      color: st.color,
+      pts: pts.map((q) => [r5((q.x - x0) / (x1 - x0 || 1)), r5((q.y - y0) / (y1 - y0 || 1))] as [number, number]),
+    };
+  };
+  /** 手書きの線を長押しでまっすぐにした直線（ペンの色・太さのまま） */
+  const straightLine = (id: string, a: Pt, b: Pt): PhotoMark => ({...newMark('line', a, b), id, line: styles.pen.line || PEN_STYLE.line, width: styles.pen.width, dash: styles.pen.dash});
+  // 長押し：描いている手書きの線を止めて LONG_PRESS たつと、始めの点から今の点までの直線にする（そのあとは終わりの点を動かせる）
+  const stopPress = () => {
+    if (press.current) clearTimeout(press.current.timer);
+    press.current = null;
+  };
+  const armPress = (at: Pt) => {
+    stopPress();
+    press.current = {
+      at,
+      timer: window.setTimeout(() => {
+        const d = drag.current;
+        if (!d || d.type !== 'pen' || d.straight || d.pts.length < 2) return;
+        const [a, b] = [d.pts[0], d.pts[d.pts.length - 1]];
+        if (Math.hypot(b.x - a.x, b.y - a.y) * k < 16) return; // 短すぎる線はまっすぐにしない
+        d.straight = true;
+        d.pts = [a, aim(a, b, false)];
+        setDraft([...latest.current.marks, straightLine(d.id, a, d.pts[1])]);
+      }, LONG_PRESS),
+    };
+  };
+  useEffect(() => stopPress, []);
+  // 折れ線（押すたびに角の点。最後の点をもう一度押す・ダブルクリック・Enter・Esc で終わる）
+  const [polyOn, setPolyOn] = useState(false);
+  const showPoly = (hover?: Pt) => {
+    const cur = poly.current;
+    if (!cur) return;
+    const m = penMark(hover ? [...cur.pts, hover] : cur.pts, cur.id);
+    setDraft(m ? [...latest.current.marks, m] : null);
+  };
+  const finishPoly = () => {
+    const cur = poly.current;
+    poly.current = null;
+    setPolyOn(false);
+    setDraft(null);
+    const m = cur ? penMark(cur.pts, cur.id) : null;
+    if (m) {
+      commit([...latest.current.marks, m]);
+      setSel([m.id]);
+    }
+  };
+  const addPolyPoint = (raw: Pt, shift: boolean) => {
+    const cur = poly.current;
+    if (!cur) {
+      poly.current = {id: markId(), pts: [snapEnd(raw)]};
+      setPolyOn(true);
+      setSel([]);
+      return;
+    }
+    const last = cur.pts[cur.pts.length - 1];
+    const q = endOf(last, raw, shift);
+    if (Math.hypot(q.x - last.x, q.y - last.y) * k < 8) {
+      finishPoly();
+      return;
+    }
+    cur.pts.push(q);
+    showPoly();
+  };
+  /** 番号（①②…）を押した所に置く：次の番号の文字だけのテキストボックス（道具はそのまま。続けて押すと次の番号） */
+  const placeNumber = (p: Pt) => {
+    const st = styles.num;
+    const text = nextNumberText(marks);
+    const em = st.size * PT_PX;
+    const w = Math.min(W, em * (text.length > 1 ? 0.6 * text.length + 0.4 : 1.15) + 2 * MARK_INSET.x);
+    const h = Math.min(H, em * MARK_LINE_K + 2 * MARK_INSET.y);
+    const base: PhotoMark = {id: markId(), kind: 'text', x1: 0, y1: 0, x2: 0, y2: 0, line: st.line, width: st.width, dash: st.dash, fill: st.fill, size: st.size, color: st.color, text, ...(st.bold ? {bold: true} : {}), ...(st.font ? {font: st.font} : {})};
+    const m = fitText(withBox(base, W, H, {x: clamp(p.x - w / 2, 0, W - w), y: clamp(p.y - h / 2, 0, H - h), w, h, rot: 0}));
+    commit([...marks, m]);
+    setSel([m.id]);
+  };
+  /** 直線の ↻ のつまみ（直線のまん中から、線と直角に上へ） */
+  const lineRotHandle = (m: PhotoMark): {c: Pt; p: Pt} | null => {
+    const e = lineEnds(m, V);
+    const len = Math.hypot(e.x2 - e.x1, e.y2 - e.y1);
+    if (len * k < 30) return null; // 短い線はつまみが端のつまみに重なるので出さない
+    let [nx, ny] = [-(e.y2 - e.y1) / len, (e.x2 - e.x1) / len];
+    if (ny > 0) [nx, ny] = [-nx, -ny];
+    const c = {x: (e.x1 + e.x2) / 2, y: (e.y1 + e.y2) / 2};
+    return {c, p: {x: c.x + nx * rotGap, y: c.y + ny * rotGap}};
+  };
+  /** 選んでいる図形のつまみを押したか（大きさ・回す・直線の端・直線を回す） */
+  const handleDrag = (p: Pt, e: {pointerType?: string}): Drag | null => {
+    if (!single) return null;
+    const ht = handleTol(e);
+    if (single.kind === 'line') {
+      const en = lineEnds(single, V);
+      const which = Math.hypot(p.x - en.x2, p.y - en.y2) <= ht ? 2 : Math.hypot(p.x - en.x1, p.y - en.y1) <= ht ? 1 : 0;
+      if (which) return {type: 'end', id: single.id, which, base: single};
+      const r = lineRotHandle(single);
+      if (r && Math.hypot(p.x - r.p.x, p.y - r.p.y) <= ht) return {type: 'rotline', id: single.id, base: single, a0: Math.atan2(p.y - r.c.y, p.x - r.c.x), c: r.c};
+      return null;
+    }
+    const b = shapeBox(single, V);
+    const h = boxHandles(b, rotGap).find((x) => Math.hypot(p.x - x.p.x, p.y - x.p.y) <= ht);
+    if (!h) return null;
+    const c = center(b);
+    return h.hy === -2 ? {type: 'rotate', id: single.id, base: single, a0: Math.atan2(p.y - c.y, p.x - c.x)} : {type: 'resize', id: single.id, hx: h.hx, hy: h.hy, base: single};
+  };
+
   const down = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.target instanceof HTMLElement && e.target.closest('[data-edit-text]') && editing) return; // 打っている文字の中（カーソルを動かす・文字を選ぶ）
     if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -766,7 +1066,23 @@ export function PhotoMarkEditor({
     // リボンのボタンから写真へ（Enter などがボタンに行かないように）。図形を選んでいれば、離したあとに打つ所へ（arm）
     if (document.activeElement !== editRef.current) e.currentTarget.focus({preventScroll: true});
     if (tool) {
-      const p0 = {x: clamp(p.x, 0, W), y: clamp(p.y, 0, H)};
+      // 描く道具のあいだは、押すといつも描く（描いたばかりの線の端から続けて描ける＝L字。直すときは「選択」。Excel の「描画モードのロック」と同じ）
+      const raw = clampP(p);
+      if (tool === 'pen') {
+        drag.current = {type: 'pen', id: markId(), pts: [raw], straight: false};
+        armPress(raw);
+        setSel([]);
+        return;
+      }
+      if (tool === 'poly') {
+        addPolyPoint(raw, e.shiftKey);
+        return;
+      }
+      if (tool === 'num') {
+        placeNumber(raw);
+        return;
+      }
+      const p0 = tool === 'line' || tool === 'arrow' || tool === 'arrow2' ? snapEnd(raw) : raw;
       const m = newMark(tool, p0, p0);
       drag.current = {type: 'create', tool, p0, id: m.id, ctrl: e.ctrlKey || e.metaKey};
       setDraft([...marks, m]);
@@ -774,24 +1090,10 @@ export function PhotoMarkEditor({
       return;
     }
     // 選んでいる図形のつまみ
-    if (single) {
-      const ht = handleTol(e);
-      if (single.kind === 'line') {
-        const en = lineEnds(single, V);
-        const which = Math.hypot(p.x - en.x2, p.y - en.y2) <= ht ? 2 : Math.hypot(p.x - en.x1, p.y - en.y1) <= ht ? 1 : 0;
-        if (which) {
-          drag.current = {type: 'end', id: single.id, which, base: single};
-          return;
-        }
-      } else {
-        const b = shapeBox(single, V);
-        const h = boxHandles(b, rotGap).find((x) => Math.hypot(p.x - x.p.x, p.y - x.p.y) <= ht);
-        if (h) {
-          const c = center(b);
-          drag.current = h.hy === -2 ? {type: 'rotate', id: single.id, base: single, a0: Math.atan2(p.y - c.y, p.x - c.x)} : {type: 'resize', id: single.id, hx: h.hx, hy: h.hy, base: single};
-          return;
-        }
-      }
+    const hd = handleDrag(p, e);
+    if (hd) {
+      drag.current = hd;
+      return;
     }
     const hit = topHit(marks, p, W, H, tolOf(e));
     if (!hit) {
@@ -803,7 +1105,7 @@ export function PhotoMarkEditor({
     const now = performance.now();
     const tap = lastTap.current;
     lastTap.current = e.pointerType === 'mouse' ? null : {id: hit.id, t: now, x: e.clientX, y: e.clientY};
-    if (e.pointerType !== 'mouse' && tap && tap.id === hit.id && now - tap.t < 400 && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 12 && isBoxKind(hit.kind)) {
+    if (e.pointerType !== 'mouse' && tap && tap.id === hit.id && now - tap.t < 400 && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 12 && hasText(hit.kind)) {
       proxyRef.current?.focus({preventScroll: true}); // iPad：押したその場でキーボードを出す（あとで打つ所に移す）
       lastTap.current = null;
       drag.current = null;
@@ -819,10 +1121,48 @@ export function PhotoMarkEditor({
 
   const move = (e: ReactPointerEvent<HTMLDivElement>) => {
     const d = drag.current;
+    // 折れ線の途中：次の角までの線を、マウスの所まで見せる
+    if (!d && poly.current && k) {
+      const cur = poly.current;
+      showPoly(endOf(cur.pts[cur.pts.length - 1], clampP(toPaper(e)), e.shiftKey));
+      return;
+    }
     if (!d) return;
     const p = toPaper(e);
+    if (d.type === 'pen') {
+      const q = clampP(p);
+      if (d.straight) {
+        d.pts = [d.pts[0], endOf(d.pts[0], q, e.shiftKey)];
+        setDraft([...marks, straightLine(d.id, d.pts[0], d.pts[1])]);
+        return;
+      }
+      const last = d.pts[d.pts.length - 1];
+      if (Math.hypot(q.x - last.x, q.y - last.y) * k < 1) return;
+      d.pts.push(q);
+      // 止めている間（画面で 3画素より動かない）は長押しの時計を進める。動いたら測り直す
+      const at = press.current?.at;
+      if (!at || Math.hypot(q.x - at.x, q.y - at.y) * k > 3) armPress(q);
+      const m = penMark(d.pts, d.id);
+      setDraft(m ? [...marks, m] : null);
+      return;
+    }
+    if (d.type === 'rotline') {
+      const en = lineEnds(d.base, V);
+      let deg = ((Math.atan2(p.y - d.c.y, p.x - d.c.x) - d.a0) * 180) / Math.PI;
+      const cur = (Math.atan2(en.y2 - en.y1, en.x2 - en.x1) * 180) / Math.PI;
+      if (e.shiftKey) deg = Math.round((cur + deg) / 15) * 15 - cur;
+      else {
+        const near = Math.round((cur + deg) / 90) * 90;
+        if (Math.abs(cur + deg - near) <= 3) deg = near - cur;
+      }
+      const n = withLine(d.base, W, H, rotP({x: en.x1, y: en.y1}, d.c, deg), rotP({x: en.x2, y: en.y2}, d.c, deg));
+      if (inside(n, W, H)) setDraft(marks.map((m) => (m.id === d.id ? n : m)));
+      return;
+    }
     if (d.type === 'create') {
-      const [a, b] = shapeFrom(d.tool, d.p0, p, e.shiftKey, d.ctrl || e.ctrlKey || e.metaKey);
+      let [a, b] = shapeFrom(d.tool, d.p0, p, e.shiftKey, d.ctrl || e.ctrlKey || e.metaKey);
+      // 直線・矢印：ほかの線の端に吸い付く・横と縦にそろえる（Ctrl のまん中からは、そのまま）
+      if ((d.tool === 'line' || d.tool === 'arrow' || d.tool === 'arrow2') && !(d.ctrl || e.ctrlKey || e.metaKey)) b = endOf(a, b, e.shiftKey);
       const m = byId(d.id, draft ?? []) ?? newMark(d.tool, a, b);
       setDraft([...marks, m.kind === 'line' ? withLine(m, W, H, a, b) : withBox(m, W, H, {x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y), rot: 0})]);
       return;
@@ -864,12 +1204,28 @@ export function PhotoMarkEditor({
       }
       n = withBox(d.base, W, H, {...b, rot});
     } else {
-      n = withBox(d.base, W, H, resizeBox(b, d.hx, d.hy, {x: clamp(p.x, 0, W), y: clamp(p.y, 0, H)}, e.shiftKey, e.ctrlKey || e.metaKey));
+      // テキストボックスの角：斜めに引くと、縦横の比のまま文字も一緒に大きく・小さく（ユーザーの指示「斜めにも縮小、拡大できるようにする」2026-10-29。
+      // テキストボックスの高さは文字に合わせるので、比のままにしないと幅しか変わらなかった）
+      const scaleText = d.base.kind === 'text' && d.hx !== 0 && d.hy !== 0;
+      n = withBox(d.base, W, H, resizeBox(b, d.hx, d.hy, {x: clamp(p.x, 0, W), y: clamp(p.y, 0, H)}, e.shiftKey || scaleText, e.ctrlKey || e.metaKey));
+      if (scaleText) n = {...n, size: clamp(Math.round(((d.base.size * shapeBox(n, V).w) / (b.w || 1)) * 2) / 2, 1, 400)};
       if (n.kind === 'text') n = fitText(n);
     }
     if (inside(n, W, H)) setDraft(marks.map((m) => (m.id === d.id ? n : m)));
   };
 
+  /** 描く道具のまま押しただけ：押した所の図形を選ぶ（なければ選ぶのをやめる）。指で2回たたくと文字を打つ */
+  const tapSelect = (p: Pt, e: {pointerType?: string; clientX: number; clientY: number}) => {
+    const hit = topHit(marks, p, W, H, tolOf(e));
+    setSel(hit ? [hit.id] : []);
+    const now = performance.now();
+    const tap = lastTap.current;
+    lastTap.current = hit && e.pointerType !== 'mouse' ? {id: hit.id, t: now, x: e.clientX, y: e.clientY} : null;
+    if (hit && tap && tap.id === hit.id && now - tap.t < 400 && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 12 && hasText(hit.kind)) {
+      lastTap.current = null;
+      startEdit(hit.id);
+    }
+  };
   const up = (e: ReactPointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     drag.current = null;
@@ -877,10 +1233,51 @@ export function PhotoMarkEditor({
     if (!d) return;
     const next = draft;
     setDraft(null);
+    if (d.type === 'pen') {
+      stopPress();
+      if (d.straight) {
+        const [a, b] = d.pts;
+        if (Math.hypot(b.x - a.x, b.y - a.y) * k >= 4) {
+          const m = straightLine(d.id, a, b);
+          commit([...marks, m]);
+          setSel([m.id]);
+        }
+        return;
+      }
+      // ぐしゃぐしゃに描いた：その線が上を通った線・図形を消す（iPhone のメモと同じ。上を通った図形がなければ、ふつうの線）
+      if (isScribble(d.pts)) {
+        const tol = 5 / k;
+        // 描いた点のあいだも見る（速く描くと点がまばらで、線をまたいでも点が線の上に来ない）
+        const dense = d.pts.flatMap((q, i) => {
+          const o = d.pts[i - 1];
+          if (!o) return [q];
+          const n = Math.max(1, Math.ceil((Math.hypot(q.x - o.x, q.y - o.y) * k) / 3));
+          return Array.from({length: n}, (_, j) => ({x: o.x + ((q.x - o.x) * (j + 1)) / n, y: o.y + ((q.y - o.y) * (j + 1)) / n}));
+        });
+        const ids = new Set(marks.filter((m) => dense.some((q) => hitMark(m, q, W, H, tol) === 2)).map((m) => m.id));
+        if (ids.size) {
+          commit(marks.filter((m) => !ids.has(m.id)));
+          setSel([]);
+          return;
+        }
+      }
+      const m = penMark(d.pts, d.id);
+      const b = m ? markBounds(m, V) : null;
+      if (m && b && Math.max(b.w, b.h) * k >= 3) {
+        commit([...marks, m]);
+        setSel([m.id]);
+      } else tapSelect(d.pts[0], e);
+      return;
+    }
     if (d.type === 'create') {
       let m = next ? byId(d.id, next) : undefined;
       if (!m) return;
       const b = markBounds(m, V);
+      // 続けて描く道具で押しただけ：何も置かない（押した所の図形を選ぶ。色・太さを直せる）
+      if (Math.max(b.w, b.h) * k < 4 && KEEP_TOOL.has(d.tool)) {
+        tapSelect(d.p0, e);
+        return;
+      }
       // 押しただけ（ほとんど動かしていない）：Excel と同じく決まった大きさで置く
       if (Math.max(b.w, b.h) * k < 4) {
         const p0 = d.p0;
@@ -896,7 +1293,7 @@ export function PhotoMarkEditor({
       if (m.kind === 'text') m = fitText(m);
       commit([...marks, m]);
       setSel([m.id]);
-      setTool(null);
+      if (!KEEP_TOOL.has(d.tool)) setTool(null);
       if (m.kind === 'text') {
         proxyRef.current?.focus({preventScroll: true}); // iPad：押したその場でキーボードを出す
         editStart.current = [...marks, m];
@@ -935,15 +1332,19 @@ export function PhotoMarkEditor({
 
   // ---------------------------------------------------------------- リボンの値
   const first = selected[0];
-  const lineStyle = first ?? {...styles.shape};
-  const fillValue = first ? first.fill : styles.shape.fill;
-  const lineValue = first ? first.line : styles.shape.line;
-  const widthValue = first ? first.width : styles.shape.width;
-  const dashValue: PhotoMarkDash = first ? first.dash : styles.shape.dash;
-  const fontFirst = selected.find((m) => isBoxKind(m.kind));
-  const fontSize = fontFirst ? fontFirst.size : styles.text.size;
-  const fontColor = fontFirst ? fontFirst.color : styles.text.color;
-  const bold = fontFirst ? !!fontFirst.bold : !!styles.text.bold;
+  const toolStyle = styles[tool ? toolStyleKey(tool) : 'shape'];
+  const fontStyle = styles[tool === 'num' ? 'num' : 'text'];
+  const lineStyle = first ?? {...toolStyle};
+  const fillValue = first ? first.fill : toolStyle.fill;
+  const lineValue = first ? first.line : toolStyle.line;
+  const widthValue = first ? first.width : toolStyle.width;
+  const dashValue: PhotoMarkDash = first ? first.dash : toolStyle.dash;
+  const fontFirst = selected.find((m) => hasText(m.kind));
+  const fontSize = fontFirst ? fontFirst.size : fontStyle.size;
+  const fontColor = fontFirst ? fontFirst.color : fontStyle.color;
+  const bold = fontFirst ? !!fontFirst.bold : !!fontStyle.bold;
+  // フォントのない書き込み（前の版）は、前の版の見た目（游ゴシックに近い）
+  const fontName = fontFirst ? (fontFirst.font ?? '游ゴシック') : (fontStyle.font ?? MARK_FONT_DEFAULT);
   const sizeOf = (m: PhotoMark | undefined) => {
     if (!m) return null;
     if (m.kind === 'line') {
@@ -990,7 +1391,7 @@ export function PhotoMarkEditor({
       </>
     );
   };
-  const item = (label: string, onClick: () => void, opts: {disabled?: boolean; checked?: boolean; keys?: string; icon?: ReactNode; sample?: ReactNode} = {}) => (
+  const item = (label: string, onClick: () => void, opts: {disabled?: boolean; checked?: boolean; keys?: string; icon?: ReactNode; sample?: ReactNode; style?: CSSProperties} = {}) => (
     <button
       key={label}
       type="button"
@@ -1004,7 +1405,9 @@ export function PhotoMarkEditor({
       className={`flex w-full items-center gap-2 whitespace-nowrap rounded px-2 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-100 disabled:opacity-40 ${opts.checked ? 'bg-slate-100' : ''}`}
     >
       <span className="flex w-6 justify-center">{opts.icon ?? (opts.checked ? '✓' : '')}</span>
-      <span className="flex-1">{label}</span>
+      <span className="flex-1" style={opts.style}>
+        {label}
+      </span>
       {opts.sample}
       {opts.keys && <span className="pl-4 text-[11px] text-slate-400">{opts.keys}</span>}
     </button>
@@ -1039,7 +1442,7 @@ export function PhotoMarkEditor({
   };
 
   const fontSizeInput = (
-    <div className="flex h-9 items-center">
+    <div className="flex h-11 items-center">
       <input
         aria-label="フォント サイズ"
         title="フォント サイズ"
@@ -1055,9 +1458,9 @@ export function PhotoMarkEditor({
         onKeyDown={(e) => {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
         }}
-        className="h-7 w-12 rounded-l border border-slate-300 px-1.5 text-[13px]"
+        className="h-9 w-14 rounded-l border border-slate-300 px-2 text-[15px]"
       />
-      <button type="button" aria-label="フォント サイズの一覧" title="フォント サイズ" onClick={(e) => openMenu('size', e.currentTarget)} className="h-7 rounded-r border border-l-0 border-slate-300 px-1 text-[10px] text-slate-600 hover:bg-slate-100">
+      <button type="button" aria-label="フォント サイズの一覧" title="フォント サイズ" onClick={(e) => openMenu('size', e.currentTarget)} className="h-9 rounded-r border border-l-0 border-slate-300 px-1.5 text-[12px] text-slate-600 hover:bg-slate-100">
         ▼
       </button>
     </div>
@@ -1070,8 +1473,8 @@ export function PhotoMarkEditor({
       resizeTo(dim, Math.max(0, Math.round(cm * 100) / 100));
     };
     return (
-      <label className="flex h-8 items-center gap-1 text-[12px] text-slate-600">
-        <span className="w-6 text-right">{label}</span>
+      <label className="flex h-11 items-center gap-1 text-[14px] text-slate-600">
+        <span className="w-8 text-right">{label}</span>
         <input
           aria-label={label}
           title={`図形の${label}（cm）`}
@@ -1096,27 +1499,28 @@ export function PhotoMarkEditor({
               apply(v + (e.key === 'ArrowUp' ? 0.1 : -0.1));
             }
           }}
-          className="h-7 w-16 rounded border border-slate-300 px-1.5 text-right text-[13px] disabled:bg-slate-50"
+          className="h-9 w-[4.5rem] rounded border border-slate-300 px-2 text-right text-[15px] disabled:bg-slate-50"
         />
         <span>cm</span>
         <span className="flex flex-col">
-          <button type="button" aria-label={`${label}を大きく`} disabled={v === null} onClick={() => v !== null && apply(v + 0.1)} className="h-3.5 px-1 text-[8px] leading-none text-slate-500 hover:bg-slate-100 disabled:opacity-30">
+          <button type="button" aria-label={`${label}を大きく`} disabled={v === null} onClick={() => v !== null && apply(v + 0.1)} className="h-[18px] px-1.5 text-[10px] leading-none text-slate-500 hover:bg-slate-100 disabled:opacity-30">
             ▲
           </button>
-          <button type="button" aria-label={`${label}を小さく`} disabled={v === null} onClick={() => v !== null && apply(Math.max(0, v - 0.1))} className="h-3.5 px-1 text-[8px] leading-none text-slate-500 hover:bg-slate-100 disabled:opacity-30">
+          <button type="button" aria-label={`${label}を小さく`} disabled={v === null} onClick={() => v !== null && apply(Math.max(0, v - 0.1))} className="h-[18px] px-1.5 text-[10px] leading-none text-slate-500 hover:bg-slate-100 disabled:opacity-30">
             ▼
           </button>
         </span>
       </label>
     );
   };
-  const split = (name: Exclude<Menu['name'], 'context'>, label: string, icon: ReactNode, apply: () => void, disabled = false) => (
-    <div className="flex h-9 shrink-0 items-stretch rounded hover:ring-1 hover:ring-slate-200">
+  // labelCls：名前を隠す画面の幅（狭い画面は絵だけ。前面へ・背面へは 1536px より狭いと絵だけ＝リボンを 1366px の画面に収める）
+  const split = (name: Exclude<Menu['name'], 'context'>, label: string, icon: ReactNode, apply: () => void, disabled = false, labelCls = 'max-sm:hidden') => (
+    <div className="flex h-11 shrink-0 items-stretch rounded hover:ring-1 hover:ring-slate-200">
       <button type="button" className={`${RB} rounded-r-none pr-1`} title={label} aria-label={label} onClick={apply} disabled={disabled}>
         {icon}
-        <span className="max-sm:hidden">{label}</span>
+        <span className={labelCls}>{label}</span>
       </button>
-      <button type="button" className="rounded-r px-1 text-[10px] text-slate-600 hover:bg-slate-100 disabled:opacity-35" aria-label={`${label}の一覧`} title={label} aria-haspopup="menu" aria-expanded={menu?.name === name} disabled={disabled} onClick={(e) => openMenu(name, e.currentTarget)}>
+      <button type="button" className="rounded-r px-1.5 text-[12px] text-slate-600 hover:bg-slate-100 disabled:opacity-35" aria-label={`${label}の一覧`} title={label} aria-haspopup="menu" aria-expanded={menu?.name === name} disabled={disabled} onClick={(e) => openMenu(name, e.currentTarget)}>
         ▼
       </button>
     </div>
@@ -1126,7 +1530,7 @@ export function PhotoMarkEditor({
   const pb = rotatedBounds({x: 0, y: 0, w: Math.max(photo.w, 1), h: Math.max(photo.h, 1)}, photo.rot);
   const ps = W / (pb.w || 1); // 写真の画素 → 紙の画素
   const [iw, ih] = [Math.max(photo.w, 1) * ps, Math.max(photo.h, 1) * ps];
-  const editMark = editing ? byId(editing) : single && isBoxKind(single.kind) && !draft ? single : null;
+  const editMark = editing ? byId(editing) : single && hasText(single.kind) && !draft ? single : null;
   const editBox = editMark ? shapeBox(editMark, V) : null;
   const strokeSel = '#64748b';
 
@@ -1137,14 +1541,24 @@ export function PhotoMarkEditor({
         .map((m) => {
           if (m.kind === 'line') {
             const e = lineEnds(m, V);
+            const r = selected.length === 1 && !draft && !tool ? lineRotHandle(m) : null;
             return (
               <g key={m.id} data-sel={m.id}>
                 {[
                   [e.x1, e.y1],
                   [e.x2, e.y2],
                 ].map(([x, y], i) => (
-                  <circle key={i} cx={x * k} cy={y * k} r={5.5} fill="white" stroke={strokeSel} strokeWidth={1.2} />
+                  <circle key={i} cx={x * k} cy={y * k} r={tool ? 3 : 5.5} fill={tool ? strokeSel : 'white'} stroke={strokeSel} strokeWidth={1.2} />
                 ))}
+                {r && (
+                  // 直線を回すつまみ（まん中のまわりに回す。Shift で 15°ずつ）
+                  <g data-line-rot transform={`translate(${r.p.x * k} ${r.p.y * k})`}>
+                    <line x1={0} y1={0} x2={(r.c.x - r.p.x) * k} y2={(r.c.y - r.p.y) * k} stroke={strokeSel} strokeWidth={1} strokeDasharray="2 2" />
+                    <circle r={8} fill="white" stroke={strokeSel} strokeWidth={1.2} />
+                    <path d="M3.5 -2.5 A4.2 4.2 0 1 0 4.2 1.5" fill="none" stroke={strokeSel} strokeWidth={1.3} />
+                    <path d="M4.5 -5.2 L3.8 -2.2 L1 -3" fill="none" stroke={strokeSel} strokeWidth={1.3} />
+                  </g>
+                )}
               </g>
             );
           }
@@ -1156,7 +1570,7 @@ export function PhotoMarkEditor({
             [1, 1],
             [-1, 1],
           ].map(([hx, hy]) => rotP({x: c.x + (hx * b.w) / 2, y: c.y + (hy * b.h) / 2}, c, b.rot));
-          const hs = selected.length === 1 && !draft ? boxHandles(b, rotGap) : [];
+          const hs = selected.length === 1 && !draft && !tool ? boxHandles(b, rotGap) : [];
           return (
             <g key={m.id} data-sel={m.id}>
               <polygon points={pts.map((q) => `${q.x * k},${q.y * k}`).join(' ')} fill="none" stroke={strokeSel} strokeWidth={1} strokeDasharray={editing === m.id ? '4 3' : undefined} />
@@ -1178,187 +1592,348 @@ export function PhotoMarkEditor({
   );
 
   const canvasCursor = tool ? 'crosshair' : 'default';
+  /** 道具を選ぶ（null＝選択）。折れ線の途中ならそこまでで終える。描く道具は覚えて、次に開いたときもその道具 */
+  const pickTool = (t: Tool | null) => {
+    if (editing) endEdit();
+    if (poly.current) finishPoly();
+    setTool(t);
+    setSel([]);
+    setMenu(null);
+    if (t && KEEP_TOOL.has(t))
+      try {
+        localStorage.setItem(TOOL_KEY, t);
+      } catch {
+        /* 覚えられなくても、この画面ではそのまま使える */
+      }
+  };
+  /** 写真を 90°回す（書き込みも一緒に。打っている文字・折れ線は入れてから） */
+  const rotatePhoto = (dir: 1 | -1) => {
+    if (!onRotate) return;
+    if (editing) endEdit();
+    if (poly.current) finishPoly();
+    setMenu(null);
+    onRotate(dir);
+  };
+  /** 閉じる（折れ線の途中ならそこまでの線を入れてから） */
+  const close = () => {
+    if (poly.current) finishPoly();
+    onClose();
+  };
   const textCss: CSSProperties | undefined = editMark ? markTextCss(editMark, k) : undefined;
 
   return (
     <div role="dialog" aria-modal="true" aria-label={`${title}の写真に書き込む`} className="fixed inset-0 z-[60] flex flex-col bg-slate-100 text-slate-800">
-      {/* 上の帯：元に戻す・やり直し（Excel のクイック アクセス ツール バー）・題名・閉じる */}
-      <div className="flex items-center gap-1 border-b border-slate-200 bg-white px-2 py-1">
-        <button type="button" className={RB} title="元に戻す (Ctrl+Z)" aria-label="元に戻す" disabled={!past.current.length && !editing} onClick={undo}>
-          ↶
-        </button>
-        <button type="button" className={RB} title="やり直し (Ctrl+Y)" aria-label="やり直し" disabled={!future.current.length} onClick={redo}>
-          ↷
-        </button>
-        <div className="min-w-0 flex-1 truncate px-2 text-sm text-slate-700">✏️ {title}</div>
-        <button type="button" onClick={onClose} className="h-9 rounded-md border border-slate-300 bg-white px-4 text-sm text-slate-700 hover:bg-slate-50">
+      {/* 上の帯：元に戻す・やり直し（Excel のクイック アクセス ツール バー）・題名・閉じる（まん中。ユーザーの指示「閉じるボタンは中央にもってくる」2026-10-29） */}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-slate-200 bg-white px-2 py-1">
+        <div className="flex min-w-0 items-center gap-1">
+          <button type="button" className={RB} title="元に戻す (Ctrl+Z)" aria-label="元に戻す" disabled={!past.current.length && !editing} onClick={undo}>
+            ↶
+          </button>
+          <button type="button" className={RB} title="やり直し (Ctrl+Y)" aria-label="やり直し" disabled={!future.current.length} onClick={redo}>
+            ↷
+          </button>
+          <div className="min-w-0 truncate px-2 text-base text-slate-700">✏️ {title}</div>
+        </div>
+        <button type="button" onClick={close} className="h-11 rounded-md border border-slate-300 bg-white px-8 text-base text-slate-700 hover:bg-slate-50">
           閉じる
         </button>
+        <div />
       </div>
       {/* リボン（Excel の「図形の書式」と同じ並び） */}
       <div className="border-b border-slate-200 bg-white">
-        <div className="flex gap-4 px-3 pt-1 text-[13px]">
+        <div className="flex justify-center gap-4 px-3 pt-1 text-[15px]">
           <span className="border-b-2 border-emerald-600 px-1 pb-0.5 text-emerald-800">図形の書式</span>
         </div>
-        <div role="toolbar" aria-label="図形の書式" className="flex items-stretch overflow-x-auto px-1 pb-0.5">
-          <Group label="図形の挿入">
-            <div className="grid grid-cols-3 gap-0.5">
-              {TOOLS.map((t) => (
-                <button
-                  key={t.key}
-                  type="button"
-                  aria-label={t.label}
-                  title={t.label}
-                  aria-pressed={tool === t.key}
-                  onClick={() => {
-                    if (editing) endEdit();
-                    setTool((cur) => (cur === t.key ? null : t.key));
-                    setSel([]);
-                  }}
-                  className={`${RB} h-8 min-w-8 px-1 ${tool === t.key ? 'bg-slate-200 ring-1 ring-slate-400' : ''}`}
-                >
-                  <Icon name={t.key} />
-                </button>
-              ))}
-            </div>
-          </Group>
-          <Group label="図形のスタイル">
-            <div className="flex flex-col">
-              {split('fill', '図形の塗りつぶし', <Icon name="fill" color={recent.fill ? `#${recent.fill}` : ''} />, () => restyle({fill: recent.fill}, 'shape'), selected.length > 0 && selected.every((m) => m.kind === 'line'))}
-              {split('line', '図形の枠線', <Icon name="outline" color={recent.line ? `#${recent.line}` : ''} />, () => restyle({line: recent.line}, 'shape'))}
-            </div>
-          </Group>
-          <Group label="フォント">
-            <div className="flex flex-col gap-0.5">
-              <div className="flex items-center gap-0.5">
-                {fontSizeInput}
-                <button type="button" className={RB} title="フォント サイズの拡大" aria-label="フォント サイズの拡大" onClick={() => growFont(1)}>
-                  A<sup>▲</sup>
-                </button>
-                <button type="button" className={RB} title="フォント サイズの縮小" aria-label="フォント サイズの縮小" onClick={() => growFont(-1)}>
-                  A<sup>▼</sup>
-                </button>
+        <div role="toolbar" aria-label="図形の書式" className="overflow-x-auto pb-0.5">
+          <div className="mx-auto flex w-max items-stretch px-1">
+            <Group label="図形の挿入">
+              <div className="grid grid-cols-6 gap-0.5">
+                {[{key: null, label: '選択（図形を選ぶ・動かす）'} as const, ...TOOLS].map((t) => (
+                  <button
+                    key={t.key ?? 'select'}
+                    type="button"
+                    aria-label={t.key ? t.label : '選択'}
+                    title={t.label}
+                    aria-pressed={tool === t.key}
+                    onClick={() => pickTool(t.key)}
+                    className={`${RB} px-1 ${tool === t.key ? 'bg-emerald-100 ring-1 ring-emerald-500' : ''}`}
+                  >
+                    <Icon name={t.key ?? 'select'} />
+                  </button>
+                ))}
               </div>
-              <div className="flex items-center gap-0.5">
-                <button type="button" className={`${RB} ${bold ? 'bg-slate-200' : ''}`} title="太字 (Ctrl+B)" aria-label="太字" aria-pressed={bold} onClick={() => restyle({bold: !bold}, 'text')}>
-                  <b>B</b>
-                </button>
-                {split('color', '文字の色', <Icon name="fontColor" color={`#${recent.color}`} />, () => restyle({color: recent.color}, 'text'))}
+            </Group>
+            <Group label="図形のスタイル">
+              <div className="flex flex-col">
+                {split('fill', '図形の塗りつぶし', <Icon name="fill" color={recent.fill ? `#${recent.fill}` : ''} />, () => restyle({fill: recent.fill}, 'shape'), selected.length > 0 && selected.every((m) => m.kind === 'line'))}
+                {split('line', '図形の枠線', <Icon name="outline" color={recent.line ? `#${recent.line}` : ''} />, () => restyle({line: recent.line}, 'shape'))}
               </div>
-            </div>
-          </Group>
-          <Group label="配置">
-            <div className="flex flex-col">
-              <div className="flex">
-                {split('front', '前面へ移動', <Icon name="front" />, () => order('front'), !sel.length)}
-                {split('back', '背面へ移動', <Icon name="back" />, () => order('back'), !sel.length)}
+            </Group>
+            <Group label="フォント">
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label="フォント"
+                    title="フォント"
+                    aria-haspopup="menu"
+                    aria-expanded={menu?.name === 'font'}
+                    onClick={(e) => openMenu('font', e.currentTarget)}
+                    className="flex h-9 w-44 items-center justify-between gap-1 rounded border border-slate-300 px-2 text-left text-[15px] text-slate-700 hover:bg-slate-50"
+                  >
+                    <span className="truncate" style={{fontFamily: markFontCss(fontName) ?? undefined}}>
+                      {fontName}
+                    </span>
+                    <span className="text-[12px] text-slate-600">▼</span>
+                  </button>
+                  {fontSizeInput}
+                </div>
+                <div className="flex items-center gap-0.5">
+                  <button type="button" className={RB} title="フォント サイズの拡大" aria-label="フォント サイズの拡大" onClick={() => growFont(1)}>
+                    A<sup>▲</sup>
+                  </button>
+                  <button type="button" className={RB} title="フォント サイズの縮小" aria-label="フォント サイズの縮小" onClick={() => growFont(-1)}>
+                    A<sup>▼</sup>
+                  </button>
+                  <button type="button" className={`${RB} ${bold ? 'bg-slate-200' : ''}`} title="太字 (Ctrl+B)" aria-label="太字" aria-pressed={bold} onClick={() => restyle({bold: !bold}, 'text')}>
+                    <b>B</b>
+                  </button>
+                  {split('color', '文字の色', <Icon name="fontColor" color={`#${recent.color}`} />, () => restyle({color: recent.color}, 'text'))}
+                </div>
               </div>
-              <div className="flex">
-                <button type="button" className={RB} title="回転" aria-label="回転" disabled={!sel.length} onClick={(e) => openMenu('rotate', e.currentTarget)}>
-                  <Icon name="rotate" />
-                  <span className="max-sm:hidden">回転</span>
-                  <span className="text-[10px]">▼</span>
-                </button>
-                <button type="button" className={RB} title="削除 (Delete)" aria-label="削除" disabled={!sel.length} onClick={remove}>
-                  <Icon name="delete" />
-                  <span className="max-sm:hidden">削除</span>
-                </button>
+            </Group>
+            <Group label="配置">
+              <div className="flex flex-col">
+                <div className="flex">
+                  {split('front', '前面へ移動', <Icon name="front" />, () => order('front'), !sel.length, 'max-2xl:hidden')}
+                  {split('back', '背面へ移動', <Icon name="back" />, () => order('back'), !sel.length, 'max-2xl:hidden')}
+                </div>
+                <div className="flex">
+                  <button type="button" className={RB} title="回転" aria-label="回転" disabled={!sel.length} onClick={(e) => openMenu('rotate', e.currentTarget)}>
+                    <Icon name="rotate" />
+                    <span className="max-sm:hidden">回転</span>
+                    <span className="text-[10px]">▼</span>
+                  </button>
+                  <button type="button" className={RB} title="削除 (Delete)" aria-label="削除" disabled={!sel.length} onClick={remove}>
+                    <Icon name="delete" />
+                    <span className="max-sm:hidden">削除</span>
+                  </button>
+                </div>
               </div>
-            </div>
-          </Group>
-          <Group label="クリップボード">
-            <button type="button" className={`${RB} h-[4.5rem] flex-col`} title="貼り付け (Ctrl+V)" aria-label="貼り付け" disabled={!clip.items.length} onClick={paste}>
-              <Icon name="paste" />
-              <span className="text-[12px]">貼り付け</span>
-            </button>
-            <div className="flex flex-col">
-              <button type="button" className={RB} title="切り取り (Ctrl+X)" aria-label="切り取り" disabled={!sel.length} onClick={cut}>
-                <Icon name="cut" />
+            </Group>
+            <Group label="クリップボード">
+              <button type="button" className={`${RB} h-[5.5rem] flex-col`} title="貼り付け (Ctrl+V)" aria-label="貼り付け" disabled={!clip.items.length} onClick={paste}>
+                <Icon name="paste" />
+                <span className="text-[14px]">貼り付け</span>
               </button>
-              <button type="button" className={RB} title="コピー (Ctrl+C)" aria-label="コピー" disabled={!sel.length} onClick={copy}>
-                <Icon name="copy" />
-              </button>
-            </div>
-          </Group>
-          <Group label="サイズ">
-            <div className="flex flex-col gap-0.5">
-              {sizeInput('h', '高さ')}
-              {sizeInput('w', '幅')}
-            </div>
-          </Group>
+              <div className="flex flex-col">
+                <button type="button" className={RB} title="切り取り (Ctrl+X)" aria-label="切り取り" disabled={!sel.length} onClick={cut}>
+                  <Icon name="cut" />
+                </button>
+                <button type="button" className={RB} title="コピー (Ctrl+C)" aria-label="コピー" disabled={!sel.length} onClick={copy}>
+                  <Icon name="copy" />
+                </button>
+              </div>
+            </Group>
+            <Group label="サイズ">
+              <div className="flex flex-col gap-0.5">
+                {sizeInput('h', '高さ')}
+                {sizeInput('w', '幅')}
+              </div>
+            </Group>
+          </div>
         </div>
       </div>
-      {/* 写真（まわりは灰色。写真の外で押すと選ぶのをやめる） */}
-      <div
-        ref={areaRef}
-        role="application"
-        aria-label="写真の書き込み"
-        className="relative min-h-0 flex-1 touch-none select-none overflow-hidden outline-none"
-        style={{cursor: canvasCursor}}
-        onPointerDown={down}
-        onPointerMove={move}
-        onPointerUp={up}
-        onPointerCancel={up}
-        onContextMenu={context}
-        onDoubleClick={(e) => {
-          if (tool || editing || !k) return;
-          const hit = topHit(marks, toPaper(e), W, H, 6 / k);
-          if (hit && isBoxKind(hit.kind)) startEdit(hit.id);
-        }}
-        tabIndex={-1}
-      >
-        {k > 0 && (
-          <div ref={stageRef} data-photo-stage className="absolute" style={{left: ox, top: oy, width: W * k, height: H * k}}>
-            <div className="absolute inset-0 overflow-hidden bg-white shadow-md">
-              <img src={photo.url} alt="" draggable={false} className="absolute max-w-none select-none" style={{left: ((W - iw) / 2) * k, top: ((H - ih) / 2) * k, width: iw * k, height: ih * k, transform: photo.rot ? `rotate(${photo.rot}deg)` : undefined}} />
-            </div>
-            <MarkLayer marks={shown} w={W} h={H} k={k} hide={editing} style={{left: 0, top: 0}} />
-            {selectionSvg}
-            {editMark && editBox && (
-              // 文字を打つ所（図形の上に重ねる。選んだだけのときは見えないまま待っていて、打つと見える＝Excel と同じく選んでそのまま打てる）
-              <div
-                data-edit-text
-                className="absolute flex flex-col"
-                style={{
-                  left: editBox.x * k,
-                  top: editBox.y * k,
-                  width: editBox.w * k,
-                  height: editBox.h * k,
-                  transform: editBox.rot ? `rotate(${editBox.rot}deg)` : undefined,
-                  justifyContent: editMark.kind === 'text' ? 'flex-start' : 'center',
-                  opacity: editing ? 1 : 0,
-                  pointerEvents: editing ? 'auto' : 'none',
-                  cursor: 'text',
+      <div className="flex min-h-0 flex-1 max-md:flex-col">
+        {/* 書式の欄：線の色・太さ・線の種類・塗りつぶし・文字の色をいつも見せる（写真の横の空いた所。ユーザーの指示「線の太さや色などは空いたスペースに常時表示する」
+            2026-10-29）。選んだ図形があればその図形の、なければ今の道具の書式。狭い画面は写真の上に横に並べる（横に動かせる） */}
+        <aside aria-label="書式" className="flex shrink-0 gap-x-5 gap-y-4 overflow-auto border-slate-200 bg-white px-3 py-2 text-slate-700 max-md:border-b md:w-64 md:flex-col md:border-r">
+          {onRotate && (
+            <PanelSection label="写真の向き">
+              <button type="button" onClick={() => rotatePhoto(-1)} aria-label="写真を左に回す" className="flex h-10 shrink-0 touch-manipulation items-center gap-1 whitespace-nowrap rounded-md border border-slate-300 bg-white px-3 text-[15px] hover:bg-slate-50">
+                ↺ 左へ
+              </button>
+              <button type="button" onClick={() => rotatePhoto(1)} aria-label="写真を右に回す" className="flex h-10 shrink-0 touch-manipulation items-center gap-1 whitespace-nowrap rounded-md border border-slate-300 bg-white px-3 text-[15px] hover:bg-slate-50">
+                ↻ 右へ
+              </button>
+            </PanelSection>
+          )}
+          <PanelSection label="線の色">
+            {PANEL_COLORS.map(([hex, name]) => (
+              <button
+                key={hex}
+                type="button"
+                aria-label={`線の色 ${name}`}
+                title={name}
+                aria-pressed={lineValue === hex}
+                onClick={() => {
+                  restyle({line: hex}, 'shape');
+                  setRecent((r) => ({...r, line: hex}));
                 }}
+                className={`h-8 w-8 shrink-0 touch-manipulation rounded border border-slate-300 ${lineValue === hex ? 'outline outline-2 outline-offset-1 outline-emerald-600' : ''}`}
+                style={{background: `#${hex}`}}
+              />
+            ))}
+          </PanelSection>
+          <PanelSection label="線の太さ">
+            {LINE_WIDTHS.map((w) => (
+              <button
+                key={w}
+                type="button"
+                aria-label={`線の太さ ${w} pt`}
+                title={`${w} pt`}
+                aria-pressed={widthValue === w}
+                onClick={() => restyle({width: w}, 'shape')}
+                className={`flex h-9 w-[4.6rem] shrink-0 touch-manipulation items-center gap-1 rounded border px-1 text-[12px] ${widthValue === w ? 'border-emerald-600 bg-emerald-50' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
               >
-                <textarea
-                  key={`${editMark.id}:${armKey}`}
-                  ref={editRef}
-                  aria-label="図形の文字"
-                  value={editMark.text ?? ''}
-                  spellCheck={false}
-                  onBeforeInput={() => {
-                    if (!latest.current.editing && editMark) {
-                      editStart.current = latest.current.marks;
-                      setEditing(editMark.id);
-                    }
-                  }}
-                  onCompositionStart={() => {
-                    if (!latest.current.editing && editMark) {
-                      editStart.current = latest.current.marks;
-                      setEditing(editMark.id);
-                    }
-                  }}
-                  onChange={(e) => onText(e.target.value)}
-                  className="block w-full resize-none overflow-hidden border-0 bg-transparent outline-none"
-                  style={{...textCss, height: textHeight(editMark, editBox.w) * k, caretColor: editing ? undefined : 'transparent'}}
-                />
+                <svg width="34" height="14" aria-hidden>
+                  <line x1="2" y1="7" x2="32" y2="7" stroke={`#${lineValue && lineValue !== 'FFFFFF' && lineValue !== 'FFFF00' ? lineValue : '334155'}`} strokeWidth={Math.max(0.6, w * PT_PX)} />
+                </svg>
+                {w}
+              </button>
+            ))}
+          </PanelSection>
+          <PanelSection label="線の種類">
+            {DASHES.map((d) => {
+              const sw = 2;
+              return (
+                <button
+                  key={d.key}
+                  type="button"
+                  aria-label={`線の種類 ${d.label}`}
+                  title={d.label}
+                  aria-pressed={dashValue === d.key}
+                  onClick={() => restyle({dash: d.key}, 'shape')}
+                  className={`flex h-9 w-[4.6rem] shrink-0 touch-manipulation items-center justify-center rounded border ${dashValue === d.key ? 'border-emerald-600 bg-emerald-50' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+                >
+                  <svg width="56" height="10" aria-hidden>
+                    <line x1="1" y1="5" x2="55" y2="5" stroke="#334155" strokeWidth={sw} strokeDasharray={d.pattern.length ? d.pattern.map((v) => v * sw).join(' ') : undefined} />
+                  </svg>
+                </button>
+              );
+            })}
+          </PanelSection>
+          <PanelSection label="塗りつぶし">
+            {[['', 'なし'] as [string, string], ...PANEL_COLORS].map(([hex, name]) => (
+              <button
+                key={hex || 'none'}
+                type="button"
+                aria-label={`塗りつぶし ${name}`}
+                title={name}
+                aria-pressed={fillValue === hex}
+                disabled={selected.length > 0 && selected.every((m) => m.kind === 'line' || m.kind === 'pen')}
+                onClick={() => {
+                  restyle({fill: hex}, 'shape');
+                  if (hex) setRecent((r) => ({...r, fill: hex}));
+                }}
+                className={`relative h-8 w-8 shrink-0 touch-manipulation overflow-hidden rounded border border-slate-300 disabled:opacity-35 ${fillValue === hex ? 'outline outline-2 outline-offset-1 outline-emerald-600' : ''}`}
+                style={{background: hex ? `#${hex}` : 'white'}}
+              >
+                {!hex && <span className="absolute left-1/2 top-[-4px] h-10 w-0.5 -translate-x-1/2 rotate-45 bg-red-500" />}
+              </button>
+            ))}
+          </PanelSection>
+          <PanelSection label="文字の色">
+            {PANEL_COLORS.map(([hex, name]) => (
+              <button
+                key={hex}
+                type="button"
+                aria-label={`文字の色 ${name}`}
+                title={name}
+                aria-pressed={fontColor === hex}
+                onClick={() => {
+                  restyle({color: hex}, 'text');
+                  setRecent((r) => ({...r, color: hex}));
+                }}
+                className={`flex h-8 w-8 shrink-0 touch-manipulation items-center justify-center rounded border border-slate-300 bg-white text-[17px] leading-none ${fontColor === hex ? 'outline outline-2 outline-offset-1 outline-emerald-600' : ''}`}
+                style={{color: `#${hex}`, background: hex === 'FFFFFF' || hex === 'FFFF00' ? '#475569' : 'white'}}
+              >
+                あ
+              </button>
+            ))}
+          </PanelSection>
+        </aside>
+        {/* 写真（まわりは灰色。写真の外で押すと選ぶのをやめる） */}
+        <div
+          ref={areaRef}
+          role="application"
+          aria-label="写真の書き込み"
+          className="relative min-h-0 min-w-0 flex-1 touch-none select-none overflow-hidden outline-none"
+          style={{cursor: canvasCursor}}
+          onPointerDown={down}
+          onPointerMove={move}
+          onPointerUp={up}
+          onPointerCancel={up}
+          onContextMenu={context}
+          onDoubleClick={(e) => {
+            if (tool === 'poly') {
+              finishPoly();
+              return;
+            }
+            if (tool === 'num' || tool === 'text' || editing || !k) return;
+            const hit = topHit(marks, toPaper(e), W, H, 6 / k);
+            if (hit && hasText(hit.kind)) startEdit(hit.id);
+          }}
+          tabIndex={-1}
+        >
+          {k > 0 && (
+            <div ref={stageRef} data-photo-stage className="absolute" style={{left: ox, top: oy, width: W * k, height: H * k}}>
+              <div className="absolute inset-0 overflow-hidden bg-white shadow-md">
+                <img src={photo.url} alt="" draggable={false} className="absolute max-w-none select-none" style={{left: ((W - iw) / 2) * k, top: ((H - ih) / 2) * k, width: iw * k, height: ih * k, transform: photo.rot ? `rotate(${photo.rot}deg)` : undefined}} />
               </div>
-            )}
-          </div>
-        )}
-        {/* iPad：押したその場でキーボードを出すための見えない入力欄 */}
-        <textarea ref={proxyRef} data-proxy aria-hidden tabIndex={-1} className="pointer-events-none absolute left-0 top-0 h-px w-px opacity-0" />
+              <MarkLayer marks={shown} w={W} h={H} k={k} hide={editing} style={{left: 0, top: 0}} />
+              {selectionSvg}
+              {editMark && editBox && (
+                // 文字を打つ所（図形の上に重ねる。選んだだけのときは見えないまま待っていて、打つと見える＝Excel と同じく選んでそのまま打てる）
+                <div
+                  data-edit-text
+                  className="absolute flex flex-col"
+                  style={{
+                    left: editBox.x * k,
+                    top: editBox.y * k,
+                    width: editBox.w * k,
+                    height: editBox.h * k,
+                    transform: editBox.rot ? `rotate(${editBox.rot}deg)` : undefined,
+                    justifyContent: editMark.kind === 'text' ? 'flex-start' : 'center',
+                    opacity: editing ? 1 : 0,
+                    pointerEvents: editing ? 'auto' : 'none',
+                    cursor: 'text',
+                  }}
+                >
+                  <textarea
+                    key={`${editMark.id}:${armKey}`}
+                    ref={editRef}
+                    aria-label="図形の文字"
+                    value={editMark.text ?? ''}
+                    spellCheck={false}
+                    onBeforeInput={() => {
+                      if (!latest.current.editing && editMark) {
+                        editStart.current = latest.current.marks;
+                        setEditing(editMark.id);
+                      }
+                    }}
+                    onCompositionStart={() => {
+                      if (!latest.current.editing && editMark) {
+                        editStart.current = latest.current.marks;
+                        setEditing(editMark.id);
+                      }
+                    }}
+                    onChange={(e) => onText(e.target.value)}
+                    className="block w-full resize-none overflow-hidden border-0 bg-transparent outline-none"
+                    style={{...textCss, height: textHeight(editMark, editBox.w) * k, caretColor: editing ? undefined : 'transparent'}}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+          {polyOn && (
+            <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={finishPoly} className="absolute bottom-3 left-1/2 h-11 -translate-x-1/2 rounded-md border border-slate-300 bg-white px-5 text-base text-slate-700 shadow-md hover:bg-slate-50">
+              ✓ 折れ線を終える
+            </button>
+          )}
+          {/* iPad：押したその場でキーボードを出すための見えない入力欄 */}
+          <textarea ref={proxyRef} data-proxy aria-hidden tabIndex={-1} className="pointer-events-none absolute left-0 top-0 h-px w-px opacity-0" />
+        </div>
       </div>
       {/* メニュー */}
       {menu?.name === 'fill' &&
@@ -1392,6 +1967,12 @@ export function PhotoMarkEditor({
           '図形の枠線',
           true,
         )}
+      {menu?.name === 'font' &&
+        menuBox(
+          MARK_FONTS.map((f) => item(f.name, () => restyle({font: f.name}, 'text'), {checked: fontName === f.name, style: {fontFamily: markFontCss(f.name) ?? undefined, fontSize: 15}})),
+          'フォント',
+          true,
+        )}
       {menu?.name === 'size' && menuBox(FONT_SIZES.map((s) => item(String(s), () => restyle({size: s}, 'text'), {checked: fontSize === s})), 'フォント サイズ')}
       {menu?.name === 'front' && menuBox([item('前面へ移動', () => order('front')), item('最前面へ移動', () => order('top'))], '前面へ移動')}
       {menu?.name === 'back' && menuBox([item('背面へ移動', () => order('back')), item('最背面へ移動', () => order('bottom'))], '背面へ移動')}
@@ -1403,7 +1984,7 @@ export function PhotoMarkEditor({
             item('切り取り', cut, {disabled: !menu.on, keys: 'Ctrl+X'}),
             item('コピー', copy, {disabled: !menu.on, keys: 'Ctrl+C'}),
             item('貼り付け', paste, {disabled: !clip.items.length, keys: 'Ctrl+V'}),
-            ...(menu.on && single && isBoxKind(single.kind) ? [item('テキストの編集', () => startEdit(single.id), {keys: 'F2'})] : []),
+            ...(menu.on && single && hasText(single.kind) ? [item('テキストの編集', () => startEdit(single.id), {keys: 'F2'})] : []),
             ...(menu.on ? [item('最前面へ移動', () => order('top')), item('最背面へ移動', () => order('bottom')), item('削除', remove, {keys: 'Delete'})] : [item('すべて選択', () => setSel(marks.map((m) => m.id)), {keys: 'Ctrl+A', disabled: !marks.length})]),
           ],
           '右クリックのメニュー',

@@ -97,7 +97,8 @@ export type PhotoMarkDash = 'solid' | 'sysDot' | 'sysDash' | 'dash' | 'dashDot' 
  */
 export type PhotoMark = {
   id: string;
-  kind: 'line' | 'rect' | 'ellipse' | 'text';
+  // pen＝手書きの線（pts の点をつなぐ）、board＝補強板（四角と、pts の斜めの線。2026-10-29 の指示「ベースプレート、木の補強板…四角の斜め」）
+  kind: 'line' | 'rect' | 'ellipse' | 'text' | 'pen' | 'board';
   x1: number;
   y1: number;
   x2: number;
@@ -113,6 +114,8 @@ export type PhotoMark = {
   size: number; // 文字の大きさ（pt）
   color: string; // 文字の色
   bold?: boolean;
+  font?: string; // 文字のフォント（MARK_FONTS の名前。ないときは前の版の書き込み＝游ゴシックに近いフォント）
+  pts?: [number, number][]; // 手書きの線・補強板の斜めの線の点（回す前の四角の中の割合 0〜1）
 };
 export type PlacePhotoMarks = {before?: PhotoMark[]; after?: PhotoMark[]};
 

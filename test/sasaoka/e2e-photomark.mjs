@@ -4,7 +4,9 @@
 //   矢印をドラッグで描く（Shift で 15°ずつ）→ 図形の枠線で色・太さ・点線、四角形（Shift で正方形）、テキストボックス（押すとすぐ打てる・日本語も）、
 //   押して選ぶ・ドラッグで動かす・つまみで大きさ・端の○で長さ、Ctrl+C／V・Delete・Ctrl+Z／Y・Ctrl を押したままドラッグで複製、サイズの欄（cm）、回転、右クリックのメニュー。
 //   閉じると写真の欄・プレビュー・印刷の写真に重なり、読み直しても残り、Excel の写真貼付用紙には Excel の図形（直線矢印コネクタ・正方形/長方形・テキスト ボックス）で入る。
-//   写真を 90°回すと書き込みも一緒に回り、写真を差し替えると消える。スマホ（390px）・iPad でも描ける
+//   写真を 90°回すと書き込みも一緒に回り、写真を差し替えると消える。スマホ（390px）・iPad でも描ける。
+//   2026-10-29：開いたときは直線・描いても道具はそのまま（続けて描く）・線の端に吸い付く（L字）・折れ線・手書きのペン（長押しでまっすぐ・ぐしゃぐしゃで消す）・
+//   補強板（茶色）・番号（①②）・選択。線は黄色・枠囲みは茶色が初め。リボンは大きく、まん中
 // usage: node e2e-photomark.mjs <サイトのURL> <出力フォルダ>
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
@@ -94,14 +96,25 @@ const kinds = () => marks().evaluateAll((els) => els.map((e) => e.getAttribute('
 /** 書き込みの画面の中の図形の線（SVG）の属性 */
 const svgOf = (i, sel) => marks().nth(i).locator(sel).first().evaluate((el) => Object.fromEntries([...el.attributes].map((a) => [a.name, a.value])));
 
-// 矢印：ドラッグで描く（終点に矢印）。描いたら選んだまま（Excel と同じ）
+// 開いたときは直線（ユーザーの指示「デフォルトは棒線にする」2026-10-29）。リボンは画面のまん中
+const pressed = (name) => ribbon.getByRole('button', {name, exact: true}).getAttribute('aria-pressed');
+assert.equal(await pressed('直線'), 'true');
+{
+  const rb = await ribbon.locator('> div').boundingBox();
+  assert.ok(Math.abs(rb.x + rb.width / 2 - 1366 / 2) < 2, `リボンはまん中 ${rb.x}+${rb.width}`);
+  const fsz = await ribbon.getByRole('group', {name: '図形の挿入'}).locator('> div').last().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+  assert.ok(fsz >= 13, `まとまりの名前の字 ${fsz}px`);
+  const cb = await dlg.getByRole('button', {name: '閉じる', exact: true}).boundingBox();
+  assert.ok(Math.abs(cb.x + cb.width / 2 - 1366 / 2) < 2, `閉じるはまん中 ${cb.x}+${cb.width}`);
+}
+// 矢印：ドラッグで描く（終点に矢印）。描いたら選んだまま。道具もそのまま（続けて描ける。ユーザーの指示「連続で前回使用していた棒線を入力できるようにする」）
 await ribbon.getByRole('button', {name: '矢印', exact: true}).click();
-assert.equal(await ribbon.getByRole('button', {name: '矢印', exact: true}).getAttribute('aria-pressed'), 'true');
+assert.equal(await pressed('矢印'), 'true');
 await dragOn([0.15, 0.85], [0.42, 0.55]);
 assert.deepEqual(await kinds(), ['line']);
-assert.equal(await ribbon.getByRole('button', {name: '矢印', exact: true}).getAttribute('aria-pressed'), 'false'); // 描いたら道具は戻る
+assert.equal(await pressed('矢印'), 'true'); // 描いても道具はそのまま
 assert.equal(await marks().nth(0).locator('polygon').count(), 1); // 矢印の先
-assert.equal((await svgOf(0, 'line')).stroke, '#FF0000'); // 赤（最初の書式）
+assert.equal((await svgOf(0, 'line')).stroke, '#FFFF00'); // 黄色（最初の書式。ユーザーの指示「初期の色は黄色」）
 // 図形の枠線 → 太さ 4.5pt・青・破線
 await ribbon.getByRole('button', {name: '図形の枠線の一覧'}).click();
 await page.getByRole('menu', {name: '図形の枠線'}).getByRole('menuitem', {name: '太さ'}).click();
@@ -123,8 +136,8 @@ assert.deepEqual(await kinds(), ['line', 'rect']);
 const rect = await svgOf(1, 'rect');
 assert.ok(Math.abs(Number(rect.width) - Number(rect.height)) < 0.5, `正方形 ${rect.width}×${rect.height}`);
 assert.equal(rect.fill, 'none'); // 塗りつぶしなし
-// 四角形は枠線の色・太さが前に選んだもの（青・4.5pt。Excel の「既定の図形に設定」のかわり）
-assert.equal(rect.stroke, '#0070C0');
+// 枠囲み（四角形）は茶色（ユーザーの指示「枠囲みの初期データは茶色」。線の色を変えても枠囲みは別に覚える）
+assert.equal(rect.stroke, '#996633');
 log('四角形（Shift で正方形）OK');
 
 // テキストボックス：押すとすぐ打てる（日本語も）
@@ -151,7 +164,15 @@ await ribbon.getByRole('button', {name: '文字の色の一覧'}).click();
 await page.getByRole('menu', {name: '文字の色'}).getByRole('menuitemradio', {name: '緑', exact: true}).click();
 assert.equal(await textDiv().evaluate((el) => getComputedStyle(el).color), 'rgb(0, 176, 80)');
 await page.screenshot({path: path.join(outDir, 'mark-01-editor.png')});
-log('テキストボックス（押すとすぐ打てる・日本語・改行・文字の大きさ 14pt・文字の色）OK');
+// フォント：初めはメイリオ。一覧（30）から選ぶ（ユーザーの指示「メイリオみたいなやつがデフォルトで、一応３０種類ぐらい選べるようにする」）
+assert.match(await textDiv().evaluate((el) => el.style.fontFamily), /^"?メイリオ"?, "?Meiryo/);
+assert.equal(await ribbon.getByRole('button', {name: 'フォント', exact: true}).innerText().then((t) => t.replace('▼', '').trim()), 'メイリオ');
+await ribbon.getByRole('button', {name: 'フォント', exact: true}).click();
+const fontMenu = page.getByRole('menu', {name: 'フォント'});
+assert.equal(await fontMenu.getByRole('menuitemradio').count(), 30);
+await fontMenu.getByRole('menuitemradio', {name: 'HG丸ｺﾞｼｯｸM-PRO'}).click();
+assert.match(await textDiv().evaluate((el) => el.style.fontFamily), /^"?HG丸ｺﾞｼｯｸM-PRO"?, "?HGMaruGothicMPRO/);
+log('テキストボックス（押すとすぐ打てる・日本語・改行・文字の大きさ 14pt・文字の色・フォント）OK');
 
 // ---------------- 選ぶ・動かす・端の○で長さ
 const selected = () => dlg.locator('[data-sel]').evaluateAll((els) => els.map((e) => e.getAttribute('data-sel')));
@@ -226,6 +247,24 @@ await width.fill('5');
 await width.press('Enter');
 assert.ok(Math.abs(Number((await svgOf(2, 'rect')).width) - (5 / 2.54) * 96) < 0.2, 'テキストボックスの幅 5cm');
 assert.equal(await width.inputValue(), '5.00');
+// 角のつまみを斜めに引く：テキストボックスは縦横の比のまま、文字も大きく（ユーザーの指示「斜めにも縮小、拡大できるようにする」）→ 元に戻す
+{
+  const handles = dlg.locator(`[data-sel="${textId}"] > circle`);
+  const br = await handles.nth(7).boundingBox(); // 右下
+  const before = await svgOf(2, 'rect');
+  await page.mouse.move(br.x + br.width / 2, br.y + br.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(br.x + br.width / 2 + 60, br.y + br.height / 2 + 30, {steps: 6});
+  await page.mouse.up();
+  const after = await svgOf(2, 'rect');
+  const grow = Number(after.width) / Number(before.width);
+  assert.ok(grow > 1.1, `幅 ${before.width} → ${after.width}`);
+  const fsNow = Number(await ribbon.getByRole('textbox', {name: 'フォント サイズ'}).inputValue());
+  assert.ok(Math.abs(fsNow - 14 * grow) <= 0.6, `文字の大きさ ${fsNow}（${grow}倍）`);
+  assert.ok(Number(after.height) / Number(before.height) > 1.1, '高さも大きく');
+  await page.keyboard.press('Control+z');
+  assert.equal(Number(await ribbon.getByRole('textbox', {name: 'フォント サイズ'}).inputValue()), 14);
+}
 // 四角形を選んで、回転 → 右へ 90 度回転、塗りつぶし → 黄
 await page.mouse.click(edge.x, edge.y);
 await ribbon.getByRole('button', {name: '回転', exact: true}).click();
@@ -260,8 +299,9 @@ assert.deepEqual(await kinds(), ['rect', 'line', 'text', 'ellipse', 'line']);
 const flat = await svgOf(4, 'line');
 assert.equal(Number(flat.y1).toFixed(2), Number(flat.y2).toFixed(2)); // 水平
 assert.equal(await marks().nth(4).locator('polygon').count(), 0); // 直線は矢印なし
-await page.keyboard.press('Escape'); // 選ぶのをやめる
+await page.keyboard.press('Escape'); // 道具と、選ぶのをやめる
 assert.deepEqual(await selected(), []);
+assert.equal(await pressed('選択'), 'true');
 await page.screenshot({path: path.join(outDir, 'mark-02-editor-all.png')});
 await page.keyboard.press('Escape'); // 閉じる
 await dlg.waitFor({state: 'detached'});
@@ -301,9 +341,9 @@ assert.deepEqual(after.map((a) => /name="([^"\d]+) \d+"/.exec(a)[1]), ['正方�
 const [xRect, xArrow, xText, xEllipse, xLine] = after;
 assert.match(xArrow, /<a:ln w="57150"><a:solidFill><a:srgbClr val="0070C0"\/><\/a:solidFill><a:prstDash val="dash"\/><a:tailEnd type="triangle" w="med" len="med"\/><\/a:ln>/);
 assert.match(xRect, /<a:xfrm rot="5400000">/);
-assert.match(xRect, /<a:solidFill><a:srgbClr val="FFFF00"\/><\/a:solidFill><a:ln w="57150">/);
+assert.match(xRect, /<a:solidFill><a:srgbClr val="FFFF00"\/><\/a:solidFill><a:ln w="28575"><a:solidFill><a:srgbClr val="996633"\/>/);
 assert.match(xText, /<xdr:cNvSpPr txBox="1"\/>/);
-assert.match(xText, /sz="1400"><a:solidFill><a:srgbClr val="00B050"\/><\/a:solidFill><\/a:rPr><a:t>Tesuri 手すり　L=800mm<\/a:t>/);
+assert.match(xText, /sz="1400"><a:solidFill><a:srgbClr val="00B050"\/><\/a:solidFill><a:latin typeface="HG丸ｺﾞｼｯｸM-PRO"\/><a:ea typeface="HG丸ｺﾞｼｯｸM-PRO"\/><a:cs typeface="HG丸ｺﾞｼｯｸM-PRO"\/><\/a:rPr><a:t>Tesuri 手すり　L=800mm<\/a:t>/);
 assert.match(xText, /<a:t>H=750mm<\/a:t>/);
 assert.match(xText, /<a:spAutoFit\/>/);
 assert.match(xEllipse, /prst="ellipse"/);
@@ -346,12 +386,129 @@ log('写真を 90°回すと書き込みも回る・差し替えると消える 
 // ---------------- プレビューの写真の道具の「✏️ 書き込み」から（ダブルクリックでも）
 await pvSlot.getByRole('button', {name: '写真貼付用紙①の改修前'}).dblclick();
 await dlg.waitFor();
+assert.equal(await pressed('直線'), 'true'); // 前に使った道具（直線）のまま開く
 await ribbon.getByRole('button', {name: '双方向矢印'}).click();
 await dragOn([0.2, 0.3], [0.8, 0.3]);
 assert.equal(await marks().nth(0).locator('polygon').count(), 2); // 両端に矢印
+log('プレビューの写真のダブルクリックから・前に使った道具のまま開く・双方向矢印 OK');
+
+// ---------------- 続けて描く・L字（線の端に吸い付く）
+const pt = (el) => ['x1', 'y1', 'x2', 'y2'].map((a) => Number(el[a]));
+await ribbon.getByRole('button', {name: '直線', exact: true}).click();
+await dragOn([0.2, 0.5], [0.5, 0.5]);
+await dragOn([0.503, 0.505], [0.5, 0.8]); // 前の線の終わりの少し横から
+assert.deepEqual(await kinds(), ['line', 'line', 'line']);
+assert.equal(await pressed('直線'), 'true');
+const [la, lb] = [pt(await svgOf(1, 'line')), pt(await svgOf(2, 'line'))];
+assert.deepEqual([lb[0], lb[1]].map((v) => v.toFixed(3)), [la[2], la[3]].map((v) => v.toFixed(3)), 'L字：前の線の端につながる');
+assert.equal(lb[0].toFixed(3), lb[2].toFixed(3), '縦に4°以内はまっすぐ縦');
+log('直線を続けて描く・L字（線の端に吸い付く）OK');
+
+// ---------------- 折れ線（押すたびに角 → ✓ 折れ線を終える）
+await ribbon.getByRole('button', {name: /^折れ線/}).click();
+for (const [fx, fy] of [
+  [0.6, 0.2],
+  [0.75, 0.2],
+  [0.75, 0.4],
+  [0.9, 0.4],
+])
+  await clickOn(fx, fy);
+await dlg.getByRole('button', {name: '✓ 折れ線を終える'}).click();
+assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen']);
+assert.equal((await svgOf(3, 'polyline')).points.trim().split(/\s+/).length, 4);
+assert.equal((await svgOf(3, 'polyline')).stroke, '#FFFF00');
+assert.equal(await pressed(/^折れ線/), 'true');
+log('折れ線 OK');
+
+// ---------------- ペン（手書き）・長押しでまっすぐ・ぐしゃぐしゃで消す
+await ribbon.getByRole('button', {name: /^ペン/}).click();
+{
+  const [p, q] = [await at(0.1, 0.62), await at(0.4, 0.62)];
+  await page.mouse.move(p.x, p.y);
+  await page.mouse.down();
+  for (let i = 1; i <= 12; i++) await page.mouse.move(p.x + ((q.x - p.x) * i) / 12, p.y + Math.sin(i) * 12);
+  await page.mouse.up();
+}
+assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen', 'pen']);
+assert.ok((await svgOf(4, 'polyline')).points.trim().split(/\s+/).length > 4, '手書きの線');
+assert.equal((await svgOf(4, 'polyline'))['stroke-linecap'], 'round');
+{
+  // 長押し：描いて止める（0.8秒）→ まっすぐな線に
+  const [p, q] = [await at(0.1, 0.72), await at(0.45, 0.74)];
+  await page.mouse.move(p.x, p.y);
+  await page.mouse.down();
+  for (let i = 1; i <= 10; i++) await page.mouse.move(p.x + ((q.x - p.x) * i) / 10, p.y + ((q.y - p.y) * i) / 10 + (i % 2 ? 6 : -6));
+  await page.waitForTimeout(800);
+  await page.mouse.up();
+}
+assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen', 'pen', 'line']);
+assert.equal((await svgOf(5, 'line')).stroke, '#FFFF00');
+{
+  // ぐしゃぐしゃ：L字の縦の線の上 → その線が消える
+  const top = await at(0.5, 0.55);
+  const bottom = await at(0.5, 0.75);
+  await page.mouse.move(top.x - 20, top.y);
+  await page.mouse.down();
+  for (let i = 1; i <= 14; i++) await page.mouse.move(top.x + (i % 2 ? 20 : -20), top.y + ((bottom.y - top.y) * i) / 14);
+  await page.mouse.up();
+}
+assert.deepEqual(await kinds(), ['line', 'line', 'pen', 'pen', 'line']);
+log('ペン（手書き・長押しでまっすぐ・ぐしゃぐしゃで消す）OK');
+
+// ---------------- 補強板（四角と斜めの線・茶色）・番号（①②）
+await ribbon.getByRole('button', {name: /^補強板/}).click();
+await dragOn([0.55, 0.55], [0.75, 0.7]);
+assert.equal((await kinds()).at(-1), 'board');
+assert.equal((await svgOf(5, 'rect')).stroke, '#996633');
+assert.equal((await svgOf(5, 'polyline')).points.trim().split(/\s+/).length, 2);
+await ribbon.getByRole('button', {name: /^番号/}).click();
+await clickOn(0.85, 0.15);
+await clickOn(0.85, 0.85);
+assert.deepEqual(await marks().evaluateAll((els) => els.slice(-2).map((e) => e.querySelector('[data-mark-text]')?.textContent)), ['①', '②']);
+await page.screenshot({path: path.join(outDir, 'mark-06-pen-board-num.png')});
+// 選択：押して選ぶ（補強板）
+await ribbon.getByRole('button', {name: '選択', exact: true}).click();
+await clickOn(0.55, 0.62);
+assert.deepEqual(await selected(), [(await ids())[5]]);
+log('補強板・番号・選択 OK');
+
+// ---------------- 書式の欄（写真の横にいつも出す）：選んだ補強板の線の色・太さ（ユーザーの指示「線の太さや色などは空いたスペースに常時表示する」）
+const panel = dlg.getByRole('complementary', {name: '書式'});
+{
+  const [pb, sb] = [await panel.boundingBox(), await stage.boundingBox()];
+  assert.ok(pb.x + pb.width <= sb.x && pb.height > 400, `書式の欄は写真の左 ${JSON.stringify(pb)}`);
+}
+assert.equal(await panel.getByRole('button', {name: '線の色 茶'}).getAttribute('aria-pressed'), 'true');
+await panel.getByRole('button', {name: '線の色 青'}).click();
+await panel.getByRole('button', {name: '線の太さ 6 pt'}).click();
+assert.equal((await svgOf(5, 'rect')).stroke, '#0070C0');
+assert.equal(Number((await svgOf(5, 'rect'))['stroke-width']).toFixed(2), (8).toFixed(2));
+assert.equal(await panel.getByRole('button', {name: '線の太さ 6 pt'}).getAttribute('aria-pressed'), 'true');
+await panel.getByRole('button', {name: '線の種類 丸点線'}).click();
+assert.ok((await svgOf(5, 'rect'))['stroke-dasharray']);
+log('書式の欄（線の色・太さ・線の種類）OK');
+
+// ---------------- 写真を回す（書き込みも一緒に回る）
+{
+  const b0 = await stage.boundingBox();
+  await panel.getByRole('button', {name: '写真を右に回す'}).click();
+  await page.waitForFunction((r) => {
+    const el = document.querySelector('[role="dialog"] [data-photo-stage]');
+    const b = el?.getBoundingClientRect();
+    return b && Math.abs(b.width / b.height - r) < 0.02;
+  }, b0.height / b0.width);
+  assert.equal(await marks().count(), 8);
+  await page.screenshot({path: path.join(outDir, 'mark-07-turned.png')});
+  await panel.getByRole('button', {name: '写真を左に回す'}).click();
+  await page.waitForFunction((r) => {
+    const el = document.querySelector('[role="dialog"] [data-photo-stage]');
+    const b = el?.getBoundingClientRect();
+    return b && Math.abs(b.width / b.height - r) < 0.02;
+  }, b0.width / b0.height);
+}
+log('写真を回す（書き込みも一緒に）OK');
 await dlg.getByRole('button', {name: '閉じる'}).click();
-assert.equal(await pvSlot.locator('[data-mark]').count(), 1);
-log('プレビューの写真のダブルクリックから・双方向矢印 OK');
+assert.equal(await pvSlot.locator('[data-mark]').count(), 8);
 
 // ---------------- スマホ（390px）・iPad：リボンは横に動かせて、写真は画面の幅いっぱい
 for (const [name, vp, touch] of [

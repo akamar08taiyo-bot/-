@@ -15,6 +15,7 @@ import {circled, eraOf, INSURER_IDS, INSURER_INFO, insurerForAddress, jobInsurer
 import {placeFromDims, withBrackets} from '../cutLink.ts';
 import {manualRow, newPlace} from '../rows.ts';
 import {usePhotoUrls} from '../photos.ts';
+import {turn} from '../photoEdit.ts';
 import {photoBounds} from '../photoMarks.ts';
 import {costIsTotal, estimateLength, insuredBoxes, kindNamesOf, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
@@ -573,6 +574,7 @@ export function ShinseiEditor({
                 marks={markPhoto.marks ?? []}
                 onChange={(marks) => photoActions.setMarks(marking, marks)}
                 onClose={() => setMarking(null)}
+                onRotate={(dir) => photoActions.setEdit(marking, turn(markPhoto.edit, dir), {w: markPhoto.w, h: markPhoto.h})}
               />
             )}
           </div>

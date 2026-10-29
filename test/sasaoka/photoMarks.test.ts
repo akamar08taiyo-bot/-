@@ -1,6 +1,29 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {arrowHead, cleanMarks, cmToPx, colorName, dashArray, lineEnds, markBounds, photoBounds, pxToCm, rotatedBounds, shapeBox, turnMarks} from '../../src/sasaoka/photoMarks.ts';
+import {
+  arrowHead,
+  BOARD_PTS,
+  BOARD_STYLE,
+  cleanMarks,
+  cmToPx,
+  colorName,
+  dashArray,
+  isScribble,
+  lineEnds,
+  MARK_FONTS,
+  markBounds,
+  markFontCss,
+  markPts,
+  nextNumberText,
+  PEN_STYLE,
+  photoBounds,
+  pxToCm,
+  rotatedBounds,
+  SHAPE_STYLE,
+  shapeBox,
+  simplifyStroke,
+  turnMarks,
+} from '../../src/sasaoka/photoMarks.ts';
 import type {PhotoMark} from '../../src/sasaoka/types.ts';
 
 const base = {line: 'FF0000', width: 2.25, dash: 'solid', fill: '', size: 11, color: '000000'} as const;
@@ -78,4 +101,88 @@ test('写真を 90°回すと書き込みも一緒に回る：直線の端は (x
   assert.deepEqual([half.x1, half.y1, half.x2, half.y2], [0.9, 0.8, 0.5, 0.1]);
   assert.equal(turnMarks([line], photo, 0, 30)[0], line);
   assert.equal(turnMarks([line], photo, 90, 90)[0], line);
+});
+
+test('手書きの線・補強板・番号の初めの書式：線・ペンは黄色、枠囲み（四角形）・補強板は茶色（ユーザーの指示「初期の色は黄色」「枠囲みの初期データは茶色」2026-10-29）', () => {
+  assert.equal(SHAPE_STYLE.line, 'FFFF00');
+  assert.equal(PEN_STYLE.line, 'FFFF00');
+  assert.equal(BOARD_STYLE.line, '996633');
+});
+
+test('手書きの線・補強板をそろえる：点は 0〜1 に丸め、点が1つの手書きの線は捨てる。補強板の点がなければ左下から右上の斜め。手書きの線・補強板には文字を持たない', () => {
+  const out = cleanMarks([
+    {id: 'p', kind: 'pen', x1: 0.1, y1: 0.1, x2: 0.5, y2: 0.4, line: 'ffff00', width: 3, pts: [[0, 0], [0.5, 2], ['x', 0.3], [1, 1]], text: 'x'},
+    {id: 'q', kind: 'pen', x1: 0.1, y1: 0.1, x2: 0.5, y2: 0.4, pts: [[0, 0]]},
+    {id: 'b', kind: 'board', x1: 0.2, y1: 0.2, x2: 0.4, y2: 0.3, line: '996633', fill: 'ffffff'},
+  ]);
+  assert.deepEqual(out.map((m) => m.kind), ['pen', 'board']);
+  assert.deepEqual(out[0].pts, [[0, 0], [0.5, 1], [0, 0.3], [1, 1]]);
+  assert.equal(out[0].fill, '');
+  assert.equal(out[0].text, undefined);
+  assert.deepEqual(out[1].pts, BOARD_PTS);
+  assert.equal(out[1].fill, 'FFFFFF');
+  // 紙の上の点（回す前の四角の中の割合 → 画素）
+  const vb = {x: 0, y: 0, w: 200, h: 100};
+  assert.deepEqual(markPts(out[1], vb), [
+    {x: 40, y: 30},
+    {x: 80, y: 20},
+  ]);
+});
+
+test('手書きの線を間引く：まっすぐな所の点は捨て、角の点は残す（見た目は同じ）', () => {
+  const pts = [...Array.from({length: 21}, (_, i) => ({x: i * 5, y: 0})), ...Array.from({length: 20}, (_, i) => ({x: 100, y: (i + 1) * 5}))];
+  assert.deepEqual(simplifyStroke(pts, 0.5), [
+    {x: 0, y: 0},
+    {x: 100, y: 0},
+    {x: 100, y: 100},
+  ]);
+  assert.equal(simplifyStroke(pts.slice(0, 2), 0.5).length, 2);
+});
+
+test('ぐしゃぐしゃに描いた線か（上から消すしぐさ）：何度も折り返す線だけ。まっすぐ・L字・丸・小さな線はちがう', () => {
+  const zigzag = Array.from({length: 12}, (_, i) => ({x: (i % 2) * 80 + i * 2, y: i * 4}));
+  assert.equal(isScribble(zigzag), true);
+  assert.equal(isScribble(Array.from({length: 20}, (_, i) => ({x: i * 10, y: 0}))), false); // まっすぐ
+  assert.equal(isScribble([...Array.from({length: 10}, (_, i) => ({x: i * 10, y: 0})), ...Array.from({length: 10}, (_, i) => ({x: 90, y: i * 10}))]), false); // L字
+  assert.equal(isScribble(Array.from({length: 40}, (_, i) => ({x: 50 + 40 * Math.cos(i / 6), y: 50 + 40 * Math.sin(i / 6)}))), false); // 丸
+  assert.equal(isScribble(zigzag.map((p) => ({x: p.x / 10, y: p.y / 10}))), false); // 小さすぎる
+});
+
+test('次に置く番号：書き込みにある番号のいちばん大きい数の次（①②…⑳、その次は (21)）。番号でない文字は数えない', () => {
+  const t = (text: string, kind: PhotoMark['kind'] = 'text') => mk({kind, x1: 0, y1: 0, x2: 0.1, y2: 0.1, text});
+  assert.equal(nextNumberText([]), '①');
+  assert.equal(nextNumberText([t('①'), t('③'), t('手すり')]), '④');
+  assert.equal(nextNumberText([t('④', 'rect')]), '①'); // 四角形の中の文字は番号とみない
+  assert.equal(nextNumberText([t('⑳')]), '(21)');
+  assert.equal(nextNumberText([t('(21)')]), '(22)');
+});
+
+test('写真を 90°回すと、手書きの線・補強板は紙の上の大きさのまま図形ごと 90°回る（中の線も一緒に）', () => {
+  const photo = {w: 400, h: 300};
+  const pen = mk({kind: 'pen', x1: 0.3, y1: 0.4, x2: 0.6, y2: 0.5, pts: [[0, 0], [1, 1]]});
+  const [p] = turnMarks([pen], photo, 0, 90);
+  assert.equal(p.rot, 90);
+  assert.deepEqual(p.pts, pen.pts);
+  // 紙の上の大きさ（写真の画素）：幅 0.3×400＝120・高さ 0.1×300＝30 → 回したあとの写真（300×400）で 0.4・0.075
+  near(p.x2 - p.x1, 0.4);
+  near(p.y2 - p.y1, 0.075);
+  const back = turnMarks(turnMarks(turnMarks([p], photo, 90, 180), photo, 180, 270), photo, 270, 0)[0];
+  assert.equal(back.rot, undefined);
+  (['x1', 'y1', 'x2', 'y2'] as const).forEach((k) => near(back[k], pen[k]));
+});
+
+test('文字のフォント：初めはメイリオ・30種類。知らないフォント・文字のない図形のフォントは捨てる。画面はそのフォント → 英語の名前 → 近いフォント', () => {
+  assert.equal(MARK_FONTS.length, 30);
+  assert.equal(MARK_FONTS[0].name, 'メイリオ');
+  assert.equal(new Set(MARK_FONTS.map((f) => f.name)).size, 30);
+  for (const st of [SHAPE_STYLE, PEN_STYLE, BOARD_STYLE]) assert.equal(st.font, 'メイリオ');
+  const out = cleanMarks([
+    {id: 't', kind: 'text', x1: 0, y1: 0, x2: 0.5, y2: 0.2, text: '手すり', font: 'HG丸ｺﾞｼｯｸM-PRO'},
+    {id: 'u', kind: 'text', x1: 0, y1: 0, x2: 0.5, y2: 0.2, text: '手すり', font: 'ないフォント'},
+    {id: 'l', kind: 'line', x1: 0, y1: 0, x2: 0.5, y2: 0.2, font: 'メイリオ'},
+  ]);
+  assert.deepEqual(out.map((m) => m.font), ['HG丸ｺﾞｼｯｸM-PRO', undefined, undefined]);
+  assert.match(markFontCss('メイリオ')!, /^"メイリオ", "Meiryo", .*sans-serif$/);
+  assert.match(markFontCss('ＭＳ 明朝')!, /^"ＭＳ 明朝", "MS Mincho", .*serif$/);
+  assert.equal(markFontCss('ないフォント'), null);
 });

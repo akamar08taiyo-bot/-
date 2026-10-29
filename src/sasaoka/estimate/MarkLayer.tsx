@@ -2,7 +2,7 @@
 // w・h＝写真の見えている四角の紙の上の大きさ（画素）、k＝紙の画素 → 画面の画素。図形は1つずつ SVG（線・塗り・矢印）と文字（HTML）で、重なりの順は書き込みの順（あとが前）
 
 import type {CSSProperties} from 'react';
-import {arrowHead, dashArray, isBoxKind, lineEnds, MARK_INSET, MARK_LINE_K, PT_PX, shapeBox} from '../photoMarks.ts';
+import {arrowHead, dashArray, isBoxKind, lineEnds, MARK_INSET, MARK_LINE_K, markFontCss, markPts, PT_PX, shapeBox} from '../photoMarks.ts';
 import {familyOf} from '../shinseiPreview.ts';
 import type {PhotoMark} from '../types.ts';
 
@@ -13,7 +13,7 @@ export const MARK_FONT = familyOf('');
 export function markTextCss(m: PhotoMark, k: number): CSSProperties {
   return {
     padding: `${MARK_INSET.y * k}px ${MARK_INSET.x * k}px`,
-    fontFamily: MARK_FONT,
+    fontFamily: (m.font && markFontCss(m.font)) || MARK_FONT,
     fontSize: m.size * PT_PX * k,
     lineHeight: MARK_LINE_K,
     fontWeight: m.bold ? 700 : 400,
@@ -55,13 +55,26 @@ function ShapeSvg({m, w, h}: {m: PhotoMark; w: number; h: number}) {
     );
   }
   const b = shapeBox(m, vb);
+  const turn = b.rot ? `rotate(${b.rot} ${b.x + b.w / 2} ${b.y + b.h / 2})` : undefined;
+  if (m.kind === 'pen' || m.kind === 'board') {
+    // 手書きの線（点をつなぐ。端と角は丸く）・補強板（四角と斜めの線）
+    const pts = markPts(m, vb)
+      .map((p) => `${p.x},${p.y}`)
+      .join(' ');
+    return (
+      <g transform={turn}>
+        {m.kind === 'board' && <rect x={b.x} y={b.y} width={b.w} height={b.h} fill={m.fill ? `#${m.fill}` : 'none'} stroke={stroke} strokeWidth={m.line ? sw : 0} strokeDasharray={array} strokeLinecap={cap} />}
+        <polyline points={pts} fill="none" stroke={stroke} strokeWidth={m.line ? sw : 0} strokeDasharray={array} strokeLinecap={m.kind === 'pen' && !array ? 'round' : cap} strokeLinejoin="round" />
+      </g>
+    );
+  }
   const common = {
     fill: m.fill ? `#${m.fill}` : 'none',
     stroke,
     strokeWidth: m.line ? sw : 0,
     strokeDasharray: array,
     strokeLinecap: cap,
-    transform: b.rot ? `rotate(${b.rot} ${b.x + b.w / 2} ${b.y + b.h / 2})` : undefined,
+    transform: turn,
   } as const;
   return m.kind === 'ellipse' ? <ellipse cx={b.x + b.w / 2} cy={b.y + b.h / 2} rx={b.w / 2} ry={b.h / 2} {...common} /> : <rect x={b.x} y={b.y} width={b.w} height={b.h} {...common} />;
 }

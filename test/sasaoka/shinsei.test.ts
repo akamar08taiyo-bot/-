@@ -1077,6 +1077,45 @@ test('写真への書き込み（Excel）：写真のすぐ上に Excel の図�
   assert.equal(new Set(ids).size, ids.length);
 });
 
+test('手書きの線・補強板（Excel）：Excel のフリーフォーム（custGeom）で。手書きの線は点をつなぎ端と角を丸く、補強板は四角と斜めの線', () => {
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 7, 0xff, 0xd9]);
+  const base = {width: 3, dash: 'solid', fill: '', size: 11, color: '000000'} as const;
+  const marks: PhotoMark[] = [
+    {...base, id: 'p', kind: 'pen', x1: 0.1, y1: 0.1, x2: 0.5, y2: 0.3, line: 'FFFF00', pts: [[0, 0], [0.5, 1], [1, 0.2]]},
+    {...base, id: 'b', kind: 'board', x1: 0.6, y1: 0.6, x2: 0.9, y2: 0.8, line: '996633', width: 2.25, pts: [[0, 1], [1, 0]], rot: 90},
+    {...base, id: 't', kind: 'text', x1: 0.1, y1: 0.6, x2: 0.4, y2: 0.7, line: '', fill: 'FFFFFF', color: 'FF0000', text: '①\n\n手すり', font: 'メイリオ'},
+  ];
+  const j = job({insurer: 'kanda'});
+  const files = unzipSync(fillShinsei(KANDA, SHINSEI.kanda!, {...shinseiValues(j, RATES), photoImages: {1: {before: {bytes: jpeg, w: 1600, h: 1200, marks}}}}));
+  const anchors = anchorsOf(strFromU8(files[drawingPath(files, '1 ')!]));
+  const at = anchors.findIndex((a) => a.includes('<xdr:pic>'));
+  const [pen, board] = anchors.slice(at + 1, at + 3);
+  assert.match(pen, /name="フリーフォーム \d+"/);
+  assert.match(board, /name="補強板 \d+"/);
+  const ext = (a: string) => /<a:ext cx="(\d+)" cy="(\d+)"\/>/.exec(a)!.slice(1).map(Number);
+  const [pw, ph] = ext(pen);
+  const paths = (a: string) => [...a.matchAll(/<a:path ([^>]*)>(.*?)<\/a:path>/g)].map((m) => ({attr: m[1], pts: [...m[2].matchAll(/<a:pt x="(\d+)" y="(\d+)"\/>/g)].map((q) => [Number(q[1]), Number(q[2])])}));
+  const pp = paths(pen);
+  assert.equal(pp.length, 1);
+  assert.match(pp[0].attr, new RegExp(`w="${pw}" h="${ph}" fill="none"`));
+  assert.deepEqual(pp[0].pts, [[0, 0], [Math.round(0.5 * pw), ph], [pw, Math.round(0.2 * ph)]]);
+  assert.match(pen, /<a:noFill\/><a:ln w="38100" cap="rnd"><a:solidFill><a:srgbClr val="FFFF00"\/><\/a:solidFill><a:round\/><\/a:ln>/);
+  // 補強板：四角（閉じた形）と斜めの線（左下 → 右上）。回した図形は xfrm に rot
+  const [bw, bh] = ext(board);
+  const bp = paths(board);
+  assert.deepEqual(bp.map((x) => x.pts), [
+    [[0, 0], [bw, 0], [bw, bh], [0, bh]],
+    [[0, bh], [bw, 0]],
+  ]);
+  assert.match(board, /<a:close\/><\/a:path>/);
+  assert.match(board, /<a:xfrm rot="5400000">/);
+  assert.match(board, /<a:ln w="28575"><a:solidFill><a:srgbClr val="996633"\/>/);
+  // 文字のフォント（Excel のフォントの名前のまま。空の行も同じフォント）
+  const text = anchors[at + 3];
+  assert.match(text, /<a:rPr lang="ja-JP" altLang="en-US" sz="1100"><a:solidFill><a:srgbClr val="FF0000"\/><\/a:solidFill><a:latin typeface="メイリオ"\/><a:ea typeface="メイリオ"\/><a:cs typeface="メイリオ"\/><\/a:rPr><a:t>①<\/a:t>/);
+  assert.match(text, /<a:endParaRPr lang="ja-JP" altLang="en-US" sz="1100"><a:latin typeface="メイリオ"\/><a:ea typeface="メイリオ"\/><a:cs typeface="メイリオ"\/><\/a:endParaRPr>/);
+});
+
 test('平面図の図：表題と工事内容のあいだの範囲に、縦横の比のまま・範囲に収まるだけ大きく貼る（図形のいちばんうしろ）。図がなければ貼らない（4つの保険者）', () => {
   const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 9, 0xff, 0xd9]); // 写真のファイルはそのまま入る
   for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki'] as const) {

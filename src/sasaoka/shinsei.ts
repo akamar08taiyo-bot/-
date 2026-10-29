@@ -13,7 +13,7 @@ import {careAmounts} from './careLines.ts';
 import {BASE_PLATE} from './cutLink.ts';
 import {circled, eraOf, jobInsurer, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa, shinseiKindNames} from './estimateForms.ts';
 import {clampOff, clampScale, normRot} from './photoEdit.ts';
-import {lineEnds, MARK_INSET, photoBounds, shapeBox} from './photoMarks.ts';
+import {BOARD_PTS, lineEnds, MARK_INSET, photoBounds, shapeBox} from './photoMarks.ts';
 import {textEm} from './print/fit.ts';
 import type {RiyuValues} from './riyu.ts';
 import type {Insurer, Job, PhotoEdit, PhotoMark, Place, PlacePhotos, Settings, ShinseiInfo, ShinseiMarks} from './types.ts';
@@ -2502,12 +2502,29 @@ function noteBoxXml(lay: SheetLayout, box: Box, lines: string[], pt: number, id:
 const MARK_NONE = '<a:scrgbClr r="0" g="0" b="0"/>';
 const solid = (hex: string) => `<a:solidFill><a:srgbClr val="${hex}"/></a:solidFill>`;
 
-/** 写真への書き込みの線（Excel の「図形の枠線」：色・太さ・実線／点線・矢印） */
+/** 写真への書き込みの線（Excel の「図形の枠線」：色・太さ・実線／点線・矢印）。手書きの線は端と角を丸く（画面と同じ） */
 function markLineXml(m: PhotoMark): string {
   if (!m.line) return '<a:ln><a:noFill/></a:ln>';
   const arrow = (tag: string, on?: boolean) => (on ? `<a:${tag} type="triangle" w="med" len="med"/>` : '');
   const dash = m.dash === 'solid' ? '' : `<a:prstDash val="${m.dash}"/>`;
-  return `<a:ln w="${Math.round(m.width * 12700)}"${m.dash === 'sysDot' ? ' cap="rnd"' : ''}>${solid(m.line)}${dash}${arrow('headEnd', m.start)}${arrow('tailEnd', m.end)}</a:ln>`;
+  const pen = m.kind === 'pen';
+  const cap = m.dash === 'sysDot' || (pen && m.dash === 'solid') ? ' cap="rnd"' : '';
+  return `<a:ln w="${Math.round(m.width * 12700)}"${cap}>${solid(m.line)}${dash}${pen ? '<a:round/>' : ''}${arrow('headEnd', m.start)}${arrow('tailEnd', m.end)}</a:ln>`;
+}
+
+/** 手書きの線・補強板の形（Excel の「フリーフォーム」と同じ custGeom）：補強板は四角と斜めの線、手書きの線は点をつなぐ。w・h は図形の四角（EMU） */
+function markGeomXml(m: PhotoMark, w: number, h: number): string {
+  const pt = ([x, y]: [number, number]) => `<a:pt x="${Math.round(x * w)}" y="${Math.round(y * h)}"/>`;
+  const pts = m.pts?.length ? m.pts : BOARD_PTS;
+  const line = `<a:path w="${w}" h="${h}" fill="none"><a:moveTo>${pt(pts[0])}</a:moveTo>${pts
+    .slice(1)
+    .map((p) => `<a:lnTo>${pt(p)}</a:lnTo>`)
+    .join('')}</a:path>`;
+  const rect =
+    m.kind === 'board'
+      ? `<a:path w="${w}" h="${h}"${m.fill ? '' : ' fill="none"'}><a:moveTo>${pt([0, 0])}</a:moveTo><a:lnTo>${pt([1, 0])}</a:lnTo><a:lnTo>${pt([1, 1])}</a:lnTo><a:lnTo>${pt([0, 1])}</a:lnTo><a:close/></a:path>`
+      : '';
+  return `<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="l" t="t" r="r" b="b"/><a:pathLst>${rect}${line}</a:pathLst></a:custGeom>`;
 }
 
 /** 図形の中の文字（段落ごとに。テキストボックスは左上から、四角形・楕円はまん中に） */
@@ -2515,9 +2532,11 @@ function markTextXml(m: PhotoMark): string {
   const sz = Math.round(m.size * 100);
   const ppr = m.kind === 'text' ? '' : '<a:pPr algn="ctr"/>';
   const rpr = `lang="ja-JP" altLang="en-US" sz="${sz}"${m.bold ? ' b="1"' : ''}`;
+  // フォント（Excel の「フォント」の名前のまま。日本語の字と英数字の両方に）
+  const font = m.font ? `<a:latin typeface="${esc(m.font)}"/><a:ea typeface="${esc(m.font)}"/><a:cs typeface="${esc(m.font)}"/>` : '';
   const paras = (m.text ?? '')
     .split(/\r?\n/)
-    .map((l) => (l ? `<a:p>${ppr}<a:r><a:rPr ${rpr}>${solid(m.color)}</a:rPr><a:t>${esc(l)}</a:t></a:r></a:p>` : `<a:p>${ppr}<a:endParaRPr ${rpr}/></a:p>`))
+    .map((l) => (l ? `<a:p>${ppr}<a:r><a:rPr ${rpr}>${solid(m.color)}${font}</a:rPr><a:t>${esc(l)}</a:t></a:r></a:p>` : `<a:p>${ppr}<a:endParaRPr ${rpr}${font ? `>${font}</a:endParaRPr>` : '/>'}</a:p>`))
     .join('');
   const [ix, iy] = [Math.round(MARK_INSET.x * EMU), Math.round(MARK_INSET.y * EMU)];
   // テキストボックスは Excel と同じく「テキストに合わせて図形のサイズを調整する」（直すと高さが文字に合う）
@@ -2542,6 +2561,15 @@ function markShapeXml(lay: SheetLayout, vb: Box, m: PhotoMark, id: number): stri
     );
   }
   const b = shapeBox(m, vb);
+  if (m.kind === 'pen' || m.kind === 'board') {
+    const fill = m.kind === 'board' && m.fill ? solid(m.fill) : '<a:noFill/>';
+    return (
+      `<xdr:twoCellAnchor>${fromTo(lay, anchorBox(b, b.rot))}<xdr:sp macro="" textlink=""><xdr:nvSpPr><xdr:cNvPr id="${id}" name="${m.kind === 'pen' ? 'フリーフォーム' : '補強板'} ${id}"/><xdr:cNvSpPr/></xdr:nvSpPr>` +
+      `<xdr:spPr>${xfrm(b, b.rot)}${markGeomXml(m, Math.max(1, emu(b.w)), Math.max(1, emu(b.h)))}${fill}${markLineXml(m)}</xdr:spPr>` +
+      `<xdr:style><a:lnRef idx="0">${MARK_NONE}</a:lnRef><a:fillRef idx="0">${MARK_NONE}</a:fillRef><a:effectRef idx="0">${MARK_NONE}</a:effectRef><a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef></xdr:style>` +
+      `</xdr:sp><xdr:clientData/></xdr:twoCellAnchor>`
+    );
+  }
   const name = m.kind === 'text' ? 'テキスト ボックス' : m.kind === 'ellipse' ? '楕円' : '正方形/長方形';
   const fill = m.fill ? solid(m.fill) : '<a:noFill/>';
   return (
