@@ -427,7 +427,7 @@ function InsurerNoSelect({sale, onChange}: {sale: Sale; onChange: (no: string) =
       disabled={areas.length < 2 && !odd}
       className="h-9 w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 text-sm disabled:bg-slate-50 disabled:text-slate-700"
       aria-label="保険者番号"
-      data-nav
+      // Enter では飛ばす（住所から選ぶので、打ち込む流れを止めない）
     >
       {!cur && <option value="">選んでください</option>}
       {odd && <option value={cur}>{cur}（介護保険証の番号）</option>}
