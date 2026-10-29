@@ -163,12 +163,14 @@ export function TokuteiEditor({
               <Btn color="softSky" onClick={() => cmd('print')}>
                 🖨 {book}を印刷
               </Btn>
-              {/* 削除は特定福祉用具の案件（申請書・販売見積書）を消す。消したあとは、この様邸の新しい案件が開く */}
-              <Btn color="white" onClick={() => cmd('delete')}>
-                削除
-              </Btn>
             </>
           }
+          // 削除は特定福祉用具の案件（申請書・販売見積書）を消す。消したあとは、この様邸の新しい案件が開く
+          remove={(className) => (
+            <Btn color="white" className={className} onClick={() => cmd('delete')}>
+              削除
+            </Btn>
+          )}
           secondary={
             <>
               {batch}

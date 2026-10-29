@@ -60,7 +60,11 @@ const open = async ({tab, tokutei}) => {
     };
     const g1 = document.querySelector('[role="group"][aria-label="保存・印刷・削除"]');
     const g2 = document.querySelector('[role="group"][aria-label="そのほかの機能"]');
-    const items = (g) => [...g.children].flatMap((c) => (c.matches('button, a, label') ? [c] : [...c.querySelectorAll('button, a')]));
+    const items = (g) =>
+      [...g.children]
+        .flatMap((c) => (c.matches('button, a, label') ? [c] : [...c.querySelectorAll('button, a')]))
+        .filter((c) => c.getBoundingClientRect().width > 0)
+        .sort((a, b) => Math.round(a.getBoundingClientRect().top) - Math.round(b.getBoundingClientRect().top) || a.getBoundingClientRect().left - b.getBoundingClientRect().left);
     const tabs = document.querySelector('[role="tablist"]').getBoundingClientRect();
     const b1 = items(g1).map((b) => ({text: b.textContent.trim(), ...box(b), bg: getComputedStyle(b).backgroundColor, font: getComputedStyle(b).fontSize, cls: b.className}));
     const b2 = items(g2).filter((b) => b.matches('button, a')).map((b) => ({text: b.textContent.trim(), ...box(b), bg: getComputedStyle(b).backgroundColor, font: getComputedStyle(b).fontSize}));
@@ -86,9 +90,12 @@ for (const width of [1366, 1600, 390]) {
   for (const t of TABS) {
     const m = await open(t);
     const names = m.b1.map((b) => b.text);
-    assert.deepEqual(names, [`📗 ${t.book}をExcelで保存`, `🖨 ${t.book}を印刷`, '削除'], `${width} ${t.tab}`);
+    // スマホは「削除」を3段目の「まとめて保存」のとなりに（ユーザーの指示「携帯では、削除とまとめて保存は横並びで」2026-10-29）
+    const phone = width === 390;
+    assert.deepEqual(names, [`📗 ${t.book}をExcelで保存`, `🖨 ${t.book}を印刷`, ...(phone ? [] : ['削除'])], `${width} ${t.tab}`);
     const more = m.b2.map((b) => b.text);
-    assert.deepEqual(more, t.more, `${width} ${t.tab}`);
+    assert.deepEqual(more, phone ? [t.more[0], '削除', ...t.more.slice(1)] : t.more, `${width} ${t.tab}`);
+    if (phone) assert.ok(Math.abs(m.b2[0].y - m.b2[1].y) < 1 && m.b2[1].x > m.b2[0].x, `${width} ${t.tab} まとめて保存と削除が横並び ${JSON.stringify(m.b2.slice(0, 2))}`);
     assert.equal(m.scroll <= 0, true, `${width} ${t.tab} 横にはみ出す`);
     // 3段目は2段目の真下（同じまん中）
     assert.ok(m.r2.y >= m.r1.y + m.r1.h - 1, `${width} ${t.tab} 3段目が2段目の下にない`);
@@ -120,7 +127,7 @@ for (const width of [1366, 1600, 390]) {
   // どのタブでも、2段目の3つのボタンと「📦 まとめて保存」は同じ位置・同じ大きさ・同じ色・同じ字の大きさ（書類の名前はどれも3字）
   const [first] = seen;
   for (const {t, m} of seen.slice(1)) {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < first.m.b1.length; i++) {
       const a = first.m.b1[i];
       const b = m.b1[i];
       for (const k of ['x', 'y', 'w', 'h']) assert.ok(Math.abs(a[k] - b[k]) <= 1, `${width} ${t.tab} ${b.text} の ${k}：${a[k]} → ${b[k]}`);
@@ -135,7 +142,7 @@ for (const width of [1366, 1600, 390]) {
     assert.equal(b.bg, a.bg, `${width} ${t.tab} まとめて保存の色`);
   }
   // 色：Excel は薄い緑・印刷は薄い水色・削除は白（ui.tsx の softGreen・softSky・white。Tailwind の色は oklab で返るので class で見る）
-  for (const {t, m} of seen) assert.deepEqual(m.b1.map((b) => b.cls.match(/\bbg-(emerald-50|sky-50|white)\b/)?.[1]), ['emerald-50', 'sky-50', 'white'], t.tab);
+  for (const {t, m} of seen) assert.deepEqual(m.b1.map((b) => b.cls.match(/\bbg-(emerald-50|sky-50|white)\b/)?.[1]), ['emerald-50', 'sky-50', 'white'].slice(0, m.b1.length), t.tab);
   log(`${width}px：5つのタブとも 2段目＝〇〇をExcelで保存・〇〇を印刷・削除、真下に まとめて保存と独自の機能。同じ位置・大きさ・色 OK`);
 }
 await page.setViewportSize({width: 1366, height: 900});

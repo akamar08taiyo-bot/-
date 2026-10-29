@@ -440,6 +440,39 @@ assert.equal((await svgOf(3, 'polyline')).stroke, '#FFFF00');
 assert.equal(await pressed(/^折れ線/), 'true');
 log('折れ線 OK');
 
+// ---------------- 四角（角を4つ押すだけ。4つ目で閉じる。ななめの四角も。ユーザーの指示「写真の中のような⬜︎の図をつくるときは、1角ワンタッチで⬜︎やななめ四角をつくれるように」2026-10-29）
+await ribbon.getByRole('button', {name: /^四角（角を4つ/}).click();
+for (const [fx, fy] of [
+  [0.1, 0.12],
+  [0.35, 0.08],
+  [0.4, 0.38],
+  [0.12, 0.42],
+])
+  await clickOn(fx, fy);
+assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen', 'pen']);
+{
+  const q = (await svgOf(4, 'polyline')).points.trim().split(/\s+/);
+  assert.equal(q.length, 5, `四角の角 ${q}`);
+  assert.equal(q[0], q[4], '閉じている');
+}
+assert.equal((await svgOf(4, 'polyline')).stroke, '#FFFF00');
+assert.equal(await pressed(/^四角（角を4つ/), 'true'); // 続けて描ける
+assert.equal(await dlg.getByRole('button', {name: '✕ 四角をやめる'}).count(), 0);
+await page.screenshot({path: path.join(outDir, 'mark-04c-quad.png')});
+// 3つ押して「✕ 四角をやめる」：描かない
+for (const [fx, fy] of [
+  [0.62, 0.6],
+  [0.72, 0.58],
+  [0.74, 0.7],
+])
+  await clickOn(fx, fy);
+await dlg.getByRole('button', {name: '✕ 四角をやめる'}).click();
+assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen', 'pen']);
+// 戻る：四角を消す（このあとの確かめのため）
+await dlg.getByRole('button', {name: '戻る', exact: true}).click();
+assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen']);
+log('四角（角を4つ押すと閉じる・途中でやめると描かない・戻る）OK');
+
 // ---------------- ペン（手書き）・長押しでまっすぐ・ぐしゃぐしゃで消す
 await ribbon.getByRole('button', {name: /^ペン/}).click();
 {

@@ -410,9 +410,9 @@ export function RiyuEditor({job, data, update, onBack, tabs, batch}: {job: Job; 
             <Btn color="softSky" onClick={() => setPrinting(true)} disabled={!pages?.length}>
               🖨 理由書を印刷
             </Btn>
-            <RemoveJobButton job={job} settings={data.settings} update={update} onBack={onBack} />
           </>
         }
+        remove={(className) => <RemoveJobButton job={job} settings={data.settings} update={update} onBack={onBack} className={className} />}
         secondary={batch}
       />
       {printing && pages && <ShinseiPrint pages={pages} title={riyuFileName(job).replace(/\.xlsx$/, '')} book="理由書" all onClose={closePrint} />}

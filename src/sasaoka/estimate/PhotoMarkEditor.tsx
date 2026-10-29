@@ -50,7 +50,7 @@ import type {PhotoMark, PhotoMarkDash} from '../types.ts';
 import {MarkLayer, markTextCss} from './MarkLayer.tsx';
 
 type Pt = {x: number; y: number};
-type Tool = 'pen' | 'poly' | 'line' | 'arrow' | 'arrow2' | 'rect' | 'ellipse' | 'text' | 'board' | 'num' | 'eraser';
+type Tool = 'pen' | 'poly' | 'quad' | 'line' | 'arrow' | 'arrow2' | 'rect' | 'ellipse' | 'text' | 'board' | 'num' | 'eraser';
 type DrawTool = Exclude<Tool, 'eraser'>; // 図形を描く道具（消しゴムのほか）
 /**
  * 書式を覚える種類（新しい図形に使う）：shape＝直線・矢印・楕円（黄色）、rect＝枠囲み（正方形/長方形）・補強板（茶色）、pen＝手書き・折れ線（黄色）、
@@ -59,7 +59,7 @@ type DrawTool = Exclude<Tool, 'eraser'>; // 図形を描く道具（消しゴム
 type StyleKey = 'shape' | 'rect' | 'pen' | 'text' | 'num';
 type Styles = Record<StyleKey, MarkStyle>;
 const styleKeyOf = (k: PhotoMark['kind']): StyleKey => (k === 'text' ? 'text' : k === 'pen' ? 'pen' : k === 'board' || k === 'rect' ? 'rect' : 'shape');
-const toolStyleKey = (t: Tool): StyleKey => (t === 'text' ? 'text' : t === 'num' ? 'num' : t === 'pen' || t === 'poly' ? 'pen' : t === 'rect' || t === 'board' ? 'rect' : 'shape');
+const toolStyleKey = (t: Tool): StyleKey => (t === 'text' ? 'text' : t === 'num' ? 'num' : t === 'pen' || t === 'poly' || t === 'quad' ? 'pen' : t === 'rect' || t === 'board' ? 'rect' : 'shape');
 type RBox = MarkBox & {rot: number};
 type Drag =
   | {type: 'create'; tool: DrawTool; p0: Pt; id: string; ctrl: boolean}
@@ -80,6 +80,8 @@ type Menu = {name: 'fill' | 'line' | 'color' | 'size' | 'font' | 'front' | 'back
 const TOOLS: {key: Tool; label: string}[] = [
   {key: 'pen', label: 'ペン（手書き。長押しでまっすぐ・ぐしゃぐしゃで消す）'},
   {key: 'poly', label: '折れ線（押すたびに角。ダブルクリック・Enter で終わる）'},
+  // ユーザーの指示「写真の中のような⬜︎の図をつくるときは、1角ワンタッチで⬜︎やななめ四角をつくれるように」2026-10-29：角を4つ押すと閉じた四角（終える操作はいらない）
+  {key: 'quad', label: '四角（角を4つ押す。ななめの四角も）'},
   {key: 'line', label: '直線'},
   {key: 'arrow', label: '矢印'},
   {key: 'arrow2', label: '双方向矢印'},
@@ -95,12 +97,12 @@ const TOOLS: {key: Tool; label: string}[] = [
  * 描いたあとも道具をそのままにするもの（続けて描く・番号を続けて置く。ユーザーの指示「連続で線を引くことができない」2026-10-29）。
  * やめるときは「選択」・同じ道具をもう一度・Esc
  */
-const KEEP_TOOL = new Set<Tool>(['pen', 'poly', 'line', 'arrow', 'arrow2', 'rect', 'ellipse', 'board', 'num']);
+const KEEP_TOOL = new Set<Tool>(['pen', 'poly', 'quad', 'line', 'arrow', 'arrow2', 'rect', 'ellipse', 'board', 'num']);
 /**
  * 描く道具のまま、選んでいる図形（描いたばかりの線など）の線の上を押してドラッグすると、その図形を動かす道具（ユーザーの指示「ひいた線は、ドロップしたら位置を動かせるようにする」2026-10-29）。
  * 手書きのペン（ぐしゃぐしゃで消すのを線の上から始める）・折れ線（押すたびに角）・消しゴムは、今までどおり押すと描く
  */
-const MOVE_TOOL = new Set<Tool>(['line', 'arrow', 'arrow2', 'rect', 'ellipse', 'board', 'text', 'num']);
+const MOVE_TOOL = new Set<Tool>(['quad', 'line', 'arrow', 'arrow2', 'rect', 'ellipse', 'board', 'text', 'num']);
 const TOOL_KEY = 'taiyo-sasaoka-mark-tool-v1'; // この端末で最後に使った描く道具（開いたときにその道具。初めは直線）
 /** 開いたときの道具：前に使った描く道具（続けて描く道具だけ）。初めは直線（ユーザーの指示「デフォルトは棒線にする」2026-10-29） */
 function loadTool(): Tool {
@@ -310,6 +312,8 @@ function Icon({name, color}: {name: string; color?: string}) {
       return <svg {...s}><path d="M2.5 15 C5 9 7.5 16 10 11 S14.5 6 17.5 4.5" strokeLinecap="round" /></svg>;
     case 'poly':
       return <svg {...s}><path d="M3 16.5 L3 7 L11 7 L11 13 L17.5 13" strokeLinejoin="round" /><circle cx="3" cy="7" r="1.3" fill="currentColor" /><circle cx="11" cy="7" r="1.3" fill="currentColor" /><circle cx="11" cy="13" r="1.3" fill="currentColor" /></svg>;
+    case 'quad':
+      return <svg {...s}><path d="M3.5 15.5 L6.5 4.5 L16.5 5.5 L14 16 Z" strokeLinejoin="round" />{[[3.5, 15.5], [6.5, 4.5], [16.5, 5.5], [14, 16]].map(([x, y]) => <circle key={x} cx={x} cy={y} r="1.4" fill="currentColor" stroke="none" />)}</svg>;
     case 'board':
       return <svg {...s}><rect x="2.5" y="4.5" width="15" height="11" stroke="#996633" /><path d="M2.5 15.5 L17.5 4.5" stroke="#996633" /></svg>;
     case 'num':
@@ -467,7 +471,7 @@ export function PhotoMarkEditor({
   const future = useRef<PhotoMark[][]>([]);
   const editStart = useRef<PhotoMark[] | null>(null);
   const drag = useRef<Drag | null>(null);
-  const poly = useRef<{id: string; pts: Pt[]} | null>(null); // 折れ線を描いている途中（押した角の点。紙の画素）
+  const poly = useRef<{id: string; pts: Pt[]; quad?: boolean} | null>(null); // 折れ線・四角を描いている途中（押した角の点。紙の画素。quad＝4つ目の角で閉じる四角）
   const press = useRef<{timer: number; at: Pt} | null>(null); // 手書きの線の長押し（止めた所）
   const lastTap = useRef<{id: string; t: number; x: number; y: number} | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -855,7 +859,7 @@ export function PhotoMarkEditor({
   const rotGap = 26 / (k || 1);
 
   const newMark = (t: DrawTool, a: Pt, b: Pt): PhotoMark => {
-    const kind: PhotoMark['kind'] = t === 'line' || t === 'arrow' || t === 'arrow2' ? 'line' : t === 'num' ? 'text' : t === 'poly' ? 'pen' : t;
+    const kind: PhotoMark['kind'] = t === 'line' || t === 'arrow' || t === 'arrow2' ? 'line' : t === 'num' ? 'text' : t === 'poly' || t === 'quad' ? 'pen' : t;
     const st = styles[toolStyleKey(t)];
     const base: PhotoMark = {
       id: markId(),
@@ -1027,7 +1031,9 @@ export function PhotoMarkEditor({
   const showPoly = (hover?: Pt) => {
     const cur = poly.current;
     if (!cur) return;
-    const m = penMark(hover ? [...cur.pts, hover] : cur.pts, cur.id);
+    const pts = hover ? [...cur.pts, hover] : cur.pts;
+    // 四角：3つ目の角からは、はじめの角へ戻る線も見せる（4つ目を押すとこの形で閉じる）
+    const m = penMark(cur.quad && pts.length >= 3 ? [...pts, cur.pts[0]] : pts, cur.id);
     setDraft(m ? [...latest.current.marks, m] : null);
   };
   const finishPoly = () => {
@@ -1035,16 +1041,17 @@ export function PhotoMarkEditor({
     poly.current = null;
     setPolyOn(false);
     setDraft(null);
-    const m = cur ? penMark(cur.pts, cur.id) : null;
+    if (cur?.quad && cur.pts.length < 4) return; // 四角は4つ目の角まで押したときだけ（途中でやめたら描かない）
+    const m = cur ? penMark(cur.quad ? [...cur.pts, cur.pts[0]] : cur.pts, cur.id) : null;
     if (m) {
       commit([...latest.current.marks, m]);
       setSel([m.id]);
     }
   };
-  const addPolyPoint = (raw: Pt, shift: boolean) => {
+  const addPolyPoint = (raw: Pt, shift: boolean, quad = false) => {
     const cur = poly.current;
     if (!cur) {
-      poly.current = {id: markId(), pts: [snapEnd(raw)]};
+      poly.current = {id: markId(), pts: [snapEnd(raw)], ...(quad ? {quad: true} : {})};
       setPolyOn(true);
       setSel([]);
       return;
@@ -1052,10 +1059,14 @@ export function PhotoMarkEditor({
     const last = cur.pts[cur.pts.length - 1];
     const q = endOf(last, raw, shift);
     if (Math.hypot(q.x - last.x, q.y - last.y) * k < 8) {
-      finishPoly();
+      if (!cur.quad) finishPoly(); // 四角は同じ所を2回押しても角を足さない（ダブルクリックなど）
       return;
     }
     cur.pts.push(q);
+    if (cur.quad && cur.pts.length === 4) {
+      finishPoly(); // 4つ目の角で閉じる
+      return;
+    }
     showPoly();
   };
   /** 番号（①②…）を押した所に置く：次の番号の文字だけのテキストボックス（道具はそのまま。続けて押すと次の番号） */
@@ -1120,13 +1131,12 @@ export function PhotoMarkEditor({
         return;
       }
       // 選んでいる図形の線・枠・文字の上：動かす。直線の端の近く（つまみの所）は、そこから続けて描く（L字。今までどおり）
-      if (MOVE_TOOL.has(tool) && sel.length) {
+      if (MOVE_TOOL.has(tool) && sel.length && !poly.current) {
         const chosen = marks.filter((m) => sel.includes(m.id));
         const onIt = chosen.find((m) => hitMark(m, p, W, H, tolOf(e)) === 2);
         const atEnd = (m: PhotoMark) => {
-          if (m.kind !== 'line') return false;
-          const en = lineEnds(m, V);
-          return Math.min(Math.hypot(p.x - en.x1, p.y - en.y1), Math.hypot(p.x - en.x2, p.y - en.y2)) <= handleTol(e);
+          const pts = m.kind === 'line' ? (({x1, y1, x2, y2}) => [{x: x1, y: y1}, {x: x2, y: y2}])(lineEnds(m, V)) : m.kind === 'pen' ? markPts(m, V) : [];
+          return pts.some((q) => Math.hypot(p.x - q.x, p.y - q.y) <= handleTol(e));
         };
         if (onIt && !atEnd(onIt)) {
           drag.current = {type: 'move', p0: p, base: chosen, ids: chosen.map((m) => m.id), moved: false, copy: e.ctrlKey || e.metaKey, toggle: null};
@@ -1139,8 +1149,8 @@ export function PhotoMarkEditor({
         setSel([]);
         return;
       }
-      if (tool === 'poly') {
-        addPolyPoint(raw, e.shiftKey);
+      if (tool === 'poly' || tool === 'quad') {
+        addPolyPoint(raw, e.shiftKey, tool === 'quad');
         return;
       }
       if (tool === 'num') {
@@ -1827,7 +1837,7 @@ export function PhotoMarkEditor({
         <div role="toolbar" aria-label="図形の書式" className="overflow-x-auto pb-0.5">
           <div className="mx-auto flex w-max items-stretch px-1">
             <Group label="図形の挿入">
-              <div className="grid grid-cols-6 gap-0.5">
+              <div className="grid grid-cols-7 gap-0.5">
                 {[{key: null, label: '選択（図形を選ぶ・動かす）'} as const, ...TOOLS].map((t) => (
                   <button
                     key={t.key ?? 'select'}
@@ -1996,6 +2006,7 @@ export function PhotoMarkEditor({
               finishPoly();
               return;
             }
+            if (tool === 'quad') return; // 四角は4つ目の角で閉じる
             if (tool === 'num' || tool === 'text' || editing || !k) return;
             const hit = topHit(marks, toPaper(e), W, H, 6 / k);
             if (hit && hasText(hit.kind)) startEdit(hit.id);
@@ -2062,7 +2073,7 @@ export function PhotoMarkEditor({
           )}
           {polyOn && (
             <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={finishPoly} className="absolute bottom-3 left-1/2 h-11 -translate-x-1/2 rounded-md border border-slate-300 bg-white px-5 text-base text-slate-700 shadow-md hover:bg-slate-50">
-              ✓ 折れ線を終える
+              {poly.current?.quad ? '✕ 四角をやめる' : '✓ 折れ線を終える'}
             </button>
           )}
           {/* iPad：押したその場でキーボードを出すための見えない入力欄 */}

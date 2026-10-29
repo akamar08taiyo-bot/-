@@ -281,9 +281,9 @@ export function EstimateEditor({
             <Btn color="softSky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
               🖨 見積書を印刷
             </Btn>
-            <RemoveJobButton job={job} settings={s} update={update} onBack={onBack} />
           </>
         }
+        remove={(className) => <RemoveJobButton job={job} settings={s} update={update} onBack={onBack} className={className} />}
         secondary={
           <>
             {batch}

@@ -509,9 +509,9 @@ export function ShinseiEditor({
             <Btn color="softSky" onClick={() => setPrinting(true)} disabled={!canMakeShinsei(insurer) || !pages?.length}>
               🖨 申請書を印刷
             </Btn>
-            <RemoveJobButton job={job} settings={s} update={update} onBack={onBack} />
           </>
         }
+        remove={(className) => <RemoveJobButton job={job} settings={s} update={update} onBack={onBack} className={className} />}
         secondary={batch}
       />
       {printing && pages && map && (

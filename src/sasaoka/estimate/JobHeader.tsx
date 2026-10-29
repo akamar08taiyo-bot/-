@@ -22,10 +22,10 @@ export function BackButton({onClick}: {onClick: () => void}) {
  * 様邸の「削除」（ゴミ箱に移す。確かめてから。完全に消すのはゴミ箱のタブから）。住宅改修申請書・工事見積書・理由書のどのタブでも同じボタン・同じ色（白）
  * （ユーザーの指示「住宅改修申請書、販売申請書、理由書、工事見積書全てに削除ボタンを設置する。ボタンの色は統一する」2026-10-28。前は工事見積書のタブだけ）
  */
-export function RemoveJobButton({job, settings, update, onBack}: {job: Job; settings: Settings; update: Update; onBack: () => void}) {
+export function RemoveJobButton({job, settings, update, onBack, className}: {job: Job; settings: Settings; update: Update; onBack: () => void; className?: string}) {
   const toast = useToast();
   return (
-    <Btn color="white" onClick={() => removeEstimate(job, settings, update, toast) && onBack()}>
+    <Btn color="white" className={className} onClick={() => removeEstimate(job, settings, update, toast) && onBack()}>
       削除
     </Btn>
   );
@@ -44,6 +44,8 @@ export function RemoveJobButton({job, settings, update, onBack}: {job: Job; sett
  * スマホ（sm 未満）は、2段目・3段目とも同じ幅の2列の格子（ボタンはどれも同じ幅。数が奇数なら最後の1つは同じ幅でまん中）、extra は「← 一覧へ戻る」の右（2026-10-29）
  * （ユーザーの指示「携帯で見た時のボタンの配置の位置…ガタガタして、若干ずれている」2026-10-29：前は行ごとにボタンの幅のまままん中に寄せていて、
  * 「削除」「まとめて保存」が1つずつ別の幅でまん中に並び、介護保険証の欄だけ左に寄っていた）。
+ * 「削除」（remove）は2段目の終わり。スマホだけは3段目の「まとめて保存」のとなり（ユーザーの指示「携帯では、削除とまとめて保存は横並びで」2026-10-29。
+ * 2段目に置くと Excelで保存・印刷の2つのあとに1つだけ残り、まとめて保存も1つだけの段になっていた）。remove はつける class を受けて、2段目と3段目に1つずつ作る
  */
 export function JobHeader({
   onBack,
@@ -52,6 +54,7 @@ export function JobHeader({
   title,
   primary,
   secondary,
+  remove,
 }: {
   onBack: () => void;
   tabs: ReactNode;
@@ -59,6 +62,7 @@ export function JobHeader({
   title: ReactNode;
   primary: ReactNode;
   secondary?: ReactNode;
+  remove?: (className: string) => ReactNode;
 }) {
   const top = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -118,9 +122,18 @@ export function JobHeader({
         </div>
         <div ref={row1} role="group" aria-label="保存・印刷・削除" className={row} style={shift ? {marginLeft: shift.a} : undefined}>
           {primary}
+          {remove?.(secondary ? 'max-sm:!hidden' : '')}
         </div>
         {secondary && (
-          <div ref={row2} role="group" aria-label="そのほかの機能" className={row} style={shift ? {marginLeft: shift.b} : undefined}>
+          // スマホ：初めの「まとめて保存」・削除・ほかの機能の順（order。削除は DOM ではいちばん初め）
+          <div
+            ref={row2}
+            role="group"
+            aria-label="そのほかの機能"
+            className={`${row} ${remove ? 'max-sm:[&>*:nth-child(2)]:order-0 max-sm:[&>*]:order-2' : ''}`}
+            style={shift ? {marginLeft: shift.b} : undefined}
+          >
+            {remove?.('sm:!hidden max-sm:!order-1')}
             {secondary}
           </div>
         )}
