@@ -77,6 +77,9 @@ URL は `#jutaku=<様邸の id>&embed=1`：その様邸の案件を開き（な�
   和暦でも打てる生年月日・被保険者番号の0埋め・今年度の残り（このアプリの記録）・理由の文例と前に書いた理由・居宅とケアマネの候補。
   住所から郵便番号は、この画面で打ったときのほか、住宅改修から受け取った住所・前から入っている住所でも、郵便番号が空なら入れる（`SaleEditor` の住所の useEffect。
   ユーザーの指示「住所のみ入力した場合、逆に郵便番号を自動で入力される」2026-10-28。住宅改修の側も `src/sasaoka/zip.ts` の `withAddressZip` で入れる）。
+  郵便番号を先に打つと、住所が空か郵便番号から入れたまま（`zip.ts` の `isZipHead`）なら住所の頭「福岡県行橋市大字流末」を入れる（`SaleEditor` の `changeZip`・`addressOfZip`。
+  ユーザーの指示「郵便番号を入力したら住所がでる、福岡県行橋市大字流松（流末）」2026-10-29。前は「行橋市流末」。大字は `oazaData.ts`＝Geolonia 住所データ CC BY 4.0 から作った一覧。
+  住宅改修の `src/sasaoka/zip.ts` の `withZipAddress` と同じ形。両方直す。テストは `link.test.ts`・`e2e-suggest.mjs`）。
   居宅とケアマネの候補は欄の下にいつも並べず、欄の右の「▼」で開くリストから選ぶ。リストの各行の ✕ で候補から消す（設定の `hiddenSuggest`。前の案件の値はそのまま。
   ユーザーの指示「候補一覧は常時表示しない　リストから選べるようにする。リスト一覧になった場合も消せるようにする」2026-10-28。`components/Suggest.tsx` の `SuggestInput`・
   `sales.ts` の `suggestValues`。ブラウザのテストは `test/tokutei/e2e-suggest.mjs`）。

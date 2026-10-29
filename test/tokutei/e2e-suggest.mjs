@@ -86,6 +86,23 @@ try {
   await page.waitForFunction(() => document.querySelector('[aria-label="郵便番号"]')?.value === '800-0344', null, {timeout: 5000});
   console.log('ok: 住所だけ入れると郵便番号 800-0344');
 
+  // 郵便番号を先に打つと、住所が空なら住所の頭（県から・大字も）。郵便番号から入れたままの住所は、打ち直した番号の住所に替わる。番地を足したら替えない
+  // （ユーザーの指示「郵便番号を入力したら住所がでる、福岡県行橋市大字流松（流末）」2026-10-29）
+  const zipBox = page.getByRole('textbox', {name: '郵便番号'});
+  const addrBox = page.getByRole('textbox', {name: '住所'});
+  await addrBox.fill('');
+  await zipBox.fill('');
+  await zipBox.pressSequentially('8240005');
+  await page.waitForFunction(() => document.querySelector('[aria-label="住所"]')?.value === '福岡県行橋市中央', null, {timeout: 5000});
+  await zipBox.fill('');
+  await zipBox.pressSequentially('8240043');
+  await page.waitForFunction(() => document.querySelector('[aria-label="住所"]')?.value === '福岡県行橋市大字流末', null, {timeout: 5000});
+  await addrBox.fill('福岡県行橋市大字流末1-1');
+  await zipBox.fill('824-0005');
+  await page.waitForTimeout(300);
+  assert.equal(await addrBox.inputValue(), '福岡県行橋市大字流末1-1');
+  console.log('ok: 郵便番号を先に打つと住所の頭（福岡県行橋市大字流末）・打ち直し・番地を足したら替えない');
+
   // スマホの幅：リストが横にはみ出さない
   const phone = await browser.newContext({viewport: {width: 390, height: 844}, deviceScaleFactor: 2, hasTouch: true, isMobile: true, locale: 'ja-JP'});
   await phone.route(/^https?:\/\/(?!localhost)/, (r) => r.abort());

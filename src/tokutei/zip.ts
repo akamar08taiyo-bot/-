@@ -1,6 +1,9 @@
 // 郵便番号と住所をつなぐ（福岡県だけ。データは zipData.ts）。
 // 住所を打てば〒が入り、〒を先に打てば住所の頭（市区町村・町域）が入る（ユーザーの指示「連動できる部分は…無駄を省けるようにする」）。
+// 住所の頭は「福岡県行橋市大字流末」のように県から・大字を付けて書く町域は「大字」も（ユーザーの指示「郵便番号を入力したら住所がでる、福岡県行橋市大字流松（流末）」
+// 2026-10-29。大字は oazaData.ts。住宅改修のアプリの src/sasaoka/zip.ts の addressOfZip と同じ）
 
+import {OAZA_FUKUOKA} from './oazaData.ts';
 import {ZIP_FUKUOKA} from './zipData.ts';
 
 type Town = {zip: string; town: string; base: string}; // base：町域の（ ）の注記を外した名前
@@ -63,13 +66,29 @@ export function zipCandidates(address: string): ZipHit[] {
     .map((t) => ({zip: zipLabel(t.zip), label: `${city.c.city}${t.town}`}));
 }
 
-/** 郵便番号 → 住所の頭（「行橋市流末」。町域の注記は外す）。福岡県になければ空 */
+let oaza: Map<string, Set<string>> | null = null;
+/** 住所に「大字」を付けて書く町域か（oazaData.ts） */
+function isOaza(city: string, town: string): boolean {
+  if (!oaza) oaza = new Map(OAZA_FUKUOKA.split('\n').map((line) => [line.split('|')[0], new Set((line.split('|')[1] ?? '').split(','))]));
+  return !!oaza.get(city)?.has(town);
+}
+
+/** 郵便番号から入れたままの住所の頭か（県・市区町村・町域だけで、番地などを足していない。住宅改修のアプリの zip.ts と同じ） */
+export function isZipHead(address: string): boolean {
+  return !!address && zipCandidates(address).some((h) => addressOfZip(h.zip) === address);
+}
+
+/**
+ * 郵便番号 → 住所の頭（「福岡県行橋市大字流末」。町域の注記は外す。福岡県の番号だけ）。町域が1つに決まれば町域まで（大字を付けて書く町域は「大字」も）、
+ * 決まらなければ（「以下に掲載がない場合」の番号・いくつかの町域にまたがる番号）市区町村まで。福岡県になければ空
+ */
 export function addressOfZip(zip: string): string {
   const d = (zip || '').normalize('NFKC').replace(/\D/g, '');
   if (d.length !== 7) return '';
-  for (const c of cities()) {
-    const t = c.towns.find((x) => x.zip === d);
-    if (t) return `${c.city}${t.base}`;
-  }
-  return '';
+  const hits = cities().flatMap((c) => c.towns.filter((t) => t.zip === d).map((t) => ({c, t})));
+  if (hits.length === 0 || new Set(hits.map((h) => h.c.city)).size !== 1) return '';
+  const {city} = hits[0].c;
+  const bases = new Set(hits.map((h) => h.t.base));
+  const town = bases.size === 1 ? [...bases][0] : '';
+  return `福岡県${city}${town && isOaza(city, town) ? '大字' : ''}${town}`;
 }

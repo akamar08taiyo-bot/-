@@ -42,9 +42,15 @@ test('住所から郵便番号（福岡県）。大字・郡は省いて書い�
   // 町域が分からなければ市区町村の番号
   assert.deepEqual(zipCandidates('行橋市どこか1-2'), [{zip: '824-0000', label: '行橋市'}]);
   assert.deepEqual(zipCandidates('東京都千代田区1-1'), []);
-  assert.equal(addressOfZip('8240043'), '行橋市流末');
-  assert.equal(addressOfZip('824-0043'), '行橋市流末');
+  // 郵便番号 → 住所の頭は県から・大字を付けて書く町域は「大字」も（ユーザーの指示「郵便番号を入力したら住所がでる、福岡県行橋市大字流松（流末）」2026-10-29）
+  assert.equal(addressOfZip('8240043'), '福岡県行橋市大字流末');
+  assert.equal(addressOfZip('824-0043'), '福岡県行橋市大字流末');
+  assert.equal(addressOfZip('824-0005'), '福岡県行橋市中央'); // 中央は大字なし
+  assert.equal(addressOfZip('800-0344'), '福岡県京都郡苅田町大字新津');
+  assert.equal(addressOfZip('824-0000'), '福岡県行橋市'); // 以下に掲載がない場合：市町村まで
   assert.equal(addressOfZip('1000001'), '');
+  // 入った住所の頭から〒に戻しても同じ番号
+  assert.deepEqual(zipCandidates(addressOfZip('824-0043') + '1-1').map((h) => h.zip), ['824-0043']);
   assert.equal(zipLabel('８２４００４３'), '824-0043');
 });
 

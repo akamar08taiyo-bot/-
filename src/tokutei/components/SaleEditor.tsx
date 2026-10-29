@@ -13,7 +13,7 @@ import type {AppData, Sale, SaleItem, SaleStatus} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {todayIso, yen} from '../util.ts';
 import {fiscalYearOf} from '../wareki.ts';
-import {addressOfZip, zipCandidates, zipLabel} from '../zip.ts';
+import {addressOfZip, isZipHead, zipCandidates, zipLabel} from '../zip.ts';
 import {ESTIMATE_CAPACITY, ESTIMATE_LABEL, estimateNoteOverflow, estimateOverflow, estimatePreview} from '../estimateBook.ts';
 import type {EstimateField} from '../estimateBook.ts';
 import {saveEstimateBook, useEstimateTemplate} from '../print/estimateFiles.ts';
@@ -177,9 +177,12 @@ export function SaleEditor({
     change({zip: hits[0].zip});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sale.address]);
-  /** 郵便番号を先に打つと、住所が空なら住所の頭（市区町村・町域）を入れる */
+  /**
+   * 郵便番号を先に打つと、住所が空なら住所の頭（「福岡県行橋市大字流末」）を入れる。住所が郵便番号から入れたままなら（番地などを足していない）、
+   * 新しい郵便番号の住所の頭に替える（打ち間違えて1字ずつ打ち直したときも。住宅改修のアプリの zip.ts の withZipAddress と同じ）
+   */
   const changeZip = (zip: string) => {
-    const head = sale.address.trim() ? '' : addressOfZip(zip);
+    const head = !sale.address.trim() || isZipHead(sale.address) ? addressOfZip(zip) : '';
     autoZip.current = '';
     change(head ? {zip, address: head} : {zip});
   };
