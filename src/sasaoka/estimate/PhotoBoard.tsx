@@ -27,12 +27,14 @@ import type {DragEvent, PointerEvent as ReactPointerEvent} from 'react';
 import type {EstimateRates} from '../calc.ts';
 import {Btn, DropArea, DropOverlay, Modal, pastedFiles, useFileDragging, useToast} from '../components/ui.tsx';
 import {circled, photoNumbers, swapPhotoNumbers} from '../estimateForms.ts';
-import {cleanEdit, turn} from '../photoEdit.ts';
-import {photoBounds, turnMarks} from '../photoMarks.ts';
-import {photoTakenDate, preparePhoto, putPhoto, rememberPhotoUrl, usePhotoUrls} from '../photos.ts';
+import {cleanEdit, normRot, turn} from '../photoEdit.ts';
+import {marksBetween, photoBounds, turnMarks} from '../photoMarks.ts';
+import {composeTiles, getPhotos, photoTakenDate, preparePhoto, putPhoto, rememberPhotoUrl, usePhotoUrls} from '../photos.ts';
+import {bestTiling, MAX_TILES} from '../photoTile.ts';
+import type {TileRect} from '../photoTile.ts';
 import {kindNamesOf, photoDay, photoPlacement, workText} from '../shinsei.ts';
 import {readStampDate} from '../stampDate.ts';
-import type {Job, PhotoEdit, PhotoMark, Place, PlacePhotoEdits, PlacePhotoMarks, PlacePhotos} from '../types.ts';
+import type {Job, PhotoEdit, PhotoMark, PhotoTiles, Place, PlacePhotoEdits, PlacePhotoMarks, PlacePhotos, PlacePhotoTiles} from '../types.ts';
 import {MarkLayer} from './MarkLayer.tsx';
 
 export type PhotoSlot = 'before' | 'after';
@@ -41,7 +43,7 @@ export const SLOT_LABEL: Record<PhotoSlot, string> = {before: '改修前', after
 /** 指で写真の上を押したまま、この時間（ミリ秒）たってから動かすと箇所をつかむ（すぐに動かしたときは画面のスクロール） */
 const HOLD_MS = 280;
 
-type SlotFields = {photos: PlacePhotos; photoDates: PlacePhotos; photoEdits: PlacePhotoEdits; photoMarks: PlacePhotoMarks};
+type SlotFields = {photos: PlacePhotos; photoDates: PlacePhotos; photoEdits: PlacePhotoEdits; photoMarks: PlacePhotoMarks; photoTiles: PlacePhotoTiles};
 
 /** 改修前・改修後の1つを替える（空なら外す。どちらもなければ持たない。書き込みは1つもなければ空） */
 function withSlot<F extends keyof SlotFields>(p: Place, field: F, slot: PhotoSlot, v: SlotFields[F][PhotoSlot] | undefined): Place {
@@ -53,9 +55,12 @@ function withSlot<F extends keyof SlotFields>(p: Place, field: F, slot: PhotoSlo
   return out as Place;
 }
 
-/** 枠の写真・撮影日・向きと大きさ・書き込みを替える */
-const withPhoto = (p: Place, slot: PhotoSlot, id: string | undefined, date: string | undefined, edit: PhotoEdit | undefined, marks?: PhotoMark[]): Place =>
-  withSlot(withSlot(withSlot(withSlot(p, 'photos', slot, id), 'photoDates', slot, date), 'photoEdits', slot, edit), 'photoMarks', slot, marks);
+/** 枠の写真・撮影日・向きと大きさ・書き込み・並べたもとの写真を替える（差し替え・削除では並べたもとの写真も外す） */
+const withPhoto = (p: Place, slot: PhotoSlot, id: string | undefined, date: string | undefined, edit: PhotoEdit | undefined, marks?: PhotoMark[], tiles?: PhotoTiles): Place =>
+  withSlot(withSlot(withSlot(withSlot(withSlot(p, 'photos', slot, id), 'photoDates', slot, date), 'photoEdits', slot, edit), 'photoMarks', slot, marks), 'photoTiles', slot, tiles);
+
+/** 並べたもとの写真の場所（Place.photoTiles の rects の1つ）→ 四角 */
+const rectOf = ([x, y, w, h]: [number, number, number, number]): TileRect => ({x, y, w, h});
 
 /** 写真の番号の箇所（写真番号の順）。写真番号のない箇所（見積書に出ない箇所）は入らない */
 export function photoPlaces(job: Pick<Job, 'places'>, rates: EstimateRates): {place: Place; no: number}[] {
@@ -146,12 +151,12 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
       if (!key) return j;
       return {...j, places: j.places.map((p) => (p.id === key.placeId ? withPhoto(p, key.slot, id, undefined, undefined) : p))};
     });
-  /** 写真のファイル（PDF はページごとに写真にする）を入れる：start の枠から（なければ①の改修前から）、改修前の空いた枠に順に */
-  const put = async (files: File[], start?: PhotoKey) => {
+  /** 写真のファイルを写真の並びにする（PDF はページごとに写真にする）。写真が1つもなければ空 */
+  const loadImages = async (files: File[]): Promise<{file: Blob; name: string}[]> => {
     const chosen = files.filter(isPhotoFile);
     if (chosen.length === 0) {
       if (files.length) toast('写真（画像）か PDF のファイルを選んでください', 'error');
-      return;
+      return [];
     }
     const images: {file: Blob; name: string}[] = [];
     setBusy((n) => n + 1);
@@ -172,6 +177,11 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
     } finally {
       setBusy((n) => n - 1);
     }
+    return images;
+  };
+  /** 写真のファイル（PDF はページごとに写真にする）を入れる：start の枠から（なければ①の改修前から）、改修前の空いた枠に順に */
+  const put = async (files: File[], start?: PhotoKey) => {
+    const images = await loadImages(files);
     if (images.length === 0) return;
     // 入れる枠：選んだ枠と、そのあとの写真番号の同じ種類（改修前・改修後）の空いた枠（ここでは足りるかを見るだけ。置く枠は placePhoto で決める）
     const list = photoPlaces(job, rates);
@@ -219,21 +229,105 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
       if (!j.places.some((x) => x.id === a.placeId) || !j.places.some((x) => x.id === b.placeId)) return j;
       const get = (k: PhotoKey) => {
         const p = j.places.find((x) => x.id === k.placeId);
-        return [p?.photos?.[k.slot], p?.photoDates?.[k.slot], p?.photoEdits?.[k.slot], p?.photoMarks?.[k.slot]] as const;
+        return [p?.photos?.[k.slot], p?.photoDates?.[k.slot], p?.photoEdits?.[k.slot], p?.photoMarks?.[k.slot], p?.photoTiles?.[k.slot]] as const;
       };
-      const [[ia, da, ea, ma], [ib, db, eb, mb]] = [get(a), get(b)];
-      let places = j.places.map((p) => (p.id === a.placeId ? withPhoto(p, a.slot, ib, db, eb, mb) : p));
-      places = places.map((p) => (p.id === b.placeId ? withPhoto(p, b.slot, ia, da, ea, ma) : p));
+      const [[ia, da, ea, ma, ta], [ib, db, eb, mb, tb]] = [get(a), get(b)];
+      let places = j.places.map((p) => (p.id === a.placeId ? withPhoto(p, a.slot, ib, db, eb, mb, tb) : p));
+      places = places.map((p) => (p.id === b.placeId ? withPhoto(p, b.slot, ia, da, ea, ma, ta) : p));
       return {...j, places};
     });
   const remove = (key: PhotoKey) => setPhoto(key, undefined, undefined);
+  /**
+   * 写真の入っている枠に、写真を足して並べる（ユーザーの指示「追加で写真を追加できる機能もつける」2026-10-29）。いまの写真（向きもそのまま）と足す写真を、
+   * 枠の中でいちばん大きく見える並べ方（横・縦・2×2。photoTile.ts）で1枚の写真にして、その枠に入れる。1つの枠に MAX_TILES 枚まで。
+   * 前に足して並べた枠は、並べたもとの写真（Place.photoTiles）から並べ直す（並べた写真を1枚として並べると、前の写真が小さくなる）。
+   * shown(w, h, edit)＝その枠に w×h の写真を置いたときの見えている四角の大きさ（紙の画素。写真に書く内容の所も入れて測る）。
+   * 書き込みは、新しく並べた写真の中のその写真の所に移す（写真が小さくなった分だけ文字も小さく）。撮影日はそのまま。写真のない枠はふつうに入れる（put）
+   */
+  const add = async (files: File[], key: PhotoKey, shown: (w: number, h: number, edit?: PhotoEdit) => {w: number; h: number}) => {
+    const place = job.places.find((p) => p.id === key.placeId);
+    const id = place?.photos?.[key.slot];
+    if (!place || !id) return put(files, key);
+    const edit = place.photoEdits?.[key.slot];
+    const tiles = place.photoTiles?.[key.slot];
+    // 並べ直せるのは、並べてできた写真のまま（差し替えていない・回していない）のとき
+    const reuse = tiles && tiles.of === id && !normRot(edit?.rot ?? 0) ? tiles : undefined;
+    let parts: {id: string; rot: number; rect: TileRect}[] = reuse
+      ? reuse.ids.map((x, i) => ({id: x, rot: reuse.rots[i], rect: rectOf(reuse.rects[i])}))
+      : [{id, rot: edit?.rot ?? 0, rect: {x: 0, y: 0, w: 1, h: 1}}];
+    const room = MAX_TILES - parts.length;
+    if (room <= 0) {
+      toast(`1つの枠に並べられるのは${MAX_TILES}枚までです`, 'error');
+      return;
+    }
+    const images = await loadImages(files);
+    if (images.length === 0) return;
+    if (images.length > room) toast(`1つの枠に並べられるのは${MAX_TILES}枚までです（${images.length - room}枚は入れませんでした）`, 'error');
+    setBusy((n) => n + 1);
+    try {
+      let stored = await getPhotos([id, ...parts.map((x) => x.id)]);
+      // もとの写真がこの端末にないときは、並べた写真を1枚として並べる
+      if (reuse && parts.some((x) => !stored.has(x.id))) {
+        parts = [{id, rot: 0, rect: {x: 0, y: 0, w: 1, h: 1}}];
+        stored = await getPhotos([id]);
+      }
+      const cur = stored.get(id);
+      if (!cur || parts.some((x) => !stored.has(x.id))) {
+        toast('この端末にない写真なので、足せません（差し替えてください）', 'error');
+        return;
+      }
+      const added = await Promise.all(images.slice(0, MAX_TILES - parts.length).map((x) => preparePhoto(x.file)));
+      const items = [...parts.map((x) => ({...stored.get(x.id)!, rot: x.rot})), ...added.map((x) => ({blob: x.blob, w: x.w, h: x.h, rot: 0}))];
+      const aspects = items.map(({w, h, rot}) => {
+        const b = photoBounds({x: 0, y: 0, w, h, rot});
+        return b.w / (b.h || 1);
+      });
+      const fit = (w: number, h: number) => shown(w, h).w / (w || 1);
+      const tiling = bestTiling(aspects, fit);
+      const made = await composeTiles(items, tiling);
+      const newId = await putPhoto(made);
+      rememberPhotoUrl(newId, made.blob, made.w, made.h);
+      // 足した写真も、もう一度並べ直すときのために入れておく
+      const addedIds = await Promise.all(added.map((x) => putPhoto({blob: x.blob, w: x.w, h: x.h})));
+      // いまの絵の中のそれぞれの写真が、紙の上でどれだけ小さくなったか（書き込みの文字をその分小さく）
+      const oldW = shown(cur.w, cur.h, edit).w;
+      const newW = shown(tiling.w, tiling.h).w;
+      const next: PhotoTiles = {
+        of: newId,
+        ids: [...parts.map((x) => x.id), ...addedIds],
+        rots: [...parts.map((x) => x.rot), ...added.map(() => 0)],
+        rects: tiling.rects.map((r) => [r.x, r.y, r.w, r.h].map((v) => Math.round(v * 1e6) / 1e6) as [number, number, number, number]),
+      };
+      setJob((j) => ({
+        ...j,
+        places: j.places.map((p) => {
+          // 足している間に差し替えた・消したときは何もしない
+          if (p.id !== key.placeId || p.photos?.[key.slot] !== id) return p;
+          const marks = p.photoMarks?.[key.slot] ?? [];
+          // 書き込みは、まん中のある写真の所ごとに動かす（どの写真にもないものは、いちばん近い写真の所）
+          const moved = marks.map((m) => {
+            const [cx, cy] = [(m.x1 + m.x2) / 2, (m.y1 + m.y2) / 2];
+            const dist = (r: TileRect) => Math.hypot(Math.max(r.x - cx, 0, cx - r.x - r.w), Math.max(r.y - cy, 0, cy - r.y - r.h));
+            const i = parts.reduce((best, x, k) => (dist(x.rect) < dist(parts[best].rect) ? k : best), 0);
+            const shrink = oldW > 0 ? (tiling.rects[i].w * newW) / (parts[i].rect.w * oldW) : 1;
+            return marksBetween([m], parts[i].rect, tiling.rects[i], shrink)[0];
+          });
+          return withPhoto(p, key.slot, newId, p.photoDates?.[key.slot], undefined, moved.length ? moved : undefined, next);
+        }),
+      }));
+    } catch {
+      toast('写真を足せませんでした', 'error');
+    } finally {
+      setBusy((n) => n - 1);
+    }
+  };
   /** 写真のファイルをドロップした：その枠から入れる */
   const drop = (e: DragEvent, target: PhotoKey) => {
     e.preventDefault();
     e.stopPropagation();
     if (e.dataTransfer.files.length) void put([...e.dataTransfer.files], target);
   };
-  return {put, swap, remove, drop, setDate, setNote, setEdit, setMarks, swapPlaces, busy, ordering};
+  return {put, add, swap, remove, drop, setDate, setNote, setEdit, setMarks, swapPlaces, busy, ordering};
 }
 
 /** 貼る順番を選ぶ画面に出すもの：写真（画面の URL・ファイルの名前）・入る枠の名前（1枚目から）・選び終わったとき */
@@ -403,6 +497,7 @@ export function PhotoBoard({
   dates,
   actions,
   onPick,
+  onAdd,
   onMark,
   paperSize,
 }: {
@@ -412,6 +507,7 @@ export function PhotoBoard({
   dates: boolean; // 写真の用紙に撮影日の欄がある（苅田町）：枠の下に撮影日の欄を出す
   actions: PhotoActions;
   onPick: (key?: PhotoKey) => void; // 写真のファイルを選ぶ（枠を決めるときは key）
+  onAdd?: (key: PhotoKey) => void; // その枠の写真に、写真を足して並べる（「＋ 追加」。usePhotoActions の add）
   onMark?: (key: PhotoKey) => void; // 写真に書き込む（PhotoMarkEditor.tsx）
   paperSize?: (key: PhotoKey) => {w: number; h: number} | null; // 写真貼付用紙の上の写真の大きさ（書き込みを同じ割合で描く）
 }) {
@@ -641,6 +737,11 @@ export function PhotoBoard({
           <Btn small color="white" className="touch:min-h-11 touch:px-4 touch:text-sm" onClick={() => pick(selected)}>
             差し替え
           </Btn>
+          {onAdd && (
+            <Btn small color="white" className="touch:min-h-11 touch:px-4 touch:text-sm" title="この枠に写真を足して並べる" onClick={() => onAdd(selected)}>
+              ＋ 追加
+            </Btn>
+          )}
           <Btn
             small
             color="white"

@@ -4,6 +4,7 @@
 
 import {useEffect, useState} from 'react';
 import type {FramePic} from './photoImport.ts';
+import type {Tiling} from './photoTile.ts';
 import type {Box} from './shinsei.ts';
 import {uid} from './util.ts';
 
@@ -252,6 +253,48 @@ export async function composeFrame(region: Box, pics: FramePic[]): Promise<{blob
     return {blob, w, h};
   } finally {
     for (const {bmp} of loaded) bmp.close();
+  }
+}
+
+/** 並べた写真の絵の長い辺（画素）。2枚並べても1枚が細かすぎないように、1枚の写真（MAX_SIDE）より少し大きく */
+const TILE_MAX_SIDE = 2000;
+
+/**
+ * 1つの枠に何枚かの写真を並べた絵を作る（photoTile.ts の並べ方。ユーザーの指示「追加で写真を追加できる機能もつける」2026-10-29）。
+ * 写真ごとに rot（右回りの度）だけ回して、並べ方の場所（回したあとの外側の四角）に描く。あいだ・余りは白
+ */
+export async function composeTiles(items: {blob: Blob; w: number; h: number; rot: number}[], tiling: Tiling): Promise<{blob: Blob; w: number; h: number}> {
+  const bmps = await Promise.all(items.map((x) => createImageBitmap(x.blob, {imageOrientation: 'from-image'})));
+  try {
+    const bounds = items.map(({w, h, rot}) => {
+      const t = (rot * Math.PI) / 180;
+      const [c, s] = [Math.abs(Math.cos(t)), Math.abs(Math.sin(t))];
+      return {bw: w * c + h * s, bh: w * s + h * c};
+    });
+    // もとの写真の細かさに合わせ（いちばん細かい写真が縮まない大きさ）、長い辺は TILE_MAX_SIDE まで
+    const fine = Math.max(1, ...bounds.map((b, i) => b.bw / Math.max(1e-6, tiling.rects[i].w * tiling.w)));
+    const k = Math.min(fine, TILE_MAX_SIDE / Math.max(tiling.w, tiling.h));
+    const [W, H] = [Math.max(1, Math.round(tiling.w * k)), Math.max(1, Math.round(tiling.h * k))];
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('写真を並べられませんでした');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, W, H);
+    items.forEach((x, i) => {
+      const r = tiling.rects[i];
+      const s = (r.w * W) / Math.max(1e-6, bounds[i].bw); // 写真の画素 → 並べた絵の画素
+      ctx.save();
+      ctx.translate((r.x + r.w / 2) * W, (r.y + r.h / 2) * H);
+      ctx.rotate((x.rot * Math.PI) / 180);
+      ctx.drawImage(bmps[i], (-x.w * s) / 2, (-x.h * s) / 2, x.w * s, x.h * s);
+      ctx.restore();
+    });
+    const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('写真を並べられませんでした'))), 'image/jpeg', 0.85));
+    return {blob, w: W, h: H};
+  } finally {
+    for (const b of bmps) b.close();
   }
 }
 

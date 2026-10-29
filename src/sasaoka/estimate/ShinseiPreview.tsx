@@ -251,6 +251,7 @@ export type PreviewPhotos = {
   of: (no: number, slot: PvPhotoSlot['slot']) => {url: string; w: number; h: number; edit?: PhotoEdit; marks?: PhotoMark[]} | null;
   onDrop: (no: number, slot: PvPhotoSlot['slot'], e: DragEvent) => void;
   onPick: (no: number, slot: PvPhotoSlot['slot']) => void;
+  onAdd?: (no: number, slot: PvPhotoSlot['slot']) => void; // 写真を足して、同じ枠に並べる（「＋ 追加」）
   onEdit: (no: number, slot: PvPhotoSlot['slot'], edit: PhotoEdit | undefined) => void;
   onMark?: (no: number, slot: PvPhotoSlot['slot']) => void; // 写真に書き込む（PhotoMarkEditor.tsx）
   onRemove?: (no: number, slot: PvPhotoSlot['slot']) => void; // 写真を削除する（選んで Backspace・Delete・道具の「削除」）
@@ -545,6 +546,12 @@ function PhotoSlotView({
                 <button type="button" className={tool} onClick={() => photos.onPick(no, slot.slot)}>
                   差し替え
                 </button>
+                {photos.onAdd && (
+                  // ユーザーの指示「追加で写真を追加できる機能もつける」2026-10-29：選んだ写真のとなりに並べる
+                  <button type="button" className={tool} title="この枠に写真を足して並べる" onClick={() => photos.onAdd?.(no, slot.slot)}>
+                    ＋ 追加
+                  </button>
+                )}
                 {photos.onMark && (
                   <button type="button" className={tool} title="写真に書き込む" onClick={() => photos.onMark?.(no, slot.slot)}>
                     ✏️ 書き込み

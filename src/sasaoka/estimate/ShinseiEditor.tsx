@@ -21,7 +21,7 @@ import {photoBounds} from '../photoMarks.ts';
 import {costIsTotal, estimateLength, insuredBoxes, kindNamesOf, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, planPlacement, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
-import type {AppData, Insurer, Job, Material, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
+import type {AppData, Insurer, Job, Material, PhotoEdit, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {toKatakana, yen} from '../util.ts';
 import {zipCandidates} from '../zip.ts';
@@ -177,8 +177,10 @@ export function ShinseiEditor({
   const photoUrls = usePhotoUrls(photoList.flatMap(({place}) => [place.photos?.before ?? '', place.photos?.after ?? '']));
   const photoInput = useRef<HTMLInputElement>(null);
   const pickFor = useRef<PhotoKey | undefined>(undefined);
-  const pickPhoto = (key?: PhotoKey) => {
+  const pickAdd = useRef(false); // 選んだ写真を、その枠の写真に足して並べる（「＋ 追加」）
+  const pickPhoto = (key?: PhotoKey, add = false) => {
     pickFor.current = key;
+    pickAdd.current = add;
     photoInput.current?.click();
   };
   const photoKey = (no: number, slot: PhotoSlot): PhotoKey | null => {
@@ -198,13 +200,18 @@ export function ShinseiEditor({
   const paperSize = (key: PhotoKey): {w: number; h: number} | null => {
     const x = photoList.find((p) => p.place.id === key.placeId);
     const ph = x ? photoOf(x.no, key.slot) : null;
-    if (!x || !ph) return null;
-    const frame = pages?.flatMap((pg) => pg.photoSlots).find((f) => f.photo === x.no && f.slot === key.slot) ?? {w: 560, h: 420};
-    const lines = key.slot === 'before' ? photoNoteLines(x.place, kindNamesOf(job)) : [];
-    const parts = photoNoteLayout({x: 0, y: 0, w: frame.w, h: frame.h}, {w: ph.w, h: ph.h, rot: ph.edit?.rot ?? 0}, lines);
-    const vb = photoBounds(photoPlacement(parts.photo, ph.w, ph.h, ph.edit));
+    return ph ? shownSize(key, ph.w, ph.h, ph.edit) : null;
+  };
+  /** その枠に w×h の写真（edit の向き・大きさ）を置いたときの、見えている四角の大きさ（画素。写真を足して並べるときにも、並べ方を決めるのに使う） */
+  const shownSize = (key: PhotoKey, w: number, h: number, edit?: PhotoEdit): {w: number; h: number} => {
+    const x = photoList.find((p) => p.place.id === key.placeId);
+    const frame = (x && pages?.flatMap((pg) => pg.photoSlots).find((f) => f.photo === x.no && f.slot === key.slot)) || {w: 560, h: 420};
+    const lines = x && key.slot === 'before' ? photoNoteLines(x.place, kindNamesOf(job)) : [];
+    const parts = photoNoteLayout({x: 0, y: 0, w: frame.w, h: frame.h}, {w, h, rot: edit?.rot ?? 0}, lines);
+    const vb = photoBounds(photoPlacement(parts.photo, w, h, edit));
     return {w: vb.w, h: vb.h};
   };
+  const addPhotos = (key: PhotoKey) => pickPhoto(key, true);
   // 書き込みの画面（写真の欄・プレビューの ✏️）
   const [marking, setMarking] = useState<PhotoKey | null>(null);
   const markPlace = marking ? photoList.find((p) => p.place.id === marking.placeId) : undefined;
@@ -239,6 +246,10 @@ export function ShinseiEditor({
     onPick: (no, slot) => {
       const key = photoKey(no, slot);
       if (key) pickPhoto(key);
+    },
+    onAdd: (no, slot) => {
+      const key = photoKey(no, slot);
+      if (key) addPhotos(key);
     },
     onEdit: (no, slot, edit) => {
       const key = photoKey(no, slot);
@@ -573,8 +584,12 @@ export function ShinseiEditor({
                 const files = [...(e.target.files ?? [])];
                 e.target.value = '';
                 const key = pickFor.current;
+                const add = pickAdd.current;
                 pickFor.current = undefined;
-                if (files.length) void photoActions.put(files, key);
+                pickAdd.current = false;
+                if (!files.length) return;
+                if (add && key) void photoActions.add(files, key, (w, h, edit) => shownSize(key, w, h, edit));
+                else void photoActions.put(files, key);
               }}
             />
             <input
@@ -589,7 +604,7 @@ export function ShinseiEditor({
                 if (files.length) void planActions.put(files);
               }}
             />
-            <PhotoBoard job={job} rates={s} sheetNos={sheetNos} dates={!!map?.sheets.some((x) => x.photoPlace?.dates)} actions={photoActions} onPick={pickPhoto} onMark={setMarking} paperSize={paperSize} />
+            <PhotoBoard job={job} rates={s} sheetNos={sheetNos} dates={!!map?.sheets.some((x) => x.photoPlace?.dates)} actions={photoActions} onPick={pickPhoto} onAdd={addPhotos} onMark={setMarking} paperSize={paperSize} />
             <PhotoOrderDialog ordering={photoActions.ordering} />
             {marking && markPlace && markPhoto && (
               <PhotoMarkEditor

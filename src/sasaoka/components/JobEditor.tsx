@@ -88,7 +88,7 @@ export function JobEditor({
     setJob((j) => {
       const i = j.places.findIndex((p) => p.id === place.id);
       const places = [...j.places];
-      const {photos: _photos, photoDates: _dates, photoEdits: _edits, photoMarks: _marks, shinseiLine: _line, ...rest} = place;
+      const {photos: _photos, photoDates: _dates, photoEdits: _edits, photoMarks: _marks, photoTiles: _tiles, shinseiLine: _line, ...rest} = place;
       places.splice(i + 1, 0, {...rest, id: uid('p'), rows: copyRows(place.rows), photo: 0});
       return {...j, places};
     });

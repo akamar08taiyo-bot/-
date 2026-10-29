@@ -71,6 +71,7 @@ export type Place = {
   photoEdits?: PlacePhotoEdits; // 写真の向き・大きさ（なければ そのまま・枠いっぱい。photoEdit.ts）
   photoNote?: string; // 写真貼付用紙の改修前の写真の横（上）に書く内容の追加（手で打つ。1行ずつ。「ベースプレート　L=800mm」）。自動の文（改修の種類・寸法）の下に書く
   photoMarks?: PlacePhotoMarks; // 写真への書き込み（直線・矢印・四角形・楕円・テキストボックス。photoMarks.ts）。写真と一緒に動き、写真を差し替えると消える
+  photoTiles?: PlacePhotoTiles; // 写真を足して並べた枠の、もとの写真（「＋ 追加」。もう一度足すと、もとの写真から並べ直す）
 };
 
 /** 改修の内容の寸法（mm。打ったまま）：l 長さ（手すり。空なら見積書の使う長さ）・h 高さ・w 幅・d 奥行 */
@@ -86,6 +87,13 @@ export type PlacePhotos = {before?: string; after?: string}; // 改修前・改�
  */
 export type PhotoEdit = {rot: number; scale: number; x?: number; y?: number};
 export type PlacePhotoEdits = {before?: PhotoEdit; after?: PhotoEdit};
+
+/**
+ * 写真を足して並べた枠（ユーザーの指示「追加で写真を追加できる機能もつける」2026-10-29。photoTile.ts）：of＝並べてできた写真の番号（枠の写真がこれのときだけ使う）、
+ * ids・rots＝並べたもとの写真の番号と向き（右回りの度）、rects＝並べた写真の中のそれぞれの場所（x・y・幅・高さの割合 0〜1）
+ */
+export type PhotoTiles = {of: string; ids: string[]; rots: number[]; rects: [number, number, number, number][]};
+export type PlacePhotoTiles = {before?: PhotoTiles; after?: PhotoTiles};
 
 /** 線の種類（Excel の「図形の枠線 → 実線／点線」と同じ。値は Excel の prstDash） */
 export type PhotoMarkDash = 'solid' | 'sysDot' | 'sysDash' | 'dash' | 'dashDot' | 'lgDash' | 'lgDashDot' | 'lgDashDotDot';

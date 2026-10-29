@@ -10,8 +10,9 @@ import {guessPieceLengthM} from './priceImport.ts';
 import {jobInsurer, MARK_INFO, MARK_KEYS, NO_SHINSEI} from './estimateForms.ts';
 import {cleanEdit} from './photoEdit.ts';
 import {cleanMarks} from './photoMarks.ts';
+import {MAX_TILES} from './photoTile.ts';
 import {cleanRiyu} from './riyu.ts';
-import type {AppData, EstimateForm, ImportedDoc, Insurer, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, PhotoMark, PlaceDims, PlacePhotoEdits, PlacePhotoMarks, PlacePhotos, Rounding, Row, Settings, ShinseiInfo, TaxMode} from './types.ts';
+import type {AppData, EstimateForm, ImportedDoc, Insurer, InvoiceTaxMode, Job, Kit, LaborItem, Material, NameSuffix, OrderEdits, OrderLine, Place, PhotoMark, PlaceDims, PlacePhotoEdits, PlacePhotoMarks, PlacePhotos, PlacePhotoTiles, Rounding, Row, Settings, ShinseiInfo, TaxMode} from './types.ts';
 import {todayIso, uid} from './util.ts';
 
 const DB_NAME = 'taiyo-sasaoka-shikiri';
@@ -291,6 +292,7 @@ const cleanPlace = (raw: Record<string, unknown>): Place => keepNewer(raw, (p) =
   ...(str(p.photoNote).trim() ? {photoNote: str(p.photoNote)} : {}), // 写真に書く内容の追加
   ...cleanPhotoEdits(p.photoEdits),
   ...cleanPhotoMarks(p.photoMarks),
+  ...cleanPhotoTiles(p.photoTiles),
 }), ['work']);
 
 /**
@@ -348,6 +350,22 @@ function cleanPhotoEdits(raw: unknown): {photoEdits?: PlacePhotoEdits} {
 function cleanPlanMarks(j: Record<string, unknown>): {planMarks?: PhotoMark[]} {
   const marks = cleanMarks(j.planMarks);
   return typeof j.planPhoto === 'string' && j.planPhoto && marks.length ? {planMarks: marks} : {};
+}
+
+/** 写真を足して並べた枠のもとの写真（2枚から MAX_TILES 枚。形のおかしいものは読まない＝足すときは並べた写真を1枚として並べる） */
+function cleanPhotoTiles(raw: unknown): {photoTiles?: PlacePhotoTiles} {
+  if (!isObj(raw)) return {};
+  const out: PlacePhotoTiles = {};
+  for (const slot of ['before', 'after'] as const) {
+    const t = raw[slot];
+    if (!isObj(t) || typeof t.of !== 'string' || !t.of || !Array.isArray(t.ids) || !Array.isArray(t.rots) || !Array.isArray(t.rects)) continue;
+    const ids = t.ids.filter((x): x is string => typeof x === 'string' && !!x);
+    const rects = t.rects.filter((r): r is [number, number, number, number] => Array.isArray(r) && r.length === 4 && r.every((v) => Number.isFinite(v) && v >= -0.001 && v <= 1.001));
+    const n = ids.length;
+    if (n < 2 || n > MAX_TILES || rects.length !== n || t.rots.length !== n) continue;
+    out[slot] = {of: t.of, ids, rots: t.rots.map((v) => numv(v)), rects};
+  }
+  return out.before || out.after ? {photoTiles: out} : {};
 }
 
 /** 写真への書き込み（photoMarks.ts の cleanMarks）。改修前・改修後とも書き込みがなければ持たない */

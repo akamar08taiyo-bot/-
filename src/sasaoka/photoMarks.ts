@@ -387,3 +387,24 @@ export function turnMarks(marks: PhotoMark[], photo: {w: number; h: number}, fro
   }
   return out;
 }
+
+/**
+ * 写真を何枚か並べた絵にしたとき（photoTile.ts）、写真への書き込みを、並べた絵の中のその写真の場所に移す。from＝いまの絵の中のその写真の場所、to＝新しい絵の中の場所
+ * （どちらも絵の中の割合。並べる前の写真なら from は絵いっぱい）。書き込みの位置は写真の見えている四角の中の割合なので、場所に合わせて動かして縮めるだけで写真の同じ所に付いていく。
+ * 写真が紙の上で小さくなった分（shrink。1 より小さい）だけ文字を小さくする（テキストボックスから文字があふれないように。線の太さはそのまま）
+ */
+export function marksBetween(marks: PhotoMark[], from: {x: number; y: number; w: number; h: number}, to: {x: number; y: number; w: number; h: number}, shrink = 1): PhotoMark[] {
+  const f = clamp(shrink, 0.05, 1);
+  const mx = (v: number) => unit(to.x + ((v - from.x) / (from.w || 1)) * to.w);
+  const my = (v: number) => unit(to.y + ((v - from.y) / (from.h || 1)) * to.h);
+  return marks.map((m) => ({
+    ...m,
+    x1: mx(m.x1),
+    y1: my(m.y1),
+    x2: mx(m.x2),
+    y2: my(m.y2),
+    ...(f < 1 ? {size: Math.max(5, Math.round(m.size * f * 2) / 2)} : {}),
+  }));
+}
+/** 並べる前の写真への書き込みを、並べた絵の中の rect に移す（marksBetween の from が絵いっぱい） */
+export const marksIntoTile = (marks: PhotoMark[], rect: {x: number; y: number; w: number; h: number}, shrink = 1): PhotoMark[] => marksBetween(marks, {x: 0, y: 0, w: 1, h: 1}, rect, shrink);
