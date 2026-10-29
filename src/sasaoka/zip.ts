@@ -30,6 +30,14 @@ function cities(): City[] {
   return parsed;
 }
 
+/** 郵便番号の市区町村（「京都郡苅田町」。福岡県の番号で、1つの市区町村に決まるときだけ。決まらなければ ''） */
+export function cityOfZip(zip: string): string {
+  const d = (zip || '').normalize('NFKC').replace(/\D/g, '');
+  if (d.length !== 7) return '';
+  const hit = cities().filter((c) => c.towns.some((t) => t.zip === d));
+  return hit.length === 1 ? hit[0].city : '';
+}
+
 /** 7けたの郵便番号を「824-0043」に（7けたでなければ打ったまま） */
 export function zipLabel(zip: string): string {
   const d = (zip || '').normalize('NFKC').replace(/\D/g, '');

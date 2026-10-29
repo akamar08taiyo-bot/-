@@ -15,10 +15,14 @@ const CMAP_FILES = import.meta.glob(
   {query: '?inline', import: 'default'},
 ) as Record<string, () => Promise<string>>;
 
-async function cmapBytes(fileName: string): Promise<Uint8Array> {
-  const key = Object.keys(CMAP_FILES).find((k) => k.endsWith('/' + fileName));
-  if (!key) throw new Error('CMap not bundled: ' + fileName);
-  const dataUrl = await CMAP_FILES[key]();
+// スキャンした PDF の白黒の画像（JBIG2・CCITT＝複合機・FAX の圧縮）と JPEG 2000 を描く部品（WebAssembly）。
+// 同梱しないと、その画像だけ描けずにページが真っ白になり、介護保険証などのスキャンを読めなかった（ユーザーの報告「保険証などが上手く取り込めないケースがあった」2026-10-29）
+const WASM_FILES = import.meta.glob(['/node_modules/pdfjs-dist/wasm/{jbig2,openjpeg}.wasm'], {query: '?inline', import: 'default'}) as Record<string, () => Promise<string>>;
+
+async function bundledBytes(files: Record<string, () => Promise<string>>, fileName: string): Promise<Uint8Array> {
+  const key = Object.keys(files).find((k) => k.endsWith('/' + fileName));
+  if (!key) throw new Error('not bundled: ' + fileName);
+  const dataUrl = await files[key]();
   const b64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
   const bin = atob(b64);
   const out = new Uint8Array(bin.length);
@@ -26,11 +30,12 @@ async function cmapBytes(fileName: string): Promise<Uint8Array> {
   return out;
 }
 
-/** pdf.js が CMap を取りに来たときに、同梱したものを渡す */
+/** pdf.js が CMap・画像を描く部品を取りに来たときに、同梱したものを渡す */
 class BundledDataFactory {
   constructor(_opts: unknown) {}
   async fetch({kind, filename}: {kind: string; filename: string}): Promise<Uint8Array> {
-    if (kind === 'cMapUrl') return cmapBytes(filename);
+    if (kind === 'cMapUrl') return bundledBytes(CMAP_FILES, filename);
+    if (kind === 'wasmUrl') return bundledBytes(WASM_FILES, filename);
     throw new Error(`${kind} は同梱していません`);
   }
 }
@@ -59,6 +64,7 @@ async function openPdf(data: Uint8Array) {
     data,
     cMapUrl: 'bundled://cmaps/',
     cMapPacked: true,
+    wasmUrl: 'bundled://wasm/',
     useWorkerFetch: false,
     // pdf.js の型定義にはないが、CMap の取り寄せ方を差し替えられる
     BinaryDataFactory: BundledDataFactory,

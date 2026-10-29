@@ -9,6 +9,7 @@
 // 画像・読んだ文字・取り出した値は、どこにも送らず、保存もしない（入れた値だけが様邸に残る）
 
 import {todayIso} from './util.ts';
+import {cityOfZip} from './zip.ts';
 
 /** 読み取った1語（画素の位置） */
 export type OcrWord = {text: string; x0: number; y0: number; x1: number; y1: number; conf?: number; chars?: {text: string; x0: number; y0: number; x1: number; y1: number}[]};
@@ -361,6 +362,19 @@ function labelCells(text: string, label: RegExp): {cells: string[]; at: number} 
   return {cells, at};
 }
 
+/**
+ * ラベルのうしろの欄の氏名（フリガナ）。姓と名の間が大きくあいて、名が次の欄に分かれて読めたときは、つないで1つに
+ * （いただいた保険証のスキャンで「木村」と「米子」が別の欄になり、名が落ちた。2026-10-29）。つなぐのは、名らしい短い欄（漢字・かな 1〜4字。
+ * ほかの欄のラベル・性別の字でない）だけ
+ */
+function nameCells(cells: string[], from: number, kana = false): string {
+  const first = cells[from] ?? '';
+  const next = squeeze(cells[from + 1] ?? '');
+  const part = kana ? /^[ァ-ヺーｦ-ﾟ]{1,8}$/ : /^[々〆ぁ-ゖァ-ヺー一-鿿]{1,4}$/;
+  const label = /要介護|要支援|認定|年月日|区分|交付|生年|性別|^[男女]$|様$|保険|番号|住所|氏名|フリ/;
+  return part.test(squeeze(first).replace(/[　]/g, '')) && part.test(next) && !label.test(next) ? `${first} ${cells[from + 1]}` : first;
+}
+
 /** 氏名・フリガナの値：ラベル（氏名・フリガナ・被保険者の字）とごみを除き、姓と名の間を全角の空白1つに */
 function personName(raw: string, kana: boolean): string {
   const t = raw
@@ -614,7 +628,7 @@ function parsePage(page: OcrPage, today: string): {info: Partial<CardInfo>; unsu
       const {cells, at} = labelCells(text, label);
       if (at < 0) return '';
       const rest = cells[at].replace(new RegExp('.*?' + label.source), '').trim();
-      return rest || cells[at + 1] || '';
+      return rest || nameCells(cells, at + 1, true);
     };
     const k = personName(cellAfter(rows[kanaRow].text, /フ\s*リ\s*[ガカ]\s*ナ/), true);
     if (k.replace(/　/g, '').length >= 2) info.kana = k;
@@ -624,7 +638,7 @@ function parsePage(page: OcrPage, today: string): {info: Partial<CardInfo>; unsu
   if (nameRow >= 0) {
     const {cells, at} = labelCells(rows[nameRow].text, NAME_LABEL);
     const rest = at < 0 ? '' : cells[at].replace(new RegExp('.*?' + NAME_LABEL.source), '').trim();
-    const n = at < 0 ? '' : personName((rest || cells[at + 1] || '').split(/(?=生年月日)/)[0], false);
+    const n = at < 0 ? '' : personName((rest || nameCells(cells, at + 1)).split(/(?=生年月日)/)[0], false);
     if (n.replace(/　/g, '').length >= 2) info.name = n;
     else if (kanaRow >= 0 && nameRow === kanaRow && rows[nameRow + 1]) {
       const n2 = personName(rows[nameRow + 1].text, false);
@@ -833,6 +847,15 @@ function parsePage(page: OcrPage, today: string): {info: Partial<CardInfo>; unsu
   if (found) {
     info.insurer = found.insurer;
     info.insurerName = found.name;
+  } else if (info.zip) {
+    // 保険者の名称が読めない（ますの数字・印にかかった字。白黒のスキャンなど）ときは、住所の郵便番号の市町村から（住所地特例などでちがうこともあるので、たしかでない）
+    const byZip = insurerOfName(cityOfZip(info.zip));
+    if (byZip.insurer) {
+      info.insurer = byZip.insurer;
+      info.insurerName = byZip.name;
+      unsure.add('insurer');
+      unsure.add('insurerName');
+    }
   }
   // 値ごとの読み取りの自信：その値の字のある行の語の自信の平均（同じ数だけ読めた値のどちらを使うかに）
   const conf: Partial<Record<CardKey, number>> = {};
@@ -903,7 +926,8 @@ export function parseCard(pages: OcrPage[], today = todayIso()): CardRead {
     return [...votes.values()];
   };
   // 形に合う値 → 多く読めた値 → 自信の高い値 → 先に読んだ値
-  const better = (a: Vote, b: Vote) => Number(b.sure) - Number(a.sure) || b.n - a.n || Math.round(b.conf / 5) - Math.round(a.conf / 5) || a.first - b.first;
+  // 同じ数だけ読めたら、読めなかった字がありそうな読み（doubt。細い「1」が落ちた「昭和2年」など）より、そうでない読み
+  const better = (a: Vote, b: Vote) => Number(b.sure) - Number(a.sure) || b.n - a.n || Number(a.doubt) - Number(b.doubt) || Math.round(b.conf / 5) - Math.round(a.conf / 5) || a.first - b.first;
   /** 選んだ値を入れる。peers：比べる読み（同じ保険証の読み） */
   const take = (g: CardKey[], best: Vote | undefined, peers: Vote[]) => {
     if (!best) return;

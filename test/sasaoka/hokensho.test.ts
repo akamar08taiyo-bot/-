@@ -361,6 +361,31 @@ test('読めなかった字がありそう：字と字の間の縦の画（細�
   assert.ok(!parseCard([read(false)]).unsure.includes('birthY'));
 });
 
+test('白黒のスキャンの保険証（2026-10-29 の報告）：姓と名が別の欄に分かれても1つの氏名・読めなかった字がありそうな読みは同じ数なら負ける・保険者の名称が読めなければ郵便番号の市町村から', () => {
+  // 姓と名の間が大きくあいた（別の欄に読めた）。名のうしろの性別・ほかの欄のラベルはつながない
+  const wide = page([[[40, '番号 0000123456']], [[40, '氏名'], [200, '見本'], [400, '花子']], [[40, '生年月日 昭和 13 年 4 月 14 日'], [560, '女']]]);
+  assert.equal(parseCard([wide]).info.name, '見本　花子');
+  const withSex = page([[[40, '番号 0000123456']], [[40, '氏名'], [200, '見本 花子'], [400, '女']]]);
+  assert.equal(parseCard([withSex]).info.name, '見本　花子');
+  const kana = page([[[40, 'フリガナ'], [200, 'ミホン'], [400, 'ハナコ']], [[40, '氏名 見本 花子']]]);
+  assert.equal(parseCard([kana]).info.kana, 'ミホン　ハナコ');
+  // 同じ数だけ読めた生年月日：細い「1」が落ちたかもしれない読み（doubt）より、そうでない読み
+  const birth = (y: string, doubt: boolean): OcrPage => ({lines: [{words: [{text: '生年月日', x0: 0, x1: 96, y0: 0, y1: 24}, {text: `昭和${y}年4月14日`, x0: 200, x1: 400, y0: 0, y1: 24}], doubt}]});
+  for (const order of [[birth('3', true), birth('13', false)], [birth('13', false), birth('3', true)]]) {
+    const r = parseCard(order);
+    assert.equal(r.info.birthY, '13');
+    assert.ok(r.unsure.includes('birthY')); // ちがう読みがあるので、確かめてもらう
+  }
+  // 保険者の名称・番号が読めない（印にかかった・ますの字）：住所の郵便番号の市町村から（たしかでない）
+  const noInsurer = page([[[40, '番号 0000123456']], [[40, '住所 〒 824-0001']], [[40, '氏名 見本 花子']], [[40, '保険者番号 4 0 9']]]);
+  const r = parseCard([noInsurer]);
+  assert.equal(r.info.insurer, 'yukuhashi');
+  assert.ok(r.unsure.includes('insurer'));
+  // 名称が読めたときは名称のまま（郵便番号の市町村とちがっても）
+  const named = page([[[40, '住所 〒 824-0001']], [[40, '保険者番号 4 0 9 9 9 9']], [[150, '苅 田 町']]]);
+  assert.equal(parseCard([named]).info.insurer, 'kanda');
+});
+
 // ---------------------------------------------------------------- 見直しで見つかった読み違い（2026-10-23）
 
 test('読み違いを直す：元号は日付の中（うしろに「6 年」）だけ。氏名・事業所の名前の「合 和」「信和」は令和にしない', () => {

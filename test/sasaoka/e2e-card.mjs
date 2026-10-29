@@ -176,6 +176,24 @@ assert.match(await page.locator('h1').first().innerText(), /見本　次郎/);
 await page.screenshot({path: path.join(outDir, 'card-new.png'), fullPage: false});
 log('新規作成 OK');
 
+// ---------------- 2b. 複合機・FAX のスキャンの PDF（白黒の CCITT G4 の画像・ページを 270° 回した形。fixtures/card-fax.pdf ＝ 架空の保険証と負担割合証を
+//   make-fax-pdf.py で入れたもの）。pdf.js の画像の部品（jbig2.wasm）を同梱していなかったときは、ページが真っ白で何も読めなかった
+//   （ユーザーの報告「保険証などが上手く取り込めないケースがあった」2026-10-29）
+await page.getByRole('button', {name: /見積もり・申請書を作成する/}).first().click();
+await page.getByRole('region', {name: '新規作成'}).getByRole('button', {name: '＋ 行橋市'}).click();
+await page.getByRole('form', {name: '申請書'}).waitFor();
+const fax = await readFile(new URL('./fixtures/card-fax.pdf', import.meta.url));
+await page.getByLabel('介護保険証のファイル').setInputFiles([{name: 'スキャン.pdf', mimeType: 'application/pdf', buffer: fax}]);
+const faxDialog = page.getByRole('dialog').filter({hasText: '介護保険証から入れる'});
+await faxDialog.getByRole('table', {name: '読んだ値'}).waitFor({timeout: 300_000});
+await page.screenshot({path: path.join(outDir, 'card-dialog-fax.png')});
+assert.equal(await faxDialog.locator('img').count(), 2, 'スキャンの2ページとも画像になる（真っ白で飛ばさない）');
+assert.match(await faxDialog.getByRole('row', {name: '被保険者番号', exact: true}).getByLabel('被保険者番号（読んだ値）').inputValue(), /^\d{10}$/);
+assert.equal(await faxDialog.getByRole('row', {name: '保険者', exact: true}).getByLabel('保険者（読んだ値）').inputValue(), 'yukuhashi');
+await faxDialog.getByRole('button', {name: 'キャンセル'}).click();
+await faxDialog.waitFor({state: 'detached'});
+log('複合機・FAX のスキャンの PDF（白黒の CCITT・270° 回したページ）OK');
+
 // ---------------- 3. 「🪪 介護保険証から入れる」は4つのタブのどれでも、1段目のタブのすぐ右（ユーザーの指示「上のタブの近辺に」）。
 //   画面をクリックしてから Ctrl+V で貼り付けても読む（「クリックしてから挿入で貼り付け」）。字を打つ欄での Ctrl+V は、ふつうの貼り付けのまま
 const cardBtn = page.getByRole('button', {name: '🪪 介護保険証・介護ソフトの画面'});
