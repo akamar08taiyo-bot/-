@@ -61,8 +61,10 @@ export function colorName(hex: string): string {
   return `#${hex}`;
 }
 
-/** 線の太さ（pt。Excel の「図形の枠線 → 太さ」と同じ） */
-export const LINE_WIDTHS = [0.25, 0.5, 0.75, 1, 1.5, 2.25, 3, 4.5, 6];
+/** 線の太さ（pt。Excel の「図形の枠線 → 太さ」の並び。2.25 のかわりに初めの太さの 2。ユーザーの指示「デフォルトの太さは2にする」2026-10-29） */
+export const LINE_WIDTHS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4.5, 6];
+/** 線の初めの太さ（pt。直線・矢印・楕円・枠囲み・ペン。ユーザーの指示「デフォルトの太さは2にする」2026-10-29。前は 2.25・ペンは 3） */
+export const DEFAULT_LINE_WIDTH = 2;
 /** 線の種類（Excel の「図形の枠線 → 実線／点線」と同じ並び・名前）。pattern は線の太さの何倍か（線・すき間） */
 export const DASHES: {key: PhotoMarkDash; label: string; pattern: number[]}[] = [
   {key: 'solid', label: '実線', pattern: []},
@@ -130,14 +132,14 @@ export function markFontCss(name: string): string | null {
 }
 
 export type MarkStyle = Pick<PhotoMark, 'line' | 'width' | 'dash' | 'fill' | 'color' | 'size'> & {bold?: boolean; font?: string};
-/** 新しい図形の書式（直線・矢印・楕円）：黄色の 2.25pt・塗りつぶしなし（ユーザーの指示「初期の色は黄色」2026-10-29。前は赤） */
-export const SHAPE_STYLE: MarkStyle = {line: 'FFFF00', width: 2.25, dash: 'solid', fill: '', color: 'FF0000', size: 11, font: MARK_FONT_DEFAULT};
+/** 新しい図形の書式（直線・矢印・楕円）：黄色の 2pt・塗りつぶしなし（ユーザーの指示「初期の色は黄色」2026-10-29。前は赤） */
+export const SHAPE_STYLE: MarkStyle = {line: 'FFFF00', width: DEFAULT_LINE_WIDTH, dash: 'solid', fill: '', color: 'FF0000', size: 11, font: MARK_FONT_DEFAULT};
 /** 新しいテキストボックスの書式：白地に赤の 11pt・枠線なし（写真の上でも読めるように） */
 export const TEXT_STYLE: MarkStyle = {line: '', width: 0.75, dash: 'solid', fill: 'FFFFFF', color: 'FF0000', size: 11, font: MARK_FONT_DEFAULT};
-/** 手書きのペンの書式：黄色の 3pt（ユーザーの指示「ペンの細さや色を変更できる（デフォルトは黄色）」2026-10-29） */
-export const PEN_STYLE: MarkStyle = {line: 'FFFF00', width: 3, dash: 'solid', fill: '', color: 'FFFF00', size: 11, font: MARK_FONT_DEFAULT};
-/** 枠囲み（正方形/長方形）と補強板（四角＋斜めの線）の書式：茶色の 2.25pt（ユーザーの指示「□で枠囲みするときは茶色がデフォルト」2026-10-29） */
-export const BOARD_STYLE: MarkStyle = {line: '996633', width: 2.25, dash: 'solid', fill: '', color: 'FF0000', size: 11, font: MARK_FONT_DEFAULT};
+/** 手書きのペンの書式：黄色の 2pt（ユーザーの指示「ペンの細さや色を変更できる（デフォルトは黄色）」2026-10-29） */
+export const PEN_STYLE: MarkStyle = {line: 'FFFF00', width: DEFAULT_LINE_WIDTH, dash: 'solid', fill: '', color: 'FFFF00', size: 11, font: MARK_FONT_DEFAULT};
+/** 枠囲み（正方形/長方形）と補強板（四角＋斜めの線）の書式：茶色の 2pt（ユーザーの指示「□で枠囲みするときは茶色がデフォルト」2026-10-29） */
+export const BOARD_STYLE: MarkStyle = {line: '996633', width: DEFAULT_LINE_WIDTH, dash: 'solid', fill: '', color: 'FF0000', size: 11, font: MARK_FONT_DEFAULT};
 /** 番号（①②…。平面図・写真に置く）：赤の 16pt・塗りつぶしと枠線なし */
 export const NUM_STYLE: MarkStyle = {line: '', width: 0.75, dash: 'solid', fill: '', color: 'FF0000', size: 16, font: MARK_FONT_DEFAULT};
 

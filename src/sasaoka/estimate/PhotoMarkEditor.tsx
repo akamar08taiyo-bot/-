@@ -138,7 +138,11 @@ function PanelSection({label, children, wrap}: {label: string; children: ReactNo
 }
 
 const MIN = 2; // 図形のいちばん小さい大きさ（紙の画素）
-const STYLE_KEY = 'taiyo-sasaoka-mark-style-v2'; // v2：線は黄色・枠囲みは茶色を初めの色に（2026-10-29。前の版で覚えた赤を引き継がない） // この端末で最後に選んだ書式（新しい図形に使う。Excel の「既定の図形に設定」のかわり）
+// この端末で最後に選んだ書式（新しい図形に使う。Excel の「既定の図形に設定」のかわり）。
+// v2：線は黄色・枠囲みは茶色を初めの色に（2026-10-29。前の版で覚えた赤を引き継がない）。
+// v3：線の太さの初めを 2pt に（ユーザーの指示「デフォルトの太さは2にする」2026-10-29）。v2 で覚えた色・線の種類・字はそのまま、線の太さだけ初めの 2pt に戻す
+const STYLE_KEY = 'taiyo-sasaoka-mark-style-v3';
+const OLD_STYLE_KEY = 'taiyo-sasaoka-mark-style-v2';
 const r5 = (v: number) => Math.round(v * 100000) / 100000;
 const normDeg = (d: number) => (Math.round((((d % 360) + 360) % 360) * 10) / 10) % 360;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -169,7 +173,12 @@ function loadStyles(): Styles {
   };
   const base: Styles = {shape: SHAPE_STYLE, rect: BOARD_STYLE, pen: PEN_STYLE, text: TEXT_STYLE, num: NUM_STYLE};
   try {
-    const raw = JSON.parse(localStorage.getItem(STYLE_KEY) ?? 'null') as Partial<Record<StyleKey, unknown>> | null;
+    let raw = JSON.parse(localStorage.getItem(STYLE_KEY) ?? 'null') as Partial<Record<StyleKey, unknown>> | null;
+    if (!raw) {
+      // 前の版（v2）で覚えた書式：線の太さ（直線・矢印・楕円・枠囲み・ペン）だけ外して、初めの太さ（2pt）に
+      const old = JSON.parse(localStorage.getItem(OLD_STYLE_KEY) ?? 'null') as Partial<Record<StyleKey, Record<string, unknown>>> | null;
+      raw = old && typeof old === 'object' ? Object.fromEntries(Object.entries(old).map(([key, st]) => [key, st && typeof st === 'object' && (key === 'shape' || key === 'rect' || key === 'pen') ? (({width: _w, ...rest}) => rest)(st) : st])) : null;
+    }
     return {
       shape: pick(raw?.shape, SHAPE_STYLE, 'rect'),
       rect: pick(raw?.rect, BOARD_STYLE, 'rect'),

@@ -68,7 +68,7 @@ test('線の種類（Excel の実線／点線）と矢印の先（線の太さ�
 test('書き込みをそろえる：位置は 0〜1・色は大文字の RRGGBB・太さ 0.25〜24pt・同じ番号は付け直す。長さのない直線・文字のないテキストボックスは捨てる', () => {
   const out = cleanMarks([
     {id: 'a', kind: 'line', x1: -1, y1: 0.5, x2: 0.5, y2: 0.5, line: '#00b050', width: 99, dash: 'dash', start: true, fill: 'FFFFFF'},
-    {id: 'a', kind: 'ellipse', x1: 0.5, y1: 0.5, x2: 0.1, y2: 0.1, width: 0, fill: 'ffff00', text: '踏み台', size: 'x', color: 'zz', bold: true},
+    {id: 'a', kind: 'ellipse', x1: 0.5, y1: 0.5, x2: 0.1, y2: 0.1, width: 0, fill: 'ffff00', text: '踏み台', size: 'x', color: 'zz', bold: true}, // 太さが読めなければ初めの 2pt
     {id: 'c', kind: 'line', x1: 0.2, y1: 0.2, x2: 0.2, y2: 0.2},
     {id: 'd', kind: 'text', x1: 0, y1: 0, x2: 0.5, y2: 0.5, text: ''},
     null,
@@ -76,7 +76,7 @@ test('書き込みをそろえる：位置は 0〜1・色は大文字の RRGGBB�
   assert.equal(out.length, 2);
   assert.deepEqual(out[0], {id: 'a', kind: 'line', x1: 0, y1: 0.5, x2: 0.5, y2: 0.5, line: '00B050', width: 24, dash: 'dash', start: true, fill: '', size: 11, color: '000000'});
   assert.notEqual(out[1].id, 'a');
-  assert.deepEqual({...out[1], id: ''}, {id: '', kind: 'ellipse', x1: 0.1, y1: 0.1, x2: 0.5, y2: 0.5, line: '', width: 2.25, dash: 'solid', fill: 'FFFF00', text: '踏み台', size: 11, color: '000000', bold: true});
+  assert.deepEqual({...out[1], id: ''}, {id: '', kind: 'ellipse', x1: 0.1, y1: 0.1, x2: 0.5, y2: 0.5, line: '', width: 2, dash: 'solid', fill: 'FFFF00', text: '踏み台', size: 11, color: '000000', bold: true});
   assert.deepEqual(cleanMarks('x'), []);
 });
 

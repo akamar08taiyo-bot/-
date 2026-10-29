@@ -69,6 +69,8 @@ await chooser.setFiles([{name: 'genkan.png', mimeType: 'image/png', buffer: room
 await photoBoard.getByRole('button', {name: '①玄関 改修前', exact: true}).locator('img').waitFor();
 
 // ---------------- 書き込みの画面を開く（写真の右上の ✏️）
+// 前の版で線の太さ 3pt を覚えていた端末（v2）：色はそのまま、太さは初めの 2pt に（ユーザーの指示「デフォルトの太さは2にする」2026-10-29）
+await page.evaluate(() => localStorage.setItem('taiyo-sasaoka-mark-style-v2', JSON.stringify({shape: {line: 'FFFF00', width: 3}, pen: {line: 'FFFF00', width: 4.5}})));
 await photoBoard.getByRole('button', {name: '①玄関 改修前に書き込む'}).click();
 const dlg = page.getByRole('dialog', {name: '①玄関の改修前の写真に書き込む'});
 await dlg.waitFor();
@@ -101,6 +103,12 @@ const svgOf = (i, sel) => marks().nth(i).locator(sel).first().evaluate((el) => O
 // 開いたときは直線（ユーザーの指示「デフォルトは棒線にする」2026-10-29）。リボンは画面のまん中
 const pressed = (name) => ribbon.getByRole('button', {name, exact: true}).getAttribute('aria-pressed');
 assert.equal(await pressed('直線'), 'true');
+// 線の太さの初めは 2pt（一覧に 2.25 はなく 2）
+{
+  const fmt = dlg.getByRole('complementary', {name: '書式'});
+  assert.equal(await fmt.getByRole('button', {name: '線の太さ 2 pt'}).getAttribute('aria-pressed'), 'true');
+  assert.equal(await fmt.getByRole('button', {name: '線の太さ 2.25 pt'}).count(), 0);
+}
 {
   const rb = await ribbon.locator('> div').boundingBox();
   assert.ok(Math.abs(rb.x + rb.width / 2 - 1366 / 2) < 2, `リボンはまん中 ${rb.x}+${rb.width}`);
@@ -347,7 +355,7 @@ assert.deepEqual(after.map((a) => /name="([^"\d]+) \d+"/.exec(a)[1]), ['正方�
 const [xRect, xArrow, xText, xEllipse, xLine] = after;
 assert.match(xArrow, /<a:ln w="57150"><a:solidFill><a:srgbClr val="0070C0"\/><\/a:solidFill><a:prstDash val="dash"\/><a:tailEnd type="triangle" w="med" len="med"\/><\/a:ln>/);
 assert.match(xRect, /<a:xfrm rot="5400000">/);
-assert.match(xRect, /<a:solidFill><a:srgbClr val="FFFF00"\/><\/a:solidFill><a:ln w="28575"><a:solidFill><a:srgbClr val="996633"\/>/);
+assert.match(xRect, /<a:solidFill><a:srgbClr val="FFFF00"\/><\/a:solidFill><a:ln w="25400"><a:solidFill><a:srgbClr val="996633"\/>/); // 初めの太さ 2pt（25400 EMU）
 assert.match(xText, /<xdr:cNvSpPr txBox="1"\/>/);
 assert.match(xText, /sz="1400"><a:solidFill><a:srgbClr val="00B050"\/><\/a:solidFill><a:latin typeface="HG丸ｺﾞｼｯｸM-PRO"\/><a:ea typeface="HG丸ｺﾞｼｯｸM-PRO"\/><a:cs typeface="HG丸ｺﾞｼｯｸM-PRO"\/><\/a:rPr><a:t>Tesuri 手すり　L=800mm<\/a:t>/);
 assert.match(xText, /<a:t>H=750mm<\/a:t>/);
