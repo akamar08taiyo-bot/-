@@ -350,8 +350,15 @@ try {
   // ---- 保険者番号（ユーザーの指示「広域連合の場合は、築上町・豊前市・上毛町・吉富町…保険者を選択できる項目を入力欄に」2026-10-29）：
   // 福岡市は住所の区（早良区）。広域連合は住所の市町村（豊前市）から、選び直すとその番号を様式第8号の保険者番号の6マスに書く
   assert.equal(await page.locator('select[aria-label="保険者番号"]').inputValue(), '401372');
+  // 区・市町村は保険者の行の中（保険者のすぐ下。ユーザーの指示「保険者を選んだ後に、〇〇区を選んで、保険者番号を確定させる」2026-10-29）。保険者を選ぶとそこへ移る
+  const insurerRow = page.locator('[data-field="insurerNo"]');
+  assert.equal(await insurerRow.locator('select[aria-label="保険者"]').count(), 1);
+  assert.equal(await insurerRow.locator('select[aria-label="保険者番号"]').count(), 1);
+  assert.equal(await page.locator('select[aria-label="保険者番号"]').evaluate((el) => el.closest('label').firstChild.textContent), '区');
   await page.getByLabel('保険者', {exact: true}).selectOption('kouiki');
   await preview.getByRole('group', {name: '様式第8号（福祉用具購入費支給申請書（受領委任払用））', exact: true}).waitFor();
+  await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '保険者番号');
+  assert.equal(await page.locator('select[aria-label="保険者番号"]').evaluate((el) => el.closest('label').firstChild.textContent), '市町村');
   await page.getByRole('textbox', {name: '住所', exact: true}).fill('福岡県豊前市大字八屋1-1');
   await page.waitForFunction(() => document.querySelector('select[aria-label="保険者番号"]')?.value === '402149');
   assert.ok((await page.locator('select[aria-label="保険者番号"]').locator('option').allInnerTexts()).some((t) => t.includes('406462') && t.includes('上毛町')));

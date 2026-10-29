@@ -71,6 +71,10 @@ export const INSURER_AREAS: Record<Insurer, InsurerArea[]> = {
 };
 
 /** 保険者のふつうの名前（選ぶ所の見出し・広域連合の構成市町村の注記に） */
+/** 保険者番号を決めるために、保険者のあとに選ぶもの（北九州市・福岡市は区、広域連合は構成市町村。ほかは1つなので選ばない。住宅改修の insurerNumbers.ts と同じ） */
+export const AREA_LABEL: Record<Insurer, string> = {yukuhashi: '', kanda: '', miyako: '', kouiki: '市町村', fukuoka: '区', kitakyushu: '区'};
+export const areaLabel = (insurer: string): string => (isInsurer(insurer) ? AREA_LABEL[insurer] : '');
+
 export const INSURER_GROUP: Record<Insurer, string> = {yukuhashi: '行橋市', kanda: '苅田町', miyako: 'みやこ町', kouiki: '福岡県介護保険広域連合', fukuoka: '福岡市', kitakyushu: '北九州市'};
 
 /**

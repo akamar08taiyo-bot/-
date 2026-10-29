@@ -3,8 +3,8 @@
 // 上に保険者と申請書の名前、選ぶ所は丸のボタン、フリガナはカタカナに、被保険者番号は10マス、生年月日は元号と年月日、Enter で次の欄。
 // 右のプレビュー（ShinseiPreview.tsx）の欄を押すと、ここのその行へ（data-field）。まだ入っていない行は薄い黄色。
 // 値は案件（Sale）のまま（見積書と同じ値。金額は見積書の側で入れる。ここでは購入金額を出すだけ）
-import {insurerAreas, insurerNoOf} from '../insurerNumbers.ts';
-import {useMemo, useState} from 'react';
+import {areaLabel, insurerAreas, insurerNoOf} from '../insurerNumbers.ts';
+import {useEffect, useMemo, useRef, useState} from 'react';
 import type {ReactNode, RefObject} from 'react';
 import type {FocusEvent} from 'react';
 import {lineOf, unitPricePatch} from '../calc.ts';
@@ -74,6 +74,14 @@ export function ShinseiInputs({
 }) {
   const makers = useMemo(() => makerChoices(data.products, data.sales), [data.products, data.sales]);
   const s = data.settings;
+  // 保険者を選んだら、続けて区・市町村（保険者番号）を選ぶ所へ（ユーザーの指示「保険者を選んだ後に、〇〇区を選んで、保険者番号を確定させる」2026-10-29）
+  const areaRef = useRef<HTMLSelectElement>(null);
+  const [focusArea, setFocusArea] = useState(false);
+  useEffect(() => {
+    if (!focusArea) return;
+    areaRef.current?.focus();
+    setFocusArea(false);
+  }, [focusArea, sale.insurer]);
   /** 1行（左に申請書の言葉、右に入れる所。field があればプレビューの欄とつなぐ） */
   const row = (label: ReactNode, children: ReactNode, field?: ShinseiField, warn = field ? missing.has(field) : false) => (
     <div
@@ -110,25 +118,32 @@ export function ShinseiInputs({
             {insurerName}　{title}
           </div>
         )}
+        {/* 保険者を選んだら、そのすぐ下で区・市町村を選んで保険者番号を決める（InsurerNoSelect。プレビューの保険者番号のマスを押してもこの行へ） */}
         {row(
           '保険者',
-          <select
-            value={sale.insurer}
-            onChange={(e) => {
-              const key = e.target.value;
-              change({insurer: key, perItem: INSURERS.find((i) => i.key === key)?.perItem ?? false});
-            }}
-            className={`h-9 w-full min-w-0 rounded-md border px-2 text-sm ${sale.insurer ? 'border-slate-300' : 'border-amber-300 bg-amber-50'}`}
-            aria-label="保険者"
-          >
-            <option value="">選んでください</option>
-            {INSURERS.map((i) => (
-              <option key={i.key} value={i.key}>
-                {i.label}
-                {i.note ? `（${i.note}）` : ''}
-              </option>
-            ))}
-          </select>,
+          <>
+            <select
+              value={sale.insurer}
+              onChange={(e) => {
+                const key = e.target.value;
+                change({insurer: key, perItem: INSURERS.find((i) => i.key === key)?.perItem ?? false});
+                // 区・市町村を選ぶ保険者なら、続けてその選ぶ所へ
+                if (areaLabel(key)) setFocusArea(true);
+              }}
+              className={`h-9 w-full min-w-0 rounded-md border px-2 text-sm ${sale.insurer ? 'border-slate-300' : 'border-amber-300 bg-amber-50'}`}
+              aria-label="保険者"
+            >
+              <option value="">選んでください</option>
+              {INSURERS.map((i) => (
+                <option key={i.key} value={i.key}>
+                  {i.label}
+                  {i.note ? `（${i.note}）` : ''}
+                </option>
+              ))}
+            </select>
+            <InsurerNoSelect sale={sale} onChange={(insurerNo) => change({insurerNo})} selectRef={areaRef} />
+          </>,
+          'insurerNo',
         )}
         {row(
           <span>
@@ -141,7 +156,6 @@ export function ShinseiInputs({
         )}
         {row('被保険者氏名', <TextInput value={sale.customer} onChange={(customer) => change({customer})} placeholder="山田　花子" className="w-full max-w-md text-base font-bold" aria-label="お客様名" data-nav />, 'customer')}
         {row('被保険者番号', <InsuredNoInput value={sale.insuredNo} onChange={(insuredNo) => change({insuredNo})} />, 'insuredNo')}
-        {row('保険者番号', <InsurerNoSelect sale={sale} onChange={(insurerNo) => change({insurerNo})} />, 'insurerNo')}
         {row('生年月日', <EraBirthInput value={sale.birthDate} onChange={(birthDate) => change({birthDate})} />, 'birthDate')}
         {row(
           '性別',
@@ -412,30 +426,36 @@ export function ShinseiInputs({
 }
 
 /**
- * 保険者番号：保険者の市町村・区から選ぶ（広域連合は構成市町村、福岡市・北九州市は区。ユーザーの指示「保険者を選択できる項目を入力欄に入れる」
- * 「他の保険者も同様の仕様にする」2026-10-29）。初めは住所から（insurerNumbers.ts）。住宅改修から受け取った一覧にない番号もそのまま出す
+ * 保険者番号：保険者のすぐ下で、北九州市・福岡市は区、広域連合は構成市町村（築上町・豊前市・上毛町・吉富町）を選んで決める
+ * （ユーザーの指示「北九州市や福岡市では、保険者を選んだ後に、〇〇区を選んで、保険者番号を確定させる、住宅改修、特定福祉用具申請書どちらも。
+ * 広域連合の場合は、広域連合を選択したら、その後に、同様に保険者を選択する（築上町、豊前市など）」2026-10-29。前は被保険者番号の下の行）。
+ * 初めは住所の区・市町村から（insurerNumbers.ts）。区・市町村が1つの保険者は番号を出すだけ。住宅改修から受け取った一覧にない番号もそのまま出す
  */
-function InsurerNoSelect({sale, onChange}: {sale: Sale; onChange: (no: string) => void}) {
+function InsurerNoSelect({sale, onChange, selectRef}: {sale: Sale; onChange: (no: string) => void; selectRef: RefObject<HTMLSelectElement | null>}) {
   const areas = insurerAreas(sale.insurer);
   const cur = insurerNoOf(sale.insurer, sale.address, sale.insurerNo ?? '');
-  const odd = cur && !areas.some((a) => a.no === cur);
-  const group = sale.insurer === 'kouiki' ? '福岡県介護保険広域連合' : sale.insurer === 'fukuoka' ? '福岡市' : sale.insurer === 'kitakyushu' ? '北九州市' : '';
+  const odd = !!cur && !areas.some((a) => a.no === cur);
+  const unit = areaLabel(sale.insurer);
+  if (!unit && !odd) return cur ? <span className="text-sm text-slate-600">保険者番号 <span className="font-mono text-slate-800">{cur}</span></span> : null;
   return (
-    <select
-      value={cur}
-      onChange={(e) => onChange(e.target.value)}
-      disabled={areas.length < 2 && !odd}
-      className="h-9 w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 text-sm disabled:bg-slate-50 disabled:text-slate-700"
-      aria-label="保険者番号"
-      // Enter では飛ばす（住所から選ぶので、打ち込む流れを止めない）
-    >
-      {!cur && <option value="">選んでください</option>}
-      {odd && <option value={cur}>{cur}（介護保険証の番号）</option>}
-      {areas.map((a) => (
-        <option key={a.no} value={a.no}>
-          {a.no}　{sale.insurer === 'kouiki' ? `${a.name}（${group}）` : group ? `${group} ${a.name}` : a.name}
-        </option>
-      ))}
-    </select>
+    <label className="flex w-full min-w-0 items-center gap-2 text-sm font-bold text-slate-600">
+      <span className="shrink-0">{unit || '保険者番号'}</span>
+      <select
+        ref={selectRef}
+        value={cur}
+        onChange={(e) => onChange(e.target.value)}
+        className={`h-9 w-full min-w-0 rounded-md border px-2 text-sm font-normal text-slate-800 ${cur ? 'border-slate-300 bg-white' : 'border-amber-300 bg-amber-50'}`}
+        aria-label="保険者番号"
+        // Enter では飛ばす（住所から選ぶので、打ち込む流れを止めない）
+      >
+        {!cur && <option value="">選んでください</option>}
+        {odd && <option value={cur}>{cur}（介護保険証の番号）</option>}
+        {areas.map((a) => (
+          <option key={a.no} value={a.no}>
+            {a.name}　{a.no}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
