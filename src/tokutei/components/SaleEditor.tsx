@@ -436,6 +436,7 @@ export function SaleEditor({
             onPickCustomer={fixedView ? undefined : () => setPickingCustomer(true)}
             onFavorite={(id) => favorite([id])}
             onHideSuggest={hideSuggest}
+            changeSettings={(f) => update('settings', f)}
           />
           <div className="min-w-0 space-y-3 lg:sticky lg:top-3 lg:self-start">
             <ShinseiPanel sale={sale} settings={s} />

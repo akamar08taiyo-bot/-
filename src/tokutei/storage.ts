@@ -4,7 +4,7 @@
 // 住宅改修 見積書アプリの src/sasaoka/storage.ts を手本にした。保存するたびにその項目の「印」（stamp:項目名）を変え、
 // 前に読んだときと印が違えば、別のタブが保存したということなので、読み直す・まとめてから保存する（sync.ts）。
 
-import {CARE_LEVELS, DEFAULT_STAFF, DEFAULT_SUPPLIERS, defaultSettings, SETTINGS_REV} from './defaults.ts';
+import {CARE_LEVELS, DEFAULT_STAFF, DEFAULT_SUPPLIERS, defaultSettings, OFFICES, SETTINGS_REV} from './defaults.ts';
 import {cleanJutakuFields} from './jutaku.ts';
 import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Product, Sale, SaleItem, SaleStatus, Settings, TaxType} from './types.ts';
 import {uid} from './util.ts';
@@ -308,6 +308,8 @@ export function cleanSettings(raw: unknown): Settings {
     fax: text('fax'),
     manager: text('manager'),
     regNo: text('regNo'),
+    // 事業者番号を入れる前に保存した設定は、保存してある営業所の番号（分かっている営業所だけ）
+    providerNo: typeof raw.providerNo === 'string' ? raw.providerNo : (OFFICES.find((o) => o.name === text('officeName'))?.providerNo ?? ''),
     staffList: list(raw.staffList, DEFAULT_STAFF),
     suppliers: list(raw.suppliers, DEFAULT_SUPPLIERS),
     discountRate: Math.min(100, Math.max(0, numv(raw.discountRate, d.discountRate))),

@@ -8,12 +8,12 @@ import type {ReactNode, RefObject} from 'react';
 import type {FocusEvent} from 'react';
 import {lineOf, unitPricePatch} from '../calc.ts';
 import type {Line} from '../calc.ts';
-import {CARE_LEVELS, INSURERS} from '../defaults.ts';
+import {CARE_LEVELS, INSURERS, OFFICES, settingsForOffice} from '../defaults.ts';
 import {blankItem, makerChoices, suggestValues, unregisteredItems} from '../sales.ts';
 import {carePlanOf, shinseiForm} from '../shinsei.ts';
 import type {ShinseiKey} from '../shinsei.ts';
 import type {ShinseiField} from '../shinseiPreview.ts';
-import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Sale, SaleItem} from '../types.ts';
+import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Sale, SaleItem, Settings} from '../types.ts';
 import {yen} from '../util.ts';
 import {zipLabel} from '../zip.ts';
 import type {ZipHit} from '../zip.ts';
@@ -47,6 +47,7 @@ export function ShinseiInputs({
   onPickCustomer,
   onFavorite,
   onHideSuggest,
+  changeSettings,
 }: {
   sale: Sale;
   data: AppData;
@@ -68,6 +69,7 @@ export function ShinseiInputs({
   onPickCustomer?: () => void; // 住宅改修の様邸のタブの中では渡さない（お客様の情報は様邸から入る。ユーザーの指示「赤枠の部分は不要です」2026-10-28）
   onFavorite: (itemId: string) => void; // 手で入れた商品を商品マスタの★お気に入りに
   onHideSuggest: (v: string) => void; // 居宅介護支援事業所・ケアマネジャーの▼のリストから消す（設定の hiddenSuggest）
+  changeSettings: (f: (s: Settings) => Settings) => void; // 福岡市の受任者（販売事業者）の営業所・事業者番号（設定のまま。見積書の発行元も同じ営業所）
 }) {
   const makers = useMemo(() => makerChoices(data.products, data.sales), [data.products, data.sales]);
   const s = data.settings;
@@ -82,6 +84,7 @@ export function ShinseiInputs({
     </div>
   );
   const kouiki = formKey === 'kouiki';
+  const fukuoka = formKey === 'fukuoka';
   // 商品がないときも、手で入れる欄を1つ開いておく（ふだんは手で入れるので。ユーザーの指示「手でいれるではなく、基本は手で入れるのがデフォルトなので開いておく
   // ２商品名以降は追加する」2026-10-26）。打つとその商品ができる（id を同じにして、打っている欄から外れないように）
   const [draft] = useState(() => blankItem(s));
@@ -175,6 +178,7 @@ export function ShinseiInputs({
         {row('住所', <TextInput value={sale.address} onChange={changeAddress} placeholder="福岡県…" className="w-full" aria-label="住所" data-nav />, 'address')}
         {row('電話番号', <TextInput type="tel" value={sale.tel} onChange={(tel) => change({tel})} placeholder="0930-00-0000" className="w-48" aria-label="電話" data-nav />, 'tel')}
         {!kouiki &&
+          !fukuoka &&
           row(
             '要介護状態区分',
             <Circles<string> label="要介護状態区分" value={sale.careLevel} onPick={(careLevel) => change({careLevel})} clearable options={CARE_LEVELS.map((c) => [c, c] as const)} />,
@@ -364,6 +368,39 @@ export function ShinseiInputs({
           </select>,
           'staff',
         )}
+        {/* 福岡市の受任者（販売事業者）：設定の営業所（住所・電話・所長）と事業者番号。ここで替えると設定も替わる */}
+        {fukuoka &&
+          row(
+            '販売事業者（受任者）',
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <select
+                value={s.officeName}
+                onChange={(e) => changeSettings((prev) => settingsForOffice(prev, e.target.value))}
+                className="h-9 min-w-0 rounded-md border border-slate-300 px-2 text-sm"
+                aria-label="販売事業者の営業所"
+              >
+                {!OFFICES.some((o) => o.name === s.officeName) && <option value={s.officeName}>{s.officeName || '—'}</option>}
+                {OFFICES.map((o) => (
+                  <option key={o.name} value={o.name}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-500">
+                事業者番号
+                <TextInput
+                  value={s.providerNo ?? ''}
+                  onChange={(providerNo) => changeSettings((prev) => ({...prev, providerNo}))}
+                  inputMode="numeric"
+                  placeholder="10けた"
+                  className="w-36 text-sm font-normal text-slate-800"
+                  aria-label="事業者番号"
+                  data-nav
+                />
+              </span>
+            </div>,
+            'seller',
+          )}
         {/* 申請日・納品日（購入日）・支給申請日の欄は外した（申請書には書かない。Excel に保存してから手で入れる。shinsei.ts の shinseiValues）。
             ユーザーの指示「特定福祉用具申請書の赤枠部分は、連動すると都合が悪いため、すべてなくす。入力が必要なときは、EXCELにおとして、手入力します」2026-10-28 */}
       </div>

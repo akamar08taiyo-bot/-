@@ -2,10 +2,26 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {strFromU8, unzipSync} from 'fflate';
-import {defaultSettings} from '../../src/tokutei/defaults.ts';
-import {carePlanOf, corpShort, fillShinsei, KOUIKI_SHEETS, padInsuredNo, reasonText, SHINSEI, shinseiChecks, shinseiFileName, shinseiValues} from '../../src/tokutei/shinsei.ts';
+import {defaultSettings, settingsForOffice} from '../../src/tokutei/defaults.ts';
+import {
+  carePlanOf,
+  corpShort,
+  fillShinsei,
+  FUKUOKA_SHEET,
+  fukuokaInsurerNo,
+  fukuokaWard,
+  insurerCheckDigit,
+  KOUIKI_SHEETS,
+  padInsuredNo,
+  pairBoxes,
+  reasonText,
+  SHINSEI,
+  shinseiChecks,
+  shinseiFileName,
+  shinseiValues,
+} from '../../src/tokutei/shinsei.ts';
 import type {ShinseiKey} from '../../src/tokutei/shinsei.ts';
-import type {Sale, SaleItem} from '../../src/tokutei/types.ts';
+import type {Sale, SaleItem, Settings} from '../../src/tokutei/types.ts';
 import {cellBox, cellFormula, ellipseCount, emOf, printOverflow, readCell, sheetPath, sheetPaths} from '../../src/tokutei/xlsxEdit.ts';
 import type {Files} from '../../src/tokutei/xlsxEdit.ts';
 
@@ -77,7 +93,7 @@ function sale(over: Partial<Sale> = {}): Sale {
   };
 }
 
-const TEMPLATE_FILES: Record<ShinseiKey, string> = {yukuhashi: 'yukuhashi.xltx', kanda: 'kanda.xltx', miyako: 'miyako.xlsx', kouiki: 'kouiki.xlsx'};
+const TEMPLATE_FILES: Record<ShinseiKey, string> = {yukuhashi: 'yukuhashi.xltx', kanda: 'kanda.xltx', miyako: 'miyako.xlsx', kouiki: 'kouiki.xlsx', fukuoka: 'fukuoka.xlsx'};
 const template = (key: ShinseiKey): Files => unzipSync(new Uint8Array(readFileSync(new URL(`../../src/tokutei/shinsei/${TEMPLATE_FILES[key]}`, import.meta.url))));
 const fill = (key: ShinseiKey, over: Partial<Sale> = {}): Files => unzipSync(fillShinsei(template(key), SHINSEI[key], shinseiValues(sale({insurer: key, ...over}), S)));
 
@@ -271,8 +287,110 @@ test('広域連合：償還払いなら償還払い用（申請者は本人）�
   assert.equal(ellipseCount(fill('kouiki', {carePlan: '無'}), KOUIKI_SHEETS.juryo), 3);
 });
 
+// 福岡市：受任者は設定の営業所（福岡東営業所）。事業者番号は架空の番号
+const FUKUOKA_S = {...settingsForOffice(S, '福岡東営業所'), providerNo: '4000000001'};
+const fukuokaSale = (over: Partial<Sale> = {}) => sale({insurer: 'fukuoka', zip: '8100001', address: '福岡県福岡市中央区天神1丁目2-3', ...over});
+const fillFukuoka = (over: Partial<Sale> = {}, s: Settings = FUKUOKA_S): Files => unzipSync(fillShinsei(template('fukuoka'), SHINSEI.fukuoka, shinseiValues(fukuokaSale(over), s)));
+const joined = (f: Files, refs: string[]) => refs.map((r) => readCell(f, FUKUOKA_SHEET, r)).join('');
+
+test('福岡市：支給申請書（受領委任払用）。申請者は本人、受任者（販売事業者）は設定の営業所', () => {
+  const f = fillFukuoka();
+  const at = (ref: string) => readCell(f, FUKUOKA_SHEET, ref);
+  assert.equal(at('E5'), 'ミホン ハナコ');
+  assert.equal(at('E6'), '見本 花子');
+  assert.equal(joined(f, pairBoxes('Y', 6, 5)), '401331'); // 原本の 4013 のうしろに、中央区の 31（様式の記載例と同じ）
+  assert.equal(joined(f, pairBoxes('Q', 10, 7)), '0001234567');
+  assert.deepEqual(['E8', 'H8', 'J8', 'L8'].map(at), ['明・大・昭', '15', '3', '15']);
+  assert.equal(at('E10'), '浴室の床からの立ち座りが困難なため。\n浴槽の出入りでふらつくため。');
+  // 販売事業者名・事業者番号（10けた）
+  assert.equal(at('E11'), '太陽シルバーサービス㈱　福岡東営業所');
+  assert.equal(joined(f, pairBoxes('Q', 10, 11)), '4000000001');
+  // 明細：種目の番号（入浴補助用具＝3）・商品名・製造事業者名・購入金額（税込）と合計。使わない行は空
+  assert.deepEqual(['C13', 'D13', 'J13', 'Q13'].map(at), ['3', 'シャワーチェア 見本A', '見本工業', '28160']);
+  assert.deepEqual(['C15', 'D15', 'J15', 'Q15'].map(at), ['3', '浴槽手すり 見本B', '見本製作所', '27808']);
+  assert.equal(joined(f, ['C17', 'D17', 'J17', 'Q17']), '');
+  assert.equal(at('Q19'), String(28160 + 27808));
+  // 日付（年度・購入日・申請日）は書かない（Excel で手入力。2026-10-28）
+  assert.equal(joined(f, ['AA3', 'AB13', 'AE13', 'AH13', 'AB15']), '');
+  assert.doesNotMatch(at('C23'), /\d/);
+  // 申請者（本人）：あて先の区長・住所（記載例と同じ形。原本の「区」の欄は消す）・氏名・日中の連絡先
+  assert.equal(at('D25'), '福岡市　中央　区長');
+  assert.equal(at('L25'), '福岡市　中央　区　天神1丁目2-3');
+  assert.equal(at('O25'), '');
+  assert.equal(at('L26'), '見本 花子');
+  assert.match(at('P28'), /^（電話　　　0930-00-0000　+）$/);
+  // 受任者：設定の営業所の郵便番号・住所・電話・名称・代表者職氏名（所長）
+  assert.match(at('E31'), new RegExp(`^（〒　　　${FUKUOKA_S.postal}　+）$`));
+  assert.equal(at('E32'), FUKUOKA_S.address);
+  assert.equal(at('W31'), FUKUOKA_S.tel);
+  assert.equal(at('E33'), '太陽シルバーサービス㈱　福岡東営業所');
+  assert.equal(at('Q33'), `所長　${FUKUOKA_S.manager}`);
+  // 振込先は書かない
+  assert.equal(joined(f, ['G38', 'G39']), '');
+  // 丸：元号（昭）・本人の状況（在宅）
+  assert.equal(ellipseCount(f, FUKUOKA_SHEET), 2);
+  // 購入金額は記載例と同じ「#,##0」・必要な理由は折り返す書式
+  const xml = strFromU8(f[sheetPath(f, FUKUOKA_SHEET)]);
+  const styles = [...strFromU8(f['xl/styles.xml']).split('<cellXfs')[1].matchAll(/<xf\b[\s\S]*?(?:\/>|<\/xf>)/g)].map((m) => m[0]);
+  const xfOf = (ref: string) => styles[Number(new RegExp(`<c r="${ref}"[^>]*\\ss="(\\d+)"`).exec(xml)?.[1] ?? 0)];
+  for (const ref of ['Q13', 'Q15', 'Q19']) assert.match(xfOf(ref), /numFmtId="3"/, ref);
+  assert.match(xfOf('E10'), /wrapText="1"/);
+  assert.equal(sheetPaths(f).size, 1);
+});
+
+test('福岡市：保険者番号は区ごと（4013＋区の番号＋検証番号）・区のない住所・平成生まれ・事業者番号がないとき', () => {
+  // 検証番号：広域連合の様式の 406470、福岡市の記載例（中央区）の 401331 と合う
+  assert.equal(insurerCheckDigit('40647'), 0);
+  assert.equal(insurerCheckDigit('40133'), 1);
+  const wards: [string, string][] = [
+    ['福岡市東区松田1-1', '401315'],
+    ['福岡県福岡市博多区博多駅前1-1', '401323'],
+    ['福岡市中央区天神1-1', '401331'],
+    ['福岡市南区高宮1-1', '401349'],
+    ['福岡市西区姪浜1-1', '401356'],
+    ['福岡市城南区七隈1-1', '401364'],
+    ['福岡市 早良区 小田部1-1', '401372'],
+  ];
+  for (const [address, no] of wards) assert.equal(fukuokaInsurerNo(address), no, address);
+  assert.equal(fukuokaInsurerNo('行橋市中央1丁目2-3'), '');
+  assert.deepEqual(fukuokaWard('福岡県福岡市東区松田1-1'), {ward: '東', rest: '松田1-1'});
+  // 1字の区：あて先の「福岡市　　東　区長」（原本のすき間の4字分に区の名前を入れる）
+  const east = fillFukuoka({address: '福岡市東区松田1-1', birthDate: '1990-05-01', tel: ''});
+  assert.equal(readCell(east, FUKUOKA_SHEET, 'D25'), '福岡市　　東　区長');
+  assert.equal(joined(east, ['AG5', 'AI5']), '15');
+  // 平成生まれは元号を書く（丸はない）。電話がなければ原本の「（電話　…）」のまま
+  assert.deepEqual(['E8', 'H8', 'J8', 'L8'].map((r) => readCell(east, FUKUOKA_SHEET, r)), ['平成', '2', '5', '1']);
+  assert.match(readCell(east, FUKUOKA_SHEET, 'P28'), /^（電話　+/);
+  assert.equal(ellipseCount(east, FUKUOKA_SHEET), 1); // 在宅だけ
+  // 区のない住所：原本の「福岡市　　　　区長」「福岡市」「区」と保険者番号の空欄のまま。住所は福岡県を外して書く
+  const other = fillFukuoka({address: '福岡県行橋市中央1丁目2-3'});
+  assert.equal(readCell(other, FUKUOKA_SHEET, 'D25'), '福岡市　　　　区長');
+  assert.equal(readCell(other, FUKUOKA_SHEET, 'L25'), '行橋市中央1丁目2-3');
+  assert.equal(joined(other, ['AG5', 'AI5']), '');
+  // 事業者番号がない営業所：原本の 4・0 のまま（ほかのマスは空）。作る前の確かめで知らせる
+  const noNo = fillFukuoka({}, {...FUKUOKA_S, providerNo: ''});
+  assert.equal(joined(noNo, pairBoxes('Q', 10, 11)), '40');
+  assert.deepEqual(shinseiChecks(fukuokaSale(), {...FUKUOKA_S, providerNo: ''}).missing, ['販売事業者の事業者番号（10けた）']);
+  // 福岡市の様式にない欄（性別・郵便番号・要介護度・記載者）は知らせない
+  assert.deepEqual(shinseiChecks(fukuokaSale({gender: '', zip: '', careLevel: '', careOffice: '', careManager: ''}), FUKUOKA_S).missing, []);
+  assert.match(shinseiChecks(fukuokaSale({items: [0, 1, 2, 3].map((k) => item({id: `k${k}`, name: `見本の杖${k}`, reason: '見本'}))}), FUKUOKA_S).overflow, /^福岡市の申請書の商品の欄は3行です。/);
+});
+
+test('福岡市：長い商品名・メーカー名は1行に入る大きさ。行橋営業所は事業者番号が初めから入る', () => {
+  const f = fillFukuoka({items: [item({id: 'a', name: '見本のシャワーベンチ背付きワイド 536-057 ロング', maker: 'パナソニックエイジフリー（株）', category: '入浴補助用具', listPrice: 30000})]});
+  for (const ref of ['D13', 'J13']) {
+    const text = readCell(f, FUKUOKA_SHEET, ref);
+    const {box, style} = cellBox(f, FUKUOKA_SHEET, ref);
+    assert.ok(emOf(text) * ((style.size * 4) / 3) <= box.w - 6 + 0.01, `${ref}「${text}」が幅 ${box.w} に入らない（${style.size}pt）`);
+  }
+  assert.equal(readCell(f, FUKUOKA_SHEET, 'J13'), 'パナソニックエイジフリー㈱');
+  const yk = fillFukuoka({}, settingsForOffice(S, '行橋営業所'));
+  assert.equal(joined(yk, pairBoxes('Q', 10, 11)), '4072601802');
+  assert.equal(printOverflow(yk, FUKUOKA_SHEET) ?? 0, 0); // A4 1枚（原本の「ページに合わせる」のまま）
+});
+
 test('アプリに入れた原本は空（前の方の記入・写真・丸が残っていない）', () => {
-  for (const key of ['yukuhashi', 'kanda', 'miyako', 'kouiki'] as ShinseiKey[]) {
+  for (const key of ['yukuhashi', 'kanda', 'miyako', 'kouiki', 'fukuoka'] as ShinseiKey[]) {
     const f = template(key);
     assert.equal(Object.keys(f).filter((n) => n.startsWith('xl/media/')).length, 0, key);
     for (const n of Object.keys(f).filter((x) => /^xl\/drawings\/drawing\d+\.xml$/.test(x))) assert.doesNotMatch(strFromU8(f[n]), /prst="ellipse"|<xdr:pic>/, `${key} ${n}`);
@@ -294,8 +412,17 @@ test('アプリに入れた原本は空（前の方の記入・写真・丸が�
   assert.doesNotMatch(strFromU8(k2['xl/workbook.xml']), /absPath|externalReference|#REF!|\[\d+\]/);
   assert.doesNotMatch(strFromU8(k2['docProps/core.xml']), /<dc:creator>[^<]|<cp:lastModifiedBy>[^<]|lastPrinted/);
   assert.doesNotMatch(strFromU8(k2['docProps/app.xml']), /<Company>[^<]/);
+  // 福岡市：記載例のシート（見本の名前・会社名）を外した。番号・氏名・商品の欄は空、保険者番号は原本の 4013 だけ
+  const fk = template('fukuoka');
+  assert.deepEqual([...sheetPaths(fk).keys()], [FUKUOKA_SHEET]);
+  assert.equal(joined(fk, [...pairBoxes('Q', 10, 7), 'E5', 'E6', 'E10', 'E11', 'D13', 'J13', 'Q13', 'L26', 'E32', 'E33', 'Q33']), '');
+  assert.equal(joined(fk, pairBoxes('Y', 6, 5)), '4013');
+  assert.doesNotMatch(strFromU8(fk['xl/workbook.xml']), /記載例|absPath/);
+  assert.doesNotMatch(strFromU8(fk['xl/sharedStrings.xml']), /天神|福岡\s*太郎/);
+  assert.doesNotMatch(strFromU8(fk['docProps/core.xml']), /<dc:creator>[^<]|<cp:lastModifiedBy>[^<]|lastPrinted/);
+  assert.equal(Object.keys(fk).filter((n) => /^xl\/(drawings|externalLinks)\//.test(n)).length, 0);
   // 共有の文字の表に、どの欄からも使われない文字（消した記入の名残り）がない
-  for (const [key, book] of [['miyako', m], ['kouiki', k2]] as const) {
+  for (const [key, book] of [['miyako', m], ['kouiki', k2], ['fukuoka', fk]] as const) {
     const used = new Set<number>();
     for (const p of sheetPaths(book).values()) for (const x of strFromU8(book[p]).matchAll(/<c r="[A-Z]+\d+"[^>]*?\st="s"[^>]*>\s*<v>(\d+)<\/v>/g)) used.add(Number(x[1]));
     const count = (strFromU8(book['xl/sharedStrings.xml']).match(/<si>/g) ?? []).length;

@@ -79,9 +79,9 @@ function sale(over: Partial<Sale> = {}): Sale {
   };
 }
 
-const TEMPLATE_FILES: Record<ShinseiKey, string> = {yukuhashi: 'yukuhashi.xltx', kanda: 'kanda.xltx', miyako: 'miyako.xlsx', kouiki: 'kouiki.xlsx'};
+const TEMPLATE_FILES: Record<ShinseiKey, string> = {yukuhashi: 'yukuhashi.xltx', kanda: 'kanda.xltx', miyako: 'miyako.xlsx', kouiki: 'kouiki.xlsx', fukuoka: 'fukuoka.xlsx'};
 const template = (key: ShinseiKey): Files => unzipSync(new Uint8Array(readFileSync(new URL(`../../src/tokutei/shinsei/${TEMPLATE_FILES[key]}`, import.meta.url))));
-const KEYS: ShinseiKey[] = ['yukuhashi', 'kanda', 'miyako', 'kouiki'];
+const KEYS: ShinseiKey[] = ['yukuhashi', 'kanda', 'miyako', 'kouiki', 'fukuoka'];
 const textOf = (p: ReturnType<typeof shinseiPreview>[number]) => p.texts.map((t) => t.runs.map((r) => r.text).join('')).join('\n');
 
 test('プレビュー：書き込むシートごとに1枚（行橋市・苅田町・みやこ町・広域連合）。書いた値が出る', () => {
@@ -90,6 +90,7 @@ test('プレビュー：書き込むシートごとに1枚（行橋市・苅田�
     kanda: ['用具・受領委任払', '用具・支給申請　受領委任払 (2)', '委任状', '完了写真'],
     miyako: ['福祉用具購入受領委任払申請書', '福祉用具支給申請(受領委任）', '納品確認写真用紙', '納品確認写真用紙 (2)'],
     kouiki: [KOUIKI_SHEETS.juryo, KOUIKI_SHEETS.photo],
+    fukuoka: ['申請書'],
   };
   for (const key of KEYS) {
     const pages = shinseiPreview(template(key), SHINSEI[key], shinseiValues(sale({insurer: key}), S));
@@ -177,9 +178,25 @@ test('まだ入っていない所（プレビューの欄を薄い黄色に）�
   assert.deepEqual([...missingFields(shinseiValues({...blank, insurer: 'kouiki'}, S), 'kouiki')].sort(), [...all.filter((f) => f !== 'careLevel'), 'carePlan'].sort());
   assert.deepEqual([...missingFields(shinseiValues(sale({insurer: 'kouiki', careLevel: ''}), S), 'kouiki')], []);
   assert.deepEqual([...missingFields(shinseiValues(sale({insurer: 'kouiki', careOffice: '', carePlan: '有'}), S), 'kouiki')], ['recorder']);
+  // 福岡市：性別・郵便番号・要介護度・記載者の欄はない。販売事業者（受任者）は設定の営業所と事業者番号（10けた）
+  assert.deepEqual([...missingFields(shinseiValues({...blank, insurer: 'fukuoka'}, S), 'fukuoka')].sort(), all.filter((f) => !['gender', 'zip', 'careLevel', 'recorder'].includes(f)).sort());
+  assert.deepEqual([...missingFields(shinseiValues(sale({insurer: 'fukuoka'}), {...S, providerNo: ''}), 'fukuoka')], ['seller']);
   // 理由は商品のどれかに理由がなければ
   const noReason = sale({items: [item({id: 'a', name: '見本の杖', reason: ''})]});
   assert.deepEqual([...missingFields(shinseiValues(noReason, S), 'yukuhashi')], ['reason']);
+});
+
+test('プレビュー：福岡市は購入金額を「28,160」（記載例と同じ表示形式）・必要な理由は折り返し・丸は元号と在宅。欄を押すと入れる所へ', () => {
+  const v = shinseiValues(sale({insurer: 'fukuoka', address: '福岡市中央区天神1丁目2-3'}), S);
+  const [page] = shinseiPreview(template('fukuoka'), SHINSEI.fukuoka, v);
+  const text = textOf(page);
+  assert.ok(text.includes('28,160') && text.includes(String((28160 + 27808).toLocaleString('ja-JP'))), text);
+  assert.ok(text.includes('福岡市　中央　区　天神1丁目2-3'));
+  assert.ok(page.texts.some((t) => t.ref === 'E10' && t.wrap));
+  assert.equal(page.shapes.filter((s) => s.kind === 'ellipse').length, 2);
+  const fields = new Set(page.fields.map((f) => f.field));
+  for (const f of ['customer', 'kana', 'insuredNo', 'birthDate', 'reason', 'seller', 'items', 'address', 'tel'] as const) assert.ok(fields.has(f), f);
+  for (const f of page.fields) assert.ok(f.x >= 0 && f.y >= 0 && f.x + f.w <= page.width + 1 && f.y + f.h <= page.height + 1, f.ref);
 });
 
 test('プレビュー：見出しは自分の欄の中に出す（行橋市の完了写真の「被保険者番号」が左の氏名の欄＝式の欄にずれていた 2026-10-26）', () => {

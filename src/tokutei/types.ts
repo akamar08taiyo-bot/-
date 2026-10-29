@@ -117,6 +117,7 @@ export type Office = {
   tel: string;
   fax: string;
   manager: string;
+  providerNo?: string; // 特定福祉用具販売の事業者番号（10けた。福岡市の支給申請書の受任者の欄）。分かっている営業所だけ
 };
 
 export type Settings = {
@@ -128,6 +129,7 @@ export type Settings = {
   fax: string;
   manager: string; // 所長
   regNo: string; // 登録番号（インボイス）
+  providerNo?: string; // 特定福祉用具販売の事業者番号（10けた。福岡市の支給申請書の「特定（介護予防）福祉用具販売事業者番号」）
   staffList: string[]; // 担当者の候補（フルネーム）
   suppliers: string[]; // 仕入先の候補
   discountRate: number; // 割引率の初期値（20 ＝ 定価の2割引き）

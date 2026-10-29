@@ -6,7 +6,7 @@
 // あわせて、押すと案件の画面のその入れる所へ行く欄（お客様名・商品・理由…）の位置も返す（式で同じ値を出している欄＝支給申請書の氏名なども押せる）
 
 import {strFromU8} from 'fflate';
-import {fillShinseiFiles, KOUIKI_SHEETS} from './shinsei.ts';
+import {FUKUOKA_ROWS, FUKUOKA_SHEET, fillShinseiFiles, KOUIKI_SHEETS, pairBoxes} from './shinsei.ts';
 import type {ShinseiForm, ShinseiKey, ShinseiValues} from './shinsei.ts';
 import {attrOf, boxes, colName, colNum, EMU, formulaRef, markLayouts, numOf, sheetLayout, sheetPaths, unesc} from './xlsxEdit.ts';
 import type {Files, SheetLayout} from './xlsxEdit.ts';
@@ -31,7 +31,8 @@ export type ShinseiField =
   | 'payMethod'
   | 'applyDate'
   | 'deliveryDate'
-  | 'claimDate';
+  | 'claimDate'
+  | 'seller';
 
 /** 入れる所の名前（プレビューの欄の説明） */
 export const FIELD_LABEL: Record<ShinseiField, string> = {
@@ -54,6 +55,7 @@ export const FIELD_LABEL: Record<ShinseiField, string> = {
   applyDate: '申請日',
   deliveryDate: '納品日（購入日）',
   claimDate: '支給申請日',
+  seller: '販売事業者（受任者）',
 };
 
 // ---------------------------------------------------------------- 欄と入れる所（shinsei.ts の SHINSEI と同じ番地。テストで書く欄がもれていないか確かめる）
@@ -190,6 +192,24 @@ export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
       ],
     },
   ],
+  // 福岡市：申請者の住所（L25）は右の空いた欄へはみ出すので AJ までつなぐ。保険者番号のうしろの2けた・あて先の区長は住所の区から。
+  // 販売事業者名・事業者番号と受任者の欄は設定の営業所（入れる所の「販売事業者（受任者）」の行）
+  fukuoka: [
+    {
+      sheet: FUKUOKA_SHEET,
+      links: [
+        ['kana', ['E5']],
+        ['customer', ['E6', 'L26', 'E9']], // 本人の状況（在宅を囲む。入れる所はないので被保険者氏名へ）
+        ['insuredNo', pairBoxes('Q', 10, 7)],
+        ['birthDate', ['E8', 'H8', 'J8', 'L8']],
+        ['reason', ['E10']],
+        ['seller', ['E11', ...pairBoxes('Q', 10, 11), 'E31', 'E32', 'W31', 'E33', 'Q33']],
+        ['items', [...rows(['C', 'D', 'J', 'Q'], FUKUOKA_ROWS), 'Q19']],
+        ['address', ['AG5', 'AI5', 'D25', ...boxes('L', 25, 25)]],
+        ['tel', ['P28']],
+      ],
+    },
+  ],
 };
 
 /** まだ入っていない入れる所（プレビューの欄を薄い黄色に。shinsei.ts の shinseiChecks と同じ考え。支給申請日は納品のあと。広域連合は要介護度の欄がなく、届出の有・無がある） */
@@ -204,10 +224,15 @@ export function missingFields(v: ShinseiValues, key: ShinseiKey): Set<ShinseiFie
   need(v.zip, 'zip');
   need(v.address, 'address');
   need(v.tel, 'tel');
-  if (key !== 'kouiki') need(v.care, 'careLevel'); // 広域連合の様式には要介護状態区分の欄がない
+  if (key === 'fukuoka') {
+    // 福岡市の様式には性別・郵便番号・要介護状態区分・記載者の欄がない。受任者の欄は設定の営業所（事業者番号が要る）
+    for (const f of ['gender', 'zip'] as const) out.delete(f);
+    need(v.seller.name && v.seller.providerNo.length === 10, 'seller');
+  }
+  if (key !== 'kouiki' && key !== 'fukuoka') need(v.care, 'careLevel'); // 広域連合の様式には要介護状態区分の欄がない
   need(v.items.length, 'items');
   need(v.items.length && v.items.every((i) => i.reason), 'reason');
-  need(key === 'kouiki' ? v.office : v.recorder, 'recorder'); // 広域連合は居宅の事業所名だけ
+  if (key !== 'fukuoka') need(key === 'kouiki' ? v.office : v.recorder, 'recorder'); // 広域連合は居宅の事業所名だけ
   need(v.ratioSet, 'burdenRatio');
   if (key === 'miyako' || key === 'kouiki') need(v.carePlan, 'carePlan');
   if (key === 'miyako') need(v.staff, 'staff');

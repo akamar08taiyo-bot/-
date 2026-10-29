@@ -296,6 +296,60 @@ try {
   assert.match(await preview.getByRole('group', {name: '福祉用具購入受領委任払申請書', exact: true}).innerText(), /居宅サービス計画の届出/);
   await page.waitForTimeout(300);
   await preview.getByRole('group', {name: '福祉用具購入受領委任払申請書', exact: true}).screenshot({path: `${out}/04g-shinsei-miyako.png`});
+  // ---- 福岡市（様式第18号の2・受領委任払用。支給申請書だけの1枚）：申請者は本人、受任者（販売事業者）は設定の営業所。
+  // 保険者番号のうしろ2けた・あて先の区長は住所の区から。要介護度の行はなく、販売事業者（受任者）の行（営業所・事業者番号）が出る
+  await page.getByLabel('保険者', {exact: true}).selectOption('fukuoka');
+  await page.getByRole('tab', {name: '📄 申請書（福岡市）'}).waitFor();
+  const FUKUOKA = preview.getByRole('group', {name: '申請書', exact: true});
+  await FUKUOKA.waitFor();
+  assert.deepEqual(await groups(), ['申請書']);
+  assert.equal(await page.getByRole('group', {name: '要介護状態区分'}).count(), 0);
+  await page.getByRole('textbox', {name: '住所', exact: true}).fill('福岡市早良区小田部1-2-3');
+  await page.waitForFunction(() => document.querySelector('[aria-label="申請書のプレビュー"]')?.textContent?.includes('福岡市　早良　区　小田部1-2-3'));
+  // 行橋営業所は事業者番号が初めから入っている。福岡西営業所に替えると空（薄い黄色）→ 入れる
+  const sellerRow = '[data-field="seller"] > div:nth-child(2)';
+  assert.equal(await page.getByLabel('事業者番号').inputValue(), '4072601802');
+  await page.getByLabel('販売事業者の営業所').selectOption('福岡西営業所');
+  await page.waitForFunction((sel) => document.querySelector(sel)?.className.includes('bg-amber-50'), sellerRow);
+  await page.getByLabel('事業者番号').fill('4000000002');
+  await page.waitForFunction((sel) => !document.querySelector(sel)?.className.includes('bg-amber-50'), sellerRow);
+  await page.waitForFunction(() => document.querySelector('[aria-label="申請書のプレビュー"]')?.textContent?.includes('太陽シルバーサービス㈱　福岡西営業所'));
+  // プレビューの受任者の欄を押すと、入れる所の販売事業者の行へ
+  await preview.getByRole('button', {name: '販売事業者（受任者）'}).first().click();
+  assert.equal(await page.evaluate(() => document.activeElement?.closest('[data-field]')?.getAttribute('data-field')), 'seller');
+  await page.waitForTimeout(300);
+  await page.screenshot({path: `${out}/04h-sale-shinsei-fukuoka.png`});
+  await FUKUOKA.screenshot({path: `${out}/04i-shinsei-fukuoka-sheet.png`});
+  const [fukuokaFile] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📗 申請書をExcelで保存'}).click()]);
+  assert.equal(fukuokaFile.suggestedFilename(), '山田花子様特定福祉用具申請書.xlsx');
+  await fukuokaFile.saveAs(`${out}/shinsei-fukuoka.xlsx`);
+  {
+    const {readCell, ellipseCount} = await import('../../src/tokutei/xlsxEdit.ts');
+    const f = unzipSync(new Uint8Array(readFileSync(`${out}/shinsei-fukuoka.xlsx`)));
+    const at = (ref) => readCell(f, '申請書', ref);
+    const pairs = (start, n, row) => Array.from({length: n}, (_, i) => at(`${String.fromCharCode(start.charCodeAt(0) + 2 * i)}${row}`));
+    assert.equal(at('E6'), '山田 花子');
+    assert.equal([at('Y5'), at('AA5'), at('AC5'), at('AE5'), at('AG5'), at('AI5')].join(''), '401372'); // 早良区
+    assert.equal([at('Q7'), at('S7'), at('U7'), at('W7'), at('Y7'), at('AA7'), at('AC7'), at('AE7'), at('AG7'), at('AI7')].join(''), '0123456789');
+    assert.equal(pairs('Q', 5, 11).join('') + [at('AA11'), at('AC11'), at('AE11'), at('AG11'), at('AI11')].join(''), '4000000002');
+    assert.equal(at('E11'), '太陽シルバーサービス㈱　福岡西営業所');
+    assert.deepEqual([at('C13'), at('D13')], ['3', 'シャワーベンチ FSフィット']);
+    assert.equal(at('Q19'), String(30800 + 12144)); // 合計＝見積書の購入金額
+    assert.equal(at('D25'), '福岡市　早良　区長');
+    assert.equal(at('L25'), '福岡市　早良　区　小田部1-2-3');
+    assert.match(at('E32'), /早良区/);
+    assert.equal(ellipseCount(f, '申請書'), 2); // 元号（昭）・在宅
+  }
+  // スマホの幅でも横にはみ出さない
+  await page.setViewportSize({width: 390, height: 844});
+  await FUKUOKA.waitFor();
+  await page.waitForTimeout(300);
+  assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1, 'スマホの幅の福岡市の申請書で横にはみ出している');
+  await page.locator('[data-field="seller"]').screenshot({path: `${out}/07d-phone-seller-fukuoka.png`});
+  await page.setViewportSize({width: 1366, height: 900});
+  // もとに戻す：営業所（設定。見積書の発行元）は行橋営業所・住所は行橋市
+  await page.getByLabel('販売事業者の営業所').selectOption('行橋営業所');
+  await page.getByRole('textbox', {name: '住所', exact: true}).fill('行橋市大字流末1327番地');
   await page.getByLabel('保険者', {exact: true}).selectOption('yukuhashi');
   await page.getByRole('tab', {name: '📄 申請書（行橋市）'}).waitFor();
   await preview.getByRole('group', {name: '用具・受領委任払', exact: true}).waitFor();

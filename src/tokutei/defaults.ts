@@ -8,7 +8,8 @@ export const OFFICES: Office[] = [
   {name: '小倉南営業所', postal: '800-0226', address: '福岡県北九州市小倉南区田原新町1-3-34', tel: '093-474-5670', fax: '093-474-5671', manager: '串山 清彦'},
   {name: '八幡西営業所', postal: '807-0815', address: '福岡県北九州市八幡西区本城東2-4-8', tel: '093-603-3512', fax: '093-601-3593', manager: '福本 浩史'},
   {name: '八幡東営業所', postal: '805-0033', address: '福岡県北九州市八幡東区山路松尾町14-6', tel: '093-654-8515', fax: '093-654-8516', manager: '兼重 陽介'},
-  {name: '行橋営業所', postal: '824-0043', address: '福岡県行橋市大字流末1327番地', tel: '0930-26-9640', fax: '0930-26-9641', manager: '久保 匠史'},
+  // 事業者番号は、広域連合の受領委任払用の様式（原本）に入っていた行橋営業所の番号。ほかの営業所は設定で入れる
+  {name: '行橋営業所', postal: '824-0043', address: '福岡県行橋市大字流末1327番地', tel: '0930-26-9640', fax: '0930-26-9641', manager: '久保 匠史', providerNo: '4072601802'},
   {name: '田川営業所', postal: '826-0042', address: '福岡県田川市大字川宮1200番地', tel: '0947-44-1895', fax: '0947-44-2372', manager: '早崎 勝'},
   {name: '飯塚営業所', postal: '820-0081', address: '福岡県飯塚市枝国510番地7', tel: '0948-52-6360', fax: '0948-52-6362', manager: '佐藤 正仁'},
   {name: '福岡南営業所', postal: '816-0912', address: '福岡県大野城市御笠川2-10-15', tel: '092-504-9810', fax: '092-504-9811', manager: '神谷 大輔'},
@@ -39,7 +40,7 @@ export function portalOffice(): string {
 export function settingsForOffice(base: Settings, officeName: string): Settings {
   const o = OFFICES.find((x) => x.name === officeName);
   if (!o) return {...base, officeName};
-  return {...base, officeName: o.name, manager: o.manager, postal: o.postal, address: o.address, tel: o.tel, fax: o.fax};
+  return {...base, officeName: o.name, manager: o.manager, postal: o.postal, address: o.address, tel: o.tel, fax: o.fax, providerNo: o.providerNo ?? ''};
 }
 
 /** 行橋営業所の担当者（住宅改修 見積書アプリと同じフルネーム） */
@@ -61,6 +62,7 @@ export const INSURERS: {key: string; label: string; note?: string; perItem?: boo
   {key: 'kanda', label: '苅田町'},
   {key: 'miyako', label: 'みやこ町', perItem: true},
   {key: 'kouiki', label: '福岡県介護保険広域連合', note: '築上町・豊前市・上毛町・吉富町'},
+  {key: 'fukuoka', label: '福岡市'},
   {key: 'other', label: 'そのほか'},
 ];
 

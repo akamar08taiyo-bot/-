@@ -41,8 +41,8 @@ PDF を pdf.js で 200dpi の JPEG と文字（`CatalogImage`＝url・codes・te
 | `defaults.ts` | 営業所（OFFICES、19か所）・担当・保険者（INSURERS。みやこ町は `perItem`）・`defaultSettings()`。営業所はポータルの localStorage `taiyo_portal_session` から |
 | `sales.ts` | 見積番号 `nextQuoteNo`・`newSale`・`copySale`・`itemFromProduct`・`blankItem`・`customerLabel`・`saleWarnings`。使い回し：`customerKey`（同じお客様＝被保険者番号10けた、なければ名前＋生年月日）・`pastCustomers`・`customerPatch`（前のお客様から入れる）・`sameYearSales`（今年度の残り）・`frequentValues`（居宅・ケアマネの候補） |
 | `category.ts` | 種目の自動判定（T字杖・歩行車・持ち運ぶスロープは対象外）。`docLabel`＝書類の種目（腰掛便座の長い細目は「腰掛便座（ポータブルトイレ）」） |
-| `shinsei.ts` | 申請書：`SHINSEI`（行橋市・苅田町・みやこ町・広域連合。シートごとに書く欄・丸・文字を小さくする欄（行の低い1行の欄は `fitWidth`）・行のそろえ。広域連合は支払方法で様式を選ぶ・シート名は `KOUIKI_SHEETS`）・`shinseiValues`（案件 → 書く値）・`fillShinsei`・`shinseiChecks`（未入力・行に入らない商品）・`shinseiFileName`（「〇〇様特定福祉用具申請書.xlsx」） |
-| `shinsei/` | 申請書の原本（`yukuhashi.xltx`・`kanda.xltx`・`miyako.xlsx`・`kouiki.xlsx`）。いただいた様式から前の方の記入・写真・丸を消したもの（式の誤りも2つ直した。広域連合は外部リンク・保存した場所・プロパティも外し、明細の書式を直した。DESIGN.md 5.2）。`shinseiFiles.ts` が `?inline` で中に入れて開く |
+| `shinsei.ts` | 申請書：`SHINSEI`（行橋市・苅田町・みやこ町・広域連合・福岡市（`fukuokaSheet`。受任者は設定の営業所 `ShinseiValues.seller`）。シートごとに書く欄・丸・文字を小さくする欄（行の低い1行の欄は `fitWidth`）・行のそろえ。広域連合は支払方法で様式を選ぶ・シート名は `KOUIKI_SHEETS`）・`shinseiValues`（案件 → 書く値）・`fillShinsei`・`shinseiChecks`（未入力・行に入らない商品）・`shinseiFileName`（「〇〇様特定福祉用具申請書.xlsx」） |
+| `shinsei/` | 申請書の原本（`yukuhashi.xltx`・`kanda.xltx`・`miyako.xlsx`・`kouiki.xlsx`・`fukuoka.xlsx`（記載例のシートを外したもの））。いただいた様式から前の方の記入・写真・丸を消したもの（式の誤りも2つ直した。広域連合は外部リンク・保存した場所・プロパティも外し、明細の書式を直した。DESIGN.md 5.2）。`shinseiFiles.ts` が `?inline` で中に入れて開く |
 | `shinseiPreview.ts` | 申請書のプレビューの材料：`shinseiPreview`（原本に `fillShinseiFiles` で書いたシートの列・行・結合・罫線・塗り・文字・図形・丸を画素に）・`SHINSEI_LINKS`（欄 → 入れる所。式で参照している欄もつなぐ）・`missingFields`。住宅改修の `shinseiPreview.ts` を写したもの |
 | `xlsxEdit.ts` | 原本の XML を直接書きかえる部品（住宅改修の `shinsei.ts` から写した）：`writeCells`（式の答えも合わせる）・`fitCell`・`sameStyle`・`drawMarks`（楕円。何行もある欄も）・`hideZeros`・`dropCalcChain`・`finishWorkbook` |
 | `wareki.ts`・`zip.ts`（`zipData.ts`＝福岡県の郵便番号）・`reasons.ts` | 生年月日の読み取り（和暦・西暦）・住所 ⇔ 郵便番号・理由の文例（細目ごとの見出し `ReasonGroup`・`reasonExamples`・`pastReasons`） |

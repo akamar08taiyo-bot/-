@@ -206,7 +206,7 @@ export function cellStyle(files: Files, xml: string, ref: string): CellStyle {
  * 書式（cellXfs の番号）の文字の大きさ（pt）・配置（alignment の XML）だけを替えた書式を足して、その番号を返す（同じものがあればそれ）。
  * 罫線・塗り・表示形式はもとの書式のまま
  */
-function variantStyle(files: Files, style: number, change: {pt?: number; alignment?: string; color?: string}): number {
+function variantStyle(files: Files, style: number, change: {pt?: number; alignment?: string; color?: string; numFmt?: number}): number {
   const {fonts, xfs} = styleParts(files);
   const xf = xfs[style];
   if (xf === undefined) return style;
@@ -242,6 +242,11 @@ function variantStyle(files: Files, style: number, change: {pt?: number; alignme
     next = /\sfontId=/.test(next) ? next.replace(/\sfontId="\d+"/, ` fontId="${fontId}"`) : next.replace(/^<xf\b/, `<xf fontId="${fontId}"`);
     next = /\sapplyFont=/.test(next) ? next.replace(/\sapplyFont="[^"]*"/, ' applyFont="1"') : next.replace(/^<xf\b/, '<xf applyFont="1"');
   }
+  if (change.numFmt !== undefined) {
+    // 表示形式（組み込みの番号。3＝#,##0）
+    next = /\snumFmtId=/.test(next) ? next.replace(/\snumFmtId="\d+"/, ` numFmtId="${change.numFmt}"`) : next.replace(/^<xf\b/, `<xf numFmtId="${change.numFmt}"`);
+    next = /\sapplyNumberFormat=/.test(next) ? next.replace(/\sapplyNumberFormat="[^"]*"/, ' applyNumberFormat="1"') : next.replace(/^<xf\b/, '<xf applyNumberFormat="1"');
+  }
   if (change.alignment !== undefined) {
     const body = /\/>$/.test(next) ? '' : (/^<xf\b[^>]*>([\s\S]*)<\/xf>$/.exec(next)?.[1] ?? '');
     const head = (/^<xf\b[^>]*?(?=\/?>)/.exec(next)?.[0] ?? '<xf');
@@ -263,6 +268,25 @@ function variantStyle(files: Files, style: number, change: {pt?: number; alignme
 export const colorStyle = (files: Files, style: number, rgb: string): number => variantStyle(files, style, {color: rgb});
 /** 字の大きさ（pt）だけ変えた書式（styles.xml に足す。同じものがあればそれ）。sizeCell とちがい、書いている途中のシートの XML に使う */
 export const sizeStyle = (files: Files, style: number, pt: number): number => variantStyle(files, style, {pt});
+
+/**
+ * 欄の書式を変える：wrap＝折り返して全体を表示する（原本が折り返さない欄に、アプリで改行を入れた文を書くとき。福岡市の必要な理由）、
+ * numFmt＝表示形式（組み込みの番号。福岡市の購入金額は原本が「標準」なので 3＝#,##0 にする。記載例と同じ）、
+ * color＝字の色（rgb。福岡市の原本は書く欄の字が様式と同じ色の所があるので、記載例と同じ黒に）
+ */
+export function formatCell(files: Files, sheet: string, ref: string, change: {wrap?: boolean; numFmt?: number; color?: string}): void {
+  const path = sheetPath(files, sheet);
+  const xml = strFromU8(files[path]);
+  const found = cellRe(ref).exec(xml);
+  if (!found) return;
+  let alignment: string | undefined;
+  if (change.wrap) {
+    const now = alignmentOf(files, xml, ref);
+    const tag = /^<alignment\b[^>]*?(?=\/?>)/.exec(now)?.[0];
+    alignment = tag ? now.replace(tag, `${tag.replace(/\swrapText="[^"]*"/, '')} wrapText="1"`) : '<alignment wrapText="1"/>';
+  }
+  files[path] = strToU8(setStyle(xml, ref, String(variantStyle(files, numOf(attrOf(found[1], 's'), 0), {alignment, numFmt: change.numFmt, color: change.color}))));
+}
 
 /** 欄の書式の配置（alignment の XML。なければ空） */
 function alignmentOf(files: Files, xml: string, ref: string): string {
@@ -450,9 +474,10 @@ export type Mark = {cell: string; needles: string[]; pick: number; after?: strin
 
 /**
  * プロポーショナルの字体（ＭＳ Ｐゴシック・ＭＳ Ｐ明朝）で全角と幅の違う文字（全角＝1）。
- * 全角のすき間（　）は、前の申請で手で書いた丸の位置に合わせて 0.75（住宅改修アプリで確かめた値）
+ * 全角のすき間（　）は、前の申請で手で書いた丸の位置に合わせて 0.75（住宅改修アプリで確かめた値）。
+ * 全角のかっこは 0.5（福岡市の様式の記載例の「在　宅　・　入　所　（入院）　中」の手書きの丸の位置に合う。まん中ぞろえの欄なので、かっこの幅で丸がずれる）
  */
-const P_WIDTH: Record<string, number> = {'　': 0.75, ' ': 0.27, '・': 0.5, '０': 0.68, '１': 0.49, '２': 0.66, '３': 0.64, '４': 0.68, '５': 0.66, '６': 0.66, '７': 0.61, '８': 0.68, '９': 0.66};
+const P_WIDTH: Record<string, number> = {'　': 0.75, ' ': 0.27, '・': 0.5, '（': 0.5, '）': 0.5, '０': 0.68, '１': 0.49, '２': 0.66, '３': 0.64, '４': 0.68, '５': 0.66, '６': 0.66, '７': 0.61, '８': 0.68, '９': 0.66};
 function charWidth(ch: string, proportional: boolean): number {
   if (proportional && P_WIDTH[ch] !== undefined) return P_WIDTH[ch];
   const c = ch.charCodeAt(0);

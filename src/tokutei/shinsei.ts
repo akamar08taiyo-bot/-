@@ -20,6 +20,7 @@ import {
   finishWorkbook,
   fitCell,
   fitPrintPage,
+  formatCell,
   hideZeros,
   LINE_K,
   sameStyle,
@@ -33,7 +34,7 @@ import type {CellValue, Files, Mark} from './xlsxEdit.ts';
 import {zipLabel} from './zip.ts';
 
 /** 申請書の原本がある保険者 */
-export type ShinseiKey = 'yukuhashi' | 'kanda' | 'miyako' | 'kouiki';
+export type ShinseiKey = 'yukuhashi' | 'kanda' | 'miyako' | 'kouiki' | 'fukuoka';
 
 /** 申請書の明細の1行 */
 export type ShinseiItem = {
@@ -43,6 +44,19 @@ export type ShinseiItem = {
   tais: string;
   product: string; // 納品名（写真の用紙）：商品名 / 品番
   reason: string;
+  name: string; // 商品名だけ（福岡市は種目・商品名・製造事業者名が別の欄）
+  maker: string; // 製造事業者名だけ（㈱に短くしたもの）
+  category: string; // 種目（福岡市は種目の番号を書く）
+};
+
+/** 受任者（販売事業者。福岡市の支給申請書）：設定の営業所 */
+export type ShinseiSeller = {
+  name: string; // 太陽シルバーサービス㈱　福岡東営業所
+  zip: string;
+  address: string;
+  tel: string;
+  rep: string; // 代表者職氏名：所長　氏名
+  providerNo: string; // 特定福祉用具販売の事業者番号（数字だけ）
 };
 
 /** 申請書に書く値（案件・設定・計算から作る。どの様式でも同じ） */
@@ -67,6 +81,7 @@ export type ShinseiValues = {
   ratioSet: boolean; // 負担割合を選んであるか
   staff: string; // 担当（みやこ町の届出者）
   payMethod: PayMethod; // 支払方法（広域連合は、受領委任払用・償還払い用のどちらの様式に書くか）
+  seller: ShinseiSeller;
 };
 
 /** 被保険者番号を10けたに（数字だけ。足りない左は 0。ユーザーの指示「5桁なら、残りの空白部分は0でうめる」） */
@@ -102,6 +117,9 @@ export function shinseiValues(sale: Sale, s: Settings): ShinseiValues {
       tais: i.tais.trim(),
       product: [i.name.trim(), i.code.trim()].filter(Boolean).join(' / '),
       reason: i.reason.trim(),
+      name: i.name.trim(),
+      maker: corpShort(i.maker),
+      category: i.category,
     };
   });
   return {
@@ -129,6 +147,14 @@ export function shinseiValues(sale: Sale, s: Settings): ShinseiValues {
     ratioSet: t.ratioSet,
     staff: sale.staff.trim(),
     payMethod: sale.payMethod,
+    seller: {
+      name: [corpShort(s.company), s.officeName.trim()].filter(Boolean).join('　'),
+      zip: zipLabel(s.postal),
+      address: s.address.trim(),
+      tel: s.tel.trim(),
+      rep: s.manager.trim() ? `所長　${s.manager.trim()}` : '',
+      providerNo: (s.providerNo ?? '').normalize('NFKC').replace(/\D/g, ''),
+    },
   };
 }
 
@@ -156,6 +182,7 @@ export type SheetWrite = {
   marks?: Mark[];
   hideZeros?: boolean; // 式が空の欄を参照して 0 と出るシート
   block?: {cell: string; head: string[]; body: string; tail: string[]}; // 理由のかたまり（みやこ町）：head の行・body（理由。欄の幅で折り返す）・tail の行を、入る大きさにして書く
+  formats?: [string, {wrap?: boolean; numFmt?: number; color?: string}][]; // 書式を変える欄（折り返す・表示形式・字の色。福岡市の必要な理由・購入金額）
 };
 
 export type ShinseiForm = {key: ShinseiKey; title: string; rows: number; sheets: (v: ShinseiValues) => SheetWrite[]};
@@ -371,6 +398,134 @@ function kouikiPhoto(v: ShinseiValues): SheetWrite {
   return {sheet: KOUIKI_SHEETS.photo, cells: [['B3', v.name], ...insuredCells('G', 3, v), ['B4', v.items.map((i) => i.product).join('、')]], fit: ['B3', 'B4']};
 }
 
+/**
+ * 福岡市（介護保険福祉用具購入費支給申請書【受領委任払用】様式第18号の2。福岡市のホームページの様式。2026-10-29 にユーザーからいただいた）：
+ * 事前の申請はなく、購入のあとの支給申請書だけ（1枚）。申請者は本人、受任者は販売事業者（設定の営業所）。
+ * 欄の位置は様式の「記載例」のシートで確かめた。書かない欄：年度・申請日・購入日（日付は書かない。2026-10-28 の指示）・振込先・保険者処理欄
+ */
+export const FUKUOKA_SHEET = '申請書';
+export const FUKUOKA_ROWS = [13, 15, 17];
+/** 種目の番号（様式の「※種目には次の番号を記載」） */
+const FUKUOKA_KIND: Record<string, number> = {
+  腰掛便座: 1,
+  自動排泄処理装置の交換可能部品: 2,
+  入浴補助用具: 3,
+  簡易浴槽: 4,
+  移動用リフトのつり具の部分: 5,
+  排泄予測支援機器: 6,
+  固定用スロープ: 7,
+  歩行器: 8,
+  歩行補助つえ: 9,
+};
+/** 福岡市の区（この順で 4013 のうしろの番号：東区＝1 … 早良区＝7） */
+const FUKUOKA_WARDS = ['東', '博多', '中央', '南', '西', '城南', '早良'];
+
+/** 住所の福岡市の区（「東」「中央」など）と、そのうしろ。区がなければ null */
+export function fukuokaWard(address: string): {ward: string; rest: string} | null {
+  const m = new RegExp(`^(?:福岡県)?[\\s　]*(?:福岡市)?[\\s　]*(${FUKUOKA_WARDS.join('|')})[\\s　]*区[\\s　]*(.*)$`).exec(address.trim());
+  return m ? {ward: m[1], rest: m[2]} : null;
+}
+
+/**
+ * 介護保険の保険者番号の6けため(検証番号)：右のけたから 2・1・2… を掛け、2けたになったら十の位と一の位を足して合計し、10 から合計の一の位を引く（一の位が 0 なら 0）。
+ * 広域連合の様式の 406470 と、福岡市の記載例（中央区）の 401331 で確かめた
+ */
+export function insurerCheckDigit(five: string): number {
+  let sum = 0;
+  [...five].reverse().forEach((d, i) => {
+    const n = Number(d) * (i % 2 === 0 ? 2 : 1);
+    sum += Math.floor(n / 10) + (n % 10);
+  });
+  return (10 - (sum % 10)) % 10;
+}
+
+/** 福岡市の保険者番号（区ごと。記載例の中央区は 401331）。区が分からなければ空 */
+export function fukuokaInsurerNo(address: string): string {
+  const w = fukuokaWard(address);
+  if (!w) return '';
+  const five = `4013${FUKUOKA_WARDS.indexOf(w.ward) + 1}`;
+  return `${five}${insurerCheckDigit(five)}`;
+}
+
+/** 1つおきの列のマス（福岡市の番号の欄は2列を結合した四角）：Q7・S7・U7… */
+export const pairBoxes = (start: string, n: number, row: number) => boxes(start, n * 2, row).filter((_, i) => i % 2 === 0);
+
+/** 原本の「（電話　…　）」「（〒　…　）」のかっこの中に書く（閉じかっこの位置が原本と同じぐらいになるよう、うしろのすき間で合わせる） */
+function inParens(head: string, value: string, em: number): string {
+  const body = `（${head}　　　${value}`;
+  return `${body}${'　'.repeat(Math.max(1, Math.round(em - emOf(body) - 1)))}）`;
+}
+const BLACK = 'FF000000';
+/** 原本のかっこの文字の長さ（全角の文字の数） */
+const FUKUOKA_TEL_EM = 27;
+const FUKUOKA_ZIP_EM = 26;
+
+function fukuokaSheet(v: ShinseiValues): SheetWrite {
+  const b = v.birth;
+  const shown = v.items.slice(0, FUKUOKA_ROWS.length);
+  const w = fukuokaWard(v.address);
+  const insurer = fukuokaInsurerNo(v.address);
+  const digits = (no: string, start: string, row: number): [string, CellValue][] => pairBoxes(start, 10, row).map((ref, i) => [ref, no ? no[i] ?? '' : '']);
+  const amounts = [...FUKUOKA_ROWS.slice(0, shown.length).map((r) => `Q${r}`), ...(shown.length ? ['Q19'] : [])];
+  return {
+    sheet: FUKUOKA_SHEET,
+    cells: [
+      ['E5', v.kana],
+      ['E6', v.name],
+      // 保険者番号：原本に 4013 まで入っている。うしろの2けたは住所の区から
+      ...when(insurer, [
+        ['AG5', Number(insurer[4])],
+        ['AI5', Number(insurer[5])],
+      ]),
+      ...(v.insuredNo ? digits(v.insuredNo, 'Q', 7) : []),
+      // 生年月日：元号は丸（明治・大正・昭和でなければ元号を書く）、年・月・日はそれぞれの欄
+      ...(b ? ([...(['明', '大', '昭'].includes(b.short) ? [] : [['E8', b.era]]), ['H8', b.y], ['J8', b.m], ['L8', b.d]] as [string, CellValue][]) : []),
+      // 販売事業者名・事業者番号（10けた。原本の 4・0 も同じ数字で書く）
+      ...when(v.seller.name, [['E11', v.seller.name]]),
+      ...(v.seller.providerNo.length === 10 ? digits(v.seller.providerNo, 'Q', 11) : []),
+      ...shown.flatMap((it, k): [string, CellValue][] => {
+        const r = FUKUOKA_ROWS[k];
+        return [
+          [`C${r}`, FUKUOKA_KIND[it.category] ?? ''],
+          [`D${r}`, it.name],
+          [`J${r}`, it.maker],
+          [`Q${r}`, it.total],
+        ];
+      }),
+      ...when(shown.length, [['Q19', shown.reduce((n, i) => n + i.total, 0)]]),
+      // 申請者（本人）：あて先の区長・住所（記載例と同じ「福岡市　中央　区　天神…」。原本の「区」の欄は消して1つの欄に）・氏名・日中の連絡先
+      ...when(w, [['D25', `福岡市${'　'.repeat(Math.ceil((4 - (w?.ward.length ?? 0)) / 2))}${w?.ward}${'　'.repeat(Math.floor((4 - (w?.ward.length ?? 0)) / 2))}区長`]]),
+      ...when(v.address, [
+        ['L25', w ? `福岡市　${w.ward}　区　${w.rest}` : v.address.replace(/^福岡県[\s　]*/, '')],
+        ['O25', ''],
+      ]),
+      ['L26', v.name],
+      ...when(v.tel, [['P28', inParens('電話', v.tel, FUKUOKA_TEL_EM)]]),
+      // 受任者（販売事業者）：設定の営業所
+      ...when(v.seller.zip, [['E31', inParens('〒', v.seller.zip, FUKUOKA_ZIP_EM)]]),
+      ...when(v.seller.address, [['E32', v.seller.address]]),
+      ...when(v.seller.tel, [['W31', v.seller.tel]]),
+      ...when(v.seller.name, [['E33', v.seller.name]]),
+      ...when(v.seller.rep, [['Q33', v.seller.rep]]),
+    ],
+    // 必要な理由：原本は折り返さない1行の欄なので、アプリで改行を入れて折り返す書式にする（入る大きさにして書く）
+    block: {cell: 'E10', head: [], body: reasonText(v), tail: []},
+    // 書いた値の字は黒（原本は様式と同じ赤紫の欄がある。記載例は値を黒で書いている。「福岡市　中央　区長」など様式の文字とまぜて書く欄は様式の色のまま）
+    formats: [
+      ...['E5', 'H8', 'J8', 'L8', 'AG5', 'AI5', ...rowsOf('C', FUKUOKA_ROWS), ...rowsOf('D', FUKUOKA_ROWS), ...rowsOf('J', FUKUOKA_ROWS), 'E32', 'W31', 'E33', 'Q33'].map((ref): [string, {color: string}] => [ref, {color: BLACK}]),
+      ['E10', {wrap: true, color: BLACK}],
+      ...amounts.map((ref): [string, {numFmt: number; color: string}] => [ref, {numFmt: 3, color: BLACK}]),
+    ],
+    // 明細の3行目の商品名・製造事業者名は、原本ではまん中ぞろえ（1・2行目は左）。1行目にそろえる
+    same: [rowsOf('D', FUKUOKA_ROWS), rowsOf('J', FUKUOKA_ROWS)],
+    fit: ['E6', 'E11', 'L26', 'E32', 'W31', 'E33', 'Q33'],
+    fitWidth: ['E5'],
+    oneLine: [...rowsOf('D', FUKUOKA_ROWS), ...rowsOf('J', FUKUOKA_ROWS)],
+    // 元号と本人の状況（在宅を囲む。入所中の方は特定福祉用具の支給の対象にならない）
+    marks: [ERA('E8', v), {cell: 'E9', needles: ['在　宅', '入　所'], pick: 0}],
+  };
+}
+
 export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
   yukuhashi: {
     key: 'yukuhashi',
@@ -467,6 +622,7 @@ export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
     rows: 3,
     sheets: (v) => [v.payMethod === '償還払い' ? kouikiShokan(v) : kouikiJuryo(v), kouikiPhoto(v)],
   },
+  fukuoka: {key: 'fukuoka', title: '福岡市', rows: FUKUOKA_ROWS.length, sheets: (v) => [fukuokaSheet(v)]},
 };
 
 export const shinseiForm = (insurer: string): ShinseiForm | null => SHINSEI[insurer as ShinseiKey] ?? null;
@@ -507,6 +663,7 @@ export function fillShinseiFiles(files: Files, form: ShinseiForm, v: ShinseiValu
   }
   for (const w of sheets) for (const [ref, pt] of w.sizes ?? []) sizeCell(files, w.sheet, ref, pt);
   for (const w of sheets) for (const [row, pt] of w.heights ?? []) setRowHeight(files, w.sheet, row, pt);
+  for (const w of sheets) for (const [ref, change] of w.formats ?? []) formatCell(files, w.sheet, ref, change);
   for (const w of sheets) for (const refs of w.same ?? []) sameStyle(files, w.sheet, refs);
   for (const w of sheets) for (const ref of w.fit ?? []) fitCell(files, w.sheet, ref);
   for (const w of sheets) for (const ref of w.fitWidth ?? []) fitCell(files, w.sheet, ref, true);
@@ -535,17 +692,19 @@ export function shinseiChecks(sale: Sale, s: Settings): {missing: string[]; over
   need(v.kana, 'フリガナ');
   need(v.insuredNo, '被保険者番号');
   need(v.birth, '生年月日');
-  need(v.gender, '性別');
-  need(v.zip, '郵便番号');
+  const kouiki = form?.key === 'kouiki';
+  const fukuoka = form?.key === 'fukuoka'; // 福岡市の様式には性別・郵便番号・要介護状態区分・記載者の欄がない
+  if (!fukuoka) need(v.gender, '性別');
+  if (!fukuoka) need(v.zip, '郵便番号');
   need(v.address, '住所');
   need(v.tel, '電話');
-  const kouiki = form?.key === 'kouiki';
-  if (!kouiki) need(v.care, '要介護度'); // 広域連合の様式には要介護状態区分の欄がない
+  if (!kouiki && !fukuoka) need(v.care, '要介護度'); // 広域連合の様式には要介護状態区分の欄がない
   need(v.items.length, '商品');
   const noReason = v.items.filter((i) => !i.reason).length;
   if (v.items.length && noReason) missing.push(noReason === v.items.length ? '福祉用具が必要な理由' : `福祉用具が必要な理由（${noReason}つ）`);
   // 広域連合は「居宅の事業所名」だけ（ケアマネジャーは署名の欄なので書かない）
   if (kouiki) need(v.office, '居宅介護支援事業所（居宅の事業所名）');
+  else if (fukuoka) need(v.seller.providerNo.length === 10, '販売事業者の事業者番号（10けた）');
   else need(v.recorder, '居宅介護支援事業所・ケアマネジャー（理由の記載者）');
   need(v.ratioSet, '負担割合');
   if (form?.key === 'miyako' || kouiki) need(v.carePlan, '居宅サービス計画の届出（有・無）');
