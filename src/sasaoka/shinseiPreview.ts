@@ -90,7 +90,8 @@ export type PvPage = {
 };
 
 /** 申請書の様式のシート（転記する項目のあるシート。平面図・写真貼付用紙・事後申請書（事前申請書を参照する式）は出さない） */
-export const isFormSheet = (s: ShinseiSheet) => !!(s.texts || s.works || s.kinds);
+// 写真の用紙（北九州市の写真の報告書は被保険者番号の欄 texts もある）は、写真番号のある用紙だけをうしろに出す
+export const isFormSheet = (s: ShinseiSheet) => !s.photoPlace && !!(s.texts || s.works || s.kinds || s.kindRows);
 
 /**
  * 申請書のプレビュー：原本（開いたもの）に転記して、様式のシートごとに1枚。そのうしろに平面図（工事内容）と、
@@ -161,6 +162,23 @@ const TEXT_FIELD: Record<keyof ShinseiTexts, ShinseiField> = {
   builderAddress: 'works',
   builderTel: 'works',
   builderRep: 'works',
+  // 北九州市：「－」の前と後ろに分けた郵便番号・電話番号、写真の報告書の被保険者番号、支給予定金額（保険給付額）は負担割合へ
+  zipA: 'zip',
+  zipB: 'zip',
+  telA: 'phone',
+  telB: 'phone',
+  telC: 'phone',
+  telHead: 'phone',
+  telTail: 'phone',
+  builderZipA: 'works',
+  builderZipB: 'works',
+  builderZipAddress: 'works',
+  builderTelA: 'works',
+  builderTelB: 'works',
+  builderTelC: 'works',
+  manager: 'works',
+  insured: 'insuredNo',
+  benefitYen: 'burden',
 };
 const MARK_FIELD: Record<keyof ShinseiMarks, ShinseiField> = {gender: 'gender', era: 'birth', care: 'care', renovated: 'renovated'};
 
@@ -174,9 +192,11 @@ function fieldRefs(sheet: ShinseiSheet): {field: ShinseiField; ref: string}[] {
   for (const k of sheet.kinds ?? []) out.push({field: 'works', ref: k.places}, {field: 'works', ref: k.works});
   for (const t of sheet.texts ?? []) {
     const key = placeholders(t.format)[0];
-    // 改修施工者（受任者。福岡市）は設定の会社・営業所なので、押せる欄にしない
-    if (key && !key.startsWith('builder')) out.push({field: TEXT_FIELD[key], ref: t.cell});
+    // 改修施工者（受任者。福岡市・北九州市）は設定の会社・営業所・担当なので、押せる欄にしない
+    if (key && !key.startsWith('builder') && key !== 'manager') out.push({field: TEXT_FIELD[key], ref: t.cell});
   }
+  // 北九州市の事前届出書の改修の種類と箇所の□：改修の内容へ
+  for (const k of sheet.kindRows ?? []) for (const ref of [k.kind, ...(k.places ?? []), k.other, k.detail]) if (ref) out.push({field: 'works', ref});
   for (const m of sheet.marks ?? []) if ('key' in m) out.push({field: MARK_FIELD[m.key], ref: m.cell});
   for (const l of sheet.links ?? []) out.push({field: l.field as ShinseiField, ref: l.ref});
   // 写真の用紙の撮影日（苅田町・みやこ町）：一覧の「改修前日付・改修後日付」

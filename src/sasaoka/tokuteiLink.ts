@@ -24,7 +24,7 @@ export type TokuteiFields = {
   address: string;
   tel: string;
   careLevel: string; // 要支援1〜要介護5
-  insurer?: string; // kanda・yukuhashi・miyako・kouiki・fukuoka（特定福祉用具も同じ名前）
+  insurer?: string; // kanda・yukuhashi・miyako・kouiki・fukuoka・kitakyushu（特定福祉用具も同じ名前）
   burdenRatio?: 1 | 2 | 3;
   careOffice: string; // 居宅介護支援事業所（理由書の作成者の事業所）
   careManager: string; // ケアマネジャー（理由書の作成者）

@@ -43,6 +43,8 @@ const FIELDS: Record<Insurer, Field[]> = {
   kouiki: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'cost', 'renovated', 'dates'], // 郵便番号はユーザーの指示で足した（2026-10-21）
   // 福岡市：性別・郵便番号・要介護状態区分の欄はない。着工日・完成日は完了届出書（工事のあと）
   fukuoka: ['kana', 'name', 'insuredNo', 'birth', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'cost', 'dates'],
+  // 北九州市：生年月日・性別・要介護状態区分の欄はない。フリガナ・着工日・完成日は支給申請書（工事のあと）。工事費見積金額は介護保険の対象分（市の記入例）
+  kitakyushu: ['kana', 'name', 'insuredNo', 'zip', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'cost', 'dates'],
 };
 // 負担割合は要介護状態区分のすぐ下（みやこ町・広域連合は電話番号の下）。申請書の原本に欄はないが、委任状の保険給付額・見積書の介護保険の内訳に使い、
 // 特定福祉用具の負担割合と同じ値（どちらで選んでも両方に入る。tokuteiLink.ts）。ユーザーの指示「住宅改修の申請書にも負担割合を設置。住宅改修⇔特定福祉用具などで連動して数字に繋げる」2026-10-28
@@ -51,11 +53,11 @@ const FIELDS: Record<Insurer, Field[]> = {
 /** みやこ町・広域連合：改修の内容は内訳明細書（別紙）、着工日・完成日は支給申請書（工事のあと）に書く */
 const twoForms = (i: Insurer) => i === 'miyako' || i === 'kouiki';
 /** 着工日・完成日を入れる保険者（工事のあとの支給申請書・完了届出書に書く。福岡市は改修の内容は申請書のまま） */
-const workDates = (i: Insurer) => twoForms(i) || i === 'fukuoka';
+const workDates = (i: Insurer) => twoForms(i) || i === 'fukuoka' || i === 'kitakyushu';
 
 /** 欄の名前（申請書の言葉） */
 function label(f: Field, i: Insurer): string {
-  if (f === 'cost') return twoForms(i) ? '改修費用（介護保険対象分）' : '改修予定費用';
+  if (f === 'cost') return twoForms(i) ? '改修費用（介護保険対象分）' : i === 'kitakyushu' ? '工事費見積金額（介護保険対象分）' : '改修予定費用';
   // 苅田町・行橋市の着工予定日は書かない（ユーザーの指示「申請書の着工予定日は空白にする」）ので、完了（完成）予定日だけ
   if (f === 'dates') return workDates(i) ? '着工日・完成日' : i === 'kanda' ? '完了予定日' : '完成予定日';
   return {
@@ -84,6 +86,7 @@ const FORM_TITLE: Record<Insurer, string> = {
   miyako: '住宅改修承認届出書・住宅改修費支給申請書（受領委任払用）',
   kouiki: '住宅改修承認申請書（様式第2号）・住宅改修費支給申請書（様式第7号）',
   fukuoka: '住宅改修費支給申請書（様式第21号）・住宅改修完了届出書（様式第22号の2）',
+  kitakyushu: '介護保険住宅改修事前届出書・住宅改修費支給申請書（受領委任払用）',
 };
 
 /** 箇所を足すのプルダウンの「そのほか」（名前を打つ箇所） */

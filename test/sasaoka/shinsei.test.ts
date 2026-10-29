@@ -5,7 +5,8 @@ import {strFromU8, unzipSync, zipSync} from 'fflate';
 import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import {DEFAULT_PLACES, defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
-import {boxLabels, checkBoxes, fillShinsei, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
+import {boxLabels, checkBoxes, fillShinsei, splitNumber, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
+import {KK_CELLS} from '../../src/sasaoka/shinsei/kitakyushuCells.ts';
 import {shinseiPreview} from '../../src/sasaoka/shinseiPreview.ts';
 import type {Insurer, Job, PhotoMark, Place, Row, ShinseiInfo, ShinseiMarks} from '../../src/sasaoka/types.ts';
 
@@ -47,6 +48,7 @@ const YUKUHASHI = new Uint8Array(readFileSync(new URL('../../src/sasaoka/shinsei
 const MIYAKO = new Uint8Array(readFileSync(new URL('../../src/sasaoka/shinsei/miyako.xltx', import.meta.url)));
 const KOUIKI = new Uint8Array(readFileSync(new URL('../../src/sasaoka/shinsei/kouiki.xltx', import.meta.url)));
 const FUKUOKA = new Uint8Array(readFileSync(new URL('../../src/sasaoka/shinsei/fukuoka.xltx', import.meta.url)));
+const KITAKYUSHU = new Uint8Array(readFileSync(new URL('../../src/sasaoka/shinsei/kitakyushu.xltx', import.meta.url)));
 
 /** シート名 → そのシートの XML */
 function sheets(bytes: Uint8Array): {files: Record<string, Uint8Array>; byName: Map<string, string>} {
@@ -613,7 +615,7 @@ function ellipses(bytes: Uint8Array, sheet: string): {from: number[]; to: number
     .map(anchorOf);
 }
 const marksOf = (m: Partial<ShinseiMarks>): ShinseiMarks => ({gender: '', era: '', care: '', renovated: '', ...m});
-const TEMPLATES: Record<Insurer, Uint8Array> = {kanda: KANDA, yukuhashi: YUKUHASHI, miyako: MIYAKO, kouiki: KOUIKI, fukuoka: FUKUOKA};
+const TEMPLATES: Record<Insurer, Uint8Array> = {kanda: KANDA, yukuhashi: YUKUHASHI, miyako: MIYAKO, kouiki: KOUIKI, fukuoka: FUKUOKA, kitakyushu: KITAKYUSHU};
 
 test('申請書の丸：選んだ性別・元号・要介護状態区分・改修状況を楕円で囲む（苅田町は事前申請書と事後申請書の両方）。選ばなければ囲まない', () => {
   assert.deepEqual(shinseiMarkKeys('kanda'), ['gender', 'era', 'care']);
@@ -858,8 +860,10 @@ test('写真貼付用紙：写真番号の用紙の改修前・改修後の枠�
     kouiki: ['写真貼付用紙:before:1', '写真貼付用紙:after:2', '写真貼付用紙 (5):before:3'],
     // 福岡市：施工前と施工後は別の用紙・1枚に写真番号2つ（⑤は施工前の3枚目の上）
     fukuoka: ['写真貼付台紙（事前）:before:1', '写真貼付台紙（完了）:after:2', '写真貼付台紙（事前） (3):before:3'],
+    // 北九州市：内容報告書（改修前）は1枚に写真番号1つ（⑤は5枚目）、完了報告書（改修後）は1枚に2つ
+    kitakyushu: ['内容報告書（写真）:before:1', '完了報告書（写真）:after:2', '内容報告書（写真） (5):before:3'],
   };
-  for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'fukuoka'] as const) {
+  for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu'] as const) {
     const files = unzipSync(fillShinsei(TEMPLATES[insurer], SHINSEI[insurer]!, {...shinseiValues(job({insurer}), RATES), photoImages}));
     const got: string[] = [];
     const entries = SHINSEI[insurer]!.sheets.filter((x) => x.photoPlace);
@@ -1301,4 +1305,116 @@ test('福岡市：申請書（様式第21号）・完了届出書（第22号の2
       [3, 'トイレ', 2],
     ],
   );
+});
+
+// ---------------------------------------------------------------- 北九州市（2026-10-29。市の Word の様式から作った原本。架空の見本 山田 太郎）
+const KK_S = {...RATES, company: '太陽シルバーサービス株式会社', officeName: '小倉営業所', manager: '見本 次郎', postal: '802-0000', address: '福岡県北九州市小倉北区見本1-1', tel: '093-000-0000'};
+const kkJob = (extra: Partial<Job> = {}) =>
+  job({
+    insurer: 'kitakyushu',
+    address: '福岡県北九州市小倉北区見本町2-3',
+    staff: '見本 三郎',
+    shinsei: {...NO_SHINSEI, kana: 'ヤマダ タロウ', zip: '802-0001', phone: '093-111-2222', owner: '山田 太郎', relation: '本人', start: '2026-11-02', end: '2026-11-05', burden: '1'},
+    ...extra,
+  });
+
+test('北九州市：郵便番号・電話番号は様式の「－」の前と後ろに分ける（区切りがなければ郵便番号は3けたと4けた、電話番号は最初の欄に全部）', () => {
+  assert.deepEqual(splitNumber('802-0001', 2, true), ['802', '0001']);
+  assert.deepEqual(splitNumber('８０２０００１', 2, true), ['802', '0001']);
+  assert.deepEqual(splitNumber('093-111-2222', 3), ['093', '111', '2222']);
+  assert.deepEqual(splitNumber('090－1234－5678', 3), ['090', '1234', '5678']);
+  assert.deepEqual(splitNumber('0931112222', 3), ['0931112222', '', '']);
+  assert.deepEqual(splitNumber('093-111-2222', 2), ['093', '111-2222']);
+  assert.deepEqual(splitNumber('093-2222', 3), ['093', '2222', '']);
+  assert.deepEqual(splitNumber('', 3), ['', '', '']);
+});
+
+test('北九州市：事前届出書（提出用・通知用）に書く。改修の種類と箇所の□を■（一覧にない箇所は「その他」に名前）、住宅の状況は■持家、施工予定業者は設定の会社・営業所', () => {
+  const kk = kkJob({places: [...job().places, place('勝手口', [mat('手すり')])]});
+  const v = shinseiValues(kk, KK_S);
+  const out = fillShinsei(KITAKYUSHU, SHINSEI.kitakyushu!, v);
+  const {byName} = sheets(out);
+  for (const [name, c] of [['事前届出書', KK_CELLS.todoke], ['事前届出書（通知用）', KK_CELLS.notice]] as const) {
+    const s = byName.get(name)!;
+    const at = (ref: string) => txt(s, ref);
+    assert.equal(at(c.name), '山田 太郎', name);
+    assert.deepEqual([at(c.zipA), at(c.zipB), at(c.address)], ['802', '0001', '福岡県北九州市小倉北区見本町2-3'], name);
+    assert.deepEqual([at(c.telA), at(c.telB), at(c.telC)], ['093', '111', '2222'], name);
+    const no = [c.no0, c.no1, c.no2, c.no3, c.no4, c.no5, c.no6, c.no7, c.no8, c.no9].map((r) => cell(s, r).match(/<v>(\d)<\/v>|<t[^>]*>(\d)<\/t>/)?.slice(1).find(Boolean) ?? '');
+    assert.equal(no.join(''), '0000366989', name);
+    assert.match(at(c.mochiie), /^■持家/, name);
+    assert.deepEqual([at(c.owner), at(c.relation)], ['山田 太郎', '本人'], name);
+    // 手すり取付：浴室①・玄関⑤・勝手口（一覧にないので「■その他（勝手口）」）。段差の解消：トイレ③。ほかの種類は原本のまま（□）
+    assert.match(at(c.kinds[0]), /^■手すり取付/, name);
+    assert.match(at(c.kinds[1]), /^■段差の解消/, name);
+    assert.equal(at(c.kinds[2]), '□床材等の変更', name); // 書かない（原本のまま）
+    assert.match(at(c.places[0]), /^■玄関・屋外　□廊下・階段　■浴室　□トイレ/, name);
+    assert.match(at(c.places2[0]), /^□洗面脱衣室　■その他（/, name);
+    assert.equal(at(c.other0), '勝手口', name);
+    assert.match(at(c.places[1]), /□浴室　■トイレ/, name);
+    assert.equal(at(c.places2[1]), '□洗面脱衣室　□その他（', name); // その他はなし（原本のまま）
+    assert.deepEqual([at(c.builder), at(c.builderRep), at(c.builderZipA), at(c.builderZipB), at(c.builderAddress), at(c.manager)], ['太陽シルバーサービス株式会社　小倉営業所', '小倉営業所所長　見本 次郎', '802', '0000', '福岡県北九州市小倉北区見本1-1', '見本 三郎'], name);
+    assert.deepEqual([at(c.builderTelA), at(c.builderTelB), at(c.builderTelC)], ['093', '000', '0000'], name);
+    // 工事費見積金額①は介護保険の対象分（市の記入例）、支給予定金額は ①×90／100（1割負担。限度額20万円まで）
+    assert.equal(at(c.cost), shinseiCost(kk, KK_S)!.toLocaleString('en-US'), name);
+    assert.equal(at(c.benefit), v.texts.benefitYen, name);
+    assert.ok(Number(v.texts.benefitYen.replace(/,/g, '')) > 0);
+  }
+  // 洋式便器・付帯工事：種類の□だけ（便器）、付帯工事は具体的な工事内容に改修の内容の行
+  const extra = kkJob({places: [place('トイレ', [mat('洋式便器')], {kind: 5}), place('玄関', [mat('下地補強')], {kind: 6})]});
+  const t2 = sheets(fillShinsei(KITAKYUSHU, SHINSEI.kitakyushu!, shinseiValues(extra, KK_S))).byName.get('事前届出書')!;
+  assert.match(txt(t2, KK_CELLS.todoke.kinds[4]), /^■洋式便器等へ/);
+  assert.match(txt(t2, KK_CELLS.todoke.kinds[5]), /^■付帯工事/);
+  assert.match(txt(t2, KK_CELLS.todoke.detail), /^②玄関/);
+  assert.doesNotMatch(txt(t2, KK_CELLS.todoke.detail), /付帯工事/);
+});
+
+test('北九州市：支給申請書（受領委任払用）・平面図・写真の報告書に書く。委任の欄の被保険者氏名は自署なので書かない。読み戻せる', () => {
+  const out = fillShinsei(KITAKYUSHU, SHINSEI.kitakyushu!, shinseiValues(kkJob(), KK_S));
+  const {byName} = sheets(out);
+  const s = byName.get('支給申請書')!;
+  const c = KK_CELLS.shikyu;
+  const at = (ref: string) => txt(s, ref);
+  assert.deepEqual([at(c.kana), at(c.name)], ['ヤマダ タロウ', '山田 太郎']);
+  assert.deepEqual([at(c.startY), at(c.startM), at(c.startD), at(c.endY), at(c.endM), at(c.endD)], ['8', '11', '2', '8', '11', '5']);
+  assert.deepEqual([at(c.zip), at(c.address), at(c.telA), at(c.telB)], ['802-0001', '福岡県北九州市小倉北区見本町2-3', '093', '111-2222']);
+  assert.match(at(c.cost), /^[\d,]+$/);
+  assert.match(at(c.benefit), /^[\d,]+$/);
+  assert.deepEqual([at(c.builder), at(c.builder2), at(c.builderRep), at(c.builderRep2)], ['太陽シルバーサービス株式会社　小倉営業所', '太陽シルバーサービス株式会社　小倉営業所', '小倉営業所所長　見本 次郎', '小倉営業所所長　見本 次郎']);
+  assert.deepEqual([at(c.builderAddress), at(c.builderTel)], ['〒802-0000　福岡県北九州市小倉北区見本1-1', '093-000-0000']);
+  assert.equal(at(c.biz), ''); // 事業者番号は書かない
+  assert.equal(txt(byName.get('平面図')!, KK_CELLS.plan.name), '山田 太郎');
+  // 内容報告書：写真番号①（1枚目）＝浴室・改修の内容、③（3枚目）＝トイレ、⑤（5枚目）＝玄関。完了報告書：1枚に①②、③は2枚目の上
+  const n = KK_CELLS.naiyo;
+  const n1 = byName.get('内容報告書（写真）')!;
+  assert.deepEqual([txt(n1, n.name), txt(n1, n.insured), txt(n1, n.place0)], ['山田 太郎', '0000366989', '浴室']);
+  assert.match(txt(n1, n.memo0), /手すりの取り付け/);
+  assert.equal(txt(byName.get('内容報告書（写真） (3)')!, n.place0), 'トイレ');
+  assert.equal(txt(byName.get('内容報告書（写真） (5)')!, n.place0), '玄関');
+  assert.equal(txt(byName.get('内容報告書（写真） (2)')!, n.place0), '');
+  const k = KK_CELLS.kanryo;
+  assert.deepEqual([txt(byName.get('完了報告書（写真）')!, k.place0), txt(byName.get('完了報告書（写真） (2)')!, k.place0), txt(byName.get('完了報告書（写真） (3)')!, k.place0)], ['浴室', 'トイレ', '玄関']);
+  const back = readShinsei(out)!;
+  assert.equal(back.insurer, 'kitakyushu');
+  assert.equal(back.name, '山田 太郎');
+  assert.equal(back.insuredNo, '0000366989');
+});
+
+test('北九州市の原本：Word の様式から作ったシート（事前届出書2枚・支給申請書の表と裏・平面図・内容報告書10枚・完了報告書5枚）。どのシートも A4 の1ページ・枠線なし', () => {
+  const {files, byName} = sheets(KITAKYUSHU);
+  assert.deepEqual([...byName.keys()].slice(0, 6), ['事前届出書', '事前届出書（通知用）', '支給申請書', '支給申請書（裏）', '平面図', '内容報告書（写真）']);
+  assert.equal(byName.size, 20);
+  for (const [name, xml] of byName) {
+    assert.match(xml, /<pageSetup[^>]*paperSize="9"/, name);
+    assert.match(xml, /<pageSetUpPr[^>]*fitToPage="1"/, name);
+    assert.match(xml, /showGridLines="0"/, name);
+  }
+  // 写真番号の欄：内容報告書は①〜⑩、完了報告書は①②〜⑨⑩
+  const naiyo = Array.from({length: 10}, (_, k) => txt(byName.get(`内容報告書（写真）${k ? ` (${k + 1})` : ''}`)!, KK_CELLS.naiyo.photo0)).join('');
+  assert.equal(naiyo, '①②③④⑤⑥⑦⑧⑨⑩');
+  const kanryo = Array.from({length: 5}, (_, k) => byName.get(`完了報告書（写真）${k ? ` (${k + 1})` : ''}`)!).map((x) => txt(x, KK_CELLS.kanryo.photo0) + txt(x, KK_CELLS.kanryo.photo1)).join('');
+  assert.equal(kanryo, '①②③④⑤⑥⑦⑧⑨⑩');
+  // 原本は Word の様式の文字だけ（記入例・前の申請の名前は入っていない）
+  for (const [name, xml] of byName) assert.doesNotMatch(xml, /太郎|花子|記入例|記載例/, name);
+  assert.ok(!Object.keys(files).some((k) => k.startsWith('xl/media/')));
 });

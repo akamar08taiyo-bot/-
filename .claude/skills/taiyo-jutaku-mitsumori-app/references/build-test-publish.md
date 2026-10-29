@@ -57,7 +57,7 @@ console.error はアプリの誤りではないので数えない（`appError`�
 | `e2e-data.mjs` | `<サイト>` | 保存と取り込み：IndexedDB に書けないときは「保存しました」にせず警告、書けるようになったら保存／この版の知らない項目（新しい版が足した項目）は、この版のタブで直して保存しても消さない／仕切り表の取り込みで「別のファイルにする」と推測したメーカー名は推測し直す（手で打った名前はそのまま） |
 
 サイトは太陽ポータルと同じ形にする（`<サイト>/sasaoka/`・`<サイト>/jutaku-mitsumori/`、特定福祉用具申請書のタブの中まで通すなら `<サイト>/tokutei/` に特定福祉用具のビルド（ブランチ `claude/care-insurance-auto-transfer-3z0c9n` の `npm run -s build:tokutei` → `dist-tokutei/`）、販売受注簿まで通すなら `<サイト>/taiyo-hacchu-scan/` に taiyo-hacchu-scan の `docs/` か `dist/`）。
-全部（23本）は `scripts/run-e2e.sh`（下）。福岡市の申請書は `e2e-fukuoka.mjs`（2026-10-29）。`e2e-shinsei.mjs` は上の段のボタンの並び（2026-10-28 から 📗 申請書をExcelで保存・🖨 申請書を印刷・削除、真下に 📦 まとめて保存。白紙に戻すはない）・申請書の印刷（PDF が1枚→チェックで2枚）も見る。5つのタブをくらべるのは `e2e-toolbar.mjs`。
+全部（24本）は `scripts/run-e2e.sh`（下）。福岡市の申請書は `e2e-fukuoka.mjs`、北九州市の申請書は `e2e-kitakyushu.mjs`（2026-10-29）。`e2e-shinsei.mjs` は上の段のボタンの並び（2026-10-28 から 📗 申請書をExcelで保存・🖨 申請書を印刷・削除、真下に 📦 まとめて保存。白紙に戻すはない）・申請書の印刷（PDF が1枚→チェックで2枚）も見る。5つのタブをくらべるのは `e2e-toolbar.mjs`。
 常駐のサーバーは作業環境の時間制限（2時間）で止められるので、テストのあいだだけ立てる `scripts/serve.mjs` を使う（番号は環境変数 `PORT`、初めは 5190）：
 
 ```sh
@@ -66,7 +66,7 @@ mkdir -p $SITE/sasaoka $SITE/jutaku-mitsumori
 cp dist-sasaoka/index.html dist-sasaoka/version.json $SITE/sasaoka/
 cp dist-jutaku/index.html dist-jutaku/version.json $SITE/jutaku-mitsumori/
 node <スキル>/scripts/serve.mjs $SITE node test/sasaoka/e2e-sheet.mjs http://localhost:5190 <出力フォルダ>
-node <スキル>/scripts/serve.mjs $SITE sh <スキル>/scripts/run-e2e.sh <出力フォルダ>   # 23本全部（25分ほど。run_in_background で）。終わりに FAIL があれば終わりのコードが 1
+node <スキル>/scripts/serve.mjs $SITE sh <スキル>/scripts/run-e2e.sh <出力フォルダ>   # 24本全部（25分ほど。run_in_background で）。終わりに FAIL があれば終わりのコードが 1
 # 特定福祉用具申請書のタブの中・カタログ・⇔ まで通すときは、特定福祉用具のブランチを build:tokutei して dist-tokutei/ を丸ごと（catalog/ も）$SITE/tokutei/ に写す
 # card・caresoft は、特定福祉用具申請書のタブの中のアプリ（<サイト>/tokutei/）がないと 404 で落ちる。ポータルの tokutei/ を写しておく。
 # いくつかの作業を同時に動かすときは、PORT=5191 などで分け、サイトのフォルダもそれぞれにする（同じフォルダのビルドを上書きし合った。2026-10-23）

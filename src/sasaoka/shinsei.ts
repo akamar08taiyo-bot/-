@@ -17,6 +17,7 @@ import {lineEnds, MARK_INSET, photoBounds, shapeBox} from './photoMarks.ts';
 import {textEm} from './print/fit.ts';
 import type {RiyuValues} from './riyu.ts';
 import type {Insurer, Job, PhotoEdit, PhotoMark, Place, PlacePhotos, Settings, ShinseiInfo, ShinseiMarks} from './types.ts';
+import {KK_CELLS} from './shinsei/kitakyushuCells.ts';
 import {customerFilePart, todayIso} from './util.ts';
 
 /** 申請書の原本の、1つのシートで転記する欄（番地）。ないものは書かない */
@@ -32,6 +33,10 @@ export type ShinseiSheet = {
   // 何か書いたら、書かない種類の欄は「－」（福岡市の記載例と同じ）
   kindCells?: string[];
   insurerNo?: string[]; // 保険者番号の6マス（福岡市。保険証から読んだ番号、なければ住所の区から。fukuokaInsurerNo）
+  // 改修の種類ごとの行の□（北九州市の事前届出書「□手すり取付」と、その行の「□玄関・屋外　□廊下・階段…」「□洗面脱衣室　□その他（　）」）：
+  // その種類の箇所があれば種類の□を■に、箇所の□を■に（一覧にない箇所は「□その他」を■にして、other の欄に名前）。detail は付帯工事の具体的な工事内容
+  kindRows?: {kind: string; places?: string[]; other?: string; detail?: string}[];
+  checks?: string[]; // いつも最初の□を■にする欄（北九州市の住宅の状況「□持家」）
   oneLine?: string[]; // 折り返さない欄（長い文字は縮めて1行に。氏名・フリガナなどのほかに。理由書の電話番号・日付）
   // 写真貼付用紙：原本の写真番号の欄（①・写真番号①・№①）を読み、その写真番号の改修場所を改修箇所の欄（place）に入れ、
   // その写真番号の箇所の写真を改修前・改修後の枠（番地の範囲。before・after）に貼る（同じ写真番号の用紙が2枚あれば、最初の用紙だけ）。
@@ -101,7 +106,25 @@ export type ShinseiTexts = Record<
   | 'builderZip'
   | 'builderAddress'
   | 'builderTel'
-  | 'builderRep',
+  | 'builderRep'
+  // 北九州市：郵便番号・電話番号は様式の「－」の前と後ろに分けて書く（3つ・2つ）。施工業者の担当者名、写真の報告書の被保険者番号（1つの欄）、
+  // 支給予定金額・申請金額（保険給付額。委任状の benefit とちがって数字だけ）
+  | 'zipA'
+  | 'zipB'
+  | 'telA'
+  | 'telB'
+  | 'telC'
+  | 'telHead'
+  | 'telTail'
+  | 'builderZipA'
+  | 'builderZipB'
+  | 'builderZipAddress'
+  | 'builderTelA'
+  | 'builderTelB'
+  | 'builderTelC'
+  | 'manager'
+  | 'insured'
+  | 'benefitYen',
   string
 >;
 
@@ -183,6 +206,65 @@ const FUKUOKA_PHOTO_SHEETS: ShinseiSheet[] = (['事前', '完了'] as const).fla
     ];
   }),
 );
+/**
+ * 北九州市の事前届出書（1枚目＝提出用・2枚目＝通知用。同じ欄を両方に書く）。欄の番地は原本と一緒に作った kitakyushuCells.ts。
+ * 郵便番号・電話番号は様式の「－」の前と後ろに分けて書く。着工予定日・届出日・前回までの給付実績・事業者番号は書かない
+ */
+function kitakyushuTodoke(sheet: string, c: (typeof KK_CELLS)['todoke'] | (typeof KK_CELLS)['notice']): ShinseiSheet {
+  return {
+    sheet,
+    name: c.name,
+    address: c.address,
+    insuredNo: [c.no0, c.no1, c.no2, c.no3, c.no4, c.no5, c.no6, c.no7, c.no8, c.no9],
+    checks: [c.mochiie],
+    // 手すり取付・段差の解消・床材等の変更・引き戸等への扉の取替えは箇所の□の行あり。洋式便器等への取替えは種類の□だけ。付帯工事は具体的な工事内容
+    kindRows: c.kinds.map((kind, i) => ({
+      kind,
+      ...(i < 4 ? {places: [c.places[i], c.places2[i]], other: [c.other0, c.other1, c.other2, c.other3][i]} : {}),
+      ...(i === 5 ? {detail: c.detail} : {}),
+    })),
+    texts: [
+      T(c.zipA, '{zipA}'),
+      T(c.zipB, '{zipB}'),
+      T(c.telA, '{telA}'),
+      T(c.telB, '{telB}'),
+      T(c.telC, '{telC}'),
+      T(c.owner, '{owner}'),
+      T(c.relation, '{relation}'),
+      T(c.builder, '{builder}'),
+      T(c.builderRep, '{builderRep}'),
+      T(c.builderZipA, '{builderZipA}'),
+      T(c.builderZipB, '{builderZipB}'),
+      T(c.builderAddress, '{builderAddress}'),
+      T(c.manager, '{manager}'),
+      T(c.builderTelA, '{builderTelA}'),
+      T(c.builderTelB, '{builderTelB}'),
+      T(c.builderTelC, '{builderTelC}'),
+      T(c.cost, '{cost}'),
+      T(c.benefit, '{benefitYen}'),
+    ],
+  };
+}
+const KK_SHIKYU = KK_CELLS.shikyu;
+/**
+ * 北九州市の写真の報告書：内容報告書（写真）は1枚に写真番号1つ（改修前の写真・改修場所・改修の内容。改修後のイメージ図は手で）を10枚、
+ * 完了報告書（写真）は1枚に写真番号2つ（改修後の写真・改修場所）を5枚。写真番号は原本の「Ｎｏ．」の欄（①〜⑩）
+ */
+const KITAKYUSHU_PHOTO_SHEETS: ShinseiSheet[] = [
+  ...Array.from({length: 10}, (_, k): ShinseiSheet => {
+    const c = KK_CELLS.naiyo;
+    return {sheet: `内容報告書（写真）${k ? ` (${k + 1})` : ''}`, name: c.name, texts: [T(c.insured, '{insured}')], photoPlace: {photo: c.photo0, place: c.place0, before: c.frame0, memo: c.memo0}};
+  }),
+  ...Array.from({length: 5}, (_, k): ShinseiSheet[] => {
+    const c = KK_CELLS.kanryo;
+    const sheet = `完了報告書（写真）${k ? ` (${k + 1})` : ''}`;
+    return [
+      {sheet, name: c.name, texts: [T(c.insured, '{insured}')], photoPlace: {photo: c.photo0, place: c.place0, after: c.frame0}},
+      {sheet, photoPlace: {photo: c.photo1, place: c.place1, after: c.frame1}},
+    ];
+  }).flat(),
+];
+
 /** 福岡市の区（この順に保険者番号の 4013 のうしろの番号：東区＝1 … 早良区＝7） */
 const FUKUOKA_WARDS = ['東', '博多', '中央', '南', '西', '城南', '早良'];
 
@@ -451,6 +533,48 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
       ...FUKUOKA_PHOTO_SHEETS,
     ],
   },
+  // 北九州市（2026-10-29。ユーザーの指示「北九州市と福岡市の書式で、全く同じ形の連動型の申請書…」）。市の様式は Word しかないので、
+  // Word の様式と同じ形の Excel にした原本（スキルの scripts/make_kitakyushu_jutaku.py。線と文字の位置から作る）。
+  // 事前届出書（工事の前。提出用・通知用）：住所・氏名・被保険者番号・電話番号・住宅の状況（■持家）・所有者・改修の種類と箇所の□・施工予定業者（設定の会社・営業所）・
+  // 工事費見積金額①（介護保険の対象分。市の記入例）・支給予定金額（①×70・80・90／100）。
+  // 支給申請書（受領委任払用。工事のあと）：フリガナ・氏名・着工日・完成日・被保険者番号・住所・電話番号・合計金額①・申請金額・事業者（委任の欄の被保険者氏名は自署なので書かない）。
+  // 工事費見積書は見積書のタブ（苅田町・行橋市・みやこ町と同じ表）。理由書は国の様式（理由書のタブ）
+  kitakyushu: {
+    title: '北九州市申請書',
+    sheets: [
+      kitakyushuTodoke('事前届出書', KK_CELLS.todoke),
+      kitakyushuTodoke('事前届出書（通知用）', KK_CELLS.notice),
+      {
+        sheet: '支給申請書',
+        name: KK_SHIKYU.name,
+        address: KK_SHIKYU.address,
+        insuredNo: [KK_SHIKYU.no0, KK_SHIKYU.no1, KK_SHIKYU.no2, KK_SHIKYU.no3, KK_SHIKYU.no4, KK_SHIKYU.no5, KK_SHIKYU.no6, KK_SHIKYU.no7, KK_SHIKYU.no8, KK_SHIKYU.no9],
+        texts: [
+          T(KK_SHIKYU.kana, '{kana}'),
+          T(KK_SHIKYU.startY, '{startY}'),
+          T(KK_SHIKYU.startM, '{startM}'),
+          T(KK_SHIKYU.startD, '{startD}'),
+          T(KK_SHIKYU.endY, '{endY}'),
+          T(KK_SHIKYU.endM, '{endM}'),
+          T(KK_SHIKYU.endD, '{endD}'),
+          T(KK_SHIKYU.zip, '{zip}'),
+          T(KK_SHIKYU.telA, '{telHead}'),
+          T(KK_SHIKYU.telB, '{telTail}'),
+          T(KK_SHIKYU.cost, '{cost}'),
+          T(KK_SHIKYU.benefit, '{benefitYen}'),
+          T(KK_SHIKYU.builder, '{builder}'),
+          T(KK_SHIKYU.builderRep, '{builderRep}'),
+          T(KK_SHIKYU.builder2, '{builder}'),
+          T(KK_SHIKYU.builderRep2, '{builderRep}'),
+          T(KK_SHIKYU.builderAddress, '{builderZipAddress}'),
+          T(KK_SHIKYU.builderTel, '{builderTel}'),
+        ],
+      },
+      // 平面図は苅田町の原本と同じ形（表題の左に氏名、下に工事内容のテキストボックス、あいだに平面図の図）
+      {sheet: '平面図', name: KK_CELLS.plan.name, nameFormat: '{name}', legend: {box: KK_CELLS.plan.legend}, plan: KK_CELLS.plan.plan},
+      ...KITAKYUSHU_PHOTO_SHEETS,
+    ],
+  },
 };
 
 // ---------------------------------------------------------------- 転記する内容
@@ -468,6 +592,7 @@ export type ShinseiValues = {
   photoKinds?: Record<number, number>; // 写真番号 → 改修の種類（1〜6。苅田町の写真の用紙の実施した工事種類）
   photoDates?: Record<number, PlacePhotos>; // 写真番号 → 改修前・改修後の撮影日（'YYYY-MM-DD'）
   photoNotes?: Record<number, string[]>; // 写真番号 → 写真貼付用紙の改修前の写真の横（上）に書く内容（自動の文と、手で足した行。photoNoteLines）
+  kindNames?: string[][]; // 改修の種類（1〜6）ごとの改修場所の名前（同じ名前は1つ。北九州市の事前届出書の□）
   marks: ShinseiMarks; // 丸で囲む値
   texts: ShinseiTexts; // 申請書の画面で入れた項目の文字（書き方の {名前} の値）
   cost: number | null; // 改修費用（数で書く欄。なければ null）
@@ -695,6 +820,19 @@ function proxyAmount(benefit: number): string {
 /** 改修施工者（受任者。福岡市の申請書）に書く会社・営業所（住宅改修のアプリの設定。請求書の発行元と同じ） */
 export type BuilderSettings = Partial<Pick<Settings, 'company' | 'officeName' | 'manager' | 'postal' | 'address' | 'tel'>>;
 
+/**
+ * 番号を様式の「－」で分けた欄に分ける（北九州市の郵便番号「〒802－0001」・電話番号「093－000－0000」）：「-」で区切られていればその区切り、
+ * なければ郵便番号は3けたと4けた。n 個より多く区切られていたら、のこりは最後の欄にまとめる。区切れなければ最初の欄に全部
+ */
+export function splitNumber(text: string, n: number, zip = false): string[] {
+  const v = text.normalize('NFKC').replace(/[‐－ー−―]/g, '-').trim();
+  let parts = v.split(/\s*-\s*/).filter(Boolean);
+  if (parts.length === 1 && zip && /^\d{7}$/.test(v)) parts = [v.slice(0, 3), v.slice(3)];
+  if (parts.length < 2) return [v, ...Array(n - 1).fill('')];
+  const head = parts.slice(0, n - 1);
+  return [...head, parts.slice(n - 1).join('-'), ...Array(Math.max(0, n - parts.length)).fill('')].slice(0, n);
+}
+
 /** 日付 → 令和の年・月・日（「令和　8」の年の欄・月・日の欄。福岡市の完了届出書の着工日・完成日） */
 function reiwaParts(iso: string): [string, string, string] {
   const r = reiwa(iso);
@@ -709,13 +847,22 @@ export function shinseiValues(job: Job, s: EstimateSettings & BuilderSettings, t
   const [startY, startM, startD] = reiwaParts(info.start);
   const [endY, endM, endD] = reiwaParts(info.end);
   const cardInsurer = t(info.insurerNo).replace(/\D/g, '');
+  const [zipA, zipB] = splitNumber(t(info.zip), 2, true);
+  const [telA, telB, telC] = splitNumber(t(info.phone), 3);
+  const [telHead, telTail] = splitNumber(t(info.phone), 2);
+  const postal = t(s.postal ?? '');
+  const [builderZipA, builderZipB] = splitNumber(postal, 2, true);
+  const [builderTelA, builderTelB, builderTelC] = splitNumber(t(s.tel ?? ''), 3);
+  const benefit = careAmounts(job, s).benefit;
+  const kinds = shinseiKinds(job, s);
   return {
     name: job.customer.trim(),
     address: job.address.trim(),
     insuredNo: job.insuredNo,
     insurerNo: cardInsurer.length === 6 ? cardInsurer : fukuokaInsurerNo(job.address),
     works: shinseiWorks(job, s),
-    kinds: shinseiKinds(job, s),
+    kinds,
+    kindNames: KINDS.map((_, i) => [...new Set(workItems(job, s).filter((w) => w.kind === i + 1 && w.line).map((w) => w.name).filter(Boolean))]),
     photos: shinseiPhotos(job, s),
     photoKinds: Object.fromEntries([...photoPlacesOf(job, s)].map(([n, p]) => [n, p.kind])),
     photoDates: photoDatesOf(job, s, today),
@@ -753,6 +900,22 @@ export function shinseiValues(job: Job, s: EstimateSettings & BuilderSettings, t
       builderTel: t(s.tel ?? ''),
       // 代表者氏名：請求書と同じ「○○営業所所長　氏名」
       builderRep: s.manager?.trim() ? `${s.officeName?.trim() ?? ''}所長　${s.manager.trim()}` : '',
+      zipA,
+      zipB,
+      telA,
+      telB,
+      telC,
+      telHead,
+      telTail,
+      builderZipA,
+      builderZipB,
+      builderZipAddress: [postal && `〒${postal}`, (s.address ?? '').trim()].filter(Boolean).join('　'),
+      builderTelA,
+      builderTelB,
+      builderTelC,
+      manager: job.staff.trim() || (s.manager ?? '').trim(), // 施工業者の担当者名：様邸の担当（なければ設定の所長）
+      insured: padInsuredNo(job.insuredNo),
+      benefitYen: benefit > 0 ? benefit.toLocaleString('en-US') : '',
     },
     cost,
     start: info.start,
@@ -1046,6 +1209,22 @@ export const EMPTY_SHINSEI: ShinseiValues = {
     builderAddress: '',
     builderTel: '',
     builderRep: '',
+    zipA: '',
+    zipB: '',
+    telA: '',
+    telB: '',
+    telC: '',
+    telHead: '',
+    telTail: '',
+    builderZipA: '',
+    builderZipB: '',
+    builderZipAddress: '',
+    builderTelA: '',
+    builderTelB: '',
+    builderTelC: '',
+    manager: '',
+    insured: '',
+    benefitYen: '',
   },
   cost: null,
   start: '',
@@ -1082,6 +1261,7 @@ export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void
     const photo = sheet.photoPlace ? photoNumberOf(readCell(files, sheet.sheet, sheet.photoPlace.photo)) : 0;
     const cells = shinseiCells(sheet, v, photo);
     for (const [ref, text] of photoBoxes(files, sheet, v, photo)) cells.set(ref, text);
+    for (const [ref, text] of kindRowCells(files, sheet, v)) cells.set(ref, text);
     if (sheet.riyu && v.riyu) for (const [ref, text] of riyuSheetCells(files, sheet, v.riyu)) cells.set(ref, text);
     writeCells(files, sheet.sheet, cells);
     wrapKinds(files, sheet, v);
@@ -1136,17 +1316,58 @@ function riyuSheetCells(files: Files, sheet: ShinseiSheet, r: RiyuValues): Map<s
 const BOX = /(?:\u{1F533}|\u{1F532}|[\u25A0\u25A1\u25FB\u25FC\u2610\u2611\u2612])\uFE0E?\uFE0F?/gu;
 
 /**
- * □の一覧（「□廊下　□階段…」）の pick 番目（0始まり）だけを■にする（ほかは□。印の形もそろえる）。
+ * □の一覧（「□廊下　□階段…」）の pick 番目（0始まり。北九州市の事前届出書のように箇所がいくつかあれば番号の配列）だけを■にする（ほかは□。印の形もそろえる）。
  * other があれば最後の項目（「□その他（　　）」）を「■勝手口」のように置きかえる（一覧にない改修場所。ユーザーの指示）
  */
-export function checkBoxes(text: string, pick: number | null, other = ''): string {
+export function checkBoxes(text: string, pick: number | number[] | null, other = ''): string {
   const src = text.replace(/\r\n/g, '\n');
   const marks = [...src.matchAll(BOX)];
   if (marks.length === 0) return src;
+  const picks = new Set(pick === null ? [] : Array.isArray(pick) ? pick : [pick]);
   let out = src.slice(0, marks[0].index);
   marks.forEach((m, i) => {
     const seg = src.slice((m.index ?? 0) + m[0].length, i + 1 < marks.length ? marks[i + 1].index : src.length);
-    out += other && i === marks.length - 1 ? `■${other}${/[\s　]*$/.exec(seg)?.[0] ?? ''}` : `${i === pick ? '■' : '□'}${seg}`;
+    out += other && i === marks.length - 1 ? `■${other}${/[\s　]*$/.exec(seg)?.[0] ?? ''}` : `${picks.has(i) ? '■' : '□'}${seg}`;
+  });
+  return out;
+}
+
+/**
+ * 北九州市の事前届出書：改修の種類の□（その種類の箇所があれば■）と、その行の箇所の□（その種類の箇所の□を■。一覧にない箇所は「□その他」を■にして、
+ * other の欄に名前を「・」でつなぐ）、付帯工事の具体的な工事内容（改修の内容の行。行の見出しが付帯工事なので種類の名前は外す）。住宅の状況の「□持家」（checks）はいつも■
+ */
+function kindRowCells(files: Files, sheet: ShinseiSheet, v: ShinseiValues): Map<string, CellValue> {
+  const out = new Map<string, CellValue>();
+  for (const ref of sheet.checks ?? []) {
+    const text = readCell(files, sheet.sheet, ref);
+    if (text) out.set(ref, checkBoxes(text, 0));
+  }
+  sheet.kindRows?.forEach((row, i) => {
+    const names = v.kindNames?.[i] ?? [];
+    if (!names.length) return;
+    const kindText = readCell(files, sheet.sheet, row.kind);
+    if (kindText) out.set(row.kind, checkBoxes(kindText, 0));
+    if (row.places) {
+      const texts = row.places.map((ref) => readCell(files, sheet.sheet, ref));
+      const labels = texts.map((t) => boxLabels(t));
+      const flat = labels.flat(); // 最後は「その他（」（placeBox は最後の項目を選ばない）
+      const picks = new Set<number>();
+      const others: string[] = [];
+      for (const name of names) {
+        const at = placeBox(flat, name);
+        if (at === null) others.push(name.normalize('NFKC').trim());
+        else picks.add(at);
+      }
+      if (others.length) picks.add(flat.length - 1);
+      let offset = 0;
+      texts.forEach((text, c) => {
+        const mine = [...picks].filter((p) => p >= offset && p < offset + labels[c].length).map((p) => p - offset);
+        if (text) out.set(row.places![c], checkBoxes(text, mine));
+        offset += labels[c].length;
+      });
+      if (row.other && others.length) out.set(row.other, others.join('・'));
+    }
+    if (row.detail) out.set(row.detail, (v.kinds[i]?.works ?? []).map((l) => l.replace(`　${KINDS[i]}`, '')).join('　'));
   });
   return out;
 }
@@ -1209,9 +1430,19 @@ const PART_ALIAS: Record<string, string[]> = {
   和室: ['居室'],
   洋室: ['居室'],
   リビング: ['居室'],
-  アプローチ: ['道路までの通路'],
+  アプローチ: ['道路までの通路', '屋外'],
   屋外: ['道路までの通路'],
   階段: ['階段'],
+  // 北九州市の事前届出書の「□玄関・屋外」「□洗面脱衣室」
+  玄関アプローチ: ['屋外', '道路までの通路'],
+  '玄関~道路': ['屋外', '道路までの通路'], // 「玄関～道路」（くらべるときは全角の～も半角に）
+  '玄関〜道路': ['屋外', '道路までの通路'],
+  洗面所: ['洗面脱衣室'],
+  脱衣所: ['洗面脱衣室'],
+  脱衣室: ['洗面脱衣室'],
+  洗面室: ['洗面脱衣室'],
+  洗面脱衣所: ['洗面脱衣室'],
+  '洗面・脱衣室': ['洗面脱衣室'],
 };
 
 /**

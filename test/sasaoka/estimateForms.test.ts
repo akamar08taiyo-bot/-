@@ -40,7 +40,8 @@ test('書式は住所の市町村から：築上町・豊前市など → 広域
   assert.equal(formForAddress('築上郡吉富町'), 'kouiki');
   assert.equal(formForAddress('行橋市東大橋2-1-7'), 'yukuhashi');
   assert.equal(formForAddress('京都郡苅田町富久町'), 'yukuhashi');
-  assert.equal(formForAddress('北九州市小倉南区'), null);
+  assert.equal(formForAddress('北九州市小倉南区'), 'yukuhashi'); // 北九州市の工事費見積書は苅田町・行橋市・みやこ町用と同じ表
+  assert.equal(formForAddress('久留米市城南町'), null);
   assert.equal(jobForm({form: '', address: '築上町'}, S), 'kouiki');
   assert.equal(jobForm({form: 'yukuhashi', address: '築上町'}, S), 'yukuhashi'); // 選んだ書式が先
   assert.equal(jobForm({form: '', address: ''}, {estimateForm: 'kouiki'}), 'kouiki');
@@ -51,7 +52,9 @@ test('保険者：苅田町・行橋市・みやこ町は同じ書式（苅田�
   assert.equal(insurerForAddress('行橋市東大橋2-1-7'), 'yukuhashi');
   assert.equal(insurerForAddress('福岡県京都郡みやこ町豊津1118'), 'miyako');
   assert.equal(insurerForAddress('福岡県豊前市八屋'), 'kouiki');
-  assert.equal(insurerForAddress('北九州市小倉南区'), null);
+  assert.equal(insurerForAddress('北九州市小倉南区'), 'kitakyushu');
+  assert.equal(insurerForAddress('福岡県福岡市早良区'), 'fukuoka');
+  assert.equal(insurerForAddress('久留米市城南町'), null);
   // 選んだ保険者で書式が決まる（住所・前に選んだ書式より先）
   assert.equal(jobForm({insurer: 'miyako', form: 'kouiki', address: '築上町'}, S), 'yukuhashi');
   assert.equal(jobForm({insurer: 'kouiki', form: '', address: '行橋市'}, S), 'kouiki');

@@ -521,6 +521,7 @@ const MUNICIPALITIES: [string, CardInsurer][] = [
   ['上毛町', 'kouiki'],
   ['吉富町', 'kouiki'],
   ['福岡市', 'fukuoka'],
+  ['北九州市', 'kitakyushu'],
 ];
 function insurerFuzzy(sq: string): {insurer: CardInsurer; name: string; exact: boolean} {
   const exact = insurerOfName(sq);

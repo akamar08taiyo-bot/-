@@ -261,7 +261,8 @@ test('保険者：名称から（広域連合の市町は広域連合）。和�
   assert.deepEqual(insurerOfName('み や こ 町'), {insurer: 'miyako', name: 'みやこ町'});
   assert.deepEqual(insurerOfName('福岡県介護保険広域連合'), {insurer: 'kouiki', name: '福岡県介護保険広域連合'});
   assert.deepEqual(insurerOfName('築上町'), {insurer: 'kouiki', name: '福岡県介護保険広域連合'});
-  assert.deepEqual(insurerOfName('北九州市'), {insurer: '', name: ''});
+  assert.deepEqual(insurerOfName('北九州市'), {insurer: 'kitakyushu', name: '北九州市'});
+  assert.deepEqual(insurerOfName('久留米市'), {insurer: '', name: ''});
   assert.equal(warekiIso('令和', '6', '2', '30'), '');
   assert.equal(warekiIso('平成', '元', '1', '8'), '1989-01-08');
   assert.equal(warekiIso('昭和', '13', '4', '14'), '1938-04-14');
