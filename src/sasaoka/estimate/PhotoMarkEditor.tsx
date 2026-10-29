@@ -125,11 +125,11 @@ const PANEL_COLORS: [string, string][] = [
 ];
 
 /** 書式の欄のひとまとまり（見出しと中身） */
-function PanelSection({label, children}: {label: string; children: ReactNode}) {
+function PanelSection({label, children, wrap}: {label: string; children: ReactNode; wrap?: boolean}) {
   return (
     <div role="group" aria-label={label} className="shrink-0">
       <div className="pb-1 text-[13px] text-slate-500">{label}</div>
-      <div className="flex gap-1 md:flex-wrap">{children}</div>
+      <div className={`flex gap-1 ${wrap ? 'flex-wrap' : 'md:flex-wrap'}`}>{children}</div>
     </div>
   );
 }
@@ -367,6 +367,9 @@ function Group({label, children}: {label: string; children: ReactNode}) {
   );
 }
 
+/** スマホの書式の欄の「色 ▼」「太さ ▼」「その他 ▼」 */
+const PHONE_PICK =
+  'flex h-10 min-w-0 flex-1 touch-manipulation items-center justify-center gap-1 whitespace-nowrap rounded-md border border-slate-300 bg-white px-1.5 text-[14px] text-slate-700 aria-expanded:border-emerald-600 aria-expanded:bg-emerald-50';
 /** 戻る・進む（上の帯）：枠のあるボタン。スマホは矢印の下に文字（幅が足りないので） */
 const UNDO_BTN =
   'flex shrink-0 touch-manipulation items-center justify-center rounded-md border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-35 max-sm:h-12 max-sm:w-14 max-sm:flex-col max-sm:text-[13px] max-sm:leading-tight sm:h-11 sm:gap-1.5 sm:px-3 sm:text-[15px]';
@@ -448,7 +451,8 @@ export function PhotoMarkEditor({
   const [armKey, setArmKey] = useState(0); // 文字を打つ所を作り直す（元に戻したときなど、打つ所の文字を今の文字にそろえる）
   const [fontText, setFontText] = useState<string | null>(null); // フォント サイズの欄に打っている途中の文字
   const [sizeText, setSizeText] = useState<{h?: string; w?: string}>({});
-  const [eraserAt, setEraserAt] = useState<{p: Pt; r: number} | null>(null); // 消しゴムの丸（なぞっている所・マウスの所。紙の画素）
+  const [eraserAt, setEraserAt] = useState<{p: Pt; r: number} | null>(null);
+  const [phonePanel, setPhonePanel] = useState<'line' | 'width' | 'more' | null>(null); // スマホの書式の欄で開いているもの（線の色・線の太さ・その他） // 消しゴムの丸（なぞっている所・マウスの所。紙の画素）
   // 塗りつぶし・枠線・文字の色のボタンの下の色（最後に選んだ色。ボタンを押すとその色に。Excel と同じ）
   const [recent, setRecent] = useState(() => ({fill: styles.shape.fill || 'FFFFFF', line: styles[toolStyleKey(loadTool())].line || SHAPE_STYLE.line, color: styles.text.color}));
   const shown = draft ?? marks;
@@ -1679,6 +1683,102 @@ export function PhotoMarkEditor({
   };
   const textCss: CSSProperties | undefined = editMark ? markTextCss(editMark, k) : undefined;
 
+  // ---------------------------------------------------------------- 書式の欄のボタン（広い画面は全部を並べ、スマホは押すと開く）
+  const rotateButtons = (
+    <>
+      <button type="button" onClick={() => rotatePhoto(-1)} aria-label="写真を左に回す" className="flex h-10 shrink-0 touch-manipulation items-center gap-1 whitespace-nowrap rounded-md border border-slate-300 bg-white px-3 text-[15px] hover:bg-slate-50">
+        ↺<span className="max-md:hidden"> 左へ</span>
+      </button>
+      <button type="button" onClick={() => rotatePhoto(1)} aria-label="写真を右に回す" className="flex h-10 shrink-0 touch-manipulation items-center gap-1 whitespace-nowrap rounded-md border border-slate-300 bg-white px-3 text-[15px] hover:bg-slate-50">
+        ↻<span className="max-md:hidden"> 右へ</span>
+      </button>
+    </>
+  );
+  const lineColorButtons = PANEL_COLORS.map(([hex, name]) => (
+    <button
+      key={hex}
+      type="button"
+      aria-label={`線の色 ${name}`}
+      title={name}
+      aria-pressed={lineValue === hex}
+      onClick={() => {
+        restyle({line: hex}, 'shape');
+        setRecent((r) => ({...r, line: hex}));
+      }}
+      className={`h-8 w-8 shrink-0 touch-manipulation rounded border border-slate-300 ${lineValue === hex ? 'outline outline-2 outline-offset-1 outline-emerald-600' : ''}`}
+      style={{background: `#${hex}`}}
+    />
+  ));
+  const lineWidthButtons = LINE_WIDTHS.map((w) => (
+    <button
+      key={w}
+      type="button"
+      aria-label={`線の太さ ${w} pt`}
+      title={`${w} pt`}
+      aria-pressed={widthValue === w}
+      onClick={() => restyle({width: w}, 'shape')}
+      className={`flex h-9 w-[4.6rem] shrink-0 touch-manipulation items-center gap-1 rounded border px-1 text-[12px] ${widthValue === w ? 'border-emerald-600 bg-emerald-50' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+    >
+      <svg width="34" height="14" aria-hidden>
+        <line x1="2" y1="7" x2="32" y2="7" stroke={`#${lineValue && lineValue !== 'FFFFFF' && lineValue !== 'FFFF00' ? lineValue : '334155'}`} strokeWidth={Math.max(0.6, w * PT_PX)} />
+      </svg>
+      {w}
+    </button>
+  ));
+  const dashButtons = DASHES.map((d) => {
+    const sw = 2;
+    return (
+      <button
+        key={d.key}
+        type="button"
+        aria-label={`線の種類 ${d.label}`}
+        title={d.label}
+        aria-pressed={dashValue === d.key}
+        onClick={() => restyle({dash: d.key}, 'shape')}
+        className={`flex h-9 w-[4.6rem] shrink-0 touch-manipulation items-center justify-center rounded border ${dashValue === d.key ? 'border-emerald-600 bg-emerald-50' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+      >
+        <svg width="56" height="10" aria-hidden>
+          <line x1="1" y1="5" x2="55" y2="5" stroke="#334155" strokeWidth={sw} strokeDasharray={d.pattern.length ? d.pattern.map((v) => v * sw).join(' ') : undefined} />
+        </svg>
+      </button>
+    );
+  });
+  const fillButtons = [['', 'なし'] as [string, string], ...PANEL_COLORS].map(([hex, name]) => (
+    <button
+      key={hex || 'none'}
+      type="button"
+      aria-label={`塗りつぶし ${name}`}
+      title={name}
+      aria-pressed={fillValue === hex}
+      disabled={selected.length > 0 && selected.every((m) => m.kind === 'line' || m.kind === 'pen')}
+      onClick={() => {
+        restyle({fill: hex}, 'shape');
+        if (hex) setRecent((r) => ({...r, fill: hex}));
+      }}
+      className={`relative h-8 w-8 shrink-0 touch-manipulation overflow-hidden rounded border border-slate-300 disabled:opacity-35 ${fillValue === hex ? 'outline outline-2 outline-offset-1 outline-emerald-600' : ''}`}
+      style={{background: hex ? `#${hex}` : 'white'}}
+    >
+      {!hex && <span className="absolute left-1/2 top-[-4px] h-10 w-0.5 -translate-x-1/2 rotate-45 bg-red-500" />}
+    </button>
+  ));
+  const textColorButtons = PANEL_COLORS.map(([hex, name]) => (
+    <button
+      key={hex}
+      type="button"
+      aria-label={`文字の色 ${name}`}
+      title={name}
+      aria-pressed={fontColor === hex}
+      onClick={() => {
+        restyle({color: hex}, 'text');
+        setRecent((r) => ({...r, color: hex}));
+      }}
+      className={`flex h-8 w-8 shrink-0 touch-manipulation items-center justify-center rounded border border-slate-300 bg-white text-[17px] leading-none ${fontColor === hex ? 'outline outline-2 outline-offset-1 outline-emerald-600' : ''}`}
+      style={{color: `#${hex}`, background: hex === 'FFFFFF' || hex === 'FFFF00' ? '#475569' : 'white'}}
+    >
+      あ
+    </button>
+  ));
+
   return (
     <div role="dialog" aria-modal="true" aria-label={`${title}の${what}に書き込む`} className="fixed inset-0 z-[60] flex flex-col bg-slate-100 text-slate-800">
       {/* 上の帯：戻る・進む（Excel のクイック アクセス ツール バーの元に戻す・やり直し）・題名・閉じる（まん中。ユーザーの指示「閉じるボタンは中央にもってくる」2026-10-29）。
@@ -1808,111 +1908,56 @@ export function PhotoMarkEditor({
       <div className="flex min-h-0 flex-1 max-md:flex-col">
         {/* 書式の欄：線の色・太さ・線の種類・塗りつぶし・文字の色をいつも見せる（写真の横の空いた所。ユーザーの指示「線の太さや色などは空いたスペースに常時表示する」
             2026-10-29）。選んだ図形があればその図形の、なければ今の道具の書式。狭い画面は写真の上に横に並べる（横に動かせる） */}
-        <aside aria-label="書式" className="flex shrink-0 gap-x-5 gap-y-4 overflow-auto border-slate-200 bg-white px-3 py-2 text-slate-700 max-md:border-b md:w-64 md:flex-col md:border-r">
-          {onRotate && (
-            <PanelSection label="写真の向き">
-              <button type="button" onClick={() => rotatePhoto(-1)} aria-label="写真を左に回す" className="flex h-10 shrink-0 touch-manipulation items-center gap-1 whitespace-nowrap rounded-md border border-slate-300 bg-white px-3 text-[15px] hover:bg-slate-50">
-                ↺ 左へ
+        <aside aria-label="書式" className="flex shrink-0 gap-x-5 gap-y-4 border-slate-200 bg-white px-3 py-2 text-slate-700 max-md:flex-col max-md:border-b md:w-64 md:flex-col md:overflow-auto md:border-r">
+          {/* 広い画面：まとまりごとに全部の色・太さを並べる */}
+          <div className="contents max-md:hidden">
+            {onRotate && <PanelSection label="写真の向き">{rotateButtons}</PanelSection>}
+            <PanelSection label="線の色">{lineColorButtons}</PanelSection>
+            <PanelSection label="線の太さ">{lineWidthButtons}</PanelSection>
+            <PanelSection label="線の種類">{dashButtons}</PanelSection>
+            <PanelSection label="塗りつぶし">{fillButtons}</PanelSection>
+            <PanelSection label="文字の色">{textColorButtons}</PanelSection>
+          </div>
+          {/* スマホ：今の色・太さのボタンを1段に（横に動かさなくても見える。ユーザーの指示「携帯版 色と太さに関しては、閉じた状態でもいいので、
+              横にスクロールせずにも表示される位置に」2026-10-29）。押すと、その下に全部の色・太さが折り返して開く（選ぶと閉じる） */}
+          <div className="md:hidden">
+            <div className="flex items-center gap-1.5">
+              {onRotate && rotateButtons}
+              <button type="button" aria-label="線の色を選ぶ" aria-expanded={phonePanel === 'line'} onClick={() => setPhonePanel((v) => (v === 'line' ? null : 'line'))} className={PHONE_PICK}>
+                <span aria-hidden className="h-6 w-6 shrink-0 rounded border border-slate-300" style={{background: lineValue ? `#${lineValue}` : 'white'}} />
+                色<span className="text-[11px] text-slate-500">▼</span>
               </button>
-              <button type="button" onClick={() => rotatePhoto(1)} aria-label="写真を右に回す" className="flex h-10 shrink-0 touch-manipulation items-center gap-1 whitespace-nowrap rounded-md border border-slate-300 bg-white px-3 text-[15px] hover:bg-slate-50">
-                ↻ 右へ
-              </button>
-            </PanelSection>
-          )}
-          <PanelSection label="線の色">
-            {PANEL_COLORS.map(([hex, name]) => (
-              <button
-                key={hex}
-                type="button"
-                aria-label={`線の色 ${name}`}
-                title={name}
-                aria-pressed={lineValue === hex}
-                onClick={() => {
-                  restyle({line: hex}, 'shape');
-                  setRecent((r) => ({...r, line: hex}));
-                }}
-                className={`h-8 w-8 shrink-0 touch-manipulation rounded border border-slate-300 ${lineValue === hex ? 'outline outline-2 outline-offset-1 outline-emerald-600' : ''}`}
-                style={{background: `#${hex}`}}
-              />
-            ))}
-          </PanelSection>
-          <PanelSection label="線の太さ">
-            {LINE_WIDTHS.map((w) => (
-              <button
-                key={w}
-                type="button"
-                aria-label={`線の太さ ${w} pt`}
-                title={`${w} pt`}
-                aria-pressed={widthValue === w}
-                onClick={() => restyle({width: w}, 'shape')}
-                className={`flex h-9 w-[4.6rem] shrink-0 touch-manipulation items-center gap-1 rounded border px-1 text-[12px] ${widthValue === w ? 'border-emerald-600 bg-emerald-50' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
-              >
-                <svg width="34" height="14" aria-hidden>
-                  <line x1="2" y1="7" x2="32" y2="7" stroke={`#${lineValue && lineValue !== 'FFFFFF' && lineValue !== 'FFFF00' ? lineValue : '334155'}`} strokeWidth={Math.max(0.6, w * PT_PX)} />
+              <button type="button" aria-label="線の太さを選ぶ" aria-expanded={phonePanel === 'width'} onClick={() => setPhonePanel((v) => (v === 'width' ? null : 'width'))} className={PHONE_PICK}>
+                <svg width="22" height="14" aria-hidden>
+                  <line x1="1" y1="7" x2="21" y2="7" stroke="#334155" strokeWidth={Math.max(0.6, Math.min(8, widthValue * PT_PX))} />
                 </svg>
-                {w}
+                {widthValue}
+                <span className="text-[11px] text-slate-500">▼</span>
               </button>
-            ))}
-          </PanelSection>
-          <PanelSection label="線の種類">
-            {DASHES.map((d) => {
-              const sw = 2;
-              return (
-                <button
-                  key={d.key}
-                  type="button"
-                  aria-label={`線の種類 ${d.label}`}
-                  title={d.label}
-                  aria-pressed={dashValue === d.key}
-                  onClick={() => restyle({dash: d.key}, 'shape')}
-                  className={`flex h-9 w-[4.6rem] shrink-0 touch-manipulation items-center justify-center rounded border ${dashValue === d.key ? 'border-emerald-600 bg-emerald-50' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
-                >
-                  <svg width="56" height="10" aria-hidden>
-                    <line x1="1" y1="5" x2="55" y2="5" stroke="#334155" strokeWidth={sw} strokeDasharray={d.pattern.length ? d.pattern.map((v) => v * sw).join(' ') : undefined} />
-                  </svg>
-                </button>
-              );
-            })}
-          </PanelSection>
-          <PanelSection label="塗りつぶし">
-            {[['', 'なし'] as [string, string], ...PANEL_COLORS].map(([hex, name]) => (
-              <button
-                key={hex || 'none'}
-                type="button"
-                aria-label={`塗りつぶし ${name}`}
-                title={name}
-                aria-pressed={fillValue === hex}
-                disabled={selected.length > 0 && selected.every((m) => m.kind === 'line' || m.kind === 'pen')}
-                onClick={() => {
-                  restyle({fill: hex}, 'shape');
-                  if (hex) setRecent((r) => ({...r, fill: hex}));
-                }}
-                className={`relative h-8 w-8 shrink-0 touch-manipulation overflow-hidden rounded border border-slate-300 disabled:opacity-35 ${fillValue === hex ? 'outline outline-2 outline-offset-1 outline-emerald-600' : ''}`}
-                style={{background: hex ? `#${hex}` : 'white'}}
-              >
-                {!hex && <span className="absolute left-1/2 top-[-4px] h-10 w-0.5 -translate-x-1/2 rotate-45 bg-red-500" />}
+              <button type="button" aria-label="線の種類・塗りつぶし・文字の色を選ぶ" aria-expanded={phonePanel === 'more'} onClick={() => setPhonePanel((v) => (v === 'more' ? null : 'more'))} className={PHONE_PICK}>
+                その他<span className="text-[11px] text-slate-500">▼</span>
               </button>
-            ))}
-          </PanelSection>
-          <PanelSection label="文字の色">
-            {PANEL_COLORS.map(([hex, name]) => (
-              <button
-                key={hex}
-                type="button"
-                aria-label={`文字の色 ${name}`}
-                title={name}
-                aria-pressed={fontColor === hex}
-                onClick={() => {
-                  restyle({color: hex}, 'text');
-                  setRecent((r) => ({...r, color: hex}));
-                }}
-                className={`flex h-8 w-8 shrink-0 touch-manipulation items-center justify-center rounded border border-slate-300 bg-white text-[17px] leading-none ${fontColor === hex ? 'outline outline-2 outline-offset-1 outline-emerald-600' : ''}`}
-                style={{color: `#${hex}`, background: hex === 'FFFFFF' || hex === 'FFFF00' ? '#475569' : 'white'}}
-              >
-                あ
-              </button>
-            ))}
-          </PanelSection>
+            </div>
+            {phonePanel && (
+              <div role="group" aria-label={{line: '線の色', width: '線の太さ', more: '線の種類・塗りつぶし・文字の色'}[phonePanel]} className="mt-2 space-y-2" onClick={(e) => (e.target as HTMLElement).closest('button') && setPhonePanel(null)}>
+                {phonePanel === 'line' && <div className="flex flex-wrap gap-1.5">{lineColorButtons}</div>}
+                {phonePanel === 'width' && <div className="flex flex-wrap gap-1.5">{lineWidthButtons}</div>}
+                {phonePanel === 'more' && (
+                  <>
+                    <PanelSection label="線の種類" wrap>
+                      {dashButtons}
+                    </PanelSection>
+                    <PanelSection label="塗りつぶし" wrap>
+                      {fillButtons}
+                    </PanelSection>
+                    <PanelSection label="文字の色" wrap>
+                      {textColorButtons}
+                    </PanelSection>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </aside>
         {/* 写真（まわりは灰色。写真の外で押すと選ぶのをやめる） */}
         <div

@@ -648,6 +648,42 @@ for (const [name, vp, touch] of [
   await touchAt('touchEnd', pt(0.5, 0.5));
   assert.equal(await d2.locator('[data-photo-stage] [data-mark]').count(), 1, `${name} 指で矢印`);
   await p2.screenshot({path: path.join(outDir, `mark-05-${name}.png`)});
+  // スマホの書式の欄：「色 ▼」「太さ ▼」が横に動かさなくても見える。押すと全部の色・太さが画面の中に折り返して開き、選ぶと閉じる
+  // （ユーザーの指示「携帯版 色と太さに関しては、閉じた状態でもいいので、横にスクロールせずにも表示される位置に」2026-10-29）
+  if (name === 'phone') {
+    const aside = d2.getByRole('complementary', {name: '書式'});
+    assert.equal(await aside.evaluate((el) => el.scrollWidth <= el.clientWidth + 1), true, 'スマホの書式の欄が横にはみ出す');
+    for (const label of ['線の色を選ぶ', '線の太さを選ぶ', '写真を右に回す']) {
+      const r = await d2.getByRole('button', {name: label, exact: true}).boundingBox();
+      assert.ok(r && r.x >= 0 && r.x + r.width <= vp.width, `${label} ${JSON.stringify(r)}`);
+    }
+    const arrow = d2.locator('[data-photo-stage] [data-mark]').first();
+    await p2.waitForTimeout(800);
+    await d2.getByRole('button', {name: '線の色を選ぶ'}).tap();
+    const colors = d2.getByRole('group', {name: '線の色', exact: true}).getByRole('button');
+    await colors.first().waitFor();
+    assert.equal(await colors.count(), 12);
+    for (const b of await colors.all()) {
+      const r = await b.boundingBox();
+      assert.ok(r.x >= 0 && r.x + r.width <= vp.width, `色が画面からはみ出す ${JSON.stringify(r)}`);
+    }
+    await p2.screenshot({path: path.join(outDir, `mark-05c-${name}-colors.png`), clip: {x: 0, y: 0, width: vp.width, height: 420}});
+    await d2.getByRole('button', {name: '線の色 赤'}).tap();
+    await d2.getByRole('group', {name: '線の色', exact: true}).waitFor({state: 'hidden', timeout: 5000}); // 選ぶと閉じる（パソコン用の欄は隠れている）
+    await p2.waitForFunction(() => document.querySelector('[role="dialog"] [data-photo-stage] [data-mark] line')?.getAttribute('stroke') === '#FF0000', null, {timeout: 5000});
+    await d2.getByRole('button', {name: '線の太さを選ぶ'}).tap();
+    const widths = d2.getByRole('group', {name: '線の太さ', exact: true}).getByRole('button');
+    await widths.first().waitFor();
+    for (const b of await widths.all()) {
+      const r = await b.boundingBox();
+      assert.ok(r.x >= 0 && r.x + r.width <= vp.width, `太さが画面からはみ出す ${JSON.stringify(r)}`);
+    }
+    await p2.screenshot({path: path.join(outDir, `mark-05d-${name}-widths.png`), clip: {x: 0, y: 0, width: vp.width, height: 420}});
+    await d2.getByRole('button', {name: '線の太さ 6 pt'}).tap();
+    await p2.waitForFunction(() => Number(document.querySelector('[role="dialog"] [data-photo-stage] [data-mark] line')?.getAttribute('stroke-width')) > 7, null, {timeout: 5000});
+    assert.equal((await d2.getByRole('button', {name: '線の太さを選ぶ'}).innerText()).replace(/\s|▼/g, ''), '6');
+    assert.ok(arrow);
+  }
   // 上の「戻る」「進む」：文字が見えて、画面に入る。閉じるとかさならない
   const close = await d2.getByRole('button', {name: '閉じる', exact: true}).boundingBox();
   for (const label of ['戻る', '進む']) {
