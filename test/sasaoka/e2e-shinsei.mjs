@@ -162,7 +162,7 @@ assert.ok(formBox && previewBox && formBox.x + formBox.width <= previewBox.x + 1
 assert.equal(await page.getByRole('group', {name: '入れ方'}).count(), 0);
 assert.equal(await page.getByRole('dialog').count(), 0);
 // 一覧は行橋市の申請書の順番（氏名が番号の前）。着工予定日はない（空白のまま。ユーザーの指示）
-assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '負担割合', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '平面図に書く文字', '完成予定日', '改修予定費用']);
+assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '負担割合', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '完成予定日', '改修予定費用']);
 assert.equal(await form.getByLabel('着工予定日').count(), 0);
 assert.match(await form.locator('div[data-field="kana"] > div:first-child').innerText(), /^フリガナ\s*（ひらがなで入力してもカタカナになります）$/);
 let pv = await preview.innerText();
@@ -1101,7 +1101,7 @@ assert.deepEqual(await pageNames(), ['事前申請書', '委任状', '平面図 
 assert.ok((await page.getByText('工事場所の住所は「行橋市」です。').count()) > 0);
 assert.equal(await page.getByRole('button', {name: '保険者を行橋市にする'}).count(), 1);
 // 一覧は苅田町の申請書の順番。ただし被保険者氏名はフリガナのすぐ下（ユーザーの指示）。完了予定日だけ（着工予定日は空白）
-assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '負担割合', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '平面図に書く文字', '完了予定日', '改修予定費用']);
+assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '負担割合', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '完了予定日', '改修予定費用']);
 assert.equal(await form.getByLabel('完了予定日').inputValue(), '2026-11-20');
 assert.equal(await form.getByLabel('改修予定費用').inputValue(), '26,950');
 assert.ok((await form.innerText()).includes('見積書の合計（税込）'));

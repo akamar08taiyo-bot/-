@@ -597,7 +597,6 @@ export type ShinseiValues = {
   photoDates?: Record<number, PlacePhotos>; // 写真番号 → 改修前・改修後の撮影日（'YYYY-MM-DD'）
   photoNotes?: Record<number, string[]>; // 写真番号 → 写真貼付用紙の改修前の写真の横（上）に書く内容（自動の文と、手で足した行。photoNoteLines）
   kindNames?: string[][]; // 改修の種類（1〜6）ごとの改修場所の名前（同じ名前は1つ。北九州市の事前届出書の□）
-  legend?: string[]; // 平面図の工事内容：改修の内容の行と、そのあとに平面図に書く文字（ShinseiInfo.planNote）の行
   kindTexts?: string[]; // 改修の種類（1〜6）の名前（保険者の様式の言葉。kindNamesOf）。改修の内容の行から種類の名前を外すとき・写真の用紙の改修の種類に
   marks: ShinseiMarks; // 丸で囲む値
   texts: ShinseiTexts; // 申請書の画面で入れた項目の文字（書き方の {名前} の値）
@@ -733,14 +732,6 @@ export function workText(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText'
 export function photoNoteLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText' | 'photoNote'>, names: string[] = KINDS): string[] {
   const added = (p.photoNote ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   return [...workTextLines(p, names), ...added];
-}
-
-/** 平面図に書く文字（ShinseiInfo.planNote）の行：工事内容の行のうしろに足す（うしろのすき間・空の行は書かない） */
-export function planNoteLines(info: Pick<ShinseiInfo, 'planNote'>): string[] {
-  return (info.planNote ?? '')
-    .split(/\r?\n/)
-    .map((l) => l.trimEnd())
-    .filter((l) => l.trim());
 }
 
 /** 改修の内容・箇所及び規模（苅田町・行橋市の申請書の欄）・平面図の工事内容：箇所ごとに1行「①玄関　手すりの取り付け　L=600mm」。写真番号・改修場所は見積書と同じ */
@@ -882,7 +873,6 @@ export function shinseiValues(job: Job, s: EstimateSettings & BuilderSettings, t
     // 選んだ保険者番号（介護保険証から読んだ番号も）、なければ住所の市町村・区から（insurerNumbers.ts。福岡市は区・広域連合は構成市町村）
     insurerNo: insurerNoOf(jobInsurer(job), job.address, cardInsurer),
     works: shinseiWorks(job, s),
-    legend: [...shinseiWorks(job, s), ...planNoteLines(info)],
     kinds,
     kindNames: KINDS.map((_, i) => [...new Set(workItems(job, s).filter((w) => w.kind === i + 1 && w.line).map((w) => w.name).filter(Boolean))]),
     photos: shinseiPhotos(job, s),
@@ -1147,7 +1137,7 @@ export function shinseiCells(sheet: ShinseiSheet, v: ShinseiValues, photo = 0): 
   if (sheet.insurerNo && v.insurerNo) sheet.insurerNo.forEach((ref, i) => out.set(ref, v.insurerNo[i] ?? ''));
   if (sheet.photoPlace?.place) out.set(sheet.photoPlace.place, (photo > 0 && v.photos[photo]) || '');
   if (sheet.photoPlace?.kind) out.set(sheet.photoPlace.kind, photo > 0 && v.photos[photo] !== undefined ? ((v.kindTexts ?? KINDS)[(v.photoKinds?.[photo] ?? 0) - 1] ?? '') : '');
-  if (sheet.legend?.cell) out.set(sheet.legend.cell, (v.legend ?? v.works).join('\n'));
+  if (sheet.legend?.cell) out.set(sheet.legend.cell, v.works.join('\n'));
   for (const t of sheet.texts ?? []) {
     const keys = placeholders(t.format);
     // 何も入れていなければ原本の文字のまま（「本人との関係（　　　）」など）
@@ -1296,7 +1286,7 @@ export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void
     fitCheckRows(files, sheet);
     drawMarks(files, sheet, v.marks);
     if (sheet.photoPlace?.kindCircles) drawKindCircle(files, sheet, photo > 0 && v.photos[photo] !== undefined ? (v.photoKinds?.[photo] ?? 0) : 0);
-    if (sheet.legend?.box) drawLegend(files, sheet, v.legend ?? v.works);
+    if (sheet.legend?.box) drawLegend(files, sheet, v.works);
     // 写真の報告書の改修の内容（北九州市のメモの欄。大きな字でまん中）：入らなければ1行ずつ欄の幅に入る大きさにする
     const memo = sheet.photoPlace?.memo;
     const memoLines = memo && sheet.photoPlace?.before && photo > 0 ? (v.photoNotes?.[photo] ?? []) : [];
@@ -1727,7 +1717,7 @@ function fitLines(files: Files, sheet: ShinseiSheet, v: ShinseiValues): void {
   // [欄, 行, 1行ずつ欄の幅に入れるか（改修の内容の行）]
   const targets: [string, string[], boolean][] = [];
   if (sheet.works) targets.push([sheet.works, v.works, true]);
-  if (sheet.legend?.cell) targets.push([sheet.legend.cell, v.legend ?? v.works, true]);
+  if (sheet.legend?.cell) targets.push([sheet.legend.cell, v.works, true]);
   sheet.kinds?.forEach((k, i) => {
     targets.push([k.works, v.kinds[i]?.works ?? [], true]);
     if (v.kinds[i]?.places) targets.push([k.places, [v.kinds[i].places], false]);

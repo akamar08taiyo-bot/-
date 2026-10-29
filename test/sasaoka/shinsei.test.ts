@@ -1396,8 +1396,8 @@ const kkJob = (extra: Partial<Job> = {}) =>
     ...extra,
   });
 
-test('北九州市：内容報告書（写真）の改修の内容は大きな字でまん中（入らなければ小さく）。平面図の図の枠は用紙の6.5割ほど、下に工事内容と平面図に書く文字（2026-10-29 の指示）', () => {
-  const out = fillShinsei(KITAKYUSHU, SHINSEI.kitakyushu!, shinseiValues(kkJob({shinsei: {...kkJob().shinsei!, planNote: '①〜③は廊下の手すり\n\n  '}}), KK_S));
+test('北九州市：内容報告書（写真）の改修の内容は大きな字でまん中（入らなければ小さく）。平面図の図の枠は用紙の6.5割ほど、下に工事内容（2026-10-29 の指示）', () => {
+  const out = fillShinsei(KITAKYUSHU, SHINSEI.kitakyushu!, shinseiValues(kkJob(), KK_S));
   const {files, byName} = sheets(out);
   const n1 = byName.get('内容報告書（写真）')!;
   const memo = KK_CELLS.naiyo.memo0;
@@ -1412,7 +1412,7 @@ test('北九州市：内容報告書（写真）の改修の内容は大きな�
   const n1l = sheets(fillShinsei(KITAKYUSHU, SHINSEI.kitakyushu!, shinseiValues(long, KK_S))).byName;
   const {files: lf} = sheets(fillShinsei(KITAKYUSHU, SHINSEI.kitakyushu!, shinseiValues(long, KK_S)));
   assert.ok(fontOf(lf, n1l.get('内容報告書（写真）')!, memo).size < 14);
-  // 平面図：図の範囲は用紙の6.5割ほど（工事内容の枠はその下）。工事内容のうしろに平面図に書く文字（空の行は書かない）
+  // 平面図：図の範囲は用紙の6.5割ほど（工事内容の枠はその下）。工事内容は改修の内容の行だけ（「平面図に書く文字」の欄はユーザーの指示「不要です」で外した。2026-10-29）
   const plan = KK_CELLS.plan;
   const lay = sheetLayout(byName.get('平面図')!);
   const pb = rangeBox(lay, plan.plan);
@@ -1422,8 +1422,8 @@ test('北九州市：内容報告書（写真）の改修の内容は大きな�
   assert.ok(lb.y >= pb.y + pb.h);
   const drawing = Object.keys(files).filter((n) => /xl\/drawings\/drawing\d+\.xml$/.test(n)).map((n) => strFromU8(files[n])).find((d) => d.includes('工事内容'))!;
   const paras = [...drawing.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]);
-  assert.equal(paras.at(-1), '①〜③は廊下の手すり');
   assert.match(paras[0], /^①浴室　手すり取付/);
+  assert.deepEqual(paras.slice(1), paras.slice(1).filter((t) => /^[①-⑳]/.test(t)));
 });
 
 test('北九州市：郵便番号・電話番号は様式の「－」の前と後ろに分ける（区切りがなければ郵便番号は3けたと4けた、電話番号は最初の欄に全部）', () => {

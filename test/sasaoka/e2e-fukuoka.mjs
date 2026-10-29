@@ -40,7 +40,7 @@ const pageNames = () => preview.getByRole('group').evaluateAll((els) => els.map(
 // 申請書・完了届出書・平面図・写真番号①②（玄関・トイレ）の施工前と施工後の写真貼付台紙（1枚に2つ）
 assert.deepEqual(await pageNames(), ['様式第21号', '完了届出書（受領委任用)', '平面図', '写真貼付台紙（事前）', '写真貼付台紙（完了）']);
 const rowLabels = async () => (await form.locator(':scope > div[data-field] > div:first-child').allInnerTexts()).map((t) => t.replace(/\s*（ひらがなで入力してもカタカナになります）$/, ''));
-assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '保険者番号', '生年月日', '住所', '電話番号', '負担割合', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '平面図に書く文字', '改修予定費用', '着工日・完成日']);
+assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '保険者番号', '生年月日', '住所', '電話番号', '負担割合', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '改修予定費用', '着工日・完成日']);
 const pv = await preview.innerText();
 for (const t of ['介護保険住宅改修費支給申請書', '介護保険住宅改修完了届出書【受領委任払用】', '早良', '小田部1-2-3', '①玄関', '②トイレ', '太陽シルバーサービス']) assert.ok(pv.includes(t), `プレビューに「${t}」がない`);
 // 写真貼付台紙は1枚に写真番号2つ：施工前の用紙に①②の改修前の枠、施工後の用紙に①②の改修後の枠

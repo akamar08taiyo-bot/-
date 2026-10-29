@@ -29,7 +29,6 @@ export type ShinseiField =
   | 'dates'
   | 'photoDates'
   | 'burden'
-  | 'planNote'
   | RiyuField;
 /** 理由書だけの項目（理由書の画面の一覧の項目。riyu.ts の RIYU_LINKS で欄と結ぶ） */
 export type RiyuField = 'careTerm' | 'housing' | 'checkDate' | 'madeDate' | 'qualification' | 'tel' | 'body' | 'careState' | 'wish' | 'equipment' | 'act:toilet' | 'act:bath' | 'act:out' | 'act:home';
@@ -192,8 +191,6 @@ function fieldRefs(sheet: ShinseiSheet): {field: ShinseiField; ref: string}[] {
   for (const ref of sheet.insuredNo ?? []) out.push({field: 'insuredNo', ref});
   for (const ref of sheet.insurerNo ?? []) out.push({field: 'insurerNo', ref});
   if (sheet.works) out.push({field: 'works', ref: sheet.works});
-  // 平面図の工事内容の欄（みやこ町。ほかの保険者はテキストボックス）：平面図に書く文字へ
-  if (sheet.legend?.cell) out.push({field: 'planNote', ref: sheet.legend.cell});
   for (const k of sheet.kinds ?? []) out.push({field: 'works', ref: k.places}, {field: 'works', ref: k.works});
   for (const t of sheet.texts ?? []) {
     const key = placeholders(t.format)[0];
