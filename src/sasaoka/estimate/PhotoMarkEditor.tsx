@@ -94,25 +94,21 @@ const TOOLS: {key: Tool; label: string}[] = [
   {key: 'eraser', label: '消しゴム（なぞった線・図形を消す）'},
 ];
 /**
- * 描いたあとも道具をそのままにするもの（続けて描く・番号を続けて置く。ユーザーの指示「連続で線を引くことができない」2026-10-29）。
- * やめるときは「選択」・同じ道具をもう一度・Esc
+ * 描いたあとも道具をそのままにするもの：直線・番号・テキスト（続けて引く・置く・打つ）と消しゴム（続けて消す）。
+ * ほかの道具（ペン・折れ線・四角・矢印・双方向矢印・正方形/長方形・楕円）は、1つ描き終えたら「選択」に戻る
+ * （ユーザーの指示「デフォルトはただの横棒、横棒と数字記入、文字の場合は連続で入力できるようにする。折れ線などそれ以外は、一度選択して入力し終えたら、
+ * 選択なしにもどる」2026-10-29。前は「連続で線を引くことができない」で全部の描く道具をそのままにしていた）。やめるときは「選択」・同じ道具をもう一度・Esc
  */
-const KEEP_TOOL = new Set<Tool>(['pen', 'poly', 'quad', 'line', 'arrow', 'arrow2', 'rect', 'ellipse', 'board', 'num']);
+const KEEP_TOOL = new Set<Tool>(['line', 'num', 'text', 'eraser']);
+/** 1つ描き終えたら「選択」に戻す（KEEP_TOOL のほか） */
+const doneTool = (t: Tool | null): Tool | null => (t && KEEP_TOOL.has(t) ? t : null);
 /**
  * 描く道具のまま、選んでいる図形（描いたばかりの線など）の線の上を押してドラッグすると、その図形を動かす道具（ユーザーの指示「ひいた線は、ドロップしたら位置を動かせるようにする」2026-10-29）。
  * 手書きのペン（ぐしゃぐしゃで消すのを線の上から始める）・折れ線（押すたびに角）・消しゴムは、今までどおり押すと描く
  */
 const MOVE_TOOL = new Set<Tool>(['quad', 'line', 'arrow', 'arrow2', 'rect', 'ellipse', 'board', 'text', 'num']);
-const TOOL_KEY = 'taiyo-sasaoka-mark-tool-v1'; // この端末で最後に使った描く道具（開いたときにその道具。初めは直線）
-/** 開いたときの道具：前に使った描く道具（続けて描く道具だけ）。初めは直線（ユーザーの指示「デフォルトは棒線にする」2026-10-29） */
-function loadTool(): Tool {
-  try {
-    const t = localStorage.getItem(TOOL_KEY) as Tool | null;
-    return t && KEEP_TOOL.has(t) && TOOLS.some((x) => x.key === t) ? t : 'line'; // 外した道具（補強板）を覚えていたら直線
-  } catch {
-    return 'line';
-  }
-}
+/** 開いたときの道具：いつも直線（ユーザーの指示「デフォルトは棒線にする」「デフォルトはただの横棒」2026-10-29。前は最後に使った道具を覚えていた） */
+const START_TOOL: Tool = 'line';
 const LONG_PRESS = 550; // 手書きの線を、止めてからまっすぐにするまでの時間（ミリ秒。iPhone のメモと同じぐらい）
 
 /** 書式の欄の色（よく使う色。黄＝線・ペン、茶＝枠囲み・補強板の初めの色） */
@@ -463,7 +459,7 @@ export function PhotoMarkEditor({
   const [marks, setMarks] = useState<PhotoMark[]>(initial);
   const [draft, setDraft] = useState<PhotoMark[] | null>(null);
   const [sel, setSel] = useState<string[]>([]);
-  const [tool, setTool] = useState<Tool | null>(loadTool);
+  const [tool, setTool] = useState<Tool | null>(START_TOOL);
   const [editing, setEditing] = useState<string | null>(null);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [sub, setSub] = useState<'width' | 'dash' | 'arrow' | null>(null);
@@ -474,7 +470,7 @@ export function PhotoMarkEditor({
   const [eraserAt, setEraserAt] = useState<{p: Pt; r: number} | null>(null);
   const [phonePanel, setPhonePanel] = useState<'line' | 'width' | 'more' | null>(null); // スマホの書式の欄で開いているもの（線の色・線の太さ・その他） // 消しゴムの丸（なぞっている所・マウスの所。紙の画素）
   // 塗りつぶし・枠線・文字の色のボタンの下の色（最後に選んだ色。ボタンを押すとその色に。Excel と同じ）
-  const [recent, setRecent] = useState(() => ({fill: styles.shape.fill || 'FFFFFF', line: styles[toolStyleKey(loadTool())].line || SHAPE_STYLE.line, color: styles.text.color}));
+  const [recent, setRecent] = useState(() => ({fill: styles.shape.fill || 'FFFFFF', line: styles[toolStyleKey(START_TOOL)].line || SHAPE_STYLE.line, color: styles.text.color}));
   const shown = draft ?? marks;
   const latest = useRef({marks, editing});
   latest.current = {marks, editing};
@@ -1057,6 +1053,7 @@ export function PhotoMarkEditor({
     if (m) {
       commit([...latest.current.marks, m]);
       setSel([m.id]);
+      setTool(doneTool); // 折れ線・四角は1つ描いたら「選択」に戻る
     }
   };
   const addPolyPoint = (raw: Pt, shift: boolean, quad = false) => {
@@ -1359,6 +1356,7 @@ export function PhotoMarkEditor({
         if (ids.size) {
           commit(marks.filter((m) => !ids.has(m.id)));
           setSel([]);
+          setTool(doneTool);
           return;
         }
       }
@@ -1367,6 +1365,7 @@ export function PhotoMarkEditor({
       if (m && b && Math.max(b.w, b.h) * k >= 3) {
         commit([...marks, m]);
         setSel([m.id]);
+        setTool(doneTool); // ペンは1本描いたら「選択」に戻る
       } else tapSelect(d.pts[0], e);
       return;
     }
@@ -1374,8 +1373,8 @@ export function PhotoMarkEditor({
       let m = next ? byId(d.id, next) : undefined;
       if (!m) return;
       const b = markBounds(m, V);
-      // 続けて描く道具で押しただけ：何も置かない（押した所の図形を選ぶ。色・太さを直せる）
-      if (Math.max(b.w, b.h) * k < 4 && KEEP_TOOL.has(d.tool)) {
+      // 直線で押しただけ：何も置かない（押した所の図形を選ぶ。色・太さを直せる）。ほかの道具は Excel と同じく決まった大きさで置く（テキストは押した所に打つ）
+      if (Math.max(b.w, b.h) * k < 4 && d.tool === 'line') {
         tapSelect(d.p0, e);
         return;
       }
@@ -1394,7 +1393,7 @@ export function PhotoMarkEditor({
       if (m.kind === 'text') m = fitText(m);
       commit([...marks, m]);
       setSel([m.id]);
-      if (!KEEP_TOOL.has(d.tool)) setTool(null);
+      if (!KEEP_TOOL.has(d.tool)) setTool(null); // 矢印・長方形・楕円などは1つ描いたら「選択」に戻る（直線・テキストはそのまま）
       if (m.kind === 'text') {
         proxyRef.current?.focus({preventScroll: true}); // iPad：押したその場でキーボードを出す
         editStart.current = [...marks, m];
@@ -1693,7 +1692,7 @@ export function PhotoMarkEditor({
   );
 
   const canvasCursor = tool === 'eraser' ? 'none' : tool ? 'crosshair' : 'default'; // 消しゴムは丸を見せる
-  /** 道具を選ぶ（null＝選択）。折れ線の途中ならそこまでで終える。描く道具は覚えて、次に開いたときもその道具 */
+  /** 道具を選ぶ（null＝選択）。折れ線の途中ならそこまでで終える */
   const pickTool = (t: Tool | null) => {
     if (editing) endEdit();
     if (poly.current) finishPoly();
@@ -1701,12 +1700,6 @@ export function PhotoMarkEditor({
     setSel([]);
     setMenu(null);
     setEraserAt(null);
-    if (t && KEEP_TOOL.has(t))
-      try {
-        localStorage.setItem(TOOL_KEY, t);
-      } catch {
-        /* 覚えられなくても、この画面ではそのまま使える */
-      }
   };
   /** 写真を 90°回す（書き込みも一緒に。打っている文字・折れ線は入れてから） */
   const rotatePhoto = (dir: 1 | -1) => {

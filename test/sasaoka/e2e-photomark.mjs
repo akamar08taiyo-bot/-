@@ -5,7 +5,7 @@
 //   押して選ぶ・ドラッグで動かす・つまみで大きさ・端の○で長さ、Ctrl+C／V・Delete・Ctrl+Z／Y・Ctrl を押したままドラッグで複製、サイズの欄（cm）、回転、右クリックのメニュー。
 //   閉じると写真の欄・プレビュー・印刷の写真に重なり、読み直しても残り、Excel の写真貼付用紙には Excel の図形（直線矢印コネクタ・正方形/長方形・テキスト ボックス）で入る。
 //   写真を 90°回すと書き込みも一緒に回り、写真を差し替えると消える。スマホ（390px）・iPad でも描ける。
-//   2026-10-29：開いたときは直線・描いても道具はそのまま（続けて描く）・線の端に吸い付く（L字）・折れ線・手書きのペン（長押しでまっすぐ・ぐしゃぐしゃで消す）・
+//   2026-10-29：開いたときはいつも直線・直線・番号・テキストは描いても道具はそのまま（続けて描く）、ほかの道具は1つ描いたら「選択」に戻る・線の端に吸い付く（L字）・折れ線・手書きのペン（長押しでまっすぐ・ぐしゃぐしゃで消す）・
 //   番号（①②）・選択。線は黄色・枠囲みは茶色が初め。リボンは大きく、まん中。補強板の道具は外した（ユーザーの指示「茶色の斜線の…機能は不要」2026-10-29）。
 //   写真を回すのは上の帯の「左へ回す」「右へ回す」（ユーザーの指示「写真回転がわかりづらい」2026-10-29。前は書式の欄の ↺ ↻）。
 //   消しゴム（なぞった線・図形を消す。1回で戻せる）・上の「戻る」「進む」は文字付き（ユーザーの指示「消しゴム機能をつける。戻る、進むボタンはもう少しわかりやすく」2026-10-29）
@@ -109,12 +109,13 @@ assert.equal(await pressed('直線'), 'true');
   const cb = await dlg.getByRole('button', {name: '閉じる', exact: true}).boundingBox();
   assert.ok(Math.abs(cb.x + cb.width / 2 - 1366 / 2) < 2, `閉じるはまん中 ${cb.x}+${cb.width}`);
 }
-// 矢印：ドラッグで描く（終点に矢印）。描いたら選んだまま。道具もそのまま（続けて描ける。ユーザーの指示「連続で前回使用していた棒線を入力できるようにする」）
+// 矢印：ドラッグで描く（終点に矢印）。描いたら選んだまま。道具は「選択」に戻る（ユーザーの指示「横棒と数字記入、文字の場合は連続で入力できるようにする。
+// 折れ線などそれ以外は、一度選択して入力し終えたら、選択なしにもどる」2026-10-29。直線・番号・テキストはそのまま）
 await ribbon.getByRole('button', {name: '矢印', exact: true}).click();
 assert.equal(await pressed('矢印'), 'true');
 await dragOn([0.15, 0.85], [0.42, 0.55]);
 assert.deepEqual(await kinds(), ['line']);
-assert.equal(await pressed('矢印'), 'true'); // 描いても道具はそのまま
+assert.equal(await pressed('選択'), 'true'); // 1つ描いたら「選択」に戻る
 assert.equal(await marks().nth(0).locator('polygon').count(), 1); // 矢印の先
 assert.equal((await svgOf(0, 'line')).stroke, '#FFFF00'); // 黄色（最初の書式。ユーザーの指示「初期の色は黄色」）
 // 図形の枠線 → 太さ 4.5pt・青・破線
@@ -135,6 +136,7 @@ log('矢印をドラッグで描く・枠線の色・太さ・破線 OK');
 await ribbon.getByRole('button', {name: '正方形/長方形'}).click();
 await dragOn([0.06, 0.55], [0.4, 0.75], ['Shift']);
 assert.deepEqual(await kinds(), ['line', 'rect']);
+assert.equal(await pressed('選択'), 'true'); // 1つ描いたら「選択」に戻る
 const rect = await svgOf(1, 'rect');
 assert.ok(Math.abs(Number(rect.width) - Number(rect.height)) < 0.5, `正方形 ${rect.width}×${rect.height}`);
 assert.equal(rect.fill, 'none'); // 塗りつぶしなし
@@ -151,6 +153,7 @@ await page.keyboard.press('Shift+Enter');
 await page.keyboard.insertText('H=750mm');
 await page.keyboard.press('Escape'); // 打ち終わる（図形は選んだまま）
 assert.deepEqual(await kinds(), ['line', 'rect', 'text']);
+assert.equal(await pressed('テキスト ボックス'), 'true'); // テキストは続けて打てる（道具はそのまま。正方形/長方形は1つ描いたら「選択」に戻った）
 assert.equal(await marks().nth(2).locator('[data-mark-text]').innerText(), 'Tesuri 手すり　L=800mm\nH=750mm');
 // 文字の大きさ 14pt・文字の色 赤
 const fs = ribbon.getByRole('textbox', {name: 'フォント サイズ'});
@@ -186,6 +189,7 @@ const lineMid = async (i) => {
   return {x: b.x + b.width / 2, y: b.y + b.height / 2};
 };
 const [arrowId, rectId, textId] = await ids();
+await ribbon.getByRole('button', {name: '選択', exact: true}).click(); // テキストの道具をやめる（そのままだと押した所に次のテキスト）
 let m = await lineMid(0);
 await page.mouse.click(m.x, m.y);
 assert.deepEqual(await selected(), [arrowId]);
@@ -388,7 +392,7 @@ log('写真を 90°回すと書き込みも回る・差し替えると消える 
 // ---------------- プレビューの写真の道具の「✏️ 書き込み」から（ダブルクリックでも）
 await pvSlot.getByRole('button', {name: '写真貼付用紙①の改修前'}).dblclick();
 await dlg.waitFor();
-assert.equal(await pressed('直線'), 'true'); // 前に使った道具（直線）のまま開く
+assert.equal(await pressed('直線'), 'true'); // 開いたときはいつも直線
 await ribbon.getByRole('button', {name: '双方向矢印'}).click();
 await dragOn([0.2, 0.3], [0.8, 0.3]);
 assert.equal(await marks().nth(0).locator('polygon').count(), 2); // 両端に矢印
@@ -438,7 +442,7 @@ await dlg.getByRole('button', {name: '✓ 折れ線を終える'}).click();
 assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen']);
 assert.equal((await svgOf(3, 'polyline')).points.trim().split(/\s+/).length, 4);
 assert.equal((await svgOf(3, 'polyline')).stroke, '#FFFF00');
-assert.equal(await pressed(/^折れ線/), 'true');
+assert.equal(await pressed('選択'), 'true'); // 1つ描いたら「選択」に戻る
 log('折れ線 OK');
 
 // ---------------- 四角（角を4つ押すだけ。4つ目で閉じる。ななめの四角も。ユーザーの指示「写真の中のような⬜︎の図をつくるときは、1角ワンタッチで⬜︎やななめ四角をつくれるように」2026-10-29）
@@ -457,10 +461,11 @@ assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen', 'pen']);
   assert.equal(q[0], q[4], '閉じている');
 }
 assert.equal((await svgOf(4, 'polyline')).stroke, '#FFFF00');
-assert.equal(await pressed(/^四角（角を4つ/), 'true'); // 続けて描ける
+assert.equal(await pressed('選択'), 'true'); // 1つ描いたら「選択」に戻る
 assert.equal(await dlg.getByRole('button', {name: '✕ 四角をやめる'}).count(), 0);
 await page.screenshot({path: path.join(outDir, 'mark-04c-quad.png')});
 // 3つ押して「✕ 四角をやめる」：描かない
+await ribbon.getByRole('button', {name: /^四角（角を4つ/}).click();
 for (const [fx, fy] of [
   [0.62, 0.6],
   [0.72, 0.58],
@@ -486,6 +491,8 @@ await ribbon.getByRole('button', {name: /^ペン/}).click();
 assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen', 'pen']);
 assert.ok((await svgOf(4, 'polyline')).points.trim().split(/\s+/).length > 4, '手書きの線');
 assert.equal((await svgOf(4, 'polyline'))['stroke-linecap'], 'round');
+assert.equal(await pressed('選択'), 'true'); // 1本描いたら「選択」に戻る
+await ribbon.getByRole('button', {name: /^ペン/}).click();
 {
   // 長押し：描いて止める（0.8秒）→ まっすぐな線に
   const [p, q] = [await at(0.1, 0.72), await at(0.45, 0.74)];
@@ -497,6 +504,7 @@ assert.equal((await svgOf(4, 'polyline'))['stroke-linecap'], 'round');
 }
 assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen', 'pen', 'line']);
 assert.equal((await svgOf(5, 'line')).stroke, '#FFFF00');
+await ribbon.getByRole('button', {name: /^ペン/}).click();
 {
   // ぐしゃぐしゃ：L字の縦の線の上 → その線が消える
   const top = await at(0.5, 0.55);
@@ -551,7 +559,31 @@ await ribbon.getByRole('button', {name: /^番号/}).click();
 await clickOn(0.85, 0.15);
 await clickOn(0.85, 0.85);
 assert.deepEqual(await marks().evaluateAll((els) => els.slice(-2).map((e) => e.querySelector('[data-mark-text]')?.textContent)), ['①', '②']);
+assert.equal(await pressed(/^番号/), 'true'); // 番号は続けて置ける（道具はそのまま）
 await page.screenshot({path: path.join(outDir, 'mark-06-pen-board-num.png')});
+// 番号の道具のまま閉じて開き直しても、開いたときは直線（ユーザーの指示「デフォルトはただの横棒」2026-10-29。前は最後に使った道具を覚えていた）
+await dlg.getByRole('button', {name: '閉じる', exact: true}).click();
+await dlg.waitFor({state: 'detached'});
+await photoBoard.getByRole('button', {name: '①玄関 改修前に書き込む'}).click();
+await dlg.waitFor();
+assert.equal(await pressed('直線'), 'true');
+// テキストは続けて打てる：押して打つ → 別の所を押すと次のテキスト（道具はテキストのまま）
+{
+  const n0 = (await kinds()).length;
+  await ribbon.getByRole('button', {name: 'テキスト ボックス'}).click();
+  await clickOn(0.05, 0.92); // テキストボックスの幅は写真の 35%（0.05〜0.40）
+  await page.keyboard.insertText('A');
+  await clickOn(0.6, 0.92);
+  await page.keyboard.insertText('B');
+  await page.keyboard.press('Escape');
+  assert.equal(await pressed('テキスト ボックス'), 'true');
+  assert.deepEqual(await marks().evaluateAll((els) => els.slice(-2).map((e) => e.querySelector('[data-mark-text]')?.textContent)), ['A', 'B']);
+  assert.equal((await kinds()).length, n0 + 2);
+  // このあとの確かめのため、戻るで2つのテキストを消す
+  for (let i = 0; i < 6 && (await kinds()).length > n0; i++) await dlg.getByRole('button', {name: '戻る', exact: true}).click();
+  assert.equal((await kinds()).length, n0);
+  await ribbon.getByRole('button', {name: '選択', exact: true}).click();
+}
 // 選択：押して選ぶ（四角形の枠）
 await ribbon.getByRole('button', {name: '選択', exact: true}).click();
 await clickOn(0.55, 0.62);
