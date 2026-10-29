@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {afterMirrors, pairJob, pairPlace, pairsPhotos} from '../../src/sasaoka/photoPair.ts';
+import {afterMirrors, copyBeforeToAfter, pairJob, pairPlace, pairsPhotos} from '../../src/sasaoka/photoPair.ts';
 import type {Job, Place} from '../../src/sasaoka/types.ts';
 
 const place = (x: Partial<Place> = {}): Place => ({id: 'p1', name: '玄関', kind: 1, ...x}) as Place;
@@ -63,4 +63,22 @@ test('様邸ごと：北九州市の箇所だけ合わせる・何も変わら�
   // 写真のない様邸を直しても（名前など）同じもの
   const renamed = job('kitakyushu', [place({name: '廊下'}), place({id: 'p2'})]);
   assert.equal(pairJob(old, renamed), renamed);
+});
+
+test('改修前を複製（北九州市の「改修前を複製」）：改修後を改修前と同じ写真・向きと大きさ・並べ方に。改修後の書き込み・撮影日は外し、改修前の書き込みは写さない', () => {
+  const p = place({
+    photos: {before: 'a', after: 'c'},
+    photoEdits: {before: {rot: 90, scale: 0.8}},
+    photoMarks: {before: [line], after: [line]},
+    photoDates: {after: '2026-11-05'},
+  });
+  const out = copyBeforeToAfter(p);
+  assert.deepEqual(out.photos, {before: 'a', after: 'a'});
+  assert.deepEqual(out.photoEdits, {before: {rot: 90, scale: 0.8}, after: {rot: 90, scale: 0.8}});
+  assert.deepEqual(out.photoMarks, {before: [line]});
+  assert.equal(out.photoDates, undefined);
+  assert.equal(afterMirrors(out), true);
+  // 改修前が空なら何もしない
+  const empty = place({photos: {after: 'c'}});
+  assert.equal(copyBeforeToAfter(empty), empty);
 });

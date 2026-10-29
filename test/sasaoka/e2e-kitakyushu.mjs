@@ -176,6 +176,46 @@ log('Excel（事前届出書・支給申請書・写真の報告書）OK');
 }
 log('写真の右上の × で削除（確かめてから・改修後の同じ写真も）OK');
 
+// ---------------- 改修前を複製（ユーザーの指示「北九州のみ、改修前の写真を改修後の写真に複製する機能をつける」2026-10-29）：改修後の枠の下のボタン。
+//   改修後が改修前と同じ写真のままなら出さない。改修後を消したあとに押すと、改修前の写真が改修後に戻る
+{
+  const png = await page.evaluate(async () => {
+    const c = document.createElement('canvas');
+    [c.width, c.height] = [1200, 900];
+    const g = c.getContext('2d');
+    g.fillStyle = '#16a34a';
+    g.fillRect(0, 0, 1200, 900);
+    const b = await new Promise((r) => c.toBlob(r, 'image/png'));
+    return [...new Uint8Array(await b.arrayBuffer())];
+  });
+  const [ch] = await Promise.all([page.waitForEvent('filechooser'), board.getByRole('button', {name: '①玄関 改修前', exact: true}).click()]);
+  await ch.setFiles([{name: 'before2.png', mimeType: 'image/png', buffer: Buffer.from(png)}]);
+  await board.getByRole('button', {name: '①玄関 改修後に書き込む', exact: true}).waitFor();
+  const copy = board.getByRole('button', {name: '改修前を複製'});
+  assert.equal(await copy.count(), 0); // 同じ写真が入っているので出さない
+  await board.getByRole('button', {name: '①玄関 改修後の写真を削除', exact: true}).click();
+  assert.equal(dialogs.at(-1), 'この写真を削除しますか？');
+  await copy.waitFor();
+  assert.equal(await board.getByRole('button', {name: '①玄関 改修前に書き込む', exact: true}).count(), 1); // 改修前は残る
+  await page.locator('[aria-label="①玄関の写真"]').screenshot({path: path.join(outDir, 'kitakyushu-4c-copy-button.png')});
+  const before = dialogs.length;
+  await copy.click();
+  assert.equal(dialogs.length, before); // 改修後が空なら確かめない
+  await board.getByRole('button', {name: '①玄関 改修後に書き込む', exact: true}).waitFor();
+  assert.equal(await copy.count(), 0);
+  const srcs = await board.locator('[aria-label="①玄関の写真"] img').evaluateAll((els) => els.map((e) => e.getAttribute('src')));
+  assert.equal(srcs.length, 2);
+  assert.equal(srcs[0], srcs[1], '改修前と改修後が同じ写真でない');
+  // 行橋市には出さない（北九州市だけ）
+  await page.getByRole('combobox', {name: '保険者', exact: true}).selectOption('yukuhashi');
+  await board.getByRole('button', {name: '①玄関 改修後の写真を削除', exact: true}).click();
+  await board.getByRole('button', {name: '①玄関 改修後に書き込む', exact: true}).waitFor({state: 'detached'});
+  assert.equal(await copy.count(), 0);
+  await page.getByRole('combobox', {name: '保険者', exact: true}).selectOption('kitakyushu');
+  await copy.waitFor();
+}
+log('改修前を複製（北九州市だけ・改修後が同じ写真なら出さない・押すと改修後に同じ写真）OK');
+
 // ---------------- スマホの幅でも横にはみ出さない
 await page.setViewportSize({width: 390, height: 844});
 await page.waitForTimeout(500);

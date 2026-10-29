@@ -28,7 +28,7 @@ import type {EstimateRates} from '../calc.ts';
 import {Btn, DropArea, DropOverlay, Modal, pastedFiles, useFileDragging, useToast} from '../components/ui.tsx';
 import {circled, photoNumbers, swapPhotoNumbers} from '../estimateForms.ts';
 import {cleanEdit, normRot, turn} from '../photoEdit.ts';
-import {afterMirrors, pairJob, pairsPhotos} from '../photoPair.ts';
+import {afterMirrors, copyBeforeToAfter, pairJob, pairsPhotos} from '../photoPair.ts';
 import {marksBetween, photoBounds, turnMarks} from '../photoMarks.ts';
 import {composeTiles, getPhotos, photoTakenDate, preparePhoto, putPhoto, rememberPhotoUrl, usePhotoUrls} from '../photos.ts';
 import {bestTiling, MAX_TILES} from '../photoTile.ts';
@@ -330,7 +330,9 @@ export function usePhotoActions(job: Job, setJobRaw: (fn: (j: Job) => Job) => vo
     e.stopPropagation();
     if (e.dataTransfer.files.length) void put([...e.dataTransfer.files], target);
   };
-  return {put, add, swap, remove, drop, setDate, setNote, setEdit, setMarks, swapPlaces, busy, ordering};
+  /** 北九州市：改修前の写真を改修後に複製する（「改修前を複製」。photoPair.ts の copyBeforeToAfter） */
+  const copyBefore = (placeId: string) => setJob((j) => ({...j, places: j.places.map((p) => (p.id === placeId ? copyBeforeToAfter(p) : p))}));
+  return {put, add, swap, remove, drop, setDate, setNote, setEdit, setMarks, swapPlaces, copyBefore, busy, ordering};
 }
 
 /** 貼る順番を選ぶ画面に出すもの：写真（画面の URL・ファイルの名前）・入る枠の名前（1枚目から）・選び終わったとき */
@@ -569,6 +571,15 @@ export function PhotoBoard({
     if (!selected || !window.confirm('選んでいる写真を削除しますか？')) return;
     actions.remove(selected);
     setSelected(null);
+  };
+  // 北九州市（改修前と改修後に同じ写真を入れ、改修後に線を書き込む）：改修後の枠の下の「改修前を複製」
+  // （ユーザーの指示「北九州のみ、改修前の写真を改修後の写真に複製する機能をつける」2026-10-29）。改修後に別の写真・書き込みがあるときは確かめてから置きかえる
+  const pairs = pairsPhotos(job);
+  const copyFromBefore = (place: Place) => {
+    const marked = !!place.photoMarks?.after?.length;
+    if (place.photos?.after && !window.confirm(marked ? '改修後の写真を改修前の写真に置きかえますか？（改修後の書き込みは消えます）' : '改修後の写真を改修前の写真に置きかえますか？')) return;
+    actions.copyBefore(place.id);
+    setSelected((cur) => (cur && cur.placeId === place.id && cur.slot === 'after' ? null : cur));
   };
   // 写真の右上の × ：その枠の写真を削除（確かめてから。ユーザーの指示「一度貼り付けた写真をけせるように。小さくバツマーク右隅に」2026-10-29）。
   // 北九州市で改修後が改修前をそのまま写したものなら、改修後の同じ写真も一緒に消える（photoPair.ts）ので、そのことも聞く
@@ -925,6 +936,19 @@ export function PhotoBoard({
                                 </button>
                               )}
                             </div>
+                            {/* 北九州市：改修前の写真を改修後に複製（改修後の枠の下。改修後が改修前と同じ写真のままなら出さない。copyFromBefore） */}
+                            {slot === 'after' && pairs && place.photos?.before && !afterMirrors(place) && (
+                              <Btn
+                                small
+                                color="white"
+                                data-no-drag
+                                className="mt-1 w-full touch:min-h-10 touch:text-sm"
+                                title="改修前の写真を改修後に複製する（線を書き込んでイメージ図に）"
+                                onClick={() => copyFromBefore(place)}
+                              >
+                                改修前を複製
+                              </Btn>
+                            )}
                             {dates && (
                               // 日付が切れないように、「改修前撮影日」「改修後撮影日」は欄の上・日付の欄は枠の幅いっぱい。直すと全部の写真の同じ撮影日が同じ日に
                               <label data-no-drag className="mt-1 block text-[11px] text-slate-600">
