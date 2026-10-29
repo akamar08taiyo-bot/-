@@ -16,6 +16,7 @@ import {placeFromDims, withBrackets} from '../cutLink.ts';
 import {manualRow, newPlace} from '../rows.ts';
 import {usePhotoUrls} from '../photos.ts';
 import {turn} from '../photoEdit.ts';
+import {INSURER_AREAS, INSURER_GROUP, insurerNoOf} from '../insurerNumbers.ts';
 import {photoBounds} from '../photoMarks.ts';
 import {costIsTotal, estimateLength, insuredBoxes, kindNamesOf, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
@@ -38,14 +39,14 @@ import {JobHeader, JobTitle, RemoveJobButton} from './JobHeader.tsx';
 /** 欄の順番：保険者ごとの申請書の上からの順番（原本を見て決めた。みやこ町・広域連合は承認の申請書の順番で、支給申請書だけの着工日・完成日は最後）。
  *  ただし被保険者氏名はどの保険者もフリガナのすぐ下（ユーザーの指示「ふりがなの下に、名前をもってくる」、2026-10-21。苅田町・みやこ町は原本では番号が先） */
 const FIELDS: Record<Insurer, Field[]> = {
-  kanda: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'planNote', 'dates', 'cost'],
-  yukuhashi: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'planNote', 'dates', 'cost'],
-  miyako: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'planNote', 'cost', 'renovated', 'dates'],
-  kouiki: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'planNote', 'cost', 'renovated', 'dates'], // 郵便番号はユーザーの指示で足した（2026-10-21）
+  kanda: ['kana', 'name', 'insuredNo', 'insurerNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'planNote', 'dates', 'cost'],
+  yukuhashi: ['kana', 'name', 'insuredNo', 'insurerNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'planNote', 'dates', 'cost'],
+  miyako: ['kana', 'name', 'insuredNo', 'insurerNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'planNote', 'cost', 'renovated', 'dates'],
+  kouiki: ['kana', 'name', 'insuredNo', 'insurerNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'planNote', 'cost', 'renovated', 'dates'], // 郵便番号はユーザーの指示で足した（2026-10-21）
   // 福岡市：性別・郵便番号・要介護状態区分の欄はない。着工日・完成日は完了届出書（工事のあと）
-  fukuoka: ['kana', 'name', 'insuredNo', 'birth', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'planNote', 'cost', 'dates'],
+  fukuoka: ['kana', 'name', 'insuredNo', 'insurerNo', 'birth', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'planNote', 'cost', 'dates'],
   // 北九州市：生年月日・性別・要介護状態区分の欄はない。フリガナ・着工日・完成日は支給申請書（工事のあと）。工事費見積金額は介護保険の対象分（市の記入例）
-  kitakyushu: ['kana', 'name', 'insuredNo', 'zip', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'planNote', 'cost', 'dates'],
+  kitakyushu: ['kana', 'name', 'insuredNo', 'insurerNo', 'zip', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'planNote', 'cost', 'dates'],
 };
 // 負担割合は要介護状態区分のすぐ下（みやこ町・広域連合は電話番号の下）。申請書の原本に欄はないが、委任状の保険給付額・見積書の介護保険の内訳に使い、
 // 特定福祉用具の負担割合と同じ値（どちらで選んでも両方に入る。tokuteiLink.ts）。ユーザーの指示「住宅改修の申請書にも負担割合を設置。住宅改修⇔特定福祉用具などで連動して数字に繋げる」2026-10-28
@@ -65,6 +66,7 @@ function label(f: Field, i: Insurer): string {
     kana: 'フリガナ',
     name: '被保険者氏名',
     insuredNo: '被保険者番号',
+    insurerNo: '保険者番号',
     birth: '生年月日',
     gender: '性別',
     zip: '郵便番号',
@@ -308,6 +310,32 @@ export function ShinseiEditor({
             </span>
           </>
         );
+      case 'insurerNo': {
+        // 保険者番号：保険者の市町村・区から選ぶ（広域連合は構成市町村、福岡市・北九州市は区。ユーザーの指示「保険者を選択できる項目を入力欄に入れる」
+        // 「他の保険者も同様の仕様にする」2026-10-29）。初めは住所から。介護保険証から読んだ一覧にない番号もそのまま出す
+        const ins = jobInsurer(job);
+        const areas = ins ? INSURER_AREAS[ins] : [];
+        const cur = insurerNoOf(ins, job.address, info.insurerNo);
+        const odd = cur && !areas.some((a) => a.no === cur);
+        return (
+          <select
+            value={cur}
+            onChange={(e) => setInfo({insurerNo: e.target.value})}
+            disabled={areas.length < 2 && !odd}
+            className="h-10 w-full max-w-md rounded-md border border-slate-300 bg-white px-2 text-base disabled:bg-slate-50 disabled:text-slate-700"
+            aria-label="保険者番号"
+            data-nav
+          >
+            {!cur && <option value="">選んでください</option>}
+            {odd && <option value={cur}>{cur}（介護保険証の番号）</option>}
+            {areas.map((a) => (
+              <option key={a.no} value={a.no}>
+                {a.no}　{ins === 'kouiki' ? `${a.name}（${INSURER_GROUP.kouiki}）` : ins === 'fukuoka' || ins === 'kitakyushu' ? `${INSURER_GROUP[ins]} ${a.name}` : a.name}
+              </option>
+            ))}
+          </select>
+        );
+      }
       case 'birth':
         return (
           <>

@@ -12,6 +12,7 @@ import type {EstimateRates, EstimateSettings} from './calc.ts';
 import {careAmounts} from './careLines.ts';
 import {BASE_PLATE} from './cutLink.ts';
 import {circled, eraOf, jobInsurer, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa, shinseiKindNames} from './estimateForms.ts';
+import {insurerNoOf} from './insurerNumbers.ts';
 import {clampOff, clampScale, normRot} from './photoEdit.ts';
 import {BOARD_PTS, lineEnds, MARK_INSET, photoBounds, shapeBox} from './photoMarks.ts';
 import {textEm} from './print/fit.ts';
@@ -32,7 +33,7 @@ export type ShinseiSheet = {
   // 改修の種類（①手すりの取り付け〜⑤便器の取替）ごとに1つの欄（福岡市の「改修の内容」の5行）：その種類の改修の内容の行。⑥付帯工事の行は最初に書いた種類の欄に足す。
   // 何か書いたら、書かない種類の欄は「－」（福岡市の記載例と同じ）
   kindCells?: string[];
-  insurerNo?: string[]; // 保険者番号の6マス（福岡市。保険証から読んだ番号、なければ住所の区から。fukuokaInsurerNo）
+  insurerNo?: string[]; // 保険者番号の6マス（福岡市・広域連合。選んだ番号・保険証から読んだ番号、なければ住所から。insurerNumbers.ts）
   // 改修の種類ごとの行の□（北九州市の事前届出書「□手すり取付」と、その行の「□玄関・屋外　□廊下・階段…」「□洗面脱衣室　□その他（　）」）：
   // その種類の箇所があれば種類の□を■に、箇所の□を■に（一覧にない箇所は「□その他」を■にして、other の欄に名前）。detail は付帯工事の具体的な工事内容
   kindRows?: {kind: string; places?: string[]; other?: string; detail?: string}[];
@@ -430,6 +431,8 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
         name: 'J6',
         address: 'J10',
         insuredNo: boxes('X', 10, 7),
+        // 保険者番号（原本は 406470＝築上町。構成市町村ごとに番号がちがうので、選んだ番号で書きかえる。ユーザーの指示 2026-10-29）
+        insurerNo: boxes('AB', 6, 5),
         marks: [GENDER('AB8'), RENOVATED('Y22')],
         texts: [
           T('J5', '{kana}'),
@@ -446,6 +449,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
         name: 'J6',
         address: 'J10',
         insuredNo: boxes('X', 10, 7),
+        insurerNo: boxes('AB', 6, 5),
         marks: [GENDER('AB8'), RENOVATED('X16')],
         texts: [
           T('J5', '{kana}'),
@@ -459,7 +463,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
           T('J18', '{reasonOffice}　{reasonName}'), // 理由書作成者名及び事業所名（前の申請の書き方：事業所名　氏名）
         ],
       },
-      {sheet: '様式第2号別紙（住宅改修内訳明細書）', name: 'I6', insuredNo: boxes('W', 10, 7), kinds: KIND_ROWS, texts: [T('I5', '{kana}')]},
+      {sheet: '様式第2号別紙（住宅改修内訳明細書）', name: 'I6', insuredNo: boxes('W', 10, 7), insurerNo: boxes('AA', 6, 5), kinds: KIND_ROWS, texts: [T('I5', '{kana}')]},
       // 前の申請と同じく、平面図の下にテキストボックス。平面図の図は表題（A1:I4）とテキストボックスのあいだ（印刷の1ページの幅＝A〜H）
       {sheet: '平面図 (2)', name: 'A1', nameFormat: '　{name}　様　邸　平面図', legend: {box: 'B37:H52'}, plan: 'A6:H35'},
       ...KOUIKI_PHOTO_SHEETS.map((sheet) => ({sheet, ...PHOTO_SHEET})),
@@ -585,7 +589,7 @@ export type ShinseiValues = {
   name: string;
   address: string;
   insuredNo: string;
-  insurerNo: string; // 保険者番号（6けた。福岡市の申請書。保険証から読んだ番号、なければ住所の区から）
+  insurerNo: string; // 保険者番号（6けた。福岡市・広域連合の申請書のマス。選んだ番号・保険証から読んだ番号、なければ住所の市町村・区から）
   works: string[];
   kinds: ShinseiKind[];
   photos: Record<number, string>; // 写真番号 → 改修場所（写真貼付用紙の改修箇所）
@@ -875,7 +879,8 @@ export function shinseiValues(job: Job, s: EstimateSettings & BuilderSettings, t
     name: job.customer.trim(),
     address: job.address.trim(),
     insuredNo: job.insuredNo,
-    insurerNo: cardInsurer.length === 6 ? cardInsurer : fukuokaInsurerNo(job.address),
+    // 選んだ保険者番号（介護保険証から読んだ番号も）、なければ住所の市町村・区から（insurerNumbers.ts。福岡市は区・広域連合は構成市町村）
+    insurerNo: insurerNoOf(jobInsurer(job), job.address, cardInsurer),
     works: shinseiWorks(job, s),
     legend: [...shinseiWorks(job, s), ...planNoteLines(info)],
     kinds,

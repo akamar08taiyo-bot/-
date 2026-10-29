@@ -86,6 +86,8 @@ export function readFromTokutei(data: unknown): {job: string; fields: Partial<To
   if (typeof f.insurer === 'string' && (INSURER_IDS as readonly string[]).includes(f.insurer)) out.insurer = f.insurer;
   if (f.burdenRatio === 1 || f.burdenRatio === 2 || f.burdenRatio === 3) out.burdenRatio = f.burdenRatio;
   if (typeof f.welfare === 'boolean') out.welfare = f.welfare;
+  // 保険者番号（6けた。特定福祉用具で選び直した番号。2026-10-29）
+  if (typeof f.insurerNo === 'string' && /^(\d{6})?$/.test(f.insurerNo)) out.insurerNo = f.insurerNo;
   return {job: o.job, fields: out};
 }
 
@@ -124,6 +126,7 @@ export function withTokuteiFields(job: Job, f: Partial<TokuteiFields>): Job {
   if (f.burdenRatio !== undefined) si.burden = String(f.burdenRatio) as ShinseiInfo['burden'];
   if (f.careOffice !== undefined) si.reasonOffice = f.careOffice;
   if (f.careManager !== undefined) si.reasonName = f.careManager;
+  if (f.insurerNo !== undefined) si.insurerNo = f.insurerNo;
   if (f.welfare !== undefined) {
     if (f.welfare) si.welfare = true;
     else delete si.welfare;

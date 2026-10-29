@@ -14,6 +14,7 @@ export type ShinseiField =
   | 'kana'
   | 'name'
   | 'insuredNo'
+  | 'insurerNo'
   | 'birth'
   | 'gender'
   | 'zip'
@@ -189,6 +190,7 @@ function fieldRefs(sheet: ShinseiSheet): {field: ShinseiField; ref: string}[] {
   if (sheet.name && !sheet.nameFormat) out.push({field: 'name', ref: sheet.name});
   if (sheet.address) out.push({field: 'address', ref: sheet.address});
   for (const ref of sheet.insuredNo ?? []) out.push({field: 'insuredNo', ref});
+  for (const ref of sheet.insurerNo ?? []) out.push({field: 'insurerNo', ref});
   if (sheet.works) out.push({field: 'works', ref: sheet.works});
   // 平面図の工事内容の欄（みやこ町。ほかの保険者はテキストボックス）：平面図に書く文字へ
   if (sheet.legend?.cell) out.push({field: 'planNote', ref: sheet.legend.cell});

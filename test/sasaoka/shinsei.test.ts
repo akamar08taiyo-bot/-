@@ -5,6 +5,7 @@ import {strFromU8, unzipSync, zipSync} from 'fflate';
 import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import {DEFAULT_PLACES, defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
+import {areaInsurerNo, INSURER_AREAS, insurerNoOf} from '../../src/sasaoka/insurerNumbers.ts';
 import {boxLabels, checkBoxes, fillShinsei, splitNumber, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, kindNamesOf, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
 import {KK_CELLS} from '../../src/sasaoka/shinsei/kitakyushuCells.ts';
 import {shinseiPreview} from '../../src/sasaoka/shinseiPreview.ts';
@@ -1498,4 +1499,43 @@ test('北九州市の原本：Word の様式から作ったシート（事前届
   // 原本は Word の様式の文字だけ（記入例・前の申請の名前は入っていない）
   for (const [name, xml] of byName) assert.doesNotMatch(xml, /太郎|花子|記入例|記載例/, name);
   assert.ok(!Object.keys(files).some((k) => k.startsWith('xl/media/')));
+});
+
+test('保険者番号（ユーザーの指示「広域連合の場合は、築上町・豊前市・上毛町・吉富町…それぞれ保険者番号が違うため、保険者を選択できる項目を」2026-10-29）：住所の市町村・区から。選んだ番号が先', () => {
+  assert.equal(areaInsurerNo('kouiki', '福岡県豊前市大字八屋1-1'), '402149');
+  assert.equal(areaInsurerNo('kouiki', '福岡県築上郡上毛町大字見本1'), '406462');
+  assert.equal(areaInsurerNo('kouiki', '築上郡吉富町見本1'), '406421');
+  assert.equal(areaInsurerNo('kouiki', '福岡県築上郡築上町見本1'), '406470');
+  assert.equal(areaInsurerNo('kouiki', '福岡県田川郡川崎町見本1'), '406058');
+  assert.equal(areaInsurerNo('kouiki', ''), '406470'); // 分からなければ原本の番号（築上町）
+  assert.equal(areaInsurerNo('kitakyushu', '福岡県北九州市八幡東区見本1-1'), '401083');
+  assert.equal(areaInsurerNo('kitakyushu', '北九州市小倉南区見本1'), '401075');
+  assert.equal(areaInsurerNo('kitakyushu', '行橋市中央1-1'), '');
+  assert.equal(areaInsurerNo('fukuoka', '中央区天神1-1'), '401331');
+  assert.equal(areaInsurerNo('yukuhashi', ''), '402131');
+  assert.equal(areaInsurerNo('miyako', ''), '406256');
+  assert.equal(areaInsurerNo('kanda', ''), '406215');
+  assert.equal(insurerNoOf('kouiki', '福岡県豊前市八屋1', '406421'), '406421'); // 選んだ番号（保険証の番号）が先
+  assert.equal(insurerNoOf('kouiki', '福岡県豊前市八屋1', '4064'), '402149'); // 6けたでなければ住所から
+  assert.equal(insurerNoOf('kitakyushu', '北九州市小倉北区見本1', '406462'), '401067'); // ほかの保険者（広域連合）の番号は使わない
+  assert.equal(insurerNoOf('kitakyushu', '北九州市小倉北区見本1', '442012'), '442012'); // 一覧にない番号（保険証の番号）はそのまま
+  // 福岡市の区の番号は、4013＋区の番号＋検証番号と同じ。どの番号も6けため（検証番号）が合う
+  for (const a of INSURER_AREAS.fukuoka) assert.equal(fukuokaInsurerNo(`福岡市${a.name}見本1`), a.no);
+  for (const list of Object.values(INSURER_AREAS)) for (const a of list) assert.equal(insurerCheckDigit(a.no.slice(0, 5)), Number(a.no[5]), `${a.name} ${a.no}`);
+});
+
+test('広域連合の申請書（様式第2号・第7号・第2号別紙）の保険者番号のマス：原本の 406470 を、選んだ・住所の市町村の番号で書きかえる', () => {
+  const j = job({insurer: 'kouiki', address: '福岡県豊前市大字八屋1-1'});
+  const digits = (bytes: Uint8Array, name: string, cols: string[]) => {
+    const sh = sheets(bytes).byName.get(name)!;
+    return cols.map((c) => cell(sh, `${c}5`).match(/<v>(\d)<\/v>|<t[^>]*>(\d)<\/t>/)?.slice(1).find(Boolean) ?? '').join('');
+  };
+  const AB = ['AB', 'AC', 'AD', 'AE', 'AF', 'AG'];
+  const AA = ['AA', 'AB', 'AC', 'AD', 'AE', 'AF'];
+  const out = fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(j, RATES));
+  assert.equal(digits(out, '様式第2号（住宅改修承認申請書）', AB), '402149');
+  assert.equal(digits(out, '様式第7号（住宅改修費支給申請書（受領委任払用）', AB), '402149');
+  assert.equal(digits(out, '様式第2号別紙（住宅改修内訳明細書）', AA), '402149');
+  const picked = fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues({...j, shinsei: {...NO_SHINSEI, insurerNo: '406462'}}, RATES));
+  assert.equal(digits(picked, '様式第2号（住宅改修承認申請書）', AB), '406462');
 });
