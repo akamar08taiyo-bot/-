@@ -76,7 +76,8 @@ type Drag =
 type Menu = {name: 'fill' | 'line' | 'color' | 'size' | 'font' | 'front' | 'back' | 'rotate'; x: number; y: number} | {name: 'context'; x: number; y: number; on: boolean};
 
 /** 図形の挿入のボタン（Excel の「図形」の線・四角形・基本図形の並び） */
-// 手書きのペン・補強板・番号（ユーザーの指示「写真に、手書きなので、線を引ける機能…ベースプレート、木の補強板…四角の斜め」「平面図の中に、①②のように番号を」2026-10-29）
+// 手書きのペン・番号（ユーザーの指示「写真に、手書きなので、線を引ける機能…」「平面図の中に、①②のように番号を」2026-10-29）。
+// 補強板（茶色の四角と斜めの線）の道具はユーザーの指示「茶色の斜線の…機能は不要」2026-10-29 で外した（前に描いた補強板は今までどおり出す・選んで動かせる）
 const TOOLS: {key: Tool; label: string}[] = [
   {key: 'pen', label: 'ペン（手書き。長押しでまっすぐ・ぐしゃぐしゃで消す）'},
   {key: 'poly', label: '折れ線（押すたびに角。ダブルクリック・Enter で終わる）'},
@@ -87,7 +88,6 @@ const TOOLS: {key: Tool; label: string}[] = [
   {key: 'arrow2', label: '双方向矢印'},
   {key: 'rect', label: '正方形/長方形'},
   {key: 'ellipse', label: '楕円'},
-  {key: 'board', label: '補強板（四角と斜めの線）'},
   {key: 'text', label: 'テキスト ボックス'},
   {key: 'num', label: '番号（①②…。押すたびに次の番号）'},
   // ユーザーの指示「消しゴム機能をつける」2026-10-29。Excel の「描画」の消しゴム（ストローク）と同じく、なぞった線・図形を1つずつまるごと消す
@@ -108,7 +108,7 @@ const TOOL_KEY = 'taiyo-sasaoka-mark-tool-v1'; // この端末で最後に使っ
 function loadTool(): Tool {
   try {
     const t = localStorage.getItem(TOOL_KEY) as Tool | null;
-    return t && KEEP_TOOL.has(t) ? t : 'line';
+    return t && KEEP_TOOL.has(t) && TOOLS.some((x) => x.key === t) ? t : 'line'; // 外した道具（補強板）を覚えていたら直線
   } catch {
     return 'line';
   }
@@ -342,6 +342,17 @@ function Icon({name, color}: {name: string; color?: string}) {
       return <svg {...s}><rect x="7.5" y="7.5" width="10" height="10" strokeDasharray="2 1.5" /><rect x="2.5" y="2.5" width="9" height="9" fill="#e2e8f0" /></svg>;
     case 'rotate':
       return <svg {...s}><path d="M15 6 A6.5 6.5 0 1 0 16.5 11" /><path d="M15.5 2.5 L15.3 6.3 L11.6 5.6" /></svg>;
+    case 'turnLeft':
+    case 'turnRight':
+      // 写真を回す：写真（山の絵の四角）と、上を回る太い矢印（前の ↺ ↻ の字だけでは分かりにくかった）。左へ回すは左右を反転
+      return (
+        <svg {...s} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={name === 'turnLeft' ? {transform: 'scaleX(-1)'} : undefined}>
+          <rect x="3" y="9.5" width="12" height="8.5" rx="1" />
+          <path d="M4.5 16.5 L8 13 L10.3 15.2 L11.8 13.8 L13.5 16.5" strokeWidth={1.3} />
+          <path d="M3.5 7.5 C5 3 12 1.5 16 5.5" strokeWidth={2} />
+          {arrow(17.2, 8, 0.6, 1)}
+        </svg>
+      );
     case 'delete':
       return <svg {...s}><path d="M4 6 H16 M8 6 V4 H12 V6 M6 6 L7 17 H13 L14 6" /></svg>;
     case 'eraser':
@@ -1713,13 +1724,17 @@ export function PhotoMarkEditor({
   const textCss: CSSProperties | undefined = editMark ? markTextCss(editMark, k) : undefined;
 
   // ---------------------------------------------------------------- 書式の欄のボタン（広い画面は全部を並べ、スマホは押すと開く）
+  // 写真を回す：上の帯の右（閉じるの右）に、戻る・進むと同じ形（絵と文字。スマホは絵の下に文字）。
+  // ユーザーの指示「写真回転がわかりづらい」2026-10-29（前は書式の欄の ↺ ↻ の字だけ）
   const rotateButtons = (
     <>
-      <button type="button" onClick={() => rotatePhoto(-1)} aria-label="写真を左に回す" className="flex h-10 shrink-0 touch-manipulation items-center gap-1 whitespace-nowrap rounded-md border border-slate-300 bg-white px-3 text-[15px] hover:bg-slate-50">
-        ↺<span className="max-md:hidden"> 左へ</span>
+      <button type="button" onClick={() => rotatePhoto(-1)} title="写真を左へ90°回す" aria-label="写真を左へ回す" className={`${UNDO_BTN} max-sm:w-[3.75rem]`}>
+        <Icon name="turnLeft" />
+        <span>左へ回す</span>
       </button>
-      <button type="button" onClick={() => rotatePhoto(1)} aria-label="写真を右に回す" className="flex h-10 shrink-0 touch-manipulation items-center gap-1 whitespace-nowrap rounded-md border border-slate-300 bg-white px-3 text-[15px] hover:bg-slate-50">
-        ↻<span className="max-md:hidden"> 右へ</span>
+      <button type="button" onClick={() => rotatePhoto(1)} title="写真を右へ90°回す" aria-label="写真を右へ回す" className={`${UNDO_BTN} max-sm:w-[3.75rem]`}>
+        <Icon name="turnRight" />
+        <span>右へ回す</span>
       </button>
     </>
   );
@@ -1824,10 +1839,10 @@ export function PhotoMarkEditor({
           </button>
           <div className="min-w-0 truncate px-2 text-base text-slate-700 max-sm:hidden">✏️ {title}</div>
         </div>
-        <button type="button" onClick={close} className="h-11 rounded-md border border-slate-300 bg-white px-8 text-base text-slate-700 hover:bg-slate-50 max-sm:px-6">
+        <button type="button" onClick={close} className="h-11 rounded-md border border-slate-300 bg-white px-8 text-base text-slate-700 hover:bg-slate-50 max-sm:px-5">
           閉じる
         </button>
-        <div />
+        <div className="flex min-w-0 items-center justify-end gap-1">{onRotate && rotateButtons}</div>
       </div>
       {/* リボン（Excel の「図形の書式」と同じ並び） */}
       <div className="border-b border-slate-200 bg-white">
@@ -1940,7 +1955,6 @@ export function PhotoMarkEditor({
         <aside aria-label="書式" className="flex shrink-0 gap-x-5 gap-y-4 border-slate-200 bg-white px-3 py-2 text-slate-700 max-md:flex-col max-md:border-b md:w-64 md:flex-col md:overflow-auto md:border-r">
           {/* 広い画面：まとまりごとに全部の色・太さを並べる */}
           <div className="contents max-md:hidden">
-            {onRotate && <PanelSection label="写真の向き">{rotateButtons}</PanelSection>}
             <PanelSection label="線の色">{lineColorButtons}</PanelSection>
             <PanelSection label="線の太さ">{lineWidthButtons}</PanelSection>
             <PanelSection label="線の種類">{dashButtons}</PanelSection>
@@ -1951,7 +1965,6 @@ export function PhotoMarkEditor({
               横にスクロールせずにも表示される位置に」2026-10-29）。押すと、その下に全部の色・太さが折り返して開く（選ぶと閉じる） */}
           <div className="md:hidden">
             <div className="flex items-center gap-1.5">
-              {onRotate && rotateButtons}
               <button type="button" aria-label="線の色を選ぶ" aria-expanded={phonePanel === 'line'} onClick={() => setPhonePanel((v) => (v === 'line' ? null : 'line'))} className={PHONE_PICK}>
                 <span aria-hidden className="h-6 w-6 shrink-0 rounded border border-slate-300" style={{background: lineValue ? `#${lineValue}` : 'white'}} />
                 色<span className="text-[11px] text-slate-500">▼</span>
