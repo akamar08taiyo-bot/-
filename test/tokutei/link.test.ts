@@ -6,7 +6,7 @@ import {pastReasons, reasonExamples} from '../../src/tokutei/reasons.ts';
 import {customerKey, customerPatch, frequentValues, newSale, pastCustomers, sameYearSales} from '../../src/tokutei/sales.ts';
 import type {Sale} from '../../src/tokutei/types.ts';
 import {ageOn, fiscalYearOf, parseDateText, warekiLabel, warekiOf} from '../../src/tokutei/wareki.ts';
-import {addressOfZip, zipCandidates, zipLabel} from '../../src/tokutei/zip.ts';
+import {addressOfZip, withoutDoubledHead, zipCandidates, zipLabel} from '../../src/tokutei/zip.ts';
 
 // 入力を1回にするための「連動」の部品（ユーザーの指示「入力できるところ、連動できる部分は徹底的に分析し、無駄を省けるようにする」）
 
@@ -49,6 +49,10 @@ test('住所から郵便番号（福岡県）。大字・郡は省いて書い�
   assert.equal(addressOfZip('800-0344'), '福岡県京都郡苅田町大字新津');
   assert.equal(addressOfZip('824-0000'), '福岡県行橋市'); // 以下に掲載がない場合：市町村まで
   assert.equal(addressOfZip('1000001'), '');
+  // 入った頭のうしろに住所を頭から打ち直したら、頭を外す（番地を足したときはそのまま）
+  assert.equal(withoutDoubledHead('福岡県行橋市行事福岡県行橋市中央1-1', '824-0001'), '福岡県行橋市中央1-1');
+  assert.equal(withoutDoubledHead('福岡県京都郡苅田町大字新津苅田町新津1-1', '800-0344'), '苅田町新津1-1');
+  assert.equal(withoutDoubledHead('福岡県行橋市大字流末1-1', '824-0043'), '福岡県行橋市大字流末1-1');
   // 入った住所の頭から〒に戻しても同じ番号
   assert.deepEqual(zipCandidates(addressOfZip('824-0043') + '1-1').map((h) => h.zip), ['824-0043']);
   assert.equal(zipLabel('８２４００４３'), '824-0043');

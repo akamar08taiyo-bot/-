@@ -101,7 +101,16 @@ try {
   await zipBox.fill('824-0005');
   await page.waitForTimeout(300);
   assert.equal(await addrBox.inputValue(), '福岡県行橋市大字流末1-1');
-  console.log('ok: 郵便番号を先に打つと住所の頭（福岡県行橋市大字流末）・打ち直し・番地を足したら替えない');
+  // 頭が入ったあとに、いつものように住所を頭から全部打っても、2回にならない
+  await addrBox.fill('');
+  await zipBox.fill('');
+  await zipBox.pressSequentially('8240001');
+  await page.waitForFunction(() => document.querySelector('[aria-label="住所"]')?.value === '福岡県行橋市行事', null, {timeout: 5000});
+  await addrBox.click();
+  await addrBox.press('End');
+  await addrBox.pressSequentially('福岡県行橋市中央1-1');
+  assert.equal(await addrBox.inputValue(), '福岡県行橋市中央1-1');
+  console.log('ok: 郵便番号を先に打つと住所の頭（福岡県行橋市大字流末）・打ち直し・番地を足したら替えない・頭から全部打っても2回にならない');
 
   // スマホの幅：リストが横にはみ出さない
   const phone = await browser.newContext({viewport: {width: 390, height: 844}, deviceScaleFactor: 2, hasTouch: true, isMobile: true, locale: 'ja-JP'});

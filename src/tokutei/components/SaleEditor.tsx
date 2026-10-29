@@ -13,7 +13,7 @@ import type {AppData, Sale, SaleItem, SaleStatus} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {todayIso, yen} from '../util.ts';
 import {fiscalYearOf} from '../wareki.ts';
-import {addressOfZip, isZipHead, zipCandidates, zipLabel} from '../zip.ts';
+import {addressOfZip, isZipHead, withoutDoubledHead, zipCandidates, zipLabel} from '../zip.ts';
 import {ESTIMATE_CAPACITY, ESTIMATE_LABEL, estimateNoteOverflow, estimateOverflow, estimatePreview} from '../estimateBook.ts';
 import type {EstimateField} from '../estimateBook.ts';
 import {saveEstimateBook, useEstimateTemplate} from '../print/estimateFiles.ts';
@@ -158,7 +158,9 @@ export function SaleEditor({
   const changeItem = (id: string, patch: Partial<SaleItem>) => change({items: sale.items.map((i) => (i.id === id ? {...i, ...patch} : i))});
 
   /** 住所を打つと、郵便番号が1つに決まれば入れる（郵便番号が空か、前に自動で入れた番号のとき） */
-  const changeAddress = (address: string) => {
+  const changeAddress = (typed: string) => {
+    // 郵便番号から入れた住所の頭のうしろに、住所を頭から打ち直したら、頭を外す（2回にしない）
+    const address = withoutDoubledHead(typed, sale.zip);
     const hits = zipCandidates(address);
     const zipNow = zipLabel(sale.zip);
     if (hits.length === 1 && (!zipNow || zipNow === autoZip.current)) {

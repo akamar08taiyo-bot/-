@@ -73,6 +73,27 @@ function isOaza(city: string, town: string): boolean {
   return !!oaza.get(city)?.has(town);
 }
 
+/** 郵便番号の市区町村（「京都郡苅田町」。福岡県の番号で、1つの市区町村に決まるときだけ。決まらなければ ''。住宅改修のアプリの zip.ts と同じ） */
+export function cityOfZip(zip: string): string {
+  const d = (zip || '').normalize('NFKC').replace(/\D/g, '');
+  if (d.length !== 7) return '';
+  const hit = cities().filter((c) => c.towns.some((t) => t.zip === d));
+  return hit.length === 1 ? hit[0].city : '';
+}
+
+/**
+ * 郵便番号から入れた住所の頭のうしろに、住所を頭から打ち直した（「福岡県…」「京都郡苅田町…」「苅田町…」）ときは、入れた頭を外す
+ * （いつものように住所を全部打つと「福岡県行橋市行事福岡県行橋市…」と2回になった。番地を足したときはそのまま。住宅改修のアプリの zip.ts と同じ）
+ */
+export function withoutDoubledHead(address: string, zip: string): string {
+  const head = addressOfZip(zip);
+  if (!head || !address.startsWith(head) || address.length === head.length) return address;
+  const rest = address.slice(head.length);
+  // 住所の頭が出る番号は、市区町村も1つに決まる（cityOfZip）。「京都郡苅田町」は「苅田町」とだけ打つこともある
+  const city = cityOfZip(zip);
+  return ['福岡県', city, city.replace(/^.+?郡/, '')].some((w) => w && rest.startsWith(w)) ? rest : address;
+}
+
 /** 郵便番号から入れたままの住所の頭か（県・市区町村・町域だけで、番地などを足していない。住宅改修のアプリの zip.ts と同じ） */
 export function isZipHead(address: string): boolean {
   return !!address && zipCandidates(address).some((h) => addressOfZip(h.zip) === address);
