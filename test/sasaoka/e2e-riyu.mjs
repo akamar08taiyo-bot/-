@@ -115,7 +115,8 @@ const sform = page.getByRole('form', {name: '申請書'});
 await sform.waitFor();
 assert.equal(await sform.getByLabel('被保険者氏名', {exact: true}).inputValue(), '見本　花子');
 assert.equal(await sform.getByLabel('被保険者番号', {exact: true}).inputValue(), '0000123456');
-assert.equal(await sform.getByLabel('郵便番号', {exact: true}).inputValue(), '824-0001');
+// 郵便番号（824-0001＝行事）から入った住所を、ちがう町（中央）の住所に打ちかえたので、郵便番号も中央の番号に（住所から郵便番号。2026-10-29）
+assert.equal(await sform.getByLabel('郵便番号', {exact: true}).inputValue(), '824-0005');
 // 申請書で住所を直すと理由書にも出る
 await sform.getByLabel('住所', {exact: true}).fill('福岡県行橋市中央2-2');
 await page.getByRole('tab', {name: '📄 理由書'}).click();
@@ -150,7 +151,7 @@ const cellText = (ref) => {
 const expect = {
   C6: '見本　花子',
   C9: '福岡県行橋市中央2-2',
-  E8: '824-0001',
+  E8: '824-0005',
   V4: '13年4月14日',
   AH4: '令和8年10月20日',
   S7: '令和7年4月1日～令和10年3月31日',
