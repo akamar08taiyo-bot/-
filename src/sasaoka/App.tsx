@@ -19,10 +19,11 @@ import {JobsPage} from './components/JobsPage.tsx';
 import {KitsPage} from './components/KitsPage.tsx';
 import {LaborPage} from './components/LaborPage.tsx';
 import {MaterialsPage} from './components/MaterialsPage.tsx';
+import {PhotoJumpButton, PhotoJumpCtx, PhotoJumpFab, scrollToPhotos} from './components/PhotoJump.tsx';
 import {SalesPlanPage} from './components/SalesPlanPage.tsx';
 import {SettingsPage} from './components/SettingsPage.tsx';
 import {TrashPage} from './components/TrashPage.tsx';
-import {ToastProvider} from './components/ui.tsx';
+import {ToastProvider, useTouchUi} from './components/ui.tsx';
 import {LABOR_REV} from './defaults.ts';
 import {EstimateEditor} from './estimate/EstimateEditor.tsx';
 import {EstimateHome, EstimateList, newEstimate} from './estimate/EstimateList.tsx';
@@ -93,6 +94,8 @@ function loadMonth(): string {
  * 同じ様邸の内容（氏名・住所・被保険者番号・改修の箇所・金額）なので、どれで直しても、ほかにすぐ出る。特定福祉用具申請書は、特定福祉用具のアプリをお客様の情報を渡して中に出す（TokuteiEditor.tsx）
  */
 function JobTabs({view, onView}: {view: JobView; onView: (v: JobView) => void}) {
+  // 携帯（md 未満）だけ、格子の理由書のとなりに「📷 写真へ」（写真の欄へ飛ぶ。タブではない。タブレットは JobHeader.tsx。PhotoJump.tsx）
+  const touch = useTouchUi();
   // ユーザーの指示「住宅改修申請書、工事見積書、特定福祉用具申請書、販売見積書の順にする」（2026-10-23）。理由書は最後
   const tabs: [JobView, string][] = [
     ['shinsei', '📝 住宅改修申請書'],
@@ -102,26 +105,31 @@ function JobTabs({view, onView}: {view: JobView; onView: (v: JobView) => void}) 
     ['riyu', '📄 理由書'],
   ];
   return (
-    // スマホ・タブレットの縦の幅では2つずつ並べる（5つ目の理由書は1段まるごと。1段にすると名前が折り返して読みにくい）。線はすき間（gap-px）から見える枠の色
-    <div
-      role="tablist"
-      aria-label="住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書"
-      className="grid w-full grid-cols-2 gap-px overflow-hidden rounded-lg border-2 border-[#14532d] bg-[#14532d] shadow-sm md:inline-flex md:w-auto md:gap-0 md:bg-white"
-    >
-      {tabs.map(([v, text]) => (
-        <button
-          key={v}
-          type="button"
-          role="tab"
-          aria-selected={view === v}
-          onClick={() => onView(v)}
-          // 広い画面は少し大きく（ユーザーの指示「このタブの部分をもう少し大きくする」2026-10-27）。md の幅は今の大きさのまま（大きくすると1段に入らない）
-          className={`whitespace-nowrap px-2 py-2 text-sm font-bold transition last:col-span-2 md:px-4 md:text-[15px] lg:px-5 lg:py-2.5 lg:text-[17px] ${view === v ? 'bg-[#14532d] text-white' : 'bg-white text-[#14532d] hover:bg-emerald-50'}`}
-        >
-          {text}
-        </button>
-      ))}
-    </div>
+    <>
+      {/* スマホ・タブレットの縦の幅では2つずつ並べる（5つ目の理由書は1段まるごと。1段にすると名前が折り返して読みにくい。「📷 写真へ」があるときは理由書のとなり）。
+          線はすき間（gap-px）から見える枠の色 */}
+      <div
+        data-job-tabs
+        role="tablist"
+        aria-label="住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書"
+        className="grid w-full grid-cols-2 gap-px overflow-hidden rounded-lg border-2 border-[#14532d] bg-[#14532d] shadow-sm md:inline-flex md:w-auto md:gap-0 md:bg-white"
+      >
+        {tabs.map(([v, text]) => (
+          <button
+            key={v}
+            type="button"
+            role="tab"
+            aria-selected={view === v}
+            onClick={() => onView(v)}
+            // 広い画面は少し大きく（ユーザーの指示「このタブの部分をもう少し大きくする」2026-10-27）。md の幅は今の大きさのまま（大きくすると1段に入らない）
+            className={`whitespace-nowrap px-2 py-2 text-sm font-bold transition ${v === 'riyu' && !touch ? 'col-span-2' : ''} md:px-4 md:text-[15px] lg:px-5 lg:py-2.5 lg:text-[17px] ${view === v ? 'bg-[#14532d] text-white' : 'bg-white text-[#14532d] hover:bg-emerald-50'}`}
+          >
+            {text}
+          </button>
+        ))}
+        <PhotoJumpButton className="bg-sky-50 px-2 py-2 text-sm md:hidden" />
+      </div>
+    </>
   );
 }
 
@@ -132,6 +140,8 @@ const isEmpty = (j: Job) =>
 export default function App({start}: {start: MainTab}) {
   const store = useStore();
   const newVersion = useNewVersion();
+  // 携帯・タブレットか（様邸の画面の右下の「📷 写真へ」を出す。PhotoJump.tsx）
+  const touch = useTouchUi();
   // URL に #tab=…&job=… があれば、そのタブ・見積書（様邸）を開く（前の版の #job=… は、最初のタブで開く）
   const [initial] = useState(readHash);
   const [tab, setTab] = useState<MainTab>(initial.tab ?? start);
@@ -360,6 +370,15 @@ export default function App({start}: {start: MainTab}) {
   // 「📦 まとめて保存」（どのタブからも同じ。BatchSave.tsx）。保存の前に、開いている特定福祉用具のタブの変更と、この様邸の変更を保存させる。
   // 5つのタブとも、上の段（JobHeader.tsx）の3段目の初め（「〇〇をExcelで保存・〇〇を印刷・削除」の真下。ユーザーの指示「…それ以外の独自の機能…は行を変えて、真下に統一して設置する」2026-10-28）
   const batch = estimateJob && <BatchSave job={estimateJob} s={data.settings} onBeforeSave={() => Promise.all([flushTokutei(), store.flush()])} />;
+  // 「📷 写真へ」（携帯・タブレット）：写真の欄は住宅改修申請書のタブにあるので、ほかのタブならそのタブに替えてから
+  const goPhotos = () => {
+    if (jobView === 'shinsei') scrollToPhotos();
+    else
+      leaveTokutei(() => {
+        setJobView('shinsei');
+        scrollToPhotos();
+      });
+  };
   const tabs = <JobTabs view={jobView} onView={(v) => leaveTokutei(() => setJobView(v))} />;
   // 見積書と請求書（仕切り計算表）を行き来する（同じ様邸を開く）
   const openEstimate = (id: string) => {
@@ -451,99 +470,102 @@ export default function App({start}: {start: MainTab}) {
           </nav>
         </header>
 
-        <main className={`no-print mx-auto min-w-0 px-3 py-4 sm:px-4 ${PAGE_WIDTH}`}>
-          {tab === 'estimate' &&
-            (estimateJob && jobView === 'order' && hasEstimateRows(estimateJob) ? (
-              <OrderPage key={estimateJob.id} job={estimateJob} data={data} update={store.update} onBack={() => setJobView('estimate')} onPrint={setPrint} />
-            ) : estimateJob && jobView === 'shinsei' ? (
-              <ShinseiEditor
-                key={estimateJob.id}
-                job={estimateJob}
-                data={data}
-                update={store.update}
-                onBack={() => {
-                  removeIfEmpty(estimateJob);
-                  setEstimateId(null);
-                  setJobView('estimate');
-                }}
-                tabs={tabs}
-                batch={batch}
-              />
-            ) : estimateJob && (jobView === 'tokutei' || jobView === 'hanbai') ? (
-              // 特定福祉用具申請書は申請書だけ、販売見積書は見積書だけを出す（同じ特定福祉用具の案件。申請書で入れた商品は見積書にも出る）
-              <TokuteiEditor
-                key={`${estimateJob.id}:${jobView}`}
-                job={estimateJob}
-                view={jobView === 'tokutei' ? 'shinsei' : 'quote'}
-                update={store.update}
-                settings={data.settings}
-                onBack={() =>
-                  leaveTokutei(() => {
+        <main className={`no-print mx-auto min-w-0 px-3 py-4 sm:px-4 touch:pb-20 ${PAGE_WIDTH}`}>
+          {/* 様邸の画面の「📷 写真へ」（携帯・タブレット。JobTabs・JobHeader.tsx の PhotoJumpButton）が飛ぶ先 */}
+          <PhotoJumpCtx.Provider value={goPhotos}>
+            {tab === 'estimate' &&
+              (estimateJob && jobView === 'order' && hasEstimateRows(estimateJob) ? (
+                <OrderPage key={estimateJob.id} job={estimateJob} data={data} update={store.update} onBack={() => setJobView('estimate')} onPrint={setPrint} />
+              ) : estimateJob && jobView === 'shinsei' ? (
+                <ShinseiEditor
+                  key={estimateJob.id}
+                  job={estimateJob}
+                  data={data}
+                  update={store.update}
+                  onBack={() => {
                     removeIfEmpty(estimateJob);
                     setEstimateId(null);
                     setJobView('estimate');
-                  })
-                }
-                tabs={tabs}
-                batch={batch}
-              />
-            ) : estimateJob && jobView === 'riyu' ? (
-              <RiyuEditor
-                key={estimateJob.id}
-                job={estimateJob}
-                data={data}
-                update={store.update}
-                onBack={() => {
-                  removeIfEmpty(estimateJob);
-                  setEstimateId(null);
-                  setJobView('estimate');
-                }}
-                tabs={tabs}
-                batch={batch}
-              />
-            ) : estimateJob ? (
-              <EstimateEditor
-                key={estimateJob.id}
-                job={estimateJob}
-                data={data}
-                update={store.update}
-                onBack={() => {
-                  removeIfEmpty(estimateJob);
-                  setEstimateId(null);
-                }}
-                onOpen={setEstimateId}
-                onOpenInvoice={openInvoice}
-                onOpenOrder={() => setJobView('order')}
-                tabs={tabs}
-                batch={batch}
-                onPrint={setPrint}
-                onSave={store.flush}
-                onManageKits={() => goMaster('kits')}
-              />
-            ) : estimateView === 'home' ? (
-              <EstimateHome
-                data={data}
-                update={store.update}
-                onNew={newOne}
-                onList={() => setEstimateView('list')}
-                onImported={showImported}
-                goMaterials={() => goMaster()}
-              />
-            ) : (
-              <EstimateList
-                data={data}
-                update={store.update}
-                month={estimateMonth}
-                setMonth={setEstimateMonth}
-                onOpen={openJob}
-                onOpenShinsei={openShinsei}
-                onNew={newOne}
-                onPrint={setPrint}
-                goMaterials={() => goMaster()}
-                onBack={() => setEstimateView('home')}
-                onImported={showImported}
-              />
-            ))}
+                  }}
+                  tabs={tabs}
+                  batch={batch}
+                />
+              ) : estimateJob && (jobView === 'tokutei' || jobView === 'hanbai') ? (
+                // 特定福祉用具申請書は申請書だけ、販売見積書は見積書だけを出す（同じ特定福祉用具の案件。申請書で入れた商品は見積書にも出る）
+                <TokuteiEditor
+                  key={`${estimateJob.id}:${jobView}`}
+                  job={estimateJob}
+                  view={jobView === 'tokutei' ? 'shinsei' : 'quote'}
+                  update={store.update}
+                  settings={data.settings}
+                  onBack={() =>
+                    leaveTokutei(() => {
+                      removeIfEmpty(estimateJob);
+                      setEstimateId(null);
+                      setJobView('estimate');
+                    })
+                  }
+                  tabs={tabs}
+                  batch={batch}
+                />
+              ) : estimateJob && jobView === 'riyu' ? (
+                <RiyuEditor
+                  key={estimateJob.id}
+                  job={estimateJob}
+                  data={data}
+                  update={store.update}
+                  onBack={() => {
+                    removeIfEmpty(estimateJob);
+                    setEstimateId(null);
+                    setJobView('estimate');
+                  }}
+                  tabs={tabs}
+                  batch={batch}
+                />
+              ) : estimateJob ? (
+                <EstimateEditor
+                  key={estimateJob.id}
+                  job={estimateJob}
+                  data={data}
+                  update={store.update}
+                  onBack={() => {
+                    removeIfEmpty(estimateJob);
+                    setEstimateId(null);
+                  }}
+                  onOpen={setEstimateId}
+                  onOpenInvoice={openInvoice}
+                  onOpenOrder={() => setJobView('order')}
+                  tabs={tabs}
+                  batch={batch}
+                  onPrint={setPrint}
+                  onSave={store.flush}
+                  onManageKits={() => goMaster('kits')}
+                />
+              ) : estimateView === 'home' ? (
+                <EstimateHome
+                  data={data}
+                  update={store.update}
+                  onNew={newOne}
+                  onList={() => setEstimateView('list')}
+                  onImported={showImported}
+                  goMaterials={() => goMaster()}
+                />
+              ) : (
+                <EstimateList
+                  data={data}
+                  update={store.update}
+                  month={estimateMonth}
+                  setMonth={setEstimateMonth}
+                  onOpen={openJob}
+                  onOpenShinsei={openShinsei}
+                  onNew={newOne}
+                  onPrint={setPrint}
+                  goMaterials={() => goMaster()}
+                  onBack={() => setEstimateView('home')}
+                  onImported={showImported}
+                />
+              ))}
+          </PhotoJumpCtx.Provider>
           {tab === 'invoice' &&
             (invoiceJob ? (
               <JobEditor
@@ -618,6 +640,8 @@ export default function App({start}: {start: MainTab}) {
               onPurged={() => setPurgeTick((n) => n + 1)}
             />
           )}
+          {/* 携帯・タブレットの様邸の画面：右下の「📷 写真へ」「↑ 上へ」（PhotoJump.tsx）。発注書の画面には出さない */}
+          {touch && tab === 'estimate' && estimateJob && jobView !== 'order' && <PhotoJumpFab onPhotos={goPhotos} />}
         </main>
       </div>
       {print && <PrintView request={print} data={data} onClose={() => setPrint(null)} />}

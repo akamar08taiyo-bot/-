@@ -1,5 +1,6 @@
 import {useLayoutEffect, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
+import {PhotoJumpButton} from '../components/PhotoJump.tsx';
 import {Btn, useToast} from '../components/ui.tsx';
 import type {Job, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
@@ -102,11 +103,14 @@ export function JobHeader({
   return (
     <div ref={top} className="flex flex-wrap items-center gap-2">
       <BackButton onClick={onBack} />
+      {/* 携帯・タブレットの「📷 写真へ」：タブレットの縦（md〜lg）は「← 一覧へ戻る」の右（スマホはタブの格子の中、タブレットの横は名前の右。PhotoJump.tsx） */}
+      <PhotoJumpButton className="hidden rounded-md bg-sky-50 px-4 py-2.5 text-[15px] shadow-sm ring-2 ring-sky-300 md:max-lg:inline-flex md:max-lg:items-center" />
       {tabs}
       {extra && <div className="max-lg:order-last max-sm:w-full max-sm:[&>button]:min-h-11 max-sm:[&>button]:w-full">{extra}</div>}
       <div ref={box} className="relative w-full space-y-2">
         <div ref={name} className="flex flex-wrap items-center gap-2 max-lg:justify-center lg:absolute lg:left-0 lg:top-0 lg:h-[2.625rem] lg:w-max">
           {title}
+          <PhotoJumpButton className="hidden rounded-md bg-sky-50 px-3 py-1.5 text-base shadow-sm ring-2 ring-sky-300 lg:inline-flex lg:items-center" />
         </div>
         <div ref={row1} role="group" aria-label="保存・印刷・削除" className={row} style={shift ? {marginLeft: shift.a} : undefined}>
           {primary}

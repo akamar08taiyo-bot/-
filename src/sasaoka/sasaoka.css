@@ -2,6 +2,10 @@
 @import 'tailwindcss' source(none);
 @source './';
 
+/* 指で使う画面（携帯・タブレット）だけに効く touch: のクラス（ユーザーの指示「携帯から見る場合とタブレットから見る場合のみにつけてほしい」2026-10-29）。
+   マウスのパソコンは pointer: fine・hover: hover なので効かない。同じ決まりを JS では ui.tsx の TOUCH_MEDIA・useTouchUi で見る */
+@custom-variant touch (@media (pointer: coarse), (hover: none));
+
 html,
 body {
   margin: 0;

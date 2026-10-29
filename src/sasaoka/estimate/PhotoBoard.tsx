@@ -602,7 +602,8 @@ export function PhotoBoard({
     <section
       ref={sectionRef}
       aria-label="写真"
-      className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
+      data-photo-board
+      className="scroll-mt-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
       onClickCapture={(e) => {
         if (swallowClick.current) {
           e.stopPropagation();
@@ -637,12 +638,13 @@ export function PhotoBoard({
             {selPlace.place.name}の{SLOT_LABEL[selected.slot]}
             ：入れ替える枠を押してください
           </span>
-          <Btn small color="white" onClick={() => pick(selected)}>
+          <Btn small color="white" className="touch:min-h-11 touch:px-4 touch:text-sm" onClick={() => pick(selected)}>
             差し替え
           </Btn>
           <Btn
             small
             color="white"
+            className="touch:min-h-11 touch:px-4 touch:text-sm"
             onClick={() => {
               actions.remove(selected);
               setSelected(null);
@@ -650,7 +652,7 @@ export function PhotoBoard({
           >
             削除
           </Btn>
-          <Btn small color="white" onClick={() => setSelected(null)}>
+          <Btn small color="white" className="touch:min-h-11 touch:px-4 touch:text-sm" onClick={() => setSelected(null)}>
             やめる
           </Btn>
         </div>
@@ -698,7 +700,7 @@ export function PhotoBoard({
                         type="button"
                         disabled={!prev}
                         onClick={() => prev && swapPlaces(place.id, prev.place.id)}
-                        className="h-8 w-8 shrink-0 touch-manipulation rounded-md border border-slate-300 bg-white text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-30"
+                        className="h-8 w-8 shrink-0 touch-manipulation rounded-md border border-slate-300 bg-white text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-30 touch:h-10 touch:w-10 touch:text-base"
                         title="前の写真番号と入れ替え"
                         aria-label={prev ? `${circled(no)}${place.name}と${circled(prev.no)}${prev.place.name}を入れ替える` : '前の写真番号なし'}
                       >
@@ -708,7 +710,7 @@ export function PhotoBoard({
                         type="button"
                         disabled={!next}
                         onClick={() => next && swapPlaces(place.id, next.place.id)}
-                        className="h-8 w-8 shrink-0 touch-manipulation rounded-md border border-slate-300 bg-white text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-30"
+                        className="h-8 w-8 shrink-0 touch-manipulation rounded-md border border-slate-300 bg-white text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-30 touch:h-10 touch:w-10 touch:text-base"
                         title="次の写真番号と入れ替え"
                         aria-label={next ? `${circled(no)}${place.name}と${circled(next.no)}${next.place.name}を入れ替える` : '次の写真番号なし'}
                       >
@@ -777,7 +779,7 @@ export function PhotoBoard({
                                   type="button"
                                   data-no-drag
                                   onClick={() => actions.setEdit(key, turn(edit, 1), photo ?? undefined)}
-                                  className="absolute right-1 top-1 flex h-8 w-8 touch-manipulation items-center justify-center rounded-full bg-white/90 text-lg leading-none text-slate-700 shadow ring-1 ring-slate-300 hover:bg-white hover:text-emerald-700"
+                                  className="absolute right-1 top-1 flex h-8 w-8 touch-manipulation items-center justify-center rounded-full bg-white/90 text-lg touch:h-10 touch:w-10 touch:text-xl leading-none text-slate-700 shadow ring-1 ring-slate-300 hover:bg-white hover:text-emerald-700"
                                   title="右に回す"
                                   aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}を右に回す`}
                                 >
@@ -790,7 +792,7 @@ export function PhotoBoard({
                                   type="button"
                                   data-no-drag
                                   onClick={() => onMark(key)}
-                                  className="absolute right-10 top-1 flex h-8 w-8 touch-manipulation items-center justify-center rounded-full bg-white/90 text-base leading-none text-slate-700 shadow ring-1 ring-slate-300 hover:bg-white hover:text-emerald-700"
+                                  className="absolute right-10 top-1 flex h-8 w-8 touch-manipulation items-center justify-center rounded-full bg-white/90 text-base touch:right-12 touch:h-10 touch:w-10 touch:text-lg leading-none text-slate-700 shadow ring-1 ring-slate-300 hover:bg-white hover:text-emerald-700"
                                   title="写真に書き込む"
                                   aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}に書き込む`}
                                 >
@@ -806,7 +808,7 @@ export function PhotoBoard({
                                   type="date"
                                   value={place.photoDates?.[slot] || photoDay(job, rates, slot)}
                                   onChange={(e) => actions.setDate(slot, e.target.value)}
-                                  className="mt-0.5 block h-7 w-full min-w-0 rounded border border-slate-300 px-1 text-xs text-slate-800"
+                                  className="mt-0.5 block h-7 w-full min-w-0 rounded border border-slate-300 px-1 text-xs text-slate-800 touch:h-9 touch:text-sm"
                                   aria-label={`${circled(no)}${place.name} ${SLOT_LABEL[slot]}撮影日`}
                                 />
                               </label>

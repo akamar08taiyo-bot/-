@@ -306,6 +306,16 @@ function subscribeDrag(fn: () => void) {
   };
 }
 
+/** 指で使う画面（携帯・タブレット）か。sasaoka.css の touch: のクラスと同じ決まり（マウスのパソコンは false） */
+export const TOUCH_MEDIA = '(pointer: coarse), (hover: none)';
+const subscribeTouch = (fn: () => void) => {
+  if (typeof matchMedia !== 'function') return () => undefined;
+  const m = matchMedia(TOUCH_MEDIA);
+  m.addEventListener('change', fn);
+  return () => m.removeEventListener('change', fn);
+};
+export const useTouchUi = () => useSyncExternalStore(subscribeTouch, () => typeof matchMedia === 'function' && matchMedia(TOUCH_MEDIA).matches, () => false);
+
 /** ファイル（エクスプローラーの写真・画像など）を画面の上でドラッグしているか（落とせる所をみな目立たせる） */
 export const useFileDragging = () => useSyncExternalStore(subscribeDrag, () => fileDragging, () => false);
 
