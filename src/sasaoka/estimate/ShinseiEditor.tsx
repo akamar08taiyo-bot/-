@@ -506,7 +506,7 @@ export function ShinseiEditor({
         primary={
           <>
             <Btn color="softGreen" onClick={save} disabled={!canMakeShinsei(insurer)}>
-              📗 申請書をExcelで保存
+              <span>📗 申請書を<span className="whitespace-nowrap">Excelで保存</span></span>
             </Btn>
             <Btn color="softSky" onClick={() => setPrinting(true)} disabled={!canMakeShinsei(insurer) || !pages?.length}>
               🖨 申請書を印刷

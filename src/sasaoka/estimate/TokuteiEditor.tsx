@@ -158,7 +158,7 @@ export function TokuteiEditor({
           primary={
             <>
               <Btn color="softGreen" onClick={() => cmd('excel')}>
-                📗 {book}をExcelで保存
+                <span>📗 {book}を<span className="whitespace-nowrap">Excelで保存</span></span>
               </Btn>
               <Btn color="softSky" onClick={() => cmd('print')}>
                 🖨 {book}を印刷

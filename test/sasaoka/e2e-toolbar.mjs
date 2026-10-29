@@ -93,6 +93,13 @@ for (const width of [1366, 1600, 390]) {
     // 3段目は2段目の真下（同じまん中）
     assert.ok(m.r2.y >= m.r1.y + m.r1.h - 1, `${width} ${t.tab} 3段目が2段目の下にない`);
     assert.ok(Math.abs(m.c1 - m.c2) < 2 || m.r2.w > m.r1.w, `${width} ${t.tab} 3段目のまん中 ${m.c1} ${m.c2}`);
+    if (width === 390) {
+      // スマホは同じ幅の2列（ユーザーの指示「携帯で見た時のボタンの配置…ガタガタして、若干ずれている」2026-10-29）：ボタンはどれも同じ幅、左の端は2つの列か、奇数の最後はまん中
+      const all = [...m.b1, ...m.b2];
+      assert.ok(all.every((b) => Math.abs(b.w - all[0].w) <= 1), `${width} ${t.tab} ボタンの幅 ${all.map((b) => Math.round(b.w))}`);
+      const lefts = new Set(all.map((b) => Math.round(b.x)));
+      assert.ok(lefts.size <= 3, `${width} ${t.tab} ボタンの左の端 ${[...lefts]}`);
+    }
     if (width >= 1024) {
       // まん中は上のタブのまん中（名前が短いので名前の右へはずらさない）
       assert.ok(Math.abs(m.c1 - m.tabsCenter) < 2, `${width} ${t.tab} 2段目のまん中 ${m.c1} タブ ${m.tabsCenter}`);

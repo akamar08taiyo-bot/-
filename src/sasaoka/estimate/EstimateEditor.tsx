@@ -276,7 +276,7 @@ export function EstimateEditor({
         primary={
           <>
             <Btn color="softGreen" onClick={() => saveEstimateExcel(job, s, toast)}>
-              📗 見積書をExcelで保存
+              <span>📗 見積書を<span className="whitespace-nowrap">Excelで保存</span></span>
             </Btn>
             <Btn color="softSky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
               🖨 見積書を印刷

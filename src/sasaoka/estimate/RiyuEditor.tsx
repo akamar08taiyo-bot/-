@@ -405,7 +405,7 @@ export function RiyuEditor({job, data, update, onBack, tabs, batch}: {job: Job; 
         primary={
           <>
             <Btn color="softGreen" onClick={save}>
-              📗 理由書をExcelで保存
+              <span>📗 理由書を<span className="whitespace-nowrap">Excelで保存</span></span>
             </Btn>
             <Btn color="softSky" onClick={() => setPrinting(true)} disabled={!pages?.length}>
               🖨 理由書を印刷
