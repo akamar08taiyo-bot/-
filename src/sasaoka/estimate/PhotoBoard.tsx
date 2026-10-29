@@ -291,8 +291,8 @@ export function PhotoOrderDialog({ordering}: {ordering: PhotoOrdering | null}) {
               onClick={() => toggle(i)}
               className={`relative flex flex-col overflow-hidden rounded-lg border-2 bg-white text-left ${n >= 0 ? 'border-sky-600 ring-2 ring-sky-200' : 'border-slate-200 hover:border-sky-400'}`}
             >
-              <span className="flex aspect-[4/3] items-center justify-center bg-slate-100">
-                <img src={x.url} alt="" className="max-h-full max-w-full object-contain" />
+              <span className="block aspect-[4/3] overflow-hidden bg-slate-100">
+                <img src={x.url} alt="" className="block h-full w-full object-contain" />
               </span>
               {n >= 0 && (
                 <span className="absolute left-1.5 top-1.5 flex h-9 min-w-9 items-center justify-center rounded-full bg-sky-600 px-2 text-lg text-white shadow" data-order={n + 1}>
