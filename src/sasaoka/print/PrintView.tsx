@@ -4,6 +4,7 @@ import type {ReactNode} from 'react';
 import {cutToLength, estimateQty, isBlankRow, jobName, jobTotals, monthSummary, placeTotals, rowAmount, shikiriPrice, taxFormula} from '../calc.ts';
 import type {MonthSummary} from '../calc.ts';
 import {cutCalc, FORM_INFO, insurerLabel, jobForm} from '../estimateForms.ts';
+import {laborForText, laborOwner} from '../rows.ts';
 import type {AppData, Job, Settings} from '../types.ts';
 import {dateLabel, monthEnd, monthLabel, num, shortDate, staffShort, todayIso, yen} from '../util.ts';
 import {Btn} from '../components/ui.tsx';
@@ -563,12 +564,15 @@ function JobDoc({job, settings: s}: {job: Job; settings: Settings}) {
               <tbody>
                 {/* 見積書の空白の行（何も入っていない部材の行）は出さない */}
                 {place.rows
-                  .filter((r) => !isBlankRow(r))
-                  .map((r) => (
+                  .map((r, i) => ({r, owner: laborOwner(place.rows, i)}))
+                  .filter(({r}) => !isBlankRow(r))
+                  .map(({r, owner}) => (
                     <tr key={r.id}>
                       <td className={`c kind ${r.kind}`}>{r.kind === 'labor' ? '手間' : '部材'}</td>
                       <td className="name">
                         {r.name || (r.kind === 'labor' ? '工事' : '部材')}
+                        {/* 手間は、取り付ける部材の商品名と型番（すぐ上の部材）を小さく（2026-10-29） */}
+                        {owner && <span className="code-sub">{laborForText(owner)}</span>}
                         {/* 切って使う部材は見積書と同じ本数（4m を 60cm → 600÷4000＝0.15本） */}
                         {cutToLength(r) && <span className="code-sub">{cutCalc(r)}本</span>}
                       </td>

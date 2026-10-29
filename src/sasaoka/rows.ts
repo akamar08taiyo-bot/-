@@ -130,6 +130,22 @@ export function setLaborCount(rows: Row[], item: LaborItem, n: number): Row[] {
   return out.filter((r) => !(isLabor(r, item.id) && r.qty <= 0));
 }
 
+/**
+ * 施工費（手間）の行が数えている部材：すぐ上の部材（あいだの施工費の行はとばす。見積書の「同上施工費」の部材と同じ）。
+ * 箇所のはじめの施工費・空白の行の下の施工費は null
+ */
+export function laborOwner(rows: Row[], i: number): Row | null {
+  if (rows[i]?.kind !== 'labor') return null;
+  for (let k = i - 1; k >= 0; k--) if (rows[k].kind === 'material') return isBlankRow(rows[k]) ? null : rows[k];
+  return null;
+}
+
+/**
+ * 施工費の行に出す、取り付ける部材の名前（商品名と型番）：「手すり（丸棒 4000mm） BD-134 の施工費」。
+ * 施工費の名前（木・タイル…）だけでは何の施工費か分からなかった（ユーザーの指示「商品名と型番を記載する」2026-10-29）
+ */
+export const laborForText = (owner: Row): string => `${[owner.name.trim(), owner.code.trim()].filter(Boolean).join(' ') || '部材'} の施工費`;
+
 /** 部材の行（at）のすぐ下に続く手間の行の範囲 [start, end)。見積書ではここが「同上施工費」になる */
 export function workRange(rows: Row[], at: number): [number, number] {
   let end = at + 1;

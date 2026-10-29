@@ -4,7 +4,7 @@
 
 import {useLayoutEffect, useRef, useState} from 'react';
 import {estimateAmount, estimatePlaceLines, estimateUnitPrice, placeTotals, rowAmount, shikiriPrice} from '../calc.ts';
-import {addMaterial, copyRows, kitRows, removeOneMaterial} from '../rows.ts';
+import {addMaterial, copyRows, kitRows, laborForText, laborOwner, removeOneMaterial} from '../rows.ts';
 import type {AppData, Kit, Material, Place, Row} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {uid, yen} from '../util.ts';
@@ -189,14 +189,20 @@ function KitCard({
               {kit.rows.map((r, i) => {
                 const cur = current[i] ?? r;
                 const label = r.name || (r.kind === 'labor' ? '工事' : '部材');
+                const owner = laborOwner(kit.rows, i);
                 return (
                   <tr key={r.id} className="border-t border-slate-100 align-middle">
                     <td data-cell="kind" className="px-2 py-1.5">
                       <KindBadge kind={r.kind} label="施工費" />
                     </td>
                     <td data-cell="name" className="px-2 py-1.5">
-                      <div className="font-bold text-slate-800">{label}</div>
-                      {(r.maker || r.code) && <div className="text-[11px] text-slate-500">{[r.maker, r.code].filter(Boolean).join('　')}</div>}
+                      {/* 施工費は、取り付ける部材の商品名と型番（すぐ上の部材）。施工費の名前（木・タイル…）は下に小さく */}
+                      <div className="font-bold text-slate-800">{owner ? laborForText(owner) : label}</div>
+                      {owner ? (
+                        <div className="text-[11px] text-slate-500">取付手間：{label}</div>
+                      ) : (
+                        (r.maker || r.code) && <div className="text-[11px] text-slate-500">{[r.maker, r.code].filter(Boolean).join('　')}</div>
+                      )}
                     </td>
                     <td data-cell="price" data-label="単価" className="px-2 py-1.5 text-right tabular-nums">
                       {yen(estimateUnitPrice(cur, rates))}

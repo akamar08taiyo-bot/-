@@ -3,7 +3,7 @@ import {cutToLength, jobName, jobTotals, placeTotals, rowAmount, taxFormula} fro
 import type {JobTotals} from '../calc.ts';
 import {cutCalc} from '../estimateForms.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
-import {addMaterial, copyRows, kitFromRows, manualRow, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
+import {addMaterial, copyRows, kitFromRows, laborForText, laborOwner, manualRow, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
 import {withBillMonth} from '../salesPlan.ts';
 import type {AppData, Job, Kit, Material, NameSuffix, Place, Row, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
@@ -470,6 +470,11 @@ function PlaceCard({
                       aria-label="品名"
                     />
                     {(r.code || r.maker) && <div className="px-2 text-[11px] text-slate-500">{[r.maker, r.code].filter(Boolean).join('　')}</div>}
+                    {/* 施工費は、取り付ける部材の商品名と型番（すぐ上の部材）を下に（2026-10-29） */}
+                    {(() => {
+                      const owner = laborOwner(place.rows, i);
+                      return owner && <div className="px-2 text-xs text-slate-600">{laborForText(owner)}</div>;
+                    })()}
                   </td>
                   <td data-cell="price" data-label="単価" className="px-2 py-1.5 text-right">
                     {r.kind === 'material' && r.price === 0 ? (

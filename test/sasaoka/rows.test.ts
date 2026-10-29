@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {addMaterial, insertRowsAt, kitFromRows, kitRows, laborCount, laborRange, laborRow, laborSpot, manualRow, materialRow, removeOneMaterial, replaceRange, setLaborCount, workRange} from '../../src/sasaoka/rows.ts';
+import {addMaterial, insertRowsAt, kitFromRows, kitRows, laborCount, laborRange, laborRow, laborForText, laborOwner, laborSpot, manualRow, materialRow, removeOneMaterial, replaceRange, setLaborCount, workRange} from '../../src/sasaoka/rows.ts';
 import type {LaborItem, Material} from '../../src/sasaoka/types.ts';
 
 const wood: LaborItem = {id: 'l01', name: '木', price: 1000, estPrice: null, note: ''};
@@ -133,4 +133,15 @@ test('部材を選ぶ画面の −：0 になったら部材を消す。上が�
   // 1つ減らすだけなら数量
   rows = removeOneMaterial([materialRow(bracket, 2), laborRow(wood, 1)], bracket.id);
   assert.deepEqual(rows.map((r) => [r.name, r.qty]), [['ブラケット', 1], ['木', 1]]);
+});
+
+test('施工費の行が数えている部材：すぐ上の部材（あいだの施工費はとばす）。箇所のはじめ・空白の行の下は null。名前は「商品名 型番 の施工費」', () => {
+  const rows = [laborRow(wood, 1), materialRow(rail), laborRow(wood, 2), laborRow(tile, 1), materialRow(bracket), manualRow('material', {name: ''}), laborRow(wood, 1)];
+  assert.equal(laborOwner(rows, 0), null);
+  assert.equal(laborOwner(rows, 1), null); // 部材の行は null
+  assert.equal(laborOwner(rows, 2)?.id, rows[1].id);
+  assert.equal(laborOwner(rows, 3)?.id, rows[1].id);
+  assert.equal(laborOwner(rows, 6), null);
+  assert.equal(laborForText(rows[1]), `${rail.name} ${rail.code} の施工費`);
+  assert.equal(laborForText({...rows[1], code: ''}), `${rail.name} の施工費`);
 });
