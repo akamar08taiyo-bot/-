@@ -140,8 +140,6 @@ assert.equal(handoff.fields.insurer, 'yukuhashi');
 assert.deepEqual([handoff.fields.careFrom, handoff.fields.careTo], ['2024-04-01', '2027-03-31']);
 // 特定福祉用具申請書のタブにも「🪪 介護保険証から入れる」（入れると中の特定福祉用具のアプリを開き直す）
 assert.equal(await page.getByRole('button', {name: '🪪 介護保険証', exact: true}).isVisible(), true);
-// 介護ソフトの画面から入れるは外した（ユーザーの指示「その機能はちょっと現実的に使えそうにないので、そこは外してください」2026-10-29）
-assert.equal(await page.getByText(/介護ソフト/).count(), 0);
 log('申請書・理由書・見積書・特定福祉用具に出た OK');
 
 // ---------------- 2. 新規作成の様邸に PDF をドロップ（見積もりの入口には読み取りの欄を出さない）

@@ -298,8 +298,8 @@ if (withTokutei) {
   await showCat.waitFor();
   const drop = showCat.locator('xpath=../*[1]'); // 🪪 の枠（同じ箱の最初）
   const [dropBox, showBox, printBox] = [await drop.boundingBox(), await showCat.boundingBox(), await printCat.boundingBox()];
-  assert.match(await drop.innerText(), /介護保険証/);
-  assert.doesNotMatch(await drop.innerText(), /介護ソフト/); // 介護ソフトの画面から入れるは外した（2026-10-29）
+  // 枠の文字は「🪪 介護保険証」だけ（ユーザーの指示「全てから外してください」2026-10-29）
+  assert.equal((await drop.innerText()).replace(/\s+/g, ' ').trim(), '🪪 介護保険証 ここにドロップ・Ctrl+V（押して選んでもよい）');
   assert.ok(Math.abs(showBox.x - dropBox.x) < 1 && Math.abs(showBox.width - dropBox.width) < 1 && showBox.y >= dropBox.y + dropBox.height && printBox.y >= showBox.y + showBox.height, `${JSON.stringify(dropBox)} ${JSON.stringify(showBox)} ${JSON.stringify(printBox)}`);
   assert.ok(printBox.y + printBox.height <= 1000, '画面の下にはみ出す');
   await page.screenshot({path: path.join(outDir, 'tokutei-3-catalog-buttons.png')});

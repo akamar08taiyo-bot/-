@@ -1,6 +1,6 @@
 // ドロップと貼り付けの分かりやすい枠を確かめる（ユーザーの指示「完了写真もドラッグ＆ドロップや貼付けしやすいようにする。介護保険証もそうです」2026-10-23。
-// 前は e2e-caresoft.mjs の中。介護ソフトの画面から入れるを外したとき（2026-10-29）に、ここに分けた）：
-//   1. 様邸の画面の入口「🪪 介護保険証」：タブのすぐ右の点線の枠・「ここにドロップ・Ctrl+V」・ファイルを持ってくると薄い緑・重ねると「ここに離す」。介護ソフトの文字は出さない
+// 2026-10-29 に、ほかの確かめから分けた）：
+//   1. 様邸の画面の入口「🪪 介護保険証」：タブのすぐ右の点線の枠・「ここにドロップ・Ctrl+V」・ファイルを持ってくると薄い緑・重ねると「ここに離す」。枠の文字は「🪪 介護保険証」だけ
 //   2. 写真の枠：ファイルを持ってくると枠が薄い緑・重ねると「ここに離す」、空いた枠にドロップ、枠を選んで Ctrl+V（介護保険証の読み取りにはならない）・差し替え
 //   3. スマホ（390px）で横にはみ出さない（スクリーンショットを保存）
 // usage: node e2e-drop.mjs <サイトのURL> <出力フォルダ>
@@ -32,8 +32,6 @@ await form.waitFor();
 const area = page.getByRole('button', {name: '🪪 介護保険証', exact: true});
 assert.match(await area.innerText(), /^\s*🪪 介護保険証\s*ここにドロップ・Ctrl\+V\s*$/);
 assert.equal(await area.evaluate((el) => getComputedStyle(el).borderStyle), 'dashed');
-// 介護ソフトの画面から入れるは外した（ユーザーの指示「その機能はちょっと現実的に使えそうにないので、そこは外してください」2026-10-29）
-assert.equal(await page.getByText(/介護ソフト/).count(), 0);
 const tablist = page.getByRole('tablist', {name: '住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書'});
 const [t, b] = [await tablist.boundingBox(), await area.boundingBox()];
 assert.ok(b.x >= t.x + t.width && b.x - (t.x + t.width) < 24 && Math.abs(b.y + b.height / 2 - (t.y + t.height / 2)) < 6, `タブのすぐ右 ${JSON.stringify({t, b})}`);
@@ -54,7 +52,7 @@ await area.getByText('ここに離す').waitFor();
 assert.equal(await area.getAttribute('data-drop'), 'over');
 await page.screenshot({path: path.join(outDir, 'drag-over-area.png'), clip: {x: 0, y: 0, width: 1366, height: 260}});
 await page.waitForFunction(() => !document.querySelector('[aria-label="🪪 介護保険証"]')?.textContent?.includes('ここに離す'), null, {timeout: 3000});
-log('入口の枠「🪪 介護保険証」・ドラッグ中の色・「ここに離す」・介護ソフトの文字なし OK');
+log('入口の枠「🪪 介護保険証」・ドラッグ中の色・「ここに離す」OK');
 
 // ---------------- 2. 写真の枠：ドロップ・Ctrl+V（申請書のタブ）
 /** ファイルの入った貼り付け（Ctrl+V。今いる所に paste を出す） */
@@ -127,7 +125,8 @@ log('写真の枠：ドラッグ中の色・ここに離す・ドロップ・Ctr
 await page.setViewportSize({width: 390, height: 844});
 await page.waitForTimeout(400);
 assert.ok((await page.evaluate(() => document.documentElement.scrollWidth)) <= 390, `申請書のタブ ${await page.evaluate(() => document.documentElement.scrollWidth)}`);
-assert.equal(await page.getByText(/介護ソフト/).count(), 0);
+// スマホの幅では小さい字（ここにドロップ…）を出さない。枠の文字は「🪪 介護保険証」だけ
+assert.equal((await page.getByRole('button', {name: '🪪 介護保険証', exact: true}).innerText()).trim(), '🪪 介護保険証');
 await page.screenshot({path: path.join(outDir, 'phone-shinsei.png')});
 await page.getByRole('region', {name: '写真'}).screenshot({path: path.join(outDir, 'phone-photos.png')});
 await page.getByRole('navigation').getByRole('button', {name: /見積もり・申請書を作成する/}).click();
