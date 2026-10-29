@@ -99,6 +99,14 @@ for (const width of [1366, 1600, 390]) {
       assert.ok(all.every((b) => Math.abs(b.w - all[0].w) <= 1), `${width} ${t.tab} ボタンの幅 ${all.map((b) => Math.round(b.w))}`);
       const lefts = new Set(all.map((b) => Math.round(b.x)));
       assert.ok(lefts.size <= 3, `${width} ${t.tab} ボタンの左の端 ${[...lefts]}`);
+      // 介護保険証の枠は「← 一覧へ戻る」の右・同じ高さ（ユーザーの指示「携帯でみたときに介護保険証の部分…右上の部分に配置移動」2026-10-29。高いとタブごとに段が動く）
+      const card = await page.evaluate(() => {
+        const r = (el) => el && el.getBoundingClientRect();
+        const back = r([...document.querySelectorAll('button')].find((x) => x.textContent.includes('一覧へ戻る')));
+        const c = [...document.querySelectorAll('button[aria-label="🪪 介護保険証"]')].map(r).find((x) => x.width > 0);
+        return c && {dy: Math.abs(c.top - back.top), dh: Math.abs(c.height - back.height), gap: c.left - back.right, right: c.right};
+      });
+      if (card) assert.ok(card.dy < 1 && card.dh < 1 && card.gap > 0 && card.right <= width, `${width} ${t.tab} 介護保険証の枠 ${JSON.stringify(card)}`);
     }
     if (width >= 1024) {
       // まん中は上のタブのまん中（名前が短いので名前の右へはずらさない）

@@ -41,7 +41,7 @@ export function RemoveJobButton({job, settings, update, onBack}: {job: Job; sett
  * 3段目：その真下に、まとめて保存とタブごとの機能（secondary。同じまん中にそろえる）。名前は2段目の高さだけを使うので、3段目は名前の下まで広げてよい。
  * 名前が長くて2段目に重なるときは、2段目・3段目とも名前の右へずらす（まん中は2段目・3段目で同じ）。
  * 狭い画面（lg 未満）は、名前・2段目・3段目をそれぞれ1行にして、行のまん中に。extra はその下（どのタブでもボタンの段の高さを変えない）。
- * スマホ（sm 未満）は、2段目・3段目とも同じ幅の2列の格子（ボタンはどれも同じ幅。数が奇数なら最後の1つは同じ幅でまん中）、extra は幅いっぱい
+ * スマホ（sm 未満）は、2段目・3段目とも同じ幅の2列の格子（ボタンはどれも同じ幅。数が奇数なら最後の1つは同じ幅でまん中）、extra は「← 一覧へ戻る」の右（2026-10-29）
  * （ユーザーの指示「携帯で見た時のボタンの配置の位置…ガタガタして、若干ずれている」2026-10-29：前は行ごとにボタンの幅のまままん中に寄せていて、
  * 「削除」「まとめて保存」が1つずつ別の幅でまん中に並び、介護保険証の欄だけ左に寄っていた）。
  */
@@ -98,16 +98,20 @@ export function JobHeader({
     'max-sm:grid max-sm:grid-cols-2 max-sm:items-stretch max-sm:[&>*]:min-h-11 max-sm:[&>*]:w-full max-sm:[&>*]:whitespace-normal max-sm:[&>*]:px-2 max-sm:[&>*]:leading-tight ' +
     'max-sm:[&>label]:col-span-2 max-sm:[&>label]:justify-center max-sm:[&>*:last-child:nth-child(odd):not(label)]:col-span-2 max-sm:[&>*:last-child:nth-child(odd):not(label)]:mx-auto max-sm:[&>*:last-child:nth-child(odd):not(label)]:w-[calc(50%-0.25rem)]';
   // 1つの折り返す箱に、1段目（← 一覧へ戻る・タブ・extra）と、2段目より下（box。いつも1行まるごと）を入れる。
-  // 狭い画面は extra（介護保険証の欄。タブによって出したり出さなかったりする）を最後に回す：前はタブの下に入って、その分だけボタンの段が
-  // タブごとに上下にずれた（「タブを切り替えても、位置や大きさ、色などは変えない」）
+  // extra（介護保険証の欄。タブによって出したり出さなかったりする）は、ボタンの段をタブごとに上下にずらさない所に置く（「タブを切り替えても、位置や大きさ、色などは変えない」）：
+  // スマホ（sm 未満）は「← 一覧へ戻る」の右の空いた所（ユーザーの指示「携帯でみたときに介護保険証の部分…右上の部分に配置移動」2026-10-29。前はいちばん下で、
+  // ボタンの段のあいだに入って見えた）。高さは「← 一覧へ戻る」と同じにする（高いと、その段がタブごとに高くなる）。
+  // タブレット（sm〜lg）はいちばん下（order-last）、広い画面（lg から）はタブのすぐ右（order-1。2段目より下の box は order-2）
   return (
     <div ref={top} className="flex flex-wrap items-center gap-2">
       <BackButton onClick={onBack} />
+      {extra && (
+        <div className="min-w-0 max-sm:flex-1 max-sm:self-stretch max-sm:[&>button]:h-full max-sm:[&>button]:w-full sm:max-lg:order-last lg:order-1">{extra}</div>
+      )}
       {/* 携帯・タブレットの「📷 写真へ」：タブレットの縦（md〜lg）は「← 一覧へ戻る」の右（スマホはタブの格子の中、タブレットの横は名前の右。PhotoJump.tsx） */}
       <PhotoJumpButton className="hidden rounded-md bg-sky-50 px-4 py-2.5 text-[15px] shadow-sm ring-2 ring-sky-300 md:max-lg:inline-flex md:max-lg:items-center" />
       {tabs}
-      {extra && <div className="max-lg:order-last max-sm:w-full max-sm:[&>button]:min-h-11 max-sm:[&>button]:w-full">{extra}</div>}
-      <div ref={box} className="relative w-full space-y-2">
+      <div ref={box} className="relative w-full space-y-2 lg:order-2">
         <div ref={name} className="flex flex-wrap items-center gap-2 max-lg:justify-center lg:absolute lg:left-0 lg:top-0 lg:h-[2.625rem] lg:w-max">
           {title}
           <PhotoJumpButton className="hidden rounded-md bg-sky-50 px-3 py-1.5 text-base shadow-sm ring-2 ring-sky-300 lg:inline-flex lg:items-center" />
