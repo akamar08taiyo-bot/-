@@ -11,7 +11,7 @@ import {estimateTotals, isBlankRow} from './calc.ts';
 import type {EstimateRates, EstimateSettings} from './calc.ts';
 import {careAmounts} from './careLines.ts';
 import {BASE_PLATE} from './cutLink.ts';
-import {circled, eraOf, jobInsurer, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa} from './estimateForms.ts';
+import {circled, eraOf, jobInsurer, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa, shinseiKindNames} from './estimateForms.ts';
 import {clampOff, clampScale, normRot} from './photoEdit.ts';
 import {lineEnds, MARK_INSET, photoBounds, shapeBox} from './photoMarks.ts';
 import {textEm} from './print/fit.ts';
@@ -593,6 +593,8 @@ export type ShinseiValues = {
   photoDates?: Record<number, PlacePhotos>; // 写真番号 → 改修前・改修後の撮影日（'YYYY-MM-DD'）
   photoNotes?: Record<number, string[]>; // 写真番号 → 写真貼付用紙の改修前の写真の横（上）に書く内容（自動の文と、手で足した行。photoNoteLines）
   kindNames?: string[][]; // 改修の種類（1〜6）ごとの改修場所の名前（同じ名前は1つ。北九州市の事前届出書の□）
+  legend?: string[]; // 平面図の工事内容：改修の内容の行と、そのあとに平面図に書く文字（ShinseiInfo.planNote）の行
+  kindTexts?: string[]; // 改修の種類（1〜6）の名前（保険者の様式の言葉。kindNamesOf）。改修の内容の行から種類の名前を外すとき・写真の用紙の改修の種類に
   marks: ShinseiMarks; // 丸で囲む値
   texts: ShinseiTexts; // 申請書の画面で入れた項目の文字（書き方の {名前} の値）
   cost: number | null; // 改修費用（数で書く欄。なければ null）
@@ -614,16 +616,22 @@ export type PhotoImages = {before?: PhotoImage; after?: PhotoImage};
  */
 export type WorkItem = {id: string; kind: number; name: string; photo: number; line: string};
 
-/** 見積書に出る箇所ごとの改修の内容の行。見積書に出ない箇所（行のない箇所）は入れない */
-export function workItems(job: Pick<Job, 'places'>, rates: EstimateRates): WorkItem[] {
+/** 見積書に出る箇所ごとの改修の内容の行。見積書に出ない箇所（行のない箇所）は入れない。改修の種類の名前は保険者の様式の言葉（kindNamesOf） */
+export function workItems(job: Pick<Job, 'places'> & Partial<Pick<Job, 'insurer' | 'form' | 'address'>>, rates: EstimateRates): WorkItem[] {
   const photos = photoNumbers(job, rates);
+  const names = kindNamesOf(job);
   const out: WorkItem[] = [];
   for (const p of job.places) {
     const photo = photos.get(p.id);
     if (photo === undefined) continue;
-    out.push({id: p.id, kind: p.kind, name: p.name.trim(), photo, line: workLine(p, photo)});
+    out.push({id: p.id, kind: p.kind, name: p.name.trim(), photo, line: workLine(p, photo, names)});
   }
   return out;
+}
+
+/** 様邸の保険者の申請書に書く改修の種類の名前（北九州市「手すり取付」・福岡市「手すりの取付け」、ほかは KINDS。estimateForms.ts の shinseiKindNames） */
+export function kindNamesOf(job: Partial<Pick<Job, 'insurer' | 'form' | 'address'>>): string[] {
+  return shinseiKindNames(jobInsurer({insurer: job.insurer, form: job.form ?? '', address: job.address ?? ''}));
 }
 
 
@@ -632,10 +640,10 @@ export function workItems(job: Pick<Job, 'places'>, rates: EstimateRates): WorkI
  * ユーザーの指示（2026-10-21）「①玄関　手すりの取付（項目名）L=600mm と表記する」（項目名はそのあと「手すりの取り付け」に）：写真番号・改修場所、改修の種類の名前、寸法を全角のすき間で区切る。
  * 寸法は申請書のタブで入れる（`Place.dims`）：手すりは長さ（L=）と高さ（H=。任意）、段差の解消は幅・奥行・高さ（「W600mm D350mm H150mm」）
  */
-function workLine(p: Place, photo: number): string {
+function workLine(p: Place, photo: number, names: string[] = KINDS): string {
   // そのほか（`Place.shinseiText`）は次の行に、全角のすき間1つ下げて（ユーザーの指示「そのほかの部分の記載は、行替えして表示するようにする」2026-10-26）。
   // 行の一覧にするとき（shinseiWorks・shinseiKinds）は改行で分ける。Excel から読むときは、下げた行を前の行のつづきにする（workLinesOf）
-  const [head = '', ...rest] = workTextLines(p);
+  const [head = '', ...rest] = workTextLines(p, names);
   return [[`${circled(photo)}${p.name.trim()}`, head].filter(Boolean).join('　'), ...rest.map((r) => `　${r}`)].join('\n');
 }
 
@@ -706,32 +714,40 @@ function dimsText(p: Pick<Place, 'kind' | 'rows' | 'dims'>): string {
  * 改修の内容の文の行（写真番号・改修場所のうしろ）：1行目は改修の種類の名前・寸法「手すりの取り付け　L=600mm H=800mm」、そのほか（`Place.shinseiText`）は2行目
  * （ユーザーの指示「そのほかの部分の記載は、行替えして表示するようにする」2026-10-26。前は1行目のうしろに足していた）
  */
-export function workTextLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText'>): string[] {
-  return [[KINDS[p.kind - 1] ?? '', dimsText(p)].filter(Boolean).join('　'), p.shinseiText?.trim() ?? ''].filter(Boolean);
+export function workTextLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText'>, names: string[] = KINDS): string[] {
+  return [[names[p.kind - 1] ?? '', dimsText(p)].filter(Boolean).join('　'), p.shinseiText?.trim() ?? ''].filter(Boolean);
 }
 /** 改修の内容の文を1行で（写真の欄の見出しなど、画面の1行に出すところ） */
-export function workText(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText'>): string {
-  return workTextLines(p).join('　');
+export function workText(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText'>, names: string[] = KINDS): string {
+  return workTextLines(p, names).join('　');
 }
 
 /**
  * 写真貼付用紙の写真の横（上）に書く内容（ユーザーの指示「自動入力　手すり　L=800mm H=600mm、追加　手入力例ベースプレート　L=800mm みたいな感じ」）：
  * 1行目は自動の文（改修の種類・寸法・そのほか＝workText）、そのあとに手で足した行（`Place.photoNote`。空の行は書かない）
  */
-export function photoNoteLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText' | 'photoNote'>): string[] {
+export function photoNoteLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText' | 'photoNote'>, names: string[] = KINDS): string[] {
   const added = (p.photoNote ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  return [...workTextLines(p), ...added];
+  return [...workTextLines(p, names), ...added];
+}
+
+/** 平面図に書く文字（ShinseiInfo.planNote）の行：工事内容の行のうしろに足す（うしろのすき間・空の行は書かない） */
+export function planNoteLines(info: Pick<ShinseiInfo, 'planNote'>): string[] {
+  return (info.planNote ?? '')
+    .split(/\r?\n/)
+    .map((l) => l.trimEnd())
+    .filter((l) => l.trim());
 }
 
 /** 改修の内容・箇所及び規模（苅田町・行橋市の申請書の欄）・平面図の工事内容：箇所ごとに1行「①玄関　手すりの取り付け　L=600mm」。写真番号・改修場所は見積書と同じ */
-export function shinseiWorks(job: Pick<Job, 'places'>, rates: EstimateRates): string[] {
+export function shinseiWorks(job: Pick<Job, 'places'> & Partial<Pick<Job, 'insurer' | 'form' | 'address'>>, rates: EstimateRates): string[] {
   return workItems(job, rates)
     .flatMap((w) => w.line.split('\n'))
     .filter(Boolean);
 }
 
 /** 改修の種類ごと（6行。内訳明細書）：箇所は改修場所を「・」でつなぐ（同じ名前は1つ）。工事内容は申請書と同じ「①玄関　手すりの取り付け　L=600mm」の書き方 */
-export function shinseiKinds(job: Pick<Job, 'places'>, rates: EstimateRates): ShinseiKind[] {
+export function shinseiKinds(job: Pick<Job, 'places'> & Partial<Pick<Job, 'insurer' | 'form' | 'address'>>, rates: EstimateRates): ShinseiKind[] {
   const lines = workItems(job, rates).filter((w) => w.line);
   return KINDS.map((_, i) => {
     const mine = lines.filter((w) => w.kind === i + 1);
@@ -861,12 +877,14 @@ export function shinseiValues(job: Job, s: EstimateSettings & BuilderSettings, t
     insuredNo: job.insuredNo,
     insurerNo: cardInsurer.length === 6 ? cardInsurer : fukuokaInsurerNo(job.address),
     works: shinseiWorks(job, s),
+    legend: [...shinseiWorks(job, s), ...planNoteLines(info)],
     kinds,
     kindNames: KINDS.map((_, i) => [...new Set(workItems(job, s).filter((w) => w.kind === i + 1 && w.line).map((w) => w.name).filter(Boolean))]),
     photos: shinseiPhotos(job, s),
     photoKinds: Object.fromEntries([...photoPlacesOf(job, s)].map(([n, p]) => [n, p.kind])),
     photoDates: photoDatesOf(job, s, today),
-    photoNotes: Object.fromEntries([...photoPlacesOf(job, s)].map(([n, p]) => [n, photoNoteLines(p)] as const).filter(([, lines]) => lines.length > 0)),
+    photoNotes: Object.fromEntries([...photoPlacesOf(job, s)].map(([n, p]) => [n, photoNoteLines(p, kindNamesOf(job))] as const).filter(([, lines]) => lines.length > 0)),
+    kindTexts: kindNamesOf(job),
     marks: {gender: info.gender, era: eraOf(info), care: info.care, renovated: info.renovated}, // 元号は選んでいなければ昭和
     texts: {
       kana: info.kana.trim(),
@@ -1123,8 +1141,8 @@ export function shinseiCells(sheet: ShinseiSheet, v: ShinseiValues, photo = 0): 
   if (sheet.kindCells) for (const [ref, text] of kindCellTexts(sheet.kindCells, v)) out.set(ref, text);
   if (sheet.insurerNo && v.insurerNo) sheet.insurerNo.forEach((ref, i) => out.set(ref, v.insurerNo[i] ?? ''));
   if (sheet.photoPlace?.place) out.set(sheet.photoPlace.place, (photo > 0 && v.photos[photo]) || '');
-  if (sheet.photoPlace?.kind) out.set(sheet.photoPlace.kind, photo > 0 && v.photos[photo] !== undefined ? (KINDS[(v.photoKinds?.[photo] ?? 0) - 1] ?? '') : '');
-  if (sheet.legend?.cell) out.set(sheet.legend.cell, v.works.join('\n'));
+  if (sheet.photoPlace?.kind) out.set(sheet.photoPlace.kind, photo > 0 && v.photos[photo] !== undefined ? ((v.kindTexts ?? KINDS)[(v.photoKinds?.[photo] ?? 0) - 1] ?? '') : '');
+  if (sheet.legend?.cell) out.set(sheet.legend.cell, (v.legend ?? v.works).join('\n'));
   for (const t of sheet.texts ?? []) {
     const keys = placeholders(t.format);
     // 何も入れていなければ原本の文字のまま（「本人との関係（　　　）」など）
@@ -1145,7 +1163,8 @@ export function shinseiCells(sheet: ShinseiSheet, v: ShinseiValues, photo = 0): 
  */
 function kindCellTexts(cells: string[], v: ShinseiValues): [string, string][] {
   // 行の見出しが種類の名前（「手すりの取付け」）なので、箇所ごとの文字から種類の名前は外す（「①浴室　L=600mm H=800mm」）
-  const lines = cells.map((_, i) => (v.kinds[i]?.works ?? []).map((l) => l.replace(`　${KINDS[i]}`, '')));
+  const names = v.kindTexts ?? KINDS;
+  const lines = cells.map((_, i) => (v.kinds[i]?.works ?? []).map((l) => l.replace(`　${names[i]}`, '')));
   const extra = v.kinds.slice(cells.length).flatMap((k) => k.works);
   if (extra.length) lines[Math.max(0, lines.findIndex((l) => l.length > 0))].push(...extra);
   if (!lines.some((l) => l.length)) return cells.map((ref) => [ref, '']);
@@ -1272,7 +1291,12 @@ export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void
     fitCheckRows(files, sheet);
     drawMarks(files, sheet, v.marks);
     if (sheet.photoPlace?.kindCircles) drawKindCircle(files, sheet, photo > 0 && v.photos[photo] !== undefined ? (v.photoKinds?.[photo] ?? 0) : 0);
-    if (sheet.legend?.box) drawLegend(files, sheet, v.works);
+    if (sheet.legend?.box) drawLegend(files, sheet, v.legend ?? v.works);
+    // 写真の報告書の改修の内容（北九州市のメモの欄。大きな字でまん中）：入らなければ1行ずつ欄の幅に入る大きさにする
+    const memo = sheet.photoPlace?.memo;
+    const memoLines = memo && sheet.photoPlace?.before && photo > 0 ? (v.photoNotes?.[photo] ?? []) : [];
+    const memoPath = memoLines.length ? sheetPaths(files).get(sheet.sheet) : undefined;
+    if (memo && memoPath) fitCell(files, memoPath, memo, memoLines, true);
     // A4 から少しはみ出すシートは、印刷を「1ページに合わせる」に（Excel で印刷して2〜4枚に分かれないように）
     fitPrintPage(files, sheet.sheet);
     // 平面図の図（Excel に保存するときだけ。画面のプレビューは図を枠に重ねて描く）
@@ -1367,7 +1391,7 @@ function kindRowCells(files: Files, sheet: ShinseiSheet, v: ShinseiValues): Map<
       });
       if (row.other && others.length) out.set(row.other, others.join('・'));
     }
-    if (row.detail) out.set(row.detail, (v.kinds[i]?.works ?? []).map((l) => l.replace(`　${KINDS[i]}`, '')).join('　'));
+    if (row.detail) out.set(row.detail, (v.kinds[i]?.works ?? []).map((l) => l.replace(`　${(v.kindTexts ?? KINDS)[i]}`, '')).join('　'));
   });
   return out;
 }
@@ -1698,7 +1722,7 @@ function fitLines(files: Files, sheet: ShinseiSheet, v: ShinseiValues): void {
   // [欄, 行, 1行ずつ欄の幅に入れるか（改修の内容の行）]
   const targets: [string, string[], boolean][] = [];
   if (sheet.works) targets.push([sheet.works, v.works, true]);
-  if (sheet.legend?.cell) targets.push([sheet.legend.cell, v.works, true]);
+  if (sheet.legend?.cell) targets.push([sheet.legend.cell, v.legend ?? v.works, true]);
   sheet.kinds?.forEach((k, i) => {
     targets.push([k.works, v.kinds[i]?.works ?? [], true]);
     if (v.kinds[i]?.places) targets.push([k.places, [v.kinds[i].places], false]);
@@ -2334,7 +2358,8 @@ export type PhotoNoteLayout = {photo: Box; note: Box | null; align: 'left' | 'ce
 /**
  * 写真の枠を、写真の所と書く欄に分ける（ユーザーの指示「写真をめいいっぱいにしない。縦写真の場合、写真を左に寄せてスペースをつくる。
  * 横写真の場合、上にスペースをあけて入力スペースをつくるなど、バランスよく」、2026-10-21）。
- * 縦長の写真（回したあとで）：枠の高さに合わせた写真の幅（枠の幅の 62% まで）を左に、残りの右を書く欄に（左ぞろえ）。
+ * 縦長の写真（回したあとで）：枠の高さに合わせた写真の幅（枠の幅の 62% まで）をまん中に、写真の右の空いた所を書く欄に（左ぞろえ。
+ * ユーザーの指示「縦型の写真の場合は、中央に、その縦型の写真を持ってきて、その右側に長さ…高さ…を右側の空いたスペースに」2026-10-29。前は写真を左に寄せていた）。
  * 横長の写真・写真のない枠：上に写真、その下に NOTE_GAP あけて書く欄（あけた分もふくめて、行の数に合わせて枠の高さの 16〜32%。写真の高さが余れば写真の下から）。
  * 書く欄の文字は中央ぞろえ（ユーザーの指示「画像を上にもってきて、画像の下に寸法をもってくる」「文字については、中央ぞろえにする」2026-10-22。前は書く欄が上）。
  * どれも枠の中。画面のプレビューと Excel で同じ計算を使う
@@ -2348,7 +2373,8 @@ export function photoNoteLayout(frame: Box, size: {w: number; h: number; rot?: n
     const [bw, bh] = [Math.max(size.w, 1) * c + Math.max(size.h, 1) * s, Math.max(size.w, 1) * s + Math.max(size.h, 1) * c];
     if (bh > bw * 1.05) {
       const pw = Math.min(frame.w * 0.62, ((frame.h - 2 * pad) * bw) / bh + 2 * pad);
-      return {photo: {x: frame.x, y: frame.y, w: pw, h: frame.h}, note: {x: frame.x + pw, y: frame.y, w: frame.w - pw, h: frame.h}, align: 'left'};
+      const px = frame.x + (frame.w - pw) / 2;
+      return {photo: {x: px, y: frame.y, w: pw, h: frame.h}, note: {x: px + pw, y: frame.y, w: frame.x + frame.w - (px + pw), h: frame.h}, align: 'left'};
     }
     ratio = bh / bw;
   }

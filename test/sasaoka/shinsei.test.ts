@@ -5,7 +5,7 @@ import {strFromU8, unzipSync, zipSync} from 'fflate';
 import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import {DEFAULT_PLACES, defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
-import {boxLabels, checkBoxes, fillShinsei, splitNumber, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
+import {boxLabels, checkBoxes, fillShinsei, splitNumber, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, kindNamesOf, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
 import {KK_CELLS} from '../../src/sasaoka/shinsei/kitakyushuCells.ts';
 import {shinseiPreview} from '../../src/sasaoka/shinseiPreview.ts';
 import type {Insurer, Job, PhotoMark, Place, Row, ShinseiInfo, ShinseiMarks} from '../../src/sasaoka/types.ts';
@@ -810,6 +810,17 @@ test('申請書から先に作る：見積書の行がない箇所（空白の�
   assert.deepEqual(shinseiWorks(job({places: [place('浴室', [mat('木の手すり 35φ 4m', {lengthCm: 60, pieceLengthM: 4})], {dims: {l: '650', h: '750'}})]}), RATES), ['①浴室　手すりの取り付け　L=650mm H=750mm']);
 });
 
+test('改修の種類の名前は保険者の様式の言葉（北九州市「手すり取付」・福岡市「手すりの取付け」。ほかは「手すりの取り付け」。2026-10-29 の指示）', () => {
+  const places = [place('浴室', [mat('木の手すり 35φ 4m', {lengthCm: 60, pieceLengthM: 4})]), place('トイレ', [mat('見本の床材', {})], {kind: 3}), place('居室', [mat('見本の引き戸', {})], {kind: 4})];
+  const works = (insurer: Insurer) => shinseiWorks(job({places, insurer}), RATES);
+  assert.deepEqual(works('kitakyushu'), ['①浴室　手すり取付　L=600mm', '②トイレ　床材等の変更', '③居室　引き戸等への扉の取替え']);
+  assert.deepEqual(works('fukuoka'), ['①浴室　手すりの取付け　L=600mm', '②トイレ　床又は通路面の材料変更', '③居室　引き戸等への扉の取替え']);
+  for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki'] as Insurer[]) assert.deepEqual(works(insurer), ['①浴室　手すりの取り付け　L=600mm', '②トイレ　床材の変更', '③居室　扉の取替'], insurer);
+  // 写真に書く内容も同じ名前。保険者を選んでいなければ住所の市町村から
+  assert.deepEqual(photoNoteLines(places[0], kindNamesOf({insurer: '', form: '', address: '福岡県北九州市小倉北区見本町1-1'})), ['手すり取付　L=600mm']);
+  assert.deepEqual(photoNoteLines(places[0]), ['手すりの取り付け　L=600mm']);
+});
+
 /** 範囲（'A7:H22'）→ [左の列, 上の行, 右の列, 下の行]（0始まり） */
 const cellsOf = (range: string) => {
   const m = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(range)!;
@@ -935,15 +946,16 @@ test('写真貼付用紙：写真番号の用紙の改修前・改修後の枠�
   assert.doesNotMatch(strFromU8(plain['[Content_Types].xml']), /Extension="jpeg"/);
 });
 
-test('写真の用紙の写真の横（下）に書く欄：縦の写真は左に寄せて右に、横の写真・写真のない枠は写真が上・書く欄は下で中央ぞろえ（ユーザーの指示「写真をめいいっぱいにしない」「画像を上に、画像の下に寸法」）', () => {
+test('写真の用紙の写真の横（下）に書く欄：縦の写真はまん中に・写真の右に書く欄、横の写真・写真のない枠は写真が上・書く欄は下で中央ぞろえ（ユーザーの指示「写真をめいいっぱいにしない」「画像を上に、画像の下に寸法」）', () => {
   const frame = {x: 0, y: 0, w: 600, h: 300};
   const lines = ['手すりの取り付け　L=800mm H=600mm', 'ベースプレート　L=800mm'];
   // 書くことがなければ枠いっぱい（前と同じ）
   assert.deepEqual(photoNoteLayout(frame, {w: 900, h: 1600}, []), {photo: frame, note: null, align: 'left'});
-  // 縦の写真：枠の高さに合わせた写真の幅を左に、残りを右の書く欄に
+  // 縦の写真：枠の高さに合わせた写真の幅をまん中に、写真の右の空いた所を書く欄に（ユーザーの指示「縦型の写真の場合は、中央に…その右側に長さ」2026-10-29）
   const tall = photoNoteLayout(frame, {w: 900, h: 1600}, lines);
   assert.ok(Math.abs(tall.photo.w - (((300 - 8) * 900) / 1600 + 8)) < 0.01, JSON.stringify(tall));
-  assert.ok(tall.note && Math.abs(tall.note.x - tall.photo.w) < 0.01 && tall.note.w > 250 && tall.note.h === 300 && tall.photo.h === 300);
+  assert.ok(Math.abs(tall.photo.x + tall.photo.w / 2 - 300) < 0.01, JSON.stringify(tall)); // まん中
+  assert.ok(tall.note && Math.abs(tall.note.x - (tall.photo.x + tall.photo.w)) < 0.01 && Math.abs(tall.note.x + tall.note.w - 600) < 0.01 && tall.note.w > 100 && tall.note.h === 300 && tall.photo.h === 300);
   assert.equal(tall.align, 'left');
   // 横の写真：上に写真、その下に NOTE_GAP あけて書く欄（あけた分もふくめて枠の高さの 16〜32%）。文字は中央ぞろえ
   // （ユーザーの指示「写真と文字の位置を少しだけずらす。（文字をもう少し下にする）」2026-10-25。前は写真のすぐ下）
@@ -1318,6 +1330,36 @@ const kkJob = (extra: Partial<Job> = {}) =>
     ...extra,
   });
 
+test('北九州市：内容報告書（写真）の改修の内容は大きな字でまん中（入らなければ小さく）。平面図の図の枠は用紙の6.5割ほど、下に工事内容と平面図に書く文字（2026-10-29 の指示）', () => {
+  const out = fillShinsei(KITAKYUSHU, SHINSEI.kitakyushu!, shinseiValues(kkJob({shinsei: {...kkJob().shinsei!, planNote: '①〜③は廊下の手すり\n\n  '}}), KK_S));
+  const {files, byName} = sheets(out);
+  const n1 = byName.get('内容報告書（写真）')!;
+  const memo = KK_CELLS.naiyo.memo0;
+  assert.ok(fontOf(files, n1, memo).size >= 12, String(fontOf(files, n1, memo).size));
+  const {xfs} = styleParts(files);
+  const xf = xfs[Number(/\ss="(\d+)"/.exec(cell(n1, memo))?.[1] ?? 0)];
+  assert.match(xf, /horizontal="center"/);
+  assert.doesNotMatch(xf, /vertical="top"/);
+  // 長い改修の内容（そのほかの行を足す）は、1行ずつ欄の幅に入る大きさに小さくする
+  const long = kkJob();
+  long.places = long.places.map((p, i) => (i === 0 ? {...p, photoNote: 'ベースプレート　L=600mm 下地補強の木材を壁の中に入れて固定する（見本の長い文）'} : p));
+  const n1l = sheets(fillShinsei(KITAKYUSHU, SHINSEI.kitakyushu!, shinseiValues(long, KK_S))).byName;
+  const {files: lf} = sheets(fillShinsei(KITAKYUSHU, SHINSEI.kitakyushu!, shinseiValues(long, KK_S)));
+  assert.ok(fontOf(lf, n1l.get('内容報告書（写真）')!, memo).size < 14);
+  // 平面図：図の範囲は用紙の6.5割ほど（工事内容の枠はその下）。工事内容のうしろに平面図に書く文字（空の行は書かない）
+  const plan = KK_CELLS.plan;
+  const lay = sheetLayout(byName.get('平面図')!);
+  const pb = rangeBox(lay, plan.plan);
+  const lb = rangeBox(lay, plan.legend);
+  const page = lb.y + lb.h;
+  assert.ok(pb.h / page > 0.55 && pb.h / page < 0.7, `${pb.h} / ${page}`);
+  assert.ok(lb.y >= pb.y + pb.h);
+  const drawing = Object.keys(files).filter((n) => /xl\/drawings\/drawing\d+\.xml$/.test(n)).map((n) => strFromU8(files[n])).find((d) => d.includes('工事内容'))!;
+  const paras = [...drawing.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]);
+  assert.equal(paras.at(-1), '①〜③は廊下の手すり');
+  assert.match(paras[0], /^①浴室　手すり取付/);
+});
+
 test('北九州市：郵便番号・電話番号は様式の「－」の前と後ろに分ける（区切りがなければ郵便番号は3けたと4けた、電話番号は最初の欄に全部）', () => {
   assert.deepEqual(splitNumber('802-0001', 2, true), ['802', '0001']);
   assert.deepEqual(splitNumber('８０２０００１', 2, true), ['802', '0001']);
@@ -1388,7 +1430,7 @@ test('北九州市：支給申請書（受領委任払用）・平面図・写�
   const n = KK_CELLS.naiyo;
   const n1 = byName.get('内容報告書（写真）')!;
   assert.deepEqual([txt(n1, n.name), txt(n1, n.insured), txt(n1, n.place0)], ['山田 太郎', '0000366989', '浴室']);
-  assert.match(txt(n1, n.memo0), /手すりの取り付け/);
+  assert.equal(txt(n1, n.memo0), '手すり取付　L=600mm'); // 改修の種類の名前は北九州市の様式の言葉（事前届出書の「□手すり取付」。2026-10-29）
   assert.equal(txt(byName.get('内容報告書（写真） (3)')!, n.place0), 'トイレ');
   assert.equal(txt(byName.get('内容報告書（写真） (5)')!, n.place0), '玄関');
   assert.equal(txt(byName.get('内容報告書（写真） (2)')!, n.place0), '');

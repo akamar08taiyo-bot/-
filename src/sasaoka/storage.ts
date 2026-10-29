@@ -413,6 +413,8 @@ function cleanShinsei(raw: unknown, legacyMarks: unknown): ShinseiInfo {
   out.insurerNo = str(src.insurerNo).normalize('NFKC').replace(/\D/g, '').slice(0, 8); // 全角の数字も（\D は半角の数字のほかを消す）
   out.burden = ['1', '2', '3'].includes(str(src.burden)) ? (str(src.burden) as ShinseiInfo['burden']) : '';
   if (src.welfare === true) out.welfare = true; // 生活保護（介護ソフトの画面から。2026-10-23）
+  const planNote = str(src.planNote);
+  if (planNote.trim()) out.planNote = planNote.slice(0, 4000); // 平面図に書く文字（2026-10-29）
   return out;
 }
 

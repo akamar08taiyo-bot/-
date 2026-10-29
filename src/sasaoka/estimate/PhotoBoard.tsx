@@ -28,7 +28,7 @@ import {circled, photoNumbers, swapPhotoNumbers} from '../estimateForms.ts';
 import {cleanEdit, turn} from '../photoEdit.ts';
 import {photoBounds, turnMarks} from '../photoMarks.ts';
 import {photoTakenDate, preparePhoto, putPhoto, rememberPhotoUrl, usePhotoUrls} from '../photos.ts';
-import {photoDay, photoPlacement, workText} from '../shinsei.ts';
+import {kindNamesOf, photoDay, photoPlacement, workText} from '../shinsei.ts';
 import {readStampDate} from '../stampDate.ts';
 import type {Job, PhotoEdit, PhotoMark, Place, PlacePhotoEdits, PlacePhotoMarks, PlacePhotos} from '../types.ts';
 import {MarkLayer} from './MarkLayer.tsx';
@@ -359,6 +359,25 @@ export function PhotoBoard({
     const slot = place ? (['before', 'after'] as const).find((x) => !place.photos?.[x]) : undefined;
     return place && slot ? {start: {placeId: place.id, slot}} : null;
   };
+  // 写真を選んでいるときの Backspace・Delete：その写真を削除（確かめてから。ユーザーの指示「キーボードのbackボタンで写真を削除できるようにする」2026-10-29）
+  const removeSelected = useRef<() => void>(() => {});
+  removeSelected.current = () => {
+    if (!selected || !window.confirm('選んでいる写真を削除しますか？')) return;
+    actions.remove(selected);
+    setSelected(null);
+  };
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.key !== 'Backspace' && e.key !== 'Delete') || e.defaultPrevented) return; // プレビューの写真を消したとき（ShinseiPreview.tsx）は消さない
+      const t = e.target instanceof Element ? e.target : null;
+      if (t?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])') || document.querySelector('[role="dialog"]')) return;
+      e.preventDefault();
+      removeSelected.current();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [selected]);
   const putLatest = useRef(actions.put);
   putLatest.current = actions.put;
   useEffect(() => {
@@ -695,10 +714,10 @@ export function PhotoBoard({
                         追加 手入力 ベースプレート L=800mm」。改修前だけ＝工務店さんに見積もり依頼・内容を伝えるためのもの） */}
                     <div data-no-drag className="mt-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs" role="group" aria-label={`${circled(no)}${place.name} 改修前の写真に書く内容`}>
                       <div className="text-[11px] font-bold text-slate-600">改修前の写真に書く内容</div>
-                      {workText(place) && (
+                      {workText(place, kindNamesOf(job)) && (
                         <div className="mt-0.5 text-slate-700">
                           <span className="mr-1.5 text-[11px] text-slate-500">自動</span>
-                          {workText(place)}
+                          {workText(place, kindNamesOf(job))}
                         </div>
                       )}
                       <label className="mt-1 block text-[11px] text-slate-600">

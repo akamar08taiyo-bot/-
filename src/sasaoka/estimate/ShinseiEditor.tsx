@@ -16,7 +16,7 @@ import {placeFromDims, withBrackets} from '../cutLink.ts';
 import {manualRow, newPlace} from '../rows.ts';
 import {usePhotoUrls} from '../photos.ts';
 import {photoBounds} from '../photoMarks.ts';
-import {costIsTotal, estimateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
+import {costIsTotal, estimateLength, insuredBoxes, kindNamesOf, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
 import type {AppData, Insurer, Job, Material, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
@@ -37,14 +37,14 @@ import {JobHeader, JobTitle, RemoveJobButton} from './JobHeader.tsx';
 /** 欄の順番：保険者ごとの申請書の上からの順番（原本を見て決めた。みやこ町・広域連合は承認の申請書の順番で、支給申請書だけの着工日・完成日は最後）。
  *  ただし被保険者氏名はどの保険者もフリガナのすぐ下（ユーザーの指示「ふりがなの下に、名前をもってくる」、2026-10-21。苅田町・みやこ町は原本では番号が先） */
 const FIELDS: Record<Insurer, Field[]> = {
-  kanda: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'dates', 'cost'],
-  yukuhashi: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'dates', 'cost'],
-  miyako: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'cost', 'renovated', 'dates'],
-  kouiki: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'cost', 'renovated', 'dates'], // 郵便番号はユーザーの指示で足した（2026-10-21）
+  kanda: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'planNote', 'dates', 'cost'],
+  yukuhashi: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'planNote', 'dates', 'cost'],
+  miyako: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'planNote', 'cost', 'renovated', 'dates'],
+  kouiki: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'planNote', 'cost', 'renovated', 'dates'], // 郵便番号はユーザーの指示で足した（2026-10-21）
   // 福岡市：性別・郵便番号・要介護状態区分の欄はない。着工日・完成日は完了届出書（工事のあと）
-  fukuoka: ['kana', 'name', 'insuredNo', 'birth', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'cost', 'dates'],
+  fukuoka: ['kana', 'name', 'insuredNo', 'birth', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'planNote', 'cost', 'dates'],
   // 北九州市：生年月日・性別・要介護状態区分の欄はない。フリガナ・着工日・完成日は支給申請書（工事のあと）。工事費見積金額は介護保険の対象分（市の記入例）
-  kitakyushu: ['kana', 'name', 'insuredNo', 'zip', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'cost', 'dates'],
+  kitakyushu: ['kana', 'name', 'insuredNo', 'zip', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'planNote', 'cost', 'dates'],
 };
 // 負担割合は要介護状態区分のすぐ下（みやこ町・広域連合は電話番号の下）。申請書の原本に欄はないが、委任状の保険給付額・見積書の介護保険の内訳に使い、
 // 特定福祉用具の負担割合と同じ値（どちらで選んでも両方に入る。tokuteiLink.ts）。ユーザーの指示「住宅改修の申請書にも負担割合を設置。住宅改修⇔特定福祉用具などで連動して数字に繋げる」2026-10-28
@@ -76,6 +76,7 @@ function label(f: Field, i: Insurer): string {
     works: '改修の内容・箇所及び規模',
     renovated: '現在までの改修状況',
     photoDates: '改修前日付・改修後日付',
+    planNote: '平面図に書く文字',
   }[f];
 }
 
@@ -197,7 +198,7 @@ export function ShinseiEditor({
     const ph = x ? photoOf(x.no, key.slot) : null;
     if (!x || !ph) return null;
     const frame = pages?.flatMap((pg) => pg.photoSlots).find((f) => f.photo === x.no && f.slot === key.slot) ?? {w: 560, h: 420};
-    const lines = key.slot === 'before' ? photoNoteLines(x.place) : [];
+    const lines = key.slot === 'before' ? photoNoteLines(x.place, kindNamesOf(job)) : [];
     const parts = photoNoteLayout({x: 0, y: 0, w: frame.w, h: frame.h}, {w: ph.w, h: ph.h, rot: ph.edit?.rot ?? 0}, lines);
     const vb = photoBounds(photoPlacement(parts.photo, ph.w, ph.h, ph.edit));
     return {w: vb.w, h: vb.h};
@@ -219,7 +220,7 @@ export function ShinseiEditor({
     of: photoOf,
     note: (no) => {
       const x = photoList.find((p) => p.no === no);
-      return x ? photoNoteLines(x.place) : [];
+      return x ? photoNoteLines(x.place, kindNamesOf(job)) : [];
     },
     onDrop: (no, slot, e) => {
       const key = photoKey(no, slot);
@@ -234,6 +235,10 @@ export function ShinseiEditor({
       if (key) photoActions.setEdit(key, edit, photoOf(no, slot) ?? undefined);
     },
     onMark: (no, slot) => setMarking(photoKey(no, slot)),
+    onRemove: (no, slot) => {
+      const key = photoKey(no, slot);
+      if (key) photoActions.remove(key);
+    },
   };
   const previewPlan: PreviewPlan = {
     image: job.planPhoto ? (planUrl ?? null) : undefined,
@@ -364,6 +369,18 @@ export function ShinseiEditor({
         );
       case 'works':
         return <WorksEditor job={job} setJob={setJob} s={s} insurer={i} materials={data.materials} />;
+      case 'planNote':
+        // 平面図の工事内容の行のうしろに書く（ユーザーの指示「平面図の…下に文字を入力できるようにする」2026-10-29）
+        return (
+          <textarea
+            value={info.planNote ?? ''}
+            onChange={(e) => setInfo({planNote: e.target.value})}
+            rows={3}
+            placeholder="平面図の下に書く文字（工事内容のうしろ）"
+            className="min-h-20 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            aria-label="平面図に書く文字"
+          />
+        );
       case 'cost':
         return (
           <>

@@ -253,8 +253,13 @@ export type PreviewPhotos = {
   onPick: (no: number, slot: PvPhotoSlot['slot']) => void;
   onEdit: (no: number, slot: PvPhotoSlot['slot'], edit: PhotoEdit | undefined) => void;
   onMark?: (no: number, slot: PvPhotoSlot['slot']) => void; // 写真に書き込む（PhotoMarkEditor.tsx）
+  onRemove?: (no: number, slot: PvPhotoSlot['slot']) => void; // 写真を削除する（選んで Backspace・Delete・道具の「削除」）
   note?: (no: number) => string[]; // 改修前の写真の横（上）に書く内容（自動の文と手で足した行。photoNoteLines）
 };
+
+/** 打つ欄・ほかの画面にいるときのキーは、写真・平面図の図の操作にしない */
+const typingTarget = (t: EventTarget | null) =>
+  (t instanceof Element && !!t.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) || !!document.querySelector('[role="dialog"]');
 
 const SLOT_NAME = {before: '改修前', after: '改修後'} as const;
 
@@ -305,7 +310,14 @@ function PhotoSlotView({
   const name = `写真貼付用紙${circled(no)}の${SLOT_NAME[slot.slot]}`;
   const z = 1 / Math.max(zoom, 0.05);
 
-  // ほかの所を押す・Esc で選ぶのをやめる
+  // 写真を削除（確かめてから。平面図の図と同じ）
+  const removeRef = useRef<() => void>(() => {});
+  removeRef.current = () => {
+    if (!photos.onRemove || !window.confirm(`${name}の写真を削除しますか？`)) return;
+    onSelect(false);
+    photos.onRemove(no, slot.slot);
+  };
+  // ほかの所を押す・Esc で選ぶのをやめる。Backspace・Delete で削除（ユーザーの指示「キーボードのbackボタンで写真を削除できるようにする」2026-10-29）
   useEffect(() => {
     if (!selected) return;
     const outside = (e: PointerEvent) => {
@@ -313,17 +325,21 @@ function PhotoSlotView({
     };
     const esc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onSelect(false);
+      else if ((e.key === 'Backspace' || e.key === 'Delete') && !typingTarget(e.target)) {
+        e.preventDefault();
+        removeRef.current();
+      }
     };
     // iPad の Safari：2本の指でひねる・つまむとき、画面ごと拡大しないように
     const el = rootRef.current;
     const still = (e: Event) => e.preventDefault();
     document.addEventListener('pointerdown', outside, true);
-    document.addEventListener('keydown', esc);
+    document.addEventListener('keydown', esc, true); // 写真の欄（PhotoBoard）で写真を選んでいても、プレビューの写真を先に消す
     el?.addEventListener('gesturestart', still);
     el?.addEventListener('gesturechange', still);
     return () => {
       document.removeEventListener('pointerdown', outside, true);
-      document.removeEventListener('keydown', esc);
+      document.removeEventListener('keydown', esc, true);
       el?.removeEventListener('gesturestart', still);
       el?.removeEventListener('gesturechange', still);
     };
@@ -450,7 +466,7 @@ function PhotoSlotView({
     transform: b.rot ? `rotate(${b.rot}deg)` : undefined,
   });
   const tool =
-    'flex h-9 min-w-9 touch-manipulation items-center justify-center rounded-md border border-slate-300 bg-white px-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800';
+    'flex h-9 min-w-9 touch-manipulation items-center justify-center whitespace-nowrap rounded-md border border-slate-300 bg-white px-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800';
 
   return (
     // 選んでいるときは、つまみ・道具がほかの欄・下の枠より上に出るように
@@ -514,7 +530,7 @@ function PhotoSlotView({
               <div
                 role="toolbar"
                 aria-label={`${name}の向き・大きさ`}
-                className="absolute left-1/2 top-full flex gap-1 rounded-lg bg-white/95 p-1 shadow-lg ring-1 ring-slate-300"
+                className="absolute left-1/2 top-full flex w-max gap-1 whitespace-nowrap rounded-lg bg-white/95 p-1 shadow-lg ring-1 ring-slate-300"
                 style={{transform: `translate(-50%, ${6 * z}px) scale(${z})`, transformOrigin: 'top center'}}
               >
                 <button type="button" className={tool} title="左に回す" aria-label="左に回す" onClick={() => photos.onEdit(no, slot.slot, turn(edit, -1))}>
@@ -532,6 +548,11 @@ function PhotoSlotView({
                 {photos.onMark && (
                   <button type="button" className={tool} title="写真に書き込む" onClick={() => photos.onMark?.(no, slot.slot)}>
                     ✏️ 書き込み
+                  </button>
+                )}
+                {photos.onRemove && (
+                  <button type="button" className={tool} title="写真を削除（Backspace・Delete）" onClick={() => removeRef.current()}>
+                    削除
                   </button>
                 )}
                 <button type="button" className={`${tool} border-sky-600 text-sky-800`} onClick={() => onSelect(false)}>

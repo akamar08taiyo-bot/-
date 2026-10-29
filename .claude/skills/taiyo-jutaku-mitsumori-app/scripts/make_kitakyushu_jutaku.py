@@ -288,7 +288,8 @@ def photo_fields(pg, n, after_only):
         fs.append(F(f'place{k}', list(V), h='center', size=10.5, wrap=True, shrink=True))
         if not after_only:
             memo = pg.region(P[2] + 5, P[3] + 4)
-            fs.append(F(f'memo{k}', list(memo), size=9, wrap=True, v='top'))
+            # 改修の内容：大きな字でまん中に（ユーザーの指示「左上に寄せるのではなく、しっかりと大きく表示してください」2026-10-29。入らなければアプリが小さくする）
+            fs.append(F(f'memo{k}', list(memo), size=14, h='center', wrap=True))
     return fs
 
 
@@ -321,7 +322,8 @@ pg7 = next(i for i in range(30) if '平面図' in ''.join(c['text'] for c in __i
 s5 = {'name': '平面図', 'pdf': kanda_pdf, 'segs': [[pg7, None, None]], 'font': 'ＭＳ Ｐゴシック', 'fonts': {'IPAPGothic': 'ＭＳ Ｐゴシック'}, 'drop': [[40, 400, 60, 500]]}
 title = Page(s5).find('様邸')
 s5['fields'] = [F('name', [45, title['top'] - 3, title['x0'] - 2, title['bottom'] + 3], h='right', size=20, shrink=True),
-                F('plan', [45, 115, 549, 690], merge=False), F('legend', [45, 700, 549, 800], merge=False)]
+                # 図の枠は用紙の 6.5割ほど・下に工事内容と平面図に書く文字（ユーザーの指示「平面図の入力欄が大きすぎるので、画面全体の6.5割程度におさえて、下に文字を入力できるようにする」2026-10-29）
+                F('plan', [45, 115, 549, 600], merge=False), F('legend', [45, 610, 549, 800], merge=False)]
 sheets.append(s5)
 for n in range(10):
     s = {'name': '内容報告書（写真）' + (f' ({n + 1})' if n else ''), 'pdf': naiyo, 'segs': [[0, None, None]], **MARU, 'bold': ['住宅改修内容報告書（写真）']}
