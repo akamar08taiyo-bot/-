@@ -1,7 +1,9 @@
 // 写真貼付用紙の写真（ユーザーの指示「撮ってきた画像を、ドラッグ＆ドロップで貼り付けたり、添付して貼り付けたり」
 // 「写真番号の1番と2番の入れ替えなど、編集もしやすく」）。
 // 写真番号（見積書の箇所の順番。申請書の改修の内容と同じ）ごとに 改修前・改修後 の枠を並べる。枠に写真のファイルをドロップするか、枠を押して選ぶ。
-// 何枚かまとめて選ぶ（ドロップする）と、①から順に改修前の空いた枠に入る。
+// 何枚かまとめて選ぶ（ドロップする）と、①から順に改修前の空いた枠に入る。2枚より多いときは、写真を押した順に 1枚目・2枚目… の枠に貼る
+// （PhotoOrderDialog。ユーザーの指示「5つセットしたら、その5つのチェックした順番に、1枚目…5枚目に一度にいっぺんに写真が貼り付けられる」2026-10-29。
+// ファイルを選ぶ画面で選んだ順は、パソコンによって守られない）。
 // 写真の入れ替え：写真を押して選んでから入れ替えたい枠を押す（空いた枠なら移す）。差し替え・削除もできる。
 // 写真は縮めてこの端末に保存し（photos.ts）、申請書の Excel の写真貼付用紙（写真番号の用紙）に貼る。
 // 撮影日（申請書の一覧の「改修前日付・改修後日付」。苅田町・みやこ町の写真の用紙の「撮影日」）：写真を入れると、写真の撮影日時（Exif）、
@@ -23,7 +25,7 @@
 import {useEffect, useRef, useState} from 'react';
 import type {DragEvent, PointerEvent as ReactPointerEvent} from 'react';
 import type {EstimateRates} from '../calc.ts';
-import {Btn, DropArea, DropOverlay, pastedFiles, useFileDragging, useToast} from '../components/ui.tsx';
+import {Btn, DropArea, DropOverlay, Modal, pastedFiles, useFileDragging, useToast} from '../components/ui.tsx';
 import {circled, photoNumbers, swapPhotoNumbers} from '../estimateForms.ts';
 import {cleanEdit, turn} from '../photoEdit.ts';
 import {photoBounds, turnMarks} from '../photoMarks.ts';
@@ -68,6 +70,21 @@ export function photoPlaces(job: Pick<Job, 'places'>, rates: EstimateRates): {pl
 export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void, rates: EstimateRates) {
   const toast = useToast();
   const [busy, setBusy] = useState(0);
+  // 何枚かまとめて入れるときの、貼る順番を選ぶ画面（PhotoOrderDialog）。選んだ順（写真の番号の並び）か、やめたら null を返す
+  const [ordering, setOrdering] = useState<PhotoOrdering | null>(null);
+  const chooseOrder = (images: {file: Blob; name: string}[], dests: string[]) =>
+    new Promise<number[] | null>((resolve) => {
+      const items = images.map((x) => ({url: URL.createObjectURL(x.file), name: x.name}));
+      setOrdering({
+        items,
+        dests,
+        done: (order) => {
+          for (const x of items) URL.revokeObjectURL(x.url);
+          setOrdering(null);
+          resolve(order);
+        },
+      });
+    });
   // 新しい写真は、向き・大きさをそのまま（0°・枠いっぱい）にする
   const setPhoto = (key: PhotoKey, id: string | undefined, date: string | undefined) =>
     setJob((j) => ({...j, places: j.places.map((p) => (p.id === key.placeId ? withPhoto(p, key.slot, id, date, undefined) : p))}));
@@ -165,7 +182,18 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
       toast('写真を入れる空いた枠がありません（写真を押して差し替えます）', 'error');
       return;
     }
-    const used = images.slice(0, room);
+    // 2枚より多いときは、押した順に貼る（その順に、選んだ枠・そのあとの空いた枠へ）
+    let ordered = images;
+    if (images.length >= 2) {
+      const targets = [...(start ? list.filter((x) => x.place.id === start.placeId) : []), ...list.slice(from).filter(({place}) => !place.photos?.[slot])];
+      const order = await chooseOrder(
+        images,
+        targets.slice(0, room).map((x) => `${circled(x.no)}${x.place.name || '改修場所'} ${SLOT_LABEL[slot]}`),
+      );
+      if (!order?.length) return;
+      ordered = order.map((i) => images[i]);
+    }
+    const used = ordered.slice(0, room);
     setBusy((n) => n + used.length);
     for (const [i, {file, name}] of used.entries()) {
       try {
@@ -182,7 +210,7 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
         setBusy((n) => n - 1);
       }
     }
-    if (images.length > used.length) toast(`写真番号の枠が足りないので、${images.length - used.length}枚は入れませんでした`, 'error');
+    if (ordered.length > used.length) toast(`写真番号の枠が足りないので、${ordered.length - used.length}枚は入れませんでした`, 'error');
   };
   /** 2つの枠の写真を入れ替える（片方が空なら移す）。撮影日・向きと大きさ・書き込みも一緒に */
   const swap = (a: PhotoKey, b: PhotoKey) =>
@@ -205,7 +233,82 @@ export function usePhotoActions(job: Job, setJob: (fn: (j: Job) => Job) => void,
     e.stopPropagation();
     if (e.dataTransfer.files.length) void put([...e.dataTransfer.files], target);
   };
-  return {put, swap, remove, drop, setDate, setNote, setEdit, setMarks, swapPlaces, busy};
+  return {put, swap, remove, drop, setDate, setNote, setEdit, setMarks, swapPlaces, busy, ordering};
+}
+
+/** 貼る順番を選ぶ画面に出すもの：写真（画面の URL・ファイルの名前）・入る枠の名前（1枚目から）・選び終わったとき */
+export type PhotoOrdering = {items: {url: string; name: string}[]; dests: string[]; done: (order: number[] | null) => void};
+
+/**
+ * 何枚かまとめて入れた写真を、押した順に 1枚目・2枚目… の枠に貼る画面。押すと番号と入る枠が付き、もう一度押すと外す（うしろの番号はつめる）。
+ * 「残りを今の順で」で、まだ押していない写真を並びの順に足す。貼るのは番号の付いた写真だけ
+ */
+export function PhotoOrderDialog({ordering}: {ordering: PhotoOrdering | null}) {
+  const [picked, setPicked] = useState<number[]>([]);
+  useEffect(() => setPicked([]), [ordering]);
+  if (!ordering) return null;
+  const {items, dests, done} = ordering;
+  const toggle = (i: number) => setPicked((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i]));
+  const paste = () => picked.length && done(picked);
+  return (
+    <Modal
+      title="📷 押した順に貼ります"
+      wide
+      onClose={() => done(null)}
+      footer={
+        <>
+          <Btn color="white" onClick={() => done(null)}>
+            キャンセル
+          </Btn>
+          <Btn color="white" disabled={picked.length === 0} onClick={() => setPicked([])}>
+            選び直す
+          </Btn>
+          <Btn color="white" disabled={picked.length === items.length} onClick={() => setPicked((p) => [...p, ...items.map((_, i) => i).filter((i) => !p.includes(i))])}>
+            残りを今の順で
+          </Btn>
+          <Btn color="softBlue" disabled={picked.length === 0} onClick={paste}>
+            この順番で貼る（{picked.length}枚）
+          </Btn>
+        </>
+      }
+    >
+      <div
+        role="group"
+        aria-label="貼る写真"
+        className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.nativeEvent.isComposing && picked.length && !(e.target instanceof HTMLButtonElement)) paste();
+        }}
+      >
+        {items.map((x, i) => {
+          const n = picked.indexOf(i);
+          return (
+            <button
+              key={i}
+              type="button"
+              aria-pressed={n >= 0}
+              aria-label={x.name}
+              onClick={() => toggle(i)}
+              className={`relative flex flex-col overflow-hidden rounded-lg border-2 bg-white text-left ${n >= 0 ? 'border-sky-600 ring-2 ring-sky-200' : 'border-slate-200 hover:border-sky-400'}`}
+            >
+              <span className="flex aspect-[4/3] items-center justify-center bg-slate-100">
+                <img src={x.url} alt="" className="max-h-full max-w-full object-contain" />
+              </span>
+              {n >= 0 && (
+                <span className="absolute left-1.5 top-1.5 flex h-9 min-w-9 items-center justify-center rounded-full bg-sky-600 px-2 text-lg text-white shadow" data-order={n + 1}>
+                  {n + 1}
+                </span>
+              )}
+              <span className="truncate px-2 pt-1 text-xs text-slate-500">{x.name}</span>
+              <span className={`px-2 pb-1.5 text-sm ${n >= 0 ? (n < dests.length ? 'text-sky-800' : 'text-amber-700') : 'text-slate-400'}`}>
+                {n < 0 ? '　' : n < dests.length ? `→ ${dests[n]}` : '→ 入る枠がありません'}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </Modal>
+  );
 }
 
 /** 写真（画像）か PDF のファイルか（写真の枠・平面図の枠に入れられるもの） */

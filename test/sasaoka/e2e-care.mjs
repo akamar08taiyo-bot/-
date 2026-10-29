@@ -28,7 +28,7 @@ await page.getByRole('button', {name: /サンプルで試す/}).click();
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 const estimateTab = page.getByRole('tab', {name: /工事見積書/});
 if ((await estimateTab.getAttribute('aria-selected')) !== 'true') await estimateTab.click();
-await page.getByRole('combobox', {name: '保険者'}).selectOption('kanda');
+await page.getByRole('combobox', {name: '保険者', exact: true}).selectOption('kanda');
 const sheet = page.getByRole('region', {name: '見積書', exact: true});
 await sheet.waitFor();
 

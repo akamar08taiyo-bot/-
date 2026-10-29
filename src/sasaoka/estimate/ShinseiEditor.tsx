@@ -25,7 +25,7 @@ import type {AppData, Insurer, Job, Material, Place, PlaceDims, Settings, Shinse
 import type {Update} from '../useStore.ts';
 import {toKatakana, yen} from '../util.ts';
 import {zipCandidates} from '../zip.ts';
-import {PhotoBoard, photoPlaces, SLOT_LABEL, usePhotoActions, usePlanActions} from './PhotoBoard.tsx';
+import {PhotoBoard, PhotoOrderDialog, photoPlaces, SLOT_LABEL, usePhotoActions, usePlanActions} from './PhotoBoard.tsx';
 import {PhotoMarkEditor} from './PhotoMarkEditor.tsx';
 import type {PhotoKey, PhotoSlot} from './PhotoBoard.tsx';
 import {canMakeShinsei, saveShinsei, useTemplate} from './shinseiFiles.ts';
@@ -603,6 +603,7 @@ export function ShinseiEditor({
               }}
             />
             <PhotoBoard job={job} rates={s} sheetNos={sheetNos} dates={!!map?.sheets.some((x) => x.photoPlace?.dates)} actions={photoActions} onPick={pickPhoto} onMark={setMarking} paperSize={paperSize} />
+            <PhotoOrderDialog ordering={photoActions.ordering} />
             {marking && markPlace && markPhoto && (
               <PhotoMarkEditor
                 key={`${marking.placeId}:${marking.slot}`}

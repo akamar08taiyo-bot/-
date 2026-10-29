@@ -521,7 +521,7 @@ log('笹岡工務店の請求書に最初から入る・外す・仕切価格を
 
 // ---------------- 工事場所の住所の市町村が保険者と違うと知らせる（打っている途中では変えない。変えるのはボタンで）。
 // みやこ町は書式は同じで保険者だけ変わる。築上町は広域連合（書式も広域連合用）。材／手を「手」にすると施工費（数量は時間・1時間2,500円）
-const insurer = page.getByRole('combobox', {name: '保険者'});
+const insurer = page.getByRole('combobox', {name: '保険者', exact: true});
 assert.equal(await insurer.inputValue(), 'yukuhashi');
 await typeIn('job:address', '福岡県京都郡みやこ町豊津');
 await page.getByRole('button', {name: '保険者をみやこ町にする'}).click();

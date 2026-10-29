@@ -385,14 +385,38 @@ const pdfOf = async (jpeg) => {
 };
 const srcOf = (loc) => loc.locator('img').getAttribute('src');
 const emptySlot = async (loc) => (await loc.locator('img').count()) === 0 && (await loc.innerText()).startsWith('＋');
-// 「📷 写真を選ぶ」で2枚：①玄関・②トイレの改修前に順に入る
+// 「📷 写真を選ぶ」で2枚：押した順に ①玄関・②トイレの改修前に入る（ユーザーの指示「チェックした順番に、1枚目…に一度にいっぺんに」2026-10-29）。
+// ファイルの並び（blue → red）ではなく、押した順（red → blue）
 const [chooser] = await Promise.all([page.waitForEvent('filechooser'), photoBoard.getByRole('button', {name: '📷 写真を選ぶ'}).click()]);
 await chooser.setFiles([
-  {name: 'red.png', mimeType: 'image/png', buffer: red},
   {name: 'blue.png', mimeType: 'image/png', buffer: blue},
+  {name: 'red.png', mimeType: 'image/png', buffer: red},
 ]);
+{
+  const order = page.getByRole('dialog').filter({hasText: '押した順に貼ります'});
+  const pics = order.getByRole('group', {name: '貼る写真'});
+  await pics.waitFor();
+  const paste = order.getByRole('button', {name: /^この順番で貼る/});
+  assert.equal(await paste.isDisabled(), true);
+  await pics.getByRole('button', {name: 'blue.png'}).click();
+  await pics.getByRole('button', {name: 'red.png'}).click();
+  assert.match(await pics.getByRole('button', {name: 'blue.png'}).innerText(), /1[\s\S]*→ ①玄関 改修前/);
+  assert.match(await pics.getByRole('button', {name: 'red.png'}).innerText(), /2[\s\S]*→ ②トイレ 改修前/);
+  // もう一度押すと外れて、うしろの番号がつまる
+  await pics.getByRole('button', {name: 'blue.png'}).click();
+  assert.match(await pics.getByRole('button', {name: 'red.png'}).innerText(), /1[\s\S]*→ ①玄関 改修前/);
+  assert.equal(await pics.getByRole('button', {name: 'blue.png'}).getAttribute('aria-pressed'), 'false');
+  await page.screenshot({path: path.join(outDir, '85a-photo-order.png')});
+  await order.getByRole('button', {name: '残りを今の順で'}).click();
+  assert.equal(await paste.innerText(), 'この順番で貼る（2枚）');
+  await paste.click();
+  await order.waitFor({state: 'detached'});
+}
 await slot('①', '玄関', '改修前').locator('img').waitFor();
 await slot('②', 'トイレ', '改修前').locator('img').waitFor();
+// ①は横長の red（1600×1200）、②は縦長の blue
+assert.ok(await slot('①', '玄関', '改修前').locator('img').evaluate((el) => el.naturalWidth > el.naturalHeight), '押した順に入らない');
+assert.ok(await slot('②', 'トイレ', '改修前').locator('img').evaluate((el) => el.naturalWidth < el.naturalHeight), '押した順に入らない');
 const [redSrc, blueSrc] = [await srcOf(slot('①', '玄関', '改修前')), await srcOf(slot('②', 'トイレ', '改修前'))];
 assert.ok(await emptySlot(slot('①', '玄関', '改修後')));
 // ①玄関の改修後の枠に写真のファイルをドロップ
@@ -965,6 +989,13 @@ await chooser3.setFiles([
   {name: 'red.png', mimeType: 'image/png', buffer: red},
   {name: 'blue.png', mimeType: 'image/png', buffer: blue},
 ]);
+// 指で押した順に（red → blue）
+{
+  const pics = ipad.getByRole('dialog').getByRole('group', {name: '貼る写真'});
+  await pics.getByRole('button', {name: 'red.png'}).tap();
+  await pics.getByRole('button', {name: 'blue.png'}).tap();
+  await ipad.getByRole('dialog').getByRole('button', {name: 'この順番で貼る（2枚）'}).tap();
+}
 const slot2 = (no, name, which) => board2.getByRole('button', {name: `${no}${name} ${which}`, exact: true});
 /** 指で押した結果（click）は少し遅れて届くことがあるので、そうなるまで待つ（3秒まで） */
 const until = async (check, what) => {
@@ -1063,7 +1094,7 @@ log('iPad・スマホ（指で見出し・写真の上を押したままドラ�
 // ---------------- 苅田町：保険者を替えると苅田町の申請書。丸は残る（もう一度押すと外れる）。事後申請書は式で同じ内容
 await shinseiTab.click();
 assert.equal(await page.getByRole('button', {name: /^保険者を.*にする$/}).count(), 0);
-await page.getByRole('combobox', {name: '保険者'}).selectOption('kanda');
+await page.getByRole('combobox', {name: '保険者', exact: true}).selectOption('kanda');
 await pageOf('事前申請書').waitFor();
 assert.deepEqual(await pageNames(), ['事前申請書', '委任状', '平面図  (2)', '1 ', '1  (3)']);
 // 工事場所の住所（行橋市）と違う保険者を選ぶと、見積書のタブと同じく知らせる（変えるのはボタンで）
@@ -1171,7 +1202,7 @@ const boxes = (col, n, row) =>
     const name = (kk) => (kk <= 0 ? '' : name(Math.floor((kk - 1) / 26)) + String.fromCharCode(65 + ((kk - 1) % 26)));
     return `${name(c)}${row}`;
   });
-await page.getByRole('combobox', {name: '保険者'}).selectOption('miyako');
+await page.getByRole('combobox', {name: '保険者', exact: true}).selectOption('miyako');
 await pageOf('住宅改修承認届出書').waitFor();
 assert.deepEqual(await pageNames(), ['住宅改修承認届出書', '住宅改修費支給申請書(受領委任払用)', '住宅改修内訳明細書', '平面図', '写真 (1)', '写真 (2)']);
 // 内訳明細書の氏名（式で承認届出書と同じ）を押しても、一覧の氏名の欄へ
@@ -1201,7 +1232,7 @@ assert.equal(await pageOf('写真 (2)').locator('svg ellipse').count(), 1);
 log('みやこ町の申請書（6枚のプレビュー・式の欄も押せる・承認届出書・支給申請書・内訳明細書・写真・改修の種別の丸）OK');
 
 // ---------------- 広域連合（築上町など）：承認申請書・支給申請書（受領委任払用）・内訳明細書（別紙）・平面図・写真貼付用紙
-await page.getByRole('combobox', {name: '保険者'}).selectOption('kouiki');
+await page.getByRole('combobox', {name: '保険者', exact: true}).selectOption('kouiki');
 await pageOf('様式第2号（住宅改修承認申請書）').waitFor();
 // 広域連合の一覧にも郵便番号（住所の前。ユーザーの指示で足した）
 assert.deepEqual((await rowLabels()).slice(0, 8), ['フリガナ', '被保険者氏名', '被保険者番号', '保険者番号', '生年月日', '性別', '郵便番号', '住所']);
@@ -1216,13 +1247,13 @@ assert.deepEqual(vertical, {n: 8, sameX: true, down: true, inside: true});
 await pageOf('写真貼付用紙').screenshot({path: path.join(outDir, '89-kouiki-photo-vertical.png')});
 assert.deepEqual(await pageNames(), ['様式第2号（住宅改修承認申請書）', '様式第7号（住宅改修費支給申請書（受領委任払用）', '様式第2号別紙（住宅改修内訳明細書）', '平面図 (2)', '写真貼付用紙', '写真貼付用紙 (2)']);
 assert.ok((await preview.innerText()).includes('様式第２号（第６条関係）')); // ヘッダー
-await estimateTab.click();
-await sheet.locator('.form-page', {hasText: '内訳書　様式'}).first().waitFor(); // 見積書は広域連合用になる
 // 保険者番号：広域連合は構成市町村ごとに番号がちがうので選ぶ（ユーザーの指示 2026-10-29）。住所（行橋市）が構成市町村でなければ原本の 406470（築上町）
 const insurerNo = form.getByRole('combobox', {name: '保険者番号'});
 assert.equal(await insurerNo.inputValue(), '406470');
 assert.ok((await insurerNo.locator('option').allInnerTexts()).some((t) => t.includes('402149') && t.includes('豊前市')));
 await insurerNo.selectOption('402149'); // 豊前市
+await estimateTab.click();
+await sheet.locator('.form-page', {hasText: '内訳書　様式'}).first().waitFor(); // 見積書は広域連合用になる
 const kk = await make();
 assert.equal(kk.name, '（サンプル）山田様住宅改修申請書.xlsx');
 const g = sheetsOf(kk.bytes);
@@ -1251,10 +1282,10 @@ assert.deepEqual(SHINSEI_PHOTO_SHEETS.kouiki.map((n) => g.ellipses(n)), [1, 1, 1
 log('広域連合の申請書（6枚のプレビュー・ヘッダー・承認申請書・支給申請書・内訳明細書・平面図・写真貼付用紙・丸）OK');
 // 4つの保険者すべてで申請書の Excel のボタンが出る
 for (const i of ['kanda', 'yukuhashi', 'miyako', 'kouiki']) {
-  await page.getByRole('combobox', {name: '保険者'}).selectOption(i);
+  await page.getByRole('combobox', {name: '保険者', exact: true}).selectOption(i);
   assert.equal(await page.getByRole('button', {name: '📗 申請書をExcelで保存'}).count(), 1, i);
 }
-await page.getByRole('combobox', {name: '保険者'}).selectOption('kanda');
+await page.getByRole('combobox', {name: '保険者', exact: true}).selectOption('kanda');
 
 // ---------------- 見積もりの入口：「申請書（Excel）から作る」はない（ユーザーの指示「不要」）。タブの名前は「見積もり・申請書を作成する」
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();

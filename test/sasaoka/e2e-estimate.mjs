@@ -109,7 +109,7 @@ const typeIn = async (k, text, end = 'Enter') => {
   await page.waitForTimeout(60);
 };
 assert.deepEqual(await totals(), ['合計', '26,950', '26,950']);
-assert.deepEqual(await page.getByRole('combobox', {name: '保険者'}).locator('option').allInnerTexts(), ['苅田町', '行橋市', 'みやこ町', '広域連合', '福岡市', '北九州市']); // 福岡市・北九州市は 2026-10-29 から
+assert.deepEqual(await page.getByRole('combobox', {name: '保険者', exact: true}).locator('option').allInnerTexts(), ['苅田町', '行橋市', 'みやこ町', '広域連合', '福岡市', '北九州市']); // 福岡市・北九州市は 2026-10-29 から
 
 // ---------------- 見積書の欄：被保険者番号・切って使う手すりを 120cm（1.2÷4＝0.3本×16,000＝4,800）
 await typeIn('job:insuredNo', '0000366989');
@@ -282,7 +282,7 @@ assert.deepEqual(await totals(), ['合計', '59,600', '53,720']);
 log('介護保険の対象外OK');
 
 // ---------------- 広域連合用に変える：写真番号・改修の種類を見積書の欄で入れる。施工費は「時間×2,500円」。2ページ（Ｐ－1・Ｐ－2）
-await page.getByRole('combobox', {name: '保険者'}).selectOption('kouiki'); // 広域連合 → 広域連合用の書式
+await page.getByRole('combobox', {name: '保険者', exact: true}).selectOption('kouiki'); // 広域連合 → 広域連合用の書式
 await sheet.locator('.form-page', {hasText: '内訳書　様式'}).first().waitFor();
 await typeIn(await key('L型手すり', 'photo'), '5');
 await typeIn(await key('L型手すり', 'kind'), '5');
@@ -391,6 +391,8 @@ await page.getByRole('button', {name: '数え終わったら閉じる'}).click()
 const kitText = await kitCard.innerText();
 assert.ok(kitText.includes('10,800円') && kitText.includes('仕切り 9,300円'), kitText);
 assert.deepEqual((await kitCard.locator('tbody tr').allInnerTexts()).map((t) => t.split('\n')[0].split('\t')[0]), ['部材', '施工費']);
+// 施工費の行は、取り付ける部材の商品名と型番（ユーザーの指示「商品名と型番を記載する」2026-10-29）。施工費の名前は「取付手間：タイル」
+assert.match(await kitCard.locator('tbody tr').nth(1).innerText(), /L型手すり S-TL01 の施工費[\s\S]*取付手間：タイル/);
 await page.getByRole('tab', {name: '部材＋施工費（常用・3件）'}).waitFor();
 log('部材＋施工費（常用）のセットを登録OK');
 
