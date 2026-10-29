@@ -1463,7 +1463,8 @@ test('北九州市：事前届出書（提出用・通知用）に書く。改�
     assert.equal(at(c.other0), '勝手口', name);
     assert.match(at(c.places[1]), /□浴室　■トイレ/, name);
     assert.equal(at(c.places2[1]), '□洗面脱衣室　□その他（', name); // その他はなし（原本のまま）
-    assert.deepEqual([at(c.builder), at(c.builderRep), at(c.builderZipA), at(c.builderZipB), at(c.builderAddress), at(c.manager)], ['太陽シルバーサービス株式会社　小倉営業所', '小倉営業所所長　見本 次郎', '802', '0000', '福岡県北九州市小倉北区見本1-1', '見本 三郎'], name);
+    // 所在地は郵便番号と住所の1行（原本の小さな「〒」「-」の欄に分けて書くと、郵便番号だけ小さく上にずれて見えた。ユーザーの指摘 2026-10-29）
+    assert.deepEqual([at(c.builder), at(c.builderRep), at(c.builderAddress), at(c.manager)], ['太陽シルバーサービス株式会社　小倉営業所', '小倉営業所所長　見本 次郎', '〒802-0000　福岡県北九州市小倉北区見本1-1', '見本 三郎'], name);
     assert.deepEqual([at(c.builderTelA), at(c.builderTelB), at(c.builderTelC)], ['093', '000', '0000'], name);
     // 工事費見積金額①は介護保険の対象分（市の記入例）、支給予定金額は ①×90／100（1割負担。限度額20万円まで）
     assert.equal(at(c.cost), shinseiCost(kk, KK_S)!.toLocaleString('en-US'), name);

@@ -171,8 +171,6 @@ const TEXT_FIELD: Record<keyof ShinseiTexts, ShinseiField> = {
   telC: 'phone',
   telHead: 'phone',
   telTail: 'phone',
-  builderZipA: 'works',
-  builderZipB: 'works',
   builderZipAddress: 'works',
   builderTelA: 'works',
   builderTelB: 'works',

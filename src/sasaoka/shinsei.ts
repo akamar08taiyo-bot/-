@@ -120,8 +120,6 @@ export type ShinseiTexts = Record<
   | 'telC'
   | 'telHead'
   | 'telTail'
-  | 'builderZipA'
-  | 'builderZipB'
   | 'builderZipAddress'
   | 'builderTelA'
   | 'builderTelB'
@@ -237,9 +235,8 @@ function kitakyushuTodoke(sheet: string, c: (typeof KK_CELLS)['todoke'] | (typeo
       T(c.relation, '{relation}'),
       T(c.builder, '{builder}'),
       T(c.builderRep, '{builderRep}'),
-      T(c.builderZipA, '{builderZipA}'),
-      T(c.builderZipB, '{builderZipB}'),
-      T(c.builderAddress, '{builderAddress}'),
+      // 所在地は「〒802-0001　福岡県北九州市…」の1行（郵便番号と住所を同じ大きさで。原本の小さな「〒」「-」は外した。make_kitakyushu_jutaku.py）
+      T(c.builderAddress, '{builderZipAddress}'),
       T(c.manager, '{manager}'),
       T(c.builderTelA, '{builderTelA}'),
       T(c.builderTelB, '{builderTelB}'),
@@ -870,7 +867,6 @@ export function shinseiValues(job: Job, s: EstimateSettings & BuilderSettings, t
   const [telA, telB, telC] = splitNumber(t(info.phone), 3);
   const [telHead, telTail] = splitNumber(t(info.phone), 2);
   const postal = t(s.postal ?? '');
-  const [builderZipA, builderZipB] = splitNumber(postal, 2, true);
   const [builderTelA, builderTelB, builderTelC] = splitNumber(t(s.tel ?? ''), 3);
   const benefit = careAmounts(job, s).benefit;
   const kinds = shinseiKinds(job, s);
@@ -928,8 +924,6 @@ export function shinseiValues(job: Job, s: EstimateSettings & BuilderSettings, t
       telC,
       telHead,
       telTail,
-      builderZipA,
-      builderZipB,
       builderZipAddress: [postal && `〒${postal}`, (s.address ?? '').trim()].filter(Boolean).join('　'),
       builderTelA,
       builderTelB,
@@ -1238,8 +1232,6 @@ export const EMPTY_SHINSEI: ShinseiValues = {
     telC: '',
     telHead: '',
     telTail: '',
-    builderZipA: '',
-    builderZipB: '',
     builderZipAddress: '',
     builderTelA: '',
     builderTelB: '',

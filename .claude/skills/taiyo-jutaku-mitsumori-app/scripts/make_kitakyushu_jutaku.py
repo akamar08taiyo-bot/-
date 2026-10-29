@@ -126,8 +126,22 @@ def center(r):
 KIND_LABELS = ['□手すり取付', '□段差の解消', '□床材等の変更', '□引き戸等への', '□洋式便器等へ', '□付帯工事']
 
 
-def todoke_fields(pg, notice):
-    """事前届出書の欄（notice＝2枚目の通知用。左上は〒・住所・氏名の送り先の欄で、見出しがない）"""
+def page_box(sh, box):
+    """つないだ座標（Page の items・欄）の四角 → drop に書く [x0, 上, x1, 下, ページ]（ページの座標）"""
+    yoff = 0.0
+    for sg in sh['segs']:
+        pg_no, top, bottom = sg[0], sg[1] or 0.0, sg[2]
+        yoff += sg[3] if len(sg) > 3 else 0.0
+        end = yoff + (bottom - top) if bottom is not None else float('inf')
+        if yoff <= (box[1] + box[3]) / 2 <= end:
+            return [box[0], box[1] - yoff + top, box[2], box[3] - yoff + top, pg_no]
+        yoff = end
+    sys.exit(f'{box} がどのページにもない')
+
+
+def todoke_fields(pg, notice, sh):
+    """事前届出書の欄（notice＝2枚目の通知用。左上は〒・住所・氏名の送り先の欄で、見出しがない）。
+    sh に drop（入れない原本の字）を足す"""
     fs = []
     if notice:
         z = pg.find('〒')
@@ -187,9 +201,10 @@ def todoke_fields(pg, notice):
     tel = pg.find('電話番号', near=P)
     d1 = pg.after(tel, '－')
     d2 = pg.after(d1, '－')
-    fs += [F('builderZipA', [z['x1'] + 0.5, z['top'] - 0.5, dz['x0'] - 0.5, z['bottom'] + 1], h='center', size=8),
-           F('builderZipB', [dz['x1'] + 0.5, z['top'] - 0.5, dz['x1'] + 30, z['bottom'] + 1], size=8),
-           F('builderAddress', [dz['x1'] + 32, z['top'] - 0.5, P[2] - 2, mgr['top'] - 1], size=9, shrink=True),
+    # 所在地は「〒802-0001　福岡県北九州市…」の1行（郵便番号と住所を同じ大きさ・同じ高さに）。原本の小さな「〒」「-」（8pt）の欄に数字を入れると、
+    # 「-」が点に見え、郵便番号だけ小さく上にずれて見えた（ユーザーの指摘「北九州の郵便番号が綺麗に入力されていない」2026-10-29）→ 原本の「〒」「-」は入れない
+    sh.setdefault('drop', []).extend(page_box(sh, [it['x0'] - 0.3, it['top'] - 0.3, it['x1'] + 0.3, it['bottom'] + 0.3]) for it in (z, dz))
+    fs += [F('builderAddress', [z['x0'] - 0.5, z['top'] - 0.5, P[2] - 2, mgr['top'] - 1], size=9, shrink=True),
            F('manager', [mgr['x1'] + 1, mgr['top'] - 1, tel['x0'] - 2, P[3] - 0.5], size=8, shrink=True),
            F('builderTelA', [tel['x1'] + 1, tel['top'] - 1, d1['x0'] - 1, P[3] - 0.5], h='center', size=8),
            F('builderTelB', [d1['x1'] + 1, tel['top'] - 1, d2['x0'] - 1, P[3] - 0.5], h='center', size=8),
@@ -296,11 +311,11 @@ sheets = []
 
 s1 = {'name': '事前届出書', 'pdf': todoke, 'segs': [[0, None, 747.5]], **GOTHIC, 'bold': ['施工についての注意点'],
       'texts': [{'text': '様式①　提出用', 'box': [464, 754, 545, 766], 'size': 10.5}]}
-s1['fields'] = todoke_fields(Page(s1), False)
+s1['fields'] = todoke_fields(Page(s1), False, s1)
 sheets.append(s1)
 s2 = {'name': '事前届出書（通知用）', 'pdf': todoke, 'segs': [[0, 745, 805.25], [1, 51.35, 702]], 'join': [[40, 268]], 'drop': [[455, 750, 545, 769, 0]],
       **GOTHIC, 'bold': ['施工についての注意点']}
-s2['fields'] = todoke_fields(Page(s2), True)
+s2['fields'] = todoke_fields(Page(s2), True, s2)
 sheets.append(s2)
 # 支給申請書：LibreOffice で折り返した見出し（フリガナ・改修の内容…）は Word と同じ1行・2行に直す
 s3 = {'name': '支給申請書', 'pdf': shikyu, 'segs': [[0, None, 812]], **GOTHIC, 'bold': ['介護保険居宅介護（予防）住宅改修費支給申請書（受領委任払用）'],

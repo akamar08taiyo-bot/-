@@ -112,6 +112,8 @@ for (const [name, c] of [['事前届出書', KK_CELLS.todoke], ['事前届出書
   assert.match(text(name, c.kinds[0]), /^■手すり取付/, name); // サンプルの①玄関・②トイレは手すりの取り付け
   assert.match(text(name, c.places[0]), /■玄関・屋外.*■トイレ/, name);
   assert.match(text(name, c.builder), /^太陽シルバーサービス.*行橋営業所$/, name);
+  // 施工予定業者の所在地は郵便番号と住所の1行（ユーザーの指摘「北九州の郵便番号が綺麗に入力されていない」2026-10-29）
+  assert.match(text(name, c.builderAddress), /^〒\d{3}-\d{4}　福岡県/, name);
 }
 const s = KK_CELLS.shikyu;
 assert.deepEqual([text('支給申請書', s.kana), text('支給申請書', s.name)], ['サンプル　ヤマダ', '（サンプル）山田']);
