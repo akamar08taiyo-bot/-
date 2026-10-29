@@ -39,13 +39,29 @@ const pageOf = (name) => preview.getByRole('group', {name, exact: true});
 await pageOf('事前届出書').waitFor();
 await pageOf('内容報告書（写真）').waitFor();
 await page.waitForTimeout(800);
+// 保険者のすぐ右で区を選んで保険者番号を決める（ユーザーの指示「北九州市や福岡市では、保険者を選んだ後に、〇〇区を選んで、保険者番号を確定させる」2026-10-29）。
+// 初めは住所の小倉北区。保険者を選び直すと区の選ぶ所へ移る
+{
+  const area = page.getByRole('combobox', {name: '保険者番号'});
+  assert.equal(await area.inputValue(), '401067');
+  assert.equal(await area.evaluate((el) => el.closest('label').firstChild.textContent), '区');
+  assert.deepEqual(await area.locator('option').allInnerTexts(), ['門司区　401018', '若松区　401034', '戸畑区　401059', '小倉北区　401067', '小倉南区　401075', '八幡東区　401083', '八幡西区　401091']);
+  await page.getByRole('combobox', {name: '保険者', exact: true}).selectOption('yukuhashi');
+  assert.equal(await area.count(), 0); // 行橋市は1つなので選ばない（番号だけ）
+  await page.getByRole('combobox', {name: '保険者', exact: true}).selectOption('kitakyushu');
+  await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '保険者番号');
+  await area.selectOption('401091'); // 八幡西区
+  await page.locator('section', {has: page.getByRole('combobox', {name: '保険者', exact: true})}).first().screenshot({path: path.join(outDir, 'kitakyushu-0-area.png')});
+  await area.selectOption('401067');
+  await pageOf('事前届出書').waitFor();
+}
 const pageNames = () => preview.getByRole('group').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
 const names = await pageNames();
 // 写真番号①②（玄関・トイレ）：内容報告書は1枚に1つ（2枚）、完了報告書は1枚に2つ（1枚）。写真の用紙は写真番号の順（①の内容報告書・完了報告書、②の内容報告書）
 // 支給申請書の裏（代理人の委任状・注意書き）は書く欄がないのでプレビューには出さない（Excel には入る）
 assert.deepEqual(names, ['事前届出書', '事前届出書（通知用）', '支給申請書', '内容報告書（写真）', '完了報告書（写真）', '内容報告書（写真） (2)']);
 const rowLabels = async () => (await form.locator(':scope > div[data-field] > div:first-child').allInnerTexts()).map((t) => t.replace(/\s*（ひらがなで入力してもカタカナになります）$/, ''));
-assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '保険者番号', '郵便番号', '住所', '電話番号', '負担割合', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '工事費見積金額（介護保険対象分）', '着工日・完成日']);
+assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '郵便番号', '住所', '電話番号', '負担割合', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '工事費見積金額（介護保険対象分）', '着工日・完成日']);
 const pv = await preview.innerText();
 for (const t of ['介護保険住宅改修事前届出書', '介護保険居宅介護（予防）住宅改修費支給申請書（受領委任払用）', '住宅改修内容報告書（写真）', '住宅改修完了報告書（写真）', '小倉北区見本町1-2-3', '太陽シルバーサービス']) assert.ok(pv.includes(t), `プレビューに「${t}」がない`);
 assert.equal(await pageOf('内容報告書（写真）').getByRole('button', {name: /改修前/}).count(), 1);

@@ -8,7 +8,7 @@
 // 写真への書き込み（✏️。PhotoMarkEditor.tsx）は、写真貼付用紙の上の写真の大きさ（paperSize）で開く（線の太さ・文字の大きさが紙の上と同じ割合になるように）
 
 import {Fragment, useDeferredValue, useEffect, useMemo, useRef, useState} from 'react';
-import type {InputHTMLAttributes, KeyboardEvent, ReactNode} from 'react';
+import type {InputHTMLAttributes, KeyboardEvent, ReactNode, RefObject} from 'react';
 import {isBlankRow, jobName} from '../calc.ts';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {circled, eraOf, INSURER_IDS, INSURER_INFO, insurerForAddress, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, photoNumbers} from '../estimateForms.ts';
@@ -16,7 +16,7 @@ import {placeFromDims, withBrackets} from '../cutLink.ts';
 import {manualRow, newPlace} from '../rows.ts';
 import {usePhotoUrls} from '../photos.ts';
 import {turn} from '../photoEdit.ts';
-import {INSURER_AREAS, INSURER_GROUP, insurerNoOf} from '../insurerNumbers.ts';
+import {AREA_LABEL, INSURER_AREAS, insurerNoOf} from '../insurerNumbers.ts';
 import {photoBounds} from '../photoMarks.ts';
 import {costIsTotal, estimateLength, insuredBoxes, kindNamesOf, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, planPlacement, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
@@ -37,16 +37,17 @@ import {CardFill} from '../components/CardReader.tsx';
 import {JobHeader, JobTitle, RemoveJobButton} from './JobHeader.tsx';
 
 /** 欄の順番：保険者ごとの申請書の上からの順番（原本を見て決めた。みやこ町・広域連合は承認の申請書の順番で、支給申請書だけの着工日・完成日は最後）。
- *  ただし被保険者氏名はどの保険者もフリガナのすぐ下（ユーザーの指示「ふりがなの下に、名前をもってくる」、2026-10-21。苅田町・みやこ町は原本では番号が先） */
+ *  ただし被保険者氏名はどの保険者もフリガナのすぐ下（ユーザーの指示「ふりがなの下に、名前をもってくる」、2026-10-21。苅田町・みやこ町は原本では番号が先）。
+ *  保険者番号（区・市町村）は一覧ではなく、上の保険者のすぐ右で選ぶ（InsurerAreaPick） */
 const FIELDS: Record<Insurer, Field[]> = {
-  kanda: ['kana', 'name', 'insuredNo', 'insurerNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'dates', 'cost'],
-  yukuhashi: ['kana', 'name', 'insuredNo', 'insurerNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'dates', 'cost'],
-  miyako: ['kana', 'name', 'insuredNo', 'insurerNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'cost', 'renovated', 'dates'],
-  kouiki: ['kana', 'name', 'insuredNo', 'insurerNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'cost', 'renovated', 'dates'], // 郵便番号はユーザーの指示で足した（2026-10-21）
+  kanda: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'dates', 'cost'],
+  yukuhashi: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'dates', 'cost'],
+  miyako: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'cost', 'renovated', 'dates'],
+  kouiki: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'cost', 'renovated', 'dates'], // 郵便番号はユーザーの指示で足した（2026-10-21）
   // 福岡市：性別・郵便番号・要介護状態区分の欄はない。着工日・完成日は完了届出書（工事のあと）
-  fukuoka: ['kana', 'name', 'insuredNo', 'insurerNo', 'birth', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'cost', 'dates'],
+  fukuoka: ['kana', 'name', 'insuredNo', 'birth', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'cost', 'dates'],
   // 北九州市：生年月日・性別・要介護状態区分の欄はない。フリガナ・着工日・完成日は支給申請書（工事のあと）。工事費見積金額は介護保険の対象分（市の記入例）
-  kitakyushu: ['kana', 'name', 'insuredNo', 'insurerNo', 'zip', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'cost', 'dates'],
+  kitakyushu: ['kana', 'name', 'insuredNo', 'zip', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'cost', 'dates'],
 };
 // 負担割合は要介護状態区分のすぐ下（みやこ町・広域連合は電話番号の下）。申請書の原本に欄はないが、委任状の保険給付額・見積書の介護保険の内訳に使い、
 // 特定福祉用具の負担割合と同じ値（どちらで選んでも両方に入る。tokuteiLink.ts）。ユーザーの指示「住宅改修の申請書にも負担割合を設置。住宅改修⇔特定福祉用具などで連動して数字に繋げる」2026-10-28
@@ -117,6 +118,14 @@ export function ShinseiEditor({
   const setJob = (fn: (j: Job) => Job) => update('jobs', (list) => list.map((j) => (j.id === job.id ? {...fn(j), updatedAt: Date.now()} : j)));
   const setInfo = (patch: Partial<ShinseiInfo>) => setJob((j) => ({...j, shinsei: {...NO_SHINSEI, ...j.shinsei, ...patch}}));
   const setInsurer = (i: Insurer) => setJob((j) => ({...j, insurer: i, form: INSURER_INFO[i].form}));
+  // 保険者を選んだら、続けて区・市町村（保険者番号）を選ぶ所へ（ユーザーの指示「保険者を選んだ後に、〇〇区を選んで、保険者番号を確定させる」2026-10-29）
+  const areaRef = useRef<HTMLSelectElement>(null);
+  const [focusArea, setFocusArea] = useState(false);
+  useEffect(() => {
+    if (!focusArea) return;
+    areaRef.current?.focus();
+    setFocusArea(false);
+  }, [focusArea, insurer]);
   const byAddress = insurerForAddress(job.address);
   // 前から住所だけ入っている様邸：開いたときに、郵便番号が空なら住所から1つに決まる番号を入れる（住所を入れ直したときは useStore の withAddressZip。
   // ユーザーの指示「住所のみ入力した場合、逆に郵便番号を自動で入力される」2026-10-28）
@@ -330,32 +339,6 @@ export function ShinseiEditor({
             </span>
           </>
         );
-      case 'insurerNo': {
-        // 保険者番号：保険者の市町村・区から選ぶ（広域連合は構成市町村、福岡市・北九州市は区。ユーザーの指示「保険者を選択できる項目を入力欄に入れる」
-        // 「他の保険者も同様の仕様にする」2026-10-29）。初めは住所から。介護保険証から読んだ一覧にない番号もそのまま出す
-        const ins = jobInsurer(job);
-        const areas = ins ? INSURER_AREAS[ins] : [];
-        const cur = insurerNoOf(ins, job.address, info.insurerNo);
-        const odd = cur && !areas.some((a) => a.no === cur);
-        return (
-          <select
-            value={cur}
-            onChange={(e) => setInfo({insurerNo: e.target.value})}
-            disabled={areas.length < 2 && !odd}
-            className="h-10 w-full max-w-md rounded-md border border-slate-300 bg-white px-2 text-base disabled:bg-slate-50 disabled:text-slate-700"
-            aria-label="保険者番号"
-            // Enter では飛ばす（住所から選ぶので、打ち込む流れ（被保険者番号 → 生年月日）を止めない）
-          >
-            {!cur && <option value="">選んでください</option>}
-            {odd && <option value={cur}>{cur}（介護保険証の番号）</option>}
-            {areas.map((a) => (
-              <option key={a.no} value={a.no}>
-                {a.no}　{ins === 'kouiki' ? `${a.name}（${INSURER_GROUP.kouiki}）` : ins === 'fukuoka' || ins === 'kitakyushu' ? `${INSURER_GROUP[ins]} ${a.name}` : a.name}
-              </option>
-            ))}
-          </select>
-        );
-      }
       case 'birth':
         return (
           <>
@@ -523,7 +506,13 @@ export function ShinseiEditor({
           保険者
           <select
             value={insurer}
-            onChange={(e) => e.target.value && setInsurer(e.target.value as Insurer)}
+            onChange={(e) => {
+              if (!e.target.value) return;
+              const next = e.target.value as Insurer;
+              setInsurer(next);
+              // 区・市町村を選ぶ保険者なら、続けてその選ぶ所へ
+              if (AREA_LABEL[next]) setFocusArea(true);
+            }}
             className={`h-9 rounded-md border px-2 text-sm ${insurer ? 'border-slate-300 text-slate-800' : 'border-amber-400 bg-amber-50 text-amber-800'}`}
             aria-label="保険者"
           >
@@ -535,6 +524,7 @@ export function ShinseiEditor({
             ))}
           </select>
         </label>
+        {insurer && <InsurerAreaPick insurer={insurer} address={job.address} picked={info.insurerNo} onPick={(insurerNo) => setInfo({insurerNo})} selectRef={areaRef} />}
         {/* 工事場所の市町村が保険者と違うときは知らせる（見積書のタブと同じ。違う保険者を選んだまま、その申請書を作らないように。変えるのはボタンで） */}
         {byAddress && byAddress !== insurer && (
           <div className="flex w-full flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-900">
@@ -775,6 +765,48 @@ function Dim({
  * 寸法（ユーザーの指示「入力項目に長さ、高さという項目をつくる」「段差の解消は幅・奥行・高さの入力欄」）：手すりは 長さ（L=600mm。入れなければ見積書の使う長さ＝薄い字）・
  * 高さ（H=800mm。任意）、段差の解消は 幅・奥行・高さ（W600mm D350mm H150mm）。「そのほか」はうしろに足す文。下に、申請書に書く行を1行ずつの欄で出す（手で直せる）
  */
+/**
+ * 保険者番号：保険者のすぐ右で、北九州市・福岡市は区、広域連合は構成市町村（築上町・豊前市・上毛町・吉富町）を選んで決める
+ * （ユーザーの指示「北九州市や福岡市では、保険者を選んだ後に、〇〇区を選んで、保険者番号を確定させる、住宅改修、特定福祉用具申請書どちらも。
+ * 広域連合の場合は、広域連合を選択したら、その後に、同様に保険者を選択する（築上町、豊前市など）」2026-10-29。前は一覧の被保険者番号の下）。
+ * 初めは住所の区・市町村から（insurerNumbers.ts の insurerNoOf）。区・市町村が1つの保険者は番号を出すだけ。介護保険証から読んだ一覧にない番号もそのまま出す。
+ * プレビューの保険者番号のマスを押すとここへ（data-field="insurerNo"）
+ */
+function InsurerAreaPick({insurer, address, picked, onPick, selectRef}: {insurer: Insurer; address: string; picked: string; onPick: (no: string) => void; selectRef: RefObject<HTMLSelectElement | null>}) {
+  const areas = INSURER_AREAS[insurer];
+  const cur = insurerNoOf(insurer, address, picked);
+  const odd = !!cur && !areas.some((a) => a.no === cur);
+  const unit = AREA_LABEL[insurer];
+  if (!unit && !odd) {
+    return (
+      <div data-field="insurerNo" className="grid gap-1 text-xs font-bold text-slate-600">
+        保険者番号
+        <span className="flex h-9 items-center font-mono text-sm font-normal text-slate-800">{cur}</span>
+      </div>
+    );
+  }
+  return (
+    <label data-field="insurerNo" className="grid min-w-[11rem] gap-1 text-xs font-bold text-slate-600">
+      {unit || '保険者番号'}
+      <select
+        ref={selectRef}
+        value={cur}
+        onChange={(e) => onPick(e.target.value)}
+        className={`h-9 rounded-md border px-2 text-sm ${cur ? 'border-slate-300 text-slate-800' : 'border-amber-400 bg-amber-50 text-amber-800'}`}
+        aria-label="保険者番号"
+      >
+        {!cur && <option value="">（選ぶ）</option>}
+        {odd && <option value={cur}>{cur}（介護保険証の番号）</option>}
+        {areas.map((a) => (
+          <option key={a.no} value={a.no}>
+            {a.name}　{a.no}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (fn: (j: Job) => Job) => void; s: Settings; insurer: Insurer; materials: Material[]}) {
   const photos = photoNumbers(job, s);
   const setPlace = (id: string, fn: (p: Place) => Place) => setJob((j) => ({...j, places: j.places.map((p) => (p.id === id ? fn(p) : p))}));

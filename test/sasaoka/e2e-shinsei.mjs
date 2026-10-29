@@ -162,7 +162,7 @@ assert.ok(formBox && previewBox && formBox.x + formBox.width <= previewBox.x + 1
 assert.equal(await page.getByRole('group', {name: '入れ方'}).count(), 0);
 assert.equal(await page.getByRole('dialog').count(), 0);
 // 一覧は行橋市の申請書の順番（氏名が番号の前）。着工予定日はない（空白のまま。ユーザーの指示）
-assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '負担割合', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '完成予定日', '改修予定費用']);
+assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '負担割合', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '完成予定日', '改修予定費用']);
 assert.equal(await form.getByLabel('着工予定日').count(), 0);
 assert.match(await form.locator('div[data-field="kana"] > div:first-child').innerText(), /^フリガナ\s*（ひらがなで入力してもカタカナになります）$/);
 let pv = await preview.innerText();
@@ -1101,7 +1101,7 @@ assert.deepEqual(await pageNames(), ['事前申請書', '委任状', '平面図 
 assert.ok((await page.getByText('工事場所の住所は「行橋市」です。').count()) > 0);
 assert.equal(await page.getByRole('button', {name: '保険者を行橋市にする'}).count(), 1);
 // 一覧は苅田町の申請書の順番。ただし被保険者氏名はフリガナのすぐ下（ユーザーの指示）。完了予定日だけ（着工予定日は空白）
-assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '負担割合', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '完了予定日', '改修予定費用']);
+assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '要介護状態区分', '負担割合', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '完了予定日', '改修予定費用']);
 assert.equal(await form.getByLabel('完了予定日').inputValue(), '2026-11-20');
 assert.equal(await form.getByLabel('改修予定費用').inputValue(), '26,950');
 assert.ok((await form.innerText()).includes('見積書の合計（税込）'));
@@ -1235,7 +1235,7 @@ log('みやこ町の申請書（6枚のプレビュー・式の欄も押せる�
 await page.getByRole('combobox', {name: '保険者', exact: true}).selectOption('kouiki');
 await pageOf('様式第2号（住宅改修承認申請書）').waitFor();
 // 広域連合の一覧にも郵便番号（住所の前。ユーザーの指示で足した）
-assert.deepEqual((await rowLabels()).slice(0, 8), ['フリガナ', '被保険者氏名', '被保険者番号', '保険者番号', '生年月日', '性別', '郵便番号', '住所']);
+assert.deepEqual((await rowLabels()).slice(0, 7), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '性別', '郵便番号', '住所']);
 // 写真貼付用紙の改修の種別①〜⑥は、原本どおり縦書き（ユーザーの指示「縦で入力できるようにする」）：1文字ずつ下へ、欄の中に収まる
 const vertical = await pageOf('写真貼付用紙').evaluate((el) => {
   const span = [...el.querySelectorAll('span.sr-only')].find((x) => x.textContent === '手すりの取り付け');
@@ -1247,10 +1247,15 @@ assert.deepEqual(vertical, {n: 8, sameX: true, down: true, inside: true});
 await pageOf('写真貼付用紙').screenshot({path: path.join(outDir, '89-kouiki-photo-vertical.png')});
 assert.deepEqual(await pageNames(), ['様式第2号（住宅改修承認申請書）', '様式第7号（住宅改修費支給申請書（受領委任払用）', '様式第2号別紙（住宅改修内訳明細書）', '平面図 (2)', '写真貼付用紙', '写真貼付用紙 (2)']);
 assert.ok((await preview.innerText()).includes('様式第２号（第６条関係）')); // ヘッダー
-// 保険者番号：広域連合は構成市町村ごとに番号がちがうので選ぶ（ユーザーの指示 2026-10-29）。住所（行橋市）が構成市町村でなければ原本の 406470（築上町）
-const insurerNo = form.getByRole('combobox', {name: '保険者番号'});
+// 保険者番号：広域連合は構成市町村ごとに番号がちがうので選ぶ（ユーザーの指示 2026-10-29）。住所（行橋市）が構成市町村でなければ原本の 406470（築上町）。
+// 選ぶ所は保険者のすぐ右（見出し「市町村」。ユーザーの指示「広域連合を選択したら、その後に、同様に保険者を選択する（築上町、豊前市など）」）。保険者を選ぶとそこへ移る
+const insurerNo = page.getByRole('combobox', {name: '保険者番号'});
+assert.equal(await form.getByRole('combobox', {name: '保険者番号'}).count(), 0); // 一覧の中にはない
+assert.equal(await insurerNo.evaluate((el) => el === document.activeElement), true);
+assert.equal(await insurerNo.evaluate((el) => el.closest('label').firstChild.textContent), '市町村');
 assert.equal(await insurerNo.inputValue(), '406470');
 assert.ok((await insurerNo.locator('option').allInnerTexts()).some((t) => t.includes('402149') && t.includes('豊前市')));
+await page.locator('section', {has: page.getByRole('combobox', {name: '保険者', exact: true})}).first().screenshot({path: path.join(outDir, '89b-kouiki-area.png')});
 await insurerNo.selectOption('402149'); // 豊前市
 await estimateTab.click();
 await sheet.locator('.form-page', {hasText: '内訳書　様式'}).first().waitFor(); // 見積書は広域連合用になる
