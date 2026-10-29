@@ -657,7 +657,8 @@ for (const [name, vp, touch] of [
     assert.ok(r.x >= 0 && r.x + r.width <= close.x && r.width >= 44 && r.height >= 44, `${name} ${label} ${JSON.stringify(r)} 閉じる ${JSON.stringify(close)}`);
   }
   // 指の消しゴムで矢印を消す → 戻るで戻る
-  // tap() は押した結果（click）を待たないので、消しゴムに替わるのを待ってから描く
+  // tap() は押した結果（click）を待たないので、消しゴムに替わるのを待ってから描く。指で描いたすぐあとの tap は取りこぼすことがあるので間をあける（下の「戻る」と同じ）
+  await p2.waitForTimeout(800);
   await d2.getByRole('button', {name: /^消しゴム/}).tap();
   await d2.locator('button[aria-pressed="true"][aria-label^="消しゴム"]').waitFor();
   await touchAt('touchStart', pt(0.3, 0.6));
