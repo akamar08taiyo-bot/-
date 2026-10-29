@@ -609,7 +609,7 @@ def build_sheet(ws, pdf, sh):
             t0, b0 = it['cy'] - 0.6 * it['s'], it['cy'] + 0.6 * it['s']
         shapes.append({'text': it['text'], 'from': anchor(x0, t0), 'to': anchor(x1, b0), 'w': round((x1 - x0) / 0.75 * 9525), 'h': round((b0 - t0) / 0.75 * 9525),
                        'x': round((x0 - XB[0]) / 0.75 * 9525), 'y': round((t0 - YB[0]) / 0.75 * 9525),
-                       'font': font, 'size': it['s'], 'bold': it['b'], 'vertical': it['kind'] == 'v', 'h': it.get('h', 'left'), 'v': it.get('v', 'center')})
+                       'font': font, 'size': it['s'], 'bold': it['b'], 'vertical': it['kind'] == 'v', 'ha': it.get('h', 'left'), 'v': it.get('v', 'center')})
         out_items.append({'text': it['text'], 'ref': 'shape', 'kind': it['kind'], 'x0': round(it['x0'], 1), 'top': round(it['top'], 1)})
     # 文字のない囲まれた欄は結合（アプリが書けるように）
     for i0, j0, i1, j1 in regs_final:
@@ -668,7 +668,8 @@ def add_shapes(path, shapes_by_sheet):
         for k, sp in enumerate(shapes):
             fc, fco, fr, fro = sp['from']
             tc, tco, tr, tro = sp['to']
-            algn = {'left': 'l', 'center': 'ctr', 'right': 'r'}[sp['h']]
+            # 字のそろえは 'ha'（'h' は図形の高さ。前は同じ名前にして高さが「left」になり、Excel で開くと修復になる xlsx ができていた。2026-10-29）
+            algn = {'left': 'l', 'center': 'ctr', 'right': 'r'}[sp['ha']]
             anc = {'top': 't', 'center': 'ctr', 'bottom': 'b'}[sp['v']]
             vert = ' vert="eaVert"' if sp['vertical'] else ''
             b = ' b="1"' if sp['bold'] else ''

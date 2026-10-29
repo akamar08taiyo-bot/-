@@ -605,3 +605,14 @@ test('保険者番号（ユーザーの指示「広域連合の場合は、築�
   assert.equal(shinseiValues(sale({insurer: 'kitakyushu', address: '北九州市八幡東区見本1'}), S).insurerNo, '401083');
   assert.equal(shinseiValues(sale({insurer: 'yukuhashi'}), S).insurerNo, '402131');
 });
+
+test('原本の図形の大きさ（a:ext の cx・cy）はどれも数（前は北九州市の原本の文字の枠が cy="left" で、Excel で開くと修復になるおそれがあった。2026-10-29）', () => {
+  for (const key of Object.keys(TEMPLATE_FILES) as ShinseiKey[]) {
+    const files = template(key);
+    for (const [name, data] of Object.entries(files)) {
+      if (!/^xl\/drawings\/drawing\d+\.xml$/.test(name)) continue;
+      const bad = [...strFromU8(data).matchAll(/<a:ext\s[^>]*\bc[xy]="[^"]*"[^>]*>/g)].map((m) => m[0]).filter((e) => !/^<a:ext cx="\d+" cy="\d+"\/>$/.test(e));
+      assert.deepEqual(bad, [], `${key} ${name}`);
+    }
+  }
+});

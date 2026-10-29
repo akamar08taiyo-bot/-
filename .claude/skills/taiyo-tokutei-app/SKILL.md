@@ -52,6 +52,8 @@ URL は `#jutaku=<様邸の id>&embed=1`：その様邸の案件を開き（な�
   北九州市（2026-10-29、`kitakyushu.xlsx`）：支給申請書（受領委任払用）と概要書の表・裏の4シート。原本は市の様式（Word・Excel）から `scripts/make_kitakyushu_tokutei.py`
   （`scripts/pdf_form_xlsx.py` で PDF の線と字を Excel の罫線・欄に写す）で作り、欄の番地は `shinsei/kitakyushuCells.ts`。種目ごとの金額は税抜（市の記入例）、合計は税込、
   給付率は「７０・８０・９０」の丸（`marks` の needles）。概要書の業者名は「会社名⏎〒住所⏎電話」。プレビューの1枚目に商品名はない（概要書が3枚目）。
+  原本の文字の枠の大きさが `cy="left"`（`pdf_form_xlsx.py` で字のそろえと高さを同じ `h` にしていた）で XSD の INVALID だった → 2026-10-29 に `ha` に分け、原本は
+  住宅改修のスキルの `scripts/fix_shape_ext.py` で直した（`test/tokutei/shinsei.test.ts` の「原本の図形の大きさ」）。原本を作ったら `validate.py` で ALL VALID を確かめる。
 - 保険者番号（2026-10-29。ユーザーの指示「広域連合の場合は、築上町・豊前市・上毛町・吉富町…保険者を選択できる項目を入力欄に入れる」「他の保険者も同様の仕様にする」）：
   `insurerNumbers.ts`（住宅改修の `src/sasaoka/insurerNumbers.ts` と同じ一覧）。申請書の画面の「保険者番号」（`Sale.insurerNo`。初めは住所の市町村・区、広域連合で分からなければ 406470）。
   広域連合の様式第8号（AA2:AF2）・償還払い用（AA4:AF4）と福岡市（Y5〜AI5 の1つおき）に書く。ほかの保険者の一覧にある番号（保険者を選び直す前の番号）は使わない。
