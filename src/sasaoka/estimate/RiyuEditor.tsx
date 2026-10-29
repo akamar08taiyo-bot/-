@@ -396,7 +396,7 @@ export function RiyuEditor({job, data, update, onBack, tabs, batch}: {job: Job; 
 
   return (
     <div className="space-y-3">
-      {/* 上の2段はどのタブでも同じ形（JobHeader.tsx）。介護保険証・介護ソフトの画面の欄とカタログのボタン（CardFill）は出さない
+      {/* 上の2段はどのタブでも同じ形（JobHeader.tsx）。介護保険証の欄とカタログのボタン（CardFill）は出さない
           （ユーザーの指示「理由書作成のときも同様になくす」2026-10-27。申請書・特定福祉用具・販売見積書のタブにはある） */}
       <JobHeader
         onBack={onBack}

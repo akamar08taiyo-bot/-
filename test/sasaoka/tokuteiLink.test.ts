@@ -34,7 +34,7 @@ test('特定福祉用具に渡すお客様の情報：特定福祉用具の案�
   });
 });
 
-test('生活保護（介護ソフトの画面の給付情報が「生保」）は、生活保護のときだけ welfare: true を渡す', () => {
+test('生活保護（負担割合の横のチェック）は、生活保護のときだけ welfare: true を渡す', () => {
   assert.equal(tokuteiFields(job({shinsei: {...job().shinsei, welfare: true}})).welfare, true);
   assert.ok(!('welfare' in tokuteiFields(job())));
   assert.ok(!('welfare' in tokuteiFields(job({shinsei: {...job().shinsei, welfare: false}}))));

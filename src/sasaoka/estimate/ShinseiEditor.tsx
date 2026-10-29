@@ -500,7 +500,7 @@ export function ShinseiEditor({
       <JobHeader
         onBack={onBack}
         tabs={tabs}
-        extra={<CardFill job={job} setJob={setJob} staffList={s.staffList} />}
+        extra={<CardFill job={job} setJob={setJob} />}
         title={<JobTitle name={job.customer.trim() ? jobName(job) : '新しい申請書'} badge={insurer ? INSURER_INFO[insurer].name : undefined} />}
         // 2段目は Excelで保存・印刷・削除、3段目はまとめて保存（どのタブも同じ並び。JobHeader.tsx）。保険者を選ぶまで（原本がないので）Excel・印刷は押せない
         primary={

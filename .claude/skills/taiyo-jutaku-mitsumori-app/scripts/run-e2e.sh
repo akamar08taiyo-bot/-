@@ -9,7 +9,7 @@ FAIL=0
 for t in "e2e.mjs http://localhost:5190/sasaoka/index.html" "e2e-settings.mjs http://localhost:5190/sasaoka/index.html" \
   "e2e-sheet.mjs http://localhost:5190" "e2e-estimate.mjs http://localhost:5190" "e2e-sync.mjs http://localhost:5190" "e2e-order.mjs http://localhost:5190" \
   "e2e-shinsei.mjs http://localhost:5190" "e2e-riyu.mjs http://localhost:5190" "e2e-card.mjs http://localhost:5190" \
-  "e2e-trash.mjs http://localhost:5190" "e2e-data.mjs http://localhost:5190" "e2e-caresoft.mjs http://localhost:5190" \
+  "e2e-trash.mjs http://localhost:5190" "e2e-data.mjs http://localhost:5190" "e2e-drop.mjs http://localhost:5190" \
   "e2e-bracket.mjs http://localhost:5190" "e2e-tokutei.mjs http://localhost:5190" "e2e-sales.mjs http://localhost:5190" \
   "e2e-photomark.mjs http://localhost:5190" "e2e-import-docs.mjs http://localhost:5190" "e2e-delete.mjs http://localhost:5190" "e2e-zip.mjs http://localhost:5190" \
   "e2e-toolbar.mjs http://localhost:5190" "e2e-care.mjs http://localhost:5190" \

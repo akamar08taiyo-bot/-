@@ -20,7 +20,7 @@
 // Excel と同じ操作の書き込みの画面（PhotoMarkEditor.tsx）。書き込みは写真と一緒に動き（入れ替え・90°回す）、写真を差し替える・消すと消える
 // ドロップ・貼り付けが分かるように（ユーザーの指示「完了写真もドラッグ＆ドロップや貼付けしやすいようにする…認識しやすいように、見やすいように」2026-10-23）：
 // 空いた枠に「ドロップ・Ctrl+V」、ファイルを画面に持ってくると枠がみな薄い緑、重ねた枠は「ここに離す」。Ctrl+V は選んでいる枠（押した・Tab で移った枠、
-// 箇所の中のボタンにいるときはその箇所の空いた枠）に貼る。枠を選んでいないときの Ctrl+V は、介護保険証・介護ソフトの画面の読み取り（CardReader.tsx）のまま
+// 箇所の中のボタンにいるときはその箇所の空いた枠）に貼る。枠を選んでいないときの Ctrl+V は、介護保険証の読み取り（CardReader.tsx）のまま
 
 import {useEffect, useRef, useState} from 'react';
 import type {DragEvent, PointerEvent as ReactPointerEvent} from 'react';
@@ -448,7 +448,7 @@ export function PhotoBoard({
   };
 
   // Ctrl+V：選んでいる枠に写真を貼る（字を打つ欄・ほかの画面が開いているときは、ふつうの貼り付け）。
-  // 写真の欄の中で枠を選んでいないときは何もしない（介護保険証・介護ソフトの画面の読み取りへ）。ほかの貼り付けより先に受ける（capture）
+  // 写真の欄の中で枠を選んでいないときは何もしない（介護保険証の読み取りへ）。ほかの貼り付けより先に受ける（capture）
   const pasteTo = useRef<() => {start?: PhotoKey} | null>(() => null);
   pasteTo.current = () => {
     const active = document.activeElement instanceof HTMLElement && sectionRef.current?.contains(document.activeElement) ? document.activeElement : null;
