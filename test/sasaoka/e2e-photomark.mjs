@@ -6,7 +6,8 @@
 //   閉じると写真の欄・プレビュー・印刷の写真に重なり、読み直しても残り、Excel の写真貼付用紙には Excel の図形（直線矢印コネクタ・正方形/長方形・テキスト ボックス）で入る。
 //   写真を 90°回すと書き込みも一緒に回り、写真を差し替えると消える。スマホ（390px）・iPad でも描ける。
 //   2026-10-29：開いたときは直線・描いても道具はそのまま（続けて描く）・線の端に吸い付く（L字）・折れ線・手書きのペン（長押しでまっすぐ・ぐしゃぐしゃで消す）・
-//   補強板（茶色）・番号（①②）・選択。線は黄色・枠囲みは茶色が初め。リボンは大きく、まん中
+//   補強板（茶色）・番号（①②）・選択。線は黄色・枠囲みは茶色が初め。リボンは大きく、まん中。
+//   消しゴム（なぞった線・図形を消す。1回で戻せる）・上の「戻る」「進む」は文字付き（ユーザーの指示「消しゴム機能をつける。戻る、進むボタンはもう少しわかりやすく」2026-10-29）
 // usage: node e2e-photomark.mjs <サイトのURL> <出力フォルダ>
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
@@ -234,7 +235,7 @@ await page.mouse.move(edge.x + 60, edge.y - 20, {steps: 6});
 await page.mouse.up();
 await page.keyboard.up('Control');
 assert.deepEqual(await kinds(), ['line', 'rect', 'text', 'rect']);
-await dlg.getByRole('button', {name: '元に戻す'}).click(); // 上の ↶（Excel のクイック アクセス ツール バー）
+await dlg.getByRole('button', {name: '戻る', exact: true}).click(); // 上の「戻る」（Excel のクイック アクセス ツール バーの元に戻す）
 assert.deepEqual(await kinds(), ['line', 'rect', 'text']);
 log('コピー・貼り付け・削除・元に戻す・やり直し・Ctrl を押したままドラッグで複製 OK');
 
@@ -455,6 +456,38 @@ assert.equal((await svgOf(5, 'line')).stroke, '#FFFF00');
 assert.deepEqual(await kinds(), ['line', 'line', 'pen', 'pen', 'line']);
 log('ペン（手書き・長押しでまっすぐ・ぐしゃぐしゃで消す）OK');
 
+// ---------------- 消しゴム：なぞった所の線・図形をまるごと消す（なぞり終わるまでに通ったものを1回で）→ 戻る・進む
+{
+  const before = await ids();
+  const undoBtn = dlg.getByRole('button', {name: '戻る', exact: true});
+  const redoBtn = dlg.getByRole('button', {name: '進む', exact: true});
+  assert.deepEqual([await undoBtn.innerText(), await redoBtn.innerText()].map((t) => t.trim()), ['戻る', '進む']);
+  await ribbon.getByRole('button', {name: /^消しゴム/}).click();
+  assert.equal(await pressed(/^消しゴム/), 'true');
+  // マウスを載せると消しゴムの丸
+  const c = await at(0.25, 0.5);
+  await page.mouse.move(c.x, c.y);
+  await page.mouse.move(c.x + 2, c.y + 2);
+  assert.equal(await dlg.locator('[data-eraser]').count(), 1);
+  // 手書きの線（y＝0.62 のあたりの波の線）を縦になぞる
+  await dragOn([0.25, 0.55], [0.25, 0.69]);
+  const after = await ids();
+  assert.ok(after.length < before.length && after.every((id) => before.includes(id)), `消しゴム ${before} → ${after}`);
+  assert.equal(await pressed(/^消しゴム/), 'true'); // 消しゴムのまま（続けて消せる）
+  await page.screenshot({path: path.join(outDir, 'mark-06a-eraser.png')});
+  await undoBtn.click();
+  assert.deepEqual(await ids(), before);
+  await redoBtn.click();
+  assert.deepEqual(await ids(), after);
+  await undoBtn.click();
+  assert.deepEqual(await ids(), before);
+  // 何もない所をなぞっても、何も消さない（戻るの回数も増えない）
+  await dragOn([0.95, 0.05], [0.97, 0.08]);
+  assert.deepEqual(await ids(), before);
+  assert.equal(await redoBtn.isDisabled(), false);
+}
+log('消しゴム（なぞった線を消す・戻る・進む）OK');
+
 // ---------------- 補強板（四角と斜めの線・茶色）・番号（①②）
 await ribbon.getByRole('button', {name: /^補強板/}).click();
 await dragOn([0.55, 0.55], [0.75, 0.7]);
@@ -615,6 +648,28 @@ for (const [name, vp, touch] of [
   await touchAt('touchEnd', pt(0.5, 0.5));
   assert.equal(await d2.locator('[data-photo-stage] [data-mark]').count(), 1, `${name} 指で矢印`);
   await p2.screenshot({path: path.join(outDir, `mark-05-${name}.png`)});
+  // 上の「戻る」「進む」：文字が見えて、画面に入る。閉じるとかさならない
+  const close = await d2.getByRole('button', {name: '閉じる', exact: true}).boundingBox();
+  for (const label of ['戻る', '進む']) {
+    const b = d2.getByRole('button', {name: label, exact: true});
+    assert.equal((await b.innerText()).trim(), label, `${name} ${label}の文字`);
+    const r = await b.boundingBox();
+    assert.ok(r.x >= 0 && r.x + r.width <= close.x && r.width >= 44 && r.height >= 44, `${name} ${label} ${JSON.stringify(r)} 閉じる ${JSON.stringify(close)}`);
+  }
+  // 指の消しゴムで矢印を消す → 戻るで戻る
+  // tap() は押した結果（click）を待たないので、消しゴムに替わるのを待ってから描く
+  await d2.getByRole('button', {name: /^消しゴム/}).tap();
+  await d2.locator('button[aria-pressed="true"][aria-label^="消しゴム"]').waitFor();
+  await touchAt('touchStart', pt(0.3, 0.6));
+  for (let i = 1; i <= 6; i++) await touchAt('touchMove', pt(0.3 + (0.15 * i) / 6, 0.6 + (0.1 * i) / 6));
+  await touchAt('touchEnd', pt(0.45, 0.7));
+  assert.equal(await d2.locator('[data-photo-stage] [data-mark]').count(), 0, `${name} 指の消しゴム`);
+  assert.equal(await d2.locator('[data-eraser]').count(), 0, `${name} 指を離したら消しゴムの丸は消える`);
+  // 消したすぐあと（0.3秒ほど）に押すと、テストのブラウザは2回たたいたと見て押した結果（click）を出さないことがある。人が押すくらいの間をあける
+  await p2.waitForTimeout(800);
+  await d2.getByRole('button', {name: '戻る', exact: true}).tap();
+  await p2.waitForFunction(() => document.querySelectorAll('[role="dialog"] [data-photo-stage] [data-mark]').length === 1, null, {timeout: 5000}); // 戻る
+  await p2.screenshot({path: path.join(outDir, `mark-05b-${name}-top.png`), clip: {x: 0, y: 0, width: vp.width, height: 330}});
   await c2.close();
 }
 log('スマホ（390px）・iPad：指で描ける・横にはみ出さない OK');

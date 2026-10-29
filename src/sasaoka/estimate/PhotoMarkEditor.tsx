@@ -50,7 +50,8 @@ import type {PhotoMark, PhotoMarkDash} from '../types.ts';
 import {MarkLayer, markTextCss} from './MarkLayer.tsx';
 
 type Pt = {x: number; y: number};
-type Tool = 'pen' | 'poly' | 'line' | 'arrow' | 'arrow2' | 'rect' | 'ellipse' | 'text' | 'board' | 'num';
+type Tool = 'pen' | 'poly' | 'line' | 'arrow' | 'arrow2' | 'rect' | 'ellipse' | 'text' | 'board' | 'num' | 'eraser';
+type DrawTool = Exclude<Tool, 'eraser'>; // 図形を描く道具（消しゴムのほか）
 /**
  * 書式を覚える種類（新しい図形に使う）：shape＝直線・矢印・楕円（黄色）、rect＝枠囲み（正方形/長方形）・補強板（茶色）、pen＝手書き・折れ線（黄色）、
  * text＝テキストボックス、num＝番号
@@ -61,7 +62,7 @@ const styleKeyOf = (k: PhotoMark['kind']): StyleKey => (k === 'text' ? 'text' : 
 const toolStyleKey = (t: Tool): StyleKey => (t === 'text' ? 'text' : t === 'num' ? 'num' : t === 'pen' || t === 'poly' ? 'pen' : t === 'rect' || t === 'board' ? 'rect' : 'shape');
 type RBox = MarkBox & {rot: number};
 type Drag =
-  | {type: 'create'; tool: Tool; p0: Pt; id: string; ctrl: boolean}
+  | {type: 'create'; tool: DrawTool; p0: Pt; id: string; ctrl: boolean}
   | {type: 'move'; p0: Pt; base: PhotoMark[]; ids: string[]; moved: boolean; copy: boolean; toggle: string | null}
   | {type: 'resize'; id: string; hx: number; hy: number; base: PhotoMark}
   | {type: 'rotate'; id: string; base: PhotoMark; a0: number}
@@ -69,7 +70,9 @@ type Drag =
   // 手書き：pts＝描いた点（紙の画素）。straight＝長押しでまっすぐにした（そのあとは終わりの点を動かす）
   | {type: 'pen'; id: string; pts: Pt[]; straight: boolean}
   // 直線をまん中のまわりに回す（直線の ↻ のつまみ）
-  | {type: 'rotline'; id: string; base: PhotoMark; a0: number; c: Pt};
+  | {type: 'rotline'; id: string; base: PhotoMark; a0: number; c: Pt}
+  // 消しゴム：なぞった所（last＝前の点）の線・図形を消す。ids＝もう消した図形、r＝消しゴムの半径（紙の画素）
+  | {type: 'erase'; last: Pt; ids: string[]; r: number};
 type Menu = {name: 'fill' | 'line' | 'color' | 'size' | 'font' | 'front' | 'back' | 'rotate'; x: number; y: number} | {name: 'context'; x: number; y: number; on: boolean};
 
 /** 図形の挿入のボタン（Excel の「図形」の線・四角形・基本図形の並び） */
@@ -85,6 +88,8 @@ const TOOLS: {key: Tool; label: string}[] = [
   {key: 'board', label: '補強板（四角と斜めの線）'},
   {key: 'text', label: 'テキスト ボックス'},
   {key: 'num', label: '番号（①②…。押すたびに次の番号）'},
+  // ユーザーの指示「消しゴム機能をつける」2026-10-29。Excel の「描画」の消しゴム（ストローク）と同じく、なぞった線・図形を1つずつまるごと消す
+  {key: 'eraser', label: '消しゴム（なぞった線・図形を消す）'},
 ];
 /**
  * 描いたあとも道具をそのままにするもの（続けて描く・番号を続けて置く。ユーザーの指示「連続で線を引くことができない」2026-10-29）。
@@ -330,6 +335,17 @@ function Icon({name, color}: {name: string; color?: string}) {
       return <svg {...s}><path d="M15 6 A6.5 6.5 0 1 0 16.5 11" /><path d="M15.5 2.5 L15.3 6.3 L11.6 5.6" /></svg>;
     case 'delete':
       return <svg {...s}><path d="M4 6 H16 M8 6 V4 H12 V6 M6 6 L7 17 H13 L14 6" /></svg>;
+    case 'eraser':
+      return <svg {...s}><path d="M2.8 12.3 L6.3 8.8 L13 15.5 L11.5 17 H7.5 Z" fill="#f9a8d4" strokeLinejoin="round" /><path d="M6.3 8.8 L10.3 4.8 L17 11.5 L13 15.5" strokeLinejoin="round" /><path d="M11.5 17 H17.5" strokeLinecap="round" /></svg>;
+    case 'undo':
+    case 'redo':
+      // 戻る・進む：太めの曲がった矢印（前の ↶ ↷ の字は細くて見えにくかった）
+      return (
+        <svg {...s} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" style={name === 'redo' ? {transform: 'scaleX(-1)'} : undefined}>
+          <path d="M7 4.5 L3 8.5 L7 12.5" />
+          <path d="M3.5 8.5 H12 A4.5 4.5 0 0 1 12 17.5 H8" />
+        </svg>
+      );
     case 'cut':
       return <svg {...s}><circle cx="6" cy="15" r="2.5" /><circle cx="14" cy="15" r="2.5" /><path d="M7.5 13 L14 3 M12.5 13 L6 3" /></svg>;
     case 'copy':
@@ -351,6 +367,9 @@ function Group({label, children}: {label: string; children: ReactNode}) {
   );
 }
 
+/** 戻る・進む（上の帯）：枠のあるボタン。スマホは矢印の下に文字（幅が足りないので） */
+const UNDO_BTN =
+  'flex shrink-0 touch-manipulation items-center justify-center rounded-md border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-35 max-sm:h-12 max-sm:w-14 max-sm:flex-col max-sm:text-[13px] max-sm:leading-tight sm:h-11 sm:gap-1.5 sm:px-3 sm:text-[15px]';
 const RB = 'flex h-11 min-w-11 shrink-0 touch-manipulation items-center justify-center gap-1 rounded px-2 text-[15px] text-slate-700 hover:bg-slate-100 disabled:pointer-events-none disabled:opacity-35';
 
 /** 色を選ぶ（Excel の色のメニュー：テーマの色 10×6・標準の色・なし・その他の色） */
@@ -429,6 +448,7 @@ export function PhotoMarkEditor({
   const [armKey, setArmKey] = useState(0); // 文字を打つ所を作り直す（元に戻したときなど、打つ所の文字を今の文字にそろえる）
   const [fontText, setFontText] = useState<string | null>(null); // フォント サイズの欄に打っている途中の文字
   const [sizeText, setSizeText] = useState<{h?: string; w?: string}>({});
+  const [eraserAt, setEraserAt] = useState<{p: Pt; r: number} | null>(null); // 消しゴムの丸（なぞっている所・マウスの所。紙の画素）
   // 塗りつぶし・枠線・文字の色のボタンの下の色（最後に選んだ色。ボタンを押すとその色に。Excel と同じ）
   const [recent, setRecent] = useState(() => ({fill: styles.shape.fill || 'FFFFFF', line: styles[toolStyleKey(loadTool())].line || SHAPE_STYLE.line, color: styles.text.color}));
   const shown = draft ?? marks;
@@ -825,7 +845,7 @@ export function PhotoMarkEditor({
   const handleTol = (e: {pointerType?: string}) => (e.pointerType === 'touch' || e.pointerType === 'pen' ? 22 : 9) / (k || 1);
   const rotGap = 26 / (k || 1);
 
-  const newMark = (t: Tool, a: Pt, b: Pt): PhotoMark => {
+  const newMark = (t: DrawTool, a: Pt, b: Pt): PhotoMark => {
     const kind: PhotoMark['kind'] = t === 'line' || t === 'arrow' || t === 'arrow2' ? 'line' : t === 'num' ? 'text' : t === 'poly' ? 'pen' : t;
     const st = styles[toolStyleKey(t)];
     const base: PhotoMark = {
@@ -885,6 +905,19 @@ export function PhotoMarkEditor({
   };
 
   const clampP = (p: Pt): Pt => ({x: clamp(p.x, 0, W), y: clamp(p.y, 0, H)});
+  /** 消しゴムの半径（紙の画素）：指は大きめ */
+  const eraserR = (e: {pointerType?: string}) => (e.pointerType === 'touch' || e.pointerType === 'pen' ? 16 : 9) / (k || 1);
+  /** 消しゴムで a から b までなぞる：通った所に線・枠・文字が当たる図形を消す（塗りのない四角・楕円の中は消さない＝線の上をなぞる） */
+  const eraseAlong = (d: Extract<Drag, {type: 'erase'}>, a: Pt, b: Pt) => {
+    const n = Math.max(1, Math.ceil((Math.hypot(b.x - a.x, b.y - a.y) * k) / 3));
+    const pts = Array.from({length: n + 1}, (_, j) => ({x: a.x + ((b.x - a.x) * j) / n, y: a.y + ((b.y - a.y) * j) / n}));
+    const hit = marks.filter((m) => !d.ids.includes(m.id) && pts.some((q) => hitMark(m, q, W, H, d.r) === 2)).map((m) => m.id);
+    d.last = b;
+    setEraserAt({p: b, r: d.r});
+    if (!hit.length) return;
+    d.ids = [...d.ids, ...hit];
+    setDraft(marks.filter((m) => !d.ids.includes(m.id)));
+  };
   /**
    * 線の端に吸い付く（画面で 10画素まで）：直線・矢印・折れ線・手書きの線の端につなげて描ける（L字・続けて描く線。
    * ユーザーの指示「L字に曲げることができない」「連続で線を引くことができない」2026-10-29）。吸い付かなければ p のまま
@@ -1070,6 +1103,13 @@ export function PhotoMarkEditor({
     if (tool) {
       // 描く道具のあいだは、押すといつも描く（描いたばかりの線の端から続けて描ける＝L字。直すときは「選択」。Excel の「描画モードのロック」と同じ）
       const raw = clampP(p);
+      if (tool === 'eraser') {
+        const d: Drag = {type: 'erase', last: raw, ids: [], r: eraserR(e)};
+        drag.current = d;
+        setSel([]);
+        eraseAlong(d, raw, raw);
+        return;
+      }
       if (tool === 'pen') {
         drag.current = {type: 'pen', id: markId(), pts: [raw], straight: false};
         armPress(raw);
@@ -1123,6 +1163,15 @@ export function PhotoMarkEditor({
 
   const move = (e: ReactPointerEvent<HTMLDivElement>) => {
     const d = drag.current;
+    if (d?.type === 'erase') {
+      eraseAlong(d, d.last, clampP(toPaper(e)));
+      return;
+    }
+    // 消しゴムを選んでマウスを動かしている：消しゴムの丸を見せる
+    if (!d && tool === 'eraser' && k) {
+      setEraserAt({p: toPaper(e), r: eraserR(e)});
+      return;
+    }
     // 折れ線の途中：次の角までの線を、マウスの所まで見せる
     if (!d && poly.current && k) {
       const cur = poly.current;
@@ -1235,6 +1284,12 @@ export function PhotoMarkEditor({
     if (!d) return;
     const next = draft;
     setDraft(null);
+    if (d.type === 'erase') {
+      // なぞって消したものを1回で入れる（元に戻すも1回）。指を離したら丸は消す
+      setEraserAt(e.pointerType === 'mouse' ? {p: d.last, r: d.r} : null);
+      if (d.ids.length) commit(marks.filter((m) => !d.ids.includes(m.id)));
+      return;
+    }
     if (d.type === 'pen') {
       stopPress();
       if (d.straight) {
@@ -1593,7 +1648,7 @@ export function PhotoMarkEditor({
     </svg>
   );
 
-  const canvasCursor = tool ? 'crosshair' : 'default';
+  const canvasCursor = tool === 'eraser' ? 'none' : tool ? 'crosshair' : 'default'; // 消しゴムは丸を見せる
   /** 道具を選ぶ（null＝選択）。折れ線の途中ならそこまでで終える。描く道具は覚えて、次に開いたときもその道具 */
   const pickTool = (t: Tool | null) => {
     if (editing) endEdit();
@@ -1601,6 +1656,7 @@ export function PhotoMarkEditor({
     setTool(t);
     setSel([]);
     setMenu(null);
+    setEraserAt(null);
     if (t && KEEP_TOOL.has(t))
       try {
         localStorage.setItem(TOOL_KEY, t);
@@ -1625,18 +1681,21 @@ export function PhotoMarkEditor({
 
   return (
     <div role="dialog" aria-modal="true" aria-label={`${title}の${what}に書き込む`} className="fixed inset-0 z-[60] flex flex-col bg-slate-100 text-slate-800">
-      {/* 上の帯：元に戻す・やり直し（Excel のクイック アクセス ツール バー）・題名・閉じる（まん中。ユーザーの指示「閉じるボタンは中央にもってくる」2026-10-29） */}
+      {/* 上の帯：戻る・進む（Excel のクイック アクセス ツール バーの元に戻す・やり直し）・題名・閉じる（まん中。ユーザーの指示「閉じるボタンは中央にもってくる」2026-10-29）。
+          戻る・進むは太い矢印と文字（ユーザーの指示「戻る、進むボタンはもう少しわかりやすく」2026-10-29。前は細い ↶ ↷ だけ）。スマホは矢印の下に文字、題名は出さない（入らない） */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-slate-200 bg-white px-2 py-1">
         <div className="flex min-w-0 items-center gap-1">
-          <button type="button" className={RB} title="元に戻す (Ctrl+Z)" aria-label="元に戻す" disabled={!past.current.length && !editing} onClick={undo}>
-            ↶
+          <button type="button" className={UNDO_BTN} title="戻る（元に戻す Ctrl+Z）" aria-label="戻る" disabled={!past.current.length && !editing} onClick={undo}>
+            <Icon name="undo" />
+            <span>戻る</span>
           </button>
-          <button type="button" className={RB} title="やり直し (Ctrl+Y)" aria-label="やり直し" disabled={!future.current.length} onClick={redo}>
-            ↷
+          <button type="button" className={UNDO_BTN} title="進む（やり直し Ctrl+Y）" aria-label="進む" disabled={!future.current.length} onClick={redo}>
+            <Icon name="redo" />
+            <span>進む</span>
           </button>
-          <div className="min-w-0 truncate px-2 text-base text-slate-700">✏️ {title}</div>
+          <div className="min-w-0 truncate px-2 text-base text-slate-700 max-sm:hidden">✏️ {title}</div>
         </div>
-        <button type="button" onClick={close} className="h-11 rounded-md border border-slate-300 bg-white px-8 text-base text-slate-700 hover:bg-slate-50">
+        <button type="button" onClick={close} className="h-11 rounded-md border border-slate-300 bg-white px-8 text-base text-slate-700 hover:bg-slate-50 max-sm:px-6">
           閉じる
         </button>
         <div />
@@ -1866,6 +1925,7 @@ export function PhotoMarkEditor({
           onPointerMove={move}
           onPointerUp={up}
           onPointerCancel={up}
+          onPointerLeave={() => !drag.current && setEraserAt(null)}
           onContextMenu={context}
           onDoubleClick={(e) => {
             if (tool === 'poly') {
@@ -1885,6 +1945,14 @@ export function PhotoMarkEditor({
               </div>
               <MarkLayer marks={shown} w={W} h={H} k={k} hide={editing} style={{left: 0, top: 0}} />
               {selectionSvg}
+              {tool === 'eraser' && eraserAt && (
+                <div
+                  data-eraser
+                  aria-hidden
+                  className="pointer-events-none absolute rounded-full border-2 border-slate-700 bg-white/50 shadow"
+                  style={{left: (eraserAt.p.x - eraserAt.r) * k, top: (eraserAt.p.y - eraserAt.r) * k, width: 2 * eraserAt.r * k, height: 2 * eraserAt.r * k}}
+                />
+              )}
               {editMark && editBox && (
                 // 文字を打つ所（図形の上に重ねる。選んだだけのときは見えないまま待っていて、打つと見える＝Excel と同じく選んでそのまま打てる）
                 <div
