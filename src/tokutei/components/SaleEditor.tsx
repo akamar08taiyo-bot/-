@@ -163,7 +163,10 @@ export function SaleEditor({
     const address = withoutDoubledHead(typed, sale.zip);
     const hits = zipCandidates(address);
     const zipNow = zipLabel(sale.zip);
-    if (hits.length === 1 && (!zipNow || zipNow === autoZip.current)) {
+    // 郵便番号が空か、前の住所から入れたまま（前の住所の番号と同じ。打っている途中の「福岡県京都郡苅田町」で入った町の番号 800-0300 など）なら、
+    // 今の住所の番号に（ユーザーの指示「住所から逆算して郵便番号を割り出すこともできる」2026-10-29。読み直したあとも）
+    const fromBefore = !!zipNow && zipCandidates(sale.address).some((h) => h.zip === zipNow);
+    if (hits.length === 1 && (!zipNow || zipNow === autoZip.current || fromBefore)) {
       autoZip.current = hits[0].zip;
       change({address, zip: hits[0].zip});
     } else change({address});
@@ -183,7 +186,9 @@ export function SaleEditor({
    * 郵便番号を先に打つと、住所が空なら住所の頭（「福岡県行橋市大字流末」）を入れる。住所が郵便番号から入れたままなら（番地などを足していない）、
    * 新しい郵便番号の住所の頭に替える（打ち間違えて1字ずつ打ち直したときも。住宅改修のアプリの zip.ts の withZipAddress と同じ）
    */
-  const changeZip = (zip: string) => {
+  const changeZip = (typed: string) => {
+    // 7けたを打ち終わったら「800-0333」の形に（ハイフンなし・全角で打っても。ユーザーの指示「郵便番号は、ハイフンなしでもありでも自動計算」2026-10-29）
+    const zip = typed.normalize('NFKC').replace(/\D/g, '').length === 7 ? zipLabel(typed) : typed;
     const head = !sale.address.trim() || isZipHead(sale.address) ? addressOfZip(zip) : '';
     autoZip.current = '';
     change(head ? {zip, address: head} : {zip});

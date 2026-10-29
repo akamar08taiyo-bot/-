@@ -112,6 +112,23 @@ try {
   assert.equal(await addrBox.inputValue(), '福岡県行橋市中央1-1');
   console.log('ok: 郵便番号を先に打つと住所の頭（福岡県行橋市大字流末）・打ち直し・番地を足したら替えない・頭から全部打っても2回にならない');
 
+  // 住所を1字ずつ打っても、町名まで打つとその番号（途中で入った町の番号 800-0300 のままにしない）。郵便番号は全角・ハイフンなしでも「800-0333」に
+  // （ユーザーの指示「郵便番号は、ハイフンなしでもありでも自動計算、住所から逆算して郵便番号を割り出すこともできる」2026-10-29）
+  await addrBox.fill('');
+  await zipBox.fill('');
+  await addrBox.click();
+  await addrBox.pressSequentially('福岡県京都郡苅田町');
+  await page.waitForFunction(() => document.querySelector('[aria-label="郵便番号"]')?.value === '800-0300', null, {timeout: 5000});
+  await addrBox.pressSequentially('大字黒添');
+  await page.waitForFunction(() => document.querySelector('[aria-label="郵便番号"]')?.value === '800-0333', null, {timeout: 5000});
+  await addrBox.fill('');
+  await zipBox.fill('');
+  await zipBox.click();
+  await zipBox.pressSequentially('８０００３３３');
+  await page.waitForFunction(() => document.querySelector('[aria-label="郵便番号"]')?.value === '800-0333', null, {timeout: 5000});
+  assert.equal(await addrBox.inputValue(), '福岡県京都郡苅田町大字黒添');
+  console.log('ok: 住所を1字ずつ打っても町名までの郵便番号（800-0333）・全角でハイフンなしの郵便番号も「800-0333」に');
+
   // スマホの幅：リストが横にはみ出さない
   const phone = await browser.newContext({viewport: {width: 390, height: 844}, deviceScaleFactor: 2, hasTouch: true, isMobile: true, locale: 'ja-JP'});
   await phone.route(/^https?:\/\/(?!localhost)/, (r) => r.abort());
