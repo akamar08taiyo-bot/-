@@ -405,6 +405,25 @@ assert.deepEqual([lb[0], lb[1]].map((v) => v.toFixed(3)), [la[2], la[3]].map((v)
 assert.equal(lb[0].toFixed(3), lb[2].toFixed(3), '縦に4°以内はまっすぐ縦');
 log('直線を続けて描く・L字（線の端に吸い付く）OK');
 
+// ---------------- 描いた線は、描く道具のままドラッグで動かせる（ユーザーの指示「ひいた線は、ドロップしたら位置を動かせるようにする」2026-10-29）。
+// 描いたばかりの線（選んでいる）の上を押して動かす → 動く（長さ・向きはそのまま、線は増えない、道具は直線のまま）。戻るで戻る
+{
+  const before = pt(await svgOf(2, 'line'));
+  await dragOn([0.5, 0.65], [0.6, 0.62]);
+  assert.deepEqual(await kinds(), ['line', 'line', 'line'], '線は増えない');
+  assert.equal(await pressed('直線'), 'true');
+  const after = pt(await svgOf(2, 'line'));
+  const b = await box();
+  const [dx, dy] = [after[0] - before[0], after[1] - before[1]];
+  const k = (before[3] - before[1]) / (0.3 * b.height); // 図の単位 ÷ 画面の画素（線は写真の高さの 0.3）
+  assert.ok(Math.abs(dx - b.width * 0.1 * k) < 3 && Math.abs(dy + b.height * 0.03 * k) < 3, `動いた ${JSON.stringify({before, after, dx, dy, k})}`);
+  assert.ok(Math.abs(after[2] - after[0] - (before[2] - before[0])) < 0.5 && Math.abs(after[3] - after[1] - (before[3] - before[1])) < 0.5, '長さ・向きはそのまま');
+  await page.screenshot({path: path.join(outDir, 'mark-04b-move-line.png')});
+  await dlg.getByRole('button', {name: '戻る', exact: true}).click();
+  assert.deepEqual(pt(await svgOf(2, 'line')).map((v) => v.toFixed(2)), before.map((v) => v.toFixed(2)));
+}
+log('描いた線を描く道具のままドラッグで動かす・戻る OK');
+
 // ---------------- 折れ線（押すたびに角 → ✓ 折れ線を終える）
 await ribbon.getByRole('button', {name: /^折れ線/}).click();
 for (const [fx, fy] of [
@@ -648,6 +667,23 @@ for (const [name, vp, touch] of [
   await touchAt('touchEnd', pt(0.5, 0.5));
   assert.equal(await d2.locator('[data-photo-stage] [data-mark]').count(), 1, `${name} 指で矢印`);
   await p2.screenshot({path: path.join(outDir, `mark-05-${name}.png`)});
+  // 描いた矢印を、矢印の道具のまま指で動かす（線の上を押して動かす）→ 元の所へ戻す
+  {
+    const lineAt = () => d2.locator('[data-photo-stage] [data-mark] line').first().evaluate((el) => ['x1', 'y1', 'x2', 'y2'].map((a) => Number(el.getAttribute(a))));
+    const a0 = await lineAt();
+    const slide = async (from, to) => {
+      await touchAt('touchStart', pt(...from));
+      for (let i = 1; i <= 6; i++) await touchAt('touchMove', pt(from[0] + ((to[0] - from[0]) * i) / 6, from[1] + ((to[1] - from[1]) * i) / 6));
+      await touchAt('touchEnd', pt(...to));
+    };
+    await slide([0.35, 0.65], [0.35, 0.55]);
+    const a1 = await lineAt();
+    assert.equal(await d2.locator('[data-photo-stage] [data-mark]').count(), 1, `${name} 指で動かしても矢印は1本`);
+    assert.ok(a1[1] < a0[1] - 5 && Math.abs(a1[0] - a0[0]) < 2, `${name} 指で矢印を動かす ${a0} → ${a1}`);
+    await slide([0.35, 0.55], [0.35, 0.65]);
+    const a2 = await lineAt();
+    assert.ok(Math.abs(a2[1] - a0[1]) < 2, `${name} 元の所へ ${a0} → ${a2}`);
+  }
   // スマホの書式の欄：「色 ▼」「太さ ▼」が横に動かさなくても見える。押すと全部の色・太さが画面の中に折り返して開き、選ぶと閉じる
   // （ユーザーの指示「携帯版 色と太さに関しては、閉じた状態でもいいので、横にスクロールせずにも表示される位置に」2026-10-29）
   if (name === 'phone') {

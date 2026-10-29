@@ -96,6 +96,11 @@ const TOOLS: {key: Tool; label: string}[] = [
  * やめるときは「選択」・同じ道具をもう一度・Esc
  */
 const KEEP_TOOL = new Set<Tool>(['pen', 'poly', 'line', 'arrow', 'arrow2', 'rect', 'ellipse', 'board', 'num']);
+/**
+ * 描く道具のまま、選んでいる図形（描いたばかりの線など）の線の上を押してドラッグすると、その図形を動かす道具（ユーザーの指示「ひいた線は、ドロップしたら位置を動かせるようにする」2026-10-29）。
+ * 手書きのペン（ぐしゃぐしゃで消すのを線の上から始める）・折れ線（押すたびに角）・消しゴムは、今までどおり押すと描く
+ */
+const MOVE_TOOL = new Set<Tool>(['line', 'arrow', 'arrow2', 'rect', 'ellipse', 'board', 'text', 'num']);
 const TOOL_KEY = 'taiyo-sasaoka-mark-tool-v1'; // この端末で最後に使った描く道具（開いたときにその道具。初めは直線）
 /** 開いたときの道具：前に使った描く道具（続けて描く道具だけ）。初めは直線（ユーザーの指示「デフォルトは棒線にする」2026-10-29） */
 function loadTool(): Tool {
@@ -1113,6 +1118,20 @@ export function PhotoMarkEditor({
         setSel([]);
         eraseAlong(d, raw, raw);
         return;
+      }
+      // 選んでいる図形の線・枠・文字の上：動かす。直線の端の近く（つまみの所）は、そこから続けて描く（L字。今までどおり）
+      if (MOVE_TOOL.has(tool) && sel.length) {
+        const chosen = marks.filter((m) => sel.includes(m.id));
+        const onIt = chosen.find((m) => hitMark(m, p, W, H, tolOf(e)) === 2);
+        const atEnd = (m: PhotoMark) => {
+          if (m.kind !== 'line') return false;
+          const en = lineEnds(m, V);
+          return Math.min(Math.hypot(p.x - en.x1, p.y - en.y1), Math.hypot(p.x - en.x2, p.y - en.y2)) <= handleTol(e);
+        };
+        if (onIt && !atEnd(onIt)) {
+          drag.current = {type: 'move', p0: p, base: chosen, ids: chosen.map((m) => m.id), moved: false, copy: e.ctrlKey || e.metaKey, toggle: null};
+          return;
+        }
       }
       if (tool === 'pen') {
         drag.current = {type: 'pen', id: markId(), pts: [raw], straight: false};
