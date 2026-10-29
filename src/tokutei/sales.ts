@@ -249,6 +249,7 @@ export function customerPatch(from: Sale): Partial<Sale> {
     careLevel: from.careLevel,
     insurer: from.insurer,
     insurerName: from.insurerName,
+    ...(from.insurerNo ? {insurerNo: from.insurerNo} : {}),
     burdenRatio: from.burdenRatio,
     payMethod: from.payMethod,
     perItem: from.perItem,

@@ -11,6 +11,8 @@ import {
   fukuokaInsurerNo,
   fukuokaWard,
   insurerCheckDigit,
+  KITAKYUSHU_SHEETS,
+  kitakyushuAddress,
   KOUIKI_SHEETS,
   padInsuredNo,
   pairBoxes,
@@ -21,6 +23,7 @@ import {
   shinseiValues,
 } from '../../src/tokutei/shinsei.ts';
 import type {ShinseiKey} from '../../src/tokutei/shinsei.ts';
+import {KK_CELLS} from '../../src/tokutei/shinsei/kitakyushuCells.ts';
 import type {Sale, SaleItem, Settings} from '../../src/tokutei/types.ts';
 import {cellBox, cellFormula, ellipseCount, emOf, printOverflow, readCell, sheetPath, sheetPaths} from '../../src/tokutei/xlsxEdit.ts';
 import type {Files} from '../../src/tokutei/xlsxEdit.ts';
@@ -93,7 +96,7 @@ function sale(over: Partial<Sale> = {}): Sale {
   };
 }
 
-const TEMPLATE_FILES: Record<ShinseiKey, string> = {yukuhashi: 'yukuhashi.xltx', kanda: 'kanda.xltx', miyako: 'miyako.xlsx', kouiki: 'kouiki.xlsx', fukuoka: 'fukuoka.xlsx'};
+const TEMPLATE_FILES: Record<ShinseiKey, string> = {yukuhashi: 'yukuhashi.xltx', kanda: 'kanda.xltx', miyako: 'miyako.xlsx', kouiki: 'kouiki.xlsx', fukuoka: 'fukuoka.xlsx', kitakyushu: 'kitakyushu.xlsx'};
 const template = (key: ShinseiKey): Files => unzipSync(new Uint8Array(readFileSync(new URL(`../../src/tokutei/shinsei/${TEMPLATE_FILES[key]}`, import.meta.url))));
 const fill = (key: ShinseiKey, over: Partial<Sale> = {}): Files => unzipSync(fillShinsei(template(key), SHINSEI[key], shinseiValues(sale({insurer: key, ...over}), S)));
 
@@ -389,8 +392,94 @@ test('福岡市：長い商品名・メーカー名は1行に入る大きさ。�
   assert.equal(printOverflow(yk, FUKUOKA_SHEET) ?? 0, 0); // A4 1枚（原本の「ページに合わせる」のまま）
 });
 
+// 北九州市：申請するのは事業者（設定の営業所。小倉営業所）。事業者番号は架空の番号
+const KK_S: Settings = {...settingsForOffice(S, '小倉営業所'), providerNo: '4000000001'};
+const kkSale = (over: Partial<Sale> = {}) => sale({insurer: 'kitakyushu', zip: '8030814', address: '福岡県北九州市小倉北区城内1-1', ...over});
+const fillKK = (over: Partial<Sale> = {}, s: Settings = KK_S): Files => unzipSync(fillShinsei(template('kitakyushu'), SHINSEI.kitakyushu, shinseiValues(kkSale(over), s)));
+const KS: Record<string, string> = KK_CELLS.shikyu;
+const KG: Record<string, string> = KK_CELLS.gaiyo;
+/** 丸（楕円の図形）の左の位置（EMU） */
+const ellipseXs = (f: Files, sheet: string): number[] => {
+  const path = sheetPath(f, sheet);
+  const rels = strFromU8(f[path.replace(/([^/]+)$/, '_rels/$1.rels')]);
+  const target = /Target="\.\.\/drawings\/([^"]+)"/.exec(rels)?.[1];
+  return target ? [...strFromU8(f[`xl/drawings/${target}`]).matchAll(/<a:off x="(\d+)"[^>]*\/><a:ext[^>]*\/><\/a:xfrm><a:prstGeom prst="ellipse"/g)].map((m) => Number(m[1])) : [];
+};
+
+test('北九州市：支給申請書（受領委任払用）。申請内容は種目ごとの金額（税抜）と合計金額（税込）。申請するのは設定の営業所', () => {
+  const f = fillKK();
+  const at = (ref: string) => readCell(f, KITAKYUSHU_SHEETS.shikyu, ref);
+  assert.deepEqual([...sheetPaths(f).keys()], ['支給申請書', '支給申請書（裏）', '概要書', '概要書（裏）']);
+  assert.equal(at(KS.provider), '４００００００００１'); // 市の記入例と同じ全角（10けた）
+  assert.equal(at(KS.kana), 'ミホン ハナコ');
+  assert.equal(at(KS.name), '見本 花子');
+  assert.equal(Array.from({length: 10}, (_, i) => at(KS[`no${i}`])).join(''), '0001234567');
+  assert.equal(at(KS.address), '小倉北区城内1-1'); // 記入例と同じ区から
+  assert.equal(at(KS.tel), '0930-00-0000');
+  // 入浴補助用具（3）：税抜の 25,600＋25,280。ほかの種目は空
+  assert.equal(at(KS.kind3), String(25600 + 25280));
+  for (const no of [1, 2, 4, 5, 6, 7, 8, 9]) assert.equal(at(KS[`kind${no}`]), '', `kind${no}`);
+  assert.equal(at(KS.total), String(28160 + 27808));
+  assert.equal(at(KS.prev), ''); // 今年度の残りが空欄
+  assert.equal(at(KS.benefit), String(55968 - Math.ceil(55968 / 10)));
+  assert.equal(at(KS.reason), '浴室の床からの立ち座りが困難なため。\n浴槽の出入りでふらつくため。');
+  // 委任の欄・申請の欄の事業者は設定の営業所（住所は区から）。委任の欄の被保険者氏名は自署なので書かない
+  for (const ref of [KS.sellerA, KS.sellerB]) assert.equal(at(ref), '太陽シルバーサービス㈱　小倉営業所');
+  for (const ref of [KS.repA, KS.repB]) assert.equal(at(ref), '所長　森口 賢一');
+  assert.equal(at(KS.sellerAddress), '小倉北区重住3丁目11-21');
+  assert.equal(at(KS.sellerTel), '093-952-1616');
+  // 丸：給付率の９０だけ。金額は「#,##0」
+  assert.equal(ellipseCount(f, KITAKYUSHU_SHEETS.shikyu), 1);
+  const xml = strFromU8(f[sheetPath(f, KITAKYUSHU_SHEETS.shikyu)]);
+  const styles = [...strFromU8(f['xl/styles.xml']).split('<cellXfs')[1].matchAll(/<xf\b[\s\S]*?(?:\/>|<\/xf>)/g)].map((m) => m[0]);
+  const xfOf = (ref: string) => styles[Number(new RegExp(`<c r="${ref}"[^>]*\\ss="(\\d+)"`).exec(xml)?.[1] ?? 0)];
+  for (const ref of [KS.kind3, KS.total, KS.benefit]) assert.match(xfOf(ref), /numFmtId="3"/, ref);
+  // 裏（委任状）と概要書の裏（注意事項）は原本のまま
+  for (const sh of [KITAKYUSHU_SHEETS.back, KITAKYUSHU_SHEETS.gaiyoBack]) assert.equal(strFromU8(f[sheetPath(f, sh)]), strFromU8(template('kitakyushu')[sheetPath(f, sh)]), sh);
+});
+
+test('北九州市：概要書は商品ごとに 種目・品目、形式等（商品名と品番）・金額（税抜）。合計・消費税・総合計・業者名（連絡先）・担当者', () => {
+  const f = fillKK();
+  const g = (ref: string) => readCell(f, KITAKYUSHU_SHEETS.gaiyo, ref);
+  assert.equal(g(KG.name), '見本 花子');
+  assert.equal(g(KG.insured), '0001234567');
+  assert.deepEqual([g(KG.amount), g(KG.tax), g(KG.total)], [String(25600 + 25280), String(2560 + 2528), String(28160 + 27808)]);
+  assert.equal(g(KG.seller), '太陽シルバーサービス㈱　小倉営業所\n〒802-0011　福岡県北九州市小倉北区重住3丁目11-21\n電話　093-952-1616');
+  assert.equal(g(KG.manager), '土居 翔太');
+  assert.deepEqual([g(KG.kind0), g(KG.item0), g(KG.yen0)], ['入浴補助用具', 'シャワーチェア 見本A\nSC-01', '25600']);
+  assert.deepEqual([g(KG.kind1), g(KG.item1), g(KG.yen1)], ['入浴補助用具', '浴槽手すり 見本B', '25280']);
+  assert.equal([g(KG.kind2), g(KG.item2), g(KG.yen2), g(KG.about0), g(KG.about1)].join(''), ''); // 概要（特長等）は手で書く
+  // 商品が13個あれば12個まで（画面で知らせる）
+  const many = Array.from({length: 13}, (_, k) => item({id: `m${k}`, name: `見本の杖${k}`, category: '歩行補助つえ', listPrice: 10000, reason: '見本'}));
+  assert.match(shinseiChecks(kkSale({items: many}), KK_S).overflow, /^北九州市の申請書の商品の欄は12行です。13つ目からの商品/);
+  const fm = fillKK({items: many});
+  assert.equal(readCell(fm, KITAKYUSHU_SHEETS.gaiyo, KG.item11), '見本の杖11');
+  assert.equal(readCell(fm, KITAKYUSHU_SHEETS.shikyu, KS.kind9), String(8000 * 13)); // 申請書の種目の金額は全部の商品
+});
+
+test('北九州市：給付率の丸は負担割合から（1割＝９０・2割＝８０・3割＝７０）・前回までの給付実績は今年度の残りから・選んでいなければ空', () => {
+  const xs = ([1, 2, 3] as const).map((burdenRatio) => ellipseXs(fillKK({burdenRatio}), KITAKYUSHU_SHEETS.shikyu));
+  for (const x of xs) assert.equal(x.length, 1);
+  assert.ok(xs[0][0] > xs[1][0] && xs[1][0] > xs[2][0], JSON.stringify(xs)); // ９０ は ８０ の右、８０ は ７０ の右
+  const two = fillKK({burdenRatio: 2, remaining: 70000});
+  const at = (ref: string) => readCell(two, KITAKYUSHU_SHEETS.shikyu, ref);
+  assert.equal(at(KS.prev), '30000'); // 10万円 − 今年度の残り 7万円
+  assert.equal(at(KS.benefit), String(55968 - Math.ceil((55968 * 2) / 10))); // 合計が残りより少ないので合計の8割
+  const none = fillKK({burdenRatio: null});
+  assert.equal(ellipseCount(none, KITAKYUSHU_SHEETS.shikyu), 0);
+  assert.equal(readCell(none, KITAKYUSHU_SHEETS.shikyu, KS.benefit), '');
+  // 事業者番号がない営業所：書かない。作る前の確かめで知らせる。様式にない欄（生年月日・性別・郵便番号・要介護度・記載者）は知らせない
+  const noNo = fillKK({}, {...KK_S, providerNo: ''});
+  assert.equal(readCell(noNo, KITAKYUSHU_SHEETS.shikyu, KS.provider), '');
+  assert.deepEqual(shinseiChecks(kkSale(), {...KK_S, providerNo: ''}).missing, ['販売事業者の事業者番号（10けた）']);
+  assert.deepEqual(shinseiChecks(kkSale({birthDate: '', gender: '', zip: '', careLevel: '', careOffice: '', careManager: ''}), KK_S).missing, []);
+  // 市の外の住所は福岡県だけ外す
+  assert.equal(kitakyushuAddress('福岡県行橋市大字流末1327番地'), '行橋市大字流末1327番地');
+  assert.equal(kitakyushuAddress('北九州市 八幡東区中央1-1'), '八幡東区中央1-1');
+});
+
 test('アプリに入れた原本は空（前の方の記入・写真・丸が残っていない）', () => {
-  for (const key of ['yukuhashi', 'kanda', 'miyako', 'kouiki', 'fukuoka'] as ShinseiKey[]) {
+  for (const key of ['yukuhashi', 'kanda', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu'] as ShinseiKey[]) {
     const f = template(key);
     assert.equal(Object.keys(f).filter((n) => n.startsWith('xl/media/')).length, 0, key);
     for (const n of Object.keys(f).filter((x) => /^xl\/drawings\/drawing\d+\.xml$/.test(x))) assert.doesNotMatch(strFromU8(f[n]), /prst="ellipse"|<xdr:pic>/, `${key} ${n}`);
@@ -421,8 +510,15 @@ test('アプリに入れた原本は空（前の方の記入・写真・丸が�
   assert.doesNotMatch(strFromU8(fk['xl/sharedStrings.xml']), /天神|福岡\s*太郎/);
   assert.doesNotMatch(strFromU8(fk['docProps/core.xml']), /<dc:creator>[^<]|<cp:lastModifiedBy>[^<]|lastPrinted/);
   assert.equal(Object.keys(fk).filter((n) => /^xl\/(drawings|externalLinks)\//.test(n)).length, 0);
+  // 北九州市：市の様式（Word・Excel）から作った原本。書く欄はどれも空で、記入例（001053094.pdf）の見本の名前は入っていない
+  const kk = template('kitakyushu');
+  assert.deepEqual([...sheetPaths(kk).keys()], ['支給申請書', '支給申請書（裏）', '概要書', '概要書（裏）']);
+  assert.equal(Object.values(KK_CELLS.shikyu).map((r) => (r === KK_CELLS.shikyu.ratio ? '' : readCell(kk, KITAKYUSHU_SHEETS.shikyu, r))).join(''), '');
+  assert.equal(Object.values(KK_CELLS.gaiyo).map((r) => readCell(kk, KITAKYUSHU_SHEETS.gaiyo, r)).join(''), '');
+  assert.doesNotMatch(strFromU8(kk['xl/sharedStrings.xml']), /北九\s*花子|小倉福祉用具|戸畑|城内/);
+  assert.equal(Object.keys(kk).filter((n) => /^xl\/(externalLinks|printerSettings)\//.test(n)).length, 0);
   // 共有の文字の表に、どの欄からも使われない文字（消した記入の名残り）がない
-  for (const [key, book] of [['miyako', m], ['kouiki', k2], ['fukuoka', fk]] as const) {
+  for (const [key, book] of [['miyako', m], ['kouiki', k2], ['fukuoka', fk], ['kitakyushu', kk]] as const) {
     const used = new Set<number>();
     for (const p of sheetPaths(book).values()) for (const x of strFromU8(book[p]).matchAll(/<c r="[A-Z]+\d+"[^>]*?\st="s"[^>]*>\s*<v>(\d+)<\/v>/g)) used.add(Number(x[1]));
     const count = (strFromU8(book['xl/sharedStrings.xml']).match(/<si>/g) ?? []).length;
@@ -493,4 +589,19 @@ test('印刷：A4 から少しはみ出す原本のシート（広域連合の�
   const pre = strFromU8(y[sheetPaths(y).get('用具・受領委任払')!]);
   assert.doesNotMatch(pre, /fitToPage="1"/); // 原本の倍率で入る
   assert.ok((printOverflow(y, '用具・受領委任払') ?? 9) < 1);
+});
+
+test('保険者番号（ユーザーの指示「広域連合の場合は、築上町・豊前市・上毛町・吉富町…それぞれ保険者番号が違うため、保険者を選択できる項目を」2026-10-29）：広域連合の様式の6マスを、選んだ・住所の市町村の番号で書きかえる', () => {
+  const digits = (files: Files, sheet: string, cols: string[], row: number) => cols.map((c) => String(readCell(files, sheet, `${c}${row}`) ?? '')).join('');
+  const AA = ['AA', 'AB', 'AC', 'AD', 'AE', 'AF'];
+  // 豊前市の方：受領委任払用（様式第8号）は 402149（原本の 406470 を書きかえる）
+  const buzen = fill('kouiki', {address: '福岡県豊前市大字八屋1-1'});
+  assert.equal(digits(buzen, KOUIKI_SHEETS.juryo, AA, 2), '402149');
+  // 選んだ番号（上毛町）が先。償還払い用（空のマス）にも書く
+  const picked = fill('kouiki', {address: '福岡県豊前市大字八屋1-1', insurerNo: '406462', payMethod: '償還払い'});
+  assert.equal(digits(picked, KOUIKI_SHEETS.shokan, AA, 4), '406462');
+  // 市町村が分からなければ原本と同じ 406470（築上町）
+  assert.equal(digits(fill('kouiki', {address: ''}), KOUIKI_SHEETS.juryo, AA, 2), '406470');
+  assert.equal(shinseiValues(sale({insurer: 'kitakyushu', address: '北九州市八幡東区見本1'}), S).insurerNo, '401083');
+  assert.equal(shinseiValues(sale({insurer: 'yukuhashi'}), S).insurerNo, '402131');
 });

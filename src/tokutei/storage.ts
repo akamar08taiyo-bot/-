@@ -264,6 +264,7 @@ export function cleanSales(raw: unknown): Sale[] {
       careLevel: CARE_LEVELS.includes(str(s.careLevel)) ? str(s.careLevel) : '',
       insurer: str(s.insurer),
       insurerName: str(s.insurerName),
+      ...(/^\d{6}$/.test(str(s.insurerNo)) ? {insurerNo: str(s.insurerNo)} : {}), // 保険者番号（2026-10-29）
       // null は「まだ選んでいない」（2026-10-27 から）。項目のない前の版のデータは 1割のまま
       burdenRatio: s.burdenRatio === null ? null : ((ratio === 2 || ratio === 3 ? ratio : 1) as BurdenRatio),
       payMethod: (s.payMethod === '償還払い' ? '償還払い' : '受領委任払い') as PayMethod,
@@ -288,6 +289,7 @@ export function cleanSales(raw: unknown): Sale[] {
       updatedAt: numv(s.updatedAt),
       // 住宅改修の様邸から開いた案件（jutaku.ts）
       ...(str(s.jutakuJob) ? {jutakuJob: str(s.jutakuJob), jutakuSync: isObj(s.jutakuSync) ? cleanJutakuFields(s.jutakuSync) : {}} : {}),
+      ...(str(s.jutakuItems) ? {jutakuItems: str(s.jutakuItems)} : {}),
       ...(typeof s.showSelfPay === 'boolean' ? {showSelfPay: s.showSelfPay} : {}), // 初めは出す（外したら false を残す）
       ...(numv(s.hacchuSentAt) > 0 ? {hacchuSentAt: numv(s.hacchuSentAt)} : {}),
       ...(s.uriageCustomer === 'new' || s.uriageCustomer === 'existing' ? {uriageCustomer: s.uriageCustomer} : {}),

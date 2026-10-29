@@ -6,7 +6,8 @@
 // あわせて、押すと案件の画面のその入れる所へ行く欄（お客様名・商品・理由…）の位置も返す（式で同じ値を出している欄＝支給申請書の氏名なども押せる）
 
 import {strFromU8} from 'fflate';
-import {FUKUOKA_ROWS, FUKUOKA_SHEET, fillShinseiFiles, KOUIKI_SHEETS, pairBoxes} from './shinsei.ts';
+import {FUKUOKA_ROWS, FUKUOKA_SHEET, fillShinseiFiles, KITAKYUSHU_GAIYO_ROWS, KITAKYUSHU_SHEETS, KOUIKI_SHEETS, pairBoxes} from './shinsei.ts';
+import {KK_CELLS} from './shinsei/kitakyushuCells.ts';
 import type {ShinseiForm, ShinseiKey, ShinseiValues} from './shinsei.ts';
 import {attrOf, boxes, colName, colNum, EMU, formulaRef, markLayouts, numOf, sheetLayout, sheetPaths, unesc} from './xlsxEdit.ts';
 import type {Files, SheetLayout} from './xlsxEdit.ts';
@@ -16,6 +17,7 @@ export type ShinseiField =
   | 'customer'
   | 'kana'
   | 'insuredNo'
+  | 'insurerNo'
   | 'birthDate'
   | 'gender'
   | 'zip'
@@ -39,6 +41,7 @@ export const FIELD_LABEL: Record<ShinseiField, string> = {
   customer: 'お客様名',
   kana: 'フリガナ',
   insuredNo: '被保険者番号',
+  insurerNo: '保険者番号',
   birthDate: '生年月日',
   gender: '性別',
   zip: '郵便番号',
@@ -98,6 +101,8 @@ const MIYAKO_PHOTOS = ['納品確認写真用紙', '納品確認写真用紙 (2)
 // 様式の題名を押すと支払方法へ（受領委任払用・償還払い用のどちらに書くかは支払方法で決まる）
 const KOUIKI_JURYO_ROWS = [12, 14, 16];
 const KOUIKI_SHOKAN_ROWS = [14, 16, 18];
+const KK: Record<string, string> = KK_CELLS.shikyu;
+const KG: Record<string, string> = KK_CELLS.gaiyo;
 
 export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
   yukuhashi: [{sheet: '用具・受領委任払', links: preLinks(7)}, PROXY, PHOTO],
@@ -156,6 +161,7 @@ export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
         ['kana', ['G2']],
         ['customer', ['G3']], // 委任状の被保険者氏名（L38）は自署なので書かない・押せる欄にしない（2026-10-26）
         ['insuredNo', boxes('W', 10, 4)],
+        ['insurerNo', boxes('AA', 6, 2)],
         ['birthDate', ['G6']],
         ['gender', ['W6']],
         ['zip', ['G8']],
@@ -173,6 +179,7 @@ export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
         ['kana', boxes('I', 9, 4)],
         ['customer', ['I6', ...boxes('J', 10, 34)]],
         ['insuredNo', boxes('W', 10, 6)],
+        ['insurerNo', boxes('AA', 6, 4)],
         ['birthDate', ['I8']],
         ['gender', ['W8']],
         ['zip', ['I10']],
@@ -192,7 +199,7 @@ export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
       ],
     },
   ],
-  // 福岡市：申請者の住所（L25）は右の空いた欄へはみ出すので AJ までつなぐ。保険者番号のうしろの2けた・あて先の区長は住所の区から。
+  // 福岡市：申請者の住所（L25）は右の空いた欄へはみ出すので AJ までつなぐ。保険者番号は選んだ区（初めは住所の区）・あて先の区長は住所の区から。
   // 販売事業者名・事業者番号と受任者の欄は設定の営業所（入れる所の「販売事業者（受任者）」の行）
   fukuoka: [
     {
@@ -205,8 +212,36 @@ export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
         ['reason', ['E10']],
         ['seller', ['E11', ...pairBoxes('Q', 10, 11), 'E31', 'E32', 'W31', 'E33', 'Q33']],
         ['items', [...rows(['C', 'D', 'J', 'Q'], FUKUOKA_ROWS), 'Q19']],
-        ['address', ['AG5', 'AI5', 'D25', ...boxes('L', 25, 25)]],
+        ['insurerNo', pairBoxes('Y', 6, 5)],
+        ['address', ['D25', ...boxes('L', 25, 25)]],
         ['tel', ['P28']],
+      ],
+    },
+  ],
+  // 北九州市：申請の欄の事業者（申請者）・委任の欄の事業者・事業者番号は設定の営業所（入れる所の「販売事業者（受任者）」の行）。給付率の丸と申請金額は負担割合へ
+  kitakyushu: [
+    {
+      sheet: KITAKYUSHU_SHEETS.shikyu,
+      links: [
+        ['kana', [KK.kana]],
+        ['customer', [KK.name]],
+        ['insuredNo', Array.from({length: 10}, (_, i) => KK[`no${i}`])],
+        ['address', [KK.address]],
+        ['tel', [KK.tel]],
+        ['items', [...Array.from({length: 9}, (_, i) => KK[`kind${i + 1}`]), KK.total]],
+        ['burdenRatio', [KK.benefit, KK.ratio]],
+        ['reason', [KK.reason]],
+        ['seller', [KK.provider, KK.sellerA, KK.repA, KK.sellerB, KK.repB, KK.sellerAddress, KK.sellerTel]],
+      ],
+    },
+    {
+      sheet: KITAKYUSHU_SHEETS.gaiyo,
+      links: [
+        ['customer', [KG.name]],
+        ['insuredNo', [KG.insured]],
+        ['items', [KG.amount, KG.tax, KG.total, ...Array.from({length: KITAKYUSHU_GAIYO_ROWS}, (_, r) => [KG[`kind${r}`], KG[`item${r}`], KG[`yen${r}`]]).flat()]],
+        ['seller', [KG.seller]],
+        ['staff', [KG.manager]],
       ],
     },
   ],
@@ -224,15 +259,17 @@ export function missingFields(v: ShinseiValues, key: ShinseiKey): Set<ShinseiFie
   need(v.zip, 'zip');
   need(v.address, 'address');
   need(v.tel, 'tel');
-  if (key === 'fukuoka') {
-    // 福岡市の様式には性別・郵便番号・要介護状態区分・記載者の欄がない。受任者の欄は設定の営業所（事業者番号が要る）
+  const seller = key === 'fukuoka' || key === 'kitakyushu';
+  if (seller) {
+    // 福岡市・北九州市の様式には性別・郵便番号・要介護状態区分・記載者の欄がない（北九州市は生年月日も）。受任者の欄は設定の営業所（事業者番号が要る）
     for (const f of ['gender', 'zip'] as const) out.delete(f);
+    if (key === 'kitakyushu') out.delete('birthDate');
     need(v.seller.name && v.seller.providerNo.length === 10, 'seller');
   }
-  if (key !== 'kouiki' && key !== 'fukuoka') need(v.care, 'careLevel'); // 広域連合の様式には要介護状態区分の欄がない
+  if (key !== 'kouiki' && !seller) need(v.care, 'careLevel'); // 広域連合の様式には要介護状態区分の欄がない
   need(v.items.length, 'items');
   need(v.items.length && v.items.every((i) => i.reason), 'reason');
-  if (key !== 'fukuoka') need(key === 'kouiki' ? v.office : v.recorder, 'recorder'); // 広域連合は居宅の事業所名だけ
+  if (!seller) need(key === 'kouiki' ? v.office : v.recorder, 'recorder'); // 広域連合は居宅の事業所名だけ
   need(v.ratioSet, 'burdenRatio');
   if (key === 'miyako' || key === 'kouiki') need(v.carePlan, 'carePlan');
   if (key === 'miyako') need(v.staff, 'staff');

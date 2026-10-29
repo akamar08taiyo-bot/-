@@ -101,7 +101,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
           <Field label="登録番号（インボイス）">
             <TextInput value={s.regNo} onChange={(regNo) => set({regNo})} />
           </Field>
-          {/* 福岡市の支給申請書の受任者の欄（特定（介護予防）福祉用具販売事業者番号）に書く */}
+          {/* 福岡市・北九州市の支給申請書の受任者・事業者の欄（特定（介護予防）福祉用具販売事業者番号・事業者番号）に書く */}
           <Field label="事業者番号（特定福祉用具販売）">
             <TextInput value={s.providerNo ?? ''} onChange={(providerNo) => set({providerNo})} inputMode="numeric" placeholder="10けた" />
           </Field>

@@ -63,6 +63,7 @@ export const INSURERS: {key: string; label: string; note?: string; perItem?: boo
   {key: 'miyako', label: 'みやこ町', perItem: true},
   {key: 'kouiki', label: '福岡県介護保険広域連合', note: '築上町・豊前市・上毛町・吉富町'},
   {key: 'fukuoka', label: '福岡市'},
+  {key: 'kitakyushu', label: '北九州市'},
   {key: 'other', label: 'そのほか'},
 ];
 

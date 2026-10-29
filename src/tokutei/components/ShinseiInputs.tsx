@@ -3,6 +3,7 @@
 // 上に保険者と申請書の名前、選ぶ所は丸のボタン、フリガナはカタカナに、被保険者番号は10マス、生年月日は元号と年月日、Enter で次の欄。
 // 右のプレビュー（ShinseiPreview.tsx）の欄を押すと、ここのその行へ（data-field）。まだ入っていない行は薄い黄色。
 // 値は案件（Sale）のまま（見積書と同じ値。金額は見積書の側で入れる。ここでは購入金額を出すだけ）
+import {insurerAreas, insurerNoOf} from '../insurerNumbers.ts';
 import {useMemo, useState} from 'react';
 import type {ReactNode, RefObject} from 'react';
 import type {FocusEvent} from 'react';
@@ -69,7 +70,7 @@ export function ShinseiInputs({
   onPickCustomer?: () => void; // 住宅改修の様邸のタブの中では渡さない（お客様の情報は様邸から入る。ユーザーの指示「赤枠の部分は不要です」2026-10-28）
   onFavorite: (itemId: string) => void; // 手で入れた商品を商品マスタの★お気に入りに
   onHideSuggest: (v: string) => void; // 居宅介護支援事業所・ケアマネジャーの▼のリストから消す（設定の hiddenSuggest）
-  changeSettings: (f: (s: Settings) => Settings) => void; // 福岡市の受任者（販売事業者）の営業所・事業者番号（設定のまま。見積書の発行元も同じ営業所）
+  changeSettings: (f: (s: Settings) => Settings) => void; // 福岡市・北九州市の受任者（販売事業者）の営業所・事業者番号（設定のまま。見積書の発行元も同じ営業所）
 }) {
   const makers = useMemo(() => makerChoices(data.products, data.sales), [data.products, data.sales]);
   const s = data.settings;
@@ -84,7 +85,8 @@ export function ShinseiInputs({
     </div>
   );
   const kouiki = formKey === 'kouiki';
-  const fukuoka = formKey === 'fukuoka';
+  // 福岡市・北九州市：要介護状態区分の欄がなく、販売事業者（受任者）の営業所・事業者番号を書く
+  const seller = formKey === 'fukuoka' || formKey === 'kitakyushu';
   // 商品がないときも、手で入れる欄を1つ開いておく（ふだんは手で入れるので。ユーザーの指示「手でいれるではなく、基本は手で入れるのがデフォルトなので開いておく
   // ２商品名以降は追加する」2026-10-26）。打つとその商品ができる（id を同じにして、打っている欄から外れないように）
   const [draft] = useState(() => blankItem(s));
@@ -139,6 +141,7 @@ export function ShinseiInputs({
         )}
         {row('被保険者氏名', <TextInput value={sale.customer} onChange={(customer) => change({customer})} placeholder="山田　花子" className="w-full max-w-md text-base font-bold" aria-label="お客様名" data-nav />, 'customer')}
         {row('被保険者番号', <InsuredNoInput value={sale.insuredNo} onChange={(insuredNo) => change({insuredNo})} />, 'insuredNo')}
+        {row('保険者番号', <InsurerNoSelect sale={sale} onChange={(insurerNo) => change({insurerNo})} />, 'insurerNo')}
         {row('生年月日', <EraBirthInput value={sale.birthDate} onChange={(birthDate) => change({birthDate})} />, 'birthDate')}
         {row(
           '性別',
@@ -178,7 +181,7 @@ export function ShinseiInputs({
         {row('住所', <TextInput value={sale.address} onChange={changeAddress} placeholder="福岡県…" className="w-full" aria-label="住所" data-nav />, 'address')}
         {row('電話番号', <TextInput type="tel" value={sale.tel} onChange={(tel) => change({tel})} placeholder="0930-00-0000" className="w-48" aria-label="電話" data-nav />, 'tel')}
         {!kouiki &&
-          !fukuoka &&
+          !seller &&
           row(
             '要介護状態区分',
             <Circles<string> label="要介護状態区分" value={sale.careLevel} onPick={(careLevel) => change({careLevel})} clearable options={CARE_LEVELS.map((c) => [c, c] as const)} />,
@@ -368,8 +371,8 @@ export function ShinseiInputs({
           </select>,
           'staff',
         )}
-        {/* 福岡市の受任者（販売事業者）：設定の営業所（住所・電話・所長）と事業者番号。ここで替えると設定も替わる */}
-        {fukuoka &&
+        {/* 福岡市・北九州市の受任者（販売事業者）：設定の営業所（住所・電話・所長）と事業者番号。ここで替えると設定も替わる */}
+        {seller &&
           row(
             '販売事業者（受任者）',
             <div className="flex w-full flex-wrap items-center gap-2">
@@ -405,5 +408,34 @@ export function ShinseiInputs({
             ユーザーの指示「特定福祉用具申請書の赤枠部分は、連動すると都合が悪いため、すべてなくす。入力が必要なときは、EXCELにおとして、手入力します」2026-10-28 */}
       </div>
     </div>
+  );
+}
+
+/**
+ * 保険者番号：保険者の市町村・区から選ぶ（広域連合は構成市町村、福岡市・北九州市は区。ユーザーの指示「保険者を選択できる項目を入力欄に入れる」
+ * 「他の保険者も同様の仕様にする」2026-10-29）。初めは住所から（insurerNumbers.ts）。住宅改修から受け取った一覧にない番号もそのまま出す
+ */
+function InsurerNoSelect({sale, onChange}: {sale: Sale; onChange: (no: string) => void}) {
+  const areas = insurerAreas(sale.insurer);
+  const cur = insurerNoOf(sale.insurer, sale.address, sale.insurerNo ?? '');
+  const odd = cur && !areas.some((a) => a.no === cur);
+  const group = sale.insurer === 'kouiki' ? '福岡県介護保険広域連合' : sale.insurer === 'fukuoka' ? '福岡市' : sale.insurer === 'kitakyushu' ? '北九州市' : '';
+  return (
+    <select
+      value={cur}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={areas.length < 2 && !odd}
+      className="h-9 w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 text-sm disabled:bg-slate-50 disabled:text-slate-700"
+      aria-label="保険者番号"
+      data-nav
+    >
+      {!cur && <option value="">選んでください</option>}
+      {odd && <option value={cur}>{cur}（介護保険証の番号）</option>}
+      {areas.map((a) => (
+        <option key={a.no} value={a.no}>
+          {a.no}　{sale.insurer === 'kouiki' ? `${a.name}（${group}）` : group ? `${group} ${a.name}` : a.name}
+        </option>
+      ))}
+    </select>
   );
 }

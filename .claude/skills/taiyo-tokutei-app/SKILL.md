@@ -34,6 +34,7 @@ URL は `#jutaku=<様邸の id>&embed=1`：その様邸の案件を開き（な�
 詳しいことは必要になったときに読む：
 - コードの地図・データの形・計算の関数 → `references/codebase.md`
 - テスト・ビルド・Excel の確かめ方・公開とデプロイの確かめ方 → `references/build-test-publish.md`
+- 介護保険の保険者番号（福岡県・大分県・熊本県・佐賀県・長崎県の一覧と、申請書の保険者番号のマス・選ぶ欄の決まり）→ `references/insurer-numbers.md`（住宅改修のスキルにも同じもの）
 
 ## 画面と帳票
 
@@ -47,7 +48,16 @@ URL は `#jutaku=<様邸の id>&embed=1`：その様邸の案件を開き（な�
   福岡市（2026-10-29、`fukuoka.xlsx`。様式第18号の2・受領委任払用）も支給申請書だけの1枚：申請者は本人、受任者（販売事業者）は設定の営業所と事業者番号
   （設定の `providerNo`。営業所の一覧 `OFFICES` の `providerNo` は行橋営業所だけ。申請書の画面の「販売事業者（受任者）」の行で替えると設定も替わる＝見積書の発行元も）。
   番号のマスは2列ずつ（`pairBoxes`）。保険者番号のうしろ2けた・あて先の区長は住所の区から（`fukuokaWard`・`fukuokaInsurerNo`・`insurerCheckDigit`）。
-  書いた値の字は黒・購入金額は #,##0・必要な理由は折り返す（`SheetWrite.formats` → `xlsxEdit.ts` の `formatCell`）。北九州市は様式待ち。
+  書いた値の字は黒・購入金額は #,##0・必要な理由は折り返す（`SheetWrite.formats` → `xlsxEdit.ts` の `formatCell`）。
+  北九州市（2026-10-29、`kitakyushu.xlsx`）：支給申請書（受領委任払用）と概要書の表・裏の4シート。原本は市の様式（Word・Excel）から `scripts/make_kitakyushu_tokutei.py`
+  （`scripts/pdf_form_xlsx.py` で PDF の線と字を Excel の罫線・欄に写す）で作り、欄の番地は `shinsei/kitakyushuCells.ts`。種目ごとの金額は税抜（市の記入例）、合計は税込、
+  給付率は「７０・８０・９０」の丸（`marks` の needles）。概要書の業者名は「会社名⏎〒住所⏎電話」。プレビューの1枚目に商品名はない（概要書が3枚目）。
+- 保険者番号（2026-10-29。ユーザーの指示「広域連合の場合は、築上町・豊前市・上毛町・吉富町…保険者を選択できる項目を入力欄に入れる」「他の保険者も同様の仕様にする」）：
+  `insurerNumbers.ts`（住宅改修の `src/sasaoka/insurerNumbers.ts` と同じ一覧）。申請書の画面の「保険者番号」（`Sale.insurerNo`。初めは住所の市町村・区、広域連合で分からなければ 406470）。
+  広域連合の様式第8号（AA2:AF2）・償還払い用（AA4:AF4）と福岡市（Y5〜AI5 の1つおき）に書く。ほかの保険者の一覧にある番号（保険者を選び直す前の番号）は使わない。
+  住宅改修と ⇔（`jutaku.ts` の TEXT に insurerNo）。5県の一覧は `references/insurer-numbers.md`
+- 住宅改修の取り込み（📥）で読んだ特定福祉用具の申請書の福祉用具は、受け渡し（localStorage の `items`・`itemsKey`）で届き、案件に福祉用具がなければ入れる
+  （`jutaku.ts` の `withItems`・`itemsFromJutaku`。`Sale.jutakuItems` に目印。2026-10-29。ユーザーの報告「申請書を読み込めないことがある」）
 - 申請書の画面（DESIGN.md 5.2.2）：案件の画面のタブ「📋 見積もり」「📄 申請書（行橋市）」（上の「📄 申請書」のボタンでも開く）。左は見積もりと同じ入れる所、
   右は「📄 申請書（Excel）を作る」とプレビュー（Excel に保存するのと同じ書き込みをした原本のシートを描く）。プレビューの欄を押すと左のその所へ（`data-field`）、
   入れている所の欄を囲む、まだ入っていない所（`missingFields`）は薄い黄色。見積書のプレビューの入れている所は、ごく薄い黄色と細い枠（`ShinseiPreview.tsx` の `TONE.yellow`。

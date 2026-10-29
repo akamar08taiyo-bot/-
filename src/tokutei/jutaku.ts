@@ -5,16 +5,53 @@
 //   2つのアプリはコードもデータも分けている（ユーザーの指示「全く別物として作成」）。受け渡しの形を変えるときは、
 //   住宅改修（リポジトリ akamar08taiyo-bot/- のブランチ claude/sasaoka-shikiri-app）の src/sasaoka/tokuteiLink.ts も直す
 
+import {guessCategory} from './category.ts';
 import {CARE_LEVELS, INSURERS} from './defaults.ts';
-import {newSale} from './sales.ts';
-import type {BurdenRatio, Gender, JutakuFields, Sale, Settings} from './types.ts';
+import {blankItem, newSale} from './sales.ts';
+import type {BurdenRatio, Gender, JutakuFields, Sale, SaleItem, Settings} from './types.ts';
 
 export const JUTAKU_KEY = 'taiyo-tokutei-from-jutaku-v1';
 
-export type JutakuHandoff = {job: string; fields: JutakuFields};
+/**
+ * 住宅改修の「📥 取り込む」で読んだ特定福祉用具の申請書の福祉用具（2026-10-29。住宅改修の src/sasaoka/types.ts の TokuteiImportItem と同じ形）。
+ * amount は申請書の金額（taxIn＝消費税込み。北九州市の概要書は税抜）
+ */
+export type JutakuItem = {category: string; name: string; code: string; maker: string; amount: number; taxIn: boolean};
+export type JutakuHandoff = {job: string; fields: JutakuFields; items?: JutakuItem[]; itemsKey?: string};
+
+function cleanItems(raw: unknown): JutakuItem[] {
+  if (!Array.isArray(raw)) return [];
+  const s = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+  return raw
+    .filter((v): v is Record<string, unknown> => !!v && typeof v === 'object')
+    .flatMap((it) => {
+      const amount = typeof it.amount === 'number' && Number.isFinite(it.amount) && it.amount > 0 ? Math.round(it.amount) : 0;
+      return amount && s(it.name) ? [{category: s(it.category), name: s(it.name), code: s(it.code), maker: s(it.maker), amount, taxIn: it.taxIn !== false}] : [];
+    })
+    .slice(0, 20);
+}
+
+/**
+ * 受け取った福祉用具を案件の明細に：販売単価（税抜）は申請書の金額（税込みなら ÷1.1 を四捨五入）。数量は1。定価・仕入れは申請書にないので空（あとで商品を選び直せる）。
+ * 種目は申請書の種目、なければ商品名から
+ */
+export function itemsFromJutaku(items: JutakuItem[], settings: Pick<Settings, 'discountRate'>): SaleItem[] {
+  return items.map((it) => {
+    const g = guessCategory(it.name, it.category);
+    return {...blankItem(settings), name: it.name, code: it.code, maker: it.maker, category: g.category || it.category, sub: g.sub, unitPrice: it.taxIn ? Math.round(it.amount / 1.1) : it.amount};
+  });
+}
+
+/** 受け取った福祉用具を入れる：案件に福祉用具がまだなく、同じ目印をまだ入れていないときだけ（ここで入れた・直した福祉用具は上書きしない） */
+function withItems(sale: Sale, h: JutakuHandoff, settings: Settings, now: number): Sale {
+  if (!h.items?.length || !h.itemsKey || sale.jutakuItems === h.itemsKey) return sale;
+  if (sale.items.some((i) => i.name.trim() || i.productId)) return {...sale, jutakuItems: h.itemsKey};
+  return {...sale, items: itemsFromJutaku(h.items, settings), jutakuItems: h.itemsKey, updatedAt: now};
+}
 
 // 担当（staff）も受け取る（住宅改修の様邸の担当＝受注残に入る担当。入っていなければ住宅改修は渡さない。2026-10-26）
-const TEXT = ['customer', 'kana', 'insuredNo', 'zip', 'address', 'tel', 'careOffice', 'careManager', 'staff'] as const;
+// 保険者番号（insurerNo）も受け取る（住宅改修で選んだ番号・介護保険証から読んだ番号。2026-10-29）
+const TEXT = ['customer', 'kana', 'insuredNo', 'zip', 'address', 'tel', 'careOffice', 'careManager', 'staff', 'insurerNo'] as const;
 /** 住宅改修から受け取る項目（JutakuFields）の全部 */
 const KEYS = [...TEXT, 'birthDate', 'gender', 'careLevel', 'insurer', 'burdenRatio', 'welfare'] as const;
 
@@ -43,7 +80,8 @@ export function readJutaku(raw: string | null, job: string): JutakuHandoff | nul
     if (!v || typeof v !== 'object') return null;
     const o = v as Record<string, unknown>;
     if (o.job !== job || !o.fields || typeof o.fields !== 'object') return null;
-    return {job, fields: cleanJutakuFields(o.fields as Record<string, unknown>)};
+    const items = cleanItems(o.items);
+    return {job, fields: cleanJutakuFields(o.fields as Record<string, unknown>), ...(items.length && typeof o.itemsKey === 'string' && o.itemsKey ? {items, itemsKey: o.itemsKey} : {})};
   } catch {
     return null;
   }
@@ -72,8 +110,9 @@ export function applyJutaku(sales: Sale[], settings: Settings, h: JutakuHandoff,
   }
   const linked = sales.filter((s) => s.jutakuJob === h.job).sort((a, b) => b.updatedAt - a.updatedAt)[0];
   if (!linked) {
-    const sale: Sale = {...newSale(sales, settings, h.fields.insurer ?? INSURERS[0].key, now), ...h.fields, jutakuJob: h.job};
+    let sale: Sale = {...newSale(sales, settings, h.fields.insurer ?? INSURERS[0].key, now), ...h.fields, jutakuJob: h.job};
     sale.jutakuSync = syncedValues(sale);
+    sale = withItems(sale, h, settings, now);
     return {sales: [sale, ...sales], id: sale.id};
   }
   // 生活保護は 2026-10-23 から受け取る。それより前に作った案件の jutakuSync には無いので、初めの値（なし）を受け取ったものとみなす
@@ -91,8 +130,9 @@ export function applyJutaku(sales: Sale[], settings: Settings, h: JutakuHandoff,
   if (patch.insurer) patch.perItem = INSURERS.find((i) => i.key === patch.insurer)?.perItem ?? false;
   const sync: JutakuFields = {...prev, ...h.fields};
   const synced = KEYS.every((k) => prev[k] === sync[k]);
-  if (Object.keys(patch).length === 0 && synced) return {sales, id: linked.id};
-  const next: Sale = {...linked, ...patch, jutakuSync: sync, updatedAt: Object.keys(patch).length ? now : linked.updatedAt};
+  const filled = withItems(linked, h, settings, now);
+  if (Object.keys(patch).length === 0 && synced && filled === linked) return {sales, id: linked.id};
+  const next: Sale = {...filled, ...patch, jutakuSync: sync, updatedAt: Object.keys(patch).length ? now : filled.updatedAt};
   return {sales: sales.map((s) => (s.id === linked.id ? next : s)), id: linked.id};
 }
 

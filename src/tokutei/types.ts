@@ -74,6 +74,7 @@ export type Sale = {
   careLevel: string; // 要支援1〜要介護5
   insurer: string; // 保険者（defaults.ts の INSURERS の key。そのほかは 'other' と insurerName）
   insurerName: string;
+  insurerNo?: string; // 保険者番号（6けた。申請書の画面で選んだ番号・住宅改修から受け取った番号。なければ住所の市町村・区から。insurerNumbers.ts。2026-10-29）
   // 負担割合。null ＝ まだ選んでいない（ユーザーの指示「負担割合が分からないと売上伝票の発行はできない」「（選ぶまで自己負担額は）出さない」2026-10-27。
   // 新しい案件は未選択から。前は初めから1割で、2割の方を確かめないまま1割で出すおそれがあった。前からの案件の値はそのまま）
   burdenRatio: BurdenRatio | null;
@@ -99,6 +100,7 @@ export type Sale = {
   updatedAt: number;
   jutakuJob?: string; // 住宅改修のアプリの様邸の画面（🛁 特定福祉用具申請書のタブ）から開いた案件：その様邸の id（jutaku.ts）
   jutakuSync?: JutakuFields; // 前に住宅改修から受け取ったお客様の情報（住宅改修で変わった値だけ入れ直すため）
+  jutakuItems?: string; // 住宅改修で取り込んだ特定福祉用具の申請書の福祉用具を受け取った目印（そのファイルの目印。同じ福祉用具を2回入れない。jutaku.ts）
   showSelfPay?: boolean; // 見積書の明細の最後の商品の2行下から介護保険の内訳（利用者負担＝自己負担額は赤字）を出すか。空なら出す・false なら出さない（見積もりの画面の「自己負担額を表示」。estimateBook.ts の belowItemLines）
   uriageCustomer?: 'new' | 'existing'; // 売上伝票発行依頼書の顧客区分（新規・既存）。「🧾 売上伝票依頼書」の窓で選んだもの（uriage.ts）
   hacchuSentAt?: number; // 販売受注簿へ送った時刻（「📤 販売受注簿に転記」か、状態を承認にしたときの自動。自動で送るのは1回だけ。handoff.ts の queueHacchu）
@@ -106,7 +108,7 @@ export type Sale = {
 
 /** 住宅改修のアプリから受け取るお客様の情報（jutaku.ts。案件の項目の名前で。生活保護 welfare は 2026-10-23 から） */
 export type JutakuFields = Partial<
-  Pick<Sale, 'customer' | 'kana' | 'insuredNo' | 'birthDate' | 'gender' | 'zip' | 'address' | 'tel' | 'careLevel' | 'insurer' | 'burdenRatio' | 'careOffice' | 'careManager' | 'welfare' | 'staff'>
+  Pick<Sale, 'customer' | 'kana' | 'insuredNo' | 'birthDate' | 'gender' | 'zip' | 'address' | 'tel' | 'careLevel' | 'insurer' | 'burdenRatio' | 'careOffice' | 'careManager' | 'welfare' | 'staff' | 'insurerNo'>
 >;
 
 /** 見積書の発行元（営業所） */
@@ -117,7 +119,7 @@ export type Office = {
   tel: string;
   fax: string;
   manager: string;
-  providerNo?: string; // 特定福祉用具販売の事業者番号（10けた。福岡市の支給申請書の受任者の欄）。分かっている営業所だけ
+  providerNo?: string; // 特定福祉用具販売の事業者番号（10けた。福岡市・北九州市の支給申請書の受任者・事業者番号の欄）。分かっている営業所だけ
 };
 
 export type Settings = {
@@ -129,7 +131,7 @@ export type Settings = {
   fax: string;
   manager: string; // 所長
   regNo: string; // 登録番号（インボイス）
-  providerNo?: string; // 特定福祉用具販売の事業者番号（10けた。福岡市の支給申請書の「特定（介護予防）福祉用具販売事業者番号」）
+  providerNo?: string; // 特定福祉用具販売の事業者番号（10けた。福岡市の支給申請書の「特定（介護予防）福祉用具販売事業者番号」・北九州市の「事業者番号」）
   staffList: string[]; // 担当者の候補（フルネーム）
   suppliers: string[]; // 仕入先の候補
   discountRate: number; // 割引率の初期値（20 ＝ 定価の2割引き）

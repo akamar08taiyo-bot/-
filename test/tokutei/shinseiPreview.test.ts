@@ -79,9 +79,9 @@ function sale(over: Partial<Sale> = {}): Sale {
   };
 }
 
-const TEMPLATE_FILES: Record<ShinseiKey, string> = {yukuhashi: 'yukuhashi.xltx', kanda: 'kanda.xltx', miyako: 'miyako.xlsx', kouiki: 'kouiki.xlsx', fukuoka: 'fukuoka.xlsx'};
+const TEMPLATE_FILES: Record<ShinseiKey, string> = {yukuhashi: 'yukuhashi.xltx', kanda: 'kanda.xltx', miyako: 'miyako.xlsx', kouiki: 'kouiki.xlsx', fukuoka: 'fukuoka.xlsx', kitakyushu: 'kitakyushu.xlsx'};
 const template = (key: ShinseiKey): Files => unzipSync(new Uint8Array(readFileSync(new URL(`../../src/tokutei/shinsei/${TEMPLATE_FILES[key]}`, import.meta.url))));
-const KEYS: ShinseiKey[] = ['yukuhashi', 'kanda', 'miyako', 'kouiki', 'fukuoka'];
+const KEYS: ShinseiKey[] = ['yukuhashi', 'kanda', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu'];
 const textOf = (p: ReturnType<typeof shinseiPreview>[number]) => p.texts.map((t) => t.runs.map((r) => r.text).join('')).join('\n');
 
 test('プレビュー：書き込むシートごとに1枚（行橋市・苅田町・みやこ町・広域連合）。書いた値が出る', () => {
@@ -91,6 +91,8 @@ test('プレビュー：書き込むシートごとに1枚（行橋市・苅田�
     miyako: ['福祉用具購入受領委任払申請書', '福祉用具支給申請(受領委任）', '納品確認写真用紙', '納品確認写真用紙 (2)'],
     kouiki: [KOUIKI_SHEETS.juryo, KOUIKI_SHEETS.photo],
     fukuoka: ['申請書'],
+    // 北九州市：支給申請書（表・裏）と概要書（表・裏）。商品名は概要書に書く（支給申請書は種目ごとの金額）
+    kitakyushu: ['支給申請書', '支給申請書（裏）', '概要書', '概要書（裏）'],
   };
   for (const key of KEYS) {
     const pages = shinseiPreview(template(key), SHINSEI[key], shinseiValues(sale({insurer: key}), S));
@@ -99,10 +101,11 @@ test('プレビュー：書き込むシートごとに1枚（行橋市・苅田�
       sheets[key],
       key,
     );
-    for (const p of pages) assert.ok(p.width > 400 && p.height > 600 && p.texts.length > 5 && p.lines.length > 5, `${key} ${p.sheet}`);
+    // 北九州市の支給申請書の裏（委任状）は、用紙の上半分だけの印刷範囲
+    for (const p of pages) assert.ok(p.width > 400 && (p.height > 600 || p.sheet === '支給申請書（裏）') && p.texts.length > 5 && p.lines.length > 5, `${key} ${p.sheet} ${p.width}×${p.height}`);
     const first = textOf(pages[0]);
     assert.ok(first.includes('見本 花子') && first.includes('ミホン ハナコ'), key);
-    assert.ok(first.includes('シャワーチェア 見本A'), key);
+    assert.ok((key === 'kitakyushu' ? textOf(pages[2]) : first).includes('シャワーチェア 見本A'), key);
   }
   // 丸で囲む欄（性別・元号）は、丸と同じ位置に1文字ずつ。丸の図形もある
   const yk = shinseiPreview(template('yukuhashi'), SHINSEI.yukuhashi, shinseiValues(sale(), S))[0];

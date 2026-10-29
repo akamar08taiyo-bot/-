@@ -5,6 +5,7 @@
 // 原本の式でつながっている欄（支給申請書・写真の用紙が事前申請書を参照）は式のまま使い、書くのは決めた欄だけ（原本のシート・空欄・図形は消さない）。
 // 書かない欄：個人番号・印・ケアマネジャーの署名・受け取り者氏名・市町村の記入欄。
 
+import {insurerNoOf} from './insurerNumbers.ts';
 import {saleTotals} from './calc.ts';
 import {docLabel} from './category.ts';
 import {CARE_LEVELS} from './defaults.ts';
@@ -32,19 +33,22 @@ import {
 } from './xlsxEdit.ts';
 import type {CellValue, Files, Mark} from './xlsxEdit.ts';
 import {zipLabel} from './zip.ts';
+import {KK_CELLS, KK_SHEETS} from './shinsei/kitakyushuCells.ts';
 
 /** 申請書の原本がある保険者 */
-export type ShinseiKey = 'yukuhashi' | 'kanda' | 'miyako' | 'kouiki' | 'fukuoka';
+export type ShinseiKey = 'yukuhashi' | 'kanda' | 'miyako' | 'kouiki' | 'fukuoka' | 'kitakyushu';
 
 /** 申請書の明細の1行 */
 export type ShinseiItem = {
   label: string; // 福祉用具名（種目及び商品名）：「入浴補助用具（入浴用いす）」と商品名の2行
   makerSeller: string; // 製造事業者名及び販売事業者名：メーカー名と会社名の2行
   total: number; // 購入金額（税込）
+  amount: number; // 購入金額（税抜。北九州市の申請内容・概要書の金額）
   tais: string;
   product: string; // 納品名（写真の用紙）：商品名 / 品番
   reason: string;
   name: string; // 商品名だけ（福岡市は種目・商品名・製造事業者名が別の欄）
+  code: string; // 品番（北九州市の概要書の「品目、形式等」）
   maker: string; // 製造事業者名だけ（㈱に短くしたもの）
   category: string; // 種目（福岡市は種目の番号を書く）
 };
@@ -62,6 +66,7 @@ export type ShinseiSeller = {
 /** 申請書に書く値（案件・設定・計算から作る。どの様式でも同じ） */
 export type ShinseiValues = {
   name: string;
+  insurerNo: string; // 保険者番号（6けた。選んだ番号、なければ住所の市町村・区から。広域連合・福岡市の申請書のマス。insurerNumbers.ts）
   kana: string;
   insuredNo: string; // 10けた（足りない左は 0）。番号がなければ空
   birth: Wareki | null;
@@ -79,6 +84,8 @@ export type ShinseiValues = {
   claimDate: string; // 支給申請日
   benefit: number; // 保険給付額（保険者負担）。負担割合を選んでいなければ 0（委任状の金額は空欄）
   ratioSet: boolean; // 負担割合を選んであるか
+  ratio: number; // 負担割合（1〜3割。北九州市の給付率 90・80・70 の丸）
+  used: number; // 前回までの給付実績（今年度にもう使った購入金額＝限度額−今年度の残り。残りが空欄なら 0）
   staff: string; // 担当（みやこ町の届出者）
   payMethod: PayMethod; // 支払方法（広域連合は、受領委任払用・償還払い用のどちらの様式に書くか）
   seller: ShinseiSeller;
@@ -114,16 +121,19 @@ export function shinseiValues(sale: Sale, s: Settings): ShinseiValues {
       // メーカー名と会社名は1行ずつ。株式会社・（株）は㈱にして短く（ユーザーの指示「会社名や商品名は、1行から増えないようにする　太陽シルバーサービス㈱などでも良い」2026-10-26）
       makerSeller: [corpShort(i.maker), corpShort(s.company)].filter(Boolean).join('\n'),
       total: l.total,
+      amount: l.amount,
       tais: i.tais.trim(),
       product: [i.name.trim(), i.code.trim()].filter(Boolean).join(' / '),
       reason: i.reason.trim(),
       name: i.name.trim(),
+      code: i.code.trim(),
       maker: corpShort(i.maker),
       category: i.category,
     };
   });
   return {
     name: sale.customer.trim(),
+    insurerNo: insurerNoOf(sale.insurer, sale.address, sale.insurerNo ?? ''),
     kana: sale.kana.trim(),
     insuredNo: padInsuredNo(sale.insuredNo),
     birth: warekiOf(sale.birthDate),
@@ -145,6 +155,8 @@ export function shinseiValues(sale: Sale, s: Settings): ShinseiValues {
     claimDate: '',
     benefit: t.ratioSet ? t.insurerBurden : 0,
     ratioSet: t.ratioSet,
+    ratio: t.ratio,
+    used: t.remainingBlank ? 0 : Math.max(0, t.limit - t.remaining),
     staff: sale.staff.trim(),
     payMethod: sale.payMethod,
     seller: {
@@ -368,7 +380,8 @@ function kouikiJuryo(v: ShinseiValues): SheetWrite {
   const c: KouikiCells = {kana: 'G2', name: 'G3', insured: ['W', 4], birth: 'G6', gender: 'W6', zip: 'G8', address: 'G9', rows: KOUIKI_JURYO_ROWS, total: 'R18', reason: 'J20', plan: 'J21', date: {era: 'C27', y: 'F27', m: 'I27', d: 'L27'}};
   return {
     sheet: KOUIKI_SHEETS.juryo,
-    cells: [...kouikiCells(v, c, birthChoice(v, '明 ・ 大 ・ 昭　')), ['Z9', v.tel]],
+    // 保険者番号（原本は 406470＝築上町。構成市町村ごとに番号がちがうので、選んだ番号で書きかえる。ユーザーの指示 2026-10-29）
+    cells: [...kouikiCells(v, c, birthChoice(v, '明 ・ 大 ・ 昭　')), ['Z9', v.tel], ...insurerBoxes(v, 'AA', 2)],
     block: kouikiPlan(c, v),
     fit: kouikiFit(c),
     oneLine: kouikiOneLine(c),
@@ -377,6 +390,10 @@ function kouikiJuryo(v: ShinseiValues): SheetWrite {
   };
 }
 
+/** 保険者番号の6マス（広域連合の様式。1字ずつの欄。原本の数と同じく数で書く） */
+const insurerBoxes = (v: ShinseiValues, start: string, row: number): [string, CellValue][] =>
+  v.insurerNo.length === 6 ? boxes(start, 6, row).map((ref, i): [string, CellValue] => [ref, Number(v.insurerNo[i])]) : [];
+
 /** 償還払い用：元号の字がないので「昭和31年6月10日生」。申請者は本人（住所・氏名・電話）。届出者・口座の欄は書かない */
 function kouikiShokan(v: ShinseiValues): SheetWrite {
   const c: KouikiCells = {kana: 'I4', name: 'I6', insured: ['W', 6], birth: 'I8', gender: 'W8', zip: 'I10', address: 'I11', rows: KOUIKI_SHOKAN_ROWS, total: 'R20', reason: 'I22', plan: 'I23', date: {era: 'H30', y: 'J30', m: 'M30', d: 'P30'}};
@@ -384,7 +401,7 @@ function kouikiShokan(v: ShinseiValues): SheetWrite {
   return {
     sheet: KOUIKI_SHEETS.shokan,
     // 申請者（本人）の住所・氏名・電話は、下線の左の欄に書く（右の空いた欄へはみ出して出る）
-    cells: [...kouikiCells(v, c, b ? `${b.era}${b.y}年${b.m}月${b.d}日生` : null), ['J32', v.address], ['J34', v.name], ['Y34', v.tel]],
+    cells: [...kouikiCells(v, c, b ? `${b.era}${b.y}年${b.m}月${b.d}日生` : null), ['J32', v.address], ['J34', v.name], ['Y34', v.tel], ...insurerBoxes(v, 'AA', 4)],
     block: kouikiPlan(c, v),
     fit: kouikiFit(c),
     oneLine: kouikiOneLine(c),
@@ -405,8 +422,8 @@ function kouikiPhoto(v: ShinseiValues): SheetWrite {
  */
 export const FUKUOKA_SHEET = '申請書';
 export const FUKUOKA_ROWS = [13, 15, 17];
-/** 種目の番号（様式の「※種目には次の番号を記載」） */
-const FUKUOKA_KIND: Record<string, number> = {
+/** 種目の番号（福岡市の様式の「※種目には次の番号を記載」。北九州市の申請書・概要書の種目の並び (1)〜(9) と同じ） */
+const KIND_NO: Record<string, number> = {
   腰掛便座: 1,
   自動排泄処理装置の交換可能部品: 2,
   入浴補助用具: 3,
@@ -464,7 +481,8 @@ function fukuokaSheet(v: ShinseiValues): SheetWrite {
   const b = v.birth;
   const shown = v.items.slice(0, FUKUOKA_ROWS.length);
   const w = fukuokaWard(v.address);
-  const insurer = fukuokaInsurerNo(v.address);
+  // 保険者番号：選んだ番号、なければ住所の区から（insurerNumbers.ts。区ごとの番号は fukuokaInsurerNo と同じ）
+  const insurer = v.insurerNo.startsWith('4013') ? v.insurerNo : fukuokaInsurerNo(v.address);
   const digits = (no: string, start: string, row: number): [string, CellValue][] => pairBoxes(start, 10, row).map((ref, i) => [ref, no ? no[i] ?? '' : '']);
   const amounts = [...FUKUOKA_ROWS.slice(0, shown.length).map((r) => `Q${r}`), ...(shown.length ? ['Q19'] : [])];
   return {
@@ -486,7 +504,7 @@ function fukuokaSheet(v: ShinseiValues): SheetWrite {
       ...shown.flatMap((it, k): [string, CellValue][] => {
         const r = FUKUOKA_ROWS[k];
         return [
-          [`C${r}`, FUKUOKA_KIND[it.category] ?? ''],
+          [`C${r}`, KIND_NO[it.category] ?? ''],
           [`D${r}`, it.name],
           [`J${r}`, it.maker],
           [`Q${r}`, it.total],
@@ -524,6 +542,95 @@ function fukuokaSheet(v: ShinseiValues): SheetWrite {
     // 元号と本人の状況（在宅を囲む。入所中の方は特定福祉用具の支給の対象にならない）
     marks: [ERA('E8', v), {cell: 'E9', needles: ['在　宅', '入　所'], pick: 0}],
   };
+}
+
+/**
+ * 北九州市（介護保険居宅介護（予防）福祉用具購入費支給申請書（受領委任払用）と、添える特定福祉用具概要書（介護保険用）。2026-10-29 にユーザーからいただいた市の様式）：
+ * 事前の申請はなく、購入のあとの支給申請書だけ。申請するのは事業者（受任者＝設定の営業所。事業者番号も）で、被保険者は委任の欄に自署する（氏名は書かない）。
+ * 原本はスキルの scripts/make_kitakyushu_tokutei.py が市の様式（Word・Excel）から作り、欄の番地は kitakyushuCells.ts に書き出す。
+ * 申請内容は種目ごとの金額（市の記入例の「税抜の金額を記入」）・合計金額（消費税込）①・前回までの給付実績②（今年度の残りを入れたときだけ）・申請金額（保険給付額）。
+ * 給付率（７０・８０・９０）は負担割合から丸で囲む。概要書は商品ごとに 種目・品目、形式等（商品名と品番）・金額（税抜）と、合計・消費税・総合計・業者名（連絡先）・担当者。
+ * 書かない欄：購入月・領収書記載日・委任と申請と概要書の日付（日付は書かない。2026-10-28 の指示）・口座振込依頼欄・選択制のチェック・概要書の概要（特長等）・市の記入欄・
+ * 裏の委任状（口座名義人が事業者の代表者とちがうときに書く）
+ */
+export const KITAKYUSHU_SHEETS = {shikyu: KK_SHEETS[0], back: KK_SHEETS[1], gaiyo: KK_SHEETS[2], gaiyoBack: KK_SHEETS[3]} as const;
+/** 概要書の商品の行（原本の2行ずつで1つの商品） */
+export const KITAKYUSHU_GAIYO_ROWS = 12;
+const KK: Record<string, string> = KK_CELLS.shikyu;
+const KG: Record<string, string> = KK_CELLS.gaiyo;
+/** 北九州市の住所は区から書く（市の記入例「小倉北区城内１－１」「八幡東区中央一丁目１－１」）。市の外の住所は福岡県だけ外す */
+export const kitakyushuAddress = (address: string) => address.trim().replace(/^(?:福岡県)?[\s　]*(?:北九州市[\s　]*)?/, '');
+/** 事業者番号は市の記入例と同じ全角の数字 */
+const fullDigits = (s: string) => s.replace(/[0-9]/g, (d) => String.fromCharCode(d.charCodeAt(0) + 0xfee0));
+
+function kitakyushuSheets(v: ShinseiValues): SheetWrite[] {
+  const kinds = new Map<number, number>();
+  for (const it of v.items) {
+    const no = KIND_NO[it.category];
+    if (no) kinds.set(no, (kinds.get(no) ?? 0) + it.amount);
+  }
+  const amount = v.items.reduce((n, i) => n + i.amount, 0);
+  const total = v.items.reduce((n, i) => n + i.total, 0);
+  const shown = v.items.slice(0, KITAKYUSHU_GAIYO_ROWS);
+  const yen = (ok: unknown, ref: string, n: number): [string, CellValue][] => (ok ? [[ref, n]] : []);
+  const seller = v.seller;
+  const sellerAddress = kitakyushuAddress(seller.address);
+  // 業者名（連絡先）：販売事業者名・住所・電話番号（概要書の記入上の注意事項）
+  const contact = [seller.name, [seller.zip && `〒${seller.zip}`, seller.address].filter(Boolean).join('　'), seller.tel && `電話　${seller.tel}`].filter(Boolean).join('\n');
+  return [
+    {
+      sheet: KITAKYUSHU_SHEETS.shikyu,
+      cells: [
+        ...when(seller.providerNo.length === 10, [[KK.provider, fullDigits(seller.providerNo)]]),
+        [KK.kana, v.kana],
+        [KK.name, v.name],
+        ...Array.from({length: 10}, (_, i): [string, CellValue] => [KK[`no${i}`], v.insuredNo[i] ?? '']),
+        [KK.address, kitakyushuAddress(v.address)],
+        [KK.tel, v.tel],
+        ...[...kinds].map(([no, n]): [string, CellValue] => [KK[`kind${no}`], n]),
+        ...yen(v.items.length, KK.total, total),
+        ...yen(v.used > 0, KK.prev, v.used),
+        ...yen(v.benefit > 0, KK.benefit, v.benefit),
+        // 委任の欄（被保険者氏名は自署）と申請の欄の事業者：設定の営業所
+        ...when(seller.name, [
+          [KK.sellerA, seller.name],
+          [KK.sellerB, seller.name],
+        ]),
+        ...when(seller.rep, [
+          [KK.repA, seller.rep],
+          [KK.repB, seller.rep],
+        ]),
+        ...when(sellerAddress, [[KK.sellerAddress, sellerAddress]]),
+        ...when(seller.tel, [[KK.sellerTel, seller.tel]]),
+      ],
+      block: {cell: KK.reason, head: [], body: reasonText(v), tail: []},
+      formats: [...[...kinds.keys()].map((no) => KK[`kind${no}`]), KK.total, KK.prev, KK.benefit].map((ref): [string, {numFmt: number}] => [ref, {numFmt: 3}]),
+      fit: [KK.kana, KK.name, KK.address, KK.tel, KK.sellerA, KK.repA, KK.sellerB, KK.repB, KK.sellerAddress, KK.sellerTel],
+      // 給付率の丸：1割＝９０・2割＝８０・3割＝７０（生活保護も 1割）
+      marks: [{cell: KK.ratio, needles: ['７０', '８０', '９０'], pick: v.ratioSet ? 3 - v.ratio : -1}],
+    },
+    {sheet: KITAKYUSHU_SHEETS.back},
+    {
+      sheet: KITAKYUSHU_SHEETS.gaiyo,
+      cells: [
+        [KG.name, v.name],
+        [KG.insured, v.insuredNo],
+        ...yen(v.items.length, KG.amount, amount),
+        ...yen(v.items.length, KG.tax, total - amount),
+        ...yen(v.items.length, KG.total, total),
+        ...when(seller.name, [[KG.seller, contact]]),
+        [KG.manager, v.staff],
+        ...shown.flatMap((it, r): [string, CellValue][] => [
+          [KG[`kind${r}`], it.category],
+          [KG[`item${r}`], [it.name, it.code].filter(Boolean).join('\n')],
+          [KG[`yen${r}`], it.amount],
+        ]),
+      ],
+      formats: [KG.amount, KG.tax, KG.total, ...shown.map((_, r) => KG[`yen${r}`])].map((ref): [string, {numFmt: number}] => [ref, {numFmt: 3}]),
+      fit: [KG.name, KG.seller, KG.manager, ...shown.flatMap((_, r) => [KG[`kind${r}`], KG[`item${r}`]])],
+    },
+    {sheet: KITAKYUSHU_SHEETS.gaiyoBack},
+  ];
 }
 
 export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
@@ -623,6 +730,7 @@ export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
     sheets: (v) => [v.payMethod === '償還払い' ? kouikiShokan(v) : kouikiJuryo(v), kouikiPhoto(v)],
   },
   fukuoka: {key: 'fukuoka', title: '福岡市', rows: FUKUOKA_ROWS.length, sheets: (v) => [fukuokaSheet(v)]},
+  kitakyushu: {key: 'kitakyushu', title: '北九州市', rows: KITAKYUSHU_GAIYO_ROWS, sheets: kitakyushuSheets},
 };
 
 export const shinseiForm = (insurer: string): ShinseiForm | null => SHINSEI[insurer as ShinseiKey] ?? null;
@@ -691,20 +799,21 @@ export function shinseiChecks(sale: Sale, s: Settings): {missing: string[]; over
   need(v.name, 'お客様名');
   need(v.kana, 'フリガナ');
   need(v.insuredNo, '被保険者番号');
-  need(v.birth, '生年月日');
   const kouiki = form?.key === 'kouiki';
-  const fukuoka = form?.key === 'fukuoka'; // 福岡市の様式には性別・郵便番号・要介護状態区分・記載者の欄がない
-  if (!fukuoka) need(v.gender, '性別');
-  if (!fukuoka) need(v.zip, '郵便番号');
+  // 福岡市・北九州市の様式には性別・郵便番号・要介護状態区分・記載者の欄がない（北九州市は生年月日の欄もない）。販売事業者（受任者）の事業者番号を書く
+  const seller = form?.key === 'fukuoka' || form?.key === 'kitakyushu';
+  if (form?.key !== 'kitakyushu') need(v.birth, '生年月日');
+  if (!seller) need(v.gender, '性別');
+  if (!seller) need(v.zip, '郵便番号');
   need(v.address, '住所');
   need(v.tel, '電話');
-  if (!kouiki && !fukuoka) need(v.care, '要介護度'); // 広域連合の様式には要介護状態区分の欄がない
+  if (!kouiki && !seller) need(v.care, '要介護度'); // 広域連合の様式には要介護状態区分の欄がない
   need(v.items.length, '商品');
   const noReason = v.items.filter((i) => !i.reason).length;
   if (v.items.length && noReason) missing.push(noReason === v.items.length ? '福祉用具が必要な理由' : `福祉用具が必要な理由（${noReason}つ）`);
   // 広域連合は「居宅の事業所名」だけ（ケアマネジャーは署名の欄なので書かない）
   if (kouiki) need(v.office, '居宅介護支援事業所（居宅の事業所名）');
-  else if (fukuoka) need(v.seller.providerNo.length === 10, '販売事業者の事業者番号（10けた）');
+  else if (seller) need(v.seller.providerNo.length === 10, '販売事業者の事業者番号（10けた）');
   else need(v.recorder, '居宅介護支援事業所・ケアマネジャー（理由の記載者）');
   need(v.ratioSet, '負担割合');
   if (form?.key === 'miyako' || kouiki) need(v.carePlan, '居宅サービス計画の届出（有・無）');

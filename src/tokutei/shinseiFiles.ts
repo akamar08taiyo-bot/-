@@ -6,6 +6,7 @@ import {unzipSync} from 'fflate';
 import {useEffect, useState} from 'react';
 import fukuoka from './shinsei/fukuoka.xlsx?inline';
 import kanda from './shinsei/kanda.xltx?inline';
+import kitakyushu from './shinsei/kitakyushu.xlsx?inline';
 import kouiki from './shinsei/kouiki.xlsx?inline';
 import miyako from './shinsei/miyako.xlsx?inline';
 import yukuhashi from './shinsei/yukuhashi.xltx?inline';
@@ -15,7 +16,7 @@ import type {Sale, Settings} from './types.ts';
 import type {Files} from './xlsxEdit.ts';
 import {downloadBlob} from './util.ts';
 
-const TEMPLATES: Record<ShinseiKey, string> = {kanda, yukuhashi, miyako, kouiki, fukuoka};
+const TEMPLATES: Record<ShinseiKey, string> = {kanda, yukuhashi, miyako, kouiki, fukuoka, kitakyushu};
 const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 /** 開いた原本（保険者ごとに1回だけ開いて覚えておく。書き込むときは {...files} に書く） */

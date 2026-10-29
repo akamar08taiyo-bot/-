@@ -169,3 +169,43 @@ test('担当（ユーザーの指示「受注残に入れるとき当然担当�
   assert.deepEqual(jutakuChanges({...sale, staff: '見本 太郎'}, null, {customer: '見本 花子', staff: ''}), {});
   assert.deepEqual(jutakuChanges({...sale, staff: '見本 太郎'}, syncedValues(sale), null), {staff: '見本 太郎'});
 });
+
+test('住宅改修で取り込んだ特定福祉用具の申請書の福祉用具（2026-10-29）：案件に福祉用具がまだなければ入れる。同じものは2回入れない・ここで入れた福祉用具は上書きしない', () => {
+  const settings = defaultSettings();
+  const items = [
+    {category: '入浴補助用具', name: 'シャワーチェア 見本A', code: 'SC-01', maker: '見本工業', amount: 28160, taxIn: true},
+    {category: '', name: '浴槽手すり 見本B', code: '', maker: '', amount: 12640, taxIn: false},
+    {category: '', name: '', code: '', maker: '', amount: 100, taxIn: true}, // 名前のない行は捨てる
+  ];
+  const h = readJutaku(JSON.stringify({job: 'j1', fields, items, itemsKey: 'k1'}), 'j1')!;
+  assert.equal(h.items?.length, 2);
+  const first = applyJutaku([], settings, h, 1000);
+  const sale = first.sales[0];
+  assert.equal(sale.jutakuItems, 'k1');
+  assert.deepEqual(
+    sale.items.map((i) => [i.name, i.code, i.maker, i.category, i.sub, i.unitPrice, i.qty]),
+    [
+      ['シャワーチェア 見本A', 'SC-01', '見本工業', '入浴補助用具', '入浴用いす', 25600, 1], // 税込 28,160円 → 税抜 25,600円
+      ['浴槽手すり 見本B', '', '', '入浴補助用具', '浴槽用手すり', 12640, 1], // 税抜の金額はそのまま。種目は商品名から
+    ],
+  );
+  // 読み込んでも残る・同じ目印はもう入れない（消しても戻さない）
+  const saved = cleanSales(JSON.parse(JSON.stringify(first.sales)))[0];
+  assert.equal(saved.jutakuItems, 'k1');
+  const emptied = {...saved, items: []};
+  assert.equal(applyJutaku([emptied], settings, h, 2000).sales[0].items.length, 0);
+  // 前からある案件：福祉用具があれば入れない（目印だけ残す）、なければ入れる
+  const own = {...saved, jutakuItems: undefined, items: saved.items.slice(0, 1)};
+  const r = applyJutaku([own], settings, {...h, itemsKey: 'k2'}, 3000).sales[0];
+  assert.deepEqual([r.items.length, r.jutakuItems], [1, 'k2']);
+  const none = applyJutaku([{...emptied, jutakuItems: undefined}], settings, {...h, itemsKey: 'k3'}, 3000).sales[0];
+  assert.deepEqual([none.items.length, none.jutakuItems], [2, 'k3']);
+  // 福祉用具のない受け渡し（前の版の住宅改修）は今までどおり
+  assert.equal(readJutaku(JSON.stringify({job: 'j1', fields}), 'j1')?.items, undefined);
+});
+
+test('保険者番号（insurerNo。2026-10-29）も受け取る：住宅改修で選んだ・介護保険証から読んだ番号', () => {
+  const h = readJutaku(JSON.stringify({job: 'j1', fields: {...fields, insurer: 'kouiki', insurerNo: '402149'}}), 'j1')!;
+  assert.equal(h.fields.insurerNo, '402149');
+  assert.equal(applyJutaku([], defaultSettings(), h, 1).sales[0].insurerNo, '402149');
+});

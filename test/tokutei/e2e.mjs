@@ -347,6 +347,33 @@ try {
   assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1, 'スマホの幅の福岡市の申請書で横にはみ出している');
   await page.locator('[data-field="seller"]').screenshot({path: `${out}/07d-phone-seller-fukuoka.png`});
   await page.setViewportSize({width: 1366, height: 900});
+  // ---- 保険者番号（ユーザーの指示「広域連合の場合は、築上町・豊前市・上毛町・吉富町…保険者を選択できる項目を入力欄に」2026-10-29）：
+  // 福岡市は住所の区（早良区）。広域連合は住所の市町村（豊前市）から、選び直すとその番号を様式第8号の保険者番号の6マスに書く
+  assert.equal(await page.locator('select[aria-label="保険者番号"]').inputValue(), '401372');
+  await page.getByLabel('保険者', {exact: true}).selectOption('kouiki');
+  await preview.getByRole('group', {name: '様式第8号（福祉用具購入費支給申請書（受領委任払用））', exact: true}).waitFor();
+  await page.getByRole('textbox', {name: '住所', exact: true}).fill('福岡県豊前市大字八屋1-1');
+  await page.waitForFunction(() => document.querySelector('select[aria-label="保険者番号"]')?.value === '402149');
+  assert.ok((await page.locator('select[aria-label="保険者番号"]').locator('option').allInnerTexts()).some((t) => t.includes('406462') && t.includes('上毛町')));
+  await page.locator('select[aria-label="保険者番号"]').selectOption('406462'); // 上毛町
+  await page.locator('[data-field="insurerNo"]').screenshot({path: `${out}/04j-insurer-no-kouiki.png`});
+  const [insurerFile] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📗 申請書をExcelで保存'}).click()]);
+  await insurerFile.saveAs(`${out}/shinsei-kouiki-insurer.xlsx`);
+  {
+    const {readCell} = await import('../../src/tokutei/xlsxEdit.ts');
+    const f = unzipSync(new Uint8Array(readFileSync(`${out}/shinsei-kouiki-insurer.xlsx`)));
+    assert.equal(['AA', 'AB', 'AC', 'AD', 'AE', 'AF'].map((c) => readCell(f, '様式第8号（福祉用具購入費支給申請書（受領委任払用））', `${c}2`)).join(''), '406462');
+  }
+  // ---- 北九州市（支給申請書・受領委任払用と概要書）：4枚のプレビュー。商品名は概要書に
+  await page.getByLabel('保険者', {exact: true}).selectOption('kitakyushu');
+  await page.getByRole('tab', {name: '📄 申請書（北九州市）'}).waitFor();
+  await preview.getByRole('group', {name: '概要書', exact: true}).waitFor();
+  assert.deepEqual(await groups(), ['支給申請書', '支給申請書（裏）', '概要書', '概要書（裏）']);
+  // 広域連合で選んだ番号（上毛町）は北九州市では使わない（住所に区がなければ選んでいない）
+  assert.equal(await page.locator('select[aria-label="保険者番号"]').inputValue(), '');
+  assert.ok((await preview.getByRole('group', {name: '概要書', exact: true}).innerText()).includes('シャワーベンチ FSフィット'));
+  await page.screenshot({path: `${out}/04k-sale-shinsei-kitakyushu.png`});
+
   // もとに戻す：営業所（設定。見積書の発行元）は行橋営業所・住所は行橋市
   await page.getByLabel('販売事業者の営業所').selectOption('行橋営業所');
   await page.getByRole('textbox', {name: '住所', exact: true}).fill('行橋市大字流末1327番地');
