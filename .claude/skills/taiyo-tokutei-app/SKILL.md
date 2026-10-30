@@ -26,7 +26,8 @@ description: 太陽シルバーサービス行橋営業所の業務アプリ「�
 2026-10-26 からは逆向き（⇔）の postMessage `taiyo-tokutei-to-jutaku`（ここで直したお客様の情報・担当を住宅改修の様邸へ。`jutakuChanges`）・親からの `taiyo-tokutei-catalog`（カタログの窓・印刷）。
 アプリ間の受け渡しの全体の表は `taiyo-portal` スキルの「アプリ間の受け渡し」。
 URL は `#jutaku=<様邸の id>&embed=1`：その様邸の案件を開き（なければ作る）、住宅改修で変わった値だけ入れ直す。embed では題名の段を出さない。
-住宅改修はタブを替える・一覧へ戻る前に `window.__taiyoTokuteiFlush` で保存を待つ（枠が消えると IndexedDB の保存が途中で止まり、直した値が消えた）。部品（取り込み・自動保存など）は写してきたもので、直すときは別々に直す。
+住宅改修はタブを替える・一覧へ戻る前に `window.__taiyoTokuteiFlush` で保存を待つ（枠が消えると IndexedDB の保存が途中で止まり、直した値が消えた）。
+住宅改修の「📲 様邸のデータ」（携帯→パソコン。2026-10-30）は `window.__taiyoTokuteiCase`（その様邸の案件を渡す）・`__taiyoTokuteiPutCase`（送られた案件に置きかえる。cleanSales で直してから。update のあと少し待って flush）を呼ぶ（`App.tsx`。その様邸の案件ができてから置く）。部品（取り込み・自動保存など）は写してきたもので、直すときは別々に直す。
 
 作業の場所：今のチェックアウトが別のブランチ（住宅改修など）なら、git worktree で別のフォルダに出す（`references/build-test-publish.md` の1）。
 2026-10 のセッションでは `/home/user/tokutei-wt`、2026-10-26 は `/home/user/tokutei` に出していた。`/home/user/-` は住宅改修のブランチなので取り違えない。

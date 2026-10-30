@@ -12,10 +12,11 @@ import {SettingsPage} from './components/SettingsPage.tsx';
 import {ToastProvider} from './components/ui.tsx';
 import {applyJutaku, FROM_JUTAKU_CATALOG, JUTAKU_KEY, jutakuChanges, readJutaku, syncedValues, TO_JUTAKU} from './jutaku.ts';
 import type {CatalogAsk} from './jutaku.ts';
-import type {JutakuFields} from './types.ts';
+import type {JutakuFields, Sale} from './types.ts';
 import {estimateBook} from './print/estimateFiles.ts';
 import {PrintView} from './print/PrintView.tsx';
 import {writeSalesSummary} from './salesSummary.ts';
+import {cleanSales} from './storage.ts';
 import {shinseiForm} from './shinsei.ts';
 import {shinseiBook} from './shinseiFiles.ts';
 import {useNewVersion} from './update.ts';
@@ -144,9 +145,13 @@ export default function App() {
     store.update('sales', (list) => list.map((x) => (x.id === id ? {...x, jutakuSync: {...x.jutakuSync, ...fields}} : x)));
   }, [linkedSale, jutaku, store]);
   useEffect(() => {
-    if (!linkedSale || !data) return;
+    if (!linkedSale || !data || !jutaku) return;
     type Book = {name: string; bytes: Uint8Array};
-    const w = window as Window & {__taiyoTokuteiFiles?: (kinds: string[]) => Promise<Book[]>};
+    const w = window as Window & {
+      __taiyoTokuteiFiles?: (kinds: string[]) => Promise<Book[]>;
+      __taiyoTokuteiCase?: () => Promise<Sale>;
+      __taiyoTokuteiPutCase?: (incoming: unknown) => Promise<boolean>;
+    };
     const settings = data.settings;
     w.__taiyoTokuteiFiles = async (kinds) => {
       await store.flush();
@@ -156,10 +161,26 @@ export default function App() {
       if (kinds.includes('quote')) out.push(await estimateBook(linkedSale, settings));
       return out;
     };
+    // 住宅改修の「様邸のデータ」（携帯で作ったものをパソコンへ送る。住宅改修の src/sasaoka/jobShare.ts。ユーザーの指示「携帯で作成したものを、パソコンに送った場合…
+    // そのまま（申請書、見積もりなど全て）、共有したい…開くとパソコンの中のアプリで同期させる」2026-10-30）：この様邸の案件を渡す・送られた案件に置きかえる
+    w.__taiyoTokuteiCase = async () => {
+      await store.flush();
+      return JSON.parse(JSON.stringify(linkedSale)) as Sale;
+    };
+    w.__taiyoTokuteiPutCase = async (incoming) => {
+      const [sale] = cleanSales([incoming]);
+      if (!sale) return false;
+      // この様邸の案件は送られたもの1つに（開いたときに作った空の案件・前の案件は置きかえる）。案件の番号は送った端末と同じ
+      store.update('sales', (list) => [...list.filter((x) => x.jutakuJob !== jutaku && x.id !== sale.id), {...sale, jutakuJob: jutaku}]);
+      await new Promise((r) => setTimeout(r, 50)); // 変更が保存の待ち（update の中）に入ってから保存する
+      return store.flush();
+    };
     return () => {
       delete w.__taiyoTokuteiFiles;
+      delete w.__taiyoTokuteiCase;
+      delete w.__taiyoTokuteiPutCase;
     };
-  }, [linkedSale, data, store.flush]);
+  }, [linkedSale, data, jutaku, store]);
 
   // 住宅改修の「📖 カタログを表示」「🖨 カタログを印刷」：開いている案件の画面で、カタログの窓・カタログの印刷を出す（案件が開く前に届いても、開いたら出す）
   const [catalogAsk, setCatalogAsk] = useState<CatalogAsk | null>(null);

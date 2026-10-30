@@ -52,7 +52,7 @@ description: 太陽シルバーサービス㈱（行橋営業所）の「太陽�
 | `taiyo-tokutei-from-jutaku-v1`（localStorage） | 住宅改修（`tokuteiLink.ts` の `writeTokutei`）→ 特定福祉用具（`jutaku.ts` の `readJutaku`・`applyJutaku`） | `{job, fields}`：お客様の情報・保険者・負担割合・居宅・ケアマネ・介護保険証の値・生活保護・担当（2026-10-26） |
 | `taiyo-tokutei-to-jutaku`（postMessage、中の枠 → 親） | 特定福祉用具（`App.tsx`・`jutakuChanges`）→ 住宅改修（`App.tsx`・`readFromTokutei`・`withTokuteiFields`） | `{type, job, fields}`：特定福祉用具で直したお客様の情報・担当（⇔。2026-10-26）。送った値は特定福祉用具の `jutakuSync` にもする |
 | `taiyo-tokutei-catalog`（postMessage、親 → 中の枠） | 住宅改修（`TokuteiEditor.tsx`）→ 特定福祉用具（`App.tsx` → `SaleEditor` の `catalogAsk`） | `{type, action: 'show'｜'print'}`：様邸の画面の左の「📖 カタログを表示」「🖨 カタログを印刷」 |
-| `window.__taiyoTokuteiFlush`・`__taiyoTokuteiFiles` | 特定福祉用具が置く → 住宅改修が呼ぶ | 枠を消す前に保存を待つ・まとめて保存の Excel を作る |
+| `window.__taiyoTokuteiFlush`・`__taiyoTokuteiFiles`・`__taiyoTokuteiCase`・`__taiyoTokuteiPutCase` | 特定福祉用具が置く（`App.tsx`。その様邸の案件ができてから）→ 住宅改修が呼ぶ（`tokuteiLink.ts` の `withTokutei`） | 枠を消す前に保存を待つ・Excelで保存／メールで送付の Excel を作る・様邸のデータ（携帯→パソコン。`jobShare.ts`）でその様邸の案件を渡す／送られた案件に置きかえる（2026-10-30） |
 | `taiyo-tokutei-sales-v1`（localStorage） | 特定福祉用具（`salesSummary.ts`）→ 住宅改修の売上見込み・一覧の名前（`linked`）・受注残（taiyo-link） | `{v, updatedAt, rows, linked}`：案件ごとの金額（税抜）・月（納品日など）・担当・居宅・営業所 |
 | `taiyo-jutaku-sales-v1`（localStorage） | 住宅改修（`salesPlan.ts`）→ 受注残（taiyo-link） | `{v, updatedAt, rows, tokuteiMonths}`：見積書のある様邸ごとの金額・売上月・担当・居宅・営業所、このアプリで月を変えた特定福祉用具の案件の月 |
 | `taiyo-hacchu-import-v1`・`taiyo-hacchu-import-queue-v1`（localStorage） | 住宅改修の発注書・特定福祉用具 → 販売受注簿作成ツール | kind で分ける。**受け取る側を先に公開**（知らない kind は黙って消す） |
