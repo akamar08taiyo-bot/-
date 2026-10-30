@@ -77,14 +77,18 @@ export function TokuteiEditor({
     update?.('jobs', (list) => list.map((j) => (j.id === job.id ? {...fn(j), updatedAt: Date.now()} : j)));
     setReload(true);
   };
-  // 中の枠は画面の下までの高さ（画面ごとスクロールさせず、特定福祉用具のアプリの中だけスクロールする。上の段が折り返す幅・画面の大きさを変えたときも合わせる）
+  // 中の枠は画面の下までの高さ（画面ごとスクロールさせず、特定福祉用具のアプリの中だけスクロールする。上の段が折り返す幅・画面の大きさを変えたときも合わせる）。
+  // 上の段だけで画面がうまるとき（スマホ）は、画面の高さ（下のバーが出ているときの高さ＝svh。スクロールで変わらない）にして、枠まで動かすと画面いっぱいに出す
+  //（前は 560px で、ページの一番下にあるため画面の上まで動かせず、中のカタログの窓の絵が画面の外になった。2026-10-30）
   const frame = useRef<HTMLIFrameElement>(null);
   const head = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState<number | null>(null);
+  const [height, setHeight] = useState<number | string | null>(null);
   useLayoutEffect(() => {
     const fit = () => {
       const el = frame.current;
-      if (el) setHeight(Math.max(MIN_HEIGHT, Math.floor(window.innerHeight - el.getBoundingClientRect().top - window.scrollY - BOTTOM)));
+      if (!el) return;
+      const rest = Math.floor(window.innerHeight - el.getBoundingClientRect().top - window.scrollY - BOTTOM);
+      setHeight(rest >= MIN_HEIGHT ? rest : `max(${MIN_HEIGHT}px, calc(100svh - ${BOTTOM * 2}px))`);
     };
     fit();
     window.addEventListener('resize', fit);

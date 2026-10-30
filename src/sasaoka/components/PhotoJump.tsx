@@ -104,6 +104,7 @@ export function PhotoJumpFab({onPhotos}: {onPhotos: () => void}) {
     // 書き込みの画面・確かめる画面（z-40 から上）の下にかくれる。iPhone の下の帯（ホームバー）にかからないように safe-area の分あける
     <button
       type="button"
+      data-photo-fab
       onClick={() => (state === 'top' ? window.scrollTo({top: 0, behavior: 'smooth'}) : onPhotos())}
       className="no-print fixed right-3 z-30 flex h-12 touch-manipulation items-center gap-1 rounded-full bg-white px-4 text-base font-bold text-sky-900 shadow-lg ring-2 ring-sky-400 active:bg-sky-50"
       style={{bottom: 'calc(1rem + env(safe-area-inset-bottom))'}}

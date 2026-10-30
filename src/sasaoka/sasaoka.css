@@ -916,3 +916,9 @@ table.fm .yk-issuer {
 .taiyo-portal-back:hover{background:#f1f5f9!important;color:#0f172a!important}
 .taiyo-portal-back:focus-visible{outline:2px solid #64748b!important;outline-offset:2px}
 @media print{.taiyo-portal-back{display:none!important}}
+
+/* 特定福祉用具のタブの中でカタログの窓を開いているときは、右下の「📷 写真へ」を出さない（スマホで窓の絵・ページの上に重なっていた。
+   窓を開くと特定福祉用具のアプリが枠に data-catalog-open を付ける＝tokutei の CatalogViewer.tsx。2026-10-30） */
+body:has(iframe[data-catalog-open]) [data-photo-fab] {
+  display: none;
+}
