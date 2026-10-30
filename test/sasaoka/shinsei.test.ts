@@ -6,7 +6,7 @@ import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import {DEFAULT_PLACES, defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {areaInsurerNo, INSURER_AREAS, insurerNoOf} from '../../src/sasaoka/insurerNumbers.ts';
-import {boxLabels, checkBoxes, fillShinsei, splitNumber, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, kindNamesOf, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoNoteText, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
+import {boxLabels, checkBoxes, fillShinsei, fixedPitch, hangLines, hangPrefixes, indentOf, splitNumber, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, kindNamesOf, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoNoteText, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
 import {KK_CELLS} from '../../src/sasaoka/shinsei/kitakyushuCells.ts';
 import {shinseiPreview} from '../../src/sasaoka/shinseiPreview.ts';
 import type {Insurer, Job, PhotoMark, Place, Row, ShinseiInfo, ShinseiMarks} from '../../src/sasaoka/types.ts';
@@ -119,7 +119,7 @@ test('改修の内容・箇所及び規模：「①浴室　手すりの取り�
     '①玄関　手すりの取り付け　L=800mm H=750mm',
     '②屋外　段差の解消　W600mm D350mm H150mm',
     '③トイレ　手すりの取り付け　L=600×850mm',
-    '　木製', // そのほかは次の行に下げて（「そのほかの部分の記載は、行替えして表示するようにする」2026-10-26）
+    '　　　　 木製', // そのほかは次の行に、改修の種類（手すりの取り付け）の頭にそろえて下げる（ＭＳ Ｐゴシックの幅で「③トイレ　」と同じ幅。2026-10-30）
     '④浴室　段差の解消　W700mm',
   ]);
   assert.deepEqual(shinseiKinds(sized, RATES)[1].works, ['②屋外　段差の解消　W600mm D350mm H150mm', '④浴室　段差の解消　W700mm']); // 内訳明細書も同じ
@@ -459,9 +459,9 @@ test('行橋市の申請書：住改・受領委任払の氏名・住所・被�
   assert.equal(readShinsei(fillShinsei(KANDA, SHINSEI.kanda!, v))?.insurer, 'kanda');
   // そのほかは次の行に下げて書き、読み戻すと前の行のつづき（「そのほかの部分の記載は、行替えして表示するようにする」2026-10-26）
   const extra = shinseiValues(job({insurer: 'yukuhashi', places: [place('廊下', [mat('L型手すり')], {dims: {l: '2400'}, shinseiText: 'ベースプレート　L=2400mm'})]}), RATES);
-  assert.deepEqual(extra.works, ['①廊下　手すりの取り付け　L=2400mm', '　ベースプレート　L=2400mm']);
+  assert.deepEqual(extra.works, ['①廊下　手すりの取り付け　L=2400mm', '　　　　ベースプレート　L=2400mm']); // 「①廊下　」と同じ幅だけ下げる
   const back = fillShinsei(YUKUHASHI, SHINSEI.yukuhashi!, extra);
-  assert.match(cell(sheets(back).byName.get('住改・受領委任払')!, 'F14'), /①廊下　手すりの取り付け　L=2400mm(&#10;|\n)　ベースプレート　L=2400mm/);
+  assert.match(cell(sheets(back).byName.get('住改・受領委任払')!, 'F14'), /①廊下　手すりの取り付け　L=2400mm(&#10;|\n)　　　　ベースプレート　L=2400mm/);
   assert.deepEqual(readShinsei(back)?.places, [{photo: 1, name: '廊下', kind: 1, text: '手すりの取り付け　L=2400mm　ベースプレート　L=2400mm'}]);
   // 原本のまま（何も書いていない）なら空
   for (const [insurer, bytes] of [['kanda', KANDA], ['miyako', MIYAKO], ['kouiki', KOUIKI]] as const) {
@@ -828,6 +828,31 @@ const cellsOf = (range: string) => {
   const col = (c: string) => [...c].reduce((a, ch) => a * 26 + ch.charCodeAt(0) - 64, 0) - 1;
   return [col(m[1]), Number(m[2]) - 1, col(m[3]), Number(m[4]) - 1];
 };
+
+test('そのほかの行は改修の種類の頭にそろえて下げる：欄の字体がＭＳ Ｐゴシックならその幅、等幅（行橋市のＭＳ 明朝・平面図の游ゴシック）なら字数で', () => {
+  // ユーザーの指示「手すりの取り付けとベースプレートがある場合…上下の位置を合わせる（ベースプレート位置を右にずらし、手すりの取り付けの位置に合わせる）」2026-10-30
+  assert.equal(indentOf('②トイレ　'), '　　　　 '); // ＭＳ Ｐゴシックの「トイレ」は全角より狭い
+  assert.equal(indentOf('②トイレ　', true), '　　　　　');
+  assert.equal(indentOf('①2階廊下　', true), '　　　　　 '); // 半角は全角の半分
+  assert.equal(fixedPitch('ＭＳ 明朝'), true);
+  assert.equal(fixedPitch('游ゴシック'), true);
+  for (const f of ['ＭＳ Ｐゴシック', 'ＭＳ Ｐ明朝', 'BIZ UDP明朝 Medium', 'Meiryo UI', '']) assert.equal(fixedPitch(f), false, f);
+  assert.deepEqual(hangLines(['②トイレ　手すりの取り付け', '　　　　 ベースプレート', '③玄関　段差の解消'], true), ['②トイレ　手すりの取り付け', '　　　　　ベースプレート', '③玄関　段差の解消']);
+  assert.deepEqual(hangPrefixes(['②トイレ　手すりの取り付け', '　　　　 ベースプレート', '　ちがう下げ方']), [null, '②トイレ　', null]);
+  const toilet = (insurer: Insurer) => job({insurer, places: [place('トイレ', [mat('L型手すり')], {dims: {l: '800'}, shinseiText: 'ベースプレート　L=800mm'})]});
+  const head = '①トイレ　手すりの取り付け　L=800mm';
+  const kanda = shinseiValues(toilet('kanda'), RATES);
+  assert.deepEqual(kanda.works, [head, '　　　　 ベースプレート　L=800mm']);
+  assert.equal(txt(sheets(fillShinsei(KANDA, SHINSEI.kanda!, kanda)).byName.get('事前申請書')!, 'J14'), `${head}\n　　　　 ベースプレート　L=800mm`); // ＭＳ Ｐゴシック
+  const yuku = shinseiValues(toilet('yukuhashi'), RATES);
+  const {files: yukuFiles, byName: yukuSheets} = sheets(fillShinsei(YUKUHASHI, SHINSEI.yukuhashi!, yuku));
+  assert.equal(txt(yukuSheets.get('住改・受領委任払')!, 'F14'), `${head}\n　　　　　ベースプレート　L=800mm`); // ＭＳ 明朝
+  const sheet = SHINSEI.yukuhashi!.sheets.find((x) => x.legend?.box)!;
+  const box = anchorsOf(strFromU8(yukuFiles[drawingPath(yukuFiles, sheet.sheet)])).find((a) => /<xdr:cNvSpPr txBox="1"\/>/.test(a) && a.includes(head))!;
+  assert.deepEqual([...box.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]), [head, '　　　　　ベースプレート　L=800mm']); // 平面図の工事内容（游ゴシック）
+  // 読み戻すと前の行のつづき（どちらの下げ方でも）
+  assert.deepEqual(readShinsei(fillShinsei(YUKUHASHI, SHINSEI.yukuhashi!, yuku))?.places, [{photo: 1, name: 'トイレ', kind: 1, text: '手すりの取り付け　L=800mm　ベースプレート　L=800mm'}]);
+});
 
 test('平面図：空いた所に工事内容（申請書の改修の内容と同じ行）を書く（平面図そのものは Excel で描く）。箇所がなければ書かない', () => {
   const lines = ['①浴室　手すりの取り付け　L=600mm', '⑤玄関　手すりの取り付け　L=400×600×600mm', '③トイレ　段差の解消'];

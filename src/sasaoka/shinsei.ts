@@ -649,10 +649,78 @@ export function kindNamesOf(job: Partial<Pick<Job, 'insurer' | 'form' | 'address
  * 寸法は申請書のタブで入れる（`Place.dims`）：手すりは長さ（L=）と高さ（H=。任意）、段差の解消は幅・奥行・高さ（「W600mm D350mm H150mm」）
  */
 function workLine(p: Place, photo: number, names: string[] = KINDS): string {
-  // そのほか（`Place.shinseiText`）は次の行に、全角のすき間1つ下げて（ユーザーの指示「そのほかの部分の記載は、行替えして表示するようにする」2026-10-26）。
+  // そのほか（`Place.shinseiText`）は次の行に（ユーザーの指示「そのほかの部分の記載は、行替えして表示するようにする」2026-10-26）。
+  // 下げる幅は、1行目の改修の種類（「手すりの取り付け」）の頭にそろえる（ユーザーの指示「手すりの取り付けとベースプレートがある場合…上下の位置を合わせる。
+  // （ベースプレート位置を右にずらし、手すりの取り付けの位置に合わせる）」2026-10-30。前は全角のすき間1つ）。
   // 行の一覧にするとき（shinseiWorks・shinseiKinds）は改行で分ける。Excel から読むときは、下げた行を前の行のつづきにする（workLinesOf）
   const [head = '', ...rest] = workTextLines(p, names);
-  return [[`${circled(photo)}${p.name.trim()}`, head].filter(Boolean).join('　'), ...rest.map((r) => `　${r}`)].join('\n');
+  const place = `${circled(photo)}${p.name.trim()}`;
+  const pad = indentOf(head ? `${place}　` : '　');
+  return [[place, head].filter(Boolean).join('　'), ...rest.map((r) => `${pad}${r}`)].join('\n');
+}
+
+/** ＭＳ Ｐゴシック・ＭＳ Ｐ明朝のひらがな・カタカナの幅（U+3041〜U+30FF。全角のすき間＝100。同じ幅の IPA Pゴシックで測った） */
+const P_KANA = [
+  80,92,81,93,65,76,71,88,78,91,98,98,82,90,67,81,90,95,79,89,82,93,79,80,90,92,95,97,87,92,94,95,
+  87,93,80,94,96,87,91,80,85,95,91,98,96,97,95,96,96,94,95,96,97,98,97,98,98,98,95,97,98,84,94,98,
+  97,82,80,92,80,94,69,83,81,78,83,98,83,82,97,93,96,86,91,87,79,78,100,100,100,100,24,18,63,68,100,58,
+  72,87,65,76,72,82,78,92,72,88,88,93,89,91,80,90,88,91,85,93,96,97,88,90,90,94,93,94,80,89,82,92,
+  92,94,71,84,91,91,95,71,75,90,92,80,90,69,97,98,97,82,89,88,80,89,91,96,96,96,92,93,93,90,79,90,
+  77,90,75,90,78,92,69,82,85,75,99,81,88,72,84,93,92,80,86,91,73,74,92,94,95,88,50,94,66,70,100,
+];
+/** プロポーショナルの字体（申請書の欄のほとんどはＭＳ Ｐゴシック・ＭＳ Ｐ明朝）での文字の幅（全角のすき間＝1） */
+function proportionalEm(s: string): number {
+  let w = 0;
+  for (const ch of s) {
+    const c = ch.codePointAt(0) ?? 0;
+    if (c >= 0x3041 && c <= 0x30ff) w += P_KANA[c - 0x3041] / 100;
+    else if (ch === '・') w += 0.5;
+    else if (ch === '～') w += 0.94;
+    else if (c < 0x2000 || (c >= 0xff61 && c <= 0xff9f)) w += 0.55;
+    else w += 1;
+  }
+  return w;
+}
+/**
+ * text と同じ幅のすき間（全角のすき間と、残りは半角のすき間）。いつも全角のすき間から始める（読み戻すとき、つづきの行と分かる）。
+ * fixed：全角の字がみな同じ幅の字体（行橋市の申請書の改修の内容のＭＳ 明朝など。半角＝全角の半分）。ほかはＭＳ Ｐゴシックの幅（半角のすき間＝0.27）
+ */
+export function indentOf(text: string, fixed = false): string {
+  if (fixed) {
+    const w = [...text].reduce((n, ch) => n + (/[\u0000-\u1fff\uff61-\uff9f]/.test(ch) ? 0.5 : 1), 0);
+    const n = Math.max(1, Math.floor(w));
+    return '　'.repeat(n) + ' '.repeat(Math.max(0, Math.round((w - n) / 0.5)));
+  }
+  const w = proportionalEm(text);
+  const n = Math.max(1, Math.floor(w + 0.14));
+  return '　'.repeat(n) + ' '.repeat(Math.max(0, Math.round((w - n) / 0.27)));
+}
+
+/** 全角の字がみな同じ幅の字体か（ＭＳ 明朝・ＭＳ ゴシック・游ゴシック。ＭＳ Ｐゴシック・BIZ UDP明朝・Meiryo UI などはちがう。名前のない字体もちがう方に） */
+export const fixedPitch = (font: string) => !!font.trim() && !/(^|\s|UD)P|UI/.test(font.normalize('NFKC'));
+
+/**
+ * 行ごとに、そのほかの行（workLine で前の行の改修の種類の頭まで下げた行）なら、下げた幅の手本（前の行の「②トイレ　」）。ほかは null。
+ * 前の行に全角のすき間がなければ（箇所だけの行）、手本は全角のすき間1つ
+ */
+export function hangPrefixes(lines: string[]): (string | null)[] {
+  let prefix = '';
+  return lines.map((line) => {
+    const lead = /^[ 　]+/.exec(line)?.[0] ?? '';
+    if (lead) return prefix && (lead === indentOf(prefix) || lead === indentOf(prefix, true)) ? prefix : null;
+    const at = line.indexOf('　');
+    prefix = at > 0 ? line.slice(0, at + 1) : '　';
+    return null;
+  });
+}
+
+/** そのほかの行の下げ幅を、書く欄の字体に合わせる（workLine はＭＳ Ｐゴシックの幅で下げている） */
+export function hangLines(lines: string[], fixed: boolean): string[] {
+  const prefixes = hangPrefixes(lines);
+  return lines.map((l, i) => {
+    const prefix = prefixes[i];
+    return prefix === null ? l : indentOf(prefix, fixed) + l.replace(/^[ 　]+/, '');
+  });
 }
 
 /**
@@ -1168,6 +1236,25 @@ function kindCellTexts(cells: string[], v: ShinseiValues): [string, string][] {
   return cells.map((ref, i) => [ref, lines[i].length ? lines[i].join('\n') : '－']);
 }
 
+/** そのほかの行の下げ幅を、書く欄の字体に合わせる（全角の字がみな同じ幅の字体＝行橋市の申請書の改修の内容のＭＳ 明朝。ほかはＭＳ Ｐゴシックの幅のまま） */
+function hangCells(files: Files, sheet: ShinseiSheet, cells: Map<string, CellValue>): void {
+  const path = sheetPaths(files).get(sheet.sheet);
+  if (!path || !files[path]) return;
+  let xml = '';
+  for (const [ref, text] of cells) {
+    if (typeof text !== 'string' || !text.includes('\n　')) continue;
+    xml ||= strFromU8(files[path]);
+    if (fixedPitch(cellStyle(files, xml, ref).font)) cells.set(ref, hangLines(text.split('\n'), true).join('\n'));
+  }
+}
+
+/** ブックのテーマの日本語の字体（図形の文字の既定の字体。名前の書いていない図形の文字＝平面図の工事内容の枠はこの字体で出る） */
+function themeFont(files: Files): string {
+  const f = files['xl/theme/theme1.xml'];
+  const minor = f ? (/<a:minorFont>([\s\S]*?)<\/a:minorFont>/.exec(strFromU8(f))?.[1] ?? '') : '';
+  return unesc(/<a:font script="Jpan" typeface="([^"]*)"/.exec(minor)?.[1] ?? '');
+}
+
 /** 書き方の中の {名前} */
 export const placeholders = (format: string) => [...format.matchAll(/\{(\w+)\}/g)].map((m) => m[1] as keyof ShinseiTexts);
 /** 生年月日の一部だけ入れたときの空き（「昭和　23年　　月　　日生」） */
@@ -1282,6 +1369,7 @@ export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void
     for (const [ref, text] of photoBoxes(files, sheet, v, photo)) cells.set(ref, text);
     for (const [ref, text] of kindRowCells(files, sheet, v)) cells.set(ref, text);
     if (sheet.riyu && v.riyu) for (const [ref, text] of riyuSheetCells(files, sheet, v.riyu)) cells.set(ref, text);
+    hangCells(files, sheet, cells);
     writeCells(files, sheet.sheet, cells);
     wrapKinds(files, sheet, v);
     fitLines(files, sheet, v);
@@ -1693,7 +1781,8 @@ function packKindCells(files: Files, sheet: ShinseiSheet, v: ShinseiValues): voi
       const px = (pt * 4) / 3;
       const lines: string[] = [];
       for (const e of entries) {
-        const last = lines.length ? `${lines[lines.length - 1]}　${e}` : '';
+        // そのほかの行（下げた行）を前の行のうしろに並べるときは、下げたすき間を外す
+        const last = lines.length ? `${lines[lines.length - 1]}　${e.replace(/^[ 　]+/, '')}` : '';
         if (last && emOf(last) * px <= box.w - 6) lines[lines.length - 1] = last;
         else lines.push(e);
       }
@@ -2293,6 +2382,8 @@ function drawLegend(files: Files, sheet: ShinseiSheet, lines: string[]): void {
   const d = drawing && files[drawing] ? strFromU8(files[drawing]) : '';
   if (!d.includes('</xdr:wsDr>')) return;
   const id = nextShapeId(d);
+  // そのほかの行の下げ幅は、枠の字体（テーマの字体。行橋市は游ゴシック）に合わせる
+  if (fixedPitch(themeFont(files))) lines = hangLines(lines, true);
   // 文字は 12pt。行が多くて枠に入らなければ小さくする（まわりの余白は左右 0.1インチ・上下 0.05インチ）
   const sz = Math.round(fitLinesSize(lines, box.w - 19.2 + 6, box.h - 9.6 + 4, 12) * 100);
   const paras = lines.map((l) => `<a:p><a:r><a:rPr lang="ja-JP" altLang="en-US" sz="${sz}"/><a:t>${esc(l)}</a:t></a:r></a:p>`).join('');

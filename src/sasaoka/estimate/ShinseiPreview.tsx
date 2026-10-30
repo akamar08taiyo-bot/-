@@ -7,13 +7,13 @@
 // 写真への書き込み（直線・矢印・四角形・楕円・テキストボックス）は写真の上に重ねて描き、写真を押したときの道具の「✏️ 書き込み」（写真をダブルクリックでも）で書き込みの画面へ
 // 平面図は、表題と工事内容のあいだに平面図の図を入れる枠（ドロップ・Ctrl+V・押して選ぶ。PlanSlotView）
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
-import type {CSSProperties, DragEvent, PointerEvent as ReactPointerEvent, RefObject} from 'react';
+import type {CSSProperties, DragEvent, PointerEvent as ReactPointerEvent, ReactNode, RefObject} from 'react';
 import type {PvFont, PvHeader, PvPage, PvPhotoSlot, PvShape, PvText, Rect, ShinseiField} from '../shinseiPreview.ts';
 import {Btn, DropArea, DropOverlay, pastedFiles, useFileDragging} from '../components/ui.tsx';
 import {circled} from '../estimateForms.ts';
 import {clampOff, clampScale, normRot, ROT_SNAP, turn} from '../photoEdit.ts';
 import {photoBounds} from '../photoMarks.ts';
-import {NOTE_INSET, photoNoteLayout, photoNoteText, photoPlacement, photoSlack, planPlacement} from '../shinsei.ts';
+import {hangPrefixes, NOTE_INSET, photoNoteLayout, photoNoteText, photoPlacement, photoSlack, planPlacement} from '../shinsei.ts';
 import {familyOf} from '../shinseiPreview.ts';
 import type {PhotoEdit, PhotoMark, ShinseiMarks} from '../types.ts';
 import {MarkLayer} from './MarkLayer.tsx';
@@ -184,12 +184,29 @@ function TextView({t}: {t: PvText}) {
       >
         {t.runs.map((r, i) => (
           <span key={i} style={fontCss(r.font, k)}>
-            {r.text}
+            {alignedLines(r.text, r.font, k)}
           </span>
         ))}
       </div>
     </div>
   );
+}
+
+/**
+ * 改修の内容の欄のそのほかの行（「②トイレ　手すりの取り付け…」の次の「　　　　 ベースプレート…」）：下げたすき間を、画面の字体で測った
+ * 「②トイレ　」の幅にする。すき間の数は Excel の欄の字体の幅で決めている（Excel・パソコンの印刷でそろう）ので、原本の字体のない端末（スマホなど）でも
+ * そろうように（ユーザーの指示「手すりの取り付けとベースプレート…の上下の位置を合わせる」2026-10-30。shinsei.ts の indentOf・hangPrefixes）
+ */
+function alignedLines(text: string, font: PvFont, k: number): ReactNode {
+  if (!text.includes('\n')) return text;
+  const lines = text.split('\n');
+  const prefixes = hangPrefixes(lines);
+  return lines.flatMap((line, i) => {
+    const prefix = prefixes[i];
+    const head: ReactNode[] = i > 0 ? ['\n'] : [];
+    if (prefix === null) return [...head, line];
+    return [...head, <span key={i} aria-hidden style={{display: 'inline-block', width: textWidth(prefix, font) * k}} />, line.replace(/^[ 　]+/, '')];
+  });
 }
 
 function ShapeView({s}: {s: PvShape}) {
@@ -241,7 +258,8 @@ function ShapeText({s}: {s: PvShape}) {
         ...fontCss(s.font!),
       }}
     >
-      {s.text}
+      {/* 1つの箱に入れる（外の箱は flex なので、行の頭のすき間の箱がそのまま並ぶと1つずつの行になる） */}
+      <div>{alignedLines(s.text, s.font!, 1)}</div>
     </div>
   );
 }
