@@ -6,7 +6,7 @@ import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import {DEFAULT_PLACES, defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {areaInsurerNo, INSURER_AREAS, insurerNoOf} from '../../src/sasaoka/insurerNumbers.ts';
-import {boxLabels, checkBoxes, fillShinsei, splitNumber, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, kindNamesOf, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
+import {boxLabels, checkBoxes, fillShinsei, splitNumber, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, kindNamesOf, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoNoteText, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
 import {KK_CELLS} from '../../src/sasaoka/shinsei/kitakyushuCells.ts';
 import {shinseiPreview} from '../../src/sasaoka/shinseiPreview.ts';
 import type {Insurer, Job, PhotoMark, Place, Row, ShinseiInfo, ShinseiMarks} from '../../src/sasaoka/types.ts';
@@ -1576,4 +1576,22 @@ test('原本の図形の大きさ（a:ext の cx・cy）はどれも数（前は
       assert.deepEqual(bad, [], `${key} ${name}`);
     }
   }
+});
+
+test('写真に書く内容：1行に入らない行は、きりのいい所（空白）で2行に（字の途中で折り返さない）・入れば1行のまま・上下のまん中（ユーザーの指示「1行で入力できない場合は…きりのいいところで2行にする」「上下中央揃えにする」）', () => {
+  // 縦の写真の右の狭い欄（幅 160 画素）
+  const narrow = {x: 0, y: 0, w: 160, h: 300};
+  const a = photoNoteText(narrow, ['手すりの取り付け　L=400×600mm']);
+  assert.deepEqual(a.lines, ['手すりの取り付け', 'L=400×600mm']);
+  assert.equal(a.pt, 10.5); // 分ければ入るので小さくしない
+  const b = photoNoteText(narrow, ['手すりの取り付け　L=600mm H=800mm', 'ベースプレート　L=800mm']);
+  assert.deepEqual(b.lines, ['手すりの取り付け', 'L=600mm H=800mm', 'ベースプレート', 'L=800mm']);
+  // 広い欄は1行のまま
+  assert.deepEqual(photoNoteText({x: 0, y: 0, w: 400, h: 60}, ['手すりの取り付け　L=400×600mm']).lines, ['手すりの取り付け　L=400×600mm']);
+  // 分けると小さくすれば入る欄：小さくして分ける
+  const small = photoNoteText({x: 0, y: 0, w: 110, h: 300}, ['手すりの取り付け　L=400×600mm']);
+  assert.ok(small.pt < 10.5 && small.pt >= 6, JSON.stringify(small));
+  assert.deepEqual(small.lines, ['手すりの取り付け', 'L=400×600mm']);
+  // 小さくしても入らない（とても狭い）ときも、分けたうえで前と同じく折り返す
+  assert.deepEqual(photoNoteText({x: 0, y: 0, w: 70, h: 300}, ['手すりの取り付け　L=400×600mm']).lines, ['手すりの取り付け', 'L=400×600mm']);
 });

@@ -13,7 +13,7 @@ import {Btn, DropArea, DropOverlay, pastedFiles, useFileDragging} from '../compo
 import {circled} from '../estimateForms.ts';
 import {clampOff, clampScale, normRot, ROT_SNAP, turn} from '../photoEdit.ts';
 import {photoBounds} from '../photoMarks.ts';
-import {NOTE_INSET, photoNoteLayout, photoNotePt, photoPlacement, photoSlack, planPlacement} from '../shinsei.ts';
+import {NOTE_INSET, photoNoteLayout, photoNoteText, photoPlacement, photoSlack, planPlacement} from '../shinsei.ts';
 import {familyOf} from '../shinseiPreview.ts';
 import type {PhotoEdit, PhotoMark, ShinseiMarks} from '../types.ts';
 import {MarkLayer} from './MarkLayer.tsx';
@@ -307,6 +307,7 @@ function PhotoSlotView({
   // 回している間（draft）は回す前の向きで分けたまま（縦・横が変わるたびに写真のまん中が動くと回しにくい）。離すと分け直す
   const lines = slot.slot === 'before' && !slot.memo ? (photos.note?.(no) ?? []) : []; // メモの欄のある用紙（福岡市）は枠に書かない
   const parts = photoNoteLayout({x: 0, y: 0, w: slot.w, h: slot.h}, photo ? {w: photo.w, h: photo.h, rot: photo.edit?.rot ?? 0} : null, lines);
+  const noteText = parts.note ? photoNoteText(parts.note, lines) : null;
   const box = photo ? photoPlacement(parts.photo, photo.w, photo.h, edit) : null;
   const name = `写真貼付用紙${circled(no)}の${SLOT_NAME[slot.slot]}`;
   const z = 1 / Math.max(zoom, 0.05);
@@ -590,9 +591,10 @@ function PhotoSlotView({
         // 写真の横（下）に書く内容（押しても写真の枠のボタンに届くように、押せない文字）
         <div
           className="pointer-events-none absolute overflow-hidden"
-          style={{left: parts.note.x, top: parts.note.y, width: parts.note.w, height: parts.note.h, padding: `${NOTE_INSET.y}px ${NOTE_INSET.x}px`, fontFamily: familyOf(''), fontSize: (photoNotePt(parts.note, lines) * 4) / 3, lineHeight: 1.25, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#000', textAlign: parts.align}}
+          style={{left: parts.note.x, top: parts.note.y, width: parts.note.w, height: parts.note.h, padding: `${NOTE_INSET.y}px ${NOTE_INSET.x}px`, fontFamily: familyOf(''), fontSize: (noteText!.pt * 4) / 3, lineHeight: 1.25, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#000', textAlign: parts.align, display: 'flex', flexDirection: 'column', justifyContent: 'center'}}
         >
-          {lines.join('\n')}
+          {/* 行はきりのいい所で分け（photoNoteText）、上下のまん中に（Excel と同じ） */}
+          {noteText!.lines.join('\n')}
         </div>
       )}
     </div>
@@ -610,6 +612,7 @@ function PhotoPrintView({slot, no, photos}: {slot: PvPhotoSlot; no: number; phot
   const photo = photos.of(no, slot.slot);
   const lines = slot.slot === 'before' && !slot.memo ? (photos.note?.(no) ?? []) : []; // メモの欄のある用紙（福岡市）は枠に書かない
   const parts = photoNoteLayout({x: 0, y: 0, w: slot.w, h: slot.h}, photo ? {w: photo.w, h: photo.h, rot: photo.edit?.rot ?? 0} : null, lines);
+  const noteText = parts.note ? photoNoteText(parts.note, lines) : null;
   const box = photo ? photoPlacement(parts.photo, photo.w, photo.h, photo.edit ?? {rot: 0, scale: 1}) : null;
   return (
     <div className="absolute overflow-hidden" style={{left: slot.x, top: slot.y, width: slot.w, height: slot.h}}>
@@ -622,9 +625,10 @@ function PhotoPrintView({slot, no, photos}: {slot: PvPhotoSlot; no: number; phot
       {parts.note && (
         <div
           className="absolute overflow-hidden"
-          style={{left: parts.note.x, top: parts.note.y, width: parts.note.w, height: parts.note.h, padding: `${NOTE_INSET.y}px ${NOTE_INSET.x}px`, fontFamily: familyOf(''), fontSize: (photoNotePt(parts.note, lines) * 4) / 3, lineHeight: 1.25, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#000', textAlign: parts.align}}
+          style={{left: parts.note.x, top: parts.note.y, width: parts.note.w, height: parts.note.h, padding: `${NOTE_INSET.y}px ${NOTE_INSET.x}px`, fontFamily: familyOf(''), fontSize: (noteText!.pt * 4) / 3, lineHeight: 1.25, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#000', textAlign: parts.align, display: 'flex', flexDirection: 'column', justifyContent: 'center'}}
         >
-          {lines.join('\n')}
+          {/* 行はきりのいい所で分け（photoNoteText）、上下のまん中に（Excel と同じ） */}
+          {noteText!.lines.join('\n')}
         </div>
       )}
     </div>

@@ -2385,8 +2385,47 @@ export function photoNoteLayout(frame: Box, size: {w: number; h: number; rot?: n
   return {photo: {x: frame.x, y: frame.y, w: frame.w, h: ph}, note: {x: frame.x, y: frame.y + ph + gap, w: frame.w, h: frame.h - ph - gap}, align: 'center'};
 }
 
-/** 書く欄の文字の大きさ（pt）：欄（余白の内側）に入る大きさ */
-export const photoNotePt = (note: Box, lines: string[]) => fitLinesSize(lines, note.w - 2 * NOTE_INSET.x + 6, note.h - 2 * NOTE_INSET.y + 4, NOTE_PT, NOTE_MIN_PT);
+/** 1行に入らない行を、きりのいい所（全角・半角の空白）で分ける（maxEm：1行に入る字の幅。空白のない語はそのまま） */
+function breakAtSpaces(line: string, maxEm: number): string[] {
+  if (emOf(line) <= maxEm) return [line];
+  const rows: string[] = [];
+  let cur = '';
+  let gap = '';
+  for (const tok of line.match(/[^　 ]+|[　 ]+/g) ?? []) {
+    if (/^[　 ]+$/.test(tok)) {
+      gap = tok;
+      continue;
+    }
+    const next = cur ? cur + gap + tok : tok;
+    if (cur && emOf(next) > maxEm) {
+      rows.push(cur);
+      cur = tok;
+    } else cur = next;
+    gap = '';
+  }
+  if (cur) rows.push(cur);
+  return rows;
+}
+
+/**
+ * 書く欄の文字の行と大きさ（pt）：1行に入らない行は、きりのいい所（空白）で行を分ける（「手すりの取り付け」／「L=400×600mm」。
+ * ユーザーの指示「1行で入力できない場合は（折り返しが必要な場合は）きりのいいところで2行にする」2026-10-30。前は字の途中で折り返し、
+ * 「…L=400×600m」「m」になった）。分けても入らなければ文字を小さくする（いちばん小さくしても入らなければ、前と同じく折り返す）。画面のプレビューと Excel で同じ
+ */
+export function photoNoteText(note: Box, lines: string[]): {lines: string[]; pt: number} {
+  const [w, h] = [note.w - 2 * NOTE_INSET.x, note.h - 2 * NOTE_INSET.y];
+  const split = (pt: number) => lines.flatMap((l) => breakAtSpaces(l, w / ((pt * 4) / 3)));
+  for (let pt = NOTE_PT; pt >= NOTE_MIN_PT; pt -= 0.5) {
+    const px = (pt * 4) / 3;
+    const out = split(pt);
+    if (out.every((l) => emOf(l) * px <= w) && out.length * px * LINE_K <= h) return {lines: out, pt};
+  }
+  const out = split(NOTE_MIN_PT);
+  return {lines: out, pt: fitLinesSize(out, w + 6, h + 4, NOTE_PT, NOTE_MIN_PT)};
+}
+
+/** 書く欄の文字の大きさ（pt）：欄（余白の内側）に入る大きさ（行はきりのいい所で分けたあと。photoNoteText） */
+export const photoNotePt = (note: Box, lines: string[]) => photoNoteText(note, lines).pt;
 
 /** 写真貼付用紙の改修前・改修後の枠に写真を貼る（xl/media に JPEG を入れ、図形のファイルに写真の図形を足す）。書く内容があれば改修前の写真の横（上）にテキストボックスで */
 function drawPhotos(files: Files, sheet: ShinseiSheet, images: PhotoImages, notes: string[] = []): void {
@@ -2409,8 +2448,8 @@ function drawPhotos(files: Files, sheet: ShinseiSheet, images: PhotoImages, note
     //（ユーザーの指示「改修後には入れる必要はありません。改修前の時に、工務店さんの方に見積もり依頼…内容を伝える時に、見やすく分かりやすく伝えるもの」2026-10-22）
     const parts = photoNoteLayout(rangeBox(lay, range), img ? {w: img.w, h: img.h, rot: img.edit?.rot} : null, slot === 'before' ? notes : []);
     if (parts.note) {
-      const pt = photoNotePt(parts.note, notes);
-      texts.push(noteBoxXml(lay, parts.note, notes, pt, id, '改修前の説明', parts.align));
+      const t = photoNoteText(parts.note, notes);
+      texts.push(noteBoxXml(lay, parts.note, t.lines, t.pt, id, '改修前の説明', parts.align));
       id++;
     }
     if (!img) continue;
@@ -2499,7 +2538,8 @@ function noteBoxXml(lay: SheetLayout, box: Box, lines: string[], pt: number, id:
     `<xdr:twoCellAnchor>${fromTo(lay, box)}<xdr:sp macro="" textlink=""><xdr:nvSpPr><xdr:cNvPr id="${id}" name="${name} ${id}"/><xdr:cNvSpPr txBox="1"/></xdr:nvSpPr>` +
     `<xdr:spPr>${xfrm(box)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln w="9525"><a:noFill/></a:ln></xdr:spPr>` +
     `<xdr:style><a:lnRef idx="0">${none}</a:lnRef><a:fillRef idx="0">${none}</a:fillRef><a:effectRef idx="0">${none}</a:effectRef><a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef></xdr:style>` +
-    `<xdr:txBody><a:bodyPr wrap="square" lIns="${ix}" tIns="${iy}" rIns="${ix}" bIns="${iy}" rtlCol="0" anchor="t"/><a:lstStyle/>${paras}</xdr:txBody></xdr:sp><xdr:clientData/></xdr:twoCellAnchor>`
+    // 文字は上下のまん中（ユーザーの指示「長さの入力…上下中央揃えにする」2026-10-30。前は欄の上）
+    `<xdr:txBody><a:bodyPr wrap="square" lIns="${ix}" tIns="${iy}" rIns="${ix}" bIns="${iy}" rtlCol="0" anchor="ctr"/><a:lstStyle/>${paras}</xdr:txBody></xdr:sp><xdr:clientData/></xdr:twoCellAnchor>`
   );
 }
 
