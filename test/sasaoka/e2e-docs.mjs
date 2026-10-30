@@ -151,6 +151,48 @@ async function finish(page, dlg, retry) {
   assert.equal(await page.evaluate(() => window.__mailto ?? null), null); // スマホはメールのソフト（mailto:）ではなく共有メニュー
   await page.getByText('メールのアプリに渡しました').waitFor();
   log('メールで送付（スマホ）：共有メニューに Excel 2つと件名・本文 OK');
+
+  // 📗 Excelで保存（iPhone）：2つ以上は共有メニュー（「ファイルに保存」でまとめて保存できる）。Safari は続けて保存すると初めの1つしか保存しない
+  // （ユーザーの報告「画面上は3つ選択されているが、メールにそのまま添付したら、一つ（住宅改修申請書）しか届いていない」2026-10-30）。本文（.txt になる）は渡さない
+  const names = [];
+  page.on('download', (d) => names.push(d.suggestedFilename()));
+  await page.evaluate(() => delete window.__shared);
+  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).click();
+  const xdlg = page.getByRole('dialog', {name: 'Excelで保存'});
+  await xdlg.getByRole('checkbox', {name: /^理由書/}).check();
+  await xdlg.getByRole('button', {name: '📗 2つ保存する'}).click();
+  await finish(page, xdlg, '📤 2つのファイルを渡す');
+  const saved = await page.evaluate(() => window.__shared);
+  assert.deepEqual(saved.files.map(([n]) => n), ['見本六郎様住宅改修申請書.xlsx', '見本六郎様住宅改修理由書.xlsx']);
+  assert.equal(saved.text, undefined);
+  assert.deepEqual(names, []); // 続けて保存（ダウンロード）はしない
+  await page.getByText('2つのファイルを渡しました').waitFor();
+  // 1つだけなら今までどおり保存（ダウンロード）
+  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).click();
+  await xdlg.getByRole('button', {name: '📗 1つ保存する'}).click();
+  await page.waitForFunction(() => !document.querySelector('[role="dialog"]'), null, {timeout: 30000});
+  await page.waitForTimeout(600);
+  assert.deepEqual(names, ['見本六郎様住宅改修申請書.xlsx']);
+  // 共有メニューにファイルを渡せない iPhone（古い iOS）：1つずつ押して保存する画面
+  await page.evaluate(() => {
+    delete navigator.canShare;
+    navigator.canShare = undefined;
+  });
+  names.length = 0;
+  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).click();
+  await xdlg.getByRole('checkbox', {name: /^理由書/}).check();
+  await xdlg.getByRole('button', {name: '📗 2つ保存する'}).click();
+  const each = xdlg.getByRole('group', {name: '1つずつ保存'});
+  await each.waitFor({timeout: 30000});
+  await page.screenshot({path: path.join(outDir, 'docs-5-phone-each.png')});
+  for (const n of ['見本六郎様住宅改修申請書.xlsx', '見本六郎様住宅改修理由書.xlsx']) {
+    await each.getByRole('button', {name: n}).click();
+    await page.waitForTimeout(500);
+  }
+  assert.deepEqual(names, ['見本六郎様住宅改修申請書.xlsx', '見本六郎様住宅改修理由書.xlsx']);
+  assert.match(await each.innerText(), /✓ 見本六郎様住宅改修申請書\.xlsx[\s\S]*✓ 見本六郎様住宅改修理由書\.xlsx/);
+  await xdlg.getByRole('button', {name: '閉じる', exact: true}).last().click();
+  log('Excelで保存（iPhone）：2つ以上は共有メニュー・1つは保存・共有メニューがなければ1つずつ押して保存 OK');
   await ctx.close();
 }
 

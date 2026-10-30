@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {defaultSettings} from '../../src/sasaoka/defaults.ts';
-import {buildMailto, docsMail, isMobileDevice, MAILTO_MAX, mailtoFits} from '../../src/sasaoka/mailDraft.ts';
+import {buildMailto, docsMail, isAppleMobile, isMobileDevice, MAILTO_MAX, mailtoFits} from '../../src/sasaoka/mailDraft.ts';
 import type {Job} from '../../src/sasaoka/types.ts';
 
 const job = (customer: string, staff = ''): Job => ({customer, suffix: '様邸', staff}) as Job;
@@ -48,4 +48,14 @@ test('スマホ・タブレット（共有メニュー）か：iPhone・Android�
   assert.ok(!isMobileDevice(nav('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 0)));
   assert.ok(!isMobileDevice(nav('Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 10)));
   assert.ok(!isMobileDevice(null));
+});
+
+test('iPhone・iPad か（Safari は続けて保存すると初めの1つしか保存しないので、2つ以上は共有メニュー）：Android・パソコンはちがう', () => {
+  const nav = (userAgent: string, maxTouchPoints = 0) => ({userAgent, maxTouchPoints}) as Navigator;
+  assert.ok(isAppleMobile(nav('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)', 5)));
+  assert.ok(isAppleMobile(nav('Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X)', 5)));
+  assert.ok(isAppleMobile(nav('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 5))); // iPad（パソコンの名前で来る）
+  assert.ok(!isAppleMobile(nav('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 0))); // Mac
+  assert.ok(!isAppleMobile(nav('Mozilla/5.0 (Linux; Android 14)', 5)));
+  assert.ok(!isAppleMobile(nav('Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 10)));
 });

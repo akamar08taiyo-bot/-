@@ -304,6 +304,8 @@ description: 太陽シルバーサービス行橋営業所の業務アプリ「�
   メール：パソコンは Excel を保存して `mailto:`（件名「〇〇様 住宅改修申請書・理由書の送付」・本文に添付のファイル名・会社・営業所・担当・電話。2000字まで＝`MAILTO_MAX`。宛先は入れない）。
   スマホ・タブレット（`isMobileDevice`：iPhone・Android・指で触れる Macintosh）は `navigator.share({files, title, text})`。作るのに数秒かかって押した操作の続きと見なされなくなったら
   （`navigator.userActivation.isActive`・share の NotAllowedError）、画面に「✉ メールを開く」「📤 メールのアプリに渡す」を出してもう一度押してもらう。販売受注簿作成ツール・売上伝票発行依頼書の mailDraft と同じ作り。
+  **iPhone・iPad（`isAppleMobile`）で2つ以上を保存するときは共有メニュー**（本文なし＝「ファイルに保存」で .txt を作らない）。Safari は続けて保存（a.click の download）すると初めの1つしか保存しない
+  （ユーザーの報告「3つ選択されているが…一つ（住宅改修申請書）しか届いていない」2026-10-30。そのときの画面は古い版の「まとめて保存」）。共有メニューがなければ「1つずつ保存」（押すたびに1つ。押したその場なので保存できる）。
   **書類を選ぶ画面は `createPortal` で body に出す**：上の段の並び（JobHeader の row）の中に置くと、スマホの2列の指定（`[&>*:last-child:nth-child(odd)]:w-[calc(50%-0.25rem)]` など）が画面の外側の箱にもかかり、細い画面になった。
   ブラウザのテストは `e2e-docs.mjs`（mailto: は click を横取り、スマホは navigator.share を差しかえて渡されたファイルを見る）。ほかのテストは `e2eDocs.mjs` の `excelSave(page)` で保存する。
 - **特定福祉用具のアプリ（🛁 のタブの中）に頼むことは postMessage で、中のアプリが出てから送る**（`TokuteiEditor.tsx` の `ready`＝中に `__taiyoTokuteiFlush` がある）。

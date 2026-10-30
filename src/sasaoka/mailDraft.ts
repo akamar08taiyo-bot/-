@@ -39,10 +39,20 @@ export function isMobileDevice(nav: (Navigator & {userAgentData?: {platform?: st
   return /iPhone|iPad|iPod|Android/i.test(ua) || nav.userAgentData?.platform === 'Android' || (/Macintosh|X11; Linux/.test(ua) && touch);
 }
 
-/** 共有メニューに渡すもの（ファイルを渡せない端末は null） */
+/**
+ * iPhone・iPad か（iPad はパソコンの Mac と同じ名前で来るので、指で触れる画面かどうかでも見分ける）。Safari は続けて保存すると初めの1つしか保存しない
+ * （ユーザーの報告「画面上は3つ選択されているが、メールにそのまま添付したら、一つ（住宅改修申請書）しか届いていない」2026-10-30）ので、2つ以上は共有メニューで渡す
+ */
+export function isAppleMobile(nav: Navigator | null = typeof navigator === 'undefined' ? null : navigator): boolean {
+  if (!nav) return false;
+  const ua = nav.userAgent || '';
+  return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && (nav.maxTouchPoints || 0) > 1);
+}
+
+/** 共有メニューに渡すもの（ファイルを渡せない端末は null）。本文がなければ文は渡さない（「ファイルに保存」で文の .txt まで保存されないように） */
 export function shareData(mail: Mail, files: Attachment[]): ShareData | null {
   if (typeof File !== 'function' || typeof navigator === 'undefined' || !navigator.canShare) return null;
-  const data = {files: files.map((f) => new File([f.bytes as BlobPart], f.name, {type: f.type})), title: mail.subject, text: mail.body};
+  const data: ShareData = {files: files.map((f) => new File([f.bytes as BlobPart], f.name, {type: f.type})), title: mail.subject, ...(mail.body ? {text: mail.body} : {})};
   return navigator.canShare({files: data.files}) ? data : null;
 }
 

@@ -11,7 +11,7 @@ import {hasEstimateRows} from '../calc.ts';
 import {isBlankShinsei, jobInsurer} from '../estimateForms.ts';
 import {XLSX_TYPE, estimateXlsx} from '../estimateXlsx.ts';
 import {canMakeShinsei, riyuBook, shinseiBook} from '../estimate/shinseiFiles.ts';
-import {docsMail, isMobileDevice, openMailto, share, shareData, stillActive} from '../mailDraft.ts';
+import {docsMail, isAppleMobile, isMobileDevice, openMailto, share, shareData, stillActive} from '../mailDraft.ts';
 import type {Attachment, Mail} from '../mailDraft.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {tokuteiFiles, tokuteiHasItems} from '../tokuteiLink.ts';
@@ -54,12 +54,15 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
   const toast = useToast();
   const [picked, setPicked] = useState<Set<DocKind> | null>(null); // null は閉じている
   const [busy, setBusy] = useState(false);
-  // 作ったあと、押した操作の続きと見なされなくなって、メールを開けなかった・共有メニューを出せなかったとき：もう一度押してもらう
-  const [retry, setRetry] = useState<{mail: Mail; files: Attachment[]; data: ShareData | null} | null>(null);
+  // 作ったあと、押した操作の続きと見なされなくなって、メールを開けなかった・共有メニューを出せなかったとき：もう一度押してもらう（mail が null は Excelで保存）
+  const [retry, setRetry] = useState<{mail: Mail | null; files: Attachment[]; data: ShareData | null} | null>(null);
+  // iPhone・iPad で共有メニューを使えないとき：1つずつ押して保存してもらう（続けて保存すると初めの1つしか保存されない）。mail があればそのあとメールを開く
+  const [taps, setTaps] = useState<{files: Attachment[]; done: string[]; mail?: Mail} | null>(null);
   const why = whyNot(job);
   const chosen = KINDS.filter(([k]) => picked?.has(k) && !why[k]).map(([k]) => k);
   const open = () => {
     setRetry(null);
+    setTaps(null);
     setPicked(new Set([view]));
   };
   const close = () => !busy && setPicked(null);
@@ -101,8 +104,30 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
       downloadBlob(new Blob([f.bytes as BlobPart], {type: f.type}), f.name);
     }
   };
-  /** パソコン：添付を保存して、メールのソフトを開く */
+  /**
+   * 保存する：パソコン・Android は続けて保存。iPhone・iPad で2つ以上は共有メニュー（「ファイルに保存」でまとめて保存できる。メールのアプリにも渡せる）。
+   * 共有メニューを使えなければ、1つずつ押して保存
+   */
+  const save = async (files: Attachment[], data: ShareData | null = files.length > 1 && isAppleMobile() ? shareData({subject: 'Excelで保存', body: ''}, files) : null) => {
+    if (files.length > 1 && isAppleMobile()) {
+      const how = data ? await share(data) : 'failed';
+      if (how === 'shared') {
+        toast(`${files.length}つのファイルを渡しました`);
+        setPicked(null);
+      } else if (how === 'tap') setRetry({mail: null, files, data});
+      else if (how === 'failed') setTaps({files, done: []});
+      return;
+    }
+    await download(files);
+    toast(files.length === 1 ? `「${files[0].name}」を保存しました` : `${files.length}つのファイルを保存しました`);
+    setPicked(null);
+  };
+  /** パソコン：添付を保存して、メールのソフトを開く（iPhone・iPad で共有メニューを使えず2つ以上なら、1つずつ押して保存してから） */
   const mailto = async (mail: Mail, files: Attachment[], saved: boolean) => {
+    if (!saved && files.length > 1 && isAppleMobile()) {
+      setTaps({files, done: [], mail});
+      return;
+    }
     if (!saved) await download(files);
     if (!stillActive()) {
       setRetry({mail, files, data: null});
@@ -139,11 +164,8 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
         toast(mode === 'mail' ? '付けるものがありません' : '保存するものがありません', 'error');
         return;
       }
-      if (mode === 'excel') {
-        await download(files);
-        toast(files.length === 1 ? `「${files[0].name}」を保存しました` : `${files.length}つのファイルを保存しました`);
-        setPicked(null);
-      } else {
+      if (mode === 'excel') await save(files);
+      else {
         const labels = KINDS.filter(([k]) => chosen.includes(k)).map(([, l]) => l);
         const mail = docsMail(
           job,
@@ -180,14 +202,28 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
             title={title}
             onClose={close}
             footer={
-              retry ? (
+              taps ? (
+                <>
+                  <Btn color="white" onClick={() => setPicked(null)}>
+                    閉じる
+                  </Btn>
+                  {taps.mail && (
+                    <Btn color="softBlue" onClick={() => taps.mail && void mailto(taps.mail, taps.files, true)}>
+                      ✉ メールを開く
+                    </Btn>
+                  )}
+                </>
+              ) : retry ? (
                 <>
                   <Btn color="white" onClick={() => setPicked(null)}>
                     やめる
                   </Btn>
                   {/* 押したその場で開く（作っているあいだに、押した操作の続きと見なされなくなったので） */}
-                  <Btn color="softBlue" onClick={() => void (retry.data ? send(retry.mail, retry.files, retry.data) : mailto(retry.mail, retry.files, true))}>
-                    {retry.data ? '📤 メールのアプリに渡す' : '✉ メールを開く'}
+                  <Btn
+                    color="softBlue"
+                    onClick={() => void (!retry.mail ? save(retry.files, retry.data) : retry.data ? send(retry.mail, retry.files, retry.data) : mailto(retry.mail, retry.files, true))}
+                  >
+                    {!retry.mail ? `📤 ${retry.files.length}つのファイルを渡す` : retry.data ? '📤 メールのアプリに渡す' : '✉ メールを開く'}
                   </Btn>
                 </>
               ) : (
@@ -202,18 +238,41 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
               )
             }
           >
-            <div role="group" aria-label={mode === 'excel' ? '保存する書類' : 'メールに付ける書類'} className="grid gap-2 text-base">
-              {KINDS.map(([k, label]) => (
-                <label key={k} className={`flex items-center gap-3 rounded-md border px-3 py-2.5 ${why[k] ? 'border-slate-200 text-slate-400' : 'border-slate-300 hover:bg-emerald-50'}`}>
-                  <input type="checkbox" checked={!!picked.has(k) && !why[k]} disabled={!!why[k] || busy || !!retry} onChange={() => toggle(k)} className="h-5 w-5" />
-                  {/* 書類の名前は1行のまま（スマホでは選べないわけが次の行へ） */}
-                  <span className="min-w-0">
-                    <span className="whitespace-nowrap font-bold">{label}</span>
-                    {why[k] && <span className="ml-1 inline-block text-xs">（{why[k]}）</span>}
-                  </span>
-                </label>
-              ))}
-            </div>
+            {taps ? (
+              // 1つずつ押して保存（押したその場で保存するので、iPhone・iPad でも全部保存できる）
+              <div role="group" aria-label="1つずつ保存" className="grid gap-2 text-base">
+                <p className="text-sm text-slate-600">1つずつ押して保存してください</p>
+                {taps.files.map((f) => {
+                  const done = taps.done.includes(f.name);
+                  return (
+                    <Btn
+                      key={f.name}
+                      color={done ? 'white' : 'softGreen'}
+                      className="justify-start text-left"
+                      onClick={() => {
+                        downloadBlob(new Blob([f.bytes as BlobPart], {type: f.type}), f.name);
+                        setTaps((t) => t && {...t, done: [...new Set([...t.done, f.name])]});
+                      }}
+                    >
+                      {done ? '✓' : '📗'} {f.name}
+                    </Btn>
+                  );
+                })}
+              </div>
+            ) : (
+              <div role="group" aria-label={mode === 'excel' ? '保存する書類' : 'メールに付ける書類'} className="grid gap-2 text-base">
+                {KINDS.map(([k, label]) => (
+                  <label key={k} className={`flex items-center gap-3 rounded-md border px-3 py-2.5 ${why[k] ? 'border-slate-200 text-slate-400' : 'border-slate-300 hover:bg-emerald-50'}`}>
+                    <input type="checkbox" checked={!!picked.has(k) && !why[k]} disabled={!!why[k] || busy || !!retry} onChange={() => toggle(k)} className="h-5 w-5" />
+                    {/* 書類の名前は1行のまま（スマホでは選べないわけが次の行へ） */}
+                    <span className="min-w-0">
+                      <span className="whitespace-nowrap font-bold">{label}</span>
+                      {why[k] && <span className="ml-1 inline-block text-xs">（{why[k]}）</span>}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
           </Modal>,
           document.body,
         )}
