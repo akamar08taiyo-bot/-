@@ -9,6 +9,7 @@
 //   番号（①②）・選択。線は黄色・枠囲みは茶色が初め。リボンは大きく、まん中。補強板の道具は外した（ユーザーの指示「茶色の斜線の…機能は不要」2026-10-29）。
 //   写真を回すのは上の帯の「左へ回す」「右へ回す」（ユーザーの指示「写真回転がわかりづらい」2026-10-29。前は書式の欄の ↺ ↻）。
 //   消しゴム（なぞった線・図形を消す。1回で戻せる）・上の「戻る」「進む」は文字付き（ユーザーの指示「消しゴム機能をつける。戻る、進むボタンはもう少しわかりやすく」2026-10-29）
+//   頂点の編集（角を動かす・線の上をつかんで足す・Delete／頂点を削除で消す・Esc／✓ で終える・戻る。指でも。ユーザーの指示「エクセル　頂点の編集機能をつける」2026-10-30）
 // usage: node e2e-photomark.mjs <サイトのURL> <出力フォルダ>
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
@@ -493,6 +494,75 @@ await page.screenshot({path: path.join(outDir, 'mark-04c-quad.png')});
   await dlg.getByRole('button', {name: '戻る', exact: true}).click();
   assert.deepEqual((await svgOf(4, 'polyline')).points.trim().split(/\s+/).map((q) => q.split(',').map(Number)), pts0);
 }
+// 頂点の編集（Excel の「図形の編集 → 頂点の編集」。ユーザーの指示「エクセル　頂点の編集機能をつける」2026-10-30）：
+// 角の黒い四角をつかむとその角だけ動く・線の上をつかんで動かすと角が増える・Delete でその角を消す・Esc で終える。戻るで1つずつ戻る
+{
+  const ptsOf = async () => (await svgOf(4, 'polyline')).points.trim().split(/\s+/).map((q) => q.split(',').map(Number));
+  const pts0 = await ptsOf();
+  const pointsBtn = ribbon.getByRole('button', {name: '頂点の編集', exact: true});
+  await clickOn(0.9, 0.9);
+  assert.equal(await pointsBtn.isDisabled(), true); // 何も選んでいないときは押せない
+  await clickOn(0.225, 0.1); // 四角の上の辺を押して選ぶ
+  assert.equal((await selected()).length, 1);
+  await pointsBtn.click();
+  assert.equal(await pointsBtn.getAttribute('aria-pressed'), 'true');
+  const edit = dlg.locator('[data-vertex-edit]');
+  // 角の四角は絵だけ（押すのは下の写真の所）なので、その場所を押す
+  const clickVertex = async (i) => {
+    const r = await edit.locator(`[data-vertex="${i}"]`).boundingBox();
+    await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2);
+  };
+  assert.equal(await edit.getAttribute('data-points'), '4');
+  assert.equal(await edit.locator('[data-vertex]').count(), 4);
+  // 3つ目の角（右下）をつかんで動かす：その角だけが動く
+  const v2 = await edit.locator('[data-vertex="2"]').boundingBox();
+  await page.mouse.move(v2.x + v2.width / 2, v2.y + v2.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(v2.x + v2.width / 2 + 50, v2.y + v2.height / 2 + 40, {steps: 6});
+  await page.mouse.up();
+  const pts1 = await ptsOf();
+  assert.equal(pts1.length, 5);
+  assert.deepEqual(pts1[0], pts1[4], '閉じたまま');
+  pts0.forEach(([x, y], i) => {
+    const [dx, dy] = [(pts1[i][0] - x) * k, (pts1[i][1] - y) * k];
+    if (i === 2) assert.ok(Math.abs(dx - 50) < 1.5 && Math.abs(dy - 40) < 1.5, `動かした角 ${pts0[i]} → ${pts1[i]}`);
+    else assert.ok(Math.abs(dx) < 0.6 && Math.abs(dy) < 0.6, `ほかの角は動かない ${i}: ${pts0[i]} → ${pts1[i]}`);
+  });
+  assert.equal(await edit.locator('[data-vertex="2"]').getAttribute('fill'), 'white'); // 動かした角を選んだまま
+  // 上の辺のまん中をつかんで上へ：そこに角が増える（2つ目の角）
+  await dragOn([0.225, 0.1], [0.225, 0.03]);
+  assert.equal(await edit.getAttribute('data-points'), '5');
+  assert.equal(await edit.locator('[data-vertex="1"]').getAttribute('fill'), 'white');
+  await page.screenshot({path: path.join(outDir, 'mark-04e-points.png')});
+  // Delete：選んだ角を消す（図形は消さない）。消すと角を選んでいないので「頂点を削除」は押せない
+  await page.keyboard.press('Delete');
+  assert.equal(await edit.getAttribute('data-points'), '4');
+  assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen', 'pen']);
+  assert.equal(await dlg.getByRole('button', {name: '頂点を削除'}).isDisabled(), true);
+  // 角をつかんでから「頂点を削除」（スマホ・iPad 用のボタン）。角が3つより少なくはならない
+  await clickVertex(3);
+  await dlg.getByRole('button', {name: '頂点を削除'}).click();
+  assert.equal(await edit.getAttribute('data-points'), '3');
+  await clickVertex(0);
+  await page.keyboard.press('Delete');
+  assert.equal(await edit.getAttribute('data-points'), '3');
+  // Esc で終える（図形は選んだまま）
+  await page.keyboard.press('Escape');
+  assert.equal(await edit.count(), 0);
+  assert.equal(await pointsBtn.getAttribute('aria-pressed'), 'false');
+  assert.equal((await selected()).length, 1);
+  // 右クリックのメニューからも始められる → 「✓ 頂点の編集を終える」で終える
+  const c = await at(0.225, 0.1);
+  await page.mouse.click(c.x, c.y, {button: 'right'});
+  await page.getByRole('menuitem', {name: '頂点の編集', exact: true}).click();
+  assert.equal(await edit.count(), 1);
+  await dlg.getByRole('button', {name: '✓ 頂点の編集を終える'}).click();
+  assert.equal(await edit.count(), 0);
+  // 戻る4回（動かす・足す・消す・消す）で元の四角
+  for (let i = 0; i < 4; i++) await dlg.getByRole('button', {name: '戻る', exact: true}).click();
+  assert.deepEqual(await ptsOf(), pts0);
+  log('頂点の編集（動かす・足す・消す・終える・戻る）OK');
+}
 // 3つ押して「✕ 四角をやめる」：描かない
 await ribbon.getByRole('button', {name: /^四角（角を4つ/}).click();
 for (const [fx, fy] of [
@@ -842,6 +912,41 @@ for (const [name, vp, touch] of [
   await d2.getByRole('button', {name: '戻る', exact: true}).tap();
   await p2.waitForFunction(() => document.querySelectorAll('[role="dialog"] [data-photo-stage] [data-mark]').length === 1, null, {timeout: 5000}); // 戻る
   await p2.screenshot({path: path.join(outDir, `mark-05b-${name}-top.png`), clip: {x: 0, y: 0, width: vp.width, height: 330}});
+  // 頂点の編集を指で：四角を描く → 「頂点の編集」→ 角を指でずらす → 「✓ 頂点の編集を終える」
+  {
+    const tapAt = async (fx, fy) => {
+      await touchAt('touchStart', pt(fx, fy));
+      await touchAt('touchEnd', pt(fx, fy));
+      await p2.waitForTimeout(400);
+    };
+    await p2.waitForTimeout(800);
+    await d2.getByRole('button', {name: /^四角（角を4つ/}).tap();
+    await d2.locator('button[aria-pressed="true"][aria-label^="四角（角を4つ"]').waitFor();
+    for (const [fx, fy] of [
+      [0.55, 0.15],
+      [0.8, 0.12],
+      [0.82, 0.35],
+      [0.57, 0.38],
+    ])
+      await tapAt(fx, fy);
+    assert.equal(await d2.locator('[data-photo-stage] [data-mark]').count(), 2, `${name} 指で四角`);
+    await d2.getByRole('button', {name: '頂点の編集', exact: true}).tap();
+    const edit = d2.locator('[data-vertex-edit]');
+    await edit.waitFor();
+    const v0 = await edit.locator('[data-vertex="2"]').boundingBox();
+    const from = {x: v0.x + v0.width / 2, y: v0.y + v0.height / 2};
+    await touchAt('touchStart', from);
+    for (let i = 1; i <= 6; i++) await touchAt('touchMove', {x: from.x + (30 * i) / 6, y: from.y + (24 * i) / 6});
+    await touchAt('touchEnd', {x: from.x + 30, y: from.y + 24});
+    const v1 = await edit.locator('[data-vertex="2"]').boundingBox();
+    assert.ok(Math.abs(v1.x - v0.x - 30) < 2 && Math.abs(v1.y - v0.y - 24) < 2, `${name} 指で角を動かす ${JSON.stringify(v0)} → ${JSON.stringify(v1)}`);
+    const bar = await d2.getByRole('button', {name: '✓ 頂点の編集を終える'}).boundingBox();
+    assert.ok(bar.x >= 0 && bar.x + bar.width <= vp.width, `${name} 頂点の編集を終えるが画面に入る ${JSON.stringify(bar)}`);
+    await p2.screenshot({path: path.join(outDir, `mark-05e-${name}-points.png`)});
+    await p2.waitForTimeout(800);
+    await d2.getByRole('button', {name: '✓ 頂点の編集を終える'}).tap();
+    await edit.waitFor({state: 'detached', timeout: 5000});
+  }
   await c2.close();
 }
 log('スマホ（390px）・iPad：指で描ける・横にはみ出さない OK');

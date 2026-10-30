@@ -6,7 +6,7 @@
 // 操作も Excel と同じ：図形を選んでドラッグで描く（Shift で 15°ずつ・正方形／正円、Ctrl でまん中から）、押して選ぶ（Shift・Ctrl で足す）、ドラッグで動かす
 // （Shift で縦・横だけ、Ctrl で複製）、まわりの○で大きさ（角は Shift で縦横の比のまま）、上の↻で回す（Shift で 15°ずつ）、直線は端の○で長さ・向き、
 // ダブルクリック（Enter・F2・そのまま打つ）で文字、Delete で削除、矢印キーで少し動かす（Shift＋矢印で大きさ・Alt＋←→で 15°回す）、
-// Ctrl+Z／Y・Ctrl+C／X／V・Ctrl+D（複製）・Ctrl+A（すべて選ぶ）・Tab（次の図形）・Esc、右クリックのメニュー。
+// Ctrl+Z／Y・Ctrl+C／X／V・Ctrl+D（複製）・Ctrl+A（すべて選ぶ）・Tab（次の図形）・Esc、右クリックのメニュー、頂点の編集（手書きの線・折れ線・四角の角を動かす・足す・消す）。
 // 直したらすぐ様邸に入れる（自動保存）。位置・大きさ・線の太さ・文字の大きさは紙の上の大きさ（photoMarks.ts）で、プレビュー・Excel と同じ
 
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
@@ -32,6 +32,7 @@ import {
   markBounds,
   markId,
   markPts,
+  markVertices,
   nextNumberText,
   NUM_STYLE,
   PEN_STYLE,
@@ -44,6 +45,7 @@ import {
   STANDARD_COLORS,
   TEXT_STYLE,
   THEME_COLORS,
+  withVertices,
 } from '../photoMarks.ts';
 import type {MarkBox, MarkStyle} from '../photoMarks.ts';
 import type {PhotoMark, PhotoMarkDash} from '../types.ts';
@@ -72,7 +74,9 @@ type Drag =
   // 直線をまん中のまわりに回す（直線の ↻ のつまみ）
   | {type: 'rotline'; id: string; base: PhotoMark; a0: number; c: Pt}
   // 消しゴム：なぞった所（last＝前の点）の線・図形を消す。ids＝もう消した図形、r＝消しゴムの半径（紙の画素）
-  | {type: 'erase'; last: Pt; ids: string[]; r: number};
+  | {type: 'erase'; last: Pt; ids: string[]; r: number}
+  // 頂点の編集：i 番目の頂点を動かす（pts＝頂点の見えている位置。線の上をつかんで足した頂点も入っている。closed＝閉じた形）
+  | {type: 'vertex'; id: string; i: number; pts: Pt[]; closed: boolean; base: PhotoMark; moved: boolean; p0: Pt};
 type Menu = {name: 'fill' | 'line' | 'color' | 'size' | 'font' | 'front' | 'back' | 'rotate'; x: number; y: number} | {name: 'context'; x: number; y: number; on: boolean};
 
 /** 図形の挿入のボタン（Excel の「図形」の線・四角形・基本図形の並び） */
@@ -334,6 +338,9 @@ function Icon({name, color}: {name: string; color?: string}) {
       return <svg {...s}><path d="M3 16.5 L3 7 L11 7 L11 13 L17.5 13" strokeLinejoin="round" /><circle cx="3" cy="7" r="1.3" fill="currentColor" /><circle cx="11" cy="7" r="1.3" fill="currentColor" /><circle cx="11" cy="13" r="1.3" fill="currentColor" /></svg>;
     case 'quad':
       return <svg {...s}><path d="M3.5 15.5 L6.5 4.5 L16.5 5.5 L14 16 Z" strokeLinejoin="round" />{[[3.5, 15.5], [6.5, 4.5], [16.5, 5.5], [14, 16]].map(([x, y]) => <circle key={x} cx={x} cy={y} r="1.4" fill="currentColor" stroke="none" />)}</svg>;
+    case 'points':
+      // 頂点の編集（Excel の絵と同じく、線の角に小さな四角）
+      return <svg {...s}><path d="M2.5 15 L7 5 L12 13 L17.5 4" strokeLinejoin="round" strokeDasharray="2.2 1.6" />{[[2.5, 15], [7, 5], [12, 13], [17.5, 4]].map(([x, y]) => <rect key={x} x={x - 1.6} y={y - 1.6} width="3.2" height="3.2" fill="currentColor" stroke="none" />)}</svg>;
     case 'board':
       return <svg {...s}><rect x="2.5" y="4.5" width="15" height="11" stroke="#996633" /><path d="M2.5 15.5 L17.5 4.5" stroke="#996633" /></svg>;
     case 'num':
@@ -485,6 +492,9 @@ export function PhotoMarkEditor({
   const [sel, setSel] = useState<string[]>([]);
   const [tool, setTool] = useState<Tool | null>(START_TOOL);
   const [editing, setEditing] = useState<string | null>(null);
+  // 頂点の編集（Excel の「図形の編集 → 頂点の編集」。ユーザーの指示「エクセル　頂点の編集機能をつける」2026-10-30）：
+  // 編集している手書きの線・折れ線・四角の id と、選んでいる頂点（i）。選んでいる図形が変わったら終わる（pe）
+  const [pointEdit, setPointEdit] = useState<{id: string; i: number | null} | null>(null);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [sub, setSub] = useState<'width' | 'dash' | 'arrow' | null>(null);
   const [styles, setStyles] = useState<Styles>(loadStyles);
@@ -689,6 +699,35 @@ export function PhotoMarkEditor({
     commit(marks.filter((m) => !sel.includes(m.id)));
     setSel([]);
   };
+  // ---------------------------------------------------------------- 頂点の編集（手書きの線・折れ線・四角）
+  /** 頂点を編集している図形（選んでいる1つの手書きの線・折れ線・四角のときだけ。選ぶのが変わったら終わり） */
+  const pe = pointEdit && single && single.id === pointEdit.id && single.kind === 'pen' ? pointEdit : null;
+  const canPoints = !!single && single.kind === 'pen';
+  // ほかを選んだ・元に戻すで消えたら終える（あとで同じ図形を選び直したとき、頂点の編集のまま出ないように）
+  useEffect(() => {
+    if (pointEdit && !pe) setPointEdit(null);
+  }, [pointEdit, pe]);
+  /** 「頂点の編集」：始める／終える（Excel の「図形の編集 → 頂点の編集」と同じく、もう一度押すと終える） */
+  const togglePoints = () => {
+    setMenu(null);
+    if (pe) {
+      setPointEdit(null);
+      return;
+    }
+    if (!single || single.kind !== 'pen') return;
+    if (editing) endEdit();
+    setTool(null);
+    setPointEdit({id: single.id, i: null});
+  };
+  /** 頂点を消す（これ以上消すと線・形にならないときは消さない：開いた線は2つ、閉じた形は3つまで） */
+  const deleteVertex = (id: string, i: number) => {
+    const m = byId(id, marks);
+    if (!m) return;
+    const {pts, closed} = markVertices(m, V);
+    if (pts.length <= (closed ? 3 : 2)) return;
+    commit(marks.map((x) => (x.id === id ? withVertices(m, V, pts.filter((_, j) => j !== i), closed, MIN) : x)));
+    setPointEdit({id, i: null});
+  };
   const copy = () => {
     if (!selected.length) return;
     clip.items = selected.map((m) => ({...m}));
@@ -791,6 +830,7 @@ export function PhotoMarkEditor({
       if (poly.current) finishPoly();
       else if (editing) endEdit();
       else if (menu) setMenu(null);
+      else if (pe) setPointEdit(null);
       else if (tool) {
         setTool(null);
         setSel([]);
@@ -810,6 +850,12 @@ export function PhotoMarkEditor({
         e.preventDefault();
         act[key]();
       }
+      return;
+    }
+    // 頂点の編集で頂点を選んでいるとき：その頂点を消す（図形は消さない）
+    if ((e.key === 'Delete' || e.key === 'Backspace') && pe) {
+      e.preventDefault();
+      if (pe.i !== null) deleteVertex(pe.id, pe.i);
       return;
     }
     if ((e.key === 'Delete' || e.key === 'Backspace') && sel.length) {
@@ -1152,6 +1198,39 @@ export function PhotoMarkEditor({
     e.currentTarget.setPointerCapture(e.pointerId);
     // リボンのボタンから写真へ（Enter などがボタンに行かないように）。図形を選んでいれば、離したあとに打つ所へ（arm）
     if (document.activeElement !== editRef.current) e.currentTarget.focus({preventScroll: true});
+    // 頂点の編集：頂点（黒い四角）をつかむと動かす・Ctrl を押しながら押すと消す。線の上をつかんで動かすと、そこに頂点を足す（押しただけでは足さない）。
+    // 図形の外を押すと頂点の編集を終える（Excel と同じ）
+    if (pe) {
+      const m = byId(pe.id, marks);
+      if (m) {
+        const {pts, closed} = markVertices(m, V);
+        const ht = handleTol(e);
+        let best = -1;
+        let bd = Infinity;
+        pts.forEach((q, i) => {
+          const dd = Math.hypot(p.x - q.x, p.y - q.y);
+          if (dd <= ht && dd < bd) [best, bd] = [i, dd];
+        });
+        if (best >= 0) {
+          if (e.ctrlKey || e.metaKey) {
+            deleteVertex(m.id, best);
+            return;
+          }
+          setPointEdit({id: m.id, i: best});
+          drag.current = {type: 'vertex', id: m.id, i: best, pts, closed, base: m, moved: false, p0: p};
+          return;
+        }
+        const tol = tolOf(e) + (m.width * PT_PX) / 2;
+        const segs = closed ? pts.length : pts.length - 1;
+        for (let j = 0; j < segs; j++) {
+          if (segDist(p, pts[j], pts[(j + 1) % pts.length]) > tol) continue;
+          const added = [...pts.slice(0, j + 1), clampP(p), ...pts.slice(j + 1)];
+          drag.current = {type: 'vertex', id: m.id, i: j + 1, pts: added, closed, base: m, moved: false, p0: p};
+          return;
+        }
+      }
+      setPointEdit(null);
+    }
     if (tool) {
       // 描く道具のあいだは、押すといつも描く（描いたばかりの線の端から続けて描ける＝L字。直すときは「選択」。Excel の「描画モードのロック」と同じ）
       const raw = clampP(p);
@@ -1251,6 +1330,13 @@ export function PhotoMarkEditor({
     }
     if (!d) return;
     const p = toPaper(e);
+    if (d.type === 'vertex') {
+      if (!d.moved && Math.hypot((p.x - d.p0.x) * k, (p.y - d.p0.y) * k) < 3) return;
+      d.moved = true;
+      const n = withVertices(d.base, V, d.pts.map((q, j) => (j === d.i ? clampP(p) : q)), d.closed, MIN);
+      if (inside(n, W, H)) setDraft(marks.map((m) => (m.id === d.id ? n : m)));
+      return;
+    }
     if (d.type === 'pen') {
       const q = clampP(p);
       if (d.straight) {
@@ -1355,6 +1441,14 @@ export function PhotoMarkEditor({
     if (!d) return;
     const next = draft;
     setDraft(null);
+    if (d.type === 'vertex') {
+      // 動かしたときだけ入れる（線の上を押しただけでは頂点を足さない）。動かした頂点を選んだまま
+      if (d.moved && next) {
+        commit(next);
+        setPointEdit({id: d.id, i: d.i});
+      }
+      return;
+    }
     if (d.type === 'erase') {
       // なぞって消したものを1回で入れる（元に戻すも1回）。指を離したら丸は消す
       setEraserAt(e.pointerType === 'mouse' ? {p: d.last, r: d.r} : null);
@@ -1692,6 +1786,19 @@ export function PhotoMarkEditor({
               </g>
             );
           }
+          if (pe && m.id === pe.id) {
+            // 頂点の編集：線を点線でなぞり、頂点に小さな黒い四角（選んだ頂点は白。Excel と同じ）
+            const v = markVertices(m, V);
+            const ring = v.closed ? [...v.pts, v.pts[0]] : v.pts;
+            return (
+              <g key={m.id} data-sel={m.id} data-vertex-edit={m.id} data-points={v.pts.length}>
+                <polyline points={ring.map((q) => `${q.x * k},${q.y * k}`).join(' ')} fill="none" stroke="#dc2626" strokeWidth={1} strokeDasharray="4 3" />
+                {v.pts.map((q, i) => (
+                  <rect key={i} data-vertex={i} x={q.x * k - 4} y={q.y * k - 4} width={8} height={8} fill={pe.i === i ? 'white' : 'black'} stroke={pe.i === i ? 'black' : 'white'} strokeWidth={1} />
+                ))}
+              </g>
+            );
+          }
           const b = shapeBox(m, V);
           const c = center(b);
           const pts = [
@@ -1724,6 +1831,7 @@ export function PhotoMarkEditor({
   const canvasCursor = tool === 'eraser' ? 'none' : tool ? 'crosshair' : 'default'; // 消しゴムは丸を見せる
   /** 道具を選ぶ（null＝選択）。折れ線の途中ならそこまでで終える */
   const pickTool = (t: Tool | null) => {
+    setPointEdit(null);
     if (editing) endEdit();
     if (poly.current) finishPoly();
     setTool(t);
@@ -1889,6 +1997,19 @@ export function PhotoMarkEditor({
                     <Icon name={t.key ?? 'select'} />
                   </button>
                 ))}
+                {/* 頂点の編集（Excel の「図形の編集 → 頂点の編集」。ユーザーの指示「エクセル　頂点の編集機能をつける」2026-10-30）：
+                    手書きの線・折れ線・四角を1つ選んで押すと、角に黒い四角が出て、つかんで動かす・線の上をつかんで足す・Delete で消す */}
+                <button
+                  type="button"
+                  aria-label="頂点の編集"
+                  title="頂点の編集（手書きの線・折れ線・四角の角を動かす・足す・消す）"
+                  aria-pressed={!!pe}
+                  disabled={!pe && !canPoints}
+                  onClick={togglePoints}
+                  className={`${RB} px-1 ${pe ? 'bg-emerald-100 ring-1 ring-emerald-500' : ''}`}
+                >
+                  <Icon name="points" />
+                </button>
               </div>
             </Group>
             <Group label="図形のスタイル">
@@ -2112,6 +2233,17 @@ export function PhotoMarkEditor({
               {poly.current?.quad ? '✕ 四角をやめる' : '✓ 折れ線を終える'}
             </button>
           )}
+          {pe && (
+            // 頂点の編集のあいだ：スマホ・iPad でも消す・終えるができるように（パソコンは Delete・Esc でも）
+            <div onPointerDown={(e) => e.stopPropagation()} className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-2">
+              <button type="button" disabled={pe.i === null} onClick={() => pe.i !== null && deleteVertex(pe.id, pe.i)} className="h-11 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-base text-slate-700 shadow-md hover:bg-slate-50 disabled:opacity-40">
+                頂点を削除
+              </button>
+              <button type="button" onClick={() => setPointEdit(null)} className="h-11 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-base text-slate-700 shadow-md hover:bg-slate-50">
+                ✓ 頂点の編集を終える
+              </button>
+            </div>
+          )}
           {/* iPad：押したその場でキーボードを出すための見えない入力欄 */}
           <textarea ref={proxyRef} data-proxy aria-hidden tabIndex={-1} className="pointer-events-none absolute left-0 top-0 h-px w-px opacity-0" />
         </div>
@@ -2166,6 +2298,7 @@ export function PhotoMarkEditor({
             item('コピー', copy, {disabled: !menu.on, keys: 'Ctrl+C'}),
             item('貼り付け', paste, {disabled: !clip.items.length, keys: 'Ctrl+V'}),
             ...(menu.on && single && hasText(single.kind) ? [item('テキストの編集', () => startEdit(single.id), {keys: 'F2'})] : []),
+            ...(menu.on && canPoints ? [item(pe ? '頂点の編集を終える' : '頂点の編集', togglePoints)] : []),
             ...(menu.on ? [item('最前面へ移動', () => order('top')), item('最背面へ移動', () => order('bottom')), item('削除', remove, {keys: 'Delete'})] : [item('すべて選択', () => setSel(marks.map((m) => m.id)), {keys: 'Ctrl+A', disabled: !marks.length})]),
           ],
           '右クリックのメニュー',

@@ -294,6 +294,57 @@ export function markPts(m: PhotoMark, vb: MarkBox): P[] {
   return (m.pts ?? (m.kind === 'board' ? BOARD_PTS : [])).map(([x, y]) => ({x: b.x + x * b.w, y: b.y + y * b.h}));
 }
 
+/** 点 p を c のまわりに deg 度（右回り）回す */
+const turnAround = (p: P, c: P, deg: number): P => {
+  const t = (deg * Math.PI) / 180;
+  const [cs, sn] = [Math.cos(t), Math.sin(t)];
+  const [dx, dy] = [p.x - c.x, p.y - c.y];
+  return {x: c.x + dx * cs - dy * sn, y: c.y + dx * sn + dy * cs};
+};
+const r5v = (v: number) => Math.round(v * 100000) / 100000;
+
+/**
+ * 頂点の編集（Excel の「図形の編集 → 頂点の編集」。ユーザーの指示「エクセル　頂点の編集機能をつける」2026-10-30）：
+ * 手書きの線・折れ線・四角（kind 'pen'）の頂点の、紙の上の位置（回した図形は回したあとの、見えている位置）。
+ * closed＝閉じた形（四角など。はじめと終わりの点が同じ）。そのときは終わりの点（はじめと同じ）を除いた頂点を返す
+ */
+export function markVertices(m: PhotoMark, vb: MarkBox): {pts: P[]; closed: boolean} {
+  const b = shapeBox(m, vb);
+  const c = {x: b.x + b.w / 2, y: b.y + b.h / 2};
+  const all = markPts(m, vb).map((p) => turnAround(p, c, b.rot));
+  const [a, z] = [m.pts?.[0], m.pts?.[m.pts.length - 1]];
+  const closed = all.length >= 4 && !!a && !!z && Math.abs(a[0] - z[0]) < 1e-4 && Math.abs(a[1] - z[1]) < 1e-4;
+  return {pts: closed ? all.slice(0, -1) : all, closed};
+}
+
+/**
+ * 頂点（紙の上の見えている位置。closed なら終わりの点を除いたもの）から、手書きの線・折れ線・四角を作り直す。
+ * 書式・回した角度はそのままで、ほかの頂点は見えている位置から動かない（回した図形は、回す前の四角のまん中を計算し直す）。
+ * min＝図形のいちばん小さい大きさ（紙の画素。まっすぐな線でも四角の幅・高さが 0 にならないように）
+ */
+export function withVertices(m: PhotoMark, vb: MarkBox, pts: P[], closed: boolean, min = 2): PhotoMark {
+  const b = shapeBox(m, vb);
+  const c = {x: b.x + b.w / 2, y: b.y + b.h / 2};
+  const q = (closed ? [...pts, pts[0]] : pts).map((p) => turnAround(p, c, -b.rot));
+  const xs = q.map((p) => p.x);
+  const ys = q.map((p) => p.y);
+  let [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  if (x1 - x0 < min) [x0, x1] = [(x0 + x1) / 2 - min / 2, (x0 + x1) / 2 + min / 2];
+  if (y1 - y0 < min) [y0, y1] = [(y0 + y1) / 2 - min / 2, (y0 + y1) / 2 + min / 2];
+  const [w, h] = [x1 - x0, y1 - y0];
+  // 回す前の四角のまん中：見えている位置が変わらないように、もとのまん中 c のまわりで回した所
+  const C = turnAround({x: (x0 + x1) / 2, y: (y0 + y1) / 2}, c, b.rot);
+  const [nx, ny] = [C.x - w / 2, C.y - h / 2];
+  return {
+    ...m,
+    x1: r5v((nx - vb.x) / vb.w),
+    y1: r5v((ny - vb.y) / vb.h),
+    x2: r5v((nx + w - vb.x) / vb.w),
+    y2: r5v((ny + h - vb.y) / vb.h),
+    pts: q.map((p) => [r5v((p.x - x0) / w), r5v((p.y - y0) / h)] as [number, number]),
+  };
+}
+
 /** 回した四角（rot＝右回りの度。まん中で回る）の外側の四角 */
 export function rotatedBounds(b: MarkBox, rot = 0): MarkBox {
   const t = (rot * Math.PI) / 180;

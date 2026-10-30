@@ -14,6 +14,7 @@ import {
   markBounds,
   markFontCss,
   markPts,
+  markVertices,
   nextNumberText,
   PEN_STYLE,
   photoBounds,
@@ -23,6 +24,7 @@ import {
   shapeBox,
   simplifyStroke,
   turnMarks,
+  withVertices,
 } from '../../src/sasaoka/photoMarks.ts';
 import type {PhotoMark} from '../../src/sasaoka/types.ts';
 
@@ -185,4 +187,39 @@ test('文字のフォント：初めはメイリオ・30種類。知らないフ
   assert.match(markFontCss('メイリオ')!, /^"メイリオ", "Meiryo", .*sans-serif$/);
   assert.match(markFontCss('ＭＳ 明朝')!, /^"ＭＳ 明朝", "MS Mincho", .*serif$/);
   assert.equal(markFontCss('ないフォント'), null);
+});
+
+test('頂点の編集：頂点の見えている位置（回した図形も）・1つ動かしてもほかの頂点は動かない・閉じた四角・頂点を足す／消す', () => {
+  const V = {x: 0, y: 0, w: 1000, h: 800};
+  const near = (a: {x: number; y: number}, b: {x: number; y: number}) => Math.abs(a.x - b.x) < 0.05 && Math.abs(a.y - b.y) < 0.05;
+  // 折れ線（開いた形）：x 100〜500・y 80〜400 の四角の中に3点
+  const poly = {...base, id: 'p', kind: 'pen' as const, x1: 0.1, y1: 0.1, x2: 0.5, y2: 0.5, pts: [[0, 0], [1, 0.5], [0.25, 1]] as [number, number][]};
+  const v0 = markVertices(poly, V);
+  assert.equal(v0.closed, false);
+  assert.deepEqual(v0.pts.map((p) => [Math.round(p.x), Math.round(p.y)]), [[100, 80], [500, 240], [200, 400]]);
+  // 2つめの頂点を (700, 100) に：ほかの頂点はそのまま、四角は広がる
+  const moved = withVertices(poly, V, [v0.pts[0], {x: 700, y: 100}, v0.pts[2]], false);
+  const v1 = markVertices(moved, V);
+  assert.ok(near(v1.pts[0], v0.pts[0]) && near(v1.pts[2], v0.pts[2]) && near(v1.pts[1], {x: 700, y: 100}), JSON.stringify(v1.pts));
+  assert.deepEqual([moved.line, moved.width, moved.id], [poly.line, poly.width, 'p']); // 書式はそのまま
+  // 30°回した四角（閉じた形）：見えている位置で動かしても、ほかの3つの角は動かない（回した角度はそのまま）
+  const quad = {...base, id: 'q', kind: 'pen' as const, x1: 0.3, y1: 0.3, x2: 0.6, y2: 0.6, rot: 30, pts: [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]] as [number, number][]};
+  const q0 = markVertices(quad, V);
+  assert.equal(q0.closed, true);
+  assert.equal(q0.pts.length, 4);
+  const q1pts = q0.pts.map((p, i) => (i === 2 ? {x: p.x + 60, y: p.y + 40} : p));
+  const quad2 = withVertices(quad, V, q1pts, true);
+  assert.equal(quad2.rot, 30);
+  const q1 = markVertices(quad2, V);
+  assert.equal(q1.closed, true);
+  q1.pts.forEach((p, i) => assert.ok(near(p, q1pts[i]), `${i} ${JSON.stringify([p, q1pts[i]])}`));
+  // 頂点を足す（2つめと3つめの間）・消す
+  const added = markVertices(withVertices(quad, V, [q0.pts[0], q0.pts[1], {x: 500, y: 200}, q0.pts[2], q0.pts[3]], true), V);
+  assert.equal(added.pts.length, 5);
+  const removed = markVertices(withVertices(quad, V, q0.pts.filter((_, i) => i !== 1), true), V);
+  assert.equal(removed.pts.length, 3);
+  // まっすぐな横の線（高さ 0）でも四角の高さは 0 にしない
+  const flat = withVertices(poly, V, [{x: 100, y: 300}, {x: 600, y: 300}], false);
+  assert.ok(Math.abs(flat.y2 - flat.y1) * 800 >= 2 - 1e-6);
+  assert.ok(markVertices(flat, V).pts.every((p) => Math.abs(p.y - 300) < 0.05));
 });
