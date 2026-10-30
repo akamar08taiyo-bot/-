@@ -1,5 +1,6 @@
 import {createContext, useContext, useEffect, useRef, useState, useSyncExternalStore} from 'react';
 import type {ButtonHTMLAttributes, DragEvent as ReactDragEvent, InputHTMLAttributes, ReactNode} from 'react';
+import {toKatakana} from '../util.ts';
 
 // 色は機能ごとに1色（見積・提案書作成アプリのデザイン規約と同じ使い分け）。どれも薄い地に濃い字・細い枠。
 // 同じ働きのボタンは、どの画面でも・特定福祉用具のアプリ（src/tokutei の ui.tsx）でも同じ色（ユーザーの指示「同じ内容でボタンの色が違う場合は統一する」2026-10-28）：
@@ -151,6 +152,33 @@ export function TextInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className={`h-9 rounded-md border border-slate-300 bg-white px-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${className}`}
+      {...rest}
+    />
+  );
+}
+
+/**
+ * フリガナの欄：ひらがな・半角カタカナで打っても全角カタカナにする（`toKatakana`）。日本語の変換中は変えず（変えると変換がこわれる）、
+ * 確定したとき・貼り付けたとき・欄を離れたときに変える（申請書の欄・介護保険証から入れる画面）
+ */
+export function KanaInput({value, onChange, ...rest}: {value: string; onChange: (v: string) => void} & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
+  const composing = useRef(false);
+  const commit = (v: string) => {
+    const k = toKatakana(v);
+    if (k !== value || k !== v) onChange(k);
+  };
+  return (
+    <TextInput
+      value={value}
+      onChange={(v) => (composing.current ? onChange(v) : commit(v))}
+      onCompositionStart={() => {
+        composing.current = true;
+      }}
+      onCompositionEnd={(e) => {
+        composing.current = false;
+        commit(e.currentTarget.value);
+      }}
+      onBlur={(e) => commit(e.currentTarget.value)}
       {...rest}
     />
   );

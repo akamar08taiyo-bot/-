@@ -93,7 +93,9 @@ assert.match(await val('住所').inputValue(), /^行橋市中央一丁目1番1�
 await val('氏名').fill('見本');
 await val('氏名').fill('見本　花子');
 await val('フリガナ').fill('ミホン');
-await val('フリガナ').fill('ミホン　ハナコ');
+// ひらがなで打ち直しても全角カタカナに（ユーザーの指示「介護保険証貼り付けた場合も、ふりがなは自動でカタカナに」2026-10-30）
+await val('フリガナ').fill('みほん　はなこ');
+assert.equal(await val('フリガナ').inputValue(), 'ミホン　ハナコ');
 assert.equal(await row('氏名').getByLabel('氏名を入れる').isChecked(), true);
 // 保険者はこの様邸と同じ（行橋市）なので、はじめはチェックしない
 assert.equal(await row('保険者').getByLabel('保険者を入れる').isChecked(), false);

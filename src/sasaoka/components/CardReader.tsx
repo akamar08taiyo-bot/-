@@ -15,7 +15,7 @@ import {INSURER_IDS, INSURER_INFO, MARK_INFO, NO_SHINSEI} from '../estimateForms
 import type {CardInfo, CardRead} from '../hokensho.ts';
 import {askCatalog} from '../tokuteiLink.ts';
 import type {Insurer, Job} from '../types.ts';
-import {Btn, DropArea, Modal, pastedFiles, TextInput, useToast} from './ui.tsx';
+import {Btn, DropArea, KanaInput, Modal, pastedFiles, TextInput, useToast} from './ui.tsx';
 
 /**
  * 介護保険証の入口（点線の枠。押すとファイルを選ぶ。ファイルをこの枠にドロップしても、画面で Ctrl+V で貼り付けてもよい）。読めたら onRead。
@@ -249,6 +249,9 @@ function FieldInput({field, v, set}: {field: CardField; v: CardInfo; set: (patch
           <option value="3">3割</option>
         </select>
       );
+    case 'kana':
+      // ひらがな・半角カナで打ち直しても全角カタカナに（ユーザーの指示「介護保険証貼り付けた場合も、ふりがなは自動でカタカナに」2026-10-30。申請書の欄と同じ KanaInput）
+      return <KanaInput value={v.kana} onChange={(kana) => set({kana})} className="w-full min-w-0" aria-label="フリガナ（読んだ値）" />;
     default: {
       const label = CARD_FIELDS.find((x) => x.field === field)?.label ?? field;
       return <TextInput value={String(v[field])} onChange={(t) => set({[field]: t} as Partial<CardInfo>)} className="w-full min-w-0" aria-label={`${label}（読んだ値）`} inputMode={field === 'insuredNo' || field === 'insurerNo' || field === 'zip' ? 'numeric' : undefined} />;

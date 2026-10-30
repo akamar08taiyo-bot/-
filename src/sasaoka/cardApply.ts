@@ -5,6 +5,7 @@
 import {eraOf, INSURER_INFO, NO_SHINSEI} from './estimateForms.ts';
 import type {CardInfo, CardKey, CardRead} from './hokensho.ts';
 import {warekiText} from './riyu.ts';
+import {toKatakana} from './util.ts';
 import type {Insurer, Job, ShinseiInfo} from './types.ts';
 
 /** 確かめる画面の1行（いくつかの項目をまとめたもの＝生年月日・認定有効期間） */
@@ -118,7 +119,7 @@ export function applyCard(job: Job, v: CardInfo, picks: Set<CardField>): Job {
         next.address = v.address.trim();
         break;
       case 'kana':
-        sh.kana = v.kana.trim();
+        sh.kana = toKatakana(v.kana).trim(); // 読んだ値の画面でひらがなに打ち直しても全角カタカナで入れる
         break;
       case 'birth':
         // 申請書の元号は明治・大正・昭和（平成生まれは元号を空にして、年月日だけ）

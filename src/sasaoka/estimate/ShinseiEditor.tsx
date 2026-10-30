@@ -8,9 +8,9 @@
 // 写真への書き込み（✏️。PhotoMarkEditor.tsx）は、写真貼付用紙の上の写真の大きさ（paperSize）で開く（線の太さ・文字の大きさが紙の上と同じ割合になるように）
 
 import {Fragment, useDeferredValue, useEffect, useMemo, useRef, useState} from 'react';
-import type {InputHTMLAttributes, KeyboardEvent, ReactNode, RefObject} from 'react';
+import type {KeyboardEvent, ReactNode, RefObject} from 'react';
 import {isBlankRow, jobName} from '../calc.ts';
-import {Btn, TextInput, useToast} from '../components/ui.tsx';
+import {Btn, KanaInput, TextInput, useToast} from '../components/ui.tsx';
 import {circled, eraOf, INSURER_IDS, INSURER_INFO, insurerForAddress, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, photoNumbers} from '../estimateForms.ts';
 import {placeFromDims, withBrackets} from '../cutLink.ts';
 import {manualRow, newPlace} from '../rows.ts';
@@ -23,7 +23,7 @@ import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
 import type {AppData, Insurer, Job, Material, PhotoEdit, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
 import type {Update} from '../useStore.ts';
-import {toKatakana, yen} from '../util.ts';
+import {yen} from '../util.ts';
 import {zipCandidates} from '../zip.ts';
 import {PhotoBoard, PhotoOrderDialog, photoPlaces, SLOT_LABEL, usePhotoActions, usePlanActions} from './PhotoBoard.tsx';
 import {PhotoMarkEditor} from './PhotoMarkEditor.tsx';
@@ -689,33 +689,6 @@ export function Circles({label, options, value, onPick}: {label: string; options
         </Fragment>
       ))}
     </div>
-  );
-}
-
-/**
- * フリガナの欄：ひらがな・半角カタカナで打っても全角カタカナにする（`toKatakana`）。日本語の変換中は変えず（変えると変換がこわれる）、
- * 確定したとき・貼り付けたとき・欄を離れたときに変える
- */
-export function KanaInput({value, onChange, ...rest}: {value: string; onChange: (v: string) => void} & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
-  const composing = useRef(false);
-  const commit = (v: string) => {
-    const k = toKatakana(v);
-    if (k !== value || k !== v) onChange(k);
-  };
-  return (
-    <TextInput
-      value={value}
-      onChange={(v) => (composing.current ? onChange(v) : commit(v))}
-      onCompositionStart={() => {
-        composing.current = true;
-      }}
-      onCompositionEnd={(e) => {
-        composing.current = false;
-        commit(e.currentTarget.value);
-      }}
-      onBlur={(e) => commit(e.currentTarget.value)}
-      {...rest}
-    />
   );
 }
 
