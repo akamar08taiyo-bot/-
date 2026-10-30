@@ -6,7 +6,7 @@
 // 操作も Excel と同じ：図形を選んでドラッグで描く（Shift で 15°ずつ・正方形／正円、Ctrl でまん中から）、押して選ぶ（Shift・Ctrl で足す）、ドラッグで動かす
 // （Shift で縦・横だけ、Ctrl で複製）、まわりの○で大きさ（角は Shift で縦横の比のまま）、上の↻で回す（Shift で 15°ずつ）、直線は端の○で長さ・向き、
 // ダブルクリック（Enter・F2・そのまま打つ）で文字、Delete で削除、矢印キーで少し動かす（Shift＋矢印で大きさ・Alt＋←→で 15°回す）、
-// Ctrl+Z／Y・Ctrl+C／X／V・Ctrl+D（複製）・Ctrl+A（すべて選ぶ）・Tab（次の図形）・Esc、右クリックのメニュー、頂点の編集（手書きの線・折れ線・四角の角を動かす・足す・消す）。
+// Ctrl+Z／Y・Ctrl+C／X／V・Ctrl+D（複製）・Ctrl+A（すべて選ぶ）・Tab（次の図形）・Esc、右クリックのメニュー、頂点の編集（手書きの線・折れ線・四角の角を動かす・足す・消す）、選んだ図形の右上の ×（消す）。
 // 直したらすぐ様邸に入れる（自動保存）。位置・大きさ・線の太さ・文字の大きさは紙の上の大きさ（photoMarks.ts）で、プレビュー・Excel と同じ
 
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
@@ -1758,6 +1758,26 @@ export function PhotoMarkEditor({
   const editBox = editMark ? shapeBox(editMark, V) : null;
   const strokeSel = '#64748b';
 
+  // 選んでいる図形の右上の × ：押すと選んでいる図形を消す（いくつ選んでいても・四角などのひとまとまりの図形も。戻るで戻せる）。
+  // スマホ・iPad には Delete のキーがなく、リボンの「削除」は横に動かさないと見えない（ユーザーの指示「グループ化したものをバツで消せるようにする」2026-10-30）。
+  // 角のつまみと重ならないよう少し外に出し、写真の画面からはみ出すときは右下・左上・左下に置く。動かしている間・文字を打っている間・頂点の編集の間は出さない
+  const delAt = (() => {
+    if (!sel.length || draft || editing || pe || polyOn || !k) return null;
+    const bs = marks.filter((m) => sel.includes(m.id)).map((m) => markBounds(m, V));
+    if (!bs.length) return null;
+    const [x0, y0] = [Math.min(...bs.map((b) => b.x)) * k, Math.min(...bs.map((b) => b.y)) * k];
+    const [x1, y1] = [Math.max(...bs.map((b) => b.x + b.w)) * k, Math.max(...bs.map((b) => b.y + b.h)) * k];
+    const [d, r] = [22, 17];
+    const fits = (q: Pt) => q.x >= r - ox && q.x <= area.w - ox - r && q.y >= r - oy && q.y <= area.h - oy - r;
+    const spots = [
+      {x: x1 + d, y: y0 - d},
+      {x: x1 + d, y: y1 + d},
+      {x: x0 - d, y: y0 - d},
+      {x: x0 - d, y: y1 + d},
+    ];
+    return spots.find(fits) ?? {x: Math.min(Math.max(x1 + d, r - ox), area.w - ox - r), y: Math.min(Math.max(y0 - d, r - oy), area.h - oy - r)};
+  })();
+
   const selectionSvg = (
     <svg className="pointer-events-none absolute left-0 top-0 overflow-visible" width={W * k} height={H * k} aria-hidden>
       {shown
@@ -2177,6 +2197,20 @@ export function PhotoMarkEditor({
               </div>
               <MarkLayer marks={shown} w={W} h={H} k={k} hide={editing} style={{left: 0, top: 0}} />
               {selectionSvg}
+              {delAt && (
+                <button
+                  type="button"
+                  data-del-sel
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={remove}
+                  aria-label="選んだ図形を削除"
+                  title="削除 (Delete)"
+                  className="absolute z-[2] flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 touch-manipulation items-center justify-center rounded-full bg-white text-lg leading-none text-slate-600 shadow ring-1 ring-slate-400 hover:bg-slate-100 hover:text-slate-900 touch:h-8 touch:w-8"
+                  style={{left: delAt.x, top: delAt.y}}
+                >
+                  ×
+                </button>
+              )}
               {tool === 'eraser' && eraserAt && (
                 <div
                   data-eraser

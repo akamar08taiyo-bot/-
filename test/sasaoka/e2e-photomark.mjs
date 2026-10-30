@@ -563,6 +563,30 @@ await page.screenshot({path: path.join(outDir, 'mark-04c-quad.png')});
   assert.deepEqual(await ptsOf(), pts0);
   log('頂点の編集（動かす・足す・消す・終える・戻る）OK');
 }
+// 選んだ図形の右上の × で消す（ユーザーの指示「グループ化したものをバツで消せるようにする」2026-10-30。スマホには Delete のキーがない）。戻るで戻る
+{
+  const x = dlg.getByRole('button', {name: '選んだ図形を削除'});
+  await clickOn(0.9, 0.9);
+  assert.equal(await x.count(), 0); // 何も選んでいないときは出ない
+  await clickOn(0.225, 0.1); // 四角の上の辺を押して選ぶ
+  const xb = await x.boundingBox();
+  const [qr, qt] = [await at(0.4, 0.08), await at(0.4, 0.08)].map((p, i) => (i ? p.y : p.x)); // 四角の右の端（x 0.4）・上の端（y 0.08）
+  assert.ok(xb.x > qr && xb.y + xb.height < qt, `× は四角の右上の外 ${JSON.stringify(xb)} ${qr},${qt}`);
+  await x.click();
+  assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen']);
+  assert.equal(await x.count(), 0);
+  await dlg.getByRole('button', {name: '戻る', exact: true}).click();
+  assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen', 'pen']);
+  // いくつ選んでいても（Ctrl+A）まとめて消す → 戻る
+  await clickOn(0.225, 0.1);
+  await page.keyboard.press('Control+a');
+  await x.click();
+  assert.deepEqual(await kinds(), []);
+  await dlg.getByRole('button', {name: '戻る', exact: true}).click();
+  assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen', 'pen']);
+  await clickOn(0.9, 0.9);
+  log('選んだ図形の右上の × で消す（1つ・いくつも・戻る）OK');
+}
 // 3つ押して「✕ 四角をやめる」：描かない
 await ribbon.getByRole('button', {name: /^四角（角を4つ/}).click();
 for (const [fx, fy] of [
@@ -946,6 +970,11 @@ for (const [name, vp, touch] of [
     await p2.waitForTimeout(800);
     await d2.getByRole('button', {name: '✓ 頂点の編集を終える'}).tap();
     await edit.waitFor({state: 'detached', timeout: 5000});
+    // 指で × を押して四角を消す（矢印は残る）
+    await p2.waitForTimeout(800);
+    await p2.screenshot({path: path.join(outDir, `mark-05f-${name}-delete.png`)});
+    await d2.getByRole('button', {name: '選んだ図形を削除'}).tap();
+    await p2.waitForFunction(() => document.querySelectorAll('[role="dialog"] [data-photo-stage] [data-mark]').length === 1, null, {timeout: 5000});
   }
   await c2.close();
 }
