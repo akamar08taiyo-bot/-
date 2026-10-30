@@ -147,6 +147,18 @@ const MIN = 2; // 図形のいちばん小さい大きさ（紙の画素）
 // v3：線の太さの初めを 2pt に（ユーザーの指示「デフォルトの太さは2にする」2026-10-29）。v2 で覚えた色・線の種類・字はそのまま、線の太さだけ初めの 2pt に戻す
 const STYLE_KEY = 'taiyo-sasaoka-mark-style-v3';
 const OLD_STYLE_KEY = 'taiyo-sasaoka-mark-style-v2';
+/** 「✓ 折れ線を終える」の置き場所（写真の左上からの画面の画素。動かしたらこの端末で覚える）。
+ * 初めは写真の左上のすぐ上（まわりの灰色の所。写真を隠さない）。上にすき間がなければ写真の左上の中 */
+const POLY_BTN_KEY = 'taiyo-sasaoka-poly-button-v1';
+const loadPolyBtn = (): Pt => {
+  try {
+    const v = JSON.parse(localStorage.getItem(POLY_BTN_KEY) ?? 'null') as Partial<Pt> | null;
+    if (v && Number.isFinite(v.x) && Number.isFinite(v.y)) return {x: Number(v.x), y: Number(v.y)};
+  } catch {
+    // 読めないときは左上
+  }
+  return {x: 0, y: -50};
+};
 const r5 = (v: number) => Math.round(v * 100000) / 100000;
 const normDeg = (d: number) => (Math.round((((d % 360) + 360) % 360) * 10) / 10) % 360;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -1132,6 +1144,11 @@ export function PhotoMarkEditor({
   useEffect(() => stopPress, []);
   // 折れ線（押すたびに角の点。最後の点をもう一度押す・ダブルクリック・Enter・Esc で終わる）
   const [polyOn, setPolyOn] = useState(false);
+  // 「✓ 折れ線を終える」：写真の左上（下だと見えにくい。ユーザーの指示「折れ線をおえるボタンが下にあり見えにくいので、写真の左上に設置する。動かすこともできる」2026-10-30）。
+  // ボタンをドラッグすると動き（押して離しただけなら終える）、置いた所をこの端末で覚える
+  const [polyBtn, setPolyBtn] = useState<Pt>(loadPolyBtn);
+  const polyBtnRef = useRef<HTMLButtonElement>(null);
+  const polyBtnDrag = useRef<{x0: number; y0: number; from: Pt; moved: boolean} | null>(null);
   const showPoly = (hover?: Pt) => {
     const cur = poly.current;
     if (!cur) return;
@@ -2414,11 +2431,62 @@ export function PhotoMarkEditor({
               )}
             </div>
           )}
-          {polyOn && (
-            <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={finishPoly} className="absolute bottom-3 left-1/2 h-11 -translate-x-1/2 rounded-md border border-slate-300 bg-white px-5 text-base text-slate-700 shadow-md hover:bg-slate-50">
-              {poly.current?.quad ? '✕ 四角をやめる' : '✓ 折れ線を終える'}
-            </button>
-          )}
+          {polyOn &&
+            (() => {
+              // 写真の左上（polyBtn は写真の左上からの位置）。画面の外には出さない
+              const bw = polyBtnRef.current?.offsetWidth ?? 190;
+              const bh = polyBtnRef.current?.offsetHeight ?? 44;
+              const left = clamp(ox + polyBtn.x, 4, Math.max(4, area.w - bw - 4));
+              const top = clamp(oy + polyBtn.y, 4, Math.max(4, area.h - bh - 4));
+              return (
+                <button
+                  ref={polyBtnRef}
+                  type="button"
+                  data-poly-finish
+                  title="押すと終える・ドラッグで動かす"
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    polyBtnDrag.current = {x0: e.clientX, y0: e.clientY, from: {x: left - ox, y: top - oy}, moved: false};
+                  }}
+                  onPointerMove={(e) => {
+                    const g = polyBtnDrag.current;
+                    if (!g) return;
+                    const [dx, dy] = [e.clientX - g.x0, e.clientY - g.y0];
+                    if (!g.moved && Math.hypot(dx, dy) < 6) return;
+                    g.moved = true;
+                    setPolyBtn({x: g.from.x + dx, y: g.from.y + dy});
+                  }}
+                  onPointerUp={() => {
+                    const g = polyBtnDrag.current;
+                    polyBtnDrag.current = null;
+                    if (!g) return;
+                    if (!g.moved) {
+                      finishPoly();
+                      return;
+                    }
+                    try {
+                      localStorage.setItem(POLY_BTN_KEY, JSON.stringify({x: left - ox, y: top - oy}));
+                    } catch {
+                      // 覚えられなくても動かせる
+                    }
+                  }}
+                  onPointerCancel={() => {
+                    polyBtnDrag.current = null;
+                  }}
+                  onClick={(e) => {
+                    if (e.detail === 0) finishPoly(); // キーボード（Enter・空白）で押したとき
+                  }}
+                  className="absolute z-[3] flex h-11 touch-none select-none items-center gap-1.5 whitespace-nowrap rounded-md border border-slate-300 bg-white pl-2 pr-4 text-base text-slate-700 shadow-md hover:bg-slate-50"
+                  style={{left, top}}
+                >
+                  <span aria-hidden className="cursor-move px-0.5 text-lg leading-none text-slate-400">
+                    ⠿
+                  </span>
+                  {poly.current?.quad ? '✕ 四角をやめる' : '✓ 折れ線を終える'}
+                </button>
+              );
+            })()}
           {sel.length > 0 && !pe && !polyOn && !editing && (!draft || nudging) && (
             <div onPointerDown={(e) => e.stopPropagation()} className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2">
               {/* スマホ・iPad だけ：少しずつ動かす ◀ ▲ ▼ ▶（パソコンは矢印キー） */}

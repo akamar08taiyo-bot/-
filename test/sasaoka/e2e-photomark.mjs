@@ -454,6 +454,22 @@ for (const [i, [fx, fy]] of [
 }
 await page.mouse.move(0, 0); // マウスの所までの線を外して撮る
 await page.screenshot({path: path.join(outDir, 'mark-04b-poly-points.png')});
+// 「✓ 折れ線を終える」は写真の左上（ユーザーの指示「折れ線をおえるボタンが下にあり見えにくいので、写真の左上に設置する。動かすこともできる」2026-10-30）。
+// ドラッグで動かせて（動かしただけでは終えない）、置いた所を覚える
+{
+  const fin = dlg.getByRole('button', {name: '✓ 折れ線を終える'});
+  const [fb, sb] = [await fin.boundingBox(), await box()];
+  assert.ok(Math.abs(fb.x - sb.x) < 40 && fb.y < sb.y + 60, `写真の左上 ${JSON.stringify(fb)} ${JSON.stringify(sb)}`);
+  await page.mouse.move(fb.x + 10, fb.y + fb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(fb.x + 110, fb.y + fb.height / 2 + 80, {steps: 8});
+  await page.mouse.up();
+  const fb2 = await fin.boundingBox();
+  assert.ok(Math.abs(fb2.x - fb.x - 100) < 2 && Math.abs(fb2.y - fb.y - 80) < 2, `ドラッグで動く ${JSON.stringify(fb)} → ${JSON.stringify(fb2)}`);
+  assert.equal(await dlg.locator('[data-poly-points]').count(), 1, '動かしただけでは終えない');
+  assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('taiyo-sasaoka-poly-button-v1'))), {x: fb2.x - sb.x, y: fb2.y - sb.y});
+  await page.evaluate(() => localStorage.removeItem('taiyo-sasaoka-poly-button-v1')); // このあとのため（次に開くと初めの所）
+}
 await dlg.getByRole('button', {name: '✓ 折れ線を終える'}).click();
 assert.equal(await dlg.locator('[data-poly-points]').count(), 0); // 終えたら印は消える
 assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen']);
