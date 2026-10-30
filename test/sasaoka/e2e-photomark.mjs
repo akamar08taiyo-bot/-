@@ -623,6 +623,27 @@ await page.screenshot({path: path.join(outDir, 'mark-04c-quad.png')});
   await clickOn(0.9, 0.9);
   log('選んだ図形の右上の × で消す（1つ・いくつも・戻る）OK');
 }
+// 少しだけ動かす：マウスは 2画素動かせば動く（前は 4画素まで動かず、とんだ。ユーザーの指示「手すりを左右に微調整しようとした場合に微調整がきかない。
+// 段階が少し大きすぎる」2026-10-30）。スマホ用の ◀ ▲ ▼ ▶ はパソコンでは出さない（矢印キー）
+{
+  const a0 = await svgOf(0, 'line');
+  const b = await box();
+  const [sx, sy] = [b.x + ((Number(a0.x1) + Number(a0.x2)) / 2) * k, b.y + ((Number(a0.y1) + Number(a0.y2)) / 2) * k];
+  await page.mouse.click(sx, sy);
+  assert.equal((await selected()).length, 1);
+  assert.equal(await dlg.locator('[data-nudge]').isVisible(), false);
+  await page.mouse.move(sx, sy);
+  await page.mouse.down();
+  for (let i = 1; i <= 2; i++) await page.mouse.move(sx + i, sy);
+  await page.mouse.up();
+  const a1 = await svgOf(0, 'line');
+  const moved = (Number(a1.x1) - Number(a0.x1)) * k;
+  assert.ok(Math.abs(moved - 2) < 0.3 && Number(a1.y1) === Number(a0.y1), `2画素だけ動く ${moved}`);
+  await dlg.getByRole('button', {name: '戻る', exact: true}).click();
+  assert.deepEqual(await svgOf(0, 'line'), a0);
+  await clickOn(0.9, 0.9);
+  log('少しだけ動かす（マウスは 2画素から）OK');
+}
 // 3つ押して「✕ 四角をやめる」：描かない
 await ribbon.getByRole('button', {name: /^四角（角を4つ/}).click();
 for (const [fx, fy] of [
@@ -1030,6 +1051,52 @@ for (const [name, vp, touch] of [
     await tapAt(0.56, 0.16); // はじめの点の近く
     await p2.waitForFunction(() => document.querySelectorAll('[role="dialog"] [data-photo-stage] [data-mark]').length === 2, null, {timeout: 5000});
     assert.equal(await d2.locator('[data-poly-points]').count(), 0, `${name} 閉じたら印は消える`);
+    // 少しずつ動かす ◀ ▲ ▼ ▶（スマホ・iPad だけ）：1回押すと画面の1画素ぶん（紙の1画素より小さくはしない）・押したままだと続けて動く・戻る1回で戻る
+    {
+      const bar = d2.getByRole('group', {name: '少しずつ動かす'});
+      await bar.waitFor();
+      const ptsOf = async () => (await d2.locator('[data-photo-stage] [data-mark]').nth(1).locator('polyline').first().getAttribute('points')).trim().split(/\s+/).map((q) => q.split(',').map(Number));
+      const kk = await d2.locator('[data-photo-stage]').evaluate((el) => el.getBoundingClientRect().width / Number(el.querySelector('[data-mark] svg').getAttribute('viewBox').split(' ')[2]));
+      const step = Math.max(1, 1 / kk);
+      // 指でゆっくり 6画素ずらす：遊びの 4画素を引いた 2画素だけ動く（前は 4画素まで動かず、そこで 4画素とんだ）→ 戻る
+      {
+        const before = await ptsOf();
+        const st = await d2.locator('[data-photo-stage]').boundingBox();
+        const cx = st.x + ((before[0][0] + before[2][0]) / 2) * kk;
+        const cy = st.y + ((before[0][1] + before[2][1]) / 2) * kk; // 四角の中（つまみから離れた所）
+        await p2.waitForTimeout(800);
+        await touchAt('touchStart', {x: cx, y: cy});
+        for (let i = 1; i <= 6; i++) await touchAt('touchMove', {x: cx + i, y: cy});
+        await touchAt('touchEnd', {x: cx + 6, y: cy});
+        await p2.waitForTimeout(300);
+        const after = await ptsOf();
+        assert.ok(Math.abs((after[0][0] - before[0][0]) * kk - 2) < 0.3 && after[0][1] === before[0][1], `${name} 指で少しだけ動かす ${before[0]} → ${after[0]}`);
+        await p2.waitForTimeout(800);
+        await d2.getByRole('button', {name: '戻る', exact: true}).tap();
+        await p2.waitForTimeout(300);
+        assert.deepEqual(await ptsOf(), before);
+      }
+      const q0 = await ptsOf();
+      await p2.waitForTimeout(800);
+      await bar.getByRole('button', {name: '右へ少し動かす'}).tap();
+      await p2.waitForTimeout(300);
+      const q1 = await ptsOf();
+      assert.ok(Math.abs(q1[0][0] - q0[0][0] - step) < 0.01 && q1[0][1] === q0[0][1], `${name} ▶ で少し ${q0[0]} → ${q1[0]}（${step}）`);
+      const down = await bar.getByRole('button', {name: '下へ少し動かす'}).boundingBox();
+      const c = {x: down.x + down.width / 2, y: down.y + down.height / 2};
+      await touchAt('touchStart', c);
+      await p2.waitForTimeout(1000);
+      await touchAt('touchEnd', c);
+      await p2.waitForTimeout(300);
+      const q2 = await ptsOf();
+      assert.ok(q2[0][1] - q1[0][1] >= 5 * step - 0.01, `${name} ▼ を押したままで続けて ${q1[0]} → ${q2[0]}`);
+      for (let i = 0; i < 2; i++) {
+        await p2.waitForTimeout(800);
+        await d2.getByRole('button', {name: '戻る', exact: true}).tap();
+      }
+      await p2.waitForTimeout(300);
+      assert.deepEqual(await ptsOf(), q0, `${name} 戻る2回で元の所`);
+    }
   }
   await c2.close();
 }

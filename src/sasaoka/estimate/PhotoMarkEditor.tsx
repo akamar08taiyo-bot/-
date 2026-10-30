@@ -1395,8 +1395,20 @@ export function PhotoMarkEditor({
     }
     if (d.type === 'move') {
       let [dx, dy] = [p.x - d.p0.x, p.y - d.p0.y];
-      if (!d.moved && Math.hypot(dx * k, dy * k) < 4) return;
-      d.moved = true;
+      if (!d.moved) {
+        // 押しただけ（指のふるえ）では動かさない（マウス 2画素・指 4画素まで）。指は、動き出したら遊びの分（4画素）を引いて、そこから指と同じだけ動かす
+        // （前は動き出しで 4画素とび、少しだけ動かすことができなかった。ユーザーの指示「手すりを左右に微調整しようとした場合に微調整がきかない。段階が少し大きすぎる」2026-10-30）。
+        // マウスは今までどおりマウスの所へ（遊びは 2画素）
+        const dist = Math.hypot(dx * k, dy * k);
+        const play = e.pointerType === 'mouse' ? 2 : 4;
+        if (dist < play) return;
+        d.moved = true;
+        if (e.pointerType !== 'mouse') {
+          const f = play / dist;
+          d.p0 = {x: d.p0.x + dx * f, y: d.p0.y + dy * f};
+          [dx, dy] = [p.x - d.p0.x, p.y - d.p0.y];
+        }
+      }
       if (e.shiftKey) [dx, dy] = Math.abs(dx) >= Math.abs(dy) ? [dx, 0] : [0, dy];
       const movedList = moveBy(d.base, W, H, dx, dy);
       if (d.copy) {
@@ -1775,6 +1787,44 @@ export function PhotoMarkEditor({
   const editMark = editing ? byId(editing) : single && hasText(single.kind) && !draft ? single : null;
   const editBox = editMark ? shapeBox(editMark, V) : null;
   const strokeSel = '#64748b';
+
+  // スマホ・iPad の少しずつ動かすボタン（◀ ▲ ▼ ▶。パソコンの矢印キーと同じ）：1回押すと画面の1画素ぶん、押したままだとくり返し動く（離したときに1回で入れる＝戻るも1回）。
+  // ユーザーの指示「手すりを左右に微調整しようとした場合に微調整がきかない。段階が少し大きすぎる」2026-10-30（指のドラッグでは細かく合わせにくい）
+  const nudge = useRef<{timer: number; base: PhotoMark[]; ids: string[]; n: number; dx: number; dy: number} | null>(null);
+  const nudgeList = (st: NonNullable<typeof nudge.current>) => {
+    const step = Math.max(1, 1 / (k || 1));
+    const moved = moveBy(
+      st.base.filter((m) => st.ids.includes(m.id)),
+      W,
+      H,
+      st.dx * st.n * step,
+      st.dy * st.n * step,
+    );
+    return st.base.map((m) => moved.find((x) => x.id === m.id) ?? m);
+  };
+  const nudgeStart = (dx: number, dy: number) => (e: ReactPointerEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    if (nudge.current || !sel.length) return;
+    const st = {timer: 0, base: marks, ids: sel, n: 1, dx, dy};
+    nudge.current = st;
+    setDraft(nudgeList(st));
+    const again = () => {
+      st.n += 1;
+      setDraft(nudgeList(st));
+      st.timer = window.setTimeout(again, 60);
+    };
+    st.timer = window.setTimeout(again, 450);
+  };
+  const nudgeEnd = () => {
+    const st = nudge.current;
+    if (!st) return;
+    nudge.current = null;
+    window.clearTimeout(st.timer);
+    setDraft(null);
+    commit(nudgeList(st), st.base);
+  };
+  useEffect(() => () => window.clearTimeout(nudge.current?.timer), []);
+  const nudging = !!nudge.current;
 
   // 選んでいる図形の右上の × ：押すと選んでいる図形を消す（いくつ選んでいても・四角などのひとまとまりの図形も。戻るで戻せる）。
   // スマホ・iPad には Delete のキーがなく、リボンの「削除」は横に動かさないと見えない（ユーザーの指示「グループ化したものをバツで消せるようにする」2026-10-30）。
@@ -2303,12 +2353,44 @@ export function PhotoMarkEditor({
               {poly.current?.quad ? '✕ 四角をやめる' : '✓ 折れ線を終える'}
             </button>
           )}
-          {canPoints && !pe && !polyOn && !draft && (
-            // 手書きの線・折れ線・四角を選んでいるとき：下のまん中にも「頂点の編集」（スマホはリボンが遠い。ユーザーの指示「頂点を編集ボタンの操作がわかりずらい」2026-10-30）
-            <button type="button" data-points-start onPointerDown={(e) => e.stopPropagation()} onClick={togglePoints} className="absolute bottom-3 left-1/2 flex h-11 -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-base text-slate-700 shadow-md hover:bg-slate-50">
-              <Icon name="points" />
-              頂点の編集
-            </button>
+          {sel.length > 0 && !pe && !polyOn && !editing && (!draft || nudging) && (
+            <div onPointerDown={(e) => e.stopPropagation()} className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2">
+              {/* スマホ・iPad だけ：少しずつ動かす ◀ ▲ ▼ ▶（パソコンは矢印キー） */}
+              <div role="group" aria-label="少しずつ動かす" data-nudge className="hidden gap-1 rounded-md border border-slate-300 bg-white p-0.5 shadow-md touch:flex">
+                {(
+                  [
+                    ['左へ少し動かす', 180, -1, 0],
+                    ['上へ少し動かす', 270, 0, -1],
+                    ['下へ少し動かす', 90, 0, 1],
+                    ['右へ少し動かす', 0, 1, 0],
+                  ] as const
+                ).map(([label, deg, dx, dy]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    aria-label={label}
+                    onPointerDown={nudgeStart(dx, dy)}
+                    onPointerUp={nudgeEnd}
+                    onPointerCancel={nudgeEnd}
+                    onPointerLeave={nudgeEnd}
+                    onContextMenu={(e) => e.preventDefault()}
+                    className="flex h-10 w-10 touch-manipulation select-none items-center justify-center rounded text-base text-slate-700 hover:bg-slate-100 active:bg-emerald-100"
+                  >
+                    {/* 4つとも同じ大きさの三角（◀ ▶ の字は ▲ ▼ より小さく出る） */}
+                    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden style={{transform: `rotate(${deg}deg)`}}>
+                      <polygon points="3,2 14,8 3,14" fill="currentColor" />
+                    </svg>
+                  </button>
+                ))}
+              </div>
+              {canPoints && (
+                // 手書きの線・折れ線・四角を選んでいるとき：下のまん中にも「頂点の編集」（スマホはリボンが遠い。ユーザーの指示「頂点を編集ボタンの操作がわかりずらい」2026-10-30）
+                <button type="button" data-points-start onClick={togglePoints} className="flex h-11 items-center gap-1 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-base text-slate-700 shadow-md hover:bg-slate-50">
+                  <Icon name="points" />
+                  頂点の編集
+                </button>
+              )}
+            </div>
           )}
           {pointTip && !canPoints && !pe && (
             <div role="status" className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 py-2 text-[15px] text-slate-700 shadow-md">
