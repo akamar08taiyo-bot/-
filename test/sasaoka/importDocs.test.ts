@@ -293,7 +293,7 @@ test('日付・申請書の改修の内容の1行', () => {
     const q = placeFromShinsei({photo: 1, name: '屋外', kind: 1, text});
     assert.equal(q.dims?.l, l, text);
     assert.equal(q.shinseiText, undefined, text);
-    assert.deepEqual(shinseiWorks({places: [q]}, defaultSettings()), [`①屋外　手すりの取り付け　L=${l}mm${q.dims?.h ? ` H=${q.dims.h}mm` : ''}`]); // 1行（横一列）
+    assert.deepEqual(shinseiWorks({places: [q]}, defaultSettings()), [`①屋外　手すりの取り付け　L=${l.replaceAll('×', 'mm×')}mm${q.dims?.h ? ` H=${q.dims.h}mm` : ''}`]); // 1行（横一列）。長さは1本ずつ mm（L=700mm×1100mm×2000mm）
   }
 });
 

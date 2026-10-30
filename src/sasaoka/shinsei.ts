@@ -765,13 +765,20 @@ export function estimateLength(p: Pick<Place, 'rows'>): string {
   return mm.join('×');
 }
 
-/** 改修の内容の寸法：手すりは「L=600mm H=800mm」（長さを入れていなければ見積書の使う長さ）、段差の解消は「W600mm D350mm H150mm」。ほかの種類はなし */
+/**
+ * 改修の内容の寸法：手すりは「L=600mm H=800mm」（長さを入れていなければ見積書の使う長さ）、段差の解消は「W600mm D350mm H150mm」。ほかの種類はなし。
+ * 長さが2本以上なら1本ずつ mm を付ける（「L=400mm×600mm」。ユーザーの答え「変えてください」2026-10-30。前は「L=400×600mm」）
+ */
 function dimsText(p: Pick<Place, 'kind' | 'rows' | 'dims'>): string {
   const d = p.dims ?? {};
   if (p.kind === 1) {
     const l = mmText(d.l, true) || estimateLength(p);
     const h = mmText(d.h);
-    return [l && `L=${l}mm`, h && `H=${h}mm`].filter(Boolean).join(' ');
+    const ls = l
+      .split('×')
+      .map((x) => `${x}mm`)
+      .join('×');
+    return [l && `L=${ls}`, h && `H=${h}mm`].filter(Boolean).join(' ');
   }
   if (p.kind !== 2) return '';
   return (
@@ -2499,7 +2506,7 @@ function breakAtSpaces(line: string, maxEm: number): string[] {
 }
 
 /**
- * 書く欄の文字の行と大きさ（pt）：1行に入らない行は、きりのいい所（空白）で行を分ける（「手すりの取り付け」／「L=400×600mm」。
+ * 書く欄の文字の行と大きさ（pt）：1行に入らない行は、きりのいい所（空白）で行を分ける（「手すりの取り付け」／「L=400mm×600mm」。
  * ユーザーの指示「1行で入力できない場合は（折り返しが必要な場合は）きりのいいところで2行にする」2026-10-30。前は字の途中で折り返し、
  * 「…L=400×600m」「m」になった）。分けても入らなければ文字を小さくする（いちばん小さくしても入らなければ、前と同じく折り返す）。画面のプレビューと Excel で同じ
  */

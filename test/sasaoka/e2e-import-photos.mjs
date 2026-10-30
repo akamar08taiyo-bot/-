@@ -84,7 +84,7 @@ assert.deepEqual(kinds.sort(), ['ellipse', 'line', 'line', 'line', 'text']);
 assert.equal(await slot('②玄関 改修前').locator('[data-marks]').count(), 0);
 // 改修の内容は箇所ごとに1行（長さ 700×1100×2000 は1行に）
 const preview = page.getByLabel('申請書のプレビュー');
-assert.match(await preview.innerText(), /①浴室　手すりの取り付け　L=700×1100×2000mm/);
+assert.match(await preview.innerText(), /①浴室　手すりの取り付け　L=700mm×1100mm×2000mm/);
 await board.screenshot({path: path.join(outDir, 'import-photos-2-board.png')});
 log('写真の欄に ①浴室 改修前（2枚を1枚に・書き込み5つ）・②玄関 改修前。改修の内容は1行 OK');
 
