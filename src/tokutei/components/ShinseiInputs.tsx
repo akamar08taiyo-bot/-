@@ -174,9 +174,11 @@ export function ShinseiInputs({
         {row(
           '郵便番号',
           <>
-            <span className="inline-flex items-center gap-1">
+            <span className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
               〒
-              <TextInput value={sale.zip} onChange={changeZip} onBlur={() => sale.zip && change({zip: zipLabel(sale.zip)})} inputMode="numeric" placeholder="824-0000" className="w-32" aria-label="郵便番号" data-nav />
+              <TextInput value={sale.zip} onChange={changeZip} onBlur={() => sale.zip && change({zip: zipLabel(sale.zip)})} inputMode="numeric" placeholder="8240000" className="w-32" aria-label="郵便番号" data-nav />
+              {/* ユーザーの指示「郵便番号の記入欄は、ハイフンなしで記入することを注意書き」「住所を入れたら自動的に郵便番号が入ることもわかるように、簡潔に」2026-10-30（打ち終わると 824-0043 の形になる。zipLabel） */}
+              <span className="w-full text-[13px] leading-tight text-slate-500">ハイフンなしで入力（住所を入れると自動で入ります）</span>
             </span>
             {zips.length > 1 &&
               zips.map((z) => (

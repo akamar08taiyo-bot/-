@@ -5,6 +5,7 @@ import {backupJson, mergeById, parseBackup, productsJson} from '../storage.ts';
 import type {AppData, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {downloadBlob, todayIso} from '../util.ts';
+import {zipLabel} from '../zip.ts';
 import {Btn, NumberInput, TextInput, useToast} from './ui.tsx';
 
 function Card({title, children}: {title: string; children: ReactNode}) {
@@ -83,8 +84,9 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
           <Field label="会社名">
             <TextInput value={s.company} onChange={(company) => set({company})} />
           </Field>
-          <Field label="郵便番号">
-            <TextInput value={s.postal} onChange={(postal) => set({postal})} />
+          {/* ハイフンなしで打つ（ユーザーの指示「郵便番号の記入欄は、ハイフンなしで記入することを注意書き」2026-10-30）。7けたになったら 824-0043 の形に（見積書・申請書に出る形） */}
+          <Field label="郵便番号（ハイフンなしで入力）">
+            <TextInput value={s.postal} onChange={(postal) => set({postal: zipLabel(postal)})} inputMode="numeric" placeholder="8240000" />
           </Field>
           <Field label="所長">
             <TextInput value={s.manager} onChange={(manager) => set({manager})} />

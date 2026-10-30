@@ -38,6 +38,7 @@ try {
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('dialog', (d) => void d.accept());
   await page.goto(url);
+  await page.getByRole('button', {name: '＋ 苅田町'}).waitFor(); // 一覧が出るまで待つ（下の count() は待たない）
 
   const office = page.getByRole('textbox', {name: '居宅介護支援事業所'});
   const toggle = page.getByRole('button', {name: '居宅介護支援事業所の候補'});
