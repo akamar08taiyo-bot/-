@@ -529,10 +529,18 @@ await page.screenshot({path: path.join(outDir, 'mark-04c-quad.png')});
   const pts0 = await ptsOf();
   const pointsBtn = ribbon.getByRole('button', {name: '頂点の編集', exact: true});
   await clickOn(0.9, 0.9);
-  assert.equal(await pointsBtn.isDisabled(), true); // 何も選んでいないときは押せない
+  // 何も選んでいないときに押すと、何を選ぶかを少しのあいだ出す（ユーザーの指示「頂点を編集ボタンの操作がわかりずらい」2026-10-30。前は薄くて押せないだけだった）
+  assert.match(await pointsBtn.innerText(), /頂点の編集/); // 絵だけでなく名前も
+  await pointsBtn.click();
+  await dlg.getByRole('status').filter({hasText: '折れ線・四角・手書きの線を選んでから押します'}).waitFor();
+  assert.equal(await dlg.locator('[data-vertex-edit]').count(), 0);
+  assert.equal(await dlg.locator('[data-points-start]').count(), 0);
   await clickOn(0.225, 0.1); // 四角の上の辺を押して選ぶ
   assert.equal((await selected()).length, 1);
+  await dlg.locator('[data-points-start]').waitFor(); // 選ぶと下のまん中にも「頂点の編集」
   await pointsBtn.click();
+  assert.match(await dlg.locator('[data-points-help]').innerText(), /■をドラッグで角を動かす/); // 編集のあいだは短い案内
+  assert.equal(await dlg.locator('[data-points-start]').count(), 0);
   assert.equal(await pointsBtn.getAttribute('aria-pressed'), 'true');
   const edit = dlg.locator('[data-vertex-edit]');
   // 角の四角は絵だけ（押すのは下の写真の所）なので、その場所を押す
@@ -982,7 +990,7 @@ for (const [name, vp, touch] of [
     ])
       await tapAt(fx, fy);
     assert.equal(await d2.locator('[data-photo-stage] [data-mark]').count(), 2, `${name} 指で四角`);
-    await d2.getByRole('button', {name: '頂点の編集', exact: true}).tap();
+    await d2.locator('[data-points-start]').tap(); // 選んだら下のまん中の「頂点の編集」
     const edit = d2.locator('[data-vertex-edit]');
     await edit.waitFor();
     const v0 = await edit.locator('[data-vertex="2"]').boundingBox();
@@ -992,8 +1000,10 @@ for (const [name, vp, touch] of [
     await touchAt('touchEnd', {x: from.x + 30, y: from.y + 24});
     const v1 = await edit.locator('[data-vertex="2"]').boundingBox();
     assert.ok(Math.abs(v1.x - v0.x - 30) < 2 && Math.abs(v1.y - v0.y - 24) < 2, `${name} 指で角を動かす ${JSON.stringify(v0)} → ${JSON.stringify(v1)}`);
-    const bar = await d2.getByRole('button', {name: '✓ 頂点の編集を終える'}).boundingBox();
-    assert.ok(bar.x >= 0 && bar.x + bar.width <= vp.width, `${name} 頂点の編集を終えるが画面に入る ${JSON.stringify(bar)}`);
+    for (const loc of [d2.getByRole('button', {name: '✓ 頂点の編集を終える'}), d2.locator('[data-points-help]')]) {
+      const bar = await loc.boundingBox();
+      assert.ok(bar.x >= 0 && bar.x + bar.width <= vp.width, `${name} 頂点の編集の帯が画面に入る ${JSON.stringify(bar)}`);
+    }
     await p2.screenshot({path: path.join(outDir, `mark-05e-${name}-points.png`)});
     await p2.waitForTimeout(800);
     await d2.getByRole('button', {name: '✓ 頂点の編集を終える'}).tap();

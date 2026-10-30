@@ -495,6 +495,9 @@ export function PhotoMarkEditor({
   // 頂点の編集（Excel の「図形の編集 → 頂点の編集」。ユーザーの指示「エクセル　頂点の編集機能をつける」2026-10-30）：
   // 編集している手書きの線・折れ線・四角の id と、選んでいる頂点（i）。選んでいる図形が変わったら終わる（pe）
   const [pointEdit, setPointEdit] = useState<{id: string; i: number | null} | null>(null);
+  const [pointTip, setPointTip] = useState(false); // 「頂点の編集」を、選んでいないときに押した（どれを選ぶかを少しのあいだ出す）
+  const pointTipTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(pointTipTimer.current), []);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [sub, setSub] = useState<'width' | 'dash' | 'arrow' | null>(null);
   const [styles, setStyles] = useState<Styles>(loadStyles);
@@ -714,7 +717,13 @@ export function PhotoMarkEditor({
       setPointEdit(null);
       return;
     }
-    if (!single || single.kind !== 'pen') return;
+    if (!single || single.kind !== 'pen') {
+      // 選んでいないときに押した：何を選べばよいかを少しのあいだ出す（前はボタンが薄くなって押せないだけで、使い方が分からなかった）
+      setPointTip(true);
+      window.clearTimeout(pointTipTimer.current);
+      pointTipTimer.current = window.setTimeout(() => setPointTip(false), 2500);
+      return;
+    }
     if (editing) endEdit();
     setTool(null);
     setPointEdit({id: single.id, i: null});
@@ -1823,7 +1832,7 @@ export function PhotoMarkEditor({
               <g key={m.id} data-sel={m.id} data-vertex-edit={m.id} data-points={v.pts.length}>
                 <polyline points={ring.map((q) => `${q.x * k},${q.y * k}`).join(' ')} fill="none" stroke="#dc2626" strokeWidth={1} strokeDasharray="4 3" />
                 {v.pts.map((q, i) => (
-                  <rect key={i} data-vertex={i} x={q.x * k - 4} y={q.y * k - 4} width={8} height={8} fill={pe.i === i ? 'white' : 'black'} stroke={pe.i === i ? 'black' : 'white'} strokeWidth={1} />
+                  <rect key={i} data-vertex={i} x={q.x * k - 5} y={q.y * k - 5} width={10} height={10} fill={pe.i === i ? 'white' : 'black'} stroke={pe.i === i ? 'black' : 'white'} strokeWidth={1} />
                 ))}
               </g>
             );
@@ -2028,16 +2037,18 @@ export function PhotoMarkEditor({
                 ))}
                 {/* 頂点の編集（Excel の「図形の編集 → 頂点の編集」。ユーザーの指示「エクセル　頂点の編集機能をつける」2026-10-30）：
                     手書きの線・折れ線・四角を1つ選んで押すと、角に黒い四角が出て、つかんで動かす・線の上をつかんで足す・Delete で消す */}
+                {/* 絵だけでは分からない（ユーザーの指示「頂点を編集ボタンの操作がわかりずらい」2026-10-30）ので名前も出し、選んでいなくても押せる（押すと選ぶものを知らせる） */}
                 <button
                   type="button"
                   aria-label="頂点の編集"
                   title="頂点の編集（手書きの線・折れ線・四角の角を動かす・足す・消す）"
                   aria-pressed={!!pe}
-                  disabled={!pe && !canPoints}
                   onClick={togglePoints}
-                  className={`${RB} px-1 ${pe ? 'bg-emerald-100 ring-1 ring-emerald-500' : ''}`}
+                  // 2つ分の幅に収める（絵＋12px の名前。リボンの幅を広げない＝1366px の画面に入る）
+                  className={`col-span-2 flex h-11 touch-manipulation items-center justify-center gap-0.5 whitespace-nowrap rounded text-[12px] hover:bg-slate-100 ${pe ? 'bg-emerald-100 text-slate-700 ring-1 ring-emerald-500' : canPoints ? 'text-slate-700' : 'text-slate-500'}`}
                 >
                   <Icon name="points" />
+                  頂点の編集
                 </button>
               </div>
             </Group>
@@ -2292,15 +2303,32 @@ export function PhotoMarkEditor({
               {poly.current?.quad ? '✕ 四角をやめる' : '✓ 折れ線を終える'}
             </button>
           )}
+          {canPoints && !pe && !polyOn && !draft && (
+            // 手書きの線・折れ線・四角を選んでいるとき：下のまん中にも「頂点の編集」（スマホはリボンが遠い。ユーザーの指示「頂点を編集ボタンの操作がわかりずらい」2026-10-30）
+            <button type="button" data-points-start onPointerDown={(e) => e.stopPropagation()} onClick={togglePoints} className="absolute bottom-3 left-1/2 flex h-11 -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-base text-slate-700 shadow-md hover:bg-slate-50">
+              <Icon name="points" />
+              頂点の編集
+            </button>
+          )}
+          {pointTip && !canPoints && !pe && (
+            <div role="status" className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 py-2 text-[15px] text-slate-700 shadow-md">
+              折れ線・四角・手書きの線を選んでから押します
+            </div>
+          )}
           {pe && (
-            // 頂点の編集のあいだ：スマホ・iPad でも消す・終えるができるように（パソコンは Delete・Esc でも）
-            <div onPointerDown={(e) => e.stopPropagation()} className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-2">
-              <button type="button" disabled={pe.i === null} onClick={() => pe.i !== null && deleteVertex(pe.id, pe.i)} className="h-11 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-base text-slate-700 shadow-md hover:bg-slate-50 disabled:opacity-40">
-                頂点を削除
-              </button>
-              <button type="button" onClick={() => setPointEdit(null)} className="h-11 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-base text-slate-700 shadow-md hover:bg-slate-50">
-                ✓ 頂点の編集を終える
-              </button>
+            // 頂点の編集のあいだ：スマホ・iPad でも消す・終えるができるように（パソコンは Delete・Esc でも）。上に短い操作の案内
+            <div onPointerDown={(e) => e.stopPropagation()} className="absolute bottom-3 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5">
+              <div data-points-help className="whitespace-nowrap rounded bg-white/90 px-2 py-0.5 text-[13px] text-slate-600 shadow-sm">
+                ■をドラッグで角を動かす・線をドラッグで角を足す
+              </div>
+              <div className="flex gap-2">
+                <button type="button" disabled={pe.i === null} onClick={() => pe.i !== null && deleteVertex(pe.id, pe.i)} className="h-11 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-base text-slate-700 shadow-md hover:bg-slate-50 disabled:opacity-40">
+                  頂点を削除
+                </button>
+                <button type="button" onClick={() => setPointEdit(null)} className="h-11 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-base text-slate-700 shadow-md hover:bg-slate-50">
+                  ✓ 頂点の編集を終える
+                </button>
+              </div>
             </div>
           )}
           {/* iPad：押したその場でキーボードを出すための見えない入力欄 */}
