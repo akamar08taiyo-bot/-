@@ -439,20 +439,48 @@ log('直線を続けて描く・L字（線の端に吸い付く）OK');
 log('描いた線を描く道具のままドラッグで動かす・戻る OK');
 
 // ---------------- 折れ線（押すたびに角 → ✓ 折れ線を終える）
+// 押した点には小さな丸と番号（1・2・3…）。1つ目を押しただけでも見える（ユーザーの指示「折れ線で四角をつくるとき、点をうった場所がわかるように、
+// どことどこを繋ぐかわかるように小さく表示する」2026-10-30）
+const polyPoints = () => dlg.locator('[data-poly-point]').evaluateAll((els) => els.map((e) => e.textContent));
 await ribbon.getByRole('button', {name: /^折れ線/}).click();
-for (const [fx, fy] of [
+for (const [i, [fx, fy]] of [
   [0.6, 0.2],
   [0.75, 0.2],
   [0.75, 0.4],
   [0.9, 0.4],
-])
+].entries()) {
   await clickOn(fx, fy);
+  assert.deepEqual(await polyPoints(), Array.from({length: i + 1}, (_, j) => String(j + 1)), `折れ線の点の印 ${i + 1}`);
+}
+await page.mouse.move(0, 0); // マウスの所までの線を外して撮る
+await page.screenshot({path: path.join(outDir, 'mark-04b-poly-points.png')});
 await dlg.getByRole('button', {name: '✓ 折れ線を終える'}).click();
+assert.equal(await dlg.locator('[data-poly-points]').count(), 0); // 終えたら印は消える
 assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen']);
 assert.equal((await svgOf(3, 'polyline')).points.trim().split(/\s+/).length, 4);
 assert.equal((await svgOf(3, 'polyline')).stroke, '#FFFF00');
 assert.equal(await pressed('選択'), 'true'); // 1つ描いたら「選択」に戻る
-log('折れ線 OK');
+// 3つ目の点からは、はじめの点の近くを押すと閉じた形で終える（四角を折れ線で描く。Excel のフリーフォームと同じ）→ 戻るで消す
+await ribbon.getByRole('button', {name: /^折れ線/}).click();
+for (const [fx, fy] of [
+  [0.5, 0.62],
+  [0.7, 0.62],
+  [0.7, 0.78],
+  [0.5, 0.78],
+])
+  await clickOn(fx, fy);
+await clickOn(0.506, 0.627); // はじめの点の少し横
+assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen', 'pen']);
+{
+  const q = (await svgOf(4, 'polyline')).points.trim().split(/\s+/);
+  assert.equal(q.length, 5, `閉じた折れ線 ${q}`);
+  assert.equal(q[0], q[4], 'はじめの点へ戻って閉じる');
+}
+assert.equal(await dlg.locator('[data-poly-points]').count(), 0);
+assert.equal(await pressed('選択'), 'true');
+await dlg.getByRole('button', {name: '戻る', exact: true}).click();
+assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen']);
+log('折れ線（押した点の丸と番号・はじめの点を押すと閉じる）OK');
 
 // ---------------- 四角（角を4つ押すだけ。4つ目で閉じる。ななめの四角も。ユーザーの指示「写真の中のような⬜︎の図をつくるときは、1角ワンタッチで⬜︎やななめ四角をつくれるように」2026-10-29）
 await ribbon.getByRole('button', {name: /^四角（角を4つ/}).click();
@@ -975,6 +1003,23 @@ for (const [name, vp, touch] of [
     await p2.screenshot({path: path.join(outDir, `mark-05f-${name}-delete.png`)});
     await d2.getByRole('button', {name: '選んだ図形を削除'}).tap();
     await p2.waitForFunction(() => document.querySelectorAll('[role="dialog"] [data-photo-stage] [data-mark]').length === 1, null, {timeout: 5000});
+    // 指で折れ線：1つ目を押しただけで点の印が出る・2つ目で 1・2 → はじめの点を押して閉じる（4つ目のあと）→ 戻る
+    await p2.waitForTimeout(800);
+    await d2.getByRole('button', {name: /^折れ線/}).tap();
+    await d2.locator('button[aria-pressed="true"][aria-label^="折れ線"]').waitFor();
+    await tapAt(0.55, 0.15);
+    assert.equal(await d2.locator('[data-poly-point]').count(), 1, `${name} 1つ目の点の印`);
+    for (const [fx, fy] of [
+      [0.8, 0.15],
+      [0.8, 0.35],
+      [0.55, 0.35],
+    ])
+      await tapAt(fx, fy);
+    assert.equal(await d2.locator('[data-poly-point]').count(), 4, `${name} 4つの点の印`);
+    await p2.screenshot({path: path.join(outDir, `mark-05g-${name}-poly-points.png`)});
+    await tapAt(0.56, 0.16); // はじめの点の近く
+    await p2.waitForFunction(() => document.querySelectorAll('[role="dialog"] [data-photo-stage] [data-mark]').length === 2, null, {timeout: 5000});
+    assert.equal(await d2.locator('[data-poly-points]').count(), 0, `${name} 閉じたら印は消える`);
   }
   await c2.close();
 }

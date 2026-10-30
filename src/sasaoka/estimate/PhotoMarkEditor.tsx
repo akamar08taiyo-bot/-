@@ -1126,12 +1126,20 @@ export function PhotoMarkEditor({
       setTool(doneTool); // 折れ線・四角は1つ描いたら「選択」に戻る
     }
   };
-  const addPolyPoint = (raw: Pt, shift: boolean, quad = false) => {
+  /** 折れ線の3つ目の点からは、はじめの点の近く（closeTol 以内）を押すと、はじめの点へ戻って閉じた形で終える（Excel のフリーフォームと同じ） */
+  const closesPoly = (cur: {pts: Pt[]; quad?: boolean}, raw: Pt, closeTol: number) =>
+    !cur.quad && cur.pts.length >= 3 && Math.hypot(raw.x - cur.pts[0].x, raw.y - cur.pts[0].y) <= closeTol;
+  const addPolyPoint = (raw: Pt, shift: boolean, quad = false, closeTol = 0) => {
     const cur = poly.current;
     if (!cur) {
       poly.current = {id: markId(), pts: [snapEnd(raw)], ...(quad ? {quad: true} : {})};
       setPolyOn(true);
       setSel([]);
+      return;
+    }
+    if (closesPoly(cur, raw, closeTol)) {
+      cur.pts.push(cur.pts[0]);
+      finishPoly();
       return;
     }
     const last = cur.pts[cur.pts.length - 1];
@@ -1261,7 +1269,7 @@ export function PhotoMarkEditor({
         return;
       }
       if (tool === 'poly' || tool === 'quad') {
-        addPolyPoint(raw, e.shiftKey, tool === 'quad');
+        addPolyPoint(raw, e.shiftKey, tool === 'quad', (e.pointerType === 'touch' || e.pointerType === 'pen' ? 22 : 12) / k);
         return;
       }
       if (tool === 'num') {
@@ -1325,7 +1333,8 @@ export function PhotoMarkEditor({
     // 折れ線の途中：次の角までの線を、マウスの所まで見せる
     if (!d && poly.current && k) {
       const cur = poly.current;
-      showPoly(endOf(cur.pts[cur.pts.length - 1], clampP(toPaper(e)), e.shiftKey));
+      const q = clampP(toPaper(e));
+      showPoly(closesPoly(cur, q, 12 / k) ? cur.pts[0] : endOf(cur.pts[cur.pts.length - 1], q, e.shiftKey));
       return;
     }
     if (!d) return;
@@ -2197,6 +2206,22 @@ export function PhotoMarkEditor({
               </div>
               <MarkLayer marks={shown} w={W} h={H} k={k} hide={editing} style={{left: 0, top: 0}} />
               {selectionSvg}
+              {polyOn && poly.current && (
+                // 折れ線・四角を描いている途中：押した点に小さな丸と番号（1・2・3…＝つなぐ順）。最後の点（次の線はここから）は黒、
+                // 折れ線の3つ目からは、はじめの点に緑の輪（ここを押すと閉じる）。ユーザーの指示「折れ線で四角をつくるとき、点をうった場所がわかるように、
+                // どことどこを繋ぐかわかるように小さく表示する」2026-10-30（スマホはマウスの線が出ないので、1つ目を押しても何も見えなかった）
+                <svg data-poly-points className="pointer-events-none absolute left-0 top-0 overflow-visible" width={W * k} height={H * k} aria-hidden>
+                  {poly.current.pts.map((q, i, all) => (
+                    <g key={i} data-poly-point={i + 1}>
+                      {i === 0 && !poly.current?.quad && all.length >= 3 && <circle cx={q.x * k} cy={q.y * k} r={9} fill="none" stroke="#15803d" strokeWidth={2} />}
+                      <circle cx={q.x * k} cy={q.y * k} r={4} fill={i === all.length - 1 ? '#0f172a' : 'white'} stroke="#0f172a" strokeWidth={1.5} />
+                      <text x={q.x * k + 8} y={q.y * k - 7} fontSize={12} fill="#0f172a" stroke="white" strokeWidth={3} paintOrder="stroke">
+                        {i + 1}
+                      </text>
+                    </g>
+                  ))}
+                </svg>
+              )}
               {delAt && (
                 <button
                   type="button"
