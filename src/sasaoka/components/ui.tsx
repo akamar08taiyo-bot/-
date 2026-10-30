@@ -209,6 +209,7 @@ export function Modal({
       <div
         role="dialog"
         aria-modal="true"
+        aria-label={typeof title === 'string' ? title : undefined}
         className={`flex max-h-[calc(100vh-24px)] w-full flex-col rounded-xl bg-white shadow-2xl sm:max-h-[calc(100vh-48px)] ${wide ? 'max-w-6xl' : 'max-w-2xl'}`}
         onMouseDown={(e) => e.stopPropagation()}
       >

@@ -50,13 +50,9 @@ try {
     await page.getByRole('tab', {name: /工事見積書/}).click();
     await page.getByRole('button', {name: '🧾 売上伝票依頼書', exact: true}).waitFor();
 
-    // 上の段：まん中のかたまり（保存・Excel・印刷）のすぐ右の、右のかたまりの先頭（まん中は上のタブのまん中にそろえるので、幅を変えない）
-    const order = await page.evaluate(() => {
-      const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === '🧾 売上伝票依頼書');
-      return {right: [...b.parentElement.children].map((x) => x.textContent.trim()), before: [...b.parentElement.previousElementSibling.querySelectorAll('button')].map((x) => x.textContent.trim()).at(-1)};
-    });
-    assert.equal(order.right[0], '🧾 売上伝票依頼書', order.right.join(' / '));
-    assert.equal(order.before, '🖨 見積書を印刷');
+    // 上の段：3段目（そのほかの機能）の 💾 保存 のすぐ右（2026-10-28 から上の段は5つのタブで同じ形。JobHeader.tsx。初めの ✉ メールで送付は 2026-10-30 から）
+    const more = (await page.getByRole('group', {name: 'そのほかの機能'}).getByRole('button').allInnerTexts()).map((t) => t.trim()).filter((t) => t !== '削除');
+    assert.deepEqual(more.slice(0, 3), ['✉ メールで送付', '💾 保存', '🧾 売上伝票依頼書'], more.join(' / '));
 
     await page.getByRole('button', {name: '🧾 売上伝票依頼書', exact: true}).click();
     const dialog = page.getByRole('dialog');

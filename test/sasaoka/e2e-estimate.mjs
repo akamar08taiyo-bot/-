@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {strFromU8, unzipSync} from 'fflate';
+import {excelSave} from './e2eDocs.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const FIX = path.join(path.dirname(new URL(import.meta.url).pathname), 'fixtures');
@@ -201,12 +202,12 @@ const download = async (click, save) => {
   const files = unzipSync(new Uint8Array(await readFile(await dl.path())));
   return {name: dl.suggestedFilename(), sheet: strFromU8(files['xl/worksheets/sheet1.xml'])};
 };
-const yx = await download(() => page.getByRole('button', {name: '📗 見積書をExcelで保存'}).click());
+const yx = await download(() => excelSave(page));
 assert.equal(yx.name, '（サンプル）山田様住宅改修見積書.xlsx');
 for (const t of ['（サンプル）山田', '介護保険被保険者番号（0000366989）', '1200mm÷4000mm＝0.3', '<f>ROUNDDOWN(D9*F9,0)</f><v>4800</v>', '<v>49260</v>', '<v>59600</v>', '令和']) {
   assert.ok(yx.sheet.includes(t), `Excel に「${t}」がない`);
 }
-await page.locator('[aria-live] > div', {hasText: `Excel ファイル「${yx.name}」を保存しました`}).waitFor();
+await page.locator('[aria-live] > div', {hasText: `「${yx.name}」を保存しました`}).waitFor(); // 📗 Excelで保存（DocsDialog.tsx）の知らせ
 log('Excelで保存（苅田町・行橋市・みやこ町用）OK');
 
 // ---------------- 苅田町・行橋市・みやこ町用の印刷

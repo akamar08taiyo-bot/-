@@ -603,14 +603,14 @@ await midRow().first().waitFor();
 assert.ok((await tds('BD-134')).join('|').includes('2400mm÷4000mm＝0.6'), (await tds('BD-134')).join('|'));
 log('中間のブラケット：2400mm → BD-01G 2個・900mm で外す・Ctrl+Z で戻る OK');
 
-// ---------------- 上の段：見積書をExcelで保存・見積書を印刷・削除、その真下に まとめて保存・保存・売上伝票依頼書・発注書・複製。白紙に戻すはない
+// ---------------- 上の段：Excelで保存・見積書を印刷・削除、その真下に メールで送付（前は まとめて保存。2026-10-30）・保存・売上伝票依頼書・発注書・複製。白紙に戻すはない
 // （ユーザーの指示「基本的な並びは、申請書をEXCELで保存、申請書（見積書を印刷）、削除（白紙に戻すは不要） それ以外の独自の機能…は行を変えて、真下に統一して設置する」2026-10-28）
 const row1 = (await page.getByRole('group', {name: '保存・印刷・削除'}).getByRole('button').allInnerTexts()).map((t) => t.trim());
 const row2 = (await page.getByRole('group', {name: 'そのほかの機能'}).getByRole('button').allInnerTexts()).map((t) => t.trim());
-assert.deepEqual(row1, ['📗 見積書をExcelで保存', '🖨 見積書を印刷', '削除']);
-assert.deepEqual(row2, ['📦 まとめて保存', '💾 保存', '🧾 売上伝票依頼書', '🛒 発注書を作成', '複製']);
+assert.deepEqual(row1, ['📗 Excelで保存', '🖨 見積書を印刷', '削除']);
+assert.deepEqual(row2, ['✉ メールで送付', '💾 保存', '🧾 売上伝票依頼書', '🛒 発注書を作成', '複製']);
 assert.equal(await page.getByRole('button', {name: '📄 白紙に戻す'}).count(), 0);
-log('上の段の並び（Excel・印刷・削除／真下にまとめて保存など）・白紙に戻すはない OK');
+log('上の段の並び（Excel・印刷・削除／真下にメールで送付など）・白紙に戻すはない OK');
 
 console.log('\nERRORS:', errors.length ? errors : 'なし');
 await browser.close();

@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {strFromU8, unzipSync} from 'fflate';
+import {excelSave} from './e2eDocs.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -337,7 +338,7 @@ assert.equal(await thumbMarks(), 5);
 log('閉じると写真の欄・プレビューに重なる・読み直しても残る OK');
 
 // ---------------- Excel：写真貼付用紙に Excel の図形で（直線矢印コネクタ・正方形/長方形・テキスト ボックス・楕円・直線コネクタ）
-const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📗 申請書をExcelで保存'}).click()]);
+const [dl] = await Promise.all([page.waitForEvent('download'), excelSave(page)]);
 const file = path.join(outDir, dl.suggestedFilename());
 await dl.saveAs(file);
 const files = unzipSync(new Uint8Array(await readFile(file)));
@@ -926,7 +927,7 @@ assert.equal(await pvSlot.locator('[data-mark]').count(), 8);
   await pd.waitFor();
   await pd.getByRole('button', {name: '閉じる'}).click();
   // Excel：平面図の図のすぐ上に Excel の図形で
-  const [pdl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📗 申請書をExcelで保存'}).click()]);
+  const [pdl] = await Promise.all([page.waitForEvent('download'), excelSave(page)]);
   const pfile = path.join(outDir, 'plan-' + pdl.suggestedFilename());
   await pdl.saveAs(pfile);
   const pf = unzipSync(new Uint8Array(await readFile(pfile)));

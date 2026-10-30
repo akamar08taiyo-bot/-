@@ -164,17 +164,21 @@ if (withTokutei) {
   assert.equal(linkedCount, 1);
   log('読み直し・案件は1つ OK');
 
-  // ---------------- 📦 まとめて保存：チェックしたものだけを1つずつ保存（ユーザーの指示「住宅改修申請書・特定福祉用具申請書・住宅改修見積もり・特定福祉用具販売見積もりを
-  // 一括で保存できる機能をつける　チェック項目のみ一括で保存する」2026-10-26）。工事見積書は行がないので選べない。特定福祉用具は見えない枠で作る（ほかのタブからでも）
+  // ---------------- 📗 Excelで保存：チェックしたものだけを1つずつ保存（ユーザーの指示「住宅改修申請書・特定福祉用具申請書・住宅改修見積もり・特定福祉用具販売見積もりを
+  // 一括で保存できる機能をつける　チェック項目のみ一括で保存する」2026-10-26。「Excel で保存っていうので、一つに…デフォルトはその開いているページ…のみチェック」2026-10-30）。
+  // 工事見積書は行がないので選べない。特定福祉用具は見えない枠で作る（ほかのタブからでも）
   await page.getByRole('tab', {name: '📄 理由書'}).click();
-  await page.getByRole('button', {name: '📦 まとめて保存'}).click();
-  const dlg = page.getByRole('dialog');
-  assert.equal(await dlg.getByText('工事見積書').locator('..').getByRole('checkbox').isDisabled(), true);
+  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).click();
+  const dlg = page.getByRole('dialog', {name: 'Excelで保存'});
+  assert.equal(await dlg.getByRole('checkbox', {name: /^工事見積書/}).isDisabled(), true);
   assert.equal(await dlg.getByText('（見積書に行がありません）').count(), 1);
   const boxes = dlg.getByRole('group', {name: '保存する書類'}).getByRole('checkbox');
-  assert.deepEqual(await boxes.evaluateAll((els) => els.map((e) => [e.checked, e.disabled])), [[true, false], [false, true], [true, false], [true, false]]);
-  // 販売見積書だけ外す → 住宅改修申請書と特定福祉用具申請書の2つ
-  await boxes.nth(3).uncheck();
+  // 初めは開いているタブ（理由書）だけ
+  assert.deepEqual(await boxes.evaluateAll((els) => els.map((e) => [e.checked, e.disabled])), [[false, false], [false, true], [false, false], [false, false], [true, false]]);
+  // 住宅改修申請書と特定福祉用具申請書にチェック、理由書を外す → 2つ
+  await boxes.nth(0).check();
+  await boxes.nth(2).check();
+  await boxes.nth(4).uncheck();
   const names = [];
   page.on('download', (d) => names.push(d.suggestedFilename()));
   await dlg.getByRole('button', {name: '📗 2つ保存する'}).click();
@@ -182,11 +186,11 @@ if (withTokutei) {
   await page.waitForTimeout(800);
   assert.deepEqual(names.sort(), ['見本花子様特定福祉用具申請書.xlsx', '見本花子様住宅改修申請書.xlsx'].sort());
   assert.equal(await page.locator('iframe[title="特定福祉用具（まとめて保存）"]').count(), 0); // 見えない枠は消す
-  // 選んだものは覚えている（次に開くと販売見積書は外れたまま）
-  await page.getByRole('button', {name: '📦 まとめて保存'}).click();
-  assert.deepEqual(await boxes.evaluateAll((els) => els.map((e) => e.checked)), [true, false, true, false]);
+  // 次に開くと、また開いているタブ（理由書）だけ（前に選んだものは覚えない）
+  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).click();
+  assert.deepEqual(await boxes.evaluateAll((els) => els.map((e) => e.checked)), [false, false, false, false, true]);
   await dlg.getByRole('button', {name: 'やめる'}).click();
-  log('まとめて保存 OK');
+  log('Excelで保存（チェックしたものだけ・初めは開いているタブだけ）OK');
 
   // ---------------- 担当（ユーザーの指示「受注残に入れるとき当然担当名のところ、紐付けて受注残に飛ばせるようにしてください」2026-10-26）：
   // 特定福祉用具で選んだ担当は様邸の担当にも入る（⇔）。様邸の担当は特定福祉用具の案件にも入る（受注残には案件の担当で入る）
@@ -257,10 +261,10 @@ if (withTokutei) {
   // 特定福祉用具申請書だけを作っている様邸（ユーザーの指示「特定福祉用具の申請書を作成途中の場合も、こちらの一覧には表示されるようにする」2026-10-26）
   const name2 = page.frameLocator('iframe[title="特定福祉用具 購入申請書・見積もり作成"]').locator('input[aria-label="お客様名"]').first();
   await name2.waitFor();
-  // まとめて保存：何も入っていない住宅改修申請書は選べない（ユーザーの指示「全くの白紙の申請書や見積もりはチェックから外す」2026-10-26）
-  await page.getByRole('button', {name: '📦 まとめて保存'}).click();
-  const dlg2 = page.getByRole('dialog');
-  assert.equal(await dlg2.getByText('住宅改修申請書', {exact: true}).locator('..').getByRole('checkbox').isDisabled(), true);
+  // Excelで保存：何も入っていない住宅改修申請書は選べない（ユーザーの指示「全くの白紙の申請書や見積もりはチェックから外す」2026-10-26）
+  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).click();
+  const dlg2 = page.getByRole('dialog', {name: 'Excelで保存'});
+  assert.equal(await dlg2.getByRole('checkbox', {name: /^住宅改修申請書/}).isDisabled(), true);
   assert.equal(await dlg2.getByText('（何も入っていません）').count(), 1);
   await dlg2.getByRole('button', {name: 'やめる'}).click();
   // 特定福祉用具で入れたお客様名は住宅改修の様邸にも入る（⇔）。見積書に行がないので請求書には入れない
@@ -286,7 +290,7 @@ await page.goto(`${site}/jutaku-mitsumori/index.html#tab=estimate&job=${encodeUR
 await page.reload();
 await page.getByRole('tablist', {name: '住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書'}).waitFor({timeout: 5000});
 assert.equal(await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get('job')), emptyId);
-log('特定福祉用具申請書のタブを開いた様邸は、空でも消さない・一覧にお客様名・白紙の申請書はまとめて保存で選べない OK');
+log('特定福祉用具申請書のタブを開いた様邸は、空でも消さない・一覧にお客様名・白紙の申請書は Excelで保存で選べない OK');
 
 if (withTokutei) {
   // ---------------- 広い画面：左の 🪪 の枠の下に「📖 カタログを表示」「🖨 カタログを印刷」（ユーザーの指示「赤枠の部分にカタログを表示とカタログを印刷という

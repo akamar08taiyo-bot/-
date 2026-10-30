@@ -2,7 +2,8 @@
 // （ユーザーの指示「各タブでEXCEL印刷や保存など、表記の方法やタブの大きさ、順番を統一する。カタログ印刷など、個別のボタンについては、例外とする。
 //  基本的な並びは、申請書をEXCELで保存、申請書（見積書を印刷）、削除（白紙に戻すは不要） それ以外の独自の機能（例えば、売上伝票発行依頼書や発注書を作成、カタログを印刷など）
 //  は行を変えて、真下に統一して設置する タブを切り替えても、位置や大きさ、色などは変えない、同じ機能であればボタンの名前も変えない）行の位置も変えない（基本的に中央揃え）」2026-10-28）：
-//   2段目＝「📗 〇〇をExcelで保存」「🖨 〇〇を印刷」「削除」（上のタブのまん中にそろえる）、3段目＝その真下に「📦 まとめて保存」とタブごとの機能（同じまん中）。
+//   2段目＝「📗 Excelで保存」「🖨 〇〇を印刷」「削除」（上のタブのまん中にそろえる）、3段目＝その真下に「✉ メールで送付」とタブごとの機能（同じまん中）。
+//   （2026-10-30 に「📗 〇〇をExcelで保存」と「📦 まとめて保存」を「📗 Excelで保存」の1つにして、まとめて保存の所に「✉ メールで送付」。DocsDialog.tsx）
 //   特定福祉用具の2つのタブ（中は特定福祉用具のアプリ）も同じ所に出し、押すと中のアプリが保存・印刷・削除などをする（中のアプリの上の段は出さない）。
 //   理由書のタブにも「🖨 理由書を印刷」（2ページとも）。
 // usage: node e2e-toolbar.mjs <サイトのURL> <出力フォルダ>
@@ -37,11 +38,11 @@ await page.keyboard.press('Enter');
 await page.waitForTimeout(800);
 
 const TABS = [
-  {tab: '📝 住宅改修申請書', book: '申請書', more: ['📦 まとめて保存']},
-  {tab: '📋 工事見積書', book: '見積書', more: ['📦 まとめて保存', '💾 保存', '🧾 売上伝票依頼書', '🛒 発注書を作成', '複製']},
-  {tab: '🛁 特定福祉用具申請書', book: '申請書', more: ['📦 まとめて保存', '🖨 カタログを印刷'], tokutei: true},
-  {tab: '🏷 販売見積書', book: '見積書', more: ['📦 まとめて保存', '🖨 カタログを印刷', '🧾 売上伝票依頼書', '📤 販売受注簿に転記'], tokutei: true},
-  {tab: '📄 理由書', book: '理由書', more: ['📦 まとめて保存']},
+  {tab: '📝 住宅改修申請書', book: '申請書', more: ['✉ メールで送付']},
+  {tab: '📋 工事見積書', book: '見積書', more: ['✉ メールで送付', '💾 保存', '🧾 売上伝票依頼書', '🛒 発注書を作成', '複製']},
+  {tab: '🛁 特定福祉用具申請書', book: '申請書', more: ['✉ メールで送付', '🖨 カタログを印刷'], tokutei: true},
+  {tab: '🏷 販売見積書', book: '見積書', more: ['✉ メールで送付', '🖨 カタログを印刷', '🧾 売上伝票依頼書', '📤 販売受注簿に転記'], tokutei: true},
+  {tab: '📄 理由書', book: '理由書', more: ['✉ メールで送付']},
 ];
 const row1 = page.getByRole('group', {name: '保存・印刷・削除'});
 const row2 = page.getByRole('group', {name: 'そのほかの機能'});
@@ -90,12 +91,12 @@ for (const width of [1366, 1600, 390]) {
   for (const t of TABS) {
     const m = await open(t);
     const names = m.b1.map((b) => b.text);
-    // スマホは「削除」を3段目の「まとめて保存」のとなりに（ユーザーの指示「携帯では、削除とまとめて保存は横並びで」2026-10-29）
+    // スマホは「削除」を3段目の初め（メールで送付。前はまとめて保存）のとなりに（ユーザーの指示「携帯では、削除とまとめて保存は横並びで」2026-10-29）
     const phone = width === 390;
-    assert.deepEqual(names, [`📗 ${t.book}をExcelで保存`, `🖨 ${t.book}を印刷`, ...(phone ? [] : ['削除'])], `${width} ${t.tab}`);
+    assert.deepEqual(names, ['📗 Excelで保存', `🖨 ${t.book}を印刷`, ...(phone ? [] : ['削除'])], `${width} ${t.tab}`);
     const more = m.b2.map((b) => b.text);
     assert.deepEqual(more, phone ? [t.more[0], '削除', ...t.more.slice(1)] : t.more, `${width} ${t.tab}`);
-    if (phone) assert.ok(Math.abs(m.b2[0].y - m.b2[1].y) < 1 && m.b2[1].x > m.b2[0].x, `${width} ${t.tab} まとめて保存と削除が横並び ${JSON.stringify(m.b2.slice(0, 2))}`);
+    if (phone) assert.ok(Math.abs(m.b2[0].y - m.b2[1].y) < 1 && m.b2[1].x > m.b2[0].x, `${width} ${t.tab} メールで送付と削除が横並び ${JSON.stringify(m.b2.slice(0, 2))}`);
     assert.equal(m.scroll <= 0, true, `${width} ${t.tab} 横にはみ出す`);
     // 3段目は2段目の真下（同じまん中）
     assert.ok(m.r2.y >= m.r1.y + m.r1.h - 1, `${width} ${t.tab} 3段目が2段目の下にない`);
@@ -124,7 +125,7 @@ for (const width of [1366, 1600, 390]) {
     if (width === 1366) await page.screenshot({path: path.join(outDir, `toolbar-${TABS.indexOf(t) + 1}.png`), clip: {x: 0, y: 0, width, height: 290}});
     if (width === 390) await page.screenshot({path: path.join(outDir, `toolbar-phone-${TABS.indexOf(t) + 1}.png`), clip: {x: 0, y: 300, width, height: 520}});
   }
-  // どのタブでも、2段目の3つのボタンと「📦 まとめて保存」は同じ位置・同じ大きさ・同じ色・同じ字の大きさ（書類の名前はどれも3字）
+  // どのタブでも、2段目の3つのボタンと「✉ メールで送付」は同じ位置・同じ大きさ・同じ色・同じ字の大きさ（印刷の書類の名前はどれも3字）
   const [first] = seen;
   for (const {t, m} of seen.slice(1)) {
     for (let i = 0; i < first.m.b1.length; i++) {
@@ -134,35 +135,37 @@ for (const width of [1366, 1600, 390]) {
       assert.equal(b.bg, a.bg, `${width} ${t.tab} ${b.text} の色`);
       assert.equal(b.font, a.font, `${width} ${t.tab} ${b.text} の字の大きさ`);
     }
-    // 3段目はタブごとにボタンの数が違うので、まん中（＝2段目のまん中）・高さの位置をそろえる。まとめて保存はいつも初め・同じ大きさ・同じ色
+    // 3段目はタブごとにボタンの数が違うので、まん中（＝2段目のまん中）・高さの位置をそろえる。メールで送付はいつも初め・同じ大きさ・同じ色
     assert.ok(Math.abs(first.m.c2 - m.c2) < 2 && Math.abs(first.m.r2.y - m.r2.y) <= 1, `${width} ${t.tab} 3段目の位置 ${JSON.stringify(first.m.r2)} → ${JSON.stringify(m.r2)}`);
     const a = first.m.b2[0];
     const b = m.b2[0];
-    for (const k of ['w', 'h']) assert.ok(Math.abs(a[k] - b[k]) <= 1, `${width} ${t.tab} まとめて保存の ${k}：${a[k]} → ${b[k]}`);
-    assert.equal(b.bg, a.bg, `${width} ${t.tab} まとめて保存の色`);
+    for (const k of ['w', 'h']) assert.ok(Math.abs(a[k] - b[k]) <= 1, `${width} ${t.tab} メールで送付の ${k}：${a[k]} → ${b[k]}`);
+    assert.equal(b.bg, a.bg, `${width} ${t.tab} メールで送付の色`);
   }
   // 色：Excel は薄い緑・印刷は薄い水色・削除は白（ui.tsx の softGreen・softSky・white。Tailwind の色は oklab で返るので class で見る）
   for (const {t, m} of seen) assert.deepEqual(m.b1.map((b) => b.cls.match(/\bbg-(emerald-50|sky-50|white)\b/)?.[1]), ['emerald-50', 'sky-50', 'white'].slice(0, m.b1.length), t.tab);
-  log(`${width}px：5つのタブとも 2段目＝〇〇をExcelで保存・〇〇を印刷・削除、真下に まとめて保存と独自の機能。同じ位置・大きさ・色 OK`);
+  log(`${width}px：5つのタブとも 2段目＝Excelで保存・〇〇を印刷・削除、真下に メールで送付と独自の機能。同じ位置・大きさ・色 OK`);
 }
 await page.setViewportSize({width: 1366, height: 900});
 
 // ---------------- 特定福祉用具の2つのタブ：上の段のボタンで中のアプリが動く
 await open(TABS[2]);
 assert.equal(await frame.getByRole('group', {name: '保存・印刷・削除'}).count(), 0); // 中のアプリの上の段は出さない
-const [shinseiFile] = await Promise.all([page.waitForEvent('download'), row1.getByRole('button', {name: '📗 申請書をExcelで保存'}).click()]);
-assert.match(shinseiFile.suggestedFilename(), /\.xlsx$/);
+// 📗 Excelで保存：初めは特定福祉用具申請書（このタブ）。商品がないうちは選べない（特定福祉用具のアプリが作らない）
+await row1.getByRole('button', {name: '📗 Excelで保存'}).click();
+const xdlg = page.getByRole('dialog', {name: 'Excelで保存'});
+assert.equal(await xdlg.getByRole('checkbox', {name: /^特定福祉用具申請書/}).isDisabled(), true);
+assert.equal(await xdlg.getByText('（特定福祉用具の商品がありません）').count(), 2);
+await xdlg.getByRole('button', {name: 'やめる'}).click();
 await row1.getByRole('button', {name: '🖨 申請書を印刷'}).click();
 await frame.locator('.print-overlay').waitFor();
 await frame.locator('.print-overlay').getByRole('button', {name: '閉じる'}).click();
 await row2.getByRole('button', {name: '🖨 カタログを印刷'}).click();
 await frame.getByRole('group', {name: '印刷するページ'}).waitFor({timeout: 30000});
 await frame.getByRole('button', {name: '閉じる', exact: true}).click();
-log(`特定福祉用具申請書：申請書をExcelで保存（${shinseiFile.suggestedFilename()}）・申請書を印刷・カタログを印刷 OK`);
+log('特定福祉用具申請書：Excelで保存（商品がないうちは選べない）・申請書を印刷・カタログを印刷 OK');
 
 await open(TABS[3]);
-const [estFile] = await Promise.all([page.waitForEvent('download'), row1.getByRole('button', {name: '📗 見積書をExcelで保存'}).click()]);
-assert.match(estFile.suggestedFilename(), /\.xlsx$/);
 await row2.getByRole('button', {name: '🧾 売上伝票依頼書'}).click();
 await frame.getByRole('group', {name: '売上伝票に入れる内容'}).waitFor();
 await frame.getByRole('button', {name: '閉じる'}).first().click();
@@ -172,7 +175,7 @@ await row2.getByRole('link', {name: '📤 販売受注簿に転記'}).click();
 await frame.getByText('商品がありません').waitFor();
 await page.waitForTimeout(500);
 assert.equal(ctx.pages().length, pages);
-log(`販売見積書：見積書をExcelで保存（${estFile.suggestedFilename()}）・売上伝票依頼書・商品がなければ受注簿は開かない OK`);
+log('販売見積書：売上伝票依頼書・商品がなければ受注簿は開かない OK');
 
 // ---------------- 理由書の印刷：2ページとも初めから印刷する
 await open(TABS[4]);

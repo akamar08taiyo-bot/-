@@ -28,13 +28,14 @@ import {zipCandidates} from '../zip.ts';
 import {PhotoBoard, PhotoOrderDialog, photoPlaces, SLOT_LABEL, usePhotoActions, usePlanActions} from './PhotoBoard.tsx';
 import {PhotoMarkEditor} from './PhotoMarkEditor.tsx';
 import type {PhotoKey, PhotoSlot} from './PhotoBoard.tsx';
-import {canMakeShinsei, saveShinsei, useTemplate} from './shinseiFiles.ts';
+import {canMakeShinsei, useTemplate} from './shinseiFiles.ts';
 import {ShinseiPages} from './ShinseiPreview.tsx';
 import type {PreviewPhotos, PreviewPlan} from './ShinseiPreview.tsx';
 import {ShinseiPrint} from './ShinseiPrint.tsx';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {CardFill} from '../components/CardReader.tsx';
 import {JobHeader, JobTitle, RemoveJobButton} from './JobHeader.tsx';
+import type {JobDocs} from '../components/DocsDialog.tsx';
 
 /** 欄の順番：保険者ごとの申請書の上からの順番（原本を見て決めた。みやこ町・広域連合は承認の申請書の順番で、支給申請書だけの着工日・完成日は最後）。
  *  ただし被保険者氏名はどの保険者もフリガナのすぐ下（ユーザーの指示「ふりがなの下に、名前をもってくる」、2026-10-21。苅田町・みやこ町は原本では番号が先）。
@@ -102,14 +103,14 @@ export function ShinseiEditor({
   update,
   onBack,
   tabs,
-  batch,
+  docs,
 }: {
   job: Job;
   data: AppData;
   update: Update;
   onBack: () => void;
   tabs: ReactNode; // 申請書・見積書のタブ
-  batch?: ReactNode; // 「📦 まとめて保存」（Excel で保存・印刷と並べる。App.tsx の BatchSave）
+  docs?: JobDocs | null; // 「📗 Excelで保存」「✉ メールで送付」（どのタブも同じ。App.tsx の DocsDialog.tsx）
 }) {
   const toast = useToast();
   const s = data.settings;
@@ -284,18 +285,6 @@ export function ShinseiEditor({
   const [printing, setPrinting] = useState(false);
   // 白紙に戻すは外した（ユーザーの指示「削除（白紙に戻すは不要）」2026-10-28。前は 2026-10-26 から上の段の右にあった）
 
-  const save = () => {
-    if (!insurer) return;
-    void saveShinsei(job, insurer, s).then(
-      ({fileName, missingPhotos, unreadablePhotos, planMissing}) => {
-        toast(`「${fileName}」を保存しました`);
-        if (missingPhotos) toast(`写真${missingPhotos}枚はこの端末にないので貼っていません`, 'error');
-        if (unreadablePhotos) toast(`写真${unreadablePhotos}枚は読めなかったので貼っていません`, 'error');
-        if (planMissing) toast('平面図の図はこの端末にないので貼っていません', 'error');
-      },
-      () => toast('申請書を作れませんでした', 'error'),
-    );
-  };
   // Enter で次の欄へ（日本語の変換中は動かさない）
   const nextOnEnter = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return;
@@ -479,25 +468,24 @@ export function ShinseiEditor({
 
   return (
     <div className="space-y-3">
-      {/* 上の段（一覧へ戻る・タブ・介護保険証から入れる／名前・Excelで保存・印刷・削除／まとめて保存）はどのタブでも同じ形（JobHeader.tsx） */}
+      {/* 上の段（一覧へ戻る・タブ・介護保険証から入れる／名前・Excelで保存・印刷・削除／メールで送付）はどのタブでも同じ形（JobHeader.tsx） */}
       <JobHeader
         onBack={onBack}
         tabs={tabs}
         extra={<CardFill job={job} setJob={setJob} />}
         title={<JobTitle name={job.customer.trim() ? jobName(job) : '新しい申請書'} badge={insurer ? INSURER_INFO[insurer].name : undefined} />}
-        // 2段目は Excelで保存・印刷・削除、3段目はまとめて保存（どのタブも同じ並び。JobHeader.tsx）。保険者を選ぶまで（原本がないので）Excel・印刷は押せない
+        // 2段目は Excelで保存・印刷・削除、3段目はメールで送付（どのタブも同じ並び。JobHeader.tsx）。保険者を選ぶまで（原本がないので）印刷は押せない
+        // （Excelで保存・メールで送付は、ほかの書類も選べるので押せる。申請書は選べないだけ。DocsDialog.tsx）
         primary={
           <>
-            <Btn color="softGreen" onClick={save} disabled={!canMakeShinsei(insurer)}>
-              <span>📗 申請書を<span className="whitespace-nowrap">Excelで保存</span></span>
-            </Btn>
+            {docs?.excel}
             <Btn color="softSky" onClick={() => setPrinting(true)} disabled={!canMakeShinsei(insurer) || !pages?.length}>
               🖨 申請書を印刷
             </Btn>
           </>
         }
         remove={(className) => <RemoveJobButton job={job} settings={s} update={update} onBack={onBack} className={className} />}
-        secondary={batch}
+        secondary={docs?.mail}
       />
       {printing && pages && map && (
         <ShinseiPrint pages={pages} title={shinseiFileName(map, job, estimateDateOf(job)).replace(/\.xlsx$/, '')} photos={previewPhotos} plan={previewPlan} onClose={() => setPrinting(false)} />

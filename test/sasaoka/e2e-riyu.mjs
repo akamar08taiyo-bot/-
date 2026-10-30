@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {strFromU8, unzipSync} from 'fflate';
+import {excelSave} from './e2eDocs.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -131,7 +132,7 @@ assert.equal(await page.getByRole('form', {name: '理由書'}).getByLabel('利�
 log('読み直し OK');
 
 // ---------------- Excel で保存
-const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📗 理由書をExcelで保存'}).click()]);
+const [dl] = await Promise.all([page.waitForEvent('download'), excelSave(page)]);
 assert.equal(dl.suggestedFilename(), '見本花子様住宅改修理由書.xlsx');
 const file = path.join(outDir, dl.suggestedFilename());
 await dl.saveAs(file);

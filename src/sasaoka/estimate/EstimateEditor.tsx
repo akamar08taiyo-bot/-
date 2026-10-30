@@ -18,8 +18,9 @@ import {jutakuSalesMonth, withBillMonth, withSalesMonth} from '../salesPlan.ts';
 import type {AppData, Insurer, Job, Kit, Material, NameSuffix, Place, ShinseiInfo} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {staffFull, thisMonth, todayIso} from '../util.ts';
-import {duplicateEstimate, saveEstimateExcel} from './EstimateList.tsx';
+import {duplicateEstimate} from './EstimateList.tsx';
 import {UriageDialog} from './UriageDialog.tsx';
+import type {JobDocs} from '../components/DocsDialog.tsx';
 
 // at：見積書で選んでいた（タップしていた）行。部材・部材＋施工費（常用）はそこに入れる（`insertRowsAt`）
 type Picker =
@@ -37,7 +38,7 @@ export function EstimateEditor({
   onOpenInvoice,
   onOpenOrder,
   tabs,
-  batch,
+  docs,
   onPrint,
   onSave,
   onManageKits,
@@ -50,7 +51,7 @@ export function EstimateEditor({
   onOpenInvoice: (id: string) => void; // 「工務店請求書を確認する」で同じ様邸の仕切り計算表を開く
   onOpenOrder: () => void; // この見積書の部材の発注書を開く
   tabs: ReactNode; // 申請書・見積書のタブ（氏名・番号・住所・改修の箇所・金額は申請書と同じ）
-  batch?: ReactNode; // 「📦 まとめて保存」（保存・Excel・印刷と並べる。App.tsx の BatchSave）
+  docs?: JobDocs | null; // 「📗 Excelで保存」「✉ メールで送付」（どのタブも同じ。App.tsx の DocsDialog.tsx）
   onPrint: (r: PrintRequest) => void;
   onSave: () => Promise<boolean>; // まだ保存していない変更をすぐ保存する（保存できたら true）
   onManageKits?: () => void; // 部材・施工費マスタの「部材＋施工費（常用）」を開く
@@ -264,7 +265,7 @@ export function EstimateEditor({
 
   return (
     <div className="space-y-3">
-      {/* 上の段はどのタブでも同じ形（JobHeader.tsx）：2段目は 見積書をExcelで保存・見積書を印刷・削除、3段目は まとめて保存・保存・売上伝票依頼書・発注書を作成・複製
+      {/* 上の段はどのタブでも同じ形（JobHeader.tsx）：2段目は Excelで保存・見積書を印刷・削除、3段目は メールで送付・保存・売上伝票依頼書・発注書を作成・複製
           （ユーザーの指示「基本的な並びは、申請書をEXCELで保存、申請書（見積書を印刷）、削除（白紙に戻すは不要）それ以外の独自の機能（例えば、売上伝票発行依頼書や
           発注書を作成、カタログを印刷など）は行を変えて、真下に統一して設置する」2026-10-28）。複製は一度外したが「やはり残してください」2026-10-26 で戻した。
           名前の横は保険者だけ（「苅田町「工事費見積書兼工事費内訳書」」の書式の名前は「この部分の説明は不要」2026-10-27）。
@@ -275,9 +276,7 @@ export function EstimateEditor({
         title={<JobTitle name={name} badge={insurer ? INSURER_INFO[insurer].name : formLabel(form, s)} />}
         primary={
           <>
-            <Btn color="softGreen" onClick={() => saveEstimateExcel(job, s, toast)}>
-              <span>📗 見積書を<span className="whitespace-nowrap">Excelで保存</span></span>
-            </Btn>
+            {docs?.excel}
             <Btn color="softSky" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
               🖨 見積書を印刷
             </Btn>
@@ -286,7 +285,7 @@ export function EstimateEditor({
         remove={(className) => <RemoveJobButton job={job} settings={s} update={update} onBack={onBack} className={className} />}
         secondary={
           <>
-            {batch}
+            {docs?.mail}
             <Btn color="softBlue" onClick={save}>
               💾 保存
             </Btn>

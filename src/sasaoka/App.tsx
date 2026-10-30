@@ -40,7 +40,7 @@ import type {PrintRequest} from './print/PrintView.tsx';
 import {hasRiyuInfo} from './riyu.ts';
 import {EXAMPLE_KIT_ID, exampleKit} from './samples.ts';
 import {CATALOG_EVENT, flushTokutei, readFromTokutei, tokuteiNames, withTokuteiFields, writeTokutei} from './tokuteiLink.ts';
-import {BatchSave} from './components/BatchSave.tsx';
+import {DocsButton} from './components/DocsDialog.tsx';
 import {isTrashed, liveJobs} from './trash.ts';
 import {writeJutakuSalesSummary} from './salesPlan.ts';
 import type {Insurer, Job, Row} from './types.ts';
@@ -367,9 +367,13 @@ export default function App({start}: {start: MainTab}) {
     setEstimateId(id);
     setJobView(j && !j.estDate && !hasEstimateRows(j) ? 'shinsei' : 'estimate');
   };
-  // 「📦 まとめて保存」（どのタブからも同じ。BatchSave.tsx）。保存の前に、開いている特定福祉用具のタブの変更と、この様邸の変更を保存させる。
-  // 5つのタブとも、上の段（JobHeader.tsx）の3段目の初め（「〇〇をExcelで保存・〇〇を印刷・削除」の真下。ユーザーの指示「…それ以外の独自の機能…は行を変えて、真下に統一して設置する」2026-10-28）
-  const batch = estimateJob && <BatchSave job={estimateJob} s={data.settings} onBeforeSave={() => Promise.all([flushTokutei(), store.flush()])} />;
+  // 「📗 Excelで保存」「✉ メールで送付」（どのタブからも同じ。DocsDialog.tsx。初めは開いているタブの書類だけにチェック）。作る前に、開いている特定福祉用具のタブの変更と、
+  // この様邸の変更を保存させる。Excelで保存は上の段（JobHeader.tsx）の2段目の初め、メールで送付は3段目の初め（前の「📦 まとめて保存」の所。
+  // ユーザーの指示「Excel で保存っていうので、一つに…プラスアルファで、メールで送付」2026-10-30）
+  const docs = estimateJob && {
+    excel: <DocsButton mode="excel" job={estimateJob} s={data.settings} view={jobView === 'order' ? 'estimate' : jobView} onBeforeSave={() => Promise.all([flushTokutei(), store.flush()])} />,
+    mail: <DocsButton mode="mail" job={estimateJob} s={data.settings} view={jobView === 'order' ? 'estimate' : jobView} onBeforeSave={() => Promise.all([flushTokutei(), store.flush()])} />,
+  };
   // 「📷 写真へ」（携帯・タブレット）：写真の欄は住宅改修申請書のタブにあるので、ほかのタブならそのタブに替えてから
   const goPhotos = () => {
     if (jobView === 'shinsei') scrollToPhotos();
@@ -488,7 +492,7 @@ export default function App({start}: {start: MainTab}) {
                     setJobView('estimate');
                   }}
                   tabs={tabs}
-                  batch={batch}
+                  docs={docs}
                 />
               ) : estimateJob && (jobView === 'tokutei' || jobView === 'hanbai') ? (
                 // 特定福祉用具申請書は申請書だけ、販売見積書は見積書だけを出す（同じ特定福祉用具の案件。申請書で入れた商品は見積書にも出る）
@@ -506,7 +510,7 @@ export default function App({start}: {start: MainTab}) {
                     })
                   }
                   tabs={tabs}
-                  batch={batch}
+                  docs={docs}
                 />
               ) : estimateJob && jobView === 'riyu' ? (
                 <RiyuEditor
@@ -520,7 +524,7 @@ export default function App({start}: {start: MainTab}) {
                     setJobView('estimate');
                   }}
                   tabs={tabs}
-                  batch={batch}
+                  docs={docs}
                 />
               ) : estimateJob ? (
                 <EstimateEditor
@@ -536,7 +540,7 @@ export default function App({start}: {start: MainTab}) {
                   onOpenInvoice={openInvoice}
                   onOpenOrder={() => setJobView('order')}
                   tabs={tabs}
-                  batch={batch}
+                  docs={docs}
                   onPrint={setPrint}
                   onSave={store.flush}
                   onManageKits={() => goMaster('kits')}

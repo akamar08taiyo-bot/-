@@ -15,6 +15,7 @@ import {CATALOG_EVENT, CATALOG_MSG, flushTokutei, takeCatalog, tokuteiUrl, write
 import type {TokuteiView} from '../tokuteiLink.ts';
 import type {Job, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
+import type {JobDocs} from '../components/DocsDialog.tsx';
 
 const MIN_HEIGHT = 560;
 /** 特定福祉用具のアプリ（tokutei の SaleEditor.tsx）に頼めること。同じ名前を向こうでも使う */
@@ -47,7 +48,7 @@ export function TokuteiEditor({
   view,
   onBack,
   tabs,
-  batch,
+  docs,
   update,
   settings,
 }: {
@@ -55,7 +56,7 @@ export function TokuteiEditor({
   view: TokuteiView;
   onBack: () => void;
   tabs: ReactNode;
-  batch?: ReactNode; // 📦 まとめて保存（3段目の初め。ほかのタブと同じ）
+  docs?: JobDocs | null; // 「📗 Excelで保存」（2段目の初め）・「✉ メールで送付」（3段目の初め）。ほかのタブと同じ（App.tsx の DocsDialog.tsx）
   update?: Update;
   settings?: Pick<Settings, 'tokuteiSalesMonths'>; // 販売見積書のタブの「売上月」（このアプリで変えた特定福祉用具の案件の月）
 }) {
@@ -161,9 +162,7 @@ export function TokuteiEditor({
           title={<JobTitle name={job.customer.trim() ? jobName(job) : view === 'shinsei' ? '新しい申請書' : '新しい見積書'} badge={insurer ? INSURER_INFO[insurer].name : undefined} />}
           primary={
             <>
-              <Btn color="softGreen" onClick={() => cmd('excel')}>
-                <span>📗 {book}を<span className="whitespace-nowrap">Excelで保存</span></span>
-              </Btn>
+              {docs?.excel}
               <Btn color="softSky" onClick={() => cmd('print')}>
                 🖨 {book}を印刷
               </Btn>
@@ -177,8 +176,8 @@ export function TokuteiEditor({
           )}
           secondary={
             <>
-              {batch}
-              {/* カタログを印刷は2つのタブとも同じ所（まとめて保存のすぐ右）。販売見積書のタブは、前は中のアプリの右の欄（金額のまとめの下）にあった
+              {docs?.mail}
+              {/* カタログを印刷は2つのタブとも同じ所（メールで送付のすぐ右）。販売見積書のタブは、前は中のアプリの右の欄（金額のまとめの下）にあった
                   （その欄はユーザーの指示「この部分は全て不要です」2026-10-28 で外した） */}
               <Btn color="softSky" onClick={() => cmd('catalog')}>
                 🖨 カタログを印刷

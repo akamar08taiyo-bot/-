@@ -8,6 +8,7 @@ const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_
 import assert from 'node:assert/strict';
 import {mkdirSync} from 'node:fs';
 import path from 'node:path';
+import {excelSave} from './e2eDocs.mjs';
 
 const [site, outDir = 'e2e-out'] = process.argv.slice(2);
 mkdirSync(outDir, {recursive: true});
@@ -71,7 +72,7 @@ await care.first().waitFor();
 log('「自己負担額を表示」を外すと書かない（読み直しても）・付け直すと書く OK');
 
 // Excel にも内訳（利用者負担は赤字）
-const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📗 見積書をExcelで保存'}).click()]);
+const [dl] = await Promise.all([page.waitForEvent('download'), excelSave(page)]);
 await dl.saveAs(path.join(outDir, 'care-estimate.xlsx'));
 log(`Excel に保存（${dl.suggestedFilename()}）OK`);
 

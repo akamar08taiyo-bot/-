@@ -15,11 +15,12 @@ import type {PvPage, ShinseiField} from '../shinseiPreview.ts';
 import type {AppData, Job, RiyuAct, RiyuActKey, RiyuInfo, ShinseiInfo, ShinseiMarks} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {todayIso} from '../util.ts';
-import {saveRiyu, useTemplate} from './shinseiFiles.ts';
+import {useTemplate} from './shinseiFiles.ts';
 import {Circles, Note} from './ShinseiEditor.tsx';
 import {ShinseiPages} from './ShinseiPreview.tsx';
 import {JobHeader, JobTitle, RemoveJobButton} from './JobHeader.tsx';
 import {ShinseiPrint} from './ShinseiPrint.tsx';
+import type {JobDocs} from '../components/DocsDialog.tsx';
 
 type Field = ShinseiField;
 
@@ -81,7 +82,7 @@ function Check({on, onChange, children, label: aria}: {on: boolean; onChange: (v
   );
 }
 
-export function RiyuEditor({job, data, update, onBack, tabs, batch}: {job: Job; data: AppData; update: Update; onBack: () => void; tabs: ReactNode; batch?: ReactNode}) {
+export function RiyuEditor({job, data, update, onBack, tabs, docs}: {job: Job; data: AppData; update: Update; onBack: () => void; tabs: ReactNode; docs?: JobDocs | null}) {
   const toast = useToast();
   const s = data.settings;
   const insurer = jobInsurer(job);
@@ -138,11 +139,6 @@ export function RiyuEditor({job, data, update, onBack, tabs, batch}: {job: Job; 
   // 理由書の印刷（申請書の印刷と同じ ShinseiPrint.tsx。プレビューと同じ2ページを A4 に）
   const [printing, setPrinting] = useState(false);
   const closePrint = useCallback(() => setPrinting(false), []);
-  const save = () =>
-    void saveRiyu(job, s).then(
-      (fileName) => toast(`「${fileName}」を保存しました`),
-      () => toast('理由書を作れませんでした', 'error'),
-    );
   // Enter で次の欄へ（文章の欄は改行のまま。日本語の変換中は動かさない）
   const nextOnEnter = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return;
@@ -406,16 +402,14 @@ export function RiyuEditor({job, data, update, onBack, tabs, batch}: {job: Job; 
         title={<JobTitle name={job.customer.trim() ? jobName(job) : '新しい理由書'} badge={insurer ? INSURER_INFO[insurer].name : undefined} />}
         primary={
           <>
-            <Btn color="softGreen" onClick={save}>
-              <span>📗 理由書を<span className="whitespace-nowrap">Excelで保存</span></span>
-            </Btn>
+            {docs?.excel}
             <Btn color="softSky" onClick={() => setPrinting(true)} disabled={!pages?.length}>
               🖨 理由書を印刷
             </Btn>
           </>
         }
         remove={(className) => <RemoveJobButton job={job} settings={data.settings} update={update} onBack={onBack} className={className} />}
-        secondary={batch}
+        secondary={docs?.mail}
       />
       {printing && pages && <ShinseiPrint pages={pages} title={riyuFileName(job).replace(/\.xlsx$/, '')} book="理由書" all onClose={closePrint} />}
 

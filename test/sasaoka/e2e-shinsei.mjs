@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {strFromU8, unzipSync} from 'fflate';
+import {excelSave} from './e2eDocs.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 // 広域連合の写真貼付用紙（写真番号ごとに2枚。原本の並び）
@@ -129,9 +130,9 @@ const missingSpots = () => preview.locator('[role="button"][class*="bg-amber-300
 const focused = () => page.evaluate(() => document.activeElement?.getAttribute('aria-label'));
 /** 欄の XML（文字でない欄・原本のままの欄を見るとき） */
 const cellOf = (xml, ref) => new RegExp(`<c r="${ref}"[^>]*?(?:/>|>([\\s\\S]*?)</c>)`).exec(xml)?.[0] ?? '';
-/** 「📗 申請書をExcelで保存」 */
+/** 「📗 Excelで保存」（住宅改修申請書のタブなので、住宅改修申請書だけにチェック） */
 const saveExcel = async () => {
-  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📗 申請書をExcelで保存'}).click()]);
+  const [dl] = await Promise.all([page.waitForEvent('download'), excelSave(page)]);
   const file = path.join(outDir, dl.suggestedFilename());
   await dl.saveAs(file);
   return {name: dl.suggestedFilename(), file, bytes: new Uint8Array(await readFile(file))};
@@ -1285,10 +1286,13 @@ for (const n of twins) assert.deepEqual(photosOf(g, n, 31), [], n);
 // 改修の種別の丸：①①②②の用紙は①手すり（原本の②の用紙の丸は②だった）、箇所のない③〜⑤の用紙は丸なし
 assert.deepEqual(SHINSEI_PHOTO_SHEETS.kouiki.map((n) => g.ellipses(n)), [1, 1, 1, 1, 0, 0, 0, 0, 0, 0]);
 log('広域連合の申請書（6枚のプレビュー・ヘッダー・承認申請書・支給申請書・内訳明細書・平面図・写真貼付用紙・丸）OK');
-// 4つの保険者すべてで申請書の Excel のボタンが出る
+// 4つの保険者すべてで申請書の Excel を作れる（「📗 Excelで保存」の画面で、住宅改修申請書にはじめからチェック）
 for (const i of ['kanda', 'yukuhashi', 'miyako', 'kouiki']) {
   await page.getByRole('combobox', {name: '保険者', exact: true}).selectOption(i);
-  assert.equal(await page.getByRole('button', {name: '📗 申請書をExcelで保存'}).count(), 1, i);
+  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).click();
+  const dlg = page.getByRole('dialog', {name: 'Excelで保存'});
+  assert.equal(await dlg.getByRole('checkbox', {name: /^住宅改修申請書/}).isChecked(), true, i);
+  await dlg.getByRole('button', {name: 'やめる'}).click();
 }
 await page.getByRole('combobox', {name: '保険者', exact: true}).selectOption('kanda');
 
@@ -1307,7 +1311,7 @@ await form.waitFor();
 assert.equal(await shinseiTab.getAttribute('aria-selected'), 'true');
 assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '新しい申請書');
 assert.equal(await focused(), 'フリガナ');
-// 上の段の「📗 申請書をExcelで保存」などのかたまりは、上のタブのまん中にそろえる（ユーザーの指示「少し左にずらして、上のタブとあわせるか中央揃えにする」2026-10-27。
+// 上の段の「📗 Excelで保存」などのかたまりは、上のタブのまん中にそろえる（ユーザーの指示「少し左にずらして、上のタブとあわせるか中央揃えにする」2026-10-27。
 // その前は画面のまん中「Excelの印刷、保存ボタンを中央にもってくる」）。名前が長いときは名前のすぐ右で、名前に重ねない
 /** ボタンの入ったまん中のかたまりが、上のタブのまん中から何画素ずれているか（名前に重なっていたら Infinity） */
 const offCenter = (name) =>
@@ -1318,7 +1322,7 @@ const offCenter = (name) =>
     if (box.left < title.right + 8) return Infinity;
     return Math.abs((box.left + box.right) / 2 - (tabs.left + tabs.right) / 2);
   });
-assert.ok((await offCenter('📗 申請書をExcelで保存')) < 2);
+assert.ok((await offCenter('📗 Excelで保存')) < 2);
 await page.screenshot({path: path.join(outDir, '81b-header-center.png'), clip: {x: 0, y: 0, width: 1366, height: 240}});
 // フリガナ → 被保険者氏名 → 被保険者番号（6けたでも確定すると右に詰めて左は 0）→ 生年月日の年・月・日 → 郵便番号 → 住所 → 電話番号 → 所有者 → 関係。
 // フリガナはひらがなで打っても全角カタカナになる（ユーザーの指示「ひらがなで入力しても、全角カタカナに自動的になるようにする」）
@@ -1478,20 +1482,20 @@ await preview.waitFor();
 await estimateTab.click();
 assert.equal(await inInvoice.count(), 0);
 assert.equal(await orderBtn.isDisabled(), true);
-// 見積書のタブも、Excel・印刷・削除は上のタブのまん中（まとめて保存・保存・売上伝票依頼書・発注書・複製はその真下の段）
-assert.ok((await offCenter('📗 見積書をExcelで保存')) < 2);
+// 見積書のタブも、Excel・印刷・削除は上のタブのまん中（メールで送付・保存・売上伝票依頼書・発注書・複製はその真下の段）
+assert.ok((await offCenter('📗 Excelで保存')) < 2);
 await page.screenshot({path: path.join(outDir, '81c-header-center-estimate.png'), clip: {x: 0, y: 0, width: 1366, height: 240}});
 await shinseiTab.click();
 await preview.waitFor();
 log('申請書だけ（みやこ町。見積書なしで Excel・請求書に入れない・一覧から申請書のタブで開く）OK');
 
-// ---------------- 上の段のまん中は 申請書をExcelで保存・申請書を印刷・削除 の並び、その真下に まとめて保存（ユーザーの指示「基本的な並びは、申請書をEXCELで保存、
+// ---------------- 上の段のまん中は Excelで保存・申請書を印刷・削除 の並び、その真下に メールで送付（前は まとめて保存。2026-10-30）（ユーザーの指示「基本的な並びは、申請書をEXCELで保存、
 // 申請書（見積書を印刷）、削除（白紙に戻すは不要） それ以外の独自の機能…は行を変えて、真下に統一して設置する」2026-10-28。前は Excel・まとめて保存・印刷の並びで、右に白紙に戻す）
 const centerButtons = await page.getByRole('group', {name: '保存・印刷・削除'}).getByRole('button').allInnerTexts();
-assert.deepEqual(centerButtons.map((t) => t.trim()), ['📗 申請書をExcelで保存', '🖨 申請書を印刷', '削除']);
-assert.deepEqual((await page.getByRole('group', {name: 'そのほかの機能'}).getByRole('button').allInnerTexts()).map((t) => t.trim()), ['📦 まとめて保存']);
+assert.deepEqual(centerButtons.map((t) => t.trim()), ['📗 Excelで保存', '🖨 申請書を印刷', '削除']);
+assert.deepEqual((await page.getByRole('group', {name: 'そのほかの機能'}).getByRole('button').allInnerTexts()).map((t) => t.trim()), ['✉ メールで送付']);
 assert.equal(await page.getByRole('button', {name: '📄 白紙に戻す'}).count(), 0);
-assert.ok((await offCenter('📗 申請書をExcelで保存')) < 2);
+assert.ok((await offCenter('📗 Excelで保存')) < 2);
 await page.screenshot({path: path.join(outDir, '81d-header-shinsei-buttons.png'), clip: {x: 0, y: 0, width: 1366, height: 240}});
 // 🖨 申請書を印刷：プレビューと同じページを A4 に。初めは1枚目だけ印刷し、チェックで足せる。紙（PDF）の枚数で確かめる
 await page.getByRole('button', {name: '🖨 申請書を印刷', exact: true}).click();
@@ -1516,7 +1520,7 @@ assert.ok((await page.locator('.shinsei-sheet').first().innerText()).includes('�
 assert.equal(await page.locator('.shinsei-sheet [role="button"]').count(), 0);
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
 await page.locator('.print-overlay').waitFor({state: 'detached'});
-log('申請書をExcelで保存・印刷・削除の並び（真下にまとめて保存）・申請書の印刷（1枚目だけ→足す）OK');
+log('Excelで保存・申請書を印刷・削除の並び（真下にメールで送付）・申請書の印刷（1枚目だけ→足す）OK');
 
 // ---------------- スマホの幅：一覧の下にプレビュー（縦に並べる）。プレビューは画面の幅に縮める。横にはみ出さない
 await page.setViewportSize({width: 390, height: 844});

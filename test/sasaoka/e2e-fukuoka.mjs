@@ -9,6 +9,7 @@ import {mkdirSync} from 'node:fs';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {strFromU8, unzipSync} from 'fflate';
+import {excelSave} from './e2eDocs.mjs';
 
 const [site, outDir = 'e2e-out'] = process.argv.slice(2);
 mkdirSync(outDir, {recursive: true});
@@ -66,7 +67,7 @@ await form.getByLabel('電話番号').fill('092-111-2222');
 await form.getByLabel('着工日').fill('2026-11-02');
 await form.getByLabel('完成日').fill('2026-11-05');
 await page.waitForTimeout(1200);
-const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📗 申請書をExcelで保存'}).click()]);
+const [dl] = await Promise.all([page.waitForEvent('download'), excelSave(page)]);
 assert.equal(dl.suggestedFilename(), '（サンプル）山田様住宅改修申請書.xlsx');
 const file = path.join(outDir, 'fukuoka-shinsei.xlsx');
 await dl.saveAs(file);
