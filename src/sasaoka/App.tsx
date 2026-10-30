@@ -32,7 +32,7 @@ import {RiyuEditor} from './estimate/RiyuEditor.tsx';
 import {ShinseiEditor} from './estimate/ShinseiEditor.tsx';
 import {TokuteiEditor} from './estimate/TokuteiEditor.tsx';
 import {hasShinseiInfo} from './estimateForms.ts';
-import {APP_TITLE, PORTAL_URL, readHash, writeHash} from './links.ts';
+import {APP_TITLE, PORTAL_URL, readHash, readReceive, writeHash} from './links.ts';
 import type {JobView, MainTab} from './links.ts';
 import {photoIdsInUse, prunePhotos} from './photos.ts';
 import {PrintView} from './print/PrintView.tsx';
@@ -144,8 +144,10 @@ export default function App({start}: {start: MainTab}) {
   const touch = useTouchUi();
   // URL に #tab=…&job=… があれば、そのタブ・見積書（様邸）を開く（前の版の #job=… は、最初のタブで開く）
   const [initial] = useState(readHash);
-  const [tab, setTab] = useState<MainTab>(initial.tab ?? start);
-  const [estimateId, setEstimateId] = useState<string | null>((initial.tab ?? start) === 'estimate' ? initial.job : null);
+  // 携帯から送った様邸のデータのメールのリンク（#receive）：見積もり・申請書を作成するの入口で、受け取る画面を出す（EstimateHome・DocImport.tsx）
+  const [receive, setReceive] = useState(readReceive);
+  const [tab, setTab] = useState<MainTab>(receive ? 'estimate' : (initial.tab ?? start));
+  const [estimateId, setEstimateId] = useState<string | null>(!receive && (initial.tab ?? start) === 'estimate' ? initial.job : null);
   const [invoiceId, setInvoiceId] = useState<string | null>((initial.tab ?? start) === 'invoice' ? initial.job : null);
   // 見積もり・申請書を作成する：最初の画面（新規作成・一覧から作成）か、月ごとの一覧か
   // URL から見積書を開いたとき（読み直したとき）は、戻ると一覧
@@ -553,6 +555,8 @@ export default function App({start}: {start: MainTab}) {
                   onList={() => setEstimateView('list')}
                   onImported={showImported}
                   goMaterials={() => goMaster()}
+                  receive={receive}
+                  onReceived={() => setReceive(false)}
                 />
               ) : (
                 <EstimateList

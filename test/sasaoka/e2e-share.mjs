@@ -103,9 +103,9 @@ assert.deepEqual(
   shared.files.map((f) => [f.name, f.type]),
   [['見本七郎様_様邸データ.json', 'application/json']],
 );
-assert.match(shared.text, /「📥 申請書・見積書・理由書を取り込む」に「見本七郎様_様邸データ\.json」を入れると/);
+assert.match(shared.text, /パソコンで受け取るとき：\n① 添付の「見本七郎様_様邸データ\.json」を保存します\n② 下のリンクを開くと受け取る画面が出るので、そのファイルを入れます/);
 assert.ok(shared.text.includes(`${site}/jutaku-mitsumori/index.html`), shared.text); // アプリのリンク
-assert.ok(shared.text.trimEnd().endsWith(`${site}/jutaku-mitsumori/index.html`) && !shared.text.includes('TEL'), shared.text); // 会社・営業所・電話は書かない（データを送る際は不要）
+assert.ok(shared.text.trimEnd().endsWith(`${site}/jutaku-mitsumori/index.html#receive`) && !shared.text.includes('TEL'), shared.text); // 会社・営業所・電話は書かない（データを送る際は不要）
 const pkg = JSON.parse(shared.files[0].text);
 assert.equal(pkg.kind, 'taiyo-jutaku-job');
 assert.equal(pkg.job.customer, '見本 七郎');
@@ -120,10 +120,15 @@ await phone.ctx.close();
 // ---------------- パソコン（別の端末）：取り込む
 const pc = await context({viewport: {width: 1366, height: 900}});
 p = pc.page;
-await p.goto(`${site}/jutaku-mitsumori/index.html`);
-await p.getByRole('region', {name: '一覧から作成'}).getByRole('button', {name: '申請書・見積書・理由書を取り込む'}).waitFor();
+// メールのリンク（#receive）を開くと「📲 様邸のデータを受け取る」の画面（ユーザーの報告「URLを開くとデスクトップのデータのみしかありませんでした」2026-10-30）
+const link = shared.text.trimEnd().split('\n').at(-1);
+await p.goto(link);
+const rdlg = p.getByRole('dialog', {name: '📲 様邸のデータを受け取る'});
+await rdlg.waitFor();
+await p.screenshot({path: path.join(outDir, 'share-2a-pc-receive.png')});
 const file = {name: '見本七郎様_様邸データ.json', mimeType: 'application/json', buffer: Buffer.from(shared.files[0].text)};
-await p.locator('input[aria-label="取り込むファイル"]').setInputFiles([file]);
+const [fc] = await Promise.all([p.waitForEvent('filechooser'), rdlg.getByRole('button', {name: '様邸のデータを受け取る'}).click()]);
+await fc.setFiles([file]);
 const idlg = p.getByRole('dialog', {name: '📲 様邸のデータの取り込み'});
 await idlg.waitFor();
 const card = await idlg.getByRole('region', {name: '見本 七郎様邸のデータ'}).innerText();

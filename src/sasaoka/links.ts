@@ -27,6 +27,18 @@ export function readHash(): {tab: MainTab | null; job: string | null; view: JobV
   }
 }
 
+/**
+ * 携帯から送った様邸のデータのメールのリンク（#receive）で開いたか。開いたら、見積もり・申請書を作成するの入口で「📲 様邸のデータを受け取る」の画面を出す
+ * （ユーザーの報告「URLを開くとデスクトップのデータのみしかありませんでした」2026-10-30：リンクはアプリを開くだけで、添付のファイルを入れる所が分からなかった）
+ */
+export function readReceive(): boolean {
+  try {
+    return new URLSearchParams(location.hash.replace(/^#/, '')).has('receive');
+  } catch {
+    return false;
+  }
+}
+
 /** 開いているタブ・見積書（様邸）・発注書・申請書を URL に残す。書き換えられない所では何もしない */
 export function writeHash(tab: MainTab, jobId: string | null, view: JobView = 'estimate') {
   try {

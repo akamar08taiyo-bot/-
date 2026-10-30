@@ -3,7 +3,7 @@ import {estimateTotals, hasEstimateRows, jobName} from '../calc.ts';
 import {copyJob} from '../components/JobTools.tsx';
 import {askTrash, trashLabel, useTrashUndo} from '../components/TrashPage.tsx';
 import {tokuteiItemJobs, tokuteiNames} from '../tokuteiLink.ts';
-import {Btn, TextInput, useToast} from '../components/ui.tsx';
+import {Btn, DropArea, Modal, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm, officeInsurer} from '../estimateForms.ts';
 import {estimateXlsx, XLSX_TYPE} from '../estimateXlsx.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
@@ -104,6 +104,8 @@ export function EstimateHome({
   onList,
   onImported,
   goMaterials,
+  receive = false,
+  onReceived,
 }: {
   data: AppData;
   update: Update;
@@ -111,6 +113,8 @@ export function EstimateHome({
   onList: () => void;
   onImported: (month: string) => void; // 取り込んだあと（その月の一覧を開く）
   goMaterials: () => void;
+  receive?: boolean; // 携帯から送った様邸のデータのメールのリンク（#receive）で開いた：受け取る画面を出す
+  onReceived?: () => void;
 }) {
   const all = useEstimates(data, data.settings);
   const docs = useDocImport(data, update, onImported);
@@ -159,6 +163,26 @@ export function EstimateHome({
             <DocImportDrop onFiles={docs.start} onPick={docs.pick} />
           </div>
           {docs.element}
+          {/* 「📲 様邸のデータを受け取る」：メールのリンクで開いたとき、添付のファイルを入れる所をすぐ出す（入れると、取り込む前の確かめの画面。DocImport.tsx） */}
+          {receive && (
+            <Modal title="📲 様邸のデータを受け取る" onClose={() => onReceived?.()}>
+              <DropArea
+                name="様邸のデータを受け取る"
+                label="📲 メールに付いていた「〇〇様_様邸データ.json」をここに"
+                hint="ドロップ・押して選ぶ"
+                onFiles={(files) => {
+                  onReceived?.();
+                  docs.start(files);
+                }}
+                onPick={() => {
+                  onReceived?.();
+                  docs.pick();
+                }}
+                big
+                className="w-full"
+              />
+            </Modal>
+          )}
         </section>
       </div>
       {all.length === 0 && <GettingStarted data={data} update={update} goMaterials={goMaterials} onSample={onList} />}

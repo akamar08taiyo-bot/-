@@ -64,7 +64,7 @@ test('様邸のデータを付けるとき：取り込み方とアプリのリ�
   const m = docsMail(job('見本 花子', '見本 一郎'), s, ['様邸のデータ'], ['見本花子様_様邸データ.json'], {name: '見本花子様_様邸データ.json', url: 'https://example.invalid/jutaku-mitsumori/index.html'});
   assert.equal(m.subject, '見本 花子様邸'); // 様邸のデータだけなら「〇〇様邸」
   const lines = m.body.split('\n');
-  assert.equal(lines.at(-1), 'https://example.invalid/jutaku-mitsumori/index.html');
-  assert.ok(lines.some((l) => l.includes('「見本花子様_様邸データ.json」を入れると')));
+  assert.equal(lines.at(-1), 'https://example.invalid/jutaku-mitsumori/index.html#receive'); // 開くと受け取る画面
+  assert.ok(lines.includes('① 添付の「見本花子様_様邸データ.json」を保存します'));
   for (const t of ['見本商事株式会社', '見本営業所', '担当：', 'TEL']) assert.ok(!m.body.includes(t), t);
 });
