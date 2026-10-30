@@ -573,6 +573,29 @@ try {
   assert.ok(Math.abs(again.x - sized.x) < 2 && Math.abs(again.y - sized.y) < 2 && Math.abs(again.width - sized.width) < 2, `覚えていない ${JSON.stringify(again)}`);
   await page.keyboard.press('Escape');
   await viewer.waitFor({state: 'detached'});
+  // スマホの幅：窓は画面いっぱい・検索の欄は1段まるごと・2本の指で広げると大きく（ユーザーの話「携帯で特定福祉用具カタログを開こうとした場合に開けない」2026-10-30。
+  // 前は画面の下の6割に出て、住宅改修のタブの中では絵の所が画面の外になった。開くと14ページを一度に絵にしていて iPhone では開けなかった）
+  await page.setViewportSize({width: 390, height: 844});
+  await page.getByRole('button', {name: '📖 カタログ', exact: true}).first().click();
+  await viewer.waitFor();
+  assert.deepEqual(await viewer.boundingBox(), {x: 0, y: 0, width: 390, height: 844});
+  const phoneSearch = await viewer.getByRole('searchbox', {name: 'カタログから検索'}).boundingBox();
+  assert.ok(phoneSearch.width > 350, `検索の欄がせまい ${JSON.stringify(phoneSearch)}`);
+  await page.waitForFunction(() => document.querySelector('[aria-label="カタログのページの絵"] img')?.complete, null, {timeout: 60000});
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setTouchEmulationEnabled', {enabled: true, maxTouchPoints: 5});
+  const view = await viewer.getByLabel('カタログのページの絵').boundingBox();
+  const [cx, cy] = [view.x + view.width / 2, view.y + view.height / 2];
+  const fingers = (d) => [{x: cx - d, y: cy, id: 1}, {x: cx + d, y: cy, id: 2}];
+  await cdp.send('Input.dispatchTouchEvent', {type: 'touchStart', touchPoints: fingers(40)});
+  for (let d = 50; d <= 100; d += 10) await cdp.send('Input.dispatchTouchEvent', {type: 'touchMove', touchPoints: fingers(d)});
+  await cdp.send('Input.dispatchTouchEvent', {type: 'touchEnd', touchPoints: []});
+  assert.equal((await viewer.getByRole('button', {name: 'もとの大きさ'}).textContent())?.trim(), '250%');
+  await cdp.send('Emulation.setTouchEmulationEnabled', {enabled: false});
+  await page.screenshot({path: `${out}/05e-catalog-phone.png`});
+  await viewer.getByRole('button', {name: 'カタログを閉じる'}).click();
+  await viewer.waitFor({state: 'detached'});
+  await page.setViewportSize({width: 1366, height: 900});
   await catSearch.fill('');
 
   // ---- 品目が多くても原本の明細（16行）の中に入って、A4 1枚のまま。備考は3行まで（入らない行は画面で知らせる）

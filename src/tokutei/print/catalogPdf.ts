@@ -12,14 +12,33 @@ export type CatalogImage = {url: string; codes: Set<string>; text: string}; // t
 /** catalog/ の PDF の場所（住宅改修のタブの中の枠でも、このアプリの index.html の隣） */
 export const catalogUrl = (file: string) => new URL(`catalog/${file}`, document.baseURI).href;
 
-export async function loadCatalogPage(file: string): Promise<CatalogImage> {
+/** PDF（1ページ目）を開いて fn に渡す（終わったら閉じる） */
+async function withPage<T>(file: string, fn: (page: PdfPage) => Promise<T>): Promise<T> {
   const res = await fetch(catalogUrl(file));
   if (!res.ok) throw new Error(`${res.status}`);
   const task = await openPdf(new Uint8Array(await res.arrayBuffer()));
   try {
     const doc = await task.promise;
-    const page = await doc.getPage(1);
-    const text = (await page.getTextContent()).items.map((i) => ('str' in i ? i.str : '')).join(' ');
+    return await fn(await doc.getPage(1));
+  } finally {
+    await task.destroy();
+  }
+}
+type PdfPage = Awaited<ReturnType<Awaited<Awaited<ReturnType<typeof openPdf>>['promise']>['getPage']>>;
+
+const textOf = async (page: PdfPage) => (await page.getTextContent()).items.map((i) => ('str' in i ? i.str : '')).join(' ');
+
+/**
+ * ページの文字だけ（カタログから検索に使う）。絵にしないので軽い。
+ * カタログの窓は、前は開くと全部のページ（14ページ）を一度に絵にしていて、iPhone では開けなかった（ユーザーの話「携帯で特定福祉用具カタログを開こうとした場合に開けない」2026-10-30）
+ */
+export function loadCatalogText(file: string): Promise<string> {
+  return withPage(file, textOf);
+}
+
+export async function loadCatalogPage(file: string): Promise<CatalogImage> {
+  return withPage(file, async (page) => {
+    const text = await textOf(page);
     const viewport = page.getViewport({scale: DPI / 72});
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(viewport.width);
@@ -30,9 +49,10 @@ export async function loadCatalogPage(file: string): Promise<CatalogImage> {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     await page.render({canvas, canvasContext: ctx, viewport}).promise;
     const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/jpeg', 0.9));
+    // 絵にした画用紙（1654×2339 ほど）はすぐ空にする（iPhone の Safari は画用紙に使える大きさに上限があり、残しておくと次のページが描けない）
+    canvas.width = 0;
+    canvas.height = 0;
     if (!blob) throw new Error('image');
     return {url: URL.createObjectURL(blob), codes: pageCodes(text), text};
-  } finally {
-    await task.destroy();
-  }
+  });
 }

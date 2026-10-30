@@ -3,12 +3,15 @@
 // 画面の右に浮かぶ窓で、上の帯をつかむと動き、右下の角をつかむと大きさが変わる（マウスでも指でも）。置いた所・大きさはこの端末で覚える。
 // 「カタログから検索」に商品名・品番（261-S1063 など）を打つと、その字のあるページだけを並べる。ページを押すとそのページを出す。
 // ページの絵は、マウスのホイールで大きく・小さく（マウスのある所を中心に）、つかんで動かせる（ユーザーの指示「カタログではアップしたときにとぎれてしまうため、
-// 画像内をうごかせるようにする。スクロールでアップと縮小をできるようにする」2026-10-27。前は −・＋ のボタンだけで、大きくすると窓の中で切れて見えた）
+// 画像内をうごかせるようにする。スクロールでアップと縮小をできるようにする」2026-10-27。前は −・＋ のボタンだけで、大きくすると窓の中で切れて見えた）。
+// 絵にするのは出しているページだけ（ほかのページは検索に使う文字だけを1ページずつ読む）。前は開くと14ページを一度に絵にしていて、
+// パソコンでも絵が出るまで十数秒、iPhone では開けなかった（ユーザーの話「携帯で特定福祉用具カタログを開こうとした場合に開けない」2026-10-30）。
+// スマホ（幅 640px 未満）は、窓を画面（住宅改修のタブの中では枠）いっぱいに出し、枠が画面の上に来るように動かす。2本の指で広げる・つまむと大きく・小さく
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {PointerEvent as ReactPointerEvent} from 'react';
 import {CATALOG, catalogLabel, catalogMatches, catalogPicks} from '../catalog.ts';
 import type {Sale} from '../types.ts';
-import {loadCatalogPage} from './catalogPdf.ts';
+import {loadCatalogPage, loadCatalogText} from './catalogPdf.ts';
 import type {CatalogImage} from './catalogPdf.ts';
 
 const KEY = 'taiyo-tokutei-catalog-window-v1'; // 窓の位置・大きさ（この端末だけ）
@@ -16,7 +19,7 @@ const MIN = {w: 320, h: 260};
 const ZOOM = {min: 0.5, max: 4};
 const clampZoom = (z: number) => Math.min(ZOOM.max, Math.max(ZOOM.min, Math.round(z * 100) / 100));
 
-/** 読んだページ（窓を閉じても覚えておく。開くたびに読み直さない） */
+/** 絵にしたページ（窓を閉じても覚えておく。開くたびに読み直さない） */
 const loaded = new Map<string, Promise<CatalogImage | null>>();
 function page(file: string): Promise<CatalogImage | null> {
   let p = loaded.get(file);
@@ -26,13 +29,31 @@ function page(file: string): Promise<CatalogImage | null> {
   }
   return p;
 }
+/** ページの文字（検索に使う。絵にしたページはその文字） */
+const textLoaded = new Map<string, Promise<string>>();
+function pageText(file: string): Promise<string> {
+  const img = loaded.get(file);
+  if (img) return img.then((r) => r?.text ?? '');
+  let p = textLoaded.get(file);
+  if (!p) {
+    p = loadCatalogText(file).catch(() => '');
+    textLoaded.set(file, p);
+  }
+  return p;
+}
 
 type Box = {x: number; y: number; w: number; h: number};
-/** 初めは画面の右（プレビューの所）。前に置いた所があればそこ（画面からはみ出す分は戻す） */
+/** スマホの幅（窓を画面いっぱいに出す） */
+const narrow = () => window.innerWidth < 640;
+/**
+ * 初めは画面の右（プレビューの所）。前に置いた所があればそこ（画面からはみ出す分は戻す）。
+ * スマホは画面いっぱい（前は画面の下の6割で、住宅改修のタブの中の枠では、絵の所が画面の外に出て見えなかった）
+ */
 function firstBox(): Box {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const def = vw < 640 ? {x: 8, y: Math.round(vh * 0.35), w: vw - 16, h: Math.round(vh * 0.6)} : {x: vw - Math.min(620, Math.round(vw * 0.46)) - 16, y: 72, w: Math.min(620, Math.round(vw * 0.46)), h: vh - 100};
+  if (narrow()) return {x: 0, y: 0, w: vw, h: vh};
+  const def = {x: vw - Math.min(620, Math.round(vw * 0.46)) - 16, y: 72, w: Math.min(620, Math.round(vw * 0.46)), h: vh - 100};
   try {
     const v = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Box | null;
     if (v && [v.x, v.y, v.w, v.h].every((n) => typeof n === 'number' && Number.isFinite(n))) return clampBox(v);
@@ -96,6 +117,35 @@ export function CatalogViewer({sale, query: initial, onClose, onPrint}: {sale: S
     el.addEventListener('wheel', onWheel, {passive: false});
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
+  // 2本の指で広げる・つまむ（スマホ・iPad）。1本の指はそのまま絵を動かす（画面ごと大きくしないように、2本のときだけ止める）
+  useEffect(() => {
+    const el = viewRef.current;
+    if (!el) return;
+    let start: {d: number; zoom: number} | null = null;
+    const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) start = {d: dist(e.touches), zoom: zoomRef.current};
+    };
+    const onMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2 || !start || start.d <= 0) return;
+      e.preventDefault();
+      const target = clampZoom((start.zoom * dist(e.touches)) / start.d);
+      zoomBy(target / zoomRef.current, (e.touches[0].clientX + e.touches[1].clientX) / 2, (e.touches[0].clientY + e.touches[1].clientY) / 2);
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) start = null;
+    };
+    el.addEventListener('touchstart', onStart, {passive: true});
+    el.addEventListener('touchmove', onMove, {passive: false});
+    el.addEventListener('touchend', onEnd);
+    el.addEventListener('touchcancel', onEnd);
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+      el.removeEventListener('touchcancel', onEnd);
+    };
+  }, []);
   /** ページの絵をつかんで動かす（マウス。指は今までどおりの指で動かす） */
   const pan = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.pointerType !== 'mouse' || e.button !== 0) return;
@@ -121,19 +171,32 @@ export function CatalogViewer({sale, query: initial, onClose, onPrint}: {sale: S
   // 初めに出すページ：見積もりの商品が載っているページ（なければ1ページ目）
   const [current, setCurrent] = useState(() => [...catalogPicks(sale.items)][0] ?? 0);
   useEffect(() => setQuery(initial), [initial]);
-  // ページを読む（読めたページから検索できる）
+  const alive = useRef(true);
   useEffect(() => {
-    let alive = true;
-    CATALOG.forEach((p, i) => {
-      void page(p.file).then((r) => {
-        if (!alive) return;
-        setImages((c) => c.map((x, j) => (j === i ? r : x)));
-        setTexts((c) => c.map((x, j) => (j === i ? (r?.text ?? '') : x)));
-      });
-    });
+    alive.current = true;
     return () => {
-      alive = false;
+      alive.current = false;
     };
+  }, []);
+  // 出しているページを絵にする（初めて出すときだけ。読んだ絵は覚えておく）
+  useEffect(() => {
+    const i = current;
+    void page(CATALOG[i].file).then((r) => {
+      if (!alive.current) return;
+      setImages((c) => c.map((x, j) => (j === i ? r : x)));
+      if (r) setTexts((c) => c.map((x, j) => (j === i ? r.text : x)));
+    });
+  }, [current]);
+  // 検索に使う文字は、初めのページの絵が出てから1ページずつ読む（一度に読むと重い）
+  useEffect(() => {
+    void (async () => {
+      await page(CATALOG[current].file);
+      for (const [i, p] of CATALOG.entries()) {
+        const text = await pageText(p.file);
+        if (!alive.current) return;
+        setTexts((c) => c.map((x, j) => (j === i ? text : x)));
+      }
+    })();
   }, []);
   const matches = useMemo(() => catalogMatches(query, texts), [query, texts]);
   // 検索したら、見つかった最初のページを出す（打つたびに。見つかったページの中を押して選び直せる）
@@ -148,6 +211,20 @@ export function CatalogViewer({sale, query: initial, onClose, onPrint}: {sale: S
       /* 覚えられなくても使える */
     }
   }, [box]);
+  // スマホで住宅改修のタブの中（枠）にいるときは、枠が画面の上に来るように動かす（窓が枠の下のほうにあって、絵の所が画面の外になっていた）。
+  // 枠に印を付けて、住宅改修の画面の右下の「📷 写真へ」を窓の上に重ねない（住宅改修の sasaoka.css）
+  useEffect(() => {
+    let frame: HTMLElement | null = null;
+    try {
+      frame = window.frameElement as HTMLElement | null;
+    } catch {
+      frame = null;
+    }
+    if (!frame) return;
+    frame.setAttribute('data-catalog-open', '');
+    if (narrow()) frame.scrollIntoView({block: 'start', behavior: 'smooth'});
+    return () => frame?.removeAttribute('data-catalog-open');
+  }, []);
   useEffect(() => {
     const onResize = () => setBox((b) => clampBox(b));
     const onKey = (e: KeyboardEvent) => {
@@ -204,7 +281,8 @@ export function CatalogViewer({sale, query: initial, onClose, onPrint}: {sale: S
           onChange={(e) => setQuery(e.target.value)}
           placeholder="カタログから検索（商品名・品番）"
           aria-label="カタログから検索"
-          className="h-8 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 text-sm"
+          // スマホは1段まるごと（ボタンの段の下。前は幅が詰まって字が1字も見えなかった）
+          className="order-last h-8 min-w-0 basis-full rounded-md border border-slate-300 bg-white px-2 text-base sm:order-none sm:flex-1 sm:basis-0 sm:text-sm"
         />
         <button type="button" className={tool} onClick={() => zoomBy(1 / 1.2)} aria-label="小さく">
           −
@@ -224,7 +302,7 @@ export function CatalogViewer({sale, query: initial, onClose, onPrint}: {sale: S
         </button>
       </div>
       <div role="group" aria-label="カタログのページ" className="flex max-h-20 flex-wrap gap-1 overflow-y-auto border-b border-slate-200 px-2 py-1.5">
-        {matches.length === 0 && <span className="text-xs text-slate-500">見つかりません</span>}
+        {matches.length === 0 && <span className="text-xs text-slate-500">{texts.includes(null) ? 'さがしています…' : '見つかりません'}</span>}
         {matches.map((i) => (
           <button
             key={CATALOG[i].file}
