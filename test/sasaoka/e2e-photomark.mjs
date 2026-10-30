@@ -644,6 +644,39 @@ await page.screenshot({path: path.join(outDir, 'mark-04c-quad.png')});
   await clickOn(0.9, 0.9);
   log('少しだけ動かす（マウスは 2画素から）OK');
 }
+// 直線の端をつまむ（直線の道具のまま。ユーザーの指示「編集途中の線に対して、片側の頂点をつまむと、左右に微調整したりできるようにする」2026-10-30）：
+// 端を押して離すと緑の輪 → ドラッグ（押した所から動かした分だけ）・矢印キーでその端だけ動く。端からすぐドラッグすると、今までどおり続けて描く（L字）
+{
+  await ribbon.getByRole('button', {name: '直線', exact: true}).click();
+  await dragOn([0.05, 0.1], [0.05, 0.3]);
+  const n0 = (await kinds()).length;
+  const li = n0 - 1;
+  const num = (a) => Object.fromEntries(['x1', 'y1', 'x2', 'y2'].map((key) => [key, Number(a[key])]));
+  const l0 = num(await svgOf(li, 'line'));
+  await clickOn(0.05, 0.3); // 下の端を押して離す
+  assert.equal(await dlg.locator('[data-end-pick]').count(), 1, 'つまんだ端に緑の輪');
+  assert.equal((await kinds()).length, n0, '押して離しただけでは描かない');
+  // 端から少しずれた所を押してドラッグ：端はとばず、動かした分（20画素）だけ動く。もう一方の端はそのまま
+  const e2 = await at(0.05, 0.3);
+  await page.mouse.move(e2.x + 3, e2.y);
+  await page.mouse.down();
+  for (let i = 1; i <= 10; i++) await page.mouse.move(e2.x + 3 + i * 2, e2.y);
+  await page.mouse.up();
+  const l1 = num(await svgOf(li, 'line'));
+  assert.ok(Math.abs((l1.x2 - l0.x2) * k - 20) < 1 && Math.abs(l1.y2 - l0.y2) < 0.01 && l1.x1 === l0.x1 && l1.y1 === l0.y1, `つまんだ端だけ動く ${JSON.stringify(l0)} → ${JSON.stringify(l1)}`);
+  assert.equal(await dlg.locator('[data-end-pick]').count(), 1);
+  await page.keyboard.press('ArrowRight'); // 矢印キー：その端だけ 1画素
+  const l2 = num(await svgOf(li, 'line'));
+  assert.ok(Math.abs(l2.x2 - l1.x2 - 1) < 0.01 && l2.x1 === l1.x1, `矢印キーで端だけ ${JSON.stringify(l1)} → ${JSON.stringify(l2)}`);
+  // 上の端からすぐドラッグ：続けて描く（L字）。つまむのはやめる
+  await dragOn([0.05, 0.1], [0.15, 0.1]);
+  assert.equal((await kinds()).length, n0 + 1);
+  assert.equal(await dlg.locator('[data-end-pick]').count(), 0);
+  for (let i = 0; i < 4; i++) await dlg.getByRole('button', {name: '戻る', exact: true}).click();
+  assert.equal((await kinds()).length, n0 - 1);
+  await ribbon.getByRole('button', {name: '選択', exact: true}).click();
+  log('直線の端をつまむ（押して離すと緑の輪・その端だけドラッグ／矢印キー・すぐドラッグは続けて描く）OK');
+}
 // 3つ押して「✕ 四角をやめる」：描かない
 await ribbon.getByRole('button', {name: /^四角（角を4つ/}).click();
 for (const [fx, fy] of [
@@ -1096,6 +1129,33 @@ for (const [name, vp, touch] of [
       }
       await p2.waitForTimeout(300);
       assert.deepEqual(await ptsOf(), q0, `${name} 戻る2回で元の所`);
+    }
+    // 直線（矢印）の端をつまんで ▶：その端だけ少し動く → 戻る
+    {
+      const a = d2.locator('[data-photo-stage] [data-mark]').nth(0).locator('line').first();
+      const num = async () => Object.fromEntries(await Promise.all(['x1', 'y1', 'x2', 'y2'].map(async (key) => [key, Number(await a.getAttribute(key))])));
+      const kk = await d2.locator('[data-photo-stage]').evaluate((el) => el.getBoundingClientRect().width / Number(el.querySelector('[data-mark] svg').getAttribute('viewBox').split(' ')[2]));
+      const st = await d2.locator('[data-photo-stage]').boundingBox();
+      const a0 = await num();
+      const scr = (x, y) => ({x: st.x + x * kk, y: st.y + y * kk});
+      const tapPt = async (q) => {
+        await touchAt('touchStart', q);
+        await touchAt('touchEnd', q);
+        await p2.waitForTimeout(400);
+      };
+      await p2.waitForTimeout(800);
+      await tapPt(scr((a0.x1 + a0.x2) / 2, (a0.y1 + a0.y2) / 2)); // 線を選ぶ
+      await tapPt(scr(a0.x1, a0.y1)); // はじめの端をつまむ
+      assert.equal(await d2.locator('[data-end-pick]').count(), 1, `${name} 端をつまむ`);
+      await d2.getByRole('button', {name: '右へ少し動かす'}).tap();
+      await p2.waitForTimeout(300);
+      const a1 = await num();
+      assert.ok(Math.abs(a1.x1 - a0.x1 - Math.max(1, 1 / kk)) < 0.01 && a1.y1 === a0.y1 && Math.abs(a1.x2 - a0.x2) < 0.2 && Math.abs(a1.y2 - a0.y2) < 0.2, `${name} ▶ でつまんだ端だけ（矢印の先の線は向きで少しだけ変わる） ${JSON.stringify(a0)} → ${JSON.stringify(a1)}`);
+      await p2.screenshot({path: path.join(outDir, `mark-05h-${name}-end-pick.png`)});
+      await p2.waitForTimeout(800);
+      await d2.getByRole('button', {name: '戻る', exact: true}).tap();
+      await p2.waitForTimeout(300);
+      assert.deepEqual(await num(), a0);
     }
   }
   await c2.close();

@@ -9,7 +9,7 @@
 // Ctrl+Z／Y・Ctrl+C／X／V・Ctrl+D（複製）・Ctrl+A（すべて選ぶ）・Tab（次の図形）・Esc、右クリックのメニュー、頂点の編集（手書きの線・折れ線・四角の角を動かす・足す・消す）、選んだ図形の右上の ×（消す）。
 // 直したらすぐ様邸に入れる（自動保存）。位置・大きさ・線の太さ・文字の大きさは紙の上の大きさ（photoMarks.ts）で、プレビュー・Excel と同じ
 
-import {useEffect, useLayoutEffect, useRef, useState} from 'react';
+import {Fragment, useEffect, useLayoutEffect, useRef, useState} from 'react';
 import type {CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode} from 'react';
 import {
   BOARD_PTS,
@@ -64,11 +64,11 @@ const styleKeyOf = (k: PhotoMark['kind']): StyleKey => (k === 'text' ? 'text' : 
 const toolStyleKey = (t: Tool): StyleKey => (t === 'text' ? 'text' : t === 'num' ? 'num' : t === 'pen' || t === 'poly' || t === 'quad' ? 'pen' : t === 'rect' || t === 'board' ? 'rect' : 'shape');
 type RBox = MarkBox & {rot: number};
 type Drag =
-  | {type: 'create'; tool: DrawTool; p0: Pt; id: string; ctrl: boolean}
+  | {type: 'create'; tool: DrawTool; p0: Pt; id: string; ctrl: boolean; fromEnd?: {id: string; which: 1 | 2}}
   | {type: 'move'; p0: Pt; base: PhotoMark[]; ids: string[]; moved: boolean; copy: boolean; toggle: string | null}
   | {type: 'resize'; id: string; hx: number; hy: number; base: PhotoMark}
   | {type: 'rotate'; id: string; base: PhotoMark; a0: number}
-  | {type: 'end'; id: string; which: 1 | 2; base: PhotoMark}
+  | {type: 'end'; id: string; which: 1 | 2; base: PhotoMark; p0: Pt; moved: boolean}
   // 手書き：pts＝描いた点（紙の画素）。straight＝長押しでまっすぐにした（そのあとは終わりの点を動かす）
   | {type: 'pen'; id: string; pts: Pt[]; straight: boolean}
   // 直線をまん中のまわりに回す（直線の ↻ のつまみ）
@@ -495,6 +495,9 @@ export function PhotoMarkEditor({
   // 頂点の編集（Excel の「図形の編集 → 頂点の編集」。ユーザーの指示「エクセル　頂点の編集機能をつける」2026-10-30）：
   // 編集している手書きの線・折れ線・四角の id と、選んでいる頂点（i）。選んでいる図形が変わったら終わる（pe）
   const [pointEdit, setPointEdit] = useState<{id: string; i: number | null} | null>(null);
+  // つまんだ直線の端（端を押して離すと緑の輪。その端だけをドラッグ・◀ ▲ ▼ ▶・矢印キーで動かす。ユーザーの指示「編集途中の線に対して、片側の頂点をつまむと、
+  // 左右に微調整したりできるようにする」2026-10-30。直線の道具のまま端からすぐドラッグすると、今までどおりそこから続けて描く＝L字）
+  const [endPick, setEndPick] = useState<{id: string; which: 1 | 2} | null>(null);
   const [pointTip, setPointTip] = useState(false); // 「頂点の編集」を、選んでいないときに押した（どれを選ぶかを少しのあいだ出す）
   const pointTipTimer = useRef(0);
   useEffect(() => () => window.clearTimeout(pointTipTimer.current), []);
@@ -710,6 +713,18 @@ export function PhotoMarkEditor({
   useEffect(() => {
     if (pointEdit && !pe) setPointEdit(null);
   }, [pointEdit, pe]);
+  const ep = endPick && single && single.id === endPick.id && single.kind === 'line' ? endPick : null;
+  useEffect(() => {
+    if (endPick && !ep) setEndPick(null);
+  }, [endPick, ep]);
+  /** 直線の片方の端を (dx, dy) 動かした線（写真の外には出さない） */
+  const endMoved = (m: PhotoMark, which: 1 | 2, dx: number, dy: number): PhotoMark => {
+    const en = lineEnds(m, V);
+    const [a, b] = [{x: en.x1, y: en.y1}, {x: en.x2, y: en.y2}];
+    const q = which === 1 ? a : b;
+    const n = {x: clamp(q.x + dx, 0, W), y: clamp(q.y + dy, 0, H)};
+    return which === 1 ? withLine(m, W, H, n, b) : withLine(m, W, H, a, n);
+  };
   /** 「頂点の編集」：始める／終える（Excel の「図形の編集 → 頂点の編集」と同じく、もう一度押すと終える） */
   const togglePoints = () => {
     setMenu(null);
@@ -916,6 +931,9 @@ export function PhotoMarkEditor({
             return inside(n, W, H) ? n : m;
           }),
         );
+      } else if (ep) {
+        // 直線の端をつまんでいる：その端だけを 1画素ずつ
+        commit(marks.map((m) => (m.id === ep.id ? endMoved(m, ep.which, d.x * (ctrl ? 0.5 : 1), d.y * (ctrl ? 0.5 : 1)) : m)));
       } else {
         const step = ctrl ? 0.5 : 1;
         const moving = marks.filter((m) => sel.includes(m.id));
@@ -1193,7 +1211,7 @@ export function PhotoMarkEditor({
     if (single.kind === 'line') {
       const en = lineEnds(single, V);
       const which = Math.hypot(p.x - en.x2, p.y - en.y2) <= ht ? 2 : Math.hypot(p.x - en.x1, p.y - en.y1) <= ht ? 1 : 0;
-      if (which) return {type: 'end', id: single.id, which, base: single};
+      if (which) return {type: 'end', id: single.id, which, base: single, p0: p, moved: false};
       const r = lineRotHandle(single);
       if (r && Math.hypot(p.x - r.p.x, p.y - r.p.y) <= ht) return {type: 'rotline', id: single.id, base: single, a0: Math.atan2(p.y - r.c.y, p.x - r.c.x), c: r.c};
       return null;
@@ -1215,6 +1233,16 @@ export function PhotoMarkEditor({
     e.currentTarget.setPointerCapture(e.pointerId);
     // リボンのボタンから写真へ（Enter などがボタンに行かないように）。図形を選んでいれば、離したあとに打つ所へ（arm）
     if (document.activeElement !== editRef.current) e.currentTarget.focus({preventScroll: true});
+    // つまんだ直線の端（緑の輪）を押した：その端だけを動かす（道具が直線のままでも）。ほかの所を押したら、つまむのをやめる
+    if (ep && single) {
+      const en = lineEnds(single, V);
+      const q = ep.which === 1 ? {x: en.x1, y: en.y1} : {x: en.x2, y: en.y2};
+      if (Math.hypot(p.x - q.x, p.y - q.y) <= handleTol(e)) {
+        drag.current = {type: 'end', id: single.id, which: ep.which, base: single, p0: p, moved: false};
+        return;
+      }
+    }
+    if (endPick) setEndPick(null);
     // 頂点の編集：頂点（黒い四角）をつかむと動かす・Ctrl を押しながら押すと消す。線の上をつかんで動かすと、そこに頂点を足す（押しただけでは足さない）。
     // 図形の外を押すと頂点の編集を終える（Excel と同じ）
     if (pe) {
@@ -1287,7 +1315,15 @@ export function PhotoMarkEditor({
       }
       const p0 = tool === 'line' || tool === 'arrow' || tool === 'arrow2' ? snapEnd(raw) : raw;
       const m = newMark(tool, p0, p0);
-      drag.current = {type: 'create', tool, p0, id: m.id, ctrl: e.ctrlKey || e.metaKey};
+      // 選んでいる直線の端を押した：すぐドラッグすれば続けて描く（L字）・押して離せば、その端をつまむ（up で endPick）
+      let fromEnd: {id: string; which: 1 | 2} | undefined;
+      if (single?.kind === 'line') {
+        const en = lineEnds(single, V);
+        const [d2, d1] = [Math.hypot(p.x - en.x2, p.y - en.y2), Math.hypot(p.x - en.x1, p.y - en.y1)];
+        const ht = handleTol(e);
+        if (Math.min(d1, d2) <= ht) fromEnd = {id: single.id, which: d2 <= d1 ? 2 : 1};
+      }
+      drag.current = {type: 'create', tool, p0, id: m.id, ctrl: e.ctrlKey || e.metaKey, fromEnd};
       setDraft([...marks, m]);
       setSel([m.id]);
       return;
@@ -1421,7 +1457,22 @@ export function PhotoMarkEditor({
     if (d.type === 'end') {
       const en = lineEnds(d.base, V);
       const fixed = d.which === 1 ? {x: en.x2, y: en.y2} : {x: en.x1, y: en.y1};
-      let q = {x: clamp(p.x, 0, W), y: clamp(p.y, 0, H)};
+      const start = d.which === 1 ? {x: en.x1, y: en.y1} : {x: en.x2, y: en.y2};
+      // 端は押した所から動かした分だけ動かす（前は指の所へとんだ。指は端から少しずれた所を押すので、押しただけで端が動いた）。
+      // 遊びは動かす（move）と同じ：マウス 2画素・指 4画素（指は遊びの分を引く）
+      let [dx, dy] = [p.x - d.p0.x, p.y - d.p0.y];
+      if (!d.moved) {
+        const dist = Math.hypot(dx * k, dy * k);
+        const play = e.pointerType === 'mouse' ? 2 : 4;
+        if (dist < play) return;
+        d.moved = true;
+        if (e.pointerType !== 'mouse') {
+          const f = play / dist;
+          d.p0 = {x: d.p0.x + dx * f, y: d.p0.y + dy * f};
+          [dx, dy] = [p.x - d.p0.x, p.y - d.p0.y];
+        }
+      }
+      let q = {x: clamp(start.x + dx, 0, W), y: clamp(start.y + dy, 0, H)};
       if (e.shiftKey) {
         q = snap15(fixed, q);
         q = {x: clamp(q.x, 0, W), y: clamp(q.y, 0, H)};
@@ -1529,6 +1580,12 @@ export function PhotoMarkEditor({
       const b = markBounds(m, V);
       // 直線で押しただけ：何も置かない（押した所の図形を選ぶ。色・太さを直せる）。ほかの道具は Excel と同じく決まった大きさで置く（テキストは押した所に打つ）
       if (Math.max(b.w, b.h) * k < 4 && d.tool === 'line') {
+        // 選んでいた直線の端を押して離した：その端をつまむ（緑の輪）
+        if (d.fromEnd) {
+          setSel([d.fromEnd.id]);
+          setEndPick(d.fromEnd);
+          return;
+        }
         tapSelect(d.p0, e);
         return;
       }
@@ -1572,6 +1629,8 @@ export function PhotoMarkEditor({
       } else commit(next);
       return;
     }
+    // 直線の端：動かしても押しただけでも、その端をつまんだままにする（続けて ◀ ▲ ▼ ▶・矢印キーで少しずつ）
+    if (d.type === 'end') setEndPick({id: d.id, which: d.which});
     if (next && JSON.stringify(next) !== JSON.stringify(marks)) commit(next);
   };
 
@@ -1790,9 +1849,12 @@ export function PhotoMarkEditor({
 
   // スマホ・iPad の少しずつ動かすボタン（◀ ▲ ▼ ▶。パソコンの矢印キーと同じ）：1回押すと画面の1画素ぶん、押したままだとくり返し動く（離したときに1回で入れる＝戻るも1回）。
   // ユーザーの指示「手すりを左右に微調整しようとした場合に微調整がきかない。段階が少し大きすぎる」2026-10-30（指のドラッグでは細かく合わせにくい）
-  const nudge = useRef<{timer: number; base: PhotoMark[]; ids: string[]; n: number; dx: number; dy: number} | null>(null);
+  const nudge = useRef<{timer: number; base: PhotoMark[]; ids: string[]; n: number; dx: number; dy: number; end: {id: string; which: 1 | 2} | null} | null>(null);
   const nudgeList = (st: NonNullable<typeof nudge.current>) => {
     const step = Math.max(1, 1 / (k || 1));
+    // 直線の端をつまんでいるときは、その端だけ
+    const end = st.end;
+    if (end) return st.base.map((m) => (m.id === end.id ? endMoved(m, end.which, st.dx * st.n * step, st.dy * st.n * step) : m));
     const moved = moveBy(
       st.base.filter((m) => st.ids.includes(m.id)),
       W,
@@ -1805,7 +1867,7 @@ export function PhotoMarkEditor({
   const nudgeStart = (dx: number, dy: number) => (e: ReactPointerEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     if (nudge.current || !sel.length) return;
-    const st = {timer: 0, base: marks, ids: sel, n: 1, dx, dy};
+    const st = {timer: 0, base: marks, ids: sel, n: 1, dx, dy, end: ep};
     nudge.current = st;
     setDraft(nudgeList(st));
     const again = () => {
@@ -1860,7 +1922,11 @@ export function PhotoMarkEditor({
                   [e.x1, e.y1],
                   [e.x2, e.y2],
                 ].map(([x, y], i) => (
-                  <circle key={i} cx={x * k} cy={y * k} r={tool ? 3 : 5.5} fill={tool ? strokeSel : 'white'} stroke={strokeSel} strokeWidth={1.2} />
+                  <Fragment key={i}>
+                    {/* つまんだ端：緑の輪（その端だけを動かす） */}
+                    {ep && ep.id === m.id && ep.which === i + 1 && <circle data-end-pick={i + 1} cx={x * k} cy={y * k} r={11} fill="rgba(21,128,61,0.12)" stroke="#15803d" strokeWidth={2} />}
+                    <circle cx={x * k} cy={y * k} r={tool ? 3 : 5.5} fill={tool ? strokeSel : 'white'} stroke={strokeSel} strokeWidth={1.2} />
+                  </Fragment>
                 ))}
                 {r && (
                   // 直線を回すつまみ（まん中のまわりに回す。Shift で 15°ずつ）
