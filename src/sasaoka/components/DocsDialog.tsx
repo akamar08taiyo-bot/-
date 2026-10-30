@@ -5,7 +5,7 @@
 // ファイルは1つずつ、いつもの名前で保存する（ブラウザが「複数のファイルのダウンロード」を一度だけ聞くことがある）。メールは mailDraft.ts。
 // 特定福祉用具の2つは特定福祉用具のアプリに作ってもらう（tokuteiLink.ts の tokuteiFiles）。作れない書類（見積書に行がない・特定福祉用具の商品がない）は選べない。
 // 「📲 様邸のデータ」（jobShare.ts）は、パソコンのこのアプリに取り込むファイル（申請書・見積書・理由書の内容・写真・特定福祉用具の案件をすべて。2026-10-30）
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import type {ReactNode} from 'react';
 import {createPortal} from 'react-dom';
 import {hasEstimateRows} from '../calc.ts';
@@ -37,6 +37,10 @@ type Mode = 'excel' | 'mail';
 type Pick = DocKind | 'data';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** これより大きい様邸のデータは、メールで届かないことがあると知らせる（会社のメールの受け取れる大きさは 5〜10MB のことが多い。メールで送るとさらに 1.3倍ほどになる） */
+const BIG_DATA = 5 * 1024 * 1024;
+/** 大きさの見せ方（「850KB」「2.4MB」） */
+export const sizeText = (bytes: number) => (bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))}KB` : `${(bytes / 1024 / 1024).toFixed(1)}MB`);
 
 /** 作れない書類と、そのわけ（作れるものは ''） */
 function whyNot(job: Job): Record<DocKind, string> {
@@ -63,6 +67,24 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
   const [retry, setRetry] = useState<{mail: Mail | null; files: Attachment[]; data: ShareData | null} | null>(null);
   // iPhone・iPad で共有メニューを使えないとき：1つずつ押して保存してもらう（続けて保存すると初めの1つしか保存されない）。mail があればそのあとメールを開く
   const [taps, setTaps] = useState<{files: Attachment[]; done: string[]; mail?: Mail} | null>(null);
+  // 様邸のデータのおおよその大きさ（バイト）。写真が多いと数MB になり、会社のメールで受け取れない・迷惑メールになることがある
+  // （ユーザーの報告「データを送っているのに、メールが届かない」2026-10-30）ので、送る前に見せる
+  const [dataSize, setDataSize] = useState<number | null>(null);
+  const opened = picked !== null;
+  useEffect(() => {
+    if (!opened) return;
+    let alive = true;
+    void getPhotos([...photoIdsInUse([job])]).then(
+      (stored) => {
+        const photos = [...stored.values()].reduce((n, p) => n + p.blob.size, 0);
+        if (alive) setDataSize(Math.ceil((photos * 4) / 3) + JSON.stringify(job).length); // 写真は base64（4/3 倍）
+      },
+      () => alive && setDataSize(null),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [opened, job]);
   const why = whyNot(job);
   const chosen = KINDS.filter(([k]) => picked?.has(k) && !why[k]).map(([k]) => k);
   const withData = !!picked?.has('data');
@@ -301,7 +323,8 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
                   <input type="checkbox" checked={!!picked.has('data')} disabled={busy || !!retry} onChange={() => toggle('data')} className="h-5 w-5" />
                   <span className="min-w-0">
                     <span className="whitespace-nowrap font-bold">📲 様邸のデータ</span>
-                    <span className="ml-1 inline-block text-xs text-slate-500">（パソコンのアプリに取り込む）</span>
+                    <span className="ml-1 inline-block text-xs text-slate-500">（パソコンのアプリに取り込む{dataSize !== null ? `・約 ${sizeText(dataSize)}` : ''}）</span>
+                    {dataSize !== null && dataSize > BIG_DATA && <span className="block text-xs font-bold text-rose-700">写真が多く大きいので、会社のメールでは届かないことがあります</span>}
                   </span>
                 </label>
               </div>

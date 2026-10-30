@@ -83,6 +83,9 @@ await p.getByRole('button', {name: '✉ メールで送付', exact: true}).click
 const mdlg = p.getByRole('dialog', {name: 'メールで送付（Excel）'});
 const data = mdlg.getByRole('group', {name: '様邸のデータ'}).getByRole('checkbox');
 assert.equal(await data.isChecked(), false); // 初めは付けない
+// 送る前におおよその大きさ（写真1枚ぶん。会社のメールで届かないときの目安。ユーザーの報告「データを送っているのに、メールが届かない」2026-10-30）
+await p.waitForFunction(() => /パソコンのアプリに取り込む・約 \d+(\.\d)?(KB|MB)）/.test(document.querySelector('[role="group"][aria-label="様邸のデータ"]')?.textContent ?? ''));
+assert.equal(await mdlg.getByText('写真が多く大きいので').count(), 0); // 小さいので知らせない
 await mdlg.getByRole('group', {name: 'メールに付ける書類'}).getByRole('checkbox', {name: /^住宅改修申請書/}).uncheck();
 await data.check();
 await p.screenshot({path: path.join(outDir, 'share-1-phone-dialog.png')});
