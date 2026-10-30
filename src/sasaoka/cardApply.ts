@@ -7,6 +7,7 @@ import type {CardInfo, CardKey, CardRead} from './hokensho.ts';
 import {warekiText} from './riyu.ts';
 import {toKatakana} from './util.ts';
 import type {Insurer, Job, ShinseiInfo} from './types.ts';
+import {addressOfZip, isZipHead, withoutDoubledHead, zipCandidates, zipLabel} from './zip.ts';
 
 /** 確かめる画面の1行（いくつかの項目をまとめたもの＝生年月日・認定有効期間） */
 export type CardField = 'insuredNo' | 'kana' | 'name' | 'birth' | 'gender' | 'zip' | 'address' | 'care' | 'careTerm' | 'insurer' | 'insurerNo' | 'office' | 'burden';
@@ -26,6 +27,43 @@ export const CARD_FIELDS: {field: CardField; label: string; keys: CardKey[]}[] =
   {field: 'office', label: '居宅介護支援事業所', keys: ['office']},
   {field: 'burden', label: '利用者負担の割合', keys: ['burden']},
 ];
+
+/**
+ * 確かめる画面で郵便番号・住所を直したとき、もう一方も入れる（申請書の欄と同じ決まり。zip.ts の withZipAddress・withAddressZip。
+ * ユーザーの指示「介護保険証読み取り画面でも、郵便番号も入力したら⇄読み取れるように」2026-10-30）：
+ * 郵便番号は7けたで「824-0043」の形に。住所が空か郵便番号から入れたままなら、郵便番号の住所（の頭）を入れる。
+ * 住所を直したら、郵便番号が空か前の住所の番号のままなら、1つに決まる番号を入れる。also：一緒に変えた行
+ */
+export function linkZipAddress(prev: CardInfo, patch: Partial<CardInfo>): {info: CardInfo; also: CardField[]} {
+  const info = {...prev, ...patch};
+  const also: CardField[] = [];
+  if (patch.zip !== undefined && patch.zip !== prev.zip) {
+    if (patch.zip.normalize('NFKC').replace(/\D/g, '').length === 7) info.zip = zipLabel(patch.zip);
+    const addr = addressOfZip(patch.zip);
+    if (addr && addr !== prev.address && (!prev.address.trim() || isZipHead(prev.address))) {
+      info.address = addr;
+      also.push('address');
+    }
+  }
+  if (patch.address !== undefined && patch.address !== prev.address) {
+    info.address = withoutDoubledHead(patch.address, info.zip);
+    const zipNow = zipLabel(prev.zip);
+    const fromBefore = !!zipNow && zipCandidates(prev.address).some((h) => h.zip === zipNow);
+    const hits = zipCandidates(info.address);
+    if (hits.length === 1 && hits[0].zip !== zipNow && (!zipNow || fromBefore)) {
+      info.zip = hits[0].zip;
+      also.push('zip');
+    }
+  }
+  return {info, also};
+}
+
+/** 読んだ値で郵便番号か住所の片方だけが読めたとき、もう一方を入れる（確かめる画面を開いたとき） */
+export function fillZipAddress(info: CardInfo): CardInfo {
+  if (info.zip.trim() && !info.address.trim()) return linkZipAddress({...info, zip: ''}, {zip: info.zip}).info;
+  if (info.address.trim() && !info.zip.trim()) return linkZipAddress({...info, address: ''}, {address: info.address}).info;
+  return info;
+}
 
 /** 和暦の生年月日の文字（「昭和13年4月14日」） */
 export const birthText = (v: Pick<CardInfo, 'era' | 'birthY' | 'birthM' | 'birthD'>) => (v.era && v.birthY ? `${v.era}${v.birthY}年${v.birthM}月${v.birthD}日` : '');

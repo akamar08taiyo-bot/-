@@ -1,7 +1,7 @@
 // 介護保険証から読んだ値を様邸に入れる（cardApply.ts）。値はすべて架空
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {addCardRead, applyCard, birthText, currentOf, defaultPicks, fieldText, termText} from '../../src/sasaoka/cardApply.ts';
+import {addCardRead, applyCard, birthText, currentOf, defaultPicks, fieldText, fillZipAddress, linkZipAddress, termText} from '../../src/sasaoka/cardApply.ts';
 import {NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {NO_CARD} from '../../src/sasaoka/hokensho.ts';
 import type {CardInfo, CardKey} from '../../src/sasaoka/hokensho.ts';
@@ -114,4 +114,24 @@ test('追加で読み取る：空いた欄は足す・黄色の欄はたしか�
   // 同じ読みが2回なら、たしかに
   const r3 = addCardRead(cur, ['kana'], new Set(), {...add, info: {...NO_CARD, kana: 'ミキン　カコ'}, unsure: ['kana']});
   assert.deepEqual([r3.info.kana, r3.unsure, r3.changed], ['ミキン　カコ', [], ['kana']]);
+});
+
+test('確かめる画面の郵便番号⇔住所：郵便番号を打つと住所（の頭）・住所を打つと郵便番号。手で入れたもう一方は変えない（ユーザーの指示「介護保険証読み取り画面でも、郵便番号も入力したら⇄読み取れるように」）', () => {
+  // ハイフンなしで打つと 824-0043 の形に・住所が空なら郵便番号の住所
+  const a = linkZipAddress(NO_CARD, {zip: '８２４００４３'});
+  assert.deepEqual([a.info.zip, a.info.address, a.also], ['824-0043', '福岡県行橋市大字流末', ['address']]);
+  // 住所が郵便番号から入れたままなら、住所を直すと郵便番号も（町名まで打ったら町の番号に）
+  const b = linkZipAddress(a.info, {address: '福岡県京都郡苅田町大字黒添'});
+  assert.deepEqual([b.info.zip, b.also], ['800-0333', ['zip']]);
+  // 番地を足した住所は、郵便番号を打ち直しても変えない
+  const c = linkZipAddress({...b.info, address: '福岡県京都郡苅田町大字黒添1-2'}, {zip: '8240043'});
+  assert.deepEqual([c.info.address, c.also], ['福岡県京都郡苅田町大字黒添1-2', []]);
+  // 手で入れた郵便番号（今の住所の番号でない）は、住所を直しても変えない
+  const d = linkZipAddress({...NO_CARD, zip: '824-0043', address: '見本の住所'}, {address: '福岡県京都郡苅田町大字黒添'});
+  assert.deepEqual([d.info.zip, d.also], ['824-0043', []]);
+  // 開いたとき：片方だけ読めたら、もう一方を入れる（両方読めていればそのまま）
+  assert.equal(fillZipAddress({...NO_CARD, zip: '824-0043'}).address, '福岡県行橋市大字流末');
+  assert.equal(fillZipAddress({...NO_CARD, address: '福岡県京都郡苅田町大字黒添1-2'}).zip, '800-0333');
+  const both = {...NO_CARD, zip: '824-0043', address: '見本の住所'};
+  assert.equal(fillZipAddress(both), both);
 });

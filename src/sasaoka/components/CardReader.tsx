@@ -7,7 +7,7 @@
 
 import {useEffect, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
-import {addCardRead, applyCard, birthText, CARD_FIELDS, currentOf, defaultPicks, fieldText, sameText} from '../cardApply.ts';
+import {addCardRead, applyCard, birthText, CARD_FIELDS, currentOf, defaultPicks, fieldText, fillZipAddress, linkZipAddress, sameText} from '../cardApply.ts';
 import type {CardField} from '../cardApply.ts';
 import {isCardFile, readCards} from '../cardOcr.ts';
 import type {CardProgress} from '../cardOcr.ts';
@@ -249,12 +249,19 @@ function FieldInput({field, v, set}: {field: CardField; v: CardInfo; set: (patch
           <option value="3">3割</option>
         </select>
       );
+    case 'zip':
+      return (
+        <>
+          <TextInput value={v.zip} onChange={(zip) => set({zip})} className="w-full min-w-0" aria-label="郵便番号（読んだ値）" inputMode="numeric" placeholder="8240000" />
+          <span className="mt-0.5 block text-[13px] leading-tight text-slate-500">ハイフンなしで入力（住所を入れると自動で入ります）</span>
+        </>
+      );
     case 'kana':
       // ひらがな・半角カナで打ち直しても全角カタカナに（ユーザーの指示「介護保険証貼り付けた場合も、ふりがなは自動でカタカナに」2026-10-30。申請書の欄と同じ KanaInput）
       return <KanaInput value={v.kana} onChange={(kana) => set({kana})} className="w-full min-w-0" aria-label="フリガナ（読んだ値）" />;
     default: {
       const label = CARD_FIELDS.find((x) => x.field === field)?.label ?? field;
-      return <TextInput value={String(v[field])} onChange={(t) => set({[field]: t} as Partial<CardInfo>)} className="w-full min-w-0" aria-label={`${label}（読んだ値）`} inputMode={field === 'insuredNo' || field === 'insurerNo' || field === 'zip' ? 'numeric' : undefined} />;
+      return <TextInput value={String(v[field])} onChange={(t) => set({[field]: t} as Partial<CardInfo>)} className="w-full min-w-0" aria-label={`${label}（読んだ値）`} inputMode={field === 'insuredNo' || field === 'insurerNo' ? 'numeric' : undefined} />;
     }
   }
 }
@@ -266,22 +273,24 @@ function FieldInput({field, v, set}: {field: CardField; v: CardInfo; set: (patch
  */
 export function CardDialog({job, read, thumbs, onApply, onClose, newJob = false}: {job: Job; read: CardRead; thumbs: string[]; onApply: (next: Job) => void; onClose: () => void; newJob?: boolean}) {
   const toast = useToast();
-  const [v, setV] = useState<CardInfo>(read.info);
+  const [v, setV] = useState<CardInfo>(() => fillZipAddress(read.info));
   // 読んだ値とたしかでない項目（追加で読み取ると増える。「読めず」「黄色」の印に使う）・手で直した欄
   const [got, setGot] = useState({info: read.info, unsure: read.unsure, kinds: read.kinds});
   const edited = useRef(new Set<CardField>());
   const [shots, setShots] = useState(thumbs);
   const [picks, setPicks] = useState<Set<CardField>>(() => {
-    const p = defaultPicks(job, read.info, read.unsure);
+    const p = defaultPicks(job, fillZipAddress(read.info), read.unsure);
     if (newJob) p.add('insurer');
     return p;
   });
   const [big, setBig] = useState<string | null>(null);
   const cur = currentOf(job);
   const set = (field: CardField) => (patch: Partial<CardInfo>) => {
-    edited.current.add(field);
-    setV((x) => ({...x, ...patch}));
-    setPicks((p) => new Set(p).add(field));
+    // 郵便番号・住所は、直すともう一方も入る（linkZipAddress）。一緒に入った行も「直した行」にしてチェックを付ける
+    const {info, also} = linkZipAddress(v, patch);
+    for (const f of [field, ...also]) edited.current.add(f);
+    setV(info);
+    setPicks((p) => new Set([...p, field, ...also]));
   };
   const toggle = (field: CardField, on: boolean) =>
     setPicks((p) => {

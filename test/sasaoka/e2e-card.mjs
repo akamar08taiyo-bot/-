@@ -96,6 +96,17 @@ await val('フリガナ').fill('ミホン');
 // ひらがなで打ち直しても全角カタカナに（ユーザーの指示「介護保険証貼り付けた場合も、ふりがなは自動でカタカナに」2026-10-30）
 await val('フリガナ').fill('みほん　はなこ');
 assert.equal(await val('フリガナ').inputValue(), 'ミホン　ハナコ');
+// 郵便番号⇔住所（ユーザーの指示「介護保険証読み取り画面でも、郵便番号も入力したら⇄読み取れるように」2026-10-30）。郵便番号の欄の下に注意書き
+assert.match(await row('郵便番号').innerText(), /ハイフンなしで入力（住所を入れると自動で入ります）/);
+await val('住所').fill('');
+await val('郵便番号').fill('8240043');
+assert.deepEqual([await val('郵便番号').inputValue(), await val('住所').inputValue()], ['824-0043', '福岡県行橋市大字流末']);
+await val('住所').fill('福岡県京都郡苅田町大字黒添');
+assert.equal(await val('郵便番号').inputValue(), '800-0333');
+// 元に戻す（住所を先に。番地まである住所は、郵便番号を打ち直しても変わらない）
+await val('住所').fill('行橋市中央一丁目1番1号');
+await val('郵便番号').fill('824-0001');
+assert.deepEqual([await val('郵便番号').inputValue(), await val('住所').inputValue()], ['824-0001', '行橋市中央一丁目1番1号']);
 assert.equal(await row('氏名').getByLabel('氏名を入れる').isChecked(), true);
 // 保険者はこの様邸と同じ（行橋市）なので、はじめはチェックしない
 assert.equal(await row('保険者').getByLabel('保険者を入れる').isChecked(), false);
