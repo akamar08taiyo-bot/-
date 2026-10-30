@@ -452,6 +452,19 @@ for (const [i, [fx, fy]] of [
   await clickOn(fx, fy);
   assert.deepEqual(await polyPoints(), Array.from({length: i + 1}, (_, j) => String(j + 1)), `折れ線の点の印 ${i + 1}`);
 }
+// 描いている途中の「戻る」「進む」：押した点を1つずつ戻す・やり直す（ユーザーの指示「折れ線で指示をだしているときも、戻るを押すともとにもどる。例 ③から②にもどる」2026-10-30）
+{
+  const before = await kinds();
+  await dlg.getByRole('button', {name: '戻る', exact: true}).click();
+  assert.deepEqual(await polyPoints(), ['1', '2', '3'], '戻るで ④ を戻す');
+  assert.deepEqual(await kinds(), before, 'ほかの図形はそのまま');
+  await dlg.getByRole('button', {name: '進む', exact: true}).click();
+  assert.deepEqual(await polyPoints(), ['1', '2', '3', '4'], '進むで ④ をやり直す');
+  await page.keyboard.press('Control+z');
+  assert.deepEqual(await polyPoints(), ['1', '2', '3'], 'Ctrl+Z も同じ');
+  await page.keyboard.press('Control+y');
+  assert.deepEqual(await polyPoints(), ['1', '2', '3', '4']);
+}
 await page.mouse.move(0, 0); // マウスの所までの線を外して撮る
 await page.screenshot({path: path.join(outDir, 'mark-04b-poly-points.png')});
 // 「✓ 折れ線を終える」は写真の左上（ユーザーの指示「折れ線をおえるボタンが下にあり見えにくいので、写真の左上に設置する。動かすこともできる」2026-10-30）。
@@ -496,6 +509,16 @@ assert.equal(await dlg.locator('[data-poly-points]').count(), 0);
 assert.equal(await pressed('選択'), 'true');
 await dlg.getByRole('button', {name: '戻る', exact: true}).click();
 assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen']);
+// 1つ目の点まで戻すと、描くのをやめる（図形は増えない）
+await ribbon.getByRole('button', {name: /^折れ線/}).click();
+await clickOn(0.5, 0.62);
+await clickOn(0.7, 0.62);
+await dlg.getByRole('button', {name: '戻る', exact: true}).click();
+await dlg.getByRole('button', {name: '戻る', exact: true}).click();
+assert.equal(await dlg.locator('[data-poly-points]').count(), 0);
+assert.equal(await dlg.getByRole('button', {name: '✓ 折れ線を終える'}).count(), 0);
+assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen']);
+await ribbon.getByRole('button', {name: '選択', exact: true}).click();
 log('折れ線（押した点の丸と番号・はじめの点を押すと閉じる）OK');
 
 // ---------------- 四角（角を4つ押すだけ。4つ目で閉じる。ななめの四角も。ユーザーの指示「写真の中のような⬜︎の図をつくるときは、1角ワンタッチで⬜︎やななめ四角をつくれるように」2026-10-29）
@@ -1096,6 +1119,13 @@ for (const [name, vp, touch] of [
     ])
       await tapAt(fx, fy);
     assert.equal(await d2.locator('[data-poly-point]').count(), 4, `${name} 4つの点の印`);
+    // 指で「戻る」：④を戻す → 「進む」で戻す
+    await p2.waitForTimeout(800);
+    await d2.getByRole('button', {name: '戻る', exact: true}).tap();
+    await p2.waitForFunction(() => document.querySelectorAll('[data-poly-point]').length === 3, null, {timeout: 5000});
+    await p2.waitForTimeout(800);
+    await d2.getByRole('button', {name: '進む', exact: true}).tap();
+    await p2.waitForFunction(() => document.querySelectorAll('[data-poly-point]').length === 4, null, {timeout: 5000});
     await p2.screenshot({path: path.join(outDir, `mark-05g-${name}-poly-points.png`)});
     await tapAt(0.56, 0.16); // はじめの点の近く
     await p2.waitForFunction(() => document.querySelectorAll('[role="dialog"] [data-photo-stage] [data-mark]').length === 2, null, {timeout: 5000});

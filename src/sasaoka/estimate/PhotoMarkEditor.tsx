@@ -690,7 +690,23 @@ export function PhotoMarkEditor({
   );
 
   // ---------------------------------------------------------------- 元に戻す・コピー・貼り付けなど
+  // 折れ線・四角を描いている途中の「戻る」「進む」：押した点を1つずつ戻す・やり直す（1つ目の点まで戻すと描くのをやめる）。
+  // ユーザーの指示「折れ線で指示をだしているときも、戻るを押すともとにもどる。例 ③から②にもどる」2026-10-30（前は描く前の図形が戻った）
+  const polyRedo = useRef<Pt[]>([]);
   const undo = () => {
+    const cur = poly.current;
+    if (cur) {
+      const q = cur.pts.pop();
+      if (q) polyRedo.current.push(q);
+      if (cur.pts.length) showPoly();
+      else {
+        poly.current = null;
+        polyRedo.current = [];
+        setPolyOn(false);
+        setDraft(null);
+      }
+      return;
+    }
     endEdit();
     const prev = past.current.pop();
     if (!prev) return;
@@ -702,6 +718,15 @@ export function PhotoMarkEditor({
     setArmKey((n) => n + 1);
   };
   const redo = () => {
+    const cur = poly.current;
+    if (cur) {
+      const q = polyRedo.current.pop();
+      if (q) {
+        cur.pts.push(q);
+        showPoly();
+      }
+      return;
+    }
     endEdit();
     const next = future.current.pop();
     if (!next) return;
@@ -1160,6 +1185,7 @@ export function PhotoMarkEditor({
   const finishPoly = () => {
     const cur = poly.current;
     poly.current = null;
+    polyRedo.current = [];
     setPolyOn(false);
     setDraft(null);
     if (cur?.quad && cur.pts.length < 4) return; // 四角は4つ目の角まで押したときだけ（途中でやめたら描かない）
@@ -1175,6 +1201,7 @@ export function PhotoMarkEditor({
     !cur.quad && cur.pts.length >= 3 && Math.hypot(raw.x - cur.pts[0].x, raw.y - cur.pts[0].y) <= closeTol;
   const addPolyPoint = (raw: Pt, shift: boolean, quad = false, closeTol = 0) => {
     const cur = poly.current;
+    polyRedo.current = []; // 新しく点を押したら、戻した点はやり直さない
     if (!cur) {
       poly.current = {id: markId(), pts: [snapEnd(raw)], ...(quad ? {quad: true} : {})};
       setPolyOn(true);
@@ -2131,11 +2158,11 @@ export function PhotoMarkEditor({
           戻る・進むは太い矢印と文字（ユーザーの指示「戻る、進むボタンはもう少しわかりやすく」2026-10-29。前は細い ↶ ↷ だけ）。スマホは矢印の下に文字、題名は出さない（入らない） */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-slate-200 bg-white px-2 py-1">
         <div className="flex min-w-0 items-center gap-1">
-          <button type="button" className={UNDO_BTN} title="戻る（元に戻す Ctrl+Z）" aria-label="戻る" disabled={!past.current.length && !editing} onClick={undo}>
+          <button type="button" className={UNDO_BTN} title="戻る（元に戻す Ctrl+Z）" aria-label="戻る" disabled={!past.current.length && !editing && !polyOn} onClick={undo}>
             <Icon name="undo" />
             <span>戻る</span>
           </button>
-          <button type="button" className={UNDO_BTN} title="進む（やり直し Ctrl+Y）" aria-label="進む" disabled={!future.current.length} onClick={redo}>
+          <button type="button" className={UNDO_BTN} title="進む（やり直し Ctrl+Y）" aria-label="進む" disabled={polyOn ? !polyRedo.current.length : !future.current.length} onClick={redo}>
             <Icon name="redo" />
             <span>進む</span>
           </button>
