@@ -1,7 +1,9 @@
 // カタログの PDF（1ページ）を読んで、印刷用の絵（JPEG）と品番の一覧（catalog.ts の pageCodes）にする。
 // PDF をそのまま開いて印刷するとブラウザ・端末ごとに出方がちがうので（iPad は印刷のボタンが出ないことがある）、
 // 絵にして見積書・申請書と同じ印刷の画面（A4縦）で出す。
-import {pageCodes} from '../catalog.ts';
+import {CATALOG, pageCodes} from '../catalog.ts';
+import {parseCatalogPage} from '../catalogItems.ts';
+import type {CatalogProduct, PdfText} from '../catalogItems.ts';
 import {openPdf} from '../import/pdfText.ts';
 
 /** 印刷の細かさ（A4 で 200dpi ＝ 1654×2339 ほど） */
@@ -55,4 +57,36 @@ export async function loadCatalogPage(file: string): Promise<CatalogImage> {
     if (!blob) throw new Error('image');
     return {url: URL.createObjectURL(blob), codes: pageCodes(text), text};
   });
+}
+
+/** ページの文字と位置（左上から pt。catalogItems.ts で商品の一覧にする） */
+export function loadCatalogItems(file: string): Promise<PdfText[]> {
+  return withPage(file, async (page) => {
+    const vp = page.getViewport({scale: 1});
+    const tc = await page.getTextContent();
+    return tc.items.flatMap((i) => ('str' in i ? [{s: i.str, x: i.transform[4], y: vp.height - i.transform[5], w: i.width, h: Math.abs(i.transform[3])}] : []));
+  });
+}
+
+/**
+ * カタログの全部のページの商品（ユーザーの指示「カタログに載っている商品、すべて取り込んでもらいたい」2026-10-30）。
+ * はじめて使うときに1ページずつ読んで（文字だけ。絵にしない）、この画面を開いているあいだ覚えておく。読めなかったときは次にまた読む
+ */
+let products: Promise<CatalogProduct[]> | null = null;
+export function loadCatalogProducts(): Promise<CatalogProduct[]> {
+  if (!products) {
+    products = (async () => {
+      const out: CatalogProduct[] = [];
+      for (const p of CATALOG) {
+        try {
+          out.push(...parseCatalogPage(await loadCatalogItems(p.file), p));
+        } catch {
+          // 読めなかったページはとばす
+        }
+      }
+      if (!out.length) products = null;
+      return out;
+    })();
+  }
+  return products;
 }

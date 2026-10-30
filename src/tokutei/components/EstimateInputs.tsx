@@ -17,6 +17,7 @@ import {yen} from '../util.ts';
 import {zipLabel} from '../zip.ts';
 import type {ZipHit} from '../zip.ts';
 import {CategorySelect} from './CategorySelect.tsx';
+import {CatalogPicker} from './CatalogPicker.tsx';
 import {MakerInput} from './MakerInput.tsx';
 import {ReasonField} from './ReasonField.tsx';
 import {AddItemButton, CatalogSearch, Circles, EraBirthInput, InsuredNoInput, KanaInput} from './ShinseiParts.tsx';
@@ -135,9 +136,10 @@ export function EstimateInputs({
                 change={(patch) => changeItem(l.item.id, patch)}
                 remove={() => change({items: sale.items.filter((x) => x.id !== l.item.id)})}
                 favorite={unregistered.has(l.item.id) ? () => onFavorite(l.item.id) : undefined}
+                onCatalog={onCatalog}
               />
             ))}
-            {t.lines.length === 0 && <ItemBlock key={draft.id} line={lineOf(draft, s)} no={1} makers={makers} change={(patch) => onAddItem({...draft, ...patch})} />}
+            {t.lines.length === 0 && <ItemBlock key={draft.id} line={lineOf(draft, s)} no={1} makers={makers} change={(patch) => onAddItem({...draft, ...patch})} onCatalog={onCatalog} />}
             {t.lines.length > 0 && (
               <AddItemButton
                 next={t.lines.length + 1}
@@ -391,6 +393,7 @@ function ItemBlock({
   change,
   remove,
   favorite,
+  onCatalog,
 }: {
   line: Line;
   no: number;
@@ -398,6 +401,7 @@ function ItemBlock({
   change: (patch: Partial<SaleItem>) => void;
   remove?: () => void;
   favorite?: () => void; // 手で入れた商品を★お気に入りに（まだ商品マスタにないときだけ）
+  onCatalog?: (query: string) => void; // カタログの窓を開く（カタログの商品の「p.40」）
 }) {
   const i = l.item;
   const manual = i.productId === null;
@@ -425,6 +429,8 @@ function ItemBlock({
           <span>{[i.maker, i.code, i.tais && `TAIS ${i.tais}`].filter(Boolean).join('　')}</span>
         )}
       </div>
+      {/* 種目・メーカーを選ぶと、カタログのその商品の一覧（押すと商品名・品番・定価が入る） */}
+      {manual && <CatalogPicker item={i} onPick={change} onCatalog={onCatalog} />}
       <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1.5 pl-8 text-xs font-bold text-slate-500">
         定価（税抜）
         <div className="flex min-w-0 flex-wrap items-center gap-2">

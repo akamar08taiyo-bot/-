@@ -19,6 +19,7 @@ import {yen} from '../util.ts';
 import {zipLabel} from '../zip.ts';
 import type {ZipHit} from '../zip.ts';
 import {CategorySelect} from './CategorySelect.tsx';
+import {CatalogPicker} from './CatalogPicker.tsx';
 import {MakerInput} from './MakerInput.tsx';
 import {ReasonField} from './ReasonField.tsx';
 import {AddItemButton, CatalogSearch, Circles, EraBirthInput, InsuredNoInput, KanaInput, nextOnEnter} from './ShinseiParts.tsx';
@@ -273,6 +274,8 @@ export function ShinseiInputs({
                   <div className="flex min-w-0 flex-wrap items-center gap-2 pl-8">
                     {i.productId === null ? <MakerInput value={i.maker} onChange={(maker) => changeItem(i.id, {maker})} choices={makers} className="w-56" /> : i.maker && <span className="text-xs text-slate-500">{i.maker}</span>}
                   </div>
+                  {/* 種目・メーカーを選ぶと、カタログのその商品の一覧（押すと商品名・品番・定価が入る。ユーザーの指示 2026-10-30） */}
+                  {i.productId === null && <CatalogPicker item={i} onPick={(patch) => changeItem(i.id, patch)} onCatalog={onCatalog} />}
                   {/* 定価の下に割引率と販売金額（ユーザーの指示「定価の下に、販売金額を記載する」「定価の下に割引率を表示、変更できるようにする」2026-10-26）。
                       販売金額は 定価×(100−割引率)%（打ち直したら薄い黄色で、↺ で戻す。販売見積書の単価と同じ値）。割引率を変えたら販売金額は計算し直す。
                       その下に数量（− ＋。ユーザーの指示「数量を追加」2026-10-26。販売見積書の数量と同じ値）。右の金額は 販売金額×数量＋税（申請書の購入予定金額） */}

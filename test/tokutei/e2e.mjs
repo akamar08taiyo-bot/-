@@ -849,6 +849,30 @@ try {
   await page.getByRole('button', {name: '⬇ すべてをファイルに保存'}).waitFor();
   await page.screenshot({path: `${out}/09-settings.png`, fullPage: true});
 
+  // ---- カタログから商品を選ぶ（ユーザーの指示「シャワーチェアで、パナソニックを選んだ場合に、お渡ししたカタログの中の、パナソニックのシャワーチェアの一覧を表示する…
+  // カタログに載っている商品、すべて取り込んでもらいたい」2026-10-30）：種目 → 品目（シャワーチェアなど）→ メーカー → 商品と色。押すと商品名・メーカー・品番・定価が入る
+  await page.setViewportSize({width: 1366, height: 900});
+  await page.getByRole('button', {name: '📝 見積もり・申請'}).click();
+  if (!(await page.getByRole('button', {name: '＋ 苅田町'}).count())) await page.getByRole('button', {name: '📝 見積もり・申請'}).click();
+  await page.getByRole('button', {name: '＋ 苅田町'}).click();
+  await page.getByRole('button', {name: '📄 申請書', exact: true}).click();
+  const catForm = page.getByRole('form', {name: '申請書に入れる所'});
+  await catForm.getByLabel('種目', {exact: true}).selectOption('入浴補助用具');
+  const picker = catForm.getByRole('group', {name: 'カタログの商品'});
+  await picker.getByRole('button', {name: 'シャワーチェア・ベンチ'}).click({timeout: 60000});
+  assert.deepEqual(await picker.getByRole('button', {pressed: false}).filter({hasText: /（株）$/}).allInnerTexts(), ['アロン化成（株）', 'パナソニックエイジフリー（株）']);
+  await picker.getByRole('button', {name: 'パナソニックエイジフリー（株）'}).click();
+  assert.equal(await catForm.getByLabel('メーカー').first().inputValue(), 'パナソニックエイジフリー（株）');
+  const panaList = picker.getByRole('list', {name: 'パナソニックエイジフリー（株）の商品'});
+  assert.equal(await panaList.getByRole('listitem').count(), 11); // カタログ p.40 のシャワーチェア 11種
+  await page.screenshot({path: `${out}/05f-catalog-picker.png`});
+  await panaList.getByRole('button', {name: 'シャワーチェアAir コンパクトSPワンタッチ ブルー PN-L41431Aを入れる'}).click();
+  assert.equal(await catForm.getByLabel('商品名').inputValue(), 'シャワーチェアAir コンパクトSPワンタッチ ブルー');
+  assert.ok(Number((await catForm.getByLabel('定価').inputValue()).replace(/[^\d]/g, '')) > 0);
+  assert.equal(await panaList.count(), 0); // 選んだら閉じる（「▼ 商品 11件」で開き直せる）
+  await picker.getByRole('button', {name: '▼ 商品 11件'}).waitFor();
+  await page.screenshot({path: `${out}/05g-catalog-picked.png`});
+
   // ---- スマホの幅（はじめて開いたとき）
   const phone = await browser.newContext({viewport: {width: 390, height: 844}, deviceScaleFactor: 2});
   const p2 = await phone.newPage();
