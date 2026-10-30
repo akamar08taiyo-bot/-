@@ -5,14 +5,14 @@
 // ファイルは1つずつ、いつもの名前で保存する（ブラウザが「複数のファイルのダウンロード」を一度だけ聞くことがある）。メールは mailDraft.ts。
 // 特定福祉用具の2つは特定福祉用具のアプリに作ってもらう（tokuteiLink.ts の tokuteiFiles）。作れない書類（見積書に行がない・特定福祉用具の商品がない）は選べない。
 // 「📲 様邸のデータ」（jobShare.ts）は、パソコンのこのアプリに取り込むファイル（申請書・見積書・理由書の内容・写真・特定福祉用具の案件をすべて。2026-10-30）
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
 import {createPortal} from 'react-dom';
 import {hasEstimateRows} from '../calc.ts';
 import {isBlankShinsei, jobInsurer} from '../estimateForms.ts';
 import {XLSX_TYPE, estimateXlsx} from '../estimateXlsx.ts';
 import {canMakeShinsei, riyuBook, shinseiBook} from '../estimate/shinseiFiles.ts';
-import {docsMail, isAppleMobile, isMobileDevice, openMailto, share, shareData, stillActive} from '../mailDraft.ts';
+import {DATA_LABEL, docsMail, isAppleMobile, isMobileDevice, openMailto, share, shareData, stillActive} from '../mailDraft.ts';
 import type {Attachment, Mail} from '../mailDraft.ts';
 import {JOB_SHARE_TYPE, jobPackageJson, jobPackageName} from '../jobShare.ts';
 import {getPhotos, photoIdsInUse} from '../photos.ts';
@@ -70,6 +70,8 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
   // 様邸のデータのおおよその大きさ（バイト）。写真が多いと数MB になり、会社のメールで受け取れない・迷惑メールになることがある
   // （ユーザーの報告「データを送っているのに、メールが届かない」2026-10-30）ので、送る前に見せる
   const [dataSize, setDataSize] = useState<number | null>(null);
+  // iPhone・iPad で、押したときにコピーした件名（共有メニューからのメールには件名が入らないので、件名に貼り付けてもらう）
+  const copied = useRef('');
   const opened = picked !== null;
   useEffect(() => {
     if (!opened) return;
@@ -183,7 +185,7 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
     if (data) {
       const how = await share(data);
       if (how === 'shared') {
-        toast('メールのアプリに渡しました');
+        toast(copied.current ? `件名「${copied.current}」をコピーしました。メールの件名に貼り付けてください` : 'メールのアプリに渡しました');
         setPicked(null);
         return;
       }
@@ -196,6 +198,22 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
     await mailto(mail, files, false);
   };
   const run = async () => {
+    const labels = [...KINDS.filter(([k]) => chosen.includes(k)).map(([, l]) => l), ...(withData ? [DATA_LABEL] : [])];
+    const data = withData ? {name: jobPackageName(job), url: location.origin + location.pathname} : undefined;
+    // iPhone・iPad の共有メニューからのメールには件名が入らない（Web Share では件名を渡せない）ので、押したその場で件名（「〇〇様邸」など）をコピーしておく
+    // （ユーザーの指示「〇〇様邸など、ひっかかりにくい件名にする」2026-10-30。件名が空だと迷惑メールにされやすい。コピーは押した操作の続きでないとできない）
+    copied.current = '';
+    if (mode === 'mail' && isAppleMobile()) {
+      const subject = docsMail(job, s, labels, [], data).subject;
+      try {
+        void navigator.clipboard?.writeText(subject).then(
+          () => (copied.current = subject),
+          () => undefined,
+        );
+      } catch {
+        /* コピーできなくても送れる */
+      }
+    }
     setBusy(true);
     setRetry(null);
     try {
@@ -207,8 +225,6 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
       }
       if (mode === 'excel') await save(files);
       else {
-        const labels = [...KINDS.filter(([k]) => chosen.includes(k)).map(([, l]) => l), ...(withData ? ['様邸のデータ'] : [])];
-        const data = withData ? {name: jobPackageName(job), url: location.origin + location.pathname} : undefined;
         const mail = docsMail(
           job,
           s,

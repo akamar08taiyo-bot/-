@@ -106,7 +106,7 @@ async function finish(page, dlg, retry) {
   const href = await page.evaluate(() => window.__mailto);
   assert.ok(href, 'メールを開いていない');
   const q = new URLSearchParams(href.slice(href.indexOf('?') + 1));
-  assert.equal(q.get('subject'), '見本 六郎様 住宅改修申請書・理由書の送付');
+  assert.equal(q.get('subject'), '見本 六郎様邸 住宅改修申請書・理由書');
   const body = q.get('body').split('\r\n');
   assert.deepEqual(body.slice(0, 7), ['お世話になっております。', '見本 六郎様の住宅改修申請書・理由書をお送りします。', 'ご確認のほど、よろしくお願いいたします。', '', '（添付）', '・見本六郎様住宅改修申請書.xlsx', '・見本六郎様住宅改修理由書.xlsx']);
   await page.getByText(/メールを開きました/).waitFor();
@@ -130,6 +130,10 @@ async function finish(page, dlg, retry) {
     navigator.share = async (d) => {
       window.__shared = {title: d.title, text: d.text, files: d.files.map((f) => [f.name, f.type, f.size])};
     };
+    // 件名のコピー（iPhone の共有メニューからのメールには件名が入らないので、押したときにコピーする）も覚える
+    navigator.clipboard.writeText = async (t) => {
+      window.__clip = t;
+    };
   });
   await page.getByRole('button', {name: '✉ メールで送付', exact: true}).click();
   const mdlg = page.getByRole('dialog', {name: 'メールで送付（Excel）'});
@@ -139,7 +143,8 @@ async function finish(page, dlg, retry) {
   await mdlg.getByRole('button', {name: '✉ 2つ付けてメールを作る'}).click();
   await finish(page, mdlg, '📤 メールのアプリに渡す');
   const shared = await page.evaluate(() => window.__shared);
-  assert.equal(shared.title, '見本 六郎様 住宅改修申請書・理由書の送付');
+  assert.equal(shared.title, '見本 六郎様邸 住宅改修申請書・理由書');
+  assert.equal(await page.evaluate(() => window.__clip), '見本 六郎様邸 住宅改修申請書・理由書'); // 件名をコピー
   assert.deepEqual(
     shared.files.map(([n, t, size]) => [n, t, size > 1000]),
     [
@@ -149,7 +154,7 @@ async function finish(page, dlg, retry) {
   );
   assert.match(shared.text, /見本 六郎様の住宅改修申請書・理由書をお送りします。/);
   assert.equal(await page.evaluate(() => window.__mailto ?? null), null); // スマホはメールのソフト（mailto:）ではなく共有メニュー
-  await page.getByText('メールのアプリに渡しました').waitFor();
+  await page.getByText('件名「見本 六郎様邸 住宅改修申請書・理由書」をコピーしました。メールの件名に貼り付けてください').waitFor();
   log('メールで送付（スマホ）：共有メニューに Excel 2つと件名・本文 OK');
 
   // 📗 Excelで保存（iPhone）：2つ以上は共有メニュー（「ファイルに保存」でまとめて保存できる）。Safari は続けて保存すると初めの1つしか保存しない

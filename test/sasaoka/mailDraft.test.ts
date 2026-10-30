@@ -10,7 +10,7 @@ const s = {...defaultSettings(), company: '見本商事株式会社', officeName
 
 test('件名・本文：お客様名と選んだ書類（タブの順）、付けるファイルの名前、会社・営業所・担当・電話', () => {
   const m = docsMail(job('見本 花子', '見本 一郎'), s, ['住宅改修申請書', '工事見積書'], ['見本花子様住宅改修申請書.xlsx', '見本花子様住宅改修見積書.xlsx']);
-  assert.equal(m.subject, '見本 花子様 住宅改修申請書・工事見積書の送付');
+  assert.equal(m.subject, '見本 花子様邸 住宅改修申請書・工事見積書'); // 「〇〇様邸」と書類（ユーザーの指示「〇〇様邸など、ひっかかりにくい件名にする」）
   assert.deepEqual(m.body.split('\n'), [
     'お世話になっております。',
     '見本 花子様の住宅改修申請書・工事見積書をお送りします。',
@@ -26,7 +26,7 @@ test('件名・本文：お客様名と選んだ書類（タブの順）、付�
   ]);
   // お客様名・担当がなければ、その所は書かない
   const blank = docsMail(job(''), s, ['理由書'], ['お客様住宅改修理由書.xlsx']);
-  assert.equal(blank.subject, '理由書の送付');
+  assert.equal(blank.subject, '理由書');
   assert.equal(blank.body.split('\n')[1], '理由書をお送りします。');
   assert.ok(!blank.body.includes('担当：'));
 });
@@ -62,6 +62,7 @@ test('iPhone・iPad か（Safari は続けて保存すると初めの1つしか�
 
 test('様邸のデータを付けるとき：取り込み方とアプリのリンクを書き、会社・営業所・担当・電話は書かない（ユーザーの指示「データを送る際、ここの部分は不要」2026-10-30）', () => {
   const m = docsMail(job('見本 花子', '見本 一郎'), s, ['様邸のデータ'], ['見本花子様_様邸データ.json'], {name: '見本花子様_様邸データ.json', url: 'https://example.invalid/jutaku-mitsumori/index.html'});
+  assert.equal(m.subject, '見本 花子様邸'); // 様邸のデータだけなら「〇〇様邸」
   const lines = m.body.split('\n');
   assert.equal(lines.at(-1), 'https://example.invalid/jutaku-mitsumori/index.html');
   assert.ok(lines.some((l) => l.includes('「見本花子様_様邸データ.json」を入れると')));

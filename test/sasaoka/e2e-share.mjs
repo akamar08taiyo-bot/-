@@ -78,6 +78,9 @@ await p.evaluate(() => {
   navigator.share = async (d) => {
     window.__shared = {title: d.title, text: d.text, files: await Promise.all(d.files.map(async (f) => ({name: f.name, type: f.type, text: f.type === 'application/json' ? await f.text() : null})))};
   };
+  navigator.clipboard.writeText = async (t) => {
+    window.__clip = t;
+  };
 });
 await p.getByRole('button', {name: '✉ メールで送付', exact: true}).click();
 const mdlg = p.getByRole('dialog', {name: 'メールで送付（Excel）'});
@@ -92,7 +95,10 @@ await p.screenshot({path: path.join(outDir, 'share-1-phone-dialog.png')});
 await mdlg.getByRole('button', {name: '✉ 1つ付けてメールを作る'}).click();
 await p.waitForFunction(() => window.__shared, null, {timeout: 60000});
 const shared = await p.evaluate(() => window.__shared);
-assert.equal(shared.title, '見本 七郎様 様邸のデータの送付');
+assert.equal(shared.title, '見本 七郎様邸');
+// iPhone のメールには件名が入らないので、押したときに件名「〇〇様邸」をコピーして、貼り付けてもらう（ユーザーの指示「〇〇様邸など、ひっかかりにくい件名にする」）
+assert.equal(await p.evaluate(() => window.__clip), '見本 七郎様邸');
+await p.getByText('件名「見本 七郎様邸」をコピーしました。メールの件名に貼り付けてください').waitFor();
 assert.deepEqual(
   shared.files.map((f) => [f.name, f.type]),
   [['見本七郎様_様邸データ.json', 'application/json']],

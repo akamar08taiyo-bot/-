@@ -11,6 +11,7 @@
  */
 export const MAILTO_MAX = 2000;
 
+import {jobName} from './calc.ts';
 import type {Job, Settings} from './types.ts';
 
 export type Mail = {to?: string[]; subject: string; body: string};
@@ -92,6 +93,9 @@ export function openMailto(mail: Mail): void {
  * メールの件名・本文（宛先はメールのソフト・アプリで入れる）。labels は書類の名前（タブの順）、names は付けるファイルの名前（本文の「（添付）」に並べる。
  * パソコンは mailto: で添付できないので、どのファイルを付けるか分かるように）
  */
+/** 様邸のデータの、メールの中での名前（DocsDialog.tsx の □ と同じ） */
+export const DATA_LABEL = '様邸のデータ';
+
 export function docsMail(job: Job, s: Settings, labels: string[], names: string[], data?: {name: string; url: string}): Mail {
   const who = job.customer.trim() ? `${job.customer.trim()}様` : '';
   const what = labels.join('・');
@@ -107,7 +111,10 @@ export function docsMail(job: Job, s: Settings, labels: string[], names: string[
       ...(data ? ['', `パソコンの「申請書・見積書作成」を開き、「📥 申請書・見積書・理由書を取り込む」に「${data.name}」を入れると、申請書・見積書・写真などがそのまま入ります。`, data.url] : []),
       ...(sign.length ? ['', ...sign] : []),
     ].join('\n');
-  const subject = `${who ? `${who} ` : ''}${what}の送付`;
+  // 件名は「〇〇様邸」と書類の名前だけ（ユーザーの指示「〇〇様邸など、ひっかかりにくい件名にする」2026-10-30。前は「〇〇様 …の送付」）。
+  // 様邸のデータだけなら「〇〇様邸」。iPhone の共有メニューからのメールには件名が入らないので、押したときに件名をコピーする（DocsDialog.tsx）
+  const house = job.customer.trim() ? jobName(job) : '';
+  const subject = [house, labels.filter((l) => l !== DATA_LABEL).join('・')].filter(Boolean).join(' ') || what;
   // メールのソフトに渡せる長さを超えるときは、添付の名前の並びを外す
   return mailtoFits({subject, body: body(names)}) ? {subject, body: body(names)} : {subject, body: body([])};
 }
