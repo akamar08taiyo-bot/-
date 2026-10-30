@@ -150,7 +150,7 @@ const rect = await svgOf(1, 'rect');
 assert.ok(Math.abs(Number(rect.width) - Number(rect.height)) < 0.5, `正方形 ${rect.width}×${rect.height}`);
 assert.equal(rect.fill, 'none'); // 塗りつぶしなし
 // 枠囲み（四角形）は茶色（ユーザーの指示「枠囲みの初期データは茶色」。線の色を変えても枠囲みは別に覚える）
-assert.equal(rect.stroke, '#996633');
+assert.equal(rect.stroke, '#734A2B'); // 写真の柱の木の色に近い茶色（2026-10-30）
 log('四角形（Shift で正方形）OK');
 
 // テキストボックス：押すとすぐ打てる（日本語も）
@@ -356,7 +356,7 @@ assert.deepEqual(after.map((a) => /name="([^"\d]+) \d+"/.exec(a)[1]), ['正方�
 const [xRect, xArrow, xText, xEllipse, xLine] = after;
 assert.match(xArrow, /<a:ln w="57150"><a:solidFill><a:srgbClr val="0070C0"\/><\/a:solidFill><a:prstDash val="dash"\/><a:tailEnd type="triangle" w="med" len="med"\/><\/a:ln>/);
 assert.match(xRect, /<a:xfrm rot="5400000">/);
-assert.match(xRect, /<a:solidFill><a:srgbClr val="FFFF00"\/><\/a:solidFill><a:ln w="25400"><a:solidFill><a:srgbClr val="996633"\/>/); // 初めの太さ 2pt（25400 EMU）
+assert.match(xRect, /<a:solidFill><a:srgbClr val="FFFF00"\/><\/a:solidFill><a:ln w="25400"><a:solidFill><a:srgbClr val="734A2B"\/>/); // 初めの太さ 2pt（25400 EMU）
 assert.match(xText, /<xdr:cNvSpPr txBox="1"\/>/);
 assert.match(xText, /sz="1400"><a:solidFill><a:srgbClr val="00B050"\/><\/a:solidFill><a:latin typeface="HG丸ｺﾞｼｯｸM-PRO"\/><a:ea typeface="HG丸ｺﾞｼｯｸM-PRO"\/><a:cs typeface="HG丸ｺﾞｼｯｸM-PRO"\/><\/a:rPr><a:t>Tesuri 手すり　L=800mm<\/a:t>/);
 assert.match(xText, /<a:t>H=750mm<\/a:t>/);
@@ -806,7 +806,7 @@ assert.equal(await ribbon.getByRole('button', {name: /^補強板/}).count(), 0);
 await ribbon.getByRole('button', {name: '正方形/長方形'}).click();
 await dragOn([0.55, 0.55], [0.75, 0.7]);
 assert.equal((await kinds()).at(-1), 'rect');
-assert.equal((await svgOf(5, 'rect')).stroke, '#996633');
+assert.equal((await svgOf(5, 'rect')).stroke, '#734A2B');
 await ribbon.getByRole('button', {name: /^番号/}).click();
 await clickOn(0.85, 0.15);
 await clickOn(0.85, 0.85);

@@ -14,6 +14,7 @@ import type {CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as React
 import {
   BOARD_PTS,
   BOARD_STYLE,
+  BROWN,
   cleanMarks,
   cmToPx,
   colorName,
@@ -118,7 +119,7 @@ const LONG_PRESS = 550; // 手書きの線を、止めてからまっすぐに�
 /** 書式の欄の色（よく使う色。黄＝線・ペン、茶＝枠囲み・補強板の初めの色） */
 const PANEL_COLORS: [string, string][] = [
   ['FFFF00', '黄'],
-  ['996633', '茶'],
+  [BROWN, '茶'], // 写真の柱の木の色に近い茶色（photoMarks.ts の BROWN）
   ['FF0000', '赤'],
   ['FFC000', 'オレンジ'],
   ['92D050', '薄い緑'],
@@ -354,7 +355,7 @@ function Icon({name, color}: {name: string; color?: string}) {
       // 頂点の編集（Excel の絵と同じく、線の角に小さな四角）
       return <svg {...s}><path d="M2.5 15 L7 5 L12 13 L17.5 4" strokeLinejoin="round" strokeDasharray="2.2 1.6" />{[[2.5, 15], [7, 5], [12, 13], [17.5, 4]].map(([x, y]) => <rect key={x} x={x - 1.6} y={y - 1.6} width="3.2" height="3.2" fill="currentColor" stroke="none" />)}</svg>;
     case 'board':
-      return <svg {...s}><rect x="2.5" y="4.5" width="15" height="11" stroke="#996633" /><path d="M2.5 15.5 L17.5 4.5" stroke="#996633" /></svg>;
+      return <svg {...s}><rect x="2.5" y="4.5" width="15" height="11" stroke={`#${BROWN}`} /><path d="M2.5 15.5 L17.5 4.5" stroke={`#${BROWN}`} /></svg>;
     case 'num':
       return <svg {...s}><circle cx="10" cy="10" r="7.5" /><path d="M8.3 7.3 L10.3 6 V14.3 M8.2 14.3 H12.3" strokeLinecap="round" /></svg>;
     case 'line':

@@ -108,7 +108,16 @@ test('写真を 90°回すと書き込みも一緒に回る：直線の端は (x
 test('手書きの線・補強板・番号の初めの書式：線・ペンは黄色、枠囲み（四角形）・補強板は茶色（ユーザーの指示「初期の色は黄色」「枠囲みの初期データは茶色」2026-10-29）', () => {
   assert.equal(SHAPE_STYLE.line, 'FFFF00');
   assert.equal(PEN_STYLE.line, 'FFFF00');
-  assert.equal(BOARD_STYLE.line, '996633');
+  assert.equal(BOARD_STYLE.line, '734A2B'); // 写真の柱の木の色に近い茶色（ユーザーの指示「茶色のベースプレートの色を、もう少し柱の色に近くする」2026-10-30）
+});
+
+test('前の茶色（996633）で描いた図形・覚えた書式は、読むと今の茶色（柱の色に近い 734A2B）に。ほかの色はそのまま', () => {
+  const out = cleanMarks([
+    {id: 'r', kind: 'rect', x1: 0.1, y1: 0.1, x2: 0.5, y2: 0.4, line: '996633', fill: '996633', color: '996633', text: 'a'},
+    {id: 'l', kind: 'line', x1: 0.1, y1: 0.1, x2: 0.5, y2: 0.4, line: 'ffff00'},
+  ]);
+  assert.deepEqual([out[0].line, out[0].fill, out[0].color], ['734A2B', '734A2B', '734A2B']);
+  assert.equal(out[1].line, 'FFFF00');
 });
 
 test('手書きの線・補強板をそろえる：点は 0〜1 に丸め、点が1つの手書きの線は捨てる。補強板の点がなければ左下から右上の斜め。手書きの線・補強板には文字を持たない', () => {

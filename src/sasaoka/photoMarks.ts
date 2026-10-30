@@ -138,8 +138,15 @@ export const SHAPE_STYLE: MarkStyle = {line: 'FFFF00', width: DEFAULT_LINE_WIDTH
 export const TEXT_STYLE: MarkStyle = {line: '', width: 0.75, dash: 'solid', fill: 'FFFFFF', color: 'FF0000', size: 11, font: MARK_FONT_DEFAULT};
 /** 手書きのペンの書式：黄色の 2pt（ユーザーの指示「ペンの細さや色を変更できる（デフォルトは黄色）」2026-10-29） */
 export const PEN_STYLE: MarkStyle = {line: 'FFFF00', width: DEFAULT_LINE_WIDTH, dash: 'solid', fill: '', color: 'FFFF00', size: 11, font: MARK_FONT_DEFAULT};
+/**
+ * 茶色（書式の欄の「茶」・枠囲みの初めの色）：写真の柱・枠の木の色（ユーザーの指示「茶色のベースプレートの色を、もう少し柱の色に近くする」2026-10-30。
+ * いただいた写真の柱は #624227 ほど。影と見分けられるよう少し明るく）。前の茶色（996633）で描いた図形・覚えた書式は、読むときにこの色にする（cleanMarks）
+ */
+export const BROWN = '734A2B';
+const OLD_BROWN = '996633';
+const recolor = (hex: string) => (hex === OLD_BROWN ? BROWN : hex);
 /** 枠囲み（正方形/長方形）と補強板（四角＋斜めの線）の書式：茶色の 2pt（ユーザーの指示「□で枠囲みするときは茶色がデフォルト」2026-10-29） */
-export const BOARD_STYLE: MarkStyle = {line: '996633', width: DEFAULT_LINE_WIDTH, dash: 'solid', fill: '', color: 'FF0000', size: 11, font: MARK_FONT_DEFAULT};
+export const BOARD_STYLE: MarkStyle = {line: BROWN, width: DEFAULT_LINE_WIDTH, dash: 'solid', fill: '', color: 'FF0000', size: 11, font: MARK_FONT_DEFAULT};
 /** 番号（①②…。平面図・写真に置く）：赤の 16pt・塗りつぶしと枠線なし */
 export const NUM_STYLE: MarkStyle = {line: '', width: 0.75, dash: 'solid', fill: '', color: 'FF0000', size: 16, font: MARK_FONT_DEFAULT};
 
@@ -201,16 +208,16 @@ export function cleanMarks(raw: unknown): PhotoMark[] {
       x2,
       y2,
       ...(rot && rot < 360 ? {rot} : {}),
-      line: hexOf(m.line),
+      line: recolor(hexOf(m.line)),
       width: Number.isFinite(width) && width > 0 ? Math.round(clamp(width, 0.25, 24) * 100) / 100 : SHAPE_STYLE.width,
       dash: DASH_KEYS.has(m.dash as PhotoMarkDash) ? (m.dash as PhotoMarkDash) : 'solid',
       ...(kind === 'line' && m.start === true ? {start: true} : {}),
       ...(kind === 'line' && m.end === true ? {end: true} : {}),
-      fill: kind === 'line' || kind === 'pen' ? '' : hexOf(m.fill),
+      fill: kind === 'line' || kind === 'pen' ? '' : recolor(hexOf(m.fill)),
       ...(text ? {text} : {}),
       ...(hasPts(kind) ? {pts: pts.length >= 2 ? pts : BOARD_PTS} : {}),
       size: Number.isFinite(size) && size > 0 ? Math.round(clamp(size, 1, 400) * 10) / 10 : SHAPE_STYLE.size,
-      color: hexOf(m.color) || '000000',
+      color: recolor(hexOf(m.color)) || '000000',
       ...(m.bold === true ? {bold: true} : {}),
       ...(hasText(kind) && typeof m.font === 'string' && FONT_OF.has(m.font) ? {font: m.font} : {}),
     });
