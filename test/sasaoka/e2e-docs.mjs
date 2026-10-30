@@ -45,7 +45,7 @@ async function newJob(options) {
   await page.waitForTimeout(800);
   return {ctx, page};
 }
-const checks = (dlg) => dlg.getByRole('group').getByRole('checkbox').evaluateAll((els) => els.map((e) => [e.closest('label').querySelector('.font-bold').textContent, e.checked, e.disabled]));
+const checks = (dlg) => dlg.getByRole('group', {name: /書類$/}).getByRole('checkbox').evaluateAll((els) => els.map((e) => [e.closest('label').querySelector('.font-bold').textContent, e.checked, e.disabled]));
 /** 作っているあいだに、押した操作の続きと見なされなくなったときは、もう一度押す画面になる（そのときは押す） */
 async function finish(page, dlg, retry) {
   await Promise.race([

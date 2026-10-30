@@ -234,24 +234,27 @@ export function tokuteiNames(): Map<string, string> {
 }
 
 export type TokuteiBook = {name: string; bytes: Uint8Array};
-type FilesWindow = Window & {__taiyoTokuteiFiles?: (kinds: TokuteiView[]) => Promise<TokuteiBook[]>};
-const filesOf = (frame: HTMLIFrameElement | null) => {
+/** 特定福祉用具のアプリ（枠の中）が住宅改修に頼まれてすること（特定福祉用具の App.tsx） */
+type TokuteiWindow = Window & {
+  __taiyoTokuteiFiles?: (kinds: TokuteiView[]) => Promise<TokuteiBook[]>;
+  __taiyoTokuteiCase?: () => Promise<unknown>;
+  __taiyoTokuteiPutCase?: (sale: unknown) => Promise<boolean>;
+};
+const appOf = (frame: HTMLIFrameElement | null): TokuteiWindow | null => {
   try {
-    return (frame?.contentWindow as FilesWindow | null | undefined)?.__taiyoTokuteiFiles;
+    return (frame?.contentWindow as TokuteiWindow | null | undefined) ?? null;
   } catch {
-    return undefined;
+    return null;
   }
 };
 
 /**
- * この様邸の特定福祉用具の申請書（shinsei）・販売見積書（quote）の Excel を、特定福祉用具のアプリに作ってもらう（「📗 Excelで保存」「✉ メールで送付」。前の「まとめて保存」。
- * ユーザーの指示「住宅改修申請書・特定福祉用具申請書・住宅改修見積もり・特定福祉用具販売見積もりを一括で保存できる機能をつける」2026-10-26）。
- * 特定福祉用具のタブを開いていればその枠に、なければ見えない枠でその様邸の案件を開いて頼む（特定福祉用具の App.tsx の __taiyoTokuteiFiles）。
- * 開くまで長くても20秒待つ。作れなければ例外
+ * この様邸の特定福祉用具の案件を開いた特定福祉用具のアプリに頼む。特定福祉用具のタブを開いていればその枠に、なければ見えない枠でその様邸の案件を開いて頼む。
+ * ready：頼めるようになったか（その様邸の案件ができてから置かれる）。開くまで長くても20秒待つ。頼めなければ例外
  */
-export async function tokuteiFiles(job: Job, kinds: TokuteiView[]): Promise<TokuteiBook[]> {
-  const open = document.querySelector<HTMLIFrameElement>('iframe[data-tokutei]');
-  if (open && filesOf(open)) return filesOf(open)!(kinds);
+async function withTokutei<T>(job: Job, ready: (w: TokuteiWindow) => boolean, call: (w: TokuteiWindow) => Promise<T>): Promise<T> {
+  const open = appOf(document.querySelector<HTMLIFrameElement>('iframe[data-tokutei]'));
+  if (open && ready(open)) return call(open);
   writeTokutei(job);
   const frame = document.createElement('iframe');
   frame.src = tokuteiUrl(job.id, 'shinsei');
@@ -261,12 +264,58 @@ export async function tokuteiFiles(job: Job, kinds: TokuteiView[]): Promise<Toku
   document.body.appendChild(frame);
   try {
     const started = Date.now();
-    while (!filesOf(frame)) {
+    for (;;) {
+      const w = appOf(frame);
+      if (w && ready(w)) return await call(w);
       if (Date.now() - started > 20000) throw new Error('特定福祉用具のアプリを開けませんでした');
       await new Promise((r) => setTimeout(r, 200));
     }
-    return await filesOf(frame)!(kinds);
   } finally {
     frame.remove();
   }
+}
+
+/**
+ * この様邸の特定福祉用具の申請書（shinsei）・販売見積書（quote）の Excel を、特定福祉用具のアプリに作ってもらう（「📗 Excelで保存」「✉ メールで送付」。前の「まとめて保存」。
+ * ユーザーの指示「住宅改修申請書・特定福祉用具申請書・住宅改修見積もり・特定福祉用具販売見積もりを一括で保存できる機能をつける」2026-10-26）。
+ * 特定福祉用具の App.tsx の __taiyoTokuteiFiles。作れなければ例外
+ */
+export function tokuteiFiles(job: Job, kinds: TokuteiView[]): Promise<TokuteiBook[]> {
+  return withTokutei(
+    job,
+    (w) => typeof w.__taiyoTokuteiFiles === 'function',
+    (w) => w.__taiyoTokuteiFiles!(kinds),
+  );
+}
+
+/** この様邸に特定福祉用具の案件があるか（商品のない作りかけも。特定福祉用具が書いたまとめの linked。ないのに枠を開くと空の案件ができるので、先に見る） */
+export function tokuteiLinked(jobId: string): boolean {
+  try {
+    const raw = JSON.parse(localStorage.getItem('taiyo-tokutei-sales-v1') ?? 'null') as {rows?: {jutakuJob?: string}[]; linked?: {job?: string}[]} | null;
+    return !!raw && ((raw.linked ?? []).some((l) => l.job === jobId) || (raw.rows ?? []).some((r) => r.jutakuJob === jobId));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 様邸のデータ（携帯で作ったものをパソコンへ送る。jobShare.ts）：この様邸の特定福祉用具の案件をそのまま受け取る（特定福祉用具の App.tsx の __taiyoTokuteiCase）。
+ * 案件がなければ null（枠を開かない）
+ */
+export async function tokuteiCase(job: Job): Promise<unknown> {
+  if (!tokuteiLinked(job.id)) return null;
+  return withTokutei(
+    job,
+    (w) => typeof w.__taiyoTokuteiCase === 'function',
+    (w) => w.__taiyoTokuteiCase!(),
+  );
+}
+
+/** 送られた特定福祉用具の案件を、この端末のその様邸の案件にする（前の案件は置きかえる。特定福祉用具の App.tsx の __taiyoTokuteiPutCase）。入れられたら true */
+export function putTokuteiCase(job: Job, sale: unknown): Promise<boolean> {
+  return withTokutei(
+    job,
+    (w) => typeof w.__taiyoTokuteiPutCase === 'function',
+    (w) => w.__taiyoTokuteiPutCase!(sale),
+  );
 }

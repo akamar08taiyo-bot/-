@@ -54,6 +54,15 @@ export async function putPhoto(p: {blob: Blob; w: number; h: number}): Promise<s
   return photo.id;
 }
 
+/**
+ * 写真を、ほかの端末と同じ番号で入れる（携帯から送った様邸のデータ。jobShare.ts。様邸は写真を番号で持つので、番号を変えずに入れる）。
+ * 同じ番号の写真があれば置きかえる
+ */
+export async function putPhotoAs(p: {id: string; blob: Blob; w: number; h: number}): Promise<void> {
+  const photo: StoredPhoto = {id: p.id, blob: p.blob, w: p.w, h: p.h, created: Date.now()};
+  await run('readwrite', (s) => s.put(photo));
+}
+
 /** 番号の写真（ないものは入らない） */
 export async function getPhotos(ids: string[]): Promise<Map<string, StoredPhoto>> {
   const out = new Map<string, StoredPhoto>();

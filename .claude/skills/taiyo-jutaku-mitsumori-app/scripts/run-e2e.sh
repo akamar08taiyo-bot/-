@@ -14,7 +14,7 @@ for t in "e2e.mjs http://localhost:5190/sasaoka/index.html" "e2e-settings.mjs ht
   "e2e-photomark.mjs http://localhost:5190" "e2e-photoadd.mjs http://localhost:5190" "e2e-import-docs.mjs http://localhost:5190" "e2e-delete.mjs http://localhost:5190" "e2e-zip.mjs http://localhost:5190" \
   "e2e-toolbar.mjs http://localhost:5190" "e2e-care.mjs http://localhost:5190" \
   "e2e-import-photos.mjs http://localhost:5190" "e2e-fukuoka.mjs http://localhost:5190" "e2e-kitakyushu.mjs http://localhost:5190" \
-  "e2e-import-tokutei.mjs http://localhost:5190" "e2e-docs.mjs http://localhost:5190"; do
+  "e2e-import-tokutei.mjs http://localhost:5190" "e2e-docs.mjs http://localhost:5190" "e2e-share.mjs http://localhost:5190"; do
   set -- $t
   timeout 500 node "test/sasaoka/$1" "$2" "$OUT" > "$OUT/$1.log" 2>&1
   code=$?

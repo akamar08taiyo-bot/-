@@ -3,7 +3,8 @@
 // デフォルトはその開いているページ…のみチェック。…メールで送付機能についても、基本的には一括で全てメールできるような形に…デフォルトは一つだけチェック」2026-10-30。
 // 前はタブごとの「📗 〇〇をExcelで保存」と、別の「📦 まとめて保存」（前に選んだものを覚えていた。2026-10-26）があった）。
 // ファイルは1つずつ、いつもの名前で保存する（ブラウザが「複数のファイルのダウンロード」を一度だけ聞くことがある）。メールは mailDraft.ts。
-// 特定福祉用具の2つは特定福祉用具のアプリに作ってもらう（tokuteiLink.ts の tokuteiFiles）。作れない書類（見積書に行がない・特定福祉用具の商品がない）は選べない
+// 特定福祉用具の2つは特定福祉用具のアプリに作ってもらう（tokuteiLink.ts の tokuteiFiles）。作れない書類（見積書に行がない・特定福祉用具の商品がない）は選べない。
+// 「📲 様邸のデータ」（jobShare.ts）は、パソコンのこのアプリに取り込むファイル（申請書・見積書・理由書の内容・写真・特定福祉用具の案件をすべて。2026-10-30）
 import {useState} from 'react';
 import type {ReactNode} from 'react';
 import {createPortal} from 'react-dom';
@@ -13,8 +14,10 @@ import {XLSX_TYPE, estimateXlsx} from '../estimateXlsx.ts';
 import {canMakeShinsei, riyuBook, shinseiBook} from '../estimate/shinseiFiles.ts';
 import {docsMail, isAppleMobile, isMobileDevice, openMailto, share, shareData, stillActive} from '../mailDraft.ts';
 import type {Attachment, Mail} from '../mailDraft.ts';
+import {JOB_SHARE_TYPE, jobPackageJson, jobPackageName} from '../jobShare.ts';
+import {getPhotos, photoIdsInUse} from '../photos.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
-import {tokuteiFiles, tokuteiHasItems} from '../tokuteiLink.ts';
+import {tokuteiCase, tokuteiFiles, tokuteiHasItems} from '../tokuteiLink.ts';
 import type {TokuteiView} from '../tokuteiLink.ts';
 import type {Job, Settings} from '../types.ts';
 import {downloadBlob} from '../util.ts';
@@ -30,6 +33,8 @@ const KINDS: [DocKind, string][] = [
   ['riyu', '理由書'],
 ];
 type Mode = 'excel' | 'mail';
+/** チェックできるもの：書類と、様邸のデータ（data） */
+type Pick = DocKind | 'data';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -52,7 +57,7 @@ function whyNot(job: Job): Record<DocKind, string> {
  */
 export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job: Job; s: Settings; view: DocKind; onBeforeSave?: () => Promise<unknown>}) {
   const toast = useToast();
-  const [picked, setPicked] = useState<Set<DocKind> | null>(null); // null は閉じている
+  const [picked, setPicked] = useState<Set<Pick> | null>(null); // null は閉じている
   const [busy, setBusy] = useState(false);
   // 作ったあと、押した操作の続きと見なされなくなって、メールを開けなかった・共有メニューを出せなかったとき：もう一度押してもらう（mail が null は Excelで保存）
   const [retry, setRetry] = useState<{mail: Mail | null; files: Attachment[]; data: ShareData | null} | null>(null);
@@ -60,13 +65,15 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
   const [taps, setTaps] = useState<{files: Attachment[]; done: string[]; mail?: Mail} | null>(null);
   const why = whyNot(job);
   const chosen = KINDS.filter(([k]) => picked?.has(k) && !why[k]).map(([k]) => k);
+  const withData = !!picked?.has('data');
+  const count = chosen.length + (withData ? 1 : 0);
   const open = () => {
     setRetry(null);
     setTaps(null);
     setPicked(new Set([view]));
   };
   const close = () => !busy && setPicked(null);
-  const toggle = (k: DocKind) =>
+  const toggle = (k: Pick) =>
     setPicked((p) => {
       const next = new Set(p);
       if (next.has(k)) next.delete(k);
@@ -95,6 +102,18 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
     if (chosen.includes('riyu')) {
       const r = await riyuBook(job, s);
       add(r.bytes, r.fileName);
+    }
+    if (withData) {
+      // 様邸のデータ：様邸と、使っている写真（この端末にあるもの。番号のまま）と、特定福祉用具の案件（あれば）
+      const stored = await getPhotos([...photoIdsInUse([job])]);
+      const photos = await Promise.all([...stored.values()].map(async (p) => ({id: p.id, w: p.w, h: p.h, type: p.blob.type || 'image/jpeg', bytes: new Uint8Array(await p.blob.arrayBuffer())})));
+      let tokutei: unknown = null;
+      try {
+        tokutei = await tokuteiCase(job);
+      } catch {
+        notes.push('特定福祉用具の案件は入れられませんでした');
+      }
+      files.push({name: jobPackageName(job), type: JOB_SHARE_TYPE, bytes: new TextEncoder().encode(jobPackageJson(job, photos, tokutei))});
     }
     return {files, notes};
   };
@@ -166,12 +185,14 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
       }
       if (mode === 'excel') await save(files);
       else {
-        const labels = KINDS.filter(([k]) => chosen.includes(k)).map(([, l]) => l);
+        const labels = [...KINDS.filter(([k]) => chosen.includes(k)).map(([, l]) => l), ...(withData ? ['様邸のデータ'] : [])];
+        const data = withData ? {name: jobPackageName(job), url: location.origin + location.pathname} : undefined;
         const mail = docsMail(
           job,
           s,
           labels,
           files.map((f) => f.name),
+          data,
         );
         await send(mail, files, isMobileDevice() ? shareData(mail, files) : null);
       }
@@ -183,7 +204,7 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
     }
   };
   const title = mode === 'excel' ? 'Excelで保存' : 'メールで送付（Excel）';
-  const go = mode === 'excel' ? `📗 ${chosen.length}つ保存する` : `✉ ${chosen.length}つ付けてメールを作る`;
+  const go = mode === 'excel' ? `📗 ${count}つ保存する` : `✉ ${count}つ付けてメールを作る`;
   return (
     <>
       {mode === 'excel' ? (
@@ -231,7 +252,7 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
                   <Btn color="white" onClick={close} disabled={busy}>
                     やめる
                   </Btn>
-                  <Btn color={mode === 'excel' ? 'softGreen' : 'softBlue'} onClick={() => void run()} disabled={busy || chosen.length === 0}>
+                  <Btn color={mode === 'excel' ? 'softGreen' : 'softBlue'} onClick={() => void run()} disabled={busy || count === 0}>
                     {busy ? '作っています…' : go}
                   </Btn>
                 </>
@@ -271,6 +292,18 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
                     </span>
                   </label>
                 ))}
+              </div>
+            )}
+            {!taps && (
+              // 様邸のデータ（パソコンのこのアプリに取り込む。jobShare.ts）。書類とは別の □（初めは付けない）
+              <div role="group" aria-label="様邸のデータ" className="mt-3 border-t border-slate-200 pt-3 text-base">
+                <label className="flex items-center gap-3 rounded-md border border-slate-300 px-3 py-2.5 hover:bg-emerald-50">
+                  <input type="checkbox" checked={!!picked.has('data')} disabled={busy || !!retry} onChange={() => toggle('data')} className="h-5 w-5" />
+                  <span className="min-w-0">
+                    <span className="whitespace-nowrap font-bold">📲 様邸のデータ</span>
+                    <span className="ml-1 inline-block text-xs text-slate-500">（パソコンのアプリに取り込む）</span>
+                  </span>
+                </label>
               </div>
             )}
           </Modal>,

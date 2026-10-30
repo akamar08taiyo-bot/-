@@ -306,6 +306,10 @@ description: 太陽シルバーサービス行橋営業所の業務アプリ「�
   （`navigator.userActivation.isActive`・share の NotAllowedError）、画面に「✉ メールを開く」「📤 メールのアプリに渡す」を出してもう一度押してもらう。販売受注簿作成ツール・売上伝票発行依頼書の mailDraft と同じ作り。
   **iPhone・iPad（`isAppleMobile`）で2つ以上を保存するときは共有メニュー**（本文なし＝「ファイルに保存」で .txt を作らない）。Safari は続けて保存（a.click の download）すると初めの1つしか保存しない
   （ユーザーの報告「3つ選択されているが…一つ（住宅改修申請書）しか届いていない」2026-10-30。そのときの画面は古い版の「まとめて保存」）。共有メニューがなければ「1つずつ保存」（押すたびに1つ。押したその場なので保存できる）。
+  **📲 様邸のデータ**（同じ画面の下の別の □。`jobShare.ts`。ユーザーの指示「携帯で作成したものを、パソコンに送った場合…そのまま…共有したい…リンクでもいい…開くとパソコンの中のアプリで同期」2026-10-30）：
+  様邸・使っている写真（`photoIdsInUse` → `getPhotos`。base64）・特定福祉用具の案件（`tokuteiCase`。案件のない様邸は枠を開かない）を1つの .json に。パソコンは DocImport.tsx の取り込みに .json も
+  （`isJobPackage`・`parseJobPackage`＝cleanJobs）→ 確かめ（この端末の方があとで直していれば赤で）→ 写真は `putPhotoAs`（同じ番号）・様邸は `mergeById`（置きかえ）・特定福祉用具は `putTokuteiCase`。
+  サーバーを使わない（ユーザーが「データをあずけるのは一旦保留」）ので、写真の入るリンクは作れない → ファイル＋本文にアプリのリンク。ブラウザのテストは `e2e-share.mjs`（携帯の端末とパソコンの端末を別の保存場所で）。
   **書類を選ぶ画面は `createPortal` で body に出す**：上の段の並び（JobHeader の row）の中に置くと、スマホの2列の指定（`[&>*:last-child:nth-child(odd)]:w-[calc(50%-0.25rem)]` など）が画面の外側の箱にもかかり、細い画面になった。
   ブラウザのテストは `e2e-docs.mjs`（mailto: は click を横取り、スマホは navigator.share を差しかえて渡されたファイルを見る）。ほかのテストは `e2eDocs.mjs` の `excelSave(page)` で保存する。
 - **特定福祉用具のアプリ（🛁 のタブの中）に頼むことは postMessage で、中のアプリが出てから送る**（`TokuteiEditor.tsx` の `ready`＝中に `__taiyoTokuteiFlush` がある）。

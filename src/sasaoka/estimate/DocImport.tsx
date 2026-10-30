@@ -1,7 +1,8 @@
 // 見積書の一覧・見積もりの入口の「📥 取り込む」：申請書・見積書・理由書の Excel を選ぶ／ドロップすると、名字ごとにまとめた確かめの画面を出し、
 // 「取り込む」で様邸を作る（同じ名字の様邸があれば、そこに足す＝合算）。読み取り・まとめ方は importDocs.ts。
 // 申請書の写真貼付用紙・平面図の写真と書き込みも一緒に入れる（枠ごとに1枚にまとめて端末に保存。photoImport.ts・photos.ts の composeFrame）。
-// 前に取り込んだ申請書でも、まだ入っていない写真があれば「写真を取り込む」（ユーザーの指示「申請書などを取り込んだときに、一括で写真などもと取り込めるようにする」2026-10-28）
+// 前に取り込んだ申請書でも、まだ入っていない写真があれば「写真を取り込む」（ユーザーの指示「申請書などを取り込んだときに、一括で写真などもと取り込めるようにする」2026-10-28）。
+// 携帯から送った「📲 様邸のデータ」（.json。jobShare.ts）も入れられる：同じ様邸（同じ番号）は送ったデータで置きかえ、なければ足す。写真・特定福祉用具の案件も（2026-10-30）
 import {useRef, useState} from 'react';
 import type {ReactNode} from 'react';
 import {jobName} from '../calc.ts';
@@ -10,7 +11,11 @@ import {applyImport, DOC_LABEL, planImport, readDoc} from '../importDocs.ts';
 import type {ImportGroup, ReadDoc} from '../importDocs.ts';
 import {frameLayout, missingFrames, withImportedPhotos} from '../photoImport.ts';
 import type {FramePhotos, StoredFrame} from '../photoImport.ts';
-import {composeFrame, putPhoto} from '../photos.ts';
+import {isJobPackage, jobPackageSummary, parseJobPackage} from '../jobShare.ts';
+import type {JobPackage} from '../jobShare.ts';
+import {composeFrame, putPhoto, putPhotoAs} from '../photos.ts';
+import {mergeById} from '../storage.ts';
+import {putTokuteiCase} from '../tokuteiLink.ts';
 import type {AppData, Job} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {monthLabel, todayIso, yen} from '../util.ts';
@@ -42,9 +47,31 @@ export function useDocImport(data: AppData, update: Update, onImported: (month: 
   const [drafts, setDrafts] = useState<Draft[] | null>(null);
   const [bad, setBad] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  // 様邸のデータ（携帯から送ったもの）と、一緒に入れた Excel（様邸のデータを取り込んだあとに読む）
+  const [pkgs, setPkgs] = useState<{list: JobPackage[]; rest: File[]} | null>(null);
   const s = data.settings;
 
-  const start = async (files: File[]) => {
+  const start = async (all: File[]) => {
+    const packages: JobPackage[] = [];
+    const files: File[] = [];
+    for (const f of all) {
+      if (!/\.json$/i.test(f.name) && f.type !== 'application/json') {
+        files.push(f);
+        continue;
+      }
+      try {
+        const text = await f.text();
+        if (!isJobPackage(text)) throw new Error('様邸のデータのファイルではありません');
+        packages.push(parseJobPackage(text));
+      } catch (e) {
+        toast(`読めませんでした：${f.name}（${e instanceof Error ? e.message : String(e)}）`, 'error');
+      }
+    }
+    if (packages.length) {
+      setPkgs({list: packages, rest: files});
+      return;
+    }
+    if (files.length === 0) return;
     const docs: ReadDoc[] = [];
     const unread: string[] = [];
     for (const f of files) {
@@ -147,12 +174,54 @@ export function useDocImport(data: AppData, update: Update, onImported: (month: 
     }
   };
 
+  /** 様邸のデータを取り込む：写真（同じ番号で）→ 様邸（同じ番号は置きかえ）→ 特定福祉用具の案件（特定福祉用具のアプリに頼む）。そのあと一緒に入れた Excel を読む */
+  const runPkgs = async () => {
+    if (!pkgs || busy) return;
+    setBusy(true);
+    let photos = 0;
+    try {
+      for (const p of pkgs.list) {
+        for (const ph of p.photos) {
+          await putPhotoAs({id: ph.id, blob: new Blob([ph.bytes as BlobPart], {type: ph.type}), w: ph.w, h: ph.h});
+          photos += 1;
+        }
+        update('jobs', (jobs) => mergeById(jobs, [p.job]));
+        if (p.tokutei) {
+          try {
+            if (!(await putTokuteiCase(p.job, p.tokutei))) throw new Error('保存できませんでした');
+          } catch (e) {
+            toast(`${jobName(p.job)}の特定福祉用具は入れられませんでした（${e instanceof Error ? e.message : String(e)}）`, 'error');
+          }
+        }
+      }
+      toast(`${pkgs.list.map((p) => jobName(p.job)).join('・')}を取り込みました${photos ? `（写真 ${photos}枚）` : ''}`);
+      const rest = pkgs.rest;
+      setPkgs(null);
+      onImported(pkgs.list[0].job.month);
+      if (rest.length) void start(rest);
+    } catch (e) {
+      toast(`取り込めませんでした：${e instanceof Error ? e.message : String(e)}`, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const closePkgs = () => {
+    if (busy) return;
+    const rest = pkgs?.rest ?? [];
+    setPkgs(null);
+    if (rest.length) void start(rest);
+  };
+  const when = (iso: string | number) => {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+
   const element = (
     <>
       <input
         ref={input}
         type="file"
-        accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.json,application/json"
         multiple
         className="hidden"
         aria-label="取り込むファイル"
@@ -162,6 +231,47 @@ export function useDocImport(data: AppData, update: Update, onImported: (month: 
           if (files.length) void start(files);
         }}
       />
+      {pkgs && (
+        <Modal
+          title="📲 様邸のデータの取り込み"
+          onClose={closePkgs}
+          footer={
+            <>
+              <Btn color="white" onClick={closePkgs} disabled={busy}>
+                やめる
+              </Btn>
+              <Btn color="purple" disabled={busy} onClick={() => void runPkgs()}>
+                {busy ? '取り込んでいます…' : `取り込む（${pkgs.list.length}件）`}
+              </Btn>
+            </>
+          }
+        >
+          <div className="space-y-3" aria-label="取り込む様邸のデータ">
+            {pkgs.list.map((p) => {
+              const sum = jobPackageSummary(p);
+              const here = data.jobs.find((j) => j.id === p.job.id);
+              return (
+                <section key={p.job.id} className="rounded-lg border border-slate-200 bg-white p-3" aria-label={`${jobName(p.job)}のデータ`}>
+                  <div className="text-base font-bold text-slate-800">{jobName(p.job)}</div>
+                  <p className="mt-1 text-sm text-slate-700">
+                    改修の箇所 {sum.places}・見積書の行 {sum.rows}・写真 {sum.photos}枚{sum.tokuteiItems !== null ? `・特定福祉用具 ${sum.tokuteiItems}点` : ''}
+                    {p.exportedAt && <span className="ml-2 text-slate-500">（{when(p.exportedAt)} に送ったもの）</span>}
+                  </p>
+                  {here ? (
+                    <p className={`mt-1 text-sm ${here.updatedAt > p.job.updatedAt ? 'font-bold text-rose-700' : 'text-slate-600'}`}>
+                      {here.updatedAt > p.job.updatedAt
+                        ? `この端末の方があとで直されています（${when(here.updatedAt)}）。送ったデータで置きかえます`
+                        : `この端末の同じ様邸を、送ったデータで置きかえます`}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-sm text-slate-600">新しく足します（{monthLabel(p.job.month)}）</p>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        </Modal>
+      )}
       {drafts && (
         <Modal
           title="📥 申請書・見積書・理由書の取り込み"
@@ -257,5 +367,5 @@ export function useDocImport(data: AppData, update: Update, onImported: (month: 
 
 /** 見積もりの入口の取り込みの欄（ファイルをドロップ・押して選ぶ） */
 export function DocImportDrop({onFiles, onPick}: {onFiles: (files: File[]) => void; onPick: () => void}) {
-  return <DropArea name="申請書・見積書・理由書を取り込む" label="📥 申請書・見積書・理由書を取り込む" hint="ここにドロップ・押して選ぶ（.xlsx）" onFiles={onFiles} onPick={onPick} big className="w-full" />;
+  return <DropArea name="申請書・見積書・理由書を取り込む" label="📥 申請書・見積書・理由書を取り込む" hint="ここにドロップ・押して選ぶ（.xlsx・様邸データ）" onFiles={onFiles} onPick={onPick} big className="w-full" />;
 }

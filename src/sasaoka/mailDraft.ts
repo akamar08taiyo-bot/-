@@ -92,7 +92,7 @@ export function openMailto(mail: Mail): void {
  * メールの件名・本文（宛先はメールのソフト・アプリで入れる）。labels は書類の名前（タブの順）、names は付けるファイルの名前（本文の「（添付）」に並べる。
  * パソコンは mailto: で添付できないので、どのファイルを付けるか分かるように）
  */
-export function docsMail(job: Job, s: Settings, labels: string[], names: string[]): Mail {
+export function docsMail(job: Job, s: Settings, labels: string[], names: string[], data?: {name: string; url: string}): Mail {
   const who = job.customer.trim() ? `${job.customer.trim()}様` : '';
   const what = labels.join('・');
   const sign = [[s.company, s.officeName].filter(Boolean).join(' '), job.staff?.trim() ? `担当：${job.staff.trim()}` : '', s.tel ? `TEL ${s.tel}` : ''].filter(Boolean);
@@ -102,6 +102,8 @@ export function docsMail(job: Job, s: Settings, labels: string[], names: string[
       `${who ? `${who}の` : ''}${what}をお送りします。`,
       'ご確認のほど、よろしくお願いいたします。',
       ...(list.length ? ['', '（添付）', ...list.map((n) => `・${n}`)] : []),
+      // 様邸のデータ（jobShare.ts）：パソコンのアプリで取り込むやり方と、アプリの場所（リンク）
+      ...(data ? ['', `パソコンの「申請書・見積書作成」を開き、「📥 申請書・見積書・理由書を取り込む」に「${data.name}」を入れると、申請書・見積書・写真などがそのまま入ります。`, data.url] : []),
       ...(sign.length ? ['', ...sign] : []),
     ].join('\n');
   const subject = `${who ? `${who} ` : ''}${what}の送付`;
