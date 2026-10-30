@@ -209,8 +209,10 @@ export function RiyuEditor({job, data, update, onBack, tabs, batch}: {job: Job; 
         );
       case 'zip':
         return (
-          <span className="inline-flex items-center gap-1">
-            〒<TextInput value={info.zip} onChange={(zip) => setInfo({zip})} inputMode="numeric" placeholder="824-0000" className="w-32" aria-label="郵便番号" data-nav />
+          <span className="flex flex-wrap items-center gap-x-1 gap-y-0.5">
+            〒<TextInput value={info.zip} onChange={(zip) => setInfo({zip})} inputMode="numeric" placeholder="8240000" className="w-32" aria-label="郵便番号" data-nav />
+            {/* ユーザーの指示「郵便番号の記入欄は、ハイフンなしで記入することを注意書き」「住所を入れたら自動的に郵便番号が入ることもわかるように、簡潔に」2026-10-30（7けた打つと 824-0043 の形になる。zip.ts の withZipAddress） */}
+            <span className="w-full text-[13px] leading-tight text-slate-500">ハイフンなしで入力（住所を入れると自動で入ります）</span>
           </span>
         );
       case 'address':

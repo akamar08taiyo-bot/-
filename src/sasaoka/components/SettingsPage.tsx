@@ -7,6 +7,7 @@ import {FORM_IDS, formLabel} from '../estimateForms.ts';
 import type {AppData, EstimateForm, InvoiceTaxMode, Rounding, Settings, TaxMode} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {downloadBlob, todayIso} from '../util.ts';
+import {zipLabel} from '../zip.ts';
 import {Btn, NumberInput, TextInput, useToast} from './ui.tsx';
 
 function Section({title, children, note}: {title: string; children: ReactNode; note?: ReactNode}) {
@@ -123,7 +124,10 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
         <Field label="所長名（請求書に「○○営業所所長　氏名」、見積書の代表者名に出ます）">
           {text('manager', '例：久保 匠史')}
         </Field>
-        <Field label="郵便番号">{text('postal')}</Field>
+        {/* ハイフンなしで打つ（ユーザーの指示「郵便番号の記入欄は、ハイフンなしで記入することを注意書き」2026-10-30）。7けたになったら 824-0043 の形に（請求書・申請書に出る形） */}
+        <Field label="郵便番号（ハイフンなしで入力）">
+          <TextInput value={s.postal} onChange={(v) => set({postal: zipLabel(v)})} inputMode="numeric" className="w-full" placeholder="8240000" />
+        </Field>
         <Field label="住所" wide>
           {text('address')}
         </Field>
