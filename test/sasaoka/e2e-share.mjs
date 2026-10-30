@@ -96,6 +96,7 @@ assert.deepEqual(
 );
 assert.match(shared.text, /「📥 申請書・見積書・理由書を取り込む」に「見本七郎様_様邸データ\.json」を入れると/);
 assert.ok(shared.text.includes(`${site}/jutaku-mitsumori/index.html`), shared.text); // アプリのリンク
+assert.ok(shared.text.trimEnd().endsWith(`${site}/jutaku-mitsumori/index.html`) && !shared.text.includes('TEL'), shared.text); // 会社・営業所・電話は書かない（データを送る際は不要）
 const pkg = JSON.parse(shared.files[0].text);
 assert.equal(pkg.kind, 'taiyo-jutaku-job');
 assert.equal(pkg.job.customer, '見本 七郎');

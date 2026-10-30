@@ -95,7 +95,8 @@ export function openMailto(mail: Mail): void {
 export function docsMail(job: Job, s: Settings, labels: string[], names: string[], data?: {name: string; url: string}): Mail {
   const who = job.customer.trim() ? `${job.customer.trim()}様` : '';
   const what = labels.join('・');
-  const sign = [[s.company, s.officeName].filter(Boolean).join(' '), job.staff?.trim() ? `担当：${job.staff.trim()}` : '', s.tel ? `TEL ${s.tel}` : ''].filter(Boolean);
+  // 会社・営業所・担当・電話（様邸のデータを送るとき＝自分のパソコンへ送るときは付けない。ユーザーの指示「データを送る際、ここの部分は不要」2026-10-30）
+  const sign = data ? [] : [[s.company, s.officeName].filter(Boolean).join(' '), job.staff?.trim() ? `担当：${job.staff.trim()}` : '', s.tel ? `TEL ${s.tel}` : ''].filter(Boolean);
   const body = (list: string[]) =>
     [
       'お世話になっております。',

@@ -59,3 +59,11 @@ test('iPhone・iPad か（Safari は続けて保存すると初めの1つしか�
   assert.ok(!isAppleMobile(nav('Mozilla/5.0 (Linux; Android 14)', 5)));
   assert.ok(!isAppleMobile(nav('Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 10)));
 });
+
+test('様邸のデータを付けるとき：取り込み方とアプリのリンクを書き、会社・営業所・担当・電話は書かない（ユーザーの指示「データを送る際、ここの部分は不要」2026-10-30）', () => {
+  const m = docsMail(job('見本 花子', '見本 一郎'), s, ['様邸のデータ'], ['見本花子様_様邸データ.json'], {name: '見本花子様_様邸データ.json', url: 'https://example.invalid/jutaku-mitsumori/index.html'});
+  const lines = m.body.split('\n');
+  assert.equal(lines.at(-1), 'https://example.invalid/jutaku-mitsumori/index.html');
+  assert.ok(lines.some((l) => l.includes('「見本花子様_様邸データ.json」を入れると')));
+  for (const t of ['見本商事株式会社', '見本営業所', '担当：', 'TEL']) assert.ok(!m.body.includes(t), t);
+});
