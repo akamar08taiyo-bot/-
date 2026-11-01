@@ -490,7 +490,8 @@ try {
   const viewer = page.getByRole('dialog', {name: 'カタログ'});
   await viewer.waitFor();
   const viewerChips = viewer.getByRole('group', {name: 'カタログのページ'}).getByRole('button');
-  await page.waitForFunction(() => [...document.querySelectorAll('[aria-label="カタログのページ"] button')].map((b) => b.textContent).join('|') === 'p.40 シャワーチェア（パナソニック ユクリア）', null, {timeout: 60000});
+  // ページのボタンの頭には、そのページの品目（2026-11-01。p.40 は「シャワーチェア」）
+  await page.waitForFunction(() => [...document.querySelectorAll('[aria-label="カタログのページ"] button')].map((b) => b.textContent).join('|') === 'シャワーチェアp.40 シャワーチェア（パナソニック ユクリア）', null, {timeout: 60000});
   await page.waitForFunction(() => {
     const img = document.querySelector('[aria-label="カタログのページの絵"] img');
     return img?.getAttribute('alt') === 'p.40 シャワーチェア（パナソニック ユクリア）' && img.complete && img.naturalWidth > 1500;
@@ -859,11 +860,22 @@ try {
   const catForm = page.getByRole('form', {name: '申請書に入れる所'});
   await catForm.getByLabel('種目', {exact: true}).selectOption('入浴補助用具');
   const picker = catForm.getByRole('group', {name: 'カタログの商品'});
-  await picker.getByRole('button', {name: 'シャワーチェア・ベンチ'}).click({timeout: 60000});
-  assert.deepEqual(await picker.getByRole('button', {pressed: false}).filter({hasText: /（株）$/}).allInnerTexts(), ['アロン化成（株）', 'パナソニックエイジフリー（株）']);
+  // 品目「シャワーチェア」を押すと、その品目の商品だけ（シャワーベンチ・シャワーチェア・シャワーキャリー。マットは出ない）がすぐ出る（2026-11-01）
+  await picker.getByRole('button', {name: /^シャワーチェア\s*\d+$/}).click({timeout: 60000});
+  const chairList = picker.getByRole('list', {name: 'シャワーチェアの商品'});
+  const chairNames = await chairList.getByRole('listitem').locator('span.font-bold').allInnerTexts();
+  assert.ok(chairNames.length >= 25, `${chairNames.length}`);
+  assert.ok(chairNames.some((n) => /シャワーラク/.test(n)) && chairNames.some((n) => /シャワーベンチ/.test(n)));
+  assert.ok(!chairNames.some((n) => /マット/.test(n)));
+  // さがす言葉で絞る
+  await picker.getByLabel('カタログの商品をさがす').fill('シャワーラク');
+  const raku = await chairList.getByRole('listitem').locator('span.font-bold').allInnerTexts();
+  assert.ok(raku.length >= 5 && raku.every((n) => /シャワーラク/.test(n)), raku.join(','));
+  await picker.getByLabel('カタログの商品をさがす').fill('');
+  assert.deepEqual(await picker.getByRole('button', {pressed: false}).filter({hasText: /（株）$/}).allInnerTexts(), ['アロン化成（株）', 'パナソニックエイジフリー（株）', 'ウチヱ（株）']);
   await picker.getByRole('button', {name: 'パナソニックエイジフリー（株）'}).click();
   assert.equal(await catForm.getByLabel('メーカー').first().inputValue(), 'パナソニックエイジフリー（株）');
-  const panaList = picker.getByRole('list', {name: 'パナソニックエイジフリー（株）の商品'});
+  const panaList = chairList;
   assert.equal(await panaList.getByRole('listitem').count(), 11); // カタログ p.40 のシャワーチェア 11種
   await page.screenshot({path: `${out}/05f-catalog-picker.png`});
   await panaList.getByRole('button', {name: 'シャワーチェアAir コンパクトSPワンタッチ ブルー PN-L41431Aを入れる'}).click();

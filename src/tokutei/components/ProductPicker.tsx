@@ -1,5 +1,5 @@
 import {useMemo, useState} from 'react';
-import {categoryLabel, categoryTab} from '../category.ts';
+import {categoryTab, sortSubs, subShort} from '../category.ts';
 import type {Product, Settings} from '../types.ts';
 import {matchesAll, yen} from '../util.ts';
 import {productPrice, sortProducts} from './ProductsPage.tsx';
@@ -27,6 +27,7 @@ export function ProductPicker({
   const favCount = products.filter((p) => p.favorite).length;
   const [view, setView] = useState<View>(favCount > 0 ? 'fav' : 'all');
   const [tab, setTab] = useState('');
+  const [sub, setSub] = useState('');
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<Record<string, number>>({});
 
@@ -36,7 +37,11 @@ export function ProductPicker({
     return sortProducts(products);
   }, [products, view]);
   const tabs = useMemo(() => [...new Set(base.map((p) => categoryTab(p.category)))], [base]);
-  const shown = base.filter((p) => (tab === '' || categoryTab(p.category) === tab) && matchesAll(`${p.name} ${p.maker} ${p.code} ${p.category} ${p.sub}`, query)).slice(0, 200);
+  const inTab = base.filter((p) => tab === '' || categoryTab(p.category) === tab);
+  // 種目のタブの中の品目（シャワーチェア・浴槽台など）。選ぶとその品目の商品だけ（ユーザーの指示「シャワーチェアを選んだら、シャワーチェアの一覧のみ」2026-11-01）
+  // 種目のタブがない（商品の種目が1つだけ）ときも、その種目の品目を出す
+  const subs = tab || tabs.length === 1 ? sortSubs([...new Set(inTab.map((p) => p.sub).filter(Boolean))]) : [];
+  const shown = inTab.filter((p) => (!sub || p.sub === sub) && matchesAll(`${p.name} ${p.maker} ${p.code} ${p.category} ${p.sub} ${subShort(p.sub)}`, query)).slice(0, 200);
 
   return (
     <Modal
@@ -65,6 +70,7 @@ export function ProductPicker({
                 onClick={() => {
                   setView(id);
                   setTab('');
+                  setSub('');
                 }}
                 className={`rounded-md px-3 py-1.5 text-sm font-bold ${view === id ? 'bg-teal-100 text-teal-900 ring-1 ring-inset ring-teal-300' : 'text-slate-600 hover:bg-teal-50'}`}
               >
@@ -80,10 +86,28 @@ export function ProductPicker({
               <button
                 key={t || 'all'}
                 type="button"
-                onClick={() => setTab(t)}
+                onClick={() => {
+                  setTab(t);
+                  setSub('');
+                }}
                 className={`rounded-full border px-3 py-1 text-xs font-bold ${tab === t ? 'border-teal-400 bg-teal-100 text-teal-900' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'}`}
               >
                 {t || 'すべての種目'}
+              </button>
+            ))}
+          </div>
+        )}
+        {subs.length > 1 && (
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="品目">
+            {['', ...subs].map((sb) => (
+              <button
+                key={sb || 'all'}
+                type="button"
+                aria-pressed={sub === sb}
+                onClick={() => setSub(sb)}
+                className={`rounded-md border px-2.5 py-1 text-xs ${sub === sb ? 'border-sky-500 bg-sky-100 font-bold text-sky-900' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'}`}
+              >
+                {sb ? subShort(sb) : 'すべての品目'}
               </button>
             ))}
           </div>
@@ -104,7 +128,7 @@ export function ProductPicker({
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-bold text-slate-800">{p.name}</div>
                     <div className="truncate text-xs text-slate-500">
-                      {[categoryLabel(p.category, p.sub) || '種目なし', p.maker, p.code].filter(Boolean).join('　')}
+                      {[p.category ? `${p.category}（${subShort(p.sub, p.category)}）` : '種目なし', p.maker, p.code].filter(Boolean).join('　')}
                     </div>
                   </div>
                   <div className="text-right text-xs tabular-nums text-slate-500">

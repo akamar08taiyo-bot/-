@@ -64,7 +64,9 @@ test('カタログから検索：ページの名前・ページの文字・品�
   assert.deepEqual(catalogMatches('533-685', texts), [at(172)]);
   assert.ok(catalogMatches('浴槽台', texts).includes(at(43)) && catalogMatches('浴槽台', texts).includes(at(44)));
   assert.deepEqual(catalogMatches('浴槽台 安寿', texts), [at(44)]);
-  assert.deepEqual(catalogMatches('シャワーチェア', texts), [at(40)]);
+  // ページの品目（kind）でも探せる：シャワーベンチ・シャワーキャリーのページも「シャワーチェア」（2026-11-01）
+  assert.deepEqual(catalogMatches('シャワーチェア', texts), [at(37), at(40), at(50)]);
+  assert.deepEqual(catalogMatches('ポータブルトイレ 安寿', texts), [at(172), at(173), at(178), at(179)]);
   assert.deepEqual(catalogMatches('見つからない語', texts), []);
 });
 

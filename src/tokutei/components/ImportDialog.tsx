@@ -17,6 +17,9 @@ import {
 } from '../import/priceImport.ts';
 import type {Candidate, Grid, Mapping, PositionedWord} from '../import/priceImport.ts';
 import {isXlsx, readXlsx} from '../import/xlsx.ts';
+import {catalogCandidates, isKaientaiOrder, parseCatalogPage} from '../catalogItems.ts';
+import type {CatalogProduct} from '../catalogItems.ts';
+import {subShort} from '../category.ts';
 import type {Sheet} from '../import/xlsx.ts';
 import type {Product, Settings} from '../types.ts';
 import {matchesAll, yen} from '../util.ts';
@@ -30,7 +33,9 @@ type Source =
   | {kind: 'xlsx'; sheets: Sheet[]}
   | {kind: 'csv'; grid: Grid}
   | {kind: 'paste'; text: string}
-  | {kind: 'pdf'; lines: string[]; words: PositionedWord[][]; pages: number};
+  | {kind: 'pdf'; lines: string[]; words: PositionedWord[][]; pages: number}
+  // 介援隊のカタログの PDF（注文番号 261-… のある商品の囲み）。商品ごとに読む（2026-11-01。表として読むと定価が仕切に入り、種目もずれた）
+  | {kind: 'catalog'; products: CatalogProduct[]; pages: number};
 
 type Override = Partial<Pick<Candidate, 'include' | 'favorite' | 'name' | 'price' | 'listPrice' | 'category' | 'sub' | 'categoryByHand'>>;
 
@@ -91,6 +96,7 @@ export function ImportDialog({
     if (source.kind === 'xlsx') return source.sheets[sheetIndex]?.rows ?? [];
     if (source.kind === 'csv') return source.grid;
     if (source.kind === 'paste') return textToGrid(source.text);
+    if (source.kind === 'catalog') return [];
     // PDFは見出しの位置に合わせて列をそろえる（見出しが見つからなければタブで区切る）
     return alignToHeader(source.words) ?? source.lines.map((l) => l.split('\t'));
   }, [source, sheetIndex]);
@@ -99,6 +105,7 @@ export function ImportDialog({
     if (!source) return [];
     if (source.kind === 'pdf') return source.lines;
     if (source.kind === 'paste') return textToLines(source.text);
+    if (source.kind === 'catalog') return [];
     return grid.map((r) => r.join('  '));
   }, [source, grid]);
 
@@ -110,6 +117,11 @@ export function ImportDialog({
     setOverrides({});
     setQuery('');
     setError('');
+    if (next.kind === 'catalog') {
+      setMode('lines');
+      setMapping(null);
+      return;
+    }
     const aligned = next.kind === 'pdf' ? alignToHeader(next.words) : null;
     const g =
       next.kind === 'xlsx' ? (next.sheets[firstSheet]?.rows ?? []) : next.kind === 'csv' ? next.grid : next.kind === 'paste' ? textToGrid(next.text) : (aligned ?? []);
@@ -132,10 +144,16 @@ export function ImportDialog({
       const head = String.fromCharCode(...bytes.slice(0, 5));
       if (head === '%PDF-') {
         setBusy('PDFを読み取っています…（ページ数が多いと少し時間がかかります）');
-        const {pdfToLines, NoTextError} = await import('../import/pdfText.ts');
+        const {pdfToLines, pdfPageItems, NoTextError} = await import('../import/pdfText.ts');
         try {
+          // pdf.js は渡したデータを使い終わると空にするので、カタログとして読む分を先に写しておく
+          const again = bytes.slice();
           const r = await pdfToLines(bytes);
-          start({kind: 'pdf', lines: r.lines, words: r.words, pages: r.pages}, f.name);
+          // 介援隊のカタログなら、商品ごとに読む（定価＝カタログの価格・仕切は空欄・種目は「介・購入」の印と商品名で）
+          const pages = await pdfPageItems(again);
+          const products = pages.flatMap((pg) => parseCatalogPage(pg.items, {page: pg.page, subs: []}));
+          if (products.some((p) => p.variants.some((v) => isKaientaiOrder(v.orderCode)))) start({kind: 'catalog', products, pages: r.pages}, f.name);
+          else start({kind: 'pdf', lines: r.lines, words: r.words, pages: r.pages}, f.name);
         } catch (e) {
           if (e instanceof NoTextError) {
             setError('このPDFは紙をスキャンした画像だけのPDFで、文字の情報がありません。Excel・CSVの仕切り一覧表を取り込んでください。');
@@ -159,6 +177,7 @@ export function ImportDialog({
 
   const base: Candidate[] = useMemo(() => {
     if (!source) return [];
+    if (source.kind === 'catalog') return catalogCandidates(source.products, maker.trim());
     if (mode === 'table' && mapping) return gridCandidates(grid, mapping, maker.trim());
     return lineCandidates(lines, nth, maker.trim(), listNth);
   }, [source, mode, mapping, grid, lines, nth, listNth, maker]);
@@ -284,7 +303,11 @@ export function ImportDialog({
           <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
             <div className="text-xs text-slate-600">
               <div className="font-bold text-slate-800">{fileName || '貼り付けた表'}</div>
-              {source.kind === 'pdf' ? (
+              {source.kind === 'catalog' ? (
+                <div>
+                  介援隊カタログ {source.pages}ページ・{source.products.length}商品
+                </div>
+              ) : source.kind === 'pdf' ? (
                 <div>
                   PDF {source.pages}ページ・{source.lines.length}行
                 </div>
@@ -328,33 +351,37 @@ export function ImportDialog({
                 ))}
               </select>
             </label>
-            <div className="grid gap-1 text-xs font-bold text-slate-600">
-              読み取り方
-              <div className="flex rounded-lg border border-slate-300 bg-white p-0.5">
-                {(
-                  [
-                    ['table', '表の列で読む'],
-                    ['lines', '1行ずつ読む'],
-                  ] as const
-                ).map(([id, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => {
-                      setMode(id);
-                      setOverrides({});
-                      if (id === 'table' && !mapping) setMapping(detectMapping(grid));
-                    }}
-                    className={`rounded-md px-3 py-1.5 text-sm font-bold ${mode === id ? 'bg-violet-100 text-violet-900 ring-1 ring-inset ring-violet-300' : 'text-slate-600 hover:bg-violet-50'}`}
-                  >
-                    {label}
-                  </button>
-                ))}
+            {source.kind !== 'catalog' && (
+              <div className="grid gap-1 text-xs font-bold text-slate-600">
+                読み取り方
+                <div className="flex rounded-lg border border-slate-300 bg-white p-0.5">
+                  {(
+                    [
+                      ['table', '表の列で読む'],
+                      ['lines', '1行ずつ読む'],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => {
+                        setMode(id);
+                        setOverrides({});
+                        if (id === 'table' && !mapping) setMapping(detectMapping(grid));
+                      }}
+                      className={`rounded-md px-3 py-1.5 text-sm font-bold ${mode === id ? 'bg-violet-100 text-violet-900 ring-1 ring-inset ring-violet-300' : 'text-slate-600 hover:bg-violet-50'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {mode === 'table' && mapping ? (
+          {source.kind === 'catalog' ? (
+            <p className="rounded-lg bg-teal-50 px-3 py-2 text-sm text-teal-900">📖 介援隊カタログとして読みました（カタログの金額＝定価・仕切は空欄）</p>
+          ) : mode === 'table' && mapping ? (
             <div className="flex flex-wrap items-end gap-3">
               <label className="grid gap-1 text-xs font-bold text-slate-600">
                 見出しの行
@@ -461,6 +488,7 @@ export function ImportDialog({
                           className="w-full"
                           ariaLabel={`${c.name}の種目`}
                         />
+                        {c.category && c.sub && <div className="mt-0.5 text-[11px] text-teal-700">{subShort(c.sub)}</div>}
                         {c.warn && !c.category && <div className="mt-0.5 text-[11px] text-rose-600">{c.warn}</div>}
                       </td>
                       <td className="px-2 py-1">

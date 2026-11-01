@@ -93,6 +93,32 @@ export async function pdfToLines(data: Uint8Array): Promise<{lines: string[]; wo
   return {lines, words, pages: doc.numPages};
 }
 
+/**
+ * ページごとの文字と位置（左上から pt）。介援隊カタログのページ（catalogItems.ts の parseCatalogPage）として読めるか見るときに使う。
+ * page はカタログのページ番号（ページの下の大きな数字。読めなければ PDF の何ページ目か）
+ */
+export async function pdfPageItems(data: Uint8Array): Promise<{page: number; items: {s: string; x: number; y: number; w: number; h: number}[]}[]> {
+  const task = await openPdf(data);
+  const doc = await task.promise;
+  const out: {page: number; items: {s: string; x: number; y: number; w: number; h: number}[]}[] = [];
+  try {
+    for (let p = 1; p <= doc.numPages; p++) {
+      const page = await doc.getPage(p);
+      const vp = page.getViewport({scale: 1});
+      const content = await page.getTextContent();
+      const items = (content.items as TextItem[])
+        .filter((it) => typeof it.str === 'string')
+        .map((it) => ({s: it.str, x: it.transform[4], y: vp.height - it.transform[5], w: it.width, h: Math.abs(it.transform[3])}));
+      // カタログのページ番号：いちばん下の、大きめの数字だけの字
+      const num = items.filter((t) => /^\d{1,3}$/.test(t.s.trim()) && t.y > vp.height - 40 && t.h >= 9).sort((a, b) => b.y - a.y)[0];
+      out.push({page: num ? Number(num.s.trim()) : p, items});
+    }
+  } finally {
+    await task.destroy();
+  }
+  return out;
+}
+
 /** 見た目の行ごとにまとめる。行の文字（列の区切りはタブ）と、1語ずつの位置を返す */
 function groupRows(items: TextItem[]): {text: string; words: PdfWord[]}[] {
   const rows: {y: number; h: number; items: TextItem[]}[] = [];

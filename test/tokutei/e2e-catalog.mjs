@@ -1,0 +1,142 @@
+// 介援隊カタログの種目・品目（ユーザーの指示「アプリ側がカタログをみて、入浴補助用具、腰掛便座などの判別がついていない…シャワーキャリーはシャワーチェア、
+// ラップポンは、腰掛便座など、カタログ一覧の全ての項目でわかるようにする。シャワーチェアを選んだら、シャワーチェアの一覧のみが商品一覧からさがせるようにする」2026-11-01）：
+//   ① 商品マスタの取り込みに介援隊カタログの PDF（p.50 シャワーキャリー・p.47 すべり止めマット）を入れる → カタログとして読み、定価にカタログの金額・仕切は空欄、
+//      シャワーキャリーは「入浴補助用具（シャワーチェア）」でチェック済み、マットは対象外でチェックなし
+//   ② 商品を選ぶ画面：入浴のタブ → 品目「シャワーチェア」で、シャワーキャリーだけ（マットは出ない）
+//   ③ カタログの窓のページの一覧に、ページごとの品目（シャワーキャリーのページは「シャワーチェア」）
+// 使い方：npm run -s build:tokutei のあと node test/tokutei/e2e-catalog.mjs [出力フォルダ]
+// 金額は確かめるだけで、テストにもリポジトリにも書かない（ユーザーの指示「リポジトリに仕入れや定価は残さない」）
+
+import {createServer} from 'node:http';
+import {mkdirSync, readFileSync} from 'node:fs';
+import {join} from 'node:path';
+import assert from 'node:assert/strict';
+
+const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node22/lib/node_modules/playwright/index.mjs');
+const out = process.argv[2] ?? 'e2e-out';
+mkdirSync(out, {recursive: true});
+
+const dist = new URL('../../dist-tokutei/', import.meta.url).pathname;
+const catalogDir = new URL('../../public-tokutei/catalog/', import.meta.url).pathname;
+const server = createServer((req, res) => {
+  const path = (req.url ?? '/').split('?')[0];
+  const catalog = /\/catalog\/([\w.-]+\.pdf)$/.exec(path);
+  const file = catalog ? join('catalog', catalog[1]) : path.endsWith('/version.json') ? 'version.json' : 'index.html';
+  try {
+    res.writeHead(200, {'content-type': catalog ? 'application/pdf' : file.endsWith('.json') ? 'application/json' : 'text/html; charset=utf-8'});
+    res.end(readFileSync(join(dist, file)));
+  } catch {
+    res.writeHead(404);
+    res.end();
+  }
+});
+const port = Number(process.env.E2E_PORT ?? 5193);
+await new Promise((r) => server.listen(port, r));
+const url = `http://localhost:${port}/tokutei/`;
+
+const browser = await chromium.launch({env: {...process.env, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8'}});
+const errors = [];
+try {
+  const ctx = await browser.newContext({viewport: {width: 1366, height: 900}});
+  await ctx.route(/^https?:\/\/(?!localhost)/, (r) => r.abort());
+  await ctx.addInitScript(() => {
+    try {
+      localStorage.setItem('taiyo_portal_session', JSON.stringify({office: '行橋営業所'}));
+    } catch {
+      /* about:blank では使えない */
+    }
+  });
+  const page = await ctx.newPage();
+  page.on('pageerror', (e) => errors.push(String(e)));
+  page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+  page.on('dialog', (d) => void d.accept());
+  await page.goto(url);
+  await page.getByRole('heading', {name: '特定福祉用具 購入申請書・見積もり作成'}).waitFor();
+
+  // ---- ① 商品マスタの取り込み：カタログの PDF を2つ（1つずつ）
+  await page.getByRole('button', {name: '📦 商品マスタ'}).click();
+  let imported = 0;
+  let chairs = 0;
+  for (const [file, expect] of [
+    ['kaientai-p050.pdf', 'carrier'],
+    ['kaientai-p044.pdf', 'bath'],
+    ['kaientai-p047.pdf', 'mat'],
+  ]) {
+    await page.getByRole('button', {name: '📄 仕切り一覧表を取り込む'}).click();
+    await page.getByLabel('仕切り一覧表のファイル').setInputFiles(join(catalogDir, file));
+    await page.getByText('📖 介援隊カタログとして読みました').waitFor({timeout: 60000});
+    const imp = page.getByRole('dialog');
+    const rows = imp.locator('tbody tr');
+    const n = await rows.count();
+    assert.ok(n > 0, file);
+    for (let i = 0; i < n; i++) {
+      const row = rows.nth(i);
+      const checked = await row.locator('input[type=checkbox]').isChecked();
+      const cat = await row.locator('select').inputValue();
+      if (expect !== 'mat') {
+        assert.ok(checked, `${file} ${i} チェック`);
+        assert.equal(cat, '入浴補助用具');
+        assert.match(await row.innerText(), expect === 'carrier' ? /シャワーチェア/ : /浴槽台|浴槽手すり/);
+      } else {
+        assert.ok(!checked, `${file} ${i} マットはチェックしない`);
+        assert.equal(cat, '');
+        assert.match(await row.innerText(), /対象外/);
+      }
+    }
+    if (expect !== 'mat') {
+      if (expect === 'carrier') await page.screenshot({path: `${out}/c1-import-catalog.png`});
+      const btn = imp.getByRole('button', {name: /^商品マスタに取り込む（\d+件）$/});
+      const k = Number(/（(\d+)件）/.exec(await btn.innerText())[1]);
+      assert.equal(k, n);
+      imported += k;
+      if (expect === 'carrier') chairs = k;
+      await btn.click();
+      await page.getByText(`全${imported}件`).waitFor();
+    } else {
+      await page.screenshot({path: `${out}/c2-import-mats.png`});
+      await imp.getByRole('button', {name: /閉じる|やめる|キャンセル/}).first().click();
+    }
+  }
+  await page.getByText(`全${imported}件`).waitFor();
+  // 仕切は空欄なので、利益率は出さない（ユーザーの指示「仕切りは空白で良い。なので、利益率はわかりません」2026-11-01）
+  assert.equal(await page.getByText(/利益率/).count(), 0);
+  await page.screenshot({path: `${out}/c3-products.png`, fullPage: true});
+
+  // ---- ② 見積もり → 「★ 商品を選ぶ」→ 入浴 → 品目「シャワーチェア」
+  await page.getByRole('button', {name: '📝 見積もり・申請'}).click();
+  if (!(await page.getByRole('button', {name: '＋ 苅田町'}).count())) await page.getByRole('button', {name: '📝 見積もり・申請'}).click();
+  await page.getByRole('button', {name: '＋ 苅田町'}).click();
+  await page.screenshot({path: `${out}/c3b-new-sale.png`});
+  await page.getByRole('button', {name: '★ 商品を選ぶ'}).first().click();
+  await page.screenshot({path: `${out}/c3c-picker-open.png`});
+  const dlg = page.getByRole('dialog').filter({hasText: '商品を選ぶ'});
+  await dlg.getByRole('button', {name: /^すべて（\d+）$/}).click();
+  const subs = dlg.getByRole('group', {name: '品目'});
+  assert.deepEqual(await subs.getByRole('button').allInnerTexts(), ['すべての品目', 'シャワーチェア', '浴槽手すり', '浴槽台']);
+  await subs.getByRole('button', {name: 'シャワーチェア'}).click();
+  await dlg.locator('li').nth(chairs).waitFor({state: 'detached'}); // 絞り終わるのを待つ
+  const names = await dlg.locator('li div.truncate.font-bold').allInnerTexts();
+  assert.equal(names.length, chairs);
+  assert.ok(names.every((n) => !/マット|浴槽/.test(n)), names.join(','));
+  assert.match(await dlg.locator('li').first().innerText(), /入浴補助用具（シャワーチェア）/);
+  await page.screenshot({path: `${out}/c4-product-picker.png`});
+  await dlg.getByRole('button', {name: '閉じる'}).last().click();
+
+  // ---- ③ カタログの窓：ページの一覧に品目
+  await page.getByRole('button', {name: /カタログから検索|📖 カタログ/}).first().click();
+  const viewer = page.getByRole('dialog', {name: 'カタログ'});
+  const pages = viewer.getByRole('group', {name: 'カタログのページ'});
+  await pages.getByRole('button').first().waitFor();
+  const labels = await pages.getByRole('button').allInnerTexts();
+  const carrierPage = labels.find((l) => /p\.50/.test(l));
+  assert.ok(carrierPage && /シャワーチェア/.test(carrierPage), carrierPage);
+  assert.ok(labels.find((l) => /p\.47/.test(l))?.includes('介護保険の対象外'));
+  assert.ok(labels.find((l) => /p\.172/.test(l))?.includes('ポータブルトイレ'));
+  await page.screenshot({path: `${out}/c5-catalog-pages.png`});
+
+  assert.deepEqual(errors, []);
+  console.log(`ok: カタログの取り込み（${imported}件・定価・仕切は空欄）→ 商品を選ぶ（品目シャワーチェア）→ カタログのページの品目`);
+} finally {
+  await browser.close();
+  server.close();
+}

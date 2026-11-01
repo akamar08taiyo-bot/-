@@ -2,30 +2,22 @@
 // お渡ししたカタログの中の、パナソニックのシャワーチェアの一覧を表示する…まず項目名を入力した後に、その後にメーカー名を選択する。
 // そこで選択したら、パナソニックのシャワーチェアの商品一覧」2026-10-30）。
 // 商品の欄の種目を選ぶと、その種目のカタログの品目（シャワーチェア・浴槽台など＝細目）とメーカーが出る（押すと細目・メーカーの欄に入る）。
-// メーカーを選ぶと、そのメーカーの商品と色・大きさ（品番）が出て、
+// 品目を選ぶと、その品目の商品と色・大きさ（品番）が出る（シャワーキャリーもシャワーチェアの中。2026-11-01）。メーカー・さがす言葉でさらに絞れる。
 // 押すと商品名・メーカー・品番・TAIS・定価が入る。カタログの商品は PDF から読む（print/catalogPdf.ts の loadCatalogProducts。catalogItems.ts）
 import {useEffect, useState} from 'react';
 import {catalogInCategory, catalogItemPatch, catalogMakers, sameMaker} from '../catalogItems.ts';
 import type {CatalogProduct} from '../catalogItems.ts';
+import {sortSubs, subShort} from '../category.ts';
 import {loadCatalogProducts} from '../print/catalogPdf.ts';
 import type {SaleItem} from '../types.ts';
+import {matchesAll} from '../util.ts';
 
 const yen = (n: number) => n.toLocaleString('ja-JP');
-/** 細目のふだんの呼び方（ユーザーの言い方「シャワーチェア」。種目の欄は種目だけなので、ここで品目を選ぶ） */
-const SUB_LABEL: Record<string, string> = {
-  入浴用いす: 'シャワーチェア・ベンチ',
-  浴槽内いす: '浴槽台',
-  浴槽用手すり: '浴槽手すり',
-  入浴台: 'バスボード',
-  '移動できる便器（ポータブルトイレ）': 'ポータブルトイレ',
-  和式便器を腰掛式にするもの: '据置式便座',
-  洋式便器の高さを補うもの: '補高便座',
-  立ち上がりを補助するもの: '昇降便座',
-};
 
 export function CatalogPicker({item, onPick, onCatalog}: {item: SaleItem; onPick: (patch: Partial<SaleItem>) => void; onCatalog?: (query: string) => void}) {
   const [all, setAll] = useState<CatalogProduct[] | null>(null);
   const [open, setOpen] = useState(!item.name.trim());
+  const [query, setQuery] = useState('');
   // 種目を選んだら読む（はじめの1回だけ。2回目からは覚えたもの）
   useEffect(() => {
     if (!item.category || all) return;
@@ -39,10 +31,13 @@ export function CatalogPicker({item, onPick, onCatalog}: {item: SaleItem; onPick
   if (!all) return <p className="pl-8 text-xs text-slate-500">📖 カタログを読んでいます…</p>;
   const inCategory = catalogInCategory(all, item.category, '');
   if (!inCategory.length) return null;
-  const subs = [...new Set(inCategory.map((p) => p.sub).filter(Boolean))];
+  const subs = sortSubs([...new Set(inCategory.map((p) => p.sub).filter(Boolean))]);
   const inSub = item.sub ? inCategory.filter((p) => p.sub === item.sub) : inCategory;
   const makers = catalogMakers(inSub);
-  const shown = item.maker.trim() ? inSub.filter((p) => sameMaker(p.maker, item.maker)) : [];
+  // 品目（シャワーチェアなど）を選ぶと、その品目の商品だけを一覧に出す（ユーザーの指示「シャワーチェアを選んだら、シャワーチェアの一覧のみが
+  // 商品一覧からさがせるようにする」2026-11-01）。メーカー・検索の言葉で、さらに絞れる。品目が1つの種目（杖など）は初めから出す
+  const ready = !!item.sub || subs.length <= 1 || !!item.maker.trim() || !!query.trim();
+  const shown = ready ? inSub.filter((p) => (!item.maker.trim() || sameMaker(p.maker, item.maker)) && matchesAll(`${p.name} ${p.maker} ${p.variants.map((v) => `${v.code} ${v.label}`).join(' ')}`, query)) : [];
   const chip = 'rounded-md border px-2 py-1 text-xs';
   return (
     <div role="group" aria-label="カタログの商品" className="ml-8 grid gap-1.5 rounded-md border border-sky-200 bg-sky-50/60 p-2">
@@ -54,11 +49,15 @@ export function CatalogPicker({item, onPick, onCatalog}: {item: SaleItem; onPick
               key={sb}
               type="button"
               aria-pressed={item.sub === sb}
-              onClick={() => onPick({sub: item.sub === sb ? '' : sb})}
+              onClick={() => {
+                onPick({sub: item.sub === sb ? '' : sb});
+                setOpen(true);
+              }}
               className={`${chip} ${item.sub === sb ? 'border-sky-500 bg-sky-100 text-sky-900' : 'border-slate-300 bg-white font-normal text-slate-700 hover:bg-slate-50'}`}
               title={sb}
             >
-              {SUB_LABEL[sb] ?? sb}
+              {subShort(sb)}
+              <span className="ml-1 font-normal text-slate-500">{inCategory.filter((p) => p.sub === sb).length}</span>
             </button>
           ))}
         </div>
@@ -71,7 +70,7 @@ export function CatalogPicker({item, onPick, onCatalog}: {item: SaleItem; onPick
             type="button"
             aria-pressed={sameMaker(m, item.maker)}
             onClick={() => {
-              onPick({maker: m});
+              onPick({maker: sameMaker(m, item.maker) ? '' : m});
               setOpen(true);
             }}
             className={`${chip} ${sameMaker(m, item.maker) ? 'border-sky-500 bg-sky-100 text-sky-900' : 'border-slate-300 bg-white font-normal text-slate-700 hover:bg-slate-50'}`}
@@ -79,20 +78,32 @@ export function CatalogPicker({item, onPick, onCatalog}: {item: SaleItem; onPick
             {m}
           </button>
         ))}
-        {shown.length > 0 && (
+        {ready && (
           <button type="button" onClick={() => setOpen((o) => !o)} className="ml-auto rounded px-1.5 py-0.5 font-normal text-sky-800 hover:bg-sky-100" aria-expanded={open}>
             {open ? '▲ 閉じる' : `▼ 商品 ${shown.length}件`}
           </button>
         )}
       </div>
+      {open && (ready || subs.length > 1) && (
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={`${subShort(item.sub, item.category)}の中から 商品名・品番でさがす`}
+          aria-label="カタログの商品をさがす"
+          className="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-sm outline-none focus:border-sky-500"
+        />
+      )}
       {open && shown.length > 0 && (
-        <ul className="grid max-h-80 gap-1 overflow-y-auto" aria-label={`${item.maker}の商品`}>
+        <ul className="grid max-h-80 gap-1 overflow-y-auto" aria-label={`${subShort(item.sub, item.category)}の商品`}>
           {shown.map((p) => {
             const prices = [...new Set(p.variants.map((v) => v.listPrice))];
             return (
               <li key={p.key} className="rounded border border-slate-200 bg-white p-1.5">
                 <div className="flex flex-wrap items-baseline gap-x-2 text-sm text-slate-800">
+                  <span className="rounded bg-teal-100 px-1 text-[10px] text-teal-800">{subShort(p.sub, p.category)}</span>
                   <span className="font-bold">{p.name}</span>
+                  {!sameMaker(p.maker, item.maker) && p.maker && <span className="text-xs text-slate-500">{p.maker}</span>}
                   {prices.length === 1 && prices[0] > 0 && <span className="text-xs text-slate-600">定価 {yen(prices[0])}円（税抜）</span>}
                   {onCatalog && (
                     <button type="button" onClick={() => onCatalog(p.variants[0]?.orderCode || p.name)} className="ml-auto text-xs text-sky-700 underline" title="カタログのこのページを開く">
@@ -125,7 +136,7 @@ export function CatalogPicker({item, onPick, onCatalog}: {item: SaleItem; onPick
           })}
         </ul>
       )}
-      {item.maker.trim() && !shown.length && <p className="text-xs text-slate-500">このメーカーの商品はカタログにありません</p>}
+      {ready && open && !shown.length && <p className="text-xs text-slate-500">{query.trim() ? '見つかりませんでした' : 'この条件の商品はカタログにありません'}</p>}
     </div>
   );
 }

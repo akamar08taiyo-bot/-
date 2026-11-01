@@ -311,6 +311,8 @@ export function CatalogViewer({sale, query: initial, onClose, onPrint}: {sale: S
             onClick={() => setCurrent(i)}
             className={`rounded-md border px-2 py-0.5 text-xs ${i === current ? 'border-sky-400 bg-sky-100 text-sky-900' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
           >
+            {/* そのページの品目（シャワーキャリーのページも「シャワーチェア」。ユーザーの指示 2026-11-01） */}
+            <span className={`mr-1 rounded px-1 text-[10px] ${CATALOG[i].kind === '介護保険の対象外' ? 'bg-slate-200 text-slate-600' : 'bg-teal-100 text-teal-800'}`}>{CATALOG[i].kind}</span>
             {catalogLabel(CATALOG[i])}
           </button>
         ))}

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {CATALOG} from '../../src/tokutei/catalog.ts';
-import {appMaker, catalogInCategory, catalogItemPatch, catalogMakers, parseCatalogPage, sameMaker} from '../../src/tokutei/catalogItems.ts';
+import {appMaker, catalogCandidates, catalogInCategory, catalogItemPatch, catalogMakers, isKaientaiOrder, parseCatalogPage, sameMaker} from '../../src/tokutei/catalogItems.ts';
 import type {CatalogProduct, PdfText} from '../../src/tokutei/catalogItems.ts';
 
 const root = new URL('../../node_modules/pdfjs-dist/', import.meta.url).pathname;
@@ -155,4 +155,36 @@ test('種目・メーカーで絞る：シャワーチェア（入浴用いす�
   const toilets = catalogInCategory(all, '腰掛便座', '移動できる便器（ポータブルトイレ）');
   assert.ok(toilets.some((p) => p.page === 172) && toilets.some((p) => p.page === 177));
   assert.deepEqual(catalogInCategory(all, '', ''), []);
+});
+
+test('カタログの「介・購入」の印：p.50 のシャワーキャリーは全部シャワーチェア（入浴用いす）、p.47 のすべり止めマットは対象外で一覧に出ない（2026-11-01）', async () => {
+  const carriers = await productsOf(50);
+  assert.ok(carriers.length >= 10);
+  assert.ok(carriers.every((p) => p.insured === true && p.category === '入浴補助用具' && p.sub === '入浴用いす'), carriers.map((p) => `${p.name}:${p.sub}`).join(','));
+  const mats = await productsOf(47);
+  assert.ok(mats.every((p) => p.category === '' && p.note !== ''), mats.map((p) => `${p.name}:${p.category}`).join(','));
+  // 印のあるページで印のない商品（ポータブルトイレの消耗品）は対象外
+  const toilets = await productsOf(172);
+  assert.ok(toilets.filter((p) => p.insured).every((p) => p.sub === '移動できる便器（ポータブルトイレ）'));
+  assert.ok(toilets.some((p) => p.insured === false && p.category === ''));
+  // シャワーチェアを選ぶと、シャワーベンチ・シャワーチェア・シャワーキャリーが出て、マットは出ない
+  const all: CatalogProduct[] = [];
+  for (const c of CATALOG) all.push(...(await productsOf(c.page)));
+  const chairs = catalogInCategory(all, '入浴補助用具', '入浴用いす');
+  assert.ok(chairs.some((p) => p.page === 37) && chairs.some((p) => p.page === 40) && chairs.some((p) => p.page === 50));
+  assert.ok(chairs.every((p) => p.sub === '入浴用いす'));
+  assert.ok(!all.filter((p) => p.page === 47).some((p) => catalogInCategory([p], '入浴補助用具', '').length));
+});
+
+test('商品マスタの取り込み（カタログの PDF）：カタログの金額は定価、仕切は空欄、種目の決まったものだけチェック（2026-11-01）', async () => {
+  const list = [...(await productsOf(50)), ...(await productsOf(47))];
+  const cands = catalogCandidates(list, '');
+  assert.ok(cands.length > 0);
+  assert.ok(cands.every((c) => c.price === null), '仕切は空欄');
+  assert.ok(cands.filter((c) => c.listPrice !== null).length >= cands.length * 0.9, '定価がある');
+  const carriers = cands.filter((c) => c.row === 50);
+  assert.ok(carriers.every((c) => c.include && c.sub === '入浴用いす'));
+  const mats = cands.filter((c) => c.row === 47);
+  assert.ok(mats.every((c) => !c.include && c.category === '' && /マット|対象外|印/.test(c.warn)));
+  assert.ok(isKaientaiOrder('261-S0100') && !isKaientaiOrder('536-482'));
 });

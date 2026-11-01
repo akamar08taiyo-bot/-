@@ -13,6 +13,7 @@ export type CatalogPage = {
   subs?: string[]; // この細目の商品があれば、初めから印刷するページに入れる
   maker?: RegExp; // このメーカーの商品（か、メーカーが空の商品）だけ
   words?: RegExp; // 商品名にこの言葉があれば、このページだけ（同じ細目のほかのページは入れない）
+  kind: string; // ページの一覧に出す品目（「シャワーチェア」「ポータブルトイレ」「介護保険の対象外」）。ユーザーの指示「カタログ一覧の全ての項目でわかるようにする」2026-11-01
 };
 
 const PORTABLE_TOILET = '移動できる便器（ポータブルトイレ）';
@@ -20,21 +21,24 @@ const ANJU = /アロン|安寿/;
 
 /** ページの並び（印刷の画面のチェックの順）。入浴の用具 → 腰掛便座 → 固定用スロープ。2026-10-26 にユーザーから p.37・40・43・44・172・178・179、2026-10-28 に p.214 をいただいて足した */
 export const CATALOG: CatalogPage[] = [
-  {file: 'kaientai-p037.pdf', page: 37, title: 'シャワーベンチ（安寿）', subs: ['入浴用いす'], maker: ANJU},
-  {file: 'kaientai-p040.pdf', page: 40, title: 'シャワーチェア（パナソニック ユクリア）', subs: ['入浴用いす'], maker: /パナソニック|panasonic|ユクリア/i},
-  {file: 'kaientai-p043.pdf', page: 43, title: '浴槽台（パナソニック ユクリア）', subs: ['浴槽内いす'], maker: /パナソニック|panasonic|ユクリア/i},
-  {file: 'kaientai-p044.pdf', page: 44, title: '浴槽台・浴槽手すり（安寿）', subs: ['浴槽内いす', '浴槽用手すり'], maker: ANJU},
+  {file: 'kaientai-p037.pdf', page: 37, kind: 'シャワーチェア', title: 'シャワーベンチ（安寿）', subs: ['入浴用いす'], maker: ANJU},
+  {file: 'kaientai-p040.pdf', page: 40, kind: 'シャワーチェア', title: 'シャワーチェア（パナソニック ユクリア）', subs: ['入浴用いす'], maker: /パナソニック|panasonic|ユクリア/i},
+  {file: 'kaientai-p043.pdf', page: 43, kind: '浴槽台', title: '浴槽台（パナソニック ユクリア）', subs: ['浴槽内いす'], maker: /パナソニック|panasonic|ユクリア/i},
+  {file: 'kaientai-p044.pdf', page: 44, kind: '浴槽台・浴槽手すり', title: '浴槽台・浴槽手すり（安寿）', subs: ['浴槽内いす', '浴槽用手すり'], maker: ANJU},
   // 浴槽手すりがパナソニック（入浴グリップ ユクリア）と分かるように（ユーザーの指示「浴槽手すりがパナソニックであることがわかるようにする」2026-10-28）
-  {file: 'kaientai-p045.pdf', page: 45, title: '浴槽手すり・バスボード（パナソニック）', subs: ['浴槽用手すり', '入浴台']},
-  {file: 'kaientai-p047.pdf', page: 47, title: 'すべり止めマット', words: /すべり止め|滑り止め/},
-  {file: 'kaientai-p050.pdf', page: 50, title: 'シャワーキャリー', words: /シャワーキャリー/},
-  {file: 'kaientai-p172.pdf', page: 172, title: '家具調トイレ（安寿）', subs: [PORTABLE_TOILET], maker: ANJU},
-  {file: 'kaientai-p173.pdf', page: 173, title: '家具調トイレ セレクトS（安寿）', subs: [PORTABLE_TOILET], maker: ANJU},
-  {file: 'kaientai-p177.pdf', page: 177, title: 'ポータブルトイレ（パナソニック）', subs: [PORTABLE_TOILET], maker: /パナソニック|panasonic/i},
-  {file: 'kaientai-p178.pdf', page: 178, title: 'ポータブルトイレ FX-30（安寿）', maker: ANJU, words: /FX-?30|マルチアシスト/i},
+  {file: 'kaientai-p045.pdf', page: 45, kind: '浴槽手すり・バスボード', title: '浴槽手すり・バスボード（パナソニック）', subs: ['浴槽用手すり', '入浴台']},
+  {file: 'kaientai-p047.pdf', page: 47, kind: '介護保険の対象外', title: 'すべり止めマット', words: /すべり止め|滑り止め/},
+  // シャワーキャリーは入浴用いす（ユーザーの指示「シャワーキャリーはシャワーチェア」2026-11-01）。ページの一覧の品目は「シャワーチェア」。
+  // 印刷に入れるのは商品名にシャワーキャリーとあるときだけ（ふつうのシャワーチェアでキャリーのページを入れない。細目 subs は付けない）
+  {file: 'kaientai-p050.pdf', page: 50, kind: 'シャワーチェア', title: 'シャワーキャリー', words: /シャワーキャリー/},
+  {file: 'kaientai-p172.pdf', page: 172, kind: 'ポータブルトイレ', title: '家具調トイレ（安寿）', subs: [PORTABLE_TOILET], maker: ANJU},
+  {file: 'kaientai-p173.pdf', page: 173, kind: 'ポータブルトイレ', title: '家具調トイレ セレクトS（安寿）', subs: [PORTABLE_TOILET], maker: ANJU},
+  {file: 'kaientai-p177.pdf', page: 177, kind: 'ポータブルトイレ', title: 'ポータブルトイレ（パナソニック）', subs: [PORTABLE_TOILET], maker: /パナソニック|panasonic/i},
+  {file: 'kaientai-p178.pdf', page: 178, kind: 'ポータブルトイレ', title: 'ポータブルトイレ FX-30（安寿）', maker: ANJU, words: /FX-?30|マルチアシスト/i},
   {
     file: 'kaientai-p179.pdf',
     page: 179,
+    kind: '据置式便座・ポータブルトイレ',
     title: '据置式便座・ポータブルトイレ（安寿）',
     subs: ['和式便器を腰掛式にするもの'],
     maker: /アロン|安寿|新輝/,
@@ -42,7 +46,7 @@ export const CATALOG: CatalogPage[] = [
   },
   // 固定用スロープ（2024年4月から特定福祉用具にも。段差解消スロープ）。ユーザーの指示「スロープのカタログも追加してください」2026-10-28。
   // 品番・申込番号がページにあればこのページ（catalogPicks）。なければ商品名に「スロープ」「段差解消」があればこのページ（ダンスロープ・インタースロープ・エコ段差スロープ など）
-  {file: 'kaientai-p214.pdf', page: 214, title: '段差解消スロープ', words: /スロープ|段差解消/},
+  {file: 'kaientai-p214.pdf', page: 214, kind: '固定用スロープ', title: '段差解消スロープ', words: /スロープ|段差解消/},
 ];
 
 export const catalogLabel = (p: CatalogPage) => `p.${p.page} ${p.title}`;
@@ -68,7 +72,7 @@ export function catalogMatches(query: string, texts: readonly (string | null)[])
       const q = plain(w);
       const code = codeKey(w);
       const text = texts[i] ?? '';
-      return plain(catalogLabel(CATALOG[i])).includes(q) || plain(text).includes(q) || (code.length >= 4 && codeKey(text).includes(code));
+      return plain(`${catalogLabel(CATALOG[i])} ${CATALOG[i].kind}`).includes(q) || plain(text).includes(q) || (code.length >= 4 && codeKey(text).includes(code));
     }),
   );
 }

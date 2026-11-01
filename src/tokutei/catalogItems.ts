@@ -11,6 +11,7 @@
 //   金額（11.3pt）と、そのそばの（税抜¥27,000）（5.3pt）。1つの金額が、たてに並んだ品番の行のまとまりのまん中に置かれる
 //   TAIS コード（TAIS/00532-000037。5.3pt）、仕様の行（●…。5.7pt）の右の端にメーカー名（アロン化成（株）など）
 import type {CatalogPage} from './catalog.ts';
+import type {Candidate} from './import/priceImport.ts';
 import {CATEGORIES, guessCategory} from './category.ts';
 import {makerKey} from './sales.ts';
 import type {SaleItem} from './types.ts';
@@ -32,8 +33,13 @@ export type CatalogProduct = {
   page: number;
   name: string; // 見出しの商品名
   maker: string; // メーカー名（このアプリの書き方。パナソニックエイジフリー（株）・アロン化成（株）など）。分からなければ空
-  category: string;
+  category: string; // 種目。介護保険の購入の対象でないと分かったもの（すべり止めマット・印のない商品）は空
   sub: string;
+  /** カタログの「介・購入」の印：true＝ある、false＝ない（印のあるページで）、null＝このページには印がない（杖・スロープのページ） */
+  insured: boolean | null;
+  /** 種目が空のわけ（「すべり止めマットは介護保険の対象外です」など）。種目があれば空 */
+  note: string;
+  taxFree: boolean; // 非課税（福祉用具の杖など。定価は書いてある金額のまま）
   variants: CatalogVariant[]; // 品番ごと。定価は税抜（カタログの（税抜¥…））。読めなければ 0
 };
 
@@ -107,8 +113,9 @@ type Price = {x: number; y: number; value: number};
 export function parseCatalogPage(raw: PdfText[], page: Pick<CatalogPage, 'page' | 'subs'>): CatalogProduct[] {
   const items = raw.map((t) => ({...t, s: t.s.normalize('NFKC').trim()})).filter((t) => t.s);
 
-  // 見出し：番号のすぐ右の商品名
-  const nums = items.filter((t) => isTitle(t) && NUM.test(t.s));
+  // 見出し：番号のすぐ右の商品名。「・」は「5・6」の番号のつなぎ。商品名の字のすぐ右の「・」（「ラップポン・プリート2」）は商品名の中なので番号にしない
+  const inName = (n: PdfText) => n.s === '・' && items.some((t) => t !== n && isTitle(t) && !NUM.test(t.s) && Math.abs(t.y - n.y) <= 1.6 && between(n.x - (t.x + t.w), -4, 3));
+  const nums = items.filter((t) => isTitle(t) && NUM.test(t.s) && !inName(t));
   const heads: Header[] = [];
   for (const t of items) {
     if (!isTitle(t) || NUM.test(t.s) || ORDER.test(t.s)) continue;
@@ -163,6 +170,11 @@ export function parseCatalogPage(raw: PdfText[], page: Pick<CatalogPage, 'page' 
     return '';
   };
 
+  // 「介・購入」の印（介護保険の購入の対象。5pt の「介」と「購入」）。ページの下の凡例（「介・購入　介護保険購入対象商品」）は除く
+  const legend = (t: PdfText) => items.some((o) => /購入対象/.test(o.s) && Math.abs(o.y - t.y) <= 2 && between(o.x - t.x, 0, 60));
+  const isBadge = (t: PdfText) => isSmall(t) && t.s === '購入' && !legend(t) && items.some((o) => o.s === '介' && Math.abs(o.y - t.y) <= 1.5 && between(t.x - o.x, 0, 12));
+  const pageBadges = items.some(isBadge);
+
   const out: {at: Header; p: CatalogProduct}[] = [];
   for (const b of blocks.values()) {
     const name = titleOf(b.head, items);
@@ -172,8 +184,9 @@ export function parseCatalogPage(raw: PdfText[], page: Pick<CatalogPage, 'page' 
     if (!variants.length && !orders.length) continue;
     const rowCodes = variants.map((v) => v.code);
     const maker = appMaker(makerOf(b) || (/^安寿/.test(name) ? 'アロン化成' : rowCodes.some((c) => /^PN-/.test(c)) ? 'パナソニック' : ''));
-    const g = guessCategory(name);
-    const fallback = !g.category && page.subs?.length === 1 ? CATEGORIES.find((c) => c.subs.includes(page.subs![0])) : undefined;
+    const insured = pageBadges ? b.tokens.some(isBadge) : null;
+    const taxFree = b.tokens.some((t) => /非課税/.test(t.s));
+    const {category, sub, note} = catalogCategory(name, insured, taxFree, page.subs);
     out.push({
       at: b.head,
       p: {
@@ -181,8 +194,11 @@ export function parseCatalogPage(raw: PdfText[], page: Pick<CatalogPage, 'page' 
         page: page.page,
         name,
         maker,
-        category: g.category || fallback?.name || '',
-        sub: g.category ? g.sub : fallback ? page.subs![0] : '',
+        category,
+        sub,
+        insured,
+        note,
+        taxFree,
         variants: variants.length
           ? variants
           : orders.map((o) => ({
@@ -198,9 +214,24 @@ export function parseCatalogPage(raw: PdfText[], page: Pick<CatalogPage, 'page' 
   return out.sort((a, c) => a.at.y - c.at.y || a.at.x - c.at.x).map((x) => x.p);
 }
 
+/**
+ * カタログの商品の種目と細目。商品名から決め（category.ts の guessCategory）、決まらなければページの細目（1つのとき）。
+ * 「介・購入」の印のあるページで印のない商品（すべり止めマット・クッション・リフト・介護保険の対象でないもの）は種目を空にする。
+ * 杖のページには印がないので、非課税（福祉用具の杖）の多点杖だけを対象にする（課税の杖は福祉用具でないことが多い）
+ */
+export function catalogCategory(name: string, insured: boolean | null, taxFree: boolean, subs?: string[]): {category: string; sub: string; note: string} {
+  const g = guessCategory(name);
+  if (insured === false) return {category: '', sub: '', note: g.warn || 'カタログに「介・購入」の印がありません（介護保険の購入の対象外）'};
+  if (g.category === '歩行補助つえ' && insured === null && !taxFree) return {category: '', sub: '', note: '非課税でない杖（介護保険の対象か確かめてください）'};
+  if (g.category) return {category: g.category, sub: g.sub, note: ''};
+  const fallback = subs?.length === 1 ? CATEGORIES.find((c) => c.subs.includes(subs[0])) : undefined;
+  if (fallback) return {category: fallback.name, sub: subs![0], note: ''};
+  return {category: '', sub: '', note: g.warn};
+}
+
 /** 見出しの商品名：番号の右から、同じ囲みの中で続く行（3行まで。行の間は 12pt まで） */
 function titleOf(h: Header, items: PdfText[]): string {
-  const tokens = items.filter((t) => isTitle(t) && Math.abs(t.h - h.title.h) <= 0.8 && !NUM.test(t.s) && !ORDER.test(t.s) && t.x >= h.title.x - 3 && t.x < h.end && between(t.y - h.title.y, -1.6, 30));
+  const tokens = items.filter((t) => isTitle(t) && Math.abs(t.h - h.title.h) <= 0.8 && (!NUM.test(t.s) || (t.s === '・' && t.x > h.title.x)) && !ORDER.test(t.s) && t.x >= h.title.x - 3 && t.x < h.end && between(t.y - h.title.y, -1.6, 30));
   const picked: PdfText[][] = [];
   for (const l of linesOf(tokens)) {
     const prev = picked.at(-1);
@@ -525,4 +556,42 @@ export function catalogItemPatch(p: CatalogProduct, v: CatalogVariant, item: Pic
     category: p.category || item.category,
     sub: p.sub || item.sub,
   };
+}
+
+/** 介援隊の注文番号（261-S0100 など）。この番号のある PDF は介援隊のカタログとして読む */
+export const isKaientaiOrder = (s: string) => /^\d{3}-[A-Z]\d{4}$/.test(s);
+
+/**
+ * 商品マスタの取り込み（components/ImportDialog.tsx）で、介援隊のカタログの PDF を読んだときの候補（品番ごとに1行）。
+ * カタログの金額は定価（税抜）。仕切は空欄（ユーザーの指示「カタログにのっているのは、定価です。販売価格は、そこから20パーセント引がデフォルト、
+ * 仕切りは空白で良い」2026-11-01。前は表として読み、定価を仕切に入れていた）。種目は「介・購入」の印と商品名で決め（catalogCategory）、
+ * 決まったものだけ初めからチェックする（すべり止めマットなど介護保険の対象外のものは、チェックを付ければ取り込める）
+ */
+export function catalogCandidates(products: CatalogProduct[], defaultMaker = ''): Candidate[] {
+  const out: Candidate[] = [];
+  products.forEach((p) =>
+    p.variants.forEach((v, i) => {
+      const listPrice = v.listPrice > 0 ? v.listPrice : null;
+      out.push({
+        key: `c${p.key}:${i}`,
+        row: p.page,
+        name: [p.name, v.label].filter(Boolean).join(' '),
+        price: null,
+        listPrice,
+        code: v.code || v.orderCode,
+        maker: p.maker || defaultMaker,
+        unit: '',
+        tais: v.tais,
+        jan: '',
+        taxType: p.taxFree ? '非課税' : '10%',
+        taxKnown: true,
+        category: p.category,
+        sub: p.sub,
+        warn: p.category ? '' : p.note,
+        include: !!p.category && listPrice !== null,
+        favorite: false,
+      });
+    }),
+  );
+  return out;
 }
