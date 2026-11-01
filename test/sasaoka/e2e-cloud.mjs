@@ -18,11 +18,13 @@ const TK = 'iframe[title="特定福祉用具 購入申請書・見積もり作�
 const PASS = 'みほんの合言葉2026';
 const cloud = fakeCloud();
 
-async function context(options) {
+async function context(options, tryCloud = true) {
   const ctx = await browser.newContext({locale: 'ja-JP', acceptDownloads: true, ...options});
   await ctx.route(/^https?:\/\/(?!localhost)/, (r) => r.abort());
   await useFakeFirebase(ctx, cloud);
   await ctx.addInitScript(() => localStorage.setItem('taiyo_portal_session', JSON.stringify({office: '行橋営業所'})));
+  // 常時同期は保留中（useCloud.ts の CLOUD_ON）。このテストは試しの印（CLOUD_TRY）を付けて動かす
+  if (tryCloud) await ctx.addInitScript(() => localStorage.setItem('taiyo-jutaku-cloud-try', '1'));
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
   page.on('dialog', (d) => void d.accept());
@@ -59,6 +61,23 @@ async function startSync(p, pass = PASS) {
   await dlg.waitFor({state: 'detached'});
   await p.locator('[data-cloud="idle"]').waitFor({timeout: 30000});
   return text;
+}
+
+// ---------------- 保留中：試しの印のない端末には、設定の同期の欄も上の段の印も出ず、クラウドにもつながない
+{
+  const plain = await context({viewport: {width: 1366, height: 900}}, false);
+  const reqs = [];
+  plain.page.on('request', (r) => /gstatic\.com\/firebasejs|fake-firestore/.test(r.url()) && reqs.push(r.url()));
+  await plain.page.goto(`${site}/jutaku-mitsumori/index.html`);
+  await goTab(plain.page, '⚙ 設定');
+  await plain.page.getByRole('heading', {name: '請求先'}).first().waitFor();
+  assert.equal(await plain.page.getByRole('region', {name: 'スマホ・パソコンの同期'}).count(), 0, '保留中は同期の欄を出さない');
+  assert.equal(await plain.page.locator('[data-cloud]').count(), 0, '保留中は上の段の印を出さない');
+  await plain.page.waitForTimeout(1000);
+  assert.deepEqual(reqs, [], '保留中はクラウドにつながない');
+  await plain.page.screenshot({path: path.join(outDir, 'cloud-hold-settings.png')});
+  await plain.ctx.close();
+  log('保留中：同期の欄・印なし、クラウドにつながない');
 }
 
 // ---------------- パソコン：様邸を作ってから同期を始める

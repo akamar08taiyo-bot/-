@@ -18,7 +18,23 @@ export type CloudPlan = {remoteJobs: number; localJobs: number; commit: () => Pr
 
 const LOCK = 'taiyo-jutaku-cloud';
 
-export function useCloud() {
+/**
+ * 常時同期は一旦保留（ユーザーの指示「常時保存、連動は一旦保留にします」2026-11-01）。保留のあいだは設定の欄も上の段の印も出さず、
+ * 前に同期を始めた端末でも同期を動かさない（その端末の覚え＝合言葉の鍵はそのまま。true に戻せば、またその設定で動く）。
+ * ブラウザのテスト（e2e-cloud.mjs）は localStorage の CLOUD_TRY を '1' にして、保留のままでも試せる
+ */
+const CLOUD_ON = false;
+export const CLOUD_TRY = 'taiyo-jutaku-cloud-try';
+export function cloudEnabled(): boolean {
+  if (CLOUD_ON) return true;
+  try {
+    return localStorage.getItem(CLOUD_TRY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function useCloud(enabled = true) {
   const [view, setView] = useState<CloudView>({state: 'off', at: null, message: ''});
   const engine = useRef<CloudEngine | null>(null);
   const release = useRef<(() => void) | null>(null);
@@ -81,6 +97,7 @@ export function useCloud() {
   }, [stop]);
 
   useEffect(() => {
+    if (!enabled) return; // 保留のあいだは何もしない（クラウドにもつながない）
     alive.current = true;
     void run();
     // この端末で保存した（このタブ・ほかのタブ・🛁 の中の特定福祉用具）→ 少し待って送る
@@ -106,7 +123,7 @@ export function useCloud() {
       document.removeEventListener('visibilitychange', visible);
       stop();
     };
-  }, [run, stop]);
+  }, [enabled, run, stop]);
 
   /**
    * 合言葉を確かめる：鍵を作ってクラウドにつなぎ、その合言葉の置き場所にある様邸の数と、この端末の様邸の数を返す（画面で確かめてから commit で始める）。

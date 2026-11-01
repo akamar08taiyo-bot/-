@@ -42,7 +42,7 @@ import {EXAMPLE_KIT_ID, exampleKit} from './samples.ts';
 import {CATALOG_EVENT, flushTokutei, readFromTokutei, tokuteiNames, withTokuteiFields, writeTokutei} from './tokuteiLink.ts';
 import {DocsButton} from './components/DocsDialog.tsx';
 import {CloudBadge} from './components/CloudSection.tsx';
-import {useCloud} from './cloud/useCloud.ts';
+import {cloudEnabled, useCloud} from './cloud/useCloud.ts';
 import {isTrashed, liveJobs} from './trash.ts';
 import {writeJutakuSalesSummary} from './salesPlan.ts';
 import type {Insurer, Job, Row} from './types.ts';
@@ -141,8 +141,10 @@ const isEmpty = (j: Job) =>
 
 export default function App({start}: {start: MainTab}) {
   const store = useStore();
-  // 常時同期（設定のタブの「☁ スマホ・パソコンの同期」。cloud/）。同期していない端末では何もしない
-  const cloud = useCloud();
+  // 常時同期（設定のタブの「☁ スマホ・パソコンの同期」。cloud/）。同期していない端末では何もしない。
+  // いまは保留（cloudEnabled() が false）なので、欄も印も出さず、同期も動かさない
+  const [cloudOn] = useState(cloudEnabled);
+  const cloud = useCloud(cloudOn);
   const newVersion = useNewVersion();
   // 携帯・タブレットか（様邸の画面の右下の「📷 写真へ」を出す。PhotoJump.tsx）
   const touch = useTouchUi();
@@ -467,7 +469,7 @@ export default function App({start}: {start: MainTab}) {
               ) : (
                 <span>{store.savedAt ? 'この端末に自動保存しました' : 'この端末に自動保存します'}</span>
               )}
-              <CloudBadge view={cloud.view} />
+              {cloudOn && <CloudBadge view={cloud.view} />}
             </div>
           </div>
           {/* 上のタブ：字を大きく・高く（ユーザーの指示「ここらへんのタブももう少し大きく見やすくする」2026-10-25）。選んでいないタブも薄い白の地で、タブと分かるように。
@@ -645,7 +647,7 @@ export default function App({start}: {start: MainTab}) {
             </div>
           )}
           {/* 設定はゴミ箱の様邸も入ったデータ（バックアップ（すべて）に入れて、なくさない。読み込んでもゴミ箱のまま） */}
-          {tab === 'settings' && <SettingsPage data={all} update={store.update} cloud={cloud} />}
+          {tab === 'settings' && <SettingsPage data={all} update={store.update} cloud={cloudOn ? cloud : undefined} />}
           {tab === 'trash' && (
             <TrashPage
               data={all}
