@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {CATALOG} from '../../src/tokutei/catalog.ts';
-import {appMaker, catalogCandidates, catalogInCategory, catalogItemPatch, catalogMakers, isKaientaiOrder, parseCatalogPage, sameMaker} from '../../src/tokutei/catalogItems.ts';
+import {appMaker, catalogCandidates, catalogFilter, catalogInCategory, catalogItemPatch, catalogMakers, catalogPagesOf, isKaientaiOrder, looseKey, parseCatalogPage, sameMaker} from '../../src/tokutei/catalogItems.ts';
 import type {CatalogProduct, PdfText} from '../../src/tokutei/catalogItems.ts';
 
 const root = new URL('../../node_modules/pdfjs-dist/', import.meta.url).pathname;
@@ -203,4 +203,36 @@ test('歩行器のページ（p.136・137。2026-11-01 ユーザーの指示「�
   assert.equal(walkers.find((p) => p.name === '歩行器')?.category, '歩行器');
   // 種目「歩行器」を選ぶと、固定式だけが出る
   assert.equal(catalogInCategory(walkers, '歩行器', '').length, 11);
+});
+
+// メーカーの横の「🔍 商品検索」（ユーザーの指示「メーカー名の横に、商品検索ボタン。メーカー名、項目名を入力すると、フィルターをかけられた商品のみ表示されるようにする。
+// カタログも同様です」2026-11-01）：種目・項目名（商品名の欄に打った字）・メーカーで絞る。カタログの窓は、絞った商品の載っているページだけ
+test('商品検索：種目・項目名・メーカーで絞る（のばす音・ひらがなのちがいは同じ。品目の名前ならその品目をみな）', async () => {
+  const all = (await Promise.all(CATALOG.map((c) => productsOf(c.page)))).flat();
+  const item = (category: string, name: string, maker: string) => ({category, sub: '', name, maker});
+  // 入浴補助用具・「シャワーチェアー」・パナソニック → p.40 のパナソニックのシャワーチェア 11
+  const pana = catalogFilter(all, item('入浴補助用具', 'シャワーチェアー', 'パナソニックエイジフリー（株）'));
+  assert.equal(pana.byName, true);
+  assert.equal(pana.sub, '入浴用いす');
+  assert.equal(pana.items.length, 11);
+  assert.ok(pana.items.every((p) => p.sub === '入浴用いす' && sameMaker(p.maker, 'パナソニック')));
+  assert.deepEqual(catalogPagesOf(pana.items), [40]);
+  // ひらがな・種目が空・メーカーは「パナソニック」だけでも同じ
+  assert.deepEqual(catalogFilter(all, item('', 'しゃわーちぇあ', 'パナソニック')).items, pana.items);
+  // 品目の名前（シャワーチェア）なら、シャワーキャリー・シャワーベンチもふくむ（シャワーチェアの品目。2026-11-01 の指示）
+  const chairs = catalogFilter(all, item('入浴補助用具', 'シャワーチェア', ''));
+  assert.deepEqual(catalogPagesOf(chairs.items), [37, 40, 50]);
+  // ほかの語は商品名にあるもの（ユクリア）。商品名になければページの題（p.50 シャワーキャリー）
+  const yu = catalogFilter(all, item('入浴補助用具', 'ユクリア', ''));
+  assert.ok(yu.items.length > 0 && yu.items.every((p) => looseKey(p.name).includes(looseKey('ユクリア'))));
+  assert.deepEqual(catalogPagesOf(catalogFilter(all, item('入浴補助用具', 'シャワーキャリー', '')).items), [50]);
+  // 種目が空でも、項目名から種目を推し量る（ポータブルトイレ → 腰掛便座）。介護保険の対象（種目のある商品）だけ
+  const toilets = catalogFilter(all, item('', 'ポータブルトイレ', ''));
+  assert.equal(toilets.category, '腰掛便座');
+  assert.ok(toilets.items.length > 0 && toilets.items.every((p) => p.category === '腰掛便座'));
+  assert.ok(catalogFilter(all, item('', '', '')).items.every((p) => p.category));
+  // 項目名に合う商品がなければ、項目名を外した種目・メーカーの商品
+  const none = catalogFilter(all, item('入浴補助用具', 'みほんのなまえ', 'アロン化成'));
+  assert.equal(none.byName, false);
+  assert.ok(none.items.length > 0 && none.items.every((p) => p.category === '入浴補助用具' && sameMaker(p.maker, 'アロン化成')));
 });

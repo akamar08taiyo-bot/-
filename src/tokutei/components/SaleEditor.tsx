@@ -9,6 +9,7 @@ import {saveShinsei, useTemplate} from '../shinseiFiles.ts';
 import {FIELD_LABEL, missingFields, shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField} from '../shinseiPreview.ts';
 import type {CatalogAsk} from '../jutaku.ts';
+import type {CatalogPagesFilter} from '../catalog.ts';
 import type {AppData, Sale, SaleItem, SaleStatus} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {todayIso, yen} from '../util.ts';
@@ -239,7 +240,7 @@ export function SaleEditor({
   // 「🧾 売上伝票依頼書」の窓（UriageDialog.tsx）
   const [uriageOpen, setUriageOpen] = useState(false);
   // カタログの窓（print/CatalogViewer.tsx）。「カタログから検索」に打った字で開く
-  const [catalogView, setCatalogView] = useState<{query: string} | null>(null);
+  const [catalogView, setCatalogView] = useState<{query: string; filter?: CatalogPagesFilter} | null>(null);
   useEffect(() => {
     if (!catalogAsk) return;
     if (catalogAsk.action === 'print') setPrintingCatalog(true);
@@ -441,7 +442,7 @@ export function SaleEditor({
             zips={zips}
             onPickProduct={() => setPicking(true)}
             onScan={() => setScanning(true)}
-            onCatalog={(query) => setCatalogView({query})}
+            onCatalog={(query, filter) => setCatalogView({query, filter})}
             onAddItem={(item) => change({items: [...sale.items, item ?? blankItem(s)]})}
             onPickCustomer={fixedView ? undefined : () => setPickingCustomer(true)}
             onFavorite={(id) => favorite([id])}
@@ -481,7 +482,7 @@ export function SaleEditor({
             usedYear={prevYear.length ? {count: prevYear.length, used: usedYear, label: `${fy ?? ''}年度`} : null}
             onPickProduct={() => setPicking(true)}
             onScan={() => setScanning(true)}
-            onCatalog={(query) => setCatalogView({query})}
+            onCatalog={(query, filter) => setCatalogView({query, filter})}
             onAddItem={(item) => change({items: [...sale.items, item ?? blankItem(s)]})}
             onPickCustomer={fixedView ? undefined : () => setPickingCustomer(true)}
             onFavorite={(id) => favorite([id])}
@@ -600,7 +601,7 @@ export function SaleEditor({
           }
         />
       )}
-      {catalogView && <CatalogViewer sale={sale} query={catalogView.query} onClose={closeCatalog} onPrint={() => setPrintingCatalog(true)} />}
+      {catalogView && <CatalogViewer sale={sale} query={catalogView.query} filter={catalogView.filter} onClose={closeCatalog} onPrint={() => setPrintingCatalog(true)} />}
       {printingCatalog && <CatalogPrintView sale={sale} onClose={() => setPrintingCatalog(false)} />}
       {uriageOpen && <UriageDialog sale={sale} settings={s} change={change} onClose={() => setUriageOpen(false)} />}
       {pickingCustomer && <CustomerPicker sales={data.sales} current={sale} onPick={pickCustomer} onClose={() => setPickingCustomer(false)} />}

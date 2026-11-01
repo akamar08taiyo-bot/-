@@ -13,13 +13,14 @@ import {CARE_LEVELS, INSURERS, OFFICES, settingsForOffice} from '../defaults.ts'
 import {blankItem, makerChoices, suggestValues, unregisteredItems} from '../sales.ts';
 import {carePlanOf, shinseiForm} from '../shinsei.ts';
 import type {ShinseiKey} from '../shinsei.ts';
+import type {OpenCatalog} from '../catalog.ts';
 import type {ShinseiField} from '../shinseiPreview.ts';
 import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Sale, SaleItem, Settings} from '../types.ts';
 import {yen} from '../util.ts';
 import {zipLabel} from '../zip.ts';
 import type {ZipHit} from '../zip.ts';
 import {CategorySelect} from './CategorySelect.tsx';
-import {CatalogPicker} from './CatalogPicker.tsx';
+import {CatalogPicker, CatalogSearchButton} from './CatalogPicker.tsx';
 import {MakerInput} from './MakerInput.tsx';
 import {ReasonField} from './ReasonField.tsx';
 import {AddItemButton, CatalogSearch, Circles, EraBirthInput, InsuredNoInput, KanaInput, nextOnEnter} from './ShinseiParts.tsx';
@@ -66,7 +67,7 @@ export function ShinseiInputs({
   zips: ZipHit[];
   onPickProduct: () => void;
   onScan: () => void; // 「📷 スクショから自動認識」の窓を開く（scanItem.ts）
-  onCatalog: (query: string) => void; // 右にカタログの窓を開く（print/CatalogViewer.tsx）
+  onCatalog: OpenCatalog; // 右にカタログの窓を開く（print/CatalogViewer.tsx。商品検索のときは絞ったページだけ）
   onAddItem: (item?: SaleItem) => void; // 手で入れる商品を足す（item があればその商品＝最初から開いている欄に打ったもの）
   onPickCustomer?: () => void; // 住宅改修の様邸のタブの中では渡さない（お客様の情報は様邸から入る。ユーザーの指示「赤枠の部分は不要です」2026-10-28）
   onFavorite: (itemId: string) => void; // 手で入れた商品を商品マスタの★お気に入りに
@@ -101,6 +102,8 @@ export function ShinseiInputs({
   const [draft] = useState(() => blankItem(s));
   const rows: Line[] = lines.length ? lines : [lineOf(draft, s)];
   const changeRow = (id: string, patch: Partial<SaleItem>) => (lines.length ? changeItem(id, patch) : onAddItem({...draft, ...patch}));
+  // メーカーの横の「🔍 商品検索」を押した回数（商品ごと。CatalogPicker が増えたら絞った商品を出す）
+  const [searchAt, setSearchAt] = useState<Record<string, number>>({});
   const unregistered = new Set(unregisteredItems(sale, data.products).map((i) => i.id));
   const title = shinseiForm(sale.insurer)?.title;
   const insurerName = INSURERS.find((i) => i.key === sale.insurer)?.label;
@@ -271,11 +274,19 @@ export function ShinseiInputs({
                     )}
                   </div>
                   <TextInput value={i.name} onChange={(name) => changeItem(i.id, {name})} placeholder="商品名" className="ml-8 min-w-0" aria-label="商品名" data-nav />
-                  <div className="flex min-w-0 flex-wrap items-center gap-2 pl-8">
-                    {i.productId === null ? <MakerInput value={i.maker} onChange={(maker) => changeItem(i.id, {maker})} choices={makers} className="w-56" /> : i.maker && <span className="text-xs text-slate-500">{i.maker}</span>}
+                  {/* メーカーの横に「🔍 商品検索」（ユーザーの指示「メーカー名の横に、商品検索ボタン」2026-11-01）。スマホの幅でも1行に並ぶよう、メーカーの欄を縮める */}
+                  <div className="flex min-w-0 items-center gap-2 pl-8">
+                    {i.productId === null ? (
+                      <>
+                        <MakerInput value={i.maker} onChange={(maker) => changeItem(i.id, {maker})} choices={makers} className="w-56 min-w-0 shrink" />
+                        <CatalogSearchButton onSearch={() => setSearchAt((m) => ({...m, [i.id]: (m[i.id] ?? 0) + 1}))} />
+                      </>
+                    ) : (
+                      i.maker && <span className="text-xs text-slate-500">{i.maker}</span>
+                    )}
                   </div>
                   {/* 種目・メーカーを選ぶと、カタログのその商品の一覧（押すと商品名・品番・定価が入る。ユーザーの指示 2026-10-30） */}
-                  {i.productId === null && <CatalogPicker item={i} onPick={(patch) => changeItem(i.id, patch)} onCatalog={onCatalog} />}
+                  {i.productId === null && <CatalogPicker item={i} onPick={(patch) => changeItem(i.id, patch)} onCatalog={onCatalog} search={searchAt[i.id] ?? 0} />}
                   {/* 定価の下に割引率と販売金額（ユーザーの指示「定価の下に、販売金額を記載する」「定価の下に割引率を表示、変更できるようにする」2026-10-26）。
                       販売金額は 定価×(100−割引率)%（打ち直したら薄い黄色で、↺ で戻す。販売見積書の単価と同じ値）。割引率を変えたら販売金額は計算し直す。
                       その下に数量（− ＋。ユーザーの指示「数量を追加」2026-10-26。販売見積書の数量と同じ値）。右の金額は 販売金額×数量＋税（申請書の購入予定金額） */}

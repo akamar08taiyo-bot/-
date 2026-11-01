@@ -10,9 +10,10 @@
 //   1つの囲みに品番の表が左右に2つあることもある（安寿 軽量浴槽台の「すべり止めシートタイプ」「ソフトクッションタイプ」）
 //   金額（11.3pt）と、そのそばの（税抜¥27,000）（5.3pt）。1つの金額が、たてに並んだ品番の行のまとまりのまん中に置かれる
 //   TAIS コード（TAIS/00532-000037。5.3pt）、仕様の行（●…。5.7pt）の右の端にメーカー名（アロン化成（株）など）
+import {CATALOG} from './catalog.ts';
 import type {CatalogPage} from './catalog.ts';
 import type {Candidate} from './import/priceImport.ts';
-import {CATEGORIES, guessCategory, WHEELED} from './category.ts';
+import {CATEGORIES, guessCategory, subShort, WHEELED} from './category.ts';
 import {makerKey} from './sales.ts';
 import type {SaleItem} from './types.ts';
 
@@ -551,6 +552,63 @@ export function catalogInCategory(list: CatalogProduct[], category: string, sub:
   if (!category) return [];
   return list.filter((p) => p.category === category && (!sub || p.sub === sub));
 }
+
+/** ひらがなをカタカナに（「しゃわーちぇあ」でも「シャワーチェア」に当たるように） */
+const toKatakana = (s: string) => s.replace(/[\u3041-\u3096]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
+/**
+ * 見くらべ用の文字：全角・半角、大文字・小文字、ひらがな・カタカナ、のばす音（ー）・空白・中黒のちがいをなくす
+ * （「シャワーチェアー」も「シャワーチェア」に、「ﾕｸﾘｱ」も「ユクリア」に当たる）
+ */
+export const looseKey = (s: string) =>
+  toKatakana((s || '').normalize('NFKC').toLowerCase()).replace(/[\s\u30fc\u2010-\u2015\u2212\-\u30fb]/g, '');
+
+/** 商品の欄の値（種目・品目・項目名＝商品名の欄に打った字・メーカー）で絞る条件 */
+export type CatalogFilter = Pick<SaleItem, 'category' | 'sub' | 'name' | 'maker'>;
+
+/** 品目・種目の名前そのもの（「シャワーチェア」「浴槽台」「ポータブルトイレ」「歩行器」など）。打った語がこれなら、その品目の商品をみな出す */
+const GENERIC = new Map<string, {category: string; sub: string}>();
+for (const c of CATEGORIES) {
+  GENERIC.set(looseKey(c.name), {category: c.name, sub: ''});
+  for (const sb of c.subs) for (const n of [sb, subShort(sb)]) GENERIC.set(looseKey(n), {category: c.name, sub: sb});
+}
+
+/**
+ * カタログの商品を、商品の欄の種目・品目・項目名（商品名の欄に打った字）・メーカーで絞る（ユーザーの指示「メーカー名の横に、商品検索ボタン。
+ * メーカー名、項目名を入力すると、フィルターをかけられた商品のみ表示されるようにする。カタログも同様です」2026-11-01）。
+ * 介護保険の購入の対象（種目のある商品）だけ。種目が空なら項目名から種目・品目を推し量る。項目名の語は：
+ *   品目の名前そのもの（「シャワーチェアー」）→ その品目の商品をみな（シャワーキャリー・シャワーベンチもシャワーチェアの品目。2026-11-01 の指示）
+ *   ほかの語（「ユクリア」「シャワーキャリー」）→ 商品名・品番・色や大きさにある商品。どの商品にもなければ、ページの題（p.50 シャワーキャリー）、
+ *   それにもなければ、その語から推し量った品目
+ * 項目名に当たる商品がなければ、項目名を外した種目・メーカーの商品（byName が false）
+ */
+export function catalogFilter(list: CatalogProduct[], f: CatalogFilter): {items: CatalogProduct[]; category: string; sub: string; byName: boolean} {
+  const name = toKatakana((f.name || '').normalize('NFKC')).trim();
+  const guess = name ? guessCategory(name) : {category: '', sub: ''};
+  const category = f.category || guess.category;
+  const sub = f.sub || (guess.category && guess.category === category ? guess.sub : '');
+  const maker = (f.maker || '').trim();
+  const base = list.filter((p) => p.category && (!category || p.category === category) && (!sub || p.sub === sub) && (!maker || sameMaker(p.maker, maker)));
+  const words = name.split(/\s+/).filter(Boolean);
+  if (!words.length) return {items: base, category, sub, byName: false};
+  const hay = new Map(base.map((p) => [p, looseKey(`${p.name} ${p.maker} ${p.variants.map((v) => `${v.code} ${v.label}`).join(' ')}`)]));
+  const tests = words.map((w): ((p: CatalogProduct) => boolean) => {
+    const key = looseKey(w);
+    const gen = GENERIC.get(key);
+    if (gen) return (p) => p.category === gen.category && (!gen.sub || p.sub === gen.sub);
+    const literal = (p: CatalogProduct) => hay.get(p)!.includes(key);
+    if (base.some(literal)) return literal;
+    // 商品名になければ、ページの題（p.50「シャワーキャリー」）
+    const onPage = (p: CatalogProduct) => looseKey(CATALOG.find((c) => c.page === p.page)?.title ?? '').includes(key);
+    if (base.some(onPage)) return onPage;
+    const g = guessCategory(w);
+    return g.category ? (p) => p.category === g.category && (!g.sub || p.sub === g.sub) : () => false;
+  });
+  const hits = base.filter((p) => tests.every((t) => t(p)));
+  return hits.length ? {items: hits, category, sub, byName: true} : {items: base, category, sub, byName: false};
+}
+
+/** 絞った商品の載っているカタログのページ（ページの番号。カタログの窓をそのページだけにする） */
+export const catalogPagesOf = (list: CatalogProduct[]) => [...new Set(list.map((p) => p.page))].sort((a, b) => a - b);
 
 /** メーカーが同じか（書き方のちがい・「パナソニック」と「パナソニックエイジフリー（株）」も同じに見る） */
 export const sameMaker = (a: string, b: string) => {

@@ -3,9 +3,13 @@
 // そこで選択したら、パナソニックのシャワーチェアの商品一覧」2026-10-30）。
 // 商品の欄の種目を選ぶと、その種目のカタログの品目（シャワーチェア・浴槽台など＝細目）とメーカーが出る（押すと細目・メーカーの欄に入る）。
 // 品目を選ぶと、その品目の商品と色・大きさ（品番）が出る（シャワーキャリーもシャワーチェアの中。2026-11-01）。メーカー・さがす言葉でさらに絞れる。
-// 押すと商品名・メーカー・品番・TAIS・定価が入る。カタログの商品は PDF から読む（print/catalogPdf.ts の loadCatalogProducts。catalogItems.ts）
-import {useEffect, useState} from 'react';
-import {catalogInCategory, catalogItemPatch, catalogMakers, sameMaker} from '../catalogItems.ts';
+// 押すと商品名・メーカー・品番・TAIS・定価が入る。カタログの商品は PDF から読む（print/catalogPdf.ts の loadCatalogProducts。catalogItems.ts）。
+// メーカーの欄の横の「🔍 商品検索」（search が増える）で、種目・項目名（商品名の欄に打った字）・メーカーで絞った商品だけを出し、
+// 広い画面ではカタログの窓も、その商品の載っているページだけにする（ユーザーの指示「メーカー名の横に、商品検索ボタン。メーカー名、項目名を入力すると、
+// フィルターをかけられた商品のみ表示されるようにする。カタログも同様です」2026-11-01。絞り方は catalogItems.ts の catalogFilter）
+import {useEffect, useRef, useState} from 'react';
+import type {CatalogPagesFilter, OpenCatalog} from '../catalog.ts';
+import {catalogFilter, catalogInCategory, catalogItemPatch, catalogMakers, catalogPagesOf, looseKey, sameMaker} from '../catalogItems.ts';
 import type {CatalogProduct} from '../catalogItems.ts';
 import {sortSubs, subShort} from '../category.ts';
 import {loadCatalogProducts} from '../print/catalogPdf.ts';
@@ -13,34 +17,97 @@ import type {SaleItem} from '../types.ts';
 import {matchesAll} from '../util.ts';
 
 const yen = (n: number) => n.toLocaleString('ja-JP');
+/** カタログの窓を一緒に開く広さ（狭い画面では窓が画面いっぱいになるので、ボタンで開く） */
+const WIDE = 1024;
 
-export function CatalogPicker({item, onPick, onCatalog}: {item: SaleItem; onPick: (patch: Partial<SaleItem>) => void; onCatalog?: (query: string) => void}) {
+/** メーカーの欄の横の「🔍 商品検索」（押すたびに onSearch。CatalogPicker の search を1つ増やす） */
+export function CatalogSearchButton({onSearch}: {onSearch: () => void}) {
+  return (
+    <button
+      type="button"
+      onClick={onSearch}
+      className="h-9 shrink-0 rounded-md border border-slate-300 bg-white px-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
+      title="種目・商品名・メーカーで、カタログの商品をさがす"
+    >
+      🔍 商品検索
+    </button>
+  );
+}
+
+export function CatalogPicker({item, onPick, onCatalog, search = 0}: {item: SaleItem; onPick: (patch: Partial<SaleItem>) => void; onCatalog?: OpenCatalog; search?: number}) {
   const [all, setAll] = useState<CatalogProduct[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [tries, setTries] = useState(0);
   const [open, setOpen] = useState(!item.name.trim());
   const [query, setQuery] = useState('');
-  // 種目を選んだら読む（はじめの1回だけ。2回目からは覚えたもの）
+  const [searched, setSearched] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+  // 種目を選んだら・商品検索を押したら読む（はじめの1回だけ。2回目からは覚えたもの）。読めなければ知らせる（前は何も出ず、一覧がないように見えた）
+  const want = !!item.category || search > 0;
   useEffect(() => {
-    if (!item.category || all) return;
+    if (!want || all) return;
     let alive = true;
-    void loadCatalogProducts().then((list) => alive && setAll(list));
+    setFailed(false);
+    loadCatalogProducts().then(
+      (list) => {
+        if (!alive) return;
+        if (list.length) setAll(list);
+        else setFailed(true);
+      },
+      () => alive && setFailed(true),
+    );
     return () => {
       alive = false;
     };
-  }, [item.category, all]);
-  if (!item.category) return null;
-  if (!all) return <p className="pl-8 text-xs text-slate-500">📖 カタログを読んでいます…</p>;
-  const inCategory = catalogInCategory(all, item.category, '');
-  if (!inCategory.length) return null;
+  }, [want, all, tries]);
+  // 種目・項目名・メーカーで絞る（商品検索を押していないときも、一覧に出す商品はこの条件）。カタログから選んだ商品の名前のままなら、
+  // 名前では絞らない（「▼ 商品 11件」で開き直して、同じ品目・メーカーのほかの商品に選び直せるように）
+  const picked = !!item.code && !!all?.some((p) => p.variants.some((v) => v.code === item.code && [p.name, v.label].filter(Boolean).join(' ') === item.name.trim()));
+  const by = picked ? {...item, name: ''} : item;
+  const found = all ? catalogFilter(all, by) : null;
+  // 条件の名前（「シャワーチェア・パナソニックエイジフリー（株）」）。項目名が品目と同じ（シャワーチェアー）なら重ねて書かない
+  const kind = found ? subShort(found.sub, found.category) : '';
+  const word = found?.byName && looseKey(by.name) !== looseKey(kind) ? by.name.trim() : '';
+  const filter: CatalogPagesFilter | null = found ? {pages: catalogPagesOf(found.items), label: [kind, word, item.maker.trim()].filter(Boolean).join('・')} : null;
+  // 商品検索を押した：一覧を開いて、そこまで動かす。広い画面ではカタログの窓も同じ商品のページだけで開く（読み終わってから1回）
+  useEffect(() => {
+    if (!search) return;
+    setOpen(true);
+    setSearched(true);
+    setQuery('');
+  }, [search]);
+  const shownFor = useRef(0);
+  useEffect(() => {
+    if (!search || !found || shownFor.current === search) return;
+    shownFor.current = search;
+    requestAnimationFrame(() => boxRef.current?.scrollIntoView({block: 'nearest', behavior: 'smooth'}));
+    if (onCatalog && filter && filter.pages.length && window.innerWidth >= WIDE) onCatalog('', filter);
+  });
+
+  if (!item.category && !searched) return null;
+  if (failed)
+    return (
+      <p className="ml-8 flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+        📖 カタログを読めませんでした
+        <button type="button" onClick={() => setTries((n) => n + 1)} className="rounded border border-amber-300 bg-white px-2 py-0.5">
+          ↻ もう一度
+        </button>
+      </p>
+    );
+  if (!all || !found || !filter) return <p className="pl-8 text-xs text-slate-500">📖 カタログを読んでいます…</p>;
+  const inCategory = catalogInCategory(all, found.category, '');
+  if (!inCategory.length && !searched) return null; // カタログにない種目（杖など）は出さない（商品検索を押したら「ありません」と知らせる）
   const subs = sortSubs([...new Set(inCategory.map((p) => p.sub).filter(Boolean))]);
-  const inSub = item.sub ? inCategory.filter((p) => p.sub === item.sub) : inCategory;
-  const makers = catalogMakers(inSub);
+  // メーカーのボタンは、種目・品目・項目名に合う商品のメーカー（メーカーの欄で絞る前）
+  const makers = catalogMakers(catalogFilter(all, {...by, maker: ''}).items);
   // 品目（シャワーチェアなど）を選ぶと、その品目の商品だけを一覧に出す（ユーザーの指示「シャワーチェアを選んだら、シャワーチェアの一覧のみが
   // 商品一覧からさがせるようにする」2026-11-01）。メーカー・検索の言葉で、さらに絞れる。品目が1つの種目（杖など）は初めから出す
-  const ready = !!item.sub || subs.length <= 1 || !!item.maker.trim() || !!query.trim();
-  const shown = ready ? inSub.filter((p) => (!item.maker.trim() || sameMaker(p.maker, item.maker)) && matchesAll(`${p.name} ${p.maker} ${p.variants.map((v) => `${v.code} ${v.label}`).join(' ')}`, query)) : [];
+  const ready = searched || !!item.sub || subs.length <= 1 || !!item.maker.trim() || !!query.trim();
+  const shown = ready ? found.items.filter((p) => matchesAll(`${p.name} ${p.maker} ${p.variants.map((v) => `${v.code} ${v.label}`).join(' ')}`, query)) : [];
   const chip = 'rounded-md border px-2 py-1 text-xs';
+  const what = subShort(found.sub, found.category) || 'カタログ';
   return (
-    <div role="group" aria-label="カタログの商品" className="ml-8 grid gap-1.5 rounded-md border border-sky-200 bg-sky-50/60 p-2">
+    <div ref={boxRef} role="group" aria-label="カタログの商品" className="ml-8 grid scroll-mt-4 gap-1.5 rounded-md border border-sky-200 bg-sky-50/60 p-2">
       {subs.length > 1 && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold text-sky-900">
           <span>📖 品目：</span>
@@ -84,18 +151,32 @@ export function CatalogPicker({item, onPick, onCatalog}: {item: SaleItem; onPick
           </button>
         )}
       </div>
+      {/* 商品検索の条件と件数。「📖 カタログで見る」で、カタログの窓をこの商品の載っているページだけで開く */}
+      {searched && open && (
+        <div role="status" className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded bg-white/70 px-1.5 py-1 text-xs text-slate-700">
+          <span>
+            🔍 <b className="font-bold text-sky-900">{filter.label || 'すべて'}</b>：{shown.length}件
+          </span>
+          {by.name.trim() && !found.byName && <span className="text-amber-800">（「{item.name.trim()}」に合う商品がないので、{[what, item.maker.trim()].filter(Boolean).join('・')}の商品）</span>}
+          {onCatalog && filter.pages.length > 0 && (
+            <button type="button" onClick={() => onCatalog('', filter)} className="ml-auto rounded border border-sky-300 bg-white px-2 py-0.5 font-bold text-sky-900 hover:bg-sky-50">
+              📖 カタログで見る（{filter.pages.map((n) => `p.${n}`).join('・')}）
+            </button>
+          )}
+        </div>
+      )}
       {open && (ready || subs.length > 1) && (
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={`${subShort(item.sub, item.category)}の中から 商品名・品番でさがす`}
+          placeholder={`${what}の中から 商品名・品番でさがす`}
           aria-label="カタログの商品をさがす"
           className="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-sm outline-none focus:border-sky-500"
         />
       )}
       {open && shown.length > 0 && (
-        <ul className="grid max-h-80 gap-1 overflow-y-auto" aria-label={`${subShort(item.sub, item.category)}の商品`}>
+        <ul className="grid max-h-80 gap-1 overflow-y-auto" aria-label={`${what}の商品`}>
           {shown.map((p) => {
             const prices = [...new Set(p.variants.map((v) => v.listPrice))];
             return (
@@ -119,6 +200,7 @@ export function CatalogPicker({item, onPick, onCatalog}: {item: SaleItem; onPick
                       onClick={() => {
                         onPick(catalogItemPatch(p, v, item));
                         setOpen(false);
+                        setSearched(false);
                       }}
                       className={`${chip} border-slate-300 bg-white text-left text-slate-800 hover:border-sky-400 hover:bg-sky-50 ${item.code === v.code ? 'border-sky-500 bg-sky-100' : ''}`}
                       aria-label={`${p.name} ${v.label} ${v.code}を入れる`}

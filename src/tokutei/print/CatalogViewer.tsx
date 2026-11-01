@@ -10,6 +10,7 @@
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {PointerEvent as ReactPointerEvent} from 'react';
 import {CATALOG, catalogLabel, catalogMatches, catalogPicks} from '../catalog.ts';
+import type {CatalogPagesFilter} from '../catalog.ts';
 import type {Sale} from '../types.ts';
 import {loadCatalogPage, loadCatalogText} from './catalogPdf.ts';
 import type {CatalogImage} from './catalogPdf.ts';
@@ -71,9 +72,11 @@ function clampBox(b: Box): Box {
   return {w, h, x: Math.max(0, Math.min(b.x, vw - w)), y: Math.max(0, Math.min(b.y, vh - h))};
 }
 
-export function CatalogViewer({sale, query: initial, onClose, onPrint}: {sale: Sale; query: string; onClose: () => void; onPrint: () => void}) {
+/** filter：出すページを絞る（商品の欄の「🔍 商品検索」で絞った商品の載っているページだけ。「✕ 全部のページ」で外す） */
+export function CatalogViewer({sale, query: initial, filter, onClose, onPrint}: {sale: Sale; query: string; filter?: CatalogPagesFilter; onClose: () => void; onPrint: () => void}) {
   const [box, setBox] = useState<Box>(firstBox);
   const [query, setQuery] = useState(initial);
+  const [only, setOnly] = useState<CatalogPagesFilter | null>(filter ?? null);
   const [texts, setTexts] = useState<(string | null)[]>(() => CATALOG.map(() => null));
   const [images, setImages] = useState<(CatalogImage | null | undefined)[]>(() => CATALOG.map(() => undefined));
   const [zoom, setZoom] = useState(1);
@@ -168,9 +171,20 @@ export function CatalogViewer({sale, query: initial, onClose, onPrint}: {sale: S
     el.addEventListener('pointerup', up);
     el.addEventListener('pointercancel', up);
   };
-  // 初めに出すページ：見積もりの商品が載っているページ（なければ1ページ目）
-  const [current, setCurrent] = useState(() => [...catalogPicks(sale.items)][0] ?? 0);
+  // 初めに出すページ：絞ったページの1つ目、なければ見積もりの商品が載っているページ（なければ1ページ目）
+  const firstOf = (f: CatalogPagesFilter | null | undefined) => (f ? CATALOG.findIndex((c) => f.pages.includes(c.page)) : -1);
+  const [current, setCurrent] = useState(() => (firstOf(filter) >= 0 ? firstOf(filter) : ([...catalogPicks(sale.items)][0] ?? 0)));
   useEffect(() => setQuery(initial), [initial]);
+  // 商品検索をし直したら（「✕ 全部のページ」のあとに同じ条件でも）、そのページだけにして1つ目を出す
+  const firstFilter = useRef(true);
+  useEffect(() => {
+    if (firstFilter.current) {
+      firstFilter.current = false;
+      return;
+    }
+    setOnly(filter ?? null);
+    if (firstOf(filter) >= 0) setCurrent(firstOf(filter));
+  }, [filter]);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -198,7 +212,7 @@ export function CatalogViewer({sale, query: initial, onClose, onPrint}: {sale: S
       }
     })();
   }, []);
-  const matches = useMemo(() => catalogMatches(query, texts), [query, texts]);
+  const matches = useMemo(() => catalogMatches(query, texts).filter((i) => !only || only.pages.includes(CATALOG[i].page)), [query, texts, only]);
   // 検索したら、見つかった最初のページを出す（打つたびに。見つかったページの中を押して選び直せる）
   useEffect(() => {
     if (!query.trim()) return;
@@ -302,6 +316,14 @@ export function CatalogViewer({sale, query: initial, onClose, onPrint}: {sale: S
         </button>
       </div>
       <div role="group" aria-label="カタログのページ" className="flex max-h-20 flex-wrap gap-1 overflow-y-auto border-b border-slate-200 px-2 py-1.5">
+        {only && (
+          <span className="flex flex-wrap items-center gap-1 text-xs text-slate-700">
+            🔍 <b className="font-bold text-sky-900">{only.label || '商品検索'}</b>
+            <button type="button" onClick={() => setOnly(null)} className="rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-slate-600 hover:bg-slate-50">
+              ✕ 全部のページ
+            </button>
+          </span>
+        )}
         {matches.length === 0 && <span className="text-xs text-slate-500">{texts.includes(null) ? 'さがしています…' : '見つかりません'}</span>}
         {matches.map((i) => (
           <button

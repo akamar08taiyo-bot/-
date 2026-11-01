@@ -17,6 +17,14 @@ export type CatalogPage = {
   kind: string; // ページの一覧に出す品目（「シャワーチェア」「ポータブルトイレ」「介護保険の対象外」）。ユーザーの指示「カタログ一覧の全ての項目でわかるようにする」2026-11-01
 };
 
+/**
+ * カタログの窓に出すページを絞る（商品の欄の「🔍 商品検索」で絞った商品の載っているページだけ。ユーザーの指示「カタログも同様です」2026-11-01）。
+ * pages はページの番号、label は絞った条件（「入浴補助用具・シャワーチェアー・パナソニックエイジフリー（株）」）
+ */
+export type CatalogPagesFilter = {pages: number[]; label: string};
+/** カタログの窓を開く：query はカタログから検索の字、filter は出すページを絞るとき */
+export type OpenCatalog = (query: string, filter?: CatalogPagesFilter) => void;
+
 const PORTABLE_TOILET = '移動できる便器（ポータブルトイレ）';
 const ANJU = /アロン|安寿/;
 

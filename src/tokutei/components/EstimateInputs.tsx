@@ -12,12 +12,13 @@ import {showsSelfPay, userBurdenLine} from '../estimateBook.ts';
 import type {EstimateField} from '../estimateBook.ts';
 import {blankItem, makerChoices, suggestValues, unregisteredItems} from '../sales.ts';
 import {carePlanOf} from '../shinsei.ts';
+import type {OpenCatalog} from '../catalog.ts';
 import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Sale, SaleItem, SaleStatus, TaxType} from '../types.ts';
 import {yen} from '../util.ts';
 import {zipLabel} from '../zip.ts';
 import type {ZipHit} from '../zip.ts';
 import {CategorySelect} from './CategorySelect.tsx';
-import {CatalogPicker} from './CatalogPicker.tsx';
+import {CatalogPicker, CatalogSearchButton} from './CatalogPicker.tsx';
 import {MakerInput} from './MakerInput.tsx';
 import {ReasonField} from './ReasonField.tsx';
 import {AddItemButton, CatalogSearch, Circles, EraBirthInput, InsuredNoInput, KanaInput} from './ShinseiParts.tsx';
@@ -67,7 +68,7 @@ export function EstimateInputs({
   usedYear: {count: number; used: number; label: string} | null; // 今年度の申請（このアプリの記録）
   onPickProduct: () => void;
   onScan: () => void; // 「📷 スクショから自動認識」の窓を開く（scanItem.ts）
-  onCatalog: (query: string) => void; // 右にカタログの窓を開く（print/CatalogViewer.tsx）
+  onCatalog: OpenCatalog; // 右にカタログの窓を開く（print/CatalogViewer.tsx。商品検索のときは絞ったページだけ）
   onAddItem: (item?: SaleItem) => void; // 手で入れる商品を足す（item があればその商品＝最初から開いている欄に打ったもの）
   onPickCustomer?: () => void; // 住宅改修の様邸のタブの中では渡さない（お客様の情報は様邸から入る。ユーザーの指示「赤枠の部分は不要です」2026-10-28）
   onFavorite: (itemId: string) => void; // 手で入れた商品を商品マスタの★お気に入りに
@@ -401,10 +402,11 @@ function ItemBlock({
   change: (patch: Partial<SaleItem>) => void;
   remove?: () => void;
   favorite?: () => void; // 手で入れた商品を★お気に入りに（まだ商品マスタにないときだけ）
-  onCatalog?: (query: string) => void; // カタログの窓を開く（カタログの商品の「p.40」）
+  onCatalog?: OpenCatalog; // カタログの窓を開く（カタログの商品の「p.40」・商品検索で絞ったページ）
 }) {
   const i = l.item;
   const manual = i.productId === null;
+  const [search, setSearch] = useState(0); // メーカーの横の「🔍 商品検索」を押した回数
   const auto = basisNote(l);
   return (
     <div data-item={i.id} className="grid gap-2 rounded-md border border-slate-200 bg-white p-2">
@@ -422,7 +424,11 @@ function ItemBlock({
       <div className="flex min-w-0 flex-wrap items-center gap-2 pl-8 text-xs text-slate-500">
         {manual ? (
           <>
-            <MakerInput value={i.maker} onChange={(maker) => change({maker})} choices={makers} className="w-56" />
+            {/* メーカーの横に「🔍 商品検索」（ユーザーの指示「メーカー名の横に、商品検索ボタン」2026-11-01。スマホの幅でも1行に並ぶよう、メーカーの欄を縮める） */}
+            <span className="flex min-w-0 max-w-full items-center gap-2">
+              <MakerInput value={i.maker} onChange={(maker) => change({maker})} choices={makers} className="w-56 min-w-0 shrink" />
+              <CatalogSearchButton onSearch={() => setSearch((n) => n + 1)} />
+            </span>
             <TextInput value={i.code} onChange={(code) => change({code})} placeholder="品番" className="w-48" aria-label="品番" />
           </>
         ) : (
@@ -430,7 +436,7 @@ function ItemBlock({
         )}
       </div>
       {/* 種目・メーカーを選ぶと、カタログのその商品の一覧（押すと商品名・品番・定価が入る） */}
-      {manual && <CatalogPicker item={i} onPick={change} onCatalog={onCatalog} />}
+      {manual && <CatalogPicker item={i} onPick={change} onCatalog={onCatalog} search={search} />}
       <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1.5 pl-8 text-xs font-bold text-slate-500">
         定価（税抜）
         <div className="flex min-w-0 flex-wrap items-center gap-2">

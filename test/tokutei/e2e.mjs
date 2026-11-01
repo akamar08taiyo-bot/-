@@ -886,6 +886,29 @@ try {
   assert.equal(await panaList.count(), 0); // 選んだら閉じる（「▼ 商品 11件」で開き直せる）
   await picker.getByRole('button', {name: '▼ 商品 11件'}).waitFor();
   await page.screenshot({path: `${out}/05g-catalog-picked.png`});
+  // メーカーの横の「🔍 商品検索」（ユーザーの指示「メーカー名の横に、商品検索ボタン。メーカー名、項目名を入力すると、フィルターをかけられた商品のみ表示されるようにする。
+  // カタログも同様です」2026-11-01）：項目名「シャワーチェアー」・パナソニックで、その商品だけ。広い画面ではカタログの窓も、その商品の載っているページだけ
+  await catForm.getByLabel('商品名').fill('シャワーチェアー');
+  await catForm.getByRole('button', {name: '🔍 商品検索'}).click();
+  const searchStatus = picker.getByRole('status');
+  await searchStatus.waitFor();
+  assert.match(await searchStatus.innerText(), /シャワーチェア・パナソニックエイジフリー（株）：11件/);
+  assert.equal(await chairList.getByRole('listitem').count(), 11);
+  const searchViewer = page.getByRole('dialog', {name: 'カタログ'});
+  await searchViewer.waitFor();
+  const viewerPages = searchViewer.getByRole('group', {name: 'カタログのページ'});
+  await page.waitForFunction(() => !document.querySelector('[aria-label="カタログのページ"]')?.textContent?.includes('さがしています'));
+  assert.deepEqual(await viewerPages.getByRole('button', {name: /^.+p\.\d+/}).allInnerTexts(), ['シャワーチェアp.40 シャワーチェア（パナソニック ユクリア）']);
+  await page.screenshot({path: `${out}/05h-product-search.png`});
+  await viewerPages.getByRole('button', {name: '✕ 全部のページ'}).click();
+  assert.equal(await viewerPages.getByRole('button', {name: /^.+p\.\d+/}).count(), 15);
+  await searchViewer.getByRole('button', {name: 'カタログを閉じる'}).click();
+  // 合う商品がなければ、種目・メーカーの商品（知らせる）
+  await catForm.getByLabel('商品名').fill('みほんのなまえ');
+  await catForm.getByRole('button', {name: '🔍 商品検索'}).click();
+  await page.getByRole('dialog', {name: 'カタログ'}).waitFor();
+  assert.match(await searchStatus.innerText(), /「みほんのなまえ」に合う商品がないので/);
+  await page.getByRole('dialog', {name: 'カタログ'}).getByRole('button', {name: 'カタログを閉じる'}).click();
 
   // ---- スマホの幅（はじめて開いたとき）
   const phone = await browser.newContext({viewport: {width: 390, height: 844}, deviceScaleFactor: 2});
