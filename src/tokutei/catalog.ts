@@ -13,6 +13,7 @@ export type CatalogPage = {
   subs?: string[]; // この細目の商品があれば、初めから印刷するページに入れる
   maker?: RegExp; // このメーカーの商品（か、メーカーが空の商品）だけ
   words?: RegExp; // 商品名にこの言葉があれば、このページだけ（同じ細目のほかのページは入れない）
+  category?: string; // ページの商品がみな同じ種目のとき（歩行器のページ）。商品名で種目が決まらない商品に使う
   kind: string; // ページの一覧に出す品目（「シャワーチェア」「ポータブルトイレ」「介護保険の対象外」）。ユーザーの指示「カタログ一覧の全ての項目でわかるようにする」2026-11-01
 };
 
@@ -31,6 +32,10 @@ export const CATALOG: CatalogPage[] = [
   // シャワーキャリーは入浴用いす（ユーザーの指示「シャワーキャリーはシャワーチェア」2026-11-01）。ページの一覧の品目は「シャワーチェア」。
   // 印刷に入れるのは商品名にシャワーキャリーとあるときだけ（ふつうのシャワーチェアでキャリーのページを入れない。細目 subs は付けない）
   {file: 'kaientai-p050.pdf', page: 50, kind: 'シャワーチェア', title: 'シャワーキャリー', words: /シャワーキャリー/},
+  // 歩行器（2024年4月から選択制。買えるのは脚がすべて杖先ゴムの固定式・交互式だけで、車輪・キャスターのある歩行車は対象外）。
+  // ユーザーの指示「固定用歩行器のカタログも追加」2026-11-01。p.136 はキャスター付きが多く、固定式は ⑨ スライドフィットEX 固定式。p.137 は ①〜⑩ が固定型、⑪〜⑮ はシルバーカー
+  {file: 'kaientai-p136.pdf', page: 136, kind: '歩行器', category: '歩行器', title: '歩行器（キャスター付き・固定式）', words: /スライドフィット|ミニフィット/},
+  {file: 'kaientai-p137.pdf', page: 137, kind: '歩行器', category: '歩行器', title: '歩行器（固定型）・シルバーカー', words: /固定型|固定式|ウォーカー|歩行器/},
   {file: 'kaientai-p172.pdf', page: 172, kind: 'ポータブルトイレ', title: '家具調トイレ（安寿）', subs: [PORTABLE_TOILET], maker: ANJU},
   {file: 'kaientai-p173.pdf', page: 173, kind: 'ポータブルトイレ', title: '家具調トイレ セレクトS（安寿）', subs: [PORTABLE_TOILET], maker: ANJU},
   {file: 'kaientai-p177.pdf', page: 177, kind: 'ポータブルトイレ', title: 'ポータブルトイレ（パナソニック）', subs: [PORTABLE_TOILET], maker: /パナソニック|panasonic/i},

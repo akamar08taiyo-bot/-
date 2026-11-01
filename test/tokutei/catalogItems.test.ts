@@ -188,3 +188,19 @@ test('商品マスタの取り込み（カタログの PDF）：カタログの�
   assert.ok(mats.every((c) => !c.include && c.category === '' && /マット|対象外|印/.test(c.warn)));
   assert.ok(isKaientaiOrder('261-S0100') && !isKaientaiOrder('536-482'));
 });
+
+test('歩行器のページ（p.136・137。2026-11-01 ユーザーの指示「固定用歩行器のカタログも追加」）：脚がすべて杖先ゴムの固定式だけが「歩行器」、キャスター・ブレーキのある歩行車とシルバーカーは対象外', async () => {
+  const walkers = [...(await productsOf(136)), ...(await productsOf(137))];
+  const fixed = walkers.filter((p) => p.category === '歩行器').map((p) => p.name);
+  assert.equal(fixed.length, 11, fixed.join(','));
+  assert.ok(fixed.includes('スライドフィットEX 固定式'));
+  assert.ok(fixed.every((n) => !/前輪|サニー|ショッピング/.test(n)));
+  for (const n of ['スライドフィットEX 前輪後輪3インチ', 'セーフティーアーム ウォーカーMタイプ', 'セーフティーアーム Vタイプウォーカー', 'サニーウォーカー SP', '安寿 サンフィール ショッピング']) {
+    const p = walkers.find((x) => x.name === n);
+    assert.ok(p && p.category === '' && /歩行車|対象外/.test(p.note), n);
+  }
+  // ページの端の見出し（「歩行器／シルバーカー」）で、固定型の歩行器を歩行車にしない
+  assert.equal(walkers.find((p) => p.name === '歩行器')?.category, '歩行器');
+  // 種目「歩行器」を選ぶと、固定式だけが出る
+  assert.equal(catalogInCategory(walkers, '歩行器', '').length, 11);
+});

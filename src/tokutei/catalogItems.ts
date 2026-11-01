@@ -12,7 +12,7 @@
 //   TAIS コード（TAIS/00532-000037。5.3pt）、仕様の行（●…。5.7pt）の右の端にメーカー名（アロン化成（株）など）
 import type {CatalogPage} from './catalog.ts';
 import type {Candidate} from './import/priceImport.ts';
-import {CATEGORIES, guessCategory} from './category.ts';
+import {CATEGORIES, guessCategory, WHEELED} from './category.ts';
 import {makerKey} from './sales.ts';
 import type {SaleItem} from './types.ts';
 
@@ -110,7 +110,7 @@ type Block = {head: Header; tokens: PdfText[]};
 type Price = {x: number; y: number; value: number};
 
 /** ページの文字 → 商品の一覧（見出しの順） */
-export function parseCatalogPage(raw: PdfText[], page: Pick<CatalogPage, 'page' | 'subs'>): CatalogProduct[] {
+export function parseCatalogPage(raw: PdfText[], page: Pick<CatalogPage, 'page' | 'subs'> & {category?: string}): CatalogProduct[] {
   const items = raw.map((t) => ({...t, s: t.s.normalize('NFKC').trim()})).filter((t) => t.s);
 
   // 見出し：番号のすぐ右の商品名。「・」は「5・6」の番号のつなぎ。商品名の字のすぐ右の「・」（「ラップポン・プリート2」）は商品名の中なので番号にしない
@@ -186,7 +186,9 @@ export function parseCatalogPage(raw: PdfText[], page: Pick<CatalogPage, 'page' 
     const maker = appMaker(makerOf(b) || (/^安寿/.test(name) ? 'アロン化成' : rowCodes.some((c) => /^PN-/.test(c)) ? 'パナソニック' : ''));
     const insured = pageBadges ? b.tokens.some(isBadge) : null;
     const taxFree = b.tokens.some((t) => /非課税/.test(t.s));
-    const {category, sub, note} = catalogCategory(name, insured, taxFree, page.subs);
+    // 囲みの説明の文（歩行車の見分けに使う）。ページの端の見出し（右ページの右・左ページの左の「歩行器／シルバーカー」など）は入れない
+    const text = b.tokens.filter((t) => t.x < 570 && t.x + t.w > 30).map((t) => t.s).join('');
+    const {category, sub, note} = catalogCategory(name, insured, taxFree, page.subs, text, page.category);
     out.push({
       at: b.head,
       p: {
@@ -219,13 +221,29 @@ export function parseCatalogPage(raw: PdfText[], page: Pick<CatalogPage, 'page' 
  * 「介・購入」の印のあるページで印のない商品（すべり止めマット・クッション・リフト・介護保険の対象でないもの）は種目を空にする。
  * 杖のページには印がないので、非課税（福祉用具の杖）の多点杖だけを対象にする（課税の杖は福祉用具でないことが多い）
  */
-export function catalogCategory(name: string, insured: boolean | null, taxFree: boolean, subs?: string[]): {category: string; sub: string; note: string} {
+export function catalogCategory(
+  name: string,
+  insured: boolean | null,
+  taxFree: boolean,
+  subs?: string[],
+  text = '',
+  pageCategory = '',
+): {category: string; sub: string; note: string} {
   const g = guessCategory(name);
   if (insured === false) return {category: '', sub: '', note: g.warn || 'カタログに「介・購入」の印がありません（介護保険の購入の対象外）'};
   if (g.category === '歩行補助つえ' && insured === null && !taxFree) return {category: '', sub: '', note: '非課税でない杖（介護保険の対象か確かめてください）'};
+  // 歩行器：商品名に車輪の言葉がなくても、囲みの説明（「前脚のスイングキャスター」「ハンドルブレーキ」）にあれば歩行車で対象外。
+  // 選択制で買えるのは、脚がすべて杖先ゴムの固定式・交互式だけ（2026-11-01 ユーザーの指示「固定用歩行器のカタログも追加」。カタログ p.136・137）
+  const walker = g.category === '歩行器' || (!g.category && !g.warn && pageCategory === '歩行器');
+  if (walker) {
+    if (WHEELED.test(`${name} ${text}`)) return {category: '', sub: '', note: '車輪・キャスターのある歩行車は対象外（買えるのは脚がすべて杖先ゴムの固定式・交互式）'};
+    if (!taxFree && insured === null) return {category: '', sub: '', note: '非課税でない歩行器（介護保険の対象か確かめてください）'};
+    return {category: '歩行器', sub: '', note: ''};
+  }
   if (g.category) return {category: g.category, sub: g.sub, note: ''};
   const fallback = subs?.length === 1 ? CATEGORIES.find((c) => c.subs.includes(subs[0])) : undefined;
   if (fallback) return {category: fallback.name, sub: subs![0], note: ''};
+  if (pageCategory && !g.warn) return {category: pageCategory, sub: '', note: ''};
   return {category: '', sub: '', note: g.warn};
 }
 
@@ -264,7 +282,10 @@ function blockVariants(b: Block, photoColor: (code: string) => string): CatalogV
   const used = new Set<PdfText>();
   // 金額：左のすぐそばに「￥」「各￥」がある大きな数（ページ番号などの大きな数をとらない）
   const yen = b.tokens.filter((t) => /[¥￥]$/.test(t.s));
-  const amounts = b.tokens.filter((t) => isPrice(t) && yen.some((y) => between(t.x - y.x, 0, 24) && Math.abs(y.y - t.y) <= 4));
+  // 「非課税 ￥」「非課税 各￥」のように前に字のついた￥は、左の端ではなく右の端が金額のすぐ左（2026-11-01。歩行器・杖の非課税の金額を読めていなかった）
+  const amounts = b.tokens.filter(
+    (t) => isPrice(t) && yen.some((y) => Math.abs(y.y - t.y) <= 4 && (between(t.x - y.x, 0, 24) || between(t.x - (y.x + y.w), -4, 8))),
+  );
   for (const p of amounts.sort((a, c) => a.y - c.y)) {
     // そばの（税抜¥…）。税込の金額＝税抜×1.1 のものを先に（税抜の字は金額の下のことも、右上のこともある）。なければ書いてある金額（税のかからない品）
     const value = yenOf(p.s);
