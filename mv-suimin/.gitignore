@@ -1,0 +1,15 @@
+node_modules
+dist
+.DS_Store
+.env
+
+# Ignore the output video from Git but not videos you import into src/.
+out
+
+# analysis scratch (stills, plots, arrays); keep the alignment JSON
+work/*
+!work/*.json
+# raw API payloads / duplicate of public/song.mp3
+song/req.json
+song/resp*.json
+song/*.mp3

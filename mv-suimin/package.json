@@ -1,0 +1,44 @@
+{
+  "name": "mv-suimin",
+  "version": "1.0.0",
+  "description": "Lyric music video (vertical 1080x1920) synced to song timing",
+  "repository": {},
+  "license": "UNLICENSED",
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24"
+  },
+  "private": true,
+  "dependencies": {
+    "@fontsource/dela-gothic-one": "^5.3.0",
+    "@fontsource/dotgothic16": "^5.3.1",
+    "@fontsource/noto-sans-jp": "^5.3.1",
+    "@fontsource/zen-old-mincho": "^5.3.1",
+    "@remotion/cli": "4.0.539",
+    "@remotion/media": "4.0.539",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.539"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config-flat": "4.0.539",
+    "@types/react": "19.2.7",
+    "@types/web": "0.0.166",
+    "eslint": "10.12.0",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade",
+    "lint": "eslint src && tsc",
+    "align": "python3 scripts/align_gemini.py public/song.mp3 --out work/align_raw.json && python3 scripts/align_chunks.py public/song.mp3",
+    "timing": "python3 scripts/build_timing.py public/song.mp3 --plot",
+    "stills": "node scripts/stills.mjs",
+    "render": "remotion render src/index.ts MV out/mv-suimin.mp4 --concurrency=4 --crf=18 --audio-codec=aac --audio-bitrate=256k ${REMOTION_BROWSER:+--browser-executable=$REMOTION_BROWSER}",
+    "srt": "python3 scripts/make_srt.py"
+  },
+  "allowScripts": {
+    "esbuild": false
+  }
+}
