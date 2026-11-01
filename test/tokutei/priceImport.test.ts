@@ -208,3 +208,55 @@ test('Excel（.xlsx）の表を読む', () => {
     ],
   );
 });
+
+test('お客様向けの価格表（このアプリで作った介援隊カタログの価格表の形）：カタログ価格＝定価、販売価格は仕切にしない、商品名の空の行は上の商品、小見出しは種目の手がかり（2026-11-01）', () => {
+  // 見本の数字（本物の価格ではない）。1つ目の形：仕切の列なし、見出しは2行（自己負担の1割〜3割）
+  const old = [
+    ['見本の価格表', '', '', '', '', '', '', '割引率', '', '20'],
+    ['ページ', '商品名', 'タイプ・サイズ', 'メーカー', 'カタログ\n価格(税込)', '販売価格\n(税込)', '自己負担額（介護保険）', '', ''],
+    ['', '', '', '', '', '', '1割', '2割', '3割'],
+    ['■ 入浴用いす（シャワーキャリー）　カタログ p.50', '', '', '', '', '', '', '', ''],
+    ['p.50①', '見本キャリー', 'U型シート', '見本工業', '11000', '8800', '880', '1760', '2640'],
+    ['', '', '穴無しシート', '', '12100', '9680', '968', '1936', '2904'],
+    ['■ すべり止めマット（介護保険の対象外・全額自己負担）　カタログ p.47', '', '', '', '', '', '', '', ''],
+    ['p.47①', '見本マット', 'M', '見本ゴム', '1100', '880', '—', '—', '—'],
+  ];
+  const m = detectMapping(old);
+  assert.equal(m.list, 4);
+  assert.equal(m.listTaxIn, true);
+  assert.equal(m.price, -1, '販売価格は仕切にしない（自己負担の列がある＝お客様向け）');
+  const c = gridCandidates(old, m, 'パナソニック');
+  // タイプちがいの行のメーカーは上の行と同じ（初めのメーカーの欄の値にしない）
+  assert.deepEqual(c.map((x) => x.maker), ['見本工業', '見本工業', '見本ゴム']);
+  assert.deepEqual(
+    c.map((x) => [x.name, x.listPrice, x.price, x.sub, x.include]),
+    [
+      ['見本キャリー U型シート', 10000, null, '入浴用いす', true],
+      ['見本キャリー 穴無しシート', 11000, null, '入浴用いす', true], // 商品名の空の行は上の商品のタイプちがい
+      ['見本マット M', 1000, null, '', false], // マットは対象外（チェックしない）
+    ],
+  );
+  // 2つ目の形：「定価」「仕切」の列がある（仕切は空欄）
+  const now = [
+    ['ページ', '商品名', 'タイプ・サイズ', 'メーカー', '定価\n(税込)', '販売価格\n(税込)', '仕切', '自己負担額（介護保険）', '', ''],
+    ['', '', '', '', '', '', '', '1割', '2割', '3割'],
+    ['p.50①', '見本キャリー', 'U型シート', '見本工業', '11000', '8800', '', '880', '1760', '2640'],
+  ];
+  const m2 = detectMapping(now);
+  assert.equal(m2.price, 6);
+  assert.deepEqual(gridCandidates(now, m2, '').map((x) => [x.listPrice, x.price]), [[10000, null]]);
+  // 仕入先の表の「販売価格」（自己負担の列のない表）は今までどおり仕切の候補
+  assert.equal(detectMapping([['商品名', '定価', '販売価格'], ['見本', '1000', '700']]).price, 2);
+});
+
+test('同じファイルを取り込み直すと、そのファイルで前に入れた仕切は、表が空欄なら空欄に戻す（読み取りのまちがいを直せる）。ほかのファイルなら今のまま', () => {
+  const p = (cost: number, source: string) => ({
+    id: 'p1', name: '見本キャリー U型シート', maker: '見本工業', code: '', tais: '', jan: '', category: '入浴補助用具', sub: '入浴用いす', categoryByHand: false,
+    listPrice: 0, cost, taxType: '10%' as const, unit: '', supplier: '', favorite: false, useCount: 0, lastUsedAt: 0, source, updatedAt: 0,
+  });
+  const cand = {key: 'g1', row: 1, name: '見本キャリー U型シート', price: null, listPrice: 10000, code: '', maker: '見本工業', unit: '', tais: '', jan: '', taxType: '10%' as const, taxKnown: false, category: '入浴補助用具', sub: '入浴用いす', warn: '', include: true, favorite: false};
+  const same = mergeProducts([p(8000, '見本の価格表.xlsx')], [cand], '見本の価格表.xlsx').list[0];
+  assert.deepEqual([same.listPrice, same.cost], [10000, 0]);
+  const other = mergeProducts([p(8000, '問屋の仕切表.xlsx')], [cand], '見本の価格表.xlsx').list[0];
+  assert.deepEqual([other.listPrice, other.cost], [10000, 8000]);
+});

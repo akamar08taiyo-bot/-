@@ -61,6 +61,13 @@ export function ProductsPage({data, update}: {data: AppData; update: Update}) {
   const patch = (id: string, change: Partial<Product>) =>
     update('products', (list) => list.map((p) => (p.id === id ? {...p, ...change, updatedAt: Date.now()} : p)));
 
+  const removeShown = () => {
+    const ids = new Set(shown.map((p) => p.id));
+    if (!window.confirm(`表示中の${ids.size}件を商品マスタから消します。よろしいですか？（作った見積書の明細は消えません）`)) return;
+    update('products', (list) => list.filter((x) => !ids.has(x.id)));
+    toast(`${ids.size}件を消しました`);
+  };
+
   const remove = (p: Product) => {
     if (!window.confirm(`「${p.name}」を商品マスタから消します。よろしいですか？（作った見積書の明細は消えません）`)) return;
     update('products', (list) => list.filter((x) => x.id !== p.id));
@@ -128,6 +135,12 @@ export function ProductsPage({data, update}: {data: AppData; update: Update}) {
         <span className="ml-auto text-sm text-slate-500">
           {shown.length}件 ／ 全{data.products.length}件
         </span>
+        {/* 表示中の商品をまとめて消す（取り込みのまちがいを消して取り込み直せるように。2026-11-01）。消す前に確かめる */}
+        {shown.length > 0 && (
+          <Btn color="white" small onClick={removeShown}>
+            表示中の{shown.length}件を消す
+          </Btn>
+        )}
       </div>
 
       {data.products.length === 0 ? (

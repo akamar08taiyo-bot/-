@@ -152,7 +152,8 @@ const NAME_KEYS: [string, number][] = [
 ];
 const MAKER_KEYS = ['メーカー', '製造元', '製造事業者'];
 const UNIT_KEYS = ['単位', '入数'];
-const LIST_KEYS = ['定価', '希望小売', '標準価格', '上代', 'ガイド価格', '小売価格', 'メーカー価格'];
+// 「カタログ価格」は介援隊などのカタログに載っている定価（2026-11-01。前は仕切の候補になっていた）
+const LIST_KEYS = ['定価', '希望小売', '標準価格', '上代', 'ガイド価格', '小売価格', 'メーカー価格', 'カタログ価格'];
 const SPEC_KEYS = ['色', 'カラー', '規格', '仕様', 'サイズ'];
 const TAX_KEYS = ['税区分', '課税', '非課税', '税率'];
 const CAT_KEYS = ['種目', '分類', 'カテゴリ'];
@@ -179,7 +180,8 @@ const PRICE_KEYS: [string, number][] = [
 ];
 
 const has = (cell: string, keys: string[]) => {
-  const c = normalize(cell).toLowerCase();
+  // 見出しのセルの中の改行・空白（「カタログ⏎価格(税込)」）は除いて見くらべる
+  const c = normalize(cell).toLowerCase().replace(/\s+/g, '');
   return keys.some((k) => c.includes(k.toLowerCase()));
 };
 const priceScore = (cell: string) => (normalize(cell).includes('率') ? 0 : keyScore(cell, PRICE_KEYS));
@@ -249,9 +251,13 @@ export function detectMapping(grid: Grid): Mapping {
         m.priceTaxIn = taxIn(cell);
       }
     });
+    // お客様向けの価格表（「自己負担」の列がある＝このアプリで作った介援隊カタログの価格表など）の「販売価格」は、お客様に売る値段で仕切ではない。
+    // 仕切の列がなければ仕切は空欄（2026-11-01 ユーザーの指示「仕切りは空白で良い」。前は販売価格を仕切に入れ、利益率がでたらめになった）
+    const forCustomer = row.some((cell) => /自己負担/.test(normalize(cell)));
+    if (forCustomer && m.price >= 0 && /販売/.test(normalize(row[m.price])) && !/仕切|仕入|納/.test(normalize(row[m.price]))) m.price = -1;
     if (m.name >= 0 && (m.price >= 0 || m.list >= 0)) {
       // 仕切の見出しがなければ、定価より右の見出しのない列に金額が入っていればそれを使う。なければ仕切は空欄で取り込む
-      if (m.price < 0) m.price = untitledPriceColumn(grid, r, m.list, new Set([m.name, m.code, m.maker, m.unit, m.spec, m.tais, m.jan, m.tax, m.cat]));
+      if (m.price < 0 && !forCustomer) m.price = untitledPriceColumn(grid, r, m.list, new Set([m.name, m.code, m.maker, m.unit, m.spec, m.tais, m.jan, m.tax, m.cat]));
       return m;
     }
     // 商品名の列がなくても、品番と仕切があれば「仕切だけを入れる表」として読む
@@ -437,8 +443,20 @@ export function gridCandidates(grid: Grid, m: Mapping, defaultMaker: string): Ca
   const out: Candidate[] = [];
   const cell = (row: string[], c: number) => (c >= 0 ? normalize(row[c]) : '');
   const split = codeHasSpec(grid, m);
+  // 1つの商品のタイプ・大きさちがいの2行目から、商品名の欄が空のことがある（このアプリで作った価格表など）→ 上の行の商品名を使う。
+  // 小見出しの行（「■ 入浴用いす（シャワーチェア）」のように1つのセルだけに字のある行）は、その下の商品の種目の手がかりにする（種目の列がないとき）
+  let lastBase = '';
+  let lastMaker = '';
+  let section = '';
   grid.forEach((row, r) => {
     if (r <= m.header) return;
+    const filled = row.map((x) => normalize(x)).filter(Boolean);
+    if (filled.length === 1 && parsePrice(filled[0]) === null) {
+      section = filled[0];
+      lastBase = '';
+      lastMaker = '';
+      return;
+    }
     let code = cell(row, m.code);
     let spec = m.spec >= 0 && m.spec !== m.code ? cell(row, m.spec) : '';
     if (split && code.includes(' ')) {
@@ -447,7 +465,19 @@ export function gridCandidates(grid: Grid, m: Mapping, defaultMaker: string): Ca
       spec = [code.slice(at + 1), spec].filter(Boolean).join(' ');
       code = code.slice(0, at);
     }
-    const base = cell(row, m.name);
+    const rawPrice0 = m.price >= 0 ? parsePrice(row[m.price]) : null;
+    const rawList0 = m.list >= 0 ? parsePrice(row[m.list]) : null;
+    let base = cell(row, m.name);
+    let maker = cell(row, m.maker);
+    // 品番がない行で、商品名だけが空（金額はある）なら、上の行と同じ商品のタイプちがい（メーカーも上の行と同じ。空なら初めのメーカーの欄の値にしない）
+    if (!base && !code && lastBase && (rawPrice0 !== null || rawList0 !== null)) {
+      base = lastBase;
+      maker ||= lastMaker;
+    }
+    if (base && !looksLikeHeader(base)) {
+      lastBase = base;
+      lastMaker = maker;
+    }
     const full = base && spec && !base.includes(spec) ? `${base} ${spec}` : base;
     // 商品名のうしろに品番がくり返されていれば外す
     const name = code && full.endsWith(` ${code}`) ? full.slice(0, -code.length - 1) : full;
@@ -461,7 +491,7 @@ export function gridCandidates(grid: Grid, m: Mapping, defaultMaker: string): Ca
     const price = exTax(rawPrice, m.priceTaxIn, taxType);
     const listPrice = exTax(rawList, m.listTaxIn, taxType);
     const unit = unitText(cell(row, m.unit));
-    const g = guessCategory(name, cell(row, m.cat));
+    const g = guessCategory(name, m.cat >= 0 ? cell(row, m.cat) : section);
     // 仕切が空欄でも、定価があれば取り込む（仕切はあとで入れられる）。対象外と分かった商品（T字杖など）は最初はチェックしない
     const valid = (name !== '' || code !== '') && ((price ?? 0) > 0 || (listPrice ?? 0) > 0) && !g.warn;
     out.push({
@@ -471,7 +501,7 @@ export function gridCandidates(grid: Grid, m: Mapping, defaultMaker: string): Ca
       price: price !== null && price > 0 ? price : null,
       listPrice: listPrice !== null && listPrice > 0 ? listPrice : null,
       code,
-      maker: cell(row, m.maker) || defaultMaker,
+      maker: maker || defaultMaker,
       unit,
       tais: m.tais >= 0 ? taisText(cell(row, m.tais)) : '',
       jan: m.jan >= 0 ? cell(row, m.jan).replace(/\D/g, '') : '',
@@ -705,8 +735,10 @@ export function mergeProducts(existing: Product[], incoming: Candidate[], source
       const next: Product = {
         ...p,
         name: c.name || p.name,
-        cost: c.price ?? p.cost,
-        listPrice: c.listPrice ?? p.listPrice,
+        // 同じファイル（source）をもう一度取り込んだときは、表の空欄は空欄に戻す（前の読み取りのまちがいを直せるように。2026-11-01：
+        // 介援隊カタログの価格表の「販売価格」を仕切に入れてしまった商品を、取り込み直しで直す）。ほかのファイルの空欄なら今の金額のまま
+        cost: c.price ?? (source && p.source === source ? 0 : p.cost),
+        listPrice: c.listPrice ?? (source && p.source === source ? 0 : p.listPrice),
         unit: c.unit || p.unit,
         tais: c.tais || p.tais,
         jan: c.jan || p.jan,
