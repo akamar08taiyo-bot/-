@@ -285,14 +285,29 @@ export function isScribble(pts: P[]): boolean {
 /** 次に置く番号（①②…。書き込みにある番号のいちばん大きい数の次。20 より上は「(21)」） */
 export function nextNumberText(marks: PhotoMark[]): string {
   let max = 0;
-  for (const m of marks) {
-    const t = (m.text ?? '').trim();
-    const c = t.length === 1 ? t.charCodeAt(0) - 0x2460 + 1 : 0;
-    const n = c >= 1 && c <= 20 ? c : Number(/^\((\d+)\)$/.exec(t)?.[1] ?? 0);
-    if (m.kind === 'text' && n > max) max = n;
-  }
+  for (const m of marks) if (m.kind === 'text') max = Math.max(max, numberOfText(m.text));
   const next = max + 1;
   return next <= 20 ? String.fromCharCode(0x2460 + next - 1) : `(${next})`;
+}
+
+/** 番号の道具で置いた文字（①〜⑳・(21)…）の番号。番号でなければ 0 */
+function numberOfText(text: string | undefined): number {
+  const t = (text ?? '').trim();
+  const c = t.length === 1 ? t.charCodeAt(0) - 0x2460 + 1 : 0;
+  return c >= 1 && c <= 20 ? c : Number(/^\((\d+)\)$/.exec(t)?.[1] ?? 0);
+}
+
+/** 番号（番号の道具で置いた①②…のテキスト ボックス）か */
+export const isNumberMark = (m: PhotoMark): boolean => m.kind === 'text' && numberOfText(m.text) > 0;
+
+/**
+ * 重なりの順（うしろが前）：番号はいつもいちばん前、ほかは書き込みの順。あとから線・図形を描いても、平面図・写真の①②③が隠れない
+ * （ユーザーの指示「平面図の中で①②③と番号をふる…貼り付けた平面図に簡単に番号をふれる。なので前面におく（番号）」2026-11-01）。
+ * 画面・印刷（MarkLayer.tsx）・Excel の図形（shinsei.ts）・押した図形を選ぶ順（PhotoMarkEditor.tsx の topHit）で同じ順にする。番号がなければ同じ並びを返す
+ */
+export function frontOrder(marks: PhotoMark[]): PhotoMark[] {
+  const nums = marks.filter(isNumberMark);
+  return nums.length === 0 || nums.length === marks.length ? marks : [...marks.filter((m) => !isNumberMark(m)), ...nums];
 }
 
 /** 手書きの線・補強板の斜めの線の紙の上の点（回す前。回すときは shapeBox の rot でまん中のまわりに） */

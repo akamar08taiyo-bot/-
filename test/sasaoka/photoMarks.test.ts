@@ -8,6 +8,8 @@ import {
   cmToPx,
   colorName,
   dashArray,
+  frontOrder,
+  isNumberMark,
   isScribble,
   lineEnds,
   MARK_FONTS,
@@ -166,6 +168,16 @@ test('次に置く番号：書き込みにある番号のいちばん大きい�
   assert.equal(nextNumberText([t('④', 'rect')]), '①'); // 四角形の中の文字は番号とみない
   assert.equal(nextNumberText([t('⑳')]), '(21)');
   assert.equal(nextNumberText([t('(21)')]), '(22)');
+});
+
+test('重なりの順：番号（①②…）はいつもいちばん前、ほかは書き込みの順（ユーザーの指示「平面図の中で①②③と番号をふる…前面におく（番号）」2026-11-01）', () => {
+  const t = (id: string, text: string, kind: PhotoMark['kind'] = 'text') => ({...mk({kind, x1: 0, y1: 0, x2: 0.1, y2: 0.1, text}), id});
+  const [n1, line, n2, box, memo] = [t('n1', '①'), t('l', '', 'line'), t('n2', '②'), t('r', '④', 'rect'), t('m', '手すり')];
+  assert.deepEqual(frontOrder([n1, line, n2, box, memo]).map((m) => m.id), ['l', 'r', 'm', 'n1', 'n2']); // 番号は置いた順のまま前へ
+  assert.deepEqual([n1, line, n2, box, memo].map(isNumberMark), [true, false, true, false, false]); // 四角形の中の文字・ふつうの文字は番号ではない
+  const plain = [line, box];
+  assert.equal(frontOrder(plain), plain); // 番号がなければ同じ並び
+  assert.equal(frontOrder([n1, n2]).length, 2);
 });
 
 test('写真を 90°回すと、手書きの線・補強板は紙の上の大きさのまま図形ごと 90°回る（中の線も一緒に）', () => {

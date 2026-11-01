@@ -817,9 +817,9 @@ test('改修の種類の名前は保険者の様式の言葉（北九州市「�
   assert.deepEqual(works('kitakyushu'), ['①浴室　手すり取付　L=600mm', '②トイレ　床材等の変更', '③居室　引き戸等への扉の取替え']);
   assert.deepEqual(works('fukuoka'), ['①浴室　手すりの取付け　L=600mm', '②トイレ　床又は通路面の材料変更', '③居室　引き戸等への扉の取替え']);
   for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki'] as Insurer[]) assert.deepEqual(works(insurer), ['①浴室　手すりの取り付け　L=600mm', '②トイレ　床材の変更', '③居室　扉の取替'], insurer);
-  // 写真に書く内容も同じ名前。保険者を選んでいなければ住所の市町村から
-  assert.deepEqual(photoNoteLines(places[0], kindNamesOf({insurer: '', form: '', address: '福岡県北九州市小倉北区見本町1-1'})), ['手すり取付　L=600mm']);
-  assert.deepEqual(photoNoteLines(places[0]), ['手すりの取り付け　L=600mm']);
+  // 写真に書く内容は、改修の種類の名前を書かない（どの保険者でも長さだけ。2026-11-01 の指示「手すりの取り付けなどの項目の名前はいらない」）
+  assert.deepEqual(photoNoteLines(places[0]), ['L=600mm']);
+  assert.deepEqual(photoNoteLines(places[1]), []); // 寸法のない種類は自動の文なし（写真は枠いっぱい）
 });
 
 /** 範囲（'A7:H22'）→ [左の列, 上の行, 右の列, 下の行]（0始まり） */
@@ -1008,9 +1008,11 @@ test('写真の用紙の写真の横（下）に書く欄：縦の写真はま�
   // 低い枠・行の多い書く欄でも、書く欄はなくならず、字は入る大きさ（6pt まで小さく）
   const many = photoNoteLayout({x: 0, y: 0, w: 600, h: 120}, {w: 1600, h: 1200}, [...lines, ...lines, ...lines]);
   assert.ok(many.note!.h > 20 && many.note!.y + many.note!.h === 120 && photoNotePt(many.note!, [...lines, ...lines, ...lines]) >= 6, JSON.stringify(many));
-  // 書く内容：自動の文（改修の種類・寸法）のあとに、手で足した行（空の行は書かない）
-  assert.deepEqual(photoNoteLines({kind: 1, rows: [], dims: {l: '800', h: '600'}, photoNote: 'ベースプレート　L=800mm\n\n 補強板 '}), ['手すりの取り付け　L=800mm H=600mm', 'ベースプレート　L=800mm', '補強板']);
-  assert.deepEqual(photoNoteLines({kind: 2, rows: [], dims: {w: '600', d: '350', h: '150'}}), ['段差の解消　W600mm D350mm H150mm']);
+  // 書く内容：自動の文（寸法だけ。手すりは長さだけ＝高さ H は書かない、段差の解消は W・D・H）のあとに、手で足した行（空の行は書かない）
+  // （ユーザーの指示「手すりの取り付けなどの項目の名前はいらない。Ｌ＝600mmのみでよい」2026-11-01）
+  assert.deepEqual(photoNoteLines({kind: 1, rows: [], dims: {l: '800', h: '600'}, photoNote: 'ベースプレート　L=800mm\n\n 補強板 '}), ['L=800mm', 'ベースプレート　L=800mm', '補強板']);
+  assert.deepEqual(photoNoteLines({kind: 2, rows: [], dims: {w: '600', d: '350', h: '150'}}), ['W600mm D350mm H150mm']);
+  assert.deepEqual(photoNoteLines({kind: 1, rows: [], dims: {l: '400×600'}, shinseiText: '見本の補足'}), ['L=400mm×600mm', '見本の補足']);
 });
 
 test('写真の用紙（Excel）：改修前の写真の横（上）の書く欄に、自動の文と手で足した行をテキストボックスで書き、写真は残りの所に。改修後は写真を枠いっぱい。写真のない写真番号にも書く', () => {
@@ -1025,7 +1027,8 @@ test('写真の用紙（Excel）：改修前の写真の横（上）の書く欄
   // 書く欄は改修前の枠だけ（ユーザーの指示「改修後には入れる必要はありません。改修前の時に、工務店さんの方に…内容を伝える時に、見やすく分かりやすく伝えるもの」）
   assert.equal(boxes.length, 1);
   assert.match(boxes[0], /name="改修前の説明 \d+"/);
-  assert.deepEqual([...boxes[0].matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]), ['手すりの取り付け　L=600mm', 'ベースプレート　L=800mm']);
+  // 改修の種類の名前は書かない（用紙の「実施した工事種類」の■で分かる。ユーザーの指示「手すりの取り付けなどの項目の名前はいらない」2026-11-01）
+  assert.deepEqual([...boxes[0].matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]), ['L=600mm', 'ベースプレート　L=800mm']);
   // 字体は原本のテキストボックスと同じテーマの本文の字体（書かないと明朝などで出る）
   assert.match(boxes[0], /<xdr:style>.*<a:fontRef idx="minor">.*<\/xdr:style><xdr:txBody>/);
   const sheet = SHINSEI.kanda!.sheets.find((x) => x.sheet === '1 ')!;
@@ -1047,7 +1050,7 @@ test('写真の用紙（Excel）：改修前の写真の横（上）の書く欄
   const five = anchorsOf(strFromU8(files[drawingPath(files, '1  (5)')!])).filter(isNote);
   assert.equal(five.length, 1);
   assert.match(five[0], /name="改修前の説明 \d+"/);
-  assert.deepEqual([...five[0].matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]), ['手すりの取り付け　L=400mm×600mm×600mm']);
+  assert.deepEqual([...five[0].matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]), ['L=400mm×600mm×600mm']);
   assert.match(five[0], /<a:p><a:pPr algn="ctr"\/>/);
   // 画面のプレビュー（photoImages なし）では書かない（画面は枠に重ねて描く）
   const pv = unzipSync(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(j, RATES)));
@@ -1523,7 +1526,8 @@ test('北九州市：支給申請書（受領委任払用）・写真の報告�
   const n = KK_CELLS.naiyo;
   const n1 = byName.get('内容報告書（写真）')!;
   assert.deepEqual([txt(n1, n.name), txt(n1, n.insured), txt(n1, n.place0)], ['山田 太郎', '0000366989', '浴室']);
-  assert.equal(txt(n1, n.memo0), '手すり取付　L=600mm'); // 改修の種類の名前は北九州市の様式の言葉（事前届出書の「□手すり取付」。2026-10-29）
+  // 改修の内容の欄は改修の種類の名前も書く（用紙に種類の□がない。写真の横に書く内容とはちがう）。名前は北九州市の様式の言葉（事前届出書の「□手すり取付」。2026-10-29）
+  assert.equal(txt(n1, n.memo0), '手すり取付　L=600mm');
   assert.equal(txt(byName.get('内容報告書（写真） (3)')!, n.place0), 'トイレ');
   assert.equal(txt(byName.get('内容報告書（写真） (5)')!, n.place0), '玄関');
   assert.equal(txt(byName.get('内容報告書（写真） (2)')!, n.place0), '');

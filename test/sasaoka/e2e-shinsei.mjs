@@ -686,25 +686,26 @@ log('写真（選ぶ・ドロップ・押して入れ替え・押して移す・
 log('平面図の図（枠・ドラッグ中の色・ここに離す・ドロップ・Ctrl+V・差し替え（PDF）・Excel の平面図・読み直し・スマホの幅・削除は確かめてから）OK');
 
 // ---------------- 写真に書く内容（ユーザーの指示「写真をめいいっぱいにしない。縦写真の場合、写真を左に寄せてスペースをつくる。横写真の場合、上にスペースをあけて
-// 入力スペースをつくる」「自動入力 手すり L=800mm H=600mm、追加 手入力例 ベースプレート L=800mm」）：写真の欄の箇所ごとに、自動の文（改修の種類・寸法）と手で足す行。
+// 入力スペースをつくる」「自動入力 手すり L=800mm H=600mm、追加 手入力例 ベースプレート L=800mm」）：写真の欄の箇所ごとに、自動の文（寸法）と手で足す行。
+// 自動の文に改修の種類の名前は書かない・手すりは長さだけ（「手すりの取り付けなどの項目の名前はいらない。Ｌ＝600mmのみでよい」2026-11-01）。
 // 改修前の枠だけに書く（「改修後には入れる必要はありません。改修前の時に、工務店さんの方に見積もり依頼…内容を伝える時に、見やすく分かりやすく伝えるもの」）。
 // プレビューと Excel の写真貼付用紙は、縦の写真は左に寄せて右に、横の写真・写真のない枠は写真の下に中央ぞろえで書く（「画像を上に、画像の下に寸法」2026-10-22）。改修後の写真は枠いっぱい
 const noteGroup = (no, name) => photoBoard.getByRole('group', {name: `${no}${name} 改修前の写真に書く内容`});
-assert.match(await noteGroup('①', '玄関').innerText(), /自動\s*手すりの取り付け　L=600mm H=800mm/);
-assert.match(await noteGroup('②', 'トイレ').innerText(), /自動\s*手すりの取り付け/);
+assert.match(await noteGroup('①', '玄関').innerText(), /自動\s*L=600mm\n/);
+assert.doesNotMatch(await noteGroup('①', '玄関').innerText(), /手すりの取り付け|H=800mm/);
+assert.doesNotMatch(await noteGroup('②', 'トイレ').innerText(), /自動/); // 長さを入れていない手すりは自動の文なし
 await photoBoard.getByLabel('②トイレ 改修前の写真に書く内容の追加').fill('ベースプレート　L=800mm');
 const p2 = pageOf('住改・写真②');
 const p1n = pageOf('住改・写真 ①');
 /** プレビューの写真貼付用紙の枠に書いた内容（枠の写真のボタンと同じ所にある文字） */
-const pvNote = (pg, name, text) => pg.getByRole('button', {name, exact: true}).locator('xpath=..').getByText(text);
+const pvNote = (pg, name, text, opt) => pg.getByRole('button', {name, exact: true}).locator('xpath=..').getByText(text, opt);
 const noteB = pvNote(p2, '写真貼付用紙②の改修前', 'ベースプレート　L=800mm');
 await noteB.waitFor();
 const auto2 = (await noteB.innerText()).split('\n');
-assert.equal(auto2.length, 2);
-assert.ok(auto2[0].startsWith('手すりの取り付け') && auto2[1] === 'ベースプレート　L=800mm', auto2.join('/'));
+assert.deepEqual(auto2, ['ベースプレート　L=800mm']);
 // 改修後の枠には書かない（②の改修後の写真・①の写真のない改修後の枠）
-assert.equal(await pvNote(p2, '写真貼付用紙②の改修後', '手すりの取り付け').count(), 0);
-assert.equal(await pvNote(p1n, '写真貼付用紙①の改修後', '手すりの取り付け').count(), 0);
+assert.equal(await pvNote(p2, '写真貼付用紙②の改修後', 'ベースプレート').count(), 0);
+assert.equal(await pvNote(p1n, '写真貼付用紙①の改修後', 'L=600mm').count(), 0);
 // ②の改修前は縦の写真（青 900×1600）→ 写真はまん中、書く内容は右の空いた所（ユーザーの指示「縦型の写真の場合は、中央に…右側の空いたスペースに」2026-10-29）。①の改修前は横の写真（黄 1600×533）→ 写真は上、書く内容はそのすぐ下で中央ぞろえ。
 // ②の改修後の横の写真（緑 1200×900）は枠いっぱい（枠のまん中）。どれも枠の中
 const boxOf = (loc) => loc.boundingBox();
@@ -713,7 +714,7 @@ const [nb, ib, fb, n1, i1, f1, ia, fa] = await Promise.all([
   boxOf(noteB),
   boxOf(btn(p2, '写真貼付用紙②の改修前').locator('img')),
   boxOf(btn(p2, '写真貼付用紙②の改修前')),
-  boxOf(pvNote(p1n, '写真貼付用紙①の改修前', 'L=600mm H=800mm')),
+  boxOf(pvNote(p1n, '写真貼付用紙①の改修前', 'L=600mm', {exact: true})),
   boxOf(btn(p1n, '写真貼付用紙①の改修前').locator('img')),
   boxOf(btn(p1n, '写真貼付用紙①の改修前')),
   boxOf(btn(p2, '写真貼付用紙②の改修後').locator('img')),
@@ -722,7 +723,7 @@ const [nb, ib, fb, n1, i1, f1, ia, fa] = await Promise.all([
 assert.ok(nb.x >= ib.x + ib.width - 1 && Math.abs(ib.x + ib.width / 2 - (fb.x + fb.width / 2)) < fb.width * 0.05 && nb.x + nb.width <= fb.x + fb.width + 1, `縦の写真がまん中・書く内容が右にない ${JSON.stringify([ib, nb, fb])}`);
 assert.ok(n1.y >= i1.y + i1.height - 1 && n1.y - (i1.y + i1.height) < f1.height * 0.1, `横の写真のすぐ下に書いていない ${JSON.stringify([i1, n1])}`);
 assert.ok(Math.abs(i1.y - f1.y) < f1.height * 0.05, `横の写真が枠の上にない ${JSON.stringify([i1, f1])}`);
-assert.equal(await pvNote(p1n, '写真貼付用紙①の改修前', 'L=600mm H=800mm').evaluate((el) => getComputedStyle(el).textAlign), 'center');
+assert.equal(await pvNote(p1n, '写真貼付用紙①の改修前', 'L=600mm', {exact: true}).evaluate((el) => getComputedStyle(el).textAlign), 'center');
 assert.ok(Math.abs(ia.y + ia.height / 2 - (fa.y + fa.height / 2)) < 2 && Math.abs(ia.x + ia.width / 2 - (fa.x + fa.width / 2)) < 2, `改修後の写真が枠のまん中にない ${JSON.stringify([ia, fa])}`);
 const inside = (b, f) => b.x >= f.x - 1 && b.y >= f.y - 1 && b.x + b.width <= f.x + f.width + 1 && b.y + b.height <= f.y + f.height + 1;
 assert.ok([[nb, fb], [ib, fb], [n1, f1], [i1, f1], [ia, fa]].every(([b, f]) => inside(b, f)), '写真か書く内容が枠からはみ出す');
@@ -743,7 +744,7 @@ const notesOf = (book, name) => {
 };
 const noted = sheetsOf((await saveExcel()).bytes);
 assert.deepEqual(notesOf(noted, '住改・写真②'), [`改修前の説明:${auto2.join('/')}`]);
-assert.deepEqual(notesOf(noted, '住改・写真 ①'), ['改修前の説明:手すりの取り付け　L=600mm H=800mm']);
+assert.deepEqual(notesOf(noted, '住改・写真 ①'), ['改修前の説明:L=600mm']);
 assert.deepEqual(photosOf(noted, '住改・写真②', 28).sort(), ['改修前:900x1600', '改修後:1200x900']); // 写真はそのまま
 // 読み直しても残る
 await page.waitForTimeout(1200);
@@ -832,7 +833,7 @@ assert.equal(await rotOf(pvPic), 90);
 // 横長の写真を立てると、枠の高さに合わせて小さくなり（枠からはみ出さない）、縦の写真なのでまん中（写真に書く内容は上から右の空いた所へ。2026-10-29）
 const turned = await sizeOf(pvPic);
 assert.ok(turned.w < full.w && Math.abs(turned.x - full.x) < full.w * 0.05, `回して縦になった写真がまん中にない ${JSON.stringify([full, turned])}`);
-const [turnedImg, rightNote] = [await pvPhoto.locator('img').boundingBox(), await pvNote(p1, '写真貼付用紙①の改修前', 'L=600mm H=800mm').boundingBox()];
+const [turnedImg, rightNote] = [await pvPhoto.locator('img').boundingBox(), await pvNote(p1, '写真貼付用紙①の改修前', 'L=600mm', {exact: true}).boundingBox()];
 assert.ok(rightNote.x >= turnedImg.x + turnedImg.width - 1, `回して縦になった写真の右に書いていない ${JSON.stringify([turnedImg, rightNote])}`);
 /** Excel の写真貼付用紙①の改修前の写真の向き・位置・大きさ（EMU） */
 const picXfrm = async () => {

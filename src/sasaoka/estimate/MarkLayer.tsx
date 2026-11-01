@@ -1,8 +1,9 @@
 // 写真への書き込み（photoMarks.ts）を描く：申請書のプレビュー・印刷・写真の欄の小さな写真・書き込みの画面（PhotoMarkEditor.tsx）で同じ見た目に。
-// w・h＝写真の見えている四角の紙の上の大きさ（画素）、k＝紙の画素 → 画面の画素。図形は1つずつ SVG（線・塗り・矢印）と文字（HTML）で、重なりの順は書き込みの順（あとが前）
+// w・h＝写真の見えている四角の紙の上の大きさ（画素）、k＝紙の画素 → 画面の画素。図形は1つずつ SVG（線・塗り・矢印）と文字（HTML）で、重なりの順は書き込みの順（あとが前）。
+// ただし番号（①②…）はいつもいちばん前（frontOrder）
 
 import type {CSSProperties} from 'react';
-import {arrowHead, dashArray, isBoxKind, lineEnds, MARK_INSET, MARK_LINE_K, markFontCss, markPts, PT_PX, shapeBox} from '../photoMarks.ts';
+import {arrowHead, dashArray, frontOrder, isBoxKind, lineEnds, MARK_INSET, MARK_LINE_K, markFontCss, markPts, PT_PX, shapeBox} from '../photoMarks.ts';
 import {familyOf} from '../shinseiPreview.ts';
 import type {PhotoMark} from '../types.ts';
 
@@ -110,7 +111,7 @@ export function MarkLayer({marks, w, h, k = 1, hide, style}: {marks: PhotoMark[]
   if (!marks.length || !(w > 0) || !(h > 0)) return null;
   return (
     <div className="pointer-events-none absolute" style={{width: w * k, height: h * k, ...style}} data-marks={marks.length}>
-      {marks.map((m) => (
+      {frontOrder(marks).map((m) => (
         <div key={m.id} data-mark={m.id} data-kind={m.kind} className="absolute inset-0">
           <svg width={w * k} height={h * k} viewBox={`0 0 ${w} ${h}`} overflow="visible" className="absolute left-0 top-0 block">
             <ShapeSvg m={m} w={w} h={h} />

@@ -14,7 +14,7 @@ import {BASE_PLATE} from './cutLink.ts';
 import {circled, eraOf, jobInsurer, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa, shinseiKindNames} from './estimateForms.ts';
 import {insurerNoOf} from './insurerNumbers.ts';
 import {clampOff, clampScale, normRot} from './photoEdit.ts';
-import {BOARD_PTS, lineEnds, MARK_INSET, photoBounds, shapeBox} from './photoMarks.ts';
+import {BOARD_PTS, frontOrder, lineEnds, MARK_INSET, photoBounds, shapeBox} from './photoMarks.ts';
 import {textEm} from './print/fit.ts';
 import type {RiyuValues} from './riyu.ts';
 import type {Insurer, Job, PhotoEdit, PhotoMark, Place, PlacePhotos, Settings, ShinseiInfo, ShinseiMarks} from './types.ts';
@@ -600,7 +600,8 @@ export type ShinseiValues = {
   photos: Record<number, string>; // 写真番号 → 改修場所（写真貼付用紙の改修箇所）
   photoKinds?: Record<number, number>; // 写真番号 → 改修の種類（1〜6。苅田町の写真の用紙の実施した工事種類）
   photoDates?: Record<number, PlacePhotos>; // 写真番号 → 改修前・改修後の撮影日（'YYYY-MM-DD'）
-  photoNotes?: Record<number, string[]>; // 写真番号 → 写真貼付用紙の改修前の写真の横（上）に書く内容（自動の文と、手で足した行。photoNoteLines）
+  photoNotes?: Record<number, string[]>; // 写真番号 → 写真貼付用紙の改修前の写真の横（上）に書く内容（寸法と、手で足した行。photoNoteLines）
+  photoMemos?: Record<number, string[]>; // 写真番号 → 写真の用紙の「改修の内容」の欄（北九州市・福岡市のメモの欄。改修の種類の名前も書く。photoMemoLines）
   kindNames?: string[][]; // 改修の種類（1〜6）ごとの改修場所の名前（同じ名前は1つ。北九州市の事前届出書の□）
   kindTexts?: string[]; // 改修の種類（1〜6）の名前（保険者の様式の言葉。kindNamesOf）。改修の内容の行から種類の名前を外すとき・写真の用紙の改修の種類に
   marks: ShinseiMarks; // 丸で囲む値
@@ -806,12 +807,31 @@ export function workText(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText'
 }
 
 /**
- * 写真貼付用紙の写真の横（上）に書く内容（ユーザーの指示「自動入力　手すり　L=800mm H=600mm、追加　手入力例ベースプレート　L=800mm みたいな感じ」）：
- * 1行目は自動の文（改修の種類・寸法・そのほか＝workText）、そのあとに手で足した行（`Place.photoNote`。空の行は書かない）
+ * 写真に書く内容の自動の文：寸法だけ（手すりは長さ「L=600mm」だけ、段差の解消は「W600mm D350mm H150mm」）と、そのほか（`Place.shinseiText`）。
+ * 改修の種類の名前は書かない（用紙の「実施した工事種類」の■で分かる。ユーザーの指示「青丸の部分では、手すりの取り付けなどの項目の名前はいらない。
+ * Ｌ＝600mmのみでよい」2026-11-01。前は申請書の改修の内容と同じ「手すりの取り付け　L=800mm H=800mm」）
  */
-export function photoNoteLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText' | 'photoNote'>, names: string[] = KINDS): string[] {
-  const added = (p.photoNote ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  return [...workTextLines(p, names), ...added];
+export function photoNoteAuto(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText'>): string[] {
+  const dims = p.kind === 1 ? dimsText({...p, dims: {...p.dims, h: ''}}) : dimsText(p);
+  return [dims, p.shinseiText?.trim() ?? ''].filter(Boolean);
+}
+
+/**
+ * 写真貼付用紙の写真の横（上）に書く内容（ユーザーの指示「自動入力　手すり　L=800mm H=600mm、追加　手入力例ベースプレート　L=800mm みたいな感じ」）：
+ * はじめに自動の文（寸法・そのほか＝photoNoteAuto）、そのあとに手で足した行（`Place.photoNote`。空の行は書かない）
+ */
+export function photoNoteLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText' | 'photoNote'>): string[] {
+  return [...photoNoteAuto(p), ...addedNoteLines(p)];
+}
+
+const addedNoteLines = (p: Pick<Place, 'photoNote'>) => (p.photoNote ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+
+/**
+ * 写真の用紙の「改修の内容」の欄（北九州市の内容報告書・福岡市の写真貼付台紙のメモの欄）：改修の種類の名前・寸法（申請書の改修の内容と同じ＝workTextLines）と手で足した行。
+ * この欄は用紙に改修の種類の□がないので、写真の横に書く内容（photoNoteLines）とちがって種類の名前も書く
+ */
+export function photoMemoLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText' | 'photoNote'>, names: string[] = KINDS): string[] {
+  return [...workTextLines(p, names), ...addedNoteLines(p)];
 }
 
 /** 改修の内容・箇所及び規模（苅田町・行橋市の申請書の欄）・平面図の工事内容：箇所ごとに1行「①玄関　手すりの取り付け　L=600mm」。写真番号・改修場所は見積書と同じ */
@@ -957,7 +977,8 @@ export function shinseiValues(job: Job, s: EstimateSettings & BuilderSettings, t
     photos: shinseiPhotos(job, s),
     photoKinds: Object.fromEntries([...photoPlacesOf(job, s)].map(([n, p]) => [n, p.kind])),
     photoDates: photoDatesOf(job, s, today),
-    photoNotes: Object.fromEntries([...photoPlacesOf(job, s)].map(([n, p]) => [n, photoNoteLines(p, kindNamesOf(job))] as const).filter(([, lines]) => lines.length > 0)),
+    photoNotes: Object.fromEntries([...photoPlacesOf(job, s)].map(([n, p]) => [n, photoNoteLines(p)] as const).filter(([, lines]) => lines.length > 0)),
+    photoMemos: Object.fromEntries([...photoPlacesOf(job, s)].map(([n, p]) => [n, photoMemoLines(p, kindNamesOf(job))] as const).filter(([, lines]) => lines.length > 0)),
     kindTexts: kindNamesOf(job),
     marks: {gender: info.gender, era: eraOf(info), care: info.care, renovated: info.renovated}, // 元号は選んでいなければ昭和
     texts: {
@@ -1389,7 +1410,7 @@ export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void
     if (sheet.legend?.box) drawLegend(files, sheet, v.works);
     // 写真の報告書の改修の内容（北九州市のメモの欄。大きな字でまん中）：入らなければ1行ずつ欄の幅に入る大きさにする
     const memo = sheet.photoPlace?.memo;
-    const memoLines = memo && sheet.photoPlace?.before && photo > 0 ? (v.photoNotes?.[photo] ?? []) : [];
+    const memoLines = memo && sheet.photoPlace?.before && photo > 0 ? (v.photoMemos?.[photo] ?? []) : [];
     const memoPath = memoLines.length ? sheetPaths(files).get(sheet.sheet) : undefined;
     if (memo && memoPath) fitCell(files, memoPath, memo, memoLines, true);
     // A4 から少しはみ出すシートは、印刷を「1ページに合わせる」に（Excel で印刷して2〜4枚に分かれないように）
@@ -1590,8 +1611,8 @@ function photoBoxes(files: Files, sheet: ShinseiSheet, v: ShinseiValues, photo: 
       out.set(pp.placeCells![i], next);
     });
   }
-  // メモの欄：写真に書く内容（改修前の枠だけ。写真の枠の中には書かない）
-  const notes = v.photoNotes?.[photo] ?? [];
+  // メモの欄：改修の内容（改修の種類の名前・寸法と手で足した行。改修前の枠だけ。写真の枠の中には書かない）
+  const notes = v.photoMemos?.[photo] ?? [];
   if (pp.memo && pp.before && notes.length) out.set(pp.memo, notes.join('\n'));
   const kind = v.photoKinds?.[photo];
   if (pp.kindChecks && kind) {
@@ -2555,7 +2576,7 @@ function drawPhotos(files: Files, sheet: ShinseiSheet, images: PhotoImages, note
     pics.push(media.pic(lay, img.bytes, box, box.rot, id, slot === 'before' ? '改修前' : '改修後'));
     id++;
     // 写真への書き込み：写真のすぐ上（前面）に Excel の図形で（Excel で開いて、そのまま動かす・直すことができる）
-    for (const m of img.marks ?? []) pics.push(markShapeXml(lay, photoBounds(box), m, id++));
+    for (const m of frontOrder(img.marks ?? [])) pics.push(markShapeXml(lay, photoBounds(box), m, id++));
   }
   media.done(d.replace('</xdr:wsDr>', `${pics.join('')}${texts.join('')}</xdr:wsDr>`));
 }
@@ -2618,7 +2639,7 @@ function drawPlan(files: Files, sheet: ShinseiSheet, img: PhotoImage): void {
   let id = nextShapeId(d);
   const pic = media.pic(lay, img.bytes, box, 0, id++, '平面図');
   // 図への書き込み（①②の番号・線など）：図のすぐ上に Excel の図形で（写真への書き込みと同じ。Excel で開いて動かす・直すことができる）
-  const marks = (img.marks ?? []).map((m) => markShapeXml(lay, box, m, id++)).join('');
+  const marks = frontOrder(img.marks ?? []).map((m) => markShapeXml(lay, box, m, id++)).join('');
   media.done(d.replace(/<xdr:wsDr\b[^>]*>/, (root) => root + pic + marks));
 }
 

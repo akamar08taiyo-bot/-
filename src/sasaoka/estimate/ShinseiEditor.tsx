@@ -18,7 +18,7 @@ import {usePhotoUrls} from '../photos.ts';
 import {turn} from '../photoEdit.ts';
 import {AREA_LABEL, INSURER_AREAS, insurerNoOf} from '../insurerNumbers.ts';
 import {photoBounds} from '../photoMarks.ts';
-import {costIsTotal, estimateLength, insuredBoxes, kindNamesOf, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, planPlacement, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
+import {costIsTotal, estimateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, planPlacement, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
 import type {AppData, Insurer, Job, Material, PhotoEdit, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
@@ -216,7 +216,7 @@ export function ShinseiEditor({
   const shownSize = (key: PhotoKey, w: number, h: number, edit?: PhotoEdit): {w: number; h: number} => {
     const x = photoList.find((p) => p.place.id === key.placeId);
     const frame = (x && pages?.flatMap((pg) => pg.photoSlots).find((f) => f.photo === x.no && f.slot === key.slot)) || {w: 560, h: 420};
-    const lines = x && key.slot === 'before' ? photoNoteLines(x.place, kindNamesOf(job)) : [];
+    const lines = x && key.slot === 'before' ? photoNoteLines(x.place) : [];
     const parts = photoNoteLayout({x: 0, y: 0, w: frame.w, h: frame.h}, {w, h, rot: edit?.rot ?? 0}, lines);
     const vb = photoBounds(photoPlacement(parts.photo, w, h, edit));
     return {w: vb.w, h: vb.h};
@@ -247,7 +247,7 @@ export function ShinseiEditor({
     of: photoOf,
     note: (no) => {
       const x = photoList.find((p) => p.no === no);
-      return x ? photoNoteLines(x.place, kindNamesOf(job)) : [];
+      return x ? photoNoteLines(x.place) : [];
     },
     onDrop: (no, slot, e) => {
       const key = photoKey(no, slot);
@@ -603,6 +603,7 @@ export function ShinseiEditor({
                 key={`plan:${job.planPhoto}`}
                 title="平面図"
                 what="図"
+                startTool="num"
                 photo={{url: planUrl.url, w: planUrl.w, h: planUrl.h, rot: 0}}
                 size={planSize()}
                 marks={job.planMarks ?? []}

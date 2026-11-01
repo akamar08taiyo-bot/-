@@ -33,7 +33,7 @@ import {marksBetween, photoBounds, turnMarks} from '../photoMarks.ts';
 import {composeTiles, getPhotos, photoTakenDate, preparePhoto, putPhoto, rememberPhotoUrl, usePhotoUrls} from '../photos.ts';
 import {bestTiling, MAX_TILES} from '../photoTile.ts';
 import type {TileRect} from '../photoTile.ts';
-import {kindNamesOf, photoDay, photoPlacement, workText} from '../shinsei.ts';
+import {photoDay, photoNoteAuto, photoPlacement} from '../shinsei.ts';
 import {readStampDate} from '../stampDate.ts';
 import type {Job, PhotoEdit, PhotoMark, PhotoTiles, Place, PlacePhotoEdits, PlacePhotoMarks, PlacePhotos, PlacePhotoTiles} from '../types.ts';
 import {MarkLayer} from './MarkLayer.tsx';
@@ -970,10 +970,10 @@ export function PhotoBoard({
                         追加 手入力 ベースプレート L=800mm」。改修前だけ＝工務店さんに見積もり依頼・内容を伝えるためのもの） */}
                     <div data-no-drag className="mt-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs" role="group" aria-label={`${circled(no)}${place.name} 改修前の写真に書く内容`}>
                       <div className="text-[11px] font-bold text-slate-600">改修前の写真に書く内容</div>
-                      {workText(place, kindNamesOf(job)) && (
+                      {photoNoteAuto(place).length > 0 && (
                         <div className="mt-0.5 text-slate-700">
                           <span className="mr-1.5 text-[11px] text-slate-500">自動</span>
-                          {workText(place, kindNamesOf(job))}
+                          {photoNoteAuto(place).join('　')}
                         </div>
                       )}
                       <label className="mt-1 block text-[11px] text-slate-600">

@@ -830,7 +830,8 @@ assert.equal(await pressed('直線'), 'true');
   await page.keyboard.insertText('B');
   await page.keyboard.press('Escape');
   assert.equal(await pressed('テキスト ボックス'), 'true');
-  assert.deepEqual(await marks().evaluateAll((els) => els.slice(-2).map((e) => e.querySelector('[data-mark-text]')?.textContent)), ['A', 'B']);
+  // 番号（①②）はあとから描いたテキストより前（いちばんうしろに描く＝前面。ユーザーの指示「前面におく（番号）」2026-11-01）
+  assert.deepEqual(await marks().evaluateAll((els) => els.slice(-4).map((e) => e.querySelector('[data-mark-text]')?.textContent)), ['A', 'B', '①', '②']);
   assert.equal((await kinds()).length, n0 + 2);
   // このあとの確かめのため、戻るで2つのテキストを消す
   for (let i = 0; i < 6 && (await kinds()).length > n0; i++) await dlg.getByRole('button', {name: '戻る', exact: true}).click();
@@ -902,20 +903,28 @@ assert.equal(await pvSlot.locator('[data-mark]').count(), 8);
     return {x: b.x + b.width * fx, y: b.y + b.height * fy};
   };
   const pr = pd.getByRole('toolbar', {name: '図形の書式'});
-  await pr.getByRole('button', {name: /^番号/}).click();
+  // 平面図は開いたときから番号の道具（押すたびに①②③。ユーザーの指示「平面図の中で①②③と番号をふる…簡単に番号をふれる。なので前面におく（番号）」2026-11-01）。
+  // 番号のボタンは図形の挿入のいちばん前（「選択」のすぐ右）
+  assert.equal(await pr.getByRole('button', {name: /^番号/}).getAttribute('aria-pressed'), 'true');
+  const insertTools = await pr.getByRole('group', {name: '図形の挿入'}).getByRole('button').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+  assert.deepEqual(insertTools.slice(0, 2), ['選択', '番号（①②…。押すたびに次の番号）']);
+  // 図は押せない（指で描くとき、iPhone で写真が浮き上がって共有メニューが出ないように。押した所は下の枠が受ける。2026-11-01）
+  assert.equal(await pst.locator('img').evaluate((el) => getComputedStyle(el).pointerEvents), 'none');
   for (const [fx, fy] of [[0.2, 0.3], [0.6, 0.3]]) {
     const q = await pAt(fx, fy);
     await page.mouse.click(q.x, q.y);
   }
   await pr.getByRole('button', {name: '直線', exact: true}).click();
   {
-    const [a, b] = [await pAt(0.2, 0.6), await pAt(0.7, 0.6)];
+    // ①の上を通る線をあとから引いても、番号が前（いちばんうしろに描く）
+    const [a, b] = [await pAt(0.1, 0.3), await pAt(0.7, 0.3)];
     await page.mouse.move(a.x, a.y);
     await page.mouse.down();
     for (let i = 1; i <= 8; i++) await page.mouse.move(a.x + ((b.x - a.x) * i) / 8, a.y);
     await page.mouse.up();
   }
   assert.equal(await pd.locator('[data-photo-stage] [data-mark]').count(), 3);
+  assert.deepEqual(await pd.locator('[data-photo-stage] [data-mark]').evaluateAll((els) => els.map((e) => e.dataset.kind)), ['line', 'text', 'text']);
   await page.screenshot({path: path.join(outDir, 'mark-08-plan-editor.png')});
   await pd.getByRole('button', {name: '閉じる'}).click();
   await pd.waitFor({state: 'detached'});

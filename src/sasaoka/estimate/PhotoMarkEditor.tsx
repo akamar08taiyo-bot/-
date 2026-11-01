@@ -20,6 +20,7 @@ import {
   colorName,
   DASHES,
   FONT_SIZES,
+  frontOrder,
   hasPts,
   hasText,
   isScribble,
@@ -84,6 +85,8 @@ type Menu = {name: 'fill' | 'line' | 'color' | 'size' | 'font' | 'front' | 'back
 // 手書きのペン・番号（ユーザーの指示「写真に、手書きなので、線を引ける機能…」「平面図の中に、①②のように番号を」2026-10-29）。
 // 補強板（茶色の四角と斜めの線）の道具はユーザーの指示「茶色の斜線の…機能は不要」2026-10-29 で外した（前に描いた補強板は今までどおり出す・選んで動かせる）
 const TOOLS: {key: Tool; label: string}[] = [
+  // 番号はいちばん前（「選択」のすぐ右。ユーザーの指示「平面図の中で①②③と番号をふる…簡単に番号をふれる。なので前面におく（番号）」2026-11-01）
+  {key: 'num', label: '番号（①②…。押すたびに次の番号）'},
   {key: 'pen', label: 'ペン（手書き。長押しでまっすぐ・ぐしゃぐしゃで消す）'},
   {key: 'poly', label: '折れ線（押すたびに角。ダブルクリック・Enter で終わる）'},
   // ユーザーの指示「写真の中のような⬜︎の図をつくるときは、1角ワンタッチで⬜︎やななめ四角をつくれるように」2026-10-29：角を4つ押すと閉じた四角（終える操作はいらない）
@@ -94,7 +97,6 @@ const TOOLS: {key: Tool; label: string}[] = [
   {key: 'rect', label: '正方形/長方形'},
   {key: 'ellipse', label: '楕円'},
   {key: 'text', label: 'テキスト ボックス'},
-  {key: 'num', label: '番号（①②…。押すたびに次の番号）'},
   // ユーザーの指示「消しゴム機能をつける」2026-10-29。Excel の「描画」の消しゴム（ストローク）と同じく、なぞった線・図形を1つずつまるごと消す
   {key: 'eraser', label: '消しゴム（なぞった線・図形を消す）'},
 ];
@@ -112,8 +114,8 @@ const doneTool = (t: Tool | null): Tool | null => (t && KEEP_TOOL.has(t) ? t : n
  * 手書きのペン（ぐしゃぐしゃで消すのを線の上から始める）・折れ線（押すたびに角）・消しゴムは、今までどおり押すと描く
  */
 const MOVE_TOOL = new Set<Tool>(['quad', 'line', 'arrow', 'arrow2', 'rect', 'ellipse', 'board', 'text', 'num']);
-/** 開いたときの道具：いつも直線（ユーザーの指示「デフォルトは棒線にする」「デフォルトはただの横棒」2026-10-29。前は最後に使った道具を覚えていた） */
-const START_TOOL: Tool = 'line';
+/** 開いたときの道具：写真はいつも直線（ユーザーの指示「デフォルトは棒線にする」「デフォルトはただの横棒」2026-10-29。前は最後に使った道具を覚えていた）。平面図は番号（startTool） */
+const START_TOOL = 'line' as const;
 const LONG_PRESS = 550; // 手書きの線を、止めてからまっすぐにするまでの時間（ミリ秒。iPhone のメモと同じぐらい）
 
 /** 書式の欄の色（よく使う色。黄＝線・ペン、茶＝枠囲み・補強板の初めの色） */
@@ -292,8 +294,9 @@ function inSelBox(marks: PhotoMark[], sel: string[], p: Pt, W: number, H: number
     return Math.abs(q.x - c.x) <= b.w / 2 + tol && Math.abs(q.y - c.y) <= b.h / 2 + tol;
   });
 }
-/** 押した所のいちばん前の図形（線・枠を先に。塗りのない図形の中は、ほかに当たらないときだけ） */
-function topHit(marks: PhotoMark[], p: Pt, W: number, H: number, tol: number): PhotoMark | null {
+/** 押した所のいちばん前の図形（線・枠を先に。塗りのない図形の中は、ほかに当たらないときだけ）。前うしろは描く順と同じ（番号がいちばん前。frontOrder） */
+function topHit(all: PhotoMark[], p: Pt, W: number, H: number, tol: number): PhotoMark | null {
+  const marks = frontOrder(all);
   let weak: PhotoMark | null = null;
   for (let i = marks.length - 1; i >= 0; i--) {
     const h = hitMark(marks[i], p, W, H, tol);
@@ -487,6 +490,7 @@ export function PhotoMarkEditor({
   onClose,
   onRotate,
   what = '写真',
+  startTool = START_TOOL,
 }: {
   title: string;
   photo: {url: string; w: number; h: number; rot: number};
@@ -496,6 +500,7 @@ export function PhotoMarkEditor({
   onClose: () => void;
   onRotate?: (dir: 1 | -1) => void; // 写真を 90°回す（書き込みも一緒に回して、marks・photo.rot・size を渡し直してもらう）
   what?: string; // 何に書き込むか（画面の名前「…の写真に書き込む」。平面図は「図」）
+  startTool?: 'num' | 'line'; // 開いたときの道具（平面図は番号＝開いてすぐ押すたびに①②③。写真は直線）
 }) {
   const W = Math.max(1, size.w);
   const H = Math.max(1, size.h);
@@ -503,7 +508,7 @@ export function PhotoMarkEditor({
   const [marks, setMarks] = useState<PhotoMark[]>(initial);
   const [draft, setDraft] = useState<PhotoMark[] | null>(null);
   const [sel, setSel] = useState<string[]>([]);
-  const [tool, setTool] = useState<Tool | null>(START_TOOL);
+  const [tool, setTool] = useState<Tool | null>(startTool);
   const [editing, setEditing] = useState<string | null>(null);
   // 頂点の編集（Excel の「図形の編集 → 頂点の編集」。ユーザーの指示「エクセル　頂点の編集機能をつける」2026-10-30）：
   // 編集している手書きの線・折れ線・四角の id と、選んでいる頂点（i）。選んでいる図形が変わったら終わる（pe）
@@ -523,7 +528,7 @@ export function PhotoMarkEditor({
   const [eraserAt, setEraserAt] = useState<{p: Pt; r: number} | null>(null);
   const [phonePanel, setPhonePanel] = useState<'line' | 'width' | 'more' | null>(null); // スマホの書式の欄で開いているもの（線の色・線の太さ・その他） // 消しゴムの丸（なぞっている所・マウスの所。紙の画素）
   // 塗りつぶし・枠線・文字の色のボタンの下の色（最後に選んだ色。ボタンを押すとその色に。Excel と同じ）
-  const [recent, setRecent] = useState(() => ({fill: styles.shape.fill || 'FFFFFF', line: styles[toolStyleKey(START_TOOL)].line || SHAPE_STYLE.line, color: styles.text.color}));
+  const [recent, setRecent] = useState(() => ({fill: styles.shape.fill || 'FFFFFF', line: styles[toolStyleKey(startTool)].line || SHAPE_STYLE.line, color: styles.text.color}));
   const shown = draft ?? marks;
   const latest = useRef({marks, editing});
   latest.current = {marks, editing};
@@ -2352,7 +2357,7 @@ export function PhotoMarkEditor({
           role="application"
           aria-label="写真の書き込み"
           className="relative min-h-0 min-w-0 flex-1 touch-none select-none overflow-hidden outline-none"
-          style={{cursor: canvasCursor}}
+          style={{cursor: canvasCursor, WebkitTouchCallout: 'none'}}
           onPointerDown={down}
           onPointerMove={move}
           onPointerUp={up}
@@ -2374,7 +2379,7 @@ export function PhotoMarkEditor({
           {k > 0 && (
             <div ref={stageRef} data-photo-stage className="absolute" style={{left: ox, top: oy, width: W * k, height: H * k}}>
               <div className="absolute inset-0 overflow-hidden bg-white shadow-md">
-                <img src={photo.url} alt="" draggable={false} className="absolute max-w-none select-none" style={{left: ((W - iw) / 2) * k, top: ((H - ih) / 2) * k, width: iw * k, height: ih * k, transform: photo.rot ? `rotate(${photo.rot}deg)` : undefined}} />
+                <img src={photo.url} alt="" draggable={false} className="pointer-events-none absolute max-w-none select-none" style={{left: ((W - iw) / 2) * k, top: ((H - ih) / 2) * k, width: iw * k, height: ih * k, transform: photo.rot ? `rotate(${photo.rot}deg)` : undefined}} />
               </div>
               <MarkLayer marks={shown} w={W} h={H} k={k} hide={editing} style={{left: 0, top: 0}} />
               {selectionSvg}
