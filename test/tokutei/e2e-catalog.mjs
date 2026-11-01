@@ -83,8 +83,26 @@ try {
         assert.match(await row.innerText(), /対象外/);
       }
     }
+    if (expect === 'carrier') {
+      // 定価・販売価格・仕切の3つの列。販売価格は「販売価格の割引率」の欄を変えると、みな一度に変わる（ユーザーの指示「定価、販売価格、仕切りの３つに分けて、
+      // 販売価格の部分は、新たに設けた割引率の欄を変更することによって一律で一斉に変更できるようにする」2026-11-01）。金額は計算が合うかだけを見る
+      const heads = (await imp.locator('thead th').allInnerTexts()).map((t) => t.trim());
+      assert.deepEqual(heads.filter((t) => /定価|販売価格|仕切/.test(t)), ['定価（税抜）', '販売価格（税抜）', '仕切（税抜）']);
+      const saleOk = async (rate) => {
+        for (let i = 0; i < n; i++) {
+          const row = rows.nth(i);
+          const list = Number((await row.getByLabel('定価').inputValue()).replace(/[^\d]/g, ''));
+          const sale = Number((await row.locator('[data-sale-price]').innerText()).replace(/[^\d]/g, ''));
+          assert.equal(sale, Math.floor((list * (100 - rate)) / 100), `${i} ${rate}%`);
+        }
+      };
+      await saleOk(20); // 初めは設定の割引率（20%）
+      await imp.getByLabel('販売価格の割引率').fill('25');
+      await saleOk(25);
+      assert.equal(await imp.getByText('定価の25%引き').count(), n);
+      await page.screenshot({path: `${out}/c1-import-catalog.png`});
+    }
     if (expect !== 'mat') {
-      if (expect === 'carrier') await page.screenshot({path: `${out}/c1-import-catalog.png`});
       const btn = imp.getByRole('button', {name: /^商品マスタに取り込む（\d+件）$/});
       const k = Number(/（(\d+)件）/.exec(await btn.innerText())[1]);
       assert.equal(k, n);
@@ -98,6 +116,14 @@ try {
     }
   }
   await page.getByText(`全${imported}件`).waitFor();
+  // 商品マスタも 定価・販売価格・仕切 の順。シャワーキャリー（25% で取り込んだ）は「定価の25%引き」、ほかは 20%
+  assert.equal(await page.getByText('定価の25%引き').count(), chairs);
+  assert.equal(await page.getByText('定価の20%引き').count(), imported - chairs);
+  // 表示中の商品の割引率をまとめて変える
+  await page.getByLabel('表示中の商品の割引率').fill('30');
+  await page.getByRole('button', {name: `表示中の${imported}件に`}).click();
+  await page.getByText('定価の30%引き').first().waitFor();
+  assert.equal(await page.getByText('定価の30%引き').count(), imported);
   // 仕切は空欄なので、利益率は出さない（ユーザーの指示「仕切りは空白で良い。なので、利益率はわかりません」2026-11-01）
   assert.equal(await page.getByText(/利益率/).count(), 0);
   await page.screenshot({path: `${out}/c3-products.png`, fullPage: true});

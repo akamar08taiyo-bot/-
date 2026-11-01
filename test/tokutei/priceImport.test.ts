@@ -16,6 +16,10 @@ import {
 import type {Candidate} from '../../src/tokutei/import/priceImport.ts';
 import {readXlsx} from '../../src/tokutei/import/xlsx.ts';
 import type {Product} from '../../src/tokutei/types.ts';
+import {unitPriceOf} from '../../src/tokutei/calc.ts';
+import {defaultSettings} from '../../src/tokutei/defaults.ts';
+import {itemFromProduct, productRate} from '../../src/tokutei/sales.ts';
+import {cleanProducts} from '../../src/tokutei/storage.ts';
 
 // 福祉用具の仕切り一覧表によくある並び（見本。ユーザーの価格表はリポジトリに入れない）
 const TABLE = [
@@ -259,4 +263,28 @@ test('同じファイルを取り込み直すと、そのファイルで前に�
   assert.deepEqual([same.listPrice, same.cost], [10000, 0]);
   const other = mergeProducts([p(8000, '問屋の仕切表.xlsx')], [cand], '見本の価格表.xlsx').list[0];
   assert.deepEqual([other.listPrice, other.cost], [10000, 8000]);
+});
+
+// 取り込みの「販売価格の割引率」の欄（ユーザーの指示「定価、販売価格、仕切りの３つに分けて、販売価格の部分は、新たに設けた割引率の欄を変更することによって
+// 一律で一斉に変更できるようにする」2026-11-01）：取り込んだ商品に割引率が付き、案件に入れたときの販売価格もその割引率
+test('取り込みの割引率：入れた商品・書き換えた商品に付き、案件に入れると販売価格＝定価×(100−割引率)%', () => {
+  const s = defaultSettings();
+  const old: Product = {
+    id: 'p1', name: '見本チェア', maker: '見本工業', code: 'MI-1', tais: '', jan: '', category: '入浴補助用具', sub: '入浴用いす', categoryByHand: false,
+    listPrice: 10000, cost: 0, taxType: '10%', unit: '台', supplier: '', favorite: false, useCount: 0, lastUsedAt: 0, source: '', updatedAt: 0,
+  };
+  const cand = (code: string, name: string) => ({key: code, row: 1, name, price: null, listPrice: 10000, code, maker: '見本工業', unit: '', tais: '', jan: '', taxType: '10%' as const, taxKnown: false, category: '入浴補助用具', sub: '入浴用いす', warn: '', include: true, favorite: false});
+  // 割引率の欄なし（今までどおり）→ 付けない（設定の割引率）
+  assert.equal(mergeProducts([old], [cand('MI-1', '見本チェア')]).list[0].discountRate, undefined);
+  assert.equal(productRate(old, s), s.discountRate);
+  // 割引率 25% で取り込む → 書き換えた商品（同じ品番）も新しい商品も 25%
+  const r = mergeProducts([old], [cand('MI-1', '見本チェア'), cand('MI-2', '見本チェア ワイド')], 'カタログ.pdf', '', 1, 25);
+  assert.deepEqual(r.list.map((p) => p.discountRate), [25, 25]);
+  assert.deepEqual([r.added, r.updated], [1, 1]);
+  const item = itemFromProduct(r.list[0], s);
+  assert.equal(item.discountRate, 25);
+  assert.equal(unitPriceOf(item, s).price, 7500);
+  // 保存して読み直しても残る（数字でないものは捨てて設定の割引率）
+  assert.equal(cleanProducts(r.list)[0].discountRate, 25);
+  assert.equal(cleanProducts([{...old, discountRate: 'x'}])[0].discountRate, undefined);
 });

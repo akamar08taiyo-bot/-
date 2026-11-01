@@ -698,7 +698,8 @@ export type MergeResult = {list: Product[]; added: number; updated: number; unch
  * 商品名のない行（仕切だけの表）は、同じ品番の商品が1つだけあるときに仕切を入れる。
  * supplier：このファイルの仕入先（空でなければ、取り込んだ商品の仕入先にする）
  */
-export function mergeProducts(existing: Product[], incoming: Candidate[], source = '', supplier = '', now = Date.now()): MergeResult {
+/** discountRate：取り込みの「割引率」の欄（販売価格＝定価×(100−割引率)%）。入れた商品・書き換えた商品に付ける。なければ付けない（設定の割引率） */
+export function mergeProducts(existing: Product[], incoming: Candidate[], source = '', supplier = '', now = Date.now(), discountRate?: number): MergeResult {
   const list = existing.map((p) => ({...p}));
   const byCode = new Map<string, number[]>();
   const byName = new Map<string, number>();
@@ -745,6 +746,7 @@ export function mergeProducts(existing: Product[], incoming: Candidate[], source
         taxType: c.taxKnown ? c.taxType : p.taxType,
         supplier: supplier || p.supplier,
         favorite: p.favorite || c.favorite,
+        ...(discountRate === undefined ? {} : {discountRate}),
       };
       if (c.categoryByHand) {
         // 取り込みの確認で選んだ種目は、手で選んだものとして残す
@@ -756,7 +758,7 @@ export function mergeProducts(existing: Product[], incoming: Candidate[], source
         next.category = c.category;
         next.sub = c.sub;
       }
-      const changed = (['name', 'cost', 'listPrice', 'unit', 'tais', 'jan', 'taxType', 'supplier', 'category', 'sub', 'categoryByHand', 'favorite'] as const).some(
+      const changed = (['name', 'cost', 'listPrice', 'discountRate', 'unit', 'tais', 'jan', 'taxType', 'supplier', 'category', 'sub', 'categoryByHand', 'favorite'] as const).some(
         (k) => next[k] !== p[k],
       );
       list[at] = changed ? {...next, source: source || p.source, updatedAt: now} : p;
@@ -776,6 +778,7 @@ export function mergeProducts(existing: Product[], incoming: Candidate[], source
         categoryByHand: !!c.categoryByHand,
         listPrice: c.listPrice ?? 0,
         cost: c.price ?? 0,
+        ...(discountRate === undefined ? {} : {discountRate}),
         taxType: c.taxType,
         unit: c.unit,
         supplier,

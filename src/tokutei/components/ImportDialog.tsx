@@ -17,6 +17,7 @@ import {
 } from '../import/priceImport.ts';
 import type {Candidate, Grid, Mapping, PositionedWord} from '../import/priceImport.ts';
 import {isXlsx, readXlsx} from '../import/xlsx.ts';
+import {unitPriceOf} from '../calc.ts';
 import {catalogCandidates, isKaientaiOrder, parseCatalogPage} from '../catalogItems.ts';
 import type {CatalogProduct} from '../catalogItems.ts';
 import {subShort} from '../category.ts';
@@ -88,6 +89,9 @@ export function ImportDialog({
   const [listNth, setListNth] = useState(0);
   const [maker, setMaker] = useState('');
   const [supplier, setSupplier] = useState('');
+  // 販売価格の割引率（初めは設定の割引率。変えると一覧の販売価格がみな変わり、取り込んだ商品に付く。ユーザーの指示「定価、販売価格、仕切りの３つに分けて、
+  // 販売価格の部分は、新たに設けた割引率の欄を変更することによって一律で一斉に変更できるようにする」2026-11-01）
+  const [rate, setRate] = useState(settings.discountRate);
   const [overrides, setOverrides] = useState<Record<string, Override>>({});
   const [query, setQuery] = useState('');
 
@@ -197,7 +201,7 @@ export function ImportDialog({
     });
 
   const doImport = () => {
-    const r = mergeProducts(products, included, fileName, supplier.trim());
+    const r = mergeProducts(products, included, fileName, supplier.trim(), Date.now(), rate);
     onDone(r.list);
     toast(`商品マスタに取り込みました：新しく ${r.added}件・更新 ${r.updated}件・変わらず ${r.unchanged}件`);
     onClose();
@@ -351,6 +355,13 @@ export function ImportDialog({
                 ))}
               </select>
             </label>
+            <label className="grid gap-1 text-xs font-bold text-slate-600">
+              販売価格の割引率
+              <span className="flex items-center gap-1 font-normal">
+                <NumberInput value={rate} onChange={(v) => setRate(Math.min(100, Math.max(0, v)))} min={0} className="w-16" ariaLabel="販売価格の割引率" />
+                <span className="text-sm text-slate-700">%</span>
+              </span>
+            </label>
             {source.kind !== 'catalog' && (
               <div className="grid gap-1 text-xs font-bold text-slate-600">
                 読み取り方
@@ -457,7 +468,7 @@ export function ImportDialog({
             <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">商品名と金額の組み合わせが見つかりませんでした。上の「読み取り方」や列の選び方を変えてみてください。</p>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-slate-200">
-              <table className="w-full min-w-[980px] text-sm">
+              <table className="w-full min-w-[1080px] text-sm">
                 <thead className="bg-slate-50 text-xs text-slate-500">
                   <tr>
                     <th className="w-12 px-2 py-1.5">取込</th>
@@ -466,6 +477,7 @@ export function ImportDialog({
                     <th className="w-64 px-2 py-1.5 text-left">種目</th>
                     <th className="px-2 py-1.5 text-left">品番・商品名・メーカー</th>
                     <th className="w-28 px-2 py-1.5 pr-4 text-right">定価（税抜）</th>
+                    <th className="w-28 px-2 py-1.5 pr-4 text-right">販売価格（税抜）</th>
                     <th className="w-28 px-2 py-1.5 pr-4 text-right">仕切（税抜）</th>
                     <th className="w-16 px-2 py-1.5">税</th>
                   </tr>
@@ -503,11 +515,19 @@ export function ImportDialog({
                         ) : (
                           <NumberInput value={c.listPrice} onChange={(listPrice) => setOv(c.key, {listPrice})} className="w-24" ariaLabel="定価" />
                         )}
-                        {c.listPrice !== null && (
-                          <div className="mt-0.5 text-[11px] text-slate-500">
-                            販売 {yen(Math.floor((c.listPrice * (100 - settings.discountRate)) / 100))}
-                          </div>
-                        )}
+                      </td>
+                      {/* 販売価格：定価×(100−割引率)%（上の割引率の欄で、みな一度に変わる）。定価がなければ 仕切×掛け率（見積もりと同じ calc.ts の計算） */}
+                      <td className="px-2 py-2 pr-4 text-right tabular-nums">
+                        {(() => {
+                          const {price, basis} = unitPriceOf({unitPrice: null, listPrice: c.listPrice ?? 0, cost: c.price ?? 0, discountRate: rate}, settings);
+                          if (price <= 0) return <span className="text-xs text-slate-400">—</span>;
+                          return (
+                            <>
+                              <span data-sale-price>{yen(price)}</span>
+                              <div className="mt-0.5 text-[11px] text-slate-500">{basis === 'list' ? `定価の${rate}%引き` : `仕切×${(100 + settings.markupRate) / 100}`}</div>
+                            </>
+                          );
+                        })()}
                       </td>
                       <td className="px-2 py-1 text-right">
                         {c.price === null ? (

@@ -211,6 +211,8 @@ export function cleanProducts(raw: unknown): Product[] {
     categoryByHand: p.categoryByHand === true,
     listPrice: Math.max(0, numv(p.listPrice)),
     cost: Math.max(0, numv(p.cost)),
+    // 割引率は決めた商品だけ（なければ設定の割引率）
+    ...(optNum(p.discountRate) === null ? {} : {discountRate: Math.min(100, Math.max(0, optNum(p.discountRate)!))}),
     taxType: tax(p.taxType),
     unit: str(p.unit),
     supplier: str(p.supplier),

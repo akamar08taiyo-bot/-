@@ -2,7 +2,7 @@ import {useMemo, useState} from 'react';
 import type {ReactNode} from 'react';
 import {unitPriceOf} from '../calc.ts';
 import {CATEGORIES, docLabel} from '../category.ts';
-import {makerChoices} from '../sales.ts';
+import {makerChoices, productRate} from '../sales.ts';
 import {productsCsv} from '../storage.ts';
 import type {AppData, Product, Settings, TaxType} from '../types.ts';
 import type {Update} from '../useStore.ts';
@@ -27,10 +27,11 @@ export function sortProducts(list: Product[]): Product[] {
   );
 }
 
-/** 販売単価（定価の2割引き。定価がなければ仕切×1.25）と利益率（販売単価に対する） */
-export function productPrice(p: Product, s: Settings): {price: number; rate: number | null} {
-  const {price} = unitPriceOf({unitPrice: null, listPrice: p.listPrice, cost: p.cost, discountRate: s.discountRate}, s);
-  return {price, rate: price > 0 && p.cost > 0 ? (price - p.cost) / price : null};
+/** 販売価格（定価×(100−割引率)%。割引率は商品の割引率、なければ設定の割引率。定価がなければ仕切×1.25）と利益率（販売価格に対する） */
+export function productPrice(p: Product, s: Settings): {price: number; rate: number | null; off: number; byList: boolean} {
+  const off = productRate(p, s);
+  const {price, basis} = unitPriceOf({unitPrice: null, listPrice: p.listPrice, cost: p.cost, discountRate: off}, s);
+  return {price, rate: price > 0 && p.cost > 0 ? (price - p.cost) / price : null, off, byList: basis === 'list'};
 }
 
 export function ProductsPage({data, update}: {data: AppData; update: Update}) {
@@ -42,6 +43,7 @@ export function ProductsPage({data, update}: {data: AppData; update: Update}) {
   const [cat, setCat] = useState('');
   const [limit, setLimit] = useState(PAGE);
   const s = data.settings;
+  const [bulkRate, setBulkRate] = useState(s.discountRate); // 表示中の商品にまとめて入れる割引率
 
   const shown = useMemo(
     () =>
@@ -66,6 +68,13 @@ export function ProductsPage({data, update}: {data: AppData; update: Update}) {
     if (!window.confirm(`表示中の${ids.size}件を商品マスタから消します。よろしいですか？（作った見積書の明細は消えません）`)) return;
     update('products', (list) => list.filter((x) => !ids.has(x.id)));
     toast(`${ids.size}件を消しました`);
+  };
+
+  // 表示中の商品の販売価格の割引率をまとめて変える（ユーザーの指示「販売価格の部分は、新たに設けた割引率の欄を変更することによって一律で一斉に変更できるようにする」2026-11-01）
+  const rateShown = () => {
+    const ids = new Set(shown.map((p) => p.id));
+    update('products', (list) => list.map((x) => (ids.has(x.id) ? {...x, discountRate: bulkRate, updatedAt: Date.now()} : x)));
+    toast(`${ids.size}件の割引率を${bulkRate}%にしました`);
   };
 
   const remove = (p: Product) => {
@@ -135,6 +144,15 @@ export function ProductsPage({data, update}: {data: AppData; update: Update}) {
         <span className="ml-auto text-sm text-slate-500">
           {shown.length}件 ／ 全{data.products.length}件
         </span>
+        {shown.length > 0 && (
+          <span className="flex items-center gap-1 text-sm text-slate-700">
+            <span className="text-xs font-bold text-slate-600">割引率</span>
+            <NumberInput value={bulkRate} onChange={(v) => setBulkRate(Math.min(100, Math.max(0, v)))} min={0} className="w-16" ariaLabel="表示中の商品の割引率" />%
+            <Btn color="white" small onClick={rateShown}>
+              表示中の{shown.length}件に
+            </Btn>
+          </span>
+        )}
         {/* 表示中の商品をまとめて消す（取り込みのまちがいを消して取り込み直せるように。2026-11-01）。消す前に確かめる */}
         {shown.length > 0 && (
           <Btn color="white" small onClick={removeShown}>
@@ -157,15 +175,15 @@ export function ProductsPage({data, update}: {data: AppData; update: Update}) {
                 <th className="w-64 px-2 py-2 text-left">種目</th>
                 <th className="px-2 py-2 text-left">商品名・メーカー・品番</th>
                 <th className="w-28 px-2 py-2 pr-4 text-right">定価（税抜）</th>
+                <th className="w-32 px-2 py-2 text-right">販売価格（税抜）</th>
                 <th className="w-28 px-2 py-2 pr-4 text-right">仕切（税抜）</th>
-                <th className="w-28 px-2 py-2 text-right">販売単価</th>
                 <th className="w-20 px-2 py-2">税</th>
                 <th className="w-24 px-2 py-2"></th>
               </tr>
             </thead>
             <tbody>
               {shown.slice(0, limit).map((p) => {
-                const {price, rate} = productPrice(p, s);
+                const {price, rate, off, byList} = productPrice(p, s);
                 const low = rate !== null && rate * 100 < s.minProfitRate;
                 return (
                   <tr key={p.id} className="border-t border-slate-100 align-top">
@@ -190,12 +208,13 @@ export function ProductsPage({data, update}: {data: AppData; update: Update}) {
                     <td className="px-2 py-1 text-right">
                       <NumberInput value={p.listPrice} onChange={(listPrice) => patch(p.id, {listPrice})} min={0} blankZero className="w-24" ariaLabel="定価" />
                     </td>
-                    <td className="px-2 py-1 text-right">
-                      <NumberInput value={p.cost} onChange={(cost) => patch(p.id, {cost})} min={0} blankZero className="w-24" ariaLabel="仕切" />
-                    </td>
                     <td className="px-2 py-2 text-right tabular-nums">
                       {price > 0 ? yen(price) : '—'}
+                      {price > 0 && <div className="text-[11px] text-slate-500">{byList ? `定価の${off}%引き` : `仕切×${(100 + s.markupRate) / 100}`}</div>}
                       {rate !== null && <div className={`text-[11px] ${low ? 'font-bold text-rose-600' : 'text-slate-500'}`}>利益率 {Math.round(rate * 100)}%</div>}
+                    </td>
+                    <td className="px-2 py-1 text-right">
+                      <NumberInput value={p.cost} onChange={(cost) => patch(p.id, {cost})} min={0} blankZero className="w-24" ariaLabel="仕切" />
                       {p.cost <= 0 && <div className="text-[11px] text-amber-700">仕切なし</div>}
                     </td>
                     <td className="px-2 py-1">
@@ -266,7 +285,7 @@ function Field({label, children}: {label: string; children: ReactNode}) {
 export function ProductEditModal({product, settings, makers, onSave, onClose}: {product: Product; settings: Settings; makers: string[]; onSave: (p: Product) => void; onClose: () => void}) {
   const [p, setP] = useState(product);
   const set = (change: Partial<Product>) => setP((x) => ({...x, ...change}));
-  const {price, rate} = productPrice(p, settings);
+  const {price, rate, off} = productPrice(p, settings);
   return (
     <Modal
       title={product.id ? '商品を直す' : '商品を手で足す'}
@@ -309,6 +328,9 @@ export function ProductEditModal({product, settings, makers, onSave, onClose}: {
         <Field label="定価（税抜）">
           <NumberInput value={p.listPrice} onChange={(listPrice) => set({listPrice})} min={0} blankZero />
         </Field>
+        <Field label="販売価格の割引率（%）">
+          <NumberInput value={off} onChange={(discountRate) => set({discountRate: Math.min(100, Math.max(0, discountRate))})} min={0} />
+        </Field>
         <Field label="仕切（税抜・任意）">
           <NumberInput value={p.cost} onChange={(cost) => set({cost})} min={0} blankZero />
         </Field>
@@ -338,8 +360,8 @@ export function ProductEditModal({product, settings, makers, onSave, onClose}: {
           <input type="checkbox" checked={p.favorite} onChange={(e) => set({favorite: e.target.checked})} />★お気に入り
         </label>
         <p className="text-sm text-slate-600 sm:col-span-2">
-          販売単価 <b className="tabular-nums">{price > 0 ? `${yen(price)}円` : '—'}</b>
-          {p.listPrice > 0 ? `（定価×${(100 - settings.discountRate) / 100}）` : p.cost > 0 ? `（定価がないので 仕切×${(100 + settings.markupRate) / 100}）` : ''}
+          販売価格 <b className="tabular-nums">{price > 0 ? `${yen(price)}円` : '—'}</b>
+          {p.listPrice > 0 ? `（定価の${off}%引き）` : p.cost > 0 ? `（定価がないので 仕切×${(100 + settings.markupRate) / 100}）` : ''}
           {rate !== null && `　利益率 ${Math.round(rate * 100)}%`}
         </p>
         {p.source && <p className="text-xs text-slate-400 sm:col-span-2">取り込んだ表：{p.source}</p>}

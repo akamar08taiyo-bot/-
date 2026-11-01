@@ -75,6 +75,9 @@ export function copySale(sale: Sale, sales: Sale[], now = Date.now()): Sale {
 }
 
 /** 商品マスタの商品を明細の1行にする（値を書き写す。割引率は設定の初期値） */
+/** 商品の販売価格の割引率（%）：商品で決めた割引率、なければ設定の割引率 */
+export const productRate = (p: Pick<Product, 'discountRate'>, settings: Pick<Settings, 'discountRate'>) => p.discountRate ?? settings.discountRate;
+
 export function itemFromProduct(p: Product, settings: Pick<Settings, 'discountRate'>): SaleItem {
   return {
     id: uid('i'),
@@ -91,7 +94,7 @@ export function itemFromProduct(p: Product, settings: Pick<Settings, 'discountRa
     listPrice: p.listPrice,
     cost: p.cost,
     qty: 1,
-    discountRate: settings.discountRate,
+    discountRate: productRate(p, settings),
     unitPrice: null,
     reason: '',
   };
