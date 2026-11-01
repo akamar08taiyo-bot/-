@@ -63,6 +63,12 @@ export async function putPhotoAs(p: {id: string; blob: Blob; w: number; h: numbe
   await run('readwrite', (s) => s.put(photo));
 }
 
+/** この端末にある写真の番号のすべて（常時同期で、まだ送っていない写真を探す。cloud/local.ts） */
+export async function photoKeys(): Promise<Set<string>> {
+  const keys = await run<IDBValidKey[]>('readonly', (s) => s.getAllKeys());
+  return new Set((keys ?? []).map(String));
+}
+
 /** 番号の写真（ないものは入らない） */
 export async function getPhotos(ids: string[]): Promise<Map<string, StoredPhoto>> {
   const out = new Map<string, StoredPhoto>();
@@ -382,7 +388,13 @@ export type PhotoUrl = {url: string; w: number; h: number};
 /** 写真の URL と大きさ（番号 → URL。この端末にない写真は null）。読み込むまでは入らない */
 export function usePhotoUrls(ids: string[]): Record<string, PhotoUrl | null> {
   const key = [...new Set(ids.filter(Boolean))].sort().join(',');
-  const [, setTick] = useState(0);
+  const [tick, setTick] = useState(0);
+  // ほかの端末から写真が届いたら（常時同期）、「この端末にない写真」だったものを読み直す
+  useEffect(() => {
+    const on = () => setTick((n) => n + 1);
+    window.addEventListener(PHOTOS_ARRIVED, on);
+    return () => window.removeEventListener(PHOTOS_ARRIVED, on);
+  }, []);
   useEffect(() => {
     const missing = key ? key.split(',').filter((id) => !urlCache.has(id)) : [];
     if (missing.length === 0) return;
@@ -399,13 +411,21 @@ export function usePhotoUrls(ids: string[]): Record<string, PhotoUrl | null> {
     return () => {
       alive = false;
     };
-  }, [key]);
+  }, [key, tick]);
   const out: Record<string, PhotoUrl | null> = {};
   for (const id of key ? key.split(',') : []) {
     const u = urlCache.get(id);
     if (u !== undefined) out[id] = u;
   }
   return out;
+}
+
+const PHOTOS_ARRIVED = 'taiyo-photos-arrived';
+
+/** ほかの端末から写真が届いた（常時同期。cloud/engine.ts）：この端末になかった写真として覚えていたものを忘れて、写真の欄・プレビューで読み直す */
+export function photosArrived(ids: string[]): void {
+  for (const id of ids) if (urlCache.get(id) === null) urlCache.delete(id);
+  window.dispatchEvent(new Event(PHOTOS_ARRIVED));
 }
 
 /** 入れたばかりの写真を、読み直さずに出せるように覚えておく（明るさを補正してから） */

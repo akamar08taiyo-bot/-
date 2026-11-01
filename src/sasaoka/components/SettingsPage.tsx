@@ -8,6 +8,8 @@ import type {AppData, EstimateForm, InvoiceTaxMode, Rounding, Settings, TaxMode}
 import type {Update} from '../useStore.ts';
 import {downloadBlob, todayIso} from '../util.ts';
 import {zipLabel} from '../zip.ts';
+import type {Cloud} from '../cloud/useCloud.ts';
+import {CloudSection} from './CloudSection.tsx';
 import {Btn, NumberInput, TextInput, useToast} from './ui.tsx';
 
 function Section({title, children, note}: {title: string; children: ReactNode; note?: ReactNode}) {
@@ -59,7 +61,7 @@ function ListArea({value, onChange, rows, label}: {value: string[]; onChange: (v
 }
 
 /** 設定（見積書・請求書の両方） */
-export function SettingsPage({data, update}: {data: AppData; update: Update}) {
+export function SettingsPage({data, update, cloud}: {data: AppData; update: Update; cloud?: Cloud}) {
   const toast = useToast();
   const s = data.settings;
   const set = (patch: Partial<Settings>) => update('settings', (prev) => ({...prev, ...patch}));
@@ -97,6 +99,7 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
 
   return (
     <div className="max-w-5xl space-y-4">
+      {cloud && <CloudSection cloud={cloud} />}
       <Section title="請求先">
         <Field label="請求先（工務店）の名前　※請求書には「○○　御中」と出ます">{text('clientName', '例：○○工務店')}</Field>
       </Section>
