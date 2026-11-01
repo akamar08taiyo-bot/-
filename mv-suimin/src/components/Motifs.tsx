@@ -663,7 +663,7 @@ const Tilt: React.FC<MotifProps> = ({ t, ps }) => {
     <g>
       <clipPath id="tiltclip"><rect x={0} y={0} width={920} height={700} /></clipPath>
       <g clipPath="url(#tiltclip)">
-        <g transform={`translate(0 ${-560 * b})`}>
+        <g transform={`translate(0 ${-640 * b})`}>
           <g opacity={clamp01(a * 2)}>
             {[0, 1, 2].map((i) => (
               <g key={i} transform={`translate(${520 + i * 26} ${90 + i * 26}) rotate(${-6 + i * 4})`} opacity={1 - i * 0.3}>
@@ -677,7 +677,7 @@ const Tilt: React.FC<MotifProps> = ({ t, ps }) => {
               <path d="M -110 0 C -110 -120, -60 -185, 0 -185 C 60 -185, 110 -120, 110 0 Z" fill={C.paper} />
             </g>
           </g>
-          <g transform="translate(0 560)">
+          <g transform="translate(0 640)">
             <line x1={60} y1={560} x2={860} y2={560} stroke={C.dim} strokeWidth={6} />
             {[330, 590].map((x, i) => (
               <path key={i} d={`M ${x - 90} 556 L ${x - 90} 500 Q ${x - 90} 470 ${x - 50} 470 L ${x + 10} 470 Q ${x + 30} 510 ${x + 80} 520 Q ${x + 110} 530 ${x + 110} 556 Z`}

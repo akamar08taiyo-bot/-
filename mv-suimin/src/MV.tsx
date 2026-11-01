@@ -4,7 +4,7 @@ import { Audio } from '@remotion/media';
 import './lib/fonts';
 import timing from './data/timing.json';
 import { Lyrics } from './components/Lyrics';
-import { Background, HUD, MotifLayer, Overlays, Punch } from './components/Stage';
+import { Background, HUD, Intro, MotifLayer, Outro, Overlays, Punch } from './components/Stage';
 
 export type MVProps = { withAudio: boolean };
 
@@ -18,9 +18,11 @@ export const MV: React.FC<MVProps> = ({ withAudio }) => {
       <Background t={t} frame={frame} />
       <MotifLayer t={t} />
       <Lyrics t={t} />
+      <Intro t={t} />
+      <Punch t={t} />
       <HUD t={t} />
       <Overlays t={t} />
-      <Punch t={t} />
+      <Outro t={t} />
     </AbsoluteFill>
   );
 };

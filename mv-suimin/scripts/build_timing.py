@@ -19,6 +19,7 @@ ap.add_argument('audio')
 ap.add_argument('--align', default=os.path.join(ROOT, 'work', 'align_chunks.json'))
 ap.add_argument('--out', default=os.path.join(ROOT, 'src', 'data', 'timing.json'))
 ap.add_argument('--plot', action='store_true')
+ap.add_argument('--bpm', type=float, default=120.0, help='tempo hint for beat tracking')
 args = ap.parse_args()
 
 lyrics = json.load(open(os.path.join(ROOT, 'src', 'data', 'lyrics.json'), encoding='utf-8'))
@@ -71,13 +72,14 @@ for i, v in enumerate(raw):
         raw[i] = (prev + nxt) / 2
 
 
-def snap(x):
-    """move x to the end of the deepest breath gap in [x-0.35, x+0.2]"""
-    a, b = np.searchsorted(t, [x - 0.35, x + 0.2])
+def snap(x, before=0.35, after=0.2):
+    """move x to the end of the best breath gap in [x-before, x+after] (deep and close wins)"""
+    a, b = np.searchsorted(t, [x - before, x + after])
     if b - a < 5:
         return x, 0.0
     seg = voc_db[a:b]
-    k = int(np.argmin(seg))
+    score = seg + 8.0 * np.abs(t[a:b] - x)
+    k = int(np.argmin(score))
     # gap depth relative to the louder of the surrounding 0.25 s
     l0, r1 = np.searchsorted(t, [t[a + k] - 0.25, t[a + k] + 0.25])
     ref = min(np.percentile(voc_db[l0:a + k + 1], 80), np.percentile(voc_db[a + k:r1], 80))
@@ -94,8 +96,16 @@ def snap(x):
 
 starts = []
 for pid, x in zip(order, raw):
-    s, depth = snap(x)
+    first = pid.endswith('#0')
+    s, depth = snap(x, 0.2, 0.15) if first else snap(x, 0.45, 0.3)
     starts.append(s)
+# snapping must not squeeze neighbours: revert the larger move to the estimate
+for _ in range(3):
+    for i in range(1, len(starts)):
+        exp_gap = raw[i] - raw[i - 1]
+        if starts[i] - starts[i - 1] < 0.55 * exp_gap:
+            j = i if abs(starts[i] - raw[i]) >= abs(starts[i - 1] - raw[i - 1]) else i - 1
+            starts[j] = raw[j]
 # keep strictly increasing with >= 0.25 s spacing
 for i in range(1, len(starts)):
     if starts[i] < starts[i - 1] + 0.25:
@@ -103,7 +113,7 @@ for i in range(1, len(starts)):
 
 # ---------- beat grid ----------
 oenv = librosa.onset.onset_strength(y=y, sr=sr)
-tempo, beats = librosa.beat.beat_track(onset_envelope=oenv, sr=sr, start_bpm=150, units='time')
+tempo, beats = librosa.beat.beat_track(onset_envelope=oenv, sr=sr, start_bpm=args.bpm, units='time')
 beats = np.asarray(beats)
 k = np.round((beats - beats[0]) / np.median(np.diff(beats)))
 T, t0 = np.polyfit(k, beats, 1)
@@ -131,9 +141,23 @@ snares = hits(1800, 6000, 0.25, 0.18)
 # ---------- cut before punchline ----------
 perc_db = 10 * np.log10(smooth(band(P, 40, 8000), 0.08) + 1e-9)
 punch_start = starts[order.index('punch-1#0')]
-a, b = np.searchsorted(t, [punch_start - 2.5, punch_start + 0.1])
-d = np.diff(perc_db[a:b])
-cut = float(t[a + int(np.argmin(smooth(d, 0.05)))]) if b - a > 10 else punch_start - 0.6
+quiet = total_db < total_db.max() - 40
+cut, outro_start = None, None
+i = int(np.searchsorted(t, punch_start))
+while i < len(t):
+    if quiet[i]:
+        j = i
+        while j < len(t) and quiet[j]:
+            j += 1
+        if t[min(j, len(t) - 1)] - t[i] >= 0.12 and t[i] < music_end - 1.0:
+            cut, outro_start = float(t[i]), float(t[min(j, len(t) - 1)])
+            break
+        i = j
+    i += 1
+if cut is None:  # instruments drop right before the punchline
+    a, b = np.searchsorted(t, [punch_start - 2.5, punch_start + 0.1])
+    d = np.diff(perc_db[a:b])
+    cut = float(t[a + int(np.argmin(smooth(d, 0.05)))]) if b - a > 10 else punch_start - 0.6
 
 # ---------- assemble ----------
 pid_start = dict(zip(order, starts))
@@ -144,7 +168,7 @@ for idx, (s, l) in enumerate(flat_lines):
     nxt = pid_start[f"{flat_lines[idx + 1][1]['id']}#0"] if idx + 1 < len(flat_lines) else None
     e_last = est.get(f"{l['id']}#{len(l['phrases']) - 1}", {}).get('end')
     if nxt is None:
-        end = min(music_end, (e_last or ps[-1] + 1.8) + 0.1)
+        end = cut if cut > ps[-1] else min(music_end, (e_last or ps[-1] + 1.8) + 0.1)
     else:
         end = nxt
     phrases = []
@@ -158,7 +182,7 @@ for s in lyrics['sections']:
     if ls:
         sections.append({'id': s['id'], 'label': s['label'], 'start': ls[0]['start'], 'end': ls[-1]['end']})
 last_end = lines[-1]['end']
-sections.append({'id': 'outro', 'label': 'OUTRO', 'start': round(last_end, 3), 'end': round(music_end, 3)})
+sections.append({'id': 'outro', 'label': 'OUTRO', 'start': round(max(last_end, cut), 3), 'end': round(music_end, 3)})
 # make sections contiguous, and the first one start at 0
 sections[0]['start'] = 0.0
 for i in range(len(sections) - 1):
@@ -166,7 +190,7 @@ for i in range(len(sections) - 1):
 
 timing = {
     'audio': os.path.basename(args.audio),
-    'duration': round(min(dur, music_end + 1.0), 3),
+    'duration': round(min(dur, music_end + 0.6), 3),
     'musicEnd': round(music_end, 3),
     'bpm': round(60.0 / T, 3),
     'beat0': round(float(t0), 4),
@@ -175,12 +199,13 @@ timing = {
     'kicks': kicks,
     'snares': snares,
     'cut': round(cut, 3),
+    'outroStart': round(outro_start if outro_start else cut, 3),
     'sections': sections,
     'lines': lines,
 }
 json.dump(timing, open(args.out, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 print(f"bpm {timing['bpm']} beat0 {timing['beat0']} | beats {len(grid)} kicks {len(kicks)} snares {len(snares)}")
-print(f"cut {cut:.2f} punch {punch_start:.2f} musicEnd {music_end:.2f} duration {timing['duration']}")
+print(f"cut {cut:.2f} outroStart {timing['outroStart']:.2f} punch {punch_start:.2f} musicEnd {music_end:.2f} duration {timing['duration']}")
 for s in sections:
     print(f"  {s['id']:6s} {s['start']:6.2f} - {s['end']:6.2f}")
 for pid, r, s in zip(order, raw, starts):
@@ -190,10 +215,10 @@ if args.plot:
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
-    n = int(np.ceil(music_end / 8))
+    n = int(np.ceil(music_end / 10))
     fig, axes = plt.subplots(n, 1, figsize=(22, 2.6 * n))
     for r, ax in enumerate(axes):
-        a0, a1 = r * 8, r * 8 + 8
+        a0, a1 = r * 10, r * 10 + 10
         m = (t >= a0) & (t < a1)
         ax.plot(t[m], voc_db[m], color='k', lw=0.7)
         for x, s_ in kicks:

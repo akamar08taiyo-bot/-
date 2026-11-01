@@ -3,7 +3,7 @@ import { AbsoluteFill, Img, staticFile } from 'remotion';
 import timing from '../data/timing.json';
 import { C, LINE_META } from '../data/meta';
 import { F } from '../lib/fonts';
-import { clamp01, eio, eo, hash, kickPulse, lerp, prog, snarePulse } from '../lib/anim';
+import { clamp01, eback, eio, eo, hash, kickPulse, lerp, prog, snarePulse } from '../lib/anim';
 import { MOTIFS } from './Motifs';
 
 type Line = (typeof timing.lines)[number];
@@ -87,12 +87,12 @@ export const MotifLayer: React.FC<{ t: number }> = ({ t }) => {
 // ------------------------------------------------------------------ HUD (stream overlay + sleep balance)
 const gaugeAt = (t: number) => {
   const pts: [number, number][] = [
-    [0, 0.62], [sec('v1').end, 0.1], [sec('hook').end, 0.72], [sec('v2').end, 0.05], [sec('final').end, 1.0],
+    [0, 0.62], [sec('v1').end, 0.1], [sec('hook').end, 0.72], [sec('v2').end, 0.05], [sec('final').end, 0.85], [timing.cut, 1.0],
   ];
   for (let i = 0; i < pts.length - 1; i++) {
     const [a, va] = pts[i];
     const [b, vb] = pts[i + 1];
-    if (t <= b) return lerp(va, vb, i === 3 ? eio((t - a) / (b - a)) : clamp01((t - a) / (b - a)));
+    if (t <= b) return lerp(va, vb, i >= 3 ? eio((t - a) / (b - a)) : clamp01((t - a) / (b - a)));
   }
   return 1;
 };
@@ -176,38 +176,140 @@ export const Overlays: React.FC<{ t: number }> = ({ t }) => {
   );
 };
 
-// ------------------------------------------------------------------ punchline (after the hard cut)
+// ------------------------------------------------------------------ intro (before the first line)
+export const Intro: React.FC<{ t: number }> = ({ t }) => {
+  const first = timing.lines[0].start;
+  if (t >= first + 0.1) return null;
+  const a = prog(t, 0.15, 0.3, (x) => eback(x, 2));
+  const out = prog(t, first - 0.35, 0.3, eo);
+  return (
+    <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 28, background: C.red, borderRadius: 26, padding: '22px 52px 26px', scale: String(a * (1 - 0.6 * out)), opacity: 1 - out, translate: `0px ${-180 * out}px` }}>
+        <div style={{ width: 44, height: 44, borderRadius: 22, background: '#fff', opacity: 0.5 + 0.5 * Math.round(0.5 + 0.5 * Math.sin(t * 9)) }} />
+        <span style={{ fontFamily: F.dot, fontSize: 120, color: '#fff', letterSpacing: '0.08em' }}>LIVE</span>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// ------------------------------------------------------------------ punchline (sung, then the build until the hard cut)
+const units = (s: string) => [...s].reduce((a, ch) => a + (/[\x20-\x7e]/.test(ch) ? 0.62 : 1), 0);
+
 export const Punch: React.FC<{ t: number }> = ({ t }) => {
   const line = timing.lines.find((l) => l.id === 'punch-1')!;
-  if (t < line.start - 0.1 || t >= line.end) return null;
+  if (t < line.start - 0.3 || t >= timing.cut) return null;
+  const t0 = line.start - 0.07;
+  const sung = Math.max(1.5, (timing.cut - line.start) * 0.6);
   const text = line.text;
-  const a = prog(t, line.start - 0.05, 0.45, eo);
-  const zoom = 1 + 0.015 * clamp01((t - line.start) / 2);
-  const style: React.CSSProperties = {
-    fontFamily: F.mincho,
-    fontWeight: 500,
-    fontSize: 70,
-    letterSpacing: '0.14em',
-    color: C.paper,
-    whiteSpace: 'nowrap',
-  };
+  const tail = text.endsWith('いつだ') ? 'いつだ' : text.slice(-3);
+  const head = text.slice(0, text.length - tail.length);
+  const fillHead = clamp01((t - line.start) / (sung * 0.72));
+  const fillTail = clamp01((t - line.start - sung * 0.72) / (sung * 0.28));
+  const k = kickPulse(t);
+  const build = clamp01((t - line.start - sung) / Math.max(0.5, timing.cut - line.start - sung));
+  const dark = prog(t, line.start - 0.3, 0.5);
+  const fig = prog(t, t0, 0.6, eo);
+  const push = 1 + 0.07 * eio(build) + 0.012 * k;
+  const headSize = Math.min(104, 880 / (units(head) * 1.1));
+  const row = (str: string, fill: number, size: number, color: string, weight: number) => (
+    <div style={{ position: 'relative', fontFamily: F.mincho, fontWeight: weight, fontSize: size, letterSpacing: '0.1em', lineHeight: 1.15, whiteSpace: 'nowrap' }}>
+      <div style={{ color, opacity: 0.22 }}>{str}</div>
+      <div style={{ position: 'absolute', inset: 0, color, clipPath: `inset(-20% ${(1 - fill) * 100}% -20% -5%)`, textShadow: `0 0 ${20 + 40 * build}px rgba(244,226,161,${0.25 + 0.35 * build})` }}>{str}</div>
+    </div>
+  );
   return (
-    <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center', scale: String(zoom) }}>
-      <div style={{ position: 'absolute', top: 820, ...style, opacity: a }}>{text}</div>
-      <div
-        style={{
-          position: 'absolute',
-          top: 916,
-          ...style,
-          opacity: a * 0.22,
-          scale: '1 -1',
-          WebkitMaskImage: 'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 85%)',
-          maskImage: 'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 85%)',
-        }}
-      >
-        {text}
-      </div>
-      <div style={{ position: 'absolute', top: 905, width: 640 * a, height: 2, background: C.dim }} />
+    <AbsoluteFill>
+      <AbsoluteFill style={{ backgroundColor: '#000', opacity: 0.55 * dark + 0.3 * build }} />
+      <AbsoluteFill style={{ scale: String(push) }}>
+        <svg width={1080} height={1920} style={{ position: 'absolute', opacity: fig }}>
+          <line x1={540} y1={290} x2={540} y2={900} stroke={C.paper} strokeOpacity={0.45} strokeWidth={3} />
+          <g transform={`translate(${lerp(300, 345, fig)} 0)`}>
+            <g transform="translate(0 760) scale(1.05)">
+              <ellipse cx={0} cy={-120} rx={70} ry={84} fill={C.paper} />
+              <path d="M -150 120 C -150 10, -70 -30, 0 -30 C 70 -30, 150 10, 150 120 Z" fill={C.paper} />
+              <path d="M 52 -150 L 92 -128 L 70 -112" fill={C.paper} />
+            </g>
+          </g>
+          <g transform={`translate(${lerp(780, 735, fig)} 0)`} opacity={0.55 + 0.35 * build}>
+            <g transform="translate(0 760) scale(-1.05 1.05)">
+              <ellipse cx={0} cy={-120} rx={70} ry={84} fill={C.moon} />
+              <path d="M -150 120 C -150 10, -70 -30, 0 -30 C 70 -30, 150 10, 150 120 Z" fill={C.moon} />
+              <path d="M 52 -150 L 92 -128 L 70 -112" fill={C.moon} />
+            </g>
+          </g>
+          <line x1={445} y1={613} x2={635} y2={613} stroke={C.moon} strokeWidth={5} strokeDasharray="3 14" strokeLinecap="round" opacity={fig} />
+        </svg>
+        <div style={{ position: 'absolute', top: 1010, left: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, opacity: prog(t, t0, 0.4) }}>
+          {row(head, fillHead, headSize, '#F3EEDF', 900)}
+          {row(tail, fillTail, 220, C.moon, 900)}
+          <div style={{ marginTop: -26, scale: '1 -1', opacity: 0.18 + 0.2 * build, WebkitMaskImage: 'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 80%)', maskImage: 'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 80%)' }}>
+            {row(tail, fillTail, 220, C.moon, 900)}
+          </div>
+        </div>
+      </AbsoluteFill>
+    </AbsoluteFill>
+  );
+};
+
+// ------------------------------------------------------------------ outro (piano after the cut): the stream ends, eyes close
+export const Outro: React.FC<{ t: number }> = ({ t }) => {
+  const o0 = timing.outroStart;
+  if (t < o0) return null;
+  const end = timing.musicEnd;
+  const fadeOut = prog(t, end - 1.8, 1.7, eio);
+  const stars = prog(t, o0, 2.5);
+  const eye = prog(t, o0 + 0.4, 1.6, eio);
+  const moon = prog(t, o0 + 1.2, 1.5, eo);
+  const ui = prog(t, o0 + 0.2, 0.8);
+  const arc = 'M 300 900 Q 540 1010 780 900';
+  return (
+    <AbsoluteFill style={{ backgroundColor: '#000' }}>
+      <AbsoluteFill style={{ opacity: 1 - fadeOut }}>
+        <AbsoluteFill style={{ opacity: stars, background: 'radial-gradient(90% 60% at 50% 35%, #0e1836 0%, #03050b 75%)' }} />
+        <svg width={1080} height={1920} style={{ position: 'absolute' }}>
+          {Array.from({ length: 70 }).map((_, i) => (
+            <circle key={i} cx={hash(i * 5.3) * 1080} cy={hash(i * 2.9) * 1500} r={1 + hash(i + 4) * 2.4} fill="#fff"
+              opacity={stars * (0.15 + 0.55 * Math.abs(Math.sin(t * (0.5 + hash(i) * 1.5) + i)))} />
+          ))}
+          <defs>
+            <mask id="outromoon">
+              <circle cx={540} cy={600} r={110} fill="#fff" />
+              <circle cx={586} cy={567} r={95} fill="#000" />
+            </mask>
+            <radialGradient id="outroglow">
+              <stop offset="0" stopColor={C.moon} stopOpacity={0.3} />
+              <stop offset="1" stopColor={C.moon} stopOpacity={0} />
+            </radialGradient>
+          </defs>
+          <circle cx={540} cy={600} r={280} fill="url(#outroglow)" opacity={moon} />
+          <circle cx={540} cy={600} r={110} fill={C.moon} mask="url(#outromoon)" opacity={moon} transform={`translate(0 ${(1 - moon) * 40})`} />
+          <path d={arc} fill="none" stroke={C.paper} strokeWidth={10} strokeLinecap="round" strokeDasharray={560} strokeDashoffset={560 * (1 - eye)} />
+          {[0, 1, 2, 3, 4].map((i) => {
+            const x = 360 + i * 90;
+            const y = 900 + 110 * (1 - Math.pow((x - 540) / 240, 2)) * 0.5;
+            return <line key={i} x1={x} y1={y + 6} x2={x + (i - 2) * 9} y2={y + 44} stroke={C.paper} strokeWidth={7} strokeLinecap="round" opacity={clamp01(eye * 5 - 4)} />;
+          })}
+        </svg>
+        <div style={{ position: 'absolute', top: 92, left: 80, right: 80, display: 'flex', alignItems: 'center', gap: 22, opacity: ui }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#2a2d36', borderRadius: 10, padding: '6px 18px 8px' }}>
+            <div style={{ width: 16, height: 16, borderRadius: 8, background: C.gray }} />
+            <span style={{ fontFamily: F.dot, fontSize: 36, color: C.gray, letterSpacing: '0.08em' }}>OFFLINE</span>
+          </div>
+          <div style={{ flex: 1 }} />
+          <span style={{ fontFamily: F.dot, fontSize: 32, color: C.dim, letterSpacing: '0.18em' }}>配信終了</span>
+        </div>
+        <div style={{ position: 'absolute', top: 1612, left: 80, right: 80, opacity: ui }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14 }}>
+            <span style={{ fontFamily: F.sans, fontWeight: 900, fontSize: 34, color: C.paper, letterSpacing: '0.12em' }}>睡眠残高</span>
+            <span style={{ fontFamily: F.dot, fontSize: 34, color: C.moon }}>FULL</span>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {Array.from({ length: 20 }).map((_, i) => (
+              <div key={i} style={{ flex: 1, height: 30, borderRadius: 4, background: C.moon, opacity: 0.35 + 0.65 * clamp01((t - o0 - 0.3) * 6 - i * 0.25) }} />
+            ))}
+          </div>
+        </div>
+      </AbsoluteFill>
     </AbsoluteFill>
   );
 };

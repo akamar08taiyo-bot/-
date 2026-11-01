@@ -13,3 +13,7 @@ work/*
 song/req.json
 song/resp*.json
 song/*.mp3
+# the song itself is not committed (place it at public/song.wav)
+public/song.wav
+public/song.mp3
+song/user/

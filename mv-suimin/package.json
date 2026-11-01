@@ -32,11 +32,11 @@
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
     "lint": "eslint src && tsc",
-    "align": "python3 scripts/align_gemini.py public/song.mp3 --out work/align_raw.json && python3 scripts/align_chunks.py public/song.mp3",
-    "timing": "python3 scripts/build_timing.py public/song.mp3 --plot",
+    "timing": "python3 scripts/rough_from_srt.py song/lyrics_timing.srt && python3 scripts/build_timing.py public/song.wav --align work/align_srt.json --bpm 120 --plot",
     "stills": "node scripts/stills.mjs",
     "render": "remotion render src/index.ts MV out/mv-suimin.mp4 --concurrency=4 --crf=18 --audio-codec=aac --audio-bitrate=256k ${REMOTION_BROWSER:+--browser-executable=$REMOTION_BROWSER}",
-    "srt": "python3 scripts/make_srt.py"
+    "srt": "python3 scripts/make_srt.py",
+    "timing:gemini": "python3 scripts/align_gemini.py public/song.wav --out work/align_raw.json && python3 scripts/align_chunks.py public/song.wav && python3 scripts/build_timing.py public/song.wav --align work/align_chunks.json --plot"
   },
   "allowScripts": {
     "esbuild": false
