@@ -657,6 +657,22 @@ try {
   assert.equal(await selfPay.isChecked(), true);
   const estPreview = page.locator('[aria-label="見積書のプレビュー"]');
   await estPreview.getByText(/^利用者負担（1割）　[\d,]+円$/).waitFor();
+  // プレビューの右上の − ％ ＋ で大きく・小さく。Ctrl＋スクロールでも（ユーザーの指示「見積もりの右上に+-マーク。アップして見えるようにする。Ctrl+スクロールでも可能にする」2026-11-01）
+  const zoomBar = page.getByRole('group', {name: '拡大・縮小'});
+  const zoomNow = async () => Number((await zoomBar.getByRole('button', {name: 'もとの大きさ'}).innerText()).replace('%', ''));
+  const paperW = async () => (await estPreview.locator('[role="group"]').first().boundingBox()).width;
+  const w100 = await paperW();
+  await zoomBar.getByRole('button', {name: '大きく'}).click();
+  assert.equal(await zoomNow(), 120);
+  assert.ok((await paperW()) > w100 * 1.15);
+  await estPreview.hover({position: {x: 120, y: 160}}); // プレビューの上にマウスを置く（画面に出るまで動かす）
+  await page.keyboard.down('Control');
+  await page.mouse.wheel(0, -240);
+  await page.keyboard.up('Control');
+  await page.waitForFunction(() => Number(document.querySelector('[aria-label="拡大・縮小"] [aria-label="もとの大きさ"]')?.textContent?.replace('%', '')) > 120);
+  await page.screenshot({path: `${out}/05e-estimate-zoom.png`});
+  await zoomBar.getByRole('button', {name: 'もとの大きさ'}).click();
+  assert.equal(await zoomNow(), 100);
   await page.screenshot({path: `${out}/05e-self-pay.png`});
   await selfPay.uncheck();
   await estPreview.getByText('介護保険（受領委任払い）', {exact: true}).waitFor({state: 'detached'});
@@ -665,15 +681,17 @@ try {
   await page.getByRole('textbox', {name: '備考', exact: true}).fill(['ご不明な点は担当までお問い合わせください。', '見本の2行目です。', '見本の3行目です。', '納品の前にお電話いたします。'].join('\n'));
   await page.getByText('見積書の備考は3行までです').waitFor();
   await page.getByRole('button', {name: '🖨 見積書を印刷'}).first().click();
-  await page.locator('.est-sheet [role="group"]').waitFor();
-  const longDoc = await page.locator('.est-sheet').innerText();
-  for (const s of ['見本の商品 1', '見本の商品 8', 'ご不明な点は担当までお問い合わせください。', '42,944']) assert.ok(longDoc.includes(s), `10品の見積書に「${s}」がない`);
+  await page.locator('.est-sheet [role="group"]').first().waitFor();
+  // 品名は商品ごとに メーカー／商品名／【品番】の行（ユーザーの指示 2026-11-01）なので、10品（★の2つは3行）は1ページ目の16行に商品が入り、
+  // 介護保険の内訳は2ページ目の初めから
+  const longDoc = (await page.locator('.est-sheet').allInnerTexts()).join('\n');
+  for (const s of ['見本の商品 1', '見本の商品 8', 'ご不明な点は担当までお問い合わせください。', '42,944', '【品番】']) assert.ok(longDoc.includes(s), `10品の見積書に「${s}」がない`);
   assert.ok(!longDoc.includes('納品の前にお電話いたします。'));
   await assertFits(page, '10品');
   await page.pdf({path: `${out}/estimate-long.pdf`, preferCSSPageSize: true, printBackground: true});
-  assert.equal(pdfPages(`${out}/estimate-long.pdf`), 1);
+  assert.equal(pdfPages(`${out}/estimate-long.pdf`), await page.locator('.est-sheet').count());
   await page.emulateMedia({media: 'screen'});
-  await page.locator('.est-sheet').screenshot({path: `${out}/05c-estimate-long.png`});
+  await page.locator('.est-sheet').first().screenshot({path: `${out}/05c-estimate-long.png`});
   await page.getByRole('button', {name: '閉じる'}).click();
   await page.getByRole('textbox', {name: '備考', exact: true}).fill('ご不明な点は担当までお問い合わせください。');
 
@@ -688,8 +706,11 @@ try {
   assert.equal(await page.locator('.est-sheet').count(), 2);
   const page1 = await page.locator('.est-sheet').nth(0).innerText();
   const page2 = await page.locator('.est-sheet').nth(1).innerText();
-  assert.ok(page1.includes('見本の商品 14') && !page1.includes('見本の商品 15') && page1.includes('1／2') && page1.includes('42,944'));
-  for (const s of ['御　見　積　書', '山田 花子　様', '2／2（明細のつづき）', '見本の商品 15', '見本の商品 21']) assert.ok(page2.includes(s), `2ページ目に「${s}」がない`);
+  // 1つの商品の行はページをまたがない。1ページ目の最後の商品の次から2ページ目
+  const lastOn1 = Math.max(...[...page1.matchAll(/見本の商品 (\d+)/g)].map((m) => Number(m[1])));
+  assert.ok(lastOn1 >= 8 && page1.includes('1／2') && page1.includes('42,944'), page1);
+  for (const s of ['御　見　積　書', '山田 花子　様', '2／2（明細のつづき）', `見本の商品 ${lastOn1 + 1}`, '見本の商品 21']) assert.ok(page2.includes(s), `2ページ目に「${s}」がない`);
+  assert.ok(!page2.includes(`見本の商品 ${lastOn1}\n`));
   await assertFits(page, '23品');
   await page.pdf({path: `${out}/estimate-2pages.pdf`, preferCSSPageSize: true, printBackground: true});
   assert.equal(pdfPages(`${out}/estimate-2pages.pdf`), 2);
@@ -706,7 +727,7 @@ try {
   const [download2] = await Promise.all([page.waitForEvent('download'), page.locator('.print-toolbar').getByRole('button', {name: '📗 Excelで保存'}).click()]);
   await download2.saveAs(`${out}/estimate-2pages.xlsx`);
   const sheet2 = strFromU8(unzipSync(readFileSync(`${out}/estimate-2pages.xlsx`))['xl/worksheets/sheet1.xml']);
-  assert.equal(cellOf(sheet2, 'A71'), '見本の商品 15'); // 2ページ目の明細の1行目（63行目から：頭の7行・見出し）
+  assert.equal(cellOf(sheet2, 'A71'), `見本の商品 ${lastOn1 + 1}`); // 2ページ目の明細の1行目（63行目から：頭の7行・見出し）
   assert.equal(cellOf(sheet2, 'E21'), '42944');
   assert.match(sheet2, /<rowBreaks count="1" manualBreakCount="1"><brk id="62"/);
   await page.getByRole('button', {name: '閉じる'}).click();

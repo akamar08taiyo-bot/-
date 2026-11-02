@@ -6,7 +6,7 @@ import test from 'node:test';
 import {strFromU8, unzipSync} from 'fflate';
 import {basisNote, itemNote, saleTotals} from '../../src/tokutei/calc.ts';
 import {defaultSettings, settingsForOffice} from '../../src/tokutei/defaults.ts';
-import {CONT_ROWS, contBlock, ESTIMATE_CAPACITY, ESTIMATE_ROWS, estimateFileName, estimateNotes, estimateOverflow, insuranceLines, estimatePages, estimatePreview, fillEstimate, fitScale, selfPayIndex, belowItemLines} from '../../src/tokutei/estimateBook.ts';
+import {CONT_ROWS, contBlock, ESTIMATE_CAPACITY, ESTIMATE_ROWS, estimateFileName, estimateLayout, estimateNotes, estimateOverflow, insuranceLines, estimatePreview, fillEstimate, fitScale, itemNameLines, belowItemLines} from '../../src/tokutei/estimateBook.ts';
 import type {Sale, SaleItem} from '../../src/tokutei/types.ts';
 import {cellFormula, readCell, sheetLayout} from '../../src/tokutei/xlsxEdit.ts';
 import type {Files} from '../../src/tokutei/xlsxEdit.ts';
@@ -101,22 +101,38 @@ test('販売見積書：宛名・見積番号・見積日・営業所・件名�
   assert.equal(cellFormula(f, SH, 'I12'), '');
   for (const r of [8, 9, 12, 16]) assert.equal(readCell(f, SH, `H${r}`), ''); // 前の場所（H）は空
   assert.equal(readCell(f, SH, 'B14'), '特定福祉用具の購入');
-  // 1行目：シャワーチェア 見本A（品番）・1台・32,000×0.8＝25,600円・10%・備考に算出根拠
-  assert.deepEqual(['A23', 'F23', 'G23', 'H23', 'I23', 'J23', 'K23'].map((r) => readCell(f, SH, r)), ['シャワーチェア 見本A　SC-01', '1', '台', '25600', '25600', '0.1', '定価32,000円の20%引き']);
+  // 品名は1商品を メーカー名／商品名（色まで）／【品番】の行に。数量・単位・単価・金額・税率・備考は1行目（ユーザーの指示 2026-11-01）。
+  // 1つ目：見本工業／シャワーチェア 見本A／【品番】SC-01（23〜25行）・1台・32,000×0.8＝25,600円・10%・備考に算出根拠
+  assert.deepEqual(['A23', 'A24', 'A25'].map((r) => readCell(f, SH, r)), ['見本工業', 'シャワーチェア 見本A', '【品番】SC-01']);
+  assert.deepEqual(['F23', 'G23', 'H23', 'I23', 'J23', 'K23'].map((r) => readCell(f, SH, r)), ['1', '台', '25600', '25600', '0.1', '定価32,000円の20%引き']);
   assert.equal(cellFormula(f, SH, 'I23'), 'IF(F23*H23,F23*H23,"")');
-  // 2行目：浴槽手すり 見本B・2個・15,800×0.8＝12,640円 ×2＝25,280円
-  assert.deepEqual(['A24', 'F24', 'G24', 'H24', 'I24'].map((r) => readCell(f, SH, r)), ['浴槽手すり 見本B', '2', '個', '12640', '25280']);
-  // 3行目から下は空（原本で式のない行には書かない）
-  assert.equal(readCell(f, SH, 'A25'), '');
-  assert.equal(readCell(f, SH, 'I25'), '');
+  for (const r of [24, 25]) assert.deepEqual(['F', 'G', 'H', 'I', 'J', 'K'].map((c) => readCell(f, SH, `${c}${r}`)), ['', '', '', '', '', ''], `${r}`);
+  // 2つ目：品番が空なので2行（見本製作所／浴槽手すり 見本B。26・27行。空白の行を残さない）・2個・15,800×0.8＝12,640円 ×2＝25,280円
+  assert.deepEqual(['A26', 'A27', 'F26', 'G26', 'H26', 'I26'].map((r) => readCell(f, SH, r)), ['見本製作所', '浴槽手すり 見本B', '2', '個', '12640', '25280']);
+  // 商品の欄は初めから9行（23〜31行）。空いた行は空欄
+  for (const r of [28, 29, 30, 31]) assert.equal(readCell(f, SH, `A${r}`), '', `A${r}`);
+  assert.equal(readCell(f, SH, 'I28'), '');
   // 品名の欄の書式はどの行も1行目と同じ（原本の2行目の10pt・3行目の赤の太字は使わない）。いちばん下の行は下の罫線の書式のまま
   const xml = strFromU8(f['xl/worksheets/sheet1.xml']);
   const style = (ref: string) => new RegExp(`<c r="${ref}"[^>]*?\\ss="(\\d+)"`).exec(xml)?.[1];
-  for (const r of [24, 25, 37]) assert.equal(style(`A${r}`), style('A23'), `A${r}`);
+  for (const r of [24, 29, 30, 37]) assert.equal(style(`A${r}`), style('A23'), `A${r}`);
   assert.notEqual(style('A42'), style('A23'));
+  // 商品の区切りは実線（1つ目の最後の25行の下・2つ目の最後の27行の下・商品の欄の終わりの31行の下）。1つの商品の中の行の間は原本の細い点線（hair）のまま
+  const styles = strFromU8(f['xl/styles.xml']);
+  const list = (outer: string, inner: string) => [...(new RegExp(`<${outer}\\b[^>]*>([\\s\\S]*?)</${outer}>`).exec(styles)?.[1] ?? '').matchAll(new RegExp(`<${inner}\\b[^>]*?(?:/>|>[\\s\\S]*?</${inner}>)`, 'g'))].map((m) => m[0]);
+  const xfs = list('cellXfs', 'xf');
+  const borders = list('borders', 'border');
+  const edge = (ref: string, side: string) => new RegExp(`<${side} style="(\\w+)"`).exec(borders[Number(/borderId="(\d+)"/.exec(xfs[Number(style(ref))])?.[1] ?? 0)])?.[1] ?? '';
+  for (const r of [25, 27, 31]) for (const c of ['A', 'C', 'F', 'I', 'K']) assert.equal(edge(`${c}${r}`, 'bottom'), 'thin', `${c}${r}`);
+  for (const r of [26, 28, 32]) assert.equal(edge(`A${r}`, 'top'), 'thin', `A${r}`);
+  for (const r of [23, 24, 26, 29]) assert.equal(edge(`A${r}`, 'bottom'), 'hair', `A${r}`);
   // 値段のない品目（手で入れてまだ値段がない）は単価・金額を空に
   const g = unzipSync(fillEstimate(template(), sale({items: [item({name: '見本の商品', listPrice: 0})]}), S));
-  assert.deepEqual(['A23', 'F23', 'H23', 'I23'].map((r) => readCell(g, SH, r)), ['見本の商品', '1', '', '']);
+  assert.deepEqual(['A23', 'F23', 'H23', 'I23', 'A24'].map((r) => readCell(g, SH, r)), ['見本の商品', '1', '', '', '']);
+  // 品名の行：メーカー・品番が空なら詰める。品番は末尾まで
+  assert.deepEqual(itemNameLines(item({maker: 'パナソニック', name: 'シャワーチェアAir コンパクトワンタッチ ブルー', code: 'PN-L41432A'})), ['パナソニック', 'シャワーチェアAir コンパクトワンタッチ ブルー', '【品番】PN-L41432A']);
+  assert.deepEqual(itemNameLines(item({name: '見本の商品', code: 'X-1'})), ['見本の商品', '【品番】X-1']);
+  assert.deepEqual(itemNameLines(item({})), ['']);
 });
 
 test('販売見積書：合計は原本の式（税率ごとの合計・切り捨ての消費税）。答えもアプリの金額と同じ', () => {
@@ -144,13 +160,13 @@ test('介護保険の内訳は明細の下に1行ずつ（「備考欄に記載�
   const f = unzipSync(fillEstimate(template(), v, S));
   assert.equal(readCell(f, SH, 'A59'), '備　　考'); // 見出しはそのまま
   assert.deepEqual(['A60', 'A61', 'A62'].map((r) => readCell(f, SH, r)), ['納品の前にお電話いたします。', 'ご不明な点は担当までお問い合わせください。', '']);
-  // 2点（23・24行目）→ 1行あけて 26〜29行目。金額の欄・税率は空で、合計は変わらない
+  // 2点（23〜27行目）。商品の欄は初めから9行（23〜31行）なので、その下の 32〜35行目。金額の欄・税率は空で、合計は変わらない
   const at = (r: number) => readCell(f, SH, `A${r}`);
-  assert.equal(at(25), '');
-  assert.deepEqual([26, 27, 28, 29].map(at), insuranceLines(v, t));
-  assert.equal(at(30), '');
-  assert.equal(readCell(f, SH, 'I27'), '');
-  assert.equal(readCell(f, SH, 'J27'), '');
+  assert.equal(at(31), '');
+  assert.deepEqual([32, 33, 34, 35].map(at), insuranceLines(v, t));
+  assert.equal(at(36), '');
+  assert.equal(readCell(f, SH, 'I33'), '');
+  assert.equal(readCell(f, SH, 'J33'), '');
   // 利用者負担（自己負担額）の行だけ赤
   const xml = strFromU8(f['xl/worksheets/sheet1.xml']);
   const styles = strFromU8(f['xl/styles.xml']);
@@ -159,8 +175,8 @@ test('介護保険の内訳は明細の下に1行ずつ（「備考欄に記載�
     const xf = [...(/<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/.exec(styles)?.[1] ?? '').matchAll(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g)][st]?.[0] ?? '';
     return [...(/<fonts[^>]*>([\s\S]*?)<\/fonts>/.exec(styles)?.[1] ?? '').matchAll(/<font\b[^>]*?(?:\/>|>[\s\S]*?<\/font>)/g)][Number(/fontId="(\d+)"/.exec(xf)?.[1] ?? 0)]?.[0] ?? '';
   };
-  assert.match(fontOf('A28'), /<color rgb="FFFF0000"\/>/);
-  for (const r of ['A26', 'A27', 'A29']) assert.doesNotMatch(fontOf(r), /FFFF0000/, r);
+  assert.match(fontOf('A34'), /<color rgb="FFFF0000"\/>/);
+  for (const r of ['A32', 'A33', 'A35']) assert.doesNotMatch(fontOf(r), /FFFF0000/, r);
   // 宛名は原本（16pt）より2段大きく 20pt（ユーザーの指示「名前の部分は2段階ぐらい大きくする」2026-10-28）
   assert.match(fontOf('A6'), /<sz val="20"\/>/);
   // プレビューでも赤
@@ -174,7 +190,7 @@ test('販売見積書のプレビュー：原本の1枚。欄を押すと入れ�
   const pages = estimatePreview(template(), sale(), S);
   assert.equal(pages.length, 1);
   const text = pages[0].texts.map((x) => x.runs.map((r) => r.text).join('')).join('\n');
-  for (const s of ['御　見　積　書', '見本 花子　様', 'シャワーチェア 見本A　SC-01', '55,968', '太陽シルバーサービス株式会社', '登録番号：T1290001044462', 'TEL：0930-26-9640', 'FAX：0930-26-9641', '担当：土居 翔太', '定価32,000円の20%引き', '備考']) assert.ok(text.includes(s), s);
+  for (const s of ['御　見　積　書', '見本 花子　様', '見本工業', 'シャワーチェア 見本A', '【品番】SC-01', '55,968', '太陽シルバーサービス株式会社', '登録番号：T1290001044462', 'TEL：0930-26-9640', 'FAX：0930-26-9641', '担当：土居 翔太', '定価32,000円の20%引き', '備考']) assert.ok(text.includes(s), s);
   assert.deepEqual([...new Set(pages[0].fields.map((x) => x.field))].sort(), ['customer', 'estimateDate', 'items', 'note', 'quoteNo', 'selfPay', 'staff']);
   // 印の枠（グループの中の2つの四角）は描く。その上に小さな枠で「所長印」「担当印」（左・右。「□の印鑑欄の上に小さく横□で囲み…」2026-10-26）。
   // 赤い枠・説明の文字（印刷しない図形）は描かない
@@ -202,19 +218,21 @@ test('販売見積書の原本：所長の印影の画像・作った人・パ�
   assert.equal(estimateFileName(sale({customer: ''})), '販売見積書.xlsx');
   assert.equal(ESTIMATE_ROWS.length, 16); // ユーザーの指示「見積もりの行数は4行ぐらい減らしていい」
   assert.equal(estimateOverflow(sale({items: many(22)})), 0); // 3ページまで入る
-  assert.equal(estimateOverflow(sale({items: many(ESTIMATE_CAPACITY + 2)})), 2);
+  assert.equal(estimateOverflow(sale({items: manyFull(ESTIMATE_CAPACITY)})), 0); // 品名が3行の商品は 33点まで
+  assert.equal(estimateOverflow(sale({items: manyFull(ESTIMATE_CAPACITY + 2)})), 2);
 });
 
-/** 架空の商品 n 点（定価 10,000円・課税） */
+/** 架空の商品 n 点（定価 10,000円・課税）。品名は1行（メーカー・品番なし） */
 const many = (n: number) => Array.from({length: n}, (_, i) => item({id: `x${i}`, name: `見本の商品 ${i + 1}`, listPrice: 10000, cost: 6000}));
+/** 品名が3行（メーカー・商品名・品番）の架空の商品 n 点 */
+const manyFull = (n: number) => Array.from({length: n}, (_, i) => item({id: `y${i}`, maker: '見本工業', name: `見本の商品 ${i + 1}`, code: `MI-${i + 1}`, listPrice: 10000, cost: 6000}));
 
 test('3ページまで（ユーザーの指示「ページは3ページまでいけるようにする」）：2・3ページ目の明細の行の数は、1ページ目と同じ高さに入るだけ', () => {
   const xml = strFromU8(template()['xl/worksheets/sheet1.xml']);
   const lay = sheetLayout(xml);
   const h = (a: number, b: number) => Array.from({length: b - a + 1}, (_, i) => lay.rowH(a + i)).reduce((x, y) => x + y, 0);
   assert.equal(CONT_ROWS, Math.floor((h(1, 62) - h(1, 7) - lay.rowH(22)) / lay.rowH(23)));
-  assert.equal(ESTIMATE_CAPACITY, 16 + CONT_ROWS * 2);
-  assert.deepEqual([0, 1, 16, 17, 16 + CONT_ROWS, 17 + CONT_ROWS, ESTIMATE_CAPACITY, ESTIMATE_CAPACITY + 5].map(estimatePages), [1, 1, 1, 2, 2, 3, 3, 3]);
+  assert.equal(ESTIMATE_CAPACITY, 5 + Math.floor(CONT_ROWS / 3) * 2);
   // 1ページ目が1枚に入る倍率（原本の「1ページに収める」と同じ。明細を16行にして縦が短くなったので前の 76% より大きい。
   // 2026-10-26 に会社の欄の行を高くして 82% → 81%）
   assert.equal(fitScale(xml), 81);
@@ -233,13 +251,13 @@ test('2ページ（25点）：つづきに題名・番号・日付・宛名と�
   assert.equal(readCell(f, SH, `A${head}`), '品名');
   assert.equal(readCell(f, SH, 'A4'), '1／2');
   assert.equal(readCell(f, SH, `A${top + 3}`), '2／2（明細のつづき）');
-  // 17点目から2ページ目（1ページ目は16行）
+  // 17点目から2ページ目（1ページ目は16行。品名が1行の商品）。介護保険の内訳は最後の商品のすぐ下
   assert.equal(readCell(f, SH, 'A38'), '見本の商品 16');
   assert.equal(readCell(f, SH, 'A39'), '');
   assert.deepEqual(['A', 'F', 'H', 'I', 'J', 'K'].map((c) => readCell(f, SH, `${c}${rows[0]}`)), ['見本の商品 17', '1', '8000', '8000', '0.1', '定価10,000円の20%引き']);
   assert.equal(cellFormula(f, SH, `I${rows[0]}`), `IF(F${rows[0]}*H${rows[0]},F${rows[0]}*H${rows[0]},"")`);
   assert.equal(readCell(f, SH, `A${rows[8]}`), '見本の商品 25');
-  assert.equal(readCell(f, SH, `A${rows[9]}`), '');
+  assert.equal(readCell(f, SH, `A${rows[9]}`), '介護保険（受領委任払い）');
   // 合計：25点×8,000円＝200,000円＋税20,000円。式は1ページ目と2ページ目の明細を足す
   const t = saleTotals(v, S);
   assert.equal(Number(readCell(f, SH, 'E21')), t.total);
@@ -396,23 +414,27 @@ test('見積書のバランスの直し（2026-10-26）：備考の列を広く�
 
 test('自己負担額を表示（初めからオン）：外すと明細の下の介護保険の内訳を書かない。置き場所はページに入るように', () => {
   const one = [item({id: 'a', name: '見本の台', listPrice: 30000})]; // 24,000円＋税 2,400円＝26,400円 → 1割 2,640円
-  // 書く場所：最後の商品の2行下（1行あける）から。ページの終わりならすぐ下、それも入らなければ次のページの1行目
-  assert.equal(selfPayIndex(1, 4), 2);
-  assert.equal(selfPayIndex(1, 0), -1);
-  assert.equal(selfPayIndex(0, 4), -1);
-  assert.equal(selfPayIndex(11, 4), 12); // 12〜15（1ページ目の最後の行＝38行目まで）
-  assert.equal(selfPayIndex(12, 4), 12); // すぐ下から
-  assert.equal(selfPayIndex(13, 4), ESTIMATE_ROWS.length); // 1ページ目に入らない → 2ページ目の1行目
-  assert.equal(selfPayIndex(16, 4), 16);
-  assert.equal(selfPayIndex(ESTIMATE_CAPACITY - 2, 4), -1);
-  // 初め（空）：A25〜A28 に内訳
+  // 明細の割り付け（ユーザーの指示 2026-11-01）：商品の欄は初めから9行（1〜3商品は変えない）。4商品から必要な分だけ増やす。
+  // 介護保険の内訳は商品の欄のすぐ下。1ページ目（16行）に入らなければ次のページの初めから。1つの商品の行はページをまたがない
+  const lay = (n: number, rows = 3, below = 4) => estimateLayout(Array.from({length: n}, () => rows), below);
+  assert.deepEqual(lay(1), {items: [{start: 0, rows: 3}], areaEnd: 8, below: 9, pages: 1});
+  assert.deepEqual(lay(3), {items: [0, 3, 6].map((start) => ({start, rows: 3})), areaEnd: 8, below: 9, pages: 1}); // 3商品：行は増えない
+  assert.deepEqual(lay(4), {items: [0, 3, 6, 9].map((start) => ({start, rows: 3})), areaEnd: 11, below: 12, pages: 1}); // 4商品：12行に
+  assert.deepEqual(lay(5).items.at(-1), {start: 12, rows: 3});
+  assert.deepEqual([lay(5).below, lay(5).pages], [ESTIMATE_ROWS.length, 2]); // 内訳が入らない → 2ページ目の初め
+  assert.deepEqual(lay(6).items.at(-1), {start: ESTIMATE_ROWS.length, rows: 3}); // 6つ目は2ページ目の初めから（1ページ目の残り1行にまたがない）
+  assert.deepEqual([lay(6).areaEnd, lay(6).below, lay(6).pages], [ESTIMATE_ROWS.length + 2, ESTIMATE_ROWS.length + 3, 2]);
+  assert.equal(lay(1, 3, 0).below, -1);
+  assert.deepEqual(lay(0), {items: [], areaEnd: 8, below: -1, pages: 1});
+  assert.equal(lay(ESTIMATE_CAPACITY + 1, 3, 0).items.length, ESTIMATE_CAPACITY);
+  // 初め（品名1行の商品1つ）：商品の欄（23〜31行）の下の A32〜A35 に内訳
   const on = sale({items: one});
   const f = unzipSync(fillEstimate(template(), on, S));
-  assert.deepEqual(['A25', 'A26', 'A27', 'A28'].map((r) => readCell(f, SH, r)), ['介護保険（受領委任払い）', '介護保険の対象　26,400円', '利用者負担（1割）　2,640円', '保険者負担（9割）　23,760円']);
-  assert.equal(readCell(f, SH, 'A24'), '');
+  assert.deepEqual(['A32', 'A33', 'A34', 'A35'].map((r) => readCell(f, SH, r)), ['介護保険（受領委任払い）', '介護保険の対象　26,400円', '利用者負担（1割）　2,640円', '保険者負担（9割）　23,760円']);
+  assert.equal(readCell(f, SH, 'A31'), '');
   // 外す（false）：書かない。合計は変わらない
   const off = unzipSync(fillEstimate(template(), sale({items: one, showSelfPay: false}), S));
-  assert.equal(readCell(off, SH, 'A25'), '');
+  assert.equal(readCell(off, SH, 'A32'), '');
   assert.equal(readCell(f, SH, 'E21'), readCell(off, SH, 'E21'));
   // 生活保護・限度額を超えた分
   const w = sale({items: one, welfare: true});

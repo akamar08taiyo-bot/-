@@ -206,13 +206,36 @@ export function cellStyle(files: Files, xml: string, ref: string): CellStyle {
  * 書式（cellXfs の番号）の文字の大きさ（pt）・配置（alignment の XML）だけを替えた書式を足して、その番号を返す（同じものがあればそれ）。
  * 罫線・塗り・表示形式はもとの書式のまま
  */
-function variantStyle(files: Files, style: number, change: {pt?: number; alignment?: string; color?: string; numFmt?: number}): number {
+function variantStyle(files: Files, style: number, change: {pt?: number; alignment?: string; color?: string; numFmt?: number; edges?: {top?: string; bottom?: string}}): number {
   const {fonts, xfs} = styleParts(files);
   const xf = xfs[style];
   if (xf === undefined) return style;
   let xml = strFromU8(files['xl/styles.xml']);
   const count = (tag: string, n: number) => (xml = xml.replace(new RegExp(`<${tag}\\b([^>]*?)\\scount="\\d+"`), `<${tag}$1 count="${n}"`));
   let next = xf;
+  if (change.edges) {
+    // 罫線の上・下の線の種類だけ替える（thin＝細い実線。色はもとの線の色、なければ自動）
+    const borders = [...(/<borders\b[^>]*>([\s\S]*?)<\/borders>/.exec(xml)?.[1] ?? '').matchAll(/<border\b[^>]*?(?:\/>|>[\s\S]*?<\/border>)/g)].map((m) => m[0]);
+    let border = borders[numOf(attrOf(next, 'borderId'), 0)] ?? '<border><left/><right/><top/><bottom/><diagonal/></border>';
+    if (/^<border\b[^>]*\/>$/.test(border)) border = '<border><left/><right/><top/><bottom/><diagonal/></border>';
+    for (const side of ['top', 'bottom'] as const) {
+      const kind = change.edges[side];
+      if (!kind) continue;
+      const re = new RegExp(`<${side}\\b[^>]*?(?:\\/>|>[\\s\\S]*?<\\/${side}>)`);
+      const now = re.exec(border)?.[0] ?? '';
+      const color = /<color\b[^>]*\/>/.exec(now)?.[0] ?? '<color auto="1"/>';
+      const line = `<${side} style="${kind}">${color}</${side}>`;
+      border = now ? border.replace(re, line) : border.replace(/<diagonal\b/, `${line}<diagonal`);
+    }
+    let borderId = borders.indexOf(border);
+    if (borderId < 0) {
+      borderId = borders.length;
+      xml = xml.replace('</borders>', `${border}</borders>`);
+      count('borders', borders.length + 1);
+    }
+    next = /\sborderId=/.test(next) ? next.replace(/\sborderId="\d+"/, ` borderId="${borderId}"`) : next.replace(/^<xf\b/, `<xf borderId="${borderId}"`);
+    next = /\sapplyBorder=/.test(next) ? next.replace(/\sapplyBorder="[^"]*"/, ' applyBorder="1"') : next.replace(/^<xf\b/, '<xf applyBorder="1"');
+  }
   if (change.pt !== undefined) {
     const font = fonts[numOf(attrOf(xf, 'fontId'), 0)] ?? '<font/>';
     const sized = /<sz\b[^>]*\/>/.test(font)
@@ -264,6 +287,8 @@ function variantStyle(files: Files, style: number, change: {pt?: number; alignme
   return id;
 }
 
+/** 罫線の上・下の線の種類だけ変えた書式（なければ足す。edges の例 {bottom: 'thin'}）。新しい書式の番号 */
+export const edgeStyle = (files: Files, style: number, edges: {top?: string; bottom?: string}): number => variantStyle(files, style, {edges});
 /** 字の色だけ変えた書式（なければ足す）。新しい書式の番号 */
 export const colorStyle = (files: Files, style: number, rgb: string): number => variantStyle(files, style, {color: rgb});
 /** 字の大きさ（pt）だけ変えた書式（styles.xml に足す。同じものがあればそれ）。sizeCell とちがい、書いている途中のシートの XML に使う */

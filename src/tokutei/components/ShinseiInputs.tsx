@@ -281,11 +281,13 @@ export function ShinseiInputs({
                         <CatalogSearchButton onSearch={() => setSearchAt((m) => ({...m, [i.id]: (m[i.id] ?? 0) + 1}))} />
                       </>
                     ) : (
-                      i.maker && <span className="text-xs text-slate-500">{i.maker}</span>
+                      (i.maker || i.code) && <span className="text-xs text-slate-500">{[i.maker, i.code].filter(Boolean).join('　')}</span>
                     )}
                   </div>
                   {/* 商品名はメーカー・商品検索の下（ユーザーの指示「メーカー名、商品検索を上にもってきて、その下に商品名をもってくる」2026-11-01） */}
                   <TextInput value={i.name} onChange={(name) => changeItem(i.id, {name})} placeholder="商品名" className="ml-8 min-w-0" aria-label="商品名" data-nav />
+                  {/* 品番（見積書の品名の3行目「【品番】…」。ユーザーの指示「メーカー名・商品名・品番は、別々の項目として持つ（入力欄…に項目がなければ追加する）」2026-11-01） */}
+                  {i.productId === null && <TextInput value={i.code} onChange={(code) => changeItem(i.id, {code})} placeholder="品番" className="ml-8 w-48 max-w-[calc(100%-2rem)]" aria-label="品番" />}
                   {/* 種目・メーカーを選ぶと、カタログのその商品の一覧（押すと商品名・品番・定価が入る。ユーザーの指示 2026-10-30） */}
                   {i.productId === null && <CatalogPicker item={i} onPick={(patch) => changeItem(i.id, patch)} onCatalog={onCatalog} search={searchAt[i.id] ?? 0} />}
                   {/* 定価の下に割引率と販売金額（ユーザーの指示「定価の下に、販売金額を記載する」「定価の下に割引率を表示、変更できるようにする」2026-10-26）。

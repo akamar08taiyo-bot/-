@@ -8,6 +8,10 @@ import type {PvFont, PvHeader, PvPage, PvShape, PvText, ShinseiField} from '../s
 
 const PAD = 18; // 紙の余白（画素）
 const MAX_SCALE = 1.3; // 広い画面では少し大きく
+/** プレビューの拡大・縮小（右上の − ＋・Ctrl＋スクロール。1 は枠の幅に合わせた大きさ） */
+const ZOOM = {min: 0.5, max: 3};
+const clampZoom = (z: number) => Math.min(ZOOM.max, Math.max(ZOOM.min, Math.round(z * 100) / 100));
+const zoomKey = (title: string) => `taiyo-tokutei-preview-zoom:${title}`;
 
 /** 要素の幅（画面の幅が変わったら測り直す） */
 function useWidth<T extends HTMLElement>() {
@@ -324,7 +328,39 @@ export function ShinseiPages<F extends string = ShinseiField>({
 }) {
   const [wrapRef, wrapWidth] = useWidth<HTMLDivElement>();
   const widest = Math.max(...pages.map((p) => paper(p).width), 1);
-  const scale = fixedScale ?? (wrapWidth ? Math.min(MAX_SCALE, wrapWidth / widest) : 1);
+  // 右上の − ＋ と Ctrl＋スクロールで大きく・小さく（ユーザーの指示「見積もりの右上に+-マーク。アップして見えるようにする。Ctrl+スクロールでも可能にする」2026-11-01）。
+  // 大きさはプレビューごとに（見積書・申請書）この端末で覚える。印刷のときは使わない
+  const [zoom, setZoomState] = useState(() => {
+    try {
+      return clampZoom(Number(localStorage.getItem(zoomKey(title))) || 1);
+    } catch {
+      return 1;
+    }
+  });
+  const setZoom = (f: (z: number) => number) =>
+    setZoomState((z) => {
+      const next = clampZoom(f(z));
+      try {
+        localStorage.setItem(zoomKey(title), String(next));
+      } catch {
+        /* 覚えられなくても使える */
+      }
+      return next;
+    });
+  const outerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = outerRef.current;
+    if (!el || print) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return; // Ctrl を押していないときは、ふつうに動かす
+      e.preventDefault(); // ブラウザの画面ごとの拡大にしない
+      const step = e.deltaMode === 1 ? e.deltaY * 0.05 : e.deltaY * 0.002;
+      setZoom((z) => z * Math.min(1.25, Math.max(0.8, Math.exp(-step))));
+    };
+    el.addEventListener('wheel', onWheel, {passive: false});
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [print, title]);
+  const scale = fixedScale ?? (wrapWidth ? Math.min(MAX_SCALE, wrapWidth / widest) : 1) * (print ? 1 : zoom);
 
   // 入れている所の欄（同じ所が2枚目にもあるとき＝式で同じ値を出している欄は、最初に出てくる欄）が見えるように、プレビューの枠の中を動かす。
   // 縦に並べた狭い画面（枠が動かない）では、画面ごと動かさない（入れている所が見えなくなるので）
@@ -341,8 +377,26 @@ export function ShinseiPages<F extends string = ShinseiField>({
   }, [firstKey, scrollBox]);
   let firstDone = false;
 
+  const tool = 'h-8 min-w-8 rounded-md border border-slate-300 bg-white px-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40';
   return (
-    <div ref={wrapRef} className={print ? 'print-pages' : 'space-y-4'} aria-label={title}>
+    <div ref={outerRef} className={print ? '' : 'relative'}>
+      {!print && (
+        // 右上の − 100% ＋（プレビューの枠の中で動いても右上に残る）
+        <div className="sticky top-0 z-20 h-0">
+          <div role="group" aria-label="拡大・縮小" className="absolute right-1 top-1 flex items-center gap-1 rounded-lg border border-slate-300 bg-white/95 p-1 shadow-sm">
+            <button type="button" className={tool} onClick={() => setZoom((z) => z / 1.2)} disabled={zoom <= ZOOM.min} aria-label="小さく" title="小さく（Ctrl＋スクロールでも）">
+              −
+            </button>
+            <button type="button" className={`${tool} tabular-nums`} onClick={() => setZoom(() => 1)} aria-label="もとの大きさ" title="もとの大きさに戻す">
+              {Math.round(zoom * 100)}%
+            </button>
+            <button type="button" className={tool} onClick={() => setZoom((z) => z * 1.2)} disabled={zoom >= ZOOM.max} aria-label="大きく" title="大きく（Ctrl＋スクロールでも）">
+              ＋
+            </button>
+          </div>
+        </div>
+      )}
+    <div ref={wrapRef} className={print ? 'print-pages' : `space-y-4 ${zoom > 1 ? 'overflow-x-auto' : ''}`} aria-label={title}>
       {pages.map((page, pageNo) => {
         const pp = paper(page);
         return (
@@ -430,6 +484,7 @@ export function ShinseiPages<F extends string = ShinseiField>({
           </div>
         );
       })}
+    </div>
     </div>
   );
 }
