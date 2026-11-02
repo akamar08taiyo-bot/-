@@ -35,9 +35,9 @@ React 19 + TypeScript + Vite（`vite.tokutei.config.ts` で1ファイルの `dis
 | `salesSummary.ts` | 住宅改修の「📈 売上見込みを確認する」・受注残・進捗管理へ渡す案件ごとの金額（localStorage `taiyo-tokutei-sales-v1`＝`{v, updatedAt, rows, linked}`。`salesMonthOf`＝納品日→承認日→申請日→見積日→作った日の月・担当・居宅・営業所 office。
 仕切・利益は入れない。`linked`＝住宅改修の様邸から開いた案件のお客様名（商品のない作りかけも。住宅改修の一覧に名前を出す）。App.tsx が書く。2026-10-25〜26） |
 | `catalog.ts`・`print/catalogPdf.ts`・`print/CatalogPrint.tsx`・`print/CatalogViewer.tsx` | 介援隊のカタログ：ページの表 `CATALOG`（12ページ）・`catalogLabel`・品番の見くらべ `codeKey`・`pageCodes`・初めのチェック `catalogPicks`・検索 `catalogMatches`・題 `catalogTitle`。
+| `print/CatalogMarks.tsx` | カタログの印刷の「⭕ 丸で囲む」（2026-11-02）：`Mark`（絵に対する割合）・`saleMarks`（見積もりの商品の囲みに丸）・`MarkLayer`（なぞって足す・押して選ぶ・✕）・`MarkToggle`（黄色）・`useMarkKeys`（Delete・Ctrl+Z）。開いているあいだだけ覚える（`rememberMarks`） |
 PDF を pdf.js で 200dpi の JPEG と文字（`CatalogImage`＝url・codes・text）に。印刷の画面（チェックしたページだけ）と、浮かぶ窓（動かす・大きさ・検索・印刷。置いた所は `taiyo-tokutei-catalog-window-v1`） |
 | `components/ShinseiParts.tsx` | 申請書・見積書の入れる所の部品（丸のボタン `Circles`・フリガナ `KanaInput`・被保険者番号の10マス・生年月日の元号と年月日・「＋ 2つ目の…を追加」`AddItemButton`・Enter で次の欄 `nextOnEnter`・「カタログから検索」`CatalogSearch`） |
-| `scanItem.ts`・`components/ScanDialog.tsx` | 「📷 スクショから自動認識」の窓：左に受注簿ツールの読み取り（`SCAN_PATH`＝`/taiyo-hacchu-scan/?embed=scan`）、右に読み取った商品。`scanDraft`（届いた値 → 右の欄）・`itemFromScan`（見積書の1行）・`CATALOG_SITES`（ケアマックス（介援隊）・ウェルファン）。受け取るのは同じ origin の iframe の window からの `taiyo-hacchu-scanned` だけ。窓の上の貼り付け・落とした画像は `taiyo-scan-image` で渡す |
 | `defaults.ts` | 営業所（OFFICES、19か所）・担当・保険者（INSURERS。みやこ町は `perItem`）・`defaultSettings()`。営業所はポータルの localStorage `taiyo_portal_session` から |
 | `sales.ts` | 見積番号 `nextQuoteNo`・`newSale`・`copySale`・`itemFromProduct`・`blankItem`・`customerLabel`・`saleWarnings`。使い回し：`customerKey`（同じお客様＝被保険者番号10けた、なければ名前＋生年月日）・`pastCustomers`・`customerPatch`（前のお客様から入れる）・`sameYearSales`（今年度の残り）・`frequentValues`（居宅・ケアマネの候補） |
 | `category.ts` | 種目の自動判定（T字杖・歩行車・持ち運ぶスロープは対象外）。`docLabel`＝書類の種目（腰掛便座の長い細目は「腰掛便座（ポータブルトイレ）」） |
@@ -67,4 +67,4 @@ PDF を pdf.js で 200dpi の JPEG と文字（`CatalogImage`＝url・codes・te
 ## テスト（`test/tokutei/`）
 
 `calc.test.ts`（計算の例）・`category.test.ts`・`priceImport.test.ts`・`estimateBook.test.ts`（原本の欄・式とその答えが `saleTotals` と同じか・非課税・備考の3行・明細の書式・プレビュー・原本に印影がないか・ファイル名）・
-`shinsei.test.ts`（4つの申請書の欄・丸の数・式の答え・広域連合の支払方法・原本に前の方の記入が残っていないか）・`shinseiPreview.test.ts`（プレビューのシート・SHINSEI_LINKS のもれ・まだ入っていない所）・`link.test.ts`（生年月日・郵便番号・前のお客様・今年度の残り・理由）・`jutaku.test.ts`（住宅改修からの受け渡し：開いた様邸のものだけ・案件を作る／開く・変わった値だけ入れ直す・保険者と個別切り上げ・読み込みで残す）・`scanItem.test.ts`（読み取りの値 → 右の欄・税込から税抜・見積書の1行・カタログ）・`handoff.test.ts`（販売受注簿へ渡す内容・限度額を超えるとき・生活保護・個別切り上げ・3割、3000通りの見積もりで内訳の合計が見積書と同じ）・`e2e-hacchu.mjs`（受注簿ツールと同じサイトに置いて、転記 → 受注簿に入れる → ページの給付内訳 → 印刷 → 直したらふつうの計算）・`e2e-scan.mjs`（架空の介援隊の画面を画像にして窓の上で貼り付け → 本物の tesseract.js で読む → 右の欄 → 見積書に入れる）・`e2e.mjs`（ブラウザで通し。申請書の Excel を落として欄を読む）。
+`shinsei.test.ts`（4つの申請書の欄・丸の数・式の答え・広域連合の支払方法・原本に前の方の記入が残っていないか）・`shinseiPreview.test.ts`（プレビューのシート・SHINSEI_LINKS のもれ・まだ入っていない所）・`link.test.ts`（生年月日・郵便番号・前のお客様・今年度の残り・理由）・`jutaku.test.ts`（住宅改修からの受け渡し：開いた様邸のものだけ・案件を作る／開く・変わった値だけ入れ直す・保険者と個別切り上げ・読み込みで残す）・`handoff.test.ts`（販売受注簿へ渡す内容・限度額を超えるとき・生活保護・個別切り上げ・3割、3000通りの見積もりで内訳の合計が見積書と同じ）・`e2e-hacchu.mjs`（受注簿ツールと同じサイトに置いて、転記 → 受注簿に入れる → ページの給付内訳 → 印刷 → 直したらふつうの計算）・`e2e.mjs`（ブラウザで通し。申請書の Excel を落として欄を読む）。

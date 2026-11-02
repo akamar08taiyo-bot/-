@@ -9,15 +9,17 @@ type View = 'fav' | 'recent' | 'all';
 
 /**
  * 案件に入れる商品を選ぶ画面。★お気に入り → 最近使った → すべて（検索）の順。種目のタブで絞れる。
- * 「入れる」を押すたびに明細に1行入る（閉じるまで続けて選べる）
+ * 商品の欄の定価の横の「★ お気に入りから入力」で開き、「入れる」を押すとその欄の商品になって閉じる（SaleEditor の pickFavorite）
  */
 export function ProductPicker({
+  title = '商品を選ぶ',
   products,
   settings,
   onPick,
   onToggleFavorite,
   onClose,
 }: {
+  title?: string;
   products: Product[];
   settings: Settings;
   onPick: (p: Product) => void;
@@ -46,7 +48,7 @@ export function ProductPicker({
   return (
     <Modal
       wide
-      title="商品を選ぶ"
+      title={title}
       onClose={onClose}
       footer={
         <Btn color="white" onClick={onClose}>

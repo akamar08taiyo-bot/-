@@ -68,6 +68,15 @@ body {
 /* 介援隊のカタログのページ（PDF を絵にしたもの。catalog.ts）。カタログの紙に余白があるので、紙いっぱいに */
 .cat-sheet {
   padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* 「⭕ 丸で囲む」（print/CatalogMarks.tsx）：絵と同じ縦横の比の箱。丸はこの箱に対する割合で重ねる */
+.cat-mark-frame {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
 }
 .cat-sheet img {
   display: block;
@@ -105,8 +114,13 @@ body {
     background: none;
   }
   .print-toolbar,
-  .cat-print-side {
+  .cat-print-side,
+  .cat-mark-ui {
     display: none !important;
+  }
+  /* 選んでいる丸（画面ではだいだい色）も、印刷は赤 */
+  .cat-sheet [data-mark] {
+    stroke: #e11d48;
   }
   .print-root {
     padding: 0;

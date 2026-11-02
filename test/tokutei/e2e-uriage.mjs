@@ -94,10 +94,14 @@ try {
     await page.getByLabel('納品日').fill('2026-10-30');
     const staff = await page.getByRole('combobox', {name: '担当'}).evaluate((el) => [...el.options].map((o) => o.value).find(Boolean));
     await page.getByRole('combobox', {name: '担当'}).selectOption(staff);
-    await page.getByRole('button', {name: '★ 商品を選ぶ'}).click();
+    // 定価の横の「★ お気に入りから入力」：選ぶとその欄の商品になって閉じる（ユーザーの指示「お気に入りから入力をこの辺にもってくる」2026-11-02）
+    await page.getByRole('button', {name: '★ お気に入りから入力'}).last().click();
     await page.getByRole('button', {name: 'シャワーチェア 見本Aを入れる'}).click();
+    await page.getByRole('dialog', {name: 'お気に入りから入力'}).waitFor({state: 'detached'});
+    await page.getByRole('button', {name: /^＋ \d+つ目の(福祉用具|商品)を追加$/}).click();
+    await page.getByRole('button', {name: '★ お気に入りから入力'}).last().click();
     await page.getByRole('button', {name: '浴槽台 見本Bを入れる'}).click();
-    await page.getByRole('button', {name: '閉じる'}).last().click();
+    await page.getByRole('dialog', {name: 'お気に入りから入力'}).waitFor({state: 'detached'});
     await page.getByText('27,808円').first().waitFor();
 
     // 負担割合は未選択から：自己負担額は出さない

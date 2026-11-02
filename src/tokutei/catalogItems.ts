@@ -42,7 +42,13 @@ export type CatalogProduct = {
   note: string;
   taxFree: boolean; // 非課税（福祉用具の杖など。定価は書いてある金額のまま）
   variants: CatalogVariant[]; // 品番ごと。定価は税抜（カタログの（税抜¥…））。読めなければ 0
+  /**
+   * ページの上の囲みの位置（左上から pt）：見出し・写真・品番・定価・説明の文字の入る所。カタログの窓で、ページの絵の上に重ねる「押せる枠」に使う
+   * （ユーザーの指示「カタログと商品をリンクさせて、自動的に商品名や金額などが全てはいるようにする」2026-11-02）
+   */
+  box?: PageBox;
 };
+export type PageBox = {x: number; y: number; w: number; h: number};
 
 const between = (v: number, lo: number, hi: number) => v >= lo && v <= hi;
 // 見出しは 9.2pt（安寿 軽量浴槽台の 7・8 は 8.5pt）。説明の 8.5pt の文は、番号のすぐ右にないので見出しにならない
@@ -190,6 +196,12 @@ export function parseCatalogPage(raw: PdfText[], page: Pick<CatalogPage, 'page' 
     // 囲みの説明の文（歩行車の見分けに使う）。ページの端の見出し（右ページの右・左ページの左の「歩行器／シルバーカー」など）は入れない
     const text = b.tokens.filter((t) => t.x < 570 && t.x + t.w > 30).map((t) => t.s).join('');
     const {category, sub, note} = catalogCategory(name, insured, taxFree, page.subs, text, page.category);
+    // 囲みの位置：見出しの左上から、囲みの文字（品番・定価・説明）のいちばん右・下まで。右はとなりの見出しの手前まで
+    const inside = b.tokens.filter((t) => t.x < b.head.end && t.x + t.w > 30);
+    const left = Math.min(b.head.x, ...inside.map((t) => t.x));
+    const top = Math.min(b.head.y - b.head.title.h, ...inside.map((t) => t.y - t.h)) - 2;
+    const right = Math.min(b.head.end, Math.max(...inside.map((t) => t.x + t.w))) + 2;
+    const bottom = Math.max(...inside.map((t) => t.y)) + 3;
     out.push({
       at: b.head,
       p: {
@@ -202,6 +214,7 @@ export function parseCatalogPage(raw: PdfText[], page: Pick<CatalogPage, 'page' 
         insured,
         note,
         taxFree,
+        box: {x: Math.round(left - 2), y: Math.round(top), w: Math.round(right - left + 2), h: Math.round(bottom - top)},
         variants: variants.length
           ? variants
           : orders.map((o) => ({

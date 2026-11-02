@@ -20,6 +20,46 @@ const yen = (n: number) => n.toLocaleString('ja-JP');
 /** カタログの窓を一緒に開く広さ（狭い画面では窓が画面いっぱいになるので、ボタンで開く） */
 const WIDE = 1024;
 
+/**
+ * 種目の横の「📖 カタログから選ぶ」（ユーザーの指示「入浴補助用具の横に、カタログから選ぶ。設置。項目名とメーカー名を選択すると（選択したものだけの
+ * カタログを表示）クリックするとカタログが開き、カタログと商品をリンクさせて、自動的に商品名や金額などが全てはいるようにする」2026-11-02）：
+ * 種目・品目・メーカーで絞ったページだけのカタログの窓を開く（何も選んでいなければ全部のページ）。窓のページの商品を押すと、この商品の欄に入る（SaleEditor の pickFromCatalog）
+ */
+export function CatalogChooseButton({item, onCatalog}: {item: SaleItem; onCatalog: OpenCatalog}) {
+  const [busy, setBusy] = useState(false);
+  const open = async () => {
+    setBusy(true);
+    const filter = await itemCatalogFilter(item);
+    setBusy(false);
+    onCatalog('', filter, item.id);
+  };
+  return (
+    <button
+      type="button"
+      onClick={() => void open()}
+      disabled={busy}
+      className="h-9 shrink-0 rounded-md border border-sky-300 bg-sky-50 px-2.5 text-sm font-bold text-sky-900 hover:bg-sky-100 disabled:opacity-60"
+      title="種目・品目・メーカーのカタログのページを開いて、ページの商品を押して入れる"
+    >
+      {/* スマホの幅では「📖 カタログ」だけ見せる（種目の欄が「入浴」まで縮んでいた。読み上げの名前は「📖 カタログから選ぶ」のまま） */}
+      📖 カタログ<span className="max-sm:sr-only">から選ぶ</span>
+    </button>
+  );
+}
+
+/** 商品の欄の種目・品目・メーカーで絞ったカタログのページ（何も選んでいない・読めない・載っていなければ undefined＝全部のページ） */
+export async function itemCatalogFilter(item: SaleItem): Promise<CatalogPagesFilter | undefined> {
+  if (!item.category && !item.sub && !item.maker.trim()) return undefined;
+  try {
+    const found = catalogFilter(await loadCatalogProducts(), {...item, name: ''});
+    const pages = catalogPagesOf(found.items);
+    return pages.length ? {pages, label: [subShort(found.sub, found.category), item.maker.trim()].filter(Boolean).join('・')} : undefined;
+  } catch {
+    // 読めなければ全部のページで開く（ページの絵は窓が読む）
+    return undefined;
+  }
+}
+
 /** メーカーの欄の横の「🔍 商品検索」（押すたびに onSearch。CatalogPicker の search を1つ増やす） */
 export function CatalogSearchButton({onSearch}: {onSearch: () => void}) {
   return (
@@ -81,7 +121,7 @@ export function CatalogPicker({item, onPick, onCatalog, search = 0}: {item: Sale
     if (!search || !found || shownFor.current === search) return;
     shownFor.current = search;
     requestAnimationFrame(() => boxRef.current?.scrollIntoView({block: 'nearest', behavior: 'smooth'}));
-    if (onCatalog && filter && filter.pages.length && window.innerWidth >= WIDE) onCatalog('', filter);
+    if (onCatalog && filter && filter.pages.length && window.innerWidth >= WIDE) onCatalog('', filter, item.id);
   });
 
   if (!item.category && !searched) return null;
@@ -159,7 +199,7 @@ export function CatalogPicker({item, onPick, onCatalog, search = 0}: {item: Sale
           </span>
           {by.name.trim() && !found.byName && <span className="text-amber-800">（「{item.name.trim()}」に合う商品がないので、{[what, item.maker.trim()].filter(Boolean).join('・')}の商品）</span>}
           {onCatalog && filter.pages.length > 0 && (
-            <button type="button" onClick={() => onCatalog('', filter)} className="ml-auto rounded border border-sky-300 bg-white px-2 py-0.5 font-bold text-sky-900 hover:bg-sky-50">
+            <button type="button" onClick={() => onCatalog('', filter, item.id)} className="ml-auto rounded border border-sky-300 bg-white px-2 py-0.5 font-bold text-sky-900 hover:bg-sky-50">
               📖 カタログで見る（{filter.pages.map((n) => `p.${n}`).join('・')}）
             </button>
           )}
@@ -187,7 +227,7 @@ export function CatalogPicker({item, onPick, onCatalog, search = 0}: {item: Sale
                   {!sameMaker(p.maker, item.maker) && p.maker && <span className="text-xs text-slate-500">{p.maker}</span>}
                   {prices.length === 1 && prices[0] > 0 && <span className="text-xs text-slate-600">定価 {yen(prices[0])}円（税抜）</span>}
                   {onCatalog && (
-                    <button type="button" onClick={() => onCatalog(p.variants[0]?.orderCode || p.name)} className="ml-auto text-xs text-sky-700 underline" title="カタログのこのページを開く">
+                    <button type="button" onClick={() => onCatalog(p.variants[0]?.orderCode || p.name, undefined, item.id)} className="ml-auto text-xs text-sky-700 underline" title="カタログのこのページを開く">
                       p.{p.page}
                     </button>
                   )}

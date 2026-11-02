@@ -2,7 +2,7 @@
 // ラップポンは、腰掛便座など、カタログ一覧の全ての項目でわかるようにする。シャワーチェアを選んだら、シャワーチェアの一覧のみが商品一覧からさがせるようにする」2026-11-01）：
 //   ① 商品マスタの取り込みに介援隊カタログの PDF（p.50 シャワーキャリー・p.47 すべり止めマット）を入れる → カタログとして読み、定価にカタログの金額・仕切は空欄、
 //      シャワーキャリーは「入浴補助用具（シャワーチェア）」でチェック済み、マットは対象外でチェックなし
-//   ② 商品を選ぶ画面：入浴のタブ → 品目「シャワーチェア」で、シャワーキャリーだけ（マットは出ない）
+//   ② お気に入りから入力の画面：入浴のタブ → 品目「シャワーチェア」で、シャワーキャリーだけ（マットは出ない）
 //   ③ カタログの窓のページの一覧に、ページごとの品目（シャワーキャリーのページは「シャワーチェア」）
 // 使い方：npm run -s build:tokutei のあと node test/tokutei/e2e-catalog.mjs [出力フォルダ]
 // 金額は確かめるだけで、テストにもリポジトリにも書かない（ユーザーの指示「リポジトリに仕入れや定価は残さない」）
@@ -128,14 +128,14 @@ try {
   assert.equal(await page.getByText(/利益率/).count(), 0);
   await page.screenshot({path: `${out}/c3-products.png`, fullPage: true});
 
-  // ---- ② 見積もり → 「★ 商品を選ぶ」→ 入浴 → 品目「シャワーチェア」
+  // ---- ② 見積もり → 定価の横の「★ お気に入りから入力」→ 入浴 → 品目「シャワーチェア」
   await page.getByRole('button', {name: '📝 見積もり・申請'}).click();
   if (!(await page.getByRole('button', {name: '＋ 苅田町'}).count())) await page.getByRole('button', {name: '📝 見積もり・申請'}).click();
   await page.getByRole('button', {name: '＋ 苅田町'}).click();
   await page.screenshot({path: `${out}/c3b-new-sale.png`});
-  await page.getByRole('button', {name: '★ 商品を選ぶ'}).first().click();
+  await page.getByRole('button', {name: '★ お気に入りから入力'}).first().click();
   await page.screenshot({path: `${out}/c3c-picker-open.png`});
-  const dlg = page.getByRole('dialog').filter({hasText: '商品を選ぶ'});
+  const dlg = page.getByRole('dialog', {name: 'お気に入りから入力'});
   await dlg.getByRole('button', {name: /^すべて（\d+）$/}).click();
   const subs = dlg.getByRole('group', {name: '品目'});
   assert.deepEqual(await subs.getByRole('button').allInnerTexts(), ['すべての品目', 'シャワーチェア', '浴槽手すり', '浴槽台']);
@@ -149,7 +149,7 @@ try {
   await dlg.getByRole('button', {name: '閉じる'}).last().click();
 
   // ---- ③ カタログの窓：ページの一覧に品目
-  await page.getByRole('button', {name: /カタログから検索|📖 カタログ/}).first().click();
+  await page.getByRole('button', {name: '📖 カタログ', exact: true}).first().click();
   const viewer = page.getByRole('dialog', {name: 'カタログ'});
   const pages = viewer.getByRole('group', {name: 'カタログのページ'});
   await pages.getByRole('button').first().waitFor();
@@ -161,7 +161,7 @@ try {
   await page.screenshot({path: `${out}/c5-catalog-pages.png`});
 
   assert.deepEqual(errors, []);
-  console.log(`ok: カタログの取り込み（${imported}件・定価・仕切は空欄）→ 商品を選ぶ（品目シャワーチェア）→ カタログのページの品目`);
+  console.log(`ok: カタログの取り込み（${imported}件・定価・仕切は空欄）→ お気に入りから入力（品目シャワーチェア）→ カタログのページの品目`);
 } finally {
   await browser.close();
   server.close();

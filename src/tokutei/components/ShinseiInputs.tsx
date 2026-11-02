@@ -20,10 +20,10 @@ import {yen} from '../util.ts';
 import {zipLabel} from '../zip.ts';
 import type {ZipHit} from '../zip.ts';
 import {CategorySelect} from './CategorySelect.tsx';
-import {CatalogPicker, CatalogSearchButton} from './CatalogPicker.tsx';
+import {CatalogChooseButton, CatalogPicker, CatalogSearchButton} from './CatalogPicker.tsx';
 import {MakerInput} from './MakerInput.tsx';
 import {ReasonField} from './ReasonField.tsx';
-import {AddItemButton, CatalogSearch, Circles, EraBirthInput, InsuredNoInput, KanaInput, nextOnEnter} from './ShinseiParts.tsx';
+import {AddItemButton, CatalogSearch, Circles, EraBirthInput, FavoriteButton, InsuredNoInput, KanaInput, nextOnEnter} from './ShinseiParts.tsx';
 import {SuggestInput} from './Suggest.tsx';
 import {Btn, NumberInput, Stepper, TextInput} from './ui.tsx';
 
@@ -43,8 +43,7 @@ export function ShinseiInputs({
   changeAddress,
   changeZip,
   zips,
-  onPickProduct,
-  onScan,
+  onPickFavorite,
   onCatalog,
   onAddItem,
   onPickCustomer,
@@ -65,8 +64,7 @@ export function ShinseiInputs({
   changeAddress: (address: string) => void;
   changeZip: (zip: string) => void;
   zips: ZipHit[];
-  onPickProduct: () => void;
-  onScan: () => void; // 「📷 スクショから自動認識」の窓を開く（scanItem.ts）
+  onPickFavorite: (itemId: string) => void; // 定価の横の「★ お気に入りから入力」：商品マスタから選んで、その欄の商品にする
   onCatalog: OpenCatalog; // 右にカタログの窓を開く（print/CatalogViewer.tsx。商品検索のときは絞ったページだけ）
   onAddItem: (item?: SaleItem) => void; // 手で入れる商品を足す（item があればその商品＝最初から開いている欄に打ったもの）
   onPickCustomer?: () => void; // 住宅改修の様邸のタブの中では渡さない（お客様の情報は様邸から入る。ユーザーの指示「赤枠の部分は不要です」2026-10-28）
@@ -259,7 +257,9 @@ export function ShinseiInputs({
                   {/* 1行目：種目、その下にメーカー・🔍 商品検索、商品名（ユーザーの指示「入力順は、種目、商品名の順」2026-10-26、「メーカー名、商品検索を上にもってきて、その下に商品名」2026-11-01）。その下に定価・割引率・販売金額 */}
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-teal-100 text-xs font-bold text-teal-800">{idx + 1}</span>
-                    <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => changeItem(i.id, {category, sub})} ariaLabel="種目" className="w-48" />
+                    <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => changeItem(i.id, {category, sub})} ariaLabel="種目" className="w-48 min-w-0 shrink" />
+                    {/* 種目の横に「📖 カタログから選ぶ」（ユーザーの指示 2026-11-02）：選んだ種目・品目・メーカーのページだけのカタログを開き、ページの商品を押すとこの欄に入る */}
+                    <CatalogChooseButton item={i} onCatalog={onCatalog} />
                     {/* 消すのは右上（販売見積書と同じ。金額の横だとスマホの幅で1段下に落ちた） */}
                     {lines.length > 0 && (
                       <button
@@ -284,6 +284,8 @@ export function ShinseiInputs({
                       (i.maker || i.code) && <span className="text-xs text-slate-500">{[i.maker, i.code].filter(Boolean).join('　')}</span>
                     )}
                   </div>
+                  {/* 種目・メーカーの下に「カタログから検索」（販売見積書と同じ。ユーザーの指示「販売の見積もりでも、メーカー名、項目名を入れた下にカタログから検索するをもってくる」2026-11-02） */}
+                  <CatalogSearch item={i} onCatalog={onCatalog} />
                   {/* 商品名はメーカー・商品検索の下（ユーザーの指示「メーカー名、商品検索を上にもってきて、その下に商品名をもってくる」2026-11-01） */}
                   <TextInput value={i.name} onChange={(name) => changeItem(i.id, {name})} placeholder="商品名" className="ml-8 min-w-0" aria-label="商品名" data-nav />
                   {/* 品番（見積書の品名の3行目「【品番】…」。ユーザーの指示「メーカー名・商品名・品番は、別々の項目として持つ（入力欄…に項目がなければ追加する）」2026-11-01） */}
@@ -294,13 +296,16 @@ export function ShinseiInputs({
                       販売金額は 定価×(100−割引率)%（打ち直したら薄い黄色で、↺ で戻す。販売見積書の単価と同じ値）。割引率を変えたら販売金額は計算し直す。
                       その下に数量（− ＋。ユーザーの指示「数量を追加」2026-10-26。販売見積書の数量と同じ値）。右の金額は 販売金額×数量＋税（申請書の購入予定金額） */}
                   <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1.5 pl-8 text-xs font-bold text-slate-500">
-                    定価（税抜）
+                    {/* 狭い幅でお気に入りのボタンが下に折れても、見出しは定価の欄の高さに */}
+                    <span className="self-start pt-2.5">定価（税抜）</span>
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                       {i.productId === null ? (
                         <NumberInput value={i.listPrice} onChange={(listPrice) => changeItem(i.id, {listPrice})} min={0} blankZero className="w-28" ariaLabel="定価" />
                       ) : (
                         <span className="text-sm tabular-nums text-slate-700">{yen(i.listPrice)}円</span>
                       )}
+                      {/* 定価の横に「★ お気に入りから入力」（ユーザーの指示「お気に入りから入力をこの辺にもってくる」2026-11-02） */}
+                      <FavoriteButton onClick={() => onPickFavorite(i.id)} />
                       {unregistered.has(i.id) && (
                         <Btn color="white" small onClick={() => onFavorite(i.id)} aria-label={`${i.name}をお気に入りに登録`}>
                           ☆ お気に入りに登録
@@ -343,15 +348,8 @@ export function ShinseiInputs({
                 }}
               />
             )}
-            <div className="flex flex-wrap gap-2">
-              <Btn color="teal" small onClick={onPickProduct}>
-                ★ 商品を選ぶ
-              </Btn>
-              <Btn color="purple" small onClick={onScan}>
-                📷 スクショから自動認識
-              </Btn>
-              <CatalogSearch onOpen={onCatalog} />
-            </div>
+            {/* 下の「★ 商品を選ぶ」「📷 スクショから自動認識」は外した（ユーザーの指示「商品を選ぶとスクショから認識はなくす」2026-11-02）。
+                お気に入りは定価の横、カタログから検索は種目・メーカーの下（商品の欄ごと） */}
           </div>,
           'items',
         )}

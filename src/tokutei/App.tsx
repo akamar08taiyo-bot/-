@@ -280,6 +280,17 @@ export default function App() {
                 {t.label}
               </button>
             ))}
+            {/* 住宅改修の様邸のタブの中（申請書・販売見積書）では、タブの右に印刷（ユーザーの指示「ここに印刷ボタンをもってくる」2026-11-02）。
+                住宅改修の画面の上の段の「🖨 見積書を印刷」「🖨 申請書を印刷」と同じ働き（SaleEditor の __taiyoTokuteiCmd('print')）。印刷なので薄い水色 */}
+            {embed && embedView && tab === 'sales' && sale && (
+              <button
+                type="button"
+                onClick={() => (window as Window & {__taiyoTokuteiCmd?: (cmd: string) => boolean}).__taiyoTokuteiCmd?.('print')}
+                className="ml-1 whitespace-nowrap rounded-lg border-2 border-sky-300 bg-sky-50 px-3 py-2 text-sm font-bold text-sky-900 shadow-sm transition hover:bg-sky-100 sm:ml-2 sm:px-5 sm:py-2.5 sm:text-base lg:text-[17px]"
+              >
+                🖨 {embedView === 'shinsei' ? '申請書' : '見積書'}を印刷
+              </button>
+            )}
           </nav>
         </header>
 

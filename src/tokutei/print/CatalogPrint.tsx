@@ -6,6 +6,8 @@ import {salePages} from '../catalogItems.ts';
 import type {Sale} from '../types.ts';
 import {loadCatalogCodes, loadCatalogPage, loadCatalogProducts} from './catalogPdf.ts';
 import type {CatalogImage} from './catalogPdf.ts';
+import {MarkLayer, MarkToggle, rememberMarks, rememberedMarks, saleMarks, useMarkKeys} from './CatalogMarks.tsx';
+import type {Mark, Marks} from './CatalogMarks.tsx';
 import {useFitZoom} from './PrintView.tsx';
 
 /**
@@ -25,6 +27,58 @@ export function CatalogPrintView({sale, only, onClose}: {sale: Sale; only?: Cata
   const [showAll, setShowAll] = useState(false);
   const touched = useRef(false);
   const items = useRef(sale.items); // 開いたときの商品で選ぶ（印刷の画面を開いているあいだに商品は変わらない）
+  // 「⭕ 丸で囲む」（CatalogMarks.tsx）：ページごとの丸・選んでいる丸・ページの絵の大きさ（丸の位置は絵に対する割合）
+  const [marking, setMarking] = useState(false);
+  const [marks, setMarksState] = useState<Marks>(() => rememberedMarks(sale.id));
+  const [sel, setSel] = useState<{file: string; i: number} | null>(null);
+  const [natural, setNatural] = useState<Record<string, {w: number; h: number}>>({});
+  const history = useRef<Marks[]>([]); // 変える前の丸（Ctrl+Z で1つ前に戻す。消した丸も戻る）
+  const putMarks = (next: Marks) => {
+    rememberMarks(sale.id, next);
+    return next;
+  };
+  const setMarks = (file: string, list: Mark[]) => {
+    history.current.push(marks);
+    setMarksState(putMarks({...marks, [file]: list}));
+  };
+  const toggleMarking = async () => {
+    if (marking) {
+      setMarking(false);
+      setSel(null);
+      return;
+    }
+    setMarking(true);
+    // 初めて押したとき（丸がひとつもない）は、見積もりの商品のカタログの囲みに丸を付ける
+    if (Object.values(marks).some((l) => l.length)) return;
+    const products = await loadCatalogProducts().catch(() => []);
+    const auto = saleMarks(
+      items.current,
+      products,
+      (page) => natural[CATALOG.find((c) => c.page === page)?.file ?? ''] ?? null,
+      (page) => {
+        const i = CATALOG.findIndex((c) => c.page === page);
+        return i >= 0 && picked.has(i) ? CATALOG[i].file : null;
+      },
+    );
+    if (Object.keys(auto).length) {
+      history.current.push(marks);
+      setMarksState(putMarks(auto));
+    }
+  };
+  useMarkKeys(
+    marking,
+    () => {
+      if (!sel) return;
+      setMarks(sel.file, (marks[sel.file] ?? []).filter((_, j) => j !== sel.i));
+      setSel(null);
+    },
+    () => {
+      const prev = history.current.pop();
+      if (!prev) return;
+      setMarksState(putMarks(prev));
+      setSel(null);
+    },
+  );
   useEffect(() => {
     const before = document.title;
     document.title = catalogTitle(sale);
@@ -82,7 +136,8 @@ export function CatalogPrintView({sale, only, onClose}: {sale: Sale; only?: Cata
   const bar = useRef<HTMLDivElement>(null);
   const [sideTop, setSideTop] = useState<number | null>(null);
   useLayoutEffect(() => {
-    const place = () => setSideTop(Math.round(Math.max((bar.current?.getBoundingClientRect().bottom ?? 0) + 16, window.innerHeight / 2 - 72)));
+    // 「⭕ 丸で囲む」（高さ 80px＋すき間 12px）を上に重ねても、「印刷する」は前と同じ高さ（帯より下にはみ出すときは帯の下から）
+    const place = () => setSideTop(Math.round(Math.max((bar.current?.getBoundingClientRect().bottom ?? 0) + 16, window.innerHeight / 2 - 72 - 92)));
     place();
     const ro = new ResizeObserver(place);
     if (bar.current) ro.observe(bar.current);
@@ -102,6 +157,9 @@ export function CatalogPrintView({sale, only, onClose}: {sale: Sale; only?: Cata
       <div ref={bar} className="print-toolbar">
         <span className="font-bold">カタログ（介援隊）</span>
         {/* 広い画面（xl）では「印刷する」は左の空いた所に大きく（下の cat-print-side）。狭い画面はここ（ページの左に置く所がない） */}
+        <span className="xl:hidden">
+          <MarkToggle on={marking} onClick={() => void toggleMarking()} />
+        </span>
         <button
           type="button"
           onClick={() => window.print()}
@@ -134,17 +192,20 @@ export function CatalogPrintView({sale, only, onClose}: {sale: Sale; only?: Cata
         </button>
       </div>
       {/* 「印刷する」を左の空いた所に大きく（ユーザーの指示「印刷ボタンをこちらに大きくもってくる」2026-10-28。前は上の帯の題名の横の小さなボタン）。
-          紙（A4 の幅 794px）の左に 240px ほど空く広い画面（xl・1280px〜）だけ */}
-      <button
-        type="button"
-        onClick={() => window.print()}
-        disabled={!ready}
-        style={sideTop === null ? undefined : {top: sideTop}}
-        className="cat-print-side fixed left-6 top-1/2 z-[2] hidden h-36 w-44 flex-col items-center justify-center gap-2 rounded-xl bg-sky-100 text-xl font-bold text-sky-900 shadow-lg hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-40 xl:flex"
-      >
-        <span aria-hidden="true" className="text-4xl leading-none">🖨</span>
-        <span className="sr-only">🖨 </span>印刷する
-      </button>
+          紙（A4 の幅 794px）の左に 240px ほど空く広い画面（xl・1280px〜）だけ。その上に「⭕ 丸で囲む」（ユーザーの指示「カタログを丸で囲むボタンをつくる。
+          印刷ボタンと並行して作成する」2026-11-02） */}
+      <div style={sideTop === null ? undefined : {top: sideTop}} className="cat-print-side fixed left-6 top-1/2 z-[2] hidden flex-col gap-3 xl:flex">
+        <MarkToggle big on={marking} onClick={() => void toggleMarking()} />
+        <button
+          type="button"
+          onClick={() => window.print()}
+          disabled={!ready}
+          className="flex h-36 w-44 flex-col items-center justify-center gap-2 rounded-xl bg-sky-100 text-xl font-bold text-sky-900 shadow-lg hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <span aria-hidden="true" className="text-4xl leading-none">🖨</span>
+          <span className="sr-only">🖨 </span>印刷する
+        </button>
+      </div>
       <div className="print-root" style={{zoom}}>
         {picked.size === 0 && <p className="p-10 text-center text-sm text-white/80">印刷するページにチェックを入れてください</p>}
         {CATALOG.map((p, i) => {
@@ -153,7 +214,30 @@ export function CatalogPrintView({sale, only, onClose}: {sale: Sale; only?: Cata
           return (
             <div key={p.file} className={`est-sheet cat-sheet ${i === last ? 'est-last' : ''}`} aria-label={`カタログ ${catalogLabel(p)}`}>
               {pg && pg !== 'error' ? (
-                <img src={pg.url} alt={catalogLabel(p)} />
+                natural[p.file] ? (
+                  // 丸を重ねるため、絵と同じ縦横の比の箱に入れる（紙の中で縦横どちらかいっぱい・まん中。印刷の紙の高さ 296mm に収める）
+                  <div className="cat-mark-frame" style={{aspectRatio: `${natural[p.file].w} / ${natural[p.file].h}`, ...(natural[p.file].w / natural[p.file].h > 210 / 296 ? {width: '100%'} : {height: '100%'})}}>
+                    <MarkLayer
+                      marks={marks[p.file] ?? []}
+                      on={marking}
+                      onChange={(list) => setMarks(p.file, list)}
+                      selected={sel?.file === p.file ? sel.i : null}
+                      onSelect={(i) => setSel(i === null ? null : {file: p.file, i})}
+                      label={`${catalogLabel(p)}の丸`}
+                    >
+                      <img src={pg.url} alt={catalogLabel(p)} draggable={false} />
+                    </MarkLayer>
+                  </div>
+                ) : (
+                  <img
+                    src={pg.url}
+                    alt={catalogLabel(p)}
+                    onLoad={(e) => {
+                      const {naturalWidth: w, naturalHeight: h} = e.currentTarget;
+                      setNatural((n) => ({...n, [p.file]: {w, h}}));
+                    }}
+                  />
+                )
               ) : (
                 <p className="p-10 text-center text-sm text-slate-500">{pg === 'error' ? `${catalogLabel(p)} を読めませんでした` : `${catalogLabel(p)} を読み込んでいます…`}</p>
               )}

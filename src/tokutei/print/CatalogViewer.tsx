@@ -6,13 +6,17 @@
 // 画像内をうごかせるようにする。スクロールでアップと縮小をできるようにする」2026-10-27。前は −・＋ のボタンだけで、大きくすると窓の中で切れて見えた）。
 // 絵にするのは出しているページだけ（ほかのページは検索に使う文字だけを1ページずつ読む）。前は開くと14ページを一度に絵にしていて、
 // パソコンでも絵が出るまで十数秒、iPhone では開けなかった（ユーザーの話「携帯で特定福祉用具カタログを開こうとした場合に開けない」2026-10-30）。
-// スマホ（幅 640px 未満）は、窓を画面（住宅改修のタブの中では枠）いっぱいに出し、枠が画面の上に来るように動かす。2本の指で広げる・つまむと大きく・小さく
+// スマホ（幅 640px 未満）は、窓を画面（住宅改修のタブの中では枠）いっぱいに出し、枠が画面の上に来るように動かす。2本の指で広げる・つまむと大きく・小さく。
+// ページの商品には「押せる枠」（点線の枠と「＋ 選ぶ」）を重ね、押すと色・品番を選んで商品の欄に商品名・メーカー・品番・TAIS・定価が入る
+// （ユーザーの指示「カタログと商品をリンクさせて、自動的に商品名や金額などが全てはいるようにする。カタログでは、クリックできるよう認識できるようの工夫する」2026-11-02）。
+// 枠はカタログの文字の位置から（catalogItems.ts の CatalogProduct.box）。入っている商品は「✓ 入っています」
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {PointerEvent as ReactPointerEvent} from 'react';
 import {CATALOG, catalogLabel, catalogMatches, catalogPicks} from '../catalog.ts';
 import type {CatalogPagesFilter} from '../catalog.ts';
+import type {CatalogProduct, CatalogVariant} from '../catalogItems.ts';
 import type {Sale} from '../types.ts';
-import {loadCatalogPage, loadCatalogText} from './catalogPdf.ts';
+import {DPI, loadCatalogPage, loadCatalogProducts, loadCatalogText} from './catalogPdf.ts';
 import type {CatalogImage} from './catalogPdf.ts';
 
 const KEY = 'taiyo-tokutei-catalog-window-v1'; // 窓の位置・大きさ（この端末だけ）
@@ -72,8 +76,27 @@ function clampBox(b: Box): Box {
   return {w, h, x: Math.max(0, Math.min(b.x, vw - w)), y: Math.max(0, Math.min(b.y, vh - h))};
 }
 
-/** filter：出すページを絞る（商品の欄の「🔍 商品検索」で絞った商品の載っているページだけ。「✕ 全部のページ」で外す） */
-export function CatalogViewer({sale, query: initial, filter, onClose, onPrint}: {sale: Sale; query: string; filter?: CatalogPagesFilter; onClose: () => void; onPrint: (only?: CatalogPagesFilter) => void}) {
+/**
+ * filter：出すページを絞る（商品の欄の「🔍 商品検索」「📖 カタログから選ぶ」で絞った商品の載っているページだけ。「✕ 全部のページ」で外す）。
+ * onPick：ページの商品を押して色・品番を選んだとき（商品の欄に入れる。pickTo は入れる先の名前「1つ目」）
+ */
+export function CatalogViewer({
+  sale,
+  query: initial,
+  filter,
+  onClose,
+  onPrint,
+  onPick,
+  pickTo,
+}: {
+  sale: Sale;
+  query: string;
+  filter?: CatalogPagesFilter;
+  onClose: () => void;
+  onPrint: (only?: CatalogPagesFilter) => void;
+  onPick?: (p: CatalogProduct, v: CatalogVariant) => void;
+  pickTo?: string;
+}) {
   const [box, setBox] = useState<Box>(firstBox);
   const [query, setQuery] = useState(initial);
   const [only, setOnly] = useState<CatalogPagesFilter | null>(filter ?? null);
@@ -86,6 +109,10 @@ export function CatalogViewer({sale, query: initial, filter, onClose, onPrint}: 
   // 拡大・縮小したあと、マウスのあった所（px, py）の絵が同じ所に残るように動かす（cx, cy は前の大きさでの絵の上の位置）
   const anchor = useRef<{px: number; py: number; cx: number; cy: number; ratio: number} | null>(null);
   const [panning, setPanning] = useState(false);
+  // カタログの商品（押せる枠に使う。ビルドで作った文字の一覧から読むので軽い）・出しているページの絵の大きさ（画素）・色を選んでいる商品
+  const [products, setProducts] = useState<CatalogProduct[] | null>(null);
+  const [natural, setNatural] = useState<{w: number; h: number} | null>(null);
+  const [choose, setChoose] = useState<CatalogProduct | null>(null);
   /** factor 倍にする。clientX・clientY（マウスの所）を中心に。なければ枠のまん中 */
   const zoomBy = (factor: number, clientX?: number, clientY?: number) => {
     const el = viewRef.current;
@@ -149,10 +176,14 @@ export function CatalogViewer({sale, query: initial, filter, onClose, onPrint}: 
       el.removeEventListener('touchcancel', onEnd);
     };
   }, []);
-  /** ページの絵をつかんで動かす（マウス。指は今までどおりの指で動かす） */
+  /**
+   * ページの絵をつかんで動かす（マウス。指は今までどおりの指で動かす）。押せる枠の上で押して、ほとんど動かさずに離したら、その枠を押したことにする
+   * （つかんで動かすために押さえたまま離すので、そのままだと枠のボタンが押されない）
+   */
   const pan = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.pointerType !== 'mouse' || e.button !== 0) return;
     const el = e.currentTarget;
+    const hot = (e.target as HTMLElement).closest<HTMLElement>('[data-hotspot]');
     e.preventDefault();
     el.setPointerCapture(e.pointerId);
     const start = {x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop};
@@ -161,7 +192,8 @@ export function CatalogViewer({sale, query: initial, filter, onClose, onPrint}: 
       el.scrollLeft = start.left - (ev.clientX - start.x);
       el.scrollTop = start.top - (ev.clientY - start.y);
     };
-    const up = () => {
+    const up = (ev: PointerEvent) => {
+      if (hot && ev.type === 'pointerup' && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 5) hot.click();
       setPanning(false);
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
@@ -192,6 +224,30 @@ export function CatalogViewer({sale, query: initial, filter, onClose, onPrint}: 
       alive.current = false;
     };
   }, []);
+  // カタログの商品（押せる枠）。読めなくても絵は見られる
+  const picking = !!onPick;
+  useEffect(() => {
+    if (!picking) return;
+    loadCatalogProducts().then(
+      (list) => alive.current && setProducts(list),
+      () => {},
+    );
+  }, [picking]);
+  const pageProducts = useMemo(() => (products ?? []).filter((p) => p.page === CATALOG[current].page && p.box && p.variants.length), [products, current]);
+  // 見積もりに入っている品番（その商品の枠は「✓ 入っています」）
+  const inSale = new Set(sale.items.map((i) => i.code).filter(Boolean));
+  /** 商品の枠を押した：色・品番が1つならすぐ入れる。2つ以上なら選ぶ */
+  const pickProduct = (p: CatalogProduct) => (p.variants.length === 1 ? pickVariant(p, p.variants[0]) : setChoose(p));
+  const pickVariant = (p: CatalogProduct, v: CatalogVariant) => {
+    setChoose(null);
+    onPick?.(p, v);
+    // スマホは窓が画面いっぱいなので、入れたら閉じて商品の欄を見せる
+    if (narrow()) onClose();
+  };
+  useEffect(() => {
+    setNatural(null);
+    setChoose(null);
+  }, [current]);
   // 出しているページを絵にする（初めて出すときだけ。読んだ絵は覚えておく）
   useEffect(() => {
     const i = current;
@@ -329,6 +385,12 @@ export function CatalogViewer({sale, query: initial, filter, onClose, onPrint}: 
             </button>
           </span>
         )}
+        {/* 押せることが分かるように（ユーザーの指示「カタログでは、クリックできるよう認識できるようの工夫する」） */}
+        {onPick && pageProducts.length > 0 && (
+          <span className="flex items-center gap-1 rounded-md border border-sky-300 bg-sky-50 px-1.5 py-0.5 text-xs font-bold text-sky-900">
+            👆 商品を押すと{pickTo ? `「${pickTo}」に` : ''}入ります
+          </span>
+        )}
         {matches.length === 0 && <span className="text-xs text-slate-500">{texts.includes(null) ? 'さがしています…' : '見つかりません'}</span>}
         {matches.map((i) => (
           <button
@@ -352,11 +414,78 @@ export function CatalogViewer({sale, query: initial, filter, onClose, onPrint}: 
         title="ホイールで大きく・小さく、つかんで動かす"
       >
         {img ? (
-          <img src={img.url} alt={catalogLabel(CATALOG[current])} className="block max-w-none" style={{width: `${zoom * 100}%`}} draggable={false} />
+          // 押せる枠の札の字は、ページの絵の幅に合わせる（cqw。スマホの小さいページで札が商品名を隠さないように）
+          <div className="relative" style={{width: `${zoom * 100}%`, containerType: 'inline-size'}}>
+            <img
+              src={img.url}
+              alt={catalogLabel(CATALOG[current])}
+              className="block w-full max-w-none"
+              draggable={false}
+              onLoad={(e) => setNatural({w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight})}
+            />
+            {/* 商品の押せる枠：点線の枠と「＋ 選ぶ」。マウスを乗せると色が濃くなる。入っている商品は実線と「✓ 入っています」 */}
+            {onPick &&
+              natural &&
+              pageProducts.map((p) => {
+                const b = p.box!;
+                const k = DPI / 72;
+                const has = p.variants.some((v) => inSale.has(v.code));
+                const pct = (v: number, all: number) => `${((v * k) / all) * 100}%`;
+                return (
+                  <button
+                    key={p.key}
+                    type="button"
+                    data-hotspot
+                    onClick={() => pickProduct(p)}
+                    aria-label={`${p.name}を選ぶ`}
+                    title={`${p.name}（押すと商品の欄に入ります）`}
+                    className={`absolute cursor-pointer rounded-md border-2 transition-colors ${
+                      has ? 'border-teal-600 bg-teal-400/15 hover:bg-teal-400/25' : 'border-dashed border-sky-500/80 bg-sky-300/[0.07] hover:border-solid hover:bg-sky-300/25'
+                    } ${choose?.key === p.key ? '!border-solid !bg-sky-300/30' : ''}`}
+                    style={{left: pct(b.x, natural.w), top: pct(b.y, natural.h), width: pct(b.w, natural.w), height: pct(b.h, natural.h)}}
+                  >
+                    {/* 札は枠の上の線にまたがる右上（見出しの商品名にかぶらないように） */}
+                    <span
+                      style={{fontSize: 'clamp(9px, 1.7cqw, 13px)'}}
+                      className={`absolute right-1 top-0 -translate-y-1/2 whitespace-nowrap rounded-full border px-[0.6em] py-[0.15em] font-bold leading-tight shadow-sm ${
+                        has ? 'border-teal-500 bg-teal-50 text-teal-800' : 'border-sky-500 bg-white text-sky-800'
+                      }`}
+                    >
+                      {has ? '✓ 入っています' : '＋ 選ぶ'}
+                    </span>
+                  </button>
+                );
+              })}
+          </div>
         ) : (
           <p className="p-6 text-center text-sm text-slate-500">{img === null ? `${catalogLabel(CATALOG[current])} を読めませんでした` : 'カタログを読み込んでいます…'}</p>
         )}
       </div>
+      {/* 色・品番を選ぶ（押した商品に色・大きさが2つ以上あるとき）。押すと商品の欄に入る */}
+      {choose && (
+        <div role="dialog" aria-label="色・品番を選ぶ" className="absolute inset-x-2 bottom-2 z-10 max-h-[60%] overflow-auto rounded-lg border border-sky-300 bg-white p-2 shadow-xl">
+          <div className="mb-1.5 flex items-center gap-2">
+            <span className="min-w-0 text-sm font-bold text-slate-800">{choose.name}</span>
+            <button type="button" onClick={() => setChoose(null)} className="ml-auto shrink-0 rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm text-slate-600 hover:bg-slate-50" aria-label="選ぶのをやめる">
+              ✕
+            </button>
+          </div>
+          <div className="grid gap-1">
+            {choose.variants.map((v) => (
+              <button
+                key={v.code}
+                type="button"
+                onClick={() => pickVariant(choose, v)}
+                className={`flex min-h-10 items-center gap-2 rounded-md border px-2 py-1.5 text-left text-sm hover:bg-sky-50 ${inSale.has(v.code) ? 'border-teal-500 bg-teal-50' : 'border-slate-300 bg-white'}`}
+              >
+                <span className="font-bold text-slate-800">{v.label || choose.name}</span>
+                <span className="text-xs text-slate-500">{v.code}</span>
+                {v.listPrice > 0 && <span className="ml-auto whitespace-nowrap tabular-nums text-slate-700">定価 ¥{v.listPrice.toLocaleString('ja-JP')}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {/* 右下の角：つかんで大きさを変える */}
       <div
         onPointerDown={(e) => drag(e, 'size')}

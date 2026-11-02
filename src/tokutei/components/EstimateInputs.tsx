@@ -18,10 +18,10 @@ import {yen} from '../util.ts';
 import {zipLabel} from '../zip.ts';
 import type {ZipHit} from '../zip.ts';
 import {CategorySelect} from './CategorySelect.tsx';
-import {CatalogPicker, CatalogSearchButton} from './CatalogPicker.tsx';
+import {CatalogChooseButton, CatalogPicker, CatalogSearchButton} from './CatalogPicker.tsx';
 import {MakerInput} from './MakerInput.tsx';
 import {ReasonField} from './ReasonField.tsx';
-import {AddItemButton, CatalogSearch, Circles, EraBirthInput, InsuredNoInput, KanaInput} from './ShinseiParts.tsx';
+import {AddItemButton, CatalogSearch, Circles, EraBirthInput, FavoriteButton, InsuredNoInput, KanaInput} from './ShinseiParts.tsx';
 import {SuggestInput} from './Suggest.tsx';
 import {Btn, NumberInput, OptionalNumberInput, Stepper, TextInput} from './ui.tsx';
 
@@ -43,8 +43,7 @@ export function EstimateInputs({
   zips,
   setStatus,
   usedYear,
-  onPickProduct,
-  onScan,
+  onPickFavorite,
   onCatalog,
   onAddItem,
   onPickCustomer,
@@ -66,8 +65,7 @@ export function EstimateInputs({
   zips: ZipHit[];
   setStatus: (status: SaleStatus) => void;
   usedYear: {count: number; used: number; label: string} | null; // 今年度の申請（このアプリの記録）
-  onPickProduct: () => void;
-  onScan: () => void; // 「📷 スクショから自動認識」の窓を開く（scanItem.ts）
+  onPickFavorite: (itemId: string) => void; // 定価の横の「★ お気に入りから入力」：商品マスタから選んで、その欄の商品にする
   onCatalog: OpenCatalog; // 右にカタログの窓を開く（print/CatalogViewer.tsx。商品検索のときは絞ったページだけ）
   onAddItem: (item?: SaleItem) => void; // 手で入れる商品を足す（item があればその商品＝最初から開いている欄に打ったもの）
   onPickCustomer?: () => void; // 住宅改修の様邸のタブの中では渡さない（お客様の情報は様邸から入る。ユーザーの指示「赤枠の部分は不要です」2026-10-28）
@@ -138,9 +136,20 @@ export function EstimateInputs({
                 remove={() => change({items: sale.items.filter((x) => x.id !== l.item.id)})}
                 favorite={unregistered.has(l.item.id) ? () => onFavorite(l.item.id) : undefined}
                 onCatalog={onCatalog}
+                onPickFavorite={() => onPickFavorite(l.item.id)}
               />
             ))}
-            {t.lines.length === 0 && <ItemBlock key={draft.id} line={lineOf(draft, s)} no={1} makers={makers} change={(patch) => onAddItem({...draft, ...patch})} onCatalog={onCatalog} />}
+            {t.lines.length === 0 && (
+              <ItemBlock
+                key={draft.id}
+                line={lineOf(draft, s)}
+                no={1}
+                makers={makers}
+                change={(patch) => onAddItem({...draft, ...patch})}
+                onCatalog={onCatalog}
+                onPickFavorite={() => onPickFavorite(draft.id)}
+              />
+            )}
             {t.lines.length > 0 && (
               <AddItemButton
                 next={t.lines.length + 1}
@@ -152,15 +161,8 @@ export function EstimateInputs({
                 }}
               />
             )}
-            <div className="flex flex-wrap gap-2">
-              <Btn color="teal" small onClick={onPickProduct}>
-                ★ 商品を選ぶ
-              </Btn>
-              <Btn color="purple" small onClick={onScan}>
-                📷 スクショから自動認識
-              </Btn>
-              <CatalogSearch onOpen={onCatalog} />
-            </div>
+            {/* 下の「★ 商品を選ぶ」「📷 スクショから自動認識」は外した（ユーザーの指示「商品を選ぶとスクショから認識はなくす」2026-11-02）。
+                お気に入りは定価の横、カタログから検索は種目・メーカーの下（商品の欄ごと） */}
           </div>,
           'items',
         )}
@@ -395,6 +397,7 @@ function ItemBlock({
   remove,
   favorite,
   onCatalog,
+  onPickFavorite,
 }: {
   line: Line;
   no: number;
@@ -403,6 +406,7 @@ function ItemBlock({
   remove?: () => void;
   favorite?: () => void; // 手で入れた商品を★お気に入りに（まだ商品マスタにないときだけ）
   onCatalog?: OpenCatalog; // カタログの窓を開く（カタログの商品の「p.40」・商品検索で絞ったページ）
+  onPickFavorite: () => void; // 定価の横の「★ お気に入りから入力」
 }) {
   const i = l.item;
   const manual = i.productId === null;
@@ -413,7 +417,9 @@ function ItemBlock({
       {/* 種目 → メーカー・🔍 商品検索 → 商品名の順（申請書のタブと同じ。ユーザーの指示 2026-10-26・2026-11-01）。消すのは右上 */}
       <div className="flex min-w-0 items-center gap-2">
         <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-teal-100 text-xs font-bold text-teal-800">{no}</span>
-        <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => change({category, sub})} ariaLabel="種目" className="w-48" />
+        <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => change({category, sub})} ariaLabel="種目" className="w-48 min-w-0 shrink" />
+        {/* 種目の横に「📖 カタログから選ぶ」（申請書のタブと同じ。ユーザーの指示 2026-11-02） */}
+        {onCatalog && <CatalogChooseButton item={i} onCatalog={onCatalog} />}
         {remove && (
           <button type="button" onClick={remove} className="ml-auto rounded px-2 py-1 text-rose-500 hover:bg-rose-50" aria-label={`${i.name || '商品'}を消す`} title="消す">
             ✕
@@ -434,14 +440,18 @@ function ItemBlock({
           <span>{[i.maker, i.code, i.tais && `TAIS ${i.tais}`].filter(Boolean).join('　')}</span>
         )}
       </div>
+      {/* 種目・メーカーの下に「カタログから検索」（ユーザーの指示「販売の見積もりでも、メーカー名、項目名を入れた下にカタログから検索するをもってくる」2026-11-02） */}
+      {onCatalog && <CatalogSearch item={i} onCatalog={onCatalog} />}
       {/* 商品名はメーカー・商品検索の下（ユーザーの指示「メーカー名、商品検索を上にもってきて、その下に商品名をもってくる」2026-11-01） */}
       <TextInput value={i.name} onChange={(name) => change({name})} placeholder="商品名" className="ml-8 min-w-0" aria-label="商品名" />
       {/* 種目・メーカーを選ぶと、カタログのその商品の一覧（押すと商品名・品番・定価が入る） */}
       {manual && <CatalogPicker item={i} onPick={change} onCatalog={onCatalog} search={search} />}
       <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1.5 pl-8 text-xs font-bold text-slate-500">
-        定価（税抜）
+        {/* 狭い幅でお気に入りのボタンが下に折れても、見出しは定価の欄の高さに */}
+        <span className="self-start pt-2.5">定価（税抜）</span>
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <NumberInput value={i.listPrice} onChange={(listPrice) => change({listPrice})} min={0} blankZero className="w-28" ariaLabel="定価" />
+          <FavoriteButton onClick={onPickFavorite} />
           {favorite && (
             <Btn color="white" small onClick={favorite} aria-label={`${i.name}をお気に入りに登録`}>
               ☆ お気に入りに登録

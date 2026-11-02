@@ -239,3 +239,24 @@ test('商品検索：種目・項目名・メーカーで絞る（のばす音�
   assert.equal(none.byName, false);
   assert.ok(none.items.length > 0 && none.items.every((p) => p.category === '入浴補助用具' && sameMaker(p.maker, 'アロン化成')));
 });
+
+test('カタログの商品の囲みの位置（box）：カタログの窓の押せる枠。p.40 は 11 の商品が重ならずに並び、どの囲みも品番の文字を含む', async () => {
+  // ユーザーの指示「カタログと商品をリンクさせて、自動的に商品名や金額などが全てはいるようにする。カタログでは、クリックできるよう認識できるようの工夫する」2026-11-02
+  const p40 = CATALOG.find((c) => c.page === 40)!;
+  const items = await itemsOf(p40.file);
+  const list = parseCatalogPage(items, p40);
+  assert.equal(list.length, 11);
+  for (const p of list) {
+    const b = p.box!;
+    assert.ok(b && b.w > 100 && b.h > 150 && b.x >= 0 && b.y >= 0 && b.x + b.w <= 600 && b.y + b.h <= 850, `${p.name} ${JSON.stringify(b)}`);
+    // 品番の文字（PN-…）が囲みの中にある
+    const code = items.find((t) => t.s.normalize('NFKC').trim() === p.variants[0].code);
+    assert.ok(code && code.x >= b.x && code.x <= b.x + b.w && code.y >= b.y && code.y <= b.y + b.h, `${p.name} ${p.variants[0].code}`);
+  }
+  // 囲み同士は重ならない（押した所の商品が1つに決まる）
+  for (const [i, a] of list.entries())
+    for (const c of list.slice(i + 1)) {
+      const [x, y] = [Math.min(a.box!.x + a.box!.w, c.box!.x + c.box!.w) - Math.max(a.box!.x, c.box!.x), Math.min(a.box!.y + a.box!.h, c.box!.y + c.box!.h) - Math.max(a.box!.y, c.box!.y)];
+      assert.ok(x <= 2 || y <= 2, `${a.name} と ${c.name} が重なる`);
+    }
+});

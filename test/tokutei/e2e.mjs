@@ -130,10 +130,23 @@ try {
   await page.getByRole('button', {name: '＋ 行橋市'}).click();
   await page.getByRole('textbox', {name: 'お客様名', exact: true}).fill('山田 花子');
   await page.getByLabel('被保険者番号', {exact: true}).fill('0123456789');
-  await page.getByRole('button', {name: '★ 商品を選ぶ'}).click();
+  // 定価の横の「★ お気に入りから入力」：選ぶとその欄の商品になって閉じる（ユーザーの指示「お気に入りから入力をこの辺にもってくる」2026-11-02）
+  await page.getByRole('button', {name: '★ お気に入りから入力'}).last().click();
   await page.getByRole('button', {name: 'シャワーベンチ FSフィットを入れる'}).click();
+  await page.getByRole('dialog', {name: 'お気に入りから入力'}).waitFor({state: 'detached'});
+  await page.getByRole('button', {name: /^＋ \d+つ目の(福祉用具|商品)を追加$/}).click();
+  await page.getByRole('button', {name: '★ お気に入りから入力'}).last().click();
   await page.getByRole('button', {name: '浴槽台 ユクリアを入れる'}).click();
-  await page.getByRole('button', {name: '閉じる'}).last().click();
+  await page.getByRole('dialog', {name: 'お気に入りから入力'}).waitFor({state: 'detached'});
+  // 商品の欄の下の「★ 商品を選ぶ」「📷 スクショから自動認識」はなくした（ユーザーの指示「商品を選ぶとスクショから認識はなくす」2026-11-02）
+  assert.equal(await page.getByRole('button', {name: /★ 商品を選ぶ|スクショから自動認識/}).count(), 0);
+  assert.deepEqual(await page.getByLabel('商品名', {exact: true}).evaluateAll((xs) => xs.map((x) => x.value)), ['シャワーベンチ FSフィット', '浴槽台 ユクリア']);
+  // 見積もりの画面（広い幅）では、定価の欄の右に並ぶ
+  {
+    const f = await page.getByRole('button', {name: '★ お気に入りから入力'}).first().boundingBox();
+    const pr = await page.getByLabel('定価', {exact: true}).first().boundingBox();
+    assert.ok(f.x > pr.x + pr.width && Math.abs(f.y + f.height / 2 - (pr.y + pr.height / 2)) < 3, `${JSON.stringify(f)} ${JSON.stringify(pr)}`);
+  }
   // 35,000×0.8＝28,000＋税2,800＝30,800、13,800×0.8＝11,040＋税1,104＝12,144 → 42,944円。1割：4,295円（切り上げ）・保険者 38,649円
   await page.getByText('42,944円').first().waitFor();
   // 負担割合は未選択から。選ぶまで自己負担額は出さない（ユーザーの指示 2026-10-27）
@@ -394,12 +407,12 @@ try {
   await page.getByRole('tab', {name: '📄 申請書（行橋市）'}).waitFor();
   await preview.getByRole('group', {name: '用具・受領委任払', exact: true}).waitFor();
   // 申請書の画面にも「カタログから検索」。Enter は次の欄へ移らず、カタログの窓を開く
-  await page.getByRole('searchbox', {name: 'カタログから検索'}).fill('浴槽台');
-  await page.getByRole('searchbox', {name: 'カタログから検索'}).press('Enter');
+  await page.getByRole('searchbox', {name: 'カタログから検索'}).first().fill('浴槽台');
+  await page.getByRole('searchbox', {name: 'カタログから検索'}).first().press('Enter');
   await page.getByRole('dialog', {name: 'カタログ'}).waitFor();
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'カタログから検索');
   await page.getByRole('dialog', {name: 'カタログ'}).getByRole('button', {name: 'カタログを閉じる'}).click();
-  await page.getByRole('searchbox', {name: 'カタログから検索'}).fill('');
+  await page.getByRole('searchbox', {name: 'カタログから検索'}).first().fill('');
 
   // 見積もりの画面に戻る（金額のまとめ）
   await page.getByRole('tab', {name: '📋 見積もり'}).click();
@@ -521,7 +534,7 @@ try {
 
   // ---- カタログの窓（ユーザーの指示「商品を入力する際、カタログから検索という欄を入力して、右のスペースにカタログを開くことができる。
   // カタログを見ながら商品を入力できるようにする。カタログのポップは位置を移動したり、大きさを変更できるようにする」2026-10-26）
-  const catSearch = page.getByRole('searchbox', {name: 'カタログから検索'});
+  const catSearch = page.getByRole('searchbox', {name: 'カタログから検索'}).first();
   await catSearch.fill('261s1063'); // p.40 の品番（ハイフン・小文字のちがいは同じ）
   await catSearch.press('Enter');
   const viewer = page.getByRole('dialog', {name: 'カタログ'});
@@ -605,7 +618,7 @@ try {
   await viewer.getByRole('button', {name: 'カタログを閉じる'}).click();
   await viewer.waitFor({state: 'detached'});
   // 開き直すと、前に置いた所・大きさ（この端末で覚える）
-  await page.getByRole('button', {name: '📖 カタログ', exact: true}).click();
+  await page.getByRole('button', {name: '📖 カタログ', exact: true}).first().click();
   await viewer.waitFor();
   const again = await viewer.boundingBox();
   assert.ok(Math.abs(again.x - sized.x) < 2 && Math.abs(again.y - sized.y) < 2 && Math.abs(again.width - sized.width) < 2, `覚えていない ${JSON.stringify(again)}`);
@@ -985,6 +998,77 @@ try {
   await viewerPages.getByRole('button', {name: '✕ 全部のページ'}).click();
   assert.equal(await viewerPages.getByRole('button', {name: /^.+p\.\d+/}).count(), 26);
   await searchViewer.getByRole('button', {name: 'カタログを閉じる'}).click();
+  // 種目の横の「📖 カタログから選ぶ」（ユーザーの指示「入浴補助用具の横に、カタログから選ぶ。設置。項目名とメーカー名を選択すると（選択したものだけの
+  // カタログを表示）クリックするとカタログが開き、カタログと商品をリンクさせて、自動的に商品名や金額などが全てはいるようにする。カタログでは、
+  // クリックできるよう認識できるようの工夫する」2026-11-02）：種目・メーカーのページだけの窓。ページの商品に押せる枠（＋ 選ぶ）。押して色を選ぶと入る
+  await catForm.getByRole('button', {name: '📖 カタログから選ぶ'}).click();
+  const pickViewer = page.getByRole('dialog', {name: 'カタログ'});
+  await pickViewer.waitFor();
+  const pickPages = await pickViewer.getByRole('group', {name: 'カタログのページ'}).getByRole('button', {name: /p\.\d+/}).allInnerTexts();
+  assert.ok(pickPages.length >= 2 && pickPages.every((t) => /パナソニック/.test(t)), pickPages.join(' | '));
+  await pickViewer.getByText('👆 商品を押すと「1つ目」に入ります').waitFor();
+  const midHot = pickViewer.getByRole('button', {name: 'シャワーチェアAir ミドルSPワンタッチを選ぶ'});
+  await midHot.waitFor({timeout: 30000});
+  assert.equal(await pickViewer.locator('[data-hotspot]').count(), 11); // p.40 の 11 の商品
+  assert.equal(await midHot.locator('span').innerText(), '＋ 選ぶ');
+  await page.screenshot({path: `${out}/05j-catalog-hotspots.png`});
+  await midHot.click();
+  const chooser = pickViewer.getByRole('dialog', {name: '色・品番を選ぶ'});
+  await chooser.waitFor();
+  assert.equal(await chooser.getByRole('button').filter({hasText: /PN-L4183/}).count(), 3);
+  await chooser.getByRole('button', {name: /オレンジ/}).click();
+  await chooser.waitFor({state: 'detached'});
+  assert.equal(await catForm.getByLabel('商品名').inputValue(), 'シャワーチェアAir ミドルSPワンタッチ オレンジ');
+  assert.equal(await catForm.getByLabel('品番').inputValue(), 'PN-L41831D');
+  assert.ok(Number((await catForm.getByLabel('定価').inputValue()).replace(/[^\d]/g, '')) > 0);
+  assert.equal(await midHot.locator('span').innerText(), '✓ 入っています'); // 入れた商品の枠
+  await page.screenshot({path: `${out}/05k-catalog-picked.png`});
+  await pickViewer.getByRole('button', {name: 'カタログを閉じる'}).click();
+  // 「カタログから検索」は商品の欄ごとに、種目・メーカーのすぐ下・商品名の上。「★ お気に入りから入力」は定価の横（ユーザーの指示 2026-11-02）
+  const yOf = async (loc) => (await loc.boundingBox()).y;
+  const catRow = catForm.getByRole('searchbox', {name: 'カタログから検索'});
+  assert.equal(await catRow.count(), 1);
+  assert.ok((await yOf(catForm.getByLabel('メーカー').first())) < (await yOf(catRow)) && (await yOf(catRow)) < (await yOf(catForm.getByLabel('商品名'))));
+  // 狭い幅（申請書のタブ）では定価の欄のすぐ下に折れる
+  const favBox = await catForm.getByRole('button', {name: '★ お気に入りから入力'}).boundingBox();
+  const priceBox = await catForm.getByLabel('定価').boundingBox();
+  assert.ok(favBox.x >= priceBox.x - 1 && favBox.y >= priceBox.y && favBox.y < priceBox.y + priceBox.height + 12, `${JSON.stringify(favBox)} ${JSON.stringify(priceBox)}`);
+  // 商品名・品番を打って Enter：その言葉のページ。ページの商品を押すと、この欄に入る（2つ目にはならない）
+  await catRow.fill('PN-L41431A');
+  await catRow.press('Enter');
+  const rowViewer = page.getByRole('dialog', {name: 'カタログ'});
+  await rowViewer.getByText('👆 商品を押すと「1つ目」に入ります').waitFor();
+  await rowViewer.getByRole('button', {name: 'シャワーチェアAir コンパクトSPワンタッチを選ぶ'}).click({timeout: 30000});
+  await rowViewer.getByRole('dialog', {name: '色・品番を選ぶ'}).getByRole('button', {name: /ブルー/}).click();
+  assert.equal(await catForm.getByLabel('品番').inputValue(), 'PN-L41431A');
+  assert.equal(await catForm.getByLabel('商品名').count(), 1);
+  await page.screenshot({path: `${out}/05l-catalog-row-search.png`});
+  // カタログの印刷の「⭕ 丸で囲む」（ユーザーの指示「カタログを丸で囲むボタンをつくる。印刷ボタンと並行して作成する」2026-11-02）：
+  // 「印刷する」のすぐ上。初めて押すと見積もりの商品（PN-L41431A）に丸。なぞると丸を足す・✕ で消す・Ctrl+Z で戻す
+  await rowViewer.getByRole('button', {name: '🖨 印刷'}).click();
+  await page.waitForFunction(() => [...document.querySelectorAll('.cat-sheet img')].some((i) => i.complete && i.naturalWidth > 1000), null, {timeout: 60000});
+  const markBtn = page.locator('.cat-print-side').getByRole('button', {name: '⭕ 丸で囲む'});
+  const sidePrint = await page.locator('.cat-print-side').getByRole('button', {name: /印刷する/}).boundingBox();
+  const markBox = await markBtn.boundingBox();
+  assert.ok(markBox.y + markBox.height <= sidePrint.y && Math.abs(markBox.x - sidePrint.x) < 2, `${JSON.stringify(markBox)} ${JSON.stringify(sidePrint)}`);
+  await markBtn.click();
+  assert.equal(await markBtn.getAttribute('aria-pressed'), 'true');
+  const marks = page.locator('.cat-sheet [data-mark]');
+  await page.waitForFunction(() => document.querySelectorAll('.cat-sheet [data-mark]').length === 1, null, {timeout: 30000});
+  const markArea = await page.locator('.cat-mark-box').first().boundingBox();
+  await page.mouse.move(markArea.x + markArea.width * 0.55, markArea.y + 300);
+  await page.mouse.down();
+  await page.mouse.move(markArea.x + markArea.width * 0.8, markArea.y + 420, {steps: 5});
+  await page.mouse.up();
+  assert.equal(await marks.count(), 2);
+  await page.getByRole('button', {name: '丸を消す'}).click();
+  assert.equal(await marks.count(), 1);
+  await page.keyboard.press('Control+z');
+  assert.equal(await marks.count(), 2);
+  await page.screenshot({path: `${out}/05m-catalog-marks.png`});
+  await page.locator('.print-overlay').getByRole('button', {name: '閉じる', exact: true}).click();
+  await rowViewer.getByRole('button', {name: 'カタログを閉じる'}).click();
+  await catRow.fill('');
   // 合う商品がなければ、種目・メーカーの商品（知らせる）
   await catForm.getByLabel('商品名').fill('みほんのなまえ');
   await catForm.getByRole('button', {name: '🔍 商品検索'}).click();

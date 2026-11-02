@@ -6,8 +6,8 @@ import {parseCatalogPage} from '../catalogItems.ts';
 import type {CatalogProduct, PdfText} from '../catalogItems.ts';
 import {openPdf} from '../import/pdfText.ts';
 
-/** 印刷の細かさ（A4 で 200dpi ＝ 1654×2339 ほど） */
-const DPI = 200;
+/** 印刷の細かさ（A4 で 200dpi ＝ 1654×2339 ほど）。カタログの窓の押せる枠は、ページの pt をこの倍率で絵の画素にする */
+export const DPI = 200;
 
 export type CatalogImage = {url: string; codes: Set<string>; text: string}; // text：ページの文字（カタログから検索に使う）
 

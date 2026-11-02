@@ -9,8 +9,10 @@ import {saveShinsei, useTemplate} from '../shinseiFiles.ts';
 import {FIELD_LABEL, missingFields, shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField} from '../shinseiPreview.ts';
 import type {CatalogAsk} from '../jutaku.ts';
-import type {CatalogPagesFilter} from '../catalog.ts';
-import type {AppData, Sale, SaleItem, SaleStatus} from '../types.ts';
+import type {CatalogPagesFilter, OpenCatalog} from '../catalog.ts';
+import {catalogItemPatch} from '../catalogItems.ts';
+import type {CatalogProduct, CatalogVariant} from '../catalogItems.ts';
+import type {AppData, Product, Sale, SaleItem, SaleStatus} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {todayIso, yen} from '../util.ts';
 import {fiscalYearOf} from '../wareki.ts';
@@ -24,7 +26,6 @@ import {ShinseiPrintView} from '../print/PrintView.tsx';
 import {CustomerPicker} from './CustomerPicker.tsx';
 import {EstimateInputs} from './EstimateInputs.tsx';
 import {ProductPicker} from './ProductPicker.tsx';
-import {ScanDialog} from './ScanDialog.tsx';
 import {ShinseiInputs} from './ShinseiInputs.tsx';
 import {ShinseiPanel, useShinseiExcel} from './ShinseiPanel.tsx';
 import {ShinseiPages} from './ShinseiPreview.tsx';
@@ -58,10 +59,11 @@ export function SaleEditor({
   catalogAsk?: CatalogAsk | null; // 住宅改修の様邸の画面の左の「📖 カタログを表示」「🖨 カタログを印刷」（App.tsx）
 }) {
   const toast = useToast();
-  const [picking, setPicking] = useState(false);
+  // 定価の横の「★ お気に入りから入力」で開いた商品の欄（id。選ぶとその欄の商品になる）
+  const [picking, setPicking] = useState<string | null>(null);
   const [pickingCustomer, setPickingCustomer] = useState(false);
-  // 「📷 スクショから自動認識」の窓（scanItem.ts）
-  const [scanning, setScanning] = useState(false);
+  // 「📷 スクショから自動認識」はなくした（ユーザーの指示「商品を選ぶとスクショから認識はなくす」2026-11-02。戻すときは git の 1ef1d44 の
+  // scanItem.ts・components/ScanDialog.tsx・test/tokutei/e2e-scan.mjs と、受注簿ツールの ?embed=scan）
   // 住所から自動で入れた郵便番号（手で直した番号は、住所を直しても変えない）
   const autoZip = useRef('');
   const s = data.settings;
@@ -240,8 +242,42 @@ export function SaleEditor({
   const [printingCatalog, setPrintingCatalog] = useState<{only?: CatalogPagesFilter} | null>(null);
   // 「🧾 売上伝票依頼書」の窓（UriageDialog.tsx）
   const [uriageOpen, setUriageOpen] = useState(false);
-  // カタログの窓（print/CatalogViewer.tsx）。「カタログから検索」に打った字で開く
-  const [catalogView, setCatalogView] = useState<{query: string; filter?: CatalogPagesFilter} | null>(null);
+  // カタログの窓（print/CatalogViewer.tsx）。「カタログから検索」に打った字で開く。target：ページの商品を押したときに入れる商品の欄
+  const [catalogView, setCatalogView] = useState<{query: string; filter?: CatalogPagesFilter; target?: string} | null>(null);
+  const openCatalog: OpenCatalog = (query, filter, target) => setCatalogView({query, filter, target});
+  /**
+   * カタログの窓でページの商品を押して色・品番を選んだ：商品の欄に商品名・メーカー・品番・TAIS・定価・種目を入れる（販売金額は定価×割引率）。
+   * 入れる先は、開いた商品の欄（「📖 カタログから選ぶ」・商品の一覧の「カタログで見る」）。なければ空いた手入れの欄、それもなければ新しい欄。
+   * 同じ窓でもう一度押すと、同じ欄を入れ替える（選び直し）。開いた欄がまだない（初めの1つ目）ときは、新しい欄を作ってそこを入れる先にする
+   * （ユーザーの指示「クリックするとカタログが開き、カタログと商品をリンクさせて、自動的に商品名や金額などが全てはいるようにする」2026-11-02）
+   */
+  const catalogTarget = catalogView?.target ? sale.items.find((i) => i.id === catalogView.target) : sale.items.find((i) => i.productId === null && !i.name.trim());
+  const pickFromCatalog = (p: CatalogProduct, v: CatalogVariant) => {
+    const name = [p.name, v.label].filter(Boolean).join(' ');
+    if (catalogTarget) {
+      change({items: sale.items.map((i) => (i.id === catalogTarget.id ? {...i, ...catalogItemPatch(p, v, i), productId: null} : i))});
+      setCatalogView((c) => c && {...c, target: catalogTarget.id});
+      toast(`${sale.items.indexOf(catalogTarget) + 1}つ目に入れました：${name}`);
+      return;
+    }
+    const b = blankItem(s);
+    const added = {...b, ...catalogItemPatch(p, v, b)};
+    change({items: [...sale.items, added]});
+    setCatalogView((c) => c && {...c, target: added.id});
+    toast(`${sale.items.length + 1}つ目に入れました：${name}`);
+  };
+  // 窓の「👆 商品を押すと「1つ目」に入ります」の名前
+  const pickTo = `${catalogTarget ? sale.items.indexOf(catalogTarget) + 1 : sale.items.length + 1}つ目`;
+  /**
+   * 定価の横の「★ お気に入りから入力」で選んだ商品を、その欄の商品にする（ユーザーの指示「お気に入りから入力をこの辺にもってくる」2026-11-02）。
+   * 数量・福祉用具が必要な理由はそのまま。まだない欄（最初から開いている空の欄）なら足す
+   */
+  const pickFavorite = (itemId: string, p: Product) => {
+    const item = itemFromProduct(p, s);
+    const at = sale.items.find((i) => i.id === itemId);
+    change({items: at ? sale.items.map((i) => (i.id === itemId ? {...item, id: i.id, qty: i.qty, reason: i.reason} : i)) : [...sale.items, item]});
+    update('products', (list) => markUsed(list, p.id));
+  };
   useEffect(() => {
     if (!catalogAsk) return;
     if (catalogAsk.action === 'print') setPrintingCatalog({});
@@ -441,9 +477,8 @@ export function SaleEditor({
             changeAddress={changeAddress}
             changeZip={changeZip}
             zips={zips}
-            onPickProduct={() => setPicking(true)}
-            onScan={() => setScanning(true)}
-            onCatalog={(query, filter) => setCatalogView({query, filter})}
+            onPickFavorite={setPicking}
+            onCatalog={openCatalog}
             onAddItem={(item) => change({items: [...sale.items, item ?? blankItem(s)]})}
             onPickCustomer={fixedView ? undefined : () => setPickingCustomer(true)}
             onFavorite={(id) => favorite([id])}
@@ -481,9 +516,8 @@ export function SaleEditor({
             zips={zips}
             setStatus={setStatus}
             usedYear={prevYear.length ? {count: prevYear.length, used: usedYear, label: `${fy ?? ''}年度`} : null}
-            onPickProduct={() => setPicking(true)}
-            onScan={() => setScanning(true)}
-            onCatalog={(query, filter) => setCatalogView({query, filter})}
+            onPickFavorite={setPicking}
+            onCatalog={openCatalog}
             onAddItem={(item) => change({items: [...sale.items, item ?? blankItem(s)]})}
             onPickCustomer={fixedView ? undefined : () => setPickingCustomer(true)}
             onFavorite={(id) => favorite([id])}
@@ -581,14 +615,6 @@ export function SaleEditor({
         </div>
       )}
 
-      {scanning && (
-        <ScanDialog
-          settings={s}
-          makers={makerChoices(data.products, data.sales)}
-          onAdd={(item) => update('sales', (list) => list.map((x) => (x.id === sale.id ? {...x, items: [...x.items, item], updatedAt: Date.now()} : x)))}
-          onClose={() => setScanning(false)}
-        />
-      )}
       {printingShinsei && pages && pages.length > 0 && (
         <ShinseiPrintView
           pages={pages}
@@ -602,19 +628,30 @@ export function SaleEditor({
           }
         />
       )}
-      {catalogView && <CatalogViewer sale={sale} query={catalogView.query} filter={catalogView.filter} onClose={closeCatalog} onPrint={(only) => setPrintingCatalog({only})} />}
+      {catalogView && (
+        <CatalogViewer
+          sale={sale}
+          query={catalogView.query}
+          filter={catalogView.filter}
+          onClose={closeCatalog}
+          onPrint={(only) => setPrintingCatalog({only})}
+          onPick={pickFromCatalog}
+          pickTo={pickTo}
+        />
+      )}
       {printingCatalog && <CatalogPrintView sale={sale} only={printingCatalog.only} onClose={() => setPrintingCatalog(null)} />}
       {uriageOpen && <UriageDialog sale={sale} settings={s} change={change} onClose={() => setUriageOpen(false)} />}
       {pickingCustomer && <CustomerPicker sales={data.sales} current={sale} onPick={pickCustomer} onClose={() => setPickingCustomer(false)} />}
       {picking && (
         <ProductPicker
+          title="お気に入りから入力"
           products={data.products}
           settings={s}
-          onClose={() => setPicking(false)}
+          onClose={() => setPicking(null)}
           onToggleFavorite={(p) => update('products', (list) => list.map((x) => (x.id === p.id ? {...x, favorite: !x.favorite, updatedAt: Date.now()} : x)))}
           onPick={(p) => {
-            update('sales', (list) => list.map((x) => (x.id === sale.id ? {...x, items: [...x.items, itemFromProduct(p, s)], updatedAt: Date.now()} : x)));
-            update('products', (list) => markUsed(list, p.id));
+            pickFavorite(picking, p);
+            setPicking(null);
           }}
         />
       )}

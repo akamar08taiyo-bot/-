@@ -4,10 +4,13 @@
 //   生年月日は 明治・大正・昭和（初めは昭和）と 年・月・日、郵便番号は 〒。Enter で次の欄（data-nav）
 import {Fragment, useEffect, useRef, useState} from 'react';
 import type {InputHTMLAttributes, KeyboardEvent} from 'react';
+import type {OpenCatalog} from '../catalog.ts';
 import {padInsuredNo} from '../shinsei.ts';
+import type {SaleItem} from '../types.ts';
 import {toKatakana} from '../util.ts';
 import {fromWareki, warekiOf} from '../wareki.ts';
-import {TextInput} from './ui.tsx';
+import {itemCatalogFilter} from './CatalogPicker.tsx';
+import {Btn, TextInput} from './ui.tsx';
 
 /** 丸のボタンで1つ選ぶ（住宅改修の Circles と同じ形）。clearable なら、選んでいるものをもう一度押すと外す */
 export function Circles<T extends string | number>({
@@ -148,7 +151,7 @@ export function EraBirthInput({value, onChange}: {value: string; onChange: (iso:
 }
 
 /**
- * 2つ目からの商品を足すボタン。前は小さな白い「＋ 追加」で、★ 商品を選ぶ・📷 スクショから自動認識の色のボタンに並んで見つけにくかった
+ * 2つ目からの商品を足すボタン。前は小さな白い「＋ 追加」で、★ 商品を選ぶ・📷 スクショから自動認識（どちらも 2026-11-02 に外した）の色のボタンに並んで見つけにくかった
  * （ユーザーの指示「追加のボタンはもう少しわかりやすいようにしてください」2026-10-26）→ 最後の商品のすぐ下に、横いっぱいの点線の枠で「＋ 2つ目の福祉用具を追加」。
  * 押したら、足した商品の種目の欄へ移る（足したことが分かるように）。onAdd は足した商品の id を返す（商品の枠に data-item）
  */
@@ -175,13 +178,16 @@ export function AddItemButton({next, noun, onAdd}: {next: number; noun: string; 
 
 /**
  * 「カタログから検索」の欄（ユーザーの指示「商品を入力する際、カタログから検索という欄を入力して、右のスペースにカタログを開くことができる。
- * カタログを見ながら商品を入力できるようにする」2026-10-26）。★ 商品を選ぶ・📷 の右。商品名・品番を打って Enter か「📖 カタログ」で、
- * 右にカタログの窓（print/CatalogViewer.tsx）を開く。空のまま押すと、見積もりの商品の載っているページを出す
+ * カタログを見ながら商品を入力できるようにする」2026-10-26）。商品の欄ごとに、種目・メーカーのすぐ下（ユーザーの指示「販売の見積もりでも、
+ * メーカー名、項目名を入れた下にカタログから検索するをもってくる」2026-11-02。前は商品の欄の下の ★ 商品を選ぶ・📷 の右に1つだけ）。
+ * 商品名・品番を打って Enter か「📖 カタログ」で、右にカタログの窓（print/CatalogViewer.tsx）を開く。窓のページの商品を押すと、この欄に入る。
+ * 空のまま押すと、種目・品目・メーカーで絞ったページ（何も選んでいなければ全部のページ。「📖 カタログから選ぶ」と同じ）
  */
-export function CatalogSearch({onOpen}: {onOpen: (query: string) => void}) {
+export function CatalogSearch({item, onCatalog}: {item: SaleItem; onCatalog: OpenCatalog}) {
   const [q, setQ] = useState('');
+  const open = async () => (q.trim() ? onCatalog(q, undefined, item.id) : onCatalog('', await itemCatalogFilter(item), item.id));
   return (
-    <span className="flex min-w-0 flex-1 basis-56 items-center gap-1">
+    <span className="flex min-w-0 items-center gap-1 pl-8">
       <input
         type="search"
         value={q}
@@ -191,16 +197,28 @@ export function CatalogSearch({onOpen}: {onOpen: (query: string) => void}) {
           if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
           e.preventDefault();
           e.stopPropagation();
-          onOpen(q);
+          void open();
         }}
         placeholder="カタログから検索"
         aria-label="カタログから検索"
-        className="h-8 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 text-sm"
+        className="h-9 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 text-sm"
       />
-      <button type="button" onClick={() => onOpen(q)} className="h-8 shrink-0 rounded-md border border-slate-300 bg-white px-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+      <button type="button" onClick={() => void open()} className="h-9 shrink-0 rounded-md border border-slate-300 bg-white px-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">
         📖 カタログ
       </button>
     </span>
+  );
+}
+
+/**
+ * 定価の横の「★ お気に入りから入力」（ユーザーの指示「お気に入りから入力をこの辺にもってくる」2026-11-02。前は商品の欄の下の「★ 商品を選ぶ」で、
+ * 選ぶと新しい商品の行が増えた）。商品マスタの★お気に入り（なければすべて）から選ぶと、この欄の商品になる（SaleEditor の pickFavorite）
+ */
+export function FavoriteButton({onClick}: {onClick: () => void}) {
+  return (
+    <Btn color="teal" small onClick={onClick}>
+      ★ お気に入りから入力
+    </Btn>
   );
 }
 

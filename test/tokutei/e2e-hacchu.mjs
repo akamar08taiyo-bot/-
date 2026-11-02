@@ -103,10 +103,14 @@ try {
   await page.getByLabel('電話').fill('0930-00-0000');
   await page.getByLabel('納品日').fill('2026-10-30');
   await page.getByRole('combobox', {name: '担当'}).selectOption('土居 翔太');
-  await page.getByRole('button', {name: '★ 商品を選ぶ'}).click();
+  // 定価の横の「★ お気に入りから入力」：選ぶとその欄の商品になって閉じる（ユーザーの指示「お気に入りから入力をこの辺にもってくる」2026-11-02）
+  await page.getByRole('button', {name: '★ お気に入りから入力'}).last().click();
   await page.getByRole('button', {name: 'シャワーチェア 見本Aを入れる'}).click();
+  await page.getByRole('dialog', {name: 'お気に入りから入力'}).waitFor({state: 'detached'});
+  await page.getByRole('button', {name: /^＋ \d+つ目の(福祉用具|商品)を追加$/}).click();
+  await page.getByRole('button', {name: '★ お気に入りから入力'}).last().click();
   await page.getByRole('button', {name: '浴槽台 見本Bを入れる'}).click();
-  await page.getByRole('button', {name: '閉じる'}).last().click();
+  await page.getByRole('dialog', {name: 'お気に入りから入力'}).waitFor({state: 'detached'});
   await page.getByText('27,808円').first().waitFor();
   // 負担割合は未選択から（2026-10-27）。選ぶまで「📤 販売受注簿に転記」は送らない
   await page.getByRole('group', {name: '負担割合', exact: true}).first().getByRole('button', {name: '1割'}).click();
@@ -190,9 +194,9 @@ try {
   await page.getByRole('button', {name: '📝 見積もり・申請'}).click();
   await page.getByRole('button', {name: '＋ 行橋市'}).click();
   await page.getByRole('textbox', {name: 'お客様名', exact: true}).fill('見本 次郎');
-  await page.getByRole('button', {name: '★ 商品を選ぶ'}).click();
+  await page.getByRole('button', {name: '★ お気に入りから入力'}).last().click();
   await page.getByRole('button', {name: 'シャワーチェア 見本Aを入れる'}).click();
-  await page.getByRole('button', {name: '閉じる'}).last().click();
+  await page.getByRole('dialog', {name: 'お気に入りから入力'}).waitFor({state: 'detached'});
   await page.getByText('13,904円').first().waitFor();
   const queue = () => page.evaluate(() => JSON.parse(localStorage.getItem('taiyo-hacchu-import-queue-v1') ?? '[]'));
   assert.deepEqual(await queue(), []);
