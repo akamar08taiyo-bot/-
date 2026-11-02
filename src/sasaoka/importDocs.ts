@@ -10,6 +10,7 @@
 
 import {estimateTotals, hasEstimateRows, isBlankRow, overheadAuto} from './calc.ts';
 import {CARE_LINE} from './careLines.ts';
+import {plateFromText} from './cutLink.ts';
 import type {EstimateSettings} from './calc.ts';
 import {jobInsurer, KINDS, NO_SHINSEI} from './estimateForms.ts';
 import {readRiyuBook, NO_RIYU} from './riyu.ts';
@@ -132,6 +133,9 @@ export function placeFromShinsei(sp: ShinseiPlace): Place {
     take('L', true, 'l', true);
     take('H', true, 'h');
   }
+  // 手すりの取り付けのベースプレートの行（「ベースプレート　L=1300mm」）は、ベースプレートの長さの欄に（申請書のタブの「＋ ベースプレート」。2026-11-02）
+  const plate = sp.kind === 1 ? plateFromText(rest) : null;
+  if (plate) rest = plate.rest;
   if (sp.kind === 2) {
     take('W', false, 'w');
     take('D', false, 'd');
@@ -139,7 +143,14 @@ export function placeFromShinsei(sp: ShinseiPlace): Place {
   }
   const other = rest.replace(/^[\s　]+|[\s　]+$/g, '').replace(/[\s　]{2,}/g, '　');
   // 空白の行を1つ（申請書のタブで足した箇所と同じ。ShinseiEditor.tsx。行のない箇所は申請書・見積書に出ない）
-  return {...newPlace(sp.name, [manualRow('material')]), kind: sp.kind || 1, photo: sp.photo, ...(Object.keys(dims).length ? {dims} : {}), ...(other ? {shinseiText: other} : {})};
+  return {
+    ...newPlace(sp.name, [manualRow('material')]),
+    kind: sp.kind || 1,
+    photo: sp.photo,
+    ...(Object.keys(dims).length ? {dims} : {}),
+    ...(plate ? {plateLength: plate.bp} : {}),
+    ...(other ? {shinseiText: other} : {}),
+  };
 }
 
 const base = (file: string, hash: string, kind: DocKind): ReadDoc => ({
@@ -758,7 +769,7 @@ export function applyImport(baseJob: Job | null, docs: ReadDoc[], name: string, 
       for (const p of d.places) {
         const i = job.places.findIndex((q) => samePlace(q, p));
         if (i < 0) job.places.push(p);
-        else job.places[i] = fill(job.places[i], {dims: p.dims, shinseiText: p.shinseiText, photo: job.places[i].photo ? undefined : p.photo});
+        else job.places[i] = fill(job.places[i], {dims: p.dims, plateLength: p.plateLength, shinseiText: p.shinseiText, photo: job.places[i].photo ? undefined : p.photo});
       }
       if (d.total) costs += d.total;
     }

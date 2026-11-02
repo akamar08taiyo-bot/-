@@ -12,13 +12,13 @@ import type {KeyboardEvent, ReactNode, RefObject} from 'react';
 import {isBlankRow, jobName} from '../calc.ts';
 import {Btn, KanaInput, TextInput, useToast} from '../components/ui.tsx';
 import {circled, eraOf, INSURER_IDS, INSURER_INFO, insurerForAddress, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, photoNumbers} from '../estimateForms.ts';
-import {placeFromDims, withBrackets} from '../cutLink.ts';
+import {placeFromDims, plateFromText, withBrackets} from '../cutLink.ts';
 import {manualRow, newPlace} from '../rows.ts';
 import {usePhotoUrls} from '../photos.ts';
 import {turn} from '../photoEdit.ts';
 import {AREA_LABEL, INSURER_AREAS, insurerNoOf} from '../insurerNumbers.ts';
 import {photoBounds} from '../photoMarks.ts';
-import {costIsTotal, estimateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, planPlacement, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
+import {costIsTotal, estimateLength, estimatePlateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, planPlacement, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
 import type {AppData, Insurer, Job, Material, PhotoEdit, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
@@ -783,8 +783,37 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
       if (!v.trim()) delete dims[key];
       const {dims: _old, ...rest} = x;
       const next: Place = Object.keys(dims).length ? {...rest, dims} : rest;
+      // 手すり・ベースプレートの長さは、見積書の手すり・ベースプレートの使う長さにする（`placeFromDims`）
       return key === 'l' ? withBrackets(x, placeFromDims(next), materials) : next;
     });
+  // ベースプレートの長さ（「＋ ベースプレート」）。見積書のベースプレートの使う長さにする（空にしたら手すりと同じ長さ。`placeFromDims`）
+  const setPlate = (id: string, v: string) =>
+    setPlace(id, (x) => {
+      const {plateLength: _old, ...rest} = x;
+      const next: Place = v.trim() ? {...rest, plateLength: v} : rest;
+      return withBrackets(x, placeFromDims(next), materials);
+    });
+  /**
+   * 「＋ ベースプレート」：ベースプレートの長さの欄を開く（ユーザーの指示「ベースプレートをいれる場合は、追加ボタンを押して、長さの欄にベースプレートの正確な長さをいれる、
+   * 入れたら、自動的に見積もりの方でも長さを汲み取り、見積金額に反映する」2026-11-02）。そのほかに「ベースプレート　1300mm」と打ってあれば、その長さを移す
+   */
+  const openPlate = (p: Place) => {
+    const moved = plateFromText(p.shinseiText);
+    if (moved)
+      setPlace(p.id, (x) => {
+        const {shinseiText: _t, ...rest} = x;
+        const next: Place = {...rest, ...(moved.rest ? {shinseiText: moved.rest} : {}), plateLength: moved.bp};
+        return withBrackets(x, placeFromDims(next), materials);
+      });
+    // そのほかが空になったら、そのほかの欄は閉じる
+    if (moved && !moved.rest)
+      setOpenKeys((o) => {
+        const next = new Set(o);
+        next.delete(`${p.id}:other`);
+        return next;
+      });
+    openField(`${p.id}:bp`);
+  };
   // 見積書に箇所が出るように、空白の行を1つ入れておく（見積書で部材・施工費を入れていける）。
   // 足した箇所の寸法（手すりは長さ）にすぐ打ち込めるように、そこへ移る（ユーザーの指示「廊下、玄関など選択すると、長さの部分をすぐに入力できるようにする。とべるようにする」）。
   // 「＋ そのほか」は改修場所の名前から
@@ -828,7 +857,7 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
     const has = [
       p.photos?.before || p.photos?.after ? '写真' : '',
       p.photoDates?.before || p.photoDates?.after ? '撮影日' : '',
-      Object.values(p.dims ?? {}).some((v) => v?.trim()) ? '寸法' : '',
+      Object.values(p.dims ?? {}).some((v) => v?.trim()) || p.plateLength?.trim() ? '寸法' : '',
       p.shinseiText?.trim() ? 'そのほか' : '',
       p.photoNote?.trim() ? '写真に書く内容' : '',
     ].filter(Boolean);
@@ -847,6 +876,7 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
             );
             const showOther = openKeys.has(`${p.id}:other`) || !!p.shinseiText?.trim();
             const showHeight = openKeys.has(`${p.id}:h`) || !!p.dims?.h?.trim();
+            const showPlate = openKeys.has(`${p.id}:bp`) || !!p.plateLength?.trim();
             return (
               <div key={p.id} data-place={p.id} role="listitem" aria-label={`${n ? circled(n) : ''}${p.name || '改修場所'}`} className="border-t border-slate-100 py-2 first:border-t-0 first:pt-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -884,6 +914,32 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
                       ) : (
                         <button type="button" onClick={() => openField(`${p.id}:h`)} className={plusBtn}>
                           ＋ 高さ（任意）
+                        </button>
+                      )}
+                      {/* ベースプレートの長さ（入れると見積書のベースプレートの長さ・金額に。空なら手すりと同じ長さ）。薄い字は見積書のいまの長さ */}
+                      {showPlate ? (
+                        <span className="inline-flex items-center gap-0.5">
+                          <Dim
+                            label="ベースプレート"
+                            value={p.plateLength ?? ''}
+                            placeholder={estimatePlateLength(p)}
+                            wide
+                            autoFocus={opened === `${p.id}:bp`}
+                            onChange={(v) => setPlate(p.id, v)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => closeField(`${p.id}:bp`, 'ベースプレート', p.plateLength ?? '', () => setPlate(p.id, ''))}
+                            className={closeBtn}
+                            aria-label="ベースプレートを閉じる"
+                            title="ベースプレートを閉じる（入れた長さは消えます）"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ) : (
+                        <button type="button" onClick={() => openPlate(p)} className={plusBtn}>
+                          ＋ ベースプレート
                         </button>
                       )}
                     </>

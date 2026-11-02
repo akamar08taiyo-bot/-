@@ -12,8 +12,8 @@ import {CARE_RED, careLines, showsCareLines} from '../careLines.ts';
 import {BurdenPicker} from './ShinseiEditor.tsx';
 import {estimateDateOf} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
-import {fillAdded, withBrackets} from '../cutLink.ts';
-import {addMaterial, insertRowsAt, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
+import {fillAdded, placeAfterQty, withBrackets} from '../cutLink.ts';
+import {addMaterial, changeRowQty, insertRowsAt, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
 import {jutakuSalesMonth, withBillMonth, withSalesMonth} from '../salesPlan.ts';
 import type {AppData, Insurer, Job, Kit, Material, NameSuffix, Place, ShinseiInfo} from '../types.ts';
 import type {Update} from '../useStore.ts';
@@ -86,10 +86,16 @@ export function EstimateEditor({
     setJob((j) => ({...j, places: [...j.places, p]}));
     return p.id;
   };
+  // 部材を選ぶ画面で最後に入れた行。閉じたら見積書でその行を選ぶ（続けて「施工費から入れる」と、その部材の同上施工費になる。
+  // 前は前に選んでいた行のままで、2か所目の手すりの施工費が1か所目に入った。ユーザーの指示「1箇所につき、部材をのせていく」2026-11-02）
+  const lastAdded = useRef<string | null>(null);
+  const [focusRow, setFocusRow] = useState<{id: string; n: number} | null>(null);
   // 作った箇所に何も入れずに閉じたら、その箇所は消す（空の箇所を残すと、いちばん下の行がその箇所になる）
   const closePicker = () => {
     const id = created.current;
     created.current = null;
+    if (lastAdded.current) setFocusRow({id: lastAdded.current, n: Date.now()});
+    lastAdded.current = null;
     setPicker(null);
     const unused = (p: Place) => p.id === id && p.rows.length === 0 && !p.name.trim();
     if (id && job.places.some(unused)) setJob((j) => ({...j, places: j.places.filter((p) => !unused(p))}));
@@ -315,6 +321,7 @@ export function EstimateEditor({
         onPickKit={(placeId, rowId) => setPicker({placeId: placeFor(placeId), kind: 'kit', at: placeId ? rowId : null})}
         onPrint={() => onPrint({kind: 'estimate', jobId: job.id})}
         between={settingsRow}
+        focusRow={focusRow}
       />
 
       {fixPrices && <ShikiriPriceDialog job={job} materials={data.materials} setJob={setJob} update={update} onClose={() => setFixPrices(false)} />}
@@ -328,11 +335,15 @@ export function EstimateEditor({
           onAdd={(row) => {
             const at = picker.at;
             // 長さの分かっている箇所に入れた手すり・ベースプレートは、その長さにする（`fillAdded`）。中間のブラケットの数も（`withBrackets`）
+            // 同じ部材がもう箇所にあっても、別の行に入れる（`addMaterial`）
             setPlace(pickPlace.id, (p) => withBrackets(p, fillAdded({...p, rows: addMaterial(p.rows, row, at)}, new Set([row.id])), data.materials));
-            // 続けて選んだ部材は、いま入れた行のすぐ下に（同じ部材なら数が増えるだけなので、そのまま）
-            if (!pickPlace.rows.some((r) => r.kind === 'material' && r.refId === row.refId)) setPicker((pk) => (pk && pk.kind === 'material' ? {...pk, at: row.id} : pk));
+            // 続けて選んだ部材は、いま入れた行のすぐ下に
+            setPicker((pk) => (pk && pk.kind === 'material' ? {...pk, at: row.id} : pk));
+            lastAdded.current = row.id;
           }}
           onRemoveOne={(refId) => setPlace(pickPlace.id, (p) => ({...p, rows: removeOneMaterial(p.rows, refId)}))}
+          // ＋／−：いま入れた行の数量（手すり・ベースプレートの長さ、中間のブラケットの数も見積書で数量を直したときと同じに。`placeAfterQty`）
+          onQty={(rowId, delta) => setPlace(pickPlace.id, (p) => withBrackets(p, placeAfterQty(p, {...p, rows: changeRowQty(p.rows, rowId, delta)}, rowId), data.materials))}
           onToggleFavorite={toggleFavorite}
           onAddToMaster={addToMaster}
           onClose={closePicker}

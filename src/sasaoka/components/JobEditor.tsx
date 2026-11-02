@@ -3,7 +3,7 @@ import {cutToLength, jobName, jobTotals, placeTotals, rowAmount, taxFormula} fro
 import type {JobTotals} from '../calc.ts';
 import {cutCalc} from '../estimateForms.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
-import {addMaterial, copyRows, kitFromRows, laborForText, laborOwner, manualRow, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
+import {addMaterial, changeRowQty, copyRows, kitFromRows, laborForText, laborOwner, manualRow, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
 import {withBillMonth} from '../salesPlan.ts';
 import type {AppData, Job, Kit, Material, NameSuffix, Place, Row, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
@@ -323,6 +323,7 @@ export function JobEditor({
           rates={s}
           onAdd={(row) => setPlace(pickPlace.id, (p) => ({...p, rows: addMaterial(p.rows, row)}))}
           onRemoveOne={(refId) => setPlace(pickPlace.id, (p) => ({...p, rows: removeOneMaterial(p.rows, refId)}))}
+          onQty={(rowId, delta) => setPlace(pickPlace.id, (p) => ({...p, rows: changeRowQty(p.rows, rowId, delta)}))}
           onToggleFavorite={toggleFavorite}
           onAddToMaster={addToMaster}
           onClose={() => setPicker(null)}

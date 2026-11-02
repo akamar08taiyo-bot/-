@@ -54,26 +54,56 @@ function withMm(r: Row, mm: number): Row {
   return usedMm(r) === Math.round(mm) && (r.qty === 1 || r.lengthCm > 0) ? r : {...r, lengthCm: Math.round(mm * 1000) / 10000, qty: 1};
 }
 
-/** 申請書の長さを見積書の行に：手すりの行が長さの数と同じだけあれば順に、1行なら合計。ベースプレートは1行なら合計 */
-export function lengthsToRows(rows: Row[], mms: number[]): Row[] {
-  if (mms.length === 0) return rows;
-  const total = mms.reduce((a, b) => a + b, 0);
+/**
+ * 申請書の長さを見積書の行に：手すりの行が長さの数と同じだけあれば順に、1行なら合計。ベースプレートは plateMms（申請書の「ベースプレート」の長さ。
+ * なければ手すりと同じ長さ）を、1行なら合計・行が長さの数と同じだけあれば順に
+ */
+export function lengthsToRows(rows: Row[], mms: number[], plateMms: number[] = mms): Row[] {
+  if (mms.length === 0 && plateMms.length === 0) return rows;
+  const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
   const rails = rows.filter((r) => cutRow(r) && !isPlate(r));
   const plates = rows.filter((r) => cutRow(r) && isPlate(r));
   const want = new Map<string, number>();
-  if (rails.length === 1) want.set(rails[0].id, total);
-  else if (rails.length > 1 && rails.length === mms.length) rails.forEach((r, i) => want.set(r.id, mms[i]));
-  if (plates.length === 1) want.set(plates[0].id, total);
+  if (mms.length > 0) {
+    if (rails.length === 1) want.set(rails[0].id, sum(mms));
+    else if (rails.length > 1 && rails.length === mms.length) rails.forEach((r, i) => want.set(r.id, mms[i]));
+  }
+  if (plateMms.length > 0) {
+    if (plates.length === 1) want.set(plates[0].id, sum(plateMms));
+    else if (plates.length > 1 && plates.length === plateMms.length) plates.forEach((r, i) => want.set(r.id, plateMms[i]));
+  }
   if (want.size === 0) return rows;
   const out = rows.map((r) => (want.has(r.id) ? withMm(r, want.get(r.id)!) : r));
   return out.every((r, i) => r === rows[i]) ? rows : out;
 }
 
-/** 申請書で箇所の長さを入れたとき（手すりの取り付けの箇所だけ）。空にしたときは見積書を変えない */
+/** 申請書のベースプレートの長さ（mm の数）。入れていなければ []（見積書のベースプレートは手すりと同じ長さ） */
+export const plateLengths = (p: Pick<Place, 'kind' | 'plateLength'>): number[] => (p.kind === 1 ? dimsLengths(p.plateLength) : []);
+
+/**
+ * 申請書で箇所の長さ（手すり・ベースプレート）を入れたとき（手すりの取り付けの箇所だけ）。空にしたときは見積書を変えない
+ * （ベースプレートの長さを空にしたら、ベースプレートは手すりの長さにもどす）
+ */
 export function placeFromDims(p: Place): Place {
   if (p.kind !== 1) return p;
-  const rows = lengthsToRows(p.rows, dimsLengths(p.dims?.l));
+  const rails = dimsLengths(p.dims?.l);
+  const plates = plateLengths(p);
+  const rows = lengthsToRows(p.rows, rails, plates.length ? plates : rails);
   return rows === p.rows ? p : {...p, rows};
+}
+
+/**
+ * 「そのほか」に打ったベースプレートの長さ（「ベースプレート　1300mm」「ベースプレート L=800mm」）を、ベースプレートの長さの欄に移すとき：
+ * 長さ（打ったまま。「1300」）と、残りのそのほかの文。ベースプレートの長さがなければ null
+ */
+export function plateFromText(text: string | undefined): {bp: string; rest: string} | null {
+  const num = '[0-9０-９][0-9０-９,，.．]*';
+  const re = new RegExp(`(^|[\\s　])ベースプレート[\\s　]*(?:[LＬ][\\s　]*[=＝][\\s　]*)?(${num}(?:[\\s　]*(?:mm|ｍｍ|㎜)?[\\s　]*[×xX*＊ｘＸ][\\s　]*${num})*)[\\s　]*(?:mm|ｍｍ|㎜)?`, 'i');
+  const m = re.exec(text ?? '');
+  if (!m) return null;
+  const bp = m[2].normalize('NFKC').replace(/\s*mm\s*/gi, '').replace(/\s*[×xX*]\s*/g, '×');
+  const rest = (text ?? '').replace(m[0], m[1]).replace(/^[\s　]+|[\s　]+$/g, '').replace(/[\s　]{2,}/g, '　');
+  return {bp, rest};
 }
 
 /**
@@ -91,10 +121,17 @@ export function placeAfterQty(before: Place, after: Place, rowId: string): Place
   if (next === prev || next === 0) return after;
   let rows = after.rows;
   const others = after.rows.filter((r) => cutRow(r) && isPlate(r) !== plate);
-  if (others.length === 1 && (usedMm(others[0]) === 0 || usedMm(others[0]) === prev)) {
+  // 申請書にベースプレートの長さを入れてあれば、手すりとベースプレートは別の長さ（もう一方に合わせない）
+  const ownPlate = plateLengths(after);
+  if (ownPlate.length === 0 && others.length === 1 && (usedMm(others[0]) === 0 || usedMm(others[0]) === prev)) {
     rows = rows.map((r) => (r === others[0] ? withMm(r, next) : r));
   }
   let out: Place = rows === after.rows ? after : {...after, rows};
+  // ベースプレートの数量を直して、申請書のベースプレートの長さが前は見積書と同じだったなら、申請書の長さは空ける（手すりの長さと同じ作り）
+  if (plate && ownPlate.length > 0 && ownPlate.reduce((a, b) => a + b, 0) === prev) {
+    const {plateLength: _bp, ...place} = out;
+    out = place;
+  }
   const dims = dimsLengths(after.dims?.l);
   const railsBefore = sumMm(before.rows.filter((r) => cutRow(r) && !isPlate(r)));
   const railsAfter = sumMm(out.rows.filter((r) => cutRow(r) && !isPlate(r)));
@@ -113,11 +150,12 @@ export function placeAfterQty(before: Place, after: Place, rowId: string): Place
 export function fillAdded(p: Place, ids: Set<string>): Place {
   const dims = p.kind === 1 ? dimsLengths(p.dims?.l) : [];
   const dimsTotal = dims.reduce((a, b) => a + b, 0);
+  const plateTotal = plateLengths(p).reduce((a, b) => a + b, 0); // 申請書のベースプレートの長さ（なければ手すりと同じ）
   let changed = false;
   const rows = p.rows.map((r) => {
     if (!ids.has(r.id) || !cutRow(r) || r.lengthCm > 0) return r;
     const other = sumMm(p.rows.filter((x) => !ids.has(x.id) && cutRow(x) && isPlate(x) !== isPlate(r)));
-    const mm = dimsTotal || other;
+    const mm = (isPlate(r) && plateTotal) || dimsTotal || other;
     if (!mm) return r;
     changed = true;
     return withMm(r, mm);

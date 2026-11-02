@@ -229,6 +229,7 @@ const hasShinseiData = (p: Place) =>
     p.photoDates?.before ||
     p.photoDates?.after ||
     Object.values(p.dims ?? {}).some((v) => v?.trim()) ||
+    p.plateLength?.trim() ||
     p.shinseiText?.trim() ||
     p.photoNote?.trim()
   );

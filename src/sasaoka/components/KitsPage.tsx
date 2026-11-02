@@ -4,7 +4,7 @@
 
 import {useLayoutEffect, useRef, useState} from 'react';
 import {estimateAmount, estimatePlaceLines, estimateUnitPrice, placeTotals, rowAmount, shikiriPrice} from '../calc.ts';
-import {addMaterial, copyRows, kitRows, laborForText, laborOwner, removeOneMaterial} from '../rows.ts';
+import {addMaterial, changeRowQty, copyRows, kitRows, laborForText, laborOwner, removeOneMaterial} from '../rows.ts';
 import type {AppData, Kit, Material, Place, Row} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {uid, yen} from '../util.ts';
@@ -99,6 +99,7 @@ export function KitsPage({data, update}: {data: AppData; update: Update}) {
           rates={s}
           onAdd={(row) => setRows(pickKit.id, (rows) => addMaterial(rows, row))}
           onRemoveOne={(refId) => setRows(pickKit.id, (rows) => removeOneMaterial(rows, refId))}
+          onQty={(rowId, delta) => setRows(pickKit.id, (rows) => changeRowQty(rows, rowId, delta))}
           onToggleFavorite={toggleFavorite}
           onAddToMaster={addToMaster}
           onClose={() => setPicker(null)}

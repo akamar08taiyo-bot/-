@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {cutRow, dimsLengths, fillAdded, lengthsToRows, midBrackets, placeAfterQty, placeFromDims, withBrackets} from '../../src/sasaoka/cutLink.ts';
+import {cutRow, dimsLengths, fillAdded, lengthsToRows, midBrackets, placeAfterQty, placeFromDims, plateFromText, withBrackets} from '../../src/sasaoka/cutLink.ts';
+import {workItems} from '../../src/sasaoka/shinsei.ts';
 import {estimateQty} from '../../src/sasaoka/calc.ts';
 import {applySheet} from '../../src/sasaoka/sheetEdit.ts';
 import {laborRow, materialRow} from '../../src/sasaoka/rows.ts';
@@ -47,6 +48,35 @@ test('申請書の長さ（L=600×1800mm）を入れると、見積書の手す�
   assert.equal(placeFromDims(other), other);
   const empty = place([rail({lengthCm: 260})]);
   assert.equal(placeFromDims(empty), empty);
+});
+
+test('申請書の「＋ ベースプレート」の長さ（1300mm）は、見積書のベースプレートだけの長さ。空なら手すりと同じ長さ（ユーザーの指示 2026-11-02）', () => {
+  // 手すり L=2100mm・ベースプレート 1300mm → 手すり 2100÷2000＝1.05本、ベースプレート 1300÷2000＝0.65本
+  let p = placeFromDims(place([rail(), bracket, plate()], {dims: {l: '2100'}, plateLength: '1300'}));
+  assert.deepEqual(qtys(p), {rail: 1.05, plate: 0.65});
+  // ベースプレートの長さを空にすると、手すりと同じ長さにもどる
+  p = placeFromDims({...p, plateLength: undefined});
+  assert.deepEqual(qtys(p), {rail: 1.05, plate: 1.05});
+  // 手すりの長さがなくても、ベースプレートの長さだけで入る
+  assert.deepEqual(qtys(placeFromDims(place([rail({lengthCm: 90}), plate()], {plateLength: '800'}))), {rail: 0.45, plate: 0.4});
+  // あとから部材リストから入れたベースプレートも、その長さ
+  const added = fillAdded(place([rail({lengthCm: 210}), plate()], {dims: {l: '2100'}, plateLength: '1300'}), new Set(['plate']));
+  assert.deepEqual(qtys(added), {rail: 1.05, plate: 0.65});
+  // ベースプレートの長さを入れてあれば、見積書で手すりの数量を直してもベースプレートは変えない。ベースプレートを直したら申請書の長さは空ける（見積書の長さを出す）
+  const before = place([rail({lengthCm: 210}), plate({lengthCm: 130})], {dims: {l: '2100'}, plateLength: '1300'});
+  const railed = placeAfterQty(before, {...before, rows: [rail({lengthCm: 240}), plate({lengthCm: 130})]}, 'rail');
+  assert.deepEqual(qtys(railed), {rail: 1.2, plate: 0.65});
+  const plated = placeAfterQty(before, {...before, rows: [rail({lengthCm: 210}), plate({lengthCm: 150})]}, 'plate');
+  assert.deepEqual([qtys(plated), plated.dims, plated.plateLength], [{rail: 1.05, plate: 0.75}, {l: '2100'}, undefined]);
+  // 申請書の改修の内容：手すりの行の下にベースプレートの行（手すりの取り付けの頭にそろえる）
+  const job = {places: [{...before, rows: [rail({lengthCm: 210}), plate({lengthCm: 130})]}]};
+  const line = workItems(job, S)[0].line.split('\n');
+  assert.equal(line[0], '①廊下　手すりの取り付け　L=2100mm');
+  assert.match(line[1], /^[ 　]+ベースプレート　L=1300mm$/);
+  // そのほかに打ってあったベースプレート（「ベースプレート　1300mm」）は、「＋ ベースプレート」を押すと長さの欄に移す
+  assert.deepEqual(plateFromText('ベースプレート　1300mm'), {bp: '1300', rest: ''});
+  assert.deepEqual(plateFromText('ベースプレート L=800mm　補強あり'), {bp: '800', rest: '補強あり'});
+  assert.equal(plateFromText('補強板 900mm'), null);
 });
 
 test('見積書で手すりの数量を入れると、ベースプレートも同じ長さ。逆も同じ。前から違う長さにしてあれば変えない', () => {

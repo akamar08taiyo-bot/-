@@ -176,6 +176,14 @@ test('申請書の長さ（L=2100×2100）の合計が入った手すり・ベ�
   // 1本ずつ別の行に入れたときと同じ
   const sep = job(['廊下', [cut(BD134, 210), cut(BD134, 210)]]);
   assert.deepEqual(brief(orderBaseLines(sep, [BD134, BD132], RATE)), [['BD-134', 2, '本']]);
+  // ベースプレートの長さ（申請書の「＋ ベースプレート」1300mm）を入れたら、ベースプレートはその長さで数える（手すりは 2100mm×2 のまま。2026-11-02）
+  const bp = job(['廊下', [materialRow(BD134, 1), materialRow(PLATE4, 1)]]);
+  bp.places[0] = placeFromDims({...bp.places[0], kind: 1, dims: {l: '2100×2100'}, plateLength: '1300'});
+  assert.deepEqual(bp.places[0].rows.map((r) => [r.lengthCm, r.qty]), [[420, 1], [130, 1]]);
+  assert.deepEqual(brief(orderBaseLines(bp, [BD134, BD132, PLATE4, PLATE2], RATE)), [
+    ['BD-134', 2, '本'],
+    ['BP-80-2000', 1, '枚'],
+  ]);
   // 2200mm＋1900mm は 4000mm から 2200mm、2000mm から 1900mm
   assert.deepEqual(brief(orderBaseLines(withDims('2200×1900'), [BD134, BD132, PLATE4, PLATE2], RATE)), [
     ['BD-134', 1, '本'],

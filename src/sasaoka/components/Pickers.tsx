@@ -21,6 +21,7 @@ export function MaterialPicker({
   rates,
   onAdd,
   onRemoveOne,
+  onQty,
   onToggleFavorite,
   onAddToMaster,
   onClose,
@@ -30,7 +31,9 @@ export function MaterialPicker({
   mode: AppMode;
   rates: EstimateRates; // 見積の単価（定価×率）を出すとき
   onAdd: (row: Row) => void;
-  onRemoveOne: (refId: string) => void; // − で1つ減らす（0 で行を消す）
+  onRemoveOne: (refId: string) => void; // − で1つ減らす（0 で行を消す）。onQty がないとき（発注書）
+  // いま入れた行の数量を ＋／− で変える（0 で行を消す）。あれば「＋ 追加」はいつも別の行（同じ部材でも箇所の手すりごとに。`addMaterial`）
+  onQty?: (rowId: string, delta: number) => void;
   onToggleFavorite: (id: string) => void;
   onAddToMaster: (m: Material) => void;
   onClose: () => void;
@@ -49,6 +52,13 @@ export function MaterialPicker({
   }, [materials, tab, maker, query]);
 
   const addedCount = (id: string) => place.rows.filter((r) => r.refId === id).reduce((n, r) => n + r.qty, 0);
+  // onQty があるとき：＋／− は、この画面でいちばん最後に「＋ 追加」で入れた行だけ（ほかの部材は、もう箇所にあっても「＋ 追加」で別の行に）
+  const [last, setLast] = useState<{matId: string; rowId: string} | null>(null);
+  const lastRow = (id: string) => (last && last.matId === id ? place.rows.find((r) => r.id === last.rowId) : undefined);
+  const addRow = (m: Material, row: Row = materialRow(m)) => {
+    onAdd(row);
+    if (onQty && row.refId) setLast({matId: row.refId, rowId: row.id});
+  };
 
   // 商品名は空でもよい（金額だけの行）。名前があるときだけ部材リストにも登録できる
   const canAddManual = manual.name.trim() !== '' || manual.price > 0 || manual.listPrice > 0;
@@ -69,7 +79,7 @@ export function MaterialPicker({
       updatedAt: Date.now(),
     };
     if (save) onAddToMaster(m);
-    onAdd({...materialRow(m, manual.qty), refId: save ? m.id : null});
+    addRow(m, {...materialRow(m, manual.qty), refId: save ? m.id : null});
     setManual({name: '', price: 0, listPrice: 0, qty: 1, save: manual.save});
   };
 
@@ -79,7 +89,9 @@ export function MaterialPicker({
       title={
         <>
           「{place.name || '箇所'}」に部材を追加
-          <span className="ml-2 text-xs font-normal text-slate-500">「追加」を押すと入ります。入れたあとは ＋／− で数量を変えられます（続けて選べます）</span>
+          <span className="ml-2 text-xs font-normal text-slate-500">
+            {onQty ? '「追加」を押すと1行入ります（同じ部材も別の行）。入れた行は ＋／− で数量を変えられます' : '「追加」を押すと入ります。入れたあとは ＋／− で数量を変えられます（続けて選べます）'}
+          </span>
         </>
       }
       onClose={onClose}
@@ -145,7 +157,10 @@ export function MaterialPicker({
             </thead>
             <tbody>
               {list.slice(0, SHOW_LIMIT).map((m) => {
-                const n = addedCount(m.id);
+                const mine = onQty ? lastRow(m.id) : undefined;
+                const n = onQty ? (mine?.qty ?? 0) : addedCount(m.id);
+                const plus = () => (mine && onQty ? onQty(mine.id, 1) : addRow(m));
+                const minus = () => (mine && onQty ? onQty(mine.id, -1) : onRemoveOne(m.id));
                 return (
                   <tr key={m.id} className="border-t border-slate-100 hover:bg-purple-50/50">
                     <td className="px-1 text-center">
@@ -168,18 +183,18 @@ export function MaterialPicker({
                       {n > 0 ? (
                         // 入れた部材は ＋／− で数量を変える（0 にすると行を消す）
                         <span className="inline-flex items-center gap-1">
-                          <Btn small color="white" className="!px-3 !text-sm" onClick={() => onRemoveOne(m.id)} aria-label={`${m.name}を1つ減らす`}>
+                          <Btn small color="white" className="!px-3 !text-sm" onClick={minus} aria-label={`${m.name}を1つ減らす`}>
                             −
                           </Btn>
                           <span className="min-w-[2.5rem] text-center text-base font-bold tabular-nums text-emerald-800" aria-label={`${m.name}の数量`}>
                             {num(n)}
                           </span>
-                          <Btn small color="emerald" className="!px-3 !text-sm" onClick={() => onAdd(materialRow(m))} aria-label={`${m.name}を1つ増やす`}>
+                          <Btn small color="emerald" className="!px-3 !text-sm" onClick={plus} aria-label={`${m.name}を1つ増やす`}>
                             ＋
                           </Btn>
                         </span>
                       ) : (
-                        <Btn small color="emerald" onClick={() => onAdd(materialRow(m))}>
+                        <Btn small color="emerald" onClick={() => addRow(m)}>
                           ＋ 追加
                         </Btn>
                       )}

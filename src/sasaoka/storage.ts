@@ -286,6 +286,7 @@ const cleanPlace = (raw: Record<string, unknown>): Place => keepNewer(raw, (p) =
   photo: Math.max(0, Math.floor(numv(p.photo))),
   // 前の版の「工事名称」（work）は読まない。見積書の改修内容・工事名称は改修の種類から
   ...lengthTail(numv(p.kind, 1), cleanDims(p.dims), str(p.shinseiText)),
+  ...(str(p.plateLength).trim() ? {plateLength: str(p.plateLength)} : {}), // ベースプレートの長さ（「＋ ベースプレート」）
   ...(typeof p.shinseiLine === 'string' ? {shinseiLine: p.shinseiLine} : {}), // 手で直した改修の内容（空にしたのも、そのまま）
   ...cleanPhotos(p.photos),
   ...cleanPhotoDates(p.photoDates),

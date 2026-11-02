@@ -60,6 +60,7 @@ export function EstimateSheet({
   onPickKit,
   onPrint,
   between,
+  focusRow,
 }: {
   job: Job;
   settings: Settings;
@@ -72,6 +73,8 @@ export function EstimateSheet({
   onPrint: () => void;
   // 「部材リストから入れる」などの行のすぐ下に出すもの（工事見積書の保険者・担当・作成日・請求書の行。EstimateEditor.tsx）
   between?: ReactNode;
+  // この行を選ぶ（部材を選ぶ画面で最後に入れた行。n が変わるたびに）。続けて「施工費から入れる」と、その部材の同上施工費になる
+  focusRow?: {id: string; n: number} | null;
 }) {
   const estDate = estimateDateOf(job); // 見積もり作成日（右上の作成日）
   const toast = useToast();
@@ -96,6 +99,11 @@ export function EstimateSheet({
   const own = useRef<Job | null>(null); // この見積書の欄で入れた変更（保存のときに updatedAt だけが付いて戻ってくる）
   const lastOutside = useRef(0);
   const lastPlace = useRef<string | null>(null); // 最後に選んだ欄の箇所（ツールバーから入れる箇所。`toolPlace`）
+  useEffect(() => {
+    if (!focusRow || !job.places.some((p) => p.rows.some((r) => r.id === focusRow.id))) return;
+    setEdit(null);
+    setSel({key: `line:${focusRow.id}:text`, occ: 0});
+  }, [focusRow?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   // 見積書の外（部材リストから入れる・保険者・担当・請求書に入れる など）で変わったときも、Ctrl+Z でその前に戻せるようにする
   //（戻すのは見積書の全体なので、記録しないと Ctrl+Z でそちらの変更まで消えてしまう）。続けて変わったもの（打ち込みなど）は1回にまとめる
   useLayoutEffect(() => {

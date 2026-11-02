@@ -49,10 +49,22 @@ export function materialRow(m: Material, qty = 1): Row {
   };
 }
 
-/** 部材を選ぶ画面で選んだ部材を箇所に入れる。同じ部材（部材リストの同じもの）がもうあれば、行を増やさずに数量を足す */
+/**
+ * 部材を選ぶ画面の「＋ 追加」：選んだ部材を箇所に1行入れる（見積書で選んでいる行の所。`insertRowsAt`）。
+ * 同じ部材がもう箇所にあっても、その行に数量を足さずに別の行にする（ユーザーの指示「施工費や部材を追加する際は、同じ部材を追加する場合でも、
+ * 1箇所につき、部材をのせていく。例えばBD-132 BD-08G 施工費2000円が2箇所ある場合は、たさずにそれぞれでこの部材を追加していく」2026-11-02。
+ * 前は同じ部材の行の数量が増え、2か所目の手すりのエンドブラケットが1か所目の行に足されていた）。入れた行の数量は、選ぶ画面の ＋／−（`changeRowQty`）
+ */
 export function addMaterial(rows: Row[], row: Row, at: string | null = null): Row[] {
-  const same = row.refId ? rows.find((r) => r.kind === 'material' && r.refId === row.refId) : undefined;
-  return same ? rows.map((r) => (r === same ? {...r, qty: r.qty + row.qty} : r)) : insertRowsAt(rows, [row], at);
+  return insertRowsAt(rows, [row], at);
+}
+
+/** 部材を選ぶ画面の ＋／−：その行（いま入れた行）の数量を delta だけ変える。0 になったら行を消す（`removeOneMaterial` と同じ消し方） */
+export function changeRowQty(rows: Row[], rowId: string, delta: number): Row[] {
+  const at = rows.findIndex((r) => r.id === rowId);
+  if (at < 0) return rows;
+  const qty = rows[at].qty + delta;
+  return qty > 0 ? rows.map((r, i) => (i === at ? {...r, qty} : r)) : dropMaterialAt(rows, at);
 }
 
 /**
@@ -79,6 +91,11 @@ export function removeOneMaterial(rows: Row[], refId: string): Row[] {
   if (at < 0) return rows;
   const same = rows[at];
   if (same.qty > 1) return rows.map((r) => (r === same ? {...r, qty: r.qty - 1} : r));
+  return dropMaterialAt(rows, at);
+}
+
+/** 部材の行を消す。上が施工費の行なら、すぐ下の施工費（同上施工費）も一緒に消す（`removeOneMaterial` のわけ） */
+function dropMaterialAt(rows: Row[], at: number): Row[] {
   const end = at > 0 && rows[at - 1].kind === 'labor' ? workRange(rows, at)[1] : at + 1;
   return [...rows.slice(0, at), ...rows.slice(end)];
 }
@@ -108,16 +125,22 @@ export function laborCount(rows: Row[], itemId: string): number {
  * 手間の箇所数を n にする。増やすときは同じ手間の一番下の行に足し（なければ最後に1行入れる）、
  * 減らすときは下の行から減らして、0 になった行は消す。
  * 部材ごとに分けて入れた手間の行（見積書の「同上施工費」）は1行にまとめない。
+ * 一番下の同じ手間の行が、いちばん下の部材より上（前の手すりの同上施工費）なら、そこには足さずに最後に1行入れる（いちばん下の部材の同上施工費になる。
+ * ユーザーの指示「BD-132 BD-08G 施工費2000円が2箇所ある場合は、たさずにそれぞれでこの部材を追加していく」2026-11-02）。
+ * 箇所のはじめの施工費（上に部材のない行）には今までどおり足す
  */
 export function setLaborCount(rows: Row[], item: LaborItem, n: number): Row[] {
   let delta = Math.max(0, n) - laborCount(rows, item.id);
   if (delta === 0) return rows;
   if (delta > 0) {
     let last = -1;
+    let lastMaterial = -1;
     rows.forEach((r, i) => {
       if (isLabor(r, item.id)) last = i;
+      if (r.kind === 'material' && !isBlankRow(r)) lastMaterial = i;
     });
-    if (last < 0) return [...rows, laborRow(item, delta)];
+    const lead = last >= 0 && !rows.slice(0, last).some((r) => r.kind === 'material' && !isBlankRow(r));
+    if (last < 0 || (last < lastMaterial && !lead)) return [...rows, laborRow(item, delta)];
     return rows.map((r, i) => (i === last ? {...r, qty: r.qty + delta} : r));
   }
   const out = [...rows];

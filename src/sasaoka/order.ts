@@ -13,7 +13,7 @@
 
 import {cutToLength, isBlankRow, listPriceOf, shikiriPrice} from './calc.ts';
 import type {EstimateRates} from './calc.ts';
-import {dimsLengths} from './cutLink.ts';
+import {BASE_PLATE, dimsLengths, plateLengths} from './cutLink.ts';
 import {circled, photoNumbers} from './estimateForms.ts';
 import {normalize} from './priceImport.ts';
 import type {Job, Material, OrderEdits, OrderLine, Row} from './types.ts';
@@ -169,9 +169,11 @@ export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[], 
   for (const place of job.places) {
     const photo = photoOf.get(place.id) ?? 0;
     // 申請書の長さ（手すりの取り付けの箇所の L=2100×2100）。区切りごとに1本の手すり
-    const dims = place.kind === 1 ? dimsLengths(place.dims?.l) : [];
-    const dimsTotal = dims.reduce((a, b) => a + b, 0);
+    const railDims = place.kind === 1 ? dimsLengths(place.dims?.l) : [];
+    const plateDims = plateLengths(place); // ベースプレートの長さ（申請書の「＋ ベースプレート」。なければ手すりと同じ）
     for (const r of place.rows) {
+      const dims = plateDims.length > 0 && BASE_PLATE.test(`${r.estText ?? ''} ${r.name}`) ? plateDims : railDims;
+      const dimsTotal = dims.reduce((a, b) => a + b, 0);
       if (r.kind !== 'material' || isBlankRow(r)) continue;
       if (!r.name.trim() && !r.code.trim()) continue; // 金額だけの行（値引きなど）は発注しない
       if (!(r.qty > 0)) continue;

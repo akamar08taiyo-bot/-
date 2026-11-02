@@ -154,7 +154,7 @@ test('申請書（4つの保険者）を読むと、お客様・箇所（寸法�
   const j = sample({
     shinsei: {...NO_SHINSEI, kana: 'ミホン　ハナコ', phone: '0930-00-0000', zip: '824-0001', end: '2026-11-20', cost: 54321},
     places: [
-      {...newPlace('玄関', [manualRow('material')]), photo: 1, dims: {l: '600', h: '800'}, shinseiText: 'ベースプレート　L=600mm'},
+      {...newPlace('玄関', [manualRow('material')]), photo: 1, dims: {l: '600', h: '800'}, plateLength: '600'},
       {...newPlace('屋外', [manualRow('material')]), kind: 2, photo: 2, dims: {w: '600', d: '350', h: '150'}},
     ],
   });
@@ -168,10 +168,10 @@ test('申請書（4つの保険者）を読むと、お客様・箇所（寸法�
     assert.equal(d.total, 54321, insurer);
     assert.equal(d.info.phone, '0930-00-0000', insurer);
     assert.deepEqual(
-      d.places.map((p) => [p.name, p.photo, p.kind, p.dims, p.shinseiText ?? '']),
+      d.places.map((p) => [p.name, p.photo, p.kind, p.dims, p.shinseiText ?? '', p.plateLength ?? '']),
       [
-        ['玄関', 1, 1, {l: '600', h: '800'}, 'ベースプレート　L=600mm'],
-        ['屋外', 2, 2, {w: '600', d: '350', h: '150'}, ''],
+        ['玄関', 1, 1, {l: '600', h: '800'}, '', '600'], // ベースプレートの行は「＋ ベースプレート」の長さに（2026-11-02）
+        ['屋外', 2, 2, {w: '600', d: '350', h: '150'}, '', ''],
       ],
       insurer,
     );

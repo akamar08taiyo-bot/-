@@ -368,13 +368,13 @@ const placeNames = async () => (await sheet.locator('[data-edit^="place:"][data-
 const lastWork = async () => (await sheet.locator('.form-page tr', {hasText: '同上施工費'}).last().locator('td').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
 const linesBefore = await lines();
 assert.deepEqual(await placeNames(), ['①浴室', '②トイレ']);
-// ①浴室の空白の行を選んで部材リストから入れる → 空白の行がブラケットになり、選んでいた欄がなくなる →
-// 「🔧 施工費から入れる」は ①浴室 のいちばん下（前は新しい箇所③の「施工費」になった）
+// ①浴室の空白の行を選んで部材リストから入れる → 空白の行がブラケットになり、閉じると最後に入れたブラケットの行を選ぶ（2026-11-02。前は選んでいた欄がなくなった）→
+// 「🔧 施工費から入れる」はそのブラケットの同上施工費（①浴室。前は新しい箇所③の「施工費」になった）
 await sheet.getByRole('button', {name: 'サンプル S-TS35 木の手すり 35φ 4mの行の下に1行入れる'}).click();
 await pickAdd(/ブラケット/);
-assert.equal(await bar(), '　'); // 選んでいる欄がない
+assert.equal(await bar(), 'サンプル S-BK01 ブラケット'); // 最後に入れた行を選んでいる
 await sheet.getByRole('button', {name: '🔧 施工費から入れる'}).click();
-await page.getByRole('dialog').getByText('「浴室」の取付手間').waitFor();
+await page.getByRole('dialog').getByText('「ブラケット」の施工費').waitFor();
 await page.getByRole('button', {name: '木の箇所数を1増やす', exact: true}).click();
 await page.getByRole('button', {name: '数え終わったら閉じる'}).click();
 assert.deepEqual(await placeNames(), ['①浴室', '②トイレ']);

@@ -802,11 +802,36 @@ function dimsText(p: Pick<Place, 'kind' | 'rows' | 'dims'>): string {
  * 改修の内容の文の行（写真番号・改修場所のうしろ）：1行目は改修の種類の名前・寸法「手すりの取り付け　L=600mm H=800mm」、そのほか（`Place.shinseiText`）は2行目
  * （ユーザーの指示「そのほかの部分の記載は、行替えして表示するようにする」2026-10-26。前は1行目のうしろに足していた）
  */
-export function workTextLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText'>, names: string[] = KINDS): string[] {
-  return [[names[p.kind - 1] ?? '', dimsText(p)].filter(Boolean).join('　'), p.shinseiText?.trim() ?? ''].filter(Boolean);
+export function workTextLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'plateLength' | 'shinseiText'>, names: string[] = KINDS): string[] {
+  return [[names[p.kind - 1] ?? '', dimsText(p)].filter(Boolean).join('　'), plateText(p), p.shinseiText?.trim() ?? ''].filter(Boolean);
+}
+
+/**
+ * ベースプレートの行（手すりの取り付けの箇所の「＋ ベースプレート」の長さ）：「ベースプレート　L=1300mm」。そのほかと同じく次の行（手すりの取り付けの頭にそろえる）。
+ * 入れていなければ ''（前はそのほかに「ベースプレート　1300mm」と打っていた。ユーザーの指示 2026-11-02）
+ */
+function plateText(p: Pick<Place, 'kind' | 'plateLength'>): string {
+  if (p.kind !== 1) return '';
+  const l = mmText(p.plateLength, true);
+  return l
+    ? `ベースプレート　L=${l
+        .split('×')
+        .map((x) => `${x}mm`)
+        .join('×')}`
+    : '';
+}
+
+/** 見積書のベースプレートの使う長さ（申請書のベースプレートの欄の薄い字。`estimateLength` のベースプレートの方） */
+export function estimatePlateLength(p: Pick<Place, 'rows'>): string {
+  const mm: string[] = [];
+  for (const r of p.rows) {
+    if (r.kind !== 'material' || isBlankRow(r) || !(r.lengthCm > 0) || !(r.qty > 0) || !BASE_PLATE.test(`${r.estText ?? ''} ${r.name}`)) continue;
+    for (let i = 0; i < Math.max(1, Math.round(r.qty)); i++) mm.push(String(Math.round(r.lengthCm * 10)));
+  }
+  return mm.join('×');
 }
 /** 改修の内容の文を1行で（写真の欄の見出しなど、画面の1行に出すところ） */
-export function workText(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText'>, names: string[] = KINDS): string {
+export function workText(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'plateLength' | 'shinseiText'>, names: string[] = KINDS): string {
   return workTextLines(p, names).join('　');
 }
 
@@ -815,16 +840,16 @@ export function workText(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText'
  * 改修の種類の名前は書かない（用紙の「実施した工事種類」の■で分かる。ユーザーの指示「青丸の部分では、手すりの取り付けなどの項目の名前はいらない。
  * Ｌ＝600mmのみでよい」2026-11-01。前は申請書の改修の内容と同じ「手すりの取り付け　L=800mm H=800mm」）
  */
-export function photoNoteAuto(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText'>): string[] {
+export function photoNoteAuto(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'plateLength' | 'shinseiText'>): string[] {
   const dims = p.kind === 1 ? dimsText({...p, dims: {...p.dims, h: ''}}) : dimsText(p);
-  return [dims, p.shinseiText?.trim() ?? ''].filter(Boolean);
+  return [dims, plateText(p), p.shinseiText?.trim() ?? ''].filter(Boolean);
 }
 
 /**
  * 写真貼付用紙の写真の横（上）に書く内容（ユーザーの指示「自動入力　手すり　L=800mm H=600mm、追加　手入力例ベースプレート　L=800mm みたいな感じ」）：
  * はじめに自動の文（寸法・そのほか＝photoNoteAuto）、そのあとに手で足した行（`Place.photoNote`。空の行は書かない）
  */
-export function photoNoteLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText' | 'photoNote'>): string[] {
+export function photoNoteLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'plateLength' | 'shinseiText' | 'photoNote'>): string[] {
   return [...photoNoteAuto(p), ...addedNoteLines(p)];
 }
 
@@ -834,7 +859,7 @@ const addedNoteLines = (p: Pick<Place, 'photoNote'>) => (p.photoNote ?? '').spli
  * 写真の用紙の「改修の内容」の欄（北九州市の内容報告書・福岡市の写真貼付台紙のメモの欄）：改修の種類の名前・寸法（申請書の改修の内容と同じ＝workTextLines）と手で足した行。
  * この欄は用紙に改修の種類の□がないので、写真の横に書く内容（photoNoteLines）とちがって種類の名前も書く
  */
-export function photoMemoLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText' | 'photoNote'>, names: string[] = KINDS): string[] {
+export function photoMemoLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'plateLength' | 'shinseiText' | 'photoNote'>, names: string[] = KINDS): string[] {
   return [...workTextLines(p, names), ...addedNoteLines(p)];
 }
 

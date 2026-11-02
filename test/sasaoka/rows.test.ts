@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {addMaterial, insertRowsAt, kitFromRows, kitRows, laborCount, laborRange, laborRow, laborForText, laborOwner, laborSpot, manualRow, materialRow, removeOneMaterial, replaceRange, setLaborCount, workRange} from '../../src/sasaoka/rows.ts';
+import {addMaterial, changeRowQty, insertRowsAt, kitFromRows, kitRows, laborCount, laborRange, laborRow, laborForText, laborOwner, laborSpot, manualRow, materialRow, removeOneMaterial, replaceRange, setLaborCount, workRange} from '../../src/sasaoka/rows.ts';
 import type {LaborItem, Material} from '../../src/sasaoka/types.ts';
 
 const wood: LaborItem = {id: 'l01', name: '木', price: 1000, estPrice: null, note: ''};
@@ -47,6 +47,15 @@ test('setLaborCount：部材ごとに分けた手間（同上施工費）の行�
   assert.deepEqual(less.map((r) => [r.name, r.qty]), [['木製手すり 4m', 1], ['木', 1], ['ブラケット', 1]]);
 });
 
+test('setLaborCount：同じ手間がいちばん下の部材より上（前の手すりの同上施工費）なら足さずに最後に1行。箇所のはじめの施工費には足す', () => {
+  // 1か所目（手すり・ブラケット・木）、2か所目（手すり・ブラケット）：木は2か所目の下に別の行
+  const rows = [materialRow(rail), materialRow(bracket), laborRow(wood, 1), materialRow(rail), materialRow(bracket)];
+  assert.deepEqual(setLaborCount(rows, wood, 2).map((r) => [r.name, r.qty]), [['木製手すり 4m', 1], ['ブラケット', 1], ['木', 1], ['木製手すり 4m', 1], ['ブラケット', 1], ['木', 1]]);
+  // 箇所のはじめの施工費（上に部材がない）はそのまま足す
+  const lead = [laborRow(wood, 1), materialRow(rail)];
+  assert.deepEqual(setLaborCount(lead, wood, 2).map((r) => [r.name, r.qty]), [['木', 2], ['木製手すり 4m', 1]]);
+});
+
 test('workRange・replaceRange：部材のすぐ下の手間だけを数え直す', () => {
   const rows = [materialRow(rail), laborRow(wood, 2), materialRow(bracket), laborRow(tile, 1)];
   assert.deepEqual(workRange(rows, 0), [1, 2]);
@@ -71,10 +80,21 @@ test('見積書で選んでいる（タップしている）行のところに�
   assert.deepEqual(names(insertRowsAt(rows, [pipe], rows[0].id)), ['木製手すり 4m', '木', '手すり受け', '（空白）', 'ブラケット']); // 部材を選んでいたら、同上施工費のすぐ下
   assert.deepEqual(names(insertRowsAt(rows, [pipe], rows[1].id)), ['木製手すり 4m', '木', '手すり受け', '（空白）', 'ブラケット']); // 同上施工費を選んでいても同じ
   assert.deepEqual(names(insertRowsAt(rows, [pipe], null)), ['木製手すり 4m', '木', '（空白）', 'ブラケット', '手すり受け']); // 選んでいなければいちばん下
-  // 部材リストから入れる：同じ部材があれば数が増えるだけ（どこを選んでいても）
+  // 部材リストから入れる：同じ部材がもう箇所にあっても別の行（その手すりの所に。ユーザーの指示「同じ部材を追加する場合でも、1箇所につき、部材をのせていく」2026-11-02）
   const more = addMaterial(rows, materialRow(bracket), blankRow.id);
-  assert.deepEqual([names(more), more[3].qty], [names(rows), 2]);
+  assert.deepEqual(more.map((r) => [r.name || '（空白）', r.qty]), [['木製手すり 4m', 1], ['木', 2], ['ブラケット', 1], ['ブラケット', 1]]);
   assert.deepEqual(names(addMaterial(rows, pipe, blankRow.id)), ['木製手すり 4m', '木', '手すり受け', 'ブラケット']);
+});
+
+test('部材を選ぶ画面の ＋／−（changeRowQty）：いま入れた行だけ数量を変える。0 で行を消す', () => {
+  const first = materialRow(bracket, 2);
+  const second = materialRow(bracket, 1);
+  let rows = [materialRow(rail), first, laborRow(wood, 1), materialRow(rail), second];
+  rows = changeRowQty(rows, second.id, 1);
+  assert.deepEqual(rows.map((r) => r.qty), [1, 2, 1, 1, 2]); // 1か所目のブラケット（2）はそのまま
+  rows = changeRowQty(changeRowQty(rows, second.id, -1), second.id, -1);
+  assert.deepEqual(rows.map((r) => r.name), ['木製手すり 4m', 'ブラケット', '木', '木製手すり 4m']);
+  assert.equal(changeRowQty(rows, 'ない行', 1), rows);
 });
 
 test('施工費を入れる所（見積書で選んでいる行）：部材ならその同上施工費、同上施工費ならそのまとまり、空白の行ならその行に入って同上施工費になる', () => {
