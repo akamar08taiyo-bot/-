@@ -80,7 +80,11 @@ test('切って使う部材の本数：余りが0.1本より少なければも�
   assert.deepEqual(p([[1800, 1]]), [1, 0, 2200, false]); // 2000mm だと余り 200mm で危ない → 4000mm
   assert.deepEqual(p([[3800, 1]]), [1, 1, 2200, true]); // 余り 200mm → 2000mm をもう1本
   assert.deepEqual(p([[4000, 1]]), [1, 1, 2000, true]); // ちょうど1本 → もう1本
-  assert.deepEqual(p([[2100, 2]]), [2, 0, 3800, false]); // 2100mm は 2000mm から切れない
+  assert.deepEqual(p([[2100, 2]]), [1, 1, 1800, false]); // 合算 4200mm（1.05本）→ 4000mm＋2000mm（2026-11-02 から合算。前は 4000mm 2本）
+  // ユーザーの例「0.7本・0.3本・0.2本 → 合算すると2本で足りる」（2026-11-02）：4800mm（1.2本）→ 4000mm＋2000mm
+  assert.deepEqual(p([[2800, 1], [1200, 1], [800, 1]]), [1, 1, 1200, false]);
+  // 0.6本×3＝1.8本 → 4000mm 2本（前は手すり1本ずつ入れて 4000mm 3本）
+  assert.deepEqual(p([[2400, 3]]), [2, 0, 800, false]);
   assert.deepEqual(p([[1500, 3]]), [1, 1, 1500, false]); // 4000mm に2本、2000mm に1本
   assert.deepEqual(p([[4500, 1]]), [1, 1, 1500, false]); // 1本より長い（継ぐ）→ 4000mm＋残り 500mm は 2000mm
   assert.deepEqual(p([[3800, 1]], false), [2, 0, 4200, true]); // 2000mm がない部材は 4000mm をもう1本
@@ -159,7 +163,7 @@ test('2000mmだけで足りるときは2000mmの品だけを発注する。部�
   assert.deepEqual([noHalf[0].price, noHalf[0].listPrice], [0, 0]);
 });
 
-test('申請書の長さ（L=2100×2100）の合計が入った手すり・ベースプレートは、区切りごとに1本ずつ切って数える（2100mm×2 は 4000mm 2本）', () => {
+test('申請書の長さ（L=2100×2100）の手すり・ベースプレートも、使う長さを合算して数える（2100mm×2＝4200mm は 4000mm＋2000mm。2026-11-02 から）', () => {
   // 申請書で長さを入れると、見積書の手すり・ベースプレートの行（1行ずつ）に合計が入る（`placeFromDims`：4200mm＝1.05本）
   const withDims = (l: string, kind = 1) => {
     const j = job(['廊下', [materialRow(BD134, 1), materialRow(PLATE4, 1)]]);
@@ -168,20 +172,32 @@ test('申請書の長さ（L=2100×2100）の合計が入った手すり・ベ�
   };
   const j = withDims('2100×2100');
   assert.deepEqual(j.places[0].rows.map((r) => [r.lengthCm, r.qty]), [[420, 1], [420, 1]]);
-  // 合計の 4200mm を継いで数えると 4000mm 1本＋2000mm 1本になるが、2100mm は 2000mm からは切れない
+  // 合算の 4200mm（1.05本）→ 4000mm 1本＋2000mm 1本（ユーザーの指示「合算した数を発注書に入れる」2026-11-02。前は区切りごとに 4000mm 2本）
   assert.deepEqual(brief(orderBaseLines(j, [BD134, BD132, PLATE4, PLATE2], RATE)), [
-    ['BD-134', 2, '本'],
-    ['BP-80-4000', 2, '枚'],
+    ['BD-134', 1, '本'],
+    ['BD-132', 1, '本'],
+    ['BP-80-4000', 1, '枚'],
+    ['BP-80-2000', 1, '枚'],
   ]);
-  // 1本ずつ別の行に入れたときと同じ
-  const sep = job(['廊下', [cut(BD134, 210), cut(BD134, 210)]]);
-  assert.deepEqual(brief(orderBaseLines(sep, [BD134, BD132], RATE)), [['BD-134', 2, '本']]);
+  // 1本ずつ別の行（別の箇所）に入れたときも同じ
+  const sep = job(['廊下', [cut(BD134, 210)]], ['玄関', [cut(BD134, 210)]]);
+  assert.deepEqual(brief(orderBaseLines(sep, [BD134, BD132], RATE)), [
+    ['BD-134', 1, '本'],
+    ['BD-132', 1, '本'],
+  ]);
+  // 本数だけの行（使う長さがない 0.7本・0.3本・0.2本）も合算（前は「1.2本」と小数のまま出た）
+  const qtyOnly = job(['玄関', [materialRow(BD134, 0.7)]], ['廊下', [materialRow(BD134, 0.3)]], ['トイレ', [materialRow(BD134, 0.2)]]);
+  assert.deepEqual(brief(orderBaseLines(qtyOnly, [BD134, BD132], RATE)), [
+    ['BD-134', 1, '本'],
+    ['BD-132', 1, '本'],
+  ]);
   // ベースプレートの長さ（申請書の「＋ ベースプレート」1300mm）を入れたら、ベースプレートはその長さで数える（手すりは 2100mm×2 のまま。2026-11-02）
   const bp = job(['廊下', [materialRow(BD134, 1), materialRow(PLATE4, 1)]]);
   bp.places[0] = placeFromDims({...bp.places[0], kind: 1, dims: {l: '2100×2100'}, plateLength: '1300'});
   assert.deepEqual(bp.places[0].rows.map((r) => [r.lengthCm, r.qty]), [[420, 1], [130, 1]]);
   assert.deepEqual(brief(orderBaseLines(bp, [BD134, BD132, PLATE4, PLATE2], RATE)), [
-    ['BD-134', 2, '本'],
+    ['BD-134', 1, '本'],
+    ['BD-132', 1, '本'],
     ['BP-80-2000', 1, '枚'],
   ]);
   // 2200mm＋1900mm は 4000mm から 2200mm、2000mm から 1900mm

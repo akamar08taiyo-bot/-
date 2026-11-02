@@ -142,18 +142,18 @@ test('中間のブラケットの数：手すり1本ごとに ceil(長さ÷900mm
 });
 
 test('申請書の長さ（L=600×1800）を入れると、手すりのすぐ下に BD-01G を1個（部材リストから。端のブラケットはそのまま）', () => {
-  const before = place([rail(), bracket], {dims: {l: '600×1800'}});
-  const after = withBrackets(before, placeFromDims(before), MATS);
+  const before = place([rail(), bracket]);
+  const after = withBrackets(before, placeFromDims({...before, dims: {l: '600×1800'}}), MATS);
   assert.deepEqual(after.rows.map((r) => r.id === 'rail' || r.id === 'br' ? r.id : r.code), ['rail', 'BD-01G', 'br']);
   const added = after.rows[1];
   assert.deepEqual([added.refId, added.qty, added.unit, added.price], ['m01g', 1, '個', 600]);
   // まっすぐ 2400mm なら2個
   const straight = place([rail(), bracket], {dims: {l: '2400'}});
-  assert.deepEqual(mids(withBrackets(straight, placeFromDims(straight), MATS)), [['BD-01G', 2]]);
+  assert.deepEqual(mids(withBrackets(before, placeFromDims(straight), MATS)), [['BD-01G', 2]]);
   // 端のブラケットがシルバー（BD-08S）なら BD-01S。部材リストになければ品番だけの行（単価は空。仕切価格が空欄の知らせに出る）
   const silver = place([rail(), {...bracket, name: 'BD-08S 35エンドブラケットカバー付 シルバー'}], {dims: {l: '2400'}});
-  assert.deepEqual(mids(withBrackets(silver, placeFromDims(silver), MATS)), [['BD-01S', 2]]);
-  const none = withBrackets(straight, placeFromDims(straight), []).rows[1];
+  assert.deepEqual(mids(withBrackets({...silver, dims: undefined}, placeFromDims(silver), MATS)), [['BD-01S', 2]]);
+  const none = withBrackets(before, placeFromDims(straight), []).rows[1];
   assert.deepEqual([none.code, none.maker, none.name, none.unit, none.qty, none.price, none.listPrice], ['BD-01G', 'マツ六', '35ブラケット横型カバー付 ゴールド', '個', 2, 0, 0]);
 });
 
@@ -162,9 +162,20 @@ test('見積書で手すりの数量を直すと BD-01G も入れ直す。手で
   assert.deepEqual(mids(j.places[0]), [['BD-01G', 2]]);
   j = applySheet(j, 'line:rail:qty', '1800mm', sheet).job;
   assert.deepEqual(mids(j.places[0]), [['BD-01G', 1]]);
-  // 4000mm の手すりを切らずに2本（数量 2）なら 4個×2
-  const full = applySheet(job1(place([{...rail(), id: 'bar', name: 'BD-134 35アッシュ丸棒 ディンプル付 Mオーク 4m', pieceLengthM: 4}])), 'line:bar:qty', '2', sheet).job;
-  assert.deepEqual(mids(full.places[0]), [['BD-01G', 8]]);
+  // まるごとの本数（1本・2本）だけで、取り付ける長さが分からない（申請書の長さもない）ときは入れない
+  // （ユーザーの話「BDの13に1本頼んだら、なんか自動的にブラケットが見積もりに入ることがありました」2026-11-02。前は 4000mm の手すり2本とみなして 8個）
+  const barRow = {...rail(), id: 'bar', name: 'BD-134 35アッシュ丸棒 ディンプル付 Mオーク 4m', pieceLengthM: 4};
+  const full = applySheet(job1(place([barRow])), 'line:bar:qty', '2', sheet).job;
+  assert.deepEqual(mids(full.places[0]), []);
+  assert.deepEqual(mids(applySheet(job1(place([barRow])), 'line:bar:qty', '1', sheet).job.places[0]), []);
+  // 申請書の長さ（L=1800）があれば、まるごとの1本を発注していても、取り付ける 1800mm の手すりの数（1個）
+  const withL = place([], {dims: {l: '1800'}});
+  assert.deepEqual(mids(withBrackets(withL, {...withL, rows: [{...barRow, qty: 1}]}, MATS)), [['BD-01G', 1]]);
+  // 使う長さの行を、まるごとの1本にしたら（長さが分からなくなったら）入れたままの BD-01G は外す
+  let back = applySheet(job1(place([barRow])), 'line:bar:qty', '2400mm', sheet).job;
+  assert.deepEqual(mids(back.places[0]), [['BD-01G', 2]]);
+  back = applySheet(back, 'line:bar:qty', '1', sheet).job;
+  assert.deepEqual(mids(back.places[0]), []);
   // 手で3個にしたら、手すりの長さを変えても3個のまま
   const midId = j.places[0].rows.find((r) => r.code === 'BD-01G')!.id;
   j = applySheet(j, `line:${midId}:qty`, '3', sheet).job;

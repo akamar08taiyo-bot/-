@@ -191,21 +191,26 @@ const isRail35 = isPart(RAIL_35);
 const isMid = isPart(MID_BRACKET);
 const isEnd = isPart(END_BRACKET);
 
-/** 箇所の 35 の丸棒の1本ずつの長さ（mm）。申請書の長さの区切り（L=600×1800）の合計が手すりの長さと同じなら、区切りごと */
+/**
+ * 箇所の 35 の丸棒の取り付ける1本ずつの長さ（mm）。取り付ける長さが分かるときだけ（分からなければ []＝中間のブラケットを入れない）：
+ *   ・申請書の手すりの長さ（L=600×1800）があれば、その区切りごと（取り付ける手すりの長さ）
+ *   ・なければ、見積書で使う長さを入れた行（0.6本＝2400mm など）
+ * まるごとの1本（「1本」「2本」・ちょうど4000mm）は数えない（ユーザーの話「BDの13に1本頼んだら、なんか自動的にブラケットが見積もりに入ることがありました」2026-11-02。
+ * 前は1本を 4000mm の手すりとみなして BD-01G を4個入れていた。1本を発注しても、切って何か所かに使うことがある）
+ */
 function railRuns(p: Place): number[] {
-  const runs: number[] = [];
-  for (const r of p.rows) {
-    if (!isRail35(r)) continue;
-    if (r.lengthCm > 0) for (let i = 0; i < Math.max(1, Math.round(r.qty)); i++) runs.push(r.lengthCm * 10);
-    else if (r.pieceLengthM > 0 && r.qty > 0) {
-      // 切らずに使う（1本・2本）。本数が小数なら、その長さを1本
-      if (Number.isInteger(r.qty)) for (let i = 0; i < r.qty; i++) runs.push(r.pieceLengthM * 1000);
-      else runs.push(r.qty * r.pieceLengthM * 1000);
-    }
-  }
-  const total = runs.reduce((a, b) => a + b, 0);
+  const rails = p.rows.filter(isRail35);
+  if (rails.length === 0) return [];
   const dims = p.kind === 1 ? dimsLengths(p.dims?.l) : [];
-  return dims.length > 0 && Math.abs(dims.reduce((a, b) => a + b, 0) - total) < 1 ? dims : runs;
+  if (dims.length > 0) return dims;
+  const runs: number[] = [];
+  for (const r of rails) {
+    if (!(r.lengthCm > 0)) continue;
+    const mm = r.lengthCm * 10;
+    if (r.pieceLengthM > 0 && Math.abs(mm - r.pieceLengthM * 1000) < 0.5) continue; // ちょうど1本（長さが分からない）
+    for (let i = 0; i < Math.max(1, Math.round(r.qty)); i++) runs.push(mm);
+  }
+  return runs;
 }
 
 /** 中間のブラケットの数：手すり1本ごとに ceil(長さ÷900mm)−1（900mm までは0。1800mm は1、2400mm は2、4000mm は4） */
@@ -231,8 +236,9 @@ function midRow(p: Place, materials: Material[], qty: number): Row {
  */
 export function withBrackets(before: Place | undefined, after: Place, materials: Material[]): Place {
   const runs = railRuns(after);
-  if (runs.length === 0) return after;
   const prevRuns = before ? railRuns(before) : [];
+  // 取り付ける長さが分からなくなった（手すりを消した・まるごとの1本にした）ときは、入れたままの BD-01G を外す（下の「要らなくなった」）
+  if (runs.length === 0 && prevRuns.length === 0) return after;
   const want = midBrackets(runs);
   const mids = after.rows.filter(isMid);
   if (mids.length > 1) return after;

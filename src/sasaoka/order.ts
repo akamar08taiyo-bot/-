@@ -1,11 +1,12 @@
 // 発注書：見積書に入っている部材を「何を何個（何本・何枚）発注するか」にまとめる。
 //   同じ部材（メーカー・品番・品名が同じ）は、箇所をまたいで足す。施工費（手間）の行・何も入っていない行は入れない。
 //   切って使う部材（マツ六の手すり BD-134・ベースプレートなど、1本の長さと使う長さの入った部材）は、
-//   使う長さを足して、1本（4000mm）を何本発注するかを数える：
-//     ・同じ1本から切れるものはまとめる（長いものから順に、入る1本に入れていく）
-//     ・半分の長さ（4000mm なら 2000mm）で足りる1本は、2000mm にする（部材リストの 2000mm の品。なければ品番を空けて知らせる）
+//   箇所をまたいで使う長さ（本数）を合算して、1本（4000mm）を何本発注するかを数える（ユーザーの指示「1箇所目、2箇所目、3箇所目を合算した数を
+//   発注書に入れる…0.7本・0.3本・0.2本…合算すると2本で足りるので、2本」2026-11-02。前は手すり1本ずつ入る1本に入れていき、合算より多くなることがあった）：
+//     ・合算の本数の端数（4000mm なら合算 − まるごとの本数）が半分の長さ（2000mm）で足りれば、2000mm にする（部材リストの 2000mm の品。なければ品番を空けて知らせる）
 //     ・余り（発注する長さ − 使う長さ）が 0.1本（4000mm なら 400mm）より少ないときは危ないので、もう1本（2000mm）
-//     例：600mm×2＋1600mm×1＝2800mm（0.7本）→ 4000mm を1本（余り 1200mm）
+//     例：0.7本＋0.3本＋0.2本＝1.2本（4800mm）→ 4000mm を1本＋2000mm を1本（余り 1200mm）
+//         600mm×2＋1600mm×1＝2800mm（0.7本）→ 4000mm を1本（余り 1200mm）
 //         1600mm×1（0.4本）→ 2000mm を1本（余り 400mm）
 //         3800mm×1（0.95本）→ 4000mm を1本、余りが 200mm しかないので 2000mm をもう1本
 //   そのほか（規格品をそのまま使う部材）は見積書の数量のまま。
@@ -13,7 +14,6 @@
 
 import {cutToLength, isBlankRow, listPriceOf, shikiriPrice} from './calc.ts';
 import type {EstimateRates} from './calc.ts';
-import {BASE_PLATE, dimsLengths, plateLengths} from './cutLink.ts';
 import {circled, photoNumbers} from './estimateForms.ts';
 import {normalize} from './priceImport.ts';
 import type {Job, Material, OrderEdits, OrderLine, Row} from './types.ts';
@@ -50,48 +50,27 @@ export type BarPlan = {
 
 /**
  * 使う長さ（mm×本数）から、1本 stockMm の部材を何本発注するか。halfOk のときは、半分の長さの品も使う。
- * 1本より長いもの（継いで使う）は、まるごとの1本と残りに分けて数える
+ * 箇所をまたいで使う長さを合算し、まるごとの本数＋端数にする（ユーザーの指示「1箇所目、2箇所目、3箇所目を合算した数を発注書に入れる」2026-11-02。
+ * 前は手すり1本ずつ、入る1本に入れていく数え方で、合算より多くなることがあった）
  */
 export function planBars(pieces: {mm: number; count: number}[], stockMm: number, halfOk: boolean, margin = ORDER_MARGIN): BarPlan {
-  const list: number[] = [];
-  let joined = 0;
-  const put = (len: number) => {
-    if (!(len > EPS)) return;
-    const n = Math.floor(len / stockMm + EPS);
-    joined += n;
-    const rest = len - n * stockMm;
-    if (rest > EPS) list.push(rest);
-  };
-  for (const p of pieces) {
-    const count = Math.max(0, p.count);
-    for (let i = 1; i <= Math.floor(count + EPS); i++) put(p.mm);
-    const frac = count - Math.floor(count + EPS);
-    if (frac > EPS) put(p.mm * frac);
-  }
-  // 長いものから順に、入る1本に入れていく（入らなければ新しい1本）
-  list.sort((a, b) => b - a);
-  const bins: number[] = [];
-  for (const len of list) {
-    const i = bins.findIndex((used) => used + len <= stockMm + EPS);
-    if (i >= 0) bins[i] += len;
-    else bins.push(len);
-  }
-  const totalMm = joined * stockMm + list.reduce((a, b) => a + b, 0);
+  const totalMm = pieces.reduce((n, p) => n + (p.mm > EPS ? p.mm * Math.max(0, p.count) : 0), 0);
   const halfMm = stockMm / 2;
   const need = margin * stockMm;
-  let full = joined + bins.length;
+  let full = Math.floor(totalMm / stockMm + EPS);
+  const rest = Math.max(0, totalMm - full * stockMm);
   let half = 0;
-  let slack = full * stockMm - totalMm;
   let halved = false;
-  // いちばん少ししか使わない1本が半分の長さで足り、それでも余りが 0.1本以上あれば、半分の長さにする
-  if (halfOk && bins.length > 0 && Math.min(...bins) <= halfMm + EPS && slack - halfMm >= need - EPS) {
-    full--;
-    half++;
-    slack -= halfMm;
-    halved = true;
+  if (rest > EPS) {
+    // 端数が半分の長さで足り、それでも余りが 0.1本以上あれば、半分の長さにする
+    if (halfOk && rest + need <= halfMm + EPS) {
+      half++;
+      halved = true;
+    } else full++;
   }
+  let slack = full * stockMm + half * halfMm - totalMm;
   let extra = false;
-  if (slack < need - EPS) {
+  if (totalMm > EPS && slack < need - EPS) {
     extra = true;
     if (halfOk) half++;
     else full++;
@@ -168,12 +147,7 @@ export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[], 
   const photoOf = photoNumbers(job, rates);
   for (const place of job.places) {
     const photo = photoOf.get(place.id) ?? 0;
-    // 申請書の長さ（手すりの取り付けの箇所の L=2100×2100）。区切りごとに1本の手すり
-    const railDims = place.kind === 1 ? dimsLengths(place.dims?.l) : [];
-    const plateDims = plateLengths(place); // ベースプレートの長さ（申請書の「＋ ベースプレート」。なければ手すりと同じ）
     for (const r of place.rows) {
-      const dims = plateDims.length > 0 && BASE_PLATE.test(`${r.estText ?? ''} ${r.name}`) ? plateDims : railDims;
-      const dimsTotal = dims.reduce((a, b) => a + b, 0);
       if (r.kind !== 'material' || isBlankRow(r)) continue;
       if (!r.name.trim() && !r.code.trim()) continue; // 金額だけの行（値引きなど）は発注しない
       if (!(r.qty > 0)) continue;
@@ -187,10 +161,12 @@ export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[], 
       if (photo > 0) g.photos.add(photo);
       if (cutToLength(r)) {
         const len = Math.round(r.lengthCm * 100) / 10;
-        // 申請書の長さの合計を1行に入れた手すり・ベースプレート（L=2100×2100 → 4200mm。`placeFromDims`）は、区切りごとに1本ずつ切る
-        // （中間のブラケットの数え方 `railRuns` と同じ。合計の 4200mm を継いで数えると 4000mm＋2000mm になるが、2100mm は 2000mm からは切れない）
-        if (dims.length > 0 && Math.abs(dimsTotal - len * r.qty) < 1) for (const mm of dims) g.pieces.set(mm, (g.pieces.get(mm) ?? 0) + 1);
-        else g.pieces.set(len, (g.pieces.get(len) ?? 0) + r.qty);
+        g.pieces.set(len, (g.pieces.get(len) ?? 0) + r.qty);
+      } else if (stockMm > 0 && !Number.isInteger(r.qty)) {
+        // 使う長さがなく本数だけが小数の行（0.7本など）：端数はその本数ぶんの長さとして合算する（前は「1.2本」のように小数のまま発注書に出た）
+        const whole = Math.floor(r.qty + EPS);
+        g.whole += whole;
+        if (r.qty - whole > EPS) g.pieces.set(Math.round((r.qty - whole) * stockMm), (g.pieces.get(Math.round((r.qty - whole) * stockMm)) ?? 0) + 1);
       } else {
         g.whole += r.qty;
       }

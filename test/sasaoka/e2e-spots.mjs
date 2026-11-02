@@ -132,6 +132,49 @@ await sheet.waitFor();
 assert.ok((await plateText()).includes('0.75'), await plateText());
 log('見積書のベースプレート：申請書の長さ 1300mm→0.65本、1500mm→0.75本 OK');
 
+// ---------------- 申請書に入れた箇所を見積書から消す（ユーザーの指示「見積もり書の方からも、消せるように、そして申請書の内容を変更できるように…
+// いきなり消すのではなく…申請書からも削除してよいですか」2026-11-02）：玄関 L=600 の手すりを見積書で ✕ → 聞く（やめる／見積書の行だけ消す／申請書からも削除）
+await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
+await form.waitFor();
+await works.getByRole('combobox', {name: '箇所を足す'}).selectOption({label: '玄関'});
+await page.keyboard.type('600');
+const entrance = works.getByRole('listitem', {name: /^②玄関/});
+assert.equal(await entrance.getByLabel('長さ（mm）').inputValue(), '600');
+await page.waitForTimeout(600);
+await page.getByRole('tab', {name: '📋 工事見積書'}).click();
+await sheet.waitFor();
+const entranceRow = () => sheet.locator('.form-page tr', {hasText: '玄関'}).first();
+await entranceRow().locator('[data-edit$=":text"]').first().click();
+await openMaterials();
+await pick('BD-132');
+await page.getByRole('button', {name: '選び終わったら閉じる'}).click();
+assert.ok((await entranceRow().innerText()).includes('BD-132'));
+const ask = page.getByRole('dialog', {name: '「玄関」は申請書にも入っています'});
+// やめる：何も消えない
+await entranceRow().getByRole('button', {name: /の行を消す$/}).click();
+await ask.waitFor();
+await page.screenshot({path: path.join(outDir, 'spots-04-delete-ask.png')});
+await ask.getByRole('button', {name: 'やめる'}).click();
+assert.ok((await entranceRow().innerText()).includes('BD-132'));
+// 見積書の行だけ消す：見積書は空白の行、申請書の玄関は残る
+await entranceRow().getByRole('button', {name: /の行を消す$/}).click();
+await ask.getByRole('button', {name: '見積書の行だけ消す'}).click();
+await ask.waitFor({state: 'detached'});
+assert.ok(!(await entranceRow().innerText()).includes('BD-132'));
+// 空白の行の ✕：「見積書の行だけ消す」は出さない → 申請書からも削除
+await entranceRow().getByRole('button', {name: /の行を消す$/}).click();
+await ask.waitFor();
+assert.equal(await ask.getByRole('button', {name: '見積書の行だけ消す'}).count(), 0);
+await ask.getByRole('button', {name: '申請書からも削除'}).click();
+await ask.waitFor({state: 'detached'});
+assert.equal(await sheet.locator('.form-page tr', {hasText: '玄関'}).count(), 0);
+await page.waitForTimeout(600);
+await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
+await form.waitFor();
+assert.equal(await works.getByRole('listitem', {name: /玄関/}).count(), 0);
+assert.equal(await works.getByRole('listitem', {name: '①階段'}).count(), 1);
+log('見積書から申請書の箇所を消す（やめる・見積書の行だけ・申請書からも削除）OK');
+
 assert.deepEqual(errors, []);
 await browser.close();
 console.log('ALL OK');

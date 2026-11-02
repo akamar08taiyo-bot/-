@@ -8,6 +8,8 @@ import {
   applySheet,
   clearedSheet,
   deleteLine,
+  deletePlace,
+  deleteTouchesShinsei,
   dropEmptyPlaces,
   insertBlankAfter,
   isEmptyPlace,
@@ -480,10 +482,22 @@ test('申請書のタブで寸法・写真を入れた箇所は、見積書の �
   const plain = {...emptyJob(), places: [entry, newPlace('トイレ', [materialRow(bar, 1)])]};
   assert.deepEqual(deleteLine(plain, plain.places[1].rows[0].id).places.map((p) => p.name), ['玄関']);
   // 撮影日だけ・そのほかだけの箇所も残す（申請書の一覧の ✕ で聞く箇所と同じ）
-  for (const extra of [{photoDates: {before: '2026-10-01'}}, {shinseiText: '木製'}]) {
+  for (const extra of [{photoDates: {before: '2026-10-01'}}, {shinseiText: '木製'}, {plateLength: '1300'}]) {
     const kept = {...emptyJob(), places: [entry, {...newPlace('トイレ', [materialRow(bar, 1)]), ...extra}]};
     assert.deepEqual(deleteLine(kept, kept.places[1].rows[0].id).places.map((p) => p.name), ['玄関', 'トイレ']);
   }
+});
+
+test('見積書の ✕ で申請書に入れた箇所の最後の行を消すときは、申請書からも消すか聞く（deleteTouchesShinsei）。「申請書からも削除」は箇所ごと消す（deletePlace）', () => {
+  // ユーザーの指示「見積もり書の方からも、消せるように…いきなり消すのではなく、注意、申請書からも削除してよいですか」2026-11-02
+  const entry = {...newPlace('玄関', [materialRow(rail, 1)]), dims: {l: '600'}};
+  const toilet = newPlace('トイレ', [materialRow(bar, 1), materialRow(rail, 1)]);
+  const job: Job = {...emptyJob(), places: [entry, toilet]};
+  assert.equal(deleteTouchesShinsei(job, entry.rows[0].id)?.id, entry.id); // 申請書の寸法がある箇所の最後の行 → 聞く
+  assert.equal(deleteTouchesShinsei(job, toilet.rows[0].id), null); // 行が残る → 聞かない
+  assert.equal(deleteTouchesShinsei({...job, places: [{...entry, dims: undefined}, toilet]}, entry.rows[0].id), null); // 申請書の内容がない → 聞かない（今までどおり消える）
+  assert.equal(deleteTouchesShinsei(job, 'no-such-row'), null);
+  assert.deepEqual(deletePlace(job, entry.id).places.map((p) => p.name), ['トイレ']);
 });
 
 test('白紙に戻す：見積書の内容と、申請書の項目・理由書（お客様のこと）を消す。保険者・担当・請求書に入れるかは残す', () => {

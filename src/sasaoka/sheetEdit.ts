@@ -544,6 +544,23 @@ function unitRange(rows: Row[], ri: number): [number, number] {
  * ただし申請書のタブで寸法・写真などを入れた箇所は残して空白の行にする（前は申請書の寸法・写真まで消えていた。箇所は申請書のタブの ✕ で消す）。
  * その空白の行を消そうとしたときは何もしない（同じ job を返す）
  */
+/**
+ * 見積書の行を消すと、申請書に入れた箇所（寸法・写真などのある箇所）の見積書の行がなくなるとき、その箇所。ほかは null。
+ * 見積書の ✕ で、申請書からも消すか聞く（ユーザーの指示「見積もり書の方からも、消せるように…ただし、いきなり消すのではなく、注意、
+ * 申請書からも削除してよいですかみたいな注意書き」2026-11-02。前は「申請書に入れた箇所は、申請書のタブで消せます」と出て見積書からは消せなかった）
+ */
+export function deleteTouchesShinsei(job: Job, rowId: string): Place | null {
+  const found = findRow(job, rowId);
+  if (!found) return null;
+  const [a, b] = unitRange(found.place.rows, found.ri);
+  return found.place.rows.length - (b - a) === 0 && hasShinseiData(found.place) ? found.place : null;
+}
+
+/** 箇所を見積書と申請書の両方から消す（申請書の改修の内容・寸法・写真なども） */
+export function deletePlace(job: Job, placeId: string): Job {
+  return {...job, places: job.places.filter((p) => p.id !== placeId)};
+}
+
 export function deleteLine(job: Job, rowId: string): Job {
   const found = findRow(job, rowId);
   if (!found) return job;
