@@ -1041,6 +1041,14 @@ try {
   await midHot.click();
   const chooser = pickViewer.getByRole('dialog', {name: '色・品番を選ぶ'});
   await chooser.waitFor();
+  // 色を選ぶ欄はページの絵の下に並べる（絵に重ねない）。開いているあいだも絵だけを動かせて、端まで動かしてもうしろの画面は動かない
+  // （ユーザーの指示「この状態で、写真だけスクロールで移動できるようにする」2026-11-02）
+  const pickView = pickViewer.getByLabel('カタログのページの絵');
+  const [pickViewBox, chooserBox] = [await pickView.boundingBox(), await chooser.boundingBox()];
+  assert.ok(chooserBox.y >= pickViewBox.y + pickViewBox.height - 1, `${JSON.stringify(pickViewBox)} ${JSON.stringify(chooserBox)}`);
+  assert.equal(await pickView.evaluate((el) => getComputedStyle(el).overscrollBehaviorY), 'contain');
+  const midBox = await midHot.boundingBox(); // 押した商品の枠は、狭くなった絵の所の中に見えている
+  assert.ok(midBox.y < pickViewBox.y + pickViewBox.height && midBox.y + midBox.height > pickViewBox.y, `${JSON.stringify(midBox)} ${JSON.stringify(pickViewBox)}`);
   assert.equal(await chooser.getByRole('button').filter({hasText: /PN-L4183/}).count(), 3);
   await chooser.getByRole('button', {name: /オレンジ/}).click();
   await chooser.waitFor({state: 'detached'});

@@ -254,6 +254,17 @@ export function CatalogViewer({
     setNatural(null);
     setChoose(null);
   }, [current]);
+  // 色を選ぶ欄が開いたら（絵の所が狭くなる）、押した商品の枠が見えるように絵だけを動かす（うしろの画面は動かさない）
+  useLayoutEffect(() => {
+    const el = viewRef.current;
+    if (!choose || !el) return;
+    const hot = [...el.querySelectorAll<HTMLElement>('[data-hotspot]')].find((b) => b.dataset.key === choose.key);
+    if (!hot) return;
+    const r = hot.getBoundingClientRect();
+    const v = el.getBoundingClientRect();
+    if (r.top < v.top) el.scrollTop -= v.top - r.top + 8;
+    else if (r.bottom > v.bottom) el.scrollTop += Math.min(r.bottom - v.bottom + 8, r.top - v.top - 8);
+  }, [choose]);
   // 出しているページを絵にする（初めて出すときだけ。読んだ絵は覚えておく）
   useEffect(() => {
     const i = current;
@@ -416,7 +427,8 @@ export function CatalogViewer({
       <div
         ref={viewRef}
         onPointerDown={pan}
-        className={`relative min-h-0 flex-1 overflow-auto bg-slate-200 ${img ? (panning ? 'cursor-grabbing select-none' : 'cursor-grab') : ''}`}
+        // overscroll-contain：絵の端まで動かしても、うしろの画面（住宅改修の画面など）まで動かさない（ユーザーの指示「写真だけスクロールで移動できるようにする」2026-11-02）
+        className={`relative min-h-0 flex-1 overflow-auto overscroll-contain bg-slate-200 ${img ? (panning ? 'cursor-grabbing select-none' : 'cursor-grab') : ''}`}
         aria-label="カタログのページの絵"
         title="ホイールで大きく・小さく、つかんで動かす"
       >
@@ -443,6 +455,7 @@ export function CatalogViewer({
                     key={p.key}
                     type="button"
                     data-hotspot
+                    data-key={p.key}
                     onClick={() => pickProduct(p)}
                     aria-label={`${p.name}を選ぶ`}
                     title={`${p.name}（押すと商品の欄に入ります）`}
@@ -468,9 +481,11 @@ export function CatalogViewer({
           <p className="p-6 text-center text-sm text-slate-500">{img === null ? `${catalogLabel(CATALOG[current])} を読めませんでした` : 'カタログを読み込んでいます…'}</p>
         )}
       </div>
-      {/* 色・品番を選ぶ（押した商品に色・大きさが2つ以上あるとき）。押すと商品の欄に入る */}
+      {/* 色・品番を選ぶ（押した商品に色・大きさが2つ以上あるとき）。押すと商品の欄に入る。
+          ページの絵の下に並べる（前は絵の上に重ねていて、絵の下の方が隠れたまま動かせなかった。ユーザーの指示「この状態で、写真だけスクロールで移動できるようにする」2026-11-02）。
+          開いているあいだも、絵は上の残りの所でスクロール・拡大できる */}
       {choose && (
-        <div role="dialog" aria-label="色・品番を選ぶ" className="absolute inset-x-2 bottom-2 z-10 max-h-[60%] overflow-auto rounded-lg border border-sky-300 bg-white p-2 shadow-xl">
+        <div role="dialog" aria-label="色・品番を選ぶ" className="max-h-[45%] shrink-0 overflow-auto overscroll-contain border-t-2 border-sky-300 bg-white p-2 pb-3 shadow-[0_-4px_12px_rgba(15,23,42,0.12)]">
           <div className="mb-1.5 flex items-center gap-2">
             <span className="min-w-0 text-sm font-bold text-slate-800">{choose.name}</span>
             <button type="button" onClick={() => setChoose(null)} className="ml-auto shrink-0 rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm text-slate-600 hover:bg-slate-50" aria-label="選ぶのをやめる">
