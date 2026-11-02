@@ -1312,16 +1312,15 @@ await form.waitFor();
 assert.equal(await shinseiTab.getAttribute('aria-selected'), 'true');
 assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '新しい申請書');
 assert.equal(await focused(), 'フリガナ');
-// 上の段の「📗 Excelで保存」などのかたまりは、上のタブのまん中にそろえる（ユーザーの指示「少し左にずらして、上のタブとあわせるか中央揃えにする」2026-10-27。
-// その前は画面のまん中「Excelの印刷、保存ボタンを中央にもってくる」）。名前が長いときは名前のすぐ右で、名前に重ねない
-/** ボタンの入ったまん中のかたまりが、上のタブのまん中から何画素ずれているか（名前に重なっていたら Infinity） */
+// 上の段の「📗 Excelで保存」などのかたまりは、パソコンでは名前のすぐ右（16px あけて）から1列に（ユーザーの指示「パソコン入力の際は、赤枠部分を、２列を一列にする」2026-11-02。
+// その前は上のタブのまん中「少し左にずらして、上のタブとあわせるか中央揃えにする」2026-10-27、さらに前は画面のまん中）。名前に重ねない
+/** ボタンの入ったかたまりの左の端が、名前の右＋16px から何画素ずれているか（名前に重なっていたら Infinity） */
 const offCenter = (name) =>
   page.getByRole('button', {name, exact: true}).evaluate((b) => {
-    const tabs = document.querySelector('[role="tablist"]').getBoundingClientRect();
     const box = b.parentElement.getBoundingClientRect();
     const title = document.querySelector('h1').parentElement.getBoundingClientRect();
     if (box.left < title.right + 8) return Infinity;
-    return Math.abs((box.left + box.right) / 2 - (tabs.left + tabs.right) / 2);
+    return Math.abs(box.left - (title.right + 16));
   });
 assert.ok((await offCenter('📗 Excelで保存')) < 2);
 await page.screenshot({path: path.join(outDir, '81b-header-center.png'), clip: {x: 0, y: 0, width: 1366, height: 240}});
@@ -1483,7 +1482,7 @@ await preview.waitFor();
 await estimateTab.click();
 assert.equal(await inInvoice.count(), 0);
 assert.equal(await orderBtn.isDisabled(), true);
-// 見積書のタブも、Excel・印刷・削除は上のタブのまん中（メールで送付・保存・売上伝票依頼書・発注書・複製はその真下の段）
+// 見積書のタブも、Excel・印刷・削除は名前のすぐ右（メールで送付・保存・売上伝票依頼書・発注書・複製はそのすぐ右）
 assert.ok((await offCenter('📗 Excelで保存')) < 2);
 await page.screenshot({path: path.join(outDir, '81c-header-center-estimate.png'), clip: {x: 0, y: 0, width: 1366, height: 240}});
 await shinseiTab.click();

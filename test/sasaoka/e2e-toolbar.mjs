@@ -2,7 +2,7 @@
 // （ユーザーの指示「各タブでEXCEL印刷や保存など、表記の方法やタブの大きさ、順番を統一する。カタログ印刷など、個別のボタンについては、例外とする。
 //  基本的な並びは、申請書をEXCELで保存、申請書（見積書を印刷）、削除（白紙に戻すは不要） それ以外の独自の機能（例えば、売上伝票発行依頼書や発注書を作成、カタログを印刷など）
 //  は行を変えて、真下に統一して設置する タブを切り替えても、位置や大きさ、色などは変えない、同じ機能であればボタンの名前も変えない）行の位置も変えない（基本的に中央揃え）」2026-10-28）：
-//   2段目＝「📗 Excelで保存」「🖨 〇〇を印刷」「削除」（上のタブのまん中にそろえる）、3段目＝その真下に「✉ メールで送付」とタブごとの機能（同じまん中）。
+//   2段目＝「📗 Excelで保存」「🖨 〇〇を印刷」「削除」、3段目＝「✉ メールで送付」とタブごとの機能。パソコンは名前のすぐ右から1列（2026-11-02）、狭い画面は2段目の真下（同じまん中）。
 //   （2026-10-30 に「📗 〇〇をExcelで保存」と「📦 まとめて保存」を「📗 Excelで保存」の1つにして、まとめて保存の所に「✉ メールで送付」。DocsDialog.tsx）
 //   特定福祉用具の2つのタブ（中は特定福祉用具のアプリ）も同じ所に出し、押すと中のアプリが保存・印刷・削除などをする（中のアプリの上の段は出さない）。
 //   理由書のタブにも「🖨 理由書を印刷」（2ページとも）。
@@ -98,9 +98,17 @@ for (const width of [1366, 1600, 390]) {
     assert.deepEqual(more, phone ? [t.more[0], '削除', ...t.more.slice(1)] : t.more, `${width} ${t.tab}`);
     if (phone) assert.ok(Math.abs(m.b2[0].y - m.b2[1].y) < 1 && m.b2[1].x > m.b2[0].x, `${width} ${t.tab} メールで送付と削除が横並び ${JSON.stringify(m.b2.slice(0, 2))}`);
     assert.equal(m.scroll <= 0, true, `${width} ${t.tab} 横にはみ出す`);
-    // 3段目は2段目の真下（同じまん中）
-    assert.ok(m.r2.y >= m.r1.y + m.r1.h - 1, `${width} ${t.tab} 3段目が2段目の下にない`);
-    assert.ok(Math.abs(m.c1 - m.c2) < 2 || m.r2.w > m.r1.w, `${width} ${t.tab} 3段目のまん中 ${m.c1} ${m.c2}`);
+    // パソコン（lg から）は2段目と3段目を1列に（ユーザーの指示「パソコン入力の際は、赤枠部分を、２列を一列にする」2026-11-02）：3段目は2段目のすぐ右・同じ高さ。
+    // ほかは3段目は2段目の真下（同じまん中）
+    m.one = Math.abs(m.r2.y - m.r1.y) < 2;
+    console.log(`${width} ${t.tab} ${m.one ? '1列' : '2段'} r1=${JSON.stringify(m.r1)} r2=${JSON.stringify(m.r2)}`);
+    if (width >= 1024) {
+      assert.ok(m.one, `${width} ${t.tab} 1列になっていない ${JSON.stringify(m.r1)} ${JSON.stringify(m.r2)}`);
+      assert.ok(m.r2.x >= m.r1.x + m.r1.w && m.r2.x - (m.r1.x + m.r1.w) < 12, `${width} ${t.tab} 3段目が2段目のすぐ右にない`);
+    } else {
+      assert.ok(m.r2.y >= m.r1.y + m.r1.h - 1, `${width} ${t.tab} 3段目が2段目の下にない`);
+      assert.ok(Math.abs(m.c1 - m.c2) < 2 || m.r2.w > m.r1.w, `${width} ${t.tab} 3段目のまん中 ${m.c1} ${m.c2}`);
+    }
     if (width === 390) {
       // スマホは同じ幅の2列（ユーザーの指示「携帯で見た時のボタンの配置…ガタガタして、若干ずれている」2026-10-29）：ボタンはどれも同じ幅、左の端は2つの列か、奇数の最後はまん中
       const all = [...m.b1, ...m.b2];
@@ -117,9 +125,8 @@ for (const width of [1366, 1600, 390]) {
       if (card) assert.ok(card.dy < 1 && card.dh < 1 && card.gap > 0 && card.right <= width, `${width} ${t.tab} 介護保険証の枠 ${JSON.stringify(card)}`);
     }
     if (width >= 1024) {
-      // まん中は上のタブのまん中（名前が短いので名前の右へはずらさない）
-      assert.ok(Math.abs(m.c1 - m.tabsCenter) < 2, `${width} ${t.tab} 2段目のまん中 ${m.c1} タブ ${m.tabsCenter}`);
-      assert.ok(m.r1.x > m.name.x + m.name.w, `${width} ${t.tab} 名前に重なる`);
+      // パソコンは名前のすぐ右から（タブのまん中にはそろえない。2026-11-02）
+      assert.ok(m.r1.x > m.name.x + m.name.w && m.r1.x - (m.name.x + m.name.w) < 120, `${width} ${t.tab} 名前のすぐ右にない ${JSON.stringify(m.name)} ${JSON.stringify(m.r1)}`);
     }
     seen.push({t, m});
     if (width === 1366) await page.screenshot({path: path.join(outDir, `toolbar-${TABS.indexOf(t) + 1}.png`), clip: {x: 0, y: 0, width, height: 290}});
@@ -136,7 +143,9 @@ for (const width of [1366, 1600, 390]) {
       assert.equal(b.font, a.font, `${width} ${t.tab} ${b.text} の字の大きさ`);
     }
     // 3段目はタブごとにボタンの数が違うので、まん中（＝2段目のまん中）・高さの位置をそろえる。メールで送付はいつも初め・同じ大きさ・同じ色
-    assert.ok(Math.abs(first.m.c2 - m.c2) < 2 && Math.abs(first.m.r2.y - m.r2.y) <= 1, `${width} ${t.tab} 3段目の位置 ${JSON.stringify(first.m.r2)} → ${JSON.stringify(m.r2)}`);
+    // 1列のときは、メールで送付の始まり（3段目の左の端）と高さをそろえる
+    if (m.one) assert.ok(Math.abs(first.m.r2.x - m.r2.x) <= 1 && Math.abs(first.m.r2.y - m.r2.y) <= 1, `${width} ${t.tab} 3段目の位置 ${JSON.stringify(first.m.r2)} → ${JSON.stringify(m.r2)}`);
+    else assert.ok(Math.abs(first.m.c2 - m.c2) < 2 && Math.abs(first.m.r2.y - m.r2.y) <= 1, `${width} ${t.tab} 3段目の位置 ${JSON.stringify(first.m.r2)} → ${JSON.stringify(m.r2)}`);
     const a = first.m.b2[0];
     const b = m.b2[0];
     for (const k of ['w', 'h']) assert.ok(Math.abs(a[k] - b[k]) <= 1, `${width} ${t.tab} メールで送付の ${k}：${a[k]} → ${b[k]}`);
@@ -144,7 +153,7 @@ for (const width of [1366, 1600, 390]) {
   }
   // 色：Excel は薄い緑・印刷は薄い水色・削除は白（ui.tsx の softGreen・softSky・white。Tailwind の色は oklab で返るので class で見る）
   for (const {t, m} of seen) assert.deepEqual(m.b1.map((b) => b.cls.match(/\bbg-(emerald-50|sky-50|white)\b/)?.[1]), ['emerald-50', 'sky-50', 'white'].slice(0, m.b1.length), t.tab);
-  log(`${width}px：5つのタブとも 2段目＝Excelで保存・〇〇を印刷・削除、真下に メールで送付と独自の機能。同じ位置・大きさ・色 OK`);
+  log(`${width}px：5つのタブとも 2段目＝Excelで保存・〇〇を印刷・削除、${width >= 1024 ? 'すぐ右（1列）' : '真下'}に メールで送付と独自の機能。同じ位置・大きさ・色 OK`);
 }
 await page.setViewportSize({width: 1366, height: 900});
 

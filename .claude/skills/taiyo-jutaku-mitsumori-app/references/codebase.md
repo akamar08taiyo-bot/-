@@ -43,7 +43,7 @@ Excelで保存・メールで送付の `tokuteiFiles`（見えない枠の `__ta
 `TokuteiEditor.tsx` は中のアプリが出たら（`ready`）`takeCatalog` を送る。
 2026-10-28：販売見積書のタブ（view=quote）だけ、名前・保険者の右に「売上月」（`TokuteiSalesMonth`。まとめ `taiyo-tokutei-sales-v1` にこの様邸の案件があるときだけ。storage のできごとで読み直す。
 直すと `Settings.tokuteiSalesMonths`）。上の段の高さが変わったら枠の高さも合わせる（ResizeObserver） |
-| `estimate/JobHeader.tsx` | 様邸の画面の5つのタブに共通の上の段（`JobHeader`：1段目＝← 一覧へ戻る・タブ・extra、2段目＝名前（左）と `primary`＝〇〇をExcelで保存・〇〇を印刷・削除、3段目＝`secondary`＝まとめて保存とタブごとの機能。2段目・3段目はタブのまん中にそろえる＝`shift`）、`RemoveJobButton`（ゴミ箱へ）・`JobTitle`・`BackButton` |
+| `estimate/JobHeader.tsx` | 様邸の画面の5つのタブに共通の上の段（`JobHeader`：1段目＝← 一覧へ戻る・タブ・extra、2段目＝名前（左）と `primary`＝〇〇をExcelで保存・〇〇を印刷・削除、3段目＝`secondary`＝メールで送付とタブごとの機能。パソコン（lg〜）は名前のすぐ右から2段目・3段目を1列に＝`shift.one`（ユーザーの指示「パソコン入力の際は、赤枠部分を、２列を一列にする」2026-11-02。入りきらないボタンは3段目の中で折り返す。3段目の場所が 240px 未満なら2段目の下）。狭い画面は2段・行のまん中）、`RemoveJobButton`（ゴミ箱へ）・`JobTitle`・`BackButton` |
 | `estimate/EstimateEditor.tsx` | 見積書のタブ（📗 見積書をExcelで保存・🖨 見積書を印刷・削除／💾 保存・🧾 売上伝票依頼書・🛒 発注書を作成・複製（上の段は `JobHeader.tsx`）・保険者・担当・見積もり作成日・笹岡工務店の請求書に入れる・請求する月（`withBillMonth`）・売上月（`withSalesMonth`。ちがう月は薄い黄色））。`setJob` で `startEstimate` を通す |
 | `estimate/ShinseiPrint.tsx` | 住宅改修申請書の印刷（2026-10-26）：プレビューと同じページ（`ShinseiPages` の `print`・`fixedScale`）を1ページずつ `.shinsei-sheet`（高さ 270mm・overflow hidden）に。初めは1枚目だけ・チェックで足す。開いているあいだ `<html class="shinsei-printing">`（#root を印刷しない）・document.title＝「○○様住宅改修申請書」 |
 | `components/DocsDialog.tsx` | 📗 Excelで保存・✉ メールで送付（`DocsButton` の mode。5つの書類のうちチェックしたものだけ。初めは開いているタブだけ。何も入っていない書類は押せない＝`whyNot`。画面は createPortal で body に）。保存の前に `onBeforeSave`（特定福祉用具の保存と、この様邸の保存を待つ）。2026-10-30 までは `BatchSave.tsx`（📦 まとめて保存） |

@@ -8,6 +8,10 @@ import {removeEstimate} from './EstimateList.tsx';
 
 /** 様邸の名前と、2段目のボタン（Excelで保存・印刷・削除）のあいだに、少なくともあける幅（px） */
 const MIN_GAP = 16;
+/** パソコンで2段目と3段目を1列に並べるときの、あいだの幅（px。ボタンのあいだ gap-2 と同じ） */
+const ROW_GAP = 8;
+/** 1列にするときに3段目に要る幅（px。これより狭いと3段目は2段目の下）。いちばん長いボタン（販売受注簿に転記）が入る幅 */
+const ROW2_MIN = 240;
 
 /** 様邸の画面の「← 一覧へ戻る」。どのタブでも同じ大きさにする（大きさが違うと、すぐ右のタブの位置がタブごとにずれる） */
 export function BackButton({onClick}: {onClick: () => void}) {
@@ -46,7 +50,10 @@ export function RemoveJobButton({job, settings, update, onBack, className}: {job
  * （ユーザーの指示「携帯で見た時のボタンの配置の位置…ガタガタして、若干ずれている」2026-10-29：前は行ごとにボタンの幅のまままん中に寄せていて、
  * 「削除」「まとめて保存」が1つずつ別の幅でまん中に並び、介護保険証の欄だけ左に寄っていた）。
  * 「削除」（remove）は2段目の終わり。スマホだけは3段目の初め（メールで送付。前はまとめて保存）のとなり（ユーザーの指示「携帯では、削除とまとめて保存は横並びで」2026-10-29。
- * 2段目に置くと Excelで保存・印刷の2つのあとに1つだけ残り、3段目の初めも1つだけの段になっていた）。remove はつける class を受けて、2段目と3段目に1つずつ作る
+ * 2段目に置くと Excelで保存・印刷の2つのあとに1つだけ残り、3段目の初めも1つだけの段になっていた）。remove はつける class を受けて、2段目と3段目に1つずつ作る。
+ * パソコン（lg から）は、2段目と3段目が名前の右に1列で入るなら1列に並べる（ユーザーの指示「パソコン入力の際は、赤枠部分を、２列を一列にする」2026-11-02）。
+ * 2段目は名前のすぐ右（タブを切り替えても同じ所）、そのすぐ右に3段目（入りきらないボタンは3段目の中で折り返す）。3段目の場所がほとんどない（狭い画面・長い名前）ときは3段目を2段目の下に同じ左の端で。
+ * そのため、パソコンでは2段目・3段目をタブのまん中にはそろえない（上の「基本的に中央揃え」は、狭い画面のときだけ）
  */
 export function JobHeader({
   onBack,
@@ -70,8 +77,8 @@ export function JobHeader({
   const name = useRef<HTMLDivElement>(null);
   const row1 = useRef<HTMLDivElement>(null);
   const row2 = useRef<HTMLDivElement>(null);
-  // 2段目・3段目の左の余白（px）。null は狭い画面（行のまん中に置く）
-  const [shift, setShift] = useState<{a: number; b: number} | null>(null);
+  // 2段目・3段目の左の余白（px）。one は2段目と3段目を1列に（b は2段目からのすき間）。null は狭い画面（行のまん中に置く）
+  const [shift, setShift] = useState<{a: number; b: number; one: boolean} | null>(null);
   useLayoutEffect(() => {
     const tablist = top.current?.querySelector<HTMLElement>('[role="tablist"]');
     const place = () => {
@@ -80,13 +87,15 @@ export function JobHeader({
         return;
       }
       const left = box.current.getBoundingClientRect().left;
-      const t = tablist.getBoundingClientRect();
       const n = name.current.getBoundingClientRect();
       const w1 = row1.current.getBoundingClientRect().width;
-      const w2 = row2.current?.getBoundingClientRect().width ?? 0;
-      // まん中はタブのまん中。2段目が名前に MIN_GAP より近づくなら右へ
-      const center = Math.max(t.left + t.width / 2, n.right + MIN_GAP + w1 / 2) - left;
-      setShift({a: Math.round(center - w1 / 2), b: Math.max(0, Math.round(center - w2 / 2))});
+      // パソコンは名前のすぐ右から1列に：2段目（Excelで保存・印刷・削除）、そのすぐ右に3段目（ユーザーの指示「パソコン入力の際は、赤枠部分を、２列を一列にする」2026-11-02。
+      // 前は2段目・3段目ともタブのまん中にそろえた2段）。2段目の位置は名前だけで決まるので、タブを切り替えても動かない。
+      // 3段目が右の端までに入りきらない（ボタンの多いタブ・売上月の欄）ときは、3段目の中で折り返す（3段目の左の端の下へ）。
+      // 3段目の場所がほとんどない（狭い画面・長い名前）ときは、3段目を2段目の下に同じ左の端で
+      const a = Math.round(n.right + MIN_GAP - left);
+      const one = !!row2.current && box.current.getBoundingClientRect().width - (a + w1 + ROW_GAP) >= ROW2_MIN;
+      setShift({a, b: one ? ROW_GAP : a, one});
     };
     place();
     // 画面の幅（box の幅）・タブの大きさ・名前（打ち込むと変わる）・ボタンの数が変わったら置き直す
@@ -116,12 +125,12 @@ export function JobHeader({
       {/* 携帯・タブレットの「📷 写真へ」：タブレットの縦（md〜lg）は「← 一覧へ戻る」の右（スマホはタブの格子の中、タブレットの横は名前の右。PhotoJump.tsx） */}
       <PhotoJumpButton className="hidden rounded-md bg-sky-50 px-4 py-2.5 text-[15px] shadow-sm ring-2 ring-sky-300 md:max-lg:inline-flex md:max-lg:items-center" />
       {tabs}
-      <div ref={box} className="relative w-full space-y-2 lg:order-2">
+      <div ref={box} className={`relative w-full lg:order-2 ${shift?.one ? 'flex items-start' : 'space-y-2'}`}>
         <div ref={name} className="flex flex-wrap items-center gap-2 max-lg:justify-center lg:absolute lg:left-0 lg:top-0 lg:h-[2.625rem] lg:w-max">
           {title}
           <PhotoJumpButton className="hidden rounded-md bg-sky-50 px-3 py-1.5 text-base shadow-sm ring-2 ring-sky-300 lg:inline-flex lg:items-center" />
         </div>
-        <div ref={row1} role="group" aria-label="保存・印刷・削除" className={row} style={shift ? {marginLeft: shift.a} : undefined}>
+        <div ref={row1} role="group" aria-label="保存・印刷・削除" className={row} style={shift ? {marginLeft: shift.a, flexShrink: 0} : undefined}>
           {primary}
           {remove?.(secondary ? 'max-sm:!hidden' : '')}
         </div>
@@ -132,7 +141,8 @@ export function JobHeader({
             role="group"
             aria-label="そのほかの機能"
             className={`${row} ${remove ? 'max-sm:[&>*:nth-child(2)]:order-0 max-sm:[&>*]:order-2' : ''}`}
-            style={shift ? {marginLeft: shift.b} : undefined}
+            // 1列のときは2段目の右の残りの幅で折り返す（row の lg:w-max・lg:flex-nowrap を打ち消す）
+            style={shift ? (shift.one ? {marginLeft: shift.b, flex: '1 1 0%', minWidth: 0, width: 'auto', flexWrap: 'wrap'} : {marginLeft: shift.b}) : undefined}
           >
             {remove?.('sm:!hidden max-sm:!order-1')}
             {secondary}
