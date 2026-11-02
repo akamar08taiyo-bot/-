@@ -140,17 +140,40 @@ export function setLaborCount(rows: Row[], item: LaborItem, n: number): Row[] {
       if (r.kind === 'material' && !isBlankRow(r)) lastMaterial = i;
     });
     const lead = last >= 0 && !rows.slice(0, last).some((r) => r.kind === 'material' && !isBlankRow(r));
-    if (last < 0 || (last < lastMaterial && !lead)) return [...rows, laborRow(item, delta)];
-    return rows.map((r, i) => (i === last ? {...r, qty: r.qty + delta} : r));
+    if (last < 0 || (last < lastMaterial && !lead)) {
+      const added = [...rows, laborRow(item, delta)];
+      return autoGroupAmount(added, [added.length - 1]);
+    }
+    return autoGroupAmount(
+      rows.map((r, i) => (i === last ? {...r, qty: r.qty + delta} : r)),
+      [last],
+    );
   }
   const out = [...rows];
+  const changed: number[] = [];
   for (let i = out.length - 1; i >= 0 && delta < 0; i--) {
     if (!isLabor(out[i], item.id)) continue;
     const take = Math.min(out[i].qty, -delta);
     out[i] = {...out[i], qty: out[i].qty - take};
+    changed.push(i);
     delta += take;
   }
-  return out.filter((r) => !(isLabor(r, item.id) && r.qty <= 0));
+  return autoGroupAmount(out, changed).filter((r) => !(isLabor(r, item.id) && r.qty <= 0));
+}
+
+/**
+ * 箇所数を変えた施工費のまとまり（続いた手間の行＝見積書の1行）は、見積書で手で直した金額（estAmount）を外して自動の金額に戻す。
+ * 残すと、木を足しても・タイルを足しても見積書の金額が打った金額のままで、足した施工費が入らなかった（2026-11-02 のデバッグで見つけた）
+ */
+function autoGroupAmount(rows: Row[], at: number[]): Row[] {
+  const out = [...rows];
+  for (const i of at) {
+    if (out[i]?.kind !== 'labor') continue;
+    let start = i;
+    while (start > 0 && out[start - 1].kind === 'labor') start--;
+    for (let k = start; k < out.length && out[k].kind === 'labor'; k++) if (out[k].estAmount != null) out[k] = {...out[k], estAmount: null};
+  }
+  return out;
 }
 
 /**

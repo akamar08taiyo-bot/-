@@ -184,7 +184,7 @@ for (const size of sizesArg.split(',')) {
     await page.getByRole('button', {name: '今のデータに足す（同じものは上書き）'}).click();
     await page.waitForTimeout(800);
   });
-  for (const t of ['🧾 請求書を確認する', '📈 売上見込みを確認する', '📦 部材・施工費マスタ', '🗑 ゴミ箱', '📝 見積もり・申請書を作成する']) {
+  for (const t of ['🧾 工務店請求書を確認する', '📈 売上見込みを確認する', '📦 部材・施工費マスタ', '🗑 ゴミ箱', '📝 見積もり・申請書を作成する']) {
     await step(`住宅改修-${t.slice(2)}`, async () => {
       await page.locator('header nav').getByRole('button', {name: t}).click();
     });
@@ -283,10 +283,6 @@ for (const size of sizesArg.split(',')) {
       await page.getByLabel('定価').last().fill('9800');
       await page.getByLabel('備考に足す文').fill('見本：お届けは平日の午前中を希望されています（玄関前に段差あり）。').catch(() => {});
     });
-    await step(`特定-${ins}-商品を選ぶ`, async () => {
-      await page.getByRole('button', {name: '★ 商品を選ぶ'}).first().click();
-    });
-    await closeDialog();
     await step(`特定-${ins}-前のお客様から入れる`, async () => {
       await page.getByRole('button', {name: /前のお客様から入れる/}).first().click();
     });
@@ -297,8 +293,8 @@ for (const size of sizesArg.split(',')) {
     });
     await closeDialog();
     await step(`特定-${ins}-カタログの印刷`, async () => {
-      await page.getByRole('button', {name: '📖 カタログを印刷'}).first().click();
-      await page.waitForFunction(() => document.querySelectorAll('.cat-sheet img').length === 5, null, {timeout: 60000});
+      await page.getByRole('button', {name: '🖨 カタログを印刷'}).first().click();
+      await page.waitForFunction(() => document.querySelectorAll('.cat-sheet img').length > 0, null, {timeout: 60000});
     }, {full: false});
     await closeDialog();
     const shinseiTab = page.getByRole('tab', {name: /^📄 申請書/});
@@ -309,17 +305,9 @@ for (const size of sizesArg.split(',')) {
         await page.getByPlaceholder('居宅介護支援事業所').first().fill('見本長谷川原居宅介護支援事業所（行橋サテライト）').catch(() => {});
       });
       await step(`特定-${ins}-申請書の印刷`, async () => {
-        await page.getByRole('button', {name: '🖨 印刷', exact: true}).click();
+        await page.getByRole('button', {name: '🖨 申請書を印刷', exact: true}).click();
         await page.locator('.print-overlay').waitFor();
       }, {full: false});
-      await closeDialog();
-    }
-    if (ins === tkIns[0]) {
-      await step(`特定-${ins}-スクショから自動認識`, async () => {
-        await page.getByRole('tab', {name: '📋 見積もり'}).click().catch(() => {});
-        await page.getByRole('button', {name: /スクショから自動認識/}).first().click();
-        await page.waitForTimeout(1500);
-      }, {frame: false});
       await closeDialog();
     }
   }

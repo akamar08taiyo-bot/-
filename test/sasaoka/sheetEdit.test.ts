@@ -3,7 +3,7 @@ import test from 'node:test';
 import {estimateTotals, jobTotals} from '../../src/sasaoka/calc.ts';
 import {formLines} from '../../src/sasaoka/estimateForms.ts';
 import {placeFromDims, withBrackets} from '../../src/sasaoka/cutLink.ts';
-import {laborRow, manualRow, materialRow, newPlace} from '../../src/sasaoka/rows.ts';
+import {laborRow, manualRow, materialRow, newPlace, setLaborCount} from '../../src/sasaoka/rows.ts';
 import {
   applySheet,
   clearedSheet,
@@ -241,6 +241,24 @@ test('金額の欄も直せる：施工費はその金額（仕切り計算表�
   assert.equal(formLines(applySheet(job, `line:${lab}:amount`, '', yk).job, S, 'yukuhashi')[1].amount, 2000);
   // 金額に数字でないもの・数量が0の行は何もしない
   assert.equal(applySheet(job, `line:${mat}:amount`, 'あ', yk).job, job);
+});
+
+test('見積書で金額を直した施工費に、部材を選ぶ画面で施工費を足す・減らすと、そのまとまりは自動の金額に戻る（足した施工費が入らなかった）', () => {
+  const wood = {id: 'k1', name: '木', price: 1000, estPrice: 1500} as Parameters<typeof setLaborCount>[1];
+  const tile = {id: 'k2', name: 'タイル', price: 1500, estPrice: 2000} as Parameters<typeof setLaborCount>[1];
+  let {job} = type(emptyJob(), [['new:name', '階段'], ['new:text', 'インテリアバー', bar]]);
+  const put = (j: Job, rows: Row[]): Job => ({...j, places: [{...j.places[0], rows}]});
+  job = put(job, setLaborCount(job.places[0].rows, wood, 2));
+  const lab = job.places[0].rows[1].id;
+  job = applySheet(job, `line:${lab}:amount`, '2800', yk).job;
+  const amounts = (j: Job) => formLines(j, S, 'yukuhashi').map((l) => l.amount);
+  assert.deepEqual(amounts(job), [6400, 2800]);
+  assert.deepEqual(amounts(put(job, setLaborCount(job.places[0].rows, tile, 1))), [6400, 5000]); // 木 2×1,500＋タイル 2,000
+  assert.deepEqual(amounts(put(job, setLaborCount(job.places[0].rows, wood, 1))), [6400, 1500]);
+  // ほかの手すりの施工費（別のまとまり）の直した金額は残す
+  let two = put(job, [...job.places[0].rows, materialRow(bar), {...laborRow(wood, 1), estAmount: 1200}]);
+  two = put(two, setLaborCount(two.places[0].rows.slice(), wood, 4)); // いちばん下の木に足す → 下のまとまりだけ自動に
+  assert.deepEqual(amounts(two), [6400, 2800, 6400, 3000]);
 });
 
 test('どこの欄か（describeKey）：「①階段 ／ 品名 ／ 欄の名前」。施工費は取り付ける手間の名前（木 など）', () => {
