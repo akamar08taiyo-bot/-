@@ -213,3 +213,24 @@ test('プレビュー：見出しは自分の欄の中に出す（行橋市の�
     assert.ok(Math.abs(label.x + label.w / 2 - (at('A2').x + at('A2').w + name.w + label.w / 2)) < 1); // 自分の欄のまん中
   }
 });
+
+// 種目及び商品名の欄：長い商品名は区切りの良い所で2行にして、種目の字を大きく（ユーザーの指示「項目名（入浴補助用具等）の文字が小さすぎる。
+// 商品名が長くなった場合は、2段にしてもよい。（区切りの良いところ、シャワーチェアAir／コンパクトワンタッチ ブルー）」2026-11-01）。製造事業者名は1行のまま
+test('プレビュー：種目及び商品名の長い商品名は区切りの良い所で2行・種目の字が大きくなる。メーカーは1行', () => {
+  const long = 'シャワーチェアAir コンパクトワンタッチ ブルー';
+  // 2行にした方が字が大きくなる様式だけ2行（広域連合は欄が低く、2行にしても大きくならないので1行のまま）
+  for (const key of ['kanda', 'yukuhashi', 'miyako'] as ShinseiKey[]) {
+    const one = sale({insurer: key, items: [item({id: 'a', name: long, maker: 'パナソニックエイジフリー（株）', category: '入浴補助用具', sub: '入浴用いす', listPrice: 32000})]});
+    const page = shinseiPreview(template(key), SHINSEI[key], shinseiValues(one, S))[0];
+    const label = page.texts.find((t) => t.runs.map((r) => r.text).join('').startsWith('入浴補助用具'));
+    assert.ok(label, key);
+    assert.equal(label.runs.map((r) => r.text).join(''), '入浴補助用具\nシャワーチェアAir\nコンパクトワンタッチ ブルー', key);
+    if (key === 'kanda') assert.ok(label.runs[0].font.size >= 11.9, `${label.runs[0].font.size}`); // 苅田町は原本の 9pt のまま（前は 6.5pt）
+    // 短い商品名なら1行のまま
+    const short = sale({insurer: key, items: [item({id: 'a', name: '見本チェア', maker: '見本工業', category: '入浴補助用具', listPrice: 1000})]});
+    const page2 = shinseiPreview(template(key), SHINSEI[key], shinseiValues(short, S))[0];
+    assert.ok(page2.texts.some((t) => t.runs.map((r) => r.text).join('') === '入浴補助用具\n見本チェア'), key);
+    // メーカーの欄は1行ずつ（2行にしない）
+    assert.ok(page.texts.some((t) => /^パナソニックエイジフリー㈱\n/.test(t.runs.map((r) => r.text).join(''))), key);
+  }
+});

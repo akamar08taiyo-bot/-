@@ -10,7 +10,7 @@
 //   1つの囲みに品番の表が左右に2つあることもある（安寿 軽量浴槽台の「すべり止めシートタイプ」「ソフトクッションタイプ」）
 //   金額（11.3pt）と、そのそばの（税抜¥27,000）（5.3pt）。1つの金額が、たてに並んだ品番の行のまとまりのまん中に置かれる
 //   TAIS コード（TAIS/00532-000037。5.3pt）、仕様の行（●…。5.7pt）の右の端にメーカー名（アロン化成（株）など）
-import {CATALOG} from './catalog.ts';
+import {CATALOG, catalogPicks} from './catalog.ts';
 import type {CatalogPage} from './catalog.ts';
 import type {Candidate} from './import/priceImport.ts';
 import {CATEGORIES, guessCategory, subShort, WHEELED} from './category.ts';
@@ -577,8 +577,8 @@ for (const c of CATEGORIES) {
  * メーカー名、項目名を入力すると、フィルターをかけられた商品のみ表示されるようにする。カタログも同様です」2026-11-01）。
  * 介護保険の購入の対象（種目のある商品）だけ。種目が空なら項目名から種目・品目を推し量る。項目名の語は：
  *   品目の名前そのもの（「シャワーチェアー」）→ その品目の商品をみな（シャワーキャリー・シャワーベンチもシャワーチェアの品目。2026-11-01 の指示）
- *   ほかの語（「ユクリア」「シャワーキャリー」）→ 商品名・品番・色や大きさにある商品。どの商品にもなければ、ページの題（p.50 シャワーキャリー）、
- *   それにもなければ、その語から推し量った品目
+ *   ほかの語（「ユクリア」「シャワーキャリー」）→ 商品名・品番・色や大きさか、ページの題（かっこの外。p.48〜51 のシャワーキャリー）にある商品。
+ *   どれにもなければ、その語から推し量った品目
  * 項目名に当たる商品がなければ、項目名を外した種目・メーカーの商品（byName が false）
  */
 export function catalogFilter(list: CatalogProduct[], f: CatalogFilter): {items: CatalogProduct[]; category: string; sub: string; byName: boolean} {
@@ -595,16 +595,45 @@ export function catalogFilter(list: CatalogProduct[], f: CatalogFilter): {items:
     const key = looseKey(w);
     const gen = GENERIC.get(key);
     if (gen) return (p) => p.category === gen.category && (!gen.sub || p.sub === gen.sub);
-    const literal = (p: CatalogProduct) => hay.get(p)!.includes(key);
+    // 商品名・品番にあるか、ページの題（かっこの中の例の名前は除く）にあるか：「シャワーキャリー」は、名前にシャワーキャリーとある商品と、
+    // p.48〜51 のシャワーキャリーのページの商品（シャトレチェア・シャワーラク など。名前にはない）
+    const onPage = (p: CatalogProduct) => looseKey((CATALOG.find((c) => c.page === p.page)?.title ?? '').replace(/（.*?）|\(.*?\)/g, '')).includes(key);
+    const literal = (p: CatalogProduct) => hay.get(p)!.includes(key) || onPage(p);
     if (base.some(literal)) return literal;
-    // 商品名になければ、ページの題（p.50「シャワーキャリー」）
-    const onPage = (p: CatalogProduct) => looseKey(CATALOG.find((c) => c.page === p.page)?.title ?? '').includes(key);
-    if (base.some(onPage)) return onPage;
     const g = guessCategory(w);
     return g.category ? (p) => p.category === g.category && (!g.sub || p.sub === g.sub) : () => false;
   });
   const hits = base.filter((p) => tests.every((t) => t(p)));
   return hits.length ? {items: hits, category, sub, byName: true} : {items: base, category, sub, byName: false};
+}
+
+/**
+ * カタログの印刷で初めにチェックするページ（CATALOG の順の番号）。商品ごとに：品番の載っているページ、なければ種目・項目名・メーカーで絞った
+ * 商品（catalogFilter。商品検索と同じ）のページ（ユーザーの指示「該当の項目で絞ったら絞ったものだけを表示するようにする。現在は、自分でチェックする形式」
+ * 2026-11-01）。項目名に合う商品がないとき・カタログを読めないときは今までの選び方（catalogPicks：商品名の言葉・細目とメーカー）
+ */
+export function salePages(items: (CatalogFilter & Pick<SaleItem, 'code'>)[], codes: (Set<string> | null)[], products: CatalogProduct[]): Set<number> {
+  const out = new Set<number>();
+  for (const it of items) {
+    const byCode = catalogPicks([{name: '', maker: '', sub: '', code: it.code}], codes);
+    if (byCode.size) {
+      for (const i of byCode) out.add(i);
+      continue;
+    }
+    const name = (it.name || '').trim();
+    if (products.length && (it.category || name || (it.maker || '').trim())) {
+      const f = catalogFilter(products, it);
+      if (f.byName || !name) {
+        for (const pg of catalogPagesOf(f.items)) {
+          const i = CATALOG.findIndex((c) => c.page === pg);
+          if (i >= 0) out.add(i);
+        }
+        continue;
+      }
+    }
+    for (const i of catalogPicks([it], codes)) out.add(i);
+  }
+  return out;
 }
 
 /** 絞った商品の載っているカタログのページ（ページの番号。カタログの窓をそのページだけにする） */

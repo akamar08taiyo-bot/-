@@ -59,8 +59,18 @@ export async function loadCatalogPage(file: string): Promise<CatalogImage> {
   });
 }
 
-/** ページの文字と位置（左上から pt。catalogItems.ts で商品の一覧にする） */
+/** ページの文字と位置（左上から pt。catalogItems.ts で商品の一覧にする）。読んだページは覚えておく（商品の一覧と印刷の品番で同じものを使う） */
+const itemsLoaded = new Map<string, Promise<PdfText[]>>();
 export function loadCatalogItems(file: string): Promise<PdfText[]> {
+  let p = itemsLoaded.get(file);
+  if (!p) {
+    p = readCatalogItems(file);
+    itemsLoaded.set(file, p);
+    p.catch(() => itemsLoaded.delete(file)); // 読めなかったら次にまた読む
+  }
+  return p;
+}
+function readCatalogItems(file: string): Promise<PdfText[]> {
   return withPage(file, async (page) => {
     const vp = page.getViewport({scale: 1});
     const tc = await page.getTextContent();
@@ -89,4 +99,20 @@ export function loadCatalogProducts(): Promise<CatalogProduct[]> {
     })();
   }
   return products;
+}
+
+/**
+ * ページごとの品番（catalog.ts の pageCodes。印刷で初めにチェックするページを品番で選ぶ）。絵にしないで文字だけ読む
+ * （前は印刷の画面を開くと全部のページを絵にしてから品番を見ていた。ページが 26 になって重いので、チェックしたページだけ絵にする）
+ */
+export async function loadCatalogCodes(): Promise<(Set<string> | null)[]> {
+  const out: (Set<string> | null)[] = [];
+  for (const p of CATALOG) {
+    try {
+      out.push(pageCodes((await loadCatalogItems(p.file)).map((t) => t.s).join(' ')));
+    } catch {
+      out.push(null);
+    }
+  }
+  return out;
 }

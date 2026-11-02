@@ -410,7 +410,7 @@ function ItemBlock({
   const auto = basisNote(l);
   return (
     <div data-item={i.id} className="grid gap-2 rounded-md border border-slate-200 bg-white p-2">
-      {/* 種目 → 商品名の順（申請書のタブと同じ。ユーザーの指示「入力順は、種目、商品名の順」2026-10-26）。消すのは右上 */}
+      {/* 種目 → メーカー・🔍 商品検索 → 商品名の順（申請書のタブと同じ。ユーザーの指示 2026-10-26・2026-11-01）。消すのは右上 */}
       <div className="flex min-w-0 items-center gap-2">
         <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-teal-100 text-xs font-bold text-teal-800">{no}</span>
         <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => change({category, sub})} ariaLabel="種目" className="w-48" />
@@ -420,7 +420,6 @@ function ItemBlock({
           </button>
         )}
       </div>
-      <TextInput value={i.name} onChange={(name) => change({name})} placeholder="商品名" className="ml-8 min-w-0" aria-label="商品名" />
       <div className="flex min-w-0 flex-wrap items-center gap-2 pl-8 text-xs text-slate-500">
         {manual ? (
           <>
@@ -435,6 +434,8 @@ function ItemBlock({
           <span>{[i.maker, i.code, i.tais && `TAIS ${i.tais}`].filter(Boolean).join('　')}</span>
         )}
       </div>
+      {/* 商品名はメーカー・商品検索の下（ユーザーの指示「メーカー名、商品検索を上にもってきて、その下に商品名をもってくる」2026-11-01） */}
+      <TextInput value={i.name} onChange={(name) => change({name})} placeholder="商品名" className="ml-8 min-w-0" aria-label="商品名" />
       {/* 種目・メーカーを選ぶと、カタログのその商品の一覧（押すと商品名・品番・定価が入る） */}
       {manual && <CatalogPicker item={i} onPick={change} onCatalog={onCatalog} search={search} />}
       <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1.5 pl-8 text-xs font-bold text-slate-500">

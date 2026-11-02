@@ -256,7 +256,7 @@ export function ShinseiInputs({
               const changeItem = changeRow;
               return (
                 <div key={i.id} data-item={i.id} className="grid gap-2 rounded-md border border-slate-200 p-2">
-                  {/* 1行目：種目 → 商品名（申請書の「種目名及び商品名」と同じ順。ユーザーの指示「入力順は、種目、商品名の順」2026-10-26）。その下にメーカー、定価・割引率・販売金額 */}
+                  {/* 1行目：種目、その下にメーカー・🔍 商品検索、商品名（ユーザーの指示「入力順は、種目、商品名の順」2026-10-26、「メーカー名、商品検索を上にもってきて、その下に商品名」2026-11-01）。その下に定価・割引率・販売金額 */}
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-teal-100 text-xs font-bold text-teal-800">{idx + 1}</span>
                     <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => changeItem(i.id, {category, sub})} ariaLabel="種目" className="w-48" />
@@ -273,7 +273,6 @@ export function ShinseiInputs({
                       </button>
                     )}
                   </div>
-                  <TextInput value={i.name} onChange={(name) => changeItem(i.id, {name})} placeholder="商品名" className="ml-8 min-w-0" aria-label="商品名" data-nav />
                   {/* メーカーの横に「🔍 商品検索」（ユーザーの指示「メーカー名の横に、商品検索ボタン」2026-11-01）。スマホの幅でも1行に並ぶよう、メーカーの欄を縮める */}
                   <div className="flex min-w-0 items-center gap-2 pl-8">
                     {i.productId === null ? (
@@ -285,6 +284,8 @@ export function ShinseiInputs({
                       i.maker && <span className="text-xs text-slate-500">{i.maker}</span>
                     )}
                   </div>
+                  {/* 商品名はメーカー・商品検索の下（ユーザーの指示「メーカー名、商品検索を上にもってきて、その下に商品名をもってくる」2026-11-01） */}
+                  <TextInput value={i.name} onChange={(name) => changeItem(i.id, {name})} placeholder="商品名" className="ml-8 min-w-0" aria-label="商品名" data-nav />
                   {/* 種目・メーカーを選ぶと、カタログのその商品の一覧（押すと商品名・品番・定価が入る。ユーザーの指示 2026-10-30） */}
                   {i.productId === null && <CatalogPicker item={i} onPick={(patch) => changeItem(i.id, patch)} onCatalog={onCatalog} search={searchAt[i.id] ?? 0} />}
                   {/* 定価の下に割引率と販売金額（ユーザーの指示「定価の下に、販売金額を記載する」「定価の下に割引率を表示、変更できるようにする」2026-10-26）。

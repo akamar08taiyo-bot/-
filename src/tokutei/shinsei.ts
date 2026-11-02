@@ -7,7 +7,7 @@
 
 import {insurerNoOf} from './insurerNumbers.ts';
 import {saleTotals} from './calc.ts';
-import {docLabel} from './category.ts';
+import {CATEGORIES, docLabel} from './category.ts';
 import {CARE_LEVELS} from './defaults.ts';
 import type {CarePlan, Gender, PayMethod, Sale, Settings} from './types.ts';
 import {warekiLabel, warekiOf} from './wareki.ts';
@@ -20,6 +20,7 @@ import {
   emOf,
   finishWorkbook,
   fitCell,
+  fitNameCell,
   fitPrintPage,
   formatCell,
   hideZeros,
@@ -775,7 +776,9 @@ export function fillShinseiFiles(files: Files, form: ShinseiForm, v: ShinseiValu
   for (const w of sheets) for (const refs of w.same ?? []) sameStyle(files, w.sheet, refs);
   for (const w of sheets) for (const ref of w.fit ?? []) fitCell(files, w.sheet, ref);
   for (const w of sheets) for (const ref of w.fitWidth ?? []) fitCell(files, w.sheet, ref, true);
-  for (const w of sheets) for (const ref of w.oneLine ?? []) fitCell(files, w.sheet, ref, false, true);
+  // 名前の欄：種目及び商品名（1行目が種目）の長い商品名は、区切りの良い所で2行に（fitNameCell）。製造事業者名の欄は1行のまま（2026-10-26 の指示）
+  const isLabel = (lines: string[]) => CATEGORIES.some((c) => lines[0].startsWith(c.name));
+  for (const w of sheets) for (const ref of w.oneLine ?? []) fitNameCell(files, w.sheet, ref, isLabel);
   for (const w of sheets) if (w.marks?.length) drawMarks(files, w.sheet, w.marks);
   // 4. 書いたシートが A4 から少しはみ出すなら、印刷を「1ページに合わせる」に（Excel で印刷して2〜4枚に分かれないように）
   for (const w of sheets) fitPrintPage(files, w.sheet);

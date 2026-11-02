@@ -1,20 +1,28 @@
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {CATALOG, catalogLabel, catalogPicks, catalogTitle} from '../catalog.ts';
+import type {CatalogPagesFilter} from '../catalog.ts';
+import {salePages} from '../catalogItems.ts';
 import type {Sale} from '../types.ts';
-import {loadCatalogPage} from './catalogPdf.ts';
+import {loadCatalogCodes, loadCatalogPage, loadCatalogProducts} from './catalogPdf.ts';
 import type {CatalogImage} from './catalogPdf.ts';
 import {useFitZoom} from './PrintView.tsx';
 
 /**
  * 介援隊のカタログの印刷（catalog.ts）。カタログのページを A4 縦の紙で並べ、チェックしたページだけ印刷する。
  * 初めは見積もりの商品が載っているページにチェック（品番・細目・商品名で）。画面にもチェックしたページだけを出す（ユーザーの指示「チェックを入れたら、
- * 該当のカタログページを一番上にもってくる」「該当のページのみ印刷プレビューに表示する」2026-10-26。前は全部のページを並べ、外したページを薄くしていた）
+ * 該当のカタログページを一番上にもってくる」「該当のページのみ印刷プレビューに表示する」2026-10-26。前は全部のページを並べ、外したページを薄くしていた）。
+ * 初めのチェックは、商品の種目・項目名・メーカーで絞った商品のページ（salePages。商品検索と同じ絞り方）。only（カタログの窓で絞ったページ）があればそのページ。
+ * ページの一覧も絞ったページだけを出し、「＋ ほかのページ」で全部（ユーザーの指示「該当の項目で絞ったら絞ったものだけを表示するようにする。
+ * 現在は、自分でチェックする形式」2026-11-01）。絵にするのはチェックしたページだけ（26ページを全部絵にすると重い）
  */
-export function CatalogPrintView({sale, onClose}: {sale: Sale; onClose: () => void}) {
+export function CatalogPrintView({sale, only, onClose}: {sale: Sale; only?: CatalogPagesFilter; onClose: () => void}) {
   const zoom = useFitZoom();
   const [pages, setPages] = useState<(CatalogImage | 'error' | null)[]>(() => CATALOG.map(() => null));
-  const [picked, setPicked] = useState<Set<number>>(() => catalogPicks(sale.items));
+  const [fixed] = useState(() => (only?.pages.length ? new Set(CATALOG.flatMap((c, i) => (only.pages.includes(c.page) ? [i] : []))) : null));
+  const [picked, setPicked] = useState<Set<number>>(() => fixed ?? catalogPicks(sale.items));
+  const [matched, setMatched] = useState<Set<number>>(() => fixed ?? catalogPicks(sale.items)); // 絞ったページ（一覧に出す）
+  const [showAll, setShowAll] = useState(false);
   const touched = useRef(false);
   const items = useRef(sale.items); // 開いたときの商品で選ぶ（印刷の画面を開いているあいだに商品は変わらない）
   useEffect(() => {
@@ -29,26 +37,38 @@ export function CatalogPrintView({sale, onClose}: {sale: Sale; onClose: () => vo
       window.removeEventListener('keydown', onKey);
     };
   }, [sale, onClose]);
-  // 1ページずつ読む（読めたページから出す）。全部読めたら、品番の載っているページにもチェック（まだ手で変えていなければ）
+  // 品番・商品の一覧（文字だけ）を読んだら、商品の載っているページにチェックし直す（まだ手で変えていなければ。カタログの窓で絞って開いたときはそのまま）
+  const alive = useRef(true);
+  const urls = useRef<string[]>([]);
   useEffect(() => {
-    let alive = true;
-    const urls: string[] = [];
-    void (async () => {
-      const got: (CatalogImage | 'error')[] = [];
-      for (const [i, p] of CATALOG.entries()) {
-        const r = await loadCatalogPage(p.file).catch(() => 'error' as const);
-        if (r !== 'error') urls.push(r.url);
-        if (!alive) break;
-        got[i] = r;
-        setPages((c) => c.map((x, j) => (j === i ? r : x)));
-      }
-      if (alive && !touched.current) setPicked(catalogPicks(items.current, got.map((x) => (x && x !== 'error' ? x.codes : null))));
-    })();
+    alive.current = true;
+    if (!fixed) {
+      void Promise.all([loadCatalogCodes(), loadCatalogProducts().catch(() => [])]).then(([codes, products]) => {
+        if (!alive.current || touched.current) return;
+        const m = salePages(items.current, codes, products);
+        setPicked(m);
+        setMatched(m);
+      });
+    }
     return () => {
-      alive = false;
-      for (const u of urls) URL.revokeObjectURL(u);
+      alive.current = false;
+      for (const u of urls.current) URL.revokeObjectURL(u);
     };
   }, []);
+  // チェックしたページを1ページずつ絵にする（読めたページから出す。一度読んだページは覚えておく）
+  const requested = useRef(new Set<number>());
+  useEffect(() => {
+    void (async () => {
+      for (const i of [...picked].sort((a, b) => a - b)) {
+        if (requested.current.has(i)) continue;
+        requested.current.add(i);
+        const r = await loadCatalogPage(CATALOG[i].file).catch(() => 'error' as const);
+        if (r !== 'error') urls.current.push(r.url);
+        if (!alive.current) return;
+        setPages((c) => c.map((x, j) => (j === i ? r : x)));
+      }
+    })();
+  }, [picked]);
   const toggle = (i: number) => {
     touched.current = true;
     setPicked((c) => {
@@ -73,6 +93,9 @@ export function CatalogPrintView({sale, onClose}: {sale: Sale; onClose: () => vo
     };
   }, []);
   const last = Math.max(-1, ...picked);
+  // 一覧に出すページ：絞ったページ（とチェックしたページ）。「＋ ほかのページ」で全部
+  const narrowed = matched.size > 0 && !showAll;
+  const listed = CATALOG.flatMap((_, i) => (!narrowed || matched.has(i) || picked.has(i) ? [i] : []));
   const ready = picked.size > 0 && [...picked].every((i) => pages[i] && pages[i] !== 'error');
   return createPortal(
     <div className="print-overlay">
@@ -90,15 +113,21 @@ export function CatalogPrintView({sale, onClose}: {sale: Sale; onClose: () => vo
         {/* ページの名前は大きく、押せる所を広く（ユーザーの指示「チラシリスト（例浴槽手すり、浴槽台）などの文字は大きくして選びやすくする」2026-10-28。前は 14px の字とチェックだけ）。
             スマホはページが12あると上の帯が画面の半分になるので、帯の中でスクロールする高さまで */}
         <span role="group" aria-label="印刷するページ" className="flex max-h-[10rem] flex-wrap items-center gap-x-1.5 gap-y-1 overflow-y-auto sm:max-h-none sm:overflow-visible">
-          {CATALOG.map((p, i) => (
+          {only?.label && <span className="text-sm text-white/80">🔍 {only.label}</span>}
+          {listed.map((i) => (
             <label
-              key={p.file}
+              key={CATALOG[i].file}
               className={`flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-base sm:text-[17px] ${picked.has(i) ? 'bg-white/20 ring-1 ring-white/60' : 'hover:bg-white/10'}`}
             >
               <input type="checkbox" checked={picked.has(i)} onChange={() => toggle(i)} className="h-5 w-5 shrink-0" />
-              {catalogLabel(p)}
+              {catalogLabel(CATALOG[i])}
             </label>
           ))}
+          {matched.size > 0 && (
+            <button type="button" onClick={() => setShowAll((v) => !v)} className="rounded-md border border-white/40 px-2.5 py-1 text-sm text-white hover:bg-white/10">
+              {showAll ? '絞ったページだけ' : `＋ ほかのページ（${CATALOG.length - listed.length}）`}
+            </button>
+          )}
         </span>
         <button type="button" onClick={onClose} className="rounded-md border border-white/40 px-4 py-2 text-sm font-bold text-white hover:bg-white/10">
           閉じる

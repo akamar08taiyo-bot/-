@@ -73,7 +73,7 @@ function clampBox(b: Box): Box {
 }
 
 /** filter：出すページを絞る（商品の欄の「🔍 商品検索」で絞った商品の載っているページだけ。「✕ 全部のページ」で外す） */
-export function CatalogViewer({sale, query: initial, filter, onClose, onPrint}: {sale: Sale; query: string; filter?: CatalogPagesFilter; onClose: () => void; onPrint: () => void}) {
+export function CatalogViewer({sale, query: initial, filter, onClose, onPrint}: {sale: Sale; query: string; filter?: CatalogPagesFilter; onClose: () => void; onPrint: (only?: CatalogPagesFilter) => void}) {
   const [box, setBox] = useState<Box>(firstBox);
   const [query, setQuery] = useState(initial);
   const [only, setOnly] = useState<CatalogPagesFilter | null>(filter ?? null);
@@ -308,7 +308,12 @@ export function CatalogViewer({sale, query: initial, filter, onClose, onPrint}: 
         <button type="button" className={tool} onClick={() => zoomBy(1.2)} aria-label="大きく">
           ＋
         </button>
-        <button type="button" className={`${tool} !border-sky-300 !bg-sky-50 !text-sky-900`} onClick={onPrint}>
+        {/* 印刷：商品検索・カタログから検索で絞っていれば、そのページだけで印刷の画面を開く（ユーザーの指示「該当の項目で絞ったら絞ったものだけを表示する」2026-11-01） */}
+        <button
+          type="button"
+          className={`${tool} !border-sky-300 !bg-sky-50 !text-sky-900`}
+          onClick={() => onPrint(only || query.trim() ? {pages: matches.map((i) => CATALOG[i].page), label: [only?.label, query.trim()].filter(Boolean).join('・')} : undefined)}
+        >
           🖨 印刷
         </button>
         <button type="button" className={tool} onClick={onClose} aria-label="カタログを閉じる">

@@ -442,6 +442,55 @@ export function fitCell(files: Files, sheet: string, ref: string, widthOnly = fa
 }
 
 /**
+ * 長い名前を区切りの良い所で2行に分ける候補（空白・閉じかっこのあと・開きかっこの前）。2行のうち長い方がいちばん短くなる所から順に
+ * （「シャワーチェアAir コンパクトワンタッチ ブルー」→「シャワーチェアAir」「コンパクトワンタッチ ブルー」）
+ */
+export function nameBreaks(name: string): [string, string][] {
+  const out: [string, string][] = [];
+  const chars = [...name];
+  for (let i = 1; i < chars.length; i++) {
+    const a = chars[i - 1];
+    const b = chars[i];
+    const space = /[ \u3000]/.test(b);
+    if (!space && !/[\]］）)」]/.test(a) && !/[\[［（(「]/.test(b)) continue;
+    const head = chars.slice(0, i).join('').trim();
+    const tail = chars.slice(space ? i + 1 : i).join('').trim();
+    if (head && tail) out.push([head, tail]);
+  }
+  return out.sort((x, y) => Math.max(emOf(x[0]), emOf(x[1])) - Math.max(emOf(y[0]), emOf(y[1])));
+}
+
+/**
+ * 名前の欄（種目及び商品名）：最後の行（商品名）が長いときは、区切りの良い所で2行にした方が字が大きくなるなら2行にする（欄の文字を書きかえる）。
+ * そのあと fitCell で、どの行も幅に入る大きさにする（ユーザーの指示「項目名（入浴補助用具等）の文字が小さすぎる。商品名が長くなった場合は、2段にしてもよい。
+ * （区切りの良いところ、シャワーチェアAir／コンパクトワンタッチ ブルー）」2026-11-01。前は商品名を1行に入れるため、種目まで小さくなっていた）
+ */
+export function fitNameCell(files: Files, sheet: string, ref: string, canSplit: (lines: string[]) => boolean): number | null {
+  const path = sheetPath(files, sheet);
+  const xml = strFromU8(files[path]);
+  const text = cellText(xml, ref, sharedStrings(files));
+  const lines = text.split('\n');
+  const last = lines[lines.length - 1] ?? '';
+  if (lines.length >= 2 && last && canSplit(lines)) {
+    const box = rangeBox(sheetLayout(xml), ref);
+    const st = cellStyle(files, xml, ref);
+    const size = (ls: string[]) => fitSize(ls, box.w, box.h, st.size, false);
+    let best = lines;
+    let bestPt = size(lines);
+    for (const [a, b] of nameBreaks(last).slice(0, 3)) {
+      const next = [...lines.slice(0, -1), a, b];
+      const pt = size(next);
+      if (pt > bestPt + 0.4) {
+        best = next;
+        bestPt = pt;
+      }
+    }
+    if (best !== lines) writeCells(files, sheet, new Map([[ref, best.join('\n')]]));
+  }
+  return fitCell(files, sheet, ref, false, true);
+}
+
+/**
  * 折り返しの欄に入れる文を、欄の幅で行に分ける（Excel の折り返しにまかせると、丸をつける行の位置が分からないため）。
  * pt の文字で1行に入る長さで切る（句読点の前では切らない）
  */

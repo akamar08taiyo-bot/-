@@ -146,8 +146,8 @@ test('種目・メーカーで絞る：シャワーチェア（入浴用いす�
   const chairs = catalogInCategory(all, '入浴補助用具', '入浴用いす');
   assert.deepEqual(catalogMakers(chairs).slice(0, 2), ['アロン化成（株）', 'パナソニックエイジフリー（株）']);
   const pana = chairs.filter((p) => sameMaker(p.maker, 'パナソニックエイジフリー（株）'));
-  assert.equal(pana.length, 11);
-  assert.ok(pana.every((p) => p.page === 40));
+  assert.equal(pana.length, 24); // p.40 の 11 と p.41（おりたたみ）の 13
+  assert.deepEqual([...new Set(pana.map((p) => p.page))], [40, 41]);
   assert.ok(sameMaker('パナソニック', 'パナソニックエイジフリー(株)'));
   assert.ok(!sameMaker('アロン化成（株）', 'パナソニックエイジフリー（株）'));
   assert.equal(appMaker('安寿'), 'アロン化成（株）');
@@ -214,18 +214,21 @@ test('商品検索：種目・項目名・メーカーで絞る（のばす音�
   const pana = catalogFilter(all, item('入浴補助用具', 'シャワーチェアー', 'パナソニックエイジフリー（株）'));
   assert.equal(pana.byName, true);
   assert.equal(pana.sub, '入浴用いす');
-  assert.equal(pana.items.length, 11);
+  assert.equal(pana.items.length, 24);
   assert.ok(pana.items.every((p) => p.sub === '入浴用いす' && sameMaker(p.maker, 'パナソニック')));
-  assert.deepEqual(catalogPagesOf(pana.items), [40]);
+  assert.deepEqual(catalogPagesOf(pana.items), [40, 41]);
   // ひらがな・種目が空・メーカーは「パナソニック」だけでも同じ
   assert.deepEqual(catalogFilter(all, item('', 'しゃわーちぇあ', 'パナソニック')).items, pana.items);
   // 品目の名前（シャワーチェア）なら、シャワーキャリー・シャワーベンチもふくむ（シャワーチェアの品目。2026-11-01 の指示）
   const chairs = catalogFilter(all, item('入浴補助用具', 'シャワーチェア', ''));
-  assert.deepEqual(catalogPagesOf(chairs.items), [37, 40, 50]);
+  assert.deepEqual(catalogPagesOf(chairs.items), [37, 40, 41, 48, 49, 50, 51]);
   // ほかの語は商品名にあるもの（ユクリア）。商品名になければページの題（p.50 シャワーキャリー）
   const yu = catalogFilter(all, item('入浴補助用具', 'ユクリア', ''));
   assert.ok(yu.items.length > 0 && yu.items.every((p) => looseKey(p.name).includes(looseKey('ユクリア'))));
-  assert.deepEqual(catalogPagesOf(catalogFilter(all, item('入浴補助用具', 'シャワーキャリー', '')).items), [50]);
+  assert.deepEqual(catalogPagesOf(catalogFilter(all, item('入浴補助用具', 'シャワーキャリー', '')).items), [48, 49, 50, 51]);
+  // 四点杖（多点杖）・ラップポン（ポータブルトイレ）
+  assert.deepEqual(catalogPagesOf(catalogFilter(all, item('', '多点杖', '')).items), [151, 152, 153, 154]);
+  assert.deepEqual(catalogPagesOf(catalogFilter(all, item('', 'ラップポン', '')).items), [174, 175]);
   // 種目が空でも、項目名から種目を推し量る（ポータブルトイレ → 腰掛便座）。介護保険の対象（種目のある商品）だけ
   const toilets = catalogFilter(all, item('', 'ポータブルトイレ', ''));
   assert.equal(toilets.category, '腰掛便座');

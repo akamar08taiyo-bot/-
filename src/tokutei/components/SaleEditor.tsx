@@ -236,14 +236,15 @@ export function SaleEditor({
     setPrintingShinsei(true);
   };
   // 介援隊のカタログの印刷（catalog.ts。見積もりの商品が載っているページに初めからチェック）
-  const [printingCatalog, setPrintingCatalog] = useState(false);
+  // カタログの印刷（only：カタログの窓で絞ったページだけで開くとき）
+  const [printingCatalog, setPrintingCatalog] = useState<{only?: CatalogPagesFilter} | null>(null);
   // 「🧾 売上伝票依頼書」の窓（UriageDialog.tsx）
   const [uriageOpen, setUriageOpen] = useState(false);
   // カタログの窓（print/CatalogViewer.tsx）。「カタログから検索」に打った字で開く
   const [catalogView, setCatalogView] = useState<{query: string; filter?: CatalogPagesFilter} | null>(null);
   useEffect(() => {
     if (!catalogAsk) return;
-    if (catalogAsk.action === 'print') setPrintingCatalog(true);
+    if (catalogAsk.action === 'print') setPrintingCatalog({});
     else setCatalogView((c) => c ?? {query: ''});
   }, [catalogAsk]);
   const closeCatalog = useCallback(() => setCatalogView(null), []);
@@ -314,7 +315,7 @@ export function SaleEditor({
     excel: () => (onShinsei ? excelShinsei() : (saveExcel(), true)),
     print: () => (onShinsei ? printShinseiIfReady() : (print(), true)),
     delete: () => (remove(), true),
-    catalog: () => (setPrintingCatalog(true), true),
+    catalog: () => (setPrintingCatalog({}), true),
     uriage: () => (setUriageOpen(true), true),
     hacchu: prepareHacchu,
   };
@@ -372,7 +373,7 @@ export function SaleEditor({
             {onShinsei ? (
               // 介援隊のカタログのページを選んで印刷（catalog.ts。ユーザーの指示「申請書を作成するとき…カタログの PDF の印刷」2026-10-26）。
               // 印刷なので薄い水色（住宅改修の様邸の画面の「🖨 カタログを印刷」と同じ色・同じ名前。2026-10-28）
-              <Btn color="softSky" onClick={() => setPrintingCatalog(true)}>
+              <Btn color="softSky" onClick={() => setPrintingCatalog({})}>
                 🖨 カタログを印刷
               </Btn>
             ) : (
@@ -550,7 +551,7 @@ export function SaleEditor({
                       🖨 見積書を印刷
                     </Btn>
                     {/* 介援隊のカタログのページを選んで印刷（ユーザーの指示「販売見積書…を作成するとき…カタログの PDF の印刷」2026-10-26） */}
-                    <Btn color="softSky" className="w-full" onClick={() => setPrintingCatalog(true)}>
+                    <Btn color="softSky" className="w-full" onClick={() => setPrintingCatalog({})}>
                       🖨 カタログを印刷
                     </Btn>
                   </div>
@@ -601,8 +602,8 @@ export function SaleEditor({
           }
         />
       )}
-      {catalogView && <CatalogViewer sale={sale} query={catalogView.query} filter={catalogView.filter} onClose={closeCatalog} onPrint={() => setPrintingCatalog(true)} />}
-      {printingCatalog && <CatalogPrintView sale={sale} onClose={() => setPrintingCatalog(false)} />}
+      {catalogView && <CatalogViewer sale={sale} query={catalogView.query} filter={catalogView.filter} onClose={closeCatalog} onPrint={(only) => setPrintingCatalog({only})} />}
+      {printingCatalog && <CatalogPrintView sale={sale} only={printingCatalog.only} onClose={() => setPrintingCatalog(null)} />}
       {uriageOpen && <UriageDialog sale={sale} settings={s} change={change} onClose={() => setUriageOpen(false)} />}
       {pickingCustomer && <CustomerPicker sales={data.sales} current={sale} onPick={pickCustomer} onClose={() => setPickingCustomer(false)} />}
       {picking && (
