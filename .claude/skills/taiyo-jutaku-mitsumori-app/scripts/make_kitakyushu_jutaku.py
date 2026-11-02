@@ -260,9 +260,13 @@ def shikyu_fields(pg):
         yen = [it for it in pg.items if it['text'] == '円' and V[0] <= it['x0'] <= V[2] and V[1] <= it['cy'] <= V[3]][0]
         fs.append(F(key, [V[0] + 2, V[1] + 1, yen['x0'] - 1, V[3] - 1], h='right', size=11, shrink=True))
     # 委任の欄（被保険者氏名は自署なので書かない）と申請の欄の事業者
+    # 委任の欄の事業者名は、すぐ上の右にある注記「※署名（自署）の場合は押印する必要はありません」の手前まで（注記の下まで伸ばすと、
+    # 長い事業者名が注記に重なった。2026-11-02。注記の字は欄の行に少しかかる）
+    note = pg.find('※署名')
     for n, key in ((0, 'builder'), (1, 'builder2')):
         lab = pg.find('事業者名', n=n)
-        fs.append(F(key, [lab['x1'] + 3, lab['top'] - 0.5, 450, lab['bottom'] + 0.5], size=10.5, shrink=True))
+        right = min(450, note['x0'] - 2) if n == 0 else 450
+        fs.append(F(key, [lab['x1'] + 3, lab['top'] - 0.5, right, lab['bottom'] + 0.5], size=10.5, shrink=True))
     lab = pg.find('代表者名', exact=True)
     fs.append(F('builderRep', [lab['x1'] + 3, lab['top'] - 0.5, 450, lab['bottom'] + 0.5], size=10.5, shrink=True))
     lab = pg.find('代表者名(申請者)')

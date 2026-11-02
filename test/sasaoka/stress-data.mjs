@@ -101,7 +101,7 @@ const shinsei = (o) => ({
 });
 
 const job = (n, insurer, form, address, extra = {}) => ({
-  id: `stress-${insurer}`, month: '2026-10', customer: `見本長谷川原　美千代子${n}`, suffix: '様邸', staff: '久保 匠史', date: '2026-11-05', estDate: '2026-10-22',
+  id: `stress-${insurer}`, month: new Date().toISOString().slice(0, 7), customer: `見本長谷川原　美千代子${n}`, suffix: '様邸', staff: '久保 匠史', date: '2026-11-05', estDate: '2026-10-22',
   address, note: '玄関・浴室・トイレ・寝室・階段・勝手口・居間・洗面所の住宅改修（見本）', insuredNo: '0001234567', insurer, form,
   overhead: null, overheadTarget: null, shikiri: true,
   places: places().map((p, i) => ({id: `${insurer}-p${i + 1}`, photo: 0, ...p})),
@@ -115,7 +115,15 @@ const data = {
     job('B', 'yukuhashi', 'yukuhashi', '福岡県行橋市大字流末1234番地56　見本マンション行橋駅前東館1203号室'),
     job('C', 'miyako', 'yukuhashi', '福岡県京都郡みやこ町犀川大坂1234番地5　見本コーポ犀川第三203号室'),
     job('D', 'kouiki', 'kouiki', '福岡県築上郡築上町大字椎田1234番地56　見本レジデンス椎田南第一101号'),
+    // 福岡市・北九州市（受領委任払の様式に、受任者＝設定の会社・営業所・代表者（所長）の欄がある。ユーザーの指示「委任状の…社長名…はみ出し」2026-11-02）
+    job('E', 'fukuoka', 'yukuhashi', '福岡県福岡市早良区小田部4丁目1234番地56　見本マンション小田部東館1203号室', {shinsei: {zip: '814-0032', insurerNo: '401307'}}),
+    job('F', 'kitakyushu', 'yukuhashi', '福岡県北九州市小倉北区重住3丁目1234番56号　見本ハイツ重住南第二ビル301号室', {shinsei: {zip: '802-0011', insurerNo: '401000'}}),
   ],
+  // 長い会社名・営業所名・所長名（受任者の欄。架空）
+  settings: {
+    company: '太陽シルバーサービス株式会社', officeName: '北九州小倉南第二営業所', manager: '見本長谷川原　一郎太',
+    postal: '802-0011', address: '福岡県北九州市小倉北区重住3丁目1234番56号　見本ビル2階', tel: '093-000-0000', fax: '093-000-0001',
+  },
 };
 fs.writeFileSync(out, JSON.stringify(data, null, 1));
 console.log('wrote', out, data.jobs.length, 'jobs');

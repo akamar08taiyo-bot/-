@@ -39,6 +39,8 @@ export type ShinseiSheet = {
   kindRows?: {kind: string; places?: string[]; other?: string; detail?: string}[];
   checks?: string[]; // いつも最初の□を■にする欄（北九州市の住宅の状況「□持家」）
   oneLine?: string[]; // 折り返さない欄（長い文字は縮めて1行に。氏名・フリガナなどのほかに。理由書の電話番号・日付）
+  // 右の空いた欄へはみ出して書く1行の欄の、はみ出してよい右の端の列（委任状の委任者の住所は下線の端の G 列まで。それより長ければ小さくする）
+  spillTo?: Record<string, string>;
   // 写真貼付用紙：原本の写真番号の欄（①・写真番号①・№①）を読み、その写真番号の改修場所を改修箇所の欄（place）に入れ、
   // その写真番号の箇所の写真を改修前・改修後の枠（番地の範囲。before・after）に貼る（同じ写真番号の用紙が2枚あれば、最初の用紙だけ）。
   // 苅田町の写真の用紙は、改修箇所・実施した工事種類が□の一覧（placeChecks・kindChecks。その写真番号の箇所の□を■に）と、撮影日の欄（dates）。
@@ -327,6 +329,8 @@ const PROXY_AMOUNT_EM = 28;
 const PROXY: ShinseiSheet = {
   sheet: '委任状',
   texts: [T('A32', '　　　　委任者　住　所　　{address}'), T('B23', '{benefit}円')],
+  // 委任者の住所は下線（C32:G32）の右の端まで。前は長い住所が下線を越えて表の右の線まで伸びた（ユーザーの指示「委任状の…はみ出し」2026-11-02）
+  spillTo: {A32: 'G'},
   enlarge: {cell: 'B23', pt: PROXY_AMOUNT_PT, rows: PROXY_AMOUNT_ROWS},
 };
 
@@ -1011,8 +1015,9 @@ export function shinseiValues(job: Job, s: EstimateSettings & BuilderSettings, t
       builderZip: t(s.postal ?? ''),
       builderAddress: (s.address ?? '').trim(),
       builderTel: t(s.tel ?? ''),
-      // 代表者氏名：請求書と同じ「○○営業所所長　氏名」
-      builderRep: s.manager?.trim() ? `${s.officeName?.trim() ?? ''}所長　${s.manager.trim()}` : '',
+      // 代表者氏名：「所長　氏名」（特定福祉用具の申請書と同じ）。前は請求書と同じ「○○営業所所長　氏名」にしていたが、すぐ上（左）の名称に営業所があり、
+      // 北九州市の事前届出書の代表者名の狭い欄で字がとても小さくなった（ユーザーの指示「委任状の…社長名…はみ出し…文字が極端に小さくなってないか」2026-11-02）
+      builderRep: s.manager?.trim() ? `所長　${s.manager.trim()}` : '',
       zipA,
       zipB,
       telA,
@@ -1920,7 +1925,7 @@ function fitTexts(files: Files, sheet: ShinseiSheet, cells: Map<string, CellValu
     const lay = sheetLayout(before);
     let xml = before;
     for (const {ref, text, oneLine: single} of list) {
-      const style = fitStyle(files, xml, lay, ref, text, single);
+      const style = fitStyle(files, xml, lay, ref, text, single, sheet.spillTo?.[ref]);
       if (style !== null) xml = setStyle(xml, ref, String(style));
     }
     if (xml !== before) files[p] = strToU8(xml);
@@ -1928,7 +1933,7 @@ function fitTexts(files: Files, sheet: ShinseiSheet, cells: Map<string, CellValu
 }
 
 /** 欄に文字が入らないときの書式（入るときは null） */
-function fitStyle(files: Files, xml: string, lay: SheetLayout, ref: string, text: string, oneLine: boolean): number | null {
+function fitStyle(files: Files, xml: string, lay: SheetLayout, ref: string, text: string, oneLine: boolean, spillTo?: string): number | null {
   const found = cellRe(ref).exec(xml);
   const at = /^([A-Z]+)(\d+)$/.exec(ref);
   if (!found || !at) return null;
@@ -1952,7 +1957,7 @@ function fitStyle(files: Files, xml: string, lay: SheetLayout, ref: string, text
   const need = [...text.replace(/\n/g, '')].reduce((n, ch) => n + charWidth(ch, proportional), 0) * px + CELL_PAD;
   let avail = box.w;
   if (!merge) {
-    const maxCol = colNum(/<dimension ref="[A-Z]+\d+:([A-Z]+)\d+"/.exec(xml)?.[1] ?? 'A') || c;
+    const maxCol = spillTo ? colNum(spillTo) : colNum(/<dimension ref="[A-Z]+\d+:([A-Z]+)\d+"/.exec(xml)?.[1] ?? 'A') || c;
     const row = new RegExp(`<row r="${r}"[^>]*>([\\s\\S]*?)</row>`).exec(xml)?.[1] ?? '';
     const filled = new Set([...row.matchAll(/<c r="([A-Z]+)\d+"[^>]*?(?:\/>|>([\s\S]*?)<\/c>)/g)].filter((m) => /<v>[^<]|<is>/.test(m[2] ?? '')).map((m) => colNum(m[1])));
     const empty = (cc: number) => cc >= 1 && cc <= maxCol && !mergeOf(cc, r) && !filled.has(cc);

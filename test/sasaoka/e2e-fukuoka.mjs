@@ -86,7 +86,7 @@ assert.match(text(a, 'G19'), /^太陽シルバーサービス.*福岡西営業�
 assert.match(text(a, 'O27'), /092-111-2222/);
 const b = '完了届出書（受領委任用)';
 assert.deepEqual([text(b, 'P16'), text(b, 'V16'), text(b, 'X16'), text(b, 'P17'), text(b, 'V17'), text(b, 'X17')], ['令和　8', '11', '2', '令和　8', '11', '5']);
-assert.match(text(b, 'P29'), /^福岡西営業所所長　/);
+assert.match(text(b, 'P29'), /^所長　/);
 assert.match(text('写真貼付台紙（事前）', 'D6'), /■玄関・道路までの通路/);
 assert.match(text('写真貼付台紙（事前）', 'D24'), /■便所/); // 下の②トイレ
 assert.equal(sheets.size, 13);

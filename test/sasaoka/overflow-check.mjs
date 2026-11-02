@@ -3,6 +3,7 @@
 // 長い値の架空の様邸（stress-data.mjs。4つの保険者）を設定のバックアップから足し、見積書（画面・印刷）・申請書・理由書・発注書（画面・印刷）・請求書・様邸の明細の
 // 文字のかたまりごとに、いちばん近い箱（表のます、はみ出しを隠す箱）の内側から出ていないかをはかる。0 件が目標。
 // スマホの幅の印刷イメージは CSS の zoom で縮めて見せるので、箱の線の太さも同じ倍率にしてから引く（縮める前の太さを引くと内側を狭く測ってしまう）。
+// 申請書・理由書のプレビューは、6pt（8画素）より小さくなった字も数える（ユーザーの指示「文字が極端に小さくなってないか」2026-11-02）。
 // usage: node stress-data.mjs <長い値の json> && node overflow-check.mjs <サイトのURL> <長い値の json> <出力フォルダ> [幅（既定 1366。スマホは 390）]
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import path from 'node:path';
@@ -71,6 +72,23 @@ const MEASURE = (roots) => {
       }
       // 文字の大きさに対して、どれだけはみ出しているか（字の上下のすき間で少しはみ出すのは数えない）
       const fs = parseFloat(cs.fontSize) * (b.height / (box.offsetHeight || b.height) || 1);
+      // はみ出していたら、空白（半角・全角）を除いた字だけで測り直す（原本の全角スペースで2行目に送る文字は、行の終わりの空白が欄の外に出るが見えない）
+      if (dx > 1 || dy > Math.max(1.5, fs * 0.25)) {
+        dx = 0;
+        dy = 0;
+        const str = n.textContent;
+        for (let i = 0; i < str.length; i++) {
+          if (/[\s\u3000]/.test(str[i])) continue;
+          const one = document.createRange();
+          one.setStart(n, i);
+          one.setEnd(n, i + 1);
+          for (const q of one.getClientRects()) {
+            if (q.width <= 0.5 || q.height <= 0.5) continue;
+            dx = Math.max(dx, l - q.left, q.right - r);
+            dy = Math.max(dy, t - q.top, q.bottom - btm);
+          }
+        }
+      }
       if (dx > 1 || dy > Math.max(1.5, fs * 0.25)) {
         out.push({text: text.slice(0, 48), box: `${box.tagName.toLowerCase()}${typeof box.className === 'string' && box.className ? '.' + box.className.trim().split(/\s+/).slice(0, 2).join('.') : ''}`, w: Math.round(r - l), dx: Math.round(dx * 10) / 10, dy: Math.round(dy * 10) / 10, clips});
       }
@@ -79,6 +97,27 @@ const MEASURE = (roots) => {
   return out;
 };
 
+// 小さすぎる字：帳票の字の大きさ（プレビューは用紙の画素。画面の拡大・縮小の前）が 8 画素（6pt）より小さい文字のかたまり
+const TINY = (roots) => {
+  const out = [];
+  for (const root of roots) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const text = n.textContent.replace(/\s+/g, ' ').trim();
+      const el = n.parentElement;
+      if (!text || !el || el.closest('.sr-only, button, select, option, textarea, input')) continue;
+      const px = parseFloat(getComputedStyle(el).fontSize);
+      if (px < 8) out.push({text: text.slice(0, 40), px: Math.round(px * 10) / 10});
+    }
+  }
+  return out;
+};
+const tiny = {};
+const recordTiny = async (name, locator) => {
+  const items = (await locator.count()) ? await locator.evaluateAll(TINY) : [];
+  tiny[name] = items;
+  if (items.length) console.log(`  小さすぎる字 ${name}: ${items.length} 件`, JSON.stringify(items.slice(0, 6)));
+};
 const results = {};
 const record = async (name, locator) => {
   const roots = await locator.count();
@@ -93,14 +132,14 @@ const shotOf = async (name, locator) => {
   else await page.screenshot({path: file, fullPage: true});
 };
 
-// ---------------- 長い値の様邸をバックアップから入れる（今のデータに足す）
+// ---------------- 長い値の様邸と設定（長い会社名・営業所名・所長名）をバックアップから入れる（今のデータを置き換える。設定は置き換えるときだけ入る）
 await page.goto(`${site}/jutaku-mitsumori/index.html`);
 await page.getByRole('navigation').getByRole('button', {name: /設定/}).click();
 await page.locator('input[type=file][accept=".json,application/json"]').setInputFiles(backup);
-await page.getByRole('button', {name: '今のデータに足す（同じものは上書き）'}).click();
+await page.getByRole('button', {name: '今のデータを置き換える'}).click();
 await page.waitForTimeout(800);
 
-const ids = ['kanda', 'yukuhashi', 'miyako', 'kouiki'];
+const ids = ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu'];
 for (const ins of ids) {
   const job = `stress-${ins}`;
   // 見積書（画面）
@@ -123,12 +162,14 @@ for (const ins of ids) {
   await page.locator('[aria-label="申請書のプレビュー"]').waitFor();
   await page.waitForTimeout(1500);
   await record(`${ins}-申請書`, page.locator('[aria-label="申請書のプレビュー"]'));
+  await recordTiny(`${ins}-申請書`, page.locator('[aria-label="申請書のプレビュー"]'));
   await shotOf(`${ins}-申請書`, page.locator('[aria-label="申請書のプレビュー"]'));
   // 理由書（プレビュー）
   await page.getByRole('tab', {name: '📄 理由書'}).click();
   await page.locator('[aria-label="理由書のプレビュー"]').waitFor();
   await page.waitForTimeout(1500);
   await record(`${ins}-理由書`, page.locator('[aria-label="理由書のプレビュー"]'));
+  await recordTiny(`${ins}-理由書`, page.locator('[aria-label="理由書のプレビュー"]'));
   await shotOf(`${ins}-理由書`, page.locator('[aria-label="理由書のプレビュー"]'));
   // 発注書（画面・印刷）
   await page.getByRole('tab', {name: '📋 工事見積書'}).click();
@@ -154,13 +195,15 @@ await page.waitForTimeout(600);
 await record('請求書の印刷', page.locator('.print-overlay .sheet'));
 await shotOf('請求書の印刷', page.locator('.print-overlay .sheet').first());
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
-await page.getByRole('cell', {name: /美千代子A/}).first().click();
+// 様邸の明細（請求書のタブの様邸の画面）は URL で開く（請求書の一覧の見た目が変わっても動くように）
+await page.goto(`${site}/jutaku-mitsumori/index.html#tab=invoice&job=stress-kanda`);
+await page.reload();
 await page.getByRole('button', {name: '🖨 この様邸の明細を印刷'}).click();
 await page.locator('.print-overlay').waitFor();
 await page.waitForTimeout(600);
 await record('様邸の明細の印刷', page.locator('.print-overlay .sheet'));
 await shotOf('様邸の明細の印刷', page.locator('.print-overlay .sheet').first());
 
-fs.writeFileSync(path.join(out, `${tag}-results.json`), JSON.stringify(results, null, 1));
+fs.writeFileSync(path.join(out, `${tag}-results.json`), JSON.stringify({results, tiny}, null, 1));
 console.log(errors.length ? errors.join('\n') : 'errors: なし');
 await browser.close();

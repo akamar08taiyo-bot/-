@@ -1378,12 +1378,12 @@ test('福岡市：申請書（様式第21号）・完了届出書（第22号の2
   assert.match(at('O27'), /092-111-2222/);
   assert.doesNotMatch(at('Q17'), /\d/); // 着工予定日は原本のまま（書かない）
   assert.equal(ellipses(out, '様式第21号').length, 3); // 元号（昭）・在宅・１．利用する
-  // 完了届出書：改修施工者（受任者）＝設定の会社・営業所、着工日・完成日（令和）、代表者は「○○営業所所長　氏名」。振込先は書かない
+  // 完了届出書：改修施工者（受任者）＝設定の会社・営業所、着工日・完成日（令和）、代表者は「所長　氏名」（名称に営業所があるので）。振込先は書かない
   const b = byName.get('完了届出書（受領委任用)')!;
   const bt = (ref: string) => txt(b, ref);
   assert.equal(bt('F16'), '太陽シルバーサービス株式会社　福岡西営業所');
   assert.deepEqual([bt('P16'), bt('V16'), bt('X16'), bt('P17'), bt('V17'), bt('X17')], ['令和　8', '11', '2', '令和　8', '11', '5']);
-  assert.deepEqual([bt('F27'), bt('F28'), bt('E29'), bt('P29')], ['814-0000', '福岡県福岡市早良区見本1-1', '太陽シルバーサービス株式会社　福岡西営業所', '福岡西営業所所長　見本 次郎']);
+  assert.deepEqual([bt('F27'), bt('F28'), bt('E29'), bt('P29')], ['814-0000', '福岡県福岡市早良区見本1-1', '太陽シルバーサービス株式会社　福岡西営業所', '所長　見本 次郎']);
   assert.match(bt('O28'), /092-000-0000/);
   assert.equal(bt('E31'), '');
   assert.equal(ellipses(out, '完了届出書（受領委任用)').length, 1); // 元号だけ
@@ -1492,7 +1492,7 @@ test('北九州市：事前届出書（提出用・通知用）に書く。改�
     assert.match(at(c.places[1]), /□浴室　■トイレ/, name);
     assert.equal(at(c.places2[1]), '□洗面脱衣室　□その他（', name); // その他はなし（原本のまま）
     // 所在地は郵便番号と住所の1行（原本の小さな「〒」「-」の欄に分けて書くと、郵便番号だけ小さく上にずれて見えた。ユーザーの指摘 2026-10-29）
-    assert.deepEqual([at(c.builder), at(c.builderRep), at(c.builderAddress), at(c.manager)], ['太陽シルバーサービス株式会社　小倉営業所', '小倉営業所所長　見本 次郎', '〒802-0000　福岡県北九州市小倉北区見本1-1', '見本 三郎'], name);
+    assert.deepEqual([at(c.builder), at(c.builderRep), at(c.builderAddress), at(c.manager)], ['太陽シルバーサービス株式会社　小倉営業所', '所長　見本 次郎', '〒802-0000　福岡県北九州市小倉北区見本1-1', '見本 三郎'], name);
     assert.deepEqual([at(c.builderTelA), at(c.builderTelB), at(c.builderTelC)], ['093', '000', '0000'], name);
     // 工事費見積金額①は介護保険の対象分（市の記入例）、支給予定金額は ①×90／100（1割負担。限度額20万円まで）
     assert.equal(at(c.cost), shinseiCost(kk, KK_S)!.toLocaleString('en-US'), name);
@@ -1519,7 +1519,7 @@ test('北九州市：支給申請書（受領委任払用）・写真の報告�
   assert.deepEqual([at(c.zip), at(c.address), at(c.telA), at(c.telB)], ['802-0001', '福岡県北九州市小倉北区見本町2-3', '093', '111-2222']);
   assert.match(at(c.cost), /^[\d,]+$/);
   assert.match(at(c.benefit), /^[\d,]+$/);
-  assert.deepEqual([at(c.builder), at(c.builder2), at(c.builderRep), at(c.builderRep2)], ['太陽シルバーサービス株式会社　小倉営業所', '太陽シルバーサービス株式会社　小倉営業所', '小倉営業所所長　見本 次郎', '小倉営業所所長　見本 次郎']);
+  assert.deepEqual([at(c.builder), at(c.builder2), at(c.builderRep), at(c.builderRep2)], ['太陽シルバーサービス株式会社　小倉営業所', '太陽シルバーサービス株式会社　小倉営業所', '所長　見本 次郎', '所長　見本 次郎']);
   assert.deepEqual([at(c.builderAddress), at(c.builderTel)], ['〒802-0000　福岡県北九州市小倉北区見本1-1', '093-000-0000']);
   assert.equal(at(c.biz), ''); // 事業者番号は書かない
   // 内容報告書：写真番号①（1枚目）＝浴室・改修の内容、③（3枚目）＝トイレ、⑤（5枚目）＝玄関。完了報告書：1枚に①②、③は2枚目の上
@@ -1623,4 +1623,47 @@ test('写真に書く内容：1行に入らない行は、きりのいい所（�
   assert.deepEqual(small.lines, ['手すりの取り付け', 'L=400mm×600mm']);
   // 小さくしても入らない（とても狭い）ときも、分けたうえで前と同じく折り返す
   assert.deepEqual(photoNoteText({x: 0, y: 0, w: 70, h: 300}, ['手すりの取り付け　L=400mm×600mm']).lines, ['手すりの取り付け', 'L=400mm×600mm']);
+});
+
+test('委任状（苅田町・行橋市）：受任者の欄（会社名・営業所・所長名の3行）は C14:H18 の縦の中央。長い委任者の住所は下線（G 列）の右の端までに入る大きさ', () => {
+  // ユーザーの指示「委任状の部分…社長名であったりだとか、もろもろはみ出しの部分などがありました」（2026-11-02）：
+  // 3行の 12pt の欄（C15:H17 の3行）は Excel でぎりぎりで、所長名の行が欄の下で切れることがあった・長い住所が下線を越えて表の右の線まで伸びた
+  const long = '福岡県京都郡苅田町大字与原1234番地56　見本ハイツ苅田南第二ビル301号室';
+  for (const [insurer, bytes] of [['kanda', KANDA], ['yukuhashi', YUKUHASHI]] as const) {
+    const {files, byName} = sheets(fillShinsei(bytes, SHINSEI[insurer]!, shinseiValues(job({insurer, address: long}), RATES)));
+    const proxy = byName.get('委任状')!;
+    assert.match(proxy, /<mergeCell ref="C14:H18"\/>/, insurer);
+    assert.doesNotMatch(proxy, /C15:H17/, insurer);
+    // 印刷は「1ページに合わせる」（表の右の線が2枚目に分かれないように）
+    assert.match(proxy, /<pageSetUpPr fitToPage="1"\/>/, insurer);
+    assert.match(proxy, /<pageSetup fitToWidth="1" fitToHeight="1"/, insurer);
+    // 文字（共有の文字）は C14 に移し、C15 は書式だけ
+    const shared = [...strFromU8(files['xl/sharedStrings.xml']).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => [...m[1].replace(/<rPh\b[\s\S]*?<\/rPh>/g, '').matchAll(/<t[^>]*>([^<]*)<\/t>/g)].map((t) => t[1]).join(''));
+    assert.match(shared[Number(/<v>(\d+)<\/v>/.exec(cell(proxy, 'C14'))?.[1])], /^\u3000太陽シルバーサービス株式会社/, insurer);
+    assert.doesNotMatch(cell(proxy, 'C15'), /<v>/, insurer);
+    const {xfs} = styleParts(files);
+    assert.match(xfs[Number(/\ss="(\d+)"/.exec(cell(proxy, 'C14'))?.[1])], /vertical="center"[^>]*wrapText="1"/, insurer);
+    // 住所：A〜G 列の幅に入る（どの字体でも入るよう全角1・半角0.5で数えて）
+    const text = txt(proxy, 'A32');
+    assert.ok(text.endsWith(long), insurer);
+    const lay = sheetLayout(proxy);
+    const width = rangeBox(lay, 'A32:G32').w;
+    const pt = fontOf(files, proxy, 'A32').size;
+    const em = [...text].reduce((n, ch) => n + (/[ -~]/.test(ch) ? 0.5 : 1), 0);
+    assert.ok(pt < 11 && (em * pt * 4) / 3 <= width, `${insurer} ${pt}pt ${em}em ${width}px`);
+    // 短い住所は原本の大きさのまま
+    const short = sheets(fillShinsei(bytes, SHINSEI[insurer]!, shinseiValues(job({insurer, address: '福岡県行橋市中央1-2-3'}), RATES)));
+    assert.equal(fontOf(short.files, short.byName.get('委任状')!, 'A32').size, 11, insurer);
+  }
+});
+
+test('北九州市の支給申請書：委任の欄の事業者名は、右の注記「※署名（自署）の場合は押印する必要はありません」の手前まで（重ならない）。代表者は「所長　氏名」', () => {
+  const {byName, files} = sheets(KITAKYUSHU);
+  const xml = byName.get('支給申請書')!;
+  assert.match(xml, /<mergeCell ref="AA64:BU64"\/>/);
+  // 注記（図形）の左の端は BV 列（73 列目＝0 始まり）。事業者名の欄の右の端（BU）はその手前
+  const drawing = Object.entries(files).find(([k, v]) => k.startsWith('xl/drawings/drawing') && /※署名（自署）/.test(strFromU8(v)));
+  assert.ok(drawing);
+  const anchor = strFromU8(drawing[1]).split(/<xdr:twoCellAnchor\b/).find((a) => a.includes('※署名（自署）')) ?? '';
+  assert.equal(Number(/<xdr:from><xdr:col>(\d+)<\/xdr:col>/.exec(anchor)?.[1]), 73);
 });
