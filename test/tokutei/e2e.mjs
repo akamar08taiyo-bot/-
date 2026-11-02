@@ -942,7 +942,12 @@ try {
   await catForm.getByLabel('種目', {exact: true}).selectOption('入浴補助用具');
   const picker = catForm.getByRole('group', {name: 'カタログの商品'});
   // 品目「シャワーチェア」を押すと、その品目の商品だけ（シャワーベンチ・シャワーチェア・シャワーキャリー。マットは出ない）がすぐ出る（2026-11-01）
-  await picker.getByRole('button', {name: /^シャワーチェア\s*\d+$/}).click({timeout: 60000});
+  // 品目・メーカーは押すと開く・閉じる（アコーディオン。ユーザーの指示「品目とメーカーはアコーディオン形式」2026-11-02）：品目は選ぶまで開いていて、選ぶと閉じる。メーカーは初めは閉じている
+  assert.equal(await picker.getByRole('group', {name: 'メーカー'}).count(), 0);
+  await picker.getByRole('group', {name: '品目'}).getByRole('button', {name: /^シャワーチェア\s*\d+$/}).click({timeout: 60000});
+  await picker.getByRole('group', {name: '品目'}).waitFor({state: 'detached'});
+  assert.match(await picker.getByRole('button', {name: /^📖 品目：/}).innerText(), /シャワーチェア\s*\d+/);
+  assert.equal(await picker.getByRole('button', {name: /^📖 品目：/}).getAttribute('aria-expanded'), 'false');
   const chairList = picker.getByRole('list', {name: 'シャワーチェアの商品'});
   // 商品の一覧はビルドで作った文字の一覧から（PDF 26 ページ・24MB を読まない。ユーザーの指示「カタログの読み込みスピードが遅くないか」2026-11-02）
   assert.equal(catalogGets.pdf, pdfBefore, `商品の一覧のために PDF を ${catalogGets.pdf - pdfBefore} 回読んだ`);
@@ -957,19 +962,39 @@ try {
   assert.ok(raku.length >= 5 && raku.every((n) => /シャワーラク/.test(n)), raku.join(','));
   await picker.getByLabel('カタログの商品をさがす').fill('');
   // シャワーチェアの品目のメーカー（カタログの順。2026-11-01 にシャワーキャリーのページを足して、モリトー・カワムラサイクルなども）
-  const chairMakers = await picker.getByRole('button', {pressed: false}).filter({hasText: /（株）$/}).allInnerTexts();
+  await picker.getByRole('button', {name: /^メーカー：/}).click();
+  const chairMakers = await picker.getByRole('group', {name: 'メーカー'}).getByRole('button', {pressed: false}).filter({hasText: /（株）$/}).allInnerTexts();
   assert.deepEqual(chairMakers.slice(0, 2), ['アロン化成（株）', 'パナソニックエイジフリー（株）']);
   assert.ok(['ウチヱ（株）', 'ピジョン（株）'].every((m) => chairMakers.includes(m)), chairMakers.join(','));
-  await picker.getByRole('button', {name: 'パナソニックエイジフリー（株）'}).click();
+  await picker.getByRole('group', {name: 'メーカー'}).getByRole('button', {name: 'パナソニックエイジフリー（株）'}).click();
   assert.equal(await catForm.getByLabel('メーカー').first().inputValue(), 'パナソニックエイジフリー（株）');
+  await picker.getByRole('group', {name: 'メーカー'}).waitFor({state: 'detached'}); // 選んだらメーカーの段は閉じる（見出しに選んだメーカー）
+  assert.match(await picker.getByRole('button', {name: /^メーカー：/}).innerText(), /パナソニックエイジフリー（株）/);
   const panaList = chairList;
   assert.equal(await panaList.getByRole('listitem').count(), 24); // カタログ p.40 のシャワーチェア 11種と p.41（おりたたみ）の 13種
+  // 色が2つ以上ある商品は、商品名を押すと色が開く（ユーザーの指示「商品名も色が複数ある場合は、アコーディオン形式にして、商品名をおすと、色を選べるようにする」2026-11-02）
+  // 色が1つだけの商品（p.40 のプレミアム）は、商品名を押すとすぐ入る
+  assert.deepEqual(await panaList.getByRole('button', {name: /を入れる$/}).evaluateAll((xs) => xs.map((x) => x.getAttribute('aria-label').replace(/ [\w-]+を入れる$/, ''))), ['シャワーチェアAir ミドルSPワンタッチ プレミアム']);
+  const compact = panaList.getByRole('button', {name: 'シャワーチェアAir コンパクトSPワンタッチ（3種類）'});
+  assert.equal(await compact.getAttribute('aria-expanded'), 'false');
   await page.screenshot({path: `${out}/05f-catalog-picker.png`});
-  await panaList.getByRole('button', {name: 'シャワーチェアAir コンパクトSPワンタッチ ブルー PN-L41431Aを入れる'}).click();
+  await compact.click();
+  assert.equal(await compact.getAttribute('aria-expanded'), 'true');
+  const colors = panaList.getByRole('group', {name: 'シャワーチェアAir コンパクトSPワンタッチの色・種類'});
+  assert.equal(await colors.getByRole('button').count(), 3);
+  // 開くのは1つずつ（別の商品を押すと前の商品は閉じる）
+  const middle = panaList.getByRole('button', {name: 'シャワーチェアAir ミドルSPワンタッチ（3種類）'});
+  await middle.click();
+  assert.equal(await compact.getAttribute('aria-expanded'), 'false');
+  assert.equal(await panaList.getByRole('group').count(), 1);
+  await page.screenshot({path: `${out}/05f2-catalog-colors.png`});
+  await compact.click();
+  await colors.getByRole('button', {name: 'シャワーチェアAir コンパクトSPワンタッチ ブルー PN-L41431Aを入れる'}).click();
   assert.equal(await catForm.getByLabel('商品名').inputValue(), 'シャワーチェアAir コンパクトSPワンタッチ ブルー');
   assert.ok(Number((await catForm.getByLabel('定価').inputValue()).replace(/[^\d]/g, '')) > 0);
-  assert.equal(await panaList.count(), 0); // 選んだら閉じる（「▼ 商品 24件」で開き直せる）
-  await picker.getByRole('button', {name: '▼ 商品 24件'}).waitFor();
+  assert.equal(await panaList.count(), 0); // 選んだら閉じる（「商品：24件」で開き直せる）
+  const productsHead = picker.getByRole('button', {name: /^商品：\s*24件/});
+  assert.equal(await productsHead.getAttribute('aria-expanded'), 'false');
   await page.screenshot({path: `${out}/05g-catalog-picked.png`});
   // メーカーの横の「🔍 商品検索」（ユーザーの指示「メーカー名の横に、商品検索ボタン。メーカー名、項目名を入力すると、フィルターをかけられた商品のみ表示されるようにする。
   // カタログも同様です」2026-11-01）：項目名「シャワーチェアー」・パナソニックで、その商品だけ。広い画面ではカタログの窓も、その商品の載っているページだけ
