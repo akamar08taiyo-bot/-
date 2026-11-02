@@ -103,12 +103,8 @@ if (withTokutei) {
   await pv.getByRole('group', {name: '用具・受領委任払', exact: true}).waitFor();
   assert.equal(await tk.getByRole('tab', {name: '📋 見積もり'}).count(), 0);
   assert.equal(await tk.getByRole('button', {name: '🖨 見積書を印刷'}).count(), 0);
-  // 特定福祉用具のタブ（見積もり・申請／商品マスタ／設定）の右に「🖨 申請書を印刷」（ユーザーの指示「ここに印刷ボタンをもってくる」2026-11-02）
-  const navPrint = tk.getByRole('button', {name: '🖨 申請書を印刷'});
-  assert.equal(await navPrint.count(), 1);
-  const settingsTab = await tk.getByRole('button', {name: '⚙ 設定'}).boundingBox();
-  const navPrintBox = await navPrint.boundingBox();
-  assert.ok(settingsTab && navPrintBox && navPrintBox.x > settingsTab.x + settingsTab.width && Math.abs(navPrintBox.y - settingsTab.y) < 6, `${JSON.stringify(settingsTab)} ${JSON.stringify(navPrintBox)}`);
+  // 特定福祉用具のタブ（見積もり・申請／商品マスタ／設定）の右に印刷は置かない（一度置いたが、上の段の印刷とすぐ近くに2つ並ぶので、ユーザーの答え「外します」2026-11-02）
+  assert.equal(await tk.getByRole('button', {name: '🖨 申請書を印刷'}).count(), 0);
   const formBox = await tk.getByRole('form', {name: '申請書に入れる所'}).boundingBox();
   const pvBox = await pv.boundingBox();
   assert.ok(formBox && pvBox && formBox.x + formBox.width < pvBox.x && pvBox.width > formBox.width, `${JSON.stringify(formBox)} ${JSON.stringify(pvBox)}`);
@@ -127,12 +123,12 @@ if (withTokutei) {
   // 右下の金額のまとめ・利益・印刷の欄は出さない（ユーザーの指示「この部分は全て不要です」2026-10-28。印刷は上の段）
   assert.equal(await tk.getByText('購入金額（税込）').count(), 0);
   assert.equal(await tk.getByText('利益', {exact: true}).count(), 0);
-  // 印刷はタブ（見積もり・申請／商品マスタ／設定）の右の「🖨 見積書を印刷」だけ（ユーザーの指示「ここに印刷ボタンをもってくる」2026-11-02）。押すと見積書の印刷の画面
-  assert.equal(await tk.getByRole('button', {name: '🖨 見積書を印刷'}).count(), 1);
+  // 中のアプリには印刷のボタンを出さない（上の段の「🖨 見積書を印刷」だけ。ユーザーの答え「外します」2026-11-02）。上の段の印刷で、中のアプリの見積書の印刷の画面が開く
+  assert.equal(await tk.getByRole('button', {name: '🖨 見積書を印刷'}).count(), 0);
   await page.frame({url: /tokutei\/index\.html/})?.evaluate(() => {
     window.print = () => {};
   });
-  await tk.getByRole('button', {name: '🖨 見積書を印刷'}).click();
+  await page.getByRole('group', {name: '保存・印刷・削除'}).getByRole('button', {name: '🖨 見積書を印刷'}).click();
   await tk.locator('.print-overlay').waitFor();
   await page.screenshot({path: path.join(outDir, 'tokutei-1c-hanbai-print.png')});
   await tk.locator('.print-overlay').getByRole('button', {name: /閉じる/}).first().click();
