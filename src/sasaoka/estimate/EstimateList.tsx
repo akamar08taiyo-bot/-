@@ -3,7 +3,7 @@ import {estimateTotals, hasEstimateRows, jobName} from '../calc.ts';
 import {copyJob} from '../components/JobTools.tsx';
 import {askTrash, trashLabel, useTrashUndo} from '../components/TrashPage.tsx';
 import {tokuteiItemJobs, tokuteiNames} from '../tokuteiLink.ts';
-import {Btn, DropArea, Modal, TextInput, useToast} from '../components/ui.tsx';
+import {Btn, btnClass, DropArea, Modal, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_INFO, INSURER_IDS, INSURER_INFO, insurerLabel, jobForm, officeInsurer} from '../estimateForms.ts';
 import {estimateXlsx, XLSX_TYPE} from '../estimateXlsx.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
@@ -11,6 +11,7 @@ import {DocImportDrop, useDocImport} from './DocImport.tsx';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {jutakuSales, jutakuSalesMonth, readTokuteiSales, rowSalesMonth, shiftSalesMonth, TOKUTEI_SALES_KEY} from '../salesPlan.ts';
 import type {TokuteiSale} from '../salesPlan.ts';
+import {OTHER_FORMS} from '../otherForms.ts';
 import {addSamples, hasSamples} from '../samples.ts';
 import type {AppData, Insurer, Job, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
@@ -121,6 +122,7 @@ export function EstimateHome({
   useTrashUndo(update); // 見積書の画面で削除（ゴミ箱へ）して戻ってきたとき、Ctrl+Z で戻す
   const month = thisMonth();
   const inMonth = all.filter((e) => e.job.month === month).length;
+  const [otherForms, setOtherForms] = useState(false);
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
@@ -145,8 +147,21 @@ export function EstimateHome({
                 ＋ {INSURER_INFO.kouiki.name}
               </Btn>
             </div>
+            {/* このアプリでまだ作れない市の申請書（市・広域連合の公式のページ）へ（ユーザーの指示「久留米、飯塚、大分、田川の申請書に飛べるページを用意して」2026-11-02） */}
+            <Btn color="white" className="w-full !px-4 !py-3 !text-base" onClick={() => setOtherForms(true)}>
+              📑 {OTHER_FORMS.map((f) => f.city).join('・')}の申請書
+            </Btn>
           </div>
         </section>
+        {otherForms && (
+          <OtherFormsDialog
+            onClose={() => setOtherForms(false)}
+            onKouiki={() => {
+              setOtherForms(false);
+              onNew('kouiki');
+            }}
+          />
+        )}
         {/* 新規作成（薄い緑）と同じ形で、薄い水色に色づけて分かるように（ユーザーの指示「一覧から作成の方も、薄く色づけてわかるようにする」2026-10-27。前は白い枠に白いボタン） */}
         <section className="rounded-xl border-2 border-sky-600 bg-white p-5 shadow-sm" aria-label="一覧から作成">
           <h2 className="text-xl font-bold text-sky-900">📋 一覧から作成</h2>
@@ -187,6 +202,42 @@ export function EstimateHome({
       </div>
       {all.length === 0 && <GettingStarted data={data} update={update} goMaterials={goMaterials} onSample={onList} />}
     </div>
+  );
+}
+
+/**
+ * 久留米市・飯塚市・大分市・田川市の申請書のページ（市・広域連合の公式サイト）を新しいタブで開く（`otherForms.ts`）。
+ * 田川市は福岡県介護保険広域連合なので、このアプリの広域連合の書式で作れる（「＋ 広域連合の書式で作る」）
+ */
+function OtherFormsDialog({onClose, onKouiki}: {onClose: () => void; onKouiki: () => void}) {
+  return (
+    <Modal title="📑 ほかの市の申請書" onClose={onClose} wide>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {OTHER_FORMS.map((f) => (
+          <section key={f.id} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3" aria-label={f.city}>
+            <h3 className="text-lg font-bold text-slate-800">
+              {f.city}
+              {f.note && <span className="ml-2 text-xs font-normal text-slate-500">{f.note}</span>}
+            </h3>
+            <div className="mt-2 grid gap-2">
+              {f.links.map((l) => (
+                <a key={l.url} href={l.url} target="_blank" rel="noopener noreferrer" className={`${btnClass('white')} !justify-start`}>
+                  {l.label}
+                  <span className="ml-auto text-slate-400" aria-hidden="true">
+                    ↗
+                  </span>
+                </a>
+              ))}
+              {f.kouiki && (
+                <Btn color="emerald" className="!justify-start" onClick={onKouiki}>
+                  ＋ 広域連合の書式で作る
+                </Btn>
+              )}
+            </div>
+          </section>
+        ))}
+      </div>
+    </Modal>
   );
 }
 
