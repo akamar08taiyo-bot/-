@@ -209,6 +209,17 @@ await sheet.getByLabel('選んでいる欄', {exact: true}).scrollIntoViewIfNeed
 await page.mouse.wheel(0, -60);
 await page.waitForTimeout(200);
 await page.screenshot({path: path.join(outDir, 'spots-05-amount.png')});
+// 部材の内容（品名）を Delete で消すと、その部材の行がなくなる（前は品名だけ消えて「材料費」と数量・単価が残った。ユーザーの指摘 2026-11-02）。Ctrl+Z で戻る
+const before132 = await sheet.locator('.form-page tr', {hasText: 'BD-132'}).count();
+await railRow.locator('[data-edit$=":text"]').click();
+await page.keyboard.press('Delete');
+await page.waitForTimeout(200);
+assert.equal(await sheet.locator('.form-page tr', {hasText: 'BD-132'}).count(), before132 - 1);
+assert.equal(await sheet.locator('.form-page td', {hasText: /^材料費$/}).count(), 0);
+await page.keyboard.press('ControlOrMeta+z');
+await page.waitForTimeout(200);
+assert.equal(await sheet.locator('.form-page tr', {hasText: 'BD-132'}).count(), before132);
+log('部材の内容を Delete で消すと行ごとなくなる（「材料費」が残らない）・Ctrl+Z で戻る OK');
 // スマホの幅でも、選んでいる欄の名前で上の段が横にはみ出さない
 await page.setViewportSize({width: 390, height: 844});
 await page.waitForTimeout(300);

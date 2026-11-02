@@ -388,7 +388,14 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
     if (trimmed === (isBlankRow(r) ? '' : (r.estText ?? materialText(r)))) return {job, key};
     // 挿入した空白の行に「同上施工費」などと打ったら、施工費の行にする（いちばん下の行と同じ。前は部材の行になり、仕切りの取付手間に入らなかった）
     if (isBlankRow(r) && isLaborText(trimmed)) return laborFromBlank(job, found, trimmed);
-    if (trimmed === '') return {job: patchRow(job, found, {name: '', maker: '', code: '', estText: null}), key};
+    if (trimmed === '') {
+      // 内容（品名）を消したら、その部材を消す（同上施工費ごと。行の左の ✕ と同じ。Ctrl+Z で戻せる）。前は品名だけが消えて、
+      // 数量・単価・金額の残った「材料費」の行になった（ユーザーの指摘「部材を消すと、なぜか…と表示される」2026-11-02）。選ぶのは、その位置に来た行
+      const next = deleteLine(job, r.id);
+      const p = next.places.find((x) => x.id === found.place.id);
+      const at = p ? (p.rows[found.ri] ?? p.rows[p.rows.length - 1]) : undefined;
+      return {job: next, key: at ? `line:${at.id}:text` : 'new:text'};
+    }
     return {job: patchRow(job, found, {name: trimmed, maker: '', code: '', estText: null, pieceLengthM: r.pieceLengthM || guessPieceLengthM(trimmed)}), key};
   }
   // 切って使う手すり・ベースプレートは、同じ箇所のもう一方と申請書の長さにもつなぐ。手すりの長さが変わったら中間のブラケットの数も（`cutLink.ts`）

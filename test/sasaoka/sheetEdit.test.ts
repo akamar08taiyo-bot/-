@@ -261,6 +261,29 @@ test('見積書で金額を直した施工費に、部材を選ぶ画面で施�
   assert.deepEqual(amounts(two), [6400, 2800, 6400, 3000]);
 });
 
+test('部材の内容（品名）を消す（Delete）と、その部材を同上施工費ごと消す（品名だけ消えて「材料費」と数量・単価が残っていた）', () => {
+  let {job} = type(emptyJob(), [
+    ['new:name', '玄関'],
+    ['new:text', 'インテリアバー', bar],
+    ['new:text', '同上施工費'],
+    ['line:@:price', '2000'],
+    ['new:text', '木の手すり', rail],
+  ]);
+  const [mat, , second] = job.places[0].rows.map((r) => r.id);
+  const res = applySheet(job, `line:${mat}:text`, '', yk);
+  assert.deepEqual(formLines(res.job, S, 'yukuhashi').map((l) => l.text), ['サンプル S-TS35 木の手すり 35φ 4m']);
+  assert.equal(res.key, `line:${second}:text`); // その位置に来た行を選ぶ
+  assert.ok(!formLines(res.job, S, 'yukuhashi').some((l) => l.text === '材料費'));
+  // 最後の部材を消すと箇所ごとなくなる（申請書に何も入れていない箇所）。選ぶのはいちばん下の行
+  const last = applySheet(res.job, `line:${second}:text`, '', yk);
+  assert.deepEqual([last.job.places.length, last.key], [0, 'new:text']);
+  // 申請書の寸法の入った箇所は残して、空白の行に
+  const kept: Job = {...res.job, places: [{...res.job.places[0], dims: {l: '1200'}}]};
+  const blank = applySheet(kept, `line:${second}:text`, '', yk).job;
+  assert.equal(blank.places.length, 1);
+  assert.deepEqual(formLines(blank, S, 'yukuhashi', {all: true}).filter((l) => !l.isNew).map((l) => [l.blank, l.text]), [[true, '']]);
+});
+
 test('どこの欄か（describeKey）：「①階段 ／ 品名 ／ 欄の名前」。施工費は取り付ける手間の名前（木 など）', () => {
   let {job} = type(emptyJob(), [
     ['new:name', '階段'],
