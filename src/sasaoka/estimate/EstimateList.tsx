@@ -156,9 +156,9 @@ export function EstimateHome({
         {otherForms && (
           <OtherFormsDialog
             onClose={() => setOtherForms(false)}
-            onKouiki={() => {
+            onMake={(i) => {
               setOtherForms(false);
-              onNew('kouiki');
+              onNew(i);
             }}
           />
         )}
@@ -207,9 +207,9 @@ export function EstimateHome({
 
 /**
  * 久留米市・飯塚市・大分市・田川市の申請書のページ（市・広域連合の公式サイト）を新しいタブで開く（`otherForms.ts`）。
- * 田川市は福岡県介護保険広域連合なので、このアプリの広域連合の書式で作れる（「＋ 広域連合の書式で作る」）
+ * 田川市は福岡県介護保険広域連合なので、このアプリの広域連合の書式で作れる（「＋ 広域連合の書式で作る」）。久留米市はいただいた様式で作れる（「＋ 久留米市の書式で作る」）
  */
-function OtherFormsDialog({onClose, onKouiki}: {onClose: () => void; onKouiki: () => void}) {
+function OtherFormsDialog({onClose, onMake}: {onClose: () => void; onMake: (insurer: Insurer) => void}) {
   return (
     <Modal title="📑 ほかの市の申請書" onClose={onClose} wide>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -228,9 +228,9 @@ function OtherFormsDialog({onClose, onKouiki}: {onClose: () => void; onKouiki: (
                   </span>
                 </a>
               ))}
-              {f.kouiki && (
-                <Btn color="emerald" className="!justify-start" onClick={onKouiki}>
-                  ＋ 広域連合の書式で作る
+              {f.make && (
+                <Btn color="emerald" className="!justify-start" onClick={() => onMake(f.make!)}>
+                  ＋ {INSURER_INFO[f.make].name}の書式で作る
                 </Btn>
               )}
             </div>

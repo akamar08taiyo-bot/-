@@ -178,6 +178,13 @@ const TEXT_FIELD: Record<keyof ShinseiTexts, ShinseiField> = {
   manager: 'works',
   insured: 'insuredNo',
   benefitYen: 'burden',
+  // 久留米市：年齢は生年月日、住所の市のうしろは住所、負担割合の□は負担割合、「同左：■」は理由書作成者へ
+  age: 'birth',
+  cityRest: 'address',
+  burden1: 'burden',
+  burden2: 'burden',
+  burden3: 'burden',
+  sameLeft: 'reason',
 };
 const MARK_FIELD: Record<keyof ShinseiMarks, ShinseiField> = {gender: 'gender', era: 'birth', care: 'care', renovated: 'renovated'};
 

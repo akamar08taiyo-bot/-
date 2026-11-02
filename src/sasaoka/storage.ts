@@ -276,7 +276,7 @@ const cleanRow = (raw: Record<string, unknown>): Row => keepNewer(raw, (r) => ({
 
 const KINDS = [1, 2, 3, 4, 5, 6]; // 見積書の改修の種類（①〜⑥）
 const FORMS: EstimateForm[] = ['yukuhashi', 'kouiki'];
-const INSURERS: Insurer[] = ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu'];
+const INSURERS: Insurer[] = ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu', 'kurume'];
 
 const cleanPlace = (raw: Record<string, unknown>): Place => keepNewer(raw, (p) => ({
   id: str(p.id) || uid('p'),

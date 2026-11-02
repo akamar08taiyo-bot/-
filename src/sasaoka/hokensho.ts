@@ -20,7 +20,7 @@ export type OcrPage = {lines: OcrLine[]; conf?: number; source?: number}; // con
 
 export type CardEra = '明治' | '大正' | '昭和' | '平成';
 export type CardCare = '' | '要支援1' | '要支援2' | '要介護1' | '要介護2' | '要介護3' | '要介護4' | '要介護5';
-export type CardInsurer = '' | 'kanda' | 'yukuhashi' | 'miyako' | 'kouiki' | 'fukuoka' | 'kitakyushu';
+export type CardInsurer = '' | 'kanda' | 'yukuhashi' | 'miyako' | 'kouiki' | 'fukuoka' | 'kitakyushu' | 'kurume';
 
 /** 保険証から取り出した項目（読めなかった項目は ''） */
 export type CardInfo = {
@@ -337,6 +337,7 @@ const INSURER_NAMES: [RegExp, CardInsurer, string][] = [
   [/豊前市|築上町|上毛町|吉富町/, 'kouiki', '福岡県介護保険広域連合'],
   [/福岡市/, 'fukuoka', '福岡市'],
   [/北九州市/, 'kitakyushu', '北九州市'],
+  [/久留米市|久留米/, 'kurume', '久留米市'],
 ];
 
 /** 保険者の名称から保険者（広域連合の市町は広域連合） */

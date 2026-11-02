@@ -1,8 +1,11 @@
 // このアプリでまだ申請書を作れない市（久留米市・飯塚市・大分市）と、福岡県介護保険広域連合の田川市の、申請書のページ（市・広域連合の公式サイト）。
 // 見積もり・申請書を作成するの「新規作成」から、新しいタブで開く（ユーザーの指示「久留米、飯塚、大分、田川の申請書に飛べるページを用意して」2026-11-02。
-// 音声入力で「食べる」と入っていた）。この市の申請書をアプリで作るのは保留（ユーザーの指示「一旦保留で」2026-10-29）。
+// 音声入力で「食べる」と入っていた）。そのあと「その資料をもとに田川、久留米、大分、飯塚で書類の作成をお願いします」（2026-11-02）で、
+// いただいた様式から作れるようにした市は make にその保険者を入れ、「＋ 〇〇の書式で作る」を出す。
 // どのページも 2026-11-02 に検索で見つけた公式のページ（作業環境からは市のサイトを開けないので、検索の結果の題名で確かめた）。
 // 市がページを移したら、ここを直す（tests: test/sasaoka/otherForms.test.ts）。
+
+import type {Insurer} from './types.ts';
 
 export type OtherFormLink = {label: string; url: string};
 export type OtherForm = {
@@ -10,7 +13,8 @@ export type OtherForm = {
   city: string;
   /** 保険者のこと（田川市は福岡県介護保険広域連合の田川・桂川支部。申請書はこのアプリの広域連合の書式で作れる） */
   note?: string;
-  kouiki?: boolean;
+  /** このアプリで作れる書式（田川市＝広域連合・久留米市＝久留米市） */
+  make?: Insurer;
   links: OtherFormLink[];
 };
 
@@ -18,6 +22,7 @@ export const OTHER_FORMS: OtherForm[] = [
   {
     id: 'kurume',
     city: '久留米市',
+    make: 'kurume',
     links: [
       // 「3-4.介護保険居宅介護（介護予防）住宅改修関係申請書等」
       {label: '🏠 住宅改修の申請書', url: 'https://www.city.kurume.fukuoka.jp/1500soshiki/9045kaigo/3020shinsei/2007-1218-1654-94.html'},
@@ -53,7 +58,7 @@ export const OTHER_FORMS: OtherForm[] = [
     id: 'tagawa',
     city: '田川市',
     note: '福岡県介護保険広域連合（田川・桂川支部）',
-    kouiki: true,
+    make: 'kouiki',
     links: [
       // 「住宅改修・福祉用具購入等関係申請様式ダウンロード」
       {label: '🏠🛁 住宅改修・福祉用具購入の申請書', url: 'https://www.fukuoka-kaigo.jp/application/benefit02.html'},

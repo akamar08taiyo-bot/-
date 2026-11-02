@@ -16,6 +16,6 @@ test('ほかの市の申請書：久留米市・飯塚市・大分市・田川�
     assert.ok(f.links.some((l) => l.label.includes('福祉用具購入')), `${f.city} の福祉用具購入`);
     assert.equal(new Set(f.links.map((l) => l.url)).size, f.links.length);
   }
-  // 田川市だけ広域連合（このアプリの広域連合の書式で作れる）
-  assert.deepEqual(OTHER_FORMS.filter((f) => f.kouiki).map((f) => f.city), ['田川市']);
+  // このアプリで作れる書式：久留米市はいただいた様式、田川市は広域連合の書式（2026-11-02）
+  assert.deepEqual(OTHER_FORMS.filter((f) => f.make).map((f) => [f.city, f.make]), [['久留米市', 'kurume'], ['田川市', 'kouiki']]);
 });

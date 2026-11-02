@@ -11,7 +11,7 @@ import {estimateTotals, isBlankRow} from './calc.ts';
 import type {EstimateRates, EstimateSettings} from './calc.ts';
 import {careAmounts} from './careLines.ts';
 import {BASE_PLATE} from './cutLink.ts';
-import {circled, eraOf, jobInsurer, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa, shinseiKindNames} from './estimateForms.ts';
+import {circled, eraOf, INSURER_INFO, jobInsurer, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa, shinseiKindNames} from './estimateForms.ts';
 import {insurerNoOf} from './insurerNumbers.ts';
 import {clampOff, clampScale, normRot} from './photoEdit.ts';
 import {BOARD_PTS, frontOrder, lineEnds, MARK_INSET, photoBounds, shapeBox} from './photoMarks.ts';
@@ -36,7 +36,9 @@ export type ShinseiSheet = {
   insurerNo?: string[]; // 保険者番号の6マス（福岡市・広域連合。選んだ番号・保険証から読んだ番号、なければ住所から。insurerNumbers.ts）
   // 改修の種類ごとの行の□（北九州市の事前届出書「□手すり取付」と、その行の「□玄関・屋外　□廊下・階段…」「□洗面脱衣室　□その他（　）」）：
   // その種類の箇所があれば種類の□を■に、箇所の□を■に（一覧にない箇所は「□その他」を■にして、other の欄に名前）。detail は付帯工事の具体的な工事内容
-  kindRows?: {kind: string; places?: string[]; other?: string; detail?: string}[];
+  // detailFormat：detail の欄の書き方（{text} に内容。久留米市の「　　（　　　）」の行は「　　（{text}）」）。
+  // detailCounts：内容を改修場所と箇所の数で書く（「トイレ１箇所、洗面所２箇所」。久留米市の記入例と同じ）。ないときは改修の内容の行（寸法つき）
+  kindRows?: {kind: string; places?: string[]; other?: string; detail?: string; detailFormat?: string; detailCounts?: boolean}[];
   checks?: string[]; // いつも最初の□を■にする欄（北九州市の住宅の状況「□持家」）
   oneLine?: string[]; // 折り返さない欄（長い文字は縮めて1行に。氏名・フリガナなどのほかに。理由書の電話番号・日付）
   // 右の空いた欄へはみ出して書く1行の欄の、はみ出してよい右の端の列（委任状の委任者の住所は下線の端の G 列まで。それより長ければ小さくする）
@@ -128,7 +130,15 @@ export type ShinseiTexts = Record<
   | 'builderTelC'
   | 'manager'
   | 'insured'
-  | 'benefitYen',
+  | 'benefitYen'
+  // 久留米市：年齢（生年月日のうしろの「（86歳）」。申請書を作る日の年齢）、住所の市の名前のうしろ（原本に「久留米市」と印刷してある欄）、
+  // 負担割合の□（1割・2割・3割のどれか1つが「■」）、理由書作成者の「同左：□」（介護支援専門員等と同じ人なので ■）
+  | 'age'
+  | 'cityRest'
+  | 'burden1'
+  | 'burden2'
+  | 'burden3'
+  | 'sameLeft',
   string
 >;
 
@@ -158,6 +168,41 @@ export const colNum = (letters: string) => [...letters].reduce((n, ch) => n * 26
 export const colName = (n: number): string => (n <= 0 ? '' : colName(Math.floor((n - 1) / 26)) + String.fromCharCode(65 + ((n - 1) % 26)));
 /** 横に並んだマス（start から n 個） */
 const boxes = (start: string, n: number, row: number) => Array.from({length: n}, (_, i) => `${colName(colNum(start) + i)}${row}`);
+/**
+ * 久留米市の改修の内容の5つの種類（□手すりの取り付け〜□洋式便所等への便器の取替）：種類の行（J列）の□を■に、すぐ下の「（　）」の行に
+ * 改修場所と箇所の数（市の記入例「（トイレ１箇所、洗面所２箇所）」）。first は「□ 手すりの取り付け」の行（事前承認申請書 13・支給申請書 16）
+ */
+const KURUME_KIND_ROWS = (first: number) =>
+  [0, 1, 2, 3, 4].map((i) => ({kind: `J${first + 2 * i}`, detail: `J${first + 2 * i + 1}`, detailFormat: '　　（{text}）', detailCounts: true}));
+
+/** 改修場所と箇所の数（「トイレ１箇所、洗面所２箇所」。出てきた順。数は全角） */
+export function placeCounts(names: string[]): string {
+  const counts = new Map<string, number>();
+  for (const n of names) if (n.trim()) counts.set(n.trim(), (counts.get(n.trim()) ?? 0) + 1);
+  const zen = (n: number) => String(n).replace(/[0-9]/g, (d) => String.fromCharCode(d.charCodeAt(0) + 0xfee0));
+  return [...counts].map(([name, n]) => `${name}${zen(n)}箇所`).join('、');
+}
+
+/** 年齢（申請書を作る日。生年月日の元号・年・月・日から。分からなければ空） */
+export function ageOn(era: string, y: string, m: string, d: string, today: string): string {
+  const base = ({明治: 1867, 大正: 1911, 昭和: 1925, 平成: 1988} as Record<string, number>)[era];
+  const [by, bm, bd] = [y, m, d].map((v) => Number(v.normalize('NFKC').trim()));
+  const t = /^(\d{4})-(\d{2})-(\d{2})/.exec(today);
+  if (!base || !(by > 0) || !(bm >= 1 && bm <= 12) || !(bd >= 1 && bd <= 31) || !t) return '';
+  const year = base + by;
+  const age = Number(t[1]) - year - (Number(t[2]) * 100 + Number(t[3]) < bm * 100 + bd ? 1 : 0);
+  return age > 0 && age < 130 ? String(age) : '';
+}
+
+/** 住所の、保険者の市の名前のうしろ（原本に「久留米市」と印刷してある欄に書く）。市の名前で始まらない住所はそのまま */
+export function cityRest(address: string, insurer: Insurer | ''): string {
+  const a = address.trim().replace(/^福岡県\s*/, '');
+  const city = insurer ? INSURER_INFO[insurer].name : '';
+  return city && a.startsWith(city) ? a.slice(city.length).trim() : a;
+}
+
+/** 2列ずつ結合したマス（久留米市の被保険者番号の10マス：AN・AP・AR…） */
+const boxes2 = (start: string, n: number, row: number) => Array.from({length: n}, (_, i) => `${colName(colNum(start) + 2 * i)}${row}`);
 /** 丸数字（①〜⑳）→ 番号 */
 const circledNum = (ch: string) => ch.charCodeAt(0) - 0x2460 + 1;
 
@@ -588,6 +633,77 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
       ...KITAKYUSHU_PHOTO_SHEETS,
     ],
   },
+  // 久留米市（2026-11-02。ユーザーの指示「その資料をもとに田川、久留米、大分、飯塚で書類の作成をお願いします」。いただいた住宅改修事前承認申請書・
+  // 住宅改修費支給申請書（第2号様式）に、苅田町の原本の平面図・行橋市の原本の工事写真添付用紙（市の様式はなく、日付入りの写真であればよい）を足した原本
+  // ＝スキルの scripts/make_kurume_jutaku.py）。書き方は市の記入例のとおり：
+  //   改修の内容は種類ごとの□を■にし、下の「（　）」に改修場所と箇所の数（「トイレ１箇所、洗面所２箇所」）。
+  //   介護支援専門員等は被保険者証の居宅介護支援事業所（理由書作成者と同じ）、理由書作成者は「同左：■」。改修予定費用は見積書と同じ金額。
+  //   着工予定日・完成予定日は「日程が未確定の場合も、予定日を記載」。負担割合の□を■。
+  //   申請者の署名（氏名）は「必ず手書き…パソコン打ちは不可」なので書かない（事前承認申請書は住所・電話番号だけ。支給申請書は「※本人自書」なので電話番号だけ）。
+  //   支払い方法（償還払い・受領委任払い）と受領委任払い取扱事業所登録番号は書かない（登録しているかは営業所ごと。手で）。個人番号・口座も書かない。
+  // 保険者番号 402032 は原本に印刷してある。理由書は国の様式（理由書のタブ）、工事費内訳書は「参考様式」なので見積書のタブ。
+  kurume: {
+    title: '久留米市申請書',
+    sheets: [
+      {
+        sheet: '事前承認申請書',
+        name: 'J4',
+        insuredNo: boxes2('AN', 10, 5),
+        marks: [ERA('J6')],
+        kindRows: KURUME_KIND_ROWS(13),
+        texts: [
+          T('J3', '{kana}'),
+          T('J6', ' 明・大・昭　{y}年{m}月{d}日{age}'),
+          T('J7', '〒{zip}'),
+          T('Q8', '{cityRest}'),
+          T('J10', '{owner}'),
+          T('AN10', '{relation}'),
+          T('AN12', '{builder}'),
+          T('AN15', '℡（{builderTelA}）{builderTelB}－{builderTelC}'),
+          T('AN20', '{start}'),
+          T('AN22', '{end}'),
+          T('J24', '{reasonOffice}'),
+          T('J27', '{reasonName}'),
+          T('AI29', '{sameLeft}'),
+          T('J30', '{cost}'),
+          T('BA30', '{burden1}'),
+          T('BA31', '{burden2}'),
+          T('BA32', '{burden3}'),
+          T('V41', '{cityRest}'), // 申請者の住所（「久留米市」は原本の O41）。氏名は手書き
+          T('AS44', '{phone}'),
+        ],
+      },
+      {
+        sheet: '支給申請書',
+        name: 'J6',
+        insuredNo: boxes2('AN', 10, 6),
+        marks: [ERA('J8')],
+        kindRows: KURUME_KIND_ROWS(16),
+        texts: [
+          T('J4', '{kana}'),
+          T('J8', ' 明・大・昭　{y}年{m}月{d}日{age}'),
+          T('J10', ' 〒{zip}'),
+          T('P11', '{cityRest}'),
+          T('J13', '{owner}'),
+          T('AN13', '{relation}'),
+          T('AN15', '{builder}'),
+          T('AN18', '℡（{builderTelA}）{builderTelB}－{builderTelC}'),
+          T('AN23', '{start}'),
+          T('AN25', '{end}'),
+          T('J27', '{reasonOffice}'),
+          T('J30', '{reasonName}'),
+          T('AI32', '{sameLeft}'),
+          T('J33', '{cost}'),
+          T('AZ33', '{burden1}'),
+          T('AZ34', '{burden2}'),
+          T('AZ35', '{burden3}'),
+          T('AS46', '{phone}'), // 申請者の住所・氏名は「※本人自書」
+        ],
+      },
+      {sheet: '平面図', name: 'C2', nameFormat: '{name}', legend: {box: 'C54:AQ68'}, plan: 'C8:AQ52'},
+      ...YUKUHASHI_PHOTO_SHEETS.map((sheet) => ({sheet, ...YUKUHASHI_PHOTO})),
+    ],
+  },
 };
 
 // ---------------------------------------------------------------- 転記する内容
@@ -607,6 +723,7 @@ export type ShinseiValues = {
   photoNotes?: Record<number, string[]>; // 写真番号 → 写真貼付用紙の改修前の写真の横（上）に書く内容（寸法と、手で足した行。photoNoteLines）
   photoMemos?: Record<number, string[]>; // 写真番号 → 写真の用紙の「改修の内容」の欄（北九州市・福岡市のメモの欄。改修の種類の名前も書く。photoMemoLines）
   kindNames?: string[][]; // 改修の種類（1〜6）ごとの改修場所の名前（同じ名前は1つ。北九州市の事前届出書の□）
+  kindPlaces?: string[][]; // 改修の種類（1〜6）ごとの改修場所の名前（箇所ごと。同じ名前も箇所の数だけ。久留米市の「トイレ１箇所、洗面所２箇所」）
   kindTexts?: string[]; // 改修の種類（1〜6）の名前（保険者の様式の言葉。kindNamesOf）。改修の内容の行から種類の名前を外すとき・写真の用紙の改修の種類に
   marks: ShinseiMarks; // 丸で囲む値
   texts: ShinseiTexts; // 申請書の画面で入れた項目の文字（書き方の {名前} の値）
@@ -935,7 +1052,7 @@ function photoDatesOf(job: Pick<Job, 'places'>, rates: EstimateRates, today: str
  * 改修費用は見積書の金額と連動する（ユーザーの指示「改修予定費用のところが、自分で作った見積もりの金額が連動するように」）。
  * 苅田町・行橋市の申請書は「改修予定費用」＝見積書の合計（税込）。みやこ町・広域連合は「改修費用（介護保険対象分）」＝見積書の介護保険対象分の合計（税込）
  */
-export const costIsTotal = (insurer: Insurer | '') => insurer === 'kanda' || insurer === 'yukuhashi' || insurer === 'fukuoka'; // 福岡市の改修予定費用・改修費用も合計（対象外の工事も含めてよい。提出書類チェックシート）
+export const costIsTotal = (insurer: Insurer | '') => insurer === 'kanda' || insurer === 'yukuhashi' || insurer === 'fukuoka' || insurer === 'kurume'; // 久留米市は記入例「見積書と同じ金額を記載してください」 // 福岡市の改修予定費用・改修費用も合計（対象外の工事も含めてよい。提出書類チェックシート）
 
 /** 改修費用：手で入れた金額、なければ見積書の金額（costIsTotal）。見積書がなければ null */
 export function shinseiCost(job: Job, s: EstimateSettings): number | null {
@@ -1003,6 +1120,7 @@ export function shinseiValues(job: Job, s: EstimateSettings & BuilderSettings, t
     works: shinseiWorks(job, s),
     kinds,
     kindNames: KINDS.map((_, i) => [...new Set(workItems(job, s).filter((w) => w.kind === i + 1 && w.line).map((w) => w.name).filter(Boolean))]),
+    kindPlaces: KINDS.map((_, i) => workItems(job, s).filter((w) => w.kind === i + 1 && w.line).map((w) => w.name.trim()).filter(Boolean)),
     photos: shinseiPhotos(job, s),
     photoKinds: Object.fromEntries([...photoPlacesOf(job, s)].map(([n, p]) => [n, p.kind])),
     photoDates: photoDatesOf(job, s, today),
@@ -1057,6 +1175,12 @@ export function shinseiValues(job: Job, s: EstimateSettings & BuilderSettings, t
       manager: job.staff.trim() || (s.manager ?? '').trim(), // 施工業者の担当者名：様邸の担当（なければ設定の所長）
       insured: padInsuredNo(job.insuredNo),
       benefitYen: benefit > 0 ? benefit.toLocaleString('en-US') : '',
+      age: ((a) => (a ? `（${a}歳）` : ''))(ageOn(eraOf(info), info.birthY, info.birthM, info.birthD, today)), // 生年月日がなければ「（　歳）」ごと書かない
+      cityRest: cityRest(job.address, jobInsurer(job)),
+      burden1: info.burden === '1' ? '■' : '',
+      burden2: info.burden === '2' ? '■' : '',
+      burden3: info.burden === '3' ? '■' : '',
+      sameLeft: info.reasonOffice.trim() || info.reasonName.trim() ? '同左 ： ■ （上記記載は不要）' : '',
     },
     cost,
     start: info.start,
@@ -1384,6 +1508,12 @@ export const EMPTY_SHINSEI: ShinseiValues = {
     manager: '',
     insured: '',
     benefitYen: '',
+    age: '',
+    cityRest: '',
+    burden1: '',
+    burden2: '',
+    burden3: '',
+    sameLeft: '',
   },
   cost: null,
   start: '',
@@ -1537,7 +1667,12 @@ function kindRowCells(files: Files, sheet: ShinseiSheet, v: ShinseiValues): Map<
       });
       if (row.other && others.length) out.set(row.other, others.join('・'));
     }
-    if (row.detail) out.set(row.detail, (v.kinds[i]?.works ?? []).map((l) => l.replace(`　${(v.kindTexts ?? KINDS)[i]}`, '')).join('　'));
+    if (row.detail) {
+      const text = row.detailCounts
+        ? placeCounts(v.kindPlaces?.[i] ?? names)
+        : (v.kinds[i]?.works ?? []).map((l) => l.replace(`　${(v.kindTexts ?? KINDS)[i]}`, '')).join('　');
+      out.set(row.detail, row.detailFormat ? row.detailFormat.replace('{text}', text) : text);
+    }
   });
   return out;
 }
