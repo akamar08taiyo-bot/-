@@ -52,7 +52,8 @@ log('住宅改修申請書・工事見積書・理由書に白い「削除」OK'
 // 中のアプリの上の段は出さない（同じボタンが2つにならないように。ユーザーの指示「各タブでEXCEL印刷や保存など…統一する」2026-10-28）。カタログを印刷は薄い水色
 if (withTokutei) {
   const frame = page.frameLocator('iframe[title="特定福祉用具 購入申請書・見積もり作成"]');
-  const del = page.getByRole('group', {name: '保存・印刷・削除'}).getByRole('button', {name: '削除', exact: true});
+  // 削除は上の段のいちばん最後（そのほかの機能の終わり。2026-11-02）
+  const del = page.getByRole('group', {name: 'そのほかの機能'}).getByRole('button', {name: '削除', exact: true});
   for (const tab of ['🛁 特定福祉用具申請書', '🏷 販売見積書']) {
     await page.getByRole('tab', {name: tab}).click();
     await page.getByRole('tab', {name: tab, selected: true}).waitFor();
@@ -60,7 +61,7 @@ if (withTokutei) {
     assert.equal(await bg(del), WHITE, tab);
     await frame.getByLabel('商品名').first().waitFor({timeout: 15000});
     assert.equal(await frame.getByRole('button', {name: '削除', exact: true}).count(), 0, tab);
-    assert.equal(await frame.getByRole('group', {name: '保存・印刷・削除'}).count(), 0, tab);
+    assert.equal(await frame.getByRole('group', {name: '保存・印刷'}).count(), 0, tab);
     // 2つのタブとも上の段の3段目（Excel・印刷・削除の真下）
     const cat = page.getByRole('group', {name: 'そのほかの機能'}).getByRole('button', {name: '🖨 カタログを印刷'});
     assert.match(await cat.getAttribute('class'), /bg-sky-50/, tab);

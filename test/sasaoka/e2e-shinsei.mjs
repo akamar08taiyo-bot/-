@@ -1482,7 +1482,7 @@ await preview.waitFor();
 await estimateTab.click();
 assert.equal(await inInvoice.count(), 0);
 assert.equal(await orderBtn.isDisabled(), true);
-// 見積書のタブも、Excel・印刷・削除は名前のすぐ右（メールで送付・保存・売上伝票依頼書・発注書・複製はそのすぐ右）
+// 見積書のタブも、Excel・印刷・削除は名前のすぐ右（メールで送付・保存・売上伝票を作成・発注書・複製・削除はそのすぐ右）
 assert.ok((await offCenter('📗 Excelで保存')) < 2);
 await page.screenshot({path: path.join(outDir, '81c-header-center-estimate.png'), clip: {x: 0, y: 0, width: 1366, height: 240}});
 await shinseiTab.click();
@@ -1491,9 +1491,10 @@ log('申請書だけ（みやこ町。見積書なしで Excel・請求書に入
 
 // ---------------- 上の段のまん中は Excelで保存・申請書を印刷・削除 の並び、その真下に メールで送付（前は まとめて保存。2026-10-30）（ユーザーの指示「基本的な並びは、申請書をEXCELで保存、
 // 申請書（見積書を印刷）、削除（白紙に戻すは不要） それ以外の独自の機能…は行を変えて、真下に統一して設置する」2026-10-28。前は Excel・まとめて保存・印刷の並びで、右に白紙に戻す）
-const centerButtons = await page.getByRole('group', {name: '保存・印刷・削除'}).getByRole('button').allInnerTexts();
-assert.deepEqual(centerButtons.map((t) => t.trim()), ['📗 Excelで保存', '🖨 申請書を印刷', '削除']);
-assert.deepEqual((await page.getByRole('group', {name: 'そのほかの機能'}).getByRole('button').allInnerTexts()).map((t) => t.trim()), ['✉ メールで送付']);
+const centerButtons = await page.getByRole('group', {name: '保存・印刷'}).getByRole('button').allInnerTexts();
+assert.deepEqual(centerButtons.map((t) => t.trim()), ['📗 Excelで保存', '🖨 申請書を印刷']);
+// 削除はいちばん最後（ユーザーの指示「…メールで送付…それから最後に、削除」2026-11-02）
+assert.deepEqual((await page.getByRole('group', {name: 'そのほかの機能'}).getByRole('button').allInnerTexts()).map((t) => t.trim()), ['✉ メールで送付', '削除']);
 assert.equal(await page.getByRole('button', {name: '📄 白紙に戻す'}).count(), 0);
 assert.ok((await offCenter('📗 Excelで保存')) < 2);
 await page.screenshot({path: path.join(outDir, '81d-header-shinsei-buttons.png'), clip: {x: 0, y: 0, width: 1366, height: 240}});

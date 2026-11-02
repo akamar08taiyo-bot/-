@@ -468,13 +468,13 @@ export function ShinseiEditor({
 
   return (
     <div className="space-y-3">
-      {/* 上の段（一覧へ戻る・タブ・介護保険証から入れる／名前・Excelで保存・印刷・削除／メールで送付）はどのタブでも同じ形（JobHeader.tsx） */}
+      {/* 上の段（一覧へ戻る・タブ・介護保険証から入れる／名前・Excelで保存・印刷／メールで送付）はどのタブでも同じ形（JobHeader.tsx） */}
       <JobHeader
         onBack={onBack}
         tabs={tabs}
         extra={<CardFill job={job} setJob={setJob} />}
         title={<JobTitle name={job.customer.trim() ? jobName(job) : '新しい申請書'} badge={insurer ? INSURER_INFO[insurer].name : undefined} />}
-        // 2段目は Excelで保存・印刷・削除、3段目はメールで送付（どのタブも同じ並び。JobHeader.tsx）。保険者を選ぶまで（原本がないので）印刷は押せない
+        // 2段目は Excelで保存・印刷、3段目はメールで送付（どのタブも同じ並び。JobHeader.tsx）。保険者を選ぶまで（原本がないので）印刷は押せない
         // （Excelで保存・メールで送付は、ほかの書類も選べるので押せる。申請書は選べないだけ。DocsDialog.tsx）
         primary={
           <>

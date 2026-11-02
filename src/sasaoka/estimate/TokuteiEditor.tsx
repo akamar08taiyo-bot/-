@@ -174,30 +174,34 @@ export function TokuteiEditor({
               削除
             </Btn>
           )}
+          // 並び：カタログを印刷・メールで送付・販売受注簿を作成・売上伝票を作成、最後に削除（JobHeader）、売上月はそのうしろ（ユーザーの指示「順番、Excel で保存、
+          // 申請書…見積もりを印刷、カタログを印刷、メールで送付、それから、販売受注簿を作成、売上伝票…を作成、それから最後に、削除」2026-11-02）
           secondary={
             <>
-              {docs?.mail}
-              {/* カタログを印刷は2つのタブとも同じ所（メールで送付のすぐ右）。販売見積書のタブは、前は中のアプリの右の欄（金額のまとめの下）にあった
+              {/* カタログを印刷は2つのタブとも同じ所（〇〇を印刷のすぐ右）。販売見積書のタブは、前は中のアプリの右の欄（金額のまとめの下）にあった
                   （その欄はユーザーの指示「この部分は全て不要です」2026-10-28 で外した） */}
               <Btn color="softSky" onClick={() => cmd('catalog')}>
                 🖨 カタログを印刷
               </Btn>
+              {docs?.mail}
               {view === 'quote' && (
                 <>
-                  <Btn color="white" onClick={() => cmd('uriage')}>
-                    🧾 売上伝票依頼書
-                  </Btn>
-                  {/* 販売受注簿作成ツールを新しいタブで開く。リンクなので、ポップアップを止める設定でも開く。開く前に中のアプリが商品を置く（置けなければ開かない） */}
+                  {/* 販売受注簿作成ツールを新しいタブで開く。リンクなので、ポップアップを止める設定でも開く。開く前に中のアプリが商品を置く（置けなければ開かない）。
+                      名前は「販売受注簿を作成」（前は「販売受注簿に転記」。2026-11-02） */}
                   <a href={HACCHU_URL} target="_blank" onClick={(e) => cmd('hacchu') || e.preventDefault()} className={btnClass('white')}>
-                    📤 販売受注簿に転記
+                    📤 販売受注簿を作成
                   </a>
-                  {/* 売上月（工事見積書の「売上月」と同じ。仕入れの月は出さない＝ユーザーの指示「仕入れの月は不要」2026-10-28）。商品を入れた案件だけ。
-                      画面だけの値で、中のアプリの見積書・申請書・Excel・印刷には出ない */}
-                  {update && settings && linked.length > 0 && <TokuteiSalesMonth rows={linked} settings={settings} update={update} />}
+                  {/* 名前は「売上伝票を作成」（前は「売上伝票依頼書」。ユーザーの指示「売上伝票…ではなく売上伝票を作成」2026-11-02） */}
+                  <Btn color="white" onClick={() => cmd('uriage')}>
+                    🧾 売上伝票を作成
+                  </Btn>
                 </>
               )}
             </>
           }
+          // 売上月（工事見積書の「売上月」と同じ。仕入れの月は出さない＝ユーザーの指示「仕入れの月は不要」2026-10-28）。商品を入れた案件だけ。
+          // 画面だけの値で、中のアプリの見積書・申請書・Excel・印刷には出ない。ボタンではないので削除のうしろ
+          tail={view === 'quote' && update && settings && linked.length > 0 ? <TokuteiSalesMonth rows={linked} settings={settings} update={update} /> : undefined}
         />
       </div>
       <div className="relative">

@@ -27,7 +27,7 @@ async function openSample(opt) {
   await page.goto(`${site}/jutaku-mitsumori/index.html`);
   await page.getByRole('button', {name: /サンプルで試す/}).click();
   await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
-  await page.getByRole('group', {name: '保存・印刷・削除'}).waitFor();
+  await page.getByRole('group', {name: '保存・印刷'}).waitFor();
   return {ctx, page};
 }
 /** 写真の欄の上の端が画面の上（8px）にある。ページの下まで動かしても届かないときは、ページのいちばん下で画面の上半分 */
@@ -106,7 +106,7 @@ for (const [name, viewport, where] of [
   for (const t of TABS) {
     await page.getByRole('tab', {name: t}).click();
     await page.waitForFunction((t) => [...document.querySelectorAll('[role=tab]')].some((e) => e.textContent.includes(t.slice(2)) && e.getAttribute('aria-selected') === 'true'), t);
-    await page.getByRole('group', {name: '保存・印刷・削除'}).waitFor();
+    await page.getByRole('group', {name: '保存・印刷'}).waitFor();
     await page.waitForTimeout(600);
     await page.evaluate(() => window.scrollTo(0, 0));
     const jump = page.getByRole('button', {name: '写真の欄へ'});
@@ -122,7 +122,7 @@ for (const [name, viewport, where] of [
         besideBack: Math.abs(r.top + r.height / 2 - (back.top + back.height / 2)) < 4 && r.left > back.right,
         besideTitle: !!b.closest('h1')?.parentElement || !!b.parentElement?.querySelector('h1'),
         right: r.right,
-        y: Math.round(document.querySelector('[aria-label="保存・印刷・削除"]').getBoundingClientRect().top),
+        y: Math.round(document.querySelector('[aria-label="保存・印刷"]').getBoundingClientRect().top),
         sw: document.documentElement.scrollWidth,
       };
     });

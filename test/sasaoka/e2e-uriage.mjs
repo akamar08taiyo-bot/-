@@ -1,4 +1,4 @@
-// 売上伝票発行依頼書を通しで確かめる：工事見積書のタブの上の段の「🧾 売上伝票依頼書」→ 足りない所（負担割合・介護度・新規／既存）を窓で入れる →
+// 売上伝票発行依頼書を通しで確かめる：工事見積書のタブの上の段の「🧾 売上伝票を作成」→ 足りない所（負担割合・介護度・新規／既存）を窓で入れる →
 // 「🧾 売上伝票発行依頼書を開く」→ 新しいタブで売上伝票のアプリが「住宅改修工事」1行（見積書の合計・仕切り計算表の合計）の入った状態で開く。生活保護も。
 // ユーザーと決めたこと（2026-10-27）：見積書のタブの上の段・住宅改修は工事1行・生活保護にチェックしたら自己負担は出さない。
 // usage: node e2e-uriage.mjs <サイトのURL> <出力フォルダ>
@@ -38,7 +38,7 @@ try {
     await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
     const estimateTab = page.getByRole('tab', {name: /工事見積書/});
     if ((await estimateTab.getAttribute('aria-selected')) !== 'true') await estimateTab.click();
-    await page.getByRole('button', {name: '🧾 売上伝票依頼書', exact: true}).waitFor();
+    await page.getByRole('button', {name: '🧾 売上伝票を作成', exact: true}).waitFor();
     // 住所（見積書の工事場所）・居宅とケアマネ（理由書の作成者）も入れておく（伝票に全部入るか確かめる）
     const sheet = page.getByRole('region', {name: '見積書', exact: true});
     await sheet.locator('[data-edit="job:address"]').click();
@@ -48,13 +48,13 @@ try {
     await page.getByLabel('作成者の所属事業所').fill('見本居宅介護支援事業所');
     await page.getByLabel('作成者の氏名').fill('見本 太郎');
     await page.getByRole('tab', {name: /工事見積書/}).click();
-    await page.getByRole('button', {name: '🧾 売上伝票依頼書', exact: true}).waitFor();
+    await page.getByRole('button', {name: '🧾 売上伝票を作成', exact: true}).waitFor();
 
     // 上の段：3段目（そのほかの機能）の 💾 保存 のすぐ右（2026-10-28 から上の段は5つのタブで同じ形。JobHeader.tsx。初めの ✉ メールで送付は 2026-10-30 から）
     const more = (await page.getByRole('group', {name: 'そのほかの機能'}).getByRole('button').allInnerTexts()).map((t) => t.trim()).filter((t) => t !== '削除');
-    assert.deepEqual(more.slice(0, 3), ['✉ メールで送付', '💾 保存', '🧾 売上伝票依頼書'], more.join(' / '));
+    assert.deepEqual(more.slice(0, 3), ['✉ メールで送付', '💾 保存', '🧾 売上伝票を作成'], more.join(' / '));
 
-    await page.getByRole('button', {name: '🧾 売上伝票依頼書', exact: true}).click();
+    await page.getByRole('button', {name: '🧾 売上伝票を作成', exact: true}).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByText('まだ入っていません：負担割合・介護度・新規・既存').waitFor();
     assert.equal(await dialog.getByRole('button', {name: '🧾 売上伝票発行依頼書を開く'}).isDisabled(), true);
@@ -105,7 +105,7 @@ try {
     log(`${tag}: 売上伝票が工事1行・仕切り ${cost}円で開いた`);
 
     // 生活保護：もう一度開く（新規・既存・負担割合は覚えている）
-    await page.getByRole('button', {name: '🧾 売上伝票依頼書', exact: true}).click();
+    await page.getByRole('button', {name: '🧾 売上伝票を作成', exact: true}).click();
     assert.equal(await dialog.getByRole('group', {name: '伝票の顧客区分'}).getByRole('button', {name: '既存'}).getAttribute('aria-pressed'), 'true');
     assert.equal(await dialog.getByRole('group', {name: '伝票の負担割合'}).getByRole('button', {name: '1割'}).getAttribute('aria-pressed'), 'true');
     await dialog.getByLabel('生活保護（自己負担は出さない）').check();
@@ -124,7 +124,7 @@ try {
     await ctx.close();
   }
   assert.deepEqual(errors, []);
-  console.log('ok: 工事見積書の 🧾 売上伝票依頼書 → 足りない所を窓で → 売上伝票（住宅改修工事1行）→ 生活保護（1366px・390px）');
+  console.log('ok: 工事見積書の 🧾 売上伝票を作成 → 足りない所を窓で → 売上伝票（住宅改修工事1行）→ 生活保護（1366px・390px）');
 } finally {
   await browser.close();
 }

@@ -128,7 +128,7 @@ if (withTokutei) {
   await page.frame({url: /tokutei\/index\.html/})?.evaluate(() => {
     window.print = () => {};
   });
-  await page.getByRole('group', {name: '保存・印刷・削除'}).getByRole('button', {name: '🖨 見積書を印刷'}).click();
+  await page.getByRole('group', {name: '保存・印刷'}).getByRole('button', {name: '🖨 見積書を印刷'}).click();
   await tk.locator('.print-overlay').waitFor();
   await page.screenshot({path: path.join(outDir, 'tokutei-1c-hanbai-print.png')});
   await tk.locator('.print-overlay').getByRole('button', {name: /閉じる/}).first().click();
