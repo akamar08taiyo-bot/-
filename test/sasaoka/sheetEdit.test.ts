@@ -10,6 +10,7 @@ import {
   deleteLine,
   deletePlace,
   deleteTouchesShinsei,
+  describeKey,
   dropEmptyPlaces,
   insertBlankAfter,
   isEmptyPlace,
@@ -212,6 +213,59 @@ test('施工費：内容に「同上施工費」と入れて単価を入れる �
   const head = rows[1].id;
   const k = applySheet(job, `line:${head}:qty`, '1.2', kk).job;
   assert.deepEqual([formLines(k, S, 'kouiki')[1].qty, formLines(k, S, 'kouiki')[1].amount, jobTotals(k, S).labor], [1.2, 3000, 2000]);
+});
+
+test('金額の欄も直せる：施工費はその金額（仕切り計算表はそのまま）、部材は 金額÷数量 を単価に（割り切れなくても金額はちょうど）。出ている金額のまま・空のとき', () => {
+  let {job} = type(emptyJob(), [
+    ['new:name', '階段'],
+    ['new:text', 'インテリアバー', bar],
+    ['new:text', '同上施工費'],
+    ['line:@:price', '2000'],
+    ['new:text', '木の手すり', rail],
+    ['line:@:qty', '0.15'],
+  ]);
+  const [mat, lab, cut] = job.places[0].rows.map((r) => r.id);
+  job = applySheet(job, `line:${lab}:amount`, '3,000', yk).job;
+  job = applySheet(job, `line:${mat}:qty`, '3', yk).job;
+  job = applySheet(job, `line:${mat}:amount`, '１００００', yk).job; // 全角でも
+  job = applySheet(job, `line:${cut}:amount`, '3000', yk).job;
+  const lines = formLines(job, S, 'yukuhashi');
+  assert.deepEqual(lines.map((l) => [l.qty, Math.round(l.unitPrice), l.amount]), [[3, 3333, 10000], [1, 3000, 3000], [0.15, 20000, 3000]]);
+  assert.equal(jobTotals(job, S).labor, 2000); // 仕切り計算表の取付手間は変えない
+  assert.deepEqual([`line:${lab}:amount`, `line:${mat}:amount`].map((k) => sheetValue(job, k, yk)), ['3000', '10000']);
+  // Excel の ROUNDDOWN(数量×単価) でも同じ金額になる単価（3×3333.333334＝10000.000002）
+  assert.equal(Math.floor(3 * job.places[0].rows[0].estPrice!), 10000);
+  // 出ている金額のまま確定しても単価を書きかえない。空にすると自動（定価8,000×0.8＝6,400円×3）に戻す
+  assert.equal(applySheet(job, `line:${mat}:amount`, '10,000', yk).job, job);
+  assert.equal(formLines(applySheet(job, `line:${mat}:amount`, '', yk).job, S, 'yukuhashi')[0].amount, 19200);
+  assert.equal(formLines(applySheet(job, `line:${lab}:amount`, '', yk).job, S, 'yukuhashi')[1].amount, 2000);
+  // 金額に数字でないもの・数量が0の行は何もしない
+  assert.equal(applySheet(job, `line:${mat}:amount`, 'あ', yk).job, job);
+});
+
+test('どこの欄か（describeKey）：「①階段 ／ 品名 ／ 欄の名前」。施工費は取り付ける手間の名前（木 など）', () => {
+  let {job} = type(emptyJob(), [
+    ['new:name', '階段'],
+    ['new:text', 'インテリアバー', bar],
+    ['new:text', '同上施工費'],
+    ['line:@:price', '2000'],
+  ]);
+  const place = job.places[0];
+  const [mat, lab] = place.rows.map((r) => r.id);
+  assert.equal(describeKey(job, `line:${lab}:amount`, S), '①階段 ／ 同上施工費 ／ 金額');
+  job = {...job, places: [{...place, rows: place.rows.map((r) => (r.id === lab ? {...r, name: '木'} : r))}]};
+  assert.equal(describeKey(job, `line:${lab}:price`, S), '①階段 ／ 同上施工費（木） ／ 単価');
+  assert.equal(describeKey(job, `line:${mat}:qty`, S), '①階段 ／ TOTO TS136GY6 インテリアバー ／ 数量');
+  assert.equal(describeKey(job, `excl:${mat}`, S), '①階段 ／ TOTO TS136GY6 インテリアバー ／ 介護保険の対象／対象外');
+  assert.equal(describeKey(job, `place:${place.id}:name`, S), '①階段 ／ 改修場所（箇所名）');
+  assert.deepEqual(['new:text', 'job:customer', 'overhead:all', 'overhead:target', 'date'].map((k) => describeKey(job, k, S)), [
+    'いちばん下の空いた行 ／ 内容（品名）',
+    'お客様名',
+    '諸経費',
+    '諸経費（介護保険対象部分）',
+    '作成日',
+  ]);
+  assert.equal(describeKey(job, 'line:nothing:price', S), '');
 });
 
 test('数えた取付手間（木 2箇所）の見積の金額を直す → 数えた行（仕切り計算表）はそのまま、見積の金額だけ。前の版の「施工費（調整）」は外す', () => {

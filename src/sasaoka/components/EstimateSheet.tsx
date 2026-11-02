@@ -14,7 +14,7 @@ import {startEstimate} from '../calc.ts';
 import {circled, KINDS, materialText} from '../estimateForms.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {KouikiForm, YukuhashiForm} from '../print/EstimateForms.tsx';
-import {applySheet, deleteLine, deletePlace, deleteTouchesShinsei, dropEmptyPlaces, insertBlankAfter, lineRows, parseDate, parsePlace, pasteLines, sheetTarget, sheetValue, toggleExcluded, toolPlace} from '../sheetEdit.ts';
+import {applySheet, deleteLine, deletePlace, deleteTouchesShinsei, describeKey, dropEmptyPlaces, FIELD_NAMES, insertBlankAfter, lineRows, parseDate, parsePlace, pasteLines, sheetTarget, sheetValue, toggleExcluded, toolPlace} from '../sheetEdit.ts';
 import {getClip, setClip, useClip} from '../sheetClip.ts';
 import type {EstimateForm, Job, Material, Place, Settings} from '../types.ts';
 import {matchesAll, todayIso, yen} from '../util.ts';
@@ -29,22 +29,6 @@ type Sel = {key: string; occ: number};
 type Edit = {mode: 'enter' | 'edit'; value: string; initial?: string};
 type Dir = 'up' | 'down' | 'left' | 'right' | 'next' | 'prev';
 type Box = {x: number; y: number; w: number; h: number; font: string; family: string; align: string};
-
-const FIELD_NAMES: Record<string, string> = {
-  text: '内容（品名）',
-  qty: '数量',
-  unit: '単位',
-  price: '単価',
-  note: '備考（定価等）',
-  name: '改修場所（箇所名）',
-  work: '改修の種類',
-  kind: '改修の種類',
-  photo: '写真番号',
-  mark: '材／手',
-  customer: 'お客様名',
-  insuredNo: '介護保険被保険者番号',
-  address: '工事場所（住所）',
-};
 
 /** 保存のときに付く updatedAt のほかは同じ見積書か */
 const sameJob = (a: Job, b: Job) => a === b || JSON.stringify({...a, updatedAt: 0}) === JSON.stringify({...b, updatedAt: 0});
@@ -773,6 +757,20 @@ export function EstimateSheet({
 
   const selName = sel ? FIELD_NAMES[field] ?? (sel.key.startsWith('excl:') ? '介護保険の対象／対象外' : sel.key.startsWith('overhead:') ? '諸経費' : sel.key === 'date' ? '作成日' : '') : '';
   const bar = editing ? edit.value : sel ? (sel.key === 'new:mark' ? mark : sheetValue(job, sel.key, ctx, estDate)) : '';
+  // どこの欄か（「①階段 ／ 同上施工費（木） ／ 金額」）。上の段の左と、欄にマウスを乗せたときに出す（ユーザーの指示「どこのセルの修正をしているか…マウスを乗せたら分かるように」2026-11-02）
+  const selDesc = sel ? describeKey(job, sel.key, s) || selName : '';
+  const selParts = selDesc.split(' ／ ');
+  const onMouseOver = (e: ReactMouseEvent) => {
+    const t = e.target as HTMLElement;
+    if (t === inputRef.current) return; // 選んでいる欄の上の入力欄は title={selDesc}
+    const el = t.closest<HTMLElement>('[data-edit]');
+    if (el && innerRef.current?.contains(el)) {
+      el.title = describeKey(jobRef.current, el.dataset.edit ?? '', s);
+      return;
+    }
+    const blank = t.closest<HTMLElement>('tr[data-blank]');
+    if (blank && innerRef.current?.contains(blank) && !blank.title) blank.title = 'いちばん下の空いた行';
+  };
 
   return (
     <>
@@ -804,8 +802,17 @@ export function EstimateSheet({
         </div>
       )}
       <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-1 text-xs">
-        <span className="w-28 shrink-0 truncate font-bold text-emerald-800" title={selName}>
-          {selName}
+        {/* 箇所と欄の名前はいつも見せ、長い品名だけを「…」で詰める（スマホの幅でも「金額」「単価」が分かるように） */}
+        <span className="flex min-w-0 max-w-[60%] shrink-0 whitespace-nowrap font-bold text-emerald-800" title={selDesc} aria-label="選んでいる欄">
+          {selParts.length === 3 ? (
+            <>
+              <span className="shrink-0 whitespace-pre">{`${selParts[0]} ／ `}</span>
+              <span className="min-w-0 truncate">{selParts[1]}</span>
+              <span className="shrink-0 whitespace-pre">{` ／ ${selParts[2]}`}</span>
+            </>
+          ) : (
+            <span className="min-w-0 truncate">{selDesc}</span>
+          )}
         </span>
         <span className="font-mono text-slate-400">fx</span>
         <span className="min-w-0 flex-1 truncate rounded border border-slate-200 bg-white px-2 py-0.5 text-slate-800" aria-label="選んでいる欄の値">
@@ -819,6 +826,7 @@ export function EstimateSheet({
         onMouseDown={onMouseDown}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
+        onMouseOver={onMouseOver}
       >
         <div style={{width: PAGE_W * scale, height: innerH * scale}}>
           <div ref={innerRef} className="relative" style={{width: PAGE_W, transform: `scale(${scale})`, transformOrigin: 'top left'}}>
@@ -858,6 +866,7 @@ export function EstimateSheet({
                 if (!edit && sel && !isToggle(sel.key)) setEdit({mode: 'enter', value: ''});
               }}
               aria-label={selName || '見積書の欄'}
+              title={selDesc || undefined}
               spellCheck={false}
               autoComplete="off"
             />

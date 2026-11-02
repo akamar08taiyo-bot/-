@@ -175,6 +175,48 @@ assert.equal(await works.getByRole('listitem', {name: /玄関/}).count(), 0);
 assert.equal(await works.getByRole('listitem', {name: '①階段'}).count(), 1);
 log('見積書から申請書の箇所を消す（やめる・見積書の行だけ・申請書からも削除）OK');
 
+// ---------------- 金額の欄も直せる・欄にマウスを乗せるとどこの欄か出る（ユーザーの指示「一度入った金額のところを、もう修正できるように…
+// 各セルに移ったときに、どこのセルの修正をしているかというセルの上にマウスを乗せたら分かるように」2026-11-02）
+await page.getByRole('tab', {name: '📋 工事見積書'}).click();
+await sheet.waitFor();
+const laborRow = sheet.locator('.form-page tr', {hasText: '同上施工費'}).first();
+const laborAmount = laborRow.locator('[data-edit$=":amount"]');
+await laborAmount.hover();
+const laborTitle = await laborAmount.getAttribute('title');
+assert.match(laborTitle ?? '', /^①階段 ／ 同上施工費（.+） ／ 金額$/, laborTitle);
+await laborAmount.click();
+const barLabel = sheet.getByLabel('選んでいる欄', {exact: true});
+assert.equal(await barLabel.getAttribute('title'), laborTitle);
+assert.equal((await barLabel.innerText()).replace(/\s+/g, ''), laborTitle.replace(/\s+/g, '')); // 上の段の左にも同じ名前
+await page.keyboard.type('5000');
+await page.keyboard.press('Enter');
+await page.waitForTimeout(300);
+assert.ok(/ 5,000 /.test(` ${(await laborRow.innerText()).replace(/\s+/g, ' ')} `), await laborRow.innerText());
+const railRow = sheet.locator('.form-page tr', {hasText: 'BD-132'}).first();
+const railAmount = railRow.locator('[data-edit$=":amount"]');
+await railAmount.hover();
+assert.match((await railAmount.getAttribute('title')) ?? '', /^①階段 ／ .*BD-132.* ／ 金額$/);
+const railPrice = railRow.locator('[data-edit$=":price"]');
+await railPrice.hover();
+assert.match((await railPrice.getAttribute('title')) ?? '', /^①階段 ／ .*BD-132.* ／ 単価$/);
+await railAmount.click();
+await page.keyboard.type('9999');
+await page.keyboard.press('Enter');
+await page.waitForTimeout(300);
+assert.ok(/ 9,999 /.test(` ${(await railRow.innerText()).replace(/\s+/g, ' ')} `), await railRow.innerText());
+await railAmount.click();
+await sheet.getByLabel('選んでいる欄', {exact: true}).scrollIntoViewIfNeeded();
+await page.mouse.wheel(0, -60);
+await page.waitForTimeout(200);
+await page.screenshot({path: path.join(outDir, 'spots-05-amount.png')});
+// スマホの幅でも、選んでいる欄の名前で上の段が横にはみ出さない
+await page.setViewportSize({width: 390, height: 844});
+await page.waitForTimeout(300);
+assert.ok((await page.evaluate(() => document.documentElement.scrollWidth)) <= 390);
+await sheet.getByLabel('選んでいる欄', {exact: true}).scrollIntoViewIfNeeded();
+await page.screenshot({path: path.join(outDir, 'spots-06-amount-phone.png')});
+log(`金額の欄を直す（施工費 5,000・部材 9,999）・マウスを乗せると「${laborTitle}」OK`);
+
 assert.deepEqual(errors, []);
 await browser.close();
 console.log('ALL OK');

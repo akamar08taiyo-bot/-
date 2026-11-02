@@ -9,7 +9,7 @@
 
 import {cutToLength, estimateAmount, estimatePlaceLines, estimateQty, estimateUnitPrice, isBlankRow, listPriceOf, overheadAuto, estimateTotals, rounddown} from './calc.ts';
 import type {EstimateRates} from './calc.ts';
-import {KINDS, autoNote, formLines, jobForm, jobInsurer, lineNote, materialText, NO_SHINSEI, noteText, rowUnit} from './estimateForms.ts';
+import {KINDS, autoNote, circled, formLines, jobForm, jobInsurer, lineNote, materialText, NO_SHINSEI, noteText, photoNumbers, rowUnit} from './estimateForms.ts';
 import {fillAdded, placeAfterQty, withBrackets} from './cutLink.ts';
 import {guessPieceLengthM} from './priceImport.ts';
 import {copyRows, manualRow, materialRow, newPlace} from './rows.ts';
@@ -173,6 +173,60 @@ function workAmount(place: Place, headId: string, rates: EstimateRates): number 
   return w?.kind === 'work' ? w.amount : 0;
 }
 
+// ---------------------------------------------------------------- 欄の説明（マウスを乗せたとき・選んだときに出す）
+
+/** 欄の名前（見積書の上の fx の左・マウスを乗せたときの説明） */
+export const FIELD_NAMES: Record<string, string> = {
+  text: '内容（品名）',
+  qty: '数量',
+  unit: '単位',
+  price: '単価',
+  amount: '金額',
+  note: '備考（定価等）',
+  name: '改修場所（箇所名）',
+  work: '改修の種類',
+  kind: '改修の種類',
+  photo: '写真番号',
+  mark: '材／手',
+  customer: 'お客様名',
+  insuredNo: '介護保険被保険者番号',
+  address: '工事場所（住所）',
+};
+
+const short = (t: string, n = 28) => (t.length > n ? `${t.slice(0, n)}…` : t);
+
+/**
+ * 見積書の欄がどこの何か（「①階段 ／ マツ六 BD-132 35アッシュ丸棒… ／ 単価」）。マウスを乗せたときの説明と、選んだ欄の名前に出す
+ * （ユーザーの指示「各セルに移ったときに、どこのセルの修正をしているかというセルの上にマウスを乗せたら分かるようにしてください」2026-11-02）
+ */
+export function describeKey(job: Job, key: string, rates: EstimateRates): string {
+  const [kind, id, field] = key.split(':');
+  if (kind === 'job') return FIELD_NAMES[id] ?? '';
+  if (kind === 'date') return '作成日';
+  if (kind === 'overhead') return id === 'target' ? '諸経費（介護保険対象部分）' : '諸経費';
+  if (kind === 'new') return ['いちばん下の空いた行', FIELD_NAMES[id] ?? ''].filter(Boolean).join(' ／ ');
+  const photos = photoNumbers(job, rates);
+  const placeName = (p: Place) => `${photos.get(p.id) ? circled(photos.get(p.id)!) : ''}${p.name.trim() || '（改修場所なし）'}`;
+  if (kind === 'place') {
+    const p = job.places.find((x) => x.id === id);
+    return p ? `${placeName(p)} ／ ${FIELD_NAMES[field] ?? ''}` : FIELD_NAMES[field] ?? '';
+  }
+  if (kind !== 'line' && kind !== 'excl') return '';
+  const found = findRow(job, id);
+  if (!found) return '';
+  const rows = found.place.rows;
+  const r = found.row;
+  let what: string;
+  if (r.kind === 'labor') {
+    const head = workHead(rows, found.ri);
+    const names = rows.slice(head, workEnd(rows, head)).map((x) => x.name.trim()).filter((x) => x && x !== '同上施工費' && x !== '施工費');
+    const after = head > 0 && rows[head - 1].kind === 'material' && !isBlankRow(rows[head - 1]);
+    what = `${after ? '同上施工費' : '施工費'}${names.length ? `（${names.join('・')}）` : ''}`;
+  } else what = isBlankRow(r) ? '空白の行' : short((r.estText ?? materialText(r)).replace(/\s+/g, ' ').trim());
+  const name = kind === 'excl' ? '介護保険の対象／対象外' : FIELD_NAMES[field] ?? '';
+  return [placeName(found.place), what, name].filter(Boolean).join(' ／ ');
+}
+
 // ---------------------------------------------------------------- いま入っている値（書き直すときの最初の文字）
 
 export function sheetValue(job: Job, key: string, ctx: SheetCtx, date = ''): string {
@@ -201,7 +255,7 @@ export function sheetValue(job: Job, key: string, ctx: SheetCtx, date = ''): str
     const amount = workAmount(found.place, r.id, rates);
     if (field === 'text') return r.estText ?? '';
     if (field === 'qty') return String(shownHours(amount, ctx.settings.estimateHourRate));
-    if (field === 'price') return String(amount);
+    if (field === 'price' || field === 'amount') return String(amount);
     if (field === 'note') return noteOf(job, r.id, ctx)?.shown ?? r.estNote ?? '';
     return '';
   }
@@ -211,6 +265,7 @@ export function sheetValue(job: Job, key: string, ctx: SheetCtx, date = ''): str
   if (field === 'qty') return String(shownQty(r));
   if (field === 'unit') return rowUnit(r);
   if (field === 'price') return String(estimateUnitPrice(r, rates));
+  if (field === 'amount') return String(estimateAmount(r, rates));
   if (field === 'note') return noteOf(job, r.id, ctx)?.shown ?? r.estNote ?? '';
   return '';
 }
@@ -305,8 +360,9 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
       const estText = trimmed === '' || trimmed === '同上施工費' || trimmed === '施工費' ? null : trimmed;
       return {job: patchRow(job, {...found, ri: head, row: headRow}, {estText, ...(single && trimmed !== '' ? {name: trimmed} : {})}), key};
     }
-    if (field === 'qty' || field === 'price') {
-      // 広域連合用の時間の欄は 時間×1時間の単価、金額の欄はその金額。空にしたら自動（笹岡工務店の手間×施工費の率）に戻す
+    if (field === 'qty' || field === 'price' || field === 'amount') {
+      // 広域連合用の時間の欄は 時間×1時間の単価、単価・金額の欄はその金額（施工費は 1式。ユーザーの指示「一度入った金額のところを、もう修正できるように」2026-11-02）。
+      // 空にしたら自動（笹岡工務店の手間×施工費の率）に戻す
       const n = parseNum(trimmed);
       if (n === null && trimmed !== '') return {job, key};
       // 出ている時間のまま確定したら何もしない（時間は小数2けたに丸めて出すので、入れ直すと金額が変わってしまう）
@@ -352,6 +408,21 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
     if (n === null) return {job, key};
     const auto = estimateUnitPrice({...r, estPrice: null}, rates);
     return {job: patchRow(job, found, {estPrice: n === auto ? null : n}), key};
+  }
+  if (field === 'amount') {
+    // 金額を打ったら、単価を 金額÷数量（切って使う部材は使う本数）にする（金額はちょうどその金額。単価は1円未満を四捨五入して出す）。空なら自動の単価に戻す
+    if (trimmed === '') return {job: patchRow(job, found, {estPrice: null}), key};
+    const n = parseNum(trimmed);
+    const q = estimateQty(r);
+    if (n === null || !(q > 0)) return {job, key};
+    const want = Math.round(n);
+    if (want === estimateAmount(r, rates)) return {job, key}; // 出ている金額のまま確定したら単価を書きかえない
+    // 1円未満を切り捨てても打った金額になる単価（10,000円÷3 は 3333.333334。Excel の ROUNDDOWN(数量×単価) でも同じ金額）
+    const near = Math.round((want / q) * 1e6) / 1e6;
+    const price = estimateAmount({...r, estPrice: near}, rates) === want ? near : Math.ceil((want / q) * 1e6) / 1e6;
+    if (estimateAmount({...r, estPrice: price}, rates) !== want) return {job, key};
+    const auto = estimateUnitPrice({...r, estPrice: null}, rates);
+    return {job: patchRow(job, found, {estPrice: Math.abs(price - auto) < 1e-6 ? null : price}), key};
   }
   if (field === 'note') {
     // 1本の長さ（定価○円（4m））を入れて使う長さが決まったときも、中間のブラケットの数を入れ直す

@@ -6,6 +6,7 @@ import {defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {estimateFileName, estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import type {Job, Place, Row} from '../../src/sasaoka/types.ts';
 import {manualRow} from '../../src/sasaoka/rows.ts';
+import {applySheet} from '../../src/sasaoka/sheetEdit.ts';
 import {fitLines, fitName, fitText, wordLines} from '../../src/sasaoka/print/fit.ts';
 import {KK, KK_ROWS, YK, YK_ROW} from '../../src/sasaoka/print/formLayout.ts';
 import {readXlsx} from '../../src/sasaoka/xlsx.ts';
@@ -164,6 +165,17 @@ test('Excel の金額は式：数量・単価を直せば計算し直される�
     n++;
   }
   assert.ok(n >= 23, `式の数 ${n}`); // 諸経費（全体・対象）は数字
+});
+
+test('見積書で金額を打った部材（割り切れない 10,000円÷0.7本）も、Excel の ROUNDDOWN(数量×単価) で打った金額になる', () => {
+  const base = job();
+  const id = base.places[0].rows[0].id;
+  const j = applySheet(base, `line:${id}:amount`, '10000', {settings: S, form: 'yukuhashi'}).job;
+  const x = open(estimateXlsx(j, S, '2026-10-20').bytes);
+  assert.equal(x.text('G9'), 10000);
+  assert.equal(x.cells.get('G9')?.f, 'ROUNDDOWN(D9*F9,0)');
+  assert.equal(Math.round(Number(x.text('F9'))), 14286); // 単価の欄は円で見せる（#,##0）
+  for (const [ref, c] of x.cells) if (c.f) assert.equal(evaluate(x.cells, ref), c.v, `${ref} =${c.f}`);
 });
 
 test('諸経費を手で直した見積書は、その金額をそのまま書く（式にしない）', () => {

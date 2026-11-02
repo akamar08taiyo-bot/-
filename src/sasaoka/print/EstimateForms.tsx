@@ -359,7 +359,8 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
       {cell(qty, YK.D, 9, 'r nr', l.isWork ? null : k('qty'))}
       {cell(l.unit, YK.E, 11, 'nl', l.isWork || l.cut ? null : k('unit'))}
       {cell(price, YK.F, 11, 'r', k('price'))}
-      {cell(amount, YK.G, 11, 'r mr')}
+      {/* 金額も打ち込める（施工費はその金額に、部材は 金額÷数量 を単価に。ユーザーの指示「一度入った金額のところを、もう修正できるように」2026-11-02） */}
+      {cell(amount, YK.G, 11, 'r mr', l.blank || open ? null : k('amount'))}
       {cell(target ? qty : '', YK.H, 9, 'r nr', excl)}
       {cell(target ? l.unit : '', YK.I, 11, 'nl', excl)}
       {cell(target ? price : '', YK.J, 11, 'r', excl)}
@@ -648,7 +649,7 @@ function KkLine({
       {cell(qty, KK.F, 9, 'r ml gothic', !l.isWork || l.hourly ? k('qty') : null)}
       {cell(l.unit, KK.G, 11, 'gothic', l.isWork || l.cut ? null : k('unit'))}
       {cell(price, KK.H, 11, 'r gothic', l.hourly ? null : k('price'))}
-      {cell(amount, KK.I, 11, 'r mr gothic')}
+      {cell(amount, KK.I, 11, 'r mr gothic', l.blank || open ? null : k('amount'))}
       <td className={`gap${bottom}`} />
       {cell(l.first ? circled(l.photo) : '', KK.K, 11, 'c ml', l.first ? `place:${l.placeId}:photo` : null)}
       {cell(l.first ? circled(l.kind) : '', KK.L, 11, 'c', l.first ? `place:${l.placeId}:kind` : null)}
