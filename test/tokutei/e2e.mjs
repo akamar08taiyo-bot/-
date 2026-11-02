@@ -21,11 +21,11 @@ const dist = new URL('../../dist-tokutei/', import.meta.url).pathname;
 const server = createServer((req, res) => {
   const path = (req.url ?? '/').split('?')[0];
   // 介援隊のカタログの PDF（dist-tokutei/catalog/。ポータルの tokutei/catalog/）
-  const catalog = /\/catalog\/([\w.-]+\.pdf)$/.exec(path);
+  const catalog = /\/catalog\/([\w.-]+\.(?:pdf|json))$/.exec(path); // PDF と、ビルドで作った文字の一覧（text.json）
   const file = catalog ? join('catalog', catalog[1]) : path.endsWith('/version.json') ? 'version.json' : 'index.html';
   try {
     const body = readFileSync(join(dist, file));
-    res.writeHead(200, {'content-type': catalog ? 'application/pdf' : file.endsWith('.json') ? 'application/json' : 'text/html; charset=utf-8'});
+    res.writeHead(200, {'content-type': catalog ? (catalog[1].endsWith('.json') ? 'application/json' : 'application/pdf') : file.endsWith('.json') ? 'application/json' : 'text/html; charset=utf-8'});
     res.end(body);
   } catch {
     res.writeHead(404);
@@ -96,6 +96,12 @@ try {
   });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(String(e)));
+  // カタログの読み込み：PDF（ページの絵）とビルドで作った文字の一覧（catalog/text.json）を何回取りに行ったか
+  const catalogGets = {pdf: 0, json: 0};
+  page.on('request', (r) => {
+    if (/\/catalog\/[\w.-]+\.pdf$/.test(r.url())) catalogGets.pdf++;
+    if (/\/catalog\/text\.json(\?|$)/.test(r.url())) catalogGets.json++;
+  });
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
   await page.goto(url);
   await page.getByRole('heading', {name: '特定福祉用具 購入申請書・見積もり作成'}).waitFor();
@@ -918,11 +924,15 @@ try {
   await page.getByRole('button', {name: '＋ 苅田町'}).click();
   await page.getByRole('button', {name: '📄 申請書', exact: true}).click();
   const catForm = page.getByRole('form', {name: '申請書に入れる所'});
+  const pdfBefore = catalogGets.pdf;
   await catForm.getByLabel('種目', {exact: true}).selectOption('入浴補助用具');
   const picker = catForm.getByRole('group', {name: 'カタログの商品'});
   // 品目「シャワーチェア」を押すと、その品目の商品だけ（シャワーベンチ・シャワーチェア・シャワーキャリー。マットは出ない）がすぐ出る（2026-11-01）
   await picker.getByRole('button', {name: /^シャワーチェア\s*\d+$/}).click({timeout: 60000});
   const chairList = picker.getByRole('list', {name: 'シャワーチェアの商品'});
+  // 商品の一覧はビルドで作った文字の一覧から（PDF 26 ページ・24MB を読まない。ユーザーの指示「カタログの読み込みスピードが遅くないか」2026-11-02）
+  assert.equal(catalogGets.pdf, pdfBefore, `商品の一覧のために PDF を ${catalogGets.pdf - pdfBefore} 回読んだ`);
+  assert.ok(catalogGets.json >= 1, 'catalog/text.json を読んでいない');
   const chairNames = await chairList.getByRole('listitem').locator('span.font-bold').allInnerTexts();
   assert.ok(chairNames.length >= 25, `${chairNames.length}`);
   assert.ok(chairNames.some((n) => /シャワーラク/.test(n)) && chairNames.some((n) => /シャワーベンチ/.test(n)));

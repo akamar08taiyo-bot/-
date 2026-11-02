@@ -20,10 +20,10 @@ const dist = new URL('../../dist-tokutei/', import.meta.url).pathname;
 const catalogDir = new URL('../../public-tokutei/catalog/', import.meta.url).pathname;
 const server = createServer((req, res) => {
   const path = (req.url ?? '/').split('?')[0];
-  const catalog = /\/catalog\/([\w.-]+\.pdf)$/.exec(path);
+  const catalog = /\/catalog\/([\w.-]+\.(?:pdf|json))$/.exec(path); // PDF と、ビルドで作った文字の一覧（text.json）
   const file = catalog ? join('catalog', catalog[1]) : path.endsWith('/version.json') ? 'version.json' : 'index.html';
   try {
-    res.writeHead(200, {'content-type': catalog ? 'application/pdf' : file.endsWith('.json') ? 'application/json' : 'text/html; charset=utf-8'});
+    res.writeHead(200, {'content-type': catalog ? (catalog[1].endsWith('.json') ? 'application/json' : 'application/pdf') : file.endsWith('.json') ? 'application/json' : 'text/html; charset=utf-8'});
     res.end(readFileSync(join(dist, file)));
   } catch {
     res.writeHead(404);

@@ -32,10 +32,33 @@ const textOf = async (page: PdfPage) => (await page.getTextContent()).items.map(
 
 /**
  * ページの文字だけ（カタログから検索に使う）。絵にしないので軽い。
- * カタログの窓は、前は開くと全部のページ（14ページ）を一度に絵にしていて、iPhone では開けなかった（ユーザーの話「携帯で特定福祉用具カタログを開こうとした場合に開けない」2026-10-30）
+ * カタログの窓は、前は開くと全部のページ（14ページ）を一度に絵にしていて、iPhone では開けなかった（ユーザーの話「携帯で特定福祉用具カタログを開こうとした場合に開けない」2026-10-30）。
+ * ビルドで作った文字の一覧（catalog/text.json）があれば、PDF は読まない
  */
 export function loadCatalogText(file: string): Promise<string> {
-  return withPage(file, textOf);
+  return loadCatalogItems(file).then((items) => items.map((t) => t.s).join(' '));
+}
+
+/**
+ * ビルドで作ったカタログの文字の一覧（catalog/text.json。vite.tokutei.config.ts の catalogText）：PDF ごとに [文字, 左, 上, 幅, 高さ]。
+ * 1回だけ読んで覚えておく。ないとき（開発中・古い版の公開）・読めないときは null（PDF を読む）。版が変わったら読み直すよう、版の印を付けて取りに行く
+ */
+let textIndex: Promise<Map<string, PdfText[]> | null> | null = null;
+function catalogTextIndex(): Promise<Map<string, PdfText[]> | null> {
+  if (!textIndex) {
+    const build = typeof __APP_BUILD__ === 'string' ? __APP_BUILD__ : '';
+    textIndex = fetch(`${catalogUrl('text.json')}?v=${encodeURIComponent(build)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json: Record<string, [string, number, number, number, number][]> | null) =>
+        json && typeof json === 'object' ? new Map(Object.entries(json).map(([file, rows]) => [file, rows.map(([s, x, y, w, h]) => ({s, x, y, w, h}))])) : null,
+      )
+      .catch(() => null);
+    // 読めなかったら次にまた取りに行く（電波が悪かったときなど）
+    void textIndex.then((m) => {
+      if (!m) textIndex = null;
+    });
+  }
+  return textIndex;
 }
 
 export async function loadCatalogPage(file: string): Promise<CatalogImage> {
@@ -59,12 +82,15 @@ export async function loadCatalogPage(file: string): Promise<CatalogImage> {
   });
 }
 
-/** ページの文字と位置（左上から pt。catalogItems.ts で商品の一覧にする）。読んだページは覚えておく（商品の一覧と印刷の品番で同じものを使う） */
+/**
+ * ページの文字と位置（左上から pt。catalogItems.ts で商品の一覧にする）。ビルドで作った文字の一覧があればそれ、なければ PDF を読む。
+ * 読んだページは覚えておく（商品の一覧と印刷の品番で同じものを使う）
+ */
 const itemsLoaded = new Map<string, Promise<PdfText[]>>();
 export function loadCatalogItems(file: string): Promise<PdfText[]> {
   let p = itemsLoaded.get(file);
   if (!p) {
-    p = readCatalogItems(file);
+    p = catalogTextIndex().then((index) => index?.get(file) ?? readCatalogItems(file));
     itemsLoaded.set(file, p);
     p.catch(() => itemsLoaded.delete(file)); // 読めなかったら次にまた読む
   }

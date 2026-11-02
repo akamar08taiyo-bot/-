@@ -20,6 +20,7 @@ import {
   emOf,
   finishWorkbook,
   fitCell,
+  fitCellIn,
   fitNameCell,
   fitPrintPage,
   formatCell,
@@ -189,6 +190,7 @@ export type SheetWrite = {
   same?: string[][]; // 明細の行の欄の文字の大きさ・配置を、最初の欄にそろえる（原本は行ごとにちがう）
   fit?: string[]; // 入りきらなければ文字を小さくする欄
   fitWidth?: string[]; // 折り返さない1行の欄で、行が字の大きさぎりぎりに低いもの：幅に入らないときだけ小さくする
+  fitIn?: [string, string][]; // 折り返さない1行の欄で、右の空いた欄へはみ出して書くもの：はみ出してよい範囲（委任状の委任者の住所＝下線の端まで）に入る大きさにする
   oneLine?: string[]; // 名前の欄（種目及び商品名・製造事業者名及び販売事業者名）：1つの名前が2行に折り返さないよう、どの行も幅に入る大きさにする
   sizes?: [string, number][]; // 文字の大きさ（pt）を変える欄（委任状の保険給付額）
   heights?: [number, number][]; // 高さ（pt）を変える行（大きくした字が入るように）：[行, 高さ]
@@ -261,6 +263,11 @@ const PROXY_AMOUNT_ROWS: [number, number][] = [
 ];
 /** 原本の 11pt で、欄の左から「円」の右の端まで（全角の文字の数） */
 const PROXY_AMOUNT_EM = 28;
+/**
+ * 委任者の住所（「委任者　住　所」と同じ A32 の欄）は、下線（C32:G32）の右の端までに入る大きさにする。前は長い住所が下線を越えて、
+ * 表の右の線・用紙の外まで伸びた（ユーザーの指示「委任状の…はみ出しの部分などがありました」2026-11-02）
+ */
+const PROXY_FIT: [string, string][] = [['A32', 'A32:G32']];
 
 /**
  * 委任状（行橋市・苅田町は同じ様式）：保険給付額・日付・委任者の住所。
@@ -606,7 +613,10 @@ function kitakyushuSheets(v: ShinseiValues): SheetWrite[] {
       ],
       block: {cell: KK.reason, head: [], body: reasonText(v), tail: []},
       formats: [...[...kinds.keys()].map((no) => KK[`kind${no}`]), KK.total, KK.prev, KK.benefit].map((ref): [string, {numFmt: number}] => [ref, {numFmt: 3}]),
-      fit: [KK.kana, KK.name, KK.address, KK.tel, KK.sellerA, KK.repA, KK.sellerB, KK.repB, KK.sellerAddress, KK.sellerTel],
+      fit: [KK.kana, KK.name, KK.address, KK.tel],
+      // 受任者（事業者名・代表者名・住所・電話番号）は1行の欄で、行が見出し（10.5pt）の高さしかない。高さで縮めると 6pt ほどになり見出しより
+      // ずっと小さかったので、幅に入らないときだけ小さくする（ユーザーの指示「委任状の…社長名…文字が極端に小さくなってないか」2026-11-02）
+      fitWidth: [KK.sellerA, KK.repA, KK.sellerB, KK.repB, KK.sellerAddress, KK.sellerTel],
       // 給付率の丸：1割＝９０・2割＝８０・3割＝７０（生活保護も 1割）
       marks: [{cell: KK.ratio, needles: ['７０', '８０', '９０'], pick: v.ratioSet ? 3 - v.ratio : -1}],
     },
@@ -641,7 +651,7 @@ export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
     rows: 3,
     sheets: (v) => [
       {sheet: '用具・受領委任払', cells: preCells(v, 7), same: PRE_SAME, fit: PRE_FIT, oneLine: PRE_ONE_LINE, marks: [ERA('F9', v), GENDER('Y9', v), CARE('F12', v)]},
-      {sheet: '委任状', cells: proxyCells(v), ...(v.benefit > 0 ? {sizes: [['B23', PROXY_AMOUNT_PT]], heights: PROXY_AMOUNT_ROWS} : {})},
+      {sheet: '委任状', cells: proxyCells(v), fitIn: PROXY_FIT, ...(v.benefit > 0 ? {sizes: [['B23', PROXY_AMOUNT_PT]], heights: PROXY_AMOUNT_ROWS} : {})},
       {sheet: '完了写真', cells: photoCells(v), fit: ['B3'], hideZeros: true},
     ],
   },
@@ -665,7 +675,7 @@ export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
         marks: [ERA('F9', v), GENDER('Y9', v), CARE('F12', v)],
         hideZeros: true,
       },
-      {sheet: '委任状', cells: proxyCells(v), ...(v.benefit > 0 ? {sizes: [['B23', PROXY_AMOUNT_PT]], heights: PROXY_AMOUNT_ROWS} : {})},
+      {sheet: '委任状', cells: proxyCells(v), fitIn: PROXY_FIT, ...(v.benefit > 0 ? {sizes: [['B23', PROXY_AMOUNT_PT]], heights: PROXY_AMOUNT_ROWS} : {})},
       {sheet: '完了写真', cells: photoCells(v), fit: ['B3'], hideZeros: true},
     ],
   },
@@ -776,6 +786,7 @@ export function fillShinseiFiles(files: Files, form: ShinseiForm, v: ShinseiValu
   for (const w of sheets) for (const refs of w.same ?? []) sameStyle(files, w.sheet, refs);
   for (const w of sheets) for (const ref of w.fit ?? []) fitCell(files, w.sheet, ref);
   for (const w of sheets) for (const ref of w.fitWidth ?? []) fitCell(files, w.sheet, ref, true);
+  for (const w of sheets) for (const [ref, range] of w.fitIn ?? []) fitCellIn(files, w.sheet, ref, range);
   // 名前の欄：種目及び商品名（1行目が種目）の長い商品名は、区切りの良い所で2行に（fitNameCell）。製造事業者名の欄は1行のまま（2026-10-26 の指示）
   const isLabel = (lines: string[]) => CATEGORIES.some((c) => lines[0].startsWith(c.name));
   for (const w of sheets) for (const ref of w.oneLine ?? []) fitNameCell(files, w.sheet, ref, isLabel);

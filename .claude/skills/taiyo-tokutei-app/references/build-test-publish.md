@@ -29,6 +29,9 @@ E2E_PORT=5194 PLAYWRIGHT=/opt/node-tools/node_modules/playwright/index.mjs timeo
   流れ：取り込み → ★ → 見積もり（42,944円・4,295円・38,649円）→ 申請書（行橋市の Excel・プレビュー。広域連合に替えて受領委任払用・償還払い用・Excel・390px）→ 印刷 → Excel の保存（ファイル名と値）→ 読み直し → 390px で横にはみ出さない。PDF のページ数は `pdfinfo` で見る。
 - 2026-10-26 から e2e.mjs は、文例の見出し・種目の並び・カタログの12ページと初めのチェック（品番を読んでから `100110000000`）・チェックしたページだけの印刷（PDF のページ数）・
   カタログの窓（開く・動かす・大きさ・覚える・印刷・Esc・申請書の画面の Enter）・複製・1行の名前も見る。
+- カタログの文字の一覧 `catalog/text.json`（ビルドの `vite.tokutei.config.ts` の `catalogText` が PDF から作る。商品の一覧・印刷の品番・窓の検索はこれだけを読む）：
+  ブラウザのテストのサーバーは `catalog/*.json` も返す（返さないと index.html が返って PDF 26 ページを読みに行き、遅いだけで通ってしまう。`e2e.mjs` は PDF を読まないことを確かめる）。
+  時間の測り方：Playwright の CDP `Network.emulateNetworkConditions`（20Mbps・60ms）で、種目を選んでから品目のボタンが出るまで（2026-11-02：PDF を読んでいたころ 23.6 秒・24MB → 1.0 秒・0.9MB）。
 - 住宅改修のタブの中（embed）・⇔・担当・カタログを表示／印刷は、住宅改修のブラウザのテスト `e2e-tokutei.mjs`（住宅改修のスキル）で確かめる：dist-tokutei/ を丸ごと（catalog/ も）住宅改修のテストのサイトの `tokutei/` に写して動かす。
 - 見た目を変えたら、パソコンとスマホ（390px）のスクリーンショットを撮って自分の目で見る。
 - 販売受注簿への転記：受注簿ツール（`akamar08taiyo-bot/taiyo-hacchu-scan`、`/home/user/taiyo-hacchu-scan`）を `npm ci && npm run build` してから
@@ -65,9 +68,9 @@ E2E_PORT=5194 PLAYWRIGHT=/opt/node-tools/node_modules/playwright/index.mjs timeo
 ```sh
 cd /home/user/tokutei-wt && npm run -s build:tokutei
 cp dist-tokutei/index.html dist-tokutei/version.json /home/user/taiyo-portal/tokutei/
-cp -r dist-tokutei/catalog /home/user/taiyo-portal/tokutei/   # 介援隊のカタログの PDF（変えたときだけ。catalog.ts）
+cp -r dist-tokutei/catalog /home/user/taiyo-portal/tokutei/   # 介援隊のカタログの PDF と文字の一覧 text.json（PDF を変えたとき・text.json がまだないとき）
 # タイルの使い方の文：taiyo-portal/index.html の APPS の name:'特定福祉用具 購入申請書・見積もり作成'
-cd /home/user/taiyo-portal && git add tokutei/index.html tokutei/version.json tokutei/catalog/*.pdf index.html && git commit … && git push -u origin master
+cd /home/user/taiyo-portal && git add tokutei/index.html tokutei/version.json tokutei/catalog/*.pdf tokutei/catalog/text.json index.html && git commit … && git push -u origin master
 ```
 
 - 先にアプリのブランチを commit・push してから、ポータルを commit・push する。ポータルの `git fetch` で、ほかのセッションの公開が先に入っていないか見る。

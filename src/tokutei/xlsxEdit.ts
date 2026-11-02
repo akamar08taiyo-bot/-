@@ -467,6 +467,22 @@ export function fitCell(files: Files, sheet: string, ref: string, widthOnly = fa
 }
 
 /**
+ * 折り返さない1行の欄で、右の空いた欄へはみ出して書く文字を、はみ出してよい範囲（range。例 委任状の委任者の住所は下線の端までの A32:G32）に入る大きさにする。
+ * Excel はとなりの欄が空いていれば表の線・用紙の端を越えても書くので、範囲を決めて縮める
+ */
+export function fitCellIn(files: Files, sheet: string, ref: string, range: string): number | null {
+  const xml = strFromU8(files[sheetPath(files, sheet)]);
+  const text = cellText(xml, ref, sharedStrings(files)).replace(/\n/g, '');
+  if (!cellRe(ref).test(xml) || !text.trim()) return null;
+  const box = rangeBox(sheetLayout(xml), range);
+  const st = cellStyle(files, xml, ref);
+  const pt = fitSize([text], box.w, Infinity, st.size, false);
+  if (pt >= st.size) return null;
+  sizeCell(files, sheet, ref, pt);
+  return pt;
+}
+
+/**
  * 長い名前を区切りの良い所で2行に分ける候補（空白・閉じかっこのあと・開きかっこの前）。2行のうち長い方がいちばん短くなる所から順に
  * （「シャワーチェアAir コンパクトワンタッチ ブルー」→「シャワーチェアAir」「コンパクトワンタッチ ブルー」）
  */

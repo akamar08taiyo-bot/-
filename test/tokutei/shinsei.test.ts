@@ -25,7 +25,7 @@ import {
 import type {ShinseiKey} from '../../src/tokutei/shinsei.ts';
 import {KK_CELLS} from '../../src/tokutei/shinsei/kitakyushuCells.ts';
 import type {Sale, SaleItem, Settings} from '../../src/tokutei/types.ts';
-import {cellBox, cellFormula, ellipseCount, emOf, printOverflow, readCell, sheetPath, sheetPaths} from '../../src/tokutei/xlsxEdit.ts';
+import {cellBox, cellFormula, cellStyle, ellipseCount, emOf, printOverflow, rangeBox, readCell, sheetLayout, sheetPath, sheetPaths} from '../../src/tokutei/xlsxEdit.ts';
 import type {Files} from '../../src/tokutei/xlsxEdit.ts';
 
 // 見本の案件（架空の方。本当のお客様の情報は使わない）
@@ -615,4 +615,38 @@ test('原本の図形の大きさ（a:ext の cx・cy）はどれも数（前は
       assert.deepEqual(bad, [], `${key} ${name}`);
     }
   }
+});
+
+test('委任状（行橋市・苅田町）：受任者の欄（会社名・営業所・所長名の3行）は C14:H18 の縦の中央。長い委任者の住所は下線（G 列）の右の端までに入る大きさ', () => {
+  // ユーザーの指示「委任状の部分…社長名であったりだとか、もろもろはみ出しの部分などがありました」（2026-11-02）：3行の 12pt の欄（C15:H17）は Excel でぎりぎりで
+  // 所長名の行が欄の下で切れることがあった。長い住所は縮める処理がなく、下線・表の右の線を越えて用紙の外まで伸びた
+  const long = '福岡県行橋市大字流末1234番地56　見本マンション行橋駅前東館1203号室';
+  for (const key of ['yukuhashi', 'kanda'] as const) {
+    const files = fill(key, {address: long});
+    const xml = strFromU8(files[sheetPath(files, '委任状')]);
+    assert.match(xml, /<mergeCell ref="C14:H18"\/>/, key);
+    assert.doesNotMatch(xml, /C15:H17/, key);
+    assert.match(xml, /<pageSetUpPr fitToPage="1"\/>/, key); // 印刷は1ページに合わせる（表の右の線が2枚目に分かれないように）
+    assert.match(readCell(files, '委任状', 'C14'), /^\u3000太陽シルバーサービス株式会社/, key);
+    assert.equal(cellStyle(files, xml, 'C14').vertical, 'center', key);
+    const text = String(readCell(files, '委任状', 'A32'));
+    assert.ok(text.endsWith(long), key);
+    const pt = cellStyle(files, xml, 'A32').size;
+    const width = rangeBox(sheetLayout(xml), 'A32:G32').w;
+    assert.ok(pt < 11 && (emOf(text) * pt * 4) / 3 <= width, `${key} ${pt}pt ${emOf(text)}em ${width}px`);
+    // 短い住所は原本の大きさのまま
+    const short = fill(key);
+    assert.equal(cellStyle(short, strFromU8(short[sheetPath(short, '委任状')]), 'A32').size, 11, key);
+  }
+});
+
+test('北九州市の支給申請書：受任者（事業者名・代表者名・住所・電話番号）は見出しと同じ 10.5pt のまま（行の高さで縮めない）。幅に入らないときだけ小さく', () => {
+  // 前は行の高さ（11.25pt）に入る大きさに縮めて 6.5pt になり、見出し「事業者名」「代表者名」よりずっと小さかった（2026-11-02）
+  const files = fillKK();
+  const xml = strFromU8(files[sheetPath(files, KITAKYUSHU_SHEETS.shikyu)]);
+  const c = KK_CELLS.shikyu;
+  for (const ref of [c.sellerA, c.repA, c.sellerB, c.repB, c.sellerAddress, c.sellerTel]) assert.equal(cellStyle(files, xml, ref).size, 10.5, ref);
+  const long = fillKK({}, {...KK_S, officeName: '見本見本見本見本見本見本見本見本見本見本見本見本見本見本営業所'});
+  const longXml = strFromU8(long[sheetPath(long, KITAKYUSHU_SHEETS.shikyu)]);
+  assert.ok(cellStyle(long, longXml, c.sellerA).size < 10.5);
 });
