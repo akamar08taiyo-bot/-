@@ -35,7 +35,7 @@ React 19 + TypeScript + Vite（`vite.tokutei.config.ts` で1ファイルの `dis
 | `salesSummary.ts` | 住宅改修の「📈 売上見込みを確認する」・受注残・進捗管理へ渡す案件ごとの金額（localStorage `taiyo-tokutei-sales-v1`＝`{v, updatedAt, rows, linked}`。`salesMonthOf`＝納品日→承認日→申請日→見積日→作った日の月・担当・居宅・営業所 office。
 仕切・利益は入れない。`linked`＝住宅改修の様邸から開いた案件のお客様名（商品のない作りかけも。住宅改修の一覧に名前を出す）。App.tsx が書く。2026-10-25〜26） |
 | `catalog.ts`・`print/catalogPdf.ts`・`print/CatalogPrint.tsx`・`print/CatalogViewer.tsx` | 介援隊のカタログ：ページの表 `CATALOG`（12ページ）・`catalogLabel`・品番の見くらべ `codeKey`・`pageCodes`・初めのチェック `catalogPicks`・検索 `catalogMatches`・題 `catalogTitle`。
-| `print/CatalogMarks.tsx` | カタログの印刷の「⭕ 丸で囲む」（2026-11-02）：`Mark`（絵に対する割合）・`saleMarks`（見積もりの商品の囲みに丸）・`MarkLayer`（なぞって足す・押して選ぶ・✕）・`MarkToggle`（黄色）・`useMarkKeys`（Delete・Ctrl+Z）。開いているあいだだけ覚える（`rememberMarks`） |
+| `print/CatalogMarks.tsx` | カタログの印刷の「🔲 枠で囲む」（2026-11-02。初めは丸、同じ日に四角の枠に）：`Mark`（絵に対する割合）・`saleMarks`（見積もりの商品の囲みに枠）・`MarkLayer`（なぞって足す・押して選ぶ・✕）・`MarkToggle`（黄色）・`useMarkKeys`（Delete・Ctrl+Z）。開いているあいだだけ覚える（`rememberMarks`） |
 PDF を pdf.js で 200dpi の JPEG と文字（`CatalogImage`＝url・codes・text）に。印刷の画面（チェックしたページだけ）と、浮かぶ窓（動かす・大きさ・検索・印刷。置いた所は `taiyo-tokutei-catalog-window-v1`） |
 | `components/ShinseiParts.tsx` | 申請書・見積書の入れる所の部品（丸のボタン `Circles`・フリガナ `KanaInput`・被保険者番号の10マス・生年月日の元号と年月日・「＋ 2つ目の…を追加」`AddItemButton`・Enter で次の欄 `nextOnEnter`・「カタログから検索」`CatalogSearch`） |
 | `defaults.ts` | 営業所（OFFICES、19か所）・担当・保険者（INSURERS。みやこ町は `perItem`）・`defaultSettings()`。営業所はポータルの localStorage `taiyo_portal_session` から |

@@ -1043,11 +1043,11 @@ try {
   assert.equal(await catForm.getByLabel('品番').inputValue(), 'PN-L41431A');
   assert.equal(await catForm.getByLabel('商品名').count(), 1);
   await page.screenshot({path: `${out}/05l-catalog-row-search.png`});
-  // カタログの印刷の「⭕ 丸で囲む」（ユーザーの指示「カタログを丸で囲むボタンをつくる。印刷ボタンと並行して作成する」2026-11-02）：
-  // 「印刷する」のすぐ上。初めて押すと見積もりの商品（PN-L41431A）に丸。なぞると丸を足す・✕ で消す・Ctrl+Z で戻す
+  // カタログの印刷の「🔲 枠で囲む」（ユーザーの指示「カタログを丸で囲むボタンをつくる。印刷ボタンと並行して作成する」「丸でかこむは、しかくでわくがこみに変更」2026-11-02）：
+  // 「印刷する」のすぐ上。初めて押すと見積もりの商品（PN-L41431A）に四角の枠。なぞると枠を足す・✕ で消す・Ctrl+Z で戻す
   await rowViewer.getByRole('button', {name: '🖨 印刷'}).click();
   await page.waitForFunction(() => [...document.querySelectorAll('.cat-sheet img')].some((i) => i.complete && i.naturalWidth > 1000), null, {timeout: 60000});
-  const markBtn = page.locator('.cat-print-side').getByRole('button', {name: '⭕ 丸で囲む'});
+  const markBtn = page.locator('.cat-print-side').getByRole('button', {name: '🔲 枠で囲む'});
   const sidePrint = await page.locator('.cat-print-side').getByRole('button', {name: /印刷する/}).boundingBox();
   const markBox = await markBtn.boundingBox();
   assert.ok(markBox.y + markBox.height <= sidePrint.y && Math.abs(markBox.x - sidePrint.x) < 2, `${JSON.stringify(markBox)} ${JSON.stringify(sidePrint)}`);
@@ -1061,10 +1061,11 @@ try {
   await page.mouse.move(markArea.x + markArea.width * 0.8, markArea.y + 420, {steps: 5});
   await page.mouse.up();
   assert.equal(await marks.count(), 2);
-  await page.getByRole('button', {name: '丸を消す'}).click();
+  await page.getByRole('button', {name: '枠を消す'}).click();
   assert.equal(await marks.count(), 1);
   await page.keyboard.press('Control+z');
   assert.equal(await marks.count(), 2);
+  assert.deepEqual(await marks.evaluateAll((xs) => xs.map((x) => x.tagName)), ['rect', 'rect']); // 丸ではなく四角の枠
   await page.screenshot({path: `${out}/05m-catalog-marks.png`});
   await page.locator('.print-overlay').getByRole('button', {name: '閉じる', exact: true}).click();
   await rowViewer.getByRole('button', {name: 'カタログを閉じる'}).click();

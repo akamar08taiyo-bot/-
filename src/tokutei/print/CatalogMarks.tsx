@@ -5,22 +5,23 @@ import type {SaleItem} from '../types.ts';
 import {DPI} from './catalogPdf.ts';
 
 /**
- * カタログの印刷の「⭕ 丸で囲む」（ユーザーの指示「カタログを丸で囲むボタンをつくる。印刷ボタンと並行して作成する」2026-11-02）。
- * 丸はページの絵に対する割合（0〜1）で持つので、画面の大きさ・印刷の大きさが変わっても同じ所に出る。印刷にもそのまま出る（赤い線）。
- * 初めて押したときは、見積もりの商品（品番が合うもの）のカタログの囲み（CatalogProduct.box）に丸を付ける。ページの上をなぞると丸を足せる。
- * 丸を押すと選べて、右上の ✕ か Delete で消す。Ctrl+Z で1つ前に戻す（消した丸も戻る）
+ * カタログの印刷の「🔲 枠で囲む」（ユーザーの指示「カタログを丸で囲むボタンをつくる。印刷ボタンと並行して作成する」2026-11-02。
+ * 同じ日に「丸でかこむは、しかくでわくがこみに変更」で丸から四角の枠に）。
+ * 枠はページの絵に対する割合（0〜1）で持つので、画面の大きさ・印刷の大きさが変わっても同じ所に出る。印刷にもそのまま出る（赤い線）。
+ * 初めて押したときは、見積もりの商品（品番が合うもの）のカタログの囲み（CatalogProduct.box）に枠を付ける。ページの上をなぞると枠を足せる。
+ * 枠を押すと選べて、右上の ✕ か Delete で消す。Ctrl+Z で1つ前に戻す（消した枠も戻る）
  */
 export type Mark = {x: number; y: number; w: number; h: number};
 export type Marks = Record<string, Mark[]>; // カタログのページのファイル名ごと
 
-// 印刷の画面を閉じて開き直しても、同じ見積もりなら丸を残す（アプリを開いているあいだだけ。保存はしない）
+// 印刷の画面を閉じて開き直しても、同じ見積もりなら枠を残す（アプリを開いているあいだだけ。保存はしない）
 const memory = new Map<string, Marks>();
 export const rememberedMarks = (saleId: string): Marks => memory.get(saleId) ?? {};
 export const rememberMarks = (saleId: string, marks: Marks) => memory.set(saleId, marks);
 
 const codeKey = (s: string) => s.normalize('NFKC').replace(/[\s\-‐－―ー]/g, '').toUpperCase();
 
-/** 見積もりの商品の、カタログのページの囲みに合わせた丸（品番が合う商品だけ）。囲みより少し大きく */
+/** 見積もりの商品の、カタログのページの囲みに合わせた枠（品番が合う商品だけ）。囲みより少し（3pt）大きく */
 export function saleMarks(items: Pick<SaleItem, 'code'>[], products: CatalogProduct[], natural: (page: number) => {w: number; h: number} | null, fileOf: (page: number) => string | null): Marks {
   const codes = new Set(items.map((i) => codeKey(i.code)).filter(Boolean));
   const out: Marks = {};
@@ -31,8 +32,8 @@ export function saleMarks(items: Pick<SaleItem, 'code'>[], products: CatalogProd
     const size = natural(p.page);
     const file = fileOf(p.page);
     if (!size || !file) continue;
-    const padX = p.box.w * 0.08;
-    const padY = p.box.h * 0.08;
+    const padX = 3;
+    const padY = 3;
     const x = Math.max(0, ((p.box.x - padX) * k) / size.w);
     const y = Math.max(0, ((p.box.y - padY) * k) / size.h);
     const r = Math.min(1, ((p.box.x + p.box.w + padX) * k) / size.w);
@@ -43,7 +44,7 @@ export function saleMarks(items: Pick<SaleItem, 'code'>[], products: CatalogProd
 }
 
 /**
- * ページの絵に重ねる丸。on（丸で囲むがオン）のときは、なぞると丸を足す・押すと選ぶ。オフのときは見るだけ（押せない）。
+ * ページの絵に重ねる枠。on（枠で囲むがオン）のときは、なぞると枠を足す・押すと選ぶ。オフのときは見るだけ（押せない）。
  * children はページの絵（img）。この箱の大きさ＝絵の大きさ
  */
 export function MarkLayer({
@@ -110,11 +111,11 @@ export function MarkLayer({
             <g key={i}>
               {/* 押しやすいように、見えない太い線を重ねる（オンのときだけ押せる） */}
               {!isDraft && on && (
-                <ellipse
-                  cx={(m.x + m.w / 2) * 100}
-                  cy={(m.y + m.h / 2) * 100}
-                  rx={(m.w / 2) * 100}
-                  ry={(m.h / 2) * 100}
+                <rect
+                  x={m.x * 100}
+                  y={m.y * 100}
+                  width={m.w * 100}
+                  height={m.h * 100}
                   fill="none"
                   stroke="transparent"
                   strokeWidth={16}
@@ -122,18 +123,18 @@ export function MarkLayer({
                   className="cat-mark-ui cursor-pointer"
                   style={{pointerEvents: 'stroke'}}
                   role="button"
-                  aria-label={`丸 ${i + 1}`}
+                  aria-label={`枠 ${i + 1}`}
                   onPointerDown={(e) => {
                     e.stopPropagation();
                     onSelect(i);
                   }}
                 />
               )}
-              <ellipse
-                cx={(m.x + m.w / 2) * 100}
-                cy={(m.y + m.h / 2) * 100}
-                rx={(m.w / 2) * 100}
-                ry={(m.h / 2) * 100}
+              <rect
+                x={m.x * 100}
+                y={m.y * 100}
+                width={m.w * 100}
+                height={m.h * 100}
                 fill="none"
                 stroke={selected === i && on ? '#f97316' : '#e11d48'}
                 strokeWidth={3.5}
@@ -154,9 +155,9 @@ export function MarkLayer({
             onSelect(null);
           }}
           className="cat-mark-ui absolute grid h-7 w-7 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-rose-600 text-sm font-bold text-white shadow"
-          style={{left: `${(marks[selected].x + marks[selected].w * 0.85) * 100}%`, top: `${(marks[selected].y + marks[selected].h * 0.15) * 100}%`}}
-          aria-label="丸を消す"
-          title="丸を消す（Delete）"
+          style={{left: `${(marks[selected].x + marks[selected].w) * 100}%`, top: `${marks[selected].y * 100}%`}}
+          aria-label="枠を消す"
+          title="枠を消す（Delete）"
         >
           ✕
         </button>
@@ -166,25 +167,25 @@ export function MarkLayer({
 }
 
 /**
- * 「⭕ 丸で囲む」のボタンの見た目：黄色（ユーザーの指示「丸のボタンは黄色」2026-11-02）。オンのときは少し濃い黄色と枠。big は左の大きなボタン（印刷するの上）
+ * 「🔲 枠で囲む」のボタンの見た目：黄色（ユーザーの指示「丸のボタンは黄色」2026-11-02）。オンのときは少し濃い黄色と枠。big は左の大きなボタン（印刷するの上）
  */
 export function MarkToggle({on, onClick, big = false}: {on: boolean; onClick: () => void; big?: boolean}) {
   const tone = on ? 'border-amber-400 bg-yellow-200 text-amber-950 ring-2 ring-amber-400' : 'border-yellow-300 bg-yellow-100 text-amber-900 hover:bg-yellow-200';
   if (big)
     return (
       <button type="button" aria-pressed={on} onClick={onClick} className={`flex h-20 w-44 flex-col items-center justify-center gap-1 rounded-xl border text-lg font-bold shadow-lg ${tone}`}>
-        <span aria-hidden="true" className="text-2xl leading-none">⭕</span>
-        <span className="sr-only">⭕ </span>丸で囲む
+        <span aria-hidden="true" className="text-2xl leading-none">🔲</span>
+        <span className="sr-only">🔲 </span>枠で囲む
       </button>
     );
   return (
     <button type="button" aria-pressed={on} onClick={onClick} className={`rounded-md border px-4 py-2.5 text-base font-bold shadow ${tone}`}>
-      ⭕ 丸で囲む
+      🔲 枠で囲む
     </button>
   );
 }
 
-/** 選んだ丸を Delete・Backspace で消す・Ctrl+Z で1つ前に戻す（字を打つ欄にいるときは何もしない） */
+/** 選んだ枠を Delete・Backspace で消す・Ctrl+Z で1つ前に戻す（字を打つ欄にいるときは何もしない） */
 export function useMarkKeys(on: boolean, onDelete: () => void, onUndo: () => void) {
   const fns = useRef({onDelete, onUndo});
   fns.current = {onDelete, onUndo};

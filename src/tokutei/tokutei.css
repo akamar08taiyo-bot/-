@@ -72,7 +72,7 @@ body {
   align-items: center;
   justify-content: center;
 }
-/* 「⭕ 丸で囲む」（print/CatalogMarks.tsx）：絵と同じ縦横の比の箱。丸はこの箱に対する割合で重ねる */
+/* 「🔲 枠で囲む」（print/CatalogMarks.tsx）：絵と同じ縦横の比の箱。枠はこの箱に対する割合で重ねる */
 .cat-mark-frame {
   position: relative;
   max-width: 100%;
@@ -118,7 +118,7 @@ body {
   .cat-mark-ui {
     display: none !important;
   }
-  /* 選んでいる丸（画面ではだいだい色）も、印刷は赤 */
+  /* 選んでいる枠（画面ではだいだい色）も、印刷は赤 */
   .cat-sheet [data-mark] {
     stroke: #e11d48;
   }

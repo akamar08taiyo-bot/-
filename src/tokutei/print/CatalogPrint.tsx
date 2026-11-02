@@ -27,12 +27,12 @@ export function CatalogPrintView({sale, only, onClose}: {sale: Sale; only?: Cata
   const [showAll, setShowAll] = useState(false);
   const touched = useRef(false);
   const items = useRef(sale.items); // 開いたときの商品で選ぶ（印刷の画面を開いているあいだに商品は変わらない）
-  // 「⭕ 丸で囲む」（CatalogMarks.tsx）：ページごとの丸・選んでいる丸・ページの絵の大きさ（丸の位置は絵に対する割合）
+  // 「🔲 枠で囲む」（CatalogMarks.tsx）：ページごとの枠・選んでいる枠・ページの絵の大きさ（枠の位置は絵に対する割合）
   const [marking, setMarking] = useState(false);
   const [marks, setMarksState] = useState<Marks>(() => rememberedMarks(sale.id));
   const [sel, setSel] = useState<{file: string; i: number} | null>(null);
   const [natural, setNatural] = useState<Record<string, {w: number; h: number}>>({});
-  const history = useRef<Marks[]>([]); // 変える前の丸（Ctrl+Z で1つ前に戻す。消した丸も戻る）
+  const history = useRef<Marks[]>([]); // 変える前の枠（Ctrl+Z で1つ前に戻す。消した枠も戻る）
   const putMarks = (next: Marks) => {
     rememberMarks(sale.id, next);
     return next;
@@ -48,7 +48,7 @@ export function CatalogPrintView({sale, only, onClose}: {sale: Sale; only?: Cata
       return;
     }
     setMarking(true);
-    // 初めて押したとき（丸がひとつもない）は、見積もりの商品のカタログの囲みに丸を付ける
+    // 初めて押したとき（枠がひとつもない）は、見積もりの商品のカタログの囲みに枠を付ける
     if (Object.values(marks).some((l) => l.length)) return;
     const products = await loadCatalogProducts().catch(() => []);
     const auto = saleMarks(
@@ -136,7 +136,7 @@ export function CatalogPrintView({sale, only, onClose}: {sale: Sale; only?: Cata
   const bar = useRef<HTMLDivElement>(null);
   const [sideTop, setSideTop] = useState<number | null>(null);
   useLayoutEffect(() => {
-    // 「⭕ 丸で囲む」（高さ 80px＋すき間 12px）を上に重ねても、「印刷する」は前と同じ高さ（帯より下にはみ出すときは帯の下から）
+    // 「🔲 枠で囲む」（高さ 80px＋すき間 12px）を上に重ねても、「印刷する」は前と同じ高さ（帯より下にはみ出すときは帯の下から）
     const place = () => setSideTop(Math.round(Math.max((bar.current?.getBoundingClientRect().bottom ?? 0) + 16, window.innerHeight / 2 - 72 - 92)));
     place();
     const ro = new ResizeObserver(place);
@@ -192,8 +192,8 @@ export function CatalogPrintView({sale, only, onClose}: {sale: Sale; only?: Cata
         </button>
       </div>
       {/* 「印刷する」を左の空いた所に大きく（ユーザーの指示「印刷ボタンをこちらに大きくもってくる」2026-10-28。前は上の帯の題名の横の小さなボタン）。
-          紙（A4 の幅 794px）の左に 240px ほど空く広い画面（xl・1280px〜）だけ。その上に「⭕ 丸で囲む」（ユーザーの指示「カタログを丸で囲むボタンをつくる。
-          印刷ボタンと並行して作成する」2026-11-02） */}
+          紙（A4 の幅 794px）の左に 240px ほど空く広い画面（xl・1280px〜）だけ。その上に「🔲 枠で囲む」（ユーザーの指示「カタログを丸で囲むボタンをつくる。
+          印刷ボタンと並行して作成する」「丸でかこむは、しかくでわくがこみに変更」2026-11-02） */}
       <div style={sideTop === null ? undefined : {top: sideTop}} className="cat-print-side fixed left-6 top-1/2 z-[2] hidden flex-col gap-3 xl:flex">
         <MarkToggle big on={marking} onClick={() => void toggleMarking()} />
         <button
@@ -215,7 +215,7 @@ export function CatalogPrintView({sale, only, onClose}: {sale: Sale; only?: Cata
             <div key={p.file} className={`est-sheet cat-sheet ${i === last ? 'est-last' : ''}`} aria-label={`カタログ ${catalogLabel(p)}`}>
               {pg && pg !== 'error' ? (
                 natural[p.file] ? (
-                  // 丸を重ねるため、絵と同じ縦横の比の箱に入れる（紙の中で縦横どちらかいっぱい・まん中。印刷の紙の高さ 296mm に収める）
+                  // 枠を重ねるため、絵と同じ縦横の比の箱に入れる（紙の中で縦横どちらかいっぱい・まん中。印刷の紙の高さ 296mm に収める）
                   <div className="cat-mark-frame" style={{aspectRatio: `${natural[p.file].w} / ${natural[p.file].h}`, ...(natural[p.file].w / natural[p.file].h > 210 / 296 ? {width: '100%'} : {height: '100%'})}}>
                     <MarkLayer
                       marks={marks[p.file] ?? []}
@@ -223,7 +223,7 @@ export function CatalogPrintView({sale, only, onClose}: {sale: Sale; only?: Cata
                       onChange={(list) => setMarks(p.file, list)}
                       selected={sel?.file === p.file ? sel.i : null}
                       onSelect={(i) => setSel(i === null ? null : {file: p.file, i})}
-                      label={`${catalogLabel(p)}の丸`}
+                      label={`${catalogLabel(p)}の枠`}
                     >
                       <img src={pg.url} alt={catalogLabel(p)} draggable={false} />
                     </MarkLayer>
