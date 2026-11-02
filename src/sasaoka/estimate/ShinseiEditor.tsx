@@ -604,6 +604,7 @@ export function ShinseiEditor({
                 title="平面図"
                 what="図"
                 startTool="num"
+                planTools
                 photo={{url: planUrl.url, w: planUrl.w, h: planUrl.h, rot: 0}}
                 size={planSize()}
                 marks={job.planMarks ?? []}

@@ -54,16 +54,35 @@ import type {PhotoMark, PhotoMarkDash} from '../types.ts';
 import {MarkLayer, markTextCss} from './MarkLayer.tsx';
 
 type Pt = {x: number; y: number};
-type Tool = 'pen' | 'poly' | 'quad' | 'line' | 'arrow' | 'arrow2' | 'rect' | 'ellipse' | 'text' | 'board' | 'num' | 'eraser';
+type Tool = 'pen' | 'poly' | 'quad' | 'line' | 'arrow' | 'arrow2' | 'rect' | 'ellipse' | 'text' | 'board' | 'num' | 'eraser' | PlanTool;
+/**
+ * 平面図の記号（ユーザーの指示「平面図では、横棒の機能と丸が込み、⬜︎（横長も含む）の機能を付け加える。番号を振る機能はそのまま…横棒を引いたり、
+ * 縦手すりであれば丸を…段差の解消など踏み台であれば四角など、簡単につけれるように」2026-11-02）：hbar＝横棒（横手すり。横か縦にまっすぐ）、
+ * circle＝丸（縦手すり。いつも正円）、square＝四角（踏み台など）、wide＝横長の四角（段差の解消など）。押すと決まった大きさで置き、なぞると好きな大きさ。
+ * できる図形はふつうの直線・楕円・正方形/長方形（Excel・印刷・プレビューは今までどおり）
+ */
+type PlanTool = 'hbar' | 'circle' | 'square' | 'wide';
 type DrawTool = Exclude<Tool, 'eraser'>; // 図形を描く道具（消しゴムのほか）
 /**
  * 書式を覚える種類（新しい図形に使う）：shape＝直線・矢印・楕円（黄色）、rect＝枠囲み（正方形/長方形）・補強板（茶色）、pen＝手書き・折れ線（黄色）、
  * text＝テキストボックス、num＝番号
  */
-type StyleKey = 'shape' | 'rect' | 'pen' | 'text' | 'num';
+type StyleKey = 'shape' | 'rect' | 'pen' | 'text' | 'num' | 'plan';
 type Styles = Record<StyleKey, MarkStyle>;
 const styleKeyOf = (k: PhotoMark['kind']): StyleKey => (k === 'text' ? 'text' : k === 'pen' ? 'pen' : k === 'board' || k === 'rect' ? 'rect' : 'shape');
-const toolStyleKey = (t: Tool): StyleKey => (t === 'text' ? 'text' : t === 'num' ? 'num' : t === 'pen' || t === 'poly' || t === 'quad' ? 'pen' : t === 'rect' || t === 'board' ? 'rect' : 'shape');
+const toolStyleKey = (t: Tool): StyleKey =>
+  t === 'text' ? 'text' : t === 'num' ? 'num' : t === 'pen' || t === 'poly' || t === 'quad' ? 'pen' : t === 'rect' || t === 'board' ? 'rect' : isPlanTool(t) ? 'plan' : 'shape';
+const isPlanTool = (t: Tool | null): t is PlanTool => t === 'hbar' || t === 'circle' || t === 'square' || t === 'wide';
+/** 平面図の記号の初めの書式：赤い線（平面図は白い紙なので、写真の初めの黄色だと見えにくい）・塗りなし */
+const PLAN_STYLE: MarkStyle = {...SHAPE_STYLE, line: 'FF0000', fill: ''};
+/** 平面図の記号のボタン（番号のすぐ右に並べる。名前を出して押しやすく） */
+const PLAN_TOOLS: {key: Tool; label: string; title: string}[] = [
+  {key: 'num', label: '① 番号', title: '番号（①②…。押すたびに次の番号）'},
+  {key: 'hbar', label: '― 横棒', title: '横棒（横手すり）：押すとその所に置く・なぞると長さを決める（横か縦にまっすぐ）'},
+  {key: 'circle', label: '○ 丸', title: '丸（縦手すり）：押すとその所に置く・なぞると大きさを決める'},
+  {key: 'square', label: '□ 四角', title: '四角（踏み台など）：押すとその所に置く・なぞると大きさを決める'},
+  {key: 'wide', label: '▭ 横長', title: '横長の四角（段差の解消など）：押すとその所に置く・なぞると大きさを決める'},
+];
 type RBox = MarkBox & {rot: number};
 type Drag =
   | {type: 'create'; tool: DrawTool; p0: Pt; id: string; ctrl: boolean; fromEnd?: {id: string; which: 1 | 2}}
@@ -106,14 +125,15 @@ const TOOLS: {key: Tool; label: string}[] = [
  * （ユーザーの指示「デフォルトはただの横棒、横棒と数字記入、文字の場合は連続で入力できるようにする。折れ線などそれ以外は、一度選択して入力し終えたら、
  * 選択なしにもどる」2026-10-29。前は「連続で線を引くことができない」で全部の描く道具をそのままにしていた）。やめるときは「選択」・同じ道具をもう一度・Esc
  */
-const KEEP_TOOL = new Set<Tool>(['line', 'num', 'text', 'eraser']);
+// 平面図の記号も続けて置ける（横棒・丸・四角・横長。2026-11-02）
+const KEEP_TOOL = new Set<Tool>(['line', 'num', 'text', 'eraser', 'hbar', 'circle', 'square', 'wide']);
 /** 1つ描き終えたら「選択」に戻す（KEEP_TOOL のほか） */
 const doneTool = (t: Tool | null): Tool | null => (t && KEEP_TOOL.has(t) ? t : null);
 /**
  * 描く道具のまま、選んでいる図形（描いたばかりの線など）の線の上を押してドラッグすると、その図形を動かす道具（ユーザーの指示「ひいた線は、ドロップしたら位置を動かせるようにする」2026-10-29）。
  * 手書きのペン（ぐしゃぐしゃで消すのを線の上から始める）・折れ線（押すたびに角）・消しゴムは、今までどおり押すと描く
  */
-const MOVE_TOOL = new Set<Tool>(['quad', 'line', 'arrow', 'arrow2', 'rect', 'ellipse', 'board', 'text', 'num']);
+const MOVE_TOOL = new Set<Tool>(['quad', 'line', 'arrow', 'arrow2', 'rect', 'ellipse', 'board', 'text', 'num', 'hbar', 'circle', 'square', 'wide']);
 /** 開いたときの道具：写真はいつも直線（ユーザーの指示「デフォルトは棒線にする」「デフォルトはただの横棒」2026-10-29。前は最後に使った道具を覚えていた）。平面図は番号（startTool） */
 const START_TOOL = 'line' as const;
 const LONG_PRESS = 550; // 手書きの線を、止めてからまっすぐにするまでの時間（ミリ秒。iPhone のメモと同じぐらい）
@@ -190,7 +210,7 @@ function loadStyles(): Styles {
     const m = cleanMarks([{kind, x1: 0, y1: 0, x2: 1, y2: 1, text: 'a', ...base, ...(raw && typeof raw === 'object' ? raw : {})}])[0];
     return m ? {line: m.line, width: m.width, dash: m.dash, fill: m.fill, color: m.color, size: m.size, bold: !!m.bold, ...(m.font ? {font: m.font} : {})} : base;
   };
-  const base: Styles = {shape: SHAPE_STYLE, rect: BOARD_STYLE, pen: PEN_STYLE, text: TEXT_STYLE, num: NUM_STYLE};
+  const base: Styles = {shape: SHAPE_STYLE, rect: BOARD_STYLE, pen: PEN_STYLE, text: TEXT_STYLE, num: NUM_STYLE, plan: PLAN_STYLE};
   try {
     let raw = JSON.parse(localStorage.getItem(STYLE_KEY) ?? 'null') as Partial<Record<StyleKey, unknown>> | null;
     if (!raw) {
@@ -204,6 +224,7 @@ function loadStyles(): Styles {
       pen: pick(raw?.pen, PEN_STYLE, 'rect'),
       text: pick(raw?.text, TEXT_STYLE, 'text'),
       num: pick(raw?.num, NUM_STYLE, 'text'),
+      plan: pick(raw?.plan, PLAN_STYLE, 'rect'),
     };
   } catch {
     return base;
@@ -491,6 +512,7 @@ export function PhotoMarkEditor({
   onRotate,
   what = '写真',
   startTool = START_TOOL,
+  planTools = false,
 }: {
   title: string;
   photo: {url: string; w: number; h: number; rot: number};
@@ -501,6 +523,7 @@ export function PhotoMarkEditor({
   onRotate?: (dir: 1 | -1) => void; // 写真を 90°回す（書き込みも一緒に回して、marks・photo.rot・size を渡し直してもらう）
   what?: string; // 何に書き込むか（画面の名前「…の写真に書き込む」。平面図は「図」）
   startTool?: 'num' | 'line'; // 開いたときの道具（平面図は番号＝開いてすぐ押すたびに①②③。写真は直線）
+  planTools?: boolean; // 平面図の記号のボタン（番号・横棒・丸・四角・横長）を上の帯の下に出す
 }) {
   const W = Math.max(1, size.w);
   const H = Math.max(1, size.h);
@@ -1006,7 +1029,8 @@ export function PhotoMarkEditor({
   const rotGap = 26 / (k || 1);
 
   const newMark = (t: DrawTool, a: Pt, b: Pt): PhotoMark => {
-    const kind: PhotoMark['kind'] = t === 'line' || t === 'arrow' || t === 'arrow2' ? 'line' : t === 'num' ? 'text' : t === 'poly' || t === 'quad' ? 'pen' : t;
+    const kind: PhotoMark['kind'] =
+      t === 'line' || t === 'arrow' || t === 'arrow2' || t === 'hbar' ? 'line' : t === 'num' ? 'text' : t === 'poly' || t === 'quad' ? 'pen' : t === 'circle' ? 'ellipse' : t === 'square' || t === 'wide' ? 'rect' : t;
     const st = styles[toolStyleKey(t)];
     const base: PhotoMark = {
       id: markId(),
@@ -1034,9 +1058,11 @@ export function PhotoMarkEditor({
   /** 描いている図形の形（Shift で 15°・正方形、Ctrl でまん中から） */
   const shapeFrom = (t: Tool, p0: Pt, raw: Pt, shift: boolean, ctrl: boolean): [Pt, Pt] => {
     let p = {x: clamp(raw.x, 0, W), y: clamp(raw.y, 0, H)};
-    const isLine = t === 'line' || t === 'arrow' || t === 'arrow2';
+    // 横棒は横か縦にまっすぐ（近い方）
+    if (t === 'hbar') p = Math.abs(p.x - p0.x) >= Math.abs(p.y - p0.y) ? {x: p.x, y: p0.y} : {x: p0.x, y: p.y};
+    const isLine = t === 'line' || t === 'arrow' || t === 'arrow2' || t === 'hbar';
     if (isLine) {
-      if (shift) p = snap15(p0, p);
+      if (shift && t !== 'hbar') p = snap15(p0, p);
       let [dx, dy] = [p.x - p0.x, p.y - p0.y];
       if (ctrl) {
         // まん中から：両側が写真に収まるまで縮める
@@ -1048,7 +1074,8 @@ export function PhotoMarkEditor({
       return [p0, {x: clamp(p0.x + dx * s, 0, W), y: clamp(p0.y + dy * s, 0, H)}];
     }
     let [dx, dy] = [p.x - p0.x, p.y - p0.y];
-    if (shift) {
+    // 丸はいつも正円（Shift を押したときと同じ）
+    if (shift || t === 'circle') {
       const m = Math.max(Math.abs(dx), Math.abs(dy));
       [dx, dy] = [Math.sign(dx || 1) * m, Math.sign(dy || 1) * m];
     }
@@ -1363,7 +1390,7 @@ export function PhotoMarkEditor({
         placeNumber(raw);
         return;
       }
-      const p0 = tool === 'line' || tool === 'arrow' || tool === 'arrow2' ? snapEnd(raw) : raw;
+      const p0 = tool === 'line' || tool === 'arrow' || tool === 'arrow2' || tool === 'hbar' ? snapEnd(raw) : raw;
       const m = newMark(tool, p0, p0);
       // 選んでいる直線の端を押した：すぐドラッグすれば続けて描く（L字）・押して離せば、その端をつまむ（up で endPick）
       let fromEnd: {id: string; which: 1 | 2} | undefined;
@@ -1642,7 +1669,18 @@ export function PhotoMarkEditor({
       // 押しただけ（ほとんど動かしていない）：Excel と同じく決まった大きさで置く
       if (Math.max(b.w, b.h) * k < 4) {
         const p0 = d.p0;
-        if (m.kind === 'line') {
+        if (isPlanTool(d.tool)) {
+          // 平面図の記号は押した所をまん中に、手すり・踏み台らしい大きさで（横棒 2.5cm・丸 0.8cm・四角 1.2cm・横長 2.4×1.2cm）
+          if (m.kind === 'line') {
+            const len = Math.min(W * 0.5, cmToPx(2.5));
+            const x1 = clamp(p0.x - len / 2, 0, W - len);
+            m = withLine(m, W, H, {x: x1, y: p0.y}, {x: x1 + len, y: p0.y});
+          } else {
+            const [w, h] = d.tool === 'circle' ? [cmToPx(0.8), cmToPx(0.8)] : d.tool === 'wide' ? [cmToPx(2.4), cmToPx(1.2)] : [cmToPx(1.2), cmToPx(1.2)];
+            const [bw, bh] = [Math.min(W, w), Math.min(H, h)];
+            m = withBox(m, W, H, {x: clamp(p0.x - bw / 2, 0, W - bw), y: clamp(p0.y - bh / 2, 0, H - bh), w: bw, h: bh, rot: 0});
+          }
+        } else if (m.kind === 'line') {
           const len = Math.min(W * 0.3, cmToPx(2.54));
           const x2 = Math.min(W, p0.x + len);
           m = withLine(m, W, H, {x: Math.max(0, x2 - len), y: p0.y}, {x: x2, y: p0.y});
@@ -2179,6 +2217,25 @@ export function PhotoMarkEditor({
         </button>
         <div className="flex min-w-0 items-center justify-end gap-1">{onRotate && rotateButtons}</div>
       </div>
+      {/* 平面図の記号（番号・横棒・丸・四角・横長）：名前を出した大きめのボタンで、上の帯のすぐ下のまん中に（ユーザーの指示「平面図では、横棒の機能と丸が込み、⬜︎（横長も含む）の機能を付け加える。
+          番号を振る機能はそのまま…簡単につけれるように」2026-11-02）。押してから図を押すと置ける・なぞると大きさを決める。もう一度押すと「選択」に戻る */}
+      {planTools && (
+        <div role="toolbar" aria-label="平面図の記号" className="flex flex-wrap items-center justify-center gap-1.5 border-b border-slate-200 bg-white px-2 py-1.5">
+          {PLAN_TOOLS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              aria-label={t.label}
+              title={t.title}
+              aria-pressed={tool === t.key}
+              onClick={() => pickTool(tool === t.key ? null : t.key)}
+              className={`h-11 min-w-[5.5rem] touch-manipulation whitespace-nowrap rounded-md border px-3 text-base ${tool === t.key ? 'border-emerald-500 bg-emerald-100 text-emerald-900 ring-1 ring-emerald-500' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
       {/* リボン（Excel の「図形の書式」と同じ並び） */}
       <div className="border-b border-slate-200 bg-white">
         <div className="flex justify-center gap-4 px-3 pt-1 text-[15px]">

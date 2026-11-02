@@ -957,6 +957,89 @@ assert.equal(await pvSlot.locator('[data-mark]').count(), 8);
   assert.ok((await pp.count()) >= 1, '印刷の平面図に書き込み');
   await page.keyboard.press('Escape');
   await page.locator('.print-overlay').waitFor({state: 'detached'});
+  // 平面図の記号（ユーザーの指示「平面図では、横棒の機能と丸が込み、⬜︎（横長も含む）の機能を付け加える。番号を振る機能はそのまま」2026-11-02）：
+  // 上の帯のすぐ下に「① 番号」「― 横棒」「○ 丸」「□ 四角」「▭ 横長」。押すと決まった大きさで置く（道具はそのまま）・なぞると大きさ。横棒は横か縦にまっすぐ・丸は正円
+  {
+    await planSlot.dblclick();
+    await pd.waitFor();
+    const sym = pd.getByRole('toolbar', {name: '平面図の記号'});
+    assert.deepEqual(await sym.getByRole('button').allInnerTexts(), ['① 番号', '― 横棒', '○ 丸', '□ 四角', '▭ 横長']);
+    const stageMarks = pd.locator('[data-photo-stage] [data-mark]');
+    const n0 = await stageMarks.count();
+    // 置いた図形（番号はいつもいちばん前に描くので、DOM の最後とは限らない。前と見くらべて新しい1つ）
+    const shot = () =>
+      stageMarks.evaluateAll((els) =>
+        els.map((e) => {
+          // 図形1つずつが図全体の大きさの svg に入っているので、svg の中の図形の大きさで測る
+          const rs = [...e.querySelectorAll('svg *')].map((x) => x.getBoundingClientRect()).filter((r) => r.width || r.height);
+          const [x0, y0] = [Math.min(...rs.map((r) => r.left)), Math.min(...rs.map((r) => r.top))];
+          const [x1, y1] = [Math.max(...rs.map((r) => r.right)), Math.max(...rs.map((r) => r.bottom))];
+          return {k: e.dataset.kind, x: Math.round(x0), y: Math.round(y0), w: Math.round(x1 - x0), h: Math.round(y1 - y0)};
+        }),
+      );
+    const added = async (act) => {
+      const before = (await shot()).map((m) => JSON.stringify(m));
+      await act();
+      const after = await shot();
+      const fresh = after.filter((m) => !before.includes(JSON.stringify(m)));
+      assert.equal(fresh.length, 1, `新しい図形が1つでない ${JSON.stringify(fresh)}`);
+      return fresh[0];
+    };
+    const tapAt = async (fx, fy) => {
+      const q = await pAt(fx, fy);
+      await page.mouse.click(q.x, q.y);
+    };
+    const dragOn = async (from, to) => {
+      const [a, b] = [await pAt(...from), await pAt(...to)];
+      await page.mouse.move(a.x, a.y);
+      await page.mouse.down();
+      for (let i = 1; i <= 8; i++) await page.mouse.move(a.x + ((b.x - a.x) * i) / 8, a.y + ((b.y - a.y) * i) / 8);
+      await page.mouse.up();
+    };
+    // ― 横棒：押すと横向きの線・なぞると縦にもまっすぐ（少しななめになぞっても）
+    await sym.getByRole('button', {name: '― 横棒'}).click();
+    assert.equal(await sym.getByRole('button', {name: '― 横棒'}).getAttribute('aria-pressed'), 'true');
+    let lb = await added(() => tapAt(0.3, 0.6));
+    assert.ok(lb.k === 'line' && lb.w > 40 && lb.h < 12, `横棒が横向きでない ${JSON.stringify(lb)}`);
+    lb = await added(() => dragOn([0.85, 0.2], [0.87, 0.5]));
+    assert.ok(lb.k === 'line' && lb.h > 60 && lb.w < 12, `横棒をなぞると縦にまっすぐにならない ${JSON.stringify(lb)}`);
+    assert.equal(await sym.getByRole('button', {name: '― 横棒'}).getAttribute('aria-pressed'), 'true'); // 続けて置ける
+    // ○ 丸：押すと正円・なぞっても正円
+    await sym.getByRole('button', {name: '○ 丸'}).click();
+    lb = await added(() => tapAt(0.5, 0.6));
+    assert.ok(lb.k === 'ellipse' && lb.w > 10 && Math.abs(lb.w - lb.h) <= 2, `丸が正円でない ${JSON.stringify(lb)}`);
+    lb = await added(() => dragOn([0.1, 0.7], [0.25, 0.75]));
+    assert.ok(lb.k === 'ellipse' && Math.abs(lb.w - lb.h) <= 2, `なぞった丸が正円でない ${JSON.stringify(lb)}`);
+    // □ 四角（正方形）・▭ 横長（幅が高さの2倍）
+    await sym.getByRole('button', {name: '□ 四角'}).click();
+    lb = await added(() => tapAt(0.65, 0.8));
+    assert.ok(lb.k === 'rect' && Math.abs(lb.w - lb.h) <= 2, `四角が正方形でない ${JSON.stringify(lb)}`);
+    await sym.getByRole('button', {name: '▭ 横長'}).click();
+    lb = await added(() => tapAt(0.4, 0.85));
+    assert.ok(lb.k === 'rect' && Math.abs(lb.w - 2 * lb.h) <= 3, `横長が横長でない ${JSON.stringify(lb)}`);
+    assert.equal(await stageMarks.count(), n0 + 6);
+    // 平面図の記号の初めの色は赤（白い紙で見えるように）
+    await page.screenshot({path: path.join(outDir, 'mark-10-plan-symbols.png')});
+    // もう一度押すと「選択」に戻る
+    await sym.getByRole('button', {name: '▭ 横長'}).click();
+    assert.equal(await sym.getByRole('button', {name: '▭ 横長'}).getAttribute('aria-pressed'), 'false');
+    await pd.getByRole('button', {name: '閉じる'}).click();
+    await pd.waitFor({state: 'detached'});
+    assert.equal(await planSlot.locator('[data-mark]').count(), n0 + 6);
+    // Excel にも図形で（直線・楕円・正方形/長方形）
+    const [sdl] = await Promise.all([page.waitForEvent('download'), excelSave(page)]);
+    const sfile = path.join(outDir, 'plan-symbols-' + sdl.suggestedFilename());
+    await sdl.saveAs(sfile);
+    const sf = unzipSync(new Uint8Array(await readFile(sfile)));
+    const sd = Object.keys(sf).filter((k) => /^xl\/drawings\/drawing\d+\.xml$/.test(k)).map((k) => strFromU8(sf[k])).find((x) => /name="平面図 \d+"/.test(x));
+    const sa = [...sd.matchAll(/<xdr:twoCellAnchor\b[\s\S]*?<\/xdr:twoCellAnchor>/g)].map((x) => x[0]);
+    const s0 = sa.findIndex((a) => /name="平面図 \d+"/.test(a));
+    const sOver = sa.slice(s0 + 1, s0 + 1 + n0 + 6);
+    assert.equal(sOver.filter((a) => /name="楕円 \d+"/.test(a)).length, 2, 'Excel の平面図に丸');
+    assert.equal(sOver.filter((a) => /name="正方形\/長方形 \d+"/.test(a)).length, 2, 'Excel の平面図に四角・横長');
+    assert.equal(sOver.filter((a) => /name="直線コネクタ \d+"/.test(a)).length, 3, 'Excel の平面図に横棒');
+  }
+  log('平面図の記号（番号・横棒・丸・四角・横長）OK');
   // 図を差し替えると書き込みは消える（写真と同じ）
   await planSlot.click();
   const [pc2] = await Promise.all([page.waitForEvent('filechooser'), preview.getByRole('toolbar', {name: '平面図の図'}).getByRole('button', {name: '差し替え'}).click()]);
