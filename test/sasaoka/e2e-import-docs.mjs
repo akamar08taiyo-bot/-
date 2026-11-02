@@ -2,7 +2,7 @@
 // 同一人物とみなし、〇〇様に合算できるようにする。それ以外は、そのまま取り込んで、申請書や見積書（合計）金額を認識し、売上見込みや受注残などに計上するようにする」2026-10-27）：
 //   見積もりの入口の「📥 申請書・見積書・理由書を取り込む」でファイルを選ぶ → 名字ごとの確かめの画面（見本の3つは「見本」様にまとめる・試作 一郎はそのまま・
 //   .xls は読めない）→ 取り込む → 一覧に「見本様邸」（住改・見積書の合計）と「試作 一郎様邸」（ほかの形の見積書の合計）→ 受注残に渡すまとめ・売上見込みにも入る →
-//   同じファイルをもう一度選ぶと「取り込み済み」で入れない → 見本様邸の見積書に明細・申請書に箇所。スマホの幅も
+//   同じファイルをもう一度選ぶと「取り込み済み」で入れない → 見本様邸の見積書に明細・申請書に箇所（見積書の箇所だけ）。スマホの幅も
 // usage: node e2e-import-docs.mjs <サイトのURL> <出力フォルダ>
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
@@ -108,9 +108,12 @@ await page.getByText('木の手すり 35φ 4m').first().waitFor();
 await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
 const form = page.getByRole('form', {name: '申請書'});
 await form.waitFor();
-assert.ok((await form.innerText()).includes('浴室'));
+// 申請書の箇所は見積書の箇所（①玄関 ②トイレ）。見本 太郎の申請書の浴室は見積書にないので足さない（前は足していて、見積書に空白の行で入った。
+// ユーザーの指摘「見積もりを転記した際に、余計な３行が入っていた」2026-11-02。e2e-extra-places.mjs）
+const works = form.getByRole('list', {name: '改修の箇所'});
+assert.deepEqual(await works.getByRole('listitem').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label'))), ['①玄関', '②トイレ']);
 await page.screenshot({path: path.join(outDir, 'import-05-shinsei.png')});
-log('見本様邸の見積書の明細・申請書の箇所 OK');
+log('見本様邸の見積書の明細・申請書の箇所（見積書にない申請書の箇所は足さない）OK');
 
 // ---------------------------------------------------------------- スマホの幅
 const phone = await open({width: 390, height: 844}, {deviceScaleFactor: 2, hasTouch: true, isMobile: true});

@@ -11,10 +11,10 @@
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ChangeEvent, ClipboardEvent as ReactClipboardEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode} from 'react';
 import {startEstimate} from '../calc.ts';
-import {circled, KINDS, materialText} from '../estimateForms.ts';
+import {circled, KINDS, materialText, photoNumbers} from '../estimateForms.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {KouikiForm, YukuhashiForm} from '../print/EstimateForms.tsx';
-import {applySheet, deleteLine, dropEmptyPlaces, insertBlankAfter, lineRows, parseDate, parsePlace, pasteLines, sheetTarget, sheetValue, toggleExcluded, toolPlace} from '../sheetEdit.ts';
+import {applySheet, deleteLine, dropEmptyPlaces, insertBlankAfter, lineRows, parseDate, parsePlace, pasteLines, sheetTarget, sheetValue, shinseiDataNames, toggleExcluded, toolPlace} from '../sheetEdit.ts';
 import {getClip, setClip, useClip} from '../sheetClip.ts';
 import type {EstimateForm, Job, Material, Settings} from '../types.ts';
 import {matchesAll, todayIso, yen} from '../util.ts';
@@ -632,10 +632,17 @@ export function EstimateSheet({
     inputRef.current?.focus({preventScroll: true});
   };
   const deleteRow = (rowId: string) => {
-    const next = deleteLine(jobRef.current, rowId);
-    if (next === jobRef.current) {
-      toast('申請書に入れた箇所は、申請書のタブで消せます'); // 寸法・写真などを入れた箇所の空白の行（`deleteLine`）
-      return;
+    const cur = jobRef.current;
+    let next = deleteLine(cur, rowId);
+    if (next === cur) {
+      // 申請書のタブで寸法・写真などを入れた箇所の空白の行：申請書に入れた内容も一緒に消えるので、確かめてから箇所ごと消す（`deleteLine` の whole）。
+      // 前は「申請書のタブで消せます」と出すだけで消せなかった（ユーザーの指摘 2026-11-02）。Ctrl+Z で戻せる
+      const place = sheetTarget(cur, `line:${rowId}:text`).place;
+      if (!place) return;
+      const no = photoNumbers(cur, s).get(place.id) ?? 0;
+      const label = `${no > 0 ? circled(no) : ''}${place.name.trim() || '箇所'}`;
+      if (!confirm(`「${label}」を消します。申請書に入れた${shinseiDataNames(place).join('・')}も消えます。よろしいですか？`)) return;
+      next = deleteLine(cur, rowId, true);
     }
     change(next);
     setSel(null);
@@ -675,6 +682,7 @@ export function EstimateSheet({
   };
   // 行の左の「挿入」：その行の下に空白の行を入れて、内容の欄を選ぶ（そのまま打ち込める）。
   // 「✕」：その行（部材は同上施工費ごと）を消す。箇所の行がなくなれば箇所も消す（その行が空白になる）。
+  //   申請書に寸法・写真などを入れた箇所は空白の行で残り、その空白の行の ✕ は確かめてから箇所ごと消す（`deleteRow`）。
   // 「コピー」：部材は同上施工費ごと、施工費はそのまとまりをコピーする。コピーしているあいだは「貼付」：その行の下に貼り付ける
   const onClick = (e: ReactMouseEvent) => {
     const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-ins], [data-copy], [data-paste], [data-del]');

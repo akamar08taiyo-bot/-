@@ -729,7 +729,8 @@ function fill<T extends object>(cur: T, add: Partial<T>): T {
 /**
  * 書類を様邸に入れる（base がなければ新しい様邸。name はお客様名＝planImport の名前）。入っている項目は変えず、空いた項目だけ埋める。
  * 見積書の明細（行にした見積書）は箇所ごと足す（同じ名前の行のない箇所＝申請書の箇所があれば、そこに入れる）。2つ目からの見積書は合算（諸経費も足す）。
- * 申請書の箇所は、同じ名前の箇所に寸法・そのほかを入れ、なければ足す。申請書の改修費用は、見積書の行がないときだけ（2つ目の申請書は足す）。
+ * 申請書の箇所は、同じ名前の箇所に寸法・そのほかを入れ、なければ足す（見積書の行がある様邸では足さない＝見積書が箇所を決める）。
+ * 申請書の改修費用は、見積書の行がないときだけ（2つ目の申請書は足す）。
  * 取り込んだ書類は imported に（目印・金額）
  */
 export function applyImport(baseJob: Job | null, docs: ReadDoc[], name: string, month: string, s: EstimateSettings, now = Date.now()): Job {
@@ -755,10 +756,14 @@ export function applyImport(baseJob: Job | null, docs: ReadDoc[], name: string, 
       overheadTarget += d.overheadTarget ?? d.overhead ?? 0;
       addedRows = true;
     } else if (d.kind === 'shinsei') {
+      // 見積書の行のある様邸では、見積書にない申請書の箇所は足さない（同じ箇所に寸法・そのほかを入れるだけ）。
+      // 前は足していたので、同じ名字でまとめた別の申請書（前の申請など）の箇所が、見積書のうしろに空白の行で入った
+      // （ユーザーの指摘「見積もりを転記した際に、余計な３行が入っていた」2026-11-02。⑥浴室 ⑦浴室 ⑧トイレ の見積書に ①廊下 ②トイレ ④洗面・脱衣室）
+      const estimated = hasEstimateRows(job);
       for (const p of d.places) {
         const i = job.places.findIndex((q) => samePlace(q, p));
-        if (i < 0) job.places.push(p);
-        else job.places[i] = fill(job.places[i], {dims: p.dims, shinseiText: p.shinseiText, photo: job.places[i].photo ? undefined : p.photo});
+        if (i >= 0) job.places[i] = fill(job.places[i], {dims: p.dims, shinseiText: p.shinseiText, photo: job.places[i].photo ? undefined : p.photo});
+        else if (!estimated) job.places.push(p);
       }
       if (d.total) costs += d.total;
     }

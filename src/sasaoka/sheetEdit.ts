@@ -221,17 +221,22 @@ const shownQty = (r: Row) => (cutToLength(r) ? Math.round(estimateQty(r) * 1000)
 /** 広域連合用の時間の欄に出す時間（施工費のまとまりの金額÷1時間の単価。小数2けた） */
 const shownHours = (amount: number, hourRate: number) => (hourRate > 0 ? Math.round((amount / hourRate) * 100) / 100 : 1);
 
-/** 申請書のタブで入れた内容（写真・撮影日・寸法・そのほか・写真に書く内容）がある箇所（申請書の一覧の ✕ で聞いてから消す箇所と同じ） */
-const hasShinseiData = (p: Place) =>
-  !!(
-    p.photos?.before ||
-    p.photos?.after ||
-    p.photoDates?.before ||
-    p.photoDates?.after ||
-    Object.values(p.dims ?? {}).some((v) => v?.trim()) ||
-    p.shinseiText?.trim() ||
-    p.photoNote?.trim()
-  );
+/**
+ * 申請書のタブで入れた内容（写真・撮影日・寸法・そのほか・写真に書く内容）のうち、その箇所に入っているものの名前。
+ * 消す前に聞くときに使う（申請書の一覧の ✕ と、見積書の ✕ で同じ）
+ */
+export function shinseiDataNames(p: Place): string[] {
+  return [
+    p.photos?.before || p.photos?.after ? '写真' : '',
+    p.photoDates?.before || p.photoDates?.after ? '撮影日' : '',
+    Object.values(p.dims ?? {}).some((v) => v?.trim()) ? '寸法' : '',
+    p.shinseiText?.trim() ? 'そのほか' : '',
+    p.photoNote?.trim() ? '写真に書く内容' : '',
+  ].filter(Boolean);
+}
+
+/** 申請書のタブで入れた内容がある箇所（申請書の一覧の ✕ で聞いてから消す箇所と同じ） */
+const hasShinseiData = (p: Place) => shinseiDataNames(p).length > 0;
 
 /** いちばん下の空いた行が入る箇所：最後の箇所に行がなければその箇所（なければ null。打ち込むと新しく作る） */
 export function pendingPlace(job: Pick<Job, 'places'>): Place | null {
@@ -540,17 +545,21 @@ function unitRange(rows: Row[], ri: number): [number, number] {
 /**
  * 見積書の1行を消す：部材の行はその部材と同上施工費、施工費の行はそのまとまり。
  * 箇所の行がなくなったら箇所も消す（改修内容・改修場所も消えて、その行が空白になる）。
- * ただし申請書のタブで寸法・写真などを入れた箇所は残して空白の行にする（前は申請書の寸法・写真まで消えていた。箇所は申請書のタブの ✕ で消す）。
- * その空白の行を消そうとしたときは何もしない（同じ job を返す）
+ * ただし申請書のタブで寸法・写真などを入れた箇所は残して空白の行にする（前は申請書の寸法・写真まで消えていた）。
+ * その空白の行を消すときは、申請書の内容ごと箇所を消す（whole。見積書の ✕ で「申請書に入れた寸法も消えます」と確かめてから）。
+ * whole でなければ何もしない（同じ job を返す）。前はいつも何もせず、取り込みで入った見積書にない箇所の空白の行を、見積書の ✕ で消せなかった
+ * （ユーザーの指摘「余計な３行が入っていたし、バツで削除しようとしたが消せなかった」2026-11-02）
  */
-export function deleteLine(job: Job, rowId: string): Job {
+export function deleteLine(job: Job, rowId: string, whole = false): Job {
   const found = findRow(job, rowId);
   if (!found) return job;
   const [a, b] = unitRange(found.place.rows, found.ri);
   const rows = [...found.place.rows.slice(0, a), ...found.place.rows.slice(b)];
   if (rows.length > 0) return setPlaceRows(job, found.pi, rows);
-  if (!hasShinseiData(found.place)) return {...job, places: job.places.filter((_, i) => i !== found.pi)};
-  return b - a === 1 && isBlankRow(found.row) ? job : setPlaceRows(job, found.pi, [manualRow('material', {qty: 1})]);
+  const dropPlace = {...job, places: job.places.filter((_, i) => i !== found.pi)};
+  if (!hasShinseiData(found.place)) return dropPlace;
+  if (b - a === 1 && isBlankRow(found.row)) return whole ? dropPlace : job;
+  return setPlaceRows(job, found.pi, [manualRow('material', {qty: 1})]);
 }
 
 /**

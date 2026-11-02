@@ -83,3 +83,26 @@ export function importFiles(): {files: {name: string; bytes: Uint8Array}[]; esti
     otherTotal: 55000,
   };
 }
+
+/**
+ * 見積書にない申請書の箇所（e2e-extra-places.mjs）：⑥浴室 ⑦浴室 ⑧トイレ の見積書（見本 花子・苅田町）と、同じ名字の申請書（見本 太郎。①廊下 ②トイレ ④洗面・脱衣室、長さ入り）。
+ * ユーザーの指摘「見積もりを転記した際に、余計な３行が入っていた」（2026-11-02）のスクリーンショットと同じ並び
+ */
+export function extraPlaceFiles(): {name: string; bytes: Uint8Array}[] {
+  const bar = (name: string, listPrice: number) => manualRow('material', {name, unit: '本', listPrice, qty: 1});
+  const kanda = {insurer: 'kanda' as const, address: '福岡県京都郡苅田町富久町1-1', estDate: '2026-11-01'};
+  const est = sample({
+    ...kanda,
+    places: [
+      {...newPlace('浴室', [bar('TOTO TS136GY6R インテリアバーF', 10500)]), photo: 6},
+      {...newPlace('浴室', [bar('TOTO TS136GLY64 インテリアバーF', 17600)]), photo: 7},
+      {...newPlace('トイレ', [bar('マツ六 BD-13435 丸棒ディンプル', 4650)]), photo: 8},
+    ],
+  });
+  const blank = (name: string, photo: number, l: string) => ({...newPlace(name, [manualRow('material')]), photo, dims: {l}});
+  const app = sample({...kanda, customer: '見本 太郎', places: [blank('廊下', 1, '1800'), blank('トイレ', 2, '600'), blank('洗面・脱衣室', 4, '800')]});
+  return [
+    {name: '見本花子様住宅改修見積書.xlsx', bytes: estimateXlsx(est, S, '2026-11-01').bytes},
+    {name: '見本太郎様住宅改修申請書.xlsx', bytes: fillShinsei(tmpl('kanda'), SHINSEI.kanda!, shinseiValues(app, S))},
+  ];
+}

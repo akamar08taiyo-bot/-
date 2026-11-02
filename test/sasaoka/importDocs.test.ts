@@ -236,6 +236,38 @@ test('名字でまとめる：同じ名字は1つの様邸（名前がちがえ�
   assert.equal(planImport([app], [{...existing, trashedAt: 5}])[0].target, '');
 });
 
+test('見積書の行のある様邸に申請書を入れるときは、見積書にない箇所を足さない（同じ箇所に寸法を入れるだけ）。申請書だけなら足す', () => {
+  // ユーザーの指摘「見積もりを転記した際に、余計な３行が入っていた」（2026-11-02）：⑥浴室 ⑦浴室 ⑧トイレ の見積書と、同じ名字の申請書（①廊下 ②トイレ ④洗面・脱衣室）を
+  // 取り込んだら、見積書のうしろに ①廊下 ②トイレ ④洗面・脱衣室 が空白の行で入り、見積書の ✕ でも消せなかった
+  const bar = (name: string, price: number) => manualRow('material', {name, unit: '本', price, listPrice: Math.round(price / 0.8), qty: 1});
+  const est = sample({
+    insurer: 'kanda',
+    address: '福岡県京都郡苅田町富久町1-1',
+    places: [
+      {...newPlace('浴室', [bar('TOTO TS136GY6R', 8400)]), photo: 6},
+      {...newPlace('浴室', [bar('TOTO TS136GLY64', 14080)]), photo: 7},
+      {...newPlace('トイレ', [bar('マツ六 BD-13435', 3720)]), photo: 8},
+    ],
+  });
+  const blank = (name: string, photo: number, l: string) => ({...newPlace(name, [manualRow('material')]), photo, dims: {l}});
+  const old = sample({customer: '見本 太郎', insurer: 'kanda', address: est.address, places: [blank('廊下', 1, '1800'), blank('トイレ', 2, '600'), blank('洗面・脱衣室', 4, '800')]});
+  const e = read(estimateXlsx(est, S, '2026-11-01').bytes, '見本花子様住宅改修見積書.xlsx');
+  const a = read(fillShinsei(tmpl('kanda'), SHINSEI.kanda!, shinseiValues(old, S)), '見本太郎様住宅改修申請書.xlsx');
+  const [g] = planImport([e, a], []);
+  assert.deepEqual(g.docs.map((d) => d.kind), ['estimate', 'shinsei']);
+  const job = applyImport(null, g.docs, g.name, g.month, S);
+  assert.deepEqual(job.places.map((p) => [p.photo, p.name, p.rows.length]), [[6, '浴室', 1], [7, '浴室', 1], [8, 'トイレ', 1]]);
+  assert.deepEqual(estimateTotals(job, S).all, estimateTotals(est, S).all);
+  // あとから申請書だけを入れても同じ（前からの様邸に見積書の行がある）
+  assert.deepEqual(applyImport(applyImport(null, [e], g.name, g.month, S), [a], g.name, g.month, S).places.map((p) => p.name), ['浴室', '浴室', 'トイレ']);
+  // 同じ箇所（⑧トイレ）は寸法を入れる
+  const same = read(fillShinsei(tmpl('kanda'), SHINSEI.kanda!, shinseiValues({...old, places: [blank('トイレ', 8, '600'), blank('廊下', 1, '1800')]}, S)), 'c.xlsx');
+  const filled = applyImport(null, [e, same], g.name, g.month, S);
+  assert.deepEqual(filled.places.map((p) => [p.photo, p.name, p.dims?.l ?? '']), [[6, '浴室', ''], [7, '浴室', ''], [8, 'トイレ', '600']]);
+  // 見積書のない様邸（申請書だけ）は、今までどおり申請書の箇所を空白の行で足す（見積書にも出して、部材を入れられる）
+  assert.deepEqual(applyImport(null, [a], a.name, g.month, S).places.map((p) => [p.photo, p.name, p.rows.length]), [[1, '廊下', 1], [2, 'トイレ', 1], [4, '洗面・脱衣室', 1]]);
+});
+
 test('合算：同じ方の見積書が2つ（ほかの形の見積書も）なら売上は足した金額、受注残・売上見込みにも入る', () => {
   const a = read(estimateXlsx(sample(), S, '2026-10-21').bytes, 'a.xlsx');
   const b = read(estimateXlsx(sample({places: [newPlace('浴室', [manualRow('material', {name: '浴室手すり', unit: '本', qty: 1, listPrice: 30000})])]}), S, '2026-10-22').bytes, 'b.xlsx');

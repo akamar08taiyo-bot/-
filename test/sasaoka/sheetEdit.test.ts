@@ -20,6 +20,7 @@ import {
   pasteLines,
   setWorkAmount,
   sheetValue,
+  shinseiDataNames,
   toggleExcluded,
   toolPlace,
 } from '../../src/sasaoka/sheetEdit.ts';
@@ -462,14 +463,19 @@ test('内容の欄で、1本の長さのない部材に選び直したら前の�
   assert.equal(job.places[0].rows[0].lengthCm, 60);
 });
 
-test('申請書のタブで寸法・写真を入れた箇所は、見積書の ✕・切り取りで行がなくなっても消さない（空白の行にして残す）', () => {
+test('申請書のタブで寸法・写真を入れた箇所は、見積書の ✕・切り取りで行がなくなっても消さない（空白の行にして残す）。空白の行の ✕ は確かめてから箇所ごと消す', () => {
   const bath = {...newPlace('浴室', [manualRow('material', {qty: 1})]), dims: {l: '800', h: '750'}, photos: {before: 'ph_before_1', after: 'ph_after_1'}, photoNote: '縦手すり'};
   const entry = newPlace('玄関', [materialRow(rail, 1)]);
   let job: Job = {...emptyJob(), places: [entry, bath]};
-  // 空白の行の ✕：何もしない（前は箇所ごと寸法・写真まで消えた）
+  // 空白の行の ✕：確かめる前は何もしない（前は箇所ごと寸法・写真まで消えた）。見積書の画面は、申請書に入れたもの（写真・寸法・写真に書く内容）を
+  // 出して確かめてから whole で箇所ごと消す（前はいつも何もせず、取り込みで入った見積書にない箇所を消せなかった。ユーザーの指摘 2026-11-02）
   assert.equal(deleteLine(job, bath.rows[0].id), job);
-  // 行を入れてから ✕：箇所は空白の行にして残す
+  assert.deepEqual(shinseiDataNames(bath), ['写真', '寸法', '写真に書く内容']);
+  assert.deepEqual(deleteLine(job, bath.rows[0].id, true).places.map((p) => p.name), ['玄関']);
+  assert.deepEqual(shinseiDataNames(entry), []);
+  // 行を入れてから ✕：箇所は空白の行にして残す（whole でも、行のある箇所は行だけ消す）
   job = {...job, places: [entry, {...bath, rows: [materialRow(bar, 1)]}]};
+  assert.deepEqual(deleteLine(job, job.places[1].rows[0].id, true).places.map((p) => [p.name, p.rows.length]), [['玄関', 1], ['浴室', 1]]);
   job = deleteLine(job, job.places[1].rows[0].id);
   assert.deepEqual([job.places.length, job.places[1].rows.length, job.places[1].photos?.before, job.places[1].dims?.l], [2, 1, 'ph_before_1', '800']);
   assert.ok(formLines(job, S, 'yukuhashi')[1].blank);

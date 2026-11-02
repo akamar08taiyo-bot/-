@@ -14,6 +14,7 @@ import {Btn, KanaInput, TextInput, useToast} from '../components/ui.tsx';
 import {circled, eraOf, INSURER_IDS, INSURER_INFO, insurerForAddress, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, photoNumbers} from '../estimateForms.ts';
 import {placeFromDims, withBrackets} from '../cutLink.ts';
 import {manualRow, newPlace} from '../rows.ts';
+import {shinseiDataNames} from '../sheetEdit.ts';
 import {usePhotoUrls} from '../photos.ts';
 import {turn} from '../photoEdit.ts';
 import {AREA_LABEL, INSURER_AREAS, insurerNoOf} from '../insurerNumbers.ts';
@@ -822,15 +823,9 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
     focusPlace.current = null;
     row.querySelector<HTMLInputElement>(want.field === 'dim' ? 'input[data-dim]' : 'input[aria-label="改修場所"]')?.focus();
   });
-  // 写真・撮影日・寸法・手で直した文などの入った箇所は、消す前に聞く（一度押しただけで写真ごと消えて、元に戻せなかった）
+  // 写真・撮影日・寸法・手で直した文などの入った箇所は、消す前に聞く（一度押しただけで写真ごと消えて、元に戻せなかった。見積書の ✕ と同じ `shinseiDataNames`）
   const remove = (p: Place) => {
-    const has = [
-      p.photos?.before || p.photos?.after ? '写真' : '',
-      p.photoDates?.before || p.photoDates?.after ? '撮影日' : '',
-      Object.values(p.dims ?? {}).some((v) => v?.trim()) ? '寸法' : '',
-      p.shinseiText?.trim() ? 'そのほか' : '',
-      p.photoNote?.trim() ? '写真に書く内容' : '',
-    ].filter(Boolean);
+    const has = shinseiDataNames(p);
     if (has.length && !confirm(`「${p.name.trim() || '箇所'}」と、その${has.join('・')}を消します。元に戻せません。よろしいですか？`)) return;
     setJob((j) => ({...j, places: j.places.filter((x) => x.id !== p.id)}));
   };
