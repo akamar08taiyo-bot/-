@@ -286,10 +286,11 @@ export function ShinseiInputs({
                   </div>
                   {/* 種目・メーカーの下に「カタログから検索」（販売見積書と同じ。ユーザーの指示「販売の見積もりでも、メーカー名、項目名を入れた下にカタログから検索するをもってくる」2026-11-02） */}
                   <CatalogSearch item={i} onCatalog={onCatalog} />
-                  {/* 商品名はメーカー・商品検索の下（ユーザーの指示「メーカー名、商品検索を上にもってきて、その下に商品名をもってくる」2026-11-01） */}
-                  <TextInput value={i.name} onChange={(name) => changeItem(i.id, {name})} placeholder="商品名" className="ml-8 min-w-0" aria-label="商品名" data-nav />
+                  {/* 商品名はメーカー・商品検索の下（ユーザーの指示「メーカー名、商品検索を上にもってきて、その下に商品名をもってくる」2026-11-01）。
+                      商品名・品番の字はほかの欄（種目・メーカー・カタログから検索）と同じ 14px（前は 16px で「やや大きすぎる」2026-11-02） */}
+                  <TextInput value={i.name} onChange={(name) => changeItem(i.id, {name})} placeholder="商品名" className="ml-8 min-w-0 text-sm" aria-label="商品名" data-nav />
                   {/* 品番（見積書の品名の3行目「【品番】…」。ユーザーの指示「メーカー名・商品名・品番は、別々の項目として持つ（入力欄…に項目がなければ追加する）」2026-11-01） */}
-                  {i.productId === null && <TextInput value={i.code} onChange={(code) => changeItem(i.id, {code})} placeholder="品番" className="ml-8 w-48 max-w-[calc(100%-2rem)]" aria-label="品番" />}
+                  {i.productId === null && <TextInput value={i.code} onChange={(code) => changeItem(i.id, {code})} placeholder="品番" className="ml-8 w-48 max-w-[calc(100%-2rem)] text-sm" aria-label="品番" />}
                   {/* 種目・メーカーを選ぶと、カタログのその商品の一覧（押すと商品名・品番・定価が入る。ユーザーの指示 2026-10-30） */}
                   {i.productId === null && <CatalogPicker item={i} onPick={(patch) => changeItem(i.id, patch)} onCatalog={onCatalog} search={searchAt[i.id] ?? 0} />}
                   {/* 定価の下に割引率と販売金額（ユーザーの指示「定価の下に、販売金額を記載する」「定価の下に割引率を表示、変更できるようにする」2026-10-26）。

@@ -32,6 +32,10 @@ E2E_PORT=5194 PLAYWRIGHT=/opt/node-tools/node_modules/playwright/index.mjs timeo
 - カタログの文字の一覧 `catalog/text.json`（ビルドの `vite.tokutei.config.ts` の `catalogText` が PDF から作る。商品の一覧・印刷の品番・窓の検索はこれだけを読む）：
   ブラウザのテストのサーバーは `catalog/*.json` も返す（返さないと index.html が返って PDF 26 ページを読みに行き、遅いだけで通ってしまう。`e2e.mjs` は PDF を読まないことを確かめる）。
   時間の測り方：Playwright の CDP `Network.emulateNetworkConditions`（20Mbps・60ms）で、種目を選んでから品目のボタンが出るまで（2026-11-02：PDF を読んでいたころ 23.6 秒・24MB → 1.0 秒・0.9MB）。
+- カタログのページの絵 `catalog/kaientai-p040.jpg` など（2026-11-02。同じ `catalogText` が pdf.js＋@napi-rs/canvas で 200dpi・JPEG 80 に。1枚 0.6〜0.9MB）：
+  カタログの窓・印刷はこの絵を出し、端末の中では PDF を読まない（ユーザーの話「タブレットで開くとパンフレットが開かない」。pdf.js は古い iPad の Safari で動かないことがある）。
+  作るのに1ページ2秒ほど（26ページで初回 +45 秒）なので、PDF の中身ごとに `node_modules/.cache/tokutei-catalog/` に覚えておく。テストのサーバーは `catalog/*.jpg` も返す
+  （返さないと PDF を読む作りに戻り、`e2e.mjs` の「PDF を読まない」で落ちる）。
 - 住宅改修のタブの中（embed）・⇔・担当・カタログを表示／印刷は、住宅改修のブラウザのテスト `e2e-tokutei.mjs`（住宅改修のスキル）で確かめる：dist-tokutei/ を丸ごと（catalog/ も）住宅改修のテストのサイトの `tokutei/` に写して動かす。
 - 見た目を変えたら、パソコンとスマホ（390px）のスクリーンショットを撮って自分の目で見る。
 - 販売受注簿への転記：受注簿ツール（`akamar08taiyo-bot/taiyo-hacchu-scan`、`/home/user/taiyo-hacchu-scan`）を `npm ci && npm run build` してから
@@ -64,9 +68,9 @@ E2E_PORT=5194 PLAYWRIGHT=/opt/node-tools/node_modules/playwright/index.mjs timeo
 ```sh
 cd /home/user/tokutei-wt && npm run -s build:tokutei
 cp dist-tokutei/index.html dist-tokutei/version.json /home/user/taiyo-portal/tokutei/
-cp -r dist-tokutei/catalog /home/user/taiyo-portal/tokutei/   # 介援隊のカタログの PDF と文字の一覧 text.json（PDF を変えたとき・text.json がまだないとき）
+cp -r dist-tokutei/catalog /home/user/taiyo-portal/tokutei/   # 介援隊のカタログの PDF・文字の一覧 text.json・ページの絵 *.jpg（PDF を変えたとき・まだないとき）
 # タイルの使い方の文：taiyo-portal/index.html の APPS の name:'特定福祉用具 購入申請書・見積もり作成'
-cd /home/user/taiyo-portal && git add tokutei/index.html tokutei/version.json tokutei/catalog/*.pdf tokutei/catalog/text.json index.html && git commit … && git push -u origin master
+cd /home/user/taiyo-portal && git add tokutei/index.html tokutei/version.json tokutei/catalog/*.pdf tokutei/catalog/*.jpg tokutei/catalog/text.json index.html && git commit … && git push -u origin master
 ```
 
 - 先にアプリのブランチを commit・push してから、ポータルを commit・push する。ポータルの `git fetch` で、ほかのセッションの公開が先に入っていないか見る。

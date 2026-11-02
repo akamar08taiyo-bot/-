@@ -61,7 +61,32 @@ function catalogTextIndex(): Promise<Map<string, PdfText[]> | null> {
   return textIndex;
 }
 
+/**
+ * カタログの1ページの絵と品番・文字。まずビルドで作った絵（catalog/kaientai-p040.jpg など。vite.tokutei.config.ts の catalogText）を使い、
+ * 品番・文字はビルドで作った文字の一覧から。絵がないとき（開発中・古い版の公開）だけ、端末の中で pdf.js で PDF を絵にする。
+ * pdf.js は新しい書き方を使っていて、iPadOS 16.4 より前の Safari では読めない（ユーザーの話「タブレットで開くとパンフレットが開かない」2026-11-02）
+ */
 export async function loadCatalogPage(file: string): Promise<CatalogImage> {
+  const build = typeof __APP_BUILD__ === 'string' ? __APP_BUILD__ : '';
+  const url = `${catalogUrl(file.replace(/\.pdf$/, '.jpg'))}?v=${encodeURIComponent(build)}`;
+  const [shown, items] = await Promise.all([
+    new Promise<boolean>((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img.naturalWidth > 0);
+      img.onerror = () => resolve(false);
+      img.src = url;
+    }),
+    loadCatalogItems(file).catch(() => null),
+  ]);
+  if (shown && items) {
+    const text = items.map((t) => t.s).join(' ');
+    return {url, codes: pageCodes(text), text};
+  }
+  return renderCatalogPage(file);
+}
+
+/** 端末の中で PDF を絵にする（ビルドで作った絵がないときだけ） */
+function renderCatalogPage(file: string): Promise<CatalogImage> {
   return withPage(file, async (page) => {
     const text = await textOf(page);
     const viewport = page.getViewport({scale: DPI / 72});

@@ -434,7 +434,7 @@ function ItemBlock({
               <MakerInput value={i.maker} onChange={(maker) => change({maker})} choices={makers} className="w-56 min-w-0 shrink" />
               <CatalogSearchButton onSearch={() => setSearch((n) => n + 1)} />
             </span>
-            <TextInput value={i.code} onChange={(code) => change({code})} placeholder="品番" className="w-48" aria-label="品番" />
+            <TextInput value={i.code} onChange={(code) => change({code})} placeholder="品番" className="w-48 text-sm" aria-label="品番" />
           </>
         ) : (
           <span>{[i.maker, i.code, i.tais && `TAIS ${i.tais}`].filter(Boolean).join('　')}</span>
@@ -442,8 +442,9 @@ function ItemBlock({
       </div>
       {/* 種目・メーカーの下に「カタログから検索」（ユーザーの指示「販売の見積もりでも、メーカー名、項目名を入れた下にカタログから検索するをもってくる」2026-11-02） */}
       {onCatalog && <CatalogSearch item={i} onCatalog={onCatalog} />}
-      {/* 商品名はメーカー・商品検索の下（ユーザーの指示「メーカー名、商品検索を上にもってきて、その下に商品名をもってくる」2026-11-01） */}
-      <TextInput value={i.name} onChange={(name) => change({name})} placeholder="商品名" className="ml-8 min-w-0" aria-label="商品名" />
+      {/* 商品名はメーカー・商品検索の下（ユーザーの指示「メーカー名、商品検索を上にもってきて、その下に商品名をもってくる」2026-11-01）。
+          商品名・品番の字はほかの欄と同じ 14px（前は 16px で「やや大きすぎる」2026-11-02） */}
+      <TextInput value={i.name} onChange={(name) => change({name})} placeholder="商品名" className="ml-8 min-w-0 text-sm" aria-label="商品名" />
       {/* 種目・メーカーを選ぶと、カタログのその商品の一覧（押すと商品名・品番・定価が入る） */}
       {manual && <CatalogPicker item={i} onPick={change} onCatalog={onCatalog} search={search} />}
       <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1.5 pl-8 text-xs font-bold text-slate-500">

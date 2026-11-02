@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import {readdirSync, readFileSync} from 'fs';
+import {createHash} from 'crypto';
+import {existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync} from 'fs';
 import path from 'path';
 import {pathToFileURL} from 'url';
 import {defineConfig} from 'vite';
@@ -70,9 +71,40 @@ function catalogText(): Plugin {
         }
       }
       this.emitFile({type: 'asset', fileName: 'catalog/text.json', source: JSON.stringify(out)});
+      // ページの絵（catalog/kaientai-p040.jpg など）も、ここで作っておく（print/catalogPdf.ts の loadCatalogPage がまずこれを読む）。
+      // 前は端末の中で pdf.js で PDF を絵にしていたが、pdf.js（legacy 版でも）は新しい書き方（class の static ブロックなど）を使っていて、
+      // iPadOS 16.4 より前の Safari では読めず、カタログが開かなかった（ユーザーの話「タブレットで開くとパンフレットが開かない」2026-11-02）。
+      // 絵なら、どの端末でもそのまま出せて、軽い。作るのに1ページ2秒ほどかかるので、PDF の中身が同じなら前に作った絵を使う（node_modules/.cache）
+      const cacheDir = path.resolve(__dirname, 'node_modules/.cache/tokutei-catalog');
+      mkdirSync(cacheDir, {recursive: true});
+      for (const file of readdirSync(dir).filter((f) => f.endsWith('.pdf')).sort()) {
+        const data = readFileSync(path.join(dir, file));
+        const key = createHash('sha1').update(data).update(`dpi=${CATALOG_DPI};q=${CATALOG_JPEG_QUALITY}`).digest('hex');
+        const cached = path.join(cacheDir, `${key}.jpg`);
+        if (!existsSync(cached)) {
+          const task = pdfjs.getDocument({data: new Uint8Array(data), cMapUrl: `${root}/cmaps/`, cMapPacked: true, verbosity: 0, standardFontDataUrl: `${root}/standard_fonts/`});
+          try {
+            const doc = await task.promise;
+            const page = await doc.getPage(1);
+            const vp = page.getViewport({scale: CATALOG_DPI / 72});
+            const {canvas, context} = doc.canvasFactory.create(Math.round(vp.width), Math.round(vp.height));
+            context.fillStyle = '#fff';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            await page.render({canvas, canvasContext: context, viewport: vp}).promise;
+            writeFileSync(cached, await canvas.encode('jpeg', CATALOG_JPEG_QUALITY));
+          } finally {
+            await task.destroy();
+          }
+        }
+        this.emitFile({type: 'asset', fileName: `catalog/${file.replace(/\.pdf$/, '.jpg')}`, source: readFileSync(cached)});
+      }
     },
   };
 }
+/** カタログのページの絵の細かさ（アプリの print/catalogPdf.ts の DPI と同じ。カタログの窓の押せる枠は、ページの pt をこの倍率で絵の画素にする） */
+const CATALOG_DPI = 200;
+/** カタログのページの絵の JPEG の質（80 で1ページ 0.7〜0.9MB。印刷しても字がにじまない） */
+const CATALOG_JPEG_QUALITY = 80;
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), viteSingleFile(), htmlAsIndex(), appVersion(), catalogText()],

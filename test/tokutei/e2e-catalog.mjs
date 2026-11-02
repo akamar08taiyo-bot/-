@@ -20,11 +20,12 @@ const dist = new URL('../../dist-tokutei/', import.meta.url).pathname;
 const catalogDir = new URL('../../public-tokutei/catalog/', import.meta.url).pathname;
 const server = createServer((req, res) => {
   const path = (req.url ?? '/').split('?')[0];
-  const catalog = /\/catalog\/([\w.-]+\.(?:pdf|json))$/.exec(path); // PDF と、ビルドで作った文字の一覧（text.json）
+  const catalog = /\/catalog\/([\w.-]+\.(?:pdf|json|jpg))$/.exec(path); // PDF と、ビルドで作った文字の一覧（text.json）・ページの絵（jpg）
   const file = catalog ? join('catalog', catalog[1]) : path.endsWith('/version.json') ? 'version.json' : 'index.html';
   try {
-    res.writeHead(200, {'content-type': catalog ? (catalog[1].endsWith('.json') ? 'application/json' : 'application/pdf') : file.endsWith('.json') ? 'application/json' : 'text/html; charset=utf-8'});
-    res.end(readFileSync(join(dist, file)));
+    const body = readFileSync(join(dist, file));
+    res.writeHead(200, {'content-type': catalog ? (catalog[1].endsWith('.json') ? 'application/json' : catalog[1].endsWith('.jpg') ? 'image/jpeg' : 'application/pdf') : file.endsWith('.json') ? 'application/json' : 'text/html; charset=utf-8'});
+    res.end(body);
   } catch {
     res.writeHead(404);
     res.end();

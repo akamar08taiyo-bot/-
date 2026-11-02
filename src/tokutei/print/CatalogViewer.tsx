@@ -105,6 +105,12 @@ export function CatalogViewer({
   const [zoom, setZoom] = useState(1);
   // ページの絵の枠（ホイールで拡大・縮小、つかんで動かす）
   const viewRef = useRef<HTMLDivElement>(null);
+  // 開いたら、窓が見える所まで画面を動かす（住宅改修のタブの中の枠では、枠の上の方が画面の外に出ていると、開いた窓が見えないことがある。
+  // ユーザーの話「タブレットで開くとパンフレットが開かない」2026-11-02。見えていれば何もしない）
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    rootRef.current?.scrollIntoView({block: 'nearest', inline: 'nearest'});
+  }, []);
   const zoomRef = useRef(1);
   // 拡大・縮小したあと、マウスのあった所（px, py）の絵が同じ所に残るように動かす（cx, cy は前の大きさでの絵の上の位置）
   const anchor = useRef<{px: number; py: number; cx: number; cy: number; ratio: number} | null>(null);
@@ -337,6 +343,7 @@ export function CatalogViewer({
   const tool = 'h-8 min-w-8 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-700 hover:bg-slate-50';
   return (
     <div
+      ref={rootRef}
       role="dialog"
       aria-label="カタログ"
       aria-modal="false"

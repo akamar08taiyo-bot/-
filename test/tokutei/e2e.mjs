@@ -21,11 +21,11 @@ const dist = new URL('../../dist-tokutei/', import.meta.url).pathname;
 const server = createServer((req, res) => {
   const path = (req.url ?? '/').split('?')[0];
   // 介援隊のカタログの PDF（dist-tokutei/catalog/。ポータルの tokutei/catalog/）
-  const catalog = /\/catalog\/([\w.-]+\.(?:pdf|json))$/.exec(path); // PDF と、ビルドで作った文字の一覧（text.json）
+  const catalog = /\/catalog\/([\w.-]+\.(?:pdf|json|jpg))$/.exec(path); // PDF と、ビルドで作った文字の一覧（text.json）・ページの絵（jpg）
   const file = catalog ? join('catalog', catalog[1]) : path.endsWith('/version.json') ? 'version.json' : 'index.html';
   try {
     const body = readFileSync(join(dist, file));
-    res.writeHead(200, {'content-type': catalog ? (catalog[1].endsWith('.json') ? 'application/json' : 'application/pdf') : file.endsWith('.json') ? 'application/json' : 'text/html; charset=utf-8'});
+    res.writeHead(200, {'content-type': catalog ? (catalog[1].endsWith('.json') ? 'application/json' : catalog[1].endsWith('.jpg') ? 'image/jpeg' : 'application/pdf') : file.endsWith('.json') ? 'application/json' : 'text/html; charset=utf-8'});
     res.end(body);
   } catch {
     res.writeHead(404);
@@ -97,10 +97,11 @@ try {
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(String(e)));
   // カタログの読み込み：PDF（ページの絵）とビルドで作った文字の一覧（catalog/text.json）を何回取りに行ったか
-  const catalogGets = {pdf: 0, json: 0};
+  const catalogGets = {pdf: 0, json: 0, jpg: 0};
   page.on('request', (r) => {
     if (/\/catalog\/[\w.-]+\.pdf$/.test(r.url())) catalogGets.pdf++;
     if (/\/catalog\/text\.json(\?|$)/.test(r.url())) catalogGets.json++;
+    if (/\/catalog\/[\w.-]+\.jpg(\?|$)/.test(r.url())) catalogGets.jpg++;
   });
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
   await page.goto(url);
@@ -1067,6 +1068,10 @@ try {
   assert.equal(await marks.count(), 2);
   assert.deepEqual(await marks.evaluateAll((xs) => xs.map((x) => x.tagName)), ['rect', 'rect']); // 丸ではなく四角の枠
   await page.screenshot({path: `${out}/05m-catalog-marks.png`});
+  // カタログのページは、ビルドで作った絵（catalog/*.jpg）を出す。端末の中で PDF を読まない（pdf.js は古い iPad の Safari で動かない。
+  // ユーザーの話「タブレットで開くとパンフレットが開かない」2026-11-02）
+  assert.equal(catalogGets.pdf, 0, `カタログの PDF を ${catalogGets.pdf} 回読んだ`);
+  assert.ok(catalogGets.jpg >= 1, 'カタログのページの絵（jpg）を読んでいない');
   await page.locator('.print-overlay').getByRole('button', {name: '閉じる', exact: true}).click();
   await rowViewer.getByRole('button', {name: 'カタログを閉じる'}).click();
   await catRow.fill('');
