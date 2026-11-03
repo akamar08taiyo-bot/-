@@ -12,8 +12,24 @@ import {loadCatalogProducts} from '../print/catalogPdf.ts';
 import type {Product, SaleItem} from '../types.ts';
 import {TextInput} from './ui.tsx';
 
-/** lead：同じ行の左に置く欄（商品名。ユーザーの指示「横にしてまとめられる部分はまとめる。重要項目は行の左にもってくる」2026-11-03。狭い幅では品番が下に折れる） */
-export function CodeLookup({item, products, onPick, onPicked, lead}: {item: SaleItem; products: Product[]; onPick: (patch: Partial<SaleItem>) => void; onPicked?: (item: SaleItem) => void; lead?: ReactNode}) {
+/**
+ * 品番の欄と「🔢 型番から検索」。ボタンはカタログの商品の枠の「📖 カタログから商品検索」の右（ユーザーの指示「その真下に、カタログから商品検索をもってくる。
+ * 右側に型番から検索をもってくる」2026-11-03）。入れる所の幅（400px ほど）にボタン2つと品番の欄は並ばないので、品番の欄は商品名の右に置く
+ * （前は商品名の右に品番の欄とボタン＝lead で、ボタンの名前は「型番から入力」）。置く所が3つに分かれるので、部品を渡して置いてもらう（children）
+ */
+export function CodeLookup({
+  item,
+  products,
+  onPick,
+  onPicked,
+  children,
+}: {
+  item: SaleItem;
+  products: Product[];
+  onPick: (patch: Partial<SaleItem>) => void;
+  onPicked?: (item: SaleItem) => void;
+  children: (parts: {input: ReactNode; button: ReactNode; note: ReactNode}) => ReactNode;
+}) {
   const [msg, setMsg] = useState<{ok: boolean; text: string} | null>(null);
   const [many, setMany] = useState<CodeHit[]>([]);
   const [busy, setBusy] = useState(false);
@@ -45,51 +61,54 @@ export function CodeLookup({item, products, onPick, onPicked, lead}: {item: Sale
       setMsg({ok: false, text: `型番 ${code} の商品が ${hits.length} つあります。入れる商品を選んでください`});
     } else setMsg({ok: false, text: `型番 ${code} とぴったり同じ商品は、カタログ・商品マスタにありません（何も入れていません）`});
   };
-  return (
-    <div className="grid min-w-0 gap-1 sm:ml-8">
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        {lead}
-        <TextInput
-          value={item.code}
-          onChange={(code) => {
-            onPick({code});
-            setMsg(null);
-            setMany([]);
-          }}
-          onKeyDown={(e) => {
-            if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
-            e.preventDefault();
-            e.stopPropagation();
-            void look();
-          }}
-          placeholder="品番（型番）"
-          className="w-40 max-w-full text-sm"
-          aria-label="品番"
-        />
-        <button
-          type="button"
-          onClick={() => void look()}
-          disabled={busy}
-          className="h-9 shrink-0 rounded-md border border-slate-300 bg-white px-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-          title="品番の欄の型番とぴったり同じ商品を、カタログ・商品マスタから入れる"
-        >
-          🔢 型番から入力
-        </button>
-      </div>
-      {msg && (
-        <p role="status" className={`rounded px-2 py-1 text-xs ${msg.ok ? 'bg-emerald-50 text-emerald-900' : 'bg-amber-50 text-amber-900'}`}>
-          {msg.text}
-        </p>
-      )}
-      {many.length > 1 && (
-        <div role="group" aria-label="同じ型番の商品" className="flex flex-wrap gap-1.5">
-          {many.map((h) => (
-            <button key={h.key} type="button" onClick={() => put(h)} className="rounded-md border border-slate-300 bg-white px-2 py-1 text-left text-xs text-slate-800 hover:border-sky-400 hover:bg-sky-50">
-              {h.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+  const input = (
+    <TextInput
+      value={item.code}
+      onChange={(code) => {
+        onPick({code});
+        setMsg(null);
+        setMany([]);
+      }}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+        e.preventDefault();
+        e.stopPropagation();
+        void look();
+      }}
+      placeholder="品番（型番）"
+      className="w-36 min-w-0 shrink text-sm"
+      aria-label="品番"
+    />
   );
+  const button = (
+    <button
+      type="button"
+      onClick={() => void look()}
+      disabled={busy}
+      className="h-9 shrink-0 rounded-md border border-slate-300 bg-white px-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+      title="商品名の右の品番の欄の型番とぴったり同じ商品を、カタログ・商品マスタから入れる"
+    >
+      🔢 型番から検索
+    </button>
+  );
+  const note =
+    msg || many.length > 1 ? (
+      <div className="grid min-w-0 gap-1">
+        {msg && (
+          <p role="status" className={`rounded px-2 py-1 text-xs ${msg.ok ? 'bg-emerald-50 text-emerald-900' : 'bg-amber-50 text-amber-900'}`}>
+            {msg.text}
+          </p>
+        )}
+        {many.length > 1 && (
+          <div role="group" aria-label="同じ型番の商品" className="flex flex-wrap gap-1.5">
+            {many.map((h) => (
+              <button key={h.key} type="button" onClick={() => put(h)} className="rounded-md border border-slate-300 bg-white px-2 py-1 text-left text-xs text-slate-800 hover:border-sky-400 hover:bg-sky-50">
+                {h.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    ) : null;
+  return <>{children({input, button, note})}</>;
 }

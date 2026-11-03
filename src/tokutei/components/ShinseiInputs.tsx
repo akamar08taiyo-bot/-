@@ -21,7 +21,6 @@ import type {ZipHit} from '../zip.ts';
 import {CategorySelect} from './CategorySelect.tsx';
 import {CatalogPicker} from './CatalogPicker.tsx';
 import {CodeLookup} from './CodeLookup.tsx';
-import {MakerInput} from './MakerInput.tsx';
 import {PriceFields} from './PriceFields.tsx';
 import {ReasonField} from './ReasonField.tsx';
 import {AddItemButton, Circles, EraBirthInput, InsuredNoInput, KanaInput, nextOnEnter} from './ShinseiParts.tsx';
@@ -256,11 +255,8 @@ export function ShinseiInputs({
                   <div className="flex min-w-0 flex-wrap items-center gap-2 pr-7">
                     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-teal-100 text-xs font-bold text-teal-800">{idx + 1}</span>
                     <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => changeItem(i.id, {category, sub})} ariaLabel="種目" className="w-40 min-w-0 shrink" />
-                    {i.productId === null ? (
-                      <MakerInput value={i.maker} onChange={(maker) => changeItem(i.id, {maker})} choices={makers} className="w-48 min-w-0 shrink" />
-                    ) : (
-                      (i.maker || i.code) && <span className="min-w-0 text-xs text-slate-500">{[i.maker, i.code].filter(Boolean).join('　')}</span>
-                    )}
+                    {/* 手で入れる商品のメーカーは、下のカタログの枠のプルダウン（ユーザーの指示「入浴補助用具の右側のリストは不要」2026-11-03） */}
+                    {i.productId !== null && (i.maker || i.code) && <span className="min-w-0 text-xs text-slate-500">{[i.maker, i.code].filter(Boolean).join('　')}</span>}
                     {/* 消すのは右上（販売見積書と同じ。金額の横だとスマホの幅で1段下に落ちた） */}
                     {lines.length > 0 && (
                       <button
@@ -274,20 +270,30 @@ export function ShinseiInputs({
                       </button>
                     )}
                   </div>
-                  {/* 種目・メーカーの下に、品目・メーカーの段と「📖 カタログから商品検索」（ユーザーの指示「項目名、メーカー名を入力したその下に、カタログから検索をおく」
-                      「カタログから選ぶ、カタログ、商品検索の３つの機能がかぶっている。カタログから商品検索という一つのボタンのみにする」2026-11-03）。押すと商品の一覧とカタログの窓 */}
-                  {i.productId === null && <CatalogPicker item={i} onPick={(patch) => changeRow(i.id, patch)} onCatalog={onCatalog} onPicked={onCatalogPicked} />}
-                  {/* 商品名（左）・品番と「🔢 型番から入力」を同じ行に（ユーザーの指示「横にしてまとめられる部分はまとめる。重要項目は行の左にもってくる」2026-11-03。
-                      狭い幅では品番が下に折れる）。型番から入力は、型番がぴったり同じ商品だけを入れる（「…確実に該当商品に当たるかを照らし合わせる」2026-11-03。CodeLookup.tsx）。
-                      品番は見積書の品名の3行目「【品番】…」（「メーカー名・商品名・品番は、別々の項目として持つ」2026-11-01）。字はほかの欄と同じ 14px */}
+                  {/* 種目の下に、品目・メーカーのプルダウンと、その下に「📖 カタログから商品検索」（絞ったカタログを開く）・右に品番と「🔢 型番から検索」
+                      （ユーザーの指示「品目はプルダウン形式。品目を選んだら、該当のメーカーをプルダウンから選ぶ。その真下に、カタログから商品検索をもってくる。
+                      右側に型番から検索をもってくる」2026-11-03。CatalogPicker.tsx・CodeLookup.tsx） */}
+                  {/* 商品名（字はほかの欄と同じ 14px）の右に品番の欄（「🔢 型番から検索」で読む欄。見積書の品名の3行目「【品番】…」） */}
                   {i.productId === null ? (
-                    <CodeLookup
-                      item={i}
-                      products={data.products}
-                      onPick={(patch) => changeRow(i.id, patch)}
-                      onPicked={onCatalogPicked}
-                      lead={<TextInput value={i.name} onChange={(name) => changeItem(i.id, {name})} placeholder="商品名" className="min-w-[16rem] flex-1 text-sm" aria-label="商品名" data-nav />}
-                    />
+                    <CodeLookup item={i} products={data.products} onPick={(patch) => changeRow(i.id, patch)} onPicked={onCatalogPicked}>
+                      {(code) => (
+                        <>
+                          <CatalogPicker
+                            item={i}
+                            onPick={(patch) => changeRow(i.id, patch)}
+                            onCatalog={onCatalog}
+                            onPicked={onCatalogPicked}
+                            makerChoices={makers}
+                            code={code.button}
+                            codeNote={code.note}
+                          />
+                          <div className="flex min-w-0 items-center gap-2 sm:ml-8">
+                            <TextInput value={i.name} onChange={(name) => changeItem(i.id, {name})} placeholder="商品名" className="min-w-0 flex-1 text-sm" aria-label="商品名" data-nav />
+                            {code.input}
+                          </div>
+                        </>
+                      )}
+                    </CodeLookup>
                   ) : (
                     <TextInput value={i.name} onChange={(name) => changeItem(i.id, {name})} placeholder="商品名" className="min-w-0 text-sm sm:ml-8" aria-label="商品名" data-nav />
                   )}

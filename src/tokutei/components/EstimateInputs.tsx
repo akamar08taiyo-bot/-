@@ -20,7 +20,6 @@ import type {ZipHit} from '../zip.ts';
 import {CategorySelect} from './CategorySelect.tsx';
 import {CatalogPicker} from './CatalogPicker.tsx';
 import {CodeLookup} from './CodeLookup.tsx';
-import {MakerInput} from './MakerInput.tsx';
 import {PriceFields} from './PriceFields.tsx';
 import {ReasonField} from './ReasonField.tsx';
 import {AddItemButton, Circles, EraBirthInput, InsuredNoInput, KanaInput} from './ShinseiParts.tsx';
@@ -435,11 +434,8 @@ function ItemBlock({
       <div className="flex min-w-0 flex-wrap items-center gap-2 pr-7">
         <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-teal-100 text-xs font-bold text-teal-800">{no}</span>
         <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => change({category, sub})} ariaLabel="種目" className="w-40 min-w-0 shrink" />
-        {manual ? (
-          <MakerInput value={i.maker} onChange={(maker) => change({maker})} choices={makers} className="w-48 min-w-0 shrink" />
-        ) : (
-          <span className="min-w-0 text-xs text-slate-500">{[i.maker, i.code, i.tais && `TAIS ${i.tais}`].filter(Boolean).join('　')}</span>
-        )}
+        {/* 手で入れる商品のメーカーは、下のカタログの枠のプルダウン（ユーザーの指示「入浴補助用具の右側のリストは不要」2026-11-03） */}
+        {!manual && <span className="min-w-0 text-xs text-slate-500">{[i.maker, i.code, i.tais && `TAIS ${i.tais}`].filter(Boolean).join('　')}</span>}
         {remove && (
           <button type="button" onClick={remove} className="absolute right-1 top-1.5 rounded px-2 py-1 text-rose-500 hover:bg-rose-50" aria-label={`${i.name || '商品'}を消す`} title="消す">
             ✕
@@ -447,17 +443,20 @@ function ItemBlock({
         )}
       </div>
       {/* 種目・メーカーの下に、品目・メーカーの段と「📖 カタログから商品検索」（申請書のタブと同じ。ユーザーの指示 2026-11-03） */}
-      {manual && <CatalogPicker item={i} onPick={change} onCatalog={onCatalog} onPicked={onPicked} />}
-      {/* 商品名（左）・品番と「🔢 型番から入力」（型番がぴったり同じ商品だけを入れる。2026-11-03）を同じ行に（「重要項目は行の左にもってくる」2026-11-03）。
-          商品名・品番の字はほかの欄と同じ 14px（前は 16px で「やや大きすぎる」2026-11-02） */}
+      {/* 品目・メーカーのプルダウン、その下に「📖 カタログから商品検索」と右に「🔢 型番から検索」（ユーザーの指示 2026-11-03。CatalogPicker.tsx・CodeLookup.tsx）。
+          商品名（字はほかの欄と同じ 14px）の右に品番の欄（型番から検索で読む欄） */}
       {manual ? (
-        <CodeLookup
-          item={i}
-          products={products}
-          onPick={change}
-          onPicked={onPicked}
-          lead={<TextInput value={i.name} onChange={(name) => change({name})} placeholder="商品名" className="min-w-[16rem] flex-1 text-sm" aria-label="商品名" />}
-        />
+        <CodeLookup item={i} products={products} onPick={change} onPicked={onPicked}>
+          {(code) => (
+            <>
+              <CatalogPicker item={i} onPick={change} onCatalog={onCatalog} onPicked={onPicked} makerChoices={makers} code={code.button} codeNote={code.note} />
+              <div className="flex min-w-0 items-center gap-2 sm:ml-8">
+                <TextInput value={i.name} onChange={(name) => change({name})} placeholder="商品名" className="min-w-0 flex-1 text-sm" aria-label="商品名" />
+                {code.input}
+              </div>
+            </>
+          )}
+        </CodeLookup>
       ) : (
         <TextInput value={i.name} onChange={(name) => change({name})} placeholder="商品名" className="min-w-0 text-sm sm:ml-8" aria-label="商品名" />
       )}

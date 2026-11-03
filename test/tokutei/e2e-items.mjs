@@ -1,5 +1,5 @@
 // 商品の欄（2026-11-03 の直し）をブラウザで確かめる。値・名前はすべて架空（カタログの商品の型番・名前はカタログの載っているもの）
-//   ・「🔢 型番から入力」：品番の欄の型番とぴったり同じ商品だけを入れる（前方一致は入れない・ないときは何も入れない）
+//   ・「🔢 型番から検索」：品番の欄の型番とぴったり同じ商品だけを入れる（前方一致は入れない・ないときは何も入れない）
 //     （ユーザーの指示「カタログ商品検索と、型番から商品をひっぱってくるのは、絶対に検索をまちがってもらっては困るので、確実に該当商品に当たるかを照らし合わせる」）
 //   ・入れた商品は自動でお気に入りへ。「★ お気に入りから入力」は品目ごとに分けて出し、「削除」で外せる（「一度入力した商品は、今後お気に入りの中に、項目ごとにいれる…当然削除する事もできる」）
 //   ・税抜の横に税込。税抜・税込を打つと割引率が変わり、割引率を打つと税抜・税込が変わる（「税抜き金額、税込み金額を変更すると、自動的に割引率が変わるようにする。また、逆もしかり」）
@@ -69,7 +69,11 @@ try {
 
   // ---- 型番から入力：頭だけ同じ型番（PN-L4143）は入れない
   const code = block.getByLabel('品番', {exact: true});
-  const lookup = block.getByRole('button', {name: '🔢 型番から入力'});
+  const lookup = block.getByRole('button', {name: '🔢 型番から検索'});
+  // 「📖 カタログから商品検索」の右（同じ段）に「🔢 型番から検索」（ユーザーの指示「右側に型番から検索をもってくる」2026-11-03）。品番の欄は商品名の右
+  const [sBox, lBox, cBox, nBox] = await Promise.all([block.getByRole('button', {name: '📖 カタログから商品検索'}), lookup, code, block.getByLabel('商品名')].map((x) => x.boundingBox()));
+  assert.ok(lBox.x > sBox.x + sBox.width && Math.abs(lBox.y - sBox.y) < 4, `${JSON.stringify(sBox)} ${JSON.stringify(lBox)}`);
+  assert.ok(cBox.x > nBox.x + nBox.width && Math.abs(cBox.y - nBox.y) < 4 && nBox.width > 150, `${JSON.stringify(nBox)} ${JSON.stringify(cBox)}`);
   await code.fill('PN-L4143');
   await lookup.click();
   await block.getByRole('status').filter({hasText: 'ぴったり同じ商品は'}).waitFor({timeout: 60000});
@@ -80,7 +84,7 @@ try {
   await block.getByRole('status').filter({hasText: '✓ 型番'}).waitFor();
   assert.equal(await block.getByLabel('商品名').inputValue(), 'シャワーチェアAir コンパクトSPワンタッチ ブルー');
   assert.equal(await code.inputValue(), 'PN-L41431A');
-  assert.equal(await block.getByLabel('メーカー').first().inputValue(), 'パナソニックエイジフリー（株）');
+  assert.equal(await block.getByRole('combobox', {name: 'メーカー', exact: true}).inputValue(), 'パナソニックエイジフリー（株）');
   const list = Number((await block.getByLabel('定価').inputValue()).replace(/,/g, ''));
   assert.ok(list > 0);
   log('型番から入力 OK');
@@ -114,8 +118,11 @@ try {
 
   // ---- はみ出し：長い商品名・メーカー名でも申請書のプレビューの欄から出ない
   await block.getByLabel('商品名').fill('見本のシャワーチェアAir ミドルワイドSPワンタッチ プレミアム ブルー');
-  await block.getByLabel('メーカー').first().fill('見本エイジフリー工業株式会社');
-  await block.getByLabel('メーカー').first().press('Escape');
+  // カタログにないメーカーは、メーカーのプルダウンの「ほかのメーカー（打つ）」で打つ（2026-11-03）
+  await block.getByRole('combobox', {name: 'メーカー', exact: true}).waitFor({timeout: 60000}); // カタログを読み終わるとプルダウン
+  await block.getByRole('combobox', {name: 'メーカー', exact: true}).selectOption({label: 'ほかのメーカー（打つ）'});
+  await block.getByRole('combobox', {name: 'メーカー（打つ）'}).fill('見本エイジフリー工業株式会社');
+  await block.getByRole('combobox', {name: 'メーカー（打つ）'}).press('Escape');
   await page.getByRole('tab', {name: /^📄 申請書/}).click();
   await page.locator('[aria-label="申請書のプレビュー"]').first().waitFor();
   await page.waitForTimeout(1200);
@@ -168,8 +175,10 @@ try {
   await p2.getByRole('button', {name: '＋ 苅田町'}).click();
   const b2 = p2.locator('[data-item]').first();
   await b2.getByLabel('種目').selectOption('入浴補助用具');
-  await b2.getByLabel('メーカー').first().fill('見本エイジフリー工業株式会社');
-  await b2.getByLabel('メーカー').first().press('Escape');
+  await b2.getByRole('combobox', {name: 'メーカー', exact: true}).waitFor({timeout: 60000}); // カタログを読み終わるとプルダウン
+  await b2.getByRole('combobox', {name: 'メーカー', exact: true}).selectOption({label: 'ほかのメーカー（打つ）'});
+  await b2.getByRole('combobox', {name: 'メーカー（打つ）'}).fill('見本エイジフリー工業株式会社');
+  await b2.getByRole('combobox', {name: 'メーカー（打つ）'}).press('Escape');
   await b2.getByLabel('商品名').fill('見本のシャワーチェアAir ミドルワイドSPワンタッチ プレミアム ブルー');
   await p2.getByRole('tab', {name: /^📄 申請書/}).click();
   await p2.locator('[aria-label="申請書のプレビュー"]').first().waitFor();
