@@ -7,7 +7,7 @@ import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import {DEFAULT_PLACES, defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {areaInsurerNo, INSURER_AREAS, insurerNoOf} from '../../src/sasaoka/insurerNumbers.ts';
-import {ageOn, boxLabels, checkBoxes, cityRest, fillShinsei, placeCounts, fixedPitch, hangLines, hangPrefixes, indentOf, splitNumber, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, kindNamesOf, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoNoteText, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
+import {ageOn, boxLabels, checkBoxes, cityRest, fillShinsei, placeCounts, fixedPitch, hangLines, hangPrefixes, indentOf, splitNumber, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, kindNamesOf, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoNoteText, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, sheetLines, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
 import {KK_CELLS} from '../../src/sasaoka/shinsei/kitakyushuCells.ts';
 import {shinseiPreview} from '../../src/sasaoka/shinseiPreview.ts';
 import type {Insurer, Job, PhotoMark, Place, Row, ShinseiInfo, ShinseiMarks} from '../../src/sasaoka/types.ts';
@@ -821,7 +821,7 @@ test('改修の種類の名前は保険者の様式の言葉（北九州市「�
   assert.deepEqual(works('fukuoka'), ['①浴室　手すりの取付け　L=600mm', '②トイレ　床又は通路面の材料変更', '③居室　引き戸等への扉の取替え']);
   for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki'] as Insurer[]) assert.deepEqual(works(insurer), ['①浴室　手すりの取り付け　L=600mm', '②トイレ　床材の変更', '③居室　扉の取替'], insurer);
   // 写真に書く内容は、改修の種類の名前を書かない（どの保険者でも長さだけ。2026-11-01 の指示「手すりの取り付けなどの項目の名前はいらない」）
-  assert.deepEqual(photoNoteLines(places[0]), ['L=600mm']);
+  assert.deepEqual(photoNoteLines(places[0]), ['手すり　L=600mm']); // 「手すり　L=600mm」（ユーザーの指示 2026-11-03）
   assert.deepEqual(photoNoteLines(places[1]), []); // 寸法のない種類は自動の文なし（写真は枠いっぱい）
 });
 
@@ -1017,9 +1017,9 @@ test('写真の用紙の写真の横（下）に書く欄：縦の写真はま�
   assert.ok(many.note!.h > 20 && many.note!.y + many.note!.h === 120 && photoNotePt(many.note!, [...lines, ...lines, ...lines]) >= 6, JSON.stringify(many));
   // 書く内容：自動の文（寸法だけ。手すりは長さだけ＝高さ H は書かない、段差の解消は W・D・H）のあとに、手で足した行（空の行は書かない）
   // （ユーザーの指示「手すりの取り付けなどの項目の名前はいらない。Ｌ＝600mmのみでよい」2026-11-01）
-  assert.deepEqual(photoNoteLines({kind: 1, rows: [], dims: {l: '800', h: '600'}, photoNote: 'ベースプレート　L=800mm\n\n 補強板 '}), ['L=800mm', 'ベースプレート　L=800mm', '補強板']);
+  assert.deepEqual(photoNoteLines({kind: 1, rows: [], dims: {l: '800', h: '600'}, photoNote: 'ベースプレート　L=800mm\n\n 補強板 '}), ['手すり　L=800mm', 'ベースプレート　L=800mm', '補強板']);
   assert.deepEqual(photoNoteLines({kind: 2, rows: [], dims: {w: '600', d: '350', h: '150'}}), ['W600mm D350mm H150mm']);
-  assert.deepEqual(photoNoteLines({kind: 1, rows: [], dims: {l: '400×600'}, shinseiText: '見本の補足'}), ['L=400mm×600mm', '見本の補足']);
+  assert.deepEqual(photoNoteLines({kind: 1, rows: [], dims: {l: '400×600'}, shinseiText: '見本の補足'}), ['手すり　L=400mm×600mm', '見本の補足']);
 });
 
 test('写真の用紙（Excel）：改修前の写真の横（上）の書く欄に、自動の文と手で足した行をテキストボックスで書き、写真は残りの所に。改修後は写真を枠いっぱい。写真のない写真番号にも書く', () => {
@@ -1035,7 +1035,7 @@ test('写真の用紙（Excel）：改修前の写真の横（上）の書く欄
   assert.equal(boxes.length, 1);
   assert.match(boxes[0], /name="改修前の説明 \d+"/);
   // 改修の種類の名前は書かない（用紙の「実施した工事種類」の■で分かる。ユーザーの指示「手すりの取り付けなどの項目の名前はいらない」2026-11-01）
-  assert.deepEqual([...boxes[0].matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]), ['L=600mm', 'ベースプレート　L=800mm']);
+  assert.deepEqual([...boxes[0].matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]), ['手すり　L=600mm', 'ベースプレート　L=800mm']);
   // 字体は原本のテキストボックスと同じテーマの本文の字体（書かないと明朝などで出る）
   assert.match(boxes[0], /<xdr:style>.*<a:fontRef idx="minor">.*<\/xdr:style><xdr:txBody>/);
   const sheet = SHINSEI.kanda!.sheets.find((x) => x.sheet === '1 ')!;
@@ -1057,7 +1057,7 @@ test('写真の用紙（Excel）：改修前の写真の横（上）の書く欄
   const five = anchorsOf(strFromU8(files[drawingPath(files, '1  (5)')!])).filter(isNote);
   assert.equal(five.length, 1);
   assert.match(five[0], /name="改修前の説明 \d+"/);
-  assert.deepEqual([...five[0].matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]), ['L=400mm×600mm×600mm']);
+  assert.deepEqual([...five[0].matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]), ['手すり　L=400mm×600mm×600mm']);
   assert.match(five[0], /<a:p><a:pPr algn="ctr"\/>/);
   // 画面のプレビュー（photoImages なし）では書かない（画面は枠に重ねて描く）
   const pv = unzipSync(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(j, RATES)));
@@ -1739,7 +1739,11 @@ test('久留米市：事前承認申請書・支給申請書に書く（記入�
     assert.equal(at(name === '事前承認申請書' ? 'J30' : 'J33'), shinseiCost(krJob(), KR_S).toLocaleString('ja-JP'), name);
     const burden = name === '事前承認申請書' ? ['BA30', 'BA31', 'BA32'] : ['AZ33', 'AZ34', 'AZ35'];
     assert.deepEqual(burden.map(at), ['■', '', ''], name); // 2割・3割は原本の □ のまま
-    assert.equal(ellipses(out, name).length, 1, name); // 元号（昭）だけ
+    // 元号（昭）と、支給申請書は（支払方法）の「２．受領委任払い」（ユーザーの答え「久留米　支払い　受領委任払い」2026-11-03）
+    assert.equal(ellipses(out, name).length, name === '支給申請書' ? 2 : 1, name);
+    // 支払い方法は「■ 受領委任払い」（償還払いは □ のまま）
+    assert.equal(at(name === '事前承認申請書' ? 'AN17' : 'AN20'), '■ 受領委任払い（取扱登録事業者のみ）', name);
+    assert.equal(R('AN', name === '事前承認申請書' ? 16 : 19), '', name);
   }
   // 申請者：事前承認申請書は住所（「久留米市」のうしろ）と電話番号だけ。支給申請書は「※本人自書」なので電話番号だけ
   const pre = byName.get('事前承認申請書')!;
@@ -1843,9 +1847,45 @@ test('飯塚市：写真添付用紙（事前申請用・支給申請用）の�
   assert.equal(txt(byName.get('事前写真④')!, 'E1'), ''); // 箇所のない用紙は原本のまま（共有の文字）
 });
 
-test('飯塚市の原本：15枚（事前承認願書・承諾書・平面図・事前写真①〜⑤・支給申請書・支給写真①〜⑤・請求書）。書く欄は空', () => {
+// 飯塚市の内訳書（ユーザーの答え「内訳書はいります」2026-11-03。いただいた 6788.xls の様式）
+test('飯塚市の内訳書：見積書の明細を1行ずつ（改修場所・種類の番号、（材）、数量・単価・金額、写真番号、介護保険対象）と小計〜合計。使わない行は隠す', () => {
+  const j = izJob({places: [...izJob().places.slice(0, 2), place('トイレ', [mat('段差解消スロープ', {excluded: true})], {kind: 2, photo: 3})]});
+  const out = fillShinsei(IIZUKA, SHINSEI.iizuka!, shinseiValues(j, IZ_S));
+  const {byName} = sheets(out);
+  const u = byName.get('内訳書')!;
+  const at = (ref: string) => txt(u, ref);
+  const num = (ref: string) => Number(/<v>([^<]*)<\/v>/.exec(cell(u, ref))?.[1] ?? NaN);
+  const lines = sheetLines(j, IZ_S);
+  assert.equal(lines.length, 3 + 4);
+  assert.deepEqual([at('B6'), at('C6'), at('I6'), at('J6')], ['⑦浴室', '①手すり', '①', '①手すり']);
+  assert.match(at('D6'), /^（材）/);
+  assert.deepEqual([num('E6'), num('G6'), num('H6'), num('K6'), num('M6')], [1, 8000, 8000, 1, 8000]); // 定価10,000円×0.8
+  assert.equal(at('B7'), '⑩勝手口'); // 一覧にない場所は ⑩その他
+  // 介護保険の対象外の行は、左記のうち介護保険対象工事の欄を空ける
+  assert.deepEqual([at('B8'), at('C8'), at('J8'), cell(u, 'M8').includes('<v>')], ['⑧トイレ', '②段差解消', '', false]);
+  const t = estimateTotals(j, IZ_S);
+  assert.deepEqual(['D9', 'D10', 'D11', 'D12'].map(at), ['小計', '諸経費', '消費税', '合計']);
+  assert.deepEqual([num('H9'), num('H12'), num('M9'), num('M12')], [t.all.subtotal, t.all.total, t.target.subtotal, t.target.total]);
+  assert.equal(at('K3'), '施工業者名\n太陽シルバーサービス株式会社　見本営業所');
+  // 1ページ（15行）に入るので、21行目からは隠す（印刷・プレビューに出さない）
+  const rowTag = (r: number) => new RegExp(`<row\\b[^>]*\\br="${r}"[^>]*>`).exec(u)?.[0] ?? '';
+  assert.doesNotMatch(rowTag(20), /hidden="1"/);
+  assert.match(rowTag(21), /hidden="1"/);
+  assert.match(rowTag(65), /hidden="1"/);
+  // 16行（12か所＋小計〜合計）なら2ページ分（6〜35行）を見せる
+  const many = izJob({places: Array.from({length: 12}, (_, i) => place(`廊下${i + 1}`, [mat('木の手すり')], {photo: i + 1}))});
+  const u2 = sheets(fillShinsei(IIZUKA, SHINSEI.iizuka!, shinseiValues(many, IZ_S))).byName.get('内訳書')!;
+  const tag2 = (r: number) => new RegExp(`<row\\b[^>]*\\br="${r}"[^>]*>`).exec(u2)?.[0] ?? '';
+  assert.equal(txt(u2, 'D21'), '合計');
+  assert.doesNotMatch(tag2(35), /hidden="1"/);
+  assert.match(tag2(36), /hidden="1"/);
+  // 見積書に行がなければ書かない（申請書だけの様邸）
+  assert.deepEqual(sheetLines(izJob({places: [place('浴室', [])]}), IZ_S), []);
+});
+
+test('飯塚市の原本：16枚（事前承認願書・承諾書・内訳書・平面図・事前写真①〜⑤・支給申請書・支給写真①〜⑤・請求書）。書く欄は空', () => {
   const {byName} = sheets(IIZUKA);
-  assert.deepEqual([...byName.keys()], ['事前承認願書', '承諾書', '平面図', '事前写真①', '事前写真②', '事前写真③', '事前写真④', '事前写真⑤', '支給申請書', '支給写真①', '支給写真②', '支給写真③', '支給写真④', '支給写真⑤', '請求書']);
+  assert.deepEqual([...byName.keys()], ['事前承認願書', '承諾書', '内訳書', '平面図', '事前写真①', '事前写真②', '事前写真③', '事前写真④', '事前写真⑤', '支給申請書', '支給写真①', '支給写真②', '支給写真③', '支給写真④', '支給写真⑤', '請求書']);
   for (const ref of ['F7', 'F8', 'S9', 'G12']) assert.equal(txt(byName.get('事前承認願書')!, ref), '', ref);
   assert.equal(areaInsurerNo('iizuka', '福岡県飯塚市見本町2-3'), '402057');
 });

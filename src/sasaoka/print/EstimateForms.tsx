@@ -52,11 +52,13 @@ function useShrinkCells() {
  */
 function nameCell(text: string, w: number, h: number, pt: number, cls: string, edit: string, lines: number, editable: boolean, slot = ''): ReactNode {
   const f = text ? fitName(text, w, h, pt, lines) : null;
-  // 空きの行（申請書で箇所を入れたときの「手すり」「ブラケット」「施工費」など。railSlots.ts）は、見積書の画面だけ薄い字で「（手すり）」。印刷には出さない
-  const hint = editable && !text && slot ? <span className="sheet-slot">（{slot}）</span> : null;
+  // 空きの行（申請書で箇所を入れたときの手すり・ブラケット・施工費などの行。railSlots.ts）は空白の行のまま。名前（「（手すり）」）は出さない
+  // （ユーザーの指示「うっすら手すり、ブラケットなど、記載してあるが、誤解をまねくため、不要」2026-11-03。前は見積書の画面に薄い字で出していた）。
+  // 印は data-slot だけ（見えない。ブラウザのテスト用）
+  const open = editable && !text && slot;
   return (
-    <td className={cls} style={f ? fitCss(f) : undefined} {...ed(editable, edit)} {...(hint ? {'data-slot': slot} : {})}>
-      {f ? fitBody(f) : hint ?? text}
+    <td className={cls} style={f ? fitCss(f) : undefined} {...ed(editable, edit)} {...(open ? {'data-slot': slot} : {})}>
+      {f ? fitBody(f) : text}
     </td>
   );
 }

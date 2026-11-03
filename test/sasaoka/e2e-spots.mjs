@@ -165,7 +165,7 @@ await ask.waitFor({state: 'detached'});
 assert.ok(!(await entranceRow().innerText()).includes('BD-132'));
 // 見積書の行だけ消したあとは、申請書で入れたときの空きの行（（ブラケット）（施工費）。railSlots.ts）が残る。空きの行は聞かずに消え、
 // 最後の空白の行の ✕ で聞く：「見積書の行だけ消す」は出さない → 申請書からも削除
-const slotTexts = () => sheet.locator('[data-slot]').evaluateAll((els) => els.map((e) => e.textContent));
+const slotTexts = () => sheet.locator('[data-slot]').evaluateAll((els) => els.map((e) => `（${e.getAttribute('data-slot')}）`));
 const slotsBefore = await slotTexts(); // 上の階段にも空きの行が残っている（玄関は最後の2つ）
 assert.deepEqual(slotsBefore.slice(-2), ['（ブラケット）', '（施工費）']);
 await entranceRow().locator('[data-edit$=":text"]').first().click({timeout: 2000}).catch(() => sheet.locator('textarea.sheet-input').click()); // 選んでいる欄は上の入力欄を押す

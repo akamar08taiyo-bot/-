@@ -222,7 +222,7 @@ export function describeKey(job: Job, key: string, rates: EstimateRates): string
     const names = rows.slice(head, workEnd(rows, head)).map((x) => x.name.trim()).filter((x) => x && x !== '同上施工費' && x !== '施工費');
     const after = head > 0 && rows[head - 1].kind === 'material' && !isBlankRow(rows[head - 1]);
     what = `${after ? '同上施工費' : '施工費'}${names.length ? `（${names.join('・')}）` : ''}`;
-  } else what = isBlankRow(r) ? (r.slot ? `${r.slot}（空き）` : '空白の行') : short((r.estText ?? materialText(r)).replace(/\s+/g, ' ').trim());
+  } else what = isBlankRow(r) ? '空白の行' : short((r.estText ?? materialText(r)).replace(/\s+/g, ' ').trim());
   const name = kind === 'excl' ? '介護保険の対象／対象外' : FIELD_NAMES[field] ?? '';
   return [placeName(found.place), what, name].filter(Boolean).join(' ／ ');
 }

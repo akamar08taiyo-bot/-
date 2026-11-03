@@ -11,7 +11,7 @@ import {estimateTotals, isBlankRow} from './calc.ts';
 import type {EstimateRates, EstimateSettings} from './calc.ts';
 import {careAmounts} from './careLines.ts';
 import {BASE_PLATE} from './cutLink.ts';
-import {circled, eraOf, INSURER_INFO, jobInsurer, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa, shinseiKindNames} from './estimateForms.ts';
+import {circled, eraOf, formLines, INSURER_INFO, jobInsurer, KINDS, lineNote, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa, shinseiKindNames} from './estimateForms.ts';
 import {insurerNoOf} from './insurerNumbers.ts';
 import {readyLengths} from './railSlots.ts';
 import {clampOff, clampScale, normRot} from './photoEdit.ts';
@@ -83,6 +83,28 @@ export type ShinseiSheet = {
   links?: {ref: string; field: string}[]; // プレビューで押すと一覧のその項目へ行く欄（上の欄のほかに。理由書だけの項目）
   // 書いたときだけ字を大きくする欄（委任状の保険給付額。cell の字を pt に、rows の行の高さ [行, pt] を変える）
   enlarge?: {cell: string; pt: number; rows: [number, number][]};
+  // 見積書の明細を1行ずつ書く表（飯塚市の内訳書）：first 行から perPage 行×pages ページ。cols は欄の列。使わない行は隠す（1ページ分は残す）
+  lines?: {first: number; perPage: number; pages: number; cols: Record<keyof SheetLine, string>};
+};
+
+/**
+ * 内訳書の1行（飯塚市の内訳書。見積書の明細と小計・諸経費・消費税・合計）：改修場所・改修の種類（様式の番号つき）・内容（（材）（手））・
+ * 数量・単位・単価・金額、写真番号、介護保険対象の改修の種類・数量・単位・金額、備考（定価等）。数のない欄は ''
+ */
+export type SheetLine = {
+  place: string;
+  kind: string;
+  text: string;
+  qty: CellValue;
+  unit: string;
+  price: CellValue;
+  amount: CellValue;
+  photo: string;
+  tkind: string;
+  tqty: CellValue;
+  tunit: string;
+  tamount: CellValue;
+  note: string;
 };
 
 /** 申請書の画面で入れた項目の文字（書き方の {名前} に入れる値） */
@@ -662,7 +684,8 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
   //   介護支援専門員等は被保険者証の居宅介護支援事業所（理由書作成者と同じ）、理由書作成者は「同左：■」。改修予定費用は見積書と同じ金額。
   //   着工予定日・完成予定日は「日程が未確定の場合も、予定日を記載」。負担割合の□を■。
   //   申請者の署名（氏名）は「必ず手書き…パソコン打ちは不可」なので書かない（事前承認申請書は住所・電話番号だけ。支給申請書は「※本人自書」なので電話番号だけ）。
-  //   支払い方法（償還払い・受領委任払い）と受領委任払い取扱事業所登録番号は書かない（登録しているかは営業所ごと。手で）。個人番号・口座も書かない。
+  //   支払い方法は「■ 受領委任払い」（事前承認申請書 AN17・支給申請書 AN20）、支給申請書の（支払方法）は「２．受領委任払い」を丸
+  //   （ユーザーの答え「久留米　支払い　受領委任払い」2026-11-03。前は書かなかった）。受領委任払い取扱事業所登録番号は聞いていないので空のまま（手で）。個人番号・口座も書かない。
   // 保険者番号 402032 は原本に印刷してある。理由書は国の様式（理由書のタブ）、工事費内訳書は「参考様式」なので見積書のタブ。
   kurume: {
     title: '久留米市申請書',
@@ -673,6 +696,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
         insuredNo: boxes2('AN', 10, 5),
         marks: [ERA('J6')],
         kindRows: KURUME_KIND_ROWS(13),
+        checks: ['AN17'], // 支払い方法の「□ 受領委任払い」
         texts: [
           T('J3', '{kana}'),
           T('J6', ' 明・大・昭　{y}年{m}月{d}日{age}'),
@@ -699,8 +723,9 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
         sheet: '支給申請書',
         name: 'J6',
         insuredNo: boxes2('AN', 10, 6),
-        marks: [ERA('J8')],
+        marks: [ERA('J8'), FIXED('B56', ['１．口座', '２．受領委任払い', '３．現金', '４．公金受取口座'], 1)],
         kindRows: KURUME_KIND_ROWS(16),
+        checks: ['AN20'], // 支払い方法の「□ 受領委任払い」
         texts: [
           T('J4', '{kana}'),
           T('J8', ' 明・大・昭　{y}年{m}月{d}日{age}'),
@@ -770,6 +795,17 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
         ],
       },
       {sheet: '承諾書', name: 'D12', texts: [T('D10', '{address}')]},
+      // 内訳書（6788.xls。ユーザーの答え「内訳書はいります」2026-11-03）：見積書の明細を6行目から（15行×4ページ。`sheetLines`）。施工業者名は設定の会社・営業所
+      {
+        sheet: '内訳書',
+        texts: [T('K3', '施工業者名\n{builder}')], // 見出しの下（下線のすぐ上）に会社・営業所
+        lines: {
+          first: 6,
+          perPage: 15,
+          pages: 4,
+          cols: {place: 'B', kind: 'C', text: 'D', qty: 'E', unit: 'F', price: 'G', amount: 'H', photo: 'I', tkind: 'J', tqty: 'K', tunit: 'L', tamount: 'M', note: 'N'},
+        },
+      },
       {sheet: '平面図', name: 'C2', nameFormat: '{name}', legend: {box: 'C54:AQ68'}, plan: 'C8:AQ52'},
       ...IIZUKA_PHOTO_SHEETS.slice(0, 5),
       {
@@ -844,6 +880,7 @@ export type ShinseiValues = {
   photoImages?: Record<number, PhotoImages>; // 写真番号 → 写真貼付用紙に貼る写真（Excel に保存するときだけ。画面のプレビューは写真を別に重ねる）
   planImage?: PhotoImage; // 平面図の図（Excel に保存するときだけ。画面のプレビューは図を別に重ねる）
   riyu?: RiyuValues; // 理由書だけの欄（理由書のシートに書く）
+  lines?: SheetLine[]; // 見積書の明細（飯塚市の内訳書。sheetLines）
 };
 
 /** 写真貼付用紙に貼る写真（JPEG のバイト列と、縦横の画素） */
@@ -1077,8 +1114,10 @@ export function workText(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'plateLength'
  * Ｌ＝600mmのみでよい」2026-11-01。前は申請書の改修の内容と同じ「手すりの取り付け　L=800mm H=800mm」）
  */
 export function photoNoteAuto(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'plateLength' | 'shinseiText'>): string[] {
+  // 手すりの長さは「手すり　L=600mm」（下のベースプレートの行「ベースプレート　L=800mm」と同じ書き方。ユーザーの指示「手すり　L＝６００ｍｍ　ベースプレート　Ｌ＝８００ｍｍ
+  // のような記載方法にする」2026-11-03。前は「L=600mm」だけで、何の長さか分かりにくかった）
   const dims = p.kind === 1 ? dimsText({...p, dims: {...p.dims, h: ''}}) : dimsText(p);
-  return [dims, plateText(p), p.shinseiText?.trim() ?? ''].filter(Boolean);
+  return [p.kind === 1 && dims ? `手すり　${dims}` : dims, plateText(p), p.shinseiText?.trim() ?? ''].filter(Boolean);
 }
 
 /**
@@ -1307,7 +1346,99 @@ export function shinseiValues(job: Job, s: EstimateSettings & BuilderSettings, t
     cost,
     start: info.start,
     end: info.end,
+    ...(jobInsurer(job) === 'iizuka' ? {lines: sheetLines(job, s)} : {}),
   };
+}
+
+// ---------------------------------------------------------------- 飯塚市の内訳書（見積書の明細を1行ずつ）
+// ユーザーの答え「内訳書はいります」（2026-11-03。飯塚市の「内訳書　様式」6788.xls。前は見積書のタブの表だけ）。
+// 様式の注意書き「材料費（原則部材ごと）と施工費を工事項目毎に明記」「改修箇所・改修の種類欄は番号を記入」のとおり、見積書（印刷と同じ行）を1行ずつ：
+// 改修場所は「①玄関」〜「⑩その他」の番号と名前、改修の種類は「①手すり」〜「⑥付帯工事」、内容は「（材）」「（手）」を頭に、全体分の数量・単位・単価・金額、
+// 写真番号、介護保険の対象なら左記のうち介護保険対象工事の改修の種類・数量・単位・金額、備考は定価等。明細のあとに小計・諸経費・消費税・合計の行（見積書と同じ金額）
+
+/** 飯塚市の内訳書の改修場所の番号（様式の見出し「①玄関②廊下　③居間④寝室　⑤台所⑥脱衣室　⑦浴室⑧トイレ　⑨屋外⑩その他」） */
+const IIZUKA_PLACES: [number, RegExp][] = [
+  [9, /屋外|道路|アプローチ|庭|門|外構|駐車|ポーチ/],
+  [1, /玄関/],
+  [2, /廊下/],
+  [3, /居間|居室|リビング|食堂/],
+  [4, /寝室/],
+  [5, /台所|キッチン/],
+  [6, /脱衣|洗面/],
+  [7, /浴室|風呂/],
+  [8, /トイレ|便所/],
+];
+export function iizukaPlace(name: string): string {
+  const n = name.normalize('NFKC').trim();
+  const no = IIZUKA_PLACES.find(([, re]) => re.test(n))?.[0] ?? 10;
+  return `${circled(no)}${n}`;
+}
+/** 飯塚市の内訳書の改修の種類（様式の見出し。③滑り防止＝床材の変更） */
+const IIZUKA_KINDS = ['①手すり', '②段差解消', '③滑り防止', '④引き戸等へ', '⑤洋式便器', '⑥付帯工事'];
+
+/** 内訳書の行：見積書（印刷と同じ行。空白の行はのぞく）と、小計・諸経費・消費税・合計。見積書に行がなければ [] */
+export function sheetLines(job: Job, s: EstimateSettings): SheetLine[] {
+  const lines = formLines(job, {...s, estimateHourRate: 0}, 'yukuhashi').filter((l) => !l.blank);
+  if (lines.length === 0) return [];
+  const names = new Map(job.places.map((p) => [p.id, p.name]));
+  const out: SheetLine[] = lines.map((l) => {
+    const open = !l.isWork && l.qty === 0; // 数を入れていない部材（数量・金額は書かない）
+    const qty: CellValue = open ? '' : l.qty;
+    const amount: CellValue = open ? '' : l.amount;
+    const kind = IIZUKA_KINDS[l.kind - 1] ?? '';
+    const target = !l.excluded;
+    return {
+      place: iizukaPlace(names.get(l.placeId) ?? l.placeName),
+      kind,
+      text: `${l.isWork ? '（手）' : '（材）'}${l.text.replace(/\s*\n\s*/g, ' ')}`,
+      qty,
+      unit: l.unit,
+      price: l.unitPrice,
+      amount,
+      photo: l.photo > 0 ? circled(l.photo) : '',
+      tkind: target ? kind : '',
+      tqty: target ? qty : '',
+      tunit: target ? l.unit : '',
+      tamount: target ? amount : '',
+      note: lineNote(l, 'yukuhashi', 0).join('\n'), // 切って使う部材は「定価20,000円（4m）×0.8」と「600mm÷4000mm＝0.15」の2行
+    };
+  });
+  const t = estimateTotals(job, s);
+  const sum = (text: string, all: number, target: number): SheetLine => ({
+    place: '', kind: '', text, qty: '', unit: '', price: '', amount: all, photo: '', tkind: '', tqty: '', tunit: '', tamount: target, note: '',
+  });
+  out.push(sum('小計', t.all.subtotal, t.target.subtotal), sum('諸経費', t.all.overhead, t.target.overhead), sum('消費税', t.all.tax, t.target.tax), sum('合計', t.all.total, t.target.total));
+  return out;
+}
+
+/** 内訳書の表の行の値（番地 → 値）と、見せる行の数（ページの行の数ずつ。1ページ分は残す） */
+function sheetLineCells(sheet: ShinseiSheet, v: ShinseiValues): {cells: Map<string, CellValue>; shown: number} {
+  const cells = new Map<string, CellValue>();
+  const t = sheet.lines;
+  if (!t) return {cells, shown: 0};
+  const cap = t.perPage * t.pages;
+  const lines = (v.lines ?? []).slice(0, cap);
+  lines.forEach((line, i) => {
+    for (const [key, col] of Object.entries(t.cols) as [keyof SheetLine, string][]) {
+      const value = line[key];
+      if (value !== '') cells.set(`${col}${t.first + i}`, value);
+    }
+  });
+  const shown = Math.min(cap, Math.max(1, Math.ceil(lines.length / t.perPage)) * t.perPage);
+  return {cells, shown};
+}
+
+/** 行を隠す（from〜to 行。内訳書の使わない行） */
+function hideRows(files: Files, sheet: string, from: number, to: number): void {
+  const path = sheetPaths(files).get(sheet);
+  if (!path || !files[path] || from > to) return;
+  const xml = strFromU8(files[path]).replace(/<row\b[^>]*?\br="(\d+)"[^>]*>/g, (tag, r: string) => {
+    const n = Number(r);
+    if (n < from || n > to) return tag;
+    const clean = tag.replace(/\shidden="[^"]*"/, '');
+    return clean.replace(/^<row\b/, '<row hidden="1"');
+  });
+  files[path] = strToU8(xml);
 }
 
 /** この保険者の申請書で丸で囲む項目（申請書を作るときに選んでもらう） */
@@ -1512,6 +1643,7 @@ export function shinseiCells(sheet: ShinseiSheet, v: ShinseiValues, photo = 0): 
   if (sheet.photoPlace?.place) out.set(sheet.photoPlace.place, (photo > 0 && v.photos[photo]) || '');
   if (sheet.photoPlace?.kind) out.set(sheet.photoPlace.kind, photo > 0 && v.photos[photo] !== undefined ? ((v.kindTexts ?? KINDS)[(v.photoKinds?.[photo] ?? 0) - 1] ?? '') : '');
   if (sheet.legend?.cell) out.set(sheet.legend.cell, v.works.join('\n'));
+  for (const [ref, value] of sheetLineCells(sheet, v).cells) out.set(ref, value);
   for (const t of sheet.texts ?? []) {
     const keys = placeholders(t.format);
     // 何も入れていなければ原本の文字のまま（「本人との関係（　　　）」など）
@@ -1683,6 +1815,11 @@ export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void
     if (sheet.riyu && v.riyu) for (const [ref, text] of riyuSheetCells(files, sheet, v.riyu)) cells.set(ref, text);
     hangCells(files, sheet, cells);
     writeCells(files, sheet.sheet, cells);
+    if (sheet.lines) {
+      const {shown} = sheetLineCells(sheet, v);
+      const last = sheet.lines.first + sheet.lines.perPage * sheet.lines.pages - 1;
+      hideRows(files, sheet.sheet, sheet.lines.first + shown, last);
+    }
     wrapKinds(files, sheet, v);
     fitLines(files, sheet, v);
     packKindCells(files, sheet, v);

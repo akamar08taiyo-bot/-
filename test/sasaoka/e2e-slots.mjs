@@ -65,14 +65,15 @@ log('申請書：手すりの種類（木手すり・既製品・屋外で高さ
 await page.getByRole('tab', {name: '📋 工事見積書'}).click();
 const sheet = page.getByRole('region', {name: '見積書', exact: true});
 await sheet.waitFor();
-const slotTexts = () => sheet.locator('[data-slot]').evaluateAll((els) => els.map((e) => e.textContent));
+const slotTexts = () => sheet.locator('[data-slot]').evaluateAll((els) => els.map((e) => `（${e.getAttribute('data-slot')}）`));
 assert.deepEqual(await slotTexts(), ['（手すり）', '（ブラケット）', '（施工費）', '（材料費）', '（施工費）', '（支柱）', '（手すり）', '（ブラケット）', '（施工費）']);
 await page.screenshot({path: path.join(outDir, 'slots-02-estimate.png')});
 log('見積書：廊下 手すり・ブラケット・施工費／トイレ 材料費・施工費／玄関～道路 支柱・手すり・ブラケット・施工費 OK');
 
 // ---------------- 空きの行を選んで部材リスト：検索は「ブラケット」・その行に入る
 await sheet.locator('[data-slot="ブラケット"]').first().click();
-assert.match(await sheet.getByLabel('選んでいる欄', {exact: true}).innerText(), /ブラケット（空き）/);
+assert.equal(await sheet.locator('[data-slot]').first().innerText(), ''); // 名前（「（手すり）」など）は見せない
+assert.match(await sheet.getByLabel('選んでいる欄', {exact: true}).innerText(), /空白の行/);
 await sheet.getByRole('button', {name: '📋 部材リストから入れる'}).click();
 const dlg = page.getByRole('dialog');
 assert.equal(await dlg.getByPlaceholder(/商品名・品番で検索/).inputValue(), 'ブラケット');

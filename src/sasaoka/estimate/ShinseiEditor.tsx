@@ -928,19 +928,8 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
                       {/* 手すりの長さは必須（入っていなければ薄い黄色。入れなければ見積書の使う長さ＝薄い字を書く）、高さは任意で ＋ を押すと開いて入れる
                           （ユーザーの指示「手すりの取り付けの高さが任意、長さは必須。手すりの取り付けの高さも、プラスで開いてから入力できるようにする。（任意）」2026-10-26） */}
                       {dim('l', '長さ', {wide: true, placeholder: estimateLength(p), missing: !p.dims?.l?.trim() && !estimateLength(p)})}
-                      {showHeight ? (
-                        <span className="inline-flex items-center gap-0.5">
-                          {dim('h', '高さ', {optional: true, autoFocus: opened === `${p.id}:h`})}
-                          <button type="button" onClick={() => closeField(`${p.id}:h`, '高さ', p.dims?.h ?? '', () => setDim(p.id, 'h', ''))} className={closeBtn} aria-label="高さを閉じる" title="高さを閉じる（入れた高さは消えます）">
-                            ✕
-                          </button>
-                        </span>
-                      ) : (
-                        <button type="button" onClick={() => openField(`${p.id}:h`)} className={plusBtn}>
-                          ＋ 高さ（任意）
-                        </button>
-                      )}
-                      {/* ベースプレートの長さ（入れると見積書のベースプレートの長さ・金額に。空なら手すりと同じ長さ）。薄い字は見積書のいまの長さ */}
+                      {/* ベースプレートの長さ（入れると見積書のベースプレートの長さ・金額に。空なら手すりと同じ長さ）。薄い字は見積書のいまの長さ。
+                          長さのすぐ横（ユーザーの指示「長さの横はベースプレートを持ってくる」2026-11-03。前は高さのうしろ） */}
                       {showPlate ? (
                         <span className="inline-flex items-center gap-0.5">
                           <Dim
@@ -964,6 +953,18 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
                       ) : (
                         <button type="button" onClick={() => openPlate(p)} className={plusBtn}>
                           ＋ ベースプレート
+                        </button>
+                      )}
+                      {showHeight ? (
+                        <span className="inline-flex items-center gap-0.5">
+                          {dim('h', '高さ', {optional: true, autoFocus: opened === `${p.id}:h`})}
+                          <button type="button" onClick={() => closeField(`${p.id}:h`, '高さ', p.dims?.h ?? '', () => setDim(p.id, 'h', ''))} className={closeBtn} aria-label="高さを閉じる" title="高さを閉じる（入れた高さは消えます）">
+                            ✕
+                          </button>
+                        </span>
+                      ) : (
+                        <button type="button" onClick={() => openField(`${p.id}:h`)} className={plusBtn}>
+                          ＋ 高さ（任意）
                         </button>
                       )}
                     </>

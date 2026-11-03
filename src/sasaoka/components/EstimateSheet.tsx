@@ -11,7 +11,7 @@
 // 日本語入力（IME）がそのまま使えるように、選んだ欄の上にいつも見えない入力欄を置いておき、打ち始めたら見えるようにする。
 
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import type {ChangeEvent, ClipboardEvent as ReactClipboardEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode} from 'react';
+import type {ChangeEvent, ClipboardEvent as ReactClipboardEvent, CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode} from 'react';
 import {startEstimate} from '../calc.ts';
 import {circled, KINDS, materialText} from '../estimateForms.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
@@ -727,6 +727,17 @@ export function EstimateSheet({
     }
   };
 
+  // 見積書の左のボタンは、明細の1行目（「手すりの取り付け　①廊下」）と同じ高さから（ユーザーの指示「部材リストや施工リストは、手すり取り付け①廊下や
+  // ②台所と同じ高さにもってくる」2026-11-03。前は見積書の上の端からで、表題・宛名の横にあった）。広い画面（ボタンが見積書の左に並ぶとき）だけ
+  const [toolTop, setToolTop] = useState(0);
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    const first = innerRef.current?.querySelector<HTMLElement>('tr[data-rows], tr[data-new]');
+    if (!el || !first) return;
+    const top = Math.max(0, Math.round(first.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - 8));
+    if (top !== toolTop) setToolTop(top);
+  });
+
   // ---------------------------------------------------------------- 見積書の左のボタン（部材・施工費を入れる・選んでいる行の挿入・削除・コピー・貼付）
   // 押しても見積書の欄の選択を外さない（打ち込んでいる欄・選んでいる行のまま）
   const keepSel = (e: ReactMouseEvent) => e.preventDefault();
@@ -855,7 +866,12 @@ export function EstimateSheet({
       </div>
       <div className="flex flex-col lg:flex-row">
       {/* 見積書の左のボタン：部材・施工費を入れる（選んでいる箇所に）・行の挿入・削除・コピー・貼付（選んでいる行に）。広い画面では見積書を下へ動かしてもついてくる */}
-      <div className="sheet-side flex shrink-0 flex-wrap gap-2 border-b border-slate-200 bg-slate-50 p-2 lg:sticky lg:top-2 lg:w-60 lg:flex-col lg:self-start lg:border-b-0 lg:border-r" role="toolbar" aria-label="見積書の左のボタン">
+      <div
+        className="sheet-side flex shrink-0 flex-wrap gap-2 border-b border-slate-200 bg-slate-50 p-2 lg:sticky lg:top-2 lg:mt-[var(--tool-top)] lg:w-60 lg:flex-col lg:self-start lg:border-b-0 lg:border-r"
+        style={{'--tool-top': `${toolTop}px`} as CSSProperties}
+        role="toolbar"
+        aria-label="見積書の左のボタン"
+      >
         <button type="button" className="sheet-tool tool-material" onMouseDown={keepSel} onClick={() => onPickMaterial(place?.id ?? null, row?.id ?? null)}>
           📋 部材リストから入れる
         </button>

@@ -94,9 +94,9 @@ test('部材リストの検索の言葉：ブラケット・支柱・ベース�
   assert.equal(slotQuery(undefined), '');
 });
 
-test('選んでいる欄の名前：空きの行は「手すり（空き）」', () => {
+test('選んでいる欄の名前：空きの行も「空白の行」（手すりなどの名前は出さない。ユーザーの指示「誤解をまねくため、不要」2026-11-03）', () => {
   const p = withSlots(newPlace('廊下'));
-  assert.match(describeKey(job([p]), `line:${p.rows[0].id}:text`, S), /手すり（空き）/);
+  assert.match(describeKey(job([p]), `line:${p.rows[0].id}:text`, S), /空白の行/);
 });
 
 test('挿入で行が入る所：部材の行を選ぶと、すぐ下の施工費のまとまりの下', () => {

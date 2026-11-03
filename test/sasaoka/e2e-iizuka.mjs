@@ -38,8 +38,9 @@ await pageOf('事前承認願書').waitFor();
 await page.waitForTimeout(800);
 const names = await preview.getByRole('group').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
 // 申請書（事前承認願書・承諾書・支給申請書・請求書）が先、平面図、写真番号ごとに事前申請用・支給申請用の写真の用紙（箇所のある番号だけ）
-assert.deepEqual(names.slice(0, 5), ['事前承認願書', '承諾書', '支給申請書', '請求書', '平面図'], names.join(','));
-assert.deepEqual(names.slice(5, 7), ['事前写真①', '支給写真①'], names.join(','));
+// 内訳書（ユーザーの答え「内訳書はいります」2026-11-03）は承諾書のうしろ
+assert.deepEqual(names.slice(0, 6), ['事前承認願書', '承諾書', '内訳書', '支給申請書', '請求書', '平面図'], names.join(','));
+assert.deepEqual(names.slice(6, 8), ['事前写真①', '支給写真①'], names.join(','));
 const rowLabels = async () => (await form.locator(':scope > div[data-field] > div:first-child').allInnerTexts()).map((t) => t.replace(/\s*（ひらがなで入力してもカタカナになります）$/, ''));
 assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '住宅改修の利用', '今回の改修費用（介護保険対象分）', '住宅改修が必要な理由書作成者', '着工日・完成日', '負担割合']);
 await pageOf('事前承認願書').screenshot({path: path.join(outDir, 'iizuka-1-jizen.png')});
@@ -57,6 +58,7 @@ await form.getByLabel('完成日').fill('2026-11-12');
 }
 await page.waitForTimeout(1200);
 await pageOf('請求書').screenshot({path: path.join(outDir, 'iizuka-3-seikyu.png')});
+await pageOf('内訳書').screenshot({path: path.join(outDir, 'iizuka-4-uchiwake.png')});
 const [dl] = await Promise.all([page.waitForEvent('download'), excelSave(page)]);
 const file = path.join(outDir, 'iizuka-shinsei.xlsx');
 await dl.saveAs(file);
@@ -74,8 +76,17 @@ assert.match(text(a, 'G32'), /^太陽シルバーサービス/);
 const b = '支給申請書';
 assert.deepEqual([text(b, 'D16'), text(b, 'S16'), text(b, 'D10')], ['令和8年11月10日', '令和8年11月12日', '■']);
 assert.match(text('請求書', 'J9'), /^￥[\d,]+　円也$/);
-assert.equal(sheets.size, 15);
-log('Excel（事前承認願書・支給申請書・請求書）OK');
+assert.equal(sheets.size, 16);
+// 内訳書：見積書の明細（サンプルの玄関・トイレ）を1行ずつ、（材）（手）、最後に小計〜合計。使わない行は隠す
+const u = '内訳書';
+assert.match(text(u, 'B6'), /^①玄関/);
+assert.match(text(u, 'D6'), /^（材）/);
+const dTexts = [...Array(60)].map((_, i) => text(u, `D${6 + i}`));
+const total = dTexts.indexOf('合計');
+assert.ok(total > 3 && dTexts.slice(total - 3, total).join(',') === '小計,諸経費,消費税', dTexts.join('|'));
+assert.ok(dTexts.some((t) => t.startsWith('（手）')), '施工費の行がない');
+assert.match(new RegExp('<row\\b[^>]*\\br="21"[^>]*>').exec(sheets.get(u))?.[0] ?? '', /hidden="1"/);
+log('Excel（事前承認願書・支給申請書・請求書・内訳書）OK');
 
 await page.setViewportSize({width: 390, height: 844});
 await page.waitForTimeout(500);
