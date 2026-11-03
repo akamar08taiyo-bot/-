@@ -126,7 +126,7 @@ function JobTabs({view, onView, cls}: {view: JobView; onView: (v: JobView) => vo
 }
 
 /**
- * 画面の上の帯の右の隅の「☰ メニュー ▼」：見積もり・申請書を作成する（一覧・新規作成）・売上見込みを確認する・工務店請求書を確認する・部材・施工費マスタ・設定・ゴミ箱
+ * 画面の上の帯の左の端（「← 業務アプリポータルへ戻る」の真下）の「☰ メニュー ▼」：見積もり・申請書を作成する（一覧・新規作成）・売上見込みを確認する・工務店請求書を確認する・部材・施工費マスタ・設定・ゴミ箱
  * （ユーザーの指示「売上見込みを確認する、工務店請求書、部材・施工費マスタ、設定、ゴミ箱は、プルダウンにして右隅におく」2026-11-03。前は帯に6つのタブ）。
  * 押す・外を押す・Esc で閉じる。ゴミ箱に入っている件数はメニューのボタンにも出す
  */
@@ -149,9 +149,9 @@ function NavMenu({tab, onTab, trashCount, top = false}: {tab: MainTab; onTab: (t
     };
   }, [open]);
   return (
-    // top：様邸のタブ（5つ）を出しているとき、携帯・タブレットの縦（md 未満）は、タブの上の段の右に（タブの横に並べると、タブの幅が狭くなって
-    // 「住宅改修申請書」などがはみ出した）。様邸を開いていないとき（タブ1〜2つ）は、今までどおり同じ段の右
-    <div ref={ref} className={`relative ml-auto shrink-0 self-center lg:self-start lg:pt-1.5 ${top ? 'max-md:order-first' : ''}`}>
+    // 帯の左の端（「← 業務アプリポータルへ戻る」の真下）。top：様邸のタブ（5つ）を出しているとき、携帯・タブレットの縦（md 未満）は、タブの上の段に1つだけ
+    // （タブの横に並べると、タブの幅が狭くなって「住宅改修申請書」などがはみ出した）
+    <div ref={ref} className={`relative shrink-0 self-center lg:self-start lg:pt-1.5 ${top ? 'max-md:w-full' : ''}`}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -166,7 +166,7 @@ function NavMenu({tab, onTab, trashCount, top = false}: {tab: MainTab; onTab: (t
       <div
         role="menu"
         aria-label="メニュー"
-        className={`${open ? 'grid' : 'hidden'} absolute right-0 top-full z-40 mt-1 w-max min-w-[16rem] gap-1 rounded-xl border border-slate-200 bg-white p-2 text-slate-800 shadow-2xl`}
+        className={`${open ? 'grid' : 'hidden'} absolute left-0 top-full z-40 mt-1 w-max min-w-[16rem] gap-1 rounded-xl border border-slate-200 bg-white p-2 text-slate-800 shadow-2xl`}
       >
         {TABS.map((t) => (
           <button
@@ -513,9 +513,11 @@ export default function App({start}: {start: MainTab}) {
             </div>
           </div>
           {/* 上の帯のタブ：様邸を開いているときは 住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書（JobTabs）、ほかは「見積もり・申請書を作成する」と
-              いま開いている画面。売上見込み・工務店請求書・部材・施工費マスタ・設定・ゴミ箱は右の隅の「☰ メニュー ▼」（ユーザーの指示「メインタブが二つある為、わかりづらい…
+              いま開いている画面。売上見込み・工務店請求書・部材・施工費マスタ・設定・ゴミ箱は左の端の「☰ メニュー ▼」（ユーザーの指示「メインタブが二つある為、わかりづらい…
               プルダウンにして右隅におく」2026-11-03。前は帯に6つのタブ、様邸のタブはその下の白い枠）。字は大きく・高く（「タブももう少し大きく見やすくする」2026-10-25） */}
           <nav aria-label="画面" className={`mx-auto flex ${PAGE_WIDTH} items-start gap-1.5 px-3 pb-3 lg:pb-0 ${jobOpen ? 'max-md:flex-wrap' : ''}`}>
+            {/* 「☰ メニュー ▼」は左の端（「← 業務アプリポータルへ戻る」の真下。ユーザーの指示「メニューは太陽ポータルに戻るの下左上にもってくる」2026-11-03。前は右の隅） */}
+            <NavMenu tab={tab} onTab={goTab} trashCount={trashCount} top={jobOpen} />
             {jobOpen ? (
               <JobTabs view={jobView} onView={(v) => leaveTokutei(() => setJobView(v))} cls={tabCls} />
             ) : (
@@ -530,7 +532,6 @@ export default function App({start}: {start: MainTab}) {
                 )}
               </div>
             )}
-            <NavMenu tab={tab} onTab={goTab} trashCount={trashCount} top={jobOpen} />
           </nav>
         </header>
 

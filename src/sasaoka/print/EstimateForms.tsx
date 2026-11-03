@@ -83,6 +83,7 @@ const PICK = (
     <button type="button" tabIndex={-1} data-pick="kit" className="pick-kit" aria-label="＋ 部材＋施工費（常用）から入れる" title="部材＋施工費（常用）から入れる">
       常用
     </button>
+    {/* 右の薄い矢印と「項目から選ぶ か 品番を入力」は、表の外の重ね（EstimateSheet.tsx の guides）。表の中に置くと、右の欄の罫線が字の上に描かれた */}
   </span>
 );
 

@@ -219,6 +219,25 @@ export function EstimateSheet({
     if (!box || Object.keys(next).some((k) => next[k as keyof Box] !== box[k as keyof Box])) setBox(next);
   });
 
+  // 空いた行の「部材｜施工費｜常用」の右の薄い矢印と案内の位置（選んでいる行は緑の pickHint を出すので除く）。
+  // 表の中に置くと右の欄の罫線（border-collapse）が字の上に描かれるので、選んだ欄の枠と同じく表の外に重ねる
+  const [guides, setGuides] = useState<{x: number; y: number; h: number}[]>([]);
+  useLayoutEffect(() => {
+    const inner = innerRef.current;
+    if (!inner) return;
+    const b = inner.getBoundingClientRect();
+    const next = [...inner.querySelectorAll<HTMLElement>('.sheet-pick')]
+      .filter((el) => !el.closest('tr')?.hasAttribute('data-current'))
+      .map((el) => {
+        // 横は「常用」のすぐ右、縦は行の高さいっぱい（上下の罫線の内側。字の上下に右の欄の縦の線がのぞかないように）
+        const r = el.getBoundingClientRect();
+        const row = el.closest('td')?.getBoundingClientRect() ?? r;
+        const round = (v: number) => Math.round(v * 10) / 10;
+        return {x: round((r.right - b.left) / scale + 6), y: round((row.top - b.top) / scale + 1), h: round(row.height / scale - 2)};
+      });
+    if (JSON.stringify(next) !== JSON.stringify(guides)) setGuides(next);
+  });
+
   // 選んだ欄を見えるところに出し、入力欄に文字が入るようにする（見積書の外の入力欄で打っているときは、そちらのまま）
   useEffect(() => {
     const el = findCell(sel);
@@ -1011,6 +1030,11 @@ export function EstimateSheet({
           <div ref={innerRef} className="relative" style={{width: PAGE_W, transform: `scale(${scale})`, transformOrigin: 'top left'}}>
             {form === 'kouiki' ? <KouikiForm job={job} settings={s} sheet={sheetOpts} /> : <YukuhashiForm job={job} settings={s} date={estDate} sheet={sheetOpts} />}
             {box && <div className="sheet-sel" style={{left: box.x, top: box.y, width: box.w, height: box.h}} />}
+            {guides.map((g, i) => (
+              <div key={i} className="sheet-pick-guide" style={{left: g.x, top: g.y, height: g.h}} aria-hidden="true">
+                ← 項目から選ぶ か 品番を入力
+              </div>
+            ))}
             {box && pickHint && (
               // 欄のすぐ右（同じ行の数量・単価・金額の欄。空いた行なので空いている）。前は欄のすぐ下に出していて、下の行の品名を隠した
               <div className="sheet-pick-hint" style={{left: box.x + box.w + 2, top: box.y, height: box.h}} role="note">
