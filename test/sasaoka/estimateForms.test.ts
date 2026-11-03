@@ -22,6 +22,7 @@ import {
   FORM_IDS,
   formLabel,
   officeInsurer,
+  estimateName,
 } from '../../src/sasaoka/estimateForms.ts';
 import {isBlankRow} from '../../src/sasaoka/calc.ts';
 import {manualRow} from '../../src/sasaoka/rows.ts';
@@ -257,4 +258,14 @@ test('空白の行：何も入っていない部材の行（見積書の「＋�
 test('令和の年月日', () => {
   assert.deepEqual(reiwa('2026-10-19'), {y: 8, m: 10, d: 19});
   assert.equal(reiwa(''), null);
+});
+
+test('見積書の品名から大文字の英字だけのシリーズ名（BAUHAUS など4字以上）を外す。メーカー名（TOTO・LIXIL）・品番・色の略号は残す（2026-11-03 の指示）', () => {
+  assert.equal(estimateName('BAUHAUS 35アッシュ丸棒 ディンプル付 φ35×2000mm Mオーク'), '35アッシュ丸棒 ディンプル付 φ35×2000mm Mオーク');
+  assert.equal(estimateName('ＢＡＵＨＡＵＳ　丸棒'), '丸棒'); // 全角も
+  assert.equal(estimateName('TOTO インテリア・バー'), 'TOTO インテリア・バー');
+  assert.equal(estimateName('LIXIL 手すり'), 'LIXIL 手すり');
+  assert.equal(estimateName('HDD7-4000 T LBR ディンプル'), 'HDD7-4000 T LBR ディンプル');
+  const r = {id: 'r', kind: 'material' as const, refId: null, name: 'BAUHAUS セパレートブラケット', code: 'BD-01G', maker: 'マツ六', unit: '個', price: 0, qty: 1, listPrice: 1350, lengthCm: 0, pieceLengthM: 0, estPrice: null, excluded: false, estText: null, estNote: null, estAmount: null};
+  assert.equal(materialText(r), 'マツ六 BD-01G セパレートブラケット');
 });

@@ -151,18 +151,21 @@ await page.getByRole('button', {name: '選び終わったら閉じる'}).click()
 assert.ok((await entranceRow().innerText()).includes('BD-132'));
 const ask = page.getByRole('dialog', {name: '「玄関」は申請書にも入っています'});
 // やめる：何も消えない
-await entranceRow().getByRole('button', {name: /の行を消す$/}).click();
+await entranceRow().locator('[data-edit$=":text"]').first().click({timeout: 2000}).catch(() => sheet.locator('textarea.sheet-input').click()); // 選んでいる欄は上の入力欄を押す
+await sheet.getByRole('toolbar', {name: '見積書の左のボタン'}).getByRole('button', {name: '✕ 削除'}).click(); // 見積書の左の「削除」（2026-11-03）
 await ask.waitFor();
 await page.screenshot({path: path.join(outDir, 'spots-04-delete-ask.png')});
 await ask.getByRole('button', {name: 'やめる'}).click();
 assert.ok((await entranceRow().innerText()).includes('BD-132'));
 // 見積書の行だけ消す：見積書は空白の行、申請書の玄関は残る
-await entranceRow().getByRole('button', {name: /の行を消す$/}).click();
+await entranceRow().locator('[data-edit$=":text"]').first().click({timeout: 2000}).catch(() => sheet.locator('textarea.sheet-input').click()); // 選んでいる欄は上の入力欄を押す
+await sheet.getByRole('toolbar', {name: '見積書の左のボタン'}).getByRole('button', {name: '✕ 削除'}).click(); // 見積書の左の「削除」（2026-11-03）
 await ask.getByRole('button', {name: '見積書の行だけ消す'}).click();
 await ask.waitFor({state: 'detached'});
 assert.ok(!(await entranceRow().innerText()).includes('BD-132'));
 // 空白の行の ✕：「見積書の行だけ消す」は出さない → 申請書からも削除
-await entranceRow().getByRole('button', {name: /の行を消す$/}).click();
+await entranceRow().locator('[data-edit$=":text"]').first().click({timeout: 2000}).catch(() => sheet.locator('textarea.sheet-input').click()); // 選んでいる欄は上の入力欄を押す
+await sheet.getByRole('toolbar', {name: '見積書の左のボタン'}).getByRole('button', {name: '✕ 削除'}).click(); // 見積書の左の「削除」（2026-11-03）
 await ask.waitFor();
 assert.equal(await ask.getByRole('button', {name: '見積書の行だけ消す'}).count(), 0);
 await ask.getByRole('button', {name: '申請書からも削除'}).click();

@@ -37,12 +37,14 @@ const SHINSEI_KINDS: Partial<Record<Insurer, string[]>> = {
   fukuoka: ['手すりの取付け', '段差の解消', '床又は通路面の材料変更', '引き戸等への扉の取替え', '洋式便器等への取替え', '付帯工事'],
   // 久留米市：事前承認申請書・支給申請書の改修の内容の□の見出し
   kurume: ['手すりの取り付け', '段差の解消', '床または通路面材料の変更', '引き戸等への扉の取替', '洋式便所等への便器の取替', '付帯工事'],
+  // 飯塚市：事前承認願書・支給申請書の改修内容の□の見出し（写真添付用紙の工事種別は「①手すりの取付」〜「⑥その他①～⑤に付帯する工事」）
+  iizuka: ['手すりの取付', '段差の解消', '床等の材料の変更', '引き戸等への扉の取替え', '洋式便器等への便器の取替え', '付帯工事'],
 };
 /** 保険者の申請書に書く改修の種類の名前（①〜⑥の順） */
 export const shinseiKindNames = (insurer: Insurer | ''): string[] => (insurer && SHINSEI_KINDS[insurer]) || KINDS;
 
 /** 保険者（申請書を出す先）。苅田町・行橋市・みやこ町は見積書の書式が同じ。申請書は保険者ごとに違う */
-export const INSURER_IDS: Insurer[] = ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu', 'kurume'];
+export const INSURER_IDS: Insurer[] = ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu', 'kurume', 'iizuka'];
 
 export const INSURER_INFO: Record<Insurer, {name: string; form: EstimateForm; area: string}> = {
   kanda: {name: '苅田町', form: 'yukuhashi', area: '苅田町'},
@@ -56,6 +58,8 @@ export const INSURER_INFO: Record<Insurer, {name: string; form: EstimateForm; ar
   kitakyushu: {name: '北九州市', form: 'yukuhashi', area: '北九州市'},
   // 久留米市（2026-11-02）：工事費内訳書は市の「参考様式」なので、見積書は苅田町・行橋市・みやこ町と同じ書式（全体と介護保険の対象部分を並べた表）
   kurume: {name: '久留米市', form: 'yukuhashi', area: '久留米市'},
+  // 飯塚市（2026-11-02）：内訳書は市の様式もあるが、見積書は苅田町・行橋市・みやこ町と同じ書式（全体と介護保険の対象部分を並べた表）
+  iizuka: {name: '飯塚市', form: 'yukuhashi', area: '飯塚市'},
 };
 
 /** 申請書で丸で囲む項目の名前と、選べる値（申請書に並んでいる順） */
@@ -111,6 +115,7 @@ export function insurerForAddress(address: string): Insurer | null {
   if (/福岡市/.test(a)) return 'fukuoka';
   if (/北九州市/.test(a)) return 'kitakyushu';
   if (/久留米市/.test(a)) return 'kurume';
+  if (/飯塚市/.test(a)) return 'iizuka';
   return null;
 }
 
@@ -200,8 +205,25 @@ export function swapPhotoNumbers(places: Place[], a: string, b: string): Place[]
 const shownLines =(place: Pick<Place, 'rows'>, rates: EstimateRates) => estimatePlaceLines(place, rates).filter((l) => l.kind === 'material' || l.amount !== 0);
 
 /** 部材の「内容（規格・範囲）」：メーカー 品番 品名（切って使う部材の長さの計算は備考・算出根拠に書く） */
+/** 英字の名前でも消さないメーカー名（大文字4字以上でも残す） */
+const KEEP_LATIN = new Set(['TOTO', 'LIXIL', 'INAX', 'DAIKEN', 'PANASONIC', 'NAKA', 'KAWAJUN', 'YAMAHA', 'TOSTEM', 'CLEANUP', 'TAKARA']);
+
+/**
+ * 見積書の品名（内容）から、大文字の英字だけのシリーズ名（マツ六の「BAUHAUS」など。4字以上）を外す（ユーザーの指示「BAUHAUS　見積もり名に
+ * このような文字が入っている場合はなくす。見積もりから文字がはみ出ている」2026-11-03）。品番（BD-132・HDD7-4000 のような数字や記号の入ったもの）・
+ * 色の略号（LBR など3字まで）・メーカー名（TOTO・LIXIL など）は残す。部材リストの名前・発注書はそのまま
+ */
+export function estimateName(name: string): string {
+  const words = name.split(/([\s\u3000]+)/);
+  const out = words.filter((w) => {
+    const n = w.normalize('NFKC');
+    return !(/^[A-Z]{4,}$/.test(n) && !KEEP_LATIN.has(n));
+  });
+  return out.join('').replace(/[ \u3000]{2,}/g, ' ').trim();
+}
+
 export function materialText(r: Row): string {
-  const base = [r.maker, r.code, r.name].map((x) => x.trim()).filter(Boolean).join(' ') || '材料費';
+  const base = [r.maker, r.code, estimateName(r.name)].map((x) => x.trim()).filter(Boolean).join(' ') || '材料費';
   return r.lengthCm > 0 && !cutToLength(r) ? `${base}（長さ${num(r.lengthCm)}cm）` : base;
 }
 

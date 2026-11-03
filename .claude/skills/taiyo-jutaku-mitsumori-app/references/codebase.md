@@ -26,7 +26,7 @@ React 19 ＋ TypeScript ＋ Vite（Tailwind）。リポジトリにはほかの�
 | `types.ts` | データの形（Material・LaborItem・Row・Place・Kit・Job・OrderLine・OrderEdits・Settings・Insurer…） |
 | `calc.ts` | 金額の計算（仕切り計算表 ①〜⑦、見積の単価・数量・金額・合計、`isBlankRow`、`cutToLength`、空欄の価格の扱い）。見積書に行があるか `hasEstimateRows`・見積書を書きはじめたとき（見積もり作成日・請求書に入れる）`startEstimate`。⑤ の式の文字 `taxFormula`（「⑦×0.1－1」。画面・印刷で同じ） |
 | `estimateForms.ts` | 見積書の2つの書式に並べる行（`formLines`・`paginate`）、備考の文字（`lineNote`・`cutCalc`）、保険者（`INSURER_INFO`・`jobInsurer`・`jobForm`・`insurerLabel`）、改修の種類の名前（`KINDS`。①は「手すりの取り付け」）、生年月日の元号（`eraOf`。選んでいなければ昭和） |
-| `print/EstimateForms.tsx` | 見積書の書式の描画（印刷と、見積書に直接入力の両方）。行の左のボタン `RowTools`（挿入・✕・コピー／貼付） |
+| `print/EstimateForms.tsx` | 見積書の書式の描画（印刷と、見積書に直接入力の両方）。欄の文字は `.fitbox`（`print/shrinkCells.ts` が出た大きさで測って縮める） |
 | `print/formLayout.ts` | 見積書の列幅・行の高さ（mm）。印刷と Excel 保存で同じ寸法を使う |
 | `print/fit.ts` | 文字の大きさと折り返し：字の幅 `textEm`（半角の英数字・記号は字ごとの幅＝数字 0.63・W/M 約0.93）・`wrapEm`・`fitText`・`fitLines`／`fitLinesPt`（申請書の改修の内容）・`wordLines`（長い商品名を言葉の切れ目で）。4.5pt より小さくなる文字は欄の中で折り返す。見積書の画面・印刷・Excel（`estimateXlsx.ts`）が同じ改行と大きさを使う |
 | `print/PrintView.tsx` | 印刷の画面（請求書・仕切り計算表・見積書・発注書）。A4、狭い画面では縮めて見せる |
@@ -120,9 +120,9 @@ Excelで保存・メールで送付の `tokuteiFiles`（見えない枠の `__ta
 - 選んだ欄の上に見えない textarea を置いて、日本語入力をそのまま使う。打ち始めたら見える。Enter・Tab・矢印・F2・Esc・Delete・Ctrl+Z／Y は `onKeyDown`、
   Ctrl+C／X／V は textarea の `onCopy`／`onCut`／`onPaste`（OS の貼り付けの文字を使うため）。
 - 候補：内容（品名）は部材リスト（★が先）、改修の種類は①〜⑥、改修場所は設定の箇所の名前。欄の「▼」か Alt+↓ で全部出す。
-- 行の左のボタン（`RowTools`。印刷には出ない。文字は CSS の ::before で出して欄の文字に混ぜない）：挿入（`data-ins`。前は「＋」）・✕（`data-del`）・コピー（`data-copy`）。
+- 行の操作は見積書の左のボタン（`EstimateSheet.tsx` の `.sheet-side`・`rowOp`。2026-11-03。前は行の左の `RowTools`＝`data-ins`・`data-del`・`data-copy`・`data-paste`）：選んでいる欄の行（`lineIdOf(sel)`）に効く。ボタンは `onMouseDown` で止めて欄の選択を外さない。
   空白の行（`isBlankRow`）の欄の値（`sheetValue`）は空（内容の「材料費」・数量「1」などを出さない。F2・ダブルクリックで書き直すときも空から）。
-  コピー中は「貼付」（`data-paste`）に替わり、コピーした行に `data-copied`（黄色）。ボタンを押しても欄を選ばないよう、`onMouseDown` で止めて `onClick` で処理する。
+  コピー中は「📋 貼付」が押せ、コピーした行に `data-copied`（黄色）。
 - 行のコピー：`lineRows`（部材は同上施工費ごと、施工費はまとまり）を `sheetClip` に覚える。貼り付けは `pasteLines(job, 欄のキー, 行, 切り取りなら消すID)`：
   行のすぐ下、空白の行ならその行、箇所の欄なら最初の行の下、いちばん下の行なら最後の箇所。Ctrl+V は OS の貼り付けの文字がコピーしたときの文字と同じときだけ行を貼る（違えば欄に文字）。
 - 元に戻す（Ctrl+Z）・やり直す（Ctrl+Y）：変更のたびに前の Job を積む（100回まで）。1つの操作は1回の `change()` にまとめる（元に戻すが1回で済むように）。
@@ -132,7 +132,7 @@ Excelで保存・メールで送付の `tokuteiFiles`（見えない枠の `__ta
 - 白紙に戻す（**2026-10-28 に画面から外した**。中身の `sheetEdit.ts` の `clearedSheet` は残してある。下は外す前の作り。`estimate/EstimateEditor.tsx` の `clearSheet`。ボタンは「🖨 見積書を印刷」の横）：`confirm` で確かめてから customer・insuredNo・address・places・overhead・
   overheadTarget・order を空にする。保険者と書式は `jobInsurer`／`jobForm` の値で固定して残す（住所から決まっていた古い見積書でも書式が変わらないように）。
   見積書の外での変更なので、上のしくみで Ctrl+Z で戻せる。選んでいた欄がなくなったら、選択の枠の `useLayoutEffect` でお客様名の欄を選び直す（すぐ打ち込める）。
-- **行の左のボタンを足すときの決まり**：
+- **行の操作のボタンを足すときの決まり**（2026-11-03 からは見積書の左の列 `.sheet-side` に足す。下は行の左に出していたときの記録）：
   - `RowTools` は2つの書式（苅田町・行橋市・みやこ町用・広域連合用）で共通（`print/EstimateForms.tsx` の YkLine と KkLine の両方から呼ぶ）。1か所直せば両方に出る。印刷・Excel には出ない。
   - 置き場所は見積書の左の余白だけ。入力の画面だけ表を右に寄せている（`sasaoka.css` の `.est-sheet .form-page.yk { padding-left: 28mm }`・`.kk { 29mm }`、書式ごとに別の指定）。
     「＋」を「挿入」にしたとき（2026-10-21）、入力の画面だけページを 300mm（`.est-sheet .form-page { width: 300mm }` と `EstimateSheet.tsx` の `PAGE_W`）に広げ、表を 3mm 右に寄せた（印刷は A4横 297mm のまま）。

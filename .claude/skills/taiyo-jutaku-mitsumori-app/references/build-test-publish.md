@@ -122,7 +122,7 @@ github.io はこの作業環境から見えない（403）。GitHub MCP で確�
 - 新しいタブで開くリンク：`const [tab] = await Promise.all([ctx.waitForEvent('page'), link.click()])`。開いた先を差し替えるなら `ctx.route('**/taiyo-hacchu-scan/**', …)`。
 - 自動保存（0.4秒後）を待ってから読み直す（`waitForTimeout(1200)`）。
 - 見積書の外（部材を選ぶ画面・施工費を数える画面など）で続けて変えたものは、1秒以内なら Ctrl+Z 1回にまとまる（`EstimateSheet.tsx` の `lastOutside`）。
-  テストで何回 Ctrl+Z を押すかが決まらないので、片づけは行の左の✕（`{name}の行を消す`）で消す（`e2e-sheet.mjs` の「押している行に入れる」）。
+  テストで何回 Ctrl+Z を押すかが決まらないので、片づけは見積書の左の「✕ 削除」で消す（行の内容の欄を選んでから。`e2e-sheet.mjs` の `rowOp`）（`e2e-sheet.mjs` の「押している行に入れる」）。
 - 数字の欄（`NumberInput`）は type=text なので `getByRole('spinbutton')` では見つからない → `getByLabel(…, {exact: true})`。
 - 見た目を変えたら、1366px とスマホ（390×844、deviceScaleFactor 2）のスクリーンショットを撮って自分で見る。横にはみ出していないか（`document.documentElement.scrollWidth`）も見る。
   文字が欄からはみ出していないかも、プレビュー・印刷の欄を Playwright でページの中から全部調べて数える（2026-10-23 に申請書・理由書・見積書を4つの保険者とも 1366px・390px で 0 にした。

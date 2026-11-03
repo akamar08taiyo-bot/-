@@ -62,6 +62,8 @@ export type ShinseiSheet = {
     placeCells?: string[];
     memo?: string;
     kindChecks?: string;
+    // 工事種別の□が欄ごと（飯塚市の写真添付用紙「□①手すりの取付」〜「□⑥その他①～⑤に付帯する工事」。改修の種類の順）：その写真番号の箇所の種類の□を■
+    kindCells?: string[];
     kindCircles?: string[];
     dates?: {before: string; after: string; label?: string};
     // 同じ写真番号・同じ枠（改修前／改修後）の写真は最初の用紙だけに貼るが、組（group）がちがえば両方に貼る
@@ -138,7 +140,10 @@ export type ShinseiTexts = Record<
   | 'burden1'
   | 'burden2'
   | 'burden3'
-  | 'sameLeft',
+  | 'sameLeft'
+  // 飯塚市の請求書：Ａ 支給対象額（10割分。限度額まで）・Ｃ 本人負担分（Ａ－Ｂ）。Ｂ 保険給付分は benefitYen
+  | 'coveredYen'
+  | 'shareYen',
   string
 >;
 
@@ -236,6 +241,22 @@ const YUKUHASHI_PHOTO_SHEETS = ['住改・写真 ①', '住改・写真②', '�
 const YUKUHASHI_PHOTO = {photoPlace: {photo: 'M2', place: 'E4', kind: 'M4', before: 'B7:O28', after: 'B30:O51'}};
 /** 福岡市の様式第21号・第22号の2の「改修の内容」（手すりの取付け〜洋式便器等への取替えの5行。改修の種類の①〜⑤の順） */
 const FUKUOKA_KIND_CELLS = ['G11', 'G12', 'G13', 'G14', 'G15'];
+/**
+ * 飯塚市の写真添付用紙（写真番号①〜⑤。J6）：事前申請用（改修前だけ）と支給申請用（改修前・改修後）。改修場所の□（E1〜S1・E2・G2、最後は「□その他（」）、
+ * 工事種別の□（①〜⑥）、撮影日（J5・J13。原本の年・月・日の欄を1つにした）、写真の枠（見出しの「（事前申請用）改修前 写真添付用紙」の下）。
+ * 改修前の写真は事前申請用と支給申請用の両方に貼る（組 group がちがう）
+ */
+const IIZUKA_PHOTO_SHEETS: ShinseiSheet[] = (['事前', '支給'] as const).flatMap((kind) =>
+  ['①', '②', '③', '④', '⑤'].map((n): ShinseiSheet => ({
+    sheet: `${kind}写真${n}`,
+    photoPlace: {
+      photo: 'J6',
+      placeCells: ['E1', 'G1', 'I1', 'K1', 'M1', 'O1', 'Q1', 'S1', 'E2', 'G2', 'K2'],
+      kindCells: ['E3', 'I3', 'M3', 'E4', 'J4', 'O4'],
+      ...(kind === '事前' ? {before: 'A9:T14', dates: {before: 'J5', after: ''}, group: 'jizen'} : {before: 'A9:T12', after: 'A16:T21', dates: {before: 'J5', after: 'J13'}}),
+    },
+  })),
+);
 /**
  * 福岡市の写真貼付台紙（施工前・施工後を5枚ずつ。1枚に写真番号が2つ：上 ①・下 ②、2枚目は ③・④ …）。被保険者氏名 D3・番号 H3〜Q3、
  * 改修の場所（□の見出しの欄）・写真番号（B9・B26）・メモ（B12・B29。写真に書く内容）・写真の枠（D8:Q21・D25:Q38）
@@ -703,6 +724,95 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
       {sheet: '平面図', name: 'C2', nameFormat: '{name}', legend: {box: 'C54:AQ68'}, plan: 'C8:AQ52'},
       ...YUKUHASHI_PHOTO_SHEETS.map((sheet) => ({sheet, ...YUKUHASHI_PHOTO})),
     ],
+  },  // 飯塚市（2026-11-02。同じ指示。いただいた事前承認願書【受領委任払用】（様式第4号）・支給申請書【受領委任払用】・写真添付用紙（事前申請用・支給申請用）・
+  // 承諾書・請求書【受領委任払用】に、苅田町の原本の平面図（事前承認願書の添付書類に「□平面図」）を足した原本＝スキルの scripts/make_iizuka_jutaku.py）：
+  //   改修内容の□（並びは 手すり・段差・床／便器・引き戸）を■、住宅の種類は■個人住宅・現在の状況は■在宅（北九州市の持家・福岡市の在宅と同じ）、
+  //   住宅改修の利用は 無・有 を丸、今回の改修費用・改修費用は介護保険対象分（支給申請書に「介護保険対象分の工事合計金額」）。
+  //   受領委任払の委任の欄（事前承認願書の委任者・支給申請書の申請者）は住所だけ書き、氏名は自署（委任状の氏名と同じ。ユーザーの指示 2026-10）。
+  //   同意書・受任者・請求者は設定の会社・営業所（〒・住所・電話・「所長　氏名」）。口座・申請日は書かない。
+  //   写真添付用紙は写真番号①〜⑤ごとに事前申請用（改修前）と支給申請用（改修前・改修後）。改修場所・工事種別の□を■、撮影日を書く。
+  //   請求書は Ａ 支給対象額（限度額まで）・Ｂ 保険給付分（1円未満切捨）・Ｃ 本人負担分（Ａ－Ｂ）。保険者番号 402057 は原本にない（書く欄がない）。
+  iizuka: {
+    title: '飯塚市申請書',
+    sheets: [
+      {
+        sheet: '事前承認願書',
+        name: 'F8',
+        insuredNo: boxes('S', 10, 9),
+        marks: [ERA('F10'), GENDER('S10'), RENOVATED('F18')],
+        kindRows: [{kind: 'F16'}, {kind: 'J16'}, {kind: 'N16'}, {kind: 'N17'}, {kind: 'F17'}],
+        checks: ['W12', 'W15'],
+        texts: [
+          T('F7', '{kana}'),
+          T('J10', '{y}'),
+          T('L10', '{m}'),
+          T('N10', '{d}'),
+          T('G11', '{zip}'),
+          T('G12', '{address}'),
+          T('P13', '{phone}'),
+          T('F14', '{owner}'),
+          T('S14', '{relation}'),
+          T('S18', '{cost}'),
+          T('H20', '{reasonOffice}'),
+          T('R20', '{reasonName}'),
+          T('F21', '令和{startY}'),
+          T('J21', '{startM}'),
+          T('L21', '{startD}'),
+          T('S21', '令和{endY}'),
+          T('W21', '{endM}'),
+          T('Z21', '{endD}'),
+          T('G24', '{address}'), // 委任者（申請者）の住所。氏名は自署
+          T('G31', '{builderZipAddress}'),
+          T('G32', '{builder}'),
+          T('U32', '{builderTel}'),
+          T('G33', '{builderRep}'),
+        ],
+      },
+      {sheet: '承諾書', name: 'D12', texts: [T('D10', '{address}')]},
+      {sheet: '平面図', name: 'C2', nameFormat: '{name}', legend: {box: 'C54:AQ68'}, plan: 'C8:AQ52'},
+      ...IIZUKA_PHOTO_SHEETS.slice(0, 5),
+      {
+        sheet: '支給申請書',
+        name: 'D4',
+        insuredNo: boxes('S', 10, 5),
+        marks: [ERA('D6'), GENDER('S6')],
+        kindRows: [{kind: 'D10'}, {kind: 'D11'}, {kind: 'D12'}, {kind: 'D14'}, {kind: 'D13'}],
+        checks: ['P11'],
+        texts: [
+          T('D3', '{kana}'),
+          T('I6', '{y}'),
+          T('K6', '{m}'),
+          T('M6', '{d}'),
+          T('E7', '{zip}'),
+          T('E8', '{address}'),
+          T('S9', '{phone}'),
+          T('N15', '{cost}'),
+          T('D16', '令和{startY}年{startM}月{startD}日'),
+          T('S16', '令和{endY}年{endM}月{endD}日'),
+          T('F19', '{address}'), // 申請者の住所。氏名は自署
+          T('G24', '{builderZipAddress}'),
+          T('G25', '{builder}'),
+          T('V25', '{builderTel}'),
+          T('G26', '{builderRep}'),
+        ],
+      },
+      ...IIZUKA_PHOTO_SHEETS.slice(5),
+      {
+        sheet: '請求書',
+        name: 'G12',
+        insuredNo: boxes('R', 10, 11),
+        texts: [
+          T('Q5', '{builderZipAddress}'),
+          T('Q6', '{builder}'),
+          T('Q7', '{builderRep}'),
+          T('J9', '￥{benefitYen}　円也'),
+          T('G11', '{kana}'),
+          T('D17', '{coveredYen}'),
+          T('U14', '{benefitYen}'),
+          T('U17', '{shareYen}'),
+        ],
+      },
+    ],
   },
 };
 
@@ -1109,7 +1219,8 @@ export function shinseiValues(job: Job, s: EstimateSettings & BuilderSettings, t
   const [telHead, telTail] = splitNumber(t(info.phone), 2);
   const postal = t(s.postal ?? '');
   const [builderTelA, builderTelB, builderTelC] = splitNumber(t(s.tel ?? ''), 3);
-  const benefit = careAmounts(job, s).benefit;
+  const care = careAmounts(job, s);
+  const benefit = care.benefit;
   const kinds = shinseiKinds(job, s);
   return {
     name: job.customer.trim(),
@@ -1181,6 +1292,8 @@ export function shinseiValues(job: Job, s: EstimateSettings & BuilderSettings, t
       burden2: info.burden === '2' ? '■' : '',
       burden3: info.burden === '3' ? '■' : '',
       sameLeft: info.reasonOffice.trim() || info.reasonName.trim() ? '同左 ： ■ （上記記載は不要）' : '',
+      coveredYen: care.covered > 0 ? care.covered.toLocaleString('en-US') : '',
+      shareYen: benefit > 0 ? care.share.toLocaleString('en-US') : '', // 負担割合を選んでいなければ書かない（Ｂと同じ）
     },
     cost,
     start: info.start,
@@ -1514,6 +1627,8 @@ export const EMPTY_SHINSEI: ShinseiValues = {
     burden2: '',
     burden3: '',
     sameLeft: '',
+    coveredYen: '',
+    shareYen: '',
   },
   cost: null,
   start: '',
@@ -1772,7 +1887,8 @@ function photoBoxes(files: Files, sheet: ShinseiSheet, v: ShinseiValues, photo: 
       if (!text) return;
       const other = at === null && i === texts.length - 1;
       let next = checkBoxes(text, i === at || other ? 0 : null);
-      if (other) next = next.replace(/([（(])[^（()）]*([)）])/, (_, a: string, b: string) => `${a}${name.normalize('NFKC').trim()}${b}`);
+      // 閉じかっこが次の欄にある原本（飯塚市の「□その他（」＋「）」）は「（」のうしろに名前
+      if (other) next = next.replace(/([（(])[^（()）]*([)）]|$)/, (_, a: string, b: string) => `${a}${name.normalize('NFKC').trim()}${b}`);
       out.set(pp.placeCells![i], next);
     });
   }
@@ -1784,9 +1900,15 @@ function photoBoxes(files: Files, sheet: ShinseiSheet, v: ShinseiValues, photo: 
     const text = readCell(files, sheet.sheet, pp.kindChecks);
     if (text) out.set(pp.kindChecks, checkBoxes(text, kind - 1));
   }
+  if (pp.kindCells && kind) {
+    const ref = pp.kindCells[kind - 1];
+    const text = ref ? readCell(files, sheet.sheet, ref) : '';
+    if (text) out.set(ref, checkBoxes(text, 0));
+  }
   for (const slot of ['before', 'after'] as const) {
     const day = v.photoDates?.[photo]?.[slot];
-    if (pp.dates && day) out.set(pp.dates[slot], (pp.dates.label ?? '') + reiwaText(day));
+    // 改修前だけの用紙（飯塚市の事前申請用）は改修後の撮影日の欄がない（空の番地）
+    if (pp.dates?.[slot] && day) out.set(pp.dates[slot], (pp.dates.label ?? '') + reiwaText(day));
   }
   return out;
 }
@@ -2536,11 +2658,13 @@ function findNeedle(text: string, needles: string[], i: number): [number, number
   let from = 0;
   for (let k = 0; k <= i && k < needles.length; k++) {
     const at = text.indexOf(needles[k], from);
-    if (at < 0) return null;
+    if (at < 0) break;
     if (k === i) return [at, at + needles[k].length];
     from = at + needles[k].length;
   }
-  return null;
+  // 原本の並びがちがう（飯塚市の住宅改修の利用「無・有」）：その字が1つだけなら、その位置
+  const at = i < needles.length ? text.indexOf(needles[i]) : -1;
+  return at >= 0 && text.indexOf(needles[i], at + 1) < 0 ? [at, at + needles[i].length] : null;
 }
 
 /** 範囲（'A9:S31'。結合した欄の左上だけでもよい）の位置と大きさ（画素。シートの左上から） */

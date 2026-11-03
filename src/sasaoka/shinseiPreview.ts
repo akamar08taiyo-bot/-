@@ -185,6 +185,9 @@ const TEXT_FIELD: Record<keyof ShinseiTexts, ShinseiField> = {
   burden2: 'burden',
   burden3: 'burden',
   sameLeft: 'reason',
+  // 飯塚市の請求書：支給対象額・本人負担分は負担割合から
+  coveredYen: 'burden',
+  shareYen: 'burden',
 };
 const MARK_FIELD: Record<keyof ShinseiMarks, ShinseiField> = {gender: 'gender', era: 'birth', care: 'care', renovated: 'renovated'};
 
@@ -208,7 +211,7 @@ function fieldRefs(sheet: ShinseiSheet): {field: ShinseiField; ref: string}[] {
   for (const l of sheet.links ?? []) out.push({field: l.field as ShinseiField, ref: l.ref});
   // 写真の用紙の撮影日（苅田町・みやこ町）：一覧の「改修前日付・改修後日付」
   const dates = sheet.photoPlace?.dates;
-  if (dates) out.push({field: 'photoDates', ref: dates.before}, {field: 'photoDates', ref: dates.after});
+  for (const ref of dates ? [dates.before, dates.after] : []) if (ref) out.push({field: 'photoDates', ref}); // 改修前だけの用紙は改修後の欄がない（空）
   return out;
 }
 

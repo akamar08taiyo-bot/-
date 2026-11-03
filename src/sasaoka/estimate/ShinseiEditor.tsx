@@ -51,6 +51,8 @@ const FIELDS: Record<Insurer, Field[]> = {
   kitakyushu: ['kana', 'name', 'insuredNo', 'zip', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'cost', 'dates'],
   // 久留米市（2026-11-02）：性別・要介護状態区分の欄はない。介護支援専門員等＝理由書作成者（「同左」）。着工（予定）日・完成（予定）日は両方の申請書。負担割合の□も申請書にある
   kurume: ['kana', 'name', 'insuredNo', 'birth', 'zip', 'address', 'phone', 'owner', 'reason', 'photoDates', 'works', 'dates', 'cost', 'burden'],
+  // 飯塚市（2026-11-02）：事前承認願書の上からの順。住宅改修の利用（無・有）・今回の改修費用・理由書作成者・着工予定日・完成予定日。負担割合は請求書の保険給付分・本人負担分
+  iizuka: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'owner', 'photoDates', 'works', 'renovated', 'cost', 'reason', 'dates', 'burden'],
 };
 // 負担割合は要介護状態区分のすぐ下（みやこ町・広域連合は電話番号の下）。申請書の原本に欄はないが、委任状の保険給付額・見積書の介護保険の内訳に使い、
 // 特定福祉用具の負担割合と同じ値（どちらで選んでも両方に入る。tokuteiLink.ts）。ユーザーの指示「住宅改修の申請書にも負担割合を設置。住宅改修⇔特定福祉用具などで連動して数字に繋げる」2026-10-28
@@ -59,11 +61,12 @@ const FIELDS: Record<Insurer, Field[]> = {
 /** みやこ町・広域連合：改修の内容は内訳明細書（別紙）、着工日・完成日は支給申請書（工事のあと）に書く */
 const twoForms = (i: Insurer) => i === 'miyako' || i === 'kouiki';
 /** 着工日・完成日を入れる保険者（工事のあとの支給申請書・完了届出書に書く。福岡市は改修の内容は申請書のまま） */
-const workDates = (i: Insurer) => twoForms(i) || i === 'fukuoka' || i === 'kitakyushu' || i === 'kurume';
+const workDates = (i: Insurer) => twoForms(i) || i === 'fukuoka' || i === 'kitakyushu' || i === 'kurume' || i === 'iizuka';
 
 /** 欄の名前（申請書の言葉） */
 function label(f: Field, i: Insurer): string {
-  if (f === 'cost') return twoForms(i) ? '改修費用（介護保険対象分）' : i === 'kitakyushu' ? '工事費見積金額（介護保険対象分）' : '改修予定費用';
+  if (f === 'cost') return twoForms(i) ? '改修費用（介護保険対象分）' : i === 'kitakyushu' ? '工事費見積金額（介護保険対象分）' : i === 'iizuka' ? '今回の改修費用（介護保険対象分）' : '改修予定費用';
+  if (f === 'renovated' && i === 'iizuka') return '住宅改修の利用';
   // 苅田町・行橋市の着工予定日は書かない（ユーザーの指示「申請書の着工予定日は空白にする」）ので、完了（完成）予定日だけ
   if (f === 'dates') return workDates(i) ? '着工日・完成日' : i === 'kanda' ? '完了予定日' : '完成予定日';
   return {
@@ -95,6 +98,7 @@ const FORM_TITLE: Record<Insurer, string> = {
   fukuoka: '住宅改修費支給申請書（様式第21号）・住宅改修完了届出書（様式第22号の2）',
   kitakyushu: '介護保険住宅改修事前届出書・住宅改修費支給申請書（受領委任払用）',
   kurume: '住宅改修事前承認申請書・住宅改修費支給申請書（第2号様式）',
+  iizuka: '住宅改修費事前承認願書・住宅改修費支給申請書・請求書（受領委任払用）',
 };
 
 /** 箇所を足すのプルダウンの「そのほか」（名前を打つ箇所） */
@@ -419,7 +423,7 @@ export function ShinseiEditor({
           </>
         );
       case 'renovated':
-        return <Circles label="現在までの改修状況" options={MARK_INFO.renovated.options} value={info.renovated} onPick={(renovated) => setInfo({renovated} as Partial<ShinseiInfo>)} />;
+        return <Circles label={label('renovated', i)} options={MARK_INFO.renovated.options} value={info.renovated} onPick={(renovated) => setInfo({renovated} as Partial<ShinseiInfo>)} />;
       case 'photoDates':
         // 写真の日付（苅田町・みやこ町は写真の用紙の撮影日に書く）。改修前は当日・改修後は空。日付入り写真を入れるとその日付（PhotoBoard.tsx）。
         // 直すと、すべての写真の同じ改修前・改修後の日付になる。改修前を消すと当日に戻る
@@ -455,7 +459,7 @@ export function ShinseiEditor({
               {end}
               <input type="date" value={info.end} onChange={(e) => setInfo({end: e.target.value})} className="h-9 rounded-md border border-slate-300 px-2" aria-label={end} data-nav />
             </label>
-            {workDates(i) && <Note>{i === 'kurume' ? '事前承認申請書（予定日）と支給申請書に書きます' : `${i === 'fukuoka' ? '完了届出書' : '支給申請書'}に書きます（工事のあと）`}</Note>}
+            {workDates(i) && <Note>{i === 'kurume' || i === 'iizuka' ? `${i === 'kurume' ? '事前承認申請書' : '事前承認願書'}（予定日）と支給申請書に書きます` : `${i === 'fukuoka' ? '完了届出書' : '支給申請書'}に書きます（工事のあと）`}</Note>}
           </>
         );
       }

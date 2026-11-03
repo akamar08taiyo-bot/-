@@ -110,7 +110,7 @@ const typeIn = async (k, text, end = 'Enter') => {
   await page.waitForTimeout(60);
 };
 assert.deepEqual(await totals(), ['合計', '26,950', '26,950']);
-assert.deepEqual(await page.getByRole('combobox', {name: '保険者', exact: true}).locator('option').allInnerTexts(), ['苅田町', '行橋市', 'みやこ町', '広域連合', '福岡市', '北九州市', '久留米市']); // 福岡市・北九州市は 2026-10-29 から、久留米市は 2026-11-02 から
+assert.deepEqual(await page.getByRole('combobox', {name: '保険者', exact: true}).locator('option').allInnerTexts(), ['苅田町', '行橋市', 'みやこ町', '広域連合', '福岡市', '北九州市', '久留米市', '飯塚市']); // 福岡市・北九州市は 2026-10-29 から、久留米市・飯塚市は 2026-11-02 から
 
 // ---------------- 見積書の欄：被保険者番号・切って使う手すりを 120cm（1.2÷4＝0.3本×16,000＝4,800）
 await typeIn('job:insuredNo', '0000366989');

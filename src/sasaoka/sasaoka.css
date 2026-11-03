@@ -186,100 +186,10 @@ img {
 .est-sheet .form-page.kk {
   padding-left: 29mm;
 }
-.est-sheet td.tools-cell {
-  position: relative;
-  overflow: visible;
-}
-.sheet-rowtools {
-  position: absolute;
-  top: 50%;
-  right: calc(100% + 1.2mm);
-  display: flex;
-  gap: 0.8mm;
-  transform: translateY(-50%);
-}
-.sheet-rowtools button {
-  width: 5.6mm;
-  height: 4.9mm;
-  padding: 0;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  background: #fff;
-  font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Noto Sans JP', 'Meiryo', sans-serif;
-  font-size: 9pt;
-  font-weight: 700;
-  line-height: 1;
-  cursor: pointer;
-}
-.sheet-ins {
-  color: #047857;
-}
-.sheet-rowtools .sheet-ins {
-  width: auto;
-  padding: 0 1.2mm;
-  font-size: 8pt;
-}
-.sheet-ins::before {
-  content: '挿入';
-}
-.sheet-rowtools .sheet-copy,
-.sheet-rowtools .sheet-paste {
-  width: auto;
-  padding: 0 1.2mm;
-  color: #1d4ed8;
-  font-size: 8pt;
-}
-.sheet-copy::before {
-  content: 'コピー';
-}
-/* 「貼付」は「コピー」と同じ幅（並びがずれないように）。コピー中の帯と同じ色 */
-.sheet-rowtools .sheet-paste {
-  min-width: 11mm;
-  border-color: #f59e0b;
-  background: #fffbeb;
-  color: #b45309;
-}
-.sheet-paste::before {
-  content: '貼付';
-}
-/* コピーのない行（施工費・空白の行）は、場所だけ空けて「挿入」「✕」の並びをそろえる */
-.sheet-copy-none {
-  visibility: hidden;
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid transparent;
-  font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Noto Sans JP', 'Meiryo', sans-serif;
-  font-weight: 700;
-}
-.sheet-del {
-  color: #be123c;
-}
-.sheet-del::before {
-  content: '✕';
-}
-.sheet-ins:hover,
-.sheet-ins:focus-visible {
-  border-color: #059669;
-  background: #ecfdf5;
-}
-.sheet-copy:hover,
-.sheet-copy:focus-visible {
-  border-color: #2563eb;
-  background: #eff6ff;
-}
-.sheet-paste:hover,
-.sheet-paste:focus-visible {
-  border-color: #d97706;
-  background: #fef3c7;
-}
+/* 行の挿入・削除・コピー・貼付は見積書の左のボタン（EstimateSheet.tsx。前は明細の行の左に1行ずつ出していた。2026-11-03） */
 /* コピー・切り取りした行（貼り付けるまで） */
 .est-sheet tr[data-copied] > td {
   background-color: #fef3c7;
-}
-.sheet-del:hover,
-.sheet-del:focus-visible {
-  border-color: #e11d48;
-  background: #fff1f2;
 }
 /* 選んでいる欄の枠（Excel と同じ緑） */
 .sheet-sel {
@@ -372,6 +282,34 @@ img {
 }
 .sheet-tool:disabled {
   opacity: 0.5;
+  cursor: default;
+}
+/* 見積書の左のボタン（2026-11-03）：広い画面では縦に並べ、字が長いボタンは折り返す */
+@media (min-width: 1024px) {
+  .sheet-side .sheet-tool {
+    width: 100%;
+    padding: 9px 10px;
+    font-size: 15px;
+    text-align: left;
+    line-height: 1.35;
+  }
+}
+/* 選んでいる行の 挿入・削除・コピー・貼付（色は付けない。削除も白：消す前の確かめで守る） */
+.sheet-rowbtn {
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  background: #fff;
+  padding: 8px 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  white-space: nowrap;
+}
+.sheet-rowbtn:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+.sheet-rowbtn:disabled {
+  opacity: 0.45;
   cursor: default;
 }
 
@@ -775,6 +713,10 @@ table.fm th {
 }
 table.fm th {
   text-align: center;
+}
+/* 欄の文字（EstimateForms.tsx の fitBody）。shrinkCells.ts が欄の中に浮かせ、入りきらなければ縮める */
+.fitbox {
+  display: inline-block;
 }
 /* 罫線：細線（thin）と中太線（medium）。nr・nl はその側の線を消す（数量と単位を1つの欄に見せる） */
 table.fm tr.g > td,

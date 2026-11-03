@@ -5,12 +5,13 @@
 //   excl:行ID（介護保険の対象外）／overhead:all|target（諸経費）。明細の行には data-rows（もとになった入力の行）を付ける。
 //   金額のない施工費の行も出し、明細のあとに打ち込める空いた行（new:…、data-new）を1行足す。
 //   ほかの空いた行には data-blank を付ける（押すと、打ち込める行の同じ列を選ぶ）。
-//   明細の行の左（余白）には「挿入」（data-ins：この行の下に空白の行を入れる）・「✕」（data-del：この行を消す。部材は同上施工費ごと）・
-//   「コピー」（data-copy：部材は同上施工費ごと、施工費はそのまとまりをコピー）を出す。コピーしているあいだは「コピー」の代わりに
-//   「貼付」（data-paste：コピーした行をこの行の下に貼り付け）を出し、コピーした行には data-copied を付ける。
+//   行の挿入・削除・コピー・貼付は、見積書の左のボタン（EstimateSheet.tsx。選んでいる行に効く）。前は明細の行の左（余白）に1行ずつ出していたが、
+//   ユーザーの指示「削除ボタン、挿入、コピーボタンについては、各行に作成するのではなく、見積もりの左手に設置する」（2026-11-03）で外した。
+//   コピーした行には data-copied を付ける。
 // 何も入っていない部材の行（line.blank）は、印刷でも空白の行（数量・単価・金額も出さない）
 // 明細の下の介護保険の内訳（line.memo。careLines.ts）は左の欄をまとめた1行の文字（data-care）。利用者負担は赤字
 
+import {useEffect, useLayoutEffect, useRef} from 'react';
 import type {CSSProperties, ReactNode} from 'react';
 import {estimateTotals} from '../calc.ts';
 import {CARE_RED, withCareLines} from '../careLines.ts';
@@ -20,11 +21,29 @@ import type {Job, Settings} from '../types.ts';
 import {num, yen} from '../util.ts';
 import {fitCss, fitLines, fitName, fitText} from './fit.ts';
 import type {Fit} from './fit.ts';
+import {shrinkCells} from './shrinkCells.ts';
 import {issuerLines, KK, KK_FOOT, KK_LEFT, KK_NOTE_1, KK_NOTE_2, KK_RIGHT, KK_ROWS, NOTE_KIND, NOTE_MARK, NOTE_PHOTO, totalRows, YK, YK_ROW} from './formLayout.ts';
 
-/** fit.ts で決めた欄の文字：1行ならその文字、折り返すときは1行ずつ（Excel と同じ改行。ブラウザに折り返させない） */
+/**
+ * fit.ts で決めた欄の文字：1行ならその文字、折り返すときは1行ずつ（Excel と同じ改行。ブラウザに折り返させない）。
+ * .fitbox に入れて、ブラウザに出た大きさで欄に入るか測り、入らなければ縮める（shrinkCells.ts。最小フォントサイズの設定などで大きく出たとき）
+ */
 function fitBody(f: Fit): ReactNode {
-  return f.lines.length > 1 ? f.lines.map((t, i) => <div key={i}>{t}</div>) : f.lines[0];
+  return <span className="fitbox">{f.lines.length > 1 ? f.lines.map((t, i) => <div key={i}>{t}</div>) : f.lines[0]}</span>;
+}
+
+/** 書式のページをまとめる要素の ref：描くたびに、欄の文字を欄に収める（shrinkCells）。字体が読み込まれたあとにも */
+function useShrinkCells() {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => shrinkCells(ref.current));
+  useEffect(() => {
+    let alive = true;
+    void document.fonts?.ready.then(() => alive && shrinkCells(ref.current));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return ref;
 }
 
 /**
@@ -55,59 +74,12 @@ const ed = (editable: boolean, key: string | null) => (editable && key ? {'data-
 
 /**
  * 見積書に直接入力するとき：mark 広域連合用の「材／手」（いちばん下の行に施工費を入れるか）。
- * copied：コピーした行（印を付ける）、pasting：コピーした行があり、行の左に「貼付」を出す
+ * copied：コピーした行（印を付ける）、pasting：コピーした行がある
  */
 export type SheetOpts = {mark: '材' | '手'; copied?: string[]; pasting?: boolean};
 
 /** コピーした行の印（見積書に直接入力するときだけ） */
 const copiedAttr = (sheet: SheetOpts | null | undefined, l: FormLine) => (sheet?.copied?.length && l.rowIds.some((id) => sheet.copied?.includes(id)) ? {'data-copied': ''} : {});
-
-/**
- * 見積書に直接入力するときの、明細の行の左のボタン（左から）：「挿入」この行の下に1行入れる（空白の行）／「✕」この行を消す（部材は同上施工費ごと）／
- * 「コピー」部材は同上施工費ごと、施工費（同上施工費）はそのまとまりをコピー（空白の行にはない。並びがそろうよう、場所だけ空ける）。
- * コピーしているあいだは「コピー」の代わりに「貼付」（コピーした行をこの行の下に貼り付け。空白の行ならその行に入れる）。
- * 印刷には出ない。文字は CSS で出す（欄の文字 innerText に混ざらないように）
- */
-function RowTools({line: l, sheet}: {line: FormLine; sheet: SheetOpts}) {
-  const name = l.text || (l.isWork ? '施工費' : l.blank ? '空白' : '部材');
-  return (
-    <span className="sheet-rowtools no-print">
-      <button type="button" className="sheet-ins" data-ins={l.rowId} title="この行の下に1行入れる（Ctrl+Shift+＋）" aria-label={`${name}の行の下に1行入れる`} />
-      <button
-        type="button"
-        className="sheet-del"
-        data-del={l.rowId}
-        title={l.isWork || l.blank ? 'この行を消す（Ctrl+－）' : 'この部材（と同上施工費）を消す（Ctrl+－）'}
-        aria-label={`${name}の行を消す`}
-      />
-      {sheet.pasting ? (
-        <button type="button" className="sheet-paste" data-paste={l.rowId} title="コピーした行をこの行の下に貼り付ける（Ctrl+V）" aria-label={`${name}の行の下に貼り付け`} />
-      ) : l.blank ? (
-        <span className="sheet-copy sheet-copy-none" aria-hidden="true" />
-      ) : (
-        <button
-          type="button"
-          className="sheet-copy"
-          data-copy={l.rowId}
-          title={l.isWork ? 'この施工費をコピー（Ctrl+C）' : 'この部材（と同上施工費）をコピー（Ctrl+C）'}
-          aria-label={`${name}の行をコピー`}
-        />
-      )}
-    </span>
-  );
-}
-
-/**
- * コピーしているあいだ、いちばん下の打ち込める行と、その下の空いた行の左にも「貼付」を出す（ユーザーの指示：貼り付ける行を自分で選べるように）。
- * そこに貼り付けると、いちばん下（最後の箇所のあと。打ち込める行に改修場所を打っていれば、その箇所）に入る
- */
-function PasteHere() {
-  return (
-    <span className="sheet-rowtools no-print">
-      <button type="button" className="sheet-paste" data-paste="new" title="コピーした行をいちばん下に貼り付ける（Ctrl+V）" aria-label="いちばん下に貼り付け" />
-    </span>
-  );
-}
 
 /** 書式の明細の行（sheet なら金額のない施工費の行と、打ち込める空いた行も） */
 function sheetLines(job: Job, s: Settings, form: 'yukuhashi' | 'kouiki', sheet: SheetOpts | null | undefined) {
@@ -137,8 +109,9 @@ export function YukuhashiForm({
   const issuer = issuerLines(job, s);
   const issuerW = YK.H + YK.I + YK.J + YK.K + YK.L + YK.M;
   const name = job.customer.trim();
+  const fitRef = useShrinkCells();
   return (
-    <>
+    <div ref={fitRef} style={{display: 'contents'}}>
       {pages.map((page, pi) => {
         const last = pi === pages.length - 1;
         return (
@@ -278,7 +251,7 @@ export function YukuhashiForm({
           </div>
         );
       })}
-    </>
+    </div>
   );
 }
 
@@ -295,15 +268,9 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
   if (!l) {
     return (
       <tr className="g" style={{height: `${YK_ROW}mm`}} {...(sheet ? {'data-blank': ''} : {})}>
-        {['ml', '', '', 'nr', 'nl', '', 'mr', 'nr', 'nl', '', 'mr', 'mr', 'mr'].map((c, i) =>
-          i === 0 && sheet?.pasting ? (
-            <td key={i} className={`${c} tools-cell${bottom}`}>
-              <PasteHere />
-            </td>
-          ) : (
-            <td key={i} className={c + bottom} />
-          ),
-        )}
+        {['ml', '', '', 'nr', 'nl', '', 'mr', 'nr', 'nl', '', 'mr', 'mr', 'mr'].map((c, i) => (
+          <td key={i} className={c + bottom} />
+        ))}
       </tr>
     );
   }
@@ -326,7 +293,7 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
     const nk = (field: string) => `new:${field}`;
     return (
       <tr className="g sheet-new" style={{height: `${YK_ROW}mm`}} data-new="">
-        {cell(l.first ? l.work : '', YK.A, 11, sheet?.pasting ? 'ml tools-cell' : 'ml', nk('work'), 1, sheet?.pasting ? <PasteHere /> : null)}
+        {cell(l.first ? l.work : '', YK.A, 11, 'ml', nk('work'), 1)}
         {cell(l.first && l.placeName ? `${circled(l.photo)}${l.placeName}` : '', YK.B, 11, '', nk('name'))}
         {cell('', YK.C, 9, '', nk('text'))}
         {cell('', YK.D, 9, 'r nr', nk('qty'))}
@@ -352,7 +319,7 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
   const note = lineNote(l, 'yukuhashi', 0);
   return (
     <tr className="g" style={{height: `${YK_ROW}mm`}} {...(editable ? {'data-rows': l.rowIds.join(' '), ...copiedAttr(sheet, l)} : {})}>
-      {cell(l.first ? l.work : '', YK.A, 11, editable ? 'ml tools-cell' : 'ml', l.first ? `place:${l.placeId}:work` : null, 1, sheet ? <RowTools line={l} sheet={sheet} /> : null)}
+      {cell(l.first ? l.work : '', YK.A, 11, 'ml', l.first ? `place:${l.placeId}:work` : null, 1)}
       {/* 改修場所（写真No.）：「①勝手口」。写真番号のあとに箇所名を打ち込める */}
       {cell(l.first ? `${circled(l.photo)}${l.placeName}` : '', YK.B, 11, '', l.first ? `place:${l.placeId}:name` : null)}
       {nameCell(l.text, YK.C, YK_ROW, 9, `${bottom}`, k('text'), 2, editable)}
@@ -385,8 +352,9 @@ export function KouikiForm({job, settings: s, sheet = null}: {job: Job; settings
   const pages = paginate(withCareLines(sheetLines(job, s, 'kouiki', sheet), job, s, per), per);
   const totals = totalRows(estimateTotals(job, s));
   const tax = pct(s.taxRate);
+  const fitRef = useShrinkCells();
   return (
-    <>
+    <div ref={fitRef} style={{display: 'contents'}}>
       {pages.map((page, pi) => {
         const last = pi === pages.length - 1;
         return (
@@ -529,7 +497,7 @@ export function KouikiForm({job, settings: s, sheet = null}: {job: Job; settings
           </div>
         );
       })}
-    </>
+    </div>
   );
 }
 
@@ -560,15 +528,9 @@ function KkLine({
   if (!l) {
     return (
       <tr className="g" style={{height: `${height}mm`}} {...(sheet ? {'data-blank': ''} : {})}>
-        {['ml', '', '', 'mr', 'gap', 'ml', '', '', 'mr', 'gap', 'ml', '', 'ml', '', '', 'mr', 'ml', 'mr'].map((c, i) =>
-          i === 0 && sheet?.pasting ? (
-            <td key={i} className={`${c} tools-cell${bottom}`}>
-              <PasteHere />
-            </td>
-          ) : (
-            <td key={i} className={c + bottom} />
-          ),
-        )}
+        {['ml', '', '', 'mr', 'gap', 'ml', '', '', 'mr', 'gap', 'ml', '', 'ml', '', '', 'mr', 'ml', 'mr'].map((c, i) => (
+          <td key={i} className={c + bottom} />
+        ))}
       </tr>
     );
   }
@@ -591,7 +553,7 @@ function KkLine({
     const nk = (field: string) => `new:${field}`;
     return (
       <tr className="g sheet-new" style={{height: `${height}mm`}} data-new="">
-        {cell(l.first ? l.placeName : '', KK.A, 11, sheet?.pasting ? 'c ml tools-cell' : 'c ml', nk('name'), 2, sheet?.pasting ? <PasteHere /> : null)}
+        {cell(l.first ? l.placeName : '', KK.A, 11, 'c ml', nk('name'), 2)}
         {cell(l.first ? l.work : '', KK.B, 11, 'c', nk('work'), 2)}
         <td className={`mark${bottom}`} {...ed(editable, nk('mark'))}>
           {l.mark}
@@ -641,7 +603,7 @@ function KkLine({
   }
   return (
     <tr className="g" style={{height: `${height}mm`}} {...(editable ? {'data-rows': l.rowIds.join(' '), ...copiedAttr(sheet, l)} : {})}>
-      {cell(l.first ? l.placeName : '', KK.A, 11, editable ? 'c ml tools-cell' : 'c ml', l.first ? `place:${l.placeId}:name` : null, 2, sheet ? <RowTools line={l} sheet={sheet} /> : null)}
+      {cell(l.first ? l.placeName : '', KK.A, 11, 'c ml', l.first ? `place:${l.placeId}:name` : null, 2)}
       {cell(l.first ? l.work : '', KK.B, 11, 'c', l.first ? `place:${l.placeId}:work` : null, 2)}
       <td className={`mark${bottom}`}>{l.blank ? '' : l.mark}</td>
       {nameCell(l.text, KK.D, height, 9, `mr gothic${bottom}`, k('text'), 3, editable)}

@@ -35,6 +35,7 @@ export const OTHER_FORMS: OtherForm[] = [
   {
     id: 'iizuka',
     city: '飯塚市',
+    make: 'iizuka',
     links: [
       // 「介護保険住宅改修費関係 - 申請・手続案内」
       {label: '🏠 住宅改修の申請書', url: 'https://www.city.iizuka.lg.jp/koresido/jyuutakukaishuu.html'},

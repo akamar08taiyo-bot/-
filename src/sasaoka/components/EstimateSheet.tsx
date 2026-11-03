@@ -2,7 +2,9 @@
 // 仕切り計算表・請求書も同じ行から作る。操作は Excel と同じ：
 //   欄を選んで打ち込むと書き換え／Enter で下・Tab で右・矢印で移動／F2 かダブルクリックで書き直す／Delete で消す／Esc でやめる／Ctrl+Z で元に戻す・Ctrl+Y でやり直す
 //   （元に戻す・やり直すのボタンや、画面の説明は置かない。ユーザーの指示）
-//   行：左の「挿入」で下に1行・「✕」で消す・「コピー」→ 貼り付けたい行の「貼付」（Ctrl+C／Ctrl+X → 行を選んで Ctrl+V も同じ。Esc でコピーをやめる）
+//   見積書の左のボタン（ユーザーの指示「部材をいれる、施工費などのボタンは見積もりのページからと遠すぎるため、見積もりの左手に置く。削除ボタン、挿入、
+//   コピーボタンについては、各行に作成するのではなく、見積もりの左手に設置する」2026-11-03）：部材・施工費・部材＋施工費（常用）を入れる、
+//   選んでいる行の「挿入」（下に1行）・「削除」・「コピー」→ 貼り付けたい行を選んで「貼付」（Ctrl+C／Ctrl+X → 行を選んで Ctrl+V も同じ。Esc でコピーをやめる）
 //   Ctrl+Shift+＋ で下に1行・Ctrl+－ で行を消す・Alt+↓ で候補（改修場所・改修の種類）・Ctrl+P で印刷
 // 内容（品名）は部材リストから選べる（★お気に入りが先）。備考（算出根拠）に定価を入れると、単価は 定価×0.8。
 // いちばん下の空いた行に打ち込むと行が増え、改修場所を打ち込むと箇所が増える。
@@ -653,8 +655,8 @@ export function EstimateSheet({
   const onMouseDown = (e: ReactMouseEvent) => {
     let t = e.target as HTMLElement;
     if (sugRef.current?.contains(t)) return;
-    if (t.closest('[data-del], [data-ins], [data-copy], [data-paste], [data-drop]')) {
-      e.preventDefault(); // 行の左の「挿入」「✕」「コピー」「貼付」、欄の「▼」：欄は選ばない（押し終わったら onClick で入れる・消す・コピー・貼り付け・候補を出す）
+    if (t.closest('[data-drop]')) {
+      e.preventDefault(); // 欄の「▼」：欄は選ばない（押し終わったら候補を出す）
       return;
     }
     if (t === inputRef.current) {
@@ -681,20 +683,6 @@ export function EstimateSheet({
     select(el);
     inputRef.current?.focus({preventScroll: true});
   };
-  // 行の左の「挿入」：その行の下に空白の行を入れて、内容の欄を選ぶ（そのまま打ち込める）。
-  // 「✕」：その行（部材は同上施工費ごと）を消す。箇所の行がなくなれば箇所も消す（その行が空白になる）。
-  // 「コピー」：部材は同上施工費ごと、施工費はそのまとまりをコピーする。コピーしているあいだは「貼付」：その行の下に貼り付ける
-  const onClick = (e: ReactMouseEvent) => {
-    const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-ins], [data-copy], [data-paste], [data-del]');
-    if (!btn) return;
-    if (edit && sel) commit(edit.value, null, null, true); // 打ち込んでいた値を入れてから
-    if (btn.dataset.ins) insertRow(btn.dataset.ins);
-    else if (btn.dataset.copy) {
-      copyRow(btn.dataset.copy, false, null);
-      inputRef.current?.focus({preventScroll: true});
-    } else if (btn.dataset.paste) pasteAt(btn.dataset.paste === 'new' ? 'new:text' : `line:${btn.dataset.paste}:text`); // new：いちばん下に
-    else if (btn.dataset.del) deleteRow(btn.dataset.del);
-  };
   const onDoubleClick = (e: ReactMouseEvent) => {
     const t = e.target as HTMLElement;
     if (sugRef.current?.contains(t) || edit) return;
@@ -704,7 +692,29 @@ export function EstimateSheet({
     }
   };
 
-  // ---------------------------------------------------------------- ツールバー（部材・施工費を入れる。行を入れる・消すは行の左の「挿入」「✕」）
+  // ---------------------------------------------------------------- 見積書の左のボタン（部材・施工費を入れる・選んでいる行の挿入・削除・コピー・貼付）
+  // 押しても見積書の欄の選択を外さない（打ち込んでいる欄・選んでいる行のまま）
+  const keepSel = (e: ReactMouseEvent) => e.preventDefault();
+  // 選んでいる欄が明細の行か（いちばん下の空いた行・お客様名などの欄では、挿入・削除・コピーは押せない）
+  const onLine = !!sel && /^(line|place|excl):/.test(sel.key);
+  const rowOp = (op: 'insert' | 'delete' | 'copy' | 'paste') => {
+    if (edit && sel) commit(edit.value, null, null, true); // 打ち込んでいた値を入れてから
+    if (op === 'paste') {
+      pasteAt(pasteTarget());
+      return;
+    }
+    const id = lineIdOf(sel);
+    if (!id) {
+      toast('行を選んでください', 'error');
+      return;
+    }
+    if (op === 'insert') insertRow(id);
+    else if (op === 'delete') deleteRow(id);
+    else {
+      copyRow(id, false, null);
+      inputRef.current?.focus({preventScroll: true});
+    }
+  };
   const row = target.row;
   // 入れる箇所：選んでいる欄の箇所。欄を選んでいない（空白の行に部材を入れて、選んでいた欄がなくなったときなど）・お客様名などの欄のときは、
   // 最後に選んだ箇所（なければいちばん下の箇所）。新しい箇所は作らない（前は作って、施工費が②になった。`toolPlace`）
@@ -774,18 +784,7 @@ export function EstimateSheet({
 
   return (
     <>
-    <section className="overflow-hidden rounded-xl border-2 border-emerald-800 bg-white shadow-sm" aria-label="見積書">
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2.5 text-base">
-        <button type="button" className="sheet-tool tool-material" onClick={() => onPickMaterial(place?.id ?? null, row?.id ?? null)}>
-          📋 部材リストから入れる
-        </button>
-        <button type="button" className="sheet-tool tool-labor" onClick={() => onPickLabor(place?.id ?? null, row?.id ?? null)}>
-          🔧 施工費から入れる
-        </button>
-        <button type="button" className="sheet-tool tool-kit" onClick={() => onPickKit(place?.id ?? null, row?.id ?? null)}>
-          ＋ 部材＋施工費（常用）から入れる
-        </button>
-      </div>
+    <section className="overflow-clip rounded-xl border-2 border-emerald-800 bg-white shadow-sm" aria-label="見積書">
       {between}
       {clip && (
         <div className="flex flex-wrap items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900" role="status">
@@ -819,12 +818,39 @@ export function EstimateSheet({
           {bar.replace(/\n/g, ' ／ ') || '　'}
         </span>
       </div>
+      <div className="flex flex-col lg:flex-row">
+      {/* 見積書の左のボタン：部材・施工費を入れる（選んでいる箇所に）・行の挿入・削除・コピー・貼付（選んでいる行に）。広い画面では見積書を下へ動かしてもついてくる */}
+      <div className="sheet-side flex shrink-0 flex-wrap gap-2 border-b border-slate-200 bg-slate-50 p-2 lg:sticky lg:top-2 lg:w-60 lg:flex-col lg:self-start lg:border-b-0 lg:border-r" role="toolbar" aria-label="見積書の左のボタン">
+        <button type="button" className="sheet-tool tool-material" onMouseDown={keepSel} onClick={() => onPickMaterial(place?.id ?? null, row?.id ?? null)}>
+          📋 部材リストから入れる
+        </button>
+        <button type="button" className="sheet-tool tool-labor" onMouseDown={keepSel} onClick={() => onPickLabor(place?.id ?? null, row?.id ?? null)}>
+          🔧 施工費から入れる
+        </button>
+        <button type="button" className="sheet-tool tool-kit" aria-label="＋ 部材＋施工費（常用）から入れる" onMouseDown={keepSel} onClick={() => onPickKit(place?.id ?? null, row?.id ?? null)}>
+          <span className="whitespace-nowrap">＋ 部材＋施工費（常用）</span>
+          <span className="whitespace-nowrap">から入れる</span>
+        </button>
+        <div className="grid grid-cols-2 gap-2 lg:mt-2 lg:border-t lg:border-slate-200 lg:pt-3" role="group" aria-label="選んでいる行">
+          <button type="button" className="sheet-rowbtn" onMouseDown={keepSel} onClick={() => rowOp('insert')} disabled={!onLine} title="選んでいる行の下に1行入れる（Ctrl+Shift+＋）">
+            ＋ 挿入
+          </button>
+          <button type="button" className="sheet-rowbtn" onMouseDown={keepSel} onClick={() => rowOp('delete')} disabled={!onLine} title="選んでいる行を消す（部材は同上施工費ごと。Ctrl+－）">
+            ✕ 削除
+          </button>
+          <button type="button" className="sheet-rowbtn" onMouseDown={keepSel} onClick={() => rowOp('copy')} disabled={!onLine} title="選んでいる行をコピー（部材は同上施工費ごと。Ctrl+C）">
+            ⧉ コピー
+          </button>
+          <button type="button" className="sheet-rowbtn" onMouseDown={keepSel} onClick={() => rowOp('paste')} disabled={!clip || !sel} title="コピーした行を、選んでいる行の下に貼り付ける（Ctrl+V）">
+            📋 貼付
+          </button>
+        </div>
+      </div>
       <div
         ref={scrollRef}
-        className="est-sheet relative overflow-auto bg-slate-500"
+        className="est-sheet relative min-w-0 flex-1 overflow-auto bg-slate-500"
         style={{padding: PAD}}
         onMouseDown={onMouseDown}
-        onClick={onClick}
         onDoubleClick={onDoubleClick}
         onMouseOver={onMouseOver}
       >
@@ -872,6 +898,7 @@ export function EstimateSheet({
             />
           </div>
         </div>
+      </div>
       </div>
       {sugPos && (
         <div

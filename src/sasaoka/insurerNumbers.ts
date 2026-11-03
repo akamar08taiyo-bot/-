@@ -67,13 +67,14 @@ export const INSURER_AREAS: Record<Insurer, InsurerArea[]> = {
     {no: '401091', name: '八幡西区'},
   ],
   kurume: [{no: '402032', name: '久留米市'}],
+  iizuka: [{no: '402057', name: '飯塚市'}],
 };
 
 /** 保険者番号を決めるために、保険者のあとに選ぶもの（北九州市・福岡市は区、広域連合は構成市町村。ほかは1つなので選ばない） */
-export const AREA_LABEL: Record<Insurer, string> = {yukuhashi: '', kanda: '', miyako: '', kouiki: '市町村', fukuoka: '区', kitakyushu: '区', kurume: ''};
+export const AREA_LABEL: Record<Insurer, string> = {yukuhashi: '', kanda: '', miyako: '', kouiki: '市町村', fukuoka: '区', kitakyushu: '区', kurume: '', iizuka: ''};
 
 /** 保険者のふつうの名前（選ぶ所の見出し・広域連合の構成市町村の注記に） */
-export const INSURER_GROUP: Record<Insurer, string> = {yukuhashi: '行橋市', kanda: '苅田町', miyako: 'みやこ町', kouiki: '福岡県介護保険広域連合', fukuoka: '福岡市', kitakyushu: '北九州市', kurume: '久留米市'};
+export const INSURER_GROUP: Record<Insurer, string> = {yukuhashi: '行橋市', kanda: '苅田町', miyako: 'みやこ町', kouiki: '福岡県介護保険広域連合', fukuoka: '福岡市', kitakyushu: '北九州市', kurume: '久留米市', iizuka: '飯塚市'};
 
 /**
  * 住所から保険者番号（初めの値）：その保険者の市町村・区の名前が住所にあればその番号。福岡市は住所の区（「福岡市」を書かない住所の「中央区…」も）。
