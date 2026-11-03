@@ -115,6 +115,25 @@ export function CatalogViewer({
   // 拡大・縮小したあと、マウスのあった所（px, py）の絵が同じ所に残るように動かす（cx, cy は前の大きさでの絵の上の位置）
   const anchor = useRef<{px: number; py: number; cx: number; cy: number; ratio: number} | null>(null);
   const [panning, setPanning] = useState(false);
+  // 絵のまわりの余白（px）と窓の幅。つかんで横・上下のどちらへも自由に動かせるように、絵のまわりに窓の4割ずつの余白を置く
+  // （ユーザーの指示「つまみながら、横にずらすと、カタログ全体を動かすことが自由自在に動かすことができる」2026-11-03。前は絵が窓の幅いっぱいで、横には動かなかった）
+  const [pane, setPane] = useState({w: 0, padX: 0, padY: 0});
+  useLayoutEffect(() => {
+    const el = viewRef.current;
+    if (!el) return;
+    const measure = () => {
+      const w = el.clientWidth;
+      const next = {w, padX: Math.round(w * 0.4), padY: Math.round(el.clientHeight * 0.4)};
+      setPane((b) => (b.w === next.w && b.padX === next.padX && b.padY === next.padY ? b : next));
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const paneRef = useRef(pane);
+  paneRef.current = pane;
   // カタログの商品（押せる枠に使う。ビルドで作った文字の一覧から読むので軽い）・出しているページの絵の大きさ（画素）・色を選んでいる商品
   const [products, setProducts] = useState<CatalogProduct[] | null>(null);
   const [natural, setNatural] = useState<{w: number; h: number} | null>(null);
@@ -128,7 +147,7 @@ export function CatalogViewer({
     const r = el.getBoundingClientRect();
     const px = clientX === undefined ? r.width / 2 : clientX - r.left;
     const py = clientY === undefined ? r.height / 2 : clientY - r.top;
-    anchor.current = {px, py, cx: el.scrollLeft + px, cy: el.scrollTop + py, ratio: next / old};
+    anchor.current = {px, py, cx: el.scrollLeft + px - paneRef.current.padX, cy: el.scrollTop + py - paneRef.current.padY, ratio: next / old};
     zoomRef.current = next;
     setZoom(next);
   };
@@ -138,14 +157,16 @@ export function CatalogViewer({
     const el = viewRef.current;
     if (!a || !el) return;
     anchor.current = null;
-    el.scrollLeft = a.cx * a.ratio - a.px;
-    el.scrollTop = a.cy * a.ratio - a.py;
+    el.scrollLeft = paneRef.current.padX + a.cx * a.ratio - a.px;
+    el.scrollTop = paneRef.current.padY + a.cy * a.ratio - a.py;
   }, [zoom]);
-  // ホイールで拡大・縮小（ページを動かすのは、つかんで。ホイールの1目盛りで約 1.15 倍。トラックパッドは細かく）
+  // ホイールはふつうのスクロール（下へ・上へ）。大きく・小さくは上の －／＋（ユーザーの指示「スクロールでズームなどの機能がついているが、スクロールは下にずらす。
+  // ズームは＋－で調整する」2026-11-03。前はホイールで拡大・縮小）。Ctrl＋ホイールだけ拡大・縮小（画面ごと大きくしないように。見積書のプレビューと同じ）
   useEffect(() => {
     const el = viewRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
       const step = e.deltaMode === 1 ? e.deltaY * 0.05 : e.deltaY * 0.0015;
       zoomBy(Math.min(1.25, Math.max(0.8, Math.exp(-step))), e.clientX, e.clientY);
@@ -351,6 +372,14 @@ export function CatalogViewer({
   };
 
   const img = images[current];
+  // ページを替えたら・窓の大きさが変わったら、絵の左上を窓の左上に（まわりの余白の分だけ動かしておく）
+  const hasImg = !!img;
+  useLayoutEffect(() => {
+    const el = viewRef.current;
+    if (!el || !hasImg) return;
+    el.scrollLeft = pane.padX;
+    el.scrollTop = pane.padY;
+  }, [current, pane.padX, pane.padY, hasImg]);
   const tool = 'h-8 min-w-8 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-700 hover:bg-slate-50';
   return (
     <div
@@ -430,11 +459,13 @@ export function CatalogViewer({
         // overscroll-contain：絵の端まで動かしても、うしろの画面（住宅改修の画面など）まで動かさない（ユーザーの指示「写真だけスクロールで移動できるようにする」2026-11-02）
         className={`relative min-h-0 flex-1 overflow-auto overscroll-contain bg-slate-200 ${img ? (panning ? 'cursor-grabbing select-none' : 'cursor-grab') : ''}`}
         aria-label="カタログのページの絵"
-        title="ホイールで大きく・小さく、つかんで動かす"
+        title="つかんで動かす（ホイールで上下。大きさは － ＋）"
       >
         {img ? (
-          // 押せる枠の札の字は、ページの絵の幅に合わせる（cqw。スマホの小さいページで札が商品名を隠さないように）
-          <div className="relative" style={{width: `${zoom * 100}%`, containerType: 'inline-size'}}>
+          // 絵のまわりに余白（窓の4割ずつ）を置いて、つかんでどの向きにも動かせるように。絵の幅は窓の幅×倍率（px）
+          <div className="w-max" style={{padding: `${pane.padY}px ${pane.padX}px`}}>
+          {/* 押せる枠の札の字は、ページの絵の幅に合わせる（cqw。スマホの小さいページで札が商品名を隠さないように） */}
+          <div className="relative" style={{width: pane.w ? `${Math.round(zoom * pane.w)}px` : `${zoom * 100}%`, containerType: 'inline-size'}}>
             <img
               src={img.url}
               alt={catalogLabel(CATALOG[current])}
@@ -476,6 +507,7 @@ export function CatalogViewer({
                   </button>
                 );
               })}
+          </div>
           </div>
         ) : (
           <p className="p-6 text-center text-sm text-slate-500">{img === null ? `${catalogLabel(CATALOG[current])} を読めませんでした` : 'カタログを読み込んでいます…'}</p>

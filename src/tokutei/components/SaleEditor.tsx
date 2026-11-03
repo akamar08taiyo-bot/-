@@ -12,9 +12,9 @@ import type {CatalogAsk} from '../jutaku.ts';
 import type {CatalogPagesFilter, OpenCatalog} from '../catalog.ts';
 import {catalogItemPatch} from '../catalogItems.ts';
 import type {CatalogProduct, CatalogVariant} from '../catalogItems.ts';
-import type {AppData, Product, Sale, SaleItem, SaleStatus} from '../types.ts';
+import type {AppData, Product, Sale, SaleItem} from '../types.ts';
 import type {Update} from '../useStore.ts';
-import {todayIso, yen} from '../util.ts';
+import {yen} from '../util.ts';
 import {fiscalYearOf} from '../wareki.ts';
 import {addressOfZip, isZipHead, withoutDoubledHead, zipCandidates, zipLabel} from '../zip.ts';
 import {ESTIMATE_CAPACITY, ESTIMATE_LABEL, ESTIMATE_NOTE_LINES, estimateNoteOverflow, estimateOverflow, estimatePreview} from '../estimateBook.ts';
@@ -23,6 +23,7 @@ import {saveEstimateBook, useEstimateTemplate} from '../print/estimateFiles.ts';
 import {CatalogPrintView} from '../print/CatalogPrint.tsx';
 import {CatalogViewer} from '../print/CatalogViewer.tsx';
 import {ShinseiPrintView} from '../print/PrintView.tsx';
+import {CatalogOpenFor} from './CatalogPicker.tsx';
 import {CustomerPicker} from './CustomerPicker.tsx';
 import {EstimateInputs} from './EstimateInputs.tsx';
 import {ProductPicker} from './ProductPicker.tsx';
@@ -36,7 +37,6 @@ import {Btn, btnClass, useToast} from './ui.tsx';
 /** 住宅改修の様邸の画面の上の段から頼めること（window.__taiyoTokuteiCmd。住宅改修の TokuteiEditor.tsx と同じ名前） */
 export type TokuteiCmd = 'excel' | 'print' | 'delete' | 'catalog' | 'uriage' | 'hacchu';
 
-const STATUS_DATE: Partial<Record<SaleStatus, keyof Sale>> = {申請: 'applyDate', 承認: 'approveDate', 納品: 'deliveryDate', 集金: 'collectDate'};
 
 export function SaleEditor({
   sale,
@@ -204,14 +204,8 @@ export function SaleEditor({
     toast(`${customerLabel(from)} の内容を入れました`);
   };
 
-  const setStatus = (status: SaleStatus) => {
-    const key = STATUS_DATE[status];
-    const patch: Partial<Sale> = {status, ...(key && !sale[key] ? {[key]: todayIso()} : {})};
-    // 承認（か納品）にしたら、販売受注簿へ自動で送る（ユーザーの指示「販売受注簿にも自動で転記する」。1回だけ。受注簿ツールを開くと「受注簿に入れる」が出る）
-    queueIfReady({...sale, ...patch}, patch);
-    if ((status === '承認' || status === '納品') && !sale.hacchuSentAt && sale.items.length > 0 && sale.burdenRatio === null) toast('負担割合を選ぶと、販売受注簿へ送ります');
-    change(patch);
-  };
+  // 状態（見積・申請・承認・納品・集金）を選ぶ欄はなくした（ユーザーの指示「見積もり・申請・集金などの状態選択機能は不要なのでなくす」2026-11-03）。
+  // 前は承認（か納品）にしたら販売受注簿へ自動で送っていた。いまは「📤 販売受注簿に転記」で送る（前の版で承認にして負担割合がまだの案件は、上の queueIfReady で送る）
 
   // 一度入れた商品は、商品マスタの★お気に入りに入れる（品目ごとに「★ お気に入りから入力」に出る。ユーザーの指示「一度入力した商品は、今後お気に入りの中に、
   // 項目ごとにいれる…当然削除する事もできる」2026-11-03。前は「☆ お気に入りに登録」を押すか、印刷の前に聞いていた）。
@@ -371,6 +365,7 @@ export function SaleEditor({
   }, [fixedView]);
 
   return (
+    <CatalogOpenFor.Provider value={catalogView?.target ?? null}>
     <div className="space-y-4">
       {/* 上の段（ひとりで開いたとき）。住宅改修の様邸のタブの中（fixedView）では出さない：同じボタンを住宅改修の画面の上の段（JobHeader.tsx）に、
           ほかのタブと同じ位置・大きさ・色で出し、押されたらここの cmds を呼ぶ（ユーザーの指示「各タブでEXCEL印刷や保存など、表記の方法やタブの大きさ、順番を統一する。
@@ -519,7 +514,6 @@ export function SaleEditor({
             changeAddress={changeAddress}
             changeZip={changeZip}
             zips={zips}
-            setStatus={setStatus}
             usedYear={prevYear.length ? {count: prevYear.length, used: usedYear, label: `${fy ?? ''}年度`} : null}
             onPickFavorite={setPicking}
             onCatalog={openCatalog}
@@ -662,6 +656,7 @@ export function SaleEditor({
         />
       )}
     </div>
+    </CatalogOpenFor.Provider>
   );
 }
 

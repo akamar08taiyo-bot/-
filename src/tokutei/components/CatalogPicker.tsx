@@ -11,7 +11,7 @@
 // 一つのボタンのみにする」「項目名、メーカー名を入力したその下に、カタログから検索をおく」）。品目・メーカーの段の下に、さがす言葉の欄とこのボタン。
 // 押すと、種目・品目・メーカー・言葉で絞った商品の一覧を出し、カタログの窓もその商品の載っているページだけで開く。
 // 商品を選んだら（一覧でも窓でも）、カタログの窓と一覧（品目・メーカーの段も）を閉じる（ユーザーの指示「商品検索から商品を選んだら、カタログは閉じる。下の一覧表も閉じる」）
-import {useEffect, useRef, useState} from 'react';
+import {createContext, useContext, useEffect, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
 import type {CatalogPagesFilter, OpenCatalog} from '../catalog.ts';
 import {catalogFilter, catalogInCategory, catalogItemPatch, catalogMakers, catalogPagesOf, looseKey, sameMaker} from '../catalogItems.ts';
@@ -22,6 +22,9 @@ import type {SaleItem} from '../types.ts';
 import {MakerInput} from './MakerInput.tsx';
 
 const yen = (n: number) => n.toLocaleString('ja-JP');
+
+/** カタログの窓が開いていれば、その窓で選んだ商品を入れる商品の欄（SaleEditor.tsx の catalogView.target）。品目・メーカーを変えたら窓も切り替える */
+export const CatalogOpenFor = createContext<string | null>(null);
 /** メーカーのプルダウンの「ほかのメーカー（打つ）」 */
 const OTHER = '\u0000other';
 
@@ -95,6 +98,18 @@ export function CatalogPicker({
     if (!item.category && !item.sub && !item.maker.trim() && !item.name.trim()) onCatalog('', undefined, item.id);
     else onCatalog('', filter.pages.length ? {pages: filter.pages, label: filter.label} : undefined, item.id);
   });
+  // 品目・メーカー（・種目）を変えたら、横に開いているカタログの窓も、その品目・メーカーのページだけに切り替える
+  // （ユーザーの指示「メーカー名や品目を変えたら、横に表示されているカタログも自動的に切り替わる」2026-11-03）。窓が開いていない・ほかの欄の窓なら何もしない
+  const openFor = useContext(CatalogOpenFor);
+  const condKey = `${item.category}|${item.sub}|${item.maker.trim()}`;
+  const lastCond = useRef(condKey);
+  useEffect(() => {
+    if (condKey === lastCond.current || !found || !filter) return;
+    lastCond.current = condKey;
+    if (!onCatalog || openFor !== item.id) return;
+    if (!item.category && !item.sub && !item.maker.trim()) onCatalog('', undefined, item.id);
+    else onCatalog('', filter.pages.length ? {pages: filter.pages, label: filter.label} : undefined, item.id);
+  });
   // 選んだ商品（一覧でもカタログの窓でも）になったら、品目・メーカー・商品の段を閉じる
   useEffect(() => {
     if (!picked) return;
@@ -114,10 +129,13 @@ export function CatalogPicker({
     <button
       type="button"
       onClick={() => setSearch((n) => n + 1)}
-      className="h-9 shrink-0 rounded-md border border-sky-300 bg-sky-50 px-2.5 text-sm font-bold text-sky-900 hover:bg-sky-100"
+      className="min-h-9 w-full rounded-md border border-sky-300 bg-sky-50 px-1.5 py-1 text-sm font-bold leading-tight text-sky-900 [word-break:keep-all] hover:bg-sky-100"
       title="種目・品目・メーカーで絞った商品の一覧と、その商品の載っているカタログのページを開く"
     >
-      📖 カタログから商品検索
+      {/* 2行に折れるときは「カタログから／商品検索」で（keep-all と wbr。字の途中で折らない） */}
+      📖 カタログから
+      <wbr />
+      商品検索
     </button>
   );
   const sel = 'h-9 min-w-0 rounded-md border border-slate-300 bg-white px-1.5 text-sm text-slate-800';
@@ -129,7 +147,9 @@ export function CatalogPicker({
   const box = (top: ReactNode, bottom: ReactNode = null) => (
     <div ref={boxRef} role="group" aria-label="カタログの商品" className="grid scroll-mt-4 gap-1.5 rounded-md border border-sky-200 bg-sky-50/60 p-1.5 sm:ml-8">
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">{top}</div>
-      <div className="flex min-w-0 flex-wrap items-start gap-2">
+      {/* 「📖 カタログから商品検索」「🔢 型番から検索」「★ お気に入りから入力」を同じ段に同じ幅で並べる（せまい幅では字を2行に。
+          ユーザーの指示「お気に入りから入力は、型番検索の右にもってくる」2026-11-03。前は横に並べるだけで、パソコンでもお気に入りが下の段に落ちた） */}
+      <div className={code ? 'grid min-w-0 auto-cols-fr grid-flow-col items-stretch gap-1.5' : 'flex min-w-0'}>
         {searchButton}
         {code}
       </div>
@@ -256,7 +276,9 @@ export function CatalogPicker({
                     <span className="rounded bg-teal-100 px-1 text-[10px] text-teal-800">{subShort(p.sub, p.category)}</span>
                     <span className="font-bold">{p.name}</span>
                     {!sameMaker(p.maker, item.maker) && p.maker && <span className="text-xs text-slate-500">{p.maker}</span>}
-                    {prices.length === 1 && prices[0] > 0 && <span className="text-xs text-slate-600">定価 {yen(prices[0])}円（税抜）</span>}
+                    {prices.length === 1 && prices[0] > 0 && <span className="text-xs text-slate-600">定価 {yen(prices[0])}円（{p.taxFree ? '非課税' : '税抜'}）</span>}
+                    {/* 非課税の商品（歩行器・多点杖など。カタログの金額の横の「非課税」）は一覧でも分かるように（ユーザーの指示「しっかりと全ての商品で認識する」2026-11-03） */}
+                    {p.taxFree && (prices.length !== 1 || !(prices[0] > 0)) && <span className="text-xs text-amber-800">非課税</span>}
                     {!many && only && (only.label || only.code) && <span className="text-xs text-slate-500">{[only.label, only.code].filter(Boolean).join(' ')}</span>}
                     {many && (
                       <span className="ml-auto whitespace-nowrap text-xs text-sky-800">

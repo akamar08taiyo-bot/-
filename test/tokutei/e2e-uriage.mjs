@@ -91,7 +91,6 @@ try {
     await page.getByLabel('住所').fill('福岡県行橋市中央1-1');
     await page.getByLabel('居宅介護支援事業所').fill('見本居宅介護支援事業所');
     await page.getByLabel('ケアマネジャー').fill('見本 太郎');
-    await page.getByLabel('納品日').fill('2026-10-30');
     const staff = await page.getByRole('combobox', {name: '担当'}).evaluate((el) => [...el.options].map((o) => o.value).find(Boolean));
     await page.getByRole('combobox', {name: '担当'}).selectOption(staff);
     // 定価の横の「★ お気に入りから入力」：選ぶとその欄の商品になって閉じる（ユーザーの指示「お気に入りから入力をこの辺にもってくる」2026-11-02）
@@ -122,6 +121,8 @@ try {
     await dialog.getByRole('group', {name: '伝票の負担割合'}).getByRole('button', {name: '2割'}).click();
     await dialog.getByLabel('伝票の介護度').selectOption('要介護2');
     await dialog.getByRole('group', {name: '伝票の顧客区分'}).getByRole('button', {name: '新規'}).click();
+    // 納品日は見積もりの画面にはない（ユーザーの指示「納品日（購入日）も不要」2026-11-03）。伝票の窓で入れる（初めは今日）
+    await dialog.getByLabel('伝票の納品日').fill('2026-10-30');
     await dialog.getByText('利用者負担（2割）5,562円・保険者負担 22,246円').waitFor();
     if (!phone) assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 1366);
     else assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);

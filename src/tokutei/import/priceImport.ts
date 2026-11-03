@@ -5,6 +5,7 @@
 // 写したあとに足したもの：TAIS・JAN・税区分・種目（分類）の列、税込の表を税抜に直す、福祉用具のメーカー名。
 // 外したもの：1本の長さ（手すりなど切って使う部材だけに要る）。
 
+import {taxOf} from '../calc.ts';
 import {guessCategory} from '../category.ts';
 import type {Product, TaxType} from '../types.ts';
 import {uid} from '../util.ts';
@@ -758,6 +759,7 @@ export function mergeProducts(existing: Product[], incoming: Candidate[], source
         next.category = c.category;
         next.sub = c.sub;
       }
+      next.taxType = taxOf(next.category, next.taxType); // 歩行器・歩行補助つえは非課税（calc.ts の taxOf）
       const changed = (['name', 'cost', 'listPrice', 'discountRate', 'unit', 'tais', 'jan', 'taxType', 'supplier', 'category', 'sub', 'categoryByHand', 'favorite'] as const).some(
         (k) => next[k] !== p[k],
       );
@@ -779,7 +781,7 @@ export function mergeProducts(existing: Product[], incoming: Candidate[], source
         listPrice: c.listPrice ?? 0,
         cost: c.price ?? 0,
         ...(discountRate === undefined ? {} : {discountRate}),
-        taxType: c.taxType,
+        taxType: taxOf(c.category, c.taxType), // 歩行器・歩行補助つえは非課税（calc.ts の taxOf）
         unit: c.unit,
         supplier,
         favorite: c.favorite,

@@ -1,6 +1,6 @@
 import {useMemo, useState} from 'react';
 import type {ReactNode} from 'react';
-import {unitPriceOf} from '../calc.ts';
+import {taxOf, unitPriceOf} from '../calc.ts';
 import {CATEGORIES, docLabel} from '../category.ts';
 import {makerChoices, productRate} from '../sales.ts';
 import {productsCsv} from '../storage.ts';
@@ -194,7 +194,7 @@ export function ProductsPage({data, update}: {data: AppData; update: Update}) {
                       <CategorySelect
                         category={p.category}
                         sub={p.sub}
-                        onChange={(category, sub) => patch(p.id, {category, sub, categoryByHand: true})}
+                        onChange={(category, sub) => patch(p.id, {category, sub, categoryByHand: true, taxType: taxOf(category, p.taxType)})}
                         className="w-full"
                         ariaLabel={`${p.name}の種目`}
                       />
@@ -321,7 +321,7 @@ export function ProductEditModal({product, settings, makers, onSave, onClose}: {
         </Field>
         <div className="sm:col-span-2">
           <Field label="種目">
-            <CategorySelect category={p.category} sub={p.sub} onChange={(category, sub) => set({category, sub, categoryByHand: true})} />
+            <CategorySelect category={p.category} sub={p.sub} onChange={(category, sub) => set({category, sub, categoryByHand: true, taxType: taxOf(category, p.taxType)})} />
           </Field>
           {p.category && <p className="mt-1 text-xs text-slate-500">申請書・見積書には「{docLabel(p.category, p.sub)}」と書きます。</p>}
         </div>

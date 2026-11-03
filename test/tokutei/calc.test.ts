@@ -216,3 +216,40 @@ test('税込の値段：税抜＋消費税（切り捨て）／税込から税�
   // 税込 28,160円 → 税抜 25,600円 → 定価 32,000円の20%引き
   assert.deepEqual(unitPricePatch({listPrice: 32000}, priceFromTaxIncluded(28160, '10%')), {unitPrice: 25600, discountRate: 20});
 });
+
+test('非課税：歩行器・歩行補助つえは非課税（ユーザーの指示「歩行器（ピックアップ）や四点杖は非課税…全ての商品で認識する」2026-11-03）', async () => {
+  const {taxOf, categoryTaxPatch, taxIncluded} = await import('../../src/tokutei/calc.ts');
+  assert.equal(taxOf('歩行器', '10%'), '非課税');
+  assert.equal(taxOf('歩行補助つえ', '10%'), '非課税');
+  assert.equal(taxOf('入浴補助用具', '10%'), '10%');
+  assert.equal(taxOf('', '非課税'), '非課税'); // 種目の決まらない商品はカタログ・商品マスタのまま（介護リフトなど）
+  // 種目を変えたら：歩行器・歩行補助つえにすると非課税、そこから外すと 10%。非課税のボタンで手で決めた商品は変えない
+  assert.deepEqual(categoryTaxPatch(item(), '歩行補助つえ'), {taxType: '非課税'});
+  assert.deepEqual(categoryTaxPatch(item({category: '歩行器', taxType: '非課税'}), '入浴補助用具'), {taxType: '10%'});
+  assert.deepEqual(categoryTaxPatch(item({category: '歩行器', taxType: '非課税'}), '歩行補助つえ'), {});
+  assert.deepEqual(categoryTaxPatch(item({taxByHand: true}), '歩行器'), {});
+  assert.deepEqual(categoryTaxPatch(item({taxType: '非課税'}), '腰掛便座'), {}); // 手で入れた非課税（種目からではない）はそのまま
+  // 非課税の税込は税抜と同じ。申請書・見積書の金額も消費税なし
+  assert.equal(taxIncluded(8800, '非課税'), 8800);
+  const l = lineOf(item({category: '歩行補助つえ', taxType: '非課税', listPrice: 11000}), S);
+  assert.deepEqual([l.amount, l.tax, l.total], [8800, 0, 8800]);
+  assert.equal(priceNote(l), '定価11,000円（非課税）×0.8');
+});
+
+test('利益率：（販売単価−仕切）÷販売単価。利益率から販売単価（切り上げ。打った利益率を下回らない）（ユーザーの指示「仕切りの部分を入力したら、右側に利益率を表示、利益率をいじると、販売金額が自動的に変わる」2026-11-03）', async () => {
+  const {marginRate, priceFromMargin, unitPricePatch} = await import('../../src/tokutei/calc.ts');
+  assert.equal(marginRate(10000, 7000), 30);
+  assert.equal(marginRate(8800, 6000), 31.8);
+  assert.equal(marginRate(8800, 0), null); // 仕切がなければ出さない
+  assert.equal(marginRate(0, 6000), null);
+  assert.equal(marginRate(5000, 6000), -20); // 仕切より安い（赤字）
+  assert.equal(priceFromMargin(7000, 30), 10000);
+  assert.equal(priceFromMargin(6000, 25), 8000);
+  assert.equal(priceFromMargin(6000, 30), 8572); // 8571.43… → 8572（30.0%）
+  assert.ok(marginRate(8572, 6000)! >= 30);
+  assert.equal(priceFromMargin(6000, 0), 6000);
+  assert.equal(priceFromMargin(0, 30), null);
+  assert.equal(priceFromMargin(6000, 100), null);
+  // 利益率から決めた単価は手で入れた単価と同じ扱い：割引率も変わる（定価 11,000 円）
+  assert.deepEqual(unitPricePatch({listPrice: 11000}, priceFromMargin(6000, 30)), {unitPrice: 8572, discountRate: 22.1});
+});

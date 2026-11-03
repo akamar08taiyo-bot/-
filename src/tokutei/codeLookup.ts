@@ -2,6 +2,7 @@
 // 確実に該当商品に当たるかを照らし合わせる」2026-11-03：型番が「ぴったり同じ」商品だけ（全角・半角、大文字・小文字、空白とハイフンの違いだけは同じとみなす。
 // 前方一致・あいまいな一致はしない）
 import type {CatalogProduct, CatalogVariant} from './catalogItems.ts';
+import {taxOf} from './calc.ts';
 import {catalogItemPatch} from './catalogItems.ts';
 import type {Product, SaleItem} from './types.ts';
 
@@ -27,7 +28,7 @@ export function findByCode(code: string, catalog: CatalogProduct[], products: Pr
     add(p.name, p.maker, {
       key: `m:${p.id}`,
       label: [p.name, p.maker, p.code].filter(Boolean).join('　'),
-      patch: {name: p.name, maker: p.maker, code: p.code, tais: p.tais, category: p.category || item.category, sub: p.sub || item.sub, listPrice: p.listPrice, cost: p.cost, taxType: p.taxType, unit: p.unit || '台', supplier: p.supplier, unitPrice: null},
+      patch: {name: p.name, maker: p.maker, code: p.code, tais: p.tais, category: p.category || item.category, sub: p.sub || item.sub, listPrice: p.listPrice, cost: p.cost, taxType: taxOf(p.category || item.category, p.taxType), taxByHand: false, unit: p.unit || '台', supplier: p.supplier, unitPrice: null},
     });
   }
   for (const p of catalog)

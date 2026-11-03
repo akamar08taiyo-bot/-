@@ -14,6 +14,7 @@ import {CATALOG, catalogPicks} from './catalog.ts';
 import type {CatalogPage} from './catalog.ts';
 import type {Candidate} from './import/priceImport.ts';
 import {CATEGORIES, guessCategory, subShort, WHEELED} from './category.ts';
+import {taxOf} from './calc.ts';
 import {makerKey} from './sales.ts';
 import type {SaleItem} from './types.ts';
 
@@ -667,6 +668,7 @@ export function catalogMakers(list: CatalogProduct[]): string[] {
 
 /** カタログの品番を選んだときに、商品の欄に入れる値（商品名は見出しに色・大きさを足したもの。販売金額は定価×割引率に戻す） */
 export function catalogItemPatch(p: CatalogProduct, v: CatalogVariant, item: Pick<SaleItem, 'category' | 'sub' | 'maker'>): Partial<SaleItem> {
+  const category = p.category || item.category;
   return {
     name: [p.name, v.label].filter(Boolean).join(' '),
     maker: p.maker || item.maker,
@@ -674,8 +676,12 @@ export function catalogItemPatch(p: CatalogProduct, v: CatalogVariant, item: Pic
     tais: v.tais,
     listPrice: v.listPrice,
     unitPrice: null,
-    category: p.category || item.category,
+    category,
     sub: p.sub || item.sub,
+    // 税区分もカタログのとおり（金額の横の「非課税」。歩行器・多点杖など）。前は前の商品の税区分（初めは 10%）のままで、
+    // 非課税の多点杖の税込が1割増しになっていた（ユーザーの指示「歩行器（ピックアップ）や四点杖は非課税。カタログの横にも記載してある」2026-11-03）
+    taxType: p.taxFree ? '非課税' : taxOf(category, '10%'),
+    taxByHand: false,
   };
 }
 

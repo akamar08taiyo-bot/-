@@ -260,3 +260,20 @@ test('カタログの商品の囲みの位置（box）：カタログの窓の�
       assert.ok(x <= 2 || y <= 2, `${a.name} と ${c.name} が重なる`);
     }
 });
+
+test('非課税（カタログの金額の横の「非課税」）：歩行器・多点杖は非課税で、選ぶと税区分も非課税になる（ユーザーの指示「歩行器（ピックアップ）や四点杖は非課税。カタログの横にも記載してある。しっかりと全ての商品で認識する」2026-11-03）', async () => {
+  for (const no of [136, 137, 151, 152, 153, 154]) {
+    for (const p of await productsOf(no)) {
+      if (p.category !== '歩行器' && p.category !== '歩行補助つえ') continue;
+      assert.equal(p.taxFree, true, `p.${no} ${p.name}`);
+      // 選んだときの税区分（前は前の商品の税区分＝初めは 10% のままだった）
+      assert.equal(catalogItemPatch(p, p.variants[0], {category: '', sub: '', maker: ''}).taxType, '非課税', `p.${no} ${p.name}`);
+    }
+  }
+  const quad = (await productsOf(152)).find((p) => p.name === 'エルビスクワド')!;
+  assert.equal(quad.taxFree, true);
+  assert.equal(catalogItemPatch(quad, quad.variants[0], {category: '入浴補助用具', sub: '', maker: ''}).taxType, '非課税');
+  // 課税の商品（シャワーチェア）は 10%。前に非課税の商品を選んでいた欄でも 10% に戻る
+  const chair = (await productsOf(40))[0];
+  assert.equal(catalogItemPatch(chair, chair.variants[0], {category: '歩行器', sub: '', maker: ''}).taxType, '10%');
+});

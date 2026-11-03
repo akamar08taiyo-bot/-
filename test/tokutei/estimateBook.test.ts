@@ -341,7 +341,13 @@ test('算出根拠（税率の右の備考）：定価×割引・手で入れた
   assert.equal(basisNote(line({discountRate: 10})), '定価28,000円の10%引き');
   assert.equal(basisNote(line({discountRate: 0})), '定価28,000円');
   assert.equal(basisNote(line({unitPrice: 21000})), '定価28,000円の25%引き'); // 手で入れた単価でも、ちょうど何%引きならそう書く
-  assert.equal(basisNote(line({unitPrice: 21500})), '定価28,000円');
+  // 手で入れた単価（税込・利益率を打った単価も）は、割引率を書く（ユーザーの指示「当然備考の部分も連動して数字が変わる」2026-11-03。前は「定価28,000円」だけ）。
+  // 小数2けたまでで単価がちょうど合えばその%、合わなければ「約」
+  assert.equal(basisNote(line({unitPrice: 21500})), '定価28,000円の約23.2%引き');
+  assert.equal(basisNote(line({unitPrice: 21560})), '定価28,000円の23%引き');
+  assert.equal(basisNote(line({listPrice: 11000, unitPrice: 8569})), '定価11,000円の22.1%引き');
+  assert.equal(basisNote(line({listPrice: 11000, unitPrice: 8572})), '定価11,000円の22.07%引き');
+  assert.equal(basisNote(line({unitPrice: 28000})), '定価28,000円'); // 定価のまま
   assert.equal(basisNote(line({listPrice: 0, cost: 10000})), ''); // 仕切×125%（仕入れの値段は見せない）
   assert.equal(itemNote(line({basisNote: 'お試し価格'})), 'お試し価格');
   assert.equal(itemNote(line({basisNote: ''})), ''); // 手で消したら空のまま

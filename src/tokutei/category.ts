@@ -18,6 +18,14 @@ export const CATEGORIES: {name: string; subs: string[]}[] = [
   {name: '移動用リフトのつり具の部分', subs: []},
 ];
 
+/**
+ * 消費税のかからない種目（身体障害者用物品：歩行器・歩行補助つえ（多点杖・クラッチ）。介援隊カタログでも金額の横に「非課税」）。
+ * ユーザーの指示「歩行器（ピックアップ）や四点杖は非課税。カタログの横にも記載してある。しっかりと全ての商品で認識する」2026-11-03。
+ * 介護保険で買える歩行器（固定式・交互式）・歩行補助つえは、どれも非課税
+ */
+export const TAX_FREE_CATEGORIES = ['歩行器', '歩行補助つえ'];
+export const taxFreeCategory = (category: string) => TAX_FREE_CATEGORIES.includes(category);
+
 /** category が空なら決まらなかった。warn は対象外と分かったときの理由（画面で知らせる） */
 export type CategoryGuess = {category: string; sub: string; warn: string};
 

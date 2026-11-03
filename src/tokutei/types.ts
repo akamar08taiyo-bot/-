@@ -54,6 +54,8 @@ export type SaleItem = {
   discountRate: number; // 割引率（%）。20 ＝ 2割引き
   unitPrice: number | null; // 販売単価（税抜）を手で入れたとき。null なら 定価×(100−割引率)%
   reason: string; // 福祉用具が必要な理由（申請書の欄。用具ごと）
+  /** 税込の横の「非課税」ボタンで手で決めた（種目・カタログからの自動の非課税を変えない）。2026-11-03 */
+  taxByHand?: boolean;
   // 見積書の税率の右の「備考」（算出根拠）を手で直したとき。null・なしなら自動（「定価28,000円の20%引き」。calc.ts の basisNote）
   basisNote?: string | null;
 };

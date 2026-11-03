@@ -101,7 +101,6 @@ try {
   await page.getByLabel('フリガナ').fill('ミホン ハナコ');
   await page.getByLabel('住所').fill('福岡県行橋市中央1-1');
   await page.getByLabel('電話').fill('0930-00-0000');
-  await page.getByLabel('納品日').fill('2026-10-30');
   await page.getByRole('combobox', {name: '担当'}).selectOption('土居 翔太');
   // 定価の横の「★ お気に入りから入力」：選ぶとその欄の商品になって閉じる（ユーザーの指示「お気に入りから入力をこの辺にもってくる」2026-11-02）
   await page.getByRole('button', {name: '★ お気に入りから入力'}).last().click();
@@ -156,7 +155,7 @@ try {
   assert.equal(await cellValue(order, '住所（任意）'), '福岡県行橋市中央1-1');
   // 見積もりで入れたものは全部入る（ユーザーの問い「全て転記された内容が記載されていますか？」2026-10-27）。依頼者名・売上日・受注番号・発注番号・入荷日は受注簿で入れる欄
   assert.equal(await cellValue(order, '電話番号（任意）'), '0930-00-0000');
-  assert.equal(await cellValue(order, '納品予定日'), '2026-10-30');
+  assert.equal(await cellValue(order, '納品予定日'), ''); // 見積もりの画面に納品日の欄はない（ユーザーの指示「納品日（購入日）も不要」2026-11-03）。受注簿で入れる
   // 商品の欄（商品名・型番・仕切り・販売単価など）は入力欄の値で見る
   const fields = await fieldValues(order);
   for (const v of ['シャワーチェア 見本A', 'A-100', '1', '15800', '9480', '12640', '20']) assert.ok(fields.includes(v), `1ページ目に「${v}」がない：${fields.join('／')}`);
@@ -188,8 +187,8 @@ try {
   assert.equal((await benefit(order))['利用者負担額(1割・税込)'], '2,781円');
   await order.close();
 
-  // ---- 状態を「承認」にすると、販売受注簿へ自動で送る（ユーザーの指示「販売受注簿にも自動で転記する」2026-10-25）。1回だけ。
-  // 受注簿ツールをふつうに開くと「受注簿に入れる」が出る（列 taiyo-hacchu-import-queue-v1 から。入れたら列から消える）
+  // ---- 状態（見積・申請・承認・…）を選ぶ欄はない（ユーザーの指示「見積もり・申請・集金などの状態選択機能は不要なのでなくす」2026-11-03）。
+  // 前は「承認」にすると販売受注簿へ自動で送っていた。いまは「📤 販売受注簿に転記」で送る。負担割合を選んでも、ひとりでには送らない
   await page.goto(`${site}/tokutei/`);
   await page.getByRole('button', {name: '📝 見積もり・申請'}).click();
   await page.getByRole('button', {name: '＋ 行橋市'}).click();
@@ -198,37 +197,12 @@ try {
   await page.getByRole('button', {name: 'シャワーチェア 見本Aを入れる'}).click();
   await page.getByRole('dialog', {name: 'お気に入りから入力'}).waitFor({state: 'detached'});
   await page.getByText('13,904円').first().waitFor();
+  assert.equal(await page.getByRole('group', {name: '状態', exact: true}).count(), 0);
+  assert.equal(await page.getByLabel('納品日', {exact: true}).count(), 0);
   const queue = () => page.evaluate(() => JSON.parse(localStorage.getItem('taiyo-hacchu-import-queue-v1') ?? '[]'));
-  assert.deepEqual(await queue(), []);
-  // 負担割合を選んでいないうちは送らず、選んだときに送る（受注簿の給付内訳は負担割合で決まる。2026-10-27）
-  await page.getByRole('group', {name: '状態'}).getByRole('button', {name: '承認'}).click();
-  await page.getByText('負担割合を選ぶと、販売受注簿へ送ります').waitFor();
-  assert.deepEqual(await queue(), []);
   await page.getByRole('group', {name: '負担割合', exact: true}).first().getByRole('button', {name: '1割'}).click();
-  await page.getByText('販売受注簿へ送りました').waitFor();
-  const queued = await queue();
-  assert.equal(queued.length, 1);
-  assert.equal(queued[0].kind, 'taiyo-tokutei-order');
-  assert.equal(queued[0].customerName, '見本 次郎');
-  await page.waitForTimeout(800); // 保存（送った時刻 hacchuSentAt）
-  // 納品にしても、もう送らない
-  await page.getByRole('group', {name: '状態'}).getByRole('button', {name: '納品'}).click();
-  await page.waitForTimeout(300);
-  assert.equal((await queue()).length, 1);
-
-  const auto = await ctx.newPage();
-  auto.on('pageerror', (e) => errors.push(`受注簿（自動）: ${e}`));
-  auto.on('dialog', (d) => d.accept()); // 「前回の入力は消えて…置き換わります」（上で入れた受注簿がこの端末に残っている）
-  await auto.goto(`${site}/taiyo-hacchu-scan/`);
-  const autoDrawer = auto.getByLabel('特定福祉用具の見積もりから');
-  await autoDrawer.getByRole('heading', {name: '特定福祉用具の見積もりから商品が届いています'}).waitFor();
-  assert.match(await autoDrawer.innerText(), /見本 次郎様 特定福祉用具 の商品 1点です/);
-  await auto.screenshot({path: `${out}/hacchu-5-auto-drawer.png`});
-  await autoDrawer.getByRole('button', {name: '受注簿に入れる'}).click();
-  await auto.getByText('特定福祉用具1点を入れました').waitFor();
-  assert.equal(await auto.evaluate(() => localStorage.getItem('taiyo-hacchu-import-queue-v1')), null); // 列が空になったら消す
-  assert.equal(await cellValue(auto, '顧客名'), '見本 次郎');
-  await auto.close();
+  await page.waitForTimeout(800);
+  assert.deepEqual(await queue(), []);
 
   assert.deepEqual(errors, []);
   console.log('ok: 見積もり → 📤 販売受注簿に転記 → 受注簿に入れる（給付・1点1ページ・給付内訳は見積書と同じ合計）→ 印刷 → 直したらふつうの計算');

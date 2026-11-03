@@ -5,6 +5,7 @@
 // 前に読んだときと印が違えば、別のタブが保存したということなので、読み直す・まとめてから保存する（sync.ts）。
 
 import {CARE_LEVELS, DEFAULT_STAFF, DEFAULT_SUPPLIERS, defaultSettings, OFFICES, SETTINGS_REV} from './defaults.ts';
+import {taxOf} from './calc.ts';
 import {cleanJutakuFields} from './jutaku.ts';
 import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Product, Sale, SaleItem, SaleStatus, Settings, TaxType} from './types.ts';
 import {uid} from './util.ts';
@@ -213,7 +214,7 @@ export function cleanProducts(raw: unknown): Product[] {
     cost: Math.max(0, numv(p.cost)),
     // 割引率は決めた商品だけ（なければ設定の割引率）
     ...(optNum(p.discountRate) === null ? {} : {discountRate: Math.min(100, Math.max(0, optNum(p.discountRate)!))}),
-    taxType: tax(p.taxType),
+    taxType: taxOf(str(p.category), tax(p.taxType)), // 歩行器・歩行補助つえは非課税（calc.ts の taxOf）
     unit: str(p.unit),
     supplier: str(p.supplier),
     favorite: p.favorite === true,
@@ -236,7 +237,9 @@ function cleanItem(i: Record<string, unknown>): SaleItem {
     sub: str(i.sub),
     unit: str(i.unit),
     supplier: str(i.supplier),
-    taxType: tax(i.taxType),
+    // 歩行器・歩行補助つえは非課税（前の版で 10% のまま入れた多点杖なども直す。非課税ボタンで手で決めた商品はそのまま。calc.ts の taxOf）
+    taxType: i.taxByHand === true ? tax(i.taxType) : taxOf(str(i.category), tax(i.taxType)),
+    ...(i.taxByHand === true ? {taxByHand: true} : {}),
     listPrice: Math.max(0, numv(i.listPrice)),
     cost: Math.max(0, numv(i.cost)),
     qty: Math.max(0, numv(i.qty, 1)),

@@ -185,9 +185,10 @@ try {
   await page.getByLabel('浴槽台 ユクリアが必要な理由', {exact: true}).fill('浴槽内での立ち座りが困難なため。');
   await page.getByLabel('居宅介護支援事業所').fill('見本居宅介護支援事業所');
   await page.getByLabel('ケアマネジャー').fill('見本 太郎');
-  // 申請日・支給申請日の欄はない（申請書には書かない。Excel で手入力。2026-10-28）。状態の納品日は残す（売上月・販売受注簿に使う。申請書には書かない）
-  for (const l of ['申請日', '支給申請日']) assert.equal(await page.getByLabel(l, {exact: true}).count(), 0, l);
-  await page.getByLabel('納品日').fill('2026-10-30');
+  // 申請日・支給申請日の欄はない（申請書には書かない。Excel で手入力。2026-10-28）。状態（見積・申請・…）と納品日（購入日）の欄もない
+  // （ユーザーの指示「見積もり・申請・集金などの状態選択機能は不要なのでなくす」「納品日（購入日）も不要」2026-11-03）
+  for (const l of ['申請日', '支給申請日', '納品日']) assert.equal(await page.getByLabel(l, {exact: true}).count(), 0, l);
+  assert.equal(await page.getByRole('group', {name: '状態', exact: true}).count(), 0);
   await page.waitForTimeout(600);
   assert.equal(await page.getByText('未入力（空欄のまま作ります）').count(), 0);
   await page.screenshot({path: `${out}/04b-sale-shinsei.png`, fullPage: true});
@@ -594,24 +595,25 @@ try {
   await viewer.getByRole('button', {name: '大きく'}).click();
   assert.ok((await imgW()) > w0 * 1.15);
   assert.equal((await viewer.getByRole('button', {name: 'もとの大きさ'}).textContent())?.trim(), '120%');
-  // ホイールで大きく・小さく（マウスの所を中心に）、つかんで動かせる（ユーザーの指示「画像内をうごかせるようにする。スクロールでアップと縮小をできるようにする」2026-10-27）
+  // ホイールは下へ・上へのスクロール（大きさは変えない）、大きさは － ＋（ユーザーの指示「スクロールは下にずらす。ズームは＋－で調整する」2026-11-03。前はホイールで拡大・縮小）。
+  // つかんで横にも上下にも自由に動かせる（絵のまわりに余白。「つまみながら、横にずらすと、カタログ全体を動かすことが自由自在に動かすことができる」2026-11-03）
   const pageArea = viewer.getByLabel('カタログのページの絵');
   const area = await pageArea.boundingBox();
   await page.mouse.move(area.x + area.width * 0.7, area.y + area.height * 0.6);
   const w1 = await imgW();
-  for (let k = 0; k < 4; k++) await page.mouse.wheel(0, -100);
-  await page.waitForFunction((w) => document.querySelector('[aria-label="カタログのページの絵"] img').getBoundingClientRect().width > w * 1.5, w1);
   const scrolled = () => pageArea.evaluate((el) => ({left: el.scrollLeft, top: el.scrollTop}));
+  const sw = await scrolled();
+  await page.mouse.wheel(0, 200);
+  await page.waitForFunction((t) => document.querySelector('[aria-label="カタログのページの絵"]').scrollTop > t + 50, sw.top);
+  assert.ok(Math.abs((await imgW()) - w1) < 2, 'ホイールで大きさが変わった');
+  await viewer.getByRole('button', {name: 'もとの大きさ'}).click(); // 100%：絵は窓の幅いっぱい
   const s0 = await scrolled();
-  assert.ok(s0.left > 0 && s0.top > 0, JSON.stringify(s0)); // マウスの所を中心に大きくしたので、右下へ動いている
+  await page.mouse.move(area.x + area.width * 0.5, area.y + area.height * 0.5);
   await page.mouse.down();
-  await page.mouse.move(area.x + area.width * 0.7 - 80, area.y + area.height * 0.6 - 60, {steps: 5});
+  await page.mouse.move(area.x + area.width * 0.5 + 80, area.y + area.height * 0.5 + 60, {steps: 5});
   await page.mouse.up();
   const s1 = await scrolled();
-  assert.ok(Math.abs(s1.left - (s0.left + 80)) < 3 && Math.abs(s1.top - (s0.top + 60)) < 3, `${JSON.stringify(s0)} ${JSON.stringify(s1)}`);
-  for (let k = 0; k < 4; k++) await page.mouse.wheel(0, 100);
-  await page.waitForFunction((w) => document.querySelector('[aria-label="カタログのページの絵"] img').getBoundingClientRect().width < w * 1.2, w1);
-  await viewer.getByRole('button', {name: 'もとの大きさ'}).click();
+  assert.ok(Math.abs(s1.left - (s0.left - 80)) < 3 && Math.abs(s1.top - (s0.top - 60)) < 3, `横・上へ動かない ${JSON.stringify(s0)} ${JSON.stringify(s1)}`);
   assert.ok(Math.abs((await imgW()) - w0) < 2);
   // 🖨 印刷 はカタログの印刷の画面。Esc で印刷の画面だけ閉じる（窓は残る）
   await viewer.getByRole('button', {name: '🖨 印刷'}).click();
@@ -843,8 +845,15 @@ try {
     await el.fill(v);
     await el.blur();
   };
+  // 歩行補助つえ（多点杖）は非課税：見出しは「定価（非課税）」「販売金額（非課税）」、税込は税抜と同じ。税込の横の「非課税」ボタンで課税にもできる
+  // （ユーザーの指示「歩行器（ピックアップ）や四点杖は非課税…全ての商品で認識する」「念のため、税込み金額の横に非課税ボタンを設置」2026-11-03）
+  const taxFree = shinseiForm.locator('[data-item]').getByRole('button', {name: /非課税$/}); // 商品はこの1つだけ
+  assert.equal(await taxFree.getAttribute('aria-pressed'), 'true');
   await typeIn('割引率', '30');
   await valueIs('販売金額', '6,300');
+  await valueIs('販売金額（税込）', '6,300');
+  assert.match(await shinseiForm.innerText(), /販売金額（非課税）/);
+  await taxFree.click(); // 課税（10%）に
   await valueIs('販売金額（税込）', '6,930');
   await page.waitForFunction(() => document.querySelector('[aria-label="申請書のプレビュー"]')?.textContent?.includes('6,930'));
   await typeIn('販売金額', '7000');
@@ -861,12 +870,9 @@ try {
   await typeIn('割引率', String(rate));
   const one = Math.floor(((9000 * (100 - rate)) / 100) * 1.1);
   await valueIs('販売金額（税込）', one.toLocaleString('ja-JP'));
-  // 数量（− ＋。ユーザーの指示「数量を追加」2026-10-26。販売見積書の数量と同じ値）。2つ以上なら下にその数量の金額（税抜・税込。字の大きさはそろえる）
-  await shinseiForm.getByRole('button', {name: '見本の多点杖 ワイドの数量を1増やす'}).click();
-  await page.waitForFunction(() => document.querySelector('[aria-label="見本の多点杖 ワイドの数量"]')?.value === '2');
-  await shinseiForm.getByLabel('数量分の金額').getByText(`税込 ${Math.floor(((9000 * (100 - rate)) / 100) * 2 * 1.1).toLocaleString('ja-JP')}円`).waitFor();
-  await shinseiForm.getByRole('button', {name: '見本の多点杖 ワイドの数量を1減らす'}).click();
-  await shinseiForm.getByLabel('数量分の金額').waitFor({state: 'detached'});
+  // 数量（− ＋）は出さない（ユーザーの指示「台数は２台にすることがないので、数量機能は不要」2026-11-03。前は「数量を追加」2026-10-26）
+  assert.equal(await shinseiForm.getByRole('button', {name: '見本の多点杖 ワイドの数量を1増やす'}).count(), 0);
+  assert.equal(await shinseiForm.getByLabel('数量分の金額').count(), 0);
   await valueIs('販売金額（税込）', one.toLocaleString('ja-JP'));
   // 2つ目からは、最後の商品のすぐ下の横いっぱいの点線の枠。押すと足した商品の種目の欄へ移る（消して元に戻す）
   const addItem = shinseiForm.getByRole('button', {name: ADD_ITEM});
@@ -1075,16 +1081,17 @@ try {
   await pickViewer.waitFor({state: 'detached'});
   assert.equal(await picker.getByRole('list').count(), 0);
   await page.screenshot({path: `${out}/05k-catalog-picked.png`});
-  // 「📖 カタログから商品検索」は品目・メーカーのすぐ下・商品名の上。「★ お気に入りから入力」は定価の行（ユーザーの指示 2026-11-02）
+  // 「📖 カタログから商品検索」は品目・メーカーのすぐ下・商品名の上。「★ お気に入りから入力」は「🔢 型番から検索」の右（ユーザーの指示「お気に入りから入力は、型番検索の右にもってくる」2026-11-03）
   const yOf = async (loc) => (await loc.boundingBox()).y;
   assert.ok((await yOf(makerSel)) < (await yOf(searchBtn)) && (await yOf(searchBtn)) < (await yOf(catForm.getByLabel('商品名'))));
-  // 狭い幅（申請書のタブ）では定価・割引率の行のすぐ下に折れる
-  const favBox = await catForm.getByRole('button', {name: '★ お気に入りから入力'}).boundingBox();
-  const rateBox = await catForm.getByLabel('割引率').boundingBox();
+  // 狭い幅（申請書のタブ）では次の段の左に折れる
+  const favBox = await picker.getByRole('button', {name: '★ お気に入りから入力'}).boundingBox();
+  const codeBtnBox = await picker.getByRole('button', {name: '🔢 型番から検索'}).boundingBox();
   assert.ok(
-    (favBox.x > rateBox.x + rateBox.width && Math.abs(favBox.y + favBox.height / 2 - (rateBox.y + rateBox.height / 2)) < 3) || (favBox.y >= rateBox.y + rateBox.height - 1 && favBox.y < rateBox.y + rateBox.height + 12),
-    `${JSON.stringify(favBox)} ${JSON.stringify(rateBox)}`,
+    (favBox.x > codeBtnBox.x + codeBtnBox.width && Math.abs(favBox.y - codeBtnBox.y) < 3) || (favBox.y >= codeBtnBox.y + codeBtnBox.height - 1 && Math.abs(favBox.x - btnBox.x) < 2),
+    `${JSON.stringify(favBox)} ${JSON.stringify(codeBtnBox)}`,
   );
+  assert.equal(await catForm.locator('[data-item]').first().getByRole('button', {name: '★ お気に入りから入力'}).count(), 1); // 定価の行には出さない
   // 品番を打って「🔢 型番から検索」：ぴったり同じ型番の商品がこの欄に入る（2つ目にはならない）
   await catForm.getByLabel('品番').fill('PN-L41431A');
   await picker.getByRole('button', {name: '🔢 型番から検索'}).click();

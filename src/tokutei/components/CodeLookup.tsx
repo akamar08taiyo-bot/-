@@ -85,10 +85,12 @@ export function CodeLookup({
       type="button"
       onClick={() => void look()}
       disabled={busy}
-      className="h-9 shrink-0 rounded-md border border-slate-300 bg-white px-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+      className="min-h-9 w-full rounded-md border border-slate-300 bg-white px-1.5 py-1 text-sm font-bold leading-tight text-slate-700 [word-break:keep-all] hover:bg-slate-50 disabled:opacity-60"
       title="商品名の右の品番の欄の型番とぴったり同じ商品を、カタログ・商品マスタから入れる"
     >
-      🔢 型番から検索
+      🔢 型番から
+      <wbr />
+      検索
     </button>
   );
   const note =

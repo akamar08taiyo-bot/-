@@ -174,13 +174,19 @@ export function AddItemButton({next, noun, onAdd}: {next: number; noun: string; 
 }
 
 /**
- * 定価の横の「★ お気に入りから入力」（ユーザーの指示「お気に入りから入力をこの辺にもってくる」2026-11-02。前は商品の欄の下の「★ 商品を選ぶ」で、
+ * 「★ お気に入りから入力」：手で入れる商品の欄は「🔢 型番から検索」の右（ユーザーの指示「お気に入りから入力は、型番検索の右にもってくる」2026-11-03）、
+ * 商品マスタの商品の欄は定価の横（ユーザーの指示「お気に入りから入力をこの辺にもってくる」2026-11-02。前は商品の欄の下の「★ 商品を選ぶ」で、
  * 選ぶと新しい商品の行が増えた）。商品マスタの★お気に入り（なければすべて）から選ぶと、この欄の商品になる（SaleEditor の pickFavorite）
  */
-export function FavoriteButton({onClick}: {onClick: () => void}) {
+export function FavoriteButton({onClick, className = ''}: {onClick: () => void; className?: string}) {
   return (
-    <Btn color="teal" small onClick={onClick}>
-      ★ お気に入りから入力
+    <Btn color="teal" small onClick={onClick} className={`[word-break:keep-all] ${className}`}>
+      {/* Btn は inline-flex なので、字は1つの span に（wbr の前後が別の並びにならないように） */}
+      <span>
+        ★ お気に入り
+        <wbr />
+        から入力
+      </span>
     </Btn>
   );
 }

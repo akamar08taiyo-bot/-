@@ -3,11 +3,43 @@
 // 1円未満の決まり：販売単価・消費税・保険者負担は切り捨て、利用者負担は切り上げ（販売受注簿・売上伝票発行依頼書と同じ）。
 // 介護保険の負担は整数で計算する（Math.floor(対象×(1−0.3)) のように小数をかけると、3割のとき1円少なくなることがある）。
 
+import {taxFreeCategory} from './category.ts';
 import type {Sale, SaleItem, Settings, TaxType} from './types.ts';
 
 /** 税率（%） */
 export function taxPct(t: TaxType): number {
   return t === '非課税' ? 0 : t === '8%' ? 8 : 10;
+}
+
+/**
+ * 商品の税区分：歩行器・歩行補助つえ（多点杖など）は非課税（category.ts の TAX_FREE_CATEGORIES）、ほかは商品マスタ・カタログの税区分のまま。
+ * ユーザーの指示「歩行器（ピックアップ）や四点杖は非課税…しっかりと全ての商品で認識する」2026-11-03
+ */
+export const taxOf = (category: string, taxType: TaxType): TaxType => (taxFreeCategory(category) ? '非課税' : taxType);
+
+/**
+ * 種目を変えたときの税区分：歩行器・歩行補助つえにしたら非課税、そこから外したら 10%。
+ * 税込の横の「非課税」ボタンで手で決めた商品（taxByHand）は変えない（ユーザーの指示「念のため、税込み金額の横に非課税ボタンを設置」2026-11-03）
+ */
+export function categoryTaxPatch(item: Pick<SaleItem, 'category' | 'taxType' | 'taxByHand'>, category: string): Partial<SaleItem> {
+  if (item.taxByHand) return {};
+  if (taxFreeCategory(category)) return item.taxType === '非課税' ? {} : {taxType: '非課税'};
+  if (taxFreeCategory(item.category) && item.taxType === '非課税') return {taxType: '10%'};
+  return {};
+}
+
+/**
+ * 利益率（%。小数1けた）＝（販売単価 − 仕切）÷ 販売単価。仕切か単価がなければ null
+ * （ユーザーの指示「仕切りの部分を入力したら、右側に利益率を表示、利益率をいじると、販売金額が自動的に変わる」2026-11-03。商品マスタの利益率と同じ、販売価格に対する率）
+ */
+export function marginRate(unitPrice: number, cost: number): number | null {
+  if (!(cost > 0) || !(unitPrice > 0)) return null;
+  return Math.round(((unitPrice - cost) / unitPrice) * 1000) / 10;
+}
+/** 利益率（%）から販売単価（税抜）＝ 仕切 ÷（1 − 利益率）。円未満は切り上げ（打った利益率を下回らないように）。仕切がない・100%以上なら null */
+export function priceFromMargin(cost: number, rate: number): number | null {
+  if (!(cost > 0) || !Number.isFinite(rate) || rate >= 100) return null;
+  return Math.max(0, Math.ceil(Math.round((cost / (1 - rate / 100)) * 1e6) / 1e6));
 }
 
 /** 円の金額を1円単位の整数に（小数の誤差をなくす） */
@@ -182,16 +214,27 @@ export function rateText(discountRate: number): string {
 
 /**
  * 見積書の税率の右の「備考」に書く算出根拠（ユーザーの指示「税率の横に、備考を入れて、算出根拠をいれる。例えば税抜定価が28000円で20%引きするのであれば、その旨を記載」2026-10-25）。
- * 定価×割引：「定価28,000円の20%引き」。手で単価を入れた行は、定価からちょうど何%引きなら同じ書き方、そうでなければ「定価28,000円」。
+ * 定価×割引：「定価28,000円の20%引き」。手で単価を入れた行（税抜・税込・利益率を打った行）も、定価からの割引率を書く
+ * （ユーザーの指示「利益率をいじると、販売金額が自動的に変わる」「当然備考の部分も連動して数字が変わる」2026-11-03。前は、ちょうど何%引きでなければ「定価28,000円」だけ）：
+ * 小数2けたまでで、その割引率から計算した単価（切り捨てか四捨五入）がちょうど同じになれば「の23.21%引き」、ならなければ小数1けたで「の約23.2%引き」。
  * 定価のない商品（仕切×125% など）は書かない（仕入れの値段をお客様に見せない）
  */
 export function basisNote(line: Line): string {
   const list = toYen(line.item.listPrice);
   if (list <= 0 || line.basis === 'cost' || line.basis === 'none') return '';
   const base = `定価${Math.round(list).toLocaleString('ja-JP')}円`;
-  const off = line.basis === 'list' ? Math.round(line.item.discountRate) : Math.round((1 - line.unitPrice / list) * 1000) / 10;
-  if (line.basis === 'manual' && (!Number.isInteger(off) || Math.floor((list * (100 - off)) / 100) !== line.unitPrice)) return base;
-  return off > 0 ? `${base}の${off}%引き` : base;
+  if (line.basis === 'list') {
+    const off = Math.round(line.item.discountRate);
+    return off > 0 ? `${base}の${off}%引き` : base;
+  }
+  const raw = (1 - line.unitPrice / list) * 100;
+  if (!(raw > 0.0001)) return base; // 定価のまま・定価より高い
+  for (const d of [1, 10, 100]) {
+    const off = Math.round(raw * d) / d;
+    const at = (list * (100 - off)) / 100;
+    if (off > 0 && (Math.floor(at + 1e-9) === line.unitPrice || Math.round(at) === line.unitPrice)) return `${base}の${off}%引き`;
+  }
+  return `${base}の約${Math.round(raw * 10) / 10}%引き`;
 }
 /** 見積書の備考の欄に出す文（手で直していればそれ。手で空にしたら空） */
 export const itemNote = (line: Line): string => (typeof line.item.basisNote === 'string' ? line.item.basisNote.trim() : basisNote(line));
@@ -200,6 +243,6 @@ export const itemNote = (line: Line): string => (typeof line.item.basisNote === 
 export function priceNote(line: Line): string {
   const list = toYen(line.item.listPrice);
   if (list <= 0) return '';
-  const base = `定価${Math.round(list).toLocaleString('ja-JP')}円（税抜）`;
+  const base = `定価${Math.round(list).toLocaleString('ja-JP')}円（${line.item.taxType === '非課税' ? '非課税' : '税抜'}）`;
   return line.basis === 'list' ? `${base}×${rateText(line.item.discountRate)}` : base;
 }

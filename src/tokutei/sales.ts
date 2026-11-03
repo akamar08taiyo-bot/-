@@ -1,5 +1,6 @@
 // 案件（お客様1件の販売）を作る・写す・商品マスタから明細を入れる部品。画面から呼ぶ（計算は calc.ts）
 
+import {taxOf} from './calc.ts';
 import {DEFAULT_MAKERS, INSURERS} from './defaults.ts';
 import type {Product, Sale, SaleItem, Settings} from './types.ts';
 import {todayIso, uid} from './util.ts';
@@ -90,7 +91,7 @@ export function itemFromProduct(p: Product, settings: Pick<Settings, 'discountRa
     sub: p.sub,
     unit: p.unit || '台',
     supplier: p.supplier,
-    taxType: p.taxType,
+    taxType: taxOf(p.category, p.taxType), // 歩行器・歩行補助つえは非課税（calc.ts の taxOf）
     listPrice: p.listPrice,
     cost: p.cost,
     qty: 1,
@@ -294,14 +295,16 @@ export function customerPatch(from: Sale): Partial<Sale> {
 const saleDay = (s: Pick<Sale, 'deliveryDate' | 'applyDate' | 'estimateDate'>) => s.deliveryDate || s.applyDate || s.estimateDate;
 
 /**
- * このアプリの記録にある、同じお客様の同じ年度の申請（申請・承認・納品・集金の案件）。
- * 今年度の残り（10万円 − 使った分）を出すのに使う。ほかの事業所で買った分は入っていない
+ * このアプリの記録にある、同じお客様の同じ年度の申請（前の版で状態を申請・承認・納品・集金にした案件と、販売受注簿に送った案件）。
+ * 今年度の残り（10万円 − 使った分）を出すのに使う。ほかの事業所で買った分は入っていない。
+ * 状態（見積・申請・…）を選ぶ欄はなくした（ユーザーの指示「見積もり・申請・集金などの状態選択機能は不要なのでなくす」2026-11-03）ので、
+ * 新しい案件は「📤 販売受注簿に転記」で送ったら申請した（買った）ものとみなす（見積もりのままの案件・書きかけの複製を数えないように）
  */
 export function sameYearSales(sales: Sale[], current: Sale): Sale[] {
   const key = customerKey(current);
   const year = fiscalYearOf(saleDay(current));
   if (!key || year === null) return [];
-  return sales.filter((s) => s.id !== current.id && s.status !== '見積' && customerKey(s) === key && fiscalYearOf(saleDay(s)) === year);
+  return sales.filter((s) => s.id !== current.id && (s.status !== '見積' || !!s.hacchuSentAt) && customerKey(s) === key && fiscalYearOf(saleDay(s)) === year);
 }
 
 /** 入力欄の▼のリストの候補（多い順。設定で消した値は除く。Suggest.tsx の SuggestInput） */

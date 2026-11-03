@@ -89,6 +89,31 @@ try {
   assert.ok(list > 0);
   log('型番から入力 OK');
 
+  // ---- 品目・メーカーを変えたら、開いているカタログの窓も、その品目・メーカーのページに切り替わる
+  // （ユーザーの指示「メーカー名や品目を変えたら、横に表示されているカタログも自動的に切り替わる」2026-11-03）。「★ お気に入りから入力」は「🔢 型番から検索」の右
+  const picker = block.getByRole('group', {name: 'カタログの商品'});
+  const favBox = await picker.getByRole('button', {name: '★ お気に入りから入力'}).boundingBox();
+  assert.ok(favBox.x > lBox.x + lBox.width && Math.abs(favBox.y - lBox.y) < 4, `${JSON.stringify(lBox)} ${JSON.stringify(favBox)}`);
+  await picker.getByRole('button', {name: '📖 カタログから商品検索'}).click();
+  const viewer = page.getByRole('dialog', {name: 'カタログ'});
+  await viewer.waitFor();
+  const pageNames = () =>
+    page.evaluate(() => [...document.querySelectorAll('[aria-label="カタログのページ"] button')].map((b) => b.textContent).filter((t) => /p\.\d+/.test(t)));
+  await page.waitForFunction(() => [...document.querySelectorAll('[aria-label="カタログのページ"] button')].some((b) => /パナソニック/.test(b.textContent)), null, {timeout: 60000});
+  assert.ok((await pageNames()).every((t) => /パナソニック/.test(t)), (await pageNames()).join(' | '));
+  await picker.getByRole('combobox', {name: 'メーカー', exact: true}).selectOption('アロン化成（株）');
+  await page.waitForFunction(() => {
+    const t = [...document.querySelectorAll('[aria-label="カタログのページ"] button')].map((b) => b.textContent).filter((x) => /p\.\d+/.test(x));
+    return t.length > 0 && t.every((x) => !/パナソニック/.test(x));
+  }, null, {timeout: 30000});
+  await page.screenshot({path: `${out}/items-catalog-switch.png`});
+  await picker.getByRole('combobox', {name: 'メーカー', exact: true}).selectOption('パナソニックエイジフリー（株）');
+  await viewer.getByRole('button', {name: 'カタログを閉じる'}).click();
+  await viewer.waitFor({state: 'detached'});
+  // 数量（− ＋）は出さない（ユーザーの指示「台数は２台にすることがないので、数量機能は不要」2026-11-03）
+  assert.equal(await block.getByRole('button', {name: /の数量を1増やす$/}).count(), 0);
+  log('品目・メーカーを変えたらカタログの窓も切り替わる・お気に入りは型番から検索の右・数量なし OK');
+
   // ---- 税抜・税込・割引率（新しい見積もりは見積もりのタブ＝「販売単価」、申請書のタブは「販売金額」。部品は同じ PriceFields.tsx）
   const P = (await page.locator('[aria-label="販売金額"]').count()) ? '販売金額' : '販売単価';
   const valueIs = async (label, v) => {
@@ -115,6 +140,62 @@ try {
   const [ex, inc] = [await block.getByLabel(P, {exact: true}).boundingBox(), await block.getByLabel(`${P}（税込）`).boundingBox()];
   assert.ok(inc.x > ex.x + ex.width && Math.abs(inc.y - ex.y) < 2, `${JSON.stringify(ex)} ${JSON.stringify(inc)}`);
   log('税抜・税込・割引率 OK');
+
+  // ---- 仕切を入れたら右に利益率。利益率を打つと販売金額・割引率・備考（算出根拠）が変わる
+  // （ユーザーの指示「仕切りの部分を入力したら、右側に利益率を表示、利益率をいじると、販売金額が自動的に変わる」「当然備考の部分も連動して数字が変わる」2026-11-03）
+  assert.equal(await block.getByLabel('利益率').count(), 0); // 仕切が空のうちは出さない
+  const cost = Math.floor(p30 * 0.6);
+  await block.getByLabel('仕切').fill(String(cost));
+  await block.getByLabel('仕切').blur();
+  const rateOf = (price) => String(Math.round(((price - cost) / price) * 1000) / 10);
+  await valueIs('利益率', rateOf(p30));
+  const [cb, mb] = [await block.getByLabel('仕切').boundingBox(), await block.getByLabel('利益率').boundingBox()];
+  assert.ok(mb.x > cb.x + cb.width && Math.abs(mb.y - cb.y) < 2, `利益率は仕切の右 ${JSON.stringify(cb)} ${JSON.stringify(mb)}`);
+  const before = P === '販売単価' ? await block.getByLabel('算出根拠').inputValue() : '';
+  await block.getByLabel('利益率').fill('25');
+  await block.getByLabel('利益率').blur();
+  const p25 = Math.ceil(cost / 0.75 - 1e-9);
+  await valueIs(P, p25.toLocaleString('ja-JP'));
+  await valueIs('利益率', rateOf(p25));
+  if (P === '販売単価') {
+    const note = await block.getByLabel('算出根拠').inputValue();
+    assert.notEqual(note, before);
+    assert.match(note, new RegExp(`^定価${list.toLocaleString('ja-JP')}円の(約)?[\\d.]+%引き$`), note);
+  }
+  await page.screenshot({path: `${out}/items-margin.png`});
+  log('仕切 → 利益率 → 販売金額・割引率・備考 OK');
+
+  // ---- 非課税：多点杖（カタログの金額の横に「非課税」）を型番から入れると非課税。「定価（非課税）」「単価（非課税）」、税込は税抜と同じ。
+  // 税込の横の「非課税」ボタンで切りかえられる（ユーザーの指示「歩行器（ピックアップ）や四点杖は非課税…しっかりと全ての商品で認識する」
+  // 「念のため、税込み金額の横に非課税ボタンを設置。販売見積書も全く同様の入力方法にする」「単価（税抜き）と書いてある場所も非課税に書き換える」2026-11-03）
+  await page.getByRole('button', {name: /^＋ \d+つ目の(福祉用具|商品)を追加$/}).click();
+  const cane = page.locator('[data-item]').nth(1);
+  await cane.getByLabel('種目').selectOption('歩行補助つえ');
+  await cane.getByLabel('品番', {exact: true}).fill('ELB-G4BK');
+  await cane.getByRole('button', {name: '🔢 型番から検索'}).click();
+  await cane.getByRole('status').filter({hasText: '✓ 型番'}).waitFor({timeout: 60000});
+  assert.equal(await cane.getByLabel('商品名').inputValue(), 'エルビスクワド');
+  const free = cane.getByRole('button', {name: /非課税$/});
+  assert.equal(await free.getAttribute('aria-pressed'), 'true');
+  const caneText = await cane.innerText();
+  assert.match(caneText, /定価（非課税）/);
+  assert.match(caneText, new RegExp(`${P === '販売単価' ? '単価' : '販売金額'}（非課税）`));
+  assert.doesNotMatch(caneText, /（税抜）/);
+  const caneEx = await cane.getByLabel(P, {exact: true}).inputValue();
+  assert.equal(await cane.getByLabel(`${P}（税込）`).inputValue(), caneEx);
+  // 販売見積書も申請書と同じ入れ方：税率・単位の欄はない
+  assert.equal(await page.getByLabel('税区分').count(), 0);
+  assert.equal(await page.getByLabel('単位', {exact: true}).count(), 0);
+  await cane.screenshot({path: `${out}/items-taxfree.png`});
+  // ボタンで課税に → 税込は1割増し・見出しは（税抜）。もう一度押すと非課税
+  await free.click();
+  await page.waitForFunction(() => document.querySelectorAll('[data-item]')[1]?.querySelector('button[aria-pressed="false"]'));
+  const n = Number(caneEx.replace(/,/g, ''));
+  await valueIs(`${P}（税込）`, (n + Math.floor(n / 10)).toLocaleString('ja-JP'));
+  assert.match(await cane.innerText(), /定価（税抜）/);
+  await free.click();
+  await valueIs(`${P}（税込）`, caneEx);
+  log('非課税（カタログ・種目・ボタン）OK');
 
   // ---- はみ出し：長い商品名・メーカー名でも申請書のプレビューの欄から出ない
   await block.getByLabel('商品名').fill('見本のシャワーチェアAir ミドルワイドSPワンタッチ プレミアム ブルー');

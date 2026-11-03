@@ -7,7 +7,7 @@ import {areaLabel, insurerAreas, insurerNoOf} from '../insurerNumbers.ts';
 import {useEffect, useMemo, useRef, useState} from 'react';
 import type {ReactNode, RefObject} from 'react';
 import type {FocusEvent} from 'react';
-import {lineOf} from '../calc.ts';
+import {categoryTaxPatch, lineOf} from '../calc.ts';
 import type {Line} from '../calc.ts';
 import {CARE_LEVELS, INSURERS, OFFICES, settingsForOffice} from '../defaults.ts';
 import {blankItem, makerChoices, suggestValues} from '../sales.ts';
@@ -23,7 +23,7 @@ import {CatalogPicker} from './CatalogPicker.tsx';
 import {CodeLookup} from './CodeLookup.tsx';
 import {PriceFields} from './PriceFields.tsx';
 import {ReasonField} from './ReasonField.tsx';
-import {AddItemButton, Circles, EraBirthInput, InsuredNoInput, KanaInput, nextOnEnter} from './ShinseiParts.tsx';
+import {AddItemButton, Circles, EraBirthInput, FavoriteButton, InsuredNoInput, KanaInput, nextOnEnter} from './ShinseiParts.tsx';
 import {SuggestInput} from './Suggest.tsx';
 import {Btn, TextInput} from './ui.tsx';
 
@@ -254,7 +254,7 @@ export function ShinseiInputs({
                   {/* 1行目：種目とメーカー（ユーザーの指示「入力順は、種目、商品名の順」2026-10-26、「少し行数が長い」2026-11-03 で同じ行に。狭い幅ではメーカーが下に折れる） */}
                   <div className="flex min-w-0 flex-wrap items-center gap-2 pr-7">
                     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-teal-100 text-xs font-bold text-teal-800">{idx + 1}</span>
-                    <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => changeItem(i.id, {category, sub})} ariaLabel="種目" className="w-40 min-w-0 shrink" />
+                    <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => changeItem(i.id, {category, sub, ...categoryTaxPatch(i, category)})} ariaLabel="種目" className="w-40 min-w-0 shrink" />
                     {/* 手で入れる商品のメーカーは、下のカタログの枠のプルダウン（ユーザーの指示「入浴補助用具の右側のリストは不要」2026-11-03） */}
                     {i.productId !== null && (i.maker || i.code) && <span className="min-w-0 text-xs text-slate-500">{[i.maker, i.code].filter(Boolean).join('　')}</span>}
                     {/* 消すのは右上（販売見積書と同じ。金額の横だとスマホの幅で1段下に落ちた） */}
@@ -284,7 +284,12 @@ export function ShinseiInputs({
                             onCatalog={onCatalog}
                             onPicked={onCatalogPicked}
                             makerChoices={makers}
-                            code={code.button}
+                            code={
+                              <>
+                                {code.button}
+                                <FavoriteButton onClick={() => onPickFavorite(i.id)} className="!h-auto min-h-9 w-full !px-1.5 !py-1 !text-sm leading-tight" />
+                              </>
+                            }
                             codeNote={code.note}
                           />
                           <div className="flex min-w-0 items-center gap-2 sm:ml-8">
@@ -304,10 +309,9 @@ export function ShinseiInputs({
                     line={l}
                     change={(patch) => changeItem(i.id, patch)}
                     listEditable={i.productId === null}
-                    onPickFavorite={() => onPickFavorite(i.id)}
+                    onPickFavorite={i.productId === null ? undefined : () => onPickFavorite(i.id)}
                     priceLabel="販売金額"
                     priceAria="販売金額"
-                    unit={<span className="text-sm text-slate-700">{i.unit}</span>}
                   />
                 </div>
               );

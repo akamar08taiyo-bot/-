@@ -2,24 +2,16 @@ import {useEffect, useMemo, useState} from 'react';
 import {saleTotals} from '../calc.ts';
 import {INSURERS, insurerLabel} from '../defaults.ts';
 import {copySale, customerLabel, newSale} from '../sales.ts';
-import type {AppData, Sale, SaleStatus} from '../types.ts';
+import type {AppData, Sale} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {dateLabel, matchesAll, yen} from '../util.ts';
 import {Btn, TextInput, useToast} from './ui.tsx';
-
-const STATUS_COLOR: Record<SaleStatus, string> = {
-  見積: 'bg-slate-100 text-slate-700',
-  申請: 'bg-amber-100 text-amber-800',
-  承認: 'bg-sky-100 text-sky-800',
-  納品: 'bg-emerald-100 text-emerald-800',
-  集金: 'bg-teal-200 text-teal-900',
-};
 
 /** 見積もりの最初の画面：新しく作る（保険者を選ぶ）と、作った見積もりの一覧 */
 export function SalesPage({data, update, onOpen, onPrint}: {data: AppData; update: Update; onOpen: (id: string) => void; onPrint: (id: string) => void}) {
   const toast = useToast();
   const [query, setQuery] = useState('');
-  const [status, setStatus] = useState<SaleStatus | ''>('');
+  // 状態（見積・申請・…）で絞る欄・一覧の状態の札は外した（ユーザーの指示「見積もり・申請・集金などの状態選択機能は不要なのでなくす」2026-11-03）
 
   const create = (insurer: string) => {
     const sale = newSale(data.sales, data.settings, insurer);
@@ -32,11 +24,10 @@ export function SalesPage({data, update, onOpen, onPrint}: {data: AppData; updat
       [...data.sales]
         .filter(
           (x) =>
-            (status === '' || x.status === status) &&
             matchesAll(`${x.customer} ${x.kana} ${x.quoteNo} ${insurerLabel(x.insurer, x.insurerName)} ${x.items.map((i) => i.name).join(' ')} ${x.careManager} ${x.careOffice}`, query),
         )
         .sort((a, b) => (b.estimateDate || '').localeCompare(a.estimateDate || '') || b.createdAt - a.createdAt),
-    [data.sales, query, status],
+    [data.sales, query],
   );
 
   const remove = (sale: Sale) => {
@@ -45,9 +36,9 @@ export function SalesPage({data, update, onOpen, onPrint}: {data: AppData; updat
     toast('消しました');
   };
   // 先頭のチェックで選んで、まとめて消す（ユーザーの指示「一括で削除ボタンをつくる」2026-10-26。住宅改修の見積もりの一覧の「N件を選んでいます…削除する」と同じ形）。
-  // 消す前にいつも確かめる（元に戻せない）。検索・状態の絞りを変えたら選んだものは外す
+  // 消す前にいつも確かめる（元に戻せない）。検索を変えたら選んだものは外す
   const [checked, setChecked] = useState<Set<string>>(() => new Set());
-  useEffect(() => setChecked(new Set()), [query, status]);
+  useEffect(() => setChecked(new Set()), [query]);
   const picked = shown.filter((x) => checked.has(x.id));
   const allChecked = shown.length > 0 && picked.length === shown.length;
   const toggle = (id: string) =>
@@ -87,14 +78,6 @@ export function SalesPage({data, update, onOpen, onPrint}: {data: AppData; updat
           </label>
         )}
         <TextInput value={query} onChange={setQuery} placeholder="お客様名・商品名・ケアマネで検索" className="w-64" aria-label="見積もりを検索" />
-        <select value={status} onChange={(e) => setStatus(e.target.value as SaleStatus | '')} className="h-9 rounded-md border border-slate-300 px-2 text-sm" aria-label="状態で絞る">
-          <option value="">すべての状態</option>
-          {(Object.keys(STATUS_COLOR) as SaleStatus[]).map((x) => (
-            <option key={x} value={x}>
-              {x}
-            </option>
-          ))}
-        </select>
         <span className="ml-auto text-sm text-slate-500">{shown.length}件</span>
       </div>
       {picked.length > 0 && (
@@ -121,7 +104,6 @@ export function SalesPage({data, update, onOpen, onPrint}: {data: AppData; updat
                 <input type="checkbox" checked={checked.has(x.id)} onChange={() => toggle(x.id)} className="h-4 w-4 shrink-0" aria-label={`${customerLabel(x)}を選ぶ`} />
                 <button type="button" onClick={() => onOpen(x.id)} className="min-w-0 flex-1 text-left">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className={`rounded px-2 py-0.5 text-xs font-bold ${STATUS_COLOR[x.status]}`}>{x.status}</span>
                     <span className="font-bold text-slate-800">{customerLabel(x)}</span>
                     <span className="text-xs text-slate-500">{insurerLabel(x.insurer, x.insurerName)}</span>
                   </div>

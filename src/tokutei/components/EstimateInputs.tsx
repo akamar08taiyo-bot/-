@@ -5,7 +5,7 @@
 // 下の「お客様・申請」の行は見積書には出ないが、申請書と販売受注簿に使う（申請書の画面と同じ値）
 import {useMemo, useState} from 'react';
 import type {FocusEvent, ReactNode, RefObject} from 'react';
-import {basisNote, lineOf} from '../calc.ts';
+import {basisNote, categoryTaxPatch, lineOf} from '../calc.ts';
 import type {Line, Totals} from '../calc.ts';
 import {CARE_LEVELS, INSURERS} from '../defaults.ts';
 import {showsSelfPay, userBurdenLine} from '../estimateBook.ts';
@@ -13,7 +13,7 @@ import type {EstimateField} from '../estimateBook.ts';
 import {blankItem, makerChoices, suggestValues, unregisteredItems} from '../sales.ts';
 import {carePlanOf} from '../shinsei.ts';
 import type {OpenCatalog} from '../catalog.ts';
-import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Product, Sale, SaleItem, SaleStatus, TaxType} from '../types.ts';
+import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Product, Sale, SaleItem} from '../types.ts';
 import {yen} from '../util.ts';
 import {zipLabel} from '../zip.ts';
 import type {ZipHit} from '../zip.ts';
@@ -22,12 +22,11 @@ import {CatalogPicker} from './CatalogPicker.tsx';
 import {CodeLookup} from './CodeLookup.tsx';
 import {PriceFields} from './PriceFields.tsx';
 import {ReasonField} from './ReasonField.tsx';
-import {AddItemButton, Circles, EraBirthInput, InsuredNoInput, KanaInput} from './ShinseiParts.tsx';
+import {AddItemButton, Circles, EraBirthInput, FavoriteButton, InsuredNoInput, KanaInput} from './ShinseiParts.tsx';
 import {SuggestInput} from './Suggest.tsx';
-import {Btn, NumberInput, OptionalNumberInput, TextInput} from './ui.tsx';
+import {Btn, OptionalNumberInput, TextInput} from './ui.tsx';
 
 const dateInput = 'h-9 rounded-md border border-slate-300 bg-white px-2 text-sm outline-none focus:border-blue-500';
-const STATUSES: SaleStatus[] = ['見積', '申請', '承認', '納品', '集金'];
 
 export function EstimateInputs({
   sale,
@@ -42,7 +41,6 @@ export function EstimateInputs({
   changeAddress,
   changeZip,
   zips,
-  setStatus,
   usedYear,
   onPickFavorite,
   onCatalog,
@@ -64,7 +62,6 @@ export function EstimateInputs({
   changeAddress: (address: string) => void;
   changeZip: (zip: string) => void;
   zips: ZipHit[];
-  setStatus: (status: SaleStatus) => void;
   usedYear: {count: number; used: number; label: string} | null; // 今年度の申請（このアプリの記録）
   onPickFavorite: (itemId: string) => void; // 定価の横の「★ お気に入りから入力」：商品マスタから選んで、その欄の商品にする
   onCatalog: OpenCatalog; // 右にカタログの窓を開く（print/CatalogViewer.tsx。商品検索のときは絞ったページだけ）
@@ -284,9 +281,8 @@ export function EstimateInputs({
           />,
           'note',
         )}
-        {head('状態')}
-        {row('状態', <Circles<SaleStatus> label="状態" value={sale.status} onPick={(x) => x && setStatus(x)} options={STATUSES.map((x) => [x, x] as const)} />)}
-        {row('納品日（購入日）', <input type="date" value={sale.deliveryDate} onChange={(e) => change({deliveryDate: e.target.value})} className={dateInput} aria-label="納品日" />)}
+        {/* 状態（見積・申請・承認・納品・集金）と納品日（購入日）の欄は外した（ユーザーの指示「見積もり・申請・集金などの状態選択機能は不要なのでなくす」
+            「納品日（購入日）も不要」2026-11-03）。前に入れた状態・納品日は残る（売上の月・販売受注簿の納品予定日に使う。sales.ts の sameYearSales） */}
         {withShinsei && (
           <>
             {head('お客様・申請（申請書と販売受注簿に使う）')}
@@ -433,7 +429,8 @@ function ItemBlock({
           狭い幅ではメーカーが下に折れる）。消すのは右上 */}
       <div className="flex min-w-0 flex-wrap items-center gap-2 pr-7">
         <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-teal-100 text-xs font-bold text-teal-800">{no}</span>
-        <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => change({category, sub})} ariaLabel="種目" className="w-40 min-w-0 shrink" />
+        {/* 種目を歩行器・歩行補助つえにしたら非課税（calc.ts の categoryTaxPatch） */}
+        <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => change({category, sub, ...categoryTaxPatch(i, category)})} ariaLabel="種目" className="w-40 min-w-0 shrink" />
         {/* 手で入れる商品のメーカーは、下のカタログの枠のプルダウン（ユーザーの指示「入浴補助用具の右側のリストは不要」2026-11-03） */}
         {!manual && <span className="min-w-0 text-xs text-slate-500">{[i.maker, i.code, i.tais && `TAIS ${i.tais}`].filter(Boolean).join('　')}</span>}
         {remove && (
@@ -449,7 +446,20 @@ function ItemBlock({
         <CodeLookup item={i} products={products} onPick={change} onPicked={onPicked}>
           {(code) => (
             <>
-              <CatalogPicker item={i} onPick={change} onCatalog={onCatalog} onPicked={onPicked} makerChoices={makers} code={code.button} codeNote={code.note} />
+              <CatalogPicker
+                item={i}
+                onPick={change}
+                onCatalog={onCatalog}
+                onPicked={onPicked}
+                makerChoices={makers}
+                code={
+                  <>
+                    {code.button}
+                    <FavoriteButton onClick={onPickFavorite} className="!h-auto min-h-9 w-full !px-1.5 !py-1 !text-sm leading-tight" />
+                  </>
+                }
+                codeNote={code.note}
+              />
               <div className="flex min-w-0 items-center gap-2 sm:ml-8">
                 <TextInput value={i.name} onChange={(name) => change({name})} placeholder="商品名" className="min-w-0 flex-1 text-sm" aria-label="商品名" />
                 {code.input}
@@ -460,34 +470,16 @@ function ItemBlock({
       ) : (
         <TextInput value={i.name} onChange={(name) => change({name})} placeholder="商品名" className="min-w-0 text-sm sm:ml-8" aria-label="商品名" />
       )}
-      {/* 定価・割引率／税抜・税込／数量・税率・仕切（PriceFields.tsx。ユーザーの指示 2026-11-03「税込の合計金額は、税抜きの横に」「税抜き金額、税込み金額を変更すると、
-          自動的に割引率が変わる…逆もしかり」「少し行数が長い」） */}
+      {/* 定価・割引率／単価（税抜・非課税）と税込・非課税のボタン／仕切・利益率（PriceFields.tsx。申請書のタブと全く同じ入れ方。ユーザーの指示 2026-11-03
+          「税込の合計金額は、税抜きの横に」「念のため、税込み金額の横に非課税ボタンを設置。販売見積書も全く同様の入力方法にする」「仕切りの部分を入力したら、右側に利益率を表示」。
+          前の税率（10%・軽減8%・非課税）・単位の欄はなくした） */}
       <PriceFields
         line={l}
         change={change}
-        listEditable
-        onPickFavorite={onPickFavorite}
+        listEditable={manual}
+        onPickFavorite={manual ? undefined : onPickFavorite}
         priceLabel="単価"
         priceAria="販売単価"
-        unit={<TextInput value={i.unit} onChange={(unit) => change({unit})} placeholder="台" className="w-11 px-1.5 text-center" aria-label="単位" />}
-        extra={
-          <>
-            <span className="flex shrink-0 items-center gap-1.5">
-              <span className="text-xs font-bold text-slate-500">税率</span>
-              <select value={i.taxType} onChange={(e) => change({taxType: e.target.value as TaxType})} className="h-9 w-[5.5rem] rounded-md border border-slate-300 bg-white px-1.5 text-sm font-normal text-slate-800" aria-label="税区分">
-                <option value="10%">10%</option>
-                <option value="8%">軽減 8%</option>
-                <option value="非課税">非課税</option>
-              </select>
-            </span>
-            {manual && (
-              <span className="flex shrink-0 items-center gap-1.5">
-                <span className="text-xs font-bold text-slate-500">仕切（任意）</span>
-                <NumberInput value={i.cost} onChange={(cost) => change({cost})} min={0} blankZero className="w-24" ariaLabel="仕切" />
-              </span>
-            )}
-          </>
-        }
       />
       {/* 備考（算出根拠）は横いっぱい・見出しと同じ行（表の右の列だとスマホの幅で「定価135,000円の20%引き」が切れた） */}
       <div className="flex min-w-0 items-center gap-x-2 sm:pl-8">
