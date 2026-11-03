@@ -137,6 +137,8 @@ export function SettingsPage({data, update, cloud}: {data: AppData; update: Upda
         <Field label="電話番号">{text('tel')}</Field>
         <Field label="FAX番号">{text('fax')}</Field>
         <Field label="登録番号（インボイス）">{text('regNo', 'T＋13桁')}</Field>
+        {/* 久留米市の申請書の「受領委任払い取扱事業所登録番号」のマスに入る（ユーザーの答え「登録番号を設定で入れる（初めは空）」2026-11-03） */}
+        <Field label="久留米市の受領委任払い取扱事業所登録番号（8けた）">{text('entrustRegNo', '市から届いた番号')}</Field>
         <Field label="請求書の担当者（任意・様邸ごとの担当とは別）">{text('person', '例：山本')}</Field>
       </Section>
 

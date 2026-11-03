@@ -11,6 +11,7 @@ import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {strFromU8, unzipSync} from 'fflate';
 import {excelSave} from './e2eDocs.mjs';
+import {navItem} from './more.mjs';
 
 const [site, outDir = 'e2e-out'] = process.argv.slice(2);
 mkdirSync(outDir, {recursive: true});
@@ -49,6 +50,13 @@ page.on('dialog', (d) => void d.accept());
 form = page.getByRole('form', {name: '申請書'});
 preview = page.getByLabel('申請書のプレビュー');
 await page.goto(`${site}/jutaku-mitsumori/index.html`);
+// 設定に久留米市の受領委任払い取扱事業所登録番号（架空の8けた。初めは空）
+await (await navItem(page, '設定')).click();
+const regNo = page.getByLabel('久留米市の受領委任払い取扱事業所登録番号（8けた）');
+assert.equal(await regNo.inputValue(), '');
+await regNo.fill('12345678');
+await page.waitForTimeout(1200);
+await (await navItem(page, /見積もり・申請書を作成する/)).click();
 await page.getByRole('button', {name: /サンプルで試す/}).click();
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
@@ -105,9 +113,13 @@ assert.deepEqual([text(a, 'AN20'), text(a, 'AN22')], ['令和8年11月10日', '�
 assert.match(text(a, 'J30'), /^[\d,]+$/);
 assert.equal(text(a, 'BA30'), '■');
 assert.equal(text(a, 'AS44'), '0942-11-2222');
+// 受領委任払い取扱事業所登録番号：設定の久留米市の登録番号（8けた）を右の8マスに（上で設定に入れた架空の番号。ユーザーの答え「登録番号を設定で入れる（初めは空）」2026-11-03）
+const BOXES = ['AN', 'AP', 'AR', 'AT', 'AV', 'AX', 'AZ', 'BB', 'BD', 'BF'];
+assert.equal(BOXES.map((c) => text(a, `${c}18`) || '_').join(''), '__12345678');
 const b = '支給申請書';
 assert.deepEqual([text(b, 'J4'), text(b, 'J6'), text(b, 'P11'), text(b, 'AZ33'), text(b, 'AS46')], ['サンプル　ヤマダ', '（サンプル）山田', '見本町1-2-3', '■', '0942-11-2222']);
 assert.equal(text(b, 'J16'), '■ 手すりの取り付け');
+assert.equal(BOXES.map((c) => text(b, `${c}21`) || '_').join(''), '__12345678');
 assert.equal(sheets.size, 11);
 log('Excel（事前承認申請書・支給申請書）OK');
 

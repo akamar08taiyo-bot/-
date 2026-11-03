@@ -4,12 +4,13 @@ import test from 'node:test';
 import {strFromU8, unzipSync, zipSync} from 'fflate';
 import {estimateTotals} from '../../src/sasaoka/calc.ts';
 import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
-import {DEFAULT_PLACES, defaultSettings} from '../../src/sasaoka/defaults.ts';
+import {DEFAULT_PLACES, defaultSettings, settingsForOffice} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {areaInsurerNo, INSURER_AREAS, insurerNoOf} from '../../src/sasaoka/insurerNumbers.ts';
 import {ageOn, boxLabels, checkBoxes, cityRest, fillShinsei, placeCounts, fixedPitch, hangLines, hangPrefixes, indentOf, splitNumber, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, kindNamesOf, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoNoteText, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, sheetLines, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
 import {KK_CELLS} from '../../src/sasaoka/shinsei/kitakyushuCells.ts';
 import {shinseiPreview} from '../../src/sasaoka/shinseiPreview.ts';
+import {cleanSettings} from '../../src/sasaoka/storage.ts';
 import type {Insurer, Job, PhotoMark, Place, Row, ShinseiInfo, ShinseiMarks} from '../../src/sasaoka/types.ts';
 
 const RATES = {estimateRate: 0.8, estimateLaborRate: 1.5, estimateOverheadRate: 0.1, taxRate: 0.1};
@@ -1762,6 +1763,26 @@ test('久留米市：理由書の作成者を入れていなければ「同左�
   assert.equal(txt(a, 'AI29'), '');
   assert.deepEqual(['BA30', 'BA31', 'BA32'].map((r) => txt(a, r)), ['', '', '■']);
   assert.doesNotMatch(txt(a, 'J6'), /歳/);
+});
+
+// ユーザーの答え「登録番号を設定で入れる（初めは空）」（2026-11-03）：受領委任払い取扱事業所登録番号は設定の久留米市の登録番号（8けた）を右に寄せて
+test('久留米市：受領委任払い取扱事業所登録番号は設定の登録番号を右の8マスに（左の2マスは斜線のまま。なければ空）', () => {
+  const COLS = ['AN', 'AP', 'AR', 'AT', 'AV', 'AX', 'AZ', 'BB', 'BD', 'BF'];
+  const boxes = (s: typeof KR_S & {entrustRegNo?: string}) => {
+    const {byName} = sheets(fillShinsei(KURUME, SHINSEI.kurume!, shinseiValues(krJob(), s)));
+    return [COLS.map((c) => txt(byName.get('事前承認申請書')!, `${c}18`) || '_').join(''), COLS.map((c) => txt(byName.get('支給申請書')!, `${c}21`) || '_').join('')];
+  };
+  assert.deepEqual(boxes({...KR_S, entrustRegNo: '12345678'}), ['__12345678', '__12345678']);
+  assert.deepEqual(boxes({...KR_S, entrustRegNo: '１２３４ ５６７８'}), ['__12345678', '__12345678']); // 全角・すき間も
+  assert.deepEqual(boxes(KR_S), ['__________', '__________']);
+  assert.deepEqual(boxes({...KR_S, entrustRegNo: ''}), ['__________', '__________']);
+});
+
+test('久留米市の登録番号の設定：初めは空・前に保存した設定にもない・入れた番号は残る', () => {
+  assert.equal(defaultSettings().entrustRegNo ?? '', '');
+  assert.equal(cleanSettings({officeName: '行橋営業所'}).entrustRegNo ?? '', '');
+  assert.equal(cleanSettings({officeName: '行橋営業所', entrustRegNo: '12345678'}).entrustRegNo, '12345678');
+  assert.equal(settingsForOffice({...defaultSettings(), entrustRegNo: '12345678'}, '久留米営業所').entrustRegNo, '12345678'); // 営業所を替えても消さない
 });
 
 test('久留米市の原本：事前承認申請書・支給申請書・平面図・写真の用紙8枚。前の申請の名残りがない', () => {

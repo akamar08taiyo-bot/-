@@ -547,6 +547,7 @@ export function cleanSettings(raw: unknown): Settings {
     'fax',
     'person',
     'regNo',
+    'entrustRegNo',
     'bank',
     'subject',
     'invoiceNote',
