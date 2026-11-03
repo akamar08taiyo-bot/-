@@ -436,7 +436,7 @@ function PlaceCard({
           <button type="button" onClick={onCopy} className="rounded px-2 py-1 text-xs font-bold text-slate-500 hover:bg-slate-100" title="この箇所を複製">
             複製
           </button>
-          <button type="button" onClick={onRemove} className="rounded px-2 py-1 text-xs font-bold text-rose-600 hover:bg-rose-50" title="この箇所を削除">
+          <button type="button" onClick={onRemove} className="rounded px-2 py-1 text-xs font-bold text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="この箇所を削除">
             削除
           </button>
         </div>
@@ -506,7 +506,7 @@ function PlaceCard({
                     >
                       ▼
                     </button>
-                    <button type="button" onClick={() => onRows(place.rows.filter((x) => x.id !== r.id))} className="rounded px-1.5 text-rose-600 hover:bg-rose-50" title="この行を削除" aria-label="この行を削除">
+                    <button type="button" onClick={() => onRows(place.rows.filter((x) => x.id !== r.id))} className="rounded px-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700" title="この行を削除" aria-label="この行を削除">
                       ×
                     </button>
                   </td>

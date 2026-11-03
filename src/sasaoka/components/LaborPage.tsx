@@ -93,7 +93,7 @@ export function LaborPage({data, update}: {data: AppData; update: Update}) {
                   <button
                     type="button"
                     onClick={() => update('labor', (list) => list.filter((x) => x.id !== l.id))}
-                    className="rounded px-1.5 text-rose-600 hover:bg-rose-50"
+                    className="rounded px-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"
                     title="削除"
                     aria-label={`${l.name}を削除`}
                   >

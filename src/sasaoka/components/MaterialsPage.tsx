@@ -251,7 +251,7 @@ export function MaterialsPage({data, update}: {data: AppData; update: Update}) {
                   <td className="px-1 text-center">
                     <button
                       type="button"
-                      className="rounded px-1.5 text-rose-600 hover:bg-rose-50"
+                      className="rounded px-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"
                       title="削除"
                       aria-label={`${m.name}を削除`}
                       onClick={() => update('materials', (all) => all.filter((x) => x.id !== m.id))}

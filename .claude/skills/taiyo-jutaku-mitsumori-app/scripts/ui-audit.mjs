@@ -234,10 +234,9 @@ for (const size of sizesArg.split(',')) {
         // 部材・施工費・常用は、空いた行の内容の欄の左の「部材｜施工費｜常用」（2026-11-03 から。いちばん下の打ち込める行のものを押す）
         for (const [kind, nm] of [['material', '部材リスト'], ['labor', '施工費のリスト'], ['kit', '部材＋施工費（常用）']]) {
           await step(`住宅改修-${ins}-${nm}`, async () => {
-            // 1つ目を押したあとは、その行が選んだ行（tr[data-current]）になり、ボタンはそちらに出る（e2e-sheet.mjs の pickHere と同じ）
+            // 1つ目の画面を閉じたあとは、ボタンが動いて（光る）いて「止まるまで待つ」が終わらないので force で押す（e2e-sheet.mjs の clickStable と同じ）
             const cur = page.locator(`tr[data-current] [data-pick="${kind}"]`);
-            if (await cur.count()) await cur.first().click({force: true});
-            else await page.locator(`tr[data-new] [data-pick="${kind}"]`).first().click();
+            await ((await cur.count()) ? cur : page.locator(`tr[data-new] [data-pick="${kind}"]`)).first().click({force: true});
             await page.waitForTimeout(500);
           });
           await closeDialog();

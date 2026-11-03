@@ -257,7 +257,7 @@ function OrderRow({line: l, no, onQty, onReset, onRemove}: {line: OrderLine; no:
         type="button"
         onClick={onRemove}
         aria-label={`${label}を発注書から消す`}
-        className="col-start-2 row-start-1 h-9 w-9 self-start rounded-md border border-slate-300 bg-white text-lg font-bold text-rose-600 hover:bg-rose-50 sm:col-start-auto sm:row-start-auto sm:self-center"
+        className="col-start-2 row-start-1 h-9 w-9 self-start rounded-md border border-slate-300 bg-white text-lg font-bold text-slate-500 hover:bg-rose-50 hover:text-rose-700 sm:col-start-auto sm:row-start-auto sm:self-center"
       >
         ✕
       </button>

@@ -167,7 +167,7 @@ function KitCard({
           <button type="button" onClick={onDuplicate} className="rounded px-2 py-1 text-xs font-bold text-slate-500 hover:bg-slate-100">
             複製
           </button>
-          <button type="button" onClick={onRemove} className="rounded px-2 py-1 text-xs font-bold text-rose-600 hover:bg-rose-50" aria-label={`セット「${name}」を削除`}>
+          <button type="button" onClick={onRemove} className="rounded px-2 py-1 text-xs font-bold text-slate-500 hover:bg-rose-50 hover:text-rose-700" aria-label={`セット「${name}」を削除`}>
             削除
           </button>
         </div>
@@ -240,7 +240,7 @@ function KitCard({
                       <button
                         type="button"
                         onClick={() => onRows((rows) => rows.filter((x) => x.id !== r.id))}
-                        className="rounded px-1.5 text-rose-600 hover:bg-rose-50"
+                        className="rounded px-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-700"
                         title="この行を削除"
                         aria-label={`${label}の行を削除`}
                       >

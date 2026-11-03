@@ -80,7 +80,7 @@ export function KitPicker({
                   <button
                     type="button"
                     onClick={() => onRemove(kit)}
-                    className="rounded px-2 py-1 text-xs font-bold text-rose-600 hover:bg-rose-50"
+                    className="rounded px-2 py-1 text-xs font-bold text-slate-500 hover:bg-rose-50 hover:text-rose-700"
                     aria-label={`部材＋施工費（常用）「${kit.name}」を削除`}
                   >
                     削除
