@@ -91,9 +91,9 @@ function VerticalText({t}: {t: PvText}) {
       }}
     >
       <span className="sr-only">{t.runs.map((r) => r.text).join('')}</span>
-      <div data-fit-inner="" aria-hidden="true">
+      <div data-fit-inner="">
         {chars.map((c, i) => (
-          <div key={i} style={{...fontCss(c.font, k), whiteSpace: 'pre'}}>
+          <div key={i} aria-hidden="true" style={{...fontCss(c.font, k), whiteSpace: 'pre'}}>
             {c.ch}
           </div>
         ))}
