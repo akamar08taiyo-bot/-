@@ -154,7 +154,8 @@ export function YukuhashiForm({
                 </tr>
                 <tr style={{height: '7.67mm'}}>
                   <td colSpan={3} className="bb" style={{fontSize: '12pt'}} {...ed(editable && pi === 0, 'job:insuredNo')}>
-                    {pi === 0 && `介護保険被保険者番号（${job.insuredNo.trim() || '　　　　　　　　　　'}）`}
+                    {/* 番号は打った長さのまま入るので、欄に入るか測る（.fitbox。はみ出しを出さない決まり 2026-11-03） */}
+                    {pi === 0 && <span className="fitbox">{`介護保険被保険者番号（${job.insuredNo.trim() || '　　　　　　　　　　'}）`}</span>}
                   </td>
                   <td colSpan={4} />
                 </tr>

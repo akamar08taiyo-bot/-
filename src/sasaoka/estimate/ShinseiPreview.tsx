@@ -8,6 +8,7 @@
 // 平面図は、表題と工事内容のあいだに平面図の図を入れる枠（ドロップ・Ctrl+V・押して選ぶ。PlanSlotView）
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import type {CSSProperties, DragEvent, PointerEvent as ReactPointerEvent, ReactNode, RefObject} from 'react';
+import {fitTexts, refitOnFonts} from '../print/fitTexts.ts';
 import type {PvFont, PvHeader, PvPage, PvPhotoSlot, PvShape, PvText, Rect, ShinseiField} from '../shinseiPreview.ts';
 import {Btn, DropArea, DropOverlay, pastedFiles, useFileDragging} from '../components/ui.tsx';
 import {circled} from '../estimateForms.ts';
@@ -72,6 +73,8 @@ function VerticalText({t}: {t: PvText}) {
   }
   return (
     <div
+      data-fit={t.align === 'left' || t.align === 'right' ? t.align : 'center'}
+      data-fit-v={t.valign}
       style={{
         position: 'absolute',
         left: t.x,
@@ -88,11 +91,13 @@ function VerticalText({t}: {t: PvText}) {
       }}
     >
       <span className="sr-only">{t.runs.map((r) => r.text).join('')}</span>
-      {chars.map((c, i) => (
-        <div key={i} aria-hidden="true" style={{...fontCss(c.font, k), whiteSpace: 'pre'}}>
-          {c.ch}
-        </div>
-      ))}
+      <div data-fit-inner="" aria-hidden="true">
+        {chars.map((c, i) => (
+          <div key={i} style={{...fontCss(c.font, k), whiteSpace: 'pre'}}>
+            {c.ch}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -153,8 +158,12 @@ function TextView({t}: {t: PvText}) {
   }
   const k = fitScale(t);
   const distributed = t.align === 'distributed';
+  // data-fit：描いたあとに出た大きさを測って、欄に入りきらなければ必ず縮める（print/fitTexts.ts。見積もりの k だけでは、最小フォントサイズの設定などではみ出した。
+  // ユーザーの指示「商品名などがはみ出ている。絶対にないようにルール化する。工事費見積もりなども同様に同じルール化として必ず守る」2026-11-03）
   return (
     <div
+      data-fit={distributed ? 'center' : t.align}
+      data-fit-v={t.valign}
       style={{
         position: 'absolute',
         left: t.x,
@@ -169,6 +178,7 @@ function TextView({t}: {t: PvText}) {
       }}
     >
       <div
+        data-fit-inner=""
         style={{
           textAlign: distributed ? 'justify' : (t.align as 'left' | 'center' | 'right'),
           textAlignLast: distributed ? 'justify' : undefined,
@@ -241,6 +251,8 @@ function ShapeView({s}: {s: PvShape}) {
 function ShapeText({s}: {s: PvShape}) {
   return (
     <div
+      data-fit={s.align}
+      data-fit-v={s.valign}
       style={{
         position: 'absolute',
         left: s.x,
@@ -259,7 +271,7 @@ function ShapeText({s}: {s: PvShape}) {
       }}
     >
       {/* 1つの箱に入れる（外の箱は flex なので、行の頭のすき間の箱がそのまま並ぶと1つずつの行になる） */}
-      <div>{alignedLines(s.text, s.font!, 1)}</div>
+      <div data-fit-inner="">{alignedLines(s.text, s.font!, 1)}</div>
     </div>
   );
 }
@@ -902,6 +914,11 @@ export function ShinseiPages({
   fixedScale?: number; // 印刷の画面の大きさ（A4 の紙の余白の内側に入る大きさ。なければ枠の幅に合わせる）
 }) {
   const [wrapRef, wrapWidth] = useWidth<HTMLDivElement>();
+  // 描くたびに、欄に入りきらない文字を縮める（はみ出しを出さない決まり。print/fitTexts.ts）。字体を読み終わったら、もう一度
+  useLayoutEffect(() => {
+    fitTexts(wrapRef.current);
+  });
+  useEffect(() => refitOnFonts(() => fitTexts(wrapRef.current)), [wrapRef]);
   const widest = Math.max(...pages.map((p) => paper(p).width), 1);
   const scale = fixedScale ?? (wrapWidth ? Math.min(MAX_SCALE, wrapWidth / widest) : 1);
   // 向き・大きさを直している写真（写真番号:改修前／改修後）
