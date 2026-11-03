@@ -1015,7 +1015,7 @@ try {
   await compact.click();
   await colors.getByRole('button', {name: 'シャワーチェアAir コンパクトSPワンタッチ ブルー PN-L41431Aを入れる'}).click();
   assert.equal(await catForm.getByLabel('商品名').inputValue(), 'シャワーチェアAir コンパクトSPワンタッチ ブルー');
-  assert.ok(Number((await catForm.getByLabel('定価').inputValue()).replace(/[^\d]/g, '')) > 0);
+  await page.waitForFunction(() => Number(document.querySelector('[aria-label="申請書に入れる所"] [aria-label="定価"]')?.value.replace(/[^\d]/g, '')) > 0); // 数字の欄は描いたあとに字が入る
   assert.equal(await panaList.count(), 0); // 選んだら閉じる（「商品：24件」で開き直せる）
   const productsHead = picker.getByRole('button', {name: /^商品：\s*24件/});
   assert.equal(await productsHead.getAttribute('aria-expanded'), 'false');
@@ -1078,7 +1078,7 @@ try {
   await chooser.waitFor({state: 'detached'});
   assert.equal(await catForm.getByLabel('商品名').inputValue(), 'シャワーチェアAir ミドルSPワンタッチ オレンジ');
   assert.equal(await catForm.getByLabel('品番').inputValue(), 'PN-L41831D');
-  assert.ok(Number((await catForm.getByLabel('定価').inputValue()).replace(/[^\d]/g, '')) > 0);
+  await page.waitForFunction(() => Number(document.querySelector('[aria-label="申請書に入れる所"] [aria-label="定価"]')?.value.replace(/[^\d]/g, '')) > 0); // 数字の欄は描いたあとに字が入る
   // 選んだらカタログの窓は閉じる（ユーザーの指示「商品検索から商品を選んだら、カタログは閉じる。下の一覧表も閉じる」2026-11-03）
   await pickViewer.waitFor({state: 'detached'});
   assert.equal(await picker.getByRole('list').count(), 0);
