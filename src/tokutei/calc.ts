@@ -50,7 +50,30 @@ export function impliedDiscount(listPrice: number, unitPrice: number): number | 
 export function unitPricePatch(item: Pick<SaleItem, 'listPrice'>, unitPrice: number | null): Partial<SaleItem> {
   if (unitPrice === null) return {unitPrice};
   const off = impliedDiscount(item.listPrice, unitPrice);
-  return off === null ? {unitPrice} : {unitPrice, discountRate: off};
+  if (off !== null) return {unitPrice, discountRate: off};
+  // ちょうど何%引きでなくても、割引率の欄は定価と単価からの割引率（小数1けた・0〜100%）にする（ユーザーの指示「税抜き金額、税込み金額を変更すると、
+  // 自動的に割引率が変わるようにする。また、逆もしかり」2026-11-03。前は割引率の欄が前の値のままだった）。定価がなければ割引率はそのまま
+  const list = toYen(item.listPrice);
+  if (list <= 0 || !Number.isFinite(unitPrice)) return {unitPrice};
+  return {unitPrice, discountRate: Math.min(100, Math.max(0, Math.round((1 - unitPrice / list) * 1000) / 10))};
+}
+
+/** 1台の税込の値段：販売単価（税抜）＋消費税（切り捨て。数量が1のときの lineOf の購入金額と同じ） */
+export function taxIncluded(unitPrice: number, taxType: TaxType): number {
+  const p = Math.max(0, Math.floor(unitPrice));
+  return p + Math.floor((p * taxPct(taxType)) / 100);
+}
+
+/**
+ * 税込の値段から販売単価（税抜）：税込がその値段を超えない一番高い税抜（消費税の切り捨てで、ちょうどの税抜がない税込は1円少なくなる。10% なら 28,159円 → 25,599円＝税込 28,158円）。
+ * 販売見積書・申請書の商品の欄の「税込」を打ったとき（ユーザーの指示「税込み金額を変更すると、自動的に割引率が変わるようにする」2026-11-03）
+ */
+export function priceFromTaxIncluded(taxIn: number, taxType: TaxType): number {
+  const t = Number.isFinite(taxIn) ? Math.max(0, Math.floor(taxIn)) : 0;
+  let p = Math.floor((t * 100) / (100 + taxPct(taxType)));
+  while (taxIncluded(p + 1, taxType) <= t) p++;
+  while (p > 0 && taxIncluded(p, taxType) > t) p--;
+  return p;
 }
 
 /** 実際の割引率（%。販売受注簿に渡す）：定価×割引の行はその割引率、手で単価を入れた行は定価と単価から（整数でなければ小数1けた）、定価がなければ割引率の欄のまま */

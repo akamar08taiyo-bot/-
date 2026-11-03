@@ -145,6 +145,33 @@ export function addFavorites(products: Product[], items: SaleItem[], ids: Set<st
   return {products: [...products, ...added], items: next};
 }
 
+/**
+ * 一度入れた商品を、商品マスタの★お気に入りに入れる（ユーザーの指示「一度入力した商品は、今後お気に入りの中に、項目ごとにいれる（シャワーチェアや浴槽台等）
+ * 当然削除する事もできる」2026-11-03。前は「☆ お気に入りに登録」を押すか、印刷の前に聞いていた）。品目（sub）ごとに分けて出すのは ProductPicker。
+ * 明細は商品マスタにつながない（入れたあとも商品名・品番を直せる・カタログから選び直せるように）。同じ商品名・メーカーの商品がもうあれば、
+ * revive のときだけ★に戻す（カタログから選んだとき。お気に入りから「削除」したあと、また選んだら戻る）。種目・品目がなければ入れた明細の値で埋める
+ */
+export function rememberFavorites(products: Product[], items: SaleItem[], revive: boolean, now = Date.now()): Product[] {
+  const key = (name: string, maker: string) => `${name.normalize('NFKC').replace(/\s+/g, '')}|${makerKey(maker)}`;
+  let out = products;
+  for (const i of items) {
+    if (i.productId !== null || !i.name.trim()) continue;
+    const k = key(i.name, i.maker);
+    const at = out.findIndex((p) => key(p.name, p.maker) === k);
+    if (at >= 0) {
+      const p = out[at];
+      const fill = (!p.category && i.category) || (!p.sub && i.sub);
+      if ((revive && !p.favorite) || fill) {
+        const next = {...p, favorite: p.favorite || revive, category: p.category || i.category, sub: p.sub || i.sub, updatedAt: now};
+        out = out.map((x, n) => (n === at ? next : x));
+      }
+      continue;
+    }
+    out = addFavorites(out, [i], new Set([i.id]), now).products;
+  }
+  return out;
+}
+
 /** 手で入れる明細（商品マスタにない商品） */
 export function blankItem(settings: Pick<Settings, 'discountRate'>): SaleItem {
   return {

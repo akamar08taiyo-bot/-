@@ -7,25 +7,26 @@ import {areaLabel, insurerAreas, insurerNoOf} from '../insurerNumbers.ts';
 import {useEffect, useMemo, useRef, useState} from 'react';
 import type {ReactNode, RefObject} from 'react';
 import type {FocusEvent} from 'react';
-import {lineOf, unitPricePatch} from '../calc.ts';
+import {lineOf} from '../calc.ts';
 import type {Line} from '../calc.ts';
 import {CARE_LEVELS, INSURERS, OFFICES, settingsForOffice} from '../defaults.ts';
-import {blankItem, makerChoices, suggestValues, unregisteredItems} from '../sales.ts';
+import {blankItem, makerChoices, suggestValues} from '../sales.ts';
 import {carePlanOf, shinseiForm} from '../shinsei.ts';
 import type {ShinseiKey} from '../shinsei.ts';
 import type {OpenCatalog} from '../catalog.ts';
 import type {ShinseiField} from '../shinseiPreview.ts';
 import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Sale, SaleItem, Settings} from '../types.ts';
-import {yen} from '../util.ts';
 import {zipLabel} from '../zip.ts';
 import type {ZipHit} from '../zip.ts';
 import {CategorySelect} from './CategorySelect.tsx';
-import {CatalogChooseButton, CatalogPicker, CatalogSearchButton} from './CatalogPicker.tsx';
+import {CatalogPicker} from './CatalogPicker.tsx';
+import {CodeLookup} from './CodeLookup.tsx';
 import {MakerInput} from './MakerInput.tsx';
+import {PriceFields} from './PriceFields.tsx';
 import {ReasonField} from './ReasonField.tsx';
-import {AddItemButton, CatalogSearch, Circles, EraBirthInput, FavoriteButton, InsuredNoInput, KanaInput, nextOnEnter} from './ShinseiParts.tsx';
+import {AddItemButton, Circles, EraBirthInput, InsuredNoInput, KanaInput, nextOnEnter} from './ShinseiParts.tsx';
 import {SuggestInput} from './Suggest.tsx';
-import {Btn, NumberInput, Stepper, TextInput} from './ui.tsx';
+import {Btn, TextInput} from './ui.tsx';
 
 const dateInput = 'h-9 rounded-md border border-slate-300 bg-white px-2 text-sm outline-none focus:border-blue-500';
 
@@ -47,7 +48,7 @@ export function ShinseiInputs({
   onCatalog,
   onAddItem,
   onPickCustomer,
-  onFavorite,
+  onCatalogPicked,
   onHideSuggest,
   changeSettings,
 }: {
@@ -68,7 +69,7 @@ export function ShinseiInputs({
   onCatalog: OpenCatalog; // 右にカタログの窓を開く（print/CatalogViewer.tsx。商品検索のときは絞ったページだけ）
   onAddItem: (item?: SaleItem) => void; // 手で入れる商品を足す（item があればその商品＝最初から開いている欄に打ったもの）
   onPickCustomer?: () => void; // 住宅改修の様邸のタブの中では渡さない（お客様の情報は様邸から入る。ユーザーの指示「赤枠の部分は不要です」2026-10-28）
-  onFavorite: (itemId: string) => void; // 手で入れた商品を商品マスタの★お気に入りに
+  onCatalogPicked: (item: SaleItem) => void; // カタログの商品の一覧から選んだ（カタログの窓を閉じる・お気に入りに入れる。SaleEditor）
   onHideSuggest: (v: string) => void; // 居宅介護支援事業所・ケアマネジャーの▼のリストから消す（設定の hiddenSuggest）
   changeSettings: (f: (s: Settings) => Settings) => void; // 福岡市・北九州市の受任者（販売事業者）の営業所・事業者番号（設定のまま。見積書の発行元も同じ営業所）
 }) {
@@ -100,9 +101,6 @@ export function ShinseiInputs({
   const [draft] = useState(() => blankItem(s));
   const rows: Line[] = lines.length ? lines : [lineOf(draft, s)];
   const changeRow = (id: string, patch: Partial<SaleItem>) => (lines.length ? changeItem(id, patch) : onAddItem({...draft, ...patch}));
-  // メーカーの横の「🔍 商品検索」を押した回数（商品ごと。CatalogPicker が増えたら絞った商品を出す）
-  const [searchAt, setSearchAt] = useState<Record<string, number>>({});
-  const unregistered = new Set(unregisteredItems(sale, data.products).map((i) => i.id));
   const title = shinseiForm(sale.insurer)?.title;
   const insurerName = INSURERS.find((i) => i.key === sale.insurer)?.label;
   return (
@@ -253,19 +251,22 @@ export function ShinseiInputs({
               const i = l.item;
               const changeItem = changeRow;
               return (
-                <div key={i.id} data-item={i.id} className="grid gap-2 rounded-md border border-slate-200 p-2">
-                  {/* 1行目：種目、その下にメーカー・🔍 商品検索、商品名（ユーザーの指示「入力順は、種目、商品名の順」2026-10-26、「メーカー名、商品検索を上にもってきて、その下に商品名」2026-11-01）。その下に定価・割引率・販売金額 */}
-                  <div className="flex min-w-0 items-center gap-2">
+                <div key={i.id} data-item={i.id} className="relative grid gap-2 rounded-md border border-slate-200 p-2">
+                  {/* 1行目：種目とメーカー（ユーザーの指示「入力順は、種目、商品名の順」2026-10-26、「少し行数が長い」2026-11-03 で同じ行に。狭い幅ではメーカーが下に折れる） */}
+                  <div className="flex min-w-0 flex-wrap items-center gap-2 pr-7">
                     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-teal-100 text-xs font-bold text-teal-800">{idx + 1}</span>
-                    <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => changeItem(i.id, {category, sub})} ariaLabel="種目" className="w-48 min-w-0 shrink" />
-                    {/* 種目の横に「📖 カタログから選ぶ」（ユーザーの指示 2026-11-02）：選んだ種目・品目・メーカーのページだけのカタログを開き、ページの商品を押すとこの欄に入る */}
-                    <CatalogChooseButton item={i} onCatalog={onCatalog} />
+                    <CategorySelect category={i.category} sub={i.sub} onChange={(category, sub) => changeItem(i.id, {category, sub})} ariaLabel="種目" className="w-40 min-w-0 shrink" />
+                    {i.productId === null ? (
+                      <MakerInput value={i.maker} onChange={(maker) => changeItem(i.id, {maker})} choices={makers} className="w-48 min-w-0 shrink" />
+                    ) : (
+                      (i.maker || i.code) && <span className="min-w-0 text-xs text-slate-500">{[i.maker, i.code].filter(Boolean).join('　')}</span>
+                    )}
                     {/* 消すのは右上（販売見積書と同じ。金額の横だとスマホの幅で1段下に落ちた） */}
                     {lines.length > 0 && (
                       <button
                         type="button"
                         onClick={() => change({items: sale.items.filter((x) => x.id !== i.id)})}
-                        className="ml-auto rounded px-2 py-1 text-rose-500 hover:bg-rose-50"
+                        className="absolute right-1 top-1.5 rounded px-2 py-1 text-rose-500 hover:bg-rose-50"
                         aria-label={`${i.name || '商品'}を消す`}
                         title="消す"
                       >
@@ -273,68 +274,35 @@ export function ShinseiInputs({
                       </button>
                     )}
                   </div>
-                  {/* メーカーの横に「🔍 商品検索」（ユーザーの指示「メーカー名の横に、商品検索ボタン」2026-11-01）。スマホの幅でも1行に並ぶよう、メーカーの欄を縮める */}
-                  <div className="flex min-w-0 items-center gap-2 pl-8">
-                    {i.productId === null ? (
-                      <>
-                        <MakerInput value={i.maker} onChange={(maker) => changeItem(i.id, {maker})} choices={makers} className="w-56 min-w-0 shrink" />
-                        <CatalogSearchButton onSearch={() => setSearchAt((m) => ({...m, [i.id]: (m[i.id] ?? 0) + 1}))} />
-                      </>
-                    ) : (
-                      (i.maker || i.code) && <span className="text-xs text-slate-500">{[i.maker, i.code].filter(Boolean).join('　')}</span>
-                    )}
-                  </div>
-                  {/* 種目・メーカーの下に「カタログから検索」（販売見積書と同じ。ユーザーの指示「販売の見積もりでも、メーカー名、項目名を入れた下にカタログから検索するをもってくる」2026-11-02） */}
-                  <CatalogSearch item={i} onCatalog={onCatalog} />
-                  {/* 商品名はメーカー・商品検索の下（ユーザーの指示「メーカー名、商品検索を上にもってきて、その下に商品名をもってくる」2026-11-01）。
-                      商品名・品番の字はほかの欄（種目・メーカー・カタログから検索）と同じ 14px（前は 16px で「やや大きすぎる」2026-11-02） */}
-                  <TextInput value={i.name} onChange={(name) => changeItem(i.id, {name})} placeholder="商品名" className="ml-8 min-w-0 text-sm" aria-label="商品名" data-nav />
-                  {/* 品番（見積書の品名の3行目「【品番】…」。ユーザーの指示「メーカー名・商品名・品番は、別々の項目として持つ（入力欄…に項目がなければ追加する）」2026-11-01） */}
-                  {i.productId === null && <TextInput value={i.code} onChange={(code) => changeItem(i.id, {code})} placeholder="品番" className="ml-8 w-48 max-w-[calc(100%-2rem)] text-sm" aria-label="品番" />}
-                  {/* 種目・メーカーを選ぶと、カタログのその商品の一覧（押すと商品名・品番・定価が入る。ユーザーの指示 2026-10-30） */}
-                  {i.productId === null && <CatalogPicker item={i} onPick={(patch) => changeItem(i.id, patch)} onCatalog={onCatalog} search={searchAt[i.id] ?? 0} />}
-                  {/* 定価の下に割引率と販売金額（ユーザーの指示「定価の下に、販売金額を記載する」「定価の下に割引率を表示、変更できるようにする」2026-10-26）。
-                      販売金額は 定価×(100−割引率)%（打ち直したら薄い黄色で、↺ で戻す。販売見積書の単価と同じ値）。割引率を変えたら販売金額は計算し直す。
-                      その下に数量（− ＋。ユーザーの指示「数量を追加」2026-10-26。販売見積書の数量と同じ値）。右の金額は 販売金額×数量＋税（申請書の購入予定金額） */}
-                  <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1.5 pl-8 text-xs font-bold text-slate-500">
-                    {/* 狭い幅でお気に入りのボタンが下に折れても、見出しは定価の欄の高さに */}
-                    <span className="self-start pt-2.5">定価（税抜）</span>
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      {i.productId === null ? (
-                        <NumberInput value={i.listPrice} onChange={(listPrice) => changeItem(i.id, {listPrice})} min={0} blankZero className="w-28" ariaLabel="定価" />
-                      ) : (
-                        <span className="text-sm tabular-nums text-slate-700">{yen(i.listPrice)}円</span>
-                      )}
-                      {/* 定価の横に「★ お気に入りから入力」（ユーザーの指示「お気に入りから入力をこの辺にもってくる」2026-11-02） */}
-                      <FavoriteButton onClick={() => onPickFavorite(i.id)} />
-                      {unregistered.has(i.id) && (
-                        <Btn color="white" small onClick={() => onFavorite(i.id)} aria-label={`${i.name}をお気に入りに登録`}>
-                          ☆ お気に入りに登録
-                        </Btn>
-                      )}
-                    </div>
-                    割引率
-                    <div className="flex items-center gap-1">
-                      <NumberInput value={i.discountRate} onChange={(discountRate) => changeItem(i.id, {discountRate: Math.min(100, discountRate), unitPrice: null})} min={0} className="w-16" ariaLabel="割引率" />%
-                    </div>
-                    販売金額（税抜）
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <NumberInput value={l.unitPrice} onChange={(unitPrice) => changeItem(i.id, unitPricePatch(i, unitPrice))} min={0} className={`w-28 ${i.unitPrice !== null ? 'bg-amber-50' : ''}`} ariaLabel="販売金額" />
-                      {i.unitPrice !== null && (
-                        <button type="button" onClick={() => changeItem(i.id, {unitPrice: null})} className="rounded px-1.5 py-1 text-slate-500 hover:bg-slate-100" title="定価×割引率に戻す" aria-label="販売金額を自動に戻す">
-                          ↺
-                        </button>
-                      )}
-                    </div>
-                    数量
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <div className="flex items-center gap-1">
-                        <Stepper value={i.qty} onChange={(qty) => changeItem(i.id, {qty: Math.max(1, Math.round(qty))})} ariaLabel={`${i.name}の数量`} />
-                        {i.unit}
-                      </div>
-                      <span className="ml-auto pr-1 text-sm font-bold tabular-nums text-slate-800">{yen(l.total)}円</span>
-                    </div>
-                  </div>
+                  {/* 種目・メーカーの下に、品目・メーカーの段と「📖 カタログから商品検索」（ユーザーの指示「項目名、メーカー名を入力したその下に、カタログから検索をおく」
+                      「カタログから選ぶ、カタログ、商品検索の３つの機能がかぶっている。カタログから商品検索という一つのボタンのみにする」2026-11-03）。押すと商品の一覧とカタログの窓 */}
+                  {i.productId === null && <CatalogPicker item={i} onPick={(patch) => changeRow(i.id, patch)} onCatalog={onCatalog} onPicked={onCatalogPicked} />}
+                  {/* 商品名（左）・品番と「🔢 型番から入力」を同じ行に（ユーザーの指示「横にしてまとめられる部分はまとめる。重要項目は行の左にもってくる」2026-11-03。
+                      狭い幅では品番が下に折れる）。型番から入力は、型番がぴったり同じ商品だけを入れる（「…確実に該当商品に当たるかを照らし合わせる」2026-11-03。CodeLookup.tsx）。
+                      品番は見積書の品名の3行目「【品番】…」（「メーカー名・商品名・品番は、別々の項目として持つ」2026-11-01）。字はほかの欄と同じ 14px */}
+                  {i.productId === null ? (
+                    <CodeLookup
+                      item={i}
+                      products={data.products}
+                      onPick={(patch) => changeRow(i.id, patch)}
+                      onPicked={onCatalogPicked}
+                      lead={<TextInput value={i.name} onChange={(name) => changeItem(i.id, {name})} placeholder="商品名" className="min-w-[16rem] flex-1 text-sm" aria-label="商品名" data-nav />}
+                    />
+                  ) : (
+                    <TextInput value={i.name} onChange={(name) => changeItem(i.id, {name})} placeholder="商品名" className="min-w-0 text-sm sm:ml-8" aria-label="商品名" data-nav />
+                  )}
+                  {/* 定価・割引率（ユーザーの指示「定価の下に割引率を表示、変更できるようにする」2026-10-26）／販売金額（税抜）と税込（打つと割引率が変わる。割引率を打つと計算し直す。
+                      ユーザーの指示 2026-11-03）／数量（− ＋。「数量を追加」2026-10-26。販売見積書の数量と同じ値）。部品は PriceFields.tsx（販売見積書と同じ）。
+                      税込×数量が申請書の購入予定金額（数量が2つ以上なら下にその金額） */}
+                  <PriceFields
+                    line={l}
+                    change={(patch) => changeItem(i.id, patch)}
+                    listEditable={i.productId === null}
+                    onPickFavorite={() => onPickFavorite(i.id)}
+                    priceLabel="販売金額"
+                    priceAria="販売金額"
+                    unit={<span className="text-sm text-slate-700">{i.unit}</span>}
+                  />
                 </div>
               );
             })}

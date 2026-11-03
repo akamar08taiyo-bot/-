@@ -1,9 +1,11 @@
 // 販売見積書：いただいた会社の見積書の原本（TSS の Excel。src/tokutei/print/mitsumori.xltx）に案件を書き込む
 // （ユーザーの指示「見積書の原本はこのような形にする。プレビューを見ながら入力できるようにする」2026-10-23）。
 // 書く欄：宛名（A6）・見積番号（I4）・見積日（I5）・会社の欄（I8〜I16。所長印・担当印の枠の上：会社名／営業所　所長／〒／住所／TEL／FAX／登録番号／担当。設定の営業所から）・件名（B14）・
-// 明細（23〜38行：品名 A・数量 F・単位 G・単価（税抜）H・金額 I＝式・税率 J・備考 K＝算出根拠）・備考（60〜62行：介護保険の内訳と見積書の備考に足す文）。
+// 明細（23〜42行：品名 A・数量 F・単位 G・単価（税抜）H・金額 I＝式・税率 J・備考 K＝算出根拠）・備考（御見積合計の右の H47〜H51：見積書の備考に足す文）。
 // 原本は 2026-10-25 にユーザーの指示で直した（灰色→薄い水色・会社の欄を左寄せ・TEL と FAX を別の行に・担当・明細を16行に・税率の右に備考の列。
-// docs/tokutei/edit-mitsumori-template.py）。
+// docs/tokutei/edit-mitsumori-template.py）。2026-11-03 にユーザーの指示「消費税については、この部分では不要の為、代わりに備考欄にする（行数を増やす）」
+// 「１商品目と２商品目の間には１行開ける。３商品までは一度に入力できるようにする」で、御見積合計の右の「※※消費税について※※」の枠を備考（5行）に、
+// 下の備考（58〜62行）を隠し、明細を20行に戻した（docs/tokutei/edit-mitsumori-note.py）。
 // 合計・税率ごとの内訳・消費税は原本の式のまま（開いたときに Excel が計算する）。画面のプレビュー・スマホのために、式の答えも同じ計算で入れておく。
 // 原本は所長の印影の画像だけ消した（アプリは誰でも開けるページなので。印の枠は残す）
 // 明細が20行に入らないときは3ページまで（ユーザーの指示「ページは3ページまでいけるようにする」2026-10-25）：原本の1ページ目（1〜62行）の下に、
@@ -24,8 +26,11 @@ import {attrOf, cellRe, colorStyle, dropCalcChain, edgeStyle, esc, finishWorkboo
 import type {CellValue, Files} from './xlsxEdit.ts';
 
 export const ESTIMATE_SHEET = '見積書';
-/** 1ページ目の明細の行（原本は20行。ユーザーの指示「見積もりの行数は4行ぐらい減らしていい」で16行に。39〜42行は原本で隠してある） */
-export const ESTIMATE_ROWS = Array.from({length: 16}, (_, i) => 23 + i);
+/**
+ * 1ページ目の明細の行（23〜42行の20行）。2026-10-25 に「見積もりの行数は4行ぐらい減らしていい」で16行にしたが、2026-11-03 に下の備考の欄を御見積合計の右へ移した分で
+ * 20行に戻した（「行数をつくり、１商品目と２商品目の間には１行開ける。３商品までは一度に入力できるようにする」）
+ */
+export const ESTIMATE_ROWS = Array.from({length: 20}, (_, i) => 23 + i);
 /** 原本の明細の行（隠した行も。金額の欄の式を書く） */
 const TEMPLATE_ITEM_ROWS = Array.from({length: 20}, (_, i) => 23 + i);
 /** 列の数（A〜K。K は備考＝算出根拠） */
@@ -36,10 +41,14 @@ const PAGE1_LAST = 62;
 const HEAD_ROWS = [1, 2, 3, 4, 5, 6, 7];
 const ITEM_HEAD_ROW = 22;
 /** 2・3ページ目の明細の行の数（1ページ目と同じ高さに入るだけ：(1〜62行（隠した53〜57行は入れない） − 頭の7行 − 見出し) ÷ 明細の1行。テストで原本から確かめる） */
-export const CONT_ROWS = 42;
+export const CONT_ROWS = 41;
 export const MAX_PAGES = 3;
-/** 見積書に入る商品の数（品名が3行の商品で：1ページ目 5＋つづき 14×2。品名の行が少ない商品はもっと入る） */
-export const ESTIMATE_CAPACITY = Math.floor(16 / 3) + Math.floor(CONT_ROWS / 3) * (MAX_PAGES - 1);
+/** 商品と商品の間の空けた行の数（ユーザーの指示「１商品目と２商品目の間には１行開ける」2026-11-03。前は「商品と商品の間に空白の行は入れない」2026-11-01） */
+export const ITEM_GAP = 1;
+/** n 行のページに入る、品名が3行の商品の数（商品の下に1行あける。ページの最後の商品の下はあけなくてよい） */
+const fullItemsIn = (n: number) => Math.floor((n + ITEM_GAP) / (3 + ITEM_GAP));
+/** 見積書に入る商品の数（品名が3行の商品で：1ページ目 5＋つづき 10×2。品名の行が少ない商品はもっと入る） */
+export const ESTIMATE_CAPACITY = fullItemsIn(ESTIMATE_ROWS.length) + fullItemsIn(CONT_ROWS) * (MAX_PAGES - 1);
 
 /** n ページ目（2・3）の行：上の行・見出しの行・明細の行 */
 export function contBlock(page: number): {top: number; head: number; rows: number[]} {
@@ -67,22 +76,28 @@ export function itemNameLines(i: Pick<SaleItem, 'maker' | 'name' | 'code'>): str
   const lines = [i.maker.trim(), i.name.trim(), i.code.trim() ? `【品番】${i.code.trim()}` : ''].filter(Boolean);
   return lines.length ? lines : [''];
 }
-/** 1ページ目の明細の欄の商品の行（初めから3商品×3行。介護保険の内訳はこの下の行。ユーザーの指示「明細欄は、最初から3商品（9行分）が入る行数にする」2026-11-01） */
-export const MIN_ITEM_ROWS = 9;
+/**
+ * 1ページ目の明細の欄の商品の行（初めから3商品×（3行＋あける1行）＝12行。介護保険の内訳はこの下の行。ユーザーの指示「明細欄は、最初から3商品（9行分）が入る行数にする」2026-11-01、
+ * 「１商品目と２商品目の間には１行開ける。３商品までは一度に入力できるようにする」2026-11-03）
+ */
+export const MIN_ITEM_ROWS = 3 * (3 + ITEM_GAP);
 /** ページの明細の行の数・そのページの初めの行（itemRows の番号） */
 const pageRows = (p: number) => (p === 1 ? ESTIMATE_ROWS.length : CONT_ROWS);
 const pageStart = (p: number) => (p === 1 ? 0 : ESTIMATE_ROWS.length + (p - 2) * CONT_ROWS);
 /** 明細の行（itemRows の番号）がそのページの最後の行か（原本の太い罫線があるので、商品の区切りの線は引かない） */
 const pageEnd = (i: number) => [1, 2, 3].some((p) => i === pageStart(p) + pageRows(p) - 1);
+/** 明細の行（itemRows の番号）のページ */
+const pageOf = (i: number) => (i < pageStart(2) ? 1 : i < pageStart(3) ? 2 : 3);
 
 /** 明細の割り付け：商品ごとの行（初めの行と行の数）・商品の欄の最後の行（この下に実線）・介護保険の内訳の初めの行（-1 は出さない・入らない）・ページの数 */
 export type EstimateLayout = {items: {start: number; rows: number}[]; areaEnd: number; below: number; pages: number};
 
 /**
- * 明細の行の割り付け（ユーザーの指示 2026-11-01「1商品の3行を1つの枠として扱う」「商品と商品の間に空白の行は入れない」
+ * 明細の行の割り付け（ユーザーの指示 2026-11-01「1商品の3行を1つの枠として扱う」（「商品と商品の間に空白の行は入れない」は 2026-11-03 に「１商品目と２商品目の間には１行開ける」に）
  * 「明細欄は、最初から3商品（3行×3商品＝9行分）が入る行数にする。介護保険の内訳…の行は、この9行とは別に確保する」「1〜3商品のときは、この行数のまま変えない」
  * 「4商品以上になって入りきらないときだけ、明細欄の行数を必要な分だけ増やす」「1枚に入りきらない場合は2ページ目に続け、2ページ目にも明細の見出し行を付ける」）：
- *   商品は前から詰めて置き、1つの商品の行はページをまたがない（入らなければ次のページの初めから）。1ページ目の商品の欄は少なくとも 9 行。
+ *   商品は前から置き、商品の下に1行あける（ITEM_GAP。ページの最後ではあけない）。1つの商品の行はページをまたがない（入らなければ次のページの初めから）。
+ *   1ページ目の商品の欄は少なくとも 12 行（3商品分）。
  *   介護保険の内訳（below 行）は商品の欄のすぐ下。そのページに入らなければ次のページの初めから。合計・消費税の表は1ページ目の下のまま（明細の欄の中で割り付けるので、ずれない）。
  * perItem は商品ごとの品名の行の数（itemNameLines の数）。3ページに入らない商品は items に入れない
  */
@@ -97,7 +112,7 @@ export function estimateLayout(perItem: number[], below: number): EstimateLayout
       at = 0;
     }
     items.push({start: pageStart(page) + at, rows: k});
-    at += k;
+    at = Math.min(pageRows(page), at + k + ITEM_GAP);
   }
   if (page === 1) at = Math.max(at, MIN_ITEM_ROWS);
   const areaEnd = pageStart(page) + at - 1;
@@ -144,8 +159,11 @@ export function belowItemLines(sale: Sale, s: Settings): {lines: string[]; red: 
 const belowCount = (sale: Sale, s: Settings) => belowItemLines(sale, s).lines.length;
 /** 案件の明細の割り付け（estimateLayout） */
 export const saleLayout = (sale: Sale, s: Settings): EstimateLayout => estimateLayout(sale.items.map((i) => itemNameLines(i).length), belowCount(sale, s));
-/** 備考の行（59行目の「備　　考」の下の3行。A〜K を1つにした欄） */
-const NOTE_ROWS = [60, 61, 62];
+/** 備考の行（御見積合計の右の「備　　考」の下の5行。H〜K を1つにした欄。前は下の 60〜62行の3行。2026-11-03） */
+const NOTE_ROWS = [47, 48, 49, 50, 51];
+const NOTE_COL = 'H';
+/** 見積書の備考に書ける行の数 */
+export const ESTIMATE_NOTE_LINES = NOTE_ROWS.length;
 /** 件名（原本は空欄） */
 export const ESTIMATE_SUBJECT = '特定福祉用具の購入';
 
@@ -167,9 +185,10 @@ const links = (sale: Sale, s: Settings): [EstimateField, string[]][] => {
   const n = belowCount(sale, s);
   const rows = itemRows(pages);
   const tops = [1, ...Array.from({length: pages - 1}, (_, i) => contBlock(i + 2).top)];
-  // 商品の行（品名の行のどれも）と、商品の欄の次の空いた行（押すと商品を足す所へ）
+  // 商品の行（品名の行のどれも）と、商品の欄の次の商品の行（あけた1行の下。押すと商品を足す所へ）
   const used = lay.items.flatMap((it) => Array.from({length: it.rows}, (_, j) => it.start + j));
-  const next = (lay.items.at(-1)?.start ?? -1) + (lay.items.at(-1)?.rows ?? 0);
+  const last = lay.items.at(-1);
+  const next = last ? last.start + last.rows + ITEM_GAP : 0;
   const itemIdx = [...used, ...(next < rows.length && next <= lay.areaEnd ? [next] : [])];
   return [
     ['customer', tops.map((t) => `A${t + 5}`)],
@@ -178,14 +197,14 @@ const links = (sale: Sale, s: Settings): [EstimateField, string[]][] => {
     ['staff', ['I16']],
     ['items', itemIdx.flatMap((k) => ['A', 'F', 'G', 'H', 'I', 'J', 'K'].map((c) => `${c}${rows[k]}`))],
     ['selfPay', lay.below >= 0 ? rows.slice(lay.below, lay.below + n).map((r) => `A${r}`) : []],
-    ['note', NOTE_ROWS.map((r) => `A${r}`)],
+    ['note', NOTE_ROWS.map((r) => `${NOTE_COL}${r}`)],
   ];
 };
 
 /** 税率の欄の値（原本の下の合計の欄が、この値で税率ごとに分ける。A53〜A57 と同じ値） */
 const RATE: Record<TaxType, CellValue> = {'10%': 0.1, '8%': '軽減税率8%', 非課税: '非課税'};
 
-/** 備考の行：見積書の備考に足す文（原本の3行まで。介護保険の内訳は明細の下へ移した＝insuranceLines。2026-10-26） */
+/** 備考の行：見積書の備考に足す文（5行まで。介護保険の内訳は明細の下へ移した＝insuranceLines。2026-10-26） */
 const noteLines = (sale: Pick<Sale, 'note'>) => sale.note.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
 export const estimateNotes = (sale: Pick<Sale, 'note'>): string[] => noteLines(sale).slice(0, NOTE_ROWS.length);
 
@@ -282,9 +301,15 @@ export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
     const key = String(RATE[i.taxType]);
     sums[key] = (sums[key] ?? 0) + amount;
   });
-  // 商品の区切りは実線（商品の最後の行の下と次の行の上を細い実線に。1つの商品の中の行の間は原本の細い点線のまま。ページの最後の行は原本の太い線のまま）。
-  // 商品の欄の終わり（介護保険の内訳との境）も実線（ユーザーの指示「商品の区切りは実線で引く。1商品の中の3行の間は、線なしか細い点線にする」2026-11-01）
-  const cut = new Set([...lay.items.map((it) => it.start + it.rows - 1), lay.areaEnd].filter((k) => k >= 0 && k < rows.length && !pageEnd(k)));
+  // 商品の区切りは実線（商品の下にあけた1行の下と次の行の上を細い実線に。1つの商品の中の行の間・商品とあけた行の間は原本の細い点線のまま。
+  // ページの最後の行は原本の太い線のまま。ページの最後の商品で1行あけられなかったときは商品の最後の行の下）。
+  // 商品の欄の終わり（介護保険の内訳との境）も実線（ユーザーの指示「商品の区切りは実線で引く。1商品の中の3行の間は、線なしか細い点線にする」2026-11-01、
+  // 「１商品目と２商品目の間には１行開ける」2026-11-03）
+  const frameEnd = (it: {start: number; rows: number}) => {
+    const gap = it.start + it.rows - 1 + ITEM_GAP;
+    return pageOf(gap) === pageOf(it.start) ? gap : it.start + it.rows - 1;
+  };
+  const cut = new Set([...lay.items.map(frameEnd), lay.areaEnd].filter((k) => k >= 0 && k < rows.length && !pageEnd(k)));
   for (const k of cut) {
     for (const c of ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']) {
       for (const [ref, edges] of [
@@ -308,7 +333,7 @@ export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
     });
   // 備考
   const notes = estimateNotes(sale);
-  NOTE_ROWS.forEach((r, k) => put(`A${r}`, notes[k] ?? ''));
+  NOTE_ROWS.forEach((r, k) => put(`${NOTE_COL}${r}`, notes[k] ?? ''));
   // 2・3ページ目の明細も足す（税率ごとの合計の式）
   if (pages > 1) {
     for (const ref of ['C47', 'C48', 'C49', 'C50', 'C51']) {

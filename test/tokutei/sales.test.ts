@@ -44,3 +44,23 @@ test('手で入れた商品をお気に入りに：まだ商品マスタにな�
   assert.deepEqual(r.items.slice(1), sale.items.slice(1));
   assert.deepEqual(unregisteredItems({items: r.items}, r.products), []);
 });
+
+// 一度入れた商品はお気に入りに（ユーザーの指示「一度入力した商品は、今後お気に入りの中に、項目ごとにいれる（シャワーチェアや浴槽台等）当然削除する事もできる」2026-11-03）
+test('一度入れた商品をお気に入りに：明細はつながず・同じ商品名とメーカーは1つ・削除したあとはカタログから選び直したときだけ★に戻す', async () => {
+  const {rememberFavorites} = await import('../../src/tokutei/sales.ts');
+  const item = (over) => ({...blankItem(S), name: '見本の台 ブルー', maker: '見本工業（株）', category: '入浴補助用具', sub: '浴槽台', listPrice: 20000, ...over});
+  const a = item({id: 'a'});
+  let products = rememberFavorites([], [a, item({id: 'b', name: ' '}), item({id: 'c', productId: 'p9'})], false, 1000);
+  assert.equal(products.length, 1); // 名前のない明細・商品マスタの商品は入れない
+  assert.deepEqual([products[0].name, products[0].maker, products[0].sub, products[0].favorite], ['見本の台 ブルー', '見本工業（株）', '浴槽台', true]);
+  // 同じ商品名・メーカー（書き方ちがい・空白ちがい）はもう1つ作らない
+  products = rememberFavorites(products, [item({id: 'd', name: '見本の台　ブルー', maker: '見本工業 株式会社'})], false, 2000);
+  assert.equal(products.length, 1);
+  // お気に入りから削除したもの：手で打った明細を覚え直しても★に戻さない、カタログから選び直したら戻す
+  products = products.map((p) => ({...p, favorite: false}));
+  assert.equal(rememberFavorites(products, [a], false, 3000)[0].favorite, false);
+  assert.equal(rememberFavorites(products, [a], true, 3000)[0].favorite, true);
+  // 品目のない商品は、入れた明細の品目で埋める
+  const bare = products.map((p) => ({...p, category: '', sub: ''}));
+  assert.deepEqual(['category', 'sub'].map((k) => rememberFavorites(bare, [a], false, 4000)[0][k]), ['入浴補助用具', '浴槽台']);
+});

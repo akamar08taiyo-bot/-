@@ -4,12 +4,9 @@
 //   生年月日は 明治・大正・昭和（初めは昭和）と 年・月・日、郵便番号は 〒。Enter で次の欄（data-nav）
 import {Fragment, useEffect, useRef, useState} from 'react';
 import type {InputHTMLAttributes, KeyboardEvent} from 'react';
-import type {OpenCatalog} from '../catalog.ts';
 import {padInsuredNo} from '../shinsei.ts';
-import type {SaleItem} from '../types.ts';
 import {toKatakana} from '../util.ts';
 import {fromWareki, warekiOf} from '../wareki.ts';
-import {itemCatalogFilter} from './CatalogPicker.tsx';
 import {Btn, TextInput} from './ui.tsx';
 
 /** 丸のボタンで1つ選ぶ（住宅改修の Circles と同じ形）。clearable なら、選んでいるものをもう一度押すと外す */
@@ -173,40 +170,6 @@ export function AddItemButton({next, noun, onAdd}: {next: number; noun: string; 
     >
       ＋ {next}つ目の{noun}を追加
     </button>
-  );
-}
-
-/**
- * 「カタログから検索」の欄（ユーザーの指示「商品を入力する際、カタログから検索という欄を入力して、右のスペースにカタログを開くことができる。
- * カタログを見ながら商品を入力できるようにする」2026-10-26）。商品の欄ごとに、種目・メーカーのすぐ下（ユーザーの指示「販売の見積もりでも、
- * メーカー名、項目名を入れた下にカタログから検索するをもってくる」2026-11-02。前は商品の欄の下の ★ 商品を選ぶ・📷 の右に1つだけ）。
- * 商品名・品番を打って Enter か「📖 カタログ」で、右にカタログの窓（print/CatalogViewer.tsx）を開く。窓のページの商品を押すと、この欄に入る。
- * 空のまま押すと、種目・品目・メーカーで絞ったページ（何も選んでいなければ全部のページ。「📖 カタログから選ぶ」と同じ）
- */
-export function CatalogSearch({item, onCatalog}: {item: SaleItem; onCatalog: OpenCatalog}) {
-  const [q, setQ] = useState('');
-  const open = async () => (q.trim() ? onCatalog(q, undefined, item.id) : onCatalog('', await itemCatalogFilter(item), item.id));
-  return (
-    <span className="flex min-w-0 items-center gap-1 pl-8">
-      <input
-        type="search"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        onKeyDown={(e) => {
-          // 申請書の入れる所の Enter（次の欄へ）にしない
-          if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
-          e.preventDefault();
-          e.stopPropagation();
-          void open();
-        }}
-        placeholder="カタログから検索"
-        aria-label="カタログから検索"
-        className="h-9 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 text-sm"
-      />
-      <button type="button" onClick={() => void open()} className="h-9 shrink-0 rounded-md border border-slate-300 bg-white px-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50">
-        📖 カタログ
-      </button>
-    </span>
   );
 }
 

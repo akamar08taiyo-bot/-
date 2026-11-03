@@ -142,11 +142,13 @@ try {
   // 商品の欄の下の「★ 商品を選ぶ」「📷 スクショから自動認識」はなくした（ユーザーの指示「商品を選ぶとスクショから認識はなくす」2026-11-02）
   assert.equal(await page.getByRole('button', {name: /★ 商品を選ぶ|スクショから自動認識/}).count(), 0);
   assert.deepEqual(await page.getByLabel('商品名', {exact: true}).evaluateAll((xs) => xs.map((x) => x.value)), ['シャワーベンチ FSフィット', '浴槽台 ユクリア']);
-  // 見積もりの画面（広い幅）では、定価の欄の右に並ぶ
+  // 定価の行（定価・割引率の右。欄がせまいとき＝プレビューと横に並べた 1366px は、そのすぐ下）に「★ お気に入りから入力」
   {
     const f = await page.getByRole('button', {name: '★ お気に入りから入力'}).first().boundingBox();
-    const pr = await page.getByLabel('定価', {exact: true}).first().boundingBox();
-    assert.ok(f.x > pr.x + pr.width && Math.abs(f.y + f.height / 2 - (pr.y + pr.height / 2)) < 3, `${JSON.stringify(f)} ${JSON.stringify(pr)}`);
+    const rate = await page.getByLabel('割引率', {exact: true}).first().boundingBox();
+    const sameRow = f.x > rate.x + rate.width && Math.abs(f.y + f.height / 2 - (rate.y + rate.height / 2)) < 3;
+    const below = f.y >= rate.y + rate.height - 1 && f.y < rate.y + rate.height + 12;
+    assert.ok(sameRow || below, `${JSON.stringify(f)} ${JSON.stringify(rate)}`);
   }
   // 35,000×0.8＝28,000＋税2,800＝30,800、13,800×0.8＝11,040＋税1,104＝12,144 → 42,944円。1割：4,295円（切り上げ）・保険者 38,649円
   await page.getByText('42,944円').first().waitFor();
@@ -407,13 +409,9 @@ try {
   await page.getByLabel('保険者', {exact: true}).selectOption('yukuhashi');
   await page.getByRole('tab', {name: '📄 申請書（行橋市）'}).waitFor();
   await preview.getByRole('group', {name: '用具・受領委任払', exact: true}).waitFor();
-  // 申請書の画面にも「カタログから検索」。Enter は次の欄へ移らず、カタログの窓を開く
-  await page.getByRole('searchbox', {name: 'カタログから検索'}).first().fill('浴槽台');
-  await page.getByRole('searchbox', {name: 'カタログから検索'}).first().press('Enter');
-  await page.getByRole('dialog', {name: 'カタログ'}).waitFor();
-  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'カタログから検索');
-  await page.getByRole('dialog', {name: 'カタログ'}).getByRole('button', {name: 'カタログを閉じる'}).click();
-  await page.getByRole('searchbox', {name: 'カタログから検索'}).first().fill('');
+  // 商品マスタ（お気に入り）から入れた商品には「カタログから商品検索」「型番から入力」を出さない（商品は決まっている。手で入れる商品の欄だけ）
+  assert.equal(await page.getByRole('searchbox', {name: 'カタログから検索'}).count(), 0);
+  assert.equal(await page.getByRole('button', {name: '🔢 型番から入力'}).count(), 0);
 
   // 見積もりの画面に戻る（金額のまとめ）
   await page.getByRole('tab', {name: '📋 見積もり'}).click();
@@ -439,7 +437,7 @@ try {
   assert.match(cellOf(sheet, 'A6'), /山田 花子　様/);
   // 介護保険の内訳は明細の自己負担額の下に1行ずつ（「備考欄に記載している部分を上にずらす」「行を変えて見やすくする」2026-10-26）。下の備考の欄には書かない
   assert.ok(sheet.includes('利用者負担（1割）　4,295円'));
-  assert.doesNotMatch(cellOf(sheet, 'A60'), /利用者負担/);
+  assert.doesNotMatch(cellOf(sheet, 'H47'), /利用者負担/); // 備考は御見積合計の右（2026-11-03）
   assert.ok(!Object.keys(book).some((k) => k.startsWith('xl/media/')), '原本の印影の画像が入っている');
   // 印刷（PDF）は A4縦 1枚
   await assertFits(page, '2品');
@@ -535,9 +533,12 @@ try {
 
   // ---- カタログの窓（ユーザーの指示「商品を入力する際、カタログから検索という欄を入力して、右のスペースにカタログを開くことができる。
   // カタログを見ながら商品を入力できるようにする。カタログのポップは位置を移動したり、大きさを変更できるようにする」2026-10-26）
+  // 「カタログから商品検索」は手で入れる商品の欄（3つ目を足す。あとで消す）。Enter でも開く（申請書の入れる所の「次の欄へ」にしない）
+  await page.getByRole('button', {name: ADD_ITEM}).click();
   const catSearch = page.getByRole('searchbox', {name: 'カタログから検索'}).first();
-  await catSearch.fill('261s1063'); // p.40 の品番（ハイフン・小文字のちがいは同じ）
+  await catSearch.fill('261s1063'); // p.40 の注文番号（ハイフン・小文字のちがいは同じ）
   await catSearch.press('Enter');
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'カタログから検索');
   const viewer = page.getByRole('dialog', {name: 'カタログ'});
   await viewer.waitFor();
   const viewerChips = viewer.getByRole('group', {name: 'カタログのページ'}).getByRole('button');
@@ -619,7 +620,7 @@ try {
   await viewer.getByRole('button', {name: 'カタログを閉じる'}).click();
   await viewer.waitFor({state: 'detached'});
   // 開き直すと、前に置いた所・大きさ（この端末で覚える）
-  await page.getByRole('button', {name: '📖 カタログ', exact: true}).first().click();
+  await page.getByRole('button', {name: '📖 カタログから商品検索'}).first().click();
   await viewer.waitFor();
   const again = await viewer.boundingBox();
   assert.ok(Math.abs(again.x - sized.x) < 2 && Math.abs(again.y - sized.y) < 2 && Math.abs(again.width - sized.width) < 2, `覚えていない ${JSON.stringify(again)}`);
@@ -628,7 +629,7 @@ try {
   // スマホの幅：窓は画面いっぱい・検索の欄は1段まるごと・2本の指で広げると大きく（ユーザーの話「携帯で特定福祉用具カタログを開こうとした場合に開けない」2026-10-30。
   // 前は画面の下の6割に出て、住宅改修のタブの中では絵の所が画面の外になった。開くと14ページを一度に絵にしていて iPhone では開けなかった）
   await page.setViewportSize({width: 390, height: 844});
-  await page.getByRole('button', {name: '📖 カタログ', exact: true}).first().click();
+  await page.getByRole('button', {name: '📖 カタログから商品検索'}).first().click();
   await viewer.waitFor();
   assert.deepEqual(await viewer.boundingBox(), {x: 0, y: 0, width: 390, height: 844});
   const phoneSearch = await viewer.getByRole('searchbox', {name: 'カタログから検索'}).boundingBox();
@@ -649,6 +650,8 @@ try {
   await viewer.waitFor({state: 'detached'});
   await page.setViewportSize({width: 1366, height: 900});
   await catSearch.fill('');
+  await page.getByRole('button', {name: '商品を消す', exact: true}).click(); // 足した3つ目
+  assert.equal(await page.locator('[data-item]').count(), 2);
 
   // ---- 品目が多くても原本の明細（16行）の中に入って、A4 1枚のまま。備考は3行まで（入らない行は画面で知らせる）
   // 手で入れた品目は価格が空（0円）なので、合計（42,944円）は変わらない
@@ -668,7 +671,7 @@ try {
   assert.equal(await maker.inputValue(), 'アロン化成（株）');
   await maker.fill('見本工業');
   assert.equal(await maker.inputValue(), '見本工業');
-  await page.getByText('仕切（税抜・任意）').last().waitFor();
+  await page.getByText('仕切（任意）').last().waitFor();
   // 入れている所は住宅改修の申請書と同じ薄い黄色・細い枠（「黄色の部分の色がちょっと濃すぎて、チカチカして見にくい」2026-10-26）
   await page.waitForFunction(() => /bg-amber-300\/25 .*outline-1 .*outline-amber-400/.test(document.querySelector('[aria-label="見積書のプレビュー"] [data-pv-field="items"]')?.className ?? ''));
   // 「自己負担額を表示」は初めからオン：明細の最後の商品の2行下から介護保険の内訳（利用者負担は赤字）（ユーザーの指示「自己負担額を表示のオンオフっていうチェック項目を入れ」
@@ -698,14 +701,15 @@ try {
   await estPreview.getByText('介護保険（受領委任払い）', {exact: true}).waitFor({state: 'detached'});
   await selfPay.check();
   await estPreview.getByText('介護保険（受領委任払い）', {exact: true}).waitFor();
-  await page.getByRole('textbox', {name: '備考', exact: true}).fill(['ご不明な点は担当までお問い合わせください。', '見本の2行目です。', '見本の3行目です。', '納品の前にお電話いたします。'].join('\n'));
-  await page.getByText('見積書の備考は3行までです').waitFor();
+  // 備考は御見積合計の右の枠に5行まで（前の「※※消費税について※※」の枠。ユーザーの指示「代わりに備考欄にする（行数を増やす）」2026-11-03。前は下の3行）
+  await page.getByRole('textbox', {name: '備考', exact: true}).fill(['ご不明な点は担当までお問い合わせください。', '見本の2行目です。', '見本の3行目です。', '見本の4行目です。', '見本の5行目です。', '納品の前にお電話いたします。'].join('\n'));
+  await page.getByText('見積書の備考は5行までです').waitFor();
   await page.getByRole('button', {name: '🖨 見積書を印刷'}).first().click();
   await page.locator('.est-sheet [role="group"]').first().waitFor();
-  // 品名は商品ごとに メーカー／商品名／【品番】の行（ユーザーの指示 2026-11-01）なので、10品（★の2つは3行）は1ページ目の16行に商品が入り、
-  // 介護保険の内訳は2ページ目の初めから
+  // 品名は商品ごとに メーカー／商品名／【品番】の行（ユーザーの指示 2026-11-01）・商品の下に1行あける（2026-11-03）ので、10品（★の2つは3行）は
+  // 1ページ目の20行に★の2つと見本の商品 1〜6、2ページ目に 7・8 と介護保険の内訳
   const longDoc = (await page.locator('.est-sheet').allInnerTexts()).join('\n');
-  for (const s of ['見本の商品 1', '見本の商品 8', 'ご不明な点は担当までお問い合わせください。', '42,944', '【品番】']) assert.ok(longDoc.includes(s), `10品の見積書に「${s}」がない`);
+  for (const s of ['見本の商品 1', '見本の商品 8', 'ご不明な点は担当までお問い合わせください。', '見本の5行目です。', '42,944', '【品番】']) assert.ok(longDoc.includes(s), `10品の見積書に「${s}」がない`);
   assert.ok(!longDoc.includes('納品の前にお電話いたします。'));
   await assertFits(page, '10品');
   await page.pdf({path: `${out}/estimate-long.pdf`, preferCSSPageSize: true, printBackground: true});
@@ -715,8 +719,8 @@ try {
   await page.getByRole('button', {name: '閉じる'}).click();
   await page.getByRole('textbox', {name: '備考', exact: true}).fill('ご不明な点は担当までお問い合わせください。');
 
-  // ---- 16点を超えると2ページ目（明細のつづき）。3ページまで（ユーザーの指示「ページは3ページまでいけるようにする」。1ページ目は「行数は4行ぐらい減らしていい」で16行）
-  // 23点：1ページ目に16点（★の2つ＋見本の商品 1〜14）、2ページ目に見本の商品 15〜21
+  // ---- 1ページ目に入らなければ2ページ目（明細のつづき）。3ページまで（ユーザーの指示「ページは3ページまでいけるようにする」。1ページ目の明細は20行・商品の下に1行あける）
+  // 23点：1ページ目に★の2つ＋見本の商品 1〜6、2ページ目に見本の商品 7〜21
   for (let n = 9; n <= 21; n++) {
     await page.getByRole('button', {name: ADD_ITEM}).click();
     await page.getByLabel('商品名').last().fill(`見本の商品 ${n}`);
@@ -728,7 +732,7 @@ try {
   const page2 = await page.locator('.est-sheet').nth(1).innerText();
   // 1つの商品の行はページをまたがない。1ページ目の最後の商品の次から2ページ目
   const lastOn1 = Math.max(...[...page1.matchAll(/見本の商品 (\d+)/g)].map((m) => Number(m[1])));
-  assert.ok(lastOn1 >= 8 && page1.includes('1／2') && page1.includes('42,944'), page1);
+  assert.ok(lastOn1 >= 6 && page1.includes('1／2') && page1.includes('42,944'), page1);
   for (const s of ['御　見　積　書', '山田 花子　様', '2／2（明細のつづき）', `見本の商品 ${lastOn1 + 1}`, '見本の商品 21']) assert.ok(page2.includes(s), `2ページ目に「${s}」がない`);
   assert.ok(!page2.includes(`見本の商品 ${lastOn1}\n`));
   await assertFits(page, '23品');
@@ -825,25 +829,39 @@ try {
   const rate = Number((await shinseiForm.getByLabel('割引率').inputValue()).replace(/,/g, ''));
   await shinseiForm.getByLabel('定価').blur();
   assert.equal(await shinseiForm.getByLabel('販売金額', {exact: true}).inputValue(), (9000 * (100 - rate) / 100).toLocaleString('ja-JP'));
+  // 販売金額（税抜）のすぐ横に税込。税抜・税込のどちらを打っても割引率が変わり、割引率を打つと税抜・税込が変わる
+  // （ユーザーの指示「税込の合計金額は、税抜きの横にしっかりとわかりやすくする。税抜き金額、税込み金額を変更すると、自動的に割引率が変わるようにする。また、逆もしかり」2026-11-03）
+  const valueIs = (label, v) => page.waitForFunction(([l, x]) => document.querySelector(`[aria-label="${l}"]`)?.value === x, [label, v]);
   await shinseiForm.getByLabel('割引率').fill('30');
   await shinseiForm.getByLabel('割引率').blur();
-  await page.waitForFunction(() => document.querySelector('[aria-label="販売金額"]')?.value === '6,300');
-  await shinseiForm.getByText('6,930円').waitFor();
+  await valueIs('販売金額', '6,300');
+  await valueIs('販売金額（税込）', '6,930');
   await page.waitForFunction(() => document.querySelector('[aria-label="申請書のプレビュー"]')?.textContent?.includes('6,930'));
   await shinseiForm.getByLabel('販売金額', {exact: true}).fill('7000');
   await shinseiForm.getByLabel('販売金額', {exact: true}).blur();
-  await shinseiForm.getByText('7,700円').waitFor();
+  await valueIs('販売金額（税込）', '7,700');
+  await valueIs('割引率', '22.2'); // 9,000円の 7,000円 ＝ 22.2%引き
+  await shinseiForm.getByLabel('販売金額（税込）').click();
+  await shinseiForm.getByLabel('販売金額（税込）').fill('7920');
+  await shinseiForm.getByLabel('販売金額（税込）').blur();
+  await valueIs('販売金額', '7,200');
+  await valueIs('割引率', '20');
+  await page.waitForFunction(() => document.querySelector('[aria-label="申請書のプレビュー"]')?.textContent?.includes('7,920'));
+  // ↺ で定価×割引率に戻す（手で入れた印＝薄い黄色が消える）
   await shinseiForm.getByRole('button', {name: '販売金額を自動に戻す'}).click();
-  await shinseiForm.getByText('6,930円').waitFor();
+  await valueIs('販売金額', '7,200');
+  assert.equal(await shinseiForm.getByRole('button', {name: '販売金額を自動に戻す'}).count(), 0);
   await shinseiForm.getByLabel('割引率').fill(String(rate));
   await shinseiForm.getByLabel('割引率').blur();
-  await shinseiForm.getByText(`${Math.floor((9000 * (100 - rate)) / 100 * 1.1).toLocaleString('ja-JP')}円`).waitFor();
-  // 販売金額の下に数量（− ＋。ユーザーの指示「数量を追加」2026-10-26）。右の金額は 販売金額×数量×1.1。販売見積書の数量と同じ値
+  const one = Math.floor(((9000 * (100 - rate)) / 100) * 1.1);
+  await valueIs('販売金額（税込）', one.toLocaleString('ja-JP'));
+  // 数量（− ＋。ユーザーの指示「数量を追加」2026-10-26。販売見積書の数量と同じ値）。2つ以上なら下にその数量の金額（税抜・税込。字の大きさはそろえる）
   await shinseiForm.getByRole('button', {name: '見本の多点杖 ワイドの数量を1増やす'}).click();
   await page.waitForFunction(() => document.querySelector('[aria-label="見本の多点杖 ワイドの数量"]')?.value === '2');
-  await shinseiForm.getByText(`${Math.floor(((9000 * (100 - rate)) / 100) * 2 * 1.1).toLocaleString('ja-JP')}円`).waitFor();
+  await shinseiForm.getByLabel('数量分の金額').getByText(`税込 ${Math.floor(((9000 * (100 - rate)) / 100) * 2 * 1.1).toLocaleString('ja-JP')}円`).waitFor();
   await shinseiForm.getByRole('button', {name: '見本の多点杖 ワイドの数量を1減らす'}).click();
-  await shinseiForm.getByText(`${Math.floor((9000 * (100 - rate)) / 100 * 1.1).toLocaleString('ja-JP')}円`).waitFor();
+  await shinseiForm.getByLabel('数量分の金額').waitFor({state: 'detached'});
+  await valueIs('販売金額（税込）', one.toLocaleString('ja-JP'));
   // 2つ目からは、最後の商品のすぐ下の横いっぱいの点線の枠。押すと足した商品の種目の欄へ移る（消して元に戻す）
   const addItem = shinseiForm.getByRole('button', {name: ADD_ITEM});
   assert.equal((await addItem.textContent())?.trim(), '＋ 2つ目の福祉用具を追加');
@@ -889,7 +907,8 @@ try {
   assert.equal(await page.locator('.cat-sheet').count(), 1);
   await page.locator('.print-overlay').getByRole('button', {name: '閉じる', exact: true}).click();
   await page.getByRole('button', {name: '🖨 申請書を印刷', exact: true}).click();
-  assert.match(dialogs[0] ?? '', /手で入れた商品をお気に入り（★）に登録しますか？\n・見本の多点杖 ワイド/);
+  // 手で入れた商品は聞かずにお気に入りへ（ユーザーの指示「一度入力した商品は、今後お気に入りの中に、項目ごとにいれる」2026-11-03。前は印刷の前に聞いていた）
+  assert.ok(!dialogs.some((d) => /お気に入り/.test(d)), dialogs.join(' / '));
   await page.locator('.print-overlay').waitFor();
   assert.ok((await page.locator('.print-overlay .est-sheet').count()) >= 3); // 事前申請書・支給申請書・委任状・完了写真
   // 印刷するのは初めは1枚目だけ（「申請書印刷の場合は、１枚目のみ印刷、デフォルトは」2026-10-26）。チェックでほかのページも足せる。紙（PDF）の枚数で確かめる
@@ -996,10 +1015,11 @@ try {
   const productsHead = picker.getByRole('button', {name: /^商品：\s*24件/});
   assert.equal(await productsHead.getAttribute('aria-expanded'), 'false');
   await page.screenshot({path: `${out}/05g-catalog-picked.png`});
-  // メーカーの横の「🔍 商品検索」（ユーザーの指示「メーカー名の横に、商品検索ボタン。メーカー名、項目名を入力すると、フィルターをかけられた商品のみ表示されるようにする。
-  // カタログも同様です」2026-11-01）：項目名「シャワーチェアー」・パナソニックで、その商品だけ。広い画面ではカタログの窓も、その商品の載っているページだけ
+  // 品目・メーカーの下の「📖 カタログから商品検索」（前の「🔍 商品検索」「📖 カタログから選ぶ」「📖 カタログ」を1つに。ユーザーの指示「カタログから選ぶ、カタログ、
+  // 商品検索の３つの機能がかぶっている。カタログから商品検索という一つのボタンのみにする」2026-11-03）：項目名「シャワーチェアー」・パナソニックで、その商品だけ。
+  // 広い画面ではカタログの窓も、その商品の載っているページだけ
   await catForm.getByLabel('商品名').fill('シャワーチェアー');
-  await catForm.getByRole('button', {name: '🔍 商品検索'}).click();
+  await catForm.getByRole('button', {name: '📖 カタログから商品検索'}).click();
   const searchStatus = picker.getByRole('status');
   await searchStatus.waitFor();
   assert.match(await searchStatus.innerText(), /シャワーチェア・パナソニックエイジフリー（株）：24件/);
@@ -1024,10 +1044,9 @@ try {
   await viewerPages.getByRole('button', {name: '✕ 全部のページ'}).click();
   assert.equal(await viewerPages.getByRole('button', {name: /^.+p\.\d+/}).count(), 26);
   await searchViewer.getByRole('button', {name: 'カタログを閉じる'}).click();
-  // 種目の横の「📖 カタログから選ぶ」（ユーザーの指示「入浴補助用具の横に、カタログから選ぶ。設置。項目名とメーカー名を選択すると（選択したものだけの
-  // カタログを表示）クリックするとカタログが開き、カタログと商品をリンクさせて、自動的に商品名や金額などが全てはいるようにする。カタログでは、
-  // クリックできるよう認識できるようの工夫する」2026-11-02）：種目・メーカーのページだけの窓。ページの商品に押せる枠（＋ 選ぶ）。押して色を選ぶと入る
-  await catForm.getByRole('button', {name: '📖 カタログから選ぶ'}).click();
+  // カタログの窓のページの商品を押して入れる（ユーザーの指示「…クリックするとカタログが開き、カタログと商品をリンクさせて、自動的に商品名や金額などが全てはいるようにする。
+  // カタログでは、クリックできるよう認識できるようの工夫する」2026-11-02）：種目・メーカーのページだけの窓。ページの商品に押せる枠（＋ 選ぶ）。押して色を選ぶと入って、窓は閉じる
+  await catForm.getByRole('button', {name: '📖 カタログから商品検索'}).click();
   const pickViewer = page.getByRole('dialog', {name: 'カタログ'});
   await pickViewer.waitFor();
   const pickPages = await pickViewer.getByRole('group', {name: 'カタログのページ'}).getByRole('button', {name: /p\.\d+/}).allInnerTexts();
@@ -1055,18 +1074,23 @@ try {
   assert.equal(await catForm.getByLabel('商品名').inputValue(), 'シャワーチェアAir ミドルSPワンタッチ オレンジ');
   assert.equal(await catForm.getByLabel('品番').inputValue(), 'PN-L41831D');
   assert.ok(Number((await catForm.getByLabel('定価').inputValue()).replace(/[^\d]/g, '')) > 0);
-  assert.equal(await midHot.locator('span').innerText(), '✓ 入っています'); // 入れた商品の枠
+  // 選んだらカタログの窓は閉じる（ユーザーの指示「商品検索から商品を選んだら、カタログは閉じる。下の一覧表も閉じる」2026-11-03）
+  await pickViewer.waitFor({state: 'detached'});
+  assert.equal(await picker.getByRole('list').count(), 0);
   await page.screenshot({path: `${out}/05k-catalog-picked.png`});
-  await pickViewer.getByRole('button', {name: 'カタログを閉じる'}).click();
-  // 「カタログから検索」は商品の欄ごとに、種目・メーカーのすぐ下・商品名の上。「★ お気に入りから入力」は定価の横（ユーザーの指示 2026-11-02）
+  // 「カタログから検索」は商品の欄ごとに、品目・メーカーのすぐ下・商品名の上（ユーザーの指示「項目名、メーカー名を入力したその下に、カタログから検索をおく」2026-11-03）。
+  // 「★ お気に入りから入力」は定価の行（ユーザーの指示 2026-11-02）
   const yOf = async (loc) => (await loc.boundingBox()).y;
   const catRow = catForm.getByRole('searchbox', {name: 'カタログから検索'});
   assert.equal(await catRow.count(), 1);
   assert.ok((await yOf(catForm.getByLabel('メーカー').first())) < (await yOf(catRow)) && (await yOf(catRow)) < (await yOf(catForm.getByLabel('商品名'))));
-  // 狭い幅（申請書のタブ）では定価の欄のすぐ下に折れる
+  // 狭い幅（申請書のタブ）では定価・割引率の行のすぐ下に折れる
   const favBox = await catForm.getByRole('button', {name: '★ お気に入りから入力'}).boundingBox();
-  const priceBox = await catForm.getByLabel('定価').boundingBox();
-  assert.ok(favBox.x >= priceBox.x - 1 && favBox.y >= priceBox.y && favBox.y < priceBox.y + priceBox.height + 12, `${JSON.stringify(favBox)} ${JSON.stringify(priceBox)}`);
+  const rateBox = await catForm.getByLabel('割引率').boundingBox();
+  assert.ok(
+    (favBox.x > rateBox.x + rateBox.width && Math.abs(favBox.y + favBox.height / 2 - (rateBox.y + rateBox.height / 2)) < 3) || (favBox.y >= rateBox.y + rateBox.height - 1 && favBox.y < rateBox.y + rateBox.height + 12),
+    `${JSON.stringify(favBox)} ${JSON.stringify(rateBox)}`,
+  );
   // 商品名・品番を打って Enter：その言葉のページ。ページの商品を押すと、この欄に入る（2つ目にはならない）
   await catRow.fill('PN-L41431A');
   await catRow.press('Enter');
@@ -1076,7 +1100,11 @@ try {
   await rowViewer.getByRole('dialog', {name: '色・品番を選ぶ'}).getByRole('button', {name: /ブルー/}).click();
   assert.equal(await catForm.getByLabel('品番').inputValue(), 'PN-L41431A');
   assert.equal(await catForm.getByLabel('商品名').count(), 1);
+  await rowViewer.waitFor({state: 'detached'}); // 選んだら窓は閉じる
   await page.screenshot({path: `${out}/05l-catalog-row-search.png`});
+  // 開き直す（さがす言葉はそのまま）
+  await catForm.getByRole('button', {name: '📖 カタログから商品検索'}).click();
+  await rowViewer.waitFor();
   // カタログの印刷の「🔲 枠で囲む」（ユーザーの指示「カタログを丸で囲むボタンをつくる。印刷ボタンと並行して作成する」「丸でかこむは、しかくでわくがこみに変更」2026-11-02）：
   // 「印刷する」のすぐ上。初めて押すと見積もりの商品（PN-L41431A）に四角の枠。なぞると枠を足す・✕ で消す・Ctrl+Z で戻す
   await rowViewer.getByRole('button', {name: '🖨 印刷'}).click();
@@ -1110,7 +1138,7 @@ try {
   await catRow.fill('');
   // 合う商品がなければ、種目・メーカーの商品（知らせる）
   await catForm.getByLabel('商品名').fill('みほんのなまえ');
-  await catForm.getByRole('button', {name: '🔍 商品検索'}).click();
+  await catForm.getByRole('button', {name: '📖 カタログから商品検索'}).click();
   await page.getByRole('dialog', {name: 'カタログ'}).waitFor();
   assert.match(await searchStatus.innerText(), /「みほんのなまえ」に合う商品がないので/);
   await page.getByRole('dialog', {name: 'カタログ'}).getByRole('button', {name: 'カタログを閉じる'}).click();

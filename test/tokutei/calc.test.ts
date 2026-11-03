@@ -179,11 +179,40 @@ test('手で入れた単価から割引率：ちょうど何%引きならその%
   assert.equal(impliedDiscount(33000, 23000), null); // 30.3%引き
   assert.equal(impliedDiscount(0, 23100), null); // 定価がない
   assert.deepEqual(unitPricePatch({listPrice: 33000}, 23100), {unitPrice: 23100, discountRate: 30});
-  assert.deepEqual(unitPricePatch({listPrice: 33000}, 23000), {unitPrice: 23000}); // ちょうどでなければ割引率はそのまま
+  // ちょうど何%引きでなくても、割引率の欄は定価と単価からの割引率（小数1けた・0〜100%。ユーザーの指示「税抜き金額…を変更すると、自動的に割引率が変わる」2026-11-03）
+  assert.deepEqual(unitPricePatch({listPrice: 33000}, 23000), {unitPrice: 23000, discountRate: 30.3});
+  assert.deepEqual(unitPricePatch({listPrice: 32000}, 332252), {unitPrice: 332252, discountRate: 0}); // 定価より高い単価は 0%
+  assert.deepEqual(unitPricePatch({listPrice: 0}, 23000), {unitPrice: 23000}); // 定価がなければ割引率はそのまま
   assert.deepEqual(unitPricePatch({listPrice: 33000}, null), {unitPrice: null});
   const S = {markupRate: 25};
   const it = (over) => ({id: 'i', productId: null, name: '見本', maker: '', code: '', tais: '', category: '', sub: '', unit: '台', supplier: '', taxType: '10%', listPrice: 33000, cost: 0, qty: 1, discountRate: 35, unitPrice: null, reason: '', ...over});
   assert.equal(actualDiscount(lineOf(it({unitPrice: 23100}), S)), 30); // 割引率の欄は35のまま、単価は30%引き
   assert.equal(actualDiscount(lineOf(it({unitPrice: 23000}), S)), 30.3);
   assert.equal(actualDiscount(lineOf(it({}), S)), 35); // 定価×割引
+});
+
+// 商品の欄の「税込」を打つと税抜（販売単価）と割引率が変わる（ユーザーの指示「税込の合計金額は、税抜きの横にしっかりとわかりやすくする。
+// 税抜き金額、税込み金額を変更すると、自動的に割引率が変わるようにする。また、逆もしかり」2026-11-03）
+test('税込の値段：税抜＋消費税（切り捨て）／税込から税抜（その税込を超えない一番高い税抜）', async () => {
+  const {priceFromTaxIncluded, taxIncluded, unitPricePatch} = await import('../../src/tokutei/calc.ts');
+  assert.equal(taxIncluded(25600, '10%'), 28160);
+  assert.equal(taxIncluded(25599, '10%'), 28158);
+  assert.equal(taxIncluded(1000, '8%'), 1080);
+  assert.equal(taxIncluded(5000, '非課税'), 5000);
+  assert.equal(priceFromTaxIncluded(28160, '10%'), 25600);
+  assert.equal(priceFromTaxIncluded(28159, '10%'), 25599); // ちょうどの税抜がない → 1円少ない 28,158円
+  assert.equal(priceFromTaxIncluded(1080, '8%'), 1000);
+  assert.equal(priceFromTaxIncluded(5000, '非課税'), 5000);
+  assert.equal(priceFromTaxIncluded(0, '10%'), 0);
+  // 1円から30万円まで、税込から戻した税抜の税込は打った税込を超えず、1円より多くは下がらない
+  for (const tax of ['10%', '8%'] as const) {
+    for (let t = 1; t <= 300000; t += 7) {
+      const p = priceFromTaxIncluded(t, tax);
+      const back = taxIncluded(p, tax);
+      assert.ok(back <= t && t - back <= 1, `${tax} ${t} → ${p} → ${back}`);
+      assert.ok(taxIncluded(p + 1, tax) > t);
+    }
+  }
+  // 税込 28,160円 → 税抜 25,600円 → 定価 32,000円の20%引き
+  assert.deepEqual(unitPricePatch({listPrice: 32000}, priceFromTaxIncluded(28160, '10%')), {unitPrice: 25600, discountRate: 20});
 });

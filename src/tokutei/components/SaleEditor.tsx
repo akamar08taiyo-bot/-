@@ -3,7 +3,7 @@ import type {FocusEvent, MouseEvent} from 'react';
 import {saleTotals} from '../calc.ts';
 import {insurerLabel} from '../defaults.ts';
 import {HACCHU_IMPORT_KEY, hacchuImport, hacchuUrl, queueHacchu} from '../handoff.ts';
-import {addFavorites, blankItem, copySale, customerLabel, customerPatch, itemFromProduct, makerChoices, markUsed, sameYearSales, saleWarnings, unregisteredItems} from '../sales.ts';
+import {blankItem, rememberFavorites, copySale, customerLabel, customerPatch, itemFromProduct, makerChoices, markUsed, sameYearSales, saleWarnings, unregisteredItems} from '../sales.ts';
 import {shinseiForm, shinseiValues} from '../shinsei.ts';
 import {saveShinsei, useTemplate} from '../shinseiFiles.ts';
 import {FIELD_LABEL, missingFields, shinseiPreview} from '../shinseiPreview.ts';
@@ -17,7 +17,7 @@ import type {Update} from '../useStore.ts';
 import {todayIso, yen} from '../util.ts';
 import {fiscalYearOf} from '../wareki.ts';
 import {addressOfZip, isZipHead, withoutDoubledHead, zipCandidates, zipLabel} from '../zip.ts';
-import {ESTIMATE_CAPACITY, ESTIMATE_LABEL, estimateNoteOverflow, estimateOverflow, estimatePreview} from '../estimateBook.ts';
+import {ESTIMATE_CAPACITY, ESTIMATE_LABEL, ESTIMATE_NOTE_LINES, estimateNoteOverflow, estimateOverflow, estimatePreview} from '../estimateBook.ts';
 import type {EstimateField} from '../estimateBook.ts';
 import {saveEstimateBook, useEstimateTemplate} from '../print/estimateFiles.ts';
 import {CatalogPrintView} from '../print/CatalogPrint.tsx';
@@ -213,17 +213,18 @@ export function SaleEditor({
     change(patch);
   };
 
-  // 手で入れた商品を商品マスタの★お気に入りに（次からは「★ 商品を選ぶ」で選べる）。印刷の前にも、まだ登録していない商品があれば聞く
-  // （ユーザーの指示「商品名や金額を一度入力したら、お気に入り登録として追加できるようにする。印刷の前に、商品名や金額をお気に入り登録するか否かの確認」2026-10-26）
-  const favorite = (ids: string[]) => {
-    const r = addFavorites(data.products, sale.items, new Set(ids));
-    update('products', () => r.products);
-    change({items: r.items});
-    toast(ids.length > 1 ? `${ids.length}点をお気に入りに登録しました` : 'お気に入りに登録しました');
-  };
+  // 一度入れた商品は、商品マスタの★お気に入りに入れる（品目ごとに「★ お気に入りから入力」に出る。ユーザーの指示「一度入力した商品は、今後お気に入りの中に、
+  // 項目ごとにいれる…当然削除する事もできる」2026-11-03。前は「☆ お気に入りに登録」を押すか、印刷の前に聞いていた）。
+  // カタログから選んだ商品はすぐに、手で打った商品は印刷・申請書の印刷・一覧へ戻るときに（打っている途中の名前を入れないように）
+  const remember = (items: SaleItem[], revive: boolean) => update('products', (list) => rememberFavorites(list, items, revive));
   const askFavorites = () => {
     const list = unregisteredItems(sale, data.products);
-    if (list.length && window.confirm(`手で入れた商品をお気に入り（★）に登録しますか？\n${list.map((i) => `・${i.name.trim()}`).join('\n')}`)) favorite(list.map((i) => i.id));
+    if (list.length) remember(list, false);
+  };
+  // カタログの商品の一覧から選んだ：カタログの窓を閉じて（一覧は CatalogPicker が閉じる）、お気に入りに入れる（ユーザーの指示「商品検索から商品を選んだら、カタログは閉じる。下の一覧表も閉じる」2026-11-03）
+  const onCatalogPicked = (item: SaleItem) => {
+    setCatalogView(null);
+    remember([item], true);
   };
   const print = () => {
     askFavorites();
@@ -254,16 +255,20 @@ export function SaleEditor({
   const catalogTarget = catalogView?.target ? sale.items.find((i) => i.id === catalogView.target) : sale.items.find((i) => i.productId === null && !i.name.trim());
   const pickFromCatalog = (p: CatalogProduct, v: CatalogVariant) => {
     const name = [p.name, v.label].filter(Boolean).join(' ');
+    // 選んだら窓を閉じ、お気に入りに入れる（ユーザーの指示「商品検索から商品を選んだら、カタログは閉じる」2026-11-03。前は窓を開いたまま選び直せた）
     if (catalogTarget) {
-      change({items: sale.items.map((i) => (i.id === catalogTarget.id ? {...i, ...catalogItemPatch(p, v, i), productId: null} : i))});
-      setCatalogView((c) => c && {...c, target: catalogTarget.id});
+      const next = {...catalogTarget, ...catalogItemPatch(p, v, catalogTarget), productId: null};
+      change({items: sale.items.map((i) => (i.id === catalogTarget.id ? next : i))});
+      setCatalogView(null);
+      remember([next], true);
       toast(`${sale.items.indexOf(catalogTarget) + 1}つ目に入れました：${name}`);
       return;
     }
     const b = blankItem(s);
     const added = {...b, ...catalogItemPatch(p, v, b)};
     change({items: [...sale.items, added]});
-    setCatalogView((c) => c && {...c, target: added.id});
+    setCatalogView(null);
+    remember([added], true);
     toast(`${sale.items.length + 1}つ目に入れました：${name}`);
   };
   // 窓の「👆 商品を押すと「1つ目」に入ります」の名前
@@ -481,7 +486,7 @@ export function SaleEditor({
             onCatalog={openCatalog}
             onAddItem={(item) => change({items: [...sale.items, item ?? blankItem(s)]})}
             onPickCustomer={fixedView ? undefined : () => setPickingCustomer(true)}
-            onFavorite={(id) => favorite([id])}
+            onCatalogPicked={onCatalogPicked}
             onHideSuggest={hideSuggest}
             changeSettings={(f) => update('settings', f)}
           />
@@ -520,7 +525,7 @@ export function SaleEditor({
             onCatalog={openCatalog}
             onAddItem={(item) => change({items: [...sale.items, item ?? blankItem(s)]})}
             onPickCustomer={fixedView ? undefined : () => setPickingCustomer(true)}
-            onFavorite={(id) => favorite([id])}
+            onCatalogPicked={onCatalogPicked}
             onHideSuggest={hideSuggest}
             withShinsei={fixedView !== 'quote'}
           />
@@ -529,7 +534,7 @@ export function SaleEditor({
               <section className="rounded-xl bg-slate-200/70 p-2">
                 {estimateOverflow(sale) > 0 && <p className="mb-2 rounded-md bg-rose-50 p-2 text-xs font-bold text-rose-700">見積書の明細は3ページ・{ESTIMATE_CAPACITY}点までです（{estimateOverflow(sale)}点が入りません）</p>}
                 {estimateNoteOverflow(sale) > 0 && (
-                  <p className="mb-2 rounded-md bg-rose-50 p-2 text-xs font-bold text-rose-700">見積書の備考は3行までです（{estimateNoteOverflow(sale)}行が入りません）</p>
+                  <p className="mb-2 rounded-md bg-rose-50 p-2 text-xs font-bold text-rose-700">見積書の備考は{ESTIMATE_NOTE_LINES}行までです（{estimateNoteOverflow(sale)}行が入りません）</p>
                 )}
                 {estPages === null ? (
                   <p className="p-6 text-center text-sm text-slate-500">見積書を開いています…</p>
@@ -648,6 +653,7 @@ export function SaleEditor({
           products={data.products}
           settings={s}
           onClose={() => setPicking(null)}
+          focus={{category: sale.items.find((x) => x.id === picking)?.category ?? ''}}
           onToggleFavorite={(p) => update('products', (list) => list.map((x) => (x.id === p.id ? {...x, favorite: !x.favorite, updatedAt: Date.now()} : x)))}
           onPick={(p) => {
             pickFavorite(picking, p);

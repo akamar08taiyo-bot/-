@@ -4,6 +4,7 @@
 // 入れている所の欄は囲んで、見える所まで動かす。欄を押すと左のその入れる所へ。まだ入っていない欄は薄い黄色
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import type {CSSProperties, RefObject} from 'react';
+import {fitTexts, refitOnFonts} from '../print/fitTexts.ts';
 import type {PvFont, PvHeader, PvPage, PvShape, PvText, ShinseiField} from '../shinseiPreview.ts';
 
 const PAD = 18; // 紙の余白（画素）
@@ -60,6 +61,8 @@ function VerticalText({t}: {t: PvText}) {
   }
   return (
     <div
+      data-fit={t.align === 'left' || t.align === 'right' ? t.align : 'center'}
+      data-fit-v={t.valign}
       style={{
         position: 'absolute',
         left: t.x,
@@ -76,11 +79,13 @@ function VerticalText({t}: {t: PvText}) {
       }}
     >
       <span className="sr-only">{t.runs.map((r) => r.text).join('')}</span>
-      {chars.map((c, i) => (
-        <div key={i} aria-hidden="true" style={{...fontCss(c.font, k), whiteSpace: 'pre'}}>
-          {c.ch}
-        </div>
-      ))}
+      <div data-fit-inner="" aria-hidden="true">
+        {chars.map((c, i) => (
+          <div key={i} style={{...fontCss(c.font, k), whiteSpace: 'pre'}}>
+            {c.ch}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -160,8 +165,11 @@ function TextView({t}: {t: PvText}) {
   }
   const k = fitScale(t);
   const distributed = t.align === 'distributed';
+  // data-fit：描いたあとに出た大きさを測って、欄に入りきらなければ必ず縮める（fitTexts.ts。見積もりの k だけでは、最小フォントサイズの設定などではみ出した）
   return (
     <div
+      data-fit={distributed ? 'center' : t.align}
+      data-fit-v={t.valign}
       style={{
         position: 'absolute',
         left: t.x,
@@ -176,6 +184,7 @@ function TextView({t}: {t: PvText}) {
       }}
     >
       <div
+        data-fit-inner=""
         style={{
           textAlign: distributed ? 'justify' : (t.align as 'left' | 'center' | 'right'),
           textAlignLast: distributed ? 'justify' : undefined,
@@ -242,6 +251,8 @@ function ShapeView({s}: {s: PvShape}) {
 function ShapeText({s}: {s: PvShape}) {
   return (
     <div
+      data-fit={s.align}
+      data-fit-v={s.valign}
       style={{
         position: 'absolute',
         left: s.x,
@@ -259,7 +270,7 @@ function ShapeText({s}: {s: PvShape}) {
         ...fontCss(s.font!),
       }}
     >
-      {s.text}
+      <div data-fit-inner="">{s.text}</div>
     </div>
   );
 }
@@ -327,6 +338,11 @@ export function ShinseiPages<F extends string = ShinseiField>({
   tone?: 'sky' | 'yellow';
 }) {
   const [wrapRef, wrapWidth] = useWidth<HTMLDivElement>();
+  // 描くたびに、欄に入りきらない文字を縮める（はみ出しを出さない決まり。fitTexts.ts）。字体を読み終わったら、もう一度
+  useLayoutEffect(() => {
+    fitTexts(wrapRef.current);
+  });
+  useEffect(() => refitOnFonts(() => fitTexts(wrapRef.current)), [wrapRef]);
   const widest = Math.max(...pages.map((p) => paper(p).width), 1);
   // 右上の − ＋ と Ctrl＋スクロールで大きく・小さく（ユーザーの指示「見積もりの右上に+-マーク。アップして見えるようにする。Ctrl+スクロールでも可能にする」2026-11-01）。
   // 大きさはプレビューごとに（見積書・申請書）この端末で覚える。印刷のときは使わない

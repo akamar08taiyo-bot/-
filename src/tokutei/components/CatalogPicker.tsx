@@ -7,7 +7,12 @@
 // メーカーの欄の横の「🔍 商品検索」（search が増える）で、種目・項目名（商品名の欄に打った字）・メーカーで絞った商品だけを出し、
 // 広い画面ではカタログの窓も、その商品の載っているページだけにする（ユーザーの指示「メーカー名の横に、商品検索ボタン。メーカー名、項目名を入力すると、
 // フィルターをかけられた商品のみ表示されるようにする。カタログも同様です」2026-11-01。絞り方は catalogItems.ts の catalogFilter）
+// 2026-11-03：ボタンは「📖 カタログから商品検索」1つに（ユーザーの指示「カタログから選ぶ、カタログ、商品検索の３つの機能がかぶっている。カタログから商品検索という
+// 一つのボタンのみにする」「項目名、メーカー名を入力したその下に、カタログから検索をおく」）。品目・メーカーの段の下に、さがす言葉の欄とこのボタン。
+// 押すと、種目・品目・メーカー・言葉で絞った商品の一覧を出し、カタログの窓もその商品の載っているページだけで開く。
+// 商品を選んだら（一覧でも窓でも）、カタログの窓と一覧（品目・メーカーの段も）を閉じる（ユーザーの指示「商品検索から商品を選んだら、カタログは閉じる。下の一覧表も閉じる」）
 import {useEffect, useRef, useState} from 'react';
+import {codeMatchKey} from '../codeLookup.ts';
 import type {ReactNode} from 'react';
 import type {CatalogPagesFilter, OpenCatalog} from '../catalog.ts';
 import {catalogFilter, catalogInCategory, catalogItemPatch, catalogMakers, catalogPagesOf, looseKey, sameMaker} from '../catalogItems.ts';
@@ -18,64 +23,23 @@ import type {SaleItem} from '../types.ts';
 import {matchesAll} from '../util.ts';
 
 const yen = (n: number) => n.toLocaleString('ja-JP');
-/** カタログの窓を一緒に開く広さ（狭い画面では窓が画面いっぱいになるので、ボタンで開く） */
-const WIDE = 1024;
+/** さがす言葉で絞るときの、商品の文字（商品名・メーカー・品番・色） */
+// さがす言葉で見る字：商品名・メーカー・品番・色・介援隊の注文番号（261-S1063。前の「カタログから検索」の欄も注文番号で探せた）
+// 品番・注文番号はハイフン・空白を除いた形も入れる（「261s1063」「pnl41431d」でも当たる。型番から入力と同じ codeMatchKey）
+const productText = (p: CatalogProduct) =>
+  `${p.name} ${p.maker} ${p.variants.map((v) => `${v.code} ${codeMatchKey(v.code)} ${v.label} ${v.orderCode} ${codeMatchKey(v.orderCode)}`).join(' ')}`;
 
-/**
- * 種目の横の「📖 カタログから選ぶ」（ユーザーの指示「入浴補助用具の横に、カタログから選ぶ。設置。項目名とメーカー名を選択すると（選択したものだけの
- * カタログを表示）クリックするとカタログが開き、カタログと商品をリンクさせて、自動的に商品名や金額などが全てはいるようにする」2026-11-02）：
- * 種目・品目・メーカーで絞ったページだけのカタログの窓を開く（何も選んでいなければ全部のページ）。窓のページの商品を押すと、この商品の欄に入る（SaleEditor の pickFromCatalog）
- */
-export function CatalogChooseButton({item, onCatalog}: {item: SaleItem; onCatalog: OpenCatalog}) {
-  const [busy, setBusy] = useState(false);
-  const open = async () => {
-    setBusy(true);
-    const filter = await itemCatalogFilter(item);
-    setBusy(false);
-    onCatalog('', filter, item.id);
-  };
-  return (
-    <button
-      type="button"
-      onClick={() => void open()}
-      disabled={busy}
-      className="h-9 shrink-0 rounded-md border border-sky-300 bg-sky-50 px-2.5 text-sm font-bold text-sky-900 hover:bg-sky-100 disabled:opacity-60"
-      title="種目・品目・メーカーのカタログのページを開いて、ページの商品を押して入れる"
-    >
-      {/* スマホの幅では「📖 カタログ」だけ見せる（種目の欄が「入浴」まで縮んでいた。読み上げの名前は「📖 カタログから選ぶ」のまま） */}
-      📖 カタログ<span className="max-sm:sr-only">から選ぶ</span>
-    </button>
-  );
-}
-
-/** 商品の欄の種目・品目・メーカーで絞ったカタログのページ（何も選んでいない・読めない・載っていなければ undefined＝全部のページ） */
-export async function itemCatalogFilter(item: SaleItem): Promise<CatalogPagesFilter | undefined> {
-  if (!item.category && !item.sub && !item.maker.trim()) return undefined;
-  try {
-    const found = catalogFilter(await loadCatalogProducts(), {...item, name: ''});
-    const pages = catalogPagesOf(found.items);
-    return pages.length ? {pages, label: [subShort(found.sub, found.category), item.maker.trim()].filter(Boolean).join('・')} : undefined;
-  } catch {
-    // 読めなければ全部のページで開く（ページの絵は窓が読む）
-    return undefined;
-  }
-}
-
-/** メーカーの欄の横の「🔍 商品検索」（押すたびに onSearch。CatalogPicker の search を1つ増やす） */
-export function CatalogSearchButton({onSearch}: {onSearch: () => void}) {
-  return (
-    <button
-      type="button"
-      onClick={onSearch}
-      className="h-9 shrink-0 rounded-md border border-slate-300 bg-white px-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
-      title="種目・商品名・メーカーで、カタログの商品をさがす"
-    >
-      🔍 商品検索
-    </button>
-  );
-}
-
-export function CatalogPicker({item, onPick, onCatalog, search = 0}: {item: SaleItem; onPick: (patch: Partial<SaleItem>) => void; onCatalog?: OpenCatalog; search?: number}) {
+export function CatalogPicker({
+  item,
+  onPick,
+  onCatalog,
+  onPicked,
+}: {
+  item: SaleItem;
+  onPick: (patch: Partial<SaleItem>) => void;
+  onCatalog?: OpenCatalog;
+  onPicked?: (item: SaleItem) => void; // 一覧から商品を選んだ（カタログの窓を閉じる・お気に入りに入れる。SaleEditor）
+}) {
   const [all, setAll] = useState<CatalogProduct[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [tries, setTries] = useState(0);
@@ -86,12 +50,13 @@ export function CatalogPicker({item, onPick, onCatalog, search = 0}: {item: Sale
   const [subOpen, setSubOpen] = useState(!item.sub);
   const [makerOpen, setMakerOpen] = useState(false);
   const [openKey, setOpenKey] = useState<string | null | undefined>(undefined);
+  const [search, setSearch] = useState(0); // 「📖 カタログから商品検索」を押した回数
   // 種目を替えたら（品目が空になったら）品目の段を開き直す
   useEffect(() => {
     if (!item.sub) setSubOpen(true);
   }, [item.category]); // eslint-disable-line react-hooks/exhaustive-deps
   const boxRef = useRef<HTMLDivElement>(null);
-  // 種目を選んだら・商品検索を押したら読む（はじめの1回だけ。2回目からは覚えたもの）。読めなければ知らせる（前は何も出ず、一覧がないように見えた）
+  // 種目を選んだら・カタログから商品検索を押したら読む（はじめの1回だけ。2回目からは覚えたもの）。読めなければ知らせる（前は何も出ず、一覧がないように見えた）
   const want = !!item.category || search > 0;
   useEffect(() => {
     if (!want || all) return;
@@ -123,47 +88,104 @@ export function CatalogPicker({item, onPick, onCatalog, search = 0}: {item: Sale
     if (!search) return;
     setOpen(true);
     setSearched(true);
-    setQuery('');
   }, [search]);
   const shownFor = useRef(0);
   useEffect(() => {
-    if (!search || !found || shownFor.current === search) return;
+    if (!search || !found || !filter || shownFor.current === search) return;
     shownFor.current = search;
     requestAnimationFrame(() => boxRef.current?.scrollIntoView({block: 'nearest', behavior: 'smooth'}));
-    if (onCatalog && filter && filter.pages.length && window.innerWidth >= WIDE) onCatalog('', filter, item.id);
+    // カタログの窓は、さがす言葉にも合う商品の載っているページだけ（なければ種目・品目・メーカーのページ、それもなければ全部のページ）
+    const hits = query.trim() ? catalogPagesOf(found.items.filter((p) => matchesAll(productText(p), query))) : [];
+    if (!onCatalog) return;
+    // 何も選んでいない・打っていなければ、全部のページ（絞らない窓）
+    if (!query.trim() && !item.category && !item.sub && !item.maker.trim() && !item.name.trim()) onCatalog('', undefined, item.id);
+    // 絞った商品に合うものがなければ、さがす言葉をカタログの窓に渡して、カタログの全部の文字から探す（前の「カタログから検索」と同じ）
+    else if (query.trim() && !hits.length) onCatalog(query.trim(), undefined, item.id);
+    else onCatalog('', (hits.length ? hits : filter.pages).length ? {pages: hits.length ? hits : filter.pages, label: [filter.label, query.trim()].filter(Boolean).join('・')} : undefined, item.id);
   });
+  // 選んだ商品（一覧でもカタログの窓でも）になったら、品目・メーカー・商品の段を閉じる
+  useEffect(() => {
+    if (!picked) return;
+    setOpen(false);
+    setSubOpen(false);
+    setMakerOpen(false);
+    setSearched(false);
+    setOpenKey(undefined);
+  }, [picked, item.code]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!item.category && !searched) return null;
+  // 種目を選ぶ前・カタログを読む前は、さがす言葉の欄とボタンだけ
+  const searchRow = (placeholder: string) => (
+    <div className="flex min-w-0 flex-wrap items-center gap-1">
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          // 申請書の入れる所の Enter（次の欄へ）にしない
+          if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+          e.preventDefault();
+          e.stopPropagation();
+          setSearch((n) => n + 1);
+        }}
+        placeholder={placeholder}
+        aria-label="カタログから検索"
+        className="h-9 min-w-[10rem] flex-1 rounded-md border border-slate-300 bg-white px-2 text-sm outline-none focus:border-sky-500"
+      />
+      <button
+        type="button"
+        onClick={() => setSearch((n) => n + 1)}
+        className="h-9 shrink-0 rounded-md border border-sky-300 bg-sky-50 px-2.5 text-sm font-bold text-sky-900 hover:bg-sky-100"
+        title="種目・品目・メーカー・さがす言葉で絞った商品の一覧と、その商品の載っているカタログのページを開く"
+      >
+        📖 カタログから商品検索
+      </button>
+    </div>
+  );
+  // 枠はいつも同じ形（上＝品目・メーカーの段・まん中＝さがす言葉の欄・下＝商品の一覧）。さがす言葉で Enter を押して一覧を読み込んでも、
+  // 欄が作り直されて打っていた欄から外れないように、欄はいつも同じ所（2つ目の子）に置く
+  const box = (top: ReactNode, bottom: ReactNode, placeholder = '商品名・品番（空のままでも）') => (
+    <div ref={boxRef} role="group" aria-label="カタログの商品" className="grid scroll-mt-4 gap-1 rounded-md border border-sky-200 bg-sky-50/60 p-1.5 sm:ml-8">
+      {top}
+      {searchRow(placeholder)}
+      {bottom}
+    </div>
+  );
+  const plain = box(null, null);
+  if (!item.category && !searched) return plain;
   if (failed)
     return (
-      <p className="ml-8 flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+      <p className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200 sm:ml-8 bg-amber-50 p-2 text-xs text-amber-900">
         📖 カタログを読めませんでした
         <button type="button" onClick={() => setTries((n) => n + 1)} className="rounded border border-amber-300 bg-white px-2 py-0.5">
           ↻ もう一度
         </button>
       </p>
     );
-  if (!all || !found || !filter) return <p className="pl-8 text-xs text-slate-500">📖 カタログを読んでいます…</p>;
+  if (!all || !found || !filter) return box(null, <p className="text-xs text-slate-500">📖 カタログを読んでいます…</p>);
   const inCategory = catalogInCategory(all, found.category, '');
-  if (!inCategory.length && !searched) return null; // カタログにない種目（杖など）は出さない（商品検索を押したら「ありません」と知らせる）
+  if (!inCategory.length && !searched) return plain; // カタログにない種目（杖など）は欄とボタンだけ（押したら「ありません」と知らせる）
   const subs = sortSubs([...new Set(inCategory.map((p) => p.sub).filter(Boolean))]);
   // メーカーのボタンは、種目・品目・項目名に合う商品のメーカー（メーカーの欄で絞る前）
   const makers = catalogMakers(catalogFilter(all, {...by, maker: ''}).items);
   // 品目（シャワーチェアなど）を選ぶと、その品目の商品だけを一覧に出す（ユーザーの指示「シャワーチェアを選んだら、シャワーチェアの一覧のみが
   // 商品一覧からさがせるようにする」2026-11-01）。メーカー・検索の言葉で、さらに絞れる。品目が1つの種目（杖など）は初めから出す
   const ready = searched || !!item.sub || subs.length <= 1 || !!item.maker.trim() || !!query.trim();
-  const shown = ready ? found.items.filter((p) => matchesAll(`${p.name} ${p.maker} ${p.variants.map((v) => `${v.code} ${v.label}`).join(' ')}`, query)) : [];
+  const shown = ready ? found.items.filter((p) => matchesAll(productText(p), query)) : [];
   const chip = 'rounded-md border px-2 py-1 text-xs';
   const what = subShort(found.sub, found.category) || 'カタログ';
   const pick = (p: CatalogProduct, v: CatalogProduct['variants'][number]) => {
-    onPick(catalogItemPatch(p, v, item));
+    const patch = catalogItemPatch(p, v, item);
+    onPick(patch);
+    onPicked?.({...item, ...patch});
     setOpen(false);
+    setSubOpen(false);
+    setMakerOpen(false);
     setSearched(false);
     setOpenKey(undefined);
   };
   const subCount = (sb: string) => inCategory.filter((p) => p.sub === sb).length;
-  return (
-    <div ref={boxRef} role="group" aria-label="カタログの商品" className="ml-8 grid scroll-mt-4 gap-1 rounded-md border border-sky-200 bg-sky-50/60 p-1.5">
+  return box(
+    <>
       {/* 品目・メーカー・商品は、押すと開く・閉じる（アコーディオン。ユーザーの指示「品目とメーカーはアコーディオン形式」2026-11-02）。
           閉じているときは選んでいるものを出す。品目は選ぶまで開いておき、選んだら閉じる。メーカーは初めは閉じておく */}
       {subs.length > 1 && (
@@ -228,6 +250,9 @@ export function CatalogPicker({item, onPick, onCatalog, search = 0}: {item: Sale
           )}
         </>
       )}
+    </>,
+    <>
+      {/* 品目・メーカーの下（box のまん中）に、さがす言葉の欄と「📖 カタログから商品検索」（2026-11-03） */}
       {ready && <FoldHead label="商品：" open={open} onToggle={() => setOpen((o) => !o)} value={`${shown.length}件`} />}
       {/* 商品検索の条件と件数。「📖 カタログで見る」で、カタログの窓をこの商品の載っているページだけで開く */}
       {searched && open && (
@@ -236,22 +261,7 @@ export function CatalogPicker({item, onPick, onCatalog, search = 0}: {item: Sale
             🔍 <b className="font-bold text-sky-900">{filter.label || 'すべて'}</b>：{shown.length}件
           </span>
           {by.name.trim() && !found.byName && <span className="text-amber-800">（「{item.name.trim()}」に合う商品がないので、{[what, item.maker.trim()].filter(Boolean).join('・')}の商品）</span>}
-          {onCatalog && filter.pages.length > 0 && (
-            <button type="button" onClick={() => onCatalog('', filter, item.id)} className="ml-auto rounded border border-sky-300 bg-white px-2 py-0.5 font-bold text-sky-900 hover:bg-sky-50">
-              📖 カタログで見る（{filter.pages.map((n) => `p.${n}`).join('・')}）
-            </button>
-          )}
         </div>
-      )}
-      {open && (ready || subs.length > 1) && (
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={`${what}の中から 商品名・品番でさがす`}
-          aria-label="カタログの商品をさがす"
-          className="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-sm outline-none focus:border-sky-500"
-        />
       )}
       {/* 商品も、色・大きさが2つ以上あるものは、商品名を押すと色などが開く（アコーディオン。ユーザーの指示「商品名も色が複数ある場合は、
           アコーディオン形式にして、商品名をおすと、色を選べるようにする」2026-11-02）。開くのは1つずつ。1つだけの商品は、商品名を押すとすぐ入る */}
@@ -316,7 +326,8 @@ export function CatalogPicker({item, onPick, onCatalog, search = 0}: {item: Sale
         </ul>
       )}
       {ready && open && !shown.length && <p className="text-xs text-slate-500">{query.trim() ? '見つかりませんでした' : 'この条件の商品はカタログにありません'}</p>}
-    </div>
+    </>,
+    `${what}の中から 商品名・品番（空のままでも）`,
   );
 }
 

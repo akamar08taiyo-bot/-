@@ -150,7 +150,7 @@ try {
   await dlg.getByRole('button', {name: '閉じる'}).last().click();
 
   // ---- ③ カタログの窓：ページの一覧に品目
-  await page.getByRole('button', {name: '📖 カタログ', exact: true}).first().click();
+  await page.getByRole('button', {name: '📖 カタログから商品検索'}).first().click(); // 何も入れていない商品の欄：全部のページ
   const viewer = page.getByRole('dialog', {name: 'カタログ'});
   const pages = viewer.getByRole('group', {name: 'カタログのページ'});
   await pages.getByRole('button').first().waitFor();
