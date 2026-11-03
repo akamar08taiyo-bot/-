@@ -336,3 +336,36 @@ test('品番のない商品（注文番号だけ）で金額がいくつもあ�
   const p48 = await productsOf(48);
   assert.deepEqual(p48.find((p) => /乾度良好/.test(p.name))!.variants.map((v) => v.label), ['50×80cm', '60×90cm', '90×120cm']);
 });
+
+test('品番のすぐ下・すぐ上の種類の名前・表の左の見出し（2026-11-03 の点検。前は「ト便座」・となりの行の名前・「普通便座やわらか便座暖房便座」になっていた）', async () => {
+  const label = (ps: CatalogProduct[], code: string) => variantOf(ps, code).v.label;
+  // p.172 セレクトR 自動ラップ2：品番の下の「標準便座」「ソフト便座」「暖房便座」と、左の「ノーマルタイプ」「はねあげタイプ」
+  const p172 = await productsOf(172);
+  assert.deepEqual(
+    ['533-950', '533-951', '533-952', '533-953', '533-954', '533-955'].map((c) => label(p172, c)),
+    ['ノーマルタイプ 標準便座', 'ノーマルタイプ ソフト便座', 'ノーマルタイプ 暖房便座', 'はねあげタイプ 標準便座', 'はねあげタイプ ソフト便座', 'はねあげタイプ 暖房便座'],
+  );
+  // p.174 プリート2：左の見出しは行ごとに近いもの
+  const p174 = await productsOf(174);
+  assert.equal(label(p174, 'P2SEN02BJH'), '普通便座 ベージュ');
+  assert.equal(label(p174, 'P2SES02DJH'), 'やわらか便座 ダークブラウン');
+  assert.equal(label(p174, 'P2SEW02PJH'), '暖房便座 ピンク');
+  // p.175 ジャスピタ：名前は品番の上
+  const p175 = await productsOf(175);
+  assert.equal(label(p175, '533-900'), '標準タイプ');
+  assert.equal(label(p175, '533-901'), 'ソフト便座タイプ');
+  // p.177 座楽：品番の下の便座の種類
+  const p177 = await productsOf(177);
+  assert.equal(label(p177, 'PN-L23307'), 'ソフト便座');
+  assert.equal(label(p177, 'PN-L23218'), '脱臭あたたか便座');
+  // p.49 シャワーキャリー・p.214 スロープ：品番の下の「U型/ヘッドレスト無し」・寸法
+  assert.equal(label(await productsOf(49), 'HR034'), 'U型/ヘッドレスト無し');
+  const p214 = await productsOf(214);
+  assert.equal(label(p214, 'MSRP1076'), '幅76×奥行3×高さ1cm');
+  assert.equal(label(p214, 'S-59'), '奥行21×高さ5.9cm');
+  // 入れ子の見出し（p.173 ノーマル→標準便座→快適脱臭）は、まちがえて付けるより付けない
+  assert.equal(label(await productsOf(173), '534-020'), '');
+  // 写真の横の寸法の行（「VALSBDLOR L：」「SAVS：」）を色にしない
+  assert.equal(label(await productsOf(46), 'VALSBDSOR'), 'S/幅72cm');
+  assert.equal(label(await productsOf(136), 'SAV'), 'スタンダード');
+});

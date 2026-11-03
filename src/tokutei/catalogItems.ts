@@ -183,14 +183,15 @@ export function parseCatalogPage(raw: PdfText[], page: Pick<CatalogPage, 'page' 
   const photoColor = (code: string): string => {
     for (const t of items) {
       if (!isSmall(t) || t.s !== code) continue;
-      const below = items.find((o) => o !== t && isSmall(o) && between(o.y - t.y, 3.5, 10) && Math.abs(o.x - t.x) <= 10 && !/\d/.test(o.s));
+      // 下の行が品番・「SAVS：」のような寸法の見出しなら色ではない（p.46 バスボードの「VALSBDLOR L：」・p.136 の「SAVS：」が色に入っていた。2026-11-03 の点検）
+      const below = items.find((o) => o !== t && isSmall(o) && between(o.y - t.y, 3.5, 10) && Math.abs(o.x - t.x) <= 10 && !/\d/.test(o.s) && !CODE.test(o.s) && !/[:：]/.test(o.s));
       // 「レッ」「ド」のように分かれた字も、同じ行のつづきをつなぐ
       if (!below) continue;
       // すき間なく続く字だけ（となりの写真の色はとらない）
       const word = [below];
       for (const o of items.filter((x) => isSmall(x) && Math.abs(x.y - below.y) <= 1 && x.x > below.x).sort((a, c) => a.x - c.x)) {
         const prev = word.at(-1)!;
-        if (o.x - (prev.x + prev.w) > 1.5 || /\d/.test(o.s)) break;
+        if (o.x - (prev.x + prev.w) > 1.5 || /\d|[:：]/.test(o.s)) break;
         word.push(o);
       }
       return lineText(word);
@@ -379,16 +380,18 @@ function blockVariants(b: Block, photoColor: (code: string) => string): CatalogV
     // 表の中に金額がなければ、同じ高さの金額（左右2つの表に、右に1つの金額＝入浴グリップ ユニットバス専用）
     const myPrices = prices.some(inTable) ? prices.filter(inTable) : prices.filter((p) => between(p.y, top - 30, bottom + 30));
     const myOrders = orders.filter(inTable);
-    const labels = splitInline(tb.rows, rowLabels(b, tb.rows, right, caption(b, tb)));
     // 品番の行のまとまりのまん中（品番の下に、同じ左の位置で「O型シート」・TAIS コードなどが続くと、金額はその2行のまん中に置かれる。
     // 品番の行の高さで比べると、まとまりの境が1行ずれた：p.49 SW6083SAL・p.154 WB5148・p.136 の歩行器。2026-11-03 の点検）
     // どの行にも続きの行があるときだけ（p.214 バリアフリーレールは、まとまりの下の「フラットタイプ（長さ200cm）」を続きと見てずれた）
     const isCodeText = (t: PdfText) => t.s.split(/[、,，\s]+/).some((c) => CODE.test(c));
+    const codeX = (r: PdfText) => Math.min(...tb.rows.filter((o) => Math.abs(o.y - r.y) <= 1.6).map((o) => o.x));
+    const below = (x: number, y: number) =>
+      b.tokens.find((t) => Math.abs(t.x - x) <= 3 && t.y > y + 1 && t.y - y <= 10 && !isCodeText(t) && !isPrice(t) && !/^[●※]/.test(t.s));
     const bottomOf = (r: PdfText) => {
-      const x = Math.min(...tb.rows.filter((o) => Math.abs(o.y - r.y) <= 1.6).map((o) => o.x));
+      const x = codeX(r);
       let bottom = r.y;
       for (let k = 0; k < 2; k++) {
-        const next = b.tokens.find((t) => Math.abs(t.x - x) <= 3 && t.y > bottom + 1 && t.y - bottom <= 10 && !isCodeText(t) && !isPrice(t) && !/^[●※]/.test(t.s));
+        const next = below(x, bottom);
         if (!next) break;
         bottom = next.y;
       }
@@ -396,6 +399,33 @@ function blockVariants(b: Block, photoColor: (code: string) => string): CatalogV
     };
     const bottoms = tb.rows.map(bottomOf);
     const twoLines = bottoms.every((y, k) => y > tb.rows[k].y + 1);
+    // 品番のすぐ下（同じ左の位置）の種類の名前（p.172 セレクトR 自動ラップ2 の「標準便座」「ソフト便座」「暖房便座」。2026-11-03 の点検）。
+    // 前は品番より右の字だけを見ていたので「ソフ」「ト便座」の「ト便座」だけになり、名前のない行にはとなりの行の「ト便座」が付いた。
+    // どの行にもあるときだけ（品番の行の字と同じ大きさのかたまり。TAIS・金額・注の行はとらない）
+    // 下になければ、品番のすぐ上（p.175 ジャスピタの「標準タイプ」「ソフト便座タイプ」は品番の上にある）
+    const above = (x: number, y: number) =>
+      b.tokens.find((t) => Math.abs(t.x - x) <= 3 && t.y < y - 1 && y - t.y <= 10 && !isCodeText(t) && !isPrice(t) && !/^[●※]/.test(t.s));
+    const nameNear = (side: typeof below) => tb.rows.map((r) => {
+      const x = codeX(r);
+      const first = side(x, r.y);
+      if (!first || !isLabelSize(first)) return null;
+      const line = b.tokens
+        .filter((t) => isLabelSize(t) && Math.abs(t.y - first.y) <= 1.6 && t.x >= x - 3 && t.x < right && !/[●¥￥]|TAIS|税抜/.test(t.s) && !MARK.test(t.s) && !isPrice(t))
+        .sort((a, c) => a.x - c.x);
+      // 品番の左の位置から、すき間なく続く字だけ（右の列の字はとらない）
+      const run: PdfText[] = [];
+      for (const t of line) if (!run.length || t.x - Math.max(...run.map((u) => u.x + u.w)) <= 3) run.push(t);
+      return run.length ? run : null;
+    });
+    const okNames = (list: (PdfText[] | null)[]) => list.every((u) => u && !/^[\d\s.,-]+$/.test(lineText(u)));
+    const downs = nameNear(below);
+    const ups = okNames(downs) ? downs : nameNear(above);
+    // 上の名前は、どの行もちがう名前のときだけ（表の見出しの行を名前にしない）
+    const under = okNames(downs) ? downs : new Set(ups.map((u) => (u ? lineText(u) : ''))).size === ups.length ? ups : downs;
+    const useUnder = okNames(under);
+    const taken = new Set(useUnder ? under.flatMap((u) => u!) : []);
+    const rest = useUnder ? {...b, tokens: b.tokens.filter((t) => !taken.has(t))} : b;
+    const labels = splitInline(tb.rows, rowLabels(rest, tb.rows, right, captions(rest, tb))).map((l, k) => (useUnder ? [l, lineText(under[k]!)].filter(Boolean).join(' ') : l));
     const priceOf = assignPrices(twoLines ? tb.rows.map((r, k) => ({...r, y: (r.y + bottoms[k]) / 2})) : tb.rows, myPrices);
     tb.rows.forEach((r, k) => {
       const order = nearestY(myOrders.length ? myOrders : orders, r.y)?.s ?? '';
@@ -447,20 +477,40 @@ function cleanLabel(label: string): string {
   return out.filter((w, i) => out.findIndex((x) => x.replace(/、$/, '') === w.replace(/、$/, '')) === i).join(' ');
 }
 
-/** 表の左の見出し（「5 すべり止め シートタイプ」）：表の左 60pt までの、表の高さの中の 5.8pt の字 */
-function caption(b: Block, tb: {x: number; rows: PdfText[]}): string {
+/**
+ * 表の左の見出し（「5 すべり止め シートタイプ」）：表の左 60pt までの、表の高さの中の 5.8pt の字。行ごとに返す。
+ * 見出しがたてに離れていくつかあるとき（p.172 の「ノーマルタイプ」「はねあげタイプ」、p.174 プリート2 の「普通便座」「やわらか便座」「暖房便座」）は、
+ * 行ごとにいちばん近い見出し（前は全部をつないだ「普通便座やわらか便座暖房便座」をどの行にも付けていた。2026-11-03 の点検）
+ */
+function captions(b: Block, tb: {x: number; rows: PdfText[]}): string[] {
   const top = tb.rows[0].y - 6;
   const bottom = tb.rows.at(-1)!.y + 6;
   const words = b.tokens.filter((t) => isLabelSize(t) && between(t.y, top, bottom) && between(tb.x - t.x, 4, 60) && !/[●¥￥\d]/.test(t.s) && !MARK.test(t.s));
-  // 表の左にある字が1つのかたまり（たての3行まで）のときだけ（写真のまわりの字はとらない）
   const lines = linesOf(words);
-  return lines.length && lines.length <= 3 && words.length <= 6 ? lines.map(lineText).join('') : '';
+  // 行の間が 8pt までなら1つの見出し（2行に折り返した「ノーマル」「タイプ」）
+  const groups: PdfText[][][] = [];
+  for (const l of lines) {
+    const g = groups.at(-1);
+    if (g && l[0].y - g.at(-1)![0].y <= 8) g.push(l);
+    else groups.push([l]);
+  }
+  // 前からの決まり：表の左にある字が1つのかたまり（たての3行まで・字が6つまで）なら、どの行にもその字（写真のまわりの字はとらない）
+  const whole = lines.length && lines.length <= 3 && words.length <= 6 ? lines.map(lineText).join('') : '';
+  // 行ごとに分けるのは、見出しが1つの列にたてに並ぶとき（左の位置がそろう）・色の名前でないときだけ。
+  // 入れ子の見出し（p.173「ノーマル」→「標準便座」→「快適脱臭」・p.178）や、写真の横の色の名前（p.45・p.175）は分けない
+  const oneColumn = columnsOf(words, 5).length === 1;
+  if (groups.length < 2 || !oneColumn || words.some((t) => COLOR.test(t.s)) || groups.some((g) => g.length > 3 || g.flat().length > 6)) return tb.rows.map(() => whole);
+  const text = groups.map((g) => g.map(lineText).join(''));
+  const mid = groups.map((g) => (g[0][0].y + g.at(-1)![0].y) / 2);
+  const pick = tb.rows.map((r) => mid.map((m, i) => ({i, d: Math.abs(m - r.y)})).sort((a, c) => a.d - c.d)[0].i);
+  // どの見出しにも、それにいちばん近い行がある（見出しが表の行の並びに沿っている）ときだけ
+  return groups.every((_, i) => pick.includes(i)) ? pick.map((i) => text[i]) : tb.rows.map(() => whole);
 }
 
 /**
  * 品番の行の右の色・大きさ。列ごとに、たてに続く字（2行の「12～」「15cm」）を1つにまとめ、行にいちばん近いものを付ける
  */
-function rowLabels(b: Block, rows: PdfText[], right: number, head: string): string[] {
+function rowLabels(b: Block, rows: PdfText[], right: number, heads: string[]): string[] {
   const top = rows[0].y - 8;
   const bottom = rows.at(-1)!.y + 8;
   const left = Math.min(...rows.map((r) => r.x));
@@ -532,7 +582,7 @@ function rowLabels(b: Block, rows: PdfText[], right: number, head: string): stri
       const same = rows.filter((_, j) => picks[ci][j] === i);
       return same.length > 1 && each.length === same.length ? each[same.indexOf(r)] : text;
     });
-    return [head, ...parts].filter(Boolean).join(' ');
+    return [heads[k], ...parts].filter(Boolean).join(' ');
   });
 }
 

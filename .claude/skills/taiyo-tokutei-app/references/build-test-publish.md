@@ -36,6 +36,10 @@ E2E_PORT=5194 PLAYWRIGHT=/opt/node-tools/node_modules/playwright/index.mjs timeo
   カタログの窓・印刷はこの絵を出し、端末の中では PDF を読まない（ユーザーの話「タブレットで開くとパンフレットが開かない」。pdf.js は古い iPad の Safari で動かないことがある）。
   作るのに1ページ2秒ほど（26ページで初回 +45 秒）なので、PDF の中身ごとに `node_modules/.cache/tokutei-catalog/` に覚えておく。テストのサーバーは `catalog/*.jpg` も返す
   （返さないと PDF を読む作りに戻り、`e2e.mjs` の「PDF を読まない」で落ちる）。
+- 文字のはみ出し（2026-11-03）：`E2E_PORT=5301 node test/tokutei/e2e-overflow.mjs <出力フォルダ>`。6つの保険者で、長い値（架空）の3商品の申請書・販売見積書のプレビューの欄（`data-fit`）の字が
+  欄の外に出ていないかを、1366px・390px・最小フォントサイズ 12px のまねで数える（0 で合格）。字は1字ずつ Range で測り、空白は数えない（行の終わりの全角の空白は欄の外にぶら下がるが描かれない。
+  前は事業所名・福岡市の原本の見出しがこれで「はみ出し」に出た）。パソコンの回では申請書・見積書の Excel も保存するので、taiyo-excel-export スキルの render.sh で画像にして目で見る。
+  見積書の Excel のボタンは印刷の画面の上の帯（`.print-toolbar` の「📗 Excelで保存」）にある。
 - 住宅改修のタブの中（embed）・⇔・担当・カタログを表示／印刷は、住宅改修のブラウザのテスト `e2e-tokutei.mjs`（住宅改修のスキル）で確かめる：dist-tokutei/ を丸ごと（catalog/ も）住宅改修のテストのサイトの `tokutei/` に写して動かす。
 - 見た目を変えたら、パソコンとスマホ（390px）のスクリーンショットを撮って自分の目で見る。
 - 販売受注簿への転記：受注簿ツール（`akamar08taiyo-bot/taiyo-hacchu-scan`、`/home/user/taiyo-hacchu-scan`）を `npm ci && npm run build` してから
