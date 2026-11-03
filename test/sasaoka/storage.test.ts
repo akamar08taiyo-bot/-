@@ -52,7 +52,7 @@ test('請求書の消費税：前の版の設定（様邸ごと）は「すべ�
   assert.equal(cleanSettings({}).totalTaxRounding, 'floor');
   // 新しい版で保存した設定は、選んだまま
   assert.equal(cleanSettings({invoiceTaxMode: 'perJob', rev: 2}).invoiceTaxMode, 'perJob');
-  assert.equal(cleanSettings({rev: 1}).rev, 5);
+  assert.equal(cleanSettings({rev: 1}).rev, 6);
 });
 
 test('見積の設定：最初は定価×0.8・諸経費10%・施工費1時間2,500円・書式は苅田町・行橋市・みやこ町用', () => {
@@ -315,4 +315,11 @@ test('売上月（salesMonth）：請求する月とちがうときだけ持つ�
   assert.equal('salesMonth' in same, false);
   assert.equal(apart.salesMonth, '2026-12');
   assert.equal('salesMonth' in bad, false);
+});
+
+test('請求先：前の版の初期値「笹岡工務店」は空にする（版6。ユーザーの指示「笹岡に絞らず、工務店の請求書にいれるに変更」2026-11-03）。版6で入れた名前・ほかの名前はそのまま', () => {
+  assert.equal(cleanSettings({clientName: '笹岡工務店', rev: 5}).clientName, '');
+  assert.equal(cleanSettings({clientName: '笹岡工務店'}).clientName, '');
+  assert.equal(cleanSettings({clientName: '笹岡工務店', rev: 6}).clientName, '笹岡工務店'); // 設定で入れ直した
+  assert.equal(cleanSettings({clientName: '見本工務店', rev: 5}).clientName, '見本工務店');
 });

@@ -6,6 +6,7 @@
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import {openMore} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -46,7 +47,7 @@ await sheet.locator('[data-edit="job:address"]').click();
 await page.keyboard.type('福岡県行橋市中央1-1');
 await page.keyboard.press('Enter');
 
-await page.getByRole('button', {name: '🛒 発注書を作成'}).click();
+await (await openMore(page)).getByRole('button', {name: '🛒 発注書を作成'}).click();
 await page.getByRole('heading', {name: '発注書　（サンプル）山田様邸'}).waitFor();
 assert.match(page.url(), /#tab=estimate&job=[^&]+&view=order$/);
 const list = page.getByRole('region', {name: '発注する部材'});
@@ -186,7 +187,7 @@ assert.doesNotMatch(page.url(), /view=order/);
 
 // スマホの幅でも、数量と単位・✕ が並ぶ
 await page.setViewportSize({width: 390, height: 844});
-await page.getByRole('button', {name: '🛒 発注書を作成'}).click();
+await (await openMore(page)).getByRole('button', {name: '🛒 発注書を作成'}).click();
 await page.getByRole('heading', {name: '発注書　（サンプル）山田様邸'}).waitFor();
 const box = await list.getByRole('button', {name: 'ブラケットを発注書から消す'}).boundingBox();
 assert.ok(box && box.x + box.width <= 390, `✕ が画面からはみ出している: ${JSON.stringify(box)}`);

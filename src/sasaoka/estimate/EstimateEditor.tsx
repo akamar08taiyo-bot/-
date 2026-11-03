@@ -3,7 +3,7 @@ import type {ReactNode} from 'react';
 import {hasEstimateRows, jobName, startEstimate} from '../calc.ts';
 import {JobHeader, JobTitle, RemoveJobButton} from './JobHeader.tsx';
 import {EstimateSheet} from '../components/EstimateSheet.tsx';
-import {LaborPickerFor, missingShikiri, ShikiriPriceDialog} from '../components/JobTools.tsx';
+import {missingShikiri, ShikiriPriceDialog} from '../components/JobTools.tsx';
 import {KitPicker} from '../components/Kits.tsx';
 import {MaterialPicker} from '../components/Pickers.tsx';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
@@ -27,8 +27,6 @@ import type {JobDocs} from '../components/DocsDialog.tsx';
 type Picker =
   // query：空きの行（「ブラケット」など）を選んで開いたときの検索の言葉（`slotQuery`）
   | {placeId: string; kind: 'material'; at: string | null; query?: string}
-  // rowId：見積書で選んでいた行。施工費はそこに入れる（部材ならその同上施工費、空白の行ならその行。`laborSpot`）
-  | {placeId: string; kind: 'labor'; rowId: string | null}
   | {placeId: string; kind: 'kit'; at: string | null};
 
 export function EstimateEditor({
@@ -39,7 +37,6 @@ export function EstimateEditor({
   onOpen,
   onOpenInvoice,
   onOpenOrder,
-  tabs,
   docs,
   onPrint,
   onSave,
@@ -52,7 +49,6 @@ export function EstimateEditor({
   onOpen: (id: string) => void;
   onOpenInvoice: (id: string) => void; // 「工務店請求書を確認する」で同じ様邸の仕切り計算表を開く
   onOpenOrder: () => void; // この見積書の部材の発注書を開く
-  tabs: ReactNode; // 申請書・見積書のタブ（氏名・番号・住所・改修の箇所・金額は申請書と同じ）
   docs?: JobDocs | null; // 「📗 Excelで保存」「✉ メールで送付」（どのタブも同じ。App.tsx の DocsDialog.tsx）
   onPrint: (r: PrintRequest) => void;
   onSave: () => Promise<boolean>; // まだ保存していない変更をすぐ保存する（保存できたら true）
@@ -156,7 +152,7 @@ export function EstimateEditor({
   const settingsRow = (
     <>
       {/* 見積書の欄にないものだけ（苅田町・行橋市・みやこ町用は、お客様名・被保険者番号・工事場所・作成日を見積書の欄に打ち込む）。
-          説明の文は置かない（ユーザーの指示）。笹岡工務店の請求書に入れるかも同じ枠に並べる。
+          説明の文は置かない（ユーザーの指示）。工務店の請求書に入れるかも同じ枠に並べる（「🧾 請求書を見る」は上の段の「その他 ▼」。2026-11-03）。
           欄・文字はほかの画面より大きめ（ユーザーの指示「ここの部分はもう少し大きくする」、2026-10-21） */}
       <div className="flex flex-wrap items-end gap-3 border-b border-slate-200 bg-white px-4 py-3" role="group" aria-label="保険者・担当・作成日・請求書">
         {form === 'kouiki' && (
@@ -257,7 +253,7 @@ export function EstimateEditor({
             )}
           </div>
         </div>
-        {(estimated || job.shikiri) && <ShikiriFields job={job} data={data} setJob={setJob} onFix={() => setFixPrices(true)} onOpenInvoice={() => onOpenInvoice(job.id)} />}
+        {(estimated || job.shikiri) && <ShikiriFields job={job} data={data} setJob={setJob} onFix={() => setFixPrices(true)} />}
         {byAddress && byAddress !== insurer && (
           <div className="flex w-full flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-900">
             工事場所の住所は「{INSURER_INFO[byAddress].name}」です{INSURER_INFO[byAddress].form !== form ? `（見積書は${FORM_INFO[INSURER_INFO[byAddress].form].name}）` : ''}。
@@ -280,7 +276,6 @@ export function EstimateEditor({
           介護保険証の欄とカタログのボタン（CardFill）は出さない（ユーザーの指示「工事費見積書作成のときは、このカタログ部分や介護保険証貼り付け部分は不要なのでなくす」2026-10-27） */}
       <JobHeader
         onBack={onBack}
-        tabs={tabs}
         title={<JobTitle name={name} badge={insurer ? INSURER_INFO[insurer].name : formLabel(form, s)} />}
         primary={
           <>
@@ -305,6 +300,12 @@ export function EstimateEditor({
             <Btn color="white" onClick={onOpenOrder} disabled={!estimated} title={estimated ? undefined : '見積書に部材を入れると作れます'}>
               🛒 発注書を作成
             </Btn>
+            {/* 工務店の請求書（仕切り計算表）を見る（工務店の請求書に入れている見積書だけ。前は請求する月の横。ユーザーの指示「請求書を見るの機能はプルダウンに含める」2026-11-03） */}
+            {job.shikiri && (
+              <Btn color="white" onClick={() => onOpenInvoice(job.id)}>
+                🧾 請求書を見る
+              </Btn>
+            )}
             <Btn color="white" onClick={duplicate}>
               複製
             </Btn>
@@ -317,14 +318,15 @@ export function EstimateEditor({
         settings={s}
         form={form}
         materials={data.materials}
+        labor={data.labor}
         setJob={setJob}
         onPickMaterial={(placeId, rowId) => {
           const slot = rowId ? job.places.flatMap((p) => p.rows).find((r) => r.id === rowId) : undefined;
           setPicker({placeId: placeFor(placeId), kind: 'material', at: placeId ? rowId : null, query: slot && isOpenSlot(slot) ? slotQuery(slot.slot) : ''});
         }}
-        onPickLabor={(placeId, rowId) => setPicker({placeId: placeFor(placeId), kind: 'labor', rowId})}
         onPickKit={(placeId, rowId) => setPicker({placeId: placeFor(placeId), kind: 'kit', at: placeId ? rowId : null})}
         onPrint={() => onPrint({kind: 'estimate', jobId: job.id})}
+        excel={docs?.excel}
         between={settingsRow}
         focusRow={focusRow}
       />
@@ -352,15 +354,6 @@ export function EstimateEditor({
           onQty={(rowId, delta) => setPlace(pickPlace.id, (p) => withBrackets(p, placeAfterQty(p, {...p, rows: changeRowQty(p.rows, rowId, delta)}, rowId), data.materials))}
           onToggleFavorite={toggleFavorite}
           onAddToMaster={addToMaster}
-          onClose={closePicker}
-        />
-      )}
-      {picker && pickPlace && picker.kind === 'labor' && (
-        <LaborPickerFor
-          place={pickPlace}
-          rowId={picker.rowId}
-          data={data}
-          onRows={(rows) => setPlace(pickPlace.id, (p) => ({...p, rows}))}
           onClose={closePicker}
         />
       )}
@@ -405,16 +398,14 @@ function ShikiriFields({
   data,
   setJob,
   onFix,
-  onOpenInvoice,
 }: {
   job: Job;
   data: AppData;
   setJob: (fn: (j: Job) => Job) => void;
   onFix: () => void;
-  onOpenInvoice: () => void;
 }) {
   const missing = missingShikiri(job);
-  // 請求先は設定の名前（笹岡工務店に決め打ちしない。ユーザーの指示「笹岡工務店を使っているところ以外でも一緒にみんなが使えるように」2026-10-26）
+  // 請求先は設定の名前（初めは空＝「工務店」。ユーザーの指示「笹岡工務店ではなく、笹岡に絞らず、工務店の請求書にいれるに変更」2026-11-03）
   const client = data.settings.clientName || '工務店';
   return (
     <>
@@ -462,9 +453,6 @@ function ShikiriFields({
               title={jutakuSalesMonth(job) !== job.month ? '請求する月とちがう月です' : '請求する月と同じ（請求する月を変えると一緒に変わります）'}
             />
           </label>
-          <Btn color="white" onClick={onOpenInvoice} className="!h-11 !text-base">
-            🧾 請求書を見る
-          </Btn>
           {missing.length > 0 && (
             <div className="flex w-full flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-900">
               仕切価格が空欄の部材が {missing.length} 行あります

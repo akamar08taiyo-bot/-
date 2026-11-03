@@ -95,8 +95,8 @@ function loadMonth(): string {
  * その前は「新規作成で、保険者を選んだら、2種類、タブを作る。左側に、申請書、右側に見積もり」・「必要に応じて住宅改修の理由書にも飛べるようにする」）。
  * 同じ様邸の内容（氏名・住所・被保険者番号・改修の箇所・金額）なので、どれで直しても、ほかにすぐ出る。特定福祉用具申請書は、特定福祉用具のアプリをお客様の情報を渡して中に出す（TokuteiEditor.tsx）
  */
-function JobTabs({view, onView}: {view: JobView; onView: (v: JobView) => void}) {
-  // 携帯（md 未満）だけ、格子の理由書のとなりに「📷 写真へ」（写真の欄へ飛ぶ。タブではない。タブレットは JobHeader.tsx。PhotoJump.tsx）
+function JobTabs({view, onView, cls}: {view: JobView; onView: (v: JobView) => void; cls: (on: boolean) => string}) {
+  // 携帯（md 未満）だけ、理由書のとなりに「📷 写真へ」（写真の欄へ飛ぶ。タブではない。タブレットは JobHeader.tsx。PhotoJump.tsx）
   const touch = useTouchUi();
   // ユーザーの指示「住宅改修申請書、工事見積書、特定福祉用具申請書、販売見積書の順にする」（2026-10-23）。理由書は最後
   const tabs: [JobView, string][] = [
@@ -106,32 +106,85 @@ function JobTabs({view, onView}: {view: JobView; onView: (v: JobView) => void}) 
     ['hanbai', '🏷 販売見積書'],
     ['riyu', '📄 理由書'],
   ];
+  // 画面の上の帯のタブ（ユーザーの指示「メインタブが二つある為、わかりづらい。住宅改修申請書、工事見積書、特定福祉用具申請書、販売見積書、理由書がメインのタブに入る」2026-11-03。
+  // 前は帯の下の白い枠のタブ）。スマホ・タブレットの縦の幅では2つずつ並べる（5つ目の理由書は1段まるごと。「📷 写真へ」があるときは理由書のとなり）
   return (
-    <>
-      {/* スマホ・タブレットの縦の幅では2つずつ並べる（5つ目の理由書は1段まるごと。1段にすると名前が折り返して読みにくい。「📷 写真へ」があるときは理由書のとなり）。
-          線はすき間（gap-px）から見える枠の色 */}
-      <div
-        data-job-tabs
-        role="tablist"
-        aria-label="住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書"
-        className="grid w-full grid-cols-2 gap-px overflow-hidden rounded-lg border-2 border-[#14532d] bg-[#14532d] shadow-sm md:inline-flex md:w-auto md:gap-0 md:bg-white"
+    <div
+      data-job-tabs
+      role="tablist"
+      aria-label="住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書"
+      className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 max-md:basis-full md:flex md:flex-wrap lg:flex-nowrap"
+    >
+      {tabs.map(([v, text]) => (
+        <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => onView(v)} className={`${cls(view === v)} ${v === 'riyu' && !touch ? 'col-span-2' : ''}`}>
+          {text}
+        </button>
+      ))}
+      <PhotoJumpButton className="rounded-lg bg-sky-50 px-2 py-2 text-sm md:hidden" />
+    </div>
+  );
+}
+
+/**
+ * 画面の上の帯の右の隅の「☰ メニュー ▼」：見積もり・申請書を作成する（一覧・新規作成）・売上見込みを確認する・工務店請求書を確認する・部材・施工費マスタ・設定・ゴミ箱
+ * （ユーザーの指示「売上見込みを確認する、工務店請求書、部材・施工費マスタ、設定、ゴミ箱は、プルダウンにして右隅におく」2026-11-03。前は帯に6つのタブ）。
+ * 押す・外を押す・Esc で閉じる。ゴミ箱に入っている件数はメニューのボタンにも出す
+ */
+function NavMenu({tab, onTab, trashCount, top = false}: {tab: MainTab; onTab: (t: MainTab) => void; trashCount: number; top?: boolean}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  return (
+    // top：様邸のタブ（5つ）を出しているとき、携帯・タブレットの縦（md 未満）は、タブの上の段の右に（タブの横に並べると、タブの幅が狭くなって
+    // 「住宅改修申請書」などがはみ出した）。様邸を開いていないとき（タブ1〜2つ）は、今までどおり同じ段の右
+    <div ref={ref} className={`relative ml-auto shrink-0 self-center lg:self-start lg:pt-1.5 ${top ? 'max-md:order-first' : ''}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-lg bg-white/15 px-3 text-[15px] font-bold text-white hover:bg-white/25 lg:text-base"
       >
-        {tabs.map(([v, text]) => (
+        ☰ メニュー
+        {trashCount > 0 && <span className="rounded-full bg-white/25 px-2 text-[13px] leading-5 tabular-nums">🗑 {trashCount}</span>}
+        <span aria-hidden="true">{open ? '▲' : '▼'}</span>
+      </button>
+      <div
+        role="menu"
+        aria-label="メニュー"
+        className={`${open ? 'grid' : 'hidden'} absolute right-0 top-full z-40 mt-1 w-max min-w-[16rem] gap-1 rounded-xl border border-slate-200 bg-white p-2 text-slate-800 shadow-2xl`}
+      >
+        {TABS.map((t) => (
           <button
-            key={v}
+            key={t.id}
             type="button"
-            role="tab"
-            aria-selected={view === v}
-            onClick={() => onView(v)}
-            // 広い画面は少し大きく（ユーザーの指示「このタブの部分をもう少し大きくする」2026-10-27）。md の幅は今の大きさのまま（大きくすると1段に入らない）
-            className={`whitespace-nowrap px-2 py-2 text-sm font-bold transition ${v === 'riyu' && !touch ? 'col-span-2' : ''} md:px-4 md:text-[15px] lg:px-5 lg:py-2.5 lg:text-[17px] ${view === v ? 'bg-[#14532d] text-white' : 'bg-white text-[#14532d] hover:bg-emerald-50'}`}
+            onClick={() => {
+              setOpen(false);
+              onTab(t.id);
+            }}
+            aria-current={tab === t.id ? 'page' : undefined}
+            className={`flex min-h-11 items-center justify-between gap-3 rounded-lg px-3 text-left text-[15px] font-bold ${tab === t.id ? 'bg-emerald-50 text-[#14532d]' : 'hover:bg-slate-100'}`}
           >
-            {text}
+            {t.label}
+            {t.id === 'trash' && trashCount > 0 && <span className="rounded-full bg-stone-200 px-2 text-[13px] leading-5 tabular-nums">{trashCount}</span>}
           </button>
         ))}
-        <PhotoJumpButton className="bg-sky-50 px-2 py-2 text-sm md:hidden" />
       </div>
-    </>
+    </div>
   );
 }
 
@@ -391,7 +444,12 @@ export default function App({start}: {start: MainTab}) {
         scrollToPhotos();
       });
   };
-  const tabs = <JobTabs view={jobView} onView={(v) => leaveTokutei(() => setJobView(v))} />;
+  // 帯のタブの形（見積もり・申請書を作成する・様邸の5つのタブ・いま開いているメニューの画面）。選んでいるタブは下の画面と同じ色＋上の色の帯
+  const tabCls = (on: boolean) =>
+    `flex min-h-11 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-[15px] font-bold transition max-sm:px-2 max-sm:text-sm sm:text-base lg:min-h-[3.25rem] lg:rounded-b-none lg:rounded-t-xl lg:border-t-4 lg:px-3 lg:text-[15px] xl:px-5 xl:text-[17px] ${
+      on ? `${theme.active} ${theme.accent}` : 'bg-white/10 text-white hover:bg-white/20 lg:border-transparent'
+    }`;
+  const jobOpen = tab === 'estimate' && !!estimateJob;
   // 見積書と請求書（仕切り計算表）を行き来する（同じ様邸を開く）
   const openEstimate = (id: string) => {
     setEstimateId(id);
@@ -412,26 +470,6 @@ export default function App({start}: {start: MainTab}) {
     setMasterTab(t);
     setTab('master');
   };
-  // 広い画面（lg 以上）は1段：タブの名前を「工務店請求書を確認する」にして長くなったので（2026-10-27）、1024〜1279px は余白と字を少し詰める（ゴミ箱が右にはみ出していた）
-  const tabButton = (t: (typeof TABS)[number]) => {
-    const on = tab === t.id;
-    return (
-      <button
-        key={t.id}
-        type="button"
-        onClick={() => goTab(t.id)}
-        aria-current={on ? 'page' : undefined}
-        className={`flex min-h-11 flex-auto items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-[15px] font-bold transition sm:text-base lg:min-h-[3.25rem] lg:flex-none lg:rounded-b-none lg:rounded-t-xl lg:border-t-4 lg:px-2.5 lg:text-[15px] xl:px-5 xl:text-[17px] ${
-          on ? `${theme.active} ${theme.accent}` : 'bg-white/10 text-white hover:bg-white/20 lg:border-transparent'
-        }`}
-      >
-        {t.label}
-        {/* ゴミ箱に入っている件数 */}
-        {t.id === 'trash' && trashCount > 0 && <span className={`rounded-full px-2 text-[13px] leading-5 tabular-nums ${on ? 'bg-stone-200' : 'bg-white/20'}`}>{trashCount}</span>}
-      </button>
-    );
-  };
-
   return (
     <ToastProvider>
       {newVersion && (
@@ -449,6 +487,8 @@ export default function App({start}: {start: MainTab}) {
         </div>
       )}
       <div className={`min-h-screen ${theme.page} text-slate-800 ${print ? 'no-print' : ''}`}>
+        {/* 様邸の画面の「📷 写真へ」（携帯・タブレット。上の段の JobTabs と JobHeader.tsx の PhotoJumpButton）が飛ぶ先。上の段にもあるので header ごと包む */}
+        <PhotoJumpCtx.Provider value={goPhotos}>
         <header className={`no-print ${theme.head} text-white transition-colors`}>
           <div className={`mx-auto flex ${PAGE_WIDTH} flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3`}>
             {/* 業務アプリポータルへ戻るボタンは左上（全アプリ共通の形 .taiyo-portal-back。ユーザーの指示「太陽ポータルに戻るボタンは左上に設置」2026-10-28。前は右上） */}
@@ -472,20 +512,29 @@ export default function App({start}: {start: MainTab}) {
               {cloudOn && <CloudBadge view={cloud.view} />}
             </div>
           </div>
-          {/* 上のタブ：字を大きく・高く（ユーザーの指示「ここらへんのタブももう少し大きく見やすくする」2026-10-25）。選んでいないタブも薄い白の地で、タブと分かるように。
-              広い画面（lg 以上）は1段に並べ、選んでいるタブは下の画面と同じ色＋上の色の帯でつなげる。
-              狭い画面は折り返して並べる（横にスクロールさせると、右のタブ（ゴミ箱）が画面の外に隠れる）。字の幅で並べ、段ごとに横いっぱいに広げる。
-              設定とゴミ箱は1つのまとまりにして、いつも同じ段に並べる（ゴミ箱だけが1段に横長に残らないように。広い画面では lg:contents でまとまりを消す）。
-              スマホの幅 390px では 見積もり・申請書を作成する／売上見込みを確認する／工務店請求書を確認する／部材・施工費マスタ・設定・ゴミ箱 の4段 */}
-          <nav className={`mx-auto flex ${PAGE_WIDTH} flex-wrap gap-1.5 px-3 pb-3 lg:flex-nowrap lg:pb-0`}>
-            {TABS.slice(0, 4).map(tabButton)}
-            <div className="flex flex-auto gap-1.5 lg:contents">{TABS.slice(4).map(tabButton)}</div>
+          {/* 上の帯のタブ：様邸を開いているときは 住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書（JobTabs）、ほかは「見積もり・申請書を作成する」と
+              いま開いている画面。売上見込み・工務店請求書・部材・施工費マスタ・設定・ゴミ箱は右の隅の「☰ メニュー ▼」（ユーザーの指示「メインタブが二つある為、わかりづらい…
+              プルダウンにして右隅におく」2026-11-03。前は帯に6つのタブ、様邸のタブはその下の白い枠）。字は大きく・高く（「タブももう少し大きく見やすくする」2026-10-25） */}
+          <nav aria-label="画面" className={`mx-auto flex ${PAGE_WIDTH} items-start gap-1.5 px-3 pb-3 lg:pb-0 ${jobOpen ? 'max-md:flex-wrap' : ''}`}>
+            {jobOpen ? (
+              <JobTabs view={jobView} onView={(v) => leaveTokutei(() => setJobView(v))} cls={tabCls} />
+            ) : (
+              <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+                <button type="button" onClick={() => goTab('estimate')} aria-current={tab === 'estimate' ? 'page' : undefined} className={tabCls(tab === 'estimate')}>
+                  {TABS[0].label}
+                </button>
+                {tab !== 'estimate' && (
+                  <button type="button" onClick={() => goTab(tab)} aria-current="page" className={tabCls(true)}>
+                    {TABS.find((t) => t.id === tab)?.label}
+                  </button>
+                )}
+              </div>
+            )}
+            <NavMenu tab={tab} onTab={goTab} trashCount={trashCount} top={jobOpen} />
           </nav>
         </header>
 
         <main className={`no-print mx-auto min-w-0 px-3 py-4 sm:px-4 touch:pb-20 ${PAGE_WIDTH}`}>
-          {/* 様邸の画面の「📷 写真へ」（携帯・タブレット。JobTabs・JobHeader.tsx の PhotoJumpButton）が飛ぶ先 */}
-          <PhotoJumpCtx.Provider value={goPhotos}>
             {tab === 'estimate' &&
               (estimateJob && jobView === 'order' && hasEstimateRows(estimateJob) ? (
                 <OrderPage key={estimateJob.id} job={estimateJob} data={data} update={store.update} onBack={() => setJobView('estimate')} onPrint={setPrint} />
@@ -500,7 +549,6 @@ export default function App({start}: {start: MainTab}) {
                     setEstimateId(null);
                     setJobView('estimate');
                   }}
-                  tabs={tabs}
                   docs={docs}
                 />
               ) : estimateJob && (jobView === 'tokutei' || jobView === 'hanbai') ? (
@@ -518,7 +566,6 @@ export default function App({start}: {start: MainTab}) {
                       setJobView('estimate');
                     })
                   }
-                  tabs={tabs}
                   docs={docs}
                 />
               ) : estimateJob && jobView === 'riyu' ? (
@@ -532,7 +579,6 @@ export default function App({start}: {start: MainTab}) {
                     setEstimateId(null);
                     setJobView('estimate');
                   }}
-                  tabs={tabs}
                   docs={docs}
                 />
               ) : estimateJob ? (
@@ -548,7 +594,6 @@ export default function App({start}: {start: MainTab}) {
                   onOpen={setEstimateId}
                   onOpenInvoice={openInvoice}
                   onOpenOrder={() => setJobView('order')}
-                  tabs={tabs}
                   docs={docs}
                   onPrint={setPrint}
                   onSave={store.flush}
@@ -580,7 +625,6 @@ export default function App({start}: {start: MainTab}) {
                   onImported={showImported}
                 />
               ))}
-          </PhotoJumpCtx.Provider>
           {tab === 'invoice' &&
             (invoiceJob ? (
               <JobEditor
@@ -658,6 +702,7 @@ export default function App({start}: {start: MainTab}) {
           {/* 携帯・タブレットの様邸の画面：右下の「📷 写真へ」「↑ 上へ」（PhotoJump.tsx）。発注書の画面には出さない */}
           {touch && tab === 'estimate' && estimateJob && jobView !== 'order' && <PhotoJumpFab onPhotos={goPhotos} />}
         </main>
+        </PhotoJumpCtx.Provider>
       </div>
       {print && <PrintView request={print} data={data} onClose={() => setPrint(null)} />}
     </ToastProvider>

@@ -18,6 +18,7 @@ import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {strFromU8, unzipSync} from 'fflate';
 import {excelSave} from './e2eDocs.mjs';
+import {cellAt, moreItems, navItem} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 // 広域連合の写真貼付用紙（写真番号ごとに2枚。原本の並び）
@@ -49,7 +50,7 @@ await page.getByRole('button', {name: /サンプルで試す/}).click();
 await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 const sheet = page.getByRole('region', {name: '見積書', exact: true});
 await sheet.waitFor();
-const cell = (k) => sheet.locator(`[data-edit="${k}"]`).first();
+const cell = (k) => cellAt(sheet.locator(`[data-edit="${k}"]`).first());
 const typeIn = async (k, text, end = 'Enter') => {
   await cell(k).click();
   await page.keyboard.type(text);
@@ -1258,7 +1259,7 @@ assert.equal(await insurerNo.evaluate((el) => el === document.activeElement), tr
 assert.equal(await insurerNo.evaluate((el) => el.closest('label').firstChild.textContent), '市町村');
 assert.equal(await insurerNo.inputValue(), '406470');
 assert.ok((await insurerNo.locator('option').allInnerTexts()).some((t) => t.includes('402149') && t.includes('豊前市')));
-await page.locator('section', {has: page.getByRole('combobox', {name: '保険者', exact: true})}).first().screenshot({path: path.join(outDir, '89b-kouiki-area.png')});
+await page.getByRole('group', {name: '保険者・保険者番号'}).screenshot({path: path.join(outDir, '89b-kouiki-area.png')});
 await insurerNo.selectOption('402149'); // 豊前市
 await estimateTab.click();
 await sheet.locator('.form-page', {hasText: '内訳書　様式'}).first().waitFor(); // 見積書は広域連合用になる
@@ -1291,7 +1292,7 @@ log('広域連合の申請書（6枚のプレビュー・ヘッダー・承認�
 // 4つの保険者すべてで申請書の Excel を作れる（「📗 Excelで保存」の画面で、住宅改修申請書にはじめからチェック）
 for (const i of ['kanda', 'yukuhashi', 'miyako', 'kouiki']) {
   await page.getByRole('combobox', {name: '保険者', exact: true}).selectOption(i);
-  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).click();
+  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).first().click();
   const dlg = page.getByRole('dialog', {name: 'Excelで保存'});
   assert.equal(await dlg.getByRole('checkbox', {name: /^住宅改修申請書/}).isChecked(), true, i);
   await dlg.getByRole('button', {name: 'やめる'}).click();
@@ -1300,7 +1301,7 @@ await page.getByRole('combobox', {name: '保険者', exact: true}).selectOption(
 
 // ---------------- 見積もりの入口：「申請書（Excel）から作る」はない（ユーザーの指示「不要」）。タブの名前は「見積もり・申請書を作成する」
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
-await page.getByRole('navigation').getByRole('button', {name: '📝 見積もり・申請書を作成する'}).click();
+await (await navItem(page, '📝 見積もり・申請書を作成する')).click();
 const home = page.getByRole('region', {name: '新規作成'});
 await home.waitFor();
 assert.equal(await page.getByText('申請書（Excel）から作る').count(), 0);
@@ -1317,7 +1318,8 @@ assert.equal(await focused(), 'フリガナ');
 // その前は上のタブのまん中「少し左にずらして、上のタブとあわせるか中央揃えにする」2026-10-27、さらに前は画面のまん中）。名前に重ねない
 /** ボタンの入ったかたまりの左の端が、名前の右＋16px から何画素ずれているか（名前に重なっていたら Infinity） */
 const offCenter = (name) =>
-  page.getByRole('button', {name, exact: true}).evaluate((b) => {
+  // 見積書のタブでは見積書の左にも同じ名前のボタン（「📗 Excelで保存」。EstimateSheet.tsx の .sheet-side）があるので、上の段の方（先）
+  page.getByRole('button', {name, exact: true}).first().evaluate((b) => {
     const box = b.parentElement.getBoundingClientRect();
     const title = document.querySelector('h1').parentElement.getBoundingClientRect();
     if (box.left < title.right + 8) return Infinity;
@@ -1438,8 +1440,8 @@ await sheet.waitFor();
 assert.equal(await page.getByRole('heading', {level: 1}).innerText(), '見本 一郎様邸');
 const est = await sheet.locator('.form-page').first().innerText();
 for (const t of ['見本 一郎', '0000366989', '福岡県京都郡苅田町富久町2-2', '①玄関', '②トイレ']) assert.ok(est.includes(t), `見積書に「${t}」がない`);
-const inInvoice = page.getByLabel('笹岡工務店の請求書に入れる');
-const orderBtn = page.getByRole('button', {name: '🛒 発注書を作成'});
+const inInvoice = page.getByLabel('工務店の請求書に入れる');
+const orderBtn = page.getByRole('button', {name: '🛒 発注書を作成', includeHidden: true}); // 上の段の「その他 ▼」の中（閉じていて見えない）
 assert.equal(await inInvoice.count(), 0); // 見積書に行がないうちは出さない（申請書だけの様邸＝ほかの工務店の工事）
 assert.equal(await orderBtn.isDisabled(), true);
 await typeIn('new:text', '取付金具', 'Tab');
@@ -1450,7 +1452,7 @@ log('新規作成（申請書のタブから・フリガナにカーソル・申
 
 // ---------------- 申請書だけ（みやこ町）：見積書を作らずに Excel にする。一覧に出て（請求書には入れない）、押すと申請書のタブで開く
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
-await page.getByRole('navigation').getByRole('button', {name: /見積もり・申請書を作成する/}).click();
+await (await navItem(page, /見積もり・申請書を作成する/)).click();
 await home.waitFor();
 await home.getByRole('button', {name: '＋ みやこ町', exact: true}).click();
 await form.waitFor();
@@ -1492,10 +1494,10 @@ log('申請書だけ（みやこ町。見積書なしで Excel・請求書に入
 
 // ---------------- 上の段のまん中は Excelで保存・申請書を印刷・削除 の並び、その真下に メールで送付（前は まとめて保存。2026-10-30）（ユーザーの指示「基本的な並びは、申請書をEXCELで保存、
 // 申請書（見積書を印刷）、削除（白紙に戻すは不要） それ以外の独自の機能…は行を変えて、真下に統一して設置する」2026-10-28。前は Excel・まとめて保存・印刷の並びで、右に白紙に戻す）
-const centerButtons = await page.getByRole('group', {name: '保存・印刷'}).getByRole('button').allInnerTexts();
-assert.deepEqual(centerButtons.map((t) => t.trim()), ['📗 Excelで保存', '🖨 申請書を印刷']);
-// 削除はいちばん最後（ユーザーの指示「…メールで送付…それから最後に、削除」2026-11-02）
-assert.deepEqual((await page.getByRole('group', {name: 'そのほかの機能'}).getByRole('button').allInnerTexts()).map((t) => t.trim()), ['✉ メールで送付', '削除']);
+const centerButtons = await page.getByRole('group', {name: '保存・印刷'}).getByRole('button').filter({visible: true}).allInnerTexts();
+assert.deepEqual(centerButtons.map((t) => t.trim()), ['📗 Excelで保存', '🖨 申請書を印刷', 'その他 ▼']);
+// 「その他 ▼」の中：メールで送付、削除はいちばん最後（ユーザーの指示「…メールで送付…それから最後に、削除」2026-11-02・「プルダウンにする」2026-11-03）
+assert.deepEqual(await moreItems(page), ['✉ メールで送付', '削除']);
 assert.equal(await page.getByRole('button', {name: '📄 白紙に戻す'}).count(), 0);
 assert.ok((await offCenter('📗 Excelで保存')) < 2);
 await page.screenshot({path: path.join(outDir, '81d-header-shinsei-buttons.png'), clip: {x: 0, y: 0, width: 1366, height: 240}});

@@ -149,7 +149,7 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
     window.addEventListener('keydown', onKey);
     const title = document.title;
     // PDFに保存するときのファイル名になる
-    if (request.kind === 'invoice') document.title = `${data.settings.clientName}様_御請求書_${monthLabel(request.month)}分`;
+    if (request.kind === 'invoice') document.title = `${data.settings.clientName || '工務店'}様_御請求書_${monthLabel(request.month)}分`;
     else if (request.kind === 'sales') document.title = `売上見込み_${monthLabel(request.month)}`;
     else {
       const j = data.jobs.find((x) => x.id === request.jobId);

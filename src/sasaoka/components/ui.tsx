@@ -1,4 +1,5 @@
 import {createContext, useContext, useEffect, useRef, useState, useSyncExternalStore} from 'react';
+import {createPortal} from 'react-dom';
 import type {ButtonHTMLAttributes, DragEvent as ReactDragEvent, InputHTMLAttributes, ReactNode} from 'react';
 import {toKatakana} from '../util.ts';
 
@@ -204,7 +205,8 @@ export function Modal({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
-  return (
+  // 画面の body に出す（上の段の「その他 ▼」の中のボタン（メールで送付など）から開いても、閉じたメニューといっしょに隠れないように）
+  return createPortal(
     <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-3 sm:p-6" onMouseDown={onClose}>
       <div
         role="dialog"
@@ -222,7 +224,8 @@ export function Modal({
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
         {footer && <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-3">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

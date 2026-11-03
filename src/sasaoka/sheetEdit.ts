@@ -12,9 +12,9 @@ import type {EstimateRates} from './calc.ts';
 import {KINDS, autoNote, circled, formLines, jobForm, jobInsurer, lineNote, materialText, NO_SHINSEI, noteText, photoNumbers, rowUnit} from './estimateForms.ts';
 import {fillAdded, placeAfterQty, withBrackets} from './cutLink.ts';
 import {guessPieceLengthM} from './priceImport.ts';
-import {copyRows, manualRow, materialRow, newPlace} from './rows.ts';
+import {copyRows, laborCount, laborRange, laborSpot, manualRow, materialRow, newPlace, replaceRange, setLaborCount} from './rows.ts';
 import {padInsuredNo} from './shinsei.ts';
-import type {EstimateForm, Job, Material, Place, Row, Settings} from './types.ts';
+import type {EstimateForm, Job, LaborItem, Material, Place, Row, Settings} from './types.ts';
 
 export type SheetSettings = Pick<Settings, 'estimateRate' | 'estimateLaborRate' | 'estimateHourRate' | 'estimateOverheadRate' | 'taxRate'>;
 
@@ -316,6 +316,46 @@ export function dropEmptyPlaces(job: Job): Job {
 export function toolPlace(job: Job, key: string | null, remembered: string | null): Place | null {
   const here = key ? sheetTarget(job, key).place : null;
   return here ?? job.places.find((p) => p.id === remembered) ?? job.places[job.places.length - 1] ?? null;
+}
+
+/**
+ * 空いた行（空白の部材の行・申請書から作った空きの行）の内容の欄の「施工費」から、施工費のリストで選んだ施工費を入れる
+ * （ユーザーの指示「枠内に薄っすら、部材、施工費どちらか選べるよう、押せるようにする。施工費を押したら、プルダウンでリストを出す」2026-11-03）。
+ * 入れ方は前の「🔧 施工費から入れる」の画面で ＋ を1回押したのと同じ：空白の行はなくなり、すぐ上の部材の同上施工費（上に部材がなければ箇所のはじめの施工費）になる。
+ * 同じ施工費がもうそのまとまりにあれば箇所数を1つ増やす（`setLaborCount`）。
+ * key が いちばん下の空いた行（new:text）なら、最後の箇所（なければ作る）の最後に入れる。rowId：入った施工費のまとまりの行（見積書の1行。選ぶ欄）
+ */
+export function addLaborAt(job: Job, key: string, item: LaborItem): {job: Job; rowId: string | null} {
+  const [kind, id] = key.split(':');
+  let j = job;
+  let pi: number;
+  let anchor: string;
+  let rows: Row[];
+  if (kind === 'line') {
+    const f = findRow(j, id);
+    if (!f) return {job, rowId: null};
+    pi = f.pi;
+    rows = f.place.rows;
+    anchor = f.row.id;
+  } else {
+    if (j.places.length === 0) j = {...j, places: [newPlace('')]};
+    pi = j.places.length - 1;
+    // いちばん下に空白の行を足して、そこに入れたことにする（入れたらなくなる）
+    const blank = manualRow('material', {qty: 1});
+    rows = [...j.places[pi].rows, blank];
+    anchor = blank.id;
+  }
+  const spot = laborSpot(rows, anchor);
+  const range = laborRange(rows, spot);
+  const sub = rows.slice(range[0], range[1]).filter((r) => r.id !== spot.drop);
+  const next = setLaborCount(sub, item, laborCount(sub, item.id) + 1);
+  const out = replaceRange(rows, range, next);
+  // 入った（数が増えた）行：その施工費のいちばん下の行
+  let at = -1;
+  out.forEach((r, i) => {
+    if (i >= range[0] && i < range[0] + next.length && r.kind === 'labor' && r.refId === item.id) at = i;
+  });
+  return {job: setPlaceRows(j, pi, out), rowId: at >= 0 ? out[workHead(out, at)].id : null};
 }
 
 // ---------------------------------------------------------------- 打ち込んだ値を入れる

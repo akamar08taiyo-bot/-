@@ -14,7 +14,7 @@ import {Btn, KanaInput, TextInput, useToast} from '../components/ui.tsx';
 import {circled, eraOf, INSURER_IDS, INSURER_INFO, insurerForAddress, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, photoNumbers} from '../estimateForms.ts';
 import {placeFromDims, plateFromText, withBrackets} from '../cutLink.ts';
 import {newPlace} from '../rows.ts';
-import {RAIL_TYPES, railType, withSlots} from '../railSlots.ts';
+import {withSlots} from '../railSlots.ts';
 import {usePhotoUrls} from '../photos.ts';
 import {turn} from '../photoEdit.ts';
 import {AREA_LABEL, INSURER_AREAS, insurerNoOf} from '../insurerNumbers.ts';
@@ -22,7 +22,7 @@ import {photoBounds} from '../photoMarks.ts';
 import {costIsTotal, estimateLength, estimatePlateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, planPlacement, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
-import type {AppData, Insurer, Job, Material, PhotoEdit, Place, PlaceDims, RailType, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
+import type {AppData, Insurer, Job, Material, PhotoEdit, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {yen} from '../util.ts';
 import {zipCandidates} from '../zip.ts';
@@ -110,14 +110,12 @@ export function ShinseiEditor({
   data,
   update,
   onBack,
-  tabs,
   docs,
 }: {
   job: Job;
   data: AppData;
   update: Update;
   onBack: () => void;
-  tabs: ReactNode; // 申請書・見積書のタブ
   docs?: JobDocs | null; // 「📗 Excelで保存」「✉ メールで送付」（どのタブも同じ。App.tsx の DocsDialog.tsx）
 }) {
   const toast = useToast();
@@ -476,10 +474,9 @@ export function ShinseiEditor({
 
   return (
     <div className="space-y-3">
-      {/* 上の段（一覧へ戻る・タブ・介護保険証から入れる／名前・Excelで保存・印刷／メールで送付）はどのタブでも同じ形（JobHeader.tsx） */}
+      {/* 上の段（一覧へ戻る・名前・Excelで保存・印刷・その他 ▼・保険者・介護保険証から入れる）はどのタブでも同じ形（JobHeader.tsx） */}
       <JobHeader
         onBack={onBack}
-        tabs={tabs}
         extra={<CardFill job={job} setJob={setJob} />}
         title={<JobTitle name={job.customer.trim() ? jobName(job) : '新しい申請書'} badge={insurer ? INSURER_INFO[insurer].name : undefined} />}
         // 2段目は Excelで保存・印刷、3段目はメールで送付（どのタブも同じ並び。JobHeader.tsx）。保険者を選ぶまで（原本がないので）印刷は押せない
@@ -494,45 +491,48 @@ export function ShinseiEditor({
         }
         remove={(className) => <RemoveJobButton job={job} settings={s} update={update} onBack={onBack} className={className} />}
         secondary={docs?.mail}
+        // 保険者・保険者番号は上の段の空いた所（ユーザーの指示「この部分も空いた部分に記載して、その分上にずらす」2026-11-03。前は上の段の下の1段）
+        fields={
+          <>
+            <label className="flex items-center gap-1.5 whitespace-nowrap text-xs font-bold text-slate-600">
+              保険者
+              <select
+                value={insurer}
+                onChange={(e) => {
+                  if (!e.target.value) return;
+                  const next = e.target.value as Insurer;
+                  setInsurer(next);
+                  // 区・市町村を選ぶ保険者なら、続けてその選ぶ所へ
+                  if (AREA_LABEL[next]) setFocusArea(true);
+                }}
+                className={`h-9 min-w-[8rem] rounded-md border px-2 text-sm ${insurer ? 'border-slate-300 text-slate-800' : 'border-amber-400 bg-amber-50 text-amber-800'}`}
+                aria-label="保険者"
+              >
+                {!insurer && <option value="">（選ぶ）</option>}
+                {INSURER_IDS.map((x) => (
+                  <option key={x} value={x}>
+                    {INSURER_INFO[x].name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {insurer && <InsurerAreaPick insurer={insurer} address={job.address} picked={info.insurerNo} onPick={(insurerNo) => setInfo({insurerNo})} selectRef={areaRef} />}
+          </>
+        }
       />
       {printing && pages && map && (
         <ShinseiPrint pages={pages} title={shinseiFileName(map, job, estimateDateOf(job)).replace(/\.xlsx$/, '')} photos={previewPhotos} plan={previewPlan} onClose={() => setPrinting(false)} />
       )}
 
-      <section className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <label className="grid min-w-[10rem] gap-1 text-xs font-bold text-slate-600">
-          保険者
-          <select
-            value={insurer}
-            onChange={(e) => {
-              if (!e.target.value) return;
-              const next = e.target.value as Insurer;
-              setInsurer(next);
-              // 区・市町村を選ぶ保険者なら、続けてその選ぶ所へ
-              if (AREA_LABEL[next]) setFocusArea(true);
-            }}
-            className={`h-9 rounded-md border px-2 text-sm ${insurer ? 'border-slate-300 text-slate-800' : 'border-amber-400 bg-amber-50 text-amber-800'}`}
-            aria-label="保険者"
-          >
-            {!insurer && <option value="">（選ぶ）</option>}
-            {INSURER_IDS.map((x) => (
-              <option key={x} value={x}>
-                {INSURER_INFO[x].name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {insurer && <InsurerAreaPick insurer={insurer} address={job.address} picked={info.insurerNo} onPick={(insurerNo) => setInfo({insurerNo})} selectRef={areaRef} />}
-        {/* 工事場所の市町村が保険者と違うときは知らせる（見積書のタブと同じ。違う保険者を選んだまま、その申請書を作らないように。変えるのはボタンで） */}
-        {byAddress && byAddress !== insurer && (
-          <div className="flex w-full flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-900">
-            工事場所の住所は「{INSURER_INFO[byAddress].name}」です。
-            <Btn small color="white" onClick={() => setInsurer(byAddress)}>
-              保険者を{INSURER_INFO[byAddress].name}にする
-            </Btn>
-          </div>
-        )}
-      </section>
+      {/* 工事場所の市町村が保険者と違うときは知らせる（見積書のタブと同じ。違う保険者を選んだまま、その申請書を作らないように。変えるのはボタンで） */}
+      {byAddress && byAddress !== insurer && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-900">
+          工事場所の住所は「{INSURER_INFO[byAddress].name}」です。
+          <Btn small color="white" onClick={() => setInsurer(byAddress)}>
+            保険者を{INSURER_INFO[byAddress].name}にする
+          </Btn>
+        </div>
+      )}
 
       {!insurer ? (
         <p className="rounded-xl border border-dashed border-amber-300 bg-amber-50 px-4 py-6 text-center text-sm text-amber-900">保険者を選ぶと、その申請書が出ます。</p>
@@ -752,20 +752,20 @@ function InsurerAreaPick({insurer, address, picked, onPick, selectRef}: {insurer
   const unit = AREA_LABEL[insurer];
   if (!unit && !odd) {
     return (
-      <div data-field="insurerNo" className="grid gap-1 text-xs font-bold text-slate-600">
+      <div data-field="insurerNo" className="flex items-center gap-1.5 whitespace-nowrap text-xs font-bold text-slate-600">
         保険者番号
         <span className="flex h-9 items-center font-mono text-sm font-normal text-slate-800">{cur}</span>
       </div>
     );
   }
   return (
-    <label data-field="insurerNo" className="grid min-w-[11rem] gap-1 text-xs font-bold text-slate-600">
+    <label data-field="insurerNo" className="flex items-center gap-1.5 whitespace-nowrap text-xs font-bold text-slate-600">
       {unit || '保険者番号'}
       <select
         ref={selectRef}
         value={cur}
         onChange={(e) => onPick(e.target.value)}
-        className={`h-9 rounded-md border px-2 text-sm ${cur ? 'border-slate-300 text-slate-800' : 'border-amber-400 bg-amber-50 text-amber-800'}`}
+        className={`h-9 min-w-[10rem] rounded-md border px-2 text-sm ${cur ? 'border-slate-300 text-slate-800' : 'border-amber-400 bg-amber-50 text-amber-800'}`}
         aria-label="保険者番号"
       >
         {!cur && <option value="">（選ぶ）</option>}
@@ -910,21 +910,8 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-9">
                   {p.kind === 1 && (
                     <>
-                      {/* 手すりの種類（見積書の空きの行が変わる。`railSlots.ts`）。ユーザーの指示「TOTOの場合は…材料費で１行、施工費で１行」「屋外手すりで高さが発生する場合…支柱部材、手すり部材、ブラケット部材、施工費」2026-11-03 */}
-                      <select
-                        value={railType(p)}
-                        onChange={(e) => setPlace(p.id, (x) => ({...x, rail: e.target.value as RailType}))}
-                        className="h-9 rounded-md border border-slate-300 px-1 text-sm"
-                        aria-label="手すりの種類"
-                        title="見積書の行（手すり・ブラケット・施工費など）が変わります"
-                        data-nav
-                      >
-                        {RAIL_TYPES.map((t) => (
-                          <option key={t.value} value={t.value}>
-                            {t.label}
-                          </option>
-                        ))}
-                      </select>
+                      {/* 手すりの種類の選ぶ欄は外した（ユーザーの指示「ここの木手すりの選択は不要」2026-11-03）。見積書の空きの行は、屋外で高さを入れたら支柱・手すり・ブラケット・施工費、
+                          ほかは手すり・ブラケット・施工費（`railType`。既製品（TOTO など）は見積書で行を直す） */}
                       {/* 手すりの長さは必須（入っていなければ薄い黄色。入れなければ見積書の使う長さ＝薄い字を書く）、高さは任意で ＋ を押すと開いて入れる
                           （ユーザーの指示「手すりの取り付けの高さが任意、長さは必須。手すりの取り付けの高さも、プラスで開いてから入力できるようにする。（任意）」2026-10-26） */}
                       {dim('l', '長さ', {wide: true, placeholder: estimateLength(p), missing: !p.dims?.l?.trim() && !estimateLength(p)})}

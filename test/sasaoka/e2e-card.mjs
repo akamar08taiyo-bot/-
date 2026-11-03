@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import {readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {cardHtml, SCAN_JS} from './cardFixture.mjs';
+import {navItem} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -156,7 +157,7 @@ assert.equal(await page.getByRole('button', {name: '🪪 介護保険証', exact
 log('申請書・理由書・見積書・特定福祉用具に出た OK');
 
 // ---------------- 2. 新規作成の様邸に PDF をドロップ（見積もりの入口には読み取りの欄を出さない）
-await page.getByRole('button', {name: /見積もり・申請書を作成する/}).first().click();
+await (await navItem(page, /見積もり・申請書を作成する/)).click();
 await page.getByRole('region', {name: '新規作成'}).waitFor();
 assert.equal(await page.getByRole('button', {name: /介護保険証/}).count(), 0);
 await page.getByRole('region', {name: '新規作成'}).getByRole('button', {name: '＋ 行橋市'}).click();
@@ -192,7 +193,7 @@ log('新規作成 OK');
 // ---------------- 2b. 複合機・FAX のスキャンの PDF（白黒の CCITT G4 の画像・ページを 270° 回した形。fixtures/card-fax.pdf ＝ 架空の保険証と負担割合証を
 //   make-fax-pdf.py で入れたもの）。pdf.js の画像の部品（jbig2.wasm）を同梱していなかったときは、ページが真っ白で何も読めなかった
 //   （ユーザーの報告「保険証などが上手く取り込めないケースがあった」2026-10-29）
-await page.getByRole('button', {name: /見積もり・申請書を作成する/}).first().click();
+await (await navItem(page, /見積もり・申請書を作成する/)).click();
 await page.getByRole('region', {name: '新規作成'}).getByRole('button', {name: '＋ 行橋市'}).click();
 await page.getByRole('form', {name: '申請書'}).waitFor();
 const fax = await readFile(new URL('./fixtures/card-fax.pdf', import.meta.url));
@@ -207,7 +208,7 @@ await faxDialog.getByRole('button', {name: 'キャンセル'}).click();
 await faxDialog.waitFor({state: 'detached'});
 log('複合機・FAX のスキャンの PDF（白黒の CCITT・270° 回したページ）OK');
 
-// ---------------- 3. 「🪪 介護保険証から入れる」は4つのタブのどれでも、1段目のタブのすぐ右（ユーザーの指示「上のタブの近辺に」）。
+// ---------------- 3. 「🪪 介護保険証から入れる」は申請書のタブのどれでも、様邸の画面の上の段の右の端（前は1段目のタブのすぐ右。ユーザーの指示「上のタブの近辺に」）。
 //   画面をクリックしてから Ctrl+V で貼り付けても読む（「クリックしてから挿入で貼り付け」）。字を打つ欄での Ctrl+V は、ふつうの貼り付けのまま
 const cardBtn = page.getByRole('button', {name: '🪪 介護保険証', exact: true});
 const tablist = page.getByRole('tablist', {name: '住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書'});
@@ -231,9 +232,11 @@ for (const name of ['📝 住宅改修申請書', '📋 工事見積書', '🛁 
     assert.equal(await cardBtn.count(), 0, `${name}：🪪 の欄を出さない`);
     continue;
   }
-  const [t, b] = [await boxOf(tablist), await boxOf(cardBtn)];
-  assert.ok(b.x >= t.x + t.width && b.x - (t.x + t.width) < 24, `${name}：タブのすぐ右 ${JSON.stringify({t, b})}`);
-  assert.ok(Math.abs(b.y + b.height / 2 - (t.y + t.height / 2)) < 6, `${name}：タブと同じ段 ${JSON.stringify({t, b})}`);
+  // 2026-11-03 から、様邸のタブは上の帯（App.tsx の JobTabs）。🪪 の枠は様邸の画面の上の段（保存・印刷・その他 ▼ の段）の右の端（JobHeader.tsx の extra）
+  const more = page.getByRole('button', {name: /^その他 [▼▲]$/}).filter({visible: true}).first();
+  const [t, b] = [await boxOf(more), await boxOf(cardBtn)];
+  assert.ok(b.x >= t.x + t.width && b.x + b.width > 1366 - 60, `${name}：上の段の右の端 ${JSON.stringify({t, b})}`);
+  assert.ok(Math.abs(b.y + b.height / 2 - (t.y + t.height / 2)) < 8, `${name}：上の段と同じ段 ${JSON.stringify({t, b})}`);
   lefts.push(Math.round(b.x));
 }
 assert.equal(new Set(lefts).size, 1, `どのタブでも同じ位置 ${lefts}`);

@@ -8,6 +8,7 @@
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import path from 'node:path';
 import fs from 'node:fs';
+import {navItem, openMore} from './more.mjs';
 
 const [site, backup, out, widthArg] = process.argv.slice(2);
 const width = Number(widthArg || 1366);
@@ -134,7 +135,7 @@ const shotOf = async (name, locator) => {
 
 // ---------------- 長い値の様邸と設定（長い会社名・営業所名・所長名）をバックアップから入れる（今のデータを置き換える。設定は置き換えるときだけ入る）
 await page.goto(`${site}/jutaku-mitsumori/index.html`);
-await page.getByRole('navigation').getByRole('button', {name: /設定/}).click();
+await (await navItem(page, /設定/)).click();
 await page.locator('input[type=file][accept=".json,application/json"]').setInputFiles(backup);
 await page.getByRole('button', {name: '今のデータを置き換える'}).click();
 await page.waitForTimeout(800);
@@ -151,7 +152,7 @@ for (const ins of ids) {
   await record(`${ins}-見積書`, sheet.locator('.form-page'));
   await shotOf(`${ins}-見積書`, sheet);
   // 見積書の印刷
-  await page.getByRole('button', {name: '🖨 見積書を印刷'}).click();
+  await page.getByRole('button', {name: '🖨 見積書を印刷'}).first().click();
   await page.locator('.print-overlay').waitFor();
   await page.waitForTimeout(800);
   await record(`${ins}-見積書の印刷`, page.locator('.print-overlay .form-page'));
@@ -174,7 +175,7 @@ for (const ins of ids) {
   // 発注書（画面・印刷）
   await page.getByRole('tab', {name: '📋 工事見積書'}).click();
   await sheet.waitFor();
-  await page.getByRole('button', {name: '🛒 発注書を作成'}).click();
+  await (await openMore(page)).getByRole('button', {name: '🛒 発注書を作成'}).click();
   const list = page.getByRole('region', {name: '発注する部材'});
   await list.waitFor();
   await record(`${ins}-発注書`, page.locator('main'));

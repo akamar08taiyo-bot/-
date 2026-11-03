@@ -5,8 +5,10 @@
 //   excl:行ID（介護保険の対象外）／overhead:all|target（諸経費）。明細の行には data-rows（もとになった入力の行）を付ける。
 //   金額のない施工費の行も出し、明細のあとに打ち込める空いた行（new:…、data-new）を1行足す。
 //   ほかの空いた行には data-blank を付ける（押すと、打ち込める行の同じ列を選ぶ）。
-//   行の挿入・削除・コピー・貼付は、見積書の左のボタン（EstimateSheet.tsx。選んでいる行に効く）。前は明細の行の左（余白）に1行ずつ出していたが、
+//   行の挿入・削除・コピー・貼付は、見積書の表の見出し（改修内容）の左の小さなボタン（EstimateSheet.tsx。選んでいる行に効く）。前は明細の行の左（余白）に1行ずつ出していたが、
 //   ユーザーの指示「削除ボタン、挿入、コピーボタンについては、各行に作成するのではなく、見積もりの左手に設置する」（2026-11-03）で外した。
+//   空いた行（空白の部材の行・いちばん下の空いた行）の内容の欄には、薄く「部材｜施工費｜常用」（PICK。押すと部材を選ぶ画面・施工費のリスト・部材＋施工費（常用）。
+//   ユーザーの指示「枠内に薄っすら、部材、施工費どちらか選べるよう、押せるようにする」2026-11-03。EstimateSheet.tsx が受ける）。
 //   コピーした行には data-copied を付ける。
 // 何も入っていない部材の行（line.blank）は、印刷でも空白の行（数量・単価・金額も出さない）
 // 明細の下の介護保険の内訳（line.memo。careLines.ts）は左の欄をまとめた1行の文字（data-care）。利用者負担は赤字
@@ -50,18 +52,39 @@ function useShrinkCells() {
  * 内容（品名）の欄：長い商品名は言葉の切れ目で行を分けて書く（`fitName`・`wordLines`。「マツ六 BD-132 35アッシュ丸棒」／「ディンプル付 Mオーク 2m」）。
  * 1行に入る商品名は前と同じ（入らなければ欄の幅で折り返す）
  */
-function nameCell(text: string, w: number, h: number, pt: number, cls: string, edit: string, lines: number, editable: boolean, slot = ''): ReactNode {
+function nameCell(text: string, w: number, h: number, pt: number, cls: string, edit: string, lines: number, editable: boolean, slot = '', blank = false): ReactNode {
   const f = text ? fitName(text, w, h, pt, lines) : null;
   // 空きの行（申請書で箇所を入れたときの手すり・ブラケット・施工費などの行。railSlots.ts）は空白の行のまま。名前（「（手すり）」）は出さない
   // （ユーザーの指示「うっすら手すり、ブラケットなど、記載してあるが、誤解をまねくため、不要」2026-11-03。前は見積書の画面に薄い字で出していた）。
   // 印は data-slot だけ（見えない。ブラウザのテスト用）
   const open = editable && !text && slot;
+  // 空白の行は、入力の画面だけ「部材｜施工費｜常用」を薄く（PICK）
+  const pick = editable && !text && blank;
   return (
-    <td className={cls} style={f ? fitCss(f) : undefined} {...ed(editable, edit)} {...(open ? {'data-slot': slot} : {})}>
+    <td className={cls} style={f ? fitCss(f) : undefined} {...ed(editable, edit)} {...(open ? {'data-slot': slot} : {})} {...(pick ? {'data-empty': ''} : {})}>
       {f ? fitBody(f) : text}
+      {pick && PICK}
     </td>
   );
 }
+
+/**
+ * 空いた行の内容の欄に薄く出す「部材｜施工費｜常用」（入力の画面だけ。印刷・Excel には出ない）。押すと、部材＝部材を選ぶ画面（検索）、
+ * 施工費＝施工費のリスト（プルダウン）、常用＝部材＋施工費（常用）の画面（EstimateSheet.tsx の `runPick`）。欄を選んで品番・品名を打っても部材リストから探す
+ */
+const PICK = (
+  <span className="sheet-pick" role="group" aria-label="入れるもの">
+    <button type="button" tabIndex={-1} data-pick="material" className="pick-material" aria-label="📋 部材リストから入れる" title="部材リスト（品番・品名で検索）から入れる">
+      部材
+    </button>
+    <button type="button" tabIndex={-1} data-pick="labor" className="pick-labor" aria-label="🔧 施工費から入れる" title="施工費のリストから入れる">
+      施工費
+    </button>
+    <button type="button" tabIndex={-1} data-pick="kit" className="pick-kit" aria-label="＋ 部材＋施工費（常用）から入れる" title="部材＋施工費（常用）から入れる">
+      常用
+    </button>
+  </span>
+);
 
 /** 欄の大きさに合わせた文字（`fitText`）の style と中身 */
 function fitted(text: string, w: number, h: number, pt: number, lines = 1): {style: CSSProperties | undefined; body: ReactNode} {
@@ -300,7 +323,7 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
       <tr className="g sheet-new" style={{height: `${YK_ROW}mm`}} data-new="">
         {cell(l.first ? l.work : '', YK.A, 11, 'ml', nk('work'), 1)}
         {cell(l.first && l.placeName ? `${circled(l.photo)}${l.placeName}` : '', YK.B, 11, '', nk('name'))}
-        {cell('', YK.C, 9, '', nk('text'))}
+        {cell('', YK.C, 9, '', nk('text'), 1, editable ? PICK : null)}
         {cell('', YK.D, 9, 'r nr', nk('qty'))}
         {cell('', YK.E, 11, 'nl', nk('unit'))}
         {cell('', YK.F, 11, 'r', nk('price'))}
@@ -327,7 +350,7 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
       {cell(l.first ? l.work : '', YK.A, 11, 'ml', l.first ? `place:${l.placeId}:work` : null, 1)}
       {/* 改修場所（写真No.）：「①勝手口」。写真番号のあとに箇所名を打ち込める */}
       {cell(l.first ? `${circled(l.photo)}${l.placeName}` : '', YK.B, 11, '', l.first ? `place:${l.placeId}:name` : null)}
-      {nameCell(l.text, YK.C, YK_ROW, 9, `${bottom}`, k('text'), 2, editable, l.slot)}
+      {nameCell(l.text, YK.C, YK_ROW, 9, `${bottom}`, k('text'), 2, editable, l.slot, l.blank)}
       {cell(qty, YK.D, 9, 'r nr', l.isWork ? null : k('qty'))}
       {cell(l.unit, YK.E, 11, 'nl', l.isWork || l.cut ? null : k('unit'))}
       {cell(price, YK.F, 11, 'r', k('price'))}
@@ -563,7 +586,7 @@ function KkLine({
         <td className={`mark${bottom}`} {...ed(editable, nk('mark'))}>
           {l.mark}
         </td>
-        {cell('', KK.D, 9, 'mr gothic', nk('text'))}
+        {cell('', KK.D, 9, 'mr gothic', nk('text'), 1, editable ? PICK : null)}
         <td className={`gap${bottom}`} />
         {cell('', KK.F, 9, 'r ml gothic', nk('qty'))}
         {cell('', KK.G, 11, 'gothic', nk('unit'))}
@@ -611,7 +634,7 @@ function KkLine({
       {cell(l.first ? l.placeName : '', KK.A, 11, 'c ml', l.first ? `place:${l.placeId}:name` : null, 2)}
       {cell(l.first ? l.work : '', KK.B, 11, 'c', l.first ? `place:${l.placeId}:work` : null, 2)}
       <td className={`mark${bottom}`}>{l.blank ? '' : l.mark}</td>
-      {nameCell(l.text, KK.D, height, 9, `mr gothic${bottom}`, k('text'), 3, editable, l.slot)}
+      {nameCell(l.text, KK.D, height, 9, `mr gothic${bottom}`, k('text'), 3, editable, l.slot, l.blank)}
       <td className={`gap${bottom}`} />
       {cell(qty, KK.F, 9, 'r ml gothic', !l.isWork || l.hourly ? k('qty') : null)}
       {cell(l.unit, KK.G, 11, 'gothic', l.isWork || l.cut ? null : k('unit'))}

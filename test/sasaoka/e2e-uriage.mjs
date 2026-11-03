@@ -8,6 +8,7 @@
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import {mkdirSync, readFileSync} from 'node:fs';
+import {moreItems, openMore} from './more.mjs';
 
 const [site, outDir = 'e2e-out'] = process.argv.slice(2);
 mkdirSync(outDir, {recursive: true});
@@ -38,7 +39,7 @@ try {
     await page.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
     const estimateTab = page.getByRole('tab', {name: /工事見積書/});
     if ((await estimateTab.getAttribute('aria-selected')) !== 'true') await estimateTab.click();
-    await page.getByRole('button', {name: '🧾 売上伝票を作成', exact: true}).waitFor();
+    await page.getByRole('button', {name: '🧾 売上伝票を作成', exact: true, includeHidden: true}).waitFor({state: 'attached'}); // 上の段の「その他 ▼」の中
     // 住所（見積書の工事場所）・居宅とケアマネ（理由書の作成者）も入れておく（伝票に全部入るか確かめる）
     const sheet = page.getByRole('region', {name: '見積書', exact: true});
     await sheet.locator('[data-edit="job:address"]').click();
@@ -48,13 +49,13 @@ try {
     await page.getByLabel('作成者の所属事業所').fill('見本居宅介護支援事業所');
     await page.getByLabel('作成者の氏名').fill('見本 太郎');
     await page.getByRole('tab', {name: /工事見積書/}).click();
-    await page.getByRole('button', {name: '🧾 売上伝票を作成', exact: true}).waitFor();
+    await page.getByRole('button', {name: '🧾 売上伝票を作成', exact: true, includeHidden: true}).waitFor({state: 'attached'}); // 上の段の「その他 ▼」の中
 
-    // 上の段：3段目（そのほかの機能）の 💾 保存 のすぐ右（2026-10-28 から上の段は5つのタブで同じ形。JobHeader.tsx。初めの ✉ メールで送付は 2026-10-30 から）
-    const more = (await page.getByRole('group', {name: 'そのほかの機能'}).getByRole('button').allInnerTexts()).map((t) => t.trim()).filter((t) => t !== '削除');
+    // 上の段の「その他 ▼」の中の 💾 保存 のすぐ右（2026-11-03 からプルダウン。JobHeader.tsx。初めの ✉ メールで送付は 2026-10-30 から）
+    const more = (await moreItems(page)).filter((t) => t !== '削除');
     assert.deepEqual(more.slice(0, 3), ['✉ メールで送付', '💾 保存', '🧾 売上伝票を作成'], more.join(' / '));
 
-    await page.getByRole('button', {name: '🧾 売上伝票を作成', exact: true}).click();
+    await (await openMore(page)).getByRole('button', {name: '🧾 売上伝票を作成', exact: true}).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByText('まだ入っていません：負担割合・介護度・新規・既存').waitFor();
     assert.equal(await dialog.getByRole('button', {name: '🧾 売上伝票発行依頼書を開く'}).isDisabled(), true);
@@ -75,7 +76,7 @@ try {
     await slip.getByText('申請書・見積書作成から読み込みました。').waitFor();
     assert.equal(await page.evaluate(() => localStorage.getItem('taiyo-uriage-import-v1')), null);
     assert.equal(await slip.getByPlaceholder('例: 山田太郎').inputValue(), '（サンプル）山田');
-    assert.equal(await slip.getByPlaceholder(/施工業者名を入力|入力 \/ 候補から選択/).inputValue(), '笹岡工務店');
+    assert.equal(await slip.getByPlaceholder(/施工業者名を入力|入力 \/ 候補から選択/).inputValue(), ''); // 請求先（工務店）の名前は設定で入れたときだけ（2026-11-03）
     assert.deepEqual(await slip.getByPlaceholder('金額(税込)').evaluateAll((l) => l.map((x) => x.value)), ['26950']);
     assert.deepEqual(await slip.getByPlaceholder('仕切り(税込)').evaluateAll((l) => l.map((x) => x.value)), [String(cost)]);
     const text = await slip.locator('main').innerText();
@@ -91,7 +92,6 @@ try {
       '住所福岡県行橋市中央1-1',
       '居宅名見本居宅介護支援事業所',
       '担当ケアマネージャー見本 太郎',
-      '施工業者笹岡工務店',
       '請求区分受領委任払い',
       '介護度介護１',
       '負担割合1割',
@@ -105,7 +105,7 @@ try {
     log(`${tag}: 売上伝票が工事1行・仕切り ${cost}円で開いた`);
 
     // 生活保護：もう一度開く（新規・既存・負担割合は覚えている）
-    await page.getByRole('button', {name: '🧾 売上伝票を作成', exact: true}).click();
+    await (await openMore(page)).getByRole('button', {name: '🧾 売上伝票を作成', exact: true}).click();
     assert.equal(await dialog.getByRole('group', {name: '伝票の顧客区分'}).getByRole('button', {name: '既存'}).getAttribute('aria-pressed'), 'true');
     assert.equal(await dialog.getByRole('group', {name: '伝票の負担割合'}).getByRole('button', {name: '1割'}).getAttribute('aria-pressed'), 'true');
     await dialog.getByLabel('生活保護（自己負担は出さない）').check();

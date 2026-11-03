@@ -10,6 +10,7 @@
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import {cellAt, chooseLabor, clickStable, navItem} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -25,7 +26,7 @@ page.on('dialog', (d) => d.accept());
 await page.goto(`${site}/jutaku-mitsumori/index.html`);
 
 // ---------------- 部材リスト（価格は架空）
-await page.getByRole('navigation').getByRole('button', {name: '📦 部材・施工費マスタ'}).click();
+await (await navItem(page, '📦 部材・施工費マスタ')).click();
 await page.getByRole('button', {name: /メーカーの仕切り表を取り込む/}).click();
 const csv =
   '品番,品名,定価,仕切単価\n' +
@@ -39,7 +40,7 @@ await page.getByText('新しく 3件').waitFor();
 log('部材リスト OK');
 
 // ---------------- 申請書：階段 L=2100・「＋ ベースプレート」1300
-await page.getByRole('navigation').getByRole('button', {name: '📝 見積もり・申請書を作成する'}).click();
+await (await navItem(page, '📝 見積もり・申請書を作成する')).click();
 await page.getByRole('region', {name: '新規作成'}).getByRole('button', {name: '＋ 行橋市', exact: true}).click();
 const form = page.getByRole('form', {name: '申請書'});
 await form.waitFor();
@@ -67,7 +68,7 @@ await page.getByRole('tab', {name: '📋 工事見積書'}).click();
 const sheet = page.getByRole('region', {name: '見積書', exact: true});
 await sheet.waitFor();
 const textKey = await sheet.locator('.form-page tr', {hasText: '階段'}).first().locator('[data-edit$=":text"]').first().getAttribute('data-edit');
-await sheet.locator(`[data-edit="${textKey}"]`).click();
+await cellAt(sheet.locator(`[data-edit="${textKey}"]`)).click();
 const dlg = page.getByRole('dialog');
 const pick = async (code, plus = 0, expectAdd = true) => {
   await dlg.getByPlaceholder(/商品名・品番で検索/).fill(code);
@@ -78,9 +79,19 @@ const pick = async (code, plus = 0, expectAdd = true) => {
   for (let i = 0; i < plus; i++) await row.getByRole('button', {name: /を1つ増やす/}).click();
   return row;
 };
+// 行の操作（選んでいる行の改修内容の左）と、空いた行の「部材｜施工費｜常用」（2026-11-03。前は見積書の左の「部材リストから入れる」など）。
+// 選んでいる行が空いた行でなければ「＋ 挿入」で下に空いた行を入れてから。選んでいる欄の上の見えない入力欄の下にあるので force
+const ops = sheet.getByRole('toolbar', {name: '行の操作'});
+const pickHere = async (kind) => {
+  if (!(await sheet.locator(`tr[data-current] [data-pick="${kind}"]`).count())) await ops.getByRole('button', {name: '＋ 挿入'}).click();
+  await clickStable(sheet.locator(`tr[data-current] [data-pick="${kind}"]`));
+};
 const openMaterials = async () => {
-  await sheet.getByRole('button', {name: '📋 部材リストから入れる'}).click();
+  await pickHere('material');
   await dlg.getByRole('button', {name: /^すべて/}).click();
+};
+const addLabor = async (name) => {
+  await chooseLabor(page, () => pickHere('labor'), name);
 };
 await openMaterials();
 await pick('BD-132');
@@ -89,11 +100,8 @@ const end1 = await pick('BD-08G', 1);
 assert.equal((await end1.getByLabel(/の数量$/).innerText()).trim(), '2');
 await page.screenshot({path: path.join(outDir, 'spots-02-picker.png')});
 await page.getByRole('button', {name: '選び終わったら閉じる'}).click();
-// 閉じると、最後に入れた BD-08G の行を選んでいる → 施工費はその同上施工費
-await sheet.getByRole('button', {name: /施工費から入れる/}).click();
-await dlg.getByText(/エンドブラケット.*の施工費/).first().waitFor();
-await page.getByRole('button', {name: '木の箇所数を1増やす', exact: true}).click();
-await page.getByRole('button', {name: '数え終わったら閉じる'}).click();
+// 閉じると、最後に入れた BD-08G の行を選んでいる → 下に空いた行を入れて「施工費」→ その同上施工費
+await addLabor('木');
 
 // ---------------- 2か所目：同じ BD-132・BD-08G×2・施工費（木）を、1か所目に足さずに別の行で
 await openMaterials();
@@ -101,10 +109,7 @@ await pick('BD-132');
 const end2 = await pick('BD-08G', 1);
 assert.equal((await end2.getByLabel(/の数量$/).innerText()).trim(), '2');
 await page.getByRole('button', {name: '選び終わったら閉じる'}).click();
-await sheet.getByRole('button', {name: /施工費から入れる/}).click();
-await dlg.getByText(/エンドブラケット.*の施工費/).first().waitFor();
-await page.getByRole('button', {name: '木の箇所数を1増やす', exact: true}).click();
-await page.getByRole('button', {name: '数え終わったら閉じる'}).click();
+await addLabor('木');
 await page.waitForTimeout(500);
 
 const rows = (await sheet.locator('.form-page tr').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
@@ -144,22 +149,22 @@ await page.waitForTimeout(600);
 await page.getByRole('tab', {name: '📋 工事見積書'}).click();
 await sheet.waitFor();
 const entranceRow = () => sheet.locator('.form-page tr', {hasText: '玄関'}).first();
-await entranceRow().locator('[data-edit$=":text"]').first().click();
+await cellAt(entranceRow().locator('[data-edit$=":text"]').first()).click();
 await openMaterials();
 await pick('BD-132');
 await page.getByRole('button', {name: '選び終わったら閉じる'}).click();
 assert.ok((await entranceRow().innerText()).includes('BD-132'));
 const ask = page.getByRole('dialog', {name: '「玄関」は申請書にも入っています'});
 // やめる：何も消えない
-await entranceRow().locator('[data-edit$=":text"]').first().click({timeout: 2000}).catch(() => sheet.locator('textarea.sheet-input').click()); // 選んでいる欄は上の入力欄を押す
-await sheet.getByRole('toolbar', {name: '見積書の左のボタン'}).getByRole('button', {name: '✕ 削除'}).click(); // 見積書の左の「削除」（2026-11-03）
+await cellAt(entranceRow().locator('[data-edit$=":text"]').first()).click({timeout: 2000}).catch(() => sheet.locator('textarea.sheet-input').click()); // 選んでいる欄は上の入力欄を押す
+await ops.getByRole('button', {name: '✕ 削除'}).click(); // 行の「削除」（選んでいる行の改修内容の左。2026-11-03）
 await ask.waitFor();
 await page.screenshot({path: path.join(outDir, 'spots-04-delete-ask.png')});
 await ask.getByRole('button', {name: 'やめる'}).click();
 assert.ok((await entranceRow().innerText()).includes('BD-132'));
 // 見積書の行だけ消す：見積書は空白の行、申請書の玄関は残る
-await entranceRow().locator('[data-edit$=":text"]').first().click({timeout: 2000}).catch(() => sheet.locator('textarea.sheet-input').click()); // 選んでいる欄は上の入力欄を押す
-await sheet.getByRole('toolbar', {name: '見積書の左のボタン'}).getByRole('button', {name: '✕ 削除'}).click(); // 見積書の左の「削除」（2026-11-03）
+await cellAt(entranceRow().locator('[data-edit$=":text"]').first()).click({timeout: 2000}).catch(() => sheet.locator('textarea.sheet-input').click()); // 選んでいる欄は上の入力欄を押す
+await ops.getByRole('button', {name: '✕ 削除'}).click(); // 行の「削除」（選んでいる行の改修内容の左。2026-11-03）
 await ask.getByRole('button', {name: '見積書の行だけ消す'}).click();
 await ask.waitFor({state: 'detached'});
 assert.ok(!(await entranceRow().innerText()).includes('BD-132'));
@@ -168,13 +173,13 @@ assert.ok(!(await entranceRow().innerText()).includes('BD-132'));
 const slotTexts = () => sheet.locator('[data-slot]').evaluateAll((els) => els.map((e) => `（${e.getAttribute('data-slot')}）`));
 const slotsBefore = await slotTexts(); // 上の階段にも空きの行が残っている（玄関は最後の2つ）
 assert.deepEqual(slotsBefore.slice(-2), ['（ブラケット）', '（施工費）']);
-await entranceRow().locator('[data-edit$=":text"]').first().click({timeout: 2000}).catch(() => sheet.locator('textarea.sheet-input').click()); // 選んでいる欄は上の入力欄を押す
-await sheet.getByRole('toolbar', {name: '見積書の左のボタン'}).getByRole('button', {name: '✕ 削除'}).click(); // 見積書の左の「削除」（2026-11-03）
+await cellAt(entranceRow().locator('[data-edit$=":text"]').first()).click({timeout: 2000}).catch(() => sheet.locator('textarea.sheet-input').click()); // 選んでいる欄は上の入力欄を押す
+await ops.getByRole('button', {name: '✕ 削除'}).click(); // 行の「削除」（選んでいる行の改修内容の左。2026-11-03）
 await page.waitForTimeout(300);
 assert.equal(await ask.count(), 0); // 空きの行（ほかの行が残る）は聞かない
 assert.deepEqual(await slotTexts(), [...slotsBefore.slice(0, -2), '（施工費）']);
-await entranceRow().locator('[data-edit$=":text"]').first().click({timeout: 2000}).catch(() => sheet.locator('textarea.sheet-input').click());
-await sheet.getByRole('toolbar', {name: '見積書の左のボタン'}).getByRole('button', {name: '✕ 削除'}).click();
+await cellAt(entranceRow().locator('[data-edit$=":text"]').first()).click({timeout: 2000}).catch(() => sheet.locator('textarea.sheet-input').click());
+await ops.getByRole('button', {name: '✕ 削除'}).click();
 await ask.waitFor();
 assert.equal(await ask.getByRole('button', {name: '見積書の行だけ消す'}).count(), 0);
 await ask.getByRole('button', {name: '申請書からも削除'}).click();

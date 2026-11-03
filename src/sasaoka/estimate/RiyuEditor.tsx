@@ -82,7 +82,7 @@ function Check({on, onChange, children, label: aria}: {on: boolean; onChange: (v
   );
 }
 
-export function RiyuEditor({job, data, update, onBack, tabs, docs}: {job: Job; data: AppData; update: Update; onBack: () => void; tabs: ReactNode; docs?: JobDocs | null}) {
+export function RiyuEditor({job, data, update, onBack, docs}: {job: Job; data: AppData; update: Update; onBack: () => void; docs?: JobDocs | null}) {
   const toast = useToast();
   const s = data.settings;
   const insurer = jobInsurer(job);
@@ -398,7 +398,6 @@ export function RiyuEditor({job, data, update, onBack, tabs, docs}: {job: Job; d
           （ユーザーの指示「理由書作成のときも同様になくす」2026-10-27。申請書・特定福祉用具・販売見積書のタブにはある） */}
       <JobHeader
         onBack={onBack}
-        tabs={tabs}
         title={<JobTitle name={job.customer.trim() ? jobName(job) : '新しい理由書'} badge={insurer ? INSURER_INFO[insurer].name : undefined} />}
         primary={
           <>

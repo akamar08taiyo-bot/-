@@ -580,6 +580,8 @@ export function cleanSettings(raw: unknown): Settings {
   if (numv(raw.rev, 1) < 4) s.staffList = cleanList(s.staffList.map((n) => STAFF_FULL_NAMES.get(n) ?? n));
   // 版5より前の設定：箇所の候補が前の初期値のままなら、写真の用紙の改修箇所の名前にする（自分で直した候補はそのまま）
   if (numv(raw.rev, 1) < 5 && s.placePresets.join('\n') === OLD_DEFAULT_PLACES.join('\n')) s.placePresets = DEFAULT_PLACES;
+  // 版6より前の設定：前の初期値の請求先「笹岡工務店」は空にする（画面は「工務店」。笹岡工務店にしたいときは設定で入れる。ユーザーの指示 2026-11-03）
+  if (numv(raw.rev, 1) < 6 && s.clientName.trim() === '笹岡工務店') s.clientName = '';
   s.rev = SETTINGS_REV;
   return s;
 }

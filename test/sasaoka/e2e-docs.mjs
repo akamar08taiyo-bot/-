@@ -8,6 +8,7 @@
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import {openMore} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -66,7 +67,7 @@ async function finish(page, dlg, retry) {
   assert.equal(await page.getByRole('button', {name: /をExcelで保存/}).count(), 0);
 
   // 📗 Excelで保存：初めは住宅改修申請書（このタブ）だけ。工事見積書は行がないので選べない
-  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).click();
+  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).first().click();
   const xdlg = page.getByRole('dialog', {name: 'Excelで保存'});
   assert.deepEqual(await checks(xdlg), [
     ['住宅改修申請書', true, false],
@@ -83,7 +84,7 @@ async function finish(page, dlg, retry) {
   // 理由書のタブで開くと、理由書だけ。理由書にもチェックして2つ
   await page.getByRole('tab', {name: '📄 理由書'}).click();
   await page.getByRole('tab', {name: '📄 理由書', selected: true}).waitFor();
-  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).click();
+  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).first().click();
   assert.deepEqual((await checks(xdlg)).map(([, c]) => c), [false, false, false, false, true]);
   await xdlg.getByRole('checkbox', {name: /^住宅改修申請書/}).check();
   await xdlg.getByRole('button', {name: '📗 2つ保存する'}).click();
@@ -94,7 +95,7 @@ async function finish(page, dlg, retry) {
 
   // ✉ メールで送付：初めは理由書（このタブ）だけ。住宅改修申請書にもチェック → 2つ保存して、件名・本文の入ったメールを開く
   names.length = 0;
-  await page.getByRole('button', {name: '✉ メールで送付', exact: true}).click();
+  await (await openMore(page)).getByRole('button', {name: '✉ メールで送付', exact: true}).click();
   const mdlg = page.getByRole('dialog', {name: 'メールで送付（Excel）'});
   assert.deepEqual((await checks(mdlg)).map(([, c]) => c), [false, false, false, false, true]);
   await mdlg.getByRole('checkbox', {name: /^住宅改修申請書/}).check();
@@ -135,7 +136,7 @@ async function finish(page, dlg, retry) {
       window.__clip = t;
     };
   });
-  await page.getByRole('button', {name: '✉ メールで送付', exact: true}).click();
+  await (await openMore(page)).getByRole('button', {name: '✉ メールで送付', exact: true}).click();
   const mdlg = page.getByRole('dialog', {name: 'メールで送付（Excel）'});
   assert.deepEqual((await checks(mdlg)).map(([, c]) => c), [true, false, false, false, false]);
   await mdlg.getByRole('checkbox', {name: /^理由書/}).check();
@@ -162,7 +163,7 @@ async function finish(page, dlg, retry) {
   const names = [];
   page.on('download', (d) => names.push(d.suggestedFilename()));
   await page.evaluate(() => delete window.__shared);
-  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).click();
+  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).first().click();
   const xdlg = page.getByRole('dialog', {name: 'Excelで保存'});
   await xdlg.getByRole('checkbox', {name: /^理由書/}).check();
   await xdlg.getByRole('button', {name: '📗 2つ保存する'}).click();
@@ -173,7 +174,7 @@ async function finish(page, dlg, retry) {
   assert.deepEqual(names, []); // 続けて保存（ダウンロード）はしない
   await page.getByText('2つのファイルを渡しました').waitFor();
   // 1つだけなら今までどおり保存（ダウンロード）
-  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).click();
+  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).first().click();
   await xdlg.getByRole('button', {name: '📗 1つ保存する'}).click();
   await page.waitForFunction(() => !document.querySelector('[role="dialog"]'), null, {timeout: 30000});
   await page.waitForTimeout(600);
@@ -184,7 +185,7 @@ async function finish(page, dlg, retry) {
     navigator.canShare = undefined;
   });
   names.length = 0;
-  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).click();
+  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).first().click();
   await xdlg.getByRole('checkbox', {name: /^理由書/}).check();
   await xdlg.getByRole('button', {name: '📗 2つ保存する'}).click();
   const each = xdlg.getByRole('group', {name: '1つずつ保存'});

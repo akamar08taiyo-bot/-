@@ -9,6 +9,7 @@
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import {navItem, openMore} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -114,40 +115,33 @@ const page = await newPage(ctx, `${site}/jutaku-mitsumori/index.html`, '見積�
 await page.getByRole('heading', {name: '＋ 新規作成'}).waitFor();
 await seed(page);
 await page.reload();
-const nav = page.getByRole('navigation');
-const tabBtn = (name) => nav.getByRole('button', {name});
-const trashTab = tabBtn(/ゴミ箱/);
-await trashTab.waitFor();
+const nav = page.getByRole('navigation', {name: '画面'});
+// 画面の切り替えは「📝 見積もり・申請書を作成する」と右の隅の「☰ メニュー ▼」（ユーザーの指示「売上見込みを確認する、工務店請求書、部材・施工費マスタ、設定、ゴミ箱は、
+// プルダウンにして右隅におく」2026-11-03。前は帯に6つのタブ）
+const tabBtn = (name) => navItem(page, name);
+const menuItem = (name) => nav.getByRole('menu', {name: 'メニュー', includeHidden: true}).getByRole('button', {name, includeHidden: true});
+// ゴミ箱の件数（メニューの「🗑 ゴミ箱」と、メニューのボタンの「🗑 N」）
+const trashNum = async () => (await menuItem(/ゴミ箱/).textContent()).replace(/\D/g, '');
+const trashTab = {click: async () => (await tabBtn(/ゴミ箱/)).click()};
+await nav.getByRole('button', {name: /^☰ メニュー/}).waitFor();
 
-// ---------------- 上のタブ：6つ（見積もりの右に売上見込み・その右に工務店請求書＝ユーザーの指示 2026-10-27、設定の右にゴミ箱）・大きさ・選んでいるタブ・広い画面で1段・タブを替えても動かない
-const tabNames = await nav.getByRole('button').allInnerTexts();
-assert.deepEqual(
-  tabNames.map((t) => t.trim()),
-  ['📝 見積もり・申請書を作成する', '📈 売上見込みを確認する', '🧾 工務店請求書を確認する', '📦 部材・施工費マスタ', '⚙ 設定', '🗑 ゴミ箱'],
-);
-const tabBoxes = async () => nav.getByRole('button').evaluateAll((els) => els.map((e) => {
-  const r = e.getBoundingClientRect();
-  return {x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height), font: parseFloat(getComputedStyle(e).fontSize)};
-}));
-const first = await tabBoxes();
-assert.ok(first.every((b) => b.y === first[0].y), `1段に並んでいない: ${JSON.stringify(first)}`);
-assert.ok(first.every((b) => b.h >= 48 && b.font >= 16), `タブが小さい: ${JSON.stringify(first)}`);
+// ---------------- 上の帯：見積もり・申請書を作成する（様邸を開いていないとき）と ☰ メニュー（6つの画面）・大きさ・選んでいる画面・切り替えても動かない
+const menuNames = await nav.getByRole('menu', {name: 'メニュー', includeHidden: true}).getByRole('button', {includeHidden: true}).evaluateAll((els) => els.map((e) => e.textContent.trim().replace(/\d+$/, '')));
+assert.deepEqual(menuNames, ['📝 見積もり・申請書を作成する', '📈 売上見込みを確認する', '🧾 工務店請求書を確認する', '📦 部材・施工費マスタ', '⚙ 設定', '🗑 ゴミ箱']);
+const homeTab = nav.getByRole('button', {name: '📝 見積もり・申請書を作成する'}).filter({visible: true});
+const homeBox = await homeTab.boundingBox();
+assert.ok(homeBox.height >= 48, `タブが小さい: ${JSON.stringify(homeBox)}`);
 for (const name of ['🧾 工務店請求書を確認する', '📈 売上見込みを確認する', '📦 部材・施工費マスタ', '⚙ 設定', '🗑 ゴミ箱', '📝 見積もり・申請書を作成する']) {
-  await tabBtn(name).click();
-  assert.equal(await tabBtn(name).getAttribute('aria-current'), 'page');
-  assert.equal(await nav.locator('[aria-current=page]').count(), 1);
-  await page.waitForTimeout(250); // 色が変わり終わるまで（transition）
-  // 選んでいるタブは下の画面と同じ色（明るい地）、ほかは暗い地の上の白い字
-  const [on, off] = await Promise.all([
-    tabBtn(name).evaluate((e) => getComputedStyle(e).color),
-    nav.locator('button:not([aria-current])').first().evaluate((e) => getComputedStyle(e).color),
-  ]);
-  assert.notEqual(on, off);
-  assert.deepEqual((await tabBoxes()).map((b) => b.x), first.map((b) => b.x), `${name}：タブの位置が動いた`);
+  await (await tabBtn(name)).click();
+  // 開いている画面は帯にタブで出る（明るい地＝下の画面と同じ色）
+  const cur = nav.locator('button[aria-current=page]').filter({visible: true});
+  assert.equal(await cur.count(), 1, name);
+  assert.equal((await cur.textContent()).trim(), name);
+  assert.deepEqual((await homeTab.boundingBox()).x, homeBox.x, `${name}：タブの位置が動いた`);
   await noOverflow(page, name);
 }
 await page.screenshot({path: path.join(outDir, 'trash-01-tabs-1366.png'), clip: {x: 0, y: 0, width: 1366, height: 200}});
-log('上のタブ（6つ・大きさ・選んでいるタブ・1段・動かない）OK');
+log('上の帯（見積もり・申請書を作成する・☰ メニュー・選んでいる画面・動かない）OK');
 
 // もう1つのアプリ（請求書のタブ）を開いたままにしておく（ゴミ箱に移すと、こちらの一覧からも消える）
 const inv = await newPage(ctx, `${site}/sasaoka/index.html`, '請求書');
@@ -186,7 +180,7 @@ assert.equal(asked.pop(), '見本一様邸をゴミ箱に移しますか？');
 await page.locator('[aria-live] > div', {hasText: 'ゴミ箱に移しました'}).waitFor();
 assert.equal(await rows.count(), 3);
 assert.equal(await row('見本一様邸').count(), 0);
-assert.equal((await trashTab.innerText()).replace(/\s+/g, ' ').trim(), '🗑 ゴミ箱 1');
+assert.equal(await trashNum(), '1');
 // 開いたままの請求書のアプリからも消える
 await inv.getByRole('cell', {name: '見本一様邸', exact: true}).waitFor({state: 'detached'});
 assert.equal(await inv.locator('tbody tr', {hasText: '見本'}).count(), 3);
@@ -195,7 +189,7 @@ await page.locator('body').click({position: {x: 5, y: 600}});
 await page.keyboard.press('Control+z');
 await row('見本一様邸').waitFor();
 assert.equal(await rows.count(), 4);
-assert.equal((await trashTab.innerText()).trim(), '🗑 ゴミ箱');
+assert.equal(await trashNum(), '');
 await row('見本一様邸').getByRole('button', {name: '削除', exact: true}).click();
 assert.equal(await rows.count(), 3);
 log('一覧の行の削除 → ゴミ箱（確かめ・キャンセル・Ctrl+Z・開いたままの請求書からも消える）OK');
@@ -217,15 +211,15 @@ assert.equal(asked.pop(), '2件をゴミ箱に移しますか？');
 await page.locator('[aria-live] > div', {hasText: '2件をゴミ箱に移しました'}).waitFor();
 assert.equal(await bar.count(), 0);
 assert.deepEqual((await rows.allInnerTexts()).map((t) => /見本./.exec(t)?.[0]), ['見本四']);
-assert.equal((await trashTab.innerText()).replace(/\s+/g, ' ').trim(), '🗑 ゴミ箱 3');
+assert.equal(await trashNum(), '3');
 // 探す（すべての月）にも出ない
 await page.getByRole('textbox', {name: '見積書を探す'}).fill('見本');
 assert.equal(await rows.count(), 1);
 await page.getByRole('textbox', {name: '見積書を探す'}).fill('');
 // 件数（最初の画面の「全部で」）・請求書のタブ（一覧・印刷）にも出ない
-await tabBtn('📝 見積もり・申請書を作成する').click();
+await (await tabBtn('📝 見積もり・申請書を作成する')).click();
 assert.match(await page.locator('main').innerText(), /全部で 1件/);
-await tabBtn('🧾 工務店請求書を確認する').click();
+await (await tabBtn('🧾 工務店請求書を確認する')).click();
 await page.getByRole('cell', {name: '見本四様邸', exact: true}).waitFor();
 // 請求書の印刷・CSV のボタンは上の段のまん中（ユーザーの指示「赤枠の部分を中央にもってくる」2026-10-27。前は右の端）
 // 1366px では左の月の欄にかぶらない所まで（まん中から 100px 以内）、広い画面（1920px）ではちょうどまん中
@@ -293,7 +287,7 @@ await page.getByRole('button', {name: '見本二様邸を元に戻す'}).click()
 await page.locator('[aria-live] > div', {hasText: '見本二様邸を元に戻しました'}).waitFor();
 await page.getByRole('heading', {name: '🗑 ゴミ箱（2件）'}).waitFor();
 await inv.getByRole('cell', {name: '見本二様邸', exact: true}).waitFor(); // 開いたままの請求書のアプリにも戻る
-await tabBtn('📝 見積もり・申請書を作成する').click();
+await (await tabBtn('📝 見積もり・申請書を作成する')).click();
 assert.match(await page.locator('main').innerText(), /全部で 2件/);
 await trashTab.click();
 log('元に戻すOK');
@@ -312,7 +306,7 @@ await page.getByRole('checkbox', {name: 'すべて選ぶ'}).check();
 await page.getByRole('status', {name: '選んだ様邸'}).getByRole('button', {name: '完全に削除'}).click();
 assert.equal(asked.pop(), '1件を完全に削除しますか？元に戻せません');
 await page.getByText('ゴミ箱は空です').waitFor();
-assert.equal((await trashTab.innerText()).trim(), '🗑 ゴミ箱');
+assert.equal(await trashNum(), '');
 // 完全に削除した様邸の写真は、保存できたあとに消える
 await page.waitForFunction(
   () =>
@@ -335,7 +329,7 @@ log('行の完全に削除・チェックしてまとめて完全に削除（確
 await page.waitForTimeout(1200);
 await page.reload();
 await page.getByText('ゴミ箱は空です').waitFor();
-await tabBtn('📝 見積もり・申請書を作成する').click();
+await (await tabBtn('📝 見積もり・申請書を作成する')).click();
 assert.match(await page.locator('main').innerText(), /全部で 2件/);
 await page.getByRole('button', {name: '📋 見積書の一覧を開く'}).click();
 await row('見本四様邸').waitFor();
@@ -345,11 +339,11 @@ log('読み直しても（ゴミ箱は空・一覧は2件）OK');
 // ---------------- 見積書の画面の「削除」・請求書の様邸の「削除」もゴミ箱へ
 await row('見本四様邸').getByRole('cell', {name: '見本四様邸'}).click();
 await page.getByRole('heading', {level: 1, name: '見本四様邸'}).waitFor();
-await page.getByRole('button', {name: '削除', exact: true}).click();
+await (await openMore(page)).getByRole('button', {name: '削除', exact: true}).click();
 assert.equal(asked.pop(), '見本四様邸をゴミ箱に移しますか？');
 await row('見本二様邸').waitFor();
 assert.equal(await rows.count(), 1);
-await tabBtn('🧾 工務店請求書を確認する').click();
+await (await tabBtn('🧾 工務店請求書を確認する')).click();
 await page.getByRole('cell', {name: '見本二様邸', exact: true}).click();
 await page.getByRole('heading', {level: 1, name: '見本二様邸'}).waitFor();
 await page.getByRole('button', {name: '削除', exact: true}).first().click(); // 上の段の様邸の削除（箇所の「削除」より前）
@@ -365,15 +359,16 @@ const sp = await newPage(phone, `${site}/jutaku-mitsumori/index.html`, 'スマ�
 await sp.getByRole('heading', {name: '＋ 新規作成'}).waitFor();
 await seed(sp);
 await sp.reload();
-const spNav = sp.getByRole('navigation');
-await spNav.getByRole('button', {name: /ゴミ箱/}).waitFor();
+const spNav = sp.getByRole('navigation', {name: '画面'});
+await spNav.getByRole('button', {name: /^☰ メニュー/}).waitFor();
+// 帯は1段（見積もり・申請書を作成する・☰ メニュー）
 const rowsOf = async () => {
-  const ys = await spNav.getByRole('button').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().y)));
+  const ys = await spNav.getByRole('button').filter({visible: true}).evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().y)));
   return [...new Set(ys)].length;
 };
-assert.equal(await rowsOf(), 4);
+assert.equal(await rowsOf(), 1);
 for (const name of ['🧾 工務店請求書を確認する', '📈 売上見込みを確認する', '📦 部材・施工費マスタ', '⚙ 設定', '🗑 ゴミ箱', '📝 見積もり・申請書を作成する']) {
-  await spNav.getByRole('button', {name}).click();
+  await (await navItem(sp, name)).click();
   await sp.waitForTimeout(250);
   await noOverflow(sp, `スマホ ${name}`);
 }
@@ -384,7 +379,7 @@ await sp.getByRole('row', {name: /見本三様邸/}).getByRole('checkbox', {name
 await noOverflow(sp, 'スマホ 一覧の選んだ帯');
 await sp.screenshot({path: path.join(outDir, 'trash-05-list-bar-390.png')});
 await sp.getByRole('status', {name: '選んだ見積書'}).getByRole('button', {name: '削除する'}).click();
-await spNav.getByRole('button', {name: /ゴミ箱/}).click();
+await (await navItem(sp, /ゴミ箱/)).click();
 await sp.getByRole('heading', {name: '🗑 ゴミ箱（2件）'}).waitFor();
 await sp.getByRole('checkbox', {name: '見本二様邸を選ぶ'}).check();
 await noOverflow(sp, 'スマホ ゴミ箱');

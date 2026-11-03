@@ -4,6 +4,7 @@ const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_
 import assert from 'node:assert/strict';
 import {readFileSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
+import {navItem} from './more.mjs';
 
 const [url, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -61,14 +62,14 @@ await page.getByRole('button', {name: '✕ 閉じる'}).click();
 log('請求書の所長名・担当OK');
 
 // 担当の候補を書き換える（改行を打って足せること）→ 様邸の画面で選べる
-await page.getByRole('navigation').getByRole('button', {name: '設定'}).click();
+await (await navItem(page, '設定')).click();
 const staffArea = page.getByRole('textbox', {name: '担当者の名前'});
 await staffArea.click();
 await staffArea.press('Control+End');
 await staffArea.press('Enter');
 await staffArea.pressSequentially('山本');
 assert.equal(await staffArea.inputValue(), '久保 匠史\n土居 翔太\n宮村 茉莉花\n信田 裕太\n藤田 知美\n山本');
-await page.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click();
+await (await navItem(page, /請求書を確認する/)).click();
 await page.getByRole('cell', {name: '（サンプル）山田様邸', exact: true}).click();
 const staffSelect = page.locator('label', {hasText: '担当'}).locator('select');
 assert.deepEqual(await staffSelect.locator('option').allInnerTexts(), ['（選ぶ）', '久保 匠史', '土居 翔太', '宮村 茉莉花', '信田 裕太', '藤田 知美', '山本']);
@@ -80,17 +81,17 @@ assert.ok(!jobDoc.includes('翔太'), jobDoc);
 assert.ok(jobDoc.includes('所長 久保 匠史'), jobDoc);
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
 await staffSelect.selectOption('久保 匠史');
-await page.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click(); // 様邸の画面の左上は「← 見積もりへ戻る」。一覧へはタブで戻る
+await (await navItem(page, /請求書を確認する/)).click(); // 様邸の画面の左上は「← 見積もりへ戻る」。一覧へはタブで戻る
 log('担当の候補の追加・様邸の明細の担当OK');
 
 // 設定：請求書の担当者・振込先・1か月で1回計算
-await page.getByRole('navigation').getByRole('button', {name: '設定'}).click();
+await (await navItem(page, '設定')).click();
 await page.locator('label', {hasText: '請求書の担当者'}).locator('input').fill('山本');
 await page.locator('label', {hasText: 'お振込先'}).locator('input').fill('○○銀行 行橋支店 普通 1234567 タイヨウシルバーサービス（カ');
 await page.locator('label', {hasText: '請求書（1か月分）の消費税'}).locator('select').selectOption('monthly');
 await page.locator('label', {hasText: '⑤消費税の1円未満'}).locator('select').selectOption('floor');
 await page.screenshot({path: path.join(outDir, '21-settings.png'), fullPage: true});
-await page.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click();
+await (await navItem(page, /請求書を確認する/)).click();
 const foot = await page.getByText(/ご請求金額（税込）/).innerText();
 // 切り捨て：⑤ floor(2,011.9)=2,011 → 1か月で1回：20,119×0.1=2,011.9 → 2,011、合計 22,130
 assert.ok(foot.includes('22,130'), foot);
@@ -107,7 +108,7 @@ assert.ok(doc.includes('お振込先'));
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
 
 // バックアップ → 別のブラウザ（空のデータ）に読み込む
-await page.getByRole('navigation').getByRole('button', {name: '設定'}).click();
+await (await navItem(page, '設定')).click();
 const [bk] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: 'バックアップを保存（すべて）'}).click()]);
 const bkPath = path.join(outDir, 'backup.json');
 await bk.saveAs(bkPath);
@@ -122,11 +123,11 @@ const ctx2 = await browser.newContext({viewport: {width: 1366, height: 900}, loc
 const p2 = await ctx2.newPage();
 watch(p2);
 await p2.goto(url);
-await p2.getByRole('navigation').getByRole('button', {name: '設定'}).click();
+await (await navItem(p2, '設定')).click();
 await p2.locator('input[type=file][accept*=json]').setInputFiles(bkPath);
 await p2.getByText(/部材 5件・取付手間 17件・様邸（見積書）1件・部材＋施工費（常用） 2件・設定/).waitFor();
 await p2.getByRole('button', {name: '今のデータを置き換える'}).click();
-await p2.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click();
+await (await navItem(p2, /請求書を確認する/)).click();
 await p2.getByRole('cell', {name: '（サンプル）山田様邸', exact: true}).waitFor();
 log('別のブラウザにバックアップを読み込めたOK');
 
@@ -139,7 +140,7 @@ for (const [w, h, name] of [
   await p2.getByRole('cell', {name: '（サンプル）山田様邸', exact: true}).click();
   await p2.waitForTimeout(300);
   await p2.screenshot({path: path.join(outDir, name), fullPage: true});
-  await p2.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click(); // 様邸の画面の左上は「← 見積もりへ戻る」。一覧へはタブで戻る
+  await (await navItem(p2, /請求書を確認する/)).click(); // 様邸の画面の左上は「← 見積もりへ戻る」。一覧へはタブで戻る
 }
 log('狭い画面のスクリーンショットOK');
 
@@ -183,12 +184,12 @@ const ctx3 = await browser.newContext({viewport: {width: 1366, height: 900}, loc
 const p4 = await ctx3.newPage();
 watch(p4);
 await p4.goto(url);
-await p4.getByRole('navigation').getByRole('button', {name: '設定'}).click();
+await (await navItem(p4, '設定')).click();
 await p4.locator('input[type=file][accept*=json]').setInputFiles(oldPath);
 await p4.getByRole('button', {name: '今のデータを置き換える'}).click();
 await p4.waitForTimeout(1200);
 await p4.reload();
-await p4.getByRole('navigation').getByRole('button', {name: '設定'}).click();
+await (await navItem(p4, '設定')).click();
 await p4.waitForTimeout(500);
 const [bk2] = await Promise.all([p4.waitForEvent('download'), p4.getByRole('button', {name: 'バックアップを保存（すべて）'}).click()]);
 const fixed = JSON.parse(readFileSync(await bk2.path(), 'utf8'));

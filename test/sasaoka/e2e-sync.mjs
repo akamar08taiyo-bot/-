@@ -6,6 +6,7 @@
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import {navItem} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -61,8 +62,8 @@ await est.getByPlaceholder('例：山田').fill('同時 一郎');
 await est.locator('[data-edit="new:text"]').first().click();
 await est.keyboard.type('取付金具');
 await est.keyboard.press('Enter');
-await est.getByLabel('笹岡工務店の請求書に入れる').waitFor();
-assert.equal(await est.getByLabel('笹岡工務店の請求書に入れる').isChecked(), true);
+await est.getByLabel('工務店の請求書に入れる').waitFor();
+assert.equal(await est.getByLabel('工務店の請求書に入れる').isChecked(), true);
 const memo = shi.locator('label', {hasText: '備考（任意・明細に印刷されます）'}).locator('input');
 await memo.fill('同時に保存した備考');
 await est.waitForTimeout(1500);
@@ -84,11 +85,11 @@ await shi.screenshot({path: path.join(outDir, '60-sync-shikiri.png'), fullPage: 
 log('ほぼ同時に保存しても両方残るOK');
 
 // ---------------- 新しい見積書（同時 一郎）は、行を入れたときに仕切り計算の一覧に入る。「請求書に入れる」を外すと一覧の ☐ になる
-await shi.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click(); // 様邸の画面の左上は「← 見積もりへ戻る」。一覧へはタブで戻る
+await (await navItem(shi, /請求書を確認する/)).click(); // 様邸の画面の左上は「← 見積もりへ戻る」。一覧へはタブで戻る
 await shi.getByRole('cell', {name: '同時 一郎様邸', exact: true}).waitFor();
 assert.equal(await shi.getByRole('cell', {name: '（サンプル）山田様邸', exact: true}).count(), 1);
 await est.getByRole('cell', {name: /同時 一郎/}).click();
-await est.getByLabel('笹岡工務店の請求書に入れる').uncheck();
+await est.getByLabel('工務店の請求書に入れる').uncheck();
 // 一覧には ☐ で残る（見積書のある様邸。☑ で請求書に戻せる・次月に回せる。2026-10-25）。☑ は1件に
 const box = shi.getByRole('checkbox', {name: '同時 一郎様邸を請求書に入れる'});
 await shi.waitForFunction(() => document.querySelectorAll('main tbody input[type=checkbox]:checked').length === 1, null, {timeout: 5000});

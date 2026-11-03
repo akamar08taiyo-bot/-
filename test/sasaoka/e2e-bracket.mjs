@@ -6,6 +6,7 @@
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import {cellAt, navItem, openMore} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -20,7 +21,7 @@ page.on('dialog', (d) => d.accept());
 await page.goto(`${site}/jutaku-mitsumori/index.html`);
 
 // ---------------- 部材リスト：マツ六の手すりと中間のブラケット（価格は架空）
-await page.getByRole('navigation').getByRole('button', {name: '📦 部材・施工費マスタ'}).click();
+await (await navItem(page, '📦 部材・施工費マスタ')).click();
 await page.getByRole('button', {name: /メーカーの仕切り表を取り込む/}).click();
 const csv = '品番,品名,定価,仕切単価\nBD-134,BAUHAUS 35アッシュ丸棒 ディンプル付 Mオーク 4m,10000,6000\nBD-01G,35ブラケット横型カバー付 ゴールド,1000,600\n';
 await page.locator('[role=dialog] input[type=file]').setInputFiles({name: 'mazroc.csv', mimeType: 'text/csv', buffer: Buffer.from(csv)});
@@ -30,7 +31,7 @@ await page.getByText('新しく 2件').waitFor();
 log('部材リスト OK');
 
 // ---------------- 申請書：廊下の手すりの長さ L=600×1800（L字）
-await page.getByRole('navigation').getByRole('button', {name: '📝 見積もり・申請書を作成する'}).click();
+await (await navItem(page, '📝 見積もり・申請書を作成する')).click();
 await page.getByRole('region', {name: '新規作成'}).getByRole('button', {name: '＋ 行橋市', exact: true}).click();
 const form = page.getByRole('form', {name: '申請書'});
 await form.waitFor();
@@ -49,7 +50,7 @@ await sheet.waitFor();
 const tds = async (text) => (await sheet.locator('.form-page tr', {hasText: text}).first().locator('td').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
 const midRows = () => sheet.locator('.form-page tr', {hasText: 'BD-01G'});
 const textKey = await sheet.locator('.form-page tr', {hasText: '廊下'}).first().locator('[data-edit$=":text"]').first().getAttribute('data-edit');
-await sheet.locator(`[data-edit="${textKey}"]`).click();
+await cellAt(sheet.locator(`[data-edit="${textKey}"]`)).click();
 await page.keyboard.type('BD-134');
 await page.getByRole('listbox', {name: '候補'}).getByRole('option').first().waitFor();
 await page.keyboard.press('ArrowDown');
@@ -80,7 +81,7 @@ assert.ok((await tds('BD-01G')).join('|').includes('|1||800|800|'), (await tds('
 log('申請書の長さ 2400 → 2個・900 → 外れる・600×1800 → 1個 OK');
 
 // ---------------- 発注書にも BD-01G の数（手すりは 4000mm 1本）
-await page.getByRole('button', {name: '🛒 発注書を作成'}).click();
+await (await openMore(page)).getByRole('button', {name: '🛒 発注書を作成'}).click();
 const list = page.getByRole('region', {name: '発注する部材'});
 await list.waitFor();
 const items = (await list.locator('ol > li').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());

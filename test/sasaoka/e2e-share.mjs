@@ -8,6 +8,7 @@
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import {navItem, openMore} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -82,7 +83,7 @@ await p.evaluate(() => {
     window.__clip = t;
   };
 });
-await p.getByRole('button', {name: '✉ メールで送付', exact: true}).click();
+await (await openMore(p)).getByRole('button', {name: '✉ メールで送付', exact: true}).click();
 const mdlg = p.getByRole('dialog', {name: 'メールで送付（Excel）'});
 const data = mdlg.getByRole('group', {name: '様邸のデータ'}).getByRole('checkbox');
 assert.equal(await data.isChecked(), false); // 初めは付けない
@@ -159,7 +160,7 @@ await p.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
 await pcForm.getByLabel('被保険者氏名').fill('見本 七郎（直した）');
 await p.waitForTimeout(1200);
 await p.getByRole('button', {name: '← 一覧へ戻る'}).click();
-await p.getByRole('navigation').getByRole('button', {name: '📝 見積もり・申請書を作成する'}).click();
+await (await navItem(p, '📝 見積もり・申請書を作成する')).click();
 await p.getByRole('region', {name: '一覧から作成'}).getByRole('button', {name: '申請書・見積書・理由書を取り込む'}).waitFor();
 await p.locator('input[aria-label="取り込むファイル"]').setInputFiles([file]);
 await idlg.waitFor();

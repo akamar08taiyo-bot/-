@@ -10,6 +10,7 @@
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import {navItem} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -150,7 +151,7 @@ log('請求書の一覧：〇〇様邸と ☑・☐ で合計と印刷から外�
 // 様邸の名前を押すと様邸の画面（詳細）
 await nameCell('見本一様邸').click();
 await page.getByRole('heading', {level: 1, name: '見本一様邸'}).waitFor();
-await nav.getByRole('button', {name: /請求書を確認する/}).click();
+await (await navItem(page, /請求書を確認する/)).click();
 await nameCell('見本一様邸').waitFor();
 
 // 「次月へ」→ 次の月の請求書に（☑ のまま）
@@ -164,7 +165,7 @@ await nameCell('見本二様邸').waitFor();
 log('「次月へ」で次の月の請求書へOK');
 
 // ---------------- 売上見込み：住宅改修と特定福祉用具を別々に
-await nav.getByRole('button', {name: '📈 売上見込みを確認する'}).click();
+await (await navItem(page, '📈 売上見込みを確認する')).click();
 const jutaku = page.getByRole('region', {name: '住宅改修', exact: true});
 const tokutei = page.getByRole('region', {name: '特定福祉用具', exact: true});
 await jutaku.getByRole('button', {name: /見本二様邸/}).waitFor();
@@ -239,17 +240,17 @@ log('☑ して次月に回すOK');
 // 読み直しても残る（住宅改修は様邸に、特定福祉用具はこのアプリの設定に覚える）
 await page.waitForTimeout(1200);
 await page.reload();
-await nav.getByRole('button', {name: '📈 売上見込みを確認する'}).click();
+await (await navItem(page, '📈 売上見込みを確認する')).click();
 await page.getByRole('button', {name: '次の月'}).click();
 await jutaku.getByRole('button', {name: /見本二様邸/}).waitFor();
 await tokutei.getByRole('button', {name: /見本 花子様/}).waitFor({timeout: 20000});
 // 請求する月は変わらない（見本二は今月の請求書のまま）
-await nav.getByRole('button', {name: /請求書を確認する/}).click();
+await (await navItem(page, /請求書を確認する/)).click();
 await nameCell('見本二様邸').waitFor();
 log('読み直しても次月に回したまま・請求する月は変わらないOK');
 
 // 特定福祉用具の行を押すと、特定福祉用具のアプリでその案件を開く（新しいタブ）
-await nav.getByRole('button', {name: '📈 売上見込みを確認する'}).click(); // 売上見込みの月は次の月のまま
+await (await navItem(page, '📈 売上見込みを確認する')).click(); // 売上見込みの月は次の月のまま
 const [popup] = await Promise.all([ctx.waitForEvent('page'), tokutei.getByRole('button', {name: /見本 花子様/}).click()]);
 watch(popup, '特定福祉用具');
 await popup.waitForLoadState();
@@ -271,7 +272,7 @@ await sp.reload();
 await sp.getByRole('cell', {name: '見本二様邸', exact: true}).waitFor();
 await noOverflow(sp, 'スマホ 請求書の一覧');
 await sp.screenshot({path: path.join(outDir, 'sales-04-invoice-390.png'), fullPage: true});
-await sp.getByRole('navigation').getByRole('button', {name: '📈 売上見込みを確認する'}).click();
+await (await navItem(sp, '📈 売上見込みを確認する')).click();
 await sp.getByRole('region', {name: '特定福祉用具', exact: true}).getByRole('button', {name: /見本 花子様/}).waitFor({timeout: 20000});
 // 名前は1行（金額は次の行へ回る）
 for (const h of await sp.locator('section li button').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height))) assert.ok(h < 30, `名前が折り返している（高さ ${h}）`);

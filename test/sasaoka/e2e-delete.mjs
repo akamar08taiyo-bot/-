@@ -10,6 +10,7 @@
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import {closeMore, navItem, openMore} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -41,10 +42,12 @@ await page.waitForTimeout(800);
 // 住宅改修の3つのタブ：白い「削除」
 for (const tab of ['📝 住宅改修申請書', '📋 工事見積書', '📄 理由書']) {
   await page.getByRole('tab', {name: tab}).click();
-  const del = page.getByRole('button', {name: '削除', exact: true});
+  // 上の段の「その他 ▼」の中のいちばん最後（2026-11-03 からプルダウン）
+  const del = (await openMore(page)).getByRole('button', {name: '削除', exact: true});
   await del.waitFor();
   assert.equal(await del.count(), 1, tab);
   assert.equal(await bg(del), WHITE, tab);
+  await closeMore(page);
 }
 log('住宅改修申請書・工事見積書・理由書に白い「削除」OK');
 
@@ -53,18 +56,20 @@ log('住宅改修申請書・工事見積書・理由書に白い「削除」OK'
 if (withTokutei) {
   const frame = page.frameLocator('iframe[title="特定福祉用具 購入申請書・見積もり作成"]');
   // 削除は上の段のいちばん最後（そのほかの機能の終わり。2026-11-02）
-  const del = page.getByRole('group', {name: 'そのほかの機能'}).getByRole('button', {name: '削除', exact: true});
+  const del = page.getByRole('menu', {name: 'その他'}).getByRole('button', {name: '削除', exact: true});
   for (const tab of ['🛁 特定福祉用具申請書', '🏷 販売見積書']) {
     await page.getByRole('tab', {name: tab}).click();
     await page.getByRole('tab', {name: tab, selected: true}).waitFor();
+    await openMore(page);
     await del.waitFor();
     assert.equal(await bg(del), WHITE, tab);
     await frame.getByLabel('商品名').first().waitFor({timeout: 15000});
     assert.equal(await frame.getByRole('button', {name: '削除', exact: true}).count(), 0, tab);
     assert.equal(await frame.getByRole('group', {name: '保存・印刷'}).count(), 0, tab);
     // 2つのタブとも上の段の3段目（Excel・印刷・削除の真下）
-    const cat = page.getByRole('group', {name: 'そのほかの機能'}).getByRole('button', {name: '🖨 カタログを印刷'});
+    const cat = page.getByRole('menu', {name: 'その他'}).getByRole('button', {name: '🖨 カタログを印刷'});
     assert.match(await cat.getAttribute('class'), /bg-sky-50/, tab);
+    await closeMore(page);
     assert.equal(await frame.getByRole('button', {name: '📖 カタログを印刷'}).count(), 0, tab);
     assert.equal(await frame.getByRole('button', {name: '← 見積もりの一覧へ'}).count(), 0, tab);
     assert.equal(await frame.getByRole('button', {name: '👤 前のお客様から入れる'}).count(), 0, tab);
@@ -76,6 +81,7 @@ if (withTokutei) {
   // 販売見積書の「削除」→ 確かめ → 一覧ではなく、この様邸の新しい案件（名前は様邸から）
   await frame.getByLabel('商品名').first().fill('見本の杖');
   await page.waitForTimeout(800);
+  await openMore(page);
   await del.click();
   for (let i = 0; i < 50 && !asked.some((m) => m.includes('特定福祉用具')); i++) await page.waitForTimeout(100);
   assert.match(asked.at(-1), /特定福祉用具の見積もり・申請書を消します/);
@@ -88,11 +94,11 @@ if (withTokutei) {
 // 理由書のタブの「削除」→ 確かめてゴミ箱へ → 一覧に戻る
 await page.getByRole('tab', {name: '📄 理由書'}).click();
 await page.screenshot({path: path.join(outDir, 'delete-02-riyu.png')});
-await page.getByRole('button', {name: '削除', exact: true}).click();
+await (await openMore(page)).getByRole('button', {name: '削除', exact: true}).click();
 assert.equal(asked.at(-1), '見本 五郎様邸をゴミ箱に移しますか？');
 await page.waitForFunction(() => !location.hash.includes('job='));
 await page.locator('[aria-live] > div', {hasText: 'ゴミ箱に移しました'}).waitFor();
-assert.match(await page.getByRole('navigation').getByRole('button', {name: /ゴミ箱/}).innerText(), /1/);
+assert.match(await (await navItem(page, /ゴミ箱/)).innerText(), /1/);
 log('理由書の「削除」→ ゴミ箱 OK');
 
 await browser.close();

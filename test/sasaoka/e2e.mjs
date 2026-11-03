@@ -4,6 +4,7 @@
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import {navItem} from './more.mjs';
 
 const [url, outDir] = process.argv.slice(2);
 const FIX = path.join(path.dirname(new URL(import.meta.url).pathname), 'fixtures');
@@ -26,7 +27,7 @@ log('起動OK');
 await shot(page, '01-empty.png');
 
 // ---------------- 部材リスト：Excel の取り込み
-await page.getByRole('navigation').getByRole('button', {name: /部材・施工費マスタ/}).click();
+await (await navItem(page, /部材・施工費マスタ/)).click();
 await page.getByRole('button', {name: /メーカーの仕切り表を取り込む/}).click();
 await page.locator('input[type=file]').setInputFiles(path.join(FIX, 'maker-list.xlsx'));
 await page.getByRole('button', {name: '部材リストに取り込む（5件）'}).waitFor();
@@ -82,7 +83,7 @@ await page.locator('[role=dialog]').getByRole('button', {name: '閉じる'}).fir
 await shot(page, '05-materials.png');
 
 // ---------------- 様邸を作る：玄関（部材2種＋木2箇所）・トイレ（部材＋タイル1箇所）
-await page.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click();
+await (await navItem(page, /請求書を確認する/)).click();
 await page.getByRole('button', {name: '＋ 様邸を追加'}).click();
 await page.getByPlaceholder('例：山田').fill('田中');
 await page.locator('input[type=date]').first().fill('2026-10-03');
@@ -124,7 +125,7 @@ for (const v of ['8,920', '3,500', '624', '913', '1,395', '15,352', '13,957']) a
 await shot(page, '08-editor.png');
 
 // ---------------- 一覧・2件目（サンプル）・印刷
-await page.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click(); // 様邸の画面の左上は「← 見積もりへ戻る」。一覧へはタブで戻る
+await (await navItem(page, /請求書を確認する/)).click(); // 様邸の画面の左上は「← 見積もりへ戻る」。一覧へはタブで戻る
 const listText = await page.locator('table').first().innerText();
 assert.ok(listText.includes('田中様邸'));
 assert.ok(listText.includes('13,957'));
@@ -142,7 +143,7 @@ await page.getByRole('button', {name: '＋ 取付手間（箇所数を数える�
 await page.getByRole('button', {name: 'ウォシュレットの箇所数を1増やす', exact: true}).click();
 await page.getByRole('button', {name: 'ウォシュレット 部品代の箇所数を1増やす', exact: true}).click();
 await page.getByRole('button', {name: '数え終わったら閉じる'}).click();
-await page.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click(); // 様邸の画面の左上は「← 見積もりへ戻る」。一覧へはタブで戻る
+await (await navItem(page, /請求書を確認する/)).click(); // 様邸の画面の左上は「← 見積もりへ戻る」。一覧へはタブで戻る
 await shot(page, '09-list.png');
 
 await page.getByRole('button', {name: '🖨 請求書＋各様邸の明細'}).click();
@@ -161,12 +162,12 @@ await page.reload();
 await page.getByText('田中様邸').waitFor();
 const after = await page.locator('table').first().innerText();
 assert.ok(after.includes('佐藤様邸'));
-await page.getByRole('navigation').getByRole('button', {name: /部材・施工費マスタ/}).click();
+await (await navItem(page, /部材・施工費マスタ/)).click();
 assert.ok((await page.getByText('全11件').count()) === 1, '部材リストが11件残っていない');
 log('再読み込み後も保存されているOK');
 
 // サンプル（次の月）
-await page.getByRole('navigation').getByRole('button', {name: /請求書を確認する/}).click();
+await (await navItem(page, /請求書を確認する/)).click();
 await page.getByRole('button', {name: '次の月'}).click();
 await page.getByRole('button', {name: /サンプルで試す/}).click();
 await page.getByRole('cell', {name: '（サンプル）山田様邸', exact: true}).waitFor();
@@ -179,9 +180,9 @@ await shot(page, '12-sample-editor.png');
 await page.setViewportSize({width: 1920, height: 1000});
 const lefts = [];
 for (const name of [/見積もり・申請書を作成する/, /請求書を確認する/, /部材・施工費マスタ/, /設定/]) {
-  await page.getByRole('navigation').getByRole('button', {name}).click();
+  await (await navItem(page, name)).click();
   await page.waitForTimeout(300);
-  lefts.push(await page.evaluate(() => [document.querySelector('nav button'), document.querySelector('main')?.firstElementChild].map((el) => Math.round(el.getBoundingClientRect().left)).join(',')));
+  lefts.push(await page.evaluate(() => [document.querySelector('nav[aria-label="画面"]'), document.querySelector('main')?.firstElementChild].map((el) => Math.round(el.getBoundingClientRect().left)).join(',')));
 }
 assert.equal(new Set(lefts).size, 1, lefts.join(' / '));
 log('タブを切り替えても左右に動かないOK');

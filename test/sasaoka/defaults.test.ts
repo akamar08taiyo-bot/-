@@ -15,9 +15,9 @@ const withOffice = <T>(office: string | null, fn: () => T): T => {
   }
 };
 
-test('請求先（工務店）：行橋営業所は笹岡工務店、ほかの営業所は空。施工費の単価はどの営業所も同じ', () => {
-  assert.equal(withOffice('行橋営業所', defaultSettings).clientName, '笹岡工務店');
-  assert.equal(withOffice(null, defaultSettings).clientName, '笹岡工務店'); // ポータルから開いていない（行橋営業所として）
+test('請求先（工務店）：どの営業所も初めは空（画面は「工務店」。笹岡工務店にしたいときは設定で入れる。2026-11-03）。施工費の単価はどの営業所も同じ', () => {
+  assert.equal(withOffice('行橋営業所', defaultSettings).clientName, '');
+  assert.equal(withOffice(null, defaultSettings).clientName, ''); // ポータルから開いていない（行橋営業所として）
   const kokura = withOffice('小倉営業所', defaultSettings);
   assert.equal(kokura.clientName, '');
   assert.equal(kokura.officeName, '小倉営業所');

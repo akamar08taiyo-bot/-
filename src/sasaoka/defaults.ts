@@ -97,16 +97,16 @@ export function settingsForOffice(base: Settings, officeName: string): Settings 
  * 4：残りの担当者の候補もフルネームにした（宮村 → 宮村 茉莉花、信田 → 信田 裕太、藤田 → 藤田 知美）
  * 5：箇所の候補を写真の用紙の改修箇所の名前にした（前の候補のままなら新しい候補に。DEFAULT_PLACES）
  */
-export const SETTINGS_REV = 5;
+export const SETTINGS_REV = 6;
 /** 取付手間の見積の単価を直した版（2：踏台 木 を 2,000円に）。前に保存したマスタ・見積書の行を一度だけ直す（App.tsx） */
 export const LABOR_REV = 2;
 
 export function defaultSettings(): Settings {
   const office = portalOffice() || '行橋営業所';
   const base: Settings = {
-    // 請求先（工務店）は営業所ごとに設定で入れる。行橋営業所だけ初めから笹岡工務店（ほかの営業所は空。
-    // ユーザーの指示「笹岡工務店を使っているところ以外でも一緒にみんなが使えるようにしたいので、限定的になるのはやめて」2026-10-26）
-    clientName: office === '行橋営業所' ? '笹岡工務店' : '',
+    // 請求先（工務店）は設定で入れる（初めは空＝画面では「工務店」）。ユーザーの指示「笹岡工務店ではなく、笹岡に絞らず、工務店の請求書にいれるに変更。全て。
+    // 笹岡にしたかったら、設定の部分で工務店名を入力する」2026-11-03。前は行橋営業所だけ初めから笹岡工務店（2026-10-26）
+    clientName: '',
     company: '太陽シルバーサービス株式会社',
     officeName: '',
     manager: '',

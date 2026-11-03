@@ -14,12 +14,8 @@ import {isBlankRow} from './calc.ts';
 import {manualRow} from './rows.ts';
 import type {Place, RailType, Row} from './types.ts';
 
-/** 手すりの種類の選び方（申請書の手すりの取り付けの箇所） */
-export const RAIL_TYPES: {value: RailType; label: string}[] = [
-  {value: 'wood', label: '木手すり'},
-  {value: 'ready', label: '既製品（TOTO など）'},
-  {value: 'post', label: '屋外（支柱）'},
-];
+// 申請書の箇所の「手すりの種類」（木手すり・既製品（TOTO など）・屋外（支柱））の選ぶ欄は外した（ユーザーの指示「ここの木手すりの選択は不要」2026-11-03）。
+// 前に選んで保存した箇所（Place.rail）はそのまま使う。ほかは屋外で高さを入れたら屋外（支柱）、それ以外は木手すり
 
 /** 屋外の箇所の名前（「玄関～道路」「屋外・アプローチ」など） */
 export const OUTDOOR = /屋外|道路|アプローチ|庭|門|外構|駐車|ポーチ|外部/;

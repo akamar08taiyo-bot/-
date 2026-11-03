@@ -3,6 +3,6 @@
 
 /** 「📗 Excelで保存」を押して、書類を選ぶ画面の「📗 1つ保存する」などを押す（scope：ボタンを探す所。上の段の group など） */
 export async function excelSave(page, scope = page) {
-  await scope.getByRole('button', {name: '📗 Excelで保存', exact: true}).click();
+  await scope.getByRole('button', {name: '📗 Excelで保存', exact: true}).first().click();
   await page.getByRole('dialog', {name: 'Excelで保存'}).getByRole('button', {name: /^📗 \d+つ保存する$/}).click();
 }

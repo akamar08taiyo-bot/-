@@ -128,7 +128,7 @@ if (withTokutei) {
   await page.frame({url: /tokutei\/index\.html/})?.evaluate(() => {
     window.print = () => {};
   });
-  await page.getByRole('group', {name: '保存・印刷'}).getByRole('button', {name: '🖨 見積書を印刷'}).click();
+  await page.getByRole('group', {name: '保存・印刷'}).getByRole('button', {name: '🖨 見積書を印刷'}).first().click();
   await tk.locator('.print-overlay').waitFor();
   await page.screenshot({path: path.join(outDir, 'tokutei-1c-hanbai-print.png')});
   await tk.locator('.print-overlay').getByRole('button', {name: /閉じる/}).first().click();
@@ -179,7 +179,7 @@ if (withTokutei) {
   // 一括で保存できる機能をつける　チェック項目のみ一括で保存する」2026-10-26。「Excel で保存っていうので、一つに…デフォルトはその開いているページ…のみチェック」2026-10-30）。
   // 工事見積書は行がないので選べない。特定福祉用具は見えない枠で作る（ほかのタブからでも）
   await page.getByRole('tab', {name: '📄 理由書'}).click();
-  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).click();
+  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).first().click();
   const dlg = page.getByRole('dialog', {name: 'Excelで保存'});
   assert.equal(await dlg.getByRole('checkbox', {name: /^工事見積書/}).isDisabled(), true);
   assert.equal(await dlg.getByText('（見積書に行がありません）').count(), 1);
@@ -198,7 +198,7 @@ if (withTokutei) {
   assert.deepEqual(names.sort(), ['見本花子様特定福祉用具申請書.xlsx', '見本花子様住宅改修申請書.xlsx'].sort());
   assert.equal(await page.locator('iframe[title="特定福祉用具（まとめて保存）"]').count(), 0); // 見えない枠は消す
   // 次に開くと、また開いているタブ（理由書）だけ（前に選んだものは覚えない）
-  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).click();
+  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).first().click();
   assert.deepEqual(await boxes.evaluateAll((els) => els.map((e) => e.checked)), [false, false, false, false, true]);
   await dlg.getByRole('button', {name: 'やめる'}).click();
   log('Excelで保存（チェックしたものだけ・初めは開いているタブだけ）OK');
@@ -273,7 +273,7 @@ if (withTokutei) {
   const name2 = page.frameLocator('iframe[title="特定福祉用具 購入申請書・見積もり作成"]').locator('input[aria-label="お客様名"]').first();
   await name2.waitFor();
   // Excelで保存：何も入っていない住宅改修申請書は選べない（ユーザーの指示「全くの白紙の申請書や見積もりはチェックから外す」2026-10-26）
-  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).click();
+  await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).first().click();
   const dlg2 = page.getByRole('dialog', {name: 'Excelで保存'});
   assert.equal(await dlg2.getByRole('checkbox', {name: /^住宅改修申請書/}).isDisabled(), true);
   assert.equal(await dlg2.getByText('（何も入っていません）').count(), 1);

@@ -1,12 +1,13 @@
 // ドロップと貼り付けの分かりやすい枠を確かめる（ユーザーの指示「完了写真もドラッグ＆ドロップや貼付けしやすいようにする。介護保険証もそうです」2026-10-23。
 // 2026-10-29 に、ほかの確かめから分けた）：
-//   1. 様邸の画面の入口「🪪 介護保険証」：タブのすぐ右の点線の枠・「ここにドロップ・Ctrl+V」・ファイルを持ってくると薄い緑・重ねると「ここに離す」。枠の文字は「🪪 介護保険証」だけ
+//   1. 様邸の画面の入口「🪪 介護保険証」：上の段の右の端の点線の枠・「ここにドロップ・Ctrl+V」・ファイルを持ってくると薄い緑・重ねると「ここに離す」。枠の文字は「🪪 介護保険証」だけ
 //   2. 写真の枠：ファイルを持ってくると枠が薄い緑・重ねると「ここに離す」、空いた枠にドロップ、枠を選んで Ctrl+V（介護保険証の読み取りにはならない）・差し替え
 //   3. スマホ（390px）で横にはみ出さない（スクリーンショットを保存）
 // usage: node e2e-drop.mjs <サイトのURL> <出力フォルダ>
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import {navItem} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -28,13 +29,14 @@ await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
 const form = page.getByRole('form', {name: '申請書'});
 await form.waitFor();
 
-// ---------------- 1. 入口：タブのすぐ右の点線の枠「🪪 介護保険証」「ここにドロップ・Ctrl+V」
+// ---------------- 1. 入口：上の段の右の端の点線の枠「🪪 介護保険証」「ここにドロップ・Ctrl+V」
 const area = page.getByRole('button', {name: '🪪 介護保険証', exact: true});
 assert.match(await area.innerText(), /^\s*🪪 介護保険証\s*ここにドロップ・Ctrl\+V\s*$/);
 assert.equal(await area.evaluate((el) => getComputedStyle(el).borderStyle), 'dashed');
-const tablist = page.getByRole('tablist', {name: '住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書'});
-const [t, b] = [await tablist.boundingBox(), await area.boundingBox()];
-assert.ok(b.x >= t.x + t.width && b.x - (t.x + t.width) < 24 && Math.abs(b.y + b.height / 2 - (t.y + t.height / 2)) < 6, `タブのすぐ右 ${JSON.stringify({t, b})}`);
+// 2026-11-03 から、様邸のタブは上の帯（App.tsx の JobTabs）。枠は様邸の画面の上の段（保存・印刷・その他 ▼ の段）の右の端（JobHeader.tsx の extra）
+const more = page.getByRole('button', {name: /^その他 [▼▲]$/});
+const [t, b] = [await more.boundingBox(), await area.boundingBox()];
+assert.ok(b.x >= t.x + t.width && Math.abs(b.y + b.height / 2 - (t.y + t.height / 2)) < 8 && b.x + b.width > 1366 - 60, `上の段の右の端 ${JSON.stringify({t, b})}`);
 await page.screenshot({path: path.join(outDir, 'area-idle.png'), clip: {x: 0, y: 0, width: 1366, height: 260}});
 // ファイルを画面に持ってくると、落とせる所が薄い緑（重ねた所は「ここに離す」）
 const dragOver = (selector) =>
@@ -129,7 +131,7 @@ assert.ok((await page.evaluate(() => document.documentElement.scrollWidth)) <= 3
 assert.equal((await page.getByRole('button', {name: '🪪 介護保険証', exact: true}).innerText()).trim(), '🪪 介護保険証');
 await page.screenshot({path: path.join(outDir, 'phone-shinsei.png')});
 await page.getByRole('region', {name: '写真'}).screenshot({path: path.join(outDir, 'phone-photos.png')});
-await page.getByRole('navigation').getByRole('button', {name: /見積もり・申請書を作成する/}).click();
+await (await navItem(page, /見積もり・申請書を作成する/)).click();
 await page.getByRole('region', {name: '新規作成'}).waitFor();
 assert.ok((await page.evaluate(() => document.documentElement.scrollWidth)) <= 390, `入口 ${await page.evaluate(() => document.documentElement.scrollWidth)}`);
 await page.screenshot({path: path.join(outDir, 'phone-entry.png')});

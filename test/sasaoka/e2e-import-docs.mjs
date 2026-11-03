@@ -8,6 +8,7 @@ const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_
 import assert from 'node:assert/strict';
 import {mkdirSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
+import {navItem} from './more.mjs';
 
 const {importFiles} = await import('./importFixture.ts');
 const [site, outDir] = process.argv.slice(2);
@@ -81,7 +82,7 @@ assert.deepEqual(sums['試作 一郎'], ['2026-10', fx.otherTotal]);
 log('一覧（住改の印・見積書の合計）・受注残に渡すまとめ OK');
 
 // ---------------------------------------------------------------- 売上見込み
-await page.getByRole('navigation').getByRole('button', {name: '📈 売上見込みを確認する'}).click();
+await (await navItem(page, '📈 売上見込みを確認する')).click();
 await page.getByRole('textbox', {name: '売上の月'}).fill('2026-10');
 const plan = page.locator('main');
 await plan.getByText('見本様邸', {exact: true}).waitFor();
@@ -91,7 +92,7 @@ await page.screenshot({path: path.join(outDir, 'import-04-sales.png')});
 log('売上見込みに入る OK');
 
 // ---------------------------------------------------------------- 同じファイルをもう一度：取り込み済み
-await page.getByRole('navigation').getByRole('button', {name: '📝 見積もり・申請書を作成する'}).click();
+await (await navItem(page, '📝 見積もり・申請書を作成する')).click();
 // 取り込んだあとは一覧のまま（タブを押し直しても一覧）。一覧の上の段の「📥 取り込む」から
 await page.getByRole('button', {name: '📥 取り込む'}).waitFor();
 await page.locator('input[aria-label="取り込むファイル"]').setInputFiles(paths.slice(0, 4));

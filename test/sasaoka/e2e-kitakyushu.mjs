@@ -12,6 +12,7 @@ import path from 'node:path';
 import {strFromU8, unzipSync} from 'fflate';
 import {KK_CELLS} from '../../src/sasaoka/shinsei/kitakyushuCells.ts';
 import {excelSave} from './e2eDocs.mjs';
+import {navItem} from './more.mjs';
 
 const [site, outDir = 'e2e-out'] = process.argv.slice(2);
 mkdirSync(outDir, {recursive: true});
@@ -56,7 +57,7 @@ await page.waitForTimeout(800);
   await page.getByRole('combobox', {name: '保険者', exact: true}).selectOption('kitakyushu');
   await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '保険者番号');
   await area.selectOption('401091'); // 八幡西区
-  await page.locator('section', {has: page.getByRole('combobox', {name: '保険者', exact: true})}).first().screenshot({path: path.join(outDir, 'kitakyushu-0-area.png')});
+  await page.getByRole('group', {name: '保険者・保険者番号'}).screenshot({path: path.join(outDir, 'kitakyushu-0-area.png')});
   await area.selectOption('401067');
   await pageOf('事前届出書').waitFor();
 }
@@ -226,7 +227,8 @@ log('スマホの幅 OK');
 
 // ---------------- 郵便番号を入れると、住所が空なら住所（大字も）が入る（ユーザーの指示「郵便番号を入力したら住所がでる、福岡県行橋市大字流松（流末）」2026-10-29）。
 //   Enter で住所の欄へ移って番地を打つと、入った住所のうしろに続く。郵便番号を打ち直すと、手を加えていない住所は新しい番号の住所に
-await page.getByRole('button', {name: /見積もり・申請書を作成する/}).first().click();
+// 様邸を開いているときは、見積もり・申請書を作成するは右の隅の「☰ メニュー ▼」の中（2026-11-03。App.tsx の NavMenu）
+await (await navItem(page, /見積もり・申請書を作成する/)).click();
 await page.getByRole('region', {name: '新規作成'}).getByRole('button', {name: '＋ 北九州市', exact: true}).click();
 const form2 = page.getByRole('form', {name: '申請書'});
 await form2.waitFor();

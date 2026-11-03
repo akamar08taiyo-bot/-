@@ -47,7 +47,6 @@ export function TokuteiEditor({
   job,
   view,
   onBack,
-  tabs,
   docs,
   update,
   settings,
@@ -55,7 +54,6 @@ export function TokuteiEditor({
   job: Job;
   view: TokuteiView;
   onBack: () => void;
-  tabs: ReactNode;
   docs?: JobDocs | null; // 「📗 Excelで保存」（2段目の初め）・「✉ メールで送付」（3段目の初め）。ほかのタブと同じ（App.tsx の DocsDialog.tsx）
   update?: Update;
   settings?: Pick<Settings, 'tokuteiSalesMonths'>; // 販売見積書のタブの「売上月」（このアプリで変えた特定福祉用具の案件の月）
@@ -155,8 +153,7 @@ export function TokuteiEditor({
       <div ref={head}>
         <JobHeader
           onBack={onBack}
-          tabs={tabs}
-          // 介護保険証から入れるは、ほかのタブと同じくタブのすぐ右
+          // 介護保険証から入れるは、ほかのタブと同じく上の段の右の端（JobHeader.tsx の extra）
           extra={update && <CardFill job={job} setJob={setJob} />}
           // お客様名がまだないときの名前は、ほかのタブ（新しい申請書・新しい見積書・新しい理由書）と同じ長さに（長いと2段目のボタンが右へずれ、タブごとに位置が変わる）
           title={<JobTitle name={job.customer.trim() ? jobName(job) : view === 'shinsei' ? '新しい申請書' : '新しい見積書'} badge={insurer ? INSURER_INFO[insurer].name : undefined} />}

@@ -2,9 +2,15 @@
 // 仕切り計算表・請求書も同じ行から作る。操作は Excel と同じ：
 //   欄を選んで打ち込むと書き換え／Enter で下・Tab で右・矢印で移動／F2 かダブルクリックで書き直す／Delete で消す／Esc でやめる／Ctrl+Z で元に戻す・Ctrl+Y でやり直す
 //   （元に戻す・やり直すのボタンや、画面の説明は置かない。ユーザーの指示）
-//   見積書の左のボタン（ユーザーの指示「部材をいれる、施工費などのボタンは見積もりのページからと遠すぎるため、見積もりの左手に置く。削除ボタン、挿入、
-//   コピーボタンについては、各行に作成するのではなく、見積もりの左手に設置する」2026-11-03）：部材・施工費・部材＋施工費（常用）を入れる、
-//   選んでいる行の「挿入」（下に1行）・「削除」・「コピー」→ 貼り付けたい行を選んで「貼付」（Ctrl+C／Ctrl+X → 行を選んで Ctrl+V も同じ。Esc でコピーをやめる）
+//   部材・施工費・部材＋施工費（常用）は、空いた行の内容の欄の左に薄く出す「部材｜施工費｜常用」を押して入れる（ユーザーの指示「枠内に薄っすら、部材、施工費どちらか
+//   選べるよう、押せるようにする。施工費を押したら、プルダウンでリストを出す。部材を押したら、検索画面が出る。直接品番を入力しても検索がかかるのが、わかるようにもする」
+//   「内容の中に、部材・施工費・常用の３つをおくが、内容の中の枠内の左によせる。マウスを乗せたら、光るなどわかるようにする」2026-11-03）。部材＝部材を選ぶ画面、
+//   施工費＝施工費のリスト（`addLaborAt`）、常用＝部材＋施工費（常用）の画面。空いた欄を選ぶと右に「品番を打つと検索」、打つと部材リストの候補（見出しつき）。
+//   行の「挿入」（下に1行）・「削除」・「コピー」→ 貼り付けたい行を選んで「貼付」は、選んでいる行の改修内容の左（見積書の余白）に小さく
+//   （ユーザーの指示「改修内容の横に、挿入、削除、コピー、貼り付けボタンを小さくもってくる（工事費見積書の枠内）」「右の空いたスペースにのせたら、そのセルを選択している
+//   ことが認識でき、削除やコピーなどをおこなえるようにする」2026-11-03。選んでいる行は薄い緑。Ctrl+C／Ctrl+X → 行を選んで Ctrl+V も同じ。Esc でコピーをやめる）。
+//   見積書の左（前の「部材リストから入れる」などの所）は「Excelで保存」「見積書を印刷」（ユーザーの指示「現在の部材リスト、施工費から入れると書いてある場所には、
+//   印刷とExcel保存のボタンを設置」2026-11-03）
 //   Ctrl+Shift+＋ で下に1行・Ctrl+－ で行を消す・Alt+↓ で候補（改修場所・改修の種類）・Ctrl+P で印刷
 // 内容（品名）は部材リストから選べる（★お気に入りが先）。備考（算出根拠）に定価を入れると、単価は 定価×0.8。
 // いちばん下の空いた行に打ち込むと行が増え、改修場所を打ち込むと箇所が増える。
@@ -12,13 +18,13 @@
 
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ChangeEvent, ClipboardEvent as ReactClipboardEvent, CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode} from 'react';
-import {startEstimate} from '../calc.ts';
+import {rounddown, startEstimate} from '../calc.ts';
 import {circled, KINDS, materialText} from '../estimateForms.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {KouikiForm, YukuhashiForm} from '../print/EstimateForms.tsx';
-import {applySheet, deleteLine, deletePlace, deleteTouchesShinsei, describeKey, dropEmptyPlaces, FIELD_NAMES, insertAfterId, insertBlankAfter, lineRows, parseDate, parsePlace, pasteLines, sheetTarget, sheetValue, toggleExcluded, toolPlace} from '../sheetEdit.ts';
+import {addLaborAt, applySheet, deleteLine, deletePlace, deleteTouchesShinsei, describeKey, dropEmptyPlaces, FIELD_NAMES, insertAfterId, insertBlankAfter, lineRows, parseDate, parsePlace, pasteLines, sheetTarget, sheetValue, toggleExcluded, toolPlace} from '../sheetEdit.ts';
 import {getClip, setClip, useClip} from '../sheetClip.ts';
-import type {EstimateForm, Job, Material, Place, Settings} from '../types.ts';
+import type {EstimateForm, Job, LaborItem, Material, Place, Settings} from '../types.ts';
 import {matchesAll, todayIso, yen} from '../util.ts';
 import {Btn, Modal, useToast} from './ui.tsx';
 
@@ -40,11 +46,12 @@ export function EstimateSheet({
   settings: s,
   form,
   materials,
+  labor,
   setJob,
   onPickMaterial,
-  onPickLabor,
   onPickKit,
   onPrint,
+  excel,
   between,
   focusRow,
 }: {
@@ -52,11 +59,12 @@ export function EstimateSheet({
   settings: Settings;
   form: EstimateForm;
   materials: Material[];
+  labor: LaborItem[]; // 空いた行の「施工費」のリスト（📦 部材・施工費マスタの施工費）
   setJob: (fn: (j: Job) => Job) => void;
   onPickMaterial: (placeId: string | null, rowId: string | null) => void; // null：箇所がまだない（新しい箇所に）。rowId：選んでいる行（そこに入れる）
-  onPickLabor: (placeId: string | null, rowId: string | null) => void; // rowId：選んでいる行（部材ならその同上施工費・空白の行ならその行に。`laborSpot`）。null：箇所の施工費
   onPickKit: (placeId: string | null, rowId: string | null) => void;
   onPrint: () => void;
+  excel?: ReactNode; // 見積書の左の「📗 Excelで保存」（上の段と同じ。App.tsx の DocsButton）
   // 「部材リストから入れる」などの行のすぐ下に出すもの（工事見積書の保険者・担当・作成日・請求書の行。EstimateEditor.tsx）
   between?: ReactNode;
   // この行を選ぶ（部材を選ぶ画面で最後に入れた行。n が変わるたびに）。続けて「施工費から入れる」と、その部材の同上施工費になる
@@ -412,6 +420,25 @@ export function EstimateSheet({
   const onKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing || e.keyCode === 229) return; // 日本語の変換中
     const ctrl = e.ctrlKey || e.metaKey;
+    // 施工費のリストを開いているとき：↑↓で選ぶ・Enter で入れる・Esc で閉じる
+    if (laborMenu && !edit) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        setLaborHl((h) => (e.key === 'ArrowDown' ? Math.min(labor.length - 1, h + 1) : Math.max(0, h - 1)));
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (labor[laborHl]) chooseLabor(labor[laborHl]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setLaborMenu(null);
+        return;
+      }
+      setLaborMenu(null);
+    }
     if (!edit) {
       if (ctrl && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault();
@@ -694,6 +721,16 @@ export function EstimateSheet({
       e.preventDefault(); // 欄の「▼」：欄は選ばない（押し終わったら候補を出す）
       return;
     }
+    // 空いた行の「部材｜施工費｜常用」。選んでいる欄の上には見えない入力欄が重なっているので、その下も見る
+    const pickEl =
+      t.closest<HTMLElement>('[data-pick]') ??
+      (t === inputRef.current && !edit ? ((document.elementsFromPoint(e.clientX, e.clientY).find((x) => x instanceof HTMLElement && x.dataset.pick) as HTMLElement | undefined) ?? null) : null);
+    if (pickEl && innerRef.current?.contains(pickEl)) {
+      e.preventDefault();
+      const td = pickEl.closest<HTMLElement>('[data-edit]');
+      if (td) runPick(pickEl.dataset.pick ?? '', td);
+      return;
+    }
     if (t === inputRef.current) {
       const cur = findCell(sel)?.getBoundingClientRect();
       const inside = cur && e.clientX >= cur.left && e.clientX <= cur.right && e.clientY >= cur.top && e.clientY <= cur.bottom;
@@ -761,13 +798,82 @@ export function EstimateSheet({
       inputRef.current?.focus({preventScroll: true});
     }
   };
-  const row = target.row;
-  // 入れる箇所：選んでいる欄の箇所。欄を選んでいない（空白の行に部材を入れて、選んでいた欄がなくなったときなど）・お客様名などの欄のときは、
-  // 最後に選んだ箇所（なければいちばん下の箇所）。新しい箇所は作らない（前は作って、施工費が②になった。`toolPlace`）
-  const place = toolPlace(job, sel?.key ?? null, lastPlace.current);
   useEffect(() => {
     if (target.place) lastPlace.current = target.place.id;
   }, [target.place?.id]);
+
+  // ---------------------------------------------------------------- 空いた行の「部材｜施工費｜常用」
+  // 押した欄を選んでから：部材＝部材を選ぶ画面（申請書から作った空きの行は検索の言葉つき）、常用＝部材＋施工費（常用）の画面、施工費＝施工費のリスト。
+  // 入れる箇所は、空白の行ならその行の箇所（その行に入る）、いちばん下の空いた行なら最後の箇所の最後（なければ新しい箇所。`toolPlace`）
+  const [laborMenu, setLaborMenu] = useState<Sel | null>(null);
+  const [laborHl, setLaborHl] = useState(0);
+  const runPick = (kind: string, td: HTMLElement) => {
+    if (edit && sel) commit(edit.value, null, null, true);
+    const key = td.dataset.edit ?? '';
+    if (!key) return;
+    select(td);
+    inputRef.current?.focus({preventScroll: true});
+    const j = jobRef.current;
+    const rowId = key.startsWith('line:') ? key.split(':')[1] : null;
+    const place = rowId ? (j.places.find((p) => p.rows.some((r) => r.id === rowId)) ?? null) : toolPlace(j, key, null);
+    if (kind === 'material') onPickMaterial(place?.id ?? null, rowId);
+    else if (kind === 'kit') onPickKit(place?.id ?? null, rowId);
+    else if (kind === 'labor') {
+      setLaborMenu(selOf(td));
+      setLaborHl(0);
+    }
+  };
+  const chooseLabor = (item: LaborItem) => {
+    const m = laborMenu;
+    setLaborMenu(null);
+    if (!m) return;
+    const res = addLaborAt(jobRef.current, m.key, item);
+    if (res.job !== jobRef.current) {
+      change(res.job);
+      if (res.rowId) {
+        setSel({key: `line:${res.rowId}:text`, occ: 0});
+        setFlash(res.rowId);
+      }
+    }
+    inputRef.current?.focus({preventScroll: true});
+  };
+  // ほかの欄を選んだら・見積書の外を押したら閉じる
+  useEffect(() => {
+    if (laborMenu && sel?.key !== laborMenu.key) setLaborMenu(null);
+  }, [sel?.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const laborRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!laborMenu) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (laborRef.current?.contains(t) || t.closest?.('[data-pick="labor"]') || t === inputRef.current) return;
+      setLaborMenu(null);
+    };
+    document.addEventListener('mousedown', onDown, true);
+    return () => document.removeEventListener('mousedown', onDown, true);
+  }, [laborMenu]);
+  const laborPrice = (item: LaborItem) => item.estPrice ?? rounddown(item.price * s.estimateLaborRate);
+
+  // ---------------------------------------------------------------- 行の 挿入・削除・コピー・貼付（選んでいる行の改修内容の左。見積書の余白）
+  // 明細の行を選んでいないときは、表の見出し（改修内容）の左（押せるのは貼付だけ）。選んでいる行は薄い緑（tr[data-current]）
+  const [opsAt, setOpsAt] = useState<{left: number; top: number} | null>(null);
+  useLayoutEffect(() => {
+    const inner = innerRef.current;
+    if (!inner) return;
+    const cur = onLine ? findCell(sel) : null;
+    const tr = cur?.closest<HTMLElement>('tr') ?? null;
+    for (const x of inner.querySelectorAll('tr[data-current]')) if (x !== tr) x.removeAttribute('data-current');
+    if (tr && !tr.hasAttribute('data-current')) tr.setAttribute('data-current', '');
+    const anchor = tr?.querySelector<HTMLElement>('td') ?? inner.querySelector<HTMLElement>('.form-page th');
+    if (!anchor) {
+      if (opsAt) setOpsAt(null);
+      return;
+    }
+    const a = inner.getBoundingClientRect();
+    const b = anchor.getBoundingClientRect();
+    const next = {left: Math.round((b.left - a.left) / scale), top: Math.round((b.top - a.top) / scale)};
+    if (!opsAt || next.left !== opsAt.left || next.top !== opsAt.top) setOpsAt(next);
+  });
 
   // 打ち込む欄の位置・文字の大きさ（見積書の欄と同じ）
   const editing = edit !== null;
@@ -786,10 +892,14 @@ export function EstimateSheet({
       }
     : {left: -9999, top: 0, width: 10, height: 10};
   const rows = editing ? Math.max(1, edit.value.split('\n').length) : 1;
+  // 空いた行の内容の欄を選んでいる（打つ前）：欄のすぐ下に「品番・品名を打つと検索」（欄の中の左は「部材｜施工費｜常用」）
+  const pickHint = !editing && !!sel && field === 'text' && !!findCell(sel)?.querySelector('.sheet-pick');
+  // 内容の欄に打っているあいだは、部材リストの候補を見出しつきで出す（合うものがなくても「ありません」と出す。品番を打っても探していることが分かるように）
+  const searching = editing && textCell;
 
   // 候補の場所（画面の上に、ふつうの大きさで出す）。画面を動かしたら付いていく
   const [, setTick] = useState(0);
-  const showSug = suggestions.length > 0;
+  const showSug = suggestions.length > 0 || searching || laborMenu !== null;
   useEffect(() => {
     if (!showSug) return;
     const onMove = () => setTick((t) => t + 1);
@@ -802,10 +912,20 @@ export function EstimateSheet({
   }, [showSug]);
   const anchor = findCell(sel);
   const sugPos = (() => {
-    if (!anchor || suggestions.length === 0) return null;
+    if (!anchor || (suggestions.length === 0 && !searching)) return null;
     const r = anchor.getBoundingClientRect();
     const below = r.bottom + 4 + 320 <= window.innerHeight || r.top < 340;
     return {left: Math.max(8, Math.min(r.left, window.innerWidth - 448)), top: below ? r.bottom + 4 : Math.max(8, r.top - 4 - Math.min(320, suggestions.length * 44 + 40))};
+  })();
+
+  // 施工費のリスト（空いた行の「施工費」を押したとき）の場所：その欄の下（入らなければ上）
+  const laborCell = laborMenu ? findCell(laborMenu) : null;
+  const laborPos = (() => {
+    if (!laborCell) return null;
+    const r = laborCell.getBoundingClientRect();
+    const h = Math.min(360, labor.length * 40 + 48);
+    const below = r.bottom + 4 + h <= window.innerHeight || r.top < h + 8;
+    return {left: Math.max(8, Math.min(r.left, window.innerWidth - 368)), top: below ? r.bottom + 4 : Math.max(8, r.top - 4 - h)};
   })();
 
   // コピーした行の印・行の左の「貼付」（コピーした行があるあいだ）
@@ -865,48 +985,19 @@ export function EstimateSheet({
         </span>
       </div>
       <div className="flex flex-col lg:flex-row">
-      {/* 見積書の左のボタン：部材・施工費を入れる（選んでいる箇所に）・行の挿入・削除・コピー・貼付（選んでいる行に）。広い画面では見積書を下へ動かしてもついてくる */}
+      {/* 見積書の左のボタン：Excelで保存・見積書を印刷（前は部材・施工費・常用を入れるボタンと行の操作。部材などは空いた行の内容の欄に、行の操作は選んでいる行の左に移した。
+          ユーザーの指示「現在の部材リスト、施工費から入れると書いてある場所には、印刷とExcel保存のボタンを設置」2026-11-03）。
+          広い画面だけ（狭い画面は上の段と同じなので出さない）。見積書を下へ動かしてもついてくる */}
       <div
-        className="sheet-side flex shrink-0 flex-wrap gap-2 border-b border-slate-200 bg-slate-50 p-2 lg:sticky lg:top-2 lg:mt-[var(--tool-top)] lg:w-60 lg:flex-col lg:self-start lg:border-b-0 lg:border-r"
+        className="sheet-side hidden shrink-0 gap-2 border-r border-slate-200 bg-slate-50 p-2 lg:sticky lg:top-2 lg:mt-[var(--tool-top)] lg:flex lg:w-60 lg:flex-col lg:self-start [&>*]:w-full [&>*]:!justify-start [&>*]:!text-[15px]"
         style={{'--tool-top': `${toolTop}px`} as CSSProperties}
         role="toolbar"
         aria-label="見積書の左のボタン"
       >
-        <button type="button" className="sheet-tool tool-material" onMouseDown={keepSel} onClick={() => onPickMaterial(place?.id ?? null, row?.id ?? null)}>
-          📋 部材リストから入れる
-        </button>
-        <button type="button" className="sheet-tool tool-labor" onMouseDown={keepSel} onClick={() => onPickLabor(place?.id ?? null, row?.id ?? null)}>
-          🔧 施工費から入れる
-        </button>
-        <button type="button" className="sheet-tool tool-kit" aria-label="＋ 部材＋施工費（常用）から入れる" onMouseDown={keepSel} onClick={() => onPickKit(place?.id ?? null, row?.id ?? null)}>
-          <span className="whitespace-nowrap">＋ 部材＋施工費（常用）</span>
-          <span className="whitespace-nowrap">から入れる</span>
-        </button>
-        <div className="grid grid-cols-2 gap-2 lg:mt-2 lg:border-t lg:border-slate-200 lg:pt-3" role="group" aria-label="選んでいる行">
-          <button
-            type="button"
-            className="sheet-rowbtn"
-            onMouseDown={keepSel}
-            onClick={() => rowOp('insert')}
-            onMouseEnter={showInsertMark}
-            onMouseLeave={() => setInsertMark(null)}
-            onFocus={showInsertMark}
-            onBlur={() => setInsertMark(null)}
-            disabled={!onLine}
-            title="選んでいる行の下に1行入れる（Ctrl+Shift+＋）。入る所に緑の線が出ます"
-          >
-            ＋ 挿入
-          </button>
-          <button type="button" className="sheet-rowbtn" onMouseDown={keepSel} onClick={() => rowOp('delete')} disabled={!onLine} title="選んでいる行を消す（部材は同上施工費ごと。Ctrl+－）">
-            ✕ 削除
-          </button>
-          <button type="button" className="sheet-rowbtn" onMouseDown={keepSel} onClick={() => rowOp('copy')} disabled={!onLine} title="選んでいる行をコピー（部材は同上施工費ごと。Ctrl+C）">
-            ⧉ コピー
-          </button>
-          <button type="button" className="sheet-rowbtn" onMouseDown={keepSel} onClick={() => rowOp('paste')} disabled={!clip || !sel} title="コピーした行を、選んでいる行の下に貼り付ける（Ctrl+V）">
-            📋 貼付
-          </button>
-        </div>
+        {excel}
+        <Btn color="softSky" onClick={onPrint}>
+          🖨 見積書を印刷
+        </Btn>
       </div>
       <div
         ref={scrollRef}
@@ -920,9 +1011,43 @@ export function EstimateSheet({
           <div ref={innerRef} className="relative" style={{width: PAGE_W, transform: `scale(${scale})`, transformOrigin: 'top left'}}>
             {form === 'kouiki' ? <KouikiForm job={job} settings={s} sheet={sheetOpts} /> : <YukuhashiForm job={job} settings={s} date={estDate} sheet={sheetOpts} />}
             {box && <div className="sheet-sel" style={{left: box.x, top: box.y, width: box.w, height: box.h}} />}
+            {box && pickHint && (
+              // 欄のすぐ右（同じ行の数量・単価・金額の欄。空いた行なので空いている）。前は欄のすぐ下に出していて、下の行の品名を隠した
+              <div className="sheet-pick-hint" style={{left: box.x + box.w + 2, top: box.y, height: box.h}} role="note">
+                ⌨ 品番・品名を打つと検索
+              </div>
+            )}
             {insertMark && (
               <div className="sheet-insert-mark" style={{top: insertMark.top - 1.5, left: insertMark.left, width: insertMark.width}} aria-hidden="true">
                 <span>ここに1行入ります</span>
+              </div>
+            )}
+            {/* 行の 挿入・削除・コピー・貼付：選んでいる行の改修内容の左（余白）に小さく */}
+            {opsAt && (
+              <div className="sheet-ops" style={{left: opsAt.left - 4, top: opsAt.top}} role="toolbar" aria-label="行の操作">
+                <button
+                  type="button"
+                  onMouseDown={keepSel}
+                  onClick={() => rowOp('insert')}
+                  onMouseEnter={showInsertMark}
+                  onMouseLeave={() => setInsertMark(null)}
+                  onFocus={showInsertMark}
+                  onBlur={() => setInsertMark(null)}
+                  disabled={!onLine}
+                  aria-label="＋ 挿入"
+                  title="選んでいる行の下に1行入れる（Ctrl+Shift+＋）。入る所に緑の線が出ます"
+                >
+                  ＋挿入
+                </button>
+                <button type="button" onMouseDown={keepSel} onClick={() => rowOp('delete')} disabled={!onLine} aria-label="✕ 削除" title="選んでいる行を消す（部材は同上施工費ごと。Ctrl+－）">
+                  ✕削除
+                </button>
+                <button type="button" onMouseDown={keepSel} onClick={() => rowOp('copy')} disabled={!onLine} aria-label="⧉ コピー" title="選んでいる行をコピー（部材は同上施工費ごと。Ctrl+C）">
+                  ⧉コピー
+                </button>
+                <button type="button" onMouseDown={keepSel} onClick={() => rowOp('paste')} disabled={!clip || !sel} aria-label="📋 貼付" title="コピーした行を、選んでいる行の下に貼り付ける（Ctrl+V）">
+                  📋貼付
+                </button>
               </div>
             )}
             {/* 改修場所・改修の種類の欄の「▼」：候補から選ぶ（Excel のリストと同じ。Alt+↓ でも開く） */}
@@ -976,6 +1101,14 @@ export function EstimateSheet({
           role="listbox"
           aria-label="候補"
         >
+          {textCell && (
+            <div className="border-b border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-900">
+              {edit?.value.trim() ? `📋 部材リストから検索（品番・品名）：「${edit.value.trim()}」` : '★ お気に入り（品番・品名を打つと部材リストから検索）'}
+            </div>
+          )}
+          {searching && suggestions.length === 0 && (
+            <div className="px-3 py-2 text-xs text-slate-500">部材リストにありません（Enter でこのまま入れます）</div>
+          )}
           <div className="max-h-[300px] overflow-y-auto">
             {suggestions.map((x, i) => (
               <button
@@ -991,6 +1124,35 @@ export function EstimateSheet({
                 {x.sub && <div className="truncate text-[11px] text-slate-500">{x.sub}</div>}
               </button>
             ))}
+          </div>
+        </div>
+      )}
+      {laborMenu && laborPos && (
+        <div
+          ref={laborRef}
+          className="fixed z-50 w-[360px] max-w-[calc(100vw-16px)] overflow-hidden rounded-lg border border-sky-300 bg-white text-sm shadow-2xl"
+          style={{left: laborPos.left, top: laborPos.top}}
+          onMouseDown={(e) => e.preventDefault()}
+          role="listbox"
+          aria-label="施工費のリスト"
+        >
+          <div className="border-b border-sky-100 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-900">🔧 施工費を選ぶ</div>
+          <div className="max-h-[312px] overflow-y-auto">
+            {labor.map((item, i) => (
+              <button
+                key={item.id}
+                type="button"
+                role="option"
+                aria-selected={i === laborHl}
+                onMouseEnter={() => setLaborHl(i)}
+                onClick={() => chooseLabor(item)}
+                className={`flex w-full items-baseline justify-between gap-3 px-3 py-2 text-left ${i === laborHl ? 'bg-sky-100' : 'hover:bg-sky-50'}`}
+              >
+                <span className="min-w-0 truncate font-bold text-slate-800">{item.name}</span>
+                <span className="shrink-0 text-xs tabular-nums text-slate-500">{yen(laborPrice(item))}円</span>
+              </button>
+            ))}
+            {labor.length === 0 && <div className="px-3 py-2 text-xs text-slate-500">施工費がありません（📦 部材・施工費マスタで入れます）</div>}
           </div>
         </div>
       )}

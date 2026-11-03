@@ -1,4 +1,4 @@
-import {useLayoutEffect, useRef, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
 import {PhotoJumpButton} from '../components/PhotoJump.tsx';
 import {Btn, useToast} from '../components/ui.tsx';
@@ -6,12 +6,6 @@ import type {Job, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {removeEstimate} from './EstimateList.tsx';
 
-/** 様邸の名前と、2段目のボタン（Excelで保存・印刷）のあいだに、少なくともあける幅（px） */
-const MIN_GAP = 16;
-/** パソコンで2段目と3段目を1列に並べるときの、あいだの幅（px。ボタンのあいだ gap-2 と同じ） */
-const ROW_GAP = 8;
-/** 1列にするときに3段目に要る幅（px。これより狭いと3段目は2段目の下）。いちばん長いボタン（販売受注簿を作成）が入る幅 */
-const ROW2_MIN = 240;
 
 /** 様邸の画面の「← 一覧へ戻る」。どのタブでも同じ大きさにする（大きさが違うと、すぐ右のタブの位置がタブごとにずれる） */
 export function BackButton({onClick}: {onClick: () => void}) {
@@ -37,120 +31,106 @@ export function RemoveJobButton({job, settings, update, onBack, className}: {job
 
 /**
  * 様邸の画面（5つのタブ：住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書）の上の段。どのタブでも同じ形・同じ位置・同じ大きさ・同じ色
- * （ユーザーの指示「各タブでEXCEL印刷や保存など、表記の方法やタブの大きさ、順番を統一する。…基本的な並びは、申請書をEXCELで保存、申請書（見積書を印刷）、削除（白紙に戻すは不要）
- * それ以外の独自の機能（例えば、売上伝票発行依頼書や発注書を作成、カタログを印刷など）は行を変えて、真下に統一して設置する。タブを切り替えても、位置や大きさ、色などは変えない、
- * 同じ機能であればボタンの名前も変えない）行の位置も変えない（基本的に中央揃え）」2026-10-28）。
- * 1段目：← 一覧へ戻る・様邸のタブ・介護保険証から入れる（extra。タブのすぐ右）。
- * 2段目：様邸の名前（title。左）と、上のタブのまん中にそろえた「Excelで保存・〇〇を印刷・削除」（primary。どのタブも同じ幅＝書類の名前はどれも3字）。
- * 3段目：その真下に、メールで送付とタブごとの機能（secondary。同じまん中にそろえる）。Excelで保存・メールで送付は、どのタブでも同じ（DocsDialog.tsx。
- * ユーザーの指示「Excel で保存っていうので、一つに…プラスアルファで、メールで送付」2026-10-30。前の3段目の初めは「まとめて保存」）。名前は2段目の高さだけを使うので、3段目は名前の下まで広げてよい。
- * 名前が長くて2段目に重なるときは、2段目・3段目とも名前の右へずらす（まん中は2段目・3段目で同じ）。
- * 狭い画面（lg 未満）は、名前・2段目・3段目をそれぞれ1行にして、行のまん中に。extra はその下（どのタブでもボタンの段の高さを変えない）。
- * スマホ（sm 未満）は、2段目・3段目とも同じ幅の2列の格子（ボタンはどれも同じ幅。数が奇数なら最後の1つは同じ幅でまん中）、extra は「← 一覧へ戻る」の右（2026-10-29）
- * （ユーザーの指示「携帯で見た時のボタンの配置の位置…ガタガタして、若干ずれている」2026-10-29：前は行ごとにボタンの幅のまままん中に寄せていて、
- * 「削除」「まとめて保存」が1つずつ別の幅でまん中に並び、介護保険証の欄だけ左に寄っていた）。
- * 「削除」（remove）はいちばん最後（3段目の終わり。3段目がないタブは2段目の終わり）。tail（販売見積書の売上月の欄など、ボタンでないもの）は削除のうしろ
- * （ユーザーの指示「順番、Excel で保存、申請書…見積もりを印刷、カタログを印刷、メールで送付、それから、販売受注簿を作成、売上伝票を作成、それから最後に、削除。
- * これを左から順にボタンを並べる」2026-11-02。前は2段目の終わり・スマホだけ3段目のメールで送付のとなり）。
- * パソコン（lg から）は、2段目と3段目が名前の右に1列で入るなら1列に並べる（ユーザーの指示「パソコン入力の際は、赤枠部分を、２列を一列にする」2026-11-02）。
- * 2段目は名前のすぐ右（タブを切り替えても同じ所）、そのすぐ右に3段目（入りきらないボタンは3段目の中で折り返す）。3段目の場所がほとんどない（狭い画面・長い名前）ときは3段目を2段目の下に同じ左の端で。
- * そのため、パソコンでは2段目・3段目をタブのまん中にはそろえない（上の「基本的に中央揃え」は、狭い画面のときだけ）
+ * （ユーザーの指示「各タブでEXCEL印刷や保存など、表記の方法やタブの大きさ、順番を統一する…タブを切り替えても、位置や大きさ、色などは変えない、
+ * 同じ機能であればボタンの名前も変えない」2026-10-28）。
+ * 1段だけ：← 一覧へ戻る・様邸の名前（title）、すぐ右に「Excelで保存・〇〇を印刷・その他 ▼」（primary。名前が同じなので、タブを切り替えても同じ所）、
+ * 右の端に extra（介護保険証の欄）。「その他 ▼」の中は、メールで送付とタブごとの機能（secondary）、最後に削除（remove）
+ * （ユーザーの指示「ここの部分がごちゃごちゃしているので、プルダウンにする」2026-11-03。前は3段目に並べていた。並びはユーザーの指示「順番、Excel で保存、申請書…見積もりを印刷、
+ * カタログを印刷、メールで送付、それから、販売受注簿を作成、売上伝票を作成、それから最後に、削除」2026-11-02 のまま）。tail（販売見積書の売上月の欄）は「その他 ▼」のうしろ。
+ * 様邸のタブは画面の上の帯（App.tsx の JobTabs。ユーザーの指示「メインタブが二つある為、わかりづらい…入力欄の全体が下に下がっている為、その分上にずらす」2026-11-03）。
+ * 狭い画面（lg 未満）は、名前の段・ボタンの段・extra をそれぞれ1行にしてまん中に。スマホ（sm 未満）のボタンは同じ幅の2列の格子
+ * （ユーザーの指示「携帯で見た時のボタンの配置の位置…ガタガタして、若干ずれている」2026-10-29）
  */
 export function JobHeader({
   onBack,
-  tabs,
   extra,
   title,
   primary,
   secondary,
   remove,
   tail,
+  fields,
 }: {
   onBack: () => void;
-  tabs: ReactNode;
   extra?: ReactNode;
   title: ReactNode;
   primary: ReactNode;
   secondary?: ReactNode;
   remove?: (className: string) => ReactNode;
   tail?: ReactNode; // 削除のうしろに置く、ボタンでないもの（販売見積書の売上月）
+  fields?: ReactNode; // ボタンの段の右の空いた所に置く欄（住宅改修申請書の保険者・保険者番号）
 }) {
-  const top = useRef<HTMLDivElement>(null);
-  const box = useRef<HTMLDivElement>(null);
-  const name = useRef<HTMLDivElement>(null);
-  const row1 = useRef<HTMLDivElement>(null);
-  const row2 = useRef<HTMLDivElement>(null);
-  // 2段目・3段目の左の余白（px）。one は2段目と3段目を1列に（b は2段目からのすき間）。null は狭い画面（行のまん中に置く）
-  const [shift, setShift] = useState<{a: number; b: number; one: boolean} | null>(null);
-  useLayoutEffect(() => {
-    const tablist = top.current?.querySelector<HTMLElement>('[role="tablist"]');
-    const place = () => {
-      if (!tablist || !box.current || !name.current || !row1.current || !window.matchMedia('(min-width: 1024px)').matches) {
-        setShift(null);
-        return;
-      }
-      const left = box.current.getBoundingClientRect().left;
-      const n = name.current.getBoundingClientRect();
-      const w1 = row1.current.getBoundingClientRect().width;
-      // パソコンは名前のすぐ右から1列に：2段目（Excelで保存・印刷）、そのすぐ右に3段目（ユーザーの指示「パソコン入力の際は、赤枠部分を、２列を一列にする」2026-11-02。
-      // 前は2段目・3段目ともタブのまん中にそろえた2段）。2段目の位置は名前だけで決まるので、タブを切り替えても動かない。
-      // 3段目が右の端までに入りきらない（ボタンの多いタブ・売上月の欄）ときは、3段目の中で折り返す（3段目の左の端の下へ）。
-      // 3段目の場所がほとんどない（狭い画面・長い名前）ときは、3段目を2段目の下に同じ左の端で
-      const a = Math.round(n.right + MIN_GAP - left);
-      const one = !!row2.current && box.current.getBoundingClientRect().width - (a + w1 + ROW_GAP) >= ROW2_MIN;
-      setShift({a, b: one ? ROW_GAP : a, one});
-    };
-    place();
-    // 画面の幅（box の幅）・タブの大きさ・名前（打ち込むと変わる）・ボタンの数が変わったら置き直す
-    const ro = new ResizeObserver(place);
-    for (const el of [box.current, tablist, name.current, row1.current, row2.current]) if (el) ro.observe(el);
-    return () => ro.disconnect();
-  }, [!!secondary]);
-  // Excelで保存・メールで送付の書類を選ぶ画面（Modal）のボタンまで大きくしないよう、すぐ下のボタンだけ
+  // ボタンの段：スマホは同じ幅の2列。長い名前は2行に折り返す（字を小さくしない。「申請書をExcelで保存」は「Excelで保存」を切らない span にしてあるので「を」のあとで。
+  // 名前は1つの span に入れる：ボタンは inline-flex なので、2つに分かれると間があき、ボタンの名前にも空白が入る）。
+  // 売上月の欄（label）は2列ぶん。奇数の最後のボタンは1列ぶんの幅でまん中
   const row =
-    'flex flex-wrap items-center gap-2 lg:w-max lg:flex-nowrap lg:[&>*]:!text-base max-lg:justify-center ' +
-    // スマホ：同じ幅の2列。長い名前は2行に折り返す（字を小さくしない。「申請書をExcelで保存」は「Excelで保存」を切らない span にしてあるので「を」のあとで。
-    // 名前は1つの span に入れる：ボタンは inline-flex なので、2つに分かれると間があき、ボタンの名前にも空白が入る）。
-    // 売上月の欄（label）は2列ぶん。奇数の最後のボタンは1列ぶんの幅でまん中
+    'flex flex-wrap items-center gap-2 lg:flex-nowrap lg:[&>*]:!text-base max-lg:w-full max-lg:justify-center ' +
     'max-sm:grid max-sm:grid-cols-2 max-sm:items-stretch max-sm:[&>*]:min-h-11 max-sm:[&>*]:w-full max-sm:[&>*]:whitespace-normal max-sm:[&>*]:px-2 max-sm:[&>*]:leading-tight ' +
     'max-sm:[&>label]:col-span-2 max-sm:[&>label]:justify-center max-sm:[&>*:last-child:nth-child(odd):not(label)]:col-span-2 max-sm:[&>*:last-child:nth-child(odd):not(label)]:mx-auto max-sm:[&>*:last-child:nth-child(odd):not(label)]:w-[calc(50%-0.25rem)]';
-  // 1つの折り返す箱に、1段目（← 一覧へ戻る・タブ・extra）と、2段目より下（box。いつも1行まるごと）を入れる。
-  // extra（介護保険証の欄。タブによって出したり出さなかったりする）は、ボタンの段をタブごとに上下にずらさない所に置く（「タブを切り替えても、位置や大きさ、色などは変えない」）：
-  // スマホ（sm 未満）は「← 一覧へ戻る」の右の空いた所（ユーザーの指示「携帯でみたときに介護保険証の部分…右上の部分に配置移動」2026-10-29。前はいちばん下で、
-  // ボタンの段のあいだに入って見えた）。高さは「← 一覧へ戻る」と同じにする（高いと、その段がタブごとに高くなる）。
-  // タブレット（sm〜lg）はいちばん下（order-last）、広い画面（lg から）はタブのすぐ右（order-1。2段目より下の box は order-2）
+  // 1段：← 一覧へ戻る・様邸の名前、そのすぐ右に Excelで保存・〇〇を印刷・その他 ▼（・売上月）、右の端に extra（介護保険証の欄）。
+  // 様邸のタブ（住宅改修申請書・工事見積書…）は画面の上の帯（App.tsx の JobTabs。ユーザーの指示「メインタブが二つある為、わかりづらい」2026-11-03。
+  // 前はこの段の上に「← 一覧へ戻る」とタブの段があった）。狭い画面（lg 未満）は、名前の段・ボタンの段をそれぞれ1行にしてまん中に
   return (
-    <div ref={top} className="flex flex-wrap items-center gap-2">
-      <BackButton onClick={onBack} />
-      {extra && (
-        <div className="min-w-0 max-sm:flex-1 max-sm:self-stretch max-sm:[&>button]:h-full max-sm:[&>button]:w-full sm:max-lg:order-last lg:order-1">{extra}</div>
-      )}
-      {/* 携帯・タブレットの「📷 写真へ」：タブレットの縦（md〜lg）は「← 一覧へ戻る」の右（スマホはタブの格子の中、タブレットの横は名前の右。PhotoJump.tsx） */}
-      <PhotoJumpButton className="hidden rounded-md bg-sky-50 px-4 py-2.5 text-[15px] shadow-sm ring-2 ring-sky-300 md:max-lg:inline-flex md:max-lg:items-center" />
-      {tabs}
-      <div ref={box} className={`relative w-full lg:order-2 ${shift?.one ? 'flex items-start' : 'space-y-2'}`}>
-        <div ref={name} className="flex flex-wrap items-center gap-2 max-lg:justify-center lg:absolute lg:left-0 lg:top-0 lg:h-[2.625rem] lg:w-max">
-          {title}
-          <PhotoJumpButton className="hidden rounded-md bg-sky-50 px-3 py-1.5 text-base shadow-sm ring-2 ring-sky-300 lg:inline-flex lg:items-center" />
-        </div>
-        <div ref={row1} role="group" aria-label="保存・印刷" className={row} style={shift ? {marginLeft: shift.a, flexShrink: 0} : undefined}>
-          {primary}
-          {!secondary && remove?.('')}
-        </div>
-        {secondary && (
-          <div
-            ref={row2}
-            role="group"
-            aria-label="そのほかの機能"
-            className={row}
-            // 1列のときは2段目の右の残りの幅で折り返す（row の lg:w-max・lg:flex-nowrap を打ち消す）
-            style={shift ? (shift.one ? {marginLeft: shift.b, flex: '1 1 0%', minWidth: 0, width: 'auto', flexWrap: 'wrap'} : {marginLeft: shift.b}) : undefined}
-          >
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2 max-lg:w-full max-lg:justify-center">
+        <BackButton onClick={onBack} />
+        {title}
+        {/* 携帯・タブレットの「📷 写真へ」（PhotoJump.tsx） */}
+        <PhotoJumpButton className="hidden rounded-md bg-sky-50 px-3 py-1.5 text-base shadow-sm ring-2 ring-sky-300 md:inline-flex md:items-center" />
+      </div>
+      <div role="group" aria-label="保存・印刷" className={row}>
+        {primary}
+        {(secondary || remove) && (
+          <MoreMenu>
             {secondary}
             {remove?.('')}
-            {tail}
-          </div>
+          </MoreMenu>
         )}
+        {tail}
+      </div>
+      {fields && <div role="group" aria-label="保険者・保険者番号" className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 max-lg:w-full max-lg:justify-center">{fields}</div>}
+      {extra && <div className="min-w-0 max-lg:w-full max-lg:[&>*]:mx-auto lg:ml-auto">{extra}</div>}
+    </div>
+  );
+}
+
+/**
+ * 上の段の「その他 ▼」：押すと下にボタンが縦に並ぶ（メールで送付・保存・売上伝票を作成・発注書を作成・複製・削除など。ユーザーの指示「ここの部分がごちゃごちゃしているので、
+ * プルダウンにする」2026-11-03）。ボタンを押す・外を押す・Esc で閉じる。閉じても中は消さない（隠すだけ。メールで送付などの画面を開いたままにするため。画面は body に出す＝Modal）
+ */
+function MoreMenu({children}: {children: ReactNode}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  return (
+    // スマホの2列の格子では、上の段の子（この div）に「px-2」が付く。div に余白があると中のボタンがほかのボタンより 16px 細くなるので、余白は中のボタンに付ける
+    <div ref={ref} className="relative max-sm:!px-0">
+      <Btn color="white" className="h-full w-full lg:!text-base max-sm:min-h-11 max-sm:px-2 max-sm:leading-tight" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu">
+        その他 {open ? '▲' : '▼'}
+      </Btn>
+      <div
+        role="menu"
+        aria-label="その他"
+        className={`${open ? 'grid' : 'hidden'} absolute right-0 top-full z-30 mt-1 w-max min-w-full gap-1.5 rounded-lg border border-slate-200 bg-white p-2 shadow-xl max-sm:left-0 max-sm:right-auto [&>*]:w-full [&>*]:!justify-start [&_button]:w-full [&_button]:!justify-start`}
+        onClick={(e) => {
+          if ((e.target as HTMLElement).closest('button, a')) setOpen(false);
+        }}
+      >
+        {children}
       </div>
     </div>
   );

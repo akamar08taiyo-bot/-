@@ -9,6 +9,7 @@ const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import {fakeCloud, useFakeFirebase} from './fakeFirebase.mjs';
+import {navItem} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -33,11 +34,14 @@ async function context(options, tryCloud = true) {
 
 /** 上のタブ（見積もり・申請書を作成する・設定など。ボタン） */
 const goTab = async (p, name) => {
-  const b = p.getByRole('navigation').getByRole('button', {name});
-  await b.click();
-  await p
-    .getByRole('navigation')
+  await (await navItem(p, name)).click();
+  // 様邸を開いたまま見積もりへ戻ると、帯は様邸のタブ（App.tsx の JobTabs）になる。そのときはタブが出るのを待つ
+  const nav = p.getByRole('navigation', {name: '画面'});
+  await nav
     .locator('button[aria-current="page"]', {hasText: name.replace(/^\S+ /, '')})
+    .filter({visible: true})
+    .or(name.includes('見積もり') ? nav.locator('[data-job-tabs]') : nav.locator('[data-none]'))
+    .first()
     .waitFor();
 };
 

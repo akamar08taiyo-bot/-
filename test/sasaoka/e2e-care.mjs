@@ -77,7 +77,7 @@ await dl.saveAs(path.join(outDir, 'care-estimate.xlsx'));
 log(`Excel に保存（${dl.suggestedFilename()}）OK`);
 
 // 印刷にも
-await page.getByRole('button', {name: '🖨 見積書を印刷'}).click();
+await page.getByRole('button', {name: '🖨 見積書を印刷'}).first().click();
 await page.locator('.print-overlay tr[data-care]', {hasText: '利用者負担（1割）'}).first().waitFor();
 await page.screenshot({path: path.join(outDir, 'care-2-print.png')});
 await page.getByRole('button', {name: /閉じる/}).first().click();
