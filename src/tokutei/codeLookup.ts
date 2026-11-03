@@ -6,8 +6,16 @@ import {taxOf} from './calc.ts';
 import {catalogItemPatch} from './catalogItems.ts';
 import type {Product, SaleItem} from './types.ts';
 
-/** 型番の比べ方：全角→半角・大文字にして、空白とハイフン類を除く（「pn-l41431d」「ＰＮ－Ｌ41431Ｄ」「PNL41431D」は同じ） */
-export const codeMatchKey = (s: string) => s.normalize('NFKC').toUpperCase().replace(/[\s\-‐‑‒–—―−]/g, '');
+/**
+ * 型番の比べ方：全角→半角・大文字にして、空白とハイフン類を除く（「pn-l41431d」「ＰＮ－Ｌ41431Ｄ」「PNL41431D」は同じ）。
+ * 日本語の入力のまま打った「ＢＤー１３２」の「ー」も、英数字のあいだならハイフンとみる（ユーザーの指示「型番入力では、-がなくてもリストがでるようにする」2026-11-03）
+ */
+export const codeMatchKey = (s: string) =>
+  s
+    .normalize('NFKC')
+    .toUpperCase()
+    .replace(/([A-Z0-9])\u30fc(?=[A-Z0-9])/g, '$1')
+    .replace(/[\s\-\u2010-\u2015\u2212]/g, '');
 
 export type CodeHit = {key: string; label: string; patch: Partial<SaleItem>};
 

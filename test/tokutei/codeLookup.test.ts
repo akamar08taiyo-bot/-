@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {codeMatchKey, findByCode} from '../../src/tokutei/codeLookup.ts';
+import {matchesAll} from '../../src/tokutei/util.ts';
 
 const variant = (code, label = '', orderCode = '') => ({code, label, tais: '', listPrice: 10000, orderCode});
 const product = (key, name, maker, variants, page = 40) => ({key, page, name, maker, category: '入浴補助用具', sub: '浴槽台', insured: true, note: '', taxFree: false, variants});
@@ -18,6 +19,8 @@ test('型番の比べ方：全角・半角、大文字・小文字、空白と�
   assert.equal(codeMatchKey('ｍｈ－１２３４ａ'), 'MH1234A');
   assert.equal(codeMatchKey(' mh 1234a '), 'MH1234A');
   assert.equal(codeMatchKey('MH‐1234A'), 'MH1234A');
+  // 日本語の入力のまま打った「ー」も、英数字のあいだならハイフン（2026-11-03「型番入力では、-がなくてもリストがでるようにする」）
+  for (const s of ['BD-132', 'BD132', 'bd132', 'bd-132', 'ＢＤー１３２']) assert.equal(codeMatchKey(s), 'BD132', s);
 });
 
 test('型番がぴったり同じ商品だけ：前方一致・部分一致はしない／注文番号でも当たる／同じ型番の別の商品は2つとも出す', () => {
@@ -38,4 +41,11 @@ test('商品マスタの品番も見る（マスタが先）。同じ商品名�
   assert.equal(hits.length, 1);
   assert.equal(hits[0].key, 'm:m1');
   assert.equal(hits[0].patch.listPrice, 9800);
+});
+
+test('商品の検索（★ お気に入りから入力・商品マスタ）：品番の「-」のあるなし・大文字小文字・全角は見ない（2026-11-03「型番入力では、-がなくてもリストがでるようにする」）', () => {
+  const hay = '見本の浴槽台 見本工業（株） MH-1234A 入浴補助用具';
+  for (const q of ['MH-1234A', 'MH1234A', 'mh1234a', 'mh-1234a', 'ｍｈ１２３４ａ', 'ＭＨー１２３４Ａ', 'mh12', 'MH-12']) assert.ok(matchesAll(hay, q), q);
+  assert.ok(matchesAll('見本の台 XX100', 'XX-100'));
+  assert.ok(!matchesAll(hay, 'MH-1235'));
 });
