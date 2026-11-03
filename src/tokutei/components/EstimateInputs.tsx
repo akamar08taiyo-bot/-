@@ -423,6 +423,9 @@ function ItemBlock({
   const i = l.item;
   const manual = i.productId === null;
   const auto = basisNote(l);
+  // 備考（算出根拠）を見積書に書くか（ユーザーの答え「自動で入れるが、オンオフでけせる」2026-11-03）。書かない＝備考を空にしたとき（basisNote が ''）。
+  // 初めは書く（自動）。チェックを入れ直すと自動の文に戻る
+  const noteOn = i.basisNote !== '';
   return (
     <div data-item={i.id} className="relative grid gap-2 rounded-md border border-slate-200 bg-white p-2">
       {/* 種目 → メーカー → 商品名の順（申請書のタブと同じ。ユーザーの指示 2026-10-26・2026-11-01）。種目とメーカーは同じ行（ユーザーの指示「少し行数が長い」2026-11-03。
@@ -488,14 +491,19 @@ function ItemBlock({
           <br />
           （算出根拠）
         </span>
+        <label className="flex shrink-0 cursor-pointer items-center gap-1 text-xs text-slate-600" title="見積書の備考の欄に算出根拠を書く・書かない">
+          <input type="checkbox" checked={noteOn} onChange={(e) => change({basisNote: e.target.checked ? null : ''})} className="h-4 w-4 accent-emerald-600" />
+          見積書に書く
+        </label>
         <TextInput
-          value={typeof i.basisNote === 'string' ? i.basisNote : auto}
+          value={noteOn ? (typeof i.basisNote === 'string' ? i.basisNote : auto) : ''}
           onChange={(v) => change({basisNote: v === auto ? null : v})}
-          placeholder="定価28,000円の20%引き"
-          className="min-w-0 flex-1"
+          placeholder={noteOn ? '定価28,000円の20%引き' : '書かない'}
+          disabled={!noteOn}
+          className="min-w-0 flex-1 disabled:bg-slate-50"
           aria-label="算出根拠"
         />
-        {typeof i.basisNote === 'string' && (
+        {noteOn && typeof i.basisNote === 'string' && (
           <button type="button" onClick={() => change({basisNote: null})} className="rounded px-1.5 py-1 text-slate-500 hover:bg-slate-100" title="定価と割引から書き直す" aria-label="算出根拠を自動に戻す">
             ↺
           </button>

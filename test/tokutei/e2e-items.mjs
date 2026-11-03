@@ -249,6 +249,29 @@ try {
   await page.screenshot({path: `${out}/items-estimate.png`});
   log('販売見積書の上の段・はみ出し OK');
 
+  // ---- 備考（算出根拠）の「見積書に書く」：初めは書く（自動の文）・外すと欄もプレビューの備考も空・入れ直すと自動の文に戻る
+  // （ユーザーの答え「自動で入れるが、オンオフでけせる」2026-11-03）
+  {
+    const it = form.locator('[data-item]').first();
+    const write = it.getByRole('checkbox', {name: '見積書に書く'});
+    const note = it.getByLabel('算出根拠');
+    const inPreview = (t) => page.waitForFunction((x) => document.querySelector('[aria-label="見積書のプレビュー"]')?.textContent?.includes(x), t);
+    const notInPreview = (t) => page.waitForFunction((x) => !document.querySelector('[aria-label="見積書のプレビュー"]')?.textContent?.includes(x), t);
+    assert.equal(await write.isChecked(), true);
+    const auto = await note.inputValue();
+    assert.match(auto, /^定価[\d,]+円の/);
+    await inPreview(auto);
+    await write.uncheck();
+    assert.equal(await note.inputValue(), '');
+    assert.ok(await note.isDisabled());
+    await notInPreview(auto);
+    await it.screenshot({path: `${out}/items-note-off.png`});
+    await write.check();
+    assert.equal(await note.inputValue(), auto);
+    await inPreview(auto);
+    log('備考（算出根拠）の見積書に書く・書かない OK');
+  }
+
   // ---- お気に入り：入れた商品は品目（シャワーチェア）ごとに出て、削除で外せる
   await page.getByRole('button', {name: '🖨 見積書を印刷'}).first().click(); // 印刷の前に、手で入れた商品をお気に入りへ
   await page.locator('.est-sheet [role="group"]').first().waitFor();
