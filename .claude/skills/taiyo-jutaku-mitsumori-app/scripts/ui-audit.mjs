@@ -176,8 +176,25 @@ for (const size of sizesArg.split(',')) {
   await page.goto(`${site}/jutaku-mitsumori/index.html`);
   await page.waitForTimeout(1500);
   await shot('住宅改修-入口');
+  // 画面の切り替えは、見積もり・申請書を作成する（様邸を開いていないとき）のほかは右の隅の「☰ メニュー ▼」の中（2026-11-03 から。test/sasaoka/more.mjs の navItem と同じ）
+  const navItem = async (name) => {
+    const nav = page.getByRole('navigation', {name: '画面'});
+    const shown = nav.getByRole('button', {name}).filter({visible: true});
+    if (await shown.count()) return shown.first();
+    const btn = nav.getByRole('button', {name: /^☰ メニュー/});
+    if ((await btn.getAttribute('aria-expanded')) !== 'true') await btn.click();
+    return nav.getByRole('menu', {name: 'メニュー'}).getByRole('button', {name});
+  };
+  // 様邸の画面の上の段の「その他 ▼」（発注書を作成・カタログを印刷 など。more.mjs の openMore と同じ）
+  const openMore = async () => {
+    const btn = page.getByRole('button', {name: /^その他 [▼▲]$/});
+    if ((await btn.getAttribute('aria-expanded')) !== 'true') await btn.click();
+    const menu = page.getByRole('menu', {name: 'その他'});
+    await menu.waitFor();
+    return menu;
+  };
   await step('住宅改修-設定', async () => {
-    await page.locator('header nav').getByRole('button', {name: /設定/}).click();
+    await (await navItem('⚙ 設定')).click();
   });
   await step('住宅改修-長い値を取り込む', async () => {
     await page.locator('input[type=file][accept=".json,application/json"]').setInputFiles(backup);
@@ -186,7 +203,7 @@ for (const size of sizesArg.split(',')) {
   });
   for (const t of ['🧾 工務店請求書を確認する', '📈 売上見込みを確認する', '📦 部材・施工費マスタ', '🗑 ゴミ箱', '📝 見積もり・申請書を作成する']) {
     await step(`住宅改修-${t.slice(2)}`, async () => {
-      await page.locator('header nav').getByRole('button', {name: t}).click();
+      await (await navItem(t)).click();
     });
     if (t === '📦 部材・施工費マスタ') {
       for (const sub of ['施工費', '部材＋施工費', '部材リスト']) {
@@ -196,12 +213,12 @@ for (const size of sizesArg.split(',')) {
       }
     }
   }
-  const insurers = size === 'pc' ? ['kanda', 'yukuhashi', 'miyako', 'kouiki'] : ['kanda', 'kouiki'];
+  const insurers = size === 'pc' ? ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu', 'kurume', 'iizuka'] : ['kanda', 'kouiki'];
   for (const ins of insurers) {
     await page.goto(`${site}/jutaku-mitsumori/index.html#tab=estimate&job=stress-${ins}`);
     await page.reload();
     await page.waitForTimeout(1500);
-    for (const tab of ['📋 工事見積書', '📝 住宅改修申請書', '📄 理由書', '🛁 特定福祉用具申請書', '🏷 販売見積書']) {
+    for (const tab of ['📝 住宅改修申請書', '📋 工事見積書', '🛁 特定福祉用具申請書', '🏷 販売見積書', '📄 理由書']) {
       await step(`住宅改修-${ins}-${tab.slice(2)}`, async () => {
         await page.getByRole('tab', {name: tab, exact: true}).click();
         if (tab.startsWith('🛁') || tab.startsWith('🏷')) {
@@ -214,9 +231,14 @@ for (const size of sizesArg.split(',')) {
         }
       });
       if (tab === '📋 工事見積書' && ins === insurers[0]) {
-        for (const tool of ['📋 部材リストから入れる', '🔧 施工費から入れる', '＋ 部材＋施工費（常用）から入れる']) {
-          await step(`住宅改修-${ins}-${tool.slice(2)}`, async () => {
-            await page.getByRole('region', {name: '見積書', exact: true}).getByRole('button', {name: tool}).click();
+        // 部材・施工費・常用は、空いた行の内容の欄の左の「部材｜施工費｜常用」（2026-11-03 から。いちばん下の打ち込める行のものを押す）
+        for (const [kind, nm] of [['material', '部材リスト'], ['labor', '施工費のリスト'], ['kit', '部材＋施工費（常用）']]) {
+          await step(`住宅改修-${ins}-${nm}`, async () => {
+            // 1つ目を押したあとは、その行が選んだ行（tr[data-current]）になり、ボタンはそちらに出る（e2e-sheet.mjs の pickHere と同じ）
+            const cur = page.locator(`tr[data-current] [data-pick="${kind}"]`);
+            if (await cur.count()) await cur.first().click({force: true});
+            else await page.locator(`tr[data-new] [data-pick="${kind}"]`).first().click();
+            await page.waitForTimeout(500);
           });
           await closeDialog();
         }
@@ -226,7 +248,7 @@ for (const size of sizesArg.split(',')) {
         });
         await closeDialog();
         await step(`住宅改修-${ins}-発注書`, async () => {
-          await page.getByRole('button', {name: '🛒 発注書を作成'}).first().click();
+          await (await openMore()).getByRole('button', {name: '🛒 発注書を作成'}).click();
           await page.waitForTimeout(800);
         });
         await closeDialog();

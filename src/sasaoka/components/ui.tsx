@@ -126,7 +126,8 @@ export function Stepper({value, onChange, ariaLabel, blankZero = false}: {value:
       >
         −
       </button>
-      <NumberInput value={value} onChange={(n) => onChange(roundQty(n))} min={0} ariaLabel={ariaLabel} className="w-14 text-center" blankZero={blankZero} />
+      {/* 左右の余白は 4px（8px だと発注書の「15.5」㎡ の最後の字が欄に隠れた。2026-11-03 の全体のデバッグで測って見つけた。幅は変えない） */}
+      <NumberInput value={value} onChange={(n) => onChange(roundQty(n))} min={0} ariaLabel={ariaLabel} className="w-14 !px-1 text-center" blankZero={blankZero} />
       <button
         type="button"
         aria-label={`${ariaLabel ?? '数量'}を1増やす`}

@@ -713,6 +713,7 @@ function Dim({
   autoFocus?: boolean;
   onChange: (v: string) => void;
 }) {
+  // 長さの欄（wide）は 2本の「600×1800」まで入る 8rem（前の 7rem は最後の字が欄に隠れた。2026-11-03 の全体のデバッグ）
   return (
     <label className="inline-flex items-center gap-1 whitespace-nowrap">
       {label}
@@ -722,7 +723,7 @@ function Dim({
         onChange={onChange}
         inputMode={wide ? undefined : 'numeric'}
         placeholder={placeholder}
-        className={`${wide ? 'w-28' : 'w-16'} text-right ${missing ? 'bg-amber-50' : ''}`}
+        className={`${wide ? 'w-32' : 'w-16'} text-right ${missing ? 'bg-amber-50' : ''}`}
         aria-label={`${label}（mm）`}
         autoFocus={autoFocus}
         data-nav
