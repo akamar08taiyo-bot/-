@@ -191,6 +191,38 @@ img {
 .est-sheet tr[data-copied] > td {
   background-color: #fef3c7;
 }
+/* 空きの行の名前（申請書で箇所を入れたときの「（手すり）」「（施工費）」など。railSlots.ts）。見積書の画面だけ・印刷には出さない */
+.est-sheet .sheet-slot {
+  color: #94a3b8;
+  font-size: 9pt;
+  white-space: nowrap;
+}
+/* 「＋ 挿入」で行が入る所（ボタンにマウスを乗せている・選んでいるあいだ）。EstimateSheet.tsx */
+.sheet-insert-mark {
+  position: absolute;
+  z-index: 6;
+  height: 0;
+  border-top: 3px solid #16a34a;
+  pointer-events: none;
+}
+.sheet-insert-mark > span {
+  position: absolute;
+  top: -11px;
+  left: -2px;
+  transform: translateX(-100%);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #16a34a;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+/* 「＋ 挿入」で入れたばかりの行（少しのあいだ薄い緑） */
+.est-sheet tr[data-flash] > td {
+  background-color: #bbf7d0;
+  transition: background-color 0.6s;
+}
 /* 選んでいる欄の枠（Excel と同じ緑） */
 .sheet-sel {
   position: absolute;

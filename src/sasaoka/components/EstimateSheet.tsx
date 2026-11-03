@@ -16,7 +16,7 @@ import {startEstimate} from '../calc.ts';
 import {circled, KINDS, materialText} from '../estimateForms.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {KouikiForm, YukuhashiForm} from '../print/EstimateForms.tsx';
-import {applySheet, deleteLine, deletePlace, deleteTouchesShinsei, describeKey, dropEmptyPlaces, FIELD_NAMES, insertBlankAfter, lineRows, parseDate, parsePlace, pasteLines, sheetTarget, sheetValue, toggleExcluded, toolPlace} from '../sheetEdit.ts';
+import {applySheet, deleteLine, deletePlace, deleteTouchesShinsei, describeKey, dropEmptyPlaces, FIELD_NAMES, insertAfterId, insertBlankAfter, lineRows, parseDate, parsePlace, pasteLines, sheetTarget, sheetValue, toggleExcluded, toolPlace} from '../sheetEdit.ts';
 import {getClip, setClip, useClip} from '../sheetClip.ts';
 import type {EstimateForm, Job, Material, Place, Settings} from '../types.ts';
 import {matchesAll, todayIso, yen} from '../util.ts';
@@ -622,9 +622,44 @@ export function EstimateSheet({
   const insertRow = (rowId: string) => {
     const res = insertBlankAfter(jobRef.current, rowId);
     change(res.job);
-    if (res.rowId) setSel({key: `line:${res.rowId}:text`, occ: 0});
+    setInsertMark(null);
+    if (res.rowId) {
+      setSel({key: `line:${res.rowId}:text`, occ: 0});
+      setFlash(res.rowId);
+    }
     inputRef.current?.focus({preventScroll: true});
   };
+  // 「＋ 挿入」で行が入る所の線（ボタンにマウスを乗せている・キーボードで選んでいるあいだ）と、入れたばかりの行を少しのあいだ薄い緑に
+  // （ユーザーの指示「挿入でいれる場合、どこにスペースが入り挿入できるかが、ややわかりずらいので、わかるようにする」2026-11-03。
+  // 部材の行を選んで挿入すると、すぐ下の同上施工費のさらに下に入るので、どこに入るか分かりにくかった）
+  const [insertMark, setInsertMark] = useState<{top: number; left: number; width: number} | null>(null);
+  const showInsertMark = () => {
+    const id = lineIdOf(sel);
+    const last = id ? insertAfterId(jobRef.current, id) : null;
+    const inner = innerRef.current;
+    const tr = last && inner ? inner.querySelector<HTMLElement>(`tr[data-rows~="${CSS.escape(last)}"]`) : null;
+    if (!tr || !inner) {
+      setInsertMark(null);
+      return;
+    }
+    const a = inner.getBoundingClientRect();
+    const b = tr.getBoundingClientRect();
+    setInsertMark({top: (b.bottom - a.top) / scale, left: (b.left - a.left) / scale, width: b.width / scale});
+  };
+  const [flash, setFlash] = useState<string | null>(null);
+  useLayoutEffect(() => {
+    if (!flash) return;
+    const tr = innerRef.current?.querySelector<HTMLElement>(`tr[data-rows~="${CSS.escape(flash)}"]`);
+    tr?.setAttribute('data-flash', '');
+    const t = window.setTimeout(() => {
+      tr?.removeAttribute('data-flash');
+      setFlash(null);
+    }, 1500);
+    return () => {
+      window.clearTimeout(t);
+      tr?.removeAttribute('data-flash');
+    };
+  }, [flash]);
   // 申請書に入れた箇所の最後の行を消すとき：申請書からも消すか聞く（`deleteTouchesShinsei`。blank＝消す行が空白の行で、見積書から消すものがない）
   const [askDelete, setAskDelete] = useState<{rowId: string; place: Place; blank: boolean} | null>(null);
   const deleteRow = (rowId: string) => {
@@ -832,7 +867,18 @@ export function EstimateSheet({
           <span className="whitespace-nowrap">から入れる</span>
         </button>
         <div className="grid grid-cols-2 gap-2 lg:mt-2 lg:border-t lg:border-slate-200 lg:pt-3" role="group" aria-label="選んでいる行">
-          <button type="button" className="sheet-rowbtn" onMouseDown={keepSel} onClick={() => rowOp('insert')} disabled={!onLine} title="選んでいる行の下に1行入れる（Ctrl+Shift+＋）">
+          <button
+            type="button"
+            className="sheet-rowbtn"
+            onMouseDown={keepSel}
+            onClick={() => rowOp('insert')}
+            onMouseEnter={showInsertMark}
+            onMouseLeave={() => setInsertMark(null)}
+            onFocus={showInsertMark}
+            onBlur={() => setInsertMark(null)}
+            disabled={!onLine}
+            title="選んでいる行の下に1行入れる（Ctrl+Shift+＋）。入る所に緑の線が出ます"
+          >
             ＋ 挿入
           </button>
           <button type="button" className="sheet-rowbtn" onMouseDown={keepSel} onClick={() => rowOp('delete')} disabled={!onLine} title="選んでいる行を消す（部材は同上施工費ごと。Ctrl+－）">
@@ -858,6 +904,11 @@ export function EstimateSheet({
           <div ref={innerRef} className="relative" style={{width: PAGE_W, transform: `scale(${scale})`, transformOrigin: 'top left'}}>
             {form === 'kouiki' ? <KouikiForm job={job} settings={s} sheet={sheetOpts} /> : <YukuhashiForm job={job} settings={s} date={estDate} sheet={sheetOpts} />}
             {box && <div className="sheet-sel" style={{left: box.x, top: box.y, width: box.w, height: box.h}} />}
+            {insertMark && (
+              <div className="sheet-insert-mark" style={{top: insertMark.top - 1.5, left: insertMark.left, width: insertMark.width}} aria-hidden="true">
+                <span>ここに1行入ります</span>
+              </div>
+            )}
             {/* 改修場所・改修の種類の欄の「▼」：候補から選ぶ（Excel のリストと同じ。Alt+↓ でも開く） */}
             {box && !editing && (placeCell || kindCell) && (
               <button

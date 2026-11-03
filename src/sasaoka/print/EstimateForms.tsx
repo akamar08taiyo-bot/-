@@ -50,11 +50,13 @@ function useShrinkCells() {
  * 内容（品名）の欄：長い商品名は言葉の切れ目で行を分けて書く（`fitName`・`wordLines`。「マツ六 BD-132 35アッシュ丸棒」／「ディンプル付 Mオーク 2m」）。
  * 1行に入る商品名は前と同じ（入らなければ欄の幅で折り返す）
  */
-function nameCell(text: string, w: number, h: number, pt: number, cls: string, edit: string, lines: number, editable: boolean): ReactNode {
+function nameCell(text: string, w: number, h: number, pt: number, cls: string, edit: string, lines: number, editable: boolean, slot = ''): ReactNode {
   const f = text ? fitName(text, w, h, pt, lines) : null;
+  // 空きの行（申請書で箇所を入れたときの「手すり」「ブラケット」「施工費」など。railSlots.ts）は、見積書の画面だけ薄い字で「（手すり）」。印刷には出さない
+  const hint = editable && !text && slot ? <span className="sheet-slot">（{slot}）</span> : null;
   return (
-    <td className={cls} style={f ? fitCss(f) : undefined} {...ed(editable, edit)}>
-      {f ? fitBody(f) : text}
+    <td className={cls} style={f ? fitCss(f) : undefined} {...ed(editable, edit)} {...(hint ? {'data-slot': slot} : {})}>
+      {f ? fitBody(f) : hint ?? text}
     </td>
   );
 }
@@ -323,7 +325,7 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
       {cell(l.first ? l.work : '', YK.A, 11, 'ml', l.first ? `place:${l.placeId}:work` : null, 1)}
       {/* 改修場所（写真No.）：「①勝手口」。写真番号のあとに箇所名を打ち込める */}
       {cell(l.first ? `${circled(l.photo)}${l.placeName}` : '', YK.B, 11, '', l.first ? `place:${l.placeId}:name` : null)}
-      {nameCell(l.text, YK.C, YK_ROW, 9, `${bottom}`, k('text'), 2, editable)}
+      {nameCell(l.text, YK.C, YK_ROW, 9, `${bottom}`, k('text'), 2, editable, l.slot)}
       {cell(qty, YK.D, 9, 'r nr', l.isWork ? null : k('qty'))}
       {cell(l.unit, YK.E, 11, 'nl', l.isWork || l.cut ? null : k('unit'))}
       {cell(price, YK.F, 11, 'r', k('price'))}
@@ -607,7 +609,7 @@ function KkLine({
       {cell(l.first ? l.placeName : '', KK.A, 11, 'c ml', l.first ? `place:${l.placeId}:name` : null, 2)}
       {cell(l.first ? l.work : '', KK.B, 11, 'c', l.first ? `place:${l.placeId}:work` : null, 2)}
       <td className={`mark${bottom}`}>{l.blank ? '' : l.mark}</td>
-      {nameCell(l.text, KK.D, height, 9, `mr gothic${bottom}`, k('text'), 3, editable)}
+      {nameCell(l.text, KK.D, height, 9, `mr gothic${bottom}`, k('text'), 3, editable, l.slot)}
       <td className={`gap${bottom}`} />
       {cell(qty, KK.F, 9, 'r ml gothic', !l.isWork || l.hourly ? k('qty') : null)}
       {cell(l.unit, KK.G, 11, 'gothic', l.isWork || l.cut ? null : k('unit'))}

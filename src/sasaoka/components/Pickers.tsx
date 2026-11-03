@@ -17,6 +17,7 @@ const SHOW_LIMIT = 200;
 export function MaterialPicker({
   place,
   materials,
+  initialQuery = '',
   mode,
   rates,
   onAdd,
@@ -28,6 +29,7 @@ export function MaterialPicker({
 }: {
   place: Place;
   materials: Material[];
+  initialQuery?: string; // 初めに検索の欄に入れておく言葉（見積書の空きの行「ブラケット」などを選んで開いたとき。railSlots.ts の `slotQuery`）
   mode: AppMode;
   rates: EstimateRates; // 見積の単価（定価×率）を出すとき
   onAdd: (row: Row) => void;
@@ -39,8 +41,10 @@ export function MaterialPicker({
   onClose: () => void;
 }) {
   const favCount = materials.filter((m) => m.favorite).length;
-  const [tab, setTab] = useState<'fav' | 'all'>(favCount > 0 ? 'fav' : 'all');
-  const [query, setQuery] = useState('');
+  // 検索の言葉があるときは、★お気に入りにその言葉の部材があればお気に入り、なければすべて
+  const favHit = materials.some((m) => m.favorite && (!initialQuery || matchesAll(`${m.name} ${m.code} ${m.maker}`, initialQuery)));
+  const [tab, setTab] = useState<'fav' | 'all'>(favCount > 0 && favHit ? 'fav' : 'all');
+  const [query, setQuery] = useState(initialQuery);
   const [maker, setMaker] = useState('');
   const [manual, setManual] = useState({name: '', price: 0, listPrice: 0, qty: 1, save: true});
   const estimate = mode === 'estimate';

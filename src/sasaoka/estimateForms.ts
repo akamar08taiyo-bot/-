@@ -6,8 +6,9 @@
 // 2行目に mm で計算を書く（例：600mm÷4000mm＝0.15）。
 
 import {cutToLength, estimatePlaceLines, estimateQty, isBlankRow, listPriceOf, priceRate} from './calc.ts';
-import type {EstimateRates} from './calc.ts';
+import type {EstimateLine, EstimateRates} from './calc.ts';
 import {normalize} from './priceImport.ts';
+import {isOpenSlot} from './railSlots.ts';
 import type {EstimateForm, Insurer, Job, Place, Row, Settings, ShinseiInfo, ShinseiMarks} from './types.ts';
 import {num, yen} from './util.ts';
 
@@ -202,7 +203,16 @@ export function swapPhotoNumbers(places: Place[], a: string, b: string): Place[]
 }
 
 // 金額のない施工費の行は出さない
-const shownLines =(place: Pick<Place, 'rows'>, rates: EstimateRates) => estimatePlaceLines(place, rates).filter((l) => l.kind === 'material' || l.amount !== 0);
+/**
+ * 印刷・Excel に出す行：金額のない施工費の行と、入れなかった空きの行（申請書で箇所を入れたときの「手すり」「施工費」など。railSlots.ts）はのぞく。
+ * 空きの行しかない箇所は1行だけ（改修内容・改修場所を出す。前の空白の行1つと同じ）
+ */
+function shownLines(place: Pick<Place, 'rows'>, rates: EstimateRates): EstimateLine[] {
+  const all = estimatePlaceLines(place, rates).filter((l) => l.kind === 'material' || l.amount !== 0);
+  const open = (l: EstimateLine) => l.kind === 'material' && isOpenSlot(l.row);
+  const kept = all.filter((l) => !open(l));
+  return kept.length > 0 ? kept : all.slice(0, 1);
+}
 
 /** 部材の「内容（規格・範囲）」：メーカー 品番 品名（切って使う部材の長さの計算は備考・算出根拠に書く） */
 /** 英字の名前でも消さないメーカー名（大文字4字以上でも残す） */
@@ -284,6 +294,7 @@ export type FormLine = {
   note: string | null; // 備考（定価等）・算出根拠を手で直したとき（改行で行を分ける）
   manualAmount: boolean; // 施工費の金額を見積書で手で直した
   blank: boolean; // 何も入っていない部材の行（空白の行として出す。数量・単価・金額も出さない）
+  slot?: string; // 空きの行の名前（「手すり」「施工費」など。空白の行のときだけ。見積書の画面に薄い字で出す。railSlots.ts）
   isNew?: boolean; // 見積書に直接入力するときの、いちばん下の空いた行
   memo?: {text: string; red: boolean}; // 明細の下の介護保険の内訳の行（careLines.ts）。文字だけを左の欄に書く。red は赤字（利用者負担）
 };
@@ -330,6 +341,7 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
           note: r.estNote,
           manualAmount: false,
           blank,
+          ...(blank && r.slot ? {slot: r.slot} : {}),
         });
         return;
       }

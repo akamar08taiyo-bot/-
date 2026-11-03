@@ -13,6 +13,7 @@ import {careAmounts} from './careLines.ts';
 import {BASE_PLATE} from './cutLink.ts';
 import {circled, eraOf, INSURER_INFO, jobInsurer, KINDS, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa, shinseiKindNames} from './estimateForms.ts';
 import {insurerNoOf} from './insurerNumbers.ts';
+import {readyLengths} from './railSlots.ts';
 import {clampOff, clampScale, normRot} from './photoEdit.ts';
 import {BOARD_PTS, frontOrder, lineEnds, MARK_INSET, photoBounds, shapeBox} from './photoMarks.ts';
 import {textEm} from './print/fit.ts';
@@ -987,10 +988,18 @@ function mmOf(t: string, unit?: string): string {
   return scale === 1 ? m[1] : String(Math.round(Number(m[1]) * scale));
 }
 
-/** 見積書の手すりの使う長さ（mm。切って使う部材など長さの入った部材。補強板・ベースプレートはのぞく。2本以上は「600×850」） */
+/**
+ * 見積書の手すりの使う長さ（mm。切って使う部材など長さの入った部材。補強板・ベースプレートはのぞく。2本以上は「600×850」）。
+ * 既製品の手すり（TOTO・マツ六・矢崎化工など。切らずに使う）は商品名の長さ（`readyLengths`。ユーザーの指示「既製品については、既製品の長さから読み取って長さを入力する」2026-11-03）
+ */
 export function estimateLength(p: Pick<Place, 'rows'>): string {
   const mm: string[] = [];
   for (const r of p.rows) {
+    const ready = readyLengths(r);
+    if (ready.length > 0) {
+      mm.push(...ready.map(String));
+      continue;
+    }
     if (r.kind !== 'material' || isBlankRow(r) || !(r.lengthCm > 0) || !(r.qty > 0) || BASE_PLATE.test(`${r.estText ?? ''} ${r.name}`)) continue;
     for (let i = 0; i < Math.max(1, Math.round(r.qty)); i++) mm.push(String(Math.round(r.lengthCm * 10)));
   }

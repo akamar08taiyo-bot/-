@@ -13,7 +13,8 @@ import {isBlankRow, jobName} from '../calc.ts';
 import {Btn, KanaInput, TextInput, useToast} from '../components/ui.tsx';
 import {circled, eraOf, INSURER_IDS, INSURER_INFO, insurerForAddress, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, photoNumbers} from '../estimateForms.ts';
 import {placeFromDims, plateFromText, withBrackets} from '../cutLink.ts';
-import {manualRow, newPlace} from '../rows.ts';
+import {newPlace} from '../rows.ts';
+import {RAIL_TYPES, railType, withSlots} from '../railSlots.ts';
 import {usePhotoUrls} from '../photos.ts';
 import {turn} from '../photoEdit.ts';
 import {AREA_LABEL, INSURER_AREAS, insurerNoOf} from '../insurerNumbers.ts';
@@ -21,7 +22,7 @@ import {photoBounds} from '../photoMarks.ts';
 import {costIsTotal, estimateLength, estimatePlateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, planPlacement, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
-import type {AppData, Insurer, Job, Material, PhotoEdit, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
+import type {AppData, Insurer, Job, Material, PhotoEdit, Place, PlaceDims, RailType, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {yen} from '../util.ts';
 import {zipCandidates} from '../zip.ts';
@@ -781,7 +782,8 @@ function InsurerAreaPick({insurer, address, picked, onPick, selectRef}: {insurer
 
 function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (fn: (j: Job) => Job) => void; s: Settings; insurer: Insurer; materials: Material[]}) {
   const photos = photoNumbers(job, s);
-  const setPlace = (id: string, fn: (p: Place) => Place) => setJob((j) => ({...j, places: j.places.map((p) => (p.id === id ? fn(p) : p))}));
+  // 見積書にまだ何も入れていない箇所は、改修の種類・手すりの種類・高さ・ベースプレートに合わせて見積書の空きの行（手すり・ブラケット・施工費など）を作り直す（`withSlots`）
+  const setPlace = (id: string, fn: (p: Place) => Place) => setJob((j) => ({...j, places: j.places.map((p) => (p.id === id ? withSlots(fn(p)) : p))}));
   // 手すりの長さを入れたら、見積書のその箇所の手すり・ベースプレートの使う長さにもする（ユーザーの指示「どちらか一方を入力した際に、自動的に 1.2 の部分が入力される」。`cutLink.ts`）。
   // 中間のブラケット（BD-01G）の数も入れ直す（`withBrackets`）
   const setDim = (id: string, key: keyof PlaceDims, v: string) =>
@@ -821,7 +823,7 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
       });
     openField(`${p.id}:bp`);
   };
-  // 見積書に箇所が出るように、空白の行を1つ入れておく（見積書で部材・施工費を入れていける）。
+  // 見積書に箇所が出るように、空きの行を入れておく（木手すりなら 手すり・ブラケット・施工費。見積書でその行を選んで部材・施工費を入れていける。`withSlots`）。
   // 足した箇所の寸法（手すりは長さ）にすぐ打ち込めるように、そこへ移る（ユーザーの指示「廊下、玄関など選択すると、長さの部分をすぐに入力できるようにする。とべるようにする」）。
   // 「＋ そのほか」は改修場所の名前から
   const list = useRef<HTMLDivElement>(null);
@@ -848,7 +850,7 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
   const closeBtn = 'rounded px-1.5 py-0.5 text-sm text-slate-400 hover:bg-slate-100 hover:text-slate-700';
   const plusBtn = 'rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-700';
   const add = (name: string) => {
-    const place = newPlace(name, [manualRow('material')]);
+    const place = withSlots(newPlace(name));
     focusPlace.current = {id: place.id, field: name ? 'dim' : 'name'};
     setJob((j) => ({...j, places: [...j.places, place]}));
   };
@@ -908,6 +910,21 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-9">
                   {p.kind === 1 && (
                     <>
+                      {/* 手すりの種類（見積書の空きの行が変わる。`railSlots.ts`）。ユーザーの指示「TOTOの場合は…材料費で１行、施工費で１行」「屋外手すりで高さが発生する場合…支柱部材、手すり部材、ブラケット部材、施工費」2026-11-03 */}
+                      <select
+                        value={railType(p)}
+                        onChange={(e) => setPlace(p.id, (x) => ({...x, rail: e.target.value as RailType}))}
+                        className="h-9 rounded-md border border-slate-300 px-1 text-sm"
+                        aria-label="手すりの種類"
+                        title="見積書の行（手すり・ブラケット・施工費など）が変わります"
+                        data-nav
+                      >
+                        {RAIL_TYPES.map((t) => (
+                          <option key={t.value} value={t.value}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
                       {/* 手すりの長さは必須（入っていなければ薄い黄色。入れなければ見積書の使う長さ＝薄い字を書く）、高さは任意で ＋ を押すと開いて入れる
                           （ユーザーの指示「手すりの取り付けの高さが任意、長さは必須。手すりの取り付けの高さも、プラスで開いてから入力できるようにする。（任意）」2026-10-26） */}
                       {dim('l', '長さ', {wide: true, placeholder: estimateLength(p), missing: !p.dims?.l?.trim() && !estimateLength(p)})}

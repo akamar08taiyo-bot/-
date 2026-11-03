@@ -272,6 +272,7 @@ const cleanRow = (raw: Record<string, unknown>): Row => keepNewer(raw, (r) => ({
   estText: typeof r.estText === 'string' ? r.estText : null,
   estNote: typeof r.estNote === 'string' ? r.estNote : null,
   estAmount: optNum(r.estAmount),
+  ...(str(r.slot).trim() ? {slot: str(r.slot)} : {}), // 見積書の空きの行の名前（railSlots.ts）
 }));
 
 const KINDS = [1, 2, 3, 4, 5, 6]; // 見積書の改修の種類（①〜⑥）
@@ -284,6 +285,7 @@ const cleanPlace = (raw: Record<string, unknown>): Place => keepNewer(raw, (p) =
   rows: Array.isArray(p.rows) ? p.rows.filter(isObj).map(cleanRow) : [],
   kind: KINDS.includes(numv(p.kind, 1)) ? numv(p.kind, 1) : 1,
   photo: Math.max(0, Math.floor(numv(p.photo))),
+  ...(p.rail === 'wood' || p.rail === 'ready' || p.rail === 'post' ? {rail: p.rail} : {}), // 手すりの種類（railSlots.ts）
   // 前の版の「工事名称」（work）は読まない。見積書の改修内容・工事名称は改修の種類から
   ...lengthTail(numv(p.kind, 1), cleanDims(p.dims), str(p.shinseiText)),
   ...(str(p.plateLength).trim() ? {plateLength: str(p.plateLength)} : {}), // ベースプレートの長さ（「＋ ベースプレート」）

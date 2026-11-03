@@ -222,7 +222,7 @@ export function describeKey(job: Job, key: string, rates: EstimateRates): string
     const names = rows.slice(head, workEnd(rows, head)).map((x) => x.name.trim()).filter((x) => x && x !== '同上施工費' && x !== '施工費');
     const after = head > 0 && rows[head - 1].kind === 'material' && !isBlankRow(rows[head - 1]);
     what = `${after ? '同上施工費' : '施工費'}${names.length ? `（${names.join('・')}）` : ''}`;
-  } else what = isBlankRow(r) ? '空白の行' : short((r.estText ?? materialText(r)).replace(/\s+/g, ' ').trim());
+  } else what = isBlankRow(r) ? (r.slot ? `${r.slot}（空き）` : '空白の行') : short((r.estText ?? materialText(r)).replace(/\s+/g, ' ').trim());
   const name = kind === 'excl' ? '介護保険の対象／対象外' : FIELD_NAMES[field] ?? '';
   return [placeName(found.place), what, name].filter(Boolean).join(' ／ ');
 }
@@ -630,8 +630,14 @@ function unitRange(rows: Row[], ri: number): [number, number] {
 export function deleteTouchesShinsei(job: Job, rowId: string): Place | null {
   const found = findRow(job, rowId);
   if (!found) return null;
-  const [a, b] = unitRange(found.place.rows, found.ri);
-  return found.place.rows.length - (b - a) === 0 && hasShinseiData(found.place) ? found.place : null;
+  const rows = found.place.rows;
+  const [a, b] = unitRange(rows, found.ri);
+  const rest = [...rows.slice(0, a), ...rows.slice(b)];
+  // 申請書で入れた箇所の空きの行（railSlots.ts の「（ブラケット）」「（施工費）」など）は見積書に何も入っていない行なので、
+  // 何か入った行を消して空きの行だけになるときも聞く。空きの行を消すとき（ほかの行が残る）は聞かない
+  const real = rows.slice(a, b).some((r) => !isBlankRow(r));
+  const nothingLeft = rest.length === 0 || (real && rest.every(isBlankRow));
+  return nothingLeft && hasShinseiData(found.place) ? found.place : null;
 }
 
 /** 箇所を見積書と申請書の両方から消す（申請書の改修の内容・寸法・写真なども） */
@@ -707,6 +713,17 @@ export function pasteLines(job: Job, key: string, rows: Row[], removeIds: string
   const at = place ? place.rows.findIndex((r) => r.id === copies[0].id) : -1;
   if (!place || at < 0) return {job: j, rowId: null};
   return {job: j, rowId: place.rows[place.rows[at].kind === 'labor' ? workHead(place.rows, at) : at].id};
+}
+
+/**
+ * 見積書の1行の「挿入」で行が入る所：その行の組（部材とすぐ下の同上施工費・施工費のまとまり）のいちばん下の行。見積書の画面で、
+ * 「＋ 挿入」にマウスを乗せたときに線を出す（ユーザーの指示「挿入でいれる場合、どこにスペースが入り挿入できるかが、ややわかりずらいので、わかるようにする」2026-11-03）
+ */
+export function insertAfterId(job: Job, rowId: string): string | null {
+  const found = findRow(job, rowId);
+  if (!found) return null;
+  const [, b] = unitRange(found.place.rows, found.ri);
+  return found.place.rows[b - 1]?.id ?? null;
 }
 
 /** 見積書の1行のすぐ下に、空の部材の行を入れる（その行の欄に打ち込む） */

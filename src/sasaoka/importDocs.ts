@@ -15,6 +15,7 @@ import type {EstimateSettings} from './calc.ts';
 import {jobInsurer, KINDS, NO_SHINSEI} from './estimateForms.ts';
 import {readRiyuBook, NO_RIYU} from './riyu.ts';
 import {manualRow, newPlace} from './rows.ts';
+import {withSlots} from './railSlots.ts';
 import {isLaborText, parseKind, parseListNote, parsePlace} from './sheetEdit.ts';
 import {readShinseiPhotos} from './photoImport.ts';
 import type {FramePhotos} from './photoImport.ts';
@@ -142,15 +143,15 @@ export function placeFromShinsei(sp: ShinseiPlace): Place {
     take('H', false, 'h');
   }
   const other = rest.replace(/^[\s　]+|[\s　]+$/g, '').replace(/[\s　]{2,}/g, '　');
-  // 空白の行を1つ（申請書のタブで足した箇所と同じ。ShinseiEditor.tsx。行のない箇所は申請書・見積書に出ない）
-  return {
-    ...newPlace(sp.name, [manualRow('material')]),
+  // 見積書の空きの行（申請書のタブで足した箇所と同じ。手すり・ブラケット・施工費など。`withSlots`。行のない箇所は申請書・見積書に出ない）
+  return withSlots({
+    ...newPlace(sp.name),
     kind: sp.kind || 1,
     photo: sp.photo,
     ...(Object.keys(dims).length ? {dims} : {}),
     ...(plate ? {plateLength: plate.bp} : {}),
     ...(other ? {shinseiText: other} : {}),
-  };
+  });
 }
 
 const base = (file: string, hash: string, kind: DocKind): ReadDoc => ({
