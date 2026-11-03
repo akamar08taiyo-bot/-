@@ -277,3 +277,62 @@ test('非課税（カタログの金額の横の「非課税」）：歩行器�
   const chair = (await productsOf(40))[0];
   assert.equal(catalogItemPatch(chair, chair.variants[0], {category: '歩行器', sub: '', maker: ''}).taxType, '10%');
 });
+
+// ---------------- 2026-11-03 のカタログの金額の点検（ユーザーの指示「カタログの金額確認など、全ての項目でデバッグ」）で見つけて直したこと。
+// 金額は書かない（同じ・ちがうだけ）
+const variantOf = (list: CatalogProduct[], code: string) => {
+  for (const p of list) for (const v of p.variants) if (v.code === code) return {p, v};
+  throw new Error(`品番がない：${code}`);
+};
+
+test('英字だけの品番も読む（歩行器の SAWR・SAWMSSR・SAV、バスボードの VALSBDSOR）。NEW は品番にしない', async () => {
+  const p137 = await productsOf(137);
+  for (const c of ['SAWR', 'SAWSR', 'SAWHR', 'SAWSSR']) assert.equal(variantOf(p137, c).p.category, '歩行器', c);
+  const p136 = await productsOf(136);
+  for (const c of ['SAWMR', 'SAWMSR', 'SAWMHR', 'SAWMSSR', 'SAWCR', 'SAV', 'SAVA', 'SAUX']) assert.ok(variantOf(p136, c).v.listPrice > 0, c);
+  const p46 = await productsOf(46);
+  assert.notEqual(variantOf(p46, 'VALSBDSOR').v.listPrice, variantOf(p46, 'VALSBDLOR').v.listPrice); // S と L で金額がちがう
+  for (const no of [40, 41, 48, 49, 51, 137, 151, 152, 153, 173]) assert.ok(!(await productsOf(no)).some((p) => p.variants.some((v) => v.code === 'NEW')), `p.${no}`);
+});
+
+test('金額のまとまり：品番の下に続く行（O型シート・TAIS）があるときは、2行のまん中で比べる（SW6083SAL・WB5148・スリムタイプの歩行器）', async () => {
+  const p49 = await productsOf(49);
+  const price = (list: CatalogProduct[], c: string) => variantOf(list, c).v.listPrice;
+  assert.equal(price(p49, 'SW6083SAL'), price(p49, 'SW6084SAL')); // バケツ付の2つは同じ金額
+  assert.notEqual(price(p49, 'SW6083SAL'), price(p49, 'SW6081SAL'));
+  const p154 = await productsOf(154);
+  assert.equal(price(p154, 'WB5148'), price(p154, 'WB5256'));
+  assert.notEqual(price(p154, 'WB5148'), price(p154, 'WB5147'));
+  const p136 = await productsOf(136);
+  assert.equal(price(p136, 'SW5310'), price(p136, 'SW5320'));
+  assert.notEqual(price(p136, 'SW5310'), price(p136, 'SAWMSSR'));
+  assert.equal(price(p136, 'SW5210'), price(p136, 'SW5220'));
+  const p137 = await productsOf(137);
+  assert.equal(price(p137, 'SW5110'), price(p137, 'SW5120'));
+  assert.notEqual(price(p137, 'SW5110'), price(p137, 'SAWSSR'));
+  // 続きの行がない行のある表は今までどおり（p.214 バリアフリーレールの下の「フラットタイプ（長さ200cm）」を続きと見ない）
+  const p214 = await productsOf(214);
+  assert.equal(price(p214, 'BF120-1000-DO'), price(p214, 'BF120-1000-LO'));
+});
+
+test('囲みの中の小さな囲み（p.175 の「5 バケツA型用 袋止めN」）の下の表は、左の「4 ポータブルトイレ きらく ミニでか」のもの', async () => {
+  const p175 = await productsOf(175);
+  const kiraku = variantOf(p175, '45601').p;
+  assert.match(kiraku.name, /きらく ミニでか/);
+  assert.equal(kiraku.category, '腰掛便座');
+  assert.deepEqual(kiraku.variants.map((v) => v.code), ['45601', '45603', '45611', '45613', '40035', '40036']);
+  const bag = p175.find((p) => /袋止めN/.test(p.name))!;
+  assert.deepEqual(bag.variants.map((v) => v.code), ['261-T1115']);
+  assert.ok(bag.variants[0].listPrice > 0);
+});
+
+test('品番のない商品（注文番号だけ）で金額がいくつもあるときは、金額と同じ行の字を色・大きさにする（p.47 オーバルリンク・p.48 乾度良好）', async () => {
+  const p47 = await productsOf(47);
+  const oval = p47.find((p) => /オーバルリンク/.test(p.name))!;
+  assert.deepEqual(
+    oval.variants.map((v) => v.label.split(' ')[0]),
+    ['マットタイプM', 'マットタイプL', 'ミディアムタイプ', 'ロングタイプL1', 'ロングタイプL2', 'ロングタイプL3'],
+  );
+  const p48 = await productsOf(48);
+  assert.deepEqual(p48.find((p) => /乾度良好/.test(p.name))!.variants.map((v) => v.label), ['50×80cm', '60×90cm', '90×120cm']);
+});
