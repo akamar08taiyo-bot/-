@@ -139,6 +139,18 @@ try {
   // 税込は税抜のすぐ横（同じ行）
   const [ex, inc] = [await block.getByLabel(P, {exact: true}).boundingBox(), await block.getByLabel(`${P}（税込）`).boundingBox()];
   assert.ok(inc.x > ex.x + ex.width && Math.abs(inc.y - ex.y) < 2, `${JSON.stringify(ex)} ${JSON.stringify(inc)}`);
+  // 6けたの金額（「188,800」）でも最後の字まで見える（前は「108,000」の最後の 0 が欄に隠れていた。2026-11-03 の全体のデバッグ）
+  await block.getByLabel(`${P}（税込）`).click();
+  await block.getByLabel(`${P}（税込）`).fill('188800');
+  await block.getByLabel(`${P}（税込）`).blur();
+  for (const l of [P, `${P}（税込）`]) {
+    const [cw, sw, v] = await block.getByLabel(l, {exact: true}).evaluate((e) => [e.clientWidth, e.scrollWidth, e.value]);
+    assert.ok(v.length >= 7 && sw <= cw, `${l}「${v}」が欄に入らない ${sw}>${cw}`);
+  }
+  await block.getByLabel(`${P}（税込）`).click();
+  await block.getByLabel(`${P}（税込）`).fill(String(p30 + Math.floor(p30 / 10)));
+  await block.getByLabel(`${P}（税込）`).blur();
+  await valueIs('割引率', '30');
   log('税抜・税込・割引率 OK');
 
   // ---- 仕切を入れたら右に利益率。利益率を打つと販売金額・割引率・備考（算出根拠）が変わる

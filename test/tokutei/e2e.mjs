@@ -1026,8 +1026,8 @@ try {
   assert.equal(await viewerPages.getByRole('button', {name: /^.+p\.\d+/}).count(), 26);
   await searchViewer.getByRole('button', {name: 'カタログを閉じる'}).click();
   // 色が2つ以上ある商品は、商品名を押すと色が開く（ユーザーの指示「商品名も色が複数ある場合は、アコーディオン形式にして、商品名をおすと、色を選べるようにする」2026-11-02）
-  // 色が1つだけの商品（p.40 のプレミアム）は、商品名を押すとすぐ入る
-  assert.deepEqual(await panaList.getByRole('button', {name: /を入れる$/}).evaluateAll((xs) => xs.map((x) => x.getAttribute('aria-label').replace(/ [\w-]+を入れる$/, ''))), ['シャワーチェアAir ミドルSPワンタッチ プレミアム']);
+  // 色が1つだけの商品（p.40 のプレミアム）は、商品名を押すとすぐ入る（色は品番の下の「モカブラウン」。2026-11-03 から品番の下の名前も読む）
+  assert.deepEqual(await panaList.getByRole('button', {name: /を入れる$/}).evaluateAll((xs) => xs.map((x) => x.getAttribute('aria-label').replace(/ [\w-]+を入れる$/, ''))), ['シャワーチェアAir ミドルSPワンタッチ プレミアム モカブラウン']);
   const compact = panaList.getByRole('button', {name: 'シャワーチェアAir コンパクトSPワンタッチ（3種類）'});
   assert.equal(await compact.getAttribute('aria-expanded'), 'false');
   await compact.click();

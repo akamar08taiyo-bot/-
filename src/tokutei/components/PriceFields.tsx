@@ -19,10 +19,11 @@ import {FavoriteButton} from './ShinseiParts.tsx';
 import {NumberInput} from './ui.tsx';
 
 /** 行の見出し（左の列。どの行も同じ幅でそろえ、長い見出しは2行に）と、行の中の2つ目からの見出し。見出しと欄の組は途中で折り返さない（狭い幅では組ごと次の行へ） */
-const LABEL = 'w-[4.5rem] shrink-0 text-xs font-bold leading-tight text-slate-500';
+// 見出しは 3.5rem（「定価」「（税抜）」のように言葉の切れ目で2行。欄の高さの中に入る）。申請書のタブの左の欄（346px）で、税抜・税込・非課税を1行に入れるため
+const LABEL = 'w-14 shrink-0 text-xs font-bold leading-tight text-slate-500';
 const LABEL2 = 'shrink-0 text-xs font-bold text-slate-500';
 const ROW = 'flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1';
-const PAIR = 'flex shrink-0 items-center gap-1.5';
+const PAIR = 'flex shrink-0 items-center gap-1';
 
 /** 割引率の欄に出す値：手で入れた単価なら定価からの実際の割引率（0〜100%。前の版で入れて割引率が古いままの案件も）、ほかは割引率の欄の値 */
 export function shownDiscount(line: Line): number {
@@ -57,7 +58,10 @@ export function PriceFields({
       {/* 1行目：定価・割引率・★ お気に入りから入力（大事な定価を左に。ユーザーの指示「重要項目は行の左にもってくる」2026-11-03） */}
       <div className={ROW}>
         <span className={PAIR}>
-          <span className={LABEL}>定価（{taxWord}）</span>
+          <span className={LABEL}>
+            <span className="inline-block">定価</span>
+            <span className="inline-block">（{taxWord}）</span>
+          </span>
           {listEditable ? (
             <NumberInput value={i.listPrice} onChange={(listPrice) => change({listPrice})} min={0} blankZero className="w-24" ariaLabel="定価" />
           ) : (
@@ -74,13 +78,16 @@ export function PriceFields({
         {onPickFavorite && <FavoriteButton onClick={onPickFavorite} />}
       </div>
       {/* 2行目：税抜（非課税）と、すぐ横に税込（打つと税抜と割引率が変わる）・非課税のボタン。字の大きさは同じ。税込は見出しの色と欄の枠を少し濃くして見つけやすく。
-          パソコンの左の欄（幅 400px ほど）で1行に入るよう、欄は 5.25rem（135,000 まで入る）・ボタンは 13px（スマホでは税込と非課税が下の行へ） */}
+          申請書のタブの左の欄（幅 346px）でも1行に入るよう、ボタンは 13px（スマホでは税込と非課税が下の行へ）。欄は 5.75rem・左右の余白 6px で「188,800」まで入る
+          （前の 5.25rem・余白 8px は「108,000」の最後の字が欄に隠れていた。2026-11-03 の全体のデバッグで測って見つけた） */}
       <div className={ROW}>
         <span className={PAIR}>
+          {/* 「販売金額（税抜）」は欄の見出しの幅に入らないので、「販売金額」「（税抜）」の切れ目で2行に（前は「（税」「抜）」で切れていた） */}
           <span className={LABEL}>
-            {priceLabel}（{taxWord}）
+            <span className="inline-block">{priceLabel}</span>
+            <span className="inline-block">（{taxWord}）</span>
           </span>
-          <NumberInput value={line.unitPrice} onChange={(unitPrice) => change(unitPricePatch(i, unitPrice))} min={0} className={`w-[5.25rem] ${manual ? 'bg-amber-50' : ''}`} ariaLabel={priceAria} />
+          <NumberInput value={line.unitPrice} onChange={(unitPrice) => change(unitPricePatch(i, unitPrice))} min={0} className={`w-[5.75rem] !px-1.5 ${manual ? 'bg-amber-50' : ''}`} ariaLabel={priceAria} />
         </span>
         <span className={PAIR}>
           <span className={`${LABEL2} !text-teal-800`}>税込</span>
@@ -88,7 +95,7 @@ export function PriceFields({
             value={taxIn}
             onChange={(t) => change(unitPricePatch(i, priceFromTaxIncluded(t, i.taxType)))}
             min={0}
-            className={`w-[5.25rem] !border-teal-400 ${manual ? 'bg-amber-50' : ''}`}
+            className={`w-[5.75rem] !px-1.5 !border-teal-400 ${manual ? 'bg-amber-50' : ''}`}
             ariaLabel={`${priceAria}（税込）`}
           />
           {/* 非課税（歩行器・多点杖などは種目・カタログから自動で非課税。念のため手でも切りかえられる。押した商品は種目を変えても自動で戻さない） */}
@@ -96,7 +103,7 @@ export function PriceFields({
             type="button"
             aria-pressed={free}
             onClick={() => change({taxType: free ? '10%' : '非課税', taxByHand: true})}
-            className={`h-9 shrink-0 rounded-md border px-2 text-[13px] font-bold transition ${free ? 'border-amber-400 bg-amber-50 text-amber-900' : 'border-slate-300 bg-white text-slate-500 hover:bg-slate-50'}`}
+            className={`h-9 shrink-0 rounded-md border px-1.5 text-[13px] font-bold transition ${free ? 'border-amber-400 bg-amber-50 text-amber-900' : 'border-slate-300 bg-white text-slate-500 hover:bg-slate-50'}`}
             title={free ? '非課税（押すと課税 10%）' : '課税 10%（押すと非課税）'}
           >
             {free ? '✓ 非課税' : '非課税'}
@@ -111,7 +118,10 @@ export function PriceFields({
       {/* 3行目：仕切（任意）と、仕切を入れたら右に利益率（打つと販売金額が変わる） */}
       <div className={ROW}>
         <span className={PAIR}>
-          <span className={LABEL}>仕切（任意）</span>
+          <span className={LABEL}>
+            <span className="inline-block">仕切</span>
+            <span className="inline-block">（任意）</span>
+          </span>
           <NumberInput value={i.cost} onChange={(cost) => change({cost})} min={0} blankZero className="w-24" ariaLabel="仕切" />
         </span>
         {i.cost > 0 && (
