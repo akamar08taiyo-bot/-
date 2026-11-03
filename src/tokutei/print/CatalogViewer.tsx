@@ -373,13 +373,20 @@ export function CatalogViewer({
 
   const img = images[current];
   // ページを替えたら・窓の大きさが変わったら、絵の左上を窓の左上に（まわりの余白の分だけ動かしておく）
-  const hasImg = !!img;
-  useLayoutEffect(() => {
+  // 絵がまだ読めていない（高さ 0）ときは、上下の余白の所までしか動かせない（灰色の所が上に大きく出た）→ 絵が読めたときにもう一度動かす（toOrigin）
+  const imgUrl = img?.url ?? '';
+  const toOrigin = useRef(false);
+  const goOrigin = () => {
     const el = viewRef.current;
-    if (!el || !hasImg) return;
-    el.scrollLeft = pane.padX;
-    el.scrollTop = pane.padY;
-  }, [current, pane.padX, pane.padY, hasImg]);
+    if (!el) return;
+    el.scrollLeft = paneRef.current.padX;
+    el.scrollTop = paneRef.current.padY;
+    toOrigin.current = Math.abs(el.scrollTop - paneRef.current.padY) > 1 || Math.abs(el.scrollLeft - paneRef.current.padX) > 1;
+  };
+  useLayoutEffect(() => {
+    if (!imgUrl) return;
+    goOrigin();
+  }, [current, imgUrl, pane.padX, pane.padY]);
   const tool = 'h-8 min-w-8 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-700 hover:bg-slate-50';
   return (
     <div
@@ -471,7 +478,10 @@ export function CatalogViewer({
               alt={catalogLabel(CATALOG[current])}
               className="block w-full max-w-none"
               draggable={false}
-              onLoad={(e) => setNatural({w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight})}
+              onLoad={(e) => {
+                setNatural({w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight});
+                if (toOrigin.current) goOrigin();
+              }}
             />
             {/* 商品の押せる枠：点線の枠と「＋ 選ぶ」。マウスを乗せると色が濃くなる。入っている商品は実線と「✓ 入っています」 */}
             {onPick &&
