@@ -833,18 +833,22 @@ try {
   // 販売金額（税抜）のすぐ横に税込。税抜・税込のどちらを打っても割引率が変わり、割引率を打つと税抜・税込が変わる
   // （ユーザーの指示「税込の合計金額は、税抜きの横にしっかりとわかりやすくする。税抜き金額、税込み金額を変更すると、自動的に割引率が変わるようにする。また、逆もしかり」2026-11-03）
   const valueIs = (label, v) => page.waitForFunction(([l, x]) => document.querySelector(`[aria-label="${l}"]`)?.value === x, [label, v]);
-  await shinseiForm.getByLabel('割引率').fill('30');
-  await shinseiForm.getByLabel('割引率').blur();
+  // 数字の欄は押してから打つ（押したときに桁区切りを外して全体を選ぶので、すぐに打つと前の数字のうしろに続いてしまう）
+  const typeIn = async (label, v) => {
+    const el = shinseiForm.getByLabel(label, {exact: true});
+    await el.click();
+    await page.waitForFunction((l) => document.activeElement?.getAttribute('aria-label') === l, label);
+    await el.fill(v);
+    await el.blur();
+  };
+  await typeIn('割引率', '30');
   await valueIs('販売金額', '6,300');
   await valueIs('販売金額（税込）', '6,930');
   await page.waitForFunction(() => document.querySelector('[aria-label="申請書のプレビュー"]')?.textContent?.includes('6,930'));
-  await shinseiForm.getByLabel('販売金額', {exact: true}).fill('7000');
-  await shinseiForm.getByLabel('販売金額', {exact: true}).blur();
+  await typeIn('販売金額', '7000');
   await valueIs('販売金額（税込）', '7,700');
   await valueIs('割引率', '22.2'); // 9,000円の 7,000円 ＝ 22.2%引き
-  await shinseiForm.getByLabel('販売金額（税込）').click();
-  await shinseiForm.getByLabel('販売金額（税込）').fill('7920');
-  await shinseiForm.getByLabel('販売金額（税込）').blur();
+  await typeIn('販売金額（税込）', '7920');
   await valueIs('販売金額', '7,200');
   await valueIs('割引率', '20');
   await page.waitForFunction(() => document.querySelector('[aria-label="申請書のプレビュー"]')?.textContent?.includes('7,920'));
@@ -852,8 +856,7 @@ try {
   await shinseiForm.getByRole('button', {name: '販売金額を自動に戻す'}).click();
   await valueIs('販売金額', '7,200');
   assert.equal(await shinseiForm.getByRole('button', {name: '販売金額を自動に戻す'}).count(), 0);
-  await shinseiForm.getByLabel('割引率').fill(String(rate));
-  await shinseiForm.getByLabel('割引率').blur();
+  await typeIn('割引率', String(rate));
   const one = Math.floor(((9000 * (100 - rate)) / 100) * 1.1);
   await valueIs('販売金額（税込）', one.toLocaleString('ja-JP'));
   // 数量（− ＋。ユーザーの指示「数量を追加」2026-10-26。販売見積書の数量と同じ値）。2つ以上なら下にその数量の金額（税抜・税込。字の大きさはそろえる）
