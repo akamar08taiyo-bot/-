@@ -432,7 +432,7 @@ function useSideDrop(): boolean {
 }
 
 /**
- * 様邸の画面の「🪪 介護保険証」：読んで、確かめて、この様邸に入れる。
+ * 様邸の画面の「🪪 介護保険証から自動入力」（2026-11-03 までは「🪪 介護保険証」）：読んで、確かめて、この様邸に入れる。
  * 広い画面は、左の余白に縦長の大きな欄（どのタブでも同じ所。ユーザーの指示「各保険者のこの画面のこの辺に貼り付け欄を大きく設置し、貼り付けるようにする」2026-10-23）、
  * 狭い画面は様邸の画面の上の段の右の端の小さな欄（JobHeader.tsx の extra）。どちらか1つだけ出す（Ctrl+V を2回読まないように）
  */
@@ -453,12 +453,13 @@ export function CardFill({job, setJob}: {job: Job; setJob: (fn: (j: Job) => Job)
                 <span className="block text-5xl" aria-hidden>
                   🪪
                 </span>
-                <span className="mt-2 block text-lg leading-snug">介護保険証</span>
+                {/* 名前は「介護保険証から自動入力」（ユーザーの指示「介護保険証ではなく、介護保険証から自動入力に変更」2026-11-03） */}
+                <span className="mt-2 block text-lg leading-snug">介護保険証から自動入力</span>
               </>
             }
             hint="ここにドロップ・Ctrl+V（押して選んでもよい）"
           >
-            🪪 介護保険証
+            🪪 介護保険証から自動入力
           </CardDrop>
           {/* 介援隊のカタログ（ユーザーの指示「赤枠の部分にカタログを表示とカタログを印刷という２つのボタンを設置する」2026-10-26。🛁 のタブの中で開く。tokuteiLink.ts） */}
           <Btn color="white" className="w-full !text-base" onClick={() => askCatalog('show')}>
@@ -469,7 +470,10 @@ export function CardFill({job, setJob}: {job: Job; setJob: (fn: (j: Job) => Job)
           </Btn>
         </div>
       ) : (
-        <CardDrop onRead={setGot}>🪪 介護保険証</CardDrop>
+        // 上の段の右の小さな枠。名前が長くなった（「介護保険証から自動入力」）ので、字を少し小さく・左右の余白を詰めて、1366px（Windows の縦のスクロールバーあり）でも保険者・保険者番号と同じ段に入れる
+        <CardDrop onRead={setGot} className="!px-2" label={<span className="text-xs">🪪 介護保険証から自動入力</span>}>
+          🪪 介護保険証から自動入力
+        </CardDrop>
       )}
       {got && (
         <CardDialog

@@ -1,6 +1,6 @@
 // ドロップと貼り付けの分かりやすい枠を確かめる（ユーザーの指示「完了写真もドラッグ＆ドロップや貼付けしやすいようにする。介護保険証もそうです」2026-10-23。
 // 2026-10-29 に、ほかの確かめから分けた）：
-//   1. 様邸の画面の入口「🪪 介護保険証」：上の段の右の端の点線の枠・「ここにドロップ・Ctrl+V」・ファイルを持ってくると薄い緑・重ねると「ここに離す」。枠の文字は「🪪 介護保険証」だけ
+//   1. 様邸の画面の入口「🪪 介護保険証から自動入力」（2026-11-03 までは「🪪 介護保険証」）：上の段の右の端の点線の枠・「ここにドロップ・Ctrl+V」・ファイルを持ってくると薄い緑・重ねると「ここに離す」。枠の文字は「🪪 介護保険証から自動入力」だけ
 //   2. 写真の枠：ファイルを持ってくると枠が薄い緑・重ねると「ここに離す」、空いた枠にドロップ、枠を選んで Ctrl+V（介護保険証の読み取りにはならない）・差し替え
 //   3. スマホ（390px）で横にはみ出さない（スクリーンショットを保存）
 // usage: node e2e-drop.mjs <サイトのURL> <出力フォルダ>
@@ -29,9 +29,9 @@ await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
 const form = page.getByRole('form', {name: '申請書'});
 await form.waitFor();
 
-// ---------------- 1. 入口：上の段の右の端の点線の枠「🪪 介護保険証」「ここにドロップ・Ctrl+V」
-const area = page.getByRole('button', {name: '🪪 介護保険証', exact: true});
-assert.match(await area.innerText(), /^\s*🪪 介護保険証\s*ここにドロップ・Ctrl\+V\s*$/);
+// ---------------- 1. 入口：上の段の右の端の点線の枠「🪪 介護保険証から自動入力」「ここにドロップ・Ctrl+V」
+const area = page.getByRole('button', {name: '🪪 介護保険証から自動入力', exact: true});
+assert.match(await area.innerText(), /^\s*🪪 介護保険証から自動入力\s*ここにドロップ・Ctrl\+V\s*$/);
 assert.equal(await area.evaluate((el) => getComputedStyle(el).borderStyle), 'dashed');
 // 2026-11-03 から、様邸のタブは上の帯（App.tsx の JobTabs）。枠は様邸の画面の上の段（保存・印刷・その他 ▼ の段）の右の端（JobHeader.tsx の extra）
 const more = page.getByRole('button', {name: /^その他 [▼▲]$/});
@@ -48,13 +48,13 @@ const dragOver = (selector) =>
     el.dispatchEvent(new DragEvent('dragover', {dataTransfer: dt, bubbles: true, cancelable: true}));
   }, selector);
 await dragOver('h1');
-await page.waitForFunction(() => document.querySelector('[aria-label="🪪 介護保険証"]')?.getAttribute('data-drop') === 'ready');
-await dragOver('[aria-label="🪪 介護保険証"]');
+await page.waitForFunction(() => document.querySelector('[aria-label="🪪 介護保険証から自動入力"]')?.getAttribute('data-drop') === 'ready');
+await dragOver('[aria-label="🪪 介護保険証から自動入力"]');
 await area.getByText('ここに離す').waitFor();
 assert.equal(await area.getAttribute('data-drop'), 'over');
 await page.screenshot({path: path.join(outDir, 'drag-over-area.png'), clip: {x: 0, y: 0, width: 1366, height: 260}});
-await page.waitForFunction(() => !document.querySelector('[aria-label="🪪 介護保険証"]')?.textContent?.includes('ここに離す'), null, {timeout: 3000});
-log('入口の枠「🪪 介護保険証」・ドラッグ中の色・「ここに離す」OK');
+await page.waitForFunction(() => !document.querySelector('[aria-label="🪪 介護保険証から自動入力"]')?.textContent?.includes('ここに離す'), null, {timeout: 3000});
+log('入口の枠「🪪 介護保険証から自動入力」・ドラッグ中の色・「ここに離す」OK');
 
 // ---------------- 2. 写真の枠：ドロップ・Ctrl+V（申請書のタブ）
 /** ファイルの入った貼り付け（Ctrl+V。今いる所に paste を出す） */
@@ -127,8 +127,8 @@ log('写真の枠：ドラッグ中の色・ここに離す・ドロップ・Ctr
 await page.setViewportSize({width: 390, height: 844});
 await page.waitForTimeout(400);
 assert.ok((await page.evaluate(() => document.documentElement.scrollWidth)) <= 390, `申請書のタブ ${await page.evaluate(() => document.documentElement.scrollWidth)}`);
-// スマホの幅では小さい字（ここにドロップ…）を出さない。枠の文字は「🪪 介護保険証」だけ
-assert.equal((await page.getByRole('button', {name: '🪪 介護保険証', exact: true}).innerText()).trim(), '🪪 介護保険証');
+// スマホの幅では小さい字（ここにドロップ…）を出さない。枠の文字は「🪪 介護保険証から自動入力」だけ
+assert.equal((await page.getByRole('button', {name: '🪪 介護保険証から自動入力', exact: true}).innerText()).trim(), '🪪 介護保険証から自動入力');
 await page.screenshot({path: path.join(outDir, 'phone-shinsei.png')});
 await page.getByRole('region', {name: '写真'}).screenshot({path: path.join(outDir, 'phone-photos.png')});
 await (await navItem(page, /見積もり・申請書を作成する/)).click();
