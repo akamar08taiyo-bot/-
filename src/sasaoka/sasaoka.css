@@ -269,9 +269,14 @@ img {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   white-space: pre-wrap;
 }
-/* 空いた行の内容の欄の「部材｜施工費｜常用」（入力の画面だけ。EstimateForms.tsx の PICK）。欄の左に寄せて薄く、マウスを乗せると光る
-   （ユーザーの指示「枠内に薄っすら、部材、施工費どちらか選べるよう、押せるようにする」「内容の中の枠内の左によせる。マウスを乗せたら、光るなどわかるようにする」2026-11-03）。
+/* 空いた行の内容の欄の「部材｜施工費｜常用」（入力の画面だけ。EstimateForms.tsx の PICK）。欄のまん中に薄く、マウスを乗せると光る
+   （ユーザーの指示「枠内に薄っすら、部材、施工費どちらか選べるよう、押せるようにする」「マウスを乗せたら、光るなどわかるようにする」2026-11-03。
+   はじめは「内容の中の枠内の左によせる」だったが、同じ日に「部材・施工費・常用は枠内の中央揃えにする」）。
    色は前の左のボタンと同じ：部材＝薄い緑・施工費＝薄い水色・常用＝薄い紫 */
+/* 空白の行（td[data-empty]）と、いちばん下の打ち込める行（tr[data-new]）の内容の欄の両方 */
+.est-sheet td:has(> .sheet-pick) {
+  text-align: center;
+}
 .est-sheet .sheet-pick {
   position: relative;
   display: inline-flex;
@@ -317,7 +322,8 @@ img {
   box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.35);
 }
 /* 空いた行の「部材｜施工費｜常用」の右の薄い矢印と案内（EstimateSheet.tsx の guides。表の外の重ねで、空いた行の数量・単価の欄の上に出す。押せない）。
-   欄を選んだら、緑の「⌨ 品番・品名を打つと検索」（.sheet-pick-hint）に替わる（ユーザーの指示「薄い矢印を持ってきて、項目から選ぶか、品番を入力みたいのがわかるようにする」2026-11-03） */
+   （ユーザーの指示「薄い矢印を持ってきて、項目から選ぶか、品番を入力みたいのがわかるようにする」2026-11-03）。選んでいる行（薄い緑）も同じ案内で、地の色だけ行に合わせる。
+   前は選んだ行だけ濃い緑の「⌨ 品番・品名を打つと検索」に替えていたが、「濃い緑の説明は不要」（2026-11-03）で外した */
 .sheet-pick-guide {
   position: absolute;
   z-index: 5;
@@ -334,22 +340,8 @@ img {
   white-space: nowrap;
   pointer-events: none;
 }
-/* 空いた欄を選んだら、欄のすぐ右（同じ行の空いた数量・単価の欄の上）に「品番・品名を打つと検索」（打つ前だけ。EstimateSheet.tsx の pickHint）。
-   欄のすぐ下だと、下の行の品名を隠した */
-.sheet-pick-hint {
-  position: absolute;
-  z-index: 7;
-  display: flex;
-  align-items: center;
-  padding: 0 6px;
-  border-radius: 4px;
-  background: #217346;
-  color: #fff;
-  font-size: 10.5px;
-  font-weight: 700;
-  line-height: 1.4;
-  white-space: nowrap;
-  pointer-events: none;
+.sheet-pick-guide.on-current {
+  background: #ecfdf5; /* 選んでいる行の地（.est-sheet tr[data-current] > td）と同じ */
 }
 /* 選んでいる行（行の 挿入・削除・コピー・貼付が効く行）は薄い緑。マウスを乗せた欄は枠で分かるように（.est-sheet [data-edit]:hover）
    （ユーザーの指示「右の空いたスペースにのせたら、そのセルを選択していることが認識でき、削除やコピーなどをおこなえるようにする」2026-11-03） */

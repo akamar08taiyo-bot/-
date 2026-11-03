@@ -80,6 +80,24 @@ await setLength('600×1800');
 assert.ok((await tds('BD-01G')).join('|').includes('|1||800|800|'), (await tds('BD-01G')).join('|'));
 log('申請書の長さ 2400 → 2個・900 → 外れる・600×1800 → 1個 OK');
 
+// ---------------- 申請書の長さを空けると、見積書の手すりの長さを薄い字ではなくそのまま入れて見せる（ユーザーの指示「申請書で長さなど、何も入力していなくても
+// うっすら表示される。（入力したら手すりやベースプレートの長さから逆算して、申請書の長さを入力する）」2026-11-03）。
+// スマホのように1字ずつ消して空にしても（「600×18」「600」「6」が見積書に入る）、打ち始めたときの長さに戻る（手で入れた「600×1800」はそのまま）
+await shinseiTab.click();
+await length.click();
+await page.keyboard.press('End');
+for (let i = 0; i < 8; i++) await page.keyboard.press('Backspace');
+assert.equal(await length.inputValue(), ''); // 打っているあいだは空のまま
+await page.keyboard.press('Tab');
+assert.equal(await length.inputValue(), '600×1800');
+assert.equal(await length.getAttribute('placeholder'), '');
+assert.ok((await form.locator('[data-field="works"]').innerText()).length > 0);
+await estimateTab.click();
+await sheet.waitFor();
+assert.ok((await tds('BD-134')).join('|').includes('|0.6|本|'), (await tds('BD-134')).join('|'));
+assert.ok((await tds('BD-01G')).join('|').includes('|1||800|800|'), (await tds('BD-01G')).join('|'));
+log('申請書の長さを消しても見積書の長さ（600×1800）をそのまま入れて見せる・見積書は 0.6本のまま OK');
+
 // ---------------- 発注書にも BD-01G の数（手すりは 4000mm 1本）
 await (await openMore(page)).getByRole('button', {name: '🛒 発注書を作成'}).click();
 const list = page.getByRole('region', {name: '発注する部材'});

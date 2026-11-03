@@ -219,21 +219,19 @@ export function EstimateSheet({
     if (!box || Object.keys(next).some((k) => next[k as keyof Box] !== box[k as keyof Box])) setBox(next);
   });
 
-  // 空いた行の「部材｜施工費｜常用」の右の薄い矢印と案内の位置（選んでいる行は緑の pickHint を出すので除く）。
+  // 空いた行の「部材｜施工費｜常用」の右の薄い矢印と案内の位置（選んでいる行も。地の色は行に合わせる＝cur）。
   // 表の中に置くと右の欄の罫線（border-collapse）が字の上に描かれるので、選んだ欄の枠と同じく表の外に重ねる
-  const [guides, setGuides] = useState<{x: number; y: number; h: number}[]>([]);
+  const [guides, setGuides] = useState<{x: number; y: number; h: number; cur: boolean}[]>([]);
   useLayoutEffect(() => {
     const inner = innerRef.current;
     if (!inner) return;
     const b = inner.getBoundingClientRect();
-    const next = [...inner.querySelectorAll<HTMLElement>('.sheet-pick')]
-      .filter((el) => !el.closest('tr')?.hasAttribute('data-current'))
-      .map((el) => {
+    const next = [...inner.querySelectorAll<HTMLElement>('.sheet-pick')].map((el) => {
         // 横は「常用」のすぐ右、縦は行の高さいっぱい（上下の罫線の内側。字の上下に右の欄の縦の線がのぞかないように）
         const r = el.getBoundingClientRect();
         const row = el.closest('td')?.getBoundingClientRect() ?? r;
         const round = (v: number) => Math.round(v * 10) / 10;
-        return {x: round((r.right - b.left) / scale + 6), y: round((row.top - b.top) / scale + 1), h: round(row.height / scale - 2)};
+        return {x: round((r.right - b.left) / scale + 6), y: round((row.top - b.top) / scale + 1), h: round(row.height / scale - 2), cur: !!el.closest('tr')?.hasAttribute('data-current')};
       });
     if (JSON.stringify(next) !== JSON.stringify(guides)) setGuides(next);
   });
@@ -911,8 +909,6 @@ export function EstimateSheet({
       }
     : {left: -9999, top: 0, width: 10, height: 10};
   const rows = editing ? Math.max(1, edit.value.split('\n').length) : 1;
-  // 空いた行の内容の欄を選んでいる（打つ前）：欄のすぐ下に「品番・品名を打つと検索」（欄の中の左は「部材｜施工費｜常用」）
-  const pickHint = !editing && !!sel && field === 'text' && !!findCell(sel)?.querySelector('.sheet-pick');
   // 内容の欄に打っているあいだは、部材リストの候補を見出しつきで出す（合うものがなくても「ありません」と出す。品番を打っても探していることが分かるように）
   const searching = editing && textCell;
 
@@ -1031,16 +1027,10 @@ export function EstimateSheet({
             {form === 'kouiki' ? <KouikiForm job={job} settings={s} sheet={sheetOpts} /> : <YukuhashiForm job={job} settings={s} date={estDate} sheet={sheetOpts} />}
             {box && <div className="sheet-sel" style={{left: box.x, top: box.y, width: box.w, height: box.h}} />}
             {guides.map((g, i) => (
-              <div key={i} className="sheet-pick-guide" style={{left: g.x, top: g.y, height: g.h}} aria-hidden="true">
+              <div key={i} className={`sheet-pick-guide${g.cur ? ' on-current' : ''}`} style={{left: g.x, top: g.y, height: g.h}} aria-hidden="true">
                 ← 項目から選ぶ か 品番を入力
               </div>
             ))}
-            {box && pickHint && (
-              // 欄のすぐ右（同じ行の数量・単価・金額の欄。空いた行なので空いている）。前は欄のすぐ下に出していて、下の行の品名を隠した
-              <div className="sheet-pick-hint" style={{left: box.x + box.w + 2, top: box.y, height: box.h}} role="note">
-                ⌨ 品番・品名を打つと検索
-              </div>
-            )}
             {insertMark && (
               <div className="sheet-insert-mark" style={{top: insertMark.top - 1.5, left: insertMark.left, width: insertMark.width}} aria-hidden="true">
                 <span>ここに1行入ります</span>

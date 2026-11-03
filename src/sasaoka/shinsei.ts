@@ -1057,7 +1057,7 @@ export function estimateLength(p: Pick<Place, 'rows'>): string {
 function dimsText(p: Pick<Place, 'kind' | 'rows' | 'dims'>): string {
   const d = p.dims ?? {};
   if (p.kind === 1) {
-    const l = mmText(d.l, true) || estimateLength(p);
+    const l = mmText(d.l, true) || autoLength(p);
     const h = mmText(d.h);
     const ls = l
       .split('×')
@@ -1101,7 +1101,16 @@ function plateText(p: Pick<Place, 'kind' | 'plateLength'>): string {
     : '';
 }
 
-/** 見積書のベースプレートの使う長さ（申請書のベースプレートの欄の薄い字。`estimateLength` のベースプレートの方） */
+/**
+ * 申請書の長さを空けてあるときの長さ：見積書の手すりの使う長さ、手すりの長さがなければベースプレートの使う長さ。申請書の長さの欄には、これを薄い字ではなく
+ * ふつうの字で出す（ユーザーの指示「申請書で長さなど、何も入力していなくてもうっすら表示される。（入力したら手すりやベースプレートの長さから逆算して、申請書の長さを入力する）」2026-11-03）。
+ * 申請書・内訳明細書・平面図の「L=」もこの長さ（前から、空なら見積書の手すりの長さを書いていた）
+ */
+export function autoLength(p: Pick<Place, 'rows'>): string {
+  return estimateLength(p) || estimatePlateLength(p);
+}
+
+/** 見積書のベースプレートの使う長さ（申請書の「＋ ベースプレート」を開いたときに入れる長さ。`estimateLength` のベースプレートの方） */
 export function estimatePlateLength(p: Pick<Place, 'rows'>): string {
   const mm: string[] = [];
   for (const r of p.rows) {

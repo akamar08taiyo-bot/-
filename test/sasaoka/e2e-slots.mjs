@@ -71,20 +71,23 @@ await page.screenshot({path: path.join(outDir, 'slots-02-estimate.png')});
 log('見積書：廊下・トイレ 手すり・ブラケット・施工費／玄関～道路 支柱・手すり・ブラケット・施工費 OK');
 
 // ---------------- 空きの行の「部材」：検索は「ブラケット」・その行に入る
-// 空いた行の内容の欄には、左に薄く「部材｜施工費｜常用」だけ（名前（「（手すり）」など）は見せない）。見積書の左は Excelで保存・見積書を印刷
+// 空いた行の内容の欄には、まん中に薄く「部材｜施工費｜常用」だけ（名前（「（手すり）」など）は見せない）。見積書の左は Excelで保存・見積書を印刷
 assert.equal((await sheet.locator('[data-slot]').first().innerText()).replace(/\s/g, ''), '部材施工費常用');
 const side = sheet.getByRole('toolbar', {name: '見積書の左のボタン'});
 assert.deepEqual((await side.getByRole('button').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim()), ['📗 Excelで保存', '🖨 見積書を印刷']);
 const bracket = sheet.locator('[data-slot="ブラケット"]').first();
-// 「部材」は欄の左に寄せる（欄の左の端から少し）
-const [pickBox, cellBox] = [await bracket.getByRole('button', {name: '📋 部材リストから入れる'}).boundingBox(), await bracket.boundingBox()];
-assert.ok(pickBox.x - cellBox.x < 8, `左に寄っていない ${pickBox.x} ${cellBox.x}`);
+// 「部材｜施工費｜常用」は欄のまん中（ユーザーの指示「部材・施工費・常用は枠内の中央揃えにする」2026-11-03。前は左に寄せていた）
+const [pickBox, cellBox] = [await bracket.getByRole('group', {name: '入れるもの'}).boundingBox(), await bracket.boundingBox()];
+assert.ok(Math.abs(pickBox.x + pickBox.width / 2 - (cellBox.x + cellBox.width / 2)) < 3, `まん中にない ${JSON.stringify({pickBox, cellBox})}`);
+// いちばん下の打ち込める行も、まん中
+const newCell = sheet.locator('tr[data-new] td', {has: page.getByRole('group', {name: '入れるもの'})}).first();
+const [newPick, newBox] = [await newCell.getByRole('group', {name: '入れるもの'}).boundingBox(), await newCell.boundingBox()];
+assert.ok(Math.abs(newPick.x + newPick.width / 2 - (newBox.x + newBox.width / 2)) < 3, `いちばん下の行でまん中にない ${JSON.stringify({newPick, newBox})}`);
 await bracket.click({position: {x: cellBox.width - 10, y: cellBox.height / 2}}); // 右の空いた所を押すと、その欄（行）を選ぶ
 assert.match(await sheet.getByLabel('選んでいる欄', {exact: true}).innerText(), /空白の行/);
-assert.equal((await sheet.getByRole('note').innerText()).trim(), '⌨ 品番・品名を打つと検索');
-// お知らせは欄のすぐ右・同じ高さ（下の行の品名を隠さない）
-const hintBox = await sheet.getByRole('note').boundingBox();
-assert.ok(hintBox.x >= cellBox.x + cellBox.width - 1 && Math.abs(hintBox.y - cellBox.y) < 3, `欄のすぐ右にない ${JSON.stringify({hintBox, cellBox})}`);
+// 選んだ欄の右の濃い緑の「⌨ 品番・品名を打つと検索」は出さない（ユーザーの指示「濃い緑の説明は不要」2026-11-03）。薄い「← 項目から選ぶ か 品番を入力」はそのまま
+assert.equal(await sheet.getByRole('note').count(), 0);
+assert.equal(await sheet.getByText('品番・品名を打つと検索').count(), 0);
 assert.equal(await sheet.locator('tr[data-current]').count(), 1); // 選んでいる行は薄い緑
 await page.screenshot({path: path.join(outDir, 'slots-02b-selected.png')});
 // 選んでいる欄の上の「部材」も押せる（見えない入力欄が重なっている）
@@ -151,7 +154,11 @@ await page.getByRole('button', {name: '選び終わったら閉じる'}).click()
 await page.waitForTimeout(800);
 await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
 await form.waitFor();
-assert.equal(await toilet.getByLabel('長さ（mm）').getAttribute('placeholder'), '600');
+assert.equal(await toilet.getByLabel('長さ（mm）').inputValue(), '600'); // 薄い字ではなく、そのまま入れて見せる（2026-11-03）
+// 消しても、見積書の長さ（600）に戻る（空のままにはならない）
+await toilet.getByLabel('長さ（mm）').fill('');
+await page.keyboard.press('Tab');
+assert.equal(await toilet.getByLabel('長さ（mm）').inputValue(), '600');
 assert.ok((await page.locator('body').innerText()).includes('②トイレ　手すりの取り付け　L=600mm'), '申請書の改修の内容に L=600mm がない');
 await page.screenshot({path: path.join(outDir, 'slots-05-shinsei-length.png')});
 log('既製品の手すり（I型 600mm）→ 申請書のトイレの長さ 600・改修の内容「L=600mm」OK');

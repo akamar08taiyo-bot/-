@@ -19,7 +19,7 @@ import {usePhotoUrls} from '../photos.ts';
 import {turn} from '../photoEdit.ts';
 import {AREA_LABEL, INSURER_AREAS, insurerNoOf} from '../insurerNumbers.ts';
 import {photoBounds} from '../photoMarks.ts';
-import {costIsTotal, estimateLength, estimatePlateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, planPlacement, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
+import {autoLength, costIsTotal, estimatePlateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, planPlacement, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
 import type {AppData, Insurer, Job, Material, PhotoEdit, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
@@ -160,7 +160,7 @@ export function ShinseiEditor({
     owner: !info.owner.trim() || !info.relation.trim(),
     reason: !info.reasonOffice.trim() || !info.reasonName.trim(),
     // 手すりの長さは必須（入れていなくて見積書にも使う長さがなければ、まだ入っていない。2026-10-26）
-    works: lines.length === 0 || job.places.some((p) => p.kind === 1 && !p.dims?.l?.trim() && !estimateLength(p)),
+    works: lines.length === 0 || job.places.some((p) => p.kind === 1 && !p.dims?.l?.trim() && !autoLength(p)),
     cost: cost === null,
     renovated: !info.renovated,
     dates: false,
@@ -702,6 +702,8 @@ function Dim({
   optional = false,
   missing = false,
   autoFocus = false,
+  auto,
+  onClear,
   onChange,
 }: {
   label: string;
@@ -711,16 +713,36 @@ function Dim({
   optional?: boolean;
   missing?: boolean;
   autoFocus?: boolean;
+  /** 空けてあるときに入れて見せる値（手すりの長さ＝見積書の使う長さ。`autoLength`）。ふつうの字で出す */
+  auto?: string;
+  /** auto のある欄を消して空にしたとき。打ち始めたときの長さ（start）と、それが手で入れた長さだったか（manual）を渡す（見積書をその長さに戻す） */
+  onClear?: (start: string, manual: boolean) => void;
   onChange: (v: string) => void;
 }) {
+  // auto のある欄は、打っているあいだは打った字のまま（消して空にしても見積書の長さに戻らない）。
+  // 1字ずつ消すと「120」「12」「1」が見積書に入るので、空にしたら打ち始めたときの長さに見積書を戻す（onClear）
+  const [edit, setEdit] = useState<string | null>(null);
+  const start = useRef({text: '', manual: false});
+  const shown = edit ?? (value.trim() || auto === undefined ? value : auto);
   // 長さの欄（wide）は 2本の「600×1800」まで入る 8rem（前の 7rem は最後の字が欄に隠れた。2026-11-03 の全体のデバッグ）
   return (
     <label className="inline-flex items-center gap-1 whitespace-nowrap">
       {label}
       {optional && <span className="-ml-0.5 text-[11px] text-slate-400">（任意）</span>}
       <TextInput
-        value={value}
-        onChange={onChange}
+        value={shown}
+        onFocus={() => {
+          if (auto === undefined) return;
+          start.current = {text: value.trim() ? value : auto, manual: !!value.trim()};
+          setEdit(start.current.text);
+        }}
+        onBlur={() => setEdit(null)}
+        onChange={(v) => {
+          if (auto === undefined) return onChange(v);
+          setEdit(v);
+          if (v.trim() || !onClear) onChange(v);
+          else onClear(start.current.text, start.current.manual);
+        }}
         inputMode={wide ? undefined : 'numeric'}
         placeholder={placeholder}
         className={`${wide ? 'w-32' : 'w-16'} text-right ${missing ? 'bg-amber-50' : ''}`}
@@ -796,6 +818,15 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
       // 手すり・ベースプレートの長さは、見積書の手すり・ベースプレートの使う長さにする（`placeFromDims`）
       return key === 'l' ? withBrackets(x, placeFromDims(next), materials) : next;
     });
+  // 長さの欄を消して空にした：見積書の手すりは打ち始めたときの長さ（start）に戻して、申請書の長さは空ける（＝見積書の長さを入れて見せる）。
+  // 手で入れた長さ（「600×1800」）を消したときは、その長さに戻す（見積書の手すりは1行の 2400mm なので、空けると「2400」になって2本の区切りが消える）
+  const clearLength = (id: string, start: string) =>
+    setPlace(id, (x) => {
+      const back = start.trim() ? placeFromDims({...x, dims: {...x.dims, l: start}}) : x;
+      const {l: _l, ...dims} = back.dims ?? {};
+      const {dims: _d, ...rest} = back;
+      return withBrackets(x, Object.keys(dims).length ? {...rest, dims} : rest, materials);
+    });
   // ベースプレートの長さ（「＋ ベースプレート」）。見積書のベースプレートの使う長さにする（空にしたら手すりと同じ長さ。`placeFromDims`）
   const setPlate = (id: string, v: string) =>
     setPlace(id, (x) => {
@@ -822,6 +853,8 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
         next.delete(`${p.id}:other`);
         return next;
       });
+    // 見積書にベースプレートの長さが入っていれば、それを入れて開く（薄い字ではなく。ユーザーの指示「…手すりやベースプレートの長さから逆算して…入力する」2026-11-03）
+    if (!moved && !p.plateLength?.trim() && estimatePlateLength(p)) setPlate(p.id, estimatePlateLength(p));
     openField(`${p.id}:bp`);
   };
   // 見積書に箇所が出るように、空きの行を入れておく（木手すりなら 手すり・ブラケット・施工費。見積書でその行を選んで部材・施工費を入れていける。`withSlots`）。
@@ -913,9 +946,21 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
                     <>
                       {/* 手すりの種類の選ぶ欄は外した（ユーザーの指示「ここの木手すりの選択は不要」2026-11-03）。見積書の空きの行は、屋外で高さを入れたら支柱・手すり・ブラケット・施工費、
                           ほかは手すり・ブラケット・施工費（`railType`。既製品（TOTO など）は見積書で行を直す） */}
-                      {/* 手すりの長さは必須（入っていなければ薄い黄色。入れなければ見積書の使う長さ＝薄い字を書く）、高さは任意で ＋ を押すと開いて入れる
-                          （ユーザーの指示「手すりの取り付けの高さが任意、長さは必須。手すりの取り付けの高さも、プラスで開いてから入力できるようにする。（任意）」2026-10-26） */}
-                      {dim('l', '長さ', {wide: true, placeholder: estimateLength(p), missing: !p.dims?.l?.trim() && !estimateLength(p)})}
+                      {/* 手すりの長さは必須（入っていなければ薄い黄色）、高さは任意で ＋ を押すと開いて入れる
+                          （ユーザーの指示「手すりの取り付けの高さが任意、長さは必須。手すりの取り付けの高さも、プラスで開いてから入力できるようにする。（任意）」2026-10-26）。
+                          長さを空けてあるときは、見積書の手すり（なければベースプレート）の使う長さを、薄い字ではなくふつうの字で入れて見せる（`autoLength`。
+                          ユーザーの指示「何も入力していなくてもうっすら表示される。（入力したら手すりやベースプレートの長さから逆算して、申請書の長さを入力する）」2026-11-03）。
+                          見積書の長さが変われば、ここも変わる。手で別の長さを打てば、その長さ（見積書の手すりもその長さになる。`placeFromDims`） */}
+                      <Dim
+                        label="長さ"
+                        value={p.dims?.l ?? ''}
+                        auto={autoLength(p)}
+                        placeholder=""
+                        wide
+                        missing={!p.dims?.l?.trim() && !autoLength(p)}
+                        onClear={(start, manual) => (manual ? setDim(p.id, 'l', start) : clearLength(p.id, start))}
+                        onChange={(v) => setDim(p.id, 'l', v)}
+                      />
                       {/* ベースプレートの長さ（入れると見積書のベースプレートの長さ・金額に。空なら手すりと同じ長さ）。薄い字は見積書のいまの長さ。
                           長さのすぐ横（ユーザーの指示「長さの横はベースプレートを持ってくる」2026-11-03。前は高さのうしろ） */}
                       {showPlate ? (
@@ -923,7 +968,7 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
                           <Dim
                             label="ベースプレート"
                             value={p.plateLength ?? ''}
-                            placeholder={estimatePlateLength(p)}
+                            placeholder=""
                             wide
                             autoFocus={opened === `${p.id}:bp`}
                             onChange={(v) => setPlate(p.id, v)}

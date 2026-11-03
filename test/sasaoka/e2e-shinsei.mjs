@@ -195,10 +195,12 @@ await form.getByLabel('生年月日の日').fill('6');
 await form.getByLabel('郵便番号').fill('824-0001');
 await form.getByRole('button', {name: '本人の家'}).click();
 await form.getByLabel('完成予定日').fill('2026-11-20');
-// 改修の内容：箇所ごとに改修場所・改修の種類と寸法。手すりは長さ（入れなければ見積書の使う長さ＝薄い字）と高さ（任意）。段差の解消でないので幅・奥行はない
+// 改修の内容：箇所ごとに改修場所・改修の種類と寸法。手すりは長さ（入れなければ見積書の使う長さを、薄い字ではなくそのまま入れて見せる。2026-11-03）と高さ（任意）。
+// 段差の解消でないので幅・奥行はない
 const works = form.locator('[data-field="works"]');
 const genkan = works.getByRole('listitem', {name: '①玄関'});
-assert.equal(await genkan.getByLabel('長さ（mm）').getAttribute('placeholder'), '600');
+assert.equal(await genkan.getByLabel('長さ（mm）').inputValue(), '600');
+assert.equal(await genkan.getByLabel('長さ（mm）').getAttribute('placeholder'), '');
 assert.equal(await works.getByLabel('幅（mm）').count(), 0);
 // 手すりの長さは必須（「（任意）」は付けない）、高さは任意で ＋ を押すと開く（ユーザーの指示「手すりの取り付けの高さが任意、長さは必須。
 // 手すりの取り付けの高さも、プラスで開いてから入力できるようにする。（任意）」2026-10-26）
