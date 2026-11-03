@@ -104,12 +104,19 @@ export function searchKey(s: string): string {
   return (s || '').normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
-/** 空白区切りのすべての語を含むか */
+/**
+ * 品番の「-」のちがいを見ない形（「BD-132」「BD132」「bd132」「bd-132」を同じにする。ユーザーの指示「型番入力では、-がなくてもリストがでるようにする」2026-11-03）。
+ * 日本語の入力のまま打った「ＢＤー１３２」の「ー」も、英数字のあいだならハイフンとみる（searchKey のあとで使う＝全角は半角・大文字は小文字になっている）
+ */
+export const noHyphen = (s: string) => s.replace(/[\-\u2010-\u2015\u2212]/g, '').replace(/([a-z0-9])\u30fc(?=[a-z0-9])/g, '$1');
+
+/** 空白区切りのすべての語を含むか（大文字・小文字、全角・半角、品番の「-」のあるなしは見ない） */
 export function matchesAll(haystack: string, query: string): boolean {
   const terms = searchKey(query).split(' ').filter(Boolean);
   if (terms.length === 0) return true;
   const h = searchKey(haystack);
-  return terms.every((t) => h.includes(t));
+  const hh = noHyphen(h);
+  return terms.every((t) => h.includes(t) || hh.includes(noHyphen(t)));
 }
 
 export function downloadBlob(blob: Blob, fileName: string) {

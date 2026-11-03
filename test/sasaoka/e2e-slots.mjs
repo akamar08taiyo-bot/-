@@ -148,7 +148,7 @@ log('空きの行の「施工費」→ 施工費のリスト → 同上施工費
 // ---------------- トイレの（手すり）に TOTO 型の手すり I型 600mm（既製品）→ 申請書の長さ 600
 await sheet.locator('[data-slot="手すり"]').nth(1).getByRole('button', {name: '📋 部材リストから入れる'}).click();
 assert.equal(await dlg.getByPlaceholder(/商品名・品番で検索/).inputValue(), '');
-await dlg.getByPlaceholder(/商品名・品番で検索/).fill('T-600');
+await dlg.getByPlaceholder(/商品名・品番で検索/).fill('t600'); // 「-」なし・小文字でも出る（2026-11-03）
 await dlg.getByRole('row', {name: /T-600/}).first().getByRole('button', {name: '＋ 追加'}).click();
 await page.getByRole('button', {name: '選び終わったら閉じる'}).click();
 await page.waitForTimeout(800);

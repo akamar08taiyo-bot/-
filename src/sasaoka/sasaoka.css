@@ -299,6 +299,15 @@ img {
   cursor: pointer;
   transition: background-color 0.12s, color 0.12s, box-shadow 0.12s;
 }
+/* 広域連合の内訳明細書は内容の欄がせまい（137px）ので、まん中に置くと左右が 14px しか空かず、欄を選ぶつもりで押すと「常用」を押してしまった。
+   字と余白を少し小さくして、左右を 20px 以上空ける */
+.est-sheet .form-page.kk .sheet-pick {
+  gap: 2px;
+  font-size: 9.5px;
+}
+.est-sheet .form-page.kk .sheet-pick button {
+  padding: 2px 3px;
+}
 .est-sheet tr:hover .sheet-pick button {
   border-color: #94a3b8;
   color: #475569;

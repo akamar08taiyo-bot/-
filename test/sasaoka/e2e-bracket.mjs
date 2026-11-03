@@ -51,8 +51,10 @@ const tds = async (text) => (await sheet.locator('.form-page tr', {hasText: text
 const midRows = () => sheet.locator('.form-page tr', {hasText: 'BD-01G'});
 const textKey = await sheet.locator('.form-page tr', {hasText: '廊下'}).first().locator('[data-edit$=":text"]').first().getAttribute('data-edit');
 await cellAt(sheet.locator(`[data-edit="${textKey}"]`)).click();
-await page.keyboard.type('BD-134');
+// 品番は「-」なし・小文字でも候補に出る（ユーザーの指示「型番入力では、-がなくてもリストがでるようにする。例 BD-132 BD132 bd132 bd-132」2026-11-03）
+await page.keyboard.type('bd134');
 await page.getByRole('listbox', {name: '候補'}).getByRole('option').first().waitFor();
+assert.match(await page.getByRole('listbox', {name: '候補'}).getByRole('option').first().innerText(), /BD-134/);
 await page.keyboard.press('ArrowDown');
 await page.keyboard.press('Enter');
 await midRows().first().waitFor();
