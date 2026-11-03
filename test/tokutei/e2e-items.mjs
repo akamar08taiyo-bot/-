@@ -210,6 +210,33 @@ try {
   assert.deepEqual(await page.evaluate(overflowing), []);
   log('申請書のプレビュー はみ出し 0');
 
+  // ---- 申請書のプレビュー：福祉用具の青い枠は入れている商品の行だけ。左の商品・プレビューの行にマウスを乗せると、その行が光る
+  // （ユーザーの指示「福祉用具の青い枠は入力中の商品の行だけ・マウスを乗せた行も光らせる」）
+  const itemRows = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('[aria-label="申請書のプレビュー"] [data-pv-field="items"][data-pv-item]')].map((e) => ({
+        item: e.getAttribute('data-pv-item'),
+        on: e.className.includes('outline-sky-600'),
+        glow: e.hasAttribute('data-glow'),
+      })),
+    );
+  const sForm = page.getByRole('form', {name: '申請書に入れる所'});
+  await sForm.locator('[data-item]').nth(1).getByLabel('商品名').click();
+  await page.waitForFunction(() => document.querySelector('[data-pv-field="items"][data-pv-item="1"]')?.className.includes('outline-sky-600'));
+  let rowsNow = await itemRows();
+  assert.ok(rowsNow.some((r) => r.item === '1' && r.on), JSON.stringify(rowsNow));
+  assert.ok(rowsNow.every((r) => !r.on || r.item === '1'), `2つ目の商品の行だけを囲む ${JSON.stringify(rowsNow)}`);
+  // 左の1つ目の商品にマウスを乗せる → プレビューの1つ目の行が光る
+  await sForm.locator('[data-item]').nth(0).hover({position: {x: 30, y: 12}});
+  await page.waitForFunction(() => document.querySelector('[data-pv-field="items"][data-pv-item="0"]')?.hasAttribute('data-glow'));
+  await page.locator('[aria-label="申請書のプレビュー"]').first().screenshot({path: `${out}/items-preview-row.png`});
+  // プレビューの3つ目の行にマウスを乗せる → その行が光る（左から離れたので1つ目は光らない）
+  await page.locator('[data-pv-field="items"][data-pv-item="2"]').first().hover();
+  await page.waitForFunction(() => document.querySelector('[data-pv-field="items"][data-pv-item="2"]')?.hasAttribute('data-glow'));
+  rowsNow = await itemRows();
+  assert.ok(rowsNow.filter((r) => r.glow).every((r) => r.item === '2'), JSON.stringify(rowsNow));
+  log('申請書のプレビュー：入れている商品の行だけ囲む・マウスを乗せた行が光る OK');
+
   // ---- 販売見積書：宛名の下の1行に 見積番号・見積日・担当
   await page.getByRole('tab', {name: '📋 見積もり'}).click();
   const form = page.getByRole('form', {name: '見積書に入れる所'});

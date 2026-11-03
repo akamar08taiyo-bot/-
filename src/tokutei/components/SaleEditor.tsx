@@ -94,18 +94,32 @@ export function SaleEditor({
   }, [onShinsei, template, form, values]);
   const missing = useMemo(() => (form ? missingFields(shinseiValues(sale, s), form.key) : new Set<ShinseiField>()), [form, sale, s]);
   const [active, setActive] = useState<ShinseiField | null>(null);
+  // 福祉用具の欄で入れている商品・マウスを乗せている商品（申請書に書く商品の中の何番目か。プレビューのその行だけを囲む・光らせる。
+  // ユーザーの指示「福祉用具の青い枠は入力中の商品の行だけ・マウスを乗せた行も光らせる」2026-11-03。申請書に書くのは名前か種目のある商品＝shinsei.ts の usedLines）
+  const [activeItem, setActiveItem] = useState<number | null>(null);
+  const [hoverItem, setHoverItem] = useState<number | null>(null);
+  const shownItems = sale.items.filter((i) => i.name.trim() || i.category);
+  const itemIndexOf = (el: Element | null) => {
+    const id = el?.closest('[data-item]')?.getAttribute('data-item');
+    const at = id ? shownItems.findIndex((i) => i.id === id) : -1;
+    return at >= 0 ? at : null;
+  };
   const inputsRef = useRef<HTMLDivElement>(null);
   const previewBox = useRef<HTMLDivElement>(null);
   /** 入れている所（プレビューのその欄を囲む） */
   const onFocusField = (e: FocusEvent<HTMLElement>) => {
     const f = (e.target as HTMLElement).closest('[data-field]')?.getAttribute('data-field');
     if (f) setActive(f as ShinseiField);
+    setActiveItem(itemIndexOf(e.target as HTMLElement));
   };
-  /** プレビューの欄を押したとき：左のその入れる所へ（見える所まで動かして、打てるように） */
-  const goField = (f: ShinseiField) => {
-    const el = inputsRef.current?.querySelector<HTMLElement>(`[data-field="${f}"]`);
+  /** プレビューの欄を押したとき：左のその入れる所へ（見える所まで動かして、打てるように）。福祉用具の行なら、その商品の欄へ */
+  const goField = (f: ShinseiField, item?: number) => {
+    const box = inputsRef.current?.querySelector<HTMLElement>(`[data-field="${f}"]`);
+    const id = item === undefined ? undefined : shownItems[item]?.id;
+    const el = (id && box?.querySelector<HTMLElement>(`[data-item="${id}"]`)) || box;
     if (!el) return;
     setActive(f);
+    setActiveItem(id ? item! : null);
     el.scrollIntoView({behavior: 'smooth', block: 'center'});
     el.querySelector<HTMLElement>('input:not([type="hidden"]):not([type="checkbox"]), select, textarea, [role="radio"], button')?.focus({preventScroll: true});
   };
@@ -463,6 +477,8 @@ export function SaleEditor({
         // 申請書の画面：左に申請書の順の入れる所、右に申請書のプレビュー（大きく。画面の高さで止まり中だけ動く）。
         // 入れる所は広めに（ユーザーの指示「福祉用具が必要な理由の入力欄が狭すぎる」2026-10-26。前は 30rem。プレビューの方を大きいままにするため 36rem）
         <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,36rem)_minmax(0,1fr)]">
+          {/* 左の福祉用具の欄にマウスを乗せると、プレビューのその商品の行が光る */}
+          <div className="min-w-0" onMouseOver={(e) => setHoverItem(itemIndexOf(e.target as Element))} onMouseLeave={() => setHoverItem(null)}>
           <ShinseiInputs
             sale={sale}
             data={data}
@@ -485,6 +501,7 @@ export function SaleEditor({
             onHideSuggest={hideSuggest}
             changeSettings={(f) => update('settings', f)}
           />
+          </div>
           <div className="min-w-0 space-y-3 lg:sticky lg:top-3 lg:self-start">
             <ShinseiPanel sale={sale} settings={s} />
             <div ref={previewBox} className="min-w-0 rounded-xl bg-slate-200/70 p-2 lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto" style={{scrollbarGutter: 'stable'}}>
@@ -493,7 +510,16 @@ export function SaleEditor({
               ) : pages === null ? (
                 <p className="p-6 text-center text-sm text-slate-500">申請書を開いています…</p>
               ) : (
-                <ShinseiPages pages={pages} missing={missing} active={active} label={(f) => FIELD_LABEL[f]} onOpen={goField} scrollBox={previewBox} />
+                <ShinseiPages
+                  pages={pages}
+                  missing={missing}
+                  active={active}
+                  activeItem={activeItem}
+                  hoverItem={hoverItem}
+                  label={(f) => FIELD_LABEL[f]}
+                  onOpen={goField}
+                  scrollBox={previewBox}
+                />
               )}
             </div>
           </div>

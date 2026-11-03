@@ -314,7 +314,8 @@ export type PvShape = Rect & {
 };
 export type PvHeader = {left: PvRun[]; center: PvRun[]; right: PvRun[]};
 /** 押すと案件の画面のその入れる所へ行く欄（F：入れる所の名前。申請書は ShinseiField、見積書は estimateBook.ts の EstimateField） */
-export type PvField<F extends string = ShinseiField> = Rect & {field: F; ref: string};
+/** item：福祉用具の欄（items）のうち、何番目の商品の行か（0 から）。行の決まらない欄（合計・1つの欄にまとめて書く様式・ほかのシートの式）はなし */
+export type PvField<F extends string = ShinseiField> = Rect & {field: F; ref: string; item?: number};
 /** 申請書の1枚（原本の1つのシート） */
 export type PvPage<F extends string = ShinseiField> = {
   sheet: string;
@@ -1034,6 +1035,20 @@ function pageFields<F extends string>(sheet: string, own: [F, string[]][], cells
       near.x = x;
     } else out.push({...rect, field, ref});
   }
+  // 福祉用具の欄（items）は、商品ごとの行に番号を付ける（入れている商品の行だけを囲み、マウスを乗せた行を光らせるため。
+  // ユーザーの指示「福祉用具の青い枠は入力中の商品の行だけ・マウスを乗せた行も光らせる」）。
+  // このシートの欄の番地のうち、同じ行に2つ以上ある行（商品名・メーカー・金額などが並ぶ行）を上から 0, 1, 2…（合計の欄など1つだけの行には付けない）
+  const rowOf = (ref: string) => Number(/\d+$/.exec(ref)?.[0] ?? NaN);
+  const ownItems = own.filter(([field]) => field === 'items').flatMap(([, list]) => list);
+  const perRow = new Map<number, number>();
+  for (const ref of ownItems) perRow.set(rowOf(ref), (perRow.get(rowOf(ref)) ?? 0) + 1);
+  const itemRows = [...perRow].filter(([, n]) => n >= 2).map(([r]) => r).sort((a, b) => a - b);
+  if (itemRows.length >= 2)
+    for (const f of out) {
+      if (f.field !== 'items' || !ownItems.includes(f.ref)) continue;
+      const at = itemRows.indexOf(rowOf(f.ref));
+      if (at >= 0) f.item = at;
+    }
   return out;
 }
 

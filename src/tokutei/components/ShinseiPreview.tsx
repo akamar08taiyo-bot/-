@@ -304,12 +304,12 @@ function paper(page: PvPage<string>) {
 }
 
 const TONE = {
-  sky: {on: 'bg-sky-400/15 outline outline-2 outline-sky-600', hover: 'hover:outline hover:outline-2 hover:outline-teal-600', hoverBg: 'hover:bg-teal-400/10'},
+  sky: {on: 'bg-sky-400/15 outline outline-2 outline-sky-600', hover: 'hover:outline hover:outline-2 hover:outline-teal-600', hoverBg: 'hover:bg-teal-400/10', glow: 'bg-teal-400/10 outline outline-2 outline-teal-600'},
   // 見積書（地が水色）：入れている所は薄い黄色（ユーザーの指示「入力欄では、緑ではなく薄い黄色。特定福祉用具や住宅改修と同様」2026-10-26。前は緑）。
   // 地の色は住宅改修の申請書の黄色（入れる所の bg-amber-50・プレビューのまだ入っていない欄の bg-amber-300/35）のあいだの薄さ、枠は細く
   // （「黄色の部分の色がちょっと濃すぎて、チカチカして見にくいので色は薄く…住宅改修の申請書などで、入力しているときに黄色くしている…それと同じぐらいの色合いに」
   // 2026-10-26。前は bg-amber-200/50 と 3px のオレンジの枠）
-  yellow: {on: 'bg-amber-300/25 outline outline-1 outline-amber-400', hover: 'hover:outline hover:outline-1 hover:outline-amber-400', hoverBg: 'hover:bg-amber-300/15'},
+  yellow: {on: 'bg-amber-300/25 outline outline-1 outline-amber-400', hover: 'hover:outline hover:outline-1 hover:outline-amber-400', hoverBg: 'hover:bg-amber-300/15', glow: 'bg-amber-300/15 outline outline-1 outline-amber-400'},
 };
 
 export function ShinseiPages<F extends string = ShinseiField>({
@@ -323,12 +323,14 @@ export function ShinseiPages<F extends string = ShinseiField>({
   print = false,
   fixedScale,
   tone = 'sky',
+  activeItem = null,
+  hoverItem = null,
 }: {
   pages: PvPage<F>[];
   missing: Set<F>;
   active: F | null; // 左で入れている所（その欄を囲む）
   label: (f: F) => string;
-  onOpen: (f: F) => void; // 欄を押したとき（左のその入れる所へ）
+  onOpen: (f: F, item?: number) => void; // 欄を押したとき（左のその入れる所へ。福祉用具の行なら何番目の商品か）
   scrollBox?: RefObject<HTMLElement | null>; // プレビューを入れた枠（左の横に並べて、枠の中で動くとき）
   title?: string; // プレビューの名前（見積書は「見積書のプレビュー」）
   print?: boolean; // 印刷：押す欄・色を出さない
@@ -336,7 +338,13 @@ export function ShinseiPages<F extends string = ShinseiField>({
   // 入れている所・押せる所の色：申請書（白い様式）は水色。見積書は様式が水色なので薄い黄色（ユーザーの指示
   // 「見積もりが水色で入力しているとわかるようにしてある色も水色なので、わかりづらい」「入力欄では、緑ではなく薄い黄色」2026-10-26）
   tone?: 'sky' | 'yellow';
+  // 福祉用具の欄（items）は、左で入れている商品の行だけを囲む（null なら全部の行。ユーザーの指示「福祉用具の青い枠は入力中の商品の行だけ」）
+  activeItem?: number | null;
+  // 左でマウスを乗せている商品の行（プレビューの行を光らせる。「マウスを乗せた行も光らせる」）
+  hoverItem?: number | null;
 }) {
+  // プレビューでマウスを乗せている商品の行（同じ行の欄をまとめて光らせる。欄が離れていても1つの行として）
+  const [hoverRow, setHoverRow] = useState<number | null>(null);
   const [wrapRef, wrapWidth] = useWidth<HTMLDivElement>();
   // 描くたびに、欄に入りきらない文字を縮める（はみ出しを出さない決まり。fitTexts.ts）。字体を読み終わったら、もう一度
   useLayoutEffect(() => {
@@ -475,7 +483,8 @@ export function ShinseiPages<F extends string = ShinseiField>({
                 </svg>
                 {/* 押すと左のその入れる所へ（まだ入っていない欄は薄い黄色、入れている所は囲む） */}
                 {!print && page.fields.map((f, i) => {
-                  const on = active === f.field;
+                  const on = active === f.field && (f.item === undefined || activeItem === null || f.item === activeItem);
+                  const glow = f.item !== undefined && !on && (f.item === hoverRow || f.item === hoverItem);
                   const first = on && !firstDone;
                   if (first) firstDone = true;
                   return (
@@ -487,9 +496,13 @@ export function ShinseiPages<F extends string = ShinseiField>({
                       aria-label={label(f.field)}
                       title={label(f.field)}
                       data-pv-field={f.field}
-                      onClick={() => onOpen(f.field)}
+                      data-pv-item={f.item}
+                      data-glow={glow || undefined}
+                      onClick={() => onOpen(f.field, f.item)}
+                      onMouseEnter={f.item === undefined ? undefined : () => setHoverRow(f.item!)}
+                      onMouseLeave={f.item === undefined ? undefined : () => setHoverRow((r) => (r === f.item ? null : r))}
                       className={`absolute cursor-pointer rounded-[2px] transition-colors ${
-                        on ? TONE[tone].on : missing.has(f.field) ? `bg-amber-300/35 ${TONE[tone].hover}` : `${TONE[tone].hoverBg} ${TONE[tone].hover}`
+                        on ? TONE[tone].on : glow ? TONE[tone].glow : missing.has(f.field) ? `bg-amber-300/35 ${TONE[tone].hover}` : `${TONE[tone].hoverBg} ${TONE[tone].hover}`
                       }`}
                       style={{left: f.x, top: f.y, width: f.w, height: f.h}}
                     />
