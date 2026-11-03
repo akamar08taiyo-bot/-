@@ -542,8 +542,8 @@ try {
   const viewer = page.getByRole('dialog', {name: 'カタログ'});
   await viewer.waitFor();
   const viewerChips = viewer.getByRole('group', {name: 'カタログのページ'}).getByRole('button');
-  // ページのボタンの頭には、そのページの品目（2026-11-01。p.40 は「シャワーチェア」）
-  await page.waitForFunction(() => [...document.querySelectorAll('[aria-label="カタログのページ"] button')].map((b) => b.textContent).join('|') === 'シャワーチェアp.40 シャワーチェア（パナソニック ユクリア）', null, {timeout: 60000});
+  // ページのボタンの頭には、そのページの品目（2026-11-01。p.40 は「シャワーチェア」）。注文番号の載っているページだけで開く（「✕ 全部のページ」で外せる）
+  await page.waitForFunction(() => [...document.querySelectorAll('[aria-label="カタログのページ"] button')].map((b) => b.textContent).filter((t) => /p\.\d+/.test(t)).join('|') === 'シャワーチェアp.40 シャワーチェア（パナソニック ユクリア）', null, {timeout: 60000});
   await page.waitForFunction(() => {
     const img = document.querySelector('[aria-label="カタログのページの絵"] img');
     return img?.getAttribute('alt') === 'p.40 シャワーチェア（パナソニック ユクリア）' && img.complete && img.naturalWidth > 1500;
@@ -582,8 +582,9 @@ try {
   const sized = await viewer.boundingBox();
   assert.ok(Math.abs(sized.width - (moved.width - 120)) < 2 && Math.abs(sized.height - (moved.height - 90)) < 2 && Math.abs(sized.x - moved.x) < 2, `大きさが変わらない ${JSON.stringify(sized)}`);
   // 窓の中でも検索し直せる（空にすると全部のページ）。ページを押すとそのページ
+  await viewer.getByRole('button', {name: '✕ 全部のページ'}).click();
   await viewer.getByRole('searchbox', {name: 'カタログから検索'}).fill('');
-  assert.equal(await viewerChips.count(), 26); // 2026-11-01 に歩行器の p.136・137、いただいた全部のページ（p.41〜51・151〜154・174・175）を足した
+  assert.equal(await viewer.getByRole('group', {name: 'カタログのページ'}).getByRole('button', {name: /p\.\d+/}).count(), 26); // 2026-11-01 に歩行器の p.136・137、いただいた全部のページ（p.41〜51・151〜154・174・175）を足した
   await viewerChips.filter({hasText: 'p.172'}).click();
   await page.waitForFunction(() => document.querySelector('[aria-label="カタログのページの絵"] img')?.getAttribute('alt') === 'p.172 家具調トイレ（安寿）', null, {timeout: 60000});
   // 拡大（＋）すると絵が窓より広くなり、窓の中でスクロールする
@@ -975,11 +976,12 @@ try {
   assert.ok(chairNames.length >= 25, `${chairNames.length}`);
   assert.ok(chairNames.some((n) => /シャワーラク/.test(n)) && chairNames.some((n) => /シャワーベンチ/.test(n)));
   assert.ok(!chairNames.some((n) => /マット/.test(n)));
-  // さがす言葉で絞る
-  await picker.getByLabel('カタログの商品をさがす').fill('シャワーラク');
+  // さがす言葉で絞る（品目・メーカーの下の「カタログから検索」の欄。一覧の上の「さがす」欄はこの欄にまとめた。2026-11-03）
+  await picker.getByRole('searchbox', {name: 'カタログから検索'}).fill('シャワーラク');
+  await page.waitForFunction(() => [...document.querySelectorAll('[aria-label="シャワーチェアの商品"] li span.font-bold')].every((x) => /シャワーラク/.test(x.textContent)));
   const raku = await chairList.getByRole('listitem').locator('span.font-bold').allInnerTexts();
   assert.ok(raku.length >= 5 && raku.every((n) => /シャワーラク/.test(n)), raku.join(','));
-  await picker.getByLabel('カタログの商品をさがす').fill('');
+  await picker.getByRole('searchbox', {name: 'カタログから検索'}).fill('');
   // シャワーチェアの品目のメーカー（カタログの順。2026-11-01 にシャワーキャリーのページを足して、モリトー・カワムラサイクルなども）
   await picker.getByRole('button', {name: /^メーカー：/}).click();
   const chairMakers = await picker.getByRole('group', {name: 'メーカー'}).getByRole('button', {pressed: false}).filter({hasText: /（株）$/}).allInnerTexts();

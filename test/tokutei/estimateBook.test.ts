@@ -6,7 +6,7 @@ import test from 'node:test';
 import {strFromU8, unzipSync} from 'fflate';
 import {basisNote, itemNote, saleTotals} from '../../src/tokutei/calc.ts';
 import {defaultSettings, settingsForOffice} from '../../src/tokutei/defaults.ts';
-import {CONT_ROWS, contBlock, ESTIMATE_CAPACITY, ESTIMATE_ROWS, estimateFileName, estimateLayout, estimateNotes, estimateOverflow, insuranceLines, estimatePreview, fillEstimate, fitScale, itemNameLines, belowItemLines} from '../../src/tokutei/estimateBook.ts';
+import {CONT_ROWS, contBlock, ESTIMATE_CAPACITY, ESTIMATE_ROWS, estimateFileName, estimateLayout, estimateNotes, estimateOverflow, insuranceLines, estimatePreview, fillEstimate, fitScale, itemNameLines, belowItemLines, MIN_SHOWN_ROWS, saleLayout, shownRowsOnPage1} from '../../src/tokutei/estimateBook.ts';
 import type {Sale, SaleItem} from '../../src/tokutei/types.ts';
 import {cellFormula, readCell, sheetLayout} from '../../src/tokutei/xlsxEdit.ts';
 import type {Files} from '../../src/tokutei/xlsxEdit.ts';
@@ -471,4 +471,34 @@ test('会社の欄：設定の営業所の値（ほかの営業所でも、TEL�
   const kokura = settingsForOffice(S, '小倉営業所');
   const f = unzipSync(fillEstimate(template(), sale({staff: ''}), kokura));
   assert.deepEqual(['I9', 'I11', 'I13', 'I14', 'I16'].map((r) => readCell(f, SH, r)), ['小倉営業所　所長　森口　賢一', '〒802-0011', 'TEL：093-952-1616', 'FAX：093-952-1627', '']);
+});
+
+// ユーザーの指示「3商品＋受領委任自己負担の説明をフルにいれた場合、1番下の行をあけるのは1行だけで良い」2026-11-03：
+// 1ページ目の明細は、使った行の次の1行まで見せて（少なくとも 3商品分12行＋受領委任払いの内訳4行＋1行＝17行）、下の行は隠す
+test('1ページ目の明細の行：3商品＋受領委任払いの内訳で、下にあくのは1行だけ（17行）。中身が多ければ20行まで', () => {
+  const hidden = (sale: Sale) => {
+    const xml = strFromU8(unzipSync(fillEstimate(template(), sale, S))['xl/worksheets/sheet1.xml']);
+    return ESTIMATE_ROWS.filter((r) => new RegExp(`<row r="${r}"[^>]*hidden="1"`).test(xml));
+  };
+  const three = manyFull(3);
+  // 3商品（12行）＋内訳4行（35〜38行）＋あける1行（39行）→ 40〜42行を隠す
+  assert.equal(MIN_SHOWN_ROWS, 17);
+  const full = sale({items: three});
+  assert.deepEqual(belowItemLines(full, S).lines.length, 4);
+  assert.deepEqual(hidden(full), [40, 41, 42]);
+  const f = unzipSync(fillEstimate(template(), full, S));
+  assert.match(readCell(f, SH, 'A38'), /^保険者負担/);
+  assert.match(readCell(f, SH, 'A35'), /^介護保険（受領委任払い）/);
+  assert.equal(readCell(f, SH, 'A39'), '');
+  // 1商品・内訳なしでも 17行（3商品分の枠は残す）
+  assert.deepEqual(hidden(sale({items: manyFull(1), showSelfPay: false})), [40, 41, 42]);
+  // 償還払いは内訳が6行 → 12＋6＋1＝19行
+  assert.deepEqual(hidden(sale({items: three, payMethod: '償還払い'})), [42]);
+  // 4商品（16行）＋内訳4行＝20行：あける行はないが、20行まで（隠さない）
+  assert.deepEqual(hidden(sale({items: manyFull(4)})), []);
+  // 2ページになるときは1ページ目は20行のまま
+  assert.deepEqual(hidden(sale({items: many(25)})), []);
+  // 隠した行はプレビューにも出ない（高さ 0）。1枚のまま
+  assert.equal(estimatePreview(template(), full, S).length, 1);
+  assert.equal(shownRowsOnPage1(saleLayout(full, S), 4), 17);
 });

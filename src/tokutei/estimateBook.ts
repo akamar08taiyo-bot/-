@@ -81,6 +81,20 @@ export function itemNameLines(i: Pick<SaleItem, 'maker' | 'name' | 'code'>): str
  * 「１商品目と２商品目の間には１行開ける。３商品までは一度に入力できるようにする」2026-11-03）
  */
 export const MIN_ITEM_ROWS = 3 * (3 + ITEM_GAP);
+/** 受領委任払いの介護保険の内訳の行（介護保険（受領委任払い）・介護保険の対象・利用者負担・保険者負担） */
+const FULL_BELOW = 4;
+/**
+ * 1ページ目に見せる明細の行の数の下限：3商品分（12行）＋受領委任払いの内訳（4行）＋あける1行＝17行（ユーザーの指示「3商品＋受領委任自己負担の説明をフルにいれた場合、
+ * 1番下の行をあけるのは1行だけで良い」2026-11-03）。中身がこれより多いとき（償還払い・生活保護・限度額を超えた分・4商品から）は、使った行＋1行まで（原本の20行まで）見せ、
+ * 残りの行は隠す（印刷・Excel・プレビューに出ない）
+ */
+export const MIN_SHOWN_ROWS = MIN_ITEM_ROWS + FULL_BELOW + 1;
+/** 1ページ目に見せる明細の行の数（使った行の次の1行まで。17〜20行） */
+export function shownRowsOnPage1(lay: EstimateLayout, belowLines: number): number {
+  if (lay.pages > 1) return ESTIMATE_ROWS.length;
+  const used = lay.below >= 0 ? lay.below + belowLines : lay.areaEnd + 1;
+  return Math.min(ESTIMATE_ROWS.length, Math.max(MIN_SHOWN_ROWS, used + 1));
+}
 /** ページの明細の行の数・そのページの初めの行（itemRows の番号） */
 const pageRows = (p: number) => (p === 1 ? ESTIMATE_ROWS.length : CONT_ROWS);
 const pageStart = (p: number) => (p === 1 ? 0 : ESTIMATE_ROWS.length + (p - 2) * CONT_ROWS);
@@ -280,6 +294,9 @@ export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
   const pages = lay.pages;
   if (pages > 1) xml = addContinuation(xml, tpl, pages);
   const rows = itemRows(pages);
+  // 1ページ目の明細は、使った行の次の1行まで見せて、その下の行は隠す（17〜20行。表の下の太い線は43行目の上の線なので、隠しても表は閉じる）
+  const shown = shownRowsOnPage1(lay, belowCount(sale, s));
+  for (const r of ESTIMATE_ROWS.slice(shown)) xml = hideRow(xml, r);
   // 明細の金額の欄は、どの行もふつうの式にする（前の原本の26〜42行は「共有の式」で、親の26行目を書きかえると下の行の式がこわれた。隠した行も）
   const amountStyle = /\ss="(\d+)"/.exec(cellRe('I26').exec(xml)?.[1] ?? '')?.[1];
   for (const r of new Set([...TEMPLATE_ITEM_ROWS, ...rows])) xml = setFormula(xml, `I${r}`, `IF(F${r}*H${r},F${r}*H${r},"")`, '', amountStyle);
@@ -375,6 +392,11 @@ export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
   sizeCell(files, ESTIMATE_SHEET, 'D1', TITLE_PT);
   if (pages > 1) setPrintArea(files, pages);
   dropCalcChain(files);
+}
+
+/** 行を隠す（<row> に hidden="1"） */
+function hideRow(xml: string, r: number): string {
+  return xml.replace(new RegExp(`<row r="${r}"(?=[\\s/>])([^>]*?)(/?)>`), (m, attrs: string, close: string) => (/\shidden="1"/.test(attrs) ? m : `<row r="${r}" hidden="1"${attrs}${close}>`));
 }
 
 /** 行の XML（自分で閉じている行も） */
