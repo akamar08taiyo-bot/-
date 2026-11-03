@@ -515,13 +515,14 @@ export default function App({start}: {start: MainTab}) {
           {/* 上の帯のタブ：様邸を開いているときは 住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書（JobTabs）、ほかは「見積もり・申請書を作成する」と
               いま開いている画面。売上見込み・工務店請求書・部材・施工費マスタ・設定・ゴミ箱は左の端の「☰ メニュー ▼」（ユーザーの指示「メインタブが二つある為、わかりづらい…
               プルダウンにして右隅におく」2026-11-03。前は帯に6つのタブ、様邸のタブはその下の白い枠）。字は大きく・高く（「タブももう少し大きく見やすくする」2026-10-25） */}
-          <nav aria-label="画面" className={`mx-auto flex ${PAGE_WIDTH} items-start gap-1.5 px-3 pb-3 lg:pb-0 ${jobOpen ? 'max-md:flex-wrap' : ''}`}>
+          <nav aria-label="画面" className={`mx-auto flex ${PAGE_WIDTH} items-start gap-1.5 px-3 pb-3 max-md:flex-wrap lg:pb-0`}>
             {/* 「☰ メニュー ▼」は左の端（「← 業務アプリポータルへ戻る」の真下。ユーザーの指示「メニューは太陽ポータルに戻るの下左上にもってくる」2026-11-03。前は右の隅） */}
             <NavMenu tab={tab} onTab={goTab} trashCount={trashCount} top={jobOpen} />
             {jobOpen ? (
               <JobTabs view={jobView} onView={(v) => leaveTokutei(() => setJobView(v))} cls={tabCls} />
             ) : (
-              <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+              // スマホで「☰ メニュー（🗑 件数）」の右に入りきらないときは、メニューの下の段へ（min-w-min。前は右にはみ出した）
+              <div className="flex min-w-min flex-1 flex-wrap gap-1.5 md:min-w-0">
                 <button type="button" onClick={() => goTab('estimate')} aria-current={tab === 'estimate' ? 'page' : undefined} className={tabCls(tab === 'estimate')}>
                   {TABS[0].label}
                 </button>
