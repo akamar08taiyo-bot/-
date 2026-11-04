@@ -1,7 +1,8 @@
-// 中間のブラケット（BD-01G）の数を確かめる（ユーザーの指示「見積書で、中間のブラケット（BD-01G）の数も出しますか？」→「おねがいします」、2026-10-22）：
+// 中間のブラケット（横受け。BD-01G）を確かめる（ユーザーの指示「見積書で、中間のブラケット（BD-01G）の数も出しますか？」→「おねがいします」2026-10-22、
+// 「手すりをいれると横受けが自動的にはいるが、はいらなくてよい」2026-11-04）：
 //   部材リストにマツ六の BD-134（35アッシュ丸棒 Mオーク 4m）・BD-01G（35ブラケット横型）を取り込む（架空の価格）→
-//   申請書で廊下の長さ L=600×1800 → 見積書で手すり BD-134 を選ぶと 2400mm（0.6本）、そのすぐ下に BD-01G 1個（部材リストの単価）→
-//   申請書の長さを 2400 にすると2個・900 にすると外れる・600×1800 に戻すと1個 → 発注書にも BD-01G の数。ブラケットの間は 900mm 以内（cutLink.ts の withBrackets）
+//   申請書で廊下の長さ L=600×1800 → 見積書で手すり BD-134 を選ぶと 2400mm（0.6本）。BD-01G は自動では入らない →
+//   自分で BD-01G を入れると数は中間の数（1個）→ 申請書の長さを 2400 にすると2個・600×1800 に戻すと1個 → 発注書にも BD-01G の数。ブラケットの間は 900mm 以内（cutLink.ts の withBrackets）
 // usage: node e2e-bracket.mjs <サイトのURL> <出力フォルダ>
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
@@ -41,7 +42,7 @@ const length = works.getByRole('listitem', {name: '①廊下'}).getByLabel('長�
 await page.keyboard.type('600×1800');
 assert.equal(await length.inputValue(), '600×1800');
 
-// ---------------- 見積書：廊下の行に BD-134 を選ぶ → 2400mm（0.6本）と、そのすぐ下に BD-01G 1個（単価は定価×0.8。単位は部材リストのまま＝この表は単位の列なし）
+// ---------------- 見積書：廊下の行に BD-134 を選ぶ → 2400mm（0.6本）。BD-01G は自動では入らない → 自分で入れると1個（単価は定価×0.8。単位は部材リストのまま＝この表は単位の列なし）
 const estimateTab = page.getByRole('tab', {name: '📋 工事見積書'});
 const shinseiTab = page.getByRole('tab', {name: '📝 住宅改修申請書'});
 await estimateTab.click();
@@ -57,16 +58,21 @@ await page.getByRole('listbox', {name: '候補'}).getByRole('option').first().wa
 assert.match(await page.getByRole('listbox', {name: '候補'}).getByRole('option').first().innerText(), /BD-134/);
 await page.keyboard.press('ArrowDown');
 await page.keyboard.press('Enter');
-await midRows().first().waitFor();
+await sheet.locator('.form-page tr', {hasText: 'BD-134'}).first().waitFor();
 assert.ok((await tds('BD-134')).join('|').includes('|0.6|本|8,000|4,800|'), (await tds('BD-134')).join('|'));
+await page.waitForTimeout(300);
+assert.equal(await midRows().count(), 0); // 手すりを入れても横受けは入らない
+// 自分で入れる：いちばん下の空いた行に「bd01g」と打って Enter（品番がぴったりの部材が入る）→ 中間の数（600×1800 なら1個）
+await cellAt(sheet.locator('tr[data-new] [data-edit="new:text"]')).click();
+await page.keyboard.type('bd01g');
+await page.getByRole('listbox', {name: '候補'}).getByRole('option').first().waitFor();
+await page.keyboard.press('Enter');
+await midRows().first().waitFor();
 assert.ok((await tds('BD-01G')).join('|').includes('|1||800|800|'), (await tds('BD-01G')).join('|'));
-const rowTexts = await sheet.locator('.form-page tr').allInnerTexts();
-const railAt = rowTexts.findLastIndex((t) => t.includes('BD-134') || t.includes('ディンプル付 Mオーク 4m'));
-assert.ok(rowTexts[railAt + 1].includes('BD-01G'), rowTexts.slice(railAt, railAt + 3).join(' / '));
 await page.screenshot({path: path.join(outDir, 'bracket-1-estimate.png')});
-log('L=600×1800 → BD-134 0.6本・BD-01G 1個（手すりのすぐ下・部材リストの単価）OK');
+log('L=600×1800 → BD-134 0.6本・BD-01G は自動で入らない・自分で入れると1個（部材リストの単価）OK');
 
-// ---------------- 申請書の長さを直すと、見積書の BD-01G の数も変わる（2400 → 2個、900 → 外れる、600×1800 → 1個）
+// ---------------- 申請書の長さを直すと、見積書の BD-01G の数も変わる（2400 → 2個、600×1800 → 1個。900 で外れるのは cutLink.test.ts）
 const setLength = async (v) => {
   await shinseiTab.click();
   await length.fill(v);
@@ -75,12 +81,9 @@ const setLength = async (v) => {
 };
 await setLength('2400');
 assert.ok((await tds('BD-01G')).join('|').includes('|2||800|1,600|'), (await tds('BD-01G')).join('|'));
-await setLength('900');
-assert.equal(await midRows().count(), 0);
-assert.ok((await tds('BD-134')).join('|').includes('|0.225|本|'), (await tds('BD-134')).join('|'));
 await setLength('600×1800');
 assert.ok((await tds('BD-01G')).join('|').includes('|1||800|800|'), (await tds('BD-01G')).join('|'));
-log('申請書の長さ 2400 → 2個・900 → 外れる・600×1800 → 1個 OK');
+log('申請書の長さ 2400 → 2個・600×1800 → 1個 OK');
 
 // ---------------- 申請書の長さを空けると、見積書の手すりの長さを薄い字ではなくそのまま入れて見せる（ユーザーの指示「申請書で長さなど、何も入力していなくても
 // うっすら表示される。（入力したら手すりやベースプレートの長さから逆算して、申請書の長さを入力する）」2026-11-03）。

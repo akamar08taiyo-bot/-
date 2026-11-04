@@ -211,7 +211,7 @@ export function describeKey(job: Job, key: string, rates: EstimateRates): string
     const p = job.places.find((x) => x.id === id);
     return p ? `${placeName(p)} ／ ${FIELD_NAMES[field] ?? ''}` : FIELD_NAMES[field] ?? '';
   }
-  if (kind !== 'line' && kind !== 'excl') return '';
+  if (kind !== 'line' && kind !== 'excl' && kind !== 'split') return '';
   const found = findRow(job, id);
   if (!found) return '';
   const rows = found.place.rows;
@@ -232,6 +232,7 @@ export function describeKey(job: Job, key: string, rates: EstimateRates): string
 export function sheetValue(job: Job, key: string, ctx: SheetCtx, date = ''): string {
   const [kind, id, field] = key.split(':');
   const rates = ctx.settings;
+  if (kind === 'split') return ''; // 箇所の2行目からの改修内容・改修場所の欄（空。打つと、その行から別の箇所＝`splitPlaceAt`）
   if (kind === 'job') return String(job[id as 'customer' | 'insuredNo' | 'address'] ?? '');
   if (kind === 'date') return date;
   if (kind === 'overhead') {
@@ -407,7 +408,9 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
     if (trimmed !== '' && n === null) return {job, key};
     // 自動の諸経費（小計×率の端数調整）と同じ金額なら、手で入れたことにしない（行を足しても諸経費が前の金額のままになっていた）
     const t = estimateTotals(job, rates);
-    const target = id === 'target';
+    // 対象外の行がなければ、介護保険対象部分の諸経費は全体と同じ（`estimateTotals`）。そちらの欄で直しても全体の諸経費を直す
+    // （前は overheadTarget に入れて使われず、直しても諸経費・消費税が変わらなかった。ユーザーの指摘「諸経費を修正した際に、消費税が自動で切り替わらない」2026-11-04）
+    const target = id === 'target' && t.excluded > 0;
     const auto = overheadAuto(target ? t.target.subtotal : t.all.subtotal, rates);
     return {job: {...job, [target ? 'overheadTarget' : 'overhead']: n === null || Math.round(n) === auto ? null : Math.round(n)}, key};
   }
@@ -416,6 +419,7 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
     if (pi < 0) return {job, key};
     return {job: patchPlace(job, pi, placePatch(field, text)), key};
   }
+  if (kind === 'split') return splitPlaceAt(job, id, field, text, rates);
   if (kind === 'new') return applyNew(job, id, text, ctx);
   if (kind !== 'line') return {job, key};
 
@@ -518,6 +522,40 @@ export function toggleExcluded(job: Job, rowId: string): Job {
   if (found.row.kind === 'labor') for (let k = found.ri + 1; k < found.place.rows.length && found.place.rows[k].kind === 'labor'; k++) ids.add(found.place.rows[k].id);
   const excluded = !found.row.excluded;
   return setPlaceRows(job, found.pi, found.place.rows.map((r) => (ids.has(r.id) ? {...r, excluded} : r)));
+}
+
+/**
+ * 箇所の2行目からの行の 改修内容・改修場所（・広域連合用の写真番号・改修の種類）の欄に打ったとき：その行（部材は同上施工費ごと。`unitTop`）から
+ * 箇所の終わりまでを、打った名前・種類の新しい箇所にして、もとの箇所のすぐ下に置く（ユーザーの指示「他のセルの上に乗せた場合でも、直接変更や入力が
+ * できるようにする」2026-11-04。前は箇所の1行目にしか打てず、2行目からの改修内容・改修場所の欄は押しても何もできなかった）。
+ * 種類だけ打ったら名前はもとの箇所と同じ・名前だけ打ったら種類はもとの箇所と同じ。写真番号は見積書の箇所の順番（`photoNumbers`）。
+ * 「③玄関」と打った番号は、ほかの箇所と重なるなら使わない（写真番号＝見積書の箇所の順番。重なると①②②のようになる）。
+ * 空・読めない文字なら何もしない。返す key は新しい箇所の同じ欄（続けて打てる）
+ */
+export function splitPlaceAt(job: Job, rowId: string, field: string, text: string, rates?: EstimateRates): SheetResult {
+  const key = `split:${rowId}:${field}`;
+  if (!text.trim()) return {job, key};
+  const patch = placePatch(field, text);
+  if (Object.keys(patch).length === 0) return {job, key};
+  const found = findRow(job, rowId);
+  if (!found) return {job, key};
+  const rows = found.place.rows;
+  const a = unitTop(rows, found.ri);
+  if (a === 0) return {job: patchPlace(job, found.pi, patch), key: `place:${found.place.id}:${field}`};
+  const orig = found.place;
+  const made: Place = {
+    ...newPlace(field === 'name' ? '' : orig.name),
+    kind: orig.kind,
+    ...patch,
+    rows: rows.slice(a),
+  };
+  const places = [...job.places.slice(0, found.pi), {...orig, rows: rows.slice(0, a)}, made, ...job.places.slice(found.pi + 1)];
+  let out: Job = {...job, places};
+  if (made.photo > 0 && rates) {
+    const nums = photoNumbers(out, rates);
+    if ([...nums].some(([id, n]) => id !== made.id && n === made.photo)) out = {...out, places: places.map((x) => (x === made ? {...x, photo: 0} : x))};
+  }
+  return {job: out, key: `place:${made.id}:${field}`};
 }
 
 function placePatch(field: string, text: string): Partial<Place> {
@@ -844,7 +882,7 @@ export function insertBlankAfter(job: Job, rowId: string): {job: Job; rowId: str
 /** 欄のキーから、その行・箇所（ツールバーのボタンに使う） */
 export function sheetTarget(job: Job, key: string): {place: Place | null; row: Row | null} {
   const [kind, id] = key.split(':');
-  if (kind === 'line' || kind === 'excl') {
+  if (kind === 'line' || kind === 'excl' || kind === 'split') {
     const f = findRow(job, id);
     return {place: f?.place ?? null, row: f?.row ?? null};
   }

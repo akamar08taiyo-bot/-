@@ -17,6 +17,10 @@ test('部材の検索：品番の「-」のあるなし・大文字小文字・�
   const hay = 'ディンプル付 Mオーク 2m BD-132 マツ六';
   for (const q of ['BD-132', 'BD132', 'bd132', 'bd-132', 'ＢＤ１３２', 'ＢＤ－１３２', 'ＢＤー１３２', 'bd13', 'BD-13']) assert.ok(matchesAll(hay, q), q);
   assert.ok(matchesAll('35ブラケット横型 BD01G', 'BD-01G')); // 部材リストの品番に「-」がないときも
+  // 名前の中の空白のあるなしも見ない（「SD600-90」で「木製踏台 SD 600-90」。ユーザーの指示「スペースを入れなくても商品検索にひっかかるようにする」2026-11-04）
+  const step = '木製踏台 SD 600-90 W600XH90~100XD350mm Mオーク 013-7311 マツ六';
+  for (const q of ['SD600-90', 'sd60090', 'SD 600-90', '木製踏台SD', 'ＳＤ６００－９０', 'SD600-90 マツ六']) assert.ok(matchesAll(step, q), q);
+  assert.ok(!matchesAll(step, 'SD600-80'));
   assert.ok(matchesAll(hay, 'bd132 マツ六')); // ほかの語と一緒でも
   assert.ok(!matchesAll(hay, 'BD-134'));
   assert.ok(!matchesAll(hay, 'bd1320'));

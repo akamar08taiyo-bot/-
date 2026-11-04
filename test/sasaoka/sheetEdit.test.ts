@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {estimateTotals, jobTotals} from '../../src/sasaoka/calc.ts';
-import {formLines} from '../../src/sasaoka/estimateForms.ts';
+import {formLines, photoNumbers} from '../../src/sasaoka/estimateForms.ts';
 import {placeFromDims, withBrackets} from '../../src/sasaoka/cutLink.ts';
 import {laborRow, manualRow, materialRow, newPlace, setLaborCount} from '../../src/sasaoka/rows.ts';
 import {
@@ -26,6 +26,7 @@ import {
   pasteLines,
   setWorkAmount,
   sheetValue,
+  splitPlaceAt,
   stepLaborAt,
   toggleExcluded,
   toolPlace,
@@ -476,6 +477,14 @@ test('諸経費：出ている自動の金額のまま確定しても手で入�
   assert.equal(job.overheadTarget, 1500);
 });
 
+test('対象外の行がないとき、介護保険対象部分の欄で諸経費を直しても全体の諸経費になり、消費税・合計も変わる（「諸経費を修正した際に、消費税が自動で切り替わらない」2026-11-04）', () => {
+  let {job} = type(emptyJob(), [['new:text', '木の手すり 35φ 4m', rail]]);
+  job = applySheet(job, 'overhead:target', '6600', yk).job;
+  assert.deepEqual([job.overhead, job.overheadTarget], [6600, null]);
+  const t = estimateTotals(job, S);
+  assert.deepEqual([t.all.overhead, t.all.tax, t.target.overhead, t.target.tax], [6600, Math.trunc((t.all.subtotal + 6600) * 0.1), 6600, t.all.tax]);
+});
+
 test('数量：出ている数量のまま確定しても、切って使う手すり・申請書の長さ・中間のブラケットを書き直さない', () => {
   const bd134: Material = {id: 'm134', name: 'BAUHAUS 35丸棒 Mオーク 4m', price: 9000, listPrice: 15000, pieceLengthM: 4, maker: 'マツ六', code: 'BD-134', unit: '本', favorite: false, updatedAt: 1};
   const bd01g: Material = {id: 'm01g', name: '35ブラケット横型カバー付 ゴールド', price: 900, listPrice: 1500, pieceLengthM: 0, maker: 'マツ六', code: 'BD-01G', unit: '個', favorite: false, updatedAt: 1};
@@ -753,4 +762,41 @@ test('施工費のリストの −／＋：開いた所のまとまりの数を�
   const add = stepLaborAt(again.job, 'new:text', wood, 1);
   assert.equal(laborCountAt(add.job, add.key!, wood.id), 2);
   assert.equal(add.job.places[0].rows.length, 2);
+});
+
+test('箇所の2行目からの改修内容・改修場所に打つと、その行（同上施工費ごと）から別の箇所になる（「他のセルの上に乗せた場合でも、直接変更や入力ができるように」2026-11-04）', () => {
+  const wood = {id: 'l1', name: '木', price: 1000, estPrice: 1500, note: ''};
+  const m1 = materialRow(rail, 1);
+  const w1 = laborRow(wood, 1);
+  const m2 = {...materialRow(bar, 1), id: 'step'};
+  const w2 = laborRow(wood, 1);
+  const tail = materialRow(rail, 1);
+  const p: Place = {...newPlace('台所', [m1, w1, m2, w2, tail]), kind: 1};
+  let job: Job = {...emptyJob(), places: [p]};
+  assert.equal(sheetValue(job, `split:${m2.id}:name`, yk), '');
+  // 改修場所に「③玄関」→ 踏台から下が ③玄関（種類は同じ 手すりの取り付け）
+  let res = splitPlaceAt(job, m2.id, 'name', '③玄関');
+  assert.deepEqual(res.job.places.map((x) => [x.name, x.photo, x.kind, x.rows.map((r) => r.id)]), [
+    ['台所', p.photo, 1, [m1.id, w1.id]],
+    ['玄関', 3, 1, [m2.id, w2.id, tail.id]],
+  ]);
+  assert.equal(res.key, `place:${res.job.places[1].id}:name`);
+  // applySheet からも同じ
+  assert.deepEqual(applySheet(job, `split:${m2.id}:name`, '③玄関', yk).job.places.map((x) => x.name), ['台所', '玄関']);
+  // 打った写真番号がほかの箇所と重なるなら使わない（見積書の順番の②になる）
+  const dup = applySheet(job, `split:${m2.id}:name`, '①玄関', yk).job;
+  assert.deepEqual(dup.places.map((x) => x.photo), [p.photo, 0]);
+  assert.deepEqual([...photoNumbers(dup, S).values()], [1, 2]);
+  // 改修内容に「段差の解消」→ 名前は同じ台所・種類が段差の解消
+  res = splitPlaceAt(job, m2.id, 'work', '段差の解消');
+  assert.deepEqual(res.job.places.map((x) => [x.name, x.kind]), [['台所', 1], ['台所', 2]]);
+  // 同上施工費の行に打っても、その上の部材から分ける。空・読めない文字は何もしない。1行目なら箇所を直すだけ
+  assert.deepEqual(splitPlaceAt(job, w2.id, 'name', '玄関').job.places.map((x) => x.rows.length), [2, 3]);
+  assert.equal(splitPlaceAt(job, m2.id, 'name', '  ').job, job);
+  assert.equal(splitPlaceAt(job, m2.id, 'work', 'あいう').job, job);
+  job = splitPlaceAt(job, m1.id, 'name', '廊下').job;
+  assert.deepEqual(job.places.map((x) => x.name), ['廊下']);
+  // 見積書の行：2行目からの部材・はじめの施工費の行に split: のキー（同上施工費の行にはない）
+  const lines = formLines({...emptyJob(), places: [p]}, S, 'yukuhashi');
+  assert.deepEqual(lines.map((l) => [l.first, l.excludeId === l.rowId]), [[true, true], [false, false], [false, true], [false, false], [false, true]]);
 });

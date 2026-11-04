@@ -202,7 +202,7 @@ img {
 }
 .sheet-insert-mark > span {
   position: absolute;
-  top: -11px;
+  bottom: 3px; /* 線のすぐ上（線は選んでいる行の上の境目。下に出すと、すぐ下の「＋挿入」にかぶる） */
   left: -2px;
   transform: translateX(-100%);
   padding: 1px 6px;
@@ -368,19 +368,22 @@ img {
   position: absolute;
   z-index: 6;
   display: grid;
-  grid-template-columns: repeat(2, auto);
-  gap: 2px;
+  grid-template-columns: auto; /* 縦に1列（字を大きくしたので、2列だと見積書の左の余白に入らない） */
+  gap: 3px;
   transform: translateX(-100%);
 }
+/* 字の大きさは見積書の左の「Excelで保存」「見積書を印刷」と同じ 15px（ユーザーの指示「同じ文字の大きさにする」2026-11-04。前は 10.5px）。
+   見積書は拡大・縮小する（scale）ので、EstimateSheet.tsx で .sheet-ops に 15÷scale px を入れ、ここは em で合わせる */
 .sheet-ops button {
-  padding: 2px 4px;
+  padding: 0.2em 0.45em;
   border: 1px solid #94a3b8;
-  border-radius: 4px;
+  border-radius: 0.3em;
   background: #fff;
   color: #1e293b;
-  font-size: 10.5px;
+  font-size: 1em;
   font-weight: 700;
   line-height: 1.25;
+  text-align: left;
   white-space: nowrap;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }

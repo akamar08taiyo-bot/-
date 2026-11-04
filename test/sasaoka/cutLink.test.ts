@@ -50,13 +50,15 @@ test('申請書の長さ（L=600×1800mm）を入れると、見積書の手す�
   assert.equal(placeFromDims(empty), empty);
 });
 
-test('申請書の「＋ ベースプレート」の長さ（1300mm）は、見積書のベースプレートだけの長さ。空なら手すりと同じ長さ（ユーザーの指示 2026-11-02）', () => {
+test('申請書の「＋ ベースプレート」の長さ（1300mm）は、見積書のベースプレートだけの長さ。空にしても見積書のベースプレートはそのまま（2026-11-02・11-04）', () => {
   // 手すり L=2100mm・ベースプレート 1300mm → 手すり 2100÷2000＝1.05本、ベースプレート 1300÷2000＝0.65本
   let p = placeFromDims(place([rail(), bracket, plate()], {dims: {l: '2100'}, plateLength: '1300'}));
   assert.deepEqual(qtys(p), {rail: 1.05, plate: 0.65});
-  // ベースプレートの長さを空にすると、手すりと同じ長さにもどる
+  // ベースプレートの長さを空にしても、見積書のベースプレートは変えない（手すりの長さが変わっても変えない。2026-11-04）
   p = placeFromDims({...p, plateLength: undefined});
-  assert.deepEqual(qtys(p), {rail: 1.05, plate: 1.05});
+  assert.deepEqual(qtys(p), {rail: 1.05, plate: 0.65});
+  p = placeFromDims({...p, dims: {l: '2400'}});
+  assert.deepEqual(qtys(p), {rail: 1.2, plate: 0.65});
   // 手すりの長さがなくても、ベースプレートの長さだけで入る
   assert.deepEqual(qtys(placeFromDims(place([rail({lengthCm: 90}), plate()], {plateLength: '800'}))), {rail: 0.45, plate: 0.4});
   // あとから部材リストから入れたベースプレートも、その長さ
@@ -79,7 +81,7 @@ test('申請書の「＋ ベースプレート」の長さ（1300mm）は、見�
   assert.equal(plateFromText('補強板 900mm'), null);
 });
 
-test('見積書で手すりの数量を入れると、ベースプレートも同じ長さ。逆も同じ。前から違う長さにしてあれば変えない', () => {
+test('見積書で手すりの数量を入れると、まだ空のベースプレートは同じ長さ。長さの入ったベースプレートは手すりを直しても変えない（逆も同じ。2026-11-04）', () => {
   const job = (p: Place): Job => ({
     id: 'j', month: '2026-10', customer: '', suffix: '様邸', staff: '', date: '', address: '', note: '', insuredNo: '', form: '', overhead: null, overheadTarget: null, shikiri: true,
     places: [p], createdAt: 1, updatedAt: 1,
@@ -88,15 +90,15 @@ test('見積書で手すりの数量を入れると、ベースプレートも�
   // 手すりに 1.2 → ベースプレート（まだ空）も 1.2
   let j = applySheet(job(place([rail(), plate({qty: 0})])), 'line:rail:qty', '1.2', ctx).job;
   assert.deepEqual(qtys(j.places[0]), {rail: 1.2, plate: 1.2});
-  // ベースプレートを 2600mm に → 手すりも 1.3（前は同じ長さだったので）
+  // ベースプレートを 2600mm に → 手すりはそのまま 1.2
   j = applySheet(j, 'line:plate:qty', '2600mm', ctx).job;
-  assert.deepEqual(qtys(j.places[0]), {rail: 1.3, plate: 1.3});
-  // 手すりだけ 1.5 にしたあと、ベースプレートを直しても手すりは前から違う長さなのでそのまま
+  assert.deepEqual(qtys(j.places[0]), {rail: 1.2, plate: 1.3});
+  // 手すりを 1.5 に → ベースプレートはそのまま 1.3（前は同じ長さなら合わせていた）
   j = applySheet(j, 'line:rail:qty', '1.5', ctx).job;
-  assert.deepEqual(qtys(j.places[0]), {rail: 1.5, plate: 1.5});
-  j = {...j, places: [{...j.places[0], rows: j.places[0].rows.map((r) => (r.id === 'plate' ? {...r, lengthCm: 200} : r))}]};
-  j = applySheet(j, 'line:plate:qty', '1.1', ctx).job;
-  assert.deepEqual(qtys(j.places[0]), {rail: 1.5, plate: 1.1});
+  assert.deepEqual(qtys(j.places[0]), {rail: 1.5, plate: 1.3});
+  // 申請書の長さ（ベースプレートの長さはなし）を変えても、長さの入ったベースプレートはそのまま
+  j = {...j, places: [placeFromDims({...j.places[0], dims: {l: '2000'}})]};
+  assert.deepEqual(qtys(j.places[0]), {rail: 1, plate: 1.3});
 });
 
 test('見積書の手すりを直したら、前は同じ長さだった申請書の長さは空けて見積書の長さを出す。違う長さを書いてあればそのまま', () => {
@@ -104,7 +106,7 @@ test('見積書の手すりを直したら、前は同じ長さだった申請�
   const after = {...before, rows: before.rows.map((r) => (r.id === 'rail' ? {...r, lengthCm: 260} : r))};
   const p = placeAfterQty(before, after, 'rail');
   assert.deepEqual(p.dims, {h: '800'});
-  assert.deepEqual(qtys(p), {rail: 1.3, plate: 1.3});
+  assert.deepEqual(qtys(p), {rail: 1.3, plate: 1.2}); // ベースプレートは変えない（2026-11-04）
   const differ = {...before, dims: {l: '3000'}};
   assert.deepEqual(placeAfterQty(differ, {...after, dims: {l: '3000'}}, 'rail').dims, {l: '3000'});
 });
@@ -141,53 +143,44 @@ test('中間のブラケットの数：手すり1本ごとに ceil(長さ÷900mm
   assert.equal(midBrackets([600, 1800]), 1); // L字（L=600×1800）は1本ずつ
 });
 
-test('申請書の長さ（L=600×1800）を入れると、手すりのすぐ下に BD-01G を1個（部材リストから。端のブラケットはそのまま）', () => {
+test('手すりを入れても・長さを入れても BD-01G（横受け）は自動では入れない（「手すりをいれると横受けが自動的にはいるが、はいらなくてよい」2026-11-04）', () => {
   const before = place([rail(), bracket]);
-  const after = withBrackets(before, placeFromDims({...before, dims: {l: '600×1800'}}), MATS);
-  assert.deepEqual(after.rows.map((r) => r.id === 'rail' || r.id === 'br' ? r.id : r.code), ['rail', 'BD-01G', 'br']);
-  const added = after.rows[1];
-  assert.deepEqual([added.refId, added.qty, added.unit, added.price], ['m01g', 1, '個', 600]);
-  // まっすぐ 2400mm なら2個
+  assert.deepEqual(mids(withBrackets(before, placeFromDims({...before, dims: {l: '600×1800'}}), MATS)), []);
   const straight = place([rail(), bracket], {dims: {l: '2400'}});
-  assert.deepEqual(mids(withBrackets(before, placeFromDims(straight), MATS)), [['BD-01G', 2]]);
-  // 端のブラケットがシルバー（BD-08S）なら BD-01S。部材リストになければ品番だけの行（単価は空。仕切価格が空欄の知らせに出る）
-  const silver = place([rail(), {...bracket, name: 'BD-08S 35エンドブラケットカバー付 シルバー'}], {dims: {l: '2400'}});
-  assert.deepEqual(mids(withBrackets({...silver, dims: undefined}, placeFromDims(silver), MATS)), [['BD-01S', 2]]);
-  const none = withBrackets(before, placeFromDims(straight), []).rows[1];
-  assert.deepEqual([none.code, none.maker, none.name, none.unit, none.qty, none.price, none.listPrice], ['BD-01G', 'マツ六', '35ブラケット横型カバー付 ゴールド', '個', 2, 0, 0]);
+  assert.deepEqual(mids(withBrackets(before, placeFromDims(straight), MATS)), []);
+  assert.deepEqual(mids(applySheet(job1(place([rail(), bracket])), 'line:rail:qty', '1.2', sheet).job.places[0]), []); // 見積書で 2400mm にしても
+  const withL = place([], {dims: {l: '1800'}});
+  const barRow = {...rail(), id: 'bar', name: 'BD-134 35アッシュ丸棒 ディンプル付 Mオーク 4m', pieceLengthM: 4};
+  assert.deepEqual(mids(withBrackets(withL, {...withL, rows: [{...barRow, qty: 1}]}, MATS)), []); // 部材リストから手すりを入れても
 });
 
-test('見積書で手すりの数量を直すと BD-01G も入れ直す。手で別の数にしたらそのまま。900mm までにしたら外す', () => {
-  let j = applySheet(job1(place([rail(), bracket])), 'line:rail:qty', '1.2', sheet).job; // 2400mm
+test('自分で入れた BD-01G は、見積書で手すりの数量を直すと中間の数に入れ直す。手で別の数にしたらそのまま。900mm までにしたら 0（行は消さない）', () => {
+  const mid = (qty = 1): Row => ({...materialRow(MID_G, qty), id: 'mid'});
+  let j = applySheet(job1(place([rail(), mid(), bracket])), 'line:rail:qty', '1.2', sheet).job; // 2400mm
   assert.deepEqual(mids(j.places[0]), [['BD-01G', 2]]);
   j = applySheet(j, 'line:rail:qty', '1800mm', sheet).job;
   assert.deepEqual(mids(j.places[0]), [['BD-01G', 1]]);
-  // まるごとの本数（1本・2本）だけで、取り付ける長さが分からない（申請書の長さもない）ときは入れない
-  // （ユーザーの話「BDの13に1本頼んだら、なんか自動的にブラケットが見積もりに入ることがありました」2026-11-02。前は 4000mm の手すり2本とみなして 8個）
-  const barRow = {...rail(), id: 'bar', name: 'BD-134 35アッシュ丸棒 ディンプル付 Mオーク 4m', pieceLengthM: 4};
-  const full = applySheet(job1(place([barRow])), 'line:bar:qty', '2', sheet).job;
-  assert.deepEqual(mids(full.places[0]), []);
-  assert.deepEqual(mids(applySheet(job1(place([barRow])), 'line:bar:qty', '1', sheet).job.places[0]), []);
   // 申請書の長さ（L=1800）があれば、まるごとの1本を発注していても、取り付ける 1800mm の手すりの数（1個）
+  const barRow = {...rail(), id: 'bar', name: 'BD-134 35アッシュ丸棒 ディンプル付 Mオーク 4m', pieceLengthM: 4};
   const withL = place([], {dims: {l: '1800'}});
-  assert.deepEqual(mids(withBrackets(withL, {...withL, rows: [{...barRow, qty: 1}]}, MATS)), [['BD-01G', 1]]);
-  // 使う長さの行を、まるごとの1本にしたら（長さが分からなくなったら）入れたままの BD-01G は外す
-  let back = applySheet(job1(place([barRow])), 'line:bar:qty', '2400mm', sheet).job;
+  assert.deepEqual(mids(withBrackets(withL, {...withL, rows: [{...barRow, qty: 1}, mid(0)]}, MATS)), [['BD-01G', 1]]);
+  // 使う長さの行を、まるごとの1本にしたら（長さが分からなくなったら）中間の数にしてある BD-01G は 0
+  let back = applySheet(job1(place([barRow, mid()])), 'line:bar:qty', '2400mm', sheet).job;
   assert.deepEqual(mids(back.places[0]), [['BD-01G', 2]]);
   back = applySheet(back, 'line:bar:qty', '1', sheet).job;
-  assert.deepEqual(mids(back.places[0]), []);
+  assert.deepEqual(mids(back.places[0]), [['BD-01G', 0]]);
   // 手で3個にしたら、手すりの長さを変えても3個のまま
-  const midId = j.places[0].rows.find((r) => r.code === 'BD-01G')!.id;
-  j = applySheet(j, `line:${midId}:qty`, '3', sheet).job;
+  j = applySheet(j, 'line:mid:qty', '3', sheet).job;
   j = applySheet(j, 'line:rail:qty', '2400mm', sheet).job;
   assert.deepEqual(mids(j.places[0]), [['BD-01G', 3]]);
-  // 手で直していなければ、900mm までの手すりにしたら行を外す（単価を直した行は数を 0 に）
-  let k = applySheet(job1(place([rail(), bracket])), 'line:rail:qty', '2400mm', sheet).job;
+  // 900mm までの手すりにしたら数を 0 に（行は消さない）。また長くすると中間の数に戻る
+  let k = applySheet(job1(place([rail(), mid(), bracket])), 'line:rail:qty', '2400mm', sheet).job;
   k = applySheet(k, 'line:rail:qty', '900mm', sheet).job;
-  assert.deepEqual(mids(k.places[0]), []);
-  k = applySheet(job1(place([rail(), bracket])), 'line:rail:qty', '2400mm', sheet).job;
-  const kid = k.places[0].rows.find((r) => r.code === 'BD-01G')!.id;
-  k = applySheet(k, `line:${kid}:price`, '777', sheet).job;
+  assert.deepEqual(mids(k.places[0]), [['BD-01G', 0]]);
+  k = applySheet(k, 'line:rail:qty', '1800mm', sheet).job;
+  assert.deepEqual(mids(k.places[0]), [['BD-01G', 1]]);
+  k = applySheet(job1(place([rail(), mid(), bracket])), 'line:rail:qty', '2400mm', sheet).job;
+  k = applySheet(k, 'line:mid:price', '777', sheet).job;
   k = applySheet(k, 'line:rail:qty', '600mm', sheet).job;
   assert.deepEqual(mids(k.places[0]), [['BD-01G', 0]]);
 });
@@ -200,9 +193,9 @@ test('部材＋施工費（常用）の BD-01G（数は空け）を長さの分�
   const p = withBrackets(before, fillAdded({...before, rows: kit}, ids), MATS);
   assert.deepEqual(mids(p), [['BD-01G', 1]]);
   assert.deepEqual(p.rows.map((r) => r.kind), ['material', 'material', 'material', 'labor']); // 行は増えない（施工費は下のまま）
-  // 600mm だけなら要らないので外す
+  // 600mm だけなら要らないので数は 0 のまま（行は消さない。2026-11-04 から）
   const short = place([], {dims: {l: '600'}});
-  assert.deepEqual(mids(withBrackets(short, fillAdded({...short, rows: kit}, ids), MATS)), []);
+  assert.deepEqual(mids(withBrackets(short, fillAdded({...short, rows: kit}, ids), MATS)), [['BD-01G', 0]]);
   // 手すりの長さが分かっている箇所に、部材リストから BD-01G を入れた
   const has = place([rail({lengthCm: 240}), bracket]);
   const picked = materialRow(MID_G);

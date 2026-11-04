@@ -107,6 +107,14 @@ const ed = (editable: boolean, key: string | null) => (editable && key ? {'data-
 export type SheetOpts = {mark: '材' | '手'; copied?: string[]; pasting?: boolean};
 
 /** コピーした行の印（見積書に直接入力するときだけ） */
+/**
+ * 箇所の欄（改修内容・改修場所・写真番号・改修の種類）の欄のキー：箇所の1行目は place:箇所ID:欄、2行目からは split:行ID:欄（打つとその行から別の箇所。
+ * sheetEdit.ts の `splitPlaceAt`。ユーザーの指示「他のセルの上に乗せた場合でも、直接変更や入力ができるようにする」2026-11-04）。
+ * 部材のすぐ下の同上施工費の行は、部材と分けられないので打てない（excludeId が上の部材の行）
+ */
+const placeKey = (l: FormLine, field: string): string | null =>
+  l.first ? `place:${l.placeId}:${field}` : l.excludeId === l.rowId ? `split:${l.rowId}:${field}` : null;
+
 const copiedAttr = (sheet: SheetOpts | null | undefined, l: FormLine) => (sheet?.copied?.length && l.rowIds.some((id) => sheet.copied?.includes(id)) ? {'data-copied': ''} : {});
 
 /** 書式の明細の行（sheet なら金額のない施工費の行と、打ち込める空いた行も） */
@@ -348,9 +356,9 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
   const note = lineNote(l, 'yukuhashi', 0);
   return (
     <tr className="g" style={{height: `${YK_ROW}mm`}} {...(editable ? {'data-rows': l.rowIds.join(' '), ...copiedAttr(sheet, l)} : {})}>
-      {cell(l.first ? l.work : '', YK.A, 11, 'ml', l.first ? `place:${l.placeId}:work` : null, 1)}
+      {cell(l.first ? l.work : '', YK.A, 11, 'ml', placeKey(l, 'work'), 1)}
       {/* 改修場所（写真No.）：「①勝手口」。写真番号のあとに箇所名を打ち込める */}
-      {cell(l.first ? `${circled(l.photo)}${l.placeName}` : '', YK.B, 11, '', l.first ? `place:${l.placeId}:name` : null)}
+      {cell(l.first ? `${circled(l.photo)}${l.placeName}` : '', YK.B, 11, '', placeKey(l, 'name'))}
       {nameCell(l.text, YK.C, YK_ROW, 9, `${bottom}`, k('text'), 2, editable, l.slot, l.blank)}
       {cell(qty, YK.D, 9, 'r nr', l.isWork ? null : k('qty'))}
       {cell(l.unit, YK.E, 11, 'nl', l.isWork || l.cut ? null : k('unit'))}
@@ -632,8 +640,8 @@ function KkLine({
   }
   return (
     <tr className="g" style={{height: `${height}mm`}} {...(editable ? {'data-rows': l.rowIds.join(' '), ...copiedAttr(sheet, l)} : {})}>
-      {cell(l.first ? l.placeName : '', KK.A, 11, 'c ml', l.first ? `place:${l.placeId}:name` : null, 2)}
-      {cell(l.first ? l.work : '', KK.B, 11, 'c', l.first ? `place:${l.placeId}:work` : null, 2)}
+      {cell(l.first ? l.placeName : '', KK.A, 11, 'c ml', placeKey(l, 'name'), 2)}
+      {cell(l.first ? l.work : '', KK.B, 11, 'c', placeKey(l, 'work'), 2)}
       <td className={`mark${bottom}`}>{l.blank ? '' : l.mark}</td>
       {nameCell(l.text, KK.D, height, 9, `mr gothic${bottom}`, k('text'), 3, editable, l.slot, l.blank)}
       <td className={`gap${bottom}`} />
@@ -642,8 +650,8 @@ function KkLine({
       {cell(price, KK.H, 11, 'r gothic', l.hourly ? null : k('price'))}
       {cell(amount, KK.I, 11, 'r mr gothic', l.blank || open ? null : k('amount'))}
       <td className={`gap${bottom}`} />
-      {cell(l.first ? circled(l.photo) : '', KK.K, 11, 'c ml', l.first ? `place:${l.placeId}:photo` : null)}
-      {cell(l.first ? circled(l.kind) : '', KK.L, 11, 'c', l.first ? `place:${l.placeId}:kind` : null)}
+      {cell(l.first ? circled(l.photo) : '', KK.K, 11, 'c ml', placeKey(l, 'photo'))}
+      {cell(l.first ? circled(l.kind) : '', KK.L, 11, 'c', placeKey(l, 'kind'))}
       {cell(target ? qty : '', KK.M, 9, 'r ml gothic', excl)}
       {cell(target ? l.unit : '', KK.N, 11, 'gothic', excl)}
       {cell(target ? price : '', KK.O, 11, 'r gothic', excl)}

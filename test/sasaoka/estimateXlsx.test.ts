@@ -167,6 +167,22 @@ test('Excel の金額は式：数量・単価を直せば計算し直される�
   assert.ok(n >= 23, `式の数 ${n}`); // 諸経費（全体・対象）は数字
 });
 
+test('対象外の行がなければ、介護保険対象部分の諸経費は全体の諸経費の欄を指す（Excel で諸経費を直すと、対象部分の消費税・合計も変わる。2026-11-04）', () => {
+  const base = job();
+  const j = {...base, places: base.places.map((p) => ({...p, rows: p.rows.map((r) => ({...r, excluded: false}))}))};
+  const x = open(estimateXlsx(j, S, '2026-10-20').bytes);
+  assert.equal(x.cells.get('K24')?.f, 'G24');
+  assert.equal(x.cells.get('K25')?.f, `ROUNDDOWN((K23+K24)*${S.taxRate},0)`);
+  for (const [ref, c] of x.cells) if (c.f) assert.equal(evaluate(x.cells, ref), c.v, `${ref} =${c.f}`);
+  // Excel で全体の諸経費（G24）を 6,600 に直したつもりで計算し直す → 対象部分の消費税（K25）も (小計＋6,600)×10%
+  const cells = new Map(x.cells);
+  cells.set('G24', {...cells.get('G24')!, v: 6600});
+  const sub = evaluate(cells, 'K23') as number;
+  assert.equal(evaluate(cells, 'K25'), Math.trunc((sub + 6600) * S.taxRate));
+  // 対象外の行があれば、対象部分の諸経費は別（数字か式）で全体を指さない
+  assert.notEqual(open(estimateXlsx(base, S, '2026-10-20').bytes).cells.get('K24')?.f, 'G24');
+});
+
 test('見積書で金額を打った部材（割り切れない 10,000円÷0.7本）も、Excel の ROUNDDOWN(数量×単価) で打った金額になる', () => {
   const base = job();
   const id = base.places[0].rows[0].id;

@@ -609,24 +609,41 @@ assert.ok(plate.includes('|0.6|本|15,840|9,504|'), plate); // 数量・単価�
 assert.ok(plate.includes('定価19,800円（4m）×0.8') && plate.includes('2400mm÷4000mm＝0.6'), plate);
 log('商品名の幅（120mm幅）は1本の長さにしない（4m の 0.6＝2400mm）OK');
 
-// ---------------- 中間のブラケット（ユーザーの指示「見積書で、中間のブラケット（BD-01G）の数も」→「おねがいします」、2026-10-22）：
-// マツ六 BAUHAUS 35 の丸棒の数量に 2400mm → 手すりのすぐ下に BD-01G（35ブラケット横型）を2個（ブラケットの間は 900mm 以内）。900mm にしたら外す。Ctrl+Z は1回で戻る
+// ---------------- 中間のブラケット（横受け。BD-01G）は自動では入れない（ユーザーの指示「手すりをいれると横受けが自動的にはいるが、はいらなくてよい」2026-11-04。
+// 前は 2026-10-22 の「おねがいします」で、手すりの数量に 2400mm と入れると手すりのすぐ下に BD-01G を2個入れていた）。
+// （自分で入れた BD-01G の数は cutLink.test.ts と e2e-bracket.mjs）。手すりの数量を直しても入らない・Ctrl+Z は1回で戻る
 const midRow = () => sheet.locator('.form-page tr', {hasText: 'BD-01G'});
 await typeIn('new:text', 'マツ六 BD-134 35アッシュ丸棒 ディンプル付 Mオーク 4m', 'Tab');
 assert.equal(await selected(), '数量');
 await page.keyboard.type('2400mm');
 await page.keyboard.press('Enter');
-await midRow().first().waitFor();
-assert.ok((await tds('BD-01G')).join('|').includes('|2|個|'), (await tds('BD-01G')).join('|'));
-const rowTexts = await sheet.locator('.form-page tr').allInnerTexts();
-const railAt = rowTexts.findLastIndex((t) => t.includes('BD-134') || t.includes('ディンプル付 Mオーク 4m'));
-assert.ok(rowTexts[railAt + 1].includes('BD-01G'), rowTexts.slice(railAt, railAt + 3).join(' / '));
+await page.waitForTimeout(300);
+assert.equal(await midRow().count(), 0);
 await typeIn(await key('BD-134', 'qty'), '900mm');
 assert.equal(await midRow().count(), 0);
 await undoKey();
-await midRow().first().waitFor();
+await page.waitForTimeout(200);
 assert.ok((await tds('BD-134')).join('|').includes('2400mm÷4000mm＝0.6'), (await tds('BD-134')).join('|'));
-log('中間のブラケット：2400mm → BD-01G 2個・900mm で外す・Ctrl+Z で戻る OK');
+assert.equal(await midRow().count(), 0);
+log('中間のブラケット（横受け）：手すりを入れても・数量を直しても自動では入らない・Ctrl+Z で戻る OK');
+
+// ---------------- 箇所の2行目からの改修場所の欄にも打てる（ユーザーの指示「他のセルの上に乗せた場合でも、直接変更や入力ができるようにする」2026-11-04）：
+// 打つとその行（同上施工費ごと）から下が別の箇所になる。Ctrl+Z で戻る
+const placeCount = async () => sheet.locator('[data-edit^="place:"][data-edit$=":name"]').count();
+const placesBefore = await placeCount();
+const splitName = sheet.locator('.form-page tr', {hasText: 'BD-134'}).first().locator('[data-edit^="split:"][data-edit$=":name"]');
+assert.equal(await splitName.count(), 1);
+await cellAt(splitName).click();
+assert.equal(await selected(), '改修場所（箇所名）');
+await page.keyboard.type('洗面所');
+await page.keyboard.press('Enter');
+await page.waitForTimeout(300);
+assert.equal(await placeCount(), placesBefore + 1);
+assert.match((await tds('BD-134')).join('|'), /洗面所/);
+await undoKey();
+await page.waitForTimeout(300);
+assert.equal(await placeCount(), placesBefore);
+log('箇所の2行目からの改修場所に打つと、その行から別の箇所・Ctrl+Z で戻る OK');
 
 // ---------------- 上の段：Excelで保存・見積書を印刷・その他 ▼（メールで送付・保存・売上伝票を作成・発注書・複製、最後に削除）。白紙に戻すはない
 // （ユーザーの指示「ここの部分がごちゃごちゃしているので、プルダウンにする」2026-11-03。前は2段目に並べていた）

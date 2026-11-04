@@ -75,12 +75,14 @@ function amountFormula(qty: number, price: number, amount: number, qtyCell: stri
  * 諸経費を手で直してあるか、合計の末尾を0にする端数調整で 小計×率 と違う金額にしたとき（`overheadAuto`）は、その金額をそのまま書く
  * （式の答えがアプリの金額と同じにならない欄は数字のまま）
  */
-function totalFormulas(col: number, top: number, ranges: string[], manualOverhead: boolean, sums: EstimateSums, s: Settings): (string | undefined)[] {
+function totalFormulas(col: number, top: number, ranges: string[], manualOverhead: boolean, sums: EstimateSums, s: Settings, sameOverhead?: string): (string | undefined)[] {
   const [sub, oh, tax] = [cellRef(top, col), cellRef(top + 1, col), cellRef(top + 2, col)];
   const plain = !manualOverhead && sums.overhead === rounddown(sums.subtotal * s.estimateOverheadRate);
   return [
     `SUM(${ranges.join(',')})`,
-    plain ? `ROUNDDOWN(${sub}*${s.estimateOverheadRate},0)` : undefined,
+    // sameOverhead：介護保険対象部分の諸経費が全体と同じ（対象外の行がない）なら、全体の諸経費の欄を指す。Excel で全体の諸経費を直すと、
+    // 対象部分の諸経費・消費税・合計も変わる（ユーザーの指摘「諸経費を修正した際に、消費税が自動で切り替わらない」2026-11-04。前は数字のままで変わらなかった）
+    sameOverhead ?? (plain ? `ROUNDDOWN(${sub}*${s.estimateOverheadRate},0)` : undefined),
     `ROUNDDOWN((${sub}+${oh})*${s.taxRate},0)`,
     `${sub}+${oh}+${tax}`,
   ];
@@ -143,7 +145,7 @@ function yukuhashiSheet(job: Job, s: Settings, date: string): XSheet {
     ranges.target.push(`${cellRef(first, 10)}:${cellRef(detailEnd, 10)}`);
     const top = first + per - TOTAL_ROWS; // 小計の行
     const fAll = totalFormulas(6, top, ranges.all, job.overhead != null, t.all, s);
-    const fTarget = totalFormulas(10, top, ranges.target, manualTargetOverhead(job, t), t.target, s);
+    const fTarget = totalFormulas(10, top, ranges.target, manualTargetOverhead(job, t), t.target, s, t.excluded === 0 ? cellRef(top + 1, 6) : undefined);
     for (let i = 0; i < per; i++) {
       const r = b.row(YK_ROW);
       const bottom = i === per - 1 ? ' mb' : '';
@@ -296,7 +298,7 @@ function kouikiSheet(job: Job, s: Settings): XSheet {
     ranges.target.push(`${cellRef(first, 15)}:${cellRef(detailEnd, 15)}`);
     const top = first + per - TOTAL_ROWS;
     const fAll = totalFormulas(8, top, ranges.all, job.overhead != null, t.all, s);
-    const fTarget = totalFormulas(15, top, ranges.target, manualTargetOverhead(job, t), t.target, s);
+    const fTarget = totalFormulas(15, top, ranges.target, manualTargetOverhead(job, t), t.target, s, t.excluded === 0 ? cellRef(top + 1, 8) : undefined);
     KK_ROWS.forEach((height, i) => {
       const r = b.row(height);
       const bottom = i === per - 1 ? ' mb' : '';

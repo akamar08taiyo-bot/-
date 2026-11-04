@@ -8,7 +8,7 @@
 // 手すりの長さが変わったら、中間のブラケット（BD-01G）の数も入れ直す（`withBrackets`）
 
 import {isBlankRow} from './calc.ts';
-import {codeKey, insertRowsAt, manualRow, materialRow} from './rows.ts';
+import {codeKey} from './rows.ts';
 import type {Material, Place, Row} from './types.ts';
 
 /** ベースプレート・補強板（手すりの長さに数えない。手すりと同じ長さを使う） */
@@ -56,13 +56,15 @@ function withMm(r: Row, mm: number): Row {
 
 /**
  * 申請書の長さを見積書の行に：手すりの行が長さの数と同じだけあれば順に、1行なら合計。ベースプレートは plateMms（申請書の「ベースプレート」の長さ。
- * なければ手すりと同じ長さ）を、1行なら合計・行が長さの数と同じだけあれば順に
+ * なければ手すりと同じ長さ）を、1行なら合計・行が長さの数と同じだけあれば順に。
+ * onlyUnsetPlates：ベースプレートはまだ長さを入れていない行（lengthCm が 0）だけ（申請書にベースプレートの長さがなく、手すりの長さを使うとき。
+ * ユーザーの指示「手すりの長さがかわったら、ベースプレートの長さが自動的に変わってしまうので、変わらないようにする」2026-11-04）
  */
-export function lengthsToRows(rows: Row[], mms: number[], plateMms: number[] = mms): Row[] {
+export function lengthsToRows(rows: Row[], mms: number[], plateMms: number[] = mms, onlyUnsetPlates = false): Row[] {
   if (mms.length === 0 && plateMms.length === 0) return rows;
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
   const rails = rows.filter((r) => cutRow(r) && !isPlate(r));
-  const plates = rows.filter((r) => cutRow(r) && isPlate(r));
+  const plates = rows.filter((r) => cutRow(r) && isPlate(r) && !(onlyUnsetPlates && r.lengthCm > 0));
   const want = new Map<string, number>();
   if (mms.length > 0) {
     if (rails.length === 1) want.set(rails[0].id, sum(mms));
@@ -81,14 +83,15 @@ export function lengthsToRows(rows: Row[], mms: number[], plateMms: number[] = m
 export const plateLengths = (p: Pick<Place, 'kind' | 'plateLength'>): number[] => (p.kind === 1 ? dimsLengths(p.plateLength) : []);
 
 /**
- * 申請書で箇所の長さ（手すり・ベースプレート）を入れたとき（手すりの取り付けの箇所だけ）。空にしたときは見積書を変えない
- * （ベースプレートの長さを空にしたら、ベースプレートは手すりの長さにもどす）
+ * 申請書で箇所の長さ（手すり・ベースプレート）を入れたとき（手すりの取り付けの箇所だけ）。空にしたときは見積書を変えない。
+ * ベースプレートの長さがなければ、まだ長さを入れていない見積書のベースプレートだけ手すりと同じ長さにする（長さの入ったベースプレートは、
+ * 手すりの長さが変わっても変えない。ユーザーの指示「手すりの長さがかわったら、ベースプレートの長さが自動的に変わってしまうので、変わらないようにする」2026-11-04）
  */
 export function placeFromDims(p: Place): Place {
   if (p.kind !== 1) return p;
   const rails = dimsLengths(p.dims?.l);
   const plates = plateLengths(p);
-  const rows = lengthsToRows(p.rows, rails, plates.length ? plates : rails);
+  const rows = plates.length ? lengthsToRows(p.rows, rails, plates) : lengthsToRows(p.rows, rails, rails, true);
   return rows === p.rows ? p : {...p, rows};
 }
 
@@ -107,8 +110,9 @@ export function plateFromText(text: string | undefined): {bp: string; rest: stri
 }
 
 /**
- * 見積書で行の数量を直したとき（before → after）：同じ箇所のもう一方（手すり⇔ベースプレート）が1行で、
- * 前は直した側と同じ長さだったか、まだ長さを入れていなければ、同じ長さ（直した側の合計）にする。
+ * 見積書で行の数量を直したとき（before → after）：同じ箇所のもう一方（手すり⇔ベースプレート）が1行で、まだ長さを入れていなければ
+ * （数量が空）、同じ長さ（直した側の合計）にする。長さの入ったもう一方は変えない（前は前に同じ長さだったら合わせていた。ユーザーの指示
+ * 「手すりの長さがかわったら、ベースプレートの長さが自動的に変わってしまうので、変わらないようにする」2026-11-04）。
  * 申請書の長さが前は見積書の手すりと同じだったなら、空けて見積書の長さを出す（違う長さを書いてあったときはそのまま）
  */
 export function placeAfterQty(before: Place, after: Place, rowId: string): Place {
@@ -123,7 +127,7 @@ export function placeAfterQty(before: Place, after: Place, rowId: string): Place
   const others = after.rows.filter((r) => cutRow(r) && isPlate(r) !== plate);
   // 申請書にベースプレートの長さを入れてあれば、手すりとベースプレートは別の長さ（もう一方に合わせない）
   const ownPlate = plateLengths(after);
-  if (ownPlate.length === 0 && others.length === 1 && (usedMm(others[0]) === 0 || usedMm(others[0]) === prev)) {
+  if (ownPlate.length === 0 && others.length === 1 && usedMm(others[0]) === 0) {
     rows = rows.map((r) => (r === others[0] ? withMm(r, next) : r));
   }
   let out: Place = rows === after.rows ? after : {...after, rows};
@@ -168,16 +172,15 @@ export function fillAdded(p: Place, ids: Set<string>): Place {
 // マツ六 BAUHAUS の 35 の丸棒（BD-1xx）は、ブラケットの間を 900mm 以内にする（メーカーの決まり）。両端はエンドブラケット（BD-08G など。今までどおり手で入れる）で、
 // そのあいだに 35ブラケット横型（BD-01G）を、手すり1本（申請書の長さの区切りごと。L字は2本）に ceil(長さ÷900mm)−1 個。
 //   ・手すりの長さが変わったら（申請書の長さ・見積書の数量・部材リストから入れた）、その箇所の BD-01G の数をそれにする。手で別の数にしてあればそのまま
-//   ・BD-01G の行がなければ、手すりのすぐ下（手すりの同上施工費があればその下）に部材リストから入れる（色は端のブラケットに合わせる。部材リストになければ品番だけの行）
-//   ・900mm までの手すりにしたら、入れた BD-01G の行は外す
+//   ・BD-01G の行がなければ入れない（ユーザーの指示「手すりをいれると横受けが自動的にはいるが、はいらなくてよい」2026-11-04。
+//     前は手すりのすぐ下に部材リストから入れていた）。BD-01G を入れるのは、部材リスト・常用・品番を打って自分で入れたときだけ
+//   ・900mm までの手すりにしたら、BD-01G の数は 0（行は消さない）
 
-/** 35 の丸棒（品番 BD-1［色］［長さ］）・35ブラケット横型（中間）・35エンドブラケット（両端）。品番は `codeKey` の形 */
+/** 35 の丸棒（品番 BD-1［色］［長さ］）・35ブラケット横型（中間）。品番は `codeKey` の形 */
 const RAIL_35 = /^bd1\d\d$/;
 const MID_BRACKET = /^bd01(g|s|b|bk)?$/;
-const END_BRACKET = /^bd08(g|s|b|bk)$/;
 /** ブラケットの間（この mm 以内） */
 export const BRACKET_SPAN_MM = 900;
-const COLOR_NAMES: Record<string, string> = {g: 'ゴールド', s: 'シルバー', b: 'ブラウン', bk: 'ブラック'};
 
 /** 行の品番（比べる形）。品番の欄が空なら品名の中の「BD-132」など（見積書に手で打ち込んだ行） */
 function rowCode(r: Row): string {
@@ -189,7 +192,6 @@ const isMazroc = (r: Row) => !r.maker.trim() || /マツ六|mazroc/i.test(r.maker
 const isPart = (re: RegExp) => (r: Row) => r.kind === 'material' && !isBlankRow(r) && isMazroc(r) && re.test(rowCode(r));
 const isRail35 = isPart(RAIL_35);
 const isMid = isPart(MID_BRACKET);
-const isEnd = isPart(END_BRACKET);
 
 /**
  * 箇所の 35 の丸棒の取り付ける1本ずつの長さ（mm）。取り付ける長さが分かるときだけ（分からなければ []＝中間のブラケットを入れない）：
@@ -220,21 +222,13 @@ export function midBrackets(runsMm: number[]): number {
 
 const sameRuns = (a: number[], b: number[]) => a.length === b.length && a.every((x, i) => Math.abs(x - b[i]) < 0.5);
 
-/** 入れる中間のブラケットの行。色は端のブラケット（BD-08S なら BD-01S）、なければゴールド */
-function midRow(p: Place, materials: Material[], qty: number): Row {
-  const end = p.rows.find(isEnd);
-  const color = end ? (END_BRACKET.exec(rowCode(end))?.[1] ?? 'g') : 'g';
-  const code = `BD-01${color.toUpperCase()}`;
-  const m = materials.find((x) => codeKey(x.code) === codeKey(code));
-  return m ? materialRow(m, qty) : manualRow('material', {name: `35ブラケット横型カバー付 ${COLOR_NAMES[color]}`, code, maker: 'マツ六', unit: '個', qty});
-}
-
 /**
  * 箇所の行を直したあと（before → after）、手すり（35 の丸棒）の長さが変わっていたら、中間のブラケット（BD-01G など）の数を入れ直す。
  * BD-01G の行が前は前の長さの数（か 0・前は長さが分からなかった・いま入れた行）なら新しい数に。手で別の数にしてあれば・2行以上に分けてあればそのまま。
- * 長さが変わらなくても、部材リストから入れたばかりの BD-01G は中間の数にする
+ * 長さが変わらなくても、部材リストから入れたばかりの BD-01G は中間の数にする。BD-01G の行がなければ何もしない（自動では入れない。2026-11-04）。
+ * materials は前に BD-01G の行を部材リストから作っていたときの名残り（呼ぶ側はそのまま）
  */
-export function withBrackets(before: Place | undefined, after: Place, materials: Material[]): Place {
+export function withBrackets(before: Place | undefined, after: Place, _materials?: Material[]): Place {
   const runs = railRuns(after);
   const prevRuns = before ? railRuns(before) : [];
   // 取り付ける長さが分からなくなった（手すりを消した・まるごとの1本にした）ときは、入れたままの BD-01G を外す（下の「要らなくなった」）
@@ -250,13 +244,9 @@ export function withBrackets(before: Place | undefined, after: Place, materials:
     const follow = !was || was.qty === 0 || prevRuns.length === 0 || was.qty === midBrackets(prevRuns);
     if (!follow) return after;
     if (want > 0) return mid.qty === want ? after : setQty(want);
-    // 要らなくなった（900mm までの手すり）：入れたままの行（単価・内容・備考を直していない）は外す
-    const plain = mid.estPrice === null && mid.estText === null && mid.estNote === null && !mid.excluded;
-    if (plain) return {...after, rows: after.rows.filter((r) => r !== mid)};
+    // 要らなくなった（900mm までの手すり）：数を 0 に。行は消さない（BD-01G は自分で入れた行なので。前は自動で入れた行を外していたが、
+    // 自動で入れなくなった 2026-11-04 からは、申請書の長さを1字ずつ消している途中の「600」で消えて戻らなくなった）
     return mid.qty === 0 ? after : setQty(0);
   }
-  if (want === 0) return after;
-  let last: string | null = null;
-  for (const r of after.rows) if (isRail35(r)) last = r.id;
-  return {...after, rows: insertRowsAt(after.rows, [midRow(after, materials, want)], last)};
+  return after; // BD-01G の行がない：自動では入れない（ユーザーの指示「手すりをいれると横受けが自動的にはいるが、はいらなくてよい」2026-11-04）
 }

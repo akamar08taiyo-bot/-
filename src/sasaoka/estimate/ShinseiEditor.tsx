@@ -827,7 +827,8 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
       const {dims: _d, ...rest} = back;
       return withBrackets(x, Object.keys(dims).length ? {...rest, dims} : rest, materials);
     });
-  // ベースプレートの長さ（「＋ ベースプレート」）。見積書のベースプレートの使う長さにする（空にしたら手すりと同じ長さ。`placeFromDims`）
+  // ベースプレートの長さ（「＋ ベースプレート」）。見積書のベースプレートの使う長さにする（空にしても見積書のベースプレートは変えない。
+  // 手すりの長さが変わってもベースプレートは変えない＝2026-11-04。`placeFromDims`）
   const setPlate = (id: string, v: string) =>
     setPlace(id, (x) => {
       const {plateLength: _old, ...rest} = x;

@@ -421,7 +421,8 @@ export function EstimateSheet({
   const textCell = !!sel && field === 'text' && (sel.key.startsWith('new:') ? mark === '材' : target.row?.kind === 'material');
   const kindCell = !!sel && (field === 'work' || field === 'kind');
   // 改修場所（箇所名）：設定の「箇所の名前」から選べる（手で打ってもよい）
-  const placeCell = !!sel && field === 'name' && (sel.key.startsWith('place:') || sel.key === 'new:name');
+  // 箇所の2行目からの改修場所の欄（split:）も（打つとその行から別の箇所。`splitPlaceAt`）
+  const placeCell = !!sel && field === 'name' && (sel.key.startsWith('place:') || sel.key.startsWith('split:') || sel.key === 'new:name');
   const suggestions = useMemo(() => {
     if (!edit) return [] as {label: string; sub: string; value: string; pick: Material | null}[];
     const q = edit.value.trim();
@@ -845,7 +846,7 @@ export function EstimateSheet({
   // 押しても見積書の欄の選択を外さない（打ち込んでいる欄・選んでいる行のまま）
   const keepSel = (e: ReactMouseEvent) => e.preventDefault();
   // 選んでいる欄が明細の行か（いちばん下の空いた行・お客様名などの欄では、挿入・削除・コピーは押せない）
-  const onLine = !!sel && /^(line|place|excl):/.test(sel.key);
+  const onLine = !!sel && /^(line|place|excl|split):/.test(sel.key);
   const rowOp = (op: 'insert' | 'delete' | 'copy' | 'paste') => {
     if (edit && sel) commit(edit.value, null, null, true); // 打ち込んでいた値を入れてから
     if (op === 'paste') {
@@ -1117,7 +1118,7 @@ export function EstimateSheet({
             )}
             {/* 行の 挿入・削除・コピー・貼付：選んでいる行の改修内容の左（余白）に小さく */}
             {opsAt && (
-              <div className="sheet-ops" style={{left: opsAt.left - 4, top: opsAt.top}} role="toolbar" aria-label="行の操作">
+              <div className="sheet-ops" style={{left: opsAt.left - 4, top: opsAt.top, fontSize: `${Math.round((15 / scale) * 100) / 100}px`}} role="toolbar" aria-label="行の操作">
                 <button
                   type="button"
                   onMouseDown={keepSel}
