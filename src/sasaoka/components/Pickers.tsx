@@ -7,10 +7,11 @@ import {laborCount, manualRow, materialRow, setLaborCount} from '../rows.ts';
 import type {AppMode, LaborItem, Material, Place, Row} from '../types.ts';
 import {matchesAll, num, uid, yen} from '../util.ts';
 import {Btn, CatalogLinks, Modal, NumberInput, Star, Stepper, TextInput, useToast} from './ui.tsx';
-import {isYazaki, yazakiPageOf} from '../yazakiCatalog.ts';
-import {YazakiCatalogView} from './YazakiCatalogView.tsx';
+import {BOOKS, type BookId, catalogPageOf} from '../makerCatalogs.ts';
+import {MakerCatalogView} from './MakerCatalogView.tsx';
 
 const SHOW_LIMIT = 200;
+const LAST_BOOK = 'taiyo-sasaoka-catalog-book'; // 部材を選ぶ画面で前に開いたカタログ（この端末の localStorage）
 
 /**
  * 部材を選ぶ画面。★お気に入り／すべて を切り替えて検索し、「追加」を押すと箇所に1行入る（続けて選べる）。
@@ -67,20 +68,37 @@ export function MaterialPicker({
     onAdd(row);
     if (onQty && row.refId) setLast({matId: row.refId, rowId: row.id});
   };
-  // 矢崎化工のカタログ（yazakiCatalog.ts）。開いているあいだは部材リストの代わりにカタログを出す。page・code は開くページと光らせる品番
-  const [catalog, setCatalog] = useState<{page: number; code?: string} | null>(null);
+  // メーカーのカタログ（makerCatalogs.ts。矢崎化工・TOTO）。開いているあいだは部材リストの代わりにカタログを出す。page・code は開くページと光らせる品番。
+  // 「📖 カタログから選ぶ」は、前に開いたカタログ（この端末で覚える）
+  const [catalog, setCatalog] = useState<{book: BookId; page: number; code?: string} | null>(null);
+  const [lastBook, setLastBook] = useState<BookId>(() => {
+    try {
+      const v = localStorage.getItem(LAST_BOOK);
+      return BOOKS.some((b) => b.id === v) ? (v as BookId) : BOOKS[0].id;
+    } catch {
+      return BOOKS[0].id;
+    }
+  });
+  const rememberBook = (id: BookId) => {
+    setLastBook(id);
+    try {
+      localStorage.setItem(LAST_BOOK, id);
+    } catch {
+      /* 覚えられなくても開ける */
+    }
+  };
   const toast = useToast();
   const addFromCatalog = (m: Material) => {
     addRow(m);
     toast(`${m.code} を入れました`);
   };
   // 部材リストにない品番は、品番だけの行（金額は見積書で打つ）
-  const addCatalogCode = (code: string) => {
-    const m: Material = {id: uid('m'), name: '', price: 0, listPrice: 0, pieceLengthM: guessPieceLengthM(code), maker: '矢崎化工', code, unit: '', favorite: false, updatedAt: Date.now()};
+  const addCatalogCode = (code: string, maker: string) => {
+    const m: Material = {id: uid('m'), name: '', price: 0, listPrice: 0, pieceLengthM: guessPieceLengthM(code), maker, code, unit: '', favorite: false, updatedAt: Date.now()};
     addRow(m, {...materialRow(m), refId: null});
     toast(`${code} を入れました（部材リストにない品番）`);
   };
-  const yazakiPage = useMemo(() => new Map(materials.filter(isYazaki).map((m) => [m.id, yazakiPageOf(m)] as const)), [materials]);
+  const catalogPage = useMemo(() => new Map(materials.filter((m) => BOOKS.some((b) => b.isMaker(m.maker))).map((m) => [m.id, catalogPageOf(m)] as const)), [materials]);
 
   // 商品名は空でもよい（金額だけの行）。名前があるときだけ部材リストにも登録できる
   const canAddManual = manual.name.trim() !== '' || manual.price > 0 || manual.listPrice > 0;
@@ -160,16 +178,16 @@ export function MaterialPicker({
             ))}
           </select>
         )}
-        {/* 矢崎化工のカタログ（このアプリの中。ページの品番を押すと入る）と、メーカーのカタログ（新しいタブ）（2026-11-04） */}
-        <Btn small color="white" onClick={() => setCatalog(catalog ? null : {page: 0})} aria-pressed={!!catalog}>
-          📖 矢崎化工カタログから選ぶ
+        {/* 矢崎化工・TOTO のカタログ（このアプリの中。ページの品番を押すと入る）と、メーカーのカタログ（新しいタブ）（2026-11-04） */}
+        <Btn small color="white" onClick={() => setCatalog(catalog ? null : {book: lastBook, page: 0})} aria-pressed={!!catalog}>
+          📖 カタログから選ぶ
         </Btn>
         <CatalogLinks small />
       </div>
 
       {catalog ? (
         <div className="mt-3">
-          <YazakiCatalogView materials={materials} start={catalog} onAdd={addFromCatalog} onAddCode={addCatalogCode} onBack={() => setCatalog(null)} />
+          <MakerCatalogView materials={materials} start={catalog} onAdd={addFromCatalog} onAddCode={addCatalogCode} onBack={() => setCatalog(null)} onBook={rememberBook} />
         </div>
       ) : (
       <>
@@ -210,15 +228,15 @@ export function MaterialPicker({
                     </td>
                     <td className="px-2 py-1.5 font-bold text-slate-800">
                       {m.name}
-                      {/* 矢崎化工のカタログに載っている部材：そのページを開く（ユーザーの指示「リンクで商品検索や商品名、型番等をひっぱってこれるように」2026-11-04） */}
-                      {yazakiPage.get(m.id) && (
+                      {/* 矢崎化工・TOTO のカタログに載っている部材：そのページを開く（ユーザーの指示「リンクで商品検索や商品名、型番等をひっぱってこれるように」2026-11-04） */}
+                      {catalogPage.get(m.id) && (
                         <button
                           type="button"
-                          onClick={() => setCatalog(yazakiPage.get(m.id)!)}
+                          onClick={() => setCatalog(catalogPage.get(m.id)!)}
                           className="ml-2 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-xs font-normal text-slate-600 hover:bg-emerald-50"
                           aria-label={`${m.name}のカタログのページを開く`}
                         >
-                          📖 p.{yazakiPage.get(m.id)!.page}
+                          📖 p.{catalogPage.get(m.id)!.page}
                         </button>
                       )}
                     </td>

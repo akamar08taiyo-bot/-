@@ -198,11 +198,16 @@ description: 太陽シルバーサービス行橋営業所の業務アプリ「�
 - **メーカーのカタログ（2026-11-04）**：actibook のリンク＝マツ六、カタラボ（catalabo.org）＝TOTO、catalog.kaientai.cc＝介援隊（ユーザーの答え）。`catalogs.ts` に URL。
   部材を選ぶ画面と見積書の左に「📖 マツ六／TOTO／介援隊」（新しいタブ）。外のサイトの中のクリックは受け取れない。この作業環境からは3つのサイトに接続できない（中を見られない）。
   マツ六のカタログの PDF をいただいたら、特定福祉用具の介援隊カタログと同じく「ページの商品を押すと入る」と、PDF に載っている商品だけの部材ごとのページのリンクを作る（ユーザーの答え「両方」）。
-- **矢崎化工カタログ（2026-11-04。ユーザーの「矢崎かこうのカタログです」の PDF p.12〜81）**：部材を選ぶ画面の「📖 矢崎化工カタログから選ぶ」（`YazakiCatalogView.tsx`）。
-  ページの品番の枠を押すと部材リストの同じ品番（`catalogMaterials`。なければ色の記号を足した色ちがいから選ぶ・それもなければ品番だけの行）。部材の「📖 p.N」は `yazakiPageOf`。
-  品番と位置は OCR（`scripts/yazaki-catalog/ocr.mjs` → `merge.py` → `src/sasaoka/yazakiCatalogData.ts`）。**金額はカタログから取らない**（部材リスト＝価格表から）。
-  OCR の途中のファイル（金額の字も入る）は作業用のフォルダだけに置き、リポジトリに入れない。絵は `catalog-yazaki/` → ポータルの `jutaku-mitsumori/catalog/`（アプリを公開するとき、絵を変えたときだけ写す）。
-  ブラウザのテストは `e2e-yazaki.mjs`（サイトの `jutaku-mitsumori/catalog/` に絵を置く）。同じ品番がページに2か所あることがある（`data-code` は `.first()`）。
+- **メーカーのカタログ（2026-11-04。矢崎化工の PDF p.12〜81・TOTO の手すりカタログ 104ページ）**：部材を選ぶ画面の「📖 カタログから選ぶ」（`MakerCatalogView.tsx`、上の段で切り替え）。
+  カタログの決まりは `makerCatalogs.ts` の `BOOKS`（メーカー名・ページ・絵の場所・色ちがいの見つけ方 `variants`＝矢崎化工は品番のうしろの色の記号 suffix、TOTO は「#」のうしろ hash）。
+  ページの品番の枠を押すと `catalogMaterials`（1つならそのまま・2つ以上なら色を選ぶ・なければ品番だけの行）。部材の「📖 p.N」は `catalogPageOf`。
+  品番と位置：矢崎化工は OCR（`scripts/yazaki-catalog/ocr.mjs` → `merge.py`）、TOTO は pdf.js（`scripts/maker-catalog/render.mjs` → `codes.py`。PDF に日本語の字体が入っておらず
+  poppler の pdftoppm では日本語が消えるので、絵も pdf.js＋Chromium で描く。pdf.js の modern build は「InvalidPDFException」で読めず legacy build で読めた）。**金額はカタログから取らない**（部材リスト＝価格表から）。
+  OCR・pdf.js の途中のファイル（金額の字も入る text.json など）は作業用のフォルダだけに置き、リポジトリに入れない。絵は `catalog-yazaki/`・`catalog-toto/` → ポータルの `jutaku-mitsumori/catalog/`（アプリを公開するとき、絵を変えたときだけ写す）。
+  ブラウザのテストは `e2e-makercatalog.mjs`（サイトの `jutaku-mitsumori/catalog/` に絵を置く）。同じ品番がページに2か所あることがある（`data-code` は `.first()`）。
+  新しいメーカーのカタログを足すときは、文字のある PDF なら render.mjs → codes.py（品番の形の正規表現をそのメーカーに合わせる）、絵だけなら OCR、`BOOKS` に1行。
+- **マツ六のカタログ（actibook。ユーザーの「マツ六のカタログURLです。単体PDFにして、取り込んでください」2026-11-04）**：この作業環境からは saas.actibookone.com がネットワークの決まりで止められている（403）。
+  環境のネットワークの設定でそのドメインを許可してもらうか、PDF をもらってから、上と同じ作りで足す。
 
 ## 落とし穴（同じ失敗をしない）
 

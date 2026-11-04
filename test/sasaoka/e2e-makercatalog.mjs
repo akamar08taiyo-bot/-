@@ -1,9 +1,10 @@
-// 矢崎化工カタログ（yazakiCatalog.ts・YazakiCatalogView.tsx）：部材を選ぶ画面の「📖 矢崎化工カタログから選ぶ」と、部材の「📖 p.12」
+// メーカーのカタログ（makerCatalogs.ts・MakerCatalogView.tsx。矢崎化工・TOTO）：部材を選ぶ画面の「📖 カタログから選ぶ」と、部材の「📖 p.12」
 // （ユーザーの指示「カタログの商品をクリックしたら、商品の内容が入るようにする」「リンクで商品検索や商品名、型番等をひっぱってこれるように」2026-11-04）：
 //   部材リスト（架空の名前・金額。メーカー 矢崎化工）→ 見積書の空いた行の「部材」→ ECA-5032 USL の「📖 p.12」→ p.12 の絵（光っている枠）→
 //   枠を押すと入る → 「ECL-5049」で探す → 色の記号のない品番（施工イメージ）の枠 → 色を選ぶ → 部材リストにない品番（品番だけの行）
-// ページの絵は site の jutaku-mitsumori/catalog/（リポジトリの catalog-yazaki/ を置く）
-// usage: node e2e-yazaki.mjs <サイトのURL> <出力フォルダ>
+//   → TOTO に切り替え（「TOTOカタログです」2026-11-04）→ YHB203#NW1 の枠 → 色ちがい（#EL）を選ぶ → 色が1つの品番はそのまま入る → 次に開くと TOTO
+// ページの絵は site の jutaku-mitsumori/catalog/（リポジトリの catalog-yazaki/・catalog-toto/ を置く）
+// usage: node e2e-makercatalog.mjs <サイトのURL> <出力フォルダ>
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -34,6 +35,13 @@ await page.locator('[role=dialog] input[type=file]').setInputFiles({name: 'mihon
 await page.getByPlaceholder('例：マツ六').fill('矢崎化工');
 await page.getByRole('button', {name: '部材リストに取り込む（3件）'}).click();
 await page.getByText('新しく 3件').waitFor();
+// TOTO の部材（架空の名前・金額）
+await page.getByRole('button', {name: /メーカーの仕切り表を取り込む/}).click();
+const csvToto = '品番,品名,定価,仕切単価\n' + 'YHB203#NW1,見本 ハンドグリップ 白,9000,5000\n' + 'YHB203#EL,見本 ハンドグリップ 木目,9000,5000\n' + 'YHBS203FR#MW,見本 棚付きグリップ,20000,12000\n';
+await page.locator('[role=dialog] input[type=file]').setInputFiles({name: 'mihon-toto.csv', mimeType: 'text/csv', buffer: Buffer.from(csvToto)});
+await page.getByPlaceholder('例：マツ六').fill('TOTO');
+await page.getByRole('button', {name: '部材リストに取り込む（3件）'}).click();
+await page.getByText('新しく 3件').last().waitFor(); // 1回目のお知らせが残っていることがある
 
 // ---------------- 見積書の空いた行の「部材」→ 部材を選ぶ画面
 await (await navItem(page, '📝 見積もり・申請書を作成する')).click();
@@ -43,7 +51,7 @@ const sheet = page.getByRole('region', {name: '見積書', exact: true});
 await sheet.waitFor();
 await clickStable(sheet.locator('tr[data-new] [data-pick="material"]'));
 const dlg = page.getByRole('dialog');
-await dlg.getByRole('button', {name: '📖 矢崎化工カタログから選ぶ'}).waitFor();
+await dlg.getByRole('button', {name: '📖 カタログから選ぶ'}).waitFor();
 // 部材の「📖 p.12」（カタログに載っている矢崎化工の部材だけ）
 const link = dlg.getByRole('button', {name: '見本 エンドブラケットのカタログのページを開く'});
 assert.equal((await link.innerText()).trim(), '📖 p.12');
@@ -119,6 +127,41 @@ const text = (await sheet.innerText()).replace(/\s+/g, ' ');
 for (const c of ['見本 エンドブラケット', 'ECL-5049 SGD', 'ECA-5029 USL']) assert.ok(text.includes(c), `見積書に ${c} がない`);
 await page.screenshot({path: path.join(outDir, 'yazaki-03-sheet.png')});
 log('部材リストにない品番は品番だけの行・◀▶ OK');
+
+// ---------------- TOTO：部材の「📖 p.12」・切り替え・色ちがいを選ぶ・色が1つならそのまま入る
+await page.waitForFunction(() => !document.body.innerText.includes('を入れました'), null, {timeout: 15000}); // お知らせが行にかぶらないように
+await clickStable(sheet.locator('tr[data-new] [data-pick="material"]'));
+await dlg.getByRole('button', {name: '📖 カタログから選ぶ'}).waitFor();
+assert.equal((await dlg.getByRole('button', {name: '見本 ハンドグリップ 木目のカタログのページを開く'}).innerText()).trim(), '📖 p.12'); // ほかの色の部材も # の前が同じ品番のページ
+await dlg.getByRole('button', {name: '📖 カタログから選ぶ'}).click();
+await dlg.getByRole('region', {name: '矢崎化工カタログ'}).waitFor(); // 初めは矢崎化工
+await dlg.getByRole('group', {name: 'カタログ'}).getByRole('button', {name: '📖 TOTO'}).click();
+const tc = dlg.getByRole('region', {name: 'TOTOカタログ'});
+await tc.waitFor();
+await tc.getByLabel('カタログから探す').fill('yhb203');
+await tc.getByRole('group', {name: '見つかったページ'}).getByRole('button', {name: 'p.12', exact: true}).click();
+await page.waitForFunction(() => document.querySelector('img[alt="TOTOカタログ p.12"]')?.naturalWidth > 0, null, {timeout: 15000});
+const grip = tc.locator('[data-code="YHB203#NW1"]').first();
+assert.match(await grip.getAttribute('class'), /border-emerald/);
+await grip.click();
+const colors = tc.getByRole('group', {name: 'YHB203#NW1の色・種類を選ぶ'});
+await colors.waitFor();
+assert.deepEqual((await colors.getByRole('button').allInnerTexts()).map((t) => /^YHB203#[A-Z0-9]+/.exec(t)?.[0]).filter(Boolean), ['YHB203#NW1', 'YHB203#EL']); // 載っている色がいちばん前
+await page.screenshot({path: path.join(outDir, 'toto-01-choose.png')});
+await colors.getByRole('button', {name: /YHB203#EL/}).click();
+await page.getByText('YHB203#EL を入れました').waitFor();
+await tc.locator('[data-code="YHBS203FR#MW"]').first().click();
+await page.getByText('YHBS203FR#MW を入れました').waitFor();
+await tc.getByRole('button', {name: '← 部材リストに戻る'}).click();
+// 次に開くと TOTO（前に開いたカタログ）
+await dlg.getByRole('button', {name: '📖 カタログから選ぶ'}).click();
+await dlg.getByRole('region', {name: 'TOTOカタログ'}).waitFor();
+await dlg.getByRole('region', {name: 'TOTOカタログ'}).getByRole('button', {name: '← 部材リストに戻る'}).click();
+await page.getByRole('button', {name: '選び終わったら閉じる'}).click();
+await page.waitForTimeout(400);
+const text2 = (await sheet.innerText()).replace(/\s+/g, ' ');
+for (const c of ['見本 ハンドグリップ 木目', '見本 棚付きグリップ']) assert.ok(text2.includes(c), `見積書に ${c} がない`);
+log('TOTO：📖 p.12・切り替え・色ちがいを選ぶ・色が1つならそのまま・次も TOTO OK');
 
 console.log(errors.length ? `ERRORS:\n${errors.join('\n')}` : 'ERRORS: なし');
 await browser.close();

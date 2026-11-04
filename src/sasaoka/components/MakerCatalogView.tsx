@@ -1,28 +1,38 @@
-// 部材を選ぶ画面の中の「📖 矢崎化工カタログから選ぶ」（yazakiCatalog.ts）。ページの絵の上の品番の枠か、右の品番の一覧を押すと部材が入る。
-// 部材リストに同じ品番があれば、その部材（商品名・定価・仕切）。色の記号のない品番（施工イメージのページ）は、色を選ぶ。
+// 部材を選ぶ画面の中の「📖 カタログから選ぶ」（makerCatalogs.ts。矢崎化工・TOTO を上の段で切り替える）。ページの絵の上の品番の枠か、右の品番の一覧を押すと部材が入る。
+// 部材リストに同じ品番があれば、その部材（商品名・定価・仕切）。色の記号のない品番（矢崎化工の施工イメージのページ）・色ちがいのある品番（TOTO の #NW1 など）は、色を選ぶ。
 // 部材リストにない品番は、品番だけの行（金額は見積書で打つ）
 import {type CSSProperties, useEffect, useMemo, useRef, useState} from 'react';
-import {catalogMaterials, codeKey, yazakiImage, yazakiPages, yazakiSearch} from '../yazakiCatalog.ts';
+import {BOOKS, type BookId, bookOf, catalogMaterials, catalogSearch, codeKey} from '../makerCatalogs.ts';
 import type {Material} from '../types.ts';
 import {yen} from '../util.ts';
 import {Btn, TextInput} from './ui.tsx';
 
 const pct = (v: number) => `${Math.max(0, v * 100).toFixed(2)}%`;
 
-export function YazakiCatalogView({
-  materials,
-  start,
-  onAdd,
-  onAddCode,
-  onBack,
-}: {
+type Props = {
   materials: Material[];
-  start?: {page: number; code?: string} | null;
+  start: {book: BookId; page: number; code?: string};
   onAdd: (m: Material) => void; // 部材リストの部材を入れる
-  onAddCode: (code: string) => void; // 部材リストにない品番を入れる
+  onAddCode: (code: string, maker: string) => void; // 部材リストにない品番を入れる
   onBack: () => void;
-}) {
-  const first = yazakiPages.find((p) => p.page === start?.page) ?? yazakiPages[0];
+  onBook?: (id: BookId) => void; // 切り替えたカタログ（次に開くときもこのカタログ）
+};
+
+/** カタログを切り替えると、ページ・探す・光らせる品番は初めから（key で作り直す） */
+export function MakerCatalogView(props: Props) {
+  const [start, setStart] = useState(props.start);
+  useEffect(() => setStart(props.start), [props.start]);
+  const switchTo = (id: BookId) => {
+    setStart({book: id, page: 0});
+    props.onBook?.(id);
+  };
+  return <BookView key={`${start.book}:${start.page}:${start.code ?? ''}`} {...props} start={start} onSwitch={switchTo} />;
+}
+
+function BookView({materials, start, onAdd, onAddCode, onBack, onSwitch}: Props & {onSwitch: (id: BookId) => void}) {
+  const book = bookOf(start.book);
+  const pages = book.pages;
+  const first = pages.find((p) => p.page === start.page) ?? pages[0];
   const [page, setPage] = useState(first.page);
   const [query, setQuery] = useState('');
   const [mark, setMark] = useState<string | null>(start?.code ?? null); // 光らせる品番（部材の「📖 p.13」から開いたとき・押した品番）
@@ -30,9 +40,9 @@ export function YazakiCatalogView({
     code: string;
     list: Material[];
   } | null>(null);
-  const current = yazakiPages.find((p) => p.page === page) ?? first;
-  const idx = yazakiPages.indexOf(current);
-  const hits = useMemo(() => (query.trim() ? yazakiSearch(query, materials) : []), [query, materials]);
+  const current = pages.find((p) => p.page === page) ?? first;
+  const idx = pages.indexOf(current);
+  const hits = useMemo(() => (query.trim() ? catalogSearch(book, query, materials) : []), [book, query, materials]);
   useEffect(() => setChoose(null), [page]);
   // 探した品番がこのページになければ、見つかった最初のページへ
   useEffect(() => {
@@ -43,7 +53,7 @@ export function YazakiCatalogView({
   const imgRef = useRef<HTMLDivElement>(null);
   const [loaded, setLoaded] = useState(0);
   useEffect(() => {
-    if (!start?.code || page !== start.page) return;
+    if (!start.code || page !== start.page) return;
     imgRef.current?.querySelector<HTMLElement>(`[data-code="${CSS.escape(start.code)}"]`)?.scrollIntoView({block: 'center'});
   }, [loaded]);
   // 上の段（ページ送り・探す）はスクロールしても上に残す（窓の中の余白 16px の分も白く覆う）。右の一覧はその下に残す（ページの下の方の品番を押したときも、色を選ぶ欄が見えるように）
@@ -63,37 +73,50 @@ export function YazakiCatalogView({
   }, [choose]);
   // 右の一覧は同じ品番を1つに（施工イメージのページには同じ品番が何度も出る）
   const listed = useMemo(() => [...new Map(current.codes.map((c) => [c.code, c])).values()], [current]);
-  const matches = (code: string) => catalogMaterials(materials, code);
+  const matches = (code: string) => catalogMaterials(materials, code, book);
   const pick = (code: string) => {
     setMark(code);
     const list = matches(code);
     if (list.length === 1) onAdd(list[0]);
     else if (list.length > 1) setChoose({code, list});
-    else onAddCode(code);
+    else onAddCode(code, book.maker);
   };
   const q = codeKey(query);
   const hit = (code: string) => !!q && codeKey(code).includes(q);
 
   return (
-    <div aria-label="矢崎化工カタログ" role="region">
+    <div aria-label={`${book.maker}カタログ`} role="region">
       <div ref={barRef} className="sticky -top-4 z-10 -mx-1 -mt-4 bg-white px-1 pt-4 pb-1">
         <div className="flex flex-wrap items-center gap-2">
           <Btn small color="white" onClick={onBack}>
             ← 部材リストに戻る
           </Btn>
-          <span className="text-sm font-bold text-slate-700">📖 矢崎化工カタログ</span>
+          {/* カタログの切り替え（2026-11-04 に TOTO を足した） */}
+          <span className="inline-flex overflow-hidden rounded-md border border-slate-300" role="group" aria-label="カタログ">
+            {BOOKS.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => b.id !== book.id && onSwitch(b.id)}
+                aria-pressed={b.id === book.id}
+                className={`h-8 px-3 text-sm ${b.id === book.id ? 'bg-emerald-50 font-bold text-emerald-900' : 'bg-white text-slate-600 hover:bg-slate-50'} [&+&]:border-l [&+&]:border-slate-300`}
+              >
+                📖 {b.maker}
+              </button>
+            ))}
+          </span>
           <span className="flex items-center gap-2">
-            <Btn small color="white" onClick={() => idx > 0 && setPage(yazakiPages[idx - 1].page)} disabled={idx <= 0} aria-label="前のページ">
+            <Btn small color="white" onClick={() => idx > 0 && setPage(pages[idx - 1].page)} disabled={idx <= 0} aria-label="前のページ">
               ◀
             </Btn>
             <select value={page} onChange={(e) => setPage(Number(e.target.value))} className="h-8 rounded-md border border-slate-300 px-2 text-sm" aria-label="ページ">
-              {yazakiPages.map((p) => (
+              {pages.map((p) => (
                 <option key={p.page} value={p.page}>
                   p.{p.page}
                 </option>
               ))}
             </select>
-            <Btn small color="white" onClick={() => idx < yazakiPages.length - 1 && setPage(yazakiPages[idx + 1].page)} disabled={idx >= yazakiPages.length - 1} aria-label="次のページ">
+            <Btn small color="white" onClick={() => idx < pages.length - 1 && setPage(pages[idx + 1].page)} disabled={idx >= pages.length - 1} aria-label="次のページ">
               ▶
             </Btn>
           </span>
@@ -121,7 +144,7 @@ export function YazakiCatalogView({
       </div>
       <div className="mt-2 grid gap-3 lg:grid-cols-[minmax(0,1fr)_19rem]">
         <div ref={imgRef} className="relative w-full overflow-hidden rounded-md border border-slate-300 bg-slate-100" style={{aspectRatio: '1240 / 1754'}}>
-          <img src={yazakiImage(page)} alt={`矢崎化工カタログ p.${page}`} className="absolute inset-0 h-full w-full select-none" draggable={false} onLoad={() => setLoaded((n) => n + 1)} />
+          <img src={book.image(page)} alt={`${book.maker}カタログ p.${page}`} className="absolute inset-0 h-full w-full select-none" draggable={false} onLoad={() => setLoaded((n) => n + 1)} />
           {current.codes.map((c, i) => {
             const n = matches(c.code).length;
             const on = mark === c.code || hit(c.code);
