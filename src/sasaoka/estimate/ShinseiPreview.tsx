@@ -691,7 +691,9 @@ export type PreviewPlan = {
 /**
  * 平面図の図を入れる枠（ユーザーの指示「平面図に画像をドロップ・貼り付け」2026-10-25）：平面図の表題と工事内容のあいだの空いた所（Excel で図を貼る範囲と同じ）。
  * 写真の枠と同じく、空いた枠は点線に「ドロップ・Ctrl+V」、ファイルを画面に持ってくると薄い緑、重ねると「ここに離す」。押すとファイルを選ぶ。
- * 図は Excel と同じ位置・大きさ（planPlacement。縦横の比はそのまま、枠より大きくしない）。図を押すと選んで、差し替え・削除（確かめてから）・完了。
+ * 図は Excel と同じ位置・大きさ（planPlacement。縦横の比はそのまま、枠より大きくしない）。図を押すと、すぐ書き込みの画面（写真と同じ PhotoMarkEditor）。
+ * 差し替え・削除（確かめてから）は書き込みの画面の上の帯（ユーザーの指示「書き込みオン、オフは不要で、そのまま書き込めるようにする。写真の部分と同じでよい」2026-11-04。
+ * 前は押すと選んで、道具の「✏️ 書き込み」で書き込みの画面・「完了」で選ぶのをやめた）。Delete・Backspace は確かめてから削除。
  * 枠を押した（選んだ・Tab で移った）あとの Ctrl+V は、この枠に貼る（写真の欄・介護保険証の読み取りより先に受ける）。
  * 字が小さくならないように、紙を縮めて見せていても枠は画面の大きさで描く（slot は紙の画素、scale は縮めた割合、left・top は画面での紙の左上）
  */
@@ -777,14 +779,13 @@ function PlanSlotView({slot, scale, left, top, plan}: {slot: Rect; scale: number
         type="button"
         aria-label="平面図"
         aria-pressed={selected}
-        title={selected ? '平面図の図' : '平面図の図（押すと差し替え・削除）'}
+        title={image && plan.onMark ? '平面図の図（押すと書き込み）' : selected ? '平面図の図' : '平面図の図（押すと差し替え・削除）'}
         data-plan-slot
         data-drop={over ? 'over' : dragging ? 'ready' : undefined}
         onPointerDown={(e) => e.currentTarget.focus()}
-        onClick={() => setSelected(true)}
-        onDoubleClick={() => image && plan.onMark?.()} // 写真と同じく、ダブルクリックで書き込みの画面
+        onClick={() => (image && plan.onMark ? plan.onMark() : setSelected(true))}
         onKeyDown={(e) => {
-          if (selected && (e.key === 'Delete' || e.key === 'Backspace')) {
+          if ((selected || image) && (e.key === 'Delete' || e.key === 'Backspace')) {
             e.preventDefault();
             remove();
           }
@@ -831,19 +832,6 @@ function PlanSlotView({slot, scale, left, top, plan}: {slot: Rect; scale: number
           <Btn small color="white" onClick={plan.onPick}>
             差し替え
           </Btn>
-          {plan.onMark && (
-            <Btn
-              small
-              color="white"
-              title="図に①②の番号・線などを書き込む"
-              onClick={() => {
-                setSelected(false);
-                plan.onMark?.();
-              }}
-            >
-              ✏️ 書き込み
-            </Btn>
-          )}
           <Btn small color="white" onClick={remove}>
             削除
           </Btn>

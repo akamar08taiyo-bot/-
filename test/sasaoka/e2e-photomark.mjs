@@ -369,7 +369,7 @@ log('Excel の写真貼付用紙に Excel の図形で入る OK');
 // ---------------- 🖨 申請書を印刷：写真の用紙の写真にも重なる
 await page.getByRole('button', {name: '🖨 申請書を印刷', exact: true}).click();
 const printPages = page.getByRole('group', {name: '印刷するページ'});
-await printPages.getByRole('checkbox', {name: '4枚目'}).check();
+await printPages.getByRole('checkbox').nth(3).check(); // 4枚目（写真①。名前は「写真①」など）
 const printed = page.locator('.print-overlay .shinsei-sheet').nth(3);
 await printed.scrollIntoViewIfNeeded();
 assert.equal(await printed.locator('[data-mark]').count(), 5);
@@ -886,17 +886,17 @@ log('写真を回す（書き込みも一緒に）OK');
 await dlg.getByRole('button', {name: '閉じる'}).click();
 assert.equal(await pvSlot.locator('[data-mark]').count(), 8);
 
-// ---------------- 平面図の図にも書き込める（ユーザーの指示「平面図に①②の番号・線などを書き込める」2026-10-29）：道具の「✏️ 書き込み」・プレビュー・印刷・Excel。図を差し替えると消える
+// ---------------- 平面図の図にも書き込める（ユーザーの指示「平面図に①②の番号・線などを書き込める」2026-10-29）：図を押すとすぐ書き込みの画面（「書き込みオン、オフは不要で、そのまま書き込めるようにする」2026-11-04）・プレビュー・印刷・Excel。図を差し替えると消える
 {
   const planSlot = preview.locator('[data-plan-slot]');
   await planSlot.scrollIntoViewIfNeeded();
   const [pc] = await Promise.all([page.waitForEvent('filechooser'), planSlot.click()]);
   await pc.setFiles([{name: 'plan.png', mimeType: 'image/png', buffer: await makePhoto(1600, 1131)}]);
   await planSlot.locator('img').waitFor();
-  await planSlot.click();
-  await preview.getByRole('toolbar', {name: '平面図の図'}).getByRole('button', {name: '✏️ 書き込み'}).click();
+  await planSlot.click(); // 押すとすぐ書き込みの画面（前は道具の「✏️ 書き込み」を押した）
   const pd = page.getByRole('dialog', {name: '平面図の図に書き込む'});
   await pd.waitFor();
+  assert.equal(await preview.getByRole('toolbar', {name: '平面図の図'}).count(), 0); // 書き込みのオン・オフ（道具の列）は出さない
   const pst = pd.locator('[data-photo-stage]');
   const pAt = async (fx, fy) => {
     const b = await pst.boundingBox();
@@ -931,8 +931,8 @@ assert.equal(await pvSlot.locator('[data-mark]').count(), 8);
   assert.equal(await planSlot.locator('[data-mark]').count(), 3, 'プレビューの平面図に書き込みが重なる');
   assert.deepEqual(await planSlot.locator('[data-mark-text]').allTextContents(), ['①', '②']);
   await planSlot.screenshot({path: path.join(outDir, 'mark-09-plan-preview.png')});
-  // ダブルクリックでも開く
-  await planSlot.dblclick();
+  // もう一度押すと、また書き込みの画面
+  await planSlot.click();
   await pd.waitFor();
   await pd.getByRole('button', {name: '閉じる'}).click();
   // Excel：平面図の図のすぐ上に Excel の図形で
@@ -960,10 +960,10 @@ assert.equal(await pvSlot.locator('[data-mark]').count(), 8);
   // 平面図の記号（ユーザーの指示「平面図では、横棒の機能と丸が込み、⬜︎（横長も含む）の機能を付け加える。番号を振る機能はそのまま」2026-11-02）：
   // 上の帯のすぐ下に「① 番号」「― 横棒」「○ 丸」「□ 四角」「▭ 横長」。押すと決まった大きさで置く（道具はそのまま）・なぞると大きさ。横棒は横か縦にまっすぐ・丸は正円
   {
-    await planSlot.dblclick();
+    await planSlot.click();
     await pd.waitFor();
     const sym = pd.getByRole('toolbar', {name: '平面図の記号'});
-    assert.deepEqual(await sym.getByRole('button').allInnerTexts(), ['① 番号', '― 横棒', '○ 丸', '□ 四角', '▭ 横長']);
+    assert.deepEqual((await sym.getByRole('button').allInnerTexts()).map((t) => t.trim()), ['① 番号', '― 横棒', '○ 丸', '□ 四角', '▭ 横長', '戻る']); // 戻る：記号のすぐ右（2026-11-04）
     const stageMarks = pd.locator('[data-photo-stage] [data-mark]');
     const n0 = await stageMarks.count();
     // 置いた図形（番号はいつもいちばん前に描くので、DOM の最後とは限らない。前と見くらべて新しい1つ）
@@ -1018,6 +1018,11 @@ assert.equal(await pvSlot.locator('[data-mark]').count(), 8);
     lb = await added(() => tapAt(0.4, 0.85));
     assert.ok(lb.k === 'rect' && Math.abs(lb.w - 2 * lb.h) <= 3, `横長が横長でない ${JSON.stringify(lb)}`);
     assert.equal(await stageMarks.count(), n0 + 6);
+    // 記号のすぐ右の「戻る」で1つ戻り、上の帯の「進む」でやり直す（ユーザーの指示「番号を振った場合でも戻るボタンをつくってすぐにもどれるようにする」2026-11-04）
+    await sym.getByRole('button', {name: '1つ戻る'}).click();
+    assert.equal(await stageMarks.count(), n0 + 5);
+    await pd.getByRole('button', {name: '進む', exact: true}).click();
+    assert.equal(await stageMarks.count(), n0 + 6);
     // 平面図の記号の初めの色は赤（白い紙で見えるように）
     await page.screenshot({path: path.join(outDir, 'mark-10-plan-symbols.png')});
     // もう一度押すと「選択」に戻る
@@ -1038,15 +1043,20 @@ assert.equal(await pvSlot.locator('[data-mark]').count(), 8);
     assert.equal(sOver.filter((a) => /name="楕円 \d+"/.test(a)).length, 2, 'Excel の平面図に丸');
     assert.equal(sOver.filter((a) => /name="正方形\/長方形 \d+"/.test(a)).length, 2, 'Excel の平面図に四角・横長');
     assert.equal(sOver.filter((a) => /name="直線コネクタ \d+"/.test(a)).length, 3, 'Excel の平面図に横棒');
+    // 丸は塗りつぶしの青い◯・横棒は赤（ユーザーの指示「平面図の丸は塗りつぶしの◯にする、デフォルトは青」「線はデフォルトを赤にする」2026-11-04）
+    for (const a of sOver.filter((a) => /name="楕円 \d+"/.test(a))) assert.match(a, /<a:solidFill><a:srgbClr val="0070C0"\/><\/a:solidFill>/, '丸が塗りつぶしの青でない');
+    for (const a of sOver.filter((a) => /name="直線コネクタ \d+"/.test(a))) assert.match(a, /<a:ln\b[^>]*>\s*<a:solidFill><a:srgbClr val="FF0000"\/>/, '横棒が赤でない');
   }
   log('平面図の記号（番号・横棒・丸・四角・横長）OK');
-  // 図を差し替えると書き込みは消える（写真と同じ）
+  // 図を差し替えると書き込みは消える（写真と同じ）。差し替えは書き込みの画面の上の帯
   await planSlot.click();
-  const [pc2] = await Promise.all([page.waitForEvent('filechooser'), preview.getByRole('toolbar', {name: '平面図の図'}).getByRole('button', {name: '差し替え'}).click()]);
+  await pd.waitFor();
+  const [pc2] = await Promise.all([page.waitForEvent('filechooser'), pd.getByRole('button', {name: '差し替え', exact: true}).click()]);
+  await pd.waitFor({state: 'detached'});
   await pc2.setFiles([{name: 'plan2.png', mimeType: 'image/png', buffer: await makePhoto(1131, 1600)}]);
   await page.waitForFunction(() => document.querySelectorAll('[data-plan-slot] [data-mark]').length === 0);
 }
-log('平面図の図に書き込む（道具・ダブルクリック・プレビュー・Excel・印刷・差し替えで消える）OK');
+log('平面図の図に書き込む（押すとすぐ書き込みの画面・プレビュー・Excel・印刷・差し替えで消える）OK');
 
 // ---------------- スマホ（390px）・iPad：リボンは横に動かせて、写真は画面の幅いっぱい
 for (const [name, vp, touch] of [

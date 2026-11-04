@@ -202,9 +202,20 @@ export function YukuhashiForm({
                   <td colSpan={4} />
                 </tr>
                 <tr style={{height: '7.67mm'}}>
-                  <td colSpan={3} className="bb" style={{fontSize: '12pt'}} {...ed(editable && pi === 0, 'job:insuredNo')}>
-                    {/* 番号は打った長さのまま入るので、欄に入るか測る（.fitbox。はみ出しを出さない決まり 2026-11-03） */}
-                    {pi === 0 && <span className="fitbox">{`介護保険被保険者番号（${job.insuredNo.trim() || '　　　　　　　　　　'}）`}</span>}
+                  <td colSpan={3} className="bb" style={{fontSize: '12pt'}}>
+                    {/* 番号は打った長さのまま入るので、欄に入るか測る（.fitbox。はみ出しを出さない決まり 2026-11-03）。
+                        打つ所は（　）の中だけ（ユーザーの報告「介護保険番号の（）内が入力できない」2026-11-04。前は欄全体が打つ所で、押すと「介護保険…」の
+                        頭にカーソルが出て、打つと見出しが消え、かっこの中に打てないように見えた）。画面では、空でも押しやすい幅（7字分）にしてまん中に。
+                        画面で空のときは印刷用の空白（全角10字）を入れない（押しやすい幅と重なって欄からはみ出した）。幅のない字（\u200b）で高さだけ持たせる */}
+                    {pi === 0 && (
+                      <span className="fitbox">
+                        介護保険被保険者番号（
+                        <span {...ed(editable, 'job:insuredNo')} className={editable ? 'inline-block min-w-[7em] text-center' : undefined}>
+                          {job.insuredNo.trim() || (editable ? '\u200b' : '　　　　　　　　　　')}
+                        </span>
+                        ）
+                      </span>
+                    )}
                   </td>
                   <td colSpan={4} />
                 </tr>

@@ -9,7 +9,8 @@ import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {areaInsurerNo, INSURER_AREAS, insurerNoOf} from '../../src/sasaoka/insurerNumbers.ts';
 import {ageOn, boxLabels, checkBoxes, cityRest, fillShinsei, placeCounts, fixedPitch, hangLines, hangPrefixes, indentOf, lengthsShown, splitNumber, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, kindNamesOf, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoNoteText, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, sheetLines, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
 import {KK_CELLS} from '../../src/sasaoka/shinsei/kitakyushuCells.ts';
-import {shinseiPreview} from '../../src/sasaoka/shinseiPreview.ts';
+import {printLabels, shinseiPreview} from '../../src/sasaoka/shinseiPreview.ts';
+import type {PvPage} from '../../src/sasaoka/shinseiPreview.ts';
 import {cleanSettings} from '../../src/sasaoka/storage.ts';
 import type {Insurer, Job, PhotoMark, Place, Row, ShinseiInfo, ShinseiMarks} from '../../src/sasaoka/types.ts';
 
@@ -1923,4 +1924,26 @@ test('長さの書き方：1本ずつ mm を付ける「L=400mm×600mm」・「6
   assert.equal(lengthsShown('600'), '600'); // 1本は欄の右の「mm」
   assert.equal(lengthsShown(''), '');
   assert.equal(lengthsShown('約600×800'), '約600×800'); // 数でない字は打ったまま
+});
+
+test('印刷の画面のページの名前（1枚目・2枚目ではなく、申請書・委任状・写真① など。8つの保険者の原本のシートの名前）', () => {
+  // ユーザーの指示「ただ1枚目、2枚目と記載するのではなく、申請書、委任状、写真①　写真②のようにわかりやすくする」2026-11-04
+  const pg = (sheet: string, kind: PvPage['kind'] = 'form', photo = 0, slots: number[] = []): PvPage => ({sheet, kind, photo, photoSlots: slots.map((n) => ({photo: n})) as PvPage['photoSlots']}) as PvPage;
+  assert.deepEqual(printLabels([pg('事前申請書'), pg('委任状'), pg('平面図  (2)', 'plan'), pg('1 ', 'photo', 1, [1, 1]), pg('1  (3)', 'photo', 2, [2, 2])]), ['事前申請書', '委任状', '平面図', '写真①', '写真②']);
+  assert.deepEqual(printLabels([pg('住改・受領委任払'), pg('委任状'), pg('住改・写真 ①', 'photo', 1)]), ['申請書', '委任状', '写真①']);
+  assert.deepEqual(printLabels([pg('住宅改修承認届出書'), pg('住宅改修費支給申請書(受領委任払用)'), pg('住宅改修内訳明細書')]), ['承認届出書', '支給申請書', '内訳明細書']);
+  assert.deepEqual(printLabels([pg('様式第2号（住宅改修承認申請書）'), pg('様式第7号（住宅改修費支給申請書（受領委任払用）'), pg('様式第2号別紙（住宅改修内訳明細書）')]), ['承認申請書', '支給申請書', '内訳明細書']);
+  assert.deepEqual(printLabels([pg('様式第21号'), pg('完了届出書（受領委任用)'), pg('写真貼付台紙（事前）', 'photo', 1, [1, 2]), pg('写真貼付台紙（完了）', 'photo', 1, [1, 2])]), ['支給申請書', '完了届出書', '写真①②（事前）', '写真①②（完了）']);
+  assert.deepEqual(printLabels([pg('事前届出書'), pg('事前届出書（通知用）'), pg('支給申請書'), pg('内容報告書（写真）', 'photo', 1), pg('完了報告書（写真）', 'photo', 1, [1, 2]), pg('内容報告書（写真） (2)', 'photo', 2)]), [
+    '事前届出書',
+    '事前届出書（通知用）',
+    '支給申請書',
+    '写真①（内容報告書）',
+    '写真①②（完了報告書）',
+    '写真②（内容報告書）',
+  ]);
+  assert.deepEqual(printLabels([pg('事前承認願書'), pg('承諾書'), pg('内訳書'), pg('支給申請書'), pg('請求書'), pg('事前写真①', 'photo', 1), pg('支給写真①', 'photo', 1)]), ['事前承認願書', '承諾書', '内訳書', '支給申請書', '請求書', '写真①（事前）', '写真①（支給）']);
+  assert.deepEqual(printLabels([pg('事前承認申請書'), pg('住宅改修理由書（1ページ）'), pg('住宅改修理由書（2ページ）')]), ['事前承認申請書', '理由書（1ページ）', '理由書（2ページ）']);
+  // 同じ名前が2つ（同じ写真番号の用紙が2枚など）は（1）（2）
+  assert.deepEqual(printLabels([pg('写真', 'photo', 1), pg('写真 (2)', 'photo', 1)]), ['写真①（1）', '写真①（2）']);
 });

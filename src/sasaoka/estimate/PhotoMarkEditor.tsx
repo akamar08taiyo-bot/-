@@ -67,14 +67,16 @@ type DrawTool = Exclude<Tool, 'eraser'>; // 図形を描く道具（消しゴム
  * 書式を覚える種類（新しい図形に使う）：shape＝直線・矢印・楕円（黄色）、rect＝枠囲み（正方形/長方形）・補強板（茶色）、pen＝手書き・折れ線（黄色）、
  * text＝テキストボックス、num＝番号
  */
-type StyleKey = 'shape' | 'rect' | 'pen' | 'text' | 'num' | 'plan';
+type StyleKey = 'shape' | 'rect' | 'pen' | 'text' | 'num' | 'plan' | 'circle';
 type Styles = Record<StyleKey, MarkStyle>;
 const styleKeyOf = (k: PhotoMark['kind']): StyleKey => (k === 'text' ? 'text' : k === 'pen' ? 'pen' : k === 'board' || k === 'rect' ? 'rect' : 'shape');
 const toolStyleKey = (t: Tool): StyleKey =>
-  t === 'text' ? 'text' : t === 'num' ? 'num' : t === 'pen' || t === 'poly' || t === 'quad' ? 'pen' : t === 'rect' || t === 'board' ? 'rect' : isPlanTool(t) ? 'plan' : 'shape';
+  t === 'text' ? 'text' : t === 'num' ? 'num' : t === 'pen' || t === 'poly' || t === 'quad' ? 'pen' : t === 'rect' || t === 'board' ? 'rect' : t === 'circle' ? 'circle' : isPlanTool(t) ? 'plan' : 'shape';
 const isPlanTool = (t: Tool | null): t is PlanTool => t === 'hbar' || t === 'circle' || t === 'square' || t === 'wide';
 /** 平面図の記号の初めの書式：赤い線（平面図は白い紙なので、写真の初めの黄色だと見えにくい）・塗りなし */
 const PLAN_STYLE: MarkStyle = {...SHAPE_STYLE, line: 'FF0000', fill: ''};
+/** 平面図の丸（縦手すり）：塗りつぶしの青い◯（ユーザーの指示「平面図の丸は塗りつぶしの◯にする、デフォルトは青」2026-11-04。前は赤い輪） */
+const PLAN_CIRCLE_STYLE: MarkStyle = {...SHAPE_STYLE, line: '0070C0', fill: '0070C0'};
 /** 平面図の記号のボタン（番号のすぐ右に並べる。名前を出して押しやすく） */
 const PLAN_TOOLS: {key: Tool; label: string; title: string}[] = [
   {key: 'num', label: '① 番号', title: '番号（①②…。押すたびに次の番号）'},
@@ -204,27 +206,35 @@ const segDist = (p: Pt, a: Pt, b: Pt) => {
   return Math.hypot(p.x - (a.x + t * vx), p.y - (a.y + t * vy));
 };
 
-/** この端末で最後に選んだ書式（新しい図形・テキストボックス・ペン・補強板・番号）。読めなければ最初の書式 */
-function loadStyles(): Styles {
+/**
+ * この端末で最後に選んだ書式（新しい図形・テキストボックス・ペン・補強板・番号）。読めなければ最初の書式。
+ * 平面図（plan）は写真と別に覚え、線（直線・矢印・手書き・折れ線・横棒）の初めは赤（ユーザーの指示「線はデフォルトを赤にする」2026-11-04。
+ * 白い紙なので写真の初めの黄色だと見えにくい）
+ */
+const styleKeyFor = (plan: boolean) => (plan ? `${STYLE_KEY}-plan` : STYLE_KEY);
+function loadStyles(plan = false): Styles {
+  const shapeBase: MarkStyle = plan ? {...SHAPE_STYLE, line: 'FF0000'} : SHAPE_STYLE;
+  const penBase: MarkStyle = plan ? {...PEN_STYLE, line: 'FF0000'} : PEN_STYLE;
   const pick = (raw: unknown, base: MarkStyle, kind: PhotoMark['kind']): MarkStyle => {
     const m = cleanMarks([{kind, x1: 0, y1: 0, x2: 1, y2: 1, text: 'a', ...base, ...(raw && typeof raw === 'object' ? raw : {})}])[0];
     return m ? {line: m.line, width: m.width, dash: m.dash, fill: m.fill, color: m.color, size: m.size, bold: !!m.bold, ...(m.font ? {font: m.font} : {})} : base;
   };
-  const base: Styles = {shape: SHAPE_STYLE, rect: BOARD_STYLE, pen: PEN_STYLE, text: TEXT_STYLE, num: NUM_STYLE, plan: PLAN_STYLE};
+  const base: Styles = {shape: shapeBase, rect: BOARD_STYLE, pen: penBase, text: TEXT_STYLE, num: NUM_STYLE, plan: PLAN_STYLE, circle: PLAN_CIRCLE_STYLE};
   try {
-    let raw = JSON.parse(localStorage.getItem(STYLE_KEY) ?? 'null') as Partial<Record<StyleKey, unknown>> | null;
-    if (!raw) {
+    let raw = JSON.parse(localStorage.getItem(styleKeyFor(plan)) ?? 'null') as Partial<Record<StyleKey, unknown>> | null;
+    if (!raw && !plan) {
       // 前の版（v2）で覚えた書式：線の太さ（直線・矢印・楕円・枠囲み・ペン）だけ外して、初めの太さ（2pt）に
       const old = JSON.parse(localStorage.getItem(OLD_STYLE_KEY) ?? 'null') as Partial<Record<StyleKey, Record<string, unknown>>> | null;
       raw = old && typeof old === 'object' ? Object.fromEntries(Object.entries(old).map(([key, st]) => [key, st && typeof st === 'object' && (key === 'shape' || key === 'rect' || key === 'pen') ? (({width: _w, ...rest}) => rest)(st) : st])) : null;
     }
     return {
-      shape: pick(raw?.shape, SHAPE_STYLE, 'rect'),
+      shape: pick(raw?.shape, shapeBase, 'rect'),
       rect: pick(raw?.rect, BOARD_STYLE, 'rect'),
-      pen: pick(raw?.pen, PEN_STYLE, 'rect'),
+      pen: pick(raw?.pen, penBase, 'rect'),
       text: pick(raw?.text, TEXT_STYLE, 'text'),
       num: pick(raw?.num, NUM_STYLE, 'text'),
       plan: pick(raw?.plan, PLAN_STYLE, 'rect'),
+      circle: pick(raw?.circle, PLAN_CIRCLE_STYLE, 'rect'),
     };
   } catch {
     return base;
@@ -513,6 +523,8 @@ export function PhotoMarkEditor({
   what = '写真',
   startTool = START_TOOL,
   planTools = false,
+  onReplace,
+  onRemove,
 }: {
   title: string;
   photo: {url: string; w: number; h: number; rot: number};
@@ -524,6 +536,9 @@ export function PhotoMarkEditor({
   what?: string; // 何に書き込むか（画面の名前「…の写真に書き込む」。平面図は「図」）
   startTool?: 'num' | 'line'; // 開いたときの道具（平面図は番号＝開いてすぐ押すたびに①②③。写真は直線）
   planTools?: boolean; // 平面図の記号のボタン（番号・横棒・丸・四角・横長）を上の帯の下に出す
+  // 図を差し替える・消す（平面図。プレビューの図を押すとすぐこの画面なので、上の帯の右に置く。2026-11-04）
+  onReplace?: () => void;
+  onRemove?: () => void;
 }) {
   const W = Math.max(1, size.w);
   const H = Math.max(1, size.h);
@@ -544,14 +559,14 @@ export function PhotoMarkEditor({
   useEffect(() => () => window.clearTimeout(pointTipTimer.current), []);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [sub, setSub] = useState<'width' | 'dash' | 'arrow' | null>(null);
-  const [styles, setStyles] = useState<Styles>(loadStyles);
+  const [styles, setStyles] = useState<Styles>(() => loadStyles(planTools));
   const [armKey, setArmKey] = useState(0); // 文字を打つ所を作り直す（元に戻したときなど、打つ所の文字を今の文字にそろえる）
   const [fontText, setFontText] = useState<string | null>(null); // フォント サイズの欄に打っている途中の文字
   const [sizeText, setSizeText] = useState<{h?: string; w?: string}>({});
   const [eraserAt, setEraserAt] = useState<{p: Pt; r: number} | null>(null);
   const [phonePanel, setPhonePanel] = useState<'line' | 'width' | 'more' | null>(null); // スマホの書式の欄で開いているもの（線の色・線の太さ・その他） // 消しゴムの丸（なぞっている所・マウスの所。紙の画素）
   // 塗りつぶし・枠線・文字の色のボタンの下の色（最後に選んだ色。ボタンを押すとその色に。Excel と同じ）
-  const [recent, setRecent] = useState(() => ({fill: styles.shape.fill || 'FFFFFF', line: styles[toolStyleKey(startTool)].line || SHAPE_STYLE.line, color: styles.text.color}));
+  const [recent, setRecent] = useState(() => ({fill: styles.shape.fill || 'FFFFFF', line: styles[toolStyleKey(startTool)].line || styles.shape.line || SHAPE_STYLE.line, color: styles.text.color}));
   const shown = draft ?? marks;
   const latest = useRef({marks, editing});
   latest.current = {marks, editing};
@@ -638,7 +653,7 @@ export function PhotoMarkEditor({
     setStyles((s) => {
       const out = Object.fromEntries((Object.keys(s) as StyleKey[]).map((key) => [key, kinds.has(key) ? {...s[key], ...remember} : s[key]])) as Styles;
       try {
-        localStorage.setItem(STYLE_KEY, JSON.stringify(out));
+        localStorage.setItem(styleKeyFor(planTools), JSON.stringify(out));
       } catch {
         /* 覚えられなくても、この画面ではそのまま使える */
       }
@@ -2215,7 +2230,20 @@ export function PhotoMarkEditor({
         <button type="button" onClick={close} className="h-11 rounded-md border border-slate-300 bg-white px-8 text-base text-slate-700 hover:bg-slate-50 max-sm:px-5">
           閉じる
         </button>
-        <div className="flex min-w-0 items-center justify-end gap-1">{onRotate && rotateButtons}</div>
+        <div className="flex min-w-0 items-center justify-end gap-1">
+          {onRotate && rotateButtons}
+          {onReplace && (
+            <button type="button" onClick={onReplace} title={`${what}を差し替える`} className="h-11 rounded-md border border-slate-300 bg-white px-3 text-base text-slate-700 hover:bg-slate-50 max-sm:px-2 max-sm:text-sm">
+              差し替え
+            </button>
+          )}
+          {onRemove && (
+            <button type="button" onClick={onRemove} title={`${what}を削除`} className="h-11 rounded-md border border-slate-300 bg-white px-3 text-base text-slate-700 hover:bg-slate-50 max-sm:px-2 max-sm:text-sm">
+              {/* 図形の「削除」（リボン）と見分けがつくように「図を削除」 */}
+              {what}を削除
+            </button>
+          )}
+        </div>
       </div>
       {/* 平面図の記号（番号・横棒・丸・四角・横長）：名前を出した大きめのボタンで、上の帯のすぐ下のまん中に（ユーザーの指示「平面図では、横棒の機能と丸が込み、⬜︎（横長も含む）の機能を付け加える。
           番号を振る機能はそのまま…簡単につけれるように」2026-11-02）。押してから図を押すと置ける・なぞると大きさを決める。もう一度押すと「選択」に戻る */}
@@ -2234,6 +2262,19 @@ export function PhotoMarkEditor({
               {t.label}
             </button>
           ))}
+          {/* 戻る：記号のすぐ右（番号をふっている途中でもすぐ押せるように。ユーザーの指示「番号を振った場合でも戻るボタンをつくってすぐにもどれるようにする」2026-11-04。
+              上の帯の左はしの「戻る」と同じ働き） */}
+          <button
+            type="button"
+            aria-label="1つ戻る"
+            title="1つ戻る（Ctrl+Z）"
+            disabled={!past.current.length && !editing && !polyOn}
+            onClick={undo}
+            className="flex h-11 min-w-[5.5rem] touch-manipulation items-center justify-center gap-1 whitespace-nowrap rounded-md border border-slate-300 bg-white px-3 text-base text-slate-700 hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-35"
+          >
+            <Icon name="undo" />
+            戻る
+          </button>
         </div>
       )}
       {/* リボン（Excel の「図形の書式」と同じ並び） */}

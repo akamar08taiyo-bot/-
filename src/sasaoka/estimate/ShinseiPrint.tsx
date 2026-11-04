@@ -1,10 +1,12 @@
 // 住宅改修申請書の印刷（ユーザーの指示「申請書を保存、まとめて保存、印刷ボタンを並びで表示する」2026-10-26）。
 // 申請書のタブのプレビューと同じページ（Excel に保存するときと同じ書き込みをしたシート）を、1ページずつ A4 縦の紙の余白の内側に入る大きさで描く。
 // ブラウザの印刷で、そのまま紙・PDF にできる。初めは1枚目（事前申請書）だけ印刷し、ほかのページはチェックで足す
-// （特定福祉用具の申請書の印刷と同じ。ユーザーの指示「申請書印刷の場合は、１枚目のみ印刷、デフォルトは」2026-10-26）
-import {useEffect, useState} from 'react';
+// （特定福祉用具の申請書の印刷と同じ。ユーザーの指示「申請書印刷の場合は、１枚目のみ印刷、デフォルトは」2026-10-26）。
+// チェックの名前は「1枚目」ではなく書類の名前（申請書・委任状・平面図・写真①…）。チェックを入れるとそのページへ飛ぶ（2026-11-04）
+import {useEffect, useMemo, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {Btn} from '../components/ui.tsx';
+import {printLabels} from '../shinseiPreview.ts';
 import type {PvPage} from '../shinseiPreview.ts';
 import type {ShinseiMarks} from '../types.ts';
 import {paper, ShinseiPages} from './ShinseiPreview.tsx';
@@ -61,25 +63,41 @@ export function ShinseiPrint({
     };
   }, [title, onClose]);
   const last = Math.max(-1, ...picked);
-  const toggle = (i: number) =>
+  // ページの名前（申請書・委任状・平面図・写真① など。shinseiPreview.ts の printLabels）
+  const labels = useMemo(() => printLabels(pages), [pages]);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const sheetRefs = useRef<(HTMLDivElement | null)[]>([]);
+  /** チェックを入れたページへ飛ぶ（ユーザーの指示「チェックを入れたら、チェックしたページにとべるようにする」2026-11-04）。上の帯に隠れないよう、その下に出す */
+  const jumpTo = (i: number) => {
+    const box = overlayRef.current;
+    const el = sheetRefs.current[i];
+    if (!box || !el) return;
+    const top = box.scrollTop + el.getBoundingClientRect().top - box.getBoundingClientRect().top - (barRef.current?.offsetHeight ?? 0) - 8;
+    box.scrollTo({top: Math.max(0, top), behavior: 'smooth'});
+  };
+  const toggle = (i: number) => {
+    const on = !picked.has(i);
     setPicked((c) => {
       const next = new Set(c);
       if (next.has(i)) next.delete(i);
       else next.add(i);
       return next;
     });
+    if (on) jumpTo(i);
+  };
   // 様邸の画面（印刷しない main の中）から開くので、body の直下に出す（main ごと印刷から外れないように）
   return createPortal(
-    <div className="print-overlay">
+    <div ref={overlayRef} className="print-overlay">
       {/* 上の帯の中身はまん中に寄せる（ユーザーの指示「赤枠の部分を中央にもってくる」2026-10-28。前は 申請書（A4縦）・ページのチェックが左の端、印刷する・閉じるが右の端） */}
-      <div className="print-toolbar justify-center">
+      <div ref={barRef} className="print-toolbar justify-center">
         <div className="text-sm font-bold">{book}（A4縦）</div>
         {pages.length > 1 && (
           <span role="group" aria-label="印刷するページ" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
             {pages.map((p, i) => (
-              <label key={p.sheet} className="flex items-center gap-1" title={p.sheet}>
+              <label key={p.sheet} className="flex items-center gap-1" title={`${i + 1}枚目：${p.sheet.trim()}`}>
                 <input type="checkbox" checked={picked.has(i)} onChange={() => toggle(i)} className="h-4 w-4" />
-                {i + 1}枚目
+                {labels[i]}
               </label>
             ))}
           </span>
@@ -98,7 +116,14 @@ export function ShinseiPrint({
           const pp = paper(p);
           const scale = Math.min(INNER.w / pp.width, INNER.h / pp.height);
           return (
-            <div key={p.sheet} className={`shinsei-sheet ${picked.has(i) ? '' : 'shinsei-skip'} ${i === last ? 'shinsei-last' : ''}`} aria-label={`${book}の印刷（${i + 1}枚目）`}>
+            <div
+              key={p.sheet}
+              ref={(el) => {
+                sheetRefs.current[i] = el;
+              }}
+              className={`shinsei-sheet ${picked.has(i) ? '' : 'shinsei-skip'} ${i === last ? 'shinsei-last' : ''}`}
+              aria-label={`${book}の印刷（${labels[i]}）`}
+            >
               <ShinseiPages pages={[p]} missing={{}} active={null} marks={NO_MARKS} label={() => ''} onOpen={() => undefined} onToggle={() => undefined} photos={photos} plan={plan} title={book} print fixedScale={scale} />
             </div>
           );

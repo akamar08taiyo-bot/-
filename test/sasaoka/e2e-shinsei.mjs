@@ -579,12 +579,18 @@ log('写真（選ぶ・ドロップ・押して入れ替え・押して移す・
   assert.equal(await page.getByRole('status', {name: '介護保険証を読んでいます'}).count(), 0);
   const srcA = await planImg.getAttribute('src');
   await planPage.screenshot({path: path.join(outDir, '84d-plan-image.png')});
-  // 枠を押して選び（道具：差し替え・✏️ 書き込み・削除・完了）、Ctrl+V で差し替え（縦長の図 900×1600）。介護保険証の読み取り・写真の欄には入らない
+  // 図を押すと、すぐ書き込みの画面（ユーザーの指示「書き込みオン、オフは不要で、そのまま書き込めるようにする。写真の部分と同じでよい」2026-11-04）。
+  // 差し替え・削除は書き込みの画面の上の帯。道具の列（差し替え・✏️ 書き込み・削除・完了）は出さない
   await planSlot.click();
-  assert.equal(await planSlot.getAttribute('aria-pressed'), 'true');
-  const tools = preview.getByRole('toolbar', {name: '平面図の図'});
-  assert.deepEqual(await tools.getByRole('button').allInnerTexts(), ['差し替え', '✏️ 書き込み', '削除', '完了']);
-  await planPage.screenshot({path: path.join(outDir, '84e-plan-selected.png')});
+  const planDlg = page.getByRole('dialog', {name: '平面図の図に書き込む'});
+  await planDlg.waitFor();
+  assert.equal(await preview.getByRole('toolbar', {name: '平面図の図'}).count(), 0);
+  for (const b of ['差し替え', '図を削除', '閉じる']) assert.equal(await planDlg.getByRole('button', {name: b, exact: true}).count(), 1, b);
+  await page.screenshot({path: path.join(outDir, '84e-plan-mark.png')});
+  await planDlg.getByRole('button', {name: '閉じる', exact: true}).click();
+  await planDlg.waitFor({state: 'detached'});
+  // 枠にフォーカスがあるときの Ctrl+V で差し替え（縦長の図 900×1600）。介護保険証の読み取り・写真の欄には入らない
+  await planSlot.focus();
   const photoCount = (await photoIds()).length;
   await page.evaluate((b64) => {
     const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -600,7 +606,9 @@ log('写真（選ぶ・ドロップ・押して入れ替え・押して移す・
   assert.equal(await slot('②', 'トイレ', '改修後').locator('img').count(), 1);
   // 差し替え（ファイルを選ぶ）：PDF は1ページ目を図にする（縦長の1ページの PDF → 長い辺 1600 の縦長の図）
   await planSlot.click();
-  const [planChooser] = await Promise.all([page.waitForEvent('filechooser'), tools.getByRole('button', {name: '差し替え'}).click()]);
+  await planDlg.waitFor();
+  const [planChooser] = await Promise.all([page.waitForEvent('filechooser'), planDlg.getByRole('button', {name: '差し替え', exact: true}).click()]);
+  await planDlg.waitFor({state: 'detached'});
   assert.equal(await planChooser.isMultiple(), false);
   const srcTall = await planImg.getAttribute('src');
   await planChooser.setFiles({name: 'plan.pdf', mimeType: 'application/pdf', buffer: await pdfOf(await datedJpeg('#95a5a6', '2026:10:05 09:30:00'))});
@@ -664,11 +672,12 @@ log('写真（選ぶ・ドロップ・押して入れ替え・押して移す・
     window.confirm = (m) => (window.__asked.push(m), window.__answer);
   });
   await planSlot.click();
-  await tools.getByRole('button', {name: '削除'}).click();
+  await planDlg.getByRole('button', {name: '図を削除', exact: true}).click();
   assert.deepEqual(await page.evaluate(() => window.__asked), ['平面図の図を削除しますか？']);
   assert.equal(await planImg.count(), 1);
   await page.evaluate(() => (window.__answer = true));
-  await tools.getByRole('button', {name: '削除'}).click();
+  await planDlg.getByRole('button', {name: '図を削除', exact: true}).click();
+  await planDlg.waitFor({state: 'detached'});
   await planImg.waitFor({state: 'detached'});
   assert.match(await planSlot.innerText(), /^＋ 平面図/);
   await page.evaluate(() => (window.confirm = window.__confirm));
@@ -683,7 +692,7 @@ log('写真（選ぶ・ドロップ・押して入れ替え・押して移す・
   await planImg.waitFor();
   await page.evaluate(() => (window.confirm = () => true));
   await planSlot.click();
-  await tools.getByRole('button', {name: '削除'}).click();
+  await planDlg.getByRole('button', {name: '図を削除', exact: true}).click();
   await planImg.waitFor({state: 'detached'});
   await page.evaluate(() => (window.confirm = window.__confirm));
 }
@@ -1519,14 +1528,29 @@ const sheetPdfPages = async () => {
 };
 assert.equal(await sheetPdfPages(), 1);
 await page.screenshot({path: path.join(outDir, '81e-shinsei-print.png')});
-await printPages.getByRole('checkbox', {name: '2枚目'}).check();
+// チェックの名前は書類の名前（ユーザーの指示「ただ1枚目、2枚目と記載するのではなく、申請書、委任状、写真①　写真②のようにわかりやすくする」2026-11-04）
+const printNames = await printPages.locator('label').allInnerTexts();
+console.log('  印刷のページの名前：', printNames.join('・'));
+assert.ok(printNames.every((n) => n.trim() && !/枚目/.test(n)), printNames.join('|'));
+assert.equal(new Set(printNames).size, printNames.length, printNames.join('|'));
+assert.ok(printNames.includes('平面図') && printNames.some((n) => /^写真①/.test(n)), printNames.join('|'));
+// チェックを入れると、そのページへ飛ぶ（上の帯のすぐ下に出る。ユーザーの指示「チェックを入れたら、チェックしたページにとべるようにする」2026-11-04）
+const jumpIdx = printNames.length - 1;
+await printPages.getByRole('checkbox').nth(jumpIdx).check();
+await page.waitForTimeout(900);
+const barBottom = (await page.locator('.print-toolbar').boundingBox()).y + (await page.locator('.print-toolbar').boundingBox()).height;
+const jumped = await page.locator('.shinsei-sheet').nth(jumpIdx).boundingBox();
+assert.ok(jumped.y >= barBottom - 1 && jumped.y < barBottom + 40, `飛んだページの上 ${jumped.y}・帯の下 ${barBottom}`);
+await page.screenshot({path: path.join(outDir, '81f-shinsei-print-jump.png')});
+await printPages.getByRole('checkbox').nth(jumpIdx).uncheck();
+await printPages.getByRole('checkbox').nth(1).check();
 assert.equal(await sheetPdfPages(), 2);
 // 申請書の中の字は印刷にも出る（プレビューと同じ書き込み）。押せる所の黄色・枠は出さない
 assert.ok((await page.locator('.shinsei-sheet').first().innerText()).includes('見本'));
 assert.equal(await page.locator('.shinsei-sheet [role="button"]').count(), 0);
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
 await page.locator('.print-overlay').waitFor({state: 'detached'});
-log('Excelで保存・申請書を印刷・削除の並び（真下にメールで送付）・申請書の印刷（1枚目だけ→足す）OK');
+log('Excelで保存・申請書を印刷・削除の並び（真下にメールで送付）・申請書の印刷（1枚目だけ→足す・ページの名前・チェックでそのページへ）OK');
 
 // ---------------- スマホの幅：一覧の下にプレビュー（縦に並べる）。プレビューは画面の幅に縮める。横にはみ出さない
 await page.setViewportSize({width: 390, height: 844});

@@ -654,5 +654,38 @@ assert.deepEqual(await moreItems(page), ['✉ メールで送付', '💾 保存'
 assert.equal(await page.getByRole('button', {name: '📄 白紙に戻す'}).count(), 0);
 log('上の段の並び（Excel・印刷・メールで送付など・最後に削除）・白紙に戻すはない OK');
 
+// ---------------- 見積書の左のボタン（Excelで保存・見積書を印刷・マツ六・TOTO・介援隊）は、見えているページの表の横（ユーザーの指示「２ページ目にいっても、
+// TOTO,マツ六などのカタログは２ページ目にいってもみれるようにする」2026-11-04）：行を貼り付けて2ページにし、2ページ目の表の1行目が見えているときはその横、
+// 表の途中を見ているときは画面の上に付いてくる。Ctrl+Z で行を戻す
+await rowOp('L型手すり', '⧉ コピー');
+for (let i = 0; i < 9; i++) await ops.getByRole('button', {name: '📋 貼付'}).click();
+await page.keyboard.press('Escape');
+assert.ok((await sheet.locator('.form-page').count()) >= 2, '2ページにならない');
+const firstRowY = () =>
+  page.evaluate(() => [...document.querySelectorAll('.est-sheet .form-page')].map((pg) => pg.querySelector('tr[data-rows], tr[data-new], tr[data-blank]').getBoundingClientRect().top));
+const sideY = async () => (await side.boundingBox()).y;
+// 2ページ目の表の1行目が画面のまん中あたりに来るまで下へ
+const page2At = async (y) => {
+  const [, p2] = await firstRowY();
+  await page.evaluate((d) => scrollBy(0, d), p2 - y);
+  await page.waitForTimeout(250);
+};
+await page2At(450);
+let [, p2] = await firstRowY();
+assert.ok(Math.abs((await sideY()) - (p2 - 8)) < 3, `2ページ目の表の横にない side=${await sideY()} p2=${p2}`);
+await page.screenshot({path: path.join(outDir, 'sheet-side-page2.png')});
+// 2ページ目の表の途中（1行目が画面の上より上）：画面の上に付いてくる
+await page2At(-200);
+const stuck = await sideY();
+assert.ok(stuck >= 0 && stuck < 20, `画面の上に付いてこない ${stuck}`);
+// 1ページ目の表の1行目が見えているときは、その横（前と同じ）
+await page.evaluate(() => scrollTo(0, 0));
+await page.waitForTimeout(250);
+const [p1] = await firstRowY();
+if (p1 + (await side.boundingBox()).height < 900) assert.ok(Math.abs((await sideY()) - (p1 - 8)) < 3, `1ページ目の表の横にない side=${await sideY()} p1=${p1}`);
+for (let i = 0; i < 9; i++) await undoKey();
+await page.waitForTimeout(300);
+log('見積書の左のボタン：見えているページの表の横・表の途中では画面の上に付いてくる OK');
+
 console.log('\nERRORS:', errors.length ? errors : 'なし');
 await browser.close();

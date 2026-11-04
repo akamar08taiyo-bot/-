@@ -618,6 +618,15 @@ export function ShinseiEditor({
                 marks={job.planMarks ?? []}
                 onChange={planActions.setMarks}
                 onClose={() => setPlanMarking(false)}
+                onReplace={() => {
+                  setPlanMarking(false);
+                  pickPlan();
+                }}
+                onRemove={() => {
+                  if (!window.confirm('平面図の図を削除しますか？')) return;
+                  setPlanMarking(false);
+                  planActions.remove();
+                }}
               />
             )}
           </div>

@@ -289,11 +289,15 @@ export function EstimateSheet({
       const rc = cur.getBoundingClientRect();
       const cx = (rc.left + rc.right) / 2;
       const step = dir === 'down' ? 1 : -1;
+      // 見出しの欄（お客様名・被保険者番号・工事場所。1行に1つ）から上下へは、真下（真上）になくても次の見出しの欄へ。
+      // 被保険者番号は（　）の中だけが打つ所なので、お客様名の真下にない（2026-11-04。前は Enter で被保険者番号をとばして明細の行へ行った）
+      const head = (c: HTMLElement) => c.dataset.edit?.startsWith('job:');
       for (let k = ri + step; k >= 0 && k < rows.length && !target; k += step) {
-        target = rows[k].find((c) => {
-          const r = c.getBoundingClientRect();
-          return r.left - 1 <= cx && cx <= r.right + 1;
-        });
+        target =
+          rows[k].find((c) => {
+            const r = c.getBoundingClientRect();
+            return r.left - 1 <= cx && cx <= r.right + 1;
+          }) ?? (head(cur) ? rows[k].find(head) : undefined);
       }
     }
     if (target) select(target);
@@ -607,7 +611,7 @@ export function EstimateSheet({
   };
 
   /** 欄の文字（Ctrl+C で OS の貼り付けに入れる） */
-  const cellText = () => (sel ? sheetValue(jobRef.current, sel.key, ctx, estDate) || findCell(sel)?.innerText || '' : '');
+  const cellText = () => (sel ? sheetValue(jobRef.current, sel.key, ctx, estDate) || (findCell(sel)?.innerText ?? '').replace(/\u200b/g, '') : ''); // \u200b＝空の被保険者番号の高さだけの字（EstimateForms.tsx）
   /** 明細の行の欄（line:・excl:）か。行の欄の Ctrl+C／Ctrl+X は行をコピー・切り取り */
   const rowCell = (x: Sel | null) => !!x && /^(line|excl):/.test(x.key);
 
@@ -818,16 +822,48 @@ export function EstimateSheet({
     }
   };
 
-  // 見積書の左のボタンは、明細の1行目（「手すりの取り付け　①廊下」）と同じ高さから（ユーザーの指示「部材リストや施工リストは、手すり取り付け①廊下や
-  // ②台所と同じ高さにもってくる」2026-11-03。前は見積書の上の端からで、表題・宛名の横にあった）。広い画面（ボタンが見積書の左に並ぶとき）だけ
-  const [toolTop, setToolTop] = useState(0);
+  // 見積書の左のボタンは、明細の1行目（「手すりの取り付け　①廊下」）と同じ高さ（ユーザーの指示「部材リストや施工リストは、手すり取り付け①廊下や
+  // ②台所と同じ高さにもってくる」2026-11-03。前は見積書の上の端からで、表題・宛名の横にあった）。広い画面（ボタンが見積書の左に並ぶとき）だけ。
+  // 見えているページの表の1行目の横に出す（ユーザーの指示「２ページ目にいっても、TOTO,マツ六などのカタログは２ページ目にいってもみれるようにする」2026-11-04。
+  // 前は画面の上に付いてくるだけで、2ページ目の表を見ていても、ボタンは画面のいちばん上の離れた所にあった）。どのページの1行目も見えない（表の途中を見ている）
+  // ときは、今までどおり画面の上に付いてくる。スクロールのたびに見積書ぜんぶを描き直さないよう、位置は DOM に直接書く
+  const sideRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    const el = scrollRef.current;
-    const first = innerRef.current?.querySelector<HTMLElement>('tr[data-rows], tr[data-new]');
-    if (!el || !first) return;
-    const top = Math.max(0, Math.round(first.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - 8));
-    if (top !== toolTop) setToolTop(top);
-  });
+    const side = sideRef.current;
+    const col = side?.parentElement;
+    if (!side || !col) return;
+    let raf = 0;
+    const place = () => {
+      raf = 0;
+      if (!side.offsetParent) return; // 狭い画面（ボタンは上の段）
+      const colTop = col.getBoundingClientRect().top;
+      const h = side.offsetHeight;
+      const heads = [...(innerRef.current?.querySelectorAll<HTMLElement>('.form-page') ?? [])]
+        .map((pg) => pg.querySelector<HTMLElement>('tr[data-rows], tr[data-new], tr[data-blank]'))
+        .filter((r): r is HTMLElement => !!r)
+        .map((r) => r.getBoundingClientRect().top - colTop - 8);
+      if (!heads.length) return;
+      const viewTop = 8 - colTop; // 画面の上の端（列の中の位置）
+      const viewBottom = window.innerHeight - 8 - colTop;
+      const shown = heads.find((y) => y >= viewTop && y + h <= viewBottom);
+      const top = shown ?? Math.max(heads[0], viewTop);
+      side.style.top = `${Math.round(Math.max(0, Math.min(top, col.clientHeight - h)))}px`;
+    };
+    const ask = () => {
+      if (!raf) raf = requestAnimationFrame(place);
+    };
+    place();
+    window.addEventListener('scroll', ask, true);
+    window.addEventListener('resize', ask);
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(ask);
+    if (innerRef.current) ro?.observe(innerRef.current);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', ask, true);
+      window.removeEventListener('resize', ask);
+      ro?.disconnect();
+    };
+  }, []);
 
   // ---------------------------------------------------------------- 見積書の左のボタン（部材・施工費を入れる・選んでいる行の挿入・削除・コピー・貼付）
   // 押しても見積書の欄の選択を外さない（打ち込んでいる欄・選んでいる行のまま）
@@ -1072,10 +1108,11 @@ export function EstimateSheet({
       <div className="flex flex-col lg:flex-row">
       {/* 見積書の左のボタン：Excelで保存・見積書を印刷（前は部材・施工費・常用を入れるボタンと行の操作。部材などは空いた行の内容の欄に、行の操作は選んでいる行の左に移した。
           ユーザーの指示「現在の部材リスト、施工費から入れると書いてある場所には、印刷とExcel保存のボタンを設置」2026-11-03）。
-          広い画面だけ（狭い画面は上の段と同じなので出さない）。見積書を下へ動かしてもついてくる */}
+          広い画面だけ（狭い画面は上の段と同じなので出さない）。見積書を下へ動かしてもついてくる（見えているページの表の横。上の sideRef） */}
+      <div className="relative hidden shrink-0 lg:block lg:w-60">
       <div
-        className="sheet-side hidden shrink-0 gap-2 border-r border-slate-200 bg-slate-50 p-2 lg:sticky lg:top-2 lg:mt-[var(--tool-top)] lg:flex lg:w-60 lg:flex-col lg:self-start [&>*]:w-full [&>*]:!justify-start [&>*]:!text-[15px]"
-        style={{'--tool-top': `${toolTop}px`} as CSSProperties}
+        ref={sideRef}
+        className="sheet-side absolute inset-x-0 top-0 flex flex-col gap-2 border-r border-slate-200 bg-slate-50 p-2 [&>*]:w-full [&>*]:!justify-start [&>*]:!text-[15px]"
         role="toolbar"
         aria-label="見積書の左のボタン"
       >
@@ -1085,6 +1122,7 @@ export function EstimateSheet({
         </Btn>
         {/* メーカーのカタログ（新しいタブ。マツ六・TOTO・介援隊。ユーザーの指示「それぞれのカタログに飛べるようにして」2026-11-04） */}
         <CatalogLinks className="mt-2 border-t border-slate-200 pt-2 [&>a]:w-full [&>a]:!justify-start" />
+      </div>
       </div>
       <div
         ref={scrollRef}

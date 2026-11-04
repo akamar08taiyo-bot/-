@@ -122,7 +122,21 @@ assert.deepEqual(await totals(), ['合計', '26,950', '26,950']);
 assert.deepEqual(await page.getByRole('combobox', {name: '保険者', exact: true}).locator('option').allInnerTexts(), ['苅田町', '行橋市', 'みやこ町', '広域連合', '福岡市', '北九州市', '久留米市', '飯塚市']); // 福岡市・北九州市は 2026-10-29 から、久留米市・飯塚市は 2026-11-02 から
 
 // ---------------- 見積書の欄：被保険者番号・切って使う手すりを 120cm（1.2÷4＝0.3本×16,000＝4,800）
-await typeIn('job:insuredNo', '0000366989');
+// 被保険者番号は（　）の中だけが打つ所（ユーザーの報告「介護保険番号の（）内が入力できない」2026-11-04）：見出しの右・打っているあいだも見出しは見える
+{
+  const no = sheet.locator('[data-edit="job:insuredNo"]').first();
+  const label = sheet.locator('.fitbox', {hasText: '介護保険被保険者番号'}).first();
+  const [nb, lb] = [await no.boundingBox(), await label.boundingBox()];
+  assert.ok(nb.x > lb.x + 100 && nb.width > 60, `打つ所がかっこの中にない ${JSON.stringify({nb, lb})}`);
+  await no.click();
+  await page.keyboard.type('0000366989');
+  const input = await page.locator('textarea.sheet-input').boundingBox();
+  assert.ok(input && input.x >= nb.x - 2 && input.x + input.width <= nb.x + nb.width + 40, `打つ欄がかっこの外にかかる ${JSON.stringify({input, nb})}`);
+  assert.ok(await label.isVisible());
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(60);
+}
+assert.ok((await sheet.innerText()).includes('介護保険被保険者番号（0000366989）'));
 await typeIn(await key('木の手すり 35φ 4m', 'qty'), '120cm');
 const rail = await tds('木の手すり 35φ 4m');
 assert.deepEqual(rail.slice(3, 7), ['0.3', '本', '16,000', '4,800'], rail.join('|'));

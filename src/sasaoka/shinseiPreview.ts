@@ -90,6 +90,55 @@ export type PvPage = {
   options: PvOption[];
 };
 
+/**
+ * 印刷の画面のページの名前（ユーザーの指示「ただ1枚目、2枚目と記載するのではなく、申請書、委任状、写真①　写真②のようにわかりやすくする」2026-11-04）。
+ * 原本のシートの名前は長い・様式の番号だけ（「様式第2号（住宅改修承認申請書）」「住改・受領委任払」「1  (3)」）なので、短い書類の名前にする。
+ * 写真の用紙は写真番号（福岡市・北九州市の完了報告書は1枚に2つ）と、事前・完了などの別があればそれ。同じ名前が2つあれば（2）を付ける
+ */
+const FORM_LABEL: [RegExp, string][] = [
+  [/委任状/, '委任状'],
+  [/承諾書/, '承諾書'],
+  [/請求書/, '請求書'],
+  [/内訳明細書/, '内訳明細書'],
+  [/内訳書/, '内訳書'],
+  [/通知用/, '事前届出書（通知用）'],
+  [/事前届出書/, '事前届出書'],
+  [/承認届出書/, '承認届出書'],
+  [/事前承認願書/, '事前承認願書'],
+  [/事前承認申請書/, '事前承認申請書'],
+  [/承認申請書/, '承認申請書'],
+  [/完了届出書/, '完了届出書'],
+  [/事前申請書/, '事前申請書'],
+  [/事後申請書/, '事後申請書'],
+  [/支給申請書|様式第21号/, '支給申請書'], // 福岡市の様式第21号は介護保険住宅改修費支給申請書
+  [/受領委任払/, '申請書'], // 行橋市の「住改・受領委任払」
+];
+const PHOTO_KIND: [RegExp, string][] = [
+  [/内容報告書/, '内容報告書'],
+  [/完了報告書/, '完了報告書'],
+  [/事前/, '事前'],
+  [/完了/, '完了'],
+  [/支給/, '支給'],
+];
+export function printLabels(pages: PvPage[]): string[] {
+  const circled = (n: number) => (n >= 1 && n <= 20 ? String.fromCharCode(0x2460 + n - 1) : `(${n})`);
+  const raw = pages.map((p) => {
+    if (p.kind === 'plan') return '平面図';
+    if (p.kind === 'photo') {
+      const nums = [...new Set([p.photo, ...p.photoSlots.map((s) => s.photo)].filter((n) => n > 0))].sort((a, b) => a - b);
+      const kind = PHOTO_KIND.find(([re]) => re.test(p.sheet))?.[1];
+      return `写真${nums.map(circled).join('')}${kind ? `（${kind}）` : ''}`;
+    }
+    const page = /（(\d+)ページ）$/.exec(p.sheet)?.[1]; // 理由書（1枚のシートに2ページ）
+    if (/理由書/.test(p.sheet)) return page ? `理由書（${page}ページ）` : '理由書';
+    return FORM_LABEL.find(([re]) => re.test(p.sheet))?.[1] ?? p.sheet.trim();
+  });
+  return raw.map((l, i) => {
+    const same = raw.filter((x) => x === l).length;
+    return same > 1 ? `${l}（${raw.slice(0, i + 1).filter((x) => x === l).length}）` : l;
+  });
+}
+
 /** 申請書の様式のシート（転記する項目のあるシート。平面図・写真貼付用紙・事後申請書（事前申請書を参照する式）は出さない） */
 // 写真の用紙（北九州市の写真の報告書は被保険者番号の欄 texts もある）は、写真番号のある用紙だけをうしろに出す
 export const isFormSheet = (s: ShinseiSheet) => !s.photoPlace && !!(s.texts || s.works || s.kinds || s.kindRows);
