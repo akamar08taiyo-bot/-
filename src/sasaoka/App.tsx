@@ -128,7 +128,8 @@ function JobTabs({view, onView, cls}: {view: JobView; onView: (v: JobView) => vo
 /**
  * 画面の上の帯の左の端（「← 業務アプリポータルへ戻る」の真下）の「☰ メニュー ▼」：見積もり・申請書を作成する（一覧・新規作成）・売上見込みを確認する・工務店請求書を確認する・部材・施工費マスタ・設定・ゴミ箱
  * （ユーザーの指示「売上見込みを確認する、工務店請求書、部材・施工費マスタ、設定、ゴミ箱は、プルダウンにして右隅におく」2026-11-03。前は帯に6つのタブ）。
- * 押す・外を押す・Esc で閉じる。ゴミ箱に入っている件数はメニューのボタンにも出す
+ * 押す・外を押す・Esc で閉じる。ゴミ箱に入っている件数はメニューの中の「🗑 ゴミ箱」の右だけ
+ * （前はメニューのボタンにも「🗑 11」と出していたが、ユーザーの指示「ここのゴミ箱の数量は不要」2026-11-03 で外した）
  */
 function NavMenu({tab, onTab, trashCount, top = false}: {tab: MainTab; onTab: (t: MainTab) => void; trashCount: number; top?: boolean}) {
   const [open, setOpen] = useState(false);
@@ -160,7 +161,6 @@ function NavMenu({tab, onTab, trashCount, top = false}: {tab: MainTab; onTab: (t
         className="flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-lg bg-white/15 px-3 text-[15px] font-bold text-white hover:bg-white/25 lg:text-base"
       >
         ☰ メニュー
-        {trashCount > 0 && <span className="rounded-full bg-white/25 px-2 text-[13px] leading-5 tabular-nums">🗑 {trashCount}</span>}
         <span aria-hidden="true">{open ? '▲' : '▼'}</span>
       </button>
       <div
@@ -521,7 +521,7 @@ export default function App({start}: {start: MainTab}) {
             {jobOpen ? (
               <JobTabs view={jobView} onView={(v) => leaveTokutei(() => setJobView(v))} cls={tabCls} />
             ) : (
-              // スマホで「☰ メニュー（🗑 件数）」の右に入りきらないときは、メニューの下の段へ（min-w-min。前は右にはみ出した）
+              // スマホで「☰ メニュー」の右に入りきらないときは、メニューの下の段へ（min-w-min。前は右にはみ出した）
               <div className="flex min-w-min flex-1 flex-wrap gap-1.5 md:min-w-0">
                 <button type="button" onClick={() => goTab('estimate')} aria-current={tab === 'estimate' ? 'page' : undefined} className={tabCls(tab === 'estimate')}>
                   {TABS[0].label}

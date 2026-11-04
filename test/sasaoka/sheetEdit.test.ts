@@ -12,8 +12,11 @@ import {
   deleteTouchesShinsei,
   describeKey,
   dropEmptyPlaces,
+  insertBeforeId,
   insertBlankAfter,
+  insertBlankBefore,
   isEmptyPlace,
+  laborCountAt,
   lineRows,
   parseKind,
   parseLengthCm,
@@ -23,6 +26,7 @@ import {
   pasteLines,
   setWorkAmount,
   sheetValue,
+  stepLaborAt,
   toggleExcluded,
   toolPlace,
 } from '../../src/sasaoka/sheetEdit.ts';
@@ -683,4 +687,70 @@ test('何も入っていない箇所（前の版の施工費のボタンなど�
     [job.places[0].id, ...kept.map((p) => p.id)],
   );
   assert.equal(dropEmptyPlaces(job), job); // なければ同じ job（保存しない）
+});
+
+test('「＋ 挿入」は選んでいる行の上（部材の同上施工費なら部材の上）。箇所の1行目の上は前の箇所のいちばん下（「この間に挿入が差し込めるように」2026-11-03）', () => {
+  const wood = {id: 'l1', name: '木', price: 1000, estPrice: 1500, note: ''};
+  const a = newPlace('台所', [laborRow(wood, 1)]); // ③台所：施工費だけ
+  const m1 = materialRow(rail, 1);
+  const w1 = laborRow(wood, 1);
+  const m2 = materialRow(bar, 1);
+  const b = newPlace('台所', [m1, w1, m2]); // ④台所：手すり・同上施工費・バー
+  const job: Job = {...emptyJob(), places: [a, b]};
+  // ④の1行目の上 → ③のいちばん下（④の名前の行は動かない）
+  const top = insertBlankBefore(job, m1.id);
+  assert.deepEqual(top.job.places.map((p) => p.rows.length), [2, 3]);
+  assert.equal(top.job.places[0].rows[1].id, top.rowId);
+  assert.equal(top.job.places[1].rows[0].id, m1.id);
+  assert.equal(insertBeforeId(job, m1.id), m1.id);
+  // 同上施工費を選んでいても、部材の上（部材と同上施工費の間には入れない）→ 箇所の1行目なので前の箇所へ
+  assert.equal(insertBeforeId(job, w1.id), m1.id);
+  assert.deepEqual(insertBlankBefore(job, w1.id).job.places.map((p) => p.rows.length), [2, 3]);
+  // バーの上 → ④の中（同上施工費とバーの間）
+  const mid = insertBlankBefore(job, m2.id);
+  assert.deepEqual(mid.job.places[1].rows.map((r) => r.id === mid.rowId ? '空白' : r.id), [m1.id, w1.id, '空白', m2.id]);
+  // 最初の箇所の1行目の上 → その箇所のはじめ
+  const first = insertBlankBefore(job, a.rows[0].id);
+  assert.equal(first.job.places[0].rows[0].id, first.rowId);
+  assert.equal(insertBlankBefore(job, 'nope').rowId, null);
+});
+
+test('施工費のリストの −／＋：開いた所のまとまりの数を変え、続けて押す所（key）を返す（「施工費は一覧とともに、数量をふやせるように」2026-11-03）', () => {
+  const wood = {id: 'l1', name: '木', price: 1000, estPrice: 1500, note: ''};
+  const blank = manualRow('material', {qty: 1});
+  const m1 = materialRow(rail, 1);
+  let job: Job = {...emptyJob(), places: [newPlace('廊下', [m1, blank])]};
+  assert.equal(laborCountAt(job, `line:${blank.id}:text`, wood.id), 0);
+  // 空いた行で ＋ → 空いた行は手すりの同上施工費になる。続けて押す所はその行
+  let res = stepLaborAt(job, `line:${blank.id}:text`, wood, 1);
+  const labor = res.job.places[0].rows[1];
+  assert.deepEqual(res.job.places[0].rows.map((r) => [r.kind, r.qty]), [['material', 1], ['labor', 1]]);
+  assert.equal(res.rowId, labor.id);
+  assert.equal(res.key, `line:${labor.id}:text`);
+  job = res.job;
+  // ＋ をもう1回 → 2
+  res = stepLaborAt(job, res.key!, wood, 1);
+  assert.equal(laborCountAt(res.job, res.key!, wood.id), 2);
+  assert.equal(res.job.places[0].rows.length, 2);
+  job = res.job;
+  // − を2回 → 0 になって行がなくなる。続けて押す所は上の手すりの行（もう1回 ＋ を押すとまた同上施工費）
+  res = stepLaborAt(job, res.key!, wood, -1);
+  res = stepLaborAt(res.job, res.key!, wood, -1);
+  assert.deepEqual(res.job.places[0].rows.map((r) => r.kind), ['material']);
+  assert.equal(res.key, `line:${m1.id}:text`);
+  assert.equal(laborCountAt(res.job, res.key!, wood.id), 0);
+  // 0 のときの − は何もしない
+  const same = stepLaborAt(res.job, res.key!, wood, -1);
+  assert.equal(same.job, res.job);
+  const again = stepLaborAt(res.job, res.key!, wood, 1);
+  assert.deepEqual(again.job.places[0].rows.map((r) => [r.kind, r.qty]), [['material', 1], ['labor', 1]]);
+  // 工務店の請求書（仕切り）の施工費は 仕切りの取付手間×数（ユーザーの指示「木手すり 1箇所 1000、2箇所であれば 2000円」2026-11-03）
+  const two = stepLaborAt(again.job, `line:${again.job.places[0].rows[1].id}:text`, wood, 1).job;
+  assert.equal(jobTotals(two, S).labor, 2000);
+  assert.equal(jobTotals(again.job, S).labor, 1000);
+  // いちばん下の空いた行（new:text）：最後の箇所の最後の部材のまとまり
+  assert.equal(laborCountAt(again.job, 'new:text', wood.id), 1);
+  const add = stepLaborAt(again.job, 'new:text', wood, 1);
+  assert.equal(laborCountAt(add.job, add.key!, wood.id), 2);
+  assert.equal(add.job.places[0].rows.length, 2);
 });

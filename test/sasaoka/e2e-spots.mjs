@@ -10,7 +10,7 @@
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import {cellAt, chooseLabor, clickStable, navItem} from './more.mjs';
+import {cellAt, chooseLabor, clickStable, insertBelow, navItem, pickAt} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -83,8 +83,9 @@ const pick = async (code, plus = 0, expectAdd = true) => {
 // 選んでいる行が空いた行でなければ「＋ 挿入」で下に空いた行を入れてから。選んでいる欄の上の見えない入力欄の下にあるので force
 const ops = sheet.getByRole('toolbar', {name: '行の操作'});
 const pickHere = async (kind) => {
-  if (!(await sheet.locator(`tr[data-current] [data-pick="${kind}"]`).count())) await ops.getByRole('button', {name: '＋ 挿入'}).click();
-  await clickStable(sheet.locator(`tr[data-current] [data-pick="${kind}"]`));
+  // 「＋ 挿入」は選んでいる行の上（2026-11-03）なので、選んでいる行のすぐ下に入れるのは more.mjs の insertBelow
+  if (!(await sheet.locator(`tr[data-current] [data-pick="${kind}"]`).count())) await insertBelow(sheet);
+  await pickAt(sheet, kind);
 };
 const openMaterials = async () => {
   await pickHere('material');

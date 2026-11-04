@@ -48,7 +48,9 @@ export function cellAt(loc) {
       if (prop === 'click')
         return async (opts = {}) => {
           const b = await target.boundingBox();
-          return target.click({position: {x: Math.max(4, b.width - 20), y: b.height / 2}, ...opts});
+          // 空いた行の内容の欄（まん中に「部材｜施工費｜常用」）は、右の端に「← 項目から選ぶ か ダブルクリックで品番入力」がかぶる（2026-11-03）ので左の空いた所
+          const pick = await target.evaluate((el) => !!el.querySelector(':scope > .sheet-pick')).catch(() => false);
+          return target.click({position: {x: pick ? 6 : Math.max(4, b.width - 20), y: b.height / 2}, ...opts});
         };
       const v = target[prop];
       return typeof v === 'function' ? v.bind(target) : v;
@@ -61,7 +63,7 @@ export function cellAt(loc) {
  * 行の文字を読むテストで、ボタンの字を内容として数えないように）
  */
 // 空いた行の「← 項目から選ぶ か 品番を入力」（薄い案内。2026-11-03）も外す
-export const noPick = (t) => t.replace(/部材\s*施工費\s*常用(\s*← 項目から選ぶ か 品番を入力)?/g, '');
+export const noPick = (t) => t.replace(/部材\s*施工費\s*常用(\s*← 項目から選ぶ か (ダブルクリックで品番入力|品番を入力))?/g, '');
 
 /**
  * 動きが止まってから押す（force）。「＋ 挿入」のあと、選んだ行が見える所まで動く間に force で押すと、前の位置を押してしまう
@@ -91,4 +93,32 @@ export async function chooseLabor(page, press, name) {
     if (await list.waitFor({timeout: 3000}).then(() => true, () => false)) break;
   }
   await list.getByRole('option').filter({hasText: new RegExp(`^${name}\\d`)}).click();
+}
+
+/**
+ * 「＋ 挿入」は選んでいる行の上に1行入れる（Excel と同じ。ユーザーの指示「挿入の場合、この間に挿入が差し込めるようにする」2026-11-03。前は下）。
+ * 前と同じ「tr の行（部材は同上施工費ごと）のすぐ下」に空いた行を入れたいときは、そのすぐ下の行を選んで「＋ 挿入」。
+ * すぐ下に行がなければ（いちばん下の行）、いちばん下の空いた行（tr[data-new]。打ち込むと最後の箇所の最後に入る）を選ぶ。
+ * tr を省くと、選んでいる行（tr[data-current]）
+ */
+export async function insertBelow(sheet, tr) {
+  const base = tr ?? sheet.locator('.form-page tr[data-current]');
+  const next = await base.evaluate((el) => {
+    const all = [...el.closest('.est-sheet').querySelectorAll('.form-page tr[data-rows]')];
+    let i = all.indexOf(el) + 1;
+    while (i < all.length && all[i].innerText.includes('同上施工費')) i++;
+    return i < all.length ? i : -1;
+  });
+  if (next < 0) {
+    await cellAt(sheet.locator('tr[data-new] [data-edit="new:text"]')).click();
+    return;
+  }
+  await cellAt(sheet.locator('.form-page tr[data-rows]').nth(next).locator('[data-edit$=":text"]').first()).click();
+  await sheet.getByRole('toolbar', {name: '行の操作'}).getByRole('button', {name: '＋ 挿入'}).click();
+}
+
+/** 選んでいる空いた行（いちばん下の空いた行を選んでいるときはその行）の「部材｜施工費｜常用」 */
+export async function pickAt(sheet, kind) {
+  const cur = sheet.locator(`tr[data-current] [data-pick="${kind}"]`);
+  await clickStable((await cur.count()) ? cur : sheet.locator(`tr[data-new] [data-pick="${kind}"]`));
 }

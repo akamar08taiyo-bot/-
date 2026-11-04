@@ -8,7 +8,7 @@
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import {cellAt, chooseLabor, clickStable, moreItems, navItem, noPick, openMore} from './more.mjs';
+import {cellAt, chooseLabor, clickStable, insertBelow, moreItems, navItem, noPick, openMore, pickAt} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -55,7 +55,9 @@ const rowOp = async (row, op) => {
   await page.waitForTimeout(60);
 };
 // 選んでいる行（空いた行）の内容の欄の「部材｜施工費｜常用」（2026-11-03。前は見積書の左の「部材リストから入れる」など）。選んでいる欄の上の見えない入力欄の下にあるので force
-const pickHere = (kind) => clickStable(sheet.locator(`tr[data-current] [data-pick="${kind}"]`));
+const pickHere = (kind) => pickAt(sheet, kind);
+// name の行（部材は同上施工費ごと）のすぐ下に空いた行を入れる（「＋ 挿入」は選んでいる行の上なので、すぐ下の行を選んで挿入。more.mjs の insertBelow）
+const below = (name) => insertBelow(sheet, sheet.locator('.form-page tr[data-rows]', {hasText: name}).first());
 const laborPick = async (name) => {
   await chooseLabor(page, () => pickHere('labor'), name);
 };
@@ -172,13 +174,27 @@ assert.deepEqual((await tds('L型手すり')).slice(0, 7), ['手すりの取り�
 assert.deepEqual(await totals(), ['合計', '21,780', '21,780']);
 log('空いた行・新しい箇所・諸経費は自動のままOK');
 
-// ---------------- 行の「挿入」：選んだ行の下に1行入れる → 打ち込む／介護保険の対象外（スペース）／「削除」で消す
+// ---------------- 行の「挿入」：選んだ行の上に1行入れる → 打ち込む／介護保険の対象外（スペース）／「削除」で消す
 // 行の操作は1組（選んでいる行の改修内容の左）。見積書の左は Excelで保存・見積書を印刷だけ
 assert.deepEqual(await side.getByRole('button').allInnerTexts().then((t) => t.map((x) => x.replace(/\s+/g, ' ').trim())), ['📗 Excelで保存', '🖨 見積書を印刷']);
 assert.deepEqual(await ops.getByRole('button').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label'))), ['＋ 挿入', '✕ 削除', '⧉ コピー', '📋 貼付']);
 assert.equal(await sheet.locator('.sheet-rowtools, [data-ins], [data-del], [data-copy], [data-paste]').count(), 0);
 assert.equal(await ops.getByRole('button', {name: '📋 貼付'}).isDisabled(), true); // コピーするまで押せない
+// 「＋ 挿入」は選んでいる行の上（Excel と同じ。ユーザーの指示「挿入の場合、この間に挿入が差し込めるようにする」2026-11-03。前は下）。
+// 箇所の1行目（②トイレの L型手すり）の上は、前の箇所（①浴室）のいちばん下に入る（②トイレの名前は L型手すり の行のまま）
+const rowsNow = async () => (await sheet.locator('.form-page tr[data-rows]').allInnerTexts()).map((t) => noPick(t).replace(/\s+/g, ' ').trim());
+const beforeIns = await rowsNow();
 await rowOp('L型手すり', '＋ 挿入');
+const afterIns = await rowsNow();
+const li = afterIns.findIndex((t) => t.includes('L型手すり'));
+assert.equal(afterIns.length, beforeIns.length + 1);
+assert.equal(afterIns[li - 1], '', afterIns.join('\n'));
+assert.match(afterIns[li], /^手すりの取り付け ②トイレ/);
+assert.equal(await selected(), '内容（品名）');
+await ops.getByRole('button', {name: '✕ 削除'}).click();
+assert.deepEqual(await rowsNow(), beforeIns);
+// L型手すりの下（いちばん下の行）に入れるのは、いちばん下の空いた行に打ち込む
+await below('L型手すり');
 assert.equal(await selected(), '内容（品名）');
 await page.keyboard.type('エンド');
 await page.keyboard.press('ArrowDown');
@@ -197,7 +213,7 @@ const lt = await tds('L型手すり');
 assert.deepEqual([lt[7], lt[10], lt[11]], ['', '', '8,800'], lt.join('|'));
 await rowOp('手すりカバー', '✕ 削除');
 assert.equal(await sheet.locator('.form-page tr', {hasText: '手すりカバー'}).count(), 0);
-log('左の挿入で下に1行・対象外・左の削除で消すOK');
+log('左の挿入で上に1行（箇所の境目）・対象外・左の削除で消すOK');
 
 // ---------------- 左の「削除」：選んだ行を消す。箇所の行がなくなれば改修内容・改修場所も消えて、その行が空白になる。元に戻せる
 const lines = async () => sheet.locator('.form-page tr[data-rows]').count();
@@ -220,11 +236,11 @@ assert.deepEqual((await tds('L型手すり')).slice(0, 2), ['手すりの取り�
 assert.equal(await sheet.locator('.form-page tr', {hasText: 'エンドキャップ'}).count(), 1);
 log('左の削除（空白になる・元に戻す）OK');
 
-// ---------------- 左の「挿入」：選んだ行の下に空白の行が入り、内容の欄が選ばれる（そのまま打ち込める）。何も打たなければ空白の行のまま
+// ---------------- 左の「挿入」：選んだ行の上に空白の行が入り、内容の欄が選ばれる（そのまま打ち込める）。何も打たなければ空白の行のまま
 await rowOp('エンドキャップ', '＋ 挿入');
 assert.equal(await selected(), '内容（品名）');
 assert.equal(await lines(), before + 1);
-const blankRow = sheet.locator('.form-page tr[data-rows]').nth(await sheet.locator('.form-page tr[data-rows]').evaluateAll((trs) => trs.findIndex((tr) => tr.innerText.includes('エンドキャップ')) + 1));
+const blankRow = sheet.locator('.form-page tr[data-rows]').nth(await sheet.locator('.form-page tr[data-rows]').evaluateAll((trs) => trs.findIndex((tr) => tr.innerText.includes('エンドキャップ')) - 1));
 assert.deepEqual((await blankRow.locator('td').allInnerTexts()).map((t) => noPick(t).trim()).filter(Boolean), []); // 数量・単価・金額も出さない（内容の欄の「部材｜施工費｜常用」は除く）
 assert.equal(await page.getByText(/仕切価格が空欄の部材/).count(), 0); // 空白の行は「仕切価格がない」と言わない
 // 書き直し（F2・ダブルクリック）も空から（前は「材料費」と出た。ユーザーの指摘）
@@ -320,6 +336,9 @@ await page.getByRole('dialog').getByRole('row', {name: /ブラケット/}).getBy
 // お気に入りの一覧の「削除」：お気に入りから外す（部材リストには残る。「すべて」で★を押すと戻る）。仕切価格の空欄は「空欄」（定価から計算しない）
 const picker = page.getByRole('dialog');
 const favTab = picker.getByRole('button', {name: /^★ お気に入り（\d+）$/});
+// 開いたときは「すべて」（ユーザーの指示「デフォルトはお気に入りではなく、全てにする」2026-11-03）
+assert.equal(await picker.getByRole('button', {name: /^すべて（\d+）$/}).getAttribute('aria-pressed'), 'true');
+await favTab.click();
 const favBefore = Number(/（(\d+)）/.exec(await favTab.innerText())[1]);
 await picker.getByRole('button', {name: '補強板をお気に入りから削除'}).click();
 assert.equal(await picker.getByRole('row', {name: /補強板/}).count(), 0);
@@ -340,7 +359,7 @@ await undoKey();
 assert.equal(await lines(), pickBefore);
 log('部材リストから入れたものも Ctrl+Z／Ctrl+Y（欄を選んでいなくても）・お気に入りの削除 OK');
 
-// ---------------- 行の下に入れる：行を選んで「＋ 挿入」で空いた行 → その行の「部材」で入れた部材は、その行（行の同上施工費）のすぐ下。続けて入れたものはその下。
+// ---------------- 行の下に入れる：すぐ下の行を選んで「＋ 挿入」で空いた行 → その行の「部材」で入れた部材は、上の行（行の同上施工費）のすぐ下。続けて入れたものはその下。
 // 空いた行に入る（行は空いた行のぶんだけ）
 const pickAdd = async (...names) => {
   await pickHere('material');
@@ -353,21 +372,21 @@ const from = async (name, n) => {
 };
 // 片づけは左の「削除」で（見積書の外で続けて入れたものは Ctrl+Z 1回にまとまるので、回数が決まらない）
 const drop = (name) => rowOp(name, '✕ 削除');
-await rowOp('木の手すり 35φ 4m', '＋ 挿入');
+await below('木の手すり 35φ 4m');
 await pickAdd(/ブラケット/, /補強板/);
 assert.deepEqual(await from('サンプル S-TS35 木の手すり 35φ 4m', 4), ['サンプル S-TS35 木の手すり 35φ 4m', '同上施工費', 'サンプル S-BK01 ブラケット', 'サンプル S-HB01 補強板']);
 assert.equal(await lines(), pickBefore + 2);
 await drop('サンプル S-BK01 ブラケット');
 await drop('サンプル S-HB01 補強板');
 assert.equal(await lines(), pickBefore);
-await rowOp('エンドキャップ', '＋ 挿入'); // 空白の行の欄が選ばれる
+await below('エンドキャップ'); // いちばん下の行なので、いちばん下の空いた行
 await pickAdd(/ブラケット/);
 assert.deepEqual(await from('サンプル S-EC01 エンドキャップ', 2), ['サンプル S-EC01 エンドキャップ', 'サンプル S-BK01 ブラケット']);
 assert.equal(await lines(), pickBefore + 1);
 await drop('サンプル S-BK01 ブラケット');
 assert.equal(await lines(), pickBefore);
 // 施工費も：空白の行の「施工費」→ 施工費のリストの「木」→ その行に入り、すぐ上の部材（エンドキャップ）の同上施工費になる
-await rowOp('エンドキャップ', '＋ 挿入');
+await below('エンドキャップ');
 await laborPick('木');
 assert.deepEqual(await from('サンプル S-EC01 エンドキャップ', 2), ['サンプル S-EC01 エンドキャップ', '同上施工費']);
 assert.equal(await lines(), pickBefore + 1);
@@ -382,11 +401,11 @@ const linesBefore = await lines();
 assert.deepEqual(await placeNames(), ['①浴室', '②トイレ']);
 // ①浴室の空白の行の「部材」→ 空白の行がブラケットになり、閉じると最後に入れたブラケットの行を選ぶ（2026-11-02。前は選んでいた欄がなくなった）→
 // その下に空いた行を入れて「施工費」はそのブラケットの同上施工費（①浴室。前は新しい箇所③の「施工費」になった）
-await rowOp('木の手すり 35φ 4m', '＋ 挿入');
+await below('木の手すり 35φ 4m');
 await pickAdd(/ブラケット/);
 await sheet.getByLabel('選んでいる欄の値').filter({hasText: 'サンプル S-BK01 ブラケット'}).waitFor({timeout: 5000}).catch(() => undefined); // 閉じたあと選び直すまで待つ
 assert.equal(await bar(), 'サンプル S-BK01 ブラケット'); // 最後に入れた行を選んでいる
-await rowOp('サンプル S-BK01 ブラケット', '＋ 挿入');
+await below('サンプル S-BK01 ブラケット');
 await laborPick('木');
 assert.deepEqual(await placeNames(), ['①浴室', '②トイレ']);
 let texts = await order();

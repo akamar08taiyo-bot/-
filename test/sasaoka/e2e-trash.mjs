@@ -120,8 +120,11 @@ const nav = page.getByRole('navigation', {name: '画面'});
 // プルダウンにして右隅におく」2026-11-03。前は帯に6つのタブ）
 const tabBtn = (name) => navItem(page, name);
 const menuItem = (name) => nav.getByRole('menu', {name: 'メニュー', includeHidden: true}).getByRole('button', {name, includeHidden: true});
-// ゴミ箱の件数（メニューの「🗑 ゴミ箱」と、メニューのボタンの「🗑 N」）
-const trashNum = async () => (await menuItem(/ゴミ箱/).textContent()).replace(/\D/g, '');
+// ゴミ箱の件数（メニューの「🗑 ゴミ箱」の右だけ。メニューのボタンには出さない＝ユーザーの指示「ここのゴミ箱の数量は不要」2026-11-03）
+const trashNum = async () => {
+  assert.equal((await nav.getByRole('button', {name: /^☰ メニュー/}).textContent()).replace(/[▲▼\s]/g, ''), '☰メニュー');
+  return (await menuItem(/ゴミ箱/).textContent()).replace(/\D/g, '');
+};
 const trashTab = {click: async () => (await tabBtn(/ゴミ箱/)).click()};
 await nav.getByRole('button', {name: /^☰ メニュー/}).waitFor();
 

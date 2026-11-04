@@ -33,7 +33,7 @@ React 19 ＋ TypeScript ＋ Vite（Tailwind）。リポジトリにはほかの�
 | `print/OrderDoc.tsx` | 発注書（A4縦） |
 | `components/EstimateSheet.tsx` | 見積書に直接入力（Excel のような操作。キー操作・候補・行のコピー・貼り付け） |
 | `components/ui.tsx` | 共通の部品（`Btn`・`Modal`・`Stepper`・`NumberInput`・`COLORS`・`useToast`）と、ドロップ・貼り付けの枠 `DropArea`（点線の枠・小さく「ここにドロップ・Ctrl+V」。ファイルを画面に持ってくると薄い緑＝`data-drop="ready"`、重ねると「ここに離す」＝`data-drop="over"`。ブラウザのテストはこの印で確かめる＝Tailwind の色は oklab で返るため）・`DropOverlay`・ファイルを持ってきているか `useFileDragging`（落とせる所の外に落としてもブラウザがファイルを開かないようにする）・貼り付けのファイル `pastedFiles` |
-| `sheetEdit.ts` | 見積書の欄の値の読み書き（`applySheet`・`sheetValue`）、行の挿入・削除・コピー・貼り付け（`insertBlankAfter`・`deleteLine`・`lineRows`・`pasteLines`）、白紙に戻す `clearedSheet`（理由書も消す） |
+| `sheetEdit.ts` | 見積書の欄の値の読み書き（`applySheet`・`sheetValue`）、行の挿入・削除・コピー・貼り付け（`insertBlankBefore`＝「＋ 挿入」は選んでいる行の上・`deleteLine`・`lineRows`・`pasteLines`）、施工費のリストの −／＋（`stepLaborAt`・`laborCountAt`）、白紙に戻す `clearedSheet`（理由書も消す） |
 | `rows.ts` | 行・箇所を作る部品（`newPlace`・`materialRow`・`laborRow`・`manualRow`・`copyRows`（IDを付け直す）・`addMaterial`・`insertRowsAt`（選んでいる行のまとまりの下・空白の行ならその行に）・`laborSpot`／`laborRange`（施工費を入れる所）・`workRange`・`kitRows`）。行の操作はこれを使う |
 | `sheetClip.ts` | 行のコピーを覚えておく所（画面を移っても残る。別の見積書にも貼り付けられる） |
 | `App.tsx` | 4つのタブ・様邸の画面の4つのタブ（`JobTabs`：📝 住宅改修申請書・🛁 特定福祉用具申請書・📋 工事見積書・📄 理由書。`jobView`＝'shinsei'／'tokutei'／'estimate'／'riyu'／'order'、URL の `view=`。特定福祉用具申請書のタブを離れるときは `leaveTokutei` で中のアプリの保存を待つ）・新規作成（`newOne`＝住宅改修申請書のタブで開く）・一覧から開く（`openJob`） |

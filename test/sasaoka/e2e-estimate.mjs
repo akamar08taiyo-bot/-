@@ -10,7 +10,7 @@ import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {strFromU8, unzipSync} from 'fflate';
 import {excelSave} from './e2eDocs.mjs';
-import {cellAt, chooseLabor, clickStable, navItem, noPick, openMore} from './more.mjs';
+import {cellAt, chooseLabor, clickStable, insertBelow, navItem, noPick, openMore, pickAt} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const FIX = path.join(path.dirname(new URL(import.meta.url).pathname), 'fixtures');
@@ -112,12 +112,12 @@ const typeIn = async (k, text, end = 'Enter') => {
 };
 // 行を選んで「＋ 挿入」で空いた行を入れ、その行の内容の欄の「部材｜施工費｜常用」を押す（2026-11-03。前は見積書の左の「施工費から入れる」など）。
 // 選んでいる欄の上には見えない入力欄が重なっているので force（ユーザーは同じ所を押せる。EstimateSheet.tsx の onMouseDown）
+// 「＋ 挿入」は選んでいる行の上（2026-11-03）なので、text の行のすぐ下に入れるときは more.mjs の insertBelow（すぐ下の行を選んで挿入）
 const pickBelow = async (text, kind) => {
-  await cell(await key(text, 'text')).click();
-  await sheet.getByRole('toolbar', {name: '行の操作'}).getByRole('button', {name: '＋ 挿入'}).click();
-  await clickStable(sheet.locator(`tr[data-current] [data-pick="${kind}"]`));
+  await insertBelow(sheet, sheet.locator('.form-page tr[data-rows]', {hasText: text}).first());
+  await pickAt(sheet, kind);
 };
-const pickHere = (kind) => clickStable(sheet.locator(`tr[data-current] [data-pick="${kind}"]`));
+const pickHere = (kind) => pickAt(sheet, kind);
 assert.deepEqual(await totals(), ['合計', '26,950', '26,950']);
 assert.deepEqual(await page.getByRole('combobox', {name: '保険者', exact: true}).locator('option').allInnerTexts(), ['苅田町', '行橋市', 'みやこ町', '広域連合', '福岡市', '北九州市', '久留米市', '飯塚市']); // 福岡市・北九州市は 2026-10-29 から、久留米市・飯塚市は 2026-11-02 から
 
@@ -150,8 +150,7 @@ assert.deepEqual([bk[5], bk[6], bk[12]], ['1,680', '3,360', '定価2,100円（�
 log('見積の単価の手入力と自動に戻すOK');
 
 // ---------------- ブラケットの施工費：ブラケットの下に空いた行 →「施工費」→ 施工費のリストの「木」→ ブラケットのすぐ下に同上施工費 1,500（木の見積の単価）
-await cell(await key('ブラケット', 'text')).click();
-await sheet.getByRole('toolbar', {name: '行の操作'}).getByRole('button', {name: '＋ 挿入'}).click();
+await insertBelow(sheet, sheet.locator('.form-page tr[data-rows]', {hasText: 'ブラケット'}).first());
 await chooseLabor(page, () => pickHere('labor'), '木');
 const works = (await sheet.locator('.form-page tr', {hasText: '同上施工費'}).allInnerTexts()).map((t) => t.replace(/\s+/g, ' '));
 assert.equal(works.length, 3, works.join('|'));

@@ -326,6 +326,12 @@ export function toolPlace(job: Job, key: string | null, remembered: string | nul
  * key が いちばん下の空いた行（new:text）なら、最後の箇所（なければ作る）の最後に入れる。rowId：入った施工費のまとまりの行（見積書の1行。選ぶ欄）
  */
 export function addLaborAt(job: Job, key: string, item: LaborItem): {job: Job; rowId: string | null} {
+  const res = stepLaborAt(job, key, item, 1);
+  return {job: res.job, rowId: res.rowId};
+}
+
+/** 施工費のリストが数を変える所（`addLaborAt` と同じ）：箇所・行・そのまとまりの範囲。key の行がなければ null */
+function laborPlace(job: Job, key: string): {j: Job; pi: number; rows: Row[]; range: [number, number]; sub: Row[]; owner: string | null} | null {
   const [kind, id] = key.split(':');
   let j = job;
   let pi: number;
@@ -333,7 +339,7 @@ export function addLaborAt(job: Job, key: string, item: LaborItem): {job: Job; r
   let rows: Row[];
   if (kind === 'line') {
     const f = findRow(j, id);
-    if (!f) return {job, rowId: null};
+    if (!f) return null;
     pi = f.pi;
     rows = f.place.rows;
     anchor = f.row.id;
@@ -348,14 +354,39 @@ export function addLaborAt(job: Job, key: string, item: LaborItem): {job: Job; r
   const spot = laborSpot(rows, anchor);
   const range = laborRange(rows, spot);
   const sub = rows.slice(range[0], range[1]).filter((r) => r.id !== spot.drop);
-  const next = setLaborCount(sub, item, laborCount(sub, item.id) + 1);
+  return {j, pi, rows, range, sub, owner: spot.owner};
+}
+
+/** 施工費のリストの −／＋ の横の数：key の所（`addLaborAt` が入れるまとまり）に、その施工費がいくつ入っているか */
+export function laborCountAt(job: Job, key: string, itemId: string): number {
+  const at = laborPlace(job, key);
+  return at ? laborCount(at.sub, itemId) : 0;
+}
+
+/**
+ * 施工費のリストの −／＋：key の所（`addLaborAt` と同じまとまり）のその施工費の数を delta だけ変える
+ * （ユーザーの指示「施工費は一覧とともに、数量をふやせるようにする」2026-11-03。前の「🔧 施工費から入れる」の画面の −／＋ と同じ `setLaborCount`）。
+ * rowId：数が変わった施工費のまとまりの行（見積書の1行。選ぶ欄）。key：続けて −／＋ を押すときの所（入れた行。0 にして行がなくなったら上の部材の行。
+ * どちらもなければ null＝リストを閉じる）
+ */
+export function stepLaborAt(job: Job, key: string, item: LaborItem, delta: number): {job: Job; rowId: string | null; key: string | null} {
+  const at = laborPlace(job, key);
+  if (!at) return {job, rowId: null, key: null};
+  const {j, pi, rows, range, sub, owner} = at;
+  const n = laborCount(sub, item.id);
+  if (n + delta < 0 || delta === 0) return {job, rowId: null, key};
+  const next = setLaborCount(sub, item, n + delta);
   const out = replaceRange(rows, range, next);
-  // 入った（数が増えた）行：その施工費のいちばん下の行
-  let at = -1;
+  // 入った（数が変わった）行：その施工費のいちばん下の行
+  let hit = -1;
   out.forEach((r, i) => {
-    if (i >= range[0] && i < range[0] + next.length && r.kind === 'labor' && r.refId === item.id) at = i;
+    if (i >= range[0] && i < range[0] + next.length && r.kind === 'labor' && r.refId === item.id) hit = i;
   });
-  return {job: setPlaceRows(j, pi, out), rowId: at >= 0 ? out[workHead(out, at)].id : null};
+  const rowId = hit >= 0 ? out[workHead(out, hit)].id : null;
+  // 続けて押す所：入れた行 → そのまとまりに残った施工費 → 上の部材
+  const rest = next.find((r) => r.kind === 'labor');
+  const keep = rowId ?? rest?.id ?? owner;
+  return {job: setPlaceRows(j, pi, out), rowId, key: keep ? `line:${keep}:text` : null};
 }
 
 // ---------------------------------------------------------------- 打ち込んだ値を入れる
@@ -764,6 +795,40 @@ export function insertAfterId(job: Job, rowId: string): string | null {
   if (!found) return null;
   const [, b] = unitRange(found.place.rows, found.ri);
   return found.place.rows[b - 1]?.id ?? null;
+}
+
+/**
+ * 「＋ 挿入」で行が入る所の線を引く行：選んでいる行（部材は同上施工費ごとのまとまり）のいちばん上の行。その行の上の境目に入る（`insertBlankBefore`）
+ */
+export function insertBeforeId(job: Job, rowId: string): string | null {
+  const found = findRow(job, rowId);
+  if (!found) return null;
+  return found.place.rows[unitTop(found.place.rows, found.ri)]?.id ?? null;
+}
+
+/** 行 ri のまとまりのいちばん上：部材はその行、施工費はそのまとまりの上の部材（同上施工費）か、上に部材がなければ施工費のまとまりの1行目 */
+function unitTop(rows: Row[], ri: number): number {
+  const [a] = unitRange(rows, ri);
+  return rows[a].kind === 'labor' && a > 0 && rows[a - 1].kind === 'material' ? a - 1 : a;
+}
+
+/**
+ * 「＋ 挿入」：選んでいる行のすぐ上（Excel の行の挿入と同じ）に空の部材の行を入れる（ユーザーの指示「挿入の場合、この間に挿入が差し込めるようにする」
+ * 2026-11-03。前は選んでいる行（同上施工費ごと）の下に入れていたので、③台所の施工費と④台所の1行目の間に入れられなかった）。
+ * 部材の同上施工費を選んでいたら、その部材の上（部材と同上施工費の間には入れない）。
+ * 箇所の1行目の上は、前の箇所のいちばん下に入れる（箇所の名前の行は動かさない。入った行は前の箇所の行になる）。最初の箇所の1行目なら、その箇所のはじめ
+ */
+export function insertBlankBefore(job: Job, rowId: string): {job: Job; rowId: string | null} {
+  const found = findRow(job, rowId);
+  if (!found) return {job, rowId: null};
+  const a = unitTop(found.place.rows, found.ri);
+  const blank = manualRow('material', {qty: 1});
+  if (a === 0 && found.pi > 0) {
+    const prev = job.places[found.pi - 1];
+    return {job: setPlaceRows(job, found.pi - 1, [...prev.rows, blank]), rowId: blank.id};
+  }
+  const rows = [...found.place.rows.slice(0, a), blank, ...found.place.rows.slice(a)];
+  return {job: setPlaceRows(job, found.pi, rows), rowId: blank.id};
 }
 
 /** 見積書の1行のすぐ下に、空の部材の行を入れる（その行の欄に打ち込む） */

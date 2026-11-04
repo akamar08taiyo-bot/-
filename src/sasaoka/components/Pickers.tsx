@@ -26,6 +26,7 @@ export function MaterialPicker({
   onToggleFavorite,
   onAddToMaster,
   onClose,
+  onNext,
 }: {
   place: Place;
   materials: Material[];
@@ -39,11 +40,12 @@ export function MaterialPicker({
   onToggleFavorite: (id: string) => void;
   onAddToMaster: (m: Material) => void;
   onClose: () => void;
+  // 「🔧 施工費に進む」：閉じて、いま入れた部材の行の施工費のリストを開く（見積書だけ。ユーザーの指示「閉じると施工費に進むの２種類をつくる」2026-11-03）
+  onNext?: () => void;
 }) {
   const favCount = materials.filter((m) => m.favorite).length;
-  // 検索の言葉があるときは、★お気に入りにその言葉の部材があればお気に入り、なければすべて
-  const favHit = materials.some((m) => m.favorite && (!initialQuery || matchesAll(`${m.name} ${m.code} ${m.maker}`, initialQuery)));
-  const [tab, setTab] = useState<'fav' | 'all'>(favCount > 0 && favHit ? 'fav' : 'all');
+  // 開いたときは「すべて」（ユーザーの指示「デフォルトはお気に入りではなく、全てにする」2026-11-03。前は★お気に入りがあればお気に入りから）
+  const [tab, setTab] = useState<'fav' | 'all'>('all');
   const [query, setQuery] = useState(initialQuery);
   const [maker, setMaker] = useState('');
   const [manual, setManual] = useState({name: '', price: 0, listPrice: 0, qty: 1, save: true});
@@ -100,9 +102,16 @@ export function MaterialPicker({
       }
       onClose={onClose}
       footer={
-        <Btn color="white" onClick={onClose}>
-          選び終わったら閉じる
-        </Btn>
+        <>
+          {onNext && (
+            <Btn color="white" onClick={onNext}>
+              🔧 施工費に進む
+            </Btn>
+          )}
+          <Btn color="white" onClick={onClose}>
+            選び終わったら閉じる
+          </Btn>
+        </>
       }
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -117,6 +126,7 @@ export function MaterialPicker({
               key={id}
               type="button"
               onClick={() => setTab(id)}
+              aria-pressed={tab === id}
               className={`rounded-md px-3 py-1.5 text-sm font-bold ${tab === id ? 'bg-violet-100 text-violet-900 ring-1 ring-inset ring-violet-300' : 'text-slate-600 hover:bg-violet-50'}`}
             >
               {label}

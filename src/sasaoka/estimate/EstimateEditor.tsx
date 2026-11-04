@@ -87,12 +87,14 @@ export function EstimateEditor({
   // 部材を選ぶ画面で最後に入れた行。閉じたら見積書でその行を選ぶ（続けて「施工費から入れる」と、その部材の同上施工費になる。
   // 前は前に選んでいた行のままで、2か所目の手すりの施工費が1か所目に入った。ユーザーの指示「1箇所につき、部材をのせていく」2026-11-02）
   const lastAdded = useRef<string | null>(null);
-  const [focusRow, setFocusRow] = useState<{id: string; n: number} | null>(null);
-  // 作った箇所に何も入れずに閉じたら、その箇所は消す（空の箇所を残すと、いちばん下の行がその箇所になる）
-  const closePicker = () => {
+  const [focusRow, setFocusRow] = useState<{id: string | null; n: number; labor?: boolean} | null>(null);
+  // 作った箇所に何も入れずに閉じたら、その箇所は消す（空の箇所を残すと、いちばん下の行がその箇所になる）。
+  // labor：「🔧 施工費に進む」で閉じた（見積書で、いま入れた部材の行の施工費のリストを開く。何も入れていなければ開いた行か、いちばん下の空いた行）
+  const closePicker = (labor = false) => {
     const id = created.current;
     created.current = null;
-    if (lastAdded.current) setFocusRow({id: lastAdded.current, n: Date.now()});
+    if (lastAdded.current) setFocusRow({id: lastAdded.current, n: Date.now(), labor});
+    else if (labor) setFocusRow({id: picker?.at ?? null, n: Date.now(), labor});
     lastAdded.current = null;
     setPicker(null);
     const unused = (p: Place) => p.id === id && p.rows.length === 0 && !p.name.trim();
@@ -325,6 +327,7 @@ export function EstimateEditor({
           setPicker({placeId: placeFor(placeId), kind: 'material', at: placeId ? rowId : null, query: slot && isOpenSlot(slot) ? slotQuery(slot.slot) : ''});
         }}
         onPickKit={(placeId, rowId) => setPicker({placeId: placeFor(placeId), kind: 'kit', at: placeId ? rowId : null})}
+        onToggleFavorite={toggleFavorite}
         onPrint={() => onPrint({kind: 'estimate', jobId: job.id})}
         excel={docs?.excel}
         between={settingsRow}
@@ -354,7 +357,8 @@ export function EstimateEditor({
           onQty={(rowId, delta) => setPlace(pickPlace.id, (p) => withBrackets(p, placeAfterQty(p, {...p, rows: changeRowQty(p.rows, rowId, delta)}, rowId), data.materials))}
           onToggleFavorite={toggleFavorite}
           onAddToMaster={addToMaster}
-          onClose={closePicker}
+          onClose={() => closePicker()}
+          onNext={() => closePicker(true)}
         />
       )}
       {picker && pickPlace && picker.kind === 'kit' && (
@@ -380,7 +384,7 @@ export function EstimateEditor({
               onManageKits();
             })
           }
-          onClose={closePicker}
+          onClose={() => closePicker()}
         />
       )}
     </div>
