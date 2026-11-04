@@ -6,7 +6,9 @@ import {guessPieceLengthM} from '../priceImport.ts';
 import {laborCount, manualRow, materialRow, setLaborCount} from '../rows.ts';
 import type {AppMode, LaborItem, Material, Place, Row} from '../types.ts';
 import {matchesAll, num, uid, yen} from '../util.ts';
-import {Btn, CatalogLinks, Modal, NumberInput, Star, Stepper, TextInput} from './ui.tsx';
+import {Btn, CatalogLinks, Modal, NumberInput, Star, Stepper, TextInput, useToast} from './ui.tsx';
+import {isYazaki, yazakiPageOf} from '../yazakiCatalog.ts';
+import {YazakiCatalogView} from './YazakiCatalogView.tsx';
 
 const SHOW_LIMIT = 200;
 
@@ -65,6 +67,20 @@ export function MaterialPicker({
     onAdd(row);
     if (onQty && row.refId) setLast({matId: row.refId, rowId: row.id});
   };
+  // 矢崎化工のカタログ（yazakiCatalog.ts）。開いているあいだは部材リストの代わりにカタログを出す。page・code は開くページと光らせる品番
+  const [catalog, setCatalog] = useState<{page: number; code?: string} | null>(null);
+  const toast = useToast();
+  const addFromCatalog = (m: Material) => {
+    addRow(m);
+    toast(`${m.code} を入れました`);
+  };
+  // 部材リストにない品番は、品番だけの行（金額は見積書で打つ）
+  const addCatalogCode = (code: string) => {
+    const m: Material = {id: uid('m'), name: '', price: 0, listPrice: 0, pieceLengthM: guessPieceLengthM(code), maker: '矢崎化工', code, unit: '', favorite: false, updatedAt: Date.now()};
+    addRow(m, {...materialRow(m), refId: null});
+    toast(`${code} を入れました（部材リストにない品番）`);
+  };
+  const yazakiPage = useMemo(() => new Map(materials.filter(isYazaki).map((m) => [m.id, yazakiPageOf(m)] as const)), [materials]);
 
   // 商品名は空でもよい（金額だけの行）。名前があるときだけ部材リストにも登録できる
   const canAddManual = manual.name.trim() !== '' || manual.price > 0 || manual.listPrice > 0;
@@ -144,9 +160,19 @@ export function MaterialPicker({
             ))}
           </select>
         )}
-        {/* メーカーのカタログ（新しいタブ）。品番・商品名をカタログで確かめて探せるように（2026-11-04） */}
+        {/* 矢崎化工のカタログ（このアプリの中。ページの品番を押すと入る）と、メーカーのカタログ（新しいタブ）（2026-11-04） */}
+        <Btn small color="white" onClick={() => setCatalog(catalog ? null : {page: 0})} aria-pressed={!!catalog}>
+          📖 矢崎化工カタログから選ぶ
+        </Btn>
         <CatalogLinks small />
       </div>
+
+      {catalog ? (
+        <div className="mt-3">
+          <YazakiCatalogView materials={materials} start={catalog} onAdd={addFromCatalog} onAddCode={addCatalogCode} onBack={() => setCatalog(null)} />
+        </div>
+      ) : (
+      <>
 
       {materials.length === 0 ? (
         <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
@@ -182,7 +208,20 @@ export function MaterialPicker({
                     <td className="px-1 text-center">
                       <Star on={m.favorite} onClick={() => onToggleFavorite(m.id)} label={`${m.name}をお気に入りに`} />
                     </td>
-                    <td className="px-2 py-1.5 font-bold text-slate-800">{m.name}</td>
+                    <td className="px-2 py-1.5 font-bold text-slate-800">
+                      {m.name}
+                      {/* 矢崎化工のカタログに載っている部材：そのページを開く（ユーザーの指示「リンクで商品検索や商品名、型番等をひっぱってこれるように」2026-11-04） */}
+                      {yazakiPage.get(m.id) && (
+                        <button
+                          type="button"
+                          onClick={() => setCatalog(yazakiPage.get(m.id)!)}
+                          className="ml-2 rounded border border-slate-300 bg-white px-1.5 py-0.5 text-xs font-normal text-slate-600 hover:bg-emerald-50"
+                          aria-label={`${m.name}のカタログのページを開く`}
+                        >
+                          📖 p.{yazakiPage.get(m.id)!.page}
+                        </button>
+                      )}
+                    </td>
                     <td className="px-2 py-1.5 text-xs text-slate-500">{m.code}</td>
                     <td className="px-2 py-1.5 text-xs text-slate-500">{m.maker}</td>
                     <td className="px-2 py-1.5 text-right tabular-nums text-slate-500">{m.listPrice > 0 ? yen(m.listPrice) : '—'}</td>
@@ -232,6 +271,8 @@ export function MaterialPicker({
             </p>
           )}
         </div>
+      )}
+      </>
       )}
 
       <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">

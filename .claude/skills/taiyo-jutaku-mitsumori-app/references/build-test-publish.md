@@ -60,9 +60,10 @@ console.error はアプリの誤りではないので数えない（`appError`�
 | `e2e-photojump.mjs` | `<サイト>` | 携帯・タブレットの「📷 写真へ」（2026-10-29）：iPhone はタブの格子の理由書のとなり・工事見積書のタブから押すと住宅改修申請書のタブの写真の欄が画面の上・右下の浮かぶボタン（写真の欄では「↑ 上へ」、入れる欄のあたりでは「📷 写真へ」）・写真の ✏️ ↻ が 40px。iPad の縦（820px）は「← 一覧へ戻る」の右、横（1180px）は名前の右で、5つのタブとも上のボタンの段の高さが同じ・タブの段が切れない。パソコンには出さない |
 | `e2e-trash.mjs` | `<サイト>` | ゴミ箱：行の削除（やめる・Ctrl+Z）・もう1つのアプリにすぐ出る・チェックして「削除する」・探す／件数／請求書に出ない・読み直し・写真は完全に削除まで残る・元に戻す・完全に削除（1件ずつ・まとめて）・見積書／請求書の画面から削除・スマホの幅（タブ3段） |
 | `e2e-data.mjs` | `<サイト>` | 保存と取り込み：IndexedDB に書けないときは「保存しました」にせず警告、書けるようになったら保存／この版の知らない項目（新しい版が足した項目）は、この版のタブで直して保存しても消さない／仕切り表の取り込みで「別のファイルにする」と推測したメーカー名は推測し直す（手で打った名前はそのまま） |
+| `e2e-yazaki.mjs` | `<サイト>` | 矢崎化工カタログ（2026-11-04）：部材の「📖 p.12」→ p.12 の絵・光る枠（緑＝部材リストにある）→ 押すと入る・品番で探す → 色の記号のない品番 → 色を選ぶ・部材リストにない品番は品番だけの行（点線）・◀ ▶。`<サイト>/jutaku-mitsumori/catalog/` にリポジトリの `catalog-yazaki/` の絵を置く |
 
 サイトは太陽ポータルと同じ形にする（`<サイト>/sasaoka/`・`<サイト>/jutaku-mitsumori/`、特定福祉用具申請書のタブの中まで通すなら `<サイト>/tokutei/` に特定福祉用具のビルド（ブランチ `claude/care-insurance-auto-transfer-3z0c9n` の `npm run -s build:tokutei` → `dist-tokutei/`）、販売受注簿まで通すなら `<サイト>/taiyo-hacchu-scan/` に taiyo-hacchu-scan の `docs/` か `dist/`）。
-全部（29本）は `scripts/run-e2e.sh`（下）。写真の枠に写真を足して並べる（「＋ 追加」）は `e2e-photoadd.mjs`（2026-10-29）。福岡市の申請書は `e2e-fukuoka.mjs`、北九州市の申請書は `e2e-kitakyushu.mjs`（2026-10-29）。特定福祉用具の申請書の取り込み（架空の行橋市の様式 → 🛁 のタブに福祉用具）は `e2e-import-tokutei.mjs`（`<サイト>/tokutei/` に特定福祉用具のビルドが要る。2026-10-29）。写真の書き込み（ペン・折れ線・補強板・番号・続けて描く・L字・書式の欄・写真を回す・フォント・角で文字も大きく）は `e2e-photomark.mjs`。`e2e-shinsei.mjs` は上の段のボタンの並び（2026-10-28 から 📗 申請書をExcelで保存・🖨 申請書を印刷・削除、真下に 📦 まとめて保存。白紙に戻すはない）・申請書の印刷（PDF が1枚→チェックで2枚）も見る。5つのタブをくらべるのは `e2e-toolbar.mjs`。
+全部（37本）は `scripts/run-e2e.sh`（下）。写真の枠に写真を足して並べる（「＋ 追加」）は `e2e-photoadd.mjs`（2026-10-29）。福岡市の申請書は `e2e-fukuoka.mjs`、北九州市の申請書は `e2e-kitakyushu.mjs`（2026-10-29）。特定福祉用具の申請書の取り込み（架空の行橋市の様式 → 🛁 のタブに福祉用具）は `e2e-import-tokutei.mjs`（`<サイト>/tokutei/` に特定福祉用具のビルドが要る。2026-10-29）。写真の書き込み（ペン・折れ線・補強板・番号・続けて描く・L字・書式の欄・写真を回す・フォント・角で文字も大きく）は `e2e-photomark.mjs`。`e2e-shinsei.mjs` は上の段のボタンの並び（2026-10-28 から 📗 申請書をExcelで保存・🖨 申請書を印刷・削除、真下に 📦 まとめて保存。白紙に戻すはない）・申請書の印刷（PDF が1枚→チェックで2枚）も見る。5つのタブをくらべるのは `e2e-toolbar.mjs`。
 常駐のサーバーは作業環境の時間制限（2時間）で止められるので、テストのあいだだけ立てる `scripts/serve.mjs` を使う（番号は環境変数 `PORT`、初めは 5190）：
 
 ```sh
@@ -71,7 +72,7 @@ mkdir -p $SITE/sasaoka $SITE/jutaku-mitsumori
 cp dist-sasaoka/index.html dist-sasaoka/version.json $SITE/sasaoka/
 cp dist-jutaku/index.html dist-jutaku/version.json $SITE/jutaku-mitsumori/
 node <スキル>/scripts/serve.mjs $SITE node test/sasaoka/e2e-sheet.mjs http://localhost:5190 <出力フォルダ>
-node <スキル>/scripts/serve.mjs $SITE sh <スキル>/scripts/run-e2e.sh <出力フォルダ>   # 24本全部（25分ほど。run_in_background で）。終わりに FAIL があれば終わりのコードが 1
+node <スキル>/scripts/serve.mjs $SITE sh <スキル>/scripts/run-e2e.sh <出力フォルダ>   # 37本全部（50分ほど。run_in_background で）。終わりに FAIL があれば終わりのコードが 1
 # 特定福祉用具申請書のタブの中・カタログ・⇔ まで通すときは、特定福祉用具のブランチを build:tokutei して dist-tokutei/ を丸ごと（catalog/ も）$SITE/tokutei/ に写す
 # card は、特定福祉用具申請書のタブの中のアプリ（<サイト>/tokutei/）がないと 404 で落ちる。ポータルの tokutei/ を写しておく。
 # いくつかの作業を同時に動かすときは、PORT=5191 などで分け、サイトのフォルダもそれぞれにする（同じフォルダのビルドを上書きし合った。2026-10-23）
