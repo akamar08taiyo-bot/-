@@ -1098,7 +1098,9 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
         </div>
       )}
       {/* 箇所を足す：プルダウンで選ぶ（前はボタンを全部並べていた。ユーザーの指示「一覧形式で全て出す形にしてますが、少し全体すっきりさせたいので、
-          プルダウン形式にしてください」2026-10-26）。選ぶと足して、その箇所の長さの欄へ（「そのほか」は改修場所の名前の欄へ） */}
+          プルダウン形式にしてください」2026-10-26）。選ぶと足して、その箇所の長さの欄へ（「そのほか」は改修場所の名前の欄へ）。
+          箇所がないと見積書・申請書ができないので目立たせる（ユーザーの指示「箇所を足すっていう部分…少し目立たせるようにしてください」2026-11-05）：
+          薄い緑の地・緑の太い枠・大きめの字。まだ箇所がないときは、まわりに薄い緑の輪も付ける */}
       <select
         value=""
         onChange={(e) => {
@@ -1106,7 +1108,8 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
           if (v) add(v === OTHER_PLACE ? '' : v);
         }}
         aria-label="箇所を足す"
-        className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+        data-empty={job.places.length === 0 ? '' : undefined}
+        className={`h-12 w-full max-w-sm rounded-lg border-2 border-emerald-600 bg-emerald-50 px-4 text-base font-bold text-emerald-800 shadow-sm hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-200 ${job.places.length === 0 ? 'ring-4 ring-emerald-200' : ''}`}
       >
         <option value="">＋ 箇所を足す</option>
         {s.placePresets.map((name) => (
