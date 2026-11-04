@@ -93,8 +93,10 @@ export function ShinseiInputs({
     </div>
   );
   const kouiki = formKey === 'kouiki';
-  // 福岡市・北九州市：要介護状態区分の欄がなく、販売事業者（受任者）の営業所・事業者番号を書く
-  const seller = formKey === 'fukuoka' || formKey === 'kitakyushu';
+  // 福岡市・北九州市・久留米市・大分市：販売事業者（受任者）の営業所・事業者番号を書く（久留米市は受領委任払取扱事業所登録番号も）。
+  // 要介護状態区分の欄は、広域連合・福岡市・北九州市・久留米市（市の記入欄だけ）の様式にない
+  const seller = formKey === 'fukuoka' || formKey === 'kitakyushu' || formKey === 'kurume' || formKey === 'oita';
+  const noCare = kouiki || formKey === 'fukuoka' || formKey === 'kitakyushu' || formKey === 'kurume';
   // 商品がないときも、手で入れる欄を1つ開いておく（ふだんは手で入れるので。ユーザーの指示「手でいれるではなく、基本は手で入れるのがデフォルトなので開いておく
   // ２商品名以降は追加する」2026-10-26）。打つとその商品ができる（id を同じにして、打っている欄から外れないように）
   const [draft] = useState(() => blankItem(s));
@@ -195,8 +197,7 @@ export function ShinseiInputs({
         )}
         {row('住所', <TextInput value={sale.address} onChange={changeAddress} placeholder="福岡県…" className="w-full" aria-label="住所" data-nav />, 'address')}
         {row('電話番号', <TextInput type="tel" value={sale.tel} onChange={(tel) => change({tel})} placeholder="0930-00-0000" className="w-48" aria-label="電話" data-nav />, 'tel')}
-        {!kouiki &&
-          !seller &&
+        {!noCare &&
           row(
             '要介護状態区分',
             <Circles<string> label="要介護状態区分" value={sale.careLevel} onPick={(careLevel) => change({careLevel})} clearable options={CARE_LEVELS.map((c) => [c, c] as const)} />,
@@ -411,6 +412,21 @@ export function ShinseiInputs({
                   data-nav
                 />
               </span>
+              {/* 久留米市の受領委任払取扱事業所登録番号（市から届く8けた。設定と同じ。住宅改修のアプリの設定にも同じ欄がある） */}
+              {formKey === 'kurume' && (
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-500">
+                  受領委任払取扱事業所登録番号
+                  <TextInput
+                    value={s.entrustRegNo ?? ''}
+                    onChange={(entrustRegNo) => changeSettings((prev) => ({...prev, entrustRegNo}))}
+                    inputMode="numeric"
+                    placeholder="8けた"
+                    className="w-28 text-sm font-normal text-slate-800"
+                    aria-label="受領委任払取扱事業所登録番号"
+                    data-nav
+                  />
+                </span>
+              )}
             </div>,
             'seller',
           )}

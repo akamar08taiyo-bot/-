@@ -163,6 +163,38 @@ def primitives(pdf, segs, drop, join=None, clip=None):
                 seg(x0, b, x1, b, lw, dash)
                 seg(x0, t, x0, b, lw, dash)
                 seg(x1, t, x1, b, lw, dash)
+        # 点線を小さな絵（細い四角の画像）の並びで描いた PDF（久留米市の請求書の金額・〒のマス。Word の点線の罫線）：
+        # 同じ位置に並ぶ細い絵を1本の点線にまとめる（すき間が 3pt より短い絵どうしをつなぐ）
+        thin_v, thin_h = {}, {}
+        for im in p.images:
+            x0, x1, t, b = im['x0'], im['x1'], im['top'], im['bottom']
+            w, h = x1 - x0, b - t
+            if w <= 1.2 and h > w * 1.5:
+                thin_v.setdefault(round((x0 + x1) / 2 * 2) / 2, []).append((t, b, w))
+            elif h <= 1.2 and w > h * 1.5:
+                thin_h.setdefault(round((t + b) / 2 * 2) / 2, []).append((x0, x1, h))
+
+        def runs(pieces):
+            """[始め, 終わり, 太さ, 絵の長さの合計]：すき間のある並び（合計が長さの 9 割より短い）は点線"""
+            pieces.sort()
+            out = []
+            for a, b, lw in pieces:
+                if out and a - out[-1][1] < 3:
+                    out[-1][3] += max(0.0, b - max(a, out[-1][1]))
+                    out[-1][1] = max(out[-1][1], b)
+                else:
+                    out.append([a, b, lw, b - a])
+            return out
+
+        DASH = ([2.0, 1.0], 0)
+        for x, pieces in thin_v.items():
+            for a, b, lw, ink in runs(pieces):
+                if b - a > 3:
+                    seg(x, a, x, b, max(lw, 0.5), DASH if ink < (b - a) * 0.9 else None)
+        for y, pieces in thin_h.items():
+            for a, b, lw, ink in runs(pieces):
+                if b - a > 3:
+                    seg(a, y, b, y, max(lw, 0.5), DASH if ink < (b - a) * 0.9 else None)
         for ch in p.chars:
             if not ch['text'].strip():
                 continue

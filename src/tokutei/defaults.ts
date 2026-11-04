@@ -64,6 +64,8 @@ export const INSURERS: {key: string; label: string; note?: string; perItem?: boo
   {key: 'kouiki', label: '福岡県介護保険広域連合', note: '築上町・豊前市・上毛町・吉富町'},
   {key: 'fukuoka', label: '福岡市'},
   {key: 'kitakyushu', label: '北九州市'},
+  {key: 'kurume', label: '久留米市'},
+  {key: 'oita', label: '大分市'},
   {key: 'other', label: 'そのほか'},
 ];
 
@@ -88,6 +90,7 @@ export function defaultSettings(): Settings {
     manager: '',
     // 販売受注簿作成ツール・住宅改修 見積書アプリと同じ登録番号
     regNo: 'T1290001044462',
+    entrustRegNo: '', // 久留米市の受領委任払取扱事業所登録番号（市から届く8けた。設定で入れる）
     staffList: DEFAULT_STAFF,
     suppliers: DEFAULT_SUPPLIERS,
     discountRate: 20,

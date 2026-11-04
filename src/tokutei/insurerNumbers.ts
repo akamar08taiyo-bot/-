@@ -4,7 +4,7 @@
 // （広域連合の様式は 406470＝築上町 が原本に入っているので、選んだ番号で書きかえる。福岡市は 4013 のうしろ2けた）。
 // 福岡県のほかの保険者と、大分県・熊本県・佐賀県・長崎県の一覧はスキルの references/insurer-numbers.md。住宅改修のアプリ（src/sasaoka/insurerNumbers.ts）も同じ一覧
 // 保険者の名前は defaults.ts の INSURERS の key（住宅改修と同じ）。そのほか（other）は一覧なし
-type Insurer = 'yukuhashi' | 'kanda' | 'miyako' | 'kouiki' | 'fukuoka' | 'kitakyushu';
+type Insurer = 'yukuhashi' | 'kanda' | 'miyako' | 'kouiki' | 'fukuoka' | 'kitakyushu' | 'kurume' | 'oita';
 const isInsurer = (v: string): v is Insurer => v in INSURER_AREAS;
 
 /** name：選ぶ所に出す名前（住所にこの名前があれば初めにそれを選ぶ） */
@@ -68,14 +68,17 @@ export const INSURER_AREAS: Record<Insurer, InsurerArea[]> = {
     {no: '401083', name: '八幡東区'},
     {no: '401091', name: '八幡西区'},
   ],
+  // 久留米市（申請書の原本に 402032 が入っている）・大分市（442012。住宅改修の insurerNumbers.ts と同じ）
+  kurume: [{no: '402032', name: '久留米市'}],
+  oita: [{no: '442012', name: '大分市'}],
 };
 
 /** 保険者のふつうの名前（選ぶ所の見出し・広域連合の構成市町村の注記に） */
 /** 保険者番号を決めるために、保険者のあとに選ぶもの（北九州市・福岡市は区、広域連合は構成市町村。ほかは1つなので選ばない。住宅改修の insurerNumbers.ts と同じ） */
-export const AREA_LABEL: Record<Insurer, string> = {yukuhashi: '', kanda: '', miyako: '', kouiki: '市町村', fukuoka: '区', kitakyushu: '区'};
+export const AREA_LABEL: Record<Insurer, string> = {yukuhashi: '', kanda: '', miyako: '', kouiki: '市町村', fukuoka: '区', kitakyushu: '区', kurume: '', oita: ''};
 export const areaLabel = (insurer: string): string => (isInsurer(insurer) ? AREA_LABEL[insurer] : '');
 
-export const INSURER_GROUP: Record<Insurer, string> = {yukuhashi: '行橋市', kanda: '苅田町', miyako: 'みやこ町', kouiki: '福岡県介護保険広域連合', fukuoka: '福岡市', kitakyushu: '北九州市'};
+export const INSURER_GROUP: Record<Insurer, string> = {yukuhashi: '行橋市', kanda: '苅田町', miyako: 'みやこ町', kouiki: '福岡県介護保険広域連合', fukuoka: '福岡市', kitakyushu: '北九州市', kurume: '久留米市', oita: '大分市'};
 
 /**
  * 住所から保険者番号（初めの値）：その保険者の市町村・区の名前が住所にあればその番号。福岡市は住所の区（「福岡市」を書かない住所の「中央区…」も）。

@@ -317,6 +317,7 @@ export function cleanSettings(raw: unknown): Settings {
     regNo: text('regNo'),
     // 事業者番号を入れる前に保存した設定は、保存してある営業所の番号（分かっている営業所だけ）
     providerNo: typeof raw.providerNo === 'string' ? raw.providerNo : (OFFICES.find((o) => o.name === text('officeName'))?.providerNo ?? ''),
+    entrustRegNo: typeof raw.entrustRegNo === 'string' ? raw.entrustRegNo : '',
     staffList: list(raw.staffList, DEFAULT_STAFF),
     suppliers: list(raw.suppliers, DEFAULT_SUPPLIERS),
     discountRate: Math.min(100, Math.max(0, numv(raw.discountRate, d.discountRate))),

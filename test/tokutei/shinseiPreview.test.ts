@@ -79,9 +79,9 @@ function sale(over: Partial<Sale> = {}): Sale {
   };
 }
 
-const TEMPLATE_FILES: Record<ShinseiKey, string> = {yukuhashi: 'yukuhashi.xltx', kanda: 'kanda.xltx', miyako: 'miyako.xlsx', kouiki: 'kouiki.xlsx', fukuoka: 'fukuoka.xlsx', kitakyushu: 'kitakyushu.xlsx'};
+const TEMPLATE_FILES: Record<ShinseiKey, string> = {yukuhashi: 'yukuhashi.xltx', kanda: 'kanda.xltx', miyako: 'miyako.xlsx', kouiki: 'kouiki.xlsx', fukuoka: 'fukuoka.xlsx', kitakyushu: 'kitakyushu.xlsx', kurume: 'kurume.xlsx', oita: 'oita.xlsx'};
 const template = (key: ShinseiKey): Files => unzipSync(new Uint8Array(readFileSync(new URL(`../../src/tokutei/shinsei/${TEMPLATE_FILES[key]}`, import.meta.url))));
-const KEYS: ShinseiKey[] = ['yukuhashi', 'kanda', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu'];
+const KEYS: ShinseiKey[] = ['yukuhashi', 'kanda', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu', 'kurume', 'oita'];
 const textOf = (p: ReturnType<typeof shinseiPreview>[number]) => p.texts.map((t) => t.runs.map((r) => r.text).join('')).join('\n');
 
 test('プレビュー：書き込むシートごとに1枚（行橋市・苅田町・みやこ町・広域連合）。書いた値が出る', () => {
@@ -93,6 +93,9 @@ test('プレビュー：書き込むシートごとに1枚（行橋市・苅田�
     fukuoka: ['申請書'],
     // 北九州市：支給申請書（表・裏）と概要書（表・裏）。商品名は概要書に書く（支給申請書は種目ごとの金額）
     kitakyushu: ['支給申請書', '支給申請書（裏）', '概要書', '概要書（裏）'],
+    // 久留米市：支給申請書・委任状（受領委任払用）・請求書・委任状（久留米市提出用）。大分市：支給申請書・委任状
+    kurume: ['申請書', '委任状（受領委任払用）', '請求書', '委任状（提出用）'],
+    oita: ['支給申請書', '委任状'],
   };
   for (const key of KEYS) {
     const pages = shinseiPreview(template(key), SHINSEI[key], shinseiValues(sale({insurer: key}), S));

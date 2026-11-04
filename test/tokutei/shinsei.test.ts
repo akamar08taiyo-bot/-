@@ -14,6 +14,13 @@ import {
   KITAKYUSHU_SHEETS,
   kitakyushuAddress,
   KOUIKI_SHEETS,
+  KURUME_KIND_TEXT,
+  KURUME_RATIO_TEXT,
+  KURUME_SHEETS,
+  kurumeAddress,
+  kurumePays,
+  OITA_REASON_CELLS,
+  OITA_SHEETS,
   padInsuredNo,
   pairBoxes,
   reasonText,
@@ -24,8 +31,9 @@ import {
 } from '../../src/tokutei/shinsei.ts';
 import type {ShinseiKey} from '../../src/tokutei/shinsei.ts';
 import {KK_CELLS} from '../../src/tokutei/shinsei/kitakyushuCells.ts';
+import {KU_CELLS} from '../../src/tokutei/shinsei/kurumeCells.ts';
 import type {Sale, SaleItem, Settings} from '../../src/tokutei/types.ts';
-import {cellBox, cellFormula, cellStyle, ellipseCount, emOf, printOverflow, rangeBox, readCell, sheetLayout, sheetPath, sheetPaths} from '../../src/tokutei/xlsxEdit.ts';
+import {boxes, cellBox, cellFormula, cellStyle, ellipseCount, emOf, printOverflow, rangeBox, readCell, sheetLayout, sheetPath, sheetPaths} from '../../src/tokutei/xlsxEdit.ts';
 import type {Files} from '../../src/tokutei/xlsxEdit.ts';
 
 // 見本の案件（架空の方。本当のお客様の情報は使わない）
@@ -96,7 +104,7 @@ function sale(over: Partial<Sale> = {}): Sale {
   };
 }
 
-const TEMPLATE_FILES: Record<ShinseiKey, string> = {yukuhashi: 'yukuhashi.xltx', kanda: 'kanda.xltx', miyako: 'miyako.xlsx', kouiki: 'kouiki.xlsx', fukuoka: 'fukuoka.xlsx', kitakyushu: 'kitakyushu.xlsx'};
+const TEMPLATE_FILES: Record<ShinseiKey, string> = {yukuhashi: 'yukuhashi.xltx', kanda: 'kanda.xltx', miyako: 'miyako.xlsx', kouiki: 'kouiki.xlsx', fukuoka: 'fukuoka.xlsx', kitakyushu: 'kitakyushu.xlsx', kurume: 'kurume.xlsx', oita: 'oita.xlsx'};
 const template = (key: ShinseiKey): Files => unzipSync(new Uint8Array(readFileSync(new URL(`../../src/tokutei/shinsei/${TEMPLATE_FILES[key]}`, import.meta.url))));
 const fill = (key: ShinseiKey, over: Partial<Sale> = {}): Files => unzipSync(fillShinsei(template(key), SHINSEI[key], shinseiValues(sale({insurer: key, ...over}), S)));
 
@@ -476,6 +484,146 @@ test('北九州市：給付率の丸は負担割合から（1割＝９０・2割
   // 市の外の住所は福岡県だけ外す
   assert.equal(kitakyushuAddress('福岡県行橋市大字流末1327番地'), '行橋市大字流末1327番地');
   assert.equal(kitakyushuAddress('北九州市 八幡東区中央1-1'), '八幡東区中央1-1');
+});
+
+// 久留米市・大分市（2026-11-04 にいただいた市の様式から作った原本）。見本の方・営業所の番号は架空
+const KU_S: Settings = {...settingsForOffice(S, '久留米営業所'), providerNo: '4000000001', entrustRegNo: '12345678'};
+const kuSale = (over: Partial<Sale> = {}) => sale({insurer: 'kurume', zip: '8300000', address: '福岡県久留米市見本町1-2-3', ...over});
+const fillKU = (over: Partial<Sale> = {}, s: Settings = KU_S): Files => unzipSync(fillShinsei(template('kurume'), SHINSEI.kurume, shinseiValues(kuSale(over), s)));
+const KUP: Record<string, string> = KU_CELLS.proxy;
+const KUC: Record<string, string> = KU_CELLS.claim;
+const KUT: Record<string, string> = KU_CELLS.teisyutu;
+
+test('久留米市：支給申請書（第１号様式）。☑は種目・全額と支払・TAIS コード・事業所番号・登録番号。申請者の欄は本人の自書なので書かない', () => {
+  const f = fillKU();
+  const at = (ref: string) => readCell(f, KURUME_SHEETS.shinsei, ref);
+  assert.deepEqual([...sheetPaths(f).keys()], ['申請書', '委任状（受領委任払用）', '請求書', '委任状（提出用）']);
+  assert.equal(readCell(template('kurume'), KURUME_SHEETS.shinsei, 'C11'), KURUME_KIND_TEXT); // 原本の【福祉用具名】の文字と同じ
+  assert.equal(readCell(template('kurume'), KURUME_SHEETS.shinsei, 'AG20'), KURUME_RATIO_TEXT);
+  assert.deepEqual([at('E4'), at('E5')], ['ミホン ハナコ', '見本 花子']);
+  assert.equal(boxes('AD', 10, 5).map(at).join(''), '0001234567');
+  assert.equal(boxes('AH', 6, 4).map(at).join(''), '402032'); // 保険者番号は原本のまま
+  assert.equal(at('E7'), '明 ・ 大 ・ 昭　　　　15年　　　3月　　　15日生');
+  assert.equal(at('E9'), '〒　830　－　0000');
+  assert.deepEqual([at('E10'), at('I10')], ['久留米市', '見本町1-2-3']);
+  // 1つ目の商品：入浴補助用具に☑・税込 28,160（定価 32,000 の2割引き）・TAIS コード 00001-000001・事業所番号は設定の営業所
+  assert.equal(at('C11'), KURUME_KIND_TEXT.replace('□入浴補助用具', '☑入浴補助用具'));
+  assert.equal(at('C12'), '【種目名及び商品名】　入浴補助用具\nシャワーチェア 見本A');
+  assert.equal(at('S11'), '【製造事業者名】\n見本工業');
+  assert.equal(at('S12'), '【販売事業者名】\n太陽シルバーサービス㈱　久留米営業所');
+  assert.equal(at('AH12'), '28160');
+  assert.equal([...boxes('G', 5, 13), ...boxes('M', 6, 13)].map(at).join(''), '00001000001');
+  assert.equal(boxes('V', 10, 13).map(at).join(''), '4000000001');
+  // 2つ目（数量2の浴槽手すり 27,808）。TAIS コードのない商品はマスが空
+  assert.equal(at('AH15'), '27808');
+  assert.equal([...boxes('G', 5, 16), ...boxes('M', 6, 16)].map(at).join(''), '');
+  assert.equal(at('C17'), KURUME_KIND_TEXT); // 3つ目の行は原本のまま（□だけ）
+  // 支払：1割（商品ごとに切り上げ、最後の商品で合計＝購入金額−保険給付額に合わせる）
+  const total = 28160 + 27808;
+  const pay = Math.ceil(total / 10);
+  assert.deepEqual([at('AH13'), at('AH16')], [String(Math.ceil(28160 / 10)), String(pay - Math.ceil(28160 / 10))]);
+  assert.deepEqual([at('H20'), at('L22')], [String(total), String(pay)]);
+  assert.equal(at('AG20'), KURUME_RATIO_TEXT.replace('□', '☑'));
+  assert.equal(pairBoxes('Q', 8, 44).map(at).join(''), '12345678');
+  // 申請者（被保険者）の住所・氏名・電話番号の欄は原本のまま（※本人自書）。丸は元号と支払方法の「２．受領委任払い」
+  assert.equal(at('E27'), readCell(template('kurume'), KURUME_SHEETS.shinsei, 'E27'));
+  assert.equal(at('X30'), readCell(template('kurume'), KURUME_SHEETS.shinsei, 'X30'));
+  assert.equal(ellipseCount(f, KURUME_SHEETS.shinsei), 2);
+  for (const ref of ['AH12', 'AH13', 'H20', 'L22']) assert.ok(cellStyle(f, strFromU8(f[sheetPath(f, KURUME_SHEETS.shinsei)]), ref), ref);
+  assert.equal(printOverflow(f, KURUME_SHEETS.shinsei), null);
+});
+
+test('久留米市：委任状（受領委任払用）・請求書は設定の営業所と保険給付額。提出用の委任状は担当と営業所・委任者の住所、福祉用具購入費支給申請に丸', () => {
+  const f = fillKU();
+  const benefit = 28160 + 27808 - Math.ceil((28160 + 27808) / 10);
+  const p = (ref: string) => readCell(f, KURUME_SHEETS.proxy, ref);
+  assert.equal(p(KUP.sellerAddress), '〒838-0141\n福岡県小郡市小郡97-19');
+  assert.equal(p(KUP.sellerTel), '0942-72-8822');
+  assert.equal(p(KUP.seller), '太陽シルバーサービス㈱　久留米営業所\n所長　牟田 知広');
+  assert.equal(p(KUP.benefit), String(benefit));
+  assert.equal(p(KUP.address), '見本町1-2-3'); // 原本に「久留米市」が入っている
+  const c = (ref: string) => readCell(f, KURUME_SHEETS.claim, ref);
+  assert.equal(Array.from({length: 11}, (_, k) => c(KUC[`d${k}`])).join(''), `￥${benefit}`);
+  assert.equal(c(KUC[`d${10 - String(benefit).length}`]), '￥'); // 金額の頭に￥
+  assert.equal(Array.from({length: 7}, (_, k) => c(KUC[`z${k}`])).join(''), '8380141');
+  assert.equal(c(KUC.seller), '太陽シルバーサービス㈱　久留米営業所　所長　牟田 知広');
+  assert.deepEqual([c(KUC.telA), c(KUC.telB), c(KUC.telC)], ['0942', '72', '8822']);
+  assert.equal(c(KUC.name), '見本 花子');
+  const t = (ref: string) => readCell(f, KURUME_SHEETS.teisyutu, ref);
+  assert.deepEqual([t(KUT.visitor), t(KUT.office), t(KUT.sellerTel), t(KUT.address)], ['土居 翔太', '太陽シルバーサービス㈱　久留米営業所', '0942-72-8822', '福岡県久留米市見本町1-2-3']);
+  assert.equal(ellipseCount(f, KURUME_SHEETS.teisyutu), 1);
+  for (const sh of [KURUME_SHEETS.proxy, KURUME_SHEETS.claim, KURUME_SHEETS.teisyutu]) assert.equal(printOverflow(f, sh), null, sh);
+});
+
+test('久留米市：償還払いは支払＝全額・委任状と請求書は空・登録番号なし。市の外の住所・確かめる欄', () => {
+  const f = fillKU({payMethod: '償還払い', address: '福岡県小郡市見本1-1'});
+  const at = (ref: string) => readCell(f, KURUME_SHEETS.shinsei, ref);
+  assert.deepEqual([at('AH13'), at('AH16'), at('L22')], ['28160', '27808', String(28160 + 27808)]);
+  assert.equal(pairBoxes('Q', 8, 44).map(at).join(''), '');
+  assert.deepEqual([at('E10'), at('I10')], ['', '小郡市見本1-1']);
+  assert.equal(ellipseCount(f, KURUME_SHEETS.shinsei), 1); // 支払方法（口座・現金）は本人が選ぶ
+  for (const sh of [KURUME_SHEETS.proxy, KURUME_SHEETS.claim]) assert.equal(strFromU8(f[sheetPath(f, sh)]), strFromU8(template('kurume')[sheetPath(f, sh)]), sh);
+  assert.deepEqual(kurumePays({items: [{total: 10001}, {total: 999}] as never, payMethod: '受領委任払い', ratioSet: true, ratio: 2, benefit: 11000 - 2201}), [2001, 200]);
+  assert.equal(kurumePays({items: [{total: 100}] as never, payMethod: '受領委任払い', ratioSet: false, ratio: 1, benefit: 0}), null);
+  assert.equal(kurumeAddress('福岡県久留米市 見本町1-1'), '見本町1-1');
+  // 確かめる欄：性別・要介護度・電話・理由・記載者の欄はない。事業者番号と（受領委任払いなら）登録番号が要る
+  assert.deepEqual(shinseiChecks(kuSale({gender: '', careLevel: '', tel: '', careOffice: '', careManager: '', items: sale().items.map((i) => ({...i, reason: ''}))}), KU_S).missing, []);
+  assert.deepEqual(shinseiChecks(kuSale(), {...KU_S, providerNo: '', entrustRegNo: ''}).missing, ['販売事業者の事業者番号（10けた）', '久留米市の受領委任払取扱事業所登録番号（設定）']);
+  assert.deepEqual(shinseiChecks(kuSale({payMethod: '償還払い'}), {...KU_S, entrustRegNo: ''}).missing, []);
+  assert.match(shinseiChecks(kuSale({items: [0, 1, 2, 3].map((k) => item({id: `k${k}`, name: `見本の杖${k}`}))}), KU_S).overflow, /^久留米市の申請書の商品の欄は3行です。/);
+});
+
+const OT_S: Settings = {...settingsForOffice(S, '大分営業所'), providerNo: '4000000002'};
+const otSale = (over: Partial<Sale> = {}) => sale({insurer: 'oita', zip: '8700000', address: '大分県大分市見本町1-2-3', ...over});
+const fillOT = (over: Partial<Sale> = {}, s: Settings = OT_S): Files => unzipSync(fillShinsei(template('oita'), SHINSEI.oita, shinseiValues(otSale(over), s)));
+
+test('大分市：支給申請書（第12号様式）と委任状。受領委任に■・販売事業者は設定の営業所・理由は5行・記入者はケアマネジャー', () => {
+  const f = fillOT();
+  const at = (ref: string) => readCell(f, OITA_SHEETS.shinsei, ref);
+  assert.deepEqual([...sheetPaths(f).keys()], ['支給申請書', '委任状']);
+  assert.equal(at('AK3'), '　□償還　　■受領委任');
+  assert.deepEqual([at('I4'), at('I5')], ['ミホン ハナコ', '見本 花子']);
+  assert.equal(boxes('AK', 10, 4).map(at).join(''), '0001234567');
+  assert.equal(at('I8'), '明･大･昭　　15年　3月　15日生');
+  assert.equal(at('AD8'), '要支援(　　　）　･　要介護（　２　）');
+  assert.equal(at('A12'), '入浴補助用具\nシャワーチェア 見本A');
+  assert.deepEqual([at('N12'), at('Y12'), at('Y14')], ['見本工業', '28,160円', '27,808円']);
+  assert.equal(at('Y16'), '円'); // 使わない行は原本のまま
+  assert.equal(at('I20'), '太陽シルバーサービス㈱　大分営業所');
+  assert.equal(boxes('AK', 10, 20).map(at).join(''), '4000000002');
+  assert.deepEqual(OITA_REASON_CELLS.map(at), ['浴室の床からの立ち座りが困難なため。', '浴槽の出入りでふらつくため。', '', '', '']);
+  assert.match(at('I27'), /^　（記入者名）　見本 太郎　+（事業者名）　見本居宅介護支援事業所\n/);
+  assert.match(at('I27'), /■介護支援専門員/);
+  assert.deepEqual([at('F36'), at('AF37')], ['住所　大分県大分市見本町1-2-3', '電話番号　　0930-00-0000']);
+  assert.equal(at('F38'), readCell(template('oita'), OITA_SHEETS.shinsei, 'F38')); // 申請者の氏名は自署
+  // 書いた値は黒（原本の書く欄は赤）
+  const xml = strFromU8(f[sheetPath(f, OITA_SHEETS.shinsei)]);
+  const fonts = [...strFromU8(f['xl/styles.xml']).split('<fonts')[1].split('</fonts>')[0].matchAll(/<font\b[\s\S]*?<\/font>/g)].map((m) => m[0]);
+  const xfs = [...strFromU8(f['xl/styles.xml']).split('<cellXfs')[1].matchAll(/<xf\b[\s\S]*?(?:\/>|<\/xf>)/g)].map((m) => m[0]);
+  const colorOf = (ref: string) => /rgb="([0-9A-F]+)"/.exec(fonts[Number(/fontId="(\d+)"/.exec(xfs[Number(new RegExp(`<c r="${ref}"[^>]*\\ss="(\\d+)"`).exec(xml)?.[1] ?? 0)])?.[1] ?? 0)])?.[1];
+  for (const ref of ['I4', 'I5', 'A12', 'N12', 'I20', 'AK20', 'I22']) assert.equal(colorOf(ref), 'FF000000', ref);
+  assert.equal(ellipseCount(f, OITA_SHEETS.shinsei) - ellipseCount(template('oita'), OITA_SHEETS.shinsei), 1); // 元号の丸（原本の印の点線の丸は残す）
+  // 委任状：生年月日（昭和に丸）・住所、受任者は設定の営業所・所長と住所。福祉用具購入費支給申請と販売業者に丸。氏名・日付は自署
+  const p = (ref: string) => readCell(f, OITA_SHEETS.proxy, ref);
+  assert.equal(p('C5'), '　  　明治 ・ 大正 ・ 昭和　　15年　　3月　　15日');
+  assert.equal(p('C6'), '大分県大分市見本町1-2-3');
+  assert.equal(p('C22'), '太陽シルバーサービス㈱　大分営業所　所長　山下 厚');
+  assert.equal(p('C23'), '〒870-0953　大分県大分市下郡東1-4-35');
+  assert.deepEqual([p('C4'), p('H2')], [readCell(template('oita'), OITA_SHEETS.proxy, 'C4'), readCell(template('oita'), OITA_SHEETS.proxy, 'H2')]);
+  assert.equal(ellipseCount(f, OITA_SHEETS.proxy), 3);
+  for (const sh of [OITA_SHEETS.shinsei, OITA_SHEETS.proxy]) assert.equal(printOverflow(f, sh), null, sh);
+});
+
+test('大分市：償還払いは■償還・長い理由は小さくして5行に。確かめる欄（性別・郵便番号の欄はない）', () => {
+  const long = '見本の理由の文です。'.repeat(30);
+  const f = fillOT({payMethod: '償還払い', items: [item({id: 'a', name: '見本の杖', category: '歩行補助つえ', listPrice: 9800, taxType: '非課税', reason: long})]});
+  const at = (ref: string) => readCell(f, OITA_SHEETS.shinsei, ref);
+  assert.equal(at('AK3'), '　■償還　　□受領委任');
+  assert.equal(OITA_REASON_CELLS.map(at).join(''), long);
+  const xml = strFromU8(f[sheetPath(f, OITA_SHEETS.shinsei)]);
+  assert.ok(cellStyle(f, xml, 'I22').size < cellStyle(template('oita'), strFromU8(template('oita')[sheetPath(template('oita'), OITA_SHEETS.shinsei)]), 'I22').size);
+  assert.deepEqual(shinseiChecks(otSale({gender: '', zip: ''}), OT_S).missing, []);
+  assert.deepEqual(shinseiChecks(otSale({careLevel: '', careOffice: '', careManager: ''}), {...OT_S, providerNo: ''}).missing, ['要介護度', '居宅介護支援事業所・ケアマネジャー（理由の記載者）', '販売事業者の事業者番号（10けた）']);
 });
 
 test('アプリに入れた原本は空（前の方の記入・写真・丸が残っていない）', () => {

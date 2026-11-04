@@ -107,6 +107,10 @@ export function SettingsPage({data, update}: {data: AppData; update: Update}) {
           <Field label="事業者番号（特定福祉用具販売）">
             <TextInput value={s.providerNo ?? ''} onChange={(providerNo) => set({providerNo})} inputMode="numeric" placeholder="10けた" />
           </Field>
+          {/* 久留米市の支給申請書の「受領委任払取扱事業所登録番号」の8マス（住宅改修のアプリの設定と同じ番号） */}
+          <Field label="久留米市の受領委任払取扱事業所登録番号">
+            <TextInput value={s.entrustRegNo ?? ''} onChange={(entrustRegNo) => set({entrustRegNo})} inputMode="numeric" placeholder="市から届いた番号（8けた）" />
+          </Field>
         </div>
       </Card>
 

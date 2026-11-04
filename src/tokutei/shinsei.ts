@@ -36,9 +36,10 @@ import {
 import type {CellValue, Files, Mark} from './xlsxEdit.ts';
 import {zipLabel} from './zip.ts';
 import {KK_CELLS, KK_SHEETS} from './shinsei/kitakyushuCells.ts';
+import {KU_CELLS, KU_SHEETS} from './shinsei/kurumeCells.ts';
 
 /** 申請書の原本がある保険者 */
-export type ShinseiKey = 'yukuhashi' | 'kanda' | 'miyako' | 'kouiki' | 'fukuoka' | 'kitakyushu';
+export type ShinseiKey = 'yukuhashi' | 'kanda' | 'miyako' | 'kouiki' | 'fukuoka' | 'kitakyushu' | 'kurume' | 'oita';
 
 /** 申請書の明細の1行 */
 export type ShinseiItem = {
@@ -63,6 +64,7 @@ export type ShinseiSeller = {
   tel: string;
   rep: string; // 代表者職氏名：所長　氏名
   providerNo: string; // 特定福祉用具販売の事業者番号（数字だけ）
+  entrustRegNo: string; // 久留米市の受領委任払取扱事業所登録番号（数字だけ。設定）
 };
 
 /** 申請書に書く値（案件・設定・計算から作る。どの様式でも同じ） */
@@ -80,6 +82,7 @@ export type ShinseiValues = {
   items: ShinseiItem[];
   recorder: string; // 記載者 事業所・氏名：居宅介護支援事業所　ケアマネジャー
   office: string; // 居宅介護支援事業所だけ（広域連合の「居宅の事業所名」）
+  careManager: string; // ケアマネジャーだけ（大分市の「記入者名」）
   carePlan: CarePlan; // 居宅サービス計画の届出（みやこ町）
   applyDate: string; // 申請日（'YYYY-MM-DD'）
   deliveryDate: string; // 納品日＝購入（予定）日・撮影日
@@ -147,6 +150,7 @@ export function shinseiValues(sale: Sale, s: Settings): ShinseiValues {
     items,
     recorder: [sale.careOffice.trim(), sale.careManager.trim()].filter(Boolean).join('　'),
     office: sale.careOffice.trim(),
+    careManager: sale.careManager.trim(),
     carePlan: carePlanOf(sale),
     // 申請書の日付（申請日・購入日＝納品日・支給申請日・完了写真の撮影日）は書かない（空欄）。Excel に保存してから手で入れる
     // （ユーザーの指示「特定福祉用具申請書の赤枠部分は、連動すると都合が悪いため、すべてなくす。入力が必要なときは、EXCELにおとして、手入力します」2026-10-28。
@@ -168,6 +172,7 @@ export function shinseiValues(sale: Sale, s: Settings): ShinseiValues {
       tel: s.tel.trim(),
       rep: s.manager.trim() ? `所長　${s.manager.trim()}` : '',
       providerNo: (s.providerNo ?? '').normalize('NFKC').replace(/\D/g, ''),
+      entrustRegNo: (s.entrustRegNo ?? '').normalize('NFKC').replace(/\D/g, ''),
     },
   };
 }
@@ -198,6 +203,7 @@ export type SheetWrite = {
   hideZeros?: boolean; // 式が空の欄を参照して 0 と出るシート
   block?: {cell: string; head: string[]; body: string; tail: string[]}; // 理由のかたまり（みやこ町）：head の行・body（理由。欄の幅で折り返す）・tail の行を、入る大きさにして書く
   formats?: [string, {wrap?: boolean; numFmt?: number; color?: string}][]; // 書式を変える欄（折り返す・表示形式・字の色。福岡市の必要な理由・購入金額）
+  lines?: {cells: string[]; text: string}; // 1行ずつの欄に分けて書く文（大分市の福祉用具が必要な理由の5行）：最初の欄の幅で折り返し、入らなければ全部の欄を小さくする
 };
 
 export type ShinseiForm = {key: ShinseiKey; title: string; rows: number; sheets: (v: ShinseiValues) => SheetWrite[]};
@@ -644,6 +650,252 @@ function kitakyushuSheets(v: ShinseiValues): SheetWrite[] {
   ];
 }
 
+/**
+ * 久留米市（介護保険居宅介護（介護予防）福祉用具購入費支給申請書 第１号様式・委任状（受領委任払用 第６号様式）・請求書（第７号様式）・
+ * 委任状（久留米市提出用）。2026-11-04 にユーザーからいただいた市の様式）：事前の申請はなく、購入のあとの支給申請書だけ。
+ * 原本はスキルの scripts/make_kurume_oita_tokutei.py が作る（申請書は市の Excel、ほかは市の PDF から同じ形のシートに。欄の番地は kurumeCells.ts）。
+ * 申請書：福祉用具名の□は種目を☑、種目名及び商品名・製造事業者名・販売事業者名（設定の営業所）・全額（購入金額）・支払（本人が払う額）・TAIS コード・事業所番号、
+ *   購入金額合計・支払額、負担割合証の記載の☑、支払方法の丸（受領委任払いのとき）、受領委任払取扱事業所登録番号（設定。受領委任払いのとき）。
+ *   申請者（被保険者）の住所・氏名・電話番号の欄は「※本人自書」なので書かない。購入日・申請日・個人番号・口座振込依頼欄・市記入欄も書かない。
+ * 委任状（受領委任払用）・請求書：受領委任払いのときだけ（販売業者が市に請求する）。受任者・請求する者は設定の営業所、保険給付額・請求する金額は保険給付額。
+ *   委任者の氏名・日付は自署（ほかの保険者の委任状と同じ）。請求書の日付・口座は書かない。
+ * 委任状（久留米市提出用）：来庁する人（担当）・事業所名等・所在地・連絡先（設定の営業所）と、委任者の住所。委任する手続きの「福祉用具購入費支給申請」を丸。
+ */
+export const KURUME_SHEETS = {shinsei: KU_SHEETS[0], proxy: KU_SHEETS[1], claim: KU_SHEETS[2], teisyutu: KU_SHEETS[3]} as const;
+export const KURUME_ROWS = [11, 14, 17];
+const KUP: Record<string, string> = KU_CELLS.proxy;
+const KUC: Record<string, string> = KU_CELLS.claim;
+const KUT: Record<string, string> = KU_CELLS.teisyutu;
+/** 【福祉用具名】の□の名前（様式の字）。アプリの種目 → 様式の名前 */
+const KURUME_KINDS: Record<string, string> = {
+  腰掛便座: '腰掛便座',
+  入浴補助用具: '入浴補助用具',
+  自動排泄処理装置の交換可能部品: '自動排泄処理装置',
+  排泄予測支援機器: '排泄予測支援機器',
+  移動用リフトのつり具の部分: '移動用ﾘﾌﾄのつり具の部分',
+  簡易浴槽: '簡易浴槽',
+  固定用スロープ: 'スロープ',
+  歩行器: '歩行器',
+  歩行補助つえ: '歩行補助つえ',
+};
+/** 原本の【福祉用具名】の欄の文字（3つの行とも同じ。テストで原本と同じか確かめる） */
+export const KURUME_KIND_TEXT = '【福祉用具名】※該当するものに☑\n□腰掛便座 □入浴補助用具 □自動排泄処理装置 　\n□排泄予測支援機器 □移動用ﾘﾌﾄのつり具の部分\n□簡易浴槽 □スロープ □歩行器 □歩行補助つえ\n';
+/** 原本の負担割合証の記載の欄の文字 */
+export const KURUME_RATIO_TEXT = '□　　１　割\n□　　２　割\n□　　３　割';
+/** 久留米市の住所は「久留米市」のうしろを書く（原本の住所の欄に「久留米市」が入っている）。市の外の住所は福岡県だけ外す */
+export const kurumeAddress = (address: string) => address.trim().replace(/^(?:福岡県)?[\s　]*(?:久留米市[\s　]*)?/, '');
+const inKurume = (address: string) => /^(?:福岡県)?[\s　]*久留米市/.test(address.trim());
+
+/**
+ * 明細の【支払】（本人が販売事業者に払う額）：受領委任払いは負担割合の分（商品ごとに切り上げ、最後の商品で合計を合わせる＝購入金額の合計−保険給付額。
+ * 限度額を超えた分も最後の商品に入る）。償還払いは全額。負担割合を選んでいない受領委任払いは空（null）
+ */
+export function kurumePays(v: Pick<ShinseiValues, 'items' | 'payMethod' | 'ratioSet' | 'ratio' | 'benefit'>): number[] | null {
+  if (v.payMethod === '償還払い') return v.items.map((i) => i.total);
+  if (!v.ratioSet || !v.items.length) return null;
+  const all = v.items.reduce((n, i) => n + i.total, 0);
+  const pays = v.items.map((i) => Math.ceil((i.total * v.ratio) / 10));
+  const others = pays.slice(0, -1).reduce((n, p) => n + p, 0);
+  pays[pays.length - 1] = Math.max(0, all - v.benefit - others);
+  return pays;
+}
+
+/** 数字を右に寄せてマスに（足りない左は空。多い分は左を切る） */
+const rightDigits = (refs: string[], digits: string): [string, CellValue][] => {
+  const d = digits.slice(-refs.length);
+  return refs.map((ref, i): [string, CellValue] => [ref, d[i - (refs.length - d.length)] ?? '']);
+};
+
+function kurumeSheets(v: ShinseiValues): SheetWrite[] {
+  const shown = v.items.slice(0, KURUME_ROWS.length);
+  const pays = kurumePays(v);
+  const juryo = v.payMethod !== '償還払い';
+  const seller = v.seller;
+  const b = v.birth;
+  const birth = b ? (['明', '大', '昭'].includes(b.short) ? `明 ・ 大 ・ 昭　　　　${b.y}年　　　${b.m}月　　　${b.d}日生` : `${b.era}${b.y}年${b.m}月${b.d}日生`) : null;
+  const zip = v.zip ? `〒　${v.zip.replace('-', '　－　')}` : '';
+  const kinds = (it: ShinseiItem) => {
+    const name = KURUME_KINDS[it.category];
+    return name ? KURUME_KIND_TEXT.replace(`□${name}`, `☑${name}`) : KURUME_KIND_TEXT;
+  };
+  const tais = (r: number, code: string): [string, CellValue][] => {
+    const d = code.normalize('NFKC').replace(/\D/g, '');
+    if (d.length !== 11) return [];
+    return [...boxes('G', 5, r).map((ref, i): [string, CellValue] => [ref, d[i]]), ...boxes('M', 6, r).map((ref, i): [string, CellValue] => [ref, d[5 + i]])];
+  };
+  const amountRefs = [...KURUME_ROWS.slice(0, shown.length).flatMap((r) => [`AH${r + 1}`, ...(pays ? [`AH${r + 2}`] : [])]), ...(shown.length ? ['H20'] : []), ...(shown.length && pays ? ['L22'] : [])];
+  const benefit = juryo && v.benefit > 0 ? v.benefit : 0;
+  const zipDigits = seller.zip.replace(/\D/g, '');
+  const tel = seller.tel.split(/[-－ー]/);
+  const shinsei: SheetWrite = {
+    sheet: KURUME_SHEETS.shinsei,
+    cells: [
+      ['E4', v.kana],
+      ['E5', v.name],
+      ...insuredCells('AD', 5, v),
+      ...when(birth, [['E7', birth ?? '']]),
+      ...when(zip, [['E9', zip]]),
+      // 住所：原本の「久留米市」のうしろ。市の外の住所は「久留米市」を消して1つの欄に
+      ...(v.address ? ([...(inKurume(v.address) ? [] : [['E10', '']]), ['I10', kurumeAddress(v.address)]] as [string, CellValue][]) : []),
+      ...shown.flatMap((it, k): [string, CellValue][] => {
+        const r = KURUME_ROWS[k];
+        return [
+          [`C${r}`, kinds(it)],
+          [`S${r}`, `【製造事業者名】\n${it.maker}`],
+          // 種目は見出しの行（欄の高さは2行分）、商品名はその下の1行（長い名前は1行に入る大きさに＝oneLine）
+          [`C${r + 1}`, `【種目名及び商品名】　${it.label.split('\n')[0]}${it.name ? `\n${it.name}` : ''}`],
+          [`S${r + 1}`, `【販売事業者名】\n${seller.name}`],
+          [`AH${r + 1}`, it.total],
+          ...(pays ? ([[`AH${r + 2}`, pays[k]]] as [string, CellValue][]) : []),
+          ...tais(r + 2, it.tais),
+          ...(seller.providerNo.length === 10 ? boxes('V', 10, r + 2).map((ref, i): [string, CellValue] => [ref, seller.providerNo[i]]) : []),
+        ];
+      }),
+      ...when(shown.length, [['H20', shown.reduce((n, i) => n + i.total, 0)]]),
+      ...(shown.length && pays ? ([['L22', pays.slice(0, shown.length).reduce((n, p) => n + p, 0)]] as [string, CellValue][]) : []),
+      ...when(v.ratioSet, [['AG20', KURUME_RATIO_TEXT.split('\n').map((l, i) => (i === v.ratio - 1 ? l.replace('□', '☑') : l)).join('\n')]]),
+      // 受領委任払取扱事業所登録番号（8マス）：設定の番号を右に寄せて
+      ...(juryo && seller.entrustRegNo ? rightDigits(pairBoxes('Q', 8, 44), seller.entrustRegNo) : []),
+    ],
+    formats: [
+      ...KURUME_ROWS.slice(0, shown.length).flatMap((r): [string, {wrap: boolean}][] => [`S${r}`, `C${r + 1}`, `S${r + 1}`].map((ref) => [ref, {wrap: true}])),
+      ...amountRefs.map((ref): [string, {numFmt: number}] => [ref, {numFmt: 3}]),
+    ],
+    fit: ['E4', 'E5', 'I10', ...KURUME_ROWS.slice(0, shown.length).flatMap((r) => [`S${r}`, `S${r + 1}`])],
+    oneLine: KURUME_ROWS.slice(0, shown.length).map((r) => `C${r + 1}`),
+    marks: [ERA('E7', v), {cell: 'A34', needles: ['１．口座（本人名義のみ）', '２．受領委任払い', '３．現金'], pick: juryo ? 1 : -1}],
+  };
+  const proxy: SheetWrite = {
+    sheet: KURUME_SHEETS.proxy,
+    cells: juryo
+      ? [
+          ...when(seller.address, [[KUP.sellerAddress, [seller.zip && `〒${seller.zip}`, seller.address].filter(Boolean).join('\n')]]),
+          ...when(seller.tel, [[KUP.sellerTel, seller.tel]]),
+          ...when(seller.name, [[KUP.seller, [seller.name, seller.rep].filter(Boolean).join('\n')]]),
+          ...when(benefit, [[KUP.benefit, benefit]]),
+          ...when(v.address, [[KUP.address, kurumeAddress(v.address)]]),
+        ]
+      : [],
+    formats: juryo && benefit ? [[KUP.benefit, {numFmt: 3}]] : [],
+    fit: [KUP.sellerAddress, KUP.seller, KUP.address],
+    fitWidth: [KUP.sellerTel],
+  };
+  const claim: SheetWrite = {
+    sheet: KURUME_SHEETS.claim,
+    cells: juryo
+      ? [
+          // 金額の11マス（百億〜円）：右に寄せ、頭に￥（様式の「金額の頭部には￥をお書きください」）
+          ...(benefit ? rightDigits(Array.from({length: 11}, (_, k) => KUC[`d${k}`]), `￥${benefit}`) : []),
+          ...(zipDigits.length === 7 ? Array.from({length: 7}, (_, k): [string, CellValue] => [KUC[`z${k}`], zipDigits[k]]) : []),
+          ...when(seller.address, [[KUC.sellerAddress, seller.address]]),
+          // 氏名：会社その他の法人は法人名および代表者名（様式の注）
+          ...when(seller.name, [[KUC.seller, [seller.name, seller.rep].filter(Boolean).join('　')]]),
+          ...(tel.length === 3 ? ([[KUC.telA, tel[0]], [KUC.telB, tel[1]], [KUC.telC, tel[2]]] as [string, CellValue][]) : when(seller.tel, [[KUC.telA, seller.tel]])),
+          [KUC.name, v.name],
+        ]
+      : [],
+    fitWidth: [KUC.sellerAddress, KUC.seller, KUC.name, KUC.telA],
+  };
+  const teisyutu: SheetWrite = {
+    sheet: KURUME_SHEETS.teisyutu,
+    cells: [
+      [KUT.visitor, v.staff],
+      ...when(seller.name, [[KUT.office, seller.name]]),
+      ...when(seller.address, [[KUT.sellerAddress, [seller.zip && `〒${seller.zip}`, seller.address].filter(Boolean).join('　')]]),
+      ...when(seller.tel, [[KUT.sellerTel, seller.tel]]),
+      ...when(v.address, [[KUT.address, v.address]]),
+    ],
+    fit: [KUT.sellerAddress],
+    fitWidth: [KUT.visitor, KUT.office, KUT.sellerTel, KUT.address],
+    marks: [{cell: KUT.kind, needles: ['居宅介護(介護予防)福祉用具購入費支給申請'], pick: 0}],
+  };
+  return [shinsei, proxy, claim, teisyutu];
+}
+
+/**
+ * 大分市（介護保険居宅介護（介護予防）福祉用具購入費支給申請書 第12号様式。2026-11-02 にいただいた市の Excel。
+ * 委任状は住宅改修の大分市の申請書と同じ様式（いただいた ininjyo.xlsx。続柄の選択肢のある新しい版））：事前の申請はなく、購入のあとの支給申請書だけ。
+ * 申請書：□償還・□受領委任（支払方法を■）・フリガナ・氏名・被保険者番号・生年月日（元号の丸）・要介護状態等区分・品目・製造事業者名等・購入に要した費用・
+ *   販売事業者名と販売事業者番号（設定の営業所）・福祉用具が必要な理由（5行）・記入者名と事業者名（ケアマネジャー・居宅介護支援事業所。■介護支援専門員）・
+ *   申請者（被保険者）の住所・電話番号。申請者の氏名は自署（委任状と同じ）。購入年月日・申請日・個人番号・振込指定口座・受領に関する委任・市確認欄は書かない。
+ * 委任状：被保険者の生年月日（元号の丸）・住所、受任者は設定の会社・営業所・所長（氏名）と住所、続柄の「販売業者」と委任する手続きの「福祉用具購入費支給申請」を丸。
+ *   被保険者の氏名と日付は自署（住宅改修の大分市の委任状と同じ）
+ */
+export const OITA_SHEETS = {shinsei: '支給申請書', proxy: '委任状'} as const;
+export const OITA_ROWS = [12, 14, 16, 18];
+export const OITA_REASON_CELLS = ['I22', 'I23', 'I24', 'I25', 'I26'];
+/** 原本の「（記入者名）」の行の、「（事業者名）」の前までの文字（全角の空白でそろえる） */
+const OITA_RECORDER_HEAD = '　（記入者名）　　　　　　　　　  　　    　　  　　　';
+const fullNum = (n: number) => String(n).replace(/[0-9]/g, (d) => String.fromCharCode(d.charCodeAt(0) + 0xfee0));
+
+function oitaSheets(v: ShinseiValues): SheetWrite[] {
+  const shown = v.items.slice(0, OITA_ROWS.length);
+  const b = v.birth;
+  const seller = v.seller;
+  const care = /^要(支援|介護)([1-5])$/.exec(v.care);
+  const careS = care?.[1] === '支援' ? fullNum(Number(care[2])) : '　';
+  const careK = care?.[1] === '介護' ? fullNum(Number(care[2])) : '　';
+  // 記入者名（ケアマネジャー）と事業者名（居宅介護支援事業所）：「（事業者名）」の位置は原本と同じぐらいに（名前が長ければうしろへ）。
+  // ケアマネジャーが書くので「□介護支援専門員」を■に
+  const mgr = v.careManager ? `\u3000（記入者名）\u3000${v.careManager}` : '';
+  const head = mgr ? `${mgr}${'\u3000'.repeat(Math.max(1, Math.round(emOf(OITA_RECORDER_HEAD) - emOf(mgr))))}` : OITA_RECORDER_HEAD;
+  const recorder = [
+    `${head}（事業者名）\u3000${v.office}`,
+    '\u3000\u3000\u3000\u3000\u3000\u3000\u3000 ',
+    `       ${v.careManager ? '■' : '□'}介護支援専門員\u3000\u3000\u3000\u3000□福祉用具専門相談員\u3000\u3000\u3000\u3000□その他（\u3000\u3000\u3000\u3000`,
+  ].join('\n');
+  const eraFull = b && ['明', '大', '昭'].includes(b.short);
+  return [
+    {
+      sheet: OITA_SHEETS.shinsei,
+      cells: [
+        ['AK3', v.payMethod === '償還払い' ? '　■償還　　□受領委任' : '　□償還　　■受領委任'],
+        ['I4', v.kana],
+        ['I5', v.name],
+        ...insuredCells('AK', 4, v),
+        ...when(b, [['I8', eraFull ? `明･大･昭　　${b?.y}年　${b?.m}月　${b?.d}日生` : `${b?.era}${b?.y}年${b?.m}月${b?.d}日生`]]),
+        ...when(care, [['AD8', `要支援(　${careS}　）　･　要介護（　${careK}　）`]]),
+        ...shown.flatMap((it, k): [string, CellValue][] => {
+          const r = OITA_ROWS[k];
+          return [
+            [`A${r}`, it.label],
+            [`N${r}`, it.maker],
+            [`Y${r}`, `${it.total.toLocaleString('ja-JP')}円`],
+          ];
+        }),
+        ...when(seller.name, [['I20', seller.name]]),
+        ...(seller.providerNo.length === 10 ? boxes('AK', 10, 20).map((ref, i): [string, CellValue] => [ref, seller.providerNo[i]]) : []),
+        ...when(v.recorder || v.office, [['I27', recorder]]),
+        ...when(v.address, [['F36', `住所　${v.address}`]]),
+        ...when(v.tel, [['AF37', `電話番号　　${v.tel}`]]),
+      ],
+      lines: {cells: OITA_REASON_CELLS, text: reasonText(v)},
+      // 原本は書く欄の字が赤（市の様式の入力の目印）。書いた値は黒にする（福岡市と同じ）
+      formats: ['I4', 'I5', ...boxes('AK', 10, 4), ...rowsOf('A', OITA_ROWS), ...rowsOf('N', OITA_ROWS), 'I20', ...boxes('AK', 10, 20), ...OITA_REASON_CELLS].map((ref): [string, {color: string}] => [ref, {color: BLACK}]),
+      fit: ['I4', 'I5', 'I20', 'I27', 'F36', ...rowsOf('N', OITA_ROWS.slice(0, shown.length)), ...rowsOf('Y', OITA_ROWS.slice(0, shown.length))],
+      // 電話番号は結合していない1つの欄で、右の空いた欄へはみ出して書く（原本の「電話番号　－　－」と同じ）。行の右の端までに入る大きさに
+      fitIn: [['AF37', 'AF37:AT37']],
+      oneLine: rowsOf('A', OITA_ROWS),
+      marks: [ERA('I8', v)],
+    },
+    {
+      sheet: OITA_SHEETS.proxy,
+      cells: [
+        ...when(b, [['C5', eraFull ? `　  　明治 ・ 大正 ・ 昭和　　${b?.y}年　　${b?.m}月　　${b?.d}日` : `　  　${b?.era}　${b?.y}年　　${b?.m}月　　${b?.d}日`]]),
+        ...when(v.address, [['C6', v.address]]),
+        ...when(seller.name, [['C22', [seller.name, seller.rep].filter(Boolean).join('　')]]),
+        ...when(seller.address, [['C23', [seller.zip && `〒${seller.zip}`, seller.address].filter(Boolean).join('　')]]),
+      ],
+      fit: ['C6', 'C22', 'C23'],
+      marks: [
+        {cell: 'C5', needles: ['明治', '大正', '昭和'], pick: b && eraFull ? pick(['明', '大', '昭'], b.short) : -1},
+        {cell: 'B10', needles: ['福祉用具購入費支給申請'], pick: 0},
+        {cell: 'C24', needles: ['販売業者'], pick: 0},
+      ],
+    },
+  ];
+}
+
 export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
   yukuhashi: {
     key: 'yukuhashi',
@@ -742,6 +994,8 @@ export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
   },
   fukuoka: {key: 'fukuoka', title: '福岡市', rows: FUKUOKA_ROWS.length, sheets: (v) => [fukuokaSheet(v)]},
   kitakyushu: {key: 'kitakyushu', title: '北九州市', rows: KITAKYUSHU_GAIYO_ROWS, sheets: kitakyushuSheets},
+  kurume: {key: 'kurume', title: '久留米市', rows: KURUME_ROWS.length, sheets: kurumeSheets},
+  oita: {key: 'oita', title: '大分市', rows: OITA_ROWS.length, sheets: oitaSheets},
 };
 
 export const shinseiForm = (insurer: string): ShinseiForm | null => SHINSEI[insurer as ShinseiKey] ?? null;
@@ -764,6 +1018,20 @@ function writeBlock(files: Files, sheet: string, block: NonNullable<SheetWrite['
   if (pt < style.size) sizeCell(files, sheet, block.cell, Math.max(4.5, pt));
 }
 
+/**
+ * 1行ずつの欄（大分市の福祉用具が必要な理由の5行。点線で区切った行）に文を分けて書く：最初の欄の幅で折り返し、
+ * 行の数が欄の数より多ければ、入るまで全部の欄の文字を小さくする（行の高さにも入る大きさまで）
+ */
+function writeLines(files: Files, sheet: string, spec: NonNullable<SheetWrite['lines']>): void {
+  if (!spec.text) return;
+  const {box, style} = cellBox(files, sheet, spec.cells[0]);
+  let pt = style.size;
+  let lines = wrapText(spec.text, box.w * 0.97, pt);
+  for (; pt > 4.5 && (lines.length > spec.cells.length || (pt * 4) / 3 > box.h - 2); pt -= 0.5) lines = wrapText(spec.text, box.w * 0.97, pt - 0.5);
+  writeCells(files, sheet, new Map(spec.cells.map((ref, i): [string, CellValue] => [ref, lines[i] ?? ''])));
+  if (pt < style.size) for (const ref of spec.cells) sizeCell(files, sheet, ref, Math.max(4.5, pt));
+}
+
 /** 開いた原本（unzipSync したもの）に書き込んで、申請書（.xlsx）のバイト列にする。files は書きかえる（原本を何度も使うなら {...files} を渡す） */
 export function fillShinsei(files: Files, form: ShinseiForm, v: ShinseiValues): Uint8Array {
   fillShinseiFiles(files, form, v);
@@ -778,6 +1046,7 @@ export function fillShinseiFiles(files: Files, form: ShinseiForm, v: ShinseiValu
     const styles = new Map((w.newStyles ?? []).map(([ref, like]) => [ref, styleIdOf(files, w.sheet, like) ?? '0'] as [string, string]));
     if (w.cells?.length) writeCells(files, w.sheet, new Map(w.cells), styles);
     if (w.block) writeBlock(files, w.sheet, w.block);
+    if (w.lines) writeLines(files, w.sheet, w.lines);
     if (w.hideZeros) hideZeros(files, w.sheet);
   }
   for (const w of sheets) for (const [ref, pt] of w.sizes ?? []) sizeCell(files, w.sheet, ref, pt);
@@ -813,24 +1082,32 @@ export function shinseiChecks(sale: Sale, s: Settings): {missing: string[]; over
   need(v.name, 'お客様名');
   need(v.kana, 'フリガナ');
   need(v.insuredNo, '被保険者番号');
-  const kouiki = form?.key === 'kouiki';
-  // 福岡市・北九州市の様式には性別・郵便番号・要介護状態区分・記載者の欄がない（北九州市は生年月日の欄もない）。販売事業者（受任者）の事業者番号を書く
-  const seller = form?.key === 'fukuoka' || form?.key === 'kitakyushu';
-  if (form?.key !== 'kitakyushu') need(v.birth, '生年月日');
+  const key = form?.key;
+  const kouiki = key === 'kouiki';
+  // 様式にない欄は聞かない：福岡市・北九州市・久留米市・大分市は性別の欄がなく、販売事業者（受任者）の事業者番号を書く。
+  // 郵便番号は福岡市・北九州市・大分市にない（北九州市は生年月日もない）。要介護状態区分は広域連合・福岡市・北九州市・久留米市（市の記入欄だけ）にない。
+  // 理由の記載者は福岡市・北九州市・久留米市にない。久留米市の申請者の電話番号は本人の自書の欄なので書かない
+  const seller = key === 'fukuoka' || key === 'kitakyushu' || key === 'kurume' || key === 'oita';
+  const noZip = key === 'fukuoka' || key === 'kitakyushu' || key === 'oita';
+  const noCare = kouiki || key === 'fukuoka' || key === 'kitakyushu' || key === 'kurume';
+  const noRecorder = key === 'fukuoka' || key === 'kitakyushu' || key === 'kurume';
+  if (key !== 'kitakyushu') need(v.birth, '生年月日');
   if (!seller) need(v.gender, '性別');
-  if (!seller) need(v.zip, '郵便番号');
+  if (!noZip) need(v.zip, '郵便番号');
   need(v.address, '住所');
-  need(v.tel, '電話');
-  if (!kouiki && !seller) need(v.care, '要介護度'); // 広域連合の様式には要介護状態区分の欄がない
+  if (key !== 'kurume') need(v.tel, '電話');
+  if (!noCare) need(v.care, '要介護度');
   need(v.items.length, '商品');
   const noReason = v.items.filter((i) => !i.reason).length;
-  if (v.items.length && noReason) missing.push(noReason === v.items.length ? '福祉用具が必要な理由' : `福祉用具が必要な理由（${noReason}つ）`);
+  if (v.items.length && noReason && key !== 'kurume') missing.push(noReason === v.items.length ? '福祉用具が必要な理由' : `福祉用具が必要な理由（${noReason}つ）`);
   // 広域連合は「居宅の事業所名」だけ（ケアマネジャーは署名の欄なので書かない）
   if (kouiki) need(v.office, '居宅介護支援事業所（居宅の事業所名）');
-  else if (seller) need(v.seller.providerNo.length === 10, '販売事業者の事業者番号（10けた）');
-  else need(v.recorder, '居宅介護支援事業所・ケアマネジャー（理由の記載者）');
+  else if (!noRecorder) need(v.recorder, '居宅介護支援事業所・ケアマネジャー（理由の記載者）');
+  if (seller) need(v.seller.providerNo.length === 10, '販売事業者の事業者番号（10けた）');
+  // 久留米市の受領委任払いは、市に登録した事業所の登録番号（設定）を書く
+  if (key === 'kurume' && v.payMethod !== '償還払い') need(v.seller.entrustRegNo, '久留米市の受領委任払取扱事業所登録番号（設定）');
   need(v.ratioSet, '負担割合');
-  if (form?.key === 'miyako' || kouiki) need(v.carePlan, '居宅サービス計画の届出（有・無）');
+  if (key === 'miyako' || kouiki) need(v.carePlan, '居宅サービス計画の届出（有・無）');
   const overflow = form && v.items.length > form.rows ? `${form.title}の申請書の商品の欄は${form.rows}行です。${form.rows + 1}つ目からの商品（${v.items.slice(form.rows).map((i) => i.product).join('、')}）は入りません。` : '';
   return {missing, overflow};
 }

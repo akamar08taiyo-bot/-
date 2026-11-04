@@ -6,8 +6,9 @@
 // あわせて、押すと案件の画面のその入れる所へ行く欄（お客様名・商品・理由…）の位置も返す（式で同じ値を出している欄＝支給申請書の氏名なども押せる）
 
 import {strFromU8} from 'fflate';
-import {FUKUOKA_ROWS, FUKUOKA_SHEET, fillShinseiFiles, KITAKYUSHU_GAIYO_ROWS, KITAKYUSHU_SHEETS, KOUIKI_SHEETS, pairBoxes} from './shinsei.ts';
+import {FUKUOKA_ROWS, FUKUOKA_SHEET, fillShinseiFiles, KITAKYUSHU_GAIYO_ROWS, KITAKYUSHU_SHEETS, KOUIKI_SHEETS, KURUME_ROWS, KURUME_SHEETS, OITA_REASON_CELLS, OITA_ROWS, OITA_SHEETS, pairBoxes} from './shinsei.ts';
 import {KK_CELLS} from './shinsei/kitakyushuCells.ts';
+import {KU_CELLS} from './shinsei/kurumeCells.ts';
 import type {ShinseiForm, ShinseiKey, ShinseiValues} from './shinsei.ts';
 import {attrOf, boxes, colName, colNum, EMU, formulaRef, markLayouts, numOf, sheetLayout, sheetPaths, unesc} from './xlsxEdit.ts';
 import type {Files, SheetLayout} from './xlsxEdit.ts';
@@ -103,6 +104,9 @@ const KOUIKI_JURYO_ROWS = [12, 14, 16];
 const KOUIKI_SHOKAN_ROWS = [14, 16, 18];
 const KK: Record<string, string> = KK_CELLS.shikyu;
 const KG: Record<string, string> = KK_CELLS.gaiyo;
+const KUP: Record<string, string> = KU_CELLS.proxy;
+const KUC: Record<string, string> = KU_CELLS.claim;
+const KUT: Record<string, string> = KU_CELLS.teisyutu;
 
 export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
   yukuhashi: [{sheet: '用具・受領委任払', links: preLinks(7)}, PROXY, PHOTO],
@@ -245,6 +249,79 @@ export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
       ],
     },
   ],
+  // 久留米市：販売事業者名・事業所番号・受領委任払取扱事業所登録番号と、委任状・請求書・提出用の委任状の事業者の欄は設定の営業所（入れる所の「販売事業者（受任者）」の行）。
+  // 【支払】・支払額・負担割合証の記載・保険給付額・請求する金額は負担割合へ
+  kurume: [
+    {
+      sheet: KURUME_SHEETS.shinsei,
+      links: [
+        ['kana', ['E4']],
+        ['customer', ['E5']],
+        ['insurerNo', boxes('AH', 6, 4)],
+        ['insuredNo', boxes('AD', 10, 5)],
+        ['birthDate', ['E7']],
+        ['zip', ['E9']],
+        ['address', ['E10', 'I10']],
+        ['items', [...rows(['C', 'S'], KURUME_ROWS), ...rows(['C', 'AH'], KURUME_ROWS.map((r) => r + 1)), 'H20', ...KURUME_ROWS.flatMap((r) => [...boxes('G', 5, r + 2), ...boxes('M', 6, r + 2)])]],
+        ['seller', [...rows(['S'], KURUME_ROWS.map((r) => r + 1)), ...KURUME_ROWS.flatMap((r) => boxes('V', 10, r + 2)), ...pairBoxes('Q', 8, 44)]],
+        ['burdenRatio', ['AG20', 'L22', ...rows(['AH'], KURUME_ROWS.map((r) => r + 2))]],
+        ['payMethod', ['A34']],
+      ],
+    },
+    {
+      sheet: KURUME_SHEETS.proxy,
+      links: [
+        ['seller', [KUP.sellerAddress, KUP.sellerTel, KUP.seller]],
+        ['burdenRatio', [KUP.benefit]],
+        ['address', [KUP.address]],
+      ],
+    },
+    {
+      sheet: KURUME_SHEETS.claim,
+      links: [
+        ['burdenRatio', Array.from({length: 11}, (_, k) => KUC[`d${k}`])],
+        ['seller', [...Array.from({length: 7}, (_, k) => KUC[`z${k}`]), KUC.sellerAddress, KUC.seller, KUC.telA, KUC.telB, KUC.telC]],
+        ['customer', [KUC.name]],
+      ],
+    },
+    {
+      sheet: KURUME_SHEETS.teisyutu,
+      links: [
+        ['staff', [KUT.visitor]],
+        // 委任する手続きの「福祉用具購入費支給申請」の丸は、委任される事業者（設定の営業所）の行へ
+        ['seller', [KUT.office, KUT.sellerAddress, KUT.sellerTel, KUT.kind]],
+        ['address', [KUT.address]],
+      ],
+    },
+  ],
+  // 大分市：□償還・□受領委任は支払方法へ。販売事業者名・番号と委任状の受任者は設定の営業所。記入者名・事業者名は記載者（ケアマネジャー・居宅介護支援事業所）へ
+  oita: [
+    {
+      sheet: OITA_SHEETS.shinsei,
+      links: [
+        ['payMethod', ['AK3']],
+        ['kana', ['I4']],
+        ['customer', ['I5']],
+        ['insuredNo', boxes('AK', 10, 4)],
+        ['birthDate', ['I8']],
+        ['careLevel', ['AD8']],
+        ['items', rows(['A', 'N', 'Y'], OITA_ROWS)],
+        ['seller', ['I20', ...boxes('AK', 10, 20)]],
+        ['reason', OITA_REASON_CELLS],
+        ['recorder', ['I27']],
+        ['address', ['F36']],
+        ['tel', ['AF37']],
+      ],
+    },
+    {
+      sheet: OITA_SHEETS.proxy,
+      links: [
+        ['birthDate', ['C5']],
+        ['address', ['C6']],
+        ['seller', ['C22', 'C23', 'B10', 'C24']], // 委任する手続き・続柄（販売業者）の丸も受任者の行へ
+      ],
+    },
+  ],
 };
 
 /** まだ入っていない入れる所（プレビューの欄を薄い黄色に。shinsei.ts の shinseiChecks と同じ考え。支給申請日は納品のあと。広域連合は要介護度の欄がなく、届出の有・無がある） */
@@ -259,17 +336,21 @@ export function missingFields(v: ShinseiValues, key: ShinseiKey): Set<ShinseiFie
   need(v.zip, 'zip');
   need(v.address, 'address');
   need(v.tel, 'tel');
-  const seller = key === 'fukuoka' || key === 'kitakyushu';
+  // 様式にない欄は黄色にしない（shinsei.ts の shinseiChecks と同じ）：福岡市・北九州市・久留米市・大分市は性別の欄がなく、受任者（販売事業者）の欄は設定の営業所
+  // （事業者番号が要る。久留米市の受領委任払いは登録番号も）。郵便番号は福岡市・北九州市・大分市に、要介護状態区分は広域連合・福岡市・北九州市・久留米市に、
+  // 理由の記載者は福岡市・北九州市・久留米市にない。北九州市は生年月日、久留米市は理由・電話番号（本人の自書の欄）もない
+  const seller = key === 'fukuoka' || key === 'kitakyushu' || key === 'kurume' || key === 'oita';
   if (seller) {
-    // 福岡市・北九州市の様式には性別・郵便番号・要介護状態区分・記載者の欄がない（北九州市は生年月日も）。受任者の欄は設定の営業所（事業者番号が要る）
-    for (const f of ['gender', 'zip'] as const) out.delete(f);
-    if (key === 'kitakyushu') out.delete('birthDate');
-    need(v.seller.name && v.seller.providerNo.length === 10, 'seller');
+    out.delete('gender');
+    need(v.seller.name && v.seller.providerNo.length === 10 && (key !== 'kurume' || v.payMethod === '償還払い' || v.seller.entrustRegNo), 'seller');
   }
-  if (key !== 'kouiki' && !seller) need(v.care, 'careLevel'); // 広域連合の様式には要介護状態区分の欄がない
+  if (key === 'fukuoka' || key === 'kitakyushu' || key === 'oita') out.delete('zip');
+  if (key === 'kitakyushu') out.delete('birthDate');
+  if (key === 'kurume') out.delete('tel');
+  if (key !== 'kouiki' && key !== 'fukuoka' && key !== 'kitakyushu' && key !== 'kurume') need(v.care, 'careLevel'); // 広域連合の様式には要介護状態区分の欄がない
   need(v.items.length, 'items');
-  need(v.items.length && v.items.every((i) => i.reason), 'reason');
-  if (!seller) need(key === 'kouiki' ? v.office : v.recorder, 'recorder'); // 広域連合は居宅の事業所名だけ
+  if (key !== 'kurume') need(v.items.length && v.items.every((i) => i.reason), 'reason');
+  if (key !== 'fukuoka' && key !== 'kitakyushu' && key !== 'kurume') need(key === 'kouiki' ? v.office : v.recorder, 'recorder'); // 広域連合は居宅の事業所名だけ
   need(v.ratioSet, 'burdenRatio');
   if (key === 'miyako' || key === 'kouiki') need(v.carePlan, 'carePlan');
   if (key === 'miyako') need(v.staff, 'staff');

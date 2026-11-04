@@ -404,6 +404,75 @@ try {
   assert.ok((await preview.getByRole('group', {name: '概要書', exact: true}).innerText()).includes('シャワーベンチ FSフィット'));
   await page.screenshot({path: `${out}/04k-sale-shinsei-kitakyushu.png`});
 
+  // ---- 久留米市（2026-11-04。いただいた市の様式）：支給申請書・委任状（受領委任払用）・請求書・委任状（久留米市提出用）の4枚。
+  // 要介護度の行はなく、販売事業者（受任者）の行に久留米市の受領委任払取扱事業所登録番号（設定）。番号が入るまで薄い黄色
+  await page.getByRole('textbox', {name: '住所', exact: true}).fill('福岡県久留米市見本町1-2-3');
+  await page.getByLabel('保険者', {exact: true}).selectOption('kurume');
+  await page.getByRole('tab', {name: '📄 申請書（久留米市）'}).waitFor();
+  await preview.getByRole('group', {name: '請求書', exact: true}).waitFor();
+  assert.deepEqual(await groups(), ['申請書', '委任状（受領委任払用）', '請求書', '委任状（提出用）']);
+  assert.equal(await page.getByRole('group', {name: '要介護状態区分'}).count(), 0);
+  await page.getByLabel('販売事業者の営業所').selectOption('久留米営業所');
+  await page.waitForFunction((sel) => document.querySelector(sel)?.className.includes('bg-amber-50'), sellerRow);
+  await page.getByLabel('事業者番号').fill('4000000003');
+  await page.getByLabel('受領委任払取扱事業所登録番号').fill('12345678');
+  await page.waitForFunction((sel) => !document.querySelector(sel)?.className.includes('bg-amber-50'), sellerRow);
+  await page.waitForFunction(() => document.querySelector('[aria-label="申請書のプレビュー"]')?.textContent?.includes('見本町1-2-3'));
+  await page.waitForTimeout(300);
+  await page.screenshot({path: `${out}/04l-sale-shinsei-kurume.png`});
+  await preview.getByRole('group', {name: '申請書', exact: true}).screenshot({path: `${out}/04m-shinsei-kurume-sheet.png`});
+  await preview.getByRole('group', {name: '請求書', exact: true}).screenshot({path: `${out}/04n-shinsei-kurume-claim.png`});
+  const [kurumeFile] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📗 申請書をExcelで保存'}).click()]);
+  await kurumeFile.saveAs(`${out}/shinsei-kurume.xlsx`);
+  {
+    const {readCell, ellipseCount} = await import('../../src/tokutei/xlsxEdit.ts');
+    const f = unzipSync(new Uint8Array(readFileSync(`${out}/shinsei-kurume.xlsx`)));
+    const at = (ref) => readCell(f, '申請書', ref);
+    assert.deepEqual([at('E5'), at('E10'), at('I10')], ['山田 花子', '久留米市', '見本町1-2-3']);
+    assert.match(at('C12'), /シャワーベンチ FSフィット/);
+    assert.equal(at('S12'), '【販売事業者名】\n太陽シルバーサービス㈱　久留米営業所');
+    assert.deepEqual([at('H20'), at('L22')], [String(30800 + 12144), '4295']); // 購入金額合計・支払額（1割）
+    assert.equal(['Q', 'S', 'U', 'W', 'Y', 'AA', 'AC', 'AE'].map((c) => at(`${c}44`)).join(''), '12345678');
+    assert.equal(ellipseCount(f, '申請書'), 2); // 元号・支払方法（受領委任払い）
+    const {KU_CELLS} = await import('../../src/tokutei/shinsei/kurumeCells.ts');
+    // 保険給付額（42,944 − 4,295）：委任状と、請求書の11マス（頭に￥）
+    assert.equal(readCell(f, '委任状（受領委任払用）', KU_CELLS.proxy.benefit), '38649');
+    assert.equal(Array.from({length: 11}, (_, k) => readCell(f, '請求書', KU_CELLS.claim[`d${k}`])).join(''), '￥38649');
+  }
+  await page.setViewportSize({width: 390, height: 844});
+  await preview.getByRole('group', {name: '請求書', exact: true}).waitFor();
+  await page.waitForTimeout(300);
+  assert.ok((await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1, 'スマホの幅の久留米市の申請書で横にはみ出している');
+  await page.locator('[data-field="seller"]').screenshot({path: `${out}/07e-phone-seller-kurume.png`});
+  await page.setViewportSize({width: 1366, height: 900});
+  // ---- 大分市（2026-11-04）：支給申請書（第12号様式）と委任状の2枚。要介護状態区分の行がある
+  await page.getByRole('textbox', {name: '住所', exact: true}).fill('大分県大分市見本町1-2-3');
+  await page.getByLabel('保険者', {exact: true}).selectOption('oita');
+  await page.getByRole('tab', {name: '📄 申請書（大分市）'}).waitFor();
+  await preview.getByRole('group', {name: '委任状', exact: true}).waitFor();
+  assert.deepEqual(await groups(), ['支給申請書', '委任状']);
+  assert.equal(await page.getByRole('group', {name: '要介護状態区分'}).count(), 1);
+  await page.getByLabel('販売事業者の営業所').selectOption('大分営業所');
+  await page.getByLabel('事業者番号').fill('4000000004');
+  await page.waitForFunction((sel) => !document.querySelector(sel)?.className.includes('bg-amber-50'), sellerRow);
+  await page.waitForFunction(() => document.querySelector('[aria-label="申請書のプレビュー"]')?.textContent?.includes('大分営業所'));
+  await page.waitForTimeout(300);
+  await page.screenshot({path: `${out}/04o-sale-shinsei-oita.png`});
+  await preview.getByRole('group', {name: '支給申請書', exact: true}).screenshot({path: `${out}/04p-shinsei-oita-sheet.png`});
+  const [oitaFile] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: '📗 申請書をExcelで保存'}).click()]);
+  await oitaFile.saveAs(`${out}/shinsei-oita.xlsx`);
+  {
+    const {readCell} = await import('../../src/tokutei/xlsxEdit.ts');
+    const f = unzipSync(new Uint8Array(readFileSync(`${out}/shinsei-oita.xlsx`)));
+    const at = (ref) => readCell(f, '支給申請書', ref);
+    assert.equal(at('AK3'), '\u3000□償還\u3000\u3000■受領委任');
+    assert.equal(at('I5'), '山田 花子');
+    assert.match(at('A12'), /シャワーベンチ FSフィット/);
+    assert.equal(at('I20'), '太陽シルバーサービス㈱　大分営業所');
+    assert.equal(['AK', 'AL', 'AM', 'AN', 'AO', 'AP', 'AQ', 'AR', 'AS', 'AT'].map((c) => at(`${c}20`)).join(''), '4000000004');
+    assert.equal(readCell(f, '委任状', 'C6'), '大分県大分市見本町1-2-3');
+  }
+
   // もとに戻す：営業所（設定。見積書の発行元）は行橋営業所・住所は行橋市
   await page.getByLabel('販売事業者の営業所').selectOption('行橋営業所');
   await page.getByRole('textbox', {name: '住所', exact: true}).fill('行橋市大字流末1327番地');
