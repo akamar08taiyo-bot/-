@@ -57,11 +57,14 @@ export function searchKey(s: string): string {
  */
 export const noHyphen = (s: string) => s.replace(/[\-\u2010-\u2015\u2212]/g, '').replace(/([a-z0-9])\u30fc(?=[a-z0-9])/g, '$1');
 
-/** 空白区切りのすべての語を含むか（大文字・小文字、全角・半角、品番の「-」のあるなしは見ない） */
+/**
+ * 空白区切りのすべての語を含むか（大文字・小文字、全角・半角、品番の「-」のあるなし・商品名の中の空白のあるなしは見ない。
+ * 「SD600-90」で「SD 600-90」も出る。住宅改修の部材の検索と同じ。ユーザーの指示「スペースを入れなくても商品検索にひっかかるようにする」2026-11-04）
+ */
 export function matchesAll(haystack: string, query: string): boolean {
   const terms = searchKey(query).split(' ').filter(Boolean);
   if (terms.length === 0) return true;
-  const h = searchKey(haystack);
+  const h = searchKey(haystack).replace(/ /g, ''); // 語には空白がないので、空白を除いた名前で探せばよい
   const hh = noHyphen(h);
   return terms.every((t) => h.includes(t) || hh.includes(noHyphen(t)));
 }

@@ -47,5 +47,8 @@ test('商品の検索（★ お気に入りから入力・商品マスタ）：�
   const hay = '見本の浴槽台 見本工業（株） MH-1234A 入浴補助用具';
   for (const q of ['MH-1234A', 'MH1234A', 'mh1234a', 'mh-1234a', 'ｍｈ１２３４ａ', 'ＭＨー１２３４Ａ', 'mh12', 'MH-12']) assert.ok(matchesAll(hay, q), q);
   assert.ok(matchesAll('見本の台 XX100', 'XX-100'));
+  // 商品名の中の空白のあるなしも見ない（「XX100-90」で「見本の台 XX 100-90」。2026-11-04）
+  for (const q of ['XX100-90', 'xx10090', 'XX 100-90', '見本の台XX']) assert.ok(matchesAll('見本の台 XX 100-90 W600', q), q);
+  assert.ok(!matchesAll('見本の台 XX 100-90 W600', 'XX100-80'));
   assert.ok(!matchesAll(hay, 'MH-1235'));
 });
