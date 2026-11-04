@@ -72,7 +72,11 @@ function BookView({materials, start, onAdd, onAddCode, onBack, onSwitch}: Props 
     if (choose) chooseRef.current?.scrollIntoView({block: 'nearest'});
   }, [choose]);
   // 右の一覧は同じ品番を1つに（施工イメージのページには同じ品番が何度も出る）
-  const listed = useMemo(() => [...new Map(current.codes.map((c) => [c.code, c])).values()], [current]);
+  // 並びはページを読む順（左の段の上から、次に右の段。PDF の文字の順はばらばら）
+  const listed = useMemo(
+    () => [...new Map(current.codes.map((c) => [c.code, c])).values()].sort((a, b) => Number(a.x >= 0.5) - Number(b.x >= 0.5) || a.y - b.y || a.x - b.x),
+    [current],
+  );
   const matches = (code: string) => catalogMaterials(materials, code, book);
   const pick = (code: string) => {
     setMark(code);
@@ -101,7 +105,7 @@ function BookView({materials, start, onAdd, onAddCode, onBack, onSwitch}: Props 
                 aria-pressed={b.id === book.id}
                 className={`h-8 px-3 text-sm ${b.id === book.id ? 'bg-emerald-50 font-bold text-emerald-900' : 'bg-white text-slate-600 hover:bg-slate-50'} [&+&]:border-l [&+&]:border-slate-300`}
               >
-                📖 {b.maker}
+                {b.maker}
               </button>
             ))}
           </span>

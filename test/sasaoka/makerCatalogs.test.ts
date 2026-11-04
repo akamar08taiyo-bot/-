@@ -83,3 +83,26 @@ test('TOTO のカタログ：74 ページ。品番の形・位置が 0〜1 の�
   const on = (page: number) => toto.pages.find((p) => p.page === page)!.codes.map((c) => c.code);
   assert.deepEqual(['YHB203#NW1', 'YHBS203FBR#EL', 'YHBS203FR#MW'].filter((c) => on(12).includes(c)).length, 3);
 });
+
+test('マツ六のカタログ（Vol.8）：品番のある 58 ページ。表の「商品コード｜品番」に枠・部材の載っているページ・初めに開くカタログ', () => {
+  const m6 = bookOf('matsu6');
+  assert.equal(m6.pages.length, 58);
+  assert.equal(m6.image(5), '../jutaku-mitsumori/catalog/matsu6-p005.jpg');
+  assert.equal(m6.isMaker('マツ六株式会社'), true);
+  const codes = m6.pages.flatMap((p) => p.codes);
+  assert.ok(codes.length >= 1000, String(codes.length));
+  for (const c of codes) {
+    assert.match(c.code, /^[A-Z]{1,4}-([A-Z]-)?\d{1,4}[A-Z0-9]{0,6}(-[A-Z0-9]{1,4})?$/, c.code);
+    for (const v of [c.x, c.y, c.x + c.w, c.y + c.h]) assert.ok(v >= 0 && v <= 1.001, `${c.code} ${v}`);
+  }
+  // p.5（手すり棒）の見本（目で見て確かめたもの）：枠は左の商品コード（040-2714）からかかる
+  const on = (page: number) => m6.pages.find((p) => p.page === page)!.codes;
+  const bj = on(5).find((c) => c.code === 'BJ-14WD')!;
+  assert.ok(bj && bj.x < 0.62 && bj.x + bj.w > 0.7, JSON.stringify(bj));
+  // 部材の載っているページ（マツ六の部材だけ）・色の記号のない品番は色ちがいから
+  const t = (code: string) => mat(code, '見本の手すり', 'マツ六');
+  assert.equal(catalogPageOf(t('BJ-14WD'))?.book, 'matsu6');
+  assert.equal(catalogPageOf(t('BD-134'))?.book, 'matsu6');
+  assert.deepEqual(catalogMaterials([t('BJ-14WD'), t('BJ-13WD')], 'BJ-14WD', m6).map((m) => m.code), ['BJ-14WD']);
+  assert.ok(catalogSearch(m6, 'bd-134', []).length >= 1);
+});

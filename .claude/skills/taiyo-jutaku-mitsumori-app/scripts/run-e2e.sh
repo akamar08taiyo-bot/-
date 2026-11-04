@@ -1,7 +1,7 @@
 #!/bin/sh
 # 見積書・請求書アプリのブラウザのテストを全部（37本）動かす（serve.mjs で http://localhost:5190 を配信しているあいだに。30分ほど）。
 # usage: node serve.mjs <サイト> sh run-e2e.sh <出力フォルダ> [リポジトリ（既定 /home/user/-）]
-# e2e-makercatalog.mjs は、サイトの jutaku-mitsumori/catalog/ にカタログのページの絵（リポジトリの catalog-yazaki/*.jpg・catalog-toto/*.jpg）を置いておく
+# e2e-makercatalog.mjs は、サイトの jutaku-mitsumori/catalog/ にカタログのページの絵（リポジトリの catalog-yazaki/*.jpg・catalog-toto/*.jpg・catalog-matsu6/*.jpg）を置いておく
 OUT=${1:?出力フォルダ}
 REPO=${2:-/home/user/-}
 mkdir -p "$OUT"

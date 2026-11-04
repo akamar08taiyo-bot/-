@@ -3,15 +3,17 @@
 // 該当の商品のみでもよいため、リンクで商品検索や商品名、型番等をひっぱってこれるようにしたい」2026-11-04）。
 // ・矢崎化工（「矢崎かこうのカタログです」p.12〜81）：PDF のページは絵だけなので、品番と位置は読み取り（scripts/yazaki-catalog/）で作った yazakiCatalogData.ts
 // ・TOTO（「TOTOカタログです」手すりカタログ 104ページ）：PDF の文字と位置を pdf.js で読んで作った totoCatalogData.ts（scripts/maker-catalog/）
+// ・マツ六（「マツ六のPDFカタログです」手すりカタログ Vol.8 100ページ）：TOTO と同じ作り（matsu6CatalogData.ts）。表の「商品コード｜品番」のどちらを押しても入る
 // 金額は持たない（ユーザーの指示「リポジトリに仕入れや定価は残さない」）。商品名・定価・仕切は、部材リスト（メーカーの価格表から取り込んだもの）の同じ品番から入れる。
-// ページの絵は太陽ポータルの jutaku-mitsumori/catalog/yazaki-p013.jpg・toto-p012.jpg など（リポジトリの catalog-yazaki/・catalog-toto/ を置く）。
+// ページの絵は太陽ポータルの jutaku-mitsumori/catalog/yazaki-p013.jpg・toto-p012.jpg・matsu6-p005.jpg など（リポジトリの catalog-yazaki/・catalog-toto/・catalog-matsu6/ を置く）。
 import {YAZAKI_PAGES} from './yazakiCatalogData.ts';
 import {TOTO_PAGES} from './totoCatalogData.ts';
+import {MATSU6_PAGES} from './matsu6CatalogData.ts';
 import type {Material} from './types.ts';
 
 export type CatalogCode = {code: string; x: number; y: number; w: number; h: number}; // 位置はページの幅・高さの割合
 export type CatalogPage = {page: number; codes: CatalogCode[]};
-export type BookId = 'yazaki' | 'toto';
+export type BookId = 'yazaki' | 'toto' | 'matsu6';
 export type CatalogBook = {
   id: BookId;
   maker: string; // 部材リストのメーカー名・画面の名前
@@ -31,7 +33,9 @@ const pagesOf = (raw: {page: number; codes: [string, number, number, number, num
 const imageOf = (head: string) => (page: number) => `../jutaku-mitsumori/catalog/${head}-p${String(page).padStart(3, '0')}.jpg`;
 const nfkc = (s: string) => s.normalize('NFKC');
 
+// 並びはボタンの並び（いちばん前が初めに開くカタログ。よく使うマツ六を先頭に）
 export const BOOKS: CatalogBook[] = [
+  {id: 'matsu6', maker: 'マツ六', pages: pagesOf(MATSU6_PAGES), image: imageOf('matsu6'), isMaker: (m) => /マツ六|matsu-?roku/i.test(nfkc(m)), variants: 'suffix'},
   {id: 'yazaki', maker: '矢崎化工', pages: pagesOf(YAZAKI_PAGES), image: imageOf('yazaki'), isMaker: (m) => /矢崎/.test(nfkc(m)), variants: 'suffix'},
   {id: 'toto', maker: 'TOTO', pages: pagesOf(TOTO_PAGES), image: imageOf('toto'), isMaker: (m) => /TOTO|東陶/i.test(nfkc(m)), variants: 'hash'},
 ];

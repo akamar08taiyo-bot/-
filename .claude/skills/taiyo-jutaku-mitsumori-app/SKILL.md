@@ -198,16 +198,17 @@ description: 太陽シルバーサービス行橋営業所の業務アプリ「�
 - **メーカーのカタログ（2026-11-04）**：actibook のリンク＝マツ六、カタラボ（catalabo.org）＝TOTO、catalog.kaientai.cc＝介援隊（ユーザーの答え）。`catalogs.ts` に URL。
   部材を選ぶ画面と見積書の左に「📖 マツ六／TOTO／介援隊」（新しいタブ）。外のサイトの中のクリックは受け取れない。この作業環境からは3つのサイトに接続できない（中を見られない）。
   マツ六のカタログの PDF をいただいたら、特定福祉用具の介援隊カタログと同じく「ページの商品を押すと入る」と、PDF に載っている商品だけの部材ごとのページのリンクを作る（ユーザーの答え「両方」）。
-- **メーカーのカタログ（2026-11-04。矢崎化工の PDF p.12〜81・TOTO の手すりカタログ 104ページ）**：部材を選ぶ画面の「📖 カタログから選ぶ」（`MakerCatalogView.tsx`、上の段で切り替え）。
-  カタログの決まりは `makerCatalogs.ts` の `BOOKS`（メーカー名・ページ・絵の場所・色ちがいの見つけ方 `variants`＝矢崎化工は品番のうしろの色の記号 suffix、TOTO は「#」のうしろ hash）。
+- **メーカーのカタログ（2026-11-04。マツ六の手すりカタログ Vol.8 100ページ・矢崎化工の PDF p.12〜81・TOTO の手すりカタログ 104ページ）**：部材を選ぶ画面の「📖 カタログから選ぶ」（`MakerCatalogView.tsx`、上の段で切り替え）。
+  カタログの決まりは `makerCatalogs.ts` の `BOOKS`（並び＝切り替えの並びで先頭が初めに開く＝マツ六。メーカー名・ページ・絵の場所・色ちがいの見つけ方 `variants`＝矢崎化工・マツ六は品番のうしろの色の記号 suffix、TOTO は「#」のうしろ hash）。
   ページの品番の枠を押すと `catalogMaterials`（1つならそのまま・2つ以上なら色を選ぶ・なければ品番だけの行）。部材の「📖 p.N」は `catalogPageOf`。
-  品番と位置：矢崎化工は OCR（`scripts/yazaki-catalog/ocr.mjs` → `merge.py`）、TOTO は pdf.js（`scripts/maker-catalog/render.mjs` → `codes.py`。PDF に日本語の字体が入っておらず
+  品番と位置：矢崎化工は OCR（`scripts/yazaki-catalog/ocr.mjs` → `merge.py`）、TOTO・マツ六は pdf.js（`scripts/maker-catalog/render.mjs` → `codes.py <text.json> toto|matsu6 <ts>`。
+  マツ六は表の「商品コード｜品番」の商品コードまで枠を広げる・表の1行が「␇」区切りの1つの文字になっていることがある（codes.py の split_cells）。PDF に日本語の字体が入っておらず
   poppler の pdftoppm では日本語が消えるので、絵も pdf.js＋Chromium で描く。pdf.js の modern build は「InvalidPDFException」で読めず legacy build で読めた）。**金額はカタログから取らない**（部材リスト＝価格表から）。
-  OCR・pdf.js の途中のファイル（金額の字も入る text.json など）は作業用のフォルダだけに置き、リポジトリに入れない。絵は `catalog-yazaki/`・`catalog-toto/` → ポータルの `jutaku-mitsumori/catalog/`（アプリを公開するとき、絵を変えたときだけ写す）。
+  OCR・pdf.js の途中のファイル（金額の字も入る text.json など）は作業用のフォルダだけに置き、リポジトリに入れない。絵は `catalog-yazaki/`・`catalog-toto/`・`catalog-matsu6/` → ポータルの `jutaku-mitsumori/catalog/`（アプリを公開するとき、絵を変えたときだけ写す）。
   ブラウザのテストは `e2e-makercatalog.mjs`（サイトの `jutaku-mitsumori/catalog/` に絵を置く）。同じ品番がページに2か所あることがある（`data-code` は `.first()`）。
   新しいメーカーのカタログを足すときは、文字のある PDF なら render.mjs → codes.py（品番の形の正規表現をそのメーカーに合わせる）、絵だけなら OCR、`BOOKS` に1行。
-- **マツ六のカタログ（actibook。ユーザーの「マツ六のカタログURLです。単体PDFにして、取り込んでください」2026-11-04）**：この作業環境からは saas.actibookone.com がネットワークの決まりで止められている（403）。
-  環境のネットワークの設定でそのドメインを許可してもらうか、PDF をもらってから、上と同じ作りで足す。
+- **マツ六のカタログ（actibook の cNo=18324＝`catalogs.ts` の外のリンクと同じカタログ）**：この作業環境からは saas.actibookone.com がネットワークの決まりで止められている（403）ので、
+  ユーザーに PDF（手すりカタログ Vol.8 の zip）をもらって取り込んだ（2026-11-04）。
 
 ## 落とし穴（同じ失敗をしない）
 
