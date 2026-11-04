@@ -757,6 +757,25 @@ try {
   const zoomNow = async () => Number((await zoomBar.getByRole('button', {name: 'もとの大きさ'}).innerText()).replace('%', ''));
   const paperW = async () => (await estPreview.locator('[role="group"]').first().boundingBox()).width;
   const w100 = await paperW();
+  // − ％ ＋ は用紙の上の段にあり、用紙（題名・日付）に重ならない（ユーザーの指摘「ここがおかしい」2026-11-04。前は用紙の右上に重ねていた）。スマホの幅でも
+  const noOverlap = async (tag) => {
+    // プレビューの枠を上まで戻してから測る（下へ動かしたときは、段が上に残って下を通る用紙を隠すのでよい）
+    await estPreview.evaluate((el) => {
+      for (let p = el; p; p = p.parentElement) if (p.scrollHeight > p.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(p).overflowY)) p.scrollTop = 0;
+    });
+    await zoomBar.first().scrollIntoViewIfNeeded();
+    await page.waitForTimeout(200);
+    const bar = await zoomBar.first().boundingBox();
+    const sheet = await estPreview.locator('[role="group"]').first().boundingBox();
+    assert.ok(bar.y + bar.height <= sheet.y + 1, `${tag}：拡大・縮小のボタンが見積書の用紙に重なっている（${JSON.stringify({bar, sheet})}）`);
+  };
+  await noOverlap('1366px');
+  await page.setViewportSize({width: 390, height: 844});
+  await page.waitForTimeout(400);
+  await noOverlap('390px');
+  await page.screenshot({path: `${out}/07f-phone-estimate-zoom.png`});
+  await page.setViewportSize({width: 1366, height: 900});
+  await page.waitForTimeout(300);
   await zoomBar.getByRole('button', {name: '大きく'}).click();
   assert.equal(await zoomNow(), 120);
   assert.ok((await paperW()) > w100 * 1.15);

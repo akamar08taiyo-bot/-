@@ -405,9 +405,10 @@ export function ShinseiPages<F extends string = ShinseiField>({
   return (
     <div ref={outerRef} className={print ? '' : 'relative'}>
       {!print && (
-        // 右上の − 100% ＋（プレビューの枠の中で動いても右上に残る）
-        <div className="sticky top-0 z-20 h-0">
-          <div role="group" aria-label="拡大・縮小" className="absolute right-1 top-1 flex items-center gap-1 rounded-lg border border-slate-300 bg-white/95 p-1 shadow-sm">
+        // − 100% ＋ は用紙の上の段（右寄せ）に置く。前は用紙の右上に重ねていて、見積書の題名「御見積書」と日付・申請書の題名が隠れた
+        // （ユーザーの指摘「ここがおかしい」2026-11-04。スマホの画面）。広い画面ではプレビューの枠の中を動かしても上に残る（段の地はプレビューの枠と同じ色＝bg-slate-200/70 を地の #f2f7f7 に重ねた色。下を通る用紙を隠す）
+        <div className="z-20 mb-2 flex justify-end bg-[#e7ecf2] lg:sticky lg:top-0 lg:-mt-2 lg:pt-2">
+          <div role="group" aria-label="拡大・縮小" className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white p-1 shadow-sm">
             <button type="button" className={tool} onClick={() => setZoom((z) => z / 1.2)} disabled={zoom <= ZOOM.min} aria-label="小さく" title="小さく（Ctrl＋スクロールでも）">
               −
             </button>
