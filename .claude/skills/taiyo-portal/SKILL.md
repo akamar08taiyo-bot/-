@@ -76,6 +76,9 @@ description: 太陽シルバーサービス㈱（行橋営業所）の「太陽�
    `node -e "const h=require('fs').readFileSync('index.html','utf8');for(const m of h.match(/<script>([\s\S]*?)<\/script>/g)||[])new Function(m.replace(/<\/?script>/g,''))"`
 5. **デプロイの確かめ**：github.io はこの作業環境から見えない（403）。GitHub MCP の `actions_list`（`list_workflow_runs`、owner `akamar08taiyo-bot`、repo はポータルなら `taiyo-portal`、perPage 3）で、
    自分の push の head_sha の「pages build and deployment」が completed／success になるのを見る（1分ほど）。走っている間は `actions_get`（`get_workflow_run`）。前景の sleep は使えないので、待つときは run_in_background の sleep か Monitor で。
+   **push したのにデプロイが始まらない**（2026-11-04。ポータルの 08d3598・6ac1263 は1時間以上 run が出なかった。同じ日にアプリのリポジトリへの push が Internal Server Error で何度か断られていた）：
+   `gh api repos/akamar08taiyo-bot/taiyo-portal --jq .pushed_at` を見る。ブランチの先頭は新しいコミットなのに pushed_at が前の push の時刻のままなら、GitHub が push を受け取った後の処理（Pages の起動）をしていない。
+   空のコミットをもう一度 push し、pushed_at が新しくなるのを確かめる（このときは e839e6f で直り、1分でデプロイされた）。`gh` の pages の API はこの環境の proxy で止められる（403）。
 6. 報告：スマホで古い画面が出たら「⟳ 読み込み直す」（ポータルのフォルダのアプリ）か、読み込み直し（Ctrl+F5・アプリの強制再読込）。
 
 新しいセッションでのリポジトリの用意：`add_repo`（owner・repo。push するなら access "push"）→ `git clone https://github.com/akamar08taiyo-bot/<名前> /home/user/<名前>` → `register_repo_root`。
