@@ -49,7 +49,7 @@ for (const minFont of [false, true]) {
   await page.waitForTimeout(1200);
   const tag = minFont ? '最小フォントあり' : 'ふつう';
   let seen = 0;
-  for (const ins of ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'kurume', 'iizuka']) {
+  for (const ins of ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'kurume', 'iizuka', 'oita']) {
     const sel = page.getByRole('combobox', {name: '保険者', exact: true});
     if (!(await sel.count())) break;
     const opts = await sel.locator('option').evaluateAll((l) => l.map((o) => o.value));
@@ -61,7 +61,7 @@ for (const minFont of [false, true]) {
     total += bad.length;
     seen++;
   }
-  assert.ok(seen >= 6, `申請書を ${seen} 保険者しか見ていない`);
+  assert.ok(seen >= 7, `申請書を ${seen} 保険者しか見ていない`);
   await page.getByRole('tab', {name: /理由書/}).first().click();
   await page.waitForTimeout(1500);
   const bad2 = await page.evaluate(check);

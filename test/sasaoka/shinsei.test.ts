@@ -1943,7 +1943,7 @@ const otJob = (extra: Partial<Job> = {}) =>
 /** 欄の文字（共有の文字＝原本のままの欄も、書いた文字も） */
 function cellTexts(files: Record<string, Uint8Array>): (xml: string, ref: string) => string {
   const strings = [...strFromU8(files['xl/sharedStrings.xml']).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) =>
-    [...m[1].replace(/<rPh\b[\s\S]*?<\/rPh>/g, '').matchAll(/<t[^>]*>([^<]*)<\/t>/g)].map((t) => t[1].replace(/\r\n/g, '\n')).join(''),
+    [...m[1].replace(/<rPh\b[\s\S]*?<\/rPh>/g, '').matchAll(/<t[^>]*>([^<]*)<\/t>/g)].map((t) => t[1].replace(/&#10;/g, '\n').replace(/\r\n/g, '\n')).join(''),
   );
   return (xml, ref) => {
     const shared = new RegExp(`<c r="${ref}"[^>]*t="s"[^>]*><v>(\\d+)</v>`).exec(xml)?.[1];
@@ -1967,7 +1967,8 @@ test('大分市：支給申請兼施工承認申請書に書く（改修の内�
   assert.equal(at('AN2'), '　　　□償還　　　　■受領委任'); // 原本で■受領委任
   // 改修の内容：手すりの取付け（17行）・段差の解消（19行）に箇所と施工者・予定日。ほかの種類は「－」で、予定日の欄は原本のまま
   assert.deepEqual([at('O17'), at('O19'), at('O21'), at('O27')], ['①浴室　②勝手口', '③トイレ', '－', '－']); // 欄の幅に入るだけ1行に並べる（packKindCells）
-  for (const r of [17, 19]) assert.deepEqual([at(`Z${r}`), at(`AJ${r}`), at(`AQ${r}`)], ['太陽シルバーサービス株式会社　見本営業所', ' R8・11・10', ' R8・11・12'], `${r}行`);
+  // 施工者の欄はせまいので「㈱」と営業所は次の行（はみ出しの検査 e2e-fit で 3px はみ出していた）
+  for (const r of [17, 19]) assert.deepEqual([at(`Z${r}`), at(`AJ${r}`), at(`AQ${r}`)], ['太陽シルバーサービス㈱\n見本営業所', ' R8・11・10', ' R8・11・12'], `${r}行`);
   assert.deepEqual([at('Z21'), at('AJ21')], ['', ' R　   ・　　　・']);
   const t = estimateTotals(j, OT_S);
   assert.ok(t.all.total > t.target.total && t.target.total > 0); // トイレの段差解消スロープは対象外
@@ -2034,6 +2035,13 @@ test('大分市の原本：申請書・委任状・理由書（表・裏）・�
   for (const ref of ['C4', 'C6', 'C22', 'C23']) assert.equal(text(byName.get('委任状')!, ref), '', ref);
   assert.equal(text(byName.get('理由書（表）')!, 'H16'), '　大分市');
   assert.equal(text(byName.get('理由書（表）')!, 'B3'), '□償還　■受領委任');
+  // 全角の空白で折り返しの位置を作っていた見出しは改行で区切る（Excel 以外の字体で崩れて、はみ出していた）
+  assert.equal(text(a, 'Z7'), '要介護状態\n区分等');
+  assert.equal(text(a, 'K46'), '銀行\u3000・\u3000金庫\n組合\u3000・\u3000農協');
+  const back = byName.get('理由書（裏）')!;
+  assert.equal(text(back, 'N5'), '④改修項目\n（改修箇所）');
+  assert.equal(text(back, 'B31').split('\n')[4], '□出入り口の出入（扉の開閉を含む）');
+  assert.ok(text(back, 'N9').split('\n').every((l) => !/\u3000{2,}(?![\u3000）])/.test(l.replace(/（\u3000+）/g, ''))), text(back, 'N9'));
   assert.equal(areaInsurerNo('oita', '大分県大分市見本町2-3'), '442012');
   assert.deepEqual(kindNamesOf({insurer: 'oita'}), ['手すりの取付け', '段差の解消', '床材の変更', '引き戸等への扉の取替え', '洋式便器等への便器の取替え', '付帯工事']);
   assert.equal(cityRest('大分県大分市見本町2-3', 'oita'), '見本町2-3');

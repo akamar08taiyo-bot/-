@@ -247,6 +247,7 @@ const TEXT_FIELD: Record<keyof ShinseiTexts, ShinseiField> = {
   targetYen: 'cost',
   excludedYen: 'cost',
   reasonTel: 'reason',
+  builderShort: 'works',
 };
 const MARK_FIELD: Record<keyof ShinseiMarks, ShinseiField> = {gender: 'gender', era: 'birth', care: 'care', renovated: 'renovated'};
 

@@ -8,6 +8,7 @@
 # 申請書・理由書の「□償還　□受領委任」は「■受領委任」にしておく（受領委任払いで出す。久留米市・飯塚市と同じ）。
 # usage: python3 make_oita_jutaku.py <sinnseishoexe.xls> <ininjyo.xlsx> <riyuusyoomotemen.xls> <riyuusyouramen.xlsx> <yukuhashi.xltx> <出力.xltx>
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -99,6 +100,42 @@ try:
     f.getCellRangeByName('B3').String = '□償還　■受領委任'
     for area in ('H5:AC5', 'H6:AC7'):
         field(FRONT, area)
+
+    # 原本の見出しは、全角の空白をたくさん並べて Excel の折り返しの位置を作っている（「要介護状態　　区分等」「銀行　・　金庫　　　　組合　・　農協」・
+    # 理由書（裏）の□の一覧）。字の幅のちがう字体（LibreOffice・アプリのプレビュー・字体のない端末）では行が崩れ、欄の外へはみ出すので、改行で区切る。
+    # かっこの中の空白（書き込む所）はそのまま。かっこで始まる行（「（扉の開閉も含む）」）は1字下げる
+    def lines_of(text):
+        # かっこの中の字のうしろの空白（「（扉の開閉を含む　　…　）」で閉じかっこを次の行へ送っていた）は詰める
+        text = re.sub('（([^（）　][^（）]*?)　{2,}）', r'（\1）', text)
+        out, depth, run = '', 0, ''
+        for ch in text:
+            if ch == '　' and depth == 0:
+                run += ch
+                continue
+            if run:
+                out += '\n' if len(run) >= 2 else run
+                run = ''
+            if ch in '（(':
+                depth += 1
+            elif ch in '）)':
+                depth = max(0, depth - 1)
+            out += ch
+        out = re.sub('(?<=[^\n])□', '\n□', out)  # □の項目はいつも行の頭から
+        # 書き込む所の「（　　　　　　　　）」は欄の幅（全角9字ほど）に入る長さに。項目のうしろのかっこは次の行へ
+        #（長いと行の終わりの空白が欄の外へ出る。アプリのプレビューのはみ出しの検査で見つかった）
+        out = re.sub('(?<=[^\n　])　*（　+）', '\n（　　　　　　）', out)
+        out = re.sub('（　+）', '（　　　　　　）', out)
+        return '\n'.join(('　' + l if l.startswith('（') else l) for l in out.split('\n'))
+
+    s.getCellRangeByName('Z7').String = '要介護状態\n区分等'
+    s.getCellRangeByName('AG7').String = '要支援 (　　　）　･　要介護 (　　　）'  # アプリが書く「要介護 (　２　）」と同じ長さ
+    s.getCellRangeByName('K46').String = '銀行　・　金庫\n組合　・　農協'
+    s.getCellRangeByName('Y46').String = '本店　・　支店\n出張所　・　支所'
+    back = sheets.getByName(BACK)
+    back.getCellRangeByName('N5').String = '④改修項目\n（改修箇所）'
+    for ref in ('B9', 'H9', 'N9', 'B19', 'H19', 'B31', 'H31', 'H40'):
+        c = back.getCellRangeByName(ref)
+        c.String = lines_of(c.String)
 
     # 印刷の設定：原本の余白・向き・1ページに合わせる（持ってきたシートは原本の設定が外れてヘッダー・フッターが付く）
     styles = doc.StyleFamilies.getByName('PageStyles')

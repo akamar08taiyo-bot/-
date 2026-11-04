@@ -178,7 +178,9 @@ export type ShinseiTexts = Record<
   | 'careTermR'
   | 'targetYen'
   | 'excludedYen'
-  | 'reasonTel',
+  | 'reasonTel'
+  // 大分市の改修の内容の行の改修工事施工者（せまい欄なので「株式会社」は「㈱」、営業所は次の行）
+  | 'builderShort',
   string
 >;
 
@@ -906,7 +908,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
         insuredNo: boxes('AP', 10, 3),
         marks: [ERA('L7')],
         kindCells: OITA_KIND_ROWS.map((r) => `O${r}`),
-        kindRows: OITA_KIND_ROWS.map((r) => ({texts: [T(`Z${r}`, '{builder}'), T(`AJ${r}`, ' R{startY}・{startM}・{startD}'), T(`AQ${r}`, ' R{endY}・{endM}・{endD}')]})),
+        kindRows: OITA_KIND_ROWS.map((r) => ({texts: [T(`Z${r}`, '{builderShort}'), T(`AJ${r}`, ' R{startY}・{startM}・{startD}'), T(`AQ${r}`, ' R{endY}・{endM}・{endD}')]})),
         texts: [
           T('L3', '{kana}'),
           T('L7', '明･大･昭　　{y}年　{m}月　{d}日生'),
@@ -1491,6 +1493,7 @@ export function shinseiValues(job: Job, s: EstimateSettings & BuilderSettings, t
       targetYen: estimated ? totals.target.total.toLocaleString('en-US') : '',
       excludedYen: estimated ? Math.max(0, (cost ?? totals.all.total) - totals.target.total).toLocaleString('en-US') : '',
       reasonTel: (job.riyu?.tel ?? '').normalize('NFKC').trim(),
+      builderShort: [s.company?.trim().replace(/株式会社/, '㈱'), s.officeName?.trim()].filter(Boolean).join('\n'),
     },
     cost,
     start: info.start,
@@ -1934,6 +1937,7 @@ export const EMPTY_SHINSEI: ShinseiValues = {
     targetYen: '',
     excludedYen: '',
     reasonTel: '',
+    builderShort: '',
   },
   cost: null,
   start: '',
@@ -2706,6 +2710,9 @@ export const numOf = (text: string | undefined, d: number) => (text !== undefine
 export type SheetLayout = {colW: (c: number) => number; rowH: (r: number) => number; merges: number[][]};
 
 /** シートの列の幅・行の高さ（画素。1始まり）と結合した欄 */
+/** 真偽の属性（Excel は "1"、LibreOffice で作った原本は "true" と書く。前は "1" だけを見ていて、LibreOffice の原本の折り返す欄を折り返さない欄として縮めていた） */
+const isOn = (v: string | undefined) => v === '1' || v === 'true';
+
 export function sheetLayout(xml: string): SheetLayout {
   const fmt = /<sheetFormatPr\b[^>]*>/.exec(xml)?.[0] ?? '';
   const defW = colPx(numOf(attrOf(fmt, 'defaultColWidth'), 9));
@@ -2713,12 +2720,12 @@ export function sheetLayout(xml: string): SheetLayout {
   const cols = [...xml.matchAll(/<col\b[^>]*>/g)].map((m) => ({
     min: numOf(attrOf(m[0], 'min'), 0),
     max: numOf(attrOf(m[0], 'max'), 0),
-    px: attrOf(m[0], 'hidden') === '1' ? 0 : colPx(numOf(attrOf(m[0], 'width'), 9)),
+    px: isOn(attrOf(m[0], 'hidden')) ? 0 : colPx(numOf(attrOf(m[0], 'width'), 9)),
   }));
   const rows = new Map<number, number>();
   for (const m of xml.matchAll(/<row\b[^>]*>/g)) {
     const ht = attrOf(m[0], 'ht');
-    if (attrOf(m[0], 'hidden') === '1') rows.set(numOf(attrOf(m[0], 'r'), 0), 0);
+    if (isOn(attrOf(m[0], 'hidden'))) rows.set(numOf(attrOf(m[0], 'r'), 0), 0);
     else if (ht !== undefined) rows.set(numOf(attrOf(m[0], 'r'), 0), (numOf(ht, 0) * 4) / 3);
   }
   const merges = [...xml.matchAll(/<mergeCell ref="([A-Z]+)(\d+):([A-Z]+)(\d+)"/g)].map((m) => [colNum(m[1]), Number(m[2]), colNum(m[3]), Number(m[4])]);
@@ -2811,9 +2818,9 @@ function cellStyle(files: Files, xml: string, ref: string): CellStyle {
     bold: /<b(?:\s+val="(?:1|true)")?\s*\/>/.test(font),
     horizontal: attrOf(align, 'horizontal') ?? 'general',
     vertical: attrOf(align, 'vertical') ?? 'bottom',
-    shrink: attrOf(align, 'shrinkToFit') === '1',
+    shrink: isOn(attrOf(align, 'shrinkToFit')),
     indent: numOf(attrOf(align, 'indent'), 0),
-    wrap: attrOf(align, 'wrapText') === '1',
+    wrap: isOn(attrOf(align, 'wrapText')),
     rotation: numOf(attrOf(align, 'textRotation'), 0),
   };
 }
