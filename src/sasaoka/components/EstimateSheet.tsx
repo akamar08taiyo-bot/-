@@ -249,31 +249,6 @@ export function EstimateSheet({
     if (!box || Object.keys(next).some((k) => next[k as keyof Box] !== box[k as keyof Box])) setBox(next);
   });
 
-  // 空いた行の「部材｜施工費｜常用」の右の薄い矢印と案内の位置（選んでいる行も。地の色は行に合わせる＝cur）。
-  // 表の中に置くと右の欄の罫線（border-collapse）が字の上に描かれるので、選んだ欄の枠と同じく表の外に重ねる
-  /** 欄のキーの行（いちばん下の空いた行は new。line:・excl: は行の ID） */
-  const rowIdOf = (k: string) => (k.startsWith('new:') ? 'new' : (k.split(':')[1] ?? ''));
-  const [guides, setGuides] = useState<{x: number; y: number; h: number; cur: boolean; key: string}[]>([]);
-  useLayoutEffect(() => {
-    const inner = innerRef.current;
-    if (!inner) return;
-    const b = inner.getBoundingClientRect();
-    const next = [...inner.querySelectorAll<HTMLElement>('.sheet-pick')].map((el) => {
-        // 横は「常用」のすぐ右、縦は行の高さいっぱい（上下の罫線の内側。字の上下に右の欄の縦の線がのぞかないように）
-        const r = el.getBoundingClientRect();
-        const row = el.closest('td')?.getBoundingClientRect() ?? r;
-        const round = (v: number) => Math.round(v * 10) / 10;
-        return {
-          x: round((r.right - b.left) / scale + 6),
-          y: round((row.top - b.top) / scale + 1),
-          h: round(row.height / scale - 2),
-          cur: !!el.closest('tr')?.hasAttribute('data-current'),
-          key: el.closest<HTMLElement>('[data-edit]')?.dataset.edit ?? '',
-        };
-      });
-    if (JSON.stringify(next) !== JSON.stringify(guides)) setGuides(next);
-  });
-
   // 選んだ欄を見えるところに出し、入力欄に文字が入るようにする（見積書の外の入力欄で打っているときは、そちらのまま）
   useEffect(() => {
     const el = findCell(sel);
@@ -787,15 +762,9 @@ export function EstimateSheet({
   };
 
   // ---------------------------------------------------------------- マウス
-  /** 空いた行の右の案内（「← 項目から選ぶ か ダブルクリックで品番入力」）を押したら、その行の内容の欄を押したことにする */
-  const guideCell = (t: HTMLElement) => {
-    const g = t.closest<HTMLElement>('[data-guide]');
-    return g ? (cells().find((c) => c.dataset.edit === g.dataset.guide) ?? null) : null;
-  };
   const onMouseDown = (e: ReactMouseEvent) => {
     let t = e.target as HTMLElement;
     if (sugRef.current?.contains(t)) return;
-    t = guideCell(t) ?? t;
     if (t.closest('[data-drop]')) {
       e.preventDefault(); // 欄の「▼」：欄は選ばない（押し終わったら候補を出す）
       return;
@@ -843,7 +812,7 @@ export function EstimateSheet({
     const t = e.target as HTMLElement;
     if (sugRef.current?.contains(t) || edit) return;
     if (t.closest('[data-pick]')) return; // 「部材｜施工費｜常用」は1回目で開いている
-    if (t === inputRef.current || t.closest('[data-edit]') || t.closest('[data-guide]')) {
+    if (t === inputRef.current || t.closest('[data-edit]')) {
       e.preventDefault();
       startEdit('edit');
     }
@@ -1138,15 +1107,6 @@ export function EstimateSheet({
                 aria-hidden="true"
               />
             )}
-            {/* 押すと、その行の内容の欄（ダブルクリックで品番を打てる）。案内は数量・単価の欄にかぶるので、出さないとき：打ち込んでいる欄・
-                同じ行のほかの欄（数量など）を選んでいる・いちばん下の行を「手」（施工費の時間）にしている */}
-            {guides
-              .filter((g) => !(editing && g.key === sel?.key) && !(sel && sel.key !== g.key && rowIdOf(sel.key) === rowIdOf(g.key)) && !(g.key === 'new:text' && mark === '手'))
-              .map((g, i) => (
-                <div key={i} className={`sheet-pick-guide${g.cur ? ' on-current' : ''}`} style={{left: g.x, top: g.y, height: g.h}} data-guide={g.key} aria-hidden="true">
-                  ← 項目から選ぶ か ダブルクリックで品番入力
-                </div>
-              ))}
             {insertMark && (
               <div className="sheet-insert-mark" style={{top: insertMark.top - 1.5, left: insertMark.left, width: insertMark.width}} aria-hidden="true">
                 <span>ここに1行入ります</span>

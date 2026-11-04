@@ -347,28 +347,7 @@ img {
   color: #5b21b6;
   box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.35);
 }
-/* 空いた行の「部材｜施工費｜常用」の右の薄い矢印と案内（EstimateSheet.tsx の guides。表の外の重ねで、空いた行の数量・単価の欄の上に出す。押せない）。
-   （ユーザーの指示「薄い矢印を持ってきて、項目から選ぶか、品番を入力みたいのがわかるようにする」2026-11-03）。選んでいる行（薄い緑）も同じ案内で、地の色だけ行に合わせる。
-   前は選んだ行だけ濃い緑の「⌨ 品番・品名を打つと検索」に替えていたが、「濃い緑の説明は不要」（2026-11-03）で外した */
-.sheet-pick-guide {
-  position: absolute;
-  z-index: 5;
-  cursor: text;
-  display: flex;
-  align-items: center;
-  padding: 0 3px;
-  border-radius: 2px;
-  background: #fff; /* 下の欄の罫線を隠す（半透明だと線が字の上に透けた） */
-  color: #94a3b8;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  line-height: 1.3;
-  white-space: nowrap;
-}
-.sheet-pick-guide.on-current {
-  background: #ecfdf5; /* 選んでいる行の地（.est-sheet tr[data-current] > td）と同じ */
-}
+/* 空いた行の「部材｜施工費｜常用」の右の薄い案内「← 項目から選ぶ か ダブルクリックで品番入力」は、ユーザーの指示「ここの説明は不要です」（2026-11-04）で外した */
 /* 選んでいる行（行の 挿入・削除・コピー・貼付が効く行）は薄い緑。マウスを乗せた欄は枠で分かるように（.est-sheet [data-edit]:hover）
    （ユーザーの指示「右の空いたスペースにのせたら、そのセルを選択していることが認識でき、削除やコピーなどをおこなえるようにする」2026-11-03） */
 .est-sheet tr[data-current] > td {

@@ -48,7 +48,7 @@ export function cellAt(loc) {
       if (prop === 'click')
         return async (opts = {}) => {
           const b = await target.boundingBox();
-          // 空いた行の内容の欄（まん中に「部材｜施工費｜常用」）は、右の端に「← 項目から選ぶ か ダブルクリックで品番入力」がかぶる（2026-11-03）ので左の空いた所
+          // 空いた行の内容の欄（まん中に「部材｜施工費｜常用」）は、左の空いた所（打つ所。2026-11-04 から点滅するカーソルも左の端）
           const pick = await target.evaluate((el) => !!el.querySelector(':scope > .sheet-pick')).catch(() => false);
           return target.click({position: {x: pick ? 6 : Math.max(4, b.width - 20), y: b.height / 2}, ...opts});
         };
@@ -62,7 +62,7 @@ export function cellAt(loc) {
  * 空いた行の内容の欄の「部材｜施工費｜常用」の字を除いた文字（2026-11-03 から、空いた行・いちばん下の新しい行の内容の欄にこのボタンが入る。
  * 行の文字を読むテストで、ボタンの字を内容として数えないように）
  */
-// 空いた行の「← 項目から選ぶ か 品番を入力」（薄い案内。2026-11-03）も外す
+// 空いた行の「← 項目から選ぶ か 品番を入力」（薄い案内。2026-11-03〜11-04。今は出さない）があっても外す
 export const noPick = (t) => t.replace(/部材\s*施工費\s*常用(\s*← 項目から選ぶ か (ダブルクリックで品番入力|品番を入力))?/g, '');
 
 /**

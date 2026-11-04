@@ -167,7 +167,7 @@ log('既製品の手すり（I型 600mm）→ 申請書のトイレの長さ 600
 
 // ---------------- いちばん下の打ち込める行（2026-11-03 のユーザーの指示）：
 //   「セルを動かした場合、EXCELの様に、チカチカさせて入力できることが視覚的にわかるように」→ 欄を選ぶとカーソルが点滅（打たない欄は出さない）
-//   「ダブルクリックで品番入力と説明」→ 右の案内は「← 項目から選ぶ か ダブルクリックで品番入力」。案内をダブルクリックしても品番を打てる
+//   「ダブルクリックで品番入力と説明」→ 欄をダブルクリックすると品番を打てる（右の薄い案内は「ここの説明は不要です」2026-11-04 で外した）
 //   「常に入力のセル上で、部材・施工費・常用をおく」→ 打っているあいだも「部材｜施工費｜常用」は欄の上に見えて押せる（打つ所はその右）
 //   「品番入力の一部でお気に入りを作成できるように」→ 候補の右の ☆ で★お気に入りに入れる。「BD132」と打って Enter で部材リストの BD-132 が入る
 //   「施工費は一覧とともに、数量をふやせるように」→ 施工費のリストの −／＋（開いたまま。その数だけ金額が増える）
@@ -176,8 +176,9 @@ await page.getByRole('tab', {name: '📋 工事見積書'}).click();
 await sheet.waitFor();
 const newText = sheet.locator('tr[data-new] [data-edit="new:text"]');
 await newText.scrollIntoViewIfNeeded();
-const guide = sheet.locator('.sheet-pick-guide[data-guide="new:text"]');
-assert.equal((await guide.innerText()).trim(), '← 項目から選ぶ か ダブルクリックで品番入力');
+// 右の薄い案内「← 項目から選ぶ か ダブルクリックで品番入力」は出さない（ユーザーの指示「ここの説明は不要です」2026-11-04）
+assert.equal(await sheet.locator('.sheet-pick-guide').count(), 0);
+assert.ok(!(await sheet.innerText()).includes('項目から選ぶ'));
 await newText.click({position: {x: 6, y: 8}});
 const sheetInput = sheet.locator('textarea.sheet-input');
 // 1回押しただけで、点滅するカーソル（.sheet-caret）が欄の左の端に出る（ユーザーの指示「チカチカは左端にする」2026-11-04。数字の欄も左の端）
@@ -194,7 +195,7 @@ await caret.evaluate((el) => (el.style.animation = 'none')); // 写真は点い�
 await page.screenshot({path: path.join(outDir, 'slots-06a-caret-new.png'), clip: {x: nb.x - 260, y: nb.y - 50, width: 760, height: 120}});
 await caret.evaluate((el) => (el.style.animation = ''));
 // 数字の欄（数量）も左の端
-// 空いた行の数量の欄には「← 項目から選ぶ…」の案内がかぶる（押すと内容の欄）ので、数の入った行（BD-08G など）の数量の欄で見る
+// 数の入った行（BD-08G など）の数量の欄で見る
 const qtyCell = sheet.locator('.form-page tr[data-rows] [data-edit$=":qty"]').filter({hasText: /\d/}).first();
 if (await qtyCell.count()) {
   const qb = await qtyCell.boundingBox();
@@ -206,8 +207,8 @@ if (await qtyCell.count()) {
   await page.mouse.click(nb.x + 6, nb.y + nb.height / 2);
 }
 const rowsBefore = await trs.count();
-const gb = await guide.boundingBox();
-await page.mouse.dblclick(gb.x + gb.width / 2, gb.y + gb.height / 2);
+const nb2 = await newText.boundingBox();
+await page.mouse.dblclick(nb2.x + 6, nb2.y + nb2.height / 2); // 欄の左の空いた所（「部材」の左）をダブルクリック
 assert.equal(await sheetInput.evaluate((el) => el.classList.contains('editing')), true);
 assert.equal(await sheetInput.getAttribute('aria-label'), '内容（品名）');
 // 打っているあいだも「施工費」のボタンが見えて、いちばん上にある（入力欄の下に隠れない）
