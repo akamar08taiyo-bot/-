@@ -161,6 +161,21 @@ try {
   assert.ok(labels.find((l) => /p\.172/.test(l))?.includes('ポータブルトイレ'));
   await page.screenshot({path: `${out}/c5-catalog-pages.png`});
 
+  // ---- ④ 同じ名前の品番（p.173 家具調トイレ セレクトS）：色・品番を選ぶ欄に「ノーマル 標準便座 快適脱臭」などの違いが出る
+  //（ユーザーの指示「脱臭や暖房など、型番だけでなく、商品をえらびやすいようにする」2026-11-04。前はどれも「家具調トイレセレクトSシリーズ」だけ）
+  await pages.getByRole('button', {name: /p\.173/}).click();
+  const selectS = viewer.getByRole('button', {name: '家具調トイレセレクトSシリーズを選ぶ'});
+  await selectS.waitFor({timeout: 30000});
+  await selectS.click();
+  const chooser = viewer.getByRole('dialog', {name: '色・品番を選ぶ'});
+  await chooser.waitFor();
+  const variants = (await chooser.getByRole('button').filter({hasText: /534-0/}).allInnerTexts()).map((t) => t.replace(/定価.*$/s, '').replace(/\s+/g, ' ').trim());
+  assert.equal(variants.length, 12);
+  assert.equal(new Set(variants).size, 12, variants.join(' | '));
+  assert.ok(variants.includes('ノーマル 標準便座 快適脱臭 534-023'), variants.join(' | '));
+  assert.ok(variants.includes('はねあげ 暖房便座 534-028'), variants.join(' | '));
+  await page.screenshot({path: `${out}/c6-catalog-variants.png`});
+
   assert.deepEqual(errors, []);
   console.log(`ok: カタログの取り込み（${imported}件・定価・仕切は空欄）→ お気に入りから入力（品目シャワーチェア）→ カタログのページの品目`);
 } finally {

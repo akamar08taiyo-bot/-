@@ -363,9 +363,42 @@ test('品番のすぐ下・すぐ上の種類の名前・表の左の見出し�
   const p214 = await productsOf(214);
   assert.equal(label(p214, 'MSRP1076'), '幅76×奥行3×高さ1cm');
   assert.equal(label(p214, 'S-59'), '奥行21×高さ5.9cm');
-  // 入れ子の見出し（p.173 ノーマル→標準便座→快適脱臭）は、まちがえて付けるより付けない
-  assert.equal(label(await productsOf(173), '534-020'), '');
   // 写真の横の寸法の行（「VALSBDLOR L：」「SAVS：」）を色にしない
   assert.equal(label(await productsOf(46), 'VALSBDSOR'), 'S/幅72cm');
   assert.equal(label(await productsOf(136), 'SAV'), 'スタンダード');
+});
+
+test('同じ名前の品番を見分ける：入れ子の見出し・表の上の見出し・●の行・品番の末尾の色（ユーザーの指示「脱臭や暖房など、型番だけでなく、商品をえらびやすいようにする」2026-11-04）', async () => {
+  const label = (ps: CatalogProduct[], code: string) => variantOf(ps, code).v.label;
+  // p.173 セレクトS：左の「ノーマル／はねあげ」（6行）→「標準便座／ソフト便座／暖房便座」（2行ずつ）→「快適脱臭」（2行目）
+  const p173 = await productsOf(173);
+  assert.deepEqual(
+    ['534-020', '534-023', '534-021', '534-024', '534-022', '534-025', '534-026', '534-031'].map((c) => label(p173, c)),
+    ['ノーマル 標準便座', 'ノーマル 標準便座 快適脱臭', 'ノーマル ソフト便座', 'ノーマル ソフト便座 快適脱臭', 'ノーマル 暖房便座', 'ノーマル 暖房便座 快適脱臭', 'はねあげ 標準便座', 'はねあげ 暖房便座 快適脱臭'],
+  );
+  // p.178 FX-30：左の「S 標準便座」、右の表の2行の見出し「自動ラップ2」「標準便座」と「快適脱臭」（その2行だけ）、色は品番の右
+  const p178 = await productsOf(178);
+  assert.equal(label(p178, '532-950'), 'S 標準便座 アースブラウン');
+  assert.equal(label(p178, '532-955'), 'S 暖房便座 ミストブルー');
+  assert.equal(label(p178, '533-480'), '自動ラップ2 標準便座 アースブラウン');
+  assert.equal(label(p178, '533-487'), '自動ラップ2 標準便座 快適脱臭 ミストブルー');
+  // p.177 ラフィーネ：表の上の便座の種類・●の行（前後傾調整脚・センサー式自動脱臭）・左の「長穴／標準便座タイプ」・品番の末尾の色（B：ブラウン など）
+  const p177 = await productsOf(177);
+  assert.equal(label(p177, 'PN-L30205BE'), 'プラスチック便座 長穴便座タイプ ベージュ');
+  assert.equal(label(p177, 'PN-L30201V'), 'プラスチック便座 前後傾調整脚 標準便座タイプ パープル');
+  assert.equal(label(p177, 'PN-L30218B'), '脱臭あたたか便座 前後傾調整脚 センサー式自動脱臭 長穴便座タイプ ブラウン');
+  // p.179 サニタリエース SD：表の上の「ソフト便座タイプ」「暖房便座タイプ」
+  const p179 = await productsOf(179);
+  assert.equal(label(p179, '871-135'), 'ソフト便座タイプ 補高#5');
+  assert.equal(label(p179, '871-145'), '暖房便座タイプ 補高#5');
+  // p.175 きらく ミニでか
+  assert.equal(label(await productsOf(175), '45611'), 'MY型 アイボリー');
+  // どのポータブルトイレのページも、1つの商品の品番の名前がみなちがう
+  for (const no of [172, 173, 174, 177, 178, 179]) {
+    for (const p of await productsOf(no)) {
+      if (p.variants.length < 2) continue;
+      const names = p.variants.map((v) => v.label);
+      assert.ok(names.every(Boolean) && new Set(names).size === names.length, `p.${no} ${p.name}: ${names.join(' / ')}`);
+    }
+  }
 });

@@ -1081,6 +1081,26 @@ try {
   await pickViewer.waitFor({state: 'detached'});
   assert.equal(await picker.getByRole('list').count(), 0);
   await page.screenshot({path: `${out}/05k-catalog-picked.png`});
+  // 「⛶ 拡大」：ページ1枚を A4 の形で（絵の所の縦横が 297:210）。「↙ 拡大を閉じる」で前の窓の大きさに戻る
+  // （ユーザーの指示「拡大ボタンをおすと開く、開くと、A４サイズに開く、閉じることもできるようにする」2026-11-04）
+  await searchBtn.click();
+  await pickViewer.waitFor();
+  const winBefore = await pickViewer.boundingBox();
+  await pickViewer.getByRole('button', {name: '⛶ 拡大'}).click();
+  const bigView = await pickViewer.getByLabel('カタログのページの絵').evaluate((el) => ({w: el.clientWidth, h: el.clientHeight}));
+  assert.ok(Math.abs(bigView.h / bigView.w - 297 / 210) < 0.02, JSON.stringify(bigView));
+  assert.ok(bigView.h > winBefore.height * 0.8, `${JSON.stringify(bigView)} ${JSON.stringify(winBefore)}`);
+  const bigBox = await pickViewer.boundingBox();
+  assert.ok(bigBox.y >= 0 && bigBox.y + bigBox.height <= 900 && bigBox.x >= 0 && bigBox.x + bigBox.width <= 1366, JSON.stringify(bigBox));
+  await pickViewer.getByText(/^\d+%$/).filter({hasText: '100%'}).waitFor();
+  await page.screenshot({path: `${out}/05l-catalog-big.png`});
+  await pickViewer.getByRole('button', {name: '↙ 拡大を閉じる'}).click();
+  const back = await pickViewer.boundingBox();
+  assert.deepEqual([back.x, back.y, back.width, back.height].map(Math.round), [winBefore.x, winBefore.y, winBefore.width, winBefore.height].map(Math.round));
+  // 拡大した大きさは覚えない（次に開いたときはふつうの窓）
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('taiyo-tokutei-catalog-window-v1') ?? 'null')?.h), Math.round(winBefore.height));
+  await pickViewer.getByRole('button', {name: 'カタログを閉じる'}).click();
+  await pickViewer.waitFor({state: 'detached'});
   // 「📖 カタログから商品検索」は品目・メーカーのすぐ下・商品名の上。「★ お気に入りから入力」は「🔢 型番から検索」の右（ユーザーの指示「お気に入りから入力は、型番検索の右にもってくる」2026-11-03）
   const yOf = async (loc) => (await loc.boundingBox()).y;
   assert.ok((await yOf(makerSel)) < (await yOf(searchBtn)) && (await yOf(searchBtn)) < (await yOf(catForm.getByLabel('商品名'))));

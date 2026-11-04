@@ -98,6 +98,8 @@ export function CatalogViewer({
   pickTo?: string;
 }) {
   const [box, setBox] = useState<Box>(firstBox);
+  // 「⛶ 拡大」で開いているあいだは、前の窓の位置・大きさと絵の大きさを持つ（「拡大を閉じる」で戻す）
+  const [big, setBig] = useState<{box: Box; zoom: number} | null>(null);
   const [query, setQuery] = useState(initial);
   const [only, setOnly] = useState<CatalogPagesFilter | null>(filter ?? null);
   const [texts, setTexts] = useState<(string | null)[]>(() => CATALOG.map(() => null));
@@ -313,12 +315,13 @@ export function CatalogViewer({
     if (matches.length && !matches.includes(current)) setCurrent(matches[0]);
   }, [query, matches]);
   useEffect(() => {
+    if (big) return; // 拡大した大きさは覚えない（次に開いたときは、ふつうの窓）
     try {
       localStorage.setItem(KEY, JSON.stringify(box));
     } catch {
       /* 覚えられなくても使える */
     }
-  }, [box]);
+  }, [box, big]);
   // スマホで住宅改修のタブの中（枠）にいるときは、枠が画面の上に来るように動かす（窓が枠の下のほうにあって、絵の所が画面の外になっていた）。
   // 枠に印を付けて、住宅改修の画面の右下の「📷 写真へ」を窓の上に重ねない（住宅改修の sasaoka.css）
   useEffect(() => {
@@ -387,6 +390,50 @@ export function CatalogViewer({
     if (!imgUrl) return;
     goOrigin();
   }, [current, imgUrl, pane.padX, pane.padY]);
+  /**
+   * 「⛶ 拡大」：ページ1枚をまるごと A4 の形で見る（ユーザーの指示「拡大ボタンをおすと開く、開くと、A４サイズに開く、閉じることもできるようにする」2026-11-04）。
+   * 絵の所を A4（210×297mm＝画面で 794×1123px）にする。画面に入らなければ、画面の高さに入る大きさの A4 の形（縦横の比は同じ）。
+   * 窓の上の段・ページの段の高さ（窓の幅で折り返しが変わる）は、大きさを変えたあとにも測り直して合わせる（a4Box・fitTries）。
+   * 絵の大きさは窓の幅いっぱい（100%）にして、ページの上の端を見せる
+   */
+  const a4Box = (): Box | null => {
+    const view = viewRef.current;
+    const root = rootRef.current;
+    if (!view || !root) return null;
+    const chromeH = root.offsetHeight - view.clientHeight; // 上の段・ページの段・よこのスクロールバー・枠
+    const chromeW = root.offsetWidth - view.clientWidth; // たてのスクロールバー・枠
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const imgH = Math.min(1123, vh - 16 - chromeH, ((vw - 16 - chromeW) * 297) / 210);
+    const w = Math.round((imgH * 210) / 297 + chromeW);
+    const h = Math.round(imgH + chromeH);
+    return {w, h, x: Math.round((vw - w) / 2), y: Math.max(8, Math.round((vh - h) / 2))};
+  };
+  const fitTries = useRef(0);
+  useLayoutEffect(() => {
+    if (!big || fitTries.current <= 0) return;
+    fitTries.current -= 1;
+    const next = a4Box();
+    if (!next || (Math.abs(next.w - box.w) <= 1 && Math.abs(next.h - box.h) <= 1)) {
+      fitTries.current = 0;
+      return;
+    }
+    setBox(next);
+  }, [big, box]);
+  const openBig = () => {
+    const next = a4Box();
+    if (!next) return;
+    fitTries.current = 4;
+    setBig({box, zoom: zoomRef.current});
+    setBox(next);
+    resetZoom();
+  };
+  const closeBig = () => {
+    if (!big) return;
+    setBox(clampBox(big.box));
+    zoomBy(big.zoom / zoomRef.current);
+    setBig(null);
+  };
   const tool = 'h-8 min-w-8 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-700 hover:bg-slate-50';
   return (
     <div
@@ -406,7 +453,7 @@ export function CatalogViewer({
           placeholder="カタログから検索（商品名・品番）"
           aria-label="カタログから検索"
           // スマホは1段まるごと（ボタンの段の下。前は幅が詰まって字が1字も見えなかった）
-          className="order-last h-8 min-w-0 basis-full rounded-md border border-slate-300 bg-white px-2 text-base sm:order-none sm:flex-1 sm:basis-0 sm:text-sm"
+          className="order-last h-8 min-w-0 basis-full rounded-md border border-slate-300 bg-white px-2 text-base sm:order-none sm:min-w-40 sm:flex-1 sm:basis-0 sm:text-sm"
         />
         <button type="button" className={tool} onClick={() => zoomBy(1 / 1.2)} aria-label="小さく">
           −
@@ -419,6 +466,16 @@ export function CatalogViewer({
           ＋
         </button>
         {/* 印刷：商品検索・カタログから検索で絞っていれば、そのページだけで印刷の画面を開く（ユーザーの指示「該当の項目で絞ったら絞ったものだけを表示する」2026-11-01） */}
+        {/* ⛶ 拡大（ページ1枚を A4 の形で）／拡大を閉じる（前の窓に戻す）。スマホは窓が画面いっぱいなので出さない */}
+        {big ? (
+          <button type="button" className={`${tool} hidden sm:inline-flex sm:items-center`} onClick={closeBig} aria-pressed="true">
+            ↙ 拡大を閉じる
+          </button>
+        ) : (
+          <button type="button" className={`${tool} hidden sm:inline-flex sm:items-center`} onClick={openBig} title="ページ1枚を A4 の大きさで見る">
+            ⛶ 拡大
+          </button>
+        )}
         <button
           type="button"
           className={`${tool} !border-sky-300 !bg-sky-50 !text-sky-900`}

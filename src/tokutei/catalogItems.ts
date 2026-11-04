@@ -371,7 +371,9 @@ function blockVariants(b: Block, photoColor: (code: string) => string): CatalogV
       orderCode: nearestY(orders, p.y)?.s ?? '',
     }));
   const out: CatalogVariant[] = [];
+  const ranges: TableRange[] = [];
   tables.forEach((tb, i) => {
+    ranges.push({tb, start: out.length, end: out.length + tb.rows.length});
     const left = i === 0 ? -Infinity : tb.x - 6;
     const right = tables[i + 1] ? tables[i + 1].x - 6 : Infinity;
     const top = tb.rows[0].y - 10;
@@ -425,7 +427,16 @@ function blockVariants(b: Block, photoColor: (code: string) => string): CatalogV
     const useUnder = okNames(under);
     const taken = new Set(useUnder ? under.flatMap((u) => u!) : []);
     const rest = useUnder ? {...b, tokens: b.tokens.filter((t) => !taken.has(t))} : b;
-    const labels = splitInline(tb.rows, rowLabels(rest, tb.rows, right, captions(rest, tb))).map((l, k) => (useUnder ? [l, lineText(under[k]!)].filter(Boolean).join(' ') : l));
+    const labelsWith = (heads: string[]) => splitInline(tb.rows, rowLabels(rest, tb.rows, right, heads)).map((l, k) => (useUnder ? [l, lineText(under[k]!)].filter(Boolean).join(' ') : l));
+    let labels = labelsWith(captions(rest, tb));
+    // 行の見分けがつかない（同じ名前・名前なしの行がある）表だけ、入れ子の見出しを読む（nestedCaptions。p.173 セレクトS・p.178 FX-30 など）。
+    // 見分けのつく表は前のまま（読み方を変えて、ほかの商品の名前が変わらないように）
+    const distinct = (list: string[]) => list.every(Boolean) && new Set(list).size === list.length;
+    if (tb.rows.length > 1 && !distinct(labels)) {
+      const nested = nestedCaptions(rest, tb);
+      const next = nested ? labelsWith(nested) : null;
+      if (next && new Set(next).size > new Set(labels).size) labels = next;
+    }
     const priceOf = assignPrices(twoLines ? tb.rows.map((r, k) => ({...r, y: (r.y + bottoms[k]) / 2})) : tb.rows, myPrices);
     tb.rows.forEach((r, k) => {
       const order = nearestY(myOrders.length ? myOrders : orders, r.y)?.s ?? '';
@@ -439,7 +450,94 @@ function blockVariants(b: Block, photoColor: (code: string) => string): CatalogV
       });
     });
   });
-  return out;
+  return out.length > 1 && !distinctLabels(out) ? withTableHeads(b, ranges, out) : out;
+}
+
+type TableRange = {tb: {x: number; rows: PdfText[]}; start: number; end: number};
+const distinctLabels = (list: CatalogVariant[]) => list.every((v) => v.label) && new Set(list.map((v) => v.label)).size === list.length;
+
+/**
+ * 表をまたいで品番の見分けがつかない商品（ユーザーの指示「脱臭や暖房など、型番だけでなく、商品をえらびやすいようにする」2026-11-04）に、
+ * 表の外の手がかりを足す。足すのは見つかったものだけ（見分けのつく商品は前のまま）：
+ *   表の上の見出し（p.179 サニタリエース SD の「ソフト便座タイプ」「暖房便座タイプ」、p.177 ラフィーネの「プラスチック便座」…「脱臭あたたか便座」）：
+ *     表の上 60pt までの、2つ以上の表の上にかかる見出しの行（いちばん近い行）。表ごとに、いちばん重なる言葉
+ *   ●の行（p.177 ラフィーネの「前後傾調整脚」「センサー式自動脱臭」）：表の左の言葉と、その表の上の●
+ *   品番の末尾の色（「※品番の末尾は、B：ブラウン、V：パープル…を表しています」）
+ */
+function withTableHeads(b: Block, ranges: TableRange[], out: CatalogVariant[]): CatalogVariant[] {
+  const extra = out.map(() => [] as string[]);
+  const add = (r: TableRange, w: string) => {
+    for (let k = r.start; k < r.end; k++) if (!extra[k].includes(w)) extra[k].push(w);
+  };
+  const firstY = Math.min(...ranges.map((r) => r.tb.rows[0].y));
+  const leftX = Math.min(...ranges.map((r) => r.tb.x));
+  const cell = (i: number): [number, number] => [ranges[i].tb.x - 2, ranges[i + 1] ? ranges[i + 1].tb.x - 2 : ranges[i].tb.x + 70];
+  // 表の上の字（字のかけらをつないだ言葉）
+  const above = b.tokens.filter((t) => isLabelSize(t) && between(firstY - t.y, 3, 60) && !/[¥￥]/.test(t.s));
+  const words = linesOf(above).flatMap((line) => {
+    const groups: PdfText[][] = [];
+    for (const t of [...line].sort((a, c) => a.x - c.x)) {
+      const g = groups.at(-1);
+      if (g && t.x - Math.max(...g.map((x) => x.x + x.w)) <= 1.5 && t.s !== '●' && g.at(-1)!.s !== '●') g.push(t);
+      else groups.push([t]);
+    }
+    return groups.map((g) => ({x: g[0].x, end: Math.max(...g.map((x) => x.x + x.w)), y: g[0].y, s: lineText(g)}));
+  });
+  const isMark = (s: string) => /^[●ー－\-]$/.test(s) || MARK.test(s);
+  // 見出しの行：近い行から、2つ以上の表にちがう言葉がかかる行
+  const lines = linesOf(words.filter((w) => !isMark(w.s) && w.end > leftX).map((w) => ({...w, w: w.end - w.x, h: 0}))).sort((a, c) => c[0].y - a[0].y);
+  for (const line of lines) {
+    const picks = ranges.map((_, i) => {
+      const [x0, x1] = cell(i);
+      const best = line.map((w) => ({w, o: Math.min(x1, w.x + w.w) - Math.max(x0, w.x)})).filter((x) => x.o > 0).sort((a, c) => c.o - a.o)[0];
+      return best?.w.s ?? '';
+    });
+    if (picks.filter(Boolean).length >= 2 && new Set(picks.filter(Boolean)).size >= 2) {
+      picks.forEach((w, i) => w && add(ranges[i], w));
+      break;
+    }
+  }
+  // ●の行：表の左の言葉（上下 5pt まで。2行の「前後傾」「調整脚」）と、表の上の●
+  const dots = words.filter((w) => w.s === '●');
+  for (const y of [...new Set(dots.map((d) => Math.round(d.y)))]) {
+    const name = words.filter((w) => w.end <= leftX && Math.abs(w.y - y) <= 5 && !isMark(w.s)).sort((a, c) => a.y - c.y || a.x - c.x).map((w) => w.s).join('');
+    if (!name) continue;
+    ranges.forEach((r, i) => {
+      const [x0, x1] = cell(i);
+      if (dots.some((d) => Math.abs(d.y - y) <= 1.6 && d.x >= x0 && d.x < x1)) add(r, name);
+    });
+  }
+  // 表の左の、行のまとまりの見出し（p.177 ラフィーネの「長穴便座タイプ」「標準便座タイプ」）：2つ以上あれば、どの表の行にも高さのいちばん近い見出し
+  const lowest = Math.max(...ranges.map((r) => r.tb.rows.at(-1)!.y));
+  const side = linesOf(b.tokens.filter((t) => isLabelSize(t) && t.x + t.w <= leftX - 2 && between(t.y, firstY - 6, lowest + 6) && !isMark(t.s) && !/[¥￥\d●]/.test(t.s)));
+  const groups: PdfText[][][] = [];
+  for (const l of side) {
+    const g = groups.at(-1);
+    if (g && l[0].y - g.at(-1)![0].y <= 8) g.push(l);
+    else groups.push([l]);
+  }
+  if (groups.length >= 2) {
+    const heads = groups.map((g) => ({y: (g[0][0].y + g.at(-1)![0].y) / 2, s: g.map(lineText).join('')}));
+    for (const r of ranges)
+      r.tb.rows.forEach((row, i) => {
+        const h = [...heads].sort((a, c) => Math.abs(a.y - row.y) - Math.abs(c.y - row.y))[0];
+        if (!extra[r.start + i].includes(h.s)) extra[r.start + i].push(h.s);
+      });
+  }
+  // 品番の末尾の色
+  const legend = /末尾は[、,，]?(.+?)を表して/.exec(b.tokens.map((t) => t.s).join(''))?.[1] ?? '';
+  const suffix = new Map([...legend.matchAll(/([A-Z]{1,3})[:：]([^、,，。:：A-Z]+)/g)].map((m) => [m[1], m[2].trim()]));
+  out.forEach((v, k) => {
+    const m = /^(.*\d)([A-Z]{1,3})$/.exec(v.code);
+    const color = m ? suffix.get(m[2]) : undefined;
+    if (color && !v.label.includes(color)) extra[k].push(color);
+  });
+  return out.map((v, k) => {
+    if (!extra[k].length) return v;
+    // 足した言葉に含まれる言葉（「ソフト便座タイプ」の「ソフト便座」）は消す
+    const own = v.label.split(/\s+/).filter((w) => w && !extra[k].some((e) => e.includes(w)));
+    return {...v, label: cleanLabel([...extra[k], ...own].join(' '))};
+  });
 }
 
 /**
@@ -505,6 +603,101 @@ function captions(b: Block, tb: {x: number; rows: PdfText[]}): string[] {
   const pick = tb.rows.map((r) => mid.map((m, i) => ({i, d: Math.abs(m - r.y)})).sort((a, c) => a.d - c.d)[0].i);
   // どの見出しにも、それにいちばん近い行がある（見出しが表の行の並びに沿っている）ときだけ
   return groups.every((_, i) => pick.includes(i)) ? pick.map((i) => text[i]) : tb.rows.map(() => whole);
+}
+
+/**
+ * 表の左の入れ子の見出し（ユーザーの指示「販売カタログから商品を検索する場合、脱臭や暖房など、型番だけでなく、商品をえらびやすいようにする」2026-11-04。
+ * 前は読めず、p.173 家具調トイレ セレクトS の12の品番がみな同じ名前で並んだ）。例 p.173：
+ *   「ノーマル」（6行のまん中）│「標準便座」「ソフト便座」「暖房便座」（2行ずつのまん中）│「快適脱臭」（2行目と同じ高さ）│ 534-020 …
+ *   → 534-020「ノーマル 標準便座」・534-023「ノーマル 標準便座 快適脱臭」・534-021「ノーマル ソフト便座」…
+ * 見出しは、表の左（左の表の金額・品番より右、品番の 110pt 左まで）の 5.8pt の字。左の位置で列に分け、列ごとに、見出しがどの行の見出しかを決める：
+ *   列に1つだけ → どの行にも／見出しで行を上から分けて、どの見出しもその行のまん中にある（2行に折り返した見出しはつないで見る）／
+ *   どの見出しも、つづいた行のまん中か同じ高さにある（p.178 の「快適脱臭」：その2行だけ）。
+ * どの列も決まり、行ごとの見出しが2つ以上にちがうときだけ返す（決まらなければ null。まちがえて付けるより付けない）
+ */
+function nestedCaptions(b: Block, tb: {x: number; rows: PdfText[]}): string[] | null {
+  const ys = [...new Set(tb.rows.map((r) => Math.round(r.y * 10) / 10))].sort((a, c) => a - c);
+  if (ys.length < 2) return null;
+  const top = ys[0] - 6;
+  const bottom = ys.at(-1)! + 6;
+  const isData = (t: PdfText) => isPrice(t) || /[¥￥★↑]|税抜|TAIS/.test(t.s) || t.s.split(/[、,，\s]+/).some((c) => CODE.test(c));
+  const limit = Math.max(tb.x - 110, ...b.tokens.filter((t) => isData(t) && t.x + t.w <= tb.x - 2 && between(t.y, top, bottom)).map((t) => t.x + t.w));
+  const toks = b.tokens.filter(
+    (t) => isLabelSize(t) && between(t.y, top, bottom) && t.x > limit && t.x + t.w <= tb.x + 1 && !/[●¥￥]/.test(t.s) && !MARK.test(t.s) && !/^[\d\s.,～~-]+$/.test(t.s),
+  );
+  if (!toks.length) return null;
+  // 字のかけら（「ソフ」「ト便座」）をつなぐ。すき間のある字は別の言葉（「S」と「標準便座」）
+  const words = linesOf(toks).flatMap((line) => {
+    const groups: PdfText[][] = [];
+    for (const t of [...line].sort((a, c) => a.x - c.x)) {
+      const g = groups.at(-1);
+      if (g && t.x - Math.max(...g.map((x) => x.x + x.w)) <= 1.5) g.push(t);
+      else groups.push([t]);
+    }
+    return groups.map((g) => ({x: g[0].x, y: g[0].y, s: lineText(g)}));
+  });
+  type Word = {y: number; s: string};
+  const near = (a: number, c: number, tol: number) => Math.abs(a - c) <= tol;
+  const mid = (list: number[]) => (list[0] + list.at(-1)!) / 2;
+  // 上から分ける：見出しの間のまん中で行を分け、どの見出しも自分の行のまん中にある
+  const partition = (list: Word[]): (number[] | null)[] | null => {
+    const cuts = list.slice(1).map((w, i) => (list[i].y + w.y) / 2);
+    const spans = list.map((_, i) => ys.filter((y) => (i === 0 || y >= cuts[i - 1]) && (i === list.length - 1 || y < cuts[i])));
+    return spans.every((sp, i) => sp.length > 0 && near(mid(sp), list[i].y, 2.5)) ? spans : null;
+  };
+  // つづいた行（いちばん短いもの）のまん中か同じ高さ。ほかの見出しと重ならない
+  const spansOf = (list: Word[]): (number[] | null)[] | null => {
+    const out: number[][] = [];
+    for (const w of list) {
+      let found: number[] | null = null;
+      for (let n = 1; n <= ys.length && !found; n++)
+        for (let i = 0; i + n <= ys.length && !found; i++) {
+          const sp = ys.slice(i, i + n);
+          if (near(mid(sp), w.y, 0.8) && !out.some((o) => o.some((y) => sp.includes(y)))) found = sp;
+        }
+      if (!found) return null;
+      out.push(found);
+    }
+    return out;
+  };
+  // 2行に折り返した見出し（「自動ラップ2」「標準便座」）をつなぐ
+  const joined = (list: Word[]): Word[] => {
+    const out: {ys: number[]; s: string}[] = [];
+    for (const w of list) {
+      const last = out.at(-1);
+      if (last && w.y - last.ys.at(-1)! <= 7.5) {
+        last.ys.push(w.y);
+        last.s += /[A-Za-z0-9]$/.test(last.s) ? ` ${w.s}` : w.s;
+      } else out.push({ys: [w.y], s: w.s});
+    }
+    return out.map((o) => ({y: mid(o.ys), s: o.s}));
+  };
+  const columns = columnsOf(words, 4).sort((a, c) => a[0].x - c[0].x);
+  const perRow = ys.map(() => [] as string[]);
+  for (const col of columns) {
+    const list = [...col].sort((a, c) => a.y - c.y);
+    if (list.length === 1) {
+      perRow.forEach((p) => p.push(list[0].s));
+      continue;
+    }
+    const merged = joined(list);
+    const tries: [Word[], (number[] | null)[] | null][] = [
+      [list, partition(list)],
+      [merged, merged.length > 1 ? partition(merged) : null],
+      [list, spansOf(list)],
+      [merged, spansOf(merged)],
+    ];
+    const ok = tries.find(([, sp]) => sp);
+    if (merged.length === 1) {
+      perRow.forEach((p) => p.push(merged[0].s));
+      continue;
+    }
+    if (!ok) return null;
+    ok[0].forEach((w, i) => ok[1]![i]!.forEach((y) => perRow[ys.indexOf(y)].push(w.s)));
+  }
+  const texts = perRow.map((p) => p.join(' '));
+  if (new Set(texts).size < 2) return null;
+  return tb.rows.map((r) => texts[ys.indexOf(Math.round(r.y * 10) / 10)] ?? '');
 }
 
 /**
