@@ -25,20 +25,24 @@ for (const size of [{width: 1366, height: 900}, {width: 390, height: 844}]) {
   await open.click();
   const dlg = page.getByRole('dialog', {name: '📑 ほかの市の申請書'});
   await dlg.waitFor();
-  for (const city of ['久留米市', '飯塚市', '大分市', '田川市']) {
+  // このアプリで作れる書類のリンクは外す（ユーザーの指示「大分、田川など、できたもののリンクは外して」2026-11-04）：
+  // 住宅改修は久留米市・飯塚市・田川市、福祉用具購入は田川市（広域連合の書式）が作れる。まだ作れない書類だけリンクを出す
+  const expect = {久留米市: ['福祉用具購入'], 飯塚市: ['福祉用具購入'], 大分市: ['住宅改修', '福祉用具購入'], 田川市: []};
+  for (const [city, kinds] of Object.entries(expect)) {
     const sec = dlg.getByRole('region', {name: city});
+    await sec.waitFor();
     const links = sec.getByRole('link');
-    assert.ok((await links.count()) >= 2, city);
     for (const a of await links.all()) {
       assert.equal(await a.getAttribute('target'), '_blank');
       assert.match(await a.getAttribute('rel'), /noopener/);
       assert.match(await a.getAttribute('href'), /^https:\/\//);
     }
-    assert.ok((await sec.innerText()).includes('住宅改修'), city);
-    assert.ok((await sec.innerText()).includes('福祉用具購入'), city);
+    const labels = (await links.allInnerTexts()).join('|');
+    for (const k of ['住宅改修', '福祉用具購入']) assert.equal(labels.includes(k), kinds.includes(k), `${city} の${k}：${labels}`);
   }
-  assert.match(await dlg.getByRole('region', {name: '久留米市'}).getByRole('link', {name: /住宅改修/}).getAttribute('href'), /city\.kurume\.fukuoka\.jp/);
-  assert.match(await dlg.getByRole('region', {name: '田川市'}).getByRole('link').first().getAttribute('href'), /fukuoka-kaigo\.jp/);
+  // 飯塚市の福祉用具購入は新しいページ（ユーザーの「飯塚市の福祉用具購入が開けません」2026-11-04）
+  assert.equal(await dlg.getByRole('region', {name: '飯塚市'}).getByRole('link', {name: /福祉用具購入/}).getAttribute('href'), 'https://www.city.iizuka.lg.jp/site/shinsei/1803.html');
+  assert.equal(await dlg.getByRole('region', {name: '田川市'}).getByRole('link').count(), 0);
   assert.ok((await page.evaluate(() => document.documentElement.scrollWidth)) <= size.width);
   await page.screenshot({path: path.join(outDir, `otherforms-${size.width}.png`)});
   if (size.width > 500) {
