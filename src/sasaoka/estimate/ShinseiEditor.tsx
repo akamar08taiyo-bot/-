@@ -7,7 +7,7 @@
 // 写真（PhotoBoard）：写真番号の箇所ごとに改修前・改修後の写真を入れ、入れ替える。プレビューの写真貼付用紙にも出し、Excel の写真貼付用紙に貼る。
 // 写真への書き込み（✏️。PhotoMarkEditor.tsx）は、写真貼付用紙の上の写真の大きさ（paperSize）で開く（線の太さ・文字の大きさが紙の上と同じ割合になるように）
 
-import {Fragment, useDeferredValue, useEffect, useMemo, useRef, useState} from 'react';
+import {Fragment, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {KeyboardEvent, ReactNode, RefObject} from 'react';
 import {isBlankRow, jobName} from '../calc.ts';
 import {Btn, KanaInput, TextInput, useToast} from '../components/ui.tsx';
@@ -19,7 +19,7 @@ import {usePhotoUrls} from '../photos.ts';
 import {turn} from '../photoEdit.ts';
 import {AREA_LABEL, INSURER_AREAS, insurerNoOf} from '../insurerNumbers.ts';
 import {photoBounds} from '../photoMarks.ts';
-import {autoLength, costIsTotal, estimatePlateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, planPlacement, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
+import {autoLength, costIsTotal, lengthsShown, estimatePlateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, planPlacement, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
 import type {AppData, Insurer, Job, Material, PhotoEdit, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
@@ -723,8 +723,26 @@ function Dim({
   // 1字ずつ消すと「120」「12」「1」が見積書に入るので、空にしたら打ち始めたときの長さに見積書を戻す（onClear）
   const [edit, setEdit] = useState<string | null>(null);
   const start = useRef({text: '', manual: false});
-  const shown = edit ?? (value.trim() || auto === undefined ? value : auto);
-  // 長さの欄（wide）は 2本の「600×1800」まで入る 8rem（前の 7rem は最後の字が欄に隠れた。2026-11-03 の全体のデバッグ）
+  const raw = value.trim() || auto === undefined ? value : auto;
+  // 長さの欄（wide）は 2本以上なら「400mm×600mm」と見せる（申請書の L= と同じ書き方。`lengthsShown`。押したときもその字のまま打ち直す）。
+  // 欄の字に mm があるときは、欄の右の「mm」は出さない
+  const shown = edit ?? (wide ? lengthsShown(raw) : raw);
+  const withUnit = /mm/i.test(shown);
+  // mm を付けて見せる長い長さ（「600mm×1800mm」）は、欄の字の幅を測って欄を広げる（8rem より広いときだけ）
+  const box = useRef<HTMLInputElement>(null);
+  const [fitW, setFitW] = useState(0);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!wide || !el || !withUnit) return setFitW(0);
+    const cs = getComputedStyle(el);
+    const ctx = (dimCanvas ??= document.createElement('canvas')).getContext('2d');
+    if (!ctx) return;
+    ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const pad = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth'].reduce((a, k) => a + (parseFloat(cs.getPropertyValue(k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`))) || 0), 0);
+    setFitW(Math.ceil(ctx.measureText(shown).width + pad + 6));
+  }, [shown, wide, withUnit]);
+  // 長さの欄（wide）は 2本の「600×1800」まで入る 8rem（前の 7rem は最後の字が欄に隠れた。2026-11-03 の全体のデバッグ）。
+  // mm を付けて見せる長い長さ（「600mm×1800mm×900mm」）は字の数に合わせて広げる
   return (
     <label className="inline-flex items-center gap-1 whitespace-nowrap">
       {label}
@@ -732,13 +750,20 @@ function Dim({
       <TextInput
         value={shown}
         onFocus={() => {
-          if (auto === undefined) return;
+          // 押したときも見えていた字のまま打ち直す（「400mm×600mm」。mm 付きでも長さは読める）
+          if (auto === undefined) {
+            if (wide) setEdit(lengthsShown(value));
+            return;
+          }
           start.current = {text: value.trim() ? value : auto, manual: !!value.trim()};
-          setEdit(start.current.text);
+          setEdit(wide ? lengthsShown(start.current.text) : start.current.text);
         }}
         onBlur={() => setEdit(null)}
         onChange={(v) => {
-          if (auto === undefined) return onChange(v);
+          if (auto === undefined) {
+            if (wide) setEdit(v);
+            return onChange(v);
+          }
           setEdit(v);
           if (v.trim() || !onClear) onChange(v);
           else onClear(start.current.text, start.current.manual);
@@ -746,15 +771,19 @@ function Dim({
         inputMode={wide ? undefined : 'numeric'}
         placeholder={placeholder}
         className={`${wide ? 'w-32' : 'w-16'} text-right ${missing ? 'bg-amber-50' : ''}`}
+        ref={box}
+        style={fitW > 128 ? {width: fitW} : undefined}
         aria-label={`${label}（mm）`}
         autoFocus={autoFocus}
         data-nav
         data-dim
       />
-      <span className="text-xs text-slate-500">mm</span>
+      {!withUnit && <span className="text-xs text-slate-500">mm</span>}
     </label>
   );
 }
+
+let dimCanvas: HTMLCanvasElement | undefined; // 長さの欄の字の幅を測る
 
 /**
  * 改修の内容：箇所ごとに 写真番号・改修場所・改修の種類と寸法。見積書の箇所と同じもの（ここで足した箇所は見積書にも出る）。

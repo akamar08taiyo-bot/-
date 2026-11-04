@@ -1023,6 +1023,31 @@ function mmText(v: string | undefined, many = false): string {
   return parts.map((x) => mmOf(x, unit)).join('×');
 }
 
+/**
+ * 長さの欄の1本ずつの長さ（mm）。「600×2」の ×2 は本数（600mm を2本。見積書の本数の `dimsLengths` と同じ読み方。前は申請書に「L=600mm×2mm」と書いていた）
+ */
+function lengthParts(v: string | undefined): string[] {
+  const out: string[] = [];
+  for (const x of mmText(v, true).split('×').filter(Boolean)) {
+    const prev = out.at(-1);
+    if (prev !== undefined && /^\d{1,2}$/.test(x) && Number(x) > 0) for (let k = 1; k < Number(x); k++) out.push(prev);
+    else out.push(x);
+  }
+  return out;
+}
+
+/** 長さを mm を付けて書く：1本ずつ mm を付ける「400mm×600mm」 */
+const withMm = (parts: string[]) => parts.map((x) => `${x}mm`).join('×');
+
+/**
+ * 申請書のタブの長さ・ベースプレートの欄に見せる形（打っていないとき）：2本以上なら申請書の L= と同じ「400mm×600mm」（ユーザーの答え「変えます」2026-11-04。
+ * 前は欄に「400×600」、欄の右に「mm」で、申請書の書き方とちがって見えた）。1本・数でない字は打ったまま（欄の右の「mm」）
+ */
+export function lengthsShown(v: string): string {
+  const parts = lengthParts(v);
+  return parts.length > 1 && parts.every((x) => /^\d+(\.\d+)?$/.test(x)) ? withMm(parts) : v;
+}
+
 /** 1つの寸法（「600」「600mm」「60cm」「0.6m」）→ mm の数。数でなければ打ったまま */
 function mmOf(t: string, unit?: string): string {
   const m = /^(\d+(?:\.\d+)?)(mm|cm|m|ミリ(?:メートル)?|センチ(?:メートル)?|メートル)?$/i.exec(t);
@@ -1057,13 +1082,9 @@ export function estimateLength(p: Pick<Place, 'rows'>): string {
 function dimsText(p: Pick<Place, 'kind' | 'rows' | 'dims'>): string {
   const d = p.dims ?? {};
   if (p.kind === 1) {
-    const l = mmText(d.l, true) || autoLength(p);
+    const l = lengthParts(d.l?.trim() ? d.l : autoLength(p));
     const h = mmText(d.h);
-    const ls = l
-      .split('×')
-      .map((x) => `${x}mm`)
-      .join('×');
-    return [l && `L=${ls}`, h && `H=${h}mm`].filter(Boolean).join(' ');
+    return [l.length > 0 && `L=${withMm(l)}`, h && `H=${h}mm`].filter(Boolean).join(' ');
   }
   if (p.kind !== 2) return '';
   return (
@@ -1092,13 +1113,8 @@ export function workTextLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'plateLe
  */
 function plateText(p: Pick<Place, 'kind' | 'plateLength'>): string {
   if (p.kind !== 1) return '';
-  const l = mmText(p.plateLength, true);
-  return l
-    ? `ベースプレート　L=${l
-        .split('×')
-        .map((x) => `${x}mm`)
-        .join('×')}`
-    : '';
+  const l = lengthParts(p.plateLength);
+  return l.length > 0 ? `ベースプレート　L=${withMm(l)}` : '';
 }
 
 /**

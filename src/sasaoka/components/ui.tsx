@@ -1,6 +1,6 @@
 import {createContext, useContext, useEffect, useRef, useState, useSyncExternalStore} from 'react';
 import {createPortal} from 'react-dom';
-import type {ButtonHTMLAttributes, DragEvent as ReactDragEvent, InputHTMLAttributes, ReactNode} from 'react';
+import type {ButtonHTMLAttributes, DragEvent as ReactDragEvent, InputHTMLAttributes, ReactNode, Ref} from 'react';
 import {toKatakana} from '../util.ts';
 import {CATALOGS} from '../catalogs.ts';
 
@@ -148,7 +148,7 @@ export function TextInput({
   onChange,
   className = '',
   ...rest
-}: {value: string; onChange: (s: string) => void; className?: string} & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
+}: {value: string; onChange: (s: string) => void; className?: string; ref?: Ref<HTMLInputElement>} & Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
   return (
     <input
       type="text"

@@ -7,7 +7,7 @@ import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import {DEFAULT_PLACES, defaultSettings, settingsForOffice} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {areaInsurerNo, INSURER_AREAS, insurerNoOf} from '../../src/sasaoka/insurerNumbers.ts';
-import {ageOn, boxLabels, checkBoxes, cityRest, fillShinsei, placeCounts, fixedPitch, hangLines, hangPrefixes, indentOf, splitNumber, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, kindNamesOf, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoNoteText, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, sheetLines, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
+import {ageOn, boxLabels, checkBoxes, cityRest, fillShinsei, placeCounts, fixedPitch, hangLines, hangPrefixes, indentOf, lengthsShown, splitNumber, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, kindNamesOf, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoNoteText, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, sheetLines, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
 import {KK_CELLS} from '../../src/sasaoka/shinsei/kitakyushuCells.ts';
 import {shinseiPreview} from '../../src/sasaoka/shinseiPreview.ts';
 import {cleanSettings} from '../../src/sasaoka/storage.ts';
@@ -1909,4 +1909,18 @@ test('飯塚市の原本：16枚（事前承認願書・承諾書・内訳書・
   assert.deepEqual([...byName.keys()], ['事前承認願書', '承諾書', '内訳書', '平面図', '事前写真①', '事前写真②', '事前写真③', '事前写真④', '事前写真⑤', '支給申請書', '支給写真①', '支給写真②', '支給写真③', '支給写真④', '支給写真⑤', '請求書']);
   for (const ref of ['F7', 'F8', 'S9', 'G12']) assert.equal(txt(byName.get('事前承認願書')!, ref), '', ref);
   assert.equal(areaInsurerNo('iizuka', '福岡県飯塚市見本町2-3'), '402057');
+});
+
+test('長さの書き方：1本ずつ mm を付ける「L=400mm×600mm」・「600×2」は 600mm を2本・欄に見せる形（ユーザーの答え「変えます」2026-11-04）', () => {
+  const place = (l: string, plateLength?: string) => ({kind: 1, rows: [], dims: {l}, ...(plateLength ? {plateLength} : {})}) as unknown as Place;
+  assert.equal(workText(place('400×600')), '手すりの取り付け　L=400mm×600mm');
+  assert.equal(workText(place('400mm×600mm')), '手すりの取り付け　L=400mm×600mm'); // 欄に mm 付きで入っていても同じ
+  assert.equal(workText(place('600×2')), '手すりの取り付け　L=600mm×600mm'); // 前は「L=600mm×2mm」
+  assert.equal(workText(place('60cm')), '手すりの取り付け　L=600mm');
+  assert.equal(workText(place('600', '800×800')), '手すりの取り付け　L=600mm　ベースプレート　L=800mm×800mm');
+  assert.equal(lengthsShown('400×600'), '400mm×600mm');
+  assert.equal(lengthsShown('600×1800×900'), '600mm×1800mm×900mm');
+  assert.equal(lengthsShown('600'), '600'); // 1本は欄の右の「mm」
+  assert.equal(lengthsShown(''), '');
+  assert.equal(lengthsShown('約600×800'), '約600×800'); // 数でない字は打ったまま
 });

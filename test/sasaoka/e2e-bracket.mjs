@@ -87,14 +87,21 @@ log('申請書の長さ 2400 → 2個・600×1800 → 1個 OK');
 
 // ---------------- 申請書の長さを空けると、見積書の手すりの長さを薄い字ではなくそのまま入れて見せる（ユーザーの指示「申請書で長さなど、何も入力していなくても
 // うっすら表示される。（入力したら手すりやベースプレートの長さから逆算して、申請書の長さを入力する）」2026-11-03）。
-// スマホのように1字ずつ消して空にしても（「600×18」「600」「6」が見積書に入る）、打ち始めたときの長さに戻る（手で入れた「600×1800」はそのまま）
+// スマホのように1字ずつ消して空にしても（「600mm×18」「600」「6」が見積書に入る）、打ち始めたときの長さに戻る（手で入れた「600×1800」はそのまま）
 await shinseiTab.click();
 await length.click();
 await page.keyboard.press('End');
-for (let i = 0; i < 8; i++) await page.keyboard.press('Backspace');
+for (let i = 0; i < 12; i++) await page.keyboard.press('Backspace'); // 「600mm×1800mm」の12字
 assert.equal(await length.inputValue(), ''); // 打っているあいだは空のまま
 await page.keyboard.press('Tab');
-assert.equal(await length.inputValue(), '600×1800');
+// 打っていないときは申請書と同じ「600mm×1800mm」と見せる（欄の右の「mm」は出さない。ユーザーの答え「変えます」2026-11-04）
+assert.equal(await length.inputValue(), '600mm×1800mm');
+assert.equal(await works.getByRole('listitem', {name: '①廊下'}).locator('label', {has: page.getByLabel('長さ（mm）')}).innerText(), '長さ');
+assert.ok(await length.evaluate((el) => el.scrollWidth <= el.clientWidth), '長さの欄に入りきらない');
+await works.getByRole('listitem', {name: '①廊下'}).screenshot({path: path.join(outDir, 'bracket-length.png')});
+await length.click();
+assert.equal(await length.inputValue(), '600mm×1800mm'); // 押しても同じ字（打ち直すと打った字）
+await page.keyboard.press('Tab');
 assert.equal(await length.getAttribute('placeholder'), '');
 assert.ok((await form.locator('[data-field="works"]').innerText()).length > 0);
 await estimateTab.click();
