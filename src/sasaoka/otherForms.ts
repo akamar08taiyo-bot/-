@@ -4,6 +4,9 @@
 // いただいた様式から作れるようにした市は make にその保険者を入れ、「＋ 〇〇の書式で作る」を出す。
 // どのページも 2026-11-02 に検索で見つけた公式のページ（作業環境からは市のサイトを開けないので、検索の結果の題名で確かめた）。
 // 市がページを移したら、ここを直す（tests: test/sasaoka/otherForms.test.ts）。
+// このアプリで作れるようになった書類のリンクは外す（ユーザーの指示「大分、田川など、できたもののリンクは外して」2026-11-04）：
+// 住宅改修は久留米市・飯塚市（いただいた様式）・田川市（広域連合の書式）、福祉用具購入は田川市（特定福祉用具の広域連合の書式）。
+// 飯塚市はサイトの場所が変わっていた（ユーザーの「飯塚市の福祉用具購入が開けません」2026-11-04。前の /koresido/… は開けない。検索で /site/shinsei/1803.html を確かめた）。
 
 import type {Insurer} from './types.ts';
 
@@ -24,8 +27,6 @@ export const OTHER_FORMS: OtherForm[] = [
     city: '久留米市',
     make: 'kurume',
     links: [
-      // 「3-4.介護保険居宅介護（介護予防）住宅改修関係申請書等」
-      {label: '🏠 住宅改修の申請書', url: 'https://www.city.kurume.fukuoka.jp/1500soshiki/9045kaigo/3020shinsei/2007-1218-1654-94.html'},
       // 「3-2.介護保険居宅介護（介護予防）福祉用具購入費支給申請書」
       {label: '🛁 福祉用具購入の申請書', url: 'https://www.city.kurume.fukuoka.jp/1500soshiki/9045kaigo/3020shinsei/2007-1218-1644-94.html'},
       // 「健康福祉部介護保険課 申請書」
@@ -37,12 +38,10 @@ export const OTHER_FORMS: OtherForm[] = [
     city: '飯塚市',
     make: 'iizuka',
     links: [
-      // 「介護保険住宅改修費関係 - 申請・手続案内」
-      {label: '🏠 住宅改修の申請書', url: 'https://www.city.iizuka.lg.jp/koresido/jyuutakukaishuu.html'},
-      // 「介護保険福祉用具購入費関係 - 申請・手続案内」（検索ではこの URL だけが出た）
-      {label: '🛁 福祉用具購入の申請書', url: 'https://city.iizuka.lg.jp/koresido/hukushiyougukounyuu.html'},
-      // 「介護保険関係の各種申請書・届出書の様式集」
-      {label: '📂 介護保険の様式集', url: 'https://www.city.iizuka.lg.jp/korehoken/youshikishu.html'},
+      // 「介護保険福祉用具購入費関係 - 申請・手続案内 - 飯塚市（介護保険課）」（2026-11-04 に検索で確かめた。前の /koresido/hukushiyougukounyuu.html は開けなかった）
+      {label: '🛁 福祉用具購入の申請書', url: 'https://www.city.iizuka.lg.jp/site/shinsei/1803.html'},
+      // 「介護保険関係の各種申請書・届出書の様式集 - 飯塚市（介護保険課）」
+      {label: '📂 介護保険の様式集', url: 'https://www.city.iizuka.lg.jp/soshiki/37/2307.html'},
     ],
   },
   {
@@ -60,11 +59,6 @@ export const OTHER_FORMS: OtherForm[] = [
     city: '田川市',
     note: '福岡県介護保険広域連合（田川・桂川支部）',
     make: 'kouiki',
-    links: [
-      // 「住宅改修・福祉用具購入等関係申請様式ダウンロード」
-      {label: '🏠🛁 住宅改修・福祉用具購入の申請書', url: 'https://www.fukuoka-kaigo.jp/application/benefit02.html'},
-      // 「田川・桂川支部」（窓口）
-      {label: '🏢 田川・桂川支部', url: 'https://www.fukuoka-kaigo.jp/inquiry/union/tagawa/'},
-    ],
+    links: [], // 住宅改修・福祉用具購入とも広域連合の書式で作れる（前は広域連合の様式のページ・田川・桂川支部へのリンク）
   },
 ];
