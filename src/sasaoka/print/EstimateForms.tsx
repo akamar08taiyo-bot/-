@@ -100,6 +100,19 @@ const pct = (rate: number) => num(Math.round(rate * 1000) / 10);
 /** 手で直せる欄の印（見積書に直接入力するときだけ） */
 const ed = (editable: boolean, key: string | null) => (editable && key ? {'data-edit': key} : {});
 
+/** 空いた行の欄（左から）と、打ち込める行の同じ列の欄の名前（金額・介護保険の欄・広域連合の材／手は打たない） */
+const YK_GAP = ['work', 'name', 'text', 'qty', 'unit', 'price', '', '', '', '', '', '', 'note'];
+const KK_GAP = ['name', 'work', '', 'text', '', 'qty', 'unit', 'price', '', '', 'photo', 'kind', '', '', '', '', 'note', 'note'];
+
+/**
+ * 打ち込める行（isNew）より下の空いた行が、その何行下か（1＝すぐ下）。打ち込める行がこのページにないときは 0（打てない。押すと打ち込める行へ）。
+ * その行に打つと、あいだを空白の行でうめてから入る（sheetEdit.ts の gap:）
+ */
+const gapNo = (page: (FormLine | undefined)[], i: number): number => {
+  const ni = page.findIndex((l) => l?.isNew);
+  return ni >= 0 && i > ni && !page[i] ? i - ni : 0;
+};
+
 /**
  * 見積書に直接入力するとき：mark 広域連合用の「材／手」（いちばん下の行に施工費を入れるか）。
  * copied：コピーした行（印を付ける）、pasting：コピーした行がある
@@ -278,7 +291,7 @@ export function YukuhashiForm({
                       </tr>
                     );
                   }
-                  return <YkLine key={i} line={page[i]} bottom={bottom} editable={editable} sheet={sheet} />;
+                  return <YkLine key={i} line={page[i]} gap={gapNo(page, i)} bottom={bottom} editable={editable} sheet={sheet} />;
                 })}
               </tbody>
             </table>
@@ -292,7 +305,7 @@ export function YukuhashiForm({
   );
 }
 
-function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined; bottom: string; editable: boolean; sheet: SheetOpts | null}) {
+function YkLine({line: l, gap, bottom, editable, sheet}: {line: FormLine | undefined; gap: number; bottom: string; editable: boolean; sheet: SheetOpts | null}) {
   const cell = (text: string, w: number, pt: number, cls = '', edit: string | null = null, lines = 1, extra: ReactNode = null): ReactNode => {
     const f = fitted(text, w, YK_ROW, pt, lines);
     return (
@@ -306,7 +319,8 @@ function YkLine({line: l, bottom, editable, sheet}: {line: FormLine | undefined;
     return (
       <tr className="g" style={{height: `${YK_ROW}mm`}} {...(sheet ? {'data-blank': ''} : {})}>
         {['ml', '', '', 'nr', 'nl', '', 'mr', 'nr', 'nl', '', 'mr', 'mr', 'mr'].map((c, i) => (
-          <td key={i} className={c + bottom} />
+          // 打ち込める行の下の空いた行も、打ち込める行と同じ欄に打てる（gap:何行下:欄）
+          <td key={i} className={c + bottom} {...ed(editable && sheet !== null && gap > 0, YK_GAP[i] ? `gap:${gap}:${YK_GAP[i]}` : null)} />
         ))}
       </tr>
     );
@@ -508,7 +522,7 @@ export function KouikiForm({job, settings: s, sheet = null}: {job: Job; settings
                       </tr>
                     );
                   }
-                  return <KkLine key={i} line={page[i]} height={h} bottom={bottom} hourRate={s.estimateHourRate} editable={editable} sheet={sheet} />;
+                  return <KkLine key={i} line={page[i]} gap={gapNo(page, i)} height={h} bottom={bottom} hourRate={s.estimateHourRate} editable={editable} sheet={sheet} />;
                 })}
                 <tr style={{height: '4.35mm'}}>
                   <td />
@@ -540,6 +554,7 @@ export function KouikiForm({job, settings: s, sheet = null}: {job: Job; settings
 
 function KkLine({
   line: l,
+  gap,
   height,
   bottom,
   hourRate,
@@ -547,6 +562,7 @@ function KkLine({
   sheet,
 }: {
   line: FormLine | undefined;
+  gap: number;
   height: number;
   bottom: string;
   hourRate: number;
@@ -566,7 +582,7 @@ function KkLine({
     return (
       <tr className="g" style={{height: `${height}mm`}} {...(sheet ? {'data-blank': ''} : {})}>
         {['ml', '', '', 'mr', 'gap', 'ml', '', '', 'mr', 'gap', 'ml', '', 'ml', '', '', 'mr', 'ml', 'mr'].map((c, i) => (
-          <td key={i} className={c + bottom} />
+          <td key={i} className={c + bottom} {...ed(editable && sheet !== null && gap > 0, KK_GAP[i] ? `gap:${gap}:${KK_GAP[i]}` : null)} />
         ))}
       </tr>
     );

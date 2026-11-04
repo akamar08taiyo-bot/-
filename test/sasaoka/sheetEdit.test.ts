@@ -30,6 +30,7 @@ import {
   stepLaborAt,
   toggleExcluded,
   toolPlace,
+  withGapRows,
 } from '../../src/sasaoka/sheetEdit.ts';
 import type {Job, Material, Place, Row, Settings} from '../../src/sasaoka/types.ts';
 
@@ -722,6 +723,41 @@ test('「＋ 挿入」は選んでいる行の上（部材の同上施工費な�
   const first = insertBlankBefore(job, a.rows[0].id);
   assert.equal(first.job.places[0].rows[0].id, first.rowId);
   assert.equal(insertBlankBefore(job, 'nope').rowId, null);
+});
+
+test('緑の行より下の空いた行（gap:何行下:欄）に打つと、あいだを空白の行でうめて、押した行の位置に入る（「別のセルでも入力したり、編集したりできるように」2026-11-04）', () => {
+  const m1 = materialRow(rail, 1);
+  const job: Job = {...emptyJob(), places: [newPlace('廊下', [m1])]};
+  // 2行下の内容の欄 → 空白の行2つ（緑の行とすぐ下）のあとに入る
+  const r = applySheet(job, 'gap:2:text', '見本の部材', yk);
+  const rows = r.job.places[0].rows;
+  assert.equal(rows.length, 4);
+  assert.equal(rows[0].id, m1.id);
+  assert.equal(rows[1].name, '');
+  assert.equal(rows[2].name, '');
+  assert.equal(rows[3].name, '見本の部材');
+  assert.equal(r.key, `line:${rows[3].id}:text`);
+  // 見積書でも押した行（緑の行の2行下）に出る
+  const lines = formLines(r.job, S, 'yukuhashi');
+  assert.equal(lines.findIndex((l) => l.text.includes('見本の部材')), 3);
+  // 何も打たない・改修の種類として読めない字は、空白の行も足さない
+  assert.equal(applySheet(job, 'gap:2:text', '  ', yk).job, job);
+  assert.equal(applySheet(job, 'gap:1:kind', 'あいう', yk).job, job);
+  // 数量だけ打っても、その行に入る
+  const q = applySheet(job, 'gap:1:qty', '3', yk);
+  assert.deepEqual(q.job.places[0].rows.map((x) => x.qty), [1, 1, 3]);
+  // 改修場所の欄：あいだを空白の行でうめてから、新しい箇所（その行に箇所の名前）
+  const p = applySheet(job, 'gap:1:name', '玄関', yk);
+  assert.deepEqual(p.job.places.map((x) => [x.name, x.rows.length]), [['廊下', 2], ['玄関', 0]]);
+  // 箇所がないときは作ってからうめる
+  const e = applySheet(emptyJob(), 'gap:1:text', '見本の部材', yk);
+  assert.deepEqual(e.job.places[0].rows.map((x) => x.name), ['', '見本の部材']);
+  assert.equal(withGapRows(emptyJob(), 3).places[0].rows.length, 3);
+  // 貼り付けも押した行の位置に
+  const pasted = pasteLines(job, 'gap:2:text', [materialRow(bar, 2)]);
+  assert.deepEqual(pasted.job.places[0].rows.map((x) => x.name), [rail.name, '', '', bar.name]);
+  assert.equal(sheetValue(job, 'gap:2:text', yk), '');
+  assert.equal(describeKey(job, 'gap:2:qty', S), '空いた行 ／ 数量');
 });
 
 test('施工費のリストの −／＋：開いた所のまとまりの数を変え、続けて押す所（key）を返す（「施工費は一覧とともに、数量をふやせるように」2026-11-03）', () => {

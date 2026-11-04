@@ -205,6 +205,7 @@ export function describeKey(job: Job, key: string, rates: EstimateRates): string
   if (kind === 'date') return '作成日';
   if (kind === 'overhead') return id === 'target' ? '諸経費（介護保険対象部分）' : '諸経費';
   if (kind === 'new') return ['いちばん下の空いた行', FIELD_NAMES[id] ?? ''].filter(Boolean).join(' ／ ');
+  if (kind === 'gap') return ['空いた行', FIELD_NAMES[field] ?? ''].filter(Boolean).join(' ／ ');
   const photos = photoNumbers(job, rates);
   const placeName = (p: Place) => `${photos.get(p.id) ? circled(photos.get(p.id)!) : ''}${p.name.trim() || '（改修場所なし）'}`;
   if (kind === 'place') {
@@ -233,6 +234,7 @@ export function sheetValue(job: Job, key: string, ctx: SheetCtx, date = ''): str
   const [kind, id, field] = key.split(':');
   const rates = ctx.settings;
   if (kind === 'split') return ''; // 箇所の2行目からの改修内容・改修場所の欄（空。打つと、その行から別の箇所＝`splitPlaceAt`）
+  if (kind === 'gap') return ''; // 打ち込める行より下の空いた行（`withGapRows`）
   if (kind === 'job') return String(job[id as 'customer' | 'insuredNo' | 'address'] ?? '');
   if (kind === 'date') return date;
   if (kind === 'overhead') {
@@ -421,6 +423,16 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
   }
   if (kind === 'split') return splitPlaceAt(job, id, field, text, rates);
   if (kind === 'new') return applyNew(job, id, text, ctx);
+  if (kind === 'gap') {
+    // 打ち込める行（緑の行）より下の空いた行に打ったとき：あいだを空白の行でうめてから、その行に入れる（Excel と同じく、打った所に入る。
+    // ユーザーの指示「別のセルでも入力したり、編集したりできるようにする」2026-11-04。前は押すと緑の行に移って、下の行には打てなかった）。
+    // 何も入らないとき（空・改修の種類として読めない文字）は空白の行も足さない
+    const n = Number(id);
+    if (!(n > 0) || (trimmed === '' && !(field === 'text' && ctx.pick))) return {job, key};
+    const placeField = field === 'name' || field === 'work' || field === 'kind' || field === 'photo';
+    if (placeField && !isLaborText(trimmed) && Object.keys(placePatch(field, text)).length === 0) return {job, key};
+    return applyNew(withGapRows(job, n), field, text, ctx);
+  }
   if (kind !== 'line') return {job, key};
 
   const found = findRow(job, id);
@@ -631,6 +643,17 @@ function laborFromBlank(job: Job, found: Found, text: string): SheetResult {
   return {job: setPlaceRows(job, found.pi, own ? rows.map((x) => (x.id === head.id ? {...x, estText: text} : x)) : rows), key: `line:${head.id}:text`};
 }
 
+/**
+ * 打ち込める行より n 行下の空いた行に打つ・貼り付けるとき：最後の箇所（なければ作る）の最後に空白の行を n 行足す
+ * （打った・貼り付けた行が、押した行の位置に入るように。空白の行は見積書では何もない行。あとで ✕削除 で消せる）
+ */
+export function withGapRows(job: Job, n: number): Job {
+  let j = job.places.length === 0 ? {...job, places: [newPlace('')]} : job;
+  const pi = j.places.length - 1;
+  j = setPlaceRows(j, pi, [...j.places[pi].rows, ...Array.from({length: n}, () => manualRow('material', {qty: 1}))]);
+  return j;
+}
+
 /** いちばん下の空いた行に打ち込んだとき */
 function applyNew(job: Job, field: string, text: string, ctx: SheetCtx): SheetResult {
   const trimmed = text.trim();
@@ -780,7 +803,7 @@ export function lineRows(job: Job, rowId: string): Row[] | null {
  * コピー・切り取りした行を貼り付ける。貼り付ける場所は選んでいる欄のキーから：
  *   明細の行（line:・excl:）→ その行のすぐ下（部材なら同上施工費のうしろ）。空白の行なら、その行に入れる
  *   箇所の欄（place:）→ その箇所の最初の行のすぐ下（行のない箇所ならその箇所に）
- *   いちばん下の空いた行（new:）→ 最後の箇所のうしろ（箇所がなければ作る）
+ *   いちばん下の空いた行（new:）→ 最後の箇所のうしろ（箇所がなければ作る）。その下の空いた行（gap:n:）は、あいだを空白の行でうめてから
  * 施工費は、すぐ上に施工費があればそのまとまりに入る（見積書では1行の同上施工費になる）。
  * removeIds：切り取ったもとの行（貼り付けたあとに消す。箇所の行がなくなれば箇所も消す）。
  * 返す rowId は、貼り付けた見積書の1行（選ぶ欄に使う）。貼り付ける場所がなければ null
@@ -804,7 +827,8 @@ export function pasteLines(job: Job, key: string, rows: Row[], removeIds: string
     const pr = job.places[pi].rows;
     const b = pr.length === 0 ? 0 : unitRange(pr, 0)[1];
     j = setPlaceRows(j, pi, [...pr.slice(0, b), ...copies, ...pr.slice(b)]);
-  } else if (kind === 'new') {
+  } else if (kind === 'new' || kind === 'gap') {
+    if (kind === 'gap' && Number(id) > 0) j = withGapRows(j, Number(id)); // 下の空いた行に貼り付けたら、その行の位置に入れる
     if (j.places.length === 0) j = {...j, places: [newPlace('')]};
     pi = j.places.length - 1;
     j = setPlaceRows(j, pi, [...j.places[pi].rows, ...copies]);
@@ -887,7 +911,7 @@ export function sheetTarget(job: Job, key: string): {place: Place | null; row: R
     return {place: f?.place ?? null, row: f?.row ?? null};
   }
   if (kind === 'place') return {place: job.places.find((p) => p.id === id) ?? null, row: null};
-  if (kind === 'new') return {place: job.places[job.places.length - 1] ?? null, row: null};
+  if (kind === 'new' || kind === 'gap') return {place: job.places[job.places.length - 1] ?? null, row: null};
   return {place: null, row: null};
 }
 

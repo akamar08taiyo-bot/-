@@ -180,7 +180,31 @@ const guide = sheet.locator('.sheet-pick-guide[data-guide="new:text"]');
 assert.equal((await guide.innerText()).trim(), '← 項目から選ぶ か ダブルクリックで品番入力');
 await newText.click({position: {x: 6, y: 8}});
 const sheetInput = sheet.locator('textarea.sheet-input');
-assert.equal(await sheetInput.evaluate((el) => el.classList.contains('ready') && getComputedStyle(el).caretColor !== 'rgba(0, 0, 0, 0)' && document.activeElement === el), true);
+// 1回押しただけで、点滅するカーソル（.sheet-caret）が欄の左の端に出る（ユーザーの指示「チカチカは左端にする」2026-11-04。数字の欄も左の端）
+const caret = sheet.locator('.sheet-caret');
+await caret.waitFor();
+assert.equal(await caret.evaluate((el) => getComputedStyle(el).animationName), 'sheet-caret-blink');
+assert.equal(await sheetInput.evaluate((el) => document.activeElement === el), true);
+const cb = await caret.boundingBox();
+const nb = await newText.boundingBox();
+assert.ok(cb.x >= nb.x && cb.x < nb.x + 8 && cb.y >= nb.y && cb.y + cb.height <= nb.y + nb.height + 1, `${JSON.stringify(cb)} ${JSON.stringify(nb)}`);
+// カーソルは「部材｜施工費｜常用」より左（空いた所）
+assert.ok(cb.x + cb.width < (await newText.locator('[data-pick="material"]').boundingBox()).x, '部材のボタンより左');
+await caret.evaluate((el) => (el.style.animation = 'none')); // 写真は点いているときに撮る
+await page.screenshot({path: path.join(outDir, 'slots-06a-caret-new.png'), clip: {x: nb.x - 260, y: nb.y - 50, width: 760, height: 120}});
+await caret.evaluate((el) => (el.style.animation = ''));
+// 数字の欄（数量）も左の端
+// 空いた行の数量の欄には「← 項目から選ぶ…」の案内がかぶる（押すと内容の欄）ので、数の入った行（BD-08G など）の数量の欄で見る
+const qtyCell = sheet.locator('.form-page tr[data-rows] [data-edit$=":qty"]').filter({hasText: /\d/}).first();
+if (await qtyCell.count()) {
+  const qb = await qtyCell.boundingBox();
+  await page.mouse.click(qb.x + qb.width / 2, qb.y + qb.height / 2);
+  await caret.waitFor();
+  const qc = await caret.boundingBox();
+  assert.ok(qc.x >= qb.x && qc.x < qb.x + 8, `数量の欄のカーソル ${JSON.stringify(qc)} ${JSON.stringify(qb)}`);
+  await page.screenshot({path: path.join(outDir, 'slots-06b-caret.png'), clip: {x: qb.x - 300, y: qb.y - 60, width: 700, height: 160}});
+  await page.mouse.click(nb.x + 6, nb.y + nb.height / 2);
+}
 const rowsBefore = await trs.count();
 const gb = await guide.boundingBox();
 await page.mouse.dblclick(gb.x + gb.width / 2, gb.y + gb.height / 2);
@@ -231,7 +255,40 @@ await page.waitForTimeout(300);
 const tail = (await trs.allInnerTexts()).slice(-2).map((t) => t.replace(/\s+/g, ' ').trim());
 assert.match(tail[0], /T-600/, tail.join('|'));
 assert.match(tail[1], /^同上施工費 1 式 1,500/, tail.join('|'));
-log('打ち込める行：カーソルの点滅・ダブルクリックで品番・☆でお気に入り・BD132＋Enter・施工費の −／＋・施工費に進む OK');
+// 緑の行の2行下の空いた行にも直接打てる：押した欄が選ばれ（緑の行へ移らない）、打つとその行の位置に入る
+// （ユーザーの指示「別のセルでも入力したり、編集したりできるようにする」2026-11-04）
+const gapQty = sheet.locator('tr[data-blank] [data-edit="gap:2:qty"]');
+await gapQty.scrollIntoViewIfNeeded();
+const gq = await gapQty.boundingBox();
+await page.mouse.click(gq.x + gq.width / 2, gq.y + gq.height / 2);
+const selBox = await sheet.locator('.sheet-sel').boundingBox();
+assert.ok(Math.abs(selBox.y - gq.y) < 2 && Math.abs(selBox.x - gq.x) < 2, `選んだ欄 ${JSON.stringify(selBox)} ${JSON.stringify(gq)}`);
+const gc = await caret.boundingBox();
+assert.ok(gc.x >= gq.x && gc.x < gq.x + 8 && gc.y >= gq.y, `空いた行のカーソル ${JSON.stringify(gc)}`);
+await caret.evaluate((el) => (el.style.animation = 'none'));
+await page.screenshot({path: path.join(outDir, 'slots-10-gap-select.png'), clip: {x: gq.x - 420, y: gq.y - 90, width: 760, height: 150}});
+// 金額の欄（打たない欄）を押すと、同じ行のとなりの欄（緑の行へ移らない）
+const gapRow = gapQty.locator('xpath=..');
+const amountTd = gapRow.locator('td').nth(6);
+const ab = await amountTd.boundingBox();
+await page.mouse.click(ab.x + ab.width / 2, ab.y + ab.height / 2);
+const selBox2 = await sheet.locator('.sheet-sel').boundingBox();
+assert.ok(Math.abs(selBox2.y - gq.y) < 2, `金額の欄を押した ${JSON.stringify(selBox2)}`);
+await page.mouse.click(gq.x + gq.width / 2, gq.y + gq.height / 2);
+const rowIndex = (loc) => loc.evaluate((tr) => [...tr.parentElement.children].indexOf(tr)); // ページの表の中の何行目か（打つと画面が動くので位置では比べない）
+const gapIndex = await rowIndex(gapRow);
+const before = await trs.count();
+await page.keyboard.type('2');
+await page.keyboard.press('Enter');
+await page.waitForTimeout(400);
+assert.equal(await trs.count(), before + 3); // 空白の行2つ＋打った行
+const filled = trs.nth(before + 2);
+assert.equal(await rowIndex(filled), gapIndex, '打った行が押した行の位置にない');
+assert.equal((await filled.locator('[data-edit$=":qty"]').first().innerText()).trim(), '2');
+await filled.scrollIntoViewIfNeeded();
+const fb = await filled.boundingBox();
+await page.screenshot({path: path.join(outDir, 'slots-11-gap-typed.png'), clip: {x: fb.x, y: fb.y - 110, width: 760, height: 170}});
+log('打ち込める行：カーソルの点滅（左の端）・ダブルクリックで品番・☆でお気に入り・BD132＋Enter・施工費の −／＋・施工費に進む・下の空いた行にも打てる OK');
 await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
 await form.waitFor();
 

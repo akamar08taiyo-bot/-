@@ -205,11 +205,13 @@ export function priceRate(list: number, price: number): number | null {
 
 /**
  * 何も入っていない部材の行（見積書の「挿入」で入れた行など）。見積書では空白の行になり、金額は0。
- * 品名などを打ち込めば、ふつうの部材の行になる
+ * 品名などを打ち込めば、ふつうの部材の行になる。数量だけ打っても（1 のほか）ふつうの行（Excel と同じく、打った数が見える。
+ * 前は数量だけ打った行は空白の行のままで、打った数が消えたように見えた。2026-11-04）
  */
 export function isBlankRow(r: Row): boolean {
   return (
     r.kind === 'material' &&
+    (r.qty === 1 || !r.qty) &&
     !r.name.trim() &&
     !r.maker.trim() &&
     !r.code.trim() &&

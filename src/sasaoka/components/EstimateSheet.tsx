@@ -36,8 +36,20 @@ type Sel = {key: string; occ: number};
 /** 打ち込んでいる欄。initial：F2・ダブルクリックで開いたときの欄の値（そのまま確定したら入れない） */
 type Edit = {mode: 'enter' | 'edit'; value: string; initial?: string};
 type Dir = 'up' | 'down' | 'left' | 'right' | 'next' | 'prev';
-/** pickX：空いた行の内容の欄（「部材｜施工費｜常用」のある欄）なら、「常用」のすぐ右（打ち込む所の左の端） */
-type Box = {x: number; y: number; w: number; h: number; font: string; family: string; align: string; pickX: number | null};
+/** pickL：空いた行の内容の欄（「部材｜施工費｜常用」のある欄）なら、「部材」の左の端（打ち込む所は欄の左の端からここまで） */
+type Box = {x: number; y: number; w: number; h: number; font: string; family: string; align: string; pickL: number | null};
+
+/** 点滅するカーソルの高さ：欄の字の大きさほど（欄より少し低く） */
+const caretH = (b: Box) => Math.max(8, Math.min(b.h - 4, parseFloat(b.font) * 1.2));
+
+/** 打った字の幅（見積書の中の大きさ。いちばん長い行） */
+let measureCtx: CanvasRenderingContext2D | null = null;
+const textWidth = (text: string, b: Box): number => {
+  measureCtx ??= document.createElement('canvas').getContext('2d');
+  if (!measureCtx) return 0;
+  measureCtx.font = `${b.font} ${b.family}`;
+  return Math.max(0, ...text.split('\n').map((l) => measureCtx!.measureText(l).width));
+};
 
 /** 保存のときに付く updatedAt のほかは同じ見積書か */
 const sameJob = (a: Job, b: Job) => a === b || JSON.stringify({...a, updatedAt: 0}) === JSON.stringify({...b, updatedAt: 0});
@@ -84,6 +96,7 @@ export function EstimateSheet({
   const [scale, setScale] = useState(1);
   const [innerH, setInnerH] = useState(0);
   const [box, setBox] = useState<Box | null>(null);
+  const [focused, setFocused] = useState(false); // 見積書の入力欄に打てる（点滅するカーソルを出す）
   const scrollRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -173,18 +186,23 @@ export function EstimateSheet({
     return (tr.querySelector('[data-edit]') as HTMLElement | null) ?? null;
   };
 
-  /** 空いた行を押したときは、打ち込める行（data-new）の同じ列 */
+  /**
+   * 空いた行の打たない欄（金額など）を押したときは、その行のいちばん近い打てる欄（打ち込める行の下の空いた行は、その行に打てる。
+   * ほかのページの空いた行など、打てる欄のない行は打ち込める行（data-new）の同じ列）
+   */
   const newRowCell = (td: HTMLElement | null): HTMLElement | null => {
-    const row = innerRef.current?.querySelector<HTMLElement>('tr[data-new]');
+    const own = td?.closest('tr');
+    const row = own?.querySelector('[data-edit]') ? own : innerRef.current?.querySelector<HTMLElement>('tr[data-new]');
     if (!row) return null;
     const editable = Array.from(row.querySelectorAll<HTMLElement>('[data-edit]'));
     if (!td) return editable[0] ?? null;
     const r = td.getBoundingClientRect();
     const cx = (r.left + r.right) / 2;
-    return editable.find((c) => {
+    const dist = (c: HTMLElement) => {
       const b = c.getBoundingClientRect();
-      return b.left <= cx && cx <= b.right;
-    }) ?? editable[0] ?? null;
+      return b.left <= cx && cx <= b.right ? 0 : Math.min(Math.abs(b.left - cx), Math.abs(b.right - cx));
+    };
+    return editable.reduce<HTMLElement | null>((best, c) => (!best || dist(c) < dist(best) ? c : best), null);
   };
 
   // 選んでいる欄の枠・入力欄の位置（ページの中の位置。拡大・縮小しても付いていく）。移動の予約があれば動かす
@@ -226,7 +244,7 @@ export function EstimateSheet({
       font: cs.fontSize,
       family: cs.fontFamily,
       align: cs.textAlign,
-      pickX: pick ? Math.round(((pick.getBoundingClientRect().right - b.left) / scale + 3) * 10) / 10 : null,
+      pickL: pick ? Math.round(((pick.firstElementChild ?? pick).getBoundingClientRect().left - b.left) / scale * 10) / 10 - 2 : null,
     };
     if (!box || Object.keys(next).some((k) => next[k as keyof Box] !== box[k as keyof Box])) setBox(next);
   });
@@ -418,11 +436,11 @@ export function EstimateSheet({
   // ---------------------------------------------------------------- 候補（内容は部材リスト・★お気に入り、改修の種類は①〜⑥、改修場所は箇所の名前）
   const field = sel?.key.split(':').pop() ?? '';
   const target = sel ? sheetTarget(job, sel.key) : {place: null, row: null};
-  const textCell = !!sel && field === 'text' && (sel.key.startsWith('new:') ? mark === '材' : target.row?.kind === 'material');
+  const textCell = !!sel && field === 'text' && (sel.key.startsWith('new:') ? mark === '材' : sel.key.startsWith('gap:') || target.row?.kind === 'material');
   const kindCell = !!sel && (field === 'work' || field === 'kind');
   // 改修場所（箇所名）：設定の「箇所の名前」から選べる（手で打ってもよい）
   // 箇所の2行目からの改修場所の欄（split:）も（打つとその行から別の箇所。`splitPlaceAt`）
-  const placeCell = !!sel && field === 'name' && (sel.key.startsWith('place:') || sel.key.startsWith('split:') || sel.key === 'new:name');
+  const placeCell = !!sel && field === 'name' && (sel.key.startsWith('place:') || sel.key.startsWith('split:') || sel.key.startsWith('gap:') || sel.key === 'new:name');
   const suggestions = useMemo(() => {
     if (!edit) return [] as {label: string; sub: string; value: string; pick: Material | null}[];
     const q = edit.value.trim();
@@ -963,15 +981,22 @@ export function EstimateSheet({
 
   // 打ち込む欄の位置・文字の大きさ（見積書の欄と同じ）
   const editing = edit !== null;
-  // 空いた行の内容の欄は「部材｜施工費｜常用」の右から打つ（ボタンは打っているあいだも欄の上に見えて押せる。ユーザーの指示「常に入力のセル上で、部材・施工費・常用をおく」2026-11-03。
-  // 前は入力欄が欄の全体に重なり、打ち始めると白い入力欄の下に隠れた）
-  const pickX = box?.pickX ?? null;
-  const taLeft = box ? (pickX ?? box.x) : 0;
-  const taMin = box ? Math.max(8, box.x + box.w - taLeft) : 10;
-  const taWidth = box ? (editing ? Math.max(taMin, pickX !== null ? 240 : field === 'text' || field === 'note' || field === 'address' || field === 'customer' ? 260 : 90) : taMin) : 10;
+  // 打つ字は欄の左の端から（Excel で打つときと同じ。数字の欄も、打っているあいだは左から。点滅するカーソルも左の端。
+  // ユーザーの指示「チカチカは左端にする」2026-11-04）。空いた行の内容の欄は「部材｜施工費｜常用」の左の空いた所から打ち、
+  // 打った字がそこに入りきらなくなったら右へのびる（ボタンは打ち始めても見えて押せる。ユーザーの指示「常に入力のセル上で、部材・施工費・常用をおく」2026-11-03）
+  const pickL = box?.pickL ?? null;
+  const pickRoom = box && pickL !== null ? Math.max(8, pickL - box.x) : null;
+  const taMin = box ? (pickRoom ?? Math.max(8, box.w)) : 10;
+  const taWidth = box
+    ? editing
+      ? pickRoom !== null
+        ? Math.max(pickRoom, textWidth(edit.value, box) + 10)
+        : Math.max(taMin, field === 'text' || field === 'note' || field === 'address' || field === 'customer' ? 260 : 90)
+      : taMin
+    : 10;
   const taStyle = box
     ? {
-        left: Math.max(0, Math.min(taLeft, PAGE_W - taWidth - 4)),
+        left: Math.max(0, Math.min(box.x, PAGE_W - taWidth - 4)),
         top: box.y,
         minWidth: taMin,
         width: taWidth,
@@ -979,7 +1004,7 @@ export function EstimateSheet({
         minHeight: box.h,
         fontSize: box.font,
         fontFamily: box.family,
-        textAlign: (pickX !== null ? 'left' : editing && box.align === 'right' ? 'right' : editing ? 'left' : box.align) as 'left' | 'right' | 'center',
+        textAlign: 'left' as const,
       }
     : {left: -9999, top: 0, width: 10, height: 10};
   const rows = editing ? Math.max(1, edit.value.split('\n').length) : 1;
@@ -1102,6 +1127,17 @@ export function EstimateSheet({
           <div ref={innerRef} className="relative" style={{width: PAGE_W, transform: `scale(${scale})`, transformOrigin: 'top left'}}>
             {form === 'kouiki' ? <KouikiForm job={job} settings={s} sheet={sheetOpts} /> : <YukuhashiForm job={job} settings={s} date={estDate} sheet={sheetOpts} />}
             {box && <div className="sheet-sel" style={{left: box.x, top: box.y, width: box.w, height: box.h}} />}
+            {/* 欄を1回押したら、Excel で打つときのようにカーソルを欄の左の端で点滅させる（打てる欄だと分かるように。ユーザーの指示「セルの上で1回クリックしたら、
+                EXCELと同じ様に、チカチカさせて入力できますよってわかるようにする」「チカチカは左端にする」2026-11-04。前のブラウザの細いカーソルは、数字の欄で右の線に重なって見えなかった）。
+                欄を移るたびに初めから（key）。打ち始めたら入力欄のカーソルになる。介護保険の対象／対象外・材／手の欄は打たないので出さない */}
+            {box && sel && !editing && focused && !isToggle(sel.key) && (
+              <div
+                key={`${sel.key}:${sel.occ}`}
+                className="sheet-caret"
+                style={{left: box.x + 4, top: box.y + (box.h - caretH(box)) / 2, height: caretH(box)}}
+                aria-hidden="true"
+              />
+            )}
             {/* 押すと、その行の内容の欄（ダブルクリックで品番を打てる）。案内は数量・単価の欄にかぶるので、出さないとき：打ち込んでいる欄・
                 同じ行のほかの欄（数量など）を選んでいる・いちばん下の行を「手」（施工費の時間）にしている */}
             {guides
@@ -1159,7 +1195,7 @@ export function EstimateSheet({
             )}
             <textarea
               ref={inputRef}
-              className={`sheet-input ${editing ? 'editing' : sel && !isToggle(sel.key) ? 'ready' : ''}`}
+              className={`sheet-input ${editing ? 'editing' : ''}`}
               style={taStyle}
               rows={rows}
               value={editing ? edit.value : ''}
@@ -1168,7 +1204,9 @@ export function EstimateSheet({
               onCopy={onCopy}
               onCut={onCut}
               onPaste={onPaste}
+              onFocus={() => setFocused(true)}
               onBlur={(e) => {
+                setFocused(false);
                 // 見積書の外（ボタンなど）を押したら、打ち込んでいた値を入れる（Excel と同じ）
                 if (edit && !scrollRef.current?.contains(e.relatedTarget as Node | null) && !sugRef.current?.contains(e.relatedTarget as Node | null)) {
                   commit(edit.value, null, null, true);

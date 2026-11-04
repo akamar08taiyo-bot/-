@@ -261,10 +261,22 @@ img {
   line-height: 1.25;
   white-space: pre;
 }
-/* 欄を選んだら、Excel で打ち込むときのようにカーソルを点滅させる（打てる欄だと分かるように。ユーザーの指示「セルを動かした場合、EXCELの様に、
-   チカチカさせて入力できることが視覚的にわかるようにする」2026-11-03）。介護保険の対象／対象外・材／手の切りかえの欄は打たないので出さない */
-.sheet-input.ready {
-  caret-color: #111827;
+/* 欄を1回押したら、Excel で打つときのようにカーソルを点滅させる（打てる欄だと分かるように。ユーザーの指示「セルを動かした場合、EXCELの様に、
+   チカチカさせて入力できることが視覚的にわかるようにする」2026-11-03、「セルの上で1回クリックしたら…チカチカさせて」2026-11-04）。
+   ブラウザのカーソル（caret-color）は細く、数字の欄では右の線に重なって見えなかったので、欄の左の端（「チカチカは左端にする」2026-11-04）に
+   太めの縦線を重ねて点滅させる（EstimateSheet.tsx の sheet-caret） */
+.sheet-caret {
+  position: absolute;
+  z-index: 7;
+  width: 3px; /* 見積書は縮めて出すので、画面では 2px ほど（細いと見落とす） */
+  background: #111827;
+  pointer-events: none;
+  animation: sheet-caret-blink 1.06s step-end infinite;
+}
+@keyframes sheet-caret-blink {
+  50% {
+    opacity: 0;
+  }
 }
 .sheet-input.editing {
   background: #fff;
