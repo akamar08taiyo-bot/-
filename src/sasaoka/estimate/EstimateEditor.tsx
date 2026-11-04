@@ -15,6 +15,7 @@ import type {PrintRequest} from '../print/PrintView.tsx';
 import {fillAdded, placeAfterQty, withBrackets} from '../cutLink.ts';
 import {addMaterial, changeRowQty, insertRowsAt, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
 import {isOpenSlot, slotQuery} from '../railSlots.ts';
+import type {BookId} from '../makerCatalogs.ts';
 import {jutakuSalesMonth, withBillMonth, withSalesMonth} from '../salesPlan.ts';
 import type {AppData, Insurer, Job, Kit, Material, NameSuffix, Place, ShinseiInfo} from '../types.ts';
 import type {Update} from '../useStore.ts';
@@ -25,8 +26,8 @@ import type {JobDocs} from '../components/DocsDialog.tsx';
 
 // at：見積書で選んでいた（タップしていた）行。部材・部材＋施工費（常用）はそこに入れる（`insertRowsAt`）
 type Picker =
-  // query：空きの行（「ブラケット」など）を選んで開いたときの検索の言葉（`slotQuery`）
-  | {placeId: string; kind: 'material'; at: string | null; query?: string}
+  // query：空きの行（「ブラケット」など）を選んで開いたときの検索の言葉（`slotQuery`）。book：初めから出すカタログ（見積書の左の「📖 マツ六」など）
+  | {placeId: string; kind: 'material'; at: string | null; query?: string; book?: BookId}
   | {placeId: string; kind: 'kit'; at: string | null};
 
 export function EstimateEditor({
@@ -322,9 +323,9 @@ export function EstimateEditor({
         materials={data.materials}
         labor={data.labor}
         setJob={setJob}
-        onPickMaterial={(placeId, rowId) => {
+        onPickMaterial={(placeId, rowId, book) => {
           const slot = rowId ? job.places.flatMap((p) => p.rows).find((r) => r.id === rowId) : undefined;
-          setPicker({placeId: placeFor(placeId), kind: 'material', at: placeId ? rowId : null, query: slot && isOpenSlot(slot) ? slotQuery(slot.slot) : ''});
+          setPicker({placeId: placeFor(placeId), kind: 'material', at: placeId ? rowId : null, query: slot && isOpenSlot(slot) ? slotQuery(slot.slot) : '', book});
         }}
         onPickKit={(placeId, rowId) => setPicker({placeId: placeFor(placeId), kind: 'kit', at: placeId ? rowId : null})}
         onToggleFavorite={toggleFavorite}
@@ -341,6 +342,7 @@ export function EstimateEditor({
           place={pickPlace}
           materials={data.materials}
           initialQuery={picker.query}
+          initialCatalog={picker.book}
           mode="estimate"
           rates={s}
           onAdd={(row) => {

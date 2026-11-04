@@ -74,7 +74,7 @@ log('見積書：廊下・トイレ 手すり・ブラケット・施工費／�
 // 空いた行の内容の欄には、まん中に薄く「部材｜施工費｜常用」だけ（名前（「（手すり）」など）は見せない）。見積書の左は Excelで保存・見積書を印刷
 assert.equal((await sheet.locator('[data-slot]').first().innerText()).replace(/\s/g, ''), '部材施工費常用');
 const side = sheet.getByRole('toolbar', {name: '見積書の左のボタン'});
-assert.deepEqual((await side.getByRole('button').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim()), ['📗 Excelで保存', '🖨 見積書を印刷']);
+assert.deepEqual((await side.getByRole('button').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim()), ['📗 Excelで保存', '🖨 見積書を印刷', '📖 マツ六', '📖 TOTO', '📖 矢崎化工']);
 const bracket = sheet.locator('[data-slot="ブラケット"]').first();
 // 「部材｜施工費｜常用」は欄のまん中（ユーザーの指示「部材・施工費・常用は枠内の中央揃えにする」2026-11-03。前は左に寄せていた）
 const [pickBox, cellBox] = [await bracket.getByRole('group', {name: '入れるもの'}).boundingBox(), await bracket.boundingBox()];
@@ -246,19 +246,9 @@ await laborList.waitFor({state: 'detached'});
 // 部材を選ぶ画面の「🔧 施工費に進む」
 await clickStable(sheet.locator('tr[data-new] [data-pick="material"]'));
 assert.equal(await dlg.getByRole('button', {name: /^すべて/}).getAttribute('aria-pressed'), 'true'); // 開いたときは「すべて」
-// メーカーのカタログ（マツ六・TOTO・介援隊）を新しいタブで開くボタン（ユーザーの指示「それぞれのカタログに飛べるようにして、検索しやすいようにする」2026-11-04）。
-// テストでは外のサイトは開かない（行き先と新しいタブだけを確かめる）
-const catalogHref = async (scope, name) => {
-  const a = scope.getByRole('link', {name: `${name}のカタログを開く`});
-  assert.equal(await a.getAttribute('target'), '_blank');
-  return a.getAttribute('href');
-};
-assert.match(await catalogHref(dlg, 'マツ六'), /^https:\/\/saas\.actibookone\.com\/content\/detail\?param=.*pNo=42$/);
-assert.match(await catalogHref(dlg, 'TOTO'), /^https:\/\/www\.catalabo\.org\/iportal\/.*catalogId=87283880000/);
-assert.match(await catalogHref(dlg, '介援隊'), /^https:\/\/catalog\.kaientai\.cc\/iportal\/.*catalogId=3494140000/);
+// 外のサイトのカタログへのリンク（マツ六・TOTO・介援隊）は外した（いただいた PDF のカタログがアプリの中にある。ユーザーの「マツ六、TOTO 、矢崎です」2026-11-04）
+assert.equal(await page.getByRole('link', {name: /のカタログを開く/}).count(), 0);
 const sideBar = page.getByRole('toolbar', {name: '見積書の左のボタン'});
-assert.match(await catalogHref(sideBar, 'マツ六'), /actibookone/);
-await page.screenshot({path: path.join(outDir, 'slots-09b-catalog-links.png')});
 await dlg.getByRole('row', {name: /T-600/}).first().getByRole('button', {name: '＋ 追加'}).click();
 await page.screenshot({path: path.join(outDir, 'slots-09-next-labor-button.png')});
 await dlg.getByRole('button', {name: '🔧 施工費に進む'}).click();
@@ -303,6 +293,28 @@ await filled.scrollIntoViewIfNeeded();
 const fb = await filled.boundingBox();
 await page.screenshot({path: path.join(outDir, 'slots-11-gap-typed.png'), clip: {x: fb.x, y: fb.y - 110, width: 760, height: 170}});
 log('打ち込める行：カーソルの点滅（左の端）・ダブルクリックで品番・☆でお気に入り・BD132＋Enter・施工費の −／＋・施工費に進む・下の空いた行にも打てる OK');
+// ---------------- 見積書の左の「📖 マツ六」「📖 TOTO」「📖 矢崎化工」（ユーザーの「マツ六、TOTO 、矢崎です」2026-11-04。前は外のサイトのリンク マツ六・TOTO・介援隊）：
+// アプリの中のカタログ（いただいた PDF）がそのカタログのページで開き、品番の「＋ 追加」を押すと見積書に入る
+const books = sideBar.getByRole('group', {name: 'メーカーのカタログ'});
+assert.deepEqual((await books.getByRole('button').allInnerTexts()).map((t) => t.trim()), ['📖 マツ六', '📖 TOTO', '📖 矢崎化工']);
+const rowsBeforeCat = await trs.count();
+await books.getByRole('button', {name: 'TOTOのカタログから選ぶ'}).click();
+const totoCat = dlg.getByRole('region', {name: 'TOTOカタログ'});
+await totoCat.waitFor();
+assert.equal(await totoCat.getByRole('group', {name: 'カタログ'}).getByRole('button', {name: 'TOTO', exact: true}).getAttribute('aria-pressed'), 'true');
+assert.deepEqual((await totoCat.getByRole('group', {name: 'カタログ'}).getByRole('button').allInnerTexts()).map((t) => t.trim()), ['マツ六', 'TOTO', '矢崎化工']);
+const catItem = totoCat.getByRole('list', {name: 'このページの品番'}).getByRole('listitem').first();
+const catCode = (await catItem.locator('div.font-bold').first().innerText()).trim();
+await page.screenshot({path: path.join(outDir, 'slots-12-side-catalog.png')});
+await catItem.getByRole('button').click();
+const chooser = totoCat.getByRole('group', {name: /の色・種類を選ぶ/});
+if (await chooser.count()) await chooser.getByRole('button').nth(1).click(); // 色ちがいがあれば1つ選ぶ
+await dlg.getByRole('button', {name: '選び終わったら閉じる'}).click();
+await dlg.waitFor({state: 'detached'});
+await page.waitForTimeout(300);
+assert.ok((await trs.count()) > rowsBeforeCat, 'カタログの品番が見積書に入らない');
+assert.ok((await sheet.innerText()).replace(/\s/g, '').includes(catCode.replace(/#.*$/, '').replace(/\s/g, '')), `見積書に ${catCode} がない`);
+log(`見積書の左のカタログ（マツ六・TOTO・矢崎化工）：TOTO のカタログで ${catCode} を入れる OK`);
 await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
 await form.waitFor();
 

@@ -33,11 +33,11 @@ const pagesOf = (raw: {page: number; codes: [string, number, number, number, num
 const imageOf = (head: string) => (page: number) => `../jutaku-mitsumori/catalog/${head}-p${String(page).padStart(3, '0')}.jpg`;
 const nfkc = (s: string) => s.normalize('NFKC');
 
-// 並びはボタンの並び（いちばん前が初めに開くカタログ。よく使うマツ六を先頭に）
+// 並びはボタンの並び（いちばん前が初めに開くカタログ。よく使うマツ六を先頭に。ユーザーの「マツ六、TOTO 、矢崎です」2026-11-04 の順）
 export const BOOKS: CatalogBook[] = [
   {id: 'matsu6', maker: 'マツ六', pages: pagesOf(MATSU6_PAGES), image: imageOf('matsu6'), isMaker: (m) => /マツ六|matsu-?roku/i.test(nfkc(m)), variants: 'suffix'},
-  {id: 'yazaki', maker: '矢崎化工', pages: pagesOf(YAZAKI_PAGES), image: imageOf('yazaki'), isMaker: (m) => /矢崎/.test(nfkc(m)), variants: 'suffix'},
   {id: 'toto', maker: 'TOTO', pages: pagesOf(TOTO_PAGES), image: imageOf('toto'), isMaker: (m) => /TOTO|東陶/i.test(nfkc(m)), variants: 'hash'},
+  {id: 'yazaki', maker: '矢崎化工', pages: pagesOf(YAZAKI_PAGES), image: imageOf('yazaki'), isMaker: (m) => /矢崎/.test(nfkc(m)), variants: 'suffix'},
 ];
 export const bookOf = (id: BookId) => BOOKS.find((b) => b.id === id) ?? BOOKS[0];
 

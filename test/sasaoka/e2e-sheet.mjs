@@ -176,7 +176,7 @@ log('空いた行・新しい箇所・諸経費は自動のままOK');
 
 // ---------------- 行の「挿入」：選んだ行の上に1行入れる → 打ち込む／介護保険の対象外（スペース）／「削除」で消す
 // 行の操作は1組（選んでいる行の改修内容の左）。見積書の左は Excelで保存・見積書を印刷だけ
-assert.deepEqual(await side.getByRole('button').allInnerTexts().then((t) => t.map((x) => x.replace(/\s+/g, ' ').trim())), ['📗 Excelで保存', '🖨 見積書を印刷']);
+assert.deepEqual(await side.getByRole('button').allInnerTexts().then((t) => t.map((x) => x.replace(/\s+/g, ' ').trim())), ['📗 Excelで保存', '🖨 見積書を印刷', '📖 マツ六', '📖 TOTO', '📖 矢崎化工']);
 assert.deepEqual(await ops.getByRole('button').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label'))), ['＋ 挿入', '✕ 削除', '⧉ コピー', '📋 貼付']);
 assert.equal(await sheet.locator('.sheet-rowtools, [data-ins], [data-del], [data-copy], [data-paste]').count(), 0);
 assert.equal(await ops.getByRole('button', {name: '📋 貼付'}).isDisabled(), true); // コピーするまで押せない

@@ -26,7 +26,8 @@ import {applySheet, deleteLine, deletePlace, deleteTouchesShinsei, describeKey, 
 import {getClip, setClip, useClip} from '../sheetClip.ts';
 import type {EstimateForm, Job, LaborItem, Material, Place, Settings} from '../types.ts';
 import {matchesAll, noHyphen, searchKey, todayIso, yen} from '../util.ts';
-import {Btn, CatalogLinks, Modal, useToast} from './ui.tsx';
+import {Btn, Modal, useToast} from './ui.tsx';
+import {BOOKS, type BookId} from '../makerCatalogs.ts';
 
 /** 入力の画面の用紙の幅を px に（A4横 297mm に、行の左の「挿入」「✕」「コピー」の分 3mm を足す。sasaoka.css の .est-sheet .form-page と同じ） */
 const PAGE_W = (300 / 25.4) * 96;
@@ -75,7 +76,8 @@ export function EstimateSheet({
   materials: Material[];
   labor: LaborItem[]; // 空いた行の「施工費」のリスト（📦 部材・施工費マスタの施工費）
   setJob: (fn: (j: Job) => Job) => void;
-  onPickMaterial: (placeId: string | null, rowId: string | null) => void; // null：箇所がまだない（新しい箇所に）。rowId：選んでいる行（そこに入れる）
+  // null：箇所がまだない（新しい箇所に）。rowId：選んでいる行（そこに入れる）。book：初めからそのカタログのページを出す（見積書の左の「📖 マツ六」など）
+  onPickMaterial: (placeId: string | null, rowId: string | null, book?: BookId) => void;
   onPickKit: (placeId: string | null, rowId: string | null) => void;
   onToggleFavorite: (materialId: string) => void; // 品番・品名を打ったときの候補の ☆（部材リストの★お気に入りに入れる・外す）
   onPrint: () => void;
@@ -897,6 +899,15 @@ export function EstimateSheet({
   // 入れる箇所は、空白の行ならその行の箇所（その行に入る）、いちばん下の空いた行なら最後の箇所の最後（なければ新しい箇所。`toolPlace`）
   const [laborMenu, setLaborMenu] = useState<Sel | null>(null);
   const [laborHl, setLaborHl] = useState(0);
+  // 見積書の左の「📖 マツ六」など：選んでいる欄の行の箇所（いちばん下の空いた行・お客様名などなら最後の箇所。なければ新しい箇所。`toolPlace`）に、そのカタログから入れる
+  const openCatalog = (book: BookId) => {
+    if (edit && sel) commit(edit.value, null, null, true);
+    const j = jobRef.current;
+    const key = sel?.key ?? null;
+    const rowId = key?.startsWith('line:') ? key.split(':')[1] : null;
+    const place = rowId ? (j.places.find((p) => p.rows.some((r) => r.id === rowId)) ?? null) : toolPlace(j, key, lastPlace.current);
+    onPickMaterial(place?.id ?? null, rowId, book);
+  };
   const runPick = (kind: string, td: HTMLElement) => {
     if (edit && sel) commit(edit.value, null, null, true);
     const key = td.dataset.edit ?? '';
@@ -1120,8 +1131,15 @@ export function EstimateSheet({
         <Btn color="softSky" onClick={onPrint}>
           🖨 見積書を印刷
         </Btn>
-        {/* メーカーのカタログ（新しいタブ。マツ六・TOTO・介援隊。ユーザーの指示「それぞれのカタログに飛べるようにして」2026-11-04） */}
-        <CatalogLinks className="mt-2 border-t border-slate-200 pt-2 [&>a]:w-full [&>a]:!justify-start" />
+        {/* メーカーのカタログ（マツ六・TOTO・矢崎化工。いただいた PDF のカタログをアプリの中で開き、ページの品番を押すと選んでいる行の箇所に入る）。
+            ユーザーの「マツ六、TOTO 、矢崎です」2026-11-04（前は外のサイトのリンク マツ六・TOTO・介援隊。押した商品はアプリに入らなかった） */}
+        <div role="group" aria-label="メーカーのカタログ" className="mt-2 grid gap-2 border-t border-slate-200 pt-2 [&>*]:w-full [&>*]:!justify-start [&>*]:!text-[15px]">
+          {BOOKS.map((b) => (
+            <Btn key={b.id} color="white" onMouseDown={keepSel} onClick={() => openCatalog(b.id)} aria-label={`${b.maker}のカタログから選ぶ`}>
+              📖 {b.maker}
+            </Btn>
+          ))}
+        </div>
       </div>
       </div>
       <div

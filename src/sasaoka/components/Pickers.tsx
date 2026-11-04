@@ -6,7 +6,7 @@ import {guessPieceLengthM} from '../priceImport.ts';
 import {laborCount, manualRow, materialRow, setLaborCount} from '../rows.ts';
 import type {AppMode, LaborItem, Material, Place, Row} from '../types.ts';
 import {matchesAll, num, uid, yen} from '../util.ts';
-import {Btn, CatalogLinks, Modal, NumberInput, Star, Stepper, TextInput, useToast} from './ui.tsx';
+import {Btn, Modal, NumberInput, Star, Stepper, TextInput, useToast} from './ui.tsx';
 import {BOOKS, type BookId, catalogPageOf} from '../makerCatalogs.ts';
 import {MakerCatalogView} from './MakerCatalogView.tsx';
 
@@ -30,6 +30,7 @@ export function MaterialPicker({
   onAddToMaster,
   onClose,
   onNext,
+  initialCatalog,
 }: {
   place: Place;
   materials: Material[];
@@ -45,6 +46,8 @@ export function MaterialPicker({
   onClose: () => void;
   // 「🔧 施工費に進む」：閉じて、いま入れた部材の行の施工費のリストを開く（見積書だけ。ユーザーの指示「閉じると施工費に進むの２種類をつくる」2026-11-03）
   onNext?: () => void;
+  // 初めからそのカタログのページを出す（工事見積書の左の「📖 マツ六」「📖 TOTO」「📖 矢崎化工」から開いたとき。ユーザーの「マツ六、TOTO 、矢崎です」2026-11-04）
+  initialCatalog?: BookId;
 }) {
   const favCount = materials.filter((m) => m.favorite).length;
   // 開いたときは「すべて」（ユーザーの指示「デフォルトはお気に入りではなく、全てにする」2026-11-03。前は★お気に入りがあればお気に入りから）
@@ -70,7 +73,7 @@ export function MaterialPicker({
   };
   // メーカーのカタログ（makerCatalogs.ts。矢崎化工・TOTO）。開いているあいだは部材リストの代わりにカタログを出す。page・code は開くページと光らせる品番。
   // 「📖 カタログから選ぶ」は、前に開いたカタログ（この端末で覚える）
-  const [catalog, setCatalog] = useState<{book: BookId; page: number; code?: string} | null>(null);
+  const [catalog, setCatalog] = useState<{book: BookId; page: number; code?: string} | null>(() => (initialCatalog ? {book: initialCatalog, page: 0} : null));
   const [lastBook, setLastBook] = useState<BookId>(() => {
     try {
       const v = localStorage.getItem(LAST_BOOK);
@@ -178,11 +181,11 @@ export function MaterialPicker({
             ))}
           </select>
         )}
-        {/* 矢崎化工・TOTO のカタログ（このアプリの中。ページの品番を押すと入る）と、メーカーのカタログ（新しいタブ）（2026-11-04） */}
+        {/* マツ六・TOTO・矢崎化工のカタログ（いただいた PDF。このアプリの中。ページの品番を押すと入る）。
+            前の外のサイトへのリンク（actibook・カタラボ・介援隊）は外した（同じカタログがアプリの中にある。介援隊は住宅改修では使わない。2026-11-04） */}
         <Btn small color="white" onClick={() => setCatalog(catalog ? null : {book: lastBook, page: 0})} aria-pressed={!!catalog}>
           📖 カタログから選ぶ
         </Btn>
-        <CatalogLinks small />
       </div>
 
       {catalog ? (
