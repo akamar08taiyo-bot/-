@@ -26,3 +26,16 @@ test('部材の検索：品番の「-」のあるなし・大文字小文字・�
   assert.ok(!matchesAll(hay, 'bd1320'));
   assert.ok(matchesAll('スロープ', 'スロープ') && !matchesAll('スロープ', 'スロプ')); // カタカナののばす音はそのまま
 });
+
+test('メーカーのカタログ（マツ六＝actibook・TOTO＝カタラボ・介援隊。2026-11-04 のユーザーの答え）', async () => {
+  const {CATALOGS, catalogOf} = await import('../../src/sasaoka/catalogs.ts');
+  assert.deepEqual(CATALOGS.map((c) => c.name), ['マツ六', 'TOTO', '介援隊']);
+  assert.equal(catalogOf('マツ六')?.id, 'matsuroku');
+  assert.equal(catalogOf('ＴＯＴＯ')?.id, 'toto'); // 全角でも
+  assert.equal(catalogOf('矢崎化工'), null);
+  // マツ六はページを指定して開ける（actibook の pNo）。指定しなければ、いただいたリンクのページ
+  assert.match(CATALOGS[0].url(15), /actibookone\.com\/.*pNo=15$/);
+  assert.match(CATALOGS[0].url(), /pNo=42$/);
+  assert.match(CATALOGS[1].url(), /^https:\/\/www\.catalabo\.org\//);
+  assert.match(CATALOGS[2].url(), /^https:\/\/catalog\.kaientai\.cc\//);
+});

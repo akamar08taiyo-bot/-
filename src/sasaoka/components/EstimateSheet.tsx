@@ -26,7 +26,7 @@ import {applySheet, deleteLine, deletePlace, deleteTouchesShinsei, describeKey, 
 import {getClip, setClip, useClip} from '../sheetClip.ts';
 import type {EstimateForm, Job, LaborItem, Material, Place, Settings} from '../types.ts';
 import {matchesAll, noHyphen, searchKey, todayIso, yen} from '../util.ts';
-import {Btn, Modal, useToast} from './ui.tsx';
+import {Btn, CatalogLinks, Modal, useToast} from './ui.tsx';
 
 /** 入力の画面の用紙の幅を px に（A4横 297mm に、行の左の「挿入」「✕」「コピー」の分 3mm を足す。sasaoka.css の .est-sheet .form-page と同じ） */
 const PAGE_W = (300 / 25.4) * 96;
@@ -1083,6 +1083,8 @@ export function EstimateSheet({
         <Btn color="softSky" onClick={onPrint}>
           🖨 見積書を印刷
         </Btn>
+        {/* メーカーのカタログ（新しいタブ。マツ六・TOTO・介援隊。ユーザーの指示「それぞれのカタログに飛べるようにして」2026-11-04） */}
+        <CatalogLinks className="mt-2 border-t border-slate-200 pt-2 [&>a]:w-full [&>a]:!justify-start" />
       </div>
       <div
         ref={scrollRef}

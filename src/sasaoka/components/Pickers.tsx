@@ -6,7 +6,7 @@ import {guessPieceLengthM} from '../priceImport.ts';
 import {laborCount, manualRow, materialRow, setLaborCount} from '../rows.ts';
 import type {AppMode, LaborItem, Material, Place, Row} from '../types.ts';
 import {matchesAll, num, uid, yen} from '../util.ts';
-import {Btn, Modal, NumberInput, Star, Stepper, TextInput} from './ui.tsx';
+import {Btn, CatalogLinks, Modal, NumberInput, Star, Stepper, TextInput} from './ui.tsx';
 
 const SHOW_LIMIT = 200;
 
@@ -144,6 +144,8 @@ export function MaterialPicker({
             ))}
           </select>
         )}
+        {/* メーカーのカタログ（新しいタブ）。品番・商品名をカタログで確かめて探せるように（2026-11-04） */}
+        <CatalogLinks small />
       </div>
 
       {materials.length === 0 ? (

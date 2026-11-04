@@ -246,6 +246,19 @@ await laborList.waitFor({state: 'detached'});
 // 部材を選ぶ画面の「🔧 施工費に進む」
 await clickStable(sheet.locator('tr[data-new] [data-pick="material"]'));
 assert.equal(await dlg.getByRole('button', {name: /^すべて/}).getAttribute('aria-pressed'), 'true'); // 開いたときは「すべて」
+// メーカーのカタログ（マツ六・TOTO・介援隊）を新しいタブで開くボタン（ユーザーの指示「それぞれのカタログに飛べるようにして、検索しやすいようにする」2026-11-04）。
+// テストでは外のサイトは開かない（行き先と新しいタブだけを確かめる）
+const catalogHref = async (scope, name) => {
+  const a = scope.getByRole('link', {name: `${name}のカタログを開く`});
+  assert.equal(await a.getAttribute('target'), '_blank');
+  return a.getAttribute('href');
+};
+assert.match(await catalogHref(dlg, 'マツ六'), /^https:\/\/saas\.actibookone\.com\/content\/detail\?param=.*pNo=42$/);
+assert.match(await catalogHref(dlg, 'TOTO'), /^https:\/\/www\.catalabo\.org\/iportal\/.*catalogId=87283880000/);
+assert.match(await catalogHref(dlg, '介援隊'), /^https:\/\/catalog\.kaientai\.cc\/iportal\/.*catalogId=3494140000/);
+const sideBar = page.getByRole('toolbar', {name: '見積書の左のボタン'});
+assert.match(await catalogHref(sideBar, 'マツ六'), /actibookone/);
+await page.screenshot({path: path.join(outDir, 'slots-09b-catalog-links.png')});
 await dlg.getByRole('row', {name: /T-600/}).first().getByRole('button', {name: '＋ 追加'}).click();
 await page.screenshot({path: path.join(outDir, 'slots-09-next-labor-button.png')});
 await dlg.getByRole('button', {name: '🔧 施工費に進む'}).click();

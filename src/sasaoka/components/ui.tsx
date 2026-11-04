@@ -2,6 +2,7 @@ import {createContext, useContext, useEffect, useRef, useState, useSyncExternalS
 import {createPortal} from 'react-dom';
 import type {ButtonHTMLAttributes, DragEvent as ReactDragEvent, InputHTMLAttributes, ReactNode} from 'react';
 import {toKatakana} from '../util.ts';
+import {CATALOGS} from '../catalogs.ts';
 
 // 色は機能ごとに1色（見積・提案書作成アプリのデザイン規約と同じ使い分け）。どれも薄い地に濃い字・細い枠。
 // 同じ働きのボタンは、どの画面でも・特定福祉用具のアプリ（src/tokutei の ui.tsx）でも同じ色（ユーザーの指示「同じ内容でボタンの色が違う場合は統一する」2026-10-28）：
@@ -429,3 +430,20 @@ export function pastedFiles(data: DataTransfer, accept: (f: File) => boolean): F
   if (text && !text.split(/\r?\n/).every((line) => files.some((f) => f.name === line.trim()))) return [];
   return files;
 }
+
+/**
+ * メーカーのカタログを新しいタブで開くボタン（マツ六・TOTO・介援隊。catalogs.ts）。部材を選ぶ画面と見積書の左に出す
+ * （ユーザーの指示「見積もり作成のとき、それぞれのカタログに飛べるようにして、検索しやすいようにする」2026-11-04）
+ */
+export function CatalogLinks({small = false, className = ''}: {small?: boolean; className?: string}) {
+  return (
+    <div role="group" aria-label="メーカーのカタログ" className={`flex flex-wrap gap-1.5 ${className}`}>
+      {CATALOGS.map((c) => (
+        <a key={c.id} href={c.url()} target="_blank" rel="noopener noreferrer" className={btnClass('white', small)} aria-label={`${c.name}のカタログを開く`}>
+          📖 {c.name}
+        </a>
+      ))}
+    </div>
+  );
+}
+
