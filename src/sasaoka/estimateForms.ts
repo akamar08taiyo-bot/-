@@ -40,12 +40,15 @@ const SHINSEI_KINDS: Partial<Record<Insurer, string[]>> = {
   kurume: ['手すりの取り付け', '段差の解消', '床または通路面材料の変更', '引き戸等への扉の取替', '洋式便所等への便器の取替', '付帯工事'],
   // 飯塚市：事前承認願書・支給申請書の改修内容の□の見出し（写真添付用紙の工事種別は「①手すりの取付」〜「⑥その他①～⑤に付帯する工事」）
   iizuka: ['手すりの取付', '段差の解消', '床等の材料の変更', '引き戸等への扉の取替え', '洋式便器等への便器の取替え', '付帯工事'],
+  // 大分市：支給申請兼施工承認申請書の改修の内容の行の見出し（③は「滑りの防止及び移動の円滑化等のための床材の変更」、⑥は「その他上記の住宅改修に付帯して
+  // 必要となる住宅改修」。改修の内容・写真の用紙の工事種類に書くので短く）
+  oita: ['手すりの取付け', '段差の解消', '床材の変更', '引き戸等への扉の取替え', '洋式便器等への便器の取替え', '付帯工事'],
 };
 /** 保険者の申請書に書く改修の種類の名前（①〜⑥の順） */
 export const shinseiKindNames = (insurer: Insurer | ''): string[] => (insurer && SHINSEI_KINDS[insurer]) || KINDS;
 
 /** 保険者（申請書を出す先）。苅田町・行橋市・みやこ町は見積書の書式が同じ。申請書は保険者ごとに違う */
-export const INSURER_IDS: Insurer[] = ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu', 'kurume', 'iizuka'];
+export const INSURER_IDS: Insurer[] = ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu', 'kurume', 'iizuka', 'oita'];
 
 export const INSURER_INFO: Record<Insurer, {name: string; form: EstimateForm; area: string}> = {
   kanda: {name: '苅田町', form: 'yukuhashi', area: '苅田町'},
@@ -61,6 +64,8 @@ export const INSURER_INFO: Record<Insurer, {name: string; form: EstimateForm; ar
   kurume: {name: '久留米市', form: 'yukuhashi', area: '久留米市'},
   // 飯塚市（2026-11-02）：内訳書は市の様式もあるが、見積書は苅田町・行橋市・みやこ町と同じ書式（全体と介護保険の対象部分を並べた表）
   iizuka: {name: '飯塚市', form: 'yukuhashi', area: '飯塚市'},
+  // 大分市（2026-11-04）：見積書は市の様式がない（申請書の注意「見積書…を添付」）ので、苅田町・行橋市・みやこ町と同じ書式（全体と介護保険の対象部分を並べた表）
+  oita: {name: '大分市', form: 'yukuhashi', area: '大分市'},
 };
 
 /** 申請書で丸で囲む項目の名前と、選べる値（申請書に並んでいる順） */
@@ -117,6 +122,7 @@ export function insurerForAddress(address: string): Insurer | null {
   if (/北九州市/.test(a)) return 'kitakyushu';
   if (/久留米市/.test(a)) return 'kurume';
   if (/飯塚市/.test(a)) return 'iizuka';
+  if (/大分市/.test(a)) return 'oita';
   return null;
 }
 

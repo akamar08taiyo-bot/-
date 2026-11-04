@@ -3,7 +3,8 @@
 #   kaigoininjyo.xlsx・kaigoininjyo.pdf は前の版）＋ 住宅改修が必要な理由書（表 riyuusyoomotemen.xls・裏 riyuusyouramen.xlsx）
 #   ＋ 工事写真添付用紙（行橋市の原本の「住改・写真 ①」〜の8枚。申請書の注意「施工前の状態が確認できる書類等を添付」。市の写真の様式はない）。
 # 平面図は添付書類にないので入れない（`business-rules.md` の「平面図が要らない保険者」）。見積書は見積書のタブ。
-# アプリが字を書く欄（フリガナ・氏名・住所・電話・所有者・本人との関係・申請者の住所・理由書の事業所と作成者）は、空いた所を1つの欄に結合する（罫線はそのまま）。
+# アプリが字を書く欄（フリガナ・氏名・住所・電話・所有者・本人との関係・申請者の住所と電話・委任状の住所と受任者・理由書の事業所と作成者）は、
+# 空いた所を1つの欄に結合する（罫線はそのまま）。改修工事施工者の欄は折り返す。
 # 申請書・理由書の「□償還　□受領委任」は「■受領委任」にしておく（受領委任払いで出す。久留米市・飯塚市と同じ）。
 # usage: python3 make_oita_jutaku.py <sinnseishoexe.xls> <ininjyo.xlsx> <riyuusyoomotemen.xls> <riyuusyouramen.xlsx> <yukuhashi.xltx> <出力.xltx>
 import os
@@ -83,8 +84,16 @@ try:
     s = sheets.getByName(SHINSEI)
     s.getCellRangeByName('AN2').String = '　　　□償還　　　　■受領委任'
     s.getCellRangeByName('AR11').String = ''  # 電話番号の「ー」（1つの欄に「0930-23-1234」と書く）
-    for area, pt, wrap in (('L3:AF3', None, False), ('L4:AF6', 14, False), ('L11:AJ12', None, True), ('AO11:AY12', None, False), ('L13:AF14', None, False), ('AN13:AY14', None, False), ('M39:AI39', None, False)):
+    s.getCellRangeByName('AR11:AR12').merge(False)  # 「ー」の欄の結合を外さないと AO11:AY12 を結合できない（LibreOffice は重なる結合をしない）
+    s.getCellRangeByName('AR40').String = ''  # 申請者の電話番号の「ー」（同じ）
+    for area, pt, wrap in (('L3:AF3', None, False), ('L4:AF6', 14, False), ('L11:AJ12', None, True), ('AO11:AY12', None, False), ('L13:AF14', None, False), ('AN13:AY14', None, False), ('M39:AI39', None, False), ('AN40:AY40', None, False)):
         field(SHINSEI, area, pt, wrap)
+    # 改修工事施工者の欄（2行の高さ）は折り返す（会社名・営業所を2行に）
+    for r in (17, 19, 21, 23, 25, 27):
+        s.getCellRangeByName(f'Z{r}:AI{r + 1}').IsTextWrapped = True
+
+    for area in ('C6:H6', 'C22:H22', 'C23:H23'):  # 委任者の住所・受任者の氏名と住所
+        field(PROXY, area)
 
     f = sheets.getByName(FRONT)
     f.getCellRangeByName('B3').String = '□償還　■受領委任'

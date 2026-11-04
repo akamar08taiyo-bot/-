@@ -26,8 +26,8 @@ for (const size of [{width: 1366, height: 900}, {width: 390, height: 844}]) {
   const dlg = page.getByRole('dialog', {name: '📑 ほかの市の申請書'});
   await dlg.waitFor();
   // このアプリで作れる書類のリンクは外す（ユーザーの指示「大分、田川など、できたもののリンクは外して」2026-11-04）：
-  // 住宅改修は久留米市・飯塚市・田川市、福祉用具購入は田川市（広域連合の書式）が作れる。まだ作れない書類だけリンクを出す
-  const expect = {久留米市: ['福祉用具購入'], 飯塚市: ['福祉用具購入'], 大分市: ['住宅改修', '福祉用具購入'], 田川市: []};
+  // 住宅改修は久留米市・飯塚市・大分市・田川市、福祉用具購入は田川市（広域連合の書式）が作れる。まだ作れない書類だけリンクを出す
+  const expect = {久留米市: ['福祉用具購入'], 飯塚市: ['福祉用具購入'], 大分市: ['福祉用具購入'], 田川市: []};
   for (const [city, kinds] of Object.entries(expect)) {
     const sec = dlg.getByRole('region', {name: city});
     await sec.waitFor();

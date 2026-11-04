@@ -6,23 +6,24 @@ import {useEffect, useState} from 'react';
 import {photoNumbers} from '../estimateForms.ts';
 import {brightPhoto, getPhotos} from '../photos.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
-import {fillShinseiFiles, SHINSEI, shinseiFileName, shinseiValues} from '../shinsei.ts';
+import {fillShinseiFiles, SHINSEI, shinseiFileName} from '../shinsei.ts';
 import type {Files, PhotoImage, PhotoImages} from '../shinsei.ts';
 import type {Insurer, Job, Settings} from '../types.ts';
 import fukuoka from '../shinsei/fukuoka.xltx?inline';
 import kitakyushu from '../shinsei/kitakyushu.xltx?inline';
 import kurume from '../shinsei/kurume.xltx?inline';
 import iizuka from '../shinsei/iizuka.xltx?inline';
+import oita from '../shinsei/oita.xltx?inline';
 import kanda from '../shinsei/kanda.xltx?inline';
 import kouiki from '../shinsei/kouiki.xltx?inline';
 import miyako from '../shinsei/miyako.xltx?inline';
 import yukuhashi from '../shinsei/yukuhashi.xltx?inline';
 import riyu from '../shinsei/riyu.xltx?inline';
-import {RIYU_MAP, riyuFileName, riyuValues} from '../riyu.ts';
+import {RIYU_MAP, riyuFileName, riyuValues, shinseiBookValues} from '../riyu.ts';
 
 /** 原本：保険者ごとの申請書と、住宅改修が必要な理由書（国の様式。どの保険者も同じ） */
 export type TemplateKey = Insurer | 'riyu';
-const TEMPLATES: Partial<Record<TemplateKey, string>> = {kanda, yukuhashi, miyako, kouiki, fukuoka, kitakyushu, kurume, iizuka, riyu};
+const TEMPLATES: Partial<Record<TemplateKey, string>> = {kanda, yukuhashi, miyako, kouiki, fukuoka, kitakyushu, kurume, iizuka, oita, riyu};
 
 /** この保険者の申請書を作れるか（原本をいただいた保険者だけ） */
 export const canMakeShinsei = (insurer: Insurer | '') => !!insurer && !!TEMPLATES[insurer] && !!SHINSEI[insurer];
@@ -127,7 +128,7 @@ export async function shinseiBook(job: Job, insurer: Insurer, s: Settings): Prom
   if (!map) throw new Error('この保険者の申請書の原本がありません');
   const photos = await photoImagesOf(job, s);
   const plan = await planImageOf(job);
-  const bytes = fillShinseiFiles({...(await openTemplate(insurer))}, map, {...shinseiValues(job, s), photoImages: photos.images, planImage: plan.image});
+  const bytes = fillShinseiFiles({...(await openTemplate(insurer))}, map, {...shinseiBookValues(job, s), photoImages: photos.images, planImage: plan.image});
   return {bytes, fileName: shinseiFileName(map, job, estimateDateOf(job)), missingPhotos: photos.missing, unreadablePhotos: photos.unreadable, planMissing: plan.missing || plan.unreadable};
 }
 

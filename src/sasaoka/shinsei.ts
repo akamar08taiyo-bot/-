@@ -41,7 +41,8 @@ export type ShinseiSheet = {
   // その種類の箇所があれば種類の□を■に、箇所の□を■に（一覧にない箇所は「□その他」を■にして、other の欄に名前）。detail は付帯工事の具体的な工事内容
   // detailFormat：detail の欄の書き方（{text} に内容。久留米市の「　　（　　　）」の行は「　　（{text}）」）。
   // detailCounts：内容を改修場所と箇所の数で書く（「トイレ１箇所、洗面所２箇所」。久留米市の記入例と同じ）。ないときは改修の内容の行（寸法つき）
-  kindRows?: {kind: string; places?: string[]; other?: string; detail?: string; detailFormat?: string; detailCounts?: boolean}[];
+  // texts：その種類の箇所があるときだけ書く欄（大分市の改修の内容の行の「改修工事施工者」「着工予定年月日」「完成予定年月日」）。kind（□）のない行もある
+  kindRows?: {kind?: string; places?: string[]; other?: string; detail?: string; detailFormat?: string; detailCounts?: boolean; texts?: TextCell[]}[];
   checks?: string[]; // いつも最初の□を■にする欄（北九州市の住宅の状況「□持家」）
   oneLine?: string[]; // 折り返さない欄（長い文字は縮めて1行に。氏名・フリガナなどのほかに。理由書の電話番号・日付）
   // 右の空いた欄へはみ出して書く1行の欄の、はみ出してよい右の端の列（委任状の委任者の住所は下線の端の G 列まで。それより長ければ小さくする）
@@ -168,7 +169,16 @@ export type ShinseiTexts = Record<
   | 'sameLeft'
   // 飯塚市の請求書：Ａ 支給対象額（10割分。限度額まで）・Ｃ 本人負担分（Ａ－Ｂ）。Ｂ 保険給付分は benefitYen
   | 'coveredYen'
-  | 'shareYen',
+  | 'shareYen'
+  // 大分市：要支援・要介護の（　）に書く数字（全角）、認定有効期間（申請書は「令和7年4月1日　～　令和9年3月31日」、理由書は「R7・4・1～R9・3・31」）、
+  // 改修費用見積額のうちの介護保険対象分・対象外分、居宅介護支援事業所の担当者の連絡先（理由書のタブの作成者の連絡先）
+  | 'careS'
+  | 'careK'
+  | 'careTerm'
+  | 'careTermR'
+  | 'targetYen'
+  | 'excludedYen'
+  | 'reasonTel',
   string
 >;
 
@@ -226,7 +236,7 @@ export function ageOn(era: string, y: string, m: string, d: string, today: strin
 
 /** 住所の、保険者の市の名前のうしろ（原本に「久留米市」と印刷してある欄に書く）。市の名前で始まらない住所はそのまま */
 export function cityRest(address: string, insurer: Insurer | ''): string {
-  const a = address.trim().replace(/^福岡県\s*/, '');
+  const a = address.trim().replace(/^(?:福岡県|大分県)\s*/, '');
   const city = insurer ? INSURER_INFO[insurer].name : '';
   return city && a.startsWith(city) ? a.slice(city.length).trim() : a;
 }
@@ -417,6 +427,24 @@ const PROXY_AMOUNT_EM = 28;
  * 保険給付額（B23。原本は「すき間＋円」）は、負担割合を選んでいれば 介護保険の対象（20万円まで）−負担割合の分（ユーザーの指示「住宅改修の委任状の保険給付額の部分が
  * 連動されていない」2026-10-28。careLines.ts の careAmounts。見積書の内訳と同じ計算）。特定福祉用具の委任状と同じく 18pt で、円の右の端は原本の位置
  */
+/** 大分市の申請書の改修の内容の6行（手すりの取付け〜付帯して必要となる住宅改修。2行ずつ） */
+const OITA_KIND_ROWS = [17, 19, 21, 23, 25, 27];
+/** 大分市の理由書（表）の、理由書のタブの項目へ行く欄（理由書のタブの一覧の項目。申請書のタブには入れる所がない） */
+const OITA_RIYU_LINKS: {ref: string; field: string}[] = [
+  {ref: 'L4', field: 'checkDate'},
+  {ref: 'W4', field: 'madeDate'},
+  {ref: 'U8', field: 'tel'},
+  {ref: 'L10', field: 'qualification'},
+  {ref: 'R10', field: 'qualification'},
+  {ref: 'S10', field: 'qualification'},
+  ...['J19', 'P19', 'V19'].map((ref) => ({ref, field: 'housing'})),
+  ...[26, 27, 28, 29, 30].flatMap((r) => ['H', 'I', 'R', 'S', 'AB', 'AC'].map((c) => ({ref: `${c}${r}`, field: 'equipment'}))),
+  {ref: 'T30', field: 'equipment'},
+  ...[32, 33, 34, 35].map((r) => ({ref: `B${r}`, field: 'body'})),
+  ...[37, 38, 39, 40].map((r) => ({ref: `B${r}`, field: 'careState'})),
+  ...[42, 43, 44, 45, 46, 47].map((r) => ({ref: `B${r}`, field: 'wish'})),
+];
+
 const PROXY: ShinseiSheet = {
   sheet: '委任状',
   texts: [T('A32', '　　　　委任者　住　所　　{address}'), T('B23', '{benefit}円')],
@@ -857,6 +885,81 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
       },
     ],
   },
+  // 大分市（2026-11-04。いただいた 介護保険居宅介護（介護予防）住宅改修費支給申請兼施工承認（変更）申請書・委任状（続柄の選択肢のある新しい版）・
+  // 住宅改修が必要な理由書（表・裏）に、行橋市の原本の写真添付用紙（申請書の注意「施工前の状態が確認できる書類等を添付」。市の写真の様式はない）を足した原本＝
+  // スキルの scripts/make_oita_jutaku.py。平面図は添付書類にないので入れない）：
+  //   申請書の「□償還　■受領委任」・理由書（表）の「■受領委任」は原本で■（受領委任払いで出す。久留米市・飯塚市と同じ）。
+  //   改修の内容は種類ごとの6行：改修箇所及び規模（kindCells。書かない種類は「－」）と、その種類の箇所があれば改修工事施工者（設定の会社・営業所）・
+  //   着工予定年月日・完成予定年月日（「R8・11・20」）。改修費用見積額は見積書の合計、介護保険対象分・対象外分も書く。
+  //   申請者（被保険者）の住所・電話は書き、氏名は自署。居宅介護支援事業所は理由書の作成者（事業所・氏名・理由書のタブの連絡先）、住宅改修事業者は設定の会社・営業所・担当・電話。
+  //   委任状は被保険者の生年月日（元号の丸）・住所、受任者は設定の会社・営業所・所長（氏名）と住所、続柄の「工事業者」と委任する手続きの
+  //   「住宅改修費支給申請兼施工承認（変更）申請」を丸。被保険者の氏名と日付は自署（ほかの保険者の委任状と同じ）。
+  //   理由書（表）は申請書と同じ項目と、理由書のタブで入れた所（現地確認日・作成日・資格・Tel・住宅の種別・福祉用具・身体状況・介護状況・どう変えたいか）。
+  //   理由書（裏）（改善しようとしている生活動作など）は介護支援専門員が書くので原本のまま（印刷・保存には入れる）。保険者番号 442012 は原本にない（書く欄がない）
+  oita: {
+    title: '大分市申請書',
+    sheets: [
+      {
+        sheet: '支給申請兼施工承認申請書',
+        name: 'L4',
+        address: 'L11',
+        insuredNo: boxes('AP', 10, 3),
+        marks: [ERA('L7')],
+        kindCells: OITA_KIND_ROWS.map((r) => `O${r}`),
+        kindRows: OITA_KIND_ROWS.map((r) => ({texts: [T(`Z${r}`, '{builder}'), T(`AJ${r}`, ' R{startY}・{startM}・{startD}'), T(`AQ${r}`, ' R{endY}・{endM}・{endD}')]})),
+        texts: [
+          T('L3', '{kana}'),
+          T('L7', '明･大･昭　　{y}年　{m}月　{d}日生'),
+          T('AG7', '要支援 (　{careS}　）　･　要介護 (　{careK}　）'),
+          T('L9', '{careTerm}'),
+          T('AO11', '{phone}'),
+          T('L13', '{owner}'),
+          T('AN13', '{relation}'),
+          T('L29', '{cost}円'),
+          T('AB29', '{targetYen}円'),
+          T('AR29', '{excludedYen}円'),
+          T('M39', '{address}'), // 申請者（被保険者）の住所。氏名は自署
+          T('AN40', '{phone}'),
+          T('M60', '{reasonOffice}'),
+          T('M61', '担当者氏名（　{reasonName}　）　　連絡先（　{reasonTel}　）'),
+          T('M63', '{builder}'),
+          T('M64', '担当者氏名（　{manager}　）　　連絡先（　{builderTel}　）'),
+        ],
+      },
+      {
+        sheet: '委任状',
+        marks: [{key: 'era', cell: 'C5', needles: ['明治', '大正', '昭和']}, FIXED('B11', ['住宅改修費支給申請兼施工承認（変更）申請']), FIXED('C26', ['工事業者'])],
+        texts: [
+          T('C5', '\u3000  \u3000明治 ・ 大正 ・ 昭和\u3000\u3000{y}年\u3000\u3000{m}月\u3000\u3000{d}日'),
+          T('C6', '{address}'),
+          T('C22', '{builder}　{builderRep}'),
+          T('C23', '{builderZipAddress}'),
+        ],
+      },
+      {
+        sheet: '理由書（表）',
+        name: 'H13',
+        insuredNo: boxes('H', 10, 15),
+        marks: [{key: 'era', cell: 'W15', needles: ['Ｍ', 'Ｔ', 'Ｓ']}, RENOVATED('H21')],
+        texts: [
+          T('H5', '{reasonOffice}'),
+          T('H6', '{reasonName}'),
+          T('H12', '{kana}'),
+          T('W12', '要介護（　{careK}　） ・  要支援（　{careS}　）'),
+          T('W13', '{careTermR}'),
+          T('Z15', '{y}年{m}月{d}日'),
+          T('H16', '　大分市{cityRest}'),
+          T('Y16', '{owner}'),
+          T('H18', '{relation}'),
+        ],
+        oneLine: ['L4', 'W4', 'U8', 'W13'],
+        riyu: true, // 理由書のタブで入れた所（riyu.ts の oitaRiyuCells）
+        links: OITA_RIYU_LINKS,
+      },
+      {sheet: '理由書（裏）', texts: []}, // 書く欄はない（介護支援専門員が書く）。印刷・プレビューに出すため texts を空で持つ
+      ...YUKUHASHI_PHOTO_SHEETS.map((sheet) => ({sheet, ...YUKUHASHI_PHOTO})),
+    ],
+  },
 };
 
 // ---------------------------------------------------------------- 転記する内容
@@ -1242,7 +1345,7 @@ function photoDatesOf(job: Pick<Job, 'places'>, rates: EstimateRates, today: str
  * 改修費用は見積書の金額と連動する（ユーザーの指示「改修予定費用のところが、自分で作った見積もりの金額が連動するように」）。
  * 苅田町・行橋市の申請書は「改修予定費用」＝見積書の合計（税込）。みやこ町・広域連合は「改修費用（介護保険対象分）」＝見積書の介護保険対象分の合計（税込）
  */
-export const costIsTotal = (insurer: Insurer | '') => insurer === 'kanda' || insurer === 'yukuhashi' || insurer === 'fukuoka' || insurer === 'kurume'; // 久留米市は記入例「見積書と同じ金額を記載してください」 // 福岡市の改修予定費用・改修費用も合計（対象外の工事も含めてよい。提出書類チェックシート）
+export const costIsTotal = (insurer: Insurer | '') => insurer === 'kanda' || insurer === 'yukuhashi' || insurer === 'fukuoka' || insurer === 'kurume' || insurer === 'oita'; // 大分市は「改修費用見積額」（対象分・対象外分は別の欄） // 久留米市は記入例「見積書と同じ金額を記載してください」 // 福岡市の改修予定費用・改修費用も合計（対象外の工事も含めてよい。提出書類チェックシート）
 
 /** 改修費用：手で入れた金額、なければ見積書の金額（costIsTotal）。見積書がなければ null */
 export function shinseiCost(job: Job, s: EstimateSettings): number | null {
@@ -1302,6 +1405,12 @@ export function shinseiValues(job: Job, s: EstimateSettings & BuilderSettings, t
   const care = careAmounts(job, s);
   const benefit = care.benefit;
   const kinds = shinseiKinds(job, s);
+  const totals = estimateTotals(job, s);
+  const estimated = totals.all.total > 0; // 見積書がある（介護保険対象分・対象外分は見積書から）
+  const zen = (n: string) => n.replace(/[0-9]/g, (d) => String.fromCharCode(d.charCodeAt(0) + 0xfee0));
+  const careNo = (head: string) => (info.care.startsWith(head) ? zen(info.care.slice(head.length)) : '');
+  const rShort = (iso: string) => ((r) => (r ? `R${r.y}・${r.m}・${r.d}` : 'R　・　・'))(reiwa(iso));
+  const term = !!(info.careFrom || info.careTo);
   return {
     name: job.customer.trim(),
     address: job.address.trim(),
@@ -1375,6 +1484,13 @@ export function shinseiValues(job: Job, s: EstimateSettings & BuilderSettings, t
       sameLeft: info.reasonOffice.trim() || info.reasonName.trim() ? '同左 ： ■ （上記記載は不要）' : '',
       coveredYen: care.covered > 0 ? care.covered.toLocaleString('en-US') : '',
       shareYen: benefit > 0 ? care.share.toLocaleString('en-US') : '', // 負担割合を選んでいなければ書かない（Ｂと同じ）
+      careS: careNo('要支援'),
+      careK: careNo('要介護'),
+      careTerm: term ? `${reiwaText(info.careFrom) || '令和　　年　　月　　日'}　～　${reiwaText(info.careTo) || '令和　　年　　月　　日'}` : '',
+      careTermR: term ? `${rShort(info.careFrom)}～${rShort(info.careTo)}` : '',
+      targetYen: estimated ? totals.target.total.toLocaleString('en-US') : '',
+      excludedYen: estimated ? Math.max(0, (cost ?? totals.all.total) - totals.target.total).toLocaleString('en-US') : '',
+      reasonTel: (job.riyu?.tel ?? '').normalize('NFKC').trim(),
     },
     cost,
     start: info.start,
@@ -1684,17 +1800,19 @@ export function shinseiCells(sheet: ShinseiSheet, v: ShinseiValues, photo = 0): 
   if (sheet.legend?.cell) out.set(sheet.legend.cell, v.works.join('\n'));
   for (const [ref, value] of sheetLineCells(sheet, v).cells) out.set(ref, value);
   for (const t of sheet.texts ?? []) {
-    const keys = placeholders(t.format);
-    // 何も入れていなければ原本の文字のまま（「本人との関係（　　　）」など）
-    if (!keys.some((k) => v.texts[k])) continue;
-    if (t.as === 'number') {
-      if (v.cost !== null) out.set(t.cell, v.cost);
-    } else if (t.as === 'date') {
-      const serial = excelDate(keys.includes('end') ? v.end : v.start);
-      if (serial) out.set(t.cell, serial);
-    } else out.set(t.cell, t.format.replace(/\{(\w+)\}/g, (_, k: keyof ShinseiTexts) => v.texts[k] || BLANK[k] || ''));
+    const value = textValue(t, v);
+    if (value !== null) out.set(t.cell, value);
   }
   return out;
+}
+
+/** 書き方の欄（TextCell）に書く値。何も入れていなければ null＝原本の文字のまま（「本人との関係（　　　）」など） */
+function textValue(t: TextCell, v: ShinseiValues): CellValue | null {
+  const keys = placeholders(t.format);
+  if (!keys.some((k) => v.texts[k])) return null;
+  if (t.as === 'number') return v.cost;
+  if (t.as === 'date') return excelDate(keys.includes('end') ? v.end : v.start) || null;
+  return t.format.replace(/\{(\w+)\}/g, (_, k: keyof ShinseiTexts) => v.texts[k] || BLANK[k] || '');
 }
 
 /**
@@ -1733,7 +1851,7 @@ function themeFont(files: Files): string {
 /** 書き方の中の {名前} */
 export const placeholders = (format: string) => [...format.matchAll(/\{(\w+)\}/g)].map((m) => m[1] as keyof ShinseiTexts);
 /** 生年月日の一部だけ入れたときの空き（「昭和　23年　　月　　日生」） */
-const BLANK: Partial<ShinseiTexts> = {y: '　　', m: '　　', d: '　　'};
+const BLANK: Partial<ShinseiTexts> = {y: '　　', m: '　　', d: '　　', reasonTel: '　　　　－　　　　－　　　　'}; // 連絡先は大分市の申請書の「（　－　－　）」
 
 /** 日付（'YYYY-MM-DD'）→ Excel の日付の数（1900年1月1日＝1）。なければ 0 */
 function excelDate(iso: string): number {
@@ -1809,6 +1927,13 @@ export const EMPTY_SHINSEI: ShinseiValues = {
     sameLeft: '',
     coveredYen: '',
     shareYen: '',
+    careS: '',
+    careK: '',
+    careTerm: '',
+    careTermR: '',
+    targetYen: '',
+    excludedYen: '',
+    reasonTel: '',
   },
   cost: null,
   start: '',
@@ -1902,6 +2027,18 @@ function riyuSheetCells(files: Files, sheet: ShinseiSheet, r: RiyuValues): Map<s
   const path = sheetPaths(files).get(sheet.sheet);
   const xml = path && files[path] ? strFromU8(files[path]) : '';
   const shared = sharedStrings(files);
+  // 罫線の何行かに分けて書く文（大分市の理由書（表）の身体状況など）：1行目の欄の幅に入るだけずつ。入りきらない分は最後の行につなぐ（字を小さくして入れる＝fitTexts）
+  if (r.flows?.length && xml) {
+    const lay = sheetLayout(xml);
+    for (const f of r.flows) {
+      const em = (rangeBox(lay, f.cells[0]).w - CELL_PAD) / ((cellStyle(files, xml, f.cells[0]).size * 4) / 3);
+      const lines = flowLines(f.text, em);
+      f.cells.forEach((ref, i) => {
+        const part = i < f.cells.length - 1 ? lines[i] : lines.slice(i).join('');
+        if (part) out.set(ref, part);
+      });
+    }
+  }
   for (const [ref, c] of Object.entries(r.checks)) {
     let text = cellText(xml, ref, shared);
     if (!text) continue;
@@ -1909,6 +2046,27 @@ function riyuSheetCells(files: Files, sheet: ShinseiSheet, r: RiyuValues): Map<s
     if (c.fill) text = text.replace(/([（(])[^（()）]*([)）])/, (_, a: string, b: string) => `${a}${c.fill}${b}`);
     out.set(ref, text);
   }
+  return out;
+}
+
+/**
+ * 文を、1行 em 字（全角＝1）までの行に分ける（改行はそのまま行を変える）。行の頭に「、」「。」「）」などが来るときは前の行のうしろに付ける
+ */
+export function flowLines(text: string, em: number): string[] {
+  const out: string[] = [];
+  const width = Math.max(1, em);
+  for (const para of text.replace(/\r\n/g, '\n').split('\n')) {
+    let line = '';
+    for (const ch of para) {
+      if (line && emOf(line + ch) > width && !/[、。，．）」』・ー]/.test(ch)) {
+        out.push(line);
+        line = '';
+      }
+      line += ch;
+    }
+    out.push(line);
+  }
+  while (out.length > 1 && out[out.length - 1] === '') out.pop();
   return out;
 }
 
@@ -1945,8 +2103,12 @@ function kindRowCells(files: Files, sheet: ShinseiSheet, v: ShinseiValues): Map<
   sheet.kindRows?.forEach((row, i) => {
     const names = v.kindNames?.[i] ?? [];
     if (!names.length) return;
-    const kindText = readCell(files, sheet.sheet, row.kind);
-    if (kindText) out.set(row.kind, checkBoxes(kindText, 0));
+    const kindText = row.kind ? readCell(files, sheet.sheet, row.kind) : '';
+    if (row.kind && kindText) out.set(row.kind, checkBoxes(kindText, 0));
+    for (const t of row.texts ?? []) {
+      const value = textValue(t, v);
+      if (value !== null) out.set(t.cell, value);
+    }
     if (row.places) {
       const texts = row.places.map((ref) => readCell(files, sheet.sheet, ref));
       const labels = texts.map((t) => boxLabels(t));

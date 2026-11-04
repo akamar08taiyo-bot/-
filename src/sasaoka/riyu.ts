@@ -5,7 +5,7 @@
 // 理由書だけの欄（□を■にする所・総合的状況・P2 の活動・④改修項目）は riyuCells で書く（fillFiles の sheet.riyu）
 
 import type {EstimateRates, EstimateSettings} from './calc.ts';
-import {circled, eraOf, NO_SHINSEI} from './estimateForms.ts';
+import {circled, eraOf, jobInsurer, NO_SHINSEI} from './estimateForms.ts';
 import {colName, firstPhotoDay, readMapped, shinseiValues, workItems} from './shinsei.ts';
 import type {MarkCell, ShinseiBook, ShinseiMap, ShinseiValues} from './shinsei.ts';
 import type {RiyuField} from './shinseiPreview.ts';
@@ -241,7 +241,9 @@ export function ageAt(birth: string, at: string): number | null {
 
 /** □の欄に書くこと：pick＝何番目の□を■にするか（null は□のまま）、fill＝かっこの中に書く文字（その他） */
 export type RiyuCheck = {pick: number | null; fill?: string};
-export type RiyuValues = {cells: Record<string, string>; checks: Record<string, RiyuCheck>};
+export type RiyuValues = {cells: Record<string, string>; checks: Record<string, RiyuCheck>; flows?: RiyuFlow[]};
+/** 罫線の何行かに分けて書く文（大分市の理由書（表）の身体状況などは1行ずつの欄。shinsei.ts の flowLines で行に分ける） */
+export type RiyuFlow = {cells: string[]; text: string};
 
 /**
  * 理由書だけの欄に書く値（申請書と同じ欄＝氏名・住所・番号・郵便番号・生年月日・作成者は ShinseiMap の欄で書く）。
@@ -367,6 +369,67 @@ export const RIYU_MAP: ShinseiMap = {
     },
   ],
 };
+
+// ---------------------------------------------------------------- 大分市の理由書（表）（大分市の申請書の原本 oita.xltx の中）
+
+/** 大分市の理由書（表）の福祉用具の□（RIYU_EQUIPMENT の順に5つずつ、26〜30行の 改修前・改修後 の列）。その他は T30 のかっこと AB30・AC30 */
+const OITA_EQUIPMENT_COLS: [string, string][] = [
+  ['H', 'I'],
+  ['R', 'S'],
+  ['AB', 'AC'],
+];
+
+/**
+ * 大分市の理由書（表）の、理由書のタブで入れた欄（申請書と同じ項目＝氏名・番号・生年月日・要介護・認定有効期間・住所・所有者・作成者は SHINSEI.oita の欄で書く）：
+ * 現地確認日・理由書作成日・Tel・資格（介護支援専門員／その他）・住宅の種別（持家・公営住宅・民営借家）・福祉用具の利用状況と改修後の想定・
+ * 利用者の身体状況（4行）・介護状況（4行）・どう変えたいか（6行）
+ */
+export function oitaRiyuCells(job: Job, s: EstimateSettings): RiyuValues {
+  const info: ShinseiInfo = {...NO_SHINSEI, ...job.shinsei};
+  const r = riyuShown(job, s);
+  const cells: Record<string, string> = {};
+  const checks: Record<string, RiyuCheck> = {};
+  if (r.checkDate) cells.L4 = warekiText(r.checkDate);
+  if (r.madeDate) cells.W4 = warekiText(r.madeDate);
+  if (r.tel.trim()) cells.U8 = `Tel　${r.tel.normalize('NFKC').trim()}`;
+  // 資格：理由書のタブの「資格（介護支援専門員でないとき）」が空なら介護支援専門員（作成者を入れたときだけ）、入れたらその他（かっこの中に資格）
+  const q = r.qualification.trim();
+  if (q) {
+    checks.R10 = {pick: 0};
+    checks.S10 = {pick: null, fill: q};
+  } else if (info.reasonOffice.trim() || info.reasonName.trim()) checks.L10 = {pick: 0};
+  // 住宅の種別：持ち家→持家、借家・借間→民営借家（間）、その他で「公営」と書いたら公営住宅
+  if (r.housing === '持ち家') checks.J19 = {pick: 0};
+  else if (r.housing === '借家' || r.housing === '借間') checks.V19 = {pick: 0};
+  else if (r.housing === 'その他' && /公営|市営|県営/.test(r.housingOther)) checks.P19 = {pick: 0};
+  RIYU_EQUIPMENT.forEach((name, i) => {
+    const e = r.equipment[name];
+    const [before, after] = OITA_EQUIPMENT_COLS[Math.floor(i / 5)];
+    const row = 26 + (i % 5);
+    if (e?.before) checks[`${before}${row}`] = {pick: 0};
+    if (e?.after) checks[`${after}${row}`] = {pick: 0};
+  });
+  // その他は1行だけ：名前を「・」でつなぎ、どれかの改修前・改修後があれば□を■
+  const others = r.equipmentOther.filter((e) => e.name.trim() || e.before || e.after);
+  if (others.length) {
+    const names = others.map((e) => e.name.trim()).filter(Boolean).join('・');
+    if (names) cells.T30 = `●その他（${names}）`;
+    if (others.some((e) => e.before)) checks.AB30 = {pick: 0};
+    if (others.some((e) => e.after)) checks.AC30 = {pick: 0};
+  }
+  const flows: RiyuFlow[] = [];
+  const rows = (from: number, n: number) => Array.from({length: n}, (_, k) => `B${from + k}`);
+  if (r.body.trim()) flows.push({cells: rows(32, 4), text: r.body.trim()});
+  if (r.care.trim()) flows.push({cells: rows(37, 4), text: r.care.trim()});
+  if (r.wish.trim()) flows.push({cells: rows(42, 6), text: r.wish.trim()});
+  return {cells, checks, flows};
+}
+
+/** 申請書（保険者の原本）に書く値：大分市は申請書の中の理由書（表）に、理由書のタブで入れた欄も書く（ほかの保険者の理由書は理由書のタブで別に作る） */
+export function shinseiBookValues(job: Job, s: EstimateSettings, today = todayIso()): ShinseiValues {
+  const v = shinseiValues(job, s, today);
+  return jobInsurer(job) === 'oita' ? {...v, riyu: oitaRiyuCells(job, s)} : v;
+}
 
 /** 理由書に書く値（申請書と同じ値に、理由書だけの欄の値を足したもの） */
 export function riyuValues(job: Job, s: EstimateSettings, today = todayIso()): ShinseiValues {

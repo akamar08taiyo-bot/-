@@ -20,6 +20,6 @@ test('ほかの市の申請書：久留米市・飯塚市・大分市・田川�
   // 飯塚市の福祉用具購入は新しいページ（ユーザーの「飯塚市の福祉用具購入が開けません」2026-11-04）
   assert.equal(OTHER_FORMS.find((f) => f.id === 'iizuka')!.links.find((l) => l.label.includes('福祉用具購入'))!.url, 'https://www.city.iizuka.lg.jp/site/shinsei/1803.html');
   assert.deepEqual(OTHER_FORMS.find((f) => f.id === 'tagawa')!.links, []);
-  // このアプリで作れる書式：久留米市・飯塚市はいただいた様式、田川市は広域連合の書式（2026-11-02）
-  assert.deepEqual(OTHER_FORMS.filter((f) => f.make).map((f) => [f.city, f.make]), [['久留米市', 'kurume'], ['飯塚市', 'iizuka'], ['田川市', 'kouiki']]);
+  // このアプリで作れる書式：久留米市・飯塚市・大分市はいただいた様式（大分市は 2026-11-04）、田川市は広域連合の書式（2026-11-02）
+  assert.deepEqual(OTHER_FORMS.filter((f) => f.make).map((f) => [f.city, f.make]), [['久留米市', 'kurume'], ['飯塚市', 'iizuka'], ['大分市', 'oita'], ['田川市', 'kouiki']]);
 });

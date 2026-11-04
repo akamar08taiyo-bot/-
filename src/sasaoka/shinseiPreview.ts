@@ -96,6 +96,7 @@ export type PvPage = {
  * 写真の用紙は写真番号（福岡市・北九州市の完了報告書は1枚に2つ）と、事前・完了などの別があればそれ。同じ名前が2つあれば（2）を付ける
  */
 const FORM_LABEL: [RegExp, string][] = [
+  [/支給申請兼施工承認/, '申請書'], // 大分市の支給申請兼施工承認申請書（「承認申請書」より先に見る）
   [/委任状/, '委任状'],
   [/承諾書/, '承諾書'],
   [/請求書/, '請求書'],
@@ -130,7 +131,8 @@ export function printLabels(pages: PvPage[]): string[] {
       return `写真${nums.map(circled).join('')}${kind ? `（${kind}）` : ''}`;
     }
     const page = /（(\d+)ページ）$/.exec(p.sheet)?.[1]; // 理由書（1枚のシートに2ページ）
-    if (/理由書/.test(p.sheet)) return page ? `理由書（${page}ページ）` : '理由書';
+    const side = /（([表裏])）$/.exec(p.sheet)?.[1]; // 大分市の理由書（表）・理由書（裏）
+    if (/理由書/.test(p.sheet)) return page ? `理由書（${page}ページ）` : side ? `理由書（${side}）` : '理由書';
     return FORM_LABEL.find(([re]) => re.test(p.sheet))?.[1] ?? p.sheet.trim();
   });
   return raw.map((l, i) => {
@@ -237,6 +239,14 @@ const TEXT_FIELD: Record<keyof ShinseiTexts, ShinseiField> = {
   // 飯塚市の請求書：支給対象額・本人負担分は負担割合から
   coveredYen: 'burden',
   shareYen: 'burden',
+  // 大分市：要支援・要介護の数字は要介護状態区分、認定有効期間、介護保険対象分・対象外分は改修費用、居宅介護支援事業所の連絡先は理由書作成者へ
+  careS: 'care',
+  careK: 'care',
+  careTerm: 'careTerm',
+  careTermR: 'careTerm',
+  targetYen: 'cost',
+  excludedYen: 'cost',
+  reasonTel: 'reason',
 };
 const MARK_FIELD: Record<keyof ShinseiMarks, ShinseiField> = {gender: 'gender', era: 'birth', care: 'care', renovated: 'renovated'};
 
@@ -254,8 +264,14 @@ function fieldRefs(sheet: ShinseiSheet): {field: ShinseiField; ref: string}[] {
     // 改修施工者（受任者。福岡市・北九州市）は設定の会社・営業所・担当なので、押せる欄にしない
     if (key && !key.startsWith('builder') && key !== 'manager') out.push({field: TEXT_FIELD[key], ref: t.cell});
   }
-  // 北九州市の事前届出書の改修の種類と箇所の□：改修の内容へ
-  for (const k of sheet.kindRows ?? []) for (const ref of [k.kind, ...(k.places ?? []), k.other, k.detail]) if (ref) out.push({field: 'works', ref});
+  // 北九州市の事前届出書の改修の種類と箇所の□：改修の内容へ。大分市の改修の内容の行の着工予定・完成予定は着工日・完成日へ（施工者は設定の会社なので押せない）
+  for (const k of sheet.kindRows ?? []) {
+    for (const ref of [k.kind, ...(k.places ?? []), k.other, k.detail]) if (ref) out.push({field: 'works', ref});
+    for (const t of k.texts ?? []) {
+      const key = placeholders(t.format)[0];
+      if (key && !key.startsWith('builder') && key !== 'manager') out.push({field: TEXT_FIELD[key], ref: t.cell});
+    }
+  }
   for (const m of sheet.marks ?? []) if ('key' in m) out.push({field: MARK_FIELD[m.key], ref: m.cell});
   for (const l of sheet.links ?? []) out.push({field: l.field as ShinseiField, ref: l.ref});
   // 写真の用紙の撮影日（苅田町・みやこ町）：一覧の「改修前日付・改修後日付」

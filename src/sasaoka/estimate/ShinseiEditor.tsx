@@ -19,7 +19,8 @@ import {usePhotoUrls} from '../photos.ts';
 import {turn} from '../photoEdit.ts';
 import {AREA_LABEL, INSURER_AREAS, insurerNoOf} from '../insurerNumbers.ts';
 import {photoBounds} from '../photoMarks.ts';
-import {autoLength, costIsTotal, lengthsShown, estimatePlateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, planPlacement, SHINSEI, shinseiCost, shinseiFileName, shinseiValues, shinseiWorks} from '../shinsei.ts';
+import {autoLength, costIsTotal, lengthsShown, estimatePlateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, planPlacement, SHINSEI, shinseiCost, shinseiFileName, shinseiWorks} from '../shinsei.ts';
+import {riyuOf, shinseiBookValues} from '../riyu.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
 import type {AppData, Insurer, Job, Material, PhotoEdit, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
@@ -54,6 +55,9 @@ const FIELDS: Record<Insurer, Field[]> = {
   kurume: ['kana', 'name', 'insuredNo', 'birth', 'zip', 'address', 'phone', 'owner', 'reason', 'photoDates', 'works', 'dates', 'cost', 'burden'],
   // 飯塚市（2026-11-02）：事前承認願書の上からの順。住宅改修の利用（無・有）・今回の改修費用・理由書作成者・着工予定日・完成予定日。負担割合は請求書の保険給付分・本人負担分
   iizuka: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'owner', 'photoDates', 'works', 'renovated', 'cost', 'reason', 'dates', 'burden'],
+  // 大分市（2026-11-04）：支給申請兼施工承認申請書の上からの順（郵便番号・性別の欄はない）。要支援・要介護の（　）・認定有効期間、改修の内容の行の着工予定・完成予定、
+  // 改修費用見積額、居宅介護支援事業所（理由書作成者と連絡先）。過去の住宅改修費支給申請の有無は理由書（表）
+  oita: ['kana', 'name', 'insuredNo', 'birth', 'care', 'burden', 'careTerm', 'address', 'phone', 'owner', 'photoDates', 'works', 'dates', 'cost', 'reason', 'renovated'],
 };
 // 負担割合は要介護状態区分のすぐ下（みやこ町・広域連合は電話番号の下）。申請書の原本に欄はないが、委任状の保険給付額・見積書の介護保険の内訳に使い、
 // 特定福祉用具の負担割合と同じ値（どちらで選んでも両方に入る。tokuteiLink.ts）。ユーザーの指示「住宅改修の申請書にも負担割合を設置。住宅改修⇔特定福祉用具などで連動して数字に繋げる」2026-10-28
@@ -62,12 +66,13 @@ const FIELDS: Record<Insurer, Field[]> = {
 /** みやこ町・広域連合：改修の内容は内訳明細書（別紙）、着工日・完成日は支給申請書（工事のあと）に書く */
 const twoForms = (i: Insurer) => i === 'miyako' || i === 'kouiki';
 /** 着工日・完成日を入れる保険者（工事のあとの支給申請書・完了届出書に書く。福岡市は改修の内容は申請書のまま） */
-const workDates = (i: Insurer) => twoForms(i) || i === 'fukuoka' || i === 'kitakyushu' || i === 'kurume' || i === 'iizuka';
+const workDates = (i: Insurer) => twoForms(i) || i === 'fukuoka' || i === 'kitakyushu' || i === 'kurume' || i === 'iizuka' || i === 'oita';
 
 /** 欄の名前（申請書の言葉） */
 function label(f: Field, i: Insurer): string {
-  if (f === 'cost') return twoForms(i) ? '改修費用（介護保険対象分）' : i === 'kitakyushu' ? '工事費見積金額（介護保険対象分）' : i === 'iizuka' ? '今回の改修費用（介護保険対象分）' : '改修予定費用';
+  if (f === 'cost') return twoForms(i) ? '改修費用（介護保険対象分）' : i === 'kitakyushu' ? '工事費見積金額（介護保険対象分）' : i === 'iizuka' ? '今回の改修費用（介護保険対象分）' : i === 'oita' ? '改修費用見積額' : '改修予定費用';
   if (f === 'renovated' && i === 'iizuka') return '住宅改修の利用';
+  if (f === 'renovated' && i === 'oita') return '過去の住宅改修費支給申請';
   // 苅田町・行橋市の着工予定日は書かない（ユーザーの指示「申請書の着工予定日は空白にする」）ので、完了（完成）予定日だけ
   if (f === 'dates') return workDates(i) ? '着工日・完成日' : i === 'kanda' ? '完了予定日' : '完成予定日';
   return {
@@ -87,6 +92,7 @@ function label(f: Field, i: Insurer): string {
     works: '改修の内容・箇所及び規模',
     renovated: '現在までの改修状況',
     photoDates: '改修前日付・改修後日付',
+    careTerm: '認定有効期間',
   }[f];
 }
 
@@ -100,6 +106,7 @@ const FORM_TITLE: Record<Insurer, string> = {
   kitakyushu: '介護保険住宅改修事前届出書・住宅改修費支給申請書（受領委任払用）',
   kurume: '住宅改修事前承認申請書・住宅改修費支給申請書（第2号様式）',
   iizuka: '住宅改修費事前承認願書・住宅改修費支給申請書・請求書（受領委任払用）',
+  oita: '住宅改修費支給申請兼施工承認申請書・委任状・住宅改修が必要な理由書',
 };
 
 /** 箇所を足すのプルダウンの「そのほか」（名前を打つ箇所） */
@@ -163,6 +170,7 @@ export function ShinseiEditor({
     works: lines.length === 0 || job.places.some((p) => p.kind === 1 && !p.dims?.l?.trim() && !autoLength(p)),
     cost: cost === null,
     renovated: !info.renovated,
+    careTerm: !info.careFrom || !info.careTo,
     dates: false,
     photoDates: false, // 改修前は当日、改修後は空でよい
   };
@@ -175,7 +183,7 @@ export function ShinseiEditor({
   const pages = useMemo((): PvPage[] | null => {
     if (!template || !map) return null;
     try {
-      return shinseiPreview(template, map, shinseiValues(shown, s));
+      return shinseiPreview(template, map, shinseiBookValues(shown, s));
     } catch {
       return []; // 描けないとき（原本がこわれているなど）は一覧だけ
     }
@@ -367,6 +375,14 @@ export function ShinseiEditor({
         );
       case 'care':
         return <Circles label="要介護状態区分" options={MARK_INFO.care.options} value={info.care} onPick={(care) => setInfo({care} as Partial<ShinseiInfo>)} />;
+      case 'careTerm':
+        // 認定有効期間（大分市の申請書・理由書（表））。介護保険証から読んだ日付も入る。理由書のタブの認定有効期間と同じ値
+        return (
+          <span className="inline-flex flex-wrap items-center gap-1">
+            <input type="date" value={info.careFrom} onChange={(e) => setInfo({careFrom: e.target.value})} className="h-9 rounded-md border border-slate-300 px-2" aria-label="認定有効期間のはじめ" data-nav />～
+            <input type="date" value={info.careTo} onChange={(e) => setInfo({careTo: e.target.value})} className="h-9 rounded-md border border-slate-300 px-2" aria-label="認定有効期間のおわり" data-nav />
+          </span>
+        );
       case 'burden':
         return <BurdenPicker info={info} setInfo={setInfo} />;
       case 'owner':
@@ -394,6 +410,13 @@ export function ShinseiEditor({
               氏名
               <TextInput value={info.reasonName} onChange={(reasonName) => setInfo({reasonName})} className="w-48" aria-label="理由書作成者の氏名" data-nav />
             </span>
+            {/* 大分市の申請書の居宅介護支援事業所の「連絡先」：理由書のタブの作成者の連絡先と同じ値 */}
+            {i === 'oita' && (
+              <span className="inline-flex items-center gap-1">
+                連絡先
+                <TextInput type="tel" value={riyuOf(job).tel} onChange={(tel) => setJob((j) => ({...j, riyu: {...riyuOf(j), tel}}))} className="w-40" aria-label="理由書作成者の連絡先" data-nav />
+              </span>
+            )}
           </>
         );
       case 'works':
@@ -458,7 +481,7 @@ export function ShinseiEditor({
               {end}
               <input type="date" value={info.end} onChange={(e) => setInfo({end: e.target.value})} className="h-9 rounded-md border border-slate-300 px-2" aria-label={end} data-nav />
             </label>
-            {workDates(i) && <Note>{i === 'kurume' || i === 'iizuka' ? `${i === 'kurume' ? '事前承認申請書' : '事前承認願書'}（予定日）と支給申請書に書きます` : `${i === 'fukuoka' ? '完了届出書' : '支給申請書'}に書きます（工事のあと）`}</Note>}
+            {workDates(i) && <Note>{i === 'oita' ? '申請書の改修の内容の行（着工予定・完成予定）に書きます' : i === 'kurume' || i === 'iizuka' ? `${i === 'kurume' ? '事前承認申請書' : '事前承認願書'}（予定日）と支給申請書に書きます` : `${i === 'fukuoka' ? '完了届出書' : '支給申請書'}に書きます（工事のあと）`}</Note>}
           </>
         );
       }

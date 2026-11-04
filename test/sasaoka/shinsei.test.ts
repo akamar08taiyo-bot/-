@@ -7,8 +7,9 @@ import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import {DEFAULT_PLACES, defaultSettings, settingsForOffice} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {areaInsurerNo, INSURER_AREAS, insurerNoOf} from '../../src/sasaoka/insurerNumbers.ts';
-import {ageOn, boxLabels, checkBoxes, cityRest, fillShinsei, placeCounts, fixedPitch, hangLines, hangPrefixes, indentOf, lengthsShown, splitNumber, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, kindNamesOf, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoNoteText, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, sheetLines, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
+import {ageOn, boxLabels, checkBoxes, cityRest, fillShinsei, flowLines, placeCounts, fixedPitch, hangLines, hangPrefixes, indentOf, lengthsShown, splitNumber, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, kindNamesOf, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoNoteText, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, sheetLines, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
 import {KK_CELLS} from '../../src/sasaoka/shinsei/kitakyushuCells.ts';
+import {NO_RIYU, shinseiBookValues} from '../../src/sasaoka/riyu.ts';
 import {printLabels, shinseiPreview} from '../../src/sasaoka/shinseiPreview.ts';
 import type {PvPage} from '../../src/sasaoka/shinseiPreview.ts';
 import {cleanSettings} from '../../src/sasaoka/storage.ts';
@@ -55,6 +56,7 @@ const FUKUOKA = new Uint8Array(readFileSync(new URL('../../src/sasaoka/shinsei/f
 const KITAKYUSHU = new Uint8Array(readFileSync(new URL('../../src/sasaoka/shinsei/kitakyushu.xltx', import.meta.url)));
 const KURUME = new Uint8Array(readFileSync(new URL('../../src/sasaoka/shinsei/kurume.xltx', import.meta.url)));
 const IIZUKA = new Uint8Array(readFileSync(new URL('../../src/sasaoka/shinsei/iizuka.xltx', import.meta.url)));
+const OITA = new Uint8Array(readFileSync(new URL('../../src/sasaoka/shinsei/oita.xltx', import.meta.url)));
 
 /** シート名 → そのシートの XML */
 function sheets(bytes: Uint8Array): {files: Record<string, Uint8Array>; byName: Map<string, string>} {
@@ -621,7 +623,7 @@ function ellipses(bytes: Uint8Array, sheet: string): {from: number[]; to: number
     .map(anchorOf);
 }
 const marksOf = (m: Partial<ShinseiMarks>): ShinseiMarks => ({gender: '', era: '', care: '', renovated: '', ...m});
-const TEMPLATES: Record<Insurer, Uint8Array> = {kanda: KANDA, yukuhashi: YUKUHASHI, miyako: MIYAKO, kouiki: KOUIKI, fukuoka: FUKUOKA, kitakyushu: KITAKYUSHU, kurume: KURUME, iizuka: IIZUKA};
+const TEMPLATES: Record<Insurer, Uint8Array> = {kanda: KANDA, yukuhashi: YUKUHASHI, miyako: MIYAKO, kouiki: KOUIKI, fukuoka: FUKUOKA, kitakyushu: KITAKYUSHU, kurume: KURUME, iizuka: IIZUKA, oita: OITA};
 
 test('申請書の丸：選んだ性別・元号・要介護状態区分・改修状況を楕円で囲む（苅田町は事前申請書と事後申請書の両方）。選ばなければ囲まない', () => {
   assert.deepEqual(shinseiMarkKeys('kanda'), ['gender', 'era', 'care']);
@@ -909,8 +911,10 @@ test('写真貼付用紙：写真番号の用紙の改修前・改修後の枠�
     kurume: ['住改・写真 ①:before:1', '住改・写真 ①:after:2', '住改・写真④ (3):before:3'],
     // 飯塚市：事前申請用（改修前だけ）と支給申請用（改修前・改修後）の両方に。⑤は5枚目
     iizuka: ['事前写真①:before:1', '事前写真⑤:before:3', '支給写真①:before:1', '支給写真①:after:2', '支給写真⑤:before:3'],
+    // 大分市：行橋市の原本と同じ工事写真添付用紙
+    oita: ['住改・写真 ①:before:1', '住改・写真 ①:after:2', '住改・写真④ (3):before:3'],
   };
-  for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu', 'kurume', 'iizuka'] as const) {
+  for (const insurer of ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu', 'kurume', 'iizuka', 'oita'] as const) {
     const files = unzipSync(fillShinsei(TEMPLATES[insurer], SHINSEI[insurer]!, {...shinseiValues(job({insurer}), RATES), photoImages}));
     const got: string[] = [];
     const entries = SHINSEI[insurer]!.sheets.filter((x) => x.photoPlace);
@@ -1584,7 +1588,7 @@ test('保険者番号（ユーザーの指示「広域連合の場合は、築�
   assert.equal(insurerNoOf('kouiki', '福岡県豊前市八屋1', '406421'), '406421'); // 選んだ番号（保険証の番号）が先
   assert.equal(insurerNoOf('kouiki', '福岡県豊前市八屋1', '4064'), '402149'); // 6けたでなければ住所から
   assert.equal(insurerNoOf('kitakyushu', '北九州市小倉北区見本1', '406462'), '401067'); // ほかの保険者（広域連合）の番号は使わない
-  assert.equal(insurerNoOf('kitakyushu', '北九州市小倉北区見本1', '442012'), '442012'); // 一覧にない番号（保険証の番号）はそのまま
+  assert.equal(insurerNoOf('kitakyushu', '北九州市小倉北区見本1', '999999'), '999999'); // 一覧にない番号（保険証の番号）はそのまま（前の 442012 は大分市を足して一覧に入った）
   // 福岡市の区の番号は、4013＋区の番号＋検証番号と同じ。どの番号も6けため（検証番号）が合う
   for (const a of INSURER_AREAS.fukuoka) assert.equal(fukuokaInsurerNo(`福岡市${a.name}見本1`), a.no);
   for (const list of Object.values(INSURER_AREAS)) for (const a of list) assert.equal(insurerCheckDigit(a.no.slice(0, 5)), Number(a.no[5]), `${a.name} ${a.no}`);
@@ -1912,6 +1916,136 @@ test('飯塚市の原本：16枚（事前承認願書・承諾書・内訳書・
   assert.equal(areaInsurerNo('iizuka', '福岡県飯塚市見本町2-3'), '402057');
 });
 
+// ---------------------------------------------------------------- 大分市（2026-11-04。いただいた支給申請兼施工承認申請書・委任状・理由書（表・裏）。架空の見本 山田 太郎）
+const OT_S = {...RATES, company: '太陽シルバーサービス株式会社', officeName: '見本営業所', manager: '見本 次郎', postal: '870-0000', address: '大分県大分市見本1-1', tel: '097-000-0000'};
+const otJob = (extra: Partial<Job> = {}) =>
+  job({
+    insurer: 'oita',
+    staff: '見本 三郎',
+    address: '大分県大分市見本町2-3',
+    places: [place('浴室', [mat('木の手すり')], {photo: 1}), place('勝手口', [mat('木の手すり')], {photo: 2}), place('トイレ', [mat('段差解消スロープ', {excluded: true})], {kind: 2, photo: 3})],
+    shinsei: {...NO_SHINSEI, kana: 'ヤマダ タロウ', birthY: '15', birthM: '3', birthD: '15', care: '要介護2', careFrom: '2026-04-01', careTo: '2028-03-31', phone: '097-111-2222', owner: '山田 太郎', relation: '本人', reasonOffice: '見本居宅介護支援事業所', reasonName: '見本 花子', renovated: '無', start: '2026-11-10', end: '2026-11-12'},
+    riyu: {
+      ...NO_RIYU,
+      checkDate: '2026-10-20',
+      madeDate: '2026-10-25',
+      tel: '097-333-4444',
+      housing: '持ち家',
+      body: '見本の文。'.repeat(14),
+      care: '見本の介護状況。',
+      wish: '見本の願い。',
+      equipment: {手すり: {before: true, after: true}, スロープ: {after: true}, 腰掛便座: {before: true}},
+      equipmentOther: [{name: '見本の用具', before: false, after: true}],
+    },
+    ...extra,
+  });
+
+/** 欄の文字（共有の文字＝原本のままの欄も、書いた文字も） */
+function cellTexts(files: Record<string, Uint8Array>): (xml: string, ref: string) => string {
+  const strings = [...strFromU8(files['xl/sharedStrings.xml']).matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) =>
+    [...m[1].replace(/<rPh\b[\s\S]*?<\/rPh>/g, '').matchAll(/<t[^>]*>([^<]*)<\/t>/g)].map((t) => t[1].replace(/\r\n/g, '\n')).join(''),
+  );
+  return (xml, ref) => {
+    const shared = new RegExp(`<c r="${ref}"[^>]*t="s"[^>]*><v>(\\d+)</v>`).exec(xml)?.[1];
+    return shared === undefined ? txt(xml, ref) : strings[Number(shared)];
+  };
+}
+
+test('大分市：支給申請兼施工承認申請書に書く（改修の内容は種類ごとの行に箇所・施工者・着工予定・完成予定、費用は見積額・対象分・対象外分。申請者の氏名は自署）', () => {
+  const j = otJob();
+  const out = fillShinsei(OITA, SHINSEI.oita!, shinseiBookValues(j, OT_S));
+  const {files, byName} = sheets(out);
+  const text = cellTexts(files);
+  const a = byName.get('支給申請兼施工承認申請書')!;
+  const at = (ref: string) => text(a, ref);
+  assert.deepEqual([at('L3'), at('L4')], ['ヤマダ タロウ', '山田 太郎']);
+  assert.equal(digitsOf(a, ['AP', 'AQ', 'AR', 'AS', 'AT', 'AU', 'AV', 'AW', 'AX', 'AY'].map((c) => `${c}3`)), '0000366989');
+  assert.equal(at('L7'), '明･大･昭　　15年　3月　15日生');
+  assert.equal(at('AG7'), '要支援 (　　）　･　要介護 (　２　）');
+  assert.equal(at('L9'), '令和8年4月1日　～　令和10年3月31日');
+  assert.deepEqual([at('L11'), at('AO11'), at('L13'), at('AN13')], ['大分県大分市見本町2-3', '097-111-2222', '山田 太郎', '本人']);
+  assert.equal(at('AN2'), '　　　□償還　　　　■受領委任'); // 原本で■受領委任
+  // 改修の内容：手すりの取付け（17行）・段差の解消（19行）に箇所と施工者・予定日。ほかの種類は「－」で、予定日の欄は原本のまま
+  assert.deepEqual([at('O17'), at('O19'), at('O21'), at('O27')], ['①浴室　②勝手口', '③トイレ', '－', '－']); // 欄の幅に入るだけ1行に並べる（packKindCells）
+  for (const r of [17, 19]) assert.deepEqual([at(`Z${r}`), at(`AJ${r}`), at(`AQ${r}`)], ['太陽シルバーサービス株式会社　見本営業所', ' R8・11・10', ' R8・11・12'], `${r}行`);
+  assert.deepEqual([at('Z21'), at('AJ21')], ['', ' R　   ・　　　・']);
+  const t = estimateTotals(j, OT_S);
+  assert.ok(t.all.total > t.target.total && t.target.total > 0); // トイレの段差解消スロープは対象外
+  assert.deepEqual([at('L29'), at('AB29'), at('AR29')], [`${t.all.total.toLocaleString('en-US')}円`, `${t.target.total.toLocaleString('en-US')}円`, `${(t.all.total - t.target.total).toLocaleString('en-US')}円`]);
+  assert.deepEqual([at('M39'), at('AN40'), at('AR40')], ['大分県大分市見本町2-3', '097-111-2222', '']); // 申請者の住所・電話（氏名は自署）
+  assert.equal(at('M60'), '見本居宅介護支援事業所');
+  assert.equal(at('M61'), '担当者氏名（　見本 花子　）　　連絡先（　097-333-4444　）');
+  assert.equal(at('M63'), '太陽シルバーサービス株式会社　見本営業所');
+  assert.equal(at('M64'), '担当者氏名（　見本 三郎　）　　連絡先（　097-000-0000　）');
+  // 足した丸は元号（昭）だけ（原本の印の丸3つはそのまま）
+  assert.equal(ellipses(out, '支給申請兼施工承認申請書').length - ellipses(OITA, '支給申請兼施工承認申請書').length, 1);
+  // 連絡先を入れていなければ「（　－　－　）」のすき間のまま
+  const noTel = sheets(fillShinsei(OITA, SHINSEI.oita!, shinseiBookValues(otJob({riyu: {...NO_RIYU}}), OT_S))).byName.get('支給申請兼施工承認申請書')!;
+  assert.equal(txt(noTel, 'M61'), '担当者氏名（　見本 花子　）　　連絡先（　　　　　－　　　　－　　　　　）');
+  // 改修費用見積額は見積書の合計（手で入れた金額があればそれ）
+  assert.equal(shinseiCost(j, OT_S), t.all.total);
+});
+
+test('大分市：委任状（生年月日・住所、受任者は会社・所長と住所、工事業者と住宅改修の申請を丸。氏名は自署）と理由書（表）（理由書のタブの項目も）', () => {
+  const out = fillShinsei(OITA, SHINSEI.oita!, shinseiBookValues(otJob(), OT_S));
+  const {files, byName} = sheets(out);
+  const text = cellTexts(files);
+  const p = byName.get('委任状')!;
+  assert.equal(txt(p, 'C4'), ''); // 被保険者の氏名は自署
+  assert.match(txt(p, 'C5'), /昭和　　15年　　3月　　15日$/);
+  assert.deepEqual([txt(p, 'C6'), txt(p, 'C22'), txt(p, 'C23')], ['大分県大分市見本町2-3', '太陽シルバーサービス株式会社　見本営業所　所長　見本 次郎', '〒870-0000　大分県大分市見本1-1']);
+  assert.equal(txt(p, 'H2'), ''); // 日付は書かない
+  assert.equal(ellipses(out, '委任状').length - ellipses(OITA, '委任状').length, 3); // 元号（昭和）・住宅改修費支給申請兼施工承認（変更）申請・工事業者
+  const r = byName.get('理由書（表）')!;
+  const at = (ref: string) => text(r, ref);
+  assert.equal(at('B3'), '□償還　■受領委任');
+  assert.deepEqual([at('L4'), at('W4'), at('H5'), at('H6'), at('U8')], ['令和8年10月20日', '令和8年10月25日', '見本居宅介護支援事業所', '見本 花子', 'Tel　097-333-4444']);
+  assert.deepEqual([at('L10'), at('R10')], ['■', '□']); // 資格を入れていなければ介護支援専門員
+  assert.deepEqual([at('H12'), at('H13'), at('W12'), at('W13'), at('Z15')], ['ヤマダ タロウ', '山田 太郎', '要介護（　２　） ・  要支援（　　）', 'R8・4・1～R10・3・31', '15年3月15日']);
+  assert.equal(digitsOf(r, ['H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q'].map((c) => `${c}15`)), '0000366989');
+  assert.deepEqual([at('H16'), at('Y16'), at('H18')], ['　大分市見本町2-3', '山田 太郎', '本人']);
+  assert.deepEqual([at('J19'), at('P19'), at('V19')], ['■', '□', '□']); // 持ち家
+  // 福祉用具：手すり（改修前・改修後）・スロープ（改修後）・腰掛便座（改修前）・その他（改修後）
+  assert.deepEqual([at('H30'), at('I30'), at('R26'), at('S26'), at('AB26'), at('AC26'), at('H26')], ['■', '■', '□', '■', '■', '□', '□']);
+  assert.deepEqual([at('T30'), at('AB30'), at('AC30')], ['●その他（見本の用具）', '□', '■']);
+  // 利用者の身体状況（4行）：欄の幅ずつに分ける。つなぐと元の文
+  const body = [32, 33, 34, 35].map((n) => at(`B${n}`));
+  assert.ok(body[0] && body[1], body.join('|'));
+  assert.equal(body.join(''), '見本の文。'.repeat(14));
+  assert.deepEqual([at('B37'), at('B42')], ['見本の介護状況。', '見本の願い。']);
+  assert.equal(ellipses(out, '理由書（表）').length - ellipses(OITA, '理由書（表）').length, 2); // 元号（Ｓ）・過去の住宅改修費支給申請（無）
+  // 資格を入れたら「その他（　）」に書いて■。住宅が借家なら民営借家
+  const o = sheets(fillShinsei(OITA, SHINSEI.oita!, shinseiBookValues(otJob({riyu: {...NO_RIYU, qualification: '見本の資格', housing: '借家'}}), OT_S)));
+  const other = o.byName.get('理由書（表）')!;
+  const ot = (ref: string) => cellTexts(o.files)(other, ref);
+  assert.deepEqual([ot('L10'), ot('R10'), ot('S10'), ot('V19'), ot('J19')], ['□', '■', 'その他（見本の資格）', '■', '□']);
+  // 理由書（裏）は原本のまま（介護支援専門員が書く）
+  assert.match(text(byName.get('理由書（裏）')!, 'B5'), /改善しようとしている生活動作/);
+});
+
+test('大分市の原本：申請書・委任状・理由書（表・裏）・写真の用紙8枚。書く欄は空・受領委任に■', () => {
+  const {files, byName} = sheets(OITA);
+  const text = cellTexts(files);
+  assert.deepEqual([...byName.keys()].slice(0, 4), ['支給申請兼施工承認申請書', '委任状', '理由書（表）', '理由書（裏）']);
+  assert.equal(byName.size, 12);
+  const a = byName.get('支給申請兼施工承認申請書')!;
+  for (const ref of ['L3', 'L4', 'L11', 'AO11', 'AR11', 'L13', 'AN13', 'M39', 'AN40', 'AR40', 'M60', 'M63']) assert.equal(text(a, ref), '', ref);
+  assert.match(text(a, 'AN2'), /■受領委任/);
+  for (const ref of ['C4', 'C6', 'C22', 'C23']) assert.equal(text(byName.get('委任状')!, ref), '', ref);
+  assert.equal(text(byName.get('理由書（表）')!, 'H16'), '　大分市');
+  assert.equal(text(byName.get('理由書（表）')!, 'B3'), '□償還　■受領委任');
+  assert.equal(areaInsurerNo('oita', '大分県大分市見本町2-3'), '442012');
+  assert.deepEqual(kindNamesOf({insurer: 'oita'}), ['手すりの取付け', '段差の解消', '床材の変更', '引き戸等への扉の取替え', '洋式便器等への便器の取替え', '付帯工事']);
+  assert.equal(cityRest('大分県大分市見本町2-3', 'oita'), '見本町2-3');
+});
+
+test('文を欄の幅で行に分ける（理由書（表）の身体状況など）：全角で数え、「、。」は行の頭にしない・改行はそのまま', () => {
+  assert.deepEqual(flowLines('あいうえおかきくけこ', 4), ['あいうえ', 'おかきく', 'けこ']);
+  assert.deepEqual(flowLines('あいう。えお', 3), ['あいう。', 'えお']);
+  assert.deepEqual(flowLines('あい\nうえ', 10), ['あい', 'うえ']);
+  assert.deepEqual(flowLines('ab12', 1.2), ['ab', '12']); // 半角は 0.55 字
+});
+
 test('長さの書き方：1本ずつ mm を付ける「L=400mm×600mm」・「600×2」は 600mm を2本・欄に見せる形（ユーザーの答え「変えます」2026-11-04）', () => {
   const place = (l: string, plateLength?: string) => ({kind: 1, rows: [], dims: {l}, ...(plateLength ? {plateLength} : {})}) as unknown as Place;
   assert.equal(workText(place('400×600')), '手すりの取り付け　L=400mm×600mm');
@@ -1944,6 +2078,7 @@ test('印刷の画面のページの名前（1枚目・2枚目ではなく、申
   ]);
   assert.deepEqual(printLabels([pg('事前承認願書'), pg('承諾書'), pg('内訳書'), pg('支給申請書'), pg('請求書'), pg('事前写真①', 'photo', 1), pg('支給写真①', 'photo', 1)]), ['事前承認願書', '承諾書', '内訳書', '支給申請書', '請求書', '写真①（事前）', '写真①（支給）']);
   assert.deepEqual(printLabels([pg('事前承認申請書'), pg('住宅改修理由書（1ページ）'), pg('住宅改修理由書（2ページ）')]), ['事前承認申請書', '理由書（1ページ）', '理由書（2ページ）']);
+  assert.deepEqual(printLabels([pg('支給申請兼施工承認申請書'), pg('委任状'), pg('理由書（表）'), pg('理由書（裏）'), pg('住改・写真 ①', 'photo', 1)]), ['申請書', '委任状', '理由書（表）', '理由書（裏）', '写真①']);
   // 同じ名前が2つ（同じ写真番号の用紙が2枚など）は（1）（2）
   assert.deepEqual(printLabels([pg('写真', 'photo', 1), pg('写真 (2)', 'photo', 1)]), ['写真①（1）', '写真①（2）']);
 });
