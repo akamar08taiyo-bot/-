@@ -38,6 +38,7 @@ import {estimateDateOf} from '../print/docMeta.ts';
 import {CardFill} from '../components/CardReader.tsx';
 import {JobHeader, JobTitle, RemoveJobButton} from './JobHeader.tsx';
 import type {JobDocs} from '../components/DocsDialog.tsx';
+import {telWithHyphens} from '../tel.ts';
 
 /** 欄の順番：保険者ごとの申請書の上からの順番（原本を見て決めた。みやこ町・広域連合は承認の申請書の順番で、支給申請書だけの着工日・完成日は最後）。
  *  ただし被保険者氏名はどの保険者もフリガナのすぐ下（ユーザーの指示「ふりがなの下に、名前をもってくる」、2026-10-21。苅田町・みやこ町は原本では番号が先）。
@@ -369,7 +370,7 @@ export function ShinseiEditor({
       case 'phone':
         return (
           <>
-            <TextInput type="tel" value={info.phone} onChange={(phone) => setInfo({phone})} placeholder="0930-00-0000" className="w-48" aria-label="電話番号" data-nav />
+            <TextInput type="tel" value={telWithHyphens(info.phone)} onChange={(phone) => setInfo({phone: telWithHyphens(phone)})} placeholder="0930-00-0000" className="w-48" aria-label="電話番号" data-nav />
             {i === 'kouiki' && <Note>支給申請書（様式第7号）に書きます</Note>}
           </>
         );
@@ -414,7 +415,7 @@ export function ShinseiEditor({
             {i === 'oita' && (
               <span className="inline-flex items-center gap-1">
                 連絡先
-                <TextInput type="tel" value={riyuOf(job).tel} onChange={(tel) => setJob((j) => ({...j, riyu: {...riyuOf(j), tel}}))} className="w-40" aria-label="理由書作成者の連絡先" data-nav />
+                <TextInput type="tel" value={telWithHyphens(riyuOf(job).tel)} onChange={(tel) => setJob((j) => ({...j, riyu: {...riyuOf(j), tel: telWithHyphens(tel)}}))} className="w-40" aria-label="理由書作成者の連絡先" data-nav />
               </span>
             )}
           </>

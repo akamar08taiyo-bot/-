@@ -21,6 +21,7 @@ import {ShinseiPages} from './ShinseiPreview.tsx';
 import {JobHeader, JobTitle, RemoveJobButton} from './JobHeader.tsx';
 import {ShinseiPrint} from './ShinseiPrint.tsx';
 import type {JobDocs} from '../components/DocsDialog.tsx';
+import {telWithHyphens} from '../tel.ts';
 
 type Field = ShinseiField;
 
@@ -253,7 +254,7 @@ export function RiyuEditor({job, data, update, onBack, docs}: {job: Job; data: A
       case 'qualification':
         return <TextInput value={r.qualification} onChange={(qualification) => setRiyu({qualification})} className="w-full" aria-label="作成者の資格" data-nav />;
       case 'tel':
-        return <TextInput type="tel" value={r.tel} onChange={(tel) => setRiyu({tel})} placeholder="0930-00-0000" className="w-72 max-w-full" aria-label="作成者の連絡先" data-nav />;
+        return <TextInput type="tel" value={telWithHyphens(r.tel)} onChange={(tel) => setRiyu({tel: telWithHyphens(tel)})} placeholder="0930-00-0000" className="w-72 max-w-full" aria-label="作成者の連絡先" data-nav />;
       case 'body':
         return <TextArea value={r.body} onChange={(body) => setRiyu({body})} label="利用者の身体状況" />;
       case 'careState':

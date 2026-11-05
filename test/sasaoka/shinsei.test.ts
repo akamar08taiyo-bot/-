@@ -1491,6 +1491,9 @@ test('北九州市：事前届出書（提出用・通知用）に書く。改�
     assert.equal(at(c.name), '山田 太郎', name);
     assert.deepEqual([at(c.zipA), at(c.zipB), at(c.address)], ['802', '0001', '福岡県北九州市小倉北区見本町2-3'], name);
     assert.deepEqual([at(c.telA), at(c.telB), at(c.telC)], ['093', '111', '2222'], name);
+    // ハイフンなしで保存した電話番号も、市外局番・市内局番・4けたに分けて書く（tel.ts。ユーザーの指示「ハイフンなしで入力してもよい。自動でハイフンをいれる」2026-11-05）
+    const bare = sheets(fillShinsei(KITAKYUSHU, SHINSEI.kitakyushu!, shinseiValues({...kk, shinsei: {...kk.shinsei!, phone: '0931112222'}}, KK_S))).byName.get(name)!;
+    assert.deepEqual([txt(bare, c.telA), txt(bare, c.telB), txt(bare, c.telC)], ['093', '111', '2222'], name);
     const no = [c.no0, c.no1, c.no2, c.no3, c.no4, c.no5, c.no6, c.no7, c.no8, c.no9].map((r) => cell(s, r).match(/<v>(\d)<\/v>|<t[^>]*>(\d)<\/t>/)?.slice(1).find(Boolean) ?? '');
     assert.equal(no.join(''), '0000366989', name);
     assert.match(at(c.mochiie), /^■持家/, name);

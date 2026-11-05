@@ -10,6 +10,7 @@ import {colName, firstPhotoDay, readMapped, shinseiValues, workItems} from './sh
 import type {MarkCell, ShinseiBook, ShinseiMap, ShinseiValues} from './shinsei.ts';
 import type {RiyuField} from './shinseiPreview.ts';
 import type {Job, RiyuAct, RiyuActKey, RiyuInfo, ShinseiInfo} from './types.ts';
+import {telWithHyphens} from './tel.ts';
 import {customerFilePart, todayIso} from './util.ts';
 
 // ---------------------------------------------------------------- 原本の欄（riyu.xltx の番地）
@@ -261,7 +262,7 @@ export function riyuCells(job: Job, s: EstimateSettings, today = todayIso()): Ri
   if (r.madeDate) cells[RIYU_CELL.madeDate] = warekiText(r.madeDate);
   if (info.careFrom || info.careTo) cells[RIYU_CELL.careTerm] = `${warekiText(info.careFrom) || '　　年　月　日'}～${warekiText(info.careTo) || '　　年　月　日'}`;
   if (r.qualification.trim()) cells[RIYU_CELL.qualification] = r.qualification.trim();
-  if (r.tel.trim()) cells[RIYU_CELL.tel] = r.tel.normalize('NFKC').trim(); // 「TEL」は原本の AH9
+  if (r.tel.trim()) cells[RIYU_CELL.tel] = telWithHyphens(r.tel.normalize('NFKC').trim()); // 「TEL」は原本の AH9。ハイフンなしで保存してあってもハイフン付きに（tel.ts）
   if (r.housing && r.housing !== 'その他') checks[RIYU_CELL.housing] = {pick: ['持ち家', '借家', '借間'].indexOf(r.housing)};
   if (r.housing === 'その他') checks[RIYU_CELL.housingOther] = {pick: 0, fill: r.housingOther.trim()};
   if (r.body.trim()) cells[RIYU_CELL.body] = r.body.trim();
@@ -391,7 +392,7 @@ export function oitaRiyuCells(job: Job, s: EstimateSettings): RiyuValues {
   const checks: Record<string, RiyuCheck> = {};
   if (r.checkDate) cells.L4 = warekiText(r.checkDate);
   if (r.madeDate) cells.W4 = warekiText(r.madeDate);
-  if (r.tel.trim()) cells.U8 = `Tel　${r.tel.normalize('NFKC').trim()}`;
+  if (r.tel.trim()) cells.U8 = `Tel　${telWithHyphens(r.tel.normalize('NFKC').trim())}`;
   // 資格：理由書のタブの「資格（介護支援専門員でないとき）」が空なら介護支援専門員（作成者を入れたときだけ）、入れたらその他（かっこの中に資格）
   const q = r.qualification.trim();
   if (q) {

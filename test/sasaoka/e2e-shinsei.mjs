@@ -187,6 +187,15 @@ await pvHas('サンプル　ヤマダ');
 // プレビューの欄を押すと、一覧のその欄へ。入れている項目はプレビューで囲む
 await spot('電話番号');
 assert.equal(await focused(), '電話番号');
+// 電話番号はハイフンなしで打っても、打ち終わるとハイフンが入る（ユーザーの指示「ハイフンなしで入力してもよい。自動でハイフンをいれる」2026-11-05。tel.ts）
+{
+  const tel = form.getByRole('textbox', {name: '電話番号', exact: true});
+  const before = await tel.inputValue();
+  await tel.fill('');
+  await tel.pressSequentially('0934000000');
+  assert.equal(await tel.inputValue(), '093-400-0000');
+  await tel.fill(before);
+}
 await page.keyboard.type('0930-11-2222');
 assert.ok(await preview.getByRole('button', {name: '電話番号', exact: true}).first().evaluate((el) => el.className.includes('outline-sky-600')));
 await form.getByLabel('生年月日の年').fill('23');

@@ -22,6 +22,7 @@ import {textEm} from './print/fit.ts';
 import type {RiyuValues} from './riyu.ts';
 import type {Insurer, Job, PhotoEdit, PhotoMark, Place, PlacePhotos, Settings, ShinseiInfo, ShinseiMarks} from './types.ts';
 import {KK_CELLS} from './shinsei/kitakyushuCells.ts';
+import {telWithHyphens} from './tel.ts';
 import {customerFilePart, todayIso} from './util.ts';
 
 /** 申請書の原本の、1つのシートで転記する欄（番地）。ないものは書かない */
@@ -1421,8 +1422,10 @@ export function shinseiValues(job: Job, settings: EstimateSettings & BuilderSett
   const [endY, endM, endD] = reiwaParts(info.end);
   const cardInsurer = t(info.insurerNo).replace(/\D/g, '');
   const [zipA, zipB] = splitNumber(t(info.zip), 2, true);
-  const [telA, telB, telC] = splitNumber(t(info.phone), 3);
-  const [telHead, telTail] = splitNumber(t(info.phone), 2);
+  // 電話番号はハイフンなしで保存してあっても、市外局番などで分けて書く（tel.ts。分けないとマスの1つ目に全部入る）
+  const phone = telWithHyphens(t(info.phone));
+  const [telA, telB, telC] = splitNumber(phone, 3);
+  const [telHead, telTail] = splitNumber(phone, 2);
   const postal = t(s.postal ?? '');
   const [builderTelA, builderTelB, builderTelC] = splitNumber(t(s.tel ?? ''), 3);
   const care = careAmounts(job, s);
@@ -1455,7 +1458,7 @@ export function shinseiValues(job: Job, settings: EstimateSettings & BuilderSett
     texts: {
       kana: info.kana.trim(),
       zip: t(info.zip),
-      phone: t(info.phone),
+      phone,
       owner: info.owner.trim(),
       relation: info.relation.trim(),
       reasonOffice: info.reasonOffice.trim(),
