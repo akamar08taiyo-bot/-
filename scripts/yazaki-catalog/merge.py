@@ -1,5 +1,6 @@
 # 150dpi と 300dpi の読み取り（ocr.mjs）を合わせて、品番と位置の一覧（src/sasaoka/yazakiCatalogData.ts）を作る。金額は入れない
 # 使い方：python3 scripts/yazaki-catalog/merge.py all.jsonl all300.jsonl src/sasaoka/yazakiCatalogData.ts
+# ※ 2026-11-05 の全ページの点検で、読み取りの抜け・読み違い 188 個を手で直した（review.py）。これで作り直すと消えるので、作り直さない
 import json, re, sys, unicodedata
 CODE = re.compile(r'^[A-Z]{1,5}\d{0,2}-[0-9A-Z]{1,6}(-[0-9A-Z]{1,3})?$')
 SUF = re.compile(r'^[A-Z]{1,4}$')

@@ -31,11 +31,12 @@ const csv =
   '品番,品名,定価,仕切単価\n' +
   'ECA-5032 USL,見本 エンドブラケット,5000,3000\n' +
   'ECL-5049 USL,見本 支柱エンド 銀,4000,2400\n' +
-  'ECL-5049 SGD,見本 支柱エンド 金,4000,2400\n';
+  'ECL-5049 SGD,見本 支柱エンド 金,4000,2400\n' +
+  'CYA-1300 SGD,見本 塗装パイプ 1.3m,6000,3600\n';
 await page.locator('[role=dialog] input[type=file]').setInputFiles({name: 'mihon.csv', mimeType: 'text/csv', buffer: Buffer.from(csv)});
 await page.getByPlaceholder('例：マツ六').fill('矢崎化工');
-await page.getByRole('button', {name: '部材リストに取り込む（3件）'}).click();
-await page.getByText('新しく 3件').waitFor();
+await page.getByRole('button', {name: '部材リストに取り込む（4件）'}).click();
+await page.getByText('新しく 4件').waitFor();
 // マツ六の部材（架空の名前・金額）
 await page.getByRole('button', {name: /メーカーの仕切り表を取り込む/}).click();
 const csvM6 = '品番,品名,定価,仕切単価\n' + 'BJ-14WD,見本 曲がる手すり棒 2m,9000,5000\n';
@@ -128,11 +129,24 @@ await page.getByText('ECA-5029 USL を入れました（部材リストにない
 // ◀ ▶ でページを動かせる
 await cat.getByRole('button', {name: '次のページ'}).click();
 assert.equal(await cat.getByLabel('ページ', {exact: true}).inputValue(), '14');
+// 2026-11-05 の全ページの点検で足した・直した枠：p.12 の 4000 の行（読み取りで抜けていた。部材リストにない品番）、
+// p.24 の入り数の札のある品番「CYA-1300 3ﾎﾞﾝｲﾘ SGD」（前は札の前で切れて「CYA-1300」だけ＝色が選べなかった。部材リストの品番に札がなくても同じ色の部材が入る）
+await cat.getByLabel('ページ', {exact: true}).selectOption('12');
+await cat.locator('[data-code="HCT-4000 T USL"]').click();
+await page.getByText('HCT-4000 T USL を入れました（部材リストにない品番）').waitFor();
+await cat.getByLabel('ページ', {exact: true}).selectOption('24');
+const tagged = cat.locator('[data-code="CYA-1300 3ﾎﾞﾝｲﾘ SGD"]');
+assert.match(await tagged.getAttribute('class'), /border-emerald/); // 部材リストにある（札のない CYA-1300 SGD）
+assert.equal(await cat.locator('[data-code="CYA-1300"]').count(), 0);
+await tagged.click();
+await page.getByText('CYA-1300 SGD を入れました').waitFor();
+await page.screenshot({path: path.join(outDir, 'yazaki-04-p24.png')});
+log('点検で足した枠（p.12 の 4000 の行）・入り数の札のある品番（p.24）OK');
 await cat.getByRole('button', {name: '← 部材リストに戻る'}).click();
 await page.getByRole('button', {name: '選び終わったら閉じる'}).click();
 await page.waitForTimeout(400);
 const text = (await sheet.innerText()).replace(/\s+/g, ' ');
-for (const c of ['見本 エンドブラケット', 'ECL-5049 SGD', 'ECA-5029 USL']) assert.ok(text.includes(c), `見積書に ${c} がない`);
+for (const c of ['見本 エンドブラケット', 'ECL-5049 SGD', 'ECA-5029 USL', 'HCT-4000 T USL', '見本 塗装パイプ 1.3m']) assert.ok(text.includes(c), `見積書に ${c} がない`);
 await page.screenshot({path: path.join(outDir, 'yazaki-03-sheet.png')});
 log('部材リストにない品番は品番だけの行・◀▶ OK');
 

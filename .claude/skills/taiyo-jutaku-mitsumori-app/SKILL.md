@@ -214,6 +214,11 @@ description: 太陽シルバーサービス行橋営業所の業務アプリ「�
   poppler の pdftoppm では日本語が消えるので、絵も pdf.js＋Chromium で描く。pdf.js の modern build は「InvalidPDFException」で読めず legacy build で読めた）。**金額はカタログから取らない**（部材リスト＝価格表から）。
   OCR・pdf.js の途中のファイル（金額の字も入る text.json など）は作業用のフォルダだけに置き、リポジトリに入れない。絵は `catalog-yazaki/`・`catalog-toto/`・`catalog-matsu6/` → ポータルの `jutaku-mitsumori/catalog/`（アプリを公開するとき、絵を変えたときだけ写す）。
   ブラウザのテストは `e2e-makercatalog.mjs`（サイトの `jutaku-mitsumori/catalog/` に絵を置く）。同じ品番がページに2か所あることがある（`data-code` は `.first()`）。
+  **矢崎化工の枠は読み取りなので抜け・読み違いがある**（2026-11-05 の「カタログをタップした商品が該当商品になっているか」の点検で、表の 4000 の行・施工例の図の品番が 200 個抜け、
+  EBT-55（EBT-S5）・AA-355-1（AA-35S-1）・CYA-1300（入り数の札「3ﾎﾞﾝｲﾘ」の前で切れて色が抜けていた）・二重の枠・注意書きの「(AA-35FT不可)」の枠があった。807 → 995 個）。
+  確かめ方：`scripts/yazaki-catalog/review.py draw` で全ページの枠と品番を絵に描いて1ページずつ目で見る（ページを4つに切ると見やすい。手分けするなら subagent に3つに分けて頼んだ）→
+  抜けた品番は `grid`（0.01 の目盛り）で書き始めの点を読み → `snap`（字のかたまりを枠に）→ 描いて確かめる → `apply`。**merge.py で作り直すと手で直した分が消える**。
+  入り数の札のある品番（「CYA-1300 3ﾎﾞﾝｲﾘ SGD」「EBT-S5 10ｲﾚ SL」）は、部材リストの品番に札がなくても同じ色の部材を入れる（`makerCatalogs.ts` の `bareKey`）。マツ六・TOTO の枠は PDF の文字から作ったので正しかった。
   新しいメーカーのカタログを足すときは、文字のある PDF なら render.mjs → codes.py（品番の形の正規表現をそのメーカーに合わせる）、絵だけなら OCR、`BOOKS` に1行。
 - **マツ六のカタログ（actibook の cNo=18324＝`catalogs.ts` の外のリンクと同じカタログ）**：この作業環境からは saas.actibookone.com がネットワークの決まりで止められている（403）ので、
   ユーザーに PDF（手すりカタログ Vol.8 の zip）をもらって取り込んだ（2026-11-04）。

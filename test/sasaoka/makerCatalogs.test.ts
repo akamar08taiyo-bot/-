@@ -33,13 +33,29 @@ test('カタログの品番に合う部材：同じ品番があればそれだ�
   assert.deepEqual(catalogMaterials(list, 'HCT-2000 T USL'), []);
 });
 
+test('入り数の札（3ﾎﾞﾝｲﾘ・10ｲﾚ）のある品番：札があってもなくても同じ色の部材。札の前で切らない（2026-11-05 の点検）', () => {
+  const withTag = [mat('CYA-1300 3ﾎﾞﾝｲﾘ SGD'), mat('CYA-1300 3ﾎﾞﾝｲﾘ MGR')];
+  const noTag = [mat('EBT-S5 SL'), mat('EBT-S5 GLD'), mat('EBT-S5 MB')];
+  assert.deepEqual(catalogMaterials(withTag, 'CYA-1300 3ﾎﾞﾝｲﾘ SGD').map((m) => m.code), ['CYA-1300 3ﾎﾞﾝｲﾘ SGD']);
+  assert.deepEqual(catalogMaterials(withTag, 'CYA-1300 3ボンイリ MGR').map((m) => m.code), ['CYA-1300 3ﾎﾞﾝｲﾘ MGR']); // 全角でも
+  assert.deepEqual(catalogMaterials(noTag, 'EBT-S5 10ｲﾚ GLD').map((m) => m.code), ['EBT-S5 GLD']);
+  assert.deepEqual(catalogMaterials(withTag, 'CYA-1300').map((m) => m.code), ['CYA-1300 3ﾎﾞﾝｲﾘ SGD', 'CYA-1300 3ﾎﾞﾝｲﾘ MGR']); // 色の記号のない品番
+  assert.deepEqual(catalogMaterials(noTag, 'EBT-S5 10ｲﾚ'), catalogMaterials(noTag, 'EBT-S5'));
+  // カタログのページ（24ページの表は「CYA-1300 3ﾎﾞﾝｲﾘ SGD」）
+  assert.equal(catalogPageOf(mat('CYA-1300 3ﾎﾞﾝｲﾘ SGD'))?.page, 24);
+  assert.equal(catalogPageOf(mat('CYA-1300 SGD'))?.page, 24);
+  const p24 = yazakiPages.find((p) => p.page === 24)!.codes.map((c) => c.code);
+  for (const c of ['CYA-1300 3ﾎﾞﾝｲﾘ SGD', 'CYA-1300 3ﾎﾞﾝｲﾘ MGR', 'CYA-1300 3ﾎﾞﾝｲﾘ MLB']) assert.ok(p24.includes(c), c);
+  assert.ok(!p24.includes('CYA-1300'));
+});
+
 test('カタログのページ：p.12〜81 の 70 ページ。どのページの品番も位置が 0〜1 の間', () => {
   assert.equal(yazakiPages.length, 70);
   assert.deepEqual([yazakiPages[0].page, yazakiPages.at(-1)!.page], [12, 81]);
   const codes = yazakiPages.flatMap((p) => p.codes);
   assert.ok(codes.length >= 300, String(codes.length));
   for (const c of codes) {
-    assert.match(c.code, /^[A-Z]{1,5}\d{0,2}-[0-9A-Z]{1,6}(-[0-9A-Z]{1,3})?( [A-Z0-9]{1,4})*$/, c.code);
+    assert.match(c.code, /^[A-Z]{1,5}\d{0,2}-[0-9A-Z]{1,6}(-[0-9A-Z]{1,3})?( [A-Z0-9]{1,4}| \d{1,2}[\uFF66-\uFF9F]{2,5})*$/, c.code);
     for (const v of [c.x, c.y, c.x + c.w, c.y + c.h]) assert.ok(v >= 0 && v <= 1, `${c.code} ${v}`);
   }
   // 表紙の品番の例（見本で目で見て確かめたもの）
@@ -47,6 +63,20 @@ test('カタログのページ：p.12〜81 の 70 ページ。どのページの
   assert.ok(on(13).includes('ECA-5029 USL'));
   assert.ok(on(79).includes('CFA-1A W'));
   assert.ok(on(80).includes('CFA-1B W'));
+  // 2026-11-05 の全ページの点検で足した・直した品番（読み取りで抜けていた 4000 の行・施工例の図の品番・入り数の札のある品番）
+  for (const [page, code] of [[12, 'HCT-4000 T USL'], [12, 'HL7-P16 T USL'], [21, 'ECL-5006A'], [35, 'HD5-4000 T LBR'], [36, 'CZB-NE2 40ｲﾚ LBR'], [36, 'CZD-1-1 BR'], [38, 'EBT-S5 10ｲﾚ GLD'], [49, 'AA-35S-1 GLD'], [58, 'AA-35FWC SET'], [65, 'EBT-S5 10ｲﾚ MB'], [70, 'EBT-S3'], [73, 'SBA6-2000 T TPE W2'], [76, 'SBD-2000 T'], [78, 'EBT-4L'], [78, 'EBT-4R']] as const)
+    assert.ok(on(page).includes(code), `p.${page} ${code}`);
+  for (const [page, code] of [[24, 'CYA-1300'], [38, 'EBT-55'], [49, 'AA-355-1 GLD'], [58, 'AA-35FWC SED'], [70, 'EBT-55'], [76, 'SBD-2000T'], [78, 'EBT-4D']] as const)
+    assert.ok(!on(page).includes(code), `p.${page} ${code}（読み違い）`);
+  // 同じ所に二重の枠がない（2つの読み取りを合わせたときの残り）：となりの枠との重なりは小さいほうの枠の半分まで
+  const area = (c: {w: number; h: number}) => c.w * c.h;
+  for (const p of yazakiPages)
+    for (const [i, a] of p.codes.entries())
+      for (const b of p.codes.slice(i + 1)) {
+        const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+        const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+        assert.ok(ox <= 0 || oy <= 0 || ox * oy < 0.5 * Math.min(area(a), area(b)), `p.${p.page} ${a.code} と ${b.code}`);
+      }
 });
 
 test('部材の載っているページ・品番や商品名で探す', () => {

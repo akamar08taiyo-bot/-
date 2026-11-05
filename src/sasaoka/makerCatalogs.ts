@@ -136,6 +136,17 @@ export const codeKey = (s: string) =>
     .toUpperCase()
     .replace(/[\s\-‐‑‒–—―ー－]/g, '');
 const baseOf = (k: string) => k.split('#')[0];
+/**
+ * 入り数の札（矢崎化工の「CYA-1300 3ﾎﾞﾝｲﾘ SGD」「EBT-S5 10ｲﾚ SL」の「3ﾎﾞﾝｲﾘ」「10ｲﾚ」）を除いた形。
+ * 部材リストの品番に札があってもなくても（価格表によって書き方がちがう）同じ商品として見つける（2026-11-05 の点検で、札の前で枠が切れて色が抜けていた）
+ */
+const bareKey = (s: string) =>
+  codeKey(
+    nfkc(s)
+      .split(/\s+/)
+      .filter((t) => !/[ァ-ヶー]/.test(t))
+      .join(' '),
+  );
 
 /**
  * カタログの品番に合う部材リストの部材。
@@ -153,7 +164,15 @@ export function catalogMaterials(materials: Material[], code: string, book: Cata
     return [...exact, ...colors];
   }
   if (exact.length) return exact;
-  return materials.filter((m) => keyOf(m).startsWith(k) && /^[A-Z]/.test(keyOf(m).slice(k.length)));
+  const head = (key: (m: Material) => string, q: string) => materials.filter((m) => key(m).startsWith(q) && /^[A-Z]/.test(key(m).slice(q.length)));
+  const byHead = head(keyOf, k);
+  if (byHead.length) return byHead;
+  // 入り数の札のちがいだけ（カタログ「CYA-1300 3ﾎﾞﾝｲﾘ SGD」⇔ 部材リスト「CYA-1300 SGD」など）
+  const b = bareKey(code);
+  if (!b) return [];
+  const bareOf = (m: Material) => (m.code ? bareKey(m.code) : '');
+  const same = materials.filter((m) => bareOf(m) === b);
+  return same.length ? same : head(bareOf, b);
 }
 
 /** 部材が載っているカタログとページ（品番が同じか、カタログの品番が色の記号のない頭・# の前が同じ）。メーカーのカタログの、いちばん前のページ */
@@ -168,6 +187,7 @@ export function catalogPageOf(m: Pick<Material, 'code' | 'maker'>): {book: BookI
         const ck = codeKey(c.code);
         if (ck === k) return {book: book.id, page: p.page, code: c.code};
         if (head) continue;
+        if (bareKey(c.code) === bareKey(m.code)) head = {book: book.id, page: p.page, code: c.code};
         if (book.variants === 'hash' ? baseOf(ck) === baseOf(k) : k.startsWith(ck) && ck.length >= 6 && /^[A-Z]/.test(k.slice(ck.length))) head = {book: book.id, page: p.page, code: c.code};
       }
     if (head) return head;
