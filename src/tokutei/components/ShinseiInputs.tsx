@@ -96,8 +96,10 @@ export function ShinseiInputs({
   );
   const kouiki = formKey === 'kouiki';
   // 福岡市・北九州市・久留米市・大分市：販売事業者（受任者）の営業所・事業者番号を書く（久留米市は受領委任払取扱事業所登録番号も）。
+  // 広域連合の受領委任払用（受領委任事業者の住所・名称・電話・事業所番号）と行橋市（事業者番号）も（2026-11-05。前は原本の行橋営業所のままで、この行はなかった）。
   // 要介護状態区分の欄は、広域連合・福岡市・北九州市・久留米市（市の記入欄だけ）の様式にない
-  const seller = formKey === 'fukuoka' || formKey === 'kitakyushu' || formKey === 'kurume' || formKey === 'oita';
+  const seller =
+    formKey === 'fukuoka' || formKey === 'kitakyushu' || formKey === 'kurume' || formKey === 'oita' || formKey === 'yukuhashi' || (kouiki && sale.payMethod !== '償還払い');
   const noCare = kouiki || formKey === 'fukuoka' || formKey === 'kitakyushu' || formKey === 'kurume';
   // 商品がないときも、手で入れる欄を1つ開いておく（ふだんは手で入れるので。ユーザーの指示「手でいれるではなく、基本は手で入れるのがデフォルトなので開いておく
   // ２商品名以降は追加する」2026-10-26）。打つとその商品ができる（id を同じにして、打っている欄から外れないように）

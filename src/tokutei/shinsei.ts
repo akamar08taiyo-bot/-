@@ -66,6 +66,7 @@ export type ShinseiSeller = {
   tel: string;
   rep: string; // 代表者職氏名：所長　氏名
   providerNo: string; // 特定福祉用具販売の事業者番号（数字だけ）
+  fullName?: string; // 太陽シルバーサービス株式会社田川営業所（株式会社のまま・すき間なし。広域連合の受領委任事業者の名称。原本と同じ書き方）
   entrustRegNo: string; // 久留米市の受領委任払取扱事業所登録番号（数字だけ。設定）
 };
 
@@ -184,6 +185,7 @@ export function shinseiValues(sale: Sale, settings: Settings): ShinseiValues {
     payMethod: sale.payMethod,
     seller: {
       name: [corpShort(s.company), s.officeName.trim()].filter(Boolean).join('　'),
+      fullName: `${s.company.trim()}${s.officeName.trim()}`, // 原本と同じく、すき間なし
       zip: zipLabel(s.postal),
       address: s.address.trim(),
       tel: s.tel.trim(),
@@ -409,17 +411,35 @@ const kouikiPlanMark = (cell: string, v: ShinseiValues): Mark => ({cell, needles
  */
 function kouikiJuryo(v: ShinseiValues): SheetWrite {
   const c: KouikiCells = {kana: 'G2', name: 'G3', insured: ['W', 4], birth: 'G6', gender: 'W6', zip: 'G8', address: 'G9', rows: KOUIKI_JURYO_ROWS, total: 'R18', reason: 'J20', plan: 'J21', date: {era: 'C27', y: 'F27', m: 'I27', d: 'L27'}};
+  const seller = v.seller;
   return {
     sheet: KOUIKI_SHEETS.juryo,
     // 保険者番号（原本は 406470＝築上町。構成市町村ごとに番号がちがうので、選んだ番号で書きかえる。ユーザーの指示 2026-10-29）
-    cells: [...kouikiCells(v, c, birthChoice(v, '明 ・ 大 ・ 昭　')), ['Z9', v.tel], ...insurerBoxes(v, 'AA', 2)],
+    // 申請者（受領委任事業者）の住所・名称・電話と事業所番号は、申請書の営業所（田川市・田川郡は田川営業所。shinseiSettings）。原本は行橋営業所のままだった
+    // （ユーザーの指示「田川営業所の事業所番号に変えてください」2026-11-05）。受領委任契約番号（Z33:AB33）は原本のまま
+    cells: [
+      ...kouikiCells(v, c, birthChoice(v, '明 ・ 大 ・ 昭　')),
+      ['Z9', v.tel],
+      ...insurerBoxes(v, 'AA', 2),
+      ...when(seller.address, [['M29', seller.address]]),
+      ...when(seller.fullName || seller.name, [['M30', seller.fullName || seller.name]]),
+      ...when(seller.tel, [['M31', seller.tel]]),
+      ...providerBoxes(v, 'S', 34),
+    ],
     block: kouikiPlan(c, v),
     fit: kouikiFit(c),
     oneLine: kouikiOneLine(c),
-    fitWidth: ['G2', 'G9', 'Z9'], // フリガナ・住所・電話の行は低い（字の大きさとほぼ同じ）
+    fitWidth: ['G2', 'G9', 'Z9', 'M29', 'M30'], // フリガナ・住所・電話の行は低い（字の大きさとほぼ同じ）。受領委任事業者の住所・名称も1行
     marks: [ERA('G6', v), GENDER('W6', v), kouikiPlanMark('J21', v)],
   };
 }
+
+/**
+ * 事業所番号の10マス（広域連合の受領委任払用・行橋市の受領委任払の申請書。原本は行橋営業所の番号のまま入っていた）：販売事業者（申請書の営業所）の番号を
+ * 原本と同じく数で書く。10けたそろっていなければ空のマス（ほかの営業所の番号を残さない）
+ */
+const providerBoxes = (v: ShinseiValues, start: string, row: number): [string, CellValue][] =>
+  boxes(start, 10, row).map((ref, i): [string, CellValue] => [ref, v.seller.providerNo.length === 10 ? Number(v.seller.providerNo[i]) : '']);
 
 /** 保険者番号の6マス（広域連合の様式。1字ずつの欄。原本の数と同じく数で書く） */
 const insurerBoxes = (v: ShinseiValues, start: string, row: number): [string, CellValue][] =>
@@ -919,7 +939,8 @@ export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
     title: '行橋市',
     rows: 3,
     sheets: (v) => [
-      {sheet: '用具・受領委任払', cells: preCells(v, 7), same: PRE_SAME, fit: PRE_FIT, oneLine: PRE_ONE_LINE, marks: [ERA('F9', v), GENDER('Y9', v), CARE('F12', v)]},
+      // 事業者番号（Z4:AI4）は販売事業者（設定の営業所）の番号。原本は行橋営業所の番号のまま入っていた（2026-11-05）
+      {sheet: '用具・受領委任払', cells: [...preCells(v, 7), ...providerBoxes(v, 'Z', 4)], same: PRE_SAME, fit: PRE_FIT, oneLine: PRE_ONE_LINE, marks: [ERA('F9', v), GENDER('Y9', v), CARE('F12', v)]},
       {sheet: '委任状', cells: proxyCells(v), fitIn: PROXY_FIT, ...(v.benefit > 0 ? {sizes: [['B23', PROXY_AMOUNT_PT]], heights: PROXY_AMOUNT_ROWS} : {})},
       {sheet: '完了写真', cells: photoCells(v), fit: ['B3'], hideZeros: true},
     ],

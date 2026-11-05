@@ -333,11 +333,13 @@ try {
   await page.getByRole('textbox', {name: '住所', exact: true}).fill('福岡市早良区小田部1-2-3');
   await page.waitForFunction(() => document.querySelector('[aria-label="申請書のプレビュー"]')?.textContent?.includes('福岡市　早良　区　小田部1-2-3'));
   // 福岡市の申請書の販売事業者は福岡市の営業所（ユーザーの指示「福岡は、福岡東、福岡南、福岡西／こちらの該当営業所と所長にする」2026-11-05）：
-  // 設定は行橋営業所のままでも、早良区は福岡西営業所。選べるのは福岡市の3つだけ。その営業所の事業者番号はまだない（薄い黄色）→ 入れる
+  // 設定は行橋営業所のままでも、早良区は福岡西営業所。選べるのは福岡市の3つだけ。その営業所の事業者番号は営業所の一覧の番号（2026-11-05）。
+  // 消すと薄い黄色 → 入れる
   const sellerRow = '[data-field="seller"] > div:nth-child(2)';
   assert.equal(await page.getByLabel('販売事業者の営業所').inputValue(), '福岡西営業所');
   assert.deepEqual((await page.getByLabel('販売事業者の営業所').locator('option').allInnerTexts()).sort(), ['福岡南営業所', '福岡東営業所', '福岡西営業所'].sort());
-  assert.equal(await page.getByLabel('事業者番号').inputValue(), '');
+  assert.equal(await page.getByLabel('事業者番号').inputValue(), '4073500615');
+  await page.getByLabel('事業者番号').fill('');
   await page.waitForFunction((sel) => document.querySelector(sel)?.className.includes('bg-amber-50'), sellerRow);
   await page.getByLabel('事業者番号').fill('4000000002');
   await page.waitForFunction((sel) => !document.querySelector(sel)?.className.includes('bg-amber-50'), sellerRow);

@@ -30,6 +30,7 @@ import {
   shinseiValues,
 } from '../../src/tokutei/shinsei.ts';
 import type {ShinseiKey} from '../../src/tokutei/shinsei.ts';
+import {cleanSettings} from '../../src/tokutei/storage.ts';
 import {KK_CELLS} from '../../src/tokutei/shinsei/kitakyushuCells.ts';
 import {KU_CELLS} from '../../src/tokutei/shinsei/kurumeCells.ts';
 import type {Sale, SaleItem, Settings} from '../../src/tokutei/types.ts';
@@ -252,7 +253,11 @@ test('広域連合：支払方法が受領委任払いなら受領委任払用�
   assert.equal(readCell(f, sh, 'J21'), ' 居宅サービス計画の届出　　　有　・　無\n 居宅の事業所名　見本居宅介護支援事業所');
   // 申請日も書かない（Excel で手入力）
   assert.ok(['C27', 'F27', 'I27', 'L27'].slice(1).every((r) => !/\d/.test(readCell(f, sh, r) ?? ''))); // 日付は書かない（Excel で手入力。2026-10-28）
-  assert.equal(readCell(f, sh, 'M30'), '太陽シルバーサービス株式会社行橋営業所'); // 申請者（受領委任事業者）は原本のまま
+  // 申請者（受領委任事業者）は申請書の営業所（築上町は設定の行橋営業所のまま）。原本と同じ書き方（2026-11-05）
+  assert.equal(readCell(f, sh, 'M30'), '太陽シルバーサービス株式会社行橋営業所');
+  assert.equal(readCell(f, sh, 'M29'), '福岡県行橋市大字流末1327番地');
+  assert.equal(readCell(f, sh, 'M31'), '0930-26-9640');
+  assert.equal(['S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'AA', 'AB'].map((c) => readCell(f, sh, `${c}34`)).join(''), '4072601802'); // 事業所番号
   assert.equal(['Z33', 'AA33', 'AB33'].map((r) => readCell(f, sh, r)).join(''), '802'); // 受領委任契約番号も原本のまま
   assert.equal(readCell(f, sh, 'L38'), '被保険者氏名'); // 委任状の氏名は自署（原本のまま。「空けて自署にする」2026-10-26）
   assert.equal(readCell(f, sh, 'G40'), ''); // 口座の欄は書かない
@@ -398,7 +403,10 @@ test('福岡市：長い商品名・メーカー名は1行に入る大きさ。�
   // ユーザーの指示「福岡は、福岡東、福岡南、福岡西／こちらの該当営業所と所長にする」（2026-11-05）：中央区は福岡西営業所。行橋営業所の事業者番号は書かない
   const yk = fillFukuoka({}, settingsForOffice(S, '行橋営業所'));
   assert.equal(readCell(yk, FUKUOKA_SHEET, 'E11'), '太陽シルバーサービス㈱　福岡西営業所');
-  assert.equal(joined(yk, pairBoxes('Q', 10, 11)), '40'); // 番号がないときは原本の頭の「40」のまま
+  // 福岡西営業所の事業所番号（営業所の一覧。チラシ作成（レンタル）と同じ。2026-11-05 から。前は行橋営業所のほかは番号がなく原本の頭の「40」のままだった）
+  assert.equal(joined(yk, pairBoxes('Q', 10, 11)), '4073500615');
+  // 番号がないとき（一覧にない営業所の名前）は原本の頭の「40」のまま
+  assert.equal(joined(fillFukuoka({}, {...settingsForOffice(S, '行橋営業所'), providerNos: {福岡西営業所: ''}}), pairBoxes('Q', 10, 11)), '40');
   const ykNo = fillFukuoka({}, {...settingsForOffice(S, '行橋営業所'), providerNos: {福岡西営業所: '4000000002'}});
   assert.equal(joined(ykNo, pairBoxes('Q', 10, 11)), '4000000002');
   assert.equal(printOverflow(ykNo, FUKUOKA_SHEET) ?? 0, 0); // A4 1枚（原本の「ページに合わせる」のまま）
@@ -825,4 +833,22 @@ test('申請書の販売事業者の営業所：大分市は大分・久留米�
   // 北九州市の中の営業所の設定は、区がちがってもそのまま（設定で直した所長も）
   const own = {...settingsForOffice(S, '八幡東営業所'), manager: '見本 次郎'};
   assert.equal(shinseiValues(sale({insurer: 'kitakyushu', address: '福岡県北九州市小倉北区見本1-1'}), own).seller.rep, '所長　見本 次郎');
+});
+
+test('事業所番号：営業所の一覧に19営業所の事業所番号（チラシ作成（レンタル）と同じ）。広域連合の田川市・田川郡は田川営業所の住所・名称・電話・番号、行橋市は設定の営業所の番号（2026-11-05）', () => {
+  assert.equal(OFFICES.filter((o) => /^\d{10}$/.test(o.providerNo ?? '')).length, OFFICES.length);
+  assert.equal(OFFICES.find((o) => o.name === '田川営業所')?.providerNo, '4071901971');
+  const sh = KOUIKI_SHEETS.juryo;
+  const f = fill('kouiki', {zip: '8260000', address: '福岡県田川市見本1-1'});
+  const t = OFFICES.find((o) => o.name === '田川営業所')!;
+  assert.deepEqual([readCell(f, sh, 'M29'), readCell(f, sh, 'M30'), readCell(f, sh, 'M31')], [t.address, '太陽シルバーサービス株式会社田川営業所', t.tel]);
+  assert.equal(['S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'AA', 'AB'].map((c) => readCell(f, sh, `${c}34`)).join(''), '4071901971');
+  // 行橋市の受領委任払の申請書：事業者番号（Z4:AI4）。行橋営業所の設定なら行橋営業所の番号、田川営業所の設定なら田川営業所の番号
+  const cols = ['Z', 'AA', 'AB', 'AC', 'AD', 'AE', 'AF', 'AG', 'AH', 'AI'];
+  const yk = fill('yukuhashi');
+  assert.equal(cols.map((c) => readCell(yk, '用具・受領委任払', `${c}4`)).join(''), '4072601802');
+  const tg = unzipSync(fillShinsei(template('yukuhashi'), SHINSEI.yukuhashi, shinseiValues(sale({insurer: 'yukuhashi'}), settingsForOffice(S, '田川営業所'))));
+  assert.equal(cols.map((c) => readCell(tg, '用具・受領委任払', `${c}4`)).join(''), '4071901971');
+  // 前に事業者番号を空のまま保存した設定は、営業所の一覧の番号（storage.ts の cleanSettings）
+  assert.equal(cleanSettings({...settingsForOffice(S, '田川営業所'), providerNo: ''}).providerNo, '4071901971');
 });

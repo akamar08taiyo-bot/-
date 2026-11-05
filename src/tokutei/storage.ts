@@ -315,8 +315,8 @@ export function cleanSettings(raw: unknown): Settings {
     fax: text('fax'),
     manager: text('manager'),
     regNo: text('regNo'),
-    // 事業者番号を入れる前に保存した設定は、保存してある営業所の番号（分かっている営業所だけ）
-    providerNo: typeof raw.providerNo === 'string' ? raw.providerNo : (OFFICES.find((o) => o.name === text('officeName'))?.providerNo ?? ''),
+    // 事業者番号を入れる前に保存した設定・空のまま保存した設定（前は行橋営業所のほかは番号が分からず空だった）は、保存してある営業所の番号
+    providerNo: typeof raw.providerNo === 'string' && raw.providerNo.trim() ? raw.providerNo : (OFFICES.find((o) => o.name === text('officeName'))?.providerNo ?? ''),
     entrustRegNo: typeof raw.entrustRegNo === 'string' ? raw.entrustRegNo : '',
     ...(isObj(raw.providerNos)
       ? {providerNos: Object.fromEntries(Object.entries(raw.providerNos).filter((e): e is [string, string] => typeof e[1] === 'string'))}

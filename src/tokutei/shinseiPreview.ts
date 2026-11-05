@@ -109,7 +109,7 @@ const KUC: Record<string, string> = KU_CELLS.claim;
 const KUT: Record<string, string> = KU_CELLS.teisyutu;
 
 export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
-  yukuhashi: [{sheet: '用具・受領委任払', links: preLinks(7)}, PROXY, PHOTO],
+  yukuhashi: [{sheet: '用具・受領委任払', links: [...preLinks(7), ['seller', boxes('Z', 10, 4)]]}, PROXY, PHOTO], // 事業者番号のマス（2026-11-05）
   kanda: [
     {sheet: '用具・受領委任払', links: [...preLinks(4), ['tel', ['Y10', 'K30']]]},
     // 支給申請書：ほとんどの欄は事前申請書を参照する式（式からつなぐ）。性別・生年月日・要介護度の丸、購入日・申請日
@@ -174,6 +174,7 @@ export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
         ['items', [...rows(['B', 'I', 'R'], KOUIKI_JURYO_ROWS), 'R18']],
         ['reason', ['J20']],
         ['recorder', ['J21']], // 居宅サービス計画の届出（有・無）と居宅の事業所名
+        ['seller', ['M29', 'M30', 'M31', ...boxes('S', 10, 34)]], // 申請者（受領委任事業者）の住所・名称・電話・事業所番号（2026-11-05）
       ],
     },
     {
