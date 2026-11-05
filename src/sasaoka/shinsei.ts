@@ -1208,10 +1208,12 @@ function dimsText(p: Pick<Place, 'kind' | 'rows' | 'dims'>): string {
 
 /**
  * 改修の内容の文の行（写真番号・改修場所のうしろ）：1行目は改修の種類の名前・寸法「手すりの取り付け　L=600mm H=800mm」、そのほか（`Place.shinseiText`）は2行目
- * （ユーザーの指示「そのほかの部分の記載は、行替えして表示するようにする」2026-10-26。前は1行目のうしろに足していた）
+ * （ユーザーの指示「そのほかの部分の記載は、行替えして表示するようにする」2026-10-26。前は1行目のうしろに足していた）。
+ * 「＋ ベースプレート」の長さは書かない（ユーザーの指示「手すりの長さを申請書に転記するときは、ベースプレートは不要」2026-11-05。
+ * 前は2行目に「ベースプレート　L=800mm」。申請書・内訳明細書・平面図・写真の用紙の改修の内容とも）。写真に書く内容（photoNoteAuto）には今までどおり書く
  */
-export function workTextLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'plateLength' | 'shinseiText'>, names: string[] = KINDS): string[] {
-  return [[names[p.kind - 1] ?? '', dimsText(p)].filter(Boolean).join('　'), plateText(p), p.shinseiText?.trim() ?? ''].filter(Boolean);
+export function workTextLines(p: Pick<Place, 'kind' | 'rows' | 'dims' | 'shinseiText'>, names: string[] = KINDS): string[] {
+  return [[names[p.kind - 1] ?? '', dimsText(p)].filter(Boolean).join('　'), p.shinseiText?.trim() ?? ''].filter(Boolean);
 }
 
 /**

@@ -3,7 +3,7 @@
 // 申請書の「＋ ベースプレート」の長さ（「ベースプレートをいれる場合は、追加ボタンを押して、長さの欄にベースプレートの正確な長さをいれる、
 // 入れたら、自動的に見積もりの方でも長さを汲み取り、見積金額に反映する」2026-11-02）を確かめる：
 //   部材リストに BD-132（2m の手すり）・BD-08G（エンドブラケット）・BH-412（ベースプレート 2m）を取り込む（架空の価格）→
-//   申請書で階段 L=2100・「＋ ベースプレート」1300 → 改修の内容に「ベースプレート　L=1300mm」→
+//   申請書で階段 L=2100・「＋ ベースプレート」1300 → 改修の内容は手すりの長さだけ（ベースプレートは写真に書く内容に）→
 //   見積書：1か所目 BD-132・BH-412・BD-08G×2・施工費（木）、2か所目 BD-132・BD-08G×2・施工費（木）。同じ部材も別の行（足さない）。
 //   ベースプレートは 1300mm÷2000mm＝0.65本 → 申請書でベースプレートを 1500 にすると 0.75本
 // usage: node e2e-spots.mjs <サイトのURL> <出力フォルダ>
@@ -58,10 +58,14 @@ assert.equal(await stair.getByLabel('そのほか').count(), 0);
 await stair.getByLabel('ベースプレート（mm）').fill('1300');
 assert.equal(await stair.getByLabel('ベースプレート（mm）').inputValue(), '1300');
 await page.waitForTimeout(600);
-const preview = await page.locator('body').innerText();
-assert.ok(/①階段　手すりの取り付け　L=2100mm\n?[ 　]*ベースプレート　L=1300mm/.test(preview) || preview.includes('ベースプレート　L=1300mm'), '申請書の改修の内容にベースプレートの行がない');
+// 申請書の改修の内容には手すりの長さだけ（ユーザーの指示「手すりの長さを申請書に転記するときは、ベースプレートは不要」2026-11-05）。
+// 写真に書く内容（改修前の写真の横）には「ベースプレート　L=1300mm」
+const mainSheet = await page.getByLabel('申請書のプレビュー').getByRole('group', {name: '住改・受領委任払', exact: true}).innerText();
+assert.ok(mainSheet.includes('①階段　手すりの取り付け　L=2100mm'), mainSheet);
+assert.ok(!mainSheet.includes('ベースプレート'), '申請書の改修の内容にベースプレートが入っている');
+assert.ok((await page.locator('body').innerText()).includes('ベースプレート　L=1300mm'), '写真に書く内容にベースプレートの行がない');
 await page.screenshot({path: path.join(outDir, 'spots-01-shinsei.png')});
-log('申請書：＋ ベースプレート 1300mm・改修の内容に「ベースプレート　L=1300mm」OK');
+log('申請書：＋ ベースプレート 1300mm・改修の内容は手すりの長さだけ・写真に書く内容に「ベースプレート　L=1300mm」OK');
 
 // ---------------- 見積書：1か所目
 await page.getByRole('tab', {name: '📋 工事見積書'}).click();
