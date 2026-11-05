@@ -272,6 +272,7 @@ const cleanRow = (raw: Record<string, unknown>): Row => keepNewer(raw, (r) => ({
   estText: typeof r.estText === 'string' ? r.estText : null,
   estNote: typeof r.estNote === 'string' ? r.estNote : null,
   estAmount: optNum(r.estAmount),
+  ...(r.estMark === '材' || r.estMark === '手' ? {estMark: r.estMark} : {}), // 見積書の材／手を手で直したとき
   ...(str(r.slot).trim() ? {slot: str(r.slot)} : {}), // 見積書の空きの行の名前（railSlots.ts）
 }));
 

@@ -100,9 +100,9 @@ const pct = (rate: number) => num(Math.round(rate * 1000) / 10);
 /** 手で直せる欄の印（見積書に直接入力するときだけ） */
 const ed = (editable: boolean, key: string | null) => (editable && key ? {'data-edit': key} : {});
 
-/** 空いた行の欄（左から）と、打ち込める行の同じ列の欄の名前（金額・介護保険の欄・広域連合の材／手は打たない） */
+/** 空いた行の欄（左から）と、打ち込める行の同じ列の欄の名前（金額・介護保険の欄は打たない。広域連合の材／手は押すと材⇔手） */
 const YK_GAP = ['work', 'name', 'text', 'qty', 'unit', 'price', '', '', '', '', '', '', 'note'];
-const KK_GAP = ['name', 'work', '', 'text', '', 'qty', 'unit', 'price', '', '', 'photo', 'kind', '', '', '', '', 'note', 'note'];
+const KK_GAP = ['name', 'work', 'mark', 'text', '', 'qty', 'unit', 'price', '', '', 'photo', 'kind', '', '', '', '', 'note', 'note'];
 
 /**
  * 打ち込める行（isNew）より下の空いた行が、その何行下か（1＝すぐ下）。打ち込める行がこのページにないときは 0（打てない。押すと打ち込める行へ）。
@@ -669,7 +669,10 @@ function KkLine({
     <tr className="g" style={{height: `${height}mm`}} {...(editable ? {'data-rows': l.rowIds.join(' '), ...copiedAttr(sheet, l)} : {})}>
       {cell(l.first ? l.placeName : '', KK.A, 11, 'c ml', placeKey(l, 'name'), 2)}
       {cell(l.first ? l.work : '', KK.B, 11, 'c', placeKey(l, 'work'), 2)}
-      <td className={`mark${bottom}`}>{l.blank ? '' : l.mark}</td>
+      {/* 材／手：どの行も選んで直せる（押すと材⇔手。ユーザーの指摘「材の部分が選択できない」2026-11-05。前はいちばん下の行だけ） */}
+      <td className={`mark${bottom}`} {...ed(editable, k('mark'))}>
+        {l.mark}
+      </td>
       {nameCell(l.text, KK.D, height, 9, `mr gothic${bottom}`, k('text'), 3, editable, l.slot, l.blank)}
       <td className={`gap${bottom}`} />
       {cell(qty, KK.F, 9, 'r ml gothic', !l.isWork || l.hourly ? k('qty') : null)}

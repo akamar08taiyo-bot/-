@@ -284,7 +284,7 @@ export type FormLine = {
   work: string; // 工事名称（苅田町・行橋市・みやこ町用は改修内容）。改修の種類から
   kind: number; // 改修の種類 1〜6
   photo: number; // 写真番号
-  mark: '材' | '手';
+  mark: '材' | '手' | ''; // 広域連合用の「材／手」（手で直していれば Row.estMark。空白の行は直していなければ空）
   text: string; // 内容（規格・範囲）／部材・仕様（手で直していればそれ）
   autoText: string; // 手で直していないときの内容
   qty: number;
@@ -331,7 +331,7 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
           rowIds: [r.id],
           excludeId: r.id,
           isWork: false,
-          mark: '材',
+          mark: r.estMark ?? (blank ? '' : '材'),
           text: r.estText ?? auto,
           autoText: auto,
           qty: l.qty,
@@ -362,7 +362,7 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
         rowIds: l.rows.map((r) => r.id),
         excludeId: l.owner?.id ?? head.id,
         isWork: true,
-        mark: '手',
+        mark: head.estMark ?? '手',
         text: head.estText ?? auto,
         autoText: auto,
         qty: hours ?? 1,

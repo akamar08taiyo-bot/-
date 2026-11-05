@@ -254,6 +254,7 @@ export function sheetValue(job: Job, key: string, ctx: SheetCtx, date = ''): str
   const found = findRow(job, id);
   if (!found) return '';
   const r = found.row;
+  if (field === 'mark') return shownMark(found.place.rows, found.ri);
   if (r.kind === 'labor') {
     const amount = workAmount(found.place, r.id, rates);
     if (field === 'text') return r.estText ?? '';
@@ -394,6 +395,24 @@ export function stepLaborAt(job: Job, key: string, item: LaborItem, delta: numbe
 
 // ---------------------------------------------------------------- 打ち込んだ値を入れる
 
+/**
+ * 広域連合用の「材／手」の欄に打った字：手・て・t → 手、材・ざ・z → 材、空 → 自動（部材は材・施工費は手・空白の行は空）。読めなければ undefined
+ */
+export function parseMark(input: string): '材' | '手' | null | undefined {
+  const t = input.normalize('NFKC').trim();
+  if (t === '') return null;
+  if (/[手てテ]|^t/i.test(t)) return '手';
+  if (/[材ざザ]|^z/i.test(t)) return '材';
+  return undefined;
+}
+
+/** いま出ている「材／手」（Row.estMark がなければ 部材は材・施工費は手・空白の行は空） */
+function shownMark(rows: Row[], ri: number): '材' | '手' | '' {
+  const r = rows[ri];
+  if (r.kind === 'labor') return rows[workHead(rows, ri)].estMark ?? '手';
+  return r.estMark ?? (isBlankRow(r) ? '' : '材');
+}
+
 export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx): SheetResult {
   const [kind, id, field] = key.split(':');
   const text = input.replace(/\r/g, '');
@@ -429,6 +448,14 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
     // 何も入らないとき（空・改修の種類として読めない文字）は空白の行も足さない
     const n = Number(id);
     if (!(n > 0) || (trimmed === '' && !(field === 'text' && ctx.pick))) return {job, key};
+    if (field === 'mark') {
+      // 空いた行の材／手：あいだを空白の行でうめて、その行の材／手にする（「手」なら、そこに打った内容・時間は施工費）
+      const m = parseMark(text);
+      if (!m) return {job, key};
+      const j = withGapRows(job, n);
+      const rows = j.places[j.places.length - 1].rows;
+      return applySheet(j, `line:${rows[rows.length - 1].id}:mark`, m, ctx);
+    }
     const placeField = field === 'name' || field === 'work' || field === 'kind' || field === 'photo';
     if (placeField && !isLaborText(trimmed) && Object.keys(placePatch(field, text)).length === 0) return {job, key};
     return applyNew(withGapRows(job, n), field, text, ctx);
@@ -438,6 +465,20 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
   const found = findRow(job, id);
   if (!found) return {job, key};
   const r = found.row;
+
+  if (field === 'mark') {
+    // 材／手（ユーザーの指摘「材の部分が選択できない」2026-11-05）：見積書・Excel に出す字だけを変える（金額・仕切り計算表は変えない）。
+    // 施工費のまとまりは最初の手間の行に持つ。自動と同じ字なら持たない。空白の行の「手」は、そこに打った内容・時間を施工費にする印にもなる
+    const m = parseMark(text);
+    if (m === undefined) return {job, key};
+    const rows = found.place.rows;
+    const ri = r.kind === 'labor' ? workHead(rows, found.ri) : found.ri;
+    const row = rows[ri];
+    const auto = row.kind === 'labor' ? '手' : isBlankRow(row) ? null : '材';
+    const {estMark: _old, ...rest} = row;
+    const next = m === null || m === auto ? rest : {...rest, estMark: m};
+    return {job: setPlaceRows(job, found.pi, rows.map((x, i) => (i === ri ? next : x))), key: `line:${row.id}:mark`};
+  }
 
   if (r.kind === 'labor') {
     const head = workHead(found.place.rows, found.ri);
@@ -469,12 +510,13 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
     if (ctx.pick) {
       const fields = materialFields(ctx.pick);
       // 1本の長さのない部材（ブラケットなど）に選び直したら、前の部材の使う長さは消す（「（長さ60cm）」と出ていた）
-      const picked = patchRow(job, found, {...fields, estText: null, estNote: null, estPrice: null, ...(fields.pieceLengthM ? {} : {lengthCm: 0})});
+      const picked = patchRow(job, found, {...fields, estText: null, estNote: null, estPrice: null, estMark: undefined, ...(fields.pieceLengthM ? {} : {lengthCm: 0})});
       return {job: withPlace(picked, found.pi, (p) => withBrackets(found.place, fillAdded(p, new Set([r.id])), ctx.materials ?? [])), key};
     }
     if (trimmed === (isBlankRow(r) ? '' : (r.estText ?? materialText(r)))) return {job, key};
     // 挿入した空白の行に「同上施工費」などと打ったら、施工費の行にする（いちばん下の行と同じ。前は部材の行になり、仕切りの取付手間に入らなかった）
-    if (isBlankRow(r) && isLaborText(trimmed)) return laborFromBlank(job, found, trimmed);
+    // 材／手を「手」にした空白の行に打った内容も施工費（いちばん下の行の「手」と同じ）
+    if (isBlankRow(r) && (isLaborText(trimmed) || (r.estMark === '手' && trimmed !== ''))) return laborFromBlank(job, found, trimmed);
     if (trimmed === '') {
       // 内容（品名）を消したら、その部材を消す（同上施工費ごと。行の左の ✕ と同じ。Ctrl+Z で戻せる）。前は品名だけが消えて、
       // 数量・単価・金額の残った「材料費」の行になった（ユーザーの指摘「部材を消すと、なぜか…と表示される」2026-11-02）。選ぶのは、その位置に来た行
@@ -484,6 +526,19 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
       return {job: next, key: at ? `line:${at.id}:text` : 'new:text'};
     }
     return {job: patchRow(job, found, {name: trimmed, maker: '', code: '', estText: null, pieceLengthM: r.pieceLengthM || guessPieceLengthM(trimmed)}), key};
+  }
+  if (isBlankRow(r) && r.estMark === '手' && (field === 'qty' || field === 'price' || field === 'amount')) {
+    // 材／手を「手」にした空白の行の時間・単価・金額：施工費の行にして、打った金額はこの行だけに入れる（いちばん下の行の「手」と同じ。`applyNew`）
+    const n = parseNum(trimmed);
+    if (n === null) return {job, key};
+    const amount = field === 'qty' ? rounddown(n * ctx.settings.estimateHourRate) : Math.round(n);
+    const conv = laborFromBlank(job, found, '施工費');
+    const headId = conv.key.split(':')[1];
+    const rows = conv.job.places[found.pi].rows;
+    const head = rows.find((x) => x.id === headId);
+    const bump = headId !== r.id && head?.estAmount != null ? head.estAmount + amount : null;
+    const next = rows.map((x) => (x.id === r.id ? {...x, price: amount, qty: 1, estPrice: amount} : bump !== null && x.id === headId ? {...x, estAmount: bump} : x));
+    return {job: setPlaceRows(conv.job, found.pi, next), key: `line:${headId}:${field}`};
   }
   // 切って使う手すり・ベースプレートは、同じ箇所のもう一方と申請書の長さにもつなぐ。手すりの長さが変わったら中間のブラケットの数も（`cutLink.ts`）
   if (field === 'qty') {
@@ -637,7 +692,7 @@ function sameNote(a: string, b: string): boolean {
  * 上の部材の同上施工費（上に施工費があればそのまとまり）になる。返す欄は、そのまとまりの内容の欄
  */
 function laborFromBlank(job: Job, found: Found, text: string): SheetResult {
-  const rows = found.place.rows.map((x, i) => (i === found.ri ? {...x, kind: 'labor' as const, name: text, price: 0, qty: 1} : x));
+  const rows = found.place.rows.map((x, i) => (i === found.ri ? {...x, kind: 'labor' as const, name: text, price: 0, qty: 1, estMark: undefined} : x));
   const head = rows[workHead(rows, found.ri)];
   const own = head.id === found.row.id && text !== '同上施工費' && text !== '施工費';
   return {job: setPlaceRows(job, found.pi, own ? rows.map((x) => (x.id === head.id ? {...x, estText: text} : x)) : rows), key: `line:${head.id}:text`};

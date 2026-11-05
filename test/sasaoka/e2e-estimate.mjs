@@ -119,7 +119,7 @@ const pickBelow = async (text, kind) => {
 };
 const pickHere = (kind) => pickAt(sheet, kind);
 assert.deepEqual(await totals(), ['合計', '26,950', '26,950']);
-assert.deepEqual(await page.getByRole('combobox', {name: '保険者', exact: true}).locator('option').allInnerTexts(), ['苅田町', '行橋市', 'みやこ町', '広域連合', '福岡市', '北九州市', '久留米市', '飯塚市']); // 福岡市・北九州市は 2026-10-29 から、久留米市・飯塚市は 2026-11-02 から
+assert.deepEqual(await page.getByRole('combobox', {name: '保険者', exact: true}).locator('option').allInnerTexts(), ['苅田町', '行橋市', 'みやこ町', '広域連合', '福岡市', '北九州市', '久留米市', '飯塚市', '大分市']); // 福岡市・北九州市は 2026-10-29 から、久留米市・飯塚市は 2026-11-02 から、大分市は 2026-11-03 から
 
 // ---------------- 見積書の欄：被保険者番号・切って使う手すりを 120cm（1.2÷4＝0.3本×16,000＝4,800）
 // 被保険者番号は（　）の中だけが打つ所（ユーザーの報告「介護保険番号の（）内が入力できない」2026-11-04）：見出しの右・打っているあいだも見出しは見える

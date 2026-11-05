@@ -569,6 +569,26 @@ assert.ok(hours.some((t) => /^1時間2,500円\s*×1\.2時間$/.test(t)), hours.j
 await page.screenshot({path: path.join(outDir, '41-sheet-kouiki.png')});
 log('広域連合用：材／手・時間OK');
 
+// どの行の材／手も選んで直せる（ユーザーの指摘「材の部分が選択できない」2026-11-05。前はいちばん下の行だけ）：
+// 選んだ欄をもう一度押すと 材⇔手（スマホで押すのと同じ）、「て」と打っても手、Delete で元の字。金額は変わらない
+const matMark = sheet.locator('.form-page tr[data-rows]', {has: page.locator('td.mark', {hasText: '材'})}).first().locator('td.mark');
+const mk = await matMark.getAttribute('data-edit');
+assert.match(mk ?? '', /^line:.+:mark$/);
+const sum0 = await totals();
+await cellAt(matMark).click();
+assert.match(await selected(), /材／手/);
+assert.equal((await bar()).trim(), '材');
+await input.click(); // 選んでいる欄をもう一度押す
+assert.equal((await cell(mk).innerText()).trim(), '手');
+await page.keyboard.press('Delete');
+assert.equal((await cell(mk).innerText()).trim(), '材');
+await page.keyboard.type('て');
+assert.equal((await cell(mk).innerText()).trim(), '手');
+assert.deepEqual(await totals(), sum0);
+await page.keyboard.press('Delete');
+assert.equal((await cell(mk).innerText()).trim(), '材');
+log('広域連合用：どの行の材／手も直せるOK');
+
 // ---------------- 「請求書を確認する」で開くと、同じ入力から仕切り計算表ができている（同じデータ）
 await page.waitForTimeout(600); // 自動保存を待つ
 await (await openMore(page)).getByRole('button', {name: '🧾 請求書を見る'}).click(); // 上の段の「その他 ▼」の中（2026-11-03）

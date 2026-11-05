@@ -388,3 +388,15 @@ test('品名・備考に貼り付けた制御文字（Word の Shift+Enter の�
   assert.ok(String(x.text('B9')).startsWith('①浴室'));
   assert.equal(readXlsx(bytes)[0].name, '山田様');
 });
+
+test('Excel（広域連合用）：手で直した材／手（部材を「手」・施工費を「材」・空白の行を「手」）もその字で書く（2026-11-05）', () => {
+  const base = job({form: 'kouiki'});
+  const [pipe, post, w1, w2] = base.places[0].rows;
+  const empty = manualRow('material', {qty: 1});
+  const j = job({form: 'kouiki', places: [{...base.places[0], rows: [{...pipe, estMark: '手'}, post, {...w1, estMark: '材'}, w2, {...empty, estMark: '手'}]}, base.places[1]]});
+  const x = open(estimateXlsx(j, S, '2026-10-20').bytes);
+  const marks = [5, 6, 7, 8, 9, 10].map((r) => x.text(`C${r}`) ?? '');
+  assert.deepEqual(marks, ['手', '材', '材', '手', '材', '材']); // パイプ・支柱・同上施工費・空白の行・木の手すり・エアコン移設
+  assert.equal(x.text('D8'), undefined); // 空白の行は材／手のほかは空
+  assert.equal(x.text('I7'), 7000); // 金額は同じ
+});

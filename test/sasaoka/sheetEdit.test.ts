@@ -836,3 +836,54 @@ test('箇所の2行目からの改修内容・改修場所に打つと、その�
   const lines = formLines({...emptyJob(), places: [p]}, S, 'yukuhashi');
   assert.deepEqual(lines.map((l) => [l.first, l.excludeId === l.rowId]), [[true, true], [false, false], [false, true], [false, false], [false, true]]);
 });
+
+test('材／手の欄：どの行でも直せる（ユーザーの指摘「材の部分が選択できない」2026-11-05）。字だけ変わり金額は同じ。空白の行を「手」にすると施工費になる', () => {
+  let {job} = type(emptyJob(), [
+    ['new:name', '廊下'],
+    ['new:text', 'インテリアバー', bar],
+    ['new:text', '同上施工費'],
+    ['line:@:price', '2000'],
+  ], kk);
+  const [matId, labId] = job.places[0].rows.map((r) => r.id);
+  const before = estimateTotals(job, S);
+  assert.deepEqual(formLines(job, S, 'kouiki').map((l) => l.mark), ['材', '手']);
+  assert.deepEqual([sheetValue(job, `line:${matId}:mark`, kk), sheetValue(job, `line:${labId}:mark`, kk)], ['材', '手']);
+  // 部材の行を「手」に・施工費の行を「材」に（て・ざ・全角も読む）。金額はそのまま
+  job = applySheet(job, `line:${matId}:mark`, 'て', kk).job;
+  job = applySheet(job, `line:${labId}:mark`, 'ｚ', kk).job;
+  assert.deepEqual(formLines(job, S, 'kouiki').map((l) => l.mark), ['手', '材']);
+  assert.deepEqual(estimateTotals(job, S), before);
+  // 読めない字は何もしない・空（Delete）は自動の字に戻す（自動と同じ字は持たない）
+  assert.equal(applySheet(job, `line:${matId}:mark`, 'あ', kk).job, job);
+  job = applySheet(job, `line:${matId}:mark`, '', kk).job;
+  job = applySheet(job, `line:${labId}:mark`, '手', kk).job;
+  assert.deepEqual(formLines(job, S, 'kouiki').map((l) => l.mark), ['材', '手']);
+  assert.ok(job.places[0].rows.every((r) => !('estMark' in r) || r.estMark === undefined));
+
+  // 空白の行：初めは空。「手」にして時間を打つと、上の部材の同上施工費（打った金額はこの行だけ。1.2時間×2,500円）
+  const blank = insertBlankAfter(job, labId);
+  job = blank.job;
+  const blankId = blank.rowId;
+  assert.equal(sheetValue(job, `line:${blankId}:mark`, kk), '');
+  assert.equal(formLines(job, S, 'kouiki', {all: true})[2].mark, '');
+  job = applySheet(job, `line:${blankId}:mark`, '手', kk).job;
+  assert.equal(formLines(job, S, 'kouiki', {all: true})[2].mark, '手');
+  job = applySheet(job, `line:${blankId}:qty`, '1.2', kk).job;
+  const rows = job.places[0].rows;
+  assert.deepEqual(rows.map((r) => r.kind), ['material', 'labor', 'labor']);
+  assert.equal(rows[2].estMark, undefined);
+  assert.equal(estimateTotals(job, S).work, 2000 + 3000);
+
+  // 空白の行を「材」にしたら、字だけ（打った内容は部材のまま）
+  const b2 = insertBlankAfter(job, rows[0].id).job;
+  const b2Id = b2.places[0].rows.find((r) => r.kind === 'material' && r.id !== matId)!.id;
+  const m2 = applySheet(b2, `line:${b2Id}:mark`, '材', kk).job;
+  assert.equal(m2.places[0].rows.find((r) => r.id === b2Id)?.estMark, '材');
+
+  // 空いた行（打ち込める行より下）の材／手：あいだを空白の行でうめて、その行を「手」に
+  const g = applySheet(job, 'gap:2:mark', '手', kk);
+  const gRows = g.job.places[0].rows;
+  assert.equal(gRows.length, rows.length + 2);
+  assert.equal(gRows.at(-1)?.estMark, '手');
+  assert.equal(g.key, `line:${gRows.at(-1)?.id}:mark`);
+});

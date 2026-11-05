@@ -376,8 +376,9 @@ function kkLine(l: FormLine, r: number, height: number, bottom: string, hourRate
   put(0, l.first ? pl.v : null, 'c ml', pl.st);
   put(1, l.first ? work.v : null, 'c', work.st);
   if (l.blank) {
-    // 空白の行（何も入っていない部材の行）は、箇所の欄のほかは罫線だけ
-    ['', 'mr', 'gap', 'ml', '', '', 'mr', 'gap'].forEach((cls, i) => put(i + 2, null, cls));
+    // 空白の行（何も入っていない部材の行）は、箇所の欄と（手で入れた）材／手のほかは罫線だけ
+    put(2, l.mark || null, 'mark', {v: 'bottom'});
+    ['mr', 'gap', 'ml', '', '', 'mr', 'gap'].forEach((cls, i) => put(i + 3, null, cls));
     put(10, l.first ? ph.v : null, 'c ml', ph.st);
     put(11, l.first ? kd.v : null, 'c', kd.st);
     ['ml', '', '', 'mr', 'ml', 'mr'].forEach((cls, i) => put(i + 12, null, cls));

@@ -22,12 +22,15 @@ import {rounddown, startEstimate} from '../calc.ts';
 import {circled, KINDS, materialText} from '../estimateForms.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {KouikiForm, YukuhashiForm} from '../print/EstimateForms.tsx';
-import {applySheet, deleteLine, deletePlace, deleteTouchesShinsei, describeKey, dropEmptyPlaces, FIELD_NAMES, insertBeforeId, insertBlankBefore, laborCountAt, lineRows, parseDate, parsePlace, pasteLines, sheetTarget, sheetValue, stepLaborAt, toggleExcluded, toolPlace} from '../sheetEdit.ts';
+import {applySheet, deleteLine, deletePlace, deleteTouchesShinsei, describeKey, dropEmptyPlaces, FIELD_NAMES, insertBeforeId, insertBlankBefore, laborCountAt, lineRows, parseDate, parseMark, parsePlace, pasteLines, sheetTarget, sheetValue, stepLaborAt, toggleExcluded, toolPlace} from '../sheetEdit.ts';
 import {getClip, setClip, useClip} from '../sheetClip.ts';
 import type {EstimateForm, Job, LaborItem, Material, Place, Settings} from '../types.ts';
 import {matchesAll, noHyphen, searchKey, todayIso, yen} from '../util.ts';
 import {Btn, Modal, useToast} from './ui.tsx';
 import {BOOKS, type BookId} from '../makerCatalogs.ts';
+
+/** 広域連合用の「材／手」の欄（いちばん下の行 new:mark・明細の行 line:…:mark・空いた行 gap:…:mark） */
+const isMarkKey = (k: string) => k.endsWith(':mark');
 
 /** 入力の画面の用紙の幅を px に（A4横 297mm に、行の左の「挿入」「✕」「コピー」の分 3mm を足す。sasaoka.css の .est-sheet .form-page と同じ） */
 const PAGE_W = (300 / 25.4) * 96;
@@ -375,9 +378,9 @@ export function EstimateSheet({
     } else if (key === 'date') {
       const d = parseDate(value);
       if (d !== null) change({...jobRef.current, estDate: d || todayIso()}); // 消したら当日
-    } else if (key === 'new:mark') {
-      if (/手/.test(value)) setMark('手');
-      else if (/材/.test(value)) setMark('材');
+    } else if (isMarkKey(key)) {
+      const m = parseMark(value);
+      if (m !== undefined) setMarkAt(key, m);
     } else if (!key.startsWith('excl:')) {
       const res = applySheet(jobRef.current, key, value, {...ctx, pick, labor: key.startsWith('new:') && mark === '手'});
       change(res.job);
@@ -388,12 +391,23 @@ export function EstimateSheet({
     pendingMove.current = then;
   };
 
+  /** 材／手の欄（いちばん下の行は次に打つ行の印、ほかの行はその行の字。ユーザーの指摘「材の部分が選択できない」2026-11-05） */
+  const setMarkAt = (key: string, value: '材' | '手' | null) => {
+    if (key === 'new:mark') {
+      if (value) setMark(value);
+      return;
+    }
+    const res = applySheet(jobRef.current, key, value ?? '', ctx);
+    if (res.job !== jobRef.current) change(res.job);
+    if (res.key !== key) setSel({key: res.key, occ: 0});
+  };
   const toggle = () => {
     if (!sel) return;
     if (sel.key.startsWith('excl:')) change(toggleExcluded(jobRef.current, sel.key.slice(5)));
     else if (sel.key === 'new:mark') setMark((m) => (m === '材' ? '手' : '材'));
+    else if (isMarkKey(sel.key)) setMarkAt(sel.key, sheetValue(jobRef.current, sel.key, ctx) === '手' ? '材' : '手'); // 空白の行は初め「手」
   };
-  const isToggle = (k: string | undefined) => !!k && (k.startsWith('excl:') || k === 'new:mark');
+  const isToggle = (k: string | undefined) => !!k && (k.startsWith('excl:') || isMarkKey(k));
 
   const startEdit = (mode: Edit['mode']) => {
     if (!sel) return;
@@ -417,7 +431,7 @@ export function EstimateSheet({
   // ---------------------------------------------------------------- 候補（内容は部材リスト・★お気に入り、改修の種類は①〜⑥、改修場所は箇所の名前）
   const field = sel?.key.split(':').pop() ?? '';
   const target = sel ? sheetTarget(job, sel.key) : {place: null, row: null};
-  const textCell = !!sel && field === 'text' && (sel.key.startsWith('new:') ? mark === '材' : sel.key.startsWith('gap:') || target.row?.kind === 'material');
+  const textCell = !!sel && field === 'text' && (sel.key.startsWith('new:') ? mark === '材' : sel.key.startsWith('gap:') || (target.row?.kind === 'material' && target.row.estMark !== '手'));
   const kindCell = !!sel && (field === 'work' || field === 'kind');
   // 改修場所（箇所名）：設定の「箇所の名前」から選べる（手で打ってもよい）
   // 箇所の2行目からの改修場所の欄（split:）も（打つとその行から別の箇所。`splitPlaceAt`）
@@ -549,7 +563,8 @@ export function EstimateSheet({
         startEdit('edit');
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
-        if (sel && !isToggle(sel.key)) commit('', null, null);
+        if (sel && isMarkKey(sel.key)) setMarkAt(sel.key, null); // 材／手は自動の字に戻す（空白の行は空）
+        else if (sel && !isToggle(sel.key)) commit('', null, null);
       } else if (e.key === ' ' && isToggle(sel?.key)) {
         e.preventDefault();
         toggle();
@@ -597,9 +612,9 @@ export function EstimateSheet({
     const v = e.target.value;
     if (!sel) return;
     if (!edit) {
-      if (sel.key === 'new:mark') {
-        if (/[手てt]/i.test(v)) setMark('手');
-        else if (/[材ざz]/i.test(v)) setMark('材');
+      if (isMarkKey(sel.key)) {
+        const m = parseMark(v);
+        if (m) setMarkAt(sel.key, m);
         e.target.value = '';
         return;
       }
@@ -811,6 +826,12 @@ export function EstimateSheet({
       commit(edit.value, null, null);
       return;
     }
+    if (sel && isToggle(sel.key) && el === findCell(sel)) {
+      // 選んでいる材／手・対象外の欄をもう一度押したら切り替える（スマホで押すだけで 材⇔手。ダブルクリックでも1回だけ）
+      toggle();
+      inputRef.current?.focus({preventScroll: true});
+      return;
+    }
     select(el);
     inputRef.current?.focus({preventScroll: true});
   };
@@ -818,6 +839,7 @@ export function EstimateSheet({
     const t = e.target as HTMLElement;
     if (sugRef.current?.contains(t) || edit) return;
     if (t.closest('[data-pick]')) return; // 「部材｜施工費｜常用」は1回目で開いている
+    if (isToggle(sel?.key)) return; // 材／手・対象外は2回目の押した所で切り替えている
     if (t === inputRef.current || t.closest('[data-edit]')) {
       e.preventDefault();
       startEdit('edit');
