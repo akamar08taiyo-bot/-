@@ -248,6 +248,79 @@ assert.equal(await qty.innerText(), '3');
 await m6.getByRole('button', {name: 'BJ-14WDを1つ減らす'}).click();
 assert.equal(await qty.innerText(), '2');
 await page.screenshot({path: path.join(outDir, 'catalog-02-qty.png')});
+// 絵を右から左にすべらせると次のページ・左から右で前のページ（ユーザーの指示「カタログのページめくりは右から左にスラッシュすることでめくれるようにする」
+// 2026-11-05）。マウスでも。すべらせても品番の枠は押されない（数量は 2 のまま）。少しだけ動かしたときはめくらない。最初のページから前へはめくらない
+const pageNo = async () => Number(await m6.getByLabel('ページ', {exact: true}).inputValue());
+const drag = async (from, to, y = 0.45, steps = 10) => {
+  const b = await m6.getByRole('img', {name: /マツ六カタログ p\.\d+/}).boundingBox();
+  await page.mouse.move(b.x + b.width * from, b.y + b.height * y);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width * to, b.y + b.height * y, {steps});
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+};
+await m6.getByRole('img', {name: 'マツ六カタログ p.5'}).scrollIntoViewIfNeeded();
+await drag(0.8, 0.2); // 右から左
+assert.equal(await pageNo(), 6);
+await drag(0.8, 0.2);
+assert.equal(await pageNo(), 7);
+await drag(0.2, 0.8); // 左から右
+assert.equal(await pageNo(), 6);
+await drag(0.5, 0.48); // 少しだけ（めくらない）
+assert.equal(await pageNo(), 6);
+await drag(0.2, 0.8);
+await drag(0.2, 0.8);
+assert.equal(await pageNo(), 3); // 最初のページ（p.3）
+await drag(0.2, 0.8);
+assert.equal(await pageNo(), 3);
+await toc.getByRole('button', {name: '屋外手すり（フリーRレール）'}).click();
+// 品番の枠の上から始めても、すべらせたら品番は入らない（数量は 2 のまま）・ページはめくれる
+const bjBox = await m6.locator('[data-code="BJ-14WD"]').first().boundingBox();
+await page.mouse.move(bjBox.x + bjBox.width / 2, bjBox.y + bjBox.height / 2);
+await page.mouse.down();
+await page.mouse.move(bjBox.x + bjBox.width / 2 - 300, bjBox.y + bjBox.height / 2, {steps: 10});
+await page.mouse.up();
+await page.waitForTimeout(300);
+assert.equal(await pageNo(), 6);
+await toc.getByRole('button', {name: '屋外手すり（フリーRレール）'}).click();
+assert.equal(await qty.innerText(), '2');
+// スマホ：指で右から左に払うと次のページ（CDP のタッチ。縦に動かしたときはふつうにスクロール）
+{
+  const phone = await browser.newContext({viewport: {width: 390, height: 844}, hasTouch: true, isMobile: true, locale: 'ja-JP'});
+  await phone.route(/^https?:\/\/(?!localhost)/, (r) => r.abort());
+  const pp = await phone.newPage();
+  pp.on('pageerror', (e) => errors.push('pageerror(phone): ' + e.message));
+  await pp.goto(`${site}/jutaku-mitsumori/index.html`);
+  await (await navItem(pp, '📝 見積もり・申請書を作成する')).click();
+  await pp.getByRole('region', {name: '新規作成'}).getByRole('button', {name: '＋ 行橋市', exact: true}).click();
+  await pp.getByRole('tab', {name: '📋 工事見積書'}).click();
+  const ps = pp.getByRole('region', {name: '見積書', exact: true});
+  await ps.waitFor();
+  await clickStable(ps.locator('tr[data-new] [data-pick="material"]'));
+  await pp.getByRole('dialog').getByRole('button', {name: '📖 カタログから選ぶ'}).click();
+  const pm = pp.getByRole('dialog').getByRole('region', {name: 'マツ六カタログ'});
+  await pm.waitFor();
+  assert.equal(await pm.getByLabel('ページ', {exact: true}).inputValue(), '43');
+  const img = pm.getByRole('img', {name: 'マツ六カタログ p.43'});
+  await img.scrollIntoViewIfNeeded();
+  const b = await img.boundingBox();
+  const cdp = await phone.newCDPSession(pp);
+  const touch = async (x0, x1, y0, y1) => {
+    await cdp.send('Input.dispatchTouchEvent', {type: 'touchStart', touchPoints: [{x: x0, y: y0}]});
+    for (let i = 1; i <= 8; i++) await cdp.send('Input.dispatchTouchEvent', {type: 'touchMove', touchPoints: [{x: x0 + ((x1 - x0) * i) / 8, y: y0 + ((y1 - y0) * i) / 8}]});
+    await cdp.send('Input.dispatchTouchEvent', {type: 'touchEnd', touchPoints: []});
+    await pp.waitForTimeout(400);
+  };
+  const y = b.y + Math.min(b.height, 844 - b.y) / 2;
+  await touch(b.x + b.width * 0.85, b.x + b.width * 0.15, y, y);
+  assert.equal(await pm.getByLabel('ページ', {exact: true}).inputValue(), '44');
+  await touch(b.x + b.width * 0.15, b.x + b.width * 0.85, y, y);
+  assert.equal(await pm.getByLabel('ページ', {exact: true}).inputValue(), '43');
+  await touch(b.x + b.width * 0.5, b.x + b.width * 0.55, y + 150, y - 150); // 縦（スクロール）はめくらない
+  assert.equal(await pm.getByLabel('ページ', {exact: true}).inputValue(), '43');
+  await phone.close();
+}
+log('絵を右から左にすべらせて次のページ・左から右で前（マウス・指）・すべらせても品番は入らない OK');
 // スマホの幅：目次は横に動かして見る・スライダーは下に見えている
 await page.setViewportSize({width: 390, height: 844});
 await page.waitForTimeout(300);

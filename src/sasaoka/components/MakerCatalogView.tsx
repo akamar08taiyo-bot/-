@@ -67,6 +67,12 @@ function BookView({materials, start, onAdd, onAddCode, qtyOf, onBack, onSwitch}:
   // 光らせる品番を見える所へ（部材の「📖 p.12」から開いたとき。ページの絵は縦に長いので、下の方の品番が見えなかった）
   const imgRef = useRef<HTMLDivElement>(null);
   const [loaded, setLoaded] = useState(0);
+  // ページの絵を横にすべらせてめくる：右から左で次のページ、左から右で前のページ（ユーザーの指示「カタログのページめくりは右から左に
+  // スラッシュすることでめくれるようにする」2026-11-05）。指でもマウスでも。縦に動かしたときはふつうのスクロール（touch-action: pan-y）。
+  // めくったときの押した所の click は品番の枠に届けない（めくるつもりで部材が入らないように）
+  const swipe = useRef<{id: number; x: number; y: number; t: number; on: boolean} | null>(null);
+  const swiped = useRef(false);
+  const [dragX, setDragX] = useState<number | null>(null); // 指についてくる絵のずれ（px。null は動かしていない）
   useEffect(() => {
     if (!start.code || page !== start.page) return;
     imgRef.current?.querySelector<HTMLElement>(`[data-code="${CSS.escape(start.code)}"]`)?.scrollIntoView({block: 'center'});
@@ -195,7 +201,60 @@ function BookView({materials, start, onAdd, onAddCode, qtyOf, onBack, onSwitch}:
         )}
       </div>
       <div className="mt-2 grid gap-3 lg:grid-cols-[minmax(0,1fr)_19rem]">
-        <div ref={imgRef} className="relative w-full overflow-hidden rounded-md border border-slate-300 bg-slate-100" style={{aspectRatio: '1240 / 1754'}}>
+        <div
+          ref={imgRef}
+          className="relative w-full overflow-hidden rounded-md border border-slate-300 bg-slate-100"
+          style={{aspectRatio: '1240 / 1754', touchAction: 'pan-y pinch-zoom'}}
+          onPointerDown={(e) => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            swipe.current = {id: e.pointerId, x: e.clientX, y: e.clientY, t: Date.now(), on: false};
+            swiped.current = false;
+          }}
+          onPointerMove={(e) => {
+            const s = swipe.current;
+            if (!s || s.id !== e.pointerId) return;
+            const dx = e.clientX - s.x;
+            const dy = e.clientY - s.y;
+            if (!s.on) {
+              if (Math.abs(dx) < 12) return;
+              if (Math.abs(dx) < Math.abs(dy) * 1.5) {
+                swipe.current = null; // 縦に動かした（スクロール）
+                return;
+              }
+              s.on = true;
+              e.currentTarget.setPointerCapture?.(e.pointerId);
+            }
+            // 最初・最後のページは少しだけ動いて戻る
+            const edge = (dx < 0 && idx >= pages.length - 1) || (dx > 0 && idx <= 0);
+            setDragX(edge ? dx / 4 : dx);
+          }}
+          onPointerUp={(e) => {
+            const s = swipe.current;
+            swipe.current = null;
+            if (!s || !s.on) return;
+            swiped.current = true;
+            setDragX(null);
+            const dx = e.clientX - s.x;
+            const next = pages[idx + (dx < 0 ? 1 : -1)];
+            // 欄の幅の15％（80px まで）より長くすべらせたか、短くてもすばやく払ったらめくる
+            if (next && (Math.abs(dx) > Math.min(80, e.currentTarget.clientWidth * 0.15) || (Math.abs(dx) > 30 && Date.now() - s.t < 300))) setPage(next.page);
+          }}
+          onPointerCancel={() => {
+            swipe.current = null;
+            setDragX(null);
+          }}
+          onClickCapture={(e) => {
+            if (!swiped.current) return;
+            swiped.current = false;
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        >
+          <div
+            className="absolute inset-0"
+            data-swipe={dragX === null ? undefined : ''}
+            style={{transform: dragX ? `translateX(${dragX}px)` : undefined, transition: dragX === null ? 'transform 0.2s ease-out' : 'none'}}
+          >
           <img src={book.image(page)} alt={`${book.maker}カタログ p.${page}`} className="absolute inset-0 h-full w-full select-none" draggable={false} onLoad={() => setLoaded((n) => n + 1)} />
           {current.codes.map((c, i) => {
             const n = matches(c.code).length;
@@ -218,6 +277,7 @@ function BookView({materials, start, onAdd, onAddCode, qtyOf, onBack, onSwitch}:
               />
             );
           })}
+          </div>
         </div>
         <div className="min-w-0 lg:sticky lg:top-[var(--bar)] lg:max-h-[calc(100vh-var(--bar)-12.5rem)] lg:self-start lg:overflow-y-auto lg:overflow-x-hidden" style={{'--bar': `${barH - 16}px`} as CSSProperties}>
           {choose && (
