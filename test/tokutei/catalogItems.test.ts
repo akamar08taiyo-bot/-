@@ -402,3 +402,25 @@ test('同じ名前の品番を見分ける：入れ子の見出し・表の上�
     }
   }
 });
+
+test('全ページの押せる枠：となりの枠と重ならない（中の小さな囲みはのぞく）・品番の字は自分の枠の中（2026-11-05 の点検。上の枠が下の見出しに 11pt かかっていた）', async () => {
+  const inside = (t: PdfText, b: {x: number; y: number; w: number; h: number}) => t.x + t.w / 2 >= b.x - 1 && t.x + t.w / 2 <= b.x + b.w + 1 && t.y >= b.y - 1 && t.y - t.h <= b.y + b.h + 1;
+  const within = (a: {x: number; y: number; w: number; h: number}, b: typeof a) => a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h;
+  for (const c of CATALOG) {
+    const items = await itemsOf(c.file);
+    const list = parseCatalogPage(items, c);
+    for (const p of list) {
+      assert.ok(p.box && p.box.w > 40 && p.box.h > 40, `p.${c.page} ${p.name}`);
+      for (const v of p.variants) {
+        const hits = items.filter((t) => t.s.normalize('NFKC').replace(/\s/g, '') === v.code.replace(/\s/g, ''));
+        if (hits.length) assert.ok(hits.some((t) => inside(t, p.box!)), `p.${c.page} ${p.name} ${v.code}`);
+      }
+    }
+    for (const [i, a] of list.entries())
+      for (const d of list.slice(i + 1)) {
+        const x = Math.min(a.box!.x + a.box!.w, d.box!.x + d.box!.w) - Math.max(a.box!.x, d.box!.x);
+        const y = Math.min(a.box!.y + a.box!.h, d.box!.y + d.box!.h) - Math.max(a.box!.y, d.box!.y);
+        if (x > 0 && y > 0) assert.ok(within(d.box!, a.box!) || within(a.box!, d.box!), `p.${c.page}「${a.name}」と「${d.name}」が重なる（${x}×${y}）`);
+      }
+  }
+});

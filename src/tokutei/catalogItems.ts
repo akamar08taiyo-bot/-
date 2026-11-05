@@ -249,7 +249,30 @@ export function parseCatalogPage(raw: PdfText[], page: Pick<CatalogPage, 'page' 
       },
     });
   }
-  return out.sort((a, c) => a.at.y - c.at.y || a.at.x - c.at.x).map((x) => x.p);
+  const list = out.sort((a, c) => a.at.y - c.at.y || a.at.x - c.at.x).map((x) => x.p);
+  trimOverlaps(list);
+  return list;
+}
+
+/**
+ * 押せる枠（box）の重なりをなくす（2026-11-05 の点検。全ページを調べると、上の商品の枠が下の商品の見出しの行（商品名・「完成品」の札）まで
+ * 11pt ほどかかり、左の商品の枠が右の商品に 3〜7pt かかっていた。押すと後ろの（下・右の）枠が上に来るので正しい商品が入るが、点線の枠がかぶって
+ * どちらの商品か分かりにくい）：下にある枠の上の線まで上の枠を、右にある枠の左の線まで左の枠を縮める。
+ * 枠の中の小さな囲み（p.175 の「バケツA型用 袋止めN」）のように、大きくかぶるもの（重なりが 20pt をこえる向き）はそのまま
+ */
+function trimOverlaps(list: CatalogProduct[]): void {
+  for (const a of list) {
+    for (const d of list) {
+      if (a === d || !a.box || !d.box) continue;
+      const A = a.box;
+      const D = d.box;
+      const ox = Math.min(A.x + A.w, D.x + D.w) - Math.max(A.x, D.x);
+      const oy = Math.min(A.y + A.h, D.y + D.h) - Math.max(A.y, D.y);
+      if (ox <= 0 || oy <= 0) continue;
+      if (D.y > A.y && oy <= 20 && ox > oy) A.h = Math.max(1, D.y - A.y - 1); // d が下：a の下の線を d の上まで
+      else if (D.x > A.x && ox <= 20 && oy > ox) A.w = Math.max(1, D.x - A.x - 1); // d が右：a の右の線を d の左まで
+    }
+  }
 }
 
 /**
