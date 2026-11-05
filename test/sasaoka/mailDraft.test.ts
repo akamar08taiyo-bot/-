@@ -8,7 +8,7 @@ import type {Job} from '../../src/sasaoka/types.ts';
 const job = (customer: string, staff = ''): Job => ({customer, suffix: '様邸', staff}) as Job;
 const s = {...defaultSettings(), company: '見本商事株式会社', officeName: '見本営業所', tel: '0000-00-0000'};
 
-test('件名・本文：お客様名と選んだ書類（タブの順）、付けるファイルの名前、会社・営業所・担当・電話', () => {
+test('件名・本文：お客様名と選んだ書類（タブの順）、付けるファイルの名前。会社・営業所・担当・電話は書かない（ユーザーの指示「メールで送るときのこの部分は不要」2026-11-05）', () => {
   const m = docsMail(job('見本 花子', '見本 一郎'), s, ['住宅改修申請書', '工事見積書'], ['見本花子様住宅改修申請書.xlsx', '見本花子様住宅改修見積書.xlsx']);
   assert.equal(m.subject, '見本 花子様邸 住宅改修申請書・工事見積書'); // 「〇〇様邸」と書類（ユーザーの指示「〇〇様邸など、ひっかかりにくい件名にする」）
   assert.deepEqual(m.body.split('\n'), [
@@ -19,11 +19,8 @@ test('件名・本文：お客様名と選んだ書類（タブの順）、付�
     '（添付）',
     '・見本花子様住宅改修申請書.xlsx',
     '・見本花子様住宅改修見積書.xlsx',
-    '',
-    '見本商事株式会社 見本営業所',
-    '担当：見本 一郎',
-    'TEL 0000-00-0000',
   ]);
+  for (const t of ['見本商事株式会社', '見本営業所', '担当：', 'TEL']) assert.ok(!m.body.includes(t), t);
   // お客様名・担当がなければ、その所は書かない
   const blank = docsMail(job(''), s, ['理由書'], ['お客様住宅改修理由書.xlsx']);
   assert.equal(blank.subject, '理由書');

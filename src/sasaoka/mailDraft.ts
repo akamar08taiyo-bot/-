@@ -96,11 +96,11 @@ export function openMailto(mail: Mail): void {
 /** 様邸のデータの、メールの中での名前（DocsDialog.tsx の □ と同じ） */
 export const DATA_LABEL = '様邸のデータ';
 
-export function docsMail(job: Job, s: Settings, labels: string[], names: string[], data?: {name: string; url: string}): Mail {
+export function docsMail(job: Job, _s: Settings, labels: string[], names: string[], data?: {name: string; url: string}): Mail {
   const who = job.customer.trim() ? `${job.customer.trim()}様` : '';
   const what = labels.join('・');
-  // 会社・営業所・担当・電話（様邸のデータを送るとき＝自分のパソコンへ送るときは付けない。ユーザーの指示「データを送る際、ここの部分は不要」2026-10-30）
-  const sign = data ? [] : [[s.company, s.officeName].filter(Boolean).join(' '), job.staff?.trim() ? `担当：${job.staff.trim()}` : '', s.tel ? `TEL ${s.tel}` : ''].filter(Boolean);
+  // 会社・営業所・担当・電話は本文の下に書かない（メールのソフトの署名が入るので。ユーザーの指示「メールで送るときのこの部分は不要」2026-11-05。
+  // 前は書類を送るときに書いていた。様邸のデータは 2026-10-30 の「データを送る際、ここの部分は不要」から書いていない）
   const body = (list: string[]) =>
     [
       'お世話になっております。',
@@ -112,7 +112,6 @@ export function docsMail(job: Job, s: Settings, labels: string[], names: string[
       ...(data
         ? ['', 'パソコンで受け取るとき：', `① 添付の「${data.name}」を保存します`, '② 下のリンクを開くと受け取る画面が出るので、そのファイルを入れます（申請書・見積書・写真などがそのまま入ります）', `${data.url}#receive`]
         : []),
-      ...(sign.length ? ['', ...sign] : []),
     ].join('\n');
   // 件名は「〇〇様邸」と書類の名前だけ（ユーザーの指示「〇〇様邸など、ひっかかりにくい件名にする」2026-10-30。前は「〇〇様 …の送付」）。
   // 様邸のデータだけなら「〇〇様邸」。iPhone の共有メニューからのメールには件名が入らないので、押したときに件名をコピーする（DocsDialog.tsx）
