@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {unzipSync} from 'fflate';
-import {defaultSettings} from '../../src/tokutei/defaults.ts';
+import {defaultSettings, settingsForOffice} from '../../src/tokutei/defaults.ts';
 import {KOUIKI_SHEETS, SHINSEI, shinseiValues} from '../../src/tokutei/shinsei.ts';
 import type {ShinseiKey} from '../../src/tokutei/shinsei.ts';
 import {missingFields, SHINSEI_LINKS, shinseiPreview} from '../../src/tokutei/shinseiPreview.ts';
@@ -185,8 +185,11 @@ test('まだ入っていない所（プレビューの欄を薄い黄色に）�
   assert.deepEqual([...missingFields(shinseiValues(sale({insurer: 'kouiki', careLevel: ''}), S), 'kouiki')], []);
   assert.deepEqual([...missingFields(shinseiValues(sale({insurer: 'kouiki', careOffice: '', carePlan: '有'}), S), 'kouiki')], ['recorder']);
   // 福岡市：性別・郵便番号・要介護度・記載者の欄はない。販売事業者（受任者）は設定の営業所と事業者番号（10けた）
-  assert.deepEqual([...missingFields(shinseiValues({...blank, insurer: 'fukuoka'}, S), 'fukuoka')].sort(), all.filter((f) => !['gender', 'zip', 'careLevel', 'recorder'].includes(f)).sort());
-  assert.deepEqual([...missingFields(shinseiValues(sale({insurer: 'fukuoka'}), {...S, providerNo: ''}), 'fukuoka')], ['seller']);
+  const fk = {...settingsForOffice(S, '福岡東営業所'), providerNo: '4000000001'};
+  assert.deepEqual([...missingFields(shinseiValues({...blank, insurer: 'fukuoka'}, fk), 'fukuoka')].sort(), all.filter((f) => !['gender', 'zip', 'careLevel', 'recorder'].includes(f)).sort());
+  assert.deepEqual([...missingFields(shinseiValues(sale({insurer: 'fukuoka'}), {...fk, providerNo: ''}), 'fukuoka')], ['seller']);
+  // 行橋営業所の設定のまま：福岡市の申請書は福岡市の営業所になり、その営業所の事業者番号がまだない
+  assert.deepEqual([...missingFields(shinseiValues(sale({insurer: 'fukuoka'}), S), 'fukuoka')], ['seller']);
   // 理由は商品のどれかに理由がなければ
   const noReason = sale({items: [item({id: 'a', name: '見本の杖', reason: ''})]});
   assert.deepEqual([...missingFields(shinseiValues(noReason, S), 'yukuhashi')], ['reason']);

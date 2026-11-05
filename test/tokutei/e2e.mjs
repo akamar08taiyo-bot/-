@@ -329,10 +329,12 @@ try {
   assert.equal(await page.getByRole('group', {name: '要介護状態区分'}).count(), 0);
   await page.getByRole('textbox', {name: '住所', exact: true}).fill('福岡市早良区小田部1-2-3');
   await page.waitForFunction(() => document.querySelector('[aria-label="申請書のプレビュー"]')?.textContent?.includes('福岡市　早良　区　小田部1-2-3'));
-  // 行橋営業所は事業者番号が初めから入っている。福岡西営業所に替えると空（薄い黄色）→ 入れる
+  // 福岡市の申請書の販売事業者は福岡市の営業所（ユーザーの指示「福岡は、福岡東、福岡南、福岡西／こちらの該当営業所と所長にする」2026-11-05）：
+  // 設定は行橋営業所のままでも、早良区は福岡西営業所。選べるのは福岡市の3つだけ。その営業所の事業者番号はまだない（薄い黄色）→ 入れる
   const sellerRow = '[data-field="seller"] > div:nth-child(2)';
-  assert.equal(await page.getByLabel('事業者番号').inputValue(), '4072601802');
-  await page.getByLabel('販売事業者の営業所').selectOption('福岡西営業所');
+  assert.equal(await page.getByLabel('販売事業者の営業所').inputValue(), '福岡西営業所');
+  assert.deepEqual((await page.getByLabel('販売事業者の営業所').locator('option').allInnerTexts()).sort(), ['福岡南営業所', '福岡東営業所', '福岡西営業所'].sort());
+  assert.equal(await page.getByLabel('事業者番号').inputValue(), '');
   await page.waitForFunction((sel) => document.querySelector(sel)?.className.includes('bg-amber-50'), sellerRow);
   await page.getByLabel('事業者番号').fill('4000000002');
   await page.waitForFunction((sel) => !document.querySelector(sel)?.className.includes('bg-amber-50'), sellerRow);
@@ -412,7 +414,7 @@ try {
   await preview.getByRole('group', {name: '請求書', exact: true}).waitFor();
   assert.deepEqual(await groups(), ['申請書', '委任状（受領委任払用）', '請求書', '委任状（提出用）']);
   assert.equal(await page.getByRole('group', {name: '要介護状態区分'}).count(), 0);
-  await page.getByLabel('販売事業者の営業所').selectOption('久留米営業所');
+  assert.equal(await page.getByLabel('販売事業者の営業所').inputValue(), '久留米営業所'); // 久留米市は久留米営業所（選ばなくても）
   await page.waitForFunction((sel) => document.querySelector(sel)?.className.includes('bg-amber-50'), sellerRow);
   await page.getByLabel('事業者番号').fill('4000000003');
   await page.getByLabel('受領委任払取扱事業所登録番号').fill('12345678');
@@ -452,7 +454,7 @@ try {
   await preview.getByRole('group', {name: '委任状', exact: true}).waitFor();
   assert.deepEqual(await groups(), ['支給申請書', '委任状']);
   assert.equal(await page.getByRole('group', {name: '要介護状態区分'}).count(), 1);
-  await page.getByLabel('販売事業者の営業所').selectOption('大分営業所');
+  assert.equal(await page.getByLabel('販売事業者の営業所').inputValue(), '大分営業所'); // 大分市は大分営業所（選ばなくても）
   await page.getByLabel('事業者番号').fill('4000000004');
   await page.waitForFunction((sel) => !document.querySelector(sel)?.className.includes('bg-amber-50'), sellerRow);
   await page.waitForFunction(() => document.querySelector('[aria-label="申請書のプレビュー"]')?.textContent?.includes('大分営業所'));
@@ -473,8 +475,7 @@ try {
     assert.equal(readCell(f, '委任状', 'C6'), '大分県大分市見本町1-2-3');
   }
 
-  // もとに戻す：営業所（設定。見積書の発行元）は行橋営業所・住所は行橋市
-  await page.getByLabel('販売事業者の営業所').selectOption('行橋営業所');
+  // もとに戻す：住所は行橋市。営業所（設定。見積書の発行元）は申請書の営業所が替わっても行橋営業所のまま（下の見積書で確かめる）
   await page.getByRole('textbox', {name: '住所', exact: true}).fill('行橋市大字流末1327番地');
   await page.getByLabel('保険者', {exact: true}).selectOption('yukuhashi');
   await page.getByRole('tab', {name: '📄 申請書（行橋市）'}).waitFor();

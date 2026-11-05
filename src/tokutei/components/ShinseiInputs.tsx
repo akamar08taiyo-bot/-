@@ -3,7 +3,7 @@
 // 上に保険者と申請書の名前、選ぶ所は丸のボタン、フリガナはカタカナに、被保険者番号は10マス、生年月日は元号と年月日、Enter で次の欄。
 // 右のプレビュー（ShinseiPreview.tsx）の欄を押すと、ここのその行へ（data-field）。まだ入っていない行は薄い黄色。
 // 値は案件（Sale）のまま（見積書と同じ値。金額は見積書の側で入れる。ここでは購入金額を出すだけ）
-import {areaLabel, insurerAreas, insurerNoOf} from '../insurerNumbers.ts';
+import {areaLabel, insurerAreaName, insurerAreas, insurerNoOf} from '../insurerNumbers.ts';
 import {useEffect, useMemo, useRef, useState} from 'react';
 import type {ReactNode, RefObject} from 'react';
 import type {FocusEvent} from 'react';
@@ -11,7 +11,8 @@ import {categoryTaxPatch, lineOf} from '../calc.ts';
 import type {Line} from '../calc.ts';
 import {CARE_LEVELS, INSURERS, OFFICES, settingsForOffice} from '../defaults.ts';
 import {blankItem, makerChoices, suggestValues} from '../sales.ts';
-import {carePlanOf, shinseiForm} from '../shinsei.ts';
+import {carePlanOf, shinseiForm, shinseiSettings} from '../shinsei.ts';
+import {shinseiOfficeGroup} from '../shinseiOffice.ts';
 import type {ShinseiKey} from '../shinsei.ts';
 import type {OpenCatalog} from '../catalog.ts';
 import type {ShinseiField} from '../shinseiPreview.ts';
@@ -103,6 +104,10 @@ export function ShinseiInputs({
   const rows: Line[] = lines.length ? lines : [lineOf(draft, s)];
   const changeRow = (id: string, patch: Partial<SaleItem>) => (lines.length ? changeItem(id, patch) : onAddItem({...draft, ...patch}));
   const title = shinseiForm(sale.insurer)?.title;
+  // 申請書に書く営業所（大分市は大分営業所など。shinseiOffice.ts）。設定の営業所とちがうときは、選ぶ欄・事業者番号はその営業所のもの
+  const sellerS = shinseiSettings(sale, s);
+  const sellerOffices = shinseiOfficeGroup(sale.insurer, insurerAreaName(sale.insurer, insurerNoOf(sale.insurer, sale.address, sale.insurerNo ?? '')));
+  const ownOffice = sellerS.officeName === s.officeName;
   const insurerName = INSURERS.find((i) => i.key === sale.insurer)?.label;
   return (
     <div ref={inputsRef} onFocusCapture={onFocusField} className="min-w-0 space-y-2">
@@ -382,19 +387,21 @@ export function ShinseiInputs({
           </select>,
           'staff',
         )}
-        {/* 福岡市・北九州市の受任者（販売事業者）：設定の営業所（住所・電話・所長）と事業者番号。ここで替えると設定も替わる */}
+        {/* 福岡市・北九州市・久留米市・大分市の受任者（販売事業者）：申請書に書く営業所（住所・電話・所長）と事業者番号。
+            その市の営業所だけを選べる（ユーザーの指示「こちらの該当営業所と所長にする」2026-11-05）。ここで替えると設定も替わる。
+            設定とちがう営業所の事業者番号は、その営業所の番号として覚える（providerNos。見積書の発行元＝設定の営業所は変えない） */}
         {seller &&
           row(
             '販売事業者（受任者）',
             <div className="flex w-full flex-wrap items-center gap-2">
               <select
-                value={s.officeName}
+                value={sellerS.officeName}
                 onChange={(e) => changeSettings((prev) => settingsForOffice(prev, e.target.value))}
                 className="h-9 min-w-0 rounded-md border border-slate-300 px-2 text-sm"
                 aria-label="販売事業者の営業所"
               >
-                {!OFFICES.some((o) => o.name === s.officeName) && <option value={s.officeName}>{s.officeName || '—'}</option>}
-                {OFFICES.map((o) => (
+                {!OFFICES.some((o) => o.name === sellerS.officeName) && <option value={sellerS.officeName}>{sellerS.officeName || '—'}</option>}
+                {OFFICES.filter((o) => !sellerOffices.length || sellerOffices.includes(o.name)).map((o) => (
                   <option key={o.name} value={o.name}>
                     {o.name}
                   </option>
@@ -403,8 +410,12 @@ export function ShinseiInputs({
               <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-500">
                 事業者番号
                 <TextInput
-                  value={s.providerNo ?? ''}
-                  onChange={(providerNo) => changeSettings((prev) => ({...prev, providerNo}))}
+                  value={sellerS.providerNo ?? ''}
+                  onChange={(providerNo) =>
+                    changeSettings((prev) =>
+                      ownOffice ? {...prev, providerNo} : {...prev, providerNos: {...prev.providerNos, [sellerS.officeName]: providerNo}},
+                    )
+                  }
                   inputMode="numeric"
                   placeholder="10けた"
                   className="w-36 text-sm font-normal text-slate-800"

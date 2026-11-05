@@ -5,10 +5,11 @@
 // 原本の式でつながっている欄（支給申請書・写真の用紙が事前申請書を参照）は式のまま使い、書くのは決めた欄だけ（原本のシート・空欄・図形は消さない）。
 // 書かない欄：個人番号・印・ケアマネジャーの署名・受け取り者氏名・市町村の記入欄。
 
-import {insurerNoOf} from './insurerNumbers.ts';
+import {insurerAreaName, insurerNoOf} from './insurerNumbers.ts';
+import {shinseiOfficeName} from './shinseiOffice.ts';
 import {saleTotals} from './calc.ts';
 import {CATEGORIES, docLabel} from './category.ts';
-import {CARE_LEVELS} from './defaults.ts';
+import {CARE_LEVELS, OFFICES} from './defaults.ts';
 import type {CarePlan, Gender, PayMethod, Sale, Settings} from './types.ts';
 import {warekiLabel, warekiOf} from './wareki.ts';
 import type {Wareki} from './wareki.ts';
@@ -116,8 +117,23 @@ export function corpShort(name: string): string {
     .replace(/[\s　]*(?:有限会社|[（(]有[)）])[\s　]*/g, '㈲');
 }
 
-export function shinseiValues(sale: Sale, s: Settings): ShinseiValues {
-  const t = saleTotals(sale, s);
+/**
+ * 申請書の販売事業者（受任者）の営業所：大分市は大分営業所、久留米市は久留米営業所、北九州市・福岡市はその市の営業所、
+ * 広域連合の田川市・田川郡は田川営業所（shinseiOffice.ts）。設定の営業所のままなら設定（直した所長・事業者番号）のまま。
+ * 替えるときは営業所の一覧の所長・住所・電話と、その営業所の事業者番号（申請書の画面で入れた providerNos。なければ一覧の番号、分からなければ空。ほかの営業所の番号を書かない）
+ */
+export function shinseiSettings(sale: Pick<Sale, 'insurer' | 'address' | 'insurerNo'>, s: Settings): Settings {
+  const current = s.officeName.trim();
+  const area = insurerAreaName(sale.insurer, insurerNoOf(sale.insurer, sale.address, sale.insurerNo ?? ''));
+  const name = shinseiOfficeName(sale.insurer, area, current);
+  if (!name || name === current) return s;
+  const o = OFFICES.find((x) => x.name === name);
+  return o ? {...s, officeName: o.name, manager: o.manager, postal: o.postal, address: o.address, tel: o.tel, fax: o.fax, providerNo: s.providerNos?.[o.name] ?? o.providerNo ?? ''} : s;
+}
+
+export function shinseiValues(sale: Sale, settings: Settings): ShinseiValues {
+  const t = saleTotals(sale, settings);
+  const s = shinseiSettings(sale, settings);
   const items = usedLines(sale, s).map((l): ShinseiItem => {
     const i = l.item;
     return {

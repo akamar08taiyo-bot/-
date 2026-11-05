@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {strFromU8, unzipSync} from 'fflate';
-import {defaultSettings, settingsForOffice} from '../../src/tokutei/defaults.ts';
+import {defaultSettings, OFFICES, settingsForOffice} from '../../src/tokutei/defaults.ts';
 import {
   carePlanOf,
   corpShort,
@@ -387,7 +387,7 @@ test('福岡市：保険者番号は区ごと（4013＋区の番号＋検証番�
   assert.match(shinseiChecks(fukuokaSale({items: [0, 1, 2, 3].map((k) => item({id: `k${k}`, name: `見本の杖${k}`, reason: '見本'}))}), FUKUOKA_S).overflow, /^福岡市の申請書の商品の欄は3行です。/);
 });
 
-test('福岡市：長い商品名・メーカー名は1行に入る大きさ。行橋営業所は事業者番号が初めから入る', () => {
+test('福岡市：長い商品名・メーカー名は1行に入る大きさ。行橋営業所の設定でも販売事業者は福岡市の営業所（事業者番号はその営業所の番号）', () => {
   const f = fillFukuoka({items: [item({id: 'a', name: '見本のシャワーベンチ背付きワイド 536-057 ロング', maker: 'パナソニックエイジフリー（株）', category: '入浴補助用具', listPrice: 30000})]});
   for (const ref of ['D13', 'J13']) {
     const text = readCell(f, FUKUOKA_SHEET, ref);
@@ -395,9 +395,13 @@ test('福岡市：長い商品名・メーカー名は1行に入る大きさ。�
     assert.ok(emOf(text) * ((style.size * 4) / 3) <= box.w - 6 + 0.01, `${ref}「${text}」が幅 ${box.w} に入らない（${style.size}pt）`);
   }
   assert.equal(readCell(f, FUKUOKA_SHEET, 'J13'), 'パナソニックエイジフリー㈱');
+  // ユーザーの指示「福岡は、福岡東、福岡南、福岡西／こちらの該当営業所と所長にする」（2026-11-05）：中央区は福岡西営業所。行橋営業所の事業者番号は書かない
   const yk = fillFukuoka({}, settingsForOffice(S, '行橋営業所'));
-  assert.equal(joined(yk, pairBoxes('Q', 10, 11)), '4072601802');
-  assert.equal(printOverflow(yk, FUKUOKA_SHEET) ?? 0, 0); // A4 1枚（原本の「ページに合わせる」のまま）
+  assert.equal(readCell(yk, FUKUOKA_SHEET, 'E11'), '太陽シルバーサービス㈱　福岡西営業所');
+  assert.equal(joined(yk, pairBoxes('Q', 10, 11)), '40'); // 番号がないときは原本の頭の「40」のまま
+  const ykNo = fillFukuoka({}, {...settingsForOffice(S, '行橋営業所'), providerNos: {福岡西営業所: '4000000002'}});
+  assert.equal(joined(ykNo, pairBoxes('Q', 10, 11)), '4000000002');
+  assert.equal(printOverflow(ykNo, FUKUOKA_SHEET) ?? 0, 0); // A4 1枚（原本の「ページに合わせる」のまま）
 });
 
 // 北九州市：申請するのは事業者（設定の営業所。小倉営業所）。事業者番号は架空の番号
@@ -794,7 +798,31 @@ test('北九州市の支給申請書：受任者（事業者名・代表者名�
   const xml = strFromU8(files[sheetPath(files, KITAKYUSHU_SHEETS.shikyu)]);
   const c = KK_CELLS.shikyu;
   for (const ref of [c.sellerA, c.repA, c.sellerB, c.repB, c.sellerAddress, c.sellerTel]) assert.equal(cellStyle(files, xml, ref).size, 10.5, ref);
-  const long = fillKK({}, {...KK_S, officeName: '見本見本見本見本見本見本見本見本見本見本見本見本見本見本営業所'});
+  const long = fillKK({}, {...KK_S, company: '見本見本見本見本見本見本見本見本見本見本見本見本見本見本株式会社'});
   const longXml = strFromU8(long[sheetPath(long, KITAKYUSHU_SHEETS.shikyu)]);
   assert.ok(cellStyle(long, longXml, c.sellerA).size < 10.5);
+});
+
+test('申請書の販売事業者の営業所：大分市は大分・久留米市は久留米・北九州市と福岡市は区の近く・広域連合の田川市と田川郡は田川（設定の営業所がその中ならそのまま）', () => {
+  // ユーザーの指示（2026-11-05）「大分の申請書は、大分営業所／久留米は久留米営業所／…／こちらの該当営業所と所長にする」。見積書の発行元（設定）は変えない
+  const yk = settingsForOffice(S, '行橋営業所');
+  const cases: [Partial<Sale>, string][] = [
+    [{insurer: 'oita', address: '大分県大分市見本町1-1'}, '大分営業所'],
+    [{insurer: 'kurume', address: '福岡県久留米市見本町1-1'}, '久留米営業所'],
+    [{insurer: 'kitakyushu', address: '福岡県北九州市若松区見本1-1'}, '八幡西営業所'],
+    [{insurer: 'kitakyushu', address: '福岡県北九州市門司区見本1-1'}, '小倉営業所'],
+    [{insurer: 'fukuoka', address: '福岡県福岡市博多区見本1-1'}, '福岡東営業所'],
+    [{insurer: 'fukuoka', address: '福岡県福岡市南区見本1-1'}, '福岡南営業所'],
+    [{insurer: 'kouiki', address: '福岡県田川郡福智町見本1-1'}, '田川営業所'],
+    [{insurer: 'kouiki', address: '福岡県豊前市見本1-1'}, '行橋営業所'],
+    [{insurer: 'yukuhashi', address: '福岡県行橋市見本1-1'}, '行橋営業所'],
+  ];
+  for (const [over, office] of cases) {
+    const o = OFFICES.find((x) => x.name === office)!;
+    const v = shinseiValues(sale(over), yk);
+    assert.deepEqual([v.seller.name, v.seller.address, v.seller.rep], [`太陽シルバーサービス㈱　${o.name}`, o.address, `所長　${o.manager}`], String(over.address));
+  }
+  // 北九州市の中の営業所の設定は、区がちがってもそのまま（設定で直した所長も）
+  const own = {...settingsForOffice(S, '八幡東営業所'), manager: '見本 次郎'};
+  assert.equal(shinseiValues(sale({insurer: 'kitakyushu', address: '福岡県北九州市小倉北区見本1-1'}), own).seller.rep, '所長　見本 次郎');
 });
