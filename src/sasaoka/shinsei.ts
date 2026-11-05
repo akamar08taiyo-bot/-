@@ -263,6 +263,11 @@ const PHOTO_SHEET = {
   name: 'B4',
   insuredNo: boxes('D', 10, 4),
   photoPlace: {photo: 'R4', place: 'B5', before: 'A9:S31', after: 'A34:S58', kindCircles: ['D5:E6', 'F5:G6', 'H5:I6', 'J5:K6', 'L5:M6', 'N5:O6']},
+  // 施工業者名（P6:S6）は「太陽シルバーサービス㈱」と営業所の2行（ユーザーの指示「綺麗に2行にする。例 太陽シルバーサービス（株）／行橋営業所」2026-11-05。
+  // 広域連合の原本は「太陽シルバーサービス株式会社　行橋営業所」の1行で、欄の幅で3行に切れていた。営業所は申請書の営業所（田川市・田川郡は田川営業所）
+  texts: [T('P6', '{builderShort}')],
+  // 2行のどちらも欄の幅で折れない大きさにする（前は「太陽シルバーサービ／ス㈱」と1行目が折れて3行になった）
+  oneLine: ['P6'],
 };
 /** みやこ町の写真貼付用紙：広域連合と同じ欄のほか、撮影日（改修前 D7・改修後 D32。原本は「撮影日」とだけ書いた欄。広域連合の用紙には撮影日の欄がない） */
 const MIYAKO_PHOTO = {...PHOTO_SHEET, photoPlace: {...PHOTO_SHEET.photoPlace, dates: {before: 'D7', after: 'D32', label: '撮影日　'}}};
@@ -573,6 +578,10 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
           T('J11', '{owner}　　　　本人との関係（{relation}）'),
           T('O13', '{reasonOffice}'),
           T('O14', '{reasonName}'),
+          // 施工業者の名・所在地・電話（原本は行橋営業所のまま書いてあった。申請書の営業所で書く＝田川市・田川郡は田川営業所。2026-11-05）
+          T('O16', '{builder}'),
+          T('O17', '{builderAddress}'),
+          T('O18', '{builderTel}'),
           T('J22', '{cost}円'),
         ],
       },
@@ -593,9 +602,21 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
           T('X14', '{end}'),
           T('J16', '{cost}'), // 「円」は原本の R16
           T('J18', '{reasonOffice}　{reasonName}'), // 理由書作成者名及び事業所名（前の申請の書き方：事業所名　氏名）
+          // 受任者（事業所）の所在地・名・電話（原本は行橋営業所のまま。申請書の営業所で書く。2026-11-05）
+          T('N27', '{builderAddress}'),
+          T('N28', '{builder}'),
+          T('N29', '{builderTel}'),
         ],
       },
-      {sheet: '様式第2号別紙（住宅改修内訳明細書）', name: 'I6', insuredNo: boxes('W', 10, 7), insurerNo: boxes('AA', 6, 5), kinds: KIND_ROWS, texts: [T('I5', '{kana}')]},
+      {
+        sheet: '様式第2号別紙（住宅改修内訳明細書）',
+        name: 'I6',
+        insuredNo: boxes('W', 10, 7),
+        insurerNo: boxes('AA', 6, 5),
+        kinds: KIND_ROWS,
+        // 施工業者の所在地・名称（原本は行橋営業所のまま。申請書の営業所で書く。2026-11-05）
+        texts: [T('I5', '{kana}'), T('I9', '{builderAddress}'), T('I10', '{builder}')],
+      },
       // 前の申請と同じく、平面図の下にテキストボックス。平面図の図は表題（A1:I4）とテキストボックスのあいだ（印刷の1ページの幅＝A〜H）
       {sheet: '平面図 (2)', name: 'A1', nameFormat: '　{name}　様　邸　平面図', legend: {box: 'B37:H52'}, plan: 'A6:H35'},
       ...KOUIKI_PHOTO_SHEETS.map((sheet) => ({sheet, ...PHOTO_SHEET})),
@@ -2611,7 +2632,8 @@ function fitStyle(files: Files, xml: string, lay: SheetLayout, ref: string, text
   const box = rangeBox(lay, merge ? `${colName(merge[0])}${merge[1]}:${colName(merge[2])}${merge[3]}` : ref);
   const lines = text.split('\n');
   if (st.wrap || st.horizontal === 'distributed' || st.horizontal === 'justify') {
-    const pt = fitLinesSize(lines, box.w, box.h, st.size);
+    // 折り返す欄でも、折り返さない欄（oneLine）に決めた2行以上の文字は、どの行も欄の幅で折れない大きさに（写真貼付用紙の施工業者名「太陽シルバーサービス㈱／行橋営業所」）
+    const pt = fitLinesSize(lines, box.w, box.h, st.size, 4.5, oneLine && lines.length > 1);
     return pt < st.size ? sizedStyle(files, s, pt) : null;
   }
   // 1行の欄（折り返さない欄の改行は、Excel もプレビューも1行につなげて出す）。結合していない欄は、となりの空いた欄へはみ出せる。

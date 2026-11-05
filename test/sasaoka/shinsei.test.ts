@@ -4,7 +4,7 @@ import test from 'node:test';
 import {strFromU8, unzipSync, zipSync} from 'fflate';
 import {estimateTotals} from '../../src/sasaoka/calc.ts';
 import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
-import {DEFAULT_PLACES, defaultSettings, settingsForOffice} from '../../src/sasaoka/defaults.ts';
+import {DEFAULT_PLACES, defaultSettings, OFFICES, settingsForOffice} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {areaInsurerNo, INSURER_AREAS, insurerNoOf} from '../../src/sasaoka/insurerNumbers.ts';
 import {ageOn, boxLabels, checkBoxes, cityRest, fillShinsei, flowLines, placeCounts, fixedPitch, hangLines, hangPrefixes, indentOf, lengthsShown, splitNumber, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, kindNamesOf, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoNoteText, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, sheetLines, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
@@ -1597,6 +1597,36 @@ test('保険者番号（ユーザーの指示「広域連合の場合は、築�
   for (const list of Object.values(INSURER_AREAS)) for (const a of list) assert.equal(insurerCheckDigit(a.no.slice(0, 5)), Number(a.no[5]), `${a.name} ${a.no}`);
 });
 
+const KOUIKI_PHOTO_NAMES = ['写真貼付用紙', ...[6, 2, 7, 3, 8, 4, 9, 5, 10].map((n) => `写真貼付用紙 (${n})`)];
+test('広域連合・みやこ町の写真貼付用紙の施工業者名は「太陽シルバーサービス㈱」と営業所の2行。広域連合の施工業者・受任者の名・所在地・電話は申請書の営業所（田川は田川営業所）', () => {
+  // ユーザーの指示「綺麗に2行にする。例 太陽シルバーサービス（株）／行橋営業所」2026-11-05。原本は「太陽シルバーサービス株式会社　行橋営業所」の1行（欄の幅で3行に切れた）
+  const yk = {...RATES, ...settingsForOffice(defaultSettings(), '行橋営業所'), company: '太陽シルバーサービス株式会社'};
+  const chikujo = sheets(fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(job({insurer: 'kouiki', address: '福岡県築上郡築上町椎田1-1'}), yk))).byName;
+  for (const name of KOUIKI_PHOTO_NAMES) assert.equal(txt(chikujo.get(name)!, 'P6'), '太陽シルバーサービス㈱\n行橋営業所', name);
+  assert.equal(txt(chikujo.get('様式第2号（住宅改修承認申請書）')!, 'O16'), '太陽シルバーサービス株式会社　行橋営業所');
+  const miyako = sheets(fillShinsei(MIYAKO, SHINSEI.miyako!, shinseiValues(job({insurer: 'miyako', address: '福岡県京都郡みやこ町見本1'}), yk))).byName;
+  for (const n of [1, 2, 3, 4]) assert.equal(txt(miyako.get(`写真 (${n})`)!, 'P6'), '太陽シルバーサービス㈱\n行橋営業所');
+  // 田川市のお客様（広域連合）：田川営業所の名・所在地・電話（原本に書いてあった行橋営業所のままにしない）
+  const tagawa = sheets(fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(job({insurer: 'kouiki', address: '福岡県田川市見本1-1'}), yk))).byName;
+  const o = OFFICES.find((x) => x.name === '田川営業所')!;
+  const a = tagawa.get('様式第2号（住宅改修承認申請書）')!;
+  assert.deepEqual([txt(a, 'O16'), txt(a, 'O17'), txt(a, 'O18')], ['太陽シルバーサービス株式会社　田川営業所', o.address, o.tel]);
+  const b = tagawa.get('様式第7号（住宅改修費支給申請書（受領委任払用）')!;
+  assert.deepEqual([txt(b, 'N27'), txt(b, 'N28'), txt(b, 'N29')], [o.address, '太陽シルバーサービス株式会社　田川営業所', o.tel]);
+  const c = tagawa.get('様式第2号別紙（住宅改修内訳明細書）')!;
+  assert.deepEqual([txt(c, 'I9'), txt(c, 'I10')], [o.address, '太陽シルバーサービス株式会社　田川営業所']);
+  for (const name of KOUIKI_PHOTO_NAMES) assert.equal(txt(tagawa.get(name)!, 'P6'), '太陽シルバーサービス㈱\n田川営業所', name);
+  // 2行が欄に入る：折り返しの書式・行の高さ×2行に入る字の大きさ
+  const files = sheets(fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(job({insurer: 'kouiki', address: '福岡県築上郡築上町椎田1-1'}), yk))).files;
+  const {fonts, xfs} = styleParts(files);
+  const photo = chikujo.get('写真貼付用紙')!;
+  const xf = xfs[Number(/\ss="(\d+)"/.exec(cell(photo, 'P6'))?.[1] ?? 0)];
+  assert.match(xf, /wrapText="1"/);
+  const size = Number(/<sz val="([\d.]+)"/.exec(fonts[Number(/fontId="(\d+)"/.exec(xf)?.[1] ?? 0)])?.[1]);
+  const ht = Number(new RegExp('<row r="6"[^>]*\\sht="([\\d.]+)"').exec(photo)?.[1] ?? 0);
+  assert.ok(size > 0 && size * 1.25 * 2 <= ht + 0.5, `${size}pt × 2行 > ${ht}pt`);
+});
+
 test('広域連合の申請書（様式第2号・第7号・第2号別紙）の保険者番号のマス：原本の 406470 を、選んだ・住所の市町村の番号で書きかえる', () => {
   const j = job({insurer: 'kouiki', address: '福岡県豊前市大字八屋1-1'});
   const digits = (bytes: Uint8Array, name: string, cols: string[]) => {
@@ -2005,7 +2035,7 @@ test('大分市：手すりの箇所が5つでも、改修箇所及び規模の�
   assert.doesNotMatch(xf, /shrinkToFit="1"/);
   const size = Number(/<sz val="([\d.]+)"/.exec(fonts[Number(/fontId="(\d+)"/.exec(xf)?.[1] ?? 0)])?.[1]);
   // 欄の高さ（17・18行の結合）に行の数ぶん入る大きさ
-  const rowHt = (r: number) => Number(new RegExp(`<row r="${r}"[^>]*ht="([\\d.]+)"`).exec(a)?.[1] ?? 13.5);
+  const rowHt = (r: number) => Number(new RegExp(`<row r="${r}"[^>]*\\sht="([\\d.]+)"`).exec(a)?.[1] ?? 13.5);
   const box = rowHt(17) + (/<mergeCell ref="O17:[A-Z]+18"/.test(a) ? rowHt(18) : 0);
   assert.ok(size * 1.25 * lines.length <= box + 0.5, `${size}pt × ${lines.length}行 > ${box}pt`);
 });
