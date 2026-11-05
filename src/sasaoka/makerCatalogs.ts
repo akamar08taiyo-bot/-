@@ -25,6 +25,17 @@ export type CatalogBook = {
    * hash＝「#」のうしろが色（TOTO「YHB203#NW1」の色ちがいは「YHB203#EL」。カタログには1色だけ載っているので、押すと同じ品番の色を選ぶ）
    */
   variants: 'suffix' | 'hash';
+  /**
+   * 初めに開くページ（品番から開いたときはそのページ）。ユーザーの指示（2026-11-05）「マツ六カタログのデフォルトは43Pにする」「TOTOは24Pがデフォルト」
+   * 「矢崎はデフォルトが12P」。なければ最初のページ
+   */
+  startPage?: number;
+  /**
+   * 目次（押すとそのページへ。ユーザーの指示「カタログは目次みたいな感じで飛べるようにする。例えば、マツ六であれば、ベースプレート、屋内手すり、
+   * ブラケットみたいな感じ」「矢崎であれば、屋外手すり、屋外支柱など」「TOTOであれば、浴室手すり、浴室手すり（ユニットバス用）など」2026-11-05）。
+   * ページの見出し・横の見出し（マツ六の 屋外／水まわり／室内／福祉用具、矢崎化工の 屋外／屋内／浴室手すり部材）から作った。page はその見出しの始まるページ（ページの順）
+   */
+  toc: {title: string; page: number}[];
 };
 
 const pagesOf = (raw: {page: number; codes: [string, number, number, number, number][]}[]): CatalogPage[] =>
@@ -35,10 +46,88 @@ const nfkc = (s: string) => s.normalize('NFKC');
 
 // 並びはボタンの並び（いちばん前が初めに開くカタログ。よく使うマツ六を先頭に。ユーザーの「マツ六、TOTO 、矢崎です」2026-11-04 の順）
 export const BOOKS: CatalogBook[] = [
-  {id: 'matsu6', maker: 'マツ六', pages: pagesOf(MATSU6_PAGES), image: imageOf('matsu6'), isMaker: (m) => /マツ六|matsu-?roku/i.test(nfkc(m)), variants: 'suffix'},
-  {id: 'toto', maker: 'TOTO', pages: pagesOf(TOTO_PAGES), image: imageOf('toto'), isMaker: (m) => /TOTO|東陶/i.test(nfkc(m)), variants: 'hash'},
-  {id: 'yazaki', maker: '矢崎化工', pages: pagesOf(YAZAKI_PAGES), image: imageOf('yazaki'), isMaker: (m) => /矢崎/.test(nfkc(m)), variants: 'suffix'},
+  {
+    id: 'matsu6',
+    maker: 'マツ六',
+    pages: pagesOf(MATSU6_PAGES),
+    image: imageOf('matsu6'),
+    isMaker: (m) => /マツ六|matsu-?roku/i.test(nfkc(m)),
+    variants: 'suffix',
+    startPage: 43,
+    toc: [
+      {title: '屋外手すり（フリーRレール）', page: 5},
+      {title: '屋外支柱', page: 6},
+      {title: 'ベースプレート式支柱', page: 7},
+      {title: '屋外ブラケット・ジョイント', page: 11},
+      {title: '屋外手すり（ストレートEZ）', page: 17},
+      {title: '浴室手すり（ユニットバス）', page: 21},
+      {title: '浴室手すり（ソフトアクアレール）', page: 22},
+      {title: '浴室手すり（ステンアクアレール）', page: 28},
+      {title: '浴室手すり（ソフトハンド）', page: 32},
+      {title: '屋内手すり（I型・L型）', page: 34},
+      {title: '屋内手すり棒', page: 38},
+      {title: '木製ベースプレート', page: 40},
+      {title: 'ブラケット（35）', page: 42},
+      {title: 'ブラケット（32）', page: 48},
+      {title: '遮断機式ブラケット', page: 54},
+      {title: '脱着手すりブラケット', page: 56},
+      {title: '室内用手すり支柱', page: 58},
+      {title: 'アウトセット折戸', page: 62},
+      {title: '置き型手すり（たよレール）', page: 65},
+    ],
+  },
+  {
+    id: 'toto',
+    maker: 'TOTO',
+    pages: pagesOf(TOTO_PAGES),
+    image: imageOf('toto'),
+    isMaker: (m) => /TOTO|東陶/i.test(nfkc(m)),
+    variants: 'hash',
+    startPage: 24,
+    toc: [
+      {title: 'トイレ手すり', page: 11},
+      {title: '浴室手すり', page: 19},
+      {title: '浴室手すり（ユニットバス用）', page: 26},
+      {title: '廊下・階段手すり（フリースタイル）', page: 33},
+      {title: '上がりかまち手すり', page: 43},
+      {title: '屋外手すり', page: 48},
+      {title: 'パブリック用手すり', page: 56},
+      {title: '取付方法', page: 82},
+      {title: 'イージーオーダー', page: 93},
+      {title: '品番索引', page: 102},
+    ],
+  },
+  {
+    id: 'yazaki',
+    maker: '矢崎化工',
+    pages: pagesOf(YAZAKI_PAGES),
+    image: imageOf('yazaki'),
+    isMaker: (m) => /矢崎/.test(nfkc(m)),
+    variants: 'suffix',
+    startPage: 12,
+    toc: [
+      {title: '屋外手すり（ネクステール）', page: 12},
+      {title: '屋外支柱（ネクステール）', page: 15},
+      {title: '屋外手すり（スタンダード）', page: 24},
+      {title: '屋外支柱（スタンダード）', page: 29},
+      {title: '屋内手すり（パイプ・木製丸棒）', page: 34},
+      {title: '屋内ブラケット（テナシス）', page: 38},
+      {title: '屋内ブラケット（スタンダード35）', page: 45},
+      {title: '屋内支柱（トールスタンド）', page: 55},
+      {title: '屋内ブラケット（スタンダード32）', page: 60},
+      {title: '浴室手すり（インナー）', page: 68},
+      {title: '浴室手すり（アウター）', page: 73},
+      {title: '可動式手すり', page: 79},
+    ],
+  },
 ];
+
+/** そのページの目次の見出し（そのページより前で、いちばん近い見出し。最初の見出しより前のページは null） */
+export function tocOf(book: Pick<CatalogBook, 'toc'>, page: number): {title: string; page: number} | null {
+  let hit: {title: string; page: number} | null = null;
+  for (const t of book.toc) if (t.page <= page) hit = t;
+  return hit;
+}
 export const bookOf = (id: BookId) => BOOKS.find((b) => b.id === id) ?? BOOKS[0];
 
 /** 品番をくらべる形（全角・半角、空白・ハイフン・大文字小文字のちがいは見ない。TOTO の色の「#」は残す） */

@@ -1,7 +1,7 @@
 // メーカーのカタログ（makerCatalogs.ts。矢崎化工・TOTO）：品番の合わせ方・部材の載っているページ・探す。部材は架空の名前・金額
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {bookOf, catalogMaterials, catalogPageOf, catalogSearch, codeKey} from '../../src/sasaoka/makerCatalogs.ts';
+import {BOOKS, bookOf, catalogMaterials, catalogPageOf, catalogSearch, codeKey, tocOf} from '../../src/sasaoka/makerCatalogs.ts';
 import type {Material} from '../../src/sasaoka/types.ts';
 
 const mat = (code: string, name = '見本の部材', maker = '矢崎化工'): Material => ({id: code, name, price: 100, listPrice: 200, pieceLengthM: 0, maker, code, unit: '', favorite: false, updatedAt: 1});
@@ -105,4 +105,33 @@ test('マツ六のカタログ（Vol.8）：品番のある 58 ページ。表�
   assert.equal(catalogPageOf(t('BD-134'))?.book, 'matsu6');
   assert.deepEqual(catalogMaterials([t('BJ-14WD'), t('BJ-13WD')], 'BJ-14WD', m6).map((m) => m.code), ['BJ-14WD']);
   assert.ok(catalogSearch(m6, 'bd-134', []).length >= 1);
+});
+
+test('目次と初めに開くページ：マツ六 p.43・TOTO p.24・矢崎化工 p.12。目次の見出しはページの順で、どれもカタログにあるページ（2026-11-05 の指示）', () => {
+  assert.deepEqual(
+    BOOKS.map((b) => [b.id, b.startPage]),
+    [
+      ['matsu6', 43],
+      ['toto', 24],
+      ['yazaki', 12],
+    ],
+  );
+  for (const b of BOOKS) {
+    assert.ok(b.pages.some((p) => p.page === b.startPage), `${b.id} p.${b.startPage}`);
+    assert.ok(b.toc.length >= 8, b.id);
+    for (const [i, t] of b.toc.entries()) {
+      assert.ok(b.pages.some((p) => p.page === t.page), `${b.id} ${t.title} p.${t.page}`);
+      if (i) assert.ok(t.page > b.toc[i - 1].page, `${b.id} ${t.title}`);
+    }
+  }
+  // 例に挙がった見出し（ユーザーの「マツ六であれば、ベースプレート、屋内手すり、ブラケット」「矢崎であれば、屋外手すり、屋外支柱」「TOTOであれば、浴室手すり、浴室手すり（ユニットバス用）」）
+  const titles = (id: 'matsu6' | 'toto' | 'yazaki') => bookOf(id).toc.map((t) => t.title).join('／');
+  for (const w of ['ベースプレート', '屋内手すり', 'ブラケット']) assert.ok(titles('matsu6').includes(w), w);
+  for (const w of ['屋外手すり', '屋外支柱']) assert.ok(titles('yazaki').includes(w), w);
+  for (const w of ['浴室手すり', '浴室手すり（ユニットバス用）']) assert.ok(titles('toto').includes(w), w);
+  // ページの見出し：そのページより前でいちばん近い見出し
+  assert.equal(tocOf(bookOf('matsu6'), 43)?.title, 'ブラケット（35）');
+  assert.equal(tocOf(bookOf('matsu6'), 3), null);
+  assert.equal(tocOf(bookOf('toto'), 24)?.title, '浴室手すり');
+  assert.equal(tocOf(bookOf('yazaki'), 16)?.title, '屋外支柱（ネクステール）');
 });

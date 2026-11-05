@@ -183,6 +183,84 @@ const text2 = (await sheet.innerText()).replace(/\s+/g, ' ');
 for (const c of ['見本 曲がる手すり棒 2m', '見本 ハンドグリップ 木目', '見本 棚付きグリップ']) assert.ok(text2.includes(c), `見積書に ${c} がない`);
 log('TOTO：📖 p.12・切り替え・色ちがいを選ぶ・色が1つならそのまま・次も TOTO OK');
 
+// ---------------- 目次・下のスライダー・初めのページ・数量の − ＋（ユーザーの指示 2026-11-05「カタログは目次みたいな感じで飛べるようにする」
+// 「ページを一気にとばせるように、下の方にスライダーを設置する」「マツ六カタログのデフォルトは43Pにする」「TOTOは24Pがデフォルト」「矢崎はデフォルトが12P」
+// 「数量をちょうせいできるようにする」）
+await page.waitForFunction(() => !document.body.innerText.includes('を入れました'), null, {timeout: 15000});
+await clickStable(sheet.locator('tr[data-new] [data-pick="material"]'));
+await dlg.getByRole('button', {name: '📖 カタログから選ぶ'}).click();
+const tc2 = dlg.getByRole('region', {name: 'TOTOカタログ'});
+await tc2.waitFor();
+assert.equal(await tc2.getByLabel('ページ', {exact: true}).inputValue(), '24'); // TOTO は p.24 から
+assert.equal(await tc2.getByRole('group', {name: '目次'}).getByRole('button', {pressed: true}).innerText(), '浴室手すり');
+await tc2.getByRole('group', {name: '目次'}).getByRole('button', {name: '浴室手すり（ユニットバス用）'}).click();
+assert.equal(await tc2.getByLabel('ページ', {exact: true}).inputValue(), '26');
+await dlg.getByRole('group', {name: 'カタログ'}).getByRole('button', {name: '矢崎化工', exact: true}).click();
+const yc = dlg.getByRole('region', {name: '矢崎化工カタログ'});
+await yc.waitFor();
+assert.equal(await yc.getByLabel('ページ', {exact: true}).inputValue(), '12'); // 矢崎化工は p.12 から
+await yc.getByRole('group', {name: '目次'}).getByRole('button', {name: '屋外支柱（ネクステール）'}).click();
+assert.equal(await yc.getByLabel('ページ', {exact: true}).inputValue(), '15');
+await dlg.getByRole('group', {name: 'カタログ'}).getByRole('button', {name: 'マツ六', exact: true}).click();
+const m6 = dlg.getByRole('region', {name: 'マツ六カタログ'});
+await m6.waitFor();
+assert.equal(await m6.getByLabel('ページ', {exact: true}).inputValue(), '43'); // マツ六は p.43 から
+await page.waitForFunction(() => document.querySelector('img[alt="マツ六カタログ p.43"]')?.naturalWidth > 0, null, {timeout: 15000});
+const toc = m6.getByRole('group', {name: '目次'});
+assert.equal(await toc.getByRole('button', {pressed: true}).innerText(), 'ブラケット（35）');
+for (const w of ['ベースプレート式支柱', '屋内手すり棒', 'ブラケット（32）']) await toc.getByRole('button', {name: w}).waitFor();
+// 右の品番の一覧は横にはみ出さない（「横がきれていてみえません」）・「＋ 追加」が見える
+const list = m6.getByRole('list', {name: 'このページの品番'});
+const over = await list.evaluate((el) => {
+  const box = el.parentElement;
+  return {sw: box.scrollWidth, cw: box.clientWidth, btn: [...el.querySelectorAll('button')].every((b) => b.getBoundingClientRect().right <= box.getBoundingClientRect().right + 0.5)};
+});
+assert.ok(over.sw <= over.cw && over.btn, JSON.stringify(over));
+// 下のスライダー：ページの絵を下へスクロールしても画面の中に見えている
+const slider = m6.getByLabel('ページを一気に動かす');
+await inView(slider);
+await page.screenshot({path: path.join(outDir, 'catalog-01-toc.png')});
+await m6.getByRole('img', {name: 'マツ六カタログ p.43'}).hover();
+await page.mouse.wheel(0, 900);
+await page.waitForTimeout(300);
+await inView(slider);
+await inView(m6.getByRole('group', {name: '目次'}));
+// 目次を押すとそのページへ。スライダーで一気に（いちばん後ろ・まん中）
+await toc.getByRole('button', {name: 'ベースプレート式支柱'}).click();
+assert.equal(await m6.getByLabel('ページ', {exact: true}).inputValue(), '7');
+const max = Number(await slider.getAttribute('max'));
+await slider.fill(String(max));
+assert.equal(await m6.getByLabel('ページ', {exact: true}).inputValue(), '73');
+await slider.fill(String(Math.round(max / 2)));
+const mid = Number(await m6.getByLabel('ページ', {exact: true}).inputValue());
+assert.ok(mid > 30 && mid < 50, String(mid));
+// 数量：「＋ 追加」→ − 1 ＋ → ＋ で 2・ページの枠をもう一度押すと 3・− で 2
+await toc.getByRole('button', {name: '屋外手すり（フリーRレール）'}).click();
+assert.equal(await m6.getByLabel('ページ', {exact: true}).inputValue(), '5');
+await m6.getByRole('button', {name: 'BJ-14WDを追加'}).click();
+const qty = m6.getByLabel('BJ-14WDの数量', {exact: true});
+await qty.waitFor();
+assert.equal(await qty.innerText(), '1');
+await m6.getByRole('button', {name: 'BJ-14WDを1つ増やす'}).click();
+assert.equal(await qty.innerText(), '2');
+await m6.locator('[data-code="BJ-14WD"]').first().click();
+assert.equal(await qty.innerText(), '3');
+await m6.getByRole('button', {name: 'BJ-14WDを1つ減らす'}).click();
+assert.equal(await qty.innerText(), '2');
+await page.screenshot({path: path.join(outDir, 'catalog-02-qty.png')});
+// スマホの幅：目次は横に動かして見る・スライダーは下に見えている
+await page.setViewportSize({width: 390, height: 844});
+await page.waitForTimeout(300);
+assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= 390), '横にはみ出す');
+await page.screenshot({path: path.join(outDir, 'catalog-03-phone.png')});
+await page.setViewportSize({width: 1366, height: 900});
+await page.getByRole('button', {name: '選び終わったら閉じる'}).click();
+await page.waitForTimeout(400);
+// 見積書の行の数量も 2
+const qtys = await sheet.locator('tr').filter({hasText: '見本 曲がる手すり棒 2m'}).allInnerTexts();
+assert.ok(qtys.some((t) => /(^|\s)2(\s|$)/.test(t.replace(/\t/g, ' '))), qtys.join(' / '));
+log('目次・スライダー・初めのページ（43・24・12）・数量の − ＋ OK');
+
 console.log(errors.length ? `ERRORS:\n${errors.join('\n')}` : 'ERRORS: なし');
 await browser.close();
 if (errors.length) process.exit(1);

@@ -67,9 +67,10 @@ export function MaterialPicker({
   // onQty があるとき：＋／− は、この画面でいちばん最後に「＋ 追加」で入れた行だけ（ほかの部材は、もう箇所にあっても「＋ 追加」で別の行に）
   const [last, setLast] = useState<{matId: string; rowId: string} | null>(null);
   const lastRow = (id: string) => (last && last.matId === id ? place.rows.find((r) => r.id === last.rowId) : undefined);
-  const addRow = (m: Material, row: Row = materialRow(m)) => {
+  const addRow = (m: Material, row: Row = materialRow(m)): Row => {
     onAdd(row);
     if (onQty && row.refId) setLast({matId: row.refId, rowId: row.id});
+    return row;
   };
   // メーカーのカタログ（makerCatalogs.ts。矢崎化工・TOTO）。開いているあいだは部材リストの代わりにカタログを出す。page・code は開くページと光らせる品番。
   // 「📖 カタログから選ぶ」は、前に開いたカタログ（この端末で覚える）
@@ -91,15 +92,30 @@ export function MaterialPicker({
     }
   };
   const toast = useToast();
-  const addFromCatalog = (m: Material) => {
-    addRow(m);
+  // カタログの品番 → この画面でその品番から入れた行（カタログの一覧の − ＋ で数量を変える。ユーザーの指示「数量をちょうせいできるようにする」2026-11-05）
+  const [catRows, setCatRows] = useState<Record<string, {rowId: string; refId: string | null}>>({});
+  const keepCatRow = (code: string, row: Row) => setCatRows((c) => ({...c, [code]: {rowId: row.id, refId: row.refId}}));
+  const addFromCatalog = (m: Material, code: string) => {
+    keepCatRow(code, addRow(m));
     toast(`${m.code} を入れました`);
   };
   // 部材リストにない品番は、品番だけの行（金額は見積書で打つ）
   const addCatalogCode = (code: string, maker: string) => {
     const m: Material = {id: uid('m'), name: '', price: 0, listPrice: 0, pieceLengthM: guessPieceLengthM(code), maker, code, unit: '', favorite: false, updatedAt: Date.now()};
-    addRow(m, {...materialRow(m), refId: null});
+    keepCatRow(code, addRow(m, {...materialRow(m), refId: null}));
     toast(`${code} を入れました（部材リストにない品番）`);
+  };
+  // 見積書（onQty あり）は入れた行の数量。発注書（onQty なし）は部材リストの部材の数（部材リストにない品番の行は数えない）
+  const catalogQty = (code: string): {n: number; plus: () => void; minus: () => void} | null => {
+    const c = catRows[code];
+    if (!c) return null;
+    if (onQty) {
+      const row = place.rows.find((r) => r.id === c.rowId);
+      return row ? {n: row.qty, plus: () => onQty(row.id, 1), minus: () => onQty(row.id, -1)} : null;
+    }
+    const m = c.refId ? materials.find((x) => x.id === c.refId) : undefined;
+    if (!m) return null;
+    return {n: addedCount(m.id), plus: () => addRow(m), minus: () => onRemoveOne(m.id)};
   };
   const catalogPage = useMemo(() => new Map(materials.filter((m) => BOOKS.some((b) => b.isMaker(m.maker))).map((m) => [m.id, catalogPageOf(m)] as const)), [materials]);
 
@@ -190,7 +206,15 @@ export function MaterialPicker({
 
       {catalog ? (
         <div className="mt-3">
-          <MakerCatalogView materials={materials} start={catalog} onAdd={addFromCatalog} onAddCode={addCatalogCode} onBack={() => setCatalog(null)} onBook={rememberBook} />
+          <MakerCatalogView
+            materials={materials}
+            start={catalog}
+            onAdd={addFromCatalog}
+            onAddCode={addCatalogCode}
+            qtyOf={catalogQty}
+            onBack={() => setCatalog(null)}
+            onBook={rememberBook}
+          />
         </div>
       ) : (
       <>
