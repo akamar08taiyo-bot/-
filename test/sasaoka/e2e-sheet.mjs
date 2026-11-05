@@ -589,6 +589,27 @@ await page.keyboard.press('Delete');
 assert.equal((await cell(mk).innerText()).trim(), '材');
 log('広域連合用：どの行の材／手も直せるOK');
 
+// 同上施工費の行を選んで「＋ 挿入」：部材と同上施工費の間に入る（ユーザーの指示「このセルにカーソルをあてていた場合の挿入は、部材と取り付け費の間に挿入をお願い」2026-11-05。
+// 前は部材の上）。入る所の線も同上施工費の行の上。Ctrl+Z で戻す
+{
+  const rowsTr = sheet.locator('.form-page tr[data-rows]');
+  const before = (await rowsTr.allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
+  const wi = before.findIndex((t, i) => i > 0 && t.includes('同上施工費') && !before[i - 1].includes('施工費'));
+  assert.ok(wi > 0, before.join('\n'));
+  await rowOp(rowsTr.nth(wi), '＋ 挿入');
+  await sheet.locator('tr[data-flash]').waitFor();
+  const after = (await rowsTr.allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
+  assert.equal(after.length, before.length + 1);
+  assert.equal(await rowsTr.evaluateAll((els) => els.findIndex((e) => e.hasAttribute('data-flash'))), wi); // 部材のすぐ下
+  assert.equal(after[wi - 1], before[wi - 1]);
+  assert.match(after[wi + 1], /同上施工費/);
+  await page.screenshot({path: path.join(outDir, '41b-sheet-insert-between.png')});
+  await undoKey();
+  await page.waitForTimeout(100);
+  assert.equal(await rowsTr.count(), before.length);
+}
+log('同上施工費を選んで挿入すると部材と同上施工費の間OK');
+
 // ---------------- 「請求書を確認する」で開くと、同じ入力から仕切り計算表ができている（同じデータ）
 await page.waitForTimeout(600); // 自動保存を待つ
 await (await openMore(page)).getByRole('button', {name: '🧾 請求書を見る'}).click(); // 上の段の「その他 ▼」の中（2026-11-03）

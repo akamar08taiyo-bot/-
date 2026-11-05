@@ -920,7 +920,15 @@ export function insertAfterId(job: Job, rowId: string): string | null {
 export function insertBeforeId(job: Job, rowId: string): string | null {
   const found = findRow(job, rowId);
   if (!found) return null;
-  return found.place.rows[unitTop(found.place.rows, found.ri)]?.id ?? null;
+  return found.place.rows[insertTop(found.place.rows, found.ri)]?.id ?? null;
+}
+
+/**
+ * 「＋ 挿入」で行が入る所：部材はその行の上、施工費はそのまとまりの1行目の上。部材の同上施工費を選んでいたら、部材と同上施工費の間
+ * （ユーザーの指示「このセルにカーソルをあてていた場合の挿入は、部材と取り付け費の間に挿入をお願い」2026-11-05。前は部材の上に入れていた）
+ */
+function insertTop(rows: Row[], ri: number): number {
+  return unitRange(rows, ri)[0];
 }
 
 /** 行 ri のまとまりのいちばん上：部材はその行、施工費はそのまとまりの上の部材（同上施工費）か、上に部材がなければ施工費のまとまりの1行目 */
@@ -932,13 +940,13 @@ function unitTop(rows: Row[], ri: number): number {
 /**
  * 「＋ 挿入」：選んでいる行のすぐ上（Excel の行の挿入と同じ）に空の部材の行を入れる（ユーザーの指示「挿入の場合、この間に挿入が差し込めるようにする」
  * 2026-11-03。前は選んでいる行（同上施工費ごと）の下に入れていたので、③台所の施工費と④台所の1行目の間に入れられなかった）。
- * 部材の同上施工費を選んでいたら、その部材の上（部材と同上施工費の間には入れない）。
+ * 部材の同上施工費を選んでいたら、部材と同上施工費の間（2026-11-05。前は部材の上。`insertTop`）。
  * 箇所の1行目の上は、前の箇所のいちばん下に入れる（箇所の名前の行は動かさない。入った行は前の箇所の行になる）。最初の箇所の1行目なら、その箇所のはじめ
  */
 export function insertBlankBefore(job: Job, rowId: string): {job: Job; rowId: string | null} {
   const found = findRow(job, rowId);
   if (!found) return {job, rowId: null};
-  const a = unitTop(found.place.rows, found.ri);
+  const a = insertTop(found.place.rows, found.ri);
   const blank = manualRow('material', {qty: 1});
   if (a === 0 && found.pi > 0) {
     const prev = job.places[found.pi - 1];

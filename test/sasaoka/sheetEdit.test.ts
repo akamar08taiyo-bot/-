@@ -699,7 +699,7 @@ test('何も入っていない箇所（前の版の施工費のボタンなど�
   assert.equal(dropEmptyPlaces(job), job); // なければ同じ job（保存しない）
 });
 
-test('「＋ 挿入」は選んでいる行の上（部材の同上施工費なら部材の上）。箇所の1行目の上は前の箇所のいちばん下（「この間に挿入が差し込めるように」2026-11-03）', () => {
+test('「＋ 挿入」は選んでいる行の上（部材の同上施工費なら部材と同上施工費の間）。箇所の1行目の上は前の箇所のいちばん下（「この間に挿入が差し込めるように」2026-11-03）', () => {
   const wood = {id: 'l1', name: '木', price: 1000, estPrice: 1500, note: ''};
   const a = newPlace('台所', [laborRow(wood, 1)]); // ③台所：施工費だけ
   const m1 = materialRow(rail, 1);
@@ -713,9 +713,11 @@ test('「＋ 挿入」は選んでいる行の上（部材の同上施工費な�
   assert.equal(top.job.places[0].rows[1].id, top.rowId);
   assert.equal(top.job.places[1].rows[0].id, m1.id);
   assert.equal(insertBeforeId(job, m1.id), m1.id);
-  // 同上施工費を選んでいても、部材の上（部材と同上施工費の間には入れない）→ 箇所の1行目なので前の箇所へ
-  assert.equal(insertBeforeId(job, w1.id), m1.id);
-  assert.deepEqual(insertBlankBefore(job, w1.id).job.places.map((p) => p.rows.length), [2, 3]);
+  // 同上施工費を選んでいたら、部材と同上施工費の間（ユーザーの指示「部材と取り付け費の間に挿入をお願い」2026-11-05。前は部材の上）
+  assert.equal(insertBeforeId(job, w1.id), w1.id);
+  const between = insertBlankBefore(job, w1.id);
+  assert.deepEqual(between.job.places[0].rows.length, 1);
+  assert.deepEqual(between.job.places[1].rows.map((r) => (r.id === between.rowId ? '空白' : r.id)), [m1.id, '空白', w1.id, m2.id]);
   // バーの上 → ④の中（同上施工費とバーの間）
   const mid = insertBlankBefore(job, m2.id);
   assert.deepEqual(mid.job.places[1].rows.map((r) => r.id === mid.rowId ? '空白' : r.id), [m1.id, w1.id, '空白', m2.id]);
