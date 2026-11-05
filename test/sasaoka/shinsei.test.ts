@@ -1682,7 +1682,7 @@ test('北九州市の支給申請書：委任の欄の事業者名は、右の�
 });
 
 // ---------------------------------------------------------------- 久留米市（2026-11-02。いただいた住宅改修事前承認申請書・支給申請書（第2号様式）の原本。架空の見本 山田 太郎）
-const KR_S = {...RATES, company: '太陽シルバーサービス株式会社', officeName: '見本営業所', manager: '見本 次郎', postal: '830-0000', address: '福岡県久留米市見本1-1', tel: '0942-00-0000'};
+const KR_S = {...RATES, company: '太陽シルバーサービス株式会社', officeName: '久留米営業所', manager: '見本 次郎', postal: '830-0000', address: '福岡県久留米市見本1-1', tel: '0942-00-0000'};
 const krJob = (extra: Partial<Job> = {}) =>
   job({
     insurer: 'kurume',
@@ -1729,7 +1729,7 @@ test('久留米市：事前承認申請書・支給申請書に書く（記入�
     assert.deepEqual([R('J', 10), R('AN', 10)].map((v, i) => (i === 0 ? v : v)), name === '事前承認申請書' ? ['山田 太郎', '本人'] : [at('J13'), at('AN13')].length ? [R('J', 10), R('AN', 10)] : []);
     assert.equal(name === '事前承認申請書' ? at('J10') : at('J13'), '山田 太郎', name);
     assert.equal(name === '事前承認申請書' ? at('AN10') : at('AN13'), '本人', name);
-    assert.equal(R('AN', 12), '太陽シルバーサービス株式会社　見本営業所', name);
+    assert.equal(R('AN', 12), '太陽シルバーサービス株式会社　久留米営業所', name);
     assert.equal(R('AN', 15), '℡（0942）00－0000', name);
     // 改修の内容：種類の□を■、下の「（　）」に改修場所と箇所の数（トイレは2箇所）。書かない種類は原本のまま
     assert.equal(R('J', 13), '■ 手すりの取り付け', name);
@@ -1803,7 +1803,7 @@ test('久留米市の原本：事前承認申請書・支給申請書・平面�
 });
 
 // ---------------------------------------------------------------- 飯塚市（2026-11-02。いただいた事前承認願書・支給申請書・写真添付用紙・承諾書・請求書（受領委任払用）。架空の見本 山田 太郎）
-const IZ_S = {...RATES, company: '太陽シルバーサービス株式会社', officeName: '見本営業所', manager: '見本 次郎', postal: '820-0000', address: '福岡県飯塚市見本1-1', tel: '0948-00-0000'};
+const IZ_S = {...RATES, company: '太陽シルバーサービス株式会社', officeName: '飯塚営業所', manager: '見本 次郎', postal: '820-0000', address: '福岡県飯塚市見本1-1', tel: '0948-00-0000'};
 const izJob = (extra: Partial<Job> = {}) =>
   job({
     insurer: 'iizuka',
@@ -1833,7 +1833,7 @@ test('飯塚市：事前承認願書・支給申請書・承諾書・請求書�
   assert.deepEqual([at('H20'), at('R20')], ['見本居宅介護支援事業所', '見本 花子']);
   assert.deepEqual([at('F21'), at('J21'), at('L21'), at('S21'), at('W21'), at('Z21')], ['令和8', '11', '10', '令和8', '11', '12']);
   assert.equal(at('G24'), '福岡県飯塚市見本町2-3'); // 委任者の住所（氏名は自署）
-  assert.deepEqual([at('G31'), at('G32'), at('U32'), at('G33')], ['〒820-0000　福岡県飯塚市見本1-1', '太陽シルバーサービス株式会社　見本営業所', '0948-00-0000', '所長　見本 次郎']);
+  assert.deepEqual([at('G31'), at('G32'), at('U32'), at('G33')], ['〒820-0000　福岡県飯塚市見本1-1', '太陽シルバーサービス株式会社　飯塚営業所', '0948-00-0000', '所長　見本 次郎']);
   assert.equal(ellipses(out, '事前承認願書').length, 3); // 元号・性別・住宅改修の利用（無）
   const b = byName.get('支給申請書')!;
   const bt = (ref: string) => txt(b, ref);
@@ -1841,7 +1841,7 @@ test('飯塚市：事前承認願書・支給申請書・承諾書・請求書�
   assert.deepEqual([bt('D10'), bt('D11'), bt('D12'), bt('D13'), bt('D14'), bt('P11')], ['■', '■', '', '', '', '■']);
   assert.deepEqual([bt('D16'), bt('S16')], ['令和8年11月10日', '令和8年11月12日']);
   assert.equal(bt('F19'), '福岡県飯塚市見本町2-3');
-  assert.equal(bt('G25'), '太陽シルバーサービス株式会社　見本営業所');
+  assert.equal(bt('G25'), '太陽シルバーサービス株式会社　飯塚営業所');
   // 承諾書：被保険者の住所・氏名
   assert.deepEqual([txt(byName.get('承諾書')!, 'D10'), txt(byName.get('承諾書')!, 'D12')], ['福岡県飯塚市見本町2-3', '山田 太郎']);
   // 請求書：Ａ 支給対象額・Ｂ 保険給付分（9割。1円未満切捨）・Ｃ 本人負担分（Ａ－Ｂ）。請求金額は Ｂ
@@ -1892,7 +1892,7 @@ test('飯塚市の内訳書：見積書の明細を1行ずつ（改修場所・�
   const t = estimateTotals(j, IZ_S);
   assert.deepEqual(['D9', 'D10', 'D11', 'D12'].map(at), ['小計', '諸経費', '消費税', '合計']);
   assert.deepEqual([num('H9'), num('H12'), num('M9'), num('M12')], [t.all.subtotal, t.all.total, t.target.subtotal, t.target.total]);
-  assert.equal(at('K3'), '施工業者名\n太陽シルバーサービス株式会社　見本営業所');
+  assert.equal(at('K3'), '施工業者名\n太陽シルバーサービス株式会社　飯塚営業所');
   // 1ページ（15行）に入るので、21行目からは隠す（印刷・プレビューに出さない）
   const rowTag = (r: number) => new RegExp(`<row\\b[^>]*\\br="${r}"[^>]*>`).exec(u)?.[0] ?? '';
   assert.doesNotMatch(rowTag(20), /hidden="1"/);
@@ -1917,7 +1917,7 @@ test('飯塚市の原本：16枚（事前承認願書・承諾書・内訳書・
 });
 
 // ---------------------------------------------------------------- 大分市（2026-11-04。いただいた支給申請兼施工承認申請書・委任状・理由書（表・裏）。架空の見本 山田 太郎）
-const OT_S = {...RATES, company: '太陽シルバーサービス株式会社', officeName: '見本営業所', manager: '見本 次郎', postal: '870-0000', address: '大分県大分市見本1-1', tel: '097-000-0000'};
+const OT_S = {...RATES, company: '太陽シルバーサービス株式会社', officeName: '大分営業所', manager: '見本 次郎', postal: '870-0000', address: '大分県大分市見本1-1', tel: '097-000-0000'};
 const otJob = (extra: Partial<Job> = {}) =>
   job({
     insurer: 'oita',
@@ -1968,7 +1968,7 @@ test('大分市：支給申請兼施工承認申請書に書く（改修の内�
   // 改修の内容：手すりの取付け（17行）・段差の解消（19行）に箇所と施工者・予定日。ほかの種類は「－」で、予定日の欄は原本のまま
   assert.deepEqual([at('O17'), at('O19'), at('O21'), at('O27')], ['①浴室　②勝手口', '③トイレ', '－', '－']); // 欄の幅に入るだけ1行に並べる（packKindCells）
   // 施工者の欄はせまいので「㈱」と営業所は次の行（はみ出しの検査 e2e-fit で 3px はみ出していた）
-  for (const r of [17, 19]) assert.deepEqual([at(`Z${r}`), at(`AJ${r}`), at(`AQ${r}`)], ['太陽シルバーサービス㈱\n見本営業所', ' R8・11・10', ' R8・11・12'], `${r}行`);
+  for (const r of [17, 19]) assert.deepEqual([at(`Z${r}`), at(`AJ${r}`), at(`AQ${r}`)], ['太陽シルバーサービス㈱\n大分営業所', ' R8・11・10', ' R8・11・12'], `${r}行`);
   assert.deepEqual([at('Z21'), at('AJ21')], ['', ' R　   ・　　　・']);
   const t = estimateTotals(j, OT_S);
   assert.ok(t.all.total > t.target.total && t.target.total > 0); // トイレの段差解消スロープは対象外
@@ -1976,7 +1976,7 @@ test('大分市：支給申請兼施工承認申請書に書く（改修の内�
   assert.deepEqual([at('M39'), at('AN40'), at('AR40')], ['大分県大分市見本町2-3', '097-111-2222', '']); // 申請者の住所・電話（氏名は自署）
   assert.equal(at('M60'), '見本居宅介護支援事業所');
   assert.equal(at('M61'), '担当者氏名（　見本 花子　）　　連絡先（　097-333-4444　）');
-  assert.equal(at('M63'), '太陽シルバーサービス株式会社　見本営業所');
+  assert.equal(at('M63'), '太陽シルバーサービス株式会社　大分営業所');
   assert.equal(at('M64'), '担当者氏名（　見本 三郎　）　　連絡先（　097-000-0000　）');
   // 足した丸は元号（昭）だけ（原本の印の丸3つはそのまま）
   assert.equal(ellipses(out, '支給申請兼施工承認申請書').length - ellipses(OITA, '支給申請兼施工承認申請書').length, 1);
@@ -1987,6 +1987,26 @@ test('大分市：支給申請兼施工承認申請書に書く（改修の内�
   assert.equal(shinseiCost(j, OT_S), t.all.total);
 });
 
+test('大分市：手すりの箇所が5つでも、改修箇所及び規模の欄（1行の高さ）からはみ出さない：折り返して欄に入る大きさにする（ユーザーの指摘「申請書からはみ出ています」2026-11-05）', () => {
+  const places = [['玄関', '600'], ['廊下', '2000'], ['浴室', '800'], ['洗面・脱衣室', '900'], ['トイレ', '1200']].map(([n, l], i) => place(n, [mat('木の手すり')], {photo: i + 1, dims: {l}}));
+  const out = fillShinsei(OITA, SHINSEI.oita!, shinseiBookValues(otJob({places}), OT_S));
+  const {files, byName} = sheets(out);
+  const a = byName.get('支給申請兼施工承認申請書')!;
+  const text = cellTexts(files)(a, 'O17');
+  for (const w of ['①玄関', '②廊下', '③浴室', '④洗面・脱衣室', '⑤トイレ　L=1200mm']) assert.ok(text.includes(w), `${w}：${text}`);
+  const lines = text.split('\n');
+  assert.ok(lines.length >= 2, text);
+  const {fonts, xfs} = styleParts(files);
+  const xf = xfs[Number(/\ss="(\d+)"/.exec(cell(a, 'O17'))?.[1] ?? 0)];
+  assert.match(xf, /wrapText="1"/); // 行を分けて見せる（前は折り返さない＋縮小で、1行にとても小さく、または欄の外へ）
+  assert.doesNotMatch(xf, /shrinkToFit="1"/);
+  const size = Number(/<sz val="([\d.]+)"/.exec(fonts[Number(/fontId="(\d+)"/.exec(xf)?.[1] ?? 0)])?.[1]);
+  // 欄の高さ（17・18行の結合）に行の数ぶん入る大きさ
+  const rowHt = (r: number) => Number(new RegExp(`<row r="${r}"[^>]*ht="([\\d.]+)"`).exec(a)?.[1] ?? 13.5);
+  const box = rowHt(17) + (/<mergeCell ref="O17:[A-Z]+18"/.test(a) ? rowHt(18) : 0);
+  assert.ok(size * 1.25 * lines.length <= box + 0.5, `${size}pt × ${lines.length}行 > ${box}pt`);
+});
+
 test('大分市：委任状（生年月日・住所、受任者は会社・所長と住所、工事業者と住宅改修の申請を丸。氏名は自署）と理由書（表）（理由書のタブの項目も）', () => {
   const out = fillShinsei(OITA, SHINSEI.oita!, shinseiBookValues(otJob(), OT_S));
   const {files, byName} = sheets(out);
@@ -1994,7 +2014,7 @@ test('大分市：委任状（生年月日・住所、受任者は会社・所�
   const p = byName.get('委任状')!;
   assert.equal(txt(p, 'C4'), ''); // 被保険者の氏名は自署
   assert.match(txt(p, 'C5'), /昭和　　15年　　3月　　15日$/);
-  assert.deepEqual([txt(p, 'C6'), txt(p, 'C22'), txt(p, 'C23')], ['大分県大分市見本町2-3', '太陽シルバーサービス株式会社　見本営業所　所長　見本 次郎', '〒870-0000　大分県大分市見本1-1']);
+  assert.deepEqual([txt(p, 'C6'), txt(p, 'C22'), txt(p, 'C23')], ['大分県大分市見本町2-3', '太陽シルバーサービス株式会社　大分営業所　所長　見本 次郎', '〒870-0000　大分県大分市見本1-1']);
   assert.equal(txt(p, 'H2'), ''); // 日付は書かない
   assert.equal(ellipses(out, '委任状').length - ellipses(OITA, '委任状').length, 3); // 元号（昭和）・住宅改修費支給申請兼施工承認（変更）申請・工事業者
   const r = byName.get('理由書（表）')!;

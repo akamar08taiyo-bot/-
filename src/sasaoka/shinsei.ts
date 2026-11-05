@@ -12,7 +12,9 @@ import type {EstimateRates, EstimateSettings} from './calc.ts';
 import {careAmounts} from './careLines.ts';
 import {BASE_PLATE} from './cutLink.ts';
 import {circled, eraOf, formLines, INSURER_INFO, jobInsurer, KINDS, lineNote, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa, shinseiKindNames} from './estimateForms.ts';
-import {insurerNoOf} from './insurerNumbers.ts';
+import {OFFICES} from './defaults.ts';
+import {insurerAreaName, insurerNoOf} from './insurerNumbers.ts';
+import {shinseiOfficeName} from './shinseiOffice.ts';
 import {readyLengths} from './railSlots.ts';
 import {clampOff, clampScale, normRot} from './photoEdit.ts';
 import {BOARD_PTS, frontOrder, lineEnds, MARK_INSET, photoBounds, shapeBox} from './photoMarks.ts';
@@ -1391,7 +1393,24 @@ function reiwaParts(iso: string): [string, string, string] {
   return r ? [r.y === 1 ? '元' : String(r.y), String(r.m), String(r.d)] : ['', '', ''];
 }
 
-export function shinseiValues(job: Job, s: EstimateSettings & BuilderSettings, today = todayIso()): ShinseiValues {
+/**
+ * 申請書に書く会社の欄（施工者・受任者・申請者）の営業所と所長：保険者（と区・市町村）の営業所（shinseiOffice.ts。ユーザーの指示「大分の申請書は、大分営業所…
+ * こちらの該当営業所と所長にする」2026-11-05）。決まりのない保険者は設定のまま。見積書・請求書の発行元は変えない
+ */
+export function shinseiSettings<T extends BuilderSettings>(job: Job, s: T): T {
+  const insurer = jobInsurer(job);
+  const info: ShinseiInfo = {...NO_SHINSEI, ...job.shinsei};
+  const area = insurerAreaName(insurer, insurerNoOf(insurer, job.address, info.insurerNo.normalize('NFKC').replace(/\D/g, '')));
+  const current = (s.officeName ?? '').trim();
+  const name = shinseiOfficeName(insurer, area, current);
+  // 設定の営業所のままなら、設定の所長・住所（設定の画面で直したもの）を使う。替えるときだけ営業所の一覧から
+  if (!name || name === current) return s;
+  const o = OFFICES.find((x) => x.name === name);
+  return o ? {...s, officeName: o.name, manager: o.manager, postal: o.postal, address: o.address, tel: o.tel} : s;
+}
+
+export function shinseiValues(job: Job, settings: EstimateSettings & BuilderSettings, today = todayIso()): ShinseiValues {
+  const s = shinseiSettings(job, settings);
   const info: ShinseiInfo = {...NO_SHINSEI, ...job.shinsei};
   const cost = shinseiCost(job, s);
   const t = (v: string) => v.normalize('NFKC').trim();
@@ -2435,7 +2454,7 @@ function packKindCells(files: Files, sheet: ShinseiSheet, v: ShinseiValues): voi
   const path = sheetPaths(files).get(sheet.sheet);
   if (!sheet.kindCells || !path || !files[path]) return;
   const cells = new Map<string, CellValue>();
-  const sizes: [string, number][] = [];
+  const sizes: [string, number, boolean][] = []; // [欄, 字の大きさ, 2行以上か]
   const xml = strFromU8(files[path]);
   const lay = sheetLayout(xml);
   for (const [ref, text] of kindCellTexts(sheet.kindCells, v)) {
@@ -2454,7 +2473,7 @@ function packKindCells(files: Files, sheet: ShinseiSheet, v: ShinseiValues): voi
       }
       if (pt <= 4.5 || (lines.every((l) => emOf(l) * px <= box.w - 6) && lines.length * px * LINE_K <= box.h - 4)) {
         cells.set(ref, lines.join('\n'));
-        if (pt < base) sizes.push([ref, pt]);
+        if (pt < base || lines.length > 1) sizes.push([ref, pt, lines.length > 1]);
         break;
       }
     }
@@ -2462,9 +2481,15 @@ function packKindCells(files: Files, sheet: ShinseiSheet, v: ShinseiValues): voi
   if (cells.size) writeCells(files, sheet.sheet, cells);
   if (!sizes.length) return;
   let out = strFromU8(files[path]);
-  for (const [ref, pt] of sizes) {
+  for (const [ref, pt, multi] of sizes) {
     const found = cellRe(ref).exec(out);
-    if (found) out = setStyle(out, ref, String(sizedStyle(files, numOf(attrOf(found[1], 's'), 0), pt)));
+    if (!found) continue;
+    // 2行以上なら折り返しの書式にする（大分市の改修箇所及び規模の欄は原本が折り返さない1行の欄で、改行が出ずに1行に並び、
+    // 「縮小して全体を表示」でとても小さくなった。ユーザーの指摘「申請書からはみ出ています」2026-11-05。手すりの箇所が5つ）
+    let style = numOf(attrOf(found[1], 's'), 0);
+    if (multi) style = alignedStyle(files, style, {wrapText: '1', shrinkToFit: null});
+    if (pt < cellStyle(files, out, ref).size) style = sizedStyle(files, style, pt);
+    out = setStyle(out, ref, String(style));
   }
   files[path] = strToU8(out);
 }
@@ -2543,7 +2568,8 @@ function formulaCopies(files: Files): Map<string, {path: string; ref: string}[]>
 function fitTexts(files: Files, sheet: ShinseiSheet, cells: Map<string, CellValue>, copies: Map<string, {path: string; ref: string}[]>): void {
   const path = sheetPaths(files).get(sheet.sheet);
   if (!path) return;
-  const skip = new Set([...(sheet.marks ?? []).map((m) => m.cell), ...(sheet.insuredNo ?? []), ...(sheet.entrustRegNo ?? [])]);
+  // 改修の種類ごとの欄（kindCells）は packKindCells で入る大きさ・折り返しにしてあるので、ここでは縮めない（前は1行の幅で数えて「縮小して全体を表示」になった）
+  const skip = new Set([...(sheet.marks ?? []).map((m) => m.cell), ...(sheet.insuredNo ?? []), ...(sheet.entrustRegNo ?? []), ...(sheet.kindCells ?? [])]);
   const oneLine = oneLineRefs(sheet);
   const byPath = new Map<string, {ref: string; text: string; oneLine: boolean}[]>();
   const add = (p: string, item: {ref: string; text: string; oneLine: boolean}) => byPath.set(p, [...(byPath.get(p) ?? []), item]);
