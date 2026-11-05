@@ -8,6 +8,7 @@ import {actualDiscount, saleTotals} from './calc.ts';
 import type {Totals} from './calc.ts';
 import type {Sale, Settings, TaxType} from './types.ts';
 import {staffShort, yen} from './util.ts';
+import {telWithHyphens} from './tel.ts';
 
 export const HACCHU_IMPORT_KEY = 'taiyo-hacchu-import-v1';
 /**
@@ -98,7 +99,7 @@ export function hacchuImport(sale: Sale, s: Pick<Settings, 'markupRate' | 'limit
     customerName: customer,
     furigana: sale.kana.trim(),
     address: sale.address.trim(),
-    tel: sale.tel.trim(),
+    tel: telWithHyphens(sale.tel.trim()),
     sales: staffShort(sale.staff),
     deliveryDate: sale.deliveryDate,
     burdenRatio: t.ratio === 2 ? 2 : t.ratio === 3 ? 3 : 1,

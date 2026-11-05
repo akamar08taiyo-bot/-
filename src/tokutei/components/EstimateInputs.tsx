@@ -15,6 +15,7 @@ import {carePlanOf} from '../shinsei.ts';
 import type {OpenCatalog} from '../catalog.ts';
 import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Product, Sale, SaleItem} from '../types.ts';
 import {yen} from '../util.ts';
+import {telWithHyphens} from '../tel.ts';
 import {zipLabel} from '../zip.ts';
 import type {ZipHit} from '../zip.ts';
 import {CategorySelect} from './CategorySelect.tsx';
@@ -332,7 +333,7 @@ export function EstimateInputs({
               </>,
             )}
             {row('住所', <TextInput value={sale.address} onChange={changeAddress} placeholder="行橋市大字流末1327番地" className="w-full" aria-label="住所" />)}
-            {row('電話', <TextInput value={sale.tel} onChange={(tel) => change({tel})} inputMode="tel" className="w-44" aria-label="電話" />)}
+            {row('電話', <TextInput value={telWithHyphens(sale.tel)} onChange={(tel) => change({tel: telWithHyphens(tel)})} inputMode="tel" className="w-44" aria-label="電話" />)}
             {(sale.insurer === 'miyako' || sale.insurer === 'kouiki') &&
               row(
                 '居宅サービス計画の届出',

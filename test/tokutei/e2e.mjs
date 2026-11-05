@@ -177,7 +177,10 @@ try {
   await page.getByRole('group', {name: '要介護状態区分'}).getByRole('button', {name: '要介護2'}).click();
   await page.getByLabel('住所').fill('行橋市大字流末1327番地');
   assert.equal(await page.getByLabel('郵便番号').inputValue(), '824-0043');
-  await page.getByLabel('電話').fill('0930-00-0000');
+  // 電話番号はハイフンなしで打っても、打ち終わるとハイフンが入る（ユーザーの指示「ハイフンなしで入力してもよい。自動でハイフンをいれる」2026-11-05。tel.ts）
+  await page.getByLabel('電話').fill('');
+  await page.getByLabel('電話').pressSequentially('0930000000');
+  assert.equal(await page.getByLabel('電話').inputValue(), '0930-00-0000');
   // 文例はプルダウン（用具ごとの見出しに10ずつ・約100字。ユーザーの指示「シャワーチェアで10個、浴槽台で10個…」2026-10-26）
   const examples = page.getByLabel('シャワーベンチ FSフィットが必要な理由の文例');
   assert.deepEqual(await examples.locator('optgroup').evaluateAll((l) => l.map((g) => `${g.label}${g.children.length}`)), ['シャワーチェア10']);

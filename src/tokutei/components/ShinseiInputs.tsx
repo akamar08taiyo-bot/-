@@ -17,6 +17,7 @@ import type {ShinseiKey} from '../shinsei.ts';
 import type {OpenCatalog} from '../catalog.ts';
 import type {ShinseiField} from '../shinseiPreview.ts';
 import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Sale, SaleItem, Settings} from '../types.ts';
+import {telWithHyphens} from '../tel.ts';
 import {zipLabel} from '../zip.ts';
 import type {ZipHit} from '../zip.ts';
 import {CategorySelect} from './CategorySelect.tsx';
@@ -201,7 +202,7 @@ export function ShinseiInputs({
           'zip',
         )}
         {row('住所', <TextInput value={sale.address} onChange={changeAddress} placeholder="福岡県…" className="w-full" aria-label="住所" data-nav />, 'address')}
-        {row('電話番号', <TextInput type="tel" value={sale.tel} onChange={(tel) => change({tel})} placeholder="0930-00-0000" className="w-48" aria-label="電話" data-nav />, 'tel')}
+        {row('電話番号', <TextInput type="tel" value={telWithHyphens(sale.tel)} onChange={(tel) => change({tel: telWithHyphens(tel)})} placeholder="0930-00-0000" className="w-48" aria-label="電話" data-nav />, 'tel')}
         {!noCare &&
           row(
             '要介護状態区分',

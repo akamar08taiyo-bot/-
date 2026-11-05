@@ -35,6 +35,7 @@ import {
   writeCells,
 } from './xlsxEdit.ts';
 import type {CellValue, Files, Mark} from './xlsxEdit.ts';
+import {telWithHyphens} from './tel.ts';
 import {zipLabel} from './zip.ts';
 import {KK_CELLS, KK_SHEETS} from './shinsei/kitakyushuCells.ts';
 import {KU_CELLS, KU_SHEETS} from './shinsei/kurumeCells.ts';
@@ -161,7 +162,7 @@ export function shinseiValues(sale: Sale, settings: Settings): ShinseiValues {
     gender: sale.gender,
     zip: zipLabel(sale.zip),
     address: sale.address.trim(),
-    tel: sale.tel.trim(),
+    tel: telWithHyphens(sale.tel.trim()), // ハイフンなしで保存してあってもハイフン付きに（tel.ts）
     care: sale.careLevel,
     items,
     recorder: [sale.careOffice.trim(), sale.careManager.trim()].filter(Boolean).join('　'),
