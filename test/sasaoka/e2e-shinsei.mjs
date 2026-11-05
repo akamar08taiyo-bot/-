@@ -1395,6 +1395,19 @@ await works.getByRole('button', {name: '物置を消す', exact: true}).click();
 assert.match(asked.join('\n'), /^「物置」と、その寸法を消します。元に戻せません/);
 assert.equal(await works.getByRole('listitem', {name: '③物置'}).count(), 0);
 page.off('dialog', ask);
+// 入れた箇所も一覧から選び直せる（▼）・長さを入れて見積書に行のある箇所にも「削除」がある（ユーザーの指摘「一度箇所を入力したら、削除ボタンがない」
+// 「一度 例 寝室など入力したら、再度選択し直すことができない」2026-11-05）
+{
+  const g = works.getByRole('listitem', {name: '①玄関'});
+  await g.getByRole('combobox', {name: '玄関を一覧から選び直す'}).selectOption('寝室');
+  const bed = works.getByRole('listitem', {name: '①寝室'});
+  assert.equal(await bed.getByLabel('改修場所', {exact: true}).inputValue(), '寝室');
+  assert.equal(await bed.getByLabel('長さ（mm）').inputValue(), '800'); // 長さなどはそのまま
+  await bed.getByRole('combobox', {name: '寝室を一覧から選び直す'}).selectOption('玄関');
+  assert.equal(await works.getByRole('listitem', {name: '①玄関'}).getByLabel('改修場所', {exact: true}).inputValue(), '玄関');
+  for (const name of ['①玄関', '②トイレ']) assert.equal(await works.getByRole('listitem', {name}).getByRole('button', {name: /を消す$/}).count(), 1, name);
+  assert.equal((await works.getByRole('listitem', {name: '①玄関'}).getByRole('button', {name: /を消す$/}).innerText()).trim(), '削除');
+}
 const g1 = works.getByRole('listitem', {name: '①玄関'});
 assert.equal(await g1.getByLabel('長さ（mm）').inputValue(), '800');
 if (await g1.getByRole('button', {name: '＋ 高さ（任意）'}).count()) await g1.getByRole('button', {name: '＋ 高さ（任意）'}).click(); // 高さは ＋ で開く（入っていれば開いたまま）

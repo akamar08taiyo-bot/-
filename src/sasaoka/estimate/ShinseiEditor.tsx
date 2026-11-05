@@ -957,9 +957,12 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
     focusPlace.current = null;
     row.querySelector<HTMLInputElement>(want.field === 'dim' ? 'input[data-dim]' : 'input[aria-label="改修場所"]')?.focus();
   });
-  // 写真・撮影日・寸法・手で直した文などの入った箇所は、消す前に聞く（一度押しただけで写真ごと消えて、元に戻せなかった）
+  // 写真・撮影日・寸法・手で直した文などの入った箇所は、消す前に聞く（一度押しただけで写真ごと消えて、元に戻せなかった）。
+  // 見積書に行のある箇所も、ここから消せる（見積書のその箇所の行も消える。前は見積書で消すしかなく、長さを入れると ✕ が消えた。
+  // ユーザーの指摘「一度箇所を入力したら、削除ボタンがない」2026-11-05）
   const remove = (p: Place) => {
     const has = [
+      p.rows.some((r) => !isBlankRow(r)) ? '見積書の行' : '',
       p.photos?.before || p.photos?.after ? '写真' : '',
       p.photoDates?.before || p.photoDates?.after ? '撮影日' : '',
       Object.values(p.dims ?? {}).some((v) => v?.trim()) || p.plateLength?.trim() ? '寸法' : '',
@@ -972,7 +975,7 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
   return (
     <div className="w-full space-y-2">
       {job.places.length > 0 && (
-        <div ref={list} className="text-sm" role="list" aria-label="改修の箇所">
+        <div ref={list} className="@container text-sm" role="list" aria-label="改修の箇所">
           {job.places.map((p) => {
             const n = photos.get(p.id);
             const used = p.rows.some((r) => !isBlankRow(r)); // 見積書に行のある箇所は、見積書で消す
@@ -986,22 +989,48 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
               <div key={p.id} data-place={p.id} role="listitem" aria-label={`${n ? circled(n) : ''}${p.name || '改修場所'}`} className="border-t border-slate-100 py-2 first:border-t-0 first:pt-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="w-7 text-center text-base">{n ? circled(n) : '—'}</span>
-                  {/* 改修場所は行の残りいっぱい（前は w-28 で「玄関から廊下に…」「洗面所兼脱衣所」が切れていた。2026-10-26 のデバッグ） */}
-                  <TextInput value={p.name} onChange={(name) => setPlace(p.id, (x) => ({...x, name}))} placeholder="改修場所" className="min-w-[7rem] flex-1" aria-label="改修場所" data-nav />
-                  <select value={p.kind} onChange={(e) => setPlace(p.id, (x) => ({...x, kind: Number(e.target.value)}))} className="h-9 w-40 rounded-md border border-slate-300 px-1 text-sm" aria-label="改修の種類" data-nav>
+                  {/* 改修場所は行の残りいっぱい（前は w-28 で「玄関から廊下に…」「洗面所兼脱衣所」が切れていた。2026-10-26 のデバッグ）。
+                      右の ▼ で「＋ 箇所を足す」と同じ一覧から選び直せる（ユーザーの指摘「一度 例 寝室など入力したら、再度選択し直すことができない」2026-11-05）。打って直すこともできる */}
+                  <span className="flex min-w-[7rem] flex-1 items-center">
+                    <TextInput value={p.name} onChange={(name) => setPlace(p.id, (x) => ({...x, name}))} placeholder="改修場所" className="min-w-0 flex-1 rounded-r-none" aria-label="改修場所" data-nav />
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const name = e.target.value;
+                        if (name) setPlace(p.id, (x) => ({...x, name}));
+                      }}
+                      className="h-9 w-9 shrink-0 cursor-pointer appearance-none rounded-r-md border border-l-0 border-slate-300 bg-slate-50 text-center text-sm text-slate-600 hover:bg-emerald-50"
+                      aria-label={`${p.name.trim() || '改修場所'}を一覧から選び直す`}
+                      title="一覧から選び直す"
+                    >
+                      <option value="" disabled>
+                        ▼
+                      </option>
+                      {s.placePresets.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </span>
+                  {/* 欄がせまいとき（スマホ・パソコンの申請書の左の欄。欄の幅で決める＝@container）は、改修の種類は2段目（改修場所と削除を1段目に。
+                      前は ✕ が次の行の左はしに落ちて見えなかった） */}
+                  <select value={p.kind} onChange={(e) => setPlace(p.id, (x) => ({...x, kind: Number(e.target.value)}))} className="h-9 w-40 rounded-md border border-slate-300 px-1 text-sm @max-md:order-last @max-md:ml-9 @max-md:w-auto @max-md:flex-1" aria-label="改修の種類" data-nav>
                     {KINDS.map((k, i) => (
                       <option key={k} value={i + 1}>
                         {circled(i + 1)} {k}
                       </option>
                     ))}
                   </select>
-                  {used ? (
-                    <span className="w-7" />
-                  ) : (
-                    <button type="button" onClick={() => remove(p)} className="w-7 rounded py-1 text-slate-400 hover:bg-rose-50 hover:text-rose-700" aria-label={`${p.name || '箇所'}を消す`}>
-                      ✕
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => remove(p)}
+                    className="h-9 shrink-0 rounded-md border border-slate-300 bg-white px-2.5 text-sm text-slate-600 hover:bg-rose-50 hover:text-rose-700"
+                    aria-label={`${p.name || '箇所'}を消す`}
+                    title={used ? '箇所を消す（見積書のその箇所の行も消えます）' : '箇所を消す'}
+                  >
+                    削除
+                  </button>
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-9">
                   {p.kind === 1 && (
