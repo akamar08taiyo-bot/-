@@ -33,22 +33,27 @@ def report(checks):
     sys.exit(0 if ok else 1)
 
 
-def video_checks(probe, max_len=60):
+def video_checks(probe, max_len=60, min_len=35):
     v = next(s for s in probe['streams'] if s['codec_type'] == 'video')
     fps = eval(v['r_frame_rate'])
     dur = float(probe['format']['duration'])
     return v, [
         ('解像度 1080x1920', v['width'] == 1080 and v['height'] == 1920, f"{v['width']}x{v['height']}"),
         ('30fps', abs(fps - 30) < 0.01, f'{fps:.2f}'),
-        (f'長さ 35〜{max_len}秒', 35 <= dur <= max_len, f'{dur:.2f}s'),
+        (f'長さ {min_len}〜{max_len}秒', min_len <= dur <= max_len, f'{dur:.2f}s'),
     ]
 
+
+# 調査をもとにした回で、元の調査でまだ確かめていない順位（"todo": true）が残っていたら書き出さない
+todo = [r['rank'] for r in S.get('ranks', []) if r.get('todo')]
+if todo:
+    sys.exit(f'元の調査でまだ確かめていない順位があります（{todo}位）。数字を確かめて "todo" を消してから仕上げてください')
 
 if S.get('silent'):
     run(['ffmpeg', '-y', '-hide_banner', '-i', silent, '-map', '0:v', '-c:v', 'libx264', '-preset', 'slow', '-tune', 'animation',
          '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', final])
     probe = json.loads(run(['ffprobe', '-v', 'error', '-show_streams', '-show_format', '-of', 'json', final]).stdout)
-    _, checks = video_checks(probe, max_len=59)
+    _, checks = video_checks(probe, max_len=59, min_len=20 if S.get('fast') else 35)  # 高速版のランキングは30秒台
     checks.append(('音のトラックなし（音楽は YouTube で足す）', not any(s['codec_type'] == 'audio' for s in probe['streams']), '音なし'))
     report(checks)
 

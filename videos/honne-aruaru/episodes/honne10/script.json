@@ -1,0 +1,178 @@
+{
+ "id": "honne10",
+ "title": "心当たりのある男性は要注意 妻が離婚を考えたきっかけTOP10【1位はコメント欄】",
+ "silent": true,
+ "fast": true,
+ "bpm": 120,
+ "header": {
+  "series": "本音あるある",
+  "episode": "妻が離婚を考えたきっかけTOP10"
+ },
+ "source": "出典：ベンナビ離婚（株式会社アシロ）既婚女性2,993人調査（2024年1月）離婚を考えたことがある1,805人の回答",
+ "note": "※イラスト・ひと言は再現イメージです",
+ "value": {
+  "label": "回答",
+  "unit": "%",
+  "decimals": 1
+ },
+ "itemLabel": "離婚を考えたきっかけ",
+ "hook": {
+  "beats": 5,
+  "img": "honne01/img/S1.jpg",
+  "cam": {
+   "x": 0.5,
+   "y": 0.4,
+   "z": 1.15
+  },
+  "title": [
+   "心当たりのある男性は要注意",
+   "離婚を考えた",
+   "きっかけTOP10"
+  ],
+  "chip": "既婚女性2,993人に聞いた（2024年）"
+ },
+ "ranks": [
+  {
+   "rank": 10,
+   "beats": 6,
+   "item": "（未確認）",
+   "value": 0,
+   "img": "honne03/img/R8.jpg",
+   "cam": {
+    "on": [
+     "R8",
+     "WIFE"
+    ]
+   },
+   "todo": true
+  },
+  {
+   "rank": 9,
+   "beats": 6,
+   "item": "（未確認）",
+   "value": 0,
+   "img": "honne03/img/R8.jpg",
+   "cam": {
+    "on": [
+     "R8",
+     "WIFE"
+    ]
+   },
+   "todo": true
+  },
+  {
+   "rank": 8,
+   "beats": 6,
+   "item": "（未確認）",
+   "value": 0,
+   "img": "honne03/img/R8.jpg",
+   "cam": {
+    "on": [
+     "R8",
+     "WIFE"
+    ]
+   },
+   "todo": true
+  },
+  {
+   "rank": 7,
+   "beats": 6,
+   "item": "（未確認）",
+   "value": 0,
+   "img": "honne03/img/R8.jpg",
+   "cam": {
+    "on": [
+     "R8",
+     "WIFE"
+    ]
+   },
+   "todo": true
+  },
+  {
+   "rank": 6,
+   "beats": 6,
+   "item": "（未確認）",
+   "value": 0,
+   "img": "honne03/img/R8.jpg",
+   "cam": {
+    "on": [
+     "R8",
+     "WIFE"
+    ]
+   },
+   "todo": true
+  },
+  {
+   "rank": 5,
+   "beats": 6,
+   "item": "借金・金銭問題",
+   "value": 0,
+   "img": "honne02/img/X5.jpg",
+   "cam": {
+    "on": [
+     "X5",
+     "WIFE"
+    ]
+   },
+   "todo": true,
+   "tsukkomi": "そのゴルフバッグ、|何回払い？"
+  },
+  {
+   "rank": 4,
+   "beats": 6,
+   "item": "DV・モラハラ",
+   "value": 0,
+   "img": "honne01/img/S8.jpg",
+   "cam": {
+    "on": [
+     "S8",
+     "WIFE"
+    ],
+    "z": 1.05
+   },
+   "todo": true
+  },
+  {
+   "rank": 3,
+   "beats": 7,
+   "item": "夫の家族や親族との|折り合いが悪い",
+   "value": 0,
+   "img": "honne02/img/X6.jpg",
+   "cam": {
+    "on": [
+     "X6",
+     "WIFE"
+    ]
+   },
+   "todo": true,
+   "tsukkomi": "夫の実家では、|私だけ働いてます。"
+  },
+  {
+   "rank": 2,
+   "beats": 7,
+   "item": "家事や育児を|手伝ってくれない",
+   "value": 0,
+   "img": "honne04/img/K2.jpg",
+   "cam": {
+    "on": [
+     "K2",
+     "WIFE"
+    ]
+   },
+   "todo": true,
+   "tsukkomi": "手伝う、じゃなくて|一緒にやる。"
+  }
+ ],
+ "top": {
+  "beats": 8,
+  "img": "honne01/img/S1.jpg",
+  "cam": {
+   "on": [
+    "S1",
+    "WIFE"
+   ]
+  },
+  "cta": "1位は固定コメントへ",
+  "sub": "心当たりのある男性は、今日から。"
+ }
+}

@@ -156,11 +156,24 @@ export const Tsukkomi: React.FC<{text: string; cy: number; from: number; to: num
 };
 
 // ───────── 記録回数のはんこ。rollTo があれば 0 から数え上げて、最後にドン ─────────
-export const CountStamp: React.FC<{x: number; y: number; count: number; from: number; to: number; rollTo?: number}> = ({x, y, count, from, to, rollTo}) => {
+// label・unit・decimals で「回答 39.4%」のような割合のはんこにもできる（既定は「記録 〇回」）
+export const CountStamp: React.FC<{x: number; y: number; count: number; from: number; to: number; rollTo?: number; label?: string; unit?: string; decimals?: number}> = ({
+  x,
+  y,
+  count,
+  from,
+  to,
+  rollTo,
+  label = '記録',
+  unit = '回',
+  decimals = 0,
+}) => {
   const frame = useCurrentFrame();
   if (frame < from || frame >= to) return null;
   const roll = rollTo !== undefined;
-  const n = roll ? Math.round(count * Easing.out(Easing.cubic)(clamp01((frame - from) / (rollTo - from)))) : count;
+  const v = roll ? count * Easing.out(Easing.cubic)(clamp01((frame - from) / (rollTo - from))) : count;
+  const text = decimals > 0 ? v.toFixed(decimals) : Math.round(v).toLocaleString('en-US');
+  const n = Math.round(v);
   const sp = pop(frame, roll ? rollTo : from, 13, 260);
   const scale = roll ? (frame < rollTo ? 0.6 + 0.4 * pop(frame, from, 12, 220) : 1 + 0.4 * (1 - sp)) : 2.1 - 1.1 * sp;
   const shake = roll && frame < rollTo ? wobble(frame, 4, 3) : 0;
@@ -186,10 +199,10 @@ export const CountStamp: React.FC<{x: number; y: number; count: number; from: nu
         whiteSpace: 'nowrap',
       }}
     >
-      <div style={{fontSize: 36, letterSpacing: 8}}>記録</div>
+      <div style={{fontSize: 36, letterSpacing: 8}}>{label}</div>
       <div style={{display: 'flex', alignItems: 'baseline', fontVariantNumeric: 'tabular-nums'}}>
-        <span style={{fontSize: n >= 1000 ? 78 : 92}}>{n.toLocaleString('en-US')}</span>
-        <span style={{fontSize: 46}}>回</span>
+        <span style={{fontSize: n >= 1000 ? 78 : 92}}>{text}</span>
+        <span style={{fontSize: 46}}>{unit}</span>
       </div>
     </div>
   );

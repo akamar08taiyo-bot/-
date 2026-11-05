@@ -1,0 +1,176 @@
+{
+ "id": "honne09",
+ "title": "熟年離婚の原因TOP10【1位はコメント欄】",
+ "silent": true,
+ "fast": true,
+ "bpm": 120,
+ "header": {
+  "series": "本音あるある",
+  "episode": "熟年離婚の原因TOP10"
+ },
+ "source": "出典：デイライト法律事務所「熟年離婚の原因ランキング」50代以上の女性相談者（2024年12月〜2025年11月）「その他」を除く",
+ "note": "※イラスト・ひと言は再現イメージです",
+ "value": {
+  "label": "割合",
+  "unit": "%",
+  "decimals": 1
+ },
+ "itemLabel": "妻側の離婚理由",
+ "hook": {
+  "beats": 5,
+  "img": "honne01/img/S6.jpg",
+  "cam": {
+   "on": [
+    "S6",
+    "WIFE"
+   ]
+  },
+  "title": [
+   "熟年離婚の",
+   "原因",
+   "TOP10"
+  ],
+  "chip": "50代以上の女性の離婚相談で多かった理由"
+ },
+ "ranks": [
+  {
+   "rank": 10,
+   "beats": 6,
+   "item": "（未確認）",
+   "value": 0,
+   "img": "honne02/img/X1.jpg",
+   "cam": {
+    "on": [
+     "X1",
+     "WIFE"
+    ]
+   },
+   "todo": true
+  },
+  {
+   "rank": 9,
+   "beats": 6,
+   "item": "（未確認）",
+   "value": 0,
+   "img": "honne02/img/X1.jpg",
+   "cam": {
+    "on": [
+     "X1",
+     "WIFE"
+    ]
+   },
+   "todo": true
+  },
+  {
+   "rank": 8,
+   "beats": 6,
+   "item": "（未確認）",
+   "value": 0,
+   "img": "honne02/img/X1.jpg",
+   "cam": {
+    "on": [
+     "X1",
+     "WIFE"
+    ]
+   },
+   "todo": true
+  },
+  {
+   "rank": 7,
+   "beats": 6,
+   "item": "（未確認）",
+   "value": 0,
+   "img": "honne02/img/X1.jpg",
+   "cam": {
+    "on": [
+     "X1",
+     "WIFE"
+    ]
+   },
+   "todo": true
+  },
+  {
+   "rank": 6,
+   "beats": 6,
+   "item": "（未確認）",
+   "value": 0,
+   "img": "honne02/img/X1.jpg",
+   "cam": {
+    "on": [
+     "X1",
+     "WIFE"
+    ]
+   },
+   "todo": true
+  },
+  {
+   "rank": 5,
+   "beats": 6,
+   "item": "（未確認）",
+   "value": 0,
+   "img": "honne02/img/X1.jpg",
+   "cam": {
+    "on": [
+     "X1",
+     "WIFE"
+    ]
+   },
+   "todo": true
+  },
+  {
+   "rank": 4,
+   "beats": 6,
+   "item": "暴力",
+   "value": 16.3,
+   "img": "honne02/img/X1.jpg",
+   "cam": {
+    "on": [
+     "X1",
+     "WIFE"
+    ]
+   },
+   "todo": true
+  },
+  {
+   "rank": 3,
+   "beats": 7,
+   "item": "相手の不倫",
+   "value": 25.6,
+   "img": "honne01/img/S8.jpg",
+   "cam": {
+    "on": [
+     "S8",
+     "WIFE"
+    ],
+    "z": 1.05
+   },
+   "todo": true
+  },
+  {
+   "rank": 2,
+   "beats": 7,
+   "item": "精神的虐待",
+   "value": 38.8,
+   "img": "honne02/img/X7.jpg",
+   "cam": {
+    "on": [
+     "X7",
+     "WIFE"
+    ]
+   },
+   "todo": true
+  }
+ ],
+ "top": {
+  "beats": 8,
+  "img": "honne01/img/S6.jpg",
+  "cam": {
+   "on": [
+    "S6",
+    "WIFE"
+   ]
+  },
+  "cta": "1位は固定コメントへ",
+  "sub": "心当たりのある男性は、今日から。"
+ }
+}

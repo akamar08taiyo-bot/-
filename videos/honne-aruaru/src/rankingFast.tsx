@@ -1,0 +1,251 @@
+// 実際の調査をもとにした「高速TOP10」の共通の作り。10位から2位までをサクサク見せ、1位は動画では明かさず固定コメントへ。
+// 声も音もなし（音楽は投稿のときに YouTube で足す）。1つの順位は6拍（BPM120 で3秒）、3位と2位は7拍。
+// 順位と割合は調査の数字そのまま。出典は最初から最後まで画面の上に出し、イラストとひと言は再現イメージと書く。
+import React from 'react';
+import {AbsoluteFill, useCurrentFrame} from 'remotion';
+import {F} from './fonts';
+import {C, Header, Outlined} from './parts';
+import {CountStamp, RankBadge, RankStrip, Tsukkomi} from './ranking';
+import {FPS, W, clamp01, life, pop, ramp} from './lib';
+import {Box, Scene, SceneView, cam, center, faceOf} from './scene';
+import type {RCam} from './rankingEp';
+
+export type FRank = {
+  rank: number;
+  beats: number;
+  item: string; // 調査の選択肢の言葉そのまま。| で改行
+  value: number; // 調査の数字（割合なら 39.4）
+  tsukkomi?: string; // しのぶのひと言（再現）。| で改行
+  img: string;
+  cam: RCam;
+  todo?: boolean; // 元の調査でまだ確かめていない順位（finish.py はこれが残っていると書き出しを止める）
+};
+export type FScript = {
+  id: string;
+  bpm: number;
+  header: {series: string; episode: string};
+  source: string; // 出典の1行（画面の上にずっと出す）
+  note?: string; // 例「※イラスト・ひと言は再現イメージです」
+  value: {label: string; unit: string; decimals: number}; // はんこの見出しと単位（例：回答 / % / 1）
+  itemLabel?: string; // 項目のカードの札（例「妻が挙げた理由」）
+  hook: {beats: number; img: string; cam: RCam; title: [string, string, string]; chip: string};
+  ranks: FRank[]; // 10位〜2位
+  top: {beats: number; img: string; cam: RCam; cta: string; sub?: string};
+};
+
+const TSUK_Y = 1395;
+const BADGE = {x: 420, y: 395};
+const STAMP = {x: 840, y: 402};
+const ITEM_Y = 1120;
+
+// 切り替わりの白いフラッシュ（拍の頭を目で感じさせる）
+const Flash: React.FC<{at: number; strength?: number}> = ({at, strength = 0.5}) => {
+  const frame = useCurrentFrame();
+  if (frame < at || frame >= at + 4) return null;
+  return <AbsoluteFill style={{background: '#fff', opacity: strength * (1 - ramp(frame, at, at + 4))}} />;
+};
+
+const fitSize = (lines: string[], width: number, max: number) => Math.min(max, Math.floor(width / Math.max(...lines.map((l) => [...l].length), 1)));
+
+// 出典：最初から最後まで、順位の帯のすぐ下に小さく
+const SourceLine: React.FC<{source: string; note?: string}> = ({source, note}) => (
+  <div style={{position: 'absolute', top: 266, left: 0, width: W, display: 'flex', justifyContent: 'center'}}>
+    <div
+      style={{
+        maxWidth: 1000,
+        background: 'rgba(34,32,31,0.72)',
+        color: '#fff',
+        fontFamily: F.maru,
+        fontWeight: 700,
+        fontSize: 22,
+        lineHeight: 1.35,
+        padding: '4px 16px 6px',
+        borderRadius: 10,
+        textAlign: 'center',
+      }}
+    >
+      {source}
+      {note && <span style={{opacity: 0.8}}>　{note}</span>}
+    </div>
+  </div>
+);
+
+// 調査の選択肢のカード（言葉は調査のまま。かぎかっこは付けない）
+const ItemCard: React.FC<{text: string; label?: string; cy: number; from: number; to: number; todo?: boolean}> = ({text, label, cy, from, to, todo}) => {
+  const frame = useCurrentFrame();
+  if (frame < from || frame >= to) return null;
+  const lines = text.split('|');
+  const fs = fitSize(lines, 800, 96);
+  const p = pop(frame, from, 9, 240);
+  return (
+    <div style={{position: 'absolute', left: 0, width: W, top: cy, display: 'flex', justifyContent: 'center', opacity: life(frame, from, to, 2, 2)}}>
+      <div
+        style={{
+          position: 'relative',
+          transform: `translateY(-50%) scale(${0.55 + 0.45 * p})`,
+          background: todo ? '#ffe0e0' : '#fff',
+          border: todo ? `6px dashed ${C.red}` : 'none',
+          borderRadius: 30,
+          padding: '30px 46px 28px',
+          maxWidth: 940,
+          boxShadow: '0 10px 0 rgba(30,40,80,0.22), 0 18px 30px rgba(20,20,40,0.25)',
+          textAlign: 'center',
+        }}
+      >
+        {label && (
+          <div style={{position: 'absolute', top: -26, left: 30, background: C.coral, color: '#fff', fontFamily: F.maru, fontWeight: 900, fontSize: 32, padding: '3px 20px 5px', borderRadius: 999, whiteSpace: 'nowrap'}}>
+            {todo ? '未確認（元の調査で確かめる）' : label}
+          </div>
+        )}
+        {lines.map((l, i) => (
+          <div key={i} style={{fontFamily: F.dela, fontSize: fs, lineHeight: 1.22, color: C.navy, whiteSpace: 'pre'}}>
+            {l}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// 冒頭の題字（1コマ目がそのままサムネになる。最初から全部見えている）
+const FastHook: React.FC<{title: [string, string, string]; chip: string; to: number; b: (n: number) => number}> = ({title, chip, to, b}) => {
+  const frame = useCurrentFrame();
+  if (frame >= to) return null;
+  const bump = [b(1), b(2), b(3), b(4)].reduce((v, at) => v + 0.04 * (frame >= at ? 1 - ramp(frame, at, at + 5) : 0), 1);
+  const bigSize = Math.min(240, Math.floor(900 / [...title[1]].length));
+  const topSize = Math.min(112, Math.floor(940 / [...title[0]].length));
+  const lowSize = Math.min(150, Math.floor(940 / [...title[2]].length));
+  return (
+    <>
+      <div style={{position: 'absolute', left: 0, top: 720, width: W, display: 'flex', flexDirection: 'column', alignItems: 'center', transform: `scale(${bump})`}}>
+        <Outlined size={topSize} color={C.ink} stroke={Math.round(topSize * 0.18)} font={F.dela} weight={400}>
+          {title[0]}
+        </Outlined>
+        <div style={{marginTop: -24 * (bigSize / 240)}}>
+          <Outlined size={bigSize} color={C.red} stroke={Math.round(bigSize * 0.13)} font={F.dela} weight={400} shadow="drop-shadow(0 12px 0 rgba(90,20,30,0.35))">
+            {title[1]}
+          </Outlined>
+        </div>
+        <div style={{marginTop: -30 * (bigSize / 240)}}>
+          <Outlined size={lowSize} color="#F0A91B" stroke={Math.round(lowSize * 0.16)} strokeColor="#2a1c08" font={F.dela} weight={400} shadow="drop-shadow(0 8px 0 rgba(120,70,0,0.4))">
+            {title[2]}
+          </Outlined>
+        </div>
+      </div>
+      <div style={{position: 'absolute', left: 0, top: 1392, width: W, display: 'flex', justifyContent: 'center'}}>
+        <div style={{maxWidth: 980, background: '#22201f', color: '#fff', fontFamily: F.maru, fontWeight: 900, fontSize: 40, padding: '12px 32px 16px', borderRadius: 999, boxShadow: '0 6px 0 rgba(0,0,0,0.2)', textAlign: 'center'}}>
+          {chip}
+        </div>
+      </div>
+    </>
+  );
+};
+
+// 締め：1位は動画では明かさず、固定コメントへ
+const TopTeaser: React.FC<{from: number; to: number; b: (n: number) => number; cta: string; sub?: string}> = ({from, to, b, cta, sub}) => {
+  const frame = useCurrentFrame();
+  if (frame < from || frame >= to) return null;
+  const beatsIn = [0, 1, 2, 3].map((n) => b(n));
+  const pulse = beatsIn.reduce((v, at) => v + 0.06 * (frame >= at ? 1 - ramp(frame, at, at + 7) : 0), 1);
+  const lp = pop(frame, b(2), 12, 230);
+  const cp = pop(frame, b(4), 11, 210);
+  return (
+    <AbsoluteFill style={{background: 'radial-gradient(ellipse at 50% 46%, rgba(58,42,68,0.88) 0%, rgba(23,17,28,0.96) 70%)'}}>
+      <div style={{position: 'absolute', top: 600, left: 0, width: W, display: 'flex', justifyContent: 'center', transform: `translateY(-50%) scale(${pulse})`}}>
+        <Outlined size={150} color="#F0A91B" stroke={24} strokeColor="#2a1c08" font={F.dela} weight={400} shadow="drop-shadow(0 0 30px rgba(240,169,27,0.55))">
+          第1位は…
+        </Outlined>
+      </div>
+      {frame >= b(2) && (
+        <div style={{position: 'absolute', top: 900, left: 0, width: W, display: 'flex', justifyContent: 'center', opacity: clamp01(lp * 2), transform: `translateY(-50%) scale(${1.5 - 0.5 * lp})`}}>
+          <div style={{background: 'rgba(255,255,255,0.95)', borderRadius: 30, padding: '24px 60px 30px', textAlign: 'center', boxShadow: '0 10px 0 rgba(0,0,0,0.25)'}}>
+            <div style={{fontFamily: F.dela, fontSize: 150, color: C.navy, letterSpacing: 14, lineHeight: 1.1, filter: 'blur(1px)'}}>？？？</div>
+          </div>
+        </div>
+      )}
+      {frame >= b(2) && (
+        <div style={{position: 'absolute', top: 1110, left: 0, width: W, display: 'flex', justifyContent: 'center', opacity: clamp01(lp * 2)}}>
+          <div style={{border: `7px solid ${C.red}`, borderRadius: 16, color: C.red, background: 'rgba(255,255,255,0.95)', fontFamily: F.dela, fontSize: 62, padding: '4px 26px 10px', transform: `rotate(-5deg) scale(${1.6 - 0.6 * lp})`, whiteSpace: 'nowrap'}}>
+            固定コメントで発表中
+          </div>
+        </div>
+      )}
+      {frame >= b(4) && (
+        <div style={{position: 'absolute', top: 1330, left: 0, width: W, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22, transform: `scale(${0.6 + 0.4 * cp})`}}>
+          <div style={{background: C.coral, color: '#fff', fontFamily: F.maru, fontWeight: 900, fontSize: 52, padding: '12px 40px 16px', borderRadius: 999, boxShadow: '0 6px 0 rgba(60,40,30,0.25)', whiteSpace: 'nowrap'}}>{cta} ↓</div>
+          {sub && (
+            <Outlined size={Math.min(60, Math.floor(960 / [...sub].length))} color="#fff" stroke={14} strokeColor="#17111c" font={F.dela} weight={400}>
+              {sub}
+            </Outlined>
+          )}
+        </div>
+      )}
+    </AbsoluteFill>
+  );
+};
+
+export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
+  const BEAT = (FPS * 60) / S.bpm; // 1拍のフレーム数（BPM120 で 15）
+  type Seg = {id: string; from: number; to: number; b: (n: number) => number};
+  const SEGS: Seg[] = [];
+  let cursor = 0;
+  const addSeg = (id: string, beats: number) => {
+    const from = cursor;
+    cursor += Math.round(beats * BEAT);
+    SEGS.push({id, from, to: cursor, b: (n) => from + Math.round(n * BEAT)});
+  };
+  addSeg('hook', S.hook.beats);
+  S.ranks.forEach((r) => addSeg(`r${r.rank}`, r.beats));
+  addSeg('top', S.top.beats);
+  const seg = (id: string) => SEGS.find((s) => s.id === id) as Seg;
+
+  const extra = (scene: string, obj: string) => (FC[`${scene}_extra`] as Record<string, Box>)[obj];
+  const point = (c: RCam) => (c.on ? faceOf(FC, c.on[0], c.on[1]) : c.obj ? center(extra(c.obj[0], c.obj[1])) : {x: c.x ?? 0.5, y: c.y ?? 0.45});
+  const camOf = (c: RCam, z = 1.3, tx = 540, ty = 700) => {
+    const p = point(c);
+    return cam(p.x, p.y, c.z ?? z, c.tx ?? tx, c.ty ?? ty);
+  };
+
+  const SCENES: Scene[] = [
+    {img: S.hook.img, from: 0, to: seg('hook').to, keys: [{at: 0, cam: camOf(S.hook.cam, 1.3, 560, 540)}], drift: 0.05, punch: false},
+    ...S.ranks.map((r): Scene => {
+      const s = seg(`r${r.rank}`);
+      return {img: r.img, from: s.from, to: s.to, keys: [{at: s.from, cam: camOf(r.cam)}], drift: 0.08, punch: true};
+    }),
+    {img: S.top.img, from: seg('top').from, to: seg('top').to, keys: [{at: seg('top').from, cam: camOf(S.top.cam, 1.1, 540, 800)}], drift: 0.04, filter: 'blur(6px)'},
+  ];
+
+  const Comp: React.FC = () => {
+    const frame = useCurrentFrame();
+    const cur = SEGS.find((s) => frame >= s.from && frame < s.to) ?? SEGS[SEGS.length - 1];
+    const rankNow = cur.id.startsWith('r') ? Number(cur.id.slice(1)) : cur.id === 'hook' ? 11 : 1;
+    return (
+      <AbsoluteFill style={{backgroundColor: C.cream}}>
+        {SCENES.map((sc) => (
+          <SceneView key={sc.img + sc.from} sc={sc} />
+        ))}
+        <AbsoluteFill style={{background: 'linear-gradient(180deg, rgba(40,25,20,0.36) 0%, rgba(40,25,20,0) 28%, rgba(40,25,20,0) 60%, rgba(40,25,20,0.3) 100%)'}} />
+        {S.ranks.map((r) => {
+          const s = seg(`r${r.rank}`);
+          return (
+            <React.Fragment key={r.rank}>
+              <RankBadge rank={r.rank} x={BADGE.x} y={BADGE.y} from={s.from} to={s.to} />
+              <ItemCard text={r.item} label={S.itemLabel} cy={ITEM_Y} from={s.b(0.5)} to={s.to} todo={r.todo} />
+              <CountStamp x={STAMP.x} y={STAMP.y} count={r.value} from={s.b(1.5)} rollTo={s.b(2.5)} to={s.to} label={S.value.label} unit={S.value.unit} decimals={S.value.decimals} />
+              {r.tsukkomi && <Tsukkomi text={r.tsukkomi} cy={TSUK_Y} from={s.b(3)} to={s.to} />}
+            </React.Fragment>
+          );
+        })}
+        <TopTeaser from={seg('top').from} to={seg('top').to} b={seg('top').b} cta={S.top.cta} sub={S.top.sub} />
+        <FastHook title={S.hook.title} chip={S.hook.chip} to={seg('hook').to} b={seg('hook').b} />
+        {SEGS.filter((s) => s.id !== 'hook').map((s) => (
+          <Flash key={s.id} at={s.from} />
+        ))}
+        <Header series={S.header.series} episode={S.header.episode} item={0} since={0} dots={false} />
+        <RankStrip cur={rankNow} since={cur.from} />
+        <SourceLine source={S.source} note={S.note} />
+      </AbsoluteFill>
+    );
+  };
+  return {Comp, duration: cursor};
+};
