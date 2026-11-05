@@ -2144,7 +2144,7 @@ test('印刷の画面のページの名前（1枚目・2枚目ではなく、申
   assert.deepEqual(printLabels([pg('写真', 'photo', 1), pg('写真 (2)', 'photo', 1)]), ['写真①（1）', '写真①（2）']);
 });
 
-test('事業所番号のマス：申請書の営業所の介護保険の事業所番号（田川市・田川郡は田川営業所の 4071901971。原本は行橋営業所の番号のまま。ユーザーの指示 2026-11-05）', () => {
+test('事業所番号・受領委任契約番号のマス：申請書の営業所の番号（田川市・田川郡は田川営業所の 4071901971・受領委任契約番号は空。原本は行橋営業所の番号のまま。ユーザーの指示 2026-11-05）', () => {
   const box = (bytes: Uint8Array, name: string, start: string, row: number) => {
     const sh = sheets(bytes).byName.get(name)!;
     const at = (c: string) => cell(sh, `${c}${row}`).match(/<v>(\d)<\/v>|<t[^>]*>(\d)<\/t>/)?.slice(1).find(Boolean) ?? '';
@@ -2156,15 +2156,20 @@ test('事業所番号のマス：申請書の営業所の介護保険の事業�
   const B = '様式第7号（住宅改修費支給申請書（受領委任払用）';
   const yk = {...RATES, ...settingsForOffice(defaultSettings(), '行橋営業所')};
   assert.equal(OFFICES.find((o) => o.name === '田川営業所')?.jigyoshoNo, '4071901971');
-  // 田川市のお客様：田川営業所の番号（受領委任契約番号 2012 は原本のまま）
+  // 田川市のお客様：田川営業所の番号。受領委任契約番号は分からないので空のマス（ユーザーの答え「今はわからないので空白にしてください」2026-11-05。
+  // 前は原本の行橋営業所の 2012 のままだった）
   const tagawa = fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(job({insurer: 'kouiki', address: '福岡県田川市見本1-1'}), yk));
   assert.equal(box(tagawa, A, 'X', 21), '4071901971');
   assert.equal(box(tagawa, B, 'T', 32), '4071901971');
-  assert.equal(box(tagawa, A, 'AD', 20).slice(0, 4), '2012');
-  // 築上町のお客様（行橋営業所のまま）：行橋営業所の番号
+  assert.equal(box(tagawa, A, 'AD', 20).slice(0, 4), '');
+  assert.equal(box(tagawa, B, 'Z', 31).slice(0, 4), '');
+  // 築上町のお客様（行橋営業所のまま）：行橋営業所の番号・受領委任契約番号 2012
   const chikujo = fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(job({insurer: 'kouiki', address: '福岡県築上郡築上町椎田1-1'}), yk));
   assert.equal(box(chikujo, A, 'X', 21), '4072601802');
   assert.equal(box(chikujo, B, 'T', 32), '4072601802');
+  assert.equal(box(chikujo, A, 'AD', 20).slice(0, 4), '2012');
+  assert.equal(box(chikujo, B, 'Z', 31).slice(0, 4), '2012');
+  assert.equal(OFFICES.find((o) => o.name === '田川営業所')?.juryoNo, undefined);
   // 飯塚営業所で開いた広域連合（嘉麻市など。営業所は設定のまま）：飯塚営業所の番号
   const iz = {...RATES, ...settingsForOffice(defaultSettings(), '飯塚営業所')};
   assert.equal(box(fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(job({insurer: 'kouiki', address: '福岡県嘉麻市見本1'}), iz)), A, 'X', 21), '4071804183');
