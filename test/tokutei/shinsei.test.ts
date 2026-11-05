@@ -258,7 +258,7 @@ test('広域連合：支払方法が受領委任払いなら受領委任払用�
   assert.equal(readCell(f, sh, 'M29'), '福岡県行橋市大字流末1327番地');
   assert.equal(readCell(f, sh, 'M31'), '0930-26-9640');
   assert.equal(['S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'AA', 'AB'].map((c) => readCell(f, sh, `${c}34`)).join(''), '4072601802'); // 事業所番号
-  assert.equal(['Z33', 'AA33', 'AB33'].map((r) => readCell(f, sh, r)).join(''), '802'); // 受領委任契約番号も原本のまま
+  assert.equal(['Z33', 'AA33', 'AB33'].map((r) => readCell(f, sh, r)).join(''), '802'); // 受領委任契約番号（行橋営業所の番号）
   assert.equal(readCell(f, sh, 'L38'), '被保険者氏名'); // 委任状の氏名は自署（原本のまま。「空けて自署にする」2026-10-26）
   assert.equal(readCell(f, sh, 'G40'), ''); // 口座の欄は書かない
   assert.equal(ellipseCount(f, sh), 3); // 元号（昭）・性別・居宅サービス計画の届出（有）
@@ -843,6 +843,10 @@ test('事業所番号：営業所の一覧に19営業所の事業所番号（チ
   const t = OFFICES.find((o) => o.name === '田川営業所')!;
   assert.deepEqual([readCell(f, sh, 'M29'), readCell(f, sh, 'M30'), readCell(f, sh, 'M31')], [t.address, '太陽シルバーサービス株式会社田川営業所', t.tel]);
   assert.equal(['S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'AA', 'AB'].map((c) => readCell(f, sh, `${c}34`)).join(''), '4071901971');
+  // 受領委任契約番号：田川営業所は分からないので空のマス（ユーザーの答え「今はわからないので空白にしてください」2026-11-05。前は原本の行橋営業所の 802 のまま）
+  assert.equal(['Z33', 'AA33', 'AB33'].map((r) => readCell(f, sh, r) ?? '').join(''), '');
+  assert.equal(OFFICES.find((o) => o.name === '田川営業所')?.juryoNo, undefined);
+  assert.equal(OFFICES.find((o) => o.name === '行橋営業所')?.juryoNo, '802');
   // 行橋市の受領委任払の申請書：事業者番号（Z4:AI4）。行橋営業所の設定なら行橋営業所の番号、田川営業所の設定なら田川営業所の番号
   const cols = ['Z', 'AA', 'AB', 'AC', 'AD', 'AE', 'AF', 'AG', 'AH', 'AI'];
   const yk = fill('yukuhashi');

@@ -68,6 +68,7 @@ export type ShinseiSeller = {
   providerNo: string; // 特定福祉用具販売の事業者番号（数字だけ）
   fullName?: string; // 太陽シルバーサービス株式会社田川営業所（株式会社のまま・すき間なし。広域連合の受領委任事業者の名称。原本と同じ書き方）
   entrustRegNo: string; // 久留米市の受領委任払取扱事業所登録番号（数字だけ。設定）
+  juryoNo?: string; // 広域連合の受領委任契約番号（数字だけ。申請書の営業所の番号。分からない営業所は空）
 };
 
 /** 申請書に書く値（案件・設定・計算から作る。どの様式でも同じ） */
@@ -192,6 +193,7 @@ export function shinseiValues(sale: Sale, settings: Settings): ShinseiValues {
       rep: s.manager.trim() ? `所長　${s.manager.trim()}` : '',
       providerNo: (s.providerNo ?? '').normalize('NFKC').replace(/\D/g, ''),
       entrustRegNo: (s.entrustRegNo ?? '').normalize('NFKC').replace(/\D/g, ''),
+      juryoNo: OFFICES.find((o) => o.name === s.officeName.trim())?.juryoNo ?? '',
     },
   };
 }
@@ -416,7 +418,8 @@ function kouikiJuryo(v: ShinseiValues): SheetWrite {
     sheet: KOUIKI_SHEETS.juryo,
     // 保険者番号（原本は 406470＝築上町。構成市町村ごとに番号がちがうので、選んだ番号で書きかえる。ユーザーの指示 2026-10-29）
     // 申請者（受領委任事業者）の住所・名称・電話と事業所番号は、申請書の営業所（田川市・田川郡は田川営業所。shinseiSettings）。原本は行橋営業所のままだった
-    // （ユーザーの指示「田川営業所の事業所番号に変えてください」2026-11-05）。受領委任契約番号（Z33:AB33）は原本のまま
+    // （ユーザーの指示「田川営業所の事業所番号に変えてください」2026-11-05）。受領委任契約番号（Z33:AB33）も申請書の営業所の番号。
+    // 分からない営業所（田川営業所）は空のマス（ユーザーの答え「今はわからないので空白にしてください」2026-11-05。原本は行橋営業所の 802 のままだった）
     cells: [
       ...kouikiCells(v, c, birthChoice(v, '明 ・ 大 ・ 昭　')),
       ['Z9', v.tel],
@@ -425,6 +428,7 @@ function kouikiJuryo(v: ShinseiValues): SheetWrite {
       ...when(seller.fullName || seller.name, [['M30', seller.fullName || seller.name]]),
       ...when(seller.tel, [['M31', seller.tel]]),
       ...providerBoxes(v, 'S', 34),
+      ...juryoBoxes(v, 'Z', 3, 33),
     ],
     block: kouikiPlan(c, v),
     fit: kouikiFit(c),
@@ -440,6 +444,13 @@ function kouikiJuryo(v: ShinseiValues): SheetWrite {
  */
 const providerBoxes = (v: ShinseiValues, start: string, row: number): [string, CellValue][] =>
   boxes(start, 10, row).map((ref, i): [string, CellValue] => [ref, v.seller.providerNo.length === 10 ? Number(v.seller.providerNo[i]) : '']);
+
+/** 受領委任契約番号のマス（広域連合の受領委任払用）：右に寄せて数で書く。分からない・入らないときは空のマス（原本の行橋営業所の番号を残さない） */
+const juryoBoxes = (v: ShinseiValues, start: string, n: number, row: number): [string, CellValue][] => {
+  const d = v.seller.juryoNo ?? '';
+  const pad = n - d.length;
+  return boxes(start, n, row).map((ref, i): [string, CellValue] => [ref, d && pad >= 0 && i >= pad ? Number(d[i - pad]) : '']);
+};
 
 /** 保険者番号の6マス（広域連合の様式。1字ずつの欄。原本の数と同じく数で書く） */
 const insurerBoxes = (v: ShinseiValues, start: string, row: number): [string, CellValue][] =>
