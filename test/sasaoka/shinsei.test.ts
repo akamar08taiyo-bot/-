@@ -2143,3 +2143,34 @@ test('印刷の画面のページの名前（1枚目・2枚目ではなく、申
   // 同じ名前が2つ（同じ写真番号の用紙が2枚など）は（1）（2）
   assert.deepEqual(printLabels([pg('写真', 'photo', 1), pg('写真 (2)', 'photo', 1)]), ['写真①（1）', '写真①（2）']);
 });
+
+test('事業所番号のマス：申請書の営業所の介護保険の事業所番号（田川市・田川郡は田川営業所の 4071901971。原本は行橋営業所の番号のまま。ユーザーの指示 2026-11-05）', () => {
+  const box = (bytes: Uint8Array, name: string, start: string, row: number) => {
+    const sh = sheets(bytes).byName.get(name)!;
+    const at = (c: string) => cell(sh, `${c}${row}`).match(/<v>(\d)<\/v>|<t[^>]*>(\d)<\/t>/)?.slice(1).find(Boolean) ?? '';
+    const n0 = [...start].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
+    const col = (n: number): string => (n > 26 ? col(Math.floor((n - 1) / 26)) : '') + String.fromCharCode(65 + ((n - 1) % 26));
+    return Array.from({length: 10}, (_, i) => at(col(n0 + i))).join('');
+  };
+  const A = '様式第2号（住宅改修承認申請書）';
+  const B = '様式第7号（住宅改修費支給申請書（受領委任払用）';
+  const yk = {...RATES, ...settingsForOffice(defaultSettings(), '行橋営業所')};
+  assert.equal(OFFICES.find((o) => o.name === '田川営業所')?.jigyoshoNo, '4071901971');
+  // 田川市のお客様：田川営業所の番号（受領委任契約番号 2012 は原本のまま）
+  const tagawa = fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(job({insurer: 'kouiki', address: '福岡県田川市見本1-1'}), yk));
+  assert.equal(box(tagawa, A, 'X', 21), '4071901971');
+  assert.equal(box(tagawa, B, 'T', 32), '4071901971');
+  assert.equal(box(tagawa, A, 'AD', 20).slice(0, 4), '2012');
+  // 築上町のお客様（行橋営業所のまま）：行橋営業所の番号
+  const chikujo = fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(job({insurer: 'kouiki', address: '福岡県築上郡築上町椎田1-1'}), yk));
+  assert.equal(box(chikujo, A, 'X', 21), '4072601802');
+  assert.equal(box(chikujo, B, 'T', 32), '4072601802');
+  // 飯塚営業所で開いた広域連合（嘉麻市など。営業所は設定のまま）：飯塚営業所の番号
+  const iz = {...RATES, ...settingsForOffice(defaultSettings(), '飯塚営業所')};
+  assert.equal(box(fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(job({insurer: 'kouiki', address: '福岡県嘉麻市見本1'}), iz)), A, 'X', 21), '4071804183');
+  // 一覧にない営業所の名前：ほかの営業所の番号を書かない（空のマス）
+  assert.equal(box(fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(job({insurer: 'kouiki', address: '福岡県築上郡築上町椎田1-1'}), {...yk, officeName: '見本営業所'})), A, 'X', 21), '');
+  // 行橋市の受領委任払の申請書（事業者番号 Z4:AI4）
+  const ykh = fillShinsei(TEMPLATES.yukuhashi, SHINSEI.yukuhashi!, shinseiValues(job({insurer: 'yukuhashi', address: '福岡県行橋市見本1'}), yk));
+  assert.equal(box(ykh, '住改・受領委任払', 'Z', 4), '4072601802');
+});

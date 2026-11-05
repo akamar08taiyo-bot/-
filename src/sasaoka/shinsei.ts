@@ -38,6 +38,9 @@ export type ShinseiSheet = {
   // 何か書いたら、書かない種類の欄は「－」（福岡市の記載例と同じ）
   kindCells?: string[];
   insurerNo?: string[]; // 保険者番号の6マス（福岡市・広域連合。選んだ番号・保険証から読んだ番号、なければ住所から。insurerNumbers.ts）
+  // 事業所番号の10マス（広域連合の承認申請書・支給申請書、行橋市の受領委任払の申請書）。申請書の営業所の介護保険の事業所番号（defaults.ts の OFFICES）。
+  // 原本は行橋営業所の番号のままだった（ユーザーの指示「田川営業所の事業所番号に変えてください」2026-11-05）。一覧にない営業所なら空（ほかの営業所の番号を書かない）
+  providerNo?: string[];
   // 受領委任払い取扱事業所登録番号のマス（久留米市。左の2マスは斜線）。設定の登録番号を右に寄せて書く（8けたなら右の8マス）。入っていなければ空のまま＝手で
   entrustRegNo?: string[];
   // 改修の種類ごとの行の□（北九州市の事前届出書「□手すり取付」と、その行の「□玄関・屋外　□廊下・階段…」「□洗面脱衣室　□その他（　）」）：
@@ -512,6 +515,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
         name: 'F5',
         address: 'F11',
         insuredNo: boxes('Z', 10, 7),
+        providerNo: boxes('Z', 10, 4),
         works: 'F14',
         marks: [ERA('F9'), GENDER('Y9'), CARE('F12', ['１', '２'])],
         texts: [
@@ -570,6 +574,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
         insuredNo: boxes('X', 10, 7),
         // 保険者番号（原本は 406470＝築上町。構成市町村ごとに番号がちがうので、選んだ番号で書きかえる。ユーザーの指示 2026-10-29）
         insurerNo: boxes('AB', 6, 5),
+        providerNo: boxes('X', 10, 21), // 住宅改修事業者の事業所番号（受領委任契約番号 AD20:AG20 は原本のまま）
         marks: [GENDER('AB8'), RENOVATED('Y22')],
         texts: [
           T('J5', '{kana}'),
@@ -591,6 +596,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
         address: 'J10',
         insuredNo: boxes('X', 10, 7),
         insurerNo: boxes('AB', 6, 5),
+        providerNo: boxes('T', 10, 32), // 住宅改修事業者の事業所番号（受領委任契約番号 Z31:AC31 は原本のまま）
         marks: [GENDER('AB8'), RENOVATED('X16')],
         texts: [
           T('J5', '{kana}'),
@@ -998,6 +1004,7 @@ export type ShinseiValues = {
   insuredNo: string;
   insurerNo: string; // 保険者番号（6けた。福岡市・広域連合の申請書のマス。選んだ番号・保険証から読んだ番号、なければ住所の市町村・区から）
   entrustRegNo?: string; // 受領委任払い取扱事業所登録番号（数字だけ。設定の久留米市の登録番号）
+  providerNo?: string; // 申請書の営業所の介護保険の事業所番号（10けた。一覧にない営業所は空）
   works: string[];
   kinds: ShinseiKind[];
   photos: Record<number, string>; // 写真番号 → 改修場所（写真貼付用紙の改修箇所）
@@ -1465,6 +1472,7 @@ export function shinseiValues(job: Job, settings: EstimateSettings & BuilderSett
     // 選んだ保険者番号（介護保険証から読んだ番号も）、なければ住所の市町村・区から（insurerNumbers.ts。福岡市は区・広域連合は構成市町村）
     insurerNo: insurerNoOf(jobInsurer(job), job.address, cardInsurer),
     entrustRegNo: t(s.entrustRegNo ?? '').replace(/\D/g, ''),
+    providerNo: OFFICES.find((o) => o.name === (s.officeName ?? '').trim())?.jigyoshoNo ?? '',
     works: shinseiWorks(job, s),
     kinds,
     kindNames: KINDS.map((_, i) => [...new Set(workItems(job, s).filter((w) => w.kind === i + 1 && w.line).map((w) => w.name).filter(Boolean))]),
@@ -1837,6 +1845,11 @@ export function shinseiCells(sheet: ShinseiSheet, v: ShinseiValues, photo = 0): 
   });
   if (sheet.kindCells) for (const [ref, text] of kindCellTexts(sheet.kindCells, v)) out.set(ref, text);
   if (sheet.insurerNo && v.insurerNo) sheet.insurerNo.forEach((ref, i) => out.set(ref, v.insurerNo[i] ?? ''));
+  if (sheet.providerNo && v.providerNo !== undefined) {
+    // 10けたそろっていなければ空のマス（原本の行橋営業所の番号を残さない）
+    const ok = v.providerNo.length === sheet.providerNo.length;
+    sheet.providerNo.forEach((ref, i) => out.set(ref, ok ? v.providerNo![i] : ''));
+  }
   if (sheet.entrustRegNo && v.entrustRegNo) {
     // 右に寄せる（記入例は8けたで、左の2マスは斜線）
     const digits = v.entrustRegNo.slice(-sheet.entrustRegNo.length);
