@@ -112,3 +112,9 @@ node scripts/render.mjs honne09 && python3 -I scripts/finish.py --ep honne09   #
   - もう一度 `build_kit.py` を通してから公開し直す。
   - README の表に足す。
 - **保存と送付**：ブランチ `claude/honne-aruaru-video` に commit して push し、3本をユーザーに送る。
+
+## ユーザーへの返事のしかた
+
+返事の一番下に、毎回、投稿キットのリンクを付ける（ユーザーの希望。すぐ飛べるように）。
+
+投稿キット：https://claude.ai/artifact/9gc3QC3EpoCRMARJpYnmAT
