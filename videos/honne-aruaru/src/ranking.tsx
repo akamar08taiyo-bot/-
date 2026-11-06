@@ -108,7 +108,8 @@ export const QuoteCard: React.FC<{text: string; note?: string; who?: string; cy:
 };
 
 // ───────── しのぶのツッコミ（暗い手書きのカード。右から入る） ─────────
-export const Tsukkomi: React.FC<{text: string; cy: number; from: number; to: number}> = ({text, cy, from, to}) => {
+// label は吹き出しの札（既定は「しのぶ」。しのぶの出ない回は「ひとこと」など）
+export const Tsukkomi: React.FC<{text: string; cy: number; from: number; to: number; label?: string}> = ({text, cy, from, to, label = 'しのぶ'}) => {
   const frame = useCurrentFrame();
   if (frame < from || frame >= to) return null;
   const lines = text.split('|');
@@ -143,7 +144,7 @@ export const Tsukkomi: React.FC<{text: string; cy: number; from: number; to: num
             whiteSpace: 'nowrap',
           }}
         >
-          しのぶ
+          {label}
         </div>
         {lines.map((l, i) => (
           <div key={i} style={{fontFamily: F.hand, fontSize: fs, lineHeight: 1.35, color: '#fff', whiteSpace: 'pre'}}>

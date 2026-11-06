@@ -1,0 +1,120 @@
+{
+ "id": "rank01",
+ "title": "マジで家庭がうまくいくランキングTOP10【1位はコメント欄】",
+ "silent": true,
+ "fast": true,
+ "bpm": 120,
+ "header": {
+  "series": "本音あるある",
+  "episode": "家庭がうまくいくTOP10"
+ },
+ "source": "出典：アニヴェルセル総研 第103弾「夫婦円満の秘訣ランキング」全国20〜39歳の既婚男女208人（2024年3〜4月）",
+ "note": "※ひと言は編集部のコメントです",
+ "value": {
+  "label": "回答",
+  "unit": "%",
+  "decimals": 1
+ },
+ "itemLabel": "夫婦円満の秘訣",
+ "tsukLabel": "ひとこと",
+ "hook": {
+  "beats": 5,
+  "emoji": [
+   "🏠",
+   "💕",
+   "💬",
+   "🙏",
+   "✨",
+   "🤝"
+  ],
+  "bg": [
+   "#FFE29F",
+   "#FF719A"
+  ],
+  "title": [
+   "マジで家庭が",
+   "うまくいく",
+   "ランキングTOP10"
+  ],
+  "chip": "既婚男女208人に聞いた「夫婦円満の秘訣」"
+ },
+ "ranks": [
+  {
+   "rank": 10,
+   "beats": 6,
+   "item": "（未確認）",
+   "value": 0,
+   "emoji": "🎮",
+   "todo": true,
+   "tsukkomi": "同じものを見て|笑う時間。"
+  },
+  {
+   "rank": 9,
+   "beats": 6,
+   "item": "（未確認）",
+   "value": 0,
+   "emoji": "📱",
+   "todo": true,
+   "tsukkomi": "「今から帰る」の|ひと言で。"
+  },
+  {
+   "rank": 8,
+   "beats": 6,
+   "item": "（未確認）",
+   "value": 0,
+   "emoji": "✈️",
+   "todo": true,
+   "tsukkomi": "近場の日帰りでも|じゅうぶん。"
+  },
+  {
+   "rank": 7,
+   "beats": 6,
+   "item": "（未確認）",
+   "value": 0,
+   "emoji": "🧹",
+   "todo": true,
+   "tsukkomi": "“手伝う”じゃなく、|“分ける”。"
+  },
+  {
+   "rank": 6,
+   "beats": 6,
+   "item": "干渉しすぎない",
+   "value": 20.2,
+   "emoji": "🌿",
+   "todo": true,
+   "tsukkomi": "ひとりの時間も、|家族の時間。"
+  },
+  {
+   "rank": 5,
+   "beats": 6,
+   "item": "好きな気持ちを伝える",
+   "value": 27.9,
+   "emoji": "💕",
+   "todo": true,
+   "tsukkomi": "言わなくても伝わる、|は幻想。"
+  },
+  {
+   "rank": 4,
+   "beats": 6,
+   "item": "約束を守る",
+   "value": 31.7,
+   "emoji": "🤝",
+   "todo": true,
+   "tsukkomi": "小さい約束ほど、|効きます。"
+  },
+  {
+   "rank": 3,
+   "beats": 7,
+   "item": "ごめんねと素直に言う",
+   "value": 35.1,
+   "emoji": "🙇",
+   "todo": true,
+   "tsukkomi": "先に言った方が、|勝ち。"
+  }
+ ],
+ "top": {
+  "beats": 8,
+  "cta": "1位は固定コメントへ",
+  "sub": "1位は、なんと2つ。"
+ }
+}

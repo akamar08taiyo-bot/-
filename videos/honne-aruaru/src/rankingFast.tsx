@@ -15,9 +15,11 @@ export type FRank = {
   beats: number;
   item: string; // 調査の選択肢の言葉そのまま。| で改行
   value: number; // 調査の数字（割合なら 39.4）
-  tsukkomi?: string; // しのぶのひと言（再現）。| で改行
-  img: string;
-  cam: RCam;
+  tsukkomi?: string; // ひと言（再現）。| で改行
+  img?: string; // 絵（public からの場所）。無い順位は emoji と bg の色の画面にする
+  cam?: RCam;
+  emoji?: string; // 絵の代わりの大きな絵文字（しのぶの出ない回）
+  bg?: [string, string]; // 絵文字の画面の背景のグラデーション（上, 下）
   todo?: boolean; // 元の調査でまだ確かめていない順位（finish.py はこれが残っていると書き出しを止める）
 };
 export type FScript = {
@@ -28,9 +30,10 @@ export type FScript = {
   note?: string; // 例「※イラスト・ひと言は再現イメージです」
   value: {label: string; unit: string; decimals: number}; // はんこの見出しと単位（例：回答 / % / 1）
   itemLabel?: string; // 項目のカードの札（例「妻が挙げた理由」）
-  hook: {beats: number; img: string; cam: RCam; title: [string, string, string]; chip: string};
+  tsukLabel?: string; // ひと言の吹き出しの札（既定は「しのぶ」）
+  hook: {beats: number; img?: string; cam?: RCam; emoji?: string[]; bg?: [string, string]; title: [string, string, string]; chip: string};
   ranks: FRank[]; // 10位〜2位
-  top: {beats: number; img: string; cam: RCam; cta: string; sub?: string};
+  top: {beats: number; img?: string; cam?: RCam; cta: string; sub?: string};
 };
 
 const TSUK_Y = 1395;
@@ -104,6 +107,44 @@ const ItemCard: React.FC<{text: string; label?: string; cy: number; from: number
         ))}
       </div>
     </div>
+  );
+};
+
+// 絵の代わりの画面（しのぶの出ない回）：グラデーションの背景に大きな絵文字。拍の頭で弾み、ゆっくり揺れる
+// cy は絵文字の中心の高さ。still は最初のコマから全部見せる（冒頭＝サムネ用）
+const EmojiStage: React.FC<{emoji: string[]; bg: [string, string]; from: number; to: number; b: (n: number) => number; big?: boolean; cy?: number; still?: boolean}> = ({
+  emoji,
+  bg,
+  from,
+  to,
+  b,
+  big = true,
+  cy = 760,
+  still = false,
+}) => {
+  const frame = useCurrentFrame();
+  if (frame < from || frame >= to) return null;
+  const p = still ? 1 : pop(frame, from, 12, 220);
+  const beatBump = [1, 2, 3, 4, 5].reduce((v, n) => v + 0.05 * (frame >= b(n) ? 1 - ramp(frame, b(n), b(n) + 6) : 0), 1);
+  const t = (frame - from) / FPS;
+  const main = emoji[0];
+  const side = emoji.slice(1);
+  return (
+    <AbsoluteFill style={{background: `linear-gradient(180deg, ${bg[0]} 0%, ${bg[1]} 100%)`}}>
+      <AbsoluteFill style={{background: 'radial-gradient(circle at 50% 40%, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 55%)'}} />
+      {side.map((e, i) => {
+        const ang = (i / Math.max(side.length, 1)) * Math.PI * 2 + 0.5 + t * 0.6;
+        const r = 330;
+        return (
+          <div key={i} style={{position: 'absolute', left: W / 2 + Math.cos(ang) * r - 60, top: cy + Math.sin(ang) * r * 0.42 - 60, fontSize: 120, opacity: 0.85 * clamp01(p * 2), transform: `rotate(${Math.sin(t * 2 + i) * 12}deg)`}}>
+            {e}
+          </div>
+        );
+      })}
+      <div style={{position: 'absolute', left: 0, top: cy, width: W, display: 'flex', justifyContent: 'center', transform: `translateY(-50%) scale(${(0.4 + 0.6 * p) * beatBump}) rotate(${Math.sin(t * 3) * 4}deg)`}}>
+        <div style={{fontSize: big ? 330 : 240, lineHeight: 1, filter: 'drop-shadow(0 18px 24px rgba(40,20,30,0.3))'}}>{main}</div>
+      </div>
+    </AbsoluteFill>
   );
 };
 
@@ -206,14 +247,16 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
     return cam(p.x, p.y, c.z ?? z, c.tx ?? tx, c.ty ?? ty);
   };
 
+  // 絵のある区切りだけ絵の場面にする（絵の無い区切りは EmojiStage）
   const SCENES: Scene[] = [
-    {img: S.hook.img, from: 0, to: seg('hook').to, keys: [{at: 0, cam: camOf(S.hook.cam, 1.3, 560, 540)}], drift: 0.05, punch: false},
-    ...S.ranks.map((r): Scene => {
+    ...(S.hook.img ? [{img: S.hook.img, from: 0, to: seg('hook').to, keys: [{at: 0, cam: camOf(S.hook.cam ?? {}, 1.3, 560, 540)}], drift: 0.05, punch: false}] : []),
+    ...S.ranks.flatMap((r): Scene[] => {
       const s = seg(`r${r.rank}`);
-      return {img: r.img, from: s.from, to: s.to, keys: [{at: s.from, cam: camOf(r.cam)}], drift: 0.08, punch: true};
+      return r.img ? [{img: r.img, from: s.from, to: s.to, keys: [{at: s.from, cam: camOf(r.cam ?? {})}], drift: 0.08, punch: true}] : [];
     }),
-    {img: S.top.img, from: seg('top').from, to: seg('top').to, keys: [{at: seg('top').from, cam: camOf(S.top.cam, 1.1, 540, 800)}], drift: 0.04, filter: 'blur(6px)'},
+    ...(S.top.img ? [{img: S.top.img, from: seg('top').from, to: seg('top').to, keys: [{at: seg('top').from, cam: camOf(S.top.cam ?? {}, 1.1, 540, 800)}], drift: 0.04, filter: 'blur(6px)'}] : []),
   ];
+  const PALETTE: [string, string][] = [['#FFB199', '#FF6F91'], ['#FFD86F', '#FC6262'], ['#A1C4FD', '#C2E9FB'], ['#84FAB0', '#8FD3F4'], ['#F6D365', '#FDA085'], ['#FBC2EB', '#A6C1EE'], ['#FDCBF1', '#E6DEE9'], ['#A8EDEA', '#FED6E3'], ['#FFECD2', '#FCB69F'], ['#C1DFC4', '#DEECDD']];
 
   const Comp: React.FC = () => {
     const frame = useCurrentFrame();
@@ -224,6 +267,10 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
         {SCENES.map((sc) => (
           <SceneView key={sc.img + sc.from} sc={sc} />
         ))}
+        {!S.hook.img && <EmojiStage emoji={S.hook.emoji ?? ['🏠']} bg={S.hook.bg ?? ['#FFE29F', '#FF719A']} from={0} to={seg('hook').to} b={seg('hook').b} big={false} cy={500} still />}
+        {S.ranks.map((r, i) =>
+          r.img ? null : <EmojiStage key={`e${r.rank}`} emoji={[r.emoji ?? '✨']} bg={r.bg ?? PALETTE[i % PALETTE.length]} from={seg(`r${r.rank}`).from} to={seg(`r${r.rank}`).to} b={seg(`r${r.rank}`).b} />,
+        )}
         <AbsoluteFill style={{background: 'linear-gradient(180deg, rgba(40,25,20,0.36) 0%, rgba(40,25,20,0) 28%, rgba(40,25,20,0) 60%, rgba(40,25,20,0.3) 100%)'}} />
         {S.ranks.map((r) => {
           const s = seg(`r${r.rank}`);
@@ -232,7 +279,7 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
               <RankBadge rank={r.rank} x={BADGE.x} y={BADGE.y} from={s.from} to={s.to} />
               <ItemCard text={r.item} label={S.itemLabel} cy={ITEM_Y} from={s.b(0.5)} to={s.to} todo={r.todo} />
               <CountStamp x={STAMP.x} y={STAMP.y} count={r.value} from={s.b(1.5)} rollTo={s.b(2.5)} to={s.to} label={S.value.label} unit={S.value.unit} decimals={S.value.decimals} />
-              {r.tsukkomi && <Tsukkomi text={r.tsukkomi} cy={TSUK_Y} from={s.b(3)} to={s.to} />}
+              {r.tsukkomi && <Tsukkomi text={r.tsukkomi} cy={TSUK_Y} from={s.b(3)} to={s.to} label={S.tsukLabel} />}
             </React.Fragment>
           );
         })}
