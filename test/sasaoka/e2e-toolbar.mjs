@@ -42,7 +42,8 @@ const TABS = [
   {tab: '📝 住宅改修申請書', book: '申請書', more: ['✉ メールで送付']},
   {tab: '📋 工事見積書', book: '見積書', more: ['✉ メールで送付', '💾 保存', '🧾 売上伝票を作成', '🛒 発注書を作成', '複製']},
   // 並び：Excelで保存・〇〇を印刷・カタログを印刷・メールで送付・販売受注簿を作成・売上伝票を作成、最後に削除（ユーザーの指示 2026-11-02）
-  {tab: '🛁 特定福祉用具申請書', book: '申請書', more: ['🖨 カタログを印刷', '✉ メールで送付'], tokutei: true},
+  // 特定福祉用具申請書のタブも販売見積書と同じ「その他」（ユーザーの指示「特定福祉用具申請書のときも、販売見積書と同様に、その他の項目を…」2026-11-06）
+  {tab: '🛁 特定福祉用具申請書', book: '申請書', more: ['🖨 カタログを印刷', '✉ メールで送付', '📤 販売受注簿を作成', '🧾 売上伝票を作成'], tokutei: true},
   {tab: '🏷 販売見積書', book: '見積書', more: ['🖨 カタログを印刷', '✉ メールで送付', '📤 販売受注簿を作成', '🧾 売上伝票を作成'], tokutei: true},
   {tab: '📄 理由書', book: '理由書', more: ['✉ メールで送付']},
 ];
@@ -131,7 +132,16 @@ await frame.locator('.print-overlay').getByRole('button', {name: '閉じる'}).c
 await (await openMore(page)).getByRole('button', {name: '🖨 カタログを印刷'}).click();
 await frame.getByRole('group', {name: '印刷するページ'}).waitFor({timeout: 30000});
 await frame.getByRole('button', {name: '閉じる', exact: true}).click();
-log('特定福祉用具申請書：Excelで保存（商品がないうちは選べない）・申請書を印刷・カタログを印刷 OK');
+// 申請書のタブでも 売上伝票を作成 で中のアプリの窓が開く・販売受注簿を作成 は商品がないうちは開かない（2026-11-06）
+await (await openMore(page)).getByRole('button', {name: '🧾 売上伝票を作成'}).click();
+await frame.getByRole('group', {name: '売上伝票に入れる内容'}).waitFor();
+await frame.getByRole('button', {name: '閉じる'}).first().click();
+const pagesBefore = ctx.pages().length;
+await (await openMore(page)).getByRole('link', {name: '📤 販売受注簿を作成'}).click();
+await frame.getByText('商品がありません').waitFor();
+await page.waitForTimeout(500);
+assert.equal(ctx.pages().length, pagesBefore); // 商品がないので開かない
+log('特定福祉用具申請書：Excelで保存（商品がないうちは選べない）・申請書を印刷・カタログを印刷・売上伝票を作成・販売受注簿を作成 OK');
 
 await open(TABS[3]);
 await (await openMore(page)).getByRole('button', {name: '🧾 売上伝票を作成'}).click();
