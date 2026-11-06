@@ -4,6 +4,7 @@
   python3 -I scripts/build_kit.py   → kit/index.html と kit/thumb/・kit/thumb_s/・kit/chars.jpg、work/kit/<回>.mp4
 
 中身は out/<回>_概要欄.txt（【タイトル】【概要欄】【タグ欄】【固定コメント】）と kit/kit.json（回の並び・ひと言・どんな回？）。
+kit.json の episodes は作った順（古い→新しい）に足していく。ページでは新しい回を上に出す（番号は作った順のまま）。
 動画は Artifact の assets に上げる（1本 20 MiB まで。work/kit/<回>.mp4 は out/<回>.mp4 を少し軽くした版）。
 返ってきた id を kit/kit.json の "vid" に書き、もう一度このスクリプトを通してから公開し直す。
 """
@@ -124,7 +125,7 @@ page = f'''<title>しのぶの失言ノート投稿キット</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Yusei+Magic&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
 <style>
-/* 配置：黒い「失言ノート」の表紙 →「動画（投稿の順番）」→「投稿の流れ」→「投稿のときの設定」→「登場人物」。スマホは一列、広い画面は動画を2列 */
+/* 配置：黒い「失言ノート」の表紙 →「動画（新しい順）」→「投稿の流れ」→「投稿のときの設定」→「登場人物」。スマホは一列、広い画面は動画を2列 */
 :root{{
   --bg:#F2EFF3; --surface:#FFFFFF; --ink:#2A2230; --ink2:#655A6A; --line:#E0D8E1; --soft:#F7F4F7;
   --pink:#C2335B; --pink-bg:#FBE6EC; --navy:#26385F; --on-navy:#FFFFFF; --stamp:#C3302C; --check:#9A6A06;
@@ -226,16 +227,16 @@ tr:last-child th,tr:last-child td{{border-bottom:0}}
     <p class="hand">はい、記録しました。</p>
     <span class="stamp" aria-hidden="true">記録</span>
   </div>
-  <p class="lead">完成した{N}本を、「動画・サムネ・タイトル・説明文・タグ・固定コメント」の1セットずつにまとめました。上から順に、スマホだけで投稿できます。</p>
+  <p class="lead">完成した{N}本を、「動画・サムネ・タイトル・説明文・タグ・固定コメント」の1セットずつにまとめました。新しく作った動画が上です。スマホだけで投稿できます。</p>
   <nav class="nav" aria-label="ページの中"><a href="#videos">動画{N}本</a><a href="#flow">投稿の流れ</a><a href="#settings">投稿のときの設定</a><a href="#chars">登場人物</a></nav>
 </header>
 
 <section id="videos">
-  <h2>動画{N}本（投稿の順番）</h2>
+  <h2>動画{N}本（新しい順）</h2>
   <p class="sec-lead">番号は投稿する順番です。同じ日に2本出さず、数日あけて反応を比べます。保存される動画は、元の動画を少し軽くした版です（見た目はほとんど変わりません）。</p>
   <div class="row"><span class="progress" id="prog">投稿済み 0 / {N}</span></div>
   <div class="cards" id="cards">
-{chr(10).join(card(e) for e in eps)}
+{chr(10).join(card(e) for e in reversed(eps))}
   </div>
 </section>
 
