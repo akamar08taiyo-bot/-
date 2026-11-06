@@ -90,7 +90,7 @@ def card(e):
             else '<p class="intro">動画は準備中です。</p>')
     return f'''<article class="vc" id="v-{k}" data-key="{k}" data-vid="{vid}">
   <span class="posted" hidden>投稿済</span>
-  <div class="vh"><span class="no">{n}</span><span class="series">{esc(e['series'])}</span><span class="dur">{e['sec']}秒</span></div>
+  <div class="vh"><span class="no">{n}</span><span class="series">{esc(e['series'])}</span>{'<span class="new">最新</span>' if n == len(eps) else ''}<span class="dur">{e['sec']}秒</span></div>
   <p class="when">{esc(e['when'])}</p>{f'{chr(10)}  <p class="note">{esc(e["note"])}</p>' if e.get('note') else ''}
   <div class="vb">
     <img class="th" src="thumb_s/{k}.jpg" alt="サムネ：{esc(e['titles'][0])}" width="135" height="240" loading="lazy">
@@ -169,6 +169,7 @@ section{{display:flex;flex-direction:column;gap:14px;scroll-margin-top:12px}}
 .vh{{display:flex;align-items:center;gap:8px;flex-wrap:wrap}}
 .no{{font-family:var(--f-display);font-size:15px;min-width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--pink-bg);color:var(--pink);border:2px solid var(--pink)}}
 .series{{font-size:12.5px;font-weight:900;color:var(--pink);background:var(--pink-bg);border-radius:99px;padding:2px 11px;white-space:nowrap}}
+.new{{font-size:12px;font-weight:900;color:var(--on-navy);background:var(--stamp);border-radius:99px;padding:2px 10px;white-space:nowrap}}
 .dur{{font-size:12.5px;color:var(--ink2);font-variant-numeric:tabular-nums}}
 .when{{margin:0;font-size:13px;font-weight:700;color:var(--ink2)}}
 .note{{margin:0;font-size:13px;font-weight:700;color:var(--pink);background:var(--pink-bg);border-radius:10px;padding:8px 12px}}
@@ -233,7 +234,7 @@ tr:last-child th,tr:last-child td{{border-bottom:0}}
 
 <section id="videos">
   <h2>動画{N}本（新しい順）</h2>
-  <p class="sec-lead">番号は投稿する順番です。同じ日に2本出さず、数日あけて反応を比べます。保存される動画は、元の動画を少し軽くした版です（見た目はほとんど変わりません）。</p>
+  <p class="sec-lead">いちばん上が最新です。番号は作った順で、大きいほど新しい動画です。同じ日に2本出さず、数日あけて反応を比べます。保存される動画は、元の動画を少し軽くした版です（見た目はほとんど変わりません）。</p>
   <div class="row"><span class="progress" id="prog">投稿済み 0 / {N}</span></div>
   <div class="cards" id="cards">
 {chr(10).join(card(e) for e in reversed(eps))}
