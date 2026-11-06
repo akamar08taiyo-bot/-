@@ -8,6 +8,8 @@
 //   ⑦ 税抜合計 ＝ ①＋②＋③＋④
 // 請求書に並べる数字が縦にも横にも合うよう、③④⑤はそれぞれ1円単位にしてから足す
 // （Excelは小数のまま持って表示だけ丸めるので、まれに1円ずれることがある）。
+// ③④は1円未満を切り捨て（ユーザーの指示「税抜金額 20792円となります」2026-11-06：① 10,685 → ③ 747.95 → 747、
+// ④ (10,685＋8,000＋747)×0.07＝1,360.24 → 1,360、⑦ 20,792。前は四捨五入で ③ 748・⑦ 20,793 だった）。
 // 請求書（1か月分）の消費税は、最初は「すべての様邸の税抜合計×消費税率」を1回だけ計算する。
 
 import type {InvoiceTaxMode, Job, Place, Row, Settings, TaxMode} from './types.ts';
@@ -104,8 +106,8 @@ export function jobTotals(job: Pick<Job, 'places'>, s: CalcSettings): JobTotals 
     material += t.material;
     labor += t.labor;
   }
-  const markup = roundYen(material * s.rate);
-  const overhead = roundYen((material + labor + markup) * s.rate);
+  const markup = rounddown(material * s.rate);
+  const overhead = rounddown((material + labor + markup) * s.rate);
   const subtotal = material + labor + markup + overhead;
   const tax = taxAmount(subtotal, s.taxRate, s.taxMode);
   return {material, labor, markup, overhead, subtotal, tax, total: subtotal + tax};

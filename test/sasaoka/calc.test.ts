@@ -131,6 +131,13 @@ test('jobTotals は元の仕切り計算表と同じ（Excelの記入例と同�
   assert.equal(t.subtotal + t.tax, t.total);
 });
 
+test('jobTotals：③部材上乗せ・④諸経費は1円未満を切り捨て（ユーザーの指示「税抜金額 20792円となります」2026-11-06。前は四捨五入で1円多かった）', () => {
+  // ① 10,010 → ③ 700.7 → 700（四捨五入なら 701）、④ (10,010＋5,000＋700)×0.07＝1,099.7 → 1,099、⑦ 16,809（四捨五入なら 16,811）
+  const t = jobTotals(job([[mat(10010, 1, '見本の部材'), lab(5000, 1)]]), S);
+  assert.deepEqual([t.material, t.labor, t.markup, t.overhead, t.subtotal], [10010, 5000, 700, 1099, 16809]);
+  assert.equal(t.total, t.subtotal + t.tax);
+});
+
 test('jobTotals：Excelのテスト「1件目」（田中様邸）と同じ', () => {
   const j = job([[mat(3800, 2), mat(4500, 1)], [lab(1000, 4), lab(1500, 2), lab(1000, 2), lab(3000, 1)]]);
   const t = jobTotals(j, S);
@@ -147,7 +154,7 @@ test('monthSummary：様邸ごとの消費税を足す設定', () => {
   const c = job([[mat(20000, 1)]], {date: '2026-10-25'});
   const m = monthSummary([c, b, a], S);
   assert.deepEqual(m.rows.map((r) => r.job.id), [a.id, b.id, c.id]); // 施工日順
-  assert.equal(m.sum.subtotal, 26693 + 83621 + 22898);
+  assert.equal(m.sum.subtotal, 26693 + 83620 + 22898); // b の④ 78,150×0.07＝5,470.5 → 切り捨て 5,470（2026-11-06。前は四捨五入の 5,471）
   assert.equal(m.invoice.tax, m.sum.tax);
   assert.equal(m.invoice.total, m.sum.total);
   assert.equal(m.invoice.total, m.rows.reduce((s, r) => s + r.totals.total, 0));
