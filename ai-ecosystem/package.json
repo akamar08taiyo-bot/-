@@ -1,0 +1,22 @@
+{
+  "name": "ai-ecosystem",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Claude Code を入口にしたAI環境の補助スクリプト（判定AI・画像判定・音声・画像生成・Discordまとめ）",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "judge:text": "node scripts/judge-text.mjs",
+    "judge:image": "node scripts/judge-image.mjs",
+    "tts": "node scripts/tts-elevenlabs.mjs",
+    "image": "node scripts/image-generate.mjs",
+    "digest:discord": "node bots/discord-digest.mjs",
+    "check": "node --check scripts/judge-text.mjs && node --check scripts/judge-image.mjs && node --check scripts/tts-elevenlabs.mjs && node --check scripts/image-generate.mjs && node --check bots/discord-digest.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
+    "openai": "^7.53.0"
+  }
+}

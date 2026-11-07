@@ -31,6 +31,16 @@
 計算ロジックは `src/mortgage/calc.ts`（元利均等返済・見直しごとの返済額再計算＝いわゆる「5年ルール」に近い方式）。
 上昇幅やタイミングは想定の一例であり、実際の適用金利・ルール・諸費用は金融機関によって異なる。
 
+## AI環境（Claude Code を入口にした作業環境）
+
+このリポジトリには、Claude Code で開いたときに働く AI 環境も入っている。
+判断AI（ジェブ）による段取りと成果物の検品、削除やお金・公開の前に止める安全設定、文章とデザインの自動チェック、
+動画・画像・スライド・記事・議事録・請求書・SNS などのエージェントスキル、Obsidian 形式のナレッジ、案件別のデザインシステム。
+
+- 全体図と各要素の対応表: `ai-ecosystem/README.md`
+- 自分のPCでやる設定（1Password・Codex・Gemini・Obsidian・Discord ボットなど）: `ai-ecosystem/SETUP.md`
+- 共通ルール: `CLAUDE.md`
+
 ## 技術スタック
 
 - フロントエンド: React 19 + TypeScript + Vite（マルチページ）+ Tailwind CSS 4（GitHub Pagesでホスティング）
