@@ -27,9 +27,9 @@ description: YouTubeサムネイル・バナー・SNS用画像・漫画のコマ
 
 1. `judge-image.mjs` の結果で `type` が `pii` の指摘を見る。`bbox` は画像の幅・高さに対する割合 `[x, y, w, h]`。
 2. 画像のサイズ（`ffprobe -v error -show_entries stream=width,height -of csv=p=0 in.png`）を掛けてピクセルに直し、少し大きめ（上下左右に10px程度）にする。
-3. その範囲だけぼかす（例: 幅1280・高さ720の画像で、x=100, y=40, w=300, h=60 の範囲）。
+3. その範囲だけモザイク（ピクセル化）にする（例: x=100, y=40, w=300, h=30 の範囲）。いったん1/10に縮めてから元の大きさに戻すので、文字1行分の細い範囲でも使える。
    ```bash
-   ffmpeg -y -i in.png -filter_complex "[0:v]crop=300:60:100:40,boxblur=20:5[m];[0:v][m]overlay=100:40" out.png
+   ffmpeg -y -i in.png -filter_complex "[0:v]crop=300:30:100:40,scale=iw/10:-2,scale=300:30:flags=neighbor[m];[0:v][m]overlay=100:40" out.png
    ```
-   範囲が複数あるときは、この処理を範囲の数だけ繰り返す。
+   範囲が複数あるときは、この処理を範囲の数だけ繰り返す。（`boxblur` のぼかしは、高さが小さい範囲だとエラーになるので使わない）
 4. AIが返す範囲はずれることがあるので、モザイク後の画像をもう一度 `judge-image.mjs` に通し、読めないことを確かめる。

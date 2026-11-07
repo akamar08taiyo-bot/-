@@ -109,7 +109,7 @@ flowchart LR
 | 動画の要素 | 再現したもの | 状態 |
 | --- | --- | --- |
 | Google Workspace コネクター（Gmail・ドライブ・カレンダー） | claude.ai のコネクター | 要接続 |
-| Slack・Discord・Notion | claude.ai のコネクターで追加 | 要PC設定 |
+| Slack・Discord・Notion | claude.ai のコネクターで追加 | 要接続 |
 | マネーフォワード（請求書・仕訳・資産表） | `.claude/skills/invoice-moneyforward`（接続は各自） | 要PC設定 |
 | Figma（ワイヤーフレーム・イメージ図） | claude.ai のコネクター | 要接続 |
 | 動画生成 API（Seedance など） | 呼び出しスクリプトは未作成。`ad-video` スキルに「使うサービスを決めたらスクリプトを足す」と組み込む位置だけ書いた | 未実装 |
@@ -177,11 +177,15 @@ ai-ecosystem/
 | 操作 | 扱い |
 | --- | --- |
 | 保護フォルダ（`.git`・`.claude`・`.env`・`CLAUDE.md`・`knowledge`・`design-systems`）の削除・移動 | 停止 |
-| ルート・ホーム・プロジェクト全体の削除、強制 push、`.env` への書き込み | 停止 |
-| 外部サービス上の削除・消去（trash・delete・clear など） | 停止 |
-| それ以外のファイル削除（`find -exec rm`、`bash -c`、`$( )` の中、`cd` してからの削除も含む） | 確認 |
-| 安全設定（`.claude/settings*.json`・`.claude/hooks/`）の書き換え | 確認 |
-| 送信・返信・課金・公開・デプロイ・共有・招待などの外部サービス操作 | 確認 |
-| プロジェクト内のビルド成果物（dist など）と一時フォルダの削除、読み取り系の操作 | そのまま通す |
+| ルート・ホーム・プロジェクト全体の削除、強制 push（`-f`・`--force-with-lease`・`+ブランチ`）、`.env` への書き込み | 停止 |
+| 外部サービス上の削除・消去（trash・delete・clear、ゴミ箱ラベル、`DROP TABLE` などの SQL） | 停止 |
+| それ以外のファイル削除・`ai-ecosystem/output/`（原稿や動画）の削除 | 確認 |
+| 安全設定（`.claude/settings*.json`・`.claude/hooks/`）の書き換え（`cp`・`sed -i`・`git checkout`・`chmod` なども含む） | 確認 |
+| 送信・返信・課金・公開・デプロイ・共有・招待・コメント・push・設定変更などの外部サービス操作 | 確認 |
+| プロジェクト内のビルド成果物（dist・build など）と一時フォルダの削除、読み取り系の操作 | そのまま通す |
 
+コマンドは、`( )`・`{ }`・`if`・`for` の中、`sudo`・`env`・`timeout`・`xargs` などを前に付けた形、`git -C`、`bash -c`・`eval`・`$( )` の中、`cd` したあと、`node -e`・`python -c` の中の削除まで読む。
 端末操作系の MCP（desktop-commander など）経由のコマンドとファイル操作も、同じ基準で確認する。
+
+**ガードで見えないもの（対象外）**: ガードはコマンドの文字列を読んで判断するため、スクリプトファイルの中で行う処理（`node script.js`、`npm run` の中身、`make` など）は見えない。
+最後の守りは Git の履歴とバックアップ。大事なファイルはコミットしておく。
