@@ -42,7 +42,12 @@ const SYSTEM = `あなたは画像の検品係です。日本語の資料・サ�
 形式:
 {"verdict":"PASS"|"FAIL","issues":[{"image":<0始まりの番号>,"type":"text"|"pii"|"diagram"|"layout"|"style","location":"どこか（言葉で）","bbox":[x,y,w,h] または null（画像幅・高さに対する0〜1の割合）,"detail":"何が問題か","fix":"どう直すか"}],"summary":"全体の一言"}`;
 
-const client = new OpenAI(); // OPENAI_API_KEY を使う
+// キーがないときに終了コード1（=FAIL）で終わると、呼び出し側が「見た目に問題あり」と誤解するので3で終える
+if (!process.env.OPENAI_API_KEY) {
+  console.error('OPENAI_API_KEY がありません。ai-ecosystem/scripts/with-secrets.sh 経由で実行してください。');
+  process.exit(3);
+}
+const client = new OpenAI();
 try {
   const res = await client.chat.completions.create({
     model: process.env.OPENAI_VISION_MODEL ?? 'gpt-5',

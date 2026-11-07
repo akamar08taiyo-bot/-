@@ -25,6 +25,8 @@ HTML でデザインを指定し、静止画を確かめてから動画にする
    ffprobe -v error -show_entries format=duration -of csv=p=0 scene1.mp3
    ```
 5. **素材**: 必要な挿絵は `ask-other-ai` で Codex に生成させ、`images/` に入れる。BGM は権利の確認できる素材だけ使う。
+   - 実写風の短い動画素材が必要なときは、動画生成AI（Seedance など）や Antigravity に頼む。このリポジトリには動画生成APIの呼び出しスクリプトはまだない。使うサービスを決めたら、APIキーを 1Password に入れ、`ai-ecosystem/scripts/` に呼び出しスクリプトを足す。
+   - 生成した動画素材も、手順6と同じように静止画を切り出して確認してから使う。
 6. **1秒ごとの静止画で確認**: Playwright で各カードを撮影するか、Remotion の `npx remotion still` で1秒ごとに書き出す。`judge-image.mjs` で文字崩れ・はみ出しを確認し、崩れていれば絵を直す。
 7. **動画に組む**: Remotion（`npx remotion render`）か HyperFrames で書き出す。静止画からつなぐ場合は FFmpeg。
    ```bash

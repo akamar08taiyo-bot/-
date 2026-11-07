@@ -6,14 +6,20 @@ tags: [ナレッジ, 目次]
 AIが作業しながら書き足していくメモ置き場。Obsidian で「フォルダを保管庫として開く」→ このフォルダを選ぶと、そのまま読み書きできる。
 GitHub で共有しているので、別のPCや別の作業者とも同じメモを使える。
 
-| フォルダ | 中身 | 誰が使うか |
-| --- | --- | --- |
-| `rules/` | 文章・デザイン・見直しのルール | CLAUDE.md が毎回読み込む |
-| `dictionary/` | AIっぽい言い回し・見た目のNG一覧 | `style-check.mjs` フックが自動チェックに使う |
-| `skills/` | スキルの使い方・コツ・失敗と対策 | planner が段取りに使う |
-| `sns/` | Xのネタ帳 | sns-post / daily-digest |
-| `newsletter/` | メルマガの発信履歴 | メルマガ作成時に重複を避ける |
-| `clients/` | 案件・取引先ごとの決まり、宿題 | slides / invoice-moneyforward など |
-| `daily/` | 毎日のまとめ | daily-digest |
+> **このリポジトリは公開（public）。** 個人情報・メールの中身・取引先の情報・単価・未公開のネタは、Git に入るファイルに書かない。
+> `daily/`・`clients/`・`Claude/`・`private/` の中身は `.gitignore` で除外してあり、このPCの中だけに残る。
+> 別のPCとも共有したい私的なメモは、リポジトリの外にある非公開の Obsidian 保管庫（`OBSIDIAN_VAULT`）に置く。
+
+| フォルダ | 中身 | 誰が使うか | Git |
+| --- | --- | --- | --- |
+| `rules/` | 文章・デザイン・見直しのルール | CLAUDE.md が毎回読み込む | 共有 |
+| `dictionary/` | AIっぽい言い回し・見た目のNG一覧 | `style-check.mjs` フックが自動チェックに使う | 共有 |
+| `skills/` | スキルの使い方・コツ・失敗と対策 | planner が段取りに使う | 共有 |
+| `sns/` | Xのネタ帳（公開済み・公開してよいネタだけ） | sns-post / daily-digest | 共有 |
+| `newsletter/` | メルマガの発信履歴（件名と話題だけ） | メルマガ作成時に重複を避ける | 共有 |
+| `clients/` | 案件・取引先ごとの決まり、単価、宿題 | slides / invoice-moneyforward など | 除外（雛形だけ共有） |
+| `daily/` | 毎日のまとめ（メール・Discord の要約） | daily-digest | 除外 |
+| `Claude/` | セッションログ | session-memo フック | 除外 |
+| `private/` | その他の私的なメモ | obsidian-memo | 除外 |
 
 メモの書き方は `obsidian-memo` スキルを参照。

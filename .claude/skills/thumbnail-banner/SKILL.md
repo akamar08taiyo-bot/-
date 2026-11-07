@@ -22,3 +22,14 @@ description: YouTubeサムネイル・バナー・SNS用画像・漫画のコマ
 
 - 他社ロゴ・有名人の顔・既存キャラクターは使わない。
 - スクショを使う場合、個人情報が写っていたらモザイクをかけてから使う。
+
+## 個人情報にモザイクをかける
+
+1. `judge-image.mjs` の結果で `type` が `pii` の指摘を見る。`bbox` は画像の幅・高さに対する割合 `[x, y, w, h]`。
+2. 画像のサイズ（`ffprobe -v error -show_entries stream=width,height -of csv=p=0 in.png`）を掛けてピクセルに直し、少し大きめ（上下左右に10px程度）にする。
+3. その範囲だけぼかす（例: 幅1280・高さ720の画像で、x=100, y=40, w=300, h=60 の範囲）。
+   ```bash
+   ffmpeg -y -i in.png -filter_complex "[0:v]crop=300:60:100:40,boxblur=20:5[m];[0:v][m]overlay=100:40" out.png
+   ```
+   範囲が複数あるときは、この処理を範囲の数だけ繰り返す。
+4. AIが返す範囲はずれることがあるので、モザイク後の画像をもう一度 `judge-image.mjs` に通し、読めないことを確かめる。

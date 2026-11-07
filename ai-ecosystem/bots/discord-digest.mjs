@@ -102,15 +102,21 @@ if (process.env.OBSIDIAN_VAULT) {
 if (dryRun) {
   console.log(report);
 } else {
-  // Discord の1メッセージは2000文字まで。行単位で分けて送る
+  // Discord の1メッセージは2000文字まで。行単位で分け、1行が長すぎる場合はその行も切って送る
+  const LIMIT = 1900;
+  const pieces = report.split('\n').flatMap((line) => {
+    const parts = [];
+    for (let i = 0; i < line.length; i += LIMIT) parts.push(line.slice(i, i + LIMIT));
+    return parts.length ? parts : [''];
+  });
   const chunks = [];
   let buf = '';
-  for (const line of report.split('\n')) {
-    if ((buf + line + '\n').length > 1900) {
+  for (const piece of pieces) {
+    if (buf && (buf + piece + '\n').length > LIMIT) {
       chunks.push(buf);
       buf = '';
     }
-    buf += line + '\n';
+    buf += piece + '\n';
   }
   if (buf.trim()) chunks.push(buf);
   for (const content of chunks) {

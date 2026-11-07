@@ -10,6 +10,7 @@
 - アクセント `accent` #F2A93B: 1画面に1か所まで（数字や結論）
 - 文字 `text` #1C2330、補助文字 `subtext` #5B6676
 - 背景 `bg` #FFFFFF、面 `surface` #F3F6FA、罫線 `border` #D9E0EA
+- 補助色（使う場面を限る）: `primaryLight` #E6EEF9 は主色の薄い版で、表の見出し行や強調の背景だけに使う。`danger` #C8423B はエラー・警告の表示だけに使い、装飾には使わない。
 
 ## 文字
 

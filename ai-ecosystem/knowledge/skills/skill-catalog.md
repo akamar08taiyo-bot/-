@@ -20,6 +20,7 @@ tags: [ナレッジ, スキル]
 | obsidian-memo | メモの登録 | 全部 |
 | web-publish | Vercel / Cloudflare / GitHub | quality-inspector |
 | daily-digest | 毎日のまとめ | obsidian-memo |
+| book-manuscript | 書籍・電子書籍の原稿（章ごとに並列で執筆） | japanese-polish, ask-other-ai |
 
 ## コツ（使いながら足す）
 

@@ -13,3 +13,11 @@ coverage/
 # AI環境の出力物・個人設定
 ai-ecosystem/output/
 .claude/settings.local.json
+
+# 私的なメモ（このリポジトリは公開なので Git に入れない。雛形と説明だけ共有する）
+ai-ecosystem/knowledge/daily/*
+!ai-ecosystem/knowledge/daily/README.md
+ai-ecosystem/knowledge/clients/*
+!ai-ecosystem/knowledge/clients/_template.md
+ai-ecosystem/knowledge/Claude/
+ai-ecosystem/knowledge/private/

@@ -27,8 +27,10 @@ description: 毎日の定期タスク。AIニュース、YouTubeのネタ、メ�
 ## 動画・Xのネタ
 ```
 
-- `ai-ecosystem/knowledge/daily/<YYYY-MM-DD>.md` に保存し（`obsidian-memo`）、ネタは `sns/x-ideas.md` に追記する。
+- メールや Discord の中身を含むので、私的用の保管庫に保存する（`OBSIDIAN_VAULT/daily/<YYYY-MM-DD>.md`。未設定なら Git 除外の `ai-ecosystem/knowledge/daily/`）。公開リポジトリの共有ファイルには書かない。
+- 動画・Xのネタは、公開してよいものだけ `sns/x-ideas.md` に追記する。
 - 外部への送信（メール返信・投稿）は一切しない。下書きのみ。
+- 保存する前に `jeb-judge` に渡し、事実と違う要約がないか、私的な情報を公開側に書いていないか、何も送信していないかを確認させる。
 
 ## 定期実行の登録
 

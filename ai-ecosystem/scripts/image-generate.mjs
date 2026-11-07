@@ -3,20 +3,29 @@
 // 使い方: node scripts/image-generate.mjs --prompt "説明" --out out.png [--size 1536x1024|1024x1024|1024x1536]
 // 必要な環境変数: OPENAI_API_KEY（モデルは OPENAI_IMAGE_MODEL で変更可）
 import OpenAI from 'openai';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
+// 既定の保存先は Git 管理外の ai-ecosystem/output/
+const outputDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'output');
 const { values } = parseArgs({
   options: {
     prompt: { type: 'string' },
-    out: { type: 'string', default: 'image.png' },
+    out: { type: 'string', default: path.join(outputDir, `image-${Date.now()}.png`) },
     size: { type: 'string', default: '1536x1024' },
   },
 });
 if (!values.prompt) {
-  console.error('使い方: node scripts/image-generate.mjs --prompt "説明" --out out.png [--size 1536x1024]');
+  console.error('使い方: node scripts/image-generate.mjs --prompt "説明" [--out ai-ecosystem/output/out.png] [--size 1536x1024]');
   process.exit(2);
 }
+if (!process.env.OPENAI_API_KEY) {
+  console.error('OPENAI_API_KEY がありません。ai-ecosystem/scripts/with-secrets.sh 経由で実行してください。');
+  process.exit(3);
+}
+mkdirSync(path.dirname(path.resolve(values.out)), { recursive: true });
 
 const client = new OpenAI();
 try {

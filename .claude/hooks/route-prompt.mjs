@@ -19,7 +19,7 @@ const lines = [
   '【ジェブ判断プロトコル】',
   '1. 依頼の種類を判定する（動画／画像・サムネ／スライド／記事・文章／議事録・レポート／お金・事務／SNS／Webサイト・公開／開発／質問だけ）。',
   '2. .claude/skills から使うスキルを選ぶ。会社名・案件名が出たら、その案件用のスキルとデザインシステム（ai-ecosystem/design-systems/<案件>）を優先する。',
-  '3. ルートを決める: 画像生成→Codex／長い資料・動画のレビュー・Google Workspace→Gemini（Antigravity）／それ以外→Claude Code。詳細は ask-other-ai スキル。',
+  '3. ルートを決める: 画像生成→Codex／長い資料・動画のレビュー・動画生成・Google Workspace→Gemini（Antigravity）／それ以外→Claude Code。詳細は ask-other-ai スキル。',
   '4. 成果物を作る依頼は「段取り→実行（独立した作業はサブエージェントで並列）→jeb-judge で検品→FAILなら直して再検品」の順。質問に答えるだけなら検品は不要。',
 ];
 

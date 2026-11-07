@@ -55,12 +55,20 @@ npm install
 
 ## 5. Obsidian（ナレッジ）
 
+このリポジトリは公開（public）なので、メモは2つに分ける。
+
+| 置き場所 | 中身 |
+| --- | --- |
+| `ai-ecosystem/knowledge`（リポジトリ内・公開） | ルール、NG辞書、スキルのコツなど、見られても困らないもの |
+| リポジトリ外の非公開の保管庫（例: `~/Obsidian/AI-private`） | セッションログ、毎日のまとめ、取引先メモなど私的なもの |
+
 1. Obsidian を入れ、「フォルダを保管庫として開く」で `ai-ecosystem/knowledge` を選ぶ。
-2. セッションログや日次まとめを保管庫に書かせたい場合は、`.claude/settings.local.json`（Git に入らない個人設定）に保管庫のパスを書く。
+2. 私的なメモ用に、リポジトリの外に別の保管庫を作る（例: `~/Obsidian/AI-private`）。
+3. そのパスを `.claude/settings.local.json`（Git に入らない個人設定）に書く。セッションログと Discord のまとめは、ここに書き込まれる。
    ```json
-   { "env": { "OBSIDIAN_VAULT": "/Users/<あなた>/<リポジトリ>/ai-ecosystem/knowledge" } }
+   { "env": { "OBSIDIAN_VAULT": "/Users/<あなた>/Obsidian/AI-private" } }
    ```
-3. 別の保管庫を使っている場合は、そちらのパスを書けばよい（ルールとNG辞書はリポジトリ側を使い続ける）。
+4. `OBSIDIAN_VAULT` に `ai-ecosystem/knowledge` を指定しない。指定した場合も `daily/`・`clients/`・`Claude/`・`private/` は `.gitignore` で除外されるが、公開リポジトリの中に私的な情報を置くことになる。
 
 ## 6. コネクター（外部連携）
 

@@ -5,19 +5,25 @@ description: AI用のメモをObsidianの保管庫（ai-ecosystem/knowledge）�
 
 # Obsidian にメモを登録する
 
-保管庫は `ai-ecosystem/knowledge`（環境変数 `OBSIDIAN_VAULT` があればそちらにも書ける）。Obsidian で「フォルダを保管庫として開く」で、そのまま読める。
+保管庫は2つある。Obsidian で「フォルダを保管庫として開く」で、どちらもそのまま読める。
+
+- **共有用**: `ai-ecosystem/knowledge`（このリポジトリは公開。見られても困らないものだけ）
+- **私的用**: 環境変数 `OBSIDIAN_VAULT` の保管庫（リポジトリの外）。未設定なら `ai-ecosystem/knowledge` の中の Git 除外フォルダ（`daily/`・`clients/`・`private/`）に書く
 
 ## どこに書くか
 
-| 内容 | ファイル |
-| --- | --- |
-| AIっぽい・不自然な言い回し | `dictionary/ng-phrases.md`（表に1行足す。フックが自動検出に使う） |
-| AIっぽい見た目 | `dictionary/ng-design.md` |
-| スキルの使い方・コツ・失敗と対策 | `skills/skill-catalog.md` の該当スキルの節 |
-| Xの投稿ネタ | `sns/x-ideas.md` |
-| メルマガの発信履歴 | `newsletter/history.md` |
-| 案件・取引先ごとの決まりや宿題 | `clients/<案件名>.md`（`clients/_template.md` を複製） |
-| 日々の記録 | `daily/<YYYY-MM-DD>.md` |
+| 内容 | ファイル | 公開 |
+| --- | --- | --- |
+| AIっぽい・不自然な言い回し | `dictionary/ng-phrases.md`（表に1行足す。フックが自動検出に使う） | 公開 |
+| AIっぽい見た目 | `dictionary/ng-design.md` | 公開 |
+| スキルの使い方・コツ・失敗と対策 | `skills/skill-catalog.md` の該当スキルの節 | 公開 |
+| Xの投稿ネタ（公開済み・公開してよいもの） | `sns/x-ideas.md` | 公開 |
+| メルマガの発信履歴（件名と話題だけ） | `newsletter/history.md` | 公開 |
+| 案件・取引先ごとの決まり、単価、宿題 | 私的用の `clients/<案件名>.md`（`clients/_template.md` を複製） | 非公開 |
+| 日々の記録、メールや Discord の要約 | 私的用の `daily/<YYYY-MM-DD>.md` | 非公開 |
+| 未公開のネタ、その他の私的なメモ | 私的用の `private/` | 非公開 |
+
+公開の欄が「公開」のファイルに書く前に、個人名・メールアドレス・金額・取引先名・未公開の情報が入っていないか確かめる。
 
 ## 書き方
 

@@ -16,7 +16,7 @@
 | 場面 | 頼む先 |
 | --- | --- |
 | 画像生成（スライドの挿絵、図、サムネ） | Codex（イメージ生成）。使えないときは `ai-ecosystem/scripts/image-generate.mjs` |
-| 長い文章のレビュー、動画のレビュー、Google Workspace 作業 | Gemini（Antigravity / Gemini CLI） |
+| 長い文章のレビュー、動画のレビュー、動画生成、Google Workspace 作業 | Gemini（Antigravity / Gemini CLI） |
 | 画像の見た目の判定（崩れた文字・個人情報・矢印） | OpenAI Vision（`ai-ecosystem/scripts/judge-image.mjs`） |
 | それ以外 | Claude Code 自身 |
 

@@ -17,7 +17,7 @@ description: 会議の録音・文字起こし・メモから議事録やレポ�
 3. **推敲**: `japanese-editor` で読みやすくする。発言の意味は変えない。
 4. **照合**: `jeb-judge` に元の文字起こしと一緒に渡し、決定事項と数字が元と合っているか確認させる。
 5. **置き場所**: 依頼に応じて Googleドライブ（Google Workspace コネクター）、Notion、または `ai-ecosystem/output/<案件>/minutes/` に保存。参加者へのメール送信は下書きまで作り、送るのは人間。
-6. **タスク化**: 宿題は `ai-ecosystem/knowledge/clients/<案件>.md` の「宿題」欄にも追記する（`obsidian-memo`）。
+6. **タスク化**: 宿題は私的用の保管庫の `clients/<案件>.md` の「宿題」欄にも追記する（`obsidian-memo`）。議事録の中身は公開リポジトリに置かない。
 
 ## レポートの場合
 

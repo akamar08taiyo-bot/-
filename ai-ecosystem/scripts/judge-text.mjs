@@ -79,13 +79,12 @@ const schema = {
   additionalProperties: false,
 };
 
-// Claude Code 本体の課金と分けたい場合は JUDGE_ANTHROPIC_API_KEY にキーを入れる。
-// 未設定なら ANTHROPIC_API_KEY や `ant auth login` の認証を SDK が自動で使う。
-const client = process.env.JUDGE_ANTHROPIC_API_KEY
-  ? new Anthropic({ apiKey: process.env.JUDGE_ANTHROPIC_API_KEY })
-  : new Anthropic();
-
 try {
+  // Claude Code 本体の課金と分けたい場合は JUDGE_ANTHROPIC_API_KEY にキーを入れる。
+  // 未設定なら ANTHROPIC_API_KEY や `ant auth login` の認証を SDK が自動で使う。
+  const client = process.env.JUDGE_ANTHROPIC_API_KEY
+    ? new Anthropic({ apiKey: process.env.JUDGE_ANTHROPIC_API_KEY })
+    : new Anthropic();
   const response = await client.beta.messages.create({
     model: process.env.JUDGE_MODEL ?? 'claude-opus-5-5',
     max_tokens: 16000,
@@ -123,7 +122,7 @@ try {
   } else if (error instanceof SyntaxError) {
     console.error('判定結果を JSON として読めませんでした:', error.message);
   } else {
-    console.error(error);
+    console.error(`判定できませんでした（Claude API の認証情報がない可能性があります。.env の JUDGE_ANTHROPIC_API_KEY を with-secrets.sh 経由で渡すか、ant auth login を確認）: ${error?.message ?? error}`);
   }
   process.exit(3);
 }
