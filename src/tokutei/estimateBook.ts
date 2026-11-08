@@ -45,10 +45,17 @@ export const CONT_ROWS = 41;
 export const MAX_PAGES = 3;
 /** 商品と商品の間の空けた行の数（ユーザーの指示「１商品目と２商品目の間には１行開ける」2026-11-03。前は「商品と商品の間に空白の行は入れない」2026-11-01） */
 export const ITEM_GAP = 1;
-/** n 行のページに入る、品名が3行の商品の数（商品の下に1行あける。ページの最後の商品の下はあけなくてよい） */
-const fullItemsIn = (n: number) => Math.floor((n + ITEM_GAP) / (3 + ITEM_GAP));
-/** 見積書に入る商品の数（品名が3行の商品で：1ページ目 5＋つづき 10×2。品名の行が少ない商品はもっと入る） */
-export const ESTIMATE_CAPACITY = fullItemsIn(ESTIMATE_ROWS.length) + fullItemsIn(CONT_ROWS) * (MAX_PAGES - 1);
+/**
+ * 商品の間をあけない商品の数：4商品からは商品と商品の間をあけずに詰める（ユーザーの指示「4商品目になる場合は、1商品目と2商品目でスペースを開けずに1ページにおさめる」
+ * 2026-11-08。前は4商品でも1行ずつあけ、介護保険の内訳（限度額を超えた分まで5行）が1ページ目に入らず2ページ目に回った）。最後の商品の下（内訳との間）の1行はあける
+ */
+export const COMPACT_FROM = 4;
+/** 商品と商品の間にあける行の数（3商品までは ITEM_GAP、4商品からは 0） */
+export const itemGap = (count: number) => (count >= COMPACT_FROM ? 0 : ITEM_GAP);
+/** n 行のページに入る、品名が3行の商品の数（商品と商品の間に gap 行あける。ページの最後の商品の下はあけなくてよい） */
+const fullItemsIn = (n: number, gap: number) => Math.floor((n + gap) / (3 + gap));
+/** 見積書に入る商品の数（品名が3行の商品で：1ページ目 6＋つづき 13×2。4商品からは商品の間をあけないので、その割り付けで数える。品名の行が少ない商品はもっと入る） */
+export const ESTIMATE_CAPACITY = fullItemsIn(ESTIMATE_ROWS.length, 0) + fullItemsIn(CONT_ROWS, 0) * (MAX_PAGES - 1);
 
 /** n ページ目（2・3）の行：上の行・見出しの行・明細の行 */
 export function contBlock(page: number): {top: number; head: number; rows: number[]} {
@@ -104,19 +111,21 @@ const pageEnd = (i: number) => [1, 2, 3].some((p) => i === pageStart(p) + pageRo
 const pageOf = (i: number) => (i < pageStart(2) ? 1 : i < pageStart(3) ? 2 : 3);
 
 /** 明細の割り付け：商品ごとの行（初めの行と行の数）・商品の欄の最後の行（この下に実線）・介護保険の内訳の初めの行（-1 は出さない・入らない）・ページの数 */
-export type EstimateLayout = {items: {start: number; rows: number}[]; areaEnd: number; below: number; pages: number};
+export type EstimateLayout = {items: {start: number; rows: number}[]; areaEnd: number; below: number; pages: number; gap: number};
 
 /**
  * 明細の行の割り付け（ユーザーの指示 2026-11-01「1商品の3行を1つの枠として扱う」（「商品と商品の間に空白の行は入れない」は 2026-11-03 に「１商品目と２商品目の間には１行開ける」に）
  * 「明細欄は、最初から3商品（3行×3商品＝9行分）が入る行数にする。介護保険の内訳…の行は、この9行とは別に確保する」「1〜3商品のときは、この行数のまま変えない」
  * 「4商品以上になって入りきらないときだけ、明細欄の行数を必要な分だけ増やす」「1枚に入りきらない場合は2ページ目に続け、2ページ目にも明細の見出し行を付ける」）：
- *   商品は前から置き、商品の下に1行あける（ITEM_GAP。ページの最後ではあけない）。1つの商品の行はページをまたがない（入らなければ次のページの初めから）。
+ *   商品は前から置き、商品の下に1行あける（ITEM_GAP。ページの最後ではあけない）。4商品からは商品と商品の間はあけない（itemGap。最後の商品の下の1行はあける）。
+ *   1つの商品の行はページをまたがない（入らなければ次のページの初めから）。
  *   1ページ目の商品の欄は少なくとも 12 行（3商品分）。
  *   介護保険の内訳（below 行）は商品の欄のすぐ下。そのページに入らなければ次のページの初めから。合計・消費税の表は1ページ目の下のまま（明細の欄の中で割り付けるので、ずれない）。
  * perItem は商品ごとの品名の行の数（itemNameLines の数）。3ページに入らない商品は items に入れない
  */
 export function estimateLayout(perItem: number[], below: number): EstimateLayout {
   const items: {start: number; rows: number}[] = [];
+  const gap = itemGap(perItem.length);
   let page = 1;
   let at = 0; // そのページの中の行
   for (const k of perItem) {
@@ -126,8 +135,11 @@ export function estimateLayout(perItem: number[], below: number): EstimateLayout
       at = 0;
     }
     items.push({start: pageStart(page) + at, rows: k});
-    at = Math.min(pageRows(page), at + k + ITEM_GAP);
+    at = Math.min(pageRows(page), at + k + gap);
   }
+  // 最後の商品の下（介護保険の内訳との間）は1行あける（ページの最後ではあけない）
+  const last = items.at(-1);
+  if (last) at = Math.min(pageRows(page), last.start - pageStart(page) + last.rows + ITEM_GAP);
   if (page === 1) at = Math.max(at, MIN_ITEM_ROWS);
   const areaEnd = pageStart(page) + at - 1;
   let start = -1;
@@ -138,7 +150,7 @@ export function estimateLayout(perItem: number[], below: number): EstimateLayout
       start = pageStart(page);
     }
   }
-  return {items, areaEnd, below: start, pages: page};
+  return {items, areaEnd, below: start, pages: page, gap};
 }
 /** 利用者負担の行（自己負担額。見積書では赤字。見積もりの画面の「自己負担額を表示」の横にも出す） */
 export const userBurdenLine = (t: Pick<Totals, 'ratio' | 'userBurden'>) => `利用者負担（${t.ratio}割）　${yen(t.userBurden)}円`;
@@ -202,7 +214,7 @@ const links = (sale: Sale, s: Settings): [EstimateField, string[]][] => {
   // 商品の行（品名の行のどれも）と、商品の欄の次の商品の行（あけた1行の下。押すと商品を足す所へ）
   const used = lay.items.flatMap((it) => Array.from({length: it.rows}, (_, j) => it.start + j));
   const last = lay.items.at(-1);
-  const next = last ? last.start + last.rows + ITEM_GAP : 0;
+  const next = last ? last.start + last.rows + lay.gap : 0;
   const itemIdx = [...used, ...(next < rows.length && next <= lay.areaEnd ? [next] : [])];
   return [
     ['customer', tops.map((t) => `A${t + 5}`)],
@@ -324,8 +336,9 @@ export function fillEstimateFiles(files: Files, all: Sale, s: Settings): void {
   // ページの最後の行は原本の太い線のまま。ページの最後の商品で1行あけられなかったときは商品の最後の行の下）。
   // 商品の欄の終わり（介護保険の内訳との境）も実線（ユーザーの指示「商品の区切りは実線で引く。1商品の中の3行の間は、線なしか細い点線にする」2026-11-01、
   // 「１商品目と２商品目の間には１行開ける」2026-11-03）
-  const frameEnd = (it: {start: number; rows: number}) => {
-    const gap = it.start + it.rows - 1 + ITEM_GAP;
+  // 4商品から（商品の間をあけない）は、商品の最後の行の下が区切り。最後の商品は下にあけた1行の下
+  const frameEnd = (it: {start: number; rows: number}, k: number) => {
+    const gap = it.start + it.rows - 1 + (k === lay.items.length - 1 ? ITEM_GAP : lay.gap);
     return pageOf(gap) === pageOf(it.start) ? gap : it.start + it.rows - 1;
   };
   const cut = new Set([...lay.items.map(frameEnd), lay.areaEnd].filter((k) => k >= 0 && k < rows.length && !pageEnd(k)));
