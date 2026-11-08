@@ -64,8 +64,13 @@ def images(key):
 
 eps = []
 for e in C['episodes']:
-    if not os.path.exists(os.path.join(OUT, f"{e['key']}.mp4")):  # まだ書き出していない回は載せない
-        print(e['key'], '（まだ書き出していないので載せない）')
+    if not os.path.exists(os.path.join(OUT, f"{e['key']}.mp4")):
+        if e.get('planned'):  # 準備中の回は、サムネと題と中身の予定だけのカードにする（数字や説明文は、確かめて書き出してから）
+            images(e['key'])
+            eps.append(dict(e, n=len(eps) + 1, titles=[e['title']]))
+            print(e['key'], '（準備中）')
+        else:  # まだ書き出していない回は載せない
+            print(e['key'], '（まだ書き出していないので載せない）')
         continue
     i = len(eps) + 1
     s = sections(os.path.join(OUT, f"{e['key']}_概要欄.txt"))
@@ -81,7 +86,27 @@ ch = Image.open(os.path.join(OUT, 'honne_characters.png')).convert('RGB')
 ch.resize((1600, 1600 * ch.height // ch.width), Image.LANCZOS).save(os.path.join(KIT, 'chars.jpg'), quality=86)
 
 
+def plan_card(e):
+    k, n = e['key'], e['n']
+    new = '<span class="new">最新</span>' if n == len(eps) else ''
+    return f'''<article class="vc-plan" id="v-{k}">
+  <div class="vh"><span class="no">{n}</span><span class="series">{esc(e['series'])}</span>{new}<span class="dur">準備中</span></div>
+  <p class="when">{esc(e['when'])}</p>
+  <p class="note">{esc(e['note'])}</p>
+  <div class="vb">
+    <img class="th" src="thumb_s/{k}.jpg" alt="サムネ：{esc(e['title'])}" width="135" height="240" loading="lazy">
+    <div class="vm">
+      <p class="lbl">タイトル（案）</p>
+      <h3 class="vt">{esc(e['title'])}</h3>
+      <p class="intro">{esc(e['about'])}</p>
+    </div>
+  </div>
+</article>'''
+
+
 def card(e):
+    if e.get('planned'):
+        return plan_card(e)
     k, n = e['key'], e['n']
     alt = ''.join(f'<li><span id="t{j}-{k}">{esc(t)}</span><button type="button" class="btn copy" data-copy="t{j}-{k}">コピー</button></li>'
                   for j, t in enumerate(e['titles'][1:], 2))
@@ -118,7 +143,8 @@ def card(e):
 
 
 chars = ''.join(f'<tr><th scope="row">{esc(a)}</th><td>{esc(b)}</td><td>{esc(c)}</td></tr>' for a, b, c in C['characters'])
-N = len(eps)
+N = len([e for e in eps if not e.get('planned')])  # 完成した本数（投稿済みの数え方もこれ）
+NP = len(eps) - N  # 準備中の本数
 page = f'''<title>しのぶの失言ノート投稿キット</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -164,6 +190,7 @@ section{{display:flex;flex-direction:column;gap:14px;scroll-margin-top:12px}}
 .progress{{font-weight:900;font-size:15px;font-variant-numeric:tabular-nums}}
 .cards{{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}}
 .vc{{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}}
+.vc-plan{{position:relative;background:var(--soft);border:2px dashed var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}}
 .vc.is-done .vb{{opacity:.7}}
 .posted{{position:absolute;right:14px;top:12px;transform:rotate(-10deg);border:2.5px solid var(--stamp);color:var(--stamp);font-family:var(--f-display);font-size:15px;line-height:1;padding:5px 8px 4px;border-radius:5px}}
 .vh{{display:flex;align-items:center;gap:8px;flex-wrap:wrap}}
@@ -228,12 +255,12 @@ tr:last-child th,tr:last-child td{{border-bottom:0}}
     <p class="hand">はい、記録しました。</p>
     <span class="stamp" aria-hidden="true">記録</span>
   </div>
-  <p class="lead">完成した{N}本を、「動画・サムネ・タイトル・説明文・タグ・固定コメント」の1セットずつにまとめました。新しく作った動画が上です。スマホだけで投稿できます。</p>
+  <p class="lead">完成した{N}本を、「動画・サムネ・タイトル・説明文・タグ・固定コメント」の1セットずつにまとめました。新しく作った動画が上です。スマホだけで投稿できます。{f'準備中の{NP}本も、いちばん上に予定として載せています。' if NP else ''}</p>
   <nav class="nav" aria-label="ページの中"><a href="#videos">動画{N}本</a><a href="#flow">投稿の流れ</a><a href="#settings">投稿のときの設定</a><a href="#chars">登場人物</a></nav>
 </header>
 
 <section id="videos">
-  <h2>動画{N}本（新しい順）</h2>
+  <h2>動画{N}本{f'＋準備中{NP}本' if NP else ''}（新しい順）</h2>
   <p class="sec-lead">いちばん上が最新です。番号は作った順で、大きいほど新しい動画です。同じ日に2本出さず、数日あけて反応を比べます。保存される動画は、元の動画を少し軽くした版です（見た目はほとんど変わりません）。</p>
   <div class="row"><span class="progress" id="prog">投稿済み 0 / {N}</span></div>
   <div class="cards" id="cards">

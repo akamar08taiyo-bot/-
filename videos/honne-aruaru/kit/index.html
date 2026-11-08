@@ -43,6 +43,7 @@ section{display:flex;flex-direction:column;gap:14px;scroll-margin-top:12px}
 .progress{font-weight:900;font-size:15px;font-variant-numeric:tabular-nums}
 .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
 .vc{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.vc-plan{position:relative;background:var(--soft);border:2px dashed var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
 .vc.is-done .vb{opacity:.7}
 .posted{position:absolute;right:14px;top:12px;transform:rotate(-10deg);border:2.5px solid var(--stamp);color:var(--stamp);font-family:var(--f-display);font-size:15px;line-height:1;padding:5px 8px 4px;border-radius:5px}
 .vh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -107,18 +108,70 @@ tr:last-child th,tr:last-child td{border-bottom:0}
     <p class="hand">はい、記録しました。</p>
     <span class="stamp" aria-hidden="true">記録</span>
   </div>
-  <p class="lead">完成した12本を、「動画・サムネ・タイトル・説明文・タグ・固定コメント」の1セットずつにまとめました。新しく作った動画が上です。スマホだけで投稿できます。</p>
+  <p class="lead">完成した12本を、「動画・サムネ・タイトル・説明文・タグ・固定コメント」の1セットずつにまとめました。新しく作った動画が上です。スマホだけで投稿できます。準備中の4本も、いちばん上に予定として載せています。</p>
   <nav class="nav" aria-label="ページの中"><a href="#videos">動画12本</a><a href="#flow">投稿の流れ</a><a href="#settings">投稿のときの設定</a><a href="#chars">登場人物</a></nav>
 </header>
 
 <section id="videos">
-  <h2>動画12本（新しい順）</h2>
+  <h2>動画12本＋準備中4本（新しい順）</h2>
   <p class="sec-lead">いちばん上が最新です。番号は作った順で、大きいほど新しい動画です。同じ日に2本出さず、数日あけて反応を比べます。保存される動画は、元の動画を少し軽くした版です（見た目はほとんど変わりません）。</p>
   <div class="row"><span class="progress" id="prog">投稿済み 0 / 12</span></div>
   <div class="cards" id="cards">
+<article class="vc-plan" id="v-rank01">
+  <div class="vh"><span class="no">16</span><span class="series">高速TOP10・家庭円満</span><span class="new">最新</span><span class="dur">準備中</span></div>
+  <p class="when">準備中（元の調査で数字を確かめてから書き出します）</p>
+  <p class="note">動画は準備中です。順位の数字を元の調査で確かめてから、ここに動画・説明文・タグ・固定コメントを入れます。</p>
+  <div class="vb">
+    <img class="th" src="thumb_s/rank01.jpg" alt="サムネ：マジで家庭がうまくいくランキングTOP10【1位はコメント欄】" width="135" height="240" loading="lazy">
+    <div class="vm">
+      <p class="lbl">タイトル（案）</p>
+      <h3 class="vt">マジで家庭がうまくいくランキングTOP10【1位はコメント欄】</h3>
+      <p class="intro">しのぶの出ない回です。人物の絵の代わりに、色の背景と大きな絵文字で見せます。実際の調査（アニヴェルセル総研「夫婦円満の秘訣ランキング」既婚男女208人、2024年）をもとに、1位（同率で2つ）は固定コメントで発表。音なし・約31秒。</p>
+    </div>
+  </div>
+</article>
+<article class="vc-plan" id="v-honne11">
+  <div class="vh"><span class="no">15</span><span class="series">高速TOP10・やっぱり夫</span><span class="dur">準備中</span></div>
+  <p class="when">準備中（元の調査で数字を確かめてから書き出します）</p>
+  <p class="note">動画は準備中です。順位の数字を元の調査で確かめてから、ここに動画・説明文・タグ・固定コメントを入れます。</p>
+  <div class="vb">
+    <img class="th" src="thumb_s/honne11.jpg" alt="サムネ：冷めた日もあるけど、やっぱり夫がいい 妻が「結婚してよかった」と思うポイントTOP10【1位はコメント欄】" width="135" height="240" loading="lazy">
+    <div class="vm">
+      <p class="lbl">タイトル（案）</p>
+      <h3 class="vt">冷めた日もあるけど、やっぱり夫がいい 妻が「結婚してよかった」と思うポイントTOP10【1位はコメント欄】</h3>
+      <p class="intro">実際の調査（縁結び大学の結婚経験者425人調査、2024年）の女性の回答をもとにした高速ランキングです。1位は固定コメントで発表。音なし・約35秒。</p>
+    </div>
+  </div>
+</article>
+<article class="vc-plan" id="v-honne10">
+  <div class="vh"><span class="no">14</span><span class="series">高速TOP10・離婚のきっかけ</span><span class="dur">準備中</span></div>
+  <p class="when">準備中（元の調査で数字を確かめてから書き出します）</p>
+  <p class="note">動画は準備中です。順位の数字を元の調査で確かめてから、ここに動画・説明文・タグ・固定コメントを入れます。</p>
+  <div class="vb">
+    <img class="th" src="thumb_s/honne10.jpg" alt="サムネ：心当たりのある男性は要注意 妻が離婚を考えたきっかけTOP10【1位はコメント欄】" width="135" height="240" loading="lazy">
+    <div class="vm">
+      <p class="lbl">タイトル（案）</p>
+      <h3 class="vt">心当たりのある男性は要注意 妻が離婚を考えたきっかけTOP10【1位はコメント欄】</h3>
+      <p class="intro">実際の調査（ベンナビ離婚の既婚女性2,993人調査、2024年1月）をもとにした高速ランキングです。1位は固定コメントで発表。音なし・約35秒。</p>
+    </div>
+  </div>
+</article>
+<article class="vc-plan" id="v-honne09">
+  <div class="vh"><span class="no">13</span><span class="series">高速TOP10・熟年離婚</span><span class="dur">準備中</span></div>
+  <p class="when">準備中（元の調査で数字を確かめてから書き出します）</p>
+  <p class="note">動画は準備中です。順位の数字を元の調査で確かめてから、ここに動画・説明文・タグ・固定コメントを入れます。</p>
+  <div class="vb">
+    <img class="th" src="thumb_s/honne09.jpg" alt="サムネ：熟年離婚の原因TOP10【1位はコメント欄】" width="135" height="240" loading="lazy">
+    <div class="vm">
+      <p class="lbl">タイトル（案）</p>
+      <h3 class="vt">熟年離婚の原因TOP10【1位はコメント欄】</h3>
+      <p class="intro">実際の調査（デイライト法律事務所「熟年離婚の原因ランキング」50代以上の女性相談者）をもとにした高速ランキングです。10位〜2位を1つ3秒で見せ、1位は動画では明かさず固定コメントで発表します。音なし・約35秒。</p>
+    </div>
+  </div>
+</article>
 <article class="vc" id="v-honne08" data-key="honne08" data-vid="b9a45f8810d6606eaa71e900da8c78c6">
   <span class="posted" hidden>投稿済</span>
-  <div class="vh"><span class="no">12</span><span class="series">しのぶの失言ノート #8</span><span class="new">最新</span><span class="dur">56秒</span></div>
+  <div class="vh"><span class="no">12</span><span class="series">しのぶの失言ノート #8</span><span class="dur">56秒</span></div>
   <p class="when">#7 の数日あと</p>
   <p class="note">音なしの回です。アップロードのとき、YouTube アプリの「サウンドを追加」で曲を選んでください（BPM120 前後のアップテンポな曲）。AI の申告は「いいえ」で大丈夫です。</p>
   <div class="vb">

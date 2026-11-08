@@ -124,6 +124,7 @@ node scripts/render.mjs honne09 && python3 -I scripts/finish.py --ep honne09   #
   - 「※イラスト・ひと言は再現イメージです」を入れる。
   - 【固定コメント】には1位を書く。例：「第1位は「性格の不一致」39.4%でした。出典：…」。
 - **カバー**：`out/honne0X_cover.png` は、静止画の `f_0.00.png` をそのまま使う。
+- **投稿キットの準備中カード**：4本は `kit/kit.json` に `"planned": true` の準備中カードとして、もう載せてある（サムネ・題・予定だけ）。書き出したら `planned` を消し、`vid` を入れ、`about` と `when` を仕上がりに合わせて書き直す。
 - **投稿キットと README**：
   - `kit/kit.json` に3本を足し、`python3 -I scripts/build_kit.py` を通す。
   - `work/kit/honne0X.mp4` を投稿キットのページに上げて、`vid` を書く。ページは https://claude.ai/artifact/9gc3QC3EpoCRMARJpYnmAT。
