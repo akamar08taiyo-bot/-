@@ -146,7 +146,8 @@ flowchart LR
 ```
 CLAUDE.md                  … 全体ルール（rules/*.md を読み込む）
 .claude/
-  settings.json            … 権限ルールとフックの登録
+  settings.json            … 権限ルール、フック、ステータスラインの登録
+  statusline.mjs           … 画面の下に週間・5時間の利用制限を常に表示（携帯用に Obsidian へも書き出す）
   hooks/                   … route-prompt / guard / style-check / stop-judge / session-memo
   agents/                  … jeb-judge / planner / quality-inspector / japanese-editor / telop-writer
   skills/                  … 14のエージェントスキル

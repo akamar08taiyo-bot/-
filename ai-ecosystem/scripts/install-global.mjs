@@ -142,6 +142,13 @@ function mergeSettings(manifest) {
     }
     settings.permissions[kind] = [...current];
   }
+  // 利用制限を常に表示するステータスライン。すでに自分のステータスラインがあれば、そちらを残す
+  if (!settings.statusLine) {
+    settings.statusLine = { type: 'command', command: 'node "$HOME/.claude/jeb/statusline.mjs"', padding: 0, refreshInterval: 60 };
+    log('ステータスライン: 週間・5時間の利用制限の表示を追加');
+  } else if (!String(settings.statusLine.command || '').includes('/.claude/jeb/')) {
+    log('ステータスライン: すでに自分の設定があるので、そのまま残しました');
+  }
   const result = writeFile(manifest, file, JSON.stringify(settings, null, 2) + '\n');
   log(`設定 ${rel(file)}: フック5つと権限ルールを追加（${result}）`);
 }
@@ -163,6 +170,7 @@ function install() {
   // 1. 共通の置き場所 ~/.claude/jeb
   const c1 = copyTree(manifest, path.join(REPO, '.claude', 'hooks'), path.join(JEB, 'hooks'));
   log(`フック → ${rel(path.join(JEB, 'hooks'))}（新規 ${c1.create}・更新 ${c1.update}）`);
+  writeFile(manifest, path.join(JEB, 'statusline.mjs'), fs.readFileSync(path.join(REPO, '.claude', 'statusline.mjs'), 'utf8'));
   for (const dir of ['scripts', 'bots']) {
     const c = copyTree(manifest, path.join(REPO, 'ai-ecosystem', dir), path.join(JEB, dir));
     log(`${dir} → ${rel(path.join(JEB, dir))}（新規 ${c.create}・更新 ${c.update}）`);
@@ -231,6 +239,8 @@ function uninstall() {
       if (settings.permissions[kind].length === 0) delete settings.permissions[kind];
     }
     if (settings.permissions && Object.keys(settings.permissions).length === 0) delete settings.permissions;
+    // こちらが入れたステータスラインだけを外す（自分で作ったものは残す）
+    if (String(settings.statusLine?.command || '').includes('/.claude/jeb/')) delete settings.statusLine;
     if (!DRY) fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n');
     log(`設定 ${rel(settingsFile)}: ジェブのフックと権限ルールを外しました`);
   }
