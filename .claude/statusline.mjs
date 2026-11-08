@@ -4,8 +4,8 @@
 // rate_limits の値は、そのセッションが返答を受け取ったときにだけ変わる（待機中の描き直しでは変わらない）。
 //
 // 環境変数 OBSIDIAN_VAULT（絶対パス・既存のフォルダ）があれば、同じ内容を「Claude/利用状況.md」に書き出す。
-// 保管庫を携帯と同期すれば携帯でも見られる。書くのは値が変わったときだけで、待機中の別のセッションが持つ
-// 古い値（同じ集計期間でより低い値）では上書きしない。
+// 保管庫を携帯と同期すれば携帯でも見られる。書くのは値が変わったときだけ。週間・5時間それぞれについて、
+// 待機中の別のセッションが持つ古い値（同じ集計期間でより低い値、前の期間の値）では上書きしない。
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -77,6 +77,73 @@ if (tiny) {
 process.stdout.write(line);
 
 // ---- 携帯で見るためのメモ ----------------------------------------------------
+// 同じ集計期間かどうか（リセット時刻が返答ごとに数秒ずれても、1時間以内なら同じ期間とみなす）
+const SAME_WINDOW_SEC = 3600;
+const sameWin = (a, b) => a && b && Math.abs(a.resetsAt - b.resetsAt) <= SAME_WINDOW_SEC;
+const eqWin = (a, b) => (!a && !b) || (a && b && a.pct === b.pct && a.resetsAt === b.resetsAt);
+
+// 前にメモした値（prev）と今回の値（cur）から、新しいほうを1つ選ぶ（週間・5時間それぞれ）。
+// 同じ期間の中で使用率は下がらないので、低い値は待機中の別のセッションが持つ古い値とみなす
+function pickNewer(prev, cur, nowSec) {
+  const prevAlive = prev && (!prev.resetsAt || prev.resetsAt > nowSec);
+  if (!cur) return prevAlive ? prev : null; // 今回この窓の値がない: 前の値がまだ有効なら残す
+  if (!prevAlive) return cur;
+  if (prev.resetsAt && cur.resetsAt) {
+    if (prev.resetsAt - cur.resetsAt > SAME_WINDOW_SEC) return prev; // 前の値のほうが新しい期間
+    if (sameWin(prev, cur) && prev.pct > cur.pct) return prev; // 同じ期間で前の値のほうが高い
+  }
+  return cur;
+}
+
+// メモ先頭の目印から前回の値を読む（前の版の形式も読める）
+function readPrev(file) {
+  if (!existsSync(file)) return null;
+  const m = readFileSync(file, 'utf8').match(/<!-- jeb-usage (\{.*?\}) -->/);
+  if (!m) return null;
+  try {
+    const p = JSON.parse(m[1]);
+    const win = (v, r) => (v && typeof v === 'object' ? v : typeof v === 'number' ? { pct: v, resetsAt: r ?? null } : null);
+    return { week: win(p.week, p.weekReset), five: win(p.five, p.fiveReset), at: p.at };
+  } catch {
+    return null;
+  }
+}
+
+function writeMemo(file) {
+  const nowSec = Date.now() / 1000;
+  const prev = readPrev(file);
+  const merged = {
+    week: pickNewer(prev?.week, week, nowSec),
+    five: pickNewer(prev?.five, five, nowSec),
+  };
+  if (prev && eqWin(merged.week, prev.week) && eqWin(merged.five, prev.five)) return; // 変わっていなければ書かない
+  // 時刻は、今回の値を取り込んだときだけ新しくする（古い値の期限切れで消えただけなら前の時刻のまま）
+  const tookNew = (merged.week === week && !eqWin(week, prev?.week)) || (five && merged.five === five && !eqWin(five, prev?.five));
+  const at = tookNew || !prev?.at ? new Date() : new Date(prev.at);
+  const w = merged.week;
+  const f = merged.five;
+  const lines = [
+    `<!-- jeb-usage ${JSON.stringify({ week: w, five: f, at: at.toISOString() })} -->`,
+    '# Claude の利用状況',
+    '',
+    `- PC で受け取った時刻: ${fmtDay.format(at)}`,
+    `- 週間: **${w.pct}%** ${bar(w.pct)}　リセット ${fmt(w.resetsAt, fmtWeekday) || '不明'}`,
+  ];
+  if (f) lines.push(`- 5時間: **${f.pct}%** ${bar(f.pct)}　リセット ${fmt(f.resetsAt, fmtTime) || '不明'}`);
+  lines.push(
+    '',
+    '値は、PC の Claude Code が返答を受け取ったときに変わる。携帯や Web で使った分は、PC で次に返答を受け取るまで反映されない。',
+  );
+  if (w.pct >= 80) lines.push('', '> 週間の上限が近い。急ぎでない作業は、リセットのあとに回す。');
+  mkdirSync(path.dirname(file), { recursive: true });
+  // 書きかけを読まれないよう、一時ファイルに書いてから置き換える。
+  // 一時ファイルは「.」始まりの決まった名前にし、途中で止められても保管庫に余計なファイルが増えないようにする
+  const tmp = path.join(path.dirname(file), '.利用状況.md.tmp');
+  writeFileSync(tmp, lines.join('\n') + '\n');
+  renameSync(tmp, file);
+}
+
+// 書き出し（上の関数と定数を定義したあとで呼ぶ）
 const vault = process.env.OBSIDIAN_VAULT;
 if (vault && path.isAbsolute(vault) && existsSync(vault) && week) {
   try {
@@ -84,47 +151,4 @@ if (vault && path.isAbsolute(vault) && existsSync(vault) && week) {
   } catch {
     // 書き出しに失敗しても、ステータスラインの表示は止めない
   }
-}
-
-function writeMemo(file) {
-  const state = { week: week.pct, weekReset: week.resetsAt, five: five?.pct ?? null, fiveReset: five?.resetsAt ?? null };
-  let prev = null;
-  if (existsSync(file)) {
-    const m = readFileSync(file, 'utf8').match(/<!-- jeb-usage (\{.*?\}) -->/);
-    if (m) {
-      try {
-        prev = JSON.parse(m[1]);
-      } catch {
-        prev = null;
-      }
-    }
-  }
-  if (prev) {
-    const same = ['week', 'weekReset', 'five', 'fiveReset'].every((k) => prev[k] === state[k]);
-    if (same) return; // 値が変わっていなければ書かない（同期の履歴を増やさない）
-    // 同じ集計期間の中で使用率が下がることはない。低い値は、待機中の別のセッションが持つ古い値
-    if (prev.weekReset && state.weekReset) {
-      if (prev.weekReset > state.weekReset) return;
-      if (prev.weekReset === state.weekReset && prev.week > state.week) return;
-    }
-  }
-  const now = new Date();
-  const lines = [
-    `<!-- jeb-usage ${JSON.stringify({ ...state, at: now.toISOString() })} -->`,
-    '# Claude の利用状況',
-    '',
-    `- PC で受け取った時刻: ${fmtDay.format(now)}`,
-    `- 週間: **${state.week}%** ${bar(state.week)}　リセット ${fmt(state.weekReset, fmtWeekday) || '不明'}`,
-  ];
-  if (five) lines.push(`- 5時間: **${five.pct}%** ${bar(five.pct)}　リセット ${fmt(five.resetsAt, fmtTime) || '不明'}`);
-  lines.push(
-    '',
-    '値は、PC の Claude Code が返答を受け取ったときに変わる。携帯や Web で使った分は、PC で次に返答を受け取るまで反映されない。',
-  );
-  if (state.week >= 80) lines.push('', '> 週間の上限が近い。急ぎでない作業は、リセットのあとに回す。');
-  mkdirSync(path.dirname(file), { recursive: true });
-  // 書きかけを読まれないよう、一時ファイルに書いてから置き換える
-  const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync(tmp, lines.join('\n') + '\n');
-  renameSync(tmp, file);
 }

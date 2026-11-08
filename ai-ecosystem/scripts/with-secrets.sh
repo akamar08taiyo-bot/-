@@ -17,17 +17,17 @@ if [ -z "${ENV_FILE:-}" ]; then
       break
     fi
   done
-  ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/../../.env}"
 fi
+SEARCHED="${ENV_FILE:-$SCRIPT_DIR/../.env または $SCRIPT_DIR/../../.env}"
 
 if [ "$#" -eq 0 ]; then
   echo "使い方: $0 <コマンド...>" >&2
   exit 2
 fi
 
-if command -v op >/dev/null 2>&1 && [ -f "$ENV_FILE" ]; then
+if command -v op >/dev/null 2>&1 && [ -n "${ENV_FILE:-}" ] && [ -f "$ENV_FILE" ]; then
   exec op run --env-file="$ENV_FILE" -- "$@"
 fi
 
-echo "[with-secrets] 1Password CLI（op）か $ENV_FILE が見つからないため、今の環境変数のまま実行します。" >&2
+echo "[with-secrets] 1Password CLI（op）か .env（$SEARCHED）が見つからないため、今の環境変数のまま実行します。" >&2
 exec "$@"

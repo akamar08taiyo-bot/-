@@ -85,9 +85,16 @@ function readSettings(file) {
   const text = fs.readFileSync(file, 'utf8');
   if (!text.trim()) return {};
   const value = JSON.parse(text);
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('中身が { } の形ではありません');
+  const isPlainObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
+  if (!isPlainObject(value)) throw new Error('中身が { } の形ではありません');
+  if (value.hooks !== undefined && !isPlainObject(value.hooks)) throw new Error('hooks が { } の形ではありません');
   for (const [event, list] of Object.entries(value.hooks ?? {})) {
     if (!Array.isArray(list)) throw new Error(`hooks.${event} が配列ではありません`);
+    if (list.some((g) => !isPlainObject(g) || !Array.isArray(g.hooks))) throw new Error(`hooks.${event} の中に、hooks の配列を持たないまとまりがあります`);
+  }
+  if (value.permissions !== undefined && !isPlainObject(value.permissions)) throw new Error('permissions が { } の形ではありません');
+  for (const kind of ['allow', 'deny', 'ask']) {
+    if (value.permissions?.[kind] !== undefined && !Array.isArray(value.permissions[kind])) throw new Error(`permissions.${kind} が配列ではありません`);
   }
   return value;
 }
@@ -334,5 +341,9 @@ try {
   else install();
 } catch (error) {
   console.error(`止めました: ${error.message}`);
+  // 途中まで進んでいた場合は、控えの記録が残っているので元に戻せる
+  if (!UNINSTALL && !DRY && fs.existsSync(MANIFEST)) {
+    console.error('途中まで入った分は、node ai-ecosystem/scripts/install-global.mjs --uninstall で元に戻せます。');
+  }
   process.exit(1);
 }
