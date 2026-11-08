@@ -33,7 +33,27 @@ export type FScript = {
   tsukLabel?: string; // ひと言の吹き出しの札（既定は「しのぶ」）
   hook: {beats: number; img?: string; cam?: RCam; emoji?: string[]; bg?: [string, string]; title: [string, string, string]; chip: string};
   ranks: FRank[]; // 10位〜2位（同率の順位は同じ数字を続けて書く。区切りは並びの順で数える）
+  bonus?: FBonus; // 番外編（2位のあと、1位の発表の前）
   top: {beats: number; img?: string; cam?: RCam; cta: string; sub?: string};
+};
+
+// 番外編：ランキングのあと、同じ調査のほかの数字から「ここを押さえれば」という、さらに大事なポイントを見せる。
+// 数字は調査のまま（どの質問の答えかを札に書く）。まとめの言葉は、調査元のまとめか「編集部のまとめ」と書く。
+export type FPoint = {
+  beats: number;
+  label: string; // 項目のカードの札（どの質問の答えか。例「離婚を考えた1,805人のうち」）
+  item: string; // 調査の答えの言葉。| で改行
+  value?: number; // 調査の数字（無いカードは、はんこを出さない）
+  stamp?: {label: string; unit: string; decimals: number}; // はんこの見出しと単位（既定は S.value）
+  sub?: string; // ひと言。| で改行
+  subLabel?: string; // ひと言の札（既定「ひとこと」）
+  emoji: string;
+  bg?: [string, string];
+};
+export type FBonus = {
+  title: {beats: number; title: [string, string, string]; chip: string; emoji?: string[]; bg?: [string, string]};
+  points: FPoint[];
+  key: {beats: number; head: string; text: string; note?: string; emoji?: string; bg?: [string, string]};
 };
 
 const TSUK_Y = 1395;
@@ -91,6 +111,7 @@ const ItemCard: React.FC<{text: string; label?: string; cy: number; from: number
           borderRadius: 30,
           padding: '30px 46px 28px',
           maxWidth: 940,
+          minWidth: label ? Math.min(940, [...label].length * 32 + 110) : undefined,
           boxShadow: '0 10px 0 rgba(30,40,80,0.22), 0 18px 30px rgba(20,20,40,0.25)',
           textAlign: 'center',
         }}
@@ -149,10 +170,11 @@ const EmojiStage: React.FC<{emoji: string[]; bg: [string, string]; from: number;
 };
 
 // 冒頭の題字（1コマ目がそのままサムネになる。最初から全部見えている）
-const FastHook: React.FC<{title: [string, string, string]; chip: string; to: number; b: (n: number) => number}> = ({title, chip, to, b}) => {
+const FastHook: React.FC<{title: [string, string, string]; chip: string; to: number; b: (n: number) => number; from?: number}> = ({title, chip, to, b, from = 0}) => {
   const frame = useCurrentFrame();
-  if (frame >= to) return null;
-  const bump = [b(1), b(2), b(3), b(4)].reduce((v, at) => v + 0.04 * (frame >= at ? 1 - ramp(frame, at, at + 5) : 0), 1);
+  if (frame < from || frame >= to) return null;
+  const enter = from > 0 ? 0.6 + 0.4 * pop(frame, from, 12, 220) : 1; // 冒頭は最初のコマから全部見せる（サムネ用）
+  const bump = enter * [b(1), b(2), b(3), b(4)].reduce((v, at) => v + 0.04 * (frame >= at ? 1 - ramp(frame, at, at + 5) : 0), 1);
   const bigSize = Math.min(240, Math.floor(900 / [...title[1]].length));
   const topSize = Math.min(112, Math.floor(940 / [...title[0]].length));
   const lowSize = Math.min(150, Math.floor(940 / [...title[2]].length));
@@ -179,6 +201,123 @@ const FastHook: React.FC<{title: [string, string, string]; chip: string; to: num
         </div>
       </div>
     </>
+  );
+};
+
+// 番外編の「ポイント1」（順位の「第10位」と同じ場所。色は緑）
+const POINT_FILL = '#178F7A';
+const PointBadge: React.FC<{n: number; x: number; y: number; from: number; to: number}> = ({n, x, y, from, to}) => {
+  const frame = useCurrentFrame();
+  if (frame < from || frame >= to) return null;
+  const p = pop(frame, from, 12, 230);
+  const sh = 'drop-shadow(0 8px 0 rgba(10,60,50,0.4))';
+  return (
+    <div style={{position: 'absolute', left: x, top: y, display: 'flex', alignItems: 'baseline', opacity: clamp01(p * 3), transform: `translate(-50%, -50%) scale(${1.7 - 0.7 * p}) rotate(${(1 - p) * -8}deg)`}}>
+      <Outlined size={78} color={POINT_FILL} font={F.dela} weight={400} stroke={17} shadow={sh}>
+        ポイント
+      </Outlined>
+      <Outlined size={184} color={POINT_FILL} font={F.dela} weight={400} stroke={24} shadow={sh}>
+        {String(n)}
+      </Outlined>
+    </div>
+  );
+};
+
+// 番外編のあいだ、順位の帯の代わりに出す札
+const BonusStrip: React.FC<{text: string; since: number; top?: number}> = ({text, since, top = 214}) => {
+  const frame = useCurrentFrame();
+  return (
+    <div style={{position: 'absolute', top, left: 0, width: W, display: 'flex', justifyContent: 'center'}}>
+      <div
+        style={{
+          height: 40,
+          display: 'flex',
+          alignItems: 'center',
+          background: POINT_FILL,
+          color: '#fff',
+          fontFamily: F.maru,
+          fontWeight: 900,
+          fontSize: 28,
+          padding: '0 28px 2px',
+          borderRadius: 10,
+          border: '3px solid #fff',
+          boxShadow: '0 4px 0 rgba(60,40,30,0.15)',
+          whiteSpace: 'nowrap',
+          transform: `scale(${0.9 + 0.1 * pop(frame, since)})`,
+        }}
+      >
+        {text}
+      </div>
+    </div>
+  );
+};
+
+// 番外編のまとめ：「ここを押さえれば」と、大事なポイント
+const BonusKey: React.FC<{from: number; to: number; b: (n: number) => number; head: string; text: string; note?: string; emoji?: string; bg?: [string, string]}> = ({
+  from,
+  to,
+  b,
+  head,
+  text,
+  note,
+  emoji = '🔑',
+  bg = ['#FFE29F', '#FFA99F'],
+}) => {
+  const frame = useCurrentFrame();
+  if (frame < from || frame >= to) return null;
+  const ep = pop(frame, from, 12, 220);
+  const hp = pop(frame, b(0.5), 12, 230);
+  const cp = pop(frame, b(1.5), 12, 220);
+  const lines = text.split('|');
+  const fs = fitSize(lines, 820, 108);
+  const t = (frame - from) / FPS;
+  const CARD_TOP = 850;
+  const cardH = lines.length * fs * 1.24 + 70 + 16; // 行の高さ＋上下の余白＋枠
+  const noteTop = CARD_TOP + cardH + 46;
+  return (
+    <AbsoluteFill style={{background: `linear-gradient(180deg, ${bg[0]} 0%, ${bg[1]} 100%)`}}>
+      <AbsoluteFill style={{background: 'radial-gradient(circle at 50% 50%, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 60%)'}} />
+      <div style={{position: 'absolute', left: 0, top: 545, width: W, display: 'flex', justifyContent: 'center', transform: `translateY(-50%) scale(${0.4 + 0.6 * ep}) rotate(${Math.sin(t * 3) * 6}deg)`}}>
+        <div style={{fontSize: 190, lineHeight: 1, filter: 'drop-shadow(0 14px 18px rgba(60,30,10,0.3))'}}>{emoji}</div>
+      </div>
+      {frame >= b(0.5) && (
+        <div style={{position: 'absolute', left: 0, top: 760, width: W, display: 'flex', justifyContent: 'center', opacity: clamp01(hp * 2), transform: `translateY(-50%) scale(${1.4 - 0.4 * hp})`}}>
+          <Outlined size={Math.min(104, Math.floor(940 / [...head].length))} color="#fff" stroke={20} strokeColor="#3a1d08" font={F.dela} weight={400} shadow="drop-shadow(0 8px 0 rgba(90,40,0,0.35))">
+            {head}
+          </Outlined>
+        </div>
+      )}
+      {frame >= b(1.5) && (
+        <div style={{position: 'absolute', left: 0, top: CARD_TOP, width: W, display: 'flex', justifyContent: 'center', opacity: clamp01(cp * 2)}}>
+          <div
+            style={{
+              transform: `scale(${0.6 + 0.4 * cp})`,
+              transformOrigin: '50% 0%',
+              background: '#fff',
+              borderRadius: 34,
+              padding: '34px 54px 36px',
+              maxWidth: 960,
+              border: `8px solid ${POINT_FILL}`,
+              boxShadow: '0 12px 0 rgba(10,60,50,0.25), 0 20px 34px rgba(40,20,10,0.25)',
+              textAlign: 'center',
+            }}
+          >
+            {lines.map((l, i) => (
+              <div key={i} style={{fontFamily: F.dela, fontSize: fs, lineHeight: 1.24, color: C.navy, whiteSpace: 'pre'}}>
+                {l}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {note && frame >= b(1.5) && (
+        <div style={{position: 'absolute', left: 0, top: noteTop, width: W, display: 'flex', justifyContent: 'center', opacity: clamp01(cp * 2)}}>
+          <div style={{maxWidth: 940, background: 'rgba(34,32,31,0.78)', color: '#fff', fontFamily: F.maru, fontWeight: 700, fontSize: 32, lineHeight: 1.4, padding: '8px 26px 10px', borderRadius: 14, textAlign: 'center'}}>
+            {note}
+          </div>
+        </div>
+      )}
+    </AbsoluteFill>
   );
 };
 
@@ -237,7 +376,13 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
   };
   addSeg('hook', S.hook.beats);
   S.ranks.forEach((r, i) => addSeg(`r${i}`, r.beats));
+  if (S.bonus) {
+    addSeg('bt', S.bonus.title.beats);
+    S.bonus.points.forEach((pt, i) => addSeg(`p${i}`, pt.beats));
+    addSeg('bk', S.bonus.key.beats);
+  }
   addSeg('top', S.top.beats);
+  const tie = (rank: number) => S.ranks.filter((r) => r.rank === rank).length > 1; // 元のグラフで同率の順位
   const seg = (id: string) => SEGS.find((s) => s.id === id) as Seg;
 
   const extra = (scene: string, obj: string) => (FC[`${scene}_extra`] as Record<string, Box>)[obj];
@@ -261,7 +406,8 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
   const Comp: React.FC = () => {
     const frame = useCurrentFrame();
     const cur = SEGS.find((s) => frame >= s.from && frame < s.to) ?? SEGS[SEGS.length - 1];
-    const rankNow = cur.id.startsWith('r') ? S.ranks[Number(cur.id.slice(1))].rank : cur.id === 'hook' ? 11 : 1; // 帯は表示の順位（同率なら同じ数字）
+    const rankNow = cur.id.startsWith('r') ? S.ranks[Number(cur.id.slice(1))].rank : cur.id === 'hook' ? 11 : cur.id === 'top' ? 1 : 1.5; // 帯は表示の順位（同率なら同じ数字）。番外編は 2位まで済み
+    const inBonus = cur.id === 'bt' || cur.id === 'bk' || /^p\d+$/.test(cur.id);
     return (
       <AbsoluteFill style={{backgroundColor: C.cream}}>
         {SCENES.map((sc) => (
@@ -271,25 +417,48 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
         {S.ranks.map((r, i) =>
           r.img ? null : <EmojiStage key={`e${i}`} emoji={[r.emoji ?? '✨']} bg={r.bg ?? PALETTE[i % PALETTE.length]} from={seg(`r${i}`).from} to={seg(`r${i}`).to} b={seg(`r${i}`).b} />,
         )}
+        {S.bonus && (
+          <EmojiStage emoji={S.bonus.title.emoji ?? ['🔑', '✨', '💡', '📝']} bg={S.bonus.title.bg ?? ['#FFF1B8', '#F7B267']} from={seg('bt').from} to={seg('bt').to} b={seg('bt').b} big={false} cy={500} />
+        )}
+        {S.bonus?.points.map((pt, i) => (
+          <EmojiStage key={`pe${i}`} emoji={[pt.emoji]} bg={pt.bg ?? PALETTE[(i + 3) % PALETTE.length]} from={seg(`p${i}`).from} to={seg(`p${i}`).to} b={seg(`p${i}`).b} />
+        ))}
         <AbsoluteFill style={{background: 'linear-gradient(180deg, rgba(40,25,20,0.36) 0%, rgba(40,25,20,0) 28%, rgba(40,25,20,0) 60%, rgba(40,25,20,0.3) 100%)'}} />
         {S.ranks.map((r, i) => {
           const s = seg(`r${i}`);
           return (
             <React.Fragment key={i}>
-              <RankBadge rank={r.rank} x={BADGE.x} y={BADGE.y} from={s.from} to={s.to} />
+              <RankBadge rank={r.rank} x={BADGE.x} y={BADGE.y} from={s.from} to={s.to} tie={tie(r.rank)} />
               <ItemCard text={r.item} label={S.itemLabel} cy={ITEM_Y} from={s.b(0.5)} to={s.to} todo={r.todo} />
               <CountStamp x={STAMP.x} y={STAMP.y} count={r.value} from={s.b(1.5)} rollTo={s.b(2.5)} to={s.to} label={S.value.label} unit={S.value.unit} decimals={S.value.decimals} />
               {r.tsukkomi && <Tsukkomi text={r.tsukkomi} cy={TSUK_Y} from={s.b(3)} to={s.to} label={S.tsukLabel} />}
             </React.Fragment>
           );
         })}
+        {S.bonus?.points.map((pt, i) => {
+          const s = seg(`p${i}`);
+          const st = pt.stamp ?? S.value;
+          const tall = pt.item.split('|').length >= 3 ? 30 : 0;
+          return (
+            <React.Fragment key={`p${i}`}>
+              <PointBadge n={i + 1} x={pt.value !== undefined ? BADGE.x - 20 : W / 2} y={BADGE.y} from={s.from} to={s.to} />
+              <ItemCard text={pt.item} label={pt.label} cy={ITEM_Y - tall} from={s.b(0.5)} to={s.to} />
+              {pt.value !== undefined && <CountStamp x={STAMP.x} y={STAMP.y} count={pt.value} from={s.b(1.5)} rollTo={s.b(2.5)} to={s.to} label={st.label} unit={st.unit} decimals={st.decimals} />}
+              {pt.sub && <Tsukkomi text={pt.sub} cy={TSUK_Y + tall} from={s.b(3)} to={s.to} label={pt.subLabel ?? 'ひとこと'} />}
+            </React.Fragment>
+          );
+        })}
+        {S.bonus && <FastHook title={S.bonus.title.title} chip={S.bonus.title.chip} from={seg('bt').from} to={seg('bt').to} b={seg('bt').b} />}
+        {S.bonus && (
+          <BonusKey from={seg('bk').from} to={seg('bk').to} b={seg('bk').b} head={S.bonus.key.head} text={S.bonus.key.text} note={S.bonus.key.note} emoji={S.bonus.key.emoji} bg={S.bonus.key.bg} />
+        )}
         <TopTeaser from={seg('top').from} to={seg('top').to} b={seg('top').b} cta={S.top.cta} sub={S.top.sub} />
         <FastHook title={S.hook.title} chip={S.hook.chip} to={seg('hook').to} b={seg('hook').b} />
         {SEGS.filter((s) => s.id !== 'hook').map((s) => (
           <Flash key={s.id} at={s.from} />
         ))}
         <Header series={S.header.series} episode={S.header.episode} item={0} since={0} dots={false} />
-        <RankStrip cur={rankNow} since={cur.from} />
+        {inBonus ? <BonusStrip text="番外編｜ここを押さえれば" since={seg('bt').from} /> : <RankStrip cur={rankNow} since={cur.from} />}
         <SourceLine source={S.source} note={S.note} />
       </AbsoluteFill>
     );

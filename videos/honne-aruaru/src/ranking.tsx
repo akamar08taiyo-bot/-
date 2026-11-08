@@ -17,8 +17,8 @@ export const tier = (rank: number) =>
 
 const fit = (lines: string[], width: number, max: number) => Math.min(max, Math.floor(width / Math.max(...lines.map((l) => [...l].length), 1)));
 
-// ───────── 「第10位」：区切りの頭でドンと出る ─────────
-export const RankBadge: React.FC<{rank: number; x: number; y: number; from: number; to: number}> = ({rank, x, y, from, to}) => {
+// ───────── 「第10位」：区切りの頭でドンと出る（同率の順位は「同率9位」） ─────────
+export const RankBadge: React.FC<{rank: number; x: number; y: number; from: number; to: number; tie?: boolean}> = ({rank, x, y, from, to, tie = false}) => {
   const frame = useCurrentFrame();
   if (frame < from || frame >= to) return null;
   const p = pop(frame, from, 12, 230);
@@ -41,7 +41,7 @@ export const RankBadge: React.FC<{rank: number; x: number; y: number; from: numb
         transform: `translate(-50%, -50%) scale(${1.7 - 0.7 * p}) rotate(${(1 - p) * -8}deg)`,
       }}
     >
-      {part('第', 88, 18)}
+      {tie ? part('同率', 70, 16) : part('第', 88, 18)}
       {part(String(rank), rank >= 10 ? 176 : 196, 24)}
       {part('位', 88, 18)}
     </div>
