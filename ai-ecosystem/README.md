@@ -96,7 +96,7 @@ flowchart LR
 | 動画生成・Google Workspace・長い文章や動画のレビュー→Antigravity（Gemini） | `scripts/ask-gemini.sh`（`GEMINI_CMD` で Antigravity にも切替） | 要PC設定 |
 | 大量のエージェントスキル（動画・画像・スライド・議事録・Web/ブログ/書籍・事務・SNS） | `.claude/skills/` の14スキル（一覧は `knowledge/skills/skill-catalog.md`。書籍は `book-manuscript`） | 済 |
 | 小さいスキルを組み合わせて大きなタスクをこなす | `planner` サブエージェントが段取り表でスキルを組み合わせる | 済 |
-| 案件ごとにスキルを分ける（A社用・B社用スライド） | `design-systems/<案件>/` と `knowledge/clients/<案件>.md`、`slides-<案件>` への複製手順 | 済 |
+| 案件ごとにスキルを分ける（A社用・B社用スライド） | `design-systems/<案件>/`、私的用の保管庫の `clients/<案件>.md`、`slides-<案件>` への複製手順 | 済 |
 | スキルごとにサブエージェントでチェック | 各スキルの最後に `quality-inspector` / `jeb-judge` | 済 |
 | Claude Memory（これまでのやり取りの蓄積） | Claude Code の自動メモリ（そのまま使う） | 済 |
 | Obsidian に AI 用メモを大量に格納 | `knowledge/`（そのまま Obsidian の保管庫として開ける） | 済 |
@@ -174,18 +174,35 @@ ai-ecosystem/
 
 ## ガードが止めるもの・確認するもの
 
+### このPCの中のファイルと Git
+
 | 操作 | 扱い |
 | --- | --- |
 | 保護フォルダ（`.git`・`.claude`・`.env`・`CLAUDE.md`・`knowledge`・`design-systems`）の削除・移動 | 停止 |
-| ルート・ホーム・プロジェクト全体の削除、強制 push（`-f`・`--force-with-lease`・`+ブランチ`）、`.env` への書き込み | 停止 |
-| 外部サービス上の削除・消去（trash・delete・clear、ゴミ箱ラベル、`DROP TABLE` などの SQL） | 停止 |
-| それ以外のファイル削除・`ai-ecosystem/output/`（原稿や動画）の削除 | 確認 |
-| 安全設定（`.claude/settings*.json`・`.claude/hooks/`）の書き換え（`cp`・`sed -i`・`git checkout`・`chmod` なども含む） | 確認 |
-| 送信・返信・課金・公開・デプロイ・共有・招待・コメント・push・設定変更などの外部サービス操作 | 確認 |
-| プロジェクト内のビルド成果物（dist・build など）と一時フォルダの削除、読み取り系の操作 | そのまま通す |
+| ルート・ホーム・プロジェクト全体の削除、`.env` への書き込み | 停止 |
+| 強制 push（`-f`・`--force-with-lease`・`--mirror`・`+ブランチ`）、リモートの枝の削除（`--delete`・`:ブランチ`） | 停止 |
+| `git clean -x`（範囲の指定なし）: Git に入っていない `.env`・私的メモ・原稿まで消える | 停止 |
+| それ以外のファイル削除（`rimraf` などの削除ツール、`ai-ecosystem/output/` の原稿や動画も含む） | 確認 |
+| 安全設定（`.claude/settings*.json`・`.claude/hooks/`）の書き換え（フォルダごとの `cp -r`・`rsync`・`git checkout`・`tar -C` も含む） | 確認 |
+| ふつうの `git push`（作業ブランチへの反映） | そのまま通す |
+| プロジェクト内のビルド成果物（dist・build など）と一時フォルダの削除 | そのまま通す |
 
-コマンドは、`( )`・`{ }`・`if`・`for` の中、`sudo`・`env`・`timeout`・`xargs` などを前に付けた形、`git -C`、`bash -c`・`eval`・`$( )` の中、`cd` したあと、`node -e`・`python -c` の中の削除まで読む。
+### 外部サービス
+
+| 操作 | MCP（コネクター）経由 | コマンド（CLI）経由 |
+| --- | --- | --- |
+| 削除・消去 | 停止（delete・trash・clear など、ゴミ箱ラベル、`trashed: true`、SQL ツールでの `DROP TABLE`・`DELETE FROM`） | 停止（`gh … delete`・`gh api -X DELETE`・`vercel remove`・`wrangler delete`・`curl -X DELETE`・DB コマンドでの削除 SQL・`supabase db reset` など） |
+| 送信・公開・課金・共有・招待・コメント・設定変更 | 確認（GitHub への書き込みはすべて確認） | 確認（`gh pr merge`・`gh repo create/edit`・`gh release create`・`vercel --prod`・`wrangler deploy` など） |
+| ネットから取ってきたスクリプトをそのまま実行（`curl … \| bash`） | — | 確認 |
+| 読み取り | そのまま通す | そのまま通す |
+
+コマンドは、`( )`・`{ }`・`if`・`for` の中、`sudo`・`env`・`timeout`・`xargs`・`npx` などを前に付けた形、`git -C`、`bash -c`・`eval`・`$( )`・`<( )` の中、`cd` したあと、`node -e`・`python -c` の中、シェルや Python に渡すヒアドキュメントとパイプ（`bash <<EOF`・`echo … | bash`）まで読む。
 端末操作系の MCP（desktop-commander など）経由のコマンドとファイル操作も、同じ基準で確認する。
 
-**ガードで見えないもの（対象外）**: ガードはコマンドの文字列を読んで判断するため、スクリプトファイルの中で行う処理（`node script.js`、`npm run` の中身、`make` など）は見えない。
+**ガードの限界（対象外）**: ガードはコマンドの文字列を読んで判断する網であり、完全な防御ではない。次のようなものは見えない。
+
+- スクリプトファイルの中で行う処理（`node script.js`、`npm run` の中身、`make` など）
+- 変数や別名を組み合わせて、実行するまで中身が決まらない書き方
+- 表にない CLI での外部操作（その場合は Claude Code の通常の許可確認に任せる）
+
 最後の守りは Git の履歴とバックアップ。大事なファイルはコミットしておく。

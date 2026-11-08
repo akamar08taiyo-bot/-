@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // PreToolUse フック: 「ハーネス判断・権限・安全設定」の関門。
 // - ファイル削除: 保護フォルダは停止、それ以外は人間に確認（プロジェクト内のビルド成果物と一時フォルダは素通し）
-// - 強制push: 停止
+// - 強制push・リモートの枝の削除: 停止
 // - .env（実キーの置き場所）への書き込み: 停止。安全設定（settings.json・フック）の書き換え: 人間に確認
-// - 外部サービス（MCP）: 削除・消去は停止 / 送信・課金・公開・共有などは人間に確認
+// - 外部サービス: 削除・消去は停止 / 送信・課金・公開・共有などは人間に確認（MCP と、gh・vercel・wrangler・curl・DB の CLI）
 //   JEB_MCP_STRICT=on にすると、読み取り以外の MCP 操作をすべて確認にする
 //
-// コマンドの文字列を読んで判断する「網」であり、完全ではない。
-// スクリプトファイルの中で行う削除（node script.js、npm run の中身など）は見えないので、最後の守りは Git とバックアップ。
+// コマンドの文字列を読んで判断する「網」であり、完全な防御ではない。
+// スクリプトファイルの中で行う処理（node script.js、npm run の中身など）は見えないので、最後の守りは Git とバックアップ。
 import { readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,14 +19,15 @@ try {
   process.exit(0);
 }
 
-const tool = input.tool_name || '';
-const ti = input.tool_input || {};
+const tool = String(input.tool_name || '');
+const ti = input.tool_input && typeof input.tool_input === 'object' ? input.tool_input : {};
 const projectDir = path.resolve(process.env.CLAUDE_PROJECT_DIR || input.cwd || process.cwd());
 const startCwd = path.resolve(input.cwd || projectDir);
 const HOME = os.homedir();
 
 // 消してはいけない場所（プロジェクトからの相対パス。大文字小文字は区別しない）
 const PROTECTED = ['.git', '.claude', '.env', 'claude.md', 'ai-ecosystem/knowledge', 'ai-ecosystem/design-systems'];
+const PROTECTED_NAMES = ['.git', '.claude', '.env', 'claude.md', 'knowledge', 'design-systems'];
 // 書き換えるときに人間の確認がいる安全設定
 const SELF_CONFIG = ['.claude/settings.json', '.claude/settings.local.json', '.claude/hooks'];
 // 作り直せるので消してよいフォルダ名（プロジェクト内だけ）
@@ -47,7 +48,7 @@ function decide(permissionDecision, reason) {
 }
 
 // ---- パスの扱い -----------------------------------------------------------
-const unquote = (s) => s.replace(/^(["'])(.*)\1$/s, '$2');
+const unquote = (s) => String(s).replace(/^(["'])(.*)\1$/s, '$2');
 function expand(p, cwd) {
   let s = unquote(p)
     .replace(/\$\{HOME\}|\$HOME\b/g, HOME)
@@ -71,6 +72,13 @@ function isProtected(abs) {
   return PROTECTED.some((p) => under(r, p) || p.startsWith(r + path.sep));
 }
 const isSelfConfig = (abs) => insideProject(abs) && SELF_CONFIG.some((p) => under(relLower(abs), p));
+// フォルダごと上書きする操作で、安全設定がその中に含まれるか
+function touchesSelfTree(abs) {
+  if (isSelfConfig(abs)) return true;
+  if (!insideProject(abs)) return false;
+  const r = relLower(abs);
+  return r === '' || SELF_CONFIG.some((p) => p.startsWith(r + path.sep));
+}
 const isEnvFile = (abs) => /^\.env(\..+)?$/i.test(path.basename(abs)) && !/\.(example|template|sample)$/i.test(abs);
 function isRegenerable(abs) {
   if (TMP_ROOTS.some((t) => abs.startsWith(t + path.sep))) return true;
@@ -82,26 +90,89 @@ function isDangerousRoot(abs) {
 }
 const hasGlob = (s) => /[*?[]/.test(s);
 const hasVar = (s) => /\$/.test(s);
-
-// ---- シェルの分解 -----------------------------------------------------------
-// ヒアドキュメントの本文（<<EOF … EOF）はコマンドではないので外す
-function stripHeredocs(cmd) {
-  const lines = cmd.split('\n');
+// オプションか（「-/.claude」のような、- で始まるパスは除く）
+const isOpt = (a) => a.length > 1 && a.startsWith('-') && !a.includes('/');
+function nonOptArgs(args) {
   const out = [];
-  const pending = [];
-  for (const line of lines) {
-    if (pending.length) {
-      const { tag, dash } = pending[0];
-      if ((dash ? line.replace(/^\t+/, '') : line).trim() === tag) pending.shift();
-      continue;
-    }
-    out.push(line);
-    for (const m of line.matchAll(/(?<!<)<<(-?)\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\2/g)) pending.push({ dash: m[1] === '-', tag: m[3] });
+  let rest = false;
+  for (const a of args) {
+    if (rest) out.push(a);
+    else if (a === '--') rest = true;
+    else if (!isOpt(a)) out.push(a);
   }
-  return out.join('\n');
+  return out;
+}
+// {a,b} の展開（1語の中、空白を含まないものだけ）
+function braceExpand(word, depth = 0) {
+  const m = word.match(/^([^{}\s]*)\{([^{}\s]*,[^{}\s]*)\}([^\s]*)$/);
+  if (!m || depth > 3 || word.startsWith('${')) return [word];
+  return m[2].split(',').flatMap((alt) => braceExpand(m[1] + alt + m[3], depth + 1));
 }
 
-// $( ) とバッククォートの中身（シングルクォートの中は除く）
+// ---- シェルの分解 -----------------------------------------------------------
+const SHELLS = new Set(['bash', 'sh', 'zsh', 'dash', 'ksh', 'fish']);
+const INTERPRETERS = { node: ['-e', '--eval', '-p', '--print'], python: ['-c'], python3: ['-c'], perl: ['-e', '-E'], ruby: ['-e'], bun: ['-e', '--eval'], deno: ['eval'] };
+const isInterpreter = (cmd) => cmd in INTERPRETERS || /^python3?(\.\d+)?$/.test(cmd);
+
+// ヒアドキュメントを見つけ、本文をコマンドから外す。シェルやインタプリタに渡す本文は、別に検査する
+function scanHeredocs(cmd) {
+  const lines = cmd.split('\n');
+  const kept = [];
+  const feeds = [];
+  const stack = ['top'];
+  let pending = [];
+  let body = [];
+  for (const line of lines) {
+    if (pending.length) {
+      const cur = pending[0];
+      if ((cur.dash ? line.replace(/^\t+/, '') : line).trim() === cur.tag) {
+        feeds.push({ cmd: cur.cmd, body: body.join('\n') });
+        body = [];
+        pending.shift();
+      } else body.push(line);
+      continue;
+    }
+    kept.push(line);
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      const top = stack[stack.length - 1];
+      if (top === 'sq') {
+        if (c === "'") stack.pop();
+        continue;
+      }
+      if (c === '\\') {
+        i++;
+        continue;
+      }
+      if (top === 'dq') {
+        if (c === '"') stack.pop();
+        else if (c === '$' && line[i + 1] === '(') {
+          stack.push('cmd');
+          i++;
+        }
+        continue;
+      }
+      if (c === "'") stack.push('sq');
+      else if (c === '"') stack.push('dq');
+      else if (c === '$' && line[i + 1] === '(') {
+        stack.push('cmd');
+        i++;
+      } else if (c === ')' && top === 'cmd') stack.pop();
+      else if (c === '<' && line[i + 1] === '<' && line[i + 2] !== '<' && line[i - 1] !== '<') {
+        const m = line.slice(i).match(/^<<(-?)\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\2/);
+        if (m) {
+          const before = line.slice(0, i).split(/[;&|(\n]/).pop().trim().split(/\s+/);
+          while (before.length && (/^[A-Za-z_][A-Za-z0-9_]*=/.test(before[0]) || ['sudo', 'env', 'command', 'exec'].includes(before[0]))) before.shift();
+          pending.push({ dash: m[1] === '-', tag: m[3], cmd: path.basename(before[0] || '') });
+          i += m[0].length - 1;
+        }
+      }
+    }
+  }
+  return { text: kept.join('\n'), feeds };
+}
+
+// $( )・<( )・>( )・バッククォートの中身（シングルクォートの中は除く）
 function substitutions(cmd) {
   const found = [];
   let q = null;
@@ -117,14 +188,14 @@ function substitutions(cmd) {
     }
     if (c === "'" && !q) q = "'";
     else if (c === '"') q = q === '"' ? null : '"';
-    else if (c === '$' && cmd[i + 1] === '(') {
+    else if ((c === '$' || (!q && (c === '<' || c === '>'))) && cmd[i + 1] === '(') {
       let depth = 1;
       let j = i + 2;
       for (; j < cmd.length && depth; j++) {
         if (cmd[j] === '(') depth++;
         else if (cmd[j] === ')') depth--;
       }
-      found.push(cmd.slice(i + 2, j - 1));
+      found.push(cmd.slice(i + 2, depth ? j : j - 1));
       i = j - 1;
     } else if (c === '`') {
       const end = cmd.indexOf('`', i + 1);
@@ -137,22 +208,24 @@ function substitutions(cmd) {
   return found;
 }
 
-// 引用符の外の ; && || | & 改行 で区切り、各部分を語に分ける
+// 引用符の外の ; && || | & 改行 で区切り、各部分を語に分ける（直前がパイプかも覚える）
 function segments(cmd) {
   const segs = [];
   let words = [];
   let word = '';
   let has = false;
   let q = null;
+  let pipeIn = false;
   const endWord = () => {
     if (has) words.push(word);
     word = '';
     has = false;
   };
-  const endSeg = () => {
+  const endSeg = (nextPipe) => {
     endWord();
-    if (words.length) segs.push(words);
+    if (words.length) segs.push({ words, pipeIn });
     words = [];
+    pipeIn = nextPipe;
   };
   for (let i = 0; i < cmd.length; i++) {
     const c = cmd[i];
@@ -174,7 +247,8 @@ function segments(cmd) {
       word += c; // 2>&1、&>file
       has = true;
     } else if (c === ';' || c === '\n' || c === '|' || c === '&') {
-      endSeg();
+      const isPipe = c === '|' && cmd[i + 1] !== '|';
+      endSeg(isPipe);
       if ((c === '|' || c === '&') && cmd[i + 1] === c) i++;
     } else if (/\s/.test(c)) endWord();
     else {
@@ -182,7 +256,7 @@ function segments(cmd) {
       has = true;
     }
   }
-  endSeg();
+  endSeg(false);
   return segs;
 }
 
@@ -194,8 +268,8 @@ function splitRedirects(words) {
     const w = words[i];
     const out = w.match(/^(\d*|&)>>?\|?(.*)$/);
     if (out) {
-      const t = out[2] || (out[2] === '' ? words[++i] : '');
-      if (t && !t.startsWith('&')) targets.push(t);
+      const t = out[2] !== '' ? out[2] : words[++i];
+      if (t && !t.startsWith('&') && !t.startsWith('(')) targets.push(t);
       continue;
     }
     if (/^\d*<<?<?$/.test(w)) {
@@ -224,19 +298,18 @@ const WRAPPERS = {
   builtin: new Set(),
   exec: new Set(['-a']),
   caffeinate: new Set(['-t', '-w']),
+  npx: new Set(['-p', '--package', '-c', '--call']),
+  bunx: new Set(['-p', '--package']),
+  shx: new Set(),
+  'with-secrets.sh': new Set(),
 };
 const XARGS_VALUE_OPTS = new Set(['-n', '-I', '-L', '-P', '-d', '-s', '-a', '-E', '-e', '-i', '-l']);
-const SHELLS = new Set(['bash', 'sh', 'zsh', 'dash', 'ksh', 'fish']);
-const DELETE_CMDS = new Set(['rm', 'rmdir', 'unlink', 'shred', 'trash', 'srm']);
-const INTERPRETERS = { node: ['-e', '--eval', '-p', '--print'], python: ['-c'], python3: ['-c'], perl: ['-e', '-E'], ruby: ['-e'], deno: ['eval'], bun: ['-e', '--eval'] };
-const CODE_DELETE = /(rmSync|rmdirSync|unlinkSync|\.rm\(|\.rmdir\(|\.unlink\(|rimraf|shutil\.rmtree|os\.remove|os\.unlink|os\.rmdir|\.unlink\(\)|rmtree|File\.delete|FileUtils\.rm|unlink\s)/;
+const DELETE_CMDS = new Set(['rm', 'rmdir', 'unlink', 'shred', 'trash', 'srm', 'rimraf', 'del', 'del-cli', 'trash-put', 'rmtrash']);
 
-// 先頭のグループ化記号・制御構文・環境変数代入・ラッパーを外して、本当のコマンドを取り出す
-function stripPrefixes(words) {
-  const w = [...words];
-  // 語にくっついた ( { と ) } を外す
+// 先頭のグループ化記号・制御構文・関数定義・環境変数代入・ラッパーを外して、本当のコマンドを取り出す
+function stripPrefixes(input, cwd, depth) {
+  let w = input.flatMap((x) => braceExpand(x));
   if (w.length) w[0] = w[0].replace(/^[({]+/, '');
-  // 末尾は、対になる開き括弧がない「余った」閉じ括弧だけを外す（${HOME} や $(…) は残す）
   const count = (s, ch) => s.split(ch).length - 1;
   while (w.length) {
     const last = w[w.length - 1];
@@ -245,15 +318,52 @@ function stripPrefixes(words) {
     else break;
   }
   let viaXargs = false;
-  for (;;) {
-    while (w.length && (w[0] === '' || PREFIX_WORDS.has(w[0]) || /^[A-Za-z_][A-Za-z0-9_]*=/.test(w[0]))) w.shift();
-    if (!w.length) break;
+  for (let guard = 0; guard < 20 && w.length; guard++) {
+    if (w[0] === '' || PREFIX_WORDS.has(w[0]) || /^[A-Za-z_][A-Za-z0-9_]*=/.test(w[0])) {
+      w.shift();
+      continue;
+    }
+    if (w[0] === 'function') {
+      w.splice(0, 2);
+      continue;
+    }
+    if (/^[A-Za-z_][\w-]*\(\)$/.test(w[0])) {
+      w.shift(); // 関数定義 f() { … }
+      continue;
+    }
+    // $(which rm) や `command -v rm` の形（語に分かれていても1つにまとめて読む）
+    if (/^(?:\$\(|`)(?:which|type|command)$/.test(w[0])) {
+      let k = 1;
+      while (k < w.length && isOpt(w[k])) k++;
+      const target = (w[k] || '').replace(/[)`]+$/, '');
+      if (target) {
+        w.splice(0, k + 1, target);
+        continue;
+      }
+    }
     const name = path.basename(w[0]);
+    if ((name === 'pnpm' || name === 'yarn') && (w[1] === 'dlx' || w[1] === 'exec')) {
+      w.splice(0, 2);
+      continue;
+    }
+    if (name === 'npm' && (w[1] === 'exec' || w[1] === 'x')) {
+      w.splice(0, 2);
+      if (w[0] === '--') w.shift();
+      continue;
+    }
+    if (name === 'gio' && ['trash', 'remove'].includes(w[1])) {
+      w.splice(0, 2, 'rm');
+      continue;
+    }
     if (name in WRAPPERS) {
       const valueOpts = WRAPPERS[name];
       w.shift();
-      while (w.length && (w[0].startsWith('-') || /^[A-Za-z_][A-Za-z0-9_]*=/.test(w[0]))) {
+      while (w.length && (isOpt(w[0]) || /^[A-Za-z_][A-Za-z0-9_]*=/.test(w[0]))) {
         const opt = w.shift();
+        if ((name === 'npx' && (opt === '-c' || opt === '--call')) && w.length) {
+          checkBash(w.shift(), cwd, depth + 1); // npx -c "コマンド"
+          continue;
+        }
         if (valueOpts.has(opt)) w.shift();
         if (opt === '--') break;
       }
@@ -263,7 +373,7 @@ function stripPrefixes(words) {
     if (name === 'xargs') {
       viaXargs = true;
       w.shift();
-      while (w.length && w[0].startsWith('-')) {
+      while (w.length && isOpt(w[0])) {
         const opt = w.shift();
         if (XARGS_VALUE_OPTS.has(opt)) w.shift();
       }
@@ -274,30 +384,36 @@ function stripPrefixes(words) {
   return { words: w.filter((x) => x !== ')' && x !== '}'), viaXargs };
 }
 
-function checkDeleteTargets(targets, cwd, seg, { viaXargs = false, findFiltered = false } = {}) {
-  if (targets.length === 0) {
+function checkDeleteTargets(targets, cwd, seg, { viaXargs = false, findNames = [] } = {}) {
+  const list = targets.map((t) => unquote(t)).filter((t) => t !== '');
+  if (list.length === 0) {
     decide('ask', `ファイル削除（${seg}）です。${viaXargs ? '消す対象が前のコマンドから渡されるため、' : ''}消してよいか人間が確認してください。`);
   }
+  if (findNames.some((n) => PROTECTED_NAMES.some((p) => n.toLowerCase().replace(/[*?'"]/g, '') === p))) {
+    decide('deny', `保護フォルダの名前で探して消そうとしています（${seg}）。`);
+  }
   let needAsk = false;
-  for (const raw of targets) {
-    const t = unquote(raw).replace(/\/+$/, '') || '/';
-    if (['*', '/*', '~/*', '.*'].includes(t)) decide('deny', `「${seg}」はフォルダの中身を丸ごと消す恐れがあるため止めました。`);
+  for (const raw of list) {
+    const t = raw.replace(/\/+$/, '') || '/';
     if (hasGlob(t)) {
       // ワイルドカードは、展開される前の固定部分（親フォルダ）で判断する
-      const head = t.split('/');
-      const idx = head.findIndex(hasGlob);
-      const base = resolveFrom(cwd, head.slice(0, idx).join('/') || '.');
+      const gi = t.search(/[*?[]/);
+      const slash = t.lastIndexOf('/', gi);
+      const baseStr = slash < 0 ? '.' : slash === 0 ? '/' : t.slice(0, slash);
+      const base = resolveFrom(cwd, baseStr);
+      const tail = t.slice(slash + 1);
       if (isDangerousRoot(base) || isProtected(base)) decide('deny', `「${seg}」は保護フォルダやプロジェクト全体に及ぶ恐れがあるため止めました。`);
+      if (/^\.\[?!?/.test(tail) && isDangerousRoot(base)) decide('deny', `「${seg}」は隠しフォルダごと消す恐れがあるため止めました。`);
       if (!isRegenerable(base)) needAsk = true;
       continue;
     }
-    const abs = resolveFrom(cwd, t);
     if (hasVar(expand(t, cwd))) {
       needAsk = true; // 中身の分からない変数
       continue;
     }
+    const abs = resolveFrom(cwd, t);
     if (isDangerousRoot(abs)) {
-      if (findFiltered && abs === projectDir) {
+      if (findNames.length && abs === projectDir) {
         needAsk = true; // find . -name '*.log' のように絞り込んでいる
         continue;
       }
@@ -309,17 +425,44 @@ function checkDeleteTargets(targets, cwd, seg, { viaXargs = false, findFiltered 
   if (needAsk) decide('ask', `ファイル削除（${seg}）です。消してよいか人間が確認してください。`);
 }
 
+// プログラムの中身（node -e、python -c、パイプやヒアドキュメントで渡したもの）を調べる
+const CODE_DELETE = /(rmSync|rmdirSync|unlinkSync|\.rm\(|\.rmdir\(|\.unlink\(|rimraf|shutil\.rmtree|os\.remove|os\.unlink|os\.rmdir|rmtree|File\.delete|FileUtils\.rm)/;
+const CODE_SHELL = /(os\.system|subprocess|child_process|execSync|exec\(|spawnSync|spawn\(|popen|system\()/;
+function checkCode(code, cwd, seg, depth) {
+  const literals = [...code.matchAll(/'([^'\n]*)'|"([^"\n]*)"|`([^`\n]*)`/g)].map((m) => m[1] ?? m[2] ?? m[3]);
+  if (CODE_SHELL.test(code)) for (const lit of literals) checkBash(lit, cwd, depth + 1);
+  if (!CODE_DELETE.test(code)) return;
+  // パスらしい文字列（空白を含まず、/ を含むか . や ~ で始まる）
+  const paths = literals.filter((l) => l && !/\s/.test(l) && (l.includes('/') || l.startsWith('.') || l.startsWith('~')));
+  for (const p of paths) {
+    const abs = resolveFrom(cwd, p);
+    if (isProtected(abs) || isDangerousRoot(abs)) decide('deny', `プログラムの中から保護フォルダを消そうとしています（${seg}）。`);
+  }
+  if (paths.length && paths.every((p) => isRegenerable(resolveFrom(cwd, p)))) return;
+  decide('ask', `プログラムの中でファイルを削除しています（${seg}）。消してよいか人間が確認してください。`);
+}
+
+const SQL_DESTRUCTIVE = /\b(drop\s+(table|database|schema|view|index)|truncate\s+table|delete\s+from)\b/i;
+const DB_CLIS = new Set(['psql', 'mysql', 'sqlite3', 'mongosh', 'mongo', 'duckdb', 'cockroach', 'sqlcmd']);
+
 function checkBash(command, cwdIn = startCwd, depth = 0) {
-  if (depth > 5) return;
-  const cmdText = stripHeredocs(command);
-  for (const inner of substitutions(cmdText)) checkBash(inner, cwdIn, depth + 1);
+  if (depth > 6 || typeof command !== 'string' || !command) return;
+  const { text, feeds } = scanHeredocs(command);
+  for (const f of feeds) {
+    if (SHELLS.has(f.cmd)) checkBash(f.body, cwdIn, depth + 1);
+    else if (isInterpreter(f.cmd)) checkCode(f.body, cwdIn, `${f.cmd} へのヒアドキュメント`, depth);
+  }
+  for (const inner of substitutions(text)) checkBash(inner, cwdIn, depth + 1);
 
   let cwd = cwdIn;
-  for (const raw of segments(cmdText)) {
+  let prev = null;
+  for (const { words: raw, pipeIn } of segments(text)) {
     const { rest, targets: redirects } = splitRedirects(raw);
-    const { words, viaXargs } = stripPrefixes(rest);
+    const { words, viaXargs } = stripPrefixes(rest, cwd, depth);
     const seg = raw.join(' ');
-    for (const t of redirects) checkWritePath(resolveFrom(cwd, t), `リダイレクト（${seg}）`, cwd);
+    const prevSeg = prev;
+    prev = words;
+    for (const t of redirects) checkWritePath(resolveFrom(cwd, t), `リダイレクト（${seg}）`);
     if (!words.length) continue;
 
     const cmd = path.basename(words[0]);
@@ -327,6 +470,18 @@ function checkBash(command, cwdIn = startCwd, depth = 0) {
 
     if (cmd === 'cd' || cmd === 'pushd') {
       cwd = args[0] && args[0] !== '-' ? resolveFrom(cwd, args[0]) : HOME;
+      continue;
+    }
+    // パイプでシェル・インタプリタに流し込む形（echo "…" | bash、curl … | sh）
+    if ((SHELLS.has(cmd) || isInterpreter(cmd)) && pipeIn && !args.some((a) => a === '-c' || /^-[a-z]*c$/.test(a) || a === '-e')) {
+      const src = prevSeg ? path.basename(prevSeg[0] || '') : '';
+      if (src === 'echo' || src === 'printf') {
+        const body = prevSeg.slice(1).filter((a) => !isOpt(a)).join(' ');
+        if (SHELLS.has(cmd)) checkBash(body, cwd, depth + 1);
+        else checkCode(body, cwd, seg, depth);
+      } else if (['curl', 'wget'].includes(src)) {
+        decide('ask', `ネットから取ってきたスクリプトをそのまま実行します（${seg}）。中身を人間が確認してください。`);
+      }
       continue;
     }
     if (SHELLS.has(cmd)) {
@@ -338,55 +493,48 @@ function checkBash(command, cwdIn = startCwd, depth = 0) {
       checkBash(args.join(' '), cwd, depth + 1);
       continue;
     }
-    if (cmd in INTERPRETERS || /^python3?(\.\d+)?$/.test(cmd)) {
+    if (isInterpreter(cmd)) {
       const flags = INTERPRETERS[cmd] ?? INTERPRETERS.python;
-      const ci = args.findIndex((a) => flags.includes(a));
-      const code = ci >= 0 ? args.slice(ci + 1).join(' ') : '';
-      if (code && CODE_DELETE.test(code)) {
-        const lower = code.toLowerCase();
-        if (PROTECTED.some((p) => lower.includes(p))) decide('deny', `プログラムの中から保護フォルダを消そうとしています（${seg}）。`);
-        decide('ask', `プログラムの中でファイルを削除しています（${seg}）。消してよいか人間が確認してください。`);
+      const ci = args.findIndex((a) => flags.includes(a) || (cmd === 'perl' && /^-[a-zA-Z]*e$/.test(a)));
+      if (cmd === 'perl' && args.some((a) => /^-[a-zA-Z]*i/.test(a))) {
+        const files = args.filter((a, i) => !isOpt(a) && i !== ci + 1);
+        for (const f of files) checkWritePath(resolveFrom(cwd, f), `書き換え（${seg}）`);
       }
+      if (ci >= 0) checkCode(args.slice(ci + 1).join(' '), cwd, seg, depth);
       continue;
     }
 
-    // git: グローバルオプション（-C <dir>、-c <k=v> など）を飛ばしてからサブコマンドを見る
     if (cmd === 'git') {
-      const g = [...args];
-      let gcwd = cwd;
-      while (g.length && g[0].startsWith('-')) {
-        const opt = g.shift();
-        if (opt === '-C') gcwd = resolveFrom(gcwd, g.shift() ?? '.');
-        else if (opt === '-c' || opt === '--namespace' || opt === '--git-dir' || opt === '--work-tree') g.shift();
-      }
-      const sub = g[0];
-      const subArgs = g.slice(1);
-      if (sub === 'push') {
-        if (subArgs.some((a) => a === '--force' || /^-[a-zA-Z]*f[a-zA-Z]*$/.test(a) || a.startsWith('--force-with-lease') || a === '--force-if-includes' || /^\+/.test(a) || /:\+/.test(a))) {
-          decide('deny', 'git push の強制（--force / -f / --force-with-lease / +ブランチ）は禁止です。履歴を書き換えない方法を選ぶか、人間に依頼してください。');
-        }
-        continue;
-      }
-      if (sub === 'clean') {
-        if (subArgs.some((a) => a === '--dry-run' || /^-[a-zA-Z]*n/.test(a))) continue;
-        checkDeleteTargets(subArgs.filter((a) => !a.startsWith('-')), gcwd, seg);
-        continue;
-      }
-      if (sub === 'rm') {
-        if (subArgs.includes('--cached')) continue; // 管理から外すだけで、ファイルは消えない
-        checkDeleteTargets(subArgs.filter((a) => !a.startsWith('-')), gcwd, seg);
-        continue;
-      }
-      if (sub === 'mv') {
-        checkMove(subArgs, gcwd, seg);
-        continue;
-      }
-      if (sub === 'checkout' || sub === 'restore') {
-        const dd = subArgs.indexOf('--');
-        const paths = dd >= 0 ? subArgs.slice(dd + 1) : sub === 'restore' ? subArgs.filter((a) => !a.startsWith('-')) : [];
-        for (const p of paths) checkWritePath(resolveFrom(gcwd, p), `git ${sub}（${seg}）`, gcwd);
+      checkGit(args, cwd, seg);
+      continue;
+    }
+    if (cmd === 'gh') {
+      checkGh(args, seg);
+      continue;
+    }
+    if (cmd === 'vercel' || cmd === 'netlify') {
+      if (args.some((a) => ['remove', 'rm', 'delete', 'sites:delete'].includes(a))) decide('deny', `公開先のサイト・プロジェクトの削除（${seg}）は禁止です。人間が画面から行ってください。`);
+      if (args.some((a) => ['--prod', 'promote', 'alias', 'domains', 'env', 'rollback'].includes(a))) decide('ask', `本番公開・公開先の設定変更（${seg}）です。人間が確認してください。`);
+      continue;
+    }
+    if (cmd === 'wrangler') {
+      if (args.includes('delete')) decide('deny', `Cloudflare 上の削除（${seg}）は禁止です。`);
+      if (args.some((a) => ['deploy', 'publish', 'secret', 'rollback'].includes(a))) decide('ask', `Cloudflare への公開・設定変更（${seg}）です。人間が確認してください。`);
+      continue;
+    }
+    if (['curl', 'wget', 'http', 'https', 'xh'].includes(cmd)) {
+      const joined = args.join(' ');
+      if (/(^|\s)(-X\s*|--request\s+|--method\s+)DELETE\b/i.test(joined) || /^DELETE$/i.test(args[0] || '')) {
+        decide('deny', `外部サービスへの DELETE リクエスト（${seg}）は禁止です。`);
       }
       continue;
+    }
+    if (DB_CLIS.has(cmd) || cmd === 'dropdb' || cmd === 'dropuser') {
+      if (cmd.startsWith('drop') || args.some((a) => SQL_DESTRUCTIVE.test(a))) decide('deny', `データベースのデータを消す操作（${seg}）は禁止です。`);
+      continue;
+    }
+    if ((cmd === 'supabase' && args[0] === 'db' && args[1] === 'reset') || (cmd === 'prisma' && args.includes('reset')) || (cmd === 'prisma' && args.includes('--force-reset'))) {
+      decide('deny', `データベースを初期化する操作（${seg}）は禁止です。`);
     }
 
     if (cmd === 'mv') {
@@ -394,46 +542,65 @@ function checkBash(command, cwdIn = startCwd, depth = 0) {
       continue;
     }
     if (['cp', 'install', 'tee', 'ln'].includes(cmd)) {
-      const paths = args.filter((a) => !a.startsWith('-'));
+      const paths = nonOptArgs(args);
       const dests = cmd === 'tee' ? paths : paths.slice(-1);
-      for (const d of dests) checkWritePath(resolveFrom(cwd, d), `書き込み（${seg}）`, cwd);
+      const recursive = args.some((a) => /^-[a-zA-Z]*[rRa]/.test(a) || a === '--recursive' || a === '--archive');
+      for (const d of dests) {
+        const abs = resolveFrom(cwd, d);
+        checkWritePath(abs, `書き込み（${seg}）`);
+        if (recursive && touchesSelfTree(abs)) decide('ask', `安全設定を含むフォルダをまとめて上書きします（${seg}）。人間が確認してください。`);
+      }
       continue;
     }
     if (cmd === 'rsync') {
-      const paths = args.filter((a) => !a.startsWith('-'));
-      const dest = paths.at(-1);
+      const dest = nonOptArgs(args).at(-1);
       if (dest) {
         const abs = resolveFrom(cwd, dest);
         if (args.some((a) => a.startsWith('--delete') || a === '--remove-source-files')) {
           if (isProtected(abs) || isDangerousRoot(abs)) decide('deny', `保護フォルダを同期で消す恐れがあります（${seg}）。`);
           decide('ask', `削除を伴う同期（${seg}）です。人間が確認してください。`);
         }
-        checkWritePath(abs, `同期（${seg}）`, cwd);
+        checkWritePath(abs, `同期（${seg}）`);
+        if (touchesSelfTree(abs)) decide('ask', `安全設定を含むフォルダへの同期です（${seg}）。人間が確認してください。`);
+      }
+      continue;
+    }
+    if (cmd === 'tar') {
+      const cluster = args.find((a) => /^-?[a-zA-Z]+$/.test(a) && !a.startsWith('--')) || '';
+      const files = nonOptArgs(args);
+      if (/f/.test(cluster) && files.length) files.shift(); // アーカイブのファイル名
+      if (args.includes('--remove-files')) checkDeleteTargets(files, cwd, seg);
+      const ci = args.findIndex((a) => a === '-C' || a === '--directory');
+      const dir = ci >= 0 ? args[ci + 1] : args.find((a) => a.startsWith('--directory='))?.slice(12);
+      if ((/x/.test(cluster) || args.includes('--extract')) && dir) {
+        const abs = resolveFrom(cwd, dir);
+        checkWritePath(abs, `展開（${seg}）`);
+        if (touchesSelfTree(abs)) decide('ask', `安全設定を含むフォルダに展開します（${seg}）。人間が確認してください。`);
       }
       continue;
     }
     if (cmd === 'dd') {
-      for (const a of args) if (a.startsWith('of=')) checkWritePath(resolveFrom(cwd, a.slice(3)), `dd（${seg}）`, cwd);
+      for (const a of args) if (a.startsWith('of=')) checkWritePath(resolveFrom(cwd, a.slice(3)), `dd（${seg}）`);
       continue;
     }
     if (cmd === 'sed' && args.some((a) => /^-[a-zA-Z]*i/.test(a) || a.startsWith('--in-place'))) {
-      const files = args.filter((a) => !a.startsWith('-') && a !== '');
-      for (const f of files.slice(1)) checkWritePath(resolveFrom(cwd, f), `書き換え（${seg}）`, cwd);
+      const files = nonOptArgs(args).filter((a) => a !== '');
+      for (const f of files.slice(1)) checkWritePath(resolveFrom(cwd, f), `書き換え（${seg}）`);
       continue;
     }
     if (['truncate', 'chmod', 'chown', 'chattr'].includes(cmd)) {
-      const files = args.filter((a) => !a.startsWith('-') && !/^\d+$/.test(a) && !/^[ugoa]*[+=-][rwxXst]*$/.test(a));
+      const files = nonOptArgs(args).filter((a) => !/^\d+$/.test(a) && !/^[ugoa]*[+=-][rwxXst]*$/.test(a));
       for (const f of files) {
         const abs = resolveFrom(cwd, f);
-        checkWritePath(abs, `${cmd}（${seg}）`, cwd);
-        if (isProtected(abs)) decide('ask', `保護フォルダのファイルを ${cmd} で変更します（${seg}）。人間が確認してください。`);
+        checkWritePath(abs, `${cmd}（${seg}）`);
+        if (isProtected(abs) && cmd !== 'chmod') decide('ask', `保護フォルダのファイルを ${cmd} で変更します（${seg}）。人間が確認してください。`);
       }
       continue;
     }
 
     // 削除系
     if (DELETE_CMDS.has(cmd)) {
-      checkDeleteTargets(args.filter((a) => !a.startsWith('-')), cwd, seg, { viaXargs });
+      checkDeleteTargets(nonOptArgs(args), cwd, seg, { viaXargs });
       continue;
     }
     if (cmd === 'find') {
@@ -445,20 +612,117 @@ function checkBash(command, cwdIn = startCwd, depth = 0) {
         if (a.startsWith('-') || a === '(' || a === '!') break;
         starts.push(a);
       }
-      const filtered = args.some((a) => ['-name', '-iname', '-path', '-ipath', '-regex', '-type', '-newer', '-mtime', '-size'].includes(a));
-      checkDeleteTargets(starts.length ? starts : ['.'], cwd, seg, { findFiltered: filtered });
+      const names = [];
+      args.forEach((a, i) => {
+        if (['-name', '-iname', '-path', '-ipath', '-regex'].includes(a) && args[i + 1]) names.push(args[i + 1]);
+      });
+      const filtered = names.length > 0 || args.some((a) => ['-type', '-newer', '-mtime', '-size'].includes(a));
+      checkDeleteTargets(starts.length ? starts : ['.'], cwd, seg, { findNames: filtered ? (names.length ? names : ['*']) : [] });
     }
   }
 }
 
+function checkGit(args, cwd, seg) {
+  const g = [...args];
+  let gcwd = cwd;
+  while (g.length && g[0].startsWith('-')) {
+    const opt = g.shift();
+    if (opt === '-C') gcwd = resolveFrom(gcwd, g.shift() ?? '.');
+    else if (opt === '-c') {
+      const v = g.shift() ?? '';
+      // git -c alias.p="push -f" p … のような別名での強制 push
+      if (/^alias\./i.test(v) && /push/.test(v) && /(\s-[a-zA-Z]*[fd]\b|--force|--mirror|--delete|\s\+|\s:)/.test(v)) {
+        decide('deny', `別名を使った強制 push・削除（${seg}）は禁止です。`);
+      }
+    } else if (opt === '--namespace' || opt === '--git-dir' || opt === '--work-tree') g.shift();
+  }
+  const sub = g[0];
+  const subArgs = g.slice(1);
+  if (sub === 'push') {
+    const cluster = (a) => /^-[a-zA-Z]+$/.test(a);
+    const force = subArgs.some((a) => a === '--force' || (cluster(a) && a.includes('f')) || a.startsWith('--force-with-lease') || a === '--force-if-includes' || unquote(a).startsWith('+') || a === '--mirror' || a === '--prune');
+    if (force) decide('deny', 'git push の強制（--force / -f / --force-with-lease / --mirror / +ブランチ）は禁止です。履歴を書き換えない方法を選ぶか、人間に依頼してください。');
+    const del = subArgs.some((a) => a === '--delete' || (cluster(a) && a.includes('d')) || /^:[^:]/.test(unquote(a)));
+    if (del) decide('deny', `リモートのブランチ・タグの削除（${seg}）は禁止です。必要なら人間が GitHub の画面から行ってください。`);
+    return;
+  }
+  if (sub === 'clean') {
+    const targets = [];
+    let dry = false;
+    let ignored = false;
+    for (let i = 0; i < subArgs.length; i++) {
+      const a = subArgs[i];
+      if (a === '-e' || a === '--exclude') i++;
+      else if (a.startsWith('--exclude=') || /^-e./.test(a)) continue;
+      else if (a === '--dry-run') dry = true;
+      else if (/^-[a-zA-Z]+$/.test(a)) {
+        if (a.includes('n')) dry = true;
+        if (/[xX]/.test(a)) ignored = true;
+      } else if (a !== '--' && !a.startsWith('--')) targets.push(a);
+    }
+    if (dry) return;
+    if (ignored) {
+      const abs = targets.map((t) => resolveFrom(gcwd, t));
+      if (abs.length === 0 || abs.some((a) => isDangerousRoot(a) || isProtected(a))) {
+        decide('deny', `git clean -x は Git に入っていないファイル（.env・私的メモ・output の原稿など）まで消します（${seg}）。消す範囲をフォルダで指定してください（例: git clean -fdx dist）。`);
+      }
+    }
+    checkDeleteTargets(targets, gcwd, seg);
+    return;
+  }
+  if (sub === 'rm') {
+    if (subArgs.includes('--cached')) return; // 管理から外すだけで、ファイルは消えない
+    checkDeleteTargets(nonOptArgs(subArgs), gcwd, seg);
+    return;
+  }
+  if (sub === 'mv') {
+    checkMove(subArgs, gcwd, seg);
+    return;
+  }
+  if (sub === 'checkout' || sub === 'restore') {
+    if (sub === 'restore' && subArgs.includes('--staged') && !subArgs.some((a) => a === '--worktree' || a === '-W')) return; // ステージから外すだけ
+    const dd = subArgs.indexOf('--');
+    const paths = dd >= 0 ? subArgs.slice(dd + 1) : sub === 'restore' ? nonOptArgs(subArgs.filter((a) => !a.startsWith('--source'))) : [];
+    for (const p of paths) {
+      const abs = resolveFrom(gcwd, p);
+      checkWritePath(abs, `git ${sub}（${seg}）`);
+      if (touchesSelfTree(abs)) decide('ask', `安全設定を含む場所を git ${sub} で書き戻します（${seg}）。人間が確認してください。`);
+    }
+  }
+}
+
+function checkGh(args, seg) {
+  const [noun, verb] = args;
+  if (noun === 'api') {
+    const joined = args.join(' ');
+    const m = joined.match(/(?:^|\s)(?:-X\s*|--method[\s=])([A-Za-z]+)/);
+    const method = (m?.[1] || '').toUpperCase();
+    if (method === 'DELETE') decide('deny', `GitHub API での削除（${seg}）は禁止です。`);
+    if (['POST', 'PUT', 'PATCH'].includes(method)) decide('ask', `GitHub API での書き込み（${seg}）です。公開リポジトリに反映されるので、人間が確認してください。`);
+    return;
+  }
+  if (args.includes('delete')) decide('deny', `GitHub 上の削除（${seg}）は禁止です。必要なら人間が画面から行ってください。`);
+  const askPairs = {
+    repo: ['create', 'edit', 'rename', 'archive', 'transfer', 'fork'],
+    release: ['create', 'edit', 'upload'],
+    pr: ['merge', 'close', 'comment', 'review'],
+    issue: ['create', 'comment', 'close', 'edit', 'transfer'],
+    secret: ['set'],
+    variable: ['set'],
+    workflow: ['run', 'enable', 'disable'],
+    gist: ['create', 'edit'],
+  };
+  if (askPairs[noun]?.includes(verb)) decide('ask', `GitHub への公開・変更（${seg}）です。人間が確認してください。`);
+}
+
 function checkMove(args, cwd, seg) {
-  const paths = args.filter((a) => !a.startsWith('-'));
+  const paths = nonOptArgs(args);
   const dest = paths.pop();
   for (const s of paths) {
     const abs = resolveFrom(cwd, s);
     if (isProtected(abs) || isDangerousRoot(abs)) decide('deny', `保護フォルダ（${relOf(abs) || '.'}）の移動は禁止です。必要なら人間が手動で行ってください。`);
   }
-  if (dest) checkWritePath(resolveFrom(cwd, dest), `移動（${seg}）`, cwd);
+  if (dest) checkWritePath(resolveFrom(cwd, dest), `移動（${seg}）`);
 }
 
 // ---- ファイル書き込み -------------------------------------------------------
@@ -478,7 +742,7 @@ const DELETE_WORDS = /(^|_)(delete|remove|trash|destroy|purge|wipe|erase|clear|t
 const DELETE_EXCEPTIONS = /remove_background/;
 const RISKY_WORDS =
   /(^|_)(send|reply|forward|pay|payment|buy|purchase|order|transfer|remit|invoice|billing|charge|refund|publish|deploy|deployment|promote|rollback|share|invite|post|tweet|comment|push|pull|merge|fork|repository|project|domain|alias|release|protection|firewall|bypass|secret|env|permission|permissions|token|config)(_|$)/;
-const SQL_DESTRUCTIVE = /\b(drop\s+(table|database|schema|view|index)|truncate\s+(table\s+)?[\w."]+|delete\s+from)\b/i;
+const SQL_TOOL = /(^|_)(sql|execute|database|db|query)(_|$)/;
 
 function stringsIn(value, out = []) {
   if (typeof value === 'string') out.push(value);
@@ -488,15 +752,16 @@ function stringsIn(value, out = []) {
 }
 
 function checkMcp(name) {
+  const parts = name.split('__');
+  const server = (parts[1] || '').toLowerCase();
   // camelCase も語に分ける（deleteConfluencePage → delete_confluence_page）
-  const words = name
-    .split('__')
-    .slice(2)
-    .join('__')
-    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-    .replace(/-/g, '_')
-    .toLowerCase();
-  const toolPart = words || name.toLowerCase();
+  const toolPart =
+    parts
+      .slice(2)
+      .join('__')
+      .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+      .replace(/-/g, '_')
+      .toLowerCase() || name.toLowerCase();
 
   // 端末操作系の MCP（コマンド実行・ファイル操作）も Bash や書き込みと同じ関門に通す
   if (typeof ti.command === 'string') checkBash(ti.command);
@@ -514,11 +779,14 @@ function checkMcp(name) {
   if (DELETE_WORDS.test(toolPart) && !DELETE_EXCEPTIONS.test(toolPart)) {
     decide('deny', `外部サービス上の削除・消去（${name}）はAIに禁止しています。必要なら人間が画面から操作してください。`);
   }
-  const strs = stringsIn(ti);
-  if (strs.some((s) => SQL_DESTRUCTIVE.test(s))) decide('deny', `データを消す SQL（DROP / TRUNCATE / DELETE FROM）を含む操作（${name}）は禁止です。`);
-  if (/(modify|label)/.test(toolPart) && strs.includes('TRASH')) decide('deny', `ゴミ箱へ移す操作（${name}）は、削除と同じ扱いで禁止です。`);
+  if (ti.trashed === true) decide('deny', `ゴミ箱へ移す操作（${name}）は、削除と同じ扱いで禁止です。`);
+  if (/(modify|label)/.test(toolPart) && stringsIn(ti).includes('TRASH')) decide('deny', `ゴミ箱へ移す操作（${name}）は、削除と同じ扱いで禁止です。`);
+  if (SQL_TOOL.test(toolPart) || ['query', 'sql', 'statement'].some((k) => typeof ti[k] === 'string')) {
+    const sql = SQL_TOOL.test(toolPart) ? stringsIn(ti) : ['query', 'sql', 'statement'].map((k) => ti[k]).filter((v) => typeof v === 'string');
+    if (sql.some((s) => SQL_DESTRUCTIVE.test(s))) decide('deny', `データを消す SQL（DROP / TRUNCATE TABLE / DELETE FROM）を含む操作（${name}）は禁止です。`);
+  }
 
-  if (lower(name).startsWith('mcp__claude-code-remote__')) return; // セッション管理系は Claude Code 側の確認に任せる
+  if (name.toLowerCase().startsWith('mcp__claude-code-remote__')) return; // セッション管理系は Claude Code 側の確認に任せる
   if (READ_WORDS.test(toolPart)) return;
 
   // 参加者を入れた予定は招待メールが飛ぶ
@@ -526,18 +794,20 @@ function checkMcp(name) {
   if (RISKY_WORDS.test(toolPart)) {
     decide('ask', `送信・お金・公開・共有・設定変更に関わる操作（${name}）です。内容（宛先・金額・本文・公開範囲）を人間が確認してから実行してください。`);
   }
+  if (server === 'github') decide('ask', `GitHub への書き込み（${name}）です。公開リポジトリに反映されるので、人間が確認してください。`);
   if (process.env.JEB_MCP_STRICT === 'on') {
     decide('ask', `外部サービスへの書き込み（${name}）です（JEB_MCP_STRICT=on）。人間が確認してください。`);
   }
 }
-function lower(s) {
-  return s.toLowerCase();
+
+try {
+  if (tool === 'Bash') checkBash(String(ti.command || ''));
+  else if (['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool)) {
+    const fp = ti.file_path || ti.notebook_path;
+    if (typeof fp === 'string' && fp) checkWritePath(path.resolve(startCwd, fp), tool);
+  } else if (tool.startsWith('mcp__')) checkMcp(tool);
+} catch (error) {
+  // ガード自身の不具合で作業を止めないよう、判定できないときは通常の許可確認に任せる
+  process.stderr.write(`[guard] 判定中にエラー: ${error?.message ?? error}\n`);
 }
-
-if (tool === 'Bash') checkBash(String(ti.command || ''));
-else if (['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool)) {
-  const fp = ti.file_path || ti.notebook_path;
-  if (fp) checkWritePath(path.resolve(startCwd, fp), tool);
-} else if (tool.startsWith('mcp__')) checkMcp(tool);
-
 process.exit(0);

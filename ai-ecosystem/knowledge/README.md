@@ -19,7 +19,7 @@ AIが作業しながら書き足していくメモ置き場。Obsidian で「フ
 | `newsletter/` | メルマガの発信履歴（件名と話題だけ） | メルマガ作成時に重複を避ける | 共有 |
 | `clients/` | 案件・取引先ごとの決まり、単価、宿題 | slides / invoice-moneyforward など | 除外（雛形だけ共有） |
 | `daily/` | 毎日のまとめ（メール・Discord の要約） | daily-digest | 除外 |
-| `Claude/` | セッションログ | session-memo フック | 除外 |
+| `Claude/` | セッションログ（`OBSIDIAN_VAULT` をこのフォルダに向けたときだけ作られる。ふつうはリポジトリ外の保管庫に書く） | session-memo フック | 除外 |
 | `private/` | その他の私的なメモ | obsidian-memo | 除外 |
 
 メモの書き方は `obsidian-memo` スキルを参照。
