@@ -170,11 +170,13 @@ function mergeSettings(manifest, settings) {
     }
     settings.permissions[kind] = [...current];
   }
-  // 利用制限を常に表示するステータスライン。すでに自分のステータスラインがあれば、そちらを残す
-  if (!settings.statusLine) {
-    settings.statusLine = { type: 'command', command: 'node "$HOME/.claude/jeb/statusline.mjs"', padding: 0, refreshInterval: 60 };
-    log('ステータスライン: 週間・5時間の利用制限の表示を追加');
-  } else if (!String(settings.statusLine.command || '').includes('/.claude/jeb/')) {
+  // 利用制限を常に表示するステータスライン。自分のステータスラインがあれば、そちらを残す。
+  // 前に入れたジェブのものなら、新しい設定に置き換える
+  const jebStatusLine = { type: 'command', command: 'node "$HOME/.claude/jeb/statusline.mjs"', padding: 0, refreshInterval: 60 };
+  if (!settings.statusLine || String(settings.statusLine.command || '').includes('/.claude/jeb/')) {
+    settings.statusLine = jebStatusLine;
+    log('ステータスライン: 週間・5時間の利用制限の表示を登録');
+  } else {
     log('ステータスライン: すでに自分の設定があるので、そのまま残しました');
   }
   const result = writeFile(manifest, file, JSON.stringify(settings, null, 2) + '\n');
