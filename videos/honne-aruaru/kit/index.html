@@ -108,27 +108,69 @@ tr:last-child th,tr:last-child td{border-bottom:0}
     <p class="hand">はい、記録しました。</p>
     <span class="stamp" aria-hidden="true">記録</span>
   </div>
-  <p class="lead">完成した15本を、「動画・サムネ・タイトル・説明文・タグ・固定コメント」の1セットずつにまとめました。新しく作った動画が上です。スマホだけで投稿できます。準備中の1本も、いちばん上に予定として載せています。</p>
-  <nav class="nav" aria-label="ページの中"><a href="#videos">動画15本</a><a href="#flow">投稿の流れ</a><a href="#settings">投稿のときの設定</a><a href="#chars">登場人物</a></nav>
+  <p class="lead">完成した16本を、「動画・サムネ・タイトル・説明文・タグ・固定コメント」の1セットずつにまとめました。新しく作った動画が上です。スマホだけで投稿できます。</p>
+  <nav class="nav" aria-label="ページの中"><a href="#videos">動画16本</a><a href="#flow">投稿の流れ</a><a href="#settings">投稿のときの設定</a><a href="#chars">登場人物</a></nav>
 </header>
 
 <section id="videos">
-  <h2>動画15本＋準備中1本（新しい順）</h2>
+  <h2>動画16本（新しい順）</h2>
   <p class="sec-lead">いちばん上が最新です。番号は作った順で、大きいほど新しい動画です。同じ日に2本出さず、数日あけて反応を比べます。保存される動画は、元の動画を少し軽くした版です（見た目はほとんど変わりません）。</p>
-  <div class="row"><span class="progress" id="prog">投稿済み 0 / 15</span></div>
+  <div class="row"><span class="progress" id="prog">投稿済み 0 / 16</span></div>
   <div class="cards" id="cards">
-<article class="vc-plan" id="v-rank01">
-  <div class="vh"><span class="no">16</span><span class="series">高速TOP10・家庭円満</span><span class="new">最新</span><span class="dur">準備中</span></div>
-  <p class="when">準備中（元の調査で数字を確かめてから書き出します）</p>
-  <p class="note">動画は準備中です。順位の数字を元の調査で確かめてから、ここに動画・説明文・タグ・固定コメントを入れます。</p>
+<article class="vc" id="v-rank01" data-key="rank01" data-vid="1fb9abcec2d3edeb205a27f1d0c3c6e6">
+  <span class="posted" hidden>投稿済</span>
+  <div class="vh"><span class="no">16</span><span class="series">高速TOP10・家庭円満</span><span class="new">最新</span><span class="dur">31秒</span></div>
+  <p class="when">しのぶの回と交互に</p>
+  <p class="note">音なしの回です。アップロードのとき、YouTube アプリの「サウンドを追加」で曲を選んでください（BPM120 前後の曲）。1位は動画では出さず、固定コメントで発表します（「固定コメントをコピー」→ コメントに貼って「固定」）。AI の申告は「いいえ」で大丈夫です。</p>
   <div class="vb">
     <img class="th" src="thumb_s/rank01.jpg" alt="サムネ：マジで家庭がうまくいくランキングTOP10【1位はコメント欄】" width="135" height="240" loading="lazy">
     <div class="vm">
-      <p class="lbl">タイトル（案）</p>
-      <h3 class="vt">マジで家庭がうまくいくランキングTOP10【1位はコメント欄】</h3>
-      <p class="intro">しのぶの出ない回です。人物の絵の代わりに、色の背景と大きな絵文字で見せます。実際の調査（アニヴェルセル総研「夫婦円満の秘訣ランキング」既婚男女208人、2024年）をもとに、1位（同率で2つ）は固定コメントで発表。音なし・約31秒。</p>
+      <p class="lbl">タイトル（おすすめ）<span class="count">31字</span></p>
+      <h3 class="vt" id="t-rank01">マジで家庭がうまくいくランキングTOP10【1位はコメント欄】</h3>
+      <div class="btns">
+        <button type="button" class="btn save" data-act="video">動画を保存</button>
+        <button type="button" class="btn save" data-act="thumb">サムネを保存</button>
+        <button type="button" class="btn copy" data-copy="t-rank01">タイトルをコピー</button>
+        <button type="button" class="btn copy" data-copy="d-rank01">説明文をコピー</button>
+        <button type="button" class="btn copy" data-copy="g-rank01">タグをコピー</button>
+        <button type="button" class="btn copy" data-copy="p-rank01">固定コメントをコピー</button>
+      </div>
+      <label class="done"><input type="checkbox" id="done-rank01"> 投稿した</label>
     </div>
   </div>
+  <details class="play"><summary>動画を見る</summary><video controls playsinline preload="none" poster="thumb_s/rank01.jpg" data-src="/_blob/1fb9abcec2d3edeb205a27f1d0c3c6e6"></video></details>
+  <details><summary>ほかのタイトル案（2つ）</summary><ul class="alt"><li><span id="t2-rank01">夫婦円満の秘訣TOP10 既婚男女208人に聞いた【1位はコメント欄】</span><button type="button" class="btn copy" data-copy="t2-rank01">コピー</button></li><li><span id="t3-rank01">夫婦円満のために大切なことTOP10【1位は固定コメント】</span><button type="button" class="btn copy" data-copy="t3-rank01">コピー</button></li></ul></details>
+  <details><summary>説明文を見る</summary><pre id="d-rank01">全国の20〜39歳の既婚男女208人に、「夫婦円満であるために大切だと思うこと」を3位まで答えてもらった調査のランキングです。数字は、1位〜3位に選んだ人を合わせた割合です。
+
+10位 共通の趣味を持つ 9.6%
+9位 こまめに連絡をとる 10.1%
+8位 旅行をする 10.6%
+7位 家事を分担する 18.8%
+6位 干渉しすぎない 20.2%
+5位 好きな気持ちを伝える 27.9%
+4位 約束を守る 31.7%
+3位 ごめんねと素直に言う 35.1%
+1位は、なんと同率で2つ。固定コメントで発表しています。
+
+あなたの家の「うまくいく秘訣」は？ コメントで教えてください。
+
+出典：アニヴェルセル株式会社「アニヴェルセル総研」第103弾 夫婦円満の秘訣ランキング（2024年10月8日発表）
+https://www.anniversaire.co.jp
+記事：https://www.anniversaire.co.jp/brand/pr/soken1/report103/
+・調査期間：2024年3月29日〜4月1日（インターネット調査）
+・対象：全国20歳〜39歳の既婚男女208名
+・設問：夫婦円満であるために大切だと思うことを3位までお答えください（1位〜3位の合算）
+
+※順位の項目と割合は、調査結果のまま載せています。ひと言は編集部のコメントです。
+
+#夫婦円満 #家庭円満 #夫婦あるある #ランキング #shorts</pre></details>
+  <details><summary>タグを見る</summary><pre id="g-rank01">夫婦円満, 夫婦円満の秘訣, 家庭円満, 夫婦あるある, 感謝の言葉, 夫婦 話し合い, 結婚生活, ランキング, TOP10, 夫婦</pre><p class="count">YouTube Studio の動画の詳細 →「タグ」に貼ります（, で区切られて1つずつのタグになります）。</p></details>
+  <details><summary>固定コメントを見る</summary><pre id="p-rank01">第1位は、同率で2つでした。
+「感謝の想いを言葉にする」61.1%
+「話し合いを大事にする」61.1%
+どちらも、10人に6人が選んでいます。3位の「ごめんねと素直に言う」35.1%を大きく引き離しました。
+出典：アニヴェルセル株式会社「アニヴェルセル総研」（くわしくは概要欄）</pre></details>
+  <details><summary>どんな回？</summary><p class="intro">しのぶの出ない回です。人物の絵の代わりに、色の背景と大きな絵文字で見せます。実際の調査（アニヴェルセル総研「夫婦円満の秘訣ランキング」、全国20〜39歳の既婚男女208名・2024年）をもとに、10位〜3位を3秒ずつ見せます。1位は同率で2つあるので2位はなく、動画は「1位は、なんと2つ。」で止めて、固定コメントで発表します。（尺：31秒。サムネにするコマ：最初のコマ）</p></details>
 </article>
 <article class="vc" id="v-honne11" data-key="honne11" data-vid="40df5d43f4e149258da0b78a1d03a128">
   <span class="posted" hidden>投稿済</span>
@@ -881,7 +923,7 @@ https://agoora.co.jp/rikon/column/gray-divorce-survey.html
 
 <script>
 (function(){
-  var N=15;
+  var N=16;
   var toastT; function toast(m){var t=document.getElementById('toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){t.hidden=true},2600)}
   // コピー
   document.addEventListener('click',function(ev){
