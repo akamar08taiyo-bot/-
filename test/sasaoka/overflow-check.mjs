@@ -140,7 +140,7 @@ await page.locator('input[type=file][accept=".json,application/json"]').setInput
 await page.getByRole('button', {name: '今のデータを置き換える'}).click();
 await page.waitForTimeout(800);
 
-const ids = ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu', 'kurume', 'iizuka'];
+const ids = ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu', 'kurume', 'iizuka', 'oita'];
 for (const ins of ids) {
   const job = `stress-${ins}`;
   // 見積書（画面）

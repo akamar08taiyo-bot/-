@@ -69,6 +69,9 @@ assert.deepEqual(handoff, {
     insurer: 'yukuhashi',
     careOffice: '',
     careManager: '',
+    // 保険者番号・生活保護はいつも送る（外したことも届くように。2026-11-08 のデバッグ）
+    insurerNo: '',
+    welfare: false,
   },
 });
 // 中の枠は画面の下まで（画面ごとはスクロールしない。特定福祉用具のアプリの中だけスクロールする）

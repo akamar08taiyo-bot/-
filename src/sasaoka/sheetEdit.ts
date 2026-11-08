@@ -46,7 +46,13 @@ const ADJUST_NAME = '施工費（調整）'; // 前の版で、見積書で直�
  */
 export function parseNum(input: string): number | null {
   if (/\d[\t\r\n]+\S/.test(input.trim())) return null;
-  const s = input.normalize('NFKC').replace(/[,\s円￥¥]/g, '').replace(/^定価[:：]?/, '').replace(/^[−ー]/, '-');
+  // うしろの単位（「2個」「2本」「1.2時間」「3箇所」など）は外して読む（前は読めずに何も変わらなかった。2026-11-08 のデバッグ。長さ cm・mm・m は parseLengthCm）
+  const s = input
+    .normalize('NFKC')
+    .replace(/[,\s円￥¥]/g, '')
+    .replace(/^定価[:：]?/, '')
+    .replace(/^[−ー]/, '-')
+    .replace(/(個|本|台|枚|組|式|セット|時間|箇所|ヶ所|ケ所|カ所|か所|ヵ所)$/, '');
   if (s === '' || !/^-?\d+(\.\d+)?$/.test(s)) return null;
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
@@ -133,6 +139,12 @@ const setPlaceRows = (job: Job, pi: number, rows: Row[]): Job => ({...job, place
 const patchRow = (job: Job, f: Found, patch: Partial<Row>): Job => setPlaceRows(job, f.pi, f.place.rows.map((r, i) => (i === f.ri ? {...r, ...patch} : r)));
 const patchPlace = (job: Job, pi: number, patch: Partial<Place>): Job => ({...job, places: job.places.map((p, i) => (i === pi ? {...p, ...patch} : p))});
 const withPlace = (job: Job, pi: number, fn: (p: Place) => Place): Job => ({...job, places: job.places.map((p, i) => (i === pi ? fn(p) : p))});
+
+/** 見積書の内容の欄の文字（materialText＝「メーカー 品番 品名」）を直したとき、頭のメーカー・品番がそのままか（品名の所だけ直した） */
+function sameMakerCode(r: Row, text: string): boolean {
+  const prefix = [r.maker, r.code].map((x) => x.trim()).filter(Boolean).join(' ');
+  return !!prefix && text.startsWith(`${prefix} `) && text.length > prefix.length + 1;
+}
 
 /** 部材リストの部材を行に書き写す */
 function materialFields(m: Material): Partial<Row> {
@@ -525,6 +537,9 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
       const at = p ? (p.rows[found.ri] ?? p.rows[p.rows.length - 1]) : undefined;
       return {job: next, key: at ? `line:${at.id}:text` : 'new:text'};
     }
+    // 頭のメーカー・品番がそのまま（品名のうしろに「（右）」を書き足した など）なら、部材（メーカー・品番・品名）はそのままで、見積書に出す文字だけ直す
+    // （前はメーカー・品番を消して全部を品名にしていたので、発注書・販売受注簿で品番のない行になり、切って使う部材の本数も別に数えた。2026-11-08 のデバッグ）
+    if (sameMakerCode(r, trimmed)) return {job: patchRow(job, found, {estText: trimmed}), key};
     return {job: patchRow(job, found, {name: trimmed, maker: '', code: '', estText: null, pieceLengthM: r.pieceLengthM || guessPieceLengthM(trimmed)}), key};
   }
   if (isBlankRow(r) && r.estMark === '手' && (field === 'qty' || field === 'price' || field === 'amount')) {
@@ -661,7 +676,9 @@ function qtyPatch(r: Row, trimmed: string): Partial<Row> {
  *  1行目の定価・1本の長さだけ直して2行目（長さの計算）がそのままなら、定価を直したとみなす（計算の行は自動で書き直す） */
 function notePatch(r: Row, text: string, auto: string, rates: EstimateRates): Partial<Row> {
   const trimmed = text.trim();
-  if (trimmed === '') return {listPrice: 0, estNote: null};
+  // 欄を空にした（Delete キー）：手で書いた備考なら自動の文に戻す。自動の文なら備考を出さない（空の文を持つ）。定価・単価は変えない
+  // （前は定価を消していたので、単価が仕切×率に下がり、備考には仕切から逆算した定価が出た。2026-11-08 のデバッグ）
+  if (trimmed === '') return r.estNote !== null && r.estNote.trim() !== '' ? {estNote: null} : {estNote: ''};
   if (sameNote(trimmed, auto)) return {estNote: null};
   const [first, ...rest] = trimmed.split('\n');
   const p = parseListNote(first.trim());
@@ -798,6 +815,8 @@ export function overheadValue(job: Job, s: SheetSettings, target: boolean): numb
  * 見積書の1行のもとになる行の範囲：部材ならその部材と、すぐ下の施工費（同上施工費）。施工費ならそのまとまり
  */
 function unitRange(rows: Row[], ri: number): [number, number] {
+  // 何も入っていない部材の行は、その1行だけ（下の施工費はその上の部材のもの。calc.ts の estimatePlaceLines。前は空の行を ✕・切り取りすると施工費まで消えた）
+  if (rows[ri].kind === 'material' && isBlankRow(rows[ri])) return [ri, ri + 1];
   if (rows[ri].kind === 'material') return [ri, workEnd(rows, ri + 1)];
   const head = workHead(rows, ri);
   return [head, workEnd(rows, head)];
@@ -863,7 +882,7 @@ export function lineRows(job: Job, rowId: string): Row[] | null {
  * removeIds：切り取ったもとの行（貼り付けたあとに消す。箇所の行がなくなれば箇所も消す）。
  * 返す rowId は、貼り付けた見積書の1行（選ぶ欄に使う）。貼り付ける場所がなければ null
  */
-export function pasteLines(job: Job, key: string, rows: Row[], removeIds: string[] = []): {job: Job; rowId: string | null} {
+export function pasteLines(job: Job, key: string, rows: Row[], removeIds: string[] = [], rates?: EstimateRates): {job: Job; rowId: string | null} {
   if (rows.length === 0) return {job, rowId: null};
   const [kind, id] = key.split(':');
   const copies = copyRows(rows);
@@ -889,6 +908,7 @@ export function pasteLines(job: Job, key: string, rows: Row[], removeIds: string
     j = setPlaceRows(j, pi, [...j.places[pi].rows, ...copies]);
   } else return {job, rowId: null};
 
+  if (rates) j = withPlace(j, pi, (p) => ({...p, rows: foldPastedLabor(p.rows, copies, rates)}));
   const targetId = j.places[pi].id;
   if (removeIds.length > 0) {
     const gone = new Set(removeIds);
@@ -901,6 +921,26 @@ export function pasteLines(job: Job, key: string, rows: Row[], removeIds: string
   const at = place ? place.rows.findIndex((r) => r.id === copies[0].id) : -1;
   if (!place || at < 0) return {job: j, rowId: null};
   return {job: j, rowId: place.rows[place.rows[at].kind === 'labor' ? workHead(place.rows, at) : at].id};
+}
+
+/**
+ * 貼り付けた施工費が、すぐ上の施工費のまとまりにつながったとき（見積書では1行になる）：どちらかの金額を手で直してあれば、
+ * つながったまとまりの金額＝上のまとまりの金額＋貼り付けた分の金額 にする（applyNew で施工費を足したときと同じ）。
+ * 前は、上のまとまりの手で直した金額のまま（貼り付けた分が見積書に入らず、仕切り計算表だけ増えた）・貼り付けた分の手で直した金額が消えた（2026-11-08 のデバッグ）
+ */
+function foldPastedLabor(rows: Row[], copies: Row[], rates: EstimateRates): Row[] {
+  const at = rows.findIndex((r) => r.id === copies[0]?.id);
+  if (at <= 0 || rows[at].kind !== 'labor' || rows[at - 1].kind !== 'labor') return rows;
+  const head = workHead(rows, at - 1);
+  const ids = new Set(copies.map((r) => r.id));
+  let end = at;
+  while (end < rows.length && rows[end].kind === 'labor' && ids.has(rows[end].id)) end++;
+  const above = rows.slice(head, at);
+  const pasted = rows.slice(at, end);
+  if (above[0].estAmount == null && pasted[0].estAmount == null) return rows; // どちらも自動の金額なら、足した合計のまま
+  const sum = (list: Row[]) => list.reduce((n, r) => n + estimateAmount(r, rates), 0);
+  const total = (above[0].estAmount ?? sum(above)) + (pasted[0].estAmount ?? sum(pasted));
+  return rows.map((r, i) => (i === head ? {...r, estAmount: total} : i === at ? {...r, estAmount: null} : r));
 }
 
 /**

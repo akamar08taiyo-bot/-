@@ -34,6 +34,7 @@ import {TokuteiEditor} from './estimate/TokuteiEditor.tsx';
 import {hasShinseiInfo} from './estimateForms.ts';
 import {APP_TITLE, PORTAL_URL, readHash, readReceive, writeHash} from './links.ts';
 import type {JobView, MainTab} from './links.ts';
+import type {ShinseiField} from './shinseiPreview.ts';
 import {photoIdsInUse, prunePhotos} from './photos.ts';
 import {PrintView} from './print/PrintView.tsx';
 import type {PrintRequest} from './print/PrintView.tsx';
@@ -213,6 +214,8 @@ export default function App({start}: {start: MainTab}) {
   const [estimateView, setEstimateView] = useState<'home' | 'list'>(estimateId ? 'list' : 'home');
   // 見積書の画面か、そこから開いた発注書・申請書か（見積書を閉じると見積書の画面にもどる）
   const [jobView, setJobView] = useState<JobView>(estimateId ? initial.view : 'estimate');
+  // 申請書のタブのプレビューで理由書だけの欄（大分市の理由書（表））を押したとき：理由書のタブで入れる項目
+  const [riyuGo, setRiyuGo] = useState<ShinseiField | null>(null);
   const [estimateMonth, setEstimateMonth] = useState(thisMonth);
   // 申請書・見積書・理由書を取り込んだら、その月の見積書の一覧を出す（DocImport.tsx）
   const showImported = (m: string) => {
@@ -552,6 +555,10 @@ export default function App({start}: {start: MainTab}) {
                     setJobView('estimate');
                   }}
                   docs={docs}
+                  onRiyu={(f) => {
+                    setRiyuGo(f);
+                    setJobView('riyu');
+                  }}
                 />
               ) : estimateJob && (jobView === 'tokutei' || jobView === 'hanbai') ? (
                 // 特定福祉用具申請書は申請書だけ、販売見積書は見積書だけを出す（同じ特定福祉用具の案件。申請書で入れた商品は見積書にも出る）
@@ -582,6 +589,8 @@ export default function App({start}: {start: MainTab}) {
                     setJobView('estimate');
                   }}
                   docs={docs}
+                  goTo={riyuGo}
+                  onWent={() => setRiyuGo(null)}
                 />
               ) : estimateJob ? (
                 <EstimateEditor

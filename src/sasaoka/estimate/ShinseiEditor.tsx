@@ -94,7 +94,7 @@ function label(f: Field, i: Insurer): string {
     renovated: '現在までの改修状況',
     photoDates: '改修前日付・改修後日付',
     careTerm: '認定有効期間',
-  }[f];
+  }[f as string] ?? '理由書のタブで入れます'; // 理由書だけの欄（大分市の理由書（表））
 }
 
 /** 申請書の名前（画面の上に出す） */
@@ -119,12 +119,15 @@ export function ShinseiEditor({
   update,
   onBack,
   docs,
+  onRiyu,
 }: {
   job: Job;
   data: AppData;
   update: Update;
   onBack: () => void;
   docs?: JobDocs | null; // 「📗 Excelで保存」「✉ メールで送付」（どのタブも同じ。App.tsx の DocsDialog.tsx）
+  // 理由書だけの項目（大分市の理由書（表）の現地確認日・身体状況など）をプレビューで押したとき：理由書のタブのその項目へ（App.tsx）
+  onRiyu?: (field: Field) => void;
 }) {
   const toast = useToast();
   const s = data.settings;
@@ -492,6 +495,8 @@ export function ShinseiEditor({
   const marks: ShinseiMarks = {gender: info.gender, era: eraOf(info), care: info.care, renovated: info.renovated};
   // プレビューの欄を押したとき：一覧のその項目の最初の欄へ
   const goField = (f: Field) => {
+    // この一覧にない項目（大分市の理由書（表）の理由書だけの欄）は、理由書のタブで入れる（前は押しても何も起きなかった）
+    if (insurer && !FIELDS[insurer].includes(f) && onRiyu) return onRiyu(f);
     setActive(f);
     document.querySelector<HTMLElement>(`[data-field="${f}"] input, [data-field="${f}"] select, [data-field="${f}"] button`)?.focus();
   };

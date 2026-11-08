@@ -42,8 +42,11 @@ export function useStore() {
   }, []);
 
   const schedule = useRef<() => void>(() => {});
+  // 今している保存（全部が終わると解決する）。保存することがなくても、保存の途中ならそれを待つ（特定福祉用具の useStore.ts と同じ。
+  // 前は保存の途中でも「保存した」と返していたので、新しい版の「⟳ 読み込み直す」で、書いている途中の最後の直しが消えることがあった。2026-11-08 のデバッグ）
+  const saving = useRef<Promise<boolean>>(Promise.resolve(true));
 
-  /** まだ保存していない変更をすぐ保存する（「保存」ボタン・画面を閉じるとき）。保存できたら true */
+  /** まだ保存していない変更をすぐ保存する（「保存」ボタン・画面を閉じるとき）。保存の途中なら、それが終わるまで待つ。保存できたら true */
   const flush = useCallback((): Promise<boolean> => {
     if (timer.current !== null) {
       window.clearTimeout(timer.current);
@@ -51,7 +54,7 @@ export function useStore() {
     }
     const items = [...pending.current.entries()];
     pending.current.clear();
-    if (items.length === 0) return Promise.resolve(true);
+    if (items.length === 0) return saving.current;
     const saves = items.map(async ([key, value]) => {
       inFlight.current.add(key);
       try {
@@ -83,7 +86,7 @@ export function useStore() {
         inFlight.current.delete(key);
       }
     });
-    return Promise.all(saves)
+    const done = Promise.all(saves)
       .then(() => {
         setSaveError('');
         setSavedAt(Date.now());
@@ -93,6 +96,9 @@ export function useStore() {
         setSaveError('保存できませんでした。この端末の空き容量、またはプライベート（シークレット）モードでないことを確認してください。');
         return false;
       });
+    const all = Promise.all([saving.current, done]).then(([, ok]) => ok);
+    saving.current = all;
+    return all;
   }, []);
 
   schedule.current = () => {

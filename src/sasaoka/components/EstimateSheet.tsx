@@ -698,7 +698,11 @@ export function EstimateSheet({
     if (!c) return;
     // ほかの見積書で切り取った行は、もとの見積書から消せないので貼り付けるだけ（前は「移しました」と出て、もとの見積書にも行が残り、請求書に2回入った）
     const move = c.cut && c.jobId === jobRef.current.id;
-    const res = pasteLines(jobRef.current, key, c.rows, move ? c.sourceIds : []);
+    // 切り取ったあとに元の行を直していたら、直したあとの行を移す（前は切り取ったときの写しを貼り付けて、あとの直し＝数量など が消えた。2026-11-08 のデバッグ）
+    const all = jobRef.current.places.flatMap((p) => p.rows);
+    const now = move ? c.sourceIds.map((id) => all.find((r) => r.id === id)) : [];
+    const rows = move && now.every(Boolean) ? (now as typeof c.rows).map((r) => ({...r})) : c.rows;
+    const res = pasteLines(jobRef.current, key, rows, move ? c.sourceIds : [], s);
     if (!res.rowId) {
       toast('貼り付ける行を選んでください', 'error');
       return;

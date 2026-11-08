@@ -7,7 +7,7 @@ import {estimateXlsx} from '../../src/sasaoka/estimateXlsx.ts';
 import {DEFAULT_PLACES, defaultSettings, OFFICES, settingsForOffice} from '../../src/sasaoka/defaults.ts';
 import {MARK_INFO, NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {areaInsurerNo, INSURER_AREAS, insurerNoOf} from '../../src/sasaoka/insurerNumbers.ts';
-import {ageOn, boxLabels, checkBoxes, cityRest, fillShinsei, flowLines, placeCounts, fixedPitch, hangLines, hangPrefixes, indentOf, lengthsShown, splitNumber, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, kindNamesOf, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoNoteText, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, sheetLines, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
+import {ageOn, boxLabels, checkBoxes, cityRest, fillShinsei, flowLines, placeCounts, fixedPitch, hangLines, hangPrefixes, indentOf, lengthsShown, splitNumber, fukuokaInsurerNo, fukuokaWard, insurerCheckDigit, fitLinesSize, insuredBoxes, kindNamesOf, NOTE_GAP, NOTE_INSET, oneRowPt, padInsuredNo, parseWorkLine, photoDay, photoNoteLayout, photoNoteLines, photoNotePt, photoNoteText, photoPlacement, placeBox, planPlacement, rangeBox, readShinsei, SHINSEI, sheetLayout, shinseiCare, shinseiCost, styleParts, shinseiFileName, shinseiKinds, shinseiMarkKeys, sheetLines, shinseiPhotos, shinseiValues, shinseiWorks, workItems, workText} from '../../src/sasaoka/shinsei.ts';
 import {KK_CELLS} from '../../src/sasaoka/shinsei/kitakyushuCells.ts';
 import {NO_RIYU, shinseiBookValues} from '../../src/sasaoka/riyu.ts';
 import {printLabels, shinseiPreview} from '../../src/sasaoka/shinseiPreview.ts';
@@ -1407,6 +1407,9 @@ test('福岡市：申請書（様式第21号）・完了届出書（第22号の2
   assert.match(txt(p1, 'D6'), /□玄関/);
   assert.match(txt(byName.get('写真貼付台紙（事前） (3)')!, 'D6'), /■玄関・道路までの通路/);
   assert.match(txt(byName.get('写真貼付台紙（事前） (2)')!, 'D7'), /■便所/);
+  // 原本の頭の空白（字下げ）はそのまま（前は消えて■が□の並びより左にずれた）
+  assert.equal(txt(byName.get('写真貼付台紙（事前） (2)')!, 'D7'), '　　■便所');
+  assert.equal(txt(p1, 'D6'), '　　□玄関・道路までの通路');
   assert.match(txt(byName.get('写真貼付台紙（完了）')!, 'N6'), /■浴室/);
   // 一覧にない場所は「■その他（勝手口）」
   const other = sheets(fillShinsei(FUKUOKA, SHINSEI.fukuoka!, shinseiValues(fukuokaJob({places: [place('勝手口', [mat('手すり')])]}), FUKUOKA_S))).byName.get('写真貼付台紙（事前）')!;
@@ -1474,6 +1477,11 @@ test('北九州市：郵便番号・電話番号は様式の「－」の前と�
   assert.deepEqual(splitNumber('８０２０００１', 2, true), ['802', '0001']);
   assert.deepEqual(splitNumber('093-111-2222', 3), ['093', '111', '2222']);
   assert.deepEqual(splitNumber('090－1234－5678', 3), ['090', '1234', '5678']);
+  // 空白・かっこで区切って打った番号も分ける
+  assert.deepEqual(splitNumber('0930 22 1234', 3), ['0930', '22', '1234']);
+  assert.deepEqual(splitNumber('0930(22)1234', 3), ['0930', '22', '1234']);
+  assert.deepEqual(splitNumber('(0930)22-1234', 3), ['0930', '22', '1234']);
+  assert.deepEqual(splitNumber('0930 22 1234', 2), ['0930', '22-1234']);
   assert.deepEqual(splitNumber('0931112222', 3), ['0931112222', '', '']);
   assert.deepEqual(splitNumber('093-111-2222', 2), ['093', '111-2222']);
   assert.deepEqual(splitNumber('093-2222', 3), ['093', '2222', '']);
@@ -1627,6 +1635,37 @@ test('広域連合・みやこ町の写真貼付用紙の施工業者名は「�
   assert.ok(size > 0 && size * 1.25 * 2 <= ht + 0.5, `${size}pt × 2行 > ${ht}pt`);
 });
 
+test('行橋市・苅田町・みやこ町の原本に書いてある行橋営業所の名前・所在地・電話・所長は、設定の営業所がちがえばその営業所の字に（行橋営業所なら原本のまま）', () => {
+  const yk = {...RATES, ...settingsForOffice(defaultSettings(), '行橋営業所'), company: '太陽シルバーサービス株式会社'};
+  const kk = {...RATES, ...settingsForOffice(defaultSettings(), '小倉営業所'), company: '太陽シルバーサービス株式会社'};
+  const o = OFFICES.find((x) => x.name === '小倉営業所')!;
+  const addr = o.address.replace(/^福岡県/, '');
+  const mgr = o.manager.replace(/\s+/g, '　');
+  const yuku = (s: typeof yk) => sheets(fillShinsei(YUKUHASHI, SHINSEI.yukuhashi!, shinseiValues(job({insurer: 'yukuhashi', address: '福岡県行橋市見本1-1'}), s))).byName;
+  const a = yuku(kk);
+  const r = a.get('住改・受領委任払')!;
+  assert.deepEqual([txt(r, 'AB14'), txt(r, 'H28'), txt(r, 'H29'), txt(r, 'H30')], ['太陽シルバーサービス㈱\n小倉営業所', addr, `太陽シルバーサービス㈱\n小倉営業所　${mgr}`, o.tel]);
+  const p = a.get('委任状')!;
+  assert.equal(txt(p, 'C10'), `　${addr}`);
+  assert.equal(txt(p, 'C12'), `　電話番号　${o.tel}`);
+  assert.match(txt(p, 'C14'), new RegExp(`小倉営業所[\\s\\S]*${mgr}　 ㊞$`));
+  assert.doesNotMatch(txt(p, 'C14'), /行橋|久保/);
+  // 行橋営業所なら原本の字のまま（書きかえない＝原本の共有の文字のまま。並び・空白も）
+  const b = yuku(yk);
+  for (const [name, ref] of [['住改・受領委任払', 'H29'], ['住改・受領委任払', 'AB14'], ['委任状', 'C10'], ['委任状', 'C14']] as const) assert.match(cell(b.get(name)!, ref), /\st="s"/, `${name} ${ref}`);
+  // みやこ町：承認届出書の施工業者（支給申請書・内訳明細書の施工業者はこの欄を参照する式なので一緒に変わる）
+  const m = sheets(fillShinsei(MIYAKO, SHINSEI.miyako!, shinseiValues(job({insurer: 'miyako', address: '福岡県京都郡みやこ町見本1'}), kk))).byName;
+  const n = m.get('住宅改修承認届出書')!;
+  assert.deepEqual([txt(n, 'N17'), txt(n, 'N18'), txt(n, 'N19'), txt(n, 'N35')], ['太陽シルバーサービス株式会社　小倉営業所', addr, o.tel, `（本人との関係：事業者）電話番号　${o.tel}`]);
+  const shikyu = m.get('住宅改修費支給申請書(受領委任払用)')!;
+  // 式の答え（開いた時点に見せる値）も新しい営業所
+  assert.deepEqual(['N27', 'N29', 'N31'].map((ref) => /<v>([^<]*)<\/v>/.exec(cell(shikyu, ref))?.[1]), [addr, '太陽シルバーサービス株式会社　小倉営業所', o.tel]);
+  // 苅田町の委任状
+  const k = sheets(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(job({insurer: 'kanda', address: '福岡県京都郡苅田町見本1'}), kk))).byName.get('委任状')!;
+  assert.deepEqual([txt(k, 'C10'), txt(k, 'C12')], [`　${addr}`, `　電話番号　${o.tel}`]);
+  assert.doesNotMatch(txt(k, 'C14'), /行橋|久保/);
+});
+
 test('広域連合の申請書（様式第2号・第7号・第2号別紙）の保険者番号のマス：原本の 406470 を、選んだ・住所の市町村の番号で書きかえる', () => {
   const j = job({insurer: 'kouiki', address: '福岡県豊前市大字八屋1-1'});
   const digits = (bytes: Uint8Array, name: string, cols: string[]) => {
@@ -1736,11 +1775,17 @@ test('久留米市：改修場所と箇所の数（全角）・年齢・住所�
   assert.equal(ageOn('昭和', '15', '3', '15', '2026-11-02'), '86');
   assert.equal(ageOn('昭和', '15', '11', '3', '2026-11-02'), '85'); // 誕生日の前の日
   assert.equal(ageOn('昭和', '１５', '3', '15', '2026-11-02'), '86'); // 全角
+  assert.equal(ageOn('昭和', '元', '12', '28', '2026-11-02'), '99'); // 昭和元年＝1926年
   assert.equal(ageOn('', '15', '3', '15', '2026-11-02'), '');
   assert.equal(ageOn('昭和', '', '3', '15', '2026-11-02'), '');
   assert.equal(cityRest('福岡県久留米市見本町2-3', 'kurume'), '見本町2-3');
   assert.equal(cityRest('久留米市 見本町2-3', 'kurume'), '見本町2-3');
   assert.equal(cityRest('福岡県うきは市見本1', 'kurume'), 'うきは市見本1'); // 市の名前で始まらなければそのまま
+});
+
+test('久留米市：設定の会社の電話がハイフンなしでも「℡（市外局番）…－…」に分けて書く', () => {
+  const out = fillShinsei(KURUME, SHINSEI.kurume!, shinseiValues(krJob(), {...KR_S, tel: '0942000000'}));
+  assert.equal(txt(sheets(out).byName.get('事前承認申請書')!, 'AN15'), '℡（0942）00－0000');
 });
 
 test('久留米市：事前承認申請書・支給申請書に書く（記入例のとおり。申請者の氏名は手書きなので書かない）', () => {
@@ -1765,9 +1810,9 @@ test('久留米市：事前承認申請書・支給申請書に書く（記入�
     assert.equal(R('AN', 12), '太陽シルバーサービス株式会社　久留米営業所', name);
     assert.equal(R('AN', 15), '℡（0942）00－0000', name);
     // 改修の内容：種類の□を■、下の「（　）」に改修場所と箇所の数（トイレは2箇所）。書かない種類は原本のまま
-    assert.equal(R('J', 13), '■ 手すりの取り付け', name);
+    assert.equal(R('J', 13), ' ■ 手すりの取り付け', name); // 原本の頭の空白（字下げ）は残す
     assert.equal(R('J', 14), '　　（浴室１箇所、トイレ２箇所）', name);
-    assert.equal(R('J', 15), '■ 段差の解消', name);
+    assert.equal(R('J', 15), ' ■ 段差の解消', name);
     assert.equal(R('J', 16), '　　（玄関１箇所）', name);
     assert.equal(R('J', 18), '', name); // □床または通路面… は共有の文字のまま（書きかえない）
     // 着工予定日・完成予定日（令和）、介護支援専門員等・理由書作成者は「同左：■」、費用は見積書の合計、負担割合は1割に■
@@ -1781,7 +1826,7 @@ test('久留米市：事前承認申請書・支給申請書に書く（記入�
     // 元号（昭）と、支給申請書は（支払方法）の「２．受領委任払い」（ユーザーの答え「久留米　支払い　受領委任払い」2026-11-03）
     assert.equal(ellipses(out, name).length, name === '支給申請書' ? 2 : 1, name);
     // 支払い方法は「■ 受領委任払い」（償還払いは □ のまま）
-    assert.equal(at(name === '事前承認申請書' ? 'AN17' : 'AN20'), '■ 受領委任払い（取扱登録事業者のみ）', name);
+    assert.equal(at(name === '事前承認申請書' ? 'AN17' : 'AN20'), ' ■ 受領委任払い（取扱登録事業者のみ）', name);
     assert.equal(R('AN', name === '事前承認申請書' ? 16 : 19), '', name);
   }
   // 申請者：事前承認申請書は住所（「久留米市」のうしろ）と電話番号だけ。支給申請書は「※本人自書」なので電話番号だけ
@@ -1942,6 +1987,19 @@ test('飯塚市の内訳書：見積書の明細を1行ずつ（改修場所・�
   assert.deepEqual(sheetLines(izJob({places: [place('浴室', [])]}), IZ_S), []);
 });
 
+test('飯塚市の内訳書：明細が60行（4ページ）に入りきらなくても、最後の行は小計・諸経費・消費税・合計（明細の方を削る）', () => {
+  const huge = izJob({places: Array.from({length: 70}, (_, i) => place(`廊下${i + 1}`, [mat('木の手すり')], {photo: (i % 5) + 1}))});
+  const lines = sheetLines(huge, IZ_S);
+  assert.equal(lines.length, 70 + 4);
+  const u = sheets(fillShinsei(IIZUKA, SHINSEI.iizuka!, shinseiValues(huge, IZ_S))).byName.get('内訳書')!;
+  const num = (ref: string) => Number(/<v>([^<]*)<\/v>/.exec(cell(u, ref))?.[1] ?? NaN);
+  // 6〜65行が使える60行：明細56行＋小計〜合計（62〜65行）
+  assert.deepEqual(['D62', 'D63', 'D64', 'D65'].map((r) => txt(u, r)), ['小計', '諸経費', '消費税', '合計']);
+  const t = estimateTotals(huge, IZ_S);
+  assert.deepEqual([num('H62'), num('H64'), num('H65')], [t.all.subtotal, t.all.tax, t.all.total]);
+  assert.match(txt(u, 'D61'), /^（材）/);
+});
+
 test('飯塚市の原本：16枚（事前承認願書・承諾書・内訳書・平面図・事前写真①〜⑤・支給申請書・支給写真①〜⑤・請求書）。書く欄は空', () => {
   const {byName} = sheets(IIZUKA);
   assert.deepEqual([...byName.keys()], ['事前承認願書', '承諾書', '内訳書', '平面図', '事前写真①', '事前写真②', '事前写真③', '事前写真④', '事前写真⑤', '支給申請書', '支給写真①', '支給写真②', '支給写真③', '支給写真④', '支給写真⑤', '請求書']);
@@ -2046,7 +2104,7 @@ test('大分市：委任状（生年月日・住所、受任者は会社・所�
   const text = cellTexts(files);
   const p = byName.get('委任状')!;
   assert.equal(txt(p, 'C4'), ''); // 被保険者の氏名は自署
-  assert.match(txt(p, 'C5'), /昭和　　15年　　3月　　15日$/);
+  assert.match(txt(p, 'C5'), /昭和　 15年　 3月　 15日$/); // 年・月・日の前は全角＋半角（2けたの月・日でも欄に入る）
   assert.deepEqual([txt(p, 'C6'), txt(p, 'C22'), txt(p, 'C23')], ['大分県大分市見本町2-3', '太陽シルバーサービス株式会社　大分営業所　所長　見本 次郎', '〒870-0000　大分県大分市見本1-1']);
   assert.equal(txt(p, 'H2'), ''); // 日付は書かない
   assert.equal(ellipses(out, '委任状').length - ellipses(OITA, '委任状').length, 3); // 元号（昭和）・住宅改修費支給申請兼施工承認（変更）申請・工事業者
@@ -2178,4 +2236,15 @@ test('事業所番号・受領委任契約番号のマス：申請書の営業�
   // 行橋市の受領委任払の申請書（事業者番号 Z4:AI4）
   const ykh = fillShinsei(TEMPLATES.yukuhashi, SHINSEI.yukuhashi!, shinseiValues(job({insurer: 'yukuhashi', address: '福岡県行橋市見本1'}), yk));
   assert.equal(box(ykh, '住改・受領委任払', 'Z', 4), '4072601802');
+});
+
+// 2026-11-08 のデバッグで見つけて直したこと（値は架空）
+test('申請書の改修費用を手で入れたら、支給予定金額・委任状の保険給付額もその金額から（限度額20万円まで。苅田町・行橋市は見積書の対象外の分を引く）', () => {
+  const S2 = settingsForOffice(defaultSettings(), '行橋営業所');
+  const j = (insurer: string, cost: number | null) =>
+    ({id: 'j', month: '2026-10', customer: '見本 花子', suffix: '様邸', staff: '', date: '', address: '', note: '', insuredNo: '0000000001', insurer, form: 'yukuhashi', overhead: null, overheadTarget: null, shikiri: true, places: [], shinsei: {...NO_SHINSEI, burden: '1', cost}, createdAt: 1, updatedAt: 1}) as never;
+  assert.deepEqual([shinseiCare(j('kitakyushu', 150000), S2).covered, shinseiCare(j('kitakyushu', 150000), S2).benefit], [150000, 135000]); // 前は見積書がないので 0
+  assert.equal(shinseiCare(j('iizuka', 250000), S2).benefit, 180000);
+  assert.equal(shinseiCare(j('kitakyushu', null), S2).benefit, 0); // 入れていなければ見積書から（見積書もなければ 0）
+  assert.equal(shinseiValues(j('kitakyushu', 150000), S2).texts.benefitYen, '135,000');
 });

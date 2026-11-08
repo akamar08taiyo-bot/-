@@ -31,8 +31,8 @@ export type TokuteiFields = {
   // 介護保険証から（入っていなければ渡さない。特定福祉用具の支給申請書に書くとき用。2026-10-22）
   careFrom?: string; // 認定の有効期間のはじめ 'YYYY-MM-DD'
   careTo?: string; // 認定の有効期間のおわり
-  insurerNo?: string; // 保険者番号（6けた）
-  welfare?: boolean; // 生活保護（負担割合の横の「生活保護」のチェック。生活保護のときだけ渡す。特定福祉用具の Sale の welfare）
+  insurerNo?: string; // 保険者番号（6けた。空なら住所から＝特定福祉用具でも空にする）
+  welfare?: boolean; // 生活保護（負担割合の横の「生活保護」のチェック。外したときも false を渡す。特定福祉用具の Sale の welfare）
   // 担当（入っていなければ渡さない。特定福祉用具の案件の担当も様邸と同じ人に＝受注残にその担当で入る。ユーザーの指示「受注残に入れるとき当然担当名のところ、
   // 紐付けて受注残に飛ばせるようにしてください」2026-10-26。特定福祉用具で直した担当も様邸に返る）
   staff?: string;
@@ -57,8 +57,10 @@ export function tokuteiFields(job: Job): TokuteiFields {
     careManager: info.reasonName.trim(),
     ...(info.careFrom ? {careFrom: info.careFrom} : {}),
     ...(info.careTo ? {careTo: info.careTo} : {}),
-    ...(info.insurerNo.trim() ? {insurerNo: info.insurerNo.trim()} : {}),
-    ...(info.welfare ? {welfare: true} : {}),
+    // 保険者番号・生活保護は、空・チェックなしでも渡す（前は入っているときだけ渡していたので、ここで消した・外したことが特定福祉用具に届かず、
+    // 生活保護を外しても特定福祉用具の利用者負担が 0円のままだった。特定福祉用具は、そこで手で直した値は上書きしない＝src/tokutei/jutaku.ts の applyJutaku）
+    insurerNo: info.insurerNo.trim(),
+    welfare: !!info.welfare,
     ...(job.staff.trim() ? {staff: job.staff.trim()} : {}),
   };
 }

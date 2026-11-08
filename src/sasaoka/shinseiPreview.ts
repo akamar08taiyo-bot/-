@@ -260,6 +260,8 @@ function fieldRefs(sheet: ShinseiSheet): {field: ShinseiField; ref: string}[] {
   for (const ref of sheet.insurerNo ?? []) out.push({field: 'insurerNo', ref});
   if (sheet.works) out.push({field: 'works', ref: sheet.works});
   for (const k of sheet.kinds ?? []) out.push({field: 'works', ref: k.places}, {field: 'works', ref: k.works});
+  // 改修の種類ごとの欄（福岡市の様式第21号・第22号の2の5行、大分市の改修箇所及び規模の6行）も改修の内容へ（前は押しても何も起きなかった）
+  for (const ref of sheet.kindCells ?? []) out.push({field: 'works', ref});
   for (const t of sheet.texts ?? []) {
     const key = placeholders(t.format)[0];
     // 改修施工者（受任者。福岡市・北九州市）は設定の会社・営業所・担当なので、押せる欄にしない

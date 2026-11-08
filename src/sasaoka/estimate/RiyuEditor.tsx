@@ -3,7 +3,7 @@
 // 被保険者番号・氏名・生年月日・性別・要介護・郵便番号・住所・作成者の事業所と氏名は申請書と同じ欄なので、どちらで直してもすぐ両方に出る。
 // ④改修項目は見積書・申請書の改修の箇所から（ここでは直さない）
 
-import {useCallback, useDeferredValue, useMemo, useRef, useState} from 'react';
+import {useCallback, useDeferredValue, useEffect, useMemo, useRef, useState} from 'react';
 import type {KeyboardEvent, ReactNode} from 'react';
 import {jobName} from '../calc.ts';
 import {Btn, TextInput, useToast} from '../components/ui.tsx';
@@ -83,7 +83,23 @@ function Check({on, onChange, children, label: aria}: {on: boolean; onChange: (v
   );
 }
 
-export function RiyuEditor({job, data, update, onBack, docs}: {job: Job; data: AppData; update: Update; onBack: () => void; docs?: JobDocs | null}) {
+export function RiyuEditor({
+  job,
+  data,
+  update,
+  onBack,
+  docs,
+  goTo,
+  onWent,
+}: {
+  job: Job;
+  data: AppData;
+  update: Update;
+  onBack: () => void;
+  docs?: JobDocs | null;
+  goTo?: Field | null; // 開いたときに入れる項目（申請書のタブのプレビューで理由書の欄を押したとき）
+  onWent?: () => void;
+}) {
   const toast = useToast();
   const s = data.settings;
   const insurer = jobInsurer(job);
@@ -136,6 +152,16 @@ export function RiyuEditor({job, data, update, onBack, docs}: {job: Job; data: A
     setActive(f);
     document.querySelector<HTMLElement>(`[data-riyu-field="${f}"] input, [data-riyu-field="${f}"] textarea, [data-riyu-field="${f}"] button`)?.focus();
   };
+  // 申請書のタブから来たとき：その項目へ（一覧が描かれてから）
+  useEffect(() => {
+    if (!goTo) return;
+    const t = window.setTimeout(() => {
+      goField(goTo);
+      onWent?.();
+    }, 0);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [goTo]);
 
   // 理由書の印刷（申請書の印刷と同じ ShinseiPrint.tsx。プレビューと同じ2ページを A4 に）
   const [printing, setPrinting] = useState(false);

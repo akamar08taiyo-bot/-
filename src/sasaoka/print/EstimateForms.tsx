@@ -110,7 +110,10 @@ const KK_GAP = ['name', 'work', 'mark', 'text', '', 'qty', 'unit', 'price', '', 
  */
 const gapNo = (page: (FormLine | undefined)[], i: number): number => {
   const ni = page.findIndex((l) => l?.isNew);
-  return ni >= 0 && i > ni && !page[i] ? i - ni : 0;
+  if (!(ni >= 0 && i > ni && !page[i])) return 0;
+  // あいだの介護保険の内訳の行（memo。見積書の行ではない）は数えない（前は数えたので、内訳の下の空いた行に打つと、内訳の行の数だけ空白の行が入った。2026-11-08 のデバッグ）
+  const memo = page.slice(ni + 1, i).filter((l) => l?.memo).length;
+  return i - ni - memo;
 };
 
 /**

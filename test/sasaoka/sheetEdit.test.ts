@@ -158,11 +158,14 @@ test('備考に定価を入れると、単価は 定価×0.8（数式と同じ�
   ({job} = type(job, [[`line:${id}:price`, '7000'], [`line:${id}:note`, '定価12,000円（税抜）×0.8']]));
   [l] = formLines(job, S, 'yukuhashi');
   assert.deepEqual([l.listPrice, l.unitPrice], [12000, 9600]);
-  // 定価でない文字はそのまま備考に。消すと定価もなくなる（Excel で定価の欄を消したのと同じ）
+  // 定価でない文字はそのまま備考に。消すと（Delete）手で書いた備考は自動の文に戻り、もう一度消すと備考を出さない。定価・単価は変えない
+  // （前は消すと定価がなくなり、単価が仕切×率に下がって、備考には仕切から逆算した定価が出た。2026-11-08 のデバッグ）
   ({job} = type(job, [[`line:${id}:note`, 'ご支給品']]));
   assert.equal(job.places[0].rows[0].estNote, 'ご支給品');
   ({job} = type(job, [[`line:${id}:note`, '']]));
-  assert.deepEqual([job.places[0].rows[0].listPrice, job.places[0].rows[0].estNote], [0, null]);
+  assert.deepEqual([job.places[0].rows[0].listPrice, job.places[0].rows[0].estNote], [12000, null]);
+  ({job} = type(job, [[`line:${id}:note`, '']]));
+  assert.deepEqual([job.places[0].rows[0].listPrice, job.places[0].rows[0].estNote, formLines(job, S, 'yukuhashi')[0].unitPrice], [12000, '', 9600]);
 });
 
 test('切って使う手すり：数量に 0.15 や 60cm を入れると 使う長さ÷1本の長さ。整数なら本数', () => {
@@ -888,4 +891,58 @@ test('材／手の欄：どの行でも直せる（ユーザーの指摘「材�
   assert.equal(gRows.length, rows.length + 2);
   assert.equal(gRows.at(-1)?.estMark, '手');
   assert.equal(g.key, `line:${gRows.at(-1)?.id}:mark`);
+});
+
+// 2026-11-08 の全体のデバッグで直したこと
+test('空の部材の行が部材と同上施工費のあいだにあっても、施工費は上の部材のもの（介護保険の対象外も）。✕で消すのは空の行だけ', () => {
+  const {job} = type(emptyJob(), [
+    ['new:text', 'インテリアバー', bar],
+    ['new:text', '同上施工費'],
+    ['line:@:price', '2000'],
+  ]);
+  const [barRow, work] = job.places[0].rows;
+  const blank = manualRow('material', {qty: 1});
+  const j: Job = {...job, places: [{...job.places[0], rows: [{...barRow, excluded: true}, blank, work]}]};
+  // 部材を介護保険の対象外にすると、その同上施工費も対象外（前は空の行の施工費になって対象に入った）
+  assert.equal(estimateTotals(j, S).target.subtotal, 0);
+  assert.equal(estimateTotals(j, S).all.subtotal, estimateTotals(job, S).all.subtotal);
+  // 空の行を✕で消しても、下の施工費は消えない
+  assert.deepEqual(deleteLine(j, blank.id).places[0].rows.map((r) => r.id), [barRow.id, work.id]);
+});
+
+test('貼り付けた施工費がすぐ上の施工費につながるとき、上の金額を手で直してあれば、貼り付けた分を足した金額にする', () => {
+  const {job} = type(emptyJob(), [
+    ['new:text', 'インテリアバー', bar],
+    ['new:text', '同上施工費'],
+    ['line:@:price', '2000'],
+  ]);
+  const [barRow, work] = job.places[0].rows;
+  const auto = formLines(job, S, 'yukuhashi').find((l) => l.text === '同上施工費')!.amount;
+  const manual: Job = {...job, places: [{...job.places[0], rows: [barRow, {...work, estAmount: 5000}]}]};
+  const res = pasteLines(manual, `line:${work.id}:text`, lineRows(job, work.id) ?? [], [], S);
+  const works = formLines(res.job, S, 'yukuhashi').filter((l) => l.isWork);
+  assert.deepEqual(works.map((l) => l.amount), [5000 + auto]);
+  // 手で直していなければ、足した合計のまま（金額は持たない）
+  const plain = pasteLines(job, `line:${work.id}:text`, lineRows(job, work.id) ?? [], [], S);
+  assert.ok(plain.job.places[0].rows.every((r) => r.estAmount == null));
+});
+
+test('内容の欄で品名のうしろだけ書き足したら、メーカー・品番はそのまま（見積書に出す文字だけ変わる）', () => {
+  const {job} = type(emptyJob(), [['new:text', 'インテリアバー', bar]]);
+  const r = job.places[0].rows[0];
+  const next = applySheet(job, `line:${r.id}:text`, 'TOTO TS136GY6 インテリアバー（右）', yk).job;
+  const row = next.places[0].rows[0];
+  assert.deepEqual([row.maker, row.code, row.name, row.estText], ['TOTO', 'TS136GY6', 'インテリアバー', 'TOTO TS136GY6 インテリアバー（右）']);
+  assert.equal(formLines(next, S, 'yukuhashi')[0].text, 'TOTO TS136GY6 インテリアバー（右）');
+  // メーカー・品番まで打ち直したら、今までどおり品名にする
+  const other = applySheet(job, `line:${r.id}:text`, '別の手すり', yk).job.places[0].rows[0];
+  assert.deepEqual([other.maker, other.code, other.name], ['', '', '別の手すり']);
+});
+
+test('数・金額の欄は「2個」「1.5時間」「3箇所」のように単位を付けて打っても読む', () => {
+  assert.equal(parseNum('2個'), 2);
+  assert.equal(parseNum('１．５時間'), 1.5);
+  assert.equal(parseNum('3箇所'), 3);
+  assert.equal(parseNum('1セット'), 1);
+  assert.equal(parseNum('2m'), null); // 長さは parseLengthCm
 });

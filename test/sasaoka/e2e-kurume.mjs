@@ -106,7 +106,7 @@ const text = (name, ref) => (/<t[^>]*>([\s\S]*?)<\/t>/.exec(new RegExp(`<c r="${
 const a = '事前承認申請書';
 assert.deepEqual([text(a, 'J3'), text(a, 'J4'), text(a, 'Q8')], ['サンプル　ヤマダ', '（サンプル）山田', '見本町1-2-3']);
 assert.match(text(a, 'J6'), /^ 明・大・昭　15年3月15日（\d+歳）$/); // 年齢は今日の年齢（昭和15年3月15日生まれは 2026-11-02 に 86歳）
-assert.equal(text(a, 'J13'), '■ 手すりの取り付け');
+assert.equal(text(a, 'J13'), ' ■ 手すりの取り付け'); // 原本の頭の空白（字下げ）は残す
 assert.match(text(a, 'J14'), /^　　（玄関１箇所/);
 assert.match(text(a, 'AN12'), /^太陽シルバーサービス/);
 assert.deepEqual([text(a, 'AN20'), text(a, 'AN22')], ['令和8年11月10日', '令和8年11月12日']);
@@ -118,7 +118,7 @@ const BOXES = ['AN', 'AP', 'AR', 'AT', 'AV', 'AX', 'AZ', 'BB', 'BD', 'BF'];
 assert.equal(BOXES.map((c) => text(a, `${c}18`) || '_').join(''), '__12345678');
 const b = '支給申請書';
 assert.deepEqual([text(b, 'J4'), text(b, 'J6'), text(b, 'P11'), text(b, 'AZ33'), text(b, 'AS46')], ['サンプル　ヤマダ', '（サンプル）山田', '見本町1-2-3', '■', '0942-11-2222']);
-assert.equal(text(b, 'J16'), '■ 手すりの取り付け');
+assert.equal(text(b, 'J16'), ' ■ 手すりの取り付け');
 assert.equal(BOXES.map((c) => text(b, `${c}21`) || '_').join(''), '__12345678');
 assert.equal(sheets.size, 11);
 log('Excel（事前承認申請書・支給申請書）OK');

@@ -10,6 +10,7 @@ import {strFromU8, strToU8, unzipSync, zipSync} from 'fflate';
 import {estimateTotals, isBlankRow} from './calc.ts';
 import type {EstimateRates, EstimateSettings} from './calc.ts';
 import {careAmounts} from './careLines.ts';
+import {HOUSING_LIMIT} from './uriage.ts';
 import {BASE_PLATE} from './cutLink.ts';
 import {circled, eraOf, formLines, INSURER_INFO, jobInsurer, KINDS, lineNote, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa, shinseiKindNames} from './estimateForms.ts';
 import {OFFICES} from './defaults.ts';
@@ -97,6 +98,9 @@ export type ShinseiSheet = {
   enlarge?: {cell: string; pt: number; rows: [number, number][]};
   // 見積書の明細を1行ずつ書く表（飯塚市の内訳書）：first 行から perPage 行×pages ページ。cols は欄の列。使わない行は隠す（1ページ分は残す）
   lines?: {first: number; perPage: number; pages: number; cols: Record<keyof SheetLine, string>};
+  // 原本に行橋営業所の名前・所在地・電話・所長がそのまま書いてある欄（苅田町・行橋市の委任状、行橋市の受領委任払の事業者の欄、みやこ町の承認届出書）。
+  // 申請書の営業所（設定）がちがえば、その字だけを書きかえる（ShinseiValues の office。前は ほかの営業所で作っても行橋営業所のままだった）
+  office?: string[];
 };
 
 /**
@@ -237,7 +241,8 @@ export function placeCounts(names: string[]): string {
 /** 年齢（申請書を作る日。生年月日の元号・年・月・日から。分からなければ空） */
 export function ageOn(era: string, y: string, m: string, d: string, today: string): string {
   const base = ({明治: 1867, 大正: 1911, 昭和: 1925, 平成: 1988} as Record<string, number>)[era];
-  const [by, bm, bd] = [y, m, d].map((v) => Number(v.normalize('NFKC').trim()));
+  // 「元」年（昭和元年・平成元年）は1年（前は数として読めず、年齢を書かなかった）
+  const [by, bm, bd] = [y, m, d].map((v) => ((n) => (n === '元' ? 1 : Number(n)))(v.normalize('NFKC').trim()));
   const t = /^(\d{4})-(\d{2})-(\d{2})/.exec(today);
   if (!base || !(by > 0) || !(bm >= 1 && bm <= 12) || !(bd >= 1 && bd <= 31) || !t) return '';
   const year = base + by;
@@ -467,6 +472,7 @@ const PROXY: ShinseiSheet = {
   // 委任者の住所は下線（C32:G32）の右の端まで。前は長い住所が下線を越えて表の右の線まで伸びた（ユーザーの指示「委任状の…はみ出し」2026-11-02）
   spillTo: {A32: 'G'},
   enlarge: {cell: 'B23', pt: PROXY_AMOUNT_PT, rows: PROXY_AMOUNT_ROWS},
+  office: ['C10', 'C12', 'C14'], // 受任者（所在地・電話番号・名称と所長）
 };
 
 /**
@@ -531,6 +537,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
           T('AB18', '{end}'), // 着工予定日（AB16）は書かない（ユーザーの指示）
           T('F20', '{cost}', 'number'),
         ],
+        office: ['AB14', 'H28', 'H29', 'H30'], // 事業者の名称・受任者の所在地・名称と所長・電話
       },
       PROXY,
       {sheet: '平面図  (2)', name: 'C2', nameFormat: '{name}', legend: {box: 'C54:AQ68'}, plan: 'C8:AQ52'},
@@ -556,6 +563,8 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
           T('N12', '{reasonName}'),
           T('I23', '{cost}', 'number'),
         ],
+        // 施工業者の名称・所在地・電話と、申請者の電話（支給申請書・内訳明細書の施工業者はこの欄を参照する式）
+        office: ['N17', 'N18', 'N19', 'N35'],
       },
       // フリガナ・生年月日・住所・住宅の所有者・改修費用は承認届出書を参照する式。電話番号と着工日・完成日（日付の欄）は書く
       {sheet: '住宅改修費支給申請書(受領委任払用)', name: 'J6', marks: [GENDER('AB8'), RENOVATED('X18')], texts: [T('AA10', '{phone}'), T('J16', '{start}', 'date'), T('X16', '{end}', 'date')]},
@@ -967,7 +976,8 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
         sheet: '委任状',
         marks: [{key: 'era', cell: 'C5', needles: ['明治', '大正', '昭和']}, FIXED('B11', ['住宅改修費支給申請兼施工承認（変更）申請']), FIXED('C26', ['工事業者'])],
         texts: [
-          T('C5', '\u3000  \u3000明治 ・ 大正 ・ 昭和\u3000\u3000{y}年\u3000\u3000{m}月\u3000\u3000{d}日'),
+          // 年・月・日の前のすき間は全角＋半角（前は全角2つで、年・月・日がみな2けた（13年12月25日）だと「日」が欄から出た。2026-11-08 のデバッグ）
+          T('C5', '\u3000  \u3000明治 ・ 大正 ・ 昭和\u3000 {y}年\u3000 {m}月\u3000 {d}日'),
           T('C6', '{address}'),
           T('C22', '{builder}　{builderRep}'),
           T('C23', '{builderZipAddress}'),
@@ -1030,7 +1040,34 @@ export type ShinseiValues = {
   planImage?: PhotoImage; // 平面図の図（Excel に保存するときだけ。画面のプレビューは図を別に重ねる）
   riyu?: RiyuValues; // 理由書だけの欄（理由書のシートに書く）
   lines?: SheetLine[]; // 見積書の明細（飯塚市の内訳書。sheetLines）
+  office?: OfficeTexts; // 申請書の営業所（原本に書いてある行橋営業所の名前・所在地・電話・所長を書きかえる。ShinseiSheet の office）
 };
+
+/** 申請書の営業所の名前・所在地（県を除く）・電話・所長（原本の行橋営業所の字を書きかえる） */
+export type OfficeTexts = {name: string; address: string; tel: string; manager: string};
+/** 原本（苅田町・行橋市・みやこ町）にそのまま書いてある行橋営業所の字 */
+const ORIGINAL_OFFICE: OfficeTexts = {name: '行橋営業所', address: '行橋市大字流末1327番地', tel: '0930-26-9640', manager: '久保　匠史'};
+
+/**
+ * 原本の行橋営業所の字（名前・所在地・電話・所長）を、申請書の営業所の字に書きかえた欄（変わる欄だけ）。
+ * 欄の中のほかの字・空白（委任状の受任者の並び）はそのまま。行橋営業所のまま・設定が空の項目は原本の字のまま
+ */
+function officeCells(files: Files, sheet: ShinseiSheet, office: OfficeTexts): [string, string][] {
+  const path = sheetPaths(files).get(sheet.sheet);
+  if (!sheet.office || !path || !files[path]) return [];
+  const xml = strFromU8(files[path]);
+  const ss = sharedStrings(files);
+  const out: [string, string][] = [];
+  for (const ref of sheet.office) {
+    const before = cellText(xml, ref, ss);
+    let text = before;
+    for (const key of ['name', 'address', 'tel', 'manager'] as const) {
+      if (office[key]) text = text.split(ORIGINAL_OFFICE[key]).join(office[key]);
+    }
+    if (text !== before) out.push([ref, text]);
+  }
+  return out;
+}
 
 /** 写真貼付用紙に貼る写真（JPEG のバイト列と、縦横の画素） */
 export type PhotoImage = {bytes: Uint8Array; w: number; h: number; edit?: PhotoEdit; marks?: PhotoMark[]}; // edit＝向き・大きさ（photoEdit.ts）、marks＝写真への書き込み（photoMarks.ts）
@@ -1395,6 +1432,21 @@ export function shinseiCost(job: Job, s: EstimateSettings): number | null {
   return (costIsTotal(jobInsurer(job)) ? t.all.total : t.target.total) || null;
 }
 
+/**
+ * 申請書の介護保険の金額（支給予定金額・委任状の保険給付額・飯塚市の請求書など）：改修費用を申請書の欄で手で入れてあれば、その金額から
+ * （苅田町・行橋市の改修予定費用は見積書の合計なので、見積書の介護保険の対象外の分を引く）。入れていなければ見積書の介護保険の対象から（careAmounts）。
+ * 前は手で入れた改修費用を見ず、見積書がないと空・見積書とちがう費用を入れると給付額だけ見積書のままだった（2026-11-08 のデバッグ）
+ */
+export function shinseiCare(job: Job, s: EstimateSettings): ReturnType<typeof careAmounts> {
+  const c = careAmounts(job, s);
+  const typed = job.shinsei?.cost;
+  if (typed == null || !Number.isFinite(typed)) return c;
+  const excluded = costIsTotal(jobInsurer(job)) ? Math.max(0, c.t.all.total - c.t.target.total) : 0;
+  const covered = Math.min(Math.max(0, Math.round(typed) - excluded), HOUSING_LIMIT);
+  const share = c.ratio ? Math.ceil((covered * c.ratio) / 10) : 0;
+  return {...c, covered, share, benefit: c.ratio ? covered - share : 0};
+}
+
 /** 日付 → 「令和8年11月5日」（申請書の日付の欄） */
 export function reiwaText(iso: string): string {
   const r = reiwa(iso);
@@ -1418,6 +1470,8 @@ export type BuilderSettings = Partial<Pick<Settings, 'company' | 'officeName' | 
 export function splitNumber(text: string, n: number, zip = false): string[] {
   const v = text.normalize('NFKC').replace(/[‐－ー−―]/g, '-').trim();
   let parts = v.split(/\s*-\s*/).filter(Boolean);
+  // ハイフンでなく空白・かっこで区切って打った番号（「0930 22 1234」「0930(22)1234」「(0930)22-1234」）も分ける（前は1つ目のマスに全部入った）
+  if (parts.length < n && /^[\d\s()-]+$/.test(v) && /[\s()]/.test(v)) parts = v.split(/[\s()-]+/).filter(Boolean);
   if (parts.length === 1 && zip && /^\d{7}$/.test(v)) parts = [v.slice(0, 3), v.slice(3)];
   if (parts.length < 2) return [v, ...Array(n - 1).fill('')];
   const head = parts.slice(0, n - 1);
@@ -1461,8 +1515,10 @@ export function shinseiValues(job: Job, settings: EstimateSettings & BuilderSett
   const [telA, telB, telC] = splitNumber(phone, 3);
   const [telHead, telTail] = splitNumber(phone, 2);
   const postal = t(s.postal ?? '');
-  const [builderTelA, builderTelB, builderTelC] = splitNumber(t(s.tel ?? ''), 3);
-  const care = careAmounts(job, s);
+  // 会社の電話も、設定にハイフンなしで入れてあれば分けて書く（久留米市の「℡（0942）72－8822」。前は「℡（0942728822）－」になった）
+  const builderTel = telWithHyphens(t(s.tel ?? ''));
+  const [builderTelA, builderTelB, builderTelC] = splitNumber(builderTel, 3);
+  const care = shinseiCare(job, s);
   const benefit = care.benefit;
   const kinds = shinseiKinds(job, s);
   const totals = estimateTotals(job, s);
@@ -1507,7 +1563,7 @@ export function shinseiValues(job: Job, settings: EstimateSettings & BuilderSett
       end: reiwaText(info.end),
       cost: cost ? cost.toLocaleString('en-US') : '',
       address: job.address.trim(), // 委任状の委任者の住所（「住所＋すき間」の1つの欄に書く）
-      benefit: proxyAmount(careAmounts(job, s).benefit), // 委任状の保険給付額（すき間＋金額。円は書き方の方）
+      benefit: proxyAmount(care.benefit), // 委任状の保険給付額（すき間＋金額。円は書き方の方）
       name: job.customer.trim(),
       ward: ward?.ward ?? '',
       street: ward?.street ?? '',
@@ -1520,7 +1576,7 @@ export function shinseiValues(job: Job, settings: EstimateSettings & BuilderSett
       builder: [s.company?.trim(), s.officeName?.trim()].filter(Boolean).join('　'),
       builderZip: t(s.postal ?? ''),
       builderAddress: (s.address ?? '').trim(),
-      builderTel: t(s.tel ?? ''),
+      builderTel,
       // 代表者氏名：「所長　氏名」（特定福祉用具の申請書と同じ）。前は請求書と同じ「○○営業所所長　氏名」にしていたが、すぐ上（左）の名称に営業所があり、
       // 北九州市の事前届出書の代表者名の狭い欄で字がとても小さくなった（ユーザーの指示「委任状の…社長名…はみ出し…文字が極端に小さくなってないか」2026-11-02）
       builderRep: s.manager?.trim() ? `所長　${s.manager.trim()}` : '',
@@ -1559,6 +1615,12 @@ export function shinseiValues(job: Job, settings: EstimateSettings & BuilderSett
     start: info.start,
     end: info.end,
     ...(jobInsurer(job) === 'iizuka' ? {lines: sheetLines(job, s)} : {}),
+    office: {
+      name: (s.officeName ?? '').trim(),
+      address: (s.address ?? '').trim().replace(/^福岡県/, ''), // 原本は県を書いていない
+      tel: t(s.tel ?? ''),
+      manager: (s.manager ?? '').trim().replace(/\s+/g, '　'),
+    },
   };
 }
 
@@ -1629,7 +1691,11 @@ function sheetLineCells(sheet: ShinseiSheet, v: ShinseiValues): {cells: Map<stri
   const t = sheet.lines;
   if (!t) return {cells, shown: 0};
   const cap = t.perPage * t.pages;
-  const lines = (v.lines ?? []).slice(0, cap);
+  // 行が多くて入りきらないときも、終わりの小計・諸経費・消費税・合計（sheetLines の最後の4行）は残し、明細の方を削る
+  // （前は前から切っていたので、60行を超えると消費税・合計が内訳書から消えた）
+  const all = v.lines ?? [];
+  const tail = all.length > cap && all.length >= 4 && all[all.length - 1].text === '合計' ? 4 : 0;
+  const lines = all.length > cap ? [...all.slice(0, cap - tail), ...all.slice(all.length - tail)] : all;
   lines.forEach((line, i) => {
     for (const [key, col] of Object.entries(t.cols) as [keyof SheetLine, string][]) {
       const value = line[key];
@@ -1823,8 +1889,16 @@ function writeCells(files: Files, sheet: string, values: Map<string, CellValue>)
 
 /** 原本のシートの欄の文字を読む（写真貼付用紙の写真番号） */
 function readCell(files: Files, sheet: string, ref: string): string {
+  return readRaw(files, sheet, ref).trim();
+}
+
+/**
+ * 原本の欄の文字（前後の空白もそのまま）。□を■にして書き直す欄は、頭の空白（字下げ）を残す
+ * （前は readCell の trim で消え、福岡市の写真貼付台紙の「　　□便所」・飯塚市の「　　　□　①　手すりの取付」・久留米市の「 □ 段差の解消」の■が左にずれた）
+ */
+function readRaw(files: Files, sheet: string, ref: string): string {
   const path = sheetPaths(files).get(sheet);
-  return path && files[path] ? cellText(strFromU8(files[path]), ref, sharedStrings(files)).trim() : '';
+  return path && files[path] ? cellText(strFromU8(files[path]), ref, sharedStrings(files)) : '';
 }
 
 /** 写真番号の欄の文字（①・1・(1)）→ 番号。なければ 0 */
@@ -2051,6 +2125,7 @@ export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void
     const cells = shinseiCells(sheet, v, photo);
     for (const [ref, text] of photoBoxes(files, sheet, v, photo)) cells.set(ref, text);
     for (const [ref, text] of kindRowCells(files, sheet, v)) cells.set(ref, text);
+    if (v.office) for (const [ref, text] of officeCells(files, sheet, v.office)) if (!cells.has(ref)) cells.set(ref, text);
     if (sheet.riyu && v.riyu) for (const [ref, text] of riyuSheetCells(files, sheet, v.riyu)) cells.set(ref, text);
     hangCells(files, sheet, cells);
     writeCells(files, sheet.sheet, cells);
@@ -2172,20 +2247,20 @@ export function checkBoxes(text: string, pick: number | number[] | null, other =
 function kindRowCells(files: Files, sheet: ShinseiSheet, v: ShinseiValues): Map<string, CellValue> {
   const out = new Map<string, CellValue>();
   for (const ref of sheet.checks ?? []) {
-    const text = readCell(files, sheet.sheet, ref);
-    if (text) out.set(ref, checkBoxes(text, 0));
+    const text = readRaw(files, sheet.sheet, ref);
+    if (text.trim()) out.set(ref, checkBoxes(text, 0));
   }
   sheet.kindRows?.forEach((row, i) => {
     const names = v.kindNames?.[i] ?? [];
     if (!names.length) return;
-    const kindText = row.kind ? readCell(files, sheet.sheet, row.kind) : '';
-    if (row.kind && kindText) out.set(row.kind, checkBoxes(kindText, 0));
+    const kindText = row.kind ? readRaw(files, sheet.sheet, row.kind) : '';
+    if (row.kind && kindText.trim()) out.set(row.kind, checkBoxes(kindText, 0));
     for (const t of row.texts ?? []) {
       const value = textValue(t, v);
       if (value !== null) out.set(t.cell, value);
     }
     if (row.places) {
-      const texts = row.places.map((ref) => readCell(files, sheet.sheet, ref));
+      const texts = row.places.map((ref) => readRaw(files, sheet.sheet, ref));
       const labels = texts.map((t) => boxLabels(t));
       const flat = labels.flat(); // 最後は「その他（」（placeBox は最後の項目を選ばない）
       const picks = new Set<number>();
@@ -2199,7 +2274,7 @@ function kindRowCells(files: Files, sheet: ShinseiSheet, v: ShinseiValues): Map<
       let offset = 0;
       texts.forEach((text, c) => {
         const mine = [...picks].filter((p) => p >= offset && p < offset + labels[c].length).map((p) => p - offset);
-        if (text) out.set(row.places![c], checkBoxes(text, mine));
+        if (text.trim()) out.set(row.places![c], checkBoxes(text, mine));
         offset += labels[c].length;
       });
       if (row.other && others.length) out.set(row.other, others.join('・'));
@@ -2297,16 +2372,16 @@ function photoBoxes(files: Files, sheet: ShinseiSheet, v: ShinseiValues, photo: 
   const name = photo > 0 ? v.photos[photo] : undefined;
   if (!pp || name === undefined) return out;
   if (pp.placeChecks) {
-    const text = readCell(files, sheet.sheet, pp.placeChecks);
+    const text = readRaw(files, sheet.sheet, pp.placeChecks);
     const at = placeBox(boxLabels(text), name);
-    if (text) out.set(pp.placeChecks, checkBoxes(text, at, at === null ? name.normalize('NFKC').trim() : ''));
+    if (text.trim()) out.set(pp.placeChecks, checkBoxes(text, at, at === null ? name.normalize('NFKC').trim() : ''));
   }
   // 福岡市の写真貼付台紙：□の見出しが欄ごと（最後は「□その他（　　）」）。その箇所の□を■、一覧にない場所は「■その他（勝手口）」
   if (pp.placeCells) {
-    const texts = pp.placeCells.map((ref) => readCell(files, sheet.sheet, ref));
+    const texts = pp.placeCells.map((ref) => readRaw(files, sheet.sheet, ref));
     const at = placeBox(texts.map((t) => boxLabels(t)[0] ?? ''), name);
     texts.forEach((text, i) => {
-      if (!text) return;
+      if (!text.trim()) return;
       const other = at === null && i === texts.length - 1;
       let next = checkBoxes(text, i === at || other ? 0 : null);
       // 閉じかっこが次の欄にある原本（飯塚市の「□その他（」＋「）」）は「（」のうしろに名前
@@ -2319,13 +2394,13 @@ function photoBoxes(files: Files, sheet: ShinseiSheet, v: ShinseiValues, photo: 
   if (pp.memo && pp.before && notes.length) out.set(pp.memo, notes.join('\n'));
   const kind = v.photoKinds?.[photo];
   if (pp.kindChecks && kind) {
-    const text = readCell(files, sheet.sheet, pp.kindChecks);
-    if (text) out.set(pp.kindChecks, checkBoxes(text, kind - 1));
+    const text = readRaw(files, sheet.sheet, pp.kindChecks);
+    if (text.trim()) out.set(pp.kindChecks, checkBoxes(text, kind - 1));
   }
   if (pp.kindCells && kind) {
     const ref = pp.kindCells[kind - 1];
-    const text = ref ? readCell(files, sheet.sheet, ref) : '';
-    if (text) out.set(ref, checkBoxes(text, 0));
+    const text = ref ? readRaw(files, sheet.sheet, ref) : '';
+    if (text.trim()) out.set(ref, checkBoxes(text, 0));
   }
   for (const slot of ['before', 'after'] as const) {
     const day = v.photoDates?.[photo]?.[slot];

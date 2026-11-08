@@ -282,6 +282,16 @@ export function estimatePlaceLines(place: Pick<Place, 'rows'>, rates: EstimateRa
     }
     const amount = estimateAmount(r, rates);
     const last = out[out.length - 1];
+    // 何も入っていない部材の行（同上施工費の上に「＋ 挿入」した行など）は、下の施工費を引き取らない：施工費はその上の部材（か施工費のまとまり）のもの
+    // （前は空の行のものになり、対象外の部材の同上施工費が対象になって介護保険の対象が増え、空の行を ✕ で消すと施工費まで消えた。2026-11-08 のデバッグ）。
+    // 空の行に部材を入れれば、その下の施工費はその部材のもの（2026-11-05 の決まり）
+    if (last && last.kind === 'material' && isBlankRow(last.row)) {
+      const prev = [...out].reverse().find((l) => !(l.kind === 'material' && isBlankRow(l.row)));
+      const owner = prev ? (prev.kind === 'material' ? prev.row : prev.owner) : null;
+      const excluded = prev ? prev.excluded : r.excluded;
+      out.push({kind: 'work', rows: [r], amount, sum: amount, afterMaterial: !!owner, excluded, owner});
+      continue;
+    }
     if (last && last.kind === 'work') {
       last.rows.push(r);
       last.sum += amount;
