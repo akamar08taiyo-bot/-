@@ -9,7 +9,7 @@
 //
 // コマンドの文字列を読んで判断する「網」であり、完全な防御ではない。
 // スクリプトファイルの中で行う処理（node script.js、npm run の中身など）は見えないので、最後の守りは Git とバックアップ。
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -563,14 +563,17 @@ function checkBash(command, cwdIn = startCwd, depth = 0) {
       checkMove(args, cwd, seg);
       continue;
     }
-    if (['cp', 'install', 'tee', 'ln'].includes(cmd)) {
-      const paths = nonOptArgs(args);
-      const dests = cmd === 'tee' ? paths : paths.slice(-1);
+    if (cmd === 'tee') {
+      for (const d of nonOptArgs(args)) checkWritePath(resolveFrom(cwd, d), `書き込み（${seg}）`);
+      continue;
+    }
+    if (['cp', 'install', 'ln'].includes(cmd)) {
+      const { sources, dest } = splitSourcesDest(args, cwd, cmd === 'install' ? ['-m', '-o', '-g', '--mode', '--owner', '--group'] : []);
+      if (!dest) continue;
       const recursive = args.some((a) => /^-[a-zA-Z]*[rRa]/.test(a) || a === '--recursive' || a === '--archive');
       // 空のファイルや別の場所へのリンクで、保護ファイルを中身ごと置き換える形
-      const blanking = paths.includes('/dev/null') || (cmd === 'ln' && args.some((a) => /^-[a-zA-Z]*f/.test(a) || a === '--force'));
-      for (const d of dests) {
-        const abs = resolveFrom(cwd, d);
+      const blanking = sources.includes('/dev/null') || (cmd === 'ln' && args.some((a) => /^-[a-zA-Z]*f/.test(a) || a === '--force'));
+      for (const abs of [dest.abs, ...dest.inside]) {
         checkWritePath(abs, `書き込み（${seg}）`);
         if (recursive && touchesSelfTree(abs)) decide('ask', `安全設定を含むフォルダをまとめて上書きします（${seg}）。人間が確認してください。`);
         if (blanking && isProtected(abs)) decide('ask', `保護フォルダのファイルを置き換えます（${seg}）。人間が確認してください。`);
@@ -767,8 +770,20 @@ function checkGh(args, seg) {
     if (['POST', 'PUT', 'PATCH'].includes(method)) decide('ask', `GitHub API での書き込み（${seg}）です。公開リポジトリに反映されるので、人間が確認してください。`);
     return;
   }
-  // 「delete」は動詞の位置（gh <名詞> delete）だけで判断する（検索語の delete は通す）
-  if (verb === 'delete' || (noun === 'repo' && verb === 'delete')) decide('deny', `GitHub 上の削除（${seg}）は禁止です。必要なら人間が画面から行ってください。`);
+  // コマンドの語（gh <名詞> [<小分類>] <動詞>）を前から最大3語集める。-R / --repo とその値は飛ばし、
+  // ほかのオプションが出たらそこで止める（検索語の delete を拾わないため）
+  const words = [];
+  for (let i = 0; i < args.length && words.length < 3; i++) {
+    const a = args[i];
+    if (a === '-R' || a === '--repo') i++;
+    else if (a.startsWith('--repo=')) continue;
+    else if (isOpt(a)) break;
+    else words.push(a);
+  }
+  // gh repo deploy-key delete、gh release delete-asset、gh project item-delete なども削除として扱う
+  if (words[0] !== 'search' && words.slice(1).some((w) => /(^|-)delete($|-)/.test(w))) {
+    decide('deny', `GitHub 上の削除（${seg}）は禁止です。必要なら人間が画面から行ってください。`);
+  }
   if (noun === 'repo' && verb === 'sync' && args.some((a) => a === '--force')) decide('deny', `リモートの枝を強制で上書きする操作（${seg}）は禁止です。`);
   const askPairs = {
     repo: ['create', 'edit', 'rename', 'archive', 'transfer', 'fork'],
@@ -780,25 +795,48 @@ function checkGh(args, seg) {
     workflow: ['run', 'enable', 'disable'],
     gist: ['create', 'edit'],
   };
-  if (askPairs[noun]?.includes(verb)) decide('ask', `GitHub への公開・変更（${seg}）です。人間が確認してください。`);
+  if (askPairs[words[0]]?.includes(words[1])) decide('ask', `GitHub への公開・変更（${seg}）です。人間が確認してください。`);
+}
+
+// mv・cp・install・ln の「元」と「先」を分ける。先がフォルダなら、中にできるファイル（先/元の名前）も返す
+function splitSourcesDest(args, cwd, valueOpts = []) {
+  const sources = [];
+  let destRaw;
+  let targetFlag = false;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    // -t <先> / -vt <先> のようなまとめ書き / --target-directory[=]<先>
+    if (a === '--target-directory' || /^-[a-zA-Z]*t$/.test(a)) {
+      destRaw = args[++i];
+      targetFlag = true;
+    } else if (a.startsWith('--target-directory=')) {
+      destRaw = a.slice('--target-directory='.length);
+      targetFlag = true;
+    } else if (valueOpts.includes(a)) i++;
+    else if (!isOpt(a)) sources.push(a);
+  }
+  if (destRaw === undefined) destRaw = sources.pop();
+  if (destRaw === undefined) return { sources, dest: null };
+  const abs = resolveFrom(cwd, destRaw);
+  let isDir = targetFlag || sources.length > 1 || /\/$/.test(destRaw);
+  if (!isDir) {
+    try {
+      isDir = statSync(abs).isDirectory();
+    } catch {
+      isDir = false;
+    }
+  }
+  const inside = isDir ? sources.map((s) => path.join(abs, path.basename(unquote(s).replace(/\/+$/, '')))) : [];
+  return { sources, dest: { abs, inside } };
 }
 
 function checkMove(args, cwd, seg) {
-  const paths = [];
-  let dest;
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
-    // mv -t <移動先> <移動元…> / --target-directory=<移動先>
-    if (a === '-t' || a === '--target-directory') dest = args[++i];
-    else if (a.startsWith('--target-directory=')) dest = a.slice('--target-directory='.length);
-    else if (!isOpt(a)) paths.push(a);
-  }
-  if (dest === undefined) dest = paths.pop();
-  for (const s of paths) {
+  const { sources, dest } = splitSourcesDest(args, cwd);
+  for (const s of sources) {
     const abs = resolveFrom(cwd, s);
     if (isProtected(abs) || isDangerousRoot(abs)) decide('deny', `保護フォルダ（${relOf(abs) || '.'}）の移動は禁止です。必要なら人間が手動で行ってください。`);
   }
-  if (dest) checkWritePath(resolveFrom(cwd, dest), `移動（${seg}）`);
+  if (dest) for (const abs of [dest.abs, ...dest.inside]) checkWritePath(abs, `移動（${seg}）`);
 }
 
 // ---- ファイル書き込み -------------------------------------------------------
