@@ -67,15 +67,28 @@ const insideProject = (abs) => {
 const relLower = (abs) => relOf(abs).toLowerCase();
 const under = (r, base) => r === base || r.startsWith(base + path.sep);
 
+// PC全体に入れた場合の共通の置き場所（install-global.mjs が ~/.claude/jeb に作る）
+const JEB_HOME = path.resolve(process.env.JEB_HOME || path.join(HOME, '.claude', 'jeb'));
+const JEB_PROTECTED = ['knowledge', 'design-systems'].map((d) => path.join(JEB_HOME, d).toLowerCase());
+const absUnder = (abs, base) => {
+  const a = abs.toLowerCase();
+  return a === base || a.startsWith(base + path.sep);
+};
+
 function isProtected(abs) {
+  // 共通の置き場所のメモとデザインシステム（とそれを含むフォルダ）は、どのプロジェクトからでも消させない
+  if (JEB_PROTECTED.some((p) => absUnder(abs, p) || p.startsWith(abs.toLowerCase() + path.sep))) return true;
   if (!insideProject(abs)) return false;
   const r = relLower(abs);
   if (r === '') return true; // プロジェクト丸ごと
   return PROTECTED.some((p) => under(r, p) || p.startsWith(r + path.sep));
 }
-// ユーザー全体の設定（~/.claude/settings*.json）に disableAllHooks などを書かれると、ガードごと止まる
+// ユーザー全体の設定（~/.claude/settings*.json）に disableAllHooks などを書かれると、ガードごと止まる。
+// 共通の置き場所のフック（~/.claude/jeb/hooks）も同じ扱い
 const USER_SETTINGS = ['settings.json', 'settings.local.json'].map((f) => path.join(HOME, '.claude', f));
-const isSelfConfig = (abs) => USER_SETTINGS.includes(abs) || (insideProject(abs) && SELF_CONFIG.some((p) => under(relLower(abs), p)));
+const JEB_HOOKS = path.join(JEB_HOME, 'hooks').toLowerCase();
+const isSelfConfig = (abs) =>
+  USER_SETTINGS.includes(abs) || absUnder(abs, JEB_HOOKS) || (insideProject(abs) && SELF_CONFIG.some((p) => under(relLower(abs), p)));
 // フォルダごと上書きする操作で、安全設定がその中に含まれるか
 function touchesSelfTree(abs) {
   if (isSelfConfig(abs)) return true;

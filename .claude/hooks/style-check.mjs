@@ -2,6 +2,7 @@
 // PostToolUse フック: 文章を書いたら「ジェブ」の文体チェック、画面系ファイルを書いたら「AIっぽいデザイン」チェックを必ず走らせる。
 // NG一覧は Obsidian のナレッジ（ai-ecosystem/knowledge/dictionary/*.md の表）から読むので、メモを育てるほど精度が上がる。
 import { existsSync, readFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 let input = {};
@@ -33,9 +34,13 @@ else if (typeof ti.new_string === 'string') added = ti.new_string;
 else if (Array.isArray(ti.edits)) added = ti.edits.map((e) => e.new_string || '').join('\n');
 if (!added.trim()) process.exit(0);
 
+// 辞書はプロジェクトの ai-ecosystem/knowledge を優先し、なければ PC全体の置き場所（~/.claude/jeb）を使う
+const JEB_HOME = process.env.JEB_HOME || path.join(os.homedir(), '.claude', 'jeb');
 function loadTable(file) {
-  const p = path.join(projectDir, 'ai-ecosystem', 'knowledge', 'dictionary', file);
-  if (!existsSync(p)) return [];
+  const p = [path.join(projectDir, 'ai-ecosystem', 'knowledge', 'dictionary', file), path.join(JEB_HOME, 'knowledge', 'dictionary', file)].find(
+    (c) => existsSync(c),
+  );
+  if (!p) return [];
   const rows = [];
   for (const line of readFileSync(p, 'utf8').split('\n')) {
     if (!line.trim().startsWith('|')) continue;

@@ -135,7 +135,49 @@ claude.ai の 設定 → コネクター で追加する。追加したものは
 - 自分のPCで動かしたい作業は Remote Control（2章）で頼む
 - Webアプリへのログインが必要な作業は、1Password のサービスアカウントなど「ボットにパスワードを見せない」仕組みを使い、パスワードをチャットやファイルに書かない
 
-## 12. 動作確認チェックリスト
+## 12. ほかのプロジェクトでも使う（PC全体に入れる）
+
+ここまでの設定は、このリポジトリで Claude Code を開いたときだけ働く。どのプロジェクトでも同じ環境を使いたいときは、PC 全体の設定（`~/.claude`）に入れる。
+
+### 入れるとどうなるか
+
+| 入るもの | 場所 |
+| --- | --- |
+| ルール（CLAUDE.md）、NG 辞書、スキルのコツ、デザインシステム、スクリプト、フック | `~/.claude/jeb/` |
+| スキル14個、サブエージェント5体 | `~/.claude/skills/`・`~/.claude/agents/` |
+| フック5つと権限ルール | `~/.claude/settings.json` に追記 |
+| ルールの読み込み | `~/.claude/CLAUDE.md` に1行追記 |
+| 成果物の出力先 | `~/AI-output/<案件>/`（どのプロジェクトの Git にも入らない） |
+
+- 今の `~/.claude/settings.json` と `~/.claude/CLAUDE.md` は上書きせず、足すだけ。変更前の内容は `~/.claude/jeb/backup/` に控える。
+- 同じ名前のスキル・サブエージェントがすでにあれば控えを取ってから入れ、外すときに元へ戻す。
+- このリポジトリのようにプロジェクト側にフックがある場合は、PC 全体のフックは何もしない（二重に動かない）。
+
+### 手順（リポジトリのフォルダで実行）
+
+```bash
+# 1. 何が変わるかを確かめる（何も変えない）
+node ai-ecosystem/scripts/install-global.mjs --dry-run
+
+# 2. 入れる
+node ai-ecosystem/scripts/install-global.mjs
+```
+
+3. Claude Code を一度終了して開き直す。ほかのプロジェクトで何か頼むと、ジェブの判断手順が効いている。
+4. APIキーを使うスクリプト用に、`~/.claude/jeb/.env.example` を `~/.claude/jeb/.env` に複製し、1Password の参照に書き換える（3章と同じ）。
+
+### 更新と取り外し
+
+- **更新**: リポジトリを `git pull` してから、もう一度 `install-global.mjs` を実行する。フック・スキル・スクリプトは新しくなり、`~/.claude/jeb/knowledge`（育てたメモ・NG 辞書）とデザインシステムはそのまま残る。
+- **取り外し**: `node ai-ecosystem/scripts/install-global.mjs --uninstall`。設定と CLAUDE.md から追記した分だけを外し、控えておいたスキルを戻す。`~/.claude/jeb`（メモとバックアップ）は残すので、不要なら中身を確かめてから自分で消す。
+
+### 注意
+
+- `~/.claude/jeb/knowledge` は Git に入らない。別の PC とも使いたいメモは、リポジトリの `ai-ecosystem/knowledge` に移して共有するか、私的用の保管庫（5章）に置く。
+- フックの登録には bash の書き方を使っている。Mac と Linux はそのまま動く。Windows では Git Bash が必要。
+- 特定のプロジェクトでだけ止めたいときは、そのプロジェクトの `.claude/settings.local.json` に `{"env": {"JEB_STYLE_CHECK": "off"}}` のように書く（止められる項目は README の「一時的に止めたいとき」）。
+
+## 13. 動作確認チェックリスト
 
 - [ ] `claude` を起動して何か依頼すると、判断手順（ジェブ判断プロトコル）が効いている
 - [ ] `rm -rf ai-ecosystem/knowledge` を頼むと止められる

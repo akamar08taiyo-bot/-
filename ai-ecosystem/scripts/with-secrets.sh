@@ -5,8 +5,17 @@
 #   例: ai-ecosystem/scripts/with-secrets.sh node ai-ecosystem/scripts/judge-image.mjs out.png
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ENV_FILE="${ENV_FILE:-$ROOT/.env}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# .env を探す順番: 環境変数 ENV_FILE → リポジトリ直下（ai-ecosystem/scripts から2つ上）→ PC全体の置き場所（~/.claude/jeb）
+if [ -z "${ENV_FILE:-}" ]; then
+  for candidate in "$SCRIPT_DIR/../../.env" "$SCRIPT_DIR/../.env"; do
+    if [ -f "$candidate" ]; then
+      ENV_FILE="$candidate"
+      break
+    fi
+  done
+  ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/../../.env}"
+fi
 
 if [ "$#" -eq 0 ]; then
   echo "使い方: $0 <コマンド...>" >&2

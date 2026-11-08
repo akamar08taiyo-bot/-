@@ -6,6 +6,7 @@
 > このリポジトリは公開（public）。私的なメモの置き場所は `knowledge/README.md` と `SETUP.md` 5章を参照。
 
 この図鑑と `SETUP.md` を Claude Code に渡して「この環境を作りたい」と頼めば、足りない手順を案内してもらえる。
+ほかのプロジェクトでも使いたいときは、`node ai-ecosystem/scripts/install-global.mjs` で PC 全体に入れられる（`SETUP.md` 12章）。
 
 ```mermaid
 flowchart LR
@@ -154,7 +155,8 @@ CLAUDE.md                  … 全体ルール（rules/*.md を読み込む）
 ai-ecosystem/
   README.md                … この図鑑
   SETUP.md                 … 自分のPCでやる設定
-  scripts/                 … 判定AI・画像判定・音声・画像生成・他AI呼び出し・1Password 連携
+  scripts/                 … 判定AI・画像判定・音声・画像生成・他AI呼び出し・1Password 連携、PC全体に入れる install-global.mjs
+  global/CLAUDE.md         … PC全体に入れたときのルール（~/.claude/jeb/CLAUDE.md になる）
   bots/discord-digest.mjs  … Discord の日次まとめ
   knowledge/               … Obsidian の保管庫（ルール・NG辞書・スキルのコツ・ネタ帳・案件メモ）
   design-systems/          … default と案件用の雛形
