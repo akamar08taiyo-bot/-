@@ -212,11 +212,11 @@ export const CountStamp: React.FC<{x: number; y: number; count: number; from: nu
 };
 
 // ───────── 残りの順位（10〜1 の帯）。cur：いまの順位（11 は始まる前、0 は全部済み） ─────────
-export const RankStrip: React.FC<{cur: number; since: number; top?: number}> = ({cur, since, top = 214}) => {
+export const RankStrip: React.FC<{cur: number; since: number; top?: number; n?: number}> = ({cur, since, top = 214, n = 10}) => {
   const frame = useCurrentFrame();
   return (
     <div style={{position: 'absolute', top, left: 0, width: W, display: 'flex', justifyContent: 'center', gap: 8}}>
-      {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((r) => {
+      {Array.from({length: n}, (_, i) => n - i).map((r) => {
         const done = r > cur;
         const now = r === cur;
         return (

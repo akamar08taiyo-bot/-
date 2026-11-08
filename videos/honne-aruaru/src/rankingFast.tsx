@@ -34,6 +34,7 @@ export type FScript = {
   note?: string; // 例「※イラスト・ひと言は再現イメージです」
   value: {label: string; unit: string; decimals: number}; // はんこの見出しと単位（例：回答 / % / 1）
   hideValues?: boolean; // 順位の数字（票数など）を画面に出さない（stat のある順位だけはんこを出す）
+  stripN?: number; // 上の順位の帯の数（既定10。TOP5 の回は5）
   itemLabel?: string; // 項目のカードの札（例「妻が挙げた理由」）
   tsukLabel?: string; // ひと言の吹き出しの札（既定は「しのぶ」）
   hook: {beats: number; img?: string; cam?: RCam; emoji?: string[]; bg?: [string, string]; title: [string, string, string]; chip: string; note?: string; credit?: string; warn?: FWarn};
@@ -510,7 +511,7 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
   const Comp: React.FC = () => {
     const frame = useCurrentFrame();
     const cur = SEGS.find((s) => frame >= s.from && frame < s.to) ?? SEGS[SEGS.length - 1];
-    const rankNow = cur.id.startsWith('r') ? S.ranks[Number(cur.id.slice(1))].rank : cur.id === 'hook' ? 11 : cur.id === 'top' ? 1 : 1.5; // 帯は表示の順位（同率なら同じ数字）。番外編は 2位まで済み
+    const rankNow = cur.id.startsWith('r') ? S.ranks[Number(cur.id.slice(1))].rank : cur.id === 'hook' ? (S.stripN ?? 10) + 1 : cur.id === 'top' ? 1 : 1.5; // 帯は表示の順位（同率なら同じ数字）。番外編は 2位まで済み
     const inBonus = cur.id === 'bt' || cur.id === 'bk' || /^p\d+$/.test(cur.id);
     return (
       <AbsoluteFill style={{backgroundColor: C.cream}}>
@@ -575,7 +576,7 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
           <Flash key={s.id} at={s.from} />
         ))}
         <Header series={S.header.series} episode={S.header.episode} item={0} since={0} dots={false} />
-        {inBonus ? <BonusStrip text={S.bonus?.strip ?? '番外編｜ここを押さえれば'} since={seg('bt').from} /> : <RankStrip cur={rankNow} since={cur.from} />}
+        {inBonus ? <BonusStrip text={S.bonus?.strip ?? '番外編｜ここを押さえれば'} since={seg('bt').from} /> : <RankStrip cur={rankNow} since={cur.from} n={S.stripN ?? 10} />}
         <SourceLine source={S.source} note={S.note} />
       </AbsoluteFill>
     );
