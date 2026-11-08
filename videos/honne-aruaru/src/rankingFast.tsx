@@ -9,6 +9,7 @@ import {CountStamp, RankBadge, RankStrip, Tsukkomi} from './ranking';
 import {FPS, W, clamp01, life, pop, ramp} from './lib';
 import {Box, Scene, SceneView, cam, center, faceOf} from './scene';
 import type {RCam} from './rankingEp';
+import {COMPARE_H, CompareCard, FFact, FList, FPin, FPrev, FTrend, ListCard, MapPin, TrendChart} from './fastData';
 
 export type FRank = {
   rank: number;
@@ -24,6 +25,9 @@ export type FRank = {
   credit?: string | string[]; // 写真のクレジット（画面の下に小さく。imgs のときは1枚ずつ）
   stat?: {value: number; label: string; unit: string; decimals: number; prefix?: string}; // 順位の数字の代わりに出す事実のはんこ（例：約45億円）
   tsukLabel?: string; // この順位だけ、ひと言の札を変える（例：数字の出典）
+  prev?: FPrev; // 前の年の同じ選択肢の数字（あると「前の年と比べると」のカードを出す）
+  fact?: FFact; // 背景の事実（調査のほかの数字や、日付のある出来事）。ひと言の場所に出す
+  pin?: FPin; // 地図の上の印（絵の上の位置 0〜1）
   todo?: boolean; // 元の調査でまだ確かめていない順位（finish.py はこれが残っていると書き出しを止める）
 };
 export type FScript = {
@@ -40,6 +44,10 @@ export type FScript = {
   hook: {beats: number; img?: string; cam?: RCam; emoji?: string[]; bg?: [string, string]; title: [string, string, string]; chip: string; note?: string; credit?: string; warn?: FWarn};
   ranks: FRank[]; // 10位〜2位（同率の順位は同じ数字を続けて書く。区切りは並びの順で数える）
   bonus?: FBonus; // 番外編（2位のあと、1位の発表の前）
+  year?: number; // 調査の年（前の年と比べるカードに出す）
+  trend?: FTrend; // 冒頭のあとの「推移」のグラフ
+  extras?: FList[]; // 2位（番外編）のあと、1位の発表の前に出す、ほかの設問の答え
+  blurImg?: string; // 推移・ほかの設問の答え・1位の予告の背景に使う、前もってぼかした絵（書き出しのとき CSS でぼかすと重い）
   top: {beats: number; img?: string; cam?: RCam; cta: string; sub?: string; credit?: string};
 };
 
@@ -462,6 +470,20 @@ const TopTeaser: React.FC<{from: number; to: number; b: (n: number) => number; c
   );
 };
 
+// 前の年との比べや背景の事実がある順位は、カードを上から順に積む（順位の札の下から）
+const ITEM_TOP = 536;
+const richLayout = (r: FRank) => {
+  if (!r.prev && !r.fact) return null;
+  const lines = r.item.split('|');
+  const itemH = lines.length * fitSize(lines, 800, 96) * 1.22 + 58;
+  const compareTop = ITEM_TOP + itemH + 44;
+  const below = r.prev ? compareTop + COMPARE_H + 26 : ITEM_TOP + itemH + 40;
+  const noteText = r.fact?.text ?? r.tsukkomi ?? '';
+  const nl = noteText.split('|');
+  const noteH = nl.length * fitSize(nl, 760, 64) * 1.35 + 62;
+  return {itemCy: ITEM_TOP + itemH / 2, compareTop, noteCy: below + 28 + noteH / 2};
+};
+
 export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
   const BEAT = (FPS * 60) / S.bpm; // 1拍のフレーム数（BPM120 で 15）
   type Seg = {id: string; from: number; to: number; b: (n: number) => number};
@@ -473,12 +495,14 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
     SEGS.push({id, from, to: cursor, b: (n) => from + Math.round(n * BEAT)});
   };
   addSeg('hook', S.hook.beats);
+  if (S.trend) addSeg('tr', S.trend.beats);
   S.ranks.forEach((r, i) => addSeg(`r${i}`, r.beats));
   if (S.bonus) {
     addSeg('bt', S.bonus.title.beats);
     S.bonus.points.forEach((pt, i) => addSeg(`p${i}`, pt.beats));
     addSeg('bk', S.bonus.key.beats);
   }
+  S.extras?.forEach((x, i) => addSeg(`x${i}`, x.beats));
   addSeg('top', S.top.beats);
   const tie = (rank: number) => S.ranks.filter((r) => r.rank === rank).length > 1; // 元のグラフで同率の順位
   const seg = (id: string) => SEGS.find((s) => s.id === id) as Seg;
@@ -502,16 +526,30 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
           return {img, from: f, to: Math.round(s.from + (k + 1) * step), keys: [{at: f, cam: camOf(r.cam ?? {})}], drift: 0.1, punch: true};
         });
       }
-      return r.img ? [{img: r.img, from: s.from, to: s.to, keys: [{at: s.from, cam: camOf(r.cam ?? {})}], drift: 0.08, punch: true}] : [];
+      const pin = r.pin;
+      const overlay: Scene['overlay'] = pin
+        ? ({frame, at}) => {
+            const q = at(pin.x, pin.y);
+            return <MapPin x={q.x} y={q.y} frame={frame} at={s.b(1)} label={pin.label} sub={pin.sub} />;
+          }
+        : undefined;
+      return r.img ? [{img: r.img, from: s.from, to: s.to, keys: [{at: s.from, cam: camOf(r.cam ?? {})}], drift: 0.08, punch: true, overlay}] : [];
     }),
-    ...(S.top.img ? [{img: S.top.img, from: seg('top').from, to: seg('top').to, keys: [{at: seg('top').from, cam: camOf(S.top.cam ?? {}, 1.1, 540, 800)}], drift: 0.04, filter: 'blur(6px)'}] : []),
+    // 推移のグラフと、ほかの設問の答えの画面：冒頭の絵をぼかして背景にする
+    ...[...(S.trend ? [{id: 'tr', img: S.trend.img}] : []), ...(S.extras ?? []).map((_, i) => ({id: `x${i}`, img: undefined as string | undefined}))].flatMap(({id, img}): Scene[] => {
+      const s = seg(id);
+      const src = S.blurImg ?? img ?? S.hook.img;
+      return src ? [{img: src, from: s.from, to: s.to, keys: [{at: s.from, cam: camOf(S.hook.cam ?? {}, 1.3, 560, 540)}], drift: 0.05, punch: true, filter: S.blurImg ? undefined : 'blur(5px) brightness(0.85)'}] : [];
+    }),
+    ...(S.top.img ? [{img: S.blurImg ?? S.top.img, from: seg('top').from, to: seg('top').to, keys: [{at: seg('top').from, cam: camOf(S.top.cam ?? {}, 1.1, 540, 800)}], drift: 0.04, filter: S.blurImg ? undefined : 'blur(6px)'}] : []),
   ];
   const PALETTE: [string, string][] = [['#FFB199', '#FF6F91'], ['#FFD86F', '#FC6262'], ['#A1C4FD', '#C2E9FB'], ['#84FAB0', '#8FD3F4'], ['#F6D365', '#FDA085'], ['#FBC2EB', '#A6C1EE'], ['#FDCBF1', '#E6DEE9'], ['#A8EDEA', '#FED6E3'], ['#FFECD2', '#FCB69F'], ['#C1DFC4', '#DEECDD']];
 
   const Comp: React.FC = () => {
     const frame = useCurrentFrame();
     const cur = SEGS.find((s) => frame >= s.from && frame < s.to) ?? SEGS[SEGS.length - 1];
-    const rankNow = cur.id.startsWith('r') ? S.ranks[Number(cur.id.slice(1))].rank : cur.id === 'hook' ? (S.stripN ?? 10) + 1 : cur.id === 'top' ? 1 : 1.5; // 帯は表示の順位（同率なら同じ数字）。番外編は 2位まで済み
+    const rankNow = /^r\d+$/.test(cur.id) ? S.ranks[Number(cur.id.slice(1))].rank : cur.id === 'hook' || cur.id === 'tr' ? (S.stripN ?? 10) + 1 : cur.id === 'top' ? 1 : 1.5; // 帯は表示の順位（同率なら同じ数字）。番外編・ほかの設問の答えは 2位まで済み
+    const sourceNow = cur.id === 'tr' ? (S.trend?.source ?? S.source) : /^x\d+$/.test(cur.id) ? (S.extras?.[Number(cur.id.slice(1))].source ?? S.source) : S.source;
     const inBonus = cur.id === 'bt' || cur.id === 'bk' || /^p\d+$/.test(cur.id);
     return (
       <AbsoluteFill style={{backgroundColor: C.cream}}>
@@ -531,16 +569,21 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
         <AbsoluteFill style={{background: 'linear-gradient(180deg, rgba(40,25,20,0.36) 0%, rgba(40,25,20,0) 28%, rgba(40,25,20,0) 60%, rgba(40,25,20,0.3) 100%)'}} />
         {S.ranks.map((r, i) => {
           const s = seg(`r${i}`);
+          const L = richLayout(r);
+          const note = r.fact ? {text: r.fact.text, label: r.fact.label} : r.tsukkomi ? {text: r.tsukkomi, label: r.tsukLabel ?? S.tsukLabel} : null;
           return (
             <React.Fragment key={i}>
               <RankBadge rank={r.rank} x={r.stat || !S.hideValues ? BADGE.x : W / 2} y={BADGE.y} from={s.from} to={s.to} tie={tie(r.rank)} />
-              <ItemCard text={r.item} label={S.itemLabel} cy={ITEM_Y} from={s.b(0.5)} to={s.to} todo={r.todo} />
+              <ItemCard text={r.item} label={S.itemLabel} cy={L ? L.itemCy : ITEM_Y} from={s.b(0.5)} to={s.to} todo={r.todo} />
+              {r.prev && L && (
+                <CompareCard prev={r.prev} curYear={S.year ?? r.prev.year + 1} cur={r.value} unit={S.value.unit} decimals={S.value.decimals} top={L.compareTop} from={s.b(3)} to={s.to} pillAt={s.b(4)} />
+              )}
               {r.stat ? (
                 <CountStamp x={STAMP.x} y={STAMP.y} count={r.stat.value} from={s.b(1.5)} rollTo={s.b(2.5)} to={s.to} label={r.stat.label} unit={r.stat.unit} decimals={r.stat.decimals} prefix={r.stat.prefix} />
               ) : (
                 !S.hideValues && <CountStamp x={STAMP.x} y={STAMP.y} count={r.value} from={s.b(1.5)} rollTo={s.b(2.5)} to={s.to} label={S.value.label} unit={S.value.unit} decimals={S.value.decimals} />
               )}
-              {r.tsukkomi && <Tsukkomi text={r.tsukkomi} cy={TSUK_Y} from={s.b(3)} to={s.to} label={r.tsukLabel ?? S.tsukLabel} />}
+              {note && <Tsukkomi text={note.text} cy={L ? L.noteCy : TSUK_Y} from={r.prev ? s.b(5) : s.b(3)} to={s.to} label={note.label} />}
             </React.Fragment>
           );
         })}
@@ -569,6 +612,10 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
         {S.bonus && (
           <BonusKey from={seg('bk').from} to={seg('bk').to} b={seg('bk').b} head={S.bonus.key.head} text={S.bonus.key.text} note={S.bonus.key.note} emoji={S.bonus.key.emoji} bg={S.bonus.key.bg} />
         )}
+        {S.trend && <TrendChart t={S.trend} from={seg('tr').from} to={seg('tr').to} b={seg('tr').b} />}
+        {S.extras?.map((x, i) => (
+          <ListCard key={`x${i}`} x={x} from={seg(`x${i}`).from} to={seg(`x${i}`).to} b={seg(`x${i}`).b} />
+        ))}
         <TopTeaser from={seg('top').from} to={seg('top').to} b={seg('top').b} cta={S.top.cta} sub={S.top.sub} />
         {S.top.credit && <CreditLine text={S.top.credit} from={seg('top').from} to={seg('top').to} />}
         {S.hook.warn ? <WarnHook w={S.hook.warn} to={seg('hook').to} b={seg('hook').b} /> : <FastHook title={S.hook.title} chip={S.hook.chip} note={S.hook.note} to={seg('hook').to} b={seg('hook').b} />}
@@ -577,7 +624,7 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
         ))}
         <Header series={S.header.series} episode={S.header.episode} item={0} since={0} dots={false} />
         {inBonus ? <BonusStrip text={S.bonus?.strip ?? '番外編｜ここを押さえれば'} since={seg('bt').from} /> : <RankStrip cur={rankNow} since={cur.from} n={S.stripN ?? 10} />}
-        <SourceLine source={S.source} note={S.note} />
+        <SourceLine source={sourceNow} note={S.note} />
       </AbsoluteFill>
     );
   };
