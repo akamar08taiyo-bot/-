@@ -32,7 +32,7 @@ export type FScript = {
   itemLabel?: string; // 項目のカードの札（例「妻が挙げた理由」）
   tsukLabel?: string; // ひと言の吹き出しの札（既定は「しのぶ」）
   hook: {beats: number; img?: string; cam?: RCam; emoji?: string[]; bg?: [string, string]; title: [string, string, string]; chip: string};
-  ranks: FRank[]; // 10位〜2位
+  ranks: FRank[]; // 10位〜2位（同率の順位は同じ数字を続けて書く。区切りは並びの順で数える）
   top: {beats: number; img?: string; cam?: RCam; cta: string; sub?: string};
 };
 
@@ -236,7 +236,7 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
     SEGS.push({id, from, to: cursor, b: (n) => from + Math.round(n * BEAT)});
   };
   addSeg('hook', S.hook.beats);
-  S.ranks.forEach((r) => addSeg(`r${r.rank}`, r.beats));
+  S.ranks.forEach((r, i) => addSeg(`r${i}`, r.beats));
   addSeg('top', S.top.beats);
   const seg = (id: string) => SEGS.find((s) => s.id === id) as Seg;
 
@@ -250,8 +250,8 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
   // 絵のある区切りだけ絵の場面にする（絵の無い区切りは EmojiStage）
   const SCENES: Scene[] = [
     ...(S.hook.img ? [{img: S.hook.img, from: 0, to: seg('hook').to, keys: [{at: 0, cam: camOf(S.hook.cam ?? {}, 1.3, 560, 540)}], drift: 0.05, punch: false}] : []),
-    ...S.ranks.flatMap((r): Scene[] => {
-      const s = seg(`r${r.rank}`);
+    ...S.ranks.flatMap((r, i): Scene[] => {
+      const s = seg(`r${i}`);
       return r.img ? [{img: r.img, from: s.from, to: s.to, keys: [{at: s.from, cam: camOf(r.cam ?? {})}], drift: 0.08, punch: true}] : [];
     }),
     ...(S.top.img ? [{img: S.top.img, from: seg('top').from, to: seg('top').to, keys: [{at: seg('top').from, cam: camOf(S.top.cam ?? {}, 1.1, 540, 800)}], drift: 0.04, filter: 'blur(6px)'}] : []),
@@ -261,7 +261,7 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
   const Comp: React.FC = () => {
     const frame = useCurrentFrame();
     const cur = SEGS.find((s) => frame >= s.from && frame < s.to) ?? SEGS[SEGS.length - 1];
-    const rankNow = cur.id.startsWith('r') ? Number(cur.id.slice(1)) : cur.id === 'hook' ? 11 : 1;
+    const rankNow = cur.id.startsWith('r') ? S.ranks[Number(cur.id.slice(1))].rank : cur.id === 'hook' ? 11 : 1; // 帯は表示の順位（同率なら同じ数字）
     return (
       <AbsoluteFill style={{backgroundColor: C.cream}}>
         {SCENES.map((sc) => (
@@ -269,13 +269,13 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
         ))}
         {!S.hook.img && <EmojiStage emoji={S.hook.emoji ?? ['🏠']} bg={S.hook.bg ?? ['#FFE29F', '#FF719A']} from={0} to={seg('hook').to} b={seg('hook').b} big={false} cy={500} still />}
         {S.ranks.map((r, i) =>
-          r.img ? null : <EmojiStage key={`e${r.rank}`} emoji={[r.emoji ?? '✨']} bg={r.bg ?? PALETTE[i % PALETTE.length]} from={seg(`r${r.rank}`).from} to={seg(`r${r.rank}`).to} b={seg(`r${r.rank}`).b} />,
+          r.img ? null : <EmojiStage key={`e${i}`} emoji={[r.emoji ?? '✨']} bg={r.bg ?? PALETTE[i % PALETTE.length]} from={seg(`r${i}`).from} to={seg(`r${i}`).to} b={seg(`r${i}`).b} />,
         )}
         <AbsoluteFill style={{background: 'linear-gradient(180deg, rgba(40,25,20,0.36) 0%, rgba(40,25,20,0) 28%, rgba(40,25,20,0) 60%, rgba(40,25,20,0.3) 100%)'}} />
-        {S.ranks.map((r) => {
-          const s = seg(`r${r.rank}`);
+        {S.ranks.map((r, i) => {
+          const s = seg(`r${i}`);
           return (
-            <React.Fragment key={r.rank}>
+            <React.Fragment key={i}>
               <RankBadge rank={r.rank} x={BADGE.x} y={BADGE.y} from={s.from} to={s.to} />
               <ItemCard text={r.item} label={S.itemLabel} cy={ITEM_Y} from={s.b(0.5)} to={s.to} todo={r.todo} />
               <CountStamp x={STAMP.x} y={STAMP.y} count={r.value} from={s.b(1.5)} rollTo={s.b(2.5)} to={s.to} label={S.value.label} unit={S.value.unit} decimals={S.value.decimals} />

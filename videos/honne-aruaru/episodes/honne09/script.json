@@ -8,14 +8,14 @@
   "series": "本音あるある",
   "episode": "熟年離婚の原因TOP10"
  },
- "source": "出典：デイライト法律事務所「熟年離婚の原因ランキング」50代以上の女性相談者（2024年12月〜2025年11月）「その他」を除く",
+ "source": "出典：離婚弁護士相談広場「熟年離婚実態調査2026」熟年離婚を経験した50代・60代の女性79名（2026年1〜2月）",
  "note": "※イラスト・ひと言は再現イメージです",
  "value": {
-  "label": "割合",
+  "label": "回答",
   "unit": "%",
   "decimals": 1
  },
- "itemLabel": "妻側の離婚理由",
+ "itemLabel": "熟年離婚を決意した夫の特徴",
  "hook": {
   "beats": 5,
   "img": "honne01/img/S6.jpg",
@@ -30,112 +30,43 @@
    "原因",
    "TOP10"
   ],
-  "chip": "50代以上の女性の離婚相談で多かった理由"
+  "chip": "熟年離婚した50〜60代の女性79人に聞いた"
  },
  "ranks": [
   {
    "rank": 10,
    "beats": 6,
-   "item": "（未確認）",
-   "value": 0,
-   "img": "honne02/img/X1.jpg",
+   "item": "親族間の問題への夫の対応|（不和・相続・介護など）",
+   "value": 2.5,
+   "img": "honne02/img/X6.jpg",
    "cam": {
     "on": [
-     "X1",
+     "X6",
      "WIFE"
-    ]
+    ],
+    "z": 1.6
    },
-   "todo": true
-  },
-  {
-   "rank": 9,
-   "beats": 6,
-   "item": "（未確認）",
-   "value": 0,
-   "img": "honne02/img/X1.jpg",
-   "cam": {
-    "on": [
-     "X1",
-     "WIFE"
-    ]
-   },
-   "todo": true
+   "tsukkomi": "介護の話になると、|急に黙る。"
   },
   {
    "rank": 8,
    "beats": 6,
-   "item": "（未確認）",
-   "value": 0,
-   "img": "honne02/img/X1.jpg",
+   "item": "妻への感謝や配慮の言葉が|ほとんどなかった",
+   "value": 3.8,
+   "img": "honne04/img/K3.jpg",
    "cam": {
     "on": [
-     "X1",
+     "K3",
      "WIFE"
     ]
    },
-   "todo": true
+   "tsukkomi": "「ありがとう」|ひと言でよかった。"
   },
   {
-   "rank": 7,
+   "rank": 8,
    "beats": 6,
-   "item": "（未確認）",
-   "value": 0,
-   "img": "honne02/img/X1.jpg",
-   "cam": {
-    "on": [
-     "X1",
-     "WIFE"
-    ]
-   },
-   "todo": true
-  },
-  {
-   "rank": 6,
-   "beats": 6,
-   "item": "（未確認）",
-   "value": 0,
-   "img": "honne02/img/X1.jpg",
-   "cam": {
-    "on": [
-     "X1",
-     "WIFE"
-    ]
-   },
-   "todo": true
-  },
-  {
-   "rank": 5,
-   "beats": 6,
-   "item": "（未確認）",
-   "value": 0,
-   "img": "honne02/img/X1.jpg",
-   "cam": {
-    "on": [
-     "X1",
-     "WIFE"
-    ]
-   },
-   "todo": true
-  },
-  {
-   "rank": 4,
-   "beats": 6,
-   "item": "暴力",
-   "value": 16.3,
-   "img": "honne02/img/X1.jpg",
-   "cam": {
-    "on": [
-     "X1",
-     "WIFE"
-    ]
-   },
-   "todo": true
-  },
-  {
-   "rank": 3,
-   "beats": 7,
-   "item": "相手の不倫",
-   "value": 25.6,
+   "item": "暴力・DVがあった",
+   "value": 3.8,
    "img": "honne01/img/S8.jpg",
    "cam": {
     "on": [
@@ -143,22 +74,89 @@
      "WIFE"
     ],
     "z": 1.05
+   }
+  },
+  {
+   "rank": 7,
+   "beats": 6,
+   "item": "金銭や経済面の管理が一方的|（ケチ・経済的DV等）",
+   "value": 8.9,
+   "img": "honne02/img/X5.jpg",
+   "cam": {
+    "on": [
+     "X5",
+     "WIFE"
+    ]
    },
-   "todo": true
+   "tsukkomi": "自分のゴルフ代は、|別会計。"
+  },
+  {
+   "rank": 5,
+   "beats": 6,
+   "item": "浮気・不倫があった",
+   "value": 11.4,
+   "img": "honne02/img/X1.jpg",
+   "cam": {
+    "on": [
+     "X1",
+     "WIFE"
+    ],
+    "z": 1.5
+   }
+  },
+  {
+   "rank": 5,
+   "beats": 6,
+   "item": "家事・子育てなど|家庭内の役割や責任を|一方的に妻に任せていた",
+   "value": 11.4,
+   "img": "honne04/img/K2.jpg",
+   "cam": {
+    "on": [
+     "K2",
+     "WIFE"
+    ]
+   },
+   "tsukkomi": "何十年も、|ワンオペでした。"
+  },
+  {
+   "rank": 3,
+   "beats": 7,
+   "item": "老後や将来の生活について|考え方の違いを|すり合わせようとしなかった",
+   "value": 12.7,
+   "img": "honne03/img/R3.jpg",
+   "cam": {
+    "on": [
+     "R3",
+     "WIFE"
+    ]
+   },
+   "tsukkomi": "定年後の話を、|聞いてくれない。"
+  },
+  {
+   "rank": 3,
+   "beats": 7,
+   "item": "会話が成立せず|話し合いができなかった|（コミュニケーション不全）",
+   "value": 12.7,
+   "img": "honne01/img/S1.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.45,
+    "z": 1.0
+   },
+   "tsukkomi": "「で？」で、|話が終わる。"
   },
   {
    "rank": 2,
    "beats": 7,
-   "item": "精神的虐待",
-   "value": 38.8,
+   "item": "威圧的な態度や|人格を否定する言動|（モラハラ）",
+   "value": 13.9,
    "img": "honne02/img/X7.jpg",
    "cam": {
     "on": [
      "X7",
      "WIFE"
     ]
-   },
-   "todo": true
+   }
   }
  ],
  "top": {

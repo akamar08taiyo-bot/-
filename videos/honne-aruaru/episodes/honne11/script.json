@@ -8,23 +8,29 @@
   "series": "本音あるある",
   "episode": "やっぱり夫がいいTOP10"
  },
- "source": "出典：縁結び大学（株式会社ネクストレベル）結婚経験がある男女425人調査（2024年2〜3月）女性291人の回答",
- "note": "※イラスト・ひと言は再現イメージです",
+ "source": "出典：縁結び大学 結婚経験がある男女425人調査（2024年2〜3月）女性291人の回答・複数回答",
+ "note": "※ひと言は編集部のコメントです",
  "value": {
   "label": "回答",
   "unit": "%",
   "decimals": 1
  },
  "itemLabel": "結婚してよかったポイント",
+ "tsukLabel": "ひとこと",
  "hook": {
   "beats": 5,
-  "img": "honne01/img/S5.jpg",
-  "cam": {
-   "on": [
-    "S5",
-    "WIFE"
-   ]
-  },
+  "emoji": [
+   "💑",
+   "🌷",
+   "💕",
+   "🏠",
+   "✨",
+   "😊"
+  ],
+  "bg": [
+   "#FFD3E0",
+   "#FF8FAB"
+  ],
   "title": [
    "冷めた日もあるけど、",
    "やっぱり",
@@ -34,143 +40,80 @@
  },
  "ranks": [
   {
-   "rank": 10,
+   "rank": 9,
    "beats": 6,
-   "item": "（未確認）",
-   "value": 0,
-   "img": "honne03/img/R3.jpg",
-   "cam": {
-    "on": [
-     "R3",
-     "WIFE"
-    ]
-   },
-   "todo": true
+   "item": "人柄が誠実",
+   "value": 16.5,
+   "emoji": "🤝",
+   "tsukkomi": "うそをつかない。|それだけで安心。"
   },
   {
    "rank": 9,
    "beats": 6,
-   "item": "（未確認）",
-   "value": 0,
-   "img": "honne03/img/R3.jpg",
-   "cam": {
-    "on": [
-     "R3",
-     "WIFE"
-    ]
-   },
-   "todo": true
-  },
-  {
-   "rank": 8,
-   "beats": 6,
-   "item": "（未確認）",
-   "value": 0,
-   "img": "honne03/img/R3.jpg",
-   "cam": {
-    "on": [
-     "R3",
-     "WIFE"
-    ]
-   },
-   "todo": true
+   "item": "失敗を許してくれる",
+   "value": 16.5,
+   "emoji": "😊",
+   "tsukkomi": "やらかしても、|笑ってくれる。"
   },
   {
    "rank": 7,
    "beats": 6,
-   "item": "（未確認）",
-   "value": 0,
-   "img": "honne03/img/R3.jpg",
-   "cam": {
-    "on": [
-     "R3",
-     "WIFE"
-    ]
-   },
-   "todo": true
+   "item": "頼りになる",
+   "value": 17.9,
+   "emoji": "💪",
+   "tsukkomi": "いざという時、|前に立ってくれる。"
+  },
+  {
+   "rank": 7,
+   "beats": 6,
+   "item": "価値観が同じ・似ている",
+   "value": 17.9,
+   "emoji": "🧩",
+   "tsukkomi": "笑うところが、|同じ。"
   },
   {
    "rank": 6,
    "beats": 6,
-   "item": "（未確認）",
-   "value": 0,
-   "img": "honne03/img/R3.jpg",
-   "cam": {
-    "on": [
-     "R3",
-     "WIFE"
-    ]
-   },
-   "todo": true
+   "item": "お金を稼げる",
+   "value": 19.9,
+   "emoji": "💰",
+   "tsukkomi": "毎日のお仕事、|おつかれさま。"
   },
   {
    "rank": 5,
    "beats": 6,
-   "item": "家事や料理が得意・|嫌がらずにやってくれる",
-   "value": 0,
-   "img": "honne04/img/K1.jpg",
-   "cam": {
-    "on": [
-     "K1",
-     "HUSBAND"
-    ]
-   },
-   "todo": true,
-   "tsukkomi": "フライパンは、|残すけど。"
+   "item": "家事や料理が得意",
+   "value": 20.3,
+   "emoji": "🍳",
+   "tsukkomi": "ごはん担当、|ありがたい。"
   },
   {
    "rank": 4,
    "beats": 6,
-   "item": "（未確認）",
-   "value": 0,
-   "img": "honne03/img/R4.jpg",
-   "cam": {
-    "on": [
-     "R4",
-     "WIFE"
-    ]
-   },
-   "todo": true
+   "item": "子供をかわいがる",
+   "value": 33.3,
+   "emoji": "🧸",
+   "tsukkomi": "子どもと本気で|遊んでくれる。"
   },
   {
    "rank": 3,
    "beats": 7,
-   "item": "一緒にいて|気を遣わない",
+   "item": "一緒にいて気を遣わない",
    "value": 34.4,
-   "img": "honne03/img/R3.jpg",
-   "cam": {
-    "on": [
-     "R3",
-     "WIFE"
-    ]
-   },
-   "todo": true,
-   "tsukkomi": "すっぴんでも、|何も言わない。"
+   "emoji": "🛋️",
+   "tsukkomi": "すっぴんでも、|平気。"
   },
   {
    "rank": 2,
    "beats": 7,
    "item": "やさしい",
    "value": 35.4,
-   "img": "honne01/img/S5.jpg",
-   "cam": {
-    "on": [
-     "S5",
-     "HUSBAND"
-    ]
-   },
-   "todo": true
+   "emoji": "🌷",
+   "tsukkomi": "頼んだことを、|嫌な顔せずに。"
   }
  ],
  "top": {
   "beats": 8,
-  "img": "honne01/img/S5.jpg",
-  "cam": {
-   "on": [
-    "S5",
-    "WIFE"
-   ]
-  },
   "cta": "1位は固定コメントへ",
   "sub": "あなたの「やっぱり夫がいい」は？"
  }

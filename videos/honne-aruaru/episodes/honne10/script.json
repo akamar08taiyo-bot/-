@@ -8,12 +8,12 @@
   "series": "本音あるある",
   "episode": "妻が離婚を考えたきっかけTOP10"
  },
- "source": "出典：ベンナビ離婚（株式会社アシロ）既婚女性2,993人調査（2024年1月）離婚を考えたことがある1,805人の回答",
+ "source": "出典：ベンナビ離婚 20〜49歳の既婚女性2,993人調査（2024年1月）離婚を考えたことがある1,805人・複数回答",
  "note": "※イラスト・ひと言は再現イメージです",
  "value": {
   "label": "回答",
-  "unit": "%",
-  "decimals": 1
+  "unit": "人",
+  "decimals": 0
  },
  "itemLabel": "離婚を考えたきっかけ",
  "hook": {
@@ -35,93 +35,36 @@
   {
    "rank": 10,
    "beats": 6,
-   "item": "（未確認）",
-   "value": 0,
-   "img": "honne03/img/R8.jpg",
+   "item": "家庭を捨てて省みない",
+   "value": 85,
+   "img": "honne01/img/S6.jpg",
    "cam": {
     "on": [
-     "R8",
+     "S6",
      "WIFE"
     ]
    },
-   "todo": true
+   "tsukkomi": "家にいても、|いないのと同じ。"
   },
   {
    "rank": 9,
    "beats": 6,
-   "item": "（未確認）",
-   "value": 0,
-   "img": "honne03/img/R8.jpg",
+   "item": "心身の病気",
+   "value": 110,
+   "img": "honne02/img/X1.jpg",
    "cam": {
     "on": [
-     "R8",
+     "X1",
      "WIFE"
-    ]
-   },
-   "todo": true
+    ],
+    "z": 1.5
+   }
   },
   {
    "rank": 8,
    "beats": 6,
-   "item": "（未確認）",
-   "value": 0,
-   "img": "honne03/img/R8.jpg",
-   "cam": {
-    "on": [
-     "R8",
-     "WIFE"
-    ]
-   },
-   "todo": true
-  },
-  {
-   "rank": 7,
-   "beats": 6,
-   "item": "（未確認）",
-   "value": 0,
-   "img": "honne03/img/R8.jpg",
-   "cam": {
-    "on": [
-     "R8",
-     "WIFE"
-    ]
-   },
-   "todo": true
-  },
-  {
-   "rank": 6,
-   "beats": 6,
-   "item": "（未確認）",
-   "value": 0,
-   "img": "honne03/img/R8.jpg",
-   "cam": {
-    "on": [
-     "R8",
-     "WIFE"
-    ]
-   },
-   "todo": true
-  },
-  {
-   "rank": 5,
-   "beats": 6,
-   "item": "借金・金銭問題",
-   "value": 0,
-   "img": "honne02/img/X5.jpg",
-   "cam": {
-    "on": [
-     "X5",
-     "WIFE"
-    ]
-   },
-   "todo": true,
-   "tsukkomi": "そのゴルフバッグ、|何回払い？"
-  },
-  {
-   "rank": 4,
-   "beats": 6,
-   "item": "DV・モラハラ",
-   "value": 0,
+   "item": "浮気・不倫",
+   "value": 165,
    "img": "honne01/img/S8.jpg",
    "cam": {
     "on": [
@@ -129,14 +72,68 @@
      "WIFE"
     ],
     "z": 1.05
+   }
+  },
+  {
+   "rank": 7,
+   "beats": 6,
+   "item": "浪費癖がある",
+   "value": 184,
+   "img": "honne02/img/X5.jpg",
+   "cam": {
+    "on": [
+     "X5",
+     "WIFE"
+    ]
    },
-   "todo": true
+   "tsukkomi": "そのゴルフバッグ、|何回払い？"
+  },
+  {
+   "rank": 6,
+   "beats": 6,
+   "item": "セックスレス",
+   "value": 186,
+   "img": "honne01/img/S2.jpg",
+   "cam": {
+    "on": [
+     "S2",
+     "WIFE"
+    ],
+    "z": 1.0
+   }
+  },
+  {
+   "rank": 5,
+   "beats": 6,
+   "item": "借金・金銭問題",
+   "value": 220,
+   "img": "honne03/img/R8.jpg",
+   "cam": {
+    "on": [
+     "R8",
+     "WIFE"
+    ]
+   },
+   "tsukkomi": "通帳を見て、|固まった。"
+  },
+  {
+   "rank": 4,
+   "beats": 6,
+   "item": "DV・モラハラ",
+   "value": 247,
+   "img": "honne02/img/X7.jpg",
+   "cam": {
+    "on": [
+     "X7",
+     "WIFE"
+    ]
+   }
   },
   {
    "rank": 3,
    "beats": 7,
    "item": "夫の家族や親族との|折り合いが悪い",
-   "value": 0,
+   "value": 265,
    "img": "honne02/img/X6.jpg",
    "cam": {
     "on": [
@@ -144,14 +141,13 @@
      "WIFE"
     ]
    },
-   "todo": true,
    "tsukkomi": "夫の実家では、|私だけ働いてます。"
   },
   {
    "rank": 2,
    "beats": 7,
    "item": "家事や育児を|手伝ってくれない",
-   "value": 0,
+   "value": 564,
    "img": "honne04/img/K2.jpg",
    "cam": {
     "on": [
@@ -159,7 +155,6 @@
      "WIFE"
     ]
    },
-   "todo": true,
    "tsukkomi": "手伝う、じゃなくて|一緒にやる。"
   }
  ],
