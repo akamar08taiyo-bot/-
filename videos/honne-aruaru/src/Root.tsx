@@ -12,6 +12,7 @@ import {Honne09, durationHonne09} from './episodes/honne09';
 import {Honne10, durationHonne10} from './episodes/honne10';
 import {Honne11, durationHonne11} from './episodes/honne11';
 import {Rank01, durationRank01} from './episodes/rank01';
+import {Japan01, durationJapan01} from './episodes/japan01';
 import {Spy01, timelineSpy01} from './episodes/spy01';
 import {Bekkan01, durationBekkan01} from './episodes/bekkan01';
 import {Bekkan02, durationBekkan02} from './episodes/bekkan02';
@@ -34,6 +35,7 @@ export const Root: React.FC = () => (
     <Composition id="honne10" component={Honne10} durationInFrames={durationHonne10} fps={FPS} width={1080} height={1920} />
     <Composition id="honne11" component={Honne11} durationInFrames={durationHonne11} fps={FPS} width={1080} height={1920} />
     <Composition id="rank01" component={Rank01} durationInFrames={durationRank01} fps={FPS} width={1080} height={1920} />
+    <Composition id="japan01" component={Japan01} durationInFrames={durationJapan01} fps={FPS} width={1080} height={1920} />
     <Composition id="spy01" component={Spy01} durationInFrames={Math.ceil(timelineSpy01.total * FPS)} fps={FPS} width={1080} height={1920} />
     <Composition id="bekkan01" component={Bekkan01} durationInFrames={durationBekkan01} fps={FPS} width={1080} height={1920} />
     <Composition id="bekkan02" component={Bekkan02} durationInFrames={durationBekkan02} fps={FPS} width={1080} height={1920} />

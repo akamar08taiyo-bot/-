@@ -20,6 +20,8 @@ export type FRank = {
   cam?: RCam;
   emoji?: string; // 絵の代わりの大きな絵文字（しのぶの出ない回）
   bg?: [string, string]; // 絵文字の画面の背景のグラデーション（上, 下）
+  imgs?: string[]; // 1つの順位で続けて見せる写真（例：四季の4枚）。img の代わり
+  credit?: string | string[]; // 写真のクレジット（画面の下に小さく。imgs のときは1枚ずつ）
   todo?: boolean; // 元の調査でまだ確かめていない順位（finish.py はこれが残っていると書き出しを止める）
 };
 export type FScript = {
@@ -31,10 +33,10 @@ export type FScript = {
   value: {label: string; unit: string; decimals: number}; // はんこの見出しと単位（例：回答 / % / 1）
   itemLabel?: string; // 項目のカードの札（例「妻が挙げた理由」）
   tsukLabel?: string; // ひと言の吹き出しの札（既定は「しのぶ」）
-  hook: {beats: number; img?: string; cam?: RCam; emoji?: string[]; bg?: [string, string]; title: [string, string, string]; chip: string; warn?: FWarn};
+  hook: {beats: number; img?: string; cam?: RCam; emoji?: string[]; bg?: [string, string]; title: [string, string, string]; chip: string; note?: string; credit?: string; warn?: FWarn};
   ranks: FRank[]; // 10位〜2位（同率の順位は同じ数字を続けて書く。区切りは並びの順で数える）
   bonus?: FBonus; // 番外編（2位のあと、1位の発表の前）
-  top: {beats: number; img?: string; cam?: RCam; cta: string; sub?: string};
+  top: {beats: number; img?: string; cam?: RCam; cta: string; sub?: string; credit?: string};
 };
 
 // 冒頭の警告版（1コマ目がサムネ）：「自分は大丈夫と思っている男性へ」＋調査の数字＋題＋「最後まで見ないと…」
@@ -60,6 +62,7 @@ export type FPoint = {
   bg?: [string, string];
 };
 export type FBonus = {
+  strip?: string; // 番外編のあいだ上に出す札（既定「番外編｜ここを押さえれば」）
   title: {beats: number; title: [string, string, string]; chip: string; emoji?: string[]; bg?: [string, string]};
   points: FPoint[];
   key: {beats: number; head: string; text: string; note?: string; emoji?: string; bg?: [string, string]};
@@ -243,7 +246,7 @@ const WarnHook: React.FC<{w: FWarn; to: number; b: (n: number) => number}> = ({w
 };
 
 // 冒頭の題字（1コマ目がそのままサムネになる。最初から全部見えている）
-const FastHook: React.FC<{title: [string, string, string]; chip: string; to: number; b: (n: number) => number; from?: number}> = ({title, chip, to, b, from = 0}) => {
+const FastHook: React.FC<{title: [string, string, string]; chip: string; to: number; b: (n: number) => number; from?: number; note?: string}> = ({title, chip, to, b, from = 0, note}) => {
   const frame = useCurrentFrame();
   if (frame < from || frame >= to) return null;
   const enter = from > 0 ? 0.6 + 0.4 * pop(frame, from, 12, 220) : 1; // 冒頭は最初のコマから全部見せる（サムネ用）
@@ -268,12 +271,30 @@ const FastHook: React.FC<{title: [string, string, string]; chip: string; to: num
           </Outlined>
         </div>
       </div>
-      <div style={{position: 'absolute', left: 0, top: 1392, width: W, display: 'flex', justifyContent: 'center'}}>
+      <div style={{position: 'absolute', left: 0, top: 1392, width: W, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12}}>
         <div style={{maxWidth: 980, background: '#22201f', color: '#fff', fontFamily: F.maru, fontWeight: 900, fontSize: 40, padding: '12px 32px 16px', borderRadius: 999, boxShadow: '0 6px 0 rgba(0,0,0,0.2)', textAlign: 'center'}}>
           {chip}
         </div>
+        {note && (
+          <div style={{maxWidth: 960, background: 'rgba(0,0,0,0.55)', color: 'rgba(255,255,255,0.92)', fontFamily: F.maru, fontWeight: 700, fontSize: 26, lineHeight: 1.35, padding: '5px 18px 7px', borderRadius: 10, textAlign: 'center'}}>
+            {note}
+          </div>
+        )}
       </div>
     </>
+  );
+};
+
+// 写真・地図のクレジット（画面の下に小さく）
+const CreditLine: React.FC<{text: string; from: number; to: number}> = ({text, from, to}) => {
+  const frame = useCurrentFrame();
+  if (frame < from || frame >= to) return null;
+  return (
+    <div style={{position: 'absolute', left: 0, top: 1548, width: W, display: 'flex', justifyContent: 'center'}}>
+      <div style={{maxWidth: 960, background: 'rgba(0,0,0,0.5)', color: 'rgba(255,255,255,0.9)', fontFamily: F.maru, fontWeight: 700, fontSize: 24, lineHeight: 1.3, padding: '4px 16px 6px', borderRadius: 10, textAlign: 'center'}}>
+        {text}
+      </div>
+    </div>
   );
 };
 
@@ -470,6 +491,13 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
     ...(S.hook.img ? [{img: S.hook.img, from: 0, to: seg('hook').to, keys: [{at: 0, cam: camOf(S.hook.cam ?? {}, 1.3, 560, 540)}], drift: 0.05, punch: false}] : []),
     ...S.ranks.flatMap((r, i): Scene[] => {
       const s = seg(`r${i}`);
+      if (r.imgs) {
+        const step = (s.to - s.from) / r.imgs.length;
+        return r.imgs.map((img, k) => {
+          const f = Math.round(s.from + k * step);
+          return {img, from: f, to: Math.round(s.from + (k + 1) * step), keys: [{at: f, cam: camOf(r.cam ?? {})}], drift: 0.1, punch: true};
+        });
+      }
       return r.img ? [{img: r.img, from: s.from, to: s.to, keys: [{at: s.from, cam: camOf(r.cam ?? {})}], drift: 0.08, punch: true}] : [];
     }),
     ...(S.top.img ? [{img: S.top.img, from: seg('top').from, to: seg('top').to, keys: [{at: seg('top').from, cam: camOf(S.top.cam ?? {}, 1.1, 540, 800)}], drift: 0.04, filter: 'blur(6px)'}] : []),
@@ -488,7 +516,7 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
         ))}
         {!S.hook.img && <EmojiStage emoji={S.hook.emoji ?? ['🏠']} bg={S.hook.bg ?? ['#FFE29F', '#FF719A']} from={0} to={seg('hook').to} b={seg('hook').b} big={false} cy={500} still />}
         {S.ranks.map((r, i) =>
-          r.img ? null : <EmojiStage key={`e${i}`} emoji={[r.emoji ?? '✨']} bg={r.bg ?? PALETTE[i % PALETTE.length]} from={seg(`r${i}`).from} to={seg(`r${i}`).to} b={seg(`r${i}`).b} />,
+          r.img || r.imgs ? null : <EmojiStage key={`e${i}`} emoji={[r.emoji ?? '✨']} bg={r.bg ?? PALETTE[i % PALETTE.length]} from={seg(`r${i}`).from} to={seg(`r${i}`).to} b={seg(`r${i}`).b} />,
         )}
         {S.bonus && (
           <EmojiStage emoji={S.bonus.title.emoji ?? ['🔑', '✨', '💡', '📝']} bg={S.bonus.title.bg ?? ['#FFF1B8', '#F7B267']} from={seg('bt').from} to={seg('bt').to} b={seg('bt').b} big={false} cy={500} />
@@ -522,16 +550,25 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
           );
         })}
         {S.bonus && <FastHook title={S.bonus.title.title} chip={S.bonus.title.chip} from={seg('bt').from} to={seg('bt').to} b={seg('bt').b} />}
+        {S.hook.credit && <CreditLine text={S.hook.credit} from={0} to={seg('hook').to} />}
+        {S.ranks.map((r, i) => {
+          if (!r.credit) return null;
+          const s = seg(`r${i}`);
+          const list = Array.isArray(r.credit) ? r.credit : [r.credit];
+          const step = (s.to - s.from) / list.length;
+          return list.map((c, k) => <CreditLine key={`c${i}_${k}`} text={c} from={Math.round(s.from + k * step)} to={Math.round(s.from + (k + 1) * step)} />);
+        })}
         {S.bonus && (
           <BonusKey from={seg('bk').from} to={seg('bk').to} b={seg('bk').b} head={S.bonus.key.head} text={S.bonus.key.text} note={S.bonus.key.note} emoji={S.bonus.key.emoji} bg={S.bonus.key.bg} />
         )}
         <TopTeaser from={seg('top').from} to={seg('top').to} b={seg('top').b} cta={S.top.cta} sub={S.top.sub} />
-        {S.hook.warn ? <WarnHook w={S.hook.warn} to={seg('hook').to} b={seg('hook').b} /> : <FastHook title={S.hook.title} chip={S.hook.chip} to={seg('hook').to} b={seg('hook').b} />}
+        {S.top.credit && <CreditLine text={S.top.credit} from={seg('top').from} to={seg('top').to} />}
+        {S.hook.warn ? <WarnHook w={S.hook.warn} to={seg('hook').to} b={seg('hook').b} /> : <FastHook title={S.hook.title} chip={S.hook.chip} note={S.hook.note} to={seg('hook').to} b={seg('hook').b} />}
         {SEGS.filter((s) => s.id !== 'hook').map((s) => (
           <Flash key={s.id} at={s.from} />
         ))}
         <Header series={S.header.series} episode={S.header.episode} item={0} since={0} dots={false} />
-        {inBonus ? <BonusStrip text="番外編｜ここを押さえれば" since={seg('bt').from} /> : <RankStrip cur={rankNow} since={cur.from} />}
+        {inBonus ? <BonusStrip text={S.bonus?.strip ?? '番外編｜ここを押さえれば'} since={seg('bt').from} /> : <RankStrip cur={rankNow} since={cur.from} />}
         <SourceLine source={S.source} note={S.note} />
       </AbsoluteFill>
     );

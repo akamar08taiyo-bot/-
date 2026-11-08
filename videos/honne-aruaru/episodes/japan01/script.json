@@ -1,0 +1,272 @@
+{
+ "id": "japan01",
+ "title": "日本が国ガチャで正解1位といわれる理由TOP10【1位はコメント欄】",
+ "silent": true,
+ "fast": true,
+ "bpm": 120,
+ "header": {
+  "series": "本音あるある",
+  "episode": "日本の魅力TOP10"
+ },
+ "source": "出典：小学館『サライ』Xキャンペーン「#私の愛するニッポン」有効回答975件（2024年6〜7月）",
+ "note": "※ひと言は編集部のコメントです",
+ "value": {
+  "label": "回答",
+  "unit": "票",
+  "decimals": 0
+ },
+ "itemLabel": "日本の魅力",
+ "tsukLabel": "ひとこと",
+ "hook": {
+  "beats": 8,
+  "img": "japan01/img/J0_map.jpg",
+  "cam": {
+   "x": 0.6,
+   "y": 0.5,
+   "z": 1.12,
+   "ty": 960
+  },
+  "title": [
+   "日本が国ガチャで",
+   "正解1位",
+   "といわれる理由TOP10"
+  ],
+  "chip": "10代の59.7%が「生まれ変わっても日本がいい」",
+  "note": "59.7%：ワカモノリサーチ 全国15〜19歳295名（2026年2〜3月）",
+  "credit": "地図：国土地理院（地理院タイル・全国最新写真）"
+ },
+ "ranks": [
+  {
+   "rank": 10,
+   "beats": 6,
+   "item": "観光地",
+   "value": 14,
+   "img": "japan01/img/R10_kiyomizu.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.42,
+    "z": 1.15
+   },
+   "tsukkomi": "行きたい場所が、|多すぎる。",
+   "credit": "写真：清水寺（Jimmy Bay / CC0）"
+  },
+  {
+   "rank": 9,
+   "beats": 6,
+   "item": "富士山",
+   "value": 17,
+   "img": "japan01/img/R9_fuji_iss.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.33,
+    "z": 1.1
+   },
+   "tsukkomi": "宇宙から見ても、|富士山。",
+   "credit": "写真：国際宇宙ステーションから見た富士山（NASA）"
+  },
+  {
+   "rank": 8,
+   "beats": 6,
+   "item": "景観",
+   "value": 28,
+   "img": "japan01/img/R8_miyajima.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.45,
+    "z": 1.12
+   },
+   "tsukkomi": "どこを撮っても、|絵になる。",
+   "credit": "写真：厳島神社の大鳥居（Balon Greyjoy / CC0）"
+  },
+  {
+   "rank": 7,
+   "beats": 6,
+   "item": "自然",
+   "value": 33,
+   "img": "japan01/img/R7_yakushima.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.5,
+    "z": 1.12
+   },
+   "tsukkomi": "山も森も海も、|ぜんぶある。",
+   "credit": "写真：屋久島 ヤクスギランド（Higa4 / CC0）"
+  },
+  {
+   "rank": 6,
+   "beats": 6,
+   "item": "伝統・文化",
+   "value": 48,
+   "img": "japan01/img/R6_fushimi.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.45,
+    "z": 1.12
+   },
+   "tsukkomi": "受け継がれて、|今もここにある。",
+   "credit": "写真：伏見稲荷大社の千本鳥居（Balon Greyjoy / CC0）"
+  },
+  {
+   "rank": 5,
+   "beats": 6,
+   "item": "清潔感（街が綺麗、|水が安心して飲めるなど）",
+   "value": 62,
+   "img": "japan01/img/R5_oshino.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.5,
+    "z": 1.12
+   },
+   "tsukkomi": "水道の水が、|そのまま飲める。",
+   "credit": "写真：忍野八海の湧き水（lumoplank / CC0）"
+  },
+  {
+   "rank": 4,
+   "beats": 6,
+   "item": "治安の良さ",
+   "value": 77,
+   "img": "japan01/img/R4_tokyo_night.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.45,
+    "z": 1.12
+   },
+   "tsukkomi": "夜道を、|ひとりで歩ける。",
+   "credit": "写真：宇宙から見た夜の東京（NASA）"
+  },
+  {
+   "rank": 3,
+   "beats": 7,
+   "item": "人間性（親切さなど）",
+   "value": 139,
+   "emoji": "🤝",
+   "bg": [
+    "#FFD3A5",
+    "#FD6585"
+   ],
+   "tsukkomi": "落とし物が、|戻ってくる。"
+  },
+  {
+   "rank": 2,
+   "beats": 8,
+   "item": "季節・四季",
+   "value": 147,
+   "imgs": [
+    "japan01/img/R2a_spring.jpg",
+    "japan01/img/R2b_summer.jpg",
+    "japan01/img/R2c_autumn.jpg",
+    "japan01/img/R2d_winter.jpg"
+   ],
+   "cam": {
+    "x": 0.5,
+    "y": 0.45,
+    "z": 1.1
+   },
+   "tsukkomi": "桜、ひまわり、紅葉、雪。|1年で4回、旅ができる。",
+   "credit": [
+    "写真：姫路城と桜（Loggieloggie / CC0）",
+    "写真：ひまわり畑（Shin-Nippori / CC0）",
+    "写真：京都・高雄の紅葉（lumoplank / CC0）",
+    "写真：白川郷の冬（雷太 / CC BY 2.0）"
+   ]
+  }
+ ],
+ "bonus": {
+  "strip": "番外編｜本当に日本が好きな理由",
+  "title": {
+   "beats": 5,
+   "title": [
+    "本当に日本が好きな理由",
+    "番外編",
+    "それは「人」"
+   ],
+   "chip": "東京の落とし物の統計（警視庁・令和7年）",
+   "emoji": [
+    "🤝",
+    "✨",
+    "👛",
+    "📱",
+    "💴"
+   ],
+   "bg": [
+    "#FFF1B8",
+    "#F7B267"
+   ]
+  },
+  "points": [
+   {
+    "beats": 10,
+    "label": "東京で1年間に届けられた落とし物の現金（令和7年）",
+    "item": "拾って、届けられた現金",
+    "value": 45,
+    "stamp": {
+     "label": "約",
+     "unit": "億円",
+     "decimals": 0
+    },
+    "sub": "1年で、約45億円。|ちゃんと届ける人がいる。",
+    "emoji": "💴",
+    "bg": [
+     "#FBC2EB",
+     "#A6C1EE"
+    ]
+   },
+   {
+    "beats": 10,
+    "label": "落とし物の携帯電話（令和7年に処理した分）",
+    "item": "持ち主に戻った",
+    "value": 83.0,
+    "stamp": {
+     "label": "割合",
+     "unit": "%",
+     "decimals": 1
+    },
+    "sub": "落としたスマホも、|ほとんど戻ってくる。",
+    "emoji": "📱",
+    "bg": [
+     "#A1C4FD",
+     "#C2E9FB"
+    ]
+   },
+   {
+    "beats": 10,
+    "label": "落とし物の財布（令和7年に処理した分）",
+    "item": "持ち主に戻った",
+    "value": 67.2,
+    "stamp": {
+     "label": "割合",
+     "unit": "%",
+     "decimals": 1
+    },
+    "sub": "財布も、|3つに2つは戻る。",
+    "emoji": "👛",
+    "bg": [
+     "#84FAB0",
+     "#8FD3F4"
+    ]
+   }
+  ],
+  "key": {
+   "beats": 10,
+   "head": "本当に日本が好きな理由",
+   "text": "いちばんの宝は、|人の温かさ。",
+   "note": "編集部のまとめ（落とし物の数字は警視庁「遺失物取扱状況（令和7年中）」。割合は、処理した件数のうち持ち主に返した件数から計算）",
+   "emoji": "🤝",
+   "bg": [
+    "#FFE29F",
+    "#FFA99F"
+   ]
+  }
+ },
+ "top": {
+  "beats": 8,
+  "img": "japan01/img/TOP_japan_night.jpg",
+  "cam": {
+   "x": 0.5,
+   "y": 0.5
+  },
+  "cta": "1位は固定コメントへ",
+  "sub": "あなたの思う1位は？",
+  "credit": "写真：宇宙から見た夜の日本（NASA）"
+ }
+}
