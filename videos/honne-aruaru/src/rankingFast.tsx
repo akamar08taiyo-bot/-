@@ -31,10 +31,19 @@ export type FScript = {
   value: {label: string; unit: string; decimals: number}; // はんこの見出しと単位（例：回答 / % / 1）
   itemLabel?: string; // 項目のカードの札（例「妻が挙げた理由」）
   tsukLabel?: string; // ひと言の吹き出しの札（既定は「しのぶ」）
-  hook: {beats: number; img?: string; cam?: RCam; emoji?: string[]; bg?: [string, string]; title: [string, string, string]; chip: string};
+  hook: {beats: number; img?: string; cam?: RCam; emoji?: string[]; bg?: [string, string]; title: [string, string, string]; chip: string; warn?: FWarn};
   ranks: FRank[]; // 10位〜2位（同率の順位は同じ数字を続けて書く。区切りは並びの順で数える）
   bonus?: FBonus; // 番外編（2位のあと、1位の発表の前）
   top: {beats: number; img?: string; cam?: RCam; cta: string; sub?: string};
+};
+
+// 冒頭の警告版（1コマ目がサムネ）：「自分は大丈夫と思っている男性へ」＋調査の数字＋題＋「最後まで見ないと…」
+export type FWarn = {
+  lead: string[]; // 呼びかけ（1行ずつ）
+  stat: {value: string; unit: string; text: string; source: string}; // 数字は調査のまま。source は数字の出典（画面の下に小さく）
+  title: string[]; // 動画の題（1行ずつ）
+  late: string; // 例「後で気づいた時には、本当に遅い。」
+  stay: string; // 例「最後まで見ないと、本当にやばい」
 };
 
 // 番外編：ランキングのあと、同じ調査のほかの数字から「ここを押さえれば」という、さらに大事なポイントを見せる。
@@ -166,6 +175,70 @@ const EmojiStage: React.FC<{emoji: string[]; bg: [string, string]; from: number;
         <div style={{fontSize: big ? 330 : 240, lineHeight: 1, filter: 'drop-shadow(0 18px 24px rgba(40,20,30,0.3))'}}>{main}</div>
       </div>
     </AbsoluteFill>
+  );
+};
+
+// 冒頭の警告版。最初のコマから全部見せる（サムネ用）。拍の頭で少し弾み、「最後まで見ないと」の札は拍ごとに脈打つ
+const WarnHook: React.FC<{w: FWarn; to: number; b: (n: number) => number}> = ({w, to, b}) => {
+  const frame = useCurrentFrame();
+  if (frame >= to) return null;
+  const beats = Array.from({length: 16}, (_, n) => b(n + 1)).filter((at) => at < to);
+  const bump = beats.reduce((v, at) => v + 0.035 * (frame >= at ? 1 - ramp(frame, at, at + 5) : 0), 1);
+  const pulse = beats.reduce((v, at) => v + 0.08 * (frame >= at ? 1 - ramp(frame, at, at + 6) : 0), 1);
+  const leadSize = Math.min(104, Math.floor(940 / Math.max(...w.lead.map((l) => [...l].length))));
+  const titleSize = Math.min(100, Math.floor(940 / Math.max(...w.title.map((l) => [...l].length))));
+  const textLines = w.stat.text.split('|');
+  const textSize = Math.min(54, Math.floor(900 / Math.max(...textLines.map((l) => [...l].length))));
+  const lateSize = Math.min(64, Math.floor(940 / [...w.late].length));
+  return (
+    <>
+      <AbsoluteFill style={{background: 'linear-gradient(180deg, rgba(20,8,14,0.35) 0%, rgba(20,8,14,0.62) 40%, rgba(20,8,14,0.7) 100%)'}} />
+      <AbsoluteFill style={{background: 'radial-gradient(ellipse at 50% 55%, rgba(0,0,0,0) 50%, rgba(140,0,20,0.35) 100%)'}} />
+      <div style={{position: 'absolute', left: 0, top: 368, width: W, display: 'flex', flexDirection: 'column', alignItems: 'center', transform: `scale(${bump})`}}>
+        {w.lead.map((l, i) => (
+          <div key={i} style={{marginTop: i ? -10 : 0}}>
+            <Outlined size={leadSize} color="#fff" stroke={Math.round(leadSize * 0.17)} strokeColor="#1a0d12" font={F.dela} weight={400} shadow="drop-shadow(0 8px 0 rgba(0,0,0,0.35))">
+              {l}
+            </Outlined>
+          </div>
+        ))}
+        <div style={{display: 'flex', alignItems: 'baseline', marginTop: 4}}>
+          <Outlined size={230} color={C.red} stroke={30} strokeColor="#fff" font={F.dela} weight={400} shadow="drop-shadow(0 12px 0 rgba(60,0,10,0.45))">
+            {w.stat.value}
+          </Outlined>
+          <Outlined size={120} color={C.red} stroke={20} strokeColor="#fff" font={F.dela} weight={400} shadow="drop-shadow(0 10px 0 rgba(60,0,10,0.45))">
+            {w.stat.unit}
+          </Outlined>
+        </div>
+        <div style={{marginTop: -6, background: 'rgba(255,255,255,0.95)', borderRadius: 18, padding: '10px 30px 14px', textAlign: 'center', boxShadow: '0 8px 0 rgba(0,0,0,0.25)'}}>
+          {textLines.map((l, i) => (
+            <div key={i} style={{fontFamily: F.maru, fontWeight: 900, fontSize: textSize, lineHeight: 1.3, color: C.ink, whiteSpace: 'pre'}}>
+              {l}
+            </div>
+          ))}
+        </div>
+        <div style={{marginTop: 22, display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
+          {w.title.map((l, i) => (
+            <div key={i} style={{marginTop: i ? -14 : 0}}>
+              <Outlined size={titleSize} color="#F0A91B" stroke={Math.round(titleSize * 0.17)} strokeColor="#2a1c08" font={F.dela} weight={400} shadow="drop-shadow(0 8px 0 rgba(120,70,0,0.4))">
+                {l}
+              </Outlined>
+            </div>
+          ))}
+        </div>
+        <div style={{marginTop: 16}}>
+          <Outlined size={lateSize} color="#fff" stroke={Math.round(lateSize * 0.2)} strokeColor="#1a0d12" font={F.dela} weight={400}>
+            {w.late}
+          </Outlined>
+        </div>
+        <div style={{marginTop: 16, transform: `scale(${pulse}) rotate(-2deg)`, background: C.red, color: '#fff', fontFamily: F.dela, fontSize: 52, padding: '10px 34px 16px', borderRadius: 16, border: '5px solid #fff', boxShadow: '0 8px 0 rgba(60,0,10,0.4)', whiteSpace: 'nowrap'}}>
+          {w.stay}
+        </div>
+        <div style={{marginTop: 18, maxWidth: 940, background: 'rgba(0,0,0,0.55)', color: 'rgba(255,255,255,0.92)', fontFamily: F.maru, fontWeight: 700, fontSize: 26, lineHeight: 1.35, padding: '5px 18px 7px', borderRadius: 10, textAlign: 'center'}}>
+          {w.stat.source}
+        </div>
+      </div>
+    </>
   );
 };
 
@@ -453,7 +526,7 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
           <BonusKey from={seg('bk').from} to={seg('bk').to} b={seg('bk').b} head={S.bonus.key.head} text={S.bonus.key.text} note={S.bonus.key.note} emoji={S.bonus.key.emoji} bg={S.bonus.key.bg} />
         )}
         <TopTeaser from={seg('top').from} to={seg('top').to} b={seg('top').b} cta={S.top.cta} sub={S.top.sub} />
-        <FastHook title={S.hook.title} chip={S.hook.chip} to={seg('hook').to} b={seg('hook').b} />
+        {S.hook.warn ? <WarnHook w={S.hook.warn} to={seg('hook').to} b={seg('hook').b} /> : <FastHook title={S.hook.title} chip={S.hook.chip} to={seg('hook').to} b={seg('hook').b} />}
         {SEGS.filter((s) => s.id !== 'hook').map((s) => (
           <Flash key={s.id} at={s.from} />
         ))}
