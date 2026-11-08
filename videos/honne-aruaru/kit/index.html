@@ -108,14 +108,14 @@ tr:last-child th,tr:last-child td{border-bottom:0}
     <p class="hand">はい、記録しました。</p>
     <span class="stamp" aria-hidden="true">記録</span>
   </div>
-  <p class="lead">完成した12本を、「動画・サムネ・タイトル・説明文・タグ・固定コメント」の1セットずつにまとめました。新しく作った動画が上です。スマホだけで投稿できます。準備中の4本も、いちばん上に予定として載せています。</p>
-  <nav class="nav" aria-label="ページの中"><a href="#videos">動画12本</a><a href="#flow">投稿の流れ</a><a href="#settings">投稿のときの設定</a><a href="#chars">登場人物</a></nav>
+  <p class="lead">完成した13本を、「動画・サムネ・タイトル・説明文・タグ・固定コメント」の1セットずつにまとめました。新しく作った動画が上です。スマホだけで投稿できます。準備中の3本も、いちばん上に予定として載せています。</p>
+  <nav class="nav" aria-label="ページの中"><a href="#videos">動画13本</a><a href="#flow">投稿の流れ</a><a href="#settings">投稿のときの設定</a><a href="#chars">登場人物</a></nav>
 </header>
 
 <section id="videos">
-  <h2>動画12本＋準備中4本（新しい順）</h2>
+  <h2>動画13本＋準備中3本（新しい順）</h2>
   <p class="sec-lead">いちばん上が最新です。番号は作った順で、大きいほど新しい動画です。同じ日に2本出さず、数日あけて反応を比べます。保存される動画は、元の動画を少し軽くした版です（見た目はほとんど変わりません）。</p>
-  <div class="row"><span class="progress" id="prog">投稿済み 0 / 12</span></div>
+  <div class="row"><span class="progress" id="prog">投稿済み 0 / 13</span></div>
   <div class="cards" id="cards">
 <article class="vc-plan" id="v-rank01">
   <div class="vh"><span class="no">16</span><span class="series">高速TOP10・家庭円満</span><span class="new">最新</span><span class="dur">準備中</span></div>
@@ -156,18 +156,60 @@ tr:last-child th,tr:last-child td{border-bottom:0}
     </div>
   </div>
 </article>
-<article class="vc-plan" id="v-honne09">
-  <div class="vh"><span class="no">13</span><span class="series">高速TOP10・熟年離婚</span><span class="dur">準備中</span></div>
-  <p class="when">準備中（元の調査で数字を確かめてから書き出します）</p>
-  <p class="note">動画は準備中です。順位の数字を元の調査で確かめてから、ここに動画・説明文・タグ・固定コメントを入れます。</p>
+<article class="vc" id="v-honne09" data-key="honne09" data-vid="83b1ec7b62b8eaa404a86fd4c4aa75b9">
+  <span class="posted" hidden>投稿済</span>
+  <div class="vh"><span class="no">13</span><span class="series">高速TOP10・熟年離婚</span><span class="dur">35秒</span></div>
+  <p class="when">失言ノート #8 の数日あと</p>
+  <p class="note">音なしの回です。アップロードのとき、YouTube アプリの「サウンドを追加」で曲を選んでください（BPM120 前後の曲）。1位は動画では出さず、固定コメントで発表します（「固定コメントをコピー」→ コメントに貼って「固定」）。AI の申告は「いいえ」で大丈夫です。</p>
   <div class="vb">
     <img class="th" src="thumb_s/honne09.jpg" alt="サムネ：熟年離婚の原因TOP10【1位はコメント欄】" width="135" height="240" loading="lazy">
     <div class="vm">
-      <p class="lbl">タイトル（案）</p>
-      <h3 class="vt">熟年離婚の原因TOP10【1位はコメント欄】</h3>
-      <p class="intro">実際の調査（デイライト法律事務所「熟年離婚の原因ランキング」50代以上の女性相談者）をもとにした高速ランキングです。10位〜2位を1つ3秒で見せ、1位は動画では明かさず固定コメントで発表します。音なし・約35秒。</p>
+      <p class="lbl">タイトル（おすすめ）<span class="count">22字</span></p>
+      <h3 class="vt" id="t-honne09">熟年離婚の原因TOP10【1位はコメント欄】</h3>
+      <div class="btns">
+        <button type="button" class="btn save" data-act="video">動画を保存</button>
+        <button type="button" class="btn save" data-act="thumb">サムネを保存</button>
+        <button type="button" class="btn copy" data-copy="t-honne09">タイトルをコピー</button>
+        <button type="button" class="btn copy" data-copy="d-honne09">説明文をコピー</button>
+        <button type="button" class="btn copy" data-copy="g-honne09">タグをコピー</button>
+        <button type="button" class="btn copy" data-copy="p-honne09">固定コメントをコピー</button>
+      </div>
+      <label class="done"><input type="checkbox" id="done-honne09"> 投稿した</label>
     </div>
   </div>
+  <details class="play"><summary>動画を見る</summary><video controls playsinline preload="none" poster="thumb_s/honne09.jpg" data-src="/_blob/83b1ec7b62b8eaa404a86fd4c4aa75b9"></video></details>
+  <details><summary>ほかのタイトル案（2つ）</summary><ul class="alt"><li><span id="t2-honne09">熟年離婚した妻79人が決意した夫の特徴TOP10【1位はコメント欄】</span><button type="button" class="btn copy" data-copy="t2-honne09">コピー</button></li><li><span id="t3-honne09">50代・60代で熟年離婚 妻が決めた理由TOP10【1位は固定コメント】</span><button type="button" class="btn copy" data-copy="t3-honne09">コピー</button></li></ul></details>
+  <details><summary>説明文を見る</summary><pre id="d-honne09">熟年離婚（婚姻期間20年以上の離婚）を経験した50代・60代の女性79人が答えた、「夫のどんなところに対して熟年離婚を決意したか」のランキングです。
+
+10位 親族間の問題への夫の対応（不和・相続・介護など）2.5%
+8位 妻への感謝や配慮の言葉がほとんどなかった 3.8%
+8位 暴力・DVがあった 3.8%
+7位 金銭や経済面の管理が一方的（ケチ・経済的DV等）8.9%
+5位 浮気・不倫があった 11.4%
+5位 家事・子育てなど家庭内の役割や責任を一方的に妻に任せていた 11.4%
+3位 老後や将来の生活について考え方の違いをすり合わせようとしなかった 12.7%
+3位 会話が成立せず話し合いができなかった（コミュニケーション不全）12.7%
+2位 威圧的な態度や人格を否定する言動（モラハラ）13.9%
+1位は、固定コメントで発表しています。
+
+心当たりのある項目、ありましたか？ コメントで教えてください。
+
+出典：離婚弁護士相談広場（https://agoora.co.jp/rikon/ ）
+「熟年離婚実態調査2026」株式会社Agoora（2026年2月25日発表）
+https://agoora.co.jp/rikon/column/gray-divorce-survey.html
+・調査日：2026年1月26日〜2月3日（Webアンケート）
+・対象：熟年離婚（婚姻期間20年以上の離婚）を経験した50代・60代の女性79名
+・設問：あなたは夫のどんなところに対して熟年離婚を決意しましたか。
+・同じ割合の項目は同じ順位にしています（10位より下は「セックスレスなど性的不調和」1.3%、「その他」1.3%）
+
+※順位の項目と割合は、上の調査のとおりです。イラストとひと言は再現イメージで、イラストはAIで作成しています。
+
+#熟年離婚 #夫婦あるある #離婚 #ランキング #shorts</pre></details>
+  <details><summary>タグを見る</summary><pre id="g-honne09">熟年離婚, 熟年離婚 原因, 離婚 理由, 夫婦あるある, 50代 夫婦, 60代 夫婦, モラハラ, 夫婦 会話, ランキング, TOP10</pre><p class="count">YouTube Studio の動画の詳細 →「タグ」に貼ります（, で区切られて1つずつのタグになります）。</p></details>
+  <details><summary>固定コメントを見る</summary><pre id="p-honne09">第1位は「借金・浪費癖があった」16.5%でした。
+7位の「金銭や経済面の管理が一方的（ケチ・経済的DV等）」8.9%と合わせると25.4%。約4人に1人が、夫のお金の問題を熟年離婚のきっかけに挙げています。
+出典：離婚弁護士相談広場「熟年離婚実態調査2026」（くわしくは概要欄）</pre></details>
+  <details><summary>どんな回？</summary><p class="intro">実際の調査（離婚弁護士相談広場「熟年離婚実態調査2026」、熟年離婚を経験した50代・60代の女性79名）をもとにした高速ランキングです。声はなく、BPM120 の拍で3秒ごとに順位が切り替わります（3位と2位は3.5秒）。同じ割合の項目は同じ順位で、10位〜2位の9項目を見せ、最後は「第1位は…？？？ 固定コメントで発表中」で止めます。2位は「威圧的な態度や人格を否定する言動（モラハラ）」13.9%。暴力・不倫などの重い項目は、ひと言を付けずに文字だけで出しています。出典は画面の上にずっと出ます。（尺：35秒。サムネにするコマ：最初のコマ）</p></details>
 </article>
 <article class="vc" id="v-honne08" data-key="honne08" data-vid="b9a45f8810d6606eaa71e900da8c78c6">
   <span class="posted" hidden>投稿済</span>
@@ -759,7 +801,7 @@ tr:last-child th,tr:last-child td{border-bottom:0}
 
 <script>
 (function(){
-  var N=12;
+  var N=13;
   var toastT; function toast(m){var t=document.getElementById('toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){t.hidden=true},2600)}
   // コピー
   document.addEventListener('click',function(ev){
