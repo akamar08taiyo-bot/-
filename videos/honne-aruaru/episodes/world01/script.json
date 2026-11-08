@@ -1,0 +1,177 @@
+{
+ "id": "world01",
+ "title": "世界中の人が日本に憧れる理由TOP10【1位はコメント欄】",
+ "silent": true,
+ "fast": true,
+ "bpm": 120,
+ "header": {
+  "series": "本音あるある",
+  "episode": "日本に憧れる理由TOP10"
+ },
+ "source": "出典：DBJ・JTBF「アジア・欧米豪 訪日外国人旅行者の意向調査2025年度版」12の国・地域で日本に旅行したい4,001人（2025年7月）",
+ "note": "※ひと言は編集部のコメントです",
+ "value": {
+  "label": "",
+  "unit": "",
+  "decimals": 0
+ },
+ "hideValues": true,
+ "itemLabel": "日本で体験したいこと",
+ "tsukLabel": "ひとこと",
+ "hook": {
+  "beats": 8,
+  "img": "japan01/img/TOP_japan_night.jpg",
+  "cam": {
+   "x": 0.5,
+   "y": 0.42,
+   "z": 1.15
+  },
+  "title": [
+   "世界中の人が",
+   "日本に憧れる",
+   "理由TOP10"
+  ],
+  "chip": "「次に観光旅行したい国」1位は日本（54%）",
+  "note": "54%：DBJ・JTBF 12の国・地域の海外旅行経験者7,413人（2025年7月）",
+  "credit": "写真：宇宙から見た夜の日本（NASA）"
+ },
+ "ranks": [
+  {
+   "rank": 10,
+   "beats": 6,
+   "item": "世界遺産の見物",
+   "value": 0,
+   "img": "japan01/img/R9_fuji_iss.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.33,
+    "z": 1.1
+   },
+   "tsukkomi": "富士山も、|世界遺産のひとつ。",
+   "credit": "写真：国際宇宙ステーションから見た富士山（NASA）"
+  },
+  {
+   "rank": 9,
+   "beats": 6,
+   "item": "紅葉の観賞",
+   "value": 0,
+   "img": "japan01/img/R2c_autumn.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.45,
+    "z": 1.12
+   },
+   "tsukkomi": "山が、|赤く燃える季節。",
+   "credit": "写真：京都・高雄の紅葉（lumoplank / CC0）"
+  },
+  {
+   "rank": 8,
+   "beats": 6,
+   "item": "日本庭園の見物",
+   "value": 0,
+   "img": "world01/img/W8_kenrokuen.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.45,
+    "z": 1.12
+   },
+   "tsukkomi": "静けさまで、|デザインされている。",
+   "credit": "写真：兼六園（lumoplank / CC0）"
+  },
+  {
+   "rank": 7,
+   "beats": 6,
+   "item": "イベント・祭りの見物",
+   "value": 0,
+   "img": "world01/img/W7_fireworks.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.42,
+    "z": 1.12
+   },
+   "tsukkomi": "夏の夜空は、|お祭り騒ぎ。",
+   "credit": "写真：天神祭の花火（Mr.ちゅらさん / CC0）"
+  },
+  {
+   "rank": 6,
+   "beats": 6,
+   "item": "温泉への入浴",
+   "value": 0,
+   "img": "world01/img/W6_yubatake.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.6,
+    "z": 1.15
+   },
+   "tsukkomi": "旅のしめくくりは、|やっぱり温泉。",
+   "credit": "写真：草津温泉の湯畑（Aspere / CC0）"
+  },
+  {
+   "rank": 5,
+   "beats": 6,
+   "item": "雪景色観賞",
+   "value": 0,
+   "img": "japan01/img/R2d_winter.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.45,
+    "z": 1.12
+   },
+   "tsukkomi": "雪国は、|まるで絵本の中。",
+   "credit": "写真：白川郷の冬（雷太 / CC BY 2.0）"
+  },
+  {
+   "rank": 4,
+   "beats": 6,
+   "item": "有名な史跡や|歴史的な建築物の見物",
+   "value": 0,
+   "img": "japan01/img/R10_kiyomizu.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.42,
+    "z": 1.15
+   },
+   "tsukkomi": "何百年前の建物が、|今も立っている。",
+   "credit": "写真：清水寺（Jimmy Bay / CC0）"
+  },
+  {
+   "rank": 3,
+   "beats": 7,
+   "item": "伝統的日本料理",
+   "value": 0,
+   "img": "world01/img/W3_kaiseki.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.45,
+    "z": 1.1
+   },
+   "tsukkomi": "季節を、|お皿で味わう。",
+   "credit": "写真：会席料理（H the wizard / CC0）"
+  },
+  {
+   "rank": 2,
+   "beats": 7,
+   "item": "桜の観賞",
+   "value": 0,
+   "img": "japan01/img/R2a_spring.jpg",
+   "cam": {
+    "x": 0.5,
+    "y": 0.45,
+    "z": 1.12
+   },
+   "tsukkomi": "1年に1度、|国じゅうがピンク色。",
+   "credit": "写真：姫路城と桜（Loggieloggie / CC0）"
+  }
+ ],
+ "top": {
+  "beats": 8,
+  "img": "japan01/img/R7_yakushima.jpg",
+  "cam": {
+   "x": 0.5,
+   "y": 0.5
+  },
+  "cta": "1位は固定コメントへ",
+  "sub": "あなたが思う1位は？",
+  "credit": "写真：屋久島（Higa4 / CC0）"
+ }
+}
