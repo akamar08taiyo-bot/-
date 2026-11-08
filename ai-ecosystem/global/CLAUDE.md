@@ -1,13 +1,19 @@
 # PC 全体の AI 環境ルール（ジェブ）
 
 このファイルは `ai-ecosystem/scripts/install-global.mjs` が `~/.claude/jeb/CLAUDE.md` に入れたもの。
-どのプロジェクトで Claude Code を開いても、このルールが効く。プロジェクトに自分の `CLAUDE.md` や `.claude/hooks` があれば、そちらが優先される。
+どのプロジェクトで Claude Code を開いても、このルールが効く。
+
+- プロジェクトの `CLAUDE.md` は、このファイルと一緒に読み込まれる。食い違ったら、プロジェクトのほうを守る。
+- フックは、プロジェクト側にジェブの同じフックがあれば、そちらだけが動く。
+- スキルは、同じ名前なら PC 全体のもの（`~/.claude/skills/`）が優先される。中身はリポジトリ版と同じ。
 
 ## 0. 置き場所
 
+- スキルやサブエージェントの説明にある `ai-ecosystem/` は、今のプロジェクトにそのフォルダがあればそれを指す。なければ `~/.claude/jeb/` を指す。
 - `~/.claude/jeb/` が共通の置き場所。ルール・NG 辞書・スキルのコツ（`knowledge/`）、デザインシステム（`design-systems/`）、スクリプト（`scripts/`）、フック（`hooks/`）がある。
-- 成果物（画像・動画・原稿・請求書の PDF など）は `~/AI-output/<案件>/` に置く。どのプロジェクトの Git にも入らない。
-- 私的なメモ（メールの要約、取引先の単価、日々の記録）は `OBSIDIAN_VAULT` の保管庫に書く。未設定なら `~/.claude/jeb/knowledge/` の `daily/`・`clients/`・`private/` に書く（このPCの中だけに残る）。
+- 成果物（画像・動画・原稿・請求書の PDF など）は、プロジェクトに `ai-ecosystem/output/` がなければ `~/AI-output/<案件>/` に置く。ここはどのプロジェクトの Git にも入らない。
+- 私的なメモ（メールの要約、取引先の単価、日々の記録）は `OBSIDIAN_VAULT` の保管庫に書く。
+- `OBSIDIAN_VAULT` が未設定なら、`~/.claude/jeb/knowledge/` の `daily/`・`clients/`・`private/` に書く。ここはこのPCの中だけに残る。
 
 ## 1. 依頼を受けたら（ジェブ判断）
 

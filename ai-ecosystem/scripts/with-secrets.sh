@@ -6,9 +6,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# .env を探す順番: 環境変数 ENV_FILE → リポジトリ直下（ai-ecosystem/scripts から2つ上）→ PC全体の置き場所（~/.claude/jeb）
+# .env を探す順番:
+#   1. 環境変数 ENV_FILE
+#   2. スクリプトの1つ上のフォルダ（PC 全体に入れた場合は ~/.claude/jeb/.env）
+#   3. スクリプトの2つ上のフォルダ（リポジトリの中では、リポジトリ直下の .env）
 if [ -z "${ENV_FILE:-}" ]; then
-  for candidate in "$SCRIPT_DIR/../../.env" "$SCRIPT_DIR/../.env"; do
+  for candidate in "$SCRIPT_DIR/../.env" "$SCRIPT_DIR/../../.env"; do
     if [ -f "$candidate" ]; then
       ENV_FILE="$candidate"
       break

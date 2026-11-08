@@ -56,17 +56,40 @@ function backupOriginal(manifest, target) {
   manifest.originals[target] = dest;
 }
 
-function writeFile(manifest, target, content, { overwrite = true } = {}) {
+function writeFile(manifest, target, content, { overwrite = true, mode } = {}) {
   const exists = fs.existsSync(target);
   if (exists && !overwrite) return 'skip';
-  if (exists && fs.readFileSync(target, 'utf8') === content) return 'same';
-  if (exists) backupOriginal(manifest, target);
-  else if (!manifest.createdFiles.includes(target)) manifest.createdFiles.push(target);
-  if (!DRY) {
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, content);
+  const same = exists && fs.readFileSync(target, 'utf8') === content;
+  if (!same) {
+    if (exists) backupOriginal(manifest, target);
+    else if (!manifest.createdFiles.includes(target)) manifest.createdFiles.push(target);
+    if (!DRY) {
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, content);
+    }
   }
-  return exists ? 'update' : 'create';
+  // 元のファイルの実行権限をそのまま写す（with-secrets.sh などを直接実行できるように）
+  if (!DRY && mode !== undefined && fs.existsSync(target)) fs.chmodSync(target, mode);
+  return same ? 'same' : exists ? 'update' : 'create';
+}
+
+function saveManifest(manifest) {
+  if (DRY) return;
+  fs.mkdirSync(JEB, { recursive: true });
+  fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2) + '\n');
+}
+
+// ~/.claude/settings.json を読む。空のファイルは「設定なし」として扱い、壊れた JSON はエラーにする
+function readSettings(file) {
+  if (!fs.existsSync(file)) return {};
+  const text = fs.readFileSync(file, 'utf8');
+  if (!text.trim()) return {};
+  const value = JSON.parse(text);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('中身が { } の形ではありません');
+  for (const [event, list] of Object.entries(value.hooks ?? {})) {
+    if (!Array.isArray(list)) throw new Error(`hooks.${event} が配列ではありません`);
+  }
+  return value;
 }
 
 function copyTree(manifest, src, dest, { overwrite = true, transform = (s) => s, skip = () => false } = {}) {
@@ -80,7 +103,8 @@ function copyTree(manifest, src, dest, { overwrite = true, transform = (s) => s,
       else if (entry.isFile()) {
         const to = path.join(dest, relPath);
         const isText = /\.(md|mjs|js|json|sh|txt)$/.test(entry.name);
-        if (isText) counts[writeFile(manifest, to, transform(fs.readFileSync(from, 'utf8')), { overwrite })]++;
+        const mode = fs.statSync(from).mode & 0o777;
+        if (isText) counts[writeFile(manifest, to, transform(fs.readFileSync(from, 'utf8')), { overwrite, mode })]++;
         else if (overwrite || !fs.existsSync(to)) {
           if (fs.existsSync(to)) backupOriginal(manifest, to);
           else if (!manifest.createdFiles.includes(to)) manifest.createdFiles.push(to);
@@ -97,12 +121,17 @@ function copyTree(manifest, src, dest, { overwrite = true, transform = (s) => s,
   return counts;
 }
 
-// スキル・サブエージェントの中のリポジトリ内の場所を、PC 全体の置き場所に読み替える
-function toGlobalPaths(text) {
-  return text
-    .replaceAll('ai-ecosystem/output/', '~/AI-output/')
-    .replaceAll('`.claude/skills/*/SKILL.md`', '`~/.claude/skills/*/SKILL.md`（プロジェクトの `.claude/skills/` もあれば両方）')
-    .replaceAll('ai-ecosystem/', '~/.claude/jeb/');
+// スキル・サブエージェントの本文はリポジトリ版のまま変えず、場所の読み方だけを冒頭に書き足す。
+// 同じ名前なら PC 全体のスキルがプロジェクトのスキルより優先されるため、本文を変えると
+// このリポジトリでの動き（NG 辞書の場所、出力先）まで変わってしまう。
+const GLOBAL_NOTE =
+  '> PC 全体に入れた版。この説明の `ai-ecosystem/` は、今のプロジェクトにそのフォルダがあればそれを指す。' +
+  'なければ `~/.claude/jeb/` を指す（`ai-ecosystem/output/` は `~/AI-output/`）。' +
+  'スキルの一覧は `.claude/skills/` と `~/.claude/skills/` の両方を見る。' +
+  '「このリポジトリは公開」という注意は、公開リポジトリで作業するときに当てはまる。\n';
+function addGlobalNote(text) {
+  const m = text.match(/^---\n[\s\S]*?\n---\n/);
+  return m ? `${m[0]}\n${GLOBAL_NOTE}${text.slice(m[0].length)}` : `${GLOBAL_NOTE}\n${text}`;
 }
 
 const HOOK_EVENTS = [
@@ -112,22 +141,21 @@ const HOOK_EVENTS = [
   ['Stop', null, 'stop-judge.mjs', 15],
   ['SessionEnd', null, 'session-memo.mjs', 10],
 ];
-// プロジェクトに同じフックがあれば何もしない（このリポジトリなどで二重に動かないように）
-const hookCommand = (file) => `[ -f "$CLAUDE_PROJECT_DIR/.claude/hooks/${file}" ] || node "$HOME/.claude/jeb/hooks/${file}"`;
-const isOurEntry = (entry) => (entry.hooks || []).some((h) => typeof h.command === 'string' && h.command.includes(HOOK_MARK));
+// プロジェクトに「ジェブの」同じフックがあれば何もしない（このリポジトリなどで二重に動かないように）。
+// ジェブと関係のない同名のフックを持つプロジェクトでは、PC 全体のフックが動く
+const hookCommand = (file) =>
+  `grep -qsE 'JEB_|ジェブ|セッションログ' "$CLAUDE_PROJECT_DIR/.claude/hooks/${file}" || node "$HOME/.claude/jeb/hooks/${file}"`;
+const isOurHook = (h) => typeof h.command === 'string' && h.command.includes(HOOK_MARK);
+// ジェブのフックだけを取り除く。同じまとまりに利用者が足したフックは残す
+const stripOurHooks = (list = []) =>
+  list.map((g) => ({ ...g, hooks: (g.hooks || []).filter((h) => !isOurHook(h)) })).filter((g) => g.hooks.length > 0);
 
-function mergeSettings(manifest) {
+function mergeSettings(manifest, settings) {
   const file = path.join(CLAUDE_DIR, 'settings.json');
-  let settings;
-  try {
-    settings = readJson(file, {});
-  } catch (error) {
-    throw new Error(`${rel(file)} が JSON として読めません（${error.message}）。直してからもう一度実行してください。何も変更していません。`);
-  }
   const project = readJson(path.join(REPO, '.claude', 'settings.json'), {});
   settings.hooks ??= {};
   for (const [event, matcher, hookFile, timeout] of HOOK_EVENTS) {
-    const list = (settings.hooks[event] ?? []).filter((e) => !isOurEntry(e));
+    const list = stripOurHooks(settings.hooks[event]);
     list.push({ ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command: hookCommand(hookFile), timeout }] });
     settings.hooks[event] = list;
   }
@@ -164,8 +192,35 @@ function ensureImport(manifest) {
 
 function install() {
   if (!fs.existsSync(path.join(REPO, '.claude', 'hooks', 'guard.mjs'))) throw new Error('リポジトリのフォルダの中から実行してください（.claude/hooks が見つかりません）。');
+  // 何かを書く前に、今の設定が読めるかを確かめる（読めなければ、ここで止めて何も変えない）
+  const settingsFile = path.join(CLAUDE_DIR, 'settings.json');
+  let settings;
+  try {
+    settings = readSettings(settingsFile);
+  } catch (error) {
+    throw new Error(`${rel(settingsFile)} を読めません（${error.message}）。直してからもう一度実行してください。何も変更していません。`);
+  }
+  const claudeMd = path.join(CLAUDE_DIR, 'CLAUDE.md');
+  if (fs.existsSync(claudeMd) && !fs.statSync(claudeMd).isFile()) throw new Error(`${rel(claudeMd)} がファイルではありません。何も変更していません。`);
+
   const manifest = loadManifest();
   log(`入れる先: ${rel(CLAUDE_DIR)}`);
+  try {
+    installSteps(manifest, settings);
+  } finally {
+    // 途中で止まっても、それまでに変えた内容と控えの場所を必ず記録する（--uninstall で戻せるように）
+    saveManifest(manifest);
+  }
+  console.log(`
+${DRY ? '試しに表示しただけで、何も変えていません。' : '入れ終わりました。'}
+- 開いている Claude Code は一度終了して開き直すと、どのプロジェクトでもジェブが働きます。
+- APIキーを使うスクリプトは、${rel(path.join(JEB, '.env.example'))} を .env に複製して 1Password の参照を書いてください。
+- 成果物は ~/AI-output/<案件>/ に置かれます。
+- リポジトリのスキルを直したときは、もう一度このスクリプトを実行してください（同じ名前なら PC 全体のスキルが優先されるため）。
+- 元に戻すとき: node ai-ecosystem/scripts/install-global.mjs --uninstall`);
+}
+
+function installSteps(manifest, settings) {
 
   // 1. 共通の置き場所 ~/.claude/jeb
   const c1 = copyTree(manifest, path.join(REPO, '.claude', 'hooks'), path.join(JEB, 'hooks'));
@@ -178,6 +233,8 @@ function install() {
   for (const f of ['package.json', 'package-lock.json']) writeFile(manifest, path.join(JEB, f), fs.readFileSync(path.join(REPO, 'ai-ecosystem', f), 'utf8'));
   writeFile(manifest, path.join(JEB, '.env.example'), fs.readFileSync(path.join(REPO, '.env.example'), 'utf8'));
   writeFile(manifest, path.join(JEB, 'CLAUDE.md'), fs.readFileSync(path.join(REPO, 'ai-ecosystem', 'global', 'CLAUDE.md'), 'utf8'));
+  // スキルの中から参照される手順書と図鑑
+  for (const f of ['SETUP.md', 'README.md']) writeFile(manifest, path.join(JEB, f), fs.readFileSync(path.join(REPO, 'ai-ecosystem', f), 'utf8'));
   // ナレッジとデザインシステムは、育てた内容を守るため上書きしない（私的なフォルダの中身はコピーしない）
   const privateDirs = /^(daily|clients|Claude|private)\//;
   const k = copyTree(manifest, path.join(REPO, 'ai-ecosystem', 'knowledge'), path.join(JEB, 'knowledge'), {
@@ -188,15 +245,15 @@ function install() {
   const d = copyTree(manifest, path.join(REPO, 'ai-ecosystem', 'design-systems'), path.join(JEB, 'design-systems'), { overwrite: false });
   log(`デザインシステム → ${rel(path.join(JEB, 'design-systems'))}（新規 ${d.create}・残した ${d.skip}）`);
 
-  // 2. スキルとサブエージェント（場所の書き方を PC 全体用に読み替える）
-  const s = copyTree(manifest, path.join(REPO, '.claude', 'skills'), path.join(CLAUDE_DIR, 'skills'), { transform: toGlobalPaths });
+  // 2. スキルとサブエージェント（本文はそのまま。冒頭に場所の読み方を書き足す）
+  const s = copyTree(manifest, path.join(REPO, '.claude', 'skills'), path.join(CLAUDE_DIR, 'skills'), { transform: addGlobalNote });
   log(`スキル14個 → ${rel(path.join(CLAUDE_DIR, 'skills'))}（新規 ${s.create}・更新 ${s.update}）`);
-  const a = copyTree(manifest, path.join(REPO, '.claude', 'agents'), path.join(CLAUDE_DIR, 'agents'), { transform: toGlobalPaths });
+  const a = copyTree(manifest, path.join(REPO, '.claude', 'agents'), path.join(CLAUDE_DIR, 'agents'), { transform: addGlobalNote });
   log(`サブエージェント5体 → ${rel(path.join(CLAUDE_DIR, 'agents'))}（新規 ${a.create}・更新 ${a.update}）`);
 
-  // 3. ルールの読み込みと、フック・権限の登録
+  // 3. ルールの読み込みと、フック・権限・ステータスラインの登録
   ensureImport(manifest);
-  mergeSettings(manifest);
+  mergeSettings(manifest, settings);
 
   // 4. スクリプト用のパッケージ
   if (!DRY && !SKIP_NPM) {
@@ -204,17 +261,6 @@ function install() {
     const r = spawnSync('npm', ['install', '--no-audit', '--no-fund', '--omit=dev'], { cwd: JEB, stdio: 'inherit', shell: process.platform === 'win32' });
     if (r.status !== 0) console.warn('npm install に失敗しました。あとで ~/.claude/jeb で npm install を実行してください。');
   }
-
-  if (!DRY) {
-    fs.mkdirSync(JEB, { recursive: true });
-    fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2) + '\n');
-  }
-  console.log(`
-${DRY ? '試しに表示しただけで、何も変えていません。' : '入れ終わりました。'}
-- 開いている Claude Code は一度終了して開き直すと、どのプロジェクトでもジェブが働きます。
-- APIキーを使うスクリプトは、${rel(path.join(JEB, '.env.example'))} を .env に複製して 1Password の参照を書いてください。
-- 成果物は ~/AI-output/<案件>/ に置かれます。
-- 元に戻すとき: node ai-ecosystem/scripts/install-global.mjs --uninstall`);
 }
 
 function uninstall() {
@@ -227,9 +273,14 @@ function uninstall() {
   // 1. 設定からフックと、こちらが足した権限ルールだけを外す（あなたが後から足した設定は残す）
   const settingsFile = path.join(CLAUDE_DIR, 'settings.json');
   if (fs.existsSync(settingsFile)) {
-    const settings = readJson(settingsFile, {});
+    let settings;
+    try {
+      settings = readSettings(settingsFile);
+    } catch (error) {
+      throw new Error(`${rel(settingsFile)} を読めません（${error.message}）。直してからもう一度実行してください。何も変更していません。`);
+    }
     for (const event of Object.keys(settings.hooks ?? {})) {
-      settings.hooks[event] = settings.hooks[event].filter((e) => !isOurEntry(e));
+      settings.hooks[event] = stripOurHooks(settings.hooks[event]);
       if (settings.hooks[event].length === 0) delete settings.hooks[event];
     }
     if (settings.hooks && Object.keys(settings.hooks).length === 0) delete settings.hooks;
