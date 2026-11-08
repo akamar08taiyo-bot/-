@@ -183,7 +183,8 @@ ai-ecosystem/
 | 強制 push（`-f`・`--force-with-lease`・`--mirror`・`+ブランチ`）、リモートの枝の削除（`--delete`・`:ブランチ`） | 停止 |
 | `git clean -x`（範囲の指定なし）: Git に入っていない `.env`・私的メモ・原稿まで消える | 停止 |
 | それ以外のファイル削除（`rimraf` などの削除ツール、`ai-ecosystem/output/` の原稿や動画も含む） | 確認 |
-| 安全設定（`.claude/settings*.json`・`.claude/hooks/`）の書き換え（フォルダごとの `cp -r`・`rsync`・`git checkout`・`tar -C` も含む） | 確認 |
+| 安全設定（`.claude/settings*.json`・`.claude/hooks/`・ユーザー全体の `~/.claude/settings*.json`）の書き換え | 確認 |
+| 安全設定を含む場所への上書き（`cp -r`・`rsync`・`git checkout`・`git restore`・`git apply`・`tar -x`・`unzip`、プログラムの中の書き込み） | 確認 |
 | ふつうの `git push`（作業ブランチへの反映） | そのまま通す |
 | プロジェクト内のビルド成果物（dist・build など）と一時フォルダの削除 | そのまま通す |
 
@@ -192,17 +193,26 @@ ai-ecosystem/
 | 操作 | MCP（コネクター）経由 | コマンド（CLI）経由 |
 | --- | --- | --- |
 | 削除・消去 | 停止（delete・trash・clear など、ゴミ箱ラベル、`trashed: true`、SQL ツールでの `DROP TABLE`・`DELETE FROM`） | 停止（`gh … delete`・`gh api -X DELETE`・`vercel remove`・`wrangler delete`・`curl -X DELETE`・DB コマンドでの削除 SQL・`supabase db reset` など） |
-| 送信・公開・課金・共有・招待・コメント・設定変更 | 確認（GitHub への書き込みはすべて確認） | 確認（`gh pr merge`・`gh repo create/edit`・`gh release create`・`vercel --prod`・`wrangler deploy` など） |
+| 送信・公開・課金・共有・招待・コメント・設定変更 | 確認（GitHub への書き込みはすべて確認） | 確認（`gh pr merge`・`gh repo create/edit`・`gh release create`・`gh api` での書き込み・`vercel --prod`・`wrangler deploy` など） |
+| 外部へのデータ送信（投稿 API・Webhook など） | 上の行と同じ | 確認（`curl` の POST・PUT・PATCH、`-d`・`-F` など。localhost は対象外） |
 | ネットから取ってきたスクリプトをそのまま実行（`curl … \| bash`） | — | 確認 |
 | 読み取り | そのまま通す | そのまま通す |
 
-コマンドは、`( )`・`{ }`・`if`・`for` の中、`sudo`・`env`・`timeout`・`xargs`・`npx` などを前に付けた形、`git -C`、`bash -c`・`eval`・`$( )`・`<( )` の中、`cd` したあと、`node -e`・`python -c` の中、シェルや Python に渡すヒアドキュメントとパイプ（`bash <<EOF`・`echo … | bash`）まで読む。
-端末操作系の MCP（desktop-commander など）経由のコマンドとファイル操作も、同じ基準で確認する。
+ガードがコマンドを読む範囲は次のとおり。
+
+- `( )`・`{ }`・`if`・`for` の中
+- `sudo`・`env`・`timeout`・`xargs`・`npx` などを前に付けた形、`git -C`
+- `bash -c`・`eval`・`$( )`・`<( )` の中と、`cd` したあとのコマンド
+- `node -e`・`python -c` の中の削除・書き込み・コマンド実行
+- シェルや Python に渡すヒアドキュメントとパイプ（`bash <<EOF`・`echo … | bash`）
+- 端末操作系の MCP（desktop-commander など）経由のコマンド、ファイル操作、対話画面に送るコード
 
 **ガードの限界（対象外）**: ガードはコマンドの文字列を読んで判断する網であり、完全な防御ではない。次のようなものは見えない。
 
 - スクリプトファイルの中で行う処理（`node script.js`、`npm run` の中身、`make` など）
-- 変数や別名を組み合わせて、実行するまで中身が決まらない書き方
+- 変数や別名を組み合わせて、実行するまで中身が決まらない書き方（`git config alias` で作った別名など）
 - 表にない CLI での外部操作（その場合は Claude Code の通常の許可確認に任せる）
+- ブラウザ操作（Playwright MCP・Claude in Chrome）での削除ボタンや投稿ボタンのクリック。`sns-post` スキルは、投稿ボタンを押さずに下書きで止める手順にしてある
+- コードを実行する MCP の中身（Figma の `use_figma` で要素を消すコードなど）
 
 最後の守りは Git の履歴とバックアップ。大事なファイルはコミットしておく。
