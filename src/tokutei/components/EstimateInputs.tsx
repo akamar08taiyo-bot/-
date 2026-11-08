@@ -13,7 +13,7 @@ import type {EstimateField} from '../estimateBook.ts';
 import {blankItem, makerChoices, suggestValues, unregisteredItems} from '../sales.ts';
 import {carePlanOf} from '../shinsei.ts';
 import type {OpenCatalog} from '../catalog.ts';
-import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Product, Sale, SaleItem} from '../types.ts';
+import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Product, Sale, SaleItem, Settings} from '../types.ts';
 import {yen} from '../util.ts';
 import {telWithHyphens} from '../tel.ts';
 import {zipLabel} from '../zip.ts';
@@ -146,6 +146,7 @@ export function EstimateInputs({
                 onPicked={onCatalogPicked}
                 onCatalog={onCatalog}
                 products={data.products}
+                settings={s}
                 onPickFavorite={() => onPickFavorite(l.item.id)}
               />
             ))}
@@ -159,6 +160,7 @@ export function EstimateInputs({
                 onCatalog={onCatalog}
                 onPicked={onCatalogPicked}
                 products={data.products}
+                settings={s}
                 onPickFavorite={() => onPickFavorite(draft.id)}
               />
             )}
@@ -410,6 +412,7 @@ function ItemBlock({
   onPicked,
   onPickFavorite,
   products,
+  settings,
 }: {
   line: Line;
   no: number;
@@ -418,6 +421,7 @@ function ItemBlock({
   remove?: () => void;
   onPicked?: (item: SaleItem) => void; // カタログの商品の一覧から選んだ
   products: Product[]; // 商品マスタ（型番から入力でさがす）
+  settings: Settings; // 割引率（カタログ・型番から入れた商品の販売金額）
   onCatalog?: OpenCatalog; // カタログの窓を開く（カタログの商品の「p.40」・商品検索で絞ったページ）
   onPickFavorite: () => void; // 定価の横の「★ お気に入りから入力」
 }) {
@@ -447,7 +451,7 @@ function ItemBlock({
       {/* 品目・メーカーのプルダウン、その下に「📖 カタログから商品検索」と右に「🔢 型番から検索」（ユーザーの指示 2026-11-03。CatalogPicker.tsx・CodeLookup.tsx）。
           商品名（字はほかの欄と同じ 14px）の右に品番の欄（型番から検索で読む欄） */}
       {manual ? (
-        <CodeLookup item={i} products={products} onPick={change} onPicked={onPicked}>
+        <CodeLookup item={i} products={products} settings={settings} onPick={change} onPicked={onPicked}>
           {(code) => (
             <>
               <CatalogPicker
@@ -456,6 +460,7 @@ function ItemBlock({
                 onCatalog={onCatalog}
                 onPicked={onPicked}
                 makerChoices={makers}
+                discountRate={settings.discountRate}
                 code={
                   <>
                     {code.button}
@@ -496,9 +501,10 @@ function ItemBlock({
           <input type="checkbox" checked={noteOn} onChange={(e) => change({basisNote: e.target.checked ? null : ''})} className="h-4 w-4 accent-emerald-600" />
           見積書に書く
         </label>
+        {/* 欄を全部消して打ち直すあいだは「書く」のまま（空白1つで持つ。'' は「書かない」なので、前は消したとたんにチェックが外れて欄が打てなくなった。2026-11-08 のデバッグ） */}
         <TextInput
-          value={noteOn ? (typeof i.basisNote === 'string' ? i.basisNote : auto) : ''}
-          onChange={(v) => change({basisNote: v === auto ? null : v})}
+          value={noteOn ? (typeof i.basisNote === 'string' ? (i.basisNote === ' ' ? '' : i.basisNote) : auto) : ''}
+          onChange={(v) => change({basisNote: v === auto ? null : v === '' ? ' ' : v})}
           placeholder={noteOn ? '定価28,000円の20%引き' : '書かない'}
           disabled={!noteOn}
           className="min-w-0 flex-1 disabled:bg-slate-50"

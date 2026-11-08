@@ -16,7 +16,7 @@ import {strFromU8, strToU8} from 'fflate';
 import {itemNote, saleTotals} from './calc.ts';
 import type {Totals} from './calc.ts';
 import {OFFICES} from './defaults.ts';
-import {customerLabel} from './sales.ts';
+import {customerLabel, withoutBlankItems} from './sales.ts';
 import {sheetPreviewPages} from './shinseiPreview.ts';
 import type {PvPage, Range} from './shinseiPreview.ts';
 import type {Sale, SaleItem, Settings, TaxType} from './types.ts';
@@ -248,7 +248,8 @@ export const TITLE_PT = 26;
 export const NAME_PT = 20;
 
 /** 原本（開いたもの）の写しに案件を書く。書いたブック（files をそのまま書きかえる） */
-export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
+export function fillEstimateFiles(files: Files, all: Sale, s: Settings): void {
+  const sale = withoutBlankItems(all); // 何も入れていない商品の欄は書かない
   const t = saleTotals(sale, s);
   const path = sheetPath(files, ESTIMATE_SHEET);
   let xml = strFromU8(files[path]);
@@ -257,13 +258,14 @@ export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
     xml = setCell(xml, ref, v);
   };
   // 宛名は左に詰めず、全角のすき間1つあける（ユーザーの指示「名前の部分は左に詰めるのではなく、スペース一つ分あける」2026-10-26）
-  put('A6', `　${customerLabel(sale).replace(/\s*様$/, '')}　様`);
+  // お客様名が空なら名前の所は空けておく（手で書けるように。前は画面の「（お客様名未入力）」がそのまま見積書に出た）
+  put('A6', `　${sale.customer.trim() ? customerLabel(sale).replace(/\s*様$/, '') : '　'.repeat(8)}　様`);
   // 宛名の字は原本（16pt）より2段大きく（ユーザーの指示「名前の部分は2段階ぐらい大きくする」2026-10-28。A6:E7 の結合＝高さ30pt に入る。長い名前は原本どおり縮めて入れる）。
   // 2・3ページ目の宛名は、ここで書いたあとの写しなので同じ大きさ
   xml = setStyle(xml, 'A6', String(sizeStyle(files, numOf(attrOf(cellRe('A6').exec(xml)?.[1] ?? '', 's'), 0), NAME_PT)));
   put('I4', `№　${sale.quoteNo.trim()}`);
-  const serial = excelDate(sale.estimateDate);
-  if (serial) put('I5', serial);
+  // 見積日が空なら空欄に（前は原本に残っていた日付＝2026年4月1日がそのまま出た）
+  put('I5', excelDate(sale.estimateDate) || '');
   // 会社の欄（ユーザーの指示「会社名や社長名などの部分は、左寄せを統一」「会社住所の下に、電話番号とFAX番号」「担当名をいれる」、
   // 「社名の部分が全体的に小さい。そして、社名は所長印、担当の上にもってくる」2026-10-26。原本の I〜K の結合。長いときは縮めて入れる）。
   // 設定の営業所の値（設定で営業所を選ぶと入る。defaults.ts の OFFICES）。空の欄は原本の値（行橋営業所）のまま
@@ -363,14 +365,30 @@ export function fillEstimateFiles(files: Files, sale: Sale, s: Settings): void {
       xml = xml.slice(0, m.index) + m[0].replace(`<f>${f}</f>`, `<f>${f}${esc(more.join(''))}</f>`) + xml.slice(m.index + m[0].length);
     }
   }
-  // 式の答え（原本の式と同じ計算：税率ごとの合計・切り捨ての消費税・御見積合計。営業所の欄はマスタのシートの値）
+  // 消費税は商品（行）ごとに切り捨てて足す（calc.ts の lineOf・DESIGN.md 4.2。画面の合計・介護保険の対象・申請書の購入金額・販売受注簿と同じ）。
+  // 原本の式は税率ごとの合計に1回だけ切り捨て（ROUNDDOWN(C47*0.1,0)）で、1円単位の単価の商品が2つ以上あると御見積合計だけ1円多くなった
+  // （2026-11-08 のデバッグで見つけた。例：12,345円の商品2つ → 御見積合計 27,159円・介護保険の対象 27,158円）。
+  // 式は行ごとの 数量×単価×税率 の切り捨ての合計（金額の欄は空の行が "" なので、数量・単価の欄でかける。2・3ページ目の明細も足す）
+  const blocks: [number, number][] = [
+    [ESTIMATE_ROWS[0], ESTIMATE_ROWS[ESTIMATE_ROWS.length - 1]],
+    ...Array.from({length: pages - 1}, (_, i): [number, number] => {
+      const rs = contBlock(i + 2).rows;
+      return [rs[0], rs[rs.length - 1]];
+    }),
+  ];
+  const lineTax = (crit: string, rate: string) =>
+    blocks.map(([a, b]) => `SUMPRODUCT(($J$${a}:$J$${b}=${crit})*ROUNDDOWN($F$${a}:$F$${b}*$H$${a}:$H$${b}*${rate},0))`).join('+');
+  const taxOfRate = (key: string) => lay.items.reduce((n, _, k) => n + (String(RATE[t.lines[k].item.taxType]) === key ? t.lines[k].tax : 0), 0);
+  // 式の答え（税率ごとの合計・消費税・御見積合計。営業所の欄はマスタのシートの値）
   const c47 = sums['0.1'] ?? 0;
   const c48 = 0; // 8%（軽減でない）の商品はこのアプリにない
   const c49 = sums['軽減税率8%'] ?? 0;
   const c50 = sums['非課税'] ?? 0;
-  const e47 = Math.floor(c47 * 0.1);
+  const e47 = taxOfRate('0.1');
   const e48 = Math.floor(c48 * 0.08);
-  const e49 = Math.floor(c49 * 0.08);
+  const e49 = taxOfRate('軽減税率8%');
+  xml = setFormula(xml, 'E47', lineTax('$A$53', '0.1'), e47, undefined);
+  xml = setFormula(xml, 'E49', lineTax('$A$55', '0.08'), e49, undefined);
   const c46 = c47 + c48 + c49 + c50;
   const e46 = e47 + e48 + e49;
   for (const [ref, v] of [
@@ -486,7 +504,8 @@ export function fillEstimate(template: Files, sale: Sale, s: Settings): Uint8Arr
 }
 
 /** 販売見積書のプレビュー（1〜3枚）。原本はそのまま（{...template} に書く）なので、打つたびに呼んでよい */
-export function estimatePreview(template: Files, sale: Sale, s: Settings): PvPage<EstimateField>[] {
+export function estimatePreview(template: Files, all: Sale, s: Settings): PvPage<EstimateField>[] {
+  const sale = withoutBlankItems(all); // 何も入れていない商品の欄は出さない（Excel と同じ）
   const files: Files = {...template};
   fillEstimateFiles(files, sale, s);
   const pages = saleLayout(sale, s).pages;

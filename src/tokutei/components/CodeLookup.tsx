@@ -9,7 +9,7 @@ import type {CatalogProduct} from '../catalogItems.ts';
 import type {CodeHit} from '../codeLookup.ts';
 import {codeMatchKey, findByCode} from '../codeLookup.ts';
 import {loadCatalogProducts} from '../print/catalogPdf.ts';
-import type {Product, SaleItem} from '../types.ts';
+import type {Product, SaleItem, Settings} from '../types.ts';
 import {TextInput} from './ui.tsx';
 
 /**
@@ -23,9 +23,11 @@ export function CodeLookup({
   onPick,
   onPicked,
   children,
+  settings,
 }: {
   item: SaleItem;
   products: Product[];
+  settings: Pick<Settings, 'discountRate'>; // 割引率（商品マスタの商品は商品の割引率、なければこれ。カタログの商品はこれ）
   onPick: (patch: Partial<SaleItem>) => void;
   onPicked?: (item: SaleItem) => void;
   children: (parts: {input: ReactNode; button: ReactNode; note: ReactNode}) => ReactNode;
@@ -54,7 +56,7 @@ export function CodeLookup({
       // カタログが読めなくても、商品マスタはさがす
     }
     setBusy(false);
-    const hits = findByCode(code, catalog, products, item);
+    const hits = findByCode(code, catalog, products, item, settings);
     if (hits.length === 1) put(hits[0]);
     else if (hits.length > 1) {
       setMany(hits);

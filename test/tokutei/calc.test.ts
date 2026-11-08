@@ -253,3 +253,14 @@ test('利益率：（販売単価−仕切）÷販売単価。利益率から販
   // 利益率から決めた単価は手で入れた単価と同じ扱い：割引率も変わる（定価 11,000 円）
   assert.deepEqual(unitPricePatch({listPrice: 11000}, priceFromMargin(6000, 30)), {unitPrice: 8572, discountRate: 22.1});
 });
+
+test('割引率は小数1けたまで（17.5% は 17.5% 引きで計算し、備考・掛率・受注簿もその%。2026-11-08 のデバッグ）', async () => {
+  const {actualDiscount, basisNote, rateText} = await import('../../src/tokutei/calc.ts');
+  const l = lineOf(item({listPrice: 28000, discountRate: 17.5, unitPrice: null}), S);
+  assert.equal(l.unitPrice, 23100); // 前は 18% 引きの 22,960
+  assert.equal(basisNote(l), '定価28,000円の17.5%引き');
+  assert.equal(actualDiscount(l), 17.5);
+  assert.equal(rateText(17.5), '0.825');
+  assert.equal(rateText(20), '0.8');
+  assert.equal(lineOf(item({listPrice: 28000, discountRate: 20, unitPrice: null}), S).unitPrice, 22400); // 整数の%は今までどおり
+});

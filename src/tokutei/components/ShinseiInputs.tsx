@@ -284,7 +284,7 @@ export function ShinseiInputs({
                       右側に型番から検索をもってくる」2026-11-03。CatalogPicker.tsx・CodeLookup.tsx） */}
                   {/* 商品名（字はほかの欄と同じ 14px）の右に品番の欄（「🔢 型番から検索」で読む欄。見積書の品名の3行目「【品番】…」） */}
                   {i.productId === null ? (
-                    <CodeLookup item={i} products={data.products} onPick={(patch) => changeRow(i.id, patch)} onPicked={onCatalogPicked}>
+                    <CodeLookup item={i} products={data.products} settings={data.settings} onPick={(patch) => changeRow(i.id, patch)} onPicked={onCatalogPicked}>
                       {(code) => (
                         <>
                           <CatalogPicker
@@ -293,6 +293,7 @@ export function ShinseiInputs({
                             onCatalog={onCatalog}
                             onPicked={onCatalogPicked}
                             makerChoices={makers}
+                            discountRate={data.settings.discountRate}
                             code={
                               <>
                                 {code.button}

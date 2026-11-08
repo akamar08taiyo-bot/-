@@ -14,6 +14,7 @@ const catalog = [
   product('p43-1', '見本の椅子', '見本化成（株）', [variant('XX-100')], 43),
 ];
 const item = {category: '', sub: '', maker: ''};
+const S = {discountRate: 20}; // 設定の割引率
 
 test('型番の比べ方：全角・半角、大文字・小文字、空白とハイフンだけ同じとみなす', () => {
   assert.equal(codeMatchKey('ｍｈ－１２３４ａ'), 'MH1234A');
@@ -24,23 +25,27 @@ test('型番の比べ方：全角・半角、大文字・小文字、空白と�
 });
 
 test('型番がぴったり同じ商品だけ：前方一致・部分一致はしない／注文番号でも当たる／同じ型番の別の商品は2つとも出す', () => {
-  const one = findByCode('mh-1234a', catalog, [], item);
+  const one = findByCode('mh-1234a', catalog, [], item, S);
   assert.equal(one.length, 1);
   assert.deepEqual([one[0].patch.name, one[0].patch.code, one[0].patch.maker], ['見本の浴槽台 ブルー', 'MH-1234A', '見本工業（株）']);
   assert.match(one[0].label, /p\.40/); // 照らし合わせられるよう、カタログのページも出す
-  assert.deepEqual(findByCode('MH-1234', catalog, [], item), []); // MH-1234A・MH-12345A の頭だけ → 入れない
-  assert.deepEqual(findByCode('1234A', catalog, [], item), []);
-  assert.deepEqual(findByCode('MH', catalog, [], item), []); // 短すぎる
-  assert.deepEqual(findByCode('261-S0002', catalog, [], item).map((h) => h.patch.code), ['MH-1234B']);
-  assert.deepEqual(findByCode('XX-100', catalog, [], item).map((h) => h.patch.name).sort(), ['見本の台', '見本の椅子']);
+  assert.deepEqual(findByCode('MH-1234', catalog, [], item, S), []); // MH-1234A・MH-12345A の頭だけ → 入れない
+  assert.deepEqual(findByCode('1234A', catalog, [], item, S), []);
+  assert.deepEqual(findByCode('MH', catalog, [], item, S), []); // 短すぎる
+  assert.deepEqual(findByCode('261-S0002', catalog, [], item, S).map((h) => h.patch.code), ['MH-1234B']);
+  assert.deepEqual(findByCode('XX-100', catalog, [], item, S).map((h) => h.patch.name).sort(), ['見本の台', '見本の椅子']);
 });
 
 test('商品マスタの品番も見る（マスタが先）。同じ商品名・メーカーはカタログと重ねない', () => {
   const master = [{id: 'm1', name: '見本の浴槽台 ブルー', maker: '見本工業（株）', code: 'MH-1234A', tais: '', jan: '', category: '入浴補助用具', sub: '浴槽台', categoryByHand: false, listPrice: 9800, cost: 0, taxType: '10%' as const, unit: '台', supplier: '', favorite: true, useCount: 0, lastUsedAt: 0, source: '', updatedAt: 0}];
-  const hits = findByCode('MH-1234A', catalog, master, item);
+  const hits = findByCode('MH-1234A', catalog, master, item, S);
   assert.equal(hits.length, 1);
   assert.equal(hits[0].key, 'm:m1');
   assert.equal(hits[0].patch.listPrice, 9800);
+  // 割引率は商品の割引率（なければ設定の割引率）。★ お気に入りから入れたときと同じ（前は前の商品の割引率のまま）
+  assert.equal(hits[0].patch.discountRate, 20);
+  assert.equal(findByCode('MH-1234A', catalog, [{...master[0], discountRate: 30}], item, S)[0].patch.discountRate, 30);
+  assert.equal(hits[0].patch.basisNote, null);
 });
 
 test('商品の検索（★ お気に入りから入力・商品マスタ）：品番の「-」のあるなし・大文字小文字・全角は見ない（2026-11-03「型番入力では、-がなくてもリストがでるようにする」）', () => {

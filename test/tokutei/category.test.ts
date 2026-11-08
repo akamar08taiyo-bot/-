@@ -82,3 +82,24 @@ test('介援隊カタログの名前：シャワーキャリーはシャワー�
   // 消耗品
   assert.equal(guessCategory('バケツA型用 袋止めN').category, '');
 });
+
+// 2026-11-08 のデバッグで見つけて直したこと（名前はすべて架空の書き方）
+test('多点杖・クラッチの別の呼び名／「キャスターなし」は固定式／分類が歩行器でも歩行車・T字杖は対象外', () => {
+  for (const n of ['四脚杖', '多脚杖', '4脚杖', 'クアッドケイン', 'トライポッド杖']) assert.deepEqual(guessCategory(n), {category: '歩行補助つえ', sub: '多点杖', warn: ''}, n);
+  assert.equal(guessCategory('エルボークラッチ').sub, 'ロフストランド・クラッチ');
+  assert.equal(guessCategory('固定型歩行器 キャスター付属なし').category, '歩行器');
+  assert.equal(guessCategory('ブレーキ無し 歩行器').category, '歩行器');
+  assert.equal(guessCategory('見本 歩行器 キャスター付き').category, '');
+  for (const [n, h] of [
+    ['見本 ロレータ（4輪歩行車）', '歩行器・歩行車'],
+    ['見本 シルバーカー', '歩行器'],
+    ['見本 T字杖 伸縮', '歩行補助つえ'],
+    ['見本 松葉杖', '歩行補助つえ'],
+  ]) {
+    const g = guessCategory(n, h);
+    assert.equal(g.category, '', n);
+    assert.ok(g.warn, n);
+  }
+  // 名前から分からなければ分類のとおり（前と同じ）
+  assert.equal(guessCategory('見本 エルビス', '歩行補助つえ').category, '歩行補助つえ');
+});

@@ -576,6 +576,8 @@ test('久留米市：償還払いは支払＝全額・委任状と請求書は�
   assert.equal(ellipseCount(f, KURUME_SHEETS.shinsei), 1); // 支払方法（口座・現金）は本人が選ぶ
   for (const sh of [KURUME_SHEETS.proxy, KURUME_SHEETS.claim]) assert.equal(strFromU8(f[sheetPath(f, sh)]), strFromU8(template('kurume')[sheetPath(f, sh)]), sh);
   assert.deepEqual(kurumePays({items: [{total: 10001}, {total: 999}] as never, payMethod: '受領委任払い', ratioSet: true, ratio: 2, benefit: 11000 - 2201}), [2001, 200]);
+  // 限度額を超えたとき：残りは前の商品から使い、超えた分は後ろの商品から（どの商品も支払は購入金額まで。前は最後の商品に 39,000円＞3,000円）
+  assert.deepEqual(kurumePays({items: [{total: 50000}, {total: 3000}] as never, payMethod: '受領委任払い', ratioSet: true, ratio: 1, benefit: 9000}), [41000, 3000]);
   assert.equal(kurumePays({items: [{total: 100}] as never, payMethod: '受領委任払い', ratioSet: false, ratio: 1, benefit: 0}), null);
   assert.equal(kurumeAddress('福岡県久留米市 見本町1-1'), '見本町1-1');
   // 確かめる欄：性別・要介護度・電話・理由・記載者の欄はない。事業者番号と（受領委任払いなら）登録番号が要る
@@ -855,4 +857,28 @@ test('事業所番号：営業所の一覧に19営業所の事業所番号（チ
   assert.equal(cols.map((c) => readCell(tg, '用具・受領委任払', `${c}4`)).join(''), '4071901971');
   // 前に事業者番号を空のまま保存した設定は、営業所の一覧の番号（storage.ts の cleanSettings）
   assert.equal(cleanSettings({...settingsForOffice(S, '田川営業所'), providerNo: ''}).providerNo, '4071901971');
+});
+
+test('行橋市・苅田町・みやこ町の原本に書いてある行橋営業所の名前・所在地・電話・所長は、設定の営業所がちがえばその営業所の字に（行橋営業所なら原本のまま）', () => {
+  const kk = {...S, ...settingsForOffice(defaultSettings(), '小倉営業所')};
+  const o = OFFICES.find((x) => x.name === '小倉営業所')!;
+  const addr = o.address.replace(/^福岡県/, '');
+  const mgr = o.manager.replace(/\s+/g, '　');
+  const fillWith = (key: ShinseiKey, s: Settings) => unzipSync(fillShinsei(template(key), SHINSEI[key], shinseiValues(sale({insurer: key}), s)));
+  const y = fillWith('yukuhashi', kk);
+  assert.deepEqual(['G28', 'G29', 'G30'].map((r) => readCell(y, '用具・受領委任払', r)), [addr, `太陽シルバーサービス㈱\n小倉営業所　${mgr}　`, o.tel]);
+  assert.deepEqual(['C10', 'C12'].map((r) => readCell(y, '委任状', r)), [`　${addr}`, `　電話番号　${o.tel}`]);
+  assert.doesNotMatch(readCell(y, '委任状', 'C14'), /行橋|久保/);
+  const k = fillWith('kanda', kk);
+  assert.deepEqual(['K28', 'K29', 'K30'].map((r) => readCell(k, '用具・支給申請　受領委任払 (2)', r)), [addr, `太陽シルバーサービス㈱\n小倉営業所　${mgr}　`, o.tel]);
+  assert.doesNotMatch(readCell(k, '委任状', 'C14'), /行橋|久保/);
+  const m = fillWith('miyako', kk);
+  assert.deepEqual(['N22', 'N23', 'N24', 'Y36'].map((r) => readCell(m, '福祉用具購入受領委任払申請書', r)), ['太陽シルバーサービス株式会社　小倉営業所', addr, o.tel, o.tel]);
+  // 支給申請書・内訳明細の事業者は、上の欄を参照する式（開いた時点の答えも新しい営業所）
+  assert.deepEqual(['P27', 'P29', 'P31'].map((r) => readCell(m, '福祉用具支給申請(受領委任）', r)), [addr, '太陽シルバーサービス株式会社　小倉営業所', o.tel]);
+  // 行橋営業所なら原本の字のまま（並び・空白も）
+  const yk = {...S, ...settingsForOffice(defaultSettings(), '行橋営業所')};
+  const y2 = fillWith('yukuhashi', yk);
+  assert.equal(readCell(y2, '委任状', 'C14'), readCell(template('yukuhashi'), '委任状', 'C14'));
+  assert.equal(readCell(y2, '用具・受領委任払', 'G29'), readCell(template('yukuhashi'), '用具・受領委任払', 'G29'));
 });

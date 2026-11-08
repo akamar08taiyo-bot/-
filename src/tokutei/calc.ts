@@ -42,6 +42,11 @@ export function priceFromMargin(cost: number, rate: number): number | null {
   return Math.max(0, Math.ceil(Math.round((cost / (1 - rate / 100)) * 1e6) / 1e6));
 }
 
+/** 割引率（%）を0.1%単位の整数に（17.5 → 175。0〜100%） */
+const discount10 = (rate: number) => Math.min(1000, Math.max(0, Math.round((Number.isFinite(rate) ? rate : 0) * 10)));
+/** 割引率（%。小数1けたまで） */
+const discountPct = (rate: number) => discount10(rate) / 10;
+
 /** 円の金額を1円単位の整数に（小数の誤差をなくす） */
 const toYen = (n: number) => (Number.isFinite(n) ? Math.round(n * 100) / 100 : 0);
 
@@ -56,8 +61,9 @@ export function unitPriceOf(item: Pick<SaleItem, 'unitPrice' | 'listPrice' | 'co
   // 1銭単位の整数にしてからかける（定価に小数があっても誤差で1円ずれないように）
   const list = Math.round(toYen(item.listPrice) * 100);
   if (list > 0) {
-    const rate = Math.min(100, Math.max(0, Math.round(item.discountRate)));
-    return {price: Math.floor((list * (100 - rate)) / 10000), basis: 'list'};
+    // 割引率は小数1けたまで（欄に 17.5 と打てる。前は四捨五入して 18% で計算していたので、欄は 17.5 なのに単価・備考・受注簿は 18% 引きだった）
+    const rate10 = discount10(item.discountRate);
+    return {price: Math.floor((list * (1000 - rate10)) / 100000), basis: 'list'};
   }
   const cost = Math.round(toYen(item.cost) * 100);
   if (cost > 0) return {price: Math.floor((cost * (100 + Math.max(0, Math.round(s.markupRate)))) / 10000), basis: 'cost'};
@@ -111,7 +117,7 @@ export function priceFromTaxIncluded(taxIn: number, taxType: TaxType): number {
 /** 実際の割引率（%。販売受注簿に渡す）：定価×割引の行はその割引率、手で単価を入れた行は定価と単価から（整数でなければ小数1けた）、定価がなければ割引率の欄のまま */
 export function actualDiscount(line: Pick<Line, 'item' | 'unitPrice' | 'basis'>): number {
   const list = toYen(line.item.listPrice);
-  if (line.basis !== 'manual' || list <= 0) return Math.round(line.item.discountRate);
+  if (line.basis !== 'manual' || list <= 0) return discountPct(line.item.discountRate);
   return impliedDiscount(list, line.unitPrice) ?? Math.round((1 - line.unitPrice / list) * 1000) / 10;
 }
 
@@ -208,8 +214,7 @@ export function saleTotals(sale: Sale, s: Pick<Settings, 'markupRate' | 'limit' 
 
 /** 掛率の表示：割引率 20 → 「0.8」、15 → 「0.85」 */
 export function rateText(discountRate: number): string {
-  const r = (100 - Math.round(discountRate)) / 100;
-  return String(Math.round(r * 100) / 100);
+  return String((1000 - discount10(discountRate)) / 1000); // 17.5% → 0.825
 }
 
 /**
@@ -224,7 +229,7 @@ export function basisNote(line: Line): string {
   if (list <= 0 || line.basis === 'cost' || line.basis === 'none') return '';
   const base = `定価${Math.round(list).toLocaleString('ja-JP')}円`;
   if (line.basis === 'list') {
-    const off = Math.round(line.item.discountRate);
+    const off = discountPct(line.item.discountRate);
     return off > 0 ? `${base}の${off}%引き` : base;
   }
   const raw = (1 - line.unitPrice / list) * 100;

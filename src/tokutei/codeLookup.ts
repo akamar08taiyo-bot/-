@@ -4,7 +4,8 @@
 import type {CatalogProduct, CatalogVariant} from './catalogItems.ts';
 import {taxOf} from './calc.ts';
 import {catalogItemPatch} from './catalogItems.ts';
-import type {Product, SaleItem} from './types.ts';
+import {productRate} from './sales.ts';
+import type {Product, SaleItem, Settings} from './types.ts';
 
 /**
  * 型番の比べ方：全角→半角・大文字にして、空白とハイフン類を除く（「pn-l41431d」「ＰＮ－Ｌ41431Ｄ」「PNL41431D」は同じ）。
@@ -20,7 +21,7 @@ export const codeMatchKey = (s: string) =>
 export type CodeHit = {key: string; label: string; patch: Partial<SaleItem>};
 
 /** 型番がぴったり同じ商品（商品マスタ → カタログの順。同じ商品名・メーカーは1つにまとめる） */
-export function findByCode(code: string, catalog: CatalogProduct[], products: Product[], item: Pick<SaleItem, 'category' | 'sub' | 'maker'>): CodeHit[] {
+export function findByCode(code: string, catalog: CatalogProduct[], products: Product[], item: Pick<SaleItem, 'category' | 'sub' | 'maker'>, settings: Pick<Settings, 'discountRate'>): CodeHit[] {
   const want = codeMatchKey(code);
   if (want.length < 3) return [];
   const out: CodeHit[] = [];
@@ -36,13 +37,14 @@ export function findByCode(code: string, catalog: CatalogProduct[], products: Pr
     add(p.name, p.maker, {
       key: `m:${p.id}`,
       label: [p.name, p.maker, p.code].filter(Boolean).join('　'),
-      patch: {name: p.name, maker: p.maker, code: p.code, tais: p.tais, category: p.category || item.category, sub: p.sub || item.sub, listPrice: p.listPrice, cost: p.cost, taxType: taxOf(p.category || item.category, p.taxType), taxByHand: false, unit: p.unit || '台', supplier: p.supplier, unitPrice: null},
+      // 割引率は商品で決めた割引率（なければ設定の割引率。★ お気に入りから・商品マスタから入れたときと同じ productRate）。手で直した備考も自動に戻す
+      patch: {name: p.name, maker: p.maker, code: p.code, tais: p.tais, category: p.category || item.category, sub: p.sub || item.sub, listPrice: p.listPrice, cost: p.cost, taxType: taxOf(p.category || item.category, p.taxType), taxByHand: false, unit: p.unit || '台', supplier: p.supplier, unitPrice: null, discountRate: productRate(p, settings), basisNote: null},
     });
   }
   for (const p of catalog)
     for (const v of p.variants as CatalogVariant[]) {
       if (codeMatchKey(v.code) !== want && (!v.orderCode || codeMatchKey(v.orderCode) !== want)) continue;
-      const patch = catalogItemPatch(p, v, item);
+      const patch = catalogItemPatch(p, v, item, settings.discountRate);
       add(patch.name ?? p.name, patch.maker ?? p.maker, {key: `c:${p.key}:${v.code}`, label: [patch.name, patch.maker, v.code, `カタログ p.${p.page}`].filter(Boolean).join('　'), patch});
     }
   return out;

@@ -27,6 +27,7 @@ import {
   formatCell,
   hideZeros,
   LINE_K,
+  readCell,
   sameStyle,
   setRowHeight,
   sizeCell,
@@ -69,6 +70,8 @@ export type ShinseiSeller = {
   fullName?: string; // 太陽シルバーサービス株式会社田川営業所（株式会社のまま・すき間なし。広域連合の受領委任事業者の名称。原本と同じ書き方）
   entrustRegNo: string; // 久留米市の受領委任払取扱事業所登録番号（数字だけ。設定）
   juryoNo?: string; // 広域連合の受領委任契約番号（数字だけ。申請書の営業所の番号。分からない営業所は空）
+  officeName?: string; // 営業所の名前だけ（原本の「行橋営業所」を書きかえる。SheetWrite の office）
+  manager?: string; // 所長の氏名だけ（原本の「久保　匠史」を書きかえる）
 };
 
 /** 申請書に書く値（案件・設定・計算から作る。どの様式でも同じ） */
@@ -189,11 +192,13 @@ export function shinseiValues(sale: Sale, settings: Settings): ShinseiValues {
       fullName: `${s.company.trim()}${s.officeName.trim()}`, // 原本と同じく、すき間なし
       zip: zipLabel(s.postal),
       address: s.address.trim(),
-      tel: s.tel.trim(),
+      tel: telWithHyphens(s.tel.trim()), // 設定にハイフンなしで入れてあっても分けて書く（久留米市の「℡（0942）72－8822」）
       rep: s.manager.trim() ? `所長　${s.manager.trim()}` : '',
       providerNo: (s.providerNo ?? '').normalize('NFKC').replace(/\D/g, ''),
       entrustRegNo: (s.entrustRegNo ?? '').normalize('NFKC').replace(/\D/g, ''),
       juryoNo: OFFICES.find((o) => o.name === s.officeName.trim())?.juryoNo ?? '',
+      officeName: s.officeName.trim(),
+      manager: s.manager.trim(),
     },
   };
 }
@@ -225,7 +230,35 @@ export type SheetWrite = {
   block?: {cell: string; head: string[]; body: string; tail: string[]}; // 理由のかたまり（みやこ町）：head の行・body（理由。欄の幅で折り返す）・tail の行を、入る大きさにして書く
   formats?: [string, {wrap?: boolean; numFmt?: number; color?: string}][]; // 書式を変える欄（折り返す・表示形式・字の色。福岡市の必要な理由・購入金額）
   lines?: {cells: string[]; text: string}; // 1行ずつの欄に分けて書く文（大分市の福祉用具が必要な理由の5行）：最初の欄の幅で折り返し、入らなければ全部の欄を小さくする
+  // 原本に行橋営業所の名前・所在地・電話・所長がそのまま書いてある欄（行橋市・苅田町・みやこ町の受任者・委任状）。申請書の営業所（設定）が
+  // ちがえば、その字だけを書きかえる（officeCells。前は ほかの営業所で作っても行橋営業所のままだった）
+  office?: string[];
 };
+
+/** 原本（行橋市・苅田町・みやこ町）にそのまま書いてある行橋営業所の字 */
+const ORIGINAL_OFFICE = {name: '行橋営業所', address: '行橋市大字流末1327番地', tel: '0930-26-9640', manager: '久保　匠史'};
+
+/**
+ * 原本の行橋営業所の字（名前・所在地・電話・所長）を、申請書の営業所の字に書きかえた欄（変わる欄だけ）。
+ * 欄の中のほかの字・空白（委任状の受任者の並び）はそのまま。行橋営業所のまま・設定が空の項目は原本の字のまま（住宅改修の shinsei.ts と同じ）
+ */
+function officeCells(files: Files, w: SheetWrite, seller: ShinseiSeller): [string, string][] {
+  if (!w.office?.length) return [];
+  const now = {
+    name: seller.officeName ?? '',
+    address: seller.address.replace(/^福岡県/, ''), // 原本は県を書いていない
+    tel: seller.tel,
+    manager: (seller.manager ?? '').replace(/\s+/g, '　'),
+  };
+  const out: [string, string][] = [];
+  for (const ref of w.office) {
+    const before = readCell(files, w.sheet, ref);
+    let text = before;
+    for (const key of ['name', 'address', 'tel', 'manager'] as const) if (now[key]) text = text.split(ORIGINAL_OFFICE[key]).join(now[key]);
+    if (text !== before) out.push([ref, text]);
+  }
+  return out;
+}
 
 export type ShinseiForm = {key: ShinseiKey; title: string; rows: number; sheets: (v: ShinseiValues) => SheetWrite[]};
 
@@ -311,6 +344,9 @@ function proxyCells(v: ShinseiValues): [string, CellValue][] {
     ...when(v.address, [['A32', `　　　　委任者　住　所　　${v.address}`]]),
   ];
 }
+
+/** 委任状の受任者（所在地・電話番号・名称と所長）：原本の行橋営業所の字を申請書の営業所に（officeCells） */
+const PROXY_OFFICE = ['C10', 'C12', 'C14'];
 
 /** 完了写真（行橋市・苅田町）：納品名（原本の式は #VALUE! になるので商品名を書く）・撮影日（納品日） */
 function photoCells(v: ShinseiValues): [string, CellValue][] {
@@ -735,16 +771,25 @@ export const kurumeAddress = (address: string) => address.trim().replace(/^(?:�
 const inKurume = (address: string) => /^(?:福岡県)?[\s　]*久留米市/.test(address.trim());
 
 /**
- * 明細の【支払】（本人が販売事業者に払う額）：受領委任払いは負担割合の分（商品ごとに切り上げ、最後の商品で合計を合わせる＝購入金額の合計−保険給付額。
- * 限度額を超えた分も最後の商品に入る）。償還払いは全額。負担割合を選んでいない受領委任払いは空（null）
+ * 明細の【支払】（本人が販売事業者に払う額）：受領委任払いは負担割合の分（商品ごとに切り上げ）。合計は購入金額の合計−保険給付額にそろえる：
+ * 切り上げで多い分は後ろの商品から1円ずつ減らし（切り捨てた額より下げない）、限度額を超えた分（全額自己負担）は後ろの商品から順に、その商品の購入金額まで足す
+ * （今年度の残りは前の商品から使う＝販売受注簿の給付内訳 benefitSplit と同じ）。前は合わせる分をみな最後の商品に入れていたので、限度額を超えると
+ * 最後の商品の支払が購入金額より多くなった（例：50,000円と3,000円・残り10,000円・1割で 5,000円・39,000円。2026-11-08 のデバッグ）。
+ * 償還払いは全額。負担割合を選んでいない受領委任払いは空（null）
  */
 export function kurumePays(v: Pick<ShinseiValues, 'items' | 'payMethod' | 'ratioSet' | 'ratio' | 'benefit'>): number[] | null {
   if (v.payMethod === '償還払い') return v.items.map((i) => i.total);
   if (!v.ratioSet || !v.items.length) return null;
   const all = v.items.reduce((n, i) => n + i.total, 0);
   const pays = v.items.map((i) => Math.ceil((i.total * v.ratio) / 10));
-  const others = pays.slice(0, -1).reduce((n, p) => n + p, 0);
-  pays[pays.length - 1] = Math.max(0, all - v.benefit - others);
+  let diff = Math.max(0, all - v.benefit) - pays.reduce((n, p) => n + p, 0);
+  for (let k = pays.length - 1; k >= 0 && diff !== 0; k--) {
+    const total = v.items[k].total;
+    const step = diff > 0 ? Math.min(diff, total - pays[k]) : -Math.min(-diff, pays[k] - Math.floor((total * v.ratio) / 10));
+    pays[k] += step;
+    diff -= step;
+  }
+  if (diff !== 0) pays[pays.length - 1] = Math.max(0, pays[pays.length - 1] + diff); // 合わせきれない分（ふつうはない）は最後の商品で
   return pays;
 }
 
@@ -951,8 +996,16 @@ export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
     rows: 3,
     sheets: (v) => [
       // 事業者番号（Z4:AI4）は販売事業者（設定の営業所）の番号。原本は行橋営業所の番号のまま入っていた（2026-11-05）
-      {sheet: '用具・受領委任払', cells: [...preCells(v, 7), ...providerBoxes(v, 'Z', 4)], same: PRE_SAME, fit: PRE_FIT, oneLine: PRE_ONE_LINE, marks: [ERA('F9', v), GENDER('Y9', v), CARE('F12', v)]},
-      {sheet: '委任状', cells: proxyCells(v), fitIn: PROXY_FIT, ...(v.benefit > 0 ? {sizes: [['B23', PROXY_AMOUNT_PT]], heights: PROXY_AMOUNT_ROWS} : {})},
+      {
+        sheet: '用具・受領委任払',
+        cells: [...preCells(v, 7), ...providerBoxes(v, 'Z', 4)],
+        same: PRE_SAME,
+        fit: PRE_FIT,
+        oneLine: PRE_ONE_LINE,
+        marks: [ERA('F9', v), GENDER('Y9', v), CARE('F12', v)],
+        office: ['G28', 'G29', 'G30'], // 受任者の所在地・名称と所長・電話
+      },
+      {sheet: '委任状', cells: proxyCells(v), fitIn: PROXY_FIT, ...(v.benefit > 0 ? {sizes: [['B23', PROXY_AMOUNT_PT]], heights: PROXY_AMOUNT_ROWS} : {}), office: PROXY_OFFICE},
       {sheet: '完了写真', cells: photoCells(v), fit: ['B3'], hideZeros: true},
     ],
   },
@@ -975,8 +1028,9 @@ export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
         oneLine: PRE_ONE_LINE,
         marks: [ERA('F9', v), GENDER('Y9', v), CARE('F12', v)],
         hideZeros: true,
+        office: ['K28', 'K29', 'K30'], // 受任者の所在地・名称と所長・電話
       },
-      {sheet: '委任状', cells: proxyCells(v), fitIn: PROXY_FIT, ...(v.benefit > 0 ? {sizes: [['B23', PROXY_AMOUNT_PT]], heights: PROXY_AMOUNT_ROWS} : {})},
+      {sheet: '委任状', cells: proxyCells(v), fitIn: PROXY_FIT, ...(v.benefit > 0 ? {sizes: [['B23', PROXY_AMOUNT_PT]], heights: PROXY_AMOUNT_ROWS} : {}), office: PROXY_OFFICE},
       {sheet: '完了写真', cells: photoCells(v), fit: ['B3'], hideZeros: true},
     ],
   },
@@ -1010,6 +1064,8 @@ export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
           fit: ['I4', 'I5', 'I9', 'Z9'],
           oneLine: [...rowsOf('B', MIYAKO_ROWS), ...rowsOf('I', MIYAKO_ROWS)],
           marks: [GENDER('AA7', v), {cell: 'I20', needles: ['有', '無'], pick: v.carePlan ? pick(['有', '無'], v.carePlan) : -1, after: '居宅サービス計画の届出'}],
+          // 受領委任事業者の名称・所在地・電話と申請者の電話（支給申請書・内訳明細の事業者はこの欄を参照する式）
+          office: ['N22', 'N23', 'N24', 'Y36'],
         },
         {
           sheet: '福祉用具支給申請(受領委任）',
@@ -1093,7 +1149,8 @@ export function fillShinseiFiles(files: Files, form: ShinseiForm, v: ShinseiValu
   // 1. 値を書く（式の答えも合わせる）→ 2. 入りきらない欄の文字を小さくする → 3. 丸（文字の大きさが決まってから位置を計算する）
   for (const w of sheets) {
     const styles = new Map((w.newStyles ?? []).map(([ref, like]) => [ref, styleIdOf(files, w.sheet, like) ?? '0'] as [string, string]));
-    if (w.cells?.length) writeCells(files, w.sheet, new Map(w.cells), styles);
+    const office = officeCells(files, w, v.seller).filter(([ref]) => !w.cells?.some(([r]) => r === ref));
+    if (w.cells?.length || office.length) writeCells(files, w.sheet, new Map([...office, ...(w.cells ?? [])]), styles);
     if (w.block) writeBlock(files, w.sheet, w.block);
     if (w.lines) writeLines(files, w.sheet, w.lines);
     if (w.hideZeros) hideZeros(files, w.sheet);

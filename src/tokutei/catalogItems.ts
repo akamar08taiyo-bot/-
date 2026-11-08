@@ -978,10 +978,18 @@ export function catalogMakers(list: CatalogProduct[]): string[] {
   return out;
 }
 
-/** カタログの品番を選んだときに、商品の欄に入れる値（商品名は見出しに色・大きさを足したもの。販売金額は定価×割引率に戻す） */
-export function catalogItemPatch(p: CatalogProduct, v: CatalogVariant, item: Pick<SaleItem, 'category' | 'sub' | 'maker'>): Partial<SaleItem> {
+/**
+ * カタログの品番を選んだときに、商品の欄に入れる値（商品名は見出しに色・大きさを足したもの。販売金額は定価×割引率＝設定の割引率に戻す）。
+ * 前の商品の仕切・仕入先・手で直した備考（算出根拠）・利益率から出た割引率も消す（前は残っていて、選び直した商品の単価・利益・見積書の備考が前の商品のままだった）
+ */
+export function catalogItemPatch(p: CatalogProduct, v: CatalogVariant, item: Pick<SaleItem, 'category' | 'sub' | 'maker'>, discountRate: number): Partial<SaleItem> {
   const category = p.category || item.category;
   return {
+    productId: null,
+    cost: 0,
+    supplier: '',
+    discountRate,
+    basisNote: null,
     name: [p.name, v.label].filter(Boolean).join(' '),
     maker: p.maker || item.maker,
     code: v.code,

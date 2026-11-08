@@ -36,6 +36,7 @@ export function CatalogPicker({
   makerChoices,
   code,
   codeNote,
+  discountRate,
 }: {
   item: SaleItem;
   onPick: (patch: Partial<SaleItem>) => void;
@@ -44,6 +45,7 @@ export function CatalogPicker({
   makerChoices: string[]; // メーカーを打つ欄の候補（カタログにないメーカー。sales.ts の makerChoices）
   code?: ReactNode; // 「📖 カタログから商品検索」の右に置くもの（「🔢 型番から検索」。CodeLookup）
   codeNote?: ReactNode; // 型番から検索の結果（入れた商品・見つからない・同じ型番の商品。CodeLookup）
+  discountRate: number; // 設定の割引率（カタログの商品は 定価×(100−割引率)%）
 }) {
   const [all, setAll] = useState<CatalogProduct[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -185,7 +187,7 @@ export function CatalogPicker({
   const chip = 'rounded-md border px-2 py-1 text-xs';
   const what = subShort(found.sub, found.category) || 'カタログ';
   const pick = (p: CatalogProduct, v: CatalogProduct['variants'][number]) => {
-    const patch = catalogItemPatch(p, v, item);
+    const patch = catalogItemPatch(p, v, item, discountRate);
     onPick(patch);
     onPicked?.({...item, ...patch});
     setOpen(false);

@@ -508,3 +508,22 @@ test('1ページ目の明細の行：3商品＋受領委任払いの内訳で、
   assert.equal(estimatePreview(template(), full, S).length, 1);
   assert.equal(shownRowsOnPage1(saleLayout(full, S), 4), 17);
 });
+
+// 2026-11-08 のデバッグで見つけて直したこと（金額は架空）
+test('消費税は商品ごとに切り捨てて足す（御見積合計＝画面の合計・介護保険の対象。式も行ごと）', () => {
+  const sl = sale({items: [item({id: 'a', name: '見本A', unitPrice: 12345}), item({id: 'b', name: '見本B', unitPrice: 12345})]});
+  const t = saleTotals(sl, S);
+  const f = unzipSync(fillEstimate(template(), sl, S));
+  assert.equal(Number(readCell(f, SH, 'E47')), t.tax); // 1,234＋1,234（前は合計 24,690 の 10% を切り捨てた 2,469）
+  assert.equal(Number(readCell(f, SH, 'E21')), t.total);
+  assert.match(cellFormula(f, SH, 'E47') ?? '', /^SUMPRODUCT\(\(\$J\$23:\$J\$42=\$A\$53\)\*ROUNDDOWN\(\$F\$23:\$F\$42\*\$H\$23:\$H\$42\*0\.1,0\)\)$/);
+});
+
+test('何も入れていない商品の欄は見積書に出さない・見積日やお客様名が空なら空欄', () => {
+  const sl = sale({customer: '', estimateDate: '', items: [item({id: 'a', name: '見本A', unitPrice: 10000}), item({id: 'b', name: '', maker: '', code: '', listPrice: 0, cost: 0, unitPrice: null})]});
+  const f = unzipSync(fillEstimate(template(), sl, S));
+  const rows = ESTIMATE_ROWS.map((r) => [readCell(f, SH, `F${r}`), readCell(f, SH, `J${r}`)].join('|')).filter((x) => x !== '|' && x !== '|0.1');
+  assert.equal(rows.length, 1); // 見本A の1行だけ（前は「1 台 10%」だけの行がもう1つ出た）
+  assert.equal(readCell(f, SH, 'I5'), ''); // 前は原本に残っていた日付（2026年4月1日）
+  assert.doesNotMatch(readCell(f, SH, 'A6'), /未入力/);
+});

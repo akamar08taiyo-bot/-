@@ -209,3 +209,24 @@ test('保険者番号（insurerNo。2026-10-29）も受け取る：住宅改修�
   assert.equal(h.fields.insurerNo, '402149');
   assert.equal(applyJutaku([], defaultSettings(), h, 1).sales[0].insurerNo, '402149');
 });
+
+// 2026-11-08 のデバッグで見つけて直したこと（値は架空）
+test('住宅改修から受け取る福祉用具：歩行器・多点杖は非課税（÷1.1 しない）・税込から税抜は1円もずらさない', async () => {
+  const {itemsFromJutaku} = await import('../../src/tokutei/jutaku.ts');
+  const {lineOf} = await import('../../src/tokutei/calc.ts');
+  const S = defaultSettings();
+  const got = itemsFromJutaku(
+    [
+      {category: '歩行補助つえ', name: '見本 四点杖', code: '', maker: '', amount: 10000, taxIn: true},
+      {category: '入浴補助用具', name: '見本 シャワーチェア', code: '', maker: '', amount: 3000, taxIn: true},
+    ],
+    S,
+  );
+  assert.deepEqual(got.map((i) => [i.taxType, lineOf(i, S).total]), [['非課税', 10000], ['10%', 3000]]); // 前は 9,091円（読み直すと非課税）・2,999円
+});
+
+test('住宅改修の保険者でこのアプリに様式のないもの（飯塚市など）は「そのほか」（前は1つめの保険者＝行橋市になった）', () => {
+  const h = readJutaku(JSON.stringify({job: 'j9', fields: {...fields, insurer: 'iizuka'}}), 'j9')!;
+  assert.equal(h.fields.insurer, 'other');
+  assert.equal(applyJutaku([], defaultSettings(), h, 1000).sales[0].insurer, 'other');
+});

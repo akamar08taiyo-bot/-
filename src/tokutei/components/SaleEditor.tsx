@@ -3,7 +3,7 @@ import type {FocusEvent, MouseEvent} from 'react';
 import {saleTotals} from '../calc.ts';
 import {insurerLabel} from '../defaults.ts';
 import {HACCHU_IMPORT_KEY, hacchuImport, hacchuUrl, queueHacchu} from '../handoff.ts';
-import {blankItem, rememberFavorites, copySale, customerLabel, customerPatch, itemFromProduct, makerChoices, markUsed, sameYearSales, saleWarnings, unregisteredItems} from '../sales.ts';
+import {blankItem, rememberFavorites, copySale, customerLabel, customerPatch, itemFromProduct, makerChoices, markUsed, sameYearSales, saleWarnings, unregisteredItems, withoutBlankItems} from '../sales.ts';
 import {shinseiForm, shinseiValues} from '../shinsei.ts';
 import {saveShinsei, useTemplate} from '../shinseiFiles.ts';
 import {FIELD_LABEL, missingFields, shinseiPreview} from '../shinseiPreview.ts';
@@ -265,7 +265,7 @@ export function SaleEditor({
     const name = [p.name, v.label].filter(Boolean).join(' ');
     // 選んだら窓を閉じ、お気に入りに入れる（ユーザーの指示「商品検索から商品を選んだら、カタログは閉じる」2026-11-03。前は窓を開いたまま選び直せた）
     if (catalogTarget) {
-      const next = {...catalogTarget, ...catalogItemPatch(p, v, catalogTarget), productId: null};
+      const next = {...catalogTarget, ...catalogItemPatch(p, v, catalogTarget, s.discountRate)};
       change({items: sale.items.map((i) => (i.id === catalogTarget.id ? next : i))});
       setCatalogView(null);
       remember([next], true);
@@ -273,7 +273,7 @@ export function SaleEditor({
       return;
     }
     const b = blankItem(s);
-    const added = {...b, ...catalogItemPatch(p, v, b)};
+    const added = {...b, ...catalogItemPatch(p, v, b, s.discountRate)};
     change({items: [...sale.items, added]});
     setCatalogView(null);
     remember([added], true);
@@ -317,7 +317,8 @@ export function SaleEditor({
   // 販売受注簿作成ツールを新しいタブで開く（リンクなので、ポップアップを止める設定でも開く）。開く前に商品を置いておく（handoff.ts）。
   // 置けなかったら false（リンクを開かない）
   const prepareHacchu = (): boolean => {
-    if (sale.items.length === 0) {
+    const items = withoutBlankItems(sale).items; // 何も入れていない商品の欄は数えない（送らない）
+    if (items.length === 0) {
       toast('商品がありません', 'error');
       return false;
     }
@@ -332,7 +333,7 @@ export function SaleEditor({
       toast('販売受注簿へ渡せませんでした（この端末のブラウザに保存できません）', 'error');
       return false;
     }
-    toast(`販売受注簿を開きました（商品 ${sale.items.length}点）。開いた画面で「受注簿に入れる」を押してください`);
+    toast(`販売受注簿を開きました（商品 ${items.length}点）。開いた画面で「受注簿に入れる」を押してください`);
     return true;
   };
   const transfer = (ev: MouseEvent<HTMLAnchorElement>) => {

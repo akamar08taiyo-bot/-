@@ -9,6 +9,7 @@ import type {Totals} from './calc.ts';
 import type {Sale, Settings, TaxType} from './types.ts';
 import {staffShort, yen} from './util.ts';
 import {telWithHyphens} from './tel.ts';
+import {withoutBlankItems} from './sales.ts';
 
 export const HACCHU_IMPORT_KEY = 'taiyo-hacchu-import-v1';
 /**
@@ -87,7 +88,8 @@ export function benefitSplit(t: Totals, welfare: boolean): {balance: number; ben
   }));
 }
 
-export function hacchuImport(sale: Sale, s: Pick<Settings, 'markupRate' | 'limit' | 'minProfitRate'>, now = Date.now()): HacchuImport {
+export function hacchuImport(all: Sale, s: Pick<Settings, 'markupRate' | 'limit' | 'minProfitRate'>, now = Date.now()): HacchuImport {
+  const sale = withoutBlankItems(all); // 何も入れていない商品の欄は送らない（受注簿に0円のページができた）
   const t = saleTotals(sale, s);
   const split = benefitSplit(t, sale.welfare);
   const customer = sale.customer.trim();
@@ -138,7 +140,7 @@ export type HacchuQueued = HacchuImport & {saleId: string};
 
 /** 販売受注簿へ自動で送る列に入れる（同じ案件の前のものは置きかえる）。商品がなければ入れない */
 export function queueHacchu(sale: Sale, s: Pick<Settings, 'markupRate' | 'limit' | 'minProfitRate'>, store: Pick<Storage, 'getItem' | 'setItem'> = localStorage, now = Date.now()): boolean {
-  if (sale.items.length === 0) return false;
+  if (withoutBlankItems(sale).items.length === 0) return false;
   let list: unknown;
   try {
     list = JSON.parse(store.getItem(HACCHU_QUEUE_KEY) || '[]');

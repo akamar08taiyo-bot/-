@@ -5,6 +5,7 @@
 //   2つのアプリはコードもデータも分けている（ユーザーの指示「全く別物として作成」）。受け渡しの形を変えるときは、
 //   住宅改修（リポジトリ akamar08taiyo-bot/- のブランチ claude/sasaoka-shikiri-app）の src/sasaoka/tokuteiLink.ts も直す
 
+import {priceFromTaxIncluded, taxOf} from './calc.ts';
 import {guessCategory} from './category.ts';
 import {CARE_LEVELS, INSURERS} from './defaults.ts';
 import {blankItem, newSale} from './sales.ts';
@@ -32,13 +33,18 @@ function cleanItems(raw: unknown): JutakuItem[] {
 }
 
 /**
- * 受け取った福祉用具を案件の明細に：販売単価（税抜）は申請書の金額（税込みなら ÷1.1 を四捨五入）。数量は1。定価・仕入れは申請書にないので空（あとで商品を選び直せる）。
+ * 受け取った福祉用具を案件の明細に：販売単価（税抜）は申請書の金額（税込みなら、税込がちょうどその金額になる税抜。非課税の種目はそのまま）。数量は1。定価・仕入れは申請書にないので空（あとで商品を選び直せる）。
  * 種目は申請書の種目、なければ商品名から
  */
 export function itemsFromJutaku(items: JutakuItem[], settings: Pick<Settings, 'discountRate'>): SaleItem[] {
   return items.map((it) => {
     const g = guessCategory(it.name, it.category);
-    return {...blankItem(settings), name: it.name, code: it.code, maker: it.maker, category: g.category || it.category, sub: g.sub, unitPrice: it.taxIn ? Math.round(it.amount / 1.1) : it.amount};
+    const category = g.category || it.category;
+    const base = blankItem(settings);
+    // 歩行器・歩行補助つえは非課税（税込＝申請書の金額のまま）。前は種目にかかわらず ÷1.1 していたので、読み直すと非課税になって1割ほど安くなった。
+    // 税込の金額からの税抜は、税込（消費税は切り捨て）がちょうどその金額になる税抜（前の ÷1.1 の四捨五入だと、3,000円が 2,999円になった）
+    const taxType = taxOf(category, base.taxType);
+    return {...base, name: it.name, code: it.code, maker: it.maker, category, sub: g.sub, taxType, unitPrice: it.taxIn ? priceFromTaxIncluded(it.amount, taxType) : it.amount};
   });
 }
 
@@ -66,6 +72,8 @@ export function cleanJutakuFields(raw: Record<string, unknown>): JutakuFields {
     if (level === '' || CARE_LEVELS.includes(level)) out.careLevel = level;
   }
   if (typeof raw.insurer === 'string' && INSURERS.some((i) => i.key === raw.insurer && i.key !== 'other')) out.insurer = raw.insurer;
+  // このアプリに様式のない保険者（住宅改修の飯塚市など）は「そのほか」（前は捨てていたので、新しい案件が1つめの保険者＝行橋市になり、行橋市の申請書で作っていた）
+  else if (typeof raw.insurer === 'string' && raw.insurer.trim() && raw.insurer !== 'other') out.insurer = 'other';
   if (raw.burdenRatio === 1 || raw.burdenRatio === 2 || raw.burdenRatio === 3) out.burdenRatio = raw.burdenRatio as BurdenRatio;
   // 生活保護（介護扶助）：住宅改修が渡すのは入っているときだけ（welfare?: boolean）。true・false のほかは捨てる
   if (typeof raw.welfare === 'boolean') out.welfare = raw.welfare;

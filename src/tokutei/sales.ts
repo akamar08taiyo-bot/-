@@ -55,11 +55,24 @@ export function newSale(sales: Sale[], settings: Settings, insurer: string, now 
   };
 }
 
+/**
+ * 何も入れていない商品の欄（「＋ 商品を追加」で開いて、商品名・品番・メーカー・金額のどれも入れていない。種目だけ選んだものも）。
+ * 見積書（Excel・印刷・プレビュー）と販売受注簿には出さない（前は見積書に「1 台 10%」だけの行が出て、受注簿には0円のページが行った。2026-11-08 のデバッグ）
+ */
+export const isBlankItem = (i: SaleItem): boolean =>
+  !i.name.trim() && !i.code.trim() && !i.maker.trim() && !i.tais.trim() && !(i.listPrice > 0) && !(i.cost > 0) && !(i.unitPrice !== null && i.unitPrice > 0);
+/** 何も入れていない商品の欄を除いた案件（見積書・販売受注簿に出すもの） */
+export const withoutBlankItems = (sale: Sale): Sale => (sale.items.some(isBlankItem) ? {...sale, items: sale.items.filter((i) => !isBlankItem(i))} : sale);
+
 /** 案件を写す（同じお客様に別の見積もり・似た見積もりを作るとき）。日付と状態は新しくする */
 export function copySale(sale: Sale, sales: Sale[], now = Date.now()): Sale {
   const date = todayIso();
+  // 販売受注簿へ送った印（hacchuSentAt）は写さない：写したままだと、まだ見積もりの写しも「買った」ことになり、今年度の残りが少なく出た（sameYearSales）。
+  // 住宅改修の様邸とのつながり（jutakuJob）も写さない：写すと、その様邸の🛁のタブに出る案件（つながった案件のうちいちばん新しいもの）が写しに替わり、
+  // 携帯から様邸のデータを取り込んだときも、写しごと置きかえて消していた
+  const {hacchuSentAt: _sent, jutakuJob: _job, ...rest} = sale;
   return {
-    ...sale,
+    ...rest,
     id: uid('s'),
     quoteNo: nextQuoteNo(sales, date),
     estimateDate: date,

@@ -3,7 +3,7 @@ import test from 'node:test';
 import {CATEGORIES, docLabel} from '../../src/tokutei/category.ts';
 import {defaultSettings} from '../../src/tokutei/defaults.ts';
 import {pastReasons, reasonExamples} from '../../src/tokutei/reasons.ts';
-import {customerKey, customerPatch, frequentValues, newSale, pastCustomers, sameYearSales} from '../../src/tokutei/sales.ts';
+import {copySale, customerKey, customerPatch, frequentValues, newSale, pastCustomers, sameYearSales} from '../../src/tokutei/sales.ts';
 import type {Sale} from '../../src/tokutei/types.ts';
 import {ageOn, fiscalYearOf, parseDateText, warekiLabel, warekiOf} from '../../src/tokutei/wareki.ts';
 import {addressOfZip, withoutDoubledHead, zipCandidates, zipLabel} from '../../src/tokutei/zip.ts';
@@ -95,6 +95,12 @@ test('今年度の残り：同じ方・同じ年度・申請した案件だけ',
     sameYearSales([done, quote, lastYear, other, cur], cur).map((x) => x.id),
     ['d'],
   );
+  // 販売受注簿に送った案件を写しても、写しは「買った」ことにならない（送った印・住宅改修の様邸とのつながりは写さない。2026-11-08 のデバッグ）
+  const sent = sale({...base, id: 's', estimateDate: '2026-10-01', hacchuSentAt: 1, jutakuJob: 'j1'});
+  const copy = copySale(sent, [sent]);
+  assert.equal(copy.hacchuSentAt, undefined);
+  assert.equal(copy.jutakuJob, undefined);
+  assert.deepEqual(sameYearSales([sent, copy, cur], cur).map((x) => x.id), ['s']);
 });
 
 test('よく使う値・前に書いた理由', () => {

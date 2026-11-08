@@ -71,9 +71,11 @@ test('パナソニックのシャワーチェア（p.40）：11の商品・色�
   );
   assert.equal(new Set(first.variants.map((v) => v.listPrice)).size, 1); // 「各¥」は色ちがいで同じ金額
   // 選ぶと商品の欄に入る値
-  const patch = catalogItemPatch(first, first.variants[1], {category: '入浴補助用具', sub: '入浴用いす', maker: ''});
+  const patch = catalogItemPatch(first, first.variants[1], {category: '入浴補助用具', sub: '入浴用いす', maker: ''}, 20);
   assert.deepEqual([patch.name, patch.maker, patch.code, patch.unitPrice], ['シャワーチェアAir コンパクトSPワンタッチ ブルー', 'パナソニックエイジフリー（株）', 'PN-L41431A', null]);
   assert.equal(patch.listPrice, first.variants[1].listPrice);
+  // 選び直したときに前の商品の仕切・仕入先・手で直した備考・割引率（利益率から出た 8.2% など）を残さない（2026-11-08 のデバッグ）
+  assert.deepEqual([patch.cost, patch.supplier, patch.basisNote, patch.discountRate, patch.productId], [0, '', null, 20, null]);
 });
 
 test('1つの金額は、たてに並んだ品番のまとまりのまん中（安寿 ステンレス製浴槽台R：10cm の2行とそれより高い8行で金額がちがう）。2行の大きさ「12～15cm」', async () => {
@@ -267,15 +269,15 @@ test('非課税（カタログの金額の横の「非課税」）：歩行器�
       if (p.category !== '歩行器' && p.category !== '歩行補助つえ') continue;
       assert.equal(p.taxFree, true, `p.${no} ${p.name}`);
       // 選んだときの税区分（前は前の商品の税区分＝初めは 10% のままだった）
-      assert.equal(catalogItemPatch(p, p.variants[0], {category: '', sub: '', maker: ''}).taxType, '非課税', `p.${no} ${p.name}`);
+      assert.equal(catalogItemPatch(p, p.variants[0], {category: '', sub: '', maker: ''}, 20).taxType, '非課税', `p.${no} ${p.name}`);
     }
   }
   const quad = (await productsOf(152)).find((p) => p.name === 'エルビスクワド')!;
   assert.equal(quad.taxFree, true);
-  assert.equal(catalogItemPatch(quad, quad.variants[0], {category: '入浴補助用具', sub: '', maker: ''}).taxType, '非課税');
+  assert.equal(catalogItemPatch(quad, quad.variants[0], {category: '入浴補助用具', sub: '', maker: ''}, 20).taxType, '非課税');
   // 課税の商品（シャワーチェア）は 10%。前に非課税の商品を選んでいた欄でも 10% に戻る
   const chair = (await productsOf(40))[0];
-  assert.equal(catalogItemPatch(chair, chair.variants[0], {category: '歩行器', sub: '', maker: ''}).taxType, '10%');
+  assert.equal(catalogItemPatch(chair, chair.variants[0], {category: '歩行器', sub: '', maker: ''}, 20).taxType, '10%');
 });
 
 // ---------------- 2026-11-03 のカタログの金額の点検（ユーザーの指示「カタログの金額確認など、全ての項目でデバッグ」）で見つけて直したこと。

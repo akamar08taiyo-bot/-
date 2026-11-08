@@ -185,6 +185,21 @@ function lsGet(key: DataKey): unknown {
 // ---------------------------------------------------------------- 壊れたデータでも画面が真っ白にならないように整える
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
+ * clean が読まなかった項目（この版の知らない、新しい版で足した項目）を、そのまま残す（住宅改修の src/sasaoka/storage.ts の keepNewer と同じ）。
+ * 新しい版を公開したあとも、前の版を開いたままのタブがある。前はそのタブが保存すると、新しい版で入れた項目（非課税ボタンの taxByHand など）が消えた
+ * （ほかのタブの保存とまとめるときも、clean を通すので）。2026-11-08 のデバッグで見つけた
+ */
+function keepNewer<T extends object>(raw: Record<string, unknown>, clean: (r: Record<string, unknown>) => T): T {
+  const read = new Set<PropertyKey>();
+  const seen = new Proxy(raw, {
+    get: (t, k) => (read.add(k), Reflect.get(t, k)),
+    has: (t, k) => (read.add(k), Reflect.has(t, k)),
+  });
+  const out = clean(seen);
+  return {...Object.fromEntries(Object.entries(raw).filter(([k]) => !read.has(k))), ...out};
+}
 const str = (v: unknown, d = '') => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : d);
 const numv = (v: unknown, d = 0) => {
   const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
@@ -200,7 +215,7 @@ const list = (v: unknown, d: string[]) => (Array.isArray(v) ? v.map((x) => str(x
 
 export function cleanProducts(raw: unknown): Product[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter(isObj).map((p) => ({
+  return raw.filter(isObj).map((rec) => keepNewer(rec, (p) => ({
     id: str(p.id) || uid('p'),
     name: str(p.name),
     maker: str(p.maker),
@@ -222,11 +237,10 @@ export function cleanProducts(raw: unknown): Product[] {
     lastUsedAt: numv(p.lastUsedAt),
     source: str(p.source),
     updatedAt: numv(p.updatedAt),
-  }));
+  })));
 }
 
-function cleanItem(i: Record<string, unknown>): SaleItem {
-  return {
+const cleanItem = (rec: Record<string, unknown>): SaleItem => keepNewer(rec, (i) => ({
     id: str(i.id) || uid('i'),
     productId: typeof i.productId === 'string' && i.productId ? i.productId : null,
     name: str(i.name),
@@ -247,14 +261,13 @@ function cleanItem(i: Record<string, unknown>): SaleItem {
     unitPrice: optNum(i.unitPrice),
     reason: str(i.reason),
     ...(typeof i.basisNote === 'string' ? {basisNote: i.basisNote} : {}),
-  };
-}
+  }));
 
 const STATUSES: SaleStatus[] = ['見積', '申請', '承認', '納品', '集金'];
 
 export function cleanSales(raw: unknown): Sale[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter(isObj).map((s) => {
+  return raw.filter(isObj).map((rec) => keepNewer(rec, (s) => {
     const ratio = numv(s.burdenRatio, 1);
     return {
       id: str(s.id) || uid('s'),
@@ -299,7 +312,7 @@ export function cleanSales(raw: unknown): Sale[] {
       ...(numv(s.hacchuSentAt) > 0 ? {hacchuSentAt: numv(s.hacchuSentAt)} : {}),
       ...(s.uriageCustomer === 'new' || s.uriageCustomer === 'existing' ? {uriageCustomer: s.uriageCustomer} : {}),
     };
-  });
+  }));
 }
 
 export function cleanSettings(raw: unknown): Settings {
