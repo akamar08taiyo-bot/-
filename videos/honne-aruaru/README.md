@@ -83,6 +83,9 @@ python3 -I scripts/build_kit.py                    # 投稿キット kit/index.h
 
 声がまだ無いときは `prep_audio.py --estimate` で文字数から仮の時刻を作れば、画面の確認だけ先にできる。
 
+書き出しの途中で `delayRender() timed out … "fonts" … Rendering the frame will be retried.` が数百コマごとにまとめて出ることがある（Remotion がページを作り直したとき）。再試行で通り、出来上がりのコマには影響しない（1回につき1分ほど遅くなるだけ）。
+大きな絵に CSS の `blur()` をかけると書き出しがとても重くなるので、ぼかした背景は前もって画像で作っておく（jc の `blurImg`）。
+
 声のない回（honne03 のランキング）は、`script.json` に `"silent": true` と `"bpm"` を書き、区切りを拍の数で決める（声・BGM・ミックスは作らない）。絵 → `detect.py` → `stills.mjs` → `render.mjs` → `finish.py`（音のトラックなしで書き出し、60秒未満か確かめる）。音楽は投稿のときに YouTube アプリの「サウンドを追加」で足す。
 
 #4 からのランキングは画面の作りを `src/rankingEp.tsx` にまとめたので、`episodes/<回>/script.json` に順位（失言・注記・回数・ツッコミ・絵・カメラ）を書くだけで作れる。
