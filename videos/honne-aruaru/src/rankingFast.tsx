@@ -22,6 +22,8 @@ export type FRank = {
   bg?: [string, string]; // 絵文字の画面の背景のグラデーション（上, 下）
   imgs?: string[]; // 1つの順位で続けて見せる写真（例：四季の4枚）。img の代わり
   credit?: string | string[]; // 写真のクレジット（画面の下に小さく。imgs のときは1枚ずつ）
+  stat?: {value: number; label: string; unit: string; decimals: number; prefix?: string}; // 順位の数字の代わりに出す事実のはんこ（例：約45億円）
+  tsukLabel?: string; // この順位だけ、ひと言の札を変える（例：数字の出典）
   todo?: boolean; // 元の調査でまだ確かめていない順位（finish.py はこれが残っていると書き出しを止める）
 };
 export type FScript = {
@@ -31,6 +33,7 @@ export type FScript = {
   source: string; // 出典の1行（画面の上にずっと出す）
   note?: string; // 例「※イラスト・ひと言は再現イメージです」
   value: {label: string; unit: string; decimals: number}; // はんこの見出しと単位（例：回答 / % / 1）
+  hideValues?: boolean; // 順位の数字（票数など）を画面に出さない（stat のある順位だけはんこを出す）
   itemLabel?: string; // 項目のカードの札（例「妻が挙げた理由」）
   tsukLabel?: string; // ひと言の吹き出しの札（既定は「しのぶ」）
   hook: {beats: number; img?: string; cam?: RCam; emoji?: string[]; bg?: [string, string]; title: [string, string, string]; chip: string; note?: string; credit?: string; warn?: FWarn};
@@ -529,10 +532,14 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
           const s = seg(`r${i}`);
           return (
             <React.Fragment key={i}>
-              <RankBadge rank={r.rank} x={BADGE.x} y={BADGE.y} from={s.from} to={s.to} tie={tie(r.rank)} />
+              <RankBadge rank={r.rank} x={r.stat || !S.hideValues ? BADGE.x : W / 2} y={BADGE.y} from={s.from} to={s.to} tie={tie(r.rank)} />
               <ItemCard text={r.item} label={S.itemLabel} cy={ITEM_Y} from={s.b(0.5)} to={s.to} todo={r.todo} />
-              <CountStamp x={STAMP.x} y={STAMP.y} count={r.value} from={s.b(1.5)} rollTo={s.b(2.5)} to={s.to} label={S.value.label} unit={S.value.unit} decimals={S.value.decimals} />
-              {r.tsukkomi && <Tsukkomi text={r.tsukkomi} cy={TSUK_Y} from={s.b(3)} to={s.to} label={S.tsukLabel} />}
+              {r.stat ? (
+                <CountStamp x={STAMP.x} y={STAMP.y} count={r.stat.value} from={s.b(1.5)} rollTo={s.b(2.5)} to={s.to} label={r.stat.label} unit={r.stat.unit} decimals={r.stat.decimals} prefix={r.stat.prefix} />
+              ) : (
+                !S.hideValues && <CountStamp x={STAMP.x} y={STAMP.y} count={r.value} from={s.b(1.5)} rollTo={s.b(2.5)} to={s.to} label={S.value.label} unit={S.value.unit} decimals={S.value.decimals} />
+              )}
+              {r.tsukkomi && <Tsukkomi text={r.tsukkomi} cy={TSUK_Y} from={s.b(3)} to={s.to} label={r.tsukLabel ?? S.tsukLabel} />}
             </React.Fragment>
           );
         })}

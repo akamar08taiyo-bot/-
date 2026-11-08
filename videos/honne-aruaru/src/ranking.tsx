@@ -158,7 +158,7 @@ export const Tsukkomi: React.FC<{text: string; cy: number; from: number; to: num
 
 // ───────── 記録回数のはんこ。rollTo があれば 0 から数え上げて、最後にドン ─────────
 // label・unit・decimals で「回答 39.4%」のような割合のはんこにもできる（既定は「記録 〇回」）
-export const CountStamp: React.FC<{x: number; y: number; count: number; from: number; to: number; rollTo?: number; label?: string; unit?: string; decimals?: number}> = ({
+export const CountStamp: React.FC<{x: number; y: number; count: number; from: number; to: number; rollTo?: number; label?: string; unit?: string; decimals?: number; prefix?: string}> = ({
   x,
   y,
   count,
@@ -168,6 +168,7 @@ export const CountStamp: React.FC<{x: number; y: number; count: number; from: nu
   label = '記録',
   unit = '回',
   decimals = 0,
+  prefix,
 }) => {
   const frame = useCurrentFrame();
   if (frame < from || frame >= to) return null;
@@ -202,6 +203,7 @@ export const CountStamp: React.FC<{x: number; y: number; count: number; from: nu
     >
       <div style={{fontSize: 36, letterSpacing: 8}}>{label}</div>
       <div style={{display: 'flex', alignItems: 'baseline', fontVariantNumeric: 'tabular-nums'}}>
+        {prefix && <span style={{fontSize: 46}}>{prefix}</span>}
         <span style={{fontSize: n >= 1000 ? 78 : 92}}>{text}</span>
         <span style={{fontSize: 46}}>{unit}</span>
       </div>
