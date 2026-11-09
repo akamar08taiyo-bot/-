@@ -94,7 +94,7 @@ export const BOOKS: CatalogBook[] = [
       {title: 'パブリック用手すり', page: 56},
       {title: '取付方法', page: 82},
       {title: 'イージーオーダー', page: 93},
-      {title: '品番索引', page: 102},
+      {title: '品番索引', page: 101},  // p.101・102（前は 102 で、p.101 が「イージーオーダー」と出た。2026-11-09）
     ],
   },
   {
