@@ -5,6 +5,8 @@ import {CATALOG, pageCodes} from '../catalog.ts';
 import {parseCatalogPage} from '../catalogItems.ts';
 import type {CatalogProduct, PdfText} from '../catalogItems.ts';
 import {openPdf} from '../import/pdfText.ts';
+import {pageRules} from './catalogRules.ts';
+import type {CatalogRule} from './catalogRules.ts';
 
 /** 印刷の細かさ（A4 で 200dpi ＝ 1654×2339 ほど）。カタログの窓の押せる枠は、ページの pt をこの倍率で絵の画素にする */
 export const DPI = 200;
@@ -130,6 +132,45 @@ function readCatalogItems(file: string): Promise<PdfText[]> {
 }
 
 /**
+ * ページの横の罫線（金額のまとまりの区切り。print/catalogRules.ts）。ビルドで作った catalog/rules.json があればそれ、なければ PDF を読む。
+ * 読めなければ空（金額は字の位置だけで推し量る）
+ */
+let rulesIndex: Promise<Map<string, CatalogRule[]> | null> | null = null;
+function catalogRulesIndex(): Promise<Map<string, CatalogRule[]> | null> {
+  if (!rulesIndex) {
+    const build = typeof __APP_BUILD__ === 'string' ? __APP_BUILD__ : '';
+    rulesIndex = fetch(`${catalogUrl('rules.json')}?v=${encodeURIComponent(build)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json: Record<string, [number, number, number][]> | null) =>
+        json && typeof json === 'object' ? new Map(Object.entries(json).map(([file, rows]) => [file, rows.map(([x, y, w]) => ({x, y, w}))])) : null,
+      )
+      .catch(() => null);
+    void rulesIndex.then((m) => {
+      if (!m) rulesIndex = null;
+    });
+  }
+  return rulesIndex;
+}
+const rulesLoaded = new Map<string, Promise<CatalogRule[]>>();
+export function loadCatalogRules(file: string): Promise<CatalogRule[]> {
+  let p = rulesLoaded.get(file);
+  if (!p) {
+    p = catalogRulesIndex()
+      .then(
+        (index) =>
+          index?.get(file) ??
+          withPage(file, async (page) => {
+            const pdfjs = (await import('pdfjs-dist/legacy/build/pdf.min.mjs')) as typeof import('pdfjs-dist');
+            return pageRules(page, pdfjs.OPS);
+          }),
+      )
+      .catch(() => []);
+    rulesLoaded.set(file, p);
+  }
+  return p;
+}
+
+/**
  * カタログの全部のページの商品（ユーザーの指示「カタログに載っている商品、すべて取り込んでもらいたい」2026-10-30）。
  * はじめて使うときに1ページずつ読んで（文字だけ。絵にしない）、この画面を開いているあいだ覚えておく。読めなかったときは次にまた読む
  */
@@ -140,7 +181,7 @@ export function loadCatalogProducts(): Promise<CatalogProduct[]> {
       const out: CatalogProduct[] = [];
       for (const p of CATALOG) {
         try {
-          out.push(...parseCatalogPage(await loadCatalogItems(p.file), p));
+          out.push(...parseCatalogPage(await loadCatalogItems(p.file), p, await loadCatalogRules(p.file)));
         } catch {
           // 読めなかったページはとばす
         }

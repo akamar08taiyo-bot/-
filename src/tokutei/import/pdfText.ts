@@ -3,6 +3,9 @@
 // pdf.js はPDFを読むときにだけ読み込む。作業用の別スレッド（worker）は使わず、この画面の中で読む
 // （1ファイルのアプリにまとめるため。仕切り表くらいの大きさなら数秒で終わる）。
 
+import {pageRules} from '../print/catalogRules.ts';
+import type {CatalogRule} from '../print/catalogRules.ts';
+
 type TextItem = {str: string; transform: number[]; width: number; height: number};
 
 // 日本語のPDFで文字を正しく読むための対応表（CMap）。アプリに同梱して、ネットにつながなくても読めるようにする
@@ -97,10 +100,13 @@ export async function pdfToLines(data: Uint8Array): Promise<{lines: string[]; wo
  * ページごとの文字と位置（左上から pt）。介援隊カタログのページ（catalogItems.ts の parseCatalogPage）として読めるか見るときに使う。
  * page はカタログのページ番号（ページの下の大きな数字。読めなければ PDF の何ページ目か）
  */
-export async function pdfPageItems(data: Uint8Array): Promise<{page: number; items: {s: string; x: number; y: number; w: number; h: number}[]}[]> {
+export async function pdfPageItems(
+  data: Uint8Array,
+): Promise<{page: number; items: {s: string; x: number; y: number; w: number; h: number}[]; rules: CatalogRule[]}[]> {
   const task = await openPdf(data);
   const doc = await task.promise;
-  const out: {page: number; items: {s: string; x: number; y: number; w: number; h: number}[]}[] = [];
+  const out: {page: number; items: {s: string; x: number; y: number; w: number; h: number}[]; rules: CatalogRule[]}[] = [];
+  const pdfjs = (await import('pdfjs-dist/legacy/build/pdf.min.mjs')) as typeof import('pdfjs-dist');
   try {
     for (let p = 1; p <= doc.numPages; p++) {
       const page = await doc.getPage(p);
@@ -111,7 +117,9 @@ export async function pdfPageItems(data: Uint8Array): Promise<{page: number; ite
         .map((it) => ({s: it.str, x: it.transform[4], y: vp.height - it.transform[5], w: it.width, h: Math.abs(it.transform[3])}));
       // カタログのページ番号：いちばん下の、大きめの数字だけの字
       const num = items.filter((t) => /^\d{1,3}$/.test(t.s.trim()) && t.y > vp.height - 40 && t.h >= 9).sort((a, b) => b.y - a.y)[0];
-      out.push({page: num ? Number(num.s.trim()) : p, items});
+      // 横の罫線（金額のまとまりの区切り。print/catalogRules.ts）
+      const rules = await pageRules(page, pdfjs.OPS).catch(() => []);
+      out.push({page: num ? Number(num.s.trim()) : p, items, rules});
     }
   } finally {
     await task.destroy();

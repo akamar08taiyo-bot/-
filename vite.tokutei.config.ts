@@ -7,6 +7,7 @@ import {pathToFileURL} from 'url';
 import {defineConfig} from 'vite';
 import type {Plugin} from 'vite';
 import {viteSingleFile} from 'vite-plugin-singlefile';
+import {pageRules} from './src/tokutei/print/catalogRules.ts';
 
 /**
  * 特定福祉用具 購入申請書・見積もり作成アプリだけを、1つのHTMLファイルとしてビルドする設定。
@@ -57,6 +58,8 @@ function catalogText(): Plugin {
       const pdfjs = await import(pathToFileURL(path.join(root, 'legacy/build/pdf.mjs')).href);
       const r = (n: number) => Math.round(n * 100) / 100;
       const out: Record<string, (string | number)[][]> = {};
+      // 横の罫線（金額のまとまりの区切り。src/tokutei/print/catalogRules.ts）。catalog/rules.json に [左, 高さ, 長さ] の並び
+      const rules: Record<string, number[][]> = {};
       for (const file of readdirSync(dir).filter((f) => f.endsWith('.pdf')).sort()) {
         const task = pdfjs.getDocument({data: new Uint8Array(readFileSync(path.join(dir, file))), cMapUrl: `${root}/cmaps/`, cMapPacked: true, verbosity: 0});
         try {
@@ -66,11 +69,13 @@ function catalogText(): Plugin {
           out[file] = tc.items.flatMap((i: {str?: string; transform: number[]; width: number}) =>
             'str' in i ? [[i.str ?? '', r(i.transform[4]), r(vp.height - i.transform[5]), r(i.width), r(Math.abs(i.transform[3]))]] : [],
           );
+          rules[file] = (await pageRules(page, pdfjs.OPS)).map((x) => [x.x, x.y, x.w]);
         } finally {
           await task.destroy();
         }
       }
       this.emitFile({type: 'asset', fileName: 'catalog/text.json', source: JSON.stringify(out)});
+      this.emitFile({type: 'asset', fileName: 'catalog/rules.json', source: JSON.stringify(rules)});
       // ページの絵（catalog/kaientai-p040.jpg など）も、ここで作っておく（print/catalogPdf.ts の loadCatalogPage がまずこれを読む）。
       // 前は端末の中で pdf.js で PDF を絵にしていたが、pdf.js（legacy 版でも）は新しい書き方（class の static ブロックなど）を使っていて、
       // iPadOS 16.4 より前の Safari では読めず、カタログが開かなかった（ユーザーの話「タブレットで開くとパンフレットが開かない」2026-11-02）。

@@ -155,7 +155,7 @@ export function ImportDialog({
           const r = await pdfToLines(bytes);
           // 介援隊のカタログなら、商品ごとに読む（定価＝カタログの価格・仕切は空欄・種目は「介・購入」の印と商品名で）
           const pages = await pdfPageItems(again);
-          const products = pages.flatMap((pg) => parseCatalogPage(pg.items, {page: pg.page, subs: []}));
+          const products = pages.flatMap((pg) => parseCatalogPage(pg.items, {page: pg.page, subs: []}, pg.rules));
           if (products.some((p) => p.variants.some((v) => isKaientaiOrder(v.orderCode)))) start({kind: 'catalog', products, pages: r.pages}, f.name);
           else start({kind: 'pdf', lines: r.lines, words: r.words, pages: r.pages}, f.name);
         } catch (e) {

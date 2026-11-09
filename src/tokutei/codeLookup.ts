@@ -42,10 +42,11 @@ export function findByCode(code: string, catalog: CatalogProduct[], products: Pr
     });
   }
   for (const p of catalog)
-    for (const v of p.variants as CatalogVariant[]) {
-      if (codeMatchKey(v.code) !== want && (!v.orderCode || codeMatchKey(v.orderCode) !== want)) continue;
+    (p.variants as CatalogVariant[]).forEach((v, i) => {
+      if (codeMatchKey(v.code) !== want && (!v.orderCode || codeMatchKey(v.orderCode) !== want)) return;
       const patch = catalogItemPatch(p, v, item, settings.discountRate);
-      add(patch.name ?? p.name, patch.maker ?? p.maker, {key: `c:${p.key}:${v.code}`, label: [patch.name, patch.maker, v.code, `カタログ p.${p.page}`].filter(Boolean).join('　'), patch});
-    }
+      // 同じ品番で色・大きさのちがうもの（p.154 EA4-102 の4色、p.51 0973 の M と L など）も別々に出す（何番目かで見分ける。2026-11-09）
+      add(patch.name ?? p.name, patch.maker ?? p.maker, {key: `c:${p.key}:${i}:${v.code}`, label: [patch.name, patch.maker, v.code, `カタログ p.${p.page}`].filter(Boolean).join('　'), patch});
+    });
   return out;
 }

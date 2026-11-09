@@ -265,6 +265,9 @@ export function CatalogViewer({
   const pageProducts = useMemo(() => (products ?? []).filter((p) => p.page === CATALOG[current].page && p.box && p.variants.length), [products, current]);
   // 見積もりに入っている品番（その商品の枠は「✓ 入っています」）
   const inSale = new Set(sale.items.map((i) => i.code).filter(Boolean));
+  // 見積もりに入っている品番か：同じ品番で色・大きさのちがうもの（p.154 EA4-102 の4色、p.137 の S と M など）は、商品名まで見る（2026-11-09）
+  const inSaleName = new Set(sale.items.filter((i) => i.code).map((i) => `${i.code}|${i.name.trim()}`));
+  const isInSale = (p: CatalogProduct, v: CatalogVariant) => inSaleName.has(`${v.code}|${[p.name, v.label].filter(Boolean).join(' ')}`);
   /** 商品の枠を押した：色・品番が1つならすぐ入れる。2つ以上なら選ぶ */
   const pickProduct = (p: CatalogProduct) => (p.variants.length === 1 ? pickVariant(p, p.variants[0]) : setChoose(p));
   const pickVariant = (p: CatalogProduct, v: CatalogVariant) => {
@@ -592,12 +595,12 @@ export function CatalogViewer({
             </button>
           </div>
           <div className="grid gap-1">
-            {choose.variants.map((v) => (
+            {choose.variants.map((v, i) => (
               <button
-                key={v.code}
+                key={`${i}:${v.code}`}
                 type="button"
                 onClick={() => pickVariant(choose, v)}
-                className={`flex min-h-10 items-center gap-2 rounded-md border px-2 py-1.5 text-left text-sm hover:bg-sky-50 ${inSale.has(v.code) ? 'border-teal-500 bg-teal-50' : 'border-slate-300 bg-white'}`}
+                className={`flex min-h-10 items-center gap-2 rounded-md border px-2 py-1.5 text-left text-sm hover:bg-sky-50 ${isInSale(choose, v) ? 'border-teal-500 bg-teal-50' : 'border-slate-300 bg-white'}`}
               >
                 <span className="font-bold text-slate-800">{v.label || choose.name}</span>
                 <span className="text-xs text-slate-500">{v.code}</span>

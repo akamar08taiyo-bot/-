@@ -1,15 +1,20 @@
 // カタログの PDF（public-tokutei/catalog/）から商品の一覧を作る（catalogItems.ts）。
 // 金額はリポジトリに書かない（ユーザーの指示「リポジトリに仕入れや定価は残さない」）ので、金額は「ある・同じ・ちがう・増える」だけを確かめる
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {CATALOG} from '../../src/tokutei/catalog.ts';
+import {CATALOG_FIXES} from '../../src/tokutei/catalogFixes.ts';
 import {appMaker, catalogCandidates, catalogFilter, catalogInCategory, catalogItemPatch, catalogMakers, catalogPagesOf, isKaientaiOrder, looseKey, parseCatalogPage, sameMaker} from '../../src/tokutei/catalogItems.ts';
 import type {CatalogProduct, PdfText} from '../../src/tokutei/catalogItems.ts';
+import {pageRules} from '../../src/tokutei/print/catalogRules.ts';
+import type {CatalogRule} from '../../src/tokutei/print/catalogRules.ts';
 
 const root = new URL('../../node_modules/pdfjs-dist/', import.meta.url).pathname;
 
-async function itemsOf(file: string): Promise<PdfText[]> {
+/** ページの文字と横の罫線（アプリのビルドと同じ pdf.js。罫線は金額のまとまりの区切り：print/catalogRules.ts） */
+async function pageOf(file: string): Promise<{items: PdfText[]; rules: CatalogRule[]}> {
   const pdfjs = await import(`${root}legacy/build/pdf.mjs`);
   const data = new Uint8Array(readFileSync(new URL(`../../public-tokutei/catalog/${file}`, import.meta.url)));
   const task = pdfjs.getDocument({data, cMapUrl: `${root}cmaps/`, cMapPacked: true, verbosity: 0});
@@ -17,16 +22,19 @@ async function itemsOf(file: string): Promise<PdfText[]> {
   const page = await doc.getPage(1);
   const vp = page.getViewport({scale: 1});
   const tc = await page.getTextContent();
-  const out = tc.items.flatMap((i: {str?: string; transform: number[]; width: number}) => ('str' in i ? [{s: i.str!, x: i.transform[4], y: vp.height - i.transform[5], w: i.width, h: Math.abs(i.transform[3])}] : []));
+  const items = tc.items.flatMap((i: {str?: string; transform: number[]; width: number}) => ('str' in i ? [{s: i.str!, x: i.transform[4], y: vp.height - i.transform[5], w: i.width, h: Math.abs(i.transform[3])}] : []));
+  const rules = await pageRules(page, pdfjs.OPS);
   await task.destroy();
-  return out;
+  return {items, rules};
 }
+const itemsOf = async (file: string) => (await pageOf(file)).items;
 
 const pages = new Map<number, CatalogProduct[]>();
 async function productsOf(no: number): Promise<CatalogProduct[]> {
   if (!pages.has(no)) {
     const p = CATALOG.find((c) => c.page === no)!;
-    pages.set(no, parseCatalogPage(await itemsOf(p.file), p));
+    const {items, rules} = await pageOf(p.file);
+    pages.set(no, parseCatalogPage(items, p, rules));
   }
   return pages.get(no)!;
 }
@@ -197,12 +205,12 @@ test('歩行器のページ（p.136・137。2026-11-01 ユーザーの指示「�
   assert.equal(fixed.length, 11, fixed.join(','));
   assert.ok(fixed.includes('スライドフィットEX 固定式'));
   assert.ok(fixed.every((n) => !/前輪|サニー|ショッピング/.test(n)));
-  for (const n of ['スライドフィットEX 前輪後輪3インチ', 'セーフティーアーム ウォーカーMタイプ', 'セーフティーアーム Vタイプウォーカー', 'サニーウォーカー SP', '安寿 サンフィール ショッピング']) {
+  for (const n of ['スライドフィットEX 前輪後輪3インチ', 'セーフティーアーム ウォーカーMタイプ', 'セーフティーアーム Vタイプウォーカー', 'サニーウォーカー SP(中)', '安寿 サンフィール ショッピング']) {
     const p = walkers.find((x) => x.name === n);
     assert.ok(p && p.category === '' && /歩行車|対象外/.test(p.note), n);
   }
   // ページの端の見出し（「歩行器／シルバーカー」）で、固定型の歩行器を歩行車にしない
-  assert.equal(walkers.find((p) => p.name === '歩行器')?.category, '歩行器');
+  assert.equal(walkers.find((p) => p.name === '歩行器(固定型)')?.category, '歩行器');
   // 種目「歩行器」を選ぶと、固定式だけが出る
   assert.equal(catalogInCategory(walkers, '歩行器', '').length, 11);
 });
@@ -393,8 +401,8 @@ test('同じ名前の品番を見分ける：入れ子の見出し・表の上�
   const p179 = await productsOf(179);
   assert.equal(label(p179, '871-135'), 'ソフト便座タイプ 補高#5');
   assert.equal(label(p179, '871-145'), '暖房便座タイプ 補高#5');
-  // p.175 きらく ミニでか
-  assert.equal(label(await productsOf(175), '45611'), 'MY型 アイボリー');
+  // p.175 きらく ミニでか（品番の左の「やわらか便座」は catalogFixes.ts。2026-11-09 の点検）
+  assert.equal(label(await productsOf(175), '45611'), 'やわらか便座 MY型 アイボリー');
   // どのポータブルトイレのページも、1つの商品の品番の名前がみなちがう
   for (const no of [172, 173, 174, 177, 178, 179]) {
     for (const p of await productsOf(no)) {
@@ -425,4 +433,39 @@ test('全ページの押せる枠：となりの枠と重ならない（中の�
         if (x > 0 && y > 0) assert.ok(within(d.box!, a.box!) || within(a.box!, d.box!), `p.${c.page}「${a.name}」と「${d.name}」が重なる（${x}×${y}）`);
       }
   }
+});
+
+// ユーザーの指示「カタログと商品が違ったものがあった。そこは絶対に間違わないでほしいので、徹底的に検査、確認する」2026-11-09：
+// 全26ページ・246商品を、ページの絵と1つずつ見くらべて確かめた読み取り結果（fixtures/catalog-snapshot.json）と同じであること。
+// 金額はリポジトリに書かない（ユーザーの指示「リポジトリに仕入れや定価は残さない」）ので、ページごとの金額の並びのしるし（sha256 の頭）だけを比べる。
+// 読み取りを直してここが変わったら、変わった商品をページの絵で確かめてから、しるしを作り直す
+test('全ページの読み取り結果が、ページの絵と見くらべて確かめたものと同じ（商品名・メーカー・種目・品番・色や大きさ・TAIS・注文番号・金額の並び）', async () => {
+  const snap = JSON.parse(readFileSync(new URL('./fixtures/catalog-snapshot.json', import.meta.url), 'utf8'));
+  assert.equal(Object.keys(snap).length, CATALOG.length);
+  for (const c of CATALOG) {
+    const list = await productsOf(c.page);
+    const got = list.map((p) => ({name: p.name, maker: p.maker, category: p.category, sub: p.sub, taxFree: p.taxFree, variants: p.variants.map((v) => [v.code, v.label, v.tais, v.orderCode])}));
+    assert.deepEqual(got, snap[c.page].products, `p.${c.page}`);
+    const prices = createHash('sha256').update(list.flatMap((p) => p.variants.map((v) => v.listPrice)).join(',')).digest('hex').slice(0, 16);
+    assert.equal(prices, snap[c.page].prices, `p.${c.page} の金額の並び`);
+  }
+});
+
+test('ページの書き方が特殊な商品の直し（catalogFixes.ts）は、どれもちょうど1つの商品に当たる・金額は読み取ったもの（2026-11-09 の点検）', async () => {
+  for (const f of CATALOG_FIXES) {
+    const list = await productsOf(f.page);
+    const hits = list.filter((p) => p.variants.some((v) => v.orderCode === f.order) && p.variants.length === f.variants.length && f.variants.every((fv, i) => p.variants[i].label === fv.label));
+    assert.equal(hits.length, 1, `p.${f.page} ${f.order}`);
+    assert.ok(hits[0].variants.every((v) => v.listPrice > 0), `p.${f.page} ${f.order} の金額`);
+  }
+  // p.136 Vタイプウォーカー：SAV・SAVS と SAVH・SAVA は金額の組がちがう（罫線で分ける。前は SAVH が SAV の金額だった）
+  const v = (await productsOf(136)).find((p) => p.variants.some((x) => x.code === 'SAVH'))!;
+  const price = (c: string) => v.variants.find((x) => x.code === c)!.listPrice;
+  assert.equal(price('SAV'), price('SAVS'));
+  assert.equal(price('SAVH'), price('SAVA'));
+  assert.notEqual(price('SAVS'), price('SAVH'));
+  // 「TAIS/取得中」・TAIS のない品番に、ほかの品番の TAIS を付けない
+  const p137 = await productsOf(137);
+  assert.equal(p137.flatMap((p) => p.variants).find((x) => x.code === 'WC-3010S')?.tais, '');
+  assert.equal((await productsOf(154)).flatMap((p) => p.variants).find((x) => x.code === 'WB3502')?.tais, '');
 });

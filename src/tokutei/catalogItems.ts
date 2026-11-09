@@ -12,6 +12,8 @@
 //   TAIS コード（TAIS/00532-000037。5.3pt）、仕様の行（●…。5.7pt）の右の端にメーカー名（アロン化成（株）など）
 import {CATALOG, catalogPicks} from './catalog.ts';
 import type {CatalogPage} from './catalog.ts';
+import type {CatalogRule} from './print/catalogRules.ts';
+import {applyFix} from './catalogFixes.ts';
 import type {Candidate} from './import/priceImport.ts';
 import {CATEGORIES, guessCategory, subShort, WHEELED} from './category.ts';
 import {taxOf} from './calc.ts';
@@ -58,13 +60,21 @@ const isPrice = (t: PdfText) => between(t.h, 10.4, 12.2) && /^[\d,]{3,}$/.test(t
 const isRowSize = (t: PdfText) => between(t.h, 6.3, 7.1);
 const isLabelSize = (t: PdfText) => between(t.h, 5.5, 6.25);
 const isSmall = (t: PdfText) => between(t.h, 4.8, 5.45);
+/**
+ * 色・大きさの字：ふつうは品番より小さい字（5.8pt）。品番と同じ大きさ（6.7pt）の、品番でない字も（p.44 の「536-482 標準 レッド」の「標準」・
+ * 2行にまたがる「標準」「ミニ」、p.47 の「M PN-L10201A ブルー」の「M」。前は小さい字しか見ず、標準とミニ・M と L が同じ名前になっていた。2026-11-09 の点検）
+ */
+const isWordSize = (t: PdfText) => isLabelSize(t) || (isRowSize(t) && !t.s.split(/[、,，\s]+/).some((c) => CODE.test(c)) && !ORDER.test(t.s) && !atEdge(t));
+/** ページの端の帯の字（右ページの右・左ページの左の「入浴」「歩行関連」などの見出し） */
+const atEdge = (t: PdfText) => t.x >= 570 || t.x + t.w <= 30;
 const NUM = /^(\d{1,2}|・)$/;
 const ORDER = /^\d{3}-[A-Z]\d{4}$/;
 /**
  * 品番：英数字とハイフン（数字を1つ以上）か、英字だけの3字以上（歩行器の SAWR・SAWMSSR・SAV、バスボードの VALSBDSOR。2026-11-03 の
- * カタログの金額の点検で、数字のない品番を読めず、品番がなくなる・となりの品番に金額がずれるのを見つけた）。NEW は新商品の印
+ * カタログの金額の点検で、数字のない品番を読めず、品番がなくなる・となりの品番に金額がずれるのを見つけた）。NEW は新商品の印。
+ * 「No.5022」「No.5600」（p.48・49 の入浴用車いす）と、スラッシュのある「KSC-2/ST」「KS11-PF/ST」も品番（前は読めず、注文番号を品番にしていた。2026-11-09 の点検）
  */
-const CODE = /^(?:(?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{2,}|(?!NEW$)[A-Z]{3,})$/;
+const CODE = /^(?:(?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{2,}|(?!NEW$)[A-Z]{3,}|No\.\d{3,}|[A-Z][A-Z0-9-]*\d[A-Z0-9-]*\/[A-Z]{1,3})$/;
 const TAIS = /TAIS\s*\/?\s*(\d{5}-\d{6})/;
 /** 色・大きさの欄に出る記号（値上がりの矢印・区切り） */
 const MARK = /^[、,，↑↓★☆※・]+$/;
@@ -119,10 +129,10 @@ export function appMaker(maker: string): string {
 type Header = {x: number; y: number; end: number; title: PdfText};
 /** extra：ほかの見出しの囲みからもらった字（囲みの中の小さな囲みの下の表。囲みの位置にだけ使う） */
 type Block = {head: Header; tokens: PdfText[]; extra?: PdfText[]};
-type Price = {x: number; y: number; value: number};
+type Price = {x: number; y: number; h: number; value: number};
 
 /** ページの文字 → 商品の一覧（見出しの順） */
-export function parseCatalogPage(raw: PdfText[], page: Pick<CatalogPage, 'page' | 'subs'> & {category?: string}): CatalogProduct[] {
+export function parseCatalogPage(raw: PdfText[], page: Pick<CatalogPage, 'page' | 'subs'> & {category?: string}, rules: CatalogRule[] = []): CatalogProduct[] {
   const items = raw.map((t) => ({...t, s: t.s.normalize('NFKC').trim()})).filter((t) => t.s);
 
   // 見出し：番号のすぐ右の商品名。「・」は「5・6」の番号のつなぎ。商品名の字のすぐ右の「・」（「ラップポン・プリート2」）は商品名の中なので番号にしない
@@ -180,21 +190,40 @@ export function parseCatalogPage(raw: PdfText[], page: Pick<CatalogPage, 'page' 
   }
 
   // 写真のまわりの品番と色（「PN-L41431D」の下に「オレンジ」）：品番の行の右に色がないときに使う
+  // 1行のすき間なく続く字（「レッ」「ド」のように分かれた字もつなぐ。となりの写真の色はとらない）
+  const wordFrom = (head: PdfText) => {
+    const word = [head];
+    for (const o of items.filter((x) => isSmall(x) && Math.abs(x.y - head.y) <= 1 && x.x > head.x).sort((a, c) => a.x - c.x)) {
+      const prev = word.at(-1)!;
+      if (o.x - (prev.x + prev.w) > 1.5 || /\d|[:：]/.test(o.s)) break;
+      word.push(o);
+    }
+    return lineText(word);
+  };
+  // 2行に折れて書いた品番（p.48「13003000」「1260014」）も、品番の字として見る
+  const codeHead = (t: PdfText, code: string): PdfText | null => {
+    if (t.s === code) return t;
+    if (!code.startsWith(t.s) || t.s.length < 4) return null;
+    return items.find((o) => o !== t && isSmall(o) && between(o.y - t.y, 3.5, 8) && Math.abs(o.x - t.x) <= 2 && t.s + o.s === code) ?? null;
+  };
+  // 写真のまわりの品番の下の色・柄。2行目まで読む（2026-11-09 の点検。前は1行目だけで、「ウォーム」「グレー」が「ウォーム」、
+  // 「バーズアイ」「レッド」が「バーズアイ」、「ワイン」「レッド」が「ワイン」になり、色ちがいの品番の見分けがつかなかった）：
+  //   1行目が短いカタカナで、つなぐと色の名前になる（ウォーム＋グレー・ミント＋グリーン・リーフ＋ワイン・ワイン＋レッド）→ つなぐ
+  //   2行目が色の名前かかっこ書き（バーズアイ／レッド、桜柄／ローズピンク、小アンバー／(ブラウン)）→ 空白でつなぐ
   const photoColor = (code: string): string => {
     for (const t of items) {
-      if (!isSmall(t) || t.s !== code) continue;
+      if (!isSmall(t)) continue;
+      const head = codeHead(t, code);
+      if (!head) continue;
       // 下の行が品番・「SAVS：」のような寸法の見出しなら色ではない（p.46 バスボードの「VALSBDLOR L：」・p.136 の「SAVS：」が色に入っていた。2026-11-03 の点検）
-      const below = items.find((o) => o !== t && isSmall(o) && between(o.y - t.y, 3.5, 10) && Math.abs(o.x - t.x) <= 10 && !/\d/.test(o.s) && !CODE.test(o.s) && !/[:：]/.test(o.s));
-      // 「レッ」「ド」のように分かれた字も、同じ行のつづきをつなぐ
+      const below = items.find((o) => o !== head && isSmall(o) && between(o.y - head.y, 3.5, 10) && Math.abs(o.x - head.x) <= 10 && !/\d/.test(o.s) && !CODE.test(o.s) && !/[:：]/.test(o.s));
       if (!below) continue;
-      // すき間なく続く字だけ（となりの写真の色はとらない）
-      const word = [below];
-      for (const o of items.filter((x) => isSmall(x) && Math.abs(x.y - below.y) <= 1 && x.x > below.x).sort((a, c) => a.x - c.x)) {
-        const prev = word.at(-1)!;
-        if (o.x - (prev.x + prev.w) > 1.5 || /\d|[:：]/.test(o.s)) break;
-        word.push(o);
-      }
-      return lineText(word);
+      const first = wordFrom(below);
+      const nextHead = items.find((o) => o !== below && isSmall(o) && between(o.y - below.y, 3.5, 8) && Math.abs(o.x - below.x) <= 2 && !/\d|[:：]/.test(o.s) && !CODE.test(o.s));
+      const next = nextHead ? wordFrom(nextHead) : '';
+      if (next && /^[ァ-ヶー]{2,4}$/.test(first) && /^[ァ-ヶー]+$/.test(next) && (!COLOR.test(first) || COLOR_HEAD.test(first)) && COLOR.test(first + next)) return first + next;
+      if (next && (COLOR.test(next) || /^\(.+\)$/.test(next)) && !COLOR.test(first)) return `${first} ${next}`;
+      return first;
     }
     return '';
   };
@@ -208,7 +237,7 @@ export function parseCatalogPage(raw: PdfText[], page: Pick<CatalogPage, 'page' 
   for (const b of blocks.values()) {
     const name = titleOf(b.head, items);
     if (!name) continue;
-    const variants = blockVariants(b, photoColor);
+    const variants = blockVariants(b, photoColor, rules);
     const orders = b.tokens.filter((t) => isTitle(t) && ORDER.test(t.s));
     if (!variants.length && !orders.length) continue;
     const rowCodes = variants.map((v) => v.code);
@@ -250,6 +279,8 @@ export function parseCatalogPage(raw: PdfText[], page: Pick<CatalogPage, 'page' 
     });
   }
   const list = out.sort((a, c) => a.at.y - c.at.y || a.at.x - c.at.x).map((x) => x.p);
+  // ページの書き方が特殊で読めない商品は、絵で確かめた直しを当てる（catalogFixes.ts。金額は読み取ったもの）
+  for (const p of list) p.variants = applyFix(p);
   trimOverlaps(list);
   return list;
 }
@@ -317,11 +348,17 @@ function titleOf(h: Header, items: PdfText[]): string {
     picked.push(l);
     if (picked.length === 3) break;
   }
-  return picked.map(lineText).join(' ').replace(/\s+/g, ' ').trim();
+  const name = picked.map(lineText).join(' ').replace(/\s+/g, ' ').trim();
+  // 見出しのすぐ右か下の、小さな字（7.8pt）のかっこ書き（「ミニフィット（超ミニ）」「シャトレチェアD (4輪自在)」「安寿 バスボード（薄型）」）。
+  // 前は見出しの字（9.2pt）だけを見ていて、かっこ書きが落ち、ちがう商品と見分けがつかなかった（2026-11-09 の点検）
+  const sub = items
+    .filter((t) => between(t.h, 7.3, 8.3) && /^[(（].+[)）]$/.test(t.s) && t.x >= h.title.x - 4 && t.x < h.end && between(t.y - h.title.y, -1.6, 12))
+    .sort((a, c) => a.y - c.y || a.x - c.x)[0];
+  return sub && !name.includes(sub.s) ? `${name}${sub.s}` : name;
 }
 
 /** 囲みの中の品番（品番の表ごと。表は品番の左の位置で分ける） */
-function blockVariants(b: Block, photoColor: (code: string) => string): CatalogVariant[] {
+function blockVariants(b: Block, photoColor: (code: string) => string, rules: CatalogRule[] = []): CatalogVariant[] {
   const rows: PdfText[] = [];
   for (const t of b.tokens) {
     if (!isRowSize(t)) continue;
@@ -353,7 +390,7 @@ function blockVariants(b: Block, photoColor: (code: string) => string): CatalogV
     const fit = cand.filter((t) => Math.abs(yenOf(t.s.replace(/^.*税抜/, '')) * 1.1 - value) <= Math.max(2, value * 0.002));
     const near = (fit.length ? fit : cand).sort((x, y) => dist(x) - dist(y))[0];
     if (near) used.add(near);
-    prices.push({x: p.x, y: p.y, value: near ? yenOf(near.s.replace(/^.*税抜/, '')) : value});
+    prices.push({x: p.x, y: p.y, h: p.h, value: near ? yenOf(near.s.replace(/^.*税抜/, '')) : value});
   }
   const orders = b.tokens.filter((t) => isTitle(t) && ORDER.test(t.s));
   const tais = b.tokens.filter((t) => isSmall(t) && TAIS.test(t.s));
@@ -385,11 +422,14 @@ function blockVariants(b: Block, photoColor: (code: string) => string): CatalogV
     )
       .replace(/[↑↓★¥￥●]|各$/g, '')
       .trim();
+  // 囲みに TAIS が1つだけなら、どの品番にも付ける（品番の表の上・金額の左に1つだけ書いてある商品。前は品番の行から 8pt の所しか見ず、
+  // 付かない品番があった：p.151 の R-103、p.153 の 605502、p.214 の TM-999 など。2026-11-09 の点検）
+  const onlyTais = (list: PdfText[]) => (new Set(list.map((t) => TAIS.exec(t.s)![1])).size === 1 ? TAIS.exec(list[0].s)![1] : '');
   if (!tables.length)
     return prices.map((p) => ({
       code: nearestY(orders, p.y)?.s ?? '',
       label: prices.length > 1 ? leftText(p) : '',
-      tais: '',
+      tais: tais.length ? onlyTais(tais) : '',
       listPrice: p.value,
       orderCode: nearestY(orders, p.y)?.s ?? '',
     }));
@@ -405,6 +445,12 @@ function blockVariants(b: Block, photoColor: (code: string) => string): CatalogV
     // 表の中に金額がなければ、同じ高さの金額（左右2つの表に、右に1つの金額＝入浴グリップ ユニットバス専用）
     const myPrices = prices.some(inTable) ? prices.filter(inTable) : prices.filter((p) => between(p.y, top - 30, bottom + 30));
     const myOrders = orders.filter(inTable);
+    // TAIS も表の左右の範囲の中のもの（p.214 インタースロープは4つの表が横に並び、同じ高さに4つの TAIS がある。前は高さだけで選び、
+    // 右の3つの表の品番に左の表の TAIS を付けていた。2026-11-09 の点検）
+    const myTais = tais.filter(inTable).length ? tais.filter(inTable) : tais;
+    // 品番のすぐ下（同じ左の位置）の TAIS は、その品番だけのもの（p.137 の「WC-3010M」の下の TAIS は WC-3010S のものではない。WC-3010S は「TAIS/取得中」。
+    // p.154 の WB3576 の TAIS も、WB3502 のものではない）。1つだけでも、ほかの品番には付けない
+    const ownedTais = (t: PdfText) => tb.rows.some((r) => Math.abs(t.x - r.x) <= 3 && between(t.y - r.y, 0.5, 9));
     // 品番の行のまとまりのまん中（品番の下に、同じ左の位置で「O型シート」・TAIS コードなどが続くと、金額はその2行のまん中に置かれる。
     // 品番の行の高さで比べると、まとまりの境が1行ずれた：p.49 SW6083SAL・p.154 WB5148・p.136 の歩行器。2026-11-03 の点検）
     // どの行にも続きの行があるときだけ（p.214 バリアフリーレールは、まとまりの下の「フラットタイプ（長さ200cm）」を続きと見てずれた）
@@ -460,14 +506,14 @@ function blockVariants(b: Block, photoColor: (code: string) => string): CatalogV
       const next = nested ? labelsWith(nested) : null;
       if (next && new Set(next).size > new Set(labels).size) labels = next;
     }
-    const priceOf = assignPrices(twoLines ? tb.rows.map((r, k) => ({...r, y: (r.y + bottoms[k]) / 2})) : tb.rows, myPrices);
+    const priceOf = rulePrices(tb.rows, myPrices, rules) ?? assignPrices(twoLines ? tb.rows.map((r, k) => ({...r, y: (r.y + bottoms[k]) / 2})) : tb.rows, myPrices);
     tb.rows.forEach((r, k) => {
       const order = nearestY(myOrders.length ? myOrders : orders, r.y)?.s ?? '';
-      const t = nearestY(tais, r.y, 8);
+      const t = nearestY(myTais, r.y, 8);
       out.push({
         code: r.s,
         label: withColor(labels[k], photoColor(r.s)),
-        tais: t ? TAIS.exec(t.s)![1] : '',
+        tais: t ? TAIS.exec(t.s)![1] : myTais.length === 1 && !ownedTais(myTais[0]) ? onlyTais(myTais) : '',
         listPrice: priceOf[k],
         orderCode: order,
       });
@@ -581,7 +627,9 @@ function splitInline(rows: PdfText[], labels: string[]): string[] {
 }
 
 /** 色・大きさに、写真のまわりの色を足す（同じ字がなければ）。「12~15cm」は「12～15cm」に */
-const COLOR = /レッド|ブルー|グリーン|オレンジ|ブラウン|グレー|ホワイト|ピンク|ベージュ|アイボリー|ブラック|イエロー|ネイビー|パープル|ワイン/;
+const COLOR = /レッド|ブルー|グリーン|オレンジ|ブラウン|グレー|ホワイト|ピンク|ベージュ|アイボリー|ブラック|イエロー|ネイビー|パープル|ワイン|シルバー/;
+/** 色の名前の前に付く言葉（「ワイン」＋「レッド」・「ローズ」＋「ピンク」など。それだけでも色の名前のもの） */
+const COLOR_HEAD = /^(ワイン|ローズ|ダーク|ライト|ミディアム|モカ|ミスト|アース|スカイ|ベビー|パステル)$/;
 const withColor = (label: string, color: string) => cleanLabel([label, color && !COLOR.test(label) ? color : ''].filter(Boolean).join(' '));
 
 /**
@@ -606,7 +654,7 @@ function cleanLabel(label: string): string {
 function captions(b: Block, tb: {x: number; rows: PdfText[]}): string[] {
   const top = tb.rows[0].y - 6;
   const bottom = tb.rows.at(-1)!.y + 6;
-  const words = b.tokens.filter((t) => isLabelSize(t) && between(t.y, top, bottom) && between(tb.x - t.x, 4, 60) && !/[●¥￥\d]/.test(t.s) && !MARK.test(t.s));
+  const words = b.tokens.filter((t) => isWordSize(t) && between(t.y, top, bottom) && between(tb.x - t.x, 4, 60) && !/[●¥￥\d]/.test(t.s) && !MARK.test(t.s));
   const lines = linesOf(words);
   // 行の間が 8pt までなら1つの見出し（2行に折り返した「ノーマル」「タイプ」）
   const groups: PdfText[][][] = [];
@@ -730,12 +778,13 @@ function rowLabels(b: Block, rows: PdfText[], right: number, heads: string[]): s
   const top = rows[0].y - 8;
   const bottom = rows.at(-1)!.y + 8;
   const left = Math.min(...rows.map((r) => r.x));
-  // 金額・TAIS より左
-  const stop = Math.min(right, ...b.tokens.filter((t) => (isPrice(t) || /[¥￥]|TAIS|税抜/.test(t.s)) && between(t.y, top, bottom) && t.x > left && t.x < right).map((t) => t.x));
+  // 金額・TAIS より左。品番のすぐ下に同じ左の位置で書いた TAIS（p.136・137 の歩行器「SAWMR スタンダード」の下の「TAIS/00465-000039」）は、
+  // 品番の右の字の終わりではない（前はここで切って、スタンダード・ミニタイプ・シルバーなどの種類の名前がみな空になっていた。2026-11-09 の点検）
+  const stop = Math.min(right, ...b.tokens.filter((t) => (isPrice(t) || /[¥￥]|TAIS|税抜/.test(t.s)) && between(t.y, top, bottom) && t.x > left + 3 && t.x < right).map((t) => t.x));
   // 行の間（いちばん狭い所）。2行の大きさはこれより狭い間でつながる
   const ys = [...new Set(rows.map((r) => Math.round(r.y * 2) / 2))].sort((a, c) => a - c);
   const gap = ys.length > 1 ? Math.min(...ys.slice(1).map((y, i) => y - ys[i])) : 10;
-  const lines = linesOf(b.tokens.filter((t) => isLabelSize(t) && between(t.y, top, bottom) && t.x > left && t.x < stop - 1 && !/[●¥￥]|TAIS|税抜/.test(t.s) && !MARK.test(t.s)));
+  const lines = linesOf(b.tokens.filter((t) => isWordSize(t) && between(t.y, top, bottom) && t.x > left && t.x < stop - 1 && !/[●¥￥]|TAIS|税抜/.test(t.s) && !MARK.test(t.s)));
   // 同じ行の中で、すき間の大きい所で分ける（大きさの列・色の列）
   const gapGroups = (line: PdfText[]) => {
     const groups: PdfText[][] = [];
@@ -766,13 +815,24 @@ function rowLabels(b: Block, rows: PdfText[], right: number, heads: string[]): s
       })
       .map((g) => ({x: g[0].x, y: g[0].y, s: lineText(g)})),
   );
-  const columns = columnsOf(words, 5).map((col) => {
+  // 品番のすぐ右（同じ行・すき間 10pt まで）の言葉：どの行にもあれば、それぞれの品番だけの種類の名前（p.136 の「SAWMR スタンダード」
+  // 「SAWMHR ハイタイプ」「SW5310 シルバー」）。品番の長さで左の位置が 5pt 以上ずれるので、左の位置で列に分けると別々の列になり、
+  // となりの行の名前が付いた（SW5310 に上の行の「SSタイプ」。2026-11-09 の点検）。その行にだけ付けて、列には入れない。
+  // ない行があるとき（p.44 の「ジャスト8-12」は下の色ちがいの行にも共通）は前のまま、列で見る
+  const ownOf = (r: PdfText) =>
+    words.filter((w) => Math.abs(r.y - w.y) <= 1.6 && between(w.x - (r.x + r.w), -1, 10)).sort((a, c) => a.x - c.x)[0];
+  const ownAll = rows.length >= 2 && rows.every((r) => rows.filter((o) => Math.abs(o.y - r.y) <= 1.6).length === 1 && ownOf(r));
+  const own = rows.map((r) => (ownAll ? ownOf(r) : undefined));
+  const columns = columnsOf(words.filter((w) => !own.includes(w)), 5).map((col) => {
     const cells: {y0: number; y1: number; s: string}[] = [];
     for (const w of col.sort((a, c) => a.y - c.y)) {
       const last = cells.at(-1);
       // 「UST-」の次の行の「130R」のように、ハイフンで終わる字は次の行とつなぐ
       const limit = /[～~-]$/.test(last?.s ?? '') ? Math.max(gap, 8) : Math.min(6.5, gap * 0.75);
-      if (last && w.y - last.y1 > 0 && w.y - last.y1 <= limit) {
+      // 言葉のすぐ下の数字の範囲（p.44 安寿 軽量浴槽台の「標準」「12-20」：3行にかかる2行の見出し）もつなぐ。前は別々になり、
+      // 「標準 レッド」「12-20 グリーン」のように、3つの高さのどれか分からなかった（2026-11-09 の点検）
+      const caption = !!last && !/\d/.test(last.s) && /^\d+(?:\.\d+)?(?:[-～~]\d+(?:\.\d+)?)+$/.test(w.s) && w.y - last.y1 <= 9;
+      if (last && w.y - last.y1 > 0 && (w.y - last.y1 <= limit || caption)) {
         last.s += /[～~-]$/.test(last.s) ? w.s : ` ${w.s}`;
         last.y1 = w.y;
       } else cells.push({y0: w.y, y1: w.y, s: w.s});
@@ -798,8 +858,34 @@ function rowLabels(b: Block, rows: PdfText[], right: number, heads: string[]): s
       const same = rows.filter((_, j) => picks[ci][j] === i);
       return same.length > 1 && each.length === same.length ? each[same.indexOf(r)] : text;
     });
-    return [heads[k], ...parts].filter(Boolean).join(' ');
+    return [heads[k], own[k]?.s ?? '', ...parts].filter(Boolean).join(' ');
   });
+}
+
+/**
+ * 罫線で金額を割り当てる：表の幅いっぱいの横の罫線（品番の列から金額の列までかかる線）で行をまとまりに分け、金額は自分のいるまとまりの行に付ける
+ * （まとまりの中の行の間の線は品番の列だけの短い線なので、区切りにしない）。罫線がない・まとまりと金額が1つずつ合わないときは null（assignPrices で推し量る）。
+ * 字の位置だけで推し量ると、p.136 の「SAV・SAVS 各¥…／SAVH・SAVA 各¥…」の SAVH を SAV・SAVS の金額にしていた（2026-11-09 の点検）
+ */
+function rulePrices(rows: PdfText[], prices: Price[], rules: CatalogRule[]): number[] | null {
+  if (!rules.length || !prices.length || !rows.length) return null;
+  const left = Math.min(...rows.map((r) => r.x));
+  const right = Math.max(...prices.map((p) => p.x));
+  const top = Math.min(...rows.map((r) => r.y - r.h), ...prices.map((p) => p.y - p.h)) - 12;
+  const bottom = Math.max(...rows.map((r) => r.y), ...prices.map((p) => p.y)) + 12;
+  const cuts = [...new Set(rules.filter((r) => r.x <= left + 3 && r.x + r.w >= right && between(r.y, top, bottom)).map((r) => Math.round(r.y * 10) / 10))].sort((a, c) => a - c);
+  if (!cuts.length) return null;
+  const band = (y: number) => cuts.filter((c) => c < y).length;
+  const rowBand = rows.map((r) => band(r.y - r.h / 2));
+  const priceBand = new Map<number, number>();
+  for (const p of prices) {
+    const k = band(p.y - p.h * 0.35);
+    if (priceBand.has(k)) return null; // 1つのまとまりに金額が2つ
+    priceBand.set(k, p.value);
+  }
+  if (rowBand.some((k) => !priceBand.has(k))) return null;
+  if ([...priceBand.keys()].some((k) => !rowBand.includes(k))) return null;
+  return rowBand.map((k) => priceBand.get(k)!);
 }
 
 /**
@@ -843,7 +929,21 @@ function assignPrices(rows: PdfText[], prices: Price[]): number[] {
 }
 
 /** メーカー名らしい字：カタカナ・漢字（ひらがなの文・仕様の●・送料などの言葉でない） */
-const isMakerName = (s: string) => !!s && s.length <= 30 && /[ァ-ヶー一-龠]/.test(s) && !/[ぁ-ん●:：／/]/.test(s) && !NOT_MAKER.test(s);
+// 寸法（p.175「幅52×奥行55.5cm」）をメーカーにしない：数字・× のある字は、「(株)」の付いた会社名（companyOf）でなければメーカーにしない
+const isMakerName = (s: string) => !!s && s.length <= 30 && /[ァ-ヶー一-龠]/.test(s) && !/[ぁ-ん●:：／/\d×]/.test(s) && !NOT_MAKER.test(s);
+/**
+ * 「(株)」「(有)」の付いた会社名（字は NFKC で半角のかっこ）。かたまりが会社名だけ（「みずわ工業(株)」「(有)ふれあいサポート」）か、
+ * 仕様の文の終わりにすき間なく続いた会社名（「●1(DY)(株)イーストアイ」「●1(D)ウチヱ(株)」「…お使いください。ケアメディックス(株)」）。
+ * 前はかたまりの最後の言葉しか見ず、「●」の付いた言葉はメーカーにしないので、空になっていた（2026-11-09 の点検）
+ */
+function companyOf(text: string): string {
+  const t = text.replace(/\s+/g, '');
+  if (/^(?:\((?:株|有)\)[^●:：。、()]+|[^●:：。、()]+\((?:株|有)\))$/.test(t) && !/×/.test(t) && t.length <= 30) return t;
+  const head = /(?:^|[●。、)])(\((?:株|有)\)[ァ-ヶー一-龠A-Za-zぁ-ん・0-9]+)$/.exec(t)?.[1];
+  const tail = /([ァ-ヶー一-龠A-Za-z・]+\((?:株|有)\))$/.exec(t)?.[1];
+  const name = head ?? tail ?? '';
+  return name && !NOT_MAKER.test(name) ? name : '';
+}
 
 /** 仕様の行（●…）の右の端の、すき間のあとのメーカー名（「アロン化成（株）」「（株）ダンロップホームプロダクツ」）。下の行から見る */
 function makerOf(b: Block): string {
@@ -860,6 +960,8 @@ function makerOf(b: Block): string {
     }
     for (const g of groups.reverse()) {
       const text = lineText(g);
+      const company = companyOf(text);
+      if (company) return company;
       // 「（D） ※は各々 パナソニック」のような所は、いちばん右の言葉（「（株）」だけならその前とつなぐ）
       const words = text.split(/\s+/).filter((w) => w && !/^[（(][A-Z][）)]$|^※/.test(w));
       const last = words.at(-1) ?? '';

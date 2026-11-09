@@ -70,7 +70,9 @@ try {
   // ---- 型番から入力：頭だけ同じ型番（PN-L4143）は入れない
   const code = block.getByLabel('品番', {exact: true});
   const lookup = block.getByRole('button', {name: '🔢 型番から検索'});
-  // 「📖 カタログから商品検索」の右（同じ段）に「🔢 型番から検索」（ユーザーの指示「右側に型番から検索をもってくる」2026-11-03）。品番の欄は商品名の右
+  // 「📖 カタログから商品検索」の右（同じ段）に「🔢 型番から検索」（ユーザーの指示「右側に型番から検索をもってくる」2026-11-03）。品番の欄は商品名の右。
+  // カタログを読み終わる（品目のプルダウンが出る）と上の段が高くなってボタンが下にずれるので、読み終わってから測る
+  await block.getByRole('combobox', {name: '品目', exact: true}).waitFor({timeout: 60000});
   const [sBox, lBox, cBox, nBox] = await Promise.all([block.getByRole('button', {name: '📖 カタログから商品検索'}), lookup, code, block.getByLabel('商品名')].map((x) => x.boundingBox()));
   assert.ok(lBox.x > sBox.x + sBox.width && Math.abs(lBox.y - sBox.y) < 4, `${JSON.stringify(sBox)} ${JSON.stringify(lBox)}`);
   assert.ok(cBox.x > nBox.x + nBox.width && Math.abs(cBox.y - nBox.y) < 4 && nBox.width > 150, `${JSON.stringify(nBox)} ${JSON.stringify(cBox)}`);

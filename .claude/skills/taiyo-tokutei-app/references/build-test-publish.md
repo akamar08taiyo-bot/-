@@ -36,6 +36,9 @@ E2E_PORT=5194 PLAYWRIGHT=/opt/node-tools/node_modules/playwright/index.mjs timeo
   カタログの窓・印刷はこの絵を出し、端末の中では PDF を読まない（ユーザーの話「タブレットで開くとパンフレットが開かない」。pdf.js は古い iPad の Safari で動かないことがある）。
   作るのに1ページ2秒ほど（26ページで初回 +45 秒）なので、PDF の中身ごとに `node_modules/.cache/tokutei-catalog/` に覚えておく。テストのサーバーは `catalog/*.jpg` も返す
   （返さないと PDF を読む作りに戻り、`e2e.mjs` の「PDF を読まない」で落ちる）。
+- カタログの全商品（2026-11-09）：`PLAYWRIGHT=… node test/tokutei/e2e-catalog-all.mjs <出力フォルダ>`（長くかかるので run_in_background で）。dist の text.json・rules.json から読み取りを作り、全ページの見出し・品番の位置を
+  カタログの窓で押して、その商品の枠か・色を選ぶ一覧が読み取りと同じか・押した商品（色まで）がそのまま見積もりに入るか（IndexedDB の `sales`）を見る。`e2e-items.mjs` は、カタログを読み終わってから（品目のプルダウンが出てから）ボタンの位置を測る
+  （読んでいるあいだは上の段が低く、ボタンが 60px ほど上にある。2026-11-09 にこれで1回落ちた）。
 - 文字のはみ出し（2026-11-03）：`E2E_PORT=5301 node test/tokutei/e2e-overflow.mjs <出力フォルダ>`。6つの保険者で、長い値（架空）の3商品の申請書・販売見積書のプレビューの欄（`data-fit`）の字が
   欄の外に出ていないかを、1366px・390px・最小フォントサイズ 12px のまねで数える（0 で合格）。字は1字ずつ Range で測り、空白は数えない（行の終わりの全角の空白は欄の外にぶら下がるが描かれない。
   前は事業所名・福岡市の原本の見出しがこれで「はみ出し」に出た）。パソコンの回では申請書・見積書の Excel も保存するので、taiyo-excel-export スキルの render.sh で画像にして目で見る。
@@ -72,9 +75,9 @@ E2E_PORT=5194 PLAYWRIGHT=/opt/node-tools/node_modules/playwright/index.mjs timeo
 ```sh
 cd /home/user/tokutei-wt && npm run -s build:tokutei
 cp dist-tokutei/index.html dist-tokutei/version.json /home/user/taiyo-portal/tokutei/
-cp -r dist-tokutei/catalog /home/user/taiyo-portal/tokutei/   # 介援隊のカタログの PDF・文字の一覧 text.json・ページの絵 *.jpg（PDF を変えたとき・まだないとき）
+cp -r dist-tokutei/catalog /home/user/taiyo-portal/tokutei/   # 介援隊のカタログの PDF・文字の一覧 text.json・横の罫線 rules.json（2026-11-09 から）・ページの絵 *.jpg（PDF を変えたとき・まだないとき）
 # タイルの使い方の文：taiyo-portal/index.html の APPS の name:'特定福祉用具 購入申請書・見積もり作成'
-cd /home/user/taiyo-portal && git add tokutei/index.html tokutei/version.json tokutei/catalog/*.pdf tokutei/catalog/*.jpg tokutei/catalog/text.json index.html && git commit … && git push -u origin master
+cd /home/user/taiyo-portal && git add tokutei/index.html tokutei/version.json tokutei/catalog/*.pdf tokutei/catalog/*.jpg tokutei/catalog/text.json tokutei/catalog/rules.json index.html && git commit … && git push -u origin master
 ```
 
 - 先にアプリのブランチを commit・push してから、ポータルを commit・push する。ポータルの `git fetch` で、ほかのセッションの公開が先に入っていないか見る。

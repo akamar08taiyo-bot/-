@@ -302,7 +302,7 @@ export function CatalogPicker({
                         key={`${v.code}-${v.label}`}
                         type="button"
                         onClick={() => pick(p, v)}
-                        className={`${chip} py-1.5 text-left text-slate-800 hover:border-sky-400 hover:bg-sky-50 ${item.code === v.code ? 'border-sky-500 bg-sky-100' : 'border-slate-300 bg-white'}`}
+                        className={`${chip} py-1.5 text-left text-slate-800 hover:border-sky-400 hover:bg-sky-50 ${item.code === v.code && [p.name, v.label].filter(Boolean).join(' ') === item.name.trim() ? 'border-sky-500 bg-sky-100' : 'border-slate-300 bg-white'}`}
                         aria-label={`${[p.name, v.label, v.code].filter(Boolean).join(' ')}を入れる`}
                       >
                         {v.label || v.code}
