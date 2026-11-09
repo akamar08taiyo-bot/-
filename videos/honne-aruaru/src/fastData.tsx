@@ -393,3 +393,58 @@ export const MapPin: React.FC<{x: number; y: number; frame: number; at: number; 
     </>
   );
 };
+
+// ───────── 答えの内訳（1本の帯。例：大好き・好き・嫌い・大嫌い）。帯は左から伸び、下に数字を並べる ─────────
+export type FSplit = {title?: string; parts: {label: string; value: number; color: string}[]};
+export const SPLIT_H = 236; // カードの高さのめやす（並べるときの間隔に使う）
+
+export const SplitCard: React.FC<{split: FSplit; top: number; from: number; to: number; unit?: string; decimals?: number}> = ({split, top, from, to, unit = '%', decimals = 1}) => {
+  const frame = useCurrentFrame();
+  if (frame < from || frame >= to) return null;
+  const p = pop(frame, from, 12, 220);
+  const grow = ramp(frame, from + 2, from + 16, Easing.out(Easing.cubic));
+  const BAR = 820;
+  const total = split.parts.reduce((v, s) => v + s.value, 0) || 100;
+  const shown = split.parts.filter((s) => s.value > 0);
+  return (
+    <div style={{position: 'absolute', left: 0, top, width: W, display: 'flex', justifyContent: 'center', opacity: life(frame, from, to, 2, 2)}}>
+      <div
+        style={{
+          position: 'relative',
+          transform: `scale(${0.6 + 0.4 * p})`,
+          transformOrigin: '50% 0%',
+          background: 'rgba(255,255,255,0.97)',
+          borderRadius: 28,
+          padding: '40px 50px 24px',
+          boxShadow: '0 10px 0 rgba(30,40,80,0.22), 0 18px 30px rgba(20,20,40,0.25)',
+        }}
+      >
+        {split.title && (
+          <div style={{position: 'absolute', top: -24, left: 30, background: C.navy, color: '#fff', fontFamily: F.maru, fontWeight: 900, fontSize: 30, padding: '3px 20px 5px', borderRadius: 999, whiteSpace: 'nowrap'}}>{split.title}</div>
+        )}
+        <div style={{width: BAR, height: 64, borderRadius: 14, overflow: 'hidden', display: 'flex', background: '#efe7e1'}}>
+          {split.parts.map((s, i) => {
+            const w = (BAR * s.value * grow) / total;
+            return (
+              <div key={i} style={{width: w, height: 64, background: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden'}}>
+                {w > 110 && <span style={{fontFamily: F.dela, fontSize: 34, color: '#fff', textShadow: '0 2px 0 rgba(0,0,0,0.25)', whiteSpace: 'nowrap'}}>{s.value.toFixed(decimals)}</span>}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{display: 'flex', justifyContent: 'center', flexWrap: 'wrap', columnGap: 26, rowGap: 4, marginTop: 14, maxWidth: BAR, opacity: clamp01((grow - 0.5) * 2)}}>
+          {shown.map((s, i) => (
+            <div key={i} style={{display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap'}}>
+              <div style={{width: 22, height: 22, borderRadius: 6, background: s.color}} />
+              <span style={{fontFamily: F.maru, fontWeight: 900, fontSize: 30, color: C.navy}}>{s.label}</span>
+              <span style={{fontFamily: F.dela, fontSize: 32, color: C.navy}}>
+                {s.value.toFixed(decimals)}
+                <span style={{fontSize: 22}}>{unit}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};

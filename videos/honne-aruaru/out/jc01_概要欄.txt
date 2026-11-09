@@ -43,7 +43,8 @@ https://www.genron-npo.net/media-file/document-file/9f90e026d8bcd050dce50b306006
 https://www.nippon.com/ja/articles/-/11643
 ・公開されている理由の数字が上位5〜6項目までのため、TOP5にしています。2024年の調査は理由の内訳が公開されておらず、2025年の調査は公表が延期されているため、2021年の調査を使っています
 
-地図：国土地理院 地理院タイル（全国最新写真（シームレス））を加工して作成
+地図：国土地理院 地理院タイル（写真。ズームレベル5は世界衛星モザイク画像）を加工して作成
+Images on 世界衛星モザイク画像 obtained from site https://lpdaac.usgs.gov/data_access maintained by the NASA Land Processes Distributed Active Archive Center (LP DAAC), USGS/Earth Resources Observation and Science (EROS) Center, Sioux Falls, South Dakota, 2026. Source of image data product.
 
 ※順位の項目と割合は、上の調査のとおりです（言葉は調査の日本語訳のまま）。グラフの目盛りは0〜100%です。
 

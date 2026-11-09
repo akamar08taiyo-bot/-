@@ -9,7 +9,7 @@ import {CountStamp, RankBadge, RankStrip, Tsukkomi} from './ranking';
 import {FPS, W, clamp01, life, pop, ramp} from './lib';
 import {Box, Scene, SceneView, cam, center, faceOf} from './scene';
 import type {RCam} from './rankingEp';
-import {COMPARE_H, CompareCard, FFact, FList, FPin, FPrev, FTrend, ListCard, MapPin, TrendChart} from './fastData';
+import {COMPARE_H, CompareCard, FFact, FList, FPin, FPrev, FSplit, FTrend, ListCard, MapPin, SPLIT_H, SplitCard, TrendChart} from './fastData';
 
 export type FRank = {
   rank: number;
@@ -28,6 +28,7 @@ export type FRank = {
   prev?: FPrev; // 前の年の同じ選択肢の数字（あると「前の年と比べると」のカードを出す）
   fact?: FFact; // 背景の事実（調査のほかの数字や、日付のある出来事）。ひと言の場所に出す
   pin?: FPin; // 地図の上の印（絵の上の位置 0〜1）
+  split?: FSplit; // 答えの内訳の帯（例：大好き・好き・嫌い・大嫌い）
   todo?: boolean; // 元の調査でまだ確かめていない順位（finish.py はこれが残っていると書き出しを止める）
 };
 export type FScript = {
@@ -473,15 +474,16 @@ const TopTeaser: React.FC<{from: number; to: number; b: (n: number) => number; c
 // 前の年との比べや背景の事実がある順位は、カードを上から順に積む（順位の札の下から）
 const ITEM_TOP = 536;
 const richLayout = (r: FRank) => {
-  if (!r.prev && !r.fact) return null;
+  if (!r.prev && !r.fact && !r.split) return null;
   const lines = r.item.split('|');
   const itemH = lines.length * fitSize(lines, 800, 96) * 1.22 + 58;
-  const compareTop = ITEM_TOP + itemH + 44;
-  const below = r.prev ? compareTop + COMPARE_H + 26 : ITEM_TOP + itemH + 40;
+  const splitTop = ITEM_TOP + itemH + 44;
+  const compareTop = r.split ? splitTop + SPLIT_H + 44 : splitTop;
+  const below = r.prev ? compareTop + COMPARE_H + 26 : r.split ? splitTop + SPLIT_H + 26 : ITEM_TOP + itemH + 40;
   const noteText = r.fact?.text ?? r.tsukkomi ?? '';
   const nl = noteText.split('|');
   const noteH = nl.length * fitSize(nl, 760, 64) * 1.35 + 62;
-  return {itemCy: ITEM_TOP + itemH / 2, compareTop, noteCy: below + 28 + noteH / 2};
+  return {itemCy: ITEM_TOP + itemH / 2, splitTop, compareTop, noteCy: below + 28 + noteH / 2};
 };
 
 export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
@@ -575,6 +577,7 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
             <React.Fragment key={i}>
               <RankBadge rank={r.rank} x={r.stat || !S.hideValues ? BADGE.x : W / 2} y={BADGE.y} from={s.from} to={s.to} tie={tie(r.rank)} />
               <ItemCard text={r.item} label={S.itemLabel} cy={L ? L.itemCy : ITEM_Y} from={s.b(0.5)} to={s.to} todo={r.todo} />
+              {r.split && L && <SplitCard split={r.split} top={L.splitTop} from={s.b(2.5)} to={s.to} unit={S.value.unit} decimals={S.value.decimals} />}
               {r.prev && L && (
                 <CompareCard prev={r.prev} curYear={S.year ?? r.prev.year + 1} cur={r.value} unit={S.value.unit} decimals={S.value.decimals} top={L.compareTop} from={s.b(3)} to={s.to} pillAt={s.b(4)} />
               )}
@@ -583,7 +586,7 @@ export const makeFastRanking = (S: FScript, FC: Record<string, unknown>) => {
               ) : (
                 !S.hideValues && <CountStamp x={STAMP.x} y={STAMP.y} count={r.value} from={s.b(1.5)} rollTo={s.b(2.5)} to={s.to} label={S.value.label} unit={S.value.unit} decimals={S.value.decimals} />
               )}
-              {note && <Tsukkomi text={note.text} cy={L ? L.noteCy : TSUK_Y} from={r.prev ? s.b(5) : s.b(3)} to={s.to} label={note.label} />}
+              {note && <Tsukkomi text={note.text} cy={L ? L.noteCy : TSUK_Y} from={r.prev ? s.b(5) : r.split ? s.b(4.5) : s.b(3)} to={s.to} label={note.label} />}
             </React.Fragment>
           );
         })}
