@@ -6,6 +6,7 @@
 # 金額・商品名は書かない（金額は部材リストから）。文の中の品番と、略した品番（「T113BP21・BP22・BP23」の BP22）は押す枠にしない。
 # usage: python3 -I scripts/maker-catalog/codes.py <text.json> <頭（toto・matsu6）> <出力の ts>
 import json
+import os
 import re
 import sys
 import unicodedata
@@ -78,6 +79,48 @@ if prefix == 'toto':
         if p['page'] in (101, 102):
             for it in p['items']:
                 INDEX.update(m.group(0) for m in re.finditer(r'[A-Z]{1,6}\d{1,5}[A-Z0-9]{0,10}(?:-[A-Z0-9]{1,6})*', it[0]))
+
+
+# 字の幅を測る書体（taiyo-excel-export スキルの setup-fonts.sh で入る。ないときは 0.55・1 の見積もり）
+try:
+    from PIL import ImageFont
+    FONT = ImageFont.truetype(os.path.expanduser('~/.fonts/BIZUDPGothic-Regular.ttf'), 100)
+except Exception:
+    FONT = None
+
+
+# 枠の端が字の途中にかかっていたら、その字の端まで広げる（ページの絵 catalog-toto/ で見る。書体の幅の見積もりでも、索引の「EWCS811R ····· 79」の
+# 終わりの R などが半字ほど切れた。2026-11-09 の再検品3）。広げるのは 1 字の幅まで。絵がなければそのまま
+_IMG = {}
+
+
+def widen_to_glyph(page, cx, y, cw, h):
+    try:
+        import numpy as np
+        from PIL import Image
+        path = os.path.join(os.path.dirname(os.path.abspath(out)), '../../catalog-toto', f'toto-p{page:03d}.jpg')
+        if page not in _IMG:
+            _IMG[page] = np.asarray(Image.open(path).convert('L'), dtype=np.int16) if os.path.exists(path) else None
+        a = _IMG[page]
+    except Exception:
+        return cx, cw
+    if a is None:
+        return cx, cw
+    H, W = a.shape
+    y0, y1 = int(round(y * H)), int(round((y + h) * H))
+    m = max(1, (y1 - y0) // 6)
+    col = (a[y0 + m:y1 - m] < 170).any(axis=0)
+    lim = max(2, int((y1 - y0) * 0.3))  # 半字まで。その中に字の切れ目がなければ（となりの字とくっついている）広げない
+    x0, x1 = int(round(cx * W)), int(round((cx + cw) * W))
+    if 0 < x0 < W and col[x0] and col[x0 - 1]:
+        k = next((k for k in range(1, lim + 1) if x0 - k >= 0 and not col[x0 - k]), None)
+        if k:
+            x0 = x0 - k + 1
+    if 0 < x1 < W - 1 and col[x1 - 1] and col[x1]:
+        k = next((k for k in range(1, lim + 1) if x1 + k < W and not col[x1 + k]), None)
+        if k:
+            x1 = x1 + k
+    return x0 / W, (x1 - x0) / W
 
 
 def width_of(s):
@@ -166,6 +209,20 @@ for p in pages:
         tw = width_of(sw) or 1
         cx = x + w * width_of(lead) / tw
         cw = w * width_of(printed) / tw
+        # TOTO：品番の前後に日本語・金額・「（L タイプ）」・表の番号がつながった文字は、字の幅を 0.55・1 と決めて見積もると半字〜1字ずれた
+        # （2026-11-09 の再検品3。p.43「トタイプ） EWT22AF35」の E・p.36「EWT10BE35LA（L タイプ）」の A が枠の外）。
+        # 書体（BIZ UDPゴシック）で字の幅を測り、品番が文字の頭なら左の端・終わりなら右の端にそろえる（表の番号の札など、書体のちがう字の分がずれない）
+        if prefix == 'toto' and FONT and sw.strip() != printed:
+            fw = FONT.getlength(sw) or 1
+            cw = w * FONT.getlength(printed) / fw
+            tail = sw[len(lead) + len(printed):]
+            if not lead.strip():
+                cx = x + w * FONT.getlength(lead) / fw
+            elif not tail.strip():
+                cx = x + w - w * FONT.getlength(tail) / fw - cw
+            else:
+                cx = x + w * FONT.getlength(lead) / fw
+            cx, cw = widen_to_glyph(p['page'], cx, y, cw, h)
         # 写真の札（TOTO p.64「写真は」の次の行の「T112HK7R」「#NW1です。」）：すぐ上の行か同じ行の左が「写真は」で終わる。
         # 同じページの表の行に同じ品番があれば外す（下で。手引きの21）
         caption = prefix == 'toto' and any(c[0].strip().endswith('写真は') and (0 < y - c[2] <= h * 1.8 and abs(c[1] - x) < 0.01 or abs(c[2] - y) < 0.004 and 0 <= x - (c[1] + c[3]) <= 0.01) for c in items)

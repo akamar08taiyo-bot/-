@@ -147,6 +147,14 @@ test('TOTO のカタログ：76 ページ。品番の形・位置が 0〜1 の�
   for (const c of ['T112CD6', 'YH702', 'CES9710C', 'TS139C2', 'UACN41R511W']) assert.ok(on(101).includes(c) || on(102).includes(c), c);
   assert.ok(on(101).length + on(102).length >= 370);
   assert.equal(tocOf(toto, 101)?.title, '品番索引'); // p.101 から索引（前は p.102 からで、p.101 が「イージーオーダー」と出た）
+  // 品番の前後に日本語・金額・「（L タイプ）」・表の番号がつながった文字の枠は、書体で字の幅を測って品番の字を全部囲む
+  // （前は字の幅を 0.55・1 と決めて見積もり、頭や終わりの1字が枠の外に出ていた。2026-11-09 の再検品3。絵で品番の左右の端を測った値と比べる）
+  const edge = (pg: number, code: string) => toto.pages.find((p) => p.page === pg)!.codes.filter((c) => c.code === code).map((c) => [c.x, c.x + c.w]);
+  for (const [x0, x1] of edge(43, 'EWT22AF35')) assert.ok(x0 <= 0.577 && x1 >= 0.655, `p.43 EWT22AF35 ${x0} ${x1}`); // 「トタイプ） EWT22AF35」の E
+  for (const [x0, x1] of edge(36, 'EWT10BE35LA')) assert.ok(x0 <= 0.541 && x1 >= 0.620, `p.36 EWT10BE35LA ${x0} ${x1}`); // 「EWT10BE35LA（L タイプ）」の A
+  for (const [x0] of edge(71, 'EWC730')) assert.ok(x0 <= 0.147, `p.71 EWC730 ${x0}`); // 「19 EWC730」の E
+  for (const [x0, x1] of edge(14, 'T110D34')) assert.ok(x1 - x0 >= 0.05, `p.14 T110D34 ${x0} ${x1}`); // 「T110D34 ¥（金額） ハンガーボルト」の 4
+  for (const [x0] of edge(82, 'T112CL9')) assert.ok(x0 <= 0.281, `p.82 T112CL9 ${x0}`); // 「L型手すり (T112CL9」の T
   // 注記の文の中の品番（p.84「なお、T110D26（樹脂プラグ20個入り）は…」）は、同じページの別売品の表の枠だけ
   assert.equal(on(84).filter((c) => c === 'T110D26').length, 1);
   // p.64「写真は T112HK7R／#NW1です。」の写真の札は、同じページの表の行（T112HK7R）があるので押す枠にしない（表の行の枠だけ）
