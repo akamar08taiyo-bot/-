@@ -14,7 +14,9 @@ import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {PointerEvent as ReactPointerEvent} from 'react';
 import {CATALOG, catalogLabel, catalogMatches, catalogPicks} from '../catalog.ts';
 import type {CatalogPagesFilter} from '../catalog.ts';
+import {featureBadges} from '../catalogItems.ts';
 import type {CatalogProduct, CatalogVariant} from '../catalogItems.ts';
+import {FeatureBadges} from '../components/FeatureBadges.tsx';
 import type {Sale} from '../types.ts';
 import {DPI, loadCatalogPage, loadCatalogProducts, loadCatalogText} from './catalogPdf.ts';
 import type {CatalogImage} from './catalogPdf.ts';
@@ -559,7 +561,7 @@ export function CatalogViewer({
                     data-key={p.key}
                     onClick={() => pickProduct(p)}
                     aria-label={`${p.name}を選ぶ`}
-                    title={`${p.name}（押すと商品の欄に入ります）`}
+                    title={`${[p.name, featureBadges(p).map((b) => b.text).join('・')].filter(Boolean).join('　')}（押すと商品の欄に入ります）`}
                     className={`absolute cursor-pointer rounded-md border-2 transition-colors ${
                       has ? 'border-teal-600 bg-teal-400/15 hover:bg-teal-400/25' : 'border-dashed border-sky-500/80 bg-sky-300/[0.07] hover:border-solid hover:bg-sky-300/25'
                     } ${choose?.key === p.key ? '!border-solid !bg-sky-300/30' : ''}`}
@@ -590,6 +592,8 @@ export function CatalogViewer({
         <div role="dialog" aria-label="色・品番を選ぶ" className="max-h-[45%] shrink-0 overflow-auto overscroll-contain border-t-2 border-sky-300 bg-white p-2 pb-3 shadow-[0_-4px_12px_rgba(15,23,42,0.12)]">
           <div className="mb-1.5 flex items-center gap-2">
             <span className="min-w-0 text-sm font-bold text-slate-800">{choose.name}</span>
+            {/* ひじ掛けあり／なし など（2026-11-09。肘付きと肘なしを取りちがえないように） */}
+            <FeatureBadges product={choose} />
             <button type="button" onClick={() => setChoose(null)} className="ml-auto shrink-0 rounded-md border border-slate-300 bg-white px-2 py-0.5 text-sm text-slate-600 hover:bg-slate-50" aria-label="選ぶのをやめる">
               ✕
             </button>

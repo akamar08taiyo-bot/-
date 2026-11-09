@@ -3,7 +3,7 @@
 // 前方一致・あいまいな一致はしない）
 import type {CatalogProduct, CatalogVariant} from './catalogItems.ts';
 import {taxOf} from './calc.ts';
-import {catalogItemPatch} from './catalogItems.ts';
+import {catalogItemPatch, featureBadges} from './catalogItems.ts';
 import {productRate} from './sales.ts';
 import type {Product, SaleItem, Settings} from './types.ts';
 
@@ -46,7 +46,7 @@ export function findByCode(code: string, catalog: CatalogProduct[], products: Pr
       if (codeMatchKey(v.code) !== want && (!v.orderCode || codeMatchKey(v.orderCode) !== want)) return;
       const patch = catalogItemPatch(p, v, item, settings.discountRate);
       // 同じ品番で色・大きさのちがうもの（p.154 EA4-102 の4色、p.51 0973 の M と L など）も別々に出す（何番目かで見分ける。2026-11-09）
-      add(patch.name ?? p.name, patch.maker ?? p.maker, {key: `c:${p.key}:${i}:${v.code}`, label: [patch.name, patch.maker, v.code, `カタログ p.${p.page}`].filter(Boolean).join('　'), patch});
+      add(patch.name ?? p.name, patch.maker ?? p.maker, {key: `c:${p.key}:${i}:${v.code}`, label: [patch.name, patch.maker, v.code, `カタログ p.${p.page}`, featureBadges(p, v).map((b) => b.text).join('・')].filter(Boolean).join('　'), patch});
     });
   return out;
 }

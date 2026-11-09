@@ -143,7 +143,8 @@ test('段差解消スロープ（p.214）：品番ごとの TAIS コードと金
   assert.equal(slope.name, 'ダンスロープミニ');
   assert.equal(slope.maker, '（株）ダンロップホームプロダクツ');
   assert.equal(slope.category, '固定用スロープ');
-  assert.equal(slope.variants[0].label, 'R-7610M 奥行4.1×高さ1.0cm');
+  // 色は写真の横の「ブラウン」だけ（2026-11-09 の検品で足した。catalogFixes.ts）
+  assert.equal(slope.variants[0].label, 'R-7610M 奥行4.1×高さ1.0cm ブラウン');
   assert.ok(slope.variants.every((v) => /^\d{5}-\d{6}$/.test(v.tais)));
   const prices = slope.variants.map((v) => v.listPrice);
   assert.equal(prices[0], prices[1]); // 「各¥」の2行
@@ -218,7 +219,8 @@ test('歩行器のページ（p.136・137。2026-11-01 ユーザーの指示「�
 // メーカーの横の「🔍 商品検索」（ユーザーの指示「メーカー名の横に、商品検索ボタン。メーカー名、項目名を入力すると、フィルターをかけられた商品のみ表示されるようにする。
 // カタログも同様です」2026-11-01）：種目・項目名（商品名の欄に打った字）・メーカーで絞る。カタログの窓は、絞った商品の載っているページだけ
 test('商品検索：種目・項目名・メーカーで絞る（のばす音・ひらがなのちがいは同じ。品目の名前ならその品目をみな）', async () => {
-  const all = (await Promise.all(CATALOG.map((c) => productsOf(c.page)))).flat();
+  const all: CatalogProduct[] = [];
+  for (const c of CATALOG) all.push(...(await productsOf(c.page)));
   const item = (category: string, name: string, maker: string) => ({category, sub: '', name, maker});
   // 入浴補助用具・「シャワーチェアー」・パナソニック → p.40 のパナソニックのシャワーチェア 11
   const pana = catalogFilter(all, item('入浴補助用具', 'シャワーチェアー', 'パナソニックエイジフリー（株）'));
@@ -339,12 +341,16 @@ test('囲みの中の小さな囲み（p.175 の「5 バケツA型用 袋止めN
 test('品番のない商品（注文番号だけ）で金額がいくつもあるときは、金額と同じ行の字を色・大きさにする（p.47 オーバルリンク・p.48 乾度良好）', async () => {
   const p47 = await productsOf(47);
   const oval = p47.find((p) => /オーバルリンク/.test(p.name))!;
+  // タイプごとに色で分ける（2026-11-09 の検品。M・L は6色、ミディアムは1色、ロングは2色）
   assert.deepEqual(
-    oval.variants.map((v) => v.label.split(' ')[0]),
+    [...new Set(oval.variants.map((v) => v.label.split(' ')[0]))],
     ['マットタイプM', 'マットタイプL', 'ミディアムタイプ', 'ロングタイプL1', 'ロングタイプL2', 'ロングタイプL3'],
   );
+  assert.equal(oval.variants.length, 19);
   const p48 = await productsOf(48);
-  assert.deepEqual(p48.find((p) => /乾度良好/.test(p.name))!.variants.map((v) => v.label), ['50×80cm', '60×90cm', '90×120cm']);
+  const dry = p48.find((p) => /乾度良好/.test(p.name))!;
+  assert.deepEqual([...new Set(dry.variants.map((v) => v.label.split(' ')[0]))], ['50×80cm', '60×90cm', '90×120cm']);
+  assert.equal(dry.variants.length, 12);
 });
 
 test('品番のすぐ下・すぐ上の種類の名前・表の左の見出し（2026-11-03 の点検。前は「ト便座」・となりの行の名前・「普通便座やわらか便座暖房便座」になっていた）', async () => {
@@ -362,8 +368,8 @@ test('品番のすぐ下・すぐ上の種類の名前・表の左の見出し�
   assert.equal(label(p174, 'P2SEW02PJH'), '暖房便座 ピンク');
   // p.175 ジャスピタ：名前は品番の上
   const p175 = await productsOf(175);
-  assert.equal(label(p175, '533-900'), '標準タイプ');
-  assert.equal(label(p175, '533-901'), 'ソフト便座タイプ');
+  assert.equal(label(p175, '533-900'), '標準タイプ ブラウン');
+  assert.equal(label(p175, '533-901'), 'ソフト便座タイプ ブラウン');
   // p.177 座楽：品番の下の便座の種類
   const p177 = await productsOf(177);
   assert.equal(label(p177, 'PN-L23307'), 'ソフト便座');
@@ -372,7 +378,8 @@ test('品番のすぐ下・すぐ上の種類の名前・表の左の見出し�
   assert.equal(label(await productsOf(49), 'HR034'), 'U型/ヘッドレスト無し');
   const p214 = await productsOf(214);
   assert.equal(label(p214, 'MSRP1076'), '幅76×奥行3×高さ1cm');
-  assert.equal(label(p214, 'S-59'), '奥行21×高さ5.9cm');
+  // 1つの品番に3色（2026-11-09 の検品。最初の行はライトオーク）
+  assert.equal(label(p214, 'S-59'), '奥行21×高さ5.9cm ライトオーク');
   // 写真の横の寸法の行（「VALSBDLOR L：」「SAVS：」）を色にしない
   assert.equal(label(await productsOf(46), 'VALSBDSOR'), 'S/幅72cm');
   assert.equal(label(await productsOf(136), 'SAV'), 'スタンダード');
@@ -468,4 +475,79 @@ test('ページの書き方が特殊な商品の直し（catalogFixes.ts）は�
   const p137 = await productsOf(137);
   assert.equal(p137.flatMap((p) => p.variants).find((x) => x.code === 'WC-3010S')?.tais, '');
   assert.equal((await productsOf(154)).flatMap((p) => p.variants).find((x) => x.code === 'WB3502')?.tais, '');
+});
+
+// 2026-11-09 のユーザーの指摘：「パナソニックのユクリア コンパクトシャワーチェアで、本来は肘付きを見積もりに出さないといけないところを、肘なしの分で
+// 照合して型番が出てきた。金額を負けなければいけない状況になった」。カタログでは肘掛けの有無が名前の「SP」と機能アイコンでしか分からない
+test('機能アイコン（ひじ掛けあり／なし など）：表のどの行も1つの商品に当たり、ユクリア コンパクトの肘付き（SP）と肘なしを見分ける', async () => {
+  const {CATALOG_FEATURES} = await import('../../src/tokutei/catalogFeatures.ts');
+  const {armrestOf} = await import('../../src/tokutei/catalogItems.ts');
+  const all: CatalogProduct[] = [];
+  for (const c of CATALOG) all.push(...(await productsOf(c.page)));
+  for (const r of CATALOG_FEATURES) {
+    const hit = all.filter((p) => p.page === r.page && p.variants[0]?.orderCode === r.order && p.variants[0]?.code === r.code);
+    assert.equal(hit.length, 1, `p.${r.page} ${r.order} ${r.code}`);
+    assert.ok(hit[0].features, `p.${r.page} ${r.code} に機能が付いていない`);
+  }
+  const of = (code: string) => all.find((p) => p.variants.some((v) => v.code === code))!;
+  assert.equal(armrestOf(of('PN-L41321A')), true, 'コンパクトSPおりたたみN は肘付き');
+  assert.equal(armrestOf(of('PN-L40721A')), false, 'コンパクトおりたたみN は肘なし');
+  // パナソニックのシャワーチェア：名前に「SP」があるものは肘付き、ないものは肘なし（カタログのアイコンと名前が食い違わない）
+  for (const p of all.filter((p) => p.page >= 40 && p.page <= 41 && /シャワーチェア/.test(p.name))) assert.equal(armrestOf(p), /SP/.test(p.name), p.name);
+});
+
+test('商品検索：「肘付き」「肘なし」で絞る。使えなかった語は黙って捨てない（unmatched で知らせる）', async () => {
+  const all: CatalogProduct[] = [];
+  for (const c of CATALOG) all.push(...(await productsOf(c.page)));
+  const codes = (r: {items: CatalogProduct[]}) => r.items.flatMap((p) => p.variants.map((v) => v.code));
+  const item = {category: '入浴補助用具', sub: '', maker: 'パナソニックエイジフリー（株）'};
+  for (const word of ['ユクリア コンパクト 肘付き', 'ユクリア コンパクト ひじ掛け付', 'ユクリア コンパクト アームレスト', 'ゆくりあ こんぱくと 肘あり']) {
+    const r = catalogFilter(all, {...item, name: word});
+    assert.deepEqual(r.unmatched, [], word);
+    assert.ok(codes(r).includes('PN-L41321A'), `${word}：コンパクトSPおりたたみN がない`);
+    assert.ok(!codes(r).includes('PN-L40721A'), `${word}：肘なしのコンパクトおりたたみN が入っている`);
+    assert.ok(r.items.every((p) => /コンパクト/.test(p.name)), word);
+  }
+  for (const word of ['ユクリア コンパクト 肘なし', 'ユクリア コンパクト ひじ掛けなし', 'ユクリア コンパクト 肘無し']) {
+    const r = catalogFilter(all, {...item, name: word});
+    assert.ok(codes(r).includes('PN-L40721A'), word);
+    assert.ok(!codes(r).includes('PN-L41321A'), `${word}：肘付きのコンパクトSPおりたたみN が入っている`);
+  }
+  // 品目の名前をくっつけて打っても、残りの語（コンパクト）を捨てない
+  const glued = catalogFilter(all, {...item, name: 'ユクリア コンパクトシャワーチェア 肘付き'});
+  assert.ok(glued.items.length > 0 && glued.items.every((p) => /コンパクト/.test(p.name) && /SP/.test(p.name)), glued.items.map((p) => p.name).join(' / '));
+  // カタログにない語は unmatched に出す（前は品目を推し量るか、全部の商品を黙って出していた）
+  const odd = catalogFilter(all, {...item, name: 'ユクリア ふわふわ'});
+  assert.deepEqual(odd.unmatched, ['フワフワ']);
+});
+
+test('検品部隊の直し（2026-11-09）：表に色の欄がなく写真の横にしか色の名前がない商品も、色ごとに選べる・色が名前に出る', async () => {
+  const all: CatalogProduct[] = [];
+  for (const c of CATALOG) all.push(...(await productsOf(c.page)));
+  const labels = (code: string) => all.flatMap((p) => p.variants.filter((v) => v.code === code).map((v) => v.label));
+  // 1つの品番に色が2つ以上（各¥）→ 色ごとの行。金額は同じ
+  assert.deepEqual(labels('KS-90'), ['ライトグリーン', 'バナナイエロー', 'ピーチピンク', 'ネイビー']);
+  assert.deepEqual(labels('BSH01'), ['レッドオレンジ', 'ホワイト']);
+  assert.deepEqual(labels('S-14'), ['奥行6×高さ1.4cm ライトオーク', '奥行6×高さ1.4cm クリアー', '奥行6×高さ1.4cm ダーク']);
+  for (const code of ['KS-90', 'BSH01', 'S-14', 'KS2', 'YM001']) {
+    const ps = all.flatMap((p) => p.variants.filter((v) => v.code === code));
+    assert.equal(new Set(ps.map((v) => v.listPrice)).size, 1, `${code} の色ちがいは同じ金額`);
+  }
+  // 品番のない商品（注文番号だけ）も色ごと
+  assert.deepEqual(labels('261-W2280'), ['ブラウン', 'ローズ赤', 'ダークグレー', 'すずらん', 'ツツジ青', 'コスモス青花']);
+  // 色が1つだけの商品は、その色を名前に
+  assert.deepEqual(labels('YM-116L-SI'), ['薄手グリーン']);
+  assert.deepEqual(labels('640062'), ['ダークブルー']);
+  // 写真の横に1つだけある色の名前は、その写真の品番だけ（p.174 の「ブラウン」は 8253 の写真の横）
+  assert.deepEqual(labels('8252'), ['標準 肘掛け 自在タイプ']);
+  assert.deepEqual(labels('8253'), ['標準 肘掛け はね上げタイプ ブラウン']);
+  // 2行に割れた「穴無し／シート」は1語
+  assert.deepEqual(labels('RT-003'), ['穴無しシート']);
+  // 品番ごとにちがう機能：さわやかチェア 泉II の自在タイプ（8252）には「ひじ掛け跳ね上げ」を出さない
+  const {featureBadges} = await import('../../src/tokutei/catalogItems.ts');
+  const izumi = all.find((p) => p.variants.some((v) => v.code === '8252'))!;
+  const v = (code: string) => izumi.variants.find((x) => x.code === code)!;
+  assert.ok(!featureBadges(izumi, v('8252')).some((b) => b.text.startsWith('ひじ掛け跳ね上げ')), '8252 は自在タイプ');
+  assert.ok(featureBadges(izumi, v('8253')).some((b) => b.text === 'ひじ掛け跳ね上げ'), '8253 ははね上げタイプ');
+  assert.ok(featureBadges(izumi).some((b) => b.text.startsWith('ひじ掛け跳ね上げ（')), '商品の行では「…の品番のみ」');
 });

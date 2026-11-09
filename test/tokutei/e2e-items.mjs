@@ -334,6 +334,48 @@ try {
   assert.deepEqual(await p2.evaluate(overflowing), []);
   log('最小フォントサイズでも はみ出し 0');
 
+  // ---- 肘付き・肘なし（2026-11-09 のユーザーの指摘：「パナソニックのユクリア コンパクトシャワーチェアで、本来は肘付きを見積もりに出さないといけないところを、
+  // 肘なしの分で照合して型番が出てきた。金額を負けなければいけない状況になった」）。商品名に「肘付き」と打って商品検索 → 一覧は肘付き（SP）だけで「ひじ掛けあり」の札。
+  // 入れたあとも欄の下に「ひじ掛けあり」。肘なしで打てば肘なしだけ。カタログにない語は赤い知らせ
+  const p3 = await ctx.newPage();
+  p3.on('pageerror', (e) => errors.push(e.message));
+  p3.on('dialog', (d) => void d.accept());
+  await p3.goto(url);
+  await p3.getByRole('button', {name: '＋ 苅田町'}).click();
+  const b3 = p3.locator('[data-item]').first();
+  await b3.getByLabel('種目').selectOption('入浴補助用具');
+  const pk3 = b3.getByRole('group', {name: 'カタログの商品'});
+  await pk3.getByRole('combobox', {name: 'メーカー', exact: true}).waitFor({timeout: 60000});
+  await pk3.getByRole('combobox', {name: 'メーカー', exact: true}).selectOption('パナソニックエイジフリー（株）');
+  await b3.getByLabel('商品名').fill('ユクリア コンパクト 肘付き');
+  await pk3.getByRole('button', {name: '📖 カタログから商品検索'}).click();
+  const list3 = pk3.getByRole('list');
+  await list3.waitFor();
+  const rows3 = await list3.locator(':scope > li').allInnerTexts();
+  assert.ok(rows3.length > 0 && rows3.every((t) => /SP/.test(t) && /ひじ掛けあり/.test(t) && /コンパクト/.test(t)), rows3.join(' | '));
+  assert.ok(rows3.some((t) => /コンパクトSPおりたたみN/.test(t)), rows3.join(' | '));
+  assert.equal(await pk3.getByRole('alert').count(), 0);
+  await p3.screenshot({path: `${out}/items-armrest-list.png`});
+  // コンパクトSPおりたたみN のブルーを入れる → 品番は肘付きの PN-L41321A、欄の下に「ひじ掛けあり」
+  await list3.getByRole('button', {name: /コンパクトSPおりたたみN（3種類）/}).click();
+  await pk3.getByRole('button', {name: /コンパクトSPおりたたみN ブルー PN-L41321Aを入れる/}).click();
+  await p3.waitForFunction(() => [...document.querySelectorAll('[aria-label="品番"]')].some((e) => e.value === 'PN-L41321A'));
+  const picked3 = b3.getByLabel('入れた商品のカタログの機能');
+  await picked3.waitFor();
+  assert.match(await picked3.innerText(), /ひじ掛けあり/);
+  await p3.screenshot({path: `${out}/items-armrest-picked.png`});
+  // 肘なしで打てば肘なし（SP のない名前）だけ
+  await b3.getByLabel('商品名').fill('ユクリア コンパクト 肘なし');
+  await pk3.getByRole('button', {name: '📖 カタログから商品検索'}).click();
+  await list3.waitFor();
+  const rows4 = await list3.locator(':scope > li').allInnerTexts();
+  assert.ok(rows4.length > 0 && rows4.every((t) => !/SP/.test(t) && /ひじ掛けなし/.test(t)), rows4.join(' | '));
+  // カタログにない語は赤い知らせ（黙って捨てない）
+  await b3.getByLabel('商品名').fill('ユクリア ふわふわ');
+  await pk3.getByRole('button', {name: '📖 カタログから商品検索'}).click();
+  await pk3.getByRole('alert').filter({hasText: '「フワフワ」は'}).waitFor();
+  log('肘付き・肘なしで絞る・ひじ掛けあり／なしの札・入れた商品の欄・使えない語の知らせ OK');
+
   assert.deepEqual(errors, []);
   console.log('ok: 型番から入力・税抜/税込/割引率・お気に入り（品目ごと・削除）・見積書の上の段・はみ出し');
 } finally {

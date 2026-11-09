@@ -20,6 +20,7 @@ import {sortSubs, subShort} from '../category.ts';
 import {loadCatalogProducts} from '../print/catalogPdf.ts';
 import type {SaleItem} from '../types.ts';
 import {MakerInput} from './MakerInput.tsx';
+import {FeatureBadges} from './FeatureBadges.tsx';
 
 const yen = (n: number) => n.toLocaleString('ja-JP');
 
@@ -78,6 +79,9 @@ export function CatalogPicker({
   // 種目・項目名・メーカーで絞る（商品検索を押していないときも、一覧に出す商品はこの条件）。カタログから選んだ商品の名前のままなら、
   // 名前では絞らない（「商品：11件」の見出しで開き直して、同じ品目・メーカーのほかの商品に選び直せるように）
   const picked = !!item.code && !!all?.some((p) => p.variants.some((v) => v.code === item.code && [p.name, v.label].filter(Boolean).join(' ') === item.name.trim()));
+  // 入れたカタログの商品（ひじ掛けあり／なし などを、入れたあとも欄の下に出して確かめられるように。2026-11-09）
+  const pickedProduct = picked ? all?.find((p) => p.variants.some((v) => v.code === item.code && [p.name, v.label].filter(Boolean).join(' ') === item.name.trim())) : undefined;
+  const pickedVariant = pickedProduct?.variants.find((v) => v.code === item.code && [pickedProduct.name, v.label].filter(Boolean).join(' ') === item.name.trim());
   const by = picked ? {...item, name: ''} : item;
   const found = all ? catalogFilter(all, by) : null;
   // 条件の名前（「シャワーチェア・パナソニックエイジフリー（株）」）。項目名が品目と同じ（シャワーチェアー）なら重ねて書かない
@@ -239,6 +243,12 @@ export function CatalogPicker({
       {other && freeMaker('メーカー（打つ）')}
     </>,
     <>
+      {pickedProduct && (pickedProduct.features || !searched) && (
+        <p className="flex flex-wrap items-center gap-1 px-1 text-xs text-slate-700" aria-label="入れた商品のカタログの機能">
+          <span className="text-slate-500">入れた商品（カタログ p.{pickedProduct.page}）：</span>
+          {pickedProduct.features ? <FeatureBadges product={pickedProduct} variant={pickedVariant} /> : <span className="text-slate-500">機能のアイコンなし</span>}
+        </p>
+      )}
       {/* 「📖 カタログから商品検索」を押したら、種目・品目・メーカーで絞った商品の一覧（カタログの窓も同じ商品のページだけで開く） */}
       {searched && (
         <FoldHead
@@ -251,6 +261,12 @@ export function CatalogPicker({
             </span>
           }
         />
+      )}
+      {/* 絞り込みに使えなかった語は必ず知らせる（2026-11-09 のユーザーの指摘：「肘付き」などの語が黙って捨てられ、肘なしの型番が見積もりに入った） */}
+      {searched && found.unmatched.length > 0 && (
+        <p role="alert" className="rounded border border-red-200 bg-red-50 px-1.5 py-1 text-xs text-red-800">
+          「{found.unmatched.join('」「')}」は、カタログの商品名・品番・機能（ひじ掛けなど）にないので、絞り込みに使っていません。入れる前に、商品名・品番・ひじ掛けの有無を確かめてください。
+        </p>
       )}
       {searched && open && by.name.trim() && !found.byName && (
         <p className="px-1 text-xs text-amber-800">（「{item.name.trim()}」に合う商品がないので、{[what, item.maker.trim()].filter(Boolean).join('・')}の商品）</p>
@@ -277,6 +293,8 @@ export function CatalogPicker({
                   >
                     <span className="rounded bg-teal-100 px-1 text-[10px] text-teal-800">{subShort(p.sub, p.category)}</span>
                     <span className="font-bold">{p.name}</span>
+                    {/* ひじ掛けあり／なし などカタログの機能アイコン（2026-11-09。肘付きと肘なしを取りちがえないように） */}
+                    <FeatureBadges product={p} />
                     {!sameMaker(p.maker, item.maker) && p.maker && <span className="text-xs text-slate-500">{p.maker}</span>}
                     {prices.length === 1 && prices[0] > 0 && <span className="text-xs text-slate-600">定価 {yen(prices[0])}円（{p.taxFree ? '非課税' : '税抜'}）</span>}
                     {/* 非課税の商品（歩行器・多点杖など。カタログの金額の横の「非課税」）は一覧でも分かるように（ユーザーの指示「しっかりと全ての商品で認識する」2026-11-03） */}

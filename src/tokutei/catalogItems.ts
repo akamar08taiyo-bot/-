@@ -14,6 +14,7 @@ import {CATALOG, catalogPicks} from './catalog.ts';
 import type {CatalogPage} from './catalog.ts';
 import type {CatalogRule} from './print/catalogRules.ts';
 import {applyFix} from './catalogFixes.ts';
+import {CATALOG_FEATURES} from './catalogFeatures.ts';
 import type {Candidate} from './import/priceImport.ts';
 import {CATEGORIES, guessCategory, subShort, WHEELED} from './category.ts';
 import {taxOf} from './calc.ts';
@@ -50,6 +51,11 @@ export type CatalogProduct = {
    * （ユーザーの指示「カタログと商品をリンクさせて、自動的に商品名や金額などが全てはいるようにする」2026-11-02）
    */
   box?: PageBox;
+  /**
+   * カタログの機能アイコン（ひじ掛け・ひじ掛け跳ね上げ・座面回転・リクライニングなど）：true＝あり（黒）、false＝なし（灰色）。アイコンのない商品は undefined。
+   * catalogFeatures.ts の表から（2026-11-09 のユーザーの指摘：ユクリア コンパクトで肘付きのはずが肘なしの型番が入った）
+   */
+  features?: Record<string, boolean>;
 };
 export type PageBox = {x: number; y: number; w: number; h: number};
 
@@ -280,7 +286,11 @@ export function parseCatalogPage(raw: PdfText[], page: Pick<CatalogPage, 'page' 
   }
   const list = out.sort((a, c) => a.at.y - c.at.y || a.at.x - c.at.x).map((x) => x.p);
   // ページの書き方が特殊で読めない商品は、絵で確かめた直しを当てる（catalogFixes.ts。金額は読み取ったもの）
-  for (const p of list) p.variants = applyFix(p);
+  for (const p of list) {
+    p.variants = applyFix(p);
+    const f = CATALOG_FEATURES.find((r) => r.page === p.page && r.order === p.variants[0]?.orderCode && r.code === p.variants[0]?.code);
+    if (f) p.features = Object.fromEntries([...f.on.map((k) => [k, true] as const), ...f.off.map((k) => [k, false] as const)]);
+  }
   trimOverlaps(list);
   return list;
 }
@@ -1009,7 +1019,10 @@ for (const c of CATEGORIES) {
  *   どれにもなければ、その語から推し量った品目
  * 項目名に当たる商品がなければ、項目名を外した種目・メーカーの商品（byName が false）
  */
-export function catalogFilter(list: CatalogProduct[], f: CatalogFilter): {items: CatalogProduct[]; category: string; sub: string; byName: boolean} {
+export function catalogFilter(
+  list: CatalogProduct[],
+  f: CatalogFilter,
+): {items: CatalogProduct[]; category: string; sub: string; byName: boolean; unmatched: string[]} {
   const name = toKatakana((f.name || '').normalize('NFKC')).trim();
   const guess = name ? guessCategory(name) : {category: '', sub: ''};
   const category = f.category || guess.category;
@@ -1017,22 +1030,95 @@ export function catalogFilter(list: CatalogProduct[], f: CatalogFilter): {items:
   const maker = (f.maker || '').trim();
   const base = list.filter((p) => p.category && (!category || p.category === category) && (!sub || p.sub === sub) && (!maker || sameMaker(p.maker, maker)));
   const words = name.split(/\s+/).filter(Boolean);
-  if (!words.length) return {items: base, category, sub, byName: false};
+  if (!words.length) return {items: base, category, sub, byName: false, unmatched: []};
   const hay = new Map(base.map((p) => [p, looseKey(`${p.name} ${p.maker} ${p.variants.map((v) => `${v.code} ${v.label}`).join(' ')}`)]));
-  const tests = words.map((w): ((p: CatalogProduct) => boolean) => {
-    const key = looseKey(w);
-    const gen = GENERIC.get(key);
-    if (gen) return (p) => p.category === gen.category && (!gen.sub || p.sub === gen.sub);
-    // 商品名・品番にあるか、ページの題（かっこの中の例の名前は除く）にあるか：「シャワーキャリー」は、名前にシャワーキャリーとある商品と、
-    // p.48〜51 のシャワーキャリーのページの商品（シャトレチェア・シャワーラク など。名前にはない）
-    const onPage = (p: CatalogProduct) => looseKey((CATALOG.find((c) => c.page === p.page)?.title ?? '').replace(/（.*?）|\(.*?\)/g, '')).includes(key);
-    const literal = (p: CatalogProduct) => hay.get(p)!.includes(key) || onPage(p);
-    if (base.some(literal)) return literal;
-    const g = guessCategory(w);
-    return g.category ? (p) => p.category === g.category && (!g.sub || p.sub === g.sub) : () => false;
-  });
-  const hits = base.filter((p) => tests.every((t) => t(p)));
-  return hits.length ? {items: hits, category, sub, byName: true} : {items: base, category, sub, byName: false};
+  // 商品名・品番にあるか、ページの題（かっこの中の例の名前は除く）にあるか：「シャワーキャリー」は、名前にシャワーキャリーとある商品と、
+  // p.48〜51 のシャワーキャリーのページの商品（シャトレチェア・シャワーラク など。名前にはない）
+  const literal = (key: string) => (p: CatalogProduct) =>
+    hay.get(p)!.includes(key) || looseKey((CATALOG.find((c) => c.page === p.page)?.title ?? '').replace(/（.*?）|\(.*?\)/g, '')).includes(key);
+  const inCat = (g: {category: string; sub: string}) => (p: CatalogProduct) => p.category === g.category && (!g.sub || p.sub === g.sub);
+  const generic = [...GENERIC.keys()].filter(Boolean).sort((a, b) => b.length - a.length);
+  const tests: ((p: CatalogProduct) => boolean)[] = [];
+  // 絞り込みに使えなかった語。黙って捨てない（2026-11-09 のユーザーの指摘：「肘付き」を打っても絞られず、肘なしの型番が見積もりに入った。
+  // 前は、商品名にない語は品目を推し量るか、一致なしで全部の商品を出していた＝「肘付き」「コンパクト」が黙って消えた）
+  const unmatched: string[] = [];
+  for (const raw of words) {
+    let w = looseKey(raw);
+    // ひじ掛け（肘付き・肘掛け付・ひじあり・アーム付／肘なし・ひじ掛けなし）：カタログの機能アイコン（catalogFeatures.ts）で絞る
+    const arm = w.match(ARM_WORD);
+    if (arm) {
+      const none = /ナシ|無/.test(arm[0]);
+      tests.push((p) => armrestOf(p) === !none);
+      w = w.replace(ARM_WORD, '');
+      if (!w) continue;
+    }
+    const gen = GENERIC.get(w);
+    if (gen) {
+      tests.push(inCat(gen));
+      continue;
+    }
+    if (base.some(literal(w))) {
+      tests.push(literal(w));
+      continue;
+    }
+    // 品目の名前を含む語（「コンパクトシャワーチェア」＝シャワーチェアの品目で、名前に「コンパクト」のある商品）
+    const g = generic.find((k) => w.includes(k));
+    if (g) {
+      tests.push(inCat(GENERIC.get(g)!));
+      const rest = w.replace(g, '');
+      if (rest && base.some(literal(rest))) tests.push(literal(rest));
+      else if (rest) unmatched.push(raw);
+      continue;
+    }
+    const gc = guessCategory(raw);
+    if (gc.category) tests.push(inCat(gc));
+    else unmatched.push(raw);
+  }
+  // 絞れた語が1つもなければ、名前では絞っていない（byName は false。使えなかった語は unmatched で知らせる）
+  const hits = tests.length ? base.filter((p) => tests.every((t) => t(p))) : [];
+  return hits.length ? {items: hits, category, sub, byName: true, unmatched} : {items: base, category, sub, byName: false, unmatched};
+}
+
+/** 商品検索の「ひじ掛け」の語（肘付き・肘掛け付・ひじあり・アーム付・アームレスト／肘なし・ひじ掛けなし）。looseKey のあと（カタカナ）の字で見る */
+// looseKey は「ー」を除くので、アームレスト・アーム付は「アムレスト」「アム付キ」で見る
+const ARM_WORD = /(?:肘|ヒジ)(?:掛ケ|掛|カケ)?(?:付キ|付|ツキ|アリ|有リ|有|ナシ|無シ|無)?|アムレスト|アム(?:付キ|付|ツキ|アリ|ナシ|無シ|無)/;
+
+/**
+ * ひじ掛けがあるか：true＝あり、false＝なし、null＝カタログのアイコンで分からない。シャワーチェア・シャワーベンチは「ひじ掛け」のアイコン（黒＝あり・灰色＝なし）、
+ * シャワーキャリー・ポータブルトイレは「ひじ掛け跳ね上げ・昇降・着脱・高さ調整」のどれかがあれば、ひじ掛けのある商品（2026-11-09。catalogFeatures.ts）
+ */
+export function armrestOf(p: Pick<CatalogProduct, 'features'>): boolean | null {
+  const f = p.features;
+  if (!f) return null;
+  if ('ひじ掛け' in f) return f['ひじ掛け'];
+  return Object.entries(f).some(([k, v]) => k.startsWith('ひじ掛け') && v) ? true : null;
+}
+
+/**
+ * 品番（種類）で変わる機能：アイコンは商品（囲み）に1組だけなので、種類の言葉で分かれているときは、その言葉のある品番だけの機能
+ * （p.174 さわやかチェア 泉II・PT：「ひじ掛け跳ね上げ」のアイコンは黒でも、8252「肘掛け 自在タイプ」は跳ね上げではない。2026-11-09 の検品）
+ */
+const VARIANT_FEATURE: Record<string, RegExp> = {'ひじ掛け跳ね上げ': /はね上げ|跳ね上げ|はねあげ|跳上/};
+
+/**
+ * 一覧・色を選ぶ欄・入れた商品の欄に出す機能の札（ひじ掛けあり／なし は必ず。ほかは「あり」のものだけ）。
+ * v を渡すと、その品番に当たる札だけ（品番で変わる機能）。渡さないときは「（はね上げタイプのみ）」のように書く
+ */
+export function featureBadges(p: Pick<CatalogProduct, 'features'> & {variants?: Pick<CatalogVariant, 'label'>[]}, v?: Pick<CatalogVariant, 'label'>): {text: string; tone: 'yes' | 'no' | 'info'}[] {
+  const out: {text: string; tone: 'yes' | 'no' | 'info'}[] = [];
+  const arm = armrestOf(p);
+  if (arm === true && p.features && 'ひじ掛け' in p.features) out.push({text: 'ひじ掛けあり', tone: 'yes'});
+  if (arm === false) out.push({text: 'ひじ掛けなし', tone: 'no'});
+  for (const [k, on] of Object.entries(p.features ?? {})) {
+    if (!on || k === 'ひじ掛け') continue;
+    const re = VARIANT_FEATURE[k];
+    const labels = (p.variants ?? []).map((x) => x.label);
+    const split = re && labels.some((l) => re.test(l)) && labels.some((l) => !re.test(l));
+    if (!split) out.push({text: k, tone: 'info'});
+    else if (!v) out.push({text: `${k}（${re.exec(labels.find((l) => re.test(l))!)![0]}の品番のみ）`, tone: 'info'});
+    else if (re.test(v.label)) out.push({text: k, tone: 'info'});
+  }
+  return out;
 }
 
 /**
