@@ -28,8 +28,12 @@ TOKEN = TOKENS[prefix]
 SHOHIN = re.compile(r'^\d{3}-\d{4}$')  # マツ六の商品コード
 # 品番だけの文字（前にかっこ・長さ、うしろに ●・×本数・※・読点・かっこ閉じがついていてもよい）
 # 2026-11-09：前の「◆」（施工例の品番の一覧）・「／」（並べた品番の2つめ）・「2m：」（長さごとの品番）も（TOTO の品番索引にあるのに枠がなかった）
+# うしろに索引のページ番号までの点とページ番号（「T112CD6 ·····」「YH702 ····· 56,57,59」。前は点のある行だけ枠がなく、索引の品番の半分ほどが押せなかった。2026-11-09 の検品）
 # うしろに金額（「TS134GLMY7 ¥（金額）」「T110D34 ¥（金額） ハンガーボルト…」。表の行の品番と金額が1つの文字になっているもの）、前に「φ35：」も
-ITEM = re.compile(r'^[（(]?\s*(?:[（(]\d+mm[)）]\s*|[（(]\d+\s*個入[)）]\s*|◆\s*|／|\d+m[：:]\s*|φ\d+[：:]\s*)?(' + TOKEN + r')\s*(●)?(?:×\d+|※\d+|[、，,)）]|\s|R/L兼用)*(?:[¥￥][\d,]+.*)?$')
+# 前に「19 」（表の番号）・「…タイプ） 」（行の頭が前の行から続いた品名）、うしろに「（L タイプ）」も（p.71 EWC730・p.43・p.36 の Lタイプの行）
+# （「19 」「…タイプ） 」「（L タイプ）」は TOTO だけ。マツ六の「（2枚） AQ-SP10」は表の行の決まり（ROW_CODE）で読む方が枠の位置が合う）
+_HEAD_T, _TAIL_T = (r'|\d{1,2}\s+|[^\s（(]{1,12}[）)]\s+', r'(?:[（(][^）)]{1,12}[）)])?') if prefix == 'toto' else ('', '')
+ITEM = re.compile(r'^[（(]?\s*(?:[（(]\d+mm[)）]\s*|[（(]\d+\s*個入[)）]\s*|◆\s*|／|\d+m[：:]\s*|φ\d+[：:]\s*' + _HEAD_T + r')?(' + TOKEN + r')\s*(●)?(?:×\d+|※\d+|[、，,)）]|\s|R/L兼用|·)*(?:(?<=·)\s*\d{1,3}(?:,\d{1,3})*)?' + _TAIL_T + r'(?:[¥￥][\d,]+.*)?$')
 COLOR = re.compile(r'^#[A-Z0-9]{1,6}$')
 COLOR_HEAD = re.compile(r'^(#[A-Z0-9]{1,6})(?:です|[。、，,）)]|$)')
 
@@ -38,7 +42,7 @@ COLOR_HEAD = re.compile(r'^(#[A-Z0-9]{1,6})(?:です|[。、，,）)]|$)')
 TEXT_FIX = {('toto', 51, 'TS139CEE1'): 'TS139CEE11'}
 # 品番のないページ（TOTO p.104 は裏表紙。「K11·19DS」はカタログの管理記号）
 SKIP_PAGES = {'toto': {104}, 'matsu6': {21}}  # マツ六 p.21 は取付けの説明（ねじが使える商品の一覧だけ。売り物の表は p.22・p.23）
-KEEP_EMPTY = {'matsu6': {3, 21}, 'toto': {93, 95, 96, 97, 98, 99, 104}}  # 押す枠はないが、カタログの窓で見られるようにページは残す（TOTO のイージーオーダーのページ・裏表紙）
+KEEP_EMPTY = {'matsu6': {3, 21}, 'toto': {68, 81, 93, 95, 96, 97, 98, 99, 104}}  # 押す枠はないが、カタログの窓で見られるようにページは残す（TOTO のイージーオーダーのページ・裏表紙）
 # 品番でない所を囲んでいた枠（マツ六。検品の第6部で見つけ、絵で確かめた）：(ページ, 品番, y の下, y の上)。説明の見本・文の中・参照の表・写真の札
 DROP = {'matsu6': [
     (3, 'BGP-01MO', 0, 1),  # 「商品スペックの見方」の見本（売り物は p.34）
@@ -59,8 +63,15 @@ DROP = {'matsu6': [
     (20, 'TS134', 0, 1),  # 「ほかの商品（TS134・135・136型など）には使用できません」の型の名前
     (79, 'T112H', 0, 1), (79, 'T113H', 0, 1),  # 注意書きの「はね上げ手すり（T112H型・T113H型）」
     *[(pg, c, 0, 1) for pg in (82, 83, 84, 86, 88, 90) for c in ('EWCS801', 'EWC73')],  # 固定金具の一覧の「（EWCS801・802型…）」「（EWC73型）」
+    # 便器・洗浄弁・便座の品番（「手すりの取付できる便器」などの対応一覧・設置できない便器の注記・取付位置の見出し。手すりの部材ではない）
+    *[(68, c, 0, 1) for c in ('U507C', 'U508C')],
+    *[(73, c, 0, 1) for c in ('CS20AB', 'C743PVN', 'C480AN', 'CS210CN', 'TCF119', 'CS510BM', 'CS501')],
+    *[(78, c, 0, 1) for c in ('CS20AB', 'C743PVN', 'C480AN', 'CS480CN', 'C14RS', 'C480N', 'CS510BM')],
+    *[(79, c, 0, 1) for c in ('TEFV70UA', 'TEFV75UA', 'TEFV70E', 'TEVN10U', 'TEVN20U', 'TEVN10E', 'TEVN30U', 'TEVN35U', 'TEVN30E', 'TCF5831', 'TCF588', 'TCF4714', 'TCF6544', 'THE28A')],
+    *[(81, c, 0, 1) for c in ('CS310B', 'CS300B')],
+    (84, 'T110D26', 0.725, 0.735),  # 注記の文の中（「なお、T110D26（樹脂プラグ20個入り）は…」。同じページの別売品の表に枠がある）
 ]}
-# TOTO の品番索引（p.101・102）。略した書き方（「(T114CL9R・CL10R)」の CL10R）を、左の品番の頭（T114）をつないで索引にある品番にする
+# TOTO の品番索引（p.101・102）。略した書き方（「(T114CL9R・CL10R)」の CL10R）を見分ける（左の品番の頭 T114 をつなぐと索引にある品番になる）
 INDEX = set()
 if prefix == 'toto':
     for p in pages:
@@ -70,7 +81,8 @@ if prefix == 'toto':
 
 
 def width_of(s):
-    return sum(0.55 if ord(c) < 0x2000 else 1.0 for c in s)
+    # 「·」は品番索引（p.101・102）のページ番号までの点（「T112CD6 ·····」）。字の半分ほどの幅（絵で測った）
+    return sum(0.29 if c == '·' else 0.55 if ord(c) < 0x2000 else 1.0 for c in s)
 
 
 def split_cells(items):
@@ -94,17 +106,34 @@ def split_cells(items):
 
 data = []
 total = 0
+def join_split(items):
+    """PDF の文字で1つの品番が2つに割れているもの（TOTO p.52「（2000mm） TS1」「39CE2●」・p.64「T1」「12H6R」）を、同じ行ですき間のないものだけつなぐ"""
+    items = sorted(items, key=lambda it: (round(it[2], 3), it[1]))
+    out = []
+    for it in items:
+        prev = out[-1] if out else None
+        if (prev and abs(prev[2] - it[2]) < 0.004 and -0.005 <= it[1] - (prev[1] + prev[3]) <= 0.003
+                and re.search(r'[A-Z0-9]$', prev[0]) and re.match(r'^[A-Z0-9]', it[0]) and re.search(r'(?:^|\s)[A-Z]{1,3}\d{0,2}$', prev[0])):
+            out[-1] = [prev[0] + it[0], prev[1], prev[2], it[1] + it[3] - prev[1], max(prev[4], it[4])]
+        else:
+            out.append(list(it))
+    return out
+
+
 for p in pages:
     if p['page'] in SKIP_PAGES.get(prefix, set()):
         if p['page'] in KEEP_EMPTY.get(prefix, set()):
             data.append({'page': p['page'], 'codes': []})
         continue
-    items = split_cells(p['items'])
+    items = split_cells(join_split(p['items']) if prefix == 'toto' else p['items'])
     codes = []
     colors = [it for it in items if COLOR.match(it[0].strip())]
     for it in items:
         s = it[0]
         m = ITEM.match(s.strip())
+        if not m and prefix == 'toto':
+            # 品名と品番が1つの文字になったもの（TOTO p.82〜90 の固定金具必要個数一覧「L型手すり (T112CL9」。同じ行の T113BL9 には枠があった）
+            m = re.match(r'^.+?\s*[（(]\s*(' + TOKEN + r')\s*[・、]?$', s.strip())
         if not m:
             continue
         code = re.sub(r' ?× ?', '×', m.group(1))
@@ -122,21 +151,24 @@ for p in pages:
         # TOTO の「タイプ番号」（イージーオーダーの見本。「タイプ番号は品番ではありません」）は押す枠にしない：同じ文字の中か、同じ行のすぐ左に「タイプ番号」
         if prefix == 'toto' and ('タイプ番号' in s or any('タイプ番号' in c[0] and abs(c[2] - y) < 0.006 and 0 <= x - (c[1] + c[3]) <= 0.03 for c in items)):
             continue
+        printed = m.group(1)  # 枠の位置は印刷された字（直す前・空白のある「MG-8 × 40P」のまま）で測る（前は直したあとの字で探して見つからず、枠が右へずれた。2026-11-09 の再検品）
         code = TEXT_FIX.get((prefix, p['page'], code), code)
-        # 略した品番（「（T114CL9R・CL10R）」の CL10R）：同じ行のすぐ左の「（品番」の頭をつないで、索引にある品番になるなら、その品番
+        # 略した品番（「（T114CL9R・CL10R）」の CL10R）：同じ行のすぐ左の「（品番」の頭をつなぐと索引にある品番になるものは、略した書き方なので押す枠にしない
+        # （前からの決まり。2026-11-09 にいったん T114CL10R につないだが、同じ表の CL10・CP22 などほかの略した品番には枠がなく、そろわなかった。再検品の指摘）
         if INDEX and code not in INDEX:
-            left = [c for c in items if abs(c[2] - y) < 0.004 and 0 <= x - (c[1] + c[3]) <= 0.02 and c[0].strip()[:1] in '（(']
-            for c in left:
-                mm = re.search(TOKEN, c[0])
-                full = next((mm.group(0)[:k] + code for k in range(1, len(mm.group(0))) if mm and mm.group(0)[:k] + code in INDEX), None) if mm else None
-                if full:
-                    code = full
-                    break
+            left = [c for c in items if abs(c[2] - y) < 0.004 and 0 <= x - (c[1] + c[3]) <= 0.02 and (c[0].strip()[:1] in '（(' or re.search(r'[（(]\s*' + TOKEN, c[0]))]
+            if any((mm := re.search(TOKEN, c[0])) and any(mm.group(0)[:k] + code in INDEX for k in range(1, len(mm.group(0)))) for c in left):
+                continue
         # 品番の前に字があれば、その分だけ枠を右へ（字の幅は半角 0.55・全角 1 で見積もる）
-        lead = s[: s.find(code)]
-        tw = width_of(s) or 1
+        # 「◆ TCF5841AUPR#NW1」の ◆ のうしろの空白は PDF の文字にだけあって、絵では幅がない（数えると枠が半字右へずれた。TOTO p.56。2026-11-09 の再検品）
+        sw = re.sub(r'(?<=◆)\s+', '', s)
+        lead = sw[: max(sw.find(printed), 0)]
+        tw = width_of(sw) or 1
         cx = x + w * width_of(lead) / tw
-        cw = w * width_of(code) / tw
+        cw = w * width_of(printed) / tw
+        # 写真の札（TOTO p.64「写真は」の次の行の「T112HK7R」「#NW1です。」）：すぐ上の行か同じ行の左が「写真は」で終わる。
+        # 同じページの表の行に同じ品番があれば外す（下で。手引きの21）
+        caption = prefix == 'toto' and any(c[0].strip().endswith('写真は') and (0 < y - c[2] <= h * 1.8 and abs(c[1] - x) < 0.01 or abs(c[2] - y) < 0.004 and 0 <= x - (c[1] + c[3]) <= 0.01) for c in items)
         # マツ六：同じ行のすぐ左（すき間 6% まで）の商品コードまで枠を広げる
         if prefix == 'matsu6':
             left = [c for c in items if SHOHIN.match(c[0].strip()) and abs(c[2] - y) < 0.004 and 0 <= cx - (c[1] + c[3]) <= 0.06]
@@ -158,7 +190,11 @@ for p in pages:
                 if mm and abs(c[1] - cx) < 0.004 and 0 < c[2] - y <= h * 1.6:
                     code += mm.group(1)
                     break
-        codes.append([code, round(cx, 4), round(y, 4), round(max(cw, 0.01), 4), round(h, 4), row])
+        codes.append([code, round(cx, 4), round(y, 4), round(max(cw, 0.01), 4), round(h, 4), row or ('caption' if caption else False)])
+    if prefix == 'toto':
+        bases = [c[0].split('#')[0] for c in codes if c[5] != 'caption']
+        codes = [c for c in codes if c[5] != 'caption' or c[0].split('#')[0] not in bases]
+        codes = [c[:5] + [False] for c in codes]
     # 表の行の品番（2026-11-09 の検品）：商品コード（040-7301）の行で、品番の形（TOKEN）に当たらない品番（P34NV-400-00・DX14C・35LB4R・EL5060-1M-NS・
     # LW-YI-600 など）も、同じ行の右（25% まで）のいちばん近い「英字と数字のまじった語」を品番にする（前はこの形を読めず、約120行に枠がなかった）
     if prefix == 'matsu6':

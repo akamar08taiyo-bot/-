@@ -137,16 +137,34 @@ test('TOTO のカタログ：76 ページ。品番の形・位置が 0〜1 の�
   // 2026-11-09 の検品部隊で直した所（絵で確かめた）：
   // p.51 1100mm は TS139CEE11（PDF の文字では「1●」が欠けて TS139CEE1 だった）
   assert.ok(on(51).includes('TS139CEE11') && !on(51).includes('TS139CEE1'));
-  // p.82〜90「（T114CL9R・CL10R）」の略した CL10R は T114CL10R（品番索引にある品番）
-  assert.ok(on(82).includes('T114CL10R') && !codes.some((c) => c.code === 'CL10R'));
-  // p.64「写真は T112HK7R／#NW1です。」の2行に割れた品番は色の記号まで
-  assert.ok(on(64).includes('T112HK7R#NW1'));
+  // p.82〜90「（T114CL9R・CL10R）」の略した CL10R は押す枠にしない（同じ表の CL10・CP22 などほかの略した品番と同じ。前は CL10R の枠だけがあった）。
+  // 品名とくっついた「L型手すり (T112CL9」は枠にする（同じ行の T113BL9 と同じ）
+  for (const pg of [82, 84, 86, 88, 90]) {
+    assert.ok(!on(pg).includes('T114CL10R') && on(pg).includes('T114CL9R') && on(pg).includes('T112CL9') && on(pg).includes('T113BL9'), `p.${pg}`);
+  }
+  assert.ok(!codes.some((c) => c.code === 'CL10R' || c.code === 'CL10'));
+  // 品番索引（p.101・102）：点とページ番号のある行（「T112CD6 ·····」「YH702 ····· 56,57,59」）も枠（前は半分ほどしか押せなかった）
+  for (const c of ['T112CD6', 'YH702', 'CES9710C', 'TS139C2', 'UACN41R511W']) assert.ok(on(101).includes(c) || on(102).includes(c), c);
+  assert.ok(on(101).length + on(102).length >= 370);
+  // 注記の文の中の品番（p.84「なお、T110D26（樹脂プラグ20個入り）は…」）は、同じページの別売品の表の枠だけ
+  assert.equal(on(84).filter((c) => c === 'T110D26').length, 1);
+  // p.64「写真は T112HK7R／#NW1です。」の写真の札は、同じページの表の行（T112HK7R）があるので押す枠にしない（表の行の枠だけ）
+  assert.ok(on(64).includes('T112HK7R') && !on(64).includes('T112HK7R#NW1') && !on(64).includes('T112HP7#DB9'));
+  assert.equal(on(64).filter((c) => c === 'T113HK7R').length, 1);
+  // 直した品番・略した品番の枠は、印刷された字の所（前は直したあとの字で探して見つからず、右へずれた。2026-11-09 の再検品）
+  const box = (pg: number, code: string) => toto.pages.find((p) => p.page === pg)!.codes.filter((c) => c.code === code);
+  assert.equal(box(51, 'TS139CEE11').length, 2);
+  for (const c of box(51, 'TS139CEE11')) assert.ok(c.x < 0.47, `TS139CEE11 の枠 ${c.x}`);
   // イージーオーダーの「タイプ番号」（品番ではない）・裏表紙の管理記号は押す枠にしない。ページは見られるように残す
   for (const pg of [93, 95, 96, 97, 98, 99, 104]) assert.deepEqual(on(pg), [], `p.${pg}`);
   // p.36「2m：EWT22AG32」・p.57「◆CES9710C#NW1」など前に字の付いた品番も（品番索引にあるのに枠がなかった）
   assert.ok(on(36).includes('EWT22AG32') && on(57).includes('CES9710C#NW1'));
   // 表の行の品番と金額が1つの文字（p.22「TS134GLMY7 ¥（金額）」）・「φ35：EWT10CS35」も
   assert.ok(on(22).includes('TS134GLMY7') && on(35).includes('EWT10CS35'));
+  // PDF の文字で2つに割れた品番（p.52「TS1」「39CE2●」・p.64「T1」「12H6R」）・表の番号の付いた行（p.71「19 EWC730」）・「（L タイプ）」の付いた行
+  assert.ok(on(52).includes('TS139CE2') && on(64).includes('T112H6R') && on(71).includes('EWC730') && on(36).includes('EWT10BE35LA'));
+  // 便器・洗浄弁・便座の対応一覧の品番（手すりの部材ではない）は押す枠にしない
+  assert.ok(!on(73).includes('CS20AB') && !on(79).includes('TEFV70UA') && !on(81).includes('CS310B') && on(68).length === 0);
 });
 
 test('マツ六のカタログ（Vol.8）：64 ページ。表の「商品コード｜品番」に枠・部材の載っているページ・初めに開くカタログ', () => {
