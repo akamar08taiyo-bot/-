@@ -210,7 +210,10 @@ description: 太陽シルバーサービス行橋営業所の業務アプリ「�
   選んでいる行の箇所で開く（品番を押すと入る）。前の外のサイトのリンク（actibook＝マツ六・カタラボ＝TOTO・catalog.kaientai.cc＝介援隊。`catalogs.ts`）は消した。介援隊は特定福祉用具のカタログで、住宅改修では使わない。
 - **メーカーのカタログ（2026-11-04。マツ六の手すりカタログ Vol.8 100ページ・矢崎化工の PDF p.12〜81・TOTO の手すりカタログ 104ページ）**：部材を選ぶ画面の「📖 カタログから選ぶ」（`MakerCatalogView.tsx`、上の段で切り替え）。
   カタログの決まりは `makerCatalogs.ts` の `BOOKS`（並び＝切り替えの並びで先頭が初めに開く＝マツ六。メーカー名・ページ・絵の場所・色ちがいの見つけ方 `variants`＝矢崎化工・マツ六は品番のうしろの色の記号 suffix、TOTO は「#」のうしろ hash）。
-  ページの品番の枠を押すと `catalogMaterials`（1つならそのまま・2つ以上なら色を選ぶ・なければ品番だけの行）。部材の「📖 p.N」は `catalogPageOf`。
+  ページの品番の枠を押すと `catalogMaterials`（品番が同じ部材＝`sameCatalogCode` が1つならそのまま・色ちがい・頭だけ同じ品番は1つでも選ぶ画面・なければ品番だけの行）。部材の「📖 p.N」は `catalogPageOf`。
+  **2026-11-09 の点検（ユーザーの指示「カタログと商品が違ったものがあった。絶対に間違わないでほしい」）で直したこと**：① 前は合う部材が1つなら品番がちがってもそのまま入れていた（TOTO「YHB203#NW1」を押して、部材リストに #NW1 がなく #EL だけあると #EL が入った）
+  → そのまま入れるのは品番が同じとき（書き方・入り数の札のちがいは同じ）だけ（`MakerCatalogView.tsx` の `pick`）。② 頭が同じ部材を探すのは、カタログの品番が数字で終わる（色の記号のない「BD-08」「ECL-5049」）か、
+  部材の品番がすき間のあとに続く（「ECL-5006H」→「ECL-5006H USL」）ときだけ（マツ六「BD-01B」を押して、部材リストに BD-01B がないと色ちがいの BD-01BK が入っていた）。
   品番と位置：矢崎化工は OCR（`scripts/yazaki-catalog/ocr.mjs` → `merge.py`）、TOTO・マツ六は pdf.js（`scripts/maker-catalog/render.mjs` → `codes.py <text.json> toto|matsu6 <ts>`。
   マツ六は表の「商品コード｜品番」の商品コードまで枠を広げる・表の1行が「␇」区切りの1つの文字になっていることがある（codes.py の split_cells）。PDF に日本語の字体が入っておらず
   poppler の pdftoppm では日本語が消えるので、絵も pdf.js＋Chromium で描く。pdf.js の modern build は「InvalidPDFException」で読めず legacy build で読めた）。**金額はカタログから取らない**（部材リスト＝価格表から）。

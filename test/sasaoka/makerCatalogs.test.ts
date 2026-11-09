@@ -1,7 +1,7 @@
 // メーカーのカタログ（makerCatalogs.ts。矢崎化工・TOTO）：品番の合わせ方・部材の載っているページ・探す。部材は架空の名前・金額
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {BOOKS, bookOf, catalogMaterials, catalogPageOf, catalogSearch, codeKey, tocOf} from '../../src/sasaoka/makerCatalogs.ts';
+import {BOOKS, bookOf, catalogMaterials, catalogPageOf, catalogSearch, codeKey, sameCatalogCode, tocOf} from '../../src/sasaoka/makerCatalogs.ts';
 import type {Material} from '../../src/sasaoka/types.ts';
 
 const mat = (code: string, name = '見本の部材', maker = '矢崎化工'): Material => ({id: code, name, price: 100, listPrice: 200, pieceLengthM: 0, maker, code, unit: '', favorite: false, updatedAt: 1});
@@ -31,6 +31,28 @@ test('カタログの品番に合う部材：同じ品番があればそれだ�
   // 色の記号のない品番：ECL-5049 の色ちがい（ECL-50490 は別の品番）
   assert.deepEqual(catalogMaterials(list, 'ECL-5049').map((m) => m.code), ['ECL-5049 USL', 'ECL-5049 SGD']);
   assert.deepEqual(catalogMaterials(list, 'HCT-2000 T USL'), []);
+});
+
+test('色の記号で終わる品番（マツ六「BD-01B」）に、続きの字だけちがう別の色（「BD-01BK」）を入れない（2026-11-09 の点検）', () => {
+  const m6 = bookOf('matsu6');
+  const list = [mat('BD-01BK', '見本のブラケット', 'マツ六'), mat('BD-08B', '見本のブラケット', 'マツ六'), mat('BD-08G', '見本のブラケット', 'マツ六'), mat('ECL-5006H USL')];
+  assert.deepEqual(catalogMaterials(list, 'BD-01B', m6), []);
+  assert.deepEqual(catalogMaterials(list, 'BD-01BK', m6).map((m) => m.code), ['BD-01BK']);
+  // 色の記号のない品番（数字で終わる）は、今までどおり色を選ぶ
+  assert.deepEqual(catalogMaterials(list, 'BD-08', m6).map((m) => m.code), ['BD-08B', 'BD-08G']);
+  // すき間のあとの色の記号（矢崎化工）は、文字で終わる品番でも色ちがい
+  assert.deepEqual(catalogMaterials(list, 'ECL-5006H').map((m) => m.code), ['ECL-5006H USL']);
+});
+
+test('カタログの枠を押してそのまま入れるのは、品番が同じ部材だけ（書き方・入り数の札のちがいは同じ。色ちがい・頭だけ同じは選ぶ画面）', () => {
+  assert.ok(sameCatalogCode('ECA-5032 USL', 'eca－5032 usl'));
+  assert.ok(sameCatalogCode('CYA-1300 SGD', 'CYA-1300 3ﾎﾞﾝｲﾘ SGD'));
+  assert.ok(sameCatalogCode('YHB203#NW1', 'YHB203#NW1'));
+  assert.ok(!sameCatalogCode('YHB203#EL', 'YHB203#NW1'));
+  assert.ok(!sameCatalogCode('ECL-5049 USL', 'ECL-5049'));
+  assert.ok(!sameCatalogCode('BD-01BK', 'BD-01B'));
+  assert.ok(!sameCatalogCode('CYA-1300 MGR', 'CYA-1300 3ﾎﾞﾝｲﾘ SGD'));
+  assert.ok(!sameCatalogCode('', ''));
 });
 
 test('入り数の札（3ﾎﾞﾝｲﾘ・10ｲﾚ）のある品番：札があってもなくても同じ色の部材。札の前で切らない（2026-11-05 の点検）', () => {

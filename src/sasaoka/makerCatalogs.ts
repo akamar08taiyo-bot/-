@@ -148,6 +148,15 @@ const bareKey = (s: string) =>
       .join(' '),
   );
 
+/** 部材の品番とカタログの品番が同じ商品か（書き方のちがい・入り数の札のあるなしだけ。色ちがい・頭だけ同じ品番は別） */
+export const sameCatalogCode = (a: string, b: string) => {
+  const k = codeKey(a);
+  if (!k) return false;
+  if (k === codeKey(b)) return true;
+  const bare = bareKey(a);
+  return !!bare && bare === bareKey(b);
+};
+
 /**
  * カタログの品番に合う部材リストの部材。
  * 矢崎化工：同じ品番があればそれだけ。なければ、品番の頭が同じ部材（施工イメージのページの「ECL-5049」は色の記号のない品番なので、ECL-5049 USL・SGD … のどれか）。
@@ -164,7 +173,13 @@ export function catalogMaterials(materials: Material[], code: string, book: Cata
     return [...exact, ...colors];
   }
   if (exact.length) return exact;
-  const head = (key: (m: Material) => string, q: string) => materials.filter((m) => key(m).startsWith(q) && /^[A-Z]/.test(key(m).slice(q.length)));
+  // 頭が同じ部材は、色の記号のない品番（数字で終わる「BD-08」「ECL-5049」）か、部材の品番がカタログの品番のあとにすき間をあけて続く
+  // （「ECL-5006H」→「ECL-5006H USL」）ときだけ。色の記号で終わる品番の続き（マツ六「BD-01B」と「BD-01BK」は色がちがう）は入れない
+  // （ユーザーの指示「カタログと商品が違ったものがあった。絶対に間違わないでほしい」2026-11-09。部材リストに BD-01B がないと BD-01BK が入っていた）
+  const upper = (s: string) => nfkc(s).toUpperCase().replace(/\s+/g, ' ').trim();
+  const spaced = (m: Material) => upper(m.code).startsWith(upper(code)) && /^ /.test(upper(m.code).slice(upper(code).length));
+  const head = (key: (m: Material) => string, q: string) =>
+    materials.filter((m) => key(m).startsWith(q) && /^[A-Z]/.test(key(m).slice(q.length)) && (/\d$/.test(q) || spaced(m)));
   const byHead = head(keyOf, k);
   if (byHead.length) return byHead;
   // 入り数の札のちがいだけ（カタログ「CYA-1300 3ﾎﾞﾝｲﾘ SGD」⇔ 部材リスト「CYA-1300 SGD」など）

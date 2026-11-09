@@ -4,7 +4,7 @@
 // 上の段に目次（押すとその見出しのページへ）、下にページのスライダー（ユーザーの指示「カタログは目次みたいな感じで飛べるようにする」
 // 「ページを一気にとばせるように、下の方にスライダーを設置する」2026-11-05）。入れた品番は − ＋ で数量を変える（「数量をちょうせいできるようにする」）
 import {type CSSProperties, useEffect, useMemo, useRef, useState} from 'react';
-import {BOOKS, type BookId, bookOf, catalogMaterials, catalogSearch, codeKey, tocOf} from '../makerCatalogs.ts';
+import {BOOKS, type BookId, bookOf, catalogMaterials, catalogSearch, codeKey, sameCatalogCode, tocOf} from '../makerCatalogs.ts';
 import type {Material} from '../types.ts';
 import {num, yen} from '../util.ts';
 import {Btn, TextInput} from './ui.tsx';
@@ -103,10 +103,14 @@ function BookView({materials, start, onAdd, onAddCode, qtyOf, onBack, onSwitch}:
     setMark(code);
     const list = matches(code);
     // もう入れた品番（色を選ぶものはのぞく）をページの絵で押したら、数量を1つ増やす（別の行にしない）
-    const step = list.length <= 1 ? qtyOf?.(code) : null;
+    // 品番がぴったり同じ部材が1つだけなら、そのまま入れる。ちがう品番（色ちがい・色の記号のない品番の頭が同じ部材）は、1つだけでも
+    // 選ぶ画面を出して、押した人が品番を見て選ぶ（ユーザーの指示「カタログと商品が違ったものがあった。絶対に間違わないでほしい」2026-11-09。
+    // 前は TOTO「YHB203#NW1」を押して部材リストに #NW1 がなく #EL だけあると、そのまま #EL を入れていた）
+    const exact = list.length === 1 && sameCatalogCode(list[0].code, code); // 入り数の札（3ﾎﾞﾝｲﾘ）のあるなしだけのちがいは同じ品番
+    const step = exact || !list.length ? qtyOf?.(code) : null;
     if (step && step.n > 0) step.plus();
-    else if (list.length === 1) onAdd(list[0], code);
-    else if (list.length > 1) setChoose({code, list});
+    else if (exact) onAdd(list[0], code);
+    else if (list.length) setChoose({code, list});
     else onAddCode(code, book.maker);
   };
   const q = codeKey(query);
