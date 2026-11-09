@@ -123,8 +123,8 @@ test('TOTO：カタログの品番（#のうしろは色）に合う部材は、
   assert.ok(catalogSearch(toto, 'yhb203', []).includes(12));
 });
 
-test('TOTO のカタログ：74 ページ。品番の形・位置が 0〜1 の間・金額の字はない', () => {
-  assert.equal(toto.pages.length, 74);
+test('TOTO のカタログ：76 ページ。品番の形・位置が 0〜1 の間・金額の字はない', () => {
+  assert.equal(toto.pages.length, 76);
   const codes = toto.pages.flatMap((p) => p.codes);
   assert.ok(codes.length >= 1000, String(codes.length));
   for (const c of codes) {
@@ -134,17 +134,31 @@ test('TOTO のカタログ：74 ページ。品番の形・位置が 0〜1 の�
   // p.12（ハンドグリップ）の見本（目で見て確かめたもの）
   const on = (page: number) => toto.pages.find((p) => p.page === page)!.codes.map((c) => c.code);
   assert.deepEqual(['YHB203#NW1', 'YHBS203FBR#EL', 'YHBS203FR#MW'].filter((c) => on(12).includes(c)).length, 3);
+  // 2026-11-09 の検品部隊で直した所（絵で確かめた）：
+  // p.51 1100mm は TS139CEE11（PDF の文字では「1●」が欠けて TS139CEE1 だった）
+  assert.ok(on(51).includes('TS139CEE11') && !on(51).includes('TS139CEE1'));
+  // p.82〜90「（T114CL9R・CL10R）」の略した CL10R は T114CL10R（品番索引にある品番）
+  assert.ok(on(82).includes('T114CL10R') && !codes.some((c) => c.code === 'CL10R'));
+  // p.64「写真は T112HK7R／#NW1です。」の2行に割れた品番は色の記号まで
+  assert.ok(on(64).includes('T112HK7R#NW1'));
+  // イージーオーダーの「タイプ番号」（品番ではない）・裏表紙の管理記号は押す枠にしない。ページは見られるように残す
+  for (const pg of [93, 95, 96, 97, 98, 99, 104]) assert.deepEqual(on(pg), [], `p.${pg}`);
+  // p.36「2m：EWT22AG32」・p.57「◆CES9710C#NW1」など前に字の付いた品番も（品番索引にあるのに枠がなかった）
+  assert.ok(on(36).includes('EWT22AG32') && on(57).includes('CES9710C#NW1'));
+  // 表の行の品番と金額が1つの文字（p.22「TS134GLMY7 ¥（金額）」）・「φ35：EWT10CS35」も
+  assert.ok(on(22).includes('TS134GLMY7') && on(35).includes('EWT10CS35'));
 });
 
-test('マツ六のカタログ（Vol.8）：品番のある 58 ページ。表の「商品コード｜品番」に枠・部材の載っているページ・初めに開くカタログ', () => {
+test('マツ六のカタログ（Vol.8）：64 ページ。表の「商品コード｜品番」に枠・部材の載っているページ・初めに開くカタログ', () => {
   const m6 = bookOf('matsu6');
-  assert.equal(m6.pages.length, 58);
+  assert.equal(m6.pages.length, 64);
   assert.equal(m6.image(5), '../jutaku-mitsumori/catalog/matsu6-p005.jpg');
   assert.equal(m6.isMaker('マツ六株式会社'), true);
   const codes = m6.pages.flatMap((p) => p.codes);
   assert.ok(codes.length >= 1000, String(codes.length));
   for (const c of codes) {
-    assert.match(c.code, /^[A-Z]{1,4}-([A-Z]-)?\d{1,4}[A-Z0-9]{0,6}(-[A-Z0-9]{1,4})?$/, c.code);
+    // 表の行の品番は BJ-14WD の形のほかに P34NV-400-00・DX14C・35LB4R・EL5060-1M-NS・MG-8×40P・SD450-90 も（2026-11-09 の検品）
+    assert.match(c.code, /^(?=.*[A-Z])(?=.*\d)[A-Z0-9][A-Z0-9×-]{2,24}$/, c.code);
     for (const v of [c.x, c.y, c.x + c.w, c.y + c.h]) assert.ok(v >= 0 && v <= 1.001, `${c.code} ${v}`);
   }
   // p.5（手すり棒）の見本（目で見て確かめたもの）：枠は左の商品コード（040-2714）からかかる
@@ -157,6 +171,15 @@ test('マツ六のカタログ（Vol.8）：品番のある 58 ページ。表�
   assert.equal(catalogPageOf(t('BD-134'))?.book, 'matsu6');
   assert.deepEqual(catalogMaterials([t('BJ-14WD'), t('BJ-13WD')], 'BJ-14WD', m6).map((m) => m.code), ['BJ-14WD']);
   assert.ok(catalogSearch(m6, 'bd-134', []).length >= 1);
+  // 2026-11-09 の検品部隊で直した所（絵で確かめた）：表の行なのに枠がなかった品番
+  const codesOn = (page: number) => on(page).map((c) => c.code);
+  for (const [pg, code] of [[19, 'AF-1'], [22, 'SAQ-OP8'], [22, 'MG-8×40P'], [23, 'ST-1'], [23, 'BP-1'], [24, 'SAP-I-N400W'], [25, 'SAP-N01W'], [32, 'P34NV-400-00'], [38, '35LB4R'], [53, 'TL-1'], [59, 'DX14C'], [60, 'SD450-90'], [62, 'MBL-WC53-S'], [63, 'EL5060-1M-NS'], [71, 'BZD-F200']] as const)
+    assert.ok(codesOn(pg).includes(code), `p.${pg} ${code}`);
+  // 品番でない所の枠は外す：取付けの説明のページ（p.21。ページは残す）・説明の見本・文の中・参照の表・写真の札
+  assert.deepEqual(codesOn(21), []);
+  assert.ok(!codesOn(3).includes('BGP-01MO') && !codesOn(57).includes('BF-27') && !codesOn(71).includes('BZD-01') && codesOn(71).includes('BZD-01WD'));
+  // p.67 ベースマットの表の「対応たよレール」の列（押すとマットでなく手すりが入っていた）
+  assert.ok(!on(67).some((c) => c.code.startsWith('BZK-0') && c.y > 0.9));
 });
 
 test('目次と初めに開くページ：マツ六 p.43・TOTO p.24・矢崎化工 p.12。目次の見出しはページの順で、どれもカタログにあるページ（2026-11-05 の指示）', () => {
