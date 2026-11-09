@@ -157,6 +157,9 @@ test('TOTO のカタログ：76 ページ。品番の形・位置が 0〜1 の�
   for (const [x0] of edge(82, 'T112CL9')) assert.ok(x0 <= 0.281, `p.82 T112CL9 ${x0}`); // 「L型手すり (T112CL9」の T
   // 注記の文の中の品番（p.84「なお、T110D26（樹脂プラグ20個入り）は…」）は、同じページの別売品の表の枠だけ
   assert.equal(on(84).filter((c) => c === 'T110D26').length, 1);
+  // 参照の一覧（p.35「取り付けられる品番」）・図の札（p.38「支柱（EWT12BB35）」）も、同じページの表の行の枠だけ（再検品4）
+  assert.equal(on(35).filter((c) => c === 'EWT10BK35R').length, 1);
+  assert.equal(on(38).filter((c) => c === 'EWT12BB35').length, 1);
   // p.64「写真は T112HK7R／#NW1です。」の写真の札は、同じページの表の行（T112HK7R）があるので押す枠にしない（表の行の枠だけ）
   assert.ok(on(64).includes('T112HK7R') && !on(64).includes('T112HK7R#NW1') && !on(64).includes('T112HP7#DB9'));
   assert.equal(on(64).filter((c) => c === 'T113HK7R').length, 1);
