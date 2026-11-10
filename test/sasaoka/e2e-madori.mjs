@@ -218,9 +218,20 @@ assert.match(await art(), /<path d="M7280 0L10010 0L10010 910L8190 910L8190 2730
 }
 await page.keyboard.press('Escape');
 // ---------------- Excel のような図形（上の段の「図形」）
-await page.getByRole('toolbar', {name: '図形'}).getByRole('button', {name: /四角/}).click();
+await page.getByRole('toolbar', {name: '図形'}).getByRole('button', {name: '四角', exact: true}).click();
 await drag([1 * M, 6 * M], [3 * M, 7 * M]);
-assert.match(await art(), /<rect x="910" y="5460" width="1820" height="910" fill="none" stroke="#e01b24" stroke-width="30"/);
+assert.match(await art(), /<g transform="translate\(910 5460\)"><path d="M0 0H1820V910H0Z" fill="none" fill-rule="evenodd" stroke="#e01b24" stroke-width="30"/);
+// 「図形 ▼」の一覧（基本図形・線・矢印）から右矢印を選ぶ → 最近使用した図形に出る
+await page.getByRole('button', {name: '図形 ▼'}).click();
+const gallery = page.locator('[aria-label="図形の一覧"]');
+await gallery.getByRole('button', {name: '右矢印', exact: true}).click();
+assert.equal(await gallery.count(), 0);
+await drag([4 * M, 6 * M], [6 * M, 7 * M]);
+assert.match(await art(), /<g transform="translate\(3640 5460\)"><path d="M0 227.5L1092 227.5L1092 0L1820 455/);
+await page.getByRole('button', {name: '図形 ▼'}).click();
+assert.ok((await gallery.innerText()).includes('最近使用した図形'));
+await page.keyboard.press('Escape');
+await page.keyboard.press('Control+z');
 // ---------------- 方眼の下のスクロールバーで横に動かす
 {
   const vx = () => canvas.evaluate((s) => s.viewBox.baseVal.x);

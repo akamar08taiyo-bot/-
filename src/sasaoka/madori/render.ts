@@ -5,6 +5,7 @@
 import {FINISH, roomColor, roomFinish, TONE} from './catalog.ts';
 import {bounds, circled, joLabel, lineLength, railBend, roomAreaOf} from './model.ts';
 import {labelSpot, polyArea, polyPath, roomPts} from './poly.ts';
+import {shapeDef, shapeLine} from './shapes.ts';
 import type {MItem, Module} from './model.ts';
 
 export const WALL = '#203a55';
@@ -491,18 +492,12 @@ export function floorSvg(items: MItem[], o: RenderOpts): string {
 function shapeSvg(it: MItem): string {
   const c = it.color ?? RED;
   const sw = 30;
-  if (it.type === '四角') return `<rect x="${r1(it.x)}" y="${r1(it.y)}" width="${r1(it.w)}" height="${r1(it.h)}" fill="none" stroke="${c}" stroke-width="${sw}"/>`;
-  if (it.type === '丸') return `<ellipse cx="${r1(it.x + it.w / 2)}" cy="${r1(it.y + it.h / 2)}" rx="${r1(Math.abs(it.w) / 2)}" ry="${r1(Math.abs(it.h) / 2)}" fill="none" stroke="${c}" stroke-width="${sw}"/>`;
-  const x2 = it.x + it.w;
-  const y2 = it.y + it.h;
-  let s = `<path d="M${r1(it.x)} ${r1(it.y)}L${r1(x2)} ${r1(y2)}" stroke="${c}" stroke-width="${sw}" stroke-linecap="round" fill="none"/>`;
-  if (it.type === '矢印') {
-    const ang = Math.atan2(it.h, it.w);
-    const L = Math.min(260, Math.hypot(it.w, it.h) * 0.4);
-    const p = (d: number) => `${r1(x2 - L * Math.cos(ang + d))} ${r1(y2 - L * Math.sin(ang + d))}`;
-    s += `<path d="M${p(-0.45)}L${r1(x2)} ${r1(y2)}L${p(0.45)}Z" fill="${c}" stroke="${c}" stroke-width="10" stroke-linejoin="round"/>`;
-  }
-  return s;
+  const def = shapeDef(it.type);
+  if (!def || def.line) return shapeLine(it.type ?? '直線', it.x, it.y, it.w, it.h, c, sw);
+  // 箱の図形：箱の中の道を、回した向き（rot）で。塗るときは薄く
+  const d = def.path ? def.path(Math.abs(it.w), Math.abs(it.h)) : '';
+  const fill = it.fill && !def.open ? `fill="${c}" fill-opacity="0.18"` : 'fill="none"';
+  return placed(it, `<path d="${d}" ${fill} fill-rule="evenodd" stroke="${c}" stroke-width="${sw}" stroke-linejoin="round"/>`);
 }
 
 /** 一覧のボタンの絵：部品1つだけの SVG（viewBox は部品のまわり）。住設・家具・階段・間口・部屋 */

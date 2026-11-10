@@ -4,6 +4,7 @@
 
 import {DOOR_TYPES, fixType, roomType, STAIR_TYPES, STEP_TYPES, WINDOW_TYPES} from './catalog.ts';
 import {bounds, isShapeLine, mid, railBend, snapTo} from './model.ts';
+import {isLineShapeType} from './shapes.ts';
 import {edgeMoved, inPoly, movedPts, polyArea, polyEdges, shapeOf, snapPt, turnedPts, vertexMoved} from './poly.ts';
 import type {MItem, Module, Rot} from './model.ts';
 
@@ -27,9 +28,8 @@ export type Tool =
   | {t: 'dim'}
   | {t: 'shape'; type: ShapeType};
 
-/** 図形（Excel と同じ。上の段の「図形」のボタン） */
-export const SHAPE_TYPES = ['直線', '矢印', '四角', '丸'] as const;
-export type ShapeType = (typeof SHAPE_TYPES)[number];
+/** 図形（Excel と同じ。上の段の「図形 ▼」の一覧。shapes.ts） */
+export type ShapeType = string;
 /** 図形の色（赤・青・黒・緑） */
 export const SHAPE_COLORS: {name: string; hex: string}[] = [
   {name: '赤', hex: '#e01b24'},
@@ -312,7 +312,7 @@ export function makeItem(tool: Tool, a: P, b: P, clickOnly: boolean, ctx: {items
     }
     case 'shape': {
       // 直線・矢印はなぞった向きのまま（ななめも）、四角・丸はなぞった箱。押しただけなら決まった大きさ
-      if (tool.type === '直線' || tool.type === '矢印') {
+      if (isLineShapeType(tool.type)) {
         const w = clickOnly ? 900 : snapTo(b.x - a.x, 10);
         const h = clickOnly ? 0 : snapTo(b.y - a.y, 10);
         if (!w && !h) return null;
@@ -482,11 +482,6 @@ export function turnedItem(it: MItem, step: number): MItem {
     const cx = it.x + it.w / 2;
     const cy = it.y + it.h / 2;
     return {...it, x: snapTo(cx - it.h / 2, step), y: snapTo(cy - it.w / 2, step), w: it.h, h: it.w};
-  }
-  if (it.kind === 'shape' && !isShapeLine(it)) {
-    const cx = it.x + it.w / 2;
-    const cy = it.y + it.h / 2;
-    return {...it, x: Math.round(cx - it.h / 2), y: Math.round(cy - it.w / 2), w: it.h, h: it.w};
   }
   if (it.kind === 'rail' || it.kind === 'line' || it.kind === 'dim' || isShapeLine(it)) {
     const cx = it.x + it.w / 2;

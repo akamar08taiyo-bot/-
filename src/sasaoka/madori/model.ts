@@ -4,6 +4,7 @@
 // 長さはすべて mm。位置は図の左上を 0。部品は階（1階・2階…）ごとに持つ。
 
 import {polyArea, shapeOf} from './poly.ts';
+import {isLineShapeType} from './shapes.ts';
 import type {Pt} from './poly.ts';
 
 /** 部品の種類 */
@@ -50,6 +51,7 @@ export type MItem = {
   // 多角形の部屋の頂点（mm。辺はみな横か縦。poly.ts）。ないときは x・y・w・h の四角。あるときも x・y・w・h は囲む四角
   pts?: {x: number; y: number}[];
   color?: string; // 図形の色（#rrggbb。なければ赤）
+  fill?: boolean; // 箱の図形を薄く塗る
 };
 
 /** 下絵（スクリーンショット・手書きの間取りの写真をうすく敷いて、なぞって描く。写真はこの端末の IndexedDB の番号。photos.ts） */
@@ -103,7 +105,7 @@ export const lineLength = (it: Pick<MItem, 'w' | 'h'>) => Math.round(Math.hypot(
 
 /** 部品の外まわりの四角（回したあと。線の部品は始点と終点を囲む） */
 /** 線の形の図形（直線・矢印。ほかの図形＝四角・丸は x・y・w・h の箱） */
-export const isShapeLine = (it: MItem) => it.kind === 'shape' && (it.type === '直線' || it.type === '矢印');
+export const isShapeLine = (it: MItem) => it.kind === 'shape' && isLineShapeType(it.type);
 
 export function bounds(it: MItem): {x: number; y: number; w: number; h: number} {
   if (it.kind === 'rail' || it.kind === 'line' || it.kind === 'dim' || isShapeLine(it)) {
@@ -250,6 +252,7 @@ export function cleanMadori(raw: unknown): Madori | undefined {
       if (it.flip === true) o.flip = true;
       if (it.turn === 1 || it.turn === -1) o.turn = it.turn;
       if (typeof it.color === 'string' && /^#[0-9a-f]{6}$/i.test(it.color)) o.color = it.color;
+      if (it.fill === true) o.fill = true;
       // 多角形の部屋の頂点（3つ以上の数の組だけ。囲む四角も頂点にそろえる）
       if (o.kind === 'room' && Array.isArray(it.pts)) {
         const pts = (it.pts as unknown[]).filter((q): q is {x: number; y: number} => !!q && typeof q === 'object' && Number.isFinite((q as Pt).x) && Number.isFinite((q as Pt).y)).map((q) => ({x: q.x, y: q.y}));

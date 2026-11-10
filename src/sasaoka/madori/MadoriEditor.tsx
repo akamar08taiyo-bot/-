@@ -16,6 +16,7 @@ import type {Update} from '../useStore.ts';
 import {DOOR_TYPES, FIX_TYPES, FINISH, ROOM_ROWS, ROOM_SHORT, ROOM_TYPES, roomFinish, STAIR_TYPES, STEP_TYPES, WINDOW_TYPES} from './catalog.ts';
 import {copied, DRAG_TOOLS, floorArea, handlesOf, hitTest, isCornerHandle, makeItem, moved, resized, SHAPE_COLORS, turnedItem} from './edit.ts';
 import {closed, orthoNext, shapeOf, snapPt} from './poly.ts';
+import {shapeDef, shapeIcon, SHAPES} from './shapes.ts';
 import type {Handle, P, Tool} from './edit.ts';
 import {MadoriPrint} from './MadoriPrint.tsx';
 import {bounds, circled, emptyMadori, hasMadori, joLabel, legendLines, legendText, lineLength, mid, MODULES, numberItems, roomAreaOf, snapStep, withFloor} from './model.ts';
@@ -60,6 +61,9 @@ type Drag =
   | {mode: 'pan'; sx: number; sy: number; v0: View}
   | {mode: 'under'; a: P; before: Madori; u0: {x: number; y: number}}
   | {mode: 'pinch'; d0: number; c0: {x: number; y: number}; v0: View};
+
+/** 最近使った図形（この端末の localStorage） */
+const RECENT_SHAPES = 'taiyo-madori-recent-shapes';
 
 /** 白紙の平面図・新しい階で、初めに選んでおく道具（いちばん描くことの多い部屋） */
 const FIRST_ROOM: Tool = {t: 'room', type: '洋室'};
@@ -708,6 +712,43 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     if (t.t !== 'room') setPoly(null); // 部屋の種類を替えるだけなら、描いている頂点はそのまま
   };
   const isTool = (t: Tool) => JSON.stringify(tool) === JSON.stringify(t);
+  // 図形の一覧（Excel の「図形 ▼」）と、最近使った図形（この端末に覚える。読めなくても動く）
+  const [shapeOpen, setShapeOpen] = useState(false);
+  const shapeBarRef = useRef<HTMLDivElement>(null);
+  const [recentShapes, setRecentShapes] = useState<string[]>(() => {
+    try {
+      const v: unknown = JSON.parse(localStorage.getItem(RECENT_SHAPES) ?? '[]');
+      return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && !!shapeDef(x)).slice(0, 10) : [];
+    } catch {
+      return [];
+    }
+  });
+  const pickShape = (name: string) => {
+    pick({t: 'shape', type: name});
+    setShapeOpen(false);
+    const next = [name, ...recentShapes.filter((x) => x !== name)].slice(0, 10);
+    setRecentShapes(next);
+    try {
+      localStorage.setItem(RECENT_SHAPES, JSON.stringify(next));
+    } catch {
+      /* 覚えられなくても図形は使える */
+    }
+  };
+  useEffect(() => {
+    if (!shapeOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (!shapeBarRef.current?.contains(e.target as Node)) setShapeOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShapeOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [shapeOpen]);
   // 一覧の絵（部品ごとの SVG。一度だけ作る）
   const thumbs = useMemo(() => {
     const by = <T extends {name: string}>(list: T[], f: (x: T) => string) => Object.fromEntries(list.map((x) => [x.name, f(x)])) as Record<string, string>;
@@ -1060,6 +1101,12 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
         </>
       )}
       {it.kind === 'num' && <MmInput label="大きさ" value={it.size ?? 260} onChange={(size) => setItem(it.id, {size})} min={60} />}
+      {it.kind === 'shape' && !shapeDef(it.type)?.line && !shapeDef(it.type)?.open && (
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={!!it.fill} onChange={(e) => setItem(it.id, {fill: e.target.checked || undefined})} className="h-4 w-4" />
+          薄く塗る
+        </label>
+      )}
       {it.kind === 'shape' && (
         <div className="flex flex-wrap items-center gap-1.5 text-sm" role="group" aria-label="図形の色">
           <span className="text-slate-600">色</span>
@@ -1160,29 +1207,34 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     const y0 = Math.min(content.y, v.y);
     return {x: x0, y: y0, w: Math.max(content.x + content.w, v.x + vw) - x0, h: Math.max(content.y + content.h, v.y + vh) - y0};
   })();
-  // 図形（Excel の「挿入 → 図形」と同じ。上の段の右の空いた所。ユーザーの指示「EXCELのような図形をそのまま書き込めるようにする」2026-11-10）
+  // 図形（Excel の「挿入 → 図形」と同じ。上の段の右の空いた所。ユーザーの指示「EXCELのような図形をそのまま書き込めるようにする」「ここの図形の機能はつけてください」2026-11-10）：
+  // 「図形 ▼」で一覧（最近使用した図形・基本図形・線・矢印）を開く。横には最近使った図形（初めは直線・矢印・四角・丸）と文字
+  const shapeBtn = (name: string, withLabel: boolean, onClick: () => void) => (
+    <button
+      key={name}
+      type="button"
+      aria-pressed={isTool({t: 'shape', type: name})}
+      aria-label={name}
+      title={name}
+      onClick={onClick}
+      className={`flex items-center gap-1 rounded-md border text-sm ${withLabel ? 'h-9 px-2' : 'h-9 w-10 justify-center'} ${isTool({t: 'shape', type: name}) ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+    >
+      <span className="block h-5 w-6 [&>svg]:h-full [&>svg]:w-full" aria-hidden dangerouslySetInnerHTML={{__html: shapeIcon(name)}} />
+      {withLabel && <span className="whitespace-nowrap">{name}</span>}
+    </button>
+  );
+  const quick = [...new Set([...recentShapes, '直線', '矢印', '四角', '丸'])].slice(0, 4); // 最近使った図形から、足りなければ初めの4つ
   const shapeBar = (
-    <div role="toolbar" aria-label="図形" className="flex flex-wrap items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 shadow-sm max-lg:justify-center">
-      <span className="px-1 text-sm text-slate-600">図形</span>
-      {(
-        [
-          ['直線', '╱'],
-          ['矢印', '↗'],
-          ['四角', '□'],
-          ['丸', '○'],
-        ] as const
-      ).map(([t, icon]) => (
-        <button
-          key={t}
-          type="button"
-          aria-pressed={isTool({t: 'shape', type: t})}
-          onClick={() => pick({t: 'shape', type: t})}
-          className={`flex h-9 items-center gap-1 rounded-md border px-2.5 text-sm ${isTool({t: 'shape', type: t}) ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
-        >
-          <span className="text-base leading-none">{icon}</span>
-          {t}
-        </button>
-      ))}
+    <div ref={shapeBarRef} role="toolbar" aria-label="図形" className="relative flex flex-wrap items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 shadow-sm max-lg:justify-center">
+      <button
+        type="button"
+        aria-expanded={shapeOpen}
+        onClick={() => setShapeOpen((o) => !o)}
+        className={`flex h-9 items-center gap-1 rounded-md border px-2.5 text-sm ${shapeOpen ? 'border-emerald-600 bg-emerald-50' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+      >
+        図形 ▼
+      </button>
+      {quick.map((n) => shapeBtn(n, false, () => pickShape(n)))}
       <button
         type="button"
         aria-pressed={isTool({t: 'text'})}
@@ -1192,6 +1244,19 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
         <span className="text-base font-bold leading-none">A</span>
         文字
       </button>
+      {shapeOpen && (
+        <div aria-label="図形の一覧" className="absolute right-0 top-full z-30 mt-1 max-h-[70vh] w-[19.5rem] overflow-y-auto rounded-lg border border-slate-300 bg-white p-2 shadow-xl max-sm:right-auto max-sm:left-0">
+          {[
+            ...(recentShapes.length ? [['最近使用した図形', recentShapes] as const] : []),
+            ...(['基本図形', '線', '矢印'] as const).map((g) => [g, SHAPES.filter((x) => x.group === g).map((x) => x.name)] as const),
+          ].map(([title, names]) => (
+            <div key={title} className="mb-2">
+              <div className="mb-1 border-b border-slate-200 pb-0.5 text-sm font-bold text-slate-700">{title}</div>
+              <div className="flex flex-wrap gap-1">{names.map((n) => shapeBtn(n, false, () => pickShape(n)))}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 

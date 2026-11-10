@@ -74,3 +74,20 @@ test('読み込み・絵：多角形の部屋の頂点を残し、道で塗る',
   assert.match(svg, /clip-path="url\(#t-c-r\)"/); // 畳割りを形で切り抜く
   assert.match(svg, />2\.5帖</);
 });
+
+test('図形（Excel と同じ一覧）：どの図形も絵になる（数でない値・空の道がない）。線は矢印の頭、箱は回した向き', async () => {
+  const {SHAPES, shapeIcon} = await import('../../src/sasaoka/madori/shapes.ts');
+  assert.ok(SHAPES.length >= 35);
+  for (const sh of SHAPES) {
+    const it: MItem = sh.line ? {id: 's', kind: 'shape', type: sh.name, x: 100, y: 100, w: 900, h: -600} : {id: 's', kind: 'shape', type: sh.name, x: 0, y: 0, w: 1200, h: 800, rot: 90};
+    const svg = floorSvg([it], {module: 910, showArea: false, showDims: false, nums: new Map(), pid: 't'});
+    assert.doesNotMatch(svg, /NaN|undefined/, sh.name);
+    assert.match(svg, /<path d="M/, sh.name);
+    assert.doesNotMatch(shapeIcon(sh.name), /NaN|undefined/, sh.name);
+  }
+  const arrow = floorSvg([{id: 'a', kind: 'shape', type: '両矢印', x: 0, y: 0, w: 1000, h: 0}], {module: 910, showArea: false, showDims: false, nums: new Map(), pid: 't'});
+  assert.equal((arrow.match(/Z" fill="#e01b24"/g) ?? []).length, 2); // 頭が両方に
+  const box = floorSvg([{id: 'b', kind: 'shape', type: '右矢印', x: 0, y: 0, w: 1000, h: 500, rot: 90, fill: true}], {module: 910, showArea: false, showDims: false, nums: new Map(), pid: 't'});
+  assert.match(box, /rotate\(90 500 250\)/);
+  assert.match(box, /fill-opacity="0\.18"/);
+});
