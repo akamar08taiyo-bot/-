@@ -29,6 +29,7 @@ import {EstimateEditor} from './estimate/EstimateEditor.tsx';
 import {EstimateHome, EstimateList, newEstimate} from './estimate/EstimateList.tsx';
 import {OrderPage} from './estimate/OrderPage.tsx';
 import {RiyuEditor} from './estimate/RiyuEditor.tsx';
+import {MadoriEditor} from './madori/MadoriEditor.tsx';
 import {ShinseiEditor} from './estimate/ShinseiEditor.tsx';
 import {TokuteiEditor} from './estimate/TokuteiEditor.tsx';
 import {hasShinseiInfo} from './estimateForms.ts';
@@ -39,6 +40,7 @@ import {photoIdsInUse, prunePhotos} from './photos.ts';
 import {PrintView} from './print/PrintView.tsx';
 import type {PrintRequest} from './print/PrintView.tsx';
 import {hasRiyuInfo} from './riyu.ts';
+import {hasMadori} from './madori/model.ts';
 import {EXAMPLE_KIT_ID, exampleKit} from './samples.ts';
 import {CATALOG_EVENT, flushTokutei, readFromTokutei, tokuteiNames, withTokuteiFields, writeTokutei} from './tokuteiLink.ts';
 import {DocsButton} from './components/DocsDialog.tsx';
@@ -97,8 +99,8 @@ function loadMonth(): string {
  * 同じ様邸の内容（氏名・住所・被保険者番号・改修の箇所・金額）なので、どれで直しても、ほかにすぐ出る。特定福祉用具申請書は、特定福祉用具のアプリをお客様の情報を渡して中に出す（TokuteiEditor.tsx）
  */
 function JobTabs({view, onView, cls}: {view: JobView; onView: (v: JobView) => void; cls: (on: boolean) => string}) {
-  // 携帯（md 未満）だけ、理由書のとなりに「📷 写真へ」（写真の欄へ飛ぶ。タブではない。タブレットは JobHeader.tsx。PhotoJump.tsx）
-  const touch = useTouchUi();
+  // 携帯（md 未満）だけ、タブの下に「📷 写真へ」（写真の欄へ飛ぶ。タブではない。タブレットは JobHeader.tsx。PhotoJump.tsx）。
+  // タブは6つ（2つずつ3段）なので、前のように理由書を1段まるごとにはしない（平面図のタブを足した。2026-11-09）
   // ユーザーの指示「住宅改修申請書、工事見積書、特定福祉用具申請書、販売見積書の順にする」（2026-10-23）。理由書は最後
   const tabs: [JobView, string][] = [
     ['shinsei', '📝 住宅改修申請書'],
@@ -106,6 +108,8 @@ function JobTabs({view, onView, cls}: {view: JobView; onView: (v: JobView) => vo
     ['tokutei', '🛁 特定福祉用具申請書'],
     ['hanbai', '🏷 販売見積書'],
     ['riyu', '📄 理由書'],
+    // 平面図（見取図）を描く（ユーザーの指示「平面図をつくれるような機能を追加する。まどりっちの機能やマイホームクラウドの機能もつけくわえる」2026-11-09。madori/）
+    ['madori', '📐 平面図'],
   ];
   // 画面の上の帯のタブ（ユーザーの指示「メインタブが二つある為、わかりづらい。住宅改修申請書、工事見積書、特定福祉用具申請書、販売見積書、理由書がメインのタブに入る」2026-11-03。
   // 前は帯の下の白い枠のタブ）。スマホ・タブレットの縦の幅では2つずつ並べる（5つ目の理由書は1段まるごと。「📷 写真へ」があるときは理由書のとなり）
@@ -113,15 +117,15 @@ function JobTabs({view, onView, cls}: {view: JobView; onView: (v: JobView) => vo
     <div
       data-job-tabs
       role="tablist"
-      aria-label="住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書"
+      aria-label="住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書・平面図"
       className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 max-md:basis-full md:flex md:flex-wrap lg:flex-nowrap"
     >
       {tabs.map(([v, text]) => (
-        <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => onView(v)} className={`${cls(view === v)} ${v === 'riyu' && !touch ? 'col-span-2' : ''}`}>
+        <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => onView(v)} className={cls(view === v)}>
           {text}
         </button>
       ))}
-      <PhotoJumpButton className="rounded-lg bg-sky-50 px-2 py-2 text-sm md:hidden" />
+      <PhotoJumpButton className="col-span-2 rounded-lg bg-sky-50 px-2 py-2 text-sm md:hidden" />
     </div>
   );
 }
@@ -191,7 +195,7 @@ function NavMenu({tab, onTab, trashCount, top = false}: {tab: MainTab; onTab: (t
 
 /** 何も入れていない見積書・様邸・申請書（作ってすぐ戻ったもの。残さない）。平面図の図だけ入れた様邸は残す */
 const isEmpty = (j: Job) =>
-  !j.customer.trim() && !j.staff && j.places.length === 0 && !j.address && !j.insuredNo && !j.date && !j.note && !hasShinseiInfo(j.shinsei) && !hasRiyuInfo(j.riyu) && !j.planPhoto;
+  !j.customer.trim() && !j.staff && j.places.length === 0 && !j.address && !j.insuredNo && !j.date && !j.note && !hasShinseiInfo(j.shinsei) && !hasRiyuInfo(j.riyu) && !j.planPhoto && !hasMadori(j.madori);
 
 export default function App({start}: {start: MainTab}) {
   const store = useStore();
@@ -575,6 +579,19 @@ export default function App({start}: {start: MainTab}) {
                       setJobView('estimate');
                     })
                   }
+                  docs={docs}
+                />
+              ) : estimateJob && jobView === 'madori' ? (
+                <MadoriEditor
+                  key={estimateJob.id}
+                  job={estimateJob}
+                  data={data}
+                  update={store.update}
+                  onBack={() => {
+                    removeIfEmpty(estimateJob);
+                    setEstimateId(null);
+                    setJobView('estimate');
+                  }}
                   docs={docs}
                 />
               ) : estimateJob && jobView === 'riyu' ? (

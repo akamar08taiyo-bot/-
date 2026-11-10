@@ -1,5 +1,5 @@
 #!/bin/sh
-# 見積書・請求書アプリのブラウザのテストを全部（38本）動かす（serve.mjs で http://localhost:5190 を配信しているあいだに。30分ほど）。
+# 見積書・請求書アプリのブラウザのテストを全部（39本）動かす（serve.mjs で http://localhost:5190 を配信しているあいだに。30分ほど）。
 # usage: node serve.mjs <サイト> sh run-e2e.sh <出力フォルダ> [リポジトリ（既定 /home/user/-）]
 # e2e-makercatalog.mjs は、サイトの jutaku-mitsumori/catalog/ にカタログのページの絵（リポジトリの catalog-yazaki/*.jpg・catalog-toto/*.jpg・catalog-matsu6/*.jpg）を置いておく
 OUT=${1:?出力フォルダ}
@@ -15,7 +15,7 @@ for t in "e2e.mjs http://localhost:5190/sasaoka/index.html" "e2e-settings.mjs ht
   "e2e-photomark.mjs http://localhost:5190" "e2e-photoadd.mjs http://localhost:5190" "e2e-import-docs.mjs http://localhost:5190" "e2e-delete.mjs http://localhost:5190" "e2e-zip.mjs http://localhost:5190" \
   "e2e-toolbar.mjs http://localhost:5190" "e2e-care.mjs http://localhost:5190" \
   "e2e-import-photos.mjs http://localhost:5190" "e2e-fukuoka.mjs http://localhost:5190" "e2e-kitakyushu.mjs http://localhost:5190" \
-  "e2e-import-tokutei.mjs http://localhost:5190" "e2e-docs.mjs http://localhost:5190" "e2e-share.mjs http://localhost:5190" "e2e-cloud.mjs http://localhost:5190" "e2e-otherforms.mjs http://localhost:5190" "e2e-kurume.mjs http://localhost:5190" "e2e-iizuka.mjs http://localhost:5190" "e2e-oita.mjs http://localhost:5190" "e2e-makercatalog.mjs http://localhost:5190" "e2e-fit.mjs http://localhost:5190"; do
+  "e2e-import-tokutei.mjs http://localhost:5190" "e2e-docs.mjs http://localhost:5190" "e2e-share.mjs http://localhost:5190" "e2e-cloud.mjs http://localhost:5190" "e2e-otherforms.mjs http://localhost:5190" "e2e-kurume.mjs http://localhost:5190" "e2e-iizuka.mjs http://localhost:5190" "e2e-oita.mjs http://localhost:5190" "e2e-makercatalog.mjs http://localhost:5190" "e2e-fit.mjs http://localhost:5190" "e2e-madori.mjs http://localhost:5190"; do
   set -- $t
   timeout 500 node "test/sasaoka/$1" "$2" "$OUT" > "$OUT/$1.log" 2>&1
   code=$?

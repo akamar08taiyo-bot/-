@@ -33,8 +33,8 @@ await form.waitFor();
 // 画面の上・ブラウザのタブの題名は「申請書・見積書作成」（太陽ポータルのタイルと同じ名前。ユーザーの答え「変える」、2026-10-22）
 assert.equal(await page.title(), '申請書・見積書作成');
 assert.equal(await page.locator('header').getByText('申請書・見積書作成', {exact: true}).count(), 1);
-const tablist = page.getByRole('tablist', {name: '住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書'});
-assert.deepEqual(await tablist.getByRole('tab').allInnerTexts(), ['📝 住宅改修申請書', '📋 工事見積書', '🛁 特定福祉用具申請書', '🏷 販売見積書', '📄 理由書']);
+const tablist = page.getByRole('tablist', {name: '住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書・平面図'});
+assert.deepEqual(await tablist.getByRole('tab').allInnerTexts(), ['📝 住宅改修申請書', '📋 工事見積書', '🛁 特定福祉用具申請書', '🏷 販売見積書', '📄 理由書', '📐 平面図']);
 assert.equal(await page.getByRole('tab', {name: '📝 住宅改修申請書'}).getAttribute('aria-selected'), 'true');
 // フリガナ → 被保険者氏名 → 被保険者番号 → 生年月日の年・月・日 → 郵便番号 → 住所 → 電話番号（架空の方）
 for (const t of ['みほん　はなこ', '見本 花子', '366989', '13', '4', '14', '824-0001', '福岡県行橋市中央1-1', '0930-00-0000']) {
@@ -302,7 +302,7 @@ if (withTokutei) {
 }
 await page.goto(`${site}/jutaku-mitsumori/index.html#tab=estimate&job=${encodeURIComponent(emptyId)}`);
 await page.reload();
-await page.getByRole('tablist', {name: '住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書'}).waitFor({timeout: 5000});
+await page.getByRole('tablist', {name: '住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書・平面図'}).waitFor({timeout: 5000});
 assert.equal(await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get('job')), emptyId);
 log('特定福祉用具申請書のタブを開いた様邸は、空でも消さない・一覧にお客様名・白紙の申請書は Excelで保存で選べない OK');
 

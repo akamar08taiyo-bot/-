@@ -33,7 +33,14 @@ export type XSheet = {
   header?: string; // ヘッダー・フッター（Excel の書き方。&L 左・&C 中・&R 右・&P ページ・&N ページ数・&9 文字の大きさ）
   footer?: string;
   font: {name: string; size: number}; // ふだんの文字（列の幅の単位もこの文字で決まる）
+  images?: XImage[]; // 貼る画像（平面図の見取図。madori/xlsx.ts）
+  // 1ページに合わせて印刷する（改ページのないシートだけ。Excel は「1ページに合わせる」にすると手動の改ページを使わない）。
+  // 字体のちがう PC（LibreOffice など）で列が広くなっても1枚に収まる（見取図。madori/xlsx.ts）
+  fitPage?: boolean;
 };
+
+/** 貼る画像（PNG）。位置と大きさはシートの左上（A1 の角）からの mm（列の幅・行の高さの mm で、どのマスの上かを決める） */
+export type XImage = {png: Uint8Array; x: number; y: number; w: number; h: number; name?: string};
 
 // XML に書けない制御文字は消す（Word・PowerPoint の Shift+Enter の改行 U+000B・改ページ U+000C は改行にする）。
 // 残すと Excel が「修復しますか」と聞いて、その欄の中身を捨てる（申請書の shinsei.ts の esc と同じ決まり）
@@ -157,14 +164,54 @@ function sheetXml(sh: XSheet, styles: Styles): string {
   return (
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
     '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+    (sh.fitPage ? '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' : '') +
     '<sheetViews><sheetView workbookViewId="0" showGridLines="0" zoomScale="100"/></sheetViews>' +
     `<sheetFormatPr defaultRowHeight="13.5"/><cols>${cols}</cols><sheetData>${rows}</sheetData>${merges}` +
     `<pageMargins left="${inch(m.l)}" right="${inch(m.r)}" top="${inch(m.t)}" bottom="${inch(m.b)}" header="${inch(m.header)}" footer="${inch(m.footer)}"/>` +
     // A4（9）。倍率を決めて、改ページは書いたとおりにする（「1ページに合わせる」にすると、Excel は改ページを使わない）
-    `<pageSetup paperSize="9" scale="${sh.scale ?? 100}" orientation="${sh.landscape ? 'landscape' : 'portrait'}"/>` +
+    `<pageSetup paperSize="9" scale="${sh.scale ?? 100}"${sh.fitPage ? ' fitToWidth="1" fitToHeight="1"' : ''} orientation="${sh.landscape ? 'landscape' : 'portrait'}"/>` +
     hf +
     breaks +
+    (sh.images?.length ? '<drawing r:id="rId1"/>' : '') +
     '</worksheet>'
+  );
+}
+
+const EMU_PER_MM = 36000;
+
+/** mm の位置 → マスと、そのマスの左上からのずれ（EMU）。列・行の境目は sheetXml と同じ mm */
+function cellAt(sizes: number[], v: number): {i: number; off: number} {
+  let start = 0;
+  for (let i = 0; i < sizes.length; i++) {
+    if (v < start + sizes[i] || i === sizes.length - 1) return {i, off: Math.max(0, Math.round((v - start) * EMU_PER_MM))};
+    start += sizes[i];
+  }
+  return {i: 0, off: 0};
+}
+
+/** 画像を置く図形の XML（画像1つにつき1つ。マスの大きさを変えても画像の大きさは変わらない＝editAs oneCell） */
+function drawingXml(sh: XSheet): string {
+  const colsMm = sh.cols;
+  const rowsMm = sh.rows.map((r) => r.h);
+  const pics = (sh.images ?? []).map((im, k) => {
+    const id = k + 2;
+    const a = {c: cellAt(colsMm, im.x), r: cellAt(rowsMm, im.y)};
+    const b = {c: cellAt(colsMm, im.x + im.w), r: cellAt(rowsMm, im.y + im.h)};
+    const name = esc(im.name ?? `画像 ${id}`);
+    return (
+      `<xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>${a.c.i}</xdr:col><xdr:colOff>${a.c.off}</xdr:colOff><xdr:row>${a.r.i}</xdr:row><xdr:rowOff>${a.r.off}</xdr:rowOff></xdr:from>` +
+      `<xdr:to><xdr:col>${b.c.i}</xdr:col><xdr:colOff>${b.c.off}</xdr:colOff><xdr:row>${b.r.i}</xdr:row><xdr:rowOff>${b.r.off}</xdr:rowOff></xdr:to>` +
+      `<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${id}" name="${name}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>` +
+      `<xdr:blipFill><a:blip r:embed="rId${k + 1}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>` +
+      `<xdr:spPr><a:xfrm><a:off x="${Math.round(im.x * EMU_PER_MM)}" y="${Math.round(im.y * EMU_PER_MM)}"/><a:ext cx="${Math.round(im.w * EMU_PER_MM)}" cy="${Math.round(im.h * EMU_PER_MM)}"/></a:xfrm>` +
+      `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor>`
+    );
+  });
+  return (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+    '<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+    pics.join('') +
+    '</xdr:wsDr>'
   );
 }
 
@@ -173,8 +220,28 @@ export function writeXlsx(sheets: XSheet[]): Uint8Array {
   if (sheets.length === 0) throw new Error('シートがありません');
   const styles = new Styles(sheets[0].font);
   const files: Record<string, Uint8Array> = {};
+  const drawings: number[] = []; // 画像のあるシート（何番目か）
+  let media = 0;
   sheets.forEach((sh, i) => {
     files[`xl/worksheets/sheet${i + 1}.xml`] = strToU8(sheetXml(sh, styles));
+    if (!sh.images?.length) return;
+    const d = drawings.length + 1;
+    drawings.push(i);
+    files[`xl/worksheets/_rels/sheet${i + 1}.xml.rels`] = strToU8(
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+        `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${d}.xml"/>` +
+        '</Relationships>',
+    );
+    files[`xl/drawings/drawing${d}.xml`] = strToU8(drawingXml(sh));
+    const rels = sh.images.map((im, k) => {
+      media++;
+      files[`xl/media/image${media}.png`] = im.png;
+      return `<Relationship Id="rId${k + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image${media}.png"/>`;
+    });
+    files[`xl/drawings/_rels/drawing${d}.xml.rels`] = strToU8(
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + rels.join('') + '</Relationships>',
+    );
   });
   const sheetName = (s: string) => esc(s.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31) || 'Sheet');
   files['[Content_Types].xml'] = strToU8(
@@ -182,9 +249,11 @@ export function writeXlsx(sheets: XSheet[]): Uint8Array {
       '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
       '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
       '<Default Extension="xml" ContentType="application/xml"/>' +
+      (media ? '<Default Extension="png" ContentType="image/png"/>' : '') +
       '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
       '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
       sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('') +
+      drawings.map((_, d) => `<Override PartName="/xl/drawings/drawing${d + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`).join('') +
       '</Types>',
   );
   files['_rels/.rels'] = strToU8(

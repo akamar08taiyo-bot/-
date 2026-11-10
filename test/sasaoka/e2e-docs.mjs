@@ -75,6 +75,7 @@ async function finish(page, dlg, retry) {
     ['特定福祉用具申請書', false, true],
     ['販売見積書', false, true],
     ['理由書', false, false],
+    ['平面図（見取図）', false, true], // 平面図を描いていないので選べない（2026-11-09）
   ]);
   await page.screenshot({path: path.join(outDir, 'docs-1-excel.png')});
   await xdlg.getByRole('button', {name: '📗 1つ保存する'}).click();
@@ -85,7 +86,7 @@ async function finish(page, dlg, retry) {
   await page.getByRole('tab', {name: '📄 理由書'}).click();
   await page.getByRole('tab', {name: '📄 理由書', selected: true}).waitFor();
   await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).first().click();
-  assert.deepEqual((await checks(xdlg)).map(([, c]) => c), [false, false, false, false, true]);
+  assert.deepEqual((await checks(xdlg)).map(([, c]) => c), [false, false, false, false, true, false]);
   await xdlg.getByRole('checkbox', {name: /^住宅改修申請書/}).check();
   await xdlg.getByRole('button', {name: '📗 2つ保存する'}).click();
   await page.waitForFunction(() => !document.querySelector('[role="dialog"]'), null, {timeout: 30000});
@@ -97,7 +98,7 @@ async function finish(page, dlg, retry) {
   names.length = 0;
   await (await openMore(page)).getByRole('button', {name: '✉ メールで送付', exact: true}).click();
   const mdlg = page.getByRole('dialog', {name: 'メールで送付（Excel）'});
-  assert.deepEqual((await checks(mdlg)).map(([, c]) => c), [false, false, false, false, true]);
+  assert.deepEqual((await checks(mdlg)).map(([, c]) => c), [false, false, false, false, true, false]);
   await mdlg.getByRole('checkbox', {name: /^住宅改修申請書/}).check();
   await page.screenshot({path: path.join(outDir, 'docs-2-mail.png')});
   await mdlg.getByRole('button', {name: '✉ 2つ付けてメールを作る'}).click();
@@ -138,7 +139,7 @@ async function finish(page, dlg, retry) {
   });
   await (await openMore(page)).getByRole('button', {name: '✉ メールで送付', exact: true}).click();
   const mdlg = page.getByRole('dialog', {name: 'メールで送付（Excel）'});
-  assert.deepEqual((await checks(mdlg)).map(([, c]) => c), [true, false, false, false, false]);
+  assert.deepEqual((await checks(mdlg)).map(([, c]) => c), [true, false, false, false, false, false]);
   await mdlg.getByRole('checkbox', {name: /^理由書/}).check();
   await page.screenshot({path: path.join(outDir, 'docs-4-phone-mail.png')});
   await mdlg.getByRole('button', {name: '✉ 2つ付けてメールを作る'}).click();

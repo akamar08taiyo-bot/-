@@ -1,7 +1,7 @@
 // 見積書・請求書・部材と施工費のマスタは、タブで切り替える1つのアプリ。
 // 太陽ポータル（taiyo-portal）の2つのフォルダ（jutaku-mitsumori/・sasaoka/）に同じアプリを置き、最初に開くタブだけを変える。
 // 同じサイトなので、データ（IndexedDB）も同じものを使う。
-// 開いているタブ・見積書（様邸）・発注書・申請書は、URL のうしろに #tab=…&job=…&view=order（住宅改修申請書は view=shinsei、特定福祉用具申請書は view=tokutei、販売見積書は view=hanbai、理由書は view=riyu）で残す（読み直しても同じ所を開く）。
+// 開いているタブ・見積書（様邸）・発注書・申請書は、URL のうしろに #tab=…&job=…&view=order（住宅改修申請書は view=shinsei、特定福祉用具申請書は view=tokutei、販売見積書は view=hanbai、理由書は view=riyu、平面図は view=madori）で残す（読み直しても同じ所を開く）。
 
 export const PORTAL_URL = 'https://akamar08taiyo-bot.github.io/taiyo-portal/';
 
@@ -12,8 +12,8 @@ export const APP_TITLE = '申請書・見積書作成';
 export type MainTab = 'estimate' | 'invoice' | 'sales' | 'master' | 'settings' | 'trash';
 const TABS: MainTab[] = ['estimate', 'invoice', 'sales', 'master', 'settings', 'trash'];
 
-/** 見積もり・申請書を作成するのタブで、様邸のどの画面を開いているか（工事見積書・発注書・住宅改修申請書・特定福祉用具申請書・販売見積書・理由書） */
-export type JobView = 'estimate' | 'order' | 'shinsei' | 'tokutei' | 'hanbai' | 'riyu';
+/** 見積もり・申請書を作成するのタブで、様邸のどの画面を開いているか（工事見積書・発注書・住宅改修申請書・特定福祉用具申請書・販売見積書・理由書・平面図） */
+export type JobView = 'estimate' | 'order' | 'shinsei' | 'tokutei' | 'hanbai' | 'riyu' | 'madori';
 
 /** URL のうしろの #tab=…&job=…&view=order（前の版の #job=… だけのときは、タブは null）。view=order は見積書の発注書、view=shinsei は住宅改修申請書、view=tokutei は特定福祉用具申請書、view=hanbai は販売見積書、view=riyu は理由書 */
 export function readHash(): {tab: MainTab | null; job: string | null; view: JobView} {
@@ -21,7 +21,7 @@ export function readHash(): {tab: MainTab | null; job: string | null; view: JobV
     const p = new URLSearchParams(location.hash.replace(/^#/, ''));
     const tab = p.get('tab');
     const view = p.get('view');
-    return {tab: TABS.includes(tab as MainTab) ? (tab as MainTab) : null, job: p.get('job') || null, view: view === 'order' || view === 'shinsei' || view === 'tokutei' || view === 'hanbai' || view === 'riyu' ? view : 'estimate'};
+    return {tab: TABS.includes(tab as MainTab) ? (tab as MainTab) : null, job: p.get('job') || null, view: view === 'order' || view === 'shinsei' || view === 'tokutei' || view === 'hanbai' || view === 'riyu' || view === 'madori' ? view : 'estimate'};
   } catch {
     return {tab: null, job: null, view: 'estimate'};
   }

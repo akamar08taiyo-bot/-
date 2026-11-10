@@ -1,4 +1,4 @@
-// 様邸の画面の「📗 Excelで保存」と「✉ メールで送付」：住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書の Excel を、チェックしたものだけ
+// 様邸の画面の「📗 Excelで保存」と「✉ メールで送付」：住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書・平面図の Excel を、チェックしたものだけ
 // まとめて保存する・メールに付ける（ユーザーの指示「Excel で保存っていうので、一つに…今までのまとめて保存の機能、要はチェックして、必要な分だけ保存していく。
 // デフォルトはその開いているページ…のみチェック。…メールで送付機能についても、基本的には一括で全てメールできるような形に…デフォルトは一つだけチェック」2026-10-30。
 // 前はタブごとの「📗 〇〇をExcelで保存」と、別の「📦 まとめて保存」（前に選んだものを覚えていた。2026-10-26）があった）。
@@ -16,6 +16,7 @@ import {DATA_LABEL, docsMail, isAppleMobile, isMobileDevice, openMailto, share, 
 import type {Attachment, Mail} from '../mailDraft.ts';
 import {JOB_SHARE_TYPE, jobPackageJson, jobPackageName} from '../jobShare.ts';
 import {getPhotos, photoIdsInUse} from '../photos.ts';
+import {hasMadori} from '../madori/model.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {tokuteiCase, tokuteiFiles, tokuteiHasItems} from '../tokuteiLink.ts';
 import type {TokuteiView} from '../tokuteiLink.ts';
@@ -24,13 +25,14 @@ import {downloadBlob} from '../util.ts';
 import {Btn, Modal, useToast} from './ui.tsx';
 
 /** 書類（様邸の画面のタブと同じ並び・同じ名前） */
-export type DocKind = 'shinsei' | 'estimate' | 'tokutei' | 'hanbai' | 'riyu';
+export type DocKind = 'shinsei' | 'estimate' | 'tokutei' | 'hanbai' | 'riyu' | 'madori';
 const KINDS: [DocKind, string][] = [
   ['shinsei', '住宅改修申請書'],
   ['estimate', '工事見積書'],
   ['tokutei', '特定福祉用具申請書'],
   ['hanbai', '販売見積書'],
   ['riyu', '理由書'],
+  ['madori', '平面図（見取図）'], // 平面図のタブで描いたもの（madori/xlsx.ts。2026-11-09）
 ];
 type Mode = 'excel' | 'mail';
 /** チェックできるもの：書類と、様邸のデータ（data） */
@@ -52,6 +54,7 @@ function whyNot(job: Job): Record<DocKind, string> {
     tokutei: tokutei ? '' : '特定福祉用具の商品がありません',
     hanbai: tokutei ? '' : '特定福祉用具の商品がありません',
     riyu: '',
+    madori: hasMadori(job.madori) ? '' : '平面図が描かれていません',
   };
 }
 
@@ -125,6 +128,12 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
     if (views.length) for (const b of await tokuteiFiles(job, views)) add(b.bytes, b.name);
     if (chosen.includes('riyu')) {
       const r = await riyuBook(job, s);
+      add(r.bytes, r.fileName);
+    }
+    if (chosen.includes('madori') && job.madori) {
+      // 平面図はブラウザで絵（PNG）にして貼る（印刷と同じ A4横の1枚。階ごとに1シート）
+      const [{madoriXlsx}, {svgToPng}] = await Promise.all([import('../madori/xlsx.ts'), import('../madori/sheet.ts')]);
+      const r = await madoriXlsx(job, s, job.madori, async (svg, w, h) => new Uint8Array(await (await svgToPng(svg, w, h, 2400)).blob.arrayBuffer()));
       add(r.bytes, r.fileName);
     }
     if (withData) {

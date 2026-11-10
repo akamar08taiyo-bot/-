@@ -14,7 +14,7 @@ const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
 const browser = await chromium.launch({env: {...process.env, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8'}});
 const errors = [];
-const TABS = ['📝 住宅改修申請書', '📋 工事見積書', '🛁 特定福祉用具申請書', '🏷 販売見積書', '📄 理由書'];
+const TABS = ['📝 住宅改修申請書', '📋 工事見積書', '🛁 特定福祉用具申請書', '🏷 販売見積書', '📄 理由書', '📐 平面図'];
 
 /** サンプルの様邸を開く（一覧から開くと工事見積書のタブ） */
 async function openSample(opt) {
@@ -51,10 +51,10 @@ const selected = (page) => page.locator('[role=tab][aria-selected=true]').innerT
   const tablist = page.locator('[data-job-tabs]');
   const jump = page.getByRole('button', {name: '写真の欄へ'});
   assert.equal(await jump.count(), 1);
-  // タブの格子の中、理由書のとなり（同じ段）
+  // タブの格子の中、理由書・平面図の段の下に1段まるごと（タブが6つになった。2026-11-09。前は理由書のとなり）
   assert.equal(await jump.evaluate((el) => !!el.closest('[data-job-tabs]')), true);
-  const [riyu, j] = [await page.getByRole('tab', {name: '📄 理由書'}).boundingBox(), await jump.boundingBox()];
-  assert.ok(Math.abs(riyu.y - j.y) < 1 && j.x > riyu.x && Math.abs(riyu.width - j.width) < 2, `${JSON.stringify(riyu)} ${JSON.stringify(j)}`);
+  const [riyu, madori, j] = [await page.getByRole('tab', {name: '📄 理由書'}).boundingBox(), await page.getByRole('tab', {name: '📐 平面図'}).boundingBox(), await jump.boundingBox()];
+  assert.ok(Math.abs(riyu.y - madori.y) < 1 && j.y > riyu.y + riyu.height - 1 && Math.abs(j.x - riyu.x) < 2 && Math.abs(j.x + j.width - (madori.x + madori.width)) < 2, `${JSON.stringify(riyu)} ${JSON.stringify(j)}`);
   await tablist.screenshot({path: path.join(outDir, 'photojump-iphone-tabs.png')});
   // 工事見積書のタブから押す → 住宅改修申請書のタブの写真の欄
   await jump.click();
