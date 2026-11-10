@@ -3,10 +3,11 @@
 // 背中を近くの壁に向けて壁ぎわに、手すりは壁ぞいに。長さはすべて mm
 
 import {DOOR_TYPES, fixType, roomType, STAIR_TYPES, STEP_TYPES, WINDOW_TYPES} from './catalog.ts';
-import {bounds, isShapeLine, mid, railBend, snapTo} from './model.ts';
+import {simplifyStroke} from '../photoMarks.ts';
+import {bounds, isShapeLine, mid, railBend, railPts, snapTo} from './model.ts';
 import {isLineShapeType} from './shapes.ts';
 import {edgeMoved, inPoly, movedPts, polyArea, polyEdges, shapeOf, snapPt, turnedPts, vertexMoved} from './poly.ts';
-import type {MItem, Module, Rot} from './model.ts';
+import type {MItem, MKind, Module, Rot} from './model.ts';
 
 export type P = {x: number; y: number};
 export type Box = {x: number; y: number; w: number; h: number};
@@ -229,6 +230,82 @@ export function straight(a: P, b: P, step: number): {x: number; y: number; w: nu
 }
 
 /**
+ * 曲げた手すりの点を整える：同じ点・同じ向きにまっすぐ続く途中の点を除く。2点ならまっすぐの手すり（pts なし）、3点より多ければ pts。
+ * x・y・w・h は1本目（始めの点から次の点まで）。L 字の len・turn は使わない（点で持つ）
+ */
+export function railFrom(it: MItem, pts: P[]): MItem {
+  const out: P[] = [];
+  for (const q of pts) {
+    const last = out[out.length - 1];
+    if (last && Math.hypot(q.x - last.x, q.y - last.y) < 1) continue;
+    out.push({x: q.x, y: q.y});
+  }
+  for (let i = 1; i < out.length - 1; ) {
+    const [a, b, c] = [out[i - 1], out[i], out[i + 1]];
+    const l = Math.hypot(b.x - a.x, b.y - a.y) * Math.hypot(c.x - b.x, c.y - b.y);
+    const cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+    const dot = (b.x - a.x) * (c.x - b.x) + (b.y - a.y) * (c.y - b.y);
+    if (l && Math.abs(cross) / l < 0.01 && dot > 0) out.splice(i, 1);
+    else i++;
+  }
+  if (out.length < 2) return it;
+  const {pts: _p, len: _l, turn: _t, ...rest} = it;
+  const [a, b] = out;
+  return {...rest, x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y, ...(out.length >= 3 ? {pts: out} : {})};
+}
+
+/**
+ * なぞった道から、曲がり角のある手すり（ユーザーの指示「横棒とL字など、自由自在に曲げれる棒（線は真っ直ぐ）」2026-11-10）：
+ * 道を間引いて曲がり角だけを残し（線はまっすぐ）、区間は線と同じく横・縦・45° にそろえ、点は 50mm にそろえる。
+ * 横・縦の区間が壁の近く（250mm 以内）を通るときは壁ぞいに。はじめ・終わりの短いはね（指を離すときのゆれ）は除く。tol＝間引く幅（mm）
+ */
+export function railPolyline(path: P[], ws: Wall[], tol: number): P[] {
+  const s = simplifyStroke(path, tol);
+  const out: P[] = [];
+  for (const q0 of s) {
+    const last = out[out.length - 1];
+    let q = {x: snapTo(q0.x, 50), y: snapTo(q0.y, 50)};
+    if (last) {
+      const dx = q.x - last.x;
+      const dy = q.y - last.y;
+      const ang = Math.abs(Math.atan2(dy, dx) * (180 / Math.PI));
+      const a45 = Math.min(ang, 180 - ang);
+      if (a45 < 22.5) q = {x: q.x, y: last.y};
+      else if (a45 > 67.5) q = {x: last.x, y: q.y};
+      else {
+        const m = Math.max(Math.abs(dx), Math.abs(dy));
+        q = {x: last.x + Math.sign(dx) * m, y: last.y + Math.sign(dy) * m};
+      }
+      if (q.x === last.x && q.y === last.y) continue;
+    }
+    out.push(q);
+  }
+  const short = Math.max(150, tol * 1.5);
+  const segLen = (a: P, b: P) => Math.hypot(b.x - a.x, b.y - a.y);
+  while (out.length > 2 && segLen(out[out.length - 2], out[out.length - 1]) < short) out.pop();
+  while (out.length > 2 && segLen(out[0], out[1]) < short) out.shift();
+  const off = HALF_WALL + 50;
+  for (let i = 0; i < out.length - 1; i++) {
+    const [a, b] = [out[i], out[i + 1]];
+    const horiz = a.y === b.y;
+    if (!horiz && a.x !== b.x) continue;
+    const near = nearestWall(
+      ws.filter((w) => w.h === horiz),
+      {x: (a.x + b.x) / 2, y: (a.y + b.y) / 2},
+      250,
+    );
+    if (!near) continue;
+    const at = near.w.at + near.side * off;
+    if (horiz) a.y = b.y = at;
+    else a.x = b.x = at;
+  }
+  return out;
+}
+
+/** 点が横・縦だけで曲がる L 字（3点）か */
+const isOrthoL = (pts: P[]) => pts.length === 3 && pts.slice(1).every((q, i) => q.x === pts[i].x || q.y === pts[i].y);
+
+/**
  * 道具で部品を作る（a＝押した所、b＝離した所。clickOnly＝ドラッグしなかった）。置けないとき（壁のない所のドア）は null
  */
 /**
@@ -263,7 +340,7 @@ export function railStroke(a: P, b: P, path: P[], ws: Wall[]): {x: number; y: nu
   return railLine(a, b, ws, false);
 }
 
-export function makeItem(tool: Tool, a: P, b: P, clickOnly: boolean, ctx: {items: MItem[]; module: Module; step: number; path?: P[]}): MItem | null {
+export function makeItem(tool: Tool, a: P, b: P, clickOnly: boolean, ctx: {items: MItem[]; module: Module; step: number; path?: P[]; tol?: number}): MItem | null {
   const ws = walls(ctx.items);
   switch (tool.t) {
     case 'room': {
@@ -281,6 +358,13 @@ export function makeItem(tool: Tool, a: P, b: P, clickOnly: boolean, ctx: {items
     case 'fix':
       return placeFixture(tool.type, b, ws);
     case 'rail': {
+      // なぞった道が2回より多く曲がっていれば（コ字・クランクなど）、曲がり角のある棒。ななめ（45°）の区間があるときも
+      if (!clickOnly && ctx.path && ctx.path.length >= 3 && !tool.lshape) {
+        const pts = railPolyline(ctx.path, ws, ctx.tol ?? 120);
+        if (pts.length >= 4 || (pts.length === 3 && !isOrthoL(pts)) || (pts.length === 2 && pts[0].x !== pts[1].x && pts[0].y !== pts[1].y)) {
+          return railFrom({id: mid(), kind: 'rail', x: 0, y: 0, w: 0, h: 0, ...(tool.place ? {place: tool.place} : {})}, pts);
+        }
+      }
       // なぞった道が角で曲がっていれば L 字（一筆）。「L型手すり」の道具は、まっすぐなぞっても下（右）へ 600mm 曲げる
       const l = !clickOnly && ctx.path ? railStroke(a, b, ctx.path, ws) : railLine(a, b, ws, clickOnly, tool.len ?? 600);
       return {id: mid(), kind: 'rail', ...l, ...(tool.place ? {place: tool.place} : {}), ...(tool.lshape && !('turn' in l && l.turn) ? {len: 600, turn: 1 as const} : {})};
@@ -351,14 +435,26 @@ const segDist = (p: P, a: P, b: P) => {
 
 const inBox = (p: P, b: Box, pad = 0) => p.x >= b.x - pad && p.x <= b.x + b.w + pad && p.y >= b.y - pad && p.y <= b.y + b.h + pad;
 
+/** p がその部品の上か（部屋のほか。tol は線をつかめる幅 mm） */
+export function hitsItem(it: MItem, p: P, tol: number): boolean {
+  if (it.kind === 'text') return inBox(p, textBox(it), tol / 2);
+  if (it.kind === 'num' || it.kind === 'vrail') return Math.hypot(p.x - it.x, p.y - it.y) <= Math.max(160, tol);
+  if (it.kind === 'rail') {
+    const pts = railPts(it);
+    return pts.slice(1).some((q, i) => segDist(p, pts[i], q) <= Math.max(tol, 60));
+  }
+  if (it.kind === 'line' || it.kind === 'dim' || isShapeLine(it)) return segDist(p, it, {x: it.x + it.w, y: it.y + it.h}) <= Math.max(tol, it.kind === 'line' ? 40 : 60);
+  if (it.kind === 'room') return it.pts ? inPoly(p, it.pts) : inBox(p, it);
+  return inBox(p, bounds(it), it.kind === 'door' || it.kind === 'window' ? 0 : tol / 3);
+}
+
 /** 押した所の部品（上に描いてあるものを先に。部屋は中にいちばん小さい部屋）。tol は線をつかめる幅（mm） */
 export function hitTest(items: MItem[], p: P, tol: number): MItem | null {
   const order: MItem['kind'][][] = [['text', 'num'], ['shape'], ['rail', 'vrail'], ['door', 'window'], ['step'], ['fix', 'stair'], ['line', 'dim']];
   for (const kinds of order) {
     for (let i = items.length - 1; i >= 0; i--) {
       const it = items[i];
-      if (!kinds.includes(it.kind)) continue;
-      if (it.kind === 'text' ? inBox(p, textBox(it), tol / 2) : it.kind === 'num' || it.kind === 'vrail' ? Math.hypot(p.x - it.x, p.y - it.y) <= Math.max(160, tol) : it.kind === 'rail' || it.kind === 'line' || it.kind === 'dim' || isShapeLine(it) ? Math.min(segDist(p, it, {x: it.x + it.w, y: it.y + it.h}), ((e) => (e ? segDist(p, {x: it.x + it.w, y: it.y + it.h}, e) : Infinity))(railBend(it))) <= Math.max(tol, it.kind === 'line' ? 40 : 60) : inBox(p, bounds(it), it.kind === 'door' || it.kind === 'window' ? 0 : tol / 3)) return it;
+      if (kinds.includes(it.kind) && hitsItem(it, p, tol)) return it;
     }
   }
   let room: MItem | null = null;
@@ -386,10 +482,19 @@ export function handlesOf(it: MItem): {h: Handle; x: number; y: number}[] {
       }),
     ];
   }
+  // 手すり：曲がり角のある棒は点ごと（■）、まっすぐの棒は両端。どちらも区間のまん中（□）をつまむと、そこで曲がる（新しい角）
+  if (it.kind === 'rail' && (it.pts || railBend(it))) {
+    const pts = railPts(it);
+    return [
+      ...pts.map((q, i) => ({h: `v${i}` as Handle, x: q.x, y: q.y})),
+      ...pts.slice(1).map((q, i) => ({h: `e${i}` as Handle, x: (pts[i].x + q.x) / 2, y: (pts[i].y + q.y) / 2})),
+    ];
+  }
   if (it.kind === 'rail' || it.kind === 'line' || it.kind === 'dim' || isShapeLine(it)) {
     return [
       {h: 'p0', x: it.x, y: it.y},
       {h: 'p1', x: it.x + it.w, y: it.y + it.h},
+      ...(it.kind === 'rail' ? [{h: 'e0' as Handle, x: it.x + it.w / 2, y: it.y + it.h / 2}] : []),
     ];
   }
   if (it.kind === 'room' || it.kind === 'stair' || it.kind === 'step' || it.kind === 'fix' || it.kind === 'shape') {
@@ -421,6 +526,22 @@ export function resized(it: MItem, h: Handle, p: P, step: number): MItem {
     if (s.w < step || s.h < step) return it;
     const {pts: _old, ...rest} = it;
     return {...rest, ...s};
+  }
+  // 手すりの点（■）を動かす・区間のまん中（□）をつまんで曲げる。となりの点と横・縦に近ければ（8° まで）そろえる
+  if (it.kind === 'rail' && /^[ve]\d+$/.test(h)) {
+    const pts = railPts(it).map((q) => ({...q}));
+    const i = Number(h.slice(1));
+    const q = {x: snapTo(p.x, 50), y: snapTo(p.y, 50)};
+    const k = h[0] === 'e' ? i + 1 : i;
+    if (h[0] === 'e') pts.splice(k, 0, q);
+    else if (pts[k]) pts[k] = q;
+    else return it;
+    for (const nb of [pts[k - 1], pts[k + 1]]) {
+      if (!nb) continue;
+      if (Math.abs(q.y - nb.y) <= Math.abs(q.x - nb.x) * 0.14) q.y = nb.y;
+      else if (Math.abs(q.x - nb.x) <= Math.abs(q.y - nb.y) * 0.14) q.x = nb.x;
+    }
+    return railFrom(it, pts);
   }
   if (h === 'p0' || h === 'p1') {
     const end = {x: it.x + it.w, y: it.y + it.h};
@@ -470,7 +591,11 @@ export function moved(it: MItem, d: P, items: MItem[], step: number): MItem {
     const at = fromBox(box, it.w, it.h);
     return {...it, x: Math.round(at.x), y: Math.round(at.y)};
   }
-  if (it.kind === 'rail') return {...it, x: snapTo(it.x + d.x, 10), y: snapTo(it.y + d.y, 10)};
+  if (it.kind === 'rail') {
+    const x = snapTo(it.x + d.x, 10);
+    const y = snapTo(it.y + d.y, 10);
+    return {...it, x, y, ...(it.pts ? {pts: movedPts(it.pts, x - it.x, y - it.y)} : {})};
+  }
   if (it.kind === 'line') return {...it, x: snapTo(it.x + d.x, step / 2), y: snapTo(it.y + d.y, step / 2)};
   return {...it, x: snapTo(it.x + d.x, 10), y: snapTo(it.y + d.y, 10)};
 }
@@ -483,6 +608,7 @@ export function turnedItem(it: MItem, step: number): MItem {
     const cy = it.y + it.h / 2;
     return {...it, x: snapTo(cx - it.h / 2, step), y: snapTo(cy - it.w / 2, step), w: it.h, h: it.w};
   }
+  if (it.kind === 'rail' && it.pts) return railFrom(it, turnedPts(it.pts, 10));
   if (it.kind === 'rail' || it.kind === 'line' || it.kind === 'dim' || isShapeLine(it)) {
     const cx = it.x + it.w / 2;
     const cy = it.y + it.h / 2;
@@ -514,4 +640,21 @@ export function floorArea(items: MItem[]): number {
   const inside = (a: MItem, b: MItem) => a !== b && a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h;
   const top = rooms.filter((a) => !rooms.some((b) => inside(a, b)));
   return Math.round(top.reduce((s, r) => s + (r.pts ? polyArea(r.pts) : Math.abs(r.w) * Math.abs(r.h)) / 1e6, 0) * 100) / 100;
+}
+
+/** ぐしゃぐしゃに書いて消せる部品（線・図形・寸法線・手すり・番号・文字・段差の解消。部屋・建具・窓・設備・階段は消さない） */
+export const ERASABLE: MKind[] = ['line', 'dim', 'shape', 'rail', 'vrail', 'num', 'text', 'step'];
+
+/**
+ * ぐしゃぐしゃの道（mm）が上を通った部品（ユーザーの指示「グジャグジャってすると線や図形は消せる」2026-11-10。写真の書き込みのペンと同じしぐさ）。
+ * 速く書くと点がまばらなので、点のあいだも tol の半分ごとに見る
+ */
+export function scribbleHits(items: MItem[], path: P[], tol: number): string[] {
+  const dense = path.flatMap((q, i) => {
+    const o = path[i - 1];
+    if (!o) return [q];
+    const n = Math.max(1, Math.ceil(Math.hypot(q.x - o.x, q.y - o.y) / Math.max(1, tol / 2)));
+    return Array.from({length: n}, (_, j) => ({x: o.x + ((q.x - o.x) * (j + 1)) / n, y: o.y + ((q.y - o.y) * (j + 1)) / n}));
+  });
+  return items.filter((it) => ERASABLE.includes(it.kind) && dense.some((q) => hitsItem(it, q, tol))).map((it) => it.id);
 }

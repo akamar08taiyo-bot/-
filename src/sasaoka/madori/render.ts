@@ -3,13 +3,15 @@
 // 手すり＝赤い線と両端の点・①②、ドア＝開く向きの弧、窓＝細い3本線
 
 import {FINISH, roomColor, roomFinish, TONE} from './catalog.ts';
-import {bounds, circled, joLabel, lineLength, railBend, roomAreaOf} from './model.ts';
+import {bounds, circled, joLabel, lineLength, railBend, railPts, roomAreaOf} from './model.ts';
 import {labelSpot, polyArea, polyPath, roomPts} from './poly.ts';
 import {shapeDef, shapeLine} from './shapes.ts';
 import type {MItem, Module} from './model.ts';
 
 export const WALL = '#203a55';
 export const RED = '#e01b24';
+/** 縦手すりの丸（塗りつぶしの青。写真・平面図の書き込みの「丸（縦手すり）」の 0070C0 と同じ） */
+export const VRAIL = '#0070c0';
 const WALL_W = 60; // 壁の線の太さ（mm）
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -461,13 +463,20 @@ export function floorSvg(items: MItem[], o: RenderOpts): string {
     else if (it.kind === 'shape') out.push(shapeSvg(it));
   }
   for (const it of items) {
-    if (it.kind === 'rail') {
+    if (it.kind === 'rail' && it.pts) {
+      // 曲がり角のある棒（何回でも曲げた手すり）
+      const pts = railPts(it);
+      const [a, z] = [pts[0], pts[pts.length - 1]];
+      out.push(`<path d="M${pts.map((q) => `${r1(q.x)} ${r1(q.y)}`).join('L')}" stroke="${RED}" stroke-width="45" fill="none" stroke-linejoin="round"/>`);
+      out.push(`<circle cx="${r1(a.x)}" cy="${r1(a.y)}" r="55" fill="${RED}"/><circle cx="${r1(z.x)}" cy="${r1(z.y)}" r="55" fill="${RED}"/>`);
+    } else if (it.kind === 'rail') {
       const e = railBend(it); // L 字の2本目（一筆で描いた L 字）
       const end = e ?? {x: it.x + it.w, y: it.y + it.h};
       out.push(`<path d="M${r1(it.x)} ${r1(it.y)}l${r1(it.w)} ${r1(it.h)}${e ? `L${r1(e.x)} ${r1(e.y)}` : ''}" stroke="${RED}" stroke-width="45" fill="none" stroke-linejoin="round"/>`);
       out.push(`<circle cx="${r1(it.x)}" cy="${r1(it.y)}" r="55" fill="${RED}"/><circle cx="${r1(end.x)}" cy="${r1(end.y)}" r="55" fill="${RED}"/>`);
     } else if (it.kind === 'vrail') {
-      out.push(`<circle cx="${r1(it.x)}" cy="${r1(it.y)}" r="75" fill="${RED}"/><circle cx="${r1(it.x)}" cy="${r1(it.y)}" r="32" fill="#ffffff"/>`);
+      // 縦手すりは塗りつぶした丸（ユーザーの指示「○（塗り潰し）」2026-11-10。申請書の写真・平面図の書き込みの「丸（縦手すり）」と同じ青）
+      out.push(`<circle cx="${r1(it.x)}" cy="${r1(it.y)}" r="75" fill="${VRAIL}"/>`);
     }
   }
   for (const it of items) {

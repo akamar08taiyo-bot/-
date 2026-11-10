@@ -48,7 +48,9 @@ export type MItem = {
   turn?: 1 | -1;
   size?: number; // 文字の大きさ（mm。図の上の大きさ）
   note?: string; // 凡例に書く文を手で直したもの（空なら自動）
-  // 多角形の部屋の頂点（mm。辺はみな横か縦。poly.ts）。ないときは x・y・w・h の四角。あるときも x・y・w・h は囲む四角
+  // 多角形の部屋の頂点（mm。辺はみな横か縦。poly.ts）。ないときは x・y・w・h の四角。あるときも x・y・w・h は囲む四角。
+  // 手すりは曲がり角のある棒の点（始め・曲がり角…・終わり。3つ以上。ユーザーの指示「横棒とL字など、自由自在に曲げれる棒（線は真っ直ぐ）」2026-11-10）。
+  // 手すりのときの x・y・w・h は1本目（始めの点から次の点まで）
   pts?: {x: number; y: number}[];
   color?: string; // 図形の色（#rrggbb。なければ赤）
   fill?: boolean; // 箱の図形を薄く塗る
@@ -103,11 +105,29 @@ export const joLabel = (jo: number) => `${Number.isInteger(jo) ? jo : jo.toFixed
 /** 線の部品（手すり・線・寸法）の長さ（mm） */
 export const lineLength = (it: Pick<MItem, 'w' | 'h'>) => Math.round(Math.hypot(it.w, it.h));
 
+/** 手すりの点（始め・曲がり角・終わり）。まっすぐは2つ、L 字（len・turn）は3つ、曲げた棒（pts）はその点 */
+export function railPts(it: MItem): Pt[] {
+  if (it.kind === 'rail' && it.pts && it.pts.length >= 2) return it.pts;
+  const e = railBend(it);
+  return [{x: it.x, y: it.y}, {x: it.x + it.w, y: it.y + it.h}, ...(e ? [e] : [])];
+}
+
+/** 手すりの区間ごとの長さ（mm） */
+export const railSegs = (it: MItem): number[] => {
+  const pts = railPts(it);
+  return pts.slice(1).map((q, i) => Math.round(Math.hypot(q.x - pts[i].x, q.y - pts[i].y)));
+};
+
 /** 部品の外まわりの四角（回したあと。線の部品は始点と終点を囲む） */
 /** 線の形の図形（直線・矢印。ほかの図形＝四角・丸は x・y・w・h の箱） */
 export const isShapeLine = (it: MItem) => it.kind === 'shape' && isLineShapeType(it.type);
 
 export function bounds(it: MItem): {x: number; y: number; w: number; h: number} {
+  if (it.kind === 'rail' && it.pts && it.pts.length >= 2) {
+    const xs = it.pts.map((q) => q.x);
+    const ys = it.pts.map((q) => q.y);
+    return {x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys)};
+  }
   if (it.kind === 'rail' || it.kind === 'line' || it.kind === 'dim' || isShapeLine(it)) {
     const x2 = it.x + it.w;
     const y2 = it.y + it.h;
@@ -193,8 +213,13 @@ export function legendText(it: MItem, placeLine: (placeId: string) => string | u
     if (line) return line.replace(/^[①-⑳]\s*/, '');
   }
   switch (it.kind) {
-    case 'rail':
+    case 'rail': {
+      // 曲げた棒：2本なら L 字と同じ書き方、3本より多ければ「L＝600＋900＋600mm」
+      const segs = it.pts ? railSegs(it) : [];
+      if (segs.length >= 3) return `L＝${segs.map((x) => fmtMm(x).replace('mm', '')).join('＋')}mm`;
+      if (segs.length === 2) return `L型　${fmtMm(segs[0]).replace('mm', '')}×${fmtMm(segs[1])}`;
       return it.len ? `L型　${fmtMm(lineLength(it)).replace('mm', '')}×${fmtMm(it.len)}` : `L＝${fmtMm(lineLength(it))}`;
+    }
     case 'vrail':
       return `縦手すり${it.len ? `　L＝${fmtMm(it.len)}` : ''}`;
     case 'step':
@@ -257,6 +282,15 @@ export function cleanMadori(raw: unknown): Madori | undefined {
       if (o.kind === 'room' && Array.isArray(it.pts)) {
         const pts = (it.pts as unknown[]).filter((q): q is {x: number; y: number} => !!q && typeof q === 'object' && Number.isFinite((q as Pt).x) && Number.isFinite((q as Pt).y)).map((q) => ({x: q.x, y: q.y}));
         if (pts.length >= 3) Object.assign(o, shapeOf(pts));
+      }
+      // 曲げた手すりの点（3つ以上。x・y・w・h は1本目にそろえる）
+      if (o.kind === 'rail' && Array.isArray(it.pts)) {
+        const pts = (it.pts as unknown[]).filter((q): q is Pt => !!q && typeof q === 'object' && Number.isFinite((q as Pt).x) && Number.isFinite((q as Pt).y)).map((q) => ({x: q.x, y: q.y}));
+        if (pts.length >= 3) {
+          delete o.len;
+          delete o.turn;
+          Object.assign(o, {x: pts[0].x, y: pts[0].y, w: pts[1].x - pts[0].x, h: pts[1].y - pts[0].y, pts});
+        }
       }
       if (it.hinge === true) o.hinge = true;
       return o;

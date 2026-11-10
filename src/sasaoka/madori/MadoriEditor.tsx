@@ -14,12 +14,13 @@ import {preparePhoto, putPhoto, rememberPhotoUrl, usePhotoUrls} from '../photos.
 import type {AppData, Job} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {DOOR_TYPES, FIX_TYPES, FINISH, ROOM_ROWS, ROOM_SHORT, ROOM_TYPES, roomFinish, STAIR_TYPES, STEP_TYPES, WINDOW_TYPES} from './catalog.ts';
-import {copied, DRAG_TOOLS, floorArea, handlesOf, hitTest, isCornerHandle, makeItem, moved, resized, SHAPE_COLORS, turnedItem} from './edit.ts';
+import {isScribble} from '../photoMarks.ts';
+import {copied, DRAG_TOOLS, floorArea, handlesOf, hitTest, isCornerHandle, makeItem, moved, railFrom, resized, scribbleHits, SHAPE_COLORS, turnedItem} from './edit.ts';
 import {closed, orthoNext, shapeOf, snapPt} from './poly.ts';
 import {shapeDef, shapeIcon, SHAPES_SHOWN} from './shapes.ts';
 import type {Handle, P, Tool} from './edit.ts';
 import {MadoriPrint} from './MadoriPrint.tsx';
-import {bounds, circled, emptyMadori, hasMadori, joLabel, legendLines, legendText, lineLength, mid, MODULES, numberItems, roomAreaOf, snapStep, withFloor} from './model.ts';
+import {bounds, circled, emptyMadori, hasMadori, joLabel, legendLines, legendText, lineLength, mid, MODULES, numberItems, railPts, railSegs, roomAreaOf, snapStep, withFloor} from './model.ts';
 import type {Madori, MFloor, MItem, Module} from './model.ts';
 import {floorSvg, patternDefs, thumbSvg, viewOf} from './render.ts';
 import {placeLookup, planSvg, sheetFloors, svgToPng} from './sheet.ts';
@@ -54,16 +55,22 @@ function PicBtn({on, onClick, svg, label}: {on: boolean; onClick: () => void; sv
 }
 
 type View = {x: number; y: number; k: number}; // 左上（mm）と倍率（1mm が何 px）
+/** 画面の上でなぞった点（px）と時刻（ぐしゃぐしゃに書いたかを見る） */
+type SP = {x: number; y: number; t: number};
 type Drag =
-  | {mode: 'create'; a: P; sx: number; sy: number; path: P[]} // path：なぞった道（手すりの一筆の L 字）
-  | {mode: 'move'; orig: MItem; a: P; sx: number; sy: number; before: Madori; moved: boolean}
+  | {mode: 'create'; a: P; sx: number; sy: number; path: P[]; sp: SP[]} // path：なぞった道（手すりの一筆の L 字・曲げた棒）
+  | {mode: 'move'; orig: MItem; a: P; sx: number; sy: number; before: Madori; moved: boolean; sp: SP[]}
   | {mode: 'resize'; orig: MItem; h: Handle; before: Madori}
-  | {mode: 'pan'; sx: number; sy: number; v0: View}
+  | {mode: 'pan'; sx: number; sy: number; v0: View; sp?: SP[]}
+  | {mode: 'erase'; sp: SP[]; v0: View} // ぐしゃぐしゃに書いて消している（v0＝書き始めたときの見え方）
   | {mode: 'under'; a: P; before: Madori; u0: {x: number; y: number}}
   | {mode: 'pinch'; d0: number; c0: {x: number; y: number}; v0: View};
 
 /** 最近使った図形（この端末の localStorage） */
 const RECENT_SHAPES = 'taiyo-madori-recent-shapes';
+
+/** 番号の道具で置ける番号（ユーザーの指示「番号1番から自動で2.3.4.5、15まで」2026-11-10） */
+const NUM_MAX = 15;
 
 /** 白紙の平面図・新しい階で、初めに選んでおく道具（いちばん描くことの多い部屋） */
 const FIRST_ROOM: Tool = {t: 'room', type: '洋室'};
@@ -212,19 +219,30 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
   const [sel, setSel] = useState<string | null>(null);
   const selItem = items.find((it) => it.id === sel) ?? null;
   const [preview, setPreview] = useState<MItem | null>(null); // 作っている途中・置く前の部品
+  const [trail, setTrail] = useState<{pts: P[]; erase: boolean} | null>(null); // なぞっている道（手すり）・ぐしゃぐしゃに書いている道
   const [printing, setPrinting] = useState(false);
   // 携帯・狭い画面（道具の一覧が方眼の上に来る幅）では、タブを開いたら道具と方眼が見える所までスクロールする。
   // 前は上のタブ・ボタンで画面がうまり、方眼が2画面ぶん下に隠れていた（2026-11-10）
   const paletteRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!window.matchMedia?.('(max-width: 1023.98px)').matches) return;
-    const id = window.requestAnimationFrame(() => paletteRef.current?.scrollIntoView({block: 'start'}));
+    // 道具の一覧の上から見せて、方眼（とすぐ上の描く道具の段）が画面の下にはみ出すなら、方眼の下の端まで見える所へ
+    const id = window.requestAnimationFrame(() => {
+      paletteRef.current?.scrollIntoView({block: 'start'});
+      const box = boxRef.current;
+      if (box && box.getBoundingClientRect().bottom > window.innerHeight) box.scrollIntoView({block: 'end'});
+    });
     return () => window.cancelAnimationFrame(id);
   }, []);
   const [busy, setBusy] = useState(false);
   const [underMove, setUnderMove] = useState(false); // 下絵を動かす
   const look = useMemo(() => placeLookup(job, s), [job, s]);
   const nums = useMemo(() => numberItems(m.floors, look.no), [m.floors, look]);
+  // 番号の道具で次に置く番号（この階の終わりに足したときの番号。階をまたいで通し番号なので、数えて決める）
+  const nextNo = useMemo(() => {
+    const probe: MItem = {id: '__next', kind: 'num', x: 0, y: 0, w: 0, h: 0};
+    return numberItems(m.floors.map((f) => (f.id === floor.id ? {...f, items: [...f.items, probe]} : f)), look.no).get('__next') ?? 1;
+  }, [m.floors, floor.id, look]);
 
   // 元に戻す・やり直す（Ctrl+Z・Ctrl+Y。この画面を開いているあいだ）
   const hist = useRef<{past: Madori[]; future: Madori[]}>({past: [], future: []});
@@ -407,7 +425,11 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     const r = svgRef.current!.getBoundingClientRect();
     return {x: v.x + (cx - r.left) / v.k, y: v.y + (cy - r.top) / v.k};
   };
-  const ctx = {items, module: m.module, step};
+  const toMmAt = (cx: number, cy: number, vv: View): P => {
+    const r = svgRef.current!.getBoundingClientRect();
+    return {x: vv.x + (cx - r.left) / vv.k, y: vv.y + (cy - r.top) / vv.k};
+  };
+  const ctx = {items, module: m.module, step, tol: 12 / v.k}; // tol：なぞった道を間引く幅（画面の 12px）
   const onDown = (e: RPointerEvent<SVGSVGElement>) => {
     if (e.button !== 0 && e.button !== 1 && e.pointerType === 'mouse') return;
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -425,8 +447,9 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       drag.current = {mode: 'pan', sx: e.clientX, sy: e.clientY, v0: v};
       return;
     }
+    const sp: SP[] = [{x: e.clientX, y: e.clientY, t: e.timeStamp}];
     if (tool.t !== 'select') {
-      drag.current = {mode: 'create', a: p, sx: e.clientX, sy: e.clientY, path: [p]};
+      drag.current = {mode: 'create', a: p, sx: e.clientX, sy: e.clientY, path: [p], sp};
       if (!(tool.t === 'room' && poly)) setPreview(makeItem(tool, p, p, true, ctx));
       return;
     }
@@ -448,12 +471,12 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     const hit = hitTest(items, p, tol);
     if (hit) {
       setSel(hit.id);
-      drag.current = {mode: 'move', orig: hit, a: p, sx: e.clientX, sy: e.clientY, before: base, moved: false};
+      drag.current = {mode: 'move', orig: hit, a: p, sx: e.clientX, sy: e.clientY, before: base, moved: false, sp};
       return;
     }
     setSel(null);
     if (underMove && floor.underlay) drag.current = {mode: 'under', a: p, before: base, u0: {x: floor.underlay.x, y: floor.underlay.y}};
-    else drag.current = {mode: 'pan', sx: e.clientX, sy: e.clientY, v0: v};
+    else drag.current = {mode: 'pan', sx: e.clientX, sy: e.clientY, v0: v, sp};
   };
   const onMove = (e: RPointerEvent<SVGSVGElement>) => {
     if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, {x: e.clientX, y: e.clientY});
@@ -470,6 +493,26 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       setView({k, x: mx - (c.x - r.left) / k, y: my - (c.y - r.top) / k});
       return;
     }
+    // ぐしゃぐしゃに書いた（線・図形を消すしぐさ。写真の書き込みのペンと同じ）：描く道具では書き始めから、選ぶ・動かすでは
+    // 動かしているあいだの直近 1.5 秒（ゆっくり位置を直すのを消すしぐさとまちがえないように）。作りかけ・動かしかけ・ずらした図はやめて、消す道を見せる
+    if (d?.mode === 'erase') {
+      d.sp.push({x: e.clientX, y: e.clientY, t: e.timeStamp});
+      setTrail({pts: d.sp.map((q) => toMmAt(q.x, q.y, d.v0)), erase: true});
+      return;
+    }
+    if (d && (d.mode === 'create' || d.mode === 'move' || (d.mode === 'pan' && d.sp))) {
+      const sp = d.sp!;
+      sp.push({x: e.clientX, y: e.clientY, t: e.timeStamp});
+      if (isScribble(d.mode === 'create' ? sp : sp.filter((q) => q.t >= e.timeStamp - 1500))) {
+        const v0 = d.mode === 'pan' ? d.v0 : v;
+        if (d.mode === 'pan') setView(d.v0);
+        setDraft(null);
+        setPreview(null);
+        drag.current = {mode: 'erase', sp, v0};
+        setTrail({pts: sp.map((q) => toMmAt(q.x, q.y, v0)), erase: true});
+        return;
+      }
+    }
     const p = toMm(e.clientX, e.clientY);
     if (!d && poly) {
       setPolyHover(orthoNext(poly[poly.length - 1], snapPt(p, step)));
@@ -485,6 +528,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       const click = Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 6;
       d.path.push(p);
       setPreview(makeItem(tool, d.a, p, DRAG_TOOLS.includes(tool.t) ? click : true, {...ctx, path: d.path}));
+      if (tool.t === 'rail' && !click) setTrail({pts: [...d.path], erase: false}); // なぞった道を薄く（曲げた所が分かるように）
     } else if (d.mode === 'move') {
       if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) return;
       d.moved = true;
@@ -510,7 +554,18 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       return;
     }
     drag.current = null;
+    setTrail(null);
     if (!d) return;
+    if (d.mode === 'erase') {
+      // 上を通った線・図形・手すり・番号・文字を消す（部屋・建具・設備は消さない。戻すで元に戻る）
+      const ids = new Set(scribbleHits(items, d.sp.map((q) => toMmAt(q.x, q.y, d.v0)), 12 / d.v0.k));
+      if (ids.size) {
+        editItems((list) => list.filter((it) => !ids.has(it.id)));
+        setSel(null);
+        toast(`${ids.size}つ消しました`);
+      }
+      return;
+    }
     if (d.mode === 'create') {
       const p = toMm(e.clientX, e.clientY);
       const click = Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 6;
@@ -524,6 +579,18 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       setPreview(null);
       if (!it) {
         if (tool.t === 'door' || tool.t === 'window') toast('部屋の壁の近くを押してください', 'error');
+        return;
+      }
+      if (it.kind === 'num' && !it.place) {
+        // 番号は続けて置ける（①のあと②③…。⑮まで）。⑮を置いたら選ぶ・動かすに戻る
+        if (nextNo > NUM_MAX) {
+          toast(`番号は${circled(NUM_MAX)}までです`, 'error');
+          setTool({t: 'select'});
+          return;
+        }
+        if (nextNo >= NUM_MAX) setTool({t: 'select'});
+        editItems((list) => [...list, it]);
+        setSel(it.id);
         return;
       }
       setTool({t: 'select'});
@@ -1057,7 +1124,35 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           <MmInput label="奥行" value={it.h} onChange={(h) => setItem(it.id, {h})} />
         </>
       )}
-      {it.kind === 'rail' && (
+      {it.kind === 'rail' && it.pts && (
+        <>
+          {/* 曲げた棒：区間ごとの長さ（直すと、その先がそのままずれる）。角は ■ を動かす・区間のまん中の □ をつまむとそこで曲がる */}
+          {railSegs(it).map((len, i) => (
+            <MmInput
+              key={i}
+              label={`${i + 1}本目`}
+              value={len}
+              onChange={(next) =>
+                setItem(it.id, (o) => {
+                  const pts = railPts(o).map((q) => ({...q}));
+                  const [a, b] = [pts[i], pts[i + 1]];
+                  const cur = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+                  const dx = Math.round(((b.x - a.x) / cur) * (next - cur));
+                  const dy = Math.round(((b.y - a.y) / cur) * (next - cur));
+                  for (let k = i + 1; k < pts.length; k++) pts[k] = {x: pts[k].x + dx, y: pts[k].y + dy};
+                  return railFrom(o, pts);
+                })
+              }
+              min={50}
+            />
+          ))}
+          <div className="text-sm text-slate-600">合計 {railSegs(it).reduce((a, b) => a + b, 0).toLocaleString('ja-JP')}mm</div>
+          <Btn color="white" small onClick={() => setItem(it.id, (o) => railFrom(o, railPts(o).slice(0, 2)))}>
+            まっすぐに戻す
+          </Btn>
+        </>
+      )}
+      {it.kind === 'rail' && !it.pts && (
         <>
           <MmInput
             label="長さ"
@@ -1207,9 +1302,10 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     const y0 = Math.min(content.y, v.y);
     return {x: x0, y: y0, w: Math.max(content.x + content.w, v.x + vw) - x0, h: Math.max(content.y + content.h, v.y + vh) - y0};
   })();
-  // 図形（Excel の「挿入 → 図形」と同じ。上の段の右の空いた所。ユーザーの指示「EXCELのような図形をそのまま書き込めるようにする」「ここの図形の機能はつけてください」2026-11-10）：
-  // 「図形 ▼」で一覧（最近使用した図形・基本図形・線・矢印）を開く。横には最近使った図形（初めは直線・矢印・四角・丸）と文字
-  const shapeBtn = (name: string, withLabel: boolean, onClick: () => void) => (
+  // 描く道具の段（方眼のすぐ上のまん中。ユーザーの指示「以下のボタンと図形ボタンは中央にもってくる」2026-11-10。前は上の段の右の端）：
+  // 図形（Excel の「挿入 → 図形」と同じ。「図形 ▼」で一覧＝最近使用した図形・基本図形・線・矢印、横に最近使った図形）と、
+  // 横棒・L字（手すり。なぞると曲がり角で曲がる棒）・丸（縦手すり。塗りつぶし）・文字・番号（①から順に⑮まで）
+  const shapeBtn = (name: string, withLabel: boolean, onClick: () => void, extra = '') => (
     <button
       key={name}
       type="button"
@@ -1217,15 +1313,17 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       aria-label={name}
       title={name}
       onClick={onClick}
-      className={`flex items-center gap-1 rounded-md border text-sm ${withLabel ? 'h-9 px-2' : 'h-9 w-10 justify-center'} ${isTool({t: 'shape', type: name}) ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+      className={`flex items-center gap-1 rounded-md border text-sm ${withLabel ? 'h-9 px-2' : 'h-9 w-10 justify-center'} ${isTool({t: 'shape', type: name}) ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-300 bg-white hover:bg-slate-50'} ${extra}`}
     >
       <span className="block h-5 w-6 [&>svg]:h-full [&>svg]:w-full" aria-hidden dangerouslySetInnerHTML={{__html: shapeIcon(name)}} />
       {withLabel && <span className="whitespace-nowrap">{name}</span>}
     </button>
   );
   const quick = [...new Set([...recentShapes, '直線', '矢印', '四角', '丸'])].slice(0, 4); // 最近使った図形から、足りなければ初めの4つ
+  const barBtn = (on: boolean) => `flex h-9 items-center gap-1 rounded-md border px-2.5 text-sm ${on ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-300 bg-white hover:bg-slate-50'}`;
+  const numFull = nextNo > NUM_MAX;
   const shapeBar = (
-    <div ref={shapeBarRef} role="toolbar" aria-label="図形" className="relative flex flex-wrap items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 shadow-sm max-lg:justify-center">
+    <div ref={shapeBarRef} role="toolbar" aria-label="描く道具" className="relative mx-auto flex w-fit max-w-full flex-wrap items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 shadow-sm">
       <button
         type="button"
         aria-expanded={shapeOpen}
@@ -1234,18 +1332,38 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       >
         図形 ▼
       </button>
-      {quick.map((n) => shapeBtn(n, false, () => pickShape(n)))}
+      {/* スマホは1行に収める（最近の図形は2つ・字は隠して絵だけ） */}
+      {quick.map((n, i) => shapeBtn(n, false, () => pickShape(n), i >= 2 ? 'max-sm:hidden' : ''))}
+      <span className="mx-0.5 h-6 w-px bg-slate-200" aria-hidden />
+      <button type="button" aria-pressed={isTool({t: 'rail'})} onClick={() => pick({t: 'rail'})} className={barBtn(isTool({t: 'rail'}))} aria-label="横棒・L字" title="横棒・L字（手すり）：なぞって描く。曲げたい所で曲げると、まっすぐの線のまま曲がる">
+        <svg viewBox="0 0 24 20" className="h-5 w-6" aria-hidden>
+          <path d="M3 5H15V16H21" fill="none" stroke="#e01b24" strokeWidth="2.6" strokeLinejoin="round" />
+          <circle cx="3" cy="5" r="2.2" fill="#e01b24" />
+          <circle cx="21" cy="16" r="2.2" fill="#e01b24" />
+        </svg>
+        <span className="max-sm:hidden">横棒・L字</span>
+      </button>
+      <button type="button" aria-pressed={isTool({t: 'vrail'})} onClick={() => pick({t: 'vrail'})} className={barBtn(isTool({t: 'vrail'}))} aria-label="丸（縦手すり）" title="丸（縦手すり）：押した所に置く">
+        <span className="block h-4 w-4 rounded-full bg-[#0070c0]" aria-hidden />
+        <span className="max-sm:hidden">縦手すり</span>
+      </button>
+      <button type="button" aria-pressed={isTool({t: 'text'})} onClick={() => pick({t: 'text'})} className={barBtn(isTool({t: 'text'}))} aria-label="文字">
+        <span className="text-base font-bold leading-none">A</span>
+        <span className="max-sm:hidden">文字</span>
+      </button>
       <button
         type="button"
-        aria-pressed={isTool({t: 'text'})}
-        onClick={() => pick({t: 'text'})}
-        className={`flex h-9 items-center gap-1 rounded-md border px-2.5 text-sm ${isTool({t: 'text'}) ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+        aria-pressed={isTool({t: 'num'})}
+        onClick={() => (numFull ? toast(`番号は${circled(NUM_MAX)}までです`, 'error') : pick({t: 'num'}))}
+        className={`${barBtn(isTool({t: 'num'}))} ${numFull ? 'opacity-50' : ''}`}
+        aria-label={`${circled(Math.min(nextNo, NUM_MAX))} 番号`}
+        title={`番号：押すたびに次の番号（${circled(1)}から${circled(NUM_MAX)}まで）`}
       >
-        <span className="text-base font-bold leading-none">A</span>
-        文字
+        <span className="text-base leading-none text-rose-600">{circled(Math.min(nextNo, NUM_MAX))}</span>
+        <span className="max-sm:hidden">番号</span>
       </button>
       {shapeOpen && (
-        <div aria-label="図形の一覧" className="absolute right-0 top-full z-30 mt-1 max-h-[70vh] w-[19.5rem] overflow-y-auto rounded-lg border border-slate-300 bg-white p-2 shadow-xl max-sm:right-auto max-sm:left-0">
+        <div aria-label="図形の一覧" className="absolute left-0 top-full z-30 mt-1 max-h-[70vh] w-[19.5rem] overflow-y-auto rounded-lg border border-slate-300 bg-white p-2 shadow-xl">
           {[
             ...(recentShapes.length ? [['最近使用した図形', recentShapes] as const] : []),
             ...(['基本図形', '線', '矢印'] as const).map((g) => [g, SHAPES_SHOWN.filter((x) => x.group === g).map((x) => x.name)] as const),
@@ -1271,8 +1389,6 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           <Btn color="white" onClick={onBack}>
             ✕ 閉じる
           </Btn>
-          <span className="ml-auto max-sm:hidden" aria-hidden />
-          {shapeBar}
         </div>
       ) : (
       <JobHeader
@@ -1287,7 +1403,6 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           </>
         }
         remove={(className) => <RemoveJobButton job={job} settings={s} update={update} onBack={onBack} className={className} />}
-        extra={shapeBar}
         // タブごとの機能は「その他 ▼」の中（ユーザーの指示「ごちゃごちゃしているので、プルダウンにする」2026-11-03。上の段に出すと iPad の横で段が下がった）
         secondary={
           <>
@@ -1385,10 +1500,12 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       </div>
 
       <div className="grid items-start gap-3 lg:grid-cols-[15rem_minmax(0,1fr)_17rem]">
-        <div ref={paletteRef} className="scroll-mt-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm max-lg:order-1">
+        <div ref={paletteRef} className="scroll-mt-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm max-lg:order-1" data-madori-palette>
           {palette}
         </div>
-        <div ref={boxRef} className="relative h-[min(72vh,760px)] min-h-[360px] overflow-hidden max-lg:h-[min(58vh,560px)] max-lg:min-h-[320px] rounded-lg border-2 border-slate-300 bg-white shadow-sm max-lg:order-2" data-madori-canvas>
+        <div className="min-w-0 space-y-2 max-lg:order-2">
+        {shapeBar}
+        <div ref={boxRef} className="relative h-[min(calc(72vh-3rem),712px)] min-h-[340px] overflow-hidden max-lg:h-[min(58vh,560px)] max-lg:min-h-[320px] scroll-mb-2 rounded-lg border-2 border-slate-300 bg-white shadow-sm" data-madori-canvas>
           <svg
             ref={svgRef}
             width={size.w}
@@ -1436,7 +1553,24 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
                 ))}
               </g>
             )}
-            {preview && <rect {...bounds(preview)} fill="#10b98114" stroke="#059669" strokeWidth={1.5 / v.k} strokeDasharray={`${6 / v.k} ${4 / v.k}`} pointerEvents="none" />}
+            {trail && (
+              <polyline
+                points={trail.pts.map((q) => `${q.x},${q.y}`).join(' ')}
+                fill="none"
+                stroke={trail.erase ? '#ef4444' : '#64748b'}
+                strokeOpacity={trail.erase ? 0.55 : 0.35}
+                strokeWidth={(trail.erase ? 8 : 4) / v.k}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                pointerEvents="none"
+                data-trail={trail.erase ? 'erase' : 'draw'}
+              />
+            )}
+            {preview && preview.kind === 'rail' ? (
+              <polyline points={railPts(preview).map((q) => `${q.x},${q.y}`).join(' ')} fill="none" stroke="#059669" strokeWidth={3 / v.k} strokeDasharray={`${6 / v.k} ${4 / v.k}`} strokeLinejoin="round" pointerEvents="none" data-rail-preview />
+            ) : (
+              preview && <rect {...bounds(preview)} fill="#10b98114" stroke="#059669" strokeWidth={1.5 / v.k} strokeDasharray={`${6 / v.k} ${4 / v.k}`} pointerEvents="none" />
+            )}
             {selBox && (
               <g pointerEvents="none">
                 <rect x={selBox.x} y={selBox.y} width={Math.max(selBox.w, 1)} height={Math.max(selBox.h, 1)} fill="none" stroke="#2563eb" strokeWidth={2 / v.k} strokeDasharray={`${6 / v.k} ${4 / v.k}`} />
@@ -1512,10 +1646,11 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           )}
           {tool.t !== 'select' && (
             <div className="pointer-events-none absolute left-2 top-2 rounded bg-emerald-700/90 px-2 py-1 text-xs text-white">
-              {tool.t === 'room' || tool.t === 'stair' || tool.t === 'fix' || tool.t === 'door' || tool.t === 'window' || tool.t === 'step' ? tool.type : tool.t === 'rail' ? (tool.lshape ? 'L型手すり' : '横手すり') : tool.t === 'vrail' ? '縦手すり' : tool.t === 'num' ? '番号' : tool.t === 'text' ? '文字' : tool.t === 'line' || tool.t === 'shape' ? tool.type : '寸法線'}
-              {tool.t === 'room' ? (poly ? '：角を押していく（はじめの点で閉じる・Enter）' : '：ドラッグで四角／角を順に押す') : DRAG_TOOLS.includes(tool.t) ? '：ドラッグ' : '：押して置く'}
+              {tool.t === 'room' || tool.t === 'stair' || tool.t === 'fix' || tool.t === 'door' || tool.t === 'window' || tool.t === 'step' ? tool.type : tool.t === 'rail' ? (tool.lshape ? 'L型手すり' : '手すり（横棒・L字）') : tool.t === 'vrail' ? '縦手すり' : tool.t === 'num' ? '番号' : tool.t === 'text' ? '文字' : tool.t === 'line' || tool.t === 'shape' ? tool.type : '寸法線'}
+              {tool.t === 'room' ? (poly ? '：角を押していく（はじめの点で閉じる・Enter）' : '：ドラッグで四角／角を順に押す') : tool.t === 'rail' && !tool.lshape ? '：なぞる（曲げたい所で曲げる）' : tool.t === 'num' ? `：押すたびに${circled(Math.min(nextNo, NUM_MAX))}から順に` : DRAG_TOOLS.includes(tool.t) ? '：ドラッグ' : '：押して置く'}
             </div>
           )}
+        </div>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm max-lg:order-3">{props}</div>
       </div>

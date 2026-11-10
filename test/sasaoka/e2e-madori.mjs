@@ -61,7 +61,7 @@ const legend = () => page.locator('ul.text-rose-600 li').allInnerTexts();
 
 // ---------------- 部屋（マイホームクラウドと同じ並び）
 await cat('部屋');
-const roomNames = await page.locator('[data-madori-canvas]').locator('xpath=../div[1]').locator('button[aria-pressed]').evaluateAll((els) => els.map((e) => e.getAttribute('title')).filter(Boolean));
+const roomNames = await page.locator('[data-madori-palette]').locator('button[aria-pressed]').evaluateAll((els) => els.map((e) => e.getAttribute('title')).filter(Boolean));
 assert.deepEqual(roomNames.slice(0, 7), ['ポーチ', '土間', '玄関', '廊下', 'ベランダ', '駐車場', 'テラス']); // 段ごとの並び（2026-11-10）
 assert.ok(roomNames.includes('寝室') && roomNames.at(-1) === '広縁' && !roomNames.includes('ウォークインクローゼット'));
 // 白紙の平面図は、開いたときから洋室が選ばれている（なぞればすぐ描ける）。同じ道具をもう一度押しても外れない
@@ -176,9 +176,11 @@ assert.match(await art(), />WC</);
 // 回すつまみ（↻）：階段を置いて、つまみを押すと 90°回る
 await cat('階段');
 await tool('直階段');
-await click(8 * M, 1 * M);
+await click(8 * M, 3 * M); // 方眼の上の端だと、つまみが方眼の外（描く道具の段の所）に出るので少し下に
 {
   const tb = await page.locator('[data-turn-handle] circle').boundingBox();
+  const cb = await page.locator('[data-madori-canvas]').boundingBox();
+  assert.ok(tb.y > cb.y, `つまみが方眼の中 ${JSON.stringify([tb, cb])}`);
   await page.mouse.click(tb.x + tb.width / 2, tb.y + tb.height / 2);
 }
 assert.match(await art(), /rotate\(90 /);
@@ -218,7 +220,7 @@ assert.match(await art(), /<path d="M7280 0L10010 0L10010 910L8190 910L8190 2730
 }
 await page.keyboard.press('Escape');
 // ---------------- Excel のような図形（上の段の「図形」）
-await page.getByRole('toolbar', {name: '図形'}).getByRole('button', {name: '四角', exact: true}).click();
+await page.getByRole('toolbar', {name: '描く道具'}).getByRole('button', {name: '四角', exact: true}).click();
 await drag([1 * M, 6 * M], [3 * M, 7 * M]);
 assert.match(await art(), /<g transform="translate\(910 5460\)"><path d="M0 0H1820V910H0Z" fill="none" fill-rule="evenodd" stroke="#e01b24" stroke-width="30"/);
 // 「図形 ▼」の一覧（基本図形・線・矢印）から右矢印を選ぶ → 最近使用した図形に出る
@@ -250,6 +252,92 @@ for (let i = 0; i < 3; i++) await page.keyboard.press('Control+z'); // 図形・
 assert.match(await art(), /寝室（和室）/);
 assert.doesNotMatch(await art(), /手すり位置|通路|>WC</);
 log('図の上で文字を打つ・回すつまみ・L字の手すり・頂点で描く部屋と形を変える・図形・スクロールバー OK');
+
+// ---------------- 方眼の上のまん中の描く道具（図形・横棒/L字・丸・文字・番号）・曲げた手すり・ぐしゃぐしゃで消す
+// （ユーザーの指示「以下のボタンと図形ボタンは中央にもってくる」「横棒とL字など、自由自在に曲げれる棒」「○（塗り潰し）」「番号1番から自動で…15まで」「グジャグジャってすると線や図形は消せる」2026-11-10）
+{
+  const bar = page.getByRole('toolbar', {name: '描く道具'});
+  const bb = await bar.boundingBox();
+  const cb = await page.locator('[data-madori-canvas]').boundingBox();
+  assert.ok(Math.abs(bb.x + bb.width / 2 - (cb.x + cb.width / 2)) < 3, `描く道具は方眼のまん中 ${JSON.stringify([bb, cb])}`);
+  assert.ok(bb.y + bb.height <= cb.y + 1 && cb.y - (bb.y + bb.height) < 16, `方眼のすぐ上 ${JSON.stringify([bb, cb])}`);
+  // コ字をなぞる → 曲げた手すり。選んだまま：角（■）4つと区間のまん中（□）3つ
+  await bar.getByRole('button', {name: '横棒・L字'}).click();
+  const px = [];
+  for (const q of [[1 * M, 6 * M], [1 * M, 8 * M], [4 * M, 8 * M], [4 * M, 6 * M]]) px.push(await toPx(...q));
+  await page.mouse.move(px[0].x, px[0].y);
+  await page.mouse.down();
+  for (const q of px.slice(1)) await page.mouse.move(q.x, q.y, {steps: 10});
+  await page.mouse.up();
+  assert.equal(await page.locator('[data-handle^="v"]').count(), 4);
+  assert.equal(await page.locator('[data-handle^="e"]').count(), 3);
+  // 下の区間のまん中（□）をつまんで下へ → もう1つ曲がる
+  {
+    const h = await page.locator('[data-handle="e1"]').boundingBox();
+    const to = await toPx(2.5 * M, 9 * M);
+    await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y, {steps: 6});
+    await page.mouse.up();
+  }
+  assert.equal(await page.locator('[data-handle^="v"]').count(), 5);
+  const v0 = await page.locator('[data-handle="v0"]').boundingBox();
+  const v1 = await page.locator('[data-handle="v1"]').boundingBox();
+  await page.keyboard.press('Escape');
+  const bent = /L＝[\d,]+(＋[\d,]+){2,}mm/;
+  assert.ok((await legend()).some((r) => bent.test(r)), `曲げた手すり ${JSON.stringify(await legend())}`);
+  // 手すりの上をぐしゃぐしゃに書く（選ぶ・動かすのまま）→ 消える。戻すで戻る
+  {
+    const c = {x: v0.x + v0.width / 2 + (v1.x - v0.x) * 0.3, y: v0.y + v0.height / 2 + (v1.y - v0.y) * 0.3};
+    await page.mouse.move(c.x, c.y);
+    await page.mouse.down();
+    for (let i = 1; i <= 9; i++) await page.mouse.move(c.x + (i % 2 ? 45 : -45), c.y + i * 3, {steps: 3});
+    await page.mouse.up();
+  }
+  assert.ok(!(await legend()).some((r) => bent.test(r)), `ぐしゃぐしゃで消えた ${JSON.stringify(await legend())}`);
+  await page.getByText('1つ消しました').last().waitFor();
+  await page.keyboard.press('Control+z');
+  assert.ok((await legend()).some((r) => bent.test(r)), '戻すで戻る');
+  // 描く道具（図形）を選んで、図形の上をぐしゃぐしゃ → 図形も消える（新しい図形は置かない）
+  await bar.getByRole('button', {name: '四角', exact: true}).click();
+  await drag([5 * M, 6 * M], [7 * M, 7 * M]);
+  const boxes = () => art().then((h) => (h.match(/<path d="M0 0H1820V910H0Z"/g) ?? []).length);
+  assert.equal(await boxes(), 1);
+  await bar.getByRole('button', {name: '直線', exact: true}).click();
+  {
+    const c = await toPx(6 * M, 6.5 * M);
+    await page.mouse.move(c.x, c.y);
+    await page.mouse.down();
+    for (let i = 1; i <= 9; i++) await page.mouse.move(c.x + (i % 2 ? 40 : -40), c.y + (i % 3) * 4, {steps: 3});
+    await page.mouse.up();
+  }
+  assert.equal(await boxes(), 0);
+  assert.doesNotMatch(await art(), /<path d="M0 0L/); // ぐしゃぐしゃの線を直線として置いていない
+  await page.keyboard.press('Control+z'); // 消した図形を戻す
+  assert.equal(await boxes(), 1);
+  // 丸（縦手すり）は塗りつぶしの青
+  const dots = () => art().then((h) => (h.match(/r="75" fill="#0070c0"/g) ?? []).length);
+  const dots0 = await dots();
+  await bar.getByRole('button', {name: '丸（縦手すり）'}).click();
+  await click(8 * M, 7 * M);
+  assert.equal(await dots(), dots0 + 1);
+  // 番号：押すたびに次の番号（道具はそのまま）
+  const numBtn = bar.getByRole('button', {name: /番号$/});
+  const circled = (n) => String.fromCharCode(0x2460 + n - 1);
+  const n0 = (await numBtn.innerText()).trim().codePointAt(0) - 0x2460 + 1;
+  await numBtn.click();
+  for (let i = 0; i < 3; i++) await click((5 + i) * M, 8.3 * M); // 9マス目は方眼の下のスクロールバーに重なる
+  assert.equal(await numBtn.getAttribute('aria-pressed'), 'true');
+  assert.ok((await numBtn.innerText()).includes(circled(n0 + 3)), await numBtn.innerText());
+  for (let i = 0; i < 3; i++) assert.ok((await art()).includes(`>${circled(n0 + i)}<`), `番号 ${circled(n0 + i)}`);
+  await page.keyboard.press('Escape');
+  // 戻す：番号3つ・丸・図形・曲げ・手すり（消したのは戻してあるので数えない）
+  for (let i = 0; i < 3 + 1 + 1 + 1 + 1; i++) await page.keyboard.press('Control+z');
+  assert.ok(!(await legend()).some((r) => bent.test(r)));
+  assert.doesNotMatch(await art(), /<path d="M0 0H1820V910H0Z"/);
+  assert.equal(await dots(), dots0);
+}
+log('方眼の上のまん中の描く道具・曲げた手すり（□で曲げる）・ぐしゃぐしゃで消す・丸・番号 OK');
 
 // ---------------- 2階
 await page.getByRole('button', {name: '＋ 階'}).click();
