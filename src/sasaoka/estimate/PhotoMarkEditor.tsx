@@ -2275,19 +2275,25 @@ export function PhotoMarkEditor({
     <div role="dialog" aria-modal="true" aria-label={`${title}の${what}に書き込む`} className="fixed inset-0 z-[60] flex flex-col bg-slate-100 text-slate-800">
       {/* 上の帯：戻る・進む（Excel のクイック アクセス ツール バーの元に戻す・やり直し）・題名・閉じる（まん中。ユーザーの指示「閉じるボタンは中央にもってくる」2026-10-29）。
           戻る・進むは太い矢印と文字（ユーザーの指示「戻る、進むボタンはもう少しわかりやすく」2026-10-29。前は細い ↶ ↷ だけ）。スマホは矢印の下に文字、題名は出さない（入らない） */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-slate-200 bg-white px-2 py-1">
+      {/* スマホは戻る・進む・削除と右の回すボタンを詰め、閉じるはそのあいだのまん中（戻る・進む・削除が閉じるに重ならないように） */}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-slate-200 bg-white px-2 py-1 max-sm:grid-cols-[auto_minmax(0,1fr)_auto]">
         <div className="flex min-w-0 items-center gap-1">
-          <button type="button" className={UNDO_BTN} title="戻る（元に戻す Ctrl+Z）" aria-label="戻る" disabled={!past.current.length && !editing && !polyOn} onClick={undo}>
+          <button type="button" className={`${UNDO_BTN} max-sm:!w-12`} title="戻る（元に戻す Ctrl+Z）" aria-label="戻る" disabled={!past.current.length && !editing && !polyOn} onClick={undo}>
             <Icon name="undo" />
             <span>戻る</span>
           </button>
-          <button type="button" className={UNDO_BTN} title="進む（やり直し Ctrl+Y）" aria-label="進む" disabled={polyOn ? !polyRedo.current.length : !future.current.length} onClick={redo}>
+          <button type="button" className={`${UNDO_BTN} max-sm:!w-12`} title="進む（やり直し Ctrl+Y）" aria-label="進む" disabled={polyOn ? !polyRedo.current.length : !future.current.length} onClick={redo}>
             <Icon name="redo" />
             <span>進む</span>
           </button>
+          {/* 削除：戻る・進むのすぐ横（ユーザーの指示「戻る進むのボタンの横に削除ボタン」2026-11-10。リボンの「削除」・Delete と同じ。選んだ図形を消す。戻るで戻る） */}
+          <button type="button" className={`${UNDO_BTN} max-sm:!w-12`} title="選んだ図形を削除（Delete）" aria-label="図形を削除" disabled={!sel.length} onClick={remove} data-top-delete>
+            <Icon name="delete" />
+            <span>削除</span>
+          </button>
           <div className="min-w-0 truncate px-2 text-base text-slate-700 max-sm:hidden">✏️ {title}</div>
         </div>
-        <button type="button" onClick={close} className="h-11 rounded-md border border-slate-300 bg-white px-8 text-base text-slate-700 hover:bg-slate-50 max-sm:px-5">
+        <button type="button" onClick={close} className="h-11 justify-self-center rounded-md border border-slate-300 bg-white px-8 text-base text-slate-700 hover:bg-slate-50 max-sm:px-3">
           閉じる
         </button>
         <div className="flex min-w-0 items-center justify-end gap-1">
