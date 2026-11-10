@@ -50,6 +50,7 @@ export const ROOM_TYPES: RoomType[] = [
   {name: '駐車場', finish: 'doma', size: [3, 6], tone: TONE.out, row: 1},
   {name: 'テラス', finish: 'tile', size: [3, 1], tone: TONE.out, row: 1},
   {name: 'LDK', finish: 'floor', size: [4, 4], tone: TONE.live, row: 2},
+  {name: 'LD', finish: 'floor', size: [4, 3], tone: TONE.live, row: 2}, // リビング・ダイニング（ユーザーの指示「LDもつくる」2026-11-10）
   {name: 'D', finish: 'floor', size: [3, 3], tone: TONE.live, row: 2},
   {name: 'K', finish: 'floor', size: [2, 3], tone: TONE.live, row: 2},
   {name: 'L', finish: 'floor', size: [3, 3], tone: TONE.live, row: 2},
