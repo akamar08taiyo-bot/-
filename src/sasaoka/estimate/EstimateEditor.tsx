@@ -1,4 +1,5 @@
 import {useEffect, useRef, useState} from 'react';
+import {DEMO} from '../demo/flag.ts';
 import type {ReactNode} from 'react';
 import {hasEstimateRows, jobName, startEstimate} from '../calc.ts';
 import {JobHeader, JobTitle, RemoveJobButton} from './JobHeader.tsx';
@@ -256,7 +257,8 @@ export function EstimateEditor({
             )}
           </div>
         </div>
-        {(estimated || job.shikiri) && <ShikiriFields job={job} data={data} setJob={setJob} onFix={() => setFixPrices(true)} />}
+        {/* 工務店の請求書（仕切り）に入れるか：イヤーズ（株）デモアプリは工務店請求書を出さないので、この欄も出さない */}
+        {!DEMO && (estimated || job.shikiri) && <ShikiriFields job={job} data={data} setJob={setJob} onFix={() => setFixPrices(true)} />}
         {byAddress && byAddress !== insurer && (
           <div className="flex w-full flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-900">
             工事場所の住所は「{INSURER_INFO[byAddress].name}」です{INSURER_INFO[byAddress].form !== form ? `（見積書は${FORM_INFO[INSURER_INFO[byAddress].form].name}）` : ''}。
@@ -297,14 +299,16 @@ export function EstimateEditor({
             </Btn>
             {/* 売上伝票発行依頼書（足りない所は窓で入れてから開く。UriageDialog.tsx）。名前は「売上伝票を作成」（2026-10-27 に「売上伝票依頼書」にしたが、
                 販売見積書のタブでユーザーの指示「売上伝票…ではなく売上伝票を作成」2026-11-02。同じ働きなので工事見積書も同じ名前） */}
-            <Btn color="white" onClick={() => setUriageOpen(true)}>
-              🧾 売上伝票を作成
-            </Btn>
+            {!DEMO && (
+              <Btn color="white" onClick={() => setUriageOpen(true)}>
+                🧾 売上伝票を作成
+              </Btn>
+            )}
             <Btn color="white" onClick={onOpenOrder} disabled={!estimated} title={estimated ? undefined : '見積書に部材を入れると作れます'}>
               🛒 発注書を作成
             </Btn>
             {/* 工務店の請求書（仕切り計算表）を見る（工務店の請求書に入れている見積書だけ。前は請求する月の横。ユーザーの指示「請求書を見るの機能はプルダウンに含める」2026-11-03） */}
-            {job.shikiri && (
+            {job.shikiri && !DEMO && (
               <Btn color="white" onClick={() => onOpenInvoice(job.id)}>
                 🧾 請求書を見る
               </Btn>

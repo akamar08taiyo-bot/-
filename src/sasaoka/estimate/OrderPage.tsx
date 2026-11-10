@@ -3,6 +3,7 @@
 // 印刷（A4縦の発注書）と、販売受注簿作成ツールへの転記ができる。
 
 import {useMemo, useState} from 'react';
+import {DEMO} from '../demo/flag.ts';
 import type {MouseEvent} from 'react';
 import {jobName} from '../calc.ts';
 import type {EstimateRates} from '../calc.ts';
@@ -122,14 +123,16 @@ export function OrderPage({
           <Btn color="softSky" onClick={() => onPrint({kind: 'order', jobId: job.id})} disabled={ordered.length === 0}>
             🖨 発注書を印刷
           </Btn>
-          <a
-            href={hacchuUrl()}
-            target="_blank"
-            onClick={transfer}
-            className="inline-flex items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
-          >
-            📤 販売受注簿に転記
-          </a>
+          {!DEMO && (
+            <a
+              href={hacchuUrl()}
+              target="_blank"
+              onClick={transfer}
+              className="inline-flex items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              📤 販売受注簿に転記
+            </a>
+          )}
         </div>
       </div>
 

@@ -4,6 +4,7 @@
 // 1つの営業所の市はその営業所。いくつかある市（北九州市・福岡市）は、いま開いている営業所（設定）がその中にあればその営業所、
 // なければお客様の区の近くの営業所。田川は広域連合の田川市と田川郡（田川・桂川支部）。ほかの保険者（行橋市・苅田町・みやこ町・広域連合のほかの市町村）は設定のまま。
 // 見積書・請求書の発行元は設定のまま（申請書だけ）。住宅改修（src/sasaoka/shinseiOffice.ts）と特定福祉用具（src/tokutei/shinseiOffice.ts）は同じ決まり
+import {DEMO} from './demo/flag.ts';
 
 /** 保険者ごとの営業所（いくつかあるときは、区が分からないときの初めの営業所を先頭に） */
 const GROUPS: Record<string, string[]> = {
@@ -40,6 +41,7 @@ const TAGAWA = ['田川市', '香春町', '添田町', '糸田町', '川崎町',
  * 決まりのない保険者は null（設定の営業所のまま）
  */
 export function shinseiOfficeName(insurer: string, area: string, current: string): string | null {
+  if (DEMO) return null; // イヤーズ（株）デモアプリは、設定の営業所のまま（社内の営業所に替えない）
   if (insurer === 'kouiki') return TAGAWA.includes(area) ? '田川営業所' : null;
   const group = GROUPS[insurer];
   if (!group) return null;
@@ -50,6 +52,7 @@ export function shinseiOfficeName(insurer: string, area: string, current: string
 
 /** 申請書に書ける営業所（申請書の画面の営業所の選ぶ欄）。決まりのない保険者は空（どの営業所でも選べる） */
 export function shinseiOfficeGroup(insurer: string, area: string): string[] {
+  if (DEMO) return [];
   if (insurer === 'kouiki') return TAGAWA.includes(area) ? ['田川営業所'] : [];
   return GROUPS[insurer] ?? [];
 }

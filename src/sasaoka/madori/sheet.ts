@@ -2,6 +2,7 @@
 // 上に「○○市　○○様邸　住宅改修工事　見取図」と日付、左に平面図、右に枠で囲んだ一覧（①　L＝600mm…赤い字）、下に会社・営業所・担当者。
 // 印刷（MadoriPrint.tsx）・Excel（xlsx.ts）・申請書の平面図の枠の画像（planPng）で同じ寸法・同じ文を使う。長さは mm
 
+import {COMPANY_NAME} from '../company.ts';
 import {workItems} from '../shinsei.ts';
 import type {Job, Settings} from '../types.ts';
 import {customerFilePart, dateLabel, isoDate, staffFull} from '../util.ts';
@@ -51,7 +52,7 @@ export function sheetText(job: Job, s: Settings, m: Madori): SheetText {
   const who = job.customer.trim() ? `${job.customer.trim()}${job.suffix === '様' ? '様' : '様邸'}` : '';
   const title = [area, who, '住宅改修工事　見取図'].filter(Boolean).join('　');
   const staff = staffFull(job.staff, s.staffList);
-  const footer = [s.company || '太陽シルバーサービス株式会社', s.officeName, staff ? `担当者：${staff}` : ''].filter(Boolean).join('　');
+  const footer = [s.company || COMPANY_NAME, s.officeName, staff ? `担当者：${staff}` : ''].filter(Boolean).join('　');
   return {title, date: dateLabel(isoDate(m.updatedAt)), footer, fileName: `${customerFilePart(job.customer)}住宅改修見取図`};
 }
 

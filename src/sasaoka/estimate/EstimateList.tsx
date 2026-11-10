@@ -1,4 +1,5 @@
 import {useEffect, useMemo, useState} from 'react';
+import {DEMO} from '../demo/flag.ts';
 import {estimateTotals, hasEstimateRows, jobName} from '../calc.ts';
 import {copyJob} from '../components/JobTools.tsx';
 import {askTrash, trashLabel, useTrashUndo} from '../components/TrashPage.tsx';
@@ -264,7 +265,9 @@ function GettingStarted({data, update, goMaterials, onSample}: {data: AppData; u
           {s.estimateRate} になります。
         </li>
         <li>
-          見積書に行を入れると、{s.clientName || '工務店'}の仕切り計算表と請求書（「工務店請求書を確認する」）に入って自動で計算され、発注書も作れます。申請書だけの様邸（ほかの工務店の工事）は、請求書・発注書に入りません（{s.clientName || '工務店'}の工事でない見積書は、見積書の上の「{s.clientName || '工務店'}の請求書に入れる」を外します）。
+          {DEMO
+            ? '見積書に行を入れると、発注書も作れます（見積書の上の「その他 ▼」）。'
+            : <>見積書に行を入れると、{s.clientName || '工務店'}の仕切り計算表と請求書（「工務店請求書を確認する」）に入って自動で計算され、発注書も作れます。申請書だけの様邸（ほかの工務店の工事）は、請求書・発注書に入りません（{s.clientName || '工務店'}の工事でない見積書は、見積書の上の「{s.clientName || '工務店'}の請求書に入れる」を外します）。</>}
         </li>
       </ol>
       {!hasSamples(data) && (

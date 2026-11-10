@@ -6,6 +6,7 @@
 // 保険証の画像は保存せず、どこにも送らない（確かめる画面に出すだけ）。入口は点線の枠に「ここにドロップ・Ctrl+V」（ドロップできることが分かるように。ui.tsx の DropArea）
 
 import {useEffect, useRef, useState} from 'react';
+import {DEMO} from '../demo/flag.ts';
 import type {ReactNode} from 'react';
 import {addCardRead, applyCard, birthText, CARD_FIELDS, currentOf, defaultPicks, fieldText, fillZipAddress, linkZipAddress, sameText} from '../cardApply.ts';
 import type {CardField} from '../cardApply.ts';
@@ -462,12 +463,16 @@ export function CardFill({job, setJob}: {job: Job; setJob: (fn: (j: Job) => Job)
             🪪 介護保険証から自動入力
           </CardDrop>
           {/* 介援隊のカタログ（ユーザーの指示「赤枠の部分にカタログを表示とカタログを印刷という２つのボタンを設置する」2026-10-26。🛁 のタブの中で開く。tokuteiLink.ts） */}
-          <Btn color="white" className="w-full !text-base" onClick={() => askCatalog('show')}>
-            📖 カタログを表示
-          </Btn>
-          <Btn color="softSky" className="w-full !text-base" onClick={() => askCatalog('print')}>
-            🖨 カタログを印刷
-          </Btn>
+          {!DEMO && (
+            <>
+              <Btn color="white" className="w-full !text-base" onClick={() => askCatalog('show')}>
+                📖 カタログを表示
+              </Btn>
+              <Btn color="softSky" className="w-full !text-base" onClick={() => askCatalog('print')}>
+                🖨 カタログを印刷
+              </Btn>
+            </>
+          )}
         </div>
       ) : (
         // 上の段の右の小さな枠。名前が長くなった（「介護保険証から自動入力」）ので、字を少し小さく・左右の余白を詰めて、1366px（Windows の縦のスクロールバーあり）でも保険者・保険者番号と同じ段に入れる

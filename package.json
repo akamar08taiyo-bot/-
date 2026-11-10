@@ -8,6 +8,7 @@
     "build": "vite build",
     "build:sasaoka": "vite build --config vite.sasaoka.config.ts",
     "build:jutaku": "vite build --config vite.jutaku.config.ts",
+    "build:years": "vite build --config vite.years.config.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",

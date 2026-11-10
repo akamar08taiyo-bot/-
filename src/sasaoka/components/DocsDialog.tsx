@@ -6,6 +6,7 @@
 // 特定福祉用具の2つは特定福祉用具のアプリに作ってもらう（tokuteiLink.ts の tokuteiFiles）。作れない書類（見積書に行がない・特定福祉用具の商品がない）は選べない。
 // 「📲 様邸のデータ」（jobShare.ts）は、パソコンのこのアプリに取り込むファイル（申請書・見積書・理由書の内容・写真・特定福祉用具の案件をすべて。2026-10-30）
 import {useEffect, useRef, useState} from 'react';
+import {DEMO} from '../demo/flag.ts';
 import type {ReactNode} from 'react';
 import {createPortal} from 'react-dom';
 import {hasEstimateRows} from '../calc.ts';
@@ -26,14 +27,16 @@ import {Btn, Modal, useToast} from './ui.tsx';
 
 /** 書類（様邸の画面のタブと同じ並び・同じ名前） */
 export type DocKind = 'shinsei' | 'estimate' | 'tokutei' | 'hanbai' | 'riyu' | 'madori';
-const KINDS: [DocKind, string][] = [
-  ['shinsei', '住宅改修申請書'],
-  ['estimate', '工事見積書'],
-  ['tokutei', '特定福祉用具申請書'],
-  ['hanbai', '販売見積書'],
-  ['riyu', '理由書'],
-  ['madori', '平面図（見取図）'], // 平面図のタブで描いたもの（madori/xlsx.ts。2026-11-09）
-];
+const KINDS: [DocKind, string][] = (
+  [
+    ['shinsei', '住宅改修申請書'],
+    ['estimate', '工事見積書'],
+    ['tokutei', '特定福祉用具申請書'],
+    ['hanbai', '販売見積書'],
+    ['riyu', '理由書'],
+    ['madori', '平面図（見取図）'], // 平面図のタブで描いたもの（madori/xlsx.ts。2026-11-09）
+  ] as [DocKind, string][]
+).filter(([k]) => !DEMO || (k !== 'tokutei' && k !== 'hanbai')); // イヤーズ（株）デモアプリは住宅改修だけ
 type Mode = 'excel' | 'mail';
 /** チェックできるもの：書類と、様邸のデータ（data） */
 type Pick = DocKind | 'data';

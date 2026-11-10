@@ -34,6 +34,7 @@ import {ShinseiEditor} from './estimate/ShinseiEditor.tsx';
 import {TokuteiEditor} from './estimate/TokuteiEditor.tsx';
 import {hasShinseiInfo} from './estimateForms.ts';
 import {APP_TITLE, PORTAL_URL, readHash, readReceive, writeHash} from './links.ts';
+import {DEMO, DEMO_NAME} from './demo/flag.ts';
 import type {JobView, MainTab} from './links.ts';
 import type {ShinseiField} from './shinseiPreview.ts';
 import {photoIdsInUse, prunePhotos} from './photos.ts';
@@ -53,7 +54,7 @@ import {useNewVersion} from './update.ts';
 import {useStore} from './useStore.ts';
 import {tesuri, thisMonth} from './util.ts';
 
-const TABS: {id: MainTab; label: string}[] = [
+const ALL_TABS: {id: MainTab; label: string}[] = [
   {id: 'estimate', label: '📝 見積もり・申請書を作成する'},
   // 売上見込みは見積もりのすぐ右、工務店の請求書はその右（ユーザーの指示「請求書を確認するではなく、工務店請求書を確認するに変更」
   // 「売上見込みを確認すると、工務店請求書を確認するの位置をいれかえる」2026-10-27。売上見込みは 2026-10-25 に請求書の右に足した）
@@ -63,6 +64,8 @@ const TABS: {id: MainTab; label: string}[] = [
   {id: 'settings', label: '⚙ 設定'},
   {id: 'trash', label: '🗑 ゴミ箱'}, // 設定のタブの横（ユーザーの指示「設定のタブの横にゴミ箱をつくり」2026-10-25）
 ];
+// イヤーズ（株）デモアプリは、売上見込み（受注残・進捗管理につながる）・工務店請求書（工務店の仕切り）を出さない
+const TABS = DEMO ? ALL_TABS.filter((t) => t.id !== 'sales' && t.id !== 'invoice') : ALL_TABS;
 
 // タブごとの色（見積書は緑、請求書は紺、売上見込みは青緑、部材・施工費マスタは紫、設定は灰、ゴミ箱は茶色がかった灰）。選んでいるタブは下の画面と同じ色にしてつなげ、
 // 広い画面ではタブの上に色の帯（accent）を付けて、どれを選んでいるか分かるようにする
@@ -110,7 +113,7 @@ function JobTabs({view, onView, cls}: {view: JobView; onView: (v: JobView) => vo
     ['riyu', '📄 理由書'],
     // 平面図（見取図）を描く（ユーザーの指示「平面図をつくれるような機能を追加する。まどりっちの機能やマイホームクラウドの機能もつけくわえる」2026-11-09。madori/）
     ['madori', '📐 平面図'],
-  ];
+  ].filter(([v]) => !DEMO || (v !== 'tokutei' && v !== 'hanbai')) as [JobView, string][]; // デモは住宅改修だけ（ユーザーの答え「住宅改修だけ」）
   // 画面の上の帯のタブ（ユーザーの指示「メインタブが二つある為、わかりづらい。住宅改修申請書、工事見積書、特定福祉用具申請書、販売見積書、理由書がメインのタブに入る」2026-11-03。
   // 前は帯の下の白い枠のタブ）。スマホ・タブレットの縦の幅では2つずつ並べる（5つ目の理由書は1段まるごと。「📷 写真へ」があるときは理由書のとなり）
   return (
@@ -274,7 +277,7 @@ export default function App({start}: {start: MainTab}) {
     if (estimateJob && (jobView === 'tokutei' || jobView === 'hanbai')) tokuteiOpened.current.add(estimateJob.id);
   }, [estimateJob?.id, jobView]);
   useEffect(() => {
-    document.title = APP_TITLE;
+    document.title = DEMO ? `${DEMO_NAME}｜${APP_TITLE}` : APP_TITLE;
   }, []);
   // 部材＋施工費（常用）の例を1つ入れておく（ユーザーの指示。一度だけ。消したら入れ直さない）
   useEffect(() => {
@@ -499,9 +502,16 @@ export default function App({start}: {start: MainTab}) {
         <header className={`no-print ${theme.head} text-white transition-colors`}>
           <div className={`mx-auto flex ${PAGE_WIDTH} flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3`}>
             {/* 業務アプリポータルへ戻るボタンは左上（全アプリ共通の形 .taiyo-portal-back。ユーザーの指示「太陽ポータルに戻るボタンは左上に設置」2026-10-28。前は右上） */}
-            <a href={PORTAL_URL} className="taiyo-portal-back">
-              ← 業務アプリポータルへ戻る
-            </a>
+            {/* イヤーズ（株）デモアプリは、ポータルへ戻るボタンの代わりにデモの名前（demo/flag.ts） */}
+            {DEMO ? (
+              <span className="rounded-md border border-white/40 bg-white px-2.5 py-1 text-sm font-bold text-[#14532d]" data-demo-name>
+                {DEMO_NAME}
+              </span>
+            ) : (
+              <a href={PORTAL_URL} className="taiyo-portal-back">
+                ← 業務アプリポータルへ戻る
+              </a>
+            )}
             <div className="flex items-center gap-3">
               <div className="grid h-9 w-9 place-items-center rounded-lg bg-white/15 text-lg font-black">住</div>
               <div>

@@ -13,6 +13,7 @@ import {careAmounts} from './careLines.ts';
 import {HOUSING_LIMIT} from './uriage.ts';
 import {BASE_PLATE} from './cutLink.ts';
 import {circled, eraOf, formLines, INSURER_INFO, jobInsurer, KINDS, lineNote, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa, shinseiKindNames} from './estimateForms.ts';
+import {ORIGINAL_OFFICE_TEXTS} from './company.ts';
 import {OFFICES} from './defaults.ts';
 import {insurerAreaName, insurerNoOf} from './insurerNumbers.ts';
 import {shinseiOfficeName} from './shinseiOffice.ts';
@@ -1045,8 +1046,8 @@ export type ShinseiValues = {
 
 /** 申請書の営業所の名前・所在地（県を除く）・電話・所長（原本の行橋営業所の字を書きかえる） */
 export type OfficeTexts = {name: string; address: string; tel: string; manager: string};
-/** 原本（苅田町・行橋市・みやこ町）にそのまま書いてある行橋営業所の字 */
-const ORIGINAL_OFFICE: OfficeTexts = {name: '行橋営業所', address: '行橋市大字流末1327番地', tel: '0930-26-9640', manager: '久保　匠史'};
+/** 原本（苅田町・行橋市・みやこ町）にそのまま書いてある営業所の字（company.ts。デモのビルドは空＝原本の字も消してある） */
+const ORIGINAL_OFFICE: OfficeTexts = ORIGINAL_OFFICE_TEXTS;
 
 /**
  * 原本の行橋営業所の字（名前・所在地・電話・所長）を、申請書の営業所の字に書きかえた欄（変わる欄だけ）。
@@ -1062,7 +1063,7 @@ function officeCells(files: Files, sheet: ShinseiSheet, office: OfficeTexts): [s
     const before = cellText(xml, ref, ss);
     let text = before;
     for (const key of ['name', 'address', 'tel', 'manager'] as const) {
-      if (office[key]) text = text.split(ORIGINAL_OFFICE[key]).join(office[key]);
+      if (office[key] && ORIGINAL_OFFICE[key]) text = text.split(ORIGINAL_OFFICE[key]).join(office[key]);
     }
     if (text !== before) out.push([ref, text]);
   }
