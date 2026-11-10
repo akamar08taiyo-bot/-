@@ -117,4 +117,6 @@ test('番号（①②の道具）の一覧の行は、申請書の同じ写真�
   assert.deepEqual(legendLines(m, none, none, (n) => lines[n]), ['①　玄関　手すり取付　L=600mm', '②　手で書いた', '③　L＝900mm']);
   // 申請書の文を渡さないときは、前と同じ（番号だけの部品は一覧に出さない）
   assert.deepEqual(legendLines(m, none, none), ['②　手で書いた', '③　L＝900mm']);
+  // 申請書にその番号の行がないときは、番号だけ並べる（印刷の一覧の枠が空にならないように。ユーザーの「印刷画面が変になっている」2026-11-10）
+  assert.deepEqual(legendLines(m, none, none, (n) => (n === 3 ? lines[3] : undefined)), ['①', '②　手で書いた', '③　L＝900mm']);
 });

@@ -1,6 +1,6 @@
 // 見取図の印刷（A4横）。いただいた Excel のテンプレートと同じ並び（sheet.ts の pageSvg）。階が2つ以上なら1階ずつ1枚。
 // 申請書の印刷（ShinseiPrint.tsx）と同じく body の直下に出し、印刷のあいだはアプリの画面を出さない（html.shinsei-printing）
-import {useEffect, useMemo, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {Btn} from '../components/ui.tsx';
 import type {Job, Settings} from '../types.ts';
@@ -25,7 +25,15 @@ export function MadoriPrint({job, settings, madori, onClose}: {job: Job; setting
   }, [madori]);
   const pages = floors.map((f, i) => pageSvg(t, madori, f, floorLegend(madori, f, look.no, look.line, i === 0, look.byNo), look.no, floors.length > 1 ? f.name : '', `pp${i}`, images));
   const [picked, setPicked] = useState<Set<number>>(() => new Set(pages.map((_, i) => i)));
-  const fit = () => Math.min(1, Math.max(0.25, (window.innerWidth - 16) / (297 * MM)));
+  // 画面の幅と高さの両方に入るように縮める（iPad の横向きで用紙の下＝会社名が切れていた。ユーザーの「印刷画面が変になっている」2026-11-10）。
+  // 高さは上の帯の下に、用紙の上下の余白（.print-root の 16px と mb-4）を足して1枚が入るように。印刷は原寸（sasaoka.css）
+  const bar = useRef<HTMLDivElement>(null);
+  const fit = () => {
+    const top = bar.current?.offsetHeight ?? 64;
+    const w = (window.innerWidth - 16) / (297 * MM);
+    const h = (window.innerHeight - top - 8) / (209.6 * MM + 32);
+    return Math.min(1, Math.max(0.25, Math.min(w, h)));
+  };
   const [zoom, setZoom] = useState(fit);
   useEffect(() => {
     const before = document.title;
@@ -34,6 +42,7 @@ export function MadoriPrint({job, settings, madori, onClose}: {job: Job; setting
       if (e.key === 'Escape') onClose();
     };
     const onResize = () => setZoom(fit());
+    onResize(); // 上の帯の高さが分かってから測り直す
     window.addEventListener('keydown', onKey);
     window.addEventListener('resize', onResize);
     document.documentElement.classList.add('shinsei-printing');
@@ -48,7 +57,7 @@ export function MadoriPrint({job, settings, madori, onClose}: {job: Job; setting
   return createPortal(
     <div className="print-overlay">
       <style>{'@media print { @page { size: A4 landscape; margin: 0; } .madori-page { box-shadow: none !important; margin: 0 !important; break-after: page; } .madori-page.madori-last { break-after: auto; } .madori-page.madori-skip { display: none !important; } }'}</style>
-      <div className="print-toolbar justify-center">
+      <div ref={bar} className="print-toolbar justify-center">
         <div className="text-sm font-bold">見取図（A4横）</div>
         {pages.length > 1 && (
           <span role="group" aria-label="印刷する階" className="flex flex-wrap items-center gap-x-3 text-sm">

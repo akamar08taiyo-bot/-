@@ -261,9 +261,10 @@ export function legendLines(
     const n = nums.get(it.id);
     if (!n || it.kind !== 'num' || rows.has(n)) continue;
     const t = legendText(it, placeLine) || (lineByNo?.(n) ?? '').replace(/^[①-⑳]\s*/, '');
-    if (t) rows.set(n, t);
+    // 印刷・Excel（lineByNo あり）は、申請書にその番号の行がなくても番号だけ並べる（一覧の枠が空にならないように。あとで手で書ける）
+    if (t || lineByNo) rows.set(n, t);
   }
-  return [...rows.entries()].sort((a, b) => a[0] - b[0]).map(([n, t]) => `${circled(n)}　${t}`);
+  return [...rows.entries()].sort((a, b) => a[0] - b[0]).map(([n, t]) => (t ? `${circled(n)}　${t}` : circled(n)));
 }
 
 /** 部品を足す・直す・消す（階の中で） */

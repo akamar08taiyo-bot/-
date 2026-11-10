@@ -478,7 +478,7 @@ log('方眼の上のまん中の描く道具・曲げた手すり（□で曲げ
   await bar.getByRole('button', {name: '番号を確定'}).click();
   const rowK = (await legend()).find((r) => r.startsWith(String.fromCharCode(0x2460 + k - 1)));
   if (want) assert.equal(rowK, `${want.slice(0, 1)}　${want.slice(1)}`);
-  else assert.equal(rowK, undefined);
+  else assert.equal(rowK, String.fromCharCode(0x2460 + k - 1)); // 申請書にその番号の行がなければ番号だけ（印刷の一覧の枠が空にならないように）
   await page.keyboard.press('Control+z');
 }
 log('住設 ▼・いつも出す・まん中の削除・すべらせて戻す／進む・方眼の下の改修の内容・番号の一覧 OK');
@@ -514,6 +514,16 @@ assert.match(first, /住宅改修工事　見取図（1階）/);
 assert.match(first, /太陽シルバーサービス株式会社/);
 assert.match(first, /①　玄関　手すりの取り付け/);
 await page.screenshot({path: path.join(outDir, 'madori-print.png')});
+// iPad の横向き（1180×820）でも、1枚目が上の帯の下に切れずに入る（ユーザーの「印刷画面が変になっている」2026-11-10。前は下の会社名が切れていた）
+for (const vp of [{width: 1180, height: 820}, {width: 1366, height: 768}, {width: 390, height: 844}]) {
+  await page.setViewportSize(vp);
+  await page.waitForTimeout(200);
+  const box = await sheets.first().boundingBox();
+  const barBottom = await page.locator('.print-toolbar').evaluate((e) => e.getBoundingClientRect().bottom);
+  assert.ok(box.y >= barBottom - 1 && box.y + box.height <= vp.height + 0.5 && box.x >= 0 && box.x + box.width <= vp.width + 0.5, `${vp.width}×${vp.height} ${JSON.stringify(box)}`);
+  if (vp.width === 1180) await page.screenshot({path: path.join(outDir, 'madori-print-ipad.png')});
+}
+await page.setViewportSize({width: 1366, height: 900});
 await page.emulateMedia({media: 'print'});
 const pdf = await page.pdf({preferCSSPageSize: true, printBackground: true});
 await page.emulateMedia({media: 'screen'});
