@@ -69,6 +69,15 @@ type Drag =
 /** 最近使った図形（この端末の localStorage） */
 const RECENT_SHAPES = 'taiyo-madori-recent-shapes';
 
+/** 描く道具の段の住設（名前・部品の種類。catalog.ts の FIX_TYPES） */
+const QUICK_FIX: [string, string, string?][] = [
+  ['トイレ', '洋式便器', 'トイレ（便器）'], // 左の一覧の部屋の「トイレ」と見分ける名前
+  ['浴槽', '浴槽'],
+  ['キッチン', 'I型キッチン'],
+  ['ベッド', 'ベッド'],
+  ['下駄箱', '玄関収納'],
+];
+
 /** 番号の道具で置ける番号（ユーザーの指示「番号1番から自動で2.3.4.5、15まで」2026-11-10） */
 const NUM_MAX = 15;
 
@@ -1405,7 +1414,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           </button>
         ))}
       </div>
-      <div className="flex items-center gap-1 lg:justify-self-start">
+      <div className="flex flex-wrap items-center justify-center gap-1 lg:justify-self-start">
         <button
           type="button"
           aria-pressed={isTool({t: 'num'})}
@@ -1417,6 +1426,23 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           <span className="text-base leading-none text-rose-600">{circled(Math.min(nextNo, NUM_MAX))}</span>
           <span className="max-sm:hidden">番号</span>
         </button>
+        {/* 住設（ユーザーの指示「住設も選べるように。トイレ、浴槽、キッチン、ベッド、下駄箱」2026-11-10）：押してから方眼を押すと、壁ぎわに置く（左の一覧の住設・家具と同じ部品） */}
+        <span className="mx-0.5 h-6 w-px bg-slate-200" aria-hidden />
+        {QUICK_FIX.map(([label, type, name]) => (
+          <button
+            key={label}
+            type="button"
+            aria-pressed={isTool({t: 'fix', type})}
+            onClick={() => pick({t: 'fix', type})}
+            aria-label={name ?? label}
+            title={`${label}：押してから方眼を押すと、壁ぎわに置く`}
+            className={`flex h-11 w-12 flex-col items-center justify-center rounded-md border leading-none max-sm:h-9 max-sm:w-9 ${isTool({t: 'fix', type}) ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+            data-quick-fix
+          >
+            <span className="block h-6 w-8 [&>svg]:h-full [&>svg]:w-full" aria-hidden dangerouslySetInnerHTML={{__html: thumbs.fix[type]}} />
+            <span className="mt-0.5 text-[10px] text-slate-700 max-sm:hidden">{label}</span>
+          </button>
+        ))}
       </div>
     </div>
   );

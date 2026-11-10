@@ -267,6 +267,17 @@ log('図の上で文字を打つ・回すつまみ・L字の手すり・頂点�
   const sb = await page.getByRole('toolbar', {name: '平面図の設定'}).boundingBox();
   const ub = await page.locator('[data-undo-center]').boundingBox();
   assert.ok(Math.abs(mid(ub) - mid(sb)) < 3 && Math.abs(mid(sb) - mid(bb)) < 3, `戻す・進むのど真ん中 ${JSON.stringify([sb, ub])}`);
+  // 住設（トイレ・浴槽・キッチン・ベッド・下駄箱）は番号の右（ユーザーの指示「住設も選べるように」2026-11-10）
+  assert.deepEqual(await bar.locator('[data-quick-fix]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label'))), ['トイレ（便器）', '浴槽', 'キッチン', 'ベッド', '下駄箱']);
+  {
+    const n0 = (await art()).length;
+    await bar.getByRole('button', {name: 'ベッド', exact: true}).click();
+    assert.equal(await bar.getByRole('button', {name: 'ベッド', exact: true}).getAttribute('aria-pressed'), 'true');
+    await click(9 * M, 6 * M);
+    assert.ok((await art()).length > n0, 'ベッドを置いた');
+    await page.keyboard.press('Control+z');
+    assert.equal((await art()).length, n0);
+  }
   const dimBox = await page.getByRole('checkbox', {name: '寸法'}).boundingBox();
   assert.ok(dimBox.x > mid(sb), '寸法は右');
   assert.ok(bb.y + bb.height <= cb.y + 1 && cb.y - (bb.y + bb.height) < 16, `方眼のすぐ上 ${JSON.stringify([bb, cb])}`);
