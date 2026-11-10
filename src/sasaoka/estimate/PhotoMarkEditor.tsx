@@ -788,8 +788,24 @@ export function PhotoMarkEditor({
   };
   // ---------------------------------------------------------------- 頂点の編集（手書きの線・折れ線・四角）
   /** 頂点を編集している図形（選んでいる1つの手書きの線・折れ線・四角のときだけ。選ぶのが変わったら終わり） */
-  const pe = pointEdit && single && single.id === pointEdit.id && single.kind === 'pen' ? pointEdit : null;
-  const canPoints = !!single && single.kind === 'pen';
+  // 直線（縦手すり1本など）も頂点の編集で両端を選んで動かせる（ユーザーの指示「縦手すり一本の場合でも、頂点の編集を押すこと、片側の頂点の場所を微調節できるようにする」2026-11-10）
+  const pointKind = (m: PhotoMark) => m.kind === 'pen' || m.kind === 'line';
+  const pe = pointEdit && single && single.id === pointEdit.id && pointKind(single) ? pointEdit : null;
+  const canPoints = !!single && pointKind(single);
+  /** 頂点（紙の上の見えている位置）。直線は始点・終点の2つ */
+  const vertsOf = (m: PhotoMark): {pts: Pt[]; closed: boolean} => {
+    if (m.kind !== 'line') return markVertices(m, V);
+    const en = lineEnds(m, V);
+    return {pts: [{x: en.x1, y: en.y1}, {x: en.x2, y: en.y2}], closed: false};
+  };
+  /** 頂点を動かした図形（直線は両端から作り直す） */
+  const withVerts = (m: PhotoMark, pts: Pt[], closed: boolean): PhotoMark => (m.kind === 'line' ? withLine(m, W, H, pts[0], pts[1]) : withVertices(m, V, pts, closed, MIN));
+  /** 選んでいる頂点を (dx, dy) 動かした図形（◀ ▲ ▼ ▶・矢印キー。写真の外には出さない） */
+  const vertexMoved = (m: PhotoMark, i: number, dx: number, dy: number): PhotoMark => {
+    const {pts, closed} = vertsOf(m);
+    const n = withVerts(m, pts.map((q, j) => (j === i ? {x: clamp(q.x + dx, 0, W), y: clamp(q.y + dy, 0, H)} : q)), closed);
+    return inside(n, W, H) ? n : m;
+  };
   // ほかを選んだ・元に戻すで消えたら終える（あとで同じ図形を選び直したとき、頂点の編集のまま出ないように）
   useEffect(() => {
     if (pointEdit && !pe) setPointEdit(null);
@@ -813,7 +829,7 @@ export function PhotoMarkEditor({
       setPointEdit(null);
       return;
     }
-    if (!single || single.kind !== 'pen') {
+    if (!single || !pointKind(single)) {
       // 選んでいないときに押した：何を選べばよいかを少しのあいだ出す（前はボタンが薄くなって押せないだけで、使い方が分からなかった）
       setPointTip(true);
       window.clearTimeout(pointTipTimer.current);
@@ -822,15 +838,16 @@ export function PhotoMarkEditor({
     }
     if (editing) endEdit();
     setTool(null);
+    setEndPick(null);
     setPointEdit({id: single.id, i: null});
   };
   /** 頂点を消す（これ以上消すと線・形にならないときは消さない：開いた線は2つ、閉じた形は3つまで） */
   const deleteVertex = (id: string, i: number) => {
     const m = byId(id, marks);
     if (!m) return;
-    const {pts, closed} = markVertices(m, V);
+    const {pts, closed} = vertsOf(m);
     if (pts.length <= (closed ? 3 : 2)) return;
-    commit(marks.map((x) => (x.id === id ? withVertices(m, V, pts.filter((_, j) => j !== i), closed, MIN) : x)));
+    commit(marks.map((x) => (x.id === id ? withVerts(m, pts.filter((_, j) => j !== i), closed) : x)));
     setPointEdit({id, i: null});
   };
   const copy = () => {
@@ -1012,6 +1029,10 @@ export function PhotoMarkEditor({
             return inside(n, W, H) ? n : m;
           }),
         );
+      } else if (pe && pe.i !== null) {
+        // 頂点の編集で頂点を選んでいる：その頂点だけを 1画素ずつ（Ctrl で半分）
+        const i = pe.i;
+        commit(marks.map((m) => (m.id === pe.id ? vertexMoved(m, i, d.x * (ctrl ? 0.5 : 1), d.y * (ctrl ? 0.5 : 1)) : m)));
       } else if (ep) {
         // 直線の端をつまんでいる：その端だけを 1画素ずつ
         commit(marks.map((m) => (m.id === ep.id ? endMoved(m, ep.which, d.x * (ctrl ? 0.5 : 1), d.y * (ctrl ? 0.5 : 1)) : m)));
@@ -1340,7 +1361,7 @@ export function PhotoMarkEditor({
     if (pe) {
       const m = byId(pe.id, marks);
       if (m) {
-        const {pts, closed} = markVertices(m, V);
+        const {pts, closed} = vertsOf(m);
         const ht = handleTol(e);
         let best = -1;
         let bd = Infinity;
@@ -1358,7 +1379,9 @@ export function PhotoMarkEditor({
           return;
         }
         const tol = tolOf(e) + (m.width * PT_PX) / 2;
-        const segs = closed ? pts.length : pts.length - 1;
+        // 直線には頂点を足さない（2つの端だけ）。線の上を押したら、頂点の編集のまま（終えない）
+        const segs = m.kind === 'line' ? 0 : closed ? pts.length : pts.length - 1;
+        if (m.kind === 'line' && segDist(p, pts[0], pts[1]) <= tol) return;
         for (let j = 0; j < segs; j++) {
           if (segDist(p, pts[j], pts[(j + 1) % pts.length]) > tol) continue;
           const added = [...pts.slice(0, j + 1), clampP(p), ...pts.slice(j + 1)];
@@ -1479,7 +1502,7 @@ export function PhotoMarkEditor({
     if (d.type === 'vertex') {
       if (!d.moved && Math.hypot((p.x - d.p0.x) * k, (p.y - d.p0.y) * k) < 3) return;
       d.moved = true;
-      const n = withVertices(d.base, V, d.pts.map((q, j) => (j === d.i ? clampP(p) : q)), d.closed, MIN);
+      const n = withVerts(d.base, d.pts.map((q, j) => (j === d.i ? clampP(p) : q)), d.closed);
       if (inside(n, W, H)) setDraft(marks.map((m) => (m.id === d.id ? n : m)));
       return;
     }
@@ -1952,12 +1975,15 @@ export function PhotoMarkEditor({
 
   // スマホ・iPad の少しずつ動かすボタン（◀ ▲ ▼ ▶。パソコンの矢印キーと同じ）：1回押すと画面の1画素ぶん、押したままだとくり返し動く（離したときに1回で入れる＝戻るも1回）。
   // ユーザーの指示「手すりを左右に微調整しようとした場合に微調整がきかない。段階が少し大きすぎる」2026-10-30（指のドラッグでは細かく合わせにくい）
-  const nudge = useRef<{timer: number; base: PhotoMark[]; ids: string[]; n: number; dx: number; dy: number; end: {id: string; which: 1 | 2} | null} | null>(null);
+  const nudge = useRef<{timer: number; base: PhotoMark[]; ids: string[]; n: number; dx: number; dy: number; end: {id: string; which: 1 | 2} | null; vertex: {id: string; i: number} | null} | null>(null);
   const nudgeList = (st: NonNullable<typeof nudge.current>) => {
     const step = Math.max(1, 1 / (k || 1));
     // 直線の端をつまんでいるときは、その端だけ
     const end = st.end;
     if (end) return st.base.map((m) => (m.id === end.id ? endMoved(m, end.which, st.dx * st.n * step, st.dy * st.n * step) : m));
+    // 頂点の編集で選んでいる頂点だけ（直線の片側の端・折れ線の角など）
+    const v = st.vertex;
+    if (v) return st.base.map((m) => (m.id === v.id ? vertexMoved(m, v.i, st.dx * st.n * step, st.dy * st.n * step) : m));
     const moved = moveBy(
       st.base.filter((m) => st.ids.includes(m.id)),
       W,
@@ -1970,7 +1996,8 @@ export function PhotoMarkEditor({
   const nudgeStart = (dx: number, dy: number) => (e: ReactPointerEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     if (nudge.current || !sel.length) return;
-    const st = {timer: 0, base: marks, ids: sel, n: 1, dx, dy, end: ep};
+    if (pe && pe.i === null) return; // 頂点の編集のあいだは、頂点を選んでから
+    const st = {timer: 0, base: marks, ids: sel, n: 1, dx, dy, end: ep, vertex: pe && pe.i !== null ? {id: pe.id, i: pe.i} : null};
     nudge.current = st;
     setDraft(nudgeList(st));
     const again = () => {
@@ -1980,6 +2007,37 @@ export function PhotoMarkEditor({
     };
     st.timer = window.setTimeout(again, 450);
   };
+  /** 少しずつ動かす ◀ ▲ ▼ ▶（スマホ・iPad だけ。パソコンは矢印キー）。頂点の編集のあいだは選んだ頂点だけを動かす（頂点を選ぶまでは押せない） */
+  const nudgePad = (disabled = false) => (
+              <div role="group" aria-label="少しずつ動かす" data-nudge className={`hidden gap-1 rounded-md border border-slate-300 bg-white p-0.5 shadow-md touch:flex ${disabled ? 'opacity-40' : ''}`}>
+                {(
+                  [
+                    ['左へ少し動かす', 180, -1, 0],
+                    ['上へ少し動かす', 270, 0, -1],
+                    ['下へ少し動かす', 90, 0, 1],
+                    ['右へ少し動かす', 0, 1, 0],
+                  ] as const
+                ).map(([label, deg, dx, dy]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    aria-label={label}
+                    disabled={disabled}
+                    onPointerDown={nudgeStart(dx, dy)}
+                    onPointerUp={nudgeEnd}
+                    onPointerCancel={nudgeEnd}
+                    onPointerLeave={nudgeEnd}
+                    onContextMenu={(e) => e.preventDefault()}
+                    className="flex h-10 w-10 touch-manipulation select-none items-center justify-center rounded text-base text-slate-700 hover:bg-slate-100 active:bg-emerald-100"
+                  >
+                    {/* 4つとも同じ大きさの三角（◀ ▶ の字は ▲ ▼ より小さく出る） */}
+                    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden style={{transform: `rotate(${deg}deg)`}}>
+                      <polygon points="3,2 14,8 3,14" fill="currentColor" />
+                    </svg>
+                  </button>
+                ))}
+              </div>
+  );
   const nudgeEnd = () => {
     const st = nudge.current;
     if (!st) return;
@@ -2016,6 +2074,19 @@ export function PhotoMarkEditor({
       {shown
         .filter((m) => sel.includes(m.id))
         .map((m) => {
+          if (pe && m.id === pe.id) {
+            // 頂点の編集：線を点線でなぞり、頂点に小さな黒い四角（選んだ頂点は白。Excel と同じ）
+            const v = vertsOf(m);
+            const ring = v.closed ? [...v.pts, v.pts[0]] : v.pts;
+            return (
+              <g key={m.id} data-sel={m.id} data-vertex-edit={m.id} data-points={v.pts.length}>
+                <polyline points={ring.map((q) => `${q.x * k},${q.y * k}`).join(' ')} fill="none" stroke="#dc2626" strokeWidth={1} strokeDasharray="4 3" />
+                {v.pts.map((q, i) => (
+                  <rect key={i} data-vertex={i} x={q.x * k - 5} y={q.y * k - 5} width={10} height={10} fill={pe.i === i ? 'white' : 'black'} stroke={pe.i === i ? 'black' : 'white'} strokeWidth={1} />
+                ))}
+              </g>
+            );
+          }
           if (m.kind === 'line') {
             const e = lineEnds(m, V);
             const r = selected.length === 1 && !draft && !tool ? lineRotHandle(m) : null;
@@ -2040,19 +2111,6 @@ export function PhotoMarkEditor({
                     <path d="M4.5 -5.2 L3.8 -2.2 L1 -3" fill="none" stroke={strokeSel} strokeWidth={1.3} />
                   </g>
                 )}
-              </g>
-            );
-          }
-          if (pe && m.id === pe.id) {
-            // 頂点の編集：線を点線でなぞり、頂点に小さな黒い四角（選んだ頂点は白。Excel と同じ）
-            const v = markVertices(m, V);
-            const ring = v.closed ? [...v.pts, v.pts[0]] : v.pts;
-            return (
-              <g key={m.id} data-sel={m.id} data-vertex-edit={m.id} data-points={v.pts.length}>
-                <polyline points={ring.map((q) => `${q.x * k},${q.y * k}`).join(' ')} fill="none" stroke="#dc2626" strokeWidth={1} strokeDasharray="4 3" />
-                {v.pts.map((q, i) => (
-                  <rect key={i} data-vertex={i} x={q.x * k - 5} y={q.y * k - 5} width={10} height={10} fill={pe.i === i ? 'white' : 'black'} stroke={pe.i === i ? 'black' : 'white'} strokeWidth={1} />
-                ))}
               </g>
             );
           }
@@ -2305,7 +2363,7 @@ export function PhotoMarkEditor({
                 <button
                   type="button"
                   aria-label="頂点の編集"
-                  title="頂点の編集（手書きの線・折れ線・四角の角を動かす・足す・消す）"
+                  title="頂点の編集（直線の端・手書きの線・折れ線・四角の角を動かす・足す・消す）"
                   aria-pressed={!!pe}
                   onClick={togglePoints}
                   // 2つ分の幅に収める（絵＋12px の名前。リボンの幅を広げない＝1366px の画面に入る）
@@ -2621,33 +2679,7 @@ export function PhotoMarkEditor({
           {sel.length > 0 && !pe && !polyOn && !editing && (!draft || nudging) && (
             <div onPointerDown={(e) => e.stopPropagation()} className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2">
               {/* スマホ・iPad だけ：少しずつ動かす ◀ ▲ ▼ ▶（パソコンは矢印キー） */}
-              <div role="group" aria-label="少しずつ動かす" data-nudge className="hidden gap-1 rounded-md border border-slate-300 bg-white p-0.5 shadow-md touch:flex">
-                {(
-                  [
-                    ['左へ少し動かす', 180, -1, 0],
-                    ['上へ少し動かす', 270, 0, -1],
-                    ['下へ少し動かす', 90, 0, 1],
-                    ['右へ少し動かす', 0, 1, 0],
-                  ] as const
-                ).map(([label, deg, dx, dy]) => (
-                  <button
-                    key={label}
-                    type="button"
-                    aria-label={label}
-                    onPointerDown={nudgeStart(dx, dy)}
-                    onPointerUp={nudgeEnd}
-                    onPointerCancel={nudgeEnd}
-                    onPointerLeave={nudgeEnd}
-                    onContextMenu={(e) => e.preventDefault()}
-                    className="flex h-10 w-10 touch-manipulation select-none items-center justify-center rounded text-base text-slate-700 hover:bg-slate-100 active:bg-emerald-100"
-                  >
-                    {/* 4つとも同じ大きさの三角（◀ ▶ の字は ▲ ▼ より小さく出る） */}
-                    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden style={{transform: `rotate(${deg}deg)`}}>
-                      <polygon points="3,2 14,8 3,14" fill="currentColor" />
-                    </svg>
-                  </button>
-                ))}
-              </div>
+              {nudgePad()}
               {canPoints && (
                 // 手書きの線・折れ線・四角を選んでいるとき：下のまん中にも「頂点の編集」（スマホはリボンが遠い。ユーザーの指示「頂点を編集ボタンの操作がわかりずらい」2026-10-30）
                 <button type="button" data-points-start onClick={togglePoints} className="flex h-11 items-center gap-1 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-base text-slate-700 shadow-md hover:bg-slate-50">
@@ -2659,19 +2691,23 @@ export function PhotoMarkEditor({
           )}
           {pointTip && !canPoints && !pe && (
             <div role="status" className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 py-2 text-[15px] text-slate-700 shadow-md">
-              折れ線・四角・手書きの線を選んでから押します
+              線・折れ線・四角・手書きの線を選んでから押します
             </div>
           )}
           {pe && (
             // 頂点の編集のあいだ：スマホ・iPad でも消す・終えるができるように（パソコンは Delete・Esc でも）。上に短い操作の案内
             <div onPointerDown={(e) => e.stopPropagation()} className="absolute bottom-3 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5">
               <div data-points-help className="whitespace-nowrap rounded bg-white/90 px-2 py-0.5 text-[13px] text-slate-600 shadow-sm">
-                ■をドラッグで角を動かす・線をドラッグで角を足す
+                {single?.kind === 'line' ? '■を押して選ぶ・ドラッグか ◀▲▼▶ で少しずつ' : '■をドラッグで角を動かす・線をドラッグで角を足す'}
               </div>
+              {/* 選んだ頂点（白い■）を ◀ ▲ ▼ ▶ で少しずつ（ユーザーの指示「縦手すり一本の場合でも、頂点の編集を押すこと、片側の頂点の場所を微調節できるようにする」2026-11-10） */}
+              {nudgePad(pe.i === null)}
               <div className="flex gap-2">
-                <button type="button" disabled={pe.i === null} onClick={() => pe.i !== null && deleteVertex(pe.id, pe.i)} className="h-11 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-base text-slate-700 shadow-md hover:bg-slate-50 disabled:opacity-40">
-                  頂点を削除
-                </button>
+                {single?.kind !== 'line' && (
+                  <button type="button" disabled={pe.i === null} onClick={() => pe.i !== null && deleteVertex(pe.id, pe.i)} className="h-11 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-base text-slate-700 shadow-md hover:bg-slate-50 disabled:opacity-40">
+                    頂点を削除
+                  </button>
+                )}
                 <button type="button" onClick={() => setPointEdit(null)} className="h-11 whitespace-nowrap rounded-md border border-slate-300 bg-white px-4 text-base text-slate-700 shadow-md hover:bg-slate-50">
                   ✓ 頂点の編集を終える
                 </button>

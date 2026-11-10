@@ -572,7 +572,7 @@ await page.screenshot({path: path.join(outDir, 'mark-04c-quad.png')});
   // 何も選んでいないときに押すと、何を選ぶかを少しのあいだ出す（ユーザーの指示「頂点を編集ボタンの操作がわかりずらい」2026-10-30。前は薄くて押せないだけだった）
   assert.match(await pointsBtn.innerText(), /頂点の編集/); // 絵だけでなく名前も
   await pointsBtn.click();
-  await dlg.getByRole('status').filter({hasText: '折れ線・四角・手書きの線を選んでから押します'}).waitFor();
+  await dlg.getByRole('status').filter({hasText: '線・折れ線・四角・手書きの線を選んでから押します'}).waitFor();
   assert.equal(await dlg.locator('[data-vertex-edit]').count(), 0);
   assert.equal(await dlg.locator('[data-points-start]').count(), 0);
   await clickOn(0.225, 0.1); // 四角の上の辺を押して選ぶ
@@ -1305,6 +1305,56 @@ for (const [name, vp, touch] of [
       await d2.getByRole('button', {name: '戻る', exact: true}).tap();
       await p2.waitForTimeout(300);
       assert.deepEqual(await num(), a0);
+    }
+    // 直線（縦手すり1本など）も「頂点の編集」：両端に■・■を押して選ぶまで ◀▲▼▶ は押せない・選んだ端だけ ▶・矢印キーで少しずつ・頂点を削除はない → 終える → 戻る
+    // （ユーザーの指示「縦手すり一本の場合でも、頂点の編集を押すこと、片側の頂点の場所を微調節できるようにする」2026-11-10）
+    {
+      const a = d2.locator('[data-photo-stage] [data-mark]').nth(0).locator('line').first();
+      const num = async () => Object.fromEntries(await Promise.all(['x1', 'y1', 'x2', 'y2'].map(async (key) => [key, Number(await a.getAttribute(key))])));
+      const kk = await d2.locator('[data-photo-stage]').evaluate((el) => el.getBoundingClientRect().width / Number(el.querySelector('[data-mark] svg').getAttribute('viewBox').split(' ')[2]));
+      const st = await d2.locator('[data-photo-stage]').boundingBox();
+      const a0 = await num();
+      const scr = (x, y) => ({x: st.x + x * kk, y: st.y + y * kk});
+      await p2.waitForTimeout(800);
+      await touchAt('touchStart', scr((a0.x1 + a0.x2) / 2, (a0.y1 + a0.y2) / 2));
+      await touchAt('touchEnd', scr((a0.x1 + a0.x2) / 2, (a0.y1 + a0.y2) / 2));
+      await p2.waitForTimeout(800);
+      await d2.locator('[data-points-start]').tap(); // 線を選んでも下のまん中に「頂点の編集」
+      const edit = d2.locator('[data-vertex-edit]');
+      await edit.waitFor();
+      assert.equal(await edit.getAttribute('data-points'), '2', `${name} 直線の頂点は両端の2つ`);
+      assert.match(await d2.locator('[data-points-help]').innerText(), /■を押して選ぶ/);
+      assert.equal(await d2.getByRole('button', {name: '頂点を削除'}).count(), 0, `${name} 直線は頂点を消さない`);
+      const pad = d2.getByRole('group', {name: '少しずつ動かす'});
+      assert.equal(await pad.getByRole('button', {name: '右へ少し動かす'}).isDisabled(), true, `${name} ■を選ぶまでは押せない`);
+      // 終わりの端（2つ目の■）を押して選ぶ
+      const v1 = await edit.locator('[data-vertex="1"]').boundingBox();
+      const vc = {x: v1.x + v1.width / 2, y: v1.y + v1.height / 2};
+      await touchAt('touchStart', vc);
+      await touchAt('touchEnd', vc);
+      await p2.waitForTimeout(400);
+      assert.equal(await edit.locator('[data-vertex="1"]').getAttribute('fill'), 'white', `${name} 選んだ端は白い■`);
+      await p2.waitForTimeout(800);
+      await pad.getByRole('button', {name: '下へ少し動かす'}).tap();
+      await p2.waitForTimeout(300);
+      const a1 = await num();
+      const stp = Math.max(1, 1 / kk);
+      assert.ok(Math.abs(a1.y2 - a0.y2 - stp) < 0.2 && Math.abs(a1.x2 - a0.x2) < 0.2 && Math.abs(a1.x1 - a0.x1) < 0.2 && Math.abs(a1.y1 - a0.y1) < 0.2, `${name} ▼ で選んだ端だけ ${JSON.stringify(a0)} → ${JSON.stringify(a1)}`);
+      await p2.keyboard.press('ArrowLeft'); // 矢印キーでも（キーボードをつないだ iPad・パソコン）
+      await p2.waitForTimeout(300);
+      const a2 = await num();
+      assert.ok(a2.x2 < a1.x2 && Math.abs(a2.x1 - a1.x1) < 0.2, `${name} ← で選んだ端だけ ${JSON.stringify(a1)} → ${JSON.stringify(a2)}`);
+      assert.equal(await edit.count(), 1, `${name} 動かしても頂点の編集のまま`);
+      await p2.screenshot({path: path.join(outDir, `mark-05i-${name}-line-points.png`)});
+      await p2.waitForTimeout(800);
+      await d2.getByRole('button', {name: '✓ 頂点の編集を終える'}).tap();
+      await edit.waitFor({state: 'detached', timeout: 5000});
+      for (let i = 0; i < 2; i++) {
+        await p2.waitForTimeout(800);
+        await d2.getByRole('button', {name: '戻る', exact: true}).tap();
+      }
+      await p2.waitForTimeout(300);
+      assert.deepEqual(await num(), a0, `${name} 戻る2回で元の線`);
     }
   }
   await c2.close();
