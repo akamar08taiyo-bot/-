@@ -9,7 +9,7 @@ import {copied, floorArea, hitTest, makeItem, moved, placeFixture, placeOpening,
 import {cleanMadori, emptyMadori, hasMadori, legendLines, legendText, numberItems, roomArea} from '../../src/sasaoka/madori/model.ts';
 import type {Madori, MItem} from '../../src/sasaoka/madori/model.ts';
 import {floorSvg} from '../../src/sasaoka/madori/render.ts';
-import {areaOf, floorLegend, pageSvg, planSvg, sheetText} from '../../src/sasaoka/madori/sheet.ts';
+import {floorLegend, pageSvg, planSvg, sheetLayout, sheetLegend, sheetText} from '../../src/sasaoka/madori/sheet.ts';
 import {madoriXlsx} from '../../src/sasaoka/madori/xlsx.ts';
 import type {Job} from '../../src/sasaoka/types.ts';
 
@@ -182,39 +182,61 @@ test('絵：床の柄・壁・名前と広さ・手すりの赤い線と番号�
 
 const job = (over: Partial<Job> = {}): Job => cleanJobs([{customer: '見本 花子', address: '福岡県行橋市大字見本1-1', staff: '見本', places: [], ...over}])[0];
 
-test('見取図の紙：題名は「市区町村　○○様邸　住宅改修工事　見取図」、下に会社・営業所・担当者', () => {
-  assert.equal(areaOf('福岡県行橋市大字見本1-1'), '行橋市');
-  assert.equal(areaOf('福岡県福岡市博多区見本町1'), '博多区');
-  assert.equal(areaOf('福岡県京都郡苅田町大字見本'), '苅田町');
-  assert.equal(areaOf('北九州市小倉北区見本1'), '小倉北区');
-  assert.equal(areaOf(''), '');
-  const s = {...defaultSettings(), officeName: '見本営業所', staffList: ['見本 一郎']};
-  const m: Madori = {...emptyMadori(), updatedAt: new Date(2026, 10, 9).getTime()};
-  const t = sheetText(job(), s, m);
-  assert.equal(t.title, '行橋市　見本 花子様邸　住宅改修工事　見取図');
-  assert.equal(t.date, '2026年11月9日');
-  assert.equal(t.footer, '太陽シルバーサービス株式会社　見本営業所　担当者：見本 一郎');
-  assert.equal(t.fileName, '見本花子様住宅改修見取図');
+test('見取図の紙：題名（〇〇様邸　見取図）・日付・会社の名前は書かない。縦が基本で、横に広い図は横', () => {
+  // ユーザーの指示「〇〇様邸　平面図、日付などは不要」「基本的には縦印刷、横広の場合は、自動的に横にする」2026-11-10
+  assert.equal(sheetText(job()).fileName, '見本花子様住宅改修見取図');
+  const tall: Madori = {...emptyMadori(), floors: [{id: 'f1', name: '1階', items: [room('a', 0, 0, 3 * M, 4 * M, '和室'), {id: 'r1', kind: 'rail', x: 0, y: 0, w: 600, h: 0}]}]};
+  const lay = sheetLayout(tall.floors, ['①　L＝600mm']);
+  assert.equal(lay.landscape, false);
+  assert.deepEqual([lay.w, lay.h], [210, 297]);
+  // 一覧の枠は平面図の下
+  assert.ok(lay.legend && lay.plan && lay.legend.y >= lay.plan.y + lay.plan.h);
+  const page = pageSvg(tall, tall.floors, lay, ['①　L＝600mm'], none, 'p');
+  assert.match(page, /viewBox="0 0 210 297"/);
+  assert.match(page, /①　L＝600mm/);
+  assert.ok(!/見取図|様邸|年|株式会社|担当者/.test(page.replace(/<pattern[\s\S]*?<\/pattern>/g, '')));
+  // 横に広い図（7マス×2マス）は横
+  const wide: Madori = {...emptyMadori(), floors: [{id: 'f1', name: '1階', items: [room('a', 0, 0, 7 * M, 2 * M)]}]};
+  const lw = sheetLayout(wide.floors, []);
+  assert.equal(lw.landscape, true);
+  assert.deepEqual([lw.w, lw.h], [297, 210]);
+  assert.equal(lw.legend, null); // 番号がなければ一覧の枠は出さない
+  assert.match(pageSvg(wide, wide.floors, lw, [], none, 'p'), /viewBox="0 0 297 210"/);
+  // 正方形に近い図は縦のまま
+  const sq: Madori = {...emptyMadori(), floors: [{id: 'f1', name: '1階', items: [room('a', 0, 0, 4 * M, 4 * M)]}]};
+  assert.equal(sheetLayout(sq.floors, []).landscape, false);
 });
 
-test('2階建て：一覧はその階の番号だけ、平面図の絵は階を横に並べて「1階」「2階」', () => {
+test('2階建て：1枚に1階・2階を並べる（見出し「1階」「2階」）。一覧は両方の階の番号', () => {
+  // ユーザーの指示「2階を作成した際は、1階と2階の内容を1枚におさまるようにする」2026-11-10
   const m: Madori = {
     ...emptyMadori(),
     floors: [
-      {id: 'f1', name: '1階', items: [room('a', 0, 0, M, M), {id: 'r1', kind: 'rail', x: 0, y: 0, w: 600, h: 0}]},
-      {id: 'f2', name: '2階', items: [room('b', 0, 0, M, M), {id: 'r2', kind: 'rail', x: 0, y: 0, w: 900, h: 0}]},
+      {id: 'f1', name: '1階', items: [room('a', 0, 0, 3 * M, 3 * M), {id: 'r1', kind: 'rail', x: 0, y: 0, w: 600, h: 0}]},
+      {id: 'f2', name: '2階', items: [room('b', 0, 0, 3 * M, 3 * M), {id: 'r2', kind: 'rail', x: 0, y: 0, w: 900, h: 0}]},
     ],
   };
   assert.deepEqual(floorLegend(m, m.floors[1], none, none, false), ['②　L＝900mm']);
+  const legend = sheetLegend(m, m.floors, none, none);
+  assert.deepEqual(legend, ['①　L＝600mm', '②　L＝900mm']);
   const p = planSvg(m, m.floors, none);
   assert.match(p.svg, />1階</);
   assert.match(p.svg, />2階</);
-  const page = pageSvg(sheetText(job(), defaultSettings(), m), m, m.floors[0], ['①　L＝600mm'], none, '1階', 'p');
-  assert.match(page, /住宅改修工事　見取図（1階）/);
-  assert.match(page, /viewBox="0 0 297 210"/);
+  const lay = sheetLayout(m.floors, legend);
+  // 正方形の階が2つ：縦の紙に縦に重ねる
+  assert.equal(lay.landscape, false);
+  assert.equal(lay.dir, 'col');
+  const page = pageSvg(m, m.floors, lay, legend, none, 'p');
+  assert.match(page, />1階</);
+  assert.match(page, />2階</);
+  assert.match(page, /②　L＝900mm/);
+  // 横に長い階が2つ：横の紙でも縦の紙でも、平面図はいちばん大きく入る並べ方
+  const flat: Madori = {...m, floors: m.floors.map((f) => ({...f, items: [room(`w${f.id}`, 0, 0, 8 * M, 2 * M)]}))};
+  const lf = sheetLayout(flat.floors, []);
+  assert.equal(lf.dir, 'col');
 });
 
-test('Excel：階ごとに1シート（A4横）・題名・一覧は赤い字・平面図は画像（PNG）', async () => {
+test('Excel：見取図を1シート（縦が基本）・一覧は赤い字・平面図は1つの画像（PNG。階をみな）', async () => {
   const m: Madori = {
     ...emptyMadori(),
     floors: [
@@ -227,22 +249,26 @@ test('Excel：階ごとに1シート（A4横）・題名・一覧は赤い字・
   const seen: string[] = [];
   const r = await madoriXlsx(job(), defaultSettings(), m, async (svg) => (seen.push(svg), png));
   assert.equal(r.fileName, '見本花子様住宅改修見取図.xlsx');
-  assert.equal(seen.length, 2); // 何も描いていない 3階 は出さない
+  assert.equal(seen.length, 1);
+  assert.match(seen[0], />1階</);
+  assert.match(seen[0], />2階</);
+  assert.ok(!seen[0].includes('3階')); // 何も描いていない 3階 は出さない
   const z = unzipSync(r.bytes);
   const wb = strFromU8(z['xl/workbook.xml']);
-  assert.deepEqual([...wb.matchAll(/<sheet [^>]*name="([^"]*)"/g)].map((x) => x[1]), ['1階', '2階']);
+  assert.deepEqual([...wb.matchAll(/<sheet [^>]*name="([^"]*)"/g)].map((x) => x[1]), ['見取図']);
   const s1 = strFromU8(z['xl/worksheets/sheet1.xml']);
-  assert.match(s1, /orientation="landscape"/);
+  assert.match(s1, /orientation="portrait"/);
+  // 行の高さは Excel の上限（409pt）まで（平面図の段は何行かに分ける）
+  const hts = [...s1.matchAll(/<row [^>]*ht="([\d.]+)"/g)].map((x) => Number(x[1]));
+  assert.ok(hts.length > 3 && Math.max(...hts) <= 409, JSON.stringify(hts));
   assert.match(s1, /<sheetPr><pageSetUpPr fitToPage="1"\/><\/sheetPr>/); // 字体のちがう PC でも1枚に
   assert.match(s1, /fitToWidth="1" fitToHeight="1"/);
   assert.match(s1, /<drawing r:id="rId1"\/>/);
-  assert.match(s1, /行橋市　見本 花子様邸　住宅改修工事　見取図（1階）/);
   assert.match(s1, /①　L＝600mm/);
+  assert.ok(!/見取図|様邸|株式会社/.test(s1));
   assert.match(strFromU8(z['xl/styles.xml']), /FFE01B24/);
   assert.deepEqual([...z['xl/media/image1.png']], [...png]);
   assert.match(strFromU8(z['[Content_Types].xml']), /Extension="png"/);
-  assert.match(strFromU8(z['[Content_Types].xml']), /drawing2\.xml/);
-  assert.match(strFromU8(z['xl/drawings/_rels/drawing2.xml.rels']), /image2\.png/);
 });
 
 test('手すりの一筆の L 字：横へなぞって角で下へ曲げると1本の L 字（番号1つ・一覧は L型）。まっすぐ・ななめは今までどおり', async () => {

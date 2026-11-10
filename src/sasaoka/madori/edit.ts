@@ -5,8 +5,8 @@
 import {DOOR_TYPES, fixType, roomType, STAIR_TYPES, STEP_TYPES, WINDOW_TYPES} from './catalog.ts';
 import {simplifyStroke} from '../photoMarks.ts';
 import {bounds, isShapeLine, mid, railBend, railPts, snapTo} from './model.ts';
-import {isLineShapeType} from './shapes.ts';
-import {edgeMoved, inPoly, movedPts, polyArea, polyEdges, shapeOf, snapPt, turnedPts, vertexMoved} from './poly.ts';
+import {isLineShapeType, shapeDef} from './shapes.ts';
+import {bboxOf, edgeMoved, freeMoved, inPoly, isOrtho, movedPts, pointAdded, polyArea, polyEdges, scaledPts, shapeOf, snapPt, turnedPts, vertexMoved} from './poly.ts';
 import type {MItem, MKind, Module, Rot} from './model.ts';
 
 export type P = {x: number; y: number};
@@ -455,6 +455,10 @@ export function hitsItem(it: MItem, p: P, tol: number): boolean {
   }
   if (it.kind === 'line' || it.kind === 'dim' || isShapeLine(it)) return segDist(p, it, {x: it.x + it.w, y: it.y + it.h}) <= Math.max(tol, it.kind === 'line' ? 40 : 60);
   if (it.kind === 'room') return it.pts ? inPoly(p, it.pts) : inBox(p, it);
+  if (it.kind === 'shape' && it.pts && it.pts.length >= 3) {
+    const pts = it.pts;
+    return inPoly(p, pts) || pts.some((a, i) => segDist(p, a, pts[(i + 1) % pts.length]) <= Math.max(tol, 60));
+  }
   return inBox(p, bounds(it), it.kind === 'door' || it.kind === 'window' ? 0 : tol / 3);
 }
 
@@ -481,8 +485,25 @@ export type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'p0' | 
 /** 頂点・角のつまみ（■。塗る）か、辺のつまみ（□） */
 export const isCornerHandle = (h: Handle) => h.startsWith('v') || h === 'nw' || h === 'ne' || h === 'se' || h === 'sw' || h === 'p0' || h === 'p1';
 
-export function handlesOf(it: MItem): {h: Handle; x: number; y: number}[] {
-  if (it.kind === 'room' && it.pts) {
+/** 頂点の編集ができる部品（部屋・箱の図形。ユーザーの指示「頂点で編集できるようにもする」2026-11-10） */
+export const canVertexEdit = (it: MItem | null | undefined): it is MItem => !!it && (it.kind === 'room' || (it.kind === 'shape' && !isShapeLine(it) && !shapeDef(it.type)?.open));
+
+/**
+ * vertex＝頂点の編集のあいだ：頂点（■。動かす・ダブルタップで消す）と辺のまん中（□。つまむと頂点が増える）。ほかの頂点は動かない。
+ * 頂点の編集でななめにした形（部屋・図形）は、ふだんは囲む四角の四隅・四辺（のびちぢみ）
+ */
+export function handlesOf(it: MItem, vertex = false): {h: Handle; x: number; y: number}[] {
+  if (vertex && (it.kind === 'room' || it.kind === 'shape') && it.pts && it.pts.length >= 3) {
+    const pts = it.pts;
+    return [
+      ...pts.map((p, i) => ({h: `v${i}` as Handle, x: p.x, y: p.y})),
+      ...pts.map((p, i) => {
+        const q = pts[(i + 1) % pts.length];
+        return {h: `e${i}` as Handle, x: (p.x + q.x) / 2, y: (p.y + q.y) / 2};
+      }),
+    ];
+  }
+  if (it.kind === 'room' && it.pts && isOrtho(it.pts)) {
     const pts = it.pts;
     return [
       ...pts.map((p, i) => ({h: `v${i}` as Handle, x: p.x, y: p.y})),
@@ -526,7 +547,28 @@ export function handlesOf(it: MItem): {h: Handle; x: number; y: number}[] {
 }
 
 /** つまみを動かした部品（step にそろえる。部屋は step、ほかは 10mm） */
-export function resized(it: MItem, h: Handle, p: P, step: number): MItem {
+export function resized(it: MItem, h: Handle, p: P, step: number, vertex = false): MItem {
+  // 頂点の編集：頂点だけを動かす・辺のまん中をつまむと頂点を足す（10mm にそろえる）
+  if (vertex && it.pts && it.pts.length >= 3 && /^[ve]\d+$/.test(h)) {
+    const i = Number(h.slice(1));
+    const q = {x: snapTo(p.x, 10), y: snapTo(p.y, 10)};
+    const pts = h[0] === 'v' ? freeMoved(it.pts, i, q) : pointAdded(it.pts, i, q);
+    return {...it, ...bboxOf(pts), pts};
+  }
+  // 頂点で作った形（ななめの辺のある部屋・頂点の編集にした図形）の四隅・四辺：囲む四角ごとのびちぢみ
+  if ((it.kind === 'room' || it.kind === 'shape') && it.pts && it.pts.length >= 3 && (it.kind === 'shape' || !isOrtho(it.pts)) && !/^[ve]\d+$/.test(h)) {
+    const b = bboxOf(it.pts);
+    let x0 = b.x;
+    let y0 = b.y;
+    let x1 = b.x + b.w;
+    let y1 = b.y + b.h;
+    if (h.includes('w')) x0 = Math.min(snapTo(p.x, 10), x1 - 50);
+    if (h.includes('e')) x1 = Math.max(snapTo(p.x, 10), x0 + 50);
+    if (h.includes('n')) y0 = Math.min(snapTo(p.y, 10), y1 - 50);
+    if (h.includes('s')) y1 = Math.max(snapTo(p.y, 10), y0 + 50);
+    const pts = scaledPts(it.pts, b, {x: x0, y: y0, w: x1 - x0, h: y1 - y0});
+    return {...it, ...bboxOf(pts), pts};
+  }
   // 多角形の部屋：頂点（となりの頂点も横・縦のまま）・辺（直角に動かす）。小さくなりすぎた辺・一直線の頂点はまとめる
   if (it.kind === 'room' && it.pts && (h.startsWith('v') || h.startsWith('e')) && !['e', 'w', 'n', 's', 'ne', 'nw', 'se', 'sw'].includes(h)) {
     const i = Number(h.slice(1));
@@ -609,7 +651,9 @@ export function moved(it: MItem, d: P, items: MItem[], step: number): MItem {
     return {...it, x, y, ...(it.pts ? {pts: movedPts(it.pts, x - it.x, y - it.y)} : {})};
   }
   if (it.kind === 'line') return {...it, x: snapTo(it.x + d.x, step / 2), y: snapTo(it.y + d.y, step / 2)};
-  return {...it, x: snapTo(it.x + d.x, 10), y: snapTo(it.y + d.y, 10)};
+  const x = snapTo(it.x + d.x, 10);
+  const y = snapTo(it.y + d.y, 10);
+  return {...it, x, y, ...(it.pts ? {pts: movedPts(it.pts, x - it.x, y - it.y)} : {})}; // 頂点の編集にした図形は頂点も一緒に
 }
 
 /** 90°回す：部屋は縦横を入れかえ（まん中のまま）、設備・階段・段差の解消は右回り、線の部品はまん中で、ドア・窓は開く向きを回す */
@@ -621,6 +665,10 @@ export function turnedItem(it: MItem, step: number): MItem {
     return {...it, x: snapTo(cx - it.h / 2, step), y: snapTo(cy - it.w / 2, step), w: it.h, h: it.w};
   }
   if (it.kind === 'rail' && it.pts) return railFrom(it, turnedPts(it.pts, 10));
+  if (it.kind === 'shape' && it.pts) {
+    const pts = turnedPts(it.pts, 10);
+    return {...it, ...bboxOf(pts), pts};
+  }
   if (it.kind === 'rail' || it.kind === 'line' || it.kind === 'dim' || isShapeLine(it)) {
     const cx = it.x + it.w / 2;
     const cy = it.y + it.h / 2;

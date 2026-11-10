@@ -52,6 +52,8 @@ export type MItem = {
   // 手すりは曲がり角のある棒の点（始め・曲がり角…・終わり。3つ以上。ユーザーの指示「横棒とL字など、自由自在に曲げれる棒（線は真っ直ぐ）」2026-11-10）。
   // 手すりのときの x・y・w・h は1本目（始めの点から次の点まで）
   pts?: {x: number; y: number}[];
+  // 図形を頂点の編集にしたときも pts（頂点。mm）。curve＝頂点を通るなめらかな線（丸を頂点の編集にしたとき。poly.ts の smoothPath）
+  curve?: boolean;
   color?: string; // 図形の色（#rrggbb。なければ赤）
   fill?: boolean; // 箱の図形を薄く塗る・段差の解消を塗りつぶしの四角（横四角）に
 };
@@ -125,7 +127,7 @@ export const railSegs = (it: MItem): number[] => {
 export const isShapeLine = (it: MItem) => it.kind === 'shape' && isLineShapeType(it.type);
 
 export function bounds(it: MItem): {x: number; y: number; w: number; h: number} {
-  if (it.kind === 'rail' && it.pts && it.pts.length >= 2) {
+  if ((it.kind === 'rail' || it.kind === 'shape') && it.pts && it.pts.length >= 2) {
     const xs = it.pts.map((q) => q.x);
     const ys = it.pts.map((q) => q.y);
     return {x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys)};

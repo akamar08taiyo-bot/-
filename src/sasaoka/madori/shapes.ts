@@ -4,21 +4,24 @@
 
 export type ShapeGroup = '基本図形' | '線' | '矢印';
 // hidden：一覧に出さない図形（平面図に要らない形。ユーザーの指示「平面図に置いて不要なものは外してください。変な形の三角や四角など」2026-11-10。前に描いた図形の絵のために残す）
-export type ShapeDef = {name: string; group: ShapeGroup; line?: boolean; open?: boolean; hidden?: boolean; path?: (w: number, h: number) => string};
+// pts：頂点の並び（0〜1。頂点の編集にするときの頂点。四角・矢印など角だけの形）
+export type ShapeDef = {name: string; group: ShapeGroup; line?: boolean; open?: boolean; hidden?: boolean; path?: (w: number, h: number) => string; pts?: [number, number][]};
 
 const r1 = (v: number) => Math.round(v * 10) / 10;
 /** 0〜1 の点の並び → 箱の大きさの道 */
-const poly = (pts: [number, number][]) => (w: number, h: number) => `M${pts.map(([x, y]) => `${r1(x * w)} ${r1(y * h)}`).join('L')}Z`;
+const poly = (pts: [number, number][]) => Object.assign((w: number, h: number) => `M${pts.map(([x, y]) => `${r1(x * w)} ${r1(y * h)}`).join('L')}Z`, {pts});
 /** 正 n 角形（上が頂点） */
-const regular = (n: number) => (w: number, h: number) =>
-  `M${Array.from({length: n}, (_, i) => {
-    const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
-    return `${r1(w / 2 + (w / 2) * Math.cos(a))} ${r1(h / 2 + (h / 2) * Math.sin(a))}`;
-  }).join('L')}Z`;
+const regular = (n: number) =>
+  poly(
+    Array.from({length: n}, (_, i) => {
+      const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+      return [0.5 + 0.5 * Math.cos(a), 0.5 + 0.5 * Math.sin(a)] as [number, number];
+    }),
+  );
 
 export const SHAPES: ShapeDef[] = [
   // ---- 基本図形
-  {name: '四角', group: '基本図形', path: (w, h) => `M0 0H${w}V${h}H0Z`},
+  {name: '四角', group: '基本図形', path: (w, h) => `M0 0H${w}V${h}H0Z`, pts: [[0, 0], [1, 0], [1, 1], [0, 1]]},
   {
     name: '角丸四角',
     group: '基本図形',
@@ -116,7 +119,36 @@ export const SHAPES: ShapeDef[] = [
   {name: '山形', hidden: true, group: '矢印', path: poly([[0, 0], [0.7, 0], [1, 0.5], [0.7, 1], [0, 1], [0.3, 0.5]])},
 ];
 
+// 角だけの形は、道を作る関数に頂点の並びを持たせてある（poly）。それを ShapeDef の pts にも置く
+for (const d of SHAPES) {
+  const pts = (d.path as {pts?: [number, number][]} | undefined)?.pts;
+  if (pts) d.pts = pts;
+}
+
 export const shapeDef = (name?: string) => SHAPES.find((s) => s.name === name);
+
+/**
+ * 図形を頂点の編集にするときの頂点（mm。回した向きも入れる）と、なめらかな線にするか：角だけの形はその角、丸は 12 の点を通るなめらかな線、
+ * ほか（角丸四角など）は四隅。curve＝なめらかな線（smoothPath）
+ */
+export function shapeToPts(it: {type?: string; x: number; y: number; w: number; h: number; rot?: number}): {pts: {x: number; y: number}[]; curve: boolean} {
+  const def = shapeDef(it.type);
+  const w = Math.abs(it.w);
+  const h = Math.abs(it.h);
+  const round = it.type === '丸';
+  const unit: [number, number][] = round
+    ? Array.from({length: 12}, (_, i) => [0.5 + 0.5 * Math.cos((i * Math.PI) / 6 - Math.PI / 2), 0.5 + 0.5 * Math.sin((i * Math.PI) / 6 - Math.PI / 2)] as [number, number])
+    : (def?.pts ?? [[0, 0], [1, 0], [1, 1], [0, 1]]);
+  const rot = ((it.rot ?? 0) * Math.PI) / 180;
+  const cx = it.x + w / 2;
+  const cy = it.y + h / 2;
+  const pts = unit.map(([u, v]) => {
+    const dx = u * w - w / 2;
+    const dy = v * h - h / 2;
+    return {x: Math.round(cx + dx * Math.cos(rot) - dy * Math.sin(rot)), y: Math.round(cy + dx * Math.sin(rot) + dy * Math.cos(rot))};
+  });
+  return {pts, curve: round};
+}
 /** 一覧に出す図形 */
 export const SHAPES_SHOWN = SHAPES.filter((s) => !s.hidden);
 /** 線の図形か（なければ四角と同じ箱の図形） */

@@ -4,7 +4,7 @@
 
 import {FINISH, roomColor, roomFinish, TONE} from './catalog.ts';
 import {bounds, circled, joLabel, lineLength, railBend, railPts, roomAreaOf} from './model.ts';
-import {labelSpot, polyArea, polyPath, roomPts} from './poly.ts';
+import {labelSpot, polyArea, polyPath, roomPts, smoothPath} from './poly.ts';
 import {shapeDef, shapeLine} from './shapes.ts';
 import type {MItem, Module} from './model.ts';
 
@@ -556,6 +556,11 @@ function shapeSvg(it: MItem): string {
   const c = it.color ?? RED;
   const sw = 30;
   const def = shapeDef(it.type);
+  if (it.pts && it.pts.length >= 3) {
+    // 頂点の編集にした図形（頂点は mm のまま。回した向きも頂点に入っている）
+    const fill = it.fill ? `fill="${c}" fill-opacity="0.18"` : 'fill="none"';
+    return `<path d="${it.curve ? smoothPath(it.pts) : polyPath(it.pts)}" ${fill} stroke="${c}" stroke-width="${sw}" stroke-linejoin="round"/>`;
+  }
   if (!def || def.line) return shapeLine(it.type ?? '直線', it.x, it.y, it.w, it.h, c, sw);
   // 箱の図形：箱の中の道を、回した向き（rot）で。塗るときは薄く
   const d = def.path ? def.path(Math.abs(it.w), Math.abs(it.h)) : '';

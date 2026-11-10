@@ -1,6 +1,6 @@
 // 平面図のタブ（📐 平面図。ユーザーの指示「平面図をつくれるような機能を追加する。まどりっちの機能やマイホームクラウドの機能もつけくわえる」2026-11-09）：
-//   部屋（マイホームクラウドと同じ一覧）を方眼にドラッグ → ドアを壁の近くで押すと壁に付く → トイレは壁ぎわ → 申請書の箇所（①玄関）の手すり → 一覧（右の枠）が
-//   申請書の改修の内容と同じ → 選んで動かす・Delete・Ctrl+Z → 2階 → 読み直しても残る（#…&view=madori）→ 見取図を印刷（A4横）→ Excel（階ごとのシート・画像）
+//   部屋（マイホームクラウドと同じ一覧）を方眼にドラッグ → ドアを壁の近くで押すと壁に付く → トイレは壁ぎわ → 申請書の箇所の置き場の①玄関を動かして図に入れる → 一覧（右の枠）が
+//   申請書の改修の内容と同じ → 選んで動かす・Delete・Ctrl+Z → 2階 → 読み直しても残る（#…&view=madori）→ 見取図を印刷（A4。縦が基本・1階と2階を1枚に・題名と日付なし）→ Excel（1シート・画像）
 //   → 申請書の平面図に入れる → スマホの幅で横にはみ出さない。お客様は架空のサンプル
 // usage: node e2e-madori.mjs <サイトのURL> <出力フォルダ>
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
@@ -122,19 +122,35 @@ assert.ok(door && (Number(door[1]) - 390) % 227.5 === 0, `ドアの開口の端�
 assert.match(svgNow, /translate\(2985 30\)/); // 便器は上の壁の面（y=30）にぴったり・押した所（3.5マス＝3185）がまん中
 log('ドアは壁に・便器は壁ぎわ OK');
 
-// ---------------- 申請書の箇所（①玄関）の手すり → 一覧は申請書の改修の内容
-await cat('改修');
-await page.getByRole('button', {name: /① 玄関/}).click();
-await drag([4.2 * M, 4.9 * M], [5.8 * M, 4.9 * M]);
-await tool('縦手すり');
+// ---------------- 申請書の箇所：方眼の右の置き場に ①玄関・②トイレ の横棒が用意してある。動かすだけで図に入る → 一覧は申請書の改修の内容
+// （ユーザーの指示「申請書を事前に入力していた場合は、事前に空きスペースに用意する…移動するだけで平面図が作成できる」「改修ボタンは不要」2026-11-10）
+assert.equal(await page.getByRole('tab', {name: '改修', exact: true}).count(), 0);
+const stageRails = () =>
+  page.locator('[data-stage] path[stroke="#e01b24"]').evaluateAll((els) =>
+    els.map((e) => {
+      const m = /M([\d.-]+) ([\d.-]+)l([\d.-]+) ([\d.-]+)/.exec(e.getAttribute('d') ?? '');
+      return m ? m.slice(1).map(Number) : null;
+    }),
+  );
+const stageText = () => page.locator('[data-stage]').innerHTML().catch(() => '');
+assert.match(await stageText(), /玄関/);
+assert.match(await stageText(), /トイレ/);
+{
+  const [g] = await stageRails();
+  assert.ok(g && g[0] > 6 * M, `置き場は図の右 ${JSON.stringify(g)}`);
+  assert.ok(!(await art()).includes('stage-'), '置き場の部品はまだ図に入っていない');
+  await drag([g[0] + g[2] / 2, g[1]], [5 * M, 4.9 * M]);
+}
+await page.getByRole('button', {name: '丸（塗りつぶし）'}).click();
 await click(3.9 * M, 0.7 * M);
 await page.keyboard.press('Escape');
 const rows = await legend();
 assert.equal(rows.length, 2);
 assert.match(rows[0], /^①　玄関　手すりの取り付け/);
 assert.equal(rows[1], '②　縦手すり　L＝800mm');
-assert.equal(await page.getByRole('button', {name: /① 玄関.*✓/}).count(), 1); // 図に置いた箇所に ✓
-log('申請書の箇所につないだ手すり①・縦手すり②・一覧 OK');
+// 置き場：①は図に入ったので消え、②（トイレ）は図に同じ番号（縦手すり②）があるので出さない
+assert.equal(await page.locator('[data-stage]').count(), 0);
+log('置き場の①玄関を動かして図に入れる・縦手すり②・一覧 OK');
 
 // ---------------- 選んで動かす・Delete・Ctrl+Z
 await click(1.5 * M, 2 * M); // 和室を選ぶ
@@ -193,8 +209,7 @@ assert.match(await art(), /rotate\(90 [\d.]+ [\d.]+\) translate\(910 0\) scale\(
 await page.getByRole('combobox', {name: '種類'}).selectOption('らせん階段');
 assert.match(await art(), /<circle cx="910" cy="910" r="855.4"/);
 // 横手すりを一筆で L 字に（横へなぞって、角で下へ）
-await cat('改修');
-await tool('横手すり');
+await tool('自在棒');
 {
   const a = await toPx(7 * M, 4 * M);
   const c = await toPx(8 * M, 4 * M);
@@ -384,6 +399,21 @@ log('図の上で文字を打つ・回すつまみ・L字の手すり・頂点�
     await page.keyboard.press('Enter');
     assert.equal(await numBtn.getAttribute('aria-pressed'), 'false');
     assert.equal(await done.isDisabled(), true);
+    // 番号のボタンをもう一度押す・置いた番号をもう一度押す・方眼の外を押すでも確定（番号は増えない）
+    // （ユーザーの指示「番号入力機能は番号の部分を2回押しても、確定と認識する。平面図内以外をタップしても確定とする」2026-11-10）
+    const before = await art();
+    await numBtn.click();
+    assert.equal(await numBtn.getAttribute('aria-pressed'), 'true');
+    await numBtn.click();
+    assert.equal(await numBtn.getAttribute('aria-pressed'), 'false');
+    await numBtn.click();
+    await click(5 * M, 8.3 * M); // 置いてある番号の上
+    assert.equal(await numBtn.getAttribute('aria-pressed'), 'false');
+    assert.equal(await art(), before, '置いた番号を押しても番号は増えない');
+    await numBtn.click();
+    await page.mouse.click(6, 640); // 方眼の外（左の余白）
+    assert.equal(await numBtn.getAttribute('aria-pressed'), 'false');
+    assert.equal(await art(), before);
   }
   // 戻す：番号3つ・丸・図形・曲げ・手すり（消したのは戻してあるので数えない）
   for (let i = 0; i < 3 + 1 + 1 + 1 + 1; i++) await page.keyboard.press('Control+z');
@@ -392,6 +422,70 @@ log('図の上で文字を打つ・回すつまみ・L字の手すり・頂点�
   assert.equal(await dots(), dots0);
 }
 log('方眼の上のまん中の描く道具・曲げた手すり（□で曲げる）・ぐしゃぐしゃで消す・丸・番号 OK');
+
+// ---------------- 頂点の編集（上の段の「◇ 頂点の編集」。ユーザーの指示「頂点で編集できるようにもする。頂点の編集も上におく。色んな形の図形を後付けでつくれる」2026-11-10）
+{
+  const bar = page.getByRole('toolbar', {name: '描く道具'});
+  const vbtn = page.getByRole('button', {name: '◇ 頂点の編集'});
+  await page.keyboard.press('Escape');
+  assert.equal(await vbtn.isDisabled(), true); // 何も選んでいなければ押せない
+  const vb = await vbtn.boundingBox();
+  const ub = await page.locator('[data-undo-center]').boundingBox();
+  assert.ok(vb.y >= ub.y - 1 && vb.y + vb.height <= ub.y + ub.height + 1, '頂点の編集は上の段のまん中（戻す・進む・削除の右）');
+  const vcount = () => page.locator('[data-handle^="v"]').count();
+  const hb = async (h) => {
+    const b = await page.locator(`[data-handle="${h}"]`).boundingBox();
+    return {x: b.x + b.width / 2, y: b.y + b.height / 2};
+  };
+  const mdrag = async (a, b) => {
+    await page.mouse.move(a.x, a.y);
+    await page.mouse.down();
+    await page.mouse.move(b.x, b.y, {steps: 6});
+    await page.mouse.up();
+  };
+  const freePaths = () => art().then((h) => [...h.matchAll(/<path d="(M[\d.\- LC]+Z)" fill="none" stroke="#e01b24" stroke-width="30" stroke-linejoin="round"/g)].map((m) => m[1]));
+  await bar.getByRole('button', {name: '四角', exact: true}).click();
+  await drag([9 * M, 6 * M], [11 * M, 8 * M]);
+  await vbtn.click();
+  assert.equal(await vbtn.getAttribute('aria-pressed'), 'true');
+  assert.equal(await vcount(), 4);
+  // 右上の角だけを右上へ（ほかの角は動かない）→ ななめの辺の形
+  const p1 = await hb('v1');
+  await mdrag(p1, {x: p1.x + 50, y: p1.y - 30});
+  let [d] = await freePaths();
+  assert.ok(d && d.split('L').length === 4, `4つの角 ${d}`);
+  // 辺のまん中（□）をつまむと角が増える
+  const e2 = await hb('e2');
+  await mdrag(e2, {x: e2.x, y: e2.y + 40});
+  assert.equal(await vcount(), 5);
+  [d] = await freePaths();
+  assert.equal(d.split('L').length, 5);
+  // 角をダブルクリック（ダブルタップ）で消す
+  const p4 = await hb('v4');
+  await page.mouse.dblclick(p4.x, p4.y);
+  assert.equal(await vcount(), 4);
+  // 角を選んで「🗑 頂点を削除」でも消せる（3つより少なくはならない）
+  const p0 = await hb('v0');
+  await page.mouse.click(p0.x, p0.y);
+  await page.getByRole('button', {name: '選んだ頂点を削除'}).click();
+  assert.equal(await vcount(), 3);
+  // 頂点の編集を終えると、ふだんの四隅・四辺のつまみ（形のまま大きくする）
+  await vbtn.click();
+  assert.equal(await vbtn.getAttribute('aria-pressed'), 'false');
+  assert.equal(await vcount(), 0);
+  assert.equal(await page.locator('[data-handle="se"]').count(), 1);
+  // 丸を頂点の編集にすると 12 の角を通るなめらかな線
+  await bar.getByRole('button', {name: '丸', exact: true}).click();
+  await drag([5 * M, 6 * M], [7 * M, 7 * M]);
+  await vbtn.click();
+  assert.equal(await vcount(), 12);
+  assert.ok((await freePaths()).some((x) => x.includes('C')), 'なめらかな線');
+  await page.keyboard.press('Escape');
+  for (let i = 0; i < 8; i++) await page.keyboard.press('Control+z'); // 丸・頂点の編集・四角と4つの直し
+  assert.equal((await freePaths()).length, 0);
+  assert.doesNotMatch(await art(), /<path d="M0 0H1820V1820H0Z"/);
+}
+log('頂点の編集：角を動かす・辺で角を足す・ダブルタップ／頂点を削除で消す・丸はなめらかな線 OK');
 
 // ---------------- 住設 ▼・いつも出す（☆）・まん中の削除・右下のすべらせて戻す／進む・方眼の下の申請書の改修の内容
 // （ユーザーの指示「他の住設もプルダウンから選べるようにして、必要な住設や、矢印などは常時表示できるようにする」「削除ボタンも中央におく」
@@ -489,8 +583,7 @@ await page.getByRole('tab', {name: '2階'}).waitFor();
 await cat('部屋');
 await tool('洋室');
 await drag([0, 0], [3 * M, 4 * M]);
-await cat('改修');
-await tool('横手すり');
+await tool('横棒');
 await click(1.5 * M, 3.8 * M);
 await page.keyboard.press('Escape');
 assert.equal((await legend()).at(-1), '③　L＝600mm'); // 階をまたいで通し番号
@@ -505,14 +598,19 @@ await page.waitForFunction(() => document.querySelector('[data-madori-canvas] sv
 assert.equal(await page.getByRole('tab', {name: '2階'}).count(), 1);
 log('読み直し OK');
 
-// ---------------- 見取図の印刷（A4横）
+// ---------------- 見取図の印刷（A4。縦が基本・横に広い図は横。1階と2階を1枚に。題名・日付・会社の名前は書かない）
+// （ユーザーの指示「〇〇様邸　平面図、日付などは不要」「基本的には縦印刷、横広の場合は、自動的に横にする」「2階を作成した際は、1階と2階の内容を1枚におさまるようにする」2026-11-10）
 await page.getByRole('button', {name: '🖨 見取図を印刷'}).click();
 const sheets = page.locator('.madori-page');
-assert.equal(await sheets.count(), 2);
+assert.equal(await sheets.count(), 1);
 const first = await sheets.first().innerHTML();
-assert.match(first, /住宅改修工事　見取図（1階）/);
-assert.match(first, /太陽シルバーサービス株式会社/);
+assert.match(first, />1階</);
+assert.match(first, />2階</);
+assert.ok(!/見取図|様邸|株式会社|担当者|\d+年\d+月\d+日/.test(first.replace(/<pattern[\s\S]*?<\/pattern>/g, '')), '題名・日付・会社の名前は書かない');
 assert.match(first, /①　玄関　手すりの取り付け/);
+assert.match(first, /③　L＝600mm/);
+const orient = await sheets.first().getAttribute('data-orientation');
+log('見取図の向き', orient);
 await page.screenshot({path: path.join(outDir, 'madori-print.png')});
 // iPad の横向き（1180×820）でも、1枚目が上の帯の下に切れずに入る（ユーザーの「印刷画面が変になっている」2026-11-10。前は下の会社名が切れていた）
 for (const vp of [{width: 1180, height: 820}, {width: 1366, height: 768}, {width: 390, height: 844}]) {
@@ -528,9 +626,9 @@ await page.emulateMedia({media: 'print'});
 const pdf = await page.pdf({preferCSSPageSize: true, printBackground: true});
 await page.emulateMedia({media: 'screen'});
 const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length;
-assert.equal(pages, 2, `印刷のページ数 ${pages}`);
+assert.equal(pages, 1, `印刷のページ数 ${pages}`);
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
-log('見取図の印刷：A4横・2枚（1階・2階）OK');
+log('見取図の印刷：1枚に1階・2階・題名と日付なし OK');
 
 // ---------------- Excel（初めは開いているタブ＝平面図だけにチェック）
 const down = page.waitForEvent('download');
@@ -544,10 +642,12 @@ assert.equal(file.suggestedFilename(), '（サンプル）山田様住宅改修�
 const saved = path.join(outDir, 'madori.xlsx');
 await file.saveAs(saved);
 const z = unzipSync(new Uint8Array(await readFile(saved)));
-assert.deepEqual([...strFromU8(z['xl/workbook.xml']).matchAll(/<sheet [^>]*name="([^"]*)"/g)].map((m) => m[1]), ['1階', '2階']);
-assert.ok(z['xl/media/image1.png'].length > 10000 && z['xl/media/image2.png']);
-assert.match(strFromU8(z['xl/worksheets/sheet1.xml']), /①　玄関　手すりの取り付け/);
-log('Excel：階ごとのシート・平面図の画像・一覧 OK');
+assert.deepEqual([...strFromU8(z['xl/workbook.xml']).matchAll(/<sheet [^>]*name="([^"]*)"/g)].map((m) => m[1]), ['見取図']);
+assert.ok(z['xl/media/image1.png'].length > 10000 && !z['xl/media/image2.png']);
+const xs1 = strFromU8(z['xl/worksheets/sheet1.xml']);
+assert.match(xs1, /①　玄関　手すりの取り付け/);
+assert.match(xs1, new RegExp(`orientation="${orient}"`));
+log('Excel：1シート（印刷と同じ向き）・平面図の画像・一覧 OK');
 
 // ---------------- 申請書の平面図の枠は、平面図のタブの今の図（ボタンを押さなくても入る。ユーザーの指示「相互転記させる」2026-11-10）。
 // 申請書の枠を押すと同じ図の編集画面。そこで描いたものは平面図のタブにも出る

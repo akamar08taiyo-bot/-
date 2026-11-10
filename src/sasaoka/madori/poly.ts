@@ -139,19 +139,35 @@ export function turnedPts(pts: Pt[], step: number): Pt[] {
 
 export const movedPts = (pts: Pt[], dx: number, dy: number): Pt[] => pts.map((p) => ({x: p.x + dx, y: p.y + dy}));
 
-/** 辺（横・縦の壁）：h＝横の壁、at＝その線の位置、from〜to＝長さの範囲 */
+/** 辺（横・縦の壁）：h＝横の壁、at＝その線の位置、from〜to＝長さの範囲。ななめの辺（頂点の編集で動かした）は壁にしない */
 export function polyEdges(pts: Pt[]): {h: boolean; at: number; from: number; to: number}[] {
-  return pts.map((a, i) => {
+  return pts.flatMap((a, i): {h: boolean; at: number; from: number; to: number}[] => {
     const b = pts[(i + 1) % pts.length];
-    return a.y === b.y ? {h: true, at: a.y, from: Math.min(a.x, b.x), to: Math.max(a.x, b.x)} : {h: false, at: a.x, from: Math.min(a.y, b.y), to: Math.max(a.y, b.y)};
+    if (a.y === b.y) return [{h: true, at: a.y, from: Math.min(a.x, b.x), to: Math.max(a.x, b.x)}];
+    if (a.x === b.x) return [{h: false, at: a.x, from: Math.min(a.y, b.y), to: Math.max(a.y, b.y)}];
+    return [];
   });
 }
 
-/** 名前を書く所：部屋の中でいちばん広く空いた所（L 字の角の外に出さない）。maxW はそこでの横の幅 */
+/** 辺がみな横か縦の形か（頂点の編集でななめにした形は false） */
+export const isOrtho = (pts: Pt[]) => pts.every((a, i) => {
+  const b = pts[(i + 1) % pts.length];
+  return a.x === b.x || a.y === b.y;
+});
+
+const segDist = (p: Pt, a: Pt, b: Pt) => {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const l2 = dx * dx + dy * dy;
+  const t = l2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+};
+
+/** 名前を書く所：部屋の中でいちばん広く空いた所（L 字の角の外に出さない）。maxW はそこでの横の幅（ななめの辺の形でも） */
 export function labelSpot(pts: Pt[], holes: Pt[][] = []): {x: number; y: number; maxW: number; maxH: number} {
   const b = bboxOf(pts);
   // 中に置いたほかの部屋（廊下の中の部屋など）は穴：名前はその外の空いた所に書く
-  const edges = [...polyEdges(pts), ...holes.flatMap(polyEdges)];
+  const segs = [pts, ...holes].flatMap((ps) => ps.map((a, i) => [a, ps[(i + 1) % ps.length]] as const));
   const N = holes.length ? 40 : 24;
   let best = {x: b.x + b.w / 2, y: b.y + b.h / 2, d: -1};
   for (let i = 1; i < N; i++) {
@@ -159,26 +175,28 @@ export function labelSpot(pts: Pt[], holes: Pt[][] = []): {x: number; y: number;
       const p = {x: b.x + (b.w * i) / N, y: b.y + (b.h * j) / N};
       if (!inPoly(p, pts) || holes.some((h) => inPoly(p, h))) continue;
       let d = Infinity;
-      for (const e of edges) {
-        const along = e.h ? p.x : p.y;
-        const across = e.h ? p.y : p.x;
-        const c = Math.max(e.from, Math.min(e.to, along));
-        d = Math.min(d, Math.hypot(along - c, across - e.at));
-      }
+      for (const [a, c] of segs) d = Math.min(d, segDist(p, a, c));
       if (d > best.d) best = {x: p.x, y: p.y, d};
     }
   }
-  // その高さ・その横の位置で、部屋の中の幅・高さ
+  // その高さ・その横の位置で、部屋の中の幅・高さ（辺と交わる所のあいだ）
   const span = (horiz: boolean) => {
-    const cuts = edges
-      .filter((e) => e.h !== horiz && (horiz ? best.y : best.x) >= e.from && (horiz ? best.y : best.x) <= e.to)
-      .map((e) => e.at)
-      .sort((u, v) => u - v);
-    const at = horiz ? best.x : best.y;
+    const at = horiz ? best.y : best.x;
+    const on = horiz ? best.x : best.y;
+    const cuts: number[] = [];
+    for (const [a, c] of segs) {
+      const a1 = horiz ? a.y : a.x;
+      const c1 = horiz ? c.y : c.x;
+      if ((a1 <= at && c1 > at) || (c1 <= at && a1 > at)) {
+        const t = (at - a1) / (c1 - a1);
+        cuts.push(horiz ? a.x + t * (c.x - a.x) : a.y + t * (c.y - a.y));
+      }
+    }
+    cuts.sort((u, v) => u - v);
     let lo = horiz ? b.x : b.y;
     let hi = horiz ? b.x + b.w : b.y + b.h;
     for (const c of cuts) {
-      if (c <= at) lo = c;
+      if (c <= on) lo = c;
       else {
         hi = c;
         break;
@@ -187,6 +205,48 @@ export function labelSpot(pts: Pt[], holes: Pt[][] = []): {x: number; y: number;
     return hi - lo;
   };
   return {x: best.x, y: best.y, maxW: span(true), maxH: span(false)};
+}
+
+/**
+ * 頂点の編集（Excel の「頂点の編集」と同じ。ユーザーの指示「頂点で編集できるようにもする」「色んな形の図形を後付けでつくれる」2026-11-10）：
+ * 頂点 i を p へ（ほかの頂点は動かさない。となりの頂点と横・縦に近ければ（8° まで）そろえる）
+ */
+export function freeMoved(pts: Pt[], i: number, p: Pt): Pt[] {
+  const n = pts.length;
+  const q = {...p};
+  for (const nb of [pts[(i + n - 1) % n], pts[(i + 1) % n]]) {
+    if (Math.abs(q.y - nb.y) <= Math.abs(q.x - nb.x) * 0.14) q.y = nb.y;
+    else if (Math.abs(q.x - nb.x) <= Math.abs(q.y - nb.y) * 0.14) q.x = nb.x;
+  }
+  return pts.map((o, k) => (k === i ? q : o));
+}
+
+/** 辺 i（頂点 i から i+1）のあいだに頂点を足す */
+export const pointAdded = (pts: Pt[], i: number, p: Pt): Pt[] => [...pts.slice(0, i + 1), {...p}, ...pts.slice(i + 1)];
+
+/** 頂点 i を消す（3つより少なくはしない） */
+export const pointRemoved = (pts: Pt[], i: number): Pt[] => (pts.length <= 3 ? pts : pts.filter((_, k) => k !== i));
+
+/** 囲む四角 from を to にのびちぢみ（頂点で作った形を、四隅・四辺のつまみで大きくする） */
+export function scaledPts(pts: Pt[], from: {x: number; y: number; w: number; h: number}, to: {x: number; y: number; w: number; h: number}): Pt[] {
+  const kx = from.w ? to.w / from.w : 1;
+  const ky = from.h ? to.h / from.h : 1;
+  return pts.map((p) => ({x: Math.round(to.x + (p.x - from.x) * kx), y: Math.round(to.y + (p.y - from.y) * ky)}));
+}
+
+/** 頂点を通るなめらかな閉じた線（丸を頂点の編集にしたとき。Catmull-Rom を3次ベジェに） */
+export function smoothPath(pts: Pt[]): string {
+  const n = pts.length;
+  const r = (v: number) => Math.round(v * 10) / 10;
+  let d = `M${r(pts[0].x)} ${r(pts[0].y)}`;
+  for (let i = 0; i < n; i++) {
+    const p0 = pts[(i + n - 1) % n];
+    const p1 = pts[i];
+    const p2 = pts[(i + 1) % n];
+    const p3 = pts[(i + 2) % n];
+    d += `C${r(p1.x + (p2.x - p0.x) / 6)} ${r(p1.y + (p2.y - p0.y) / 6)} ${r(p2.x - (p3.x - p1.x) / 6)} ${r(p2.y - (p3.y - p1.y) / 6)} ${r(p2.x)} ${r(p2.y)}`;
+  }
+  return `${d}Z`;
 }
 
 /** SVG の道 */
