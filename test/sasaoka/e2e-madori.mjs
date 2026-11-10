@@ -64,7 +64,12 @@ await cat('部屋');
 const roomNames = await page.locator('[data-madori-canvas]').locator('xpath=../div[1]').locator('button[aria-pressed]').evaluateAll((els) => els.map((e) => e.getAttribute('title')).filter(Boolean));
 assert.deepEqual(roomNames.slice(0, 6), ['ポーチ', '玄関', '土間', 'シューズクローク', '廊下', 'LDK']);
 assert.ok(roomNames.includes('ウォークインクローゼット') && roomNames.at(-1) === '屋外');
+// 白紙の平面図は、開いたときから洋室が選ばれている（なぞればすぐ描ける）。同じ道具をもう一度押しても外れない
+const pressed = (name) => page.getByRole('button', {name, exact: true}).first().getAttribute('aria-pressed');
+assert.equal(await pressed('洋室'), 'true');
 await tool('和室');
+await tool('和室');
+assert.equal(await pressed('和室'), 'true');
 await drag([0, 0], [3 * M, 4 * M]);
 await tool('廊下');
 await drag([0, 4 * M], [6 * M, 5 * M]);
@@ -184,6 +189,13 @@ await page.screenshot({path: path.join(outDir, 'madori-pc.png')});
 await page.setViewportSize({width: 390, height: 844});
 await page.waitForTimeout(500);
 assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+// 携帯：タブを開き直すと、道具と方眼が見える所までスクロールする（方眼が画面の下に隠れない）
+await page.getByRole('tab', {name: /工事見積書/}).click();
+await page.getByRole('tab', {name: '📐 平面図'}).click();
+await canvas.waitFor();
+await page.waitForTimeout(400);
+const box = await canvas.boundingBox();
+assert.ok(box.y >= 0 && box.y < 844 && box.y + box.height <= 844 + 40, `方眼が画面に見える ${JSON.stringify(box)}`);
 await page.screenshot({path: path.join(outDir, 'madori-phone.png'), fullPage: true});
 log('スマホの幅で横にはみ出さない OK');
 

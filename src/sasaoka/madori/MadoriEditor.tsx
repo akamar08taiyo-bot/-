@@ -41,6 +41,8 @@ type Drag =
   | {mode: 'under'; a: P; before: Madori; u0: {x: number; y: number}}
   | {mode: 'pinch'; d0: number; c0: {x: number; y: number}; v0: View};
 
+/** 白紙の平面図・新しい階で、初めに選んでおく道具（いちばん描くことの多い部屋） */
+const FIRST_ROOM: Tool = {t: 'room', type: '洋室'};
 const isTyping = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 const isPdf = (f: File) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
 const KIND_LABEL: Record<MItem['kind'], string> = {
@@ -113,12 +115,22 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
   const floor = m.floors.find((f) => f.id === floorId) ?? m.floors[0];
   const items = floor.items;
   const step = snapStep(m);
-  const [tool, setTool] = useState<Tool>({t: 'select'});
+  // 白紙の平面図は、開いたときから部屋（洋室）を選んでおく。前は「選ぶ・動かす」だったので、方眼をなぞっても図が動くだけで
+  // 何も描けないように見えた（ユーザーの話「平面図はかけるようになっていますか？なっていないようにみえます」2026-11-10）
+  const [tool, setTool] = useState<Tool>(() => (m.floors[0].items.length ? {t: 'select'} : FIRST_ROOM));
   const [cat, setCat] = useState<Cat>('room');
   const [sel, setSel] = useState<string | null>(null);
   const selItem = items.find((it) => it.id === sel) ?? null;
   const [preview, setPreview] = useState<MItem | null>(null); // 作っている途中・置く前の部品
   const [printing, setPrinting] = useState(false);
+  // 携帯・狭い画面（道具の一覧が方眼の上に来る幅）では、タブを開いたら道具と方眼が見える所までスクロールする。
+  // 前は上のタブ・ボタンで画面がうまり、方眼が2画面ぶん下に隠れていた（2026-11-10）
+  const paletteRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!window.matchMedia?.('(max-width: 1023.98px)').matches) return;
+    const id = window.requestAnimationFrame(() => paletteRef.current?.scrollIntoView({block: 'start'}));
+    return () => window.cancelAnimationFrame(id);
+  }, []);
   const [busy, setBusy] = useState(false);
   const [underMove, setUnderMove] = useState(false); // 下絵を動かす
   const look = useMemo(() => placeLookup(job, s), [job, s]);
@@ -371,6 +383,8 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
     change((mm) => ({...mm, floors: [...mm.floors, f], updatedAt: Date.now()}));
     setFloorId(f.id);
     setSel(null);
+    setTool(FIRST_ROOM); // 新しい階も、すぐ部屋を描ける
+    setCat('room');
   };
   const removeFloor = () => {
     if (m.floors.length < 2) return;
@@ -460,7 +474,7 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
 
   // ---------------------------------------------------------------- 左の道具
   const pick = (t: Tool) => {
-    setTool((cur) => (JSON.stringify(cur) === JSON.stringify(t) ? {t: 'select'} : t));
+    setTool(t); // 同じ道具をもう一度押しても外さない（前は外れて「選ぶ・動かす」になり、なぞっても描けなかった）
     setSel(null);
     setPreview(null);
   };
@@ -478,7 +492,7 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
         ))}
       </div>
       {/* スマホ・タブレットは方眼の上に出すので、低い箱の中でスクロール（部屋の一覧が長く、方眼が下に行きすぎた） */}
-      <div className="min-h-0 overflow-y-auto pr-0.5 max-lg:max-h-52 lg:max-h-[calc(100vh-17rem)]">
+      <div className="min-h-0 overflow-y-auto pr-0.5 max-lg:max-h-40 lg:max-h-[calc(100vh-17rem)]">
         {cat === 'room' && (
           <div className="grid grid-cols-3 gap-1 max-lg:grid-cols-4">
             {ROOM_TYPES.map((r) => (
@@ -989,8 +1003,10 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
       </div>
 
       <div className="grid items-start gap-3 lg:grid-cols-[15rem_minmax(0,1fr)_17rem]">
-        <div className="rounded-lg border border-slate-200 bg-white p-2 shadow-sm max-lg:order-1">{palette}</div>
-        <div ref={boxRef} className="relative h-[min(72vh,760px)] min-h-[360px] overflow-hidden rounded-lg border-2 border-slate-300 bg-white shadow-sm max-lg:order-2" data-madori-canvas>
+        <div ref={paletteRef} className="scroll-mt-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm max-lg:order-1">
+          {palette}
+        </div>
+        <div ref={boxRef} className="relative h-[min(72vh,760px)] min-h-[360px] overflow-hidden max-lg:h-[min(58vh,560px)] max-lg:min-h-[320px] rounded-lg border-2 border-slate-300 bg-white shadow-sm max-lg:order-2" data-madori-canvas>
           <svg
             ref={svgRef}
             width={size.w}
@@ -1029,8 +1045,10 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
               </g>
             )}
           </svg>
-          {!items.length && !preview && tool.t === 'select' && (
-            <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center text-sm text-slate-400">左の部屋を選んで、方眼の上をドラッグ</div>
+          {!items.length && !preview && (
+            <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center text-sm text-slate-400">
+              {tool.t === 'select' ? '部屋を選んで、方眼の上をドラッグ' : '方眼の上をドラッグ（指でなぞる）'}
+            </div>
           )}
           {tool.t !== 'select' && (
             <div className="pointer-events-none absolute left-2 top-2 rounded bg-emerald-700/90 px-2 py-1 text-xs text-white">
