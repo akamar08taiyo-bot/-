@@ -69,7 +69,7 @@ async function open(status, viewport = {width: 1366, height: 900}) {
   // 新規作成：久留米市・飯塚市・大分市は出さない（ユーザーの指示「久留米、飯塚、大分市の申請書はもう除いてください」2026-11-10）
   {
     const btns = (await page.getByRole('region', {name: '新規作成'}).getByRole('button').allInnerTexts()).map((t) => t.trim());
-    assert.ok(!btns.some((t) => /久留米|飯塚|大分/.test(t)), JSON.stringify(btns));
+    assert.ok(!btns.some((t) => /久留米|飯塚|大分|田川|の申請書/.test(t)), JSON.stringify(btns)); // 「📑 田川市の申請書」も出さない（「田川市の申請書の部分も不要」）
     assert.ok(btns.includes('＋ 苅田町') && btns.includes('＋ 広域連合'), JSON.stringify(btns));
   }
   // 新しい様邸（苅田町）：タブは住宅改修だけ。介援隊のカタログのボタンはない
