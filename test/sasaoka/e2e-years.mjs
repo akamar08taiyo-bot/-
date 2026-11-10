@@ -66,12 +66,21 @@ async function open(status, viewport = {width: 1366, height: 900}) {
   assert.ok(!/売上見込み|工務店請求書/.test(menuText), menuText.slice(0, 200));
   await page.keyboard.press('Escape');
   await page.screenshot({path: path.join(outDir, 'years-list.png')});
+  // 新規作成：久留米市・飯塚市・大分市は出さない（ユーザーの指示「久留米、飯塚、大分市の申請書はもう除いてください」2026-11-10）
+  {
+    const btns = (await page.getByRole('region', {name: '新規作成'}).getByRole('button').allInnerTexts()).map((t) => t.trim());
+    assert.ok(!btns.some((t) => /久留米|飯塚|大分/.test(t)), JSON.stringify(btns));
+    assert.ok(btns.includes('＋ 苅田町') && btns.includes('＋ 広域連合'), JSON.stringify(btns));
+  }
   // 新しい様邸（苅田町）：タブは住宅改修だけ。介援隊のカタログのボタンはない
   await page.getByRole('region', {name: '新規作成'}).getByRole('button', {name: '＋ 苅田町', exact: true}).click();
   const tabs = await page.locator('[data-job-tabs] [role="tab"]').allInnerTexts();
   assert.deepEqual(tabs.map((t) => t.trim()), ['📝 住宅改修申請書', '📋 工事見積書', '📄 理由書', '📐 平面図']);
   assert.equal(await page.getByRole('button', {name: '📖 カタログを表示'}).count(), 0);
   const form = page.getByRole('form', {name: '申請書'});
+  // 保険者を選ぶ欄にも出さない
+  const insurers = await page.getByLabel('保険者', {exact: true}).first().locator('option').allInnerTexts();
+  assert.ok(insurers.length >= 6 && !insurers.some((t) => /久留米|飯塚|大分/.test(t)), JSON.stringify(insurers));
   await form.getByLabel('被保険者氏名').fill('見本 花子');
   const works = form.locator('[data-field="works"]');
   await works.getByRole('combobox', {name: '箇所を足す'}).selectOption({label: '玄関'});

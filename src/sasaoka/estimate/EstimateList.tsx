@@ -149,9 +149,11 @@ export function EstimateHome({
               </Btn>
             </div>
             {/* このアプリでまだ作れない市の申請書（市・広域連合の公式のページ）へ（ユーザーの指示「久留米、飯塚、大分、田川の申請書に飛べるページを用意して」2026-11-02） */}
-            <Btn color="white" className="w-full !px-4 !py-3 !text-base" onClick={() => setOtherForms(true)}>
-              📑 {OTHER_FORMS.map((f) => f.city).join('・')}の申請書
-            </Btn>
+            {OTHER_FORMS.length > 0 && (
+              <Btn color="white" className="w-full !px-4 !py-3 !text-base" onClick={() => setOtherForms(true)}>
+                📑 {OTHER_FORMS.map((f) => f.city).join('・')}の申請書
+              </Btn>
+            )}
           </div>
         </section>
         {otherForms && (

@@ -11,6 +11,7 @@ import {normalize} from './priceImport.ts';
 import {isOpenSlot} from './railSlots.ts';
 import type {EstimateForm, Insurer, Job, Place, Row, Settings, ShinseiInfo, ShinseiMarks} from './types.ts';
 import {num, yen} from './util.ts';
+import {DEMO_HIDDEN_INSURERS} from './demo/flag.ts';
 
 export const FORM_IDS: EstimateForm[] = ['yukuhashi', 'kouiki'];
 
@@ -48,7 +49,8 @@ const SHINSEI_KINDS: Partial<Record<Insurer, string[]>> = {
 export const shinseiKindNames = (insurer: Insurer | ''): string[] => (insurer && SHINSEI_KINDS[insurer]) || KINDS;
 
 /** 保険者（申請書を出す先）。苅田町・行橋市・みやこ町は見積書の書式が同じ。申請書は保険者ごとに違う */
-export const INSURER_IDS: Insurer[] = ['kanda', 'yukuhashi', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu', 'kurume', 'iizuka', 'oita'];
+// （株）イヤーズ デモアプリでは久留米市・飯塚市・大分市を出さない（demo/flag.ts の DEMO_HIDDEN_INSURERS）
+export const INSURER_IDS: Insurer[] = (['kanda', 'yukuhashi', 'miyako', 'kouiki', 'fukuoka', 'kitakyushu', 'kurume', 'iizuka', 'oita'] as Insurer[]).filter((i) => !DEMO_HIDDEN_INSURERS.includes(i));
 
 export const INSURER_INFO: Record<Insurer, {name: string; form: EstimateForm; area: string}> = {
   kanda: {name: '苅田町', form: 'yukuhashi', area: '苅田町'},
@@ -113,6 +115,10 @@ export const isBlankShinsei = (job: Pick<Job, 'customer' | 'insuredNo' | 'addres
 
 /** 住所の市町村から保険者を決める。分からなければ null */
 export function insurerForAddress(address: string): Insurer | null {
+  const i = insurerByAddress(address);
+  return i && !DEMO_HIDDEN_INSURERS.includes(i) ? i : null;
+}
+function insurerByAddress(address: string): Insurer | null {
   const a = normalize(address);
   if (/苅田町/.test(a)) return 'kanda';
   if (/行橋市/.test(a)) return 'yukuhashi';

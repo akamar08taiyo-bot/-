@@ -10,6 +10,7 @@
 
 import {todayIso} from './util.ts';
 import {cityOfZip} from './zip.ts';
+import {DEMO_HIDDEN_INSURERS} from './demo/flag.ts';
 
 /** 読み取った1語（画素の位置） */
 export type OcrWord = {text: string; x0: number; y0: number; x1: number; y1: number; conf?: number; chars?: {text: string; x0: number; y0: number; x1: number; y1: number}[]};
@@ -345,7 +346,7 @@ const INSURER_NAMES: [RegExp, CardInsurer, string][] = [
 /** 保険者の名称から保険者（広域連合の市町は広域連合） */
 export function insurerOfName(name: string): {insurer: CardInsurer; name: string} {
   const t = squeeze(name.normalize('NFKC'));
-  for (const [re, insurer, label] of INSURER_NAMES) if (re.test(t)) return {insurer, name: label};
+  for (const [re, insurer, label] of INSURER_NAMES) if (re.test(t)) return DEMO_HIDDEN_INSURERS.includes(insurer) ? {insurer: '', name: ''} : {insurer, name: label};
   return {insurer: '', name: ''};
 }
 

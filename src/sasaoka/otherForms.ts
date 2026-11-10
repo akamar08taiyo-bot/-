@@ -9,6 +9,7 @@
 // 久留米市・大分市（2026-11-04 にいただいた様式で、特定福祉用具のアプリ＝🛁 特定福祉用具申請書のタブで作れるようにした）。
 // 飯塚市はサイトの場所が変わっていた（ユーザーの「飯塚市の福祉用具購入が開けません」2026-11-04。前の /koresido/… は開けない。検索で /site/shinsei/1803.html を確かめた）。
 
+import {DEMO_HIDDEN_INSURERS} from './demo/flag.ts';
 import type {Insurer} from './types.ts';
 
 export type OtherFormLink = {label: string; url: string};
@@ -22,7 +23,7 @@ export type OtherForm = {
   links: OtherFormLink[];
 };
 
-export const OTHER_FORMS: OtherForm[] = [
+const ALL_OTHER_FORMS: OtherForm[] = [
   {
     id: 'kurume',
     city: '久留米市',
@@ -60,3 +61,6 @@ export const OTHER_FORMS: OtherForm[] = [
     links: [], // 住宅改修・福祉用具購入とも広域連合の書式で作れる（前は広域連合の様式のページ・田川・桂川支部へのリンク）
   },
 ];
+
+/** （株）イヤーズ デモアプリでは久留米市・飯塚市・大分市を外す（田川市＝広域連合の書式は残す） */
+export const OTHER_FORMS: OtherForm[] = ALL_OTHER_FORMS.filter((f) => !DEMO_HIDDEN_INSURERS.includes(f.id));
