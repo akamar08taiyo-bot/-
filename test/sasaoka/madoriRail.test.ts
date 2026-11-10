@@ -2,7 +2,7 @@
 // ぐしゃぐしゃに書いて線・図形を消す（「グジャグジャってすると線や図形は消せる」）の計算。図はすべて架空のもの
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {ERASABLE, handlesOf, hitTest, makeItem, moved, railFrom, railPolyline, resized, scribbleHits, turnedItem} from '../../src/sasaoka/madori/edit.ts';
+import {ERASABLE, eraseHits, handlesOf, hitTest, makeItem, moved, railFrom, railPolyline, resized, scribbleHits, turnedItem} from '../../src/sasaoka/madori/edit.ts';
 import {bounds, cleanMadori, legendText, railPts, railSegs} from '../../src/sasaoka/madori/model.ts';
 import type {MItem} from '../../src/sasaoka/madori/model.ts';
 import {floorSvg} from '../../src/sasaoka/madori/render.ts';
@@ -151,6 +151,31 @@ test('ぐしゃぐしゃの道：上を通った線・図形・手すり・番�
   const over = [{x: 1500, y: 2600}, {x: 2100, y: 2800}, {x: 1500, y: 2650}, {x: 2100, y: 2850}];
   assert.deepEqual(scribbleHits(items, over, 40), []);
   assert.ok(!ERASABLE.includes('room') && !ERASABLE.includes('door') && !ERASABLE.includes('fix'));
+});
+
+test('「🗑 削除」を押してからなぞる：部屋・建具・設備も消す。小さい部品の上だけなら部屋は残す', () => {
+  // ユーザーの指示「削除をタップして、グジャグジャってなぞると、消せるように」2026-11-10
+  const items: MItem[] = [
+    {id: 'toilet', kind: 'room', type: 'トイレ', x: 0, y: 0, w: 910, h: 1820},
+    {id: 'bed', kind: 'room', type: '洋室', x: 910, y: 0, w: 3640, h: 2730},
+    {id: 'closet', kind: 'room', type: '収納', x: 3640, y: 0, w: 910, h: 910}, // 洋室の中の収納
+    {id: 'wc', kind: 'fix', type: '洋式便器', x: 250, y: 200, w: 400, h: 700},
+    {id: 'door', kind: 'door', type: '片開き戸', x: 1820, y: 2730, w: 780, h: 0},
+  ];
+  const zig = (x0: number, x1: number, y0: number, y1: number, n = 10) => Array.from({length: n}, (_, i) => ({x: i % 2 ? x1 : x0, y: y0 + ((y1 - y0) * i) / (n - 1)}));
+  // 便器の上だけ：便器だけ（トイレの部屋は残る）
+  assert.deepEqual(eraseHits(items, zig(300, 600, 250, 850), 40), ['wc']);
+  // 建具の上：建具だけ
+  assert.deepEqual(eraseHits(items, zig(1900, 2500, 2700, 2760), 40), ['door']);
+  // 部屋の中を押しただけ・なぞった：その部屋（中の収納の所は収納）
+  assert.deepEqual(eraseHits(items, [{x: 2000, y: 1000}], 40), ['bed']);
+  assert.deepEqual(eraseHits(items, [{x: 4000, y: 400}], 40), ['closet']);
+  assert.deepEqual(eraseHits(items, zig(1200, 3000, 300, 2000), 40), ['bed']);
+  // トイレの部屋じゅうをぐしゃぐしゃ：便器も部屋も
+  assert.deepEqual(eraseHits(items, zig(50, 860, 50, 1770, 16), 40).sort(), ['toilet', 'wc']);
+  // 何もない所は何も消さない
+  assert.deepEqual(eraseHits(items, zig(6000, 7000, 6000, 7000), 40), []);
+  assert.deepEqual(eraseHits(items, [], 40), []);
 });
 
 test('ぐしゃぐしゃかどうか（画面の px）：往復が多いとき・L 字やコ字は違う', () => {

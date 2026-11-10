@@ -15,7 +15,7 @@ import type {AppData, Job} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {DOOR_TYPES, FIX_TYPES, FINISH, ROOM_ROWS, ROOM_SHORT, ROOM_TYPES, roomFinish, STAIR_TYPES, STEP_TYPES, WINDOW_TYPES} from './catalog.ts';
 import {isScribble} from '../photoMarks.ts';
-import {canVertexEdit, copied, DRAG_TOOLS, floorArea, handlesOf, hitTest, isCornerHandle, makeItem, moved, railFrom, resized, scribbleHits, SHAPE_COLORS, turnedItem} from './edit.ts';
+import {canVertexEdit, copied, DRAG_TOOLS, eraseHits, floorArea, handlesOf, hitTest, isCornerHandle, makeItem, moved, railFrom, resized, scribbleHits, SHAPE_COLORS, turnedItem} from './edit.ts';
 import {bboxOf, closedShape, nearOrthoNext, pointRemoved, roomPts, shapeOf, snapPt} from './poly.ts';
 import {shapeDef, shapeIcon, SHAPES_SHOWN, shapeToPts} from './shapes.ts';
 import type {Handle, P, Tool} from './edit.ts';
@@ -64,7 +64,7 @@ type Drag =
   | {mode: 'move'; orig: MItem; a: P; sx: number; sy: number; before: Madori; moved: boolean; sp: SP[]; add?: boolean} // add＝置き場の部品を図に入れる（stage.ts）
   | {mode: 'resize'; orig: MItem; h: Handle; before: Madori; vtx?: boolean} // vtx＝頂点の編集
   | {mode: 'pan'; sx: number; sy: number; v0: View; sp?: SP[]}
-  | {mode: 'erase'; sp: SP[]; v0: View} // ぐしゃぐしゃに書いて消している（v0＝書き始めたときの見え方）
+  | {mode: 'erase'; sp: SP[]; v0: View; all?: boolean} // ぐしゃぐしゃに書いて消している（v0＝書き始めたときの見え方。all＝「🗑 削除」を押してからなぞった＝部屋なども消す）
   | {mode: 'under'; a: P; before: Madori; u0: {x: number; y: number}}
   | {mode: 'pinch'; d0: number; c0: {x: number; y: number}; v0: View};
 
@@ -253,6 +253,13 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
   }, [sel]);
   const [preview, setPreview] = useState<MItem | null>(null); // 作っている途中・置く前の部品
   const [trail, setTrail] = useState<{pts: P[]; erase: boolean} | null>(null); // なぞっている道（手すり）・ぐしゃぐしゃに書いている道
+  // 消すモード（ユーザーの指示「削除をタップして、グジャグジャってなぞると、消せるように」2026-11-10）：何も選んでいないときに「🗑 削除」を押すと入り、
+  // 方眼をなぞる（押す）と、上を通った部品を消す（部屋・建具・設備も。edit.ts の eraseHits）。もう一度押す・ほかの道具を選ぶ・Esc でやめる
+  const [delMode, setDelMode] = useState(false);
+  const [eraseIds, setEraseIds] = useState<string[]>([]); // なぞっているあいだ、消える部品を赤く見せる
+  useEffect(() => {
+    if (tool.t !== 'select') setDelMode(false);
+  }, [tool]);
   const [printing, setPrinting] = useState(false);
   // 携帯・狭い画面（道具の一覧が方眼の上に来る幅）では、タブを開いたら道具と方眼が見える所までスクロールする。
   // 前は上のタブ・ボタンで画面がうまり、方眼が2画面ぶん下に隠れていた（2026-11-10）
@@ -510,6 +517,8 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       const [a, b] = [...pointers.current.values()];
       setDraft(null);
       setPreview(null);
+      setTrail(null);
+      setEraseIds([]);
       drag.current = {mode: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y), c0: {x: (a.x + b.x) / 2, y: (a.y + b.y) / 2}, v0: v};
       return;
     }
@@ -519,6 +528,13 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       return;
     }
     const sp: SP[] = [{x: e.clientX, y: e.clientY, t: e.timeStamp}];
+    // 消すモード：押した所から消す道を書き始める（置き場の部品・下絵は消さない）
+    if (delMode) {
+      drag.current = {mode: 'erase', sp, v0: v, all: true};
+      setTrail({pts: [p], erase: true});
+      setEraseIds(eraseHits(items, [p], 12 / v.k));
+      return;
+    }
     // 置き場の部品（申請書の箇所）をつかむ：どの道具のときも、動かすと図に入る（ユーザーの指示「移動するだけで平面図が作成できる」2026-11-10）
     const ghost = poly ? null : hitTest(stage.items, p, 10 / v.k);
     if (ghost) {
@@ -581,7 +597,9 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     // 動かしているあいだの直近 1.5 秒（ゆっくり位置を直すのを消すしぐさとまちがえないように）。作りかけ・動かしかけ・ずらした図はやめて、消す道を見せる
     if (d?.mode === 'erase') {
       d.sp.push({x: e.clientX, y: e.clientY, t: e.timeStamp});
-      setTrail({pts: d.sp.map((q) => toMmAt(q.x, q.y, d.v0)), erase: true});
+      const path = d.sp.map((q) => toMmAt(q.x, q.y, d.v0));
+      setTrail({pts: path, erase: true});
+      setEraseIds((d.all ? eraseHits : scribbleHits)(items, path, 12 / d.v0.k));
       return;
     }
     if (d && (d.mode === 'create' || d.mode === 'move' || (d.mode === 'pan' && d.sp))) {
@@ -593,11 +611,18 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
         setDraft(null);
         setPreview(null);
         drag.current = {mode: 'erase', sp, v0};
-        setTrail({pts: sp.map((q) => toMmAt(q.x, q.y, v0)), erase: true});
+        const path = sp.map((q) => toMmAt(q.x, q.y, v0));
+        setTrail({pts: path, erase: true});
+        setEraseIds(scribbleHits(items, path, 12 / v0.k));
         return;
       }
     }
     const p = toMm(e.clientX, e.clientY);
+    if (!d && delMode) {
+      // 消すモードでマウスを動かしている：押すと消える部品を赤く見せる
+      if (e.pointerType === 'mouse') setEraseIds(eraseHits(items, [p], 12 / v.k));
+      return;
+    }
     if (!d && poly) {
       setPolyHover(nearOrthoNext(poly[poly.length - 1], snapPt(p, step)));
       return;
@@ -639,10 +664,11 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     }
     drag.current = null;
     setTrail(null);
+    setEraseIds([]);
     if (!d) return;
     if (d.mode === 'erase') {
-      // 上を通った線・図形・手すり・番号・文字を消す（部屋・建具・設備は消さない。戻すで元に戻る）
-      const ids = new Set(scribbleHits(items, d.sp.map((q) => toMmAt(q.x, q.y, d.v0)), 12 / d.v0.k));
+      // 上を通った線・図形・手すり・番号・文字を消す（ふだんは部屋・建具・設備は消さない。「🗑 削除」を押してからなら部屋なども。戻すで元に戻る）
+      const ids = new Set((d.all ? eraseHits : scribbleHits)(items, d.sp.map((q) => toMmAt(q.x, q.y, d.v0)), 12 / d.v0.k));
       if (ids.size) {
         editItems((list) => list.filter((it) => !ids.has(it.id)));
         setSel(null);
@@ -854,6 +880,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
 
   // ---------------------------------------------------------------- 左の道具
   const pick = (t: Tool) => {
+    setDelMode(false);
     setTool(t); // 同じ道具をもう一度押しても外さない（前は外れて「選ぶ・動かす」になり、なぞっても描けなかった）
     setSel(null);
     setPreview(null);
@@ -870,11 +897,21 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
   };
   // 道具をやめて「選ぶ・動かす」に戻す（Esc・番号の「✓ 確定」・番号を置いているときの Enter）。選んでいる部品も外す
   const endTool = () => {
+    setDelMode(false);
     setTool({t: 'select'});
     setPreview(null);
     setSel(null);
   };
   const isTool = (t: Tool) => JSON.stringify(tool) === JSON.stringify(t);
+  // 消すモードに入る・やめる（描きかけ・選んでいる部品はやめる）
+  const toggleDel = () => {
+    setDelMode(!delMode);
+    setTool({t: 'select'});
+    setSel(null);
+    setPreview(null);
+    setPoly(null);
+    setPolyHover(null);
+  };
   // 番号を置いているときに方眼の外を押すと確定（ユーザーの指示「平面図内以外をタップしても確定とする」2026-11-10）。番号のボタン（もう一度押すと確定）は除く
   const numMode = tool.t === 'num';
   useEffect(() => {
@@ -959,7 +996,14 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
   }, []);
   const palette = (
     <div className="flex min-h-0 flex-col gap-2">
-      <ToolBtn on={tool.t === 'select'} onClick={() => setTool({t: 'select'})} className="bg-white text-sm font-bold">
+      <ToolBtn
+        on={tool.t === 'select' && !delMode}
+        onClick={() => {
+          setDelMode(false);
+          setTool({t: 'select'});
+        }}
+        className="bg-white text-sm font-bold"
+      >
         ↖ 選ぶ・動かす
       </ToolBtn>
       <div role="tablist" aria-label="道具の種類" className="grid grid-cols-3 gap-1">
@@ -1403,7 +1447,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     </div>
   );
 
-  const cursor = tool.t !== 'select' ? 'crosshair' : drag.current?.mode === 'pan' ? 'grabbing' : 'default';
+  const cursor = tool.t !== 'select' || delMode ? 'crosshair' : drag.current?.mode === 'pan' ? 'grabbing' : 'default';
   const handles = it && !draft ? handlesOf(it, vtx) : it ? handlesOf(m.floors.find((f) => f.id === floor.id)!.items.find((o) => o.id === it.id) ?? it, vtx) : [];
   const selBox = it ? bounds((draft ? m.floors.find((f) => f.id === floor.id)!.items.find((o) => o.id === it.id) : it) ?? it) : null;
   const hs = 9 / v.k;
@@ -1525,6 +1569,21 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
         </button>
         {/* いつも出す図形（初めは直線・矢印・四角・丸。一覧の ☆ で増やす・減らす） */}
         {pins.shape.map((n) => shapeBtn(n, false, () => pickShape(n)))}
+        {/* 携帯・狭い画面：上の段の「🗑 削除」は方眼から遠いので、方眼のすぐ上にも消すモードのボタン（押してから方眼をなぞる・もう一度押すとやめる） */}
+        <button
+          type="button"
+          aria-pressed={delMode}
+          onClick={toggleDel}
+          disabled={!items.length && !delMode}
+          className={`${barBtn(false)} disabled:opacity-40 lg:hidden ${delMode ? '!border-rose-400 !bg-rose-50 ring-2 ring-rose-200' : ''}`}
+          aria-label="なぞって削除（方眼のすぐ上）"
+          title="押してから、消したい所をなぞると消える。もう一度押すとやめる"
+          data-del-near
+        >
+          <span className="flex h-5 w-6 items-center justify-center text-base" aria-hidden>
+            🗑
+          </span>
+        </button>
         {shapeOpen && (
           <div aria-label="図形の一覧" className="absolute left-0 top-full z-30 mt-1 max-h-[70vh] w-[20rem] max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-lg border border-slate-300 bg-white p-2 shadow-xl">
             <div className="mb-1 text-right text-xs text-slate-500">☆ を押すと段にいつも出します</div>
@@ -1729,14 +1788,22 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           <Btn color="white" small onClick={redo} disabled={!hist.current.future.length} title="Ctrl+Y">
             ↷ 進む
           </Btn>
-          {/* 削除もまん中（ユーザーの指示「削除ボタンも中央におく」2026-11-10）。選んでいる部品を消す（Delete と同じ。戻すで戻る） */}
+          {/* 削除もまん中（ユーザーの指示「削除ボタンも中央におく」2026-11-10）。選んでいる部品を消す（Delete と同じ。戻すで戻る）。
+              何も選んでいないときは消すモード（押すたびに入る・やめる。なぞった部品を消す。ユーザーの指示「削除をタップして、グジャグジャってなぞると、消せるように」） */}
           <Btn
             color="white"
             small
-            onClick={() => (vtx && vtxPick !== null ? removeVertex(vtxPick) : selItem && remove(selItem.id))}
-            disabled={!selItem}
-            title={vtx && vtxPick !== null ? '選んだ頂点を消す（Delete・ダブルタップ）' : '選んでいる部品を消す（Delete）'}
-            aria-label={vtx && vtxPick !== null ? '選んだ頂点を削除' : '選んだ部品を削除'}
+            onClick={() => {
+              if (vtx && vtxPick !== null) removeVertex(vtxPick);
+              else if (selItem) remove(selItem.id);
+              else toggleDel();
+            }}
+            disabled={!selItem && !delMode && !items.length}
+            aria-pressed={selItem ? undefined : delMode}
+            className={!selItem && delMode ? '!border-rose-400 !bg-rose-50 ring-2 ring-rose-200' : ''}
+            title={vtx && vtxPick !== null ? '選んだ頂点を消す（Delete・ダブルタップ）' : selItem ? '選んでいる部品を消す（Delete）' : '押してから、消したい所をなぞる（押す）と消える。もう一度押すとやめる'}
+            aria-label={vtx && vtxPick !== null ? '選んだ頂点を削除' : selItem ? '選んだ部品を削除' : 'なぞって削除'}
+            data-del-center
           >
             🗑 {vtx && vtxPick !== null ? '頂点を削除' : '削除'}
           </Btn>
@@ -1796,7 +1863,9 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
             onPointerUp={onUp}
             onPointerCancel={onUp}
             onPointerLeave={() => {
-              if (!drag.current) setPreview(null);
+              if (drag.current) return;
+              setPreview(null);
+              setEraseIds([]);
             }}
             onDoubleClick={(e) => {
               if (poly) {
@@ -1852,6 +1921,20 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
                 {poly.map((q, i) => (
                   <rect key={i} x={q.x - hs / 2} y={q.y - hs / 2} width={hs} height={hs} fill={i === 0 ? '#059669' : '#fff'} stroke="#059669" strokeWidth={1.5 / v.k} />
                 ))}
+              </g>
+            )}
+            {eraseIds.length > 0 && (
+              <g pointerEvents="none" data-erase-mark>
+                {items
+                  .filter((it) => eraseIds.includes(it.id))
+                  .map((it) => {
+                    const look = {fill: '#ef4444', fillOpacity: 0.16, stroke: '#ef4444', strokeWidth: 2 / v.k};
+                    if (it.kind === 'room' && it.pts) return <polygon key={it.id} points={it.pts.map((q) => `${q.x},${q.y}`).join(' ')} {...look} />;
+                    if (it.kind === 'rail') return <polyline key={it.id} points={railPts(it).map((q) => `${q.x},${q.y}`).join(' ')} fill="none" stroke="#ef4444" strokeOpacity={0.5} strokeWidth={10 / v.k} strokeLinejoin="round" />;
+                    const b = bounds(it);
+                    const pad = 4 / v.k;
+                    return <rect key={it.id} x={Math.min(b.x, b.x + b.w) - pad} y={Math.min(b.y, b.y + b.h) - pad} width={Math.abs(b.w) + pad * 2} height={Math.abs(b.h) + pad * 2} {...look} />;
+                  })}
               </g>
             )}
             {trail && (

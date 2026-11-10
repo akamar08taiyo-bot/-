@@ -2293,8 +2293,18 @@ export function PhotoMarkEditor({
             <Icon name="redo" />
             <span>進む</span>
           </button>
-          {/* 削除：戻る・進むのすぐ横（ユーザーの指示「戻る進むのボタンの横に削除ボタン」2026-11-10。リボンの「削除」・Delete と同じ。選んだ図形を消す。戻るで戻る） */}
-          <button type="button" className={`${UNDO_BTN} max-sm:!w-12`} title="選んだ図形を削除（Delete）" aria-label="図形を削除" disabled={!sel.length} onClick={remove} data-top-delete>
+          {/* 削除：戻る・進むのすぐ横（ユーザーの指示「戻る進むのボタンの横に削除ボタン」2026-11-10。リボンの「削除」・Delete と同じ。選んだ図形を消す。戻るで戻る）。
+              何も選んでいないときは消しゴムにする（なぞった線・図形を消す。もう一度押すとやめる。ユーザーの指示「削除をタップして、グジャグジャってなぞると、消せるように」2026-11-10） */}
+          <button
+            type="button"
+            className={`${UNDO_BTN} max-sm:!w-12 ${!sel.length && tool === 'eraser' ? '!border-rose-400 !bg-rose-50 ring-2 ring-rose-200' : ''}`}
+            title={sel.length ? '選んだ図形を削除（Delete）' : '押してから、消したい線・図形をなぞると消える。もう一度押すとやめる'}
+            aria-label={sel.length ? '図形を削除' : 'なぞって削除'}
+            aria-pressed={sel.length ? undefined : tool === 'eraser'}
+            disabled={!sel.length && !marks.length && tool !== 'eraser'}
+            onClick={() => (sel.length ? remove() : pickTool(tool === 'eraser' ? null : 'eraser'))}
+            data-top-delete
+          >
             <Icon name="delete" />
             <span>削除</span>
           </button>

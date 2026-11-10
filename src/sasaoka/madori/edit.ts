@@ -710,11 +710,47 @@ export const ERASABLE: MKind[] = ['line', 'dim', 'shape', 'rail', 'vrail', 'num'
  * 速く書くと点がまばらなので、点のあいだも tol の半分ごとに見る
  */
 export function scribbleHits(items: MItem[], path: P[], tol: number): string[] {
-  const dense = path.flatMap((q, i) => {
+  const dense = densePath(path, tol);
+  return items.filter((it) => ERASABLE.includes(it.kind) && dense.some((q) => hitsItem(it, q, tol))).map((it) => it.id);
+}
+
+/** なぞった道の点のあいだを tol の半分ごとに埋める（速くなぞると点がまばらなので） */
+function densePath(path: P[], tol: number): P[] {
+  return path.flatMap((q, i) => {
     const o = path[i - 1];
     if (!o) return [q];
     const n = Math.max(1, Math.ceil(Math.hypot(q.x - o.x, q.y - o.y) / Math.max(1, tol / 2)));
     return Array.from({length: n}, (_, j) => ({x: o.x + ((q.x - o.x) * (j + 1)) / n, y: o.y + ((q.y - o.y) * (j + 1)) / n}));
   });
-  return items.filter((it) => ERASABLE.includes(it.kind) && dense.some((q) => hitsItem(it, q, tol))).map((it) => it.id);
+}
+
+/**
+ * 「🗑 削除」を押してからなぞった（押した）ときに消す部品（ユーザーの指示「削除をタップして、グジャグジャってなぞると、消せるように」2026-11-10）。
+ * ふだんのぐしゃぐしゃ（scribbleHits）と違い、部屋・建具・窓・設備・階段も消す。
+ * - 部屋のほかの部品は、道が上を通ったものをみな消す。
+ * - 部屋は、道の点を「その点を囲むいちばん小さい部屋」に数えて決める。ほかの部品に当たらなかったときは、点の3割以上がある部屋を消す
+ *   （部屋の中を押す・なぞると、その部屋が消える）。ほかの部品にも当たったときは、部屋の幅・奥行きの6割以上をなぞった部屋だけ消す
+ *   （便器の上をなぞるとトイレの部屋は残り、部屋じゅうをぐしゃぐしゃにすると部屋ごと消える）
+ */
+export function eraseHits(items: MItem[], path: P[], tol: number): string[] {
+  const dense = densePath(path, tol);
+  if (!dense.length) return [];
+  const others = items.filter((it) => it.kind !== 'room' && dense.some((q) => hitsItem(it, q, tol))).map((it) => it.id);
+  const rooms = items.filter((it) => it.kind === 'room');
+  const areaOf = (r: MItem) => (r.pts ? polyArea(r.pts) : Math.abs(r.w * r.h));
+  const inRoom = new Map<string, P[]>();
+  for (const q of dense) {
+    let best: MItem | null = null;
+    for (const r of rooms) if (hitsItem(r, q, tol) && (!best || areaOf(r) < areaOf(best))) best = r;
+    if (best) inRoom.set(best.id, [...(inRoom.get(best.id) ?? []), q]);
+  }
+  const hitRooms = rooms.filter((r) => {
+    const pts = inRoom.get(r.id);
+    if (!pts) return false;
+    if (!others.length) return pts.length >= dense.length * 0.3;
+    const b = bounds(r);
+    const c = bboxOf(pts);
+    return c.w >= Math.abs(b.w) * 0.6 && c.h >= Math.abs(b.h) * 0.6;
+  });
+  return [...others, ...hitRooms.map((r) => r.id)];
 }

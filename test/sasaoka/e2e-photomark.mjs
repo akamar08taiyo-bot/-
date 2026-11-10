@@ -661,13 +661,37 @@ await page.screenshot({path: path.join(outDir, 'mark-04c-quad.png')});
   await dlg.getByRole('button', {name: '戻る', exact: true}).click();
   assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen', 'pen']);
   // 上の帯の「戻る」「進む」のすぐ横の「削除」でも消せる（ユーザーの指示「戻る進むのボタンの横に削除ボタン」2026-11-10）
-  const top = dlg.getByRole('button', {name: '図形を削除', exact: true});
+  const top = dlg.locator('[data-top-delete]');
   await clickOn(0.9, 0.9);
-  assert.equal(await top.isDisabled(), true); // 何も選んでいないときは押せない
   const rb = await dlg.getByRole('button', {name: '進む', exact: true}).boundingBox();
   const tb = await top.boundingBox();
   assert.ok(tb.x > rb.x + rb.width - 1 && tb.x - (rb.x + rb.width) < 12 && Math.abs(tb.y - rb.y) < 2, `削除は進むのすぐ右 ${JSON.stringify([rb, tb])}`);
+  // 何も選んでいないときに押すと消しゴム：ぐしゃぐしゃになぞった図形が消える・続けて消せる・もう一度押すとやめる
+  // （ユーザーの指示「削除をタップして、グジャグジャってなぞると、消せるように」2026-11-10）
+  assert.equal(await top.getAttribute('aria-label'), 'なぞって削除');
+  await top.click();
+  assert.equal(await top.getAttribute('aria-pressed'), 'true');
+  assert.equal(await pressed(/^消しゴム/), 'true');
+  {
+    const p0 = await at(0.21, 0.05);
+    await page.mouse.move(p0.x, p0.y);
+    await page.mouse.down();
+    for (let i = 1; i <= 8; i++) {
+      const q = await at(0.21 + i * 0.004, i % 2 ? 0.11 : 0.05);
+      await page.mouse.move(q.x, q.y, {steps: 3});
+    }
+    await page.mouse.up();
+  }
+  assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen'], '削除を押してなぞると消える');
+  assert.equal(await top.getAttribute('aria-pressed'), 'true', '続けて消せる');
+  await top.click();
+  assert.equal(await top.getAttribute('aria-pressed'), 'false');
+  assert.equal(await pressed(/^消しゴム/), 'false');
+  await dlg.getByRole('button', {name: '戻る', exact: true}).click();
+  assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen', 'pen']);
+  // 選んでいるときは、その図形を消す
   await clickOn(0.225, 0.1);
+  assert.equal(await top.getAttribute('aria-label'), '図形を削除');
   await top.click();
   assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen']);
   await dlg.getByRole('button', {name: '戻る', exact: true}).click();
@@ -687,7 +711,7 @@ await page.screenshot({path: path.join(outDir, 'mark-04c-quad.png')});
   await dlg.getByRole('button', {name: '戻る', exact: true}).click();
   assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen', 'pen']);
   await clickOn(0.9, 0.9);
-  log('選んだ図形の右上の × ・上の帯の「削除」「全て削除」で消す（1つ・いくつも・戻る）OK');
+  log('選んだ図形の右上の × ・上の帯の「削除」（選んでいないときは消しゴム）「全て削除」で消す（1つ・いくつも・戻る）OK');
 }
 // 少しだけ動かす：マウスは 2画素動かせば動く（前は 4画素まで動かず、とんだ。ユーザーの指示「手すりを左右に微調整しようとした場合に微調整がきかない。
 // 段階が少し大きすぎる」2026-10-30）。スマホ用の ◀ ▲ ▼ ▶ はパソコンでは出さない（矢印キー）

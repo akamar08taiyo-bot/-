@@ -506,7 +506,7 @@ log('頂点の編集：角を動かす・辺で角を足す・ダブルタップ
   // 全て削除：確かめのあとにこの階の図がみな消える。戻すで戻る
   const all = page.getByRole('button', {name: 'この階の図をすべて削除'});
   const ab = await all.boundingBox();
-  const db = await page.getByRole('button', {name: '選んだ部品を削除'}).boundingBox();
+  const db = await page.locator('[data-del-center]').boundingBox();
   assert.ok(ab.x > db.x + db.width - 1 && ab.x - (db.x + db.width) < 12, `全て削除は削除のすぐ右 ${JSON.stringify([db, ab])}`);
   const before = await art();
   let asked = '';
@@ -522,6 +522,55 @@ log('頂点の編集：角を動かす・辺で角を足す・ダブルタップ
   await page.keyboard.press('Control+z'); // 平行四辺形の部屋も戻す
 }
 log('平行四辺形の部屋・全て削除（確かめ・戻す）・応接間 OK');
+
+// ---------------- 何も選んでいないときに「🗑 削除」を押す → なぞった部品（部屋も）を消す（ユーザーの指示「削除をタップして、グジャグジャってなぞると、消せるように」2026-11-10）
+{
+  await page.keyboard.press('Escape');
+  const before = await art();
+  await cat('部屋');
+  await tool('洋室');
+  await drag([8 * M, 2 * M], [11 * M, 5 * M]); // 方眼の空いた所
+  await page.keyboard.press('Escape');
+  const withRoom = await art();
+  assert.notEqual(withRoom, before);
+  const del = page.locator('[data-del-center]');
+  assert.equal(await del.getAttribute('aria-label'), 'なぞって削除');
+  await del.click();
+  assert.equal(await del.getAttribute('aria-pressed'), 'true');
+  // 部屋の中をぐしゃぐしゃ：なぞっているあいだは消える部屋が赤く、離すと消える。消すモードのまま（続けて消せる）
+  const c = await toPx(9.5 * M, 3.5 * M);
+  await page.mouse.move(c.x, c.y);
+  await page.mouse.down();
+  for (let i = 1; i <= 9; i++) await page.mouse.move(c.x + (i % 2 ? 40 : -40), c.y + i * 2, {steps: 3});
+  await page.screenshot({path: path.join(outDir, 'madori-erase.png')});
+  assert.equal(await page.locator('[data-erase-mark] > *').count(), 1);
+  await page.mouse.up();
+  assert.equal(await art(), before, 'なぞった部屋が消えた');
+  assert.equal(await page.locator('[data-erase-mark]').count(), 0);
+  await page.getByText('1つ消しました').last().waitFor();
+  assert.equal(await del.getAttribute('aria-pressed'), 'true');
+  await page.keyboard.press('Control+z');
+  assert.equal(await art(), withRoom, '戻すで戻る');
+  // 押しただけでも消える
+  await click(10.5 * M, 4.5 * M);
+  assert.equal(await art(), before, '押した部屋が消えた');
+  await page.keyboard.press('Control+z');
+  // もう一度押すとやめる。やめたあとは部屋の中を押すと選ぶ（消さない）
+  await del.click();
+  assert.equal(await del.getAttribute('aria-pressed'), 'false');
+  await click(10.5 * M, 4.5 * M);
+  assert.equal(await art(), withRoom);
+  assert.equal(await del.getAttribute('aria-label'), '選んだ部品を削除');
+  // ほかの道具を選ぶと消すモードは終わる
+  await page.keyboard.press('Escape');
+  await del.click();
+  await tool('洋室');
+  assert.equal(await del.getAttribute('aria-pressed'), 'false');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Control+z'); // 足した部屋も戻す
+  assert.equal(await art(), before);
+}
+log('削除を押してなぞる・押すと部屋も消える（赤く見せる・続けて消せる・戻す・やめる）OK');
 
 // ---------------- 住設 ▼・いつも出す（☆）・まん中の削除・右下のすべらせて戻す／進む・方眼の下の申請書の改修の内容
 // （ユーザーの指示「他の住設もプルダウンから選べるようにして、必要な住設や、矢印などは常時表示できるようにする」「削除ボタンも中央におく」
@@ -567,15 +616,15 @@ log('平行四辺形の部屋・全て削除（確かめ・戻す）・応接間
   await page.keyboard.press('Escape');
   assert.equal(await bar.getByRole('button', {name: '矢印', exact: true}).count(), 1);
   // まん中の削除：選んだ部品を消す（何も選んでいなければ押せない）
-  const del = page.getByRole('button', {name: '選んだ部品を削除'});
-  assert.ok(await del.isDisabled());
+  const del = page.locator('[data-del-center]');
+  assert.equal(await del.getAttribute('aria-label'), 'なぞって削除'); // 何も選んでいないときは、なぞって消す
   {
     const ub = await page.locator('[data-undo-center]').boundingBox();
     const sb = await page.getByRole('toolbar', {name: '平面図の設定'}).boundingBox();
     assert.ok(Math.abs(mid(ub) - mid(sb)) < 3, `削除もまん中 ${JSON.stringify([ub, sb])}`);
   }
   await click(8 * M, 1 * M);
-  assert.ok(await del.isEnabled());
+  assert.equal(await del.getAttribute('aria-label'), '選んだ部品を削除');
   await del.click();
   assert.equal((await art()).length, n0, '削除で消えた');
   // 右下：左へすべらせると戻す・右へすべらせると進む（1回で1つ。方眼には描かない）
@@ -739,6 +788,7 @@ assert.match(await art(), /洋室/); // 平面図のタブにも残る
 log('申請書の平面図の枠から描いて入れる OK');
 
 await page.screenshot({path: path.join(outDir, 'madori-pc.png')});
+assert.equal(await page.locator('[data-del-near]').isVisible(), false, 'パソコンでは方眼の上の 🗑 は出さない（上の段の削除）');
 // ---------------- スマホ
 await page.setViewportSize({width: 390, height: 844});
 await page.waitForTimeout(500);
@@ -765,8 +815,34 @@ assert.ok(box.y >= 0 && box.y < 844 && box.y + box.height <= 844 + 40, `方眼�
   await done.click();
   assert.ok(await done.isDisabled());
 }
+// 携帯：方眼のすぐ上の 🗑（上の段の削除は方眼から遠い）で消すモード → 方眼を押すと消える → もう一度押すとやめる
+{
+  const near = page.locator('[data-del-near]');
+  assert.ok(await near.isVisible());
+  const nb = await near.boundingBox();
+  assert.ok(nb.y + nb.height <= (await canvas.boundingBox()).y && nb.y >= 0, `方眼のすぐ上 ${JSON.stringify(nb)}`);
+  const before = await art();
+  await near.click();
+  assert.equal(await near.getAttribute('aria-pressed'), 'true');
+  const cb = await canvas.boundingBox();
+  // 方眼のまん中あたりで、何かが消える所を探して押す（押すと消える部品が赤くなる所）
+  let hit = null;
+  for (const [fx, fy] of [[0.5, 0.5], [0.4, 0.4], [0.6, 0.4], [0.4, 0.6], [0.6, 0.6], [0.3, 0.3], [0.5, 0.3], [0.3, 0.5]]) {
+    const p = {x: cb.x + cb.width * fx, y: cb.y + cb.height * fy};
+    await page.mouse.click(p.x, p.y);
+    if ((await art()) !== before) {
+      hit = p;
+      break;
+    }
+  }
+  assert.ok(hit, '携帯でも押した部品が消える');
+  await page.keyboard.press('Control+z');
+  assert.equal(await art(), before);
+  await near.click();
+  assert.equal(await near.getAttribute('aria-pressed'), 'false');
+}
 await page.screenshot({path: path.join(outDir, 'madori-phone.png'), fullPage: true});
-log('スマホの幅で横にはみ出さない OK');
+log('スマホの幅で横にはみ出さない・方眼の上の 🗑 で消す OK');
 
 assert.deepEqual(errors, []);
 await browser.close();
