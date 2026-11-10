@@ -939,7 +939,8 @@ npm run build:jutaku     # dist-jutaku/index.html（住宅改修 見積書作成
 npm run build:years      # dist-years/index.html・version.json・status.json（vite.years.config.ts。今までの2つのビルドはそのまま）
 ```
 
-- 置き場所は新しいリポジトリ `akamar08taiyo-bot/years-demo`（https://akamar08taiyo-bot.github.io/years-demo/ 。公開はユーザーの「公開して」のあと）。
+- 置き場所は新しいリポジトリ `akamar08taiyo-bot/years-demo`（https://akamar08taiyo-bot.github.io/years-demo/ 。main の / を GitHub Pages で公開。2026-11-10 に 8bd8aca のビルドを公開＝years-demo の d30a68c）。
+  直したら `npm run build:years` の index.html・version.json を years-demo に置いて push する（status.json は期限を変えるときだけ）。アプリを並べる画面は作らない（ユーザーの答え「アプリを並べる機能ではなく、この工事のアプリのみで大丈夫です」）。
 - 入口（`src/sasaoka/demo/gate.ts`）：開くたびに `https://akamar08taiyo-bot.github.io/years-demo/status.json`（`{"enabled": true, "until": "2026-12-31", "message": ""}`）を読み、
   `enabled` が true で `until` の日まで（その日も）だけアプリを出す。止めた・期限が過ぎた・読めないときは「デモを使えません」の画面（読めないときは「もう一度確かめる」）。
   開いたあとも30分ごとと画面に戻ったときに読み直し、止めたら重ねて隠す（ネットにつながらないだけなら作業は止めない）。いつも同じ URL を読むので、パソコンに保存した写しでもこのファイルで止まる
