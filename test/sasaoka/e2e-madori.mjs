@@ -487,6 +487,36 @@ log('方眼の上のまん中の描く道具・曲げた手すり（□で曲げ
 }
 log('頂点の編集：角を動かす・辺で角を足す・ダブルタップ／頂点を削除で消す・丸はなめらかな線 OK');
 
+// ---------------- 角を押して平行四辺形の部屋（ユーザーの指示「角を押していって、頂点で結ぼうと思うが、平行四辺形が勝手に四角になる」2026-11-10）・
+// 全て削除（「削除の横に全て削除を設置、一応確認する」）・応接間（「応接間をいれる」）
+{
+  await cat('部屋');
+  assert.equal(await page.locator('[data-madori-palette] button[title="応接間"]').count(), 1);
+  await tool('洋室');
+  for (const [x, y] of [[6, 6], [10, 6], [9, 8], [5, 8]]) await click(x * M, y * M);
+  await click(6 * M, 6 * M); // はじめの点で閉じる
+  assert.match(await art(), new RegExp(`d="M${6 * M} ${6 * M}L${10 * M} ${6 * M}L${9 * M} ${8 * M}L${5 * M} ${8 * M}Z"`), '平行四辺形のまま');
+  await page.keyboard.press('Escape');
+  // 全て削除：確かめのあとにこの階の図がみな消える。戻すで戻る
+  const all = page.getByRole('button', {name: 'この階の図をすべて削除'});
+  const ab = await all.boundingBox();
+  const db = await page.getByRole('button', {name: '選んだ部品を削除'}).boundingBox();
+  assert.ok(ab.x > db.x + db.width - 1 && ab.x - (db.x + db.width) < 12, `全て削除は削除のすぐ右 ${JSON.stringify([db, ab])}`);
+  const before = await art();
+  let asked = '';
+  page.once('dialog', (d) => {
+    asked = d.message();
+  });
+  await all.click();
+  assert.match(asked, /1階の図.*すべて消しますか/);
+  await page.waitForFunction(() => !document.querySelector('[data-madori-canvas] svg g:not([opacity])')?.innerHTML.includes('寝室'));
+  assert.equal(await all.isDisabled(), true);
+  await page.keyboard.press('Control+z');
+  assert.equal(await art(), before, '戻すで戻る');
+  await page.keyboard.press('Control+z'); // 平行四辺形の部屋も戻す
+}
+log('平行四辺形の部屋・全て削除（確かめ・戻す）・応接間 OK');
+
 // ---------------- 住設 ▼・いつも出す（☆）・まん中の削除・右下のすべらせて戻す／進む・方眼の下の申請書の改修の内容
 // （ユーザーの指示「他の住設もプルダウンから選べるようにして、必要な住設や、矢印などは常時表示できるようにする」「削除ボタンも中央におく」
 //   「右下に、左にスラッシュすると戻る、右にスラッシュすると進む」「平面図の下のスペースに、申請書で入力した内容をいれる」2026-11-10）

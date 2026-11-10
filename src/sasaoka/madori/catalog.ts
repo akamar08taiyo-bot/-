@@ -55,6 +55,7 @@ export const ROOM_TYPES: RoomType[] = [
   {name: 'K', finish: 'floor', size: [2, 3], tone: TONE.live, row: 2},
   {name: 'L', finish: 'floor', size: [3, 3], tone: TONE.live, row: 2},
   {name: '寝室', finish: 'floor', size: [3, 4], tone: TONE.live, row: 3},
+  {name: '応接間', finish: 'floor', size: [3, 4], tone: TONE.live, row: 3}, // ユーザーの指示「応接間をいれる」2026-11-10
   {name: 'トイレ', finish: 'floor', size: [1, 1.5], tone: TONE.water, row: 4},
   {name: '洗面脱衣室', finish: 'floor', size: [2, 2], tone: TONE.water, row: 4},
   {name: '洗面所', finish: 'floor', size: [1.5, 1], tone: TONE.water, row: 4},

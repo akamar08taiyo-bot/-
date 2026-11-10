@@ -788,6 +788,13 @@ export function PhotoMarkEditor({
     commit(marks.filter((m) => !sel.includes(m.id)));
     setSel([]);
   };
+  // 全て削除（ユーザーの指示「削除の横に全て削除を設置、一応確認する」2026-11-10）：書き込みをみな消す（確かめてから。戻るで戻る。写真はそのまま）
+  const removeAll = () => {
+    if (!marks.length) return;
+    if (!window.confirm(`書き込み（線・図形・文字など ${marks.length}つ）をすべて消しますか？\n（戻るで戻せます）`)) return;
+    commit([]);
+    setSel([]);
+  };
   // ---------------------------------------------------------------- 頂点の編集（手書きの線・折れ線・四角）
   /** 頂点を編集している図形（選んでいる1つの手書きの線・折れ線・四角のときだけ。選ぶのが変わったら終わり） */
   // 直線（縦手すり1本など）も頂点の編集で両端を選んで動かせる（ユーザーの指示「縦手すり一本の場合でも、頂点の編集を押すこと、片側の頂点の場所を微調節できるようにする」2026-11-10）
@@ -2291,6 +2298,11 @@ export function PhotoMarkEditor({
             <Icon name="delete" />
             <span>削除</span>
           </button>
+          {/* 全て削除：削除の横（スマホは上の帯に入らないので、リボンの「削除」の横） */}
+          <button type="button" className={`${UNDO_BTN} max-sm:hidden`} title="書き込みをすべて消す（確かめてから。戻るで戻せます）" aria-label="書き込みを全て削除" disabled={!marks.length} onClick={removeAll}>
+            <Icon name="delete" />
+            <span>全て削除</span>
+          </button>
           <div className="min-w-0 truncate px-2 text-base text-slate-700 max-sm:hidden">✏️ {title}</div>
         </div>
         <button type="button" onClick={close} className="h-11 justify-self-center rounded-md border border-slate-300 bg-white px-8 text-base text-slate-700 hover:bg-slate-50 max-sm:px-3">
@@ -2441,6 +2453,11 @@ export function PhotoMarkEditor({
                   <button type="button" className={RB} title="削除 (Delete)" aria-label="削除" disabled={!sel.length} onClick={remove}>
                     <Icon name="delete" />
                     <span className="max-sm:hidden">削除</span>
+                  </button>
+                  {/* 全て削除（スマホだけ。パソコン・iPad は上の帯の削除の横にある） */}
+                  <button type="button" className={`${RB} sm:hidden`} title="書き込みをすべて消す（確かめてから）" aria-label="全て削除" disabled={!marks.length} onClick={removeAll}>
+                    <Icon name="delete" />
+                    <span>全て削除</span>
                   </button>
                 </div>
               </div>

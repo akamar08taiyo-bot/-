@@ -4,7 +4,7 @@ import test from 'node:test';
 import {canVertexEdit, handlesOf, moved, resized, turnedItem, walls} from '../../src/sasaoka/madori/edit.ts';
 import type {MItem} from '../../src/sasaoka/madori/model.ts';
 import {bounds} from '../../src/sasaoka/madori/model.ts';
-import {isOrtho, labelSpot, inPoly, pointRemoved, polyEdges} from '../../src/sasaoka/madori/poly.ts';
+import {closedShape, isOrtho, labelSpot, inPoly, nearOrthoNext, pointRemoved, polyEdges, shapeOf} from '../../src/sasaoka/madori/poly.ts';
 import {floorSvg} from '../../src/sasaoka/madori/render.ts';
 import {shapeToPts} from '../../src/sasaoka/madori/shapes.ts';
 
@@ -70,4 +70,20 @@ test('ななめの辺のある部屋：ななめの辺は壁にしない・名�
   assert.deepEqual(handlesOf(room).map((h) => h.h).slice(0, 3), ['nw', 'n', 'ne']);
   const v = handlesOf(room, true);
   assert.equal(v.filter((h) => h.h.startsWith('v')).length, 3);
+});
+
+test('角を押して描く部屋：横・縦に近い辺はそろえ、傾けて押せばななめの辺（平行四辺形が四角にならない）', () => {
+  // ユーザーの指示「角を押していって、頂点で結ぼうと思うが、平行四辺形が勝手に四角になる」2026-11-10
+  const a = {x: 0, y: 0};
+  assert.deepEqual(nearOrthoNext(a, {x: 3640, y: 200}), {x: 3640, y: 0}); // ほぼ横 → 横
+  assert.deepEqual(nearOrthoNext(a, {x: 150, y: 2730}), {x: 0, y: 2730}); // ほぼ縦 → 縦
+  assert.deepEqual(nearOrthoNext(a, {x: 910, y: 2730}), {x: 910, y: 2730}); // 傾けて押す → そのまま
+  // 平行四辺形：4つの角を押して閉じると、その4つの角のまま（角を足さない）
+  const para = [{x: 910, y: 0}, {x: 4550, y: 0}, {x: 3640, y: 2730}, {x: 0, y: 2730}];
+  const sh = shapeOf(closedShape(para));
+  assert.deepEqual(sh.pts, para);
+  assert.equal(isOrtho(sh.pts!), false);
+  // 辺がみな横・縦なら、今までどおりはじめの点へ横・縦で戻る角を足す（L 字の最後の角を押さなくても閉じる）
+  const l = [{x: 0, y: 0}, {x: 2730, y: 0}, {x: 2730, y: 910}, {x: 910, y: 910}, {x: 910, y: 1820}];
+  assert.deepEqual(closedShape(l).at(-1), {x: 0, y: 1820});
 });

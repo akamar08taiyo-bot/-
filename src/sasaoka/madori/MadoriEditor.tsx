@@ -16,7 +16,7 @@ import type {Update} from '../useStore.ts';
 import {DOOR_TYPES, FIX_TYPES, FINISH, ROOM_ROWS, ROOM_SHORT, ROOM_TYPES, roomFinish, STAIR_TYPES, STEP_TYPES, WINDOW_TYPES} from './catalog.ts';
 import {isScribble} from '../photoMarks.ts';
 import {canVertexEdit, copied, DRAG_TOOLS, floorArea, handlesOf, hitTest, isCornerHandle, makeItem, moved, railFrom, resized, scribbleHits, SHAPE_COLORS, turnedItem} from './edit.ts';
-import {bboxOf, closed, orthoNext, pointRemoved, roomPts, shapeOf, snapPt} from './poly.ts';
+import {bboxOf, closedShape, nearOrthoNext, pointRemoved, roomPts, shapeOf, snapPt} from './poly.ts';
 import {shapeDef, shapeIcon, SHAPES_SHOWN, shapeToPts} from './shapes.ts';
 import type {Handle, P, Tool} from './edit.ts';
 import {MadoriPrint} from './MadoriPrint.tsx';
@@ -332,6 +332,14 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     }
     setVtx(true);
   };
+  // 全て削除（ユーザーの指示「削除の横に全て削除を設置、一応確認する」2026-11-10）：いま見ている階の部品をみな消す（確かめてから。戻すで戻る。下絵は残す）
+  const removeAll = () => {
+    if (!items.length) return;
+    if (!window.confirm(`${floor.name}の図（部屋・手すり・番号など ${items.length}つ）をすべて消しますか？\n（↶ 戻すで戻せます）`)) return;
+    editItems(() => []);
+    setSel(null);
+    toast('すべて消しました');
+  };
   const removeVertex = (i: number) => {
     if (!selItem?.pts || selItem.pts.length <= 3) return;
     const pts = pointRemoved(selItem.pts, i);
@@ -450,14 +458,14 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
   };
 
   // ---------------------------------------------------------------- 部屋を頂点で描く（マイホームクラウドの「部屋入力」と同じ。ドラッグは四角＝枠囲み）：
-  // 部屋の種類を選んで、角を順に押す（辺は横・縦にそろう）。はじめの点を押す・ダブルクリック・Enter で閉じる、Backspace で1つ戻す、Esc でやめる
+  // 部屋の種類を選んで、角を順に押す（横・縦に近い辺はそろう。傾けて押せばななめの辺＝平行四辺形・台形も）。はじめの点を押す・ダブルクリック・Enter で閉じる、Backspace で1つ戻す、Esc でやめる
   const [poly, setPoly] = useState<P[] | null>(null);
   const [polyHover, setPolyHover] = useState<P | null>(null);
   const finishPoly = (pts: P[] | null = poly) => {
     setPoly(null);
     setPolyHover(null);
     if (!pts || pts.length < 3 || tool.t !== 'room') return;
-    const sh = shapeOf(closed(pts));
+    const sh = shapeOf(closedShape(pts));
     if (sh.w < step || sh.h < step) return;
     const it: MItem = {id: mid(), kind: 'room', type: tool.type, ...sh};
     editItems((list) => [...list, it]);
@@ -471,7 +479,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       return;
     }
     const last = poly[poly.length - 1];
-    const r = orthoNext(last, q);
+    const r = nearOrthoNext(last, q);
     // はじめの点（のそば）を押したら閉じる
     if (poly.length >= 3 && Math.hypot(q.x - poly[0].x, q.y - poly[0].y) <= Math.max(step, 12 / v.k)) {
       finishPoly(poly);
@@ -591,7 +599,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     }
     const p = toMm(e.clientX, e.clientY);
     if (!d && poly) {
-      setPolyHover(orthoNext(poly[poly.length - 1], snapPt(p, step)));
+      setPolyHover(nearOrthoNext(poly[poly.length - 1], snapPt(p, step)));
       return;
     }
     if (d?.mode === 'create' && tool.t === 'room' && poly) return;
@@ -1698,7 +1706,8 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           >
             {MODULES.map((x) => (
               <option key={x} value={x}>
-                {x}mm{x === 910 ? '（尺）' : x === 1000 ? '（メーター）' : ''}
+                {/* 1000mm の「（メーター）」は外した（上の段のまん中に「全て削除」を足したぶん、左の欄を短くして戻す・進むを段のど真ん中のままに） */}
+                {x}mm{x === 910 ? '（尺）' : ''}
               </option>
             ))}
           </select>
@@ -1713,7 +1722,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
         </label>
         </div>
         {/* 戻す・進むは上の段のど真ん中（ユーザーの指示「戻るボタンの位置は中央にもってくる」「戻る進むもど真ん中」2026-11-10） */}
-        <div className="flex items-center gap-1 lg:justify-self-center" data-undo-center>
+        <div className="flex flex-wrap items-center gap-1 lg:justify-self-center" data-undo-center>
           <Btn color="white" small onClick={undo} disabled={!hist.current.past.length} title="Ctrl+Z">
             ↶ 戻す
           </Btn>
@@ -1730,6 +1739,9 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
             aria-label={vtx && vtxPick !== null ? '選んだ頂点を削除' : '選んだ部品を削除'}
           >
             🗑 {vtx && vtxPick !== null ? '頂点を削除' : '削除'}
+          </Btn>
+          <Btn color="white" small onClick={removeAll} disabled={!items.length} title="この階の図をすべて消す（確かめてから。戻すで戻せます）" aria-label="この階の図をすべて削除">
+            🗑 全て削除
           </Btn>
           {/* 頂点の編集（部屋・図形を選んだとき。もう一度押すと終わる） */}
           <Btn

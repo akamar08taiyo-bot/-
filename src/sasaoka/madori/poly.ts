@@ -84,6 +84,21 @@ export function orthoNext(last: Pt, p: Pt): Pt {
   return Math.abs(p.x - last.x) >= Math.abs(p.y - last.y) ? {x: p.x, y: last.y} : {x: last.x, y: p.y};
 }
 
+/**
+ * 次の頂点：前の頂点から横・縦に近ければ（8° まで）そろえ、それより傾いていればそのまま（ななめの辺。平行四辺形・台形の部屋も描ける。
+ * ユーザーの指示「角を押していって、頂点で結ぼうと思うが、平行四辺形が勝手に四角になる」2026-11-10。前は orthoNext でいつも横か縦にした）
+ */
+export function nearOrthoNext(last: Pt, p: Pt): Pt {
+  const dx = Math.abs(p.x - last.x);
+  const dy = Math.abs(p.y - last.y);
+  if (dy <= dx * 0.14) return {x: p.x, y: last.y};
+  if (dx <= dy * 0.14) return {x: last.x, y: p.y};
+  return p;
+}
+
+/** 頂点で描いた形を閉じる：辺がみな横・縦なら、はじめの点まで横・縦の2本で戻れるように角を足す（closed）。ななめの辺があれば、そのままはじめの点へ結ぶ */
+export const closedShape = (pts: Pt[]): Pt[] => (pts.slice(1).every((q, i) => q.x === pts[i].x || q.y === pts[i].y) ? closed(pts) : pts);
+
 /** 描き終わり：最後の頂点からはじめの頂点まで横・縦の2本で戻れるように、角を1つ足す（そろっていれば足さない） */
 export function closed(pts: Pt[]): Pt[] {
   if (pts.length < 2) return pts;

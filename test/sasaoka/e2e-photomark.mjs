@@ -672,8 +672,22 @@ await page.screenshot({path: path.join(outDir, 'mark-04c-quad.png')});
   assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen']);
   await dlg.getByRole('button', {name: '戻る', exact: true}).click();
   assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen', 'pen']);
+  // 全て削除（「削除の横に全て削除を設置、一応確認する」2026-11-10）：削除のすぐ右・確かめてから全部消す・戻るで戻る
+  const all = dlg.getByRole('button', {name: '書き込みを全て削除', exact: true});
+  const ab = await all.boundingBox();
+  const tb2 = await top.boundingBox();
+  assert.ok(ab.x > tb2.x + tb2.width - 1 && ab.x - (tb2.x + tb2.width) < 12, `全て削除は削除のすぐ右 ${JSON.stringify([tb2, ab])}`);
+  let asked = '';
+  page.once('dialog', (d) => {
+    asked = d.message();
+  });
+  await all.click();
+  assert.match(asked, /すべて消しますか/);
+  assert.deepEqual(await kinds(), []);
+  await dlg.getByRole('button', {name: '戻る', exact: true}).click();
+  assert.deepEqual(await kinds(), ['line', 'line', 'line', 'pen', 'pen']);
   await clickOn(0.9, 0.9);
-  log('選んだ図形の右上の × ・上の帯の「削除」で消す（1つ・いくつも・戻る）OK');
+  log('選んだ図形の右上の × ・上の帯の「削除」「全て削除」で消す（1つ・いくつも・戻る）OK');
 }
 // 少しだけ動かす：マウスは 2画素動かせば動く（前は 4画素まで動かず、とんだ。ユーザーの指示「手すりを左右に微調整しようとした場合に微調整がきかない。
 // 段階が少し大きすぎる」2026-10-30）。スマホ用の ◀ ▲ ▼ ▶ はパソコンでは出さない（矢印キー）
