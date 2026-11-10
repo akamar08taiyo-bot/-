@@ -3,6 +3,9 @@
 // 赤い手すりの線と①②・右の「① L＝600mm」の一覧）と同じものを、方眼の上で部品を置いて作る。
 // 長さはすべて mm。位置は図の左上を 0。部品は階（1階・2階…）ごとに持つ。
 
+import {polyArea, shapeOf} from './poly.ts';
+import type {Pt} from './poly.ts';
+
 /** 部品の種類 */
 export type MKind =
   | 'room' // 部屋（四角。種類で色・柄・名前）
@@ -16,7 +19,8 @@ export type MKind =
   | 'num' // 番号（①②。自由に置く）
   | 'text' // 文字
   | 'line' // 線（汎用作図。壁の足りない所など）
-  | 'dim'; // 寸法線（長さを自動で書く）
+  | 'dim' // 寸法線（長さを自動で書く）
+  | 'shape'; // 図形（Excel と同じ 直線・矢印・四角・丸。type。2026-11-10）
 
 export type Rot = 0 | 90 | 180 | 270;
 
@@ -39,8 +43,13 @@ export type MItem = {
   n?: number; // 番号（手すり・縦手すり・段差・番号。0 か空なら自動の連番）
   place?: string; // 申請書の箇所（Place.id）。つなぐと番号と凡例の文がその箇所のもの（写真番号・改修の内容）
   len?: number; // 縦手すり・L型手すりの縦の長さ（mm。凡例に書く）
+  // L型手すりの2本目の向き（1本目の終わりから、1本目が横なら下＝1・上＝−1、縦なら右＝1・左＝−1 へ len。一筆で描いた L 字。2026-11-10）
+  turn?: 1 | -1;
   size?: number; // 文字の大きさ（mm。図の上の大きさ）
   note?: string; // 凡例に書く文を手で直したもの（空なら自動）
+  // 多角形の部屋の頂点（mm。辺はみな横か縦。poly.ts）。ないときは x・y・w・h の四角。あるときも x・y・w・h は囲む四角
+  pts?: {x: number; y: number}[];
+  color?: string; // 図形の色（#rrggbb。なければ赤）
 };
 
 /** 下絵（スクリーンショット・手書きの間取りの写真をうすく敷いて、なぞって描く。写真はこの端末の IndexedDB の番号。photos.ts） */
@@ -56,8 +65,10 @@ export type Madori = {
   module: Module;
   snap: 1 | 2 | 4; // 方眼の1マスを何分割して部品をそろえるか（2＝半マス。マイホームクラウドの 1/2）
   floors: MFloor[];
+  // 寸法線・広さは、機能は残して初めはオフ（ユーザーの指示「ここの長さとヘーベーは不要」「この機能はあってもいいが、デフォルトはオフ」2026-11-10）
   showDims: boolean; // 部屋の外まわりの寸法線を自動で出す
-  showArea: boolean; // 部屋の名前の下に広さ（帖・㎡）
+  showArea: boolean; // 部屋の名前の下に広さ（帖）
+  optRev?: 2; // 寸法・広さの初めの値をオフにしたあとの平面図（これがない前の平面図は、両方オフで読む。前の版は初めの値「出す」のまま保存していたので）
   legend?: string; // 右の一覧を手で直したもの（空なら自動。1行ずつ）
   updatedAt: number;
 };
@@ -66,7 +77,7 @@ let seq = 0;
 export const mid = () => `m${Date.now().toString(36)}${(seq++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 export function emptyMadori(): Madori {
-  return {module: 910, snap: 2, floors: [{id: mid(), name: '1階', items: []}], showDims: true, showArea: true, updatedAt: Date.now()};
+  return {module: 910, snap: 2, floors: [{id: mid(), name: '1階', items: []}], showDims: false, showArea: false, optRev: 2, updatedAt: Date.now()};
 }
 
 /** 方眼にそろえる1歩（mm） */
@@ -75,10 +86,14 @@ export const snapTo = (v: number, step: number) => Math.round(v / step) * step;
 
 /** 部屋の広さ：㎡（小数2けた）と帖（1帖＝方眼の1マス×2マス。910 なら 1.656㎡・900 なら 1.62㎡。小数1けた） */
 export function roomArea(w: number, h: number, module: Module): {m2: number; jo: number; tsubo: number} {
-  const a = (Math.abs(w) * Math.abs(h)) / 1e6;
-  const jo = (Math.abs(w) * Math.abs(h)) / (2 * module * module);
-  return {m2: Math.round(a * 100) / 100, jo: Math.round(jo * 10) / 10, tsubo: Math.round((a / 3.30579) * 100) / 100};
+  return areaOfMm2(Math.abs(w) * Math.abs(h), module);
 }
+const areaOfMm2 = (mm2: number, module: Module) => {
+  const a = mm2 / 1e6;
+  return {m2: Math.round(a * 100) / 100, jo: Math.round((mm2 / (2 * module * module)) * 10) / 10, tsubo: Math.round((a / 3.30579) * 100) / 100};
+};
+/** 部屋の広さ（多角形の部屋も） */
+export const roomAreaOf = (it: MItem, module: Module) => (it.pts && it.pts.length >= 3 ? areaOfMm2(polyArea(it.pts), module) : roomArea(it.w, it.h, module));
 
 /** 帖の書き方（6帖・4.5帖。整数なら小数をつけない） */
 export const joLabel = (jo: number) => `${Number.isInteger(jo) ? jo : jo.toFixed(1)}帖`;
@@ -87,11 +102,17 @@ export const joLabel = (jo: number) => `${Number.isInteger(jo) ? jo : jo.toFixed
 export const lineLength = (it: Pick<MItem, 'w' | 'h'>) => Math.round(Math.hypot(it.w, it.h));
 
 /** 部品の外まわりの四角（回したあと。線の部品は始点と終点を囲む） */
+/** 線の形の図形（直線・矢印。ほかの図形＝四角・丸は x・y・w・h の箱） */
+export const isShapeLine = (it: MItem) => it.kind === 'shape' && (it.type === '直線' || it.type === '矢印');
+
 export function bounds(it: MItem): {x: number; y: number; w: number; h: number} {
-  if (it.kind === 'rail' || it.kind === 'line' || it.kind === 'dim') {
+  if (it.kind === 'rail' || it.kind === 'line' || it.kind === 'dim' || isShapeLine(it)) {
     const x2 = it.x + it.w;
     const y2 = it.y + it.h;
-    return {x: Math.min(it.x, x2), y: Math.min(it.y, y2), w: Math.abs(it.w), h: Math.abs(it.h)};
+    const e = railBend(it);
+    const xs = [it.x, x2, ...(e ? [e.x] : [])];
+    const ys = [it.y, y2, ...(e ? [e.y] : [])];
+    return {x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys)};
   }
   if (it.kind === 'door' || it.kind === 'window') {
     const vert = it.rot === 90 || it.rot === 270;
@@ -101,6 +122,14 @@ export function bounds(it: MItem): {x: number; y: number; w: number; h: number} 
   if (it.kind === 'vrail' || it.kind === 'num') return {x: it.x - 150, y: it.y - 150, w: 300, h: 300};
   const vert = it.rot === 90 || it.rot === 270;
   return vert ? {x: it.x + (it.w - it.h) / 2, y: it.y + (it.h - it.w) / 2, w: it.h, h: it.w} : {x: it.x, y: it.y, w: it.w, h: it.h};
+}
+
+/** L型手すりの2本目の端（1本目の終わりから曲がった先）。L 字でなければ null */
+export function railBend(it: MItem): {x: number; y: number} | null {
+  if (it.kind !== 'rail' || !it.len || !it.turn) return null;
+  const x2 = it.x + it.w;
+  const y2 = it.y + it.h;
+  return it.h === 0 ? {x: x2, y: y2 + it.turn * it.len} : {x: x2 + it.turn * it.len, y: y2};
 }
 
 /** 階の部品をみな囲む四角（何もなければ null） */
@@ -211,7 +240,7 @@ export function cleanMadori(raw: unknown): Madori | undefined {
   const r = raw as Record<string, unknown>;
   const num = (v: unknown, d = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
   const str = (v: unknown) => (typeof v === 'string' ? v : '');
-  const KINDS: MKind[] = ['room', 'door', 'window', 'fix', 'stair', 'rail', 'vrail', 'step', 'num', 'text', 'line', 'dim'];
+  const KINDS: MKind[] = ['room', 'door', 'window', 'fix', 'stair', 'rail', 'vrail', 'step', 'num', 'text', 'line', 'dim', 'shape'];
   const floors = (Array.isArray(r.floors) ? r.floors : []).filter((f): f is Record<string, unknown> => !!f && typeof f === 'object').map((f, i) => {
     const items = (Array.isArray(f.items) ? f.items : []).filter((it): it is Record<string, unknown> => !!it && typeof it === 'object' && KINDS.includes(it.kind as MKind)).map((it) => {
       const o: MItem = {id: str(it.id) || mid(), kind: it.kind as MKind, x: num(it.x), y: num(it.y), w: num(it.w), h: num(it.h)};
@@ -219,6 +248,13 @@ export function cleanMadori(raw: unknown): Madori | undefined {
       for (const k of ['type', 'label', 'place', 'note'] as const) if (str(it[k])) o[k] = str(it[k]);
       for (const k of ['n', 'len', 'size'] as const) if (num(it[k]) > 0) o[k] = num(it[k]);
       if (it.flip === true) o.flip = true;
+      if (it.turn === 1 || it.turn === -1) o.turn = it.turn;
+      if (typeof it.color === 'string' && /^#[0-9a-f]{6}$/i.test(it.color)) o.color = it.color;
+      // 多角形の部屋の頂点（3つ以上の数の組だけ。囲む四角も頂点にそろえる）
+      if (o.kind === 'room' && Array.isArray(it.pts)) {
+        const pts = (it.pts as unknown[]).filter((q): q is {x: number; y: number} => !!q && typeof q === 'object' && Number.isFinite((q as Pt).x) && Number.isFinite((q as Pt).y)).map((q) => ({x: q.x, y: q.y}));
+        if (pts.length >= 3) Object.assign(o, shapeOf(pts));
+      }
       if (it.hinge === true) o.hinge = true;
       return o;
     });
@@ -232,7 +268,9 @@ export function cleanMadori(raw: unknown): Madori | undefined {
   if (!floors.length) return undefined;
   const module = MODULES.includes(num(r.module) as Module) ? (num(r.module) as Module) : 910;
   const snap = [1, 2, 4].includes(num(r.snap)) ? (num(r.snap) as 1 | 2 | 4) : 2;
-  return {module, snap, floors, showDims: r.showDims !== false, showArea: r.showArea !== false, ...(str(r.legend) ? {legend: str(r.legend)} : {}), updatedAt: num(r.updatedAt, Date.now())};
+  // 寸法・広さ：前の版の平面図は初めの値（出す）のまま保存されているので、オフで読む（チェックを入れ直せば出る＝optRev 2 で覚える）
+  const rev2 = r.optRev === 2;
+  return {module, snap, floors, showDims: rev2 && r.showDims === true, showArea: rev2 && r.showArea === true, optRev: 2, ...(str(r.legend) ? {legend: str(r.legend)} : {}), updatedAt: num(r.updatedAt, Date.now())};
 }
 
 /** 何か描いてあるか（白紙の平面図は保存・印刷の候補に出さない） */

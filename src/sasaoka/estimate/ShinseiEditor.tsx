@@ -28,6 +28,8 @@ import type {Update} from '../useStore.ts';
 import {yen} from '../util.ts';
 import {zipCandidates} from '../zip.ts';
 import {PhotoBoard, PhotoOrderDialog, photoPlaces, SLOT_LABEL, usePhotoActions, usePlanActions} from './PhotoBoard.tsx';
+import {MadoriEditor} from '../madori/MadoriEditor.tsx';
+import {hasMadori} from '../madori/model.ts';
 import {PhotoMarkEditor} from './PhotoMarkEditor.tsx';
 import type {PhotoKey, PhotoSlot} from './PhotoBoard.tsx';
 import {canMakeShinsei, useTemplate} from './shinseiFiles.ts';
@@ -253,6 +255,9 @@ export function ShinseiEditor({
   const pickPlan = () => planInput.current?.click();
   // 平面図の図への書き込み（①②の番号・線など。写真と同じ書き込みの画面を、紙の上の図の大きさで開く）
   const [planMarking, setPlanMarking] = useState(false);
+  // ここで平面図を描く（平面図のタブと同じ編集画面を、この画面の上に重ねて開く。描いたら「申請書の平面図に入れる」で枠に入る。
+  // ユーザーの指示「平面図はここで作成できるようにする」2026-11-10。描いたものは平面図のタブにも残る＝同じ Job.madori）
+  const [planDrawing, setPlanDrawing] = useState(false);
   const planSize = (): {w: number; h: number} => {
     const slot = pages?.find((pg) => pg.planSlot)?.planSlot;
     if (!slot || !planUrl) return {w: 560, h: 420};
@@ -298,6 +303,7 @@ export function ShinseiEditor({
     onRemove: planActions.remove,
     marks: job.planMarks,
     onMark: () => setPlanMarking(true),
+    onDraw: () => setPlanDrawing(true),
   };
   // 申請書の印刷（ShinseiPrint.tsx。プレビューと同じページを A4 に）
   const [printing, setPrinting] = useState(false);
@@ -635,6 +641,14 @@ export function ShinseiEditor({
                 onRotate={(dir) => photoActions.setEdit(marking, turn(markPhoto.edit, dir), {w: markPhoto.w, h: markPhoto.h})}
               />
             )}
+            {planDrawing && (
+              // ここで平面図を描く：平面図のタブと同じ編集画面を、この画面の上いっぱいに重ねる（role="dialog" にしない＝編集画面のキー操作を止めないため）
+              <div className="fixed inset-0 z-40 overflow-y-auto bg-[#f2f6f4] p-3 sm:p-4" aria-label="申請書の平面図を描く" data-plan-draw>
+                <div className="mx-auto max-w-[1600px]">
+                  <MadoriEditor job={job} data={data} update={update} onBack={() => setPlanDrawing(false)} embed={{onDone: () => setPlanDrawing(false)}} />
+                </div>
+              </div>
+            )}
             {planMarking && planUrl && (
               <PhotoMarkEditor
                 key={`plan:${job.planPhoto}`}
@@ -651,6 +665,14 @@ export function ShinseiEditor({
                   setPlanMarking(false);
                   pickPlan();
                 }}
+                onRedraw={
+                  hasMadori(job.madori)
+                    ? () => {
+                        setPlanMarking(false);
+                        setPlanDrawing(true);
+                      }
+                    : undefined
+                }
                 onRemove={() => {
                   if (!window.confirm('平面図の図を削除しますか？')) return;
                   setPlanMarking(false);

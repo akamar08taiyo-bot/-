@@ -686,6 +686,7 @@ export type PreviewPlan = {
   onRemove: () => void;
   marks?: PhotoMark[]; // 図への書き込み（①②の番号・線など。位置は図の見えている四角の中の割合）
   onMark?: () => void; // 図に書き込む（PhotoMarkEditor.tsx）
+  onDraw?: () => void; // ここで平面図を描く（平面図の編集画面を重ねて開く。ユーザーの指示「平面図はここで作成できるようにする」2026-11-10）
 };
 
 /**
@@ -763,6 +764,14 @@ function PlanSlotView({slot, scale, left, top, plan}: {slot: Rect; scale: number
           onFiles={(files) => plan.onFiles(files)}
           className="flex h-full w-full flex-col items-center justify-center"
         />
+        {plan.onDraw && !plan.busy && (
+          // 枠のまん中の「＋ 平面図」（画像を入れる）の下に、ここで描くボタン（枠の上に重ねる。押しても画像を選ぶ画面は開かない）
+          <div className="pointer-events-none absolute inset-x-0 top-1/2 mt-7 flex justify-center">
+            <Btn color="white" onClick={plan.onDraw} className="pointer-events-auto shadow-sm">
+              📐 ここで平面図を描く
+            </Btn>
+          </div>
+        )}
       </div>
     );
   // 図の位置（紙の画素で Excel と同じ計算をして、画面の大きさに）

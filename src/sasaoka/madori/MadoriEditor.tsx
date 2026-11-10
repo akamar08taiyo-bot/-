@@ -13,28 +13,48 @@ import {JobHeader, JobTitle, RemoveJobButton} from '../estimate/JobHeader.tsx';
 import {preparePhoto, putPhoto, rememberPhotoUrl, usePhotoUrls} from '../photos.ts';
 import type {AppData, Job} from '../types.ts';
 import type {Update} from '../useStore.ts';
-import {DOOR_TYPES, FIX_TYPES, FINISH, ROOM_SHORT, ROOM_TYPES, roomFinish, STAIR_TYPES, STEP_TYPES, WINDOW_TYPES} from './catalog.ts';
-import {copied, DRAG_TOOLS, floorArea, handlesOf, hitTest, makeItem, moved, resized, turnedItem} from './edit.ts';
+import {DOOR_TYPES, FIX_TYPES, FINISH, ROOM_ROWS, ROOM_SHORT, ROOM_TYPES, roomFinish, STAIR_TYPES, STEP_TYPES, WINDOW_TYPES} from './catalog.ts';
+import {copied, DRAG_TOOLS, floorArea, handlesOf, hitTest, isCornerHandle, makeItem, moved, resized, SHAPE_COLORS, turnedItem} from './edit.ts';
+import {closed, orthoNext, shapeOf, snapPt} from './poly.ts';
 import type {Handle, P, Tool} from './edit.ts';
 import {MadoriPrint} from './MadoriPrint.tsx';
-import {bounds, circled, emptyMadori, hasMadori, joLabel, legendLines, legendText, lineLength, mid, MODULES, numberItems, roomArea, snapStep, withFloor} from './model.ts';
+import {bounds, circled, emptyMadori, hasMadori, joLabel, legendLines, legendText, lineLength, mid, MODULES, numberItems, roomAreaOf, snapStep, withFloor} from './model.ts';
 import type {Madori, MFloor, MItem, Module} from './model.ts';
-import {floorSvg, patternDefs, viewOf} from './render.ts';
+import {floorSvg, patternDefs, thumbSvg, viewOf} from './render.ts';
 import {placeLookup, planSvg, sheetFloors, svgToPng} from './sheet.ts';
 
-type Cat = 'room' | 'door' | 'fix' | 'stair' | 'kaishu' | 'draw';
+type Cat = 'room' | 'stair' | 'door' | 'fix' | 'furn' | 'kaishu' | 'draw';
+// 道具の種類（マイホームクラウドと同じく 部屋・階段・間口・住設・家具。ユーザーの指示 2026-11-10。前は 部屋・建具・窓・設備・階段）
 const CATS: [Cat, string][] = [
   ['room', '部屋'],
-  ['door', '建具・窓'],
-  ['fix', '設備'],
   ['stair', '階段'],
+  ['door', '間口'],
+  ['fix', '住設'],
+  ['furn', '家具'],
   ['kaishu', '改修'],
   ['draw', '作図'],
 ];
 
+/** 絵のボタン（階段・間口・住設・家具。マイホームクラウドの一覧と同じく、絵の下に名前） */
+function PicBtn({on, onClick, svg, label}: {on: boolean; onClick: () => void; svg: string; label: string}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className={`flex min-w-0 flex-col items-stretch rounded-md border bg-white p-1 text-[11px] leading-tight transition ${on ? 'border-emerald-700 ring-2 ring-emerald-500' : 'border-slate-300 hover:bg-slate-50'}`}
+    >
+      <span className="block h-14 [&>svg]:h-full [&>svg]:w-full" aria-hidden dangerouslySetInnerHTML={{__html: svg}} />
+      <span className="mt-0.5 truncate rounded bg-slate-100 px-0.5 py-0.5 text-center text-slate-700">{label}</span>
+    </button>
+  );
+}
+
 type View = {x: number; y: number; k: number}; // 左上（mm）と倍率（1mm が何 px）
 type Drag =
-  | {mode: 'create'; a: P; sx: number; sy: number}
+  | {mode: 'create'; a: P; sx: number; sy: number; path: P[]} // path：なぞった道（手すりの一筆の L 字）
   | {mode: 'move'; orig: MItem; a: P; sx: number; sy: number; before: Madori; moved: boolean}
   | {mode: 'resize'; orig: MItem; h: Handle; before: Madori}
   | {mode: 'pan'; sx: number; sy: number; v0: View}
@@ -58,6 +78,7 @@ const KIND_LABEL: Record<MItem['kind'], string> = {
   text: '文字',
   line: '線',
   dim: '寸法線',
+  shape: '図形',
 };
 
 /** 道具のボタン（選んでいる道具は濃い枠） */
@@ -72,6 +93,67 @@ function ToolBtn({on, onClick, children, className = '', title}: {on: boolean; o
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * 方眼の下と右のスクロールバー（ユーザーの指示「下のスクロールで位置を移動できるようにする」2026-11-10）：描いたものと、そのまわり 3m ほどの範囲を
+ * 動かせる。つまみをドラッグで動かす・バーの空いた所を押すと1画面ぶん動く
+ */
+function ScrollBars({view, vw, vh, range, onMove}: {view: View; vw: number; vh: number; range: {x: number; y: number; w: number; h: number}; onMove: (x: number, y: number) => void}) {
+  const bar = (horiz: boolean) => {
+    const total = horiz ? range.w : range.h;
+    const size = horiz ? vw : vh;
+    const at = horiz ? view.x - range.x : view.y - range.y;
+    const start = Math.max(0, Math.min(1, at / total));
+    const len = Math.max(0.06, Math.min(1, size / total));
+    const go = (mm: number) => (horiz ? onMove(mm, view.y) : onMove(view.x, mm));
+    return (
+      <div
+        role="scrollbar"
+        aria-orientation={horiz ? 'horizontal' : 'vertical'}
+        aria-label={horiz ? '横に動かす' : '縦に動かす'}
+        aria-valuenow={Math.round(start * 100)}
+        className={`absolute z-[5] rounded-full bg-slate-100/80 ${horiz ? 'bottom-0.5 left-2 right-5 h-3' : 'bottom-5 right-0.5 top-2 w-3'}`}
+        onPointerDown={(e) => {
+          // 空いた所を押したら、そちらへ1画面ぶん
+          if (e.target !== e.currentTarget) return;
+          const r = e.currentTarget.getBoundingClientRect();
+          const pos = horiz ? (e.clientX - r.left) / r.width : (e.clientY - r.top) / r.height;
+          go((horiz ? view.x : view.y) + (pos < start ? -size : size));
+        }}
+      >
+        <div
+          data-scroll-thumb={horiz ? 'x' : 'y'}
+          className="absolute rounded-full bg-slate-400 hover:bg-slate-500"
+          style={horiz ? {left: `${start * 100}%`, width: `${len * 100}%`, top: 0, bottom: 0} : {top: `${start * 100}%`, height: `${len * 100}%`, left: 0, right: 0}}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            const el = e.currentTarget;
+            el.setPointerCapture(e.pointerId);
+            const track = el.parentElement!.getBoundingClientRect();
+            const px0 = horiz ? e.clientX : e.clientY;
+            const mm0 = horiz ? view.x : view.y;
+            const per = total / (horiz ? track.width : track.height); // 1px が何 mm
+            const move = (ev: PointerEvent) => go(mm0 + ((horiz ? ev.clientX : ev.clientY) - px0) * per);
+            const up = () => {
+              el.removeEventListener('pointermove', move);
+              el.removeEventListener('pointerup', up);
+              el.removeEventListener('pointercancel', up);
+            };
+            el.addEventListener('pointermove', move);
+            el.addEventListener('pointerup', up);
+            el.addEventListener('pointercancel', up);
+          }}
+        />
+      </div>
+    );
+  };
+  return (
+    <>
+      {bar(true)}
+      {bar(false)}
+    </>
   );
 }
 
@@ -103,7 +185,11 @@ function MmInput({value, onChange, label, min = 10}: {value: number; onChange: (
   );
 }
 
-export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data: AppData; update: Update; onBack: () => void; docs?: JobDocs}) {
+/**
+ * embed：住宅改修申請書の平面図の枠から開いたとき（ShinseiEditor.tsx。ユーザーの指示「平面図はここで作成できるようにする」2026-11-10）。
+ * 上の段は「✓ 申請書の平面図に入れる」「✕ 閉じる」だけ。描いたものは平面図のタブと同じ様邸の平面図（Job.madori）に残る
+ */
+export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job; data: AppData; update: Update; onBack: () => void; docs?: JobDocs; embed?: {onDone: () => void}}) {
   const s = data.settings;
   const toast = useToast();
   const setJob = (fn: (j: Job) => Job) => update('jobs', (list) => list.map((j) => (j.id === job.id ? {...fn(j), updatedAt: Date.now()} : j)));
@@ -200,19 +286,115 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
       return {k, x: mx - cx / k, y: my - cy / k};
     });
 
-  // ホイール：動かす（Ctrl・トラックパッドのピンチは拡大・縮小）。ページはスクロールしない
+  // ホイール：拡大・縮小（下へ回すと方眼が小さく＝遠く、上へ回すと大きく＝近く。マウスのある所を中心に。マイホームクラウドと同じ。
+  // ユーザーの指示「スクロールしたら、方眼紙を細かくして、一つ一つを小さくする。とおくする」2026-11-10。前は動かすだった）。
+  // Shift＋ホイール・トラックパッドの横へのすべらせは横に動かす。動かすのは、何もない所をドラッグ・2本の指。ページはスクロールしない
   useEffect(() => {
     const el = svgRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const r = el.getBoundingClientRect();
-      if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * 0.0025), e.clientX - r.left, e.clientY - r.top);
-      else setView((cur) => (cur ? {...cur, x: cur.x + (e.shiftKey ? e.deltaY : e.deltaX) / cur.k, y: cur.y + (e.shiftKey ? 0 : e.deltaY) / cur.k} : cur));
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1; // 行・ページ単位で来るマウスもある
+      const dx = e.deltaX * unit;
+      const dy = e.deltaY * unit;
+      if (e.shiftKey || (!e.ctrlKey && !e.metaKey && Math.abs(dx) > Math.abs(dy))) {
+        const d = e.shiftKey && !dx ? dy : dx;
+        setView((cur) => (cur ? {...cur, x: cur.x + d / cur.k} : cur));
+        return;
+      }
+      zoomAt(Math.exp(-dy * (e.ctrlKey || e.metaKey ? 0.0025 : 0.0015)), e.clientX - r.left, e.clientY - r.top);
     };
     el.addEventListener('wheel', onWheel, {passive: false});
     return () => el.removeEventListener('wheel', onWheel);
   });
+
+  // ---------------------------------------------------------------- 図の上でそのまま文字を打つ（Excel のテキストボックス・セルと同じ。ユーザーの指示
+  // 「EXCELみたいに、文字をそのまま書き込めるようにする」2026-11-10）：「文字」の道具で押した所・ダブルクリック・F2・Enter で、その所に入力欄を開く。
+  // 部屋・文字を選んだまま打ち始めると、その字から書きかえる（日本語入力の1字目も入るように、入力欄は選んでいるあいだずっと置いておき、打ったときにすぐ移る）。
+  // Enter で決める（Shift＋Enter・Alt＋Enter は改行。部屋の名前は1行）、Esc でやめる、ほかを押しても決まる
+  const [editing, setEditingState] = useState<{id: string; value: string; fresh?: MItem} | null>(null);
+  // いま打っている内容（Enter で決めたすぐあとの「入力欄から離れた」で、もう一度決めないように。前は文字が2つ重なった）
+  const editingRef = useRef(editing);
+  const setEditing = (next: typeof editing | ((cur: typeof editing) => typeof editing)) => {
+    const v2 = typeof next === 'function' ? next(editingRef.current) : next;
+    editingRef.current = v2;
+    setEditingState(v2);
+  };
+  const editRef = useRef<HTMLTextAreaElement>(null);
+  const editItem = editing ? (editing.fresh ?? items.find((it) => it.id === editing.id) ?? null) : null;
+  const canType = (it: MItem | null): it is MItem => !!it && (it.kind === 'text' || it.kind === 'room');
+  const startEdit = (it: MItem, value?: string, fresh?: MItem) => {
+    setSel(fresh ? null : it.id);
+    setEditing({id: it.id, value: value ?? (it.kind === 'room' ? it.label?.trim() || it.type || '' : (it.label ?? '')), fresh});
+    editRef.current?.focus(); // 打ったキーの字（日本語入力も）がこの入力欄に入るように、その場で移る
+  };
+  const commitEdit = () => {
+    const e = editingRef.current;
+    if (!e) return;
+    setEditing(null);
+    const text = e.value.replace(/[ \t\n\r\u3000]+$/, '');
+    if (e.fresh) {
+      if (!text.trim()) return; // 何も打たなければ置かない
+      editItems((list) => [...list, {...e.fresh!, label: text}]);
+      setSel(e.fresh.id);
+      return;
+    }
+    const it = items.find((o) => o.id === e.id);
+    if (!it) return;
+    if (it.kind === 'room') {
+      const name = text.trim();
+      const label = !name || name === it.type ? undefined : name;
+      if (label !== it.label) setItem(it.id, {label});
+    } else if (!text.trim()) remove(it.id);
+    else if (text !== it.label) setItem(it.id, {label: text});
+  };
+  useEffect(() => {
+    if (!editing) return;
+    const el = editRef.current;
+    if (!el) return;
+    if (document.activeElement !== el) el.focus();
+    const n = el.value.length;
+    el.setSelectionRange(n, n);
+  }, [editing?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 回すつまみ（Excel の図形と同じく、選んだ図形の上のまん中の ↻。押すと 90°回る。ユーザーの指示「図形は回転できるようにする」2026-11-10）
+  const canTurn = (it: MItem | null): it is MItem => !!it && it.kind !== 'num' && it.kind !== 'text' && it.kind !== 'vrail';
+  const turnHandle = (it: MItem) => {
+    const b = bounds(it);
+    return {x: b.x + b.w / 2, y: b.y - 28 / v.k};
+  };
+
+  // ---------------------------------------------------------------- 部屋を頂点で描く（マイホームクラウドの「部屋入力」と同じ。ドラッグは四角＝枠囲み）：
+  // 部屋の種類を選んで、角を順に押す（辺は横・縦にそろう）。はじめの点を押す・ダブルクリック・Enter で閉じる、Backspace で1つ戻す、Esc でやめる
+  const [poly, setPoly] = useState<P[] | null>(null);
+  const [polyHover, setPolyHover] = useState<P | null>(null);
+  const finishPoly = (pts: P[] | null = poly) => {
+    setPoly(null);
+    setPolyHover(null);
+    if (!pts || pts.length < 3 || tool.t !== 'room') return;
+    const sh = shapeOf(closed(pts));
+    if (sh.w < step || sh.h < step) return;
+    const it: MItem = {id: mid(), kind: 'room', type: tool.type, ...sh};
+    editItems((list) => [...list, it]);
+    setSel(it.id);
+    setTool({t: 'select'});
+  };
+  const polyClick = (p: P) => {
+    const q = snapPt(p, step);
+    if (!poly) {
+      setPoly([q]);
+      return;
+    }
+    const last = poly[poly.length - 1];
+    const r = orthoNext(last, q);
+    // はじめの点（のそば）を押したら閉じる
+    if (poly.length >= 3 && Math.hypot(q.x - poly[0].x, q.y - poly[0].y) <= Math.max(step, 12 / v.k)) {
+      finishPoly(poly);
+      return;
+    }
+    if (r.x === last.x && r.y === last.y) return;
+    setPoly([...poly, r]);
+  };
 
   // ---------------------------------------------------------------- 押す・ドラッグ
   const drag = useRef<Drag | null>(null);
@@ -240,11 +422,18 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
       return;
     }
     if (tool.t !== 'select') {
-      drag.current = {mode: 'create', a: p, sx: e.clientX, sy: e.clientY};
-      setPreview(makeItem(tool, p, p, true, ctx));
+      drag.current = {mode: 'create', a: p, sx: e.clientX, sy: e.clientY, path: [p]};
+      if (!(tool.t === 'room' && poly)) setPreview(makeItem(tool, p, p, true, ctx));
       return;
     }
     const tol = 10 / v.k;
+    if (canTurn(selItem)) {
+      const th = turnHandle(selItem);
+      if (Math.hypot(th.x - p.x, th.y - p.y) <= tol * 1.4) {
+        setItem(selItem.id, (it) => turnedItem(it, step));
+        return;
+      }
+    }
     if (selItem) {
       const hd = handlesOf(selItem).find((hh) => Math.hypot(hh.x - p.x, hh.y - p.y) <= tol);
       if (hd) {
@@ -278,6 +467,11 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
       return;
     }
     const p = toMm(e.clientX, e.clientY);
+    if (!d && poly) {
+      setPolyHover(orthoNext(poly[poly.length - 1], snapPt(p, step)));
+      return;
+    }
+    if (d?.mode === 'create' && tool.t === 'room' && poly) return;
     if (!d) {
       // 押す前：置く道具は、置く所（壁に吸い付いた所）を薄く見せる
       if (tool.t !== 'select' && !DRAG_TOOLS.includes(tool.t) && e.pointerType === 'mouse') setPreview(makeItem(tool, p, p, true, ctx));
@@ -285,7 +479,8 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
     }
     if (d.mode === 'create') {
       const click = Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 6;
-      setPreview(makeItem(tool, d.a, p, DRAG_TOOLS.includes(tool.t) ? click : true, ctx));
+      d.path.push(p);
+      setPreview(makeItem(tool, d.a, p, DRAG_TOOLS.includes(tool.t) ? click : true, {...ctx, path: d.path}));
     } else if (d.mode === 'move') {
       if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) return;
       d.moved = true;
@@ -315,15 +510,25 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
     if (d.mode === 'create') {
       const p = toMm(e.clientX, e.clientY);
       const click = Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 6;
-      const it = makeItem(tool, d.a, p, DRAG_TOOLS.includes(tool.t) ? click : true, ctx);
+      if (tool.t === 'room' && (click || poly)) {
+        // 部屋の道具で押しただけ（ドラッグでない）は、角を1つ置く（頂点で描く）
+        setPreview(null);
+        polyClick(poly ? p : d.a);
+        return;
+      }
+      const it = makeItem(tool, d.a, p, DRAG_TOOLS.includes(tool.t) ? click : true, {...ctx, path: [...d.path, p]});
       setPreview(null);
       if (!it) {
         if (tool.t === 'door' || tool.t === 'window') toast('部屋の壁の近くを押してください', 'error');
         return;
       }
+      setTool({t: 'select'});
+      if (it.kind === 'text') {
+        startEdit(it, '', it); // 押した所にすぐ打つ（打ち終わってから図に置く）
+        return;
+      }
       editItems((list) => [...list, it]);
       setSel(it.id);
-      setTool({t: 'select'});
     } else if ((d.mode === 'move' || d.mode === 'resize' || d.mode === 'under') && draft) {
       save(draft, d.before);
       setDraft(null);
@@ -338,6 +543,19 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
       if (document.querySelector('[role="dialog"]')) return;
       const ctrl = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
+      if (poly) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          finishPoly();
+        } else if (e.key === 'Escape') {
+          setPoly(null);
+          setPolyHover(null);
+        } else if (e.key === 'Backspace' || e.key === 'Delete') {
+          e.preventDefault();
+          setPoly(poly.length > 1 ? poly.slice(0, -1) : null);
+        }
+        return;
+      }
       if (ctrl && key === 'z') {
         e.preventDefault();
         if (e.shiftKey) redo();
@@ -351,6 +569,13 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
         setSel(null);
       } else if (!selItem) {
         return;
+      } else if (canType(selItem) && !ctrl && !e.altKey && (e.key === 'F2' || e.key === 'Enter')) {
+        e.preventDefault();
+        startEdit(selItem);
+      } else if (canType(selItem) && !ctrl && !e.altKey && ((e.key.length === 1 && e.key !== ' ') || e.key === 'Process')) {
+        // 打ち始め：その字から書きかえる（Excel のセルと同じ）。日本語入力（Process）は入力欄で変換が始まるので、字は入れない
+        if (e.key !== 'Process') e.preventDefault();
+        startEdit(selItem, e.key === 'Process' ? '' : e.key);
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         remove(selItem.id);
@@ -439,7 +664,9 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
   // ---------------------------------------------------------------- 申請書の平面図の枠に入れる
   const usePlan = async () => {
     if (!hasMadori(m)) return;
-    if (job.planPhoto && !window.confirm('申請書の平面図を、この平面図に差し替えますか？（前の図への書き込みは消えます）')) return;
+    // 申請書の枠から開いたときは、入れるために開いたので、消える書き込みがあるときだけ確かめる
+    const ask = embed ? !!job.planMarks?.length : !!job.planPhoto;
+    if (ask && !window.confirm('申請書の平面図を、この平面図に差し替えますか？（前の図への書き込みは消えます）')) return;
     setBusy(true);
     try {
       const p = planSvg(m, sheetFloors(m), look.no, 'ap');
@@ -448,6 +675,7 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
       rememberPhotoUrl(id, blob, w, h);
       setJob(({planMarks: _marks, ...j}) => ({...j, planPhoto: id}));
       toast('申請書の平面図に入れました');
+      embed?.onDone();
     } catch {
       toast('平面図を絵にできませんでした', 'error');
     } finally {
@@ -477,8 +705,19 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
     setTool(t); // 同じ道具をもう一度押しても外さない（前は外れて「選ぶ・動かす」になり、なぞっても描けなかった）
     setSel(null);
     setPreview(null);
+    if (t.t !== 'room') setPoly(null); // 部屋の種類を替えるだけなら、描いている頂点はそのまま
   };
   const isTool = (t: Tool) => JSON.stringify(tool) === JSON.stringify(t);
+  // 一覧の絵（部品ごとの SVG。一度だけ作る）
+  const thumbs = useMemo(() => {
+    const by = <T extends {name: string}>(list: T[], f: (x: T) => string) => Object.fromEntries(list.map((x) => [x.name, f(x)])) as Record<string, string>;
+    return {
+      door: by(DOOR_TYPES, (d) => thumbSvg('door', d.name, d.w, 0)),
+      window: by(WINDOW_TYPES, (d) => thumbSvg('window', d.name, d.w, 0)),
+      fix: by(FIX_TYPES, (f) => thumbSvg('fix', f.name, f.w, f.h)),
+      stair: by(STAIR_TYPES, (d) => thumbSvg('stair', d.name, d.size[0] * 910, d.size[1] * 910)),
+    };
+  }, []);
   const palette = (
     <div className="flex min-h-0 flex-col gap-2">
       <ToolBtn on={tool.t === 'select'} onClick={() => setTool({t: 'select'})} className="bg-white text-sm font-bold">
@@ -493,55 +732,48 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
       </div>
       {/* スマホ・タブレットは方眼の上に出すので、低い箱の中でスクロール（部屋の一覧が長く、方眼が下に行きすぎた） */}
       <div className="min-h-0 overflow-y-auto pr-0.5 max-lg:max-h-40 lg:max-h-[calc(100vh-17rem)]">
-        {cat === 'room' && (
-          <div className="grid grid-cols-3 gap-1 max-lg:grid-cols-4">
-            {ROOM_TYPES.map((r) => (
+        {cat === 'room' &&
+          ROOM_ROWS.map((row, ri) => (
+          <div key={ri} className="mb-1.5 grid grid-cols-3 gap-1 max-lg:grid-cols-4">
+            {row.map((r) => (
               <ToolBtn
                 key={r.name}
                 on={isTool({t: 'room', type: r.name})}
                 onClick={() => pick({t: 'room', type: r.name})}
                 // 1行が5字をこえる名前（ウォークイン・クローゼット）は字を小さく（ボタンの中で折れて3行になった）
-                className={`${r.tone} ${Math.max(...(ROOM_SHORT[r.name] ?? r.name).split('\n').map((l) => l.length)) > 4 ? '!px-0.5 !text-[11px]' : ''}`}
+                className={`${r.tone.cls} ${Math.max(...(ROOM_SHORT[r.name] ?? r.name).split('\n').map((l) => l.length)) > 4 ? '!px-0.5 !text-[11px]' : ''}`}
                 title={r.name}
               >
                 {ROOM_SHORT[r.name] ?? r.name}
               </ToolBtn>
             ))}
           </div>
-        )}
+          ))}
         {cat === 'door' && (
-          <div className="grid grid-cols-2 gap-1">
+          <div className="grid grid-cols-2 gap-1 max-lg:grid-cols-4">
             {DOOR_TYPES.map((d) => (
-              <ToolBtn key={d.name} on={isTool({t: 'door', type: d.name})} onClick={() => pick({t: 'door', type: d.name})} className="bg-white">
-                {d.name}
-              </ToolBtn>
+              <PicBtn key={d.name} on={isTool({t: 'door', type: d.name})} onClick={() => pick({t: 'door', type: d.name})} svg={thumbs.door[d.name]} label={d.name} />
             ))}
             {WINDOW_TYPES.map((d) => (
-              <ToolBtn key={d.name} on={isTool({t: 'window', type: d.name})} onClick={() => pick({t: 'window', type: d.name})} className="bg-sky-50">
-                {d.name}
-              </ToolBtn>
+              <PicBtn key={d.name} on={isTool({t: 'window', type: d.name})} onClick={() => pick({t: 'window', type: d.name})} svg={thumbs.window[d.name]} label={d.name} />
             ))}
           </div>
         )}
-        {cat === 'fix' &&
-          (['水まわり', '家具', '福祉'] as const).map((g) => (
+        {(cat === 'fix' || cat === 'furn') &&
+          (cat === 'fix' ? (['住設'] as const) : (['家具', '福祉'] as const)).map((g) => (
             <div key={g} className="mb-2">
-              <div className="mb-1 text-xs font-bold text-slate-500">{g}</div>
-              <div className="grid grid-cols-2 gap-1">
-                {FIX_TYPES.filter((f) => f.group === g).map((f) => (
-                  <ToolBtn key={f.name} on={isTool({t: 'fix', type: f.name})} onClick={() => pick({t: 'fix', type: f.name})} className="bg-white">
-                    {f.name}
-                  </ToolBtn>
+              {g === '福祉' && <div className="mb-1 text-xs font-bold text-slate-500">福祉用具</div>}
+              <div className="grid grid-cols-2 gap-1 max-lg:grid-cols-4">
+                {FIX_TYPES.filter((f) => f.group === g && !f.hidden).map((f) => (
+                  <PicBtn key={f.name} on={isTool({t: 'fix', type: f.name})} onClick={() => pick({t: 'fix', type: f.name})} svg={thumbs.fix[f.name]} label={f.name} />
                 ))}
               </div>
             </div>
           ))}
         {cat === 'stair' && (
-          <div className="grid grid-cols-2 gap-1">
+          <div className="grid grid-cols-2 gap-1 max-lg:grid-cols-4">
             {STAIR_TYPES.map((d) => (
-              <ToolBtn key={d.name} on={isTool({t: 'stair', type: d.name})} onClick={() => pick({t: 'stair', type: d.name})} className="bg-white">
-                {d.name}
-              </ToolBtn>
+              <PicBtn key={d.name} on={isTool({t: 'stair', type: d.name})} onClick={() => pick({t: 'stair', type: d.name})} svg={thumbs.stair[d.name]} label={d.name} />
             ))}
           </div>
         )}
@@ -723,7 +955,7 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
           <MmInput label="奥行" value={it.h} onChange={(h) => setItem(it.id, {h})} />
           <div className="text-sm text-slate-600">
             {(() => {
-              const a = roomArea(it.w, it.h, m.module);
+              const a = roomAreaOf(it, m.module);
               return `${joLabel(a.jo)}・${a.m2}㎡・${a.tsubo}坪`;
             })()}
             {roomFinish(it.type) && <span className="ml-1 text-xs text-slate-400">{FINISH[roomFinish(it.type)].name}</span>}
@@ -798,10 +1030,17 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
             min={50}
           />
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={!!it.len} onChange={(e) => setItem(it.id, {len: e.target.checked ? 600 : undefined})} className="h-4 w-4" />
-            L型（縦の長さ）
+            <input type="checkbox" checked={!!it.len} onChange={(e) => setItem(it.id, e.target.checked ? {len: 600, turn: 1} : {len: undefined, turn: undefined})} className="h-4 w-4" />
+            L型（曲がった先の長さ）
           </label>
-          {!!it.len && <MmInput label="縦" value={it.len} onChange={(len) => setItem(it.id, {len})} />}
+          {!!it.len && (
+            <>
+              <MmInput label="曲がった先" value={it.len} onChange={(len) => setItem(it.id, {len, turn: it.turn ?? 1})} />
+              <Btn color="white" small onClick={() => setItem(it.id, {turn: it.turn === -1 ? 1 : -1})}>
+                ⇅ 曲がる向きを反対に
+              </Btn>
+            </>
+          )}
         </>
       )}
       {it.kind === 'vrail' && <MmInput label="長さ" value={it.len ?? 800} onChange={(len) => setItem(it.id, {len})} />}
@@ -813,7 +1052,6 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
               value={it.label ?? ''}
               onChange={(e) => setItem(it.id, {label: e.target.value})}
               rows={2}
-              autoFocus
               className="mt-0.5 w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               aria-label="文字"
             />
@@ -822,6 +1060,23 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
         </>
       )}
       {it.kind === 'num' && <MmInput label="大きさ" value={it.size ?? 260} onChange={(size) => setItem(it.id, {size})} min={60} />}
+      {it.kind === 'shape' && (
+        <div className="flex flex-wrap items-center gap-1.5 text-sm" role="group" aria-label="図形の色">
+          <span className="text-slate-600">色</span>
+          {SHAPE_COLORS.map((c) => (
+            <button
+              key={c.hex}
+              type="button"
+              aria-pressed={(it.color ?? SHAPE_COLORS[0].hex) === c.hex}
+              onClick={() => setItem(it.id, {color: c.hex === SHAPE_COLORS[0].hex ? undefined : c.hex})}
+              className={`flex h-8 items-center gap-1 rounded-md border px-2 ${(it.color ?? SHAPE_COLORS[0].hex) === c.hex ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-300'}`}
+            >
+              <span className="h-3.5 w-3.5 rounded-full" style={{background: c.hex}} />
+              {c.name}
+            </button>
+          ))}
+        </div>
+      )}
       {(it.kind === 'line' || it.kind === 'dim') && <div className="text-sm text-slate-600">長さ {lineLength(it).toLocaleString('ja-JP')}mm</div>}
       {placeSelect}
       <div className="flex flex-wrap gap-1.5 pt-1">
@@ -898,9 +1153,63 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
   const handles = it && !draft ? handlesOf(it) : it ? handlesOf(m.floors.find((f) => f.id === floor.id)!.items.find((o) => o.id === it.id) ?? it) : [];
   const selBox = it ? bounds((draft ? m.floors.find((f) => f.id === floor.id)!.items.find((o) => o.id === it.id) : it) ?? it) : null;
   const hs = 9 / v.k;
+  // スクロールバーの範囲（描いたもの＋まわり 3m・いま見えている所）。つまみをドラッグしているあいだも同じ範囲を使うように、見えている所はドラッグの前のもの
+  const content = items.length ? viewOf(items, 3000) : {x: -3000, y: -3000, w: 15000, h: 12000};
+  const scrollRange = (() => {
+    const x0 = Math.min(content.x, v.x);
+    const y0 = Math.min(content.y, v.y);
+    return {x: x0, y: y0, w: Math.max(content.x + content.w, v.x + vw) - x0, h: Math.max(content.y + content.h, v.y + vh) - y0};
+  })();
+  // 図形（Excel の「挿入 → 図形」と同じ。上の段の右の空いた所。ユーザーの指示「EXCELのような図形をそのまま書き込めるようにする」2026-11-10）
+  const shapeBar = (
+    <div role="toolbar" aria-label="図形" className="flex flex-wrap items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 shadow-sm max-lg:justify-center">
+      <span className="px-1 text-sm text-slate-600">図形</span>
+      {(
+        [
+          ['直線', '╱'],
+          ['矢印', '↗'],
+          ['四角', '□'],
+          ['丸', '○'],
+        ] as const
+      ).map(([t, icon]) => (
+        <button
+          key={t}
+          type="button"
+          aria-pressed={isTool({t: 'shape', type: t})}
+          onClick={() => pick({t: 'shape', type: t})}
+          className={`flex h-9 items-center gap-1 rounded-md border px-2.5 text-sm ${isTool({t: 'shape', type: t}) ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+        >
+          <span className="text-base leading-none">{icon}</span>
+          {t}
+        </button>
+      ))}
+      <button
+        type="button"
+        aria-pressed={isTool({t: 'text'})}
+        onClick={() => pick({t: 'text'})}
+        className={`flex h-9 items-center gap-1 rounded-md border px-2.5 text-sm ${isTool({t: 'text'}) ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+      >
+        <span className="text-base font-bold leading-none">A</span>
+        文字
+      </button>
+    </div>
+  );
 
   return (
     <div className="space-y-3">
+      {embed ? (
+        <div className="flex flex-wrap items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+          <h2 className="mr-auto text-lg font-bold text-[#14532d] max-sm:w-full max-sm:text-center">📐 申請書の平面図を描く</h2>
+          <Btn color="softBlue" onClick={() => void usePlan()} disabled={!hasMadori(m) || busy}>
+            {busy ? '入れています…' : '✓ 申請書の平面図に入れる'}
+          </Btn>
+          <Btn color="white" onClick={onBack}>
+            ✕ 閉じる
+          </Btn>
+          <span className="ml-auto max-sm:hidden" aria-hidden />
+          {shapeBar}
+        </div>
+      ) : (
       <JobHeader
         onBack={onBack}
         title={<JobTitle name={job.customer.trim() ? jobName(job) : '新しい平面図'} badge={insurer ? INSURER_INFO[insurer].name : undefined} />}
@@ -913,6 +1222,7 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
           </>
         }
         remove={(className) => <RemoveJobButton job={job} settings={s} update={update} onBack={onBack} className={className} />}
+        extra={shapeBar}
         // タブごとの機能は「その他 ▼」の中（ユーザーの指示「ごちゃごちゃしているので、プルダウンにする」2026-11-03。上の段に出すと iPad の横で段が下がった）
         secondary={
           <>
@@ -923,10 +1233,13 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
           </>
         }
       />
+      )}
       {printing && <MadoriPrint job={job} settings={s} madori={m} onClose={() => setPrinting(false)} />}
 
       {/* 上の段：階・方眼・表示・元に戻す・拡大 */}
-      <div role="toolbar" aria-label="平面図の設定" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
+      {/* 左（階・方眼・表示）・まん中（戻す・進む）・右（拡大）の3つ。広い画面は3列で、戻す・進むを段のちょうどまん中に */}
+      <div role="toolbar" aria-label="平面図の設定" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm xl:grid xl:grid-cols-[minmax(max-content,1fr)_auto_minmax(0,1fr)]">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div role="tablist" aria-label="階" className="flex flex-wrap items-center gap-1">
           {m.floors.map((f) => (
             <button
@@ -983,13 +1296,17 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
           <input type="checkbox" checked={m.showArea} onChange={(e) => change((mm) => ({...mm, showArea: e.target.checked, updatedAt: Date.now()}))} className="h-4 w-4" />
           広さ（帖）
         </label>
-        <div className="flex items-center gap-1 lg:ml-auto">
+        </div>
+        {/* 戻す・進むは上の段のまん中（ユーザーの指示「戻るボタンの位置は中央にもってくる」2026-11-10） */}
+        <div className="flex items-center gap-1 lg:ml-auto xl:ml-0 xl:justify-self-center">
           <Btn color="white" small onClick={undo} disabled={!hist.current.past.length} title="Ctrl+Z">
             ↶ 戻す
           </Btn>
           <Btn color="white" small onClick={redo} disabled={!hist.current.future.length} title="Ctrl+Y">
             ↷ 進む
           </Btn>
+        </div>
+        <div className="flex items-center gap-1 lg:ml-auto xl:ml-0 xl:justify-self-end">
           <Btn color="white" small onClick={() => zoomAt(1 / 1.25)} aria-label="縮小">
             −
           </Btn>
@@ -1019,8 +1336,13 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
             onPointerLeave={() => {
               if (!drag.current) setPreview(null);
             }}
-            onDoubleClick={() => {
-              if (selItem?.kind === 'text') (document.querySelector('textarea[aria-label="文字"]') as HTMLTextAreaElement | null)?.focus();
+            onDoubleClick={(e) => {
+              if (poly) {
+                finishPoly();
+                return;
+              }
+              const hit = hitTest(items, toMm(e.clientX, e.clientY), 10 / v.k);
+              if (canType(hit)) startEdit(hit);
             }}
             style={{touchAction: 'none', cursor}}
             className="block select-none"
@@ -1035,16 +1357,89 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
             )}
             {lowerArt && <g opacity={0.15} dangerouslySetInnerHTML={{__html: lowerArt}} />}
             <g dangerouslySetInnerHTML={{__html: art}} />
+            {poly && (
+              <g pointerEvents="none" data-poly-draft>
+                <polyline
+                  points={[...poly, ...(polyHover ? [polyHover] : [])].map((q) => `${q.x},${q.y}`).join(' ')}
+                  fill="none"
+                  stroke="#059669"
+                  strokeWidth={2.5 / v.k}
+                  strokeDasharray={`${6 / v.k} ${4 / v.k}`}
+                />
+                {poly.map((q, i) => (
+                  <rect key={i} x={q.x - hs / 2} y={q.y - hs / 2} width={hs} height={hs} fill={i === 0 ? '#059669' : '#fff'} stroke="#059669" strokeWidth={1.5 / v.k} />
+                ))}
+              </g>
+            )}
             {preview && <rect {...bounds(preview)} fill="#10b98114" stroke="#059669" strokeWidth={1.5 / v.k} strokeDasharray={`${6 / v.k} ${4 / v.k}`} pointerEvents="none" />}
             {selBox && (
               <g pointerEvents="none">
                 <rect x={selBox.x} y={selBox.y} width={Math.max(selBox.w, 1)} height={Math.max(selBox.h, 1)} fill="none" stroke="#2563eb" strokeWidth={2 / v.k} strokeDasharray={`${6 / v.k} ${4 / v.k}`} />
                 {handles.map((hd) => (
-                  <rect key={hd.h} x={hd.x - hs / 2} y={hd.y - hs / 2} width={hs} height={hs} fill="#fff" stroke="#2563eb" strokeWidth={1.5 / v.k} />
+                  // 頂点・角は塗った ■、辺のまん中は □（マイホームクラウドと同じ）
+                  <rect key={hd.h} x={hd.x - hs / 2} y={hd.y - hs / 2} width={hs} height={hs} fill={isCornerHandle(hd.h) ? '#2b8de0' : '#fff'} stroke="#2563eb" strokeWidth={1.5 / v.k} data-handle={hd.h} />
                 ))}
+                {canTurn(it) && !editing && (
+                  <g data-turn-handle>
+                    <line x1={selBox.x + selBox.w / 2} y1={selBox.y} x2={selBox.x + selBox.w / 2} y2={selBox.y - 20 / v.k} stroke="#2563eb" strokeWidth={1.5 / v.k} />
+                    <circle cx={selBox.x + selBox.w / 2} cy={selBox.y - 28 / v.k} r={10 / v.k} fill="#fff" stroke="#2563eb" strokeWidth={1.5 / v.k} />
+                    <text x={selBox.x + selBox.w / 2} y={selBox.y - 28 / v.k + 5 / v.k} fontSize={14 / v.k} textAnchor="middle" fill="#2563eb">
+                      ↻
+                    </text>
+                  </g>
+                )}
               </g>
             )}
           </svg>
+          <ScrollBars view={v} vw={vw} vh={vh} range={scrollRange} onMove={(x, y) => setView({...v, x, y})} />
+          {(editing || canType(selItem)) && (() => {
+            // 図の上の入力欄（選んでいるあいだは見えないまま置いておき、打ち始めたらすぐ移る）
+            const target = editItem ?? selItem;
+            if (!target) return null;
+            const room = target.kind === 'room';
+            const size = room ? 260 : (target.size ?? 220);
+            const fs = Math.max(14, size * v.k);
+            const value = editing ? editing.value : '';
+            const lines = value.split('\n');
+            const longest = Math.max(1, ...lines.map((l) => [...l].reduce((a, c) => a + (c.charCodeAt(0) < 0x2000 ? 0.6 : 1), 0)));
+            const width = room ? Math.max(120, target.w * v.k) : Math.max(140, (longest + 2) * fs);
+            const left = room ? (target.x - v.x) * v.k : (target.x - v.x) * v.k - 4;
+            const top = room ? (target.y + target.h / 2 - v.y) * v.k - fs * 0.8 : (target.y - v.y) * v.k - 4;
+            return (
+              <textarea
+                ref={editRef}
+                value={value}
+                rows={room ? 1 : Math.max(1, lines.length)}
+                tabIndex={editing ? 0 : -1}
+                aria-label="図に打つ文字"
+                aria-hidden={!editing}
+                onChange={(e) => {
+                  const v2 = room ? e.target.value.replace(/\n/g, '') : e.target.value;
+                  setEditing((cur) => (cur ? {...cur, value: v2} : target ? {id: target.id, value: v2} : cur));
+                }}
+                onKeyDown={(e) => {
+                  if (e.nativeEvent.isComposing) return;
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setEditing(null);
+                    e.currentTarget.blur();
+                  } else if (e.key === 'Enter' && !e.shiftKey && !(e.altKey && !room)) {
+                    e.preventDefault();
+                    commitEdit();
+                    e.currentTarget.blur();
+                  } else if (e.key === 'Enter' && e.altKey && !room) {
+                    e.preventDefault();
+                    const el = e.currentTarget;
+                    el.setRangeText('\n', el.selectionStart, el.selectionEnd, 'end');
+                    setEditing((cur) => (cur ? {...cur, value: el.value} : cur));
+                  }
+                }}
+                onBlur={() => commitEdit()}
+                style={{left, top, width, fontSize: fs, lineHeight: 1.1, textAlign: room ? 'center' : 'left'}}
+                className={`absolute z-10 resize-none overflow-hidden rounded border-2 border-blue-500 bg-white/95 px-1 text-slate-900 shadow outline-none ${editing ? '' : 'pointer-events-none opacity-0'}`}
+              />
+            );
+          })()}
           {!items.length && !preview && (
             <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center text-sm text-slate-400">
               {tool.t === 'select' ? '部屋を選んで、方眼の上をドラッグ' : '方眼の上をドラッグ（指でなぞる）'}
@@ -1052,8 +1447,8 @@ export function MadoriEditor({job, data, update, onBack, docs}: {job: Job; data:
           )}
           {tool.t !== 'select' && (
             <div className="pointer-events-none absolute left-2 top-2 rounded bg-emerald-700/90 px-2 py-1 text-xs text-white">
-              {tool.t === 'room' || tool.t === 'stair' || tool.t === 'fix' || tool.t === 'door' || tool.t === 'window' || tool.t === 'step' ? tool.type : tool.t === 'rail' ? (tool.lshape ? 'L型手すり' : '横手すり') : tool.t === 'vrail' ? '縦手すり' : tool.t === 'num' ? '番号' : tool.t === 'text' ? '文字' : tool.t === 'line' ? tool.type : '寸法線'}
-              {DRAG_TOOLS.includes(tool.t) ? '：ドラッグ' : '：押して置く'}
+              {tool.t === 'room' || tool.t === 'stair' || tool.t === 'fix' || tool.t === 'door' || tool.t === 'window' || tool.t === 'step' ? tool.type : tool.t === 'rail' ? (tool.lshape ? 'L型手すり' : '横手すり') : tool.t === 'vrail' ? '縦手すり' : tool.t === 'num' ? '番号' : tool.t === 'text' ? '文字' : tool.t === 'line' || tool.t === 'shape' ? tool.type : '寸法線'}
+              {tool.t === 'room' ? (poly ? '：角を押していく（はじめの点で閉じる・Enter）' : '：ドラッグで四角／角を順に押す') : DRAG_TOOLS.includes(tool.t) ? '：ドラッグ' : '：押して置く'}
             </div>
           )}
         </div>

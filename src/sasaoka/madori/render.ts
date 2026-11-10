@@ -2,8 +2,9 @@
 // 見た目はいただいた見取図のテンプレートに合わせる：壁＝紺の太い線、フローリング＝橙の横じま、畳＝緑の畳割り、タイル＝青の目地、
 // 手すり＝赤い線と両端の点・①②、ドア＝開く向きの弧、窓＝細い3本線
 
-import {FINISH, roomFinish, roomType} from './catalog.ts';
-import {bounds, circled, joLabel, lineLength, roomArea} from './model.ts';
+import {FINISH, roomColor, roomFinish, TONE} from './catalog.ts';
+import {bounds, circled, joLabel, lineLength, railBend, roomAreaOf} from './model.ts';
+import {labelSpot, polyArea, polyPath, roomPts} from './poly.ts';
 import type {MItem, Module} from './model.ts';
 
 export const WALL = '#203a55';
@@ -22,13 +23,28 @@ const FONT = "font-family=\"'BIZ UDPGothic','Meiryo','Hiragino Sans','Noto Sans 
 function roomPattern(it: MItem, module: Module, pid: string): string {
   const f = roomFinish(it.type);
   const {x, y, w, h} = it;
-  const c = FINISH[f];
+  // 色は部屋の種類の色（一覧のボタンと同じ）、柄の形は床の種類（catalog.ts の TONE・roomColor）
+  const c = f === 'void' ? FINISH.void : roomColor(it.type);
+  const k = 'key' in c ? c.key : 'base';
+  if (it.pts) {
+    // 多角形の部屋：床と柄は形の道で塗る。畳割り・吹抜の × は形で切り抜く（囲む四角に描いて、はみ出しを隠す）
+    const d = polyPath(it.pts);
+    const fillOf: Partial<Record<string, string>> = {floor: 'floor', tile: 'tile', doma: 'doma', outside: 'out', wood: 'wood'};
+    let s = `<path d="${d}" fill="${c.fill}"/>`;
+    if (fillOf[f]) s += `<path d="${d}" fill="url(#${pid}-${fillOf[f]}-${k})"/>`;
+    else if (f === 'void' || f === 'tatami') {
+      const cid = `${pid}-c-${it.id.replace(/[^\w-]/g, '')}`;
+      const inner = f === 'tatami' ? tatami(x, y, w, h, module, c.line) : `<path d="M${x} ${y}L${x + w} ${y + h}M${x + w} ${y}L${x} ${y + h}" stroke="${c.line}" stroke-width="20" fill="none"/>`;
+      s += `<clipPath id="${cid}"><path d="${d}"/></clipPath><g clip-path="url(#${cid})">${inner}</g>`;
+    }
+    return s;
+  }
   let s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c.fill}"/>`;
-  if (f === 'floor') s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#${pid}-floor)"/>`;
-  else if (f === 'tile') s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#${pid}-tile)"/>`;
-  else if (f === 'doma') s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#${pid}-doma)"/>`;
-  else if (f === 'outside') s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#${pid}-out)"/>`;
-  else if (f === 'wood') s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#${pid}-wood)"/>`;
+  if (f === 'floor') s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#${pid}-floor-${k})"/>`;
+  else if (f === 'tile') s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#${pid}-tile-${k})"/>`;
+  else if (f === 'doma') s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#${pid}-doma-${k})"/>`;
+  else if (f === 'outside') s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#${pid}-out-${k})"/>`;
+  else if (f === 'wood') s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#${pid}-wood-${k})"/>`;
   else if (f === 'void') s += `<path d="M${x} ${y}L${x + w} ${y + h}M${x + w} ${y}L${x} ${y + h}" stroke="${c.line}" stroke-width="20" fill="none"/>`;
   else if (f === 'tatami') s += tatami(x, y, w, h, module, c.line);
   return s;
@@ -59,19 +75,24 @@ export function tatami(x: number, y: number, w: number, h: number, module: Modul
 }
 
 /** 部屋の名前と広さ（部屋の大きさに入るように字を小さくする） */
-function roomLabel(it: MItem, module: Module, showArea: boolean): string {
+function roomLabel(it: MItem, module: Module, showArea: boolean, inner: MItem[] = []): string {
   const name = (it.label?.trim() || it.type || '').trim();
-  const area = roomArea(it.w, it.h, module);
-  const areaText = showArea && roomFinish(it.type) !== 'void' && area.jo >= 0.5 ? `${joLabel(area.jo)}（${area.m2}㎡）` : '';
+  // 中に置いたほかの部屋の分は引く（廊下を大きく描いて中に部屋を置いたとき、廊下の広さは空いた所だけ）
+  const own = roomAreaOf(it, module);
+  const area = {...own, jo: Math.max(0, Math.round((own.jo - inner.reduce((a, r) => a + roomAreaOf(r, module).jo, 0)) * 10) / 10)};
+  // 広さは帖だけ（ユーザーの指示「ここの長さとヘーベーは不要」2026-11-10。前は「4.5帖（7.45㎡）」。㎡・坪は右の枠に出す）
+  const areaText = showArea && roomFinish(it.type) !== 'void' && area.jo >= 0.5 ? joLabel(area.jo) : '';
   if (!name && !areaText) return '';
-  const cx = it.x + it.w / 2;
-  const cy = it.y + it.h / 2;
-  const maxW = Math.max(100, Math.abs(it.w) - 120);
+  // 多角形の部屋は、部屋の中のいちばん広く空いた所に書く（L 字の角の外に出さない）
+  const spot = it.pts || inner.length ? labelSpot(roomPts(it), inner.map(roomPts)) : {x: it.x + it.w / 2, y: it.y + it.h / 2, maxW: Math.abs(it.w), maxH: Math.abs(it.h)};
+  const cx = spot.x;
+  const cy = spot.y;
+  const maxW = Math.max(100, spot.maxW - 120);
   const fit = (s: string, size: number) => (s ? Math.min(size, (maxW / textWidth(s, 1)) * 0.95) : size);
   const ns = fit(name, 260);
   const as = fit(areaText, 170);
   const rows: string[] = [];
-  const both = name && areaText && Math.abs(it.h) > ns + as + 80;
+  const both = name && areaText && spot.maxH > ns + as + 80;
   if (name) rows.push(`<text x="${r1(cx)}" y="${r1(both ? cy - as * 0.35 : cy + ns * 0.35)}" font-size="${r1(ns)}" text-anchor="middle" fill="#1f2937">${esc(name)}</text>`);
   if (areaText && (both || !name)) rows.push(`<text x="${r1(cx)}" y="${r1(both ? cy + ns * 0.55 + as * 0.3 : cy + as * 0.35)}" font-size="${r1(as)}" text-anchor="middle" fill="#475569">${esc(areaText)}</text>`);
   return rows.join('');
@@ -106,6 +127,24 @@ function opening(it: MItem): string {
     if (t === '両開き戸') {
       leaf(-half, half, 1);
       leaf(half, half, -1);
+    } else if (t === '親子ドア') {
+      // 大きい扉（親）と小さい扉（子）
+      leaf(-half, w * 0.65, 1);
+      leaf(half, w * 0.35, -1);
+    } else if (t === '片開き戸（袖）') {
+      // 扉と、開かない袖（細い板）
+      leaf(it.hinge ? half : -half, w * 0.7, it.hinge ? -1 : 1);
+      const sx = it.hinge ? -half : half - w * 0.3;
+      g.push(`<path d="M${sx} 0H${sx + w * 0.3}" stroke="${WALL}" stroke-width="16"/>`);
+    } else if (t === '引違い戸3枚' || t === '引違い戸4枚') {
+      // 3枚・4枚の戸を、交互に前・うしろのレールに
+      const n = t === '引違い戸3枚' ? 3 : 4;
+      const pw = w / n;
+      for (let i = 0; i < n; i++) g.push(`<path d="M${r1(-half + i * pw - (i ? w * 0.03 : 0))} ${i % 2 ? 18 : -18}H${r1(-half + (i + 1) * pw + (i < n - 1 ? w * 0.03 : 0))}" stroke="${WALL}" stroke-width="22"/>`);
+    } else if (t === '折れ戸2枚') {
+      const q = w / 8;
+      const fold = (x0: number, dir: 1 | -1) => `M${x0} 0L${x0 + dir * q} ${side * q * 0.9}L${x0 + dir * 2 * q} 0L${x0 + dir * 3 * q} ${side * q * 0.9}L${x0 + dir * 4 * q} 0`;
+      g.push(`<path d="${fold(-half, 1)}${fold(half, -1)}" stroke="${WALL}" stroke-width="16" fill="none"/>`);
     } else if (t === '片引き戸') {
       g.push(`<path d="M${-half} ${-side * 18}H${half * 0.95}" stroke="${WALL}" stroke-width="26"/>`);
       g.push(`<path d="M${half} ${side * 18}H${half + w * 0.9}" stroke="${WALL}" stroke-width="10" stroke-dasharray="30 25"/>`);
@@ -136,20 +175,73 @@ export function fixtureSymbol(type: string, w: number, h: number): string {
       return `<rect x="${w * 0.05}" y="0" width="${w * 0.9}" height="${h * 0.26}" rx="30" ${st}/><ellipse cx="${w / 2}" cy="${h * 0.62}" rx="${w * 0.42}" ry="${h * 0.36}" ${st}/><ellipse cx="${w / 2}" cy="${h * 0.64}" rx="${w * 0.24}" ry="${h * 0.22}" ${thin}/>`;
     case '和式便器':
       return `<rect x="${w * 0.1}" y="0" width="${w * 0.8}" height="${h}" rx="${w * 0.4}" ${st}/><ellipse cx="${w / 2}" cy="${h * 0.6}" rx="${w * 0.22}" ry="${h * 0.25}" ${thin}/><path d="M${w * 0.15} ${h * 0.25}H${w * 0.85}" ${thin}/>`;
+    case '洗面セット':
+      // 洗面化粧台と洗濯パン（左右に並べる）
+      return `<rect width="${w * 0.52}" height="${h}" ${st}/><ellipse cx="${w * 0.26}" cy="${h * 0.58}" rx="${w * 0.16}" ry="${h * 0.28}" ${thin}/><rect x="${w * 0.56}" y="${h * 0.02}" width="${w * 0.44}" height="${h * 0.96}" rx="40" ${st}/><circle cx="${w * 0.78}" cy="${h * 0.5}" r="${Math.min(w * 0.15, h * 0.3)}" ${thin}/>`;
+    case 'I型キッチン':
+    case 'キッチン':
+      return `<rect width="${w}" height="${h}" ${st}/><rect x="${w * 0.08}" y="${h * 0.2}" width="${w * 0.26}" height="${h * 0.6}" rx="30" ${thin}/><circle cx="${w * 0.66}" cy="${h * 0.5}" r="${h * 0.17}" ${thin}/><circle cx="${w * 0.84}" cy="${h * 0.5}" r="${h * 0.17}" ${thin}/>`;
+    case '対面キッチン':
+      return `<rect width="${w}" height="${h}" ${st}/><path d="M0 ${h * 0.72}H${w}" ${thin}/><rect x="${w * 0.08}" y="${h * 0.12}" width="${w * 0.26}" height="${h * 0.45}" rx="30" ${thin}/><circle cx="${w * 0.66}" cy="${h * 0.36}" r="${h * 0.13}" ${thin}/><circle cx="${w * 0.84}" cy="${h * 0.36}" r="${h * 0.13}" ${thin}/>`;
+    case 'アイランド型キッチン':
+      return `<rect width="${w}" height="${h}" rx="40" ${st}/><rect x="${w * 0.1}" y="${h * 0.25}" width="${w * 0.25}" height="${h * 0.5}" rx="30" ${thin}/><circle cx="${w * 0.64}" cy="${h * 0.5}" r="${h * 0.15}" ${thin}/><circle cx="${w * 0.84}" cy="${h * 0.5}" r="${h * 0.15}" ${thin}/>`;
+    case 'L型キッチン': {
+      const d = Math.min(650, w * 0.35, h * 0.4);
+      return `<path d="M0 0H${w}V${d}H${d}V${h}H0Z" ${st}/><rect x="${d * 0.2}" y="${h * 0.55}" width="${d * 0.6}" height="${h * 0.3}" rx="30" ${thin}/><circle cx="${w * 0.66}" cy="${d / 2}" r="${d * 0.2}" ${thin}/><circle cx="${w * 0.84}" cy="${d / 2}" r="${d * 0.2}" ${thin}/>`;
+    }
+    case '床下収納':
+      return `<rect width="${w}" height="${h}" ${st}/><rect x="${w * 0.12}" y="${h * 0.12}" width="${w * 0.76}" height="${h * 0.76}" ${thin}/>`;
+    case '床下点検口':
+      return `<rect width="${w}" height="${h}" stroke="${WALL}" stroke-width="14" fill="#ffffff" stroke-dasharray="50 30"/><path d="M0 0L${w} ${h}" ${thin}/>`;
+    case 'キッチンカウンター':
+    case '食器棚':
+      return `<rect width="${w}" height="${h}" ${st}/><path d="${[1, 2, 3].map((i) => `M${(w * i) / 4} 0V${h}`).join('')}" ${thin}/>`;
+    case '洗面化粧台':
     case '洗面台':
       return `<rect width="${w}" height="${h}" ${st}/><ellipse cx="${w / 2}" cy="${h * 0.58}" rx="${w * 0.3}" ry="${h * 0.3}" ${thin}/><circle cx="${w / 2}" cy="${h * 0.14}" r="${Math.min(w, h) * 0.06}" ${thin}/>`;
+    case '洗濯パン':
+      return `<rect width="${w}" height="${h}" rx="60" ${st}/><rect x="${w * 0.1}" y="${h * 0.1}" width="${w * 0.8}" height="${h * 0.8}" rx="40" ${thin}/><circle cx="${w * 0.78}" cy="${h * 0.78}" r="${Math.min(w, h) * 0.05}" ${thin}/>`;
+    case 'ユニットバス':
+      return `<rect width="${w}" height="${h}" ${st}/><rect x="${w * 0.06}" y="${h * 0.05}" width="${w * 0.88}" height="${h * 0.45}" rx="${Math.min(w, h) * 0.12}" ${thin}/><path d="M0 ${h * 0.55}H${w}" ${thin}/>`;
+    case 'トイレ付ユニットバス':
+      return `<rect width="${w}" height="${h}" ${st}/><rect x="${w * 0.06}" y="${h * 0.04}" width="${w * 0.88}" height="${h * 0.36}" rx="${Math.min(w, h) * 0.1}" ${thin}/><path d="M0 ${h * 0.45}H${w}" ${thin}/><ellipse cx="${w * 0.25}" cy="${h * 0.8}" rx="${w * 0.1}" ry="${h * 0.1}" ${thin}/><rect x="${w * 0.16}" y="${h * 0.62}" width="${w * 0.18}" height="${h * 0.06}" ${thin}/>`;
+    case '玄関収納':
+    case '下駄箱':
+      return `<rect width="${w}" height="${h}" ${st}/><path d="M0 0L${w} ${h}M${w} 0L0 ${h}" ${thin}/>`;
+    case '間仕切':
+      return `<rect width="${w}" height="${h}" stroke="${WALL}" stroke-width="10" fill="${WALL}"/>`;
+    case 'ロフト':
+      return `<rect width="${w}" height="${h}" stroke="${WALL}" stroke-width="12" fill="#ffffff" stroke-dasharray="60 40"/><path d="M${w * 0.1} ${h * 0.6}V${h}M${w * 0.28} ${h * 0.6}V${h}${[0.68, 0.76, 0.84, 0.92].map((y) => `M${w * 0.1} ${h * y}H${w * 0.28}`).join('')}" ${thin}/>${lab('ロフト', Math.min(w, h) * 0.18)}`;
+    case '食卓セット4人用':
+    case '食卓セット6人用':
+    case '食卓セット2人用': {
+      // テーブルと、上下に並べたいす
+      const n = type === '食卓セット6人用' ? 3 : type === '食卓セット4人用' ? 2 : 1;
+      const th = h * 0.5;
+      const ty = (h - th) / 2;
+      const cw = Math.min(450, (w / n) * 0.75);
+      const chairs = Array.from({length: n}, (_, i) => {
+        const cx = (w * (i + 0.5)) / n - cw / 2;
+        return `<rect x="${r1(cx)}" y="0" width="${r1(cw)}" height="${r1(ty - 30)}" rx="30" ${thin}/><rect x="${r1(cx)}" y="${r1(ty + th + 30)}" width="${r1(cw)}" height="${r1(ty - 30)}" rx="30" ${thin}/>`;
+      }).join('');
+      return `<rect y="${r1(ty)}" width="${w}" height="${r1(th)}" ${st}/>${chairs}`;
+    }
+    case '食卓2人用':
+    case '食卓4人用':
+    case '食卓6人用':
+      return `<rect width="${w}" height="${h}" ${st}/>`;
+    case 'いす':
+      return `<rect width="${w}" height="${h}" rx="40" ${st}/><path d="M${w * 0.1} ${h * 0.18}H${w * 0.9}" stroke="${WALL}" stroke-width="30"/>`;
+    case 'スツール':
+      return `<ellipse cx="${w / 2}" cy="${h / 2}" rx="${w / 2}" ry="${h / 2}" ${st}/>`;
     case '手洗器':
       return `<rect width="${w}" height="${h}" rx="20" ${st}/><ellipse cx="${w / 2}" cy="${h * 0.55}" rx="${w * 0.32}" ry="${h * 0.3}" ${thin}/>`;
     case '浴槽':
       return `<rect width="${w}" height="${h}" rx="60" ${st}/><rect x="${w * 0.08}" y="${h * 0.12}" width="${w * 0.84}" height="${h * 0.76}" rx="${Math.min(w, h) * 0.25}" ${thin}/>`;
-    case 'キッチン':
-      return `<rect width="${w}" height="${h}" ${st}/><rect x="${w * 0.08}" y="${h * 0.2}" width="${w * 0.26}" height="${h * 0.6}" rx="30" ${thin}/><circle cx="${w * 0.66}" cy="${h * 0.5}" r="${h * 0.17}" ${thin}/><circle cx="${w * 0.84}" cy="${h * 0.5}" r="${h * 0.17}" ${thin}/>`;
     case '洗濯機':
       return `<rect width="${w}" height="${h}" rx="30" ${st}/><circle cx="${w / 2}" cy="${h / 2}" r="${Math.min(w, h) * 0.32}" ${thin}/>`;
     case '冷蔵庫':
       return `<rect width="${w}" height="${h}" ${st}/>${lab('冷')}`;
-    case '下駄箱':
-      return `<rect width="${w}" height="${h}" ${st}/><path d="M0 0L${w} ${h}M${w} 0L0 ${h}" ${thin}/>`;
     case 'ベッド':
     case '介護ベッド':
       return (
@@ -212,6 +304,19 @@ function stair(it: MItem, module: Module): string {
     p.push(`<path d="M${w / 2} ${h * 0.45}V${h}" stroke="${WALL}" stroke-width="16"/>`);
     p.push(steps(0, h * 0.45, w / 2, h, false), steps(w / 2, h * 0.45, w, h, false), `<path d="M0 ${h * 0.45}H${w}" stroke="${WALL}" stroke-width="10"/>`);
     p.push(arrow([[w * 0.25, h * 0.95], [w * 0.25, h * 0.25], [w * 0.75, h * 0.25], [w * 0.75, h * 0.7]]));
+  } else if (t === '回り階段') {
+    // L 字の角を、ななめの段（回り段）でまわる
+    const lw = Math.min(w, h) * 0.5;
+    p.push(steps(0, lw, lw, h, false), steps(lw, 0, w, lw, true));
+    p.push(`<path d="M0 ${lw}L${lw} ${lw}L${lw} 0M${lw} ${lw}L0 0M${lw} ${lw}L${lw * 0.45} 0M${lw} ${lw}L0 ${lw * 0.45}" stroke="${WALL}" stroke-width="10" fill="none"/>`);
+    p.push(arrow([[lw / 2, h * 0.95], [lw / 2, lw * 0.6], [lw * 0.6, lw / 2], [w * 0.92, lw / 2]]));
+  } else if (t === 'コ字階段') {
+    // 左を上がって、上で右へ、右を下りる向き（3つの段の列と、2つの踊り場）
+    const cw = w / 3;
+    const lh = Math.min(h * 0.32, cw);
+    p.push(steps(0, lh, cw, h, false), steps(cw, 0, 2 * cw, lh, true), steps(2 * cw, lh, w, h, false));
+    p.push(`<path d="M${cw} ${lh}V${h}M${2 * cw} ${lh}V${h}M0 ${lh}H${cw}M${2 * cw} ${lh}H${w}M${cw} ${lh}H${2 * cw}" stroke="${WALL}" stroke-width="16" fill="none"/>`);
+    p.push(arrow([[cw / 2, h * 0.95], [cw / 2, lh / 2], [w - cw / 2, lh / 2], [w - cw / 2, h * 0.7]]));
   } else if (t === 'L字階段') {
     const lw = Math.min(w, h) * 0.5;
     p.push(`<path d="M${lw} ${lw}V${h}M${lw} ${lw}H${w}" stroke="${WALL}" stroke-width="16" fill="none"/>`);
@@ -298,14 +403,19 @@ function autoDims(items: MItem[]): string {
 }
 
 /** 柄の定義（ページの中で同じ id が重ならないように頭を付ける） */
+/** 床の柄（形は床の種類、色は部屋の種類の色ごと。id は「頭-柄-色」） */
 export function patternDefs(pid: string): string {
-  return (
-    `<pattern id="${pid}-floor" width="120" height="120" patternUnits="userSpaceOnUse"><path d="M0 60H120" stroke="${FINISH.floor.line}" stroke-width="24"/></pattern>` +
-    `<pattern id="${pid}-tile" width="150" height="150" patternUnits="userSpaceOnUse"><path d="M0 0H150V150" stroke="${FINISH.tile.line}" stroke-width="10" fill="none"/></pattern>` +
-    `<pattern id="${pid}-doma" width="160" height="160" patternUnits="userSpaceOnUse"><circle cx="40" cy="40" r="14" fill="${FINISH.doma.line}"/><circle cx="120" cy="110" r="10" fill="${FINISH.doma.line}"/></pattern>` +
-    `<pattern id="${pid}-out" width="200" height="200" patternUnits="userSpaceOnUse"><path d="M0 200L200 0" stroke="${FINISH.outside.line}" stroke-width="10"/></pattern>` +
-    `<pattern id="${pid}-wood" width="300" height="300" patternUnits="userSpaceOnUse"><path d="M150 0V300" stroke="${FINISH.wood.line}" stroke-width="10"/></pattern>`
-  );
+  const colors: [string, string][] = [...Object.values(TONE).map((t): [string, string] => [t.key, t.line]), ['base', FINISH.plain.line]];
+  return colors
+    .map(
+      ([k, line]) =>
+        `<pattern id="${pid}-floor-${k}" width="120" height="120" patternUnits="userSpaceOnUse"><path d="M0 60H120" stroke="${line}" stroke-width="24"/></pattern>` +
+        `<pattern id="${pid}-tile-${k}" width="150" height="150" patternUnits="userSpaceOnUse"><path d="M0 0H150V150" stroke="${line}" stroke-width="10" fill="none"/></pattern>` +
+        `<pattern id="${pid}-doma-${k}" width="160" height="160" patternUnits="userSpaceOnUse"><circle cx="40" cy="40" r="14" fill="${line}"/><circle cx="120" cy="110" r="10" fill="${line}"/></pattern>` +
+        `<pattern id="${pid}-out-${k}" width="200" height="200" patternUnits="userSpaceOnUse"><path d="M0 200L200 0" stroke="${line}" stroke-width="10"/></pattern>` +
+        `<pattern id="${pid}-wood-${k}" width="300" height="300" patternUnits="userSpaceOnUse"><path d="M150 0V300" stroke="${line}" stroke-width="10"/></pattern>`,
+    )
+    .join('');
 }
 
 export type RenderOpts = {
@@ -322,27 +432,39 @@ export type RenderOpts = {
  */
 export function floorSvg(items: MItem[], o: RenderOpts): string {
   const pid = o.pid ?? 'md';
-  const rooms = items.filter((it) => it.kind === 'room');
+  // 大きい部屋から先に塗る（廊下を大きく描いて、中に部屋を置けるように。描いた順は問わない）
+  const sizeOf = (r: MItem) => (r.pts ? polyArea(r.pts) : Math.abs(r.w * r.h));
+  const rooms = items.filter((it) => it.kind === 'room').sort((a, b) => sizeOf(b) - sizeOf(a));
+  // 部屋の中に（囲む四角ごと）入っているほかの部屋
+  const innerOf = (r: MItem) => rooms.filter((q) => q !== r && sizeOf(q) < sizeOf(r) && q.x >= r.x && q.y >= r.y && q.x + q.w <= r.x + r.w && q.y + q.h <= r.y + r.h);
   const out: string[] = [];
   for (const r of rooms) out.push(roomPattern(r, o.module, pid));
-  for (const r of rooms) out.push(`<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="none" stroke="${WALL}" stroke-width="${WALL_W}" stroke-linejoin="miter"/>`);
+  for (const r of rooms)
+    out.push(
+      r.pts
+        ? `<path d="${polyPath(r.pts)}" fill="none" stroke="${WALL}" stroke-width="${WALL_W}" stroke-linejoin="miter"/>`
+        : `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="none" stroke="${WALL}" stroke-width="${WALL_W}" stroke-linejoin="miter"/>`,
+    );
   for (const it of items) {
     if (it.kind === 'fix') out.push(placed(it, fixtureSymbol(it.type ?? '', it.w, it.h)));
     else if (it.kind === 'stair') out.push(stair(it, o.module));
   }
   // 部屋の名前は設備の上に（浴槽・ベッドに隠れないように）。字のまわりを白くふちどって読みやすく
-  out.push(`<g paint-order="stroke" stroke="#ffffff" stroke-width="40" stroke-linejoin="round">${rooms.map((r) => roomLabel(r, o.module, o.showArea)).join('')}</g>`);
+  out.push(`<g paint-order="stroke" stroke="#ffffff" stroke-width="40" stroke-linejoin="round">${rooms.map((r) => roomLabel(r, o.module, o.showArea, innerOf(r))).join('')}</g>`);
   for (const it of items) if (it.kind === 'step') out.push(step(it));
   for (const it of items) if (it.kind === 'door' || it.kind === 'window') out.push(opening(it));
   if (o.showDims) out.push(autoDims(items));
   for (const it of items) {
     if (it.kind === 'line') out.push(`<path d="M${r1(it.x)} ${r1(it.y)}l${r1(it.w)} ${r1(it.h)}" stroke="${WALL}" stroke-width="${it.type === '細線' ? 14 : WALL_W}" stroke-linecap="square"/>`);
     else if (it.kind === 'dim') out.push(dimLine(it.x, it.y, it.x + it.w, it.y + it.h, String(lineLength(it))));
+    else if (it.kind === 'shape') out.push(shapeSvg(it));
   }
   for (const it of items) {
     if (it.kind === 'rail') {
-      out.push(`<path d="M${r1(it.x)} ${r1(it.y)}l${r1(it.w)} ${r1(it.h)}" stroke="${RED}" stroke-width="45"/>`);
-      out.push(`<circle cx="${r1(it.x)}" cy="${r1(it.y)}" r="55" fill="${RED}"/><circle cx="${r1(it.x + it.w)}" cy="${r1(it.y + it.h)}" r="55" fill="${RED}"/>`);
+      const e = railBend(it); // L 字の2本目（一筆で描いた L 字）
+      const end = e ?? {x: it.x + it.w, y: it.y + it.h};
+      out.push(`<path d="M${r1(it.x)} ${r1(it.y)}l${r1(it.w)} ${r1(it.h)}${e ? `L${r1(e.x)} ${r1(e.y)}` : ''}" stroke="${RED}" stroke-width="45" fill="none" stroke-linejoin="round"/>`);
+      out.push(`<circle cx="${r1(it.x)}" cy="${r1(it.y)}" r="55" fill="${RED}"/><circle cx="${r1(end.x)}" cy="${r1(end.y)}" r="55" fill="${RED}"/>`);
     } else if (it.kind === 'vrail') {
       out.push(`<circle cx="${r1(it.x)}" cy="${r1(it.y)}" r="75" fill="${RED}"/><circle cx="${r1(it.x)}" cy="${r1(it.y)}" r="32" fill="#ffffff"/>`);
     }
@@ -363,6 +485,40 @@ export function floorSvg(items: MItem[], o: RenderOpts): string {
     }
   }
   return `<g ${FONT}>${out.join('')}</g>`;
+}
+
+/** 図形（Excel と同じ 直線・矢印・四角・丸。線の太さ 30mm、色は図形ごと＝初めは赤） */
+function shapeSvg(it: MItem): string {
+  const c = it.color ?? RED;
+  const sw = 30;
+  if (it.type === '四角') return `<rect x="${r1(it.x)}" y="${r1(it.y)}" width="${r1(it.w)}" height="${r1(it.h)}" fill="none" stroke="${c}" stroke-width="${sw}"/>`;
+  if (it.type === '丸') return `<ellipse cx="${r1(it.x + it.w / 2)}" cy="${r1(it.y + it.h / 2)}" rx="${r1(Math.abs(it.w) / 2)}" ry="${r1(Math.abs(it.h) / 2)}" fill="none" stroke="${c}" stroke-width="${sw}"/>`;
+  const x2 = it.x + it.w;
+  const y2 = it.y + it.h;
+  let s = `<path d="M${r1(it.x)} ${r1(it.y)}L${r1(x2)} ${r1(y2)}" stroke="${c}" stroke-width="${sw}" stroke-linecap="round" fill="none"/>`;
+  if (it.type === '矢印') {
+    const ang = Math.atan2(it.h, it.w);
+    const L = Math.min(260, Math.hypot(it.w, it.h) * 0.4);
+    const p = (d: number) => `${r1(x2 - L * Math.cos(ang + d))} ${r1(y2 - L * Math.sin(ang + d))}`;
+    s += `<path d="M${p(-0.45)}L${r1(x2)} ${r1(y2)}L${p(0.45)}Z" fill="${c}" stroke="${c}" stroke-width="10" stroke-linejoin="round"/>`;
+  }
+  return s;
+}
+
+/** 一覧のボタンの絵：部品1つだけの SVG（viewBox は部品のまわり）。住設・家具・階段・間口・部屋 */
+export function thumbSvg(kind: 'fix' | 'stair' | 'door' | 'window', type: string, w: number, h: number, module: Module = 910): string {
+  if (kind === 'door' || kind === 'window') {
+    const it: MItem = {id: 't', kind, type, x: 0, y: 0, w, h: 0};
+    const pad = w * 0.12;
+    const top = kind === 'door' ? -w * 0.1 : -WALL_W * 2;
+    const hh = kind === 'door' ? w * 1.05 : WALL_W * 6;
+    // 壁の線（左右）＋建具
+    const wallLine = `<path d="M${-w / 2 - pad} 0H${w / 2 + pad}" stroke="${WALL}" stroke-width="${WALL_W}"/>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${r1(-w / 2 - pad)} ${r1(top)} ${r1(w + pad * 2)} ${r1(hh)}">${wallLine}${opening(it)}</svg>`;
+  }
+  const pad = Math.max(w, h) * 0.06;
+  const inner = kind === 'stair' ? stair({id: 't', kind: 'stair', type, x: 0, y: 0, w, h}, module) : fixtureSymbol(type, w, h);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${r1(-pad)} ${r1(-pad)} ${r1(w + pad * 2)} ${r1(h + pad * 2)}" ${FONT}>${inner}</svg>`;
 }
 
 /** 絵の範囲（部品を囲む四角に余白。寸法線・番号の分も） */

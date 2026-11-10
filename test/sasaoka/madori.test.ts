@@ -64,7 +64,12 @@ test('読み込み：壊れた部品・知らない種類は捨て、方眼・�
   assert.equal(m.module, 910);
   assert.equal(m.snap, 2);
   assert.equal(m.showDims, false);
-  assert.equal(m.showArea, true);
+  assert.equal(m.showArea, false); // 前の版の平面図（optRev なし）は、寸法・広さとも初めはオフで読む
+  const kept = cleanMadori({optRev: 2, showDims: true, showArea: true, floors: [{items: []}]})!;
+  assert.equal(kept.showDims, true); // オフにしたあとの版でチェックを入れたものは残す
+  assert.equal(kept.showArea, true);
+  assert.equal(emptyMadori().showDims, false);
+  assert.equal(emptyMadori().showArea, false);
   assert.deepEqual(m.floors[0].items[0], {id: 'x', kind: 'room', x: 0, y: 0, w: 910, h: 0});
   assert.equal(m.floors[0].items.length, 2);
   assert.deepEqual(m.floors[0].items[1].place, 'p');
@@ -164,7 +169,10 @@ test('絵：床の柄・壁・名前と広さ・手すりの赤い線と番号�
   const items: MItem[] = [room('a', 0, 0, 3 * M, 4 * M, '和室'), {...room('b', 3 * M, 0, M, M, 'トイレ'), label: '<b>トイレ</b>'}, {id: 'r', kind: 'rail', x: 100, y: 100, w: 600, h: 0}];
   const svg = floorSvg(items, {module: 910, showArea: true, showDims: true, nums: new Map([['r', 1]]), pid: 't'});
   assert.match(svg, /和室/);
-  assert.match(svg, /6帖（9\.94㎡）/);
+  assert.match(svg, />6帖</); // 広さは帖だけ（㎡は出さない）
+  assert.doesNotMatch(svg, /㎡/);
+  assert.match(svg, /url\(#t-tile-water\)|fill="#e4f4fd"/); // 部屋の色は種類の色（トイレ＝水まわりの水色）
+  assert.match(svg, /#e3f6e8/); // 和室＝緑
   assert.match(svg, /&lt;b&gt;トイレ&lt;\/b&gt;/);
   assert.doesNotMatch(svg, /<b>/);
   assert.match(svg, /#e01b24/);
@@ -235,4 +243,27 @@ test('Excel：階ごとに1シート（A4横）・題名・一覧は赤い字・
   assert.match(strFromU8(z['[Content_Types].xml']), /Extension="png"/);
   assert.match(strFromU8(z['[Content_Types].xml']), /drawing2\.xml/);
   assert.match(strFromU8(z['xl/drawings/_rels/drawing2.xml.rels']), /image2\.png/);
+});
+
+test('手すりの一筆の L 字：横へなぞって角で下へ曲げると1本の L 字（番号1つ・一覧は L型）。まっすぐ・ななめは今までどおり', async () => {
+  const {railStroke} = await import('../../src/sasaoka/madori/edit.ts');
+  const {railBend: bend, legendText: lt} = await import('../../src/sasaoka/madori/model.ts');
+  const path = (pts: [number, number][]) => pts.map(([x, y]) => ({x, y}));
+  // 横 600 → 下 800（壁なし）
+  const L = railStroke({x: 1000, y: 1000}, {x: 1600, y: 1800}, path([[1000, 1000], [1300, 1000], [1600, 1000], [1600, 1400], [1600, 1800]]), []);
+  assert.deepEqual(L, {x: 1000, y: 1000, w: 600, h: 0, len: 800, turn: 1});
+  const it = {id: 'r', kind: 'rail' as const, ...L};
+  assert.deepEqual(bend(it), {x: 1600, y: 1800});
+  assert.equal(lt(it, () => undefined), 'L型　600×800mm');
+  // 縦 700 → 左 500
+  const L2 = railStroke({x: 2000, y: 0}, {x: 1500, y: 700}, path([[2000, 0], [2000, 350], [2000, 700], [1750, 700], [1500, 700]]), []);
+  assert.deepEqual(L2, {x: 2000, y: 0, w: 0, h: 700, len: 500, turn: -1});
+  // ななめにまっすぐ（角のそばを通らない）は1本の直線のまま
+  const S = railStroke({x: 0, y: 0}, {x: 900, y: 600}, path([[0, 0], [450, 300], [900, 600]]), []);
+  assert.equal('turn' in S, false);
+  // 回すと2本目も一緒に回る（横の下向き → 縦の左向き）
+  const {turnedItem} = await import('../../src/sasaoka/madori/edit.ts');
+  const t = turnedItem(it, 455);
+  assert.equal(t.h, 600);
+  assert.equal(t.turn, -1);
 });

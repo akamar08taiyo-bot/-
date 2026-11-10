@@ -62,8 +62,8 @@ const legend = () => page.locator('ul.text-rose-600 li').allInnerTexts();
 // ---------------- 部屋（マイホームクラウドと同じ並び）
 await cat('部屋');
 const roomNames = await page.locator('[data-madori-canvas]').locator('xpath=../div[1]').locator('button[aria-pressed]').evaluateAll((els) => els.map((e) => e.getAttribute('title')).filter(Boolean));
-assert.deepEqual(roomNames.slice(0, 6), ['ポーチ', '玄関', '土間', 'シューズクローク', '廊下', 'LDK']);
-assert.ok(roomNames.includes('ウォークインクローゼット') && roomNames.at(-1) === '屋外');
+assert.deepEqual(roomNames.slice(0, 7), ['ポーチ', '土間', '玄関', '廊下', 'ベランダ', '駐車場', 'テラス']); // 段ごとの並び（2026-11-10）
+assert.ok(roomNames.includes('寝室') && roomNames.at(-1) === '広縁' && !roomNames.includes('ウォークインクローゼット'));
 // 白紙の平面図は、開いたときから洋室が選ばれている（なぞればすぐ描ける）。同じ道具をもう一度押しても外れない
 const pressed = (name) => page.getByRole('button', {name, exact: true}).first().getAttribute('aria-pressed');
 assert.equal(await pressed('洋室'), 'true');
@@ -78,14 +78,42 @@ await drag([3 * M, 0], [4 * M, 1.5 * M]);
 await tool('玄関');
 await drag([4 * M, 3.5 * M], [6 * M, 5 * M]);
 assert.match(await art(), /和室/);
-assert.match(await art(), /6帖（9\.94㎡）/); // 3×4 マス＝6帖
-log('部屋：ドラッグで方眼に・帖と㎡ OK');
+assert.doesNotMatch(await art(), /<line|>2730</); // 寸法線は初めは出さない
+assert.match(await art(), /fill="#e3f6e8"/); // 和室は一覧のボタンと同じ緑
+assert.match(await art(), /fill="#e3d8c4"/); // 廊下は茶色
+assert.doesNotMatch(await art(), /帖/); // 寸法・広さ（帖）は初めはオフ
+await page.getByRole('checkbox', {name: '広さ（帖）'}).check();
+assert.match(await art(), />6帖</); // 3×4 マス＝6帖（㎡は出さない）
+assert.doesNotMatch(await art(), /㎡/);
+await page.getByRole('checkbox', {name: '寸法'}).check();
+assert.match(await art(), />2730</);
+await page.getByRole('checkbox', {name: '寸法'}).uncheck();
+log('部屋：ドラッグで方眼に・帖・色・寸法線なし OK');
+
+// ---------------- 戻す・進むは上の段のまん中、ホイールで拡大・縮小（下へ回すと遠く）
+{
+  const bar = await page.getByRole('toolbar', {name: '平面図の設定'}).boundingBox();
+  const undoBox = await page.getByRole('button', {name: '↶ 戻す'}).boundingBox();
+  const mid = undoBox.x + undoBox.width / 2;
+  assert.ok(mid > bar.x + bar.width * 0.35 && mid < bar.x + bar.width * 0.65, `戻すが上の段のまん中 ${mid} / ${bar.x}..${bar.x + bar.width}`);
+  const vbw = () => canvas.evaluate((s) => s.viewBox.baseVal.width);
+  const w0 = await vbw();
+  const c = await toPx(3 * M, 2 * M);
+  await page.mouse.move(c.x, c.y);
+  await page.mouse.wheel(0, 300);
+  await page.waitForTimeout(150);
+  assert.ok((await vbw()) > w0 * 1.3, 'ホイールを下へ回すと遠く（方眼が小さく）');
+  await page.mouse.wheel(0, -300);
+  await page.waitForTimeout(150);
+  assert.ok(Math.abs((await vbw()) - w0) < w0 * 0.05, 'ホイールを上へ回すと元の大きさに');
+}
+log('戻す・進むはまん中・ホイールで拡大・縮小 OK');
 
 // ---------------- 建具は壁に、設備は壁ぎわに
-await cat('建具・窓');
+await cat('間口');
 await tool('片開き戸');
 await click(1.5 * M, 4 * M + 150); // 和室と廊下の間の壁の少し下
-await cat('設備');
+await cat('住設');
 await tool('洋式便器');
 await click(3.5 * M, 300);
 const svgNow = await art();
@@ -121,6 +149,96 @@ await page.getByRole('textbox', {name: '部屋の名前'}).fill('寝室（和室
 await page.keyboard.press('Escape');
 assert.match(await art(), /寝室（和室）/);
 log('選ぶ・消す・Ctrl+Z・名前 OK');
+
+// ---------------- 図の上でそのまま文字を打つ（Excel と同じ）・回すつまみ
+await cat('作図');
+await tool('文字');
+await click(0.3 * M, 5.5 * M);
+const inplace = page.getByRole('textbox', {name: '図に打つ文字'});
+await inplace.waitFor();
+await page.keyboard.type('手すり位置');
+await page.keyboard.press('Enter');
+assert.match(await art(), />手すり位置</);
+// 部屋はダブルクリックでその場で名前を直す
+const hall = await toPx(1 * M, 4.5 * M);
+await page.mouse.dblclick(hall.x, hall.y);
+await inplace.waitFor();
+assert.equal(await inplace.inputValue(), '廊下');
+await page.keyboard.press('Control+a');
+await page.keyboard.type('通路');
+await page.keyboard.press('Enter');
+assert.match(await art(), />通路</);
+// 選んだまま打ち始めると、その字から書きかえる
+await click(3.3 * M, 1.3 * M); // トイレの部屋（便器の下の空いた所）
+await page.keyboard.type('WC');
+await page.keyboard.press('Enter');
+assert.match(await art(), />WC</);
+// 回すつまみ（↻）：階段を置いて、つまみを押すと 90°回る
+await cat('階段');
+await tool('直階段');
+await click(8 * M, 1 * M);
+{
+  const tb = await page.locator('[data-turn-handle] circle').boundingBox();
+  await page.mouse.click(tb.x + tb.width / 2, tb.y + tb.height / 2);
+}
+assert.match(await art(), /rotate\(90 /);
+// 横手すりを一筆で L 字に（横へなぞって、角で下へ）
+await cat('改修');
+await tool('横手すり');
+{
+  const a = await toPx(7 * M, 4 * M);
+  const c = await toPx(8 * M, 4 * M);
+  const b = await toPx(8 * M, 5 * M);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(c.x, c.y, {steps: 5});
+  await page.mouse.move(b.x, b.y, {steps: 5});
+  await page.mouse.up();
+}
+await page.keyboard.press('Escape');
+assert.ok((await legend()).some((r) => /L型　910×910mm|L型　900×900mm|L型　9\d0×9\d0mm/.test(r)), `一筆の L 字 ${JSON.stringify(await legend())}`);
+await page.keyboard.press('Control+z');
+for (let i = 0; i < 5; i++) await page.keyboard.press('Control+z'); // 文字・通路・WC・階段・回す
+// ---------------- 部屋を頂点で描く（角を順に押す・はじめの点で閉じる）・頂点（■）で形を変える
+await cat('部屋');
+await tool('洋室');
+for (const [x, y] of [[8, 0], [11, 0], [11, 1], [9, 1], [9, 3], [8, 3]]) await click(x * M, y * M);
+await click(8 * M, 0);
+assert.match(await art(), /<path d="M7280 0L10010 0L10010 910L8190 910L8190 2730L7280 2730Z" fill="#fff6d6"/);
+// 欠いた所の角（■）を右下へ → 部屋が広がる
+{
+  const h = page.locator('[data-handle="v3"]');
+  const b = await h.boundingBox();
+  const to = await toPx(10 * M, 2 * M);
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y, {steps: 6});
+  await page.mouse.up();
+  assert.match(await art(), /M7280 0L10010 0L10010 1820L9100 1820L9100 2730L7280 2730Z/); // 欠きが小さくなった L 字
+}
+await page.keyboard.press('Escape');
+// ---------------- Excel のような図形（上の段の「図形」）
+await page.getByRole('toolbar', {name: '図形'}).getByRole('button', {name: /四角/}).click();
+await drag([1 * M, 6 * M], [3 * M, 7 * M]);
+assert.match(await art(), /<rect x="910" y="5460" width="1820" height="910" fill="none" stroke="#e01b24" stroke-width="30"/);
+// ---------------- 方眼の下のスクロールバーで横に動かす
+{
+  const vx = () => canvas.evaluate((s) => s.viewBox.baseVal.x);
+  const x0 = await vx();
+  await page.locator('[data-scroll-thumb="x"]').scrollIntoViewIfNeeded();
+  const th = await page.locator('[data-scroll-thumb="x"]').boundingBox();
+  // まん中の下にお知らせが出ていることがあるので、つまみの左の端を持つ
+  await page.mouse.move(th.x + 12, th.y + th.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(th.x + 92, th.y + th.height / 2, {steps: 4});
+  await page.mouse.up();
+  const x1 = await vx();
+  assert.ok(x1 > x0 + 100, `スクロールバーで右へ ${x0} → ${x1} ${JSON.stringify(th)}`);
+}
+for (let i = 0; i < 3; i++) await page.keyboard.press('Control+z'); // 図形・頂点・多角形の部屋
+assert.match(await art(), /寝室（和室）/);
+assert.doesNotMatch(await art(), /手すり位置|通路|>WC</);
+log('図の上で文字を打つ・回すつまみ・L字の手すり・頂点で描く部屋と形を変える・図形・スクロールバー OK');
 
 // ---------------- 2階
 await page.getByRole('button', {name: '＋ 階'}).click();
@@ -183,6 +301,26 @@ await page.getByRole('button', {name: /^その他/}).click(); // タブごとの
 await page.getByRole('button', {name: '📝 申請書の平面図に入れる'}).click();
 await page.getByText('申請書の平面図に入れました').waitFor();
 log('申請書の平面図に入れる OK');
+
+// ---------------- 申請書の平面図の枠から、その場で描く（新しい様邸）
+await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
+await page.getByRole('button', {name: '＋ 苅田町'}).click();
+const drawBtn = page.getByRole('button', {name: '📐 ここで平面図を描く'});
+await drawBtn.scrollIntoViewIfNeeded();
+await drawBtn.click();
+await page.locator('[data-plan-draw]').waitFor();
+await canvas.waitFor();
+assert.equal(await page.getByRole('button', {name: '洋室', exact: true}).first().getAttribute('aria-pressed'), 'true');
+await drag([0, 0], [3 * M, 4 * M]);
+assert.match(await art(), /洋室/);
+await page.getByRole('button', {name: '✓ 申請書の平面図に入れる'}).click();
+await page.locator('[data-plan-draw]').waitFor({state: 'detached'});
+await page.getByText('申請書の平面図に入れました').last().waitFor();
+await page.locator('button[aria-label="平面図"] img').first().waitFor();
+await page.getByRole('tab', {name: '📐 平面図'}).click();
+await canvas.waitFor();
+assert.match(await art(), /洋室/); // 平面図のタブにも残る
+log('申請書の平面図の枠から描いて入れる OK');
 
 await page.screenshot({path: path.join(outDir, 'madori-pc.png')});
 // ---------------- スマホ

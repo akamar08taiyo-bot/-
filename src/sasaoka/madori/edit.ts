@@ -3,7 +3,8 @@
 // 背中を近くの壁に向けて壁ぎわに、手すりは壁ぞいに。長さはすべて mm
 
 import {DOOR_TYPES, fixType, roomType, STAIR_TYPES, STEP_TYPES, WINDOW_TYPES} from './catalog.ts';
-import {bounds, mid, snapTo} from './model.ts';
+import {bounds, isShapeLine, mid, railBend, snapTo} from './model.ts';
+import {edgeMoved, inPoly, movedPts, polyArea, polyEdges, shapeOf, snapPt, turnedPts, vertexMoved} from './poly.ts';
 import type {MItem, Module, Rot} from './model.ts';
 
 export type P = {x: number; y: number};
@@ -23,10 +24,22 @@ export type Tool =
   | {t: 'num'; place?: string}
   | {t: 'text'}
   | {t: 'line'; type: '壁' | '細線'}
-  | {t: 'dim'};
+  | {t: 'dim'}
+  | {t: 'shape'; type: ShapeType};
+
+/** 図形（Excel と同じ。上の段の「図形」のボタン） */
+export const SHAPE_TYPES = ['直線', '矢印', '四角', '丸'] as const;
+export type ShapeType = (typeof SHAPE_TYPES)[number];
+/** 図形の色（赤・青・黒・緑） */
+export const SHAPE_COLORS: {name: string; hex: string}[] = [
+  {name: '赤', hex: '#e01b24'},
+  {name: '青', hex: '#1d4ed8'},
+  {name: '黒', hex: '#111827'},
+  {name: '緑', hex: '#15803d'},
+];
 
 /** ドラッグで大きさ・長さを決める道具（ほかは押した所に置く） */
-export const DRAG_TOOLS: Tool['t'][] = ['room', 'stair', 'rail', 'step', 'line', 'dim'];
+export const DRAG_TOOLS: Tool['t'][] = ['room', 'stair', 'rail', 'step', 'line', 'dim', 'shape'];
 
 /** 壁の中心線（部屋の四角の辺）。h＝横の壁（y が一定） */
 export type Wall = {h: boolean; at: number; from: number; to: number};
@@ -36,6 +49,10 @@ export function walls(items: MItem[]): Wall[] {
   const out: Wall[] = [];
   for (const r of items) {
     if (r.kind !== 'room') continue;
+    if (r.pts) {
+      out.push(...polyEdges(r.pts)); // 多角形の部屋は辺ごとの壁
+      continue;
+    }
     out.push({h: true, at: r.y, from: r.x, to: r.x + r.w}, {h: true, at: r.y + r.h, from: r.x, to: r.x + r.w});
     out.push({h: false, at: r.x, from: r.y, to: r.y + r.h}, {h: false, at: r.x + r.w, from: r.y, to: r.y + r.h});
   }
@@ -214,7 +231,39 @@ export function straight(a: P, b: P, step: number): {x: number; y: number; w: nu
 /**
  * 道具で部品を作る（a＝押した所、b＝離した所。clickOnly＝ドラッグしなかった）。置けないとき（壁のない所のドア）は null
  */
-export function makeItem(tool: Tool, a: P, b: P, clickOnly: boolean, ctx: {items: MItem[]; module: Module; step: number}): MItem | null {
+/**
+ * 一筆で描いた L 字の手すり（ユーザーの指示「こんな感じでL字にしたい場合がある。一筆でかけるようにする」2026-11-10）：
+ * なぞった道（path）が、始めから横（縦）へ進んで角で曲がり、縦（横）へ進んでいれば L 字。両方とも 150mm 以上で、角のそばを通っているとき。
+ * 1本目は壁ぞい（railLine）、2本目も角のそばの壁ぞいにそろえ、1本目の終わりをそこまで延ばす
+ */
+export function railStroke(a: P, b: P, path: P[], ws: Wall[]): {x: number; y: number; w: number; h: number; len?: number; turn?: 1 | -1} {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  if (path.length >= 3 && Math.abs(dx) >= 150 && Math.abs(dy) >= 150) {
+    const near = (c: P) => Math.min(...path.map((q) => Math.hypot(q.x - c.x, q.y - c.y)));
+    const cH = {x: b.x, y: a.y}; // 横から縦へ
+    const cV = {x: a.x, y: b.y}; // 縦から横へ
+    const dH = near(cH);
+    const dV = near(cV);
+    const horizFirst = dH <= dV;
+    const corner = horizFirst ? cH : cV;
+    if (Math.min(dH, dV) <= Math.min(Math.abs(dx), Math.abs(dy)) * 0.35) {
+      const l1 = railLine(a, corner, ws, false);
+      const l2 = railLine(corner, b, ws, false);
+      if (horizFirst) {
+        const w = snapTo(l2.x - l1.x, 50) || Math.sign(dx) * 100;
+        const rest = b.y - l1.y;
+        return {x: l1.x, y: l1.y, w, h: 0, len: Math.max(100, snapTo(Math.abs(rest), 50)), turn: rest >= 0 ? 1 : -1};
+      }
+      const h = snapTo(l2.y - l1.y, 50) || Math.sign(dy) * 100;
+      const rest = b.x - l1.x;
+      return {x: l1.x, y: l1.y, w: 0, h, len: Math.max(100, snapTo(Math.abs(rest), 50)), turn: rest >= 0 ? 1 : -1};
+    }
+  }
+  return railLine(a, b, ws, false);
+}
+
+export function makeItem(tool: Tool, a: P, b: P, clickOnly: boolean, ctx: {items: MItem[]; module: Module; step: number; path?: P[]}): MItem | null {
   const ws = walls(ctx.items);
   switch (tool.t) {
     case 'room': {
@@ -232,8 +281,9 @@ export function makeItem(tool: Tool, a: P, b: P, clickOnly: boolean, ctx: {items
     case 'fix':
       return placeFixture(tool.type, b, ws);
     case 'rail': {
-      const l = railLine(a, b, ws, clickOnly, tool.len ?? 600);
-      return {id: mid(), kind: 'rail', ...l, ...(tool.place ? {place: tool.place} : {}), ...(tool.lshape ? {len: 600} : {})};
+      // なぞった道が角で曲がっていれば L 字（一筆）。「L型手すり」の道具は、まっすぐなぞっても下（右）へ 600mm 曲げる
+      const l = !clickOnly && ctx.path ? railStroke(a, b, ctx.path, ws) : railLine(a, b, ws, clickOnly, tool.len ?? 600);
+      return {id: mid(), kind: 'rail', ...l, ...(tool.place ? {place: tool.place} : {}), ...(tool.lshape && !('turn' in l && l.turn) ? {len: 600, turn: 1 as const} : {})};
     }
     case 'vrail': {
       const q = vrailPoint(b, ws);
@@ -259,6 +309,19 @@ export function makeItem(tool: Tool, a: P, b: P, clickOnly: boolean, ctx: {items
       const l = straight(a, b, ctx.step / 2);
       if (!l.w && !l.h) return null;
       return {id: mid(), kind: 'line', ...l, ...(tool.type === '細線' ? {type: '細線'} : {})};
+    }
+    case 'shape': {
+      // 直線・矢印はなぞった向きのまま（ななめも）、四角・丸はなぞった箱。押しただけなら決まった大きさ
+      if (tool.type === '直線' || tool.type === '矢印') {
+        const w = clickOnly ? 900 : snapTo(b.x - a.x, 10);
+        const h = clickOnly ? 0 : snapTo(b.y - a.y, 10);
+        if (!w && !h) return null;
+        return {id: mid(), kind: 'shape', type: tool.type, x: snapTo(a.x, 10), y: snapTo(a.y, 10), w, h};
+      }
+      const r = clickOnly
+        ? {x: snapTo(b.x - 450, 10), y: snapTo(b.y - 300, 10), w: 900, h: 600}
+        : {x: snapTo(Math.min(a.x, b.x), 10), y: snapTo(Math.min(a.y, b.y), 10), w: Math.max(100, snapTo(Math.abs(b.x - a.x), 10)), h: Math.max(100, snapTo(Math.abs(b.y - a.y), 10))};
+      return {id: mid(), kind: 'shape', type: tool.type, ...r};
     }
     case 'dim': {
       const l = straight(a, b, 10);
@@ -290,33 +353,46 @@ const inBox = (p: P, b: Box, pad = 0) => p.x >= b.x - pad && p.x <= b.x + b.w + 
 
 /** 押した所の部品（上に描いてあるものを先に。部屋は中にいちばん小さい部屋）。tol は線をつかめる幅（mm） */
 export function hitTest(items: MItem[], p: P, tol: number): MItem | null {
-  const order: MItem['kind'][][] = [['text', 'num'], ['rail', 'vrail'], ['door', 'window'], ['step'], ['fix', 'stair'], ['line', 'dim']];
+  const order: MItem['kind'][][] = [['text', 'num'], ['shape'], ['rail', 'vrail'], ['door', 'window'], ['step'], ['fix', 'stair'], ['line', 'dim']];
   for (const kinds of order) {
     for (let i = items.length - 1; i >= 0; i--) {
       const it = items[i];
       if (!kinds.includes(it.kind)) continue;
-      if (it.kind === 'text' ? inBox(p, textBox(it), tol / 2) : it.kind === 'num' || it.kind === 'vrail' ? Math.hypot(p.x - it.x, p.y - it.y) <= Math.max(160, tol) : it.kind === 'rail' || it.kind === 'line' || it.kind === 'dim' ? segDist(p, it, {x: it.x + it.w, y: it.y + it.h}) <= Math.max(tol, it.kind === 'line' ? 40 : 60) : inBox(p, bounds(it), it.kind === 'door' || it.kind === 'window' ? 0 : tol / 3)) return it;
+      if (it.kind === 'text' ? inBox(p, textBox(it), tol / 2) : it.kind === 'num' || it.kind === 'vrail' ? Math.hypot(p.x - it.x, p.y - it.y) <= Math.max(160, tol) : it.kind === 'rail' || it.kind === 'line' || it.kind === 'dim' || isShapeLine(it) ? Math.min(segDist(p, it, {x: it.x + it.w, y: it.y + it.h}), ((e) => (e ? segDist(p, {x: it.x + it.w, y: it.y + it.h}, e) : Infinity))(railBend(it))) <= Math.max(tol, it.kind === 'line' ? 40 : 60) : inBox(p, bounds(it), it.kind === 'door' || it.kind === 'window' ? 0 : tol / 3)) return it;
     }
   }
   let room: MItem | null = null;
+  const areaOf = (r: MItem) => (r.pts ? polyArea(r.pts) : r.w * r.h);
   for (const it of items) {
-    if (it.kind !== 'room' || !inBox(p, it)) continue;
-    if (!room || it.w * it.h < room.w * room.h) room = it;
+    if (it.kind !== 'room' || !(it.pts ? inPoly(p, it.pts) : inBox(p, it))) continue;
+    if (!room || areaOf(it) < areaOf(room)) room = it;
   }
   return room;
 }
 
-/** つまみ（大きさを変える所）。四角の部品は四隅と四辺、線の部品は両端 */
-export type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'p0' | 'p1';
+/** つまみ（大きさを変える所）。四角の部品は四隅と四辺、線の部品は両端、多角形の部屋は頂点（v0…）と辺のまん中（e0…） */
+export type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'p0' | 'p1' | `v${number}` | `e${number}`;
+/** 頂点・角のつまみ（■。塗る）か、辺のつまみ（□） */
+export const isCornerHandle = (h: Handle) => h.startsWith('v') || h === 'nw' || h === 'ne' || h === 'se' || h === 'sw' || h === 'p0' || h === 'p1';
 
 export function handlesOf(it: MItem): {h: Handle; x: number; y: number}[] {
-  if (it.kind === 'rail' || it.kind === 'line' || it.kind === 'dim') {
+  if (it.kind === 'room' && it.pts) {
+    const pts = it.pts;
+    return [
+      ...pts.map((p, i) => ({h: `v${i}` as Handle, x: p.x, y: p.y})),
+      ...pts.map((p, i) => {
+        const q = pts[(i + 1) % pts.length];
+        return {h: `e${i}` as Handle, x: (p.x + q.x) / 2, y: (p.y + q.y) / 2};
+      }),
+    ];
+  }
+  if (it.kind === 'rail' || it.kind === 'line' || it.kind === 'dim' || isShapeLine(it)) {
     return [
       {h: 'p0', x: it.x, y: it.y},
       {h: 'p1', x: it.x + it.w, y: it.y + it.h},
     ];
   }
-  if (it.kind === 'room' || it.kind === 'stair' || it.kind === 'step' || it.kind === 'fix') {
+  if (it.kind === 'room' || it.kind === 'stair' || it.kind === 'step' || it.kind === 'fix' || it.kind === 'shape') {
     const b = bounds(it);
     const cx = b.x + b.w / 2;
     const cy = b.y + b.h / 2;
@@ -336,6 +412,16 @@ export function handlesOf(it: MItem): {h: Handle; x: number; y: number}[] {
 
 /** つまみを動かした部品（step にそろえる。部屋は step、ほかは 10mm） */
 export function resized(it: MItem, h: Handle, p: P, step: number): MItem {
+  // 多角形の部屋：頂点（となりの頂点も横・縦のまま）・辺（直角に動かす）。小さくなりすぎた辺・一直線の頂点はまとめる
+  if (it.kind === 'room' && it.pts && (h.startsWith('v') || h.startsWith('e')) && !['e', 'w', 'n', 's', 'ne', 'nw', 'se', 'sw'].includes(h)) {
+    const i = Number(h.slice(1));
+    const q = snapPt(p, step);
+    const next = h.startsWith('v') ? vertexMoved(it.pts, i, q) : edgeMoved(it.pts, i, q);
+    const s = shapeOf(next);
+    if (s.w < step || s.h < step) return it;
+    const {pts: _old, ...rest} = it;
+    return {...rest, ...s};
+  }
   if (h === 'p0' || h === 'p1') {
     const end = {x: it.x + it.w, y: it.y + it.h};
     const s = it.kind === 'line' ? step / 2 : it.kind === 'rail' ? 50 : 10;
@@ -343,7 +429,7 @@ export function resized(it: MItem, h: Handle, p: P, step: number): MItem {
     const fixed = h === 'p0' ? end : {x: it.x, y: it.y};
     // 手すり・寸法線は横・縦のまま（ななめにしない）。線は 45° まで
     let moved = q;
-    if (it.kind !== 'line') moved = Math.abs(q.x - fixed.x) >= Math.abs(q.y - fixed.y) ? {x: q.x, y: fixed.y} : {x: fixed.x, y: q.y};
+    if (it.kind !== 'line' && it.kind !== 'shape') moved = Math.abs(q.x - fixed.x) >= Math.abs(q.y - fixed.y) ? {x: q.x, y: fixed.y} : {x: fixed.x, y: q.y};
     return h === 'p0' ? {...it, x: moved.x, y: moved.y, w: fixed.x - moved.x, h: fixed.y - moved.y} : {...it, w: moved.x - it.x, h: moved.y - it.y};
   }
   const s = it.kind === 'room' || it.kind === 'stair' ? step : 10;
@@ -367,6 +453,11 @@ export function resized(it: MItem, h: Handle, p: P, step: number): MItem {
 /** 部品を動かす（d＝動かした量）。部屋・階段は方眼に、ドア・窓は近くの壁に、設備・段差の解消は壁の面に吸い付く */
 export function moved(it: MItem, d: P, items: MItem[], step: number): MItem {
   const ws = walls(items.filter((o) => o.id !== it.id));
+  if (it.kind === 'room' && it.pts) {
+    const x = snapTo(it.x + d.x, step);
+    const y = snapTo(it.y + d.y, step);
+    return {...it, x, y, pts: movedPts(it.pts, x - it.x, y - it.y)};
+  }
   if (it.kind === 'room' || it.kind === 'stair') return {...it, x: snapTo(it.x + d.x, step), y: snapTo(it.y + d.y, step)};
   if (it.kind === 'door' || it.kind === 'window') {
     const next = placeOpening(it.kind, it.type ?? '', {x: it.x + d.x, y: it.y + d.y}, ws, step);
@@ -386,15 +477,23 @@ export function moved(it: MItem, d: P, items: MItem[], step: number): MItem {
 
 /** 90°回す：部屋は縦横を入れかえ（まん中のまま）、設備・階段・段差の解消は右回り、線の部品はまん中で、ドア・窓は開く向きを回す */
 export function turnedItem(it: MItem, step: number): MItem {
+  if (it.kind === 'room' && it.pts) return {...it, ...shapeOf(turnedPts(it.pts, step))};
   if (it.kind === 'room') {
     const cx = it.x + it.w / 2;
     const cy = it.y + it.h / 2;
     return {...it, x: snapTo(cx - it.h / 2, step), y: snapTo(cy - it.w / 2, step), w: it.h, h: it.w};
   }
-  if (it.kind === 'rail' || it.kind === 'line' || it.kind === 'dim') {
+  if (it.kind === 'shape' && !isShapeLine(it)) {
     const cx = it.x + it.w / 2;
     const cy = it.y + it.h / 2;
-    return {...it, x: Math.round(cx + it.h / 2), y: Math.round(cy - it.w / 2), w: -it.h, h: it.w};
+    return {...it, x: Math.round(cx - it.h / 2), y: Math.round(cy - it.w / 2), w: it.h, h: it.w};
+  }
+  if (it.kind === 'rail' || it.kind === 'line' || it.kind === 'dim' || isShapeLine(it)) {
+    const cx = it.x + it.w / 2;
+    const cy = it.y + it.h / 2;
+    // L 字の2本目も一緒に 90°（横の1本目の下向き＝turn 1 は、縦になると左向き＝−1）
+    const turn = it.turn ? (it.h === 0 ? (-it.turn as 1 | -1) : it.turn) : undefined;
+    return {...it, x: Math.round(cx + it.h / 2), y: Math.round(cy - it.w / 2), w: -it.h, h: it.w, ...(turn ? {turn} : {})};
   }
   if (it.kind === 'door' || it.kind === 'window') {
     // 開く側と吊り元を順に回す（右開き→左開き…）
@@ -409,7 +508,7 @@ export function turnedItem(it: MItem, step: number): MItem {
 /** 部品を写す（Ctrl+C・Ctrl+V・複製。方眼の1歩ずらす） */
 export function copied(it: MItem, step: number): MItem {
   const {place: _place, n: _n, ...rest} = it; // 申請書の箇所・番号は写さない（同じ番号が2つにならないように）
-  return {...rest, id: mid(), x: it.x + step, y: it.y + step};
+  return {...rest, id: mid(), x: it.x + step, y: it.y + step, ...(it.pts ? {pts: movedPts(it.pts, step, step)} : {})};
 }
 
 /** 延べ床の広さ（屋外・吹抜・バルコニー・テラス・ポーチ・車庫を除いた部屋の合計 ㎡）。ほかの部屋の中に描いた部屋（洋室の中の収納など）は二重に数えない */
@@ -419,5 +518,5 @@ export function floorArea(items: MItem[]): number {
   // 中に入っている部屋（大きい部屋の中に描いた収納など）は数えない
   const inside = (a: MItem, b: MItem) => a !== b && a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h;
   const top = rooms.filter((a) => !rooms.some((b) => inside(a, b)));
-  return Math.round(top.reduce((s, r) => s + (Math.abs(r.w) * Math.abs(r.h)) / 1e6, 0) * 100) / 100;
+  return Math.round(top.reduce((s, r) => s + (r.pts ? polyArea(r.pts) : Math.abs(r.w) * Math.abs(r.h)) / 1e6, 0) * 100) / 100;
 }

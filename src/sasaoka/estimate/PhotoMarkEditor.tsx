@@ -525,6 +525,7 @@ export function PhotoMarkEditor({
   planTools = false,
   onReplace,
   onRemove,
+  onRedraw,
 }: {
   title: string;
   photo: {url: string; w: number; h: number; rot: number};
@@ -539,6 +540,7 @@ export function PhotoMarkEditor({
   // 図を差し替える・消す（平面図。プレビューの図を押すとすぐこの画面なので、上の帯の右に置く。2026-11-04）
   onReplace?: () => void;
   onRemove?: () => void;
+  onRedraw?: () => void; // 平面図のタブで描いた図を直す（申請書の枠から平面図の編集画面を開く。2026-11-10）
 }) {
   const W = Math.max(1, size.w);
   const H = Math.max(1, size.h);
@@ -2290,6 +2292,11 @@ export function PhotoMarkEditor({
         </button>
         <div className="flex min-w-0 items-center justify-end gap-1">
           {onRotate && rotateButtons}
+          {onRedraw && (
+            <button type="button" onClick={onRedraw} title="平面図を描き直す" className="h-11 rounded-md border border-slate-300 bg-white px-3 text-base text-slate-700 hover:bg-slate-50 max-sm:px-2 max-sm:text-sm">
+              📐 平面図を直す
+            </button>
+          )}
           {onReplace && (
             <button type="button" onClick={onReplace} title={`${what}を差し替える`} className="h-11 rounded-md border border-slate-300 bg-white px-3 text-base text-slate-700 hover:bg-slate-50 max-sm:px-2 max-sm:text-sm">
               差し替え
