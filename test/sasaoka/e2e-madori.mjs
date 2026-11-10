@@ -62,8 +62,14 @@ const legend = () => page.locator('ul.text-rose-600 li').allInnerTexts();
 // ---------------- 部屋（マイホームクラウドと同じ並び）
 await cat('部屋');
 const roomNames = await page.locator('[data-madori-palette]').locator('button[aria-pressed]').evaluateAll((els) => els.map((e) => e.getAttribute('title')).filter(Boolean));
-assert.deepEqual(roomNames.slice(0, 7), ['ポーチ', '土間', '玄関', '廊下', 'ベランダ', '駐車場', 'テラス']); // 段ごとの並び（2026-11-10）
-assert.ok(roomNames.includes('寝室') && roomNames.at(-1) === '広縁' && !roomNames.includes('ウォークインクローゼット'));
+// 段ごとの並び（ユーザーの指示「和室、洋室、仏間、寝室、床の間、広縁／廊下、リビング、キッチン、ダイニングキッチン、リビングダイニングキッチン／
+// トイレ、浴室、洗面脱衣室、洗面所、脱衣室／ポーチ、玄関、土間、ベランダ、駐車場、テラス の順番に並べる」2026-11-10。応接間・収納・リビングダイニング・ダイニングは段の終わり）
+assert.deepEqual(roomNames, [
+  ...['和室', '洋室', '仏間', '寝室', '床の間', '広縁', '応接間', '収納'],
+  ...['廊下', 'リビング', 'キッチン', 'ダイニングキッチン', 'リビングダイニングキッチン', 'リビングダイニング', 'ダイニング'],
+  ...['トイレ', '浴室', '洗面脱衣室', '洗面所', '脱衣室'],
+  ...['ポーチ', '玄関', '土間', 'ベランダ', '駐車場', 'テラス'],
+]);
 // 白紙の平面図は、開いたときから洋室が選ばれている（なぞればすぐ描ける）。同じ道具をもう一度押しても外れない
 const pressed = (name) => page.getByRole('button', {name, exact: true}).first().getAttribute('aria-pressed');
 assert.equal(await pressed('洋室'), 'true');
