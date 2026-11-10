@@ -285,7 +285,9 @@ export function usePhotoActions(job: Job, setJobRaw: (fn: (j: Job) => Job) => vo
         const b = photoBounds({x: 0, y: 0, w, h, rot});
         return b.w / (b.h || 1);
       });
-      const fit = (w: number, h: number) => shown(w, h).w / (w || 1);
+      // 並べ方の大きさ（1枚目の写真の高さ＝1 の比。0.75×1.23 など）は 1000 倍して測る（shown は写真の画素として測り、1 より小さい幅・高さは 1 にするので、
+      // そのままだと縦長の並べ方を横に広いものとして測り、横に長い枠でメインの下に小さく並べていた。2026-11-10）
+      const fit = (w: number, h: number) => shown(w * 1000, h * 1000).w / (w || 1);
       const tiling = bestTiling(aspects, fit);
       const made = await composeTiles(items, tiling);
       const newId = await putPhoto(made);
@@ -294,7 +296,7 @@ export function usePhotoActions(job: Job, setJobRaw: (fn: (j: Job) => Job) => vo
       const addedIds = await Promise.all(added.map((x) => putPhoto({blob: x.blob, w: x.w, h: x.h})));
       // いまの絵の中のそれぞれの写真が、紙の上でどれだけ小さくなったか（書き込みの文字をその分小さく）
       const oldW = shown(cur.w, cur.h, edit).w;
-      const newW = shown(tiling.w, tiling.h).w;
+      const newW = shown(tiling.w * 1000, tiling.h * 1000).w;
       const next: PhotoTiles = {
         of: newId,
         ids: [...parts.map((x) => x.id), ...addedIds],

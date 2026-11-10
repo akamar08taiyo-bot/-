@@ -33,12 +33,43 @@ test('横に長い枠（北九州市の完了報告書の改修後）に縦の�
   assert.ok(tall.rects[1].y > tall.rects[0].y);
 });
 
-test('4枚を四角に近い枠に：2×2（横や縦に1列よりも写真が大きく見える）。3枚目は下の段のまん中', () => {
+/** 並べた絵の中の写真 i の見える面積（枠に入れたあとの画素²） */
+const areaOf = (t: ReturnType<typeof bestTiling>, i: number, fit: (w: number, h: number) => number) => {
+  const k = fit(t.w, t.h);
+  return t.rects[i].w * t.w * k * t.rects[i].h * t.h * k;
+};
+
+test('メインの写真（1枚目）はいつもいちばん大きく、ほかは小さくてよい（ユーザーの指示「メインの写真は1枚必ず、その他は小さくても良い」2026-11-10）', () => {
+  for (const aspects of [[0.75, 1.333], [1.333, 0.75, 0.75], [0.75, 1.333, 1.333, 0.6], [1, 1, 1]]) {
+    for (const f of [frame(600, 330), frame(330, 600), frame(500, 400)]) {
+      const t = bestTiling(aspects, f);
+      const main = areaOf(t, 0, f);
+      for (let i = 1; i < aspects.length; i++) assert.ok(areaOf(t, i, f) <= main + 1e-6, `${aspects} の ${i}枚目はメインより大きくない`);
+    }
+  }
+});
+
+test('2枚：縦に並べる（四角に近い枠の横の写真2枚）。横に長い枠に縦の写真2枚のように、横に並べた方がずっと大きく見えるときだけ横（臨機応変）', () => {
+  const two = bestTiling([1.333, 1.333], frame(500, 400));
+  assert.ok(two.rects[1].y > two.rects[0].y + two.rects[0].h - 1e-9, '2枚目はメインの下');
+  const side = bestTiling([0.75, 0.75], frame(500, 400));
+  assert.ok(side.rects[1].x > side.rects[0].x + side.rects[0].w - 1e-9, '縦の写真2枚は横に');
+});
+
+test('3枚：縦の写真はメインを左に大きく・右に2枚を縦に。横の写真はメインを上に大きく・下に2枚を横に（ユーザーの指示「縦1枚と横に2枚並べる（臨機応変）」）', () => {
+  const tall = bestTiling([0.75, 0.75, 0.75], frame(500, 400));
+  const [m, a, b] = tall.rects;
+  assert.ok(a.x >= m.x + m.w - 1e-9 && b.x >= m.x + m.w - 1e-9, `右に ${JSON.stringify(tall.rects)}`);
+  assert.ok(b.y >= a.y + a.h - 1e-9, '右の2枚は上下');
+  assert.ok(near(m.h, 1), 'メインは高さいっぱい');
+  const wide = bestTiling([1.333, 1.333, 1.333], frame(500, 400));
+  const [m2, c, d] = wide.rects;
+  assert.ok(c.y >= m2.y + m2.h - 1e-9 && d.y >= m2.y + m2.h - 1e-9, `下に ${JSON.stringify(wide.rects)}`);
+  assert.ok(d.x >= c.x + c.w - 1e-9, '下の2枚は左右');
+  assert.ok(near(m2.w, 1), 'メインは幅いっぱい');
+  // 4枚：メインと、ほかの3枚を下か右に
   const four = bestTiling([1.333, 1.333, 1.333, 1.333], frame(500, 400));
-  assert.ok(four.rects[2].y > four.rects[0].y + four.rects[0].h - 1e-9 && near(four.rects[2].x, four.rects[0].x), JSON.stringify(four.rects));
-  const three = bestTiling([1.333, 1.333, 1.333], frame(500, 400));
-  const r = three.rects[2];
-  assert.ok(Math.abs(r.x + r.w / 2 - 0.5) < 1e-6 && r.y > three.rects[0].y, JSON.stringify(three.rects));
+  assert.ok(four.rects.slice(1).every((r) => r.y >= four.rects[0].y + four.rects[0].h - 1e-9), JSON.stringify(four.rects));
 });
 
 test('書き込みは並べた絵の中のもとの写真の所に移す（写真の同じ所）。文字は写真が小さくなった分だけ小さく、線の太さはそのまま', () => {

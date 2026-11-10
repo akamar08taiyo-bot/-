@@ -112,7 +112,7 @@ const natural = (img) =>
   await done.screenshot({path: path.join(outDir, 'photoadd-2-two.png')});
   log('プレビューの「＋ 追加」：同じ枠に横に2枚並べる（枠の中で大きく・はみ出さない）OK');
 
-  // 写真の欄：写真を押して「＋ 追加」で2枚 → 4枚（2×2）。さらに足すと4枚までと知らせる
+  // 写真の欄：写真を押して「＋ 追加」で2枚 → 4枚（メイン1枚＋ほか3枚）。さらに足すと4枚までと知らせる
   await board.getByRole('button', {name: '①玄関 改修後', exact: true}).click();
   const status = page.getByRole('status', {name: '選んでいる写真'});
   await status.waitFor();
@@ -124,7 +124,7 @@ const natural = (img) =>
   const four = await natural(pv.locator('img'));
   assert.ok(Math.abs(four.w / four.h - two.w / two.h) > 0.05, `4枚の並べ方 ${JSON.stringify([two, four])}`);
   // 並べ直した（前に並べた2枚も、もとの写真から並べた。並べた写真を1枚として並べると、前の2枚が小さくなる）：様邸の並べたもとの写真は4枚、
-  // それぞれの場所のまん中が その写真の色（青・緑・赤・紫）で、どの写真も同じくらいの大きさ
+  // それぞれの場所のまん中が その写真の色（青・緑・赤・紫）で、1枚目（メイン）がいちばん大きい（ユーザーの指示「メインの写真は1枚必ず、その他は小さくても良い」2026-11-10。前は同じくらいの大きさの 2×2）
   await page.waitForTimeout(1200);
   const tiles = await page.evaluate(async () => {
     const db = await new Promise((res, rej) => {
@@ -152,7 +152,7 @@ const natural = (img) =>
   const hue = ([r, g, b]) => (b > 150 && r < 100 && g < 140 ? '青' : g > 120 && r < 100 && b < 120 ? '緑' : r > 180 && g < 80 && b < 80 ? '赤' : r > 110 && b > 180 && g < 80 ? '紫' : `?${r},${g},${b}`);
   assert.deepEqual(centers.map(hue), ['青', '緑', '赤', '紫']);
   const areas = tiles.tiles.rects.map(([, , w, h]) => w * four.w * h * four.h);
-  assert.ok(Math.min(...areas) > Math.max(...areas) * 0.4, `同じくらいの大きさ ${areas}`);
+  assert.ok(areas.slice(1).every((a) => a <= areas[0] + 1e-6 && a > areas[0] * 0.08), `メインがいちばん大きく、ほかも見える大きさ ${areas}`);
   await done.screenshot({path: path.join(outDir, 'photoadd-3-four.png')});
   log('写真の欄の「＋ 追加」：2枚まとめて足して4枚（前の2枚も、もとの写真から並べ直す）OK');
 
