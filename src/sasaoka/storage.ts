@@ -45,6 +45,25 @@ function openDb(): Promise<IDBDatabase> {
   return dbPromise;
 }
 
+/**
+ * この端末のブラウザに「このサイトのデータを消さないで」と頼む（navigator.storage.persist）。
+ * データはこの端末のブラウザにしかないので、空き容量が少ないときの自動の削除（Android の Chrome など）や、
+ * iPhone・iPad のホーム画面から開いたアプリのデータが消されにくくなる（ユーザーの話「タブレットや携帯でひらいたらデータが消えています」2026-11-10）。
+ * 認めるかどうかはブラウザが決める（Chrome・Edge・Safari は何も聞かずに決める）。Firefox は許可を聞く画面を出すので頼まない。
+ * 同じサイトのアプリ（特定福祉用具・販売受注簿など）のデータもまとめて守られる
+ */
+export async function askPersist(): Promise<boolean> {
+  try {
+    const st = typeof navigator !== 'undefined' ? navigator.storage : undefined;
+    if (!st?.persist || !st.persisted) return false;
+    if (await st.persisted()) return true;
+    if (/Firefox\//.test(navigator.userAgent)) return false;
+    return await st.persist();
+  } catch {
+    return false;
+  }
+}
+
 /** IndexedDB を使えなかったときは localStorage に保存する（ここで失敗したら呼び出し側で警告を出す） */
 export function saveLocal(key: DataKey, value: unknown) {
   localStorage.setItem(LS_PREFIX + key, JSON.stringify(value));

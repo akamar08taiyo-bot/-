@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {cleanKey, DATA_KEYS, loadAllStamped, loadKeyStamped, loadStamps, saveKeySynced} from './storage.ts';
+import {askPersist, cleanKey, DATA_KEYS, loadAllStamped, loadKeyStamped, loadStamps, saveKeySynced} from './storage.ts';
 import type {DataKey} from './storage.ts';
 import {mergeKey} from './sync.ts';
 import type {AppData} from './types.ts';
@@ -37,6 +37,8 @@ export function useStore() {
           stamps.current.set(k, st[k]);
         }
         setData(d);
+        // 読めたら、この端末のブラウザにデータを消さないよう頼む（結果は使わない。storage.ts の askPersist）
+        void askPersist();
       })
       .catch((e) => setLoadError(String(e?.message ?? e)));
   }, []);

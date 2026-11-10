@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, LABOR_REV, OFFICES, OLD_DEFAULT_PLACES, settingsForOffice} from '../../src/sasaoka/defaults.ts';
 import {NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
-import {cleanJobs, cleanKits, cleanLabor, cleanList, cleanMaterials, cleanSettings} from '../../src/sasaoka/storage.ts';
+import {askPersist, cleanJobs, cleanKits, cleanLabor, cleanList, cleanMaterials, cleanSettings} from '../../src/sasaoka/storage.ts';
 import {staffFull, staffShort, tesuri} from '../../src/sasaoka/util.ts';
 
 test('営業所を選ぶと所長名も入る', () => {
@@ -322,4 +322,31 @@ test('請求先：前の版の初期値「笹岡工務店」は空にする（�
   assert.equal(cleanSettings({clientName: '笹岡工務店'}).clientName, '');
   assert.equal(cleanSettings({clientName: '笹岡工務店', rev: 6}).clientName, '笹岡工務店'); // 設定で入れ直した
   assert.equal(cleanSettings({clientName: '見本工務店', rev: 5}).clientName, '見本工務店');
+});
+
+test('askPersist：まだなら頼む・もう守られていれば頼まない・Firefox と使えないブラウザでは頼まない', async () => {
+  const real = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const fake = (persisted: boolean, ua = 'Mozilla/5.0 (iPhone) Safari/605.1.15') => {
+    const calls: string[] = [];
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: {userAgent: ua, storage: {persisted: async () => (calls.push('persisted'), persisted), persist: async () => (calls.push('persist'), true)}},
+    });
+    return calls;
+  };
+  try {
+    let calls = fake(false);
+    assert.equal(await askPersist(), true);
+    assert.deepEqual(calls, ['persisted', 'persist']);
+    calls = fake(true);
+    assert.equal(await askPersist(), true);
+    assert.deepEqual(calls, ['persisted']);
+    calls = fake(false, 'Mozilla/5.0 (Windows NT 10.0; rv:140.0) Gecko/20100101 Firefox/140.0');
+    assert.equal(await askPersist(), false);
+    assert.deepEqual(calls, ['persisted']);
+    Object.defineProperty(globalThis, 'navigator', {configurable: true, value: {userAgent: 'x'}});
+    assert.equal(await askPersist(), false);
+  } finally {
+    if (real) Object.defineProperty(globalThis, 'navigator', real);
+  }
 });
