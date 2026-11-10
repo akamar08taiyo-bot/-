@@ -16,7 +16,7 @@ import type {Update} from '../useStore.ts';
 import {DOOR_TYPES, FIX_TYPES, FINISH, ROOM_ROWS, ROOM_SHORT, ROOM_TYPES, roomFinish, STAIR_TYPES, STEP_TYPES, WINDOW_TYPES} from './catalog.ts';
 import {copied, DRAG_TOOLS, floorArea, handlesOf, hitTest, isCornerHandle, makeItem, moved, resized, SHAPE_COLORS, turnedItem} from './edit.ts';
 import {closed, orthoNext, shapeOf, snapPt} from './poly.ts';
-import {shapeDef, shapeIcon, SHAPES} from './shapes.ts';
+import {shapeDef, shapeIcon, SHAPES_SHOWN} from './shapes.ts';
 import type {Handle, P, Tool} from './edit.ts';
 import {MadoriPrint} from './MadoriPrint.tsx';
 import {bounds, circled, emptyMadori, hasMadori, joLabel, legendLines, legendText, lineLength, mid, MODULES, numberItems, roomAreaOf, snapStep, withFloor} from './model.ts';
@@ -718,7 +718,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
   const [recentShapes, setRecentShapes] = useState<string[]>(() => {
     try {
       const v: unknown = JSON.parse(localStorage.getItem(RECENT_SHAPES) ?? '[]');
-      return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && !!shapeDef(x)).slice(0, 10) : [];
+      return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && !!shapeDef(x) && !shapeDef(x)?.hidden).slice(0, 10) : [];
     } catch {
       return [];
     }
@@ -1248,7 +1248,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
         <div aria-label="図形の一覧" className="absolute right-0 top-full z-30 mt-1 max-h-[70vh] w-[19.5rem] overflow-y-auto rounded-lg border border-slate-300 bg-white p-2 shadow-xl max-sm:right-auto max-sm:left-0">
           {[
             ...(recentShapes.length ? [['最近使用した図形', recentShapes] as const] : []),
-            ...(['基本図形', '線', '矢印'] as const).map((g) => [g, SHAPES.filter((x) => x.group === g).map((x) => x.name)] as const),
+            ...(['基本図形', '線', '矢印'] as const).map((g) => [g, SHAPES_SHOWN.filter((x) => x.group === g).map((x) => x.name)] as const),
           ].map(([title, names]) => (
             <div key={title} className="mb-2">
               <div className="mb-1 border-b border-slate-200 pb-0.5 text-sm font-bold text-slate-700">{title}</div>

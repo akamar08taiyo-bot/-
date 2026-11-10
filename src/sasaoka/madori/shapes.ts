@@ -3,7 +3,8 @@
 // 画面・印刷・画像・Excel で同じ絵（render.ts の shapeSvg がここの道を使う）
 
 export type ShapeGroup = '基本図形' | '線' | '矢印';
-export type ShapeDef = {name: string; group: ShapeGroup; line?: boolean; open?: boolean; path?: (w: number, h: number) => string};
+// hidden：一覧に出さない図形（平面図に要らない形。ユーザーの指示「平面図に置いて不要なものは外してください。変な形の三角や四角など」2026-11-10。前に描いた図形の絵のために残す）
+export type ShapeDef = {name: string; group: ShapeGroup; line?: boolean; open?: boolean; hidden?: boolean; path?: (w: number, h: number) => string};
 
 const r1 = (v: number) => Math.round(v * 10) / 10;
 /** 0〜1 の点の並び → 箱の大きさの道 */
@@ -27,17 +28,18 @@ export const SHAPES: ShapeDef[] = [
     },
   },
   {name: '丸', group: '基本図形', path: (w, h) => `M0 ${h / 2}A${w / 2} ${h / 2} 0 1 0 ${w} ${h / 2}A${w / 2} ${h / 2} 0 1 0 0 ${h / 2}Z`},
-  {name: '三角', group: '基本図形', path: poly([[0.5, 0], [1, 1], [0, 1]])},
-  {name: '直角三角', group: '基本図形', path: poly([[0, 0], [1, 1], [0, 1]])},
-  {name: '平行四辺形', group: '基本図形', path: poly([[0.25, 0], [1, 0], [0.75, 1], [0, 1]])},
-  {name: '台形', group: '基本図形', path: poly([[0.2, 0], [0.8, 0], [1, 1], [0, 1]])},
-  {name: 'ひし形', group: '基本図形', path: poly([[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]])},
-  {name: '五角形', group: '基本図形', path: regular(5)},
-  {name: '六角形', group: '基本図形', path: regular(6)},
-  {name: '八角形', group: '基本図形', path: regular(8)},
-  {name: '十字', group: '基本図形', path: poly([[0.33, 0], [0.67, 0], [0.67, 0.33], [1, 0.33], [1, 0.67], [0.67, 0.67], [0.67, 1], [0.33, 1], [0.33, 0.67], [0, 0.67], [0, 0.33], [0.33, 0.33]])},
+  {name: '三角', hidden: true, group: '基本図形', path: poly([[0.5, 0], [1, 1], [0, 1]])},
+  {name: '直角三角', hidden: true, group: '基本図形', path: poly([[0, 0], [1, 1], [0, 1]])},
+  {name: '平行四辺形', hidden: true, group: '基本図形', path: poly([[0.25, 0], [1, 0], [0.75, 1], [0, 1]])},
+  {name: '台形', hidden: true, group: '基本図形', path: poly([[0.2, 0], [0.8, 0], [1, 1], [0, 1]])},
+  {name: 'ひし形', hidden: true, group: '基本図形', path: poly([[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]])},
+  {name: '五角形', hidden: true, group: '基本図形', path: regular(5)},
+  {name: '六角形', hidden: true, group: '基本図形', path: regular(6)},
+  {name: '八角形', hidden: true, group: '基本図形', path: regular(8)},
+  {name: '十字', hidden: true, group: '基本図形', path: poly([[0.33, 0], [0.67, 0], [0.67, 0.33], [1, 0.33], [1, 0.67], [0.67, 0.67], [0.67, 1], [0.33, 1], [0.33, 0.67], [0, 0.67], [0, 0.33], [0.33, 0.33]])},
   {
     name: 'フレーム',
+    hidden: true,
     group: '基本図形',
     path: (w, h) => {
       const t = r1(Math.min(w, h) * 0.15);
@@ -46,6 +48,7 @@ export const SHAPES: ShapeDef[] = [
   },
   {
     name: 'L字',
+    hidden: true,
     group: '基本図形',
     path: (w, h) => {
       const t = r1(Math.min(w, h) * 0.42);
@@ -54,6 +57,7 @@ export const SHAPES: ShapeDef[] = [
   },
   {
     name: '円柱',
+    hidden: true,
     group: '基本図形',
     path: (w, h) => {
       const ry = r1(h * 0.12);
@@ -62,22 +66,25 @@ export const SHAPES: ShapeDef[] = [
   },
   {
     name: '立方体',
+    hidden: true,
     group: '基本図形',
     path: (w, h) => {
       const d = r1(Math.min(w, h) * 0.25);
       return `M0 ${d}H${w - d}V${h}H0ZM0 ${d}L${d} 0H${w}L${w - d} ${d}ZM${w - d} ${d}L${w} 0V${h - d}L${w - d} ${h}Z`;
     },
   },
-  {name: '大かっこ（左）', group: '基本図形', open: true, path: (w, h) => `M${w} 0H0V${h}H${w}`},
-  {name: '大かっこ（右）', group: '基本図形', open: true, path: (w, h) => `M0 0H${w}V${h}H0`},
+  {name: '大かっこ（左）', hidden: true, group: '基本図形', open: true, path: (w, h) => `M${w} 0H0V${h}H${w}`},
+  {name: '大かっこ（右）', hidden: true, group: '基本図形', open: true, path: (w, h) => `M0 0H${w}V${h}H0`},
   {
     name: '中かっこ（左）',
+    hidden: true,
     group: '基本図形',
     open: true,
     path: (w, h) => `M${w} 0Q${w / 2} 0 ${w / 2} ${h * 0.1}V${h * 0.4}Q${w / 2} ${h / 2} 0 ${h / 2}Q${w / 2} ${h / 2} ${w / 2} ${h * 0.6}V${h * 0.9}Q${w / 2} ${h} ${w} ${h}`,
   },
   {
     name: '中かっこ（右）',
+    hidden: true,
     group: '基本図形',
     open: true,
     path: (w, h) => `M0 0Q${w / 2} 0 ${w / 2} ${h * 0.1}V${h * 0.4}Q${w / 2} ${h / 2} ${w} ${h / 2}Q${w / 2} ${h / 2} ${w / 2} ${h * 0.6}V${h * 0.9}Q${w / 2} ${h} 0 ${h}`,
@@ -99,16 +106,19 @@ export const SHAPES: ShapeDef[] = [
   {name: '上下矢印', group: '矢印', path: poly([[0.5, 0], [1, 0.25], [0.75, 0.25], [0.75, 0.75], [1, 0.75], [0.5, 1], [0, 0.75], [0.25, 0.75], [0.25, 0.25], [0, 0.25]])},
   {
     name: '四方向矢印',
+    hidden: true,
     group: '矢印',
     path: poly([[0.5, 0], [0.65, 0.15], [0.57, 0.15], [0.57, 0.43], [0.85, 0.43], [0.85, 0.35], [1, 0.5], [0.85, 0.65], [0.85, 0.57], [0.57, 0.57], [0.57, 0.85], [0.65, 0.85], [0.5, 1], [0.35, 0.85], [0.43, 0.85], [0.43, 0.57], [0.15, 0.57], [0.15, 0.65], [0, 0.5], [0.15, 0.35], [0.15, 0.43], [0.43, 0.43], [0.43, 0.15], [0.35, 0.15]]),
   },
-  {name: '曲折矢印', group: '矢印', path: poly([[0, 1], [0, 0.45], [0.1, 0.3], [0.25, 0.25], [0.7, 0.25], [0.7, 0], [1, 0.4], [0.7, 0.8], [0.7, 0.55], [0.35, 0.55], [0.3, 0.6], [0.3, 1]])},
-  {name: 'Uターン矢印', group: '矢印', path: poly([[0, 1], [0, 0.35], [0.1, 0.1], [0.3, 0], [0.55, 0], [0.75, 0.1], [0.85, 0.35], [0.85, 0.55], [1, 0.55], [0.7, 0.85], [0.4, 0.55], [0.55, 0.55], [0.55, 0.35], [0.5, 0.25], [0.42, 0.22], [0.33, 0.25], [0.28, 0.35], [0.28, 1]])},
-  {name: 'ホームベース', group: '矢印', path: poly([[0, 0], [0.75, 0], [1, 0.5], [0.75, 1], [0, 1]])},
-  {name: '山形', group: '矢印', path: poly([[0, 0], [0.7, 0], [1, 0.5], [0.7, 1], [0, 1], [0.3, 0.5]])},
+  {name: '曲折矢印', hidden: true, group: '矢印', path: poly([[0, 1], [0, 0.45], [0.1, 0.3], [0.25, 0.25], [0.7, 0.25], [0.7, 0], [1, 0.4], [0.7, 0.8], [0.7, 0.55], [0.35, 0.55], [0.3, 0.6], [0.3, 1]])},
+  {name: 'Uターン矢印', hidden: true, group: '矢印', path: poly([[0, 1], [0, 0.35], [0.1, 0.1], [0.3, 0], [0.55, 0], [0.75, 0.1], [0.85, 0.35], [0.85, 0.55], [1, 0.55], [0.7, 0.85], [0.4, 0.55], [0.55, 0.55], [0.55, 0.35], [0.5, 0.25], [0.42, 0.22], [0.33, 0.25], [0.28, 0.35], [0.28, 1]])},
+  {name: 'ホームベース', hidden: true, group: '矢印', path: poly([[0, 0], [0.75, 0], [1, 0.5], [0.75, 1], [0, 1]])},
+  {name: '山形', hidden: true, group: '矢印', path: poly([[0, 0], [0.7, 0], [1, 0.5], [0.7, 1], [0, 1], [0.3, 0.5]])},
 ];
 
 export const shapeDef = (name?: string) => SHAPES.find((s) => s.name === name);
+/** 一覧に出す図形 */
+export const SHAPES_SHOWN = SHAPES.filter((s) => !s.hidden);
 /** 線の図形か（なければ四角と同じ箱の図形） */
 export const isLineShapeType = (name?: string) => !!shapeDef(name)?.line;
 
