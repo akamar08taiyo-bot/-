@@ -23,7 +23,7 @@ import {MadoriPrint} from './MadoriPrint.tsx';
 import {bounds, circled, emptyMadori, hasMadori, joLabel, legendLines, legendText, lineLength, mid, MODULES, numberItems, railPts, railSegs, roomAreaOf, snapStep, withFloor} from './model.ts';
 import type {Madori, MFloor, MItem, Module} from './model.ts';
 import {floorSvg, patternDefs, thumbSvg, viewOf} from './render.ts';
-import {placeLookup, planSvg, sheetFloors, svgToPng} from './sheet.ts';
+import {linkPlan, placeLookup, planLinked} from './sheet.ts';
 
 type Cat = 'room' | 'stair' | 'door' | 'fix' | 'furn' | 'kaishu' | 'draw';
 // 道具の種類（マイホームクラウドと同じく 部屋・階段・間口・住設・家具。ユーザーの指示 2026-11-10。前は 部屋・建具・窓・設備・階段）
@@ -709,7 +709,9 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       const id = await putPhoto({blob, w, h});
       rememberPhotoUrl(id, blob, w, h);
       const width = m.module * 12;
-      change((mm) => ({...mm, floors: mm.floors.map((f) => (f.id === floor.id ? {...f, underlay: {photo: id, x: 0, y: 0, w: width, h: Math.round((width * h) / w), opacity: 0.4}} : f)), updatedAt: Date.now()}));
+      // 申請書の枠に入れた図（図に入れる下絵）を替えるときは、図に入れる・濃さをそのまま
+      const keep = floor.underlay?.print ? {opacity: floor.underlay.opacity, print: true as const} : {opacity: 0.4};
+      change((mm) => ({...mm, floors: mm.floors.map((f) => (f.id === floor.id ? {...f, underlay: {photo: id, x: 0, y: 0, w: width, h: Math.round((width * h) / w), ...keep}} : f)), updatedAt: Date.now()}));
       setUnderMove(true);
       fitTo([...items, {id: 'u', kind: 'room', x: 0, y: 0, w: width, h: (width * h) / w}]);
     } catch {
@@ -733,25 +735,15 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     }));
 
   // ---------------------------------------------------------------- 申請書の平面図の枠に入れる
-  const usePlan = async () => {
+  // 申請書の枠と平面図のタブは同じ図（つながっていれば、ここで描いたものはそのまま申請書に出る。madori/planImage.ts）。
+  // 「申請書の平面図に入れる」は、申請書に前の版で入れた図があるとき・枠から外したときに、もう一度つなぐ
+  const linked = planLinked(job);
+  const usePlan = () => {
     if (!hasMadori(m)) return;
-    // 申請書の枠から開いたときは、入れるために開いたので、消える書き込みがあるときだけ確かめる
-    const ask = embed ? !!job.planMarks?.length : !!job.planPhoto;
-    if (ask && !window.confirm('申請書の平面図を、この平面図に差し替えますか？（前の図への書き込みは消えます）')) return;
-    setBusy(true);
-    try {
-      const p = planSvg(m, sheetFloors(m), look.no, 'ap');
-      const {blob, w, h} = await svgToPng(p.svg, p.w, p.h, 2400, 'image/jpeg');
-      const id = await putPhoto({blob, w, h});
-      rememberPhotoUrl(id, blob, w, h);
-      setJob(({planMarks: _marks, ...j}) => ({...j, planPhoto: id}));
-      toast('申請書の平面図に入れました');
-      embed?.onDone();
-    } catch {
-      toast('平面図を絵にできませんでした', 'error');
-    } finally {
-      setBusy(false);
-    }
+    if (job.planPhoto && !window.confirm('申請書の平面図を、この平面図に差し替えますか？（前の図への書き込みは消えます）')) return;
+    if (!linked) setJob(linkPlan);
+    toast('申請書の平面図に入れました');
+    embed?.onDone();
   };
 
   // ---------------------------------------------------------------- 絵
@@ -970,9 +962,13 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
                     <input type="checkbox" checked={!floor.underlay.hidden} onChange={(e) => setUnderlay({hidden: !e.target.checked})} className="h-4 w-4" />
                     見せる
                   </label>
+                  <label className="flex items-center gap-2" title="申請書の平面図・見取図の印刷・Excel にも、この絵を入れる（申請書の枠に入れた図はこれ）">
+                    <input type="checkbox" checked={!!floor.underlay.print} onChange={(e) => setUnderlay({print: e.target.checked || undefined, ...(e.target.checked ? {opacity: 1} : {})})} className="h-4 w-4" />
+                    図に入れる
+                  </label>
                   <label className="flex items-center gap-2">
                     <span className="shrink-0 text-slate-600">濃さ</span>
-                    <input type="range" min={0.1} max={0.9} step={0.05} value={floor.underlay.opacity} onChange={(e) => setUnderlay({opacity: Number(e.target.value)})} className="w-full" aria-label="下絵の濃さ" />
+                    <input type="range" min={0.1} max={1} step={0.05} value={floor.underlay.opacity} onChange={(e) => setUnderlay({opacity: Number(e.target.value)})} className="w-full" aria-label="下絵の濃さ" />
                   </label>
                   <MmInput label="幅" value={floor.underlay.w} onChange={(w) => setUnderlay({w, h: Math.round((floor.underlay!.h * w) / floor.underlay!.w)})} min={500} />
                   <Btn color="white" small className="w-full" onClick={() => setUnderlay(null)}>
@@ -1179,7 +1175,20 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           )}
         </>
       )}
-      {it.kind === 'vrail' && <MmInput label="長さ" value={it.len ?? 800} onChange={(len) => setItem(it.id, {len})} />}
+      {it.kind === 'vrail' && (
+        <>
+          <MmInput label="長さ" value={it.len ?? 800} onChange={(len) => setItem(it.id, {len})} />
+          {/* 図の丸の大きさ・形（だ円）。角のつまみでも変えられる */}
+          <MmInput label="丸の幅" value={it.w || 150} onChange={(w) => setItem(it.id, {w})} min={40} />
+          <MmInput label="丸の高さ" value={it.h || 150} onChange={(h) => setItem(it.id, {h})} min={40} />
+        </>
+      )}
+      {it.kind === 'step' && (
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={!!it.fill} onChange={(e) => setItem(it.id, {fill: e.target.checked || undefined})} className="h-4 w-4" />
+          塗りつぶし（横四角）
+        </label>
+      )}
       {it.kind === 'text' && (
         <>
           <label className="block text-sm">
@@ -1320,61 +1329,95 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     </button>
   );
   const quick = [...new Set([...recentShapes, '直線', '矢印', '四角', '丸'])].slice(0, 4); // 最近使った図形から、足りなければ初めの4つ
-  const barBtn = (on: boolean) => `flex h-9 items-center gap-1 rounded-md border px-2.5 text-sm ${on ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-300 bg-white hover:bg-slate-50'}`;
+  const barBtn = (on: boolean) => `flex h-9 items-center gap-1 rounded-md border px-2.5 text-sm max-sm:px-1.5 ${on ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-300 bg-white hover:bg-slate-50'}`;
   const numFull = nextNo > NUM_MAX;
-  const shapeBar = (
-    <div ref={shapeBarRef} role="toolbar" aria-label="描く道具" className="relative mx-auto flex w-fit max-w-full flex-wrap items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 shadow-sm">
-      <button
-        type="button"
-        aria-expanded={shapeOpen}
-        onClick={() => setShapeOpen((o) => !o)}
-        className={`flex h-9 items-center gap-1 rounded-md border px-2.5 text-sm ${shapeOpen ? 'border-emerald-600 bg-emerald-50' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
-      >
-        図形 ▼
-      </button>
-      {/* スマホは1行に収める（最近の図形は2つ・字は隠して絵だけ） */}
-      {quick.map((n, i) => shapeBtn(n, false, () => pickShape(n), i >= 2 ? 'max-sm:hidden' : ''))}
-      <span className="mx-0.5 h-6 w-px bg-slate-200" aria-hidden />
-      <button type="button" aria-pressed={isTool({t: 'rail'})} onClick={() => pick({t: 'rail'})} className={barBtn(isTool({t: 'rail'}))} aria-label="横棒・L字" title="横棒・L字（手すり）：なぞって描く。曲げたい所で曲げると、まっすぐの線のまま曲がる">
-        <svg viewBox="0 0 24 20" className="h-5 w-6" aria-hidden>
+  // 画面のど真ん中に「丸・横四角・横棒・自在棒・文字」（ユーザーの指示「丸の塗り潰し、横四角塗り潰し（大きさや形は変動できる）横棒、自在棒（線は真っ直ぐ）、
+  // 文字入力はど真ん中に持ってくる」2026-11-10）。左に「図形 ▼」と最近の図形、右に番号。広い画面は3列で、まん中の列を段のちょうどまん中に
+  const centerTools: {tool: Tool; label: string; name: string; title: string; icon: ReactNode}[] = [
+    {tool: {t: 'vrail'}, label: '丸', name: '丸（塗りつぶし）', title: '丸（縦手すり）：押すとその所に置く・なぞると大きさ・形を決める', icon: <span className="block h-4 w-4 rounded-full bg-[#0070c0]" />},
+    {tool: {t: 'step', type: '踏み台', fill: true}, label: '横四角', name: '横四角（塗りつぶし）', title: '横四角（踏み台・段差の解消）：押すとその所に置く・なぞると大きさ・形を決める', icon: <span className="block h-3 w-6 bg-[#0070c0]" />},
+    {
+      tool: {t: 'rail', straight: true},
+      label: '横棒',
+      name: '横棒',
+      title: '横棒（横手すり）：なぞった長さのまっすぐな手すり（横か縦）',
+      icon: (
+        <svg viewBox="0 0 24 20" className="h-5 w-6">
+          <path d="M3 10H21" stroke="#e01b24" strokeWidth="2.6" />
+          <circle cx="3" cy="10" r="2.2" fill="#e01b24" />
+          <circle cx="21" cy="10" r="2.2" fill="#e01b24" />
+        </svg>
+      ),
+    },
+    {
+      tool: {t: 'rail', free: true},
+      label: '自在棒',
+      name: '自在棒',
+      title: '自在棒（手すり）：なぞって描く。曲げたい所で曲げると、まっすぐの線のまま曲がる（L字・コ字なども）',
+      icon: (
+        <svg viewBox="0 0 24 20" className="h-5 w-6">
           <path d="M3 5H15V16H21" fill="none" stroke="#e01b24" strokeWidth="2.6" strokeLinejoin="round" />
           <circle cx="3" cy="5" r="2.2" fill="#e01b24" />
           <circle cx="21" cy="16" r="2.2" fill="#e01b24" />
         </svg>
-        <span className="max-sm:hidden">横棒・L字</span>
-      </button>
-      <button type="button" aria-pressed={isTool({t: 'vrail'})} onClick={() => pick({t: 'vrail'})} className={barBtn(isTool({t: 'vrail'}))} aria-label="丸（縦手すり）" title="丸（縦手すり）：押した所に置く">
-        <span className="block h-4 w-4 rounded-full bg-[#0070c0]" aria-hidden />
-        <span className="max-sm:hidden">縦手すり</span>
-      </button>
-      <button type="button" aria-pressed={isTool({t: 'text'})} onClick={() => pick({t: 'text'})} className={barBtn(isTool({t: 'text'}))} aria-label="文字">
-        <span className="text-base font-bold leading-none">A</span>
-        <span className="max-sm:hidden">文字</span>
-      </button>
-      <button
-        type="button"
-        aria-pressed={isTool({t: 'num'})}
-        onClick={() => (numFull ? toast(`番号は${circled(NUM_MAX)}までです`, 'error') : pick({t: 'num'}))}
-        className={`${barBtn(isTool({t: 'num'}))} ${numFull ? 'opacity-50' : ''}`}
-        aria-label={`${circled(Math.min(nextNo, NUM_MAX))} 番号`}
-        title={`番号：押すたびに次の番号（${circled(1)}から${circled(NUM_MAX)}まで）`}
-      >
-        <span className="text-base leading-none text-rose-600">{circled(Math.min(nextNo, NUM_MAX))}</span>
-        <span className="max-sm:hidden">番号</span>
-      </button>
-      {shapeOpen && (
-        <div aria-label="図形の一覧" className="absolute left-0 top-full z-30 mt-1 max-h-[70vh] w-[19.5rem] overflow-y-auto rounded-lg border border-slate-300 bg-white p-2 shadow-xl">
-          {[
-            ...(recentShapes.length ? [['最近使用した図形', recentShapes] as const] : []),
-            ...(['基本図形', '線', '矢印'] as const).map((g) => [g, SHAPES_SHOWN.filter((x) => x.group === g).map((x) => x.name)] as const),
-          ].map(([title, names]) => (
-            <div key={title} className="mb-2">
-              <div className="mb-1 border-b border-slate-200 pb-0.5 text-sm font-bold text-slate-700">{title}</div>
-              <div className="flex flex-wrap gap-1">{names.map((n) => shapeBtn(n, false, () => pickShape(n)))}</div>
-            </div>
-          ))}
-        </div>
-      )}
+      ),
+    },
+    {tool: {t: 'text'}, label: '文字', name: '文字', title: '文字：押した所にそのまま打つ', icon: <span className="text-base font-bold leading-none">A</span>},
+  ];
+  const shapeBar = (
+    <div
+      role="toolbar"
+      aria-label="描く道具"
+      className="flex flex-wrap items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 shadow-sm max-lg:order-2 lg:col-span-3 lg:grid lg:grid-cols-[minmax(max-content,1fr)_auto_minmax(max-content,1fr)] lg:gap-1.5"
+    >
+      <div ref={shapeBarRef} className="relative flex items-center gap-1 lg:justify-self-end">
+        <button
+          type="button"
+          aria-expanded={shapeOpen}
+          onClick={() => setShapeOpen((o) => !o)}
+          className={`flex h-9 items-center gap-1 rounded-md border px-2.5 text-sm max-sm:px-1.5 ${shapeOpen ? 'border-emerald-600 bg-emerald-50' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+        >
+          図形 ▼
+        </button>
+        {/* スマホは1行に収める（最近の図形は出さない・字は隠して絵だけ） */}
+        {quick.map((n) => shapeBtn(n, false, () => pickShape(n), 'max-sm:hidden'))}
+        {shapeOpen && (
+          <div aria-label="図形の一覧" className="absolute left-0 top-full z-30 mt-1 max-h-[70vh] w-[19.5rem] overflow-y-auto rounded-lg border border-slate-300 bg-white p-2 shadow-xl">
+            {[
+              ...(recentShapes.length ? [['最近使用した図形', recentShapes] as const] : []),
+              ...(['基本図形', '線', '矢印'] as const).map((g) => [g, SHAPES_SHOWN.filter((x) => x.group === g).map((x) => x.name)] as const),
+            ].map(([title, names]) => (
+              <div key={title} className="mb-2">
+                <div className="mb-1 border-b border-slate-200 pb-0.5 text-sm font-bold text-slate-700">{title}</div>
+                <div className="flex flex-wrap gap-1">{names.map((n) => shapeBtn(n, false, () => pickShape(n)))}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="flex items-center gap-1 lg:border-x lg:border-slate-200 lg:px-1.5" data-draw-center>
+        {centerTools.map((c) => (
+          <button key={c.name} type="button" aria-pressed={isTool(c.tool)} onClick={() => pick(c.tool)} className={barBtn(isTool(c.tool))} aria-label={c.name} title={c.title}>
+            <span className="flex h-5 w-6 items-center justify-center" aria-hidden>
+              {c.icon}
+            </span>
+            <span className="max-sm:hidden">{c.label}</span>
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-1 lg:justify-self-start">
+        <button
+          type="button"
+          aria-pressed={isTool({t: 'num'})}
+          onClick={() => (numFull ? toast(`番号は${circled(NUM_MAX)}までです`, 'error') : pick({t: 'num'}))}
+          className={`${barBtn(isTool({t: 'num'}))} ${numFull ? 'opacity-50' : ''}`}
+          aria-label={`${circled(Math.min(nextNo, NUM_MAX))} 番号`}
+          title={`番号：押すたびに次の番号（${circled(1)}から${circled(NUM_MAX)}まで）`}
+        >
+          <span className="text-base leading-none text-rose-600">{circled(Math.min(nextNo, NUM_MAX))}</span>
+          <span className="max-sm:hidden">番号</span>
+        </button>
+      </div>
     </div>
   );
 
@@ -1383,8 +1426,8 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       {embed ? (
         <div className="flex flex-wrap items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
           <h2 className="mr-auto text-lg font-bold text-[#14532d] max-sm:w-full max-sm:text-center">📐 申請書の平面図を描く</h2>
-          <Btn color="softBlue" onClick={() => void usePlan()} disabled={!hasMadori(m) || busy}>
-            {busy ? '入れています…' : '✓ 申請書の平面図に入れる'}
+          <Btn color="softBlue" onClick={usePlan} disabled={!hasMadori(m) || busy}>
+            ✓ 申請書の平面図に入れる
           </Btn>
           <Btn color="white" onClick={onBack}>
             ✕ 閉じる
@@ -1407,9 +1450,11 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
         secondary={
           <>
             {docs?.mail}
-            <Btn color="white" onClick={() => void usePlan()} disabled={!hasMadori(m) || busy}>
-              📝 申請書の平面図に入れる
-            </Btn>
+            {!linked && (
+              <Btn color="white" onClick={usePlan} disabled={!hasMadori(m) || busy}>
+                📝 申請書の平面図に入れる
+              </Btn>
+            )}
           </>
         }
       />
@@ -1417,8 +1462,9 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       {printing && <MadoriPrint job={job} settings={s} madori={m} onClose={() => setPrinting(false)} />}
 
       {/* 上の段：階・方眼・表示・元に戻す・拡大 */}
-      {/* 左（階・方眼・表示）・まん中（戻す・進む）・右（拡大）の3つ。広い画面は3列で、戻す・進むを段のちょうどまん中に */}
-      <div role="toolbar" aria-label="平面図の設定" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm xl:grid xl:grid-cols-[minmax(max-content,1fr)_auto_minmax(0,1fr)]">
+      {/* 左（階・方眼・そろえる）・ど真ん中（戻す・進む）・右（寸法・広さ・拡大）の3つ。広い画面は左右の列を同じ幅にして、戻す・進むを段のちょうどまん中に
+          （ユーザーの指示「戻る進むもど真ん中」「寸法、広さのチェックマークは右にもってくる」2026-11-10） */}
+      <div role="toolbar" aria-label="平面図の設定" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm lg:grid lg:grid-cols-[minmax(max-content,1fr)_auto_minmax(max-content,1fr)]">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div role="tablist" aria-label="階" className="flex flex-wrap items-center gap-1">
           {m.floors.map((f) => (
@@ -1468,17 +1514,9 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
             <option value={4}>1/4マス</option>
           </select>
         </label>
-        <label className="flex items-center gap-1">
-          <input type="checkbox" checked={m.showDims} onChange={(e) => change((mm) => ({...mm, showDims: e.target.checked, updatedAt: Date.now()}))} className="h-4 w-4" />
-          寸法
-        </label>
-        <label className="flex items-center gap-1">
-          <input type="checkbox" checked={m.showArea} onChange={(e) => change((mm) => ({...mm, showArea: e.target.checked, updatedAt: Date.now()}))} className="h-4 w-4" />
-          広さ（帖）
-        </label>
         </div>
-        {/* 戻す・進むは上の段のまん中（ユーザーの指示「戻るボタンの位置は中央にもってくる」2026-11-10） */}
-        <div className="flex items-center gap-1 lg:ml-auto xl:ml-0 xl:justify-self-center">
+        {/* 戻す・進むは上の段のど真ん中（ユーザーの指示「戻るボタンの位置は中央にもってくる」「戻る進むもど真ん中」2026-11-10） */}
+        <div className="flex items-center gap-1 lg:justify-self-center" data-undo-center>
           <Btn color="white" small onClick={undo} disabled={!hist.current.past.length} title="Ctrl+Z">
             ↶ 戻す
           </Btn>
@@ -1486,7 +1524,16 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
             ↷ 進む
           </Btn>
         </div>
-        <div className="flex items-center gap-1 lg:ml-auto xl:ml-0 xl:justify-self-end">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 lg:justify-self-end">
+          <label className="flex items-center gap-1">
+            <input type="checkbox" checked={m.showDims} onChange={(e) => change((mm) => ({...mm, showDims: e.target.checked, updatedAt: Date.now()}))} className="h-4 w-4" />
+            寸法
+          </label>
+          <label className="flex items-center gap-1">
+            <input type="checkbox" checked={m.showArea} onChange={(e) => change((mm) => ({...mm, showArea: e.target.checked, updatedAt: Date.now()}))} className="h-4 w-4" />
+            広さ（帖）
+          </label>
+          <div className="flex items-center gap-1">
           <Btn color="white" small onClick={() => zoomAt(1 / 1.25)} aria-label="縮小">
             −
           </Btn>
@@ -1496,16 +1543,16 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           <Btn color="white" small onClick={() => fitTo(items)}>
             全体
           </Btn>
+          </div>
         </div>
       </div>
 
       <div className="grid items-start gap-3 lg:grid-cols-[15rem_minmax(0,1fr)_17rem]">
+        {shapeBar}
         <div ref={paletteRef} className="scroll-mt-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm max-lg:order-1" data-madori-palette>
           {palette}
         </div>
-        <div className="min-w-0 space-y-2 max-lg:order-2">
-        {shapeBar}
-        <div ref={boxRef} className="relative h-[min(calc(72vh-3rem),712px)] min-h-[340px] overflow-hidden max-lg:h-[min(58vh,560px)] max-lg:min-h-[320px] scroll-mb-2 rounded-lg border-2 border-slate-300 bg-white shadow-sm" data-madori-canvas>
+        <div ref={boxRef} className="relative h-[min(calc(72vh-3rem),712px)] min-h-[340px] overflow-hidden max-lg:order-3 max-lg:h-[min(58vh,560px)] max-lg:min-h-[320px] scroll-mb-2 rounded-lg border-2 border-slate-300 bg-white shadow-sm" data-madori-canvas>
           <svg
             ref={svgRef}
             width={size.w}
@@ -1646,13 +1693,12 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           )}
           {tool.t !== 'select' && (
             <div className="pointer-events-none absolute left-2 top-2 rounded bg-emerald-700/90 px-2 py-1 text-xs text-white">
-              {tool.t === 'room' || tool.t === 'stair' || tool.t === 'fix' || tool.t === 'door' || tool.t === 'window' || tool.t === 'step' ? tool.type : tool.t === 'rail' ? (tool.lshape ? 'L型手すり' : '手すり（横棒・L字）') : tool.t === 'vrail' ? '縦手すり' : tool.t === 'num' ? '番号' : tool.t === 'text' ? '文字' : tool.t === 'line' || tool.t === 'shape' ? tool.type : '寸法線'}
-              {tool.t === 'room' ? (poly ? '：角を押していく（はじめの点で閉じる・Enter）' : '：ドラッグで四角／角を順に押す') : tool.t === 'rail' && !tool.lshape ? '：なぞる（曲げたい所で曲げる）' : tool.t === 'num' ? `：押すたびに${circled(Math.min(nextNo, NUM_MAX))}から順に` : DRAG_TOOLS.includes(tool.t) ? '：ドラッグ' : '：押して置く'}
+              {tool.t === 'step' && tool.fill ? '横四角' : tool.t === 'room' || tool.t === 'stair' || tool.t === 'fix' || tool.t === 'door' || tool.t === 'window' || tool.t === 'step' ? tool.type : tool.t === 'rail' ? (tool.lshape ? 'L型手すり' : tool.straight ? '横棒' : '自在棒') : tool.t === 'vrail' ? '丸（縦手すり）' : tool.t === 'num' ? '番号' : tool.t === 'text' ? '文字' : tool.t === 'line' || tool.t === 'shape' ? tool.type : '寸法線'}
+              {tool.t === 'room' ? (poly ? '：角を押していく（はじめの点で閉じる・Enter）' : '：ドラッグで四角／角を順に押す') : tool.t === 'rail' && !tool.lshape && !tool.straight ? '：なぞる（曲げたい所で曲げる）' : tool.t === 'vrail' || tool.t === 'step' ? '：押して置く・なぞって大きさ' : tool.t === 'num' ? `：押すたびに${circled(Math.min(nextNo, NUM_MAX))}から順に` : DRAG_TOOLS.includes(tool.t) ? '：ドラッグ' : '：押して置く'}
             </div>
           )}
         </div>
-        </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm max-lg:order-3">{props}</div>
+        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm max-lg:order-4">{props}</div>
       </div>
     </div>
   );

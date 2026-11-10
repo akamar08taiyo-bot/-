@@ -4,6 +4,8 @@
 import {unzipSync} from 'fflate';
 import {useEffect, useState} from 'react';
 import {photoNumbers} from '../estimateForms.ts';
+import {madoriPlanJpeg} from '../madori/planImage.ts';
+import {planLinked} from '../madori/sheet.ts';
 import {brightPhoto, getPhotos} from '../photos.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {fillShinseiFiles, SHINSEI, shinseiFileName} from '../shinsei.ts';
@@ -105,9 +107,18 @@ async function photoImagesOf(job: Job, s: Settings): Promise<{images: Record<num
  * 平面図の図（Job.planPhoto。写真と同じくこの端末に入れたもの）。画面と同じく、暗い図は明るさを補正したもの。
  * 図のない様邸は image なし。missing＝この端末にない（ほかの端末で入れた）、unreadable＝この端末にあるのに読めなかった
  */
-async function planImageOf(job: Job): Promise<{image?: PhotoImage; missing: boolean; unreadable: boolean}> {
+async function planImageOf(job: Job, s: Settings): Promise<{image?: PhotoImage; missing: boolean; unreadable: boolean}> {
   const id = job.planPhoto;
-  if (!id) return {missing: false, unreadable: false};
+  // 前の版で入れた図がなければ、平面図のタブの今の図（申請書の枠と同じ図。madori/planImage.ts）
+  if (!id) {
+    if (!planLinked(job)) return {missing: false, unreadable: false};
+    try {
+      const p = await madoriPlanJpeg(job, s);
+      return p ? {image: {bytes: p.bytes, w: p.w, h: p.h}, missing: false, unreadable: false} : {missing: false, unreadable: false};
+    } catch {
+      return {missing: false, unreadable: true};
+    }
+  }
   const found = await getPhotos([id]).catch(() => null);
   const photo = found?.get(id);
   if (!found || !photo) return {missing: !!found, unreadable: !found};
@@ -127,7 +138,7 @@ export async function shinseiBook(job: Job, insurer: Insurer, s: Settings): Prom
   const map = SHINSEI[insurer];
   if (!map) throw new Error('この保険者の申請書の原本がありません');
   const photos = await photoImagesOf(job, s);
-  const plan = await planImageOf(job);
+  const plan = await planImageOf(job, s);
   const bytes = fillShinseiFiles({...(await openTemplate(insurer))}, map, {...shinseiBookValues(job, s), photoImages: photos.images, planImage: plan.image});
   return {bytes, fileName: shinseiFileName(map, job, estimateDateOf(job)), missingPhotos: photos.missing, unreadablePhotos: photos.unreadable, planMissing: plan.missing || plan.unreadable};
 }

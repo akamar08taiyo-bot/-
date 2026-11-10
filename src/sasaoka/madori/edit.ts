@@ -20,9 +20,11 @@ export type Tool =
   | {t: 'window'; type: string}
   | {t: 'fix'; type: string}
   | {t: 'stair'; type: string}
-  | {t: 'rail'; place?: string; len?: number; lshape?: boolean}
+  // 手すり：straight＝横棒（いつもまっすぐ。横か縦）、free＝自在棒（なぞって曲げる。ユーザーの指示「横棒、自在棒（線は真っ直ぐ）」2026-11-10）。
+  // どちらもないもの（左の「横手すり」）は自在棒と同じ
+  | {t: 'rail'; place?: string; len?: number; lshape?: boolean; straight?: boolean; free?: boolean}
   | {t: 'vrail'; place?: string}
-  | {t: 'step'; type: string; place?: string}
+  | {t: 'step'; type: string; place?: string; fill?: boolean} // fill＝塗りつぶしの四角（横四角）
   | {t: 'num'; place?: string}
   | {t: 'text'}
   | {t: 'line'; type: '壁' | '細線'}
@@ -40,7 +42,7 @@ export const SHAPE_COLORS: {name: string; hex: string}[] = [
 ];
 
 /** ドラッグで大きさ・長さを決める道具（ほかは押した所に置く） */
-export const DRAG_TOOLS: Tool['t'][] = ['room', 'stair', 'rail', 'step', 'line', 'dim', 'shape'];
+export const DRAG_TOOLS: Tool['t'][] = ['room', 'stair', 'rail', 'vrail', 'step', 'line', 'dim', 'shape'];
 
 /** 壁の中心線（部屋の四角の辺）。h＝横の壁（y が一定） */
 export type Wall = {h: boolean; at: number; from: number; to: number};
@@ -358,6 +360,8 @@ export function makeItem(tool: Tool, a: P, b: P, clickOnly: boolean, ctx: {items
     case 'fix':
       return placeFixture(tool.type, b, ws);
     case 'rail': {
+      // 横棒：なぞっても曲げない（横か縦のまっすぐ。押しただけなら 600mm）
+      if (tool.straight) return {id: mid(), kind: 'rail', ...railLine(a, b, ws, clickOnly, tool.len ?? 600), ...(tool.place ? {place: tool.place} : {})};
       // なぞった道が2回より多く曲がっていれば（コ字・クランクなど）、曲がり角のある棒。ななめ（45°）の区間があるときも
       if (!clickOnly && ctx.path && ctx.path.length >= 3 && !tool.lshape) {
         const pts = railPolyline(ctx.path, ws, ctx.tol ?? 120);
@@ -370,6 +374,12 @@ export function makeItem(tool: Tool, a: P, b: P, clickOnly: boolean, ctx: {items
       return {id: mid(), kind: 'rail', ...l, ...(tool.place ? {place: tool.place} : {}), ...(tool.lshape && !('turn' in l && l.turn) ? {len: 600, turn: 1 as const} : {})};
     }
     case 'vrail': {
+      // 丸（縦手すり）：なぞると、その大きさ・形（だ円）。押しただけなら決まった大きさで壁ぎわに
+      if (!clickOnly) {
+        const w = Math.max(40, snapTo(Math.abs(b.x - a.x), 10));
+        const h = Math.max(40, snapTo(Math.abs(b.y - a.y), 10));
+        return {id: mid(), kind: 'vrail', x: snapTo((a.x + b.x) / 2, 10), y: snapTo((a.y + b.y) / 2, 10), w, h, len: 800, ...(tool.place ? {place: tool.place} : {})};
+      }
       const q = vrailPoint(b, ws);
       return {id: mid(), kind: 'vrail', x: q.x, y: q.y, w: 0, h: 0, len: 800, ...(tool.place ? {place: tool.place} : {})};
     }
@@ -383,7 +393,7 @@ export function makeItem(tool: Tool, a: P, b: P, clickOnly: boolean, ctx: {items
         const y0 = snapTo(Math.min(a.y, b.y), 50);
         r = {x: x0, y: y0, w: Math.max(100, snapTo(Math.abs(b.x - a.x), 50)), h: Math.max(100, snapTo(Math.abs(b.y - a.y), 50))};
       }
-      return {id: mid(), kind: 'step', type: def.name, ...r, ...(tool.place ? {place: tool.place} : {})};
+      return {id: mid(), kind: 'step', type: def.name, ...r, ...(tool.place ? {place: tool.place} : {}), ...(tool.fill ? {fill: true} : {})};
     }
     case 'num':
       return {id: mid(), kind: 'num', x: snapTo(b.x, 10), y: snapTo(b.y, 10), w: 0, h: 0, ...(tool.place ? {place: tool.place} : {})};
@@ -438,7 +448,7 @@ const inBox = (p: P, b: Box, pad = 0) => p.x >= b.x - pad && p.x <= b.x + b.w + 
 /** p がその部品の上か（部屋のほか。tol は線をつかめる幅 mm） */
 export function hitsItem(it: MItem, p: P, tol: number): boolean {
   if (it.kind === 'text') return inBox(p, textBox(it), tol / 2);
-  if (it.kind === 'num' || it.kind === 'vrail') return Math.hypot(p.x - it.x, p.y - it.y) <= Math.max(160, tol);
+  if (it.kind === 'num' || it.kind === 'vrail') return Math.hypot(p.x - it.x, p.y - it.y) <= Math.max(160, tol, Math.max(it.w, it.h) / 2 + tol / 2);
   if (it.kind === 'rail') {
     const pts = railPts(it);
     return pts.slice(1).some((q, i) => segDist(p, pts[i], q) <= Math.max(tol, 60));
@@ -497,7 +507,7 @@ export function handlesOf(it: MItem): {h: Handle; x: number; y: number}[] {
       ...(it.kind === 'rail' ? [{h: 'e0' as Handle, x: it.x + it.w / 2, y: it.y + it.h / 2}] : []),
     ];
   }
-  if (it.kind === 'room' || it.kind === 'stair' || it.kind === 'step' || it.kind === 'fix' || it.kind === 'shape') {
+  if (it.kind === 'room' || it.kind === 'stair' || it.kind === 'step' || it.kind === 'fix' || it.kind === 'shape' || it.kind === 'vrail') {
     const b = bounds(it);
     const cx = b.x + b.w / 2;
     const cy = b.y + b.h / 2;
@@ -564,6 +574,8 @@ export function resized(it: MItem, h: Handle, p: P, step: number): MItem {
   if (h.includes('n')) y0 = Math.min(snapTo(p.y, s), y1 - s);
   if (h.includes('s')) y1 = Math.max(snapTo(p.y, s), y0 + s);
   const box = {x: x0, y: y0, w: x1 - x0, h: y1 - y0};
+  // 丸（縦手すり）は x・y がまん中。大きさ・形（だ円）を変える
+  if (it.kind === 'vrail') return {...it, x: box.x + box.w / 2, y: box.y + box.h / 2, w: Math.max(40, box.w), h: Math.max(40, box.h)};
   const vert = it.rot === 90 || it.rot === 270;
   const w = vert ? box.h : box.w;
   const hh = vert ? box.w : box.h;

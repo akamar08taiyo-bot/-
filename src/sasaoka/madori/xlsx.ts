@@ -8,7 +8,7 @@ import type {XImage, XSheet} from '../xlsxWrite.ts';
 import {SheetBuilder} from '../xlsxWrite.ts';
 import type {Madori, MFloor} from './model.ts';
 import {floorBounds} from './model.ts';
-import {floorLegend, LAYOUT, PAGE, pageTitle, placeLookup, planFit, planSvg, planView, sheetFloors, sheetText, legendFont} from './sheet.ts';
+import {floorLegend, LAYOUT, PAGE, pageTitle, placeLookup, planFit, planSvg, planView, printedUnderlay, sheetFloors, sheetText, legendFont} from './sheet.ts';
 
 const PT_PER_MM = 72 / 25.4;
 const RED = 'E01B24';
@@ -62,7 +62,7 @@ export function madoriSheet(o: {title: string; date: string; footer: string; leg
 export type PlanPng = (svg: string, w: number, h: number) => Promise<Uint8Array>;
 
 /** 様邸の見取図の Excel（階ごとに1シート）。ファイル名は「山田花子様住宅改修見取図.xlsx」 */
-export async function madoriXlsx(job: Job, s: Settings, m: Madori, png: PlanPng): Promise<{bytes: Uint8Array; fileName: string}> {
+export async function madoriXlsx(job: Job, s: Settings, m: Madori, png: PlanPng, images: Record<string, string> = {}): Promise<{bytes: Uint8Array; fileName: string}> {
   const t = sheetText(job, s, m);
   const look = placeLookup(job, s);
   const floors: MFloor[] = sheetFloors(m);
@@ -71,8 +71,8 @@ export async function madoriXlsx(job: Job, s: Settings, m: Madori, png: PlanPng)
   for (const [i, f] of floors.entries()) {
     const legend = floorLegend(m, f, look.no, look.line, i === 0);
     let img: {bytes: Uint8Array; view: {w: number; h: number}} | undefined;
-    if (floorBounds(f.items)) {
-      const p = planSvg(m, [f], look.no, `x${i}`);
+    if (floorBounds(f.items) || printedUnderlay(f)) {
+      const p = planSvg(m, [f], look.no, `x${i}`, images);
       img = {bytes: await png(p.svg, p.w, p.h), view: planView(f)};
     }
     sheets.push(madoriSheet({title: pageTitle(t, many ? f.name : ''), date: t.date, footer: t.footer, legend, name: f.name || `${i + 1}階`, png: img}));

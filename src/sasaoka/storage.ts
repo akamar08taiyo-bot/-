@@ -523,6 +523,7 @@ export function cleanJobs(raw: unknown): Job[] {
       ...(typeof j.planPhoto === 'string' && j.planPhoto ? {planPhoto: j.planPhoto} : {}), // 平面図の図（写真と同じ番号＝文字。2026-10-25）
       ...cleanPlanMarks(j), // 平面図の図への書き込み（図があるときだけ。2026-10-29）
       ...((m) => (m ? {madori: m} : {}))(cleanMadori(j.madori)), // 平面図のタブの見取図（2026-11-09。madori/model.ts）
+      ...(j.planOff === true ? {planOff: true} : {}), // 申請書の平面図の枠から外した（2026-11-10）
       // 売上見込みの月＝売上月（2026-10-25）。請求する月と同じなら持たない（請求する月と一緒に変わるように。前の版は一覧の ◀ ▶ で同じ月も持った。2026-10-26）
       ...(/^\d{4}-\d{2}$/.test(str(j.salesMonth)) && str(j.salesMonth) !== str(j.month) ? {salesMonth: str(j.salesMonth)} : {}),
       ...(isObj(j.uriage) ? {uriage: cleanUriage(j.uriage)} : {}), // 売上伝票の顧客区分・請求区分（2026-10-27）

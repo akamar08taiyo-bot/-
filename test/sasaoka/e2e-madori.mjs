@@ -259,10 +259,19 @@ log('図の上で文字を打つ・回すつまみ・L字の手すり・頂点�
   const bar = page.getByRole('toolbar', {name: '描く道具'});
   const bb = await bar.boundingBox();
   const cb = await page.locator('[data-madori-canvas]').boundingBox();
-  assert.ok(Math.abs(bb.x + bb.width / 2 - (cb.x + cb.width / 2)) < 3, `描く道具は方眼のまん中 ${JSON.stringify([bb, cb])}`);
+  // 丸・横四角・横棒・自在棒・文字は段のど真ん中、戻す・進むも上の段のど真ん中、寸法・広さは右（ユーザーの指示 2026-11-10）
+  const mid = (b) => b.x + b.width / 2;
+  const cg = await bar.locator('[data-draw-center]').boundingBox();
+  assert.ok(Math.abs(mid(cg) - mid(bb)) < 3, `描く道具のど真ん中 ${JSON.stringify([bb, cg])}`);
+  assert.deepEqual(await bar.locator('[data-draw-center] button').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label'))), ['丸（塗りつぶし）', '横四角（塗りつぶし）', '横棒', '自在棒', '文字']);
+  const sb = await page.getByRole('toolbar', {name: '平面図の設定'}).boundingBox();
+  const ub = await page.locator('[data-undo-center]').boundingBox();
+  assert.ok(Math.abs(mid(ub) - mid(sb)) < 3 && Math.abs(mid(sb) - mid(bb)) < 3, `戻す・進むのど真ん中 ${JSON.stringify([sb, ub])}`);
+  const dimBox = await page.getByRole('checkbox', {name: '寸法'}).boundingBox();
+  assert.ok(dimBox.x > mid(sb), '寸法は右');
   assert.ok(bb.y + bb.height <= cb.y + 1 && cb.y - (bb.y + bb.height) < 16, `方眼のすぐ上 ${JSON.stringify([bb, cb])}`);
   // コ字をなぞる → 曲げた手すり。選んだまま：角（■）4つと区間のまん中（□）3つ
-  await bar.getByRole('button', {name: '横棒・L字'}).click();
+  await bar.getByRole('button', {name: '自在棒'}).click();
   const px = [];
   for (const q of [[1 * M, 6 * M], [1 * M, 8 * M], [4 * M, 8 * M], [4 * M, 6 * M]]) px.push(await toPx(...q));
   await page.mouse.move(px[0].x, px[0].y);
@@ -318,7 +327,7 @@ log('図の上で文字を打つ・回すつまみ・L字の手すり・頂点�
   // 丸（縦手すり）は塗りつぶしの青
   const dots = () => art().then((h) => (h.match(/r="75" fill="#0070c0"/g) ?? []).length);
   const dots0 = await dots();
-  await bar.getByRole('button', {name: '丸（縦手すり）'}).click();
+  await bar.getByRole('button', {name: '丸（塗りつぶし）'}).click();
   await click(8 * M, 7 * M);
   assert.equal(await dots(), dots0 + 1);
   // 番号：押すたびに次の番号（道具はそのまま）
@@ -395,11 +404,38 @@ assert.ok(z['xl/media/image1.png'].length > 10000 && z['xl/media/image2.png']);
 assert.match(strFromU8(z['xl/worksheets/sheet1.xml']), /①　玄関　手すりの取り付け/);
 log('Excel：階ごとのシート・平面図の画像・一覧 OK');
 
-// ---------------- 申請書の平面図に入れる
-await page.getByRole('button', {name: /^その他/}).click(); // タブごとの機能は「その他 ▼」の中
-await page.getByRole('button', {name: '📝 申請書の平面図に入れる'}).click();
-await page.getByText('申請書の平面図に入れました').waitFor();
-log('申請書の平面図に入れる OK');
+// ---------------- 申請書の平面図の枠は、平面図のタブの今の図（ボタンを押さなくても入る。ユーザーの指示「相互転記させる」2026-11-10）。
+// 申請書の枠を押すと同じ図の編集画面。そこで描いたものは平面図のタブにも出る
+{
+  await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
+  const slot = page.locator('[data-plan-slot]');
+  const slotImg = slot.locator('img');
+  await slotImg.waitFor();
+  const svgOf = () => slotImg.evaluate(async (img) => (await fetch(img.src)).text());
+  assert.ok((await svgOf()).includes('寝室（和室）'), '申請書の枠に平面図のタブの図');
+  await slot.scrollIntoViewIfNeeded();
+  await slot.click();
+  await page.locator('[data-plan-draw]').waitFor();
+  await canvas.waitFor();
+  const before = (await art()).match(/fill="#0070c0"/g)?.length ?? 0;
+  await page.getByRole('toolbar', {name: '描く道具'}).getByRole('button', {name: '丸（塗りつぶし）'}).click();
+  await click(0.5 * M, 2 * M);
+  assert.equal((await art()).match(/fill="#0070c0"/g)?.length ?? 0, before + 1);
+  await page.getByRole('button', {name: '✓ 申請書の平面図に入れる'}).click();
+  await page.locator('[data-plan-draw]').waitFor({state: 'detached'});
+  await page.waitForFunction(async (n) => {
+    const img = document.querySelector('[data-plan-slot] img');
+    return !!img && ((await (await fetch(img.src)).text()).match(/fill="#0070c0"/g)?.length ?? 0) === n;
+  }, before + 1);
+  await page.getByRole('tab', {name: '📐 平面図'}).click();
+  await canvas.waitFor();
+  assert.equal((await art()).match(/fill="#0070c0"/g)?.length ?? 0, before + 1, '申請書の枠で描いた丸が平面図のタブにも');
+  // 「申請書の平面図に入れる」は、つながっていないとき（申請書に前の版で入れた図があるときなど）だけ「その他 ▼」に出る
+  await page.getByRole('button', {name: /^その他/}).click();
+  assert.equal(await page.getByRole('button', {name: '📝 申請書の平面図に入れる'}).count(), 0);
+  await page.keyboard.press('Escape');
+}
+log('申請書の平面図の枠＝平面図のタブの図（相互転記）OK');
 
 // ---------------- 申請書の平面図の枠から、その場で描く（新しい様邸）
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();

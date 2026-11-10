@@ -46,18 +46,20 @@ export type MItem = {
   len?: number; // 縦手すり・L型手すりの縦の長さ（mm。凡例に書く）
   // L型手すりの2本目の向き（1本目の終わりから、1本目が横なら下＝1・上＝−1、縦なら右＝1・左＝−1 へ len。一筆で描いた L 字。2026-11-10）
   turn?: 1 | -1;
-  size?: number; // 文字の大きさ（mm。図の上の大きさ）
+  size?: number; // 文字の大きさ（mm。図の上の大きさ）。丸（縦手すり）の大きさは w・h（だ円の幅・高さ。0 なら 150mm の丸）
   note?: string; // 凡例に書く文を手で直したもの（空なら自動）
   // 多角形の部屋の頂点（mm。辺はみな横か縦。poly.ts）。ないときは x・y・w・h の四角。あるときも x・y・w・h は囲む四角。
   // 手すりは曲がり角のある棒の点（始め・曲がり角…・終わり。3つ以上。ユーザーの指示「横棒とL字など、自由自在に曲げれる棒（線は真っ直ぐ）」2026-11-10）。
   // 手すりのときの x・y・w・h は1本目（始めの点から次の点まで）
   pts?: {x: number; y: number}[];
   color?: string; // 図形の色（#rrggbb。なければ赤）
-  fill?: boolean; // 箱の図形を薄く塗る
+  fill?: boolean; // 箱の図形を薄く塗る・段差の解消を塗りつぶしの四角（横四角）に
 };
 
 /** 下絵（スクリーンショット・手書きの間取りの写真をうすく敷いて、なぞって描く。写真はこの端末の IndexedDB の番号。photos.ts） */
-export type Underlay = {photo: string; x: number; y: number; w: number; h: number; opacity: number; hidden?: boolean};
+// print＝図に入れる（申請書の平面図の枠に入れた図。申請書・見取図の印刷・Excel に濃さ 1 で描く。ユーザーの指示「平面図は、申請書でもつくれるし、
+// 平面図専用からもつくれる。相互転記させる」2026-11-10）。print がなければ、なぞるための下絵（印刷しない）
+export type Underlay = {photo: string; x: number; y: number; w: number; h: number; opacity: number; hidden?: boolean; print?: boolean};
 
 export type MFloor = {id: string; name: string; items: MItem[]; underlay?: Underlay};
 
@@ -141,7 +143,12 @@ export function bounds(it: MItem): {x: number; y: number; w: number; h: number} 
     const d = it.kind === 'door' ? it.w : 120;
     return vert ? {x: it.x - d, y: it.y - it.w / 2, w: d * 2, h: it.w} : {x: it.x - it.w / 2, y: it.y - d, w: it.w, h: d * 2};
   }
-  if (it.kind === 'vrail' || it.kind === 'num') return {x: it.x - 150, y: it.y - 150, w: 300, h: 300};
+  if (it.kind === 'vrail') {
+    const w = it.w || 150;
+    const h = it.h || 150;
+    return {x: it.x - w / 2, y: it.y - h / 2, w, h};
+  }
+  if (it.kind === 'num') return {x: it.x - 150, y: it.y - 150, w: 300, h: 300};
   const vert = it.rot === 90 || it.rot === 270;
   return vert ? {x: it.x + (it.w - it.h) / 2, y: it.y + (it.h - it.w) / 2, w: it.h, h: it.w} : {x: it.x, y: it.y, w: it.w, h: it.h};
 }
@@ -298,7 +305,7 @@ export function cleanMadori(raw: unknown): Madori | undefined {
     const u = f.underlay as Record<string, unknown> | undefined;
     const underlay: Underlay | undefined =
       u && typeof u === 'object' && str(u.photo) && num(u.w) > 0 && num(u.h) > 0
-        ? {photo: str(u.photo), x: num(u.x), y: num(u.y), w: num(u.w), h: num(u.h), opacity: Math.min(1, Math.max(0.05, num(u.opacity, 0.4))), ...(u.hidden === true ? {hidden: true} : {})}
+        ? {photo: str(u.photo), x: num(u.x), y: num(u.y), w: num(u.w), h: num(u.h), opacity: Math.min(1, Math.max(0.05, num(u.opacity, 0.4))), ...(u.hidden === true ? {hidden: true} : {}), ...(u.print === true ? {print: true} : {})}
         : undefined;
     return {id: str(f.id) || mid(), name: str(f.name) || `${i + 1}階`, items, ...(underlay ? {underlay} : {})};
   });

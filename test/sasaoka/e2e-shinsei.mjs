@@ -543,7 +543,9 @@ log('写真（選ぶ・ドロップ・押して入れ替え・押して移す・
 
 // ---------------- 平面図の図（ユーザーの指示「平面図に画像をドロップ・貼り付け」2026-10-25）：プレビューの平面図の表題と工事内容のあいだの枠に、
 // ドロップ・Ctrl+V・押して選ぶ（PDF も）。写真の枠と同じ見た目（点線・「ドロップ・Ctrl+V」・ファイルを持ってくると薄い緑・重ねると「ここに離す」）。
-// 図は縦横の比のまま枠に収める（Excel と同じ位置）。押して選ぶと差し替え・削除（確かめてから）。Excel の平面図に貼る。読み直しても残る
+// 図は縦横の比のまま枠に収める（Excel と同じ位置）。Excel の平面図に貼る。読み直しても残る。
+// 入れた図は平面図のタブの図（1階の「図に入れる下絵」）になり、押すと平面図の編集画面（ユーザーの指示「平面図は、申請書でもつくれるし、平面図専用からもつくれる。相互転記させる」2026-11-10）。
+// 差し替えは枠にドロップ・Ctrl+V、削除は枠を選んで Delete（確かめてから）
 {
   const planPage = pageOf('平面図  (2)');
   const planSlot = preview.getByRole('button', {name: '平面図', exact: true});
@@ -588,16 +590,15 @@ log('写真（選ぶ・ドロップ・押して入れ替え・押して移す・
   assert.equal(await page.getByRole('status', {name: '介護保険証を読んでいます'}).count(), 0);
   const srcA = await planImg.getAttribute('src');
   await planPage.screenshot({path: path.join(outDir, '84d-plan-image.png')});
-  // 図を押すと、すぐ書き込みの画面（ユーザーの指示「書き込みオン、オフは不要で、そのまま書き込めるようにする。写真の部分と同じでよい」2026-11-04）。
-  // 差し替え・削除は書き込みの画面の上の帯。道具の列（差し替え・✏️ 書き込み・削除・完了）は出さない
+  // 図を押すと、平面図の編集画面（平面図のタブと同じ図。入れた図は下絵として見える）。道具の列（差し替え・削除・完了）は出さない
   await planSlot.click();
-  const planDlg = page.getByRole('dialog', {name: '平面図の図に書き込む'});
-  await planDlg.waitFor();
+  const planDraw = page.locator('[data-plan-draw]');
+  await planDraw.waitFor();
   assert.equal(await preview.getByRole('toolbar', {name: '平面図の図'}).count(), 0);
-  for (const b of ['差し替え', '図を削除', '閉じる']) assert.equal(await planDlg.getByRole('button', {name: b, exact: true}).count(), 1, b);
+  assert.equal(await planDraw.locator('[data-madori-canvas] svg image').count(), 1, '入れた図が平面図の下絵');
   await page.screenshot({path: path.join(outDir, '84e-plan-mark.png')});
-  await planDlg.getByRole('button', {name: '閉じる', exact: true}).click();
-  await planDlg.waitFor({state: 'detached'});
+  await planDraw.getByRole('button', {name: '✕ 閉じる'}).click();
+  await planDraw.waitFor({state: 'detached'});
   // 枠にフォーカスがあるときの Ctrl+V で差し替え（縦長の図 900×1600）。介護保険証の読み取り・写真の欄には入らない
   await planSlot.focus();
   const photoCount = (await photoIds()).length;
@@ -613,14 +614,9 @@ log('写真（選ぶ・ドロップ・押して入れ替え・押して移す・
   assert.equal(await page.getByRole('status', {name: '介護保険証を読んでいます'}).count(), 0);
   assert.equal((await photoIds()).length, photoCount + 1); // 写真と同じ所に1枚（写真の枠には入らない）
   assert.equal(await slot('②', 'トイレ', '改修後').locator('img').count(), 1);
-  // 差し替え（ファイルを選ぶ）：PDF は1ページ目を図にする（縦長の1ページの PDF → 長い辺 1600 の縦長の図）
-  await planSlot.click();
-  await planDlg.waitFor();
-  const [planChooser] = await Promise.all([page.waitForEvent('filechooser'), planDlg.getByRole('button', {name: '差し替え', exact: true}).click()]);
-  await planDlg.waitFor({state: 'detached'});
-  assert.equal(await planChooser.isMultiple(), false);
+  // 差し替え（ドロップ）：PDF は1ページ目を図にする（縦長の1ページの PDF → 縦長の図）
   const srcTall = await planImg.getAttribute('src');
-  await planChooser.setFiles({name: 'plan.pdf', mimeType: 'application/pdf', buffer: await pdfOf(await datedJpeg('#95a5a6', '2026:10:05 09:30:00'))});
+  await dropFile(planSlot, await pdfOf(await datedJpeg('#95a5a6', '2026:10:05 09:30:00')), 'plan.pdf', 'application/pdf');
   await page.waitForFunction((old) => !!document.querySelector('[data-plan-slot] img') && document.querySelector('[data-plan-slot] img').getAttribute('src') !== old, srcTall);
   // Excel：平面図のシートに図（縦横の比のまま・平面図の表題と工事内容のあいだ）
   const planBook = sheetsOf((await saveExcel()).bytes);
@@ -632,7 +628,7 @@ log('写真（選ぶ・ドロップ・押して入れ替え・押して移す・
   const planEmbed = /r:embed="([^"]+)"/.exec(planPic)[1];
   const planMedia = new RegExp(`Id="${planEmbed}"[^>]*Target="\\.\\./media/([^"]+)"`).exec(strFromU8(planBook.files[`xl/drawings/_rels/${planDrawing}.rels`]))[1];
   const [pw, ph] = jpegSize(planBook.files[`xl/media/${planMedia}`]).split('x').map(Number);
-  assert.ok(ph === 1600 && pw < ph, `PDF の図の大きさ ${pw}x${ph}`);
+  assert.ok(ph === 2400 && pw < ph, `PDF の図の大きさ ${pw}x${ph}`); // 平面図の図を長い辺 2400 画素の JPEG にして貼る（madori/planImage.ts）
   // 図形の置き場所の縦横の比も図のまま
   const [pcx, pcy] = /<a:ext cx="(\d+)" cy="(\d+)"\/>/.exec(planPic).slice(1).map(Number);
   assert.ok(Math.abs(pcx / pcy - pw / ph) < 0.01, `${pcx}/${pcy}`);
@@ -654,7 +650,7 @@ log('写真（選ぶ・ドロップ・押して入れ替え・押して移す・
             const all = tx.objectStore(n).getAll();
             all.onsuccess = () => out.push(...all.result);
           }
-          tx.oncomplete = () => resolve(JSON.stringify(out).match(/"planPhoto":"([^"]+)"/)?.[1] ?? '');
+          tx.oncomplete = () => resolve(JSON.stringify(out).match(/"underlay":\{"photo":"([^"]+)"[^}]*"print":true/)?.[1] ?? '');
         };
       }),
   );
@@ -680,13 +676,13 @@ log('写真（選ぶ・ドロップ・押して入れ替え・押して移す・
     window.__confirm = window.confirm;
     window.confirm = (m) => (window.__asked.push(m), window.__answer);
   });
-  await planSlot.click();
-  await planDlg.getByRole('button', {name: '図を削除', exact: true}).click();
+  await planSlot.focus();
+  await page.keyboard.press('Delete');
   assert.deepEqual(await page.evaluate(() => window.__asked), ['平面図の図を削除しますか？']);
   assert.equal(await planImg.count(), 1);
   await page.evaluate(() => (window.__answer = true));
-  await planDlg.getByRole('button', {name: '図を削除', exact: true}).click();
-  await planDlg.waitFor({state: 'detached'});
+  await planSlot.focus();
+  await page.keyboard.press('Delete');
   await planImg.waitFor({state: 'detached'});
   assert.match(await planSlot.innerText(), /^＋ 平面図/);
   await page.evaluate(() => (window.confirm = window.__confirm));
@@ -700,12 +696,12 @@ log('写真（選ぶ・ドロップ・押して入れ替え・押して移す・
   }, green.toString('base64'));
   await planImg.waitFor();
   await page.evaluate(() => (window.confirm = () => true));
-  await planSlot.click();
-  await planDlg.getByRole('button', {name: '図を削除', exact: true}).click();
+  await planSlot.focus();
+  await page.keyboard.press('Delete');
   await planImg.waitFor({state: 'detached'});
   await page.evaluate(() => (window.confirm = window.__confirm));
 }
-log('平面図の図（枠・ドラッグ中の色・ここに離す・ドロップ・Ctrl+V・差し替え（PDF）・Excel の平面図・読み直し・スマホの幅・削除は確かめてから）OK');
+log('平面図の図（枠・ドラッグ中の色・ここに離す・ドロップ・押すと平面図の編集画面・Ctrl+V・差し替え（PDF）・Excel の平面図・読み直し・スマホの幅・削除は確かめてから）OK');
 
 // ---------------- 写真に書く内容（ユーザーの指示「写真をめいいっぱいにしない。縦写真の場合、写真を左に寄せてスペースをつくる。横写真の場合、上にスペースをあけて
 // 入力スペースをつくる」「自動入力 手すり L=800mm H=600mm、追加 手入力例 ベースプレート L=800mm」）：写真の欄の箇所ごとに、自動の文（寸法）と手で足す行。

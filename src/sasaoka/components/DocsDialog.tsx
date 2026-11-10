@@ -132,8 +132,8 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
     }
     if (chosen.includes('madori') && job.madori) {
       // 平面図はブラウザで絵（PNG）にして貼る（印刷と同じ A4横の1枚。階ごとに1シート）
-      const [{madoriXlsx}, {svgToPng}] = await Promise.all([import('../madori/xlsx.ts'), import('../madori/sheet.ts')]);
-      const r = await madoriXlsx(job, s, job.madori, async (svg, w, h) => new Uint8Array(await (await svgToPng(svg, w, h, 2400)).blob.arrayBuffer()));
+      const [{madoriXlsx}, {svgToPng}, {underlayImages}] = await Promise.all([import('../madori/xlsx.ts'), import('../madori/sheet.ts'), import('../madori/planImage.ts')]);
+      const r = await madoriXlsx(job, s, job.madori, async (svg, w, h) => new Uint8Array(await (await svgToPng(svg, w, h, 2400)).blob.arrayBuffer()), await underlayImages(job.madori));
       add(r.bytes, r.fileName);
     }
     if (withData) {

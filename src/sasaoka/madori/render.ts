@@ -337,6 +337,8 @@ function step(it: MItem): string {
   const {w, h} = it;
   const t = it.type ?? '踏み台';
   const blue = '#1d6fd1';
+  // 横四角（塗りつぶし。ユーザーの指示「横四角塗り潰し（大きさや形は変動できる）」2026-11-10）：丸（縦手すり）と同じ青で塗る
+  if (it.fill) return placed(it, `<rect width="${w}" height="${h}" stroke="${VRAIL}" stroke-width="22" fill="${VRAIL}"/>`);
   let inner = `<rect width="${w}" height="${h}" stroke="${blue}" stroke-width="22" fill="#e8f1fc"/>`;
   if (t === 'スロープ') {
     const s = Math.min(w, h) * 0.25;
@@ -475,8 +477,11 @@ export function floorSvg(items: MItem[], o: RenderOpts): string {
       out.push(`<path d="M${r1(it.x)} ${r1(it.y)}l${r1(it.w)} ${r1(it.h)}${e ? `L${r1(e.x)} ${r1(e.y)}` : ''}" stroke="${RED}" stroke-width="45" fill="none" stroke-linejoin="round"/>`);
       out.push(`<circle cx="${r1(it.x)}" cy="${r1(it.y)}" r="55" fill="${RED}"/><circle cx="${r1(end.x)}" cy="${r1(end.y)}" r="55" fill="${RED}"/>`);
     } else if (it.kind === 'vrail') {
-      // 縦手すりは塗りつぶした丸（ユーザーの指示「○（塗り潰し）」2026-11-10。申請書の写真・平面図の書き込みの「丸（縦手すり）」と同じ青）
-      out.push(`<circle cx="${r1(it.x)}" cy="${r1(it.y)}" r="75" fill="${VRAIL}"/>`);
+      // 縦手すりは塗りつぶした丸（ユーザーの指示「○（塗り潰し）」2026-11-10。申請書の写真・平面図の書き込みの「丸（縦手すり）」と同じ青）。
+      // 大きさ・形（だ円）は w・h（0 なら 150mm の丸）
+      const rx = (it.w || 150) / 2;
+      const ry = (it.h || 150) / 2;
+      out.push(rx === ry ? `<circle cx="${r1(it.x)}" cy="${r1(it.y)}" r="${r1(rx)}" fill="${VRAIL}"/>` : `<ellipse cx="${r1(it.x)}" cy="${r1(it.y)}" rx="${r1(rx)}" ry="${r1(ry)}" fill="${VRAIL}"/>`);
     }
   }
   for (const it of items) {
@@ -484,7 +489,7 @@ export function floorSvg(items: MItem[], o: RenderOpts): string {
     if (it.kind === 'rail' && n) {
       const [nx, ny] = numSpot(it);
       out.push(numText(n, nx, ny));
-    } else if (it.kind === 'vrail' && n) out.push(numText(n, it.x + 230, it.y - 120));
+    } else if (it.kind === 'vrail' && n) out.push(numText(n, it.x + (it.w || 150) / 2 + 155, it.y - (it.h || 150) / 2 - 45));
     else if (it.kind === 'step' && n) {
       const b = bounds(it);
       out.push(numText(n, b.x + b.w + 200, b.y + 80));

@@ -5,8 +5,8 @@
 import {workItems} from '../shinsei.ts';
 import type {Job, Settings} from '../types.ts';
 import {customerFilePart, dateLabel, isoDate, staffFull} from '../util.ts';
-import {floorBounds, legendLines, numberItems} from './model.ts';
-import type {Madori, MFloor} from './model.ts';
+import {emptyMadori, floorBounds, legendLines, numberItems} from './model.ts';
+import type {Madori, MFloor, Underlay} from './model.ts';
 import {floorSvg, patternDefs, RED, viewOf} from './render.ts';
 
 /** 紙（A4横）と余白・枠の位置（mm）。Excel の列の幅・行の高さもこの数 */
@@ -51,9 +51,59 @@ export function sheetText(job: Job, s: Settings, m: Madori): SheetText {
   return {title, date: dateLabel(isoDate(m.updatedAt)), footer, fileName: `${customerFilePart(job.customer)}住宅改修見取図`};
 }
 
+/** 図に入れる下絵（申請書の平面図の枠に入れた図。隠していないもの）。なぞるための下絵は印刷しない */
+export const printedUnderlay = (f: MFloor): Underlay | undefined => (f.underlay && !f.underlay.hidden && f.underlay.print ? f.underlay : undefined);
+/** その階に図がある（部品か、図に入れる下絵） */
+export const floorHasPlan = (f: MFloor) => f.items.length > 0 || !!printedUnderlay(f);
+/** 図がある平面図（申請書の平面図の枠・印刷・Excel に出すもの） */
+export const madoriHasPlan = (m: Madori | undefined): m is Madori => !!m && m.floors.some(floorHasPlan);
+
+/**
+ * 申請書の平面図の枠が、平面図のタブの図とつながっているか（ユーザーの指示「平面図は、申請書でもつくれるし、平面図専用からもつくれる。相互転記させる」2026-11-10）：
+ * 申請書に別の図（前の版で入れた図）がない・枠から外していない・図がある。つながっていれば、申請書の枠はいつも平面図のタブの今の図
+ */
+export const planLinked = (job: Pick<Job, 'planPhoto' | 'planOff' | 'madori'>): boolean => !job.planPhoto && !job.planOff && madoriHasPlan(job.madori);
+
+/** 申請書の平面図の枠と平面図のタブの図をつなぐ（申請書に前の版で入れた図・書き込みは外す。枠から外した印も消す） */
+export function linkPlan(job: Job): Job {
+  const {planPhoto: _p, planMarks: _m, planOff: _o, ...j} = job;
+  return j;
+}
+
+/**
+ * 申請書の平面図の枠に入れた画像（ドロップ・貼り付け・選ぶ）を、平面図の1階の「図に入れる下絵」にする（濃さ 1。長い辺を 9100mm＝10マス）。
+ * 前の下絵とは差し替え。描いた部品はそのまま。平面図のタブでも同じ図が出て、上に手すり・丸・番号などを描ける
+ */
+export function withPlanImage(job: Job, photo: string, w: number, h: number): Job {
+  const m = job.madori ?? emptyMadori();
+  const k = 9100 / Math.max(1, w, h);
+  const under: Underlay = {photo, x: 0, y: 0, w: Math.round(w * k), h: Math.round(h * k), opacity: 1, print: true};
+  const [first, ...rest] = m.floors;
+  return {...linkPlan(job), madori: {...m, floors: [{...first, underlay: under}, ...rest], updatedAt: Date.now()}};
+}
+
+/**
+ * 申請書の平面図の枠の図を消す：前の版で入れた図は消す。平面図のタブの図は消さずに、申請書の枠から外す（描いた部品がなく、枠に入れた画像だけなら、その画像も外す）
+ */
+export function withoutPlan(job: Job): Job {
+  const j = linkPlan(job);
+  const m = j.madori;
+  if (!m) return j;
+  const drawn = m.floors.some((f) => f.items.length > 0);
+  const next: Job = drawn ? j : {...j, madori: {...m, floors: m.floors.map((f) => (f.underlay?.print ? (({underlay: _u, ...rest}) => rest)(f) : f)), updatedAt: Date.now()}};
+  return madoriHasPlan(next.madori) ? {...next, planOff: true} : next;
+}
+
+/** 図に入れる下絵の <image>（images＝写真の番号 → data: の URL。SVG を画像にしても写るように。ないときは描かない） */
+export function underlaySvg(f: MFloor, images: Record<string, string> = {}): string {
+  const u = printedUnderlay(f);
+  const href = u ? images[u.photo] : undefined;
+  return u && href ? `<image href="${href}" x="${u.x}" y="${u.y}" width="${u.w}" height="${u.h}" preserveAspectRatio="none"/>` : '';
+}
+
 /** 印刷・Excel に出す階（何か描いてある階。どれも白紙なら1階だけ） */
 export function sheetFloors(m: Madori): MFloor[] {
-  const drawn = m.floors.filter((f) => f.items.length > 0);
+  const drawn = m.floors.filter(floorHasPlan);
   return drawn.length ? drawn : m.floors.slice(0, 1);
 }
 
@@ -70,13 +120,21 @@ export function floorLegend(m: Madori, floor: MFloor, no: (id: string) => number
   });
 }
 
-/** 平面図の範囲（階の部品を囲む四角に寸法線・番号の分の余白） */
-export const planView = (floor: MFloor) => viewOf(floor.items, 900);
+/** 平面図の範囲（階の部品を囲む四角に寸法線・番号の分の余白。図に入れる下絵があれば、それも入る範囲） */
+export function planView(floor: MFloor): {x: number; y: number; w: number; h: number} {
+  const u = printedUnderlay(floor);
+  if (!u) return viewOf(floor.items, 900);
+  if (!floor.items.length) return {x: u.x, y: u.y, w: u.w, h: u.h};
+  const v = viewOf(floor.items, 900);
+  const x0 = Math.min(v.x, u.x);
+  const y0 = Math.min(v.y, u.y);
+  return {x: x0, y: y0, w: Math.max(v.x + v.w, u.x + u.w) - x0, h: Math.max(v.y + v.h, u.y + u.h) - y0};
+}
 
 /**
  * 平面図だけの SVG（背景は白。申請書の平面図の枠・Excel の画像）。階が2つ以上なら横に並べ、上に「1階」「2階」
  */
-export function planSvg(m: Madori, floors: MFloor[], no: (id: string) => number | undefined, pid = 'pl'): {svg: string; w: number; h: number} {
+export function planSvg(m: Madori, floors: MFloor[], no: (id: string) => number | undefined, pid = 'pl', images: Record<string, string> = {}): {svg: string; w: number; h: number} {
   const nums = numberItems(m.floors, no);
   const views = floors.map(planView);
   const label = floors.length > 1 ? 500 : 0;
@@ -87,7 +145,7 @@ export function planSvg(m: Madori, floors: MFloor[], no: (id: string) => number 
   const parts = floors.map((f, i) => {
     const v = views[i];
     const g =
-      `<g transform="translate(${x - v.x} ${label - v.y})">${floorSvg(f.items, {module: m.module, showArea: m.showArea, showDims: m.showDims, nums, pid})}</g>` +
+      `<g transform="translate(${x - v.x} ${label - v.y})">${underlaySvg(f, images)}${floorSvg(f.items, {module: m.module, showArea: m.showArea, showDims: m.showDims, nums, pid})}</g>` +
       (label ? `<text x="${x + v.w / 2}" y="${label * 0.75}" font-size="${label * 0.7}" text-anchor="middle" fill="#1f2937" font-family="'BIZ UDPGothic','Meiryo',sans-serif">${escText(f.name)}</text>` : '');
     x += v.w + gap;
     return g;
@@ -148,7 +206,7 @@ export function planFit(v: {w: number; h: number}): {x: number; y: number; w: nu
 }
 
 /** 印刷の1枚（A4横）の SVG（mm）。平面図は枠に入る大きさに縮めてまん中 */
-export function pageSvg(t: SheetText, m: Madori, floor: MFloor, legend: string[], no: (id: string) => number | undefined, floorName: string, pid: string): string {
+export function pageSvg(t: SheetText, m: Madori, floor: MFloor, legend: string[], no: (id: string) => number | undefined, floorName: string, pid: string, images: Record<string, string> = {}): string {
   const {margin} = PAGE;
   const L = LAYOUT;
   const top = margin;
@@ -164,8 +222,8 @@ export function pageSvg(t: SheetText, m: Madori, floor: MFloor, legend: string[]
     `<defs>${patternDefs(pid)}</defs><rect width="${PAGE.w}" height="${PAGE.h}" fill="#ffffff"/>` +
     `<text x="${margin + 2}" y="${top + 10}" font-size="8" fill="#111827">${escText(pageTitle(t, floorName))}</text>` +
     `<text x="${PAGE.w - margin}" y="${top + 10}" font-size="6" text-anchor="end" fill="#111827">${escText(t.date)}</text>` +
-    (floorBounds(floor.items)
-      ? `<g transform="translate(${margin + fit.x} ${bodyY + fit.y}) scale(${fit.k}) translate(${-v.x} ${-v.y})">${floorSvg(floor.items, {module: m.module, showArea: m.showArea, showDims: m.showDims, nums, pid})}</g>`
+    (floorBounds(floor.items) || printedUnderlay(floor)
+      ? `<g transform="translate(${margin + fit.x} ${bodyY + fit.y}) scale(${fit.k}) translate(${-v.x} ${-v.y})">${underlaySvg(floor, images)}${floorSvg(floor.items, {module: m.module, showArea: m.showArea, showDims: m.showDims, nums, pid})}</g>`
       : '') +
     `<rect x="${lx}" y="${bodyY}" width="${L.legendW}" height="${L.bodyH}" fill="none" stroke="#7f7f7f" stroke-width="0.9"/>` +
     legend.map((row, i) => `<text x="${lx + 4}" y="${bodyY + 4 + fs * 1.55 * (i + 0.8)}" font-size="${fs}" fill="${RED}">${escText(row)}</text>`).join('') +

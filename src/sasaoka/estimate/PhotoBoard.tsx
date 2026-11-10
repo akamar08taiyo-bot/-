@@ -36,6 +36,7 @@ import type {TileRect} from '../photoTile.ts';
 import {photoDay, photoNoteAuto, photoPlacement} from '../shinsei.ts';
 import {readStampDate} from '../stampDate.ts';
 import type {Job, PhotoEdit, PhotoMark, PhotoTiles, Place, PlacePhotoEdits, PlacePhotoMarks, PlacePhotos, PlacePhotoTiles} from '../types.ts';
+import {withoutPlan, withPlanImage} from '../madori/sheet.ts';
 import {MarkLayer} from './MarkLayer.tsx';
 
 export type PhotoSlot = 'before' | 'after';
@@ -441,14 +442,16 @@ export function usePlanActions(setJob: (fn: (j: Job) => Job) => void) {
       const {blob, w, h} = await preparePhoto(src);
       const id = await putPhoto({blob, w, h});
       rememberPhotoUrl(id, blob, w, h);
-      setJob(({planMarks: _marks, ...j}) => ({...j, planPhoto: id})); // 差し替えたら前の図への書き込みは消す（写真と同じ）
+      // 平面図のタブの図の「図に入れる下絵」にする（申請書の枠と平面図のタブは同じ図。ユーザーの指示「相互転記させる」2026-11-10。
+      // 前は申請書だけの図＝planPhoto で、平面図のタブには出なかった）。前の図への書き込みは消す（写真と同じ）
+      setJob((j) => withPlanImage(j, id, w, h));
     } catch {
       toast(`「${file.name}」を読めませんでした`, 'error');
     } finally {
       setBusy(false);
     }
   };
-  const remove = () => setJob(({planPhoto: _old, planMarks: _marks, ...j}) => j);
+  const remove = () => setJob(withoutPlan);
   // 図への書き込み（PhotoMarkEditor.tsx）。書き込みがなくなったら持たない
   const setMarks = (marks: PhotoMark[]) => setJob(({planMarks: _old, ...j}) => (marks.length ? {...j, planMarks: marks} : j));
   return {put, remove, setMarks, busy};

@@ -5,6 +5,7 @@ import {createPortal} from 'react-dom';
 import {Btn} from '../components/ui.tsx';
 import type {Job, Settings} from '../types.ts';
 import type {Madori} from './model.ts';
+import {underlayImages} from './planImage.ts';
 import {floorLegend, pageSvg, placeLookup, sheetFloors, sheetText} from './sheet.ts';
 
 const MM = 96 / 25.4;
@@ -13,7 +14,16 @@ export function MadoriPrint({job, settings, madori, onClose}: {job: Job; setting
   const t = sheetText(job, settings, madori);
   const look = useMemo(() => placeLookup(job, settings), [job, settings]);
   const floors = sheetFloors(madori);
-  const pages = floors.map((f, i) => pageSvg(t, madori, f, floorLegend(madori, f, look.no, look.line, i === 0), look.no, floors.length > 1 ? f.name : '', `pp${i}`));
+  // 図に入れる下絵（申請書の平面図の枠に入れた図）も印刷に描く
+  const [images, setImages] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let off = false;
+    void underlayImages(madori).then((x) => !off && setImages(x));
+    return () => {
+      off = true;
+    };
+  }, [madori]);
+  const pages = floors.map((f, i) => pageSvg(t, madori, f, floorLegend(madori, f, look.no, look.line, i === 0), look.no, floors.length > 1 ? f.name : '', `pp${i}`, images));
   const [picked, setPicked] = useState<Set<number>>(() => new Set(pages.map((_, i) => i)));
   const fit = () => Math.min(1, Math.max(0.25, (window.innerWidth - 16) / (297 * MM)));
   const [zoom, setZoom] = useState(fit);

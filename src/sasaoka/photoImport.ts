@@ -13,6 +13,7 @@ import {photoNumbers} from './estimateForms.ts';
 import type {EstimateRates} from './calc.ts';
 import {cleanMarks, DASHES, rotatedBounds} from './photoMarks.ts';
 import type {Insurer, Job, PhotoMark, PhotoMarkDash} from './types.ts';
+import {planLinked} from './madori/sheet.ts';
 
 /** 枠に重なる写真1枚：box は回す前の四角（画素・シートの左上から）、rot は右回りの角度、crop は切り抜き（0〜1。左・上・右・下） */
 export type FramePic = {bytes: Uint8Array; type: string; box: Box; rot: number; flipH: boolean; flipV: boolean; crop: {l: number; t: number; r: number; b: number}};
@@ -520,9 +521,9 @@ function targetOf(job: Pick<Job, 'places'>, photo: number, rates: EstimateRates)
 }
 
 /** まだ入っていない枠（写真番号の箇所があって、その改修前・改修後の写真が空。平面図は平面図の図が空）。前に取り込んだ申請書の写真だけを入れるときにも使う */
-export function missingFrames<F extends Pick<FramePhotos, 'photo' | 'slot'>>(job: Pick<Job, 'places' | 'planPhoto'>, frames: F[], rates: EstimateRates): F[] {
+export function missingFrames<F extends Pick<FramePhotos, 'photo' | 'slot'>>(job: Pick<Job, 'places' | 'planPhoto' | 'planOff' | 'madori'>, frames: F[], rates: EstimateRates): F[] {
   return frames.filter((f) => {
-    if (f.slot === 'plan') return !job.planPhoto;
+    if (f.slot === 'plan') return !job.planPhoto && !planLinked(job); // 平面図のタブの図が申請書に出ていれば入っている
     const id = targetOf(job, f.photo, rates);
     const p = id ? job.places.find((q) => q.id === id) : undefined;
     return !!p && !p.photos?.[f.slot];

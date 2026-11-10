@@ -30,6 +30,8 @@ import {zipCandidates} from '../zip.ts';
 import {PhotoBoard, PhotoOrderDialog, photoPlaces, SLOT_LABEL, usePhotoActions, usePlanActions} from './PhotoBoard.tsx';
 import {MadoriEditor} from '../madori/MadoriEditor.tsx';
 import {hasMadori} from '../madori/model.ts';
+import {useMadoriPlan} from '../madori/planImage.ts';
+import {linkPlan, planLinked} from '../madori/sheet.ts';
 import {PhotoMarkEditor} from './PhotoMarkEditor.tsx';
 import type {PhotoKey, PhotoSlot} from './PhotoBoard.tsx';
 import {canMakeShinsei, useTemplate} from './shinseiFiles.ts';
@@ -294,16 +296,23 @@ export function ShinseiEditor({
       if (key) photoActions.remove(key);
     },
   };
+  // 申請書の平面図の枠は、平面図のタブと同じ図（前の版で入れた図＝planPhoto がなければ。ユーザーの指示「平面図は、申請書でもつくれるし、
+  // 平面図専用からもつくれる。相互転記させる」2026-11-10）。押すと平面図の編集画面を重ねて開く（前の版の図は今までどおり書き込みの画面）
+  const linked = planLinked(job);
+  const madoriPlan = useMadoriPlan(job, s);
   const previewPlan: PreviewPlan = {
-    image: job.planPhoto ? (planUrl ?? null) : undefined,
-    missing: planUrl === null,
+    image: job.planPhoto ? (planUrl ?? null) : linked ? madoriPlan : undefined,
+    missing: !!job.planPhoto && planUrl === null,
     busy: planActions.busy,
     onFiles: (files) => void planActions.put(files),
     onPick: pickPlan,
     onRemove: planActions.remove,
-    marks: job.planMarks,
-    onMark: () => setPlanMarking(true),
-    onDraw: () => setPlanDrawing(true),
+    marks: job.planPhoto ? job.planMarks : undefined,
+    onMark: () => (linked ? setPlanDrawing(true) : setPlanMarking(true)),
+    onDraw: () => {
+      if (job.planOff) setJob(linkPlan);
+      setPlanDrawing(true);
+    },
   };
   // 申請書の印刷（ShinseiPrint.tsx。プレビューと同じページを A4 に）
   const [printing, setPrinting] = useState(false);
