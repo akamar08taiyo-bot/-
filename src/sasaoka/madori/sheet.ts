@@ -33,10 +33,14 @@ export function areaOf(address: string): string {
 }
 
 /** 申請書の箇所（Place.id）→ 写真番号・改修の内容（申請書と同じ文） */
-export function placeLookup(job: Job, s: Settings): {no: (id: string) => number | undefined; line: (id: string) => string | undefined; list: {id: string; photo: number; name: string; line: string}[]} {
+export function placeLookup(
+  job: Job,
+  s: Settings,
+): {no: (id: string) => number | undefined; line: (id: string) => string | undefined; byNo: (n: number) => string | undefined; list: {id: string; photo: number; name: string; line: string}[]} {
   const items = workItems(job, s);
   const map = new Map(items.map((w) => [w.id, w]));
-  return {no: (id) => map.get(id)?.photo, line: (id) => map.get(id)?.line, list: items.map((w) => ({id: w.id, photo: w.photo, name: w.name, line: w.line}))};
+  const byPhoto = new Map(items.map((w) => [w.photo, w.line]));
+  return {no: (id) => map.get(id)?.photo, line: (id) => map.get(id)?.line, byNo: (n) => byPhoto.get(n), list: items.map((w) => ({id: w.id, photo: w.photo, name: w.name, line: w.line}))};
 }
 
 export type SheetText = {title: string; date: string; footer: string; fileName: string};
@@ -108,11 +112,18 @@ export function sheetFloors(m: Madori): MFloor[] {
 }
 
 /** その階の一覧の行（階をまたいだ通し番号。その階にある番号だけ。手で直した一覧があれば、1枚目にそれを出す） */
-export function floorLegend(m: Madori, floor: MFloor, no: (id: string) => number | undefined, line: (id: string) => string | undefined, first: boolean): string[] {
+export function floorLegend(
+  m: Madori,
+  floor: MFloor,
+  no: (id: string) => number | undefined,
+  line: (id: string) => string | undefined,
+  first: boolean,
+  byNo?: (n: number) => string | undefined,
+): string[] {
   if (m.legend?.trim()) return first ? legendLines(m, no, line) : [];
   const nums = numberItems(m.floors, no);
   const here = new Set(floor.items.map((it) => nums.get(it.id)).filter((n): n is number => !!n));
-  const all = legendLines({floors: m.floors}, no, line);
+  const all = legendLines({floors: m.floors}, no, line, byNo);
   return all.filter((row) => {
     const c = row.codePointAt(0) ?? 0;
     const n = c >= 0x2460 && c <= 0x2473 ? c - 0x2460 + 1 : Number(/^\((\d+)\)/.exec(row)?.[1]);

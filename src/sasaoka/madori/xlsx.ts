@@ -69,7 +69,7 @@ export async function madoriXlsx(job: Job, s: Settings, m: Madori, png: PlanPng,
   const many = floors.length > 1;
   const sheets: XSheet[] = [];
   for (const [i, f] of floors.entries()) {
-    const legend = floorLegend(m, f, look.no, look.line, i === 0);
+    const legend = floorLegend(m, f, look.no, look.line, i === 0, look.byNo);
     let img: {bytes: Uint8Array; view: {w: number; h: number}} | undefined;
     if (floorBounds(f.items) || printedUnderlay(f)) {
       const p = planSvg(m, [f], look.no, `x${i}`, images);

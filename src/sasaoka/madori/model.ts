@@ -236,18 +236,32 @@ export function legendText(it: MItem, placeLine: (placeId: string) => string | u
   }
 }
 
-/** 一覧の行（番号の順。同じ番号は1行） */
-export function legendLines(m: Pick<Madori, 'floors' | 'legend'>, placeNo: (id: string) => number | undefined, placeLine: (id: string) => string | undefined): string[] {
+/**
+ * 一覧の行（番号の順。同じ番号は1行）。番号（①②…の道具）は、手で書いた文・つないだ箇所の文がなければ、申請書の同じ写真番号の改修の内容
+ * （lineByNo。「①玄関　手すりの取り付け　L=600mm」。ユーザーの指示「平面図の下のスペースに、申請書で入力した内容をいれる」2026-11-10）。
+ * 手すりなどの部品の行があれば、その番号はそちらを出す
+ */
+export function legendLines(
+  m: Pick<Madori, 'floors' | 'legend'>,
+  placeNo: (id: string) => number | undefined,
+  placeLine: (id: string) => string | undefined,
+  lineByNo?: (n: number) => string | undefined,
+): string[] {
   if (m.legend?.trim()) return m.legend.split('\n').map((s) => s.trimEnd()).filter((s) => s.trim());
   const nums = numberItems(m.floors, placeNo);
   const rows = new Map<number, string>();
-  for (const f of m.floors) {
-    for (const it of f.items) {
-      const n = nums.get(it.id);
-      if (!n || it.kind === 'num' || rows.has(n)) continue;
-      const t = legendText(it, placeLine);
-      if (t) rows.set(n, t);
-    }
+  const all = m.floors.flatMap((f) => f.items);
+  for (const it of all) {
+    const n = nums.get(it.id);
+    if (!n || it.kind === 'num' || rows.has(n)) continue;
+    const t = legendText(it, placeLine);
+    if (t) rows.set(n, t);
+  }
+  for (const it of all) {
+    const n = nums.get(it.id);
+    if (!n || it.kind !== 'num' || rows.has(n)) continue;
+    const t = legendText(it, placeLine) || (lineByNo?.(n) ?? '').replace(/^[①-⑳]\s*/, '');
+    if (t) rows.set(n, t);
   }
   return [...rows.entries()].sort((a, b) => a[0] - b[0]).map(([n, t]) => `${circled(n)}　${t}`);
 }

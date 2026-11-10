@@ -358,7 +358,33 @@ log('図の上で文字を打つ・回すつまみ・L字の手すり・頂点�
   assert.equal(await numBtn.getAttribute('aria-pressed'), 'true');
   assert.ok((await numBtn.innerText()).includes(circled(n0 + 3)), await numBtn.innerText());
   for (let i = 0; i < 3; i++) assert.ok((await art()).includes(`>${circled(n0 + i)}<`), `番号 ${circled(n0 + i)}`);
-  await page.keyboard.press('Escape');
+  // 番号のボタンはほかより少し大きい・右に「✓ 確定」（番号を置いている間だけ押せる。押すと置き終える。ど真ん中の道具は動かない）
+  // （ユーザーの指示「番号ボタンは確定をつくる。番号ボタンもし小さい場合は少しおおきくする」2026-11-10）
+  {
+    const nb = await numBtn.boundingBox();
+    const tb = await bar.getByRole('button', {name: '文字', exact: true}).boundingBox();
+    assert.ok(nb.height > tb.height + 4, `番号のボタンが大きい ${JSON.stringify([nb, tb])}`);
+    const done = bar.getByRole('button', {name: '番号を確定'});
+    assert.equal(await done.isEnabled(), true);
+    const db = await done.boundingBox();
+    assert.ok(db.x > nb.x + nb.width - 2 && db.x - (nb.x + nb.width) < 12 && Math.abs(db.y + db.height / 2 - (nb.y + nb.height / 2)) < 3, `確定は番号のすぐ右 ${JSON.stringify([nb, db])}`);
+    const cg2 = await bar.locator('[data-draw-center]').boundingBox();
+    assert.ok(Math.abs(mid(cg2) - mid(cg)) < 1, `確定が出てもど真ん中の道具は動かない ${JSON.stringify([cg, cg2])}`);
+    await done.click();
+    assert.equal(await numBtn.getAttribute('aria-pressed'), 'false');
+    assert.equal(await done.isDisabled(), true); // 確定はいつも番号の右にあり、番号を置いていないときは押せない
+    // 確定で止めたあと、ほかの道具（和室など）に替えて描ける（ユーザーの指示「一旦ストップして、また新たに（例えば和室）など入力できる」）
+    const has4 = (await art()).includes(`>${circled(n0 + 3)}<`);
+    await click(4 * M, 8.3 * M);
+    assert.equal((await art()).includes(`>${circled(n0 + 3)}<`), has4, '確定のあとに押しても番号は増えない');
+    await page.keyboard.press('Escape');
+    // Enter でも置き終える
+    await numBtn.click();
+    assert.equal(await done.isEnabled(), true);
+    await page.keyboard.press('Enter');
+    assert.equal(await numBtn.getAttribute('aria-pressed'), 'false');
+    assert.equal(await done.isDisabled(), true);
+  }
   // 戻す：番号3つ・丸・図形・曲げ・手すり（消したのは戻してあるので数えない）
   for (let i = 0; i < 3 + 1 + 1 + 1 + 1; i++) await page.keyboard.press('Control+z');
   assert.ok(!(await legend()).some((r) => bent.test(r)));
@@ -366,6 +392,96 @@ log('図の上で文字を打つ・回すつまみ・L字の手すり・頂点�
   assert.equal(await dots(), dots0);
 }
 log('方眼の上のまん中の描く道具・曲げた手すり（□で曲げる）・ぐしゃぐしゃで消す・丸・番号 OK');
+
+// ---------------- 住設 ▼・いつも出す（☆）・まん中の削除・右下のすべらせて戻す／進む・方眼の下の申請書の改修の内容
+// （ユーザーの指示「他の住設もプルダウンから選べるようにして、必要な住設や、矢印などは常時表示できるようにする」「削除ボタンも中央におく」
+//   「右下に、左にスラッシュすると戻る、右にスラッシュすると進む」「平面図の下のスペースに、申請書で入力した内容をいれる」2026-11-10）
+{
+  const bar = page.getByRole('toolbar', {name: '描く道具'});
+  const mid = (b) => b.x + b.width / 2;
+  const cg0 = await bar.locator('[data-draw-center]').boundingBox();
+  const fixLabels = () => bar.locator('[data-quick-fix]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+  // 住設 ▼：段にない住設（洗面セット）を一覧から選んで置く。選ぶと一覧は閉じる
+  await bar.getByRole('button', {name: '住設 ▼'}).click();
+  const list = page.getByLabel('住設の一覧');
+  await list.waitFor();
+  assert.deepEqual(await list.locator('.font-bold').allInnerTexts(), ['住設', '家具', '福祉用具']);
+  await list.getByRole('button', {name: '洗面セット', exact: true}).click();
+  assert.equal(await list.count(), 0);
+  const n0 = (await art()).length;
+  await click(8 * M, 1 * M);
+  const placedArt = await art();
+  assert.ok(placedArt.length > n0, '洗面セットを置いた');
+  await page.keyboard.press('Escape');
+  // ☆ で段にいつも出す（読み直しても覚えている）・★ でまた外す。ど真ん中の道具は動かない
+  await bar.getByRole('button', {name: '住設 ▼'}).click();
+  await list.getByRole('button', {name: '洗面セットを段にいつも出す', exact: true}).click();
+  assert.equal(await list.getByRole('button', {name: '洗面セットを段にいつも出す', exact: true}).getAttribute('aria-pressed'), 'true');
+  await page.keyboard.press('Escape');
+  assert.deepEqual(await fixLabels(), ['トイレ（便器）', '浴槽', 'キッチン', 'ベッド', '下駄箱', '洗面セット']);
+  assert.ok((await page.evaluate(() => localStorage.getItem('taiyo-madori-pins-v1'))).includes('洗面セット'));
+  const cg1 = await bar.locator('[data-draw-center]').boundingBox();
+  assert.ok(Math.abs(mid(cg1) - mid(cg0)) < 1, `住設を足してもど真ん中 ${JSON.stringify([cg0, cg1])}`);
+  await bar.getByRole('button', {name: '住設 ▼'}).click();
+  await list.getByRole('button', {name: '洗面セットを段にいつも出す', exact: true}).click();
+  await page.keyboard.press('Escape');
+  assert.deepEqual(await fixLabels(), ['トイレ（便器）', '浴槽', 'キッチン', 'ベッド', '下駄箱']);
+  // 図形 ▼ の ☆：矢印を段から外す・また出す
+  await bar.getByRole('button', {name: '図形 ▼'}).click();
+  const shapes = page.getByLabel('図形の一覧');
+  await shapes.getByRole('button', {name: '矢印を段にいつも出す', exact: true}).first().click();
+  await page.keyboard.press('Escape');
+  assert.equal(await bar.getByRole('button', {name: '矢印', exact: true}).count(), 0);
+  await bar.getByRole('button', {name: '図形 ▼'}).click();
+  await shapes.getByRole('button', {name: '矢印を段にいつも出す', exact: true}).first().click();
+  await page.keyboard.press('Escape');
+  assert.equal(await bar.getByRole('button', {name: '矢印', exact: true}).count(), 1);
+  // まん中の削除：選んだ部品を消す（何も選んでいなければ押せない）
+  const del = page.getByRole('button', {name: '選んだ部品を削除'});
+  assert.ok(await del.isDisabled());
+  {
+    const ub = await page.locator('[data-undo-center]').boundingBox();
+    const sb = await page.getByRole('toolbar', {name: '平面図の設定'}).boundingBox();
+    assert.ok(Math.abs(mid(ub) - mid(sb)) < 3, `削除もまん中 ${JSON.stringify([ub, sb])}`);
+  }
+  await click(8 * M, 1 * M);
+  assert.ok(await del.isEnabled());
+  await del.click();
+  assert.equal((await art()).length, n0, '削除で消えた');
+  // 右下：左へすべらせると戻す・右へすべらせると進む（1回で1つ。方眼には描かない）
+  const pad = page.locator('[data-swipe-undo]');
+  const pb = await pad.boundingBox();
+  const cb = await page.locator('[data-madori-canvas]').boundingBox();
+  assert.ok(pb.x + pb.width > cb.x + cb.width - 60 && pb.y + pb.height > cb.y + cb.height - 60, `右下 ${JSON.stringify([pb, cb])}`);
+  const slide = async (dx) => {
+    await page.mouse.move(pb.x + pb.width / 2, pb.y + pb.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(pb.x + pb.width / 2 + dx, pb.y + pb.height / 2, {steps: 6});
+    await page.mouse.up();
+  };
+  await slide(-90);
+  assert.equal(await art(), placedArt, '左へすべらせて戻す（消したのが戻る）');
+  await slide(90);
+  assert.equal((await art()).length, n0, '右へすべらせて進む（また消える）');
+  // 方眼の下：申請書の改修の内容（申請書と同じ書き方）
+  const works = await page.locator('[data-plan-works] li').allInnerTexts();
+  assert.ok(works.length >= 1, JSON.stringify(works));
+  assert.match(works[0], /^①玄関　手すりの取り付け/);
+  const wb = await page.locator('[data-plan-works]').boundingBox();
+  assert.ok(wb.y > cb.y + cb.height - 1 && Math.abs(wb.x - cb.x) < 2, `方眼の下 ${JSON.stringify([wb, cb])}`);
+  // 番号を置くと、右の一覧に申請書の同じ写真番号の改修の内容（番号だけの部品のとき）
+  const numBtn = bar.getByRole('button', {name: /番号$/});
+  const k = (await numBtn.innerText()).trim().codePointAt(0) - 0x2460 + 1;
+  const want = works.find((w) => w.startsWith(String.fromCharCode(0x2460 + k - 1)));
+  await numBtn.click();
+  await click(4 * M, 8.3 * M);
+  await bar.getByRole('button', {name: '番号を確定'}).click();
+  const rowK = (await legend()).find((r) => r.startsWith(String.fromCharCode(0x2460 + k - 1)));
+  if (want) assert.equal(rowK, `${want.slice(0, 1)}　${want.slice(1)}`);
+  else assert.equal(rowK, undefined);
+  await page.keyboard.press('Control+z');
+}
+log('住設 ▼・いつも出す・まん中の削除・すべらせて戻す／進む・方眼の下の改修の内容・番号の一覧 OK');
 
 // ---------------- 2階
 await page.getByRole('button', {name: '＋ 階'}).click();
@@ -488,6 +604,21 @@ await canvas.waitFor();
 await page.waitForTimeout(400);
 const box = await canvas.boundingBox();
 assert.ok(box.y >= 0 && box.y < 844 && box.y + box.height <= 844 + 40, `方眼が画面に見える ${JSON.stringify(box)}`);
+// 携帯：番号の「✓ 確定」はいつも番号の右（番号を置いている間だけ押せる。段の高さ・方眼の位置は変わらない）
+{
+  const pbar = page.getByRole('toolbar', {name: '描く道具'});
+  const before = await pbar.boundingBox();
+  await pbar.getByRole('button', {name: /番号$/}).click();
+  const done = pbar.getByRole('button', {name: '番号を確定'});
+  assert.ok(await done.isVisible());
+  assert.ok(await done.isEnabled());
+  const after = await pbar.boundingBox();
+  assert.ok(Math.abs(after.height - before.height) < 1, `段の高さ ${before.height} → ${after.height}`);
+  assert.ok(Math.abs((await canvas.boundingBox()).y - box.y) < 1, '方眼の位置は変わらない');
+  await page.screenshot({path: path.join(outDir, 'madori-phone-num.png')});
+  await done.click();
+  assert.ok(await done.isDisabled());
+}
 await page.screenshot({path: path.join(outDir, 'madori-phone.png'), fullPage: true});
 log('スマホの幅で横にはみ出さない OK');
 

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {handlesOf, makeItem, resized} from '../../src/sasaoka/madori/edit.ts';
-import {bounds, cleanMadori, emptyMadori} from '../../src/sasaoka/madori/model.ts';
+import {bounds, cleanMadori, emptyMadori, legendLines} from '../../src/sasaoka/madori/model.ts';
 import type {Madori, MItem} from '../../src/sasaoka/madori/model.ts';
 import {floorSvg} from '../../src/sasaoka/madori/render.ts';
 import {linkPlan, madoriHasPlan, planLinked, planSvg, planView, sheetFloors, withoutPlan, withPlanImage} from '../../src/sasaoka/madori/sheet.ts';
@@ -102,4 +102,19 @@ test('横四角（塗りつぶし）：なぞった大きさの青い四角・�
   // 自在棒は同じなぞり方で曲がる
   const free = makeItem({t: 'rail', free: true}, path[0], path[path.length - 1], false, {...ctx, path})!;
   assert.ok(free.pts || free.len);
+});
+
+test('番号（①②の道具）の一覧の行は、申請書の同じ写真番号の改修の内容。手で書いた文・手すりなどの部品の行があればそちら', () => {
+  // ユーザーの指示「平面図の下のスペースに、申請書で入力した内容をいれる。①玄関　手すり取付（申請書の書き方にあわせる）L=600 みたいな感じ」2026-11-10
+  const m = emptyMadori();
+  m.floors[0].items.push(
+    {id: 'n1', kind: 'num', x: 0, y: 0, w: 0, h: 0},
+    {id: 'n2', kind: 'num', x: 500, y: 0, w: 0, h: 0, note: '手で書いた'},
+    {id: 'r', kind: 'rail', x: 0, y: 1000, w: 900, h: 0},
+  );
+  const lines: Record<number, string> = {1: '①玄関　手すり取付　L=600mm', 2: '②浴室　手すり取付　L=800mm', 3: '③トイレ　手すり取付　L=700mm'};
+  const none = () => undefined;
+  assert.deepEqual(legendLines(m, none, none, (n) => lines[n]), ['①　玄関　手すり取付　L=600mm', '②　手で書いた', '③　L＝900mm']);
+  // 申請書の文を渡さないときは、前と同じ（番号だけの部品は一覧に出さない）
+  assert.deepEqual(legendLines(m, none, none), ['②　手で書いた', '③　L＝900mm']);
 });

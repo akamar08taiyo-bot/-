@@ -23,7 +23,7 @@ export function MadoriPrint({job, settings, madori, onClose}: {job: Job; setting
       off = true;
     };
   }, [madori]);
-  const pages = floors.map((f, i) => pageSvg(t, madori, f, floorLegend(madori, f, look.no, look.line, i === 0), look.no, floors.length > 1 ? f.name : '', `pp${i}`, images));
+  const pages = floors.map((f, i) => pageSvg(t, madori, f, floorLegend(madori, f, look.no, look.line, i === 0, look.byNo), look.no, floors.length > 1 ? f.name : '', `pp${i}`, images));
   const [picked, setPicked] = useState<Set<number>>(() => new Set(pages.map((_, i) => i)));
   const fit = () => Math.min(1, Math.max(0.25, (window.innerWidth - 16) / (297 * MM)));
   const [zoom, setZoom] = useState(fit);

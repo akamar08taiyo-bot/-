@@ -69,14 +69,28 @@ type Drag =
 /** 最近使った図形（この端末の localStorage） */
 const RECENT_SHAPES = 'taiyo-madori-recent-shapes';
 
-/** 描く道具の段の住設（名前・部品の種類。catalog.ts の FIX_TYPES） */
-const QUICK_FIX: [string, string, string?][] = [
-  ['トイレ', '洋式便器', 'トイレ（便器）'], // 左の一覧の部屋の「トイレ」と見分ける名前
-  ['浴槽', '浴槽'],
-  ['キッチン', 'I型キッチン'],
-  ['ベッド', 'ベッド'],
-  ['下駄箱', '玄関収納'],
-];
+/**
+ * 描く道具の段にいつも出す住設・図形（ユーザーの指示「他の住設もプルダウンから選べるようにして、必要な住設や、矢印などは常時表示できるようにする」2026-11-10）。
+ * 「住設 ▼」「図形 ▼」の一覧の ☆ を押すと段にいつも出す（★）。この端末の localStorage に覚える（読めなくても初めの並びで動く）
+ */
+const PINS = 'taiyo-madori-pins-v1';
+const PIN_FIX_DEFAULT = ['洋式便器', '浴槽', 'I型キッチン', 'ベッド', '玄関収納']; // 前の段の住設（ユーザーの指示「トイレ、浴槽、キッチン、ベッド、下駄箱」）
+const PIN_SHAPE_DEFAULT = ['直線', '矢印', '四角', '丸'];
+/** 段の住設のボタンの名前（部品の種類の名前と違うもの）と、読み上げの名前（左の一覧の部屋の「トイレ」と見分ける） */
+const FIX_LABEL: Record<string, [string, string?]> = {洋式便器: ['トイレ', 'トイレ（便器）'], I型キッチン: ['キッチン'], 玄関収納: ['下駄箱']};
+type Pins = {fix: string[]; shape: string[]};
+function readPins(): Pins {
+  try {
+    const v = JSON.parse(localStorage.getItem(PINS) ?? 'null') as Partial<Pins> | null;
+    const list = (x: unknown, ok: (n: string) => boolean, d: string[]) => (Array.isArray(x) ? x.filter((n): n is string => typeof n === 'string' && ok(n)) : d);
+    return {
+      fix: list(v?.fix, (n) => FIX_TYPES.some((f) => f.name === n), PIN_FIX_DEFAULT),
+      shape: list(v?.shape, (n) => !!shapeDef(n) && !shapeDef(n)?.hidden, PIN_SHAPE_DEFAULT),
+    };
+  } catch {
+    return {fix: PIN_FIX_DEFAULT, shape: PIN_SHAPE_DEFAULT};
+  }
+}
 
 /** 番号の道具で置ける番号（ユーザーの指示「番号1番から自動で2.3.4.5、15まで」2026-11-10） */
 const NUM_MAX = 15;
@@ -643,10 +657,10 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       } else if (ctrl && key === 'y') {
         e.preventDefault();
         redo();
-      } else if (e.key === 'Escape') {
-        setTool({t: 'select'});
-        setPreview(null);
-        setSel(null);
+      } else if (e.key === 'Escape' || (e.key === 'Enter' && tool.t === 'num')) {
+        // Esc（番号を置いているときは Enter も）で道具をやめる＝番号の「✓ 確定」と同じ
+        if (e.key === 'Enter') e.preventDefault();
+        endTool();
       } else if (!selItem) {
         return;
       } else if (canType(selItem) && !ctrl && !e.altKey && (e.key === 'F2' || e.key === 'Enter')) {
@@ -766,7 +780,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
   const gridDefs =
     `<pattern id="ed-g1" width="${minor}" height="${minor}" patternUnits="userSpaceOnUse"><path d="M${minor} 0H0V${minor}" fill="none" stroke="#e6ebf2" stroke-width="${px}"/></pattern>` +
     `<pattern id="ed-g2" width="${m.module}" height="${m.module}" patternUnits="userSpaceOnUse"><path d="M${m.module} 0H0V${m.module}" fill="none" stroke="#c3cedb" stroke-width="${px * 1.2}"/></pattern>`;
-  const legend = legendLines({floors: m.floors}, look.no, look.line);
+  const legend = legendLines({floors: m.floors}, look.no, look.line, look.byNo);
   const area = floorArea(items);
   const total = m.floors.reduce((a, f) => a + floorArea(f.items), 0);
   const insurer = jobInsurer(job);
@@ -778,6 +792,21 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     setSel(null);
     setPreview(null);
     if (t.t !== 'room') setPoly(null); // 部屋の種類を替えるだけなら、描いている頂点はそのまま
+  };
+  // 右下のすべらせて戻す・進む：押した所・もう動いたか・光らせる側
+  const swipe = useRef<{x: number; done: boolean} | null>(null);
+  const [swiped, setSwiped] = useState<'undo' | 'redo' | null>(null);
+  const swipeStep = (dir: 'undo' | 'redo') => {
+    if (dir === 'undo') undo();
+    else redo();
+    setSwiped(dir);
+    window.setTimeout(() => setSwiped((cur) => (cur === dir ? null : cur)), 450);
+  };
+  // 道具をやめて「選ぶ・動かす」に戻す（Esc・番号の「✓ 確定」・番号を置いているときの Enter）。選んでいる部品も外す
+  const endTool = () => {
+    setTool({t: 'select'});
+    setPreview(null);
+    setSel(null);
   };
   const isTool = (t: Tool) => JSON.stringify(tool) === JSON.stringify(t);
   // 図形の一覧（Excel の「図形 ▼」）と、最近使った図形（この端末に覚える。読めなくても動く）
@@ -791,6 +820,24 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       return [];
     }
   });
+  const [pins, setPins] = useState<Pins>(readPins);
+  const togglePin = (kind: keyof Pins, name: string) =>
+    setPins((p) => {
+      const next = {...p, [kind]: p[kind].includes(name) ? p[kind].filter((x) => x !== name) : [...p[kind], name]};
+      try {
+        localStorage.setItem(PINS, JSON.stringify(next));
+      } catch {
+        /* 覚えられなくても、この画面の間は出る */
+      }
+      return next;
+    });
+  // 住設の一覧（「住設 ▼」。左の一覧の住設・家具・福祉用具と同じ部品）
+  const [fixOpen, setFixOpen] = useState(false);
+  const fixBarRef = useRef<HTMLDivElement>(null);
+  const pickFix = (type: string) => {
+    pick({t: 'fix', type});
+    setFixOpen(false);
+  };
   const pickShape = (name: string) => {
     pick({t: 'shape', type: name});
     setShapeOpen(false);
@@ -803,20 +850,24 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     }
   };
   useEffect(() => {
-    if (!shapeOpen) return;
-    const onDown = (e: MouseEvent) => {
+    if (!shapeOpen && !fixOpen) return;
+    const onDown = (e: PointerEvent) => {
       if (!shapeBarRef.current?.contains(e.target as Node)) setShapeOpen(false);
+      if (!fixBarRef.current?.contains(e.target as Node)) setFixOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setShapeOpen(false);
+      if (e.key === 'Escape') {
+        setShapeOpen(false);
+        setFixOpen(false);
+      }
     };
-    document.addEventListener('mousedown', onDown);
+    document.addEventListener('pointerdown', onDown);
     document.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('pointerdown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [shapeOpen]);
+  }, [shapeOpen, fixOpen]);
   // 一覧の絵（部品ごとの SVG。一度だけ作る）
   const thumbs = useMemo(() => {
     const by = <T extends {name: string}>(list: T[], f: (x: T) => string) => Object.fromEntries(list.map((x) => [x.name, f(x)])) as Record<string, string>;
@@ -1344,9 +1395,49 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       {withLabel && <span className="whitespace-nowrap">{name}</span>}
     </button>
   );
-  const quick = [...new Set([...recentShapes, '直線', '矢印', '四角', '丸'])].slice(0, 4); // 最近使った図形から、足りなければ初めの4つ
+  // 一覧の ☆／★（押すと段にいつも出す・出さない。図形・住設の絵のボタンの右上）
+  const pinBtn = (kind: keyof Pins, name: string) => {
+    const on = pins[kind].includes(name);
+    return (
+      <button
+        type="button"
+        aria-pressed={on}
+        aria-label={`${name}を段にいつも出す`}
+        title={on ? '段にいつも出す（押すと出さない）' : '段にいつも出す'}
+        onClick={(e) => {
+          e.stopPropagation();
+          togglePin(kind, name);
+        }}
+        className={`absolute -right-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full border text-[11px] leading-none ${on ? 'border-amber-400 bg-amber-50 text-amber-500' : 'border-slate-300 bg-white text-slate-400 hover:text-amber-500'}`}
+        data-pin
+      >
+        {on ? '★' : '☆'}
+      </button>
+    );
+  };
+  // 段の住設のボタン（絵＋短い名前）
+  const fixBarBtn = (type: string) => {
+    const [label, aria] = FIX_LABEL[type] ?? [type];
+    return (
+      <button
+        key={type}
+        type="button"
+        aria-pressed={isTool({t: 'fix', type})}
+        onClick={() => pickFix(type)}
+        aria-label={aria ?? label}
+        title={`${label}：押してから方眼を押すと、壁ぎわに置く`}
+        className={`flex h-11 min-w-12 max-w-16 flex-col items-center justify-center rounded-md border px-0.5 leading-none max-sm:h-9 max-sm:min-w-9 ${isTool({t: 'fix', type}) ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+        data-quick-fix
+      >
+        <span className="block h-6 w-8 [&>svg]:h-full [&>svg]:w-full" aria-hidden dangerouslySetInnerHTML={{__html: thumbs.fix[type]}} />
+        {/* 名前の字は、スマホではしまう（名前はマウスを乗せると出る） */}
+        <span className="mt-0.5 w-full truncate text-center text-[10px] text-slate-700 max-sm:hidden">{label}</span>
+      </button>
+    );
+  };
   const barBtn = (on: boolean) => `flex h-9 items-center gap-1 rounded-md border px-2.5 text-sm max-sm:px-1.5 ${on ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-300 bg-white hover:bg-slate-50'}`;
   const numFull = nextNo > NUM_MAX;
+  const numOn = tool.t === 'num';
   // 画面のど真ん中に「丸・横四角・横棒・自在棒・文字」（ユーザーの指示「丸の塗り潰し、横四角塗り潰し（大きさや形は変動できる）横棒、自在棒（線は真っ直ぐ）、
   // 文字入力はど真ん中に持ってくる」2026-11-10）。左に「図形 ▼」と最近の図形、右に番号。広い画面は3列で、まん中の列を段のちょうどまん中に
   const centerTools: {tool: Tool; label: string; name: string; title: string; icon: ReactNode}[] = [
@@ -1384,9 +1475,10 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     <div
       role="toolbar"
       aria-label="描く道具"
-      className="flex flex-wrap items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 shadow-sm max-lg:order-2 lg:col-span-3 lg:grid lg:grid-cols-[minmax(max-content,1fr)_auto_minmax(max-content,1fr)] lg:gap-1.5"
+      className="flex flex-wrap items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 shadow-sm max-lg:order-2 lg:col-span-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:gap-1.5"
     >
-      <div ref={shapeBarRef} className="relative flex items-center gap-1 lg:justify-self-end">
+      {/* 左右の列は中身が多いと折り返す（いつも出す図形・住設を増やしても、まん中の道具は段のど真ん中のまま） */}
+      <div ref={shapeBarRef} className="relative flex flex-wrap items-center justify-center gap-1 lg:justify-end">
         <button
           type="button"
           aria-expanded={shapeOpen}
@@ -1395,17 +1487,25 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
         >
           図形 ▼
         </button>
-        {/* スマホは1行に収める（最近の図形は出さない・字は隠して絵だけ） */}
-        {quick.map((n) => shapeBtn(n, false, () => pickShape(n), 'max-sm:hidden'))}
+        {/* いつも出す図形（初めは直線・矢印・四角・丸。一覧の ☆ で増やす・減らす） */}
+        {pins.shape.map((n) => shapeBtn(n, false, () => pickShape(n)))}
         {shapeOpen && (
-          <div aria-label="図形の一覧" className="absolute left-0 top-full z-30 mt-1 max-h-[70vh] w-[19.5rem] overflow-y-auto rounded-lg border border-slate-300 bg-white p-2 shadow-xl">
+          <div aria-label="図形の一覧" className="absolute left-0 top-full z-30 mt-1 max-h-[70vh] w-[20rem] max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-lg border border-slate-300 bg-white p-2 shadow-xl">
+            <div className="mb-1 text-right text-xs text-slate-500">☆ を押すと段にいつも出します</div>
             {[
               ...(recentShapes.length ? [['最近使用した図形', recentShapes] as const] : []),
               ...(['基本図形', '線', '矢印'] as const).map((g) => [g, SHAPES_SHOWN.filter((x) => x.group === g).map((x) => x.name)] as const),
             ].map(([title, names]) => (
               <div key={title} className="mb-2">
                 <div className="mb-1 border-b border-slate-200 pb-0.5 text-sm font-bold text-slate-700">{title}</div>
-                <div className="flex flex-wrap gap-1">{names.map((n) => shapeBtn(n, false, () => pickShape(n)))}</div>
+                <div className="flex flex-wrap gap-1.5 pr-1 pt-1">
+                  {names.map((n) => (
+                    <div key={n} className="relative">
+                      {shapeBtn(n, false, () => pickShape(n))}
+                      {pinBtn('shape', n)}
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
@@ -1421,35 +1521,70 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           </button>
         ))}
       </div>
-      <div className="flex flex-wrap items-center justify-center gap-1 lg:justify-self-start">
+      <div className="flex flex-wrap items-center justify-center gap-1 lg:justify-start">
+        {/* 番号のボタンはほかより少し大きく（ユーザーの指示「番号ボタンもし小さい場合は少しおおきくする」2026-11-10） */}
         <button
           type="button"
-          aria-pressed={isTool({t: 'num'})}
+          aria-pressed={numOn}
           onClick={() => (numFull ? toast(`番号は${circled(NUM_MAX)}までです`, 'error') : pick({t: 'num'}))}
-          className={`${barBtn(isTool({t: 'num'}))} ${numFull ? 'opacity-50' : ''}`}
+          className={`flex h-11 items-center gap-1.5 rounded-md border px-3 text-base max-sm:h-10 max-sm:px-2 ${numOn ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-300 bg-white hover:bg-slate-50'} ${numFull ? 'opacity-50' : ''}`}
           aria-label={`${circled(Math.min(nextNo, NUM_MAX))} 番号`}
           title={`番号：押すたびに次の番号（${circled(1)}から${circled(NUM_MAX)}まで）`}
+          data-num-tool
         >
-          <span className="text-base leading-none text-rose-600">{circled(Math.min(nextNo, NUM_MAX))}</span>
+          <span className="text-2xl leading-none text-rose-600">{circled(Math.min(nextNo, NUM_MAX))}</span>
           <span className="max-sm:hidden">番号</span>
         </button>
-        {/* 住設（ユーザーの指示「住設も選べるように。トイレ、浴槽、キッチン、ベッド、下駄箱」2026-11-10）：押してから方眼を押すと、壁ぎわに置く（左の一覧の住設・家具と同じ部品） */}
-        <span className="mx-0.5 h-6 w-px bg-slate-200" aria-hidden />
-        {QUICK_FIX.map(([label, type, name]) => (
+        {/* 確定：番号を続けて置くのをいったん止めて「選ぶ・動かす」に戻す（ユーザーの指示「番号ボタンは確定をつくる」「1.2.3番号を順に押したくないとき、
+            確定でとめたい…押したら、一旦ストップして、また新たに（例えば和室）など入力できるようにする」2026-11-10）。いつも番号の右に出し、番号を置いて
+            いないときは押せない（段の幅が変わらない）。Enter・Esc でも同じ。止めたあと番号を押すと、続きの番号から */}
+        <button
+          type="button"
+          onClick={endTool}
+          disabled={!numOn}
+          className={`flex h-11 items-center gap-1 rounded-md border px-3 text-base max-sm:h-10 max-sm:px-2 ${numOn ? 'border-emerald-600 bg-emerald-50 text-emerald-800 hover:bg-emerald-100' : 'border-slate-200 bg-white text-slate-300'}`}
+          aria-label="番号を確定"
+          title="番号を置き終える（Enter）"
+        >
+          ✓ 確定
+        </button>
+      </div>
+      {/* 2行目（まん中ぞろえ）：住設 ▼ と、いつも出す住設。数が増えても1行目（図形・まん中の道具・番号）は崩れない */}
+      <div className="flex flex-wrap items-center justify-center gap-1 lg:col-span-3 lg:border-t lg:border-slate-100 lg:pt-1" data-fix-row>
+        {/* 住設 ▼：左の一覧と同じ住設・家具・福祉用具を選ぶ。☆ で段にいつも出す */}
+        <div ref={fixBarRef} className="relative">
           <button
-            key={label}
             type="button"
-            aria-pressed={isTool({t: 'fix', type})}
-            onClick={() => pick({t: 'fix', type})}
-            aria-label={name ?? label}
-            title={`${label}：押してから方眼を押すと、壁ぎわに置く`}
-            className={`flex h-11 w-12 flex-col items-center justify-center rounded-md border leading-none max-sm:h-9 max-sm:w-9 ${isTool({t: 'fix', type}) ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
-            data-quick-fix
+            aria-expanded={fixOpen}
+            onClick={() => setFixOpen((o) => !o)}
+            className={`flex h-9 items-center gap-1 rounded-md border px-2.5 text-sm max-sm:px-1.5 ${fixOpen ? 'border-emerald-600 bg-emerald-50' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
           >
-            <span className="block h-6 w-8 [&>svg]:h-full [&>svg]:w-full" aria-hidden dangerouslySetInnerHTML={{__html: thumbs.fix[type]}} />
-            <span className="mt-0.5 text-[10px] text-slate-700 max-sm:hidden">{label}</span>
+            住設 ▼
           </button>
-        ))}
+          {fixOpen && (
+            <div
+              aria-label="住設の一覧"
+              className="absolute left-0 top-full z-30 mt-1 max-h-[70vh] w-[25rem] overflow-y-auto rounded-lg border border-slate-300 bg-white p-2 shadow-xl max-sm:fixed max-sm:inset-x-2 max-sm:bottom-2 max-sm:top-auto max-sm:w-auto max-sm:max-h-[60vh]"
+            >
+              <div className="mb-1 text-right text-xs text-slate-500">☆ を押すと段にいつも出します</div>
+              {(['住設', '家具', '福祉'] as const).map((g) => (
+                <div key={g} className="mb-2">
+                  <div className="mb-1 border-b border-slate-200 pb-0.5 text-sm font-bold text-slate-700">{g === '福祉' ? '福祉用具' : g}</div>
+                  <div className="grid grid-cols-4 gap-1.5 px-1 pt-1.5">
+                    {FIX_TYPES.filter((f) => f.group === g && !f.hidden).map((f) => (
+                      <div key={f.name} className="relative">
+                        <PicBtn on={isTool({t: 'fix', type: f.name})} onClick={() => pickFix(f.name)} svg={thumbs.fix[f.name]} label={f.name} />
+                        {pinBtn('fix', f.name)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* いつも出す住設（初めはトイレ・浴槽・キッチン・ベッド・下駄箱。ユーザーの指示「住設も選べるように」2026-11-10）：押してから方眼を押すと、壁ぎわに置く */}
+        {pins.fix.map((type) => fixBarBtn(type))}
       </div>
     </div>
   );
@@ -1556,6 +1691,10 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           <Btn color="white" small onClick={redo} disabled={!hist.current.future.length} title="Ctrl+Y">
             ↷ 進む
           </Btn>
+          {/* 削除もまん中（ユーザーの指示「削除ボタンも中央におく」2026-11-10）。選んでいる部品を消す（Delete と同じ。戻すで戻る） */}
+          <Btn color="white" small onClick={() => selItem && remove(selItem.id)} disabled={!selItem} title="選んでいる部品を消す（Delete）" aria-label="選んだ部品を削除">
+            🗑 削除
+          </Btn>
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 lg:justify-self-end">
           <label className="flex items-center gap-1">
@@ -1585,7 +1724,8 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
         <div ref={paletteRef} className="scroll-mt-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm max-lg:order-1" data-madori-palette>
           {palette}
         </div>
-        <div ref={boxRef} className="relative h-[min(calc(72vh-3rem),712px)] min-h-[340px] overflow-hidden max-lg:order-3 max-lg:h-[min(58vh,560px)] max-lg:min-h-[320px] scroll-mb-2 rounded-lg border-2 border-slate-300 bg-white shadow-sm" data-madori-canvas>
+        <div className="min-w-0 space-y-2 max-lg:order-3">
+        <div ref={boxRef} className="relative h-[min(calc(72vh-3rem),712px)] min-h-[340px] overflow-hidden max-lg:h-[min(58vh,560px)] max-lg:min-h-[320px] scroll-mb-2 rounded-lg border-2 border-slate-300 bg-white shadow-sm" data-madori-canvas>
           <svg
             ref={svgRef}
             width={size.w}
@@ -1671,6 +1811,38 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
             )}
           </svg>
           <ScrollBars view={v} vw={vw} vh={vh} range={scrollRange} onMove={(x, y) => setView({...v, x, y})} />
+          {/* 右下：左へすべらせると戻す・右へすべらせると進む（ユーザーの指示「右下に、左にスラッシュすると戻る、右にスラッシュすると進む機能をつける」2026-11-10）。
+              1回すべらせると1つ。ここでの指・マウスの動きは方眼に描かない */}
+          <div
+            role="group"
+            aria-label="すべらせて戻す・進む"
+            title="左へすべらせると戻す・右へすべらせると進む"
+            className="absolute bottom-5 right-6 z-20 flex h-11 cursor-ew-resize touch-none select-none items-center gap-2 rounded-full border border-slate-300 bg-white/90 px-3 text-sm text-slate-600 shadow"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              e.currentTarget.setPointerCapture?.(e.pointerId);
+              swipe.current = {x: e.clientX, done: false};
+            }}
+            onPointerMove={(e) => {
+              const sw = swipe.current;
+              if (!sw || sw.done) return;
+              const dx = e.clientX - sw.x;
+              if (Math.abs(dx) < 36) return;
+              sw.done = true;
+              swipeStep(dx < 0 ? 'undo' : 'redo');
+            }}
+            onPointerUp={() => {
+              swipe.current = null;
+            }}
+            onPointerCancel={() => {
+              swipe.current = null;
+            }}
+            data-swipe-undo
+          >
+            <span className={swiped === 'undo' ? 'text-emerald-700' : hist.current.past.length ? '' : 'text-slate-300'}>← 戻す</span>
+            <span className="h-5 w-px bg-slate-300" aria-hidden />
+            <span className={swiped === 'redo' ? 'text-emerald-700' : hist.current.future.length ? '' : 'text-slate-300'}>進む →</span>
+          </div>
           {(editing || canType(selItem)) && (() => {
             // 図の上の入力欄（選んでいるあいだは見えないまま置いておき、打ち始めたらすぐ移る）
             const target = editItem ?? selItem;
@@ -1727,9 +1899,26 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           {tool.t !== 'select' && (
             <div className="pointer-events-none absolute left-2 top-2 rounded bg-emerald-700/90 px-2 py-1 text-xs text-white">
               {tool.t === 'step' && tool.fill ? '横四角' : tool.t === 'room' || tool.t === 'stair' || tool.t === 'fix' || tool.t === 'door' || tool.t === 'window' || tool.t === 'step' ? tool.type : tool.t === 'rail' ? (tool.lshape ? 'L型手すり' : tool.straight ? '横棒' : '自在棒') : tool.t === 'vrail' ? '丸（縦手すり）' : tool.t === 'num' ? '番号' : tool.t === 'text' ? '文字' : tool.t === 'line' || tool.t === 'shape' ? tool.type : '寸法線'}
-              {tool.t === 'room' ? (poly ? '：角を押していく（はじめの点で閉じる・Enter）' : '：ドラッグで四角／角を順に押す') : tool.t === 'rail' && !tool.lshape && !tool.straight ? '：なぞる（曲げたい所で曲げる）' : tool.t === 'vrail' || tool.t === 'step' ? '：押して置く・なぞって大きさ' : tool.t === 'num' ? `：押すたびに${circled(Math.min(nextNo, NUM_MAX))}から順に` : DRAG_TOOLS.includes(tool.t) ? '：ドラッグ' : '：押して置く'}
+              {tool.t === 'room' ? (poly ? '：角を押していく（はじめの点で閉じる・Enter）' : '：ドラッグで四角／角を順に押す') : tool.t === 'rail' && !tool.lshape && !tool.straight ? '：なぞる（曲げたい所で曲げる）' : tool.t === 'vrail' || tool.t === 'step' ? '：押して置く・なぞって大きさ' : tool.t === 'num' ? `：押すたびに${circled(Math.min(nextNo, NUM_MAX))}から順に（終わったら ✓ 確定）` : DRAG_TOOLS.includes(tool.t) ? '：ドラッグ' : '：押して置く'}
             </div>
           )}
+        </div>
+        {/* 平面図の下に、申請書で入れた改修の内容（申請書の平面図の下の欄と同じ文。保険者の申請書の書き方「①玄関　手すりの取り付け　L=600mm」）。
+            ユーザーの指示「平面図の下のスペースに、申請書で入力した内容をいれる。①玄関　手すり取付（申請書の書き方にあわせる）L=600 みたいな感じ」2026-11-10 */}
+        <section aria-label="申請書の改修の内容" className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm" data-plan-works>
+          <div className="text-sm font-bold text-slate-700">改修の内容（申請書）</div>
+          {look.list.length ? (
+            <ul className="mt-1 space-y-0.5 text-[15px] text-slate-900">
+              {look.list.map((w) => (
+                <li key={w.id} className="whitespace-pre-wrap">
+                  {w.line}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-0.5 text-sm text-slate-400">申請書の箇所を入れると出ます</p>
+          )}
+        </section>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm max-lg:order-4">{props}</div>
       </div>
