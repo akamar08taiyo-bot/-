@@ -1,4 +1,4 @@
-// イヤーズ（株）デモアプリのビルドで、役所の原本（*.xltx）に書いてある社内の字（会社名・営業所・所在地・電話・所長・担当者・作成者）を消す
+// （株）イヤーズ デモアプリのビルドで、役所の原本（*.xltx）に書いてある社内の字（会社名・営業所・所在地・電話・所長・担当者・作成者）を消す
 // （vite.years.config.ts から。アプリの中では使わない）。字は同じ長さの空白にする（ふりがな＝rPh の位置がずれないように）
 import {strFromU8, strToU8, unzipSync, zipSync} from 'fflate';
 import {COMPANY_NAME, DEFAULT_STAFF, OFFICES, ORIGINAL_OFFICE_TEXTS} from '../company.ts';

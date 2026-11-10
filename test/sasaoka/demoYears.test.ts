@@ -1,4 +1,4 @@
-// イヤーズ（株）デモアプリ（ユーザーの指示「申請書、見積もりツールを（株）イヤーズ専用で…サンプルURLを渡し、こちらが主導権を握れるようにする。
+// （株）イヤーズ デモアプリ（ユーザーの指示「申請書、見積もりツールを（株）イヤーズ専用で…サンプルURLを渡し、こちらが主導権を握れるようにする。
 // 正式なものができるまではずっと使わせない」2026-11-10）：止めるスイッチの判定と、役所の原本から社内の字を消すこと
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -30,7 +30,8 @@ test('今までのアプリのビルド・テストではデモにならない�
 });
 
 test('デモの会社ごとの値に社内の値を入れない（営業所・担当者・仕切り・登録番号・原本の営業所の字）', () => {
-  assert.equal(demoCompany.COMPANY_NAME, '');
+  assert.equal(demoCompany.COMPANY_NAME, '株式会社イヤーズ'); // デモを使う会社の名前（ユーザーの答え「名前が変わって（株）イヤーズ」）
+  assert.ok(!/太陽|シルバーサービス/.test(demoCompany.COMPANY_NAME));
   assert.equal(demoCompany.REG_NO, '');
   assert.equal(demoCompany.DEFAULT_OFFICE, '');
   assert.deepEqual(demoCompany.OFFICES, []);

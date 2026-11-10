@@ -1,7 +1,7 @@
-// イヤーズ（株）デモアプリ（npm run build:years → dist-years/。ユーザーの指示「申請書、見積もりツールを（株）イヤーズ専用で作ろう…サンプルURLを渡し、
+// （株）イヤーズ デモアプリ（npm run build:years → dist-years/。ユーザーの指示「申請書、見積もりツールを（株）イヤーズ専用で作ろう…サンプルURLを渡し、
 // こちらが主導権を握れるようにする。正式なものができるまではずっと使わせない。ツールのどこかにイヤーズ（株）デモアプリみたいな感じでいれる。今までのアプリは絶対に残しておく」2026-11-10）：
 //   ・止めるスイッチ（status.json）：使える → 開く／止めた・期限が過ぎた → 開かない／読めない → 開かない（もう一度確かめる で開く）
-//   ・画面：上に「イヤーズ（株）デモアプリ」・ポータルへ戻る／売上見込み／工務店請求書／特定福祉用具／カタログ／営業所の一覧を出さない
+//   ・画面：上に「（株）イヤーズ デモアプリ」・ポータルへ戻る／売上見込み／工務店請求書／特定福祉用具／カタログ／営業所の一覧を出さない
 //   ・保存場所：今までのアプリ（同じサイト）のデータ（ポータルの営業所など）を読まない・書かない（名前の頭に years-demo:）
 //   ・書類（申請書・理由書の Excel）に社内の字（会社名・営業所・所長・担当者）が出ない
 // usage: node e2e-years.mjs <サイトのURL（/years-demo/ に dist-years を置いたもの）> <出力フォルダ>。お客様は架空のサンプル
@@ -54,9 +54,9 @@ async function open(status, viewport = {width: 1366, height: 900}) {
   const {ctx, page} = await open({enabled: true, until: '2099-12-31', message: ''});
   const name = page.locator('[data-demo-name]');
   await name.waitFor();
-  assert.equal((await name.innerText()).trim(), 'イヤーズ（株）デモアプリ');
+  assert.equal((await name.innerText()).trim(), '（株）イヤーズ デモアプリ');
   assert.equal(await page.getByText('業務アプリポータルへ戻る').count(), 0);
-  assert.equal(await page.title(), 'イヤーズ（株）デモアプリ｜申請書・見積書作成');
+  assert.equal(await page.title(), '（株）イヤーズ デモアプリ｜申請書・見積書作成');
   // ポータルの営業所（今までのアプリのデータ）は読まない
   assert.match(await page.locator('header').innerText(), /営業所未設定/);
   // メニュー：売上見込み・工務店請求書は出さない
@@ -125,7 +125,7 @@ async function open(status, viewport = {width: 1366, height: 900}) {
   assert.ok(stores.dbs.length > 0 && stores.dbs.every((n) => n.startsWith('years-demo:')), JSON.stringify(stores.dbs));
   assert.ok(stores.keys.filter((k) => k !== 'taiyo_portal_session').every((k) => k.startsWith('years-demo:')), JSON.stringify(stores.keys));
   assert.ok(stores.keys.includes('taiyo_portal_session'));
-  log('使える：イヤーズ（株）デモアプリの名前・社内のものを出さない・保存場所を分ける・Excel に社内の字が出ない OK');
+  log('使える：（株）イヤーズ デモアプリの名前・社内のものを出さない・保存場所を分ける・Excel に社内の字が出ない OK');
   await ctx.close();
 }
 

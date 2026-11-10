@@ -64,7 +64,7 @@ const ALL_TABS: {id: MainTab; label: string}[] = [
   {id: 'settings', label: '⚙ 設定'},
   {id: 'trash', label: '🗑 ゴミ箱'}, // 設定のタブの横（ユーザーの指示「設定のタブの横にゴミ箱をつくり」2026-10-25）
 ];
-// イヤーズ（株）デモアプリは、売上見込み（受注残・進捗管理につながる）・工務店請求書（工務店の仕切り）を出さない
+// （株）イヤーズ デモアプリは、売上見込み（受注残・進捗管理につながる）・工務店請求書（工務店の仕切り）を出さない
 const TABS = DEMO ? ALL_TABS.filter((t) => t.id !== 'sales' && t.id !== 'invoice') : ALL_TABS;
 
 // タブごとの色（見積書は緑、請求書は紺、売上見込みは青緑、部材・施工費マスタは紫、設定は灰、ゴミ箱は茶色がかった灰）。選んでいるタブは下の画面と同じ色にしてつなげ、
@@ -502,7 +502,7 @@ export default function App({start}: {start: MainTab}) {
         <header className={`no-print ${theme.head} text-white transition-colors`}>
           <div className={`mx-auto flex ${PAGE_WIDTH} flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3`}>
             {/* 業務アプリポータルへ戻るボタンは左上（全アプリ共通の形 .taiyo-portal-back。ユーザーの指示「太陽ポータルに戻るボタンは左上に設置」2026-10-28。前は右上） */}
-            {/* イヤーズ（株）デモアプリは、ポータルへ戻るボタンの代わりにデモの名前（demo/flag.ts） */}
+            {/* （株）イヤーズ デモアプリは、ポータルへ戻るボタンの代わりにデモの名前（demo/flag.ts） */}
             {DEMO ? (
               <span className="rounded-md border border-white/40 bg-white px-2.5 py-1 text-sm font-bold text-[#14532d]" data-demo-name>
                 {DEMO_NAME}

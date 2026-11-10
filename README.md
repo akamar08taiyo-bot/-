@@ -932,7 +932,7 @@ npm run build:sasaoka    # dist-sasaoka/index.html（仕切り計算・請求書
 npm run build:jutaku     # dist-jutaku/index.html（住宅改修 見積書作成。同じく1ファイル）と version.json
 ```
 
-**イヤーズ（株）デモアプリ**（ユーザーの指示「申請書、見積もりツールを（株）イヤーズ専用で作ろう…まだ正式販売していないので、サンプルURLを渡し、こちらが主導権を握れるようにする。
+**（株）イヤーズ デモアプリ**（ユーザーの指示「申請書、見積もりツールを（株）イヤーズ専用で作ろう…まだ正式販売していないので、サンプルURLを渡し、こちらが主導権を握れるようにする。
 正式なものができるまではずっと使わせない。ツールのどこかにイヤーズ（株）デモアプリみたいな感じでいれる。今までのアプリは絶対に残しておく」2026-11-10。答え：期限日＋止めるスイッチ・すかしなし・住宅改修だけ・新しいリポジトリ）：
 
 ```
@@ -940,14 +940,15 @@ npm run build:years      # dist-years/index.html・version.json・status.json（
 ```
 
 - 置き場所は新しいリポジトリ `akamar08taiyo-bot/years-demo`（https://akamar08taiyo-bot.github.io/years-demo/ 。公開はユーザーの「公開して」のあと）。
-- 入口（`src/sasaoka/demo/gate.ts`）：開くたびに `https://akamar08taiyo-bot.github.io/years-demo/status.json`（`{"enabled": true, "until": "2027-01-31", "message": ""}`）を読み、
+- 入口（`src/sasaoka/demo/gate.ts`）：開くたびに `https://akamar08taiyo-bot.github.io/years-demo/status.json`（`{"enabled": true, "until": "2026-12-31", "message": ""}`）を読み、
   `enabled` が true で `until` の日まで（その日も）だけアプリを出す。止めた・期限が過ぎた・読めないときは「デモを使えません」の画面（読めないときは「もう一度確かめる」）。
   開いたあとも30分ごとと画面に戻ったときに読み直し、止めたら重ねて隠す（ネットにつながらないだけなら作業は止めない）。いつも同じ URL を読むので、パソコンに保存した写しでもこのファイルで止まる
   （ファイルの中を書きかえられると止められない）。
 - 保存場所（`demo/isolate.ts`）：同じサイトにある今までのアプリのデータを読み書きしないよう、IndexedDB・localStorage・sessionStorage・BroadcastChannel の名前の頭に `years-demo:` を付ける（アプリの本体より先に読み込む）。
-- 社内の値：会社ごとの値（`src/sasaoka/company.ts`＝営業所・所長・担当者・工務店の仕切り・会社名・登録番号・原本の営業所の字）を `src/sasaoka/demo/company.ts`（空・見本の単価）に置きかえる。
+- 社内の値：会社ごとの値（`src/sasaoka/company.ts`＝営業所・所長・担当者・工務店の仕切り・会社名・登録番号・原本の営業所の字）を `src/sasaoka/demo/company.ts`（見本の単価。会社名だけ `株式会社イヤーズ`＝ユーザーの答え「名前が変わって（株）イヤーズ」2026-11-10。営業所・住所・担当者は ⚙ 設定で入れる）に置きかえる。
+  使える期限は 2026-12-31（ユーザーの答え「デモ期間は2026.12.31」。延ばすときは years-demo の status.json の until を書きかえる）。
   役所の原本（*.xltx）の会社名・営業所・所在地・電話・所長・担当者・作成者は、同じ長さの空白にしてから中に入れる（`demo/scrub.ts`。残っていたらビルドを止める）。
-- 画面（`demo/flag.ts` の `DEMO`）：左上に「イヤーズ（株）デモアプリ」（ポータルへ戻るの代わり）・題名も。売上見込み・工務店請求書（工務店の請求書に入れる欄も）・特定福祉用具の2つのタブ・介援隊のカタログ・
+- 画面（`demo/flag.ts` の `DEMO`）：左上に「（株）イヤーズ デモアプリ」（ポータルへ戻るの代わり）・題名も。売上見込み・工務店請求書（工務店の請求書に入れる欄も）・特定福祉用具の2つのタブ・介援隊のカタログ・
   売上伝票・販売受注簿への転記・設定の営業所の一覧は出さない。申請書の営業所は設定の営業所のまま（市ごとの営業所に替えない）。
 - テスト：`node --test test/sasaoka/demoYears.test.ts`（止めるスイッチの判定・デモの会社ごとの値・原本の掃除）、`node test/sasaoka/e2e-years.mjs <サイト（/years-demo/ に dist-years）> <出力>`
   （使える・止めた・期限・読めない・保存場所・書類に社内の字が出ない・スマホ）。

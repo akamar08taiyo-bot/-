@@ -41,7 +41,7 @@ const TAGAWA = ['田川市', '香春町', '添田町', '糸田町', '川崎町',
  * 決まりのない保険者は null（設定の営業所のまま）
  */
 export function shinseiOfficeName(insurer: string, area: string, current: string): string | null {
-  if (DEMO) return null; // イヤーズ（株）デモアプリは、設定の営業所のまま（社内の営業所に替えない）
+  if (DEMO) return null; // （株）イヤーズ デモアプリは、設定の営業所のまま（社内の営業所に替えない）
   if (insurer === 'kouiki') return TAGAWA.includes(area) ? '田川営業所' : null;
   const group = GROUPS[insurer];
   if (!group) return null;

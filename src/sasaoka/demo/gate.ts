@@ -1,8 +1,10 @@
-// イヤーズ（株）デモアプリの入口：開くたびに「止めるスイッチ」（デモのリポジトリの status.json）を読み、使えるときだけアプリを出す
+// （株）イヤーズ デモアプリの入口：開くたびに「止めるスイッチ」（デモのリポジトリの status.json）を読み、使えるときだけアプリを出す
 // （ユーザーの指示「サンプルURLを渡し、こちらが主導権を握れるようにする。正式なものができるまではずっと使わせない」2026-11-10。答え「期限日＋止めるスイッチ」）。
-// status.json：{"enabled": true, "until": "2027-01-31", "message": ""}。enabled を false にする・until を過ぎると、次に開いたときから使えない
+// status.json：{"enabled": true, "until": "2026-12-31", "message": ""}。enabled を false にする・until を過ぎると、次に開いたときから使えない
 // （開いている画面も、30分ごとと画面に戻ったときに読み直して止める）。読めないとき（ネットにつながっていない・ファイルがない）は開かない。
 // ブラウザで動くアプリなので、ファイルを保存して中を書きかえられると止められない（報告でユーザーに伝えた）
+
+import {DEMO_NAME} from './flag.ts';
 
 declare const __DEMO_STATUS__: string | undefined;
 /** 止めるスイッチの場所（いつも同じ URL を読む＝パソコンに保存した写しからでも、このファイルで止まる） */
@@ -56,7 +58,7 @@ function showLock(v: Exclude<Verdict, {ok: true}>, retry: () => void): void {
   }
   el.innerHTML =
     '<div style="max-width:28rem;width:100%;border:1px solid #cbd5e1;border-radius:12px;background:#fff;padding:24px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.08)">' +
-    '<div style="font-size:14px;color:#14532d;font-weight:700">イヤーズ（株）デモアプリ</div>' +
+    `<div style="font-size:14px;color:#14532d;font-weight:700">${esc(DEMO_NAME)}</div>` +
     `<p style="margin:16px 0;font-size:16px;color:#1e293b;line-height:1.7">${esc(v.message)}</p>` +
     (v.reason === 'unreachable' ? '<button type="button" style="border:1px solid #94a3b8;border-radius:8px;background:#fff;padding:8px 16px;font-size:15px">もう一度確かめる</button>' : '') +
     '</div>';
@@ -66,7 +68,7 @@ function showLock(v: Exclude<Verdict, {ok: true}>, retry: () => void): void {
 /** 入口：確かめてから load（アプリの本体を読み込む）。開いたあとも読み直して、止めたら重ねて隠す */
 export function startDemo(load: () => Promise<unknown>): void {
   const root = document.getElementById('root');
-  if (root) root.innerHTML = '<div style="padding:48px 16px;text-align:center;color:#475569;font-family:system-ui,sans-serif">イヤーズ（株）デモアプリを開いています…</div>';
+  if (root) root.innerHTML = `<div style="padding:48px 16px;text-align:center;color:#475569;font-family:system-ui,sans-serif">${esc(DEMO_NAME)}を開いています…</div>`;
   let started = false;
   let last = 0;
   const run = async () => {

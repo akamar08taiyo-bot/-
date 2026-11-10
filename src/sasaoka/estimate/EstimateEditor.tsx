@@ -257,7 +257,7 @@ export function EstimateEditor({
             )}
           </div>
         </div>
-        {/* 工務店の請求書（仕切り）に入れるか：イヤーズ（株）デモアプリは工務店請求書を出さないので、この欄も出さない */}
+        {/* 工務店の請求書（仕切り）に入れるか：（株）イヤーズ デモアプリは工務店請求書を出さないので、この欄も出さない */}
         {!DEMO && (estimated || job.shikiri) && <ShikiriFields job={job} data={data} setJob={setJob} onFix={() => setFixPrices(true)} />}
         {byAddress && byAddress !== insurer && (
           <div className="flex w-full flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-sm font-bold text-amber-900">

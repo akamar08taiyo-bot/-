@@ -9,7 +9,7 @@ import {scrubTemplate} from './src/sasaoka/demo/scrub.ts';
 import {APP_BUILD, appVersion} from './vite.version.ts';
 
 /**
- * イヤーズ（株）デモアプリのビルド（`npm run build:years` → dist-years/index.html と version.json）。
+ * （株）イヤーズ デモアプリのビルド（`npm run build:years` → dist-years/index.html と version.json）。
  * ユーザーの指示「申請書、見積もりツールを（株）イヤーズ専用で作ろう…まだ正式販売していないので、サンプルURLを渡し、こちらが主導権を握れるようにする。
  * 正式なものができるまではずっと使わせない。ツールのどこかにイヤーズ（株）デモアプリみたいな感じでいれる。今までのアプリは絶対に残しておく」2026-11-10。
  * 答え：期限日＋止めるスイッチ（status.json）・すかしなし・住宅改修だけ・新しいリポジトリ（years-demo）。
@@ -59,12 +59,12 @@ function htmlAsIndex(): Plugin {
   };
 }
 
-/** 止めるスイッチの初めの中身（新しいリポジトリに置く status.json。期限はひとまず 2027-01-31。あとで延ばせる） */
+/** 止めるスイッチの初めの中身（新しいリポジトリに置く status.json。期限は 2026-12-31＝ユーザーの答え「デモ期間は2026.12.31」2026-11-10。あとで延ばせる） */
 function statusFile(): Plugin {
   return {
     name: 'years-demo-status',
     generateBundle() {
-      this.emitFile({type: 'asset', fileName: 'status.json', source: `${JSON.stringify({enabled: true, until: '2027-01-31', message: ''}, null, 2)}\n`});
+      this.emitFile({type: 'asset', fileName: 'status.json', source: `${JSON.stringify({enabled: true, until: '2026-12-31', message: ''}, null, 2)}\n`});
     },
   };
 }
