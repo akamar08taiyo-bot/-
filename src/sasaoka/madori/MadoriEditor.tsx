@@ -1114,7 +1114,9 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
               value={it.type ?? ''}
               onChange={(e) => {
                 const t = e.target.value;
-                const def = it.kind === 'fix' ? FIX_TYPES.find((f) => f.name === t) : it.kind === 'step' ? STEP_TYPES.find((f) => f.name === t) : undefined;
+                // 階段は種類ごとの形の大きさ（方眼のマス）に。直階段かららせん階段に替えても、細長い四角のままにしない
+                const st = it.kind === 'stair' ? STAIR_TYPES.find((f) => f.name === t) : undefined;
+                const def = it.kind === 'fix' ? FIX_TYPES.find((f) => f.name === t) : it.kind === 'step' ? STEP_TYPES.find((f) => f.name === t) : st ? {w: st.size[0] * m.module, h: st.size[1] * m.module} : undefined;
                 setItem(it.id, {type: t, ...(def ? {w: def.w, h: def.h} : {})});
               }}
               className="mt-0.5 h-9 w-full rounded-md border border-slate-300 bg-white px-2"
@@ -1127,6 +1129,11 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           </label>
           <MmInput label="幅" value={it.w} onChange={(w) => setItem(it.id, {w})} />
           <MmInput label="奥行" value={it.h} onChange={(h) => setItem(it.id, {h})} />
+          {it.kind === 'stair' && (
+            <Btn color="white" small onClick={() => setItem(it.id, {flip: !it.flip})}>
+              ⇆ 左右反転
+            </Btn>
+          )}
         </>
       )}
       {it.kind === 'rail' && it.pts && (

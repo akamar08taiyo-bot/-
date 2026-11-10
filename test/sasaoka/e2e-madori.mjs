@@ -184,6 +184,14 @@ await click(8 * M, 3 * M); // 方眼の上の端だと、つまみが方眼の�
   await page.mouse.click(tb.x + tb.width / 2, tb.y + tb.height / 2);
 }
 assert.match(await art(), /rotate\(90 /);
+// 階段の種類（ユーザーの指示「階段の種類は増やす」2026-11-10）：9つの絵のボタン・選んで左右反転・種類を替えるとその形の大きさ
+for (const name of ['折返し階段', '折返し回り階段', 'L字階段', '回り階段', '直階段', '直階段（踊り場）', 'コ字階段', 'らせん階段', '外階段（3段）']) {
+  assert.equal(await page.locator(`[data-madori-palette] button[aria-label="${name}"]`).count(), 1, name);
+}
+await page.getByRole('button', {name: '⇆ 左右反転'}).click();
+assert.match(await art(), /rotate\(90 [\d.]+ [\d.]+\) translate\(910 0\) scale\(-1 1\)/);
+await page.getByRole('combobox', {name: '種類'}).selectOption('らせん階段');
+assert.match(await art(), /<circle cx="910" cy="910" r="855.4"/);
 // 横手すりを一筆で L 字に（横へなぞって、角で下へ）
 await cat('改修');
 await tool('横手すり');
@@ -200,7 +208,7 @@ await tool('横手すり');
 await page.keyboard.press('Escape');
 assert.ok((await legend()).some((r) => /L型　910×910mm|L型　900×900mm|L型　9\d0×9\d0mm/.test(r)), `一筆の L 字 ${JSON.stringify(await legend())}`);
 await page.keyboard.press('Control+z');
-for (let i = 0; i < 5; i++) await page.keyboard.press('Control+z'); // 文字・通路・WC・階段・回す
+for (let i = 0; i < 7; i++) await page.keyboard.press('Control+z'); // 文字・通路・WC・階段・回す・左右反転・らせん階段
 // ---------------- 部屋を頂点で描く（角を順に押す・はじめの点で閉じる）・頂点（■）で形を変える
 await cat('部屋');
 await tool('洋室');

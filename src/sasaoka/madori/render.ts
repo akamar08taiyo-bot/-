@@ -274,9 +274,10 @@ export function fixtureSymbol(type: string, w: number, h: number): string {
 }
 
 /** 設備・家具・階段・段差（左上 x,y・幅 w・奥行 h を rot だけ中心のまわりに回す） */
-function placed(it: MItem, inner: string): string {
+// mirror＝左右反転（階段の曲がる向き。四角の中で左右を入れかえてから回す）
+function placed(it: MItem, inner: string, mirror = false): string {
   const rot = it.rot ?? 0;
-  return `<g transform="translate(${r1(it.x)} ${r1(it.y)})${rot ? ` rotate(${rot} ${r1(it.w / 2)} ${r1(it.h / 2)})` : ''}">${inner}</g>`;
+  return `<g transform="translate(${r1(it.x)} ${r1(it.y)})${rot ? ` rotate(${rot} ${r1(it.w / 2)} ${r1(it.h / 2)})` : ''}${mirror ? ` translate(${r1(it.w)} 0) scale(-1 1)` : ''}">${inner}</g>`;
 }
 
 /** 階段（下から上へ上がる。矢印の先が上） */
@@ -285,9 +286,10 @@ function stair(it: MItem, module: Module): string {
   const t = it.type ?? '直階段';
   const tread = module / 4;
   const p: string[] = [`<rect width="${w}" height="${h}" stroke="${WALL}" stroke-width="20" fill="#ffffff"/>`];
-  const steps = (x0: number, y0: number, x1: number, y1: number, horiz: boolean) => {
+  // count＝段の数を決めるとき（外階段の3段）。なければ踏み面が方眼の 1/4 ほどになる数
+  const steps = (x0: number, y0: number, x1: number, y1: number, horiz: boolean, count?: number) => {
     const len = horiz ? x1 - x0 : y1 - y0;
-    const n = Math.max(1, Math.round(len / tread));
+    const n = count ?? Math.max(1, Math.round(len / tread));
     const d: string[] = [];
     for (let i = 1; i < n; i++) {
       if (horiz) d.push(`M${r1(x0 + (len * i) / n)} ${y0}V${y1}`);
@@ -307,6 +309,53 @@ function stair(it: MItem, module: Module): string {
     p.push(`<path d="M${w / 2} ${h * 0.45}V${h}" stroke="${WALL}" stroke-width="16"/>`);
     p.push(steps(0, h * 0.45, w / 2, h, false), steps(w / 2, h * 0.45, w, h, false), `<path d="M0 ${h * 0.45}H${w}" stroke="${WALL}" stroke-width="10"/>`);
     p.push(arrow([[w * 0.25, h * 0.95], [w * 0.25, h * 0.25], [w * 0.75, h * 0.25], [w * 0.75, h * 0.7]]));
+  } else if (t === '折返し回り階段') {
+    // 折返し階段の踊り場を、まん中から扇に広がる回り段（6段）にしたもの
+    const lh = h * 0.45;
+    const cx = w / 2;
+    p.push(`<path d="M${cx} ${lh}V${h}" stroke="${WALL}" stroke-width="16"/>`);
+    p.push(steps(0, lh, cx, h, false), steps(cx, lh, w, h, false), `<path d="M0 ${lh}H${w}" stroke="${WALL}" stroke-width="10"/>`);
+    const rays = [150, 120, 90, 60, 30].map((deg) => {
+      const dx = Math.cos((deg * Math.PI) / 180);
+      const dy = -Math.sin((deg * Math.PI) / 180);
+      const k = Math.min(dx < 0 ? -cx / dx : dx > 0 ? (w - cx) / dx : Infinity, -lh / dy);
+      return `M${r1(cx)} ${r1(lh)}L${r1(cx + dx * k)} ${r1(lh + dy * k)}`;
+    });
+    p.push(`<path d="${rays.join('')}" stroke="${WALL}" stroke-width="10"/>`);
+    p.push(arrow([[w * 0.25, h * 0.95], [w * 0.25, lh * 0.75], [cx, lh * 0.3], [w * 0.75, lh * 0.75], [w * 0.75, h * 0.7]]));
+  } else if (t === '直階段（踊り場）') {
+    // まっすぐの階段のまん中に、幅と同じ長さの踊り場（長い方の向きに上がる）
+    const tall = h >= w;
+    const L = Math.min(tall ? w : h, (tall ? h : w) * 0.3);
+    const a = ((tall ? h : w) - L) / 2;
+    if (tall) {
+      p.push(steps(0, 0, w, a, false), steps(0, a + L, w, h, false), `<path d="M0 ${r1(a)}H${w}M0 ${r1(a + L)}H${w}" stroke="${WALL}" stroke-width="16"/>`);
+      p.push(arrow([[w / 2, h * 0.96], [w / 2, h * 0.05]]));
+    } else {
+      p.push(steps(0, 0, a, h, true), steps(a + L, 0, w, h, true), `<path d="M${r1(a)} 0V${h}M${r1(a + L)} 0V${h}" stroke="${WALL}" stroke-width="16"/>`);
+      p.push(arrow([[w * 0.04, h / 2], [w * 0.95, h / 2]]));
+    }
+  } else if (t === 'らせん階段') {
+    // まん中の柱のまわりを回る（12段）。矢印は下から右回り
+    const cx = w / 2;
+    const cy = h / 2;
+    const R = (Math.min(w, h) / 2) * 0.94;
+    const r0 = R * 0.14;
+    const rays = Array.from({length: 12}, (_, k) => {
+      const a = (k * Math.PI) / 6;
+      return `M${r1(cx + r0 * Math.cos(a))} ${r1(cy + r0 * Math.sin(a))}L${r1(cx + R * Math.cos(a))} ${r1(cy + R * Math.sin(a))}`;
+    });
+    p.push(`<circle cx="${r1(cx)}" cy="${r1(cy)}" r="${r1(R)}" stroke="${WALL}" stroke-width="16" fill="none"/>`, `<path d="${rays.join('')}" stroke="${WALL}" stroke-width="10"/>`);
+    p.push(`<circle cx="${r1(cx)}" cy="${r1(cy)}" r="${r1(r0)}" stroke="${WALL}" stroke-width="12" fill="#ffffff"/>`);
+    const ra = R * 0.6;
+    p.push(arrow(Array.from({length: 19}, (_, k) => {
+      const a = Math.PI / 2 + (k / 18) * Math.PI * 1.6;
+      return [cx + ra * Math.cos(a), cy + ra * Math.sin(a)] as [number, number];
+    })));
+  } else if (t === '外階段（3段）') {
+    // 玄関・勝手口の外の数段（段の数は3。奥へ上がる）
+    p.push(steps(0, 0, w, h, false, 3));
+    p.push(arrow([[w / 2, h * 0.93], [w / 2, h * 0.08]]));
   } else if (t === '回り階段') {
     // L 字の角を、ななめの段（回り段）でまわる
     const lw = Math.min(w, h) * 0.5;
@@ -329,7 +378,7 @@ function stair(it: MItem, module: Module): string {
     p.push(steps(0, 0, w, h, h < w));
     p.push(h >= w ? arrow([[w / 2, h * 0.95], [w / 2, h * 0.08]]) : arrow([[w * 0.05, h / 2], [w * 0.92, h / 2]]));
   }
-  return placed(it, p.join(''));
+  return placed(it, p.join(''), !!it.flip);
 }
 
 /** 段差の解消（踏み台＝斜線・スロープ＝矢印） */

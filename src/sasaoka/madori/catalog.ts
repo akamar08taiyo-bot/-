@@ -173,13 +173,21 @@ export const FIX_TYPES: {name: string; w: number; h: number; group: FixGroup; hi
 ];
 export const fixType = (name?: string) => FIX_TYPES.find((f) => f.name === name);
 
-/** 階段（size は方眼のマス。マイホームクラウドの階段の形。ユーザーの指示「階段を選択したら」2026-11-10） */
+/**
+ * 階段（size は方眼のマス。マイホームクラウドの階段の形。ユーザーの指示「階段を選択したら」2026-11-10）。
+ * 種類を増やした（ユーザーの指示「階段の種類は増やす」2026-11-10）：一覧は2列なので、似た形を左右に並べる（踊り場・回り段の組）。
+ * 先頭は前と同じ折返し階段（知らない種類を読んだときの代わり）。L字・回り・コ字などの曲がる向きは、選んで「⇆ 左右反転」
+ */
 export const STAIR_TYPES: {name: string; size: [number, number]}[] = [
   {name: '折返し階段', size: [2, 2]},
+  {name: '折返し回り階段', size: [2, 2]},
   {name: 'L字階段', size: [2, 3]},
-  {name: '直階段', size: [1, 4]},
   {name: '回り階段', size: [2, 3]},
+  {name: '直階段', size: [1, 4]},
+  {name: '直階段（踊り場）', size: [1, 5]},
   {name: 'コ字階段', size: [3, 2.5]},
+  {name: 'らせん階段', size: [2, 2]},
+  {name: '外階段（3段）', size: [1.5, 1]},
 ];
 
 /** 段差の解消（w×h mm） */
