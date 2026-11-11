@@ -50,6 +50,7 @@ import {cloudEnabled, useCloud} from './cloud/useCloud.ts';
 import {isTrashed, liveJobs} from './trash.ts';
 import {writeJutakuSalesSummary} from './salesPlan.ts';
 import type {Insurer, Job, Row} from './types.ts';
+import {LoadingScreen, StartupError} from './components/StartupGuard.tsx';
 import {useNewVersion} from './update.ts';
 import {useStore} from './useStore.ts';
 import {tesuri, thisMonth} from './util.ts';
@@ -397,12 +398,8 @@ export default function App({start}: {start: MainTab}) {
     if (purgeTick) void store.flush().then((ok) => ok && setPruneTick((n) => n + 1));
   }, [purgeTick]);
 
-  if (store.loadError) {
-    return <div className="p-8 text-rose-700">データを読み込めませんでした：{store.loadError}</div>;
-  }
-  if (!data || !all) {
-    return <div className="p-8 text-slate-500">読み込んでいます…</div>;
-  }
+  if (store.loadError) return <StartupError message={`データを読み込めませんでした：${store.loadError}`} />;
+  if (!data || !all) return <LoadingScreen />;
 
   const theme = THEME[tab];
   // ゴミ箱に移した様邸は消さない（何も入れていない様邸でも、削除を押したならゴミ箱に残す）

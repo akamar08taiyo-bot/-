@@ -10,6 +10,38 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // 画面を出せなかったときに真っ白のままにしない（components/StartupGuard.tsx と同じ文。こちらはアプリの本体が動く前のエラー＝
+      // その端末のブラウザが読めない文など。20秒たっても画面が出ないときも出す。ユーザーの話「タブレットで申請書を開こうとしたら開かない」2026-11-12）
+      (function () {
+        var first = '';
+        function show() {
+          var root = document.getElementById('root');
+          if (!root || root.childNodes.length) return;
+          root.innerHTML =
+            '<div style="max-width:36rem;margin:0 auto;padding:24px;font-family:sans-serif;color:#1e293b">' +
+            '<p style="font-size:18px;font-weight:700;margin:0">画面を出せませんでした</p>' +
+            '<button type="button" style="margin-top:16px;height:48px;padding:0 20px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:16px;font-weight:700;color:#334155">⟳ 読み込み直す</button>' +
+            '<p data-m style="margin:16px 0 0;font-size:14px;color:#64748b;word-break:break-all"></p>' +
+            '<p data-u style="margin:4px 0 0;font-size:12px;color:#94a3b8;word-break:break-all"></p></div>';
+          root.querySelector('button').onclick = function () {
+            location.reload();
+          };
+          root.querySelector('[data-m]').textContent = first || '読み込みが終わりませんでした';
+          root.querySelector('[data-u]').textContent = navigator.userAgent;
+        }
+        window.addEventListener('error', function (e) {
+          if (!first) first = String((e && e.message) || 'error');
+          setTimeout(show, 1500);
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e && e.reason;
+          if (!first) first = String((r && (r.message || r)) || 'unhandledrejection');
+          setTimeout(show, 1500);
+        });
+        setTimeout(show, 20000);
+      })();
+    </script>
     <script type="module" src="/src/sasaoka/demo/main.tsx"></script>
   </body>
 </html>

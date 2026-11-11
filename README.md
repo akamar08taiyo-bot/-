@@ -972,6 +972,7 @@ npm run build:years      # dist-years/index.html・version.json・status.json（
 公開中：太陽ポータル（taiyo-portal リポジトリ）の `jutaku-mitsumori/index.html`（タイル名「住宅改修 見積書作成」）と `sasaoka/index.html`（タイルはなく、アプリの請求書のタブから開く）。
 直したときは、このブランチでビルド → `dist-sasaoka/` の `index.html` と `version.json` を taiyo-portal の `sasaoka/` に、`dist-jutaku/` の2つを `jutaku-mitsumori/` に上書き → taiyo-portal の master に push（GitHub Pages が自動で公開する）。
 `version.json` はビルドした日時（`vite.version.ts`。アプリにも同じ印を埋め込む）。スマホのブラウザは前に開いたページをしばらく覚えていて直した版がすぐ出ないことがあるので、アプリは開いて少ししてからと画面に戻ったときに `version.json` を見て、印が違えば上に「このアプリの新しい版が出ています ⟳ 読み込み直す」を出す（`update.ts`。保存してから読み込み直す）。
+**画面を出せなかったときは真っ白にしない**（ユーザーの話「タブレットで申請書を開こうとしたら開かない。ポータルまでは開く」2026-11-12）：アプリの本体が動く前のエラー（その端末のブラウザが読めない文など）と、20秒たっても画面が出ないときは、`jutaku.html`・`sasaoka.html`・`years.html` の小さなスクリプトが「画面を出せませんでした」「⟳ 読み込み直す」とエラーの文・ブラウザの名前を出す。画面の中のエラーは `components/StartupGuard.tsx` の `StartupGuard` が同じ画面を出す。「読み込んでいます…」が10秒たっても終わらないとき（この端末の保存場所が開くのを待ったまま）は「⟳ 読み込み直す」も出す（`LoadingScreen`）。データはこの端末の保存場所に残っているので、読み込み直しで消えない。エラーの画面の写真をもらえば、何が起きたか分かる。
 2つは必ず同じサイトに置く（別のサイトだとデータ（IndexedDB）が別になり、部材リストも請求書も連動しない）。ポータルと同じサイトなので、ポータルで選んだ営業所（`localStorage` の `taiyo_portal_session`）を発行元・施工業者に使う。
 パソコンに保存したファイルで開いたときのデータは、ポータルのデータとは別（移すときはバックアップを使う）。
 

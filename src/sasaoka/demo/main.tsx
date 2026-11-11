@@ -7,12 +7,15 @@ import {createRoot} from 'react-dom/client';
 import '../noZoom.ts';
 import App from '../App.tsx';
 import '../sasaoka.css';
+import {StartupGuard} from '../components/StartupGuard.tsx';
 import {startDemo} from './gate.ts';
 
 startDemo(async () => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <App start="estimate" />
+      <StartupGuard>
+        <App start="estimate" />
+      </StartupGuard>
     </StrictMode>,
   );
 });
