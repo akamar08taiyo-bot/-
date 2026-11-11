@@ -50,7 +50,7 @@ function PicBtn({on, onClick, svg, label}: {on: boolean; onClick: () => void; sv
       onClick={onClick}
       className={`flex min-w-0 flex-col items-stretch rounded-md border bg-white p-1 text-[11px] leading-tight transition ${on ? 'border-emerald-700 ring-2 ring-emerald-500' : 'border-slate-300 hover:bg-slate-50'}`}
     >
-      <span className="block h-14 [&>svg]:h-full [&>svg]:w-full" aria-hidden dangerouslySetInnerHTML={{__html: svg}} />
+      <span className="block h-14 max-lg:h-11 [&>svg]:h-full [&>svg]:w-full" aria-hidden dangerouslySetInnerHTML={{__html: svg}} />
       <span className="mt-0.5 truncate rounded bg-slate-100 px-0.5 py-0.5 text-center text-slate-700">{label}</span>
     </button>
   );
@@ -995,36 +995,37 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     };
   }, []);
   const palette = (
-    <div className="flex min-h-0 flex-col gap-2">
+    // 携帯・タブレット（方眼の上に出すとき）は気持ち小さく・低く（ユーザーの指示「和室、洋室などの部分を気持ち小さくして、上にコンパクトに寄せる」2026-11-11）
+    <div className="flex min-h-0 flex-col gap-2 max-lg:gap-1">
       <ToolBtn
         on={tool.t === 'select' && !delMode}
         onClick={() => {
           setDelMode(false);
           setTool({t: 'select'});
         }}
-        className="bg-white text-sm font-bold"
+        className="bg-white text-sm font-bold max-lg:min-h-8 max-lg:py-0.5"
       >
         ↖ 選ぶ・動かす
       </ToolBtn>
-      <div role="tablist" aria-label="道具の種類" className="grid grid-cols-3 gap-1">
+      <div role="tablist" aria-label="道具の種類" className="grid grid-cols-3 gap-1 max-lg:grid-cols-6">
         {CATS.map(([c, label]) => (
-          <button key={c} type="button" role="tab" aria-selected={cat === c} onClick={() => setCat(c)} className={`rounded-md px-1 py-1.5 text-xs font-bold ${cat === c ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+          <button key={c} type="button" role="tab" aria-selected={cat === c} onClick={() => setCat(c)} className={`rounded-md px-1 py-1.5 text-xs font-bold max-lg:py-1 ${cat === c ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
             {label}
           </button>
         ))}
       </div>
       {/* スマホ・タブレットは方眼の上に出すので、低い箱の中でスクロール（部屋の一覧が長く、方眼が下に行きすぎた） */}
-      <div className="min-h-0 overflow-y-auto pr-0.5 max-lg:max-h-40 lg:max-h-[calc(100vh-17rem)]">
+      <div className="min-h-0 overflow-y-auto pr-0.5 max-lg:max-h-36 lg:max-h-[calc(100vh-17rem)]">
         {cat === 'room' &&
           ROOM_ROWS.map((row, ri) => (
-          <div key={ri} className="mb-1.5 grid grid-cols-3 gap-1 max-lg:grid-cols-4">
+          <div key={ri} className="mb-1.5 grid grid-cols-3 gap-1 max-lg:mb-1 max-lg:grid-cols-4">
             {row.map((r) => (
               <ToolBtn
                 key={r.name}
                 on={isTool({t: 'room', type: r.name})}
                 onClick={() => pick({t: 'room', type: r.name})}
                 // 1行が5字をこえる名前（ウォークイン・クローゼット）は字を小さく（ボタンの中で折れて3行になった）
-                className={`${r.tone.cls} ${Math.max(...(ROOM_SHORT[r.name] ?? r.name).split('\n').map((l) => l.length)) > 4 ? '!px-0.5 !text-[11px]' : ''}`}
+                className={`${r.tone.cls} max-lg:min-h-8 max-lg:py-0.5 max-lg:text-[12px] ${Math.max(...(ROOM_SHORT[r.name] ?? r.name).split('\n').map((l) => l.length)) > 4 ? '!px-0.5 !text-[11px]' : ''}`}
                 title={r.name}
               >
                 {ROOM_SHORT[r.name] ?? r.name}
@@ -1771,14 +1772,8 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
             ))}
           </select>
         </label>
-        <label className="flex items-center gap-1">
-          そろえる
-          <select value={m.snap} onChange={(e) => change((mm) => ({...mm, snap: Number(e.target.value) as 1 | 2 | 4, updatedAt: Date.now()}))} className="h-8 rounded-md border border-slate-300 bg-white px-1" aria-label="そろえる幅">
-            <option value={1}>1マス</option>
-            <option value={2}>1/2マス</option>
-            <option value={4}>1/4マス</option>
-          </select>
-        </label>
+        {/* 「そろえる（1マス・1/2マス・1/4マス）」の欄は外した（ユーザーの指示「2分の1なんとかかんとかって書いてあるやつ、意味がわからないので、なくして」2026-11-11）。
+            そろえる幅は前に選んだまま（初めは 1/2マス。model.ts の snap） */}
         </div>
         {/* 戻す・進むは上の段のど真ん中（ユーザーの指示「戻るボタンの位置は中央にもってくる」「戻る進むもど真ん中」2026-11-10） */}
         <div className="flex flex-wrap items-center gap-1 lg:justify-self-center" data-undo-center>
@@ -1848,7 +1843,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
 
       <div className="grid items-start gap-3 lg:grid-cols-[15rem_minmax(0,1fr)_17rem]">
         {shapeBar}
-        <div ref={paletteRef} className="scroll-mt-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm max-lg:order-1" data-madori-palette>
+        <div ref={paletteRef} className="scroll-mt-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm max-lg:order-1 max-lg:p-1.5" data-madori-palette>
           {palette}
         </div>
         <div className="min-w-0 space-y-2 max-lg:order-3">

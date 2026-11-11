@@ -105,15 +105,16 @@ function JobTabs({view, onView, cls}: {view: JobView; onView: (v: JobView) => vo
   // 携帯（md 未満）だけ、タブの下に「📷 写真へ」（写真の欄へ飛ぶ。タブではない。タブレットは JobHeader.tsx。PhotoJump.tsx）。
   // タブは6つ（2つずつ3段）なので、前のように理由書を1段まるごとにはしない（平面図のタブを足した。2026-11-09）
   // ユーザーの指示「住宅改修申請書、工事見積書、特定福祉用具申請書、販売見積書の順にする」（2026-10-23）。理由書は最後
-  const tabs: [JobView, string][] = [
-    ['shinsei', '📝 住宅改修申請書'],
-    ['estimate', '📋 工事見積書'],
-    ['tokutei', '🛁 特定福祉用具申請書'],
-    ['hanbai', '🏷 販売見積書'],
-    ['riyu', '📄 理由書'],
+  // 3つ目は携帯（md 未満）の短い名前（2行。ユーザーの指示「上のタブの部分をコンパクトにして、あまりスクロール幅が少ないように。携帯で見た場合」2026-11-11）
+  const tabs: [JobView, string, string][] = [
+    ['shinsei', '📝 住宅改修申請書', '📝住宅改修\n申請書'],
+    ['estimate', '📋 工事見積書', '📋工事\n見積書'],
+    ['tokutei', '🛁 特定福祉用具申請書', '🛁特定福祉用具\n申請書'],
+    ['hanbai', '🏷 販売見積書', '🏷販売\n見積書'],
+    ['riyu', '📄 理由書', '📄\n理由書'],
     // 平面図（見取図）を描く（ユーザーの指示「平面図をつくれるような機能を追加する。まどりっちの機能やマイホームクラウドの機能もつけくわえる」2026-11-09。madori/）
-    ['madori', '📐 平面図'],
-  ].filter(([v]) => !DEMO || (v !== 'tokutei' && v !== 'hanbai')) as [JobView, string][]; // デモは住宅改修だけ（ユーザーの答え「住宅改修だけ」）
+    ['madori', '📐 平面図', '📐\n平面図'],
+  ].filter(([v]) => !DEMO || (v !== 'tokutei' && v !== 'hanbai')) as [JobView, string, string][]; // デモは住宅改修だけ（ユーザーの答え「住宅改修だけ」）
   // 画面の上の帯のタブ（ユーザーの指示「メインタブが二つある為、わかりづらい。住宅改修申請書、工事見積書、特定福祉用具申請書、販売見積書、理由書がメインのタブに入る」2026-11-03。
   // 前は帯の下の白い枠のタブ）。スマホ・タブレットの縦の幅では2つずつ並べる（5つ目の理由書は1段まるごと。「📷 写真へ」があるときは理由書のとなり）
   return (
@@ -121,14 +122,24 @@ function JobTabs({view, onView, cls}: {view: JobView; onView: (v: JobView) => vo
       data-job-tabs
       role="tablist"
       aria-label="住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書・平面図"
-      className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 max-md:basis-full md:flex md:flex-wrap lg:flex-nowrap"
+      // 携帯は「☰」のとなりに1段（デモは4つ）か2段（6つを3つずつ）。前は2つずつ3段で、方眼までのスクロールが長かった
+      className={`grid min-w-0 flex-1 gap-1 ${tabs.length <= 4 ? 'grid-cols-4' : 'grid-cols-3'} md:flex md:flex-wrap md:gap-1.5 lg:flex-nowrap`}
     >
-      {tabs.map(([v, text]) => (
-        <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => onView(v)} className={cls(view === v)}>
-          {text}
+      {tabs.map(([v, text, short]) => (
+        <button
+          key={v}
+          type="button"
+          role="tab"
+          aria-selected={view === v}
+          aria-label={text}
+          onClick={() => onView(v)}
+          className={`${cls(view === v)} max-md:!min-h-10 max-md:!whitespace-pre-line max-md:!px-1 max-md:!py-1 max-md:!text-[12px] max-md:!leading-tight`}
+        >
+          <span className="md:hidden">{short}</span>
+          <span className="max-md:hidden">{text}</span>
         </button>
       ))}
-      <PhotoJumpButton className="col-span-2 rounded-lg bg-sky-50 px-2 py-2 text-sm md:hidden" />
+      <PhotoJumpButton className="col-span-full rounded-lg bg-sky-50 px-2 py-1.5 text-sm md:hidden" />
     </div>
   );
 }
@@ -160,16 +171,19 @@ function NavMenu({tab, onTab, trashCount, top = false}: {tab: MainTab; onTab: (t
   return (
     // 帯の左の端（「← 業務アプリポータルへ戻る」の真下）。top：様邸のタブ（5つ）を出しているとき、携帯・タブレットの縦（md 未満）は、タブの上の段に1つだけ
     // （タブの横に並べると、タブの幅が狭くなって「住宅改修申請書」などがはみ出した）
-    <div ref={ref} className={`relative shrink-0 self-center lg:self-start lg:pt-1.5 ${top ? 'max-md:w-full' : ''}`}>
+    // 携帯で様邸のタブを出しているときは、タブの左に「☰」だけ（字は読み上げ用に残す。2026-11-11 前はタブの上の1段まるごと）
+    <div ref={ref} className={`relative shrink-0 self-center lg:self-start lg:pt-1.5 ${top ? 'max-md:self-stretch' : ''}`}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-lg bg-white/15 px-3 text-[15px] font-bold text-white hover:bg-white/25 lg:text-base"
+        className={`flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-lg bg-white/15 px-3 text-[15px] font-bold text-white hover:bg-white/25 lg:text-base ${top ? 'max-md:h-full max-md:min-h-10 max-md:px-2.5 max-md:text-lg' : ''}`}
       >
-        ☰ メニュー
-        <span aria-hidden="true">{open ? '▲' : '▼'}</span>
+        ☰<span className={top ? 'max-md:sr-only' : ''}> メニュー</span>
+        <span aria-hidden="true" className={top ? 'max-md:hidden' : ''}>
+          {open ? '▲' : '▼'}
+        </span>
       </button>
       <div
         role="menu"
@@ -500,7 +514,8 @@ export default function App({start}: {start: MainTab}) {
         {/* 様邸の画面の「📷 写真へ」（携帯・タブレット。上の段の JobTabs と JobHeader.tsx の PhotoJumpButton）が飛ぶ先。上の段にもあるので header ごと包む */}
         <PhotoJumpCtx.Provider value={goPhotos}>
         <header className={`no-print ${theme.head} text-white transition-colors`}>
-          <div className={`mx-auto flex ${PAGE_WIDTH} flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3`}>
+          {/* 携帯は低く（住のしるし・「この端末に自動保存しました」は出さない。保存できなかったときの赤い知らせは出す。2026-11-11） */}
+          <div className={`mx-auto flex ${PAGE_WIDTH} flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 max-md:gap-x-3 max-md:gap-y-1 max-md:py-1.5`}>
             {/* 業務アプリポータルへ戻るボタンは左上（全アプリ共通の形 .taiyo-portal-back。ユーザーの指示「太陽ポータルに戻るボタンは左上に設置」2026-10-28。前は右上） */}
             {/* （株）イヤーズ デモアプリは、ポータルへ戻るボタンの代わりにデモの名前（demo/flag.ts） */}
             {DEMO ? (
@@ -513,9 +528,9 @@ export default function App({start}: {start: MainTab}) {
               </a>
             )}
             <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 place-items-center rounded-lg bg-white/15 text-lg font-black">住</div>
+              <div className="grid h-9 w-9 place-items-center rounded-lg bg-white/15 text-lg font-black max-md:hidden">住</div>
               <div>
-                <div className="text-base font-bold leading-tight">{APP_TITLE}</div>
+                <div className="text-base font-bold leading-tight max-md:text-sm">{APP_TITLE}</div>
                 {/* 「請求先：笹岡工務店」は出さない（ユーザーの指示）。営業所だけ */}
                 <div className={`text-[11px] ${theme.sub}`}>{data.settings.officeName || '営業所未設定'}</div>
               </div>
@@ -524,7 +539,7 @@ export default function App({start}: {start: MainTab}) {
               {store.saveError ? (
                 <span className="rounded bg-rose-100 px-2 py-1 font-bold text-rose-800">{store.saveError}</span>
               ) : (
-                <span>{store.savedAt ? 'この端末に自動保存しました' : 'この端末に自動保存します'}</span>
+                <span className="max-md:hidden">{store.savedAt ? 'この端末に自動保存しました' : 'この端末に自動保存します'}</span>
               )}
               {cloudOn && <CloudBadge view={cloud.view} />}
             </div>
@@ -532,7 +547,7 @@ export default function App({start}: {start: MainTab}) {
           {/* 上の帯のタブ：様邸を開いているときは 住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書（JobTabs）、ほかは「見積もり・申請書を作成する」と
               いま開いている画面。売上見込み・工務店請求書・部材・施工費マスタ・設定・ゴミ箱は左の端の「☰ メニュー ▼」（ユーザーの指示「メインタブが二つある為、わかりづらい…
               プルダウンにして右隅におく」2026-11-03。前は帯に6つのタブ、様邸のタブはその下の白い枠）。字は大きく・高く（「タブももう少し大きく見やすくする」2026-10-25） */}
-          <nav aria-label="画面" className={`mx-auto flex ${PAGE_WIDTH} items-start gap-1.5 px-3 pb-3 max-md:flex-wrap lg:pb-0`}>
+          <nav aria-label="画面" className={`mx-auto flex ${PAGE_WIDTH} items-start gap-1.5 px-3 pb-3 max-md:pb-2 ${jobOpen ? 'max-md:items-stretch' : 'max-md:flex-wrap'} lg:pb-0`}>
             {/* 「☰ メニュー ▼」は左の端（「← 業務アプリポータルへ戻る」の真下。ユーザーの指示「メニューは太陽ポータルに戻るの下左上にもってくる」2026-11-03。前は右の隅） */}
             <NavMenu tab={tab} onTab={goTab} trashCount={trashCount} top={jobOpen} />
             {jobOpen ? (

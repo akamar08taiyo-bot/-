@@ -42,7 +42,8 @@ const atPhotos = (page) =>
     {timeout: 8000},
   );
 const fab = (page) => page.locator('button.fixed[aria-label="写真の欄へ"], button.fixed[aria-label="上へ戻る"]');
-const selected = (page) => page.locator('[role=tab][aria-selected=true]').innerText();
+// 携帯のタブは短い2行の名前（2026-11-11）なので、選んでいるタブは読み上げの名前（aria-label＝いつもの名前）で見る
+const selected = (page) => page.locator('[role=tab][aria-selected=true]').getAttribute('aria-label');
 
 // ---------------- 1. iPhone
 {
@@ -51,10 +52,10 @@ const selected = (page) => page.locator('[role=tab][aria-selected=true]').innerT
   const tablist = page.locator('[data-job-tabs]');
   const jump = page.getByRole('button', {name: '写真の欄へ'});
   assert.equal(await jump.count(), 1);
-  // タブの格子の中、理由書・平面図の段の下に1段まるごと（タブが6つになった。2026-11-09。前は理由書のとなり）
+  // タブの格子の中、いちばん下の段（理由書・平面図の段）の下に1段まるごと（携帯のタブは「☰」のとなりに3つずつ2段。2026-11-11。前は2つずつ3段）
   assert.equal(await jump.evaluate((el) => !!el.closest('[data-job-tabs]')), true);
-  const [riyu, madori, j] = [await page.getByRole('tab', {name: '📄 理由書'}).boundingBox(), await page.getByRole('tab', {name: '📐 平面図'}).boundingBox(), await jump.boundingBox()];
-  assert.ok(Math.abs(riyu.y - madori.y) < 1 && j.y > riyu.y + riyu.height - 1 && Math.abs(j.x - riyu.x) < 2 && Math.abs(j.x + j.width - (madori.x + madori.width)) < 2, `${JSON.stringify(riyu)} ${JSON.stringify(j)}`);
+  const [first, riyu, madori, j] = [await page.getByRole('tab', {name: '📝 住宅改修申請書'}).boundingBox(), await page.getByRole('tab', {name: '📄 理由書'}).boundingBox(), await page.getByRole('tab', {name: '📐 平面図'}).boundingBox(), await jump.boundingBox()];
+  assert.ok(Math.abs(riyu.y - madori.y) < 1 && j.y > riyu.y + riyu.height - 1 && Math.abs(j.x - first.x) < 2 && Math.abs(j.x + j.width - (madori.x + madori.width)) < 2, `${JSON.stringify(riyu)} ${JSON.stringify(j)}`);
   await tablist.screenshot({path: path.join(outDir, 'photojump-iphone-tabs.png')});
   // 工事見積書のタブから押す → 住宅改修申請書のタブの写真の欄
   await jump.click();

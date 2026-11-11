@@ -66,7 +66,9 @@ export function JobHeader({
   const row =
     'flex flex-wrap items-center gap-2 lg:flex-nowrap lg:[&>*]:!text-base max-lg:w-full max-lg:justify-center ' +
     'max-sm:grid max-sm:grid-cols-2 max-sm:items-stretch max-sm:[&>*]:min-h-11 max-sm:[&>*]:w-full max-sm:[&>*]:whitespace-normal max-sm:[&>*]:px-2 max-sm:[&>*]:leading-tight ' +
-    'max-sm:[&>label]:col-span-2 max-sm:[&>label]:justify-center max-sm:[&>*:last-child:nth-child(odd):not(label)]:col-span-2 max-sm:[&>*:last-child:nth-child(odd):not(label)]:mx-auto max-sm:[&>*:last-child:nth-child(odd):not(label)]:w-[calc(50%-0.25rem)]';
+    'max-sm:[&>label]:col-span-2 max-sm:[&>label]:justify-center max-sm:[&>*:last-child:nth-child(odd):not(label)]:col-span-2 max-sm:[&>*:last-child:nth-child(odd):not(label)]:mx-auto max-sm:[&>*:last-child:nth-child(odd):not(label)]:w-[calc(50%-0.25rem)] ' +
+    // ボタンがちょうど3つ（Excelで保存・〇〇を印刷・その他 ▼）なら、携帯でも1段に3つ（ユーザーの指示「上の部分をコンパクトにして、スクロール幅が少ないように」2026-11-11。前は2段）
+    'max-sm:[&:has(>:nth-child(3):last-child)]:grid-cols-3 max-sm:[&:has(>:nth-child(3):last-child)>*:last-child]:!col-span-1 max-sm:[&:has(>:nth-child(3):last-child)>*:last-child]:!mx-0 max-sm:[&:has(>:nth-child(3):last-child)>*:last-child]:!w-full max-sm:[&:has(>:nth-child(3):last-child)>*]:!px-1 max-sm:[&:has(>:nth-child(3):last-child)>*]:!text-[13px]';
   // 1段：← 一覧へ戻る・様邸の名前、そのすぐ右に Excelで保存・〇〇を印刷・その他 ▼（・売上月）、右の端に extra（介護保険証の欄）。
   // 様邸のタブ（住宅改修申請書・工事見積書…）は画面の上の帯（App.tsx の JobTabs。ユーザーの指示「メインタブが二つある為、わかりづらい」2026-11-03。
   // 前はこの段の上に「← 一覧へ戻る」とタブの段があった）。狭い画面（lg 未満）は、名前の段・ボタンの段をそれぞれ1行にしてまん中に
