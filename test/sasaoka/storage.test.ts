@@ -350,3 +350,12 @@ test('askPersist：まだなら頼む・もう守られていれば頼まない�
     if (real) Object.defineProperty(globalThis, 'navigator', real);
   }
 });
+
+test('見積書から外した箇所（estimateOff）は行がないときだけ持つ・申請書から見積書へ連動しない（shinseiLink: false）は持つ', () => {
+  // 2026-11-11（申請書も連動して消す機能はやめる・見積書へ連動のオン・オフ）
+  const [j] = cleanJobs([{customer: '見本', shinseiLink: false, places: [{name: '玄関', estimateOff: true}, {name: 'トイレ', estimateOff: true, rows: [{kind: 'material', name: '手すり'}]}]}]);
+  assert.equal(j.shinseiLink, false);
+  assert.deepEqual(j.places.map((p) => p.estimateOff), [true, undefined]);
+  const [on] = cleanJobs([{customer: '見本', shinseiLink: true, places: [{name: '玄関', estimateOff: 'yes'}]}]);
+  assert.deepEqual([on.shinseiLink, on.places[0].estimateOff], [undefined, undefined]);
+});

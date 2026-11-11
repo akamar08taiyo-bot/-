@@ -1,15 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {estimateTotals, jobTotals} from '../../src/sasaoka/calc.ts';
-import {formLines, photoNumbers} from '../../src/sasaoka/estimateForms.ts';
+import {formLines, offEstimate, photoNumbers, sheetNewLine} from '../../src/sasaoka/estimateForms.ts';
 import {placeFromDims, withBrackets} from '../../src/sasaoka/cutLink.ts';
 import {laborRow, manualRow, materialRow, newPlace, setLaborCount} from '../../src/sasaoka/rows.ts';
 import {
   applySheet,
   clearedSheet,
   deleteLine,
-  deletePlace,
-  deleteTouchesShinsei,
   describeKey,
   dropEmptyPlaces,
   insertBeforeId,
@@ -283,14 +281,10 @@ test('部材の内容（品名）を消す（Delete）と、その部材を同�
   assert.deepEqual(formLines(res.job, S, 'yukuhashi').map((l) => l.text), ['サンプル S-TS35 木の手すり 35φ 4m']);
   assert.equal(res.key, `line:${second}:text`); // その位置に来た行を選ぶ
   assert.ok(!formLines(res.job, S, 'yukuhashi').some((l) => l.text === '材料費'));
-  // 最後の部材を消すと箇所ごとなくなる（申請書に何も入れていない箇所）。選ぶのはいちばん下の行
+  // 最後の部材を消すと見積書から箇所がなくなる（申請書の箇所には残る。2026-11-11）。選ぶのはいちばん下の行
   const last = applySheet(res.job, `line:${second}:text`, '', yk);
-  assert.deepEqual([last.job.places.length, last.key], [0, 'new:text']);
-  // 申請書の寸法の入った箇所は残して、空白の行に
-  const kept: Job = {...res.job, places: [{...res.job.places[0], dims: {l: '1200'}}]};
-  const blank = applySheet(kept, `line:${second}:text`, '', yk).job;
-  assert.equal(blank.places.length, 1);
-  assert.deepEqual(formLines(blank, S, 'yukuhashi', {all: true}).filter((l) => !l.isNew).map((l) => [l.blank, l.text]), [[true, '']]);
+  assert.deepEqual([last.job.places.length, offEstimate(last.job.places[0]), last.key], [1, true, 'new:text']);
+  assert.deepEqual(formLines(last.job, S, 'yukuhashi', {all: true}), []);
 });
 
 test('どこの欄か（describeKey）：「①階段 ／ 品名 ／ 欄の名前」。施工費は取り付ける手間の名前（木 など）', () => {
@@ -387,14 +381,18 @@ test('行を消す（行の左の✕消す・この行を消す）：部材は�
   // 部材の行を消すと、すぐ下の同上施工費も消える
   job = deleteLine(job, barRow.id);
   assert.deepEqual(job.places[0].rows.map((r) => r.id), [railRow.id]);
-  // 最後の箇所の、ただ1つの行を消す → 箇所も消えて、改修内容・改修場所も出ない
+  // 最後の箇所の、ただ1つの行を消す → 見積書からは外れて、改修内容・改修場所も出ない。申請書の箇所には残る（2026-11-11）
   job = deleteLine(job, job.places[1].rows[0].id);
-  assert.deepEqual(job.places.map((p) => p.name), ['玄関']);
+  assert.deepEqual(job.places.map((p) => [p.name, offEstimate(p)]), [['玄関', false], ['トイレ', true]]);
   assert.ok(formLines(job, S, 'yukuhashi').every((l) => l.placeName === '玄関'));
-  // 残りの1行も消すと、箇所がなくなる
+  // 残りの1行も消すと、見積書に箇所がなくなる（申請書には2つとも残る）
   job = deleteLine(job, railRow.id);
-  assert.deepEqual(job.places, []);
+  assert.deepEqual(formLines(job, S, 'yukuhashi'), []);
+  assert.deepEqual(job.places.map((p) => [p.name, p.rows.length, offEstimate(p)]), [['玄関', 0, true], ['トイレ', 0, true]]);
   assert.equal(deleteLine(job, 'no-such-row'), job);
+  // 改修場所の名前も申請書の内容もない箇所は、どこにも出ないので消す
+  const nameless: Job = {...emptyJob(), places: [newPlace('', [materialRow(bar, 1)])]};
+  assert.deepEqual(deleteLine(nameless, nameless.places[0].rows[0].id).places, []);
 });
 
 test('行をコピーして貼り付け：部材は同上施工費ごと、施工費（同上施工費）はそのまとまり。選んだ行のすぐ下に入る', () => {
@@ -446,7 +444,7 @@ test('行をコピーして貼り付け：部材は同上施工費ごと、施�
   assert.deepEqual(pasteLines(job, 'job:customer', lineRows(job, work.id) ?? []), {job, rowId: null});
 });
 
-test('行を切り取って貼り付け：貼り付けた所に移る（もとの行は消え、箇所の行がなくなれば箇所も消える）', () => {
+test('行を切り取って貼り付け：貼り付けた所に移る（もとの行は消え、箇所の行がなくなれば見積書から外れる）', () => {
   let {job} = type(emptyJob(), [
     ['new:name', '玄関'],
     ['new:text', 'インテリアバー', bar],
@@ -456,8 +454,9 @@ test('行を切り取って貼り付け：貼り付けた所に移る（もと�
   const [genkan, toilet] = job.places;
   const moved = pasteLines(job, `line:${toilet.rows[0].id}:text`, lineRows(job, genkan.rows[0].id) ?? [], [genkan.rows[0].id]);
   job = moved.job;
-  assert.deepEqual(job.places.map((p) => [p.name, p.rows.map((r) => r.name)]), [['トイレ', ['木の手すり 35φ 4m', 'インテリアバー']]]);
-  assert.equal(moved.rowId, job.places[0].rows[1].id);
+  // 行がなくなった玄関は見積書から外れる（申請書には残る。2026-11-11）
+  assert.deepEqual(job.places.map((p) => [p.name, p.rows.map((r) => r.name), offEstimate(p)]), [['玄関', [], true], ['トイレ', ['木の手すり 35φ 4m', 'インテリアバー'], false]]);
+  assert.equal(moved.rowId, job.places[1].rows[1].id);
 });
 
 // ---------------------------------------------------------------- レビューで見つかった不具合（2026-10-23）
@@ -576,40 +575,65 @@ test('内容の欄で、1本の長さのない部材に選び直したら前の�
   assert.equal(job.places[0].rows[0].lengthCm, 60);
 });
 
-test('申請書のタブで寸法・写真を入れた箇所は、見積書の ✕・切り取りで行がなくなっても消さない（空白の行にして残す）', () => {
+test('見積書の ✕・切り取りで箇所の行がなくなっても、申請書の箇所は消さない（見積書から外すだけ。寸法・写真はそのまま）', () => {
+  // ユーザーの指示「申請書も連動して消す機能はやめる」2026-11-11（前は「申請書からも削除してよいですか？」と聞いた）
   const bath = {...newPlace('浴室', [manualRow('material', {qty: 1})]), dims: {l: '800', h: '750'}, photos: {before: 'ph_before_1', after: 'ph_after_1'}, photoNote: '縦手すり'};
   const entry = newPlace('玄関', [materialRow(rail, 1)]);
   let job: Job = {...emptyJob(), places: [entry, bath]};
-  // 空白の行の ✕：何もしない（前は箇所ごと寸法・写真まで消えた）
-  assert.equal(deleteLine(job, bath.rows[0].id), job);
-  // 行を入れてから ✕：箇所は空白の行にして残す
+  // 空白の行の ✕：見積書から外す（前は何もしなかった）
+  const off = deleteLine(job, bath.rows[0].id);
+  assert.deepEqual([off.places.length, off.places[1].rows.length, offEstimate(off.places[1]), off.places[1].photos?.before, off.places[1].dims?.l], [2, 0, true, 'ph_before_1', '800']);
+  // 行を入れてから ✕：見積書には出ない・写真番号は残る（申請書の②のまま）
   job = {...job, places: [entry, {...bath, rows: [materialRow(bar, 1)]}]};
   job = deleteLine(job, job.places[1].rows[0].id);
-  assert.deepEqual([job.places.length, job.places[1].rows.length, job.places[1].photos?.before, job.places[1].dims?.l], [2, 1, 'ph_before_1', '800']);
-  assert.ok(formLines(job, S, 'yukuhashi')[1].blank);
-  // 切り取って玄関に貼り付けても残る。申請書の内容のない箇所は今までどおり消える
+  assert.deepEqual([job.places.length, job.places[1].rows.length, offEstimate(job.places[1])], [2, 0, true]);
+  assert.ok(formLines(job, S, 'yukuhashi').every((l) => l.placeName === '玄関'));
+  assert.deepEqual([...photoNumbers(job, S).values()], [1, 2]);
+  // 切り取って玄関に貼り付けても申請書には残る。名前のない箇所は今までどおり消える
   job = {...job, places: [entry, {...bath, rows: [materialRow(bar, 1)]}]};
   const moved = pasteLines(job, `line:${entry.rows[0].id}:text`, lineRows(job, job.places[1].rows[0].id) ?? [], [job.places[1].rows[0].id]).job;
-  assert.deepEqual(moved.places.map((p) => [p.name, p.rows.length]), [['玄関', 2], ['浴室', 1]]);
-  const plain = {...emptyJob(), places: [entry, newPlace('トイレ', [materialRow(bar, 1)])]};
+  assert.deepEqual(moved.places.map((p) => [p.name, p.rows.length, offEstimate(p)]), [['玄関', 2, false], ['浴室', 0, true]]);
+  const plain = {...emptyJob(), places: [entry, newPlace('', [materialRow(bar, 1)])]};
   assert.deepEqual(deleteLine(plain, plain.places[1].rows[0].id).places.map((p) => p.name), ['玄関']);
   // 撮影日だけ・そのほかだけの箇所も残す（申請書の一覧の ✕ で聞く箇所と同じ）
   for (const extra of [{photoDates: {before: '2026-10-01'}}, {shinseiText: '木製'}, {plateLength: '1300'}]) {
-    const kept = {...emptyJob(), places: [entry, {...newPlace('トイレ', [materialRow(bar, 1)]), ...extra}]};
-    assert.deepEqual(deleteLine(kept, kept.places[1].rows[0].id).places.map((p) => p.name), ['玄関', 'トイレ']);
+    const kept = {...emptyJob(), places: [entry, {...newPlace('', [materialRow(bar, 1)]), ...extra}]};
+    assert.deepEqual(deleteLine(kept, kept.places[1].rows[0].id).places.map((p) => offEstimate(p)), [false, true]);
   }
+  // 切り取らなかった箇所（行のない箇所など）は、そのまま
+  const pending = newPlace('トイレ');
+  const three: Job = {...emptyJob(), places: [entry, {...bath, rows: [materialRow(bar, 1)]}, pending]};
+  const cut = pasteLines(three, `line:${entry.rows[0].id}:text`, lineRows(three, three.places[1].rows[0].id) ?? [], [three.places[1].rows[0].id]).job;
+  assert.equal(cut.places[2], pending);
 });
 
-test('見積書の ✕ で申請書に入れた箇所の最後の行を消すときは、申請書からも消すか聞く（deleteTouchesShinsei）。「申請書からも削除」は箇所ごと消す（deletePlace）', () => {
-  // ユーザーの指示「見積もり書の方からも、消せるように…いきなり消すのではなく、注意、申請書からも削除してよいですか」2026-11-02
-  const entry = {...newPlace('玄関', [materialRow(rail, 1)]), dims: {l: '600'}};
-  const toilet = newPlace('トイレ', [materialRow(bar, 1), materialRow(rail, 1)]);
-  const job: Job = {...emptyJob(), places: [entry, toilet]};
-  assert.equal(deleteTouchesShinsei(job, entry.rows[0].id)?.id, entry.id); // 申請書の寸法がある箇所の最後の行 → 聞く
-  assert.equal(deleteTouchesShinsei(job, toilet.rows[0].id), null); // 行が残る → 聞かない
-  assert.equal(deleteTouchesShinsei({...job, places: [{...entry, dims: undefined}, toilet]}, entry.rows[0].id), null); // 申請書の内容がない → 聞かない（今までどおり消える）
-  assert.equal(deleteTouchesShinsei(job, 'no-such-row'), null);
-  assert.deepEqual(deletePlace(job, entry.id).places.map((p) => p.name), ['トイレ']);
+test('見積書から外した箇所：いちばん下の空いた行・ツールバーの入れ先にしない。写真番号は申請書の番号のまま（①③）', () => {
+  const entry = newPlace('玄関', [materialRow(rail, 1)]);
+  const toilet = {...newPlace('トイレ'), estimateOff: true};
+  const bath = newPlace('浴室', [materialRow(bar, 1)]);
+  let job: Job = {...emptyJob(), places: [entry, toilet, bath]};
+  assert.deepEqual([...photoNumbers(job, S).entries()], [[entry.id, 1], [toilet.id, 2], [bath.id, 3]]);
+  assert.deepEqual(formLines(job, S, 'yukuhashi').map((l) => [l.placeName, l.photo]), [['玄関', 1], ['浴室', 3]]);
+  // いちばん下に打つと、最後の見積書の箇所（浴室）に入る。名前を打つと新しい箇所④
+  job = {...job, places: [entry, bath, toilet]};
+  assert.equal(toolPlace(job, null, null)?.id, bath.id);
+  assert.equal(toolPlace(job, null, toilet.id)?.id, bath.id);
+  let r = applySheet(job, 'new:text', '同上施工費', yk);
+  assert.deepEqual(r.job.places.map((p) => [p.name, p.rows.length]), [['玄関', 1], ['浴室', 2], ['トイレ', 0]]);
+  // いちばん下の箇所に行がなければ、その箇所の写真番号は外した箇所も数えたつぎ（玄関①・トイレ②（外した）・寝室③）
+  const pend: Job = {...job, places: [entry, toilet, newPlace('寝室')]};
+  assert.equal(sheetNewLine(pend, formLines(pend, S, 'yukuhashi'), 'yukuhashi').photo, 3);
+  const typed = applySheet(pend, 'new:text', 'インテリアバー', {...yk, pick: bar}).job;
+  assert.equal(photoNumbers(typed, S).get(pend.places[2].id), 3);
+  r = applySheet(job, 'new:name', '寝室', yk);
+  assert.deepEqual(r.job.places.map((p) => p.name), ['玄関', '浴室', 'トイレ', '寝室']);
+  assert.equal(photoNumbers(r.job, S).get(r.job.places[3].id), undefined); // 行が入るまでは番号なし（今までどおり）
+  // 見積書の箇所がみな外れていれば、いちばん下に打つと新しい箇所を作る
+  const allOff: Job = {...emptyJob(), places: [toilet]};
+  r = applySheet(allOff, 'new:text', 'インテリアバー', {...yk, pick: bar});
+  assert.deepEqual(r.job.places.map((p) => [p.name, p.rows.length]), [['トイレ', 0], ['', 1]]);
+  // 行が入れば見積書に出る
+  assert.equal(offEstimate({...toilet, rows: [materialRow(bar, 1)]}), false);
 });
 
 test('白紙に戻す：見積書の内容と、申請書の項目・理由書（お客様のこと）を消す。保険者・担当・請求書に入れるかは残す', () => {

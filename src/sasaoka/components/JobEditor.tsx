@@ -1,7 +1,7 @@
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {cutToLength, jobName, jobTotals, placeTotals, rowAmount, taxFormula} from '../calc.ts';
 import type {JobTotals} from '../calc.ts';
-import {cutCalc} from '../estimateForms.ts';
+import {cutCalc, offEstimate} from '../estimateForms.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {addMaterial, changeRowQty, copyRows, kitFromRows, laborForText, laborOwner, manualRow, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
 import {withBillMonth} from '../salesPlan.ts';
@@ -76,7 +76,8 @@ export function JobEditor({
   const movePlace = (placeId: string, delta: number) =>
     setJob((j) => {
       const i = j.places.findIndex((p) => p.id === placeId);
-      const k = i + delta;
+      let k = i + delta;
+      while (k >= 0 && k < j.places.length && offEstimate(j.places[k])) k += delta; // 見積書から外した箇所（申請書だけ。ここには出さない）はとばす
       if (i < 0 || k < 0 || k >= j.places.length) return j;
       const places = [...j.places];
       [places[i], places[k]] = [places[k], places[i]];
@@ -133,6 +134,7 @@ export function JobEditor({
     update('kits', (list) => list.filter((k) => k.id !== kit.id));
   };
 
+  const shownPlaces = job.places.filter((p) => !offEstimate(p));
   const pickPlace = picker ? job.places.find((p) => p.id === picker.placeId) : undefined;
   const presets = data.settings.placePresets;
   const used = new Map<string, number>();
@@ -242,12 +244,13 @@ export function JobEditor({
             </label>
           </section>
 
-          {job.places.map((place, i) => (
+          {/* 見積書から外した箇所（申請書だけの箇所。estimateForms.ts の offEstimate）は出さない */}
+          {shownPlaces.map((place, i) => (
             <PlaceCard
               key={place.id}
               place={place}
               first={i === 0}
-              last={i === job.places.length - 1}
+              last={i === shownPlaces.length - 1}
               presets={presets}
               focusRowId={focusRowId}
               onRename={(name) => setPlace(place.id, (p) => ({...p, name}))}

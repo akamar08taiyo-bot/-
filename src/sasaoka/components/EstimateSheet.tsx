@@ -22,11 +22,11 @@ import {rounddown, startEstimate} from '../calc.ts';
 import {circled, KINDS, materialText} from '../estimateForms.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {KouikiForm, YukuhashiForm} from '../print/EstimateForms.tsx';
-import {applySheet, deleteLine, deletePlace, deleteTouchesShinsei, describeKey, dropEmptyPlaces, FIELD_NAMES, insertBeforeId, insertBlankBefore, laborCountAt, lineRows, parseDate, parseMark, parsePlace, pasteLines, sheetTarget, sheetValue, stepLaborAt, toggleExcluded, toolPlace} from '../sheetEdit.ts';
+import {applySheet, deleteLine, describeKey, dropEmptyPlaces, FIELD_NAMES, insertBeforeId, insertBlankBefore, laborCountAt, lineRows, parseDate, parseMark, parsePlace, pasteLines, sheetTarget, sheetValue, stepLaborAt, toggleExcluded, toolPlace} from '../sheetEdit.ts';
 import {getClip, setClip, useClip} from '../sheetClip.ts';
-import type {EstimateForm, Job, LaborItem, Material, Place, Settings} from '../types.ts';
+import type {EstimateForm, Job, LaborItem, Material, Settings} from '../types.ts';
 import {matchesAll, noHyphen, searchKey, todayIso, yen} from '../util.ts';
-import {Btn, Modal, useToast} from './ui.tsx';
+import {Btn, useToast} from './ui.tsx';
 import {BOOKS, type BookId} from '../makerCatalogs.ts';
 
 /** 広域連合用の「材／手」の欄（いちばん下の行 new:mark・明細の行 line:…:mark・空いた行 gap:…:mark） */
@@ -760,30 +760,13 @@ export function EstimateSheet({
       tr?.removeAttribute('data-flash');
     };
   }, [flash]);
-  // 申請書に入れた箇所の最後の行を消すとき：申請書からも消すか聞く（`deleteTouchesShinsei`。blank＝消す行が空白の行で、見積書から消すものがない）
-  const [askDelete, setAskDelete] = useState<{rowId: string; place: Place; blank: boolean} | null>(null);
+  // 行を消す。申請書に入れた箇所の最後の行を消しても、申請書の箇所はそのまま（見積書から外すだけ。`deleteLine`）。
+  // 前は「申請書からも削除してよいですか？」と聞いていた（ユーザーの指示「申請書も連動して消す機能はやめる」2026-11-11）
   const deleteRow = (rowId: string) => {
-    const place = deleteTouchesShinsei(jobRef.current, rowId);
-    if (place) {
-      setAskDelete({rowId, place, blank: lineRows(jobRef.current, rowId) === null});
-      return;
-    }
     const next = deleteLine(jobRef.current, rowId);
     if (next === jobRef.current) return;
     change(next);
     setSel(null);
-  };
-  const answerDelete = (how: 'shinsei' | 'estimate' | null) => {
-    const ask = askDelete;
-    setAskDelete(null);
-    if (!ask || !how) return;
-    // 申請書からも：箇所ごと消す（Ctrl+Z で戻せる）。見積書の行だけ：箇所は申請書に残して、見積書は空白の行に（`deleteLine`）
-    const next = how === 'shinsei' ? deletePlace(jobRef.current, ask.place.id) : deleteLine(jobRef.current, ask.rowId);
-    if (next !== jobRef.current) {
-      change(next);
-      setSel(null);
-    }
-    inputRef.current?.focus({preventScroll: true});
   };
 
   // ---------------------------------------------------------------- マウス
@@ -1379,31 +1362,6 @@ export function EstimateSheet({
         </div>
       )}
     </section>
-    {/* 見積書の欄の外に出す（見積書の欄のキー・マウスの受け手に入らないように） */}
-    {askDelete && (
-      <Modal
-        title={`「${askDelete.place.name.trim() || '箇所'}」は申請書にも入っています`}
-        onClose={() => answerDelete(null)}
-        footer={
-          <>
-            <Btn color="white" className="!border-rose-300 !text-rose-700" onClick={() => answerDelete('shinsei')}>
-              申請書からも削除
-            </Btn>
-            {!askDelete.blank && (
-              <Btn color="white" onClick={() => answerDelete('estimate')}>
-                見積書の行だけ消す
-              </Btn>
-            )}
-            <Btn color="white" onClick={() => answerDelete(null)}>
-              やめる
-            </Btn>
-          </>
-        }
-      >
-        <p className="text-base text-slate-800">申請書からも削除してよいですか？</p>
-        <p className="mt-1 text-sm text-slate-500">申請書の改修の内容・寸法・写真も消えます（Ctrl+Z で戻せます）</p>
-      </Modal>
-    )}
     </>
   );
 }

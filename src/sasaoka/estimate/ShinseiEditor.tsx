@@ -11,7 +11,7 @@ import {Fragment, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef,
 import type {KeyboardEvent, ReactNode, RefObject} from 'react';
 import {isBlankRow, jobName} from '../calc.ts';
 import {Btn, KanaInput, TextInput, useToast} from '../components/ui.tsx';
-import {circled, eraOf, INSURER_IDS, INSURER_INFO, insurerForAddress, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, photoNumbers} from '../estimateForms.ts';
+import {circled, eraOf, INSURER_IDS, INSURER_INFO, insurerForAddress, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, offEstimate, photoNumbers} from '../estimateForms.ts';
 import {placeFromDims, plateFromText, withBrackets} from '../cutLink.ts';
 import {newPlace} from '../rows.ts';
 import {withSlots} from '../railSlots.ts';
@@ -862,7 +862,8 @@ function Dim({
 let dimCanvas: HTMLCanvasElement | undefined; // 長さの欄の字の幅を測る
 
 /**
- * 改修の内容：箇所ごとに 写真番号・改修場所・改修の種類と寸法。見積書の箇所と同じもの（ここで足した箇所は見積書にも出る）。
+ * 改修の内容：箇所ごとに 写真番号・改修場所・改修の種類と寸法。見積書の箇所と同じもの（ここで足した箇所は見積書にも出る。「見積書へ連動」を外すと出ない。
+ * 見積書で最後の行を消した箇所・連動しないで足した箇所は申請書だけに出て、「見積書に入れる」で見積書にも出る）。
  * 寸法（ユーザーの指示「入力項目に長さ、高さという項目をつくる」「段差の解消は幅・奥行・高さの入力欄」）：手すりは 長さ（L=600mm。入れなければ見積書の使う長さ＝薄い字）・
  * 高さ（H=800mm。任意）、段差の解消は 幅・奥行・高さ（W600mm D350mm H150mm）。「そのほか」はうしろに足す文。下に、申請書に書く行を1行ずつの欄で出す（手で直せる）
  */
@@ -1021,35 +1022,49 @@ function BuilderPick({job, info, setInfo, s, update}: {job: Job; info: ShinseiIn
 
 function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (fn: (j: Job) => Job) => void; s: Settings; insurer: Insurer; materials: Material[]}) {
   const photos = photoNumbers(job, s);
-  // 見積書にまだ何も入れていない箇所は、改修の種類・手すりの種類・高さ・ベースプレートに合わせて見積書の空きの行（手すり・ブラケット・施工費など）を作り直す（`withSlots`）
-  const setPlace = (id: string, fn: (p: Place) => Place) => setJob((j) => ({...j, places: j.places.map((p) => (p.id === id ? withSlots(fn(p)) : p))}));
+  // 申請書から見積書への連動（下の「見積書へ連動」。空なら連動する）。連動しないときは、申請書で入れたことを見積書の行に入れない（ユーザーの指示
+  // 「申請書を入力したら、見積もりへ連動する機能もオン、オフ切り替えできるようにする」2026-11-11）。見積書から外した箇所（`offEstimate`）も入れない
+  const linked = job.shinseiLink !== false;
+  // 見積書にまだ何も入れていない箇所は、改修の種類・手すりの種類・高さ・ベースプレートに合わせて見積書の空きの行（手すり・ブラケット・施工費など）を作り直す（`withSlots`）。
+  // flow＝見積書に入れる箇所か（連動していて、見積書から外していない）
+  const setPlace = (id: string, fn: (p: Place, flow: boolean) => Place) =>
+    setJob((j) => ({
+      ...j,
+      places: j.places.map((p) => {
+        if (p.id !== id) return p;
+        const flow = j.shinseiLink !== false && !offEstimate(p);
+        const next = fn(p, flow);
+        return flow ? withSlots(next) : next;
+      }),
+    }));
   // 手すりの長さを入れたら、見積書のその箇所の手すり・ベースプレートの使う長さにもする（ユーザーの指示「どちらか一方を入力した際に、自動的に 1.2 の部分が入力される」。`cutLink.ts`）。
   // 中間のブラケット（BD-01G）の数も入れ直す（`withBrackets`）
   const setDim = (id: string, key: keyof PlaceDims, v: string) =>
-    setPlace(id, (x) => {
+    setPlace(id, (x, flow) => {
       const dims: PlaceDims = {...x.dims, [key]: v};
       if (!v.trim()) delete dims[key];
       const {dims: _old, ...rest} = x;
       const next: Place = Object.keys(dims).length ? {...rest, dims} : rest;
       // 手すり・ベースプレートの長さは、見積書の手すり・ベースプレートの使う長さにする（`placeFromDims`）
-      return key === 'l' ? withBrackets(x, placeFromDims(next), materials) : next;
+      return key === 'l' && flow ? withBrackets(x, placeFromDims(next), materials) : next;
     });
   // 長さの欄を消して空にした：見積書の手すりは打ち始めたときの長さ（start）に戻して、申請書の長さは空ける（＝見積書の長さを入れて見せる）。
   // 手で入れた長さ（「600×1800」）を消したときは、その長さに戻す（見積書の手すりは1行の 2400mm なので、空けると「2400」になって2本の区切りが消える）
   const clearLength = (id: string, start: string) =>
-    setPlace(id, (x) => {
-      const back = start.trim() ? placeFromDims({...x, dims: {...x.dims, l: start}}) : x;
+    setPlace(id, (x, flow) => {
+      const back = flow && start.trim() ? placeFromDims({...x, dims: {...x.dims, l: start}}) : x;
       const {l: _l, ...dims} = back.dims ?? {};
       const {dims: _d, ...rest} = back;
-      return withBrackets(x, Object.keys(dims).length ? {...rest, dims} : rest, materials);
+      const next: Place = Object.keys(dims).length ? {...rest, dims} : rest;
+      return flow ? withBrackets(x, next, materials) : next;
     });
   // ベースプレートの長さ（「＋ ベースプレート」）。見積書のベースプレートの使う長さにする（空にしても見積書のベースプレートは変えない。
   // 手すりの長さが変わってもベースプレートは変えない＝2026-11-04。`placeFromDims`）
   const setPlate = (id: string, v: string) =>
-    setPlace(id, (x) => {
+    setPlace(id, (x, flow) => {
       const {plateLength: _old, ...rest} = x;
       const next: Place = v.trim() ? {...rest, plateLength: v} : rest;
-      return withBrackets(x, placeFromDims(next), materials);
+      return flow ? withBrackets(x, placeFromDims(next), materials) : next;
     });
   /**
    * 「＋ ベースプレート」：ベースプレートの長さの欄を開く（ユーザーの指示「ベースプレートをいれる場合は、追加ボタンを押して、長さの欄にベースプレートの正確な長さをいれる、
@@ -1058,10 +1073,10 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
   const openPlate = (p: Place) => {
     const moved = plateFromText(p.shinseiText);
     if (moved)
-      setPlace(p.id, (x) => {
+      setPlace(p.id, (x, flow) => {
         const {shinseiText: _t, ...rest} = x;
         const next: Place = {...rest, ...(moved.rest ? {shinseiText: moved.rest} : {}), plateLength: moved.bp};
-        return withBrackets(x, placeFromDims(next), materials);
+        return flow ? withBrackets(x, placeFromDims(next), materials) : next;
       });
     // そのほかが空になったら、そのほかの欄は閉じる
     if (moved && !moved.rest)
@@ -1100,8 +1115,9 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
   };
   const closeBtn = 'rounded px-1.5 py-0.5 text-sm text-slate-400 hover:bg-slate-100 hover:text-slate-700';
   const plusBtn = 'rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-700';
+  // 連動しないときは、見積書から外した箇所として足す（申請書だけ。箇所の「見積書に入れる」で見積書にも出る）
   const add = (name: string) => {
-    const place = withSlots(newPlace(name));
+    const place = linked ? withSlots(newPlace(name)) : {...newPlace(name), estimateOff: true};
     focusPlace.current = {id: place.id, field: name ? 'dim' : 'name'};
     setJob((j) => ({...j, places: [...j.places, place]}));
   };
@@ -1115,6 +1131,16 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
   // 写真・撮影日・寸法・手で直した文などの入った箇所は、消す前に聞く（一度押しただけで写真ごと消えて、元に戻せなかった）。
   // 見積書に行のある箇所も、ここから消せる（見積書のその箇所の行も消える。前は見積書で消すしかなく、長さを入れると ✕ が消えた。
   // ユーザーの指摘「一度箇所を入力したら、削除ボタンがない」2026-11-05）
+  // 見積書から外した箇所（見積書で最後の行を消した・連動しないで足した）を見積書に戻す：空きの行を作る（見積書でその行に部材・施工費を入れる）
+  const toEstimate = (id: string) =>
+    setJob((j) => ({
+      ...j,
+      places: j.places.map((p) => {
+        if (p.id !== id) return p;
+        const {estimateOff: _off, ...rest} = p;
+        return withSlots(rest);
+      }),
+    }));
   const remove = (p: Place) => {
     const has = [
       p.rows.some((r) => !isBlankRow(r)) ? '見積書の行' : '',
@@ -1177,6 +1203,16 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
                       </option>
                     ))}
                   </select>
+                  {offEstimate(p) && (
+                    <button
+                      type="button"
+                      onClick={() => toEstimate(p.id)}
+                      className="h-9 shrink-0 rounded-md border border-slate-300 bg-white px-2.5 text-sm text-slate-600 hover:bg-emerald-50 hover:text-emerald-800"
+                      aria-label={`${p.name || '箇所'}を見積書に入れる`}
+                    >
+                      見積書に入れる
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => remove(p)}
@@ -1285,24 +1321,31 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
           プルダウン形式にしてください」2026-10-26）。選ぶと足して、その箇所の長さの欄へ（「そのほか」は改修場所の名前の欄へ）。
           箇所がないと見積書・申請書ができないので目立たせる（ユーザーの指示「箇所を足すっていう部分…少し目立たせるようにしてください」2026-11-05）：
           薄い緑の地・緑の太い枠・大きめの字。まだ箇所がないときは、まわりに薄い緑の輪も付ける */}
-      <select
-        value=""
-        onChange={(e) => {
-          const v = e.target.value;
-          if (v) add(v === OTHER_PLACE ? '' : v);
-        }}
-        aria-label="箇所を足す"
-        data-empty={job.places.length === 0 ? '' : undefined}
-        className={`h-12 w-full max-w-sm rounded-lg border-2 border-emerald-600 bg-emerald-50 px-4 text-base font-bold text-emerald-800 shadow-sm hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-200 ${job.places.length === 0 ? 'ring-4 ring-emerald-200' : ''}`}
-      >
-        <option value="">＋ 箇所を足す</option>
-        {s.placePresets.map((name) => (
-          <option key={name} value={name}>
-            {name}
-          </option>
-        ))}
-        <option value={OTHER_PLACE}>そのほか（名前を打つ）</option>
-      </select>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <select
+          value=""
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v) add(v === OTHER_PLACE ? '' : v);
+          }}
+          aria-label="箇所を足す"
+          data-empty={job.places.length === 0 ? '' : undefined}
+          className={`h-12 w-full max-w-sm rounded-lg border-2 border-emerald-600 bg-emerald-50 px-4 text-base font-bold text-emerald-800 shadow-sm hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-200 ${job.places.length === 0 ? 'ring-4 ring-emerald-200' : ''}`}
+        >
+          <option value="">＋ 箇所を足す</option>
+          {s.placePresets.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+          <option value={OTHER_PLACE}>そのほか（名前を打つ）</option>
+        </select>
+        {/* 申請書から見積書への連動のオン・オフ（ユーザーの指示 2026-11-11。初めはオン。様邸ごと。複製では引き継ぐ） */}
+        <label className="flex items-center gap-1.5 text-sm text-slate-700">
+          <input type="checkbox" checked={linked} onChange={(e) => setJob((j) => ({...j, shinseiLink: e.target.checked ? undefined : false}))} />
+          見積書へ連動
+        </label>
+      </div>
     </div>
   );
 }

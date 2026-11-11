@@ -307,6 +307,7 @@ const cleanPlace = (raw: Record<string, unknown>): Place => keepNewer(raw, (p) =
   kind: KINDS.includes(numv(p.kind, 1)) ? numv(p.kind, 1) : 1,
   photo: Math.max(0, Math.floor(numv(p.photo))),
   ...(p.rail === 'wood' || p.rail === 'ready' || p.rail === 'post' ? {rail: p.rail} : {}), // 手すりの種類（railSlots.ts）
+  ...(p.estimateOff === true && !(Array.isArray(p.rows) && p.rows.length > 0) ? {estimateOff: true} : {}), // 見積書から外した箇所（行が入れば見積書に戻る。2026-11-11）
   // 前の版の「工事名称」（work）は読まない。見積書の改修内容・工事名称は改修の種類から
   ...lengthTail(numv(p.kind, 1), cleanDims(p.dims), str(p.shinseiText)),
   ...(str(p.plateLength).trim() ? {plateLength: str(p.plateLength)} : {}), // ベースプレートの長さ（「＋ ベースプレート」）
@@ -530,6 +531,7 @@ export function cleanJobs(raw: unknown): Job[] {
       ...(/^\d{4}-\d{2}$/.test(str(j.salesMonth)) && str(j.salesMonth) !== str(j.month) ? {salesMonth: str(j.salesMonth)} : {}),
       ...(isObj(j.uriage) ? {uriage: cleanUriage(j.uriage)} : {}), // 売上伝票の顧客区分・請求区分（2026-10-27）
       ...(j.showSelfPay === false ? {showSelfPay: false} : {}), // 見積書に介護保険の内訳を書かない（2026-10-28。careLines.ts。書くときは持たない）
+      ...(j.shinseiLink === false ? {shinseiLink: false} : {}), // 申請書から見積書へ連動しない（2026-11-11。連動するときは持たない）
       ...(Array.isArray(j.imported) ? {imported: cleanImported(j.imported)} : {}), // 取り込んだ書類（2026-10-28。importDocs.ts）
       ...((t) => (t ? {tokuteiImport: t} : {}))(cleanTokuteiImport(j.tokuteiImport)), // 取り込んだ特定福祉用具の申請書の福祉用具（2026-10-29）
       createdAt: numv(j.createdAt, Date.now()),

@@ -9,7 +9,7 @@
 
 import {cutToLength, estimateAmount, estimatePlaceLines, estimateQty, estimateUnitPrice, isBlankRow, listPriceOf, overheadAuto, estimateTotals, rounddown} from './calc.ts';
 import type {EstimateRates} from './calc.ts';
-import {KINDS, autoNote, circled, formLines, jobForm, jobInsurer, lineNote, materialText, NO_SHINSEI, noteText, photoNumbers, rowUnit} from './estimateForms.ts';
+import {KINDS, autoNote, circled, formLines, jobForm, jobInsurer, lastEstimateIndex, lineNote, materialText, NO_SHINSEI, noteText, offEstimate, photoNumbers, rowUnit} from './estimateForms.ts';
 import {fillAdded, placeAfterQty, withBrackets} from './cutLink.ts';
 import {guessPieceLengthM} from './priceImport.ts';
 import {copyRows, laborCount, laborRange, laborSpot, manualRow, materialRow, newPlace, replaceRange, setLaborCount} from './rows.ts';
@@ -307,8 +307,17 @@ const hasShinseiData = (p: Place) =>
 
 /** いちばん下の空いた行が入る箇所：最後の箇所に行がなければその箇所（なければ null。打ち込むと新しく作る） */
 export function pendingPlace(job: Pick<Job, 'places'>): Place | null {
-  const last = job.places[job.places.length - 1];
+  const at = lastEstimateIndex(job); // 見積書から外した箇所（申請書だけの箇所）は入れる先にしない
+  const last = at >= 0 ? job.places[at] : undefined;
   return last && last.rows.length === 0 ? last : null;
+}
+
+/** 見積書のいちばん下の箇所（見積書から外した箇所はとばす）。なければ最後に作る。[様邸, その箇所の番号] */
+function lastPlaceOf(job: Job): [Job, number] {
+  const at = lastEstimateIndex(job);
+  if (at >= 0) return [job, at];
+  const j = {...job, places: [...job.places, newPlace('')]};
+  return [j, j.places.length - 1];
 }
 
 /**
@@ -331,7 +340,8 @@ export function dropEmptyPlaces(job: Job): Job {
  */
 export function toolPlace(job: Job, key: string | null, remembered: string | null): Place | null {
   const here = key ? sheetTarget(job, key).place : null;
-  return here ?? job.places.find((p) => p.id === remembered) ?? job.places[job.places.length - 1] ?? null;
+  const at = lastEstimateIndex(job);
+  return here ?? job.places.find((p) => p.id === remembered && !offEstimate(p)) ?? (at >= 0 ? job.places[at] : null);
 }
 
 /**
@@ -360,8 +370,7 @@ function laborPlace(job: Job, key: string): {j: Job; pi: number; rows: Row[]; ra
     rows = f.place.rows;
     anchor = f.row.id;
   } else {
-    if (j.places.length === 0) j = {...j, places: [newPlace('')]};
-    pi = j.places.length - 1;
+    [j, pi] = lastPlaceOf(j);
     // いちばん下に空白の行を足して、そこに入れたことにする（入れたらなくなる）
     const blank = manualRow('material', {qty: 1});
     rows = [...j.places[pi].rows, blank];
@@ -465,7 +474,7 @@ export function applySheet(job: Job, key: string, input: string, ctx: SheetCtx):
       const m = parseMark(text);
       if (!m) return {job, key};
       const j = withGapRows(job, n);
-      const rows = j.places[j.places.length - 1].rows;
+      const rows = j.places[lastEstimateIndex(j)].rows;
       return applySheet(j, `line:${rows[rows.length - 1].id}:mark`, m, ctx);
     }
     const placeField = field === 'name' || field === 'work' || field === 'kind' || field === 'photo';
@@ -720,10 +729,8 @@ function laborFromBlank(job: Job, found: Found, text: string): SheetResult {
  * （打った・貼り付けた行が、押した行の位置に入るように。空白の行は見積書では何もない行。あとで ✕削除 で消せる）
  */
 export function withGapRows(job: Job, n: number): Job {
-  let j = job.places.length === 0 ? {...job, places: [newPlace('')]} : job;
-  const pi = j.places.length - 1;
-  j = setPlaceRows(j, pi, [...j.places[pi].rows, ...Array.from({length: n}, () => manualRow('material', {qty: 1}))]);
-  return j;
+  const [j, pi] = lastPlaceOf(job);
+  return setPlaceRows(j, pi, [...j.places[pi].rows, ...Array.from({length: n}, () => manualRow('material', {qty: 1}))]);
 }
 
 /** いちばん下の空いた行に打ち込んだとき */
@@ -739,14 +746,13 @@ function applyNew(job: Job, field: string, text: string, ctx: SheetCtx): SheetRe
     // 改修の種類・写真番号として読めない文字では箇所を作らない（前は何も入らない空の箇所ができて、次に打った行がそこに入った）
     if (Object.keys(patch).length === 0) return {job, key: `new:${field}`};
     let j = job;
-    if (!pendingPlace(j)) j = {...j, places: [...j.places, {...newPlace(''), kind: j.places[j.places.length - 1]?.kind ?? 1}]};
-    const pi = j.places.length - 1;
+    if (!pendingPlace(j)) j = {...j, places: [...j.places, {...newPlace(''), kind: j.places[lastEstimateIndex(j)]?.kind ?? 1}]};
+    const pi = lastEstimateIndex(j);
     return {job: patchPlace(j, pi, patch), key: `new:${field}`};
   }
-  // 明細の欄：最後の箇所（なければ作る）の最後に行を足して、そこに入れる
-  let j = job;
-  if (j.places.length === 0) j = {...j, places: [newPlace('')]};
-  const pi = j.places.length - 1;
+  // 明細の欄：最後の箇所（なければ作る。見積書から外した箇所はとばす）の最後に行を足して、そこに入れる
+  const [j0, pi] = lastPlaceOf(job);
+  let j = j0;
   const place = j.places[pi];
   const labor = ctx.labor === true || (field === 'text' && !ctx.pick && isLaborText(trimmed));
   let row: Row;
@@ -824,41 +830,30 @@ function unitRange(rows: Row[], ri: number): [number, number] {
 
 /**
  * 見積書の1行を消す：部材の行はその部材と同上施工費、施工費の行はそのまとまり。
- * 箇所の行がなくなったら箇所も消す（改修内容・改修場所も消えて、その行が空白になる）。
- * ただし申請書のタブで寸法・写真などを入れた箇所は残して空白の行にする（前は申請書の寸法・写真まで消えていた。箇所は申請書のタブの ✕ で消す）。
- * その空白の行を消そうとしたときは何もしない（同じ job を返す）
+ * 箇所に何か入った行がなくなったら（空白の行・申請書で作った空きの行だけになったときも）、その箇所は見積書から外す（`leaveEstimate`）。
+ * 申請書の箇所（改修場所・寸法・写真など）はそのまま残す（ユーザーの指示「申請書も連動して消す機能はやめる」2026-11-11。
+ * 前は「『玄関』は申請書にも入っています／申請書からも削除してよいですか？」と聞いて、申請書からも消せた）
  */
-/**
- * 見積書の行を消すと、申請書に入れた箇所（寸法・写真などのある箇所）の見積書の行がなくなるとき、その箇所。ほかは null。
- * 見積書の ✕ で、申請書からも消すか聞く（ユーザーの指示「見積もり書の方からも、消せるように…ただし、いきなり消すのではなく、注意、
- * 申請書からも削除してよいですかみたいな注意書き」2026-11-02。前は「申請書に入れた箇所は、申請書のタブで消せます」と出て見積書からは消せなかった）
- */
-export function deleteTouchesShinsei(job: Job, rowId: string): Place | null {
-  const found = findRow(job, rowId);
-  if (!found) return null;
-  const rows = found.place.rows;
-  const [a, b] = unitRange(rows, found.ri);
-  const rest = [...rows.slice(0, a), ...rows.slice(b)];
-  // 申請書で入れた箇所の空きの行（railSlots.ts の「（ブラケット）」「（施工費）」など）は見積書に何も入っていない行なので、
-  // 何か入った行を消して空きの行だけになるときも聞く。空きの行を消すとき（ほかの行が残る）は聞かない
-  const real = rows.slice(a, b).some((r) => !isBlankRow(r));
-  const nothingLeft = rest.length === 0 || (real && rest.every(isBlankRow));
-  return nothingLeft && hasShinseiData(found.place) ? found.place : null;
-}
-
-/** 箇所を見積書と申請書の両方から消す（申請書の改修の内容・寸法・写真なども） */
-export function deletePlace(job: Job, placeId: string): Job {
-  return {...job, places: job.places.filter((p) => p.id !== placeId)};
-}
-
 export function deleteLine(job: Job, rowId: string): Job {
   const found = findRow(job, rowId);
   if (!found) return job;
   const [a, b] = unitRange(found.place.rows, found.ri);
   const rows = [...found.place.rows.slice(0, a), ...found.place.rows.slice(b)];
-  if (rows.length > 0) return setPlaceRows(job, found.pi, rows);
-  if (!hasShinseiData(found.place)) return {...job, places: job.places.filter((_, i) => i !== found.pi)};
-  return b - a === 1 && isBlankRow(found.row) ? job : setPlaceRows(job, found.pi, [manualRow('material', {qty: 1})]);
+  if (rows.some((r) => !isBlankRow(r))) return setPlaceRows(job, found.pi, rows);
+  return leaveEstimate(job, found.pi);
+}
+
+/** 申請書に出すもののある箇所（改修場所の名前か、申請書のタブで入れた内容がある） */
+const keepsShinsei = (p: Place) => !!p.name.trim() || hasShinseiData(p);
+
+/**
+ * 箇所を見積書から外す：行を消して `estimateOff`（申請書には残る。申請書の箇所の「見積書に入れる」で戻る）。
+ * 改修場所の名前も申請書の内容もない箇所は、どこにも出ないので消す
+ */
+function leaveEstimate(job: Job, pi: number): Job {
+  const p = job.places[pi];
+  if (!keepsShinsei(p)) return {...job, places: job.places.filter((_, i) => i !== pi)};
+  return {...job, places: job.places.map((x, i) => (i === pi ? {...x, rows: [], estimateOff: true} : x))};
 }
 
 /**
@@ -903,8 +898,7 @@ export function pasteLines(job: Job, key: string, rows: Row[], removeIds: string
     j = setPlaceRows(j, pi, [...pr.slice(0, b), ...copies, ...pr.slice(b)]);
   } else if (kind === 'new' || kind === 'gap') {
     if (kind === 'gap' && Number(id) > 0) j = withGapRows(j, Number(id)); // 下の空いた行に貼り付けたら、その行の位置に入れる
-    if (j.places.length === 0) j = {...j, places: [newPlace('')]};
-    pi = j.places.length - 1;
+    [j, pi] = lastPlaceOf(j);
     j = setPlaceRows(j, pi, [...j.places[pi].rows, ...copies]);
   } else return {job, rowId: null};
 
@@ -912,9 +906,9 @@ export function pasteLines(job: Job, key: string, rows: Row[], removeIds: string
   const targetId = j.places[pi].id;
   if (removeIds.length > 0) {
     const gone = new Set(removeIds);
-    // 行がなくなった箇所は消す。申請書の寸法・写真などを入れた箇所は空白の行にして残す（`deleteLine` と同じ）
-    const left = j.places.map((p) => ({...p, rows: p.rows.filter((r) => !gone.has(r.id))}));
-    j = {...j, places: left.flatMap((p) => (p.rows.length > 0 || p.id === targetId ? [p] : hasShinseiData(p) ? [{...p, rows: [manualRow('material', {qty: 1})]}] : []))};
+    // 切り取った行がなくなって何か入った行の残らない箇所は、見積書から外す（申請書には残す。`deleteLine` と同じ）。切り取らなかった箇所はそのまま
+    const left = j.places.map((p) => (p.rows.some((r) => gone.has(r.id)) ? {...p, rows: p.rows.filter((r) => !gone.has(r.id))} : p));
+    j = {...j, places: left.flatMap((p, i) => (p === j.places[i] || p.id === targetId || p.rows.some((r) => !isBlankRow(r)) ? [p] : keepsShinsei(p) ? [{...p, rows: [], estimateOff: true}] : []))};
   }
   // 貼り付けた最初の行の見積書の1行（施工費は、まとまりの最初の手間の行）
   const place = j.places.find((p) => p.id === targetId);
@@ -1014,7 +1008,7 @@ export function sheetTarget(job: Job, key: string): {place: Place | null; row: R
     return {place: f?.place ?? null, row: f?.row ?? null};
   }
   if (kind === 'place') return {place: job.places.find((p) => p.id === id) ?? null, row: null};
-  if (kind === 'new' || kind === 'gap') return {place: job.places[job.places.length - 1] ?? null, row: null};
+  if (kind === 'new' || kind === 'gap') return {place: job.places[lastEstimateIndex(job)] ?? null, row: null};
   return {place: null, row: null};
 }
 

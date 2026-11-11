@@ -142,8 +142,8 @@ await sheet.waitFor();
 assert.ok((await plateText()).includes('0.75'), await plateText());
 log('見積書のベースプレート：申請書の長さ 1300mm→0.65本、1500mm→0.75本 OK');
 
-// ---------------- 申請書に入れた箇所を見積書から消す（ユーザーの指示「見積もり書の方からも、消せるように、そして申請書の内容を変更できるように…
-// いきなり消すのではなく…申請書からも削除してよいですか」2026-11-02）：玄関 L=600 の手すりを見積書で ✕ → 聞く（やめる／見積書の行だけ消す／申請書からも削除）
+// ---------------- 申請書に入れた箇所を見積書から消す：申請書には残す（ユーザーの指示「申請書も連動して消す機能はやめる」2026-11-11。
+// 前は「申請書からも削除してよいですか？」と聞いた）。玄関 L=600 の手すりを見積書で ✕ → 聞かずに見積書から外れる → 申請書の玄関は残り、「見積書に入れる」で戻る
 await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
 await form.waitFor();
 await works.getByRole('combobox', {name: '箇所を足す'}).selectOption({label: '玄関'});
@@ -159,43 +159,58 @@ await openMaterials();
 await pick('BD-132');
 await page.getByRole('button', {name: '選び終わったら閉じる'}).click();
 assert.ok((await entranceRow().innerText()).includes('BD-132'));
-const ask = page.getByRole('dialog', {name: '「玄関」は申請書にも入っています'});
-// やめる：何も消えない
-await cellAt(entranceRow().locator('[data-edit$=":text"]').first()).click({timeout: 2000}).catch(() => sheet.locator('textarea.sheet-input').click()); // 選んでいる欄は上の入力欄を押す
-await ops.getByRole('button', {name: '✕ 削除'}).click(); // 行の「削除」（選んでいる行の改修内容の左。2026-11-03）
-await ask.waitFor();
-await page.screenshot({path: path.join(outDir, 'spots-04-delete-ask.png')});
-await ask.getByRole('button', {name: 'やめる'}).click();
-assert.ok((await entranceRow().innerText()).includes('BD-132'));
-// 見積書の行だけ消す：見積書は空白の行、申請書の玄関は残る
-await cellAt(entranceRow().locator('[data-edit$=":text"]').first()).click({timeout: 2000}).catch(() => sheet.locator('textarea.sheet-input').click()); // 選んでいる欄は上の入力欄を押す
-await ops.getByRole('button', {name: '✕ 削除'}).click(); // 行の「削除」（選んでいる行の改修内容の左。2026-11-03）
-await ask.getByRole('button', {name: '見積書の行だけ消す'}).click();
-await ask.waitFor({state: 'detached'});
-assert.ok(!(await entranceRow().innerText()).includes('BD-132'));
-// 見積書の行だけ消したあとは、申請書で入れたときの空きの行（（ブラケット）（施工費）。railSlots.ts）が残る。空きの行は聞かずに消え、
-// 最後の空白の行の ✕ で聞く：「見積書の行だけ消す」は出さない → 申請書からも削除
-const slotTexts = () => sheet.locator('[data-slot]').evaluateAll((els) => els.map((e) => `（${e.getAttribute('data-slot')}）`));
-const slotsBefore = await slotTexts(); // 上の階段にも空きの行が残っている（玄関は最後の2つ）
-assert.deepEqual(slotsBefore.slice(-2), ['（ブラケット）', '（施工費）']);
 await cellAt(entranceRow().locator('[data-edit$=":text"]').first()).click({timeout: 2000}).catch(() => sheet.locator('textarea.sheet-input').click()); // 選んでいる欄は上の入力欄を押す
 await ops.getByRole('button', {name: '✕ 削除'}).click(); // 行の「削除」（選んでいる行の改修内容の左。2026-11-03）
 await page.waitForTimeout(300);
-assert.equal(await ask.count(), 0); // 空きの行（ほかの行が残る）は聞かない
-assert.deepEqual(await slotTexts(), [...slotsBefore.slice(0, -2), '（施工費）']);
-await cellAt(entranceRow().locator('[data-edit$=":text"]').first()).click({timeout: 2000}).catch(() => sheet.locator('textarea.sheet-input').click());
-await ops.getByRole('button', {name: '✕ 削除'}).click();
-await ask.waitFor();
-assert.equal(await ask.getByRole('button', {name: '見積書の行だけ消す'}).count(), 0);
-await ask.getByRole('button', {name: '申請書からも削除'}).click();
-await ask.waitFor({state: 'detached'});
-assert.equal(await sheet.locator('.form-page tr', {hasText: '玄関'}).count(), 0);
+assert.equal(await page.getByRole('dialog').count(), 0); // 聞かない
+assert.equal(await sheet.locator('.form-page tr', {hasText: '玄関'}).count(), 0); // 見積書から外れる（空きの行も残さない）
+await page.screenshot({path: path.join(outDir, 'spots-04-delete-estimate.png')});
 await page.waitForTimeout(600);
 await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
 await form.waitFor();
-assert.equal(await works.getByRole('listitem', {name: /玄関/}).count(), 0);
+assert.equal(await entrance.getByLabel('長さ（mm）').inputValue(), '600'); // 申請書の玄関は残る（番号も②のまま）
 assert.equal(await works.getByRole('listitem', {name: '①階段'}).count(), 1);
-log('見積書から申請書の箇所を消す（やめる・見積書の行だけ・申請書からも削除）OK');
+await entrance.scrollIntoViewIfNeeded();
+await page.screenshot({path: path.join(outDir, 'spots-05-shinsei-kept.png')});
+// 「見積書に入れる」：見積書に戻る（空きの行。そこに部材・施工費を入れる）
+await entrance.getByRole('button', {name: '玄関を見積書に入れる'}).click();
+assert.equal(await entrance.getByRole('button', {name: '玄関を見積書に入れる'}).count(), 0);
+await page.waitForTimeout(600);
+await page.getByRole('tab', {name: '📋 工事見積書'}).click();
+await sheet.waitFor();
+assert.ok((await sheet.locator('.form-page tr', {hasText: '玄関'}).count()) > 0);
+log('見積書の削除で申請書の箇所は消えない・「見積書に入れる」で戻る OK');
+
+// ---------------- 「見積書へ連動」を外すと、申請書で足した箇所・長さは見積書に入らない（ユーザーの指示「申請書を入力したら、見積もりへ連動する機能も
+// オン、オフ切り替えできるようにする」2026-11-11）
+await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
+await form.waitFor();
+const link = works.getByRole('checkbox', {name: '見積書へ連動'});
+assert.equal(await link.isChecked(), true); // 初めはオン
+await link.uncheck();
+await works.getByRole('combobox', {name: '箇所を足す'}).selectOption({label: '廊下'});
+await page.keyboard.type('900');
+const hall = works.getByRole('listitem', {name: /^③廊下/});
+assert.equal(await hall.getByLabel('長さ（mm）').inputValue(), '900');
+assert.equal(await hall.getByRole('button', {name: '廊下を見積書に入れる'}).count(), 1);
+// 連動しないあいだは、見積書にある階段の長さを変えても見積書の手すりの長さは変わらない
+await stair.getByLabel('長さ（mm）').fill('2400');
+await page.waitForTimeout(600);
+await page.screenshot({path: path.join(outDir, 'spots-06-link-off.png')});
+await page.getByRole('tab', {name: '📋 工事見積書'}).click();
+await sheet.waitFor();
+assert.equal(await sheet.locator('.form-page tr', {hasText: '廊下'}).count(), 0);
+const railText = async () => (await sheet.locator('.form-page tr', {hasText: 'BD-132'}).first().innerText()).replace(/\s+/g, ' ');
+assert.ok((await railText()).includes('2100mm'), await railText());
+// 戻す：オンにして、廊下と階段の長さを元に（このあとの確かめは階段・玄関のまま）
+await page.getByRole('tab', {name: '📝 住宅改修申請書'}).click();
+await form.waitFor();
+await link.check();
+await hall.getByRole('button', {name: /廊下を消す/}).click(); // 長さが入っているので確かめてから消す（dialog は accept）
+await stair.getByLabel('長さ（mm）').fill('2100');
+await page.waitForTimeout(600);
+assert.equal(await works.getByRole('listitem', {name: /廊下/}).count(), 0);
+log('「見積書へ連動」のオン・オフ OK');
 
 // ---------------- 金額の欄も直せる・欄にマウスを乗せるとどこの欄か出る（ユーザーの指示「一度入った金額のところを、もう修正できるように…
 // 各セルに移ったときに、どこのセルの修正をしているかというセルの上にマウスを乗せたら分かるように」2026-11-02）

@@ -2,11 +2,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {isBlankRow} from '../../src/sasaoka/calc.ts';
-import {formLines} from '../../src/sasaoka/estimateForms.ts';
+import {formLines, offEstimate} from '../../src/sasaoka/estimateForms.ts';
 import {insertRowsAt, materialRow, newPlace} from '../../src/sasaoka/rows.ts';
 import {readyLengths, railType, slotNames, slotQuery, withSlots} from '../../src/sasaoka/railSlots.ts';
 import {estimateLength} from '../../src/sasaoka/shinsei.ts';
-import {deleteTouchesShinsei, describeKey, insertAfterId} from '../../src/sasaoka/sheetEdit.ts';
+import {deleteLine, describeKey, insertAfterId} from '../../src/sasaoka/sheetEdit.ts';
 import type {Job, Material, Place, Row, Settings} from '../../src/sasaoka/types.ts';
 
 const S = {estimateRate: 0.8, estimateLaborRate: 1.5, estimateHourRate: 2500, estimateOverheadRate: 0.1, taxRate: 0.1} as const satisfies Pick<
@@ -131,16 +131,16 @@ test('申請書の長さ（見積書から）：切って使う手すりの使�
   assert.equal(estimateLength({rows: [cut, ready]}), '1200×600');
 });
 
-test('見積書の削除：申請書の箇所の何か入った行を消して空きの行だけになるときは聞く。空きの行を消すとき（ほかの行が残る）は聞かない', () => {
+test('見積書の削除：申請書の箇所の何か入った行を消して空きの行だけになるときは、見積書から外す（申請書には残す）。空きの行を消すとき（ほかの行が残る）はその行だけ', () => {
   const p = withSlots({...newPlace('廊下'), dims: {l: '600'}});
   const rail = materialRow(mat('手すり 4m', {pieceLengthM: 4}));
   const filled: Place = {...p, rows: insertRowsAt(p.rows, [rail], p.rows[0].id)};
   const j = job([filled]);
-  assert.equal(deleteTouchesShinsei(j, rail.id)?.id, p.id);
-  assert.equal(deleteTouchesShinsei(j, filled.rows[1].id), null); // （ブラケット）の空きの行
-  // 空きの行が最後の1行なら聞く（今までの空白の行と同じ）
-  const last: Place = {...p, rows: [p.rows[2]]};
-  assert.equal(deleteTouchesShinsei(job([last]), p.rows[2].id)?.id, p.id);
-  // 申請書の内容がない箇所は聞かない
-  assert.equal(deleteTouchesShinsei(job([{...filled, dims: undefined}]), rail.id), null);
+  const off = deleteLine(j, rail.id).places[0];
+  assert.deepEqual([off.rows.length, offEstimate(off), off.dims?.l], [0, true, '600']);
+  assert.deepEqual(formLines(job([off]), S, 'yukuhashi'), []);
+  // （ブラケット）の空きの行を消す：手すりは残る
+  assert.deepEqual(deleteLine(j, filled.rows[1].id).places[0].rows.map((r) => r.id), filled.rows.filter((_, i) => i !== 1).map((r) => r.id));
+  // 空きの行だけの箇所（見積書には空白の1行で出る）の ✕ も見積書から外す
+  assert.equal(offEstimate(deleteLine(job([p]), p.rows[0].id).places[0]), true);
 });

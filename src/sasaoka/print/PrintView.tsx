@@ -3,7 +3,7 @@ import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
 import {cutToLength, estimateQty, isBlankRow, jobName, jobTotals, monthSummary, placeTotals, rowAmount, shikiriPrice, taxFormula} from '../calc.ts';
 import type {MonthSummary} from '../calc.ts';
-import {cutCalc, FORM_INFO, insurerLabel, jobForm} from '../estimateForms.ts';
+import {cutCalc, FORM_INFO, insurerLabel, jobForm, offEstimate} from '../estimateForms.ts';
 import {laborForText, laborOwner} from '../rows.ts';
 import type {AppData, Job, Settings} from '../types.ts';
 import {dateLabel, monthEnd, monthLabel, num, shortDate, staffShort, todayIso, yen} from '../util.ts';
@@ -537,7 +537,8 @@ function JobDoc({job, settings: s}: {job: Job; settings: Settings}) {
         </table>
       </div>
 
-      {job.places.map((place) => {
+      {/* 見積書から外した箇所（申請書だけの箇所）は出さない */}
+      {job.places.filter((p) => !offEstimate(p)).map((place) => {
         const pt = placeTotals(place);
         return (
           <div key={place.id} className="place">

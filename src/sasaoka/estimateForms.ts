@@ -187,12 +187,24 @@ export function placeWork(place: Pick<Place, 'kind'>, form: EstimateForm): strin
   return (form === 'kouiki' ? KIND_WORK : KINDS)[place.kind - 1] || '';
 }
 
-/** 見積書に出る箇所（行のあるもの）ごとの写真番号。入れていなければ見積書に出る順番 */
+/** 見積書から外した箇所（申請書だけに出す。`Place.estimateOff`）。行が入れば見積書に戻る */
+export const offEstimate = (p: Pick<Place, 'estimateOff' | 'rows'>): boolean => !!p.estimateOff && p.rows.length === 0;
+
+/** 見積書のいちばん下の箇所の番号（見積書から外した箇所はとばす）。なければ -1 */
+export function lastEstimateIndex(job: Pick<Job, 'places'>): number {
+  for (let i = job.places.length - 1; i >= 0; i--) if (!offEstimate(job.places[i])) return i;
+  return -1;
+}
+
+/**
+ * 箇所ごとの写真番号（申請書の写真貼付用紙の番号。見積書の改修場所の①②も同じ）：見積書に出る箇所（行のあるもの）と、見積書から外した申請書だけの箇所。
+ * 入れていなければその順番。見積書から外した箇所も番号を持つので、見積書は ①③ のように番号がとぶことがある（申請書の写真の番号のまま）
+ */
 export function photoNumbers(job: Pick<Job, 'places'>, rates: EstimateRates): Map<string, number> {
   const out = new Map<string, number>();
   let n = 0;
   for (const p of job.places) {
-    if (shownLines(p, rates).length === 0) continue;
+    if (!offEstimate(p) && shownLines(p, rates).length === 0) continue;
     n++;
     out.set(p.id, p.photo > 0 ? p.photo : n);
   }
@@ -394,11 +406,13 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
  * 最後の箇所に行がなければ、その箇所の名前・改修の種類・写真番号を出す（そこに入る）。mark は広域連合用の「材／手」
  */
 export function sheetNewLine(job: Pick<Job, 'places'>, lines: FormLine[], form: EstimateForm, mark: '材' | '手' = '材'): FormLine {
-  const last = job.places[job.places.length - 1];
+  const at = lastEstimateIndex(job); // 見積書から外した箇所（申請書だけの箇所）はとばす
+  const last = at >= 0 ? job.places[at] : undefined;
   const pending = last && last.rows.length === 0 ? last : null;
-  const shownPlaces = new Set(lines.map((l) => l.placeId)).size;
+  // 写真番号は見積書に出る箇所と申請書だけの箇所の数のつぎ（photoNumbers と同じ数え方）
+  const shownPlaces = new Set(lines.map((l) => l.placeId)).size + job.places.filter(offEstimate).length;
   return {
-    place: pending ? job.places.length - 1 : 1e6, // 前の箇所とは別のまとまり（ページの送りに巻き込まない）
+    place: pending ? at : 1e6, // 前の箇所とは別のまとまり（ページの送りに巻き込まない）
     placeId: pending?.id ?? '',
     rowId: '',
     rowIds: [],
