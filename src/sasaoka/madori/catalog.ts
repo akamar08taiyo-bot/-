@@ -136,6 +136,12 @@ export const WINDOW_TYPES: {name: string; w: number}[] = [
  */
 export type FixGroup = '住設' | '家具' | '福祉';
 export const FIX_TYPES: {name: string; w: number; h: number; group: FixGroup; hidden?: boolean}[] = [
+  // 浴室・トイレを先頭（一覧の左上）に（ユーザーの指示「住設では、浴室、トイレは左上にもってくる」2026-11-11）
+  {name: '浴槽', w: 1500, h: 750, group: '住設'},
+  {name: 'ユニットバス', w: 1600, h: 1600, group: '住設'},
+  {name: '洋式便器', w: 400, h: 700, group: '住設'},
+  {name: '和式便器', w: 400, h: 650, group: '住設'},
+  {name: 'トイレ付ユニットバス', w: 1600, h: 2000, group: '住設'},
   {name: '洗面セット', w: 1400, h: 600, group: '住設'},
   {name: 'I型キッチン', w: 2550, h: 650, group: '住設'},
   {name: '対面キッチン', w: 2550, h: 900, group: '住設'},
@@ -144,15 +150,10 @@ export const FIX_TYPES: {name: string; w: number; h: number; group: FixGroup; hi
   {name: '床下収納', w: 600, h: 600, group: '住設'},
   {name: 'キッチンカウンター', w: 1800, h: 450, group: '住設'},
   {name: '床下点検口', w: 600, h: 600, group: '住設'},
-  {name: '洋式便器', w: 400, h: 700, group: '住設'},
-  {name: '和式便器', w: 400, h: 650, group: '住設'},
   {name: '洗面化粧台', w: 750, h: 550, group: '住設'},
   {name: '手洗器', w: 400, h: 300, group: '住設'},
   {name: '洗濯パン', w: 640, h: 640, group: '住設'},
   {name: '洗濯機', w: 640, h: 640, group: '住設'},
-  {name: 'ユニットバス', w: 1600, h: 1600, group: '住設'},
-  {name: 'トイレ付ユニットバス', w: 1600, h: 2000, group: '住設'},
-  {name: '浴槽', w: 1500, h: 750, group: '住設'},
   {name: '玄関収納', w: 900, h: 400, group: '住設'},
   {name: '間仕切', w: 1800, h: 100, group: '住設'},
   {name: 'ロフト', w: 1820, h: 1820, group: '住設'},
