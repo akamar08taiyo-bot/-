@@ -13,7 +13,7 @@ import {JobHeader, JobTitle, RemoveJobButton} from '../estimate/JobHeader.tsx';
 import {preparePhoto, putPhoto, rememberPhotoUrl, usePhotoUrls} from '../photos.ts';
 import type {AppData, Job} from '../types.ts';
 import type {Update} from '../useStore.ts';
-import {DOOR_TYPES, FIX_TYPES, FINISH, ROOM_ROWS, ROOM_SHORT, ROOM_TYPES, roomFinish, STAIR_TYPES, STEP_TYPES, WINDOW_TYPES} from './catalog.ts';
+import {DOOR_TYPES, FIX_TYPES, ROOM_ROWS, ROOM_SHORT, ROOM_TYPES, STAIR_TYPES, STEP_TYPES, WINDOW_TYPES} from './catalog.ts';
 import {isScribble} from '../photoMarks.ts';
 import {canVertexEdit, copied, DRAG_TOOLS, eraseHits, floorArea, handlesOf, hitTest, isCornerHandle, makeItem, moved, railFrom, resized, scribbleHits, SHAPE_COLORS, turnedItem} from './edit.ts';
 import {bboxOf, closedShape, nearOrthoNext, pointRemoved, roomPts, shapeOf, snapPt} from './poly.ts';
@@ -1171,10 +1171,11 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
         <>
           <label className="block text-sm">
             <span className="text-slate-600">種類</span>
+            {/* 種類の名前だけ（前は「洋室（フローリング）」のように床の柄も出していた。ユーザーの指示「（フローリング）はいらない」2026-11-11） */}
             <select value={it.type ?? ''} onChange={(e) => setItem(it.id, {type: e.target.value})} className="mt-0.5 h-9 w-full rounded-md border border-slate-300 bg-white px-2" aria-label="部屋の種類">
               {ROOM_TYPES.map((r) => (
                 <option key={r.name} value={r.name}>
-                  {r.name}（{FINISH[r.finish].name}）
+                  {r.name}
                 </option>
               ))}
             </select>
@@ -1190,7 +1191,6 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
               const a = roomAreaOf(it, m.module);
               return `${joLabel(a.jo)}・${a.m2}㎡・${a.tsubo}坪`;
             })()}
-            {roomFinish(it.type) && <span className="ml-1 text-xs text-slate-400">{FINISH[roomFinish(it.type)].name}</span>}
           </div>
         </>
       )}
