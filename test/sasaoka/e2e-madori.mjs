@@ -1,6 +1,7 @@
 // 平面図のタブ（📐 平面図。ユーザーの指示「平面図をつくれるような機能を追加する。まどりっちの機能やマイホームクラウドの機能もつけくわえる」2026-11-09）：
-//   部屋（マイホームクラウドと同じ一覧）を方眼にドラッグ → ドアを壁の近くで押すと壁に付く → トイレは壁ぎわ → 横棒を描いて申請書の箇所①玄関につなぐ → 一覧（右の枠）が
-//   申請書の改修の内容と同じ → 選んで動かす・Delete・Ctrl+Z → 2階 → 読み直しても残る（#…&view=madori）→ 見取図を印刷（A4。縦が基本・1階と2階を1枚に・題名と日付なし）→ Excel（1シート・画像）
+//   部屋（マイホームクラウドと同じ一覧）を方眼にドラッグ → ドアを壁の近くで押すと壁に付く → トイレは壁ぎわ → 横棒を描いて申請書の箇所①玄関につなぐ → 見取図の下の枠が
+//   申請書の改修の内容と同じ（右の枠の一覧は出さない）→ 選んで動かす・Delete・Ctrl+Z → 2階 → 読み直しても残る（#…&view=madori）→ 見取図を印刷（A4。縦が基本・1階と2階を1枚に・
+//   いちばん上に「〇〇様邸」・日付なし・下に改修の内容）→ Excel（1シート・画像）
 //   → 申請書の平面図に入れる → スマホの幅で横にはみ出さない。お客様は架空のサンプル
 // usage: node e2e-madori.mjs <サイトのURL> <出力フォルダ>
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
@@ -57,7 +58,17 @@ const click = async (x, y) => {
 };
 const cat = (name) => page.getByRole('tab', {name, exact: true}).click();
 const tool = (name) => page.getByRole('button', {name, exact: true}).first().click();
-const legend = () => page.locator('ul.text-rose-600 li').allInnerTexts();
+// 部品の文の一覧：前は右の枠（ユーザーの指示「この部分は不要」2026-11-11 で外した）。いまは見取図の印刷の下の枠
+// （申請書の改修の内容＋申請書にない平面図の番号の文。sheet.ts の sheetWorks）を開いて読む
+// 印刷のあいだはアプリの画面を隠すので、閉じるとスクロールが上に戻る → 前の位置に戻す（このあとの操作の座標が変わらないように）
+const legend = async () => {
+  const y = await page.evaluate(() => scrollY);
+  await page.getByRole('button', {name: '🖨 見取図を印刷'}).click();
+  const rows = await page.locator('.madori-page [data-sheet-works] text').allTextContents();
+  await page.getByRole('button', {name: '✕ 閉じる'}).click();
+  await page.evaluate((y) => scrollTo(0, y), y);
+  return rows;
+};
 
 // ---------------- 部屋（マイホームクラウドと同じ並び）
 await cat('部屋');
@@ -145,10 +156,16 @@ await page.keyboard.press('Escape');
 await page.getByRole('button', {name: '丸（塗りつぶし）'}).click();
 await click(3.9 * M, 0.7 * M);
 await page.keyboard.press('Escape');
+// 右の枠の一覧・床面積は出さない（ユーザーの指示「この部分は不要」2026-11-11）。部品を選んでいるときだけ右に部品の欄
+assert.equal(await page.getByText('一覧（右の枠）').count(), 0);
+assert.equal(await page.getByText(/床面積/).count(), 0);
+assert.equal(await page.getByRole('textbox', {name: '一覧を手で直す'}).count(), 0);
+// 見取図の下の枠は申請書の改修の内容（①玄関・②トイレ。縦手すりは②の番号＝申請書の②の行）
 const rows = await legend();
-assert.equal(rows.length, 2);
-assert.match(rows[0], /^①　玄関　手すりの取り付け/);
-assert.equal(rows[1], '②　縦手すり　L＝800mm');
+assert.equal(rows.length, 2, JSON.stringify(rows));
+assert.match(rows[0], /^①玄関　手すりの取り付け/);
+assert.match(rows[1], /^②トイレ　/);
+assert.match(await art(), />②</);
 assert.equal(await page.locator('[data-stage]').count(), 0);
 log('置き場は出さない・横棒を描いて申請書の箇所①玄関につなぐ・縦手すり②・一覧 OK');
 
@@ -303,7 +320,9 @@ log('図の上で文字を打つ・回すつまみ・L字の手すり・頂点�
   }
   const dimBox = await page.getByRole('checkbox', {name: '寸法'}).boundingBox();
   assert.ok(dimBox.x > mid(sb), '寸法は右');
-  assert.ok(bb.y + bb.height <= cb.y + 1 && cb.y - (bb.y + bb.height) < 16, `方眼のすぐ上 ${JSON.stringify([bb, cb])}`);
+  // 描く道具の段は方眼のすぐ上（間は「〇〇様邸」の行だけ。ユーザーの指示「平面図の一番上に〇〇様邸と表示しておく」2026-11-11）
+  const tb = await page.locator('[data-plan-title]').boundingBox();
+  assert.ok(bb.y + bb.height <= tb.y + 1 && tb.y + tb.height <= cb.y + 1 && cb.y - (bb.y + bb.height) < 16 + tb.height + 8, `方眼のすぐ上 ${JSON.stringify([bb, tb, cb])}`);
   // コ字をなぞる → 曲げた手すり。選んだまま：角（■）4つと区間のまん中（□）3つ
   await bar.getByRole('button', {name: '自在棒'}).click();
   const px = [];
@@ -642,6 +661,11 @@ log('削除を押してなぞる・押すと部屋も消える（赤く見せる
   assert.match(works[0], /^①玄関　手すりの取り付け/);
   const wb = await page.locator('[data-plan-works]').boundingBox();
   assert.ok(wb.y > cb.y + cb.height - 1 && Math.abs(wb.x - cb.x) < 2, `方眼の下 ${JSON.stringify([wb, cb])}`);
+  // 方眼のいちばん上に「〇〇様邸」（ユーザーの指示「平面図の一番上に〇〇様邸と表示しておく」2026-11-11）。方眼のまん中にそろえる
+  const title = page.locator('[data-plan-title]');
+  assert.equal(await title.innerText(), '（サンプル）山田様邸');
+  const tb = await title.boundingBox();
+  assert.ok(tb.y + tb.height <= cb.y + 1 && cb.y - (tb.y + tb.height) < 16 && Math.abs(tb.x + tb.width / 2 - (cb.x + cb.width / 2)) < 2, `方眼の上 ${JSON.stringify([tb, cb])}`);
   // 番号を置くと、右の一覧に申請書の同じ写真番号の改修の内容（番号だけの部品のとき）
   const numBtn = bar.getByRole('button', {name: /番号$/});
   const k = (await numBtn.innerText()).trim().codePointAt(0) - 0x2460 + 1;
@@ -650,7 +674,7 @@ log('削除を押してなぞる・押すと部屋も消える（赤く見せる
   await click(4 * M, 8.3 * M);
   await bar.getByRole('button', {name: '番号を確定'}).click();
   const rowK = (await legend()).find((r) => r.startsWith(String.fromCharCode(0x2460 + k - 1)));
-  if (want) assert.equal(rowK, `${want.slice(0, 1)}　${want.slice(1)}`);
+  if (want) assert.equal(rowK, want.split('\n')[0]); // 印刷の下の枠は方眼の下の欄と同じ文
   else assert.equal(rowK, String.fromCharCode(0x2460 + k - 1)); // 申請書にその番号の行がなければ番号だけ（印刷の一覧の枠が空にならないように）
   await page.keyboard.press('Control+z');
 }
@@ -665,7 +689,7 @@ await drag([0, 0], [3 * M, 4 * M]);
 await tool('横棒');
 await click(1.5 * M, 3.8 * M);
 await page.keyboard.press('Escape');
-assert.equal((await legend()).at(-1), '③　L＝600mm'); // 階をまたいで通し番号
+assert.equal((await legend()).at(-1), '③L＝600mm'); // 階をまたいで通し番号（申請書にない番号は部品の文）
 await page.getByRole('tab', {name: '1階', exact: true}).click();
 log('2階・通し番号 OK');
 
@@ -677,17 +701,30 @@ await page.waitForFunction(() => document.querySelector('[data-madori-canvas] sv
 assert.equal(await page.getByRole('tab', {name: '2階'}).count(), 1);
 log('読み直し OK');
 
-// ---------------- 見取図の印刷（A4。縦が基本・横に広い図は横。1階と2階を1枚に。題名・日付・会社の名前は書かない）
-// （ユーザーの指示「〇〇様邸　平面図、日付などは不要」「基本的には縦印刷、横広の場合は、自動的に横にする」「2階を作成した際は、1階と2階の内容を1枚におさまるようにする」2026-11-10）
+// ---------------- 見取図の印刷（A4。縦が基本・横に広い図は横。1階と2階を1枚に。いちばん上に「〇〇様邸」、下に改修の内容。日付・会社の名前は書かない）
+// （ユーザーの指示「〇〇様邸　平面図、日付などは不要」「基本的には縦印刷、横広の場合は、自動的に横にする」「2階を作成した際は、1階と2階の内容を1枚におさまるようにする」2026-11-10、
+//   「平面図の一番上に〇〇様邸と表示しておく」「改修の内容（申請書）…印刷時にも表示する」2026-11-11）
 await page.getByRole('button', {name: '🖨 見取図を印刷'}).click();
 const sheets = page.locator('.madori-page');
 assert.equal(await sheets.count(), 1);
 const first = await sheets.first().innerHTML();
 assert.match(first, />1階</);
 assert.match(first, />2階</);
-assert.ok(!/見取図|様邸|株式会社|担当者|\d+年\d+月\d+日/.test(first.replace(/<pattern[\s\S]*?<\/pattern>/g, '')), '題名・日付・会社の名前は書かない');
-assert.match(first, /①　玄関　手すりの取り付け/);
-assert.match(first, /③　L＝600mm/);
+assert.ok(!/見取図|平面図|株式会社|担当者|\d+年\d+月\d+日/.test(first.replace(/<pattern[\s\S]*?<\/pattern>/g, '')), '「見取図」・日付・会社の名前は書かない');
+assert.match(first, /font-weight="700"[^>]*>（サンプル）山田様邸<\/text>/);
+{
+  // 「〇〇様邸」は紙のいちばん上（平面図より上）
+  const top = await sheets.first().evaluate((el) => {
+    const t = [...el.querySelectorAll('svg > text')].find((x) => x.textContent === '（サンプル）山田様邸').getBoundingClientRect();
+    const plan = el.querySelector('svg > g[transform]').getBoundingClientRect();
+    const box = el.getBoundingClientRect();
+    return {t: t.bottom - box.top, plan: plan.top - box.top, h: box.height};
+  });
+  assert.ok(top.t < top.plan && top.t < top.h * 0.08, JSON.stringify(top));
+}
+assert.match(first, /①玄関　手すりの取り付け/);
+assert.match(first, /②トイレ　/);
+assert.match(first, /③L＝600mm/);
 const orient = await sheets.first().getAttribute('data-orientation');
 log('見取図の向き', orient);
 await page.screenshot({path: path.join(outDir, 'madori-print.png')});
@@ -707,7 +744,7 @@ await page.emulateMedia({media: 'screen'});
 const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length;
 assert.equal(pages, 1, `印刷のページ数 ${pages}`);
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
-log('見取図の印刷：1枚に1階・2階・題名と日付なし OK');
+log('見取図の印刷：1枚に1階・2階・いちばん上に〇〇様邸・下に改修の内容・日付なし OK');
 
 // ---------------- Excel（初めは開いているタブ＝平面図だけにチェック）
 const down = page.waitForEvent('download');
@@ -724,7 +761,8 @@ const z = unzipSync(new Uint8Array(await readFile(saved)));
 assert.deepEqual([...strFromU8(z['xl/workbook.xml']).matchAll(/<sheet [^>]*name="([^"]*)"/g)].map((m) => m[1]), ['見取図']);
 assert.ok(z['xl/media/image1.png'].length > 10000 && !z['xl/media/image2.png']);
 const xs1 = strFromU8(z['xl/worksheets/sheet1.xml']);
-assert.match(xs1, /①　玄関　手すりの取り付け/);
+assert.match(xs1, /①玄関　手すりの取り付け/);
+assert.match(xs1, /<c r="A1" [^>]*><is><t xml:space="preserve">（サンプル）山田様邸<\/t>/);
 assert.match(xs1, new RegExp(`orientation="${orient}"`));
 log('Excel：1シート（印刷と同じ向き）・平面図の画像・一覧 OK');
 

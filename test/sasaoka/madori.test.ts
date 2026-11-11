@@ -9,7 +9,7 @@ import {copied, floorArea, hitTest, makeItem, moved, placeFixture, placeOpening,
 import {cleanMadori, emptyMadori, hasMadori, legendLines, legendText, numberItems, roomArea} from '../../src/sasaoka/madori/model.ts';
 import type {Madori, MItem} from '../../src/sasaoka/madori/model.ts';
 import {floorSvg} from '../../src/sasaoka/madori/render.ts';
-import {floorLegend, pageSvg, planSvg, sheetLayout, sheetLegend, sheetText} from '../../src/sasaoka/madori/sheet.ts';
+import {floorLegend, pageSvg, planSvg, sheetLayout, sheetLegend, sheetText, sheetTitle, sheetWorks} from '../../src/sasaoka/madori/sheet.ts';
 import {madoriXlsx} from '../../src/sasaoka/madori/xlsx.ts';
 import type {Job} from '../../src/sasaoka/types.ts';
 
@@ -210,6 +210,65 @@ test('見取図の紙：題名（〇〇様邸　見取図）・日付・会社�
   assert.equal(sheetLayout(sq.floors, []).landscape, false);
 });
 
+test('見取図のいちばん上の「〇〇様邸」：名前＋様邸（呼び方が「様」でも様邸・名前の終わりの様／様邸は重ねない・名前がなければ書かない）', () => {
+  // ユーザーの指示「平面図の一番上に〇〇様邸と表示しておく」2026-11-11
+  assert.equal(sheetTitle({customer: '見本 花子'}), '見本 花子様邸');
+  assert.equal(sheetTitle({customer: '見本花子様'}), '見本花子様邸');
+  assert.equal(sheetTitle({customer: ' 見本花子様邸 '}), '見本花子様邸');
+  assert.equal(sheetTitle({customer: '  '}), '');
+  const tall: Madori = {...emptyMadori(), floors: [{id: 'f1', name: '1階', items: [room('a', 0, 0, 3 * M, 4 * M, '和室')]}]};
+  const plain = sheetLayout(tall.floors, ['①玄関　手すりの取り付け　L=600mm']);
+  const lay = sheetLayout(tall.floors, ['①玄関　手すりの取り付け　L=600mm'], '見本花子様邸');
+  assert.equal(plain.title, null);
+  // 題名の段のぶん、平面図は下から始まる（紙からはみ出さない・一覧の枠は平面図の下のまま）
+  assert.ok(lay.title && lay.area.y > plain.area.y && lay.title.y < lay.area.y);
+  assert.ok(lay.plan && lay.legend && lay.legend.y >= lay.plan.y + lay.plan.h && lay.legend.y + lay.legend.h <= lay.h - 10 + 0.01);
+  const page = pageSvg(tall, tall.floors, lay, ['①玄関　手すりの取り付け　L=600mm'], none, 'p', {}, '見本花子様邸');
+  assert.match(page, /<text x="105" y="[\d.]+" font-size="6" font-weight="700" text-anchor="middle"[^>]*>見本花子様邸<\/text>/);
+  assert.ok(!/見取図|平面図|年|株式会社|担当者/.test(page.replace(/<pattern[\s\S]*?<\/pattern>/g, '')), '「見取図」・日付・会社の名前は書かない');
+});
+
+test('見取図の下の枠：申請書の改修の内容（方眼の下の欄と同じ文。そのほかの行も）に、申請書にない平面図の番号を番号の順に足す', () => {
+  // ユーザーの指示「改修の内容（申請書）…常時表示しておく・印刷時にも表示する」「（右の枠の一覧は）この部分は不要」2026-11-11
+  const m: Madori = {
+    ...emptyMadori(),
+    legend: '手で直した古い一覧', // 右の枠を外したので使わない
+    floors: [
+      {
+        id: 'f1',
+        name: '1階',
+        items: [
+          room('a', 0, 0, 3 * M, 3 * M),
+          {id: 'r1', kind: 'rail', x: 0, y: 0, w: 600, h: 0, place: 'p1'}, // ①（申請書の箇所につないだ）
+          {id: 'r9', kind: 'rail', x: 0, y: 0, w: 900, h: 0, n: 9}, // ⑨ 申請書にない番号
+          {id: 'n5', kind: 'num', x: 0, y: 0, w: 0, h: 0, n: 5}, // ⑤ 申請書にない番号だけの部品
+        ] as MItem[],
+      },
+    ],
+  };
+  const list = [
+    {id: 'p2', photo: 2, name: 'トイレ', line: '②トイレ　手すりの取り付け　L=1500mm\n　　　　 ベースプレート　1800mm'},
+    {id: 'p1', photo: 1, name: '屋外', line: '①屋外　手すりの取り付け　L=600mm'},
+  ];
+  const byId = new Map(list.map((w) => [w.id, w]));
+  const look = {no: (id: string) => byId.get(id)?.photo, line: (id: string) => byId.get(id)?.line, byNo: (n: number) => list.find((w) => w.photo === n)?.line, list};
+  assert.deepEqual(sheetWorks(m, m.floors, look), [
+    '①屋外　手すりの取り付け　L=600mm',
+    '②トイレ　手すりの取り付け　L=1500mm',
+    '　　　　 ベースプレート　1800mm',
+    '⑤',
+    '⑨L＝900mm',
+  ]);
+  // 申請書の箇所がなく、平面図にも番号がなければ枠は出さない
+  const empty = {no: none, line: none, byNo: none, list: []};
+  const plain: Madori = {...emptyMadori(), floors: [{id: 'f1', name: '1階', items: [room('a', 0, 0, M, M)]}]};
+  assert.deepEqual(sheetWorks(plain, plain.floors, empty), []);
+  assert.equal(sheetLayout(plain.floors, []).legend, null);
+  // 下げたそのほかの行の半角のすき間がつぶれないように
+  const lay = sheetLayout(m.floors, sheetWorks(m, m.floors, look));
+  assert.match(pageSvg(m, m.floors, lay, sheetWorks(m, m.floors, look), look.no, 'p'), /xml:space="preserve"[^>]*>　　　　 ベースプレート/);
+});
+
 test('2階建て：1枚に1階・2階を並べる（見出し「1階」「2階」）。一覧は両方の階の番号', () => {
   // ユーザーの指示「2階を作成した際は、1階と2階の内容を1枚におさまるようにする」2026-11-10
   const m: Madori = {
@@ -267,8 +326,11 @@ test('Excel：見取図を1シート（縦が基本）・一覧は赤い字・�
   assert.match(s1, /<sheetPr><pageSetUpPr fitToPage="1"\/><\/sheetPr>/); // 字体のちがう PC でも1枚に
   assert.match(s1, /fitToWidth="1" fitToHeight="1"/);
   assert.match(s1, /<drawing r:id="rId1"\/>/);
-  assert.match(s1, /①　L＝600mm/);
-  assert.ok(!/見取図|様邸|株式会社/.test(s1));
+  // 下の枠は改修の内容の書き方（申請書の箇所がなければ、平面図の番号の部品の文）・いちばん上に「〇〇様邸」（太字・4つの列を結合）
+  assert.match(s1, /①L＝600mm/);
+  assert.match(s1, /<row r="1" [^>]*><c r="A1" s="\d+" t="inlineStr"><is><t xml:space="preserve">見本 花子様邸<\/t>/);
+  assert.match(s1, /<mergeCell ref="A1:D1"\/>/);
+  assert.ok(!/見取図|株式会社/.test(s1));
   assert.match(strFromU8(z['xl/styles.xml']), /FFE01B24/);
   assert.deepEqual([...z['xl/media/image1.png']], [...png]);
   assert.match(strFromU8(z['[Content_Types].xml']), /Extension="png"/);

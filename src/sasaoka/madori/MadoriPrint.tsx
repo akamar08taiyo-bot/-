@@ -1,4 +1,4 @@
-// 見取図の印刷（A4。縦が基本、横に広い図は横。sheet.ts の sheetLayout・pageSvg）。階が2つ以上でも1枚に並べる。
+// 見取図の印刷（A4。縦が基本、横に広い図は横。sheet.ts の sheetLayout・pageSvg）。階が2つ以上でも1枚に並べる。いちばん上に「〇〇様邸」、下に改修の内容。
 // 申請書の印刷（ShinseiPrint.tsx）と同じく body の直下に出し、印刷のあいだはアプリの画面を出さない（html.shinsei-printing）
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
@@ -6,7 +6,7 @@ import {Btn} from '../components/ui.tsx';
 import type {Job, Settings} from '../types.ts';
 import type {Madori} from './model.ts';
 import {underlayImages} from './planImage.ts';
-import {pageSvg, placeLookup, sheetFloors, sheetLayout, sheetLegend, sheetText} from './sheet.ts';
+import {pageSvg, placeLookup, sheetFloors, sheetLayout, sheetText, sheetTitle, sheetWorks} from './sheet.ts';
 
 const MM = 96 / 25.4;
 
@@ -23,9 +23,11 @@ export function MadoriPrint({job, settings, madori, onClose}: {job: Job; setting
       off = true;
     };
   }, [madori]);
-  const legend = sheetLegend(madori, floors, look.no, look.line, look.byNo);
-  const lay = sheetLayout(floors, legend);
-  const svg = pageSvg(madori, floors, lay, legend, look.no, 'pp', images);
+  // 下の枠は、方眼の下の欄と同じ申請書の改修の内容（ユーザーの指示「印刷時にも表示する」2026-11-11）。いちばん上に「〇〇様邸」
+  const legend = sheetWorks(madori, floors, look);
+  const title = sheetTitle(job);
+  const lay = sheetLayout(floors, legend, title);
+  const svg = pageSvg(madori, floors, lay, legend, look.no, 'pp', images, title);
   // 紙の大きさ（px）。高さは 0.4mm 引く（ちょうどだと、ブラウザによっては白紙の2枚目が出る）
   const pw = lay.w * MM;
   const ph = (lay.h - 0.4) * MM;

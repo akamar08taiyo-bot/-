@@ -1,5 +1,5 @@
 // 見取図の Excel（.xlsx）：印刷（MadoriPrint.tsx）と同じ A4 の1枚（縦が基本、横に広い図は横。階をみな1枚に）を1つのシートにする。
-// 一覧（①　玄関　手すりの取り付け　L=600mm…赤い字）はマスの文字（Excel で打ち直せる）、平面図は画像（PNG）。
+// いちばん上の「〇〇様邸」と、下の改修の内容（①玄関　手すりの取り付け　L=600mm…赤い字）はマスの文字（Excel で打ち直せる）、平面図は画像（PNG）。
 // 列の幅・行の高さは sheet.ts の sheetLayout の mm のまま（印刷と同じ位置）
 
 import type {Job, Settings} from '../types.ts';
@@ -7,14 +7,14 @@ import {writeXlsx} from '../xlsxWrite.ts';
 import type {XImage, XSheet} from '../xlsxWrite.ts';
 import {SheetBuilder} from '../xlsxWrite.ts';
 import type {Madori} from './model.ts';
-import {A4, placeLookup, planSvg, sheetFloors, sheetLayout, sheetLegend, sheetText} from './sheet.ts';
+import {A4, placeLookup, planSvg, sheetFloors, sheetLayout, sheetText, sheetTitle, sheetWorks} from './sheet.ts';
 import type {SheetLayout} from './sheet.ts';
 
 const PT_PER_MM = 72 / 25.4;
 const RED = 'E01B24';
 
-/** 見取図のシート。png は平面図の画像（なければ図なし） */
-export function madoriSheet(o: {lay: SheetLayout; legend: string[]; name: string; png?: Uint8Array}): XSheet {
+/** 見取図のシート。png は平面図の画像（なければ図なし）。title はいちばん上の「〇〇様邸」 */
+export function madoriSheet(o: {lay: SheetLayout; legend: string[]; name: string; png?: Uint8Array; title?: string}): XSheet {
   const {lay} = o;
   const b = new SheetBuilder();
   const font = 'ＭＳ Ｐゴシック';
@@ -23,6 +23,11 @@ export function madoriSheet(o: {lay: SheetLayout; legend: string[]; name: string
   // 一覧の1列は4つの列を結合したマス、2列なら2つずつ
   const N = 4;
   const cols = Array.from({length: N}, () => (lay.w - A4.margin * 2) / N);
+  // いちばん上の「〇〇様邸」（印刷と同じ、平面図の上の段。4つの列を結合してまん中に太字）
+  if (lay.title && o.title) {
+    const r = b.row(lay.area.y - A4.margin);
+    b.put(r, 0, o.title, {font, size: Math.round(lay.title.fs * PT_PER_MM * 2) / 2, bold: true, h: 'center', v: 'top'}, {}, 1, N);
+  }
   // 平面図の段（絵はこの上に重ねて貼る）。Excel の行の高さは 409pt（144mm）までなので、高い段は同じ高さの行に分ける
   const parts = Math.ceil(lay.area.h / 140);
   for (let i = 0; i < parts; i++) b.row(lay.area.h / parts);
@@ -70,12 +75,13 @@ export async function madoriXlsx(job: Job, s: Settings, m: Madori, png: PlanPng,
   const t = sheetText(job);
   const look = placeLookup(job, s);
   const floors = sheetFloors(m);
-  const legend = sheetLegend(m, floors, look.no, look.line, look.byNo);
-  const lay = sheetLayout(floors, legend);
+  const legend = sheetWorks(m, floors, look);
+  const title = sheetTitle(job);
+  const lay = sheetLayout(floors, legend, title);
   let img: Uint8Array | undefined;
   if (lay.plan) {
     const p = planSvg(m, floors, look.no, 'x0', images, lay.dir);
     img = await png(p.svg, p.w, p.h);
   }
-  return {bytes: writeXlsx([madoriSheet({lay, legend, name: '見取図', png: img})]), fileName: `${t.fileName}.xlsx`};
+  return {bytes: writeXlsx([madoriSheet({lay, legend, name: '見取図', png: img, title})]), fileName: `${t.fileName}.xlsx`};
 }

@@ -1,6 +1,7 @@
-// 見取図の紙（A4）：平面図と、その下に枠で囲んだ一覧（①　玄関　手すりの取り付け　L=600mm…赤い字）。
+// 見取図の紙（A4）：いちばん上に「〇〇様邸」、平面図、その下に枠で囲んだ改修の内容（①玄関　手すりの取り付け　L=600mm…赤い字）。
 // 縦が基本で、横に広い図は横（ユーザーの指示「基本的には縦印刷、横広の場合は、自動的に横にする」2026-11-10）。2階建ても1枚に1階・2階を並べる
-// （「2階を作成した際は、1階と2階の内容を1枚におさまるようにする」）。題名（〇〇様邸　見取図）・日付・会社の名前は書かない（「〇〇様邸　平面図、日付などは不要」）。
+// （「2階を作成した際は、1階と2階の内容を1枚におさまるようにする」）。日付・会社の名前・「見取図」「平面図」の文字は書かない（「〇〇様邸　平面図、日付などは不要」2026-11-10）。
+// 「〇〇様邸」だけはいちばん上に書く（ユーザーの指示「平面図の一番上に〇〇様邸と表示しておく」2026-11-11）。
 // 印刷（MadoriPrint.tsx）・Excel（xlsx.ts）で同じ位置（sheetLayout）を使う。申請書の平面図の枠の画像は planSvg。長さは mm
 
 import {textEm} from '../print/fit.ts';
@@ -15,6 +16,8 @@ import {floorSvg, patternDefs, RED, viewOf} from './render.ts';
 export const A4 = {short: 210, long: 297, margin: 10};
 /** 一覧の枠：字の大きさの候補（mm。大きい順）・行の高さ（字の倍）・枠の中の余白・列のすき間・平面図とのすき間・紙の中で一覧に使える高さの割合 */
 const LEG = {sizes: [4.2, 3.8, 3.4, 3.0, 2.6], lh: 1.55, pad: 3, colGap: 6, gap: 4, maxShare: 0.4};
+/** いちばん上の「〇〇様邸」：字の大きさ（mm）と、平面図の上に取る段の高さ（mm） */
+const TITLE = {fs: 6, h: 11};
 
 const escText = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -34,6 +37,32 @@ export type SheetText = {fileName: string};
 /** 見取図の保存名（Excel・PDF。「山田花子様住宅改修見取図」） */
 export function sheetText(job: Job): SheetText {
   return {fileName: `${customerFilePart(job.customer)}住宅改修見取図`};
+}
+
+/**
+ * 平面図のいちばん上に書く「山田花子様邸」（画面の方眼の上・印刷・Excel。ユーザーの指示「平面図の一番上に〇〇様邸と表示しておく」2026-11-11）。
+ * 様邸の呼び方を「様」にしていても「様邸」（名前の終わりの「様」「様邸」は重ねない）。お客様の名前がなければ空
+ */
+export function sheetTitle(job: Pick<Job, 'customer'>): string {
+  const name = job.customer.trim().replace(/\s*(様邸|様)$/, '');
+  return name ? `${name}様邸` : '';
+}
+
+/**
+ * 見取図の下の枠の行（ユーザーの指示「改修の内容（申請書）…常時表示しておく・印刷時にも表示する」2026-11-11）：方眼の下の欄と同じ、申請書の改修の内容
+ * （「①玄関　手すりの取り付け　L=600mm」。そのほかの2行目は次の行）。平面図に置いた番号で申請書にない番号は、その部品の文（「⑨L＝600mm」・番号だけ）を番号の順に足す
+ * （前は平面図に置いた番号の行だけ。画面の右の枠の一覧は「この部分は不要」で外したので、手で直した一覧＝Madori.legend も使わない）
+ */
+export function sheetWorks(m: Madori, floors: MFloor[], look: Pick<ReturnType<typeof placeLookup>, 'no' | 'line' | 'byNo' | 'list'>): string[] {
+  const rows = new Map<number, string>();
+  for (const w of look.list) if (!rows.has(w.photo)) rows.set(w.photo, w.line);
+  const nums = numberItems(m.floors, look.no);
+  const here = new Set(floors.flatMap((f) => f.items.map((it) => nums.get(it.id))).filter((n): n is number => !!n));
+  for (const row of legendLines({floors: m.floors}, look.no, look.line, look.byNo)) {
+    const n = rowNo(row);
+    if (here.has(n) && !rows.has(n)) rows.set(n, row.replace(/^([①-⑳]|\(\d+\))　/, '$1'));
+  }
+  return [...rows.entries()].sort((a, b) => a[0] - b[0]).flatMap(([, line]) => line.split('\n')).filter((l) => l.trim());
 }
 
 /** 図に入れる下絵（申請書の平面図の枠に入れた図。隠していないもの）。なぞるための下絵は印刷しない */
@@ -214,6 +243,7 @@ export type SheetLayout = {
   dir: PlanDir;
   plan: {x: number; y: number; w: number; h: number; k: number} | null; // 平面図の絵（planSvg の w×h を k 倍）。図がなければ null
   area: {x: number; y: number; w: number; h: number}; // 平面図に使える所
+  title: {x: number; y: number; fs: number} | null; // いちばん上の「〇〇様邸」（x はまん中・y は字の下の線）。名前がなければ null
   legend: {x: number; y: number; w: number; h: number; fs: number; cols: number; rows: number; colW: number} | null; // 一覧がなければ null
 };
 
@@ -241,16 +271,17 @@ function legendBox(lines: string[], innerW: number, maxH: number): {h: number; f
  * 紙の並びを決める：縦（A4縦）と横（A4横）、階の並べ方（横に並べる・縦に重ねる）のうち、平面図がいちばん大きく入るもの。
  * 縦を基本にして、横のほうが 1.25 倍より大きく入る（横に広い図）ときだけ横（1階・2階を横に並べたほうが少し大きいくらいなら、縦に重ねて縦のまま）
  */
-export function sheetLayout(floors: MFloor[], legend: string[]): SheetLayout {
+export function sheetLayout(floors: MFloor[], legend: string[], title = ''): SheetLayout {
   const hasPlan = floors.some(floorHasPlan);
   const dirs: PlanDir[] = floors.length > 1 ? ['row', 'col'] : ['row'];
+  const top = title ? TITLE.h : 0;
   const one = (landscape: boolean) => {
     const w = landscape ? A4.long : A4.short;
     const h = landscape ? A4.short : A4.long;
     const iw = w - A4.margin * 2;
-    const ih = h - A4.margin * 2;
+    const ih = h - A4.margin * 2 - top;
     const leg = legendBox(legend, iw, ih * LEG.maxShare);
-    const area = {x: A4.margin, y: A4.margin, w: iw, h: ih - (leg ? leg.h + LEG.gap : 0)};
+    const area = {x: A4.margin, y: A4.margin + top, w: iw, h: ih - (leg ? leg.h + LEG.gap : 0)};
     let best: {dir: PlanDir; k: number; pw: number; ph: number} = {dir: 'row', k: 0, pw: 0, ph: 0};
     if (hasPlan) {
       for (const dir of dirs) {
@@ -261,7 +292,8 @@ export function sheetLayout(floors: MFloor[], legend: string[]): SheetLayout {
     }
     const plan = hasPlan ? {x: area.x + (area.w - best.pw * best.k) / 2, y: area.y + (area.h - best.ph * best.k) / 2, w: best.pw * best.k, h: best.ph * best.k, k: best.k} : null;
     const legendAt = leg ? {x: A4.margin, y: area.y + area.h + LEG.gap, w: iw, ...leg} : null;
-    return {landscape, w, h, dir: best.dir, plan, area, legend: legendAt} satisfies SheetLayout;
+    const titleAt = title ? {x: w / 2, y: A4.margin + TITLE.fs * 0.9, fs: TITLE.fs} : null;
+    return {landscape, w, h, dir: best.dir, plan, area, title: titleAt, legend: legendAt} satisfies SheetLayout;
   };
   const tall = one(false);
   const wide = one(true);
@@ -287,23 +319,27 @@ const rowNo = (row: string) => {
   return c >= 0x2460 && c <= 0x2473 ? c - 0x2460 + 1 : Number(/^\((\d+)\)/.exec(row)?.[1] ?? 999);
 };
 
-/** 見取図の1枚の SVG（mm）。平面図（階をみな）は枠に入る大きさに縮めてまん中、その下に一覧の枠 */
-export function pageSvg(m: Madori, floors: MFloor[], lay: SheetLayout, legend: string[], no: (id: string) => number | undefined, pid: string, images: Record<string, string> = {}): string {
+/** 見取図の1枚の SVG（mm）。いちばん上に「〇〇様邸」、平面図（階をみな）は枠に入る大きさに縮めてまん中、その下に改修の内容の枠 */
+export function pageSvg(m: Madori, floors: MFloor[], lay: SheetLayout, legend: string[], no: (id: string) => number | undefined, pid: string, images: Record<string, string> = {}, title = ''): string {
   const font = `font-family="'BIZ UDPGothic','Meiryo','Hiragino Sans','Noto Sans JP',sans-serif"`;
   const p = lay.plan ? planSvg(m, floors, no, pid, images, lay.dir) : null;
   const L = lay.legend;
+  const T = title ? lay.title : null;
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${lay.w} ${lay.h}" width="${lay.w}mm" height="${lay.h}mm" ${font}>` +
     `<defs>${patternDefs(pid)}</defs><rect width="${lay.w}" height="${lay.h}" fill="#ffffff"/>` +
+    (T ? `<text x="${r2(T.x)}" y="${r2(T.y)}" font-size="${T.fs}" font-weight="700" text-anchor="middle" fill="#111827">${escText(title)}</text>` : '') +
     (p && lay.plan ? `<g transform="translate(${r2(lay.plan.x)} ${r2(lay.plan.y)}) scale(${lay.plan.k})">${p.body}</g>` : '') +
     (L
-      ? `<rect x="${L.x}" y="${r2(L.y)}" width="${L.w}" height="${r2(L.h)}" fill="none" stroke="#7f7f7f" stroke-width="0.6"/>` +
+      ? `<g data-sheet-works=""><rect x="${L.x}" y="${r2(L.y)}" width="${L.w}" height="${r2(L.h)}" fill="none" stroke="#7f7f7f" stroke-width="0.6"/>` +
         legendSpots(L, legend.length)
           .map((q, i) => {
             const tooLong = textEm(legend[i]) * L.fs > L.colW;
-            return `<text x="${r2(L.x + q.x)}" y="${r2(L.y + q.y)}" font-size="${L.fs}" fill="${RED}"${tooLong ? ` textLength="${r2(L.colW)}" lengthAdjust="spacingAndGlyphs"` : ''}>${escText(legend[i])}</text>`;
+            // そのほかの行（申請書の改修の内容の2行目）は、全角・半角のすき間で1行目の改修の種類の頭まで下げてある。半角のすき間がつぶれないように xml:space
+            return `<text x="${r2(L.x + q.x)}" y="${r2(L.y + q.y)}" font-size="${L.fs}" fill="${RED}" xml:space="preserve"${tooLong ? ` textLength="${r2(L.colW)}" lengthAdjust="spacingAndGlyphs"` : ''}>${escText(legend[i])}</text>`;
           })
-          .join('')
+          .join('') +
+        `</g>`
       : '') +
     `</svg>`
   );

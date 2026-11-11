@@ -1,5 +1,5 @@
 // 様邸の画面の「📐 平面図」のタブ（ユーザーの指示「平面図をつくれるような機能を追加する。まどりっちの機能やマイホームクラウドの機能もつけくわえる」2026-11-09）。
-// 左に道具（マイホームクラウドと同じ部屋の一覧・建具・設備・階段・改修・作図）、まん中に方眼（910mm など）、右に選んだ部品の欄と一覧（凡例）。
+// 左に道具（マイホームクラウドと同じ部屋の一覧・建具・設備・階段・改修・作図）、まん中に方眼（910mm など。上に「〇〇様邸」、下に申請書の改修の内容）、右に選んだ部品の欄（何も選んでいなければ出さない）。
 // 部屋はドラッグで方眼に、ドアと窓は壁に、トイレ・浴槽などは壁ぎわに、手すりは壁ぞいに吸い付く（edit.ts）。
 // 絵は印刷・Excel と同じ render.ts。手すり・段差の解消は申請書の箇所につなぐと、番号（写真番号）と一覧の文が申請書と同じになる
 
@@ -15,15 +15,15 @@ import type {AppData, Job} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {DOOR_TYPES, FIX_TYPES, ROOM_ROWS, ROOM_SHORT, ROOM_TYPES, STAIR_TYPES, STEP_TYPES, WINDOW_TYPES} from './catalog.ts';
 import {isScribble} from '../photoMarks.ts';
-import {canVertexEdit, copied, DRAG_TOOLS, eraseHits, floorArea, handlesOf, hitTest, isCornerHandle, makeItem, moved, railFrom, resized, scribbleHits, SHAPE_COLORS, turnedItem} from './edit.ts';
+import {canVertexEdit, copied, DRAG_TOOLS, eraseHits, handlesOf, hitTest, isCornerHandle, makeItem, moved, railFrom, resized, scribbleHits, SHAPE_COLORS, turnedItem} from './edit.ts';
 import {bboxOf, closedShape, nearOrthoNext, pointRemoved, roomPts, shapeOf, snapPt} from './poly.ts';
 import {shapeDef, shapeIcon, SHAPES_SHOWN, shapeToPts} from './shapes.ts';
 import type {Handle, P, Tool} from './edit.ts';
 import {MadoriPrint} from './MadoriPrint.tsx';
-import {bounds, circled, emptyMadori, NUM_SIZE, hasMadori, joLabel, legendLines, legendText, lineLength, mid, MODULES, numberItems, railPts, railSegs, roomAreaOf, snapStep, withFloor} from './model.ts';
+import {bounds, circled, emptyMadori, NUM_SIZE, hasMadori, joLabel, legendText, lineLength, mid, MODULES, numberItems, railPts, railSegs, roomAreaOf, snapStep, withFloor} from './model.ts';
 import type {Madori, MFloor, MItem, Module} from './model.ts';
 import {floorSvg, patternDefs, thumbSvg, viewOf} from './render.ts';
-import {linkPlan, placeLookup, planLinked} from './sheet.ts';
+import {linkPlan, placeLookup, planLinked, sheetTitle} from './sheet.ts';
 
 type Cat = 'room' | 'stair' | 'door' | 'fix' | 'furn' | 'draw';
 // 道具の種類（マイホームクラウドと同じく 部屋・階段・間口・住設・家具。ユーザーの指示 2026-11-10。前は 部屋・建具・窓・設備・階段）。
@@ -860,10 +860,8 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
   const gridDefs =
     `<pattern id="ed-g1" width="${minor}" height="${minor}" patternUnits="userSpaceOnUse"><path d="M${minor} 0H0V${minor}" fill="none" stroke="#e6ebf2" stroke-width="${px}"/></pattern>` +
     `<pattern id="ed-g2" width="${m.module}" height="${m.module}" patternUnits="userSpaceOnUse"><path d="M${m.module} 0H0V${m.module}" fill="none" stroke="#c3cedb" stroke-width="${px * 1.2}"/></pattern>`;
-  const legend = legendLines({floors: m.floors}, look.no, look.line, look.byNo);
-  const area = floorArea(items);
-  const total = m.floors.reduce((a, f) => a + floorArea(f.items), 0);
   const insurer = jobInsurer(job);
+  const title = sheetTitle(job);
 
   // ---------------------------------------------------------------- 左の道具
   const pick = (t: Tool) => {
@@ -1388,52 +1386,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
         </Btn>
       </div>
     </div>
-  ) : (
-    <div className="space-y-2">
-      <div className="text-sm font-bold text-slate-700">一覧（右の枠）</div>
-      {legend.length ? (
-        <ul className="space-y-0.5 text-sm text-rose-600">
-          {legend.map((l) => (
-            <li key={l}>{l}</li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-sm text-slate-400">手すり・段差の解消を置くと出ます</p>
-      )}
-      <details open={!!m.legend}>
-        <summary className="cursor-pointer text-xs text-slate-500">一覧を手で直す</summary>
-        <textarea
-          value={m.legend ?? legend.join('\n')}
-          onChange={(e) => change((mm) => ({...mm, legend: e.target.value, updatedAt: Date.now()}))}
-          rows={Math.max(3, legend.length + 1)}
-          className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-          aria-label="一覧を手で直す"
-        />
-        {m.legend && (
-          <Btn
-            color="white"
-            small
-            onClick={() =>
-              change((mm) => {
-                const {legend: _l, ...rest} = mm;
-                return {...rest, updatedAt: Date.now()};
-              })
-            }
-          >
-            自動に戻す
-          </Btn>
-        )}
-      </details>
-      <div className="border-t border-slate-200 pt-2 text-sm text-slate-600">
-        {floor.name}の床面積 {area}㎡（{Math.round((area / 3.30579) * 100) / 100}坪）
-        {m.floors.length > 1 && (
-          <div>
-            延べ床面積 {Math.round(total * 100) / 100}㎡（{Math.round((total / 3.30579) * 100) / 100}坪）
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  ) : null; // 何も選んでいないときの右の枠（一覧・床面積）は出さない（ユーザーの指示「この部分は不要」2026-11-11）
 
   const cursor = tool.t !== 'select' || delMode ? 'crosshair' : drag.current?.mode === 'pan' ? 'grabbing' : 'default';
   const handles = it && !draft ? handlesOf(it, vtx) : it ? handlesOf(m.floors.find((f) => f.id === floor.id)!.items.find((o) => o.id === it.id) ?? it, vtx) : [];
@@ -1834,6 +1787,13 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           {palette}
         </div>
         <div className="min-w-0 space-y-2 max-lg:order-3">
+        {/* 方眼のいちばん上に「〇〇様邸」（印刷・Excel の見取図もいちばん上。ユーザーの指示「平面図の一番上に〇〇様邸と表示しておく」2026-11-11）。
+            申請書の枠から開いたとき（embed）は、申請書の平面図の枠の図に入らないので出さない */}
+        {!embed && title && (
+          <h3 className="truncate text-center text-lg font-bold leading-tight text-slate-900" data-plan-title>
+            {title}
+          </h3>
+        )}
         <div ref={boxRef} className="relative h-[min(calc(72vh-3rem),712px)] min-h-[340px] overflow-hidden max-lg:h-[min(58vh,560px)] max-lg:min-h-[320px] scroll-mb-2 rounded-lg border-2 border-slate-300 bg-white shadow-sm" data-madori-canvas>
           <svg
             ref={svgRef}
@@ -2062,7 +2022,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           )}
         </section>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm max-lg:order-4">{props}</div>
+        {props && <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm max-lg:order-4">{props}</div>}
       </div>
     </div>
   );
