@@ -150,7 +150,10 @@ export function bounds(it: MItem): {x: number; y: number; w: number; h: number} 
     const h = it.h || 150;
     return {x: it.x - w / 2, y: it.y - h / 2, w, h};
   }
-  if (it.kind === 'num') return {x: it.x - 150, y: it.y - 150, w: 300, h: 300};
+  if (it.kind === 'num') {
+    const r = (it.size ?? NUM_SIZE) * 0.55;
+    return {x: it.x - r, y: it.y - r, w: r * 2, h: r * 2};
+  }
   const vert = it.rot === 90 || it.rot === 270;
   return vert ? {x: it.x + (it.w - it.h) / 2, y: it.y + (it.h - it.w) / 2, w: it.h, h: it.w} : {x: it.x, y: it.y, w: it.w, h: it.h};
 }
@@ -205,6 +208,13 @@ export function numberItems(floors: MFloor[], placeNo: (placeId: string) => numb
 }
 
 /** ①〜⑳（それより大きい番号は (21)） */
+/**
+ * 番号（①②…）の字の大きさ（mm。図の上の大きさ。印刷・Excel も同じ）。前は 230〜260mm（部屋の名前と同じ）で、
+ * 携帯で図全体を見ると 8px ほどしかなかった（ユーザーの指示「番号があまりにも小さすぎる」2026-11-11）。画面では、これより小さく見えるときは
+ * 28px ほどまで大きくして描く（render.ts の numMin）
+ */
+export const NUM_SIZE = 360;
+
 export function circled(n: number): string {
   return n >= 1 && n <= 20 ? String.fromCharCode(0x2460 + n - 1) : `(${n})`;
 }

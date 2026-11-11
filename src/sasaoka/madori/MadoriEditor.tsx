@@ -20,7 +20,7 @@ import {bboxOf, closedShape, nearOrthoNext, pointRemoved, roomPts, shapeOf, snap
 import {shapeDef, shapeIcon, SHAPES_SHOWN, shapeToPts} from './shapes.ts';
 import type {Handle, P, Tool} from './edit.ts';
 import {MadoriPrint} from './MadoriPrint.tsx';
-import {bounds, circled, emptyMadori, hasMadori, joLabel, legendLines, legendText, lineLength, mid, MODULES, numberItems, railPts, railSegs, roomAreaOf, snapStep, withFloor} from './model.ts';
+import {bounds, circled, emptyMadori, NUM_SIZE, hasMadori, joLabel, legendLines, legendText, lineLength, mid, MODULES, numberItems, railPts, railSegs, roomAreaOf, snapStep, withFloor} from './model.ts';
 import type {Madori, MFloor, MItem, Module} from './model.ts';
 import {floorSvg, patternDefs, thumbSvg, viewOf} from './render.ts';
 import {STAGE_FONT, stagedItems} from './stage.ts';
@@ -543,7 +543,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       return;
     }
     // 番号を置いているときに、置いた番号（すぐ前に置いた所をもう一度押した・ダブルタップ）を押すと確定（ユーザーの指示「番号の部分を2回押しても、確定と認識する」2026-11-10）
-    if (tool.t === 'num' && items.some((it) => it.kind === 'num' && Math.hypot(it.x - p.x, it.y - p.y) <= Math.max(150, 14 / v.k))) {
+    if (tool.t === 'num' && items.some((it) => it.kind === 'num' && Math.hypot(it.x - p.x, it.y - p.y) <= Math.max((it.size ?? NUM_SIZE) * 0.55, 14 / v.k))) {
       endTool();
       return;
     }
@@ -860,10 +860,12 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
 
   // ---------------------------------------------------------------- 絵
   const shown = preview && drag.current?.mode !== 'move' ? [...items, preview] : items;
-  const art = useMemo(() => floorSvg(shown, {module: m.module, showArea: m.showArea, showDims: m.showDims, nums, pid: 'ed'}), [shown, m.module, m.showArea, m.showDims, nums]);
+  // 番号は、引いて見ても画面の 24px ほどより小さくしない（ユーザーの指示「番号があまりにも小さすぎる」2026-11-11。印刷・Excel は NUM_SIZE のまま）
+  const numMin = Math.round(28 / v.k); // 画面で番号を 28px より小さくしない（携帯で図全体を見たとき）
+  const art = useMemo(() => floorSvg(shown, {module: m.module, showArea: m.showArea, showDims: m.showDims, nums, pid: 'ed', numMin}), [shown, m.module, m.showArea, m.showDims, nums, numMin]);
   const stageArt = useMemo(
-    () => floorSvg(stage.items, {module: m.module, showArea: false, showDims: false, nums: new Map(stage.items.map((it) => [it.id, look.no(it.place ?? '') ?? 0])), pid: 'eds'}),
-    [stage, m.module, look],
+    () => floorSvg(stage.items, {module: m.module, showArea: false, showDims: false, nums: new Map(stage.items.map((it) => [it.id, look.no(it.place ?? '') ?? 0])), pid: 'eds', numMin}),
+    [stage, m.module, look, numMin],
   );
   const lowerArt = useMemo(() => (lower ? floorSvg(lower.items, {module: m.module, showArea: false, showDims: false, nums: new Map(), pid: 'ed'}) : ''), [lower, m.module]);
   const vw = size.w / v.k;
@@ -1352,7 +1354,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           <MmInput label="大きさ" value={it.size ?? 220} onChange={(size) => setItem(it.id, {size})} min={60} />
         </>
       )}
-      {it.kind === 'num' && <MmInput label="大きさ" value={it.size ?? 260} onChange={(size) => setItem(it.id, {size})} min={60} />}
+      {it.kind === 'num' && <MmInput label="大きさ" value={it.size ?? NUM_SIZE} onChange={(size) => setItem(it.id, {size})} min={60} />}
       {it.kind === 'shape' && !shapeDef(it.type)?.line && !shapeDef(it.type)?.open && (
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={!!it.fill} onChange={(e) => setItem(it.id, {fill: e.target.checked || undefined})} className="h-4 w-4" />

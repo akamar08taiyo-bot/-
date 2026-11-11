@@ -3,7 +3,7 @@
 // 手すり＝赤い線と両端の点・①②、ドア＝開く向きの弧、窓＝細い3本線
 
 import {FINISH, roomColor, roomFinish, TONE} from './catalog.ts';
-import {bounds, circled, joLabel, lineLength, railBend, railPts, roomAreaOf} from './model.ts';
+import {bounds, circled, joLabel, lineLength, railBend, railPts, roomAreaOf, NUM_SIZE} from './model.ts';
 import {labelSpot, polyArea, polyPath, roomPts, smoothPath} from './poly.ts';
 import {shapeDef, shapeLine} from './shapes.ts';
 import type {MItem, Module} from './model.ts';
@@ -400,15 +400,15 @@ function step(it: MItem): string {
   return placed(it, inner);
 }
 
-/** 番号（赤い①。点の近くに置く） */
-const numText = (n: number, x: number, y: number, size = 230) =>
+/** 番号（赤い①。点の近くに置く。大きさは NUM_SIZE＝model.ts） */
+const numText = (n: number, x: number, y: number, size = NUM_SIZE) =>
   `<text x="${r1(x)}" y="${r1(y + size * 0.36)}" font-size="${size}" text-anchor="middle" fill="${RED}">${circled(n)}</text>`;
 
 /**
  * 線の部品の番号の置き場所：線の始まり（左・上の端）の近くで、線に直角に少し離す（上か左）。見本の見取図も手すりの端のそばに①
  * （まん中だと部屋の名前・広さの字に重なった）
  */
-function numSpot(it: MItem): [number, number] {
+function numSpot(it: MItem, size = NUM_SIZE): [number, number] {
   const len = Math.hypot(it.w, it.h) || 1;
   let nx = -it.h / len;
   let ny = it.w / len;
@@ -421,7 +421,9 @@ function numSpot(it: MItem): [number, number] {
   const sx = flip ? it.x + it.w : it.x;
   const sy = flip ? it.y + it.h : it.y;
   const along = Math.min(len / 4, 400);
-  return [sx + (Math.abs(it.w) / len) * along + nx * 230, sy + (Math.abs(it.h) / len) * along + ny * 230];
+  // 線から離す量は番号の大きさに合わせる（大きくした番号が手すりに重ならないように）
+  const off = size * 0.75;
+  return [sx + (Math.abs(it.w) / len) * along + nx * off, sy + (Math.abs(it.h) / len) * along + ny * off];
 }
 
 function dimLine(x1: number, y1: number, x2: number, y2: number, label: string, size = 170): string {
@@ -478,6 +480,7 @@ export type RenderOpts = {
   showDims: boolean;
   nums: Map<string, number>; // 番号（numberItems）
   pid?: string; // 柄の id の頭
+  numMin?: number; // 番号の字の小さいほうの大きさ（mm）。編集の画面で、引いて見ても番号が小さくなりすぎないように（画面の 28px ほど）
 };
 
 /**
@@ -533,16 +536,17 @@ export function floorSvg(items: MItem[], o: RenderOpts): string {
       out.push(rx === ry ? `<circle cx="${r1(it.x)}" cy="${r1(it.y)}" r="${r1(rx)}" fill="${VRAIL}"/>` : `<ellipse cx="${r1(it.x)}" cy="${r1(it.y)}" rx="${r1(rx)}" ry="${r1(ry)}" fill="${VRAIL}"/>`);
     }
   }
+  const ns = Math.max(NUM_SIZE, o.numMin ?? 0); // 手すり・縦手すり・段差の解消に付ける番号の大きさ
   for (const it of items) {
     const n = o.nums.get(it.id);
     if (it.kind === 'rail' && n) {
-      const [nx, ny] = numSpot(it);
-      out.push(numText(n, nx, ny));
-    } else if (it.kind === 'vrail' && n) out.push(numText(n, it.x + (it.w || 150) / 2 + 155, it.y - (it.h || 150) / 2 - 45));
+      const [nx, ny] = numSpot(it, ns);
+      out.push(numText(n, nx, ny, ns));
+    } else if (it.kind === 'vrail' && n) out.push(numText(n, it.x + (it.w || 150) / 2 + ns * 0.6, it.y - (it.h || 150) / 2 - ns * 0.15, ns));
     else if (it.kind === 'step' && n) {
       const b = bounds(it);
-      out.push(numText(n, b.x + b.w + 200, b.y + 80));
-    } else if (it.kind === 'num' && n) out.push(numText(n, it.x, it.y, it.size ?? 260));
+      out.push(numText(n, b.x + b.w + ns * 0.75, b.y + ns * 0.3, ns));
+    } else if (it.kind === 'num' && n) out.push(numText(n, it.x, it.y, Math.max(it.size ?? NUM_SIZE, o.numMin ?? 0)));
     else if (it.kind === 'text' && it.label) {
       const size = it.size ?? 220;
       it.label.split('\n').forEach((line, i) => out.push(`<text x="${r1(it.x)}" y="${r1(it.y + size * (i + 0.85))}" font-size="${size}" fill="#111827">${esc(line)}</text>`));

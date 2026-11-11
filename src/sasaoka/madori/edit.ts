@@ -4,7 +4,7 @@
 
 import {DOOR_TYPES, fixType, roomType, STAIR_TYPES, STEP_TYPES, WINDOW_TYPES} from './catalog.ts';
 import {simplifyStroke} from '../photoMarks.ts';
-import {bounds, isShapeLine, mid, railBend, railPts, snapTo} from './model.ts';
+import {bounds, isShapeLine, mid, NUM_SIZE, railBend, railPts, snapTo} from './model.ts';
 import {isLineShapeType, shapeDef} from './shapes.ts';
 import {bboxOf, edgeMoved, freeMoved, inPoly, isOrtho, movedPts, pointAdded, polyArea, polyEdges, scaledPts, shapeOf, snapPt, turnedPts, vertexMoved} from './poly.ts';
 import type {MItem, MKind, Module, Rot} from './model.ts';
@@ -448,7 +448,8 @@ const inBox = (p: P, b: Box, pad = 0) => p.x >= b.x - pad && p.x <= b.x + b.w + 
 /** p がその部品の上か（部屋のほか。tol は線をつかめる幅 mm） */
 export function hitsItem(it: MItem, p: P, tol: number): boolean {
   if (it.kind === 'text') return inBox(p, textBox(it), tol / 2);
-  if (it.kind === 'num' || it.kind === 'vrail') return Math.hypot(p.x - it.x, p.y - it.y) <= Math.max(160, tol, Math.max(it.w, it.h) / 2 + tol / 2);
+  if (it.kind === 'num') return Math.hypot(p.x - it.x, p.y - it.y) <= Math.max((it.size ?? NUM_SIZE) * 0.55, tol * 1.4);
+  if (it.kind === 'vrail') return Math.hypot(p.x - it.x, p.y - it.y) <= Math.max(160, tol, Math.max(it.w, it.h) / 2 + tol / 2);
   if (it.kind === 'rail') {
     const pts = railPts(it);
     return pts.slice(1).some((q, i) => segDist(p, pts[i], q) <= Math.max(tol, 60));
