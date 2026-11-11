@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {emptyMadori} from '../../src/sasaoka/madori/model.ts';
 import type {MItem} from '../../src/sasaoka/madori/model.ts';
-import {stagedItems, stageItem} from '../../src/sasaoka/madori/stage.ts';
+import {stagedItems, stageHit, stageItem} from '../../src/sasaoka/madori/stage.ts';
 import type {Place, Row} from '../../src/sasaoka/types.ts';
 
 const place = (id: string, kind: number, photo: number, over: Partial<Place> = {}): Place => ({id, name: '', rows: [], kind, photo, ...over});
@@ -40,5 +40,35 @@ test('置き場：まだ図にない箇所だけを、図の右に縦に並べ�
   assert.ok(s.labels.every((l) => s.box && l.x > s.box.x && l.x < s.box.x + s.box.w));
   // 全部図にあれば置き場は出さない
   const none = stagedItems(m.floors, f, [places[0]], [list[0]], no, 910);
-  assert.deepEqual(none, {items: [], labels: [], box: null});
+  assert.deepEqual([none.items, none.labels, none.rows, none.box], [[], [], [], null]);
+});
+
+// ユーザーの指示「個別で動くようにする」2026-11-11：番号を大きく描いても①②③が重ならず、行のどこを押してもその行の部品だけをつかむ
+test('置き場：1行に1つ（左に番号・部品・名前）。番号の大きさで行の高さを決め、行どうしは重ならない。押した行の部品だけ', () => {
+  const m = emptyMadori();
+  const f = m.floors[0];
+  const places = [place('a', 3, 1, {name: '廊下'}), place('b', 3, 2, {name: '居間・食堂'}), place('c', 1, 3, {name: '台所', dims: {l: '900'}})];
+  const list = places.map((p) => ({id: p.id, photo: p.photo, name: p.name}));
+  const no = (id: string) => places.find((p) => p.id === id)?.photo;
+  for (const ns of [360, 1200]) {
+    const s = stagedItems(m.floors, f, places, list, no, 910, ns);
+    assert.equal(s.rows.length, 3);
+    for (let i = 1; i < s.rows.length; i++) {
+      const [a, b] = [s.rows[i - 1], s.rows[i]];
+      assert.ok(a.rect.y + a.rect.h <= b.rect.y + 0.001, `行が重なる ns=${ns}`);
+      assert.ok(b.num.y - a.num.y >= ns * 1.1, `番号が重なる ns=${ns}`); // 番号の字の高さより離す
+    }
+    // 番号だけの箇所（廊下・居間）は番号そのものが部品。横棒（台所）は番号の右
+    assert.deepEqual([s.rows[0].item.kind, s.rows[2].item.kind], ['num', 'rail']);
+    assert.ok(s.rows[2].item.x > s.rows[2].num.x + ns * 0.5);
+    // 名前は部品の右・行のまん中の高さ
+    assert.ok(s.labels.every((l, i) => l.y > s.rows[i].rect.y && l.y < s.rows[i].rect.y + s.rows[i].rect.h));
+    // 行のどこを押しても（番号・名前・右の空いた所）その行の部品だけ
+    for (const r of s.rows) {
+      for (const x of [r.num.x, r.rect.x + r.rect.w - 10, (s.labels.find((l) => l.y > r.rect.y && l.y < r.rect.y + r.rect.h)?.x ?? r.num.x) + 10]) {
+        assert.equal(stageHit(s, {x, y: r.num.y})?.place, r.item.place);
+      }
+    }
+    assert.equal(stageHit(s, {x: s.rows[0].num.x, y: s.rows[0].rect.y - ns * 3}), null); // 置き場の外
+  }
 });

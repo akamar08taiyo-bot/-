@@ -141,6 +141,12 @@ const stageRails = () =>
 const stageText = () => page.locator('[data-stage]').innerHTML().catch(() => '');
 assert.match(await stageText(), /玄関/);
 assert.match(await stageText(), /トイレ/);
+// 置き場は1行に1つ（左に番号・部品・名前）。番号どうしは重ならない（ユーザーの指示「個別で動くようにする」2026-11-11）
+{
+  const nos = await page.locator('[data-stage] [data-stage-row]').evaluateAll((els) => els.map((e) => [e.textContent, e.getBoundingClientRect().top, e.getBoundingClientRect().bottom]));
+  assert.deepEqual(nos.map((n) => n[0]), ['①', '②']);
+  assert.ok(nos[0][2] <= nos[1][1] + 1, `置き場の番号が重なる ${JSON.stringify(nos)}`);
+}
 {
   const [g] = await stageRails();
   assert.ok(g && g[0] > 6 * M, `置き場は図の右 ${JSON.stringify(g)}`);
