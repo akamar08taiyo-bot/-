@@ -480,7 +480,7 @@ export type RenderOpts = {
   showDims: boolean;
   nums: Map<string, number>; // 番号（numberItems）
   pid?: string; // 柄の id の頭
-  numMin?: number; // 番号の字の小さいほうの大きさ（mm）。編集の画面で、引いて見ても番号が小さくなりすぎないように（画面の 28px ほど）
+  numMin?: number; // 番号の字の小さいほうの大きさ（mm）。編集の画面で、引いて見ても番号が小さくなりすぎないように（画面の 22px ほど）
 };
 
 /**

@@ -1,5 +1,5 @@
 // 平面図のタブ（📐 平面図。ユーザーの指示「平面図をつくれるような機能を追加する。まどりっちの機能やマイホームクラウドの機能もつけくわえる」2026-11-09）：
-//   部屋（マイホームクラウドと同じ一覧）を方眼にドラッグ → ドアを壁の近くで押すと壁に付く → トイレは壁ぎわ → 申請書の箇所の置き場の①玄関を動かして図に入れる → 一覧（右の枠）が
+//   部屋（マイホームクラウドと同じ一覧）を方眼にドラッグ → ドアを壁の近くで押すと壁に付く → トイレは壁ぎわ → 横棒を描いて申請書の箇所①玄関につなぐ → 一覧（右の枠）が
 //   申請書の改修の内容と同じ → 選んで動かす・Delete・Ctrl+Z → 2階 → 読み直しても残る（#…&view=madori）→ 見取図を印刷（A4。縦が基本・1階と2階を1枚に・題名と日付なし）→ Excel（1シート・画像）
 //   → 申請書の平面図に入れる → スマホの幅で横にはみ出さない。お客様は架空のサンプル
 // usage: node e2e-madori.mjs <サイトのURL> <出力フォルダ>
@@ -128,31 +128,20 @@ assert.ok(door && (Number(door[1]) - 390) % 227.5 === 0, `ドアの開口の端�
 assert.match(svgNow, /translate\(2985 30\)/); // 便器は上の壁の面（y=30）にぴったり・押した所（3.5マス＝3185）がまん中
 log('ドアは壁に・便器は壁ぎわ OK');
 
-// ---------------- 申請書の箇所：方眼の右の置き場に ①玄関・②トイレ の横棒が用意してある。動かすだけで図に入る → 一覧は申請書の改修の内容
-// （ユーザーの指示「申請書を事前に入力していた場合は、事前に空きスペースに用意する…移動するだけで平面図が作成できる」「改修ボタンは不要」2026-11-10）
+// ---------------- 申請書の箇所：前もって部品を並べる「置き場」は出さない（ユーザーの指示「事前に線や番号をおいておくのはなしで」2026-11-11）。
+// 横棒を描いて、右の欄の「申請書の箇所」で ①玄関 につなぐ → 番号は写真番号・一覧は申請書の改修の内容
 assert.equal(await page.getByRole('tab', {name: '改修', exact: true}).count(), 0);
-const stageRails = () =>
-  page.locator('[data-stage] path[stroke="#e01b24"]').evaluateAll((els) =>
-    els.map((e) => {
-      const m = /M([\d.-]+) ([\d.-]+)l([\d.-]+) ([\d.-]+)/.exec(e.getAttribute('d') ?? '');
-      return m ? m.slice(1).map(Number) : null;
-    }),
-  );
-const stageText = () => page.locator('[data-stage]').innerHTML().catch(() => '');
-assert.match(await stageText(), /玄関/);
-assert.match(await stageText(), /トイレ/);
-// 置き場は1行に1つ（左に番号・部品・名前）。番号どうしは重ならない（ユーザーの指示「個別で動くようにする」2026-11-11）
+assert.equal(await page.locator('[data-stage]').count(), 0);
+assert.ok(!(await art()).includes('#e01b24'), 'まだ手すりは描いていない');
+await tool('横棒');
+await drag([4.4 * M, 4.9 * M], [5.6 * M, 4.9 * M]);
 {
-  const nos = await page.locator('[data-stage] [data-stage-row]').evaluateAll((els) => els.map((e) => [e.textContent, e.getBoundingClientRect().top, e.getBoundingClientRect().bottom]));
-  assert.deepEqual(nos.map((n) => n[0]), ['①', '②']);
-  assert.ok(nos[0][2] <= nos[1][1] + 1, `置き場の番号が重なる ${JSON.stringify(nos)}`);
+  const link = page.getByRole('combobox', {name: '申請書の箇所'});
+  await link.waitFor();
+  assert.match((await link.locator('option').allInnerTexts()).join('|'), /①\s*玄関/);
+  await link.selectOption({index: 1}); // ①玄関
 }
-{
-  const [g] = await stageRails();
-  assert.ok(g && g[0] > 6 * M, `置き場は図の右 ${JSON.stringify(g)}`);
-  assert.ok(!(await art()).includes('stage-'), '置き場の部品はまだ図に入っていない');
-  await drag([g[0] + g[2] / 2, g[1]], [5 * M, 4.9 * M]);
-}
+await page.keyboard.press('Escape');
 await page.getByRole('button', {name: '丸（塗りつぶし）'}).click();
 await click(3.9 * M, 0.7 * M);
 await page.keyboard.press('Escape');
@@ -160,9 +149,8 @@ const rows = await legend();
 assert.equal(rows.length, 2);
 assert.match(rows[0], /^①　玄関　手すりの取り付け/);
 assert.equal(rows[1], '②　縦手すり　L＝800mm');
-// 置き場：①は図に入ったので消え、②（トイレ）は図に同じ番号（縦手すり②）があるので出さない
 assert.equal(await page.locator('[data-stage]').count(), 0);
-log('置き場の①玄関を動かして図に入れる・縦手すり②・一覧 OK');
+log('置き場は出さない・横棒を描いて申請書の箇所①玄関につなぐ・縦手すり②・一覧 OK');
 
 // ---------------- 選んで動かす・Delete・Ctrl+Z
 await click(1.5 * M, 2 * M); // 和室を選ぶ

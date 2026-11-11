@@ -23,13 +23,13 @@ import {MadoriPrint} from './MadoriPrint.tsx';
 import {bounds, circled, emptyMadori, NUM_SIZE, hasMadori, joLabel, legendLines, legendText, lineLength, mid, MODULES, numberItems, railPts, railSegs, roomAreaOf, snapStep, withFloor} from './model.ts';
 import type {Madori, MFloor, MItem, Module} from './model.ts';
 import {floorSvg, patternDefs, thumbSvg, viewOf} from './render.ts';
-import {stagedItems, stageHit} from './stage.ts';
 import {linkPlan, placeLookup, planLinked} from './sheet.ts';
 
 type Cat = 'room' | 'stair' | 'door' | 'fix' | 'furn' | 'draw';
 // 道具の種類（マイホームクラウドと同じく 部屋・階段・間口・住設・家具。ユーザーの指示 2026-11-10。前は 部屋・建具・窓・設備・階段）。
 // 「改修」（手すり・段差・申請書の箇所）は外した（ユーザーの指示「改修ボタンは不要。難しい」2026-11-10）。手すり・丸・横四角・番号は上の段、
-// 申請書の箇所は方眼の置き場に部品を用意する（stage.ts）
+// 申請書の箇所は、描いた手すり・番号を選んで右の欄の「申請書の箇所」でつなぐ（前の「置き場」＝前もって部品を並べておく所は、
+// ユーザーの指示「事前に線や番号をおいておくのはなしで」2026-11-11 で外した）
 const CATS: [Cat, string][] = [
   ['room', '部屋'],
   ['stair', '階段'],
@@ -61,7 +61,7 @@ type View = {x: number; y: number; k: number}; // 左上（mm）と倍率（1mm 
 type SP = {x: number; y: number; t: number};
 type Drag =
   | {mode: 'create'; a: P; sx: number; sy: number; path: P[]; sp: SP[]} // path：なぞった道（手すりの一筆の L 字・曲げた棒）
-  | {mode: 'move'; orig: MItem; a: P; sx: number; sy: number; before: Madori; moved: boolean; sp: SP[]; add?: boolean} // add＝置き場の部品を図に入れる（stage.ts）
+  | {mode: 'move'; orig: MItem; a: P; sx: number; sy: number; before: Madori; moved: boolean; sp: SP[]}
   | {mode: 'resize'; orig: MItem; h: Handle; before: Madori; vtx?: boolean} // vtx＝頂点の編集
   | {mode: 'pan'; sx: number; sy: number; v0: View; sp?: SP[]}
   | {mode: 'erase'; sp: SP[]; v0: View; all?: boolean} // ぐしゃぐしゃに書いて消している（v0＝書き始めたときの見え方。all＝「🗑 削除」を押してからなぞった＝部屋なども消す）
@@ -370,17 +370,11 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
   };
   // 開いたとき・階を替えたとき・画面の大きさが変わったとき（スマホを横にした・窓を広げた）は、描いてあるもの全体が見えるように
   useEffect(() => {
-    fitTo(items.length ? [...items, ...stageBox] : []); // 置き場も見えるように（白紙のときは方眼の初めの見え方。置き場はその右のほう）
+    fitTo(items); // 白紙のときは方眼の初めの見え方
   }, [floor.id, size.w, size.h]); // eslint-disable-line react-hooks/exhaustive-deps
   const v = view ?? {x: 0, y: 0, k: 0.08};
-  const numMin = Math.round(28 / v.k); // 画面で番号を 28px より小さくしない（携帯で図全体を見たとき）
-  // 申請書の箇所から用意した部品の置き場（まだ図にない箇所だけ。データには入れず、つかんで方眼に動かすと図に入る。stage.ts）。
-  // 行の高さ・字は画面の番号の大きさに合わせる（番号が重ならず、1つずつつかめるように）
-  const stageNs = Math.max(NUM_SIZE, numMin);
-  // 何も描いていない階は、初めの見え方（方眼の -1〜13マス。fitTo）の右の端までに置く
-  const stage = useMemo(() => stagedItems(m.floors, floor, job.places, look.list, look.no, m.module, stageNs, m.module * 12.6), [m.floors, floor, job.places, look, m.module, stageNs]);
-  // 置き場の枠（見え方を合わせるときに入れる。部品と同じ形にして viewOf に渡す）
-  const stageBox: MItem[] = stage.box ? [{id: '__stage', kind: 'room', ...stage.box}] : [];
+  // 画面で番号を 22px より小さくしない（携帯で図全体を見たとき。2026-11-11 に 28px →「番号はもう少し小さくする」で 22px）
+  const numMin = Math.round(22 / v.k);
   const zoomAt = (factor: number, cx = size.w / 2, cy = size.h / 2) =>
     setView((cur) => {
       const c = cur ?? v;
@@ -539,13 +533,6 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       setEraseIds(eraseHits(items, [p], 12 / v.k));
       return;
     }
-    // 置き場の部品（申請書の箇所）をつかむ：どの道具のときも、動かすと図に入る（ユーザーの指示「移動するだけで平面図が作成できる」2026-11-10）
-    const ghost = poly ? null : stageHit(stage, p); // 行のどこを押しても、その行の部品だけ（2026-11-11）
-    if (ghost) {
-      const real: MItem = {...ghost, id: mid()};
-      drag.current = {mode: 'move', orig: real, a: p, sx: e.clientX, sy: e.clientY, before: base, moved: false, sp, add: true};
-      return;
-    }
     // 番号を置いているときに、置いた番号（すぐ前に置いた所をもう一度押した・ダブルタップ）を押すと確定（ユーザーの指示「番号の部分を2回押しても、確定と認識する」2026-11-10）
     if (tool.t === 'num' && items.some((it) => it.kind === 'num' && Math.hypot(it.x - p.x, it.y - p.y) <= Math.max((it.size ?? NUM_SIZE) * 0.55, 14 / v.k))) {
       endTool();
@@ -646,7 +633,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) return;
       d.moved = true;
       const next = moved(d.orig, {x: p.x - d.a.x, y: p.y - d.a.y}, items, step);
-      setDraft(withFloor(d.before, floor.id, (list) => (d.add ? [...list, next] : list.map((it) => (it.id === d.orig.id ? next : it)))));
+      setDraft(withFloor(d.before, floor.id, (list) => list.map((it) => (it.id === d.orig.id ? next : it))));
     } else if (d.mode === 'resize') {
       const next = resized(d.orig, d.h, p, step, d.vtx);
       setDraft(withFloor(d.before, floor.id, (list) => list.map((it) => (it.id === d.orig.id ? next : it))));
@@ -717,7 +704,6 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     } else if ((d.mode === 'move' || d.mode === 'resize' || d.mode === 'under') && draft) {
       save(draft, d.before);
       setDraft(null);
-      if (d.mode === 'move' && d.add) setSel(d.orig.id);
     }
   };
 
@@ -866,11 +852,6 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
   const shown = preview && drag.current?.mode !== 'move' ? [...items, preview] : items;
   // 番号は、引いて見ても画面の 24px ほどより小さくしない（ユーザーの指示「番号があまりにも小さすぎる」2026-11-11。印刷・Excel は NUM_SIZE のまま）
   const art = useMemo(() => floorSvg(shown, {module: m.module, showArea: m.showArea, showDims: m.showDims, nums, pid: 'ed', numMin}), [shown, m.module, m.showArea, m.showDims, nums, numMin]);
-  const stageArt = useMemo(
-    // 部品だけ（番号は置き場の左の列に。stage.rows の num）
-    () => floorSvg(stage.items, {module: m.module, showArea: false, showDims: false, nums: new Map(), pid: 'eds'}),
-    [stage, m.module],
-  );
   const lowerArt = useMemo(() => (lower ? floorSvg(lower.items, {module: m.module, showArea: false, showDims: false, nums: new Map(), pid: 'ed'}) : ''), [lower, m.module]);
   const vw = size.w / v.k;
   const vh = size.h / v.k;
@@ -1840,7 +1821,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           <Btn color="white" small onClick={() => zoomAt(1.25)} aria-label="拡大">
             ＋
           </Btn>
-          <Btn color="white" small onClick={() => fitTo([...items, ...stageBox])}>
+          <Btn color="white" small onClick={() => fitTo(items)}>
             全体
           </Btn>
           </div>
@@ -1896,29 +1877,6 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
             )}
             {lowerArt && <g opacity={0.15} dangerouslySetInnerHTML={{__html: lowerArt}} />}
             <g dangerouslySetInnerHTML={{__html: art}} />
-            {stage.box && (
-              <g data-stage aria-label="申請書の箇所の部品の置き場">
-                <rect x={stage.box.x} y={stage.box.y} width={stage.box.w} height={stage.box.h} rx={8 / v.k} fill="#f8fafc" fillOpacity={0.9} stroke="#94a3b8" strokeWidth={1.5 / v.k} strokeDasharray={`${6 / v.k} ${4 / v.k}`} />
-                <text x={stage.box.x + stage.font * 0.6} y={stage.box.y + stage.font * 1.4} fontSize={stage.font} fill="#475569">
-                  申請書の箇所（動かして置く）
-                </text>
-                {/* 1行ずつ（番号・部品・名前）。行の区切りの細い線 */}
-                {stage.rows.slice(1).map((r) => (
-                  <line key={`sep-${r.item.id}`} x1={r.rect.x + stage.font * 0.4} x2={r.rect.x + r.rect.w - stage.font * 0.4} y1={r.rect.y} y2={r.rect.y} stroke="#cbd5e1" strokeWidth={1 / v.k} />
-                ))}
-                <g dangerouslySetInnerHTML={{__html: stageArt}} />
-                {stage.rows.map((r) => (
-                  <text key={`no-${r.item.id}`} x={r.num.x} y={r.num.y + stage.ns * 0.36} fontSize={stage.ns} textAnchor="middle" fill="#dc2626" data-stage-row={r.photo}>
-                    {circled(r.photo)}
-                  </text>
-                ))}
-                {stage.labels.map((l) => (
-                  <text key={`${l.x},${l.y}`} x={l.x} y={l.y} fontSize={stage.font} fill="#334155">
-                    {l.text}
-                  </text>
-                ))}
-              </g>
-            )}
             {poly && (
               <g pointerEvents="none" data-poly-draft>
                 <polyline
