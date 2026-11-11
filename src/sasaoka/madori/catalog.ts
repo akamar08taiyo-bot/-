@@ -39,7 +39,7 @@ export type RoomType = {name: string; finish: Finish; size: [number, number]; to
 /**
  * 部屋の種類（size は方眼の何マス×何マス。0.5 は半マス）。row は一覧の段（ユーザーの指示「和室、洋室、仏間、寝室、床の間、広縁／
  * 廊下、リビング、キッチン、ダイニングキッチン、リビングダイニングキッチン／トイレ、浴室、洗面脱衣室、洗面所、脱衣室／
- * ポーチ、玄関、土間、ベランダ、駐車場、テラス の順番に並べる」2026-11-10）。一覧になかった応接間・収納は1段目、リビングダイニング・ダイニングは
+ * ポーチ、玄関、土間、ベランダ、駐車場、テラス の順番に並べる」2026-11-10。そのうしろに道路＝「箇所の中に道路もいれる」2026-11-11）。一覧になかった応接間・収納は1段目、リビングダイニング・ダイニングは
  * 2段目の終わりに残した（「応接間をいれる」「LDもつくる」と言われたもの）。前の LDK・LD・D・K・L は名前を言葉にした（前に描いた部屋は hidden の種類でそのまま出る）。
  * hidden は一覧に出さない前の種類（前に描いた部屋の色・柄はそのまま）
  */
@@ -70,6 +70,7 @@ export const ROOM_TYPES: RoomType[] = [
   {name: 'ベランダ', finish: 'outside', size: [4, 1], tone: TONE.out, row: 4},
   {name: '駐車場', finish: 'doma', size: [3, 6], tone: TONE.out, row: 4},
   {name: 'テラス', finish: 'tile', size: [3, 1], tone: TONE.out, row: 4},
+  {name: '道路', finish: 'doma', size: [8, 4], tone: TONE.out, row: 4}, // ユーザーの指示「箇所の中に道路もいれる」2026-11-11（玄関～道路の手すり・スロープの位置を描くため。幅4マス＝約3.6m）
   // 一覧に出さない前の種類（2026-11-10 の朝の一覧の LDK・LD・D・K・L。前に描いた部屋のため）
   {name: 'LDK', finish: 'floor', size: [4, 4], tone: TONE.live, hidden: true},
   {name: 'LD', finish: 'floor', size: [4, 3], tone: TONE.live, hidden: true},

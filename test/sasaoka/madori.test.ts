@@ -163,6 +163,9 @@ test('動かす・大きさ・回す・写す', () => {
 test('床面積：屋外・バルコニーと、ほかの部屋の中に描いた部屋は数えない', () => {
   const items = [room('a', 0, 0, 4 * M, 4 * M), room('in', 0, 0, M, M, '収納'), room('b', 4 * M, 0, 4 * M, M, 'バルコニー'), room('c', 0, 4 * M, M, M, 'トイレ')];
   assert.equal(floorArea(items), Math.round(((16 + 1) * M * M) / 1e4) / 100);
+  // 道路・駐車場・ベランダも外（2026-11-11。道路を一覧に足したとき）
+  const out = ['道路', '駐車場', 'ベランダ'].map((t, i) => room(`o${i}`, 10 * M, i * 5 * M, 8 * M, 4 * M, t));
+  assert.equal(floorArea([...items, ...out]), floorArea(items));
 });
 
 test('絵：床の柄・壁・名前と広さ・手すりの赤い線と番号。名前の字はエスケープする', () => {

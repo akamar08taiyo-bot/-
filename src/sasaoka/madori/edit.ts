@@ -695,7 +695,8 @@ export function copied(it: MItem, step: number): MItem {
 
 /** 延べ床の広さ（屋外・吹抜・バルコニー・テラス・ポーチ・車庫を除いた部屋の合計 ㎡）。ほかの部屋の中に描いた部屋（洋室の中の収納など）は二重に数えない */
 export function floorArea(items: MItem[]): number {
-  const skip = new Set(['屋外', '吹抜', 'バルコニー', 'テラス', 'ポーチ', '車庫']);
+  // 床面積に入れない外の所（道路・駐車場・ベランダも。2026-11-11）
+  const skip = new Set(['屋外', '吹抜', 'バルコニー', 'ベランダ', 'テラス', 'ポーチ', '車庫', '駐車場', '道路']);
   const rooms = items.filter((it) => it.kind === 'room' && !skip.has(it.type ?? ''));
   // 中に入っている部屋（大きい部屋の中に描いた収納など）は数えない
   const inside = (a: MItem, b: MItem) => a !== b && a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h;
