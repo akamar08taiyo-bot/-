@@ -5,6 +5,8 @@
 // なければお客様の区の近くの営業所。田川は広域連合の田川市と田川郡（田川・桂川支部）。ほかの保険者（行橋市・苅田町・みやこ町・広域連合のほかの市町村）は設定のまま。
 // 見積書・請求書の発行元は設定のまま（申請書だけ）。住宅改修（src/sasaoka/shinseiOffice.ts）と特定福祉用具（src/tokutei/shinseiOffice.ts）は同じ決まり
 import {DEMO} from './demo/flag.ts';
+import {BUILDER_OFFICES, OFFICES} from './company.ts';
+import type {BuilderOffice} from './types.ts';
 
 /** 保険者ごとの営業所（いくつかあるときは、区が分からないときの初めの営業所を先頭に） */
 const GROUPS: Record<string, string[]> = {
@@ -55,4 +57,34 @@ export function shinseiOfficeGroup(insurer: string, area: string): string[] {
   if (DEMO) return [];
   if (insurer === 'kouiki') return TAGAWA.includes(area) ? ['田川営業所'] : [];
   return GROUPS[insurer] ?? [];
+}
+
+/**
+ * 申請書の施工業者に選べる営業所の名前（申請書の画面の「施工業者」の一覧）：いつもの営業所（company.ts の BUILDER_OFFICES＝行橋・小倉南・小倉・
+ * 八幡東・八幡西。ユーザーの言った順）、保険者・区から決まる営業所（auto。大分営業所など一覧にないとき）、申請書の画面で足した営業所（設定の builders）の順。同じ名前は1つ
+ */
+export function builderChoices(auto: string, added: readonly BuilderOffice[] = []): string[] {
+  return [...new Set([...BUILDER_OFFICES, auto, ...added.map((b) => b.name)].map((n) => n.trim()).filter(Boolean))];
+}
+
+/** 施工業者の営業所（足した営業所を先に。同じ名前の会社の営業所より、自分で入れた住所・番号を使う）。どちらにもなければ undefined */
+export function builderOffice(name: string, added: readonly BuilderOffice[] = []): (BuilderOffice & {juryoNo?: string}) | undefined {
+  const n = name.trim();
+  if (!n) return undefined;
+  return added.find((b) => b.name === n) ?? OFFICES.find((o) => o.name === n);
+}
+
+/** 施工業者の欄に書く会社・営業所の値（設定の一部） */
+type BuilderLike = {company?: string; officeName?: string; manager?: string; postal?: string; address?: string; tel?: string; builders?: BuilderOffice[]};
+
+/**
+ * 施工業者の営業所を設定に重ねる（会社名は足した営業所に入れてあるときだけ）。設定の営業所と同じ名前・一覧にない名前は設定のまま
+ * （設定の営業所なら、設定の画面で直した所長・住所を使う）
+ */
+export function withBuilder<T extends BuilderLike>(s: T, name: string): T {
+  const n = name.trim();
+  if (!n || n === (s.officeName ?? '').trim()) return s;
+  const o = builderOffice(n, s.builders);
+  if (!o) return s;
+  return {...s, ...('company' in o && o.company ? {company: o.company} : {}), officeName: o.name, manager: o.manager, postal: o.postal, address: o.address, tel: o.tel};
 }

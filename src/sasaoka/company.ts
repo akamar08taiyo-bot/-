@@ -80,5 +80,12 @@ export const OFFICES: Office[] = [
   {name: '大分営業所', postal: '870-0953', address: '大分県大分市下郡東1-4-35', tel: '097-504-8001', fax: '097-504-8002', manager: '山下 厚', jigyoshoNo: '4470105265'},
 ];
 
+/**
+ * 申請書の施工業者に選べる営業所（申請書の画面の「施工業者」の一覧。事業所番号は OFFICES の jigyoshoNo）。
+ * ユーザーの指示「施工業者名は、太陽シルバーサービス株　行橋、小倉南、小倉、八幡東、八幡西にする。それぞれリストから選択、追加もできる。
+ * 事業者番号もわかっていると思うので入力」2026-11-11。保険者・区から決まる営業所（大分営業所など）も一覧に足す（shinseiOffice.ts の builderChoices）
+ */
+export const BUILDER_OFFICES = ['行橋営業所', '小倉南営業所', '小倉営業所', '八幡東営業所', '八幡西営業所'];
+
 /** 役所の原本（苅田町・行橋市・みやこ町）にそのまま書いてある行橋営業所の字（申請書の営業所の字に書きかえる。shinsei.ts の officeCells） */
 export const ORIGINAL_OFFICE_TEXTS: {name: string; address: string; tel: string; manager: string} = {name: '行橋営業所', address: '行橋市大字流末1327番地', tel: '0930-26-9640', manager: '久保　匠史'};

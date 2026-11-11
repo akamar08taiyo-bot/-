@@ -19,11 +19,12 @@ import {usePhotoUrls} from '../photos.ts';
 import {turn} from '../photoEdit.ts';
 import {AREA_LABEL, INSURER_AREAS, insurerNoOf} from '../insurerNumbers.ts';
 import {photoBounds} from '../photoMarks.ts';
-import {autoLength, costIsTotal, lengthsShown, estimatePlateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, planPlacement, SHINSEI, shinseiCost, shinseiFileName, shinseiWorks} from '../shinsei.ts';
+import {autoLength, costIsTotal, lengthsShown, estimatePlateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, planPlacement, SHINSEI, shinseiAutoOffice, shinseiCost, shinseiFileName, shinseiWorks} from '../shinsei.ts';
 import {riyuOf, shinseiBookValues} from '../riyu.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
-import type {AppData, Insurer, Job, Material, PhotoEdit, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
+import type {AppData, BuilderOffice, Insurer, Job, Material, PhotoEdit, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
+import {builderChoices, builderOffice} from '../shinseiOffice.ts';
 import type {Update} from '../useStore.ts';
 import {yen} from '../util.ts';
 import {zipCandidates} from '../zip.ts';
@@ -48,24 +49,26 @@ import {telWithHyphens} from '../tel.ts';
  *  ただし被保険者氏名はどの保険者もフリガナのすぐ下（ユーザーの指示「ふりがなの下に、名前をもってくる」、2026-10-21。苅田町・みやこ町は原本では番号が先）。
  *  保険者番号（区・市町村）は一覧ではなく、上の保険者のすぐ右で選ぶ（InsurerAreaPick） */
 const FIELDS: Record<Insurer, Field[]> = {
-  kanda: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'dates', 'cost'],
-  yukuhashi: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'dates', 'cost'],
-  miyako: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'cost', 'renovated', 'dates'],
-  kouiki: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'cost', 'renovated', 'dates'], // 郵便番号はユーザーの指示で足した（2026-10-21）
+  kanda: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'dates', 'cost', 'builder'],
+  yukuhashi: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'dates', 'cost', 'builder'],
+  miyako: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'cost', 'renovated', 'dates', 'builder'],
+  kouiki: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'cost', 'renovated', 'dates', 'builder'], // 郵便番号はユーザーの指示で足した（2026-10-21）
   // 福岡市：性別・郵便番号・要介護状態区分の欄はない。着工日・完成日は完了届出書（工事のあと）
-  fukuoka: ['kana', 'name', 'insuredNo', 'birth', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'cost', 'dates'],
+  fukuoka: ['kana', 'name', 'insuredNo', 'birth', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'cost', 'dates', 'builder'],
   // 北九州市：生年月日・性別・要介護状態区分の欄はない。フリガナ・着工日・完成日は支給申請書（工事のあと）。工事費見積金額は介護保険の対象分（市の記入例）
-  kitakyushu: ['kana', 'name', 'insuredNo', 'zip', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'cost', 'dates'],
+  kitakyushu: ['kana', 'name', 'insuredNo', 'zip', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'builder', 'cost', 'dates'],
   // 久留米市（2026-11-02）：性別・要介護状態区分の欄はない。介護支援専門員等＝理由書作成者（「同左」）。着工（予定）日・完成（予定）日は両方の申請書。負担割合の□も申請書にある
-  kurume: ['kana', 'name', 'insuredNo', 'birth', 'zip', 'address', 'phone', 'owner', 'reason', 'photoDates', 'works', 'dates', 'cost', 'burden'],
+  kurume: ['kana', 'name', 'insuredNo', 'birth', 'zip', 'address', 'phone', 'owner', 'reason', 'photoDates', 'works', 'dates', 'cost', 'burden', 'builder'],
   // 飯塚市（2026-11-02）：事前承認願書の上からの順。住宅改修の利用（無・有）・今回の改修費用・理由書作成者・着工予定日・完成予定日。負担割合は請求書の保険給付分・本人負担分
-  iizuka: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'owner', 'photoDates', 'works', 'renovated', 'cost', 'reason', 'dates', 'burden'],
+  iizuka: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'owner', 'photoDates', 'works', 'renovated', 'cost', 'reason', 'dates', 'burden', 'builder'],
   // 大分市（2026-11-04）：支給申請兼施工承認申請書の上からの順（郵便番号・性別の欄はない）。要支援・要介護の（　）・認定有効期間、改修の内容の行の着工予定・完成予定、
   // 改修費用見積額、居宅介護支援事業所（理由書作成者と連絡先）。過去の住宅改修費支給申請の有無は理由書（表）
-  oita: ['kana', 'name', 'insuredNo', 'birth', 'care', 'burden', 'careTerm', 'address', 'phone', 'owner', 'photoDates', 'works', 'dates', 'cost', 'reason', 'renovated'],
+  oita: ['kana', 'name', 'insuredNo', 'birth', 'care', 'burden', 'careTerm', 'address', 'phone', 'owner', 'photoDates', 'works', 'dates', 'cost', 'reason', 'renovated', 'builder'],
 };
 // 負担割合は要介護状態区分のすぐ下（みやこ町・広域連合は電話番号の下）。申請書の原本に欄はないが、委任状の保険給付額・見積書の介護保険の内訳に使い、
 // 特定福祉用具の負担割合と同じ値（どちらで選んでも両方に入る。tokuteiLink.ts）。ユーザーの指示「住宅改修の申請書にも負担割合を設置。住宅改修⇔特定福祉用具などで連動して数字に繋げる」2026-10-28
+// 施工業者（施工者・受任者・事業者の欄に書く営業所と事業者番号）は一番下（北九州市は事前届出書の施工予定業者の位置＝改修の内容のすぐ下）。
+// ユーザーの指示「施工業者名は、太陽シルバーサービス株　行橋、小倉南、小倉、八幡東、八幡西にする。それぞれリストから選択、追加もできる。事業者番号もわかっていると思うので入力」2026-11-11
 // 改修前日付・改修後日付（写真の日付）は、改修の内容のすぐ上（ユーザーの指示「この部分に改修前日付・改修後日付を入力欄となるようにする」2026-10-22）
 
 /** みやこ町・広域連合：改修の内容は内訳明細書（別紙）、着工日・完成日は支給申請書（工事のあと）に書く */
@@ -98,6 +101,7 @@ function label(f: Field, i: Insurer): string {
     renovated: '現在までの改修状況',
     photoDates: '改修前日付・改修後日付',
     careTerm: '認定有効期間',
+    builder: '施工業者',
   }[f as string] ?? '理由書のタブで入れます'; // 理由書だけの欄（大分市の理由書（表））
 }
 
@@ -181,6 +185,7 @@ export function ShinseiEditor({
     careTerm: !info.careFrom || !info.careTo,
     dates: false,
     photoDates: false, // 改修前は当日、改修後は空でよい
+    builder: false, // 選んでいなければ保険者・区から決まる営業所
   };
   const fields = insurer ? FIELDS[insurer] : [];
 
@@ -440,6 +445,8 @@ export function ShinseiEditor({
         );
       case 'works':
         return <WorksEditor job={job} setJob={setJob} s={s} insurer={i} materials={data.materials} />;
+      case 'builder':
+        return <BuilderPick job={job} info={info} setInfo={setInfo} s={s} update={update} />;
       case 'cost':
         return (
           <>
@@ -898,6 +905,117 @@ function InsurerAreaPick({insurer, address, picked, onPick, selectRef}: {insurer
         ))}
       </select>
     </label>
+  );
+}
+
+const NO_BUILDER: BuilderOffice = {name: '', company: '', jigyoshoNo: '', postal: '', address: '', tel: '', manager: ''};
+
+/**
+ * 施工業者：申請書の施工者・受任者・事業者の欄に書く営業所（会社名・営業所・所在地・電話・所長）と事業者番号（介護保険の事業所番号）。
+ * 一覧（行橋・小倉南・小倉・八幡東・八幡西と、保険者・区から決まる営業所）から選ぶ。「＋ 追加」でほかの営業所を足す（設定の builders に残る。
+ * 足した営業所は「一覧から外す」で外せる）。選んでいなければ保険者・区から決まる営業所（shinseiOffice.ts）。
+ * ユーザーの指示「施工業者名は、太陽シルバーサービス株　行橋、小倉南、小倉、八幡東、八幡西にする。それぞれリストから選択、追加もできる。
+ * 事業者番号もわかっていると思うので入力」2026-11-11。プレビューの施工業者・事業者番号の欄を押すとここへ（data-field="builder"）
+ */
+function BuilderPick({job, info, setInfo, s, update}: {job: Job; info: ShinseiInfo; setInfo: (patch: Partial<ShinseiInfo>) => void; s: Settings; update: Update}) {
+  const added = s.builders ?? [];
+  const current = s.officeName.trim();
+  const auto = shinseiAutoOffice(job, current) || current;
+  const cur = (info.builderOffice ?? '').trim() || auto;
+  const base = builderChoices(auto, added);
+  const allChoices = base.includes(cur) ? base : [...base, cur]; // 選んでいる営業所は、一覧から外したあとも出す
+  const office = builderOffice(cur, added);
+  const company = (office && 'company' in office && office.company) || s.company;
+  const [draft, setDraft] = useState<BuilderOffice | null>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (draft && !draft.name) nameRef.current?.focus();
+  }, [draft]);
+  const isAdded = added.some((b) => b.name === cur);
+  const save = () => {
+    if (!draft) return;
+    const name = draft.name.trim();
+    if (!name) return nameRef.current?.focus();
+    const b: BuilderOffice = {
+      name,
+      ...(draft.company?.trim() && draft.company.trim() !== s.company.trim() ? {company: draft.company.trim()} : {}),
+      jigyoshoNo: draft.jigyoshoNo.normalize('NFKC').replace(/\D/g, ''),
+      postal: draft.postal.trim(),
+      address: draft.address.trim(),
+      tel: telWithHyphens(draft.tel.trim()),
+      manager: draft.manager.trim(),
+    };
+    update('settings', (prev) => ({...prev, builders: [...(prev.builders ?? []).filter((x) => x.name !== name), b]}));
+    setInfo({builderOffice: name});
+    setDraft(null);
+  };
+  const field = (key: keyof BuilderOffice, label: string, cls: string, extra: Record<string, unknown> = {}) => (
+    <label className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-slate-600">
+      {label}
+      <TextInput value={draft?.[key] ?? ''} onChange={(v) => setDraft((d) => (d ? {...d, [key]: v} : d))} className={cls} aria-label={`足す施工業者の${label}`} {...extra} />
+    </label>
+  );
+  return (
+    <>
+      <span className="text-sm text-slate-700">{company}</span>
+      {allChoices.length > 0 ? (
+        <select
+          value={cur}
+          onChange={(e) => setInfo({builderOffice: e.target.value})}
+          className="h-9 min-w-[9rem] rounded-md border border-slate-300 px-2 text-sm text-slate-800"
+          aria-label="施工業者"
+          data-nav
+        >
+          {allChoices.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <span className="text-sm text-slate-400">（営業所なし）</span> // 設定に営業所がなく、足してもいないとき（デモの初め）
+      )}
+      <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-slate-600" data-builder-no>
+        事業者番号
+        <span className={`font-mono text-sm ${office?.jigyoshoNo ? 'text-slate-800' : 'text-slate-400'}`}>{office?.jigyoshoNo || '（なし）'}</span>
+      </span>
+      <Btn small color="white" onClick={() => setDraft(draft ? null : {...NO_BUILDER, company: s.company})}>
+        ＋ 追加
+      </Btn>
+      {isAdded && (
+        <Btn
+          small
+          color="white"
+          onClick={() => {
+            if (!confirm(`「${cur}」を施工業者の一覧から外しますか？`)) return;
+            update('settings', (prev) => ({...prev, builders: (prev.builders ?? []).filter((x) => x.name !== cur)}));
+            setInfo({builderOffice: ''});
+          }}
+        >
+          一覧から外す
+        </Btn>
+      )}
+      {draft && (
+        <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border border-dashed border-slate-300 bg-slate-50 p-2" data-builder-add>
+          <label className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-slate-600">
+            営業所名
+            <TextInput ref={nameRef} value={draft.name} onChange={(name) => setDraft({...draft, name})} className="w-40" placeholder="○○営業所" aria-label="足す施工業者の営業所名" />
+          </label>
+          {field('jigyoshoNo', '事業者番号', 'w-40 font-mono', {inputMode: 'numeric', placeholder: '10けた'})}
+          {field('company', '会社名', 'w-56')}
+          {field('postal', '郵便番号', 'w-24', {placeholder: '800-0000'})}
+          {field('address', '所在地', 'w-72')}
+          {field('tel', '電話番号', 'w-36', {type: 'tel'})}
+          {field('manager', '所長', 'w-32')}
+          <Btn small color="softBlue" onClick={save}>
+            追加する
+          </Btn>
+          <Btn small color="white" onClick={() => setDraft(null)}>
+            やめる
+          </Btn>
+        </div>
+      )}
+    </>
   );
 }
 

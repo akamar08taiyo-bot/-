@@ -40,5 +40,8 @@ export type Office = {name: string; postal: string; address: string; tel: string
 /** 営業所の一覧（デモには入れない。設定で営業所名・住所などを打つ） */
 export const OFFICES: Office[] = [];
 
+/** 申請書の施工業者に初めから選べる営業所（デモには入れない。申請書の画面の「＋ 追加」で足す） */
+export const BUILDER_OFFICES: string[] = [];
+
 /** 役所の原本に書いてあった営業所の字（デモのビルドでは原本の字も空白にしてあるので、書きかえない） */
 export const ORIGINAL_OFFICE_TEXTS: {name: string; address: string; tel: string; manager: string} = {name: '', address: '', tel: '', manager: ''};

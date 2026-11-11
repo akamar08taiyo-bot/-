@@ -277,7 +277,13 @@ export type ShinseiInfo = ShinseiMarks & {
   insurerNo: string; // 保険者番号（6けた）
   burden: '' | '1' | '2' | '3'; // 利用者負担の割合（介護保険負担割合証。特定福祉用具に渡す）
   welfare?: boolean; // 生活保護（負担割合の横の「生活保護」のチェック。特定福祉用具に渡す。生活保護でなければ持たない）
+  // 申請書の施工業者（営業所の名前。company.ts の BUILDER_OFFICES・OFFICES か、設定の builders）。選んでいなければ持たない＝保険者と区から決まる営業所
+  // （shinseiOffice.ts。ユーザーの指示「施工業者名は、太陽シルバーサービス株　行橋、小倉南、小倉、八幡東、八幡西にする。それぞれリストから選択、追加もできる」2026-11-11）
+  builderOffice?: string;
 };
+
+/** 申請書の施工業者に足した営業所（申請書の画面の「＋ 追加」。設定に残る）。会社名は設定の会社とちがうときだけ */
+export type BuilderOffice = {name: string; company?: string; jigyoshoNo: string; postal: string; address: string; tel: string; manager: string};
 
 /** 理由書の「活動」（P2 の4つの段）。① 改善をしようとしている生活動作・② 困難な状況・③ 改修目的と改修の方針 */
 export type RiyuAct = {
@@ -357,6 +363,7 @@ export type Settings = {
   // ユーザーの答え「登録番号を設定で入れる（初めは空）」2026-11-03（事業者番号 4072601802 は10けたで、記入例の8けたと形が違う）。
   // この項目を入れる前の設定・テストの設定にはないので省略可
   entrustRegNo?: string;
+  builders?: BuilderOffice[]; // 申請書の施工業者に足した営業所（2026-11-11。この項目を入れる前の設定にはないので省略可）
   bank: string; // お振込先（1行）
   subject: string; // 請求書の件名（「○年○月分」のあとに付く）
   invoiceNote: string; // 請求書の備考

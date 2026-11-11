@@ -71,7 +71,7 @@ const pageNames = await preview.getByRole('group').evaluateAll((els) => els.map(
 assert.deepEqual(pageNames.slice(0, 3), ['事前承認申請書', '支給申請書', '平面図']);
 assert.ok(pageNames.slice(3).every((n) => /^住改・写真/.test(n)), pageNames.join(','));
 const rowLabels = async () => (await form.locator(':scope > div[data-field] > div:first-child').allInnerTexts()).map((t) => t.replace(/\s*（ひらがなで入力してもカタカナになります）$/, ''));
-assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '郵便番号', '住所', '電話番号', '住宅の所有者', '住宅改修が必要な理由書作成者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '着工日・完成日', '改修予定費用', '負担割合']);
+assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '郵便番号', '住所', '電話番号', '住宅の所有者', '住宅改修が必要な理由書作成者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '着工日・完成日', '改修予定費用', '負担割合', '施工業者']);
 const pv = await preview.innerText();
 for (const t of ['住宅改修事前承認申請書', '住宅改修費支給申請書', '見本町1-2-3', '太陽シルバーサービス', '（玄関１箇所']) assert.ok(pv.includes(t), `プレビューに「${t}」がない：${pv.slice(0, 1500)}`);
 await page.waitForTimeout(400);

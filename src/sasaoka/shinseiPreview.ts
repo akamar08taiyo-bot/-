@@ -29,6 +29,7 @@ export type ShinseiField =
   | 'dates'
   | 'photoDates'
   | 'burden'
+  | 'builder' // 施工業者（営業所。2026-11-11）
   | RiyuField;
 /** 理由書だけの項目（理由書の画面の一覧の項目。riyu.ts の RIYU_LINKS で欄と結ぶ） */
 export type RiyuField = 'careTerm' | 'housing' | 'checkDate' | 'madeDate' | 'qualification' | 'tel' | 'body' | 'careState' | 'wish' | 'equipment' | 'act:toilet' | 'act:bath' | 'act:out' | 'act:home';
@@ -208,12 +209,12 @@ const TEXT_FIELD: Record<keyof ShinseiTexts, ShinseiField> = {
   endY: 'dates',
   endM: 'dates',
   endD: 'dates',
-  // 改修施工者（受任者）は設定の会社・営業所（申請書の一覧には入れる所がない）。押すと改修の内容の欄へ
-  builder: 'works',
-  builderZip: 'works',
-  builderAddress: 'works',
-  builderTel: 'works',
-  builderRep: 'works',
+  // 改修施工者（受任者）は施工業者の営業所。押すと一覧の「施工業者」へ（前は入れる所がなく改修の内容の欄へ。2026-11-11）
+  builder: 'builder',
+  builderZip: 'builder',
+  builderAddress: 'builder',
+  builderTel: 'builder',
+  builderRep: 'builder',
   // 北九州市：「－」の前と後ろに分けた郵便番号・電話番号、写真の報告書の被保険者番号、支給予定金額（保険給付額）は負担割合へ
   zipA: 'zip',
   zipB: 'zip',
@@ -222,11 +223,12 @@ const TEXT_FIELD: Record<keyof ShinseiTexts, ShinseiField> = {
   telC: 'phone',
   telHead: 'phone',
   telTail: 'phone',
-  builderZipAddress: 'works',
-  builderTelA: 'works',
-  builderTelB: 'works',
-  builderTelC: 'works',
-  manager: 'works',
+  builderZipAddress: 'builder',
+  builderTelA: 'builder',
+  builderTelB: 'builder',
+  builderTelC: 'builder',
+  manager: 'builder',
+  bizNo: 'builder',
   insured: 'insuredNo',
   benefitYen: 'burden',
   // 久留米市：年齢は生年月日、住所の市のうしろは住所、負担割合の□は負担割合、「同左：■」は理由書作成者へ
@@ -247,7 +249,7 @@ const TEXT_FIELD: Record<keyof ShinseiTexts, ShinseiField> = {
   targetYen: 'cost',
   excludedYen: 'cost',
   reasonTel: 'reason',
-  builderShort: 'works',
+  builderShort: 'builder',
 };
 const MARK_FIELD: Record<keyof ShinseiMarks, ShinseiField> = {gender: 'gender', era: 'birth', care: 'care', renovated: 'renovated'};
 
@@ -264,15 +266,16 @@ function fieldRefs(sheet: ShinseiSheet): {field: ShinseiField; ref: string}[] {
   for (const ref of sheet.kindCells ?? []) out.push({field: 'works', ref});
   for (const t of sheet.texts ?? []) {
     const key = placeholders(t.format)[0];
-    // 改修施工者（受任者。福岡市・北九州市）は設定の会社・営業所・担当なので、押せる欄にしない
-    if (key && !key.startsWith('builder') && key !== 'manager') out.push({field: TEXT_FIELD[key], ref: t.cell});
+    // 改修施工者（受任者）・事業者番号は一覧の「施工業者」へ（2026-11-11）
+    if (key) out.push({field: TEXT_FIELD[key], ref: t.cell});
   }
+  for (const ref of sheet.providerNo ?? []) out.push({field: 'builder', ref}); // 事業所番号のマス
   // 北九州市の事前届出書の改修の種類と箇所の□：改修の内容へ。大分市の改修の内容の行の着工予定・完成予定は着工日・完成日へ（施工者は設定の会社なので押せない）
   for (const k of sheet.kindRows ?? []) {
     for (const ref of [k.kind, ...(k.places ?? []), k.other, k.detail]) if (ref) out.push({field: 'works', ref});
     for (const t of k.texts ?? []) {
       const key = placeholders(t.format)[0];
-      if (key && !key.startsWith('builder') && key !== 'manager') out.push({field: TEXT_FIELD[key], ref: t.cell});
+      if (key) out.push({field: TEXT_FIELD[key], ref: t.cell});
     }
   }
   for (const m of sheet.marks ?? []) if ('key' in m) out.push({field: MARK_FIELD[m.key], ref: m.cell});

@@ -14,9 +14,8 @@ import {HOUSING_LIMIT} from './uriage.ts';
 import {BASE_PLATE} from './cutLink.ts';
 import {circled, eraOf, formLines, INSURER_INFO, jobInsurer, KINDS, lineNote, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa, shinseiKindNames} from './estimateForms.ts';
 import {ORIGINAL_OFFICE_TEXTS} from './company.ts';
-import {OFFICES} from './defaults.ts';
 import {insurerAreaName, insurerNoOf} from './insurerNumbers.ts';
-import {shinseiOfficeName} from './shinseiOffice.ts';
+import {builderOffice, shinseiOfficeName, withBuilder} from './shinseiOffice.ts';
 import {readyLengths} from './railSlots.ts';
 import {clampOff, clampScale, normRot} from './photoEdit.ts';
 import {BOARD_PTS, frontOrder, lineEnds, MARK_INSET, photoBounds, shapeBox} from './photoMarks.ts';
@@ -171,6 +170,7 @@ export type ShinseiTexts = Record<
   | 'builderTelB'
   | 'builderTelC'
   | 'manager'
+  | 'bizNo' // 施工業者の事業者番号（北九州市の支給申請書の上の「事業者番号」の欄。1つの欄に10けた）
   | 'insured'
   | 'benefitYen'
   // 久留米市：年齢（生年月日のうしろの「（86歳）」。申請書を作る日の年齢）、住所の市の名前のうしろ（原本に「久留米市」と印刷してある欄）、
@@ -335,7 +335,8 @@ const FUKUOKA_PHOTO_SHEETS: ShinseiSheet[] = (['事前', '完了'] as const).fla
 );
 /**
  * 北九州市の事前届出書（1枚目＝提出用・2枚目＝通知用。同じ欄を両方に書く）。欄の番地は原本と一緒に作った kitakyushuCells.ts。
- * 郵便番号・電話番号は様式の「－」の前と後ろに分けて書く。着工予定日・届出日・前回までの給付実績・事業者番号は書かない
+ * 郵便番号・電話番号は様式の「－」の前と後ろに分けて書く。着工予定日・届出日・前回までの給付実績は書かない。
+ * 事業者番号の10マスは施工業者の営業所の介護保険の事業所番号（ユーザーの指示「事業者番号もわかっていると思うので入力」2026-11-11）
  */
 function kitakyushuTodoke(sheet: string, c: (typeof KK_CELLS)['todoke'] | (typeof KK_CELLS)['notice']): ShinseiSheet {
   return {
@@ -343,6 +344,7 @@ function kitakyushuTodoke(sheet: string, c: (typeof KK_CELLS)['todoke'] | (typeo
     name: c.name,
     address: c.address,
     insuredNo: [c.no0, c.no1, c.no2, c.no3, c.no4, c.no5, c.no6, c.no7, c.no8, c.no9],
+    providerNo: [c.biz0, c.biz1, c.biz2, c.biz3, c.biz4, c.biz5, c.biz6, c.biz7, c.biz8, c.biz9], // 施工予定業者の事業者番号
     checks: [c.mochiie],
     // 手すり取付・段差の解消・床材等の変更・引き戸等への扉の取替えは箇所の□の行あり。洋式便器等への取替えは種類の□だけ。付帯工事は具体的な工事内容
     kindRows: c.kinds.map((kind, i) => ({
@@ -746,6 +748,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
           T(KK_SHIKYU.builderRep2, '{builderRep}'),
           T(KK_SHIKYU.builderAddress, '{builderZipAddress}'),
           T(KK_SHIKYU.builderTel, '{builderTel}'),
+          T(KK_SHIKYU.biz, '{bizNo}'), // 上の「事業者番号」の欄（施工業者の営業所の事業所番号。2026-11-11）
         ],
       },
       // 平面図は一式に入れない（ユーザーの指示「住宅改修の要項をみて、もし平面図がいらない場合は、申請書一式の中から外す」2026-10-29）。
@@ -1462,7 +1465,7 @@ function proxyAmount(benefit: number): string {
 }
 
 /** 改修施工者（受任者。福岡市の申請書）に書く会社・営業所（住宅改修のアプリの設定。請求書の発行元と同じ） */
-export type BuilderSettings = Partial<Pick<Settings, 'company' | 'officeName' | 'manager' | 'postal' | 'address' | 'tel' | 'entrustRegNo'>>;
+export type BuilderSettings = Partial<Pick<Settings, 'company' | 'officeName' | 'manager' | 'postal' | 'address' | 'tel' | 'entrustRegNo' | 'builders'>>;
 
 /**
  * 番号を様式の「－」で分けた欄に分ける（北九州市の郵便番号「〒802－0001」・電話番号「093－000－0000」）：「-」で区切られていればその区切り、
@@ -1490,15 +1493,19 @@ function reiwaParts(iso: string): [string, string, string] {
  * こちらの該当営業所と所長にする」2026-11-05）。決まりのない保険者は設定のまま。見積書・請求書の発行元は変えない
  */
 export function shinseiSettings<T extends BuilderSettings>(job: Job, s: T): T {
+  const current = (s.officeName ?? '').trim();
+  // 申請書の画面で施工業者を選んでいれば、その営業所（ユーザーの指示「施工業者名は…行橋、小倉南、小倉、八幡東、八幡西にする。それぞれリストから選択、
+  // 追加もできる」2026-11-11）。足した営業所は会社名も（入れていれば）
+  // 設定の営業所のままなら、設定の所長・住所（設定の画面で直したもの）を使う。替えるときだけ営業所の一覧から（withBuilder）
+  return withBuilder(s, (job.shinsei?.builderOffice ?? '').trim() || shinseiAutoOffice(job, current));
+}
+
+/** 施工業者を選んでいないときの営業所：保険者（と区・市町村）の営業所。決まりのない保険者は空（設定の営業所のまま） */
+export function shinseiAutoOffice(job: Job, current: string): string {
   const insurer = jobInsurer(job);
   const info: ShinseiInfo = {...NO_SHINSEI, ...job.shinsei};
   const area = insurerAreaName(insurer, insurerNoOf(insurer, job.address, info.insurerNo.normalize('NFKC').replace(/\D/g, '')));
-  const current = (s.officeName ?? '').trim();
-  const name = shinseiOfficeName(insurer, area, current);
-  // 設定の営業所のままなら、設定の所長・住所（設定の画面で直したもの）を使う。替えるときだけ営業所の一覧から
-  if (!name || name === current) return s;
-  const o = OFFICES.find((x) => x.name === name);
-  return o ? {...s, officeName: o.name, manager: o.manager, postal: o.postal, address: o.address, tel: o.tel} : s;
+  return shinseiOfficeName(insurer, area, current) ?? '';
 }
 
 export function shinseiValues(job: Job, settings: EstimateSettings & BuilderSettings, today = todayIso()): ShinseiValues {
@@ -1535,8 +1542,9 @@ export function shinseiValues(job: Job, settings: EstimateSettings & BuilderSett
     // 選んだ保険者番号（介護保険証から読んだ番号も）、なければ住所の市町村・区から（insurerNumbers.ts。福岡市は区・広域連合は構成市町村）
     insurerNo: insurerNoOf(jobInsurer(job), job.address, cardInsurer),
     entrustRegNo: t(s.entrustRegNo ?? '').replace(/\D/g, ''),
-    providerNo: OFFICES.find((o) => o.name === (s.officeName ?? '').trim())?.jigyoshoNo ?? '',
-    juryoNo: OFFICES.find((o) => o.name === (s.officeName ?? '').trim())?.juryoNo ?? '',
+    // 施工業者の営業所の事業所番号・受領委任契約番号（申請書の画面で足した営業所は、そこで入れた事業所番号）
+    providerNo: builderOffice(s.officeName ?? '', s.builders)?.jigyoshoNo ?? '',
+    juryoNo: builderOffice(s.officeName ?? '', s.builders)?.juryoNo ?? '',
     works: shinseiWorks(job, s),
     kinds,
     kindNames: KINDS.map((_, i) => [...new Set(workItems(job, s).filter((w) => w.kind === i + 1 && w.line).map((w) => w.name).filter(Boolean))]),
@@ -1593,6 +1601,7 @@ export function shinseiValues(job: Job, settings: EstimateSettings & BuilderSett
       builderTelB,
       builderTelC,
       manager: job.staff.trim() || (s.manager ?? '').trim(), // 施工業者の担当者名：様邸の担当（なければ設定の所長）
+      bizNo: builderOffice(s.officeName ?? '', s.builders)?.jigyoshoNo ?? '',
       insured: padInsuredNo(job.insuredNo),
       benefitYen: benefit > 0 ? benefit.toLocaleString('en-US') : '',
       age: ((a) => (a ? `（${a}歳）` : ''))(ageOn(eraOf(info), info.birthY, info.birthM, info.birthD, today)), // 生年月日がなければ「（　歳）」ごと書かない
@@ -2066,6 +2075,7 @@ export const EMPTY_SHINSEI: ShinseiValues = {
     builderTelB: '',
     builderTelC: '',
     manager: '',
+    bizNo: '',
     insured: '',
     benefitYen: '',
     age: '',

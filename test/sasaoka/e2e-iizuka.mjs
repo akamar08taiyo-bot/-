@@ -42,7 +42,7 @@ const names = await preview.getByRole('group').evaluateAll((els) => els.map((e) 
 assert.deepEqual(names.slice(0, 6), ['事前承認願書', '承諾書', '内訳書', '支給申請書', '請求書', '平面図'], names.join(','));
 assert.deepEqual(names.slice(6, 8), ['事前写真①', '支給写真①'], names.join(','));
 const rowLabels = async () => (await form.locator(':scope > div[data-field] > div:first-child').allInnerTexts()).map((t) => t.replace(/\s*（ひらがなで入力してもカタカナになります）$/, ''));
-assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '住宅改修の利用', '今回の改修費用（介護保険対象分）', '住宅改修が必要な理由書作成者', '着工日・完成日', '負担割合']);
+assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '性別', '郵便番号', '住所', '電話番号', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '住宅改修の利用', '今回の改修費用（介護保険対象分）', '住宅改修が必要な理由書作成者', '着工日・完成日', '負担割合', '施工業者']);
 await pageOf('事前承認願書').screenshot({path: path.join(outDir, 'iizuka-1-jizen.png')});
 await pageOf('支給申請書').screenshot({path: path.join(outDir, 'iizuka-2-shikyu.png')});
 await pageOf('請求書').screenshot({path: path.join(outDir, 'iizuka-3-seikyu.png')});

@@ -59,6 +59,7 @@ assert.deepEqual(await rowLabels(), [
   '改修費用見積額',
   '住宅改修が必要な理由書作成者',
   '過去の住宅改修費支給申請',
+  '施工業者',
 ]);
 const pv = await preview.innerText();
 for (const t of ['住宅改修費支給申請兼施工承認', '■受領委任', '委　任　状', '住宅改修が必要な理由書', '見本町1-2-3', '太陽シルバーサービス']) assert.ok(pv.includes(t), `プレビューに「${t}」がない：${pv.slice(0, 1500)}`);

@@ -11,6 +11,7 @@ import {Btn, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_INFO, formLabel, INSURER_IDS, INSURER_INFO, insurerForAddress, jobForm, jobInsurer, NO_SHINSEI} from '../estimateForms.ts';
 import {CARE_RED, careLines, showsCareLines} from '../careLines.ts';
 import {BurdenPicker} from './ShinseiEditor.tsx';
+import {builderChoices} from '../shinseiOffice.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {fillAdded, placeAfterQty, withBrackets} from '../cutLink.ts';
@@ -146,6 +147,9 @@ export function EstimateEditor({
   const staffList = s.staffList;
   const staff = staffFull(job.staff, staffList);
   const staffOptions = !staff || staffList.includes(staff) ? staffList : [...staffList, staff];
+  // 施工業者：選んでいなければ設定の営業所（見積書は設定のまま。申請書だけ保険者・区の営業所に替える）
+  const builderNow = (info.builderOffice ?? '').trim() || s.officeName.trim();
+  const builderList = ((list) => (builderNow && !list.includes(builderNow) ? [...list, builderNow] : list))(builderChoices(s.officeName, s.builders));
   const pickPlace = picker ? job.places.find((p) => p.id === picker.placeId) : undefined;
   // 保険者を選ぶと、見積書の書式も決まる（苅田町・行橋市・みやこ町は同じ書式、広域連合は広域連合用）
   const setInsurer = (i: Insurer) => setJob((j) => ({...j, insurer: i, form: INSURER_INFO[i].form}));
@@ -230,6 +234,26 @@ export function EstimateEditor({
             ))}
           </select>
         </label>
+        {/* 施工業者（見積書の右上の施工業者名・代表者名・住所・電話）。住宅改修申請書のタブの施工業者と同じ値（どちらで選んでも両方に入る）。
+            選んでいなければ設定の営業所。足すのは申請書のタブの「＋ 追加」。広域連合用の書式には施工業者の欄がないので出さない。選べる営業所が1つ（デモの初め）なら出さない
+            （ユーザーの指示「施工業者名は、太陽シルバーサービス株　行橋、小倉南、小倉、八幡東、八幡西にする。それぞれリストから選択」2026-11-11） */}
+        {form !== 'kouiki' && builderList.length > 1 && (
+          <label className="grid gap-1 text-sm font-bold text-slate-600">
+            施工業者
+            <select
+              value={builderNow}
+              onChange={(e) => setInfo({builderOffice: e.target.value})}
+              className="h-11 min-w-[9rem] rounded-md border border-slate-300 px-2 text-base text-slate-800"
+              aria-label="施工業者"
+            >
+              {builderList.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="grid gap-1 text-sm font-bold text-slate-600">
           見積もり作成日
           <input

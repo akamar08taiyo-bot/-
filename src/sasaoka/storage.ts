@@ -461,6 +461,8 @@ function cleanShinsei(raw: unknown, legacyMarks: unknown): ShinseiInfo {
   out.insurerNo = str(src.insurerNo).normalize('NFKC').replace(/\D/g, '').slice(0, 8); // 全角の数字も（\D は半角の数字のほかを消す）
   out.burden = ['1', '2', '3'].includes(str(src.burden)) ? (str(src.burden) as ShinseiInfo['burden']) : '';
   if (src.welfare === true) out.welfare = true; // 生活保護（負担割合の横のチェック）
+  const builder = str(src.builderOffice).trim(); // 申請書の施工業者（選んだときだけ）
+  if (builder) out.builderOffice = builder;
   return out;
 }
 
@@ -595,6 +597,17 @@ export function cleanSettings(raw: unknown): Settings {
   s.laborEst = raw.laborEst === true;
   s.laborRev = numv(raw.laborRev, 0); // 前の版で保存した設定は 0（取付手間の見積の単価を直す）
   s.tesuri = raw.tesuri === true;
+  // 申請書の施工業者に足した営業所（名前のないものは捨てる。同じ名前は1つ）
+  if (Array.isArray(raw.builders)) {
+    const seen = new Set<string>();
+    s.builders = raw.builders.filter(isObj).flatMap((b) => {
+      const name = str(b.name).trim();
+      if (!name || seen.has(name)) return [];
+      seen.add(name);
+      const company = str(b.company).trim();
+      return [{name, ...(company ? {company} : {}), jigyoshoNo: str(b.jigyoshoNo).normalize('NFKC').replace(/\D/g, ''), postal: str(b.postal).trim(), address: str(b.address).trim(), tel: str(b.tel).trim(), manager: str(b.manager).trim()}];
+    });
+  }
   s.tokuteiSalesMonths = isObj(raw.tokuteiSalesMonths)
     ? Object.fromEntries(Object.entries(raw.tokuteiSalesMonths).filter((e): e is [string, string] => typeof e[1] === 'string' && /^\d{4}-\d{2}$/.test(e[1])))
     : {};

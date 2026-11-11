@@ -67,13 +67,48 @@ const names = await pageNames();
 // 支給申請書の裏（代理人の委任状・注意書き）は書く欄がないのでプレビューには出さない（Excel には入る）
 assert.deepEqual(names, ['事前届出書', '事前届出書（通知用）', '支給申請書', '内容報告書（写真）', '完了報告書（写真）', '内容報告書（写真） (2)']);
 const rowLabels = async () => (await form.locator(':scope > div[data-field] > div:first-child').allInnerTexts()).map((t) => t.replace(/\s*（ひらがなで入力してもカタカナになります）$/, ''));
-assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '郵便番号', '住所', '電話番号', '負担割合', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '工事費見積金額（介護保険対象分）', '着工日・完成日']);
+assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '郵便番号', '住所', '電話番号', '負担割合', '住宅の所有者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '施工業者', '工事費見積金額（介護保険対象分）', '着工日・完成日']);
 const pv = await preview.innerText();
 for (const t of ['介護保険住宅改修事前届出書', '介護保険居宅介護（予防）住宅改修費支給申請書（受領委任払用）', '住宅改修内容報告書（写真）', '住宅改修完了報告書（写真）', '小倉北区見本町1-2-3', '太陽シルバーサービス']) assert.ok(pv.includes(t), `プレビューに「${t}」がない`);
 assert.equal(await pageOf('内容報告書（写真）').getByRole('button', {name: /改修前/}).count(), 1);
 assert.equal(await pageOf('完了報告書（写真）').getByRole('button', {name: /改修後/}).count(), 2);
 // 内容報告書の「改修後のイメージ図」の欄も、改修後の写真の枠
 assert.equal(await pageOf('内容報告書（写真）').getByRole('button', {name: /改修後/}).count(), 1);
+// 施工業者（ユーザーの指示「施工業者名は、太陽シルバーサービス株　行橋、小倉南、小倉、八幡東、八幡西にする。それぞれリストから選択、追加もできる。
+// 事業者番号もわかっていると思うので入力」2026-11-11）：初めは区の営業所（小倉北区＝小倉営業所）。選ぶとプレビューの施工予定業者・事業者番号が変わる
+{
+  const row = form.locator('div[data-field="builder"]');
+  const pick = row.getByRole('combobox', {name: '施工業者'});
+  assert.equal(await pick.inputValue(), '小倉営業所');
+  assert.deepEqual(await pick.locator('option').allInnerTexts(), ['行橋営業所', '小倉南営業所', '小倉営業所', '八幡東営業所', '八幡西営業所']);
+  assert.equal((await row.locator('[data-builder-no]').innerText()).replace(/\s+/g, ''), '事業者番号4070403227');
+  await pick.selectOption('行橋営業所');
+  await page.waitForTimeout(700);
+  assert.equal((await row.locator('[data-builder-no]').innerText()).replace(/\s+/g, ''), '事業者番号4072601802');
+  const todoke = await pageOf('事前届出書').innerText();
+  assert.ok(todoke.includes('行橋営業所'), '事前届出書の施工予定業者が行橋営業所でない');
+  for (const d of '4072601802') assert.ok(todoke.includes(d));
+  // プレビューの施工予定業者の欄を押すと一覧の施工業者へ
+  await row.screenshot({path: path.join(outDir, 'kitakyushu-builder-1.png')});
+  // ＋ 追加：営業所名・事業者番号などを入れて「追加する」→ 一覧に入り、選んだ状態に
+  await row.getByRole('button', {name: '＋ 追加'}).click();
+  const add = row.locator('[data-builder-add]');
+  await add.getByLabel('足す施工業者の営業所名').fill('見本営業所');
+  await add.getByLabel('足す施工業者の事業者番号').fill('０１２３４５６７８９');
+  await add.getByLabel('足す施工業者の所在地').fill('福岡県北九州市見本区1-1');
+  await row.screenshot({path: path.join(outDir, 'kitakyushu-builder-2-add.png')});
+  await add.getByRole('button', {name: '追加する'}).click();
+  await page.waitForTimeout(700);
+  assert.equal(await pick.inputValue(), '見本営業所');
+  assert.equal((await row.locator('[data-builder-no]').innerText()).replace(/\s+/g, ''), '事業者番号0123456789');
+  assert.ok((await pageOf('事前届出書').innerText()).includes('見本営業所'));
+  // 一覧から外す（確かめてから）→ 区の営業所に戻る
+  await row.getByRole('button', {name: '一覧から外す'}).click();
+  await page.waitForTimeout(500);
+  assert.equal(await pick.inputValue(), '小倉営業所');
+  assert.equal(await pick.locator('option', {hasText: '見本営業所'}).count(), 0);
+  log('施工業者（一覧から選ぶ・事業者番号・＋ 追加・一覧から外す）OK');
+}
 await page.waitForTimeout(400);
 await page.screenshot({path: path.join(outDir, 'kitakyushu-1-shinsei.png')});
 await pageOf('事前届出書').screenshot({path: path.join(outDir, 'kitakyushu-2-todoke.png')});
@@ -138,6 +173,9 @@ for (const [name, c] of [['事前届出書', KK_CELLS.todoke], ['事前届出書
   assert.match(text(name, c.builder), /^太陽シルバーサービス.*小倉営業所$/, name);
   // 施工予定業者の所在地は郵便番号と住所の1行（ユーザーの指摘「北九州の郵便番号が綺麗に入力されていない」2026-10-29）
   assert.match(text(name, c.builderAddress), /^〒\d{3}-\d{4}　福岡県北九州市小倉北区/, name);
+  // 事業者番号の10マス＝施工業者（小倉営業所）の事業所番号（2026-11-11。数字のマスは数で書く）
+  const digit = (ref) => new RegExp(`<c r="${ref}"[^>]*?(?:/>|>([\\s\\S]*?)</c>)`).exec(sheets.get(name))?.[0].match(/<v>(\d)<\/v>|<t[^>]*>(\d)<\/t>/)?.slice(1).find(Boolean) ?? '';
+  assert.equal([c.biz0, c.biz1, c.biz2, c.biz3, c.biz4, c.biz5, c.biz6, c.biz7, c.biz8, c.biz9].map(digit).join(''), '4070403227', name);
 }
 const s = KK_CELLS.shikyu;
 assert.deepEqual([text('支給申請書', s.kana), text('支給申請書', s.name)], ['サンプル　ヤマダ', '（サンプル）山田']);

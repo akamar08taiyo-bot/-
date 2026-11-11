@@ -1545,7 +1545,7 @@ test('北九州市：支給申請書（受領委任払用）・写真の報告�
   assert.match(at(c.benefit), /^[\d,]+$/);
   assert.deepEqual([at(c.builder), at(c.builder2), at(c.builderRep), at(c.builderRep2)], ['太陽シルバーサービス株式会社　小倉営業所', '太陽シルバーサービス株式会社　小倉営業所', '所長　見本 次郎', '所長　見本 次郎']);
   assert.deepEqual([at(c.builderAddress), at(c.builderTel)], ['〒802-0000　福岡県北九州市小倉北区見本1-1', '093-000-0000']);
-  assert.equal(at(c.biz), ''); // 事業者番号は書かない
+  assert.equal(at(c.biz), '4070403227'); // 上の事業者番号の欄＝施工業者（小倉営業所）の事業所番号（2026-11-11）
   // 内容報告書：写真番号①（1枚目）＝浴室・改修の内容、③（3枚目）＝トイレ、⑤（5枚目）＝玄関。完了報告書：1枚に①②、③は2枚目の上
   const n = KK_CELLS.naiyo;
   const n1 = byName.get('内容報告書（写真）')!;
@@ -2247,4 +2247,62 @@ test('申請書の改修費用を手で入れたら、支給予定金額・委�
   assert.equal(shinseiCare(j('iizuka', 250000), S2).benefit, 180000);
   assert.equal(shinseiCare(j('kitakyushu', null), S2).benefit, 0); // 入れていなければ見積書から（見積書もなければ 0）
   assert.equal(shinseiValues(j('kitakyushu', 150000), S2).texts.benefitYen, '135,000');
+});
+
+// ユーザーの指示「施工業者名は、太陽シルバーサービス株　行橋、小倉南、小倉、八幡東、八幡西にする。それぞれリストから選択、追加もできる。
+// 事業者番号もわかっていると思うので入力」2026-11-11
+test('施工業者：選んだ営業所を申請書の施工者の欄と事業者番号のマスに書く（北九州市の事前届出書・支給申請書）。選ばなければ区の営業所', () => {
+  const S = settingsForOffice(defaultSettings(), '行橋営業所');
+  const read = (j: Job) => sheets(fillShinsei(KITAKYUSHU, SHINSEI.kitakyushu!, shinseiValues(j, S))).byName;
+  const c = KK_CELLS.todoke;
+  // 数字のマスは数（<v>）で書く
+  const digit = (xml: string, r: string) => cell(xml, r).match(/<v>(\d)<\/v>|<t[^>]*>(\d)<\/t>/)?.slice(1).find(Boolean) ?? '';
+  const biz = (xml: string, k: {biz0: string; biz1: string; biz2: string; biz3: string; biz4: string; biz5: string; biz6: string; biz7: string; biz8: string; biz9: string} = c) =>
+    [k.biz0, k.biz1, k.biz2, k.biz3, k.biz4, k.biz5, k.biz6, k.biz7, k.biz8, k.biz9].map((r) => digit(xml, r)).join('');
+  // 選んでいない：小倉北区のお客様は小倉営業所（2026-11-05 の決まりのまま）
+  const auto = read(kkJob());
+  assert.equal(txt(auto.get('事前届出書')!, c.builder), '太陽シルバーサービス株式会社　小倉営業所');
+  assert.equal(biz(auto.get('事前届出書')!), '4070403227');
+  assert.equal(biz(auto.get('事前届出書（通知用）')!, KK_CELLS.notice), '4070403227');
+  // 行橋営業所を選ぶ：名称・所長・事業者番号・支給申請書の上の事業者番号の欄も行橋営業所
+  const yk = read(kkJob({shinsei: {...kkJob().shinsei!, builderOffice: '行橋営業所'}}));
+  const t = yk.get('事前届出書')!;
+  assert.equal(txt(t, c.builder), '太陽シルバーサービス株式会社　行橋営業所');
+  assert.equal(txt(t, c.builderRep), `所長　${OFFICES.find((o) => o.name === '行橋営業所')!.manager}`);
+  assert.equal(biz(t), '4072601802');
+  assert.equal(txt(yk.get('支給申請書')!, KK_CELLS.shikyu.biz), '4072601802');
+  // 八幡西営業所
+  const yw = read(kkJob({shinsei: {...kkJob().shinsei!, builderOffice: '八幡西営業所'}}));
+  assert.equal(biz(yw.get('事前届出書')!), '4070704269');
+});
+
+test('施工業者：足した営業所（会社名・事業者番号も）を書く。選べる一覧は 行橋・小倉南・小倉・八幡東・八幡西 と区の営業所・足した営業所', async () => {
+  const {builderChoices} = await import('../../src/sasaoka/shinseiOffice.ts');
+  assert.deepEqual(builderChoices('小倉営業所'), ['行橋営業所', '小倉南営業所', '小倉営業所', '八幡東営業所', '八幡西営業所']);
+  assert.deepEqual(builderChoices('大分営業所', [{name: '見本営業所', jigyoshoNo: '', postal: '', address: '', tel: '', manager: ''}]), ['行橋営業所', '小倉南営業所', '小倉営業所', '八幡東営業所', '八幡西営業所', '大分営業所', '見本営業所']);
+  const added = {name: '見本営業所', company: '見本建設株式会社', jigyoshoNo: '0000000001', postal: '800-0000', address: '福岡県北九州市見本区1-1', tel: '093-000-1111', manager: '見本 四郎'};
+  // 設定に残る（読み直しても消えない。同じ名前は1つ・名前のないものは捨てる・番号は数字だけ）
+  const S = cleanSettings({...settingsForOffice(defaultSettings(), '行橋営業所'), builders: [added, {...added, manager: '二つ目'}, {name: ' '}, {...added, name: '見本2営業所', jigyoshoNo: '０００-1'}]});
+  assert.deepEqual(S.builders?.map((b) => [b.name, b.jigyoshoNo, b.manager]), [['見本営業所', '0000000001', '見本 四郎'], ['見本2営業所', '0001', '見本 四郎']]);
+  const j = kkJob({shinsei: {...kkJob().shinsei!, builderOffice: '見本営業所'}});
+  const t = sheets(fillShinsei(KITAKYUSHU, SHINSEI.kitakyushu!, shinseiValues(j, S))).byName.get('事前届出書')!;
+  const c = KK_CELLS.todoke;
+  assert.equal(txt(t, c.builder), '見本建設株式会社　見本営業所');
+  assert.equal(txt(t, c.builderAddress), '〒800-0000　福岡県北九州市見本区1-1');
+  assert.equal([c.biz0, c.biz1, c.biz2, c.biz3, c.biz4, c.biz5, c.biz6, c.biz7, c.biz8, c.biz9].map((r) => cell(t, r).match(/<v>(\d)<\/v>|<t[^>]*>(\d)<\/t>/)?.slice(1).find(Boolean) ?? '').join(''), '0000000001');
+  // 選んだ施工業者は読み直しても残る（空は持たない）
+  const {cleanJobs} = await import('../../src/sasaoka/storage.ts');
+  assert.equal(cleanJobs([j])[0].shinsei?.builderOffice, '見本営業所');
+  assert.equal('builderOffice' in (cleanJobs([kkJob({shinsei: {...kkJob().shinsei!, builderOffice: ''}})])[0].shinsei ?? {}), false);
+});
+
+test('施工業者：工事見積書の右上の施工業者名も、選んだ営業所（選んでいなければ設定の営業所のまま）', async () => {
+  const {issuerLines} = await import('../../src/sasaoka/print/formLayout.ts');
+  const S = settingsForOffice(defaultSettings(), '行橋営業所');
+  assert.match(issuerLines(job({insurer: 'kitakyushu'}), S)[1], /施工業者名　太陽シルバーサービス\(株\)行橋営業所/);
+  const picked = issuerLines(job({insurer: 'kitakyushu', shinsei: {...NO_SHINSEI, builderOffice: '小倉南営業所'}}), S);
+  assert.match(picked[1], /施工業者名　太陽シルバーサービス\(株\)小倉南営業所/);
+  const o = OFFICES.find((x) => x.name === '小倉南営業所')!;
+  assert.equal(picked[0], `住　　　所　${o.address}`);
+  assert.match(picked[2], new RegExp(`小倉南営業所所長　${o.manager}`));
 });
