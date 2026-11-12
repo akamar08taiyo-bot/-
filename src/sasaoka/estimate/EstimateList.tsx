@@ -25,14 +25,14 @@ const SHOW_LIMIT = 100;
  * 見積書に行を入れたときに、見積もり作成日（今日）を入れ、笹岡工務店の請求書（今月分）に入れる（calc.ts の startEstimate。
  * 申請書だけで終わる様邸を請求書に入れないため。笹岡工務店の工事でなければ、見積書の画面で外す）
  */
-export function newEstimate(insurer: Insurer): Job {
+export function newEstimate(insurer: Insurer, staff = ''): Job {
   const now = Date.now();
   return {
     id: uid('j'),
     month: thisMonth(),
     customer: '',
     suffix: '様邸',
-    staff: '',
+    staff, // 担当の初めの値は、最後に選んだ担当（defaultStaff）
     date: '',
     estDate: '', // 見積もり作成日（見積書に行を入れた日。それまでは作った日）
     address: '',

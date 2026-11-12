@@ -21,7 +21,7 @@ import {cutToLength, isBlankRow, listPriceOf, roundYen, shikiriPrice} from './ca
 import type {EstimateRates} from './calc.ts';
 import {circled, photoNumbers} from './estimateForms.ts';
 import {normalize} from './priceImport.ts';
-import type {Job, Material, OrderEdits, OrderLine, Row} from './types.ts';
+import type {Job, Material, OrderEdits, OrderLine, Place, Row} from './types.ts';
 import {num, staffShort, uid} from './util.ts';
 
 /** 余りがこれより少ないと危ないので、もう1本（1本の長さに対する割合。4000mm なら 400mm） */
@@ -437,6 +437,47 @@ export function shikiriBars(job: Pick<Job, 'places'> & {order?: OrderEdits | nul
   const lines = orderedLines(applyOrderEdits(base, edits));
   const amount = lines.reduce((n, l) => n + roundYen(l.price * l.qty), 0);
   return {rowIds, lines, amount};
+}
+
+/**
+ * 仕切り計算表の箇所の表に、切って使う部材の本数・金額を割りあてる（下に別の表を作らない。ユーザーの指示「切って使うなどで２つに分ける必要はない。
+ * 一つで良い。ただし、カットして使用することがわかるように列を追加する」2026-11-12）。
+ * 発注書の1行（箇所をまたいで合算した本数）は、その部材をいちばん初めに使う行（箇所の順・行の順）に入れ、同じ部材のほかの行は within にその行を書く。
+ * どの行の金額を足しても bars.amount と同じになる
+ */
+export type BarRow = {lines: OrderLine[]; amount: number; within: {rowId: string; place: string} | null};
+
+export function barRowMap(job: Pick<Job, 'places'>, bars: ShikiriBars): Map<string, BarRow> {
+  const at = new Map<string, {i: number; place: string}>();
+  job.places.forEach((p, pi) => p.rows.forEach((r, ri) => at.set(r.id, {i: pi * 100000 + ri, place: p.name || '箇所'})));
+  const out = new Map<string, BarRow>();
+  for (const id of bars.rowIds) out.set(id, {lines: [], amount: 0, within: null});
+  for (const l of bars.lines) {
+    const src = (l.src ?? []).filter((id) => out.has(id) && at.has(id)).sort((a, b) => at.get(a)!.i - at.get(b)!.i);
+    if (src.length === 0) continue;
+    const home = out.get(src[0])!;
+    home.lines.push(l);
+    home.amount += roundYen(l.price * l.qty);
+  }
+  // 金額を入れていない行は、同じ部材の金額を入れた行を指す
+  for (const l of bars.lines) {
+    const src = (l.src ?? []).filter((id) => out.has(id) && at.has(id)).sort((a, b) => at.get(a)!.i - at.get(b)!.i);
+    for (const id of src.slice(1)) {
+      const row = out.get(id)!;
+      if (row.lines.length === 0 && !row.within) row.within = {rowId: src[0], place: at.get(src[0])!.place};
+    }
+  }
+  return out;
+}
+
+/** 箇所の切って使う部材の金額（barRowMap で、その箇所の行に入れた分） */
+export const barPlaceAmount = (place: Pick<Place, 'rows'>, map: Map<string, BarRow>) => place.rows.reduce((n, r) => n + (map.get(r.id)?.amount ?? 0), 0);
+
+/** 「カット」の列：切って使う長さ（2400mm。2本切るときは 600mm×2） */
+export function cutLabel(r: Pick<Row, 'lengthCm' | 'qty' | 'pieceLengthM'>): string {
+  if (!(r.lengthCm > 0 && r.pieceLengthM > 0)) return '';
+  const mm = Math.round(r.lengthCm * 100) / 10;
+  return `${String(mm)}mm${r.qty !== 1 ? `×${num(r.qty, 3)}` : ''}`; // 見積書の算出根拠と同じく mm に桁区切りを付けない
 }
 
 /** どこで使うか（写真番号）：「①③」。発注書の画面と印刷に出す */

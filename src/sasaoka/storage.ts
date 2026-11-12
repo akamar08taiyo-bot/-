@@ -591,6 +591,7 @@ export function cleanSettings(raw: unknown): Settings {
   s.totalTaxRounding = ROUNDINGS.includes(raw.totalTaxRounding as Rounding) ? (raw.totalTaxRounding as Rounding) : d.totalTaxRounding;
   s.placePresets = Array.isArray(raw.placePresets) ? cleanList(raw.placePresets) : DEFAULT_PLACES;
   s.staffList = Array.isArray(raw.staffList) ? cleanList(raw.staffList) : DEFAULT_STAFF;
+  if (typeof raw.lastStaff === 'string' && raw.lastStaff.trim()) s.lastStaff = raw.lastStaff.trim();
   s.estimateRate = numv(raw.estimateRate, d.estimateRate);
   s.estimateLaborRate = Math.max(0, numv(raw.estimateLaborRate, d.estimateLaborRate));
   s.estimateOverheadRate = Math.max(0, numv(raw.estimateOverheadRate, d.estimateOverheadRate));

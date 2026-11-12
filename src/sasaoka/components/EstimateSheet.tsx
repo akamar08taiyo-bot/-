@@ -18,11 +18,11 @@
 
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ChangeEvent, ClipboardEvent as ReactClipboardEvent, CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode} from 'react';
-import {rounddown, startEstimate} from '../calc.ts';
+import {isBlankRow, rounddown, startEstimate} from '../calc.ts';
 import {circled, KINDS, materialText} from '../estimateForms.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {KouikiForm, YukuhashiForm} from '../print/EstimateForms.tsx';
-import {applySheet, deleteLine, describeKey, dropEmptyPlaces, FIELD_NAMES, insertBeforeId, insertBlankBefore, laborCountAt, lineRows, parseDate, parseMark, parsePlace, pasteLines, sheetTarget, sheetValue, stepLaborAt, toggleExcluded, toolPlace} from '../sheetEdit.ts';
+import {applySheet, deleteLine, describeKey, dropEmptyPlaces, FIELD_NAMES, insertBeforeId, insertBlankBefore, isPlaceHeadKey, laborCountAt, lineRows, parseDate, parseMark, parsePlace, pasteLines, placeOfKey, removePlaceFromEstimate, sheetTarget, sheetValue, stepLaborAt, toggleExcluded, toolPlace} from '../sheetEdit.ts';
 import {getClip, setClip, useClip} from '../sheetClip.ts';
 import type {EstimateForm, Job, LaborItem, Material, Settings} from '../types.ts';
 import {matchesAll, noHyphen, searchKey, todayIso, yen} from '../util.ts';
@@ -42,6 +42,9 @@ type Edit = {mode: 'enter' | 'edit'; value: string; initial?: string};
 type Dir = 'up' | 'down' | 'left' | 'right' | 'next' | 'prev';
 /** pickL：空いた行の内容の欄（「部材｜施工費｜常用」のある欄）なら、「部材」の左の端（打ち込む所は欄の左の端からここまで） */
 type Box = {x: number; y: number; w: number; h: number; font: string; family: string; align: string; pickL: number | null};
+
+/** 右寄せの欄（数量・単価・金額など数字の欄）。カーソルと打つ字は右端に（ユーザーの指示「左側でちかちかさせるのではなく、一番右に置く」2026-11-12） */
+const rightCell = (b: Box) => b.align === 'right' || b.align === 'end';
 
 /** 点滅するカーソルの高さ：欄の字の大きさほど（欄より少し低く） */
 const caretH = (b: Box) => Math.max(8, Math.min(b.h - 4, parseFloat(b.font) * 1.2));
@@ -382,7 +385,13 @@ export function EstimateSheet({
       const m = parseMark(value);
       if (m !== undefined) setMarkAt(key, m);
     } else if (!key.startsWith('excl:')) {
-      const res = applySheet(jobRef.current, key, value, {...ctx, pick, labor: key.startsWith('new:') && mark === '手'});
+      // 改修場所：番号（③）を変えずに名前だけ直したときは、自動の番号のまま（手で決めた番号にしない。番号を変えたらその番号）
+      let v = value;
+      if (edit?.mode === 'edit' && edit.initial !== undefined && key.endsWith(':name')) {
+        const now = parsePlace(value);
+        if (now.photo !== null && now.photo === parsePlace(edit.initial).photo) v = now.name;
+      }
+      const res = applySheet(jobRef.current, key, v, {...ctx, pick, labor: key.startsWith('new:') && mark === '手'});
       change(res.job);
       if (res.key && res.key !== key && !keepSel) setSel({key: res.key, occ: 0});
     }
@@ -564,6 +573,7 @@ export function EstimateSheet({
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         if (sel && isMarkKey(sel.key)) setMarkAt(sel.key, null); // 材／手は自動の字に戻す（空白の行は空）
+        else if (sel && isPlaceHeadKey(sel.key) && placeOfKey(jobRef.current, sel.key)) deletePlaceAll(); // 改修内容・改修場所：箇所をまるごと
         else if (sel && !isToggle(sel.key)) commit('', null, null);
       } else if (e.key === ' ' && isToggle(sel?.key)) {
         e.preventDefault();
@@ -766,6 +776,17 @@ export function EstimateSheet({
     const next = deleteLine(jobRef.current, rowId);
     if (next === jobRef.current) return;
     change(next);
+    setSel(null);
+  };
+  // 箇所をまるごと消す（「全て削除」・改修内容／改修場所の欄で Delete。ユーザーの指示「全て削除ボタンをつくる」「Deleteで全て削除できるようにする。
+  // 申請書の内容と連動しなくて良い」2026-11-12）。行があるときは確かめてから（Ctrl+Z でも戻せる）。申請書の箇所はそのまま
+  const deletePlaceAll = () => {
+    if (!sel) return;
+    const place = placeOfKey(jobRef.current, sel.key);
+    if (!place) return;
+    const label = sheetValue(jobRef.current, `place:${place.id}:name`, ctx) || place.name || 'この箇所';
+    if (place.rows.some((r) => !isBlankRow(r)) && !window.confirm(`${label}の行をすべて消しますか？`)) return;
+    change(removePlaceFromEstimate(jobRef.current, place.id));
     setSel(null);
   };
 
@@ -1021,7 +1042,8 @@ export function EstimateSheet({
     : 10;
   const taStyle = box
     ? {
-        left: Math.max(0, Math.min(box.x, PAGE_W - taWidth - 4)),
+        // 数字の欄は右の端をそろえて右から打つ（欄より広い入力欄は左にのばす）
+        left: Math.max(0, Math.min(rightCell(box) ? box.x + box.w - taWidth : box.x, PAGE_W - taWidth - 4)),
         top: box.y,
         minWidth: taMin,
         width: taWidth,
@@ -1029,7 +1051,7 @@ export function EstimateSheet({
         minHeight: box.h,
         fontSize: box.font,
         fontFamily: box.family,
-        textAlign: 'left' as const,
+        textAlign: rightCell(box) ? ('right' as const) : ('left' as const),
       }
     : {left: -9999, top: 0, width: 10, height: 10};
   const rows = editing ? Math.max(1, edit.value.split('\n').length) : 1;
@@ -1163,14 +1185,14 @@ export function EstimateSheet({
           <div ref={innerRef} className="relative" style={{width: PAGE_W, transform: `scale(${scale})`, transformOrigin: 'top left'}}>
             {form === 'kouiki' ? <KouikiForm job={job} settings={s} sheet={sheetOpts} /> : <YukuhashiForm job={job} settings={s} date={estDate} sheet={sheetOpts} />}
             {box && <div className="sheet-sel" style={{left: box.x, top: box.y, width: box.w, height: box.h}} />}
-            {/* 欄を1回押したら、Excel で打つときのようにカーソルを欄の左の端で点滅させる（打てる欄だと分かるように。ユーザーの指示「セルの上で1回クリックしたら、
+            {/* 欄を1回押したら、Excel で打つときのようにカーソルを欄の左の端（数量・単価・金額など右寄せの数字の欄は右の端。2026-11-12）で点滅させる（打てる欄だと分かるように。ユーザーの指示「セルの上で1回クリックしたら、
                 EXCELと同じ様に、チカチカさせて入力できますよってわかるようにする」「チカチカは左端にする」2026-11-04。前のブラウザの細いカーソルは、数字の欄で右の線に重なって見えなかった）。
                 欄を移るたびに初めから（key）。打ち始めたら入力欄のカーソルになる。介護保険の対象／対象外・材／手の欄は打たないので出さない */}
             {box && sel && !editing && focused && !isToggle(sel.key) && (
               <div
                 key={`${sel.key}:${sel.occ}`}
                 className="sheet-caret"
-                style={{left: box.x + 4, top: box.y + (box.h - caretH(box)) / 2, height: caretH(box)}}
+                style={{left: rightCell(box) ? box.x + box.w - 7 : box.x + 4, top: box.y + (box.h - caretH(box)) / 2, height: caretH(box)}}
                 aria-hidden="true"
               />
             )}
@@ -1204,6 +1226,16 @@ export function EstimateSheet({
                 </button>
                 <button type="button" onMouseDown={keepSel} onClick={() => rowOp('paste')} disabled={!clip || !sel} aria-label="📋 貼付" title="コピーした行を、選んでいる行の下に貼り付ける（Ctrl+V）">
                   📋貼付
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={keepSel}
+                  onClick={deletePlaceAll}
+                  disabled={!sel || !placeOfKey(job, sel.key)}
+                  aria-label="✕ 全て削除"
+                  title="選んでいる箇所（改修場所）の行をすべて消す（改修内容・改修場所の欄で Delete でも）"
+                >
+                  ✕全て削除
                 </button>
               </div>
             )}

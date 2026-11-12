@@ -21,6 +21,7 @@ import type {BookId} from '../makerCatalogs.ts';
 import {jutakuSalesMonth, withBillMonth, withSalesMonth} from '../salesPlan.ts';
 import type {AppData, Insurer, Job, Kit, Material, NameSuffix, Place, ShinseiInfo} from '../types.ts';
 import type {Update} from '../useStore.ts';
+import {rememberStaff} from '../lastStaff.ts';
 import {staffFull, thisMonth, todayIso} from '../util.ts';
 import {duplicateEstimate} from './EstimateList.tsx';
 import {UriageDialog} from './UriageDialog.tsx';
@@ -223,7 +224,11 @@ export function EstimateEditor({
           担当
           <select
             value={staff}
-            onChange={(e) => setJob((j) => ({...j, staff: e.target.value}))}
+            onChange={(e) => {
+              const v = e.target.value;
+              setJob((j) => ({...j, staff: v}));
+              rememberStaff(update, v);
+            }}
             className={`h-11 min-w-[9rem] rounded-md border px-2 text-base ${staff ? 'border-slate-300 text-slate-800' : 'border-amber-400 bg-amber-50 text-amber-800'}`}
           >
             <option value="">（選ぶ）</option>

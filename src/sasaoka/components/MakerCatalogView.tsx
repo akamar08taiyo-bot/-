@@ -363,9 +363,18 @@ function BookView({materials, start, onAdd, onAddCode, qtyOf, onBack, onSwitch}:
             />
             <span className="shrink-0 text-xs tabular-nums text-slate-500">p.{pages[pages.length - 1].page}</span>
           </div>
-          <div className="mt-1 text-center text-sm font-bold text-emerald-900" aria-live="polite">
-            p.{page}
-            {section && <span className="ml-2 font-normal text-slate-600">{section.title}</span>}
+          {/* 下にも 前のページ・次のページ（ユーザーの指示「下にも次のページ、前のページにもどれるボタンを作成」2026-11-12。上の ◀ ▶ と同じ働き） */}
+          <div className="mt-1.5 flex items-center justify-between gap-2">
+            <Btn small color="white" className="shrink-0" onClick={() => idx > 0 && setPage(pages[idx - 1].page)} disabled={idx <= 0}>
+              ◀ 前のページ
+            </Btn>
+            <div className="min-w-0 text-center text-sm font-bold text-emerald-900" aria-live="polite">
+              p.{page}
+              {section && <span className="ml-2 font-normal text-slate-600">{section.title}</span>}
+            </div>
+            <Btn small color="white" className="shrink-0" onClick={() => idx < pages.length - 1 && setPage(pages[idx + 1].page)} disabled={idx >= pages.length - 1}>
+              次のページ ▶
+            </Btn>
           </div>
         </div>
       )}

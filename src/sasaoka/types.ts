@@ -385,6 +385,8 @@ export type Settings = {
   totalTaxRounding: Rounding;
   placePresets: string[]; // 箇所の候補
   staffList: string[]; // 担当者の候補（様邸ごとに選ぶ）
+  // 最後に選んだ担当。新規作成の様邸の担当の初めの値（ユーザーの指示「担当名は一度入力したら、次から同じ名前がデフォルトにする」2026-11-12）
+  lastStaff?: string;
   // ---- 見積書
   estimateRate: number; // 見積の部材の単価＝定価×この率（0.8）
   estimateLaborRate: number; // 見積の単価を入れていない取付手間の、見積の単価＝仕切り（笹岡工務店）×この率（1.5）

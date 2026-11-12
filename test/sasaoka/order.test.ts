@@ -380,3 +380,24 @@ test('仕切り計算表の切って使う部材は発注書と同じ本数（�
   assert.equal(shikiriBars(plain, mats, RATE).rowIds.size, 0);
   assert.equal(jobTotals(plain, S, shikiriBars(plain, mats, RATE)).material, jobTotals(plain, S).material);
 });
+
+test('仕切り計算表は1つの表：切って使う部材の本数・金額は初めに使う行に入れ、ほかの行は「含む」・カットの列（2026-11-12）', async () => {
+  // ユーザーの指示「切って使うなどで２つに分ける必要はない。一つで良い。ただし、カットして使用することがわかるように列を追加する」
+  const {shikiriBars, barRowMap, barPlaceAmount, cutLabel} = await import('../../src/sasaoka/order.ts');
+  const mats = [BD134, BD132, BRACKET];
+  const two = job(['廊下', [cut(BD134, 120), materialRow(BRACKET, 2)]], ['トイレ', [cut(BD134, 120)]]);
+  const bars = shikiriBars(two, mats, RATE);
+  const map = barRowMap(two, bars);
+  const [a, b] = [two.places[0].rows[0], two.places[1].rows[0]];
+  assert.deepEqual(map.get(a.id)!.lines.map((l) => [l.code, l.qty]), [['BD-134', 1]]);
+  assert.equal(map.get(a.id)!.amount, 6000);
+  assert.equal(map.get(a.id)!.within, null);
+  assert.deepEqual(map.get(b.id), {lines: [], amount: 0, within: {rowId: a.id, place: '廊下'}});
+  assert.equal(map.has(two.places[0].rows[1].id), false); // ブラケットは今までどおり
+  assert.deepEqual([barPlaceAmount(two.places[0], map), barPlaceAmount(two.places[1], map)], [6000, 0]);
+  assert.equal(barPlaceAmount(two.places[0], map) + barPlaceAmount(two.places[1], map), bars.amount);
+  // カットの列：使う長さ（2本切るときは ×2）。切らずに使う部材は空
+  assert.equal(cutLabel(cut(BD134, 240)), '2400mm');
+  assert.equal(cutLabel(cut(BD134, 60, 2)), '600mm×2');
+  assert.equal(cutLabel(materialRow(BRACKET, 2)), '');
+});

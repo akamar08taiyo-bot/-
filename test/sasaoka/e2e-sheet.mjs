@@ -177,7 +177,7 @@ log('空いた行・新しい箇所・諸経費は自動のままOK');
 // ---------------- 行の「挿入」：選んだ行の上に1行入れる → 打ち込む／介護保険の対象外（スペース）／「削除」で消す
 // 行の操作は1組（選んでいる行の改修内容の左）。見積書の左は Excelで保存・見積書を印刷だけ
 assert.deepEqual(await side.getByRole('button').allInnerTexts().then((t) => t.map((x) => x.replace(/\s+/g, ' ').trim())), ['📗 Excelで保存', '🖨 見積書を印刷', '📖 マツ六', '📖 TOTO', '📖 矢崎化工']);
-assert.deepEqual(await ops.getByRole('button').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label'))), ['＋ 挿入', '✕ 削除', '⧉ コピー', '📋 貼付']);
+assert.deepEqual(await ops.getByRole('button').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label'))), ['＋ 挿入', '✕ 削除', '⧉ コピー', '📋 貼付', '✕ 全て削除']); // 全て削除（箇所をまるごと。2026-11-12）
 assert.equal(await sheet.locator('.sheet-rowtools, [data-ins], [data-del], [data-copy], [data-paste]').count(), 0);
 assert.equal(await ops.getByRole('button', {name: '📋 貼付'}).isDisabled(), true); // コピーするまで押せない
 // 「＋ 挿入」は選んでいる行の上（Excel と同じ。ユーザーの指示「挿入の場合、この間に挿入が差し込めるようにする」2026-11-03。前は下）。
@@ -620,10 +620,14 @@ const shikiri = await page.locator('aside table').innerText();
 // サンプルの部材リストに 2000mm の品がないので、その行の仕切価格は空欄（0円）で「確かめてください」と出す（前は 0.15本×10,000円＝1,500円で 9,900）
 assert.ok(shikiri.includes('部材代合計') && shikiri.includes('8,400') && shikiri.includes('5,000'), shikiri); // 取付手間 2,000＋3,000
 {
-  const bars = await page.locator('[data-shikiri-bars]').innerText();
-  assert.match(bars, /2000mm/);
-  assert.match(bars, /品番・価格を確かめてください/);
-  assert.match(bars, /1本/);
+  // 下に別の表は作らず、箇所の表の行に発注の本数・カットの列（ユーザーの指示「２つに分ける必要はない。一つで良い。ただし、カットして使用することがわかるように列を追加する」2026-11-12）
+  assert.equal(await page.locator('[data-shikiri-bars]').count(), 0);
+  const cutRow = page.locator('table.rows-table tr', {has: page.locator('td[data-cell="cut"]', {hasText: 'mm'})}).first();
+  const text = await cutRow.innerText();
+  assert.match(text, /600mm/); // カット
+  assert.match(text, /2000mm/); // 発注する品（2000mm）
+  assert.match(text, /品番・価格を確かめてください/);
+  assert.match(text, /発注 .*1本/);
 }
 log('仕切り計算表につながる・切って使う部材は発注書と同じ1本単位OK');
 

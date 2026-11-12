@@ -359,3 +359,13 @@ test('見積書から外した箇所（estimateOff）は行がないときだけ
   const [on] = cleanJobs([{customer: '見本', shinseiLink: true, places: [{name: '玄関', estimateOff: 'yes'}]}]);
   assert.deepEqual([on.shinseiLink, on.places[0].estimateOff], [undefined, undefined]);
 });
+
+test('担当の初めの値：最後に選んだ担当を設定に覚え、新規作成に入れる（候補から外した名前は空。2026-11-12）', async () => {
+  // ユーザーの指示「担当名は一度入力したら、次から同じ名前がデフォルトにする」
+  const {defaultStaff} = await import('../../src/sasaoka/lastStaff.ts');
+  const s = cleanSettings({staffList: ['見本 太郎', '見本 花子'], lastStaff: '見本 花子'});
+  assert.equal(s.lastStaff, '見本 花子');
+  assert.equal(defaultStaff(s), '見本 花子');
+  assert.equal(defaultStaff({...s, staffList: ['見本 太郎']}), '');
+  assert.equal(cleanSettings({lastStaff: 3}).lastStaff, undefined);
+});

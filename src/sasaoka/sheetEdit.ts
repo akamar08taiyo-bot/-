@@ -257,7 +257,13 @@ export function sheetValue(job: Job, key: string, ctx: SheetCtx, date = ''): str
     const place = kind === 'place' ? job.places.find((p) => p.id === id) : pendingPlace(job);
     const f = kind === 'place' ? field : id;
     if (!place) return '';
-    if (f === 'name') return place.name;
+    // 改修場所は見積書に出ている写真番号（③）も一緒に（直すときに番号も直せる。ユーザーの指示「②③なども編集できるようにする」2026-11-12。
+    // 前は名前だけで、ダブルクリックで直すと番号が見えず、先頭の字を消すと名前の字が消えた）
+    if (f === 'name') {
+      const nums = photoNumbers(job, rates);
+      const n = nums.get(place.id) ?? (place.photo > 0 ? place.photo : place.name.trim() ? nums.size + 1 : 0);
+      return n > 0 ? `${circled(n)}${place.name}` : place.name;
+    }
     if (f === 'work' || f === 'kind') return KINDS[place.kind - 1] ?? '';
     if (f === 'photo') return place.photo > 0 ? String(place.photo) : '';
     return '';
@@ -841,6 +847,29 @@ export function deleteLine(job: Job, rowId: string): Job {
   const rows = [...found.place.rows.slice(0, a), ...found.place.rows.slice(b)];
   if (rows.some((r) => !isBlankRow(r))) return setPlaceRows(job, found.pi, rows);
   return leaveEstimate(job, found.pi);
+}
+
+/**
+ * 選んでいる欄の箇所（「全て削除」・Delete で消す箇所）：改修内容・改修場所・行の欄はその箇所、いちばん下の打ち込む行は行のない箇所（打ちかけ）だけ
+ */
+export function placeOfKey(job: Job, key: string): Place | null {
+  const [kind, id] = key.split(':');
+  if (kind === 'place') return job.places.find((p) => p.id === id) ?? null;
+  if (kind === 'line' || kind === 'split' || kind === 'excl') return findRow(job, id)?.place ?? null;
+  if (kind === 'new') return pendingPlace(job);
+  return null;
+}
+
+/** 改修内容・改修場所の欄（Delete で箇所をまるごと消す欄） */
+export const isPlaceHeadKey = (key: string) => /^(place:[^:]+|new):(name|work|kind)$/.test(key);
+
+/**
+ * 箇所を見積書からまるごと消す（行をすべて。ユーザーの指示「全て削除ボタンをつくる」「Deleteで全て削除できるようにする。申請書の内容と連動しなくて良い」2026-11-12）。
+ * 申請書の箇所はそのまま（見積書から外すだけ。`leaveEstimate`）
+ */
+export function removePlaceFromEstimate(job: Job, placeId: string): Job {
+  const pi = job.places.findIndex((p) => p.id === placeId);
+  return pi < 0 ? job : leaveEstimate(job, pi);
 }
 
 /** 申請書に出すもののある箇所（改修場所の名前か、申請書のタブで入れた内容がある） */

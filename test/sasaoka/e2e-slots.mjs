@@ -194,15 +194,22 @@ assert.ok(cb.x + cb.width < (await newText.locator('[data-pick="material"]').bou
 await caret.evaluate((el) => (el.style.animation = 'none')); // 写真は点いているときに撮る
 await page.screenshot({path: path.join(outDir, 'slots-06a-caret-new.png'), clip: {x: nb.x - 260, y: nb.y - 50, width: 760, height: 120}});
 await caret.evaluate((el) => (el.style.animation = ''));
-// 数字の欄（数量）も左の端
-// 数の入った行（BD-08G など）の数量の欄で見る
-const qtyCell = sheet.locator('.form-page tr[data-rows] [data-edit$=":qty"]').filter({hasText: /\d/}).first();
+// 右寄せの数字の欄（金額・単価など）は右の端（ユーザーの指示「左側でちかちかさせるのではなく、一番右に置く」2026-11-12。前は数字の欄も左の端）
+// 数の入った行（BD-08G など）の金額の欄で見る
+const qtyCell = sheet.locator('.form-page tr[data-rows] [data-edit$=":amount"]').filter({hasText: /\d/}).first();
 if (await qtyCell.count()) {
+  assert.equal(await qtyCell.evaluate((el) => getComputedStyle(el).textAlign), 'right');
   const qb = await qtyCell.boundingBox();
   await page.mouse.click(qb.x + qb.width / 2, qb.y + qb.height / 2);
   await caret.waitFor();
   const qc = await caret.boundingBox();
-  assert.ok(qc.x >= qb.x && qc.x < qb.x + 8, `数量の欄のカーソル ${JSON.stringify(qc)} ${JSON.stringify(qb)}`);
+  assert.ok(qc.x + qc.width <= qb.x + qb.width && qc.x > qb.x + qb.width - 10, `金額の欄のカーソル ${JSON.stringify(qc)} ${JSON.stringify(qb)}`);
+  // 打つ字も右から（入力欄の右の端が欄の右の端）
+  await page.keyboard.type('1');
+  const ib = await sheetInput.boundingBox();
+  assert.ok(Math.abs(ib.x + ib.width - (qb.x + qb.width)) < 2, `金額の欄の入力欄 ${JSON.stringify(ib)} ${JSON.stringify(qb)}`);
+  assert.equal(await sheetInput.evaluate((el) => getComputedStyle(el).textAlign), 'right');
+  await page.keyboard.press('Escape');
   await page.screenshot({path: path.join(outDir, 'slots-06b-caret.png'), clip: {x: qb.x - 300, y: qb.y - 60, width: 700, height: 160}});
   await page.mouse.click(nb.x + 6, nb.y + nb.height / 2);
 }

@@ -6,6 +6,7 @@ import {withBillMonth} from '../salesPlan.ts';
 import {addSamples, hasSamples} from '../samples.ts';
 import type {AppData, Job} from '../types.ts';
 import type {Update} from '../useStore.ts';
+import {defaultStaff} from '../lastStaff.ts';
 import {addMonths, downloadBlob, monthLabel, staffShort, uid, yen} from '../util.ts';
 import {useTrashUndo} from './TrashPage.tsx';
 import {Btn, useToast} from './ui.tsx';
@@ -75,7 +76,7 @@ export function JobsPage({
   };
 
   const add = () => {
-    const j = newJob(month);
+    const j = {...newJob(month), staff: defaultStaff(data.settings)}; // 担当は最後に選んだ担当（2026-11-12）
     update('jobs', (list) => [...list, j]);
     onOpen(j.id);
   };

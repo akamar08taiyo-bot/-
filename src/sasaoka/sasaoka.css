@@ -140,6 +140,10 @@ img {
 .rows-narrow table.rows-table td[data-cell='qty'] {
   grid-area: qty;
 }
+/* カット（切って使う長さ）は下の段に1行で（切って使う部材の行だけ。2026-11-12） */
+.rows-narrow table.rows-table td[data-cell='cut'] {
+  grid-column: 1 / -1;
+}
 .rows-narrow table.rows-table td[data-cell='amount'] {
   grid-area: amount;
   align-self: center;

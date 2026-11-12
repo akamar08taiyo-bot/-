@@ -127,7 +127,12 @@ assert.match(await other.getAttribute('class'), /border-dashed/);
 await other.click();
 await page.getByText('ECA-5029 USL を入れました（部材リストにない品番）').waitFor();
 // ◀ ▶ でページを動かせる
-await cat.getByRole('button', {name: '次のページ'}).click();
+await cat.getByRole('button', {name: '次のページ', exact: true}).click();
+assert.equal(await cat.getByLabel('ページ', {exact: true}).inputValue(), '14');
+// 下のスライダーの所にも 前のページ・次のページ（ユーザーの指示「下にも次のページ、前のページにもどれるボタンを作成」2026-11-12）
+await cat.getByRole('button', {name: '次のページ ▶'}).click();
+assert.equal(await cat.getByLabel('ページ', {exact: true}).inputValue(), '15');
+await cat.getByRole('button', {name: '◀ 前のページ'}).click();
 assert.equal(await cat.getByLabel('ページ', {exact: true}).inputValue(), '14');
 // 2026-11-05 の全ページの点検で足した・直した枠：p.12 の 4000 の行（読み取りで抜けていた。部材リストにない品番）、
 // p.24 の入り数の札のある品番「CYA-1300 3ﾎﾞﾝｲﾘ SGD」（前は札の前で切れて「CYA-1300」だけ＝色が選べなかった。部材リストの品番に札がなくても同じ色の部材が入る）
