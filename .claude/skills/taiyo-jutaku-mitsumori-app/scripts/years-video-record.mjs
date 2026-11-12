@@ -189,12 +189,15 @@ async function chapter(i) {
 
 await page.goto(`${site}/years-demo/index.html`);
 await page.evaluate(() => window.__ov.ensure());
-await cdp.send('Page.startScreencast', {format: 'jpeg', quality: 85, maxWidth: 1920, maxHeight: 1080, everyNthFrame: 1});
 await page.mouse.move(640, 400);
 
 // タイトル・目次
 await card(`<div class="t1">（株）イヤーズ デモアプリ</div><div class="t2">住宅改修申請書・平面図　使い方</div>
   <div class="sub">申請書を入れると、プレビュー・写真の用紙・平面図に自動で入ります</div>`);
+// 撮り始めるのは題名のカードが出きってから（前は撮り始めてからカードを出したので、初めの 0.5秒ほどアプリの画面と
+// 薄いカードが重なった変な画面が映った。ユーザーの指摘「動画開始5秒で変な部分がある、一瞬へんな画面がうつる」2026-11-12）
+await wait(800);
+await cdp.send('Page.startScreencast', {format: 'jpeg', quality: 85, maxWidth: 1920, maxHeight: 1080, everyNthFrame: 1});
 await wait(5500);
 await card(`<div class="t1">目次</div><ol>${CHAPTERS.map((c) => `<li>${c}</li>`).join('')}</ol>`);
 await wait(9000);

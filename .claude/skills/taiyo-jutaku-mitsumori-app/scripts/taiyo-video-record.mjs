@@ -243,11 +243,14 @@ const jobTab = (name) => page.locator('[data-job-tabs] [role="tab"]', {hasText: 
 
 await page.goto(`${site}/jutaku-mitsumori/index.html`);
 await page.evaluate(() => window.__ov.ensure());
-if (!FAST) await cdp.send('Page.startScreencast', {format: 'jpeg', quality: 85, maxWidth: 1920, maxHeight: 1080, everyNthFrame: 1});
 await page.mouse.move(640, 400);
 
 await card(`<div class="t1">太陽シルバーサービス</div><div class="t2">申請書・見積書作成　使い方</div>
   <div class="sub">住宅改修申請書を入れると、工事見積書・理由書・平面図・特定福祉用具申請書に自動で入ります</div>`);
+// 撮り始めるのは題名のカードが出きってから（前は撮り始めてからカードを出したので、初めの 0.5秒ほどアプリの画面と
+// 薄いカードが重なった変な画面が映った。ユーザーの指摘「動画開始5秒で変な部分がある、一瞬へんな画面がうつる」2026-11-12）
+await wait(800);
+if (!FAST) await cdp.send('Page.startScreencast', {format: 'jpeg', quality: 85, maxWidth: 1920, maxHeight: 1080, everyNthFrame: 1});
 await wait(5500);
 await card(`<div class="t1">目次</div><ol>${CHAPTERS.map((c) => `<li>${c}</li>`).join('')}</ol>`);
 await wait(9500);
