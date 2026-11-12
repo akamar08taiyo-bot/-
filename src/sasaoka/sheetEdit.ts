@@ -12,6 +12,7 @@ import type {EstimateRates} from './calc.ts';
 import {KINDS, autoNote, circled, formLines, jobForm, jobInsurer, lastEstimateIndex, lineNote, materialText, NO_SHINSEI, noteText, offEstimate, photoNumbers, rowUnit} from './estimateForms.ts';
 import {fillAdded, placeAfterQty, withBrackets} from './cutLink.ts';
 import {guessPieceLengthM} from './priceImport.ts';
+import {withSlots} from './railSlots.ts';
 import {copyRows, laborCount, laborRange, laborSpot, manualRow, materialRow, newPlace, replaceRange, setLaborCount} from './rows.ts';
 import {padInsuredNo} from './shinsei.ts';
 import type {EstimateForm, Job, LaborItem, Material, Place, Row, Settings} from './types.ts';
@@ -874,6 +875,50 @@ export function removePlaceFromEstimate(job: Job, placeId: string): Job {
 
 /** 申請書に出すもののある箇所（改修場所の名前か、申請書のタブで入れた内容がある） */
 const keepsShinsei = (p: Place) => !!p.name.trim() || hasShinseiData(p);
+
+/** 改修場所の候補の「申請書の箇所」を選んだときの値の頭（打った字と見分ける。値は頭＋箇所の id） */
+export const SHINSEI_PLACE = '\uE000place:';
+
+/**
+ * 改修場所の候補の上の「申請書の箇所」（①玄関 など）を選んだとき（ユーザーの指示「リストから選択（①玄関　②玄関）みたいな感じで選択したら、
+ * 申請書の内容を読み取る」「一度変更した場合でも、①玄関などを再び入力することができるようにする」2026-11-12）。
+ * その欄の箇所の行を、選んだ申請書の箇所に移す（選んだ箇所の名前・改修の種類・寸法・写真＝申請書の内容はそのまま。写真番号も申請書のまま）。
+ * 元の箇所は、名前か申請書の内容があれば申請書だけに残し（見積書から外す。`leaveEstimate` と同じ）、なければ消す。
+ * いちばん下の空いた行で選んだとき（移す行がない）は、申請書から見積書に入れるときと同じ空きの行（手すり・ブラケット・施工費など。`withSlots`）を作る。
+ * 選んだ箇所が見積書に入っていて、移す行もなければ、その箇所を選ぶだけ
+ */
+export function bindShinseiPlace(job: Job, key: string, placeId: string, ctx: SheetCtx): SheetResult {
+  const target = job.places.find((p) => p.id === placeId);
+  if (!target) return {job, key};
+  const [kind, id] = key.split(':');
+  let j = job;
+  let from: Place | null = null;
+  if (kind === 'place') from = j.places.find((p) => p.id === id) ?? null;
+  else if (kind === 'new') from = pendingPlace(j);
+  else if (kind === 'split' || kind === 'gap') {
+    // その行から別の箇所にする（名前を打ったときと同じ）。できた箇所の行を選んだ箇所に移す
+    const res = applySheet(j, key, target.name, ctx);
+    j = res.job;
+    from = res.key ? placeOfKey(j, res.key) : null;
+  }
+  // いちばん下の空いた行の箇所（見積書で名前だけ打った、行のない箇所）は、申請書の内容がなければ消す（申請書に同じ名前が2つ残らないように）
+  const keepFrom = (p: Place) => (kind === 'new' ? hasShinseiData(p) : keepsShinsei(p));
+  const headKey = `place:${target.id}:name`;
+  if (from?.id === target.id) return {job, key: headKey};
+  const moving = from?.rows.filter((r) => !isBlankRow(r) || !r.slot) ?? [];
+  const t = j.places.find((p) => p.id === target.id)!;
+  const shown = !offEstimate(t);
+  if (moving.length === 0 && shown && t.rows.length > 0) return {job: from && !keepFrom(from) && from.rows.length === 0 ? {...j, places: j.places.filter((p) => p.id !== from!.id)} : j, key: headKey};
+  const {estimateOff: _off, ...rest} = t;
+  const kept = shown ? t.rows.filter((r) => !isBlankRow(r)) : [];
+  const bound: Place = moving.length || kept.length ? {...rest, rows: [...kept, ...moving]} : withSlots({...rest, rows: []});
+  const places = j.places.flatMap((p) => {
+    if (p.id === target.id) return [bound];
+    if (from && p.id === from.id) return keepFrom(p) ? [{...p, rows: [], estimateOff: true}] : [];
+    return [p];
+  });
+  return {job: {...j, places}, key: headKey};
+}
 
 /**
  * 箇所を見積書から外す：行を消して `estimateOff`（申請書には残る。申請書の箇所の「見積書に入れる」で戻る）。

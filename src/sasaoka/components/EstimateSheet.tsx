@@ -19,10 +19,10 @@
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ChangeEvent, ClipboardEvent as ReactClipboardEvent, CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode} from 'react';
 import {isBlankRow, rounddown, startEstimate} from '../calc.ts';
-import {circled, KINDS, materialText} from '../estimateForms.ts';
+import {circled, KINDS, materialText, offEstimate, photoNumbers} from '../estimateForms.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
 import {KouikiForm, YukuhashiForm} from '../print/EstimateForms.tsx';
-import {applySheet, deleteLine, describeKey, dropEmptyPlaces, FIELD_NAMES, insertBeforeId, insertBlankBefore, isPlaceHeadKey, laborCountAt, lineRows, parseDate, parseMark, parsePlace, pasteLines, placeOfKey, removePlaceFromEstimate, sheetTarget, sheetValue, stepLaborAt, toggleExcluded, toolPlace} from '../sheetEdit.ts';
+import {applySheet, bindShinseiPlace, deleteLine, describeKey, dropEmptyPlaces, FIELD_NAMES, insertBeforeId, insertBlankBefore, isPlaceHeadKey, laborCountAt, lineRows, parseDate, parseMark, parsePlace, pasteLines, placeOfKey, removePlaceFromEstimate, SHINSEI_PLACE, sheetTarget, sheetValue, stepLaborAt, toggleExcluded, toolPlace} from '../sheetEdit.ts';
 import {getClip, setClip, useClip} from '../sheetClip.ts';
 import type {EstimateForm, Job, LaborItem, Material, Settings} from '../types.ts';
 import {matchesAll, noHyphen, searchKey, todayIso, yen} from '../util.ts';
@@ -41,13 +41,47 @@ type Sel = {key: string; occ: number};
 type Edit = {mode: 'enter' | 'edit'; value: string; initial?: string};
 type Dir = 'up' | 'down' | 'left' | 'right' | 'next' | 'prev';
 /** pickL：空いた行の内容の欄（「部材｜施工費｜常用」のある欄）なら、「部材」の左の端（打ち込む所は欄の左の端からここまで） */
-type Box = {x: number; y: number; w: number; h: number; font: string; family: string; align: string; pickL: number | null};
+/** end：欄の字の末尾（最後の字の右の端と、その行の上下。字のない欄は null）。点滅するカーソルをそこに出す */
+type Box = {x: number; y: number; w: number; h: number; font: string; family: string; align: string; pickL: number | null; endX: number | null; endY: number | null; endH: number | null};
 
 /** 右寄せの欄（数量・単価・金額など数字の欄）。カーソルと打つ字は右端に（ユーザーの指示「左側でちかちかさせるのではなく、一番右に置く」2026-11-12） */
 const rightCell = (b: Box) => b.align === 'right' || b.align === 'end';
 
 /** 点滅するカーソルの高さ：欄の字の大きさほど（欄より少し低く） */
 const caretH = (b: Box) => Math.max(8, Math.min(b.h - 4, parseFloat(b.font) * 1.2));
+
+/**
+ * 欄に見えている字の、最後の1字の四角（画面の上の位置）。「部材｜施工費｜常用」などのボタンの字は数えない。字がなければ null。
+ * 点滅するカーソルを字の末尾に出すため（ユーザーの指示「チカチカする編集マークは末尾につける」2026-11-12）
+ */
+function textEndRect(el: HTMLElement): DOMRect | null {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => (n.parentElement?.closest('.sheet-pick, button, [data-pick]') ? NodeFilter.FILTER_REJECT : (n.textContent ?? '').trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP),
+  });
+  let last: Text | null = null;
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) last = n as Text;
+  if (!last) return null;
+  const text = last.textContent ?? '';
+  let end = text.trimEnd().length;
+  let start = end - 1;
+  if (start > 0 && /[\uDC00-\uDFFF]/.test(text[start])) start -= 1; // 2つで1字の字（絵文字など）
+  const range = document.createRange();
+  range.setStart(last, Math.max(0, start));
+  range.setEnd(last, end);
+  const rects = range.getClientRects();
+  const r = rects.length ? rects[rects.length - 1] : range.getBoundingClientRect();
+  return r.width || r.height ? r : null;
+}
+
+/** 点滅するカーソルの位置：字があれば最後の字のすぐ右（欄の中に収める）、字がなければ欄の左の端（右寄せの数字の欄は右の端） */
+function caretStyle(b: Box) {
+  if (b.endX !== null && b.endY !== null && b.endH !== null) {
+    const h = Math.max(8, Math.min(b.h - 4, b.endH));
+    const mid = b.endY + b.endH / 2;
+    return {left: Math.max(b.x + 2, Math.min(b.x + b.w - 4, b.endX + 1)), top: Math.max(b.y + 1, Math.min(b.y + b.h - h - 1, mid - h / 2)), height: h};
+  }
+  return {left: rightCell(b) ? b.x + b.w - 7 : b.x + 4, top: b.y + (b.h - caretH(b)) / 2, height: caretH(b)};
+}
 
 /** 打った字の幅（見積書の中の大きさ。いちばん長い行） */
 let measureCtx: CanvasRenderingContext2D | null = null;
@@ -244,6 +278,7 @@ export function EstimateSheet({
     const b = inner.getBoundingClientRect();
     const cs = getComputedStyle(el);
     const pick = el.querySelector<HTMLElement>(':scope > .sheet-pick');
+    const end = textEndRect(el);
     const next: Box = {
       x: (r.left - b.left) / scale,
       y: (r.top - b.top) / scale,
@@ -253,6 +288,9 @@ export function EstimateSheet({
       family: cs.fontFamily,
       align: cs.textAlign,
       pickL: pick ? Math.round(((pick.firstElementChild ?? pick).getBoundingClientRect().left - b.left) / scale * 10) / 10 - 2 : null,
+      endX: end ? Math.round(((end.right - b.left) / scale) * 10) / 10 : null,
+      endY: end ? Math.round(((end.top - b.top) / scale) * 10) / 10 : null,
+      endH: end ? Math.round((end.height / scale) * 10) / 10 : null,
     };
     if (!box || Object.keys(next).some((k) => next[k as keyof Box] !== box[k as keyof Box])) setBox(next);
   });
@@ -384,6 +422,11 @@ export function EstimateSheet({
     } else if (isMarkKey(key)) {
       const m = parseMark(value);
       if (m !== undefined) setMarkAt(key, m);
+    } else if (value.startsWith(SHINSEI_PLACE)) {
+      // 改修場所の候補の「申請書の箇所」：その箇所の申請書の内容を読んで、この欄の行をその箇所に（bindShinseiPlace）
+      const res = bindShinseiPlace(jobRef.current, key, value.slice(SHINSEI_PLACE.length), ctx);
+      change(res.job);
+      if (res.key && res.key !== key && !keepSel) setSel({key: res.key, occ: 0});
     } else if (!key.startsWith('excl:')) {
       // 改修場所：番号（③）を変えずに名前だけ直したときは、自動の番号のまま（手で決めた番号にしない。番号を変えたらその番号）
       let v = value;
@@ -427,6 +470,22 @@ export function EstimateSheet({
     const value = mode === 'edit' ? sheetValue(jobRef.current, sel.key, ctx, estDate) : '';
     setEdit(mode === 'edit' ? {mode, value, initial: value} : {mode, value});
     setHl(-1);
+    caretToEnd();
+  };
+  /** 打つ欄のカーソルを字の末尾に（F2・ダブルクリック・Backspace で打ち直すとき。Excel と同じ） */
+  const caretToEnd = () =>
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (el) el.setSelectionRange(el.value.length, el.value.length);
+    });
+  /** 選んでいる欄の末尾の1字を消して、打つ状態にする（字のない欄は何もしない） */
+  const backspaceOne = () => {
+    if (!sel) return;
+    const initial = sheetValue(jobRef.current, sel.key, ctx, estDate);
+    if (!initial) return;
+    setEdit({mode: 'edit', value: Array.from(initial).slice(0, -1).join(''), initial});
+    setHl(-1);
+    caretToEnd();
   };
 
   /** 候補を全部出す（改修場所・改修の種類の欄の ▼ と Alt+↓） */
@@ -445,8 +504,8 @@ export function EstimateSheet({
   // 改修場所（箇所名）：設定の「箇所の名前」から選べる（手で打ってもよい）
   // 箇所の2行目からの改修場所の欄（split:）も（打つとその行から別の箇所。`splitPlaceAt`）
   const placeCell = !!sel && field === 'name' && (sel.key.startsWith('place:') || sel.key.startsWith('split:') || sel.key.startsWith('gap:') || sel.key === 'new:name');
-  const suggestions = useMemo(() => {
-    if (!edit) return [] as {label: string; sub: string; value: string; pick: Material | null}[];
+  const suggestions = useMemo((): {label: string; sub: string; value: string; pick: Material | null; group?: 'shinsei' | 'preset'}[] => {
+    if (!edit) return [];
     const q = edit.value.trim();
     if (textCell) {
       const base = q ? materials.filter((m) => matchesAll(`${m.name} ${m.code} ${m.maker}`, q)) : materials.filter((m) => m.favorite);
@@ -469,12 +528,23 @@ export function EstimateSheet({
     if (placeCell) {
       // 写真番号（①）を付けて打っていても、名前の部分で探す
       const name = parsePlace(q).name;
-      return s.placePresets
-        .filter((p) => !name || matchesAll(p, name))
-        .map((p) => ({label: p, sub: '', value: p, pick: null}));
+      // 上は申請書の箇所（申請書と同じ番号・名前。選ぶと申請書の内容を読む＝bindShinseiPlace）、下は今までの箇所の名前の一覧
+      // （ユーザーの指示「リストの中も上部は、申請書に合わせる。その下には、現在と同じ一覧。差別化してわかるようにする」2026-11-12）。
+      // 選んでいる欄の箇所そのものは出さない
+      const nums = photoNumbers(job, s);
+      const own = sel?.key.startsWith('place:') ? sel.key.split(':')[1] : null;
+      const shinsei = job.places
+        .filter((p) => p.name.trim() && p.id !== own && (!name || matchesAll(p.name, name)))
+        .map((p) => {
+          const n = nums.get(p.id) ?? 0;
+          const inEstimate = !offEstimate(p) && p.rows.some((r) => !isBlankRow(r));
+          return {label: `${n > 0 ? circled(n) : ''}${p.name}`, sub: [KINDS[p.kind - 1] ?? '', inEstimate ? '見積書に入っています' : ''].filter(Boolean).join('　'), value: `${SHINSEI_PLACE}${p.id}`, pick: null, group: 'shinsei' as const};
+        });
+      const presets = s.placePresets.filter((p) => !name || matchesAll(p, name)).map((p) => ({label: p, sub: '', value: p, pick: null, group: 'preset' as const}));
+      return [...shinsei, ...presets];
     }
     return [];
-  }, [edit, textCell, kindCell, placeCell, materials, s.placePresets]);
+  }, [edit, textCell, kindCell, placeCell, materials, s.placePresets, job, sel?.key]);
   // 打った品番（「-」・大文字小文字・全角半角は見ない）か品名とぴったり同じ部材が1つだけなら、↓で選ばなくても Enter・Tab でその部材を入れる
   // （ユーザーの見積書で「BD132」と打って Enter を押したら、部材リストの BD-132 ではなく「BD132」という0円の行になっていた。2026-11-03）
   const exactHl = (() => {
@@ -570,6 +640,11 @@ export function EstimateSheet({
       } else if (e.key === 'F2') {
         e.preventDefault();
         startEdit('edit');
+      } else if (e.key === 'Backspace' && sel && !isMarkKey(sel.key) && !isToggle(sel.key)) {
+        // Backspace は末尾の1字を消して、そのまま打つ状態にする（F2 で打ち直して Backspace を押したときと同じ。続けて押すと1字ずつ消える。
+        // ユーザーの指示「文字も一文字ずつでも消せるようにする。EXCELに近づける」2026-11-12。前は欄をまるごと消していた）。欄をまるごと消すのは Delete
+        e.preventDefault();
+        backspaceOne();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         if (sel && isMarkKey(sel.key)) setMarkAt(sel.key, null); // 材／手は自動の字に戻す（空白の行は空）
@@ -1192,7 +1267,7 @@ export function EstimateSheet({
               <div
                 key={`${sel.key}:${sel.occ}`}
                 className="sheet-caret"
-                style={{left: rightCell(box) ? box.x + box.w - 7 : box.x + 4, top: box.y + (box.h - caretH(box)) / 2, height: caretH(box)}}
+                style={caretStyle(box)}
                 aria-hidden="true"
               />
             )}
@@ -1302,7 +1377,14 @@ export function EstimateSheet({
           )}
           <div className="max-h-[300px] overflow-y-auto">
             {suggestions.map((x, i) => (
-              <div key={`${x.value}-${i}`} className={`flex items-stretch ${i === curHl ? 'bg-emerald-100' : 'hover:bg-emerald-50'}`}>
+              <div key={`${x.value}-${i}`} className="contents">
+              {/* 改修場所の候補の見出し：申請書の箇所（薄い黄色。申請書の入れる所と同じ色）と、そのほかの箇所の名前 */}
+              {placeCell && x.group !== suggestions[i - 1]?.group && (
+                <div className={`border-b px-3 py-1 text-xs font-bold ${x.group === 'shinsei' ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-slate-200 bg-slate-50 text-slate-600'}`} aria-hidden="true">
+                  {x.group === 'shinsei' ? '📝 申請書の箇所（選ぶと申請書の内容を読み込みます）' : '箇所の名前'}
+                </div>
+              )}
+              <div className={`flex items-stretch ${i === curHl ? 'bg-emerald-100' : x.group === 'shinsei' ? 'bg-amber-50/40 hover:bg-emerald-50' : 'hover:bg-emerald-50'}`}>
                 <button
                   type="button"
                   role="option"
@@ -1328,6 +1410,7 @@ export function EstimateSheet({
                     {x.pick.favorite ? '★' : '☆'}
                   </button>
                 )}
+              </div>
               </div>
             ))}
           </div>

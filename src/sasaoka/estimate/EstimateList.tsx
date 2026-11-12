@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 import {DEMO} from '../demo/flag.ts';
 import {estimateTotals, hasEstimateRows, jobName} from '../calc.ts';
 import {copyJob} from '../components/JobTools.tsx';
@@ -420,12 +420,7 @@ export function EstimateList({
             ▶
           </button>
         </div>
-        <span className="text-base font-bold text-slate-600">＋ 新規作成：</span>
-        {INSURER_IDS.map((i) => (
-          <Btn key={i} color="emerald" className="!text-base" onClick={() => onNew(i)} title={`${INSURER_INFO[i].area}の見積書（${FORM_INFO[INSURER_INFO[i].form].name}「${FORM_INFO[INSURER_INFO[i].form].title}」）`}>
-            ＋ {INSURER_INFO[i].name}
-          </Btn>
-        ))}
+        <NewMenu onNew={onNew} />
         <Btn color="purple" className="!text-base" onClick={docs.pick} title="申請書・見積書・理由書の Excel（.xlsx）を取り込む">
           📥 取り込む
         </Btn>
@@ -613,6 +608,56 @@ export function EstimateList({
               </Btn>
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * 一覧の上の段の「＋ 新規作成 ▼」：押すと保険者のボタンが下に並ぶ（ユーザーの指示「この部分は集約してよい」2026-11-12。
+ * 前は「＋ 新規作成：」のあとに保険者の数だけボタンを並べていて、2段に折り返していた）。保険者を押す・外を押す・Esc で閉じる。
+ * 見積もりの入口（新規作成・一覧から作成）の保険者のボタンは、今までどおり並べたまま
+ */
+function NewMenu({onNew}: {onNew: (insurer: Insurer) => void}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  return (
+    <div ref={ref} className="relative">
+      <Btn color="emerald" className="!text-base" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu">
+        ＋ 新規作成 {open ? '▲' : '▼'}
+      </Btn>
+      {open && (
+        <div role="menu" aria-label="新規作成の保険者" className="absolute left-0 top-full z-30 mt-1 grid w-max grid-cols-3 gap-1.5 rounded-lg border border-emerald-200 bg-white p-2 shadow-xl max-sm:grid-cols-2">
+          {INSURER_IDS.map((i) => (
+            <Btn
+              key={i}
+              color="emerald"
+              className="!justify-start !text-base"
+              onClick={() => {
+                setOpen(false);
+                onNew(i);
+              }}
+              title={`${INSURER_INFO[i].area}の見積書（${FORM_INFO[INSURER_INFO[i].form].name}「${FORM_INFO[INSURER_INFO[i].form].title}」）`}
+            >
+              ＋ {INSURER_INFO[i].name}
+            </Btn>
+          ))}
         </div>
       )}
     </div>

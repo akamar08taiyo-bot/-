@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {strFromU8, unzipSync} from 'fflate';
+import {newFromList} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -860,7 +861,7 @@ log('申請書の平面図の枠＝平面図のタブの図（相互転記）OK'
 
 // ---------------- 申請書の平面図の枠から、その場で描く（新しい様邸）
 await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
-await page.getByRole('button', {name: '＋ 苅田町'}).click();
+await newFromList(page, '苅田町');
 const drawBtn = page.getByRole('button', {name: '📐 ここで平面図を描く'});
 await drawBtn.scrollIntoViewIfNeeded();
 await drawBtn.click();

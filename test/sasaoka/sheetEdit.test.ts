@@ -6,6 +6,7 @@ import {placeFromDims, withBrackets} from '../../src/sasaoka/cutLink.ts';
 import {laborRow, manualRow, materialRow, newPlace, setLaborCount} from '../../src/sasaoka/rows.ts';
 import {
   applySheet,
+  bindShinseiPlace,
   clearedSheet,
   deleteLine,
   describeKey,
@@ -23,6 +24,7 @@ import {
   parsePlace,
   pasteLines,
   setWorkAmount,
+  SHINSEI_PLACE,
   sheetValue,
   splitPlaceAt,
   stepLaborAt,
@@ -969,4 +971,48 @@ test('数・金額の欄は「2個」「1.5時間」「3箇所」のように単
   assert.equal(parseNum('3箇所'), 3);
   assert.equal(parseNum('1セット'), 1);
   assert.equal(parseNum('2m'), null); // 長さは parseLengthCm
+});
+
+test('改修場所の候補の「申請書の箇所」を選ぶ：申請書の内容（名前・種類・寸法・写真番号）のまま、その欄の行を移す・空いた行なら空きの行を作る', () => {
+  assert.ok(SHINSEI_PLACE.startsWith('\uE000')); // 打った字と見分ける頭
+  // 申請書に ①玄関（手すり・見積書から外してある）と ②廊下（段差の解消）。見積書には ③トイレ（行あり）
+  const genkan: Place = {...newPlace('玄関'), kind: 1, dims: {l: '600'}, estimateOff: true};
+  const rouka: Place = {...newPlace('廊下'), kind: 2, estimateOff: true};
+  const toilet: Place = {...newPlace('トイレ'), rows: [materialRow(rail)]};
+  const job = {...emptyJob(), places: [genkan, rouka, toilet]};
+
+  // いちばん下の空いた行で ①玄関 → 申請書から入れるときと同じ空きの行（手すり・ブラケット・施工費）。名前・寸法はそのまま
+  const a = bindShinseiPlace(job, 'new:name', genkan.id, yk);
+  const g = a.job.places.find((p) => p.id === genkan.id)!;
+  assert.equal(a.key, `place:${genkan.id}:name`);
+  assert.equal(offEstimate(g), false);
+  assert.equal(g.estimateOff, undefined);
+  assert.deepEqual(g.rows.map((r) => r.slot), ['手すり', 'ブラケット', '施工費']);
+  assert.equal(g.dims?.l, '600');
+  assert.equal(a.job.places.length, 3);
+
+  // ③トイレの改修場所で ②廊下 を選ぶ → トイレの行は廊下へ。トイレは申請書だけに残す（見積書から外す）
+  const b = bindShinseiPlace(job, `place:${toilet.id}:name`, rouka.id, yk);
+  const r = b.job.places.find((p) => p.id === rouka.id)!;
+  const t = b.job.places.find((p) => p.id === toilet.id)!;
+  assert.deepEqual(r.rows.map((x) => x.name), [rail.name]);
+  assert.equal(r.kind, 2); // 申請書の改修の種類のまま
+  assert.equal(offEstimate(t), true);
+  assert.equal(t.name, 'トイレ');
+  // 一度変えても、もう一度 ③トイレ を選べる（行がトイレに戻り、廊下は申請書だけ）
+  const c = bindShinseiPlace(b.job, `place:${rouka.id}:name`, toilet.id, yk);
+  assert.deepEqual(c.job.places.find((p) => p.id === toilet.id)!.rows.map((x) => x.name), [rail.name]);
+  assert.equal(offEstimate(c.job.places.find((p) => p.id === rouka.id)!), true);
+  // 写真番号は申請書の順番のまま（並びを変えない）
+  assert.deepEqual(c.job.places.map((p) => p.id), [genkan.id, rouka.id, toilet.id]);
+
+  // 見積書に入っている箇所を、いちばん下の空いた行で選ぶ → 選ぶだけ（行を足さない）。名前だけ打った空の箇所は消す
+  const typed = applySheet(job, 'new:name', '台所', {...yk, pick: null}).job;
+  assert.equal(typed.places.length, 4);
+  const d = bindShinseiPlace(typed, 'new:name', toilet.id, yk);
+  assert.equal(d.key, `place:${toilet.id}:name`);
+  assert.equal(d.job.places.length, 3);
+  assert.deepEqual(d.job.places.find((p) => p.id === toilet.id)!.rows.map((x) => x.name), [rail.name]);
+  // 同じ箇所を選んでも何も変えない
+  assert.equal(bindShinseiPlace(job, `place:${toilet.id}:name`, toilet.id, yk).job, job);
 });

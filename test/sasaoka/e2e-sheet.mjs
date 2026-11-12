@@ -8,7 +8,7 @@
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import {cellAt, chooseLabor, clickStable, insertBelow, moreItems, navItem, noPick, openMore, pickAt} from './more.mjs';
+import {cellAt, chooseLabor, clickStable, insertBelow, moreItems, navItem, noPick, openMore, pickAt, newFromList} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -23,7 +23,7 @@ page.on('console', (m) => m.type() === 'error' && errors.push('console: ' + m.te
 page.on('dialog', (d) => d.accept());
 await page.goto(`${site}/jutaku-mitsumori/index.html`);
 await page.getByRole('button', {name: /サンプルで試す/}).click(); // 部材リスト（★お気に入り）と取付手間の単価
-await page.getByRole('button', {name: '＋ 行橋市', exact: true}).click(); // 保険者（苅田町・行橋市・みやこ町は同じ書式）
+await newFromList(page, '行橋市'); // 保険者（苅田町・行橋市・みやこ町は同じ書式）
 await page.getByRole('tab', {name: '📋 工事見積書'}).click(); // 新規作成は申請書のタブから開く
 
 const sheet = page.getByRole('region', {name: '見積書', exact: true});
@@ -482,7 +482,13 @@ assert.equal(await lines(), linesBefore);
 await cell(await key('木の手すり 35φ 4m', 'name')).click();
 await sheet.getByRole('button', {name: '改修場所（箇所名）を候補から選ぶ'}).click();
 const placeOptions = page.getByRole('listbox', {name: '候補'}).getByRole('option');
-assert.deepEqual((await placeOptions.allInnerTexts()).slice(0, 3), ['廊下', '階段', '台所']); // 写真の用紙の改修箇所と同じ名前・順番
+{
+  // 上は申請書の箇所（①玄関 など番号つき。2026-11-12）、その下が写真の用紙の改修箇所と同じ名前・順番
+  const all = (await placeOptions.allInnerTexts()).map((t) => t.trim());
+  const i = all.indexOf('廊下');
+  assert.deepEqual(all.slice(i, i + 3), ['廊下', '階段', '台所'], JSON.stringify(all));
+  assert.ok(all.slice(0, i).every((t) => /^[①-⑳]/.test(t)), JSON.stringify(all));
+}
 await placeOptions.filter({hasText: /^廊下$/}).click();
 assert.equal((await tds('木の手すり 35φ 4m'))[1], '①廊下');
 await page.keyboard.press('Alt+ArrowDown');

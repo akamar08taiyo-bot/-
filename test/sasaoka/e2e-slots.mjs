@@ -211,6 +211,50 @@ if (await qtyCell.count()) {
   assert.equal(await sheetInput.evaluate((el) => getComputedStyle(el).textAlign), 'right');
   await page.keyboard.press('Escape');
   await page.screenshot({path: path.join(outDir, 'slots-06b-caret.png'), clip: {x: qb.x - 300, y: qb.y - 60, width: 700, height: 160}});
+  // 字のある欄は、点滅するカーソルが字の末尾（最後の字のすぐ右。ユーザーの指示「チカチカする編集マークは末尾につける」2026-11-12）。
+  // Backspace は1字ずつ消す（「文字も一文字ずつでも消せるようにする。EXCELに近づける」。前は欄をまるごと消していた）。Esc でやめると元のまま
+  const textCell = sheet.locator('.form-page tr[data-rows] [data-edit$=":text"]').filter({hasText: /BD-/}).first();
+  const tb = await textCell.boundingBox();
+  await page.mouse.click(tb.x + tb.width / 2, tb.y + tb.height / 2);
+  await caret.waitFor();
+  const tc = await caret.boundingBox();
+  const end = await textCell.evaluate((el) => {
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let last = null;
+    for (let n = w.nextNode(); n; n = w.nextNode()) if (n.textContent.trim() && !n.parentElement.closest('button, [data-pick]')) last = n;
+    const r = document.createRange();
+    const len = last.textContent.trimEnd().length;
+    r.setStart(last, len - 1);
+    r.setEnd(last, len);
+    const rs = r.getClientRects();
+    const b = rs[rs.length - 1];
+    return {right: b.right, top: b.top, bottom: b.bottom};
+  });
+  assert.ok(Math.abs(tc.x - end.right) < 4 && tc.x > tb.x + 20, `内容の欄のカーソルが字の末尾にない ${JSON.stringify(tc)} ${JSON.stringify(end)}`);
+  assert.ok(tc.y < end.bottom && tc.y + tc.height > end.top, `カーソルが最後の行にない ${JSON.stringify(tc)} ${JSON.stringify(end)}`);
+  await caret.evaluate((el) => (el.style.animation = 'none'));
+  await page.screenshot({path: path.join(outDir, 'slots-06c-caret-end.png'), clip: {x: tb.x - 120, y: tb.y - 40, width: 560, height: 110}});
+  await caret.evaluate((el) => (el.style.animation = ''));
+  await page.keyboard.press('F2');
+  const full = await sheetInput.inputValue();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Backspace');
+  assert.equal(await sheetInput.evaluate((el) => el.classList.contains('editing')), true);
+  assert.equal(await sheetInput.inputValue(), [...full].slice(0, -1).join(''));
+  await page.keyboard.press('Backspace');
+  assert.equal(await sheetInput.inputValue(), [...full].slice(0, -2).join(''));
+  assert.equal(await sheetInput.evaluate((el) => el.selectionStart === el.value.length), true, 'カーソルが末尾にない');
+  await page.keyboard.press('Escape');
+  assert.ok((await textCell.innerText()).replace(/\s+/g, '').includes(full.replace(/\s+/g, '').slice(-4)), '消さずにやめたのに字が変わった');
+  // 数字の欄も1字ずつ（金額の末尾の1字が消える）
+  await page.mouse.click(qb.x + qb.width / 2, qb.y + qb.height / 2);
+  await page.keyboard.press('F2');
+  const amount = await sheetInput.inputValue();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Backspace');
+  assert.equal(await sheetInput.inputValue(), amount.slice(0, -1));
+  await page.keyboard.press('Escape');
+  log('字の末尾にカーソル・Backspace で1字ずつ消す（内容・金額）OK');
   await page.mouse.click(nb.x + 6, nb.y + nb.height / 2);
 }
 const rowsBefore = await trs.count();

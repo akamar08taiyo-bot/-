@@ -153,17 +153,21 @@ export function JobEditor({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        {/* 一覧へは上の「🧾 工務店請求書を確認する」のタブで戻る（ユーザーの指示：「一覧へ戻るではなく、見積もりへ戻るへ変更」） */}
-        <Btn color="white" onClick={onBackToEstimate}>
-          ← 見積もりへ戻る
-        </Btn>
-        <h1 className="text-lg font-bold text-[#0c315e]">{jobName(job)}</h1>
-        {staff && <span className="text-sm font-bold text-slate-500">担当 {staff}</span>}
-        <div className="ml-auto flex flex-wrap gap-2">
-          <Btn color="softSky" onClick={() => onPrint({kind: 'job', jobId: job.id})}>
-            🖨 この様邸の明細を印刷
+      {/* 上の段：左に戻る・様邸の名前、まん中に印刷（大きめ）、右にほかのボタン（ユーザーの指示「印刷ボタンは中央に、わかりやすく」2026-11-12。
+          前は右の端に並んでいた。請求書の一覧の上の段と同じ grid）。狭い画面は折り返して並べる（スマホは印刷を1行いっぱいに） */}
+      <div className="flex flex-wrap items-center gap-2 lg:grid lg:grid-cols-[minmax(max-content,1fr)_auto_1fr] lg:gap-x-6">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* 一覧へは上の「🧾 工務店請求書を確認する」のタブで戻る（ユーザーの指示：「一覧へ戻るではなく、見積もりへ戻るへ変更」） */}
+          <Btn color="white" onClick={onBackToEstimate}>
+            ← 見積もりへ戻る
           </Btn>
+          <h1 className="text-lg font-bold text-[#0c315e]">{jobName(job)}</h1>
+          {staff && <span className="text-sm font-bold text-slate-500">担当 {staff}</span>}
+        </div>
+        <Btn color="softSky" className="min-h-[44px] !px-6 !text-base max-sm:w-full" onClick={() => onPrint({kind: 'job', jobId: job.id})}>
+          🖨 この様邸の明細を印刷
+        </Btn>
+        <div className="flex flex-wrap gap-2 lg:justify-end">
           <Btn color="white" onClick={() => onOpenEstimate(job.id)} title="同じ入力から作る見積書を「見積もり・申請書を作成する」で開きます">
             📝 見積書を開く
           </Btn>

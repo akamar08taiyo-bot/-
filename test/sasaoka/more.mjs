@@ -25,6 +25,16 @@ export async function moreItems(page) {
 }
 
 /**
+ * 見積書の一覧の上の段の「＋ 新規作成 ▼」を開いて、保険者（「苅田町」など）のボタンを押す（2026-11-12 から1つのボタンにまとめた。
+ * ユーザーの指示「この部分は集約してよい」。EstimateList.tsx の NewMenu）。見積もりの入口の「新規作成」の欄は今までどおりボタンが並ぶ
+ */
+export async function newFromList(scope, insurer) {
+  const btn = scope.getByRole('button', {name: /^＋ 新規作成 [▼▲]$/});
+  if ((await btn.getAttribute('aria-expanded')) !== 'true') await btn.click();
+  await scope.getByRole('menu', {name: '新規作成の保険者'}).getByRole('button', {name: `＋ ${insurer}`, exact: true}).click();
+}
+
+/**
  * 画面の上の帯の画面の切り替え（2026-11-03 から、見積もり・申請書を作成する（様邸を開いていないとき）のほかは右の隅の「☰ メニュー ▼」の中。
  * ユーザーの指示「売上見込みを確認する、工務店請求書、部材・施工費マスタ、設定、ゴミ箱は、プルダウンにして右隅におく」）。帯に見えていればそれ、なければメニューを開いて中のもの
  */

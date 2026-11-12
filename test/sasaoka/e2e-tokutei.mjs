@@ -187,8 +187,8 @@ if (withTokutei) {
   assert.equal(await dlg.getByRole('checkbox', {name: /^工事見積書/}).isDisabled(), true);
   assert.equal(await dlg.getByText('（見積書に行がありません）').count(), 1);
   const boxes = dlg.getByRole('group', {name: '保存する書類'}).getByRole('checkbox');
-  // 初めは開いているタブ（理由書）だけ
-  assert.deepEqual(await boxes.evaluateAll((els) => els.map((e) => [e.checked, e.disabled])), [[false, false], [false, true], [false, false], [false, false], [true, false]]);
+  // 初めは開いているタブ（理由書）だけ。いちばん下の平面図（見取図。2026-11-09）は描いていないので選べない
+  assert.deepEqual(await boxes.evaluateAll((els) => els.map((e) => [e.checked, e.disabled])), [[false, false], [false, true], [false, false], [false, false], [true, false], [false, true]]);
   // 住宅改修申請書と特定福祉用具申請書にチェック、理由書を外す → 2つ
   await boxes.nth(0).check();
   await boxes.nth(2).check();
@@ -202,7 +202,7 @@ if (withTokutei) {
   assert.equal(await page.locator('iframe[title="特定福祉用具（まとめて保存）"]').count(), 0); // 見えない枠は消す
   // 次に開くと、また開いているタブ（理由書）だけ（前に選んだものは覚えない）
   await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).first().click();
-  assert.deepEqual(await boxes.evaluateAll((els) => els.map((e) => e.checked)), [false, false, false, false, true]);
+  assert.deepEqual(await boxes.evaluateAll((els) => els.map((e) => e.checked)), [false, false, false, false, true, false]);
   await dlg.getByRole('button', {name: 'やめる'}).click();
   log('Excelで保存（チェックしたものだけ・初めは開いているタブだけ）OK');
 

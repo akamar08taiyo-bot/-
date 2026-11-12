@@ -5,7 +5,7 @@
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import {cellAt} from './more.mjs';
+import {cellAt, newFromList} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
@@ -23,7 +23,23 @@ page.on('dialog', (d) => {
 });
 await page.goto(`${site}/jutaku-mitsumori/index.html`);
 await page.getByRole('button', {name: /サンプルで試す/}).click();
-await page.getByRole('button', {name: '＋ 行橋市', exact: true}).click();
+// 一覧の上の段の新規作成は「＋ 新規作成 ▼」の1つ（ユーザーの指示「この部分は集約してよい」2026-11-12）。開くと保険者が並び、Esc・外を押すと閉じる
+{
+  const newBtn = page.getByRole('button', {name: /^＋ 新規作成 [▼▲]$/});
+  assert.equal(await newBtn.count(), 1);
+  assert.equal(await page.getByRole('button', {name: '＋ 苅田町', exact: true}).count(), 0, '保険者のボタンが閉じたまま並んでいる');
+  await newBtn.click();
+  const menu = page.getByRole('menu', {name: '新規作成の保険者'});
+  const names = (await menu.getByRole('button').allInnerTexts()).map((t) => t.trim());
+  assert.ok(['＋ 苅田町', '＋ 行橋市', '＋ みやこ町', '＋ 広域連合'].every((n) => names.includes(n)), JSON.stringify(names));
+  await page.keyboard.press('Escape');
+  await menu.waitFor({state: 'detached'});
+  await newBtn.click();
+  await page.mouse.click(5, 600);
+  await menu.waitFor({state: 'detached'});
+  log('新規作成 ▼：1つのボタンにまとめた・開く・Esc／外で閉じる OK');
+}
+await newFromList(page, '行橋市');
 await page.getByRole('tab', {name: '📋 工事見積書'}).click();
 const sheet = page.getByRole('region', {name: '見積書', exact: true});
 await sheet.waitFor();
@@ -115,6 +131,27 @@ await page.waitForTimeout(200);
 assert.equal(dialogs.length, 2);
 assert.ok(!(await names()).some((n) => n.endsWith('浴室')), (await names()).join(' '));
 log('行のない箇所は Delete で確かめずに消すOK');
+
+// 改修場所の候補：上に申請書の箇所（申請書と同じ番号。薄い黄色の見出し）、下に今までの箇所の名前（ユーザーの指示「リストの中も上部は、申請書に合わせる。
+// その下には、現在と同じ一覧。差別化してわかるようにする」2026-11-12）。申請書の箇所を選ぶと、申請書の内容（名前・改修の種類）で見積書に入る
+await cell('new:name').click();
+await page.keyboard.press('Alt+ArrowDown');
+const sug = page.getByRole('listbox', {name: '候補'});
+await sug.waitFor();
+const sugText = (await sug.innerText()).replace(/\s+/g, ' ');
+assert.ok(sugText.indexOf('申請書の箇所') >= 0 && sugText.indexOf('申請書の箇所') < sugText.indexOf('箇所の名前'), sugText);
+const opts = (await sug.getByRole('option').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
+assert.match(opts[0], /^①トイレ 手すりの取り付け/, JSON.stringify(opts));
+assert.ok(opts.some((t) => t === '廊下') && opts.some((t) => t === '玄関'), JSON.stringify(opts)); // 下は今までの一覧
+await page.screenshot({path: path.join(outDir, 'placeedit-02-list.png'), clip: {x: 0, y: 300, width: 1100, height: 520}});
+await sug.getByRole('option').first().click();
+await page.waitForTimeout(200);
+assert.ok((await names()).includes('①トイレ'), (await names()).join(' '));
+await page.getByRole('tab', {name: /住宅改修申請書/}).click();
+assert.equal(await page.getByRole('button', {name: 'トイレを見積書に入れる'}).count(), 0); // 見積書に入った
+await page.getByRole('tab', {name: '📋 工事見積書'}).click();
+await sheet.waitFor();
+log('改修場所の候補：申請書の箇所が上（番号つき）・下に今までの一覧・選ぶと申請書の箇所が見積書に入るOK');
 assert.deepEqual(errors, []);
 await browser.close();
 console.log('ok: 改修場所を直接直す（番号も）・Delete と「全て削除」で箇所をまるごと消す');
