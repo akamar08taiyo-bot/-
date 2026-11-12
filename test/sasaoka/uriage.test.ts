@@ -2,7 +2,7 @@
 // ユーザーと決めたこと（2026-10-27）：置き場所は工事見積書のタブの上の段・明細は1行・生活保護にチェックしたら自己負担は出さない。値・名前はすべて架空
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {estimateTotals, jobTotals} from '../../src/sasaoka/calc.ts';
+import {estimateTotals} from '../../src/sasaoka/calc.ts';
 import {defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
 import {cleanJobs} from '../../src/sasaoka/storage.ts';
@@ -26,13 +26,13 @@ test('介護度は売上伝票の書き方に', () => {
   assert.equal(slipCareLevel(''), '');
 });
 
-test('明細は「住宅改修工事」の1行：見積書の合計（税込）と、仕切り計算表の合計（工務店に払う額・税込）', () => {
+test('明細は「住宅改修工事」の1行：見積書の合計（税込）。仕切りは入れない（売上伝票で手で入れる。2026-11-12）', () => {
   const j = job([mat(50000, 30000)]);
   const r = uriageRequest(j, s, choice, 7000);
   assert.equal(r.kind, 'taiyo-uriage-request');
   assert.equal(r.createdAt, 7000);
   const sales = r.sales as Record<string, unknown>;
-  assert.deepEqual(sales.items, [{amount: estimateTotals(j, s).all.total, cost: jobTotals(j, s).total, productName: '住宅改修工事', color: ''}]);
+  assert.deepEqual(sales.items, [{amount: estimateTotals(j, s).all.total, cost: 0, productName: '住宅改修工事', color: ''}]);
   assert.equal(sales.serviceType, 'housing');
   assert.equal(sales.contractor, '見本工務店');
   assert.equal(sales.officeName, '見本居宅介護支援事業所');

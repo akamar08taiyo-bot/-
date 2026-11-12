@@ -4,7 +4,7 @@
 import type {MouseEvent, ReactNode} from 'react';
 import {Btn, Modal, useToast} from '../components/ui.tsx';
 import {MARK_INFO, NO_SHINSEI} from '../estimateForms.ts';
-import type {Job, Material, Settings, ShinseiInfo} from '../types.ts';
+import type {Job, Settings, ShinseiInfo} from '../types.ts';
 import {HOUSING_LIMIT, URIAGE_IMPORT_KEY, uriageAmounts, uriageMissing, uriageRequest, uriageUrl} from '../uriage.ts';
 import type {Billing, CustomerType} from '../uriage.ts';
 import {staffFull, todayIso, yen} from '../util.ts';
@@ -19,7 +19,7 @@ const CUSTOMER: [CustomerType, string][] = [
   ['existing', '既存'],
 ];
 
-export function UriageDialog({job, s, materials, setJob, onClose}: {job: Job; s: Settings; materials: Material[]; setJob: (fn: (j: Job) => Job) => void; onClose: () => void}) {
+export function UriageDialog({job, s, setJob, onClose}: {job: Job; s: Settings; setJob: (fn: (j: Job) => Job) => void; onClose: () => void}) {
   const toast = useToast();
   const si = job.shinsei ?? NO_SHINSEI;
   const setInfo = (patch: Partial<ShinseiInfo>) => setJob((j) => ({...j, shinsei: {...NO_SHINSEI, ...j.shinsei, ...patch}}));
@@ -31,11 +31,11 @@ export function UriageDialog({job, s, materials, setJob, onClose}: {job: Job; s:
   const choice = {customerType, billing, issueDate};
   const {fix, elsewhere} = uriageMissing(job, s, choice);
   const ready = fix.length === 0 && elsewhere.length === 0;
-  const a = uriageAmounts(job, s, materials); // 仕切りは仕切り計算表と同じ（切って使う部材は発注書の本数）
+  const a = uriageAmounts(job, s);
 
   const open = (ev: MouseEvent<HTMLAnchorElement>) => {
     try {
-      localStorage.setItem(URIAGE_IMPORT_KEY, JSON.stringify(uriageRequest(job, s, choice, Date.now(), materials)));
+      localStorage.setItem(URIAGE_IMPORT_KEY, JSON.stringify(uriageRequest(job, s, choice, Date.now())));
     } catch {
       ev.preventDefault();
       toast('売上伝票へ渡せませんでした（この端末のブラウザに保存できません）', 'error');
@@ -91,7 +91,7 @@ export function UriageDialog({job, s, materials, setJob, onClose}: {job: Job; s:
           '明細',
           a.total > 0 ? (
             <span className="tabular-nums text-slate-800">
-              住宅改修工事 {yen(a.total)}円（税込）・仕切り {yen(a.cost)}円
+              住宅改修工事 {yen(a.total)}円（税込）
               {a.target < a.total && `・介護保険の対象 ${yen(a.target)}円`}
             </span>
           ) : (

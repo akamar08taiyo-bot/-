@@ -61,8 +61,8 @@ try {
     assert.equal(await dialog.getByRole('button', {name: '🧾 売上伝票発行依頼書を開く'}).isDisabled(), true);
     // サンプル：見積書の合計 26,950円（e2e-estimate.mjs）
     const detail = await dialog.getByRole('group', {name: '売上伝票に入れる内容'}).innerText();
-    assert.match(detail, /住宅改修工事 26,950円（税込）・仕切り ([\d,]+)円/);
-    const cost = Number(/仕切り ([\d,]+)円/.exec(detail)[1].replace(/,/g, ''));
+    assert.match(detail, /住宅改修工事 [\d,]+円（税込）/); // 金額は売上伝票の欄で確かめる
+    assert.doesNotMatch(detail, /仕切り/); // 仕切りは売上伝票に入れない（ユーザーの指示「ここは自動で入れない」2026-11-12）
     await page.screenshot({path: `${outDir}/uriage-01-dialog-missing-${tag}.png`});
     await dialog.getByRole('group', {name: '伝票の負担割合'}).getByRole('button', {name: '1割'}).click();
     await dialog.getByLabel('伝票の介護度').selectOption('要介護1');
@@ -78,7 +78,7 @@ try {
     assert.equal(await slip.getByPlaceholder('例: 山田太郎').inputValue(), '（サンプル）山田');
     assert.equal(await slip.getByPlaceholder(/施工業者名を入力|入力 \/ 候補から選択/).inputValue(), ''); // 請求先（工務店）の名前は設定で入れたときだけ（2026-11-03）
     assert.deepEqual(await slip.getByPlaceholder('金額(税込)').evaluateAll((l) => l.map((x) => x.value)), ['26950']);
-    assert.deepEqual(await slip.getByPlaceholder('仕切り(税込)').evaluateAll((l) => l.map((x) => x.value)), [String(cost)]);
+    assert.deepEqual(await slip.getByPlaceholder('仕切り(税込)').evaluateAll((l) => l.map((x) => x.value)), ['']); // 仕切りの欄は空（手で入れる）
     const text = await slip.locator('main').innerText();
     assert.match(text, /対象内利用者負担額（1割・切り上げ）\s*¥2,695/);
     assert.match(text, /保険者負担額（9割・切り下げ）\s*¥24,255/);
@@ -96,13 +96,12 @@ try {
       '介護度介護１',
       '負担割合1割',
       '¥26,950',
-      `¥${cost.toLocaleString('ja-JP')}`,
     ]) {
       assert.ok(printed.includes(t), `伝票に「${t}」がない：${printed}`);
     }
     await slip.screenshot({path: `${outDir}/uriage-03-slip-${tag}.png`, fullPage: true});
     await slip.close();
-    log(`${tag}: 売上伝票が工事1行・仕切り ${cost}円で開いた`);
+    log(`${tag}: 売上伝票が工事1行・仕切りは空で開いた`);
 
     // 生活保護：もう一度開く（新規・既存・負担割合は覚えている）
     await (await openMore(page)).getByRole('button', {name: '🧾 売上伝票を作成', exact: true}).click();

@@ -1,14 +1,14 @@
 // 売上伝票発行依頼書（太陽ポータルと同じサイトの /taiyo-uriage-denpyo/）へ渡す内容（住宅改修）。
 // ユーザーの依頼「売上伝票の発行依頼書を自動的に作りたい」と、相談で決めたこと（2026-10-27）：置き場所は工事見積書のタブの上の段、
-// 住宅改修の明細は「住宅改修工事」の1行（見積書の合計（税込）と、工務店に払う仕切り＝仕切り計算表の合計（税込））。
+// 住宅改修の明細は「住宅改修工事」の1行（見積書の合計（税込））。仕切り（工務店に払う額）は入れない（売上伝票で手で入れる。
+// ユーザーの指示「ここは自動で入れない」2026-11-12。前は仕切り計算表の合計を入れていた）。
 // 足りない所（負担割合・介護度・新規／既存・施工日）は窓（estimate/UriageDialog.tsx）で入れてから、中身の入った売上伝票を新しいタブで開く。
 // お客様の情報は URL に載せず、この端末の localStorage（taiyo-uriage-import-v1）に置く。売上伝票のアプリ（src/lib/importRequest.js）が受け取ったらすぐ消す。
 // 特定福祉用具（src/tokutei/uriage.ts）も同じ口。形を変えるときは、受け取る側（売上伝票）を先に公開する。
 
-import {estimateTotals, jobTotals} from './calc.ts';
+import {estimateTotals} from './calc.ts';
 import {NO_SHINSEI} from './estimateForms.ts';
-import {shikiriBars} from './order.ts';
-import type {Job, Material, Settings} from './types.ts';
+import type {Job, Settings} from './types.ts';
 import {staffFull} from './util.ts';
 
 export const URIAGE_IMPORT_KEY = 'taiyo-uriage-import-v1';
@@ -25,13 +25,10 @@ export function slipCareLevel(level: string): string {
   return m ? `${m[1]}${String.fromCharCode(0xff10 + Number(m[2]))}` : '';
 }
 
-/**
- * 見積書の金額：合計（税込）・介護保険の対象（税込）・工務店に払う仕切り（仕切り計算表の合計＝税込）。
- * materials を渡すと、仕切りの切って使う部材は仕切り計算表と同じく発注書の本数（`shikiriBars`。2026-11-12）
- */
-export function uriageAmounts(job: Job, s: Settings, materials?: Material[]): {total: number; target: number; cost: number} {
+/** 見積書の金額：合計（税込）・介護保険の対象（税込） */
+export function uriageAmounts(job: Job, s: Settings): {total: number; target: number} {
   const e = estimateTotals(job, s);
-  return {total: e.all.total, target: e.target.total, cost: jobTotals(job, s, materials ? shikiriBars(job, materials, s) : undefined).total};
+  return {total: e.all.total, target: e.target.total};
 }
 
 /** 窓で選ぶもの */
@@ -55,9 +52,9 @@ export function uriageMissing(job: Job, s: Settings, c: UriageChoice): {fix: str
 export type UriageRequest = {kind: 'taiyo-uriage-request'; v: 1; createdAt: number; sales: Record<string, unknown>};
 
 /** 売上伝票に入れる内容（売上伝票のアプリの共有リンクの sales と同じ項目＋生活保護 welfare） */
-export function uriageRequest(job: Job, s: Settings, c: UriageChoice, now = Date.now(), materials?: Material[]): UriageRequest {
+export function uriageRequest(job: Job, s: Settings, c: UriageChoice, now = Date.now()): UriageRequest {
   const si = job.shinsei ?? NO_SHINSEI;
-  const a = uriageAmounts(job, s, materials);
+  const a = uriageAmounts(job, s);
   // 介護保険の対象外の工事があるか、対象が限度額（20万円）を超えるときは、売上伝票の「介護保険残高」に対象（20万円まで）を入れて、
   // 残りを実費（超過分）にする（売上伝票は残高が空欄なら全額を対象にする）
   const covered = Math.min(a.target, HOUSING_LIMIT);
@@ -79,7 +76,7 @@ export function uriageRequest(job: Job, s: Settings, c: UriageChoice, now = Date
       careLevel: slipCareLevel(si.care),
       userRatio: Number(si.burden || 1) / 10,
       ...(covered < a.total ? {remaining: covered} : {}),
-      items: [{amount: a.total, cost: a.cost, productName: '住宅改修工事', color: ''}],
+      items: [{amount: a.total, cost: 0, productName: '住宅改修工事', color: ''}], // 仕切りは 0 円＝売上伝票の欄は空のまま
       isSelfPay: false,
       welfare: si.welfare === true,
     },
