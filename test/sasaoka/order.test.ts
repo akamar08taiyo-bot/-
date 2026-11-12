@@ -6,6 +6,7 @@ import {
   bumpOrderQty,
   emptyOrderEdits,
   findHalfMaterial,
+  fitsBars,
   hacchuImport,
   orderBaseLines,
   photoLabel,
@@ -83,11 +84,32 @@ test('切って使う部材の本数：余りが0.1本より少なければも�
   assert.deepEqual(p([[2100, 2]]), [1, 1, 1800, false]); // 合算 4200mm（1.05本）→ 4000mm＋2000mm（2026-11-02 から合算。前は 4000mm 2本）
   // ユーザーの例「0.7本・0.3本・0.2本 → 合算すると2本で足りる」（2026-11-02）：4800mm（1.2本）→ 4000mm＋2000mm
   assert.deepEqual(p([[2800, 1], [1200, 1], [800, 1]]), [1, 1, 1200, false]);
-  // 0.6本×3＝1.8本 → 4000mm 2本（前は手すり1本ずつ入れて 4000mm 3本）
-  assert.deepEqual(p([[2400, 3]]), [2, 0, 800, false]);
+  // 0.6本×3＝1.8本：合算では 4000mm 2本だが余りが 0.2本（800mm）しかなく、2400mm を3本は2本から切り出せない → 4000mm 3本
+  // （ユーザーの指示「全て足して、0.1、0.2本しか残らない場合は、足りなくなる可能性があるので、注意する」2026-11-12。2026-11-02〜11-12 は 4000mm 2本）
+  assert.deepEqual(p([[2400, 3]]), [3, 0, 4800, false]);
   assert.deepEqual(p([[1500, 3]]), [1, 1, 1500, false]); // 4000mm に2本、2000mm に1本
   assert.deepEqual(p([[4500, 1]]), [1, 1, 1500, false]); // 1本より長い（継ぐ）→ 4000mm＋残り 500mm は 2000mm
   assert.deepEqual(p([[3800, 1]], false), [2, 0, 4200, true]); // 2000mm がない部材は 4000mm をもう1本
+});
+
+test('切って使う部材の本数：余りが0.2本以下なら切り分けられるかを確かめる（600mm のように余りから取れれば1本のまま）', () => {
+  // ユーザーの指示「全て足して、0.1、0.2本しか残らない場合は、足りなくなる可能性があるので、注意する」
+  // 「800mm以下でも600mmの手すりが1本ある場合などは使用できるため、1本となる」2026-11-12
+  const p = (pieces: [number, number][], halfOk = true) => {
+    const r = planBars(pieces.map(([mm, count]) => ({mm, count})), 4000, halfOk);
+    return [r.full, r.half, r.slackMm, r.cut];
+  };
+  assert.deepEqual(p([[2600, 1], [600, 1]]), [1, 0, 800, false]); // 余り 800mm（0.2本）でも 2600＋600 は1本から取れる → 1本
+  assert.deepEqual(p([[1700, 2]]), [1, 0, 600, false]); // 1700＋1700 は1本から取れる
+  assert.deepEqual(p([[1800, 4]]), [2, 0, 800, false]); // 1本に 1800 を2本ずつ → 2本で足りる
+  assert.deepEqual(p([[1500, 5]]), [2, 1, 2500, true]); // 1本に 1500 を2本ずつで4本、5本目が入らない → 2000mm をもう1本
+  assert.deepEqual(p([[2400, 3]], false), [3, 0, 4800, true]);
+  assert.deepEqual(p([[2100, 2]]), [1, 1, 1800, false]); // 余りが 0.2本より多い（1800mm）ときは今までどおり合算（継ぐかは工務店で判断）
+  // 切り分けられるか
+  assert.equal(fitsBars([{mm: 2600, count: 1}, {mm: 600, count: 1}], 4000, 1, 0), true);
+  assert.equal(fitsBars([{mm: 2400, count: 3}], 4000, 2, 0), false);
+  assert.equal(fitsBars([{mm: 2400, count: 3}], 4000, 2, 1), false); // 2000mm から 2400mm は取れない
+  assert.equal(fitsBars([{mm: 4500, count: 1}], 4000, 1, 1), true); // 1本より長い手すりは 4000mm＋残り 500mm
 });
 
 test('2000mmの品を部材リストから探す（長さだけ違う同じ品。品番 BD-134 → BD-132 も手がかり）', () => {

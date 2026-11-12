@@ -5,6 +5,11 @@
 //   発注書に入れる…0.7本・0.3本・0.2本…合算すると2本で足りるので、2本」2026-11-02。前は手すり1本ずつ入る1本に入れていき、合算より多くなることがあった）：
 //     ・合算の本数の端数（4000mm なら合算 − まるごとの本数）が半分の長さ（2000mm）で足りれば、2000mm にする（部材リストの 2000mm の品。なければ品番を空けて知らせる）
 //     ・余り（発注する長さ − 使う長さ）が 0.1本（4000mm なら 400mm）より少ないときは危ないので、もう1本（2000mm）
+//     ・余りが 0.2本（800mm）以下なら、手すり1本1本を継がずに切り出せるかを確かめ、だめならもう1本（2000mm で足りれば 2000mm）。
+//       600mm の手すりのように余りから取れれば、そのまま（ユーザーの指示「全て足して、0.1、0.2本しか残らない場合は、足りなくなる可能性があるので、注意する」
+//       「800mm以下でも600mmの手すりが1本ある場合などは使用できるため、1本となる」2026-11-12）
+//     例：2400mm×3（1.8本）→ 合算では 4000mm 2本で余り 800mm だが、2400mm は1本から1つしか取れない → 4000mm を3本
+//         2600mm＋600mm（0.8本）→ 4000mm 1本から両方取れる → 4000mm を1本（余り 800mm のまま）
 //     例：0.7本＋0.3本＋0.2本＝1.2本（4800mm）→ 4000mm を1本＋2000mm を1本（余り 1200mm）
 //         600mm×2＋1600mm×1＝2800mm（0.7本）→ 4000mm を1本（余り 1200mm）
 //         1600mm×1（0.4本）→ 2000mm を1本（余り 400mm）
@@ -21,6 +26,12 @@ import {num, staffShort, uid} from './util.ts';
 
 /** 余りがこれより少ないと危ないので、もう1本（1本の長さに対する割合。4000mm なら 400mm） */
 export const ORDER_MARGIN = 0.1;
+/**
+ * 余りがこれ以下（0.1本・0.2本。4000mm なら 800mm）のときは、合算では足りても実際に切り分けられるかを確かめ、切り分けられなければもう1本
+ * （ユーザーの指示「全て足して、0.1、0.2本しか残らない場合は、足りなくなる可能性があるので、注意する」
+ * 「800mm以下でも600mmの手すりが1本ある場合などは使用できるため、1本となる」2026-11-12）
+ */
+export const ORDER_CHECK = 0.2;
 
 const EPS = 1e-6;
 const norm = (s: string) => normalize(s).toLowerCase();
@@ -46,7 +57,56 @@ export type BarPlan = {
   slackMm: number; // 余り（発注する長さの合計 − 使う長さの合計）
   extra: boolean; // 余りが 0.1本より少ないので、もう1本足した
   halved: boolean; // 2000mm で足りる1本を 2000mm にした
+  cut: boolean; // 余りが 0.2本以下で、合算では足りても切り分けられないので、もう1本足した
 };
+
+/**
+ * 手すりの1本1本（使う長さ）を、full 本の stockMm と half 本の半分の長さから、継がずに切り出せるか。
+ * 1本より長い手すり（継いで使う）は、まるごとの本数を先に使い、残りの長さを1本として切り出す。数が多いとき（16本より多い）は大きい順に入る所へ入れる見当
+ */
+export function fitsBars(pieces: {mm: number; count: number}[], stockMm: number, full: number, half: number): boolean {
+  const TOL = 0.5; // mm
+  const list: number[] = [];
+  let fullLeft = full;
+  for (const p of pieces) {
+    if (!(p.mm > EPS) || !(p.count > EPS)) continue;
+    const whole = Math.floor(p.count + EPS);
+    const parts = [...Array(whole).fill(p.mm), ...(p.count - whole > EPS ? [p.mm * (p.count - whole)] : [])];
+    for (let mm of parts) {
+      const k = Math.floor(mm / stockMm + EPS);
+      if (k > 0) {
+        fullLeft -= k;
+        mm -= k * stockMm;
+      }
+      if (mm > TOL) list.push(mm);
+    }
+  }
+  if (fullLeft < 0) return false;
+  const bins = [...Array(fullLeft).fill(stockMm), ...Array(half).fill(stockMm / 2)];
+  list.sort((a, b) => b - a);
+  if (list.length > 16) {
+    for (const mm of list) {
+      const j = bins.findIndex((c) => c + TOL >= mm);
+      if (j < 0) return false;
+      bins[j] -= mm;
+    }
+    return true;
+  }
+  const place = (i: number): boolean => {
+    if (i === list.length) return true;
+    const tried = new Set<number>();
+    for (let j = 0; j < bins.length; j++) {
+      const c = bins[j];
+      if (c + TOL < list[i] || tried.has(Math.round(c))) continue;
+      tried.add(Math.round(c));
+      bins[j] = c - list[i];
+      if (place(i + 1)) return true;
+      bins[j] = c;
+    }
+    return false;
+  };
+  return place(0);
+}
 
 /**
  * 使う長さ（mm×本数）から、1本 stockMm の部材を何本発注するか。halfOk のときは、半分の長さの品も使う。
@@ -76,7 +136,20 @@ export function planBars(pieces: {mm: number; count: number}[], stockMm: number,
     else full++;
     slack += halfOk ? halfMm : stockMm;
   }
-  return {full, half, totalMm, slackMm: slack, extra, halved};
+  // 余りが 0.2本以下なら、継がずに切り分けられるかを確かめる（600mm の手すりなど余りから取れれば、そのまま）。
+  // 切り分けられなければ、もう1本（2000mm で切り分けられれば 2000mm、だめなら 4000mm）
+  let cut = false;
+  while (totalMm > EPS && slack <= ORDER_CHECK * stockMm + EPS && !fitsBars(pieces, stockMm, full, half)) {
+    cut = true;
+    if (halfOk && fitsBars(pieces, stockMm, full, half + 1)) {
+      half++;
+      slack += halfMm;
+    } else {
+      full++;
+      slack += stockMm;
+    }
+  }
+  return {full, half, totalMm, slackMm: slack, extra, halved, cut};
 }
 
 // ---------------------------------------------------------------- 2000mm の品
