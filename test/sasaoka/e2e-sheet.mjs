@@ -12,6 +12,7 @@ import {cellAt, chooseLabor, clickStable, insertBelow, moreItems, navItem, noPic
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
+const y = (n) => n.toLocaleString('ja-JP'); // 金額の見せ方（3けたごとの「,」）
 const browser = await chromium.launch();
 const errors = [];
 const ctx = await browser.newContext({viewport: {width: 1366, height: 900}, locale: 'ja-JP'});
@@ -622,20 +623,21 @@ await (await openMore(page)).getByRole('button', {name: '🧾 請求書を見る
 await page.waitForURL(/#tab=invoice&job=/);
 await page.getByRole('heading', {level: 1, name: '見本 太郎様邸'}).waitFor();
 const shikiri = await page.locator('aside table').innerText();
-// 切って使う部材は発注書と同じ本数（ユーザーの指示「1本単位でお願いします」2026-11-12）：木の手すり 4m を 60cm（0.15本）→ 発注書は 2000mm を1本。
-// サンプルの部材リストに 2000mm の品がないので、その行の仕切価格は空欄（0円）で「確かめてください」と出す（前は 0.15本×10,000円＝1,500円で 9,900）
-assert.ok(shikiri.includes('部材代合計') && shikiri.includes('8,400') && shikiri.includes('5,000'), shikiri); // 取付手間 2,000＋3,000
+// 切って使う部材は使った分（ユーザーの指示「請求書は、使った本数分（0.6本使ったなら、0.6本分の仕切り票となる」2026-11-12）：
+// 木の手すり 4m を 60cm → 0.15本×10000円＝1500円（同じ日の朝の1本単位＝発注書の本数で数えたのは戻した）
+assert.ok(shikiri.includes('部材代合計') && shikiri.includes(y(9900)) && shikiri.includes(y(5000)), shikiri); // 取付手間 2000＋3000
 {
   // 下に別の表は作らず、箇所の表の行に発注の本数・カットの列（ユーザーの指示「２つに分ける必要はない。一つで良い。ただし、カットして使用することがわかるように列を追加する」2026-11-12）
   assert.equal(await page.locator('[data-shikiri-bars]').count(), 0);
   const cutRow = page.locator('table.rows-table tr', {has: page.locator('td[data-cell="cut"]', {hasText: 'mm'})}).first();
   const text = await cutRow.innerText();
   assert.match(text, /600mm/); // カット
-  assert.match(text, /2000mm/); // 発注する品（2000mm）
-  assert.match(text, /品番・価格を確かめてください/);
-  assert.match(text, /発注 .*1本/);
+  assert.match(text, /使用 0\.15本/); // 金額はこの分
+  assert.ok(text.includes(y(1500)), text);
+  assert.match(text, /発注 .*1本/); // 発注書の本数は見せるだけ
+  assert.doesNotMatch(text, /品番・価格を確かめてください/); // 発注書の品の値段は仕切りに使わないので出さない
 }
-log('仕切り計算表につながる・切って使う部材は発注書と同じ1本単位OK');
+log('仕切り計算表につながる・切って使う部材は使った分（発注の本数は見せるだけ）OK');
 
 // ---------------- 様邸の画面（請求書を確認する）の左上は「← 見積もりへ戻る」：同じ見積書が開く。請求書のタブは一覧に戻っている。右の「📝 見積書を開く」も残す
 assert.equal(await page.getByRole('button', {name: '← 一覧へ戻る'}).count(), 0);

@@ -67,7 +67,8 @@ export function listPriceOf(row: Pick<Row, 'kind' | 'price' | 'listPrice'>): num
 /**
  * 行の金額 ＝ 単価（仕切価格）×数量（1円単位に四捨五入）。切って使う部材は見積書と同じく 使う長さ÷1本の長さ の本数で数える
  * （仕切価格 10,000円・1本4m を60cm使う → 0.15本・1,500円）。割り切れない数量（1m÷3m など）は丸める前の数量で計算する。
- * 仕切り計算表・請求書では、1本の長さのある部材はこの金額ではなく発注書と同じ本数で数える（order.ts の shikiriBars・jobTotals の bars。2026-11-12）
+ * 仕切り計算表・請求書もこの金額（使った分。0.6本使えば0.6本分。ユーザーの指示「請求書は、使った本数分（0.6本使ったなら、0.6本分の仕切り票となる」2026-11-12。
+ * 同じ日の朝に発注書と同じ1本単位の本数にしたのを戻した。発注書は今までどおり1本単位）
  */
 export function rowAmount(row: Pick<Row, 'kind' | 'price' | 'listPrice' | 'qty' | 'lengthCm' | 'pieceLengthM'>): number {
   const price = shikiriPrice(row);
@@ -77,18 +78,11 @@ export function rowAmount(row: Pick<Row, 'kind' | 'price' | 'listPrice' | 'qty' 
 
 export type PlaceTotals = {material: number; labor: number; total: number};
 
-/**
- * 仕切り計算表で発注書の本数で数える部材（order.ts の shikiriBars）：その見積書の行（rowIds）は箇所の金額に入れず、様邸で amount（仕切価格×発注する本数）を足す。
- * 渡さなければ前と同じ（どの行も 仕切価格×数量。部材＋施工費（常用）の金額など）
- */
-export type BarTotals = {rowIds: Set<string>; amount: number};
-
-/** 箇所の部材・手間の金額。skip の行（発注書の本数で数える部材）は入れない */
-export function placeTotals(place: Pick<Place, 'rows'>, skip?: Set<string>): PlaceTotals {
+/** 箇所の部材・手間の金額（どの行も 仕切価格×数量。切って使う部材は使った分） */
+export function placeTotals(place: Pick<Place, 'rows'>): PlaceTotals {
   let material = 0;
   let labor = 0;
   for (const r of place.rows) {
-    if (skip?.has(r.id)) continue;
     if (r.kind === 'labor') labor += rowAmount(r);
     else material += rowAmount(r);
   }
@@ -107,11 +101,11 @@ export type JobTotals = {
 
 export type CalcSettings = Pick<Settings, 'rate' | 'taxRate' | 'taxMode'>;
 
-export function jobTotals(job: Pick<Job, 'places'>, s: CalcSettings, bars?: BarTotals): JobTotals {
-  let material = bars?.amount ?? 0;
+export function jobTotals(job: Pick<Job, 'places'>, s: CalcSettings): JobTotals {
+  let material = 0;
   let labor = 0;
   for (const p of job.places) {
-    const t = placeTotals(p, bars?.rowIds);
+    const t = placeTotals(p);
     material += t.material;
     labor += t.labor;
   }
@@ -152,8 +146,8 @@ export type MonthSummary = {
   invoice: {subtotal: number; tax: number; total: number; mode: InvoiceTaxMode};
 };
 
-export function monthSummary(jobs: Job[], s: CalcSettings & Pick<Settings, 'invoiceTaxMode' | 'totalTaxRounding'>, barsOf?: (job: Job) => BarTotals): MonthSummary {
-  const rows = sortJobs(jobs).map((job) => ({job, totals: jobTotals(job, s, barsOf?.(job))}));
+export function monthSummary(jobs: Job[], s: CalcSettings & Pick<Settings, 'invoiceTaxMode' | 'totalTaxRounding'>): MonthSummary {
+  const rows = sortJobs(jobs).map((job) => ({job, totals: jobTotals(job, s)}));
   const sum = rows.reduce((acc, r) => addTotals(acc, r.totals), ZERO_TOTALS);
   if (s.invoiceTaxMode === 'monthly') {
     // すべての様邸を合計した税抜の金額に、最後に消費税率をかける
@@ -172,7 +166,7 @@ export function jobName(job: Pick<Job, 'customer' | 'suffix'>): string {
 // ---------------------------------------------------------------- 見積書
 // 元の見積書（苅田町・行橋市・みやこ町用、広域連合用）と同じく、金額はすべて ROUNDDOWN（1円未満を切り捨て）。
 // 部材の単価 ＝ 定価×掛率（0.8）。規格品をそのまま使うときは 数量＝本数（1本4mの手すりなら1本）。
-// 切って使うとき（使う長さを入れた部材）は 数量＝使う長さ÷1本の長さ（笹岡工務店の仕切り計算表は 2026-11-12 から発注書と同じ1本単位の本数）。
+// 切って使うとき（使う長さを入れた部材）は 数量＝使う長さ÷1本の長さ（笹岡工務店の仕切り計算表・請求書も同じ数量。発注書だけ1本単位の本数）。
 //   例：定価 20,000円（1本4m）を60cm使う → 0.6÷4＝0.15本、単価 16,000円、金額 16,000×0.15＝2,400円
 // 取付手間は、部材のすぐ下に続く手間の行を足して「同上施工費」の1行にする。施工費は取付手間のマスタの見積の単価（こちらで決める）×箇所数。
 //   見積の単価を入れていない手間は 仕切り（笹岡工務店）×1.5（設定の率。例：木 2箇所 ＝ 仕切り 2,000円 → 見積 3,000円）。

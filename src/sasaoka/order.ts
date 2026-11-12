@@ -440,10 +440,9 @@ export function shikiriBars(job: Pick<Job, 'places'> & {order?: OrderEdits | nul
 }
 
 /**
- * 仕切り計算表の箇所の表に、切って使う部材の本数・金額を割りあてる（下に別の表を作らない。ユーザーの指示「切って使うなどで２つに分ける必要はない。
- * 一つで良い。ただし、カットして使用することがわかるように列を追加する」2026-11-12）。
- * 発注書の1行（箇所をまたいで合算した本数）は、その部材をいちばん初めに使う行（箇所の順・行の順）に入れ、同じ部材のほかの行は within にその行を書く。
- * どの行の金額を足しても bars.amount と同じになる
+ * 仕切り計算表の箇所の表の行に、発注書の本数（1本単位）を割りあてる（数量の下に「発注 1本」と見せるだけ。金額は使った分＝rowAmount。
+ * ユーザーの指示「請求書は、使った本数分（0.6本使ったなら、0.6本分の仕切り票となる」2026-11-12）。
+ * 発注書の1行（箇所をまたいで合算した本数）は、その部材をいちばん初めに使う行（箇所の順・行の順）に入れ、同じ部材のほかの行は within にその行を書く
  */
 export type BarRow = {lines: OrderLine[]; amount: number; within: {rowId: string; place: string} | null};
 
@@ -469,9 +468,6 @@ export function barRowMap(job: Pick<Job, 'places'>, bars: ShikiriBars): Map<stri
   }
   return out;
 }
-
-/** 箇所の切って使う部材の金額（barRowMap で、その箇所の行に入れた分） */
-export const barPlaceAmount = (place: Pick<Place, 'rows'>, map: Map<string, BarRow>) => place.rows.reduce((n, r) => n + (map.get(r.id)?.amount ?? 0), 0);
 
 /** 「カット」の列：切って使う長さ（2400mm。2本切るときは 600mm×2） */
 export function cutLabel(r: Pick<Row, 'lengthCm' | 'qty' | 'pieceLengthM'>): string {

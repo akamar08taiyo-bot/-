@@ -343,47 +343,38 @@ test('販売受注簿へ渡す内容（数量は1以上の整数・営業担当�
   assert.deepEqual([full.furigana, full.tel, full.requester, full.deliveryDate], ['ヤマダ　タロウ', '0930-00-0000', '見本 次郎', '2026-11-05']);
 });
 
-test('仕切り計算表の切って使う部材は発注書と同じ本数（箇所をまたいで合算・2000mm・発注書で直した数・消した行）。ほかの行は今までどおり', async () => {
-  // ユーザーの指示「仕切り計算票では、部材が0.6本などの計算になっているが、1本まるまる送るようになるため、1本単位でお願いします」
-  // 「合算して1本となる。0.3本が2箇所でも1本」・答え「発注書と同じ本数」2026-11-12
+test('仕切り計算表・請求書の切って使う部材は使った分（0.6本なら0.6本分）。発注書の本数（1本単位）は数量の下に見せるだけ', async () => {
+  // ユーザーの指示「請求書は、使った本数分（0.6本使ったなら、0.6本分の仕切り票となる」2026-11-12
+  // （同じ日の朝の「1本まるまる送るようになるため、1本単位で」で発注書と同じ本数にしたのを戻した。発注書は1本単位のまま）
   const {shikiriBars} = await import('../../src/sasaoka/order.ts');
   const {jobTotals, placeTotals} = await import('../../src/sasaoka/calc.ts');
   const S = {rate: 0.07, taxRate: 0.1, taxMode: 'original' as const};
   const mats = [BD134, BD132, BRACKET];
-  // 0.3本（1200mm）が2箇所 → 合算 2400mm → 4000mm を1本（仕切価格 6,000円）。ブラケットは見積書の数のまま
+  // 0.3本（1200mm）が2箇所：仕切りは 0.3本分ずつ（6000円×0.3＝1800円）。発注書は合算 2400mm → 4000mm を1本
   const two = job(['廊下', [cut(BD134, 120), materialRow(BRACKET, 2)]], ['トイレ', [cut(BD134, 120)]]);
-  const b = shikiriBars(two, mats, RATE);
-  assert.deepEqual(b.lines.map((l) => [l.code, l.qty, l.price]), [['BD-134', 1, 6000]]);
-  assert.equal(b.amount, 6000);
-  assert.equal(b.rowIds.size, 2); // 手すりの2行は箇所の金額に入れない
-  assert.equal(placeTotals(two.places[0], b.rowIds).material, 1000); // 廊下はブラケット 500円×2 だけ
-  assert.equal(placeTotals(two.places[1], b.rowIds).material, 0);
-  assert.equal(jobTotals(two, S, b).material, 7000); // 6,000＋1,000（前は 0.3本×2＝0.6本 → 3,600＋1,000）
-  assert.equal(jobTotals(two, S).material, 4600); // 渡さなければ前と同じ
-  // 0.6本（2400mm）が1箇所 → 1本
+  assert.equal(placeTotals(two.places[0]).material, 2800); // 1800＋ブラケット 500円×2
+  assert.equal(placeTotals(two.places[1]).material, 1800);
+  assert.equal(jobTotals(two, S).material, 4600);
+  assert.deepEqual(shikiriBars(two, mats, RATE).lines.map((l) => [l.code, l.qty]), [['BD-134', 1]]);
+  // 0.6本（2400mm）が1箇所 → 0.6本分（3600円）。発注書は1本
   const one = job(['廊下', [cut(BD134, 240)]]);
-  assert.equal(shikiriBars(one, mats, RATE).amount, 6000);
-  // 0.3本（1200mm）が1箇所 → 発注書は 2000mm（BD-132）を1本 → 仕切価格 3,200円
+  assert.equal(jobTotals(one, S).material, 3600);
+  assert.deepEqual(shikiriBars(one, mats, RATE).lines.map((l) => [l.code, l.qty]), [['BD-134', 1]]);
+  // 0.3本（1200mm）が1箇所 → 仕切りは 0.3本分。発注書は 2000mm（BD-132）を1本
   const short = job(['廊下', [cut(BD134, 120)]]);
-  assert.deepEqual(shikiriBars(short, mats, RATE).lines.map((l) => [l.code, l.qty, l.price]), [['BD-132', 1, 3200]]);
-  // 発注書で数を直した・消した行も同じ（足した行は入れない）
-  const base = orderBaseLines(two, mats, RATE);
-  const bar = base.find((l) => l.code === 'BD-134')!;
+  assert.equal(jobTotals(short, S).material, 1800);
+  assert.deepEqual(shikiriBars(short, mats, RATE).lines.map((l) => [l.code, l.qty]), [['BD-132', 1]]);
+  // 発注書で数を直した・消しても、仕切りは使った分のまま
+  const bar = orderBaseLines(two, mats, RATE).find((l) => l.code === 'BD-134')!;
   const edited = {...two, order: addOrderLine(setOrderQty(emptyOrderEdits(), bar, 2), {...materialRow(BRACKET, 3)})};
-  assert.equal(shikiriBars(edited, mats, RATE).amount, 12000);
-  assert.equal(jobTotals(edited, S, shikiriBars(edited, mats, RATE)).material, 13000); // 発注書で足したブラケットは入れない
+  assert.equal(jobTotals(edited, S).material, 4600);
   const removed = {...two, order: removeOrderLine(emptyOrderEdits(), bar)};
-  assert.equal(shikiriBars(removed, mats, RATE).amount, 0);
-  assert.equal(jobTotals(removed, S, shikiriBars(removed, mats, RATE)).material, 1000);
-  // 切って使う部材がなければ何も変えない
-  const plain = job(['廊下', [materialRow(BRACKET, 2)]]);
-  assert.equal(shikiriBars(plain, mats, RATE).rowIds.size, 0);
-  assert.equal(jobTotals(plain, S, shikiriBars(plain, mats, RATE)).material, jobTotals(plain, S).material);
+  assert.equal(jobTotals(removed, S).material, 4600);
 });
 
-test('仕切り計算表は1つの表：切って使う部材の本数・金額は初めに使う行に入れ、ほかの行は「含む」・カットの列（2026-11-12）', async () => {
+test('仕切り計算表は1つの表：発注書の本数は初めに使う行に（数量の下に見せる）・カットの列（2026-11-12）', async () => {
   // ユーザーの指示「切って使うなどで２つに分ける必要はない。一つで良い。ただし、カットして使用することがわかるように列を追加する」
-  const {shikiriBars, barRowMap, barPlaceAmount, cutLabel} = await import('../../src/sasaoka/order.ts');
+  const {shikiriBars, barRowMap, cutLabel} = await import('../../src/sasaoka/order.ts');
   const mats = [BD134, BD132, BRACKET];
   const two = job(['廊下', [cut(BD134, 120), materialRow(BRACKET, 2)]], ['トイレ', [cut(BD134, 120)]]);
   const bars = shikiriBars(two, mats, RATE);
@@ -394,8 +385,6 @@ test('仕切り計算表は1つの表：切って使う部材の本数・金額�
   assert.equal(map.get(a.id)!.within, null);
   assert.deepEqual(map.get(b.id), {lines: [], amount: 0, within: {rowId: a.id, place: '廊下'}});
   assert.equal(map.has(two.places[0].rows[1].id), false); // ブラケットは今までどおり
-  assert.deepEqual([barPlaceAmount(two.places[0], map), barPlaceAmount(two.places[1], map)], [6000, 0]);
-  assert.equal(barPlaceAmount(two.places[0], map) + barPlaceAmount(two.places[1], map), bars.amount);
   // カットの列：使う長さ（2本切るときは ×2）。切らずに使う部材は空
   assert.equal(cutLabel(cut(BD134, 240)), '2400mm');
   assert.equal(cutLabel(cut(BD134, 60, 2)), '600mm×2');

@@ -10,6 +10,7 @@ import {navItem, newFromList} from './more.mjs';
 
 const [site, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
+const y = (n) => n.toLocaleString('ja-JP'); // 金額の見せ方（3けたごとの「,」）
 const browser = await chromium.launch();
 const errors = [];
 // 同じブラウザ（同じ保存場所）の2つのタブ
@@ -31,16 +32,16 @@ watch(shi, '仕切り');
 await shi.goto(`${site}/sasaoka/index.html`);
 await shi.getByRole('cell', {name: '（サンプル）山田様邸', exact: true}).click();
 const shiTotal = () => shi.locator('aside table').innerText();
-assert.ok((await shiTotal()).includes('11,400')); // ①部材代：手すり60cm は発注書と同じ 2000mm 1本（サンプルに 2000mm の品がないので 0円）＋3,000＋7,800＋600
+assert.ok((await shiTotal()).includes(y(12900))); // ①部材代：手すり60cm は使った分 10000×0.15＝1500＋3000＋7800＋600（2026-11-12）
 
-// ---------------- 見積書で L型手すりを2本にする → 開いたままの仕切り計算に入る（①部材代 11,400＋7,800＝19,200）
+// ---------------- 見積書で L型手すりを2本にする → 開いたままの仕切り計算に入る（①部材代 12900＋7800＝20700）
 await est.getByRole('cell', {name: /（サンプル）山田様邸/}).click();
 const sheet = est.getByRole('region', {name: '見積書', exact: true});
 const qtyKey = await sheet.locator('.form-page tr', {hasText: 'L型手すり'}).first().locator('[data-edit$=":qty"]').first().getAttribute('data-edit');
 await sheet.locator(`[data-edit="${qtyKey}"]`).click();
 await est.keyboard.type('2');
 await est.keyboard.press('Enter');
-await shi.waitForFunction(() => document.querySelector('aside table')?.textContent?.includes('19,200'), null, {timeout: 5000});
+await shi.waitForFunction((v) => document.querySelector('aside table')?.textContent?.includes(v), y(20700), {timeout: 5000});
 assert.equal(await shi.getByRole('textbox', {name: 'L型手すりの数量'}).inputValue(), '2');
 log('見積書で直す → 開いたままの仕切り計算に入るOK');
 

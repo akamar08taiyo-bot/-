@@ -1,8 +1,8 @@
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
-import {cutToLength, jobName, jobTotals, placeTotals, rowAmount, taxFormula} from '../calc.ts';
+import {cutToLength, estimateQty, jobName, jobTotals, placeTotals, rowAmount, taxFormula} from '../calc.ts';
 import type {JobTotals} from '../calc.ts';
 import {offEstimate} from '../estimateForms.ts';
-import {barPlaceAmount, barRowMap, cutLabel, shikiriBars} from '../order.ts';
+import {barRowMap, cutLabel, shikiriBars} from '../order.ts';
 import type {BarRow} from '../order.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {addMaterial, changeRowQty, copyRows, kitFromRows, laborForText, laborOwner, manualRow, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
@@ -64,11 +64,11 @@ export function JobEditor({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  // 切って使う部材は発注書と同じ本数（1本単位。order.ts の shikiriBars。ユーザーの指示「1本まるまる送るようになるため、1本単位で」2026-11-12）
+  // 切って使う部材の金額は使った分（0.6本なら0.6本分。ユーザーの指示「請求書は、使った本数分（0.6本使ったなら、0.6本分の仕切り票となる」2026-11-12）。
+  // 発注書の本数（1本単位。order.ts の shikiriBars）は、数量の下に「発注 1本」と見せるだけ（金額には入れない）
   const bars = useMemo(() => shikiriBars(job, data.materials, s), [job, data.materials, s]);
-  // 本数・金額は箇所の表の行に入れる（下に別の表を作らない。「２つに分ける必要はない。一つで良い」2026-11-12）
   const barMap = useMemo(() => barRowMap(job, bars), [job, bars]);
-  const totals = jobTotals(job, s, bars);
+  const totals = jobTotals(job, s);
 
   const setJob = (fn: (j: Job) => Job) =>
     update('jobs', (list) => list.map((j) => (j.id === job.id ? {...fn(j), updatedAt: Date.now()} : j)));
@@ -398,7 +398,7 @@ function PlaceCard({
   onAddBlank,
   barMap,
 }: {
-  barMap: Map<string, BarRow>; // 切って使う部材の行：発注書と同じ本数・金額（order.ts の barRowMap）
+  barMap: Map<string, BarRow>; // 切って使う部材の行：発注書の本数（数量の下に見せるだけ。order.ts の barRowMap）
   place: Place;
   first: boolean;
   last: boolean;
@@ -415,10 +415,7 @@ function PlaceCard({
   onSaveKit: () => void;
   onAddBlank: (kind: 'material' | 'labor') => void;
 }) {
-  // 切って使う部材は、この箇所の行に入れた発注書の本数の金額を足す
-  const pt = placeTotals(place, new Set(barMap.keys()));
-  const barAmount = barPlaceAmount(place, barMap);
-  const t = {material: pt.material + barAmount, labor: pt.labor, total: pt.total + barAmount};
+  const t = placeTotals(place);
   const listId = `places-${place.id}`;
   const setRow = (id: string, patch: Partial<Row>) => onRows(place.rows.map((r) => (r.id === id ? {...r, ...patch} : r)));
   const moveRow = (i: number, d: number) => {
@@ -502,7 +499,6 @@ function PlaceCard({
                       const owner = laborOwner(place.rows, i);
                       return owner && <div className="px-2 text-xs text-slate-600">{laborForText(owner)}</div>;
                     })()}
-                    {barMap.get(r.id)?.lines.map((l) => l.warn && <div key={l.key} className="px-2 text-xs font-bold text-amber-700">{l.warn}</div>)}
                   </td>
                   <td data-cell="cut" data-label={cutToLength(r) ? 'カット' : undefined} className="px-2 py-1.5 text-center tabular-nums text-slate-700">
                     {cutLabel(r)}
@@ -517,16 +513,23 @@ function PlaceCard({
                   </td>
                   <td data-cell="qty" data-label="数量・箇所" className="px-2 py-1.5 text-center">
                     <Stepper value={r.qty} onChange={(qty) => setRow(r.id, {qty})} ariaLabel={`${r.name || '金額だけの行'}の数量`} />
-                    {/* 切って使う部材は発注書と同じ本数で数える（箇所をまたいで合算した本数は、初めに使う行に） */}
-                    {barMap.get(r.id)?.lines.length ? (
-                      <div className="mt-0.5 text-[11px] text-slate-600">
-                        {/* 発注する品が見積書の部材とちがう（2000mm の品など）ときは品番（なければ品名）も */}
-                        発注 {barMap.get(r.id)!.lines.map((l) => `${l.code !== r.code.trim() || l.name !== r.name.trim() ? `${l.code || l.name} ` : ''}${num(l.qty, 3)}${l.unit}`).join('・')}
+                    {/* 切って使う部材：金額は使った分（0.6本）。発注書の本数（1本単位。箇所をまたいで合算した本数は、初めに使う行に）は下に小さく */}
+                    {cutToLength(r) && (
+                      <div className="mt-0.5 text-[11px] text-slate-600" data-used>
+                        使用 {num(estimateQty(r), 3)}
+                        {r.unit || '本'}
+                        {barMap.get(r.id)?.lines.length
+                          ? // 発注する品が見積書の部材とちがう（2000mm の品など）ときは品番（なければ品名）も
+                            `・発注 ${barMap
+                              .get(r.id)!
+                              .lines.map((l) => `${l.code !== r.code.trim() || l.name !== r.name.trim() ? `${l.code || l.name} ` : ''}${num(l.qty, 3)}${l.unit}`)
+                              .join('・')}`
+                          : ''}
                       </div>
-                    ) : null}
+                    )}
                   </td>
                   <td data-cell="amount" data-label="金額" className="px-2 py-1.5 text-right font-bold tabular-nums">
-                    <BarAmount row={r} bar={barMap.get(r.id)} place={place} />
+                    {yen(rowAmount(r))}
                   </td>
                   <td data-cell="ops" className="whitespace-nowrap px-1 py-1.5 text-right">
                     <button type="button" onClick={() => moveRow(i, -1)} disabled={i === 0} className="rounded px-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30" title="上へ">
@@ -577,16 +580,6 @@ function PlaceCard({
       </div>
     </section>
   );
-}
-
-/** 金額の欄：切って使う部材は発注書の本数の金額。同じ部材を別の行で合算したときは「上に含む」「【廊下】に含む」 */
-function BarAmount({row, bar, place}: {row: Row; bar: BarRow | undefined; place: Place}) {
-  if (!bar) return <>{yen(rowAmount(row))}</>;
-  if (bar.lines.length === 0 && bar.within) {
-    const here = place.rows.some((r) => r.id === bar.within!.rowId);
-    return <span className="text-xs font-normal text-slate-500">{here ? '上に含む' : `【${bar.within.place}】に含む`}</span>;
-  }
-  return <>{yen(bar.amount)}</>;
 }
 
 export function SummaryBox({totals: t, settings: s}: {totals: JobTotals; settings: Settings}) {

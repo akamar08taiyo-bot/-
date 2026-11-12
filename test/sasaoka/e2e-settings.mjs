@@ -8,6 +8,7 @@ import {navItem} from './more.mjs';
 
 const [url, outDir] = process.argv.slice(2);
 const log = (...a) => console.log('•', ...a);
+const y = (n) => n.toLocaleString('ja-JP'); // 金額の見せ方（3けたごとの「,」）
 const browser = await chromium.launch();
 const errors = [];
 const watch = (page) => {
@@ -28,17 +29,17 @@ await page.waitForTimeout(4200);
 assert.equal(await toast.count(), 0, 'お知らせが消えていない');
 log('お知らせは数秒で消えるOK');
 
-// サンプルの金額（玄関：手すり60cm＋1,500×2＋木1,000×2／トイレ：7,800＋300×2＋タイル1,500×2）。
-// 手すり（4m を 60cm）は発注書と同じ本数（2000mm を1本。2026-11-12「1本単位でお願いします」）で、サンプルの部材リストに 2000mm の品がないので仕切価格は空欄＝0円
-// （前は 10,000×0.15＝1,500 で ① 12,900・⑦ 20,119）
-// ① 11,400 ② 5,000 ③ floor(798)=798 ④ floor(17,198×0.07=1,203.86)=1,203 ⑦ 18,401
-// 請求書の消費税は すべての様邸の合計×0.1 を切り捨て：1,840.1 → 1,840、ご請求金額 20,241
+// サンプルの金額（玄関：手すり60cm 10000×0.15＋1500×2＋木1000×2／トイレ：7800＋300×2＋タイル1500×2）。
+// 切って使う手すりは使った分（0.15本分。ユーザーの指示「請求書は、使った本数分（0.6本使ったなら、0.6本分の仕切り票となる」2026-11-12。
+// 同じ日の朝の1本単位＝発注書と同じ本数で数えたのを戻した）
+// ① 12900 ② 5000 ③ floor(903)=903 ④ floor(18803×0.07=1316.21)=1316 ⑦ 20119
+// 請求書の消費税は すべての様邸の合計×0.1 を切り捨て：2011.9 → 2011、ご請求金額 22130
 // 一覧は〇〇様邸と金額（税抜）だけ（ユーザーの指示「請求書を作成する一覧については、シンプルにする」2026-10-25）。①〜④は様邸を開いた画面と印刷に
 const row = await page.getByRole('row', {name: /（サンプル）山田様邸/}).innerText();
-assert.ok(row.includes('18,401'), `一覧に 18,401 がない: ${row}`);
-for (const v of ['11,400', '1,203']) assert.ok(!row.includes(v), `一覧に内訳の ${v} が出ている: ${row}`);
-assert.ok((await page.getByText(/ご請求金額（税込）/).innerText()).includes('20,241'));
-// 一覧の下はご請求金額だけ（消費税と説明は出さない。2026-10-26）。20,241＝18,401＋消費税 1,840（すべての様邸の合計にかける）
+assert.ok(row.includes(y(20119)), `一覧に ${y(20119)} がない: ${row}`);
+for (const v of [y(12900), y(1316)]) assert.ok(!row.includes(v), `一覧に内訳の ${v} が出ている: ${row}`);
+assert.ok((await page.getByText(/ご請求金額（税込）/).innerText()).includes(y(22130)));
+// 一覧の下はご請求金額だけ（消費税と説明は出さない。2026-10-26）。22130＝20119＋消費税 2011（すべての様邸の合計にかける）
 assert.equal(await page.getByText(/すべての様邸の合計に消費税率をかけています/).count(), 0);
 log('サンプルの金額OK（消費税は全様邸の合計にかける）');
 
@@ -48,8 +49,8 @@ const csvPath = path.join(outDir, 'list.csv');
 await csvDl.saveAs(csvPath);
 const csv = readFileSync(csvPath, 'utf8');
 assert.ok(csv.startsWith('﻿No.,施工日,お客様名,担当,部材代,取付手間,部材上乗せ,諸経費,税抜計,消費税,合計'), csv.slice(0, 80));
-assert.ok(csv.includes('（サンプル）山田様邸,久保,11400,5000,798,1203,18401,,\r\n'), csv);
-assert.ok(csv.includes(',,合計,,11400,5000,798,1203,18401,1840,20241'), csv);
+assert.ok(csv.includes(['（サンプル）山田様邸', '久保', 12900, 5000, 903, 1316, 20119, '', ''].join(',') + '\r\n'), csv);
+assert.ok(csv.includes(['', '', '合計', '', 12900, 5000, 903, 1316, 20119, 2011, 22130].join(',')), csv);
 log('CSV OK:', csvDl.suggestedFilename());
 
 // 請求書（様邸ごとの消費税）：所長名と、お客様名の横の担当
@@ -59,7 +60,7 @@ const inv = page.locator('.sheet').first();
 assert.ok((await inv.innerText()).includes('行橋営業所所長　久保 匠史'), await inv.innerText());
 const invHead = await inv.locator('thead th').allInnerTexts();
 assert.deepEqual(invHead.slice(0, 5), ['No.', '施工日', 'お客様名', '担当', '部材代']);
-assert.deepEqual((await inv.locator('tbody tr').first().locator('td').allInnerTexts()).slice(2, 5), ['（サンプル）山田様邸', '久保', '11,400']);
+assert.deepEqual((await inv.locator('tbody tr').first().locator('td').allInnerTexts()).slice(2, 5), ['（サンプル）山田様邸', '久保', y(12900)]);
 await page.getByRole('button', {name: '✕ 閉じる'}).click();
 log('請求書の所長名・担当OK');
 
@@ -95,8 +96,8 @@ await page.locator('label', {hasText: '⑤消費税の1円未満'}).locator('sel
 await page.screenshot({path: path.join(outDir, '21-settings.png'), fullPage: true});
 await (await navItem(page, /請求書を確認する/)).click();
 const foot = await page.getByText(/ご請求金額（税込）/).innerText();
-// 切り捨て：1か月で1回：18,401×0.1=1,840.1 → 1,840、合計 20,241
-assert.ok(foot.includes('20,241'), foot);
+// 切り捨て：1か月で1回：20119×0.1=2011.9 → 2011、合計 22130
+assert.ok(foot.includes(y(22130)), foot);
 log('1か月で1回計算・切り捨て OK', foot);
 await page.getByRole('button', {name: '🖨 請求書を印刷'}).click();
 await page.locator('.print-overlay').waitFor();

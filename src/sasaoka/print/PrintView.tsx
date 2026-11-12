@@ -1,11 +1,10 @@
 import type {MonthPlan, PlanRow, PlanSums} from '../salesPlan.ts';
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
-import {cutToLength, estimateQty, isBlankRow, jobName, jobTotals, monthSummary, placeTotals, roundYen, rowAmount, shikiriPrice, taxFormula} from '../calc.ts';
+import {cutToLength, estimateQty, isBlankRow, jobName, jobTotals, monthSummary, placeTotals, rowAmount, shikiriPrice, taxFormula} from '../calc.ts';
 import type {MonthSummary} from '../calc.ts';
 import {FORM_INFO, insurerLabel, jobForm, offEstimate} from '../estimateForms.ts';
-import {barPlaceAmount, barRowMap, cutLabel, shikiriBars} from '../order.ts';
-import type {BarRow} from '../order.ts';
+import {cutLabel} from '../order.ts';
 import {laborForText, laborOwner} from '../rows.ts';
 import type {AppData, Job, Material, Settings} from '../types.ts';
 import {dateLabel, monthEnd, monthLabel, num, shortDate, staffShort, todayIso, yen} from '../util.ts';
@@ -166,8 +165,8 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
   }, [onClose, request, data.jobs, data.settings]);
 
   const jobs = useMemo(() => data.jobs.filter((j) => j.shikiri && j.month === month), [data.jobs, month]);
-  // 切って使う部材は発注書の本数（仕切り計算表と同じ。order.ts の shikiriBars）
-  const summary = useMemo(() => monthSummary(jobs, data.settings, (j) => shikiriBars(j, data.materials, data.settings)), [jobs, data.settings, data.materials]);
+  // 切って使う部材は使った分（0.6本なら0.6本分。仕切り計算表と同じ。2026-11-12）
+  const summary = useMemo(() => monthSummary(jobs, data.settings), [jobs, data.settings]);
 
   let sheets: ReactNode;
   if (request.kind === 'sales') {
@@ -474,18 +473,10 @@ function InvoiceDoc({month, summary, settings: s, meta}: {month: string; summary
   );
 }
 
-/** 同じ部材をほかの行でまとめて発注するとき（0.3本が2箇所で1本）の金額の欄 */
-function WithinLabel({bar, place}: {bar: BarRow; place: {rows: {id: string}[]}}) {
-  if (!bar.within) return <>{yen(0)}</>;
-  const here = place.rows.some((r) => r.id === bar.within!.rowId);
-  return <span className="code-sub">{here ? '上に含む' : `【${bar.within.place}】に含む`}</span>;
-}
-
 function JobDoc({job, settings: s, materials}: {job: Job; settings: Settings; materials: Material[]}) {
-  // 切って使う部材は発注書と同じ本数（1本単位。ユーザーの指示「1本まるまる送るようになるため、1本単位でお願いします」2026-11-12）
-  const bars = shikiriBars(job, materials, s);
-  const barMap = barRowMap(job, bars);
-  const t = jobTotals(job, s, bars);
+  // 切って使う部材は使った分（0.6本なら0.6本分。ユーザーの指示「請求書は、使った本数分（0.6本使ったなら、0.6本分の仕切り票となる」2026-11-12。
+  // 同じ日の朝の「1本単位」＝発注書と同じ本数で数えたのは戻した。発注書は1本単位のまま）
+  const t = jobTotals(job, s);
   const rate = String(s.rate);
   const summary: [string, string, number, boolean][] = [
     ['①', '部材代合計', t.material, false],
@@ -553,8 +544,7 @@ function JobDoc({job, settings: s, materials}: {job: Job; settings: Settings; ma
       {/* 見積書から外した箇所（申請書だけの箇所）は出さない。切って使う部材も箇所の表の中に（下に別の表を作らない。
           ユーザーの指示「切って使うなどで２つに分ける必要はない。一つで良い。ただし、カットして使用することがわかるように列を追加する」2026-11-12） */}
       {job.places.filter((p) => !offEstimate(p)).map((place) => {
-        const pt = placeTotals(place, bars.rowIds);
-        const barAmount = barPlaceAmount(place, barMap);
+        const pt = placeTotals(place);
         return (
           <div key={place.id} className="place">
             <div className="place-name">【{place.name || '箇所'}】</div>
@@ -584,32 +574,10 @@ function JobDoc({job, settings: s, materials}: {job: Job; settings: Settings; ma
                 {place.rows
                   .map((r, i) => ({r, owner: laborOwner(place.rows, i)}))
                   .filter(({r}) => !isBlankRow(r))
-                  .flatMap(({r, owner}) => {
-                    const bar = barMap.get(r.id);
-                    const kind = <td className={`c kind ${r.kind}`}>{r.kind === 'labor' ? '手間' : '部材'}</td>;
-                    // 切って使う部材：発注書と同じ本数・金額（4000mm と 2000mm を合わせて発注するときは2行）
-                    if (bar && bar.lines.length > 0) {
-                      return bar.lines.map((l, k) => (
-                        <tr key={`${r.id}:${l.key}`} data-cut-row>
-                          {kind}
-                          <td className="name">
-                            {l.name || r.name || l.code}
-                            {l.warn && <span className="code-sub">{l.warn}</span>}
-                          </td>
-                          <td className="code">{l.code}</td>
-                          <td className="c">{k === 0 ? cutLabel(r) : ''}</td>
-                          <td className="num">{yen(l.price)}</td>
-                          <td className="num">
-                            {num(l.qty, 3)}
-                            {l.unit}
-                          </td>
-                          <td className="num">{yen(roundYen(l.price * l.qty))}</td>
-                        </tr>
-                      ));
-                    }
-                    return [
-                      <tr key={r.id} data-cut-row={bar ? '' : undefined}>
-                        {kind}
+                  .map(({r, owner}) => (
+                      // 切って使う部材は使った分（数量 0.6・金額 0.6本分）。カットの列に使う長さ
+                      <tr key={r.id} data-cut-row={cutToLength(r) ? '' : undefined}>
+                        <td className={`c kind ${r.kind}`}>{r.kind === 'labor' ? '手間' : '部材'}</td>
                         <td className="name">
                           {r.name || (r.kind === 'labor' ? '工事' : '部材')}
                           {/* 手間は、取り付ける部材の商品名と型番（すぐ上の部材）を小さく（2026-10-29） */}
@@ -618,11 +586,10 @@ function JobDoc({job, settings: s, materials}: {job: Job; settings: Settings; ma
                         <td className="code">{r.code}</td>
                         <td className="c">{cutLabel(r)}</td>
                         <td className="num">{yen(shikiriPrice(r))}</td>
-                        <td className="num">{bar ? '' : cutToLength(r) ? num(estimateQty(r), 3) : num(r.qty)}</td>
-                        <td className="num">{bar ? <WithinLabel bar={bar} place={place} /> : yen(rowAmount(r))}</td>
-                      </tr>,
-                    ];
-                  })}
+                        <td className="num">{cutToLength(r) ? num(estimateQty(r), 3) : num(r.qty)}</td>
+                        <td className="num">{yen(rowAmount(r))}</td>
+                      </tr>
+                  ))}
                 {place.rows.every(isBlankRow) && (
                   <tr>
                     <td colSpan={7} className="c muted">
@@ -634,9 +601,9 @@ function JobDoc({job, settings: s, materials}: {job: Job; settings: Settings; ma
               <tfoot>
                 <tr>
                   <td colSpan={6} className="r">
-                    {place.name || '箇所'} 計（部材 {yen(pt.material + barAmount)}・手間 {yen(pt.labor)}）
+                    {place.name || '箇所'} 計（部材 {yen(pt.material)}・手間 {yen(pt.labor)}）
                   </td>
-                  <td className="num strong">{yen(pt.total + barAmount)}</td>
+                  <td className="num strong">{yen(pt.total)}</td>
                 </tr>
               </tfoot>
             </table>
