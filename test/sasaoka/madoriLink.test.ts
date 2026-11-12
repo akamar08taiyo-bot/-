@@ -104,7 +104,7 @@ test('横四角（塗りつぶし）：なぞった大きさの青い四角・�
   assert.ok(free.pts || free.len);
 });
 
-test('番号（①②の道具）の一覧の行は、申請書の同じ写真番号の改修の内容。手で書いた文・手すりなどの部品の行があればそちら', () => {
+test('番号（①②の道具）の一覧の行は、申請書の同じ写真番号の改修の内容。手で書いた文があればそちら（手すりには番号を付けないので出さない）', () => {
   // ユーザーの指示「平面図の下のスペースに、申請書で入力した内容をいれる。①玄関　手すり取付（申請書の書き方にあわせる）L=600 みたいな感じ」2026-11-10
   const m = emptyMadori();
   m.floors[0].items.push(
@@ -114,9 +114,10 @@ test('番号（①②の道具）の一覧の行は、申請書の同じ写真�
   );
   const lines: Record<number, string> = {1: '①玄関　手すり取付　L=600mm', 2: '②浴室　手すり取付　L=800mm', 3: '③トイレ　手すり取付　L=700mm'};
   const none = () => undefined;
-  assert.deepEqual(legendLines(m, none, none, (n) => lines[n]), ['①　玄関　手すり取付　L=600mm', '②　手で書いた', '③　L＝900mm']);
+  // 手すり（r）には番号を付けない（ユーザーの指示「棒は棒、丸は丸のみ」2026-11-12）
+  assert.deepEqual(legendLines(m, none, none, (n) => lines[n]), ['①　玄関　手すり取付　L=600mm', '②　手で書いた']);
   // 申請書の文を渡さないときは、前と同じ（番号だけの部品は一覧に出さない）
-  assert.deepEqual(legendLines(m, none, none), ['②　手で書いた', '③　L＝900mm']);
+  assert.deepEqual(legendLines(m, none, none), ['②　手で書いた']);
   // 申請書にその番号の行がないときは、番号だけ並べる（印刷の一覧の枠が空にならないように。ユーザーの「印刷画面が変になっている」2026-11-10）
-  assert.deepEqual(legendLines(m, none, none, (n) => (n === 3 ? lines[3] : undefined)), ['①', '②　手で書いた', '③　L＝900mm']);
+  assert.deepEqual(legendLines(m, none, none, (n) => (n === 3 ? lines[3] : undefined)), ['①', '②　手で書いた']);
 });

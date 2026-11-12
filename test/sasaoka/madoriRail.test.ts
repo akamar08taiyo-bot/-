@@ -123,7 +123,7 @@ test('曲げた棒を動かす・回す・押して選ぶ・読み込み・図',
   assert.equal(m.floors[0].items[1].pts, undefined); // 壊れた点は捨てて、まっすぐの手すり
   const svg = floorSvg([it], {module: 910, showDims: false, showArea: false, nums: new Map([['r', 1]])});
   assert.ok(svg.includes('M0 0L0 1000L1000 1000L1000 0'));
-  assert.ok(svg.includes('①'));
+  assert.ok(!svg.includes('①')); // 棒には番号を描かない（ユーザーの指示「棒は棒、丸は丸のみ」2026-11-12）
   assert.deepEqual(railPts(it), it.pts);
 });
 

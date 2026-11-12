@@ -23,25 +23,34 @@ test('部屋の広さ：910mm の方眼の 3×4 マスは 6帖・9.94㎡（1帖�
   assert.equal(roomArea(1.5 * M, 3 * M, 910).jo, 2.3); // 2.25 → 小数1けた
 });
 
-test('番号：申請書の箇所につないだ手すりは写真番号、手で決めた番号はそのまま、ほかは空いている番号を置いた順に（階をまたいで通し）', () => {
-  const f1 = {id: 'f1', name: '1階', items: [{id: 'a', kind: 'rail', x: 0, y: 0, w: 600, h: 0}, {id: 'b', kind: 'rail', x: 0, y: 0, w: 800, h: 0, place: 'p2'}, room('r', 0, 0, M, M)] as MItem[]};
-  const f2 = {id: 'f2', name: '2階', items: [{id: 'c', kind: 'vrail', x: 0, y: 0, w: 0, h: 0, n: 5}, {id: 'd', kind: 'step', x: 0, y: 0, w: 600, h: 400}] as MItem[]};
+test('番号：番号の道具の部品だけ（申請書の箇所につないだら写真番号、手で決めた番号はそのまま、ほかは空いている番号を置いた順に。階をまたいで通し）。手すり・丸・横四角には付けない', () => {
+  // ユーザーの指示「番号はセットにしなくても良い。棒は棒、丸は丸のみ」2026-11-12（前は手すり・縦手すり・段差の解消にも①②…）
+  const num = (id: string, more: Partial<MItem> = {}): MItem => ({id, kind: 'num', x: 0, y: 0, w: 0, h: 0, ...more});
+  const f1 = {id: 'f1', name: '1階', items: [{id: 'a', kind: 'rail', x: 0, y: 0, w: 600, h: 0}, {id: 'b', kind: 'rail', x: 0, y: 0, w: 800, h: 0, place: 'p2'}, num('x', {place: 'p2'}), num('y'), room('r', 0, 0, M, M)] as MItem[]};
+  const f2 = {id: 'f2', name: '2階', items: [{id: 'c', kind: 'vrail', x: 0, y: 0, w: 0, h: 0, n: 5}, num('z', {n: 5}), {id: 'd', kind: 'step', x: 0, y: 0, w: 600, h: 400}, num('w')] as MItem[]};
   const nums = numberItems([f1, f2], (id) => (id === 'p2' ? 1 : undefined));
-  assert.deepEqual(Object.fromEntries(nums), {b: 1, c: 5, a: 2, d: 3});
-  assert.equal(nums.has('r'), false); // 部屋には番号を付けない
+  assert.deepEqual(Object.fromEntries(nums), {x: 1, z: 5, y: 2, w: 3});
+  for (const id of ['a', 'b', 'c', 'd', 'r']) assert.equal(nums.has(id), false, id); // 手すり・丸・横四角・部屋には番号を付けない
+  // 絵にも、手すり・丸・横四角の番号は描かない
+  const svg = floorSvg([...f1.items, ...f2.items], {module: 910, showArea: false, showDims: false, nums: new Map([['a', 7], ['c', 8], ['d', 9], ['x', 1]]), pid: 't'});
+  assert.match(svg, />①</);
+  assert.doesNotMatch(svg, /⑦|⑧|⑨/);
 });
 
-test('一覧（右の枠）：見本と同じ「①　L＝600mm」「L型　600×600mm」・申請書の箇所につなぐと改修の内容・手で直した一覧', () => {
+test('番号の部品の一覧：申請書の箇所につなぐと改修の内容・手で書いた文（手すり・丸・横四角は番号がないので出さない）・部品の文の書き方・手で直した一覧', () => {
   const items: MItem[] = [
     {id: 'a', kind: 'rail', x: 0, y: 0, w: 900, h: 0},
     {id: 'b', kind: 'rail', x: 0, y: 0, w: 0, h: -600, len: 600},
     {id: 'c', kind: 'vrail', x: 0, y: 0, w: 0, h: 0, len: 800},
     {id: 'd', kind: 'step', type: '踏み台', x: 0, y: 0, w: 600, h: 400},
-    {id: 'e', kind: 'rail', x: 0, y: 0, w: 600, h: 0, place: 'p1'},
+    {id: 'e', kind: 'num', x: 0, y: 0, w: 0, h: 0, place: 'p1'},
+    {id: 'f', kind: 'num', x: 0, y: 0, w: 0, h: 0, note: '廊下　L＝900mm'},
   ];
   const m = {floors: [{id: 'f', name: '1階', items}]};
   const lines = legendLines(m, (id) => (id === 'p1' ? 1 : undefined), (id) => (id === 'p1' ? '①玄関　手すりの取り付け　L=600mm' : undefined));
-  assert.deepEqual(lines, ['①　玄関　手すりの取り付け　L=600mm', '②　L＝900mm', '③　L型　600×600mm', '④　縦手すり　L＝800mm', '⑤　踏み台　600×400mm']);
+  assert.deepEqual(lines, ['①　玄関　手すりの取り付け　L=600mm', '②　廊下　L＝900mm']);
+  // 部品の文の書き方（見本の「L＝600mm」「L型　600×600mm」）
+  assert.deepEqual(items.slice(0, 4).map((it) => legendText(it, none)), ['L＝900mm', 'L型　600×600mm', '縦手すり　L＝800mm', '踏み台　600×400mm']);
   assert.equal(legendText({...items[0], note: '廊下　L＝900mm'}, none), '廊下　L＝900mm');
   assert.deepEqual(legendLines({...m, legend: '①　手で直した\n\n②　二行目'}, none, none), ['①　手で直した', '②　二行目']);
 });
@@ -169,8 +178,8 @@ test('床面積：屋外・バルコニーと、ほかの部屋の中に描い�
 });
 
 test('絵：床の柄・壁・名前と広さ・手すりの赤い線と番号。名前の字はエスケープする', () => {
-  const items: MItem[] = [room('a', 0, 0, 3 * M, 4 * M, '和室'), {...room('b', 3 * M, 0, M, M, 'トイレ'), label: '<b>トイレ</b>'}, {id: 'r', kind: 'rail', x: 100, y: 100, w: 600, h: 0}];
-  const svg = floorSvg(items, {module: 910, showArea: true, showDims: true, nums: new Map([['r', 1]]), pid: 't'});
+  const items: MItem[] = [room('a', 0, 0, 3 * M, 4 * M, '和室'), {...room('b', 3 * M, 0, M, M, 'トイレ'), label: '<b>トイレ</b>'}, {id: 'r', kind: 'rail', x: 100, y: 100, w: 600, h: 0}, {id: 'n', kind: 'num', x: 900, y: 100, w: 0, h: 0}];
+  const svg = floorSvg(items, {module: 910, showArea: true, showDims: true, nums: new Map([['n', 1]]), pid: 't'});
   assert.match(svg, /和室/);
   assert.match(svg, />6帖</); // 広さは帖だけ（㎡は出さない）
   assert.doesNotMatch(svg, /㎡/);
@@ -224,7 +233,9 @@ test('見取図のいちばん上の「〇〇様邸」：名前＋様邸（呼�
   assert.ok(lay.title && lay.area.y > plain.area.y && lay.title.y < lay.area.y);
   assert.ok(lay.plan && lay.legend && lay.legend.y >= lay.plan.y + lay.plan.h && lay.legend.y + lay.legend.h <= lay.h - 10 + 0.01);
   const page = pageSvg(tall, tall.floors, lay, ['①玄関　手すりの取り付け　L=600mm'], none, 'p', {}, '見本花子様邸');
-  assert.match(page, /<text x="105" y="[\d.]+" font-size="6" font-weight="700" text-anchor="middle"[^>]*>見本花子様邸<\/text>/);
+  // 「〇〇様邸」は大きく（9mm）、下の改修の内容は少し小さく（3.4mm から）（ユーザーの指示「〇〇様邸の部分を大きくする」「申請書の内容の部分はもう少し小さくする」2026-11-12）
+  assert.match(page, /<text x="105" y="[\d.]+" font-size="9" font-weight="700" text-anchor="middle"[^>]*>見本花子様邸<\/text>/);
+  assert.equal(lay.legend.fs, 3.4);
   assert.ok(!/見取図|平面図|年|株式会社|担当者/.test(page.replace(/<pattern[\s\S]*?<\/pattern>/g, '')), '「見取図」・日付・会社の名前は書かない');
 });
 
@@ -239,8 +250,9 @@ test('見取図の下の枠：申請書の改修の内容（方眼の下の欄�
         name: '1階',
         items: [
           room('a', 0, 0, 3 * M, 3 * M),
-          {id: 'r1', kind: 'rail', x: 0, y: 0, w: 600, h: 0, place: 'p1'}, // ①（申請書の箇所につないだ）
-          {id: 'r9', kind: 'rail', x: 0, y: 0, w: 900, h: 0, n: 9}, // ⑨ 申請書にない番号
+          {id: 'r1', kind: 'rail', x: 0, y: 0, w: 600, h: 0, place: 'p1'}, // 手すりには番号を付けない（前の版でつないだ箇所が残っていても）
+          {id: 'n1', kind: 'num', x: 0, y: 0, w: 0, h: 0, place: 'p1'}, // ①（申請書の箇所につないだ番号）
+          {id: 'n9', kind: 'num', x: 0, y: 0, w: 0, h: 0, n: 9, note: 'L＝900mm'}, // ⑨ 申請書にない番号（手で書いた文）
           {id: 'n5', kind: 'num', x: 0, y: 0, w: 0, h: 0, n: 5}, // ⑤ 申請書にない番号だけの部品
         ] as MItem[],
       },
@@ -274,8 +286,8 @@ test('2階建て：1枚に1階・2階を並べる（見出し「1階」「2階�
   const m: Madori = {
     ...emptyMadori(),
     floors: [
-      {id: 'f1', name: '1階', items: [room('a', 0, 0, 3 * M, 3 * M), {id: 'r1', kind: 'rail', x: 0, y: 0, w: 600, h: 0}]},
-      {id: 'f2', name: '2階', items: [room('b', 0, 0, 3 * M, 3 * M), {id: 'r2', kind: 'rail', x: 0, y: 0, w: 900, h: 0}]},
+      {id: 'f1', name: '1階', items: [room('a', 0, 0, 3 * M, 3 * M), {id: 'r1', kind: 'num', x: 0, y: 0, w: 0, h: 0, note: 'L＝600mm'}]},
+      {id: 'f2', name: '2階', items: [room('b', 0, 0, 3 * M, 3 * M), {id: 'r2', kind: 'num', x: 0, y: 0, w: 0, h: 0, note: 'L＝900mm'}]},
     ],
   };
   assert.deepEqual(floorLegend(m, m.floors[1], none, none, false), ['②　L＝900mm']);
@@ -302,7 +314,7 @@ test('Excel：見取図を1シート（縦が基本）・一覧は赤い字・�
   const m: Madori = {
     ...emptyMadori(),
     floors: [
-      {id: 'f1', name: '1階', items: [room('a', 0, 0, 3 * M, 4 * M, '和室'), {id: 'r1', kind: 'rail', x: 0, y: 0, w: 600, h: 0}]},
+      {id: 'f1', name: '1階', items: [room('a', 0, 0, 3 * M, 4 * M, '和室'), {id: 'r1', kind: 'num', x: 0, y: 0, w: 0, h: 0, note: 'L＝600mm'}]},
       {id: 'f2', name: '2階', items: [room('b', 0, 0, M, M)]},
       {id: 'f3', name: '3階', items: []},
     ],

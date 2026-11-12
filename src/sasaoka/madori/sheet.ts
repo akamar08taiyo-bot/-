@@ -14,10 +14,13 @@ import {floorSvg, patternDefs, RED, viewOf} from './render.ts';
 
 /** 紙（A4）の短い辺・長い辺と余白（mm） */
 export const A4 = {short: 210, long: 297, margin: 10};
-/** 一覧の枠：字の大きさの候補（mm。大きい順）・行の高さ（字の倍）・枠の中の余白・列のすき間・平面図とのすき間・紙の中で一覧に使える高さの割合 */
-const LEG = {sizes: [4.2, 3.8, 3.4, 3.0, 2.6], lh: 1.55, pad: 3, colGap: 6, gap: 4, maxShare: 0.4};
-/** いちばん上の「〇〇様邸」：字の大きさ（mm）と、平面図の上に取る段の高さ（mm） */
-const TITLE = {fs: 6, h: 11};
+/**
+ * 下の枠（改修の内容）：字の大きさの候補（mm。大きい順）・行の高さ（字の倍）・枠の中の余白・列のすき間・平面図とのすき間・紙の中で一覧に使える高さの割合。
+ * 初めの大きさは 3.4mm（約 9.5pt。ユーザーの指示「申請書の内容の部分はもう少し小さくする」2026-11-12。前は 4.2mm）
+ */
+const LEG = {sizes: [3.4, 3.1, 2.8, 2.5], lh: 1.55, pad: 3, colGap: 6, gap: 4, maxShare: 0.4};
+/** いちばん上の「〇〇様邸」：字の大きさ（mm。9mm＝約 25pt）と、平面図の上に取る段の高さ（mm）。ユーザーの指示「〇〇様邸の部分を大きくする」2026-11-12（前は 6mm） */
+const TITLE = {fs: 9, h: 15};
 
 const escText = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 

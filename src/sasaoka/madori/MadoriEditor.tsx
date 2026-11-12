@@ -1,5 +1,5 @@
 // 様邸の画面の「📐 平面図」のタブ（ユーザーの指示「平面図をつくれるような機能を追加する。まどりっちの機能やマイホームクラウドの機能もつけくわえる」2026-11-09）。
-// 左に道具（マイホームクラウドと同じ部屋の一覧・建具・設備・階段・改修・作図）、まん中に方眼（910mm など。上に「〇〇様邸」、下に申請書の改修の内容）、右に選んだ部品の欄（何も選んでいなければ出さない）。
+// 左に道具（マイホームクラウドと同じ部屋の一覧・建具・設備・階段・改修・作図）、まん中に方眼（910mm など。上に「〇〇様邸」）、右に申請書の改修の内容と、選んだ部品の欄（何も選んでいなければ出さない）。
 // 部屋はドラッグで方眼に、ドアと窓は壁に、トイレ・浴槽などは壁ぎわに、手すりは壁ぞいに吸い付く（edit.ts）。
 // 絵は印刷・Excel と同じ render.ts。手すり・段差の解消は申請書の箇所につなぐと、番号（写真番号）と一覧の文が申請書と同じになる
 
@@ -20,7 +20,7 @@ import {bboxOf, closedShape, nearOrthoNext, pointRemoved, roomPts, shapeOf, snap
 import {shapeDef, shapeIcon, SHAPES_SHOWN, shapeToPts} from './shapes.ts';
 import type {Handle, P, Tool} from './edit.ts';
 import {MadoriPrint} from './MadoriPrint.tsx';
-import {bounds, circled, emptyMadori, NUM_SIZE, hasMadori, joLabel, legendText, lineLength, mid, MODULES, numberItems, railPts, railSegs, roomAreaOf, snapStep, withFloor} from './model.ts';
+import {bounds, circled, emptyMadori, NUM_SIZE, hasMadori, joLabel, lineLength, mid, MODULES, numberItems, railPts, railSegs, roomAreaOf, snapStep, withFloor} from './model.ts';
 import type {Madori, MFloor, MItem, Module} from './model.ts';
 import {floorSvg, patternDefs, thumbSvg, viewOf} from './render.ts';
 import {linkPlan, placeLookup, planLinked, sheetTitle} from './sheet.ts';
@@ -1112,7 +1112,8 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
   // ---------------------------------------------------------------- 右の欄
   const it = selItem;
   const nOf = it ? nums.get(it.id) : undefined;
-  const placeSelect = it && (it.kind === 'rail' || it.kind === 'vrail' || it.kind === 'step' || it.kind === 'num') && (
+  // 申請書の箇所・番号の欄は番号の部品だけ（手すり・丸・横四角には番号を付けない。ユーザーの指示「棒は棒、丸は丸のみ」2026-11-12）
+  const placeSelect = it && it.kind === 'num' && (
     <>
       <label className="block text-sm">
         <span className="text-slate-600">申請書の箇所</span>
@@ -1144,12 +1145,6 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
               </option>
             ))}
           </select>
-        </label>
-      )}
-      {it.kind !== 'num' && (
-        <label className="block text-sm">
-          <span className="text-slate-600">一覧に書く文</span>
-          <TextInput value={it.note ?? ''} onChange={(note) => setItem(it.id, {note: note || undefined})} placeholder={legendText({...it, note: ''}, look.line)} className="mt-0.5 w-full" aria-label="一覧に書く文" />
         </label>
       )}
     </>
@@ -1781,7 +1776,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
         </div>
       </div>
 
-      <div className="grid items-start gap-3 lg:grid-cols-[15rem_minmax(0,1fr)_17rem]">
+      <div className="grid items-start gap-3 lg:grid-cols-[15rem_minmax(0,1fr)_19rem]">
         {shapeBar}
         <div ref={paletteRef} className="scroll-mt-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm max-lg:order-1 max-lg:p-1.5" data-madori-palette>
           {palette}
@@ -1794,7 +1789,9 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
             {title}
           </h3>
         )}
-        <div ref={boxRef} className="relative h-[min(calc(72vh-3rem),712px)] min-h-[340px] overflow-hidden max-lg:h-[min(58vh,560px)] max-lg:min-h-[320px] scroll-mb-2 rounded-lg border-2 border-slate-300 bg-white shadow-sm" data-madori-canvas>
+        {/* 方眼の高さ：改修の内容を右の列に移したぶん、上の描く道具の段から方眼の下までが1画面に入るいっぱいまで広げる
+            （描く道具の段・「〇〇様邸」の行・すき間で約 11rem。ユーザーの指示「平面図の入力画面を広く取る」2026-11-12。前は min(72vh−3rem, 712px)） */}
+        <div ref={boxRef} className="relative h-[min(calc(100vh-11rem),1000px)] min-h-[340px] overflow-hidden max-lg:h-[min(58vh,560px)] max-lg:min-h-[320px] scroll-mb-2 rounded-lg border-2 border-slate-300 bg-white shadow-sm" data-madori-canvas>
           <svg
             ref={svgRef}
             width={size.w}
@@ -2005,24 +2002,28 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
             </div>
           )}
         </div>
-        {/* 平面図の下に、申請書で入れた改修の内容（申請書の平面図の下の欄と同じ文。保険者の申請書の書き方「①玄関　手すりの取り付け　L=600mm」）。
-            ユーザーの指示「平面図の下のスペースに、申請書で入力した内容をいれる。①玄関　手すり取付（申請書の書き方にあわせる）L=600 みたいな感じ」2026-11-10 */}
-        <section aria-label="申請書の改修の内容" className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm" data-plan-works>
-          <div className="text-sm font-bold text-slate-700">改修の内容（申請書）</div>
-          {look.list.length ? (
-            <ul className="mt-1 space-y-0.5 text-[15px] text-slate-900">
-              {look.list.map((w) => (
-                <li key={w.id} className="whitespace-pre-wrap">
-                  {w.line}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-0.5 text-sm text-slate-400">申請書の箇所を入れると出ます</p>
-          )}
-        </section>
         </div>
-        {props && <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm max-lg:order-4">{props}</div>}
+        {/* 右の列：申請書で入れた改修の内容（申請書の平面図の下の欄と同じ文。保険者の申請書の書き方「①玄関　手すりの取り付け　L=600mm」）をいつも出し、
+            部品を選んでいるときはその下に部品の欄。ユーザーの指示「平面図の下のスペースに、申請書で入力した内容をいれる」2026-11-10、
+            「申請内容を右側に表示して、平面図の入力画面を広く取る」2026-11-12（前は方眼の下）。狭い画面は方眼の下 */}
+        <div className="min-w-0 space-y-3 max-lg:order-4">
+          <section aria-label="申請書の改修の内容" className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm" data-plan-works>
+            <div className="text-sm font-bold text-slate-700">改修の内容（申請書）</div>
+            {look.list.length ? (
+              <ul className="mt-1 space-y-1 text-sm leading-snug text-slate-900">
+                {look.list.map((w) => (
+                  // 折り返した行は番号の右から（①の下に字が回り込まない）
+                  <li key={w.id} className="whitespace-pre-wrap pl-[1em] -indent-[1em]">
+                    {w.line}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-0.5 text-sm text-slate-400">申請書の箇所を入れると出ます</p>
+            )}
+          </section>
+          {props && <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">{props}</div>}
+        </div>
       </div>
     </div>
   );

@@ -30,7 +30,17 @@ await page.getByRole('tab', {name: '📐 平面図'}).click();
 await page.waitForFunction(() => location.hash.includes('view=madori'));
 const canvas = page.locator('[data-madori-canvas] svg');
 await canvas.waitFor();
+// 描くときは、上の描く道具の段が画面の上に来るまでスクロールして使う（方眼は道具の段から方眼の下までが1画面に入る高さ。ユーザーの指示「平面図の入力画面を広く取る」2026-11-12）
+const toTools = () => page.evaluate(() => document.querySelector('[role="toolbar"][aria-label="描く道具"]')?.scrollIntoView({block: 'start'}));
+await toTools();
+{
+  const t = await page.getByRole('toolbar', {name: '描く道具'}).boundingBox();
+  const c = await page.locator('[data-madori-canvas]').boundingBox();
+  assert.ok(t.y >= -1 && c.y + c.height <= 900 + 1, `道具の段と方眼が1画面に入る ${JSON.stringify([t, c])}`);
+}
 const art = () => canvas.evaluate((s) => s.querySelector('g:not([opacity])')?.innerHTML ?? '');
+/** 描いた手すり（棒）の線（path の d）。手すりには番号を付けないので、形はこれで見る */
+const railPaths = async () => [...(await art()).matchAll(/<path d="(M[^"]*)" stroke="#e01b24" stroke-width="45"/g)].map((x) => x[1]);
 const M = 910;
 /** 図の mm → 画面の位置 */
 const toPx = (x, y) =>
@@ -44,6 +54,7 @@ const toPx = (x, y) =>
     [x, y],
   );
 const drag = async (a, b) => {
+  await toTools();
   const p = await toPx(...a);
   const q = await toPx(...b);
   await page.mouse.move(p.x, p.y);
@@ -53,6 +64,7 @@ const drag = async (a, b) => {
   await page.mouse.up();
 };
 const click = async (x, y) => {
+  await toTools();
   const p = await toPx(x, y);
   await page.mouse.click(p.x, p.y);
 };
@@ -140,34 +152,46 @@ assert.match(svgNow, /translate\(2985 30\)/); // 便器は上の壁の面（y=30
 log('ドアは壁に・便器は壁ぎわ OK');
 
 // ---------------- 申請書の箇所：前もって部品を並べる「置き場」は出さない（ユーザーの指示「事前に線や番号をおいておくのはなしで」2026-11-11）。
-// 横棒を描いて、右の欄の「申請書の箇所」で ①玄関 につなぐ → 番号は写真番号・一覧は申請書の改修の内容
+// 横棒・丸には番号を付けない（ユーザーの指示「番号はセットにしなくても良い。棒は棒、丸は丸のみ」2026-11-12）。
+// 番号は「① 番号」で置き、選んで右の欄の「申請書の箇所」で ①玄関 につなぐ → 見取図の下の枠は申請書の改修の内容
 assert.equal(await page.getByRole('tab', {name: '改修', exact: true}).count(), 0);
 assert.equal(await page.locator('[data-stage]').count(), 0);
 assert.ok(!(await art()).includes('#e01b24'), 'まだ手すりは描いていない');
 await tool('横棒');
 await drag([4.4 * M, 4.9 * M], [5.6 * M, 4.9 * M]);
-{
-  const link = page.getByRole('combobox', {name: '申請書の箇所'});
-  await link.waitFor();
-  assert.match((await link.locator('option').allInnerTexts()).join('|'), /①\s*玄関/);
-  await link.selectOption({index: 1}); // ①玄関
-}
+await page.getByRole('button', {name: '選ぶのをやめる'}).waitFor(); // 描いた棒を選んでいる（右に部品の欄）
+assert.equal(await page.getByRole('combobox', {name: '申請書の箇所'}).count(), 0, '棒には申請書の箇所・番号の欄を出さない');
 await page.keyboard.press('Escape');
 await page.getByRole('button', {name: '丸（塗りつぶし）'}).click();
 await click(3.9 * M, 0.7 * M);
 await page.keyboard.press('Escape');
+assert.doesNotMatch(await art(), /[①-⑳]/, '棒・丸には番号を付けない');
+{
+  const dbar = page.getByRole('toolbar', {name: '描く道具'});
+  const nb = dbar.getByRole('button', {name: /番号$/});
+  assert.ok((await nb.innerText()).includes('①'), '棒・丸を描いても番号は①から');
+  await nb.click();
+  await click(4.4 * M, 4.4 * M);
+  await dbar.getByRole('button', {name: '番号を確定'}).click();
+  await click(4.4 * M, 4.4 * M); // 置いた①を選ぶ
+  const link = page.getByRole('combobox', {name: '申請書の箇所'});
+  await link.waitFor();
+  assert.match((await link.locator('option').allInnerTexts()).join('|'), /①\s*玄関/);
+  await link.selectOption({index: 1}); // ①玄関
+  await page.keyboard.press('Escape');
+}
+assert.equal(((await art()).match(/[①-⑳]/g) ?? []).join(''), '①');
 // 右の枠の一覧・床面積は出さない（ユーザーの指示「この部分は不要」2026-11-11）。部品を選んでいるときだけ右に部品の欄
 assert.equal(await page.getByText('一覧（右の枠）').count(), 0);
 assert.equal(await page.getByText(/床面積/).count(), 0);
 assert.equal(await page.getByRole('textbox', {name: '一覧を手で直す'}).count(), 0);
-// 見取図の下の枠は申請書の改修の内容（①玄関・②トイレ。縦手すりは②の番号＝申請書の②の行）
+// 見取図の下の枠は申請書の改修の内容（①玄関・②トイレ）
 const rows = await legend();
 assert.equal(rows.length, 2, JSON.stringify(rows));
 assert.match(rows[0], /^①玄関　手すりの取り付け/);
 assert.match(rows[1], /^②トイレ　/);
-assert.match(await art(), />②</);
 assert.equal(await page.locator('[data-stage]').count(), 0);
-log('置き場は出さない・横棒を描いて申請書の箇所①玄関につなぐ・縦手すり②・一覧 OK');
+log('置き場は出さない・棒と丸には番号なし・番号①を申請書の箇所①玄関につなぐ・見取図の下の枠 OK');
 
 // ---------------- 選んで動かす・Delete・Ctrl+Z
 await click(1.5 * M, 2 * M); // 和室を選ぶ
@@ -238,7 +262,7 @@ await tool('自在棒');
   await page.mouse.up();
 }
 await page.keyboard.press('Escape');
-assert.ok((await legend()).some((r) => /L型　910×910mm|L型　900×900mm|L型　9\d0×9\d0mm/.test(r)), `一筆の L 字 ${JSON.stringify(await legend())}`);
+assert.ok((await railPaths()).some((d) => /l9\d0 0L[\d.]+ [\d.]+$/.test(d)), `一筆の L 字 ${JSON.stringify(await railPaths())}`);
 await page.keyboard.press('Control+z');
 for (let i = 0; i < 7; i++) await page.keyboard.press('Control+z'); // 文字・通路・WC・階段・回す・左右反転・らせん階段
 // ---------------- 部屋を頂点で描く（角を順に押す・はじめの点で閉じる）・頂点（■）で形を変える
@@ -346,8 +370,9 @@ log('図の上で文字を打つ・回すつまみ・L字の手すり・頂点�
   const v0 = await page.locator('[data-handle="v0"]').boundingBox();
   const v1 = await page.locator('[data-handle="v1"]').boundingBox();
   await page.keyboard.press('Escape');
-  const bent = /L＝[\d,]+(＋[\d,]+){2,}mm/;
-  assert.ok((await legend()).some((r) => bent.test(r)), `曲げた手すり ${JSON.stringify(await legend())}`);
+  // 曲げた手すり（角が2つ以上＝4点より多い線）
+  const bent = (d) => d.split('L').length >= 4;
+  assert.ok((await railPaths()).some(bent), `曲げた手すり ${JSON.stringify(await railPaths())}`);
   // 手すりの上をぐしゃぐしゃに書く（選ぶ・動かすのまま）→ 消える。戻すで戻る
   {
     const c = {x: v0.x + v0.width / 2 + (v1.x - v0.x) * 0.3, y: v0.y + v0.height / 2 + (v1.y - v0.y) * 0.3};
@@ -356,10 +381,10 @@ log('図の上で文字を打つ・回すつまみ・L字の手すり・頂点�
     for (let i = 1; i <= 9; i++) await page.mouse.move(c.x + (i % 2 ? 45 : -45), c.y + i * 3, {steps: 3});
     await page.mouse.up();
   }
-  assert.ok(!(await legend()).some((r) => bent.test(r)), `ぐしゃぐしゃで消えた ${JSON.stringify(await legend())}`);
+  assert.ok(!(await railPaths()).some(bent), `ぐしゃぐしゃで消えた ${JSON.stringify(await railPaths())}`);
   await page.getByText('1つ消しました').last().waitFor();
   await page.keyboard.press('Control+z');
-  assert.ok((await legend()).some((r) => bent.test(r)), '戻すで戻る');
+  assert.ok((await railPaths()).some(bent), '戻すで戻る');
   // 描く道具（図形）を選んで、図形の上をぐしゃぐしゃ → 図形も消える（新しい図形は置かない）
   await bar.getByRole('button', {name: '四角', exact: true}).click();
   await drag([5 * M, 6 * M], [7 * M, 7 * M]);
@@ -436,7 +461,7 @@ log('図の上で文字を打つ・回すつまみ・L字の手すり・頂点�
   }
   // 戻す：番号3つ・丸・図形・曲げ・手すり（消したのは戻してあるので数えない）
   for (let i = 0; i < 3 + 1 + 1 + 1 + 1; i++) await page.keyboard.press('Control+z');
-  assert.ok(!(await legend()).some((r) => bent.test(r)));
+  assert.ok(!(await railPaths()).some(bent));
   assert.doesNotMatch(await art(), /<path d="M0 0H1820V910H0Z"/);
   assert.equal(await dots(), dots0);
 }
@@ -453,6 +478,7 @@ log('方眼の上のまん中の描く道具・曲げた手すり（□で曲げ
   assert.ok(vb.y >= ub.y - 1 && vb.y + vb.height <= ub.y + ub.height + 1, '頂点の編集は上の段のまん中（戻す・進む・削除の右）');
   const vcount = () => page.locator('[data-handle^="v"]').count();
   const hb = async (h) => {
+    await toTools(); // 上の段のボタンを押すとページが上に戻るので、描く道具の段までスクロールし直してから
     const b = await page.locator(`[data-handle="${h}"]`).boundingBox();
     return {x: b.x + b.width / 2, y: b.y + b.height / 2};
   };
@@ -462,6 +488,7 @@ log('方眼の上のまん中の描く道具・曲げた手すり（□で曲げ
     await page.mouse.move(b.x, b.y, {steps: 6});
     await page.mouse.up();
   };
+  await toTools();
   const freePaths = () => art().then((h) => [...h.matchAll(/<path d="(M[\d.\- LC]+Z)" fill="none" stroke="#e01b24" stroke-width="30" stroke-linejoin="round"/g)].map((m) => m[1]));
   await bar.getByRole('button', {name: '四角', exact: true}).click();
   await drag([9 * M, 6 * M], [11 * M, 8 * M]);
@@ -642,6 +669,7 @@ log('削除を押してなぞる・押すと部屋も消える（赤く見せる
   assert.equal((await art()).length, n0, '削除で消えた');
   // 右下：左へすべらせると戻す・右へすべらせると進む（1回で1つ。方眼には描かない）
   const pad = page.locator('[data-swipe-undo]');
+  await toTools(); // 上の段の削除を押すとページが上に戻る
   const pb = await pad.boundingBox();
   const cb = await page.locator('[data-madori-canvas]').boundingBox();
   assert.ok(pb.x + pb.width > cb.x + cb.width - 60 && pb.y + pb.height > cb.y + cb.height - 60, `右下 ${JSON.stringify([pb, cb])}`);
@@ -655,12 +683,15 @@ log('削除を押してなぞる・押すと部屋も消える（赤く見せる
   assert.equal(await art(), placedArt, '左へすべらせて戻す（消したのが戻る）');
   await slide(90);
   assert.equal((await art()).length, n0, '右へすべらせて進む（また消える）');
-  // 方眼の下：申請書の改修の内容（申請書と同じ書き方）
+  // 方眼の右：申請書の改修の内容（申請書と同じ書き方。ユーザーの指示「申請内容を右側に表示して、平面図の入力画面を広く取る」2026-11-12。前は方眼の下）
   const works = await page.locator('[data-plan-works] li').allInnerTexts();
   assert.ok(works.length >= 1, JSON.stringify(works));
   assert.match(works[0], /^①玄関　手すりの取り付け/);
   const wb = await page.locator('[data-plan-works]').boundingBox();
-  assert.ok(wb.y > cb.y + cb.height - 1 && Math.abs(wb.x - cb.x) < 2, `方眼の下 ${JSON.stringify([wb, cb])}`);
+  assert.ok(wb.x >= cb.x + cb.width && wb.y <= cb.y + 1, `方眼の右 ${JSON.stringify([wb, cb])}`);
+  // 方眼は広く（描く道具の段から方眼の下までが1画面に入るいっぱい。1366×900 なら 720px ほど。前は 600px）
+  const db = await bar.boundingBox();
+  assert.ok(cb.height >= 700 && cb.y + cb.height - db.y <= 900, `方眼の高さ ${JSON.stringify([db, cb])}`);
   // 方眼のいちばん上に「〇〇様邸」（ユーザーの指示「平面図の一番上に〇〇様邸と表示しておく」2026-11-11）。方眼のまん中にそろえる
   const title = page.locator('[data-plan-title]');
   assert.equal(await title.innerText(), '（サンプル）山田様邸');
@@ -678,7 +709,7 @@ log('削除を押してなぞる・押すと部屋も消える（赤く見せる
   else assert.equal(rowK, String.fromCharCode(0x2460 + k - 1)); // 申請書にその番号の行がなければ番号だけ（印刷の一覧の枠が空にならないように）
   await page.keyboard.press('Control+z');
 }
-log('住設 ▼・いつも出す・まん中の削除・すべらせて戻す／進む・方眼の下の改修の内容・番号の一覧 OK');
+log('住設 ▼・いつも出す・まん中の削除・すべらせて戻す／進む・方眼の右の改修の内容・広い方眼・番号の一覧 OK');
 
 // ---------------- 2階
 await page.getByRole('button', {name: '＋ 階'}).click();
@@ -689,7 +720,27 @@ await drag([0, 0], [3 * M, 4 * M]);
 await tool('横棒');
 await click(1.5 * M, 3.8 * M);
 await page.keyboard.press('Escape');
-assert.equal((await legend()).at(-1), '③L＝600mm'); // 階をまたいで通し番号（申請書にない番号は部品の文）
+// 2階の絵（下の階のうすい絵＝opacity の g の次）
+const art2 = () => canvas.evaluate((s) => s.querySelector(':scope > g:not([opacity])')?.innerHTML ?? '');
+assert.match(await art2(), /#e01b24/);
+assert.doesNotMatch(await art2(), /[①-⑳]/); // 棒には番号を付けない
+{
+  // 番号は階をまたいで通し番号（1階の①のあと、2階は②③）。②は申請書の②トイレの行、③は申請書にないので番号だけ
+  const dbar = page.getByRole('toolbar', {name: '描く道具'});
+  const nb = dbar.getByRole('button', {name: /番号$/});
+  assert.ok((await nb.innerText()).includes('②'), await nb.innerText());
+  await nb.click();
+  await click(0.8 * M, 1 * M);
+  await click(2.2 * M, 1 * M);
+  await dbar.getByRole('button', {name: '番号を確定'}).click();
+  await page.keyboard.press('Escape');
+}
+assert.equal(((await art2()).match(/[①-⑳]/g) ?? []).join(''), '②③');
+{
+  const rows2 = await legend();
+  assert.match(rows2.at(-2), /^②トイレ　/);
+  assert.equal(rows2.at(-1), '③');
+}
 await page.getByRole('tab', {name: '1階', exact: true}).click();
 log('2階・通し番号 OK');
 
@@ -724,7 +775,7 @@ assert.match(first, /font-weight="700"[^>]*>（サンプル）山田様邸<\/tex
 }
 assert.match(first, /①玄関　手すりの取り付け/);
 assert.match(first, /②トイレ　/);
-assert.match(first, /③L＝600mm/);
+assert.match(first, /xml:space="preserve"[^>]*>③<\/text>/); // 申請書にない番号は番号だけ
 const orient = await sheets.first().getAttribute('data-orientation');
 log('見取図の向き', orient);
 await page.screenshot({path: path.join(outDir, 'madori-print.png')});

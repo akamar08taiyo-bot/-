@@ -404,28 +404,6 @@ function step(it: MItem): string {
 const numText = (n: number, x: number, y: number, size = NUM_SIZE) =>
   `<text x="${r1(x)}" y="${r1(y + size * 0.36)}" font-size="${size}" text-anchor="middle" fill="${RED}">${circled(n)}</text>`;
 
-/**
- * 線の部品の番号の置き場所：線の始まり（左・上の端）の近くで、線に直角に少し離す（上か左）。見本の見取図も手すりの端のそばに①
- * （まん中だと部屋の名前・広さの字に重なった）
- */
-function numSpot(it: MItem, size = NUM_SIZE): [number, number] {
-  const len = Math.hypot(it.w, it.h) || 1;
-  let nx = -it.h / len;
-  let ny = it.w / len;
-  if (ny > 0 || (ny === 0 && nx > 0)) {
-    nx = -nx;
-    ny = -ny;
-  }
-  // 左・上の端（w・h が負なら終わりの端）から、線にそって 1/4（長い手すりでも 400mm まで）
-  const flip = it.w < 0 || (it.w === 0 && it.h < 0);
-  const sx = flip ? it.x + it.w : it.x;
-  const sy = flip ? it.y + it.h : it.y;
-  const along = Math.min(len / 4, 400);
-  // 線から離す量は番号の大きさに合わせる（大きくした番号が手すりに重ならないように）
-  const off = size * 0.75;
-  return [sx + (Math.abs(it.w) / len) * along + nx * off, sy + (Math.abs(it.h) / len) * along + ny * off];
-}
-
 function dimLine(x1: number, y1: number, x2: number, y2: number, label: string, size = 170): string {
   const len = Math.hypot(x2 - x1, y2 - y1) || 1;
   const ux = (x2 - x1) / len;
@@ -536,17 +514,10 @@ export function floorSvg(items: MItem[], o: RenderOpts): string {
       out.push(rx === ry ? `<circle cx="${r1(it.x)}" cy="${r1(it.y)}" r="${r1(rx)}" fill="${VRAIL}"/>` : `<ellipse cx="${r1(it.x)}" cy="${r1(it.y)}" rx="${r1(rx)}" ry="${r1(ry)}" fill="${VRAIL}"/>`);
     }
   }
-  const ns = Math.max(NUM_SIZE, o.numMin ?? 0); // 手すり・縦手すり・段差の解消に付ける番号の大きさ
+  // 番号は「① 番号」の道具で置いたものだけ。手すり（棒）・丸・横四角には番号を付けない（ユーザーの指示「番号はセットにしなくても良い。棒は棒、丸は丸のみ」2026-11-12）
   for (const it of items) {
     const n = o.nums.get(it.id);
-    if (it.kind === 'rail' && n) {
-      const [nx, ny] = numSpot(it, ns);
-      out.push(numText(n, nx, ny, ns));
-    } else if (it.kind === 'vrail' && n) out.push(numText(n, it.x + (it.w || 150) / 2 + ns * 0.6, it.y - (it.h || 150) / 2 - ns * 0.15, ns));
-    else if (it.kind === 'step' && n) {
-      const b = bounds(it);
-      out.push(numText(n, b.x + b.w + ns * 0.75, b.y + ns * 0.3, ns));
-    } else if (it.kind === 'num' && n) out.push(numText(n, it.x, it.y, Math.max(it.size ?? NUM_SIZE, o.numMin ?? 0)));
+    if (it.kind === 'num' && n) out.push(numText(n, it.x, it.y, Math.max(it.size ?? NUM_SIZE, o.numMin ?? 0)));
     else if (it.kind === 'text' && it.label) {
       const size = it.size ?? 220;
       it.label.split('\n').forEach((line, i) => out.push(`<text x="${r1(it.x)}" y="${r1(it.y + size * (i + 0.85))}" font-size="${size}" fill="#111827">${esc(line)}</text>`));
