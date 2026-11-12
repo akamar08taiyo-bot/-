@@ -159,7 +159,9 @@ async function open(status, viewport = {width: 1366, height: 900}) {
     await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
     await page.getByRole('region', {name: '新規作成'}).getByRole('button', {name: '＋ 福岡市', exact: true}).click();
     await form.getByLabel('被保険者氏名').fill('見本 花子');
-    await form.getByLabel('住所', {exact: true}).fill('福岡県福岡市中央区天神');
+    // 福岡市も郵便番号を打てば住所が入る（様式に郵便番号の欄はないが、入れるための欄。2026-11-12）
+    await form.getByLabel('郵便番号', {exact: true}).fill('8100001');
+    await page.waitForFunction(() => document.querySelector('[aria-label="住所"]')?.value === '福岡県福岡市中央区天神', null, {timeout: 5000});
     const row2 = form.locator('[data-field="builder"]');
     await row2.scrollIntoViewIfNeeded();
     assert.equal(await row2.getByRole('combobox', {name: '元請け'}).inputValue(), '見本建設株式会社　見本営業所');

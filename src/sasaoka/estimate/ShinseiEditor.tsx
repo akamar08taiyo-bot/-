@@ -49,22 +49,26 @@ import {DEMO} from '../demo/flag.ts';
 /** 欄の順番：保険者ごとの申請書の上からの順番（原本を見て決めた。みやこ町・広域連合は承認の申請書の順番で、支給申請書だけの着工日・完成日は最後）。
  *  ただし被保険者氏名はどの保険者もフリガナのすぐ下（ユーザーの指示「ふりがなの下に、名前をもってくる」、2026-10-21。苅田町・みやこ町は原本では番号が先）。
  *  保険者番号（区・市町村）は一覧ではなく、上の保険者のすぐ右で選ぶ（InsurerAreaPick） */
+/** 様式に郵便番号の欄がない保険者（福岡市・大分市）。郵便番号は住所を入れるためだけの欄（申請書には書かない） */
+const NO_ZIP_CELL: readonly Insurer[] = ['fukuoka', 'oita'];
+
 const FIELDS: Record<Insurer, Field[]> = {
   kanda: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'dates', 'cost', 'builder'],
   yukuhashi: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'care', 'burden', 'owner', 'photoDates', 'works', 'dates', 'cost', 'builder'],
   miyako: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'cost', 'renovated', 'dates', 'builder'],
   kouiki: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'burden', 'owner', 'reason', 'photoDates', 'works', 'cost', 'renovated', 'dates', 'builder'], // 郵便番号はユーザーの指示で足した（2026-10-21）
-  // 福岡市：性別・郵便番号・要介護状態区分の欄はない。着工日・完成日は完了届出書（工事のあと）
-  fukuoka: ['kana', 'name', 'insuredNo', 'birth', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'cost', 'dates', 'builder'],
+  // 福岡市：性別・要介護状態区分の欄はない。着工日・完成日は完了届出書（工事のあと）。郵便番号の欄も様式にはないが、打つと住所が入るように欄は出す
+  // （ユーザーの指示「福岡市には郵便番号自動入力はないの？」2026-11-12。NO_ZIP_CELL）
+  fukuoka: ['kana', 'name', 'insuredNo', 'birth', 'zip', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'cost', 'dates', 'builder'],
   // 北九州市：生年月日・性別・要介護状態区分の欄はない。フリガナ・着工日・完成日は支給申請書（工事のあと）。工事費見積金額は介護保険の対象分（市の記入例）
   kitakyushu: ['kana', 'name', 'insuredNo', 'zip', 'address', 'phone', 'burden', 'owner', 'photoDates', 'works', 'builder', 'cost', 'dates'],
   // 久留米市（2026-11-02）：性別・要介護状態区分の欄はない。介護支援専門員等＝理由書作成者（「同左」）。着工（予定）日・完成（予定）日は両方の申請書。負担割合の□も申請書にある
   kurume: ['kana', 'name', 'insuredNo', 'birth', 'zip', 'address', 'phone', 'owner', 'reason', 'photoDates', 'works', 'dates', 'cost', 'burden', 'builder'],
   // 飯塚市（2026-11-02）：事前承認願書の上からの順。住宅改修の利用（無・有）・今回の改修費用・理由書作成者・着工予定日・完成予定日。負担割合は請求書の保険給付分・本人負担分
   iizuka: ['kana', 'name', 'insuredNo', 'birth', 'gender', 'zip', 'address', 'phone', 'owner', 'photoDates', 'works', 'renovated', 'cost', 'reason', 'dates', 'burden', 'builder'],
-  // 大分市（2026-11-04）：支給申請兼施工承認申請書の上からの順（郵便番号・性別の欄はない）。要支援・要介護の（　）・認定有効期間、改修の内容の行の着工予定・完成予定、
+  // 大分市（2026-11-04）：支給申請兼施工承認申請書の上からの順（性別の欄はない。郵便番号は様式にないが、福岡市と同じく住所を入れるための欄を住所のすぐ上に）。要支援・要介護の（　）・認定有効期間、改修の内容の行の着工予定・完成予定、
   // 改修費用見積額、居宅介護支援事業所（理由書作成者と連絡先）。過去の住宅改修費支給申請の有無は理由書（表）
-  oita: ['kana', 'name', 'insuredNo', 'birth', 'care', 'burden', 'careTerm', 'address', 'phone', 'owner', 'photoDates', 'works', 'dates', 'cost', 'reason', 'renovated', 'builder'],
+  oita: ['kana', 'name', 'insuredNo', 'birth', 'care', 'burden', 'careTerm', 'zip', 'address', 'phone', 'owner', 'photoDates', 'works', 'dates', 'cost', 'reason', 'renovated', 'builder'],
 };
 // 負担割合は要介護状態区分のすぐ下（みやこ町・広域連合は電話番号の下）。申請書の原本に欄はないが、委任状の保険給付額・見積書の介護保険の内訳に使い、
 // 特定福祉用具の負担割合と同じ値（どちらで選んでも両方に入る。tokuteiLink.ts）。ユーザーの指示「住宅改修の申請書にも負担割合を設置。住宅改修⇔特定福祉用具などで連動して数字に繋げる」2026-10-28
@@ -172,7 +176,7 @@ export function ShinseiEditor({
     insuredNo: !insuredBoxes(job.insuredNo).join(''),
     birth: !info.birthY.trim() || !info.birthM.trim() || !info.birthD.trim(), // 元号は選んでいなければ昭和
     gender: !info.gender,
-    zip: !info.zip.trim(),
+    zip: !info.zip.trim() && !(insurer && NO_ZIP_CELL.includes(insurer)), // 様式に郵便番号の欄がない保険者は、空でも黄色にしない
     address: !job.address.trim(),
     phone: !info.phone.trim(),
     care: !info.care,
