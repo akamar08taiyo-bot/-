@@ -51,12 +51,21 @@ function align(cls: string): XStyle['h'] {
  * 1行の欄は「縮小して全体を表示」も付ける（Excel の字体が少し広くても切れない）。前は1行の欄を Excel の縮小に任せ、
  * 印刷では折り返す長い改修場所・備考が Excel では1行の小さな字になり、品名・備考の大きさも印刷と違っていた
  */
-function fitted(f: Fit): {v: string | null; st: XStyle} {
+function fitted(f: Fit, heightMm: number): {v: string | null; st: XStyle} {
   const v = f.lines.join('\n');
-  return {v: v || null, st: f.lines.length > 1 ? {size: f.pt, wrap: true} : {size: f.pt, shrink: true}};
+  return {v: v || null, st: f.lines.length > 1 ? {size: Math.min(f.pt, wrapPt(f.lines.length, heightMm)), wrap: true} : {size: f.pt, shrink: true}};
 }
+
+/**
+ * Excel で折り返す欄（2行・3行）の字の大きさの上限（pt）。Excel は折り返した行の間を印刷（字の 1.12 倍）より広く取り、
+ * 画面（Windows・100%）ではＭＳ Ｐゴシックの 6.7pt（9px）の行の間が 13px（字の約 1.45 倍）だった。そのため明細の1行（5.77mm＝21px）に
+ * 2行の品名・備考が入らず、2行目が欄の下で切れていた（ユーザーの「文字がはみ出ています」2026-11-12）。
+ * 行の間を字の 1.45 倍＋上下の余白 1pt として、欄の高さに入る大きさにする（明細の1行の2行なら 5.2pt。印刷はそのまま 6.7pt）
+ */
+const XL_WRAP = {line: 1.45, pad: 1};
+const wrapPt = (lines: number, heightMm: number) => Math.floor(((heightMm * 72) / 25.4 - XL_WRAP.pad) / (lines * XL_WRAP.line) * 10) / 10;
 /** 1つの文字の欄（`fitText`） */
-const fit = (text: string, w: number, h: number, maxPt: number, lines = 1) => fitted(fitText(text, w, h, maxPt, lines));
+const fit = (text: string, w: number, h: number, maxPt: number, lines = 1) => fitted(fitText(text, w, h, maxPt, lines), h);
 
 /** 金額・数量の欄：印刷と同じ大きさ（Excel の書式 #,##0 と同じ「12,345」の幅で） */
 const money = (v: number, w: number, h: number, maxPt = 11): XStyle => ({size: fitText(yen(v), w, h, maxPt).pt, numFmt: MONEY, shrink: true});
@@ -215,7 +224,7 @@ function ykLine(l: FormLine, r: number, put: Put) {
     ['', 'r nr', 'nl', 'r', 'r mr', 'r nr', 'nl', 'r', 'r mr', 'r mr', 'mr'].forEach((cls, i) => put(i + 2, null, cls));
     return;
   }
-  const name = fitted(fitName(l.text, YK.C, YK_ROW, 9, 2));
+  const name = fitted(fitName(l.text, YK.C, YK_ROW, 9, 2), YK_ROW);
   put(2, l.text ? name.v : null, '', name.st);
   put(3, open ? null : q, 'r nr', count(q, YK.D, YK_ROW));
   const unit = fit(l.unit, YK.E, YK_ROW, 11);
@@ -231,7 +240,7 @@ function ykLine(l: FormLine, r: number, put: Put) {
   put(11, target || open ? null : l.amount, 'r mr', money(l.amount, YK.L, YK_ROW), target || open ? undefined : G);
   // 備考（定価等）：「定価8,000円（税抜）×0.8」。切って使う部材は「定価20,000円（4m）×0.8」と「600mm÷4000mm＝0.15」の2行
   const note = lineNote(l, 'yukuhashi', 0);
-  const nt = note.length > 1 ? fitted(fitLines(note, YK.M, YK_ROW, 11)) : fit(note[0] ?? '', YK.M, YK_ROW, 11);
+  const nt = note.length > 1 ? fitted(fitLines(note, YK.M, YK_ROW, 11), YK_ROW) : fit(note[0] ?? '', YK.M, YK_ROW, 11);
   put(12, nt.v, 'mr', nt.st);
 }
 
@@ -385,7 +394,7 @@ function kkLine(l: FormLine, r: number, height: number, bottom: string, hourRate
     return;
   }
   put(2, l.mark, 'mark', {v: 'bottom'});
-  const name = fitted(fitName(l.text, KK.D, height, 9, 3));
+  const name = fitted(fitName(l.text, KK.D, height, 9, 3), height);
   put(3, l.text ? name.v : null, 'mr gothic', name.st);
   put(4, null, 'gap');
   put(5, open ? null : q, 'r ml gothic', count(q, KK.F, height));
@@ -407,7 +416,7 @@ function kkLine(l: FormLine, r: number, height: number, bottom: string, hourRate
   const note = lineNote(l, 'kouiki', hourRate);
   const basis = edges(`ml mr${bottom}`, true);
   if (note.length > 0) {
-    const nt = fitted(fitLines(note, KK.Q + KK.R, height, 10));
+    const nt = fitted(fitLines(note, KK.Q + KK.R, height, 10), height);
     b.put(r, 16, nt.v, {font: GOTHIC, ...nt.st}, basis, 1, 2);
   } else {
     put(16, null, 'ml');

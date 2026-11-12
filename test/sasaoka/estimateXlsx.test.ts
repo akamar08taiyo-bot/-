@@ -338,7 +338,12 @@ test('長い商品名は言葉の切れ目で改行する（印刷・Excel と�
   assert.equal(x.text('C9'), 'マツ六 BD-132 35アッシュ丸棒\nディンプル付 Mオーク 2m');
 });
 
-test('Excel の欄の文字は印刷と同じ大きさ・同じ改行（長い備考・改修場所・品名も切れない）', () => {
+test('Excel の欄の文字は印刷と同じ改行。大きさは印刷と同じで、折り返す欄は Excel の行の間（字の 1.45 倍）で欄の高さに入る大きさ（長い備考・改修場所・品名も切れない）', () => {
+  // ユーザーの「文字がはみ出ています」2026-11-12：Excel（Windows の画面）は 6.7pt の2行の間を 13px 取り、明細の1行（21px）の下で2行目が切れていた
+  /** Excel に書く大きさ：1行は印刷と同じ、折り返す欄は (欄の高さ − 1pt) ÷ (行数 × 1.45) まで */
+  const xlPt = (f: {pt: number; lines: string[]}, heightMm: number) =>
+    f.lines.length > 1 ? Math.min(f.pt, Math.floor((((heightMm * 72) / 25.4 - 1) / (f.lines.length * 1.45)) * 10) / 10) : f.pt;
+  const fitsExcel = (pt: number, lines: number, heightMm: number) => lines * pt * 1.45 + 1 <= (heightMm * 72) / 25.4 + 1e-9;
   const note = '定価123,456円（税抜）×0.8　メーカーの見積書（2026年10月20日付）の金額で、運賃・梱包費を含む';
   const name = 'TOTO EWT24KR68#NW1 インテリア・バーF Lタイプ 600×800mm ホワイト 浴室用（ステンレス芯・樹脂被覆）';
   const longPlace = '玄関から廊下にかけて（上がり框の横）';
@@ -358,7 +363,18 @@ test('Excel の欄の文字は印刷と同じ大きさ・同じ改行（長い�
     ['M9', fitText(note, YK.M, YK_ROW, 11)],
   ] as const) {
     assert.equal(y.text(ref), f.lines.join('\n'), ref);
-    assert.equal(sizeOf(y, ref), f.pt, ref);
+    assert.equal(sizeOf(y, ref), xlPt(f, YK_ROW), ref);
+    assert.ok(fitsExcel(sizeOf(y, ref), f.lines.length, YK_ROW), `${ref} ${sizeOf(y, ref)}pt が明細の1行に入る`);
+  }
+  {
+    // スクリーンショットの品名（2行）：印刷は 6.7pt、Excel は 5.2pt
+    const bp = 'マツ六 BH-444 木製ベースプレート 120mm幅 Mオーク 4m';
+    const y2 = open(estimateXlsx(job({places: [place('廊下', [mat(bp, 15840)])]}), S, '2026-10-22').bytes);
+    const f = fitName(bp, YK.C, YK_ROW, 9, 2);
+    assert.equal(f.lines.length, 2);
+    assert.equal(f.pt, 6.7);
+    assert.equal(String(y2.text('C9')).split('\n').length, 2);
+    assert.equal(sizeOf(y2, 'C9'), 5.2);
   }
   assert.ok(String(y.text('M9')).includes('\n')); // 長い備考は折り返す（前は1行の小さな字）
   // 広域連合用（5行目）：改修箇所 A・内容 D・算出根拠 Q
@@ -369,7 +385,8 @@ test('Excel の欄の文字は印刷と同じ大きさ・同じ改行（長い�
     ['Q5', fitLines([note], KK.Q + KK.R, KK_ROWS[0], 10)],
   ] as const) {
     assert.equal(k.text(ref), f.lines.join('\n'), ref);
-    assert.equal(sizeOf(k, ref), f.pt, ref);
+    assert.equal(sizeOf(k, ref), xlPt(f, KK_ROWS[0]), ref);
+    assert.ok(fitsExcel(sizeOf(k, ref), f.lines.length, KK_ROWS[0]), `${ref} ${sizeOf(k, ref)}pt が欄に入る`);
   }
   assert.ok(sizeOf(k, 'Q5') >= 4.5); // 前は 2.5pt でも入らず、欄の右で切れていた
 });
