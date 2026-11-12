@@ -74,7 +74,7 @@ export function SettingsPage({data, update, cloud}: {data: AppData; update: Upda
     data: Partial<AppData>;
   } | null>(null);
 
-  const exportAll = () => downloadBlob(new Blob([backupJson(data)], {type: 'application/json'}), `見積書・仕切り計算・請求書_バックアップ_${todayIso()}.json`);
+  const exportAll = () => downloadBlob(new Blob([backupJson(data)], {type: 'application/json'}), `${DEMO ? '申請書' : '見積書・仕切り計算・請求書'}_バックアップ_${todayIso()}.json`);
   const exportMaster = () =>
     downloadBlob(new Blob([masterJson(data)], {type: 'application/json'}), `部材リスト・手間単価・部材＋施工費（常用）_${todayIso()}.json`);
 
@@ -101,13 +101,16 @@ export function SettingsPage({data, update, cloud}: {data: AppData; update: Upda
   return (
     <div className="max-w-5xl space-y-4">
       {cloud && <CloudSection cloud={cloud} />}
+      {/* （株）イヤーズ デモアプリは申請書と平面図だけ（2026-11-12）：請求先・請求書・計算のしかた・見積書の欄は出さない */}
+      {!DEMO && (
       <Section title="請求先">
         <Field label="請求先（工務店）の名前　※請求書には「○○　御中」と出ます">{text('clientName', '例：○○工務店')}</Field>
       </Section>
+      )}
 
       <Section
-        title="自社の情報（請求書の発行元・見積書の施工業者）"
-        note={DEMO ? '会社名・営業所名・住所などは、申請書・見積書の施工業者・発行元に出ます。' : '営業所を選ぶと住所・電話番号・所長名が入ります。太陽ポータルから開くと、ポータルで選んだ営業所が最初から入ります。'}
+        title={DEMO ? '自社の情報（申請書の施工業者）' : '自社の情報（請求書の発行元・見積書の施工業者）'}
+        note={DEMO ? '会社名・営業所名・住所などは、申請書の施工業者に出ます。' : '営業所を選ぶと住所・電話番号・所長名が入ります。太陽ポータルから開くと、ポータルで選んだ営業所が最初から入ります。'}
       >
         {!DEMO && (
         <Field label="営業所">
@@ -126,8 +129,8 @@ export function SettingsPage({data, update, cloud}: {data: AppData; update: Upda
         </Field>
         )}
         <Field label="会社名">{text('company')}</Field>
-        <Field label="営業所名（請求書・見積書の施工業者名に出る名前）">{text('officeName')}</Field>
-        <Field label="所長名（請求書に「○○営業所所長　氏名」、見積書の代表者名に出ます）">
+        <Field label={DEMO ? '営業所名（申請書の施工業者名に出る名前）' : '営業所名（請求書・見積書の施工業者名に出る名前）'}>{text('officeName')}</Field>
+        <Field label={DEMO ? '代表者名' : '所長名（請求書に「○○営業所所長　氏名」、見積書の代表者名に出ます）'}>
           {text('manager', DEMO ? '例：山田 太郎' : '例：久保 匠史')}
         </Field>
         {/* ハイフンなしで打つ（ユーザーの指示「郵便番号の記入欄は、ハイフンなしで記入することを注意書き」2026-10-30）。7けたになったら 824-0043 の形に（請求書・申請書に出る形） */}
@@ -139,12 +142,19 @@ export function SettingsPage({data, update, cloud}: {data: AppData; update: Upda
         </Field>
         <Field label="電話番号">{text('tel')}</Field>
         <Field label="FAX番号">{text('fax')}</Field>
-        <Field label="登録番号（インボイス）">{text('regNo', 'T＋13桁')}</Field>
-        {/* 久留米市の申請書の「受領委任払い取扱事業所登録番号」のマスに入る（ユーザーの答え「登録番号を設定で入れる（初めは空）」2026-11-03） */}
-        <Field label="久留米市の受領委任払い取扱事業所登録番号（8けた）">{text('entrustRegNo', '市から届いた番号')}</Field>
-        <Field label="請求書の担当者（任意・様邸ごとの担当とは別）">{text('person', '例：山本')}</Field>
+        {/* デモは請求書・久留米市の申請書がないので出さない */}
+        {!DEMO && (
+          <>
+            <Field label="登録番号（インボイス）">{text('regNo', 'T＋13桁')}</Field>
+            {/* 久留米市の申請書の「受領委任払い取扱事業所登録番号」のマスに入る（ユーザーの答え「登録番号を設定で入れる（初めは空）」2026-11-03） */}
+            <Field label="久留米市の受領委任払い取扱事業所登録番号（8けた）">{text('entrustRegNo', '市から届いた番号')}</Field>
+            <Field label="請求書の担当者（任意・様邸ごとの担当とは別）">{text('person', '例：山本')}</Field>
+          </>
+        )}
       </Section>
 
+      {!DEMO && (
+        <>
       <Section title="請求書">
         <Field label="お振込先（1行で）" wide>
           {text('bank', '例：○○銀行 ○○支店 普通 1234567 口座名義 ○○○○')}
@@ -247,6 +257,9 @@ export function SettingsPage({data, update, cloud}: {data: AppData; update: Upda
         </Field>
       </Section>
 
+        </>
+      )}
+
       <Section title="箇所の候補" note="様邸の画面の「＋ 箇所を追加」に並ぶ名前です。1行に1つずつ書きます。">
         <div className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2">
           <ListArea label="箇所の名前" value={s.placePresets} onChange={(placePresets) => set({placePresets})} rows={5} />
@@ -260,7 +273,7 @@ export function SettingsPage({data, update, cloud}: {data: AppData; update: Upda
 
       <Section
         title="担当者の候補"
-        note="見積書・様邸の画面の「担当」から選ぶ名前です。1行に1つずつ書きます。見積書にはフルネーム、請求書と明細のお客様名の横には名字が出ます。"
+        note={DEMO ? '様邸の画面の「担当」から選ぶ名前です。1行に1つずつ書きます。' : '見積書・様邸の画面の「担当」から選ぶ名前です。1行に1つずつ書きます。見積書にはフルネーム、請求書と明細のお客様名の横には名字が出ます。'}
       >
         <div className="grid gap-1 text-xs font-bold text-slate-600 sm:col-span-2">
           <ListArea label="担当者の名前" value={s.staffList} onChange={(staffList) => set({staffList})} rows={5} />
@@ -276,16 +289,22 @@ export function SettingsPage({data, update, cloud}: {data: AppData; update: Upda
         <h2 className="mb-1 text-base font-bold text-[#0c315e]">データ（この端末のブラウザに保存）</h2>
         <p className="mb-3 text-xs leading-5 text-slate-500">
           入力した内容は、このパソコンのこのブラウザにだけ保存されます（サーバーには送りません）。ほかのパソコンでは見えないので、ときどきバックアップを保存してください。
-          見積書と請求書は同じ保存場所です。
-          部材リスト・手間単価・部材＋施工費（常用）だけを保存したファイルは、ほかの人に渡して読み込んでもらえます。
+          {!DEMO && (
+            <>
+              見積書と請求書は同じ保存場所です。
+              部材リスト・手間単価・部材＋施工費（常用）だけを保存したファイルは、ほかの人に渡して読み込んでもらえます。
+            </>
+          )}
         </p>
         <div className="flex flex-wrap gap-2">
           <Btn color="softBlue" onClick={exportAll}>
             バックアップを保存（すべて）
           </Btn>
-          <Btn color="softBlue" onClick={exportMaster}>
-            部材リスト・手間単価・部材＋施工費（常用）だけ保存（ほかの人に渡す用）
-          </Btn>
+          {!DEMO && (
+            <Btn color="softBlue" onClick={exportMaster}>
+              部材リスト・手間単価・部材＋施工費（常用）だけ保存（ほかの人に渡す用）
+            </Btn>
+          )}
           <label className="inline-flex cursor-pointer items-center rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50">
             保存したファイルを読み込む
             <input
@@ -307,7 +326,7 @@ export function SettingsPage({data, update, cloud}: {data: AppData; update: Upda
                 update('materials', () => r.materials);
                 update('jobs', () => r.jobs);
                 update('kits', () => r.kits);
-                toast('サンプルの部材・様邸・部材＋施工費（常用）を消しました');
+                toast(DEMO ? 'サンプルの様邸を消しました' : 'サンプルの部材・様邸・部材＋施工費（常用）を消しました');
               }}
             >
               サンプルを消す
@@ -318,7 +337,7 @@ export function SettingsPage({data, update, cloud}: {data: AppData; update: Upda
           <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
             <p className="font-bold text-slate-800">「{pending.name}」の中身</p>
             <p className="text-slate-600">
-              部材 {pending.data.materials?.length ?? 0}件・取付手間 {pending.data.labor?.length ?? 0}件・様邸（見積書）
+              部材 {pending.data.materials?.length ?? 0}件・取付手間 {pending.data.labor?.length ?? 0}件・様邸{DEMO ? '' : '（見積書）'}
               {pending.data.jobs?.length ?? 0}件・部材＋施工費（常用） {pending.data.kits?.length ?? 0}件{pending.data.settings ? '・設定' : ''}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">

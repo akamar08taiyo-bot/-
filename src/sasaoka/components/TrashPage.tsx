@@ -12,6 +12,7 @@ import type {AppData, Job} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {yen} from '../util.ts';
 import {Btn, useToast} from './ui.tsx';
+import {DEMO} from '../demo/flag.ts';
 
 /** 確かめ・お知らせに出す様邸の名前（お客様名がなければ、作成日と金額でどれか分かるように） */
 export function trashLabel(job: Job, s: AppData['settings']): string {
@@ -168,7 +169,7 @@ export function TrashPage({data, update, onPurged}: {data: AppData; update: Upda
                 <th className="px-2 py-2 text-left">お客様名</th>
                 <th className="hidden px-2 py-2 text-left md:table-cell">保険者</th>
                 <th className="hidden px-2 py-2 text-left md:table-cell">作成日</th>
-                <th className="hidden px-2 py-2 text-right md:table-cell">見積の合計（税込）</th>
+                <th className="hidden px-2 py-2 text-right md:table-cell">{DEMO ? '改修費用（税込）' : '見積の合計（税込）'}</th>
                 <th className="px-2 py-2" />
               </tr>
             </thead>

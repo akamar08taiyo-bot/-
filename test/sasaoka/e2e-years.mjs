@@ -3,7 +3,9 @@
 //   ・止めるスイッチ（status.json）：使える → 開く／止めた・期限が過ぎた → 開かない／読めない → 開かない（もう一度確かめる で開く）
 //   ・画面：上に「（株）イヤーズ デモアプリ」・ポータルへ戻る／売上見込み／工務店請求書／特定福祉用具／カタログ／営業所の一覧を出さない
 //   ・保存場所：今までのアプリ（同じサイト）のデータ（ポータルの営業所など）を読まない・書かない（名前の頭に years-demo:）
-//   ・書類（申請書・理由書の Excel）に社内の字（会社名・営業所・所長・担当者）が出ない
+//   ・書類（申請書の Excel）に社内の字（会社名・営業所・所長・担当者）が出ない
+//   ・様邸の画面は住宅改修申請書と平面図だけ（ユーザーの指示「見積もり作成機能はなくそうかな…申請書と、平面図のみで」「理由書作成へ連動する機能については不要」2026-11-12）：
+//     工事見積書・理由書のタブ・部材・施工費マスタ・「見積書へ連動」・見積書の言葉を出さない
 // usage: node e2e-years.mjs <サイトのURL（/years-demo/ に dist-years を置いたもの）> <出力フォルダ>。お客様は架空のサンプル
 const {chromium} = await import(process.env.PLAYWRIGHT ?? '/opt/node-tools/node_modules/playwright/index.mjs');
 import assert from 'node:assert/strict';
@@ -59,12 +61,17 @@ async function open(status, viewport = {width: 1366, height: 900}) {
   assert.equal(await page.title(), '（株）イヤーズ デモアプリ｜申請書・見積書作成');
   // ポータルの営業所（今までのアプリのデータ）は読まない
   assert.match(await page.locator('header').innerText(), /営業所未設定/);
-  // メニュー：売上見込み・工務店請求書は出さない
+  // メニュー：売上見込み・工務店請求書・部材・施工費マスタは出さない
   await page.getByRole('button', {name: /☰ メニュー/}).click();
   const menu = await page.getByRole('menu').allInnerTexts().catch(() => []);
   const menuText = menu.join(' ') || (await page.locator('body').innerText());
-  assert.ok(!/売上見込み|工務店請求書/.test(menuText), menuText.slice(0, 200));
+  assert.ok(!/売上見込み|工務店請求書|部材・施工費マスタ/.test(menuText), menuText.slice(0, 200));
+  assert.ok(/申請書を作成する/.test(menuText), menuText.slice(0, 200));
   await page.keyboard.press('Escape');
+  // 入口：見積書の言葉を出さない（一覧は「申請書の一覧」）
+  assert.equal(await page.getByRole('button', {name: '📋 申請書の一覧を開く'}).count(), 1);
+  assert.ok(!/見積/.test(await page.locator('main').innerText()), (await page.locator('main').innerText()).slice(0, 300));
+  // 前の版の URL（#tab=master など）で開いても、出さない画面は開かない
   await page.screenshot({path: path.join(outDir, 'years-list.png')});
   // 新規作成：久留米市・飯塚市・大分市は出さない（ユーザーの指示「久留米、飯塚、大分市の申請書はもう除いてください」2026-11-10）
   {
@@ -72,10 +79,10 @@ async function open(status, viewport = {width: 1366, height: 900}) {
     assert.ok(!btns.some((t) => /久留米|飯塚|大分|田川|の申請書/.test(t)), JSON.stringify(btns)); // 「📑 田川市の申請書」も出さない（「田川市の申請書の部分も不要」）
     assert.ok(btns.includes('＋ 苅田町') && btns.includes('＋ 広域連合'), JSON.stringify(btns));
   }
-  // 新しい様邸（苅田町）：タブは住宅改修だけ。介援隊のカタログのボタンはない
+  // 新しい様邸（苅田町）：タブは住宅改修申請書と平面図だけ。介援隊のカタログのボタンはない
   await page.getByRole('region', {name: '新規作成'}).getByRole('button', {name: '＋ 苅田町', exact: true}).click();
   const tabs = await page.locator('[data-job-tabs] [role="tab"]').allInnerTexts();
-  assert.deepEqual(tabs.map((t) => t.trim()), ['📝 住宅改修申請書', '📋 工事見積書', '📄 理由書', '📐 平面図']);
+  assert.deepEqual(tabs.map((t) => t.trim()), ['📝 住宅改修申請書', '📐 平面図']);
   assert.equal(await page.getByRole('button', {name: '📖 カタログを表示'}).count(), 0);
   const form = page.getByRole('form', {name: '申請書'});
   // 保険者を選ぶ欄にも出さない
@@ -88,7 +95,17 @@ async function open(status, viewport = {width: 1366, height: 900}) {
   await page.keyboard.press('Tab');
   await page.waitForTimeout(1200);
   await page.screenshot({path: path.join(outDir, 'years-shinsei.png')});
-  // 申請書・理由書の Excel に社内の字が出ない
+  // 申請書の入れる所に見積書の言葉（見積書へ連動・見積書に入れる・見積書の金額…）を出さない
+  {
+    const t = await form.innerText();
+    assert.ok(!/見積/.test(t), t.match(/.{0,20}見積.{0,20}/)?.[0]);
+  }
+  // 平面図のタブ：開ける・申請書のタブへ戻れる
+  await page.locator('[data-job-tabs] [role="tab"]', {hasText: '平面図'}).click();
+  await page.getByRole('button', {name: '🖨 平面図を印刷'}).waitFor();
+  await page.locator('[data-job-tabs] [role="tab"]', {hasText: '住宅改修申請書'}).click();
+  await form.waitFor();
+  // 申請書の Excel に社内の字が出ない。Excelで保存の画面に工事見積書・理由書は出さない
   const xlsxText = async () => {
     const dl = page.waitForEvent('download', {timeout: 60000});
     return dl;
@@ -96,14 +113,14 @@ async function open(status, viewport = {width: 1366, height: 900}) {
   await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).first().click();
   const dlg = page.getByRole('dialog', {name: 'Excelで保存'});
   const labels = await dlg.getByRole('checkbox').evaluateAll((els) => els.map((e) => e.closest('label')?.innerText.trim().split('\n')[0] ?? ''));
-  assert.ok(!labels.some((l) => /特定福祉用具|販売見積書/.test(l)), JSON.stringify(labels));
-  await dlg.getByRole('checkbox', {name: /^理由書/}).check();
+  assert.ok(!labels.some((l) => /特定福祉用具|販売見積書|工事見積書|理由書/.test(l)), JSON.stringify(labels));
+  assert.ok(labels.some((l) => /^住宅改修申請書/.test(l)) && labels.some((l) => /^平面図/.test(l)), JSON.stringify(labels));
   const downloads = [];
   page.on('download', (d) => downloads.push(d));
   await dlg.getByRole('button', {name: /保存する/}).click();
   await page.waitForFunction(() => !document.querySelector('[role="dialog"]'), null, {timeout: 60000});
   await page.waitForTimeout(1500);
-  assert.equal(downloads.length, 2, `保存したファイル ${downloads.length}`);
+  assert.equal(downloads.length, 1, `保存したファイル ${downloads.length}`);
   for (const d of downloads) {
     const p = path.join(outDir, d.suggestedFilename());
     await d.saveAs(p);
@@ -124,6 +141,14 @@ async function open(status, viewport = {width: 1366, height: 900}) {
   await page.getByRole('menuitem', {name: /設定/}).or(page.getByRole('button', {name: /⚙ 設定/})).first().click();
   await page.getByText('自社の情報').first().waitFor();
   assert.equal(await page.getByText('（選んでください）').count(), 0);
+  // 設定に請求書・見積書の欄は出さない
+  assert.ok(!/請求|見積/.test(await page.locator('main').innerText()), (await page.locator('main').innerText()).match(/.{0,20}(請求|見積).{0,20}/)?.[0]);
+  // 前の版の URL（#tab=master など）で開いても、出さない画面（部材・施工費マスタ・工務店請求書・売上見込み）は開かない
+  for (const t of ['master', 'invoice', 'sales']) {
+    await page.goto(`${site}/years-demo/index.html#tab=${t}`);
+    await page.reload();
+    await page.getByRole('button', {name: '📋 申請書の一覧を開く'}).waitFor();
+  }
   // 保存場所：今までのアプリの名前の保存場所はない（頭に years-demo:）。ポータルの営業所はそのまま
   const stores = await page.evaluate(async () => {
     const dbs = (await indexedDB.databases()).map((d) => d.name);

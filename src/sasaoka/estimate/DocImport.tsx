@@ -19,6 +19,7 @@ import {putTokuteiCase} from '../tokuteiLink.ts';
 import type {AppData, Job} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {monthLabel, todayIso, yen} from '../util.ts';
+import {DEMO} from '../demo/flag.ts';
 
 /** 確かめの画面の1まとまり（name・target・month・separate は画面で直せる） */
 type Draft = ImportGroup & {separate: boolean};
@@ -274,7 +275,7 @@ export function useDocImport(data: AppData, update: Update, onImported: (month: 
       )}
       {drafts && (
         <Modal
-          title="📥 申請書・見積書・理由書の取り込み"
+          title={DEMO ? '📥 申請書の取り込み' : '📥 申請書・見積書・理由書の取り込み'}
           onClose={close}
           wide
           footer={
@@ -367,5 +368,7 @@ export function useDocImport(data: AppData, update: Update, onImported: (month: 
 
 /** 見積もりの入口の取り込みの欄（ファイルをドロップ・押して選ぶ） */
 export function DocImportDrop({onFiles, onPick}: {onFiles: (files: File[]) => void; onPick: () => void}) {
-  return <DropArea name="申請書・見積書・理由書を取り込む" label="📥 申請書・見積書・理由書を取り込む" hint="ここにドロップ・押して選ぶ（.xlsx・様邸データ）" onFiles={onFiles} onPick={onPick} big className="w-full" />;
+  // （株）イヤーズ デモアプリは申請書と平面図だけ（2026-11-12）
+  const what = DEMO ? '申請書' : '申請書・見積書・理由書';
+  return <DropArea name={`${what}を取り込む`} label={`📥 ${what}を取り込む`} hint="ここにドロップ・押して選ぶ（.xlsx・様邸データ）" onFiles={onFiles} onPick={onPick} big className="w-full" />;
 }

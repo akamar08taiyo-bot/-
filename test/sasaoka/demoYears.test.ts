@@ -6,7 +6,7 @@ import test from 'node:test';
 import {strFromU8, unzipSync} from 'fflate';
 import {DEFAULT_STAFF, OFFICES} from '../../src/sasaoka/company.ts';
 import * as demoCompany from '../../src/sasaoka/demo/company.ts';
-import {DEMO} from '../../src/sasaoka/demo/flag.ts';
+import {DEMO, DEMO_JOB_VIEWS} from '../../src/sasaoka/demo/flag.ts';
 import {demoVerdict, todayIso} from '../../src/sasaoka/demo/gate.ts';
 import {scrubTemplate} from '../../src/sasaoka/demo/scrub.ts';
 
@@ -27,6 +27,11 @@ test('止めるスイッチ：使える・止めた・期限が過ぎた・読�
 
 test('今までのアプリのビルド・テストではデモにならない（__DEMO__ がない）', () => {
   assert.equal(DEMO, false);
+});
+
+test('デモの様邸の画面は住宅改修申請書と平面図だけ（工事見積書・理由書・発注書・特定福祉用具は出さない）', () => {
+  // ユーザーの指示「見積もり作成機能はなくそうかな…申請書と、平面図のみで」「理由書作成へ連動する機能については不要」2026-11-12
+  assert.deepEqual([...DEMO_JOB_VIEWS], ['shinsei', 'madori']);
 });
 
 test('デモの会社ごとの値に社内の値を入れない（営業所・担当者・仕切り・登録番号・原本の営業所の字）', () => {

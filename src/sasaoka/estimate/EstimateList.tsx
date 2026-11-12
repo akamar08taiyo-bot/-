@@ -170,7 +170,7 @@ export function EstimateHome({
           <h2 className="text-xl font-bold text-sky-900">📋 一覧から作成</h2>
           <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-sky-200 bg-sky-50/60 p-3">
             <Btn color="sky" className="!px-5 !py-4 !text-base" onClick={onList}>
-              📋 見積書の一覧を開く
+              {DEMO ? '📋 申請書の一覧を開く' : '📋 見積書の一覧を開く'}
             </Btn>
             <span className="text-sm text-slate-600">
               {monthLabel(month)}：{inMonth}件　／　全部で {all.length}件
@@ -250,7 +250,15 @@ function GettingStarted({data, update, goMaterials, onSample}: {data: AppData; u
   const s = data.settings;
   return (
     <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm leading-7 text-slate-600">
-      <p className="text-base font-bold text-slate-800">見積書はまだありません。</p>
+      <p className="text-base font-bold text-slate-800">{DEMO ? '申請書はまだありません。' : '見積書はまだありません。'}</p>
+      {DEMO ? (
+        // （株）イヤーズ デモアプリは申請書と平面図だけ（2026-11-12）
+        <ol className="mt-2 list-decimal space-y-1 pl-6">
+          <li>「＋ 新規作成」で保険者を選ぶと、住宅改修申請書と平面図のタブができます。</li>
+          <li>申請書は左の一覧に入れると、右のプレビュー（申請書の様式のまま）に出ます。</li>
+          <li>平面図のタブで描いた図は、申請書の平面図に入ります。</li>
+        </ol>
+      ) : (
       <ol className="mt-2 list-decimal space-y-1 pl-6">
         <li>
           「
@@ -267,11 +275,10 @@ function GettingStarted({data, update, goMaterials, onSample}: {data: AppData; u
           {s.estimateRate} になります。
         </li>
         <li>
-          {DEMO
-            ? '見積書に行を入れると、発注書も作れます（見積書の上の「その他 ▼」）。'
-            : <>見積書に行を入れると、{s.clientName || '工務店'}の仕切り計算表と請求書（「工務店請求書を確認する」）に入って自動で計算され、発注書も作れます。申請書だけの様邸（ほかの工務店の工事）は、請求書・発注書に入りません（{s.clientName || '工務店'}の工事でない見積書は、見積書の上の「{s.clientName || '工務店'}の請求書に入れる」を外します）。</>}
+          見積書に行を入れると、{s.clientName || '工務店'}の仕切り計算表と請求書（「工務店請求書を確認する」）に入って自動で計算され、発注書も作れます。申請書だけの様邸（ほかの工務店の工事）は、請求書・発注書に入りません（{s.clientName || '工務店'}の工事でない見積書は、見積書の上の「{s.clientName || '工務店'}の請求書に入れる」を外します）。
         </li>
       </ol>
+      )}
       {!hasSamples(data) && (
         <div className="mt-4">
           <Btn
@@ -282,7 +289,7 @@ function GettingStarted({data, update, goMaterials, onSample}: {data: AppData; u
               update('materials', (list) => [...list, ...r.materials]);
               update('jobs', (list) => [...list, ...r.jobs]);
               update('kits', (list) => [...list, ...r.kits]);
-              toast('サンプルの部材5件と「（サンプル）山田様邸」の見積書・部材＋施工費（常用）1件を入れました。設定画面からまとめて消せます。');
+              toast(DEMO ? '「（サンプル）山田様邸」の申請書を入れました。設定画面からまとめて消せます。' : 'サンプルの部材5件と「（サンプル）山田様邸」の見積書・部材＋施工費（常用）1件を入れました。設定画面からまとめて消せます。');
               onSample?.();
             }}
           >
@@ -305,6 +312,9 @@ function tokuteiSales(): TokuteiSale[] {
 
 /** 売上月の短い書き方：一覧の月と同じ年なら「11月」、ちがえば「2027年1月」 */
 const shortMonth = (m: string, base: string) => (m.slice(0, 4) === base.slice(0, 4) ? `${Number(m.slice(5, 7))}月` : monthLabel(m));
+
+/** 一覧の名前（（株）イヤーズ デモアプリは申請書と平面図だけなので「申請書」。2026-11-12） */
+const DOC = DEMO ? '申請書' : '見積書';
 
 /** 見積書の一覧（売上月＝様邸の月ごと。初めは作った月）。探すときは、すべての月から探す */
 export function EstimateList({
@@ -421,14 +431,14 @@ export function EstimateList({
           </button>
         </div>
         <NewMenu onNew={onNew} />
-        <Btn color="purple" className="!text-base" onClick={docs.pick} title="申請書・見積書・理由書の Excel（.xlsx）を取り込む">
+        <Btn color="purple" className="!text-base" onClick={docs.pick} title={DEMO ? '申請書の Excel（.xlsx）を取り込む' : '申請書・見積書・理由書の Excel（.xlsx）を取り込む'}>
           📥 取り込む
         </Btn>
         {docs.element}
-        <TextInput value={query} onChange={setQuery} placeholder="お客様名・住所で探す" title="すべての月から探します" className="ml-auto w-44 min-w-[10.5rem] max-w-[20rem] flex-1 text-base" aria-label="見積書を探す" />
+        <TextInput value={query} onChange={setQuery} placeholder="お客様名・住所で探す" title="すべての月から探します" className="ml-auto w-44 min-w-[10.5rem] max-w-[20rem] flex-1 text-base" aria-label={DEMO ? '申請書を探す' : '見積書を探す'} />
       </div>
       {checked.size > 0 && (
-        <div role="status" aria-label="選んだ見積書" className="flex flex-wrap items-center gap-2 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-900">
+        <div role="status" aria-label={DEMO ? '選んだ申請書' : '選んだ見積書'} className="flex flex-wrap items-center gap-2 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-900">
           <span className="font-bold">{checked.size}件を選んでいます</span>
           <Btn small color="white" onClick={() => moveMonth(-1)}>
             ◀ 前月に回す
@@ -467,8 +477,8 @@ export function EstimateList({
                 <th className="w-px whitespace-nowrap px-2 py-2 text-left">作成日</th>
                 <th className="w-px whitespace-nowrap px-2 py-2 text-left">売上月</th>
                 <th className="min-w-[11rem] px-2 py-2 text-left">お客様名</th>
-                <th className="px-2 py-2 text-right">見積の合計（税込）</th>
-                <th className="px-2 py-2 text-left">{s.clientName || '工務店'}の請求書</th>
+                <th className="px-2 py-2 text-right">{DEMO ? '改修費用（税込）' : '見積の合計（税込）'}</th>
+                {!DEMO && <th className="px-2 py-2 text-left">{s.clientName || '工務店'}の請求書</th>}
                 <th className="px-2 py-2" />
               </tr>
             </thead>
@@ -544,6 +554,7 @@ export function EstimateList({
                     <td className="px-2 py-2 text-right font-bold tabular-nums text-emerald-900" title={sales && !estimated ? (job.imported?.some((d) => d.kind === 'estimate' && !d.rows) ? '取り込んだ見積書の合計' : '申請書の改修費用') : undefined}>
                       {sales ? yen(sales.total) : <span className="font-normal text-slate-400">—</span>}
                     </td>
+                    {!DEMO && (
                     <td className="whitespace-nowrap px-2 py-2 text-sm">
                       {job.shikiri ? (
                         <span className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 font-bold text-[#0c315e]">{monthLabel(job.month)}分に入れる</span>
@@ -553,17 +564,22 @@ export function EstimateList({
                         <span className="text-slate-500">申請書だけ</span>
                       )}
                     </td>
+                    )}
                     {/* 行のボタン（申請書・印刷・Excel・複製・削除）：右の端から少し左へ（ユーザーの指示「赤枠の部分を少しだけ中央（左に寄せる）」2026-10-27）。字は 14px */}
                     <td className="whitespace-nowrap py-1.5 pl-2 pr-2 text-right xl:pr-28 [&_button]:!text-sm" onClick={(e) => e.stopPropagation()}>
                       <Btn small color="white" onClick={() => onOpenShinsei(job.id)}>
                         📝 申請書
                       </Btn>
-                      <Btn small color="softSky" className="ml-1.5" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
-                        🖨 印刷
-                      </Btn>
-                      <Btn small color="softGreen" className="ml-1.5" onClick={() => saveEstimateExcel(job, s, toast)}>
-                        📗 Excel
-                      </Btn>
+                      {!DEMO && (
+                        <>
+                          <Btn small color="softSky" className="ml-1.5" onClick={() => onPrint({kind: 'estimate', jobId: job.id})}>
+                            🖨 印刷
+                          </Btn>
+                          <Btn small color="softGreen" className="ml-1.5" onClick={() => saveEstimateExcel(job, s, toast)}>
+                            📗 Excel
+                          </Btn>
+                        </>
+                      )}
                       <Btn
                         small
                         color="white"
@@ -588,17 +604,17 @@ export function EstimateList({
               <tfoot>
                 <tr className="border-t border-slate-200 bg-emerald-50/60 text-base">
                   <td colSpan={5} className="px-2 py-2 text-right font-bold text-emerald-900">
-                    {searching ? `「${query}」の見積書` : `${monthLabel(month)}の見積書`}（{list.length}件）
+                    {searching ? `「${query}」の${DOC}` : `${monthLabel(month)}の${DOC}`}（{list.length}件）
                   </td>
                   <td className="px-2 py-2 text-right font-bold tabular-nums text-emerald-900">{yen(total)}</td>
-                  <td colSpan={2} />
+                  <td colSpan={DEMO ? 1 : 2} />
                 </tr>
               </tfoot>
             )}
           </table>
           {list.length === 0 && (
             <p className="px-4 py-6 text-center text-base text-slate-500">
-              {searching ? `「${query}」の見積書は見つかりませんでした。` : `${monthLabel(month)}の見積書はありません。◀ ▶ でほかの月を見られます。`}
+              {searching ? `「${query}」の${DOC}は見つかりませんでした。` : `${monthLabel(month)}の${DOC}はありません。◀ ▶ でほかの月を見られます。`}
             </p>
           )}
           {list.length > limit && (

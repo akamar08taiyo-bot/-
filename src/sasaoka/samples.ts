@@ -3,7 +3,8 @@
 //   見積：木の手すり 定価2万円（1本4m）を60cm → 0.15本×単価16,000円＝2,400円、そのすぐ下に同上施工費（木 2箇所＝2,000円）
 import {guessPieceLengthM} from './priceImport.ts';
 import {codeKey, kitFromRows, laborRow, manualRow, materialRow, newPlace} from './rows.ts';
-import type {AppData, Job, Kit, LaborItem, Material} from './types.ts';
+import type {AppData, Job, Kit, LaborItem, Material, Place, PlaceDims} from './types.ts';
+import {DEMO} from './demo/flag.ts';
 import {uid} from './util.ts';
 
 export const SAMPLE_MAKER = 'サンプル';
@@ -55,6 +56,12 @@ export function addSamples(data: AppData, month: string): {materials: Material[]
     createdAt: now,
     updatedAt: now,
   };
+  // （株）イヤーズ デモアプリは申請書と平面図だけ（見積書・部材リスト・部材＋施工費（常用）はない。2026-11-12）：
+  // 申請書の改修の内容（玄関・トイレの手すりの取り付けと長さ・高さ）だけの様邸にする
+  if (DEMO) {
+    const place = (name: string, dims: PlaceDims): Place => ({...newPlace(name), dims});
+    return {materials: [], kits: [], jobs: [{...job, places: [place('玄関', {l: '600', h: '800'}), place('トイレ', {l: '600', h: '750'})]}]};
+  }
   const kit = kitFromRows(SAMPLE_PREFIX + 'I型手すり（木の下地）', [materialRow(handrail, 1), labor('木', 2), materialRow(bracket, 2), materialRow(cap, 2)]);
   // 足すものだけを返す（呼ぶ側で今の並びのうしろに足す。画面の data はゴミ箱の様邸を除いたものなので、並びごと置きかえるとゴミ箱が空になる）
   return {

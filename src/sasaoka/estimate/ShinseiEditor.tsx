@@ -44,6 +44,7 @@ import {CardFill} from '../components/CardReader.tsx';
 import {JobHeader, JobTitle, RemoveJobButton} from './JobHeader.tsx';
 import type {JobDocs} from '../components/DocsDialog.tsx';
 import {telWithHyphens} from '../tel.ts';
+import {DEMO} from '../demo/flag.ts';
 
 /** 欄の順番：保険者ごとの申請書の上からの順番（原本を見て決めた。みやこ町・広域連合は承認の申請書の順番で、支給申請書だけの着工日・完成日は最後）。
  *  ただし被保険者氏名はどの保険者もフリガナのすぐ下（ユーザーの指示「ふりがなの下に、名前をもってくる」、2026-10-21。苅田町・みやこ町は原本では番号が先）。
@@ -462,8 +463,9 @@ export function ShinseiEditor({
               data-nav
             />
             円
-            <Note>{info.cost !== null ? '手で入れた金額' : cost !== null ? (costIsTotal(i) ? '見積書の合計（税込）' : '見積書の介護保険対象分の合計（税込）') : '見積書がないときは手で入れます'}</Note>
-            {info.cost !== null && (
+            {/* （株）イヤーズ デモアプリは見積書がないので、金額は手で入れるだけ（見積書の言葉を出さない。2026-11-12） */}
+            {!DEMO && <Note>{info.cost !== null ? '手で入れた金額' : cost !== null ? (costIsTotal(i) ? '見積書の合計（税込）' : '見積書の介護保険対象分の合計（税込）') : '見積書がないときは手で入れます'}</Note>}
+            {!DEMO && info.cost !== null && (
               <Btn small color="white" onClick={() => setInfo({cost: null})}>
                 見積書の金額にもどす
               </Btn>
@@ -1203,7 +1205,7 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
                       </option>
                     ))}
                   </select>
-                  {offEstimate(p) && (
+                  {!DEMO && offEstimate(p) && (
                     <button
                       type="button"
                       onClick={() => toEstimate(p.id)}
@@ -1218,7 +1220,7 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
                     onClick={() => remove(p)}
                     className="h-9 shrink-0 rounded-md border border-slate-300 bg-white px-2.5 text-sm text-slate-600 hover:bg-rose-50 hover:text-rose-700"
                     aria-label={`${p.name || '箇所'}を消す`}
-                    title={used ? '箇所を消す（見積書のその箇所の行も消えます）' : '箇所を消す'}
+                    title={used && !DEMO ? '箇所を消す（見積書のその箇所の行も消えます）' : '箇所を消す'}
                   >
                     削除
                   </button>
@@ -1340,11 +1342,13 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
           ))}
           <option value={OTHER_PLACE}>そのほか（名前を打つ）</option>
         </select>
-        {/* 申請書から見積書への連動のオン・オフ（ユーザーの指示 2026-11-11。初めはオン。様邸ごと。複製では引き継ぐ） */}
-        <label className="flex items-center gap-1.5 text-sm text-slate-700">
-          <input type="checkbox" checked={linked} onChange={(e) => setJob((j) => ({...j, shinseiLink: e.target.checked ? undefined : false}))} />
-          見積書へ連動
-        </label>
+        {/* 申請書から見積書への連動のオン・オフ（ユーザーの指示 2026-11-11。初めはオン。様邸ごと。複製では引き継ぐ）。（株）イヤーズ デモアプリは見積書がないので出さない */}
+        {!DEMO && (
+          <label className="flex items-center gap-1.5 text-sm text-slate-700">
+            <input type="checkbox" checked={linked} onChange={(e) => setJob((j) => ({...j, shinseiLink: e.target.checked ? undefined : false}))} />
+            見積書へ連動
+          </label>
+        )}
       </div>
     </div>
   );

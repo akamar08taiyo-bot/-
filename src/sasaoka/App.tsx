@@ -35,7 +35,7 @@ import {ShinseiEditor} from './estimate/ShinseiEditor.tsx';
 import {TokuteiEditor} from './estimate/TokuteiEditor.tsx';
 import {hasShinseiInfo} from './estimateForms.ts';
 import {APP_TITLE, PORTAL_URL, readHash, readReceive, writeHash} from './links.ts';
-import {DEMO, DEMO_NAME} from './demo/flag.ts';
+import {DEMO, DEMO_JOB_VIEWS, DEMO_NAME} from './demo/flag.ts';
 import type {JobView, MainTab} from './links.ts';
 import type {ShinseiField} from './shinseiPreview.ts';
 import {photoIdsInUse, prunePhotos} from './photos.ts';
@@ -67,7 +67,10 @@ const ALL_TABS: {id: MainTab; label: string}[] = [
   {id: 'trash', label: '🗑 ゴミ箱'}, // 設定のタブの横（ユーザーの指示「設定のタブの横にゴミ箱をつくり」2026-10-25）
 ];
 // （株）イヤーズ デモアプリは、売上見込み（受注残・進捗管理につながる）・工務店請求書（工務店の仕切り）を出さない
-const TABS = DEMO ? ALL_TABS.filter((t) => t.id !== 'sales' && t.id !== 'invoice') : ALL_TABS;
+// 部材・施工費マスタも出さない（見積書を作らないので。2026-11-12）。はじめのタブの名前も「申請書を作成する」
+const TABS = DEMO
+  ? ALL_TABS.filter((t) => t.id !== 'sales' && t.id !== 'invoice' && t.id !== 'master').map((t) => (t.id === 'estimate' ? {...t, label: '📝 申請書を作成する'} : t))
+  : ALL_TABS;
 
 // タブごとの色（見積書は緑、請求書は紺、売上見込みは青緑、部材・施工費マスタは紫、設定は灰、ゴミ箱は茶色がかった灰）。選んでいるタブは下の画面と同じ色にしてつなげ、
 // 広い画面ではタブの上に色の帯（accent）を付けて、どれを選んでいるか分かるようにする
@@ -116,7 +119,7 @@ function JobTabs({view, onView, cls}: {view: JobView; onView: (v: JobView) => vo
     ['riyu', '📄 理由書', '📄\n理由書'],
     // 平面図（見取図）を描く（ユーザーの指示「平面図をつくれるような機能を追加する。まどりっちの機能やマイホームクラウドの機能もつけくわえる」2026-11-09。madori/）
     ['madori', '📐 平面図', '📐\n平面図'],
-  ].filter(([v]) => !DEMO || (v !== 'tokutei' && v !== 'hanbai')) as [JobView, string, string][]; // デモは住宅改修だけ（ユーザーの答え「住宅改修だけ」）
+  ].filter(([v]) => !DEMO || DEMO_JOB_VIEWS.includes(v as JobView)) as [JobView, string, string][]; // デモは住宅改修申請書と平面図だけ（DEMO_JOB_VIEWS）
   // 画面の上の帯のタブ（ユーザーの指示「メインタブが二つある為、わかりづらい。住宅改修申請書、工事見積書、特定福祉用具申請書、販売見積書、理由書がメインのタブに入る」2026-11-03。
   // 前は帯の下の白い枠のタブ）。スマホ・タブレットの縦の幅では2つずつ並べる（5つ目の理由書は1段まるごと。「📷 写真へ」があるときは理由書のとなり）
   return (
@@ -125,7 +128,7 @@ function JobTabs({view, onView, cls}: {view: JobView; onView: (v: JobView) => vo
       role="tablist"
       aria-label="住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書・平面図"
       // 携帯は「☰」のとなりに1段（デモは4つ）か2段（6つを3つずつ）。前は2つずつ3段で、方眼までのスクロールが長かった
-      className={`grid min-w-0 flex-1 gap-1 ${tabs.length <= 4 ? 'grid-cols-4' : 'grid-cols-3'} md:flex md:flex-wrap md:gap-1.5 lg:flex-nowrap`}
+      className={`grid min-w-0 flex-1 gap-1 ${tabs.length <= 2 ? 'grid-cols-2' : tabs.length <= 4 ? 'grid-cols-4' : 'grid-cols-3'} md:flex md:flex-wrap md:gap-1.5 lg:flex-nowrap`}
     >
       {tabs.map(([v, text, short]) => (
         <button
@@ -236,7 +239,7 @@ export default function App({start}: {start: MainTab}) {
   // URL から見積書を開いたとき（読み直したとき）は、戻ると一覧
   const [estimateView, setEstimateView] = useState<'home' | 'list'>(estimateId ? 'list' : 'home');
   // 見積書の画面か、そこから開いた発注書・申請書か（見積書を閉じると見積書の画面にもどる）
-  const [jobView, setJobView] = useState<JobView>(estimateId ? initial.view : 'estimate');
+  const [jobView0, setJobView] = useState<JobView>(estimateId ? initial.view : 'estimate');
   // 申請書のタブのプレビューで理由書だけの欄（大分市の理由書（表））を押したとき：理由書のタブで入れる項目
   const [riyuGo, setRiyuGo] = useState<ShinseiField | null>(null);
   const [estimateMonth, setEstimateMonth] = useState(thisMonth);
@@ -272,6 +275,9 @@ export default function App({start}: {start: MainTab}) {
     if (live && liveSettings) writeJutakuSalesSummary(live, liveSettings);
   }, [live, liveSettings]);
   const estimateJob = useMemo(() => (data && estimateId ? (data.jobs.find((j) => j.id === estimateId) ?? null) : null), [data, estimateId]);
+  // （株）イヤーズ デモアプリは住宅改修申請書と平面図だけ（ユーザーの指示「見積もり作成機能はなくそうかなと思います。申請書と、平面図のみで」
+  // 「理由書作成へ連動する機能については不要です」2026-11-12）。ほかの画面（見積書・理由書・発注書）へ行こうとしたときは申請書を出す
+  const jobView: JobView = DEMO && !DEMO_JOB_VIEWS.includes(jobView0) ? 'shinsei' : jobView0;
   // 請求書に入れていない見積書（「笹岡工務店の請求書に入れる」を外したもの）は、請求書の画面では開かない
   const invoiceJob = useMemo(() => (data && invoiceId ? (data.jobs.find((j) => j.id === invoiceId && j.shikiri) ?? null) : null), [data, invoiceId]);
   const loaded = data !== null;
@@ -582,10 +588,15 @@ export default function App({start}: {start: MainTab}) {
                     setJobView('estimate');
                   }}
                   docs={docs}
-                  onRiyu={(f) => {
-                    setRiyuGo(f);
-                    setJobView('riyu');
-                  }}
+                  // （株）イヤーズ デモアプリは理由書のタブがないので、理由書だけの欄へは飛ばない（2026-11-12）
+                  onRiyu={
+                    DEMO
+                      ? undefined
+                      : (f) => {
+                          setRiyuGo(f);
+                          setJobView('riyu');
+                        }
+                  }
                 />
               ) : estimateJob && (jobView === 'tokutei' || jobView === 'hanbai') ? (
                 // 特定福祉用具申請書は申請書だけ、販売見積書は見積書だけを出す（同じ特定福祉用具の案件。申請書で入れた商品は見積書にも出る）
