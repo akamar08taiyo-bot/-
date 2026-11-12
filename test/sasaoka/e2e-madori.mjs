@@ -298,6 +298,18 @@ assert.match(await art(), /<path d="M7280 0L10010 0L10010 910L8190 910L8190 2730
   await page.mouse.move(to.x, to.y, {steps: 6});
   await page.mouse.up();
   assert.match(await art(), /M7280 0L10010 0L10010 1820L9100 1820L9100 2730L7280 2730Z/); // 欠きが小さくなった L 字
+  // 方眼の線から離れた所へ動かすと、半マス（455mm）に飛ばず 10mm 刻みで止まる（ユーザーの答え「（部屋の大きさのつまみは）より細かく」2026-11-12）
+  const b2 = await h.boundingBox();
+  const to2 = await toPx(10 * M - 200, 2 * M + 150);
+  await page.mouse.move(b2.x + b2.width / 2, b2.y + b2.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to2.x, to2.y, {steps: 6});
+  await page.mouse.up();
+  const m = /M7280 0L10010 0L10010 (\d+)L(\d+) \d+L\d+ 2730L7280 2730Z/.exec(await art());
+  assert.ok(m, 'L 字のまま');
+  const [y, x] = [Number(m[1]), Number(m[2])];
+  assert.ok(Math.abs(x - (10 * M - 200)) <= 20 && Math.abs(y - (2 * M + 150)) <= 20, `つまみを離した所で止まる ${x} ${y}`);
+  assert.ok(x % 10 === 0 && y % 10 === 0 && x % 455 !== 0 && y % 455 !== 0, `10mm 刻み（半マスではない）${x} ${y}`);
 }
 await page.keyboard.press('Escape');
 // ---------------- Excel のような図形（上の段の「図形」）

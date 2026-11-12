@@ -639,8 +639,25 @@ export function handlesOf(it: MItem, vertex = false): {h: Handle; x: number; y: 
   return [];
 }
 
-/** つまみを動かした部品（step にそろえる。部屋は step、ほかは 10mm） */
-export function resized(it: MItem, h: Handle, p: P, step: number, vertex = false): MItem {
+/**
+ * 部屋・階段のつまみの辺の位置。snap があるとき（画面でドラッグ）は、方眼の線（step）・ほかの部屋の辺（others）の tol 以内だけ吸い付き、ほかは 10mm 刻み
+ * （動かすときと同じ。ユーザーの答え「（部屋の大きさのつまみは）より細かく」2026-11-12。前は半マス＝455mm ずつ大きく・小さくなった）。
+ * snap がなければ今までどおり step にそろえる
+ */
+function edgeAt(v: number, step: number, others: number[], snap?: MoveSnap): number {
+  if (!snap) return snapTo(v, step);
+  return snapNear(v, [snapTo(v, step), ...others], snap);
+}
+/** つまみで小さくするときの部屋・階段の最小の幅（mm。細かく動かせるようにしたので半マスより小さくできる） */
+const MIN_ROOM = 100;
+
+/**
+ * つまみを動かした部品（部屋は step、ほかは 10mm にそろえる）。
+ * snap・items は画面でドラッグしたときに渡す：部屋・階段も 10mm 刻みで、方眼の線・ほかの部屋の辺の近くだけ吸い付く
+ */
+export function resized(it: MItem, h: Handle, p: P, step: number, vertex = false, snap?: MoveSnap, items: MItem[] = []): MItem {
+  const roomEdges = (axis: 'x' | 'y') =>
+    items.filter((o) => o.id !== it.id && (o.kind === 'room' || o.kind === 'stair')).map(bounds).flatMap((o) => (axis === 'x' ? [o.x, o.x + o.w] : [o.y, o.y + o.h]));
   // 頂点の編集：頂点だけを動かす・辺のまん中をつまむと頂点を足す（10mm にそろえる）
   if (vertex && it.pts && it.pts.length >= 3 && /^[ve]\d+$/.test(h)) {
     const i = Number(h.slice(1));
@@ -665,10 +682,11 @@ export function resized(it: MItem, h: Handle, p: P, step: number, vertex = false
   // 多角形の部屋：頂点（となりの頂点も横・縦のまま）・辺（直角に動かす）。小さくなりすぎた辺・一直線の頂点はまとめる
   if (it.kind === 'room' && it.pts && (h.startsWith('v') || h.startsWith('e')) && !['e', 'w', 'n', 's', 'ne', 'nw', 'se', 'sw'].includes(h)) {
     const i = Number(h.slice(1));
-    const q = snapPt(p, step);
+    const q = snap ? {x: edgeAt(p.x, step, roomEdges('x'), snap), y: edgeAt(p.y, step, roomEdges('y'), snap)} : snapPt(p, step);
     const next = h.startsWith('v') ? vertexMoved(it.pts, i, q) : edgeMoved(it.pts, i, q);
     const s = shapeOf(next);
-    if (s.w < step || s.h < step) return it;
+    const min = snap ? MIN_ROOM : step;
+    if (s.w < min || s.h < min) return it;
     const {pts: _old, ...rest} = it;
     return {...rest, ...s};
   }
@@ -698,16 +716,25 @@ export function resized(it: MItem, h: Handle, p: P, step: number, vertex = false
     if (it.kind !== 'line' && it.kind !== 'shape') moved = Math.abs(q.x - fixed.x) >= Math.abs(q.y - fixed.y) ? {x: q.x, y: fixed.y} : {x: fixed.x, y: q.y};
     return h === 'p0' ? {...it, x: moved.x, y: moved.y, w: fixed.x - moved.x, h: fixed.y - moved.y} : {...it, w: moved.x - it.x, h: moved.y - it.y};
   }
-  const s = it.kind === 'room' || it.kind === 'stair' ? step : 10;
+  const roomLike = it.kind === 'room' || it.kind === 'stair';
+  const s = roomLike ? step : 10;
   const b = bounds(it);
   let x0 = b.x;
   let y0 = b.y;
   let x1 = b.x + b.w;
   let y1 = b.y + b.h;
-  if (h.includes('w')) x0 = Math.min(snapTo(p.x, s), x1 - s);
-  if (h.includes('e')) x1 = Math.max(snapTo(p.x, s), x0 + s);
-  if (h.includes('n')) y0 = Math.min(snapTo(p.y, s), y1 - s);
-  if (h.includes('s')) y1 = Math.max(snapTo(p.y, s), y0 + s);
+  if (roomLike && snap) {
+    // 部屋・階段を画面でドラッグ：10mm 刻み・方眼の線とほかの部屋の辺の近くだけ吸い付く（最小 100mm）
+    if (h.includes('w')) x0 = Math.min(edgeAt(p.x, step, roomEdges('x'), snap), x1 - MIN_ROOM);
+    if (h.includes('e')) x1 = Math.max(edgeAt(p.x, step, roomEdges('x'), snap), x0 + MIN_ROOM);
+    if (h.includes('n')) y0 = Math.min(edgeAt(p.y, step, roomEdges('y'), snap), y1 - MIN_ROOM);
+    if (h.includes('s')) y1 = Math.max(edgeAt(p.y, step, roomEdges('y'), snap), y0 + MIN_ROOM);
+  } else {
+    if (h.includes('w')) x0 = Math.min(snapTo(p.x, s), x1 - s);
+    if (h.includes('e')) x1 = Math.max(snapTo(p.x, s), x0 + s);
+    if (h.includes('n')) y0 = Math.min(snapTo(p.y, s), y1 - s);
+    if (h.includes('s')) y1 = Math.max(snapTo(p.y, s), y0 + s);
+  }
   const box = {x: x0, y: y0, w: x1 - x0, h: y1 - y0};
   // 丸（縦手すり）は x・y がまん中。大きさ・形（だ円）を変える
   if (it.kind === 'vrail') return {...it, x: box.x + box.w / 2, y: box.y + box.h / 2, w: Math.max(40, box.w), h: Math.max(40, box.h)};

@@ -654,7 +654,9 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       const next = spunTo(d.orig, d.c, d.a, p, {shift: e.shiftKey, free: e.altKey});
       setDraft(withFloor(d.before, floor.id, (list) => list.map((it) => (it.id === d.orig.id ? next : it))));
     } else if (d.mode === 'resize') {
-      const next = resized(d.orig, d.h, p, step, d.vtx);
+      // 部屋・階段の大きさも動かすときと同じく 10mm 刻み・方眼の線とほかの部屋の辺の近く（画面で 6px）だけ吸い付く・Alt で吸い付かない
+      // （ユーザーの答え「（部屋の大きさのつまみは）より細かく」2026-11-12。前は半マスずつ）
+      const next = resized(d.orig, d.h, p, step, d.vtx, {tol: MOVE_SNAP_PX / v.k, free: e.altKey}, items);
       setDraft(withFloor(d.before, floor.id, (list) => list.map((it) => (it.id === d.orig.id ? next : it))));
     } else if (d.mode === 'pan') {
       setView({...d.v0, x: d.v0.x - (e.clientX - d.sx) / d.v0.k, y: d.v0.y - (e.clientY - d.sy) / d.v0.k});

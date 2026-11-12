@@ -1449,6 +1449,21 @@ const kkJob = (extra: Partial<Job> = {}) =>
     ...extra,
   });
 
+test('北九州市：支給申請書の上の「事業者番号」は、施工業者に選んだ営業所の事業所番号（営業所ごとに違う。ユーザーの答え「事業者番号は営業所毎」2026-11-12）', () => {
+  const bizOf = (builderKey: string) => {
+    const {files, byName} = sheets(fillShinsei(KITAKYUSHU, SHINSEI.kitakyushu!, shinseiValues(kkJob(), {...KK_S, builderKey})));
+    const sheet = byName.get('支給申請書')!;
+    return txt(sheet, KK_CELLS.shikyu.biz) || stxt(files, sheet, KK_CELLS.shikyu.biz);
+  };
+  const kk = ['小倉営業所', '小倉南営業所', '八幡東営業所', '八幡西営業所'];
+  const nos = kk.map(bizOf);
+  assert.deepEqual(nos, kk.map((n) => OFFICES.find((o) => o.name === n)!.jigyoshoNo));
+  assert.equal(new Set(nos).size, kk.length); // 4つの営業所で別々の番号
+  for (const n of nos) assert.match(n, /^\d{10}$/);
+  // 一覧にない施工業者（元請けなど）は空
+  assert.equal(bizOf('見本工務店'), '');
+});
+
 test('北九州市：内容報告書（写真）の改修の内容は大きな字でまん中（入らなければ小さく）（2026-10-29 の指示）', () => {
   const out = fillShinsei(KITAKYUSHU, SHINSEI.kitakyushu!, shinseiValues(kkJob(), KK_S));
   const {files, byName} = sheets(out);

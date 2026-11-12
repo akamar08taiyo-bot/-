@@ -162,6 +162,28 @@ test('押した所の部品：手すりは部屋より先、部屋は中のい�
   assert.equal(hitTest(items, {x: 9000, y: 9000}, 50), null);
 });
 
+test('部屋の大きさのつまみは細かく：画面でドラッグすると 10mm 刻み、方眼の線・となりの部屋の辺の近くだけ吸い付く（ユーザーの答え「より細かく」2026-11-12）', () => {
+  const r = room('r', 0, 0, 2 * M, 2 * M);
+  const near = {tol: 30};
+  // 半マス（455mm）の線から離れた所：10mm 刻みで止まる（前は 2730 に飛んだ）
+  assert.deepEqual(resized(r, 'se', {x: 2000, y: 1904}, 455, false, near), {...r, w: 2000, h: 1900});
+  assert.deepEqual(resized(r, 'e', {x: 2347, y: 999}, 455, false, near), {...r, w: 2350});
+  // 方眼の線（455 の倍数）の近く（30mm 以内）は線にそろう
+  assert.deepEqual(resized(r, 'e', {x: 2 * M + 455 - 20, y: 0}, 455, false, near), {...r, w: 2 * M + 455});
+  // となりの部屋の辺の近くはその辺にそろう
+  const next = room('n', 2200, 0, M, M);
+  assert.deepEqual(resized(r, 'e', {x: 2215, y: 0}, 455, false, near, [r, next]), {...r, w: 2200});
+  // Alt（free）は吸い付かない
+  assert.deepEqual(resized(r, 'e', {x: 2 * M + 455 - 20, y: 0}, 455, false, {...near, free: true}), {...r, w: 2 * M + 440});
+  // 小さくしても 100mm より小さくはならない（前は半マス）
+  assert.deepEqual(resized(r, 'w', {x: 1900, y: 0}, 455, false, near), {...r, x: 2 * M - 100, w: 100});
+  // 階段も同じ
+  const st: MItem = {id: 's', kind: 'stair', x: 0, y: 0, w: M, h: 2 * M};
+  assert.equal(resized(st, 's', {x: 0, y: 2 * M + 123}, 455, false, near).h, 2 * M + 120);
+  // 渡さなければ今までどおり半マス（テスト・ほかの呼び出し）
+  assert.deepEqual(resized(r, 'se', {x: 3 * M + 100, y: 2 * M}, 455), {...r, w: 2730, h: 1820});
+});
+
 test('動かす・大きさ・回す・写す', () => {
   const r = room('r', 0, 0, 2 * M, 2 * M);
   assert.deepEqual(moved(r, {x: 300, y: 500}, [r], 455), {...r, x: 455, y: 455});
