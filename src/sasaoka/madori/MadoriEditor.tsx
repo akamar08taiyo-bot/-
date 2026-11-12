@@ -15,12 +15,12 @@ import type {AppData, Job} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {DOOR_TYPES, FIX_TYPES, ROOM_ROWS, ROOM_SHORT, ROOM_TYPES, STAIR_TYPES, STEP_TYPES, WINDOW_TYPES} from './catalog.ts';
 import {isScribble} from '../photoMarks.ts';
-import {canVertexEdit, copied, DRAG_TOOLS, eraseHits, handlesOf, hitTest, isCornerHandle, makeItem, moved, railFrom, resized, scribbleHits, SHAPE_COLORS, turnedItem} from './edit.ts';
+import {canSpin, canVertexEdit, copied, DRAG_TOOLS, eraseHits, fixInRoom, handlesOf, hitTest, isCornerHandle, makeItem, moved, nudged, railFrom, resized, scribbleHits, SHAPE_COLORS, spunTo, turnedItem} from './edit.ts';
 import {bboxOf, closedShape, nearOrthoNext, pointRemoved, roomPts, shapeOf, snapPt} from './poly.ts';
 import {shapeDef, shapeIcon, SHAPES_SHOWN, shapeToPts} from './shapes.ts';
 import type {Handle, P, Tool} from './edit.ts';
 import {MadoriPrint} from './MadoriPrint.tsx';
-import {bounds, circled, emptyMadori, NUM_SIZE, hasMadori, joLabel, lineLength, mid, MODULES, numberItems, railPts, railSegs, roomAreaOf, snapStep, withFloor} from './model.ts';
+import {bounds, circled, emptyMadori, NUM_SIZE, hasMadori, joLabel, lineLength, mid, MODULES, normRot, numberItems, railPts, railSegs, roomAreaOf, snapStep, withFloor} from './model.ts';
 import type {Madori, MFloor, MItem, Module} from './model.ts';
 import {floorSvg, patternDefs, thumbSvg, viewOf} from './render.ts';
 import {linkPlan, placeLookup, planLinked, sheetTitle} from './sheet.ts';
@@ -63,6 +63,7 @@ type Drag =
   | {mode: 'create'; a: P; sx: number; sy: number; path: P[]; sp: SP[]} // path：なぞった道（手すりの一筆の L 字・曲げた棒）
   | {mode: 'move'; orig: MItem; a: P; sx: number; sy: number; before: Madori; moved: boolean; sp: SP[]}
   | {mode: 'resize'; orig: MItem; h: Handle; before: Madori; vtx?: boolean} // vtx＝頂点の編集
+  | {mode: 'rotate'; orig: MItem; before: Madori; c: P; a: P; sx: number; sy: number; moved: boolean} // ↻ のつまみをドラッグして回している（c＝まん中・a＝押した所）
   | {mode: 'pan'; sx: number; sy: number; v0: View; sp?: SP[]}
   | {mode: 'erase'; sp: SP[]; v0: View; all?: boolean} // ぐしゃぐしゃに書いて消している（v0＝書き始めたときの見え方。all＝「🗑 削除」を押してからなぞった＝部屋なども消す）
   | {mode: 'under'; a: P; before: Madori; u0: {x: number; y: number}}
@@ -96,6 +97,8 @@ function readPins(): Pins {
 
 /** 番号の道具で置ける番号（ユーザーの指示「番号1番から自動で2.3.4.5、15まで」2026-11-10） */
 const NUM_MAX = 15;
+const NUDGE = 10; // 矢印キー・微調整のボタンで1回に動かす長さ（mm）
+const MOVE_SNAP_PX = 6; // ドラッグで動かすとき、そろえたい所に吸い付く幅（画面の px）
 
 /** 白紙の平面図・新しい階で、初めに選んでおく道具（いちばん描くことの多い部屋） */
 const FIRST_ROOM: Tool = {t: 'room', type: '洋室'};
@@ -197,7 +200,7 @@ function ScrollBars({view, vw, vh, range, onMove}: {view: View; vw: number; vh: 
 }
 
 /** mm の数の欄（打ち終わって Enter・欄を離れたときに入れる） */
-function MmInput({value, onChange, label, min = 10}: {value: number; onChange: (v: number) => void; label: string; min?: number}) {
+function MmInput({value, onChange, label, min = 10, unit = 'mm'}: {value: number; onChange: (v: number) => void; label: string; min?: number; unit?: string}) {
   const [text, setText] = useState(String(Math.round(value)));
   useEffect(() => setText(String(Math.round(value))), [value]);
   const commit = () => {
@@ -219,7 +222,7 @@ function MmInput({value, onChange, label, min = 10}: {value: number; onChange: (
         }}
         className="h-9 w-24 rounded-md border border-slate-300 bg-white px-2 text-right outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
       />
-      <span className="text-slate-500">mm</span>
+      <span className="text-slate-500">{unit}</span>
     </label>
   );
 }
@@ -550,6 +553,12 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     if (canTurn(selItem)) {
       const th = turnHandle(selItem);
       if (Math.hypot(th.x - p.x, th.y - p.y) <= tol * 1.4) {
+        // 住設・家具・段差・階段は、つまみをドラッグすると好きな角度に回る（押すだけなら 90°。離したときに決める）
+        if (canSpin(selItem)) {
+          const b = bounds(selItem);
+          drag.current = {mode: 'rotate', orig: selItem, before: base, c: {x: b.x + b.w / 2, y: b.y + b.h / 2}, a: p, sx: e.clientX, sy: e.clientY, moved: false};
+          return;
+        }
         setItem(selItem.id, (it) => turnedItem(it, step));
         return;
       }
@@ -635,7 +644,14 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     } else if (d.mode === 'move') {
       if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) return;
       d.moved = true;
-      const next = moved(d.orig, {x: p.x - d.a.x, y: p.y - d.a.y}, items, step);
+      // 吸い付くのは、そろえたい所（方眼の線・ほかの部屋の辺・壁の面）から画面で 6px 以内のときだけ。Alt を押しながらは吸い付かない（Excel と同じ）
+      const next = moved(d.orig, {x: p.x - d.a.x, y: p.y - d.a.y}, items, step, {tol: MOVE_SNAP_PX / v.k, free: e.altKey});
+      setDraft(withFloor(d.before, floor.id, (list) => list.map((it) => (it.id === d.orig.id ? next : it))));
+    } else if (d.mode === 'rotate') {
+      if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) return;
+      d.moved = true;
+      // 0・90・180・270° の近くは吸い付き・Shift は 15° ずつ・Alt は 1° ずつ（edit.ts の spunTo）
+      const next = spunTo(d.orig, d.c, d.a, p, {shift: e.shiftKey, free: e.altKey});
       setDraft(withFloor(d.before, floor.id, (list) => list.map((it) => (it.id === d.orig.id ? next : it))));
     } else if (d.mode === 'resize') {
       const next = resized(d.orig, d.h, p, step, d.vtx);
@@ -704,7 +720,9 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       }
       editItems((list) => [...list, it]);
       setSel(it.id);
-    } else if ((d.mode === 'move' || d.mode === 'resize' || d.mode === 'under') && draft) {
+    } else if (d.mode === 'rotate' && !d.moved) {
+      setItem(d.orig.id, (it) => turnedItem(it, step)); // 押しただけ：90° 回す（今までと同じ）
+    } else if ((d.mode === 'move' || d.mode === 'resize' || d.mode === 'under' || d.mode === 'rotate') && draft) {
       save(draft, d.before);
       setDraft(null);
     }
@@ -767,11 +785,12 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       } else if (key === 'r' && !ctrl) {
         setItem(selItem.id, (it) => turnedItem(it, step));
       } else if (e.key.startsWith('Arrow')) {
+        // 矢印キーは 10mm ずつ（微調節）、Shift を押しながらは半マスずつ
         e.preventDefault();
-        const a = e.shiftKey ? 10 : step;
+        const a = e.shiftKey ? step : NUDGE;
         const dx = e.key === 'ArrowLeft' ? -a : e.key === 'ArrowRight' ? a : 0;
         const dy = e.key === 'ArrowUp' ? -a : e.key === 'ArrowDown' ? a : 0;
-        setItem(selItem.id, (it) => ({...it, x: it.x + dx, y: it.y + dy}));
+        setItem(selItem.id, (it) => nudged(it, dx, dy));
       }
     };
     window.addEventListener('keydown', onKey);
@@ -869,6 +888,19 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
   // ---------------------------------------------------------------- 左の道具
   const pick = (t: Tool) => {
     setDelMode(false);
+    if (t.t === 'fix') {
+      // 便器・浴槽は、トイレ・浴室の部屋があればその中にすぐ入れる（edit.ts の fixInRoom。部屋がなければ今までどおり押した所に置く）
+      const put = fixInRoom(t.type, items);
+      if (put) {
+        editItems((list) => [...list, put.item]);
+        setTool({t: 'select'});
+        setSel(put.item.id);
+        setPreview(null);
+        setPoly(null);
+        toast(`${put.room.label || put.room.type}に入れました`);
+        return;
+      }
+    }
     setTool(t); // 同じ道具をもう一度押しても外さない（前は外れて「選ぶ・動かす」になり、なぞっても描けなかった）
     setSel(null);
     setPreview(null);
@@ -1092,7 +1124,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
                     <input type="checkbox" checked={!floor.underlay.hidden} onChange={(e) => setUnderlay({hidden: !e.target.checked})} className="h-4 w-4" />
                     見せる
                   </label>
-                  <label className="flex items-center gap-2" title="申請書の平面図・見取図の印刷・Excel にも、この絵を入れる（申請書の枠に入れた図はこれ）">
+                  <label className="flex items-center gap-2" title="申請書の平面図・平面図の印刷・Excel にも、この絵を入れる（申請書の枠に入れた図はこれ）">
                     <input type="checkbox" checked={!!floor.underlay.print} onChange={(e) => setUnderlay({print: e.target.checked || undefined, ...(e.target.checked ? {opacity: 1} : {})})} className="h-4 w-4" />
                     図に入れる
                   </label>
@@ -1245,6 +1277,20 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           </label>
           <MmInput label="幅" value={it.w} onChange={(w) => setItem(it.id, {w})} />
           <MmInput label="奥行" value={it.h} onChange={(h) => setItem(it.id, {h})} />
+          {/* 向き（右回りの角度。↻ のつまみをドラッグしても変わる。0〜359°） */}
+          <MmInput
+            label="向き"
+            unit="°"
+            min={0}
+            value={it.rot ?? 0}
+            onChange={(deg) =>
+              setItem(it.id, (o) => {
+                const {rot: _r, ...rest} = o;
+                const rot = normRot(deg);
+                return rot ? {...rest, rot} : rest;
+              })
+            }
+          />
           {it.kind === 'stair' && (
             <Btn color="white" small onClick={() => setItem(it.id, {flip: !it.flip})}>
               ⇆ 左右反転
@@ -1362,6 +1408,24 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       )}
       {(it.kind === 'line' || it.kind === 'dim') && <div className="text-sm text-slate-600">長さ {lineLength(it).toLocaleString('ja-JP')}mm</div>}
       {placeSelect}
+      {/* 少しずつ動かす（ドラッグでは指で細かく合わせにくい iPad・スマホのため。1回 10mm。矢印キーと同じ） */}
+      <div className="flex items-center gap-1.5 text-sm" role="group" aria-label="微調整">
+        <span className="text-slate-600">微調整</span>
+        {(
+          [
+            ['←', -1, 0, '左へ'],
+            ['↑', 0, -1, '上へ'],
+            ['↓', 0, 1, '下へ'],
+            ['→', 1, 0, '右へ'],
+          ] as const
+        )
+          .filter(([, x, y]) => nudged(it, x, y) !== it)
+          .map(([icon, x, y, name]) => (
+            <Btn key={icon} color="white" small className="!min-w-9 !px-2" onClick={() => setItem(it.id, (o) => nudged(o, x * NUDGE, y * NUDGE))} title={`${name} ${NUDGE}mm（矢印キー）`} aria-label={`${name} ${NUDGE}mm 動かす`}>
+              {icon}
+            </Btn>
+          ))}
+      </div>
       <div className="flex flex-wrap gap-1.5 pt-1">
         {it.kind !== 'num' && it.kind !== 'text' && it.kind !== 'vrail' && (
           <Btn color="white" small onClick={() => setItem(it.id, (o) => turnedItem(o, step))} title="R">
@@ -1645,7 +1709,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           <>
             {docs?.excel}
             <Btn color="softSky" onClick={() => setPrinting(true)} disabled={!hasMadori(m)}>
-              🖨 見取図を印刷
+              🖨 平面図を印刷
             </Btn>
           </>
         }

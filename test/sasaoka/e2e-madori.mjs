@@ -76,7 +76,7 @@ const tool = (name) => page.getByRole('button', {name, exact: true}).first().cli
 // 印刷のあいだはアプリの画面を隠すので、閉じるとスクロールが上に戻る → 前の位置に戻す（このあとの操作の座標が変わらないように）
 const legend = async () => {
   const y = await page.evaluate(() => scrollY);
-  await page.getByRole('button', {name: '🖨 見取図を印刷'}).click();
+  await page.getByRole('button', {name: '🖨 平面図を印刷'}).click();
   const rows = await page.locator('.madori-page [data-sheet-works] text').allTextContents();
   await page.getByRole('button', {name: '✕ 閉じる'}).click();
   await page.evaluate((y) => scrollTo(0, y), y);
@@ -152,12 +152,12 @@ await cat('間口');
 await tool('片開き戸');
 await click(1.5 * M, 4 * M + 150); // 和室と廊下の間の壁の少し下
 await cat('住設');
-await tool('洋式便器');
-await click(3.5 * M, 300);
+await tool('洋式便器'); // トイレの部屋があるので、押すだけでその中に入る（ユーザーの指示「便器を選択したらトイレの中にいれる」2026-11-12。前は押してから方眼を押した）
+await page.getByText('トイレに入れました').last().waitFor();
 const svgNow = await art();
 const door = /translate\(([\d.]+) 3640\) rotate\(0\)/.exec(svgNow); // ドアの開口のまん中が壁の上（y＝和室と廊下の間の壁）
 assert.ok(door && (Number(door[1]) - 390) % 227.5 === 0, `ドアの開口の端は半マスの半分にそろう ${door?.[1]}`);
-assert.match(svgNow, /translate\(2985 30\)/); // 便器は上の壁の面（y=30）にぴったり・押した所（3.5マス＝3185）がまん中
+assert.match(svgNow, /translate\(2985 30\)/); // 便器はトイレの上の壁の面（y=30）にぴったり・左右のまん中（3.5マス＝3185）
 log('ドアは壁に・便器は壁ぎわ OK');
 
 // ---------------- 申請書の箇所：前もって部品を並べる「置き場」は出さない（ユーザーの指示「事前に線や番号をおいておくのはなしで」2026-11-11）。
@@ -764,7 +764,7 @@ log('読み直し OK');
 // ---------------- 見取図の印刷（A4。縦が基本・横に広い図は横。1階と2階を1枚に。いちばん上に「〇〇様邸」、下に改修の内容。日付・会社の名前は書かない）
 // （ユーザーの指示「〇〇様邸　平面図、日付などは不要」「基本的には縦印刷、横広の場合は、自動的に横にする」「2階を作成した際は、1階と2階の内容を1枚におさまるようにする」2026-11-10、
 //   「平面図の一番上に〇〇様邸と表示しておく」「改修の内容（申請書）…印刷時にも表示する」2026-11-11）
-await page.getByRole('button', {name: '🖨 見取図を印刷'}).click();
+await page.getByRole('button', {name: '🖨 平面図を印刷'}).click();
 const sheets = page.locator('.madori-page');
 assert.equal(await sheets.count(), 1);
 const first = await sheets.first().innerHTML();
@@ -810,15 +810,15 @@ log('見取図の印刷：1枚に1階・2階・いちばん上に〇〇様邸・
 const down = page.waitForEvent('download');
 await page.getByRole('button', {name: '📗 Excelで保存', exact: true}).first().click();
 const dialog = page.getByRole('dialog', {name: 'Excelで保存'});
-assert.equal(await dialog.getByRole('checkbox', {name: /平面図（見取図）/}).isChecked(), true);
+assert.equal(await dialog.getByRole('checkbox', {name: /^平面図/}).isChecked(), true);
 assert.equal(await dialog.getByRole('checkbox', {name: /工事見積書/}).isChecked(), false);
 await dialog.getByRole('button', {name: /^📗 \d+つ保存する$/}).click();
 const file = await down;
-assert.equal(file.suggestedFilename(), '（サンプル）山田様住宅改修見取図.xlsx');
+assert.equal(file.suggestedFilename(), '（サンプル）山田様住宅改修平面図.xlsx');
 const saved = path.join(outDir, 'madori.xlsx');
 await file.saveAs(saved);
 const z = unzipSync(new Uint8Array(await readFile(saved)));
-assert.deepEqual([...strFromU8(z['xl/workbook.xml']).matchAll(/<sheet [^>]*name="([^"]*)"/g)].map((m) => m[1]), ['見取図']);
+assert.deepEqual([...strFromU8(z['xl/workbook.xml']).matchAll(/<sheet [^>]*name="([^"]*)"/g)].map((m) => m[1]), ['平面図']);
 assert.ok(z['xl/media/image1.png'].length > 10000 && !z['xl/media/image2.png']);
 const xs1 = strFromU8(z['xl/worksheets/sheet1.xml']);
 assert.match(xs1, /①玄関　手すりの取り付け/);
@@ -878,6 +878,90 @@ await page.getByRole('tab', {name: '📐 平面図'}).click();
 await canvas.waitFor();
 assert.match(await art(), /洋室/); // 平面図のタブにも残る
 log('申請書の平面図の枠から描いて入れる OK');
+
+// ---------------- 便器はトイレの中・浴槽は浴室の中（ユーザーの指示「便器を選択したらトイレの中にいれる。浴槽を選択したら、浴室の中に入れる」2026-11-12）、
+// 少しずつ動かす（「住設などもカクカク動くので、微調節をして動かせるようにする」）、360° 回す（「向きなどは360度自由自在に動かせるようにする」）
+{
+  await cat('部屋');
+  await tool('トイレ');
+  await drag([3 * M, 0], [4 * M, 1.5 * M]); // 2730〜3640 × 0〜1365
+  await tool('浴室');
+  await drag([4 * M, 0], [6 * M, 1.5 * M]); // 3640〜5460 × 0〜1365
+  await cat('住設');
+  await tool('洋式便器');
+  await page.getByText('トイレに入れました').last().waitFor();
+  await tool('浴槽');
+  await page.getByText('浴室に入れました').last().waitFor();
+  const a1 = await art();
+  assert.match(a1, /translate\(2985 30\)"><rect x="20" y="0" width="360" height="182"/, '便器はトイレの上の壁ぎわのまん中');
+  assert.match(a1, /translate\(3800 30\)/, '浴槽は浴室の上の長い壁ぎわのまん中');
+  {
+    const c0 = await toPx(3000, 0);
+    await page.screenshot({path: path.join(outDir, 'madori-fix-in-room.png'), clip: {x: Math.max(0, c0.x - 260), y: Math.max(0, c0.y - 60), width: 620, height: 260}});
+  }
+  const toilet = async () => {
+    const m = /<g transform="translate\(([\d.-]+) ([\d.-]+)\)(?: rotate\(([\d.]+) 200 350\))?"><rect x="20" y="0" width="360" height="182"/.exec(await art());
+    assert.ok(m, '便器が見つかる');
+    return {x: Number(m[1]), y: Number(m[2]), rot: Number(m[3] ?? 0)};
+  };
+  // ドラッグで 100mm 右へ：前は右の壁から 140mm 以内で壁へ飛んだ（3210）。いまは動かした所に止まる
+  await toTools();
+  const p0 = await toPx(3185, 400);
+  const p1 = await toPx(3285, 400);
+  await page.mouse.move(p0.x, p0.y);
+  await page.mouse.down();
+  await page.mouse.move((p0.x + p1.x) / 2, p0.y, {steps: 4});
+  await page.mouse.move(p1.x, p1.y, {steps: 4});
+  await page.mouse.up();
+  let t = await toilet();
+  assert.ok(Math.abs(t.x - 3085) <= 10 && t.y === 30, `100mm 動かした所に止まる ${JSON.stringify(t)}`);
+  // 矢印キーは 10mm ずつ、右の枠の「微調整」も 10mm、Shift＋矢印は半マス
+  const x0 = t.x;
+  await page.keyboard.press('ArrowRight');
+  assert.equal((await toilet()).x, x0 + 10);
+  await page.getByRole('button', {name: '右へ 10mm 動かす'}).click();
+  assert.equal((await toilet()).x, x0 + 20);
+  await page.getByRole('button', {name: '下へ 10mm 動かす'}).click();
+  assert.equal((await toilet()).y, 40);
+  await page.keyboard.press('Shift+ArrowLeft');
+  assert.equal((await toilet()).x, x0 + 20 - 455);
+  await page.keyboard.press('Control+z');
+  assert.equal((await toilet()).x, x0 + 20);
+  // ↻ をドラッグして 45° 回す（0・90・180・270° の近くでなければ、その角度のまま）
+  await toTools();
+  t = await toilet();
+  const hb = await page.locator('[data-turn-handle] circle').boundingBox();
+  const h0 = {x: hb.x + hb.width / 2, y: hb.y + hb.height / 2};
+  const c = await toPx(t.x + 200, t.y + 350);
+  const r = Math.hypot(h0.x - c.x, h0.y - c.y);
+  await page.mouse.move(h0.x, h0.y);
+  await page.mouse.down();
+  for (const deg of [10, 20, 30, 40, 45]) await page.mouse.move(c.x + r * Math.sin((deg * Math.PI) / 180), c.y - r * Math.cos((deg * Math.PI) / 180), {steps: 2});
+  await page.mouse.up();
+  t = await toilet();
+  assert.ok(Math.abs(t.rot - 45) <= 2, `45° に回る ${t.rot}`);
+  const deg = page.getByRole('textbox', {name: '向き'});
+  assert.ok(Math.abs(Number(await deg.inputValue()) - 45) <= 2);
+  {
+    const cc = await toPx(t.x + 200, t.y + 350);
+    await page.screenshot({path: path.join(outDir, 'madori-rotate.png'), clip: {x: Math.max(0, cc.x - 220), y: Math.max(0, cc.y - 170), width: 440, height: 300}});
+  }
+  // 向きの欄に打つ → その角度。↻ を押すだけなら 90° 回る（今までと同じ）
+  await deg.fill('30');
+  await deg.press('Enter');
+  assert.equal((await toilet()).rot, 30);
+  {
+    const hb2 = await page.locator('[data-turn-handle] circle').boundingBox();
+    await page.mouse.click(hb2.x + hb2.width / 2, hb2.y + hb2.height / 2);
+  }
+  assert.equal((await toilet()).rot, 120);
+  assert.equal(await deg.inputValue(), '120');
+  // もう便器の入っているトイレしかないときは、今までどおり押した所に置く（すぐには入れない）
+  await tool('洋式便器');
+  assert.equal(await page.getByRole('button', {name: '洋式便器', exact: true}).first().getAttribute('aria-pressed'), 'true');
+  await page.keyboard.press('Escape');
+}
+log('便器はトイレ・浴槽は浴室の中に・10mm ずつ動かす・吸い付くのは近いときだけ・360° 回す OK');
 
 await page.screenshot({path: path.join(outDir, 'madori-pc.png')});
 assert.equal(await page.locator('[data-del-near]').isVisible(), false, 'パソコンでは方眼の上の 🗑 は出さない（上の段の削除）');

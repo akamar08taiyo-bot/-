@@ -5,8 +5,8 @@ import test from 'node:test';
 import {strFromU8, unzipSync} from 'fflate';
 import {defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {cleanJobs} from '../../src/sasaoka/storage.ts';
-import {copied, floorArea, hitTest, makeItem, moved, placeFixture, placeOpening, railLine, resized, turnedItem, walls} from '../../src/sasaoka/madori/edit.ts';
-import {cleanMadori, emptyMadori, hasMadori, legendLines, legendText, numberItems, roomArea} from '../../src/sasaoka/madori/model.ts';
+import {copied, fixInRoom, floorArea, hitTest, makeItem, moved, nudged, placeFixture, resized, spunTo, placeOpening, railLine, turnedItem, walls} from '../../src/sasaoka/madori/edit.ts';
+import {bounds, cleanMadori, emptyMadori, hasMadori, legendLines, legendText, numberItems, roomArea} from '../../src/sasaoka/madori/model.ts';
 import type {Madori, MItem} from '../../src/sasaoka/madori/model.ts';
 import {floorSvg} from '../../src/sasaoka/madori/render.ts';
 import {floorLegend, pageSvg, planSvg, sheetLayout, sheetLegend, sheetText, sheetTitle, sheetWorks} from '../../src/sasaoka/madori/sheet.ts';
@@ -169,6 +169,115 @@ test('動かす・大きさ・回す・写す', () => {
   assert.equal(c.n, undefined);
 });
 
+test('動かすときの微調節：そろえたい所の近く（tol 以内）だけ吸い付き、ほかは 10mm 刻み。Alt（free）は吸い付かない', () => {
+  // ユーザーの指示「住設などもカクカク動くので、微調節をして動かせるようにする」2026-11-12（前は部屋が半マスごと・設備が壁から 140mm で飛んだ）
+  const tol = 75; // 画面の 6px（倍率 0.08）
+  const big = room('big', 0, 0, 4 * M, 4 * M, '寝室');
+  const small = room('s', 455, 455, M, 455, '洗面脱衣室');
+  // 部屋：方眼の線から遠い所は 10mm 刻みで、その所に止まる
+  const a = moved(small, {x: 123, y: 148}, [big, small], 455, {tol});
+  assert.deepEqual([a.x, a.y], [580, 600]);
+  assert.equal(moved(small, {x: 0, y: 47}, [big, small], 455, {tol}).y, 455); // 線から 47mm（6px 以内）は線に戻る
+  // 方眼の線（910）の近く（左の辺が 900）は線にそろう
+  assert.equal(moved(small, {x: 445, y: 0}, [big, small], 455, {tol}).x, 910);
+  // ほかの部屋の辺（右の辺 3640）にもそろう：右の辺が 3640 から 20mm の所
+  const b = moved(small, {x: 3640 - 455 - M - 20, y: 0}, [big, small], 455, {tol});
+  assert.equal(b.x + b.w, 3640);
+  // Alt を押しているときは吸い付かない
+  assert.equal(moved(small, {x: 445, y: 0}, [big, small], 455, {tol, free: true}).x, 900);
+  // 頂点のある部屋も頂点ごと同じだけ
+  const poly: MItem = {id: 'p', kind: 'room', type: '洋室', x: 0, y: 0, w: M, h: M, pts: [{x: 0, y: 0}, {x: M, y: 0}, {x: M, y: M}, {x: 0, y: M}]};
+  const pm = moved(poly, {x: 123, y: 0}, [big, poly], 455, {tol});
+  assert.deepEqual([pm.x, pm.pts![0].x, pm.pts![2].x], [120, 120, M + 120]);
+  // 設備：壁の面から tol より離れていれば、壁に飛ばずにその所に（前は 140mm 以内で必ず壁へ）
+  const ws = [big];
+  const fix: MItem = {id: 'f', kind: 'fix', type: '洋式便器', x: 1000, y: 1000, w: 400, h: 700};
+  const f1 = moved(fix, {x: 0, y: -(1000 - 30 - 100)}, ws, 455, {tol}); // 上の辺が壁の面（30）から 100mm
+  assert.equal(f1.y, 130);
+  const f2 = moved(fix, {x: 0, y: -(1000 - 30 - 40)}, ws, 455, {tol}); // 40mm なら壁の面に付く
+  assert.equal(f2.y, 30);
+  assert.equal(moved(fix, {x: 0, y: -(1000 - 30 - 40)}, ws, 455, {tol, free: true}).y, 70);
+  // snap を渡さないとき（前と同じ）は 140mm で壁へ
+  assert.equal(moved(fix, {x: 0, y: -(1000 - 30 - 100)}, ws, 455).y, 30);
+  // ドア：壁にそって 10mm 刻み（前は半マスの半分＝227.5mm ごと）
+  const wsDoor = walls([big]);
+  const door = placeOpening('door', '片開き戸', {x: 1820, y: 0}, wsDoor, 455)!;
+  const dm = moved({...door, id: 'd'}, {x: 130, y: 0}, [big, {...door, id: 'd'}], 455, {tol});
+  assert.ok(Math.abs(dm.x - door.x - 130) <= 5, String(dm.x - door.x)); // 10mm の刻み（前は 227.5mm）
+  assert.equal(dm.y, door.y);
+});
+
+test('微調整（矢印キー・ボタン）：10mm ずつ。頂点も一緒に、ドア・窓は壁にそってだけ', () => {
+  const poly: MItem = {id: 'p', kind: 'shape', type: '四角', x: 0, y: 0, w: 100, h: 100, pts: [{x: 0, y: 0}, {x: 100, y: 0}, {x: 100, y: 100}]};
+  const n = nudged(poly, 10, -10);
+  assert.deepEqual([n.x, n.y, n.pts![1].x, n.pts![1].y], [10, -10, 110, -10]);
+  const door: MItem = {id: 'd', kind: 'door', type: '片開き戸', x: 500, y: 0, w: 800, h: 0};
+  assert.deepEqual([nudged(door, 10, 10).x, nudged(door, 10, 10).y], [510, 0]);
+  assert.equal(nudged(door, 0, 10), door); // 横の壁のドアは上下に動かさない（ボタンも出さない）
+  const vdoor: MItem = {...door, rot: 90};
+  assert.deepEqual([nudged(vdoor, 10, 10).x, nudged(vdoor, 10, 10).y], [500, 10]);
+});
+
+test('便器はトイレの中・浴槽は浴室の中：ドアのない壁に背中を付けてまん中（便器は短い壁・浴槽は長い壁）。入っている部屋・部屋がないときは null', () => {
+  // ユーザーの指示「便器を選択したらトイレの中にいれる。浴槽を選択したら、浴室の中に入れる」2026-11-12
+  const wc = room('wc', 0, 0, M, 1.5 * M, 'トイレ'); // 910×1365
+  const t1 = fixInRoom('洋式便器', [wc])!;
+  assert.equal(t1.room.id, 'wc');
+  assert.deepEqual([t1.item.x, t1.item.y, t1.item.rot ?? 0], [255, 30, 0]); // 上の短い壁の面（30）に背中・左右のまん中（455−200）
+  // ドアが上の壁にあれば、下の短い壁に背中（180°）
+  const top: MItem = {id: 'd', kind: 'door', type: '片開き戸', x: 455, y: 0, w: 600, h: 0};
+  const t2 = fixInRoom('洋式便器', [wc, top])!;
+  assert.equal(t2.item.rot, 180);
+  const b2 = bounds(t2.item);
+  assert.equal(b2.y + b2.h, 1.5 * M - 30);
+  // もう便器が入っているトイレには入れない（ほかのトイレがあればそこへ）
+  const wc2 = room('wc2', 3 * M, 0, M, 1.5 * M, 'トイレ');
+  assert.equal(fixInRoom('洋式便器', [wc, t1.item, wc2])!.room.id, 'wc2');
+  assert.equal(fixInRoom('洋式便器', [wc, t1.item]), null);
+  assert.equal(fixInRoom('洋式便器', [room('w', 0, 0, 3 * M, 4 * M, '洋室')]), null); // トイレがなければ今までどおり押して置く
+  // 浴槽（1500×750）は浴室（1820×1365＝横に長い）の長い壁に。ドアが下なら上の壁
+  const bath = room('b', 0, 0, 2 * M, 1.5 * M, '浴室');
+  const down: MItem = {id: 'd2', kind: 'door', type: '折れ戸', x: M, y: 1.5 * M, w: 800, h: 0};
+  const u = fixInRoom('浴槽', [bath, down])!;
+  assert.deepEqual([u.item.x, u.item.y, u.item.rot ?? 0], [160, 30, 0]);
+  // 名前に「トイレ」とある部屋（種類が別でも）にも入る
+  assert.ok(fixInRoom('和式便器', [{...room('x', 0, 0, M, 1.5 * M, '洗面所'), label: '1階トイレ'}]));
+  // 浴槽の入らない小さな浴室は null
+  assert.equal(fixInRoom('浴槽', [room('s', 0, 0, M, M, '浴室')]), null);
+});
+
+test('向きを 360° 自由に：↻ をドラッグした角度（0・90・180・270° の近くは吸い付き・Shift は 15°・Alt は 1°）。外まわり・読み込み・大きさ', () => {
+  // ユーザーの指示「向きなどは360度自由自在に動かせるようにする」2026-11-12
+  const fix: MItem = {id: 'f', kind: 'fix', type: '洋式便器', x: 0, y: 0, w: 400, h: 700};
+  const c = {x: 200, y: 350};
+  const a = {x: 200, y: 0}; // つまみ（まん中の真上）
+  const at = (deg: number) => ({x: c.x + 500 * Math.sin((deg * Math.PI) / 180), y: c.y - 500 * Math.cos((deg * Math.PI) / 180)});
+  assert.equal(spunTo(fix, c, a, at(37)).rot, 37);
+  assert.equal(spunTo(fix, c, a, at(88)).rot, 90); // 90° の近くは吸い付く
+  assert.equal(spunTo(fix, c, a, at(88), {free: true}).rot, 88);
+  assert.equal(spunTo(fix, c, a, at(37), {shift: true}).rot, 30);
+  assert.equal(spunTo(fix, c, a, at(-45)).rot, 315);
+  assert.equal(spunTo(fix, c, a, at(2)).rot, undefined); // 0° は rot なし
+  // 回してある部品は、押した所からの差だけ回る（つまみを押しただけで向きが飛ばない）
+  assert.equal(spunTo({...fix, rot: 90}, c, a, at(30)).rot, 120);
+  // 外まわり：45° の 400×700 は（400＋700）×0.707 の四角
+  const b = bounds({...fix, rot: 45});
+  assert.ok(Math.abs(b.w - 1100 * Math.SQRT1_2) < 0.01 && Math.abs(b.h - b.w) < 0.01);
+  assert.ok(Math.abs(b.x + b.w / 2 - 200) < 0.01 && Math.abs(b.y + b.h / 2 - 350) < 0.01); // まん中は同じ
+  // 押すと 90° ずつ（45° → 135°）
+  assert.equal(turnedItem({...fix, rot: 45}, 455).rot, 135);
+  // 読み込み：住設の 45° は残す・建具・窓は 90° ずつだけ
+  const mm = cleanMadori({module: 910, floors: [{id: 'f', name: '1階', items: [{...fix, rot: 45}, {id: 'd', kind: 'door', type: '片開き戸', x: 0, y: 0, w: 780, h: 0, rot: 45}, {...fix, id: 'g', rot: 400}]}]})!;
+  assert.deepEqual(mm.floors[0].items.map((it) => it.rot), [45, undefined, 40]);
+  // 30° に回した部品のつまみを動かすと、外まわりが新しい四角になる幅・奥行に（まん中はそのまま）
+  const r30: MItem = {...fix, rot: 30};
+  const b0 = bounds(r30);
+  const big = resized(r30, 'se', {x: b0.x + b0.w + 100, y: b0.y + b0.h + 100}, 455);
+  const b1 = bounds(big);
+  assert.ok(big.w > 400 && big.h > 700, JSON.stringify(big));
+  assert.ok(Math.abs(b1.w - (b0.w + 100)) < 15 && Math.abs(b1.h - (b0.h + 100)) < 15, JSON.stringify([b0, b1]));
+});
+
 test('床面積：屋外・バルコニーと、ほかの部屋の中に描いた部屋は数えない', () => {
   const items = [room('a', 0, 0, 4 * M, 4 * M), room('in', 0, 0, M, M, '収納'), room('b', 4 * M, 0, 4 * M, M, 'バルコニー'), room('c', 0, 4 * M, M, M, 'トイレ')];
   assert.equal(floorArea(items), Math.round(((16 + 1) * M * M) / 1e4) / 100);
@@ -196,7 +305,7 @@ const job = (over: Partial<Job> = {}): Job => cleanJobs([{customer: '見本 花�
 
 test('見取図の紙：題名（〇〇様邸　見取図）・日付・会社の名前は書かない。縦が基本で、横に広い図は横', () => {
   // ユーザーの指示「〇〇様邸　平面図、日付などは不要」「基本的には縦印刷、横広の場合は、自動的に横にする」2026-11-10
-  assert.equal(sheetText(job()).fileName, '見本花子様住宅改修見取図');
+  assert.equal(sheetText(job()).fileName, '見本花子様住宅改修平面図');
   const tall: Madori = {...emptyMadori(), floors: [{id: 'f1', name: '1階', items: [room('a', 0, 0, 3 * M, 4 * M, '和室'), {id: 'r1', kind: 'rail', x: 0, y: 0, w: 600, h: 0}]}]};
   const lay = sheetLayout(tall.floors, ['①　L＝600mm']);
   assert.equal(lay.landscape, false);
@@ -322,14 +431,14 @@ test('Excel：見取図を1シート（縦が基本）・一覧は赤い字・�
   const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
   const seen: string[] = [];
   const r = await madoriXlsx(job(), defaultSettings(), m, async (svg) => (seen.push(svg), png));
-  assert.equal(r.fileName, '見本花子様住宅改修見取図.xlsx');
+  assert.equal(r.fileName, '見本花子様住宅改修平面図.xlsx');
   assert.equal(seen.length, 1);
   assert.match(seen[0], />1階</);
   assert.match(seen[0], />2階</);
   assert.ok(!seen[0].includes('3階')); // 何も描いていない 3階 は出さない
   const z = unzipSync(r.bytes);
   const wb = strFromU8(z['xl/workbook.xml']);
-  assert.deepEqual([...wb.matchAll(/<sheet [^>]*name="([^"]*)"/g)].map((x) => x[1]), ['見取図']);
+  assert.deepEqual([...wb.matchAll(/<sheet [^>]*name="([^"]*)"/g)].map((x) => x[1]), ['平面図']);
   const s1 = strFromU8(z['xl/worksheets/sheet1.xml']);
   assert.match(s1, /orientation="portrait"/);
   // 行の高さは Excel の上限（409pt）まで（平面図の段は何行かに分ける）

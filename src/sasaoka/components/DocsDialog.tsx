@@ -34,7 +34,7 @@ const KINDS: [DocKind, string][] = (
     ['tokutei', '特定福祉用具申請書'],
     ['hanbai', '販売見積書'],
     ['riyu', '理由書'],
-    ['madori', '平面図（見取図）'], // 平面図のタブで描いたもの（madori/xlsx.ts。2026-11-09）
+    ['madori', '平面図'], // 平面図のタブで描いたもの（madori/xlsx.ts。2026-11-09）
   ] as [DocKind, string][]
 ).filter(([k]) => !DEMO || (k !== 'tokutei' && k !== 'hanbai')); // （株）イヤーズ デモアプリは住宅改修だけ
 type Mode = 'excel' | 'mail';

@@ -75,7 +75,7 @@ async function finish(page, dlg, retry) {
     ['特定福祉用具申請書', false, true],
     ['販売見積書', false, true],
     ['理由書', false, false],
-    ['平面図（見取図）', false, true], // 平面図を描いていないので選べない（2026-11-09）
+    ['平面図', false, true], // 平面図を描いていないので選べない（2026-11-09）
   ]);
   await page.screenshot({path: path.join(outDir, 'docs-1-excel.png')});
   await xdlg.getByRole('button', {name: '📗 1つ保存する'}).click();

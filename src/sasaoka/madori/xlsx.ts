@@ -70,7 +70,7 @@ export function madoriSheet(o: {lay: SheetLayout; legend: string[]; name: string
 /** 平面図の画像（PNG のバイト）。ブラウザで描く（svgToPng）。テストでは差しかえられるように引数にする */
 export type PlanPng = (svg: string, w: number, h: number) => Promise<Uint8Array>;
 
-/** 様邸の見取図の Excel（1シート）。ファイル名は「山田花子様住宅改修見取図.xlsx」 */
+/** 様邸の平面図の Excel（1シート）。ファイル名は「山田花子様住宅改修平面図.xlsx」 */
 export async function madoriXlsx(job: Job, s: Settings, m: Madori, png: PlanPng, images: Record<string, string> = {}): Promise<{bytes: Uint8Array; fileName: string}> {
   const t = sheetText(job);
   const look = placeLookup(job, s);
@@ -83,5 +83,5 @@ export async function madoriXlsx(job: Job, s: Settings, m: Madori, png: PlanPng,
     const p = planSvg(m, floors, look.no, 'x0', images, lay.dir);
     img = await png(p.svg, p.w, p.h);
   }
-  return {bytes: writeXlsx([madoriSheet({lay, legend, name: '見取図', png: img, title})]), fileName: `${t.fileName}.xlsx`};
+  return {bytes: writeXlsx([madoriSheet({lay, legend, name: '平面図', png: img, title})]), fileName: `${t.fileName}.xlsx`};
 }

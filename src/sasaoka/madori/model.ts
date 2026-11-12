@@ -23,7 +23,18 @@ export type MKind =
   | 'dim' // 寸法線（長さを自動で書く）
   | 'shape'; // 図形（Excel と同じ 直線・矢印・四角・丸。type。2026-11-10）
 
-export type Rot = 0 | 90 | 180 | 270;
+/**
+ * 向き（度）。建具・窓は 0・90・180・270 だけ。住設・家具・段差の解消・階段は 360° どの角度でも（↻ のつまみをドラッグ・右の枠の「向き」。
+ * ユーザーの指示「向きなどは360度自由自在に動かせるようにする」2026-11-12。前は 90° ずつだけ）
+ */
+export type Rot = number;
+/** 0〜360 未満にそろえ、0.1° に丸める */
+export const normRot = (deg: number): Rot => {
+  const r = Math.round(((((deg % 360) + 360) % 360)) * 10) / 10;
+  return r >= 360 ? 0 : r;
+};
+/** 90° の倍数でない向き（ななめ） */
+export const isSlanted = (rot: Rot | undefined) => !!rot && rot % 90 !== 0;
 
 /**
  * 部品1つ。x・y＝左上（線の部品は始点）、w・h＝幅・奥行（線の部品は終点までの差 dx・dy）。
@@ -153,6 +164,15 @@ export function bounds(it: MItem): {x: number; y: number; w: number; h: number} 
   if (it.kind === 'num') {
     const r = (it.size ?? NUM_SIZE) * 0.55;
     return {x: it.x - r, y: it.y - r, w: r * 2, h: r * 2};
+  }
+  if (isSlanted(it.rot)) {
+    // ななめに回した四角の外まわり（まん中は回す前と同じ）
+    const t = ((it.rot ?? 0) * Math.PI) / 180;
+    const c = Math.abs(Math.cos(t));
+    const sn = Math.abs(Math.sin(t));
+    const w = it.w * c + it.h * sn;
+    const h = it.w * sn + it.h * c;
+    return {x: it.x + it.w / 2 - w / 2, y: it.y + it.h / 2 - h / 2, w, h};
   }
   const vert = it.rot === 90 || it.rot === 270;
   return vert ? {x: it.x + (it.w - it.h) / 2, y: it.y + (it.h - it.w) / 2, w: it.h, h: it.w} : {x: it.x, y: it.y, w: it.w, h: it.h};
@@ -290,7 +310,7 @@ export function withFloor(m: Madori, floorId: string, fn: (items: MItem[]) => MI
 
 /** 90°回す（部屋・設備・階段は中心のまわり、建具・窓は壁の向きを変える） */
 export function rotated(it: MItem): MItem {
-  const rot = (((it.rot ?? 0) + 90) % 360) as Rot;
+  const rot = normRot((it.rot ?? 0) + 90);
   if (it.kind === 'rail' || it.kind === 'line' || it.kind === 'dim') {
     const cx = it.x + it.w / 2;
     const cy = it.y + it.h / 2;
@@ -309,7 +329,9 @@ export function cleanMadori(raw: unknown): Madori | undefined {
   const floors = (Array.isArray(r.floors) ? r.floors : []).filter((f): f is Record<string, unknown> => !!f && typeof f === 'object').map((f, i) => {
     const items = (Array.isArray(f.items) ? f.items : []).filter((it): it is Record<string, unknown> => !!it && typeof it === 'object' && KINDS.includes(it.kind as MKind)).map((it) => {
       const o: MItem = {id: str(it.id) || mid(), kind: it.kind as MKind, x: num(it.x), y: num(it.y), w: num(it.w), h: num(it.h)};
-      if ([90, 180, 270].includes(num(it.rot))) o.rot = num(it.rot) as Rot;
+      // 住設・家具・段差・階段・図形はどの角度でも（ななめに回した住設など）。建具・窓など、ほかは 90° ずつだけ
+      const free = it.kind === 'fix' || it.kind === 'step' || it.kind === 'stair' || it.kind === 'shape';
+      if (free ? normRot(num(it.rot)) !== 0 : [90, 180, 270].includes(num(it.rot))) o.rot = free ? normRot(num(it.rot)) : num(it.rot);
       for (const k of ['type', 'label', 'place', 'note'] as const) if (str(it[k])) o[k] = str(it[k]);
       for (const k of ['n', 'len', 'size'] as const) if (num(it[k]) > 0) o[k] = num(it[k]);
       if (it.flip === true) o.flip = true;

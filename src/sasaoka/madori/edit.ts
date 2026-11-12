@@ -4,7 +4,7 @@
 
 import {DOOR_TYPES, fixType, roomType, STAIR_TYPES, STEP_TYPES, WINDOW_TYPES} from './catalog.ts';
 import {simplifyStroke} from '../photoMarks.ts';
-import {bounds, isShapeLine, mid, NUM_SIZE, railBend, railPts, snapTo} from './model.ts';
+import {bounds, isShapeLine, isSlanted, mid, normRot, NUM_SIZE, railBend, railPts, snapTo} from './model.ts';
 import {isLineShapeType, shapeDef} from './shapes.ts';
 import {bboxOf, edgeMoved, freeMoved, inPoly, isOrtho, movedPts, pointAdded, polyArea, polyEdges, scaledPts, shapeOf, snapPt, turnedPts, vertexMoved} from './poly.ts';
 import type {MItem, MKind, Module, Rot} from './model.ts';
@@ -93,7 +93,7 @@ function rectFrom(a: P, b: P, step: number, size: {w: number; h: number}, clickO
 }
 
 /** 建具・窓を壁に置く：近くの壁の上、開口の端を方眼の半分の歩みにそろえる。開く向きは押した側 */
-export function placeOpening(kind: 'door' | 'window', type: string, p: P, ws: Wall[], step: number): MItem | null {
+export function placeOpening(kind: 'door' | 'window', type: string, p: P, ws: Wall[], step: number, snap?: MoveSnap): MItem | null {
   const def = (kind === 'door' ? DOOR_TYPES : WINDOW_TYPES).find((d) => d.name === type) ?? (kind === 'door' ? DOOR_TYPES[0] : WINDOW_TYPES[0]);
   const near = nearestWall(ws, p, 600);
   if (!near) return null;
@@ -101,13 +101,49 @@ export function placeOpening(kind: 'door' | 'window', type: string, p: P, ws: Wa
   const width = Math.min(def.w, wall.to - wall.from);
   const along = wall.h ? p.x : p.y;
   const s = step / 2;
-  let start = snapTo(along - width / 2, s);
+  // 置くとき（snap なし）は半マスにそろえる。動かすときは、半マスの線・壁の端に近いときだけそろえ、ほかは 10mm 刻み（微調節。2026-11-12）
+  const raw = along - width / 2;
+  let start = snap ? snapNear(raw, [snapTo(raw, s), wall.from, wall.to - width], snap) : snapTo(raw, s);
   start = Math.max(wall.from, Math.min(wall.to - width, start));
   const c = start + width / 2;
   // rot 0：開く側 +1＝下（flip なし）。rot 90：開く側 +1＝左（render.ts は rotate(90) で +y が −x になる）なので、右へ開くときに flip
   return wall.h
     ? {id: mid(), kind, type: def.name, x: c, y: wall.at, w: width, h: 0, ...(side < 0 ? {flip: true} : {})}
     : {id: mid(), kind, type: def.name, x: wall.at, y: c, w: width, h: 0, rot: 90, ...(side > 0 ? {flip: true} : {})};
+}
+
+/**
+ * 動かすときの吸い付き。tol＝吸い付く幅（mm。画面では 6px 分＝倍率で変わる）、free＝Alt を押している（吸い付かない）。
+ * 前は部屋・階段が半マス（455mm）ごと、設備が壁から 140mm 以内で壁へ飛び、少しずつ動かせなかった
+ * （ユーザーの指示「住設などもカクカク動くので、微調節をして動かせるようにする」2026-11-12）。
+ * そろえたい所（方眼の線・ほかの部屋の辺・壁の面）の近くだけ吸い付き、ほかは 10mm 刻みで動く
+ */
+export type MoveSnap = {tol: number; free?: boolean};
+const FINE = 10; // 吸い付かないときの刻み（mm）
+
+/** v を、targets のうち tol 以内でいちばん近い所へ。なければ 10mm 刻み */
+function snapNear(v: number, targets: number[], snap: MoveSnap): number {
+  if (!snap.free) {
+    let best: number | null = null;
+    for (const t of targets) if (Math.abs(t - v) <= snap.tol && (best === null || Math.abs(t - v) < Math.abs(best - v))) best = t;
+    if (best !== null) return best;
+  }
+  return snapTo(v, FINE);
+}
+
+/** 辺 lo・hi（左右か上下）を動かした量 d を、方眼の線・ほかの辺のうち tol 以内でいちばん近い所へそろえた量に。なければ 10mm 刻み */
+function edgeShift(lo: number, hi: number, d: number, step: number, others: number[], snap: MoveSnap): number {
+  if (!snap.free) {
+    let best: number | null = null;
+    for (const e of [lo + d, hi + d]) {
+      for (const t of [snapTo(e, step), ...others]) {
+        const dd = t - e;
+        if (Math.abs(dd) <= snap.tol && (best === null || Math.abs(dd) < Math.abs(best))) best = dd;
+      }
+    }
+    if (best !== null) return d + best;
+  }
+  return snapTo(lo + d, FINE) - lo;
 }
 
 /** 回したあとの外まわり（w・h が入れかわる） */
@@ -181,6 +217,62 @@ export function placeFixture(type: string, p: P, ws: Wall[]): MItem {
   }
   const at = fromBox(box, w, h);
   return {id: mid(), kind: 'fix', type: def?.name ?? type, x: Math.round(at.x), y: Math.round(at.y), w, h, ...(rot ? {rot} : {})};
+}
+
+/**
+ * 住設の入る部屋（ユーザーの指示「便器を選択したらトイレの中にいれる。浴槽を選択したら、浴室の中に入れる」2026-11-12）。
+ * 部屋の種類か名前にこの字があればその部屋。family＝同じ仲間（もう入っている部屋には入れない）
+ */
+const FIX_HOME: {fix: string[]; room: string[]}[] = [
+  {fix: ['洋式便器', '和式便器'], room: ['トイレ']},
+  {fix: ['浴槽', 'ユニットバス'], room: ['浴室']},
+];
+
+/**
+ * 便器・浴槽を、その階のトイレ・浴室の部屋の中に置く（まだ便器・浴槽の入っていない部屋のうち、いちばん初めに描いたもの）。
+ * 背中（上の辺）を壁の面に付けてまん中に。どの壁に付けるかは、入る壁 → ドアのない壁 → 縦長の便器は短い壁・横長の浴槽は長い壁 →
+ * ドアからいちばん遠い壁 の順で選ぶ。入る部屋がなければ null（今までどおり、押した所に置く）
+ */
+export function fixInRoom(type: string, items: MItem[]): {item: MItem; room: MItem} | null {
+  const home = FIX_HOME.find((h) => h.fix.includes(type));
+  const def = fixType(type);
+  if (!home || !def) return null;
+  const isHome = (r: MItem) => r.kind === 'room' && home.room.some((n) => (r.type ?? '').includes(n) || (r.label ?? '').includes(n));
+  const inside = (r: MItem, it: MItem) => {
+    const b = bounds(r);
+    const c = bounds(it);
+    const cx = c.x + c.w / 2;
+    const cy = c.y + c.h / 2;
+    return cx > b.x && cx < b.x + b.w && cy > b.y && cy < b.y + b.h;
+  };
+  const room = items.find((r) => isHome(r) && !items.some((o) => o.kind === 'fix' && home.fix.includes(o.type ?? '') && inside(r, o)));
+  if (!room) return null;
+  const b = bounds(room);
+  const x0 = b.x + HALF_WALL;
+  const y0 = b.y + HALF_WALL;
+  const x1 = b.x + b.w - HALF_WALL;
+  const y1 = b.y + b.h - HALF_WALL;
+  const {w, h} = def;
+  const doors = items.filter((o) => o.kind === 'door').map((o) => ({x: o.x, y: o.y}));
+  const near = 60; // ドアのまん中が壁の線からこの幅なら、その壁のドア
+  const sides = [
+    {rot: 0, along: x1 - x0, depth: y1 - y0, line: (q: P) => Math.abs(q.y - b.y) <= near && q.x >= b.x && q.x <= b.x + b.w, dist: (q: P) => Math.abs(q.y - b.y), box: {x: (x0 + x1) / 2 - w / 2, y: y0, w, h}},
+    {rot: 90, along: y1 - y0, depth: x1 - x0, line: (q: P) => Math.abs(q.x - (b.x + b.w)) <= near && q.y >= b.y && q.y <= b.y + b.h, dist: (q: P) => Math.abs(q.x - (b.x + b.w)), box: {x: x1 - h, y: (y0 + y1) / 2 - w / 2, w: h, h: w}},
+    {rot: 180, along: x1 - x0, depth: y1 - y0, line: (q: P) => Math.abs(q.y - (b.y + b.h)) <= near && q.x >= b.x && q.x <= b.x + b.w, dist: (q: P) => Math.abs(q.y - (b.y + b.h)), box: {x: (x0 + x1) / 2 - w / 2, y: y1 - h, w, h}},
+    {rot: 270, along: y1 - y0, depth: x1 - x0, line: (q: P) => Math.abs(q.x - b.x) <= near && q.y >= b.y && q.y <= b.y + b.h, dist: (q: P) => Math.abs(q.x - b.x), box: {x: x0, y: (y0 + y1) / 2 - w / 2, w: h, h: w}},
+  ].map((sd, i) => ({
+    ...sd,
+    i,
+    fits: w <= sd.along + 1 && h <= sd.depth + 1,
+    door: doors.some(sd.line),
+    match: w >= h === sd.along >= sd.depth,
+    far: doors.length ? Math.min(...doors.map(sd.dist)) : 0,
+  }));
+  const best = [...sides].sort((a, c) => +c.fits - +a.fits || +a.door - +c.door || +c.match - +a.match || c.far - a.far || a.i - c.i)[0];
+  if (!best.fits) return null;
+  const at = fromBox(best.box, w, h);
+  const item: MItem = {id: mid(), kind: 'fix', type: def.name, x: Math.round(at.x), y: Math.round(at.y), w, h, ...(best.rot ? {rot: best.rot} : {})};
+  return {item, room};
 }
 
 /** 手すりの線：横か縦にそろえ、壁の近く（250mm 以内）なら壁の面から少し内側（壁ぞい）に。長さは 50mm 刻み */
@@ -619,6 +711,30 @@ export function resized(it: MItem, h: Handle, p: P, step: number, vertex = false
   const box = {x: x0, y: y0, w: x1 - x0, h: y1 - y0};
   // 丸（縦手すり）は x・y がまん中。大きさ・形（だ円）を変える
   if (it.kind === 'vrail') return {...it, x: box.x + box.w / 2, y: box.y + box.h / 2, w: Math.max(40, box.w), h: Math.max(40, box.h)};
+  if (isSlanted(it.rot)) {
+    // ななめの部品：外まわり（W・H）が新しい四角になるような幅・奥行を出す（W＝w|cos|＋h|sin|、H＝w|sin|＋h|cos|）。
+    // 45° の近くは解けないので、幅・奥行を同じ割合で大きく・小さく
+    const t = ((it.rot ?? 0) * Math.PI) / 180;
+    const c = Math.abs(Math.cos(t));
+    const sn = Math.abs(Math.sin(t));
+    const det = c * c - sn * sn;
+    let w: number;
+    let hh: number;
+    if (Math.abs(det) > 0.2) {
+      w = (box.w * c - box.h * sn) / det;
+      hh = (box.h * c - box.w * sn) / det;
+    } else {
+      const b0 = bounds(it);
+      const k = (box.w / b0.w + box.h / b0.h) / 2;
+      w = it.w * k;
+      hh = it.h * k;
+    }
+    w = Math.max(50, Math.round(w));
+    hh = Math.max(50, Math.round(hh));
+    const cx = box.x + box.w / 2;
+    const cy = box.y + box.h / 2;
+    return {...it, x: Math.round(cx - w / 2), y: Math.round(cy - hh / 2), w, h: hh};
+  }
   const vert = it.rot === 90 || it.rot === 270;
   const w = vert ? box.h : box.w;
   const hh = vert ? box.w : box.h;
@@ -626,23 +742,50 @@ export function resized(it: MItem, h: Handle, p: P, step: number, vertex = false
   return {...it, x: at.x, y: at.y, w, h: hh};
 }
 
-/** 部品を動かす（d＝動かした量）。部屋・階段は方眼に、ドア・窓は近くの壁に、設備・段差の解消は壁の面に吸い付く */
-export function moved(it: MItem, d: P, items: MItem[], step: number): MItem {
-  const ws = walls(items.filter((o) => o.id !== it.id));
-  if (it.kind === 'room' && it.pts) {
-    const x = snapTo(it.x + d.x, step);
-    const y = snapTo(it.y + d.y, step);
-    return {...it, x, y, pts: movedPts(it.pts, x - it.x, y - it.y)};
+/** 自由に回せる部品（住設・家具・段差の解消・横四角・階段）。ほかは ↻ を押すと 90° ずつ */
+export const canSpin = (it: MItem) => it.kind === 'fix' || it.kind === 'step' || it.kind === 'stair';
+
+/**
+ * ↻ のつまみをドラッグして回す：押した所 a から今の所 p まで、まん中 c のまわりに回った角度だけ回す（右回り）。
+ * 0・90・180・270° の近く（4° 以内）は吸い付き、Shift は 15° ずつ、Alt は吸い付かない（1° ずつ）
+ */
+export function spunTo(it: MItem, c: P, a: P, p: P, opt: {shift?: boolean; free?: boolean} = {}): MItem {
+  const ang = (q: P) => (Math.atan2(q.x - c.x, -(q.y - c.y)) * 180) / Math.PI;
+  let deg = (it.rot ?? 0) + ang(p) - ang(a);
+  if (opt.shift) deg = Math.round(deg / 15) * 15;
+  else if (!opt.free) {
+    const right = Math.round(deg / 90) * 90;
+    deg = Math.abs(deg - right) <= 4 ? right : Math.round(deg);
+  } else deg = Math.round(deg);
+  const rot = normRot(deg);
+  const {rot: _old, ...rest} = it;
+  return rot ? {...rest, rot} : rest;
+}
+
+/**
+ * 部品を動かす（d＝動かした量）。部屋・階段は方眼の線・ほかの部屋の辺に、ドア・窓は近くの壁に、設備・段差の解消は壁の面に吸い付く。
+ * snap を渡さないとき（テストなど）は前と同じ強さ（部屋は半マスに必ずそろう・設備は壁から 140mm）。画面は snap（6px 分）を渡す
+ */
+export function moved(it: MItem, d: P, items: MItem[], step: number, snap?: MoveSnap): MItem {
+  const others = items.filter((o) => o.id !== it.id);
+  const ws = walls(others);
+  if (it.kind === 'room' || it.kind === 'stair') {
+    const sn = snap ?? {tol: step / 2};
+    const b = bounds(it);
+    const edges = others.filter((o) => o.kind === 'room' || o.kind === 'stair').map(bounds);
+    const dx = edgeShift(b.x, b.x + b.w, d.x, step, edges.flatMap((o) => [o.x, o.x + o.w]), sn);
+    const dy = edgeShift(b.y, b.y + b.h, d.y, step, edges.flatMap((o) => [o.y, o.y + o.h]), sn);
+    return {...it, x: it.x + dx, y: it.y + dy, ...(it.pts ? {pts: movedPts(it.pts, dx, dy)} : {})};
   }
-  if (it.kind === 'room' || it.kind === 'stair') return {...it, x: snapTo(it.x + d.x, step), y: snapTo(it.y + d.y, step)};
   if (it.kind === 'door' || it.kind === 'window') {
-    const next = placeOpening(it.kind, it.type ?? '', {x: it.x + d.x, y: it.y + d.y}, ws, step);
+    const next = placeOpening(it.kind, it.type ?? '', {x: it.x + d.x, y: it.y + d.y}, ws, step, snap);
     if (!next) return it;
     return {...it, x: next.x, y: next.y, rot: next.rot, w: it.w, ...(next.rot === it.rot ? {} : {flip: next.flip})};
   }
   if (it.kind === 'fix' || it.kind === 'step') {
     const b = bounds(it);
-    const box = magnet({x: snapTo(b.x + d.x, 10), y: snapTo(b.y + d.y, 10), w: b.w, h: b.h}, ws);
+    const box0 = {x: snapTo(b.x + d.x, FINE), y: snapTo(b.y + d.y, FINE), w: b.w, h: b.h};
+    const box = snap?.free ? box0 : magnet(box0, ws, snap ? Math.min(140, snap.tol) : 140);
     const at = fromBox(box, it.w, it.h);
     return {...it, x: Math.round(at.x), y: Math.round(at.y)};
   }
@@ -651,10 +794,26 @@ export function moved(it: MItem, d: P, items: MItem[], step: number): MItem {
     const y = snapTo(it.y + d.y, 10);
     return {...it, x, y, ...(it.pts ? {pts: movedPts(it.pts, x - it.x, y - it.y)} : {})};
   }
-  if (it.kind === 'line') return {...it, x: snapTo(it.x + d.x, step / 2), y: snapTo(it.y + d.y, step / 2)};
+  if (it.kind === 'line') {
+    const sn = snap ?? {tol: step / 4};
+    return {...it, x: it.x + edgeShift(it.x, it.x + it.w, d.x, step / 2, [], sn), y: it.y + edgeShift(it.y, it.y + it.h, d.y, step / 2, [], sn)};
+  }
   const x = snapTo(it.x + d.x, 10);
   const y = snapTo(it.y + d.y, 10);
   return {...it, x, y, ...(it.pts ? {pts: movedPts(it.pts, x - it.x, y - it.y)} : {})}; // 頂点の編集にした図形は頂点も一緒に
+}
+
+/**
+ * 矢印キー・右の「微調整」のボタンで少しずつ動かす（吸い付かない）。頂点のある部屋・図形・手すりは頂点も一緒に。
+ * ドア・窓は壁から外れないように、壁にそってだけ動かす（縦の壁＝rot 90 は上下、横の壁は左右）
+ */
+export function nudged(it: MItem, dx: number, dy: number): MItem {
+  if (it.kind === 'door' || it.kind === 'window') {
+    if (it.rot === 90 || it.rot === 270) dx = 0;
+    else dy = 0;
+  }
+  if (!dx && !dy) return it;
+  return {...it, x: it.x + dx, y: it.y + dy, ...(it.pts ? {pts: movedPts(it.pts, dx, dy)} : {})};
 }
 
 /** 90°回す：部屋は縦横を入れかえ（まん中のまま）、設備・階段・段差の解消は右回り、線の部品はまん中で、ドア・窓は開く向きを回す */
@@ -684,7 +843,8 @@ export function turnedItem(it: MItem, step: number): MItem {
     if (it.flip && it.hinge) return {...it, hinge: false};
     return {...it, flip: false};
   }
-  return {...it, rot: (((it.rot ?? 0) + 90) % 360) as Rot};
+  // ななめのときも 90° ずつ（45° → 135°）
+  return {...it, rot: normRot((it.rot ?? 0) + 90)};
 }
 
 /** 部品を写す（Ctrl+C・Ctrl+V・複製。方眼の1歩ずらす） */

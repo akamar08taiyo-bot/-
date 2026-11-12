@@ -37,9 +37,9 @@ export function placeLookup(
 
 export type SheetText = {fileName: string};
 
-/** 見取図の保存名（Excel・PDF。「山田花子様住宅改修見取図」） */
+/** 平面図の保存名（Excel・PDF。「山田花子様住宅改修平面図」。前は「見取図」＝ユーザーの指示「見取図を印刷ではなく、平面図を印刷に変更する」2026-11-12） */
 export function sheetText(job: Job): SheetText {
-  return {fileName: `${customerFilePart(job.customer)}住宅改修見取図`};
+  return {fileName: `${customerFilePart(job.customer)}住宅改修平面図`};
 }
 
 /**

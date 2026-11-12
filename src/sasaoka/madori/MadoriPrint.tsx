@@ -63,7 +63,7 @@ export function MadoriPrint({job, settings, madori, onClose}: {job: Job; setting
     <div className="print-overlay">
       <style>{`@media print { @page { size: A4 ${lay.landscape ? 'landscape' : 'portrait'}; margin: 0; } .madori-page { box-shadow: none !important; margin: 0 !important; } }`}</style>
       <div ref={bar} className="print-toolbar justify-center">
-        <div className="text-sm font-bold">見取図（A4{lay.landscape ? '横' : '縦'}）</div>
+        <div className="text-sm font-bold">平面図（A4{lay.landscape ? '横' : '縦'}）</div>
         <div className="flex flex-wrap items-center gap-2">
           <Btn color="softSky" onClick={() => window.print()} className="!px-5 !text-base">
             🖨 印刷する
@@ -75,7 +75,7 @@ export function MadoriPrint({job, settings, madori, onClose}: {job: Job; setting
       </div>
       <div className="print-root" style={zoom < 1 ? {zoom} : undefined}>
         <div
-          aria-label="見取図の印刷"
+          aria-label="平面図の印刷"
           data-orientation={lay.landscape ? 'landscape' : 'portrait'}
           className="madori-page mx-auto mb-4 overflow-hidden bg-white shadow-lg [&>svg]:block [&>svg]:h-full [&>svg]:w-full"
           style={{width: `${lay.w}mm`, height: `${lay.h - 0.4}mm`}}
