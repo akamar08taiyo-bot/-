@@ -484,8 +484,9 @@ function JobDoc({job, settings: s, materials}: {job: Job; settings: Settings; ma
     ['③', `部材上乗せ（①×${rate}）`, t.markup, false],
     ['④', `諸経費（①＋②＋③）×${rate}`, t.overhead, false],
     ['⑤', `消費税　${taxFormula(s)}`, t.tax, false],
-    ['⑥', '合計', t.total, true],
-    ['⑦', '税抜合計', t.subtotal, true],
+    // 税抜が上・税込が下（どちらも色付け。2026-11-12。前は ⑥合計・⑦税抜合計）
+    ['⑥', '税抜合計', t.subtotal, true],
+    ['⑦', '税込合計', t.total, true],
   ];
   return (
     <div className="sheet">

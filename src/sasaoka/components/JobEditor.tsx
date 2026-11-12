@@ -590,8 +590,9 @@ export function SummaryBox({totals: t, settings: s}: {totals: JobTotals; setting
     ['③', `部材上乗せ（①×${rate}）`, t.markup, false],
     ['④', `諸経費（①＋②＋③）×${rate}`, t.overhead, false],
     ['⑤', `消費税（${taxFormula(s)}）`, t.tax, false],
-    ['⑥', '合計', t.total, true],
-    ['⑦', '税抜合計', t.subtotal, true],
+    // 税抜が上・税込が下（どちらも色付け。ユーザーの指示「税抜金額と税込み金額は色付け　税抜が上にする、税込みが下になる」2026-11-12。前は ⑥合計・⑦税抜合計）
+    ['⑥', '税抜合計', t.subtotal, true],
+    ['⑦', '税込合計', t.total, true],
   ];
   return (
     <div className="overflow-hidden rounded-xl border-2 border-slate-800 bg-white">
@@ -601,7 +602,7 @@ export function SummaryBox({totals: t, settings: s}: {totals: JobTotals; setting
             <tr key={no} className="border-b border-slate-800 last:border-b-0">
               <td className={`w-9 border-r border-slate-800 py-2 text-center ${strong ? 'font-bold' : ''}`}>{no}</td>
               <td className={`border-r border-slate-800 px-2 py-2 ${strong ? 'bg-[#9dc3e6] font-bold' : ''}`}>{label}</td>
-              <td className={`px-3 py-2 text-right tabular-nums ${strong ? 'text-base font-bold' : ''}`}>{yen(value)}</td>
+              <td className={`px-3 py-2 text-right tabular-nums ${strong ? 'bg-[#dbeaf7] text-base font-bold' : ''}`}>{yen(value)}</td>
             </tr>
           ))}
         </tbody>

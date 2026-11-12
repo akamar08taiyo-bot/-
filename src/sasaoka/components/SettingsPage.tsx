@@ -165,7 +165,7 @@ export function SettingsPage({data, update, cloud}: {data: AppData; update: Upda
         title="計算のしかた"
         note={
           <>
-            ①部材代・②取付手間・③部材上乗せ（①×率）・④諸経費（（①＋②＋③）×率）・⑦税抜合計（①〜④）・⑤消費税・⑥合計（⑦＋⑤）は、元の「仕切り計算表」と同じ式です。
+            ①部材代・②取付手間・③部材上乗せ（①×率）・④諸経費（（①＋②＋③）×率）・⑥税抜合計（①〜④）・⑤消費税・⑦税込合計（⑥＋⑤）は、元の「仕切り計算表」と同じ式です（税抜を上、税込を下に並べています）。
           </>
         }
       >
@@ -202,7 +202,7 @@ export function SettingsPage({data, update, cloud}: {data: AppData; update: Upda
             onChange={(e) => set({taxMode: e.target.value as TaxMode})}
             className="h-9 max-w-full rounded-md border border-slate-300 px-2 text-sm font-normal"
           >
-            <option value="original">元の表と同じ（⑦×0.1－1円・四捨五入）</option>
+            <option value="original">元の表と同じ（⑥×0.1－1円・四捨五入）</option>
             <option value="floor">切り捨て</option>
             <option value="round">四捨五入</option>
             <option value="ceil">切り上げ</option>

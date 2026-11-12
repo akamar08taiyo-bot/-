@@ -711,6 +711,10 @@ img {
 .sheet table.summary tr.strong td.label {
   background: #9dc3e6;
 }
+/* 税抜合計・税込合計は金額の欄も薄く色付け（2026-11-12「税抜金額と税込み金額は色付け」） */
+.sheet table.summary tr.strong td.num {
+  background: #dbeaf7;
+}
 .sheet .place {
   break-inside: avoid;
   margin-top: 5mm;

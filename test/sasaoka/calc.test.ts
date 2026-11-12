@@ -66,7 +66,7 @@ test('roundYen は浮動小数の誤差を除いて四捨五入する', () => {
 });
 
 test('taxAmount の各モード', () => {
-  // 元の表：⑦×0.1－1（表示は四捨五入）
+  // 元の表：税抜合計×0.1－1（表示は四捨五入）。2026-11-12 から税抜合計を ⑥（上）・税込合計を ⑦（下）に入れかえたので式は「⑥×0.1－1」
   assert.equal(taxAmount(37070, 0.1, 'original'), 3706); // 3707.0 - 1
   assert.equal(taxAmount(26693, 0.1, 'original'), 2668); // 2669.3 → 2669 - 1
   assert.equal(taxAmount(83621, 0.1, 'original'), 8361); // 8362.1 → 8362 - 1
@@ -76,8 +76,8 @@ test('taxAmount の各モード', () => {
   assert.equal(taxAmount(133211, 0.1, 'ceil'), 13322);
   assert.equal(taxAmount(-1005, 0.1, 'floor'), -100); // マイナス（値引き）は0に向けて切り捨て
   // ⑤の式（仕切り計算表の画面と印刷で同じ）
-  assert.equal(taxFormula({taxRate: 0.1, taxMode: 'original'}), '⑦×0.1－1');
-  assert.equal(taxFormula({taxRate: 0.1, taxMode: 'floor'}), '⑦×0.1');
+  assert.equal(taxFormula({taxRate: 0.1, taxMode: 'original'}), '⑥×0.1－1');
+  assert.equal(taxFormula({taxRate: 0.1, taxMode: 'floor'}), '⑥×0.1');
 });
 
 test('rowAmount と placeTotals（玄関の例：手すり10,000＋ブラケット1,500×2＋木2箇所）', () => {
@@ -165,7 +165,7 @@ test('monthSummary：すべての様邸の税抜合計に、最後に消費税�
   const c = job([[mat(20000, 1)]]);
   const m = monthSummary([a, c], {...S, invoiceTaxMode: 'monthly'});
   assert.equal(m.invoice.subtotal, 26693 + 22898);
-  // 49,591×0.1＝4,959.1 → 切り捨て 4,959（様邸ごとの「⑦×0.1－1」は使わない）
+  // 49591×0.1＝4959.1 → 切り捨て 4959（様邸ごとの「⑥×0.1－1」は使わない）
   assert.equal(m.invoice.tax, 4959);
   assert.equal(m.invoice.total, 49591 + 4959);
   assert.equal(monthSummary([a, c], {...S, invoiceTaxMode: 'monthly', totalTaxRounding: 'ceil'}).invoice.tax, 4960);
