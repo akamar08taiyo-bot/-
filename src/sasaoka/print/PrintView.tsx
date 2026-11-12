@@ -1,11 +1,12 @@
 import type {MonthPlan, PlanRow, PlanSums} from '../salesPlan.ts';
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {ReactNode} from 'react';
-import {cutToLength, estimateQty, isBlankRow, jobName, jobTotals, monthSummary, placeTotals, rowAmount, shikiriPrice, taxFormula} from '../calc.ts';
+import {cutToLength, estimateQty, isBlankRow, jobName, jobTotals, monthSummary, placeTotals, roundYen, rowAmount, shikiriPrice, taxFormula} from '../calc.ts';
 import type {MonthSummary} from '../calc.ts';
 import {cutCalc, FORM_INFO, insurerLabel, jobForm, offEstimate} from '../estimateForms.ts';
+import {photoLabel, shikiriBars} from '../order.ts';
 import {laborForText, laborOwner} from '../rows.ts';
-import type {AppData, Job, Settings} from '../types.ts';
+import type {AppData, Job, Material, Settings} from '../types.ts';
 import {dateLabel, monthEnd, monthLabel, num, shortDate, staffShort, todayIso, yen} from '../util.ts';
 import {Btn} from '../components/ui.tsx';
 import {estimateDateOf, useDocMeta} from './docMeta.ts';
@@ -164,7 +165,8 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
   }, [onClose, request, data.jobs, data.settings]);
 
   const jobs = useMemo(() => data.jobs.filter((j) => j.shikiri && j.month === month), [data.jobs, month]);
-  const summary = useMemo(() => monthSummary(jobs, data.settings), [jobs, data.settings]);
+  // 切って使う部材は発注書の本数（仕切り計算表と同じ。order.ts の shikiriBars）
+  const summary = useMemo(() => monthSummary(jobs, data.settings, (j) => shikiriBars(j, data.materials, data.settings)), [jobs, data.settings, data.materials]);
 
   let sheets: ReactNode;
   if (request.kind === 'sales') {
@@ -173,7 +175,7 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
     sheets = (
       <>
         <InvoiceDoc month={request.month} summary={summary} settings={data.settings} meta={meta} />
-        {request.withDetails && summary.rows.map(({job}) => <JobDoc key={job.id} job={job} settings={data.settings} />)}
+        {request.withDetails && summary.rows.map(({job}) => <JobDoc key={job.id} job={job} settings={data.settings} materials={data.materials} />)}
       </>
     );
   } else {
@@ -189,7 +191,7 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
         <YukuhashiForm job={job} settings={data.settings} date={estimateDateOf(job)} />
       )
     ) : (
-      <JobDoc job={job} settings={data.settings} />
+      <JobDoc job={job} settings={data.settings} materials={data.materials} />
     );
   }
 
@@ -471,8 +473,10 @@ function InvoiceDoc({month, summary, settings: s, meta}: {month: string; summary
   );
 }
 
-function JobDoc({job, settings: s}: {job: Job; settings: Settings}) {
-  const t = jobTotals(job, s);
+function JobDoc({job, settings: s, materials}: {job: Job; settings: Settings; materials: Material[]}) {
+  // 切って使う部材は発注書と同じ本数（1本単位。ユーザーの指示「1本まるまる送るようになるため、1本単位でお願いします」2026-11-12）
+  const bars = shikiriBars(job, materials, s);
+  const t = jobTotals(job, s, bars);
   const rate = String(s.rate);
   const summary: [string, string, number, boolean][] = [
     ['①', '部材代合計', t.material, false],
@@ -539,7 +543,7 @@ function JobDoc({job, settings: s}: {job: Job; settings: Settings}) {
 
       {/* 見積書から外した箇所（申請書だけの箇所）は出さない */}
       {job.places.filter((p) => !offEstimate(p)).map((place) => {
-        const pt = placeTotals(place);
+        const pt = placeTotals(place, bars.rowIds);
         return (
           <div key={place.id} className="place">
             <div className="place-name">【{place.name || '箇所'}】</div>
@@ -580,7 +584,8 @@ function JobDoc({job, settings: s}: {job: Job; settings: Settings}) {
                       <td className="code">{r.code}</td>
                       <td className="num">{yen(shikiriPrice(r))}</td>
                       <td className="num">{cutToLength(r) ? num(estimateQty(r), 3) : num(r.qty)}</td>
-                      <td className="num">{yen(rowAmount(r))}</td>
+                      {/* 発注書の本数で数える部材は、金額を下の「切って使う部材」に */}
+                      <td className="num">{bars.rowIds.has(r.id) ? <span className="code-sub">1本単位（下）</span> : yen(rowAmount(r))}</td>
                     </tr>
                   ))}
                 {place.rows.every(isBlankRow) && (
@@ -603,6 +608,55 @@ function JobDoc({job, settings: s}: {job: Job; settings: Settings}) {
           </div>
         );
       })}
+
+      {bars.rowIds.size > 0 && (
+        <div className="place" data-shikiri-bars>
+          <div className="place-name">【切って使う部材（1本単位）】</div>
+          <table className="items detail">
+            <colgroup>
+              <col style={{width: '8%'}} />
+              <col style={{width: '42%'}} />
+              <col style={{width: '16%'}} />
+              <col style={{width: '11%'}} />
+              <col style={{width: '9%'}} />
+              <col style={{width: '14%'}} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>写真</th>
+                <th>品名</th>
+                <th>品番</th>
+                <th>単価</th>
+                <th>数量</th>
+                <th>金額</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bars.lines.map((l) => (
+                <tr key={l.key}>
+                  <td className="c">{photoLabel(l.photos)}</td>
+                  <td className="name">{l.name || l.code}</td>
+                  <td className="code">{l.code}</td>
+                  <td className="num">{yen(l.price)}</td>
+                  <td className="num">
+                    {num(l.qty, 3)}
+                    {l.unit}
+                  </td>
+                  <td className="num">{yen(roundYen(l.price * l.qty))}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={5} className="r">
+                  切って使う部材 計
+                </td>
+                <td className="num strong">{yen(bars.amount)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

@@ -616,8 +616,16 @@ await (await openMore(page)).getByRole('button', {name: '🧾 請求書を見る
 await page.waitForURL(/#tab=invoice&job=/);
 await page.getByRole('heading', {level: 1, name: '見本 太郎様邸'}).waitFor();
 const shikiri = await page.locator('aside table').innerText();
-assert.ok(shikiri.includes('部材代合計') && shikiri.includes('9,900') && shikiri.includes('5,000'), shikiri); // 取付手間 2,000＋3,000
-log('仕切り計算表につながるOK');
+// 切って使う部材は発注書と同じ本数（ユーザーの指示「1本単位でお願いします」2026-11-12）：木の手すり 4m を 60cm（0.15本）→ 発注書は 2000mm を1本。
+// サンプルの部材リストに 2000mm の品がないので、その行の仕切価格は空欄（0円）で「確かめてください」と出す（前は 0.15本×10,000円＝1,500円で 9,900）
+assert.ok(shikiri.includes('部材代合計') && shikiri.includes('8,400') && shikiri.includes('5,000'), shikiri); // 取付手間 2,000＋3,000
+{
+  const bars = await page.locator('[data-shikiri-bars]').innerText();
+  assert.match(bars, /2000mm/);
+  assert.match(bars, /品番・価格を確かめてください/);
+  assert.match(bars, /1本/);
+}
+log('仕切り計算表につながる・切って使う部材は発注書と同じ1本単位OK');
 
 // ---------------- 様邸の画面（請求書を確認する）の左上は「← 見積もりへ戻る」：同じ見積書が開く。請求書のタブは一覧に戻っている。右の「📝 見積書を開く」も残す
 assert.equal(await page.getByRole('button', {name: '← 一覧へ戻る'}).count(), 0);

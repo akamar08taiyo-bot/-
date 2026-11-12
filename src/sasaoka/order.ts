@@ -12,7 +12,7 @@
 //   そのほか（規格品をそのまま使う部材）は見積書の数量のまま。
 // 発注書で数を直した・消した・足した行は、様邸の order に持つ（見積書を直しても、手で直したところはそのまま）。
 
-import {cutToLength, isBlankRow, listPriceOf, shikiriPrice} from './calc.ts';
+import {cutToLength, isBlankRow, listPriceOf, roundYen, shikiriPrice} from './calc.ts';
 import type {EstimateRates} from './calc.ts';
 import {circled, photoNumbers} from './estimateForms.ts';
 import {normalize} from './priceImport.ts';
@@ -137,6 +137,7 @@ type Group = {
   whole: number; // 切らずに使う数
   pieces: Map<number, number>; // 切って使う長さ（mm）→ 本数
   photos: Set<number>; // 使う箇所の写真番号
+  rowIds: string[]; // 見積書の行の id
 };
 
 const productKey = (r: Row) => [r.maker, r.code, r.name].map(norm).join('|');
@@ -155,9 +156,10 @@ export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[], 
       const key = stockMm > 0 ? `bar:${productKey(r)}|${stockMm}` : `qty:${productKey(r)}|${norm(r.unit)}`;
       let g = groups.get(key);
       if (!g) {
-        g = {key, first: r, stockMm, whole: 0, pieces: new Map(), photos: new Set()};
+        g = {key, first: r, stockMm, whole: 0, pieces: new Map(), photos: new Set(), rowIds: []};
         groups.set(key, g);
       }
+      g.rowIds.push(r.id);
       if (photo > 0) g.photos.add(photo);
       if (cutToLength(r)) {
         const len = Math.round(r.lengthCm * 100) / 10;
@@ -192,6 +194,7 @@ export function orderBaseLines(job: Pick<Job, 'places'>, materials: Material[], 
       price: shikiriPrice(r),
       listPrice: listPriceOf(r),
       warn: '',
+      src: g.rowIds,
     };
     if (g.pieces.size === 0) {
       // 規格品をそのまま使う：見積書の数量のまま
@@ -259,6 +262,7 @@ function mergeSameLines(lines: OrderLine[]): OrderLine[] {
       calc: same.calc + l.calc,
       photos: [...new Set([...same.photos, ...l.photos])].sort((a, b) => a - b),
       warn: same.warn || l.warn,
+      src: [...new Set([...(same.src ?? []), ...(l.src ?? [])])],
     });
   }
   return [...byItem.values()];
@@ -339,6 +343,27 @@ export function removeOneOrderLine(edits: OrderEdits, refId: string): OrderEdits
   return same.qty > 1
     ? {...edits, added: edits.added.map((l) => (l === same ? {...l, qty: l.qty - 1} : l))}
     : {...edits, added: edits.added.filter((l) => l !== same)};
+}
+
+// ---------------------------------------------------------------- 仕切り計算表の切って使う部材
+
+/** 仕切り計算表で、発注書の本数で数える部材（1本の長さのある部材）。rowIds＝その見積書の行（箇所の行の金額には入れない）、lines＝発注する行、amount＝その金額（仕切価格×本数） */
+export type ShikiriBars = {rowIds: Set<string>; lines: OrderLine[]; amount: number};
+
+/**
+ * 仕切り計算表の、切って使う部材（手すり BD-134・ベースプレートなど1本の長さのある部材）の数と金額：発注書と同じ本数
+ * （箇所をまたいで使う長さを合算した 4000mm・2000mm の本数、余りが少ないときの1本、発注書で直した数・消した行も）。
+ * ユーザーの指示「仕切り計算票では、部材が0.6本などの計算になっているが、1本まるまる送るようになるため、1本単位でお願いします」
+ * 「合算して1本となる。0.3本が2箇所でも1本」・答え「発注書と同じ本数」2026-11-12（前は見積書と同じ 0.6本×仕切価格）。
+ * 発注書で足した行（見積書にない部材）は入れない。金額は1行ずつ1円単位に四捨五入（箇所の行と同じ）
+ */
+export function shikiriBars(job: Pick<Job, 'places'> & {order?: OrderEdits | null}, materials: Material[], rates: EstimateRates): ShikiriBars {
+  const base = orderBaseLines(job, materials, rates).filter((l) => l.lengthMm > 0);
+  const rowIds = new Set(base.flatMap((l) => l.src ?? []));
+  const edits = job.order ? {...job.order, added: []} : null;
+  const lines = orderedLines(applyOrderEdits(base, edits));
+  const amount = lines.reduce((n, l) => n + roundYen(l.price * l.qty), 0);
+  return {rowIds, lines, amount};
 }
 
 /** どこで使うか（写真番号）：「①③」。発注書の画面と印刷に出す */

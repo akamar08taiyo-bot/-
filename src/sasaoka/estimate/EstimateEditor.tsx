@@ -364,7 +364,7 @@ export function EstimateEditor({
       />
 
       {fixPrices && <ShikiriPriceDialog job={job} materials={data.materials} setJob={setJob} update={update} onClose={() => setFixPrices(false)} />}
-      {uriageOpen && <UriageDialog job={job} s={s} setJob={setJob} onClose={() => setUriageOpen(false)} />}
+      {uriageOpen && <UriageDialog job={job} s={s} materials={data.materials} setJob={setJob} onClose={() => setUriageOpen(false)} />}
       {picker && pickPlace && picker.kind === 'material' && (
         <MaterialPicker
           place={pickPlace}

@@ -1,5 +1,6 @@
 import {useMemo} from 'react';
 import {hasEstimateRows, jobName, monthSummary, sortJobs} from '../calc.ts';
+import {shikiriBars} from '../order.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {withBillMonth} from '../salesPlan.ts';
 import {addSamples, hasSamples} from '../samples.ts';
@@ -57,8 +58,10 @@ export function JobsPage({
   // 「☑︎して次月に回せるようにもする」2026-10-25）。部材代などの内訳は様邸を開いた画面と印刷に
   const listed = useMemo(() => sortJobs(data.jobs.filter((j) => j.month === month && (j.shikiri || hasEstimateRows(j)))), [data.jobs, month]);
   const jobs = useMemo(() => listed.filter((j) => j.shikiri), [listed]);
-  const summary = useMemo(() => monthSummary(jobs, data.settings), [jobs, data.settings]);
-  const totalsOf = useMemo(() => new Map(monthSummary(listed, data.settings).rows.map((r) => [r.job.id, r.totals])), [listed, data.settings]);
+  // 切って使う部材は発注書の本数（仕切り計算表と同じ。order.ts の shikiriBars）
+  const barsOf = useMemo(() => (j: Job) => shikiriBars(j, data.materials, data.settings), [data.materials, data.settings]);
+  const summary = useMemo(() => monthSummary(jobs, data.settings, barsOf), [jobs, data.settings, barsOf]);
+  const totalsOf = useMemo(() => new Map(monthSummary(listed, data.settings, barsOf).rows.map((r) => [r.job.id, r.totals])), [listed, data.settings, barsOf]);
   const monthly = data.settings.invoiceTaxMode === 'monthly';
   const unchecked = listed.filter((j) => !j.shikiri);
   const setShikiri = (id: string, shikiri: boolean) => update('jobs', (list) => list.map((j) => (j.id === id ? {...j, shikiri, updatedAt: Date.now()} : j)));

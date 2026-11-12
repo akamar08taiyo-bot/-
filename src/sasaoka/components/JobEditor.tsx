@@ -1,13 +1,15 @@
-import {useEffect, useLayoutEffect, useRef, useState} from 'react';
-import {cutToLength, jobName, jobTotals, placeTotals, rowAmount, taxFormula} from '../calc.ts';
+import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
+import {cutToLength, jobName, jobTotals, placeTotals, roundYen, rowAmount, taxFormula} from '../calc.ts';
 import type {JobTotals} from '../calc.ts';
 import {cutCalc, offEstimate} from '../estimateForms.ts';
+import {photoLabel, shikiriBars} from '../order.ts';
+import type {ShikiriBars} from '../order.ts';
 import type {PrintRequest} from '../print/PrintView.tsx';
 import {addMaterial, changeRowQty, copyRows, kitFromRows, laborForText, laborOwner, manualRow, newPlace as makePlace, removeOneMaterial} from '../rows.ts';
 import {withBillMonth} from '../salesPlan.ts';
 import type {AppData, Job, Kit, Material, NameSuffix, Place, Row, Settings} from '../types.ts';
 import type {Update} from '../useStore.ts';
-import {staffFull, uid, yen} from '../util.ts';
+import {num, staffFull, uid, yen} from '../util.ts';
 import {copyJob, LaborPickerFor} from './JobTools.tsx';
 import {KitPicker} from './Kits.tsx';
 import {MaterialPicker} from './Pickers.tsx';
@@ -61,7 +63,9 @@ export function JobEditor({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const totals = jobTotals(job, s);
+  // 切って使う部材は発注書と同じ本数（1本単位。order.ts の shikiriBars。ユーザーの指示「1本まるまる送るようになるため、1本単位で」2026-11-12）
+  const bars = useMemo(() => shikiriBars(job, data.materials, s), [job, data.materials, s]);
+  const totals = jobTotals(job, s, bars);
 
   const setJob = (fn: (j: Job) => Job) =>
     update('jobs', (list) => list.map((j) => (j.id === job.id ? {...fn(j), updatedAt: Date.now()} : j)));
@@ -263,8 +267,10 @@ export function JobEditor({
               onPickKit={() => setPicker({placeId: place.id, kind: 'kit'})}
               onSaveKit={() => saveKit(place)}
               onAddBlank={(kind) => addBlank(place, kind)}
+              barRows={bars.rowIds}
             />
           ))}
+          <BarsCard bars={bars} />
 
           <section className="rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50/40 p-4">
             <div className="mb-2 text-sm font-bold text-emerald-800">
@@ -380,7 +386,9 @@ function PlaceCard({
   onPickKit,
   onSaveKit,
   onAddBlank,
+  barRows,
 }: {
+  barRows: Set<string>; // 発注書の本数で数える部材の行（金額は下の「切って使う部材」に）
   place: Place;
   first: boolean;
   last: boolean;
@@ -397,7 +405,7 @@ function PlaceCard({
   onSaveKit: () => void;
   onAddBlank: (kind: 'material' | 'labor') => void;
 }) {
-  const t = placeTotals(place);
+  const t = placeTotals(place, barRows);
   const listId = `places-${place.id}`;
   const setRow = (id: string, patch: Partial<Row>) => onRows(place.rows.map((r) => (r.id === id ? {...r, ...patch} : r)));
   const moveRow = (i: number, d: number) => {
@@ -494,7 +502,7 @@ function PlaceCard({
                     {cutToLength(r) && <div className="mt-0.5 text-[11px] text-slate-500">{cutCalc(r)}本</div>}
                   </td>
                   <td data-cell="amount" data-label="金額" className="px-2 py-1.5 text-right font-bold tabular-nums">
-                    {yen(rowAmount(r))}
+                    {barRows.has(r.id) ? <span className="text-xs font-normal text-slate-500">1本単位（下）</span> : yen(rowAmount(r))}
                   </td>
                   <td data-cell="ops" className="whitespace-nowrap px-1 py-1.5 text-right">
                     <button type="button" onClick={() => moveRow(i, -1)} disabled={i === 0} className="rounded px-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30" title="上へ">
@@ -542,6 +550,62 @@ function PlaceCard({
           </Btn>
         )}
         {place.rows.length === 0 && <span className="text-xs text-slate-500">部材リストから部材を選び、取付手間を数えます。</span>}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * 切って使う部材（1本の長さのある部材）：発注書と同じ本数（箇所をまたいで合算した 4000mm・2000mm の本数）×仕切価格。
+ * 箇所の表の行は使う長さ（0.6本）だけ出して、金額はここ（ユーザーの指示「1本単位でお願いします」「0.3本が2箇所でも1本」2026-11-12）
+ */
+function BarsCard({bars}: {bars: ShikiriBars}) {
+  if (bars.rowIds.size === 0) return null;
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white shadow-sm" data-shikiri-bars>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-white px-4 py-2.5">
+        <span className="font-bold text-[#0c315e]">切って使う部材（1本単位・発注書と同じ本数）</span>
+        <span className="ml-auto text-sm tabular-nums text-slate-600">
+          部材 <b className="text-base text-slate-900">{yen(bars.amount)}円</b>
+        </span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="rows-table w-full min-w-[640px] text-sm">
+          <thead className="text-xs text-slate-500">
+            <tr>
+              <th className="px-2 py-1.5 text-left">品名</th>
+              <th className="w-20 px-2 py-1.5 text-center">写真番号</th>
+              <th className="w-28 px-2 py-1.5 text-right">単価</th>
+              <th className="w-20 px-2 py-1.5 text-center">数量</th>
+              <th className="w-28 px-2 py-1.5 text-right">金額</th>
+            </tr>
+          </thead>
+          <tbody>
+            {bars.lines.map((l) => (
+              <tr key={l.key} className="border-t border-slate-100 align-middle">
+                <td data-cell="name" className="px-2 py-1.5">
+                  <div className="font-bold text-slate-800">{l.name || l.code}</div>
+                  {(l.maker || l.code) && <div className="text-[11px] text-slate-500">{[l.maker, l.code].filter(Boolean).join('　')}</div>}
+                  {l.warn && <div className="text-xs font-bold text-amber-700">{l.warn}</div>}
+                </td>
+                <td data-cell="photo" data-label="写真番号" className="px-2 py-1.5 text-center">{photoLabel(l.photos)}</td>
+                <td data-cell="price" data-label="単価" className="px-2 py-1.5 text-right tabular-nums">{yen(l.price)}</td>
+                <td data-cell="qty" data-label="数量" className="px-2 py-1.5 text-center tabular-nums">
+                  {num(l.qty, 3)}
+                  {l.unit}
+                </td>
+                <td data-cell="amount" data-label="金額" className="px-2 py-1.5 text-right font-bold tabular-nums">{yen(roundYen(l.price * l.qty))}</td>
+              </tr>
+            ))}
+            {bars.lines.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-2 py-2 text-center text-slate-500">
+                  発注書で消してあります
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </section>
   );

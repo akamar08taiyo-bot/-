@@ -320,3 +320,41 @@ test('販売受注簿へ渡す内容（数量は1以上の整数・営業担当�
   const full = hacchuImport({...j, date: '2026-11-05', shinsei: {...NO_SHINSEI, kana: 'ヤマダ　タロウ', phone: '０９３０－００－００００', reasonName: '見本 次郎'}}, lines, e);
   assert.deepEqual([full.furigana, full.tel, full.requester, full.deliveryDate], ['ヤマダ　タロウ', '0930-00-0000', '見本 次郎', '2026-11-05']);
 });
+
+test('仕切り計算表の切って使う部材は発注書と同じ本数（箇所をまたいで合算・2000mm・発注書で直した数・消した行）。ほかの行は今までどおり', async () => {
+  // ユーザーの指示「仕切り計算票では、部材が0.6本などの計算になっているが、1本まるまる送るようになるため、1本単位でお願いします」
+  // 「合算して1本となる。0.3本が2箇所でも1本」・答え「発注書と同じ本数」2026-11-12
+  const {shikiriBars} = await import('../../src/sasaoka/order.ts');
+  const {jobTotals, placeTotals} = await import('../../src/sasaoka/calc.ts');
+  const S = {rate: 0.07, taxRate: 0.1, taxMode: 'original' as const};
+  const mats = [BD134, BD132, BRACKET];
+  // 0.3本（1200mm）が2箇所 → 合算 2400mm → 4000mm を1本（仕切価格 6,000円）。ブラケットは見積書の数のまま
+  const two = job(['廊下', [cut(BD134, 120), materialRow(BRACKET, 2)]], ['トイレ', [cut(BD134, 120)]]);
+  const b = shikiriBars(two, mats, RATE);
+  assert.deepEqual(b.lines.map((l) => [l.code, l.qty, l.price]), [['BD-134', 1, 6000]]);
+  assert.equal(b.amount, 6000);
+  assert.equal(b.rowIds.size, 2); // 手すりの2行は箇所の金額に入れない
+  assert.equal(placeTotals(two.places[0], b.rowIds).material, 1000); // 廊下はブラケット 500円×2 だけ
+  assert.equal(placeTotals(two.places[1], b.rowIds).material, 0);
+  assert.equal(jobTotals(two, S, b).material, 7000); // 6,000＋1,000（前は 0.3本×2＝0.6本 → 3,600＋1,000）
+  assert.equal(jobTotals(two, S).material, 4600); // 渡さなければ前と同じ
+  // 0.6本（2400mm）が1箇所 → 1本
+  const one = job(['廊下', [cut(BD134, 240)]]);
+  assert.equal(shikiriBars(one, mats, RATE).amount, 6000);
+  // 0.3本（1200mm）が1箇所 → 発注書は 2000mm（BD-132）を1本 → 仕切価格 3,200円
+  const short = job(['廊下', [cut(BD134, 120)]]);
+  assert.deepEqual(shikiriBars(short, mats, RATE).lines.map((l) => [l.code, l.qty, l.price]), [['BD-132', 1, 3200]]);
+  // 発注書で数を直した・消した行も同じ（足した行は入れない）
+  const base = orderBaseLines(two, mats, RATE);
+  const bar = base.find((l) => l.code === 'BD-134')!;
+  const edited = {...two, order: addOrderLine(setOrderQty(emptyOrderEdits(), bar, 2), {...materialRow(BRACKET, 3)})};
+  assert.equal(shikiriBars(edited, mats, RATE).amount, 12000);
+  assert.equal(jobTotals(edited, S, shikiriBars(edited, mats, RATE)).material, 13000); // 発注書で足したブラケットは入れない
+  const removed = {...two, order: removeOrderLine(emptyOrderEdits(), bar)};
+  assert.equal(shikiriBars(removed, mats, RATE).amount, 0);
+  assert.equal(jobTotals(removed, S, shikiriBars(removed, mats, RATE)).material, 1000);
+  // 切って使う部材がなければ何も変えない
+  const plain = job(['廊下', [materialRow(BRACKET, 2)]]);
+  assert.equal(shikiriBars(plain, mats, RATE).rowIds.size, 0);
+  assert.equal(jobTotals(plain, S, shikiriBars(plain, mats, RATE)).material, jobTotals(plain, S).material);
+});
