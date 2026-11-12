@@ -1,6 +1,6 @@
 // 久留米市の住宅改修の申請書を確かめる（2026-11-02。ユーザーの指示「その資料をもとに田川、久留米、大分、飯塚で書類の作成をお願いします」）：
 //   新規作成に「＋ 久留米市」。ほかの市の申請書の画面の久留米市にも「＋ 久留米市の書式で作る」。
-//   サンプルの様邸の工事場所を久留米市にすると「保険者を久留米市にする」→ 申請書のタブは久留米市の様式（事前承認申請書・支給申請書・平面図・工事写真）。
+//   サンプルの様邸の工事場所を久留米市にすると「保険者を久留米市にする」→ 申請書のタブは久留米市の様式（事前承認申請書・支給申請書・委任状（受領委任払用）・請求書・委任状（提出用）・平面図・完成後の状態を確認できる書類（写真））。
 //   「📗 申請書をExcelで保存」で、改修の内容の□→■と「（玄関１箇所）」、生年月日の年齢、住所（「久留米市」のうしろ）、負担割合の■、理由書作成者の「同左：■」、
 //   申請者の氏名を書かない（記入例「必ず手書き」）こと
 // usage: node e2e-kurume.mjs <サイトのURL> <出力フォルダ>
@@ -68,16 +68,20 @@ const pageOf = (name) => preview.getByRole('group', {name, exact: true});
 await pageOf('事前承認申請書').waitFor();
 await page.waitForTimeout(800);
 const pageNames = await preview.getByRole('group').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
-assert.deepEqual(pageNames.slice(0, 3), ['事前承認申請書', '支給申請書', '平面図']);
-assert.ok(pageNames.slice(3).every((n) => /^住改・写真/.test(n)), pageNames.join(','));
+assert.deepEqual(pageNames.slice(0, 6), ['事前承認申請書', '支給申請書', '委任状（受領委任払用）', '請求書', '委任状（提出用）', '平面図']);
+assert.ok(pageNames.length > 6 && pageNames.slice(6).every((n) => /^完成後の状態を確認できる書類[①-⑧]$/.test(n)), pageNames.join(','));
 const rowLabels = async () => (await form.locator(':scope > div[data-field] > div:first-child').allInnerTexts()).map((t) => t.replace(/\s*（ひらがなで入力してもカタカナになります）$/, ''));
 assert.deepEqual(await rowLabels(), ['フリガナ', '被保険者氏名', '被保険者番号', '生年月日', '郵便番号', '住所', '電話番号', '住宅の所有者', '住宅改修が必要な理由書作成者', '改修前日付・改修後日付', '改修の内容・箇所及び規模', '着工日・完成日', '改修予定費用', '負担割合', '施工業者']);
 const pv = await preview.innerText();
-for (const t of ['住宅改修事前承認申請書', '住宅改修費支給申請書', '見本町1-2-3', '太陽シルバーサービス', '（玄関１箇所']) assert.ok(pv.includes(t), `プレビューに「${t}」がない：${pv.slice(0, 1500)}`);
+for (const t of ['住宅改修事前承認申請書', '住宅改修費支給申請書', '見本町1-2-3', '太陽シルバーサービス', '（玄関１箇所', '介護保険住宅改修費受領委任払用', '介護保険 居宅介護(介護予防)住宅改修費', '久留米市提出用', '工事箇所　：　玄関']) assert.ok(pv.includes(t), `プレビューに「${t}」がない：${pv.slice(0, 1500)}`);
 await page.waitForTimeout(400);
 await page.screenshot({path: path.join(outDir, 'kurume-1-shinsei.png')});
 await pageOf('事前承認申請書').screenshot({path: path.join(outDir, 'kurume-2-jizen.png')});
 await pageOf('支給申請書').screenshot({path: path.join(outDir, 'kurume-3-shikyu.png')});
+await pageOf('委任状（受領委任払用）').screenshot({path: path.join(outDir, 'kurume-5-proxy.png')});
+await pageOf('請求書').screenshot({path: path.join(outDir, 'kurume-6-claim.png')});
+await pageOf('委任状（提出用）').screenshot({path: path.join(outDir, 'kurume-7-teisyutu.png')});
+await pageOf('完成後の状態を確認できる書類①').screenshot({path: path.join(outDir, 'kurume-8-photo.png')});
 log('久留米市の申請書のタブ（プレビュー・一覧の順番）OK');
 
 // ---------------- 入れる：フリガナ・生年月日・電話・負担割合・着工日・完成日
@@ -120,8 +124,22 @@ const b = '支給申請書';
 assert.deepEqual([text(b, 'J4'), text(b, 'J6'), text(b, 'P11'), text(b, 'AZ33'), text(b, 'AS46')], ['サンプル　ヤマダ', '（サンプル）山田', '見本町1-2-3', '■', '0942-11-2222']);
 assert.equal(text(b, 'J16'), ' ■ 手すりの取り付け');
 assert.equal(BOXES.map((c) => text(b, `${c}21`) || '_').join(''), '__12345678');
-assert.equal(sheets.size, 11);
-log('Excel（事前承認申請書・支給申請書）OK');
+// 委任状（受領委任払用）・請求書・委任状（提出用）・写真の用紙（2026-11-12 にいただいた様式）
+const p = '委任状（受領委任払用）';
+assert.match(text(p, 'X21'), /^太陽シルバーサービス.*\n所長/s);
+assert.match(text(p, 'J41'), /^[\d,]+$/); // 保険給付額（1割を選んだので）
+assert.equal(text(p, 'AD50'), '見本町1-2-3');
+const c = '請求書';
+const yen = ['N8', 'U8', 'AD8', 'AM8', 'AU8', 'BH8', 'BQ8', 'BV8', 'CG8', 'CN8', 'CV8'].map((r) => text(c, r)).join('');
+assert.equal(yen, `￥${text(p, 'J41').replace(/,/g, '')}`); // 金額のマス（頭に￥）＝委任状の保険給付額
+assert.equal(text(c, 'AF44'), '（サンプル）山田');
+assert.match(text('委任状（提出用）', 'N11'), /^太陽シルバーサービス/);
+assert.equal(text('委任状（提出用）', 'K39'), '福岡県久留米市見本町1-2-3');
+assert.match(text('完成後の状態を確認できる書類①', 'C6'), /^工事箇所　：　/);
+assert.equal(text('完成後の状態を確認できる書類①', 'C5'), '（サンプル）山田');
+assert.deepEqual([...sheets.keys()].slice(-2), ['承諾書（賃貸用）', '確約書']);
+assert.equal(sheets.size, 16);
+log('Excel（事前承認申請書・支給申請書・委任状・請求書・写真の用紙）OK');
 
 // ---------------- スマホの幅でも横にはみ出さない
 await page.setViewportSize({width: 390, height: 844});

@@ -369,8 +369,11 @@ log('Excel の写真貼付用紙に Excel の図形で入る OK');
 // ---------------- 🖨 申請書を印刷：写真の用紙の写真にも重なる
 await page.getByRole('button', {name: '🖨 申請書を印刷', exact: true}).click();
 const printPages = page.getByRole('group', {name: '印刷するページ'});
-await printPages.getByRole('checkbox').nth(3).check(); // 4枚目（写真①。名前は「写真①」など）
-const printed = page.locator('.print-overlay .shinsei-sheet').nth(3);
+// 1枚目の写真の用紙（名前は「写真①」など。行橋市は 申請書・委任状・請求書・平面図 のうしろ。様式が増えても数え直さないよう名前で探す）
+const photoPage = (await printPages.locator('label').allInnerTexts()).findIndex((t) => t.trim().startsWith('写真'));
+assert.ok(photoPage > 0, '印刷するページに写真の用紙がない');
+await printPages.getByRole('checkbox').nth(photoPage).check();
+const printed = page.locator('.print-overlay .shinsei-sheet').nth(photoPage);
 await printed.scrollIntoViewIfNeeded();
 assert.equal(await printed.locator('[data-mark]').count(), 5);
 await printed.screenshot({path: path.join(outDir, 'mark-03b-print.png')});

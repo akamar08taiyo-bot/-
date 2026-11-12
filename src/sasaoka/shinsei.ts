@@ -48,6 +48,10 @@ export type ShinseiSheet = {
   juryoNo?: string[];
   // 受領委任払い取扱事業所登録番号のマス（久留米市。左の2マスは斜線）。設定の登録番号を右に寄せて書く（8けたなら右の8マス）。入っていなければ空のまま＝手で
   entrustRegNo?: string[];
+  // 1マスに1字ずつ書くマス（久留米市の請求書の金額の11マス「百億〜円」・〒の7マス）：key の字を左から（right なら右に寄せて）。入らなければ書かない
+  digits?: {cells: string[]; key: keyof ShinseiTexts; right?: boolean}[];
+  // 書いてプレビューに出すときの決まり。ownerOther＝住宅の所有者が本人でないときだけ（福岡市の承諾書）。そうでなければ Excel に白紙のまま入る
+  when?: 'ownerOther';
   // 改修の種類ごとの行の□（北九州市の事前届出書「□手すり取付」と、その行の「□玄関・屋外　□廊下・階段…」「□洗面脱衣室　□その他（　）」）：
   // その種類の箇所があれば種類の□を■に、箇所の□を■に（一覧にない箇所は「□その他」を■にして、other の欄に名前）。detail は付帯工事の具体的な工事内容
   // detailFormat：detail の欄の書き方（{text} に内容。久留米市の「　　（　　　）」の行は「　　（{text}）」）。
@@ -70,6 +74,8 @@ export type ShinseiSheet = {
   photoPlace?: {
     photo: string;
     place?: string;
+    // 改修場所の欄の書き方（{place} に場所。久留米市の「工事箇所　：　玄関」は見出しと同じ欄に書く）。ないときは場所の名前だけ
+    placeFormat?: string;
     kind?: string;
     before?: string;
     after?: string;
@@ -195,7 +201,15 @@ export type ShinseiTexts = Record<
   | 'excludedYen'
   | 'reasonTel'
   // 大分市の改修の内容の行の改修工事施工者（せまい欄なので「株式会社」は「㈱」、営業所は次の行）
-  | 'builderShort',
+  | 'builderShort'
+  // 久留米市の委任状（提出用）の「来庁する人の氏名」＝様邸の担当、請求書の金額のマス（「￥」と数字。頭に￥＝様式の「金額の頭部には￥をお書きください」）・
+  // 請求する者（施工業者）の〒のマス（7けた）
+  | 'staff'
+  | 'claimYen'
+  | 'builderZipDigits'
+  // 行橋市の請求書（事業所が請求する）：個人負担額（改修費用−保険給付額）・総合計（改修費用）。公費負担額は保険給付額（benefitYen）
+  | 'selfYen'
+  | 'totalYen',
   string
 >;
 
@@ -229,6 +243,34 @@ const boxes = (start: string, n: number, row: number) => Array.from({length: n},
  * 久留米市の改修の内容の5つの種類（□手すりの取り付け〜□洋式便所等への便器の取替）：種類の行（J列）の□を■に、すぐ下の「（　）」の行に
  * 改修場所と箇所の数（市の記入例「（トイレ１箇所、洗面所２箇所）」）。first は「□ 手すりの取り付け」の行（事前承認申請書 13・支給申請書 16）
  */
+/**
+ * 久留米市の委任状（受領委任払用）・請求書・委任状（提出用）の欄の番地（2026-11-12）。原本のシートは特定福祉用具のアプリの久留米市の原本（市の PDF の様式から
+ * 作った同じ形のシート）を写して字を住宅改修の様式に直したもの（スキルの scripts/make_kurume_jutaku.py）なので、番地は特定福祉用具の kurumeCells.ts と同じ
+ */
+const KURUME_PROXY = {sellerAddress: 'X8', sellerTel: 'AG12', seller: 'X21', benefit: 'J41', address: 'AD50'} as const;
+const KURUME_CLAIM = {
+  amount: ['N8', 'U8', 'AD8', 'AM8', 'AU8', 'BH8', 'BQ8', 'BV8', 'CG8', 'CN8', 'CV8'], // 百億〜円の11マス
+  zip: ['X20', 'AB20', 'AG20', 'AR20', 'AW20', 'BC20', 'BI20'], // 〒の3マス・4マス
+  sellerAddress: 'V25',
+  seller: 'V31',
+  telA: 'T35',
+  telB: 'AK35',
+  telC: 'BE35',
+  name: 'AF44',
+};
+const KURUME_TEISYUTU = {visitor: 'N6', office: 'N11', sellerAddress: 'N16', sellerTel: 'N20', address: 'K39', jizen: 'L29', shikyu: 'L31'} as const;
+/**
+ * 久留米市の完成後の状態を確認できる書類（工事箇所ごとに1枚。写真番号①〜⑧は M6＝原本にない欄で、原本を作るときに工事箇所の行の右に足した）：
+ * フリガナ（D4）・被保険者氏名（C5）・被保険者番号（F4〜O4）・工事箇所（C6。見出しの「工事箇所　：」のうしろに場所）・工事の種類の□（B8）・
+ * 工事前の写真（C10:N10）・工事後（C12:N12）。写真は撮影日の入った写真（様式の注意）なので撮影日の欄はない
+ */
+const KURUME_PHOTO_SHEETS: ShinseiSheet[] = [...'①②③④⑤⑥⑦⑧'].map((n) => ({
+  sheet: `完成後の状態を確認できる書類${n}`,
+  name: 'C5',
+  insuredNo: boxes('F', 10, 4),
+  texts: [T('D4', '{kana}')],
+  photoPlace: {photo: 'M6', place: 'C6', placeFormat: '工事箇所　：　{place}', kindChecks: 'B8', before: 'C10:N10', after: 'C12:N12'},
+}));
 const KURUME_KIND_ROWS = (first: number) =>
   [0, 1, 2, 3, 4].map((i) => ({kind: `J${first + 2 * i}`, detail: `J${first + 2 * i + 1}`, detailFormat: '　　（{text}）', detailCounts: true}));
 
@@ -544,6 +586,13 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
         office: ['AB14', 'H28', 'H29', 'H30'], // 事業者の名称・受任者の所在地・名称と所長・電話
       },
       PROXY,
+      // 請求書（事業所が請求するもの。2026-11-12 にいただいた市の Excel の「請求書  (委任)」。スキルの scripts/make_added_forms.py で足した）：
+      // 事業所名・住所・代表者名（所長）・担当（様邸の担当）、請求内容（介護保険住宅改修費と被保険者氏名）、公費負担額＝保険給付額・個人負担額・総合計。日付は手で
+      {
+        sheet: '請求書',
+        texts: [T('T8', '{builder}'), T('T9', '{builderAddress}'), T('T10', '{builderRep}'), T('T11', '{staff}'), T('I21', '介護保険住宅改修費（{name}　様）'),
+          T('I23', '{benefitYen}'), T('I25', '{selfYen}'), T('I27', '{totalYen}')],
+      },
       {sheet: '平面図  (2)', name: 'C2', nameFormat: '{name}', legend: {box: 'C54:AQ68'}, plan: 'C8:AQ52'},
       ...YUKUHASHI_PHOTO_SHEETS.map((sheet) => ({sheet, ...YUKUHASHI_PHOTO})),
     ],
@@ -573,6 +622,14 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
       // フリガナ・生年月日・住所・住宅の所有者・改修費用は承認届出書を参照する式。電話番号と着工日・完成日（日付の欄）は書く
       {sheet: '住宅改修費支給申請書(受領委任払用)', name: 'J6', marks: [GENDER('AB8'), RENOVATED('X18')], texts: [T('AA10', '{phone}'), T('J16', '{start}', 'date'), T('X16', '{end}', 'date')]},
       {sheet: '住宅改修内訳明細書', kinds: KIND_ROWS},
+      // 委任状（様式第6号（第9条関係）。福祉用具購入費及び住宅改修費に係る受領委任払い用。2026-11-12 にいただいた Word の様式を
+      // スキルの scripts/make_added_forms.py でシートにして足した）：受任者（事業所）の所在地・電話番号・事業所名称及び代表者氏名、保険給付額、
+      // 委任者の住所。日付・委任者の氏名は自署（ほかの保険者の委任状と同じ）。
+      // プレビュー・印刷は内訳明細書のうしろ（Excel のシートの並びは支給申請書のうしろ）
+      {
+        sheet: '委任状',
+        texts: [T('V39', '{address}'), T('Z8', '{builderZipAddress}'), T('AF10', '{builderTel}'), T('Z17', '{builder}\n{builderRep}'), T('M29', '{benefitYen}')],
+      },
       // 下の M48:AW48 は左上にそろえて折り返す空いた欄。平面図の図は表題（A1:AZ6）と下の欄のあいだ
       {sheet: '平面図', name: 'A1', nameFormat: '{name}　邸　平面図', legend: {cell: 'M48'}, plan: 'B8:AY46'},
       ...[1, 2, 3, 4].map((n) => ({sheet: `写真 (${n})`, ...MIYAKO_PHOTO})),
@@ -709,6 +766,9 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
           T('P29', '{builderRep}'),
         ],
       },
+      // 住宅改修にかかる承諾書（参考様式。2026-11-12 にいただいた PDF をスキルの scripts/make_added_forms.py でシートにして足した）：
+      // 住宅の所有者が本人でないときだけ書いてプレビューに出す。あて先の区・申請者氏名・申請者住所。所有者の住所・氏名・連絡先と日付は所有者が書く
+      {sheet: '承諾書', when: 'ownerOther', texts: [T('D10', '{ward}'), T('P25', '{name}'), T('F29', '{address}')]},
       // 平面図は苅田町の原本と同じ（表題「（氏名）　様邸　平面図」・工事内容は下にテキストボックス）
       {sheet: '平面図', name: 'C2', nameFormat: '{name}', legend: {box: 'C54:AQ68'}, plan: 'C8:AQ52'},
       ...FUKUOKA_PHOTO_SHEETS,
@@ -832,8 +892,33 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
           T('AS46', '{phone}'), // 申請者の住所・氏名は「※本人自書」
         ],
       },
+      // 委任状（介護保険住宅改修費受領委任払用・第6号様式）：受任者（受領委任払い取扱事業者）の所在地・電話番号・名称及び代表者氏名、保険給付額、
+      // 委任者の住所（「久留米市」のうしろ）。日付・委任者の氏名は自署（ほかの保険者の委任状と同じ）
+      {
+        sheet: '委任状（受領委任払用）',
+        texts: [T(KURUME_PROXY.address, '{cityRest}'), T(KURUME_PROXY.sellerAddress, '{builderZipAddress}'), T(KURUME_PROXY.sellerTel, '{builderTel}'),
+          T(KURUME_PROXY.seller, '{builder}\n{builderRep}'), T(KURUME_PROXY.benefit, '{benefitYen}')],
+      },
+      // 請求書（第7号様式）：金額の11マス（右に寄せ、頭に￥）＝保険給付額、請求する者（施工業者）の〒・住所・氏名（法人は法人名および代表者名）・電話、
+      // 件名の被保険者氏名。日付・口座は書かない（手で）
+      {
+        sheet: '請求書',
+        digits: [{cells: KURUME_CLAIM.amount, key: 'claimYen', right: true}, {cells: KURUME_CLAIM.zip, key: 'builderZipDigits'}],
+        texts: [T(KURUME_CLAIM.sellerAddress, '{builderAddress}'), T(KURUME_CLAIM.seller, '{builder}　{builderRep}'), T(KURUME_CLAIM.telA, '{builderTelA}'),
+          T(KURUME_CLAIM.telB, '{builderTelB}'), T(KURUME_CLAIM.telC, '{builderTelC}'), T(KURUME_CLAIM.name, '{name}')],
+      },
+      // 委任状（久留米市提出用）：来庁する人の氏名（様邸の担当）・事業所名等・所在地・連絡先、委任者の住所。委任する手続きの
+      // 「住宅改修費事前承認申請」「住宅改修費支給申請」を丸で囲む。日付・委任者の氏名は自署
+      {
+        sheet: '委任状（提出用）',
+        marks: [FIXED(KURUME_TEISYUTU.jizen, ['居宅介護(介護予防)住宅改修費事前承認申請']), FIXED(KURUME_TEISYUTU.shikyu, ['居宅介護(介護予防)住宅改修費支給申請'])],
+        texts: [T(KURUME_TEISYUTU.address, '{address}'), T(KURUME_TEISYUTU.visitor, '{staff}'), T(KURUME_TEISYUTU.office, '{builder}'),
+          T(KURUME_TEISYUTU.sellerAddress, '{builderZipAddress}'), T(KURUME_TEISYUTU.sellerTel, '{builderTel}')],
+      },
       {sheet: '平面図', name: 'C2', nameFormat: '{name}', legend: {box: 'C54:AQ68'}, plan: 'C8:AQ52'},
-      ...YUKUHASHI_PHOTO_SHEETS.map((sheet) => ({sheet, ...YUKUHASHI_PHOTO})),
+      // 写真は市の「完成後の状態を確認できる書類」（工事箇所ごとに1枚。2026-11-12 にいただいた。前は行橋市の工事写真添付用紙を写していた）。
+      // 承諾書（賃貸用）・確約書（被保険者が亡くなったとき）は Excel に白紙で入れる（アプリは書かない。プレビューにも出さない）
+      ...KURUME_PHOTO_SHEETS,
     ],
   },  // 飯塚市（2026-11-02。同じ指示。いただいた事前承認願書【受領委任払用】（様式第4号）・支給申請書【受領委任払用】・写真添付用紙（事前申請用・支給申請用）・
   // 承諾書・請求書【受領委任払用】に、苅田町の原本の平面図（事前承認願書の添付書類に「□平面図」）を足した原本＝スキルの scripts/make_iizuka_jutaku.py）：
@@ -1654,6 +1739,12 @@ export function shinseiValues(job: Job, settings: EstimateSettings & BuilderSett
       excludedYen: estimated ? Math.max(0, (cost ?? totals.all.total) - totals.target.total).toLocaleString('en-US') : '',
       reasonTel: (job.riyu?.tel ?? '').normalize('NFKC').trim(),
       builderShort: [s.company?.trim().replace(/株式会社/, '㈱'), s.officeName?.trim()].filter(Boolean).join('\n'),
+      staff: job.staff.trim(),
+      claimYen: benefit > 0 ? `￥${benefit}` : '',
+      // 負担割合を選んでいないとき（保険給付額がない）は、個人負担額・総合計も書かない（公費負担額と合わない数を書かない）
+      selfYen: benefit > 0 && cost ? Math.max(0, cost - benefit).toLocaleString('en-US') : '',
+      totalYen: benefit > 0 && cost ? cost.toLocaleString('en-US') : '',
+      builderZipDigits: ((d) => (d.length === 7 ? d : ''))(t(s.postal ?? '').replace(/\D/g, '')),
     },
     cost,
     start: info.start,
@@ -1988,7 +2079,22 @@ export function shinseiCells(sheet: ShinseiSheet, v: ShinseiValues, photo = 0): 
     const pad = sheet.entrustRegNo.length - digits.length;
     sheet.entrustRegNo.forEach((ref, i) => out.set(ref, i < pad ? '' : digits[i - pad]));
   }
-  if (sheet.photoPlace?.place) out.set(sheet.photoPlace.place, (photo > 0 && v.photos[photo]) || '');
+  if (sheet.digits) {
+    // 1マスに1字ずつ（右に寄せる・左から）。マスに入らない・空なら書かない（原本のまま）
+    for (const d of sheet.digits) {
+      const chars = [...(v.texts[d.key] ?? '')];
+      if (!chars.length || chars.length > d.cells.length) continue;
+      const pad = d.right ? d.cells.length - chars.length : 0;
+      d.cells.forEach((ref, i) => out.set(ref, i >= pad && i - pad < chars.length ? chars[i - pad] : ''));
+    }
+  }
+  if (sheet.photoPlace?.place) {
+    const name = (photo > 0 && v.photos[photo]) || '';
+    const format = sheet.photoPlace.placeFormat;
+    // 書き方のある欄（久留米市の「工事箇所　：」）は、場所がなければ原本の見出しのまま
+    if (!format) out.set(sheet.photoPlace.place, name);
+    else if (name) out.set(sheet.photoPlace.place, format.replace('{place}', name));
+  }
   if (sheet.photoPlace?.kind) out.set(sheet.photoPlace.kind, photo > 0 && v.photos[photo] !== undefined ? ((v.kindTexts ?? KINDS)[(v.photoKinds?.[photo] ?? 0) - 1] ?? '') : '');
   if (sheet.legend?.cell) out.set(sheet.legend.cell, v.works.join('\n'));
   for (const [ref, value] of sheetLineCells(sheet, v).cells) out.set(ref, value);
@@ -2129,6 +2235,11 @@ export const EMPTY_SHINSEI: ShinseiValues = {
     excludedYen: '',
     reasonTel: '',
     builderShort: '',
+    staff: '',
+    claimYen: '',
+    builderZipDigits: '',
+    selfYen: '',
+    totalYen: '',
   },
   cost: null,
   start: '',
@@ -2161,12 +2272,21 @@ const slotKey = (sheet: ShinseiSheet, photo: number, slot: 'before' | 'after') =
  * 開いた原本（unzipSync したもの）のシートに転記する（Excel に保存するときと、画面のプレビューで同じ書き込みをする）。
  * ファイルの中身は置きかえるだけなので、原本を開いたものを {...files} で写してから渡せば、原本は何度でも使える
  */
+/** その様式を書いて出すか（ShinseiSheet の when）。所有者が本人でない＝本人との関係が「本人」以外、関係がなければ所有者の名前が被保険者とちがう */
+export function sheetWanted(sheet: Pick<ShinseiSheet, 'when'>, v: Pick<ShinseiValues, 'name' | 'texts'>): boolean {
+  if (sheet.when !== 'ownerOther') return true;
+  const relation = v.texts.relation.trim();
+  const owner = v.texts.owner.replace(/[\s　]/g, '');
+  return relation ? relation !== '本人' : !!owner && owner !== v.name.replace(/[\s　]/g, '');
+}
+
 export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void {
   // 写真を貼った写真番号と枠（「3:before:」。同じ番号の用紙が2枚＝広域連合なら、最初の用紙だけに貼る。福岡市は施工前・完了が別の用紙。
   // 北九州市の改修後の写真は、組のちがう内容報告書（イメージ図）と完了報告書の両方に貼る＝slotKey）
   const pasted = new Set<string>();
   const copies = formulaCopies(files);
   for (const sheet of map.sheets) {
+    if (!sheetWanted(sheet, v)) continue; // 決まりに合わない様式（所有者が本人のときの承諾書）は白紙のまま
     const photo = sheet.photoPlace ? photoNumberOf(readCell(files, sheet.sheet, sheet.photoPlace.photo)) : 0;
     const cells = shinseiCells(sheet, v, photo);
     for (const [ref, text] of photoBoxes(files, sheet, v, photo)) cells.set(ref, text);
@@ -2742,7 +2862,7 @@ function fitTexts(files: Files, sheet: ShinseiSheet, cells: Map<string, CellValu
   const path = sheetPaths(files).get(sheet.sheet);
   if (!path) return;
   // 改修の種類ごとの欄（kindCells）は packKindCells で入る大きさ・折り返しにしてあるので、ここでは縮めない（前は1行の幅で数えて「縮小して全体を表示」になった）
-  const skip = new Set([...(sheet.marks ?? []).map((m) => m.cell), ...(sheet.insuredNo ?? []), ...(sheet.entrustRegNo ?? []), ...(sheet.kindCells ?? [])]);
+  const skip = new Set([...(sheet.marks ?? []).map((m) => m.cell), ...(sheet.insuredNo ?? []), ...(sheet.entrustRegNo ?? []), ...(sheet.kindCells ?? []), ...(sheet.digits ?? []).flatMap((d) => d.cells)]);
   const oneLine = oneLineRefs(sheet);
   const byPath = new Map<string, {ref: string; text: string; oneLine: boolean}[]>();
   const add = (p: string, item: {ref: string; text: string; oneLine: boolean}) => byPath.set(p, [...(byPath.get(p) ?? []), item]);

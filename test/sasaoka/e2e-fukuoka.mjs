@@ -91,7 +91,7 @@ assert.deepEqual([text(b, 'P16'), text(b, 'V16'), text(b, 'X16'), text(b, 'P17')
 assert.match(text(b, 'P29'), /^所長　/);
 assert.match(text('写真貼付台紙（事前）', 'D6'), /■玄関・道路までの通路/);
 assert.match(text('写真貼付台紙（事前）', 'D24'), /■便所/); // 下の②トイレ
-assert.equal(sheets.size, 13);
+assert.equal(sheets.size, 14); // 承諾書（2026-11-12 に足した。所有者が本人なら白紙）も
 log('Excel（申請書・完了届出書・写真貼付台紙の改修の場所）OK');
 
 // ---------------- スマホの幅でも横にはみ出さない

@@ -60,8 +60,9 @@ test('プレビュー：保険者ごとに申請書の様式のシートを1枚�
   const forms = (insurer: Insurer) => preview(insurer).filter((p) => p.kind === 'form').map((p) => p.sheet);
   // 苅田町・行橋市は委任状も（特定福祉用具と同じ委任状。委任者の住所だけ書く。2026-10-27）
   assert.deepEqual(forms('kanda'), ['事前申請書', '委任状']);
-  assert.deepEqual(forms('yukuhashi'), ['住改・受領委任払', '委任状']);
-  assert.deepEqual(forms('miyako'), ['住宅改修承認届出書', '住宅改修費支給申請書(受領委任払用)', '住宅改修内訳明細書']);
+  // 行橋市の請求書（事業所が請求するもの）・みやこ町の委任状（受領委任払い用）は 2026-11-12 に足した
+  assert.deepEqual(forms('yukuhashi'), ['住改・受領委任払', '委任状', '請求書']);
+  assert.deepEqual(forms('miyako'), ['住宅改修承認届出書', '住宅改修費支給申請書(受領委任払用)', '住宅改修内訳明細書', '委任状']);
   assert.deepEqual(forms('kouiki'), ['様式第2号（住宅改修承認申請書）', '様式第7号（住宅改修費支給申請書（受領委任払用）', '様式第2号別紙（住宅改修内訳明細書）']);
   const [yk] = preview('yukuhashi');
   const title = yk.header?.center.map((r) => r.text).join('');
@@ -77,8 +78,8 @@ test('プレビュー：保険者ごとに申請書の様式のシートを1枚�
 test('プレビュー：様式のうしろに平面図（空いた所に工事内容）と、写真番号の箇所の写真貼付用紙（改修前・改修後の枠）', () => {
   const kinds = (insurer: Insurer, j?: Job) => preview(insurer, j).map((p) => `${p.kind}:${p.sheet}${p.photo ? `:${p.photo}` : ''}`);
   assert.deepEqual(kinds('kanda'), ['form:事前申請書', 'form:委任状', 'plan:平面図  (2)', 'photo:1 :1', 'photo:1  (3):2']);
-  assert.deepEqual(kinds('yukuhashi'), ['form:住改・受領委任払', 'form:委任状', 'plan:平面図  (2)', 'photo:住改・写真 ①:1', 'photo:住改・写真②:2']);
-  assert.deepEqual(kinds('miyako').slice(3), ['plan:平面図', 'photo:写真 (1):1', 'photo:写真 (2):2']);
+  assert.deepEqual(kinds('yukuhashi'), ['form:住改・受領委任払', 'form:委任状', 'form:請求書', 'plan:平面図  (2)', 'photo:住改・写真 ①:1', 'photo:住改・写真②:2']);
+  assert.deepEqual(kinds('miyako').slice(4), ['plan:平面図', 'photo:写真 (1):1', 'photo:写真 (2):2']);
   // 広域連合は同じ写真番号の用紙が2枚ずつ。写真を貼る最初の用紙だけ
   assert.deepEqual(kinds('kouiki').slice(3), ['plan:平面図 (2)', 'photo:写真貼付用紙:1', 'photo:写真貼付用紙 (2):2']);
   // 工事内容は申請書の改修の内容と同じ行（苅田町・行橋市・広域連合は空いた所いっぱいの文字の枠、みやこ町は平面図の下の欄 M48）

@@ -5,7 +5,7 @@
 // あわせて、押すと入れられる欄（フリガナ・生年月日…）と、押すと丸がつく値（男・女…）の位置も返す（式で同じ値を出している欄＝支給申請書の氏名なども押せる）
 
 import {strFromU8} from 'fflate';
-import {attrOf, colName, colNum, EMU, fillFiles, formulaRef, markOptions, markTexts, numOf, photoSlotEntries, placeholders, rangeBox, sheetLayout, sheetPaths, styleParts, unesc} from './shinsei.ts';
+import {attrOf, colName, colNum, EMU, fillFiles, formulaRef, markOptions, markTexts, numOf, photoSlotEntries, placeholders, rangeBox, sheetLayout, sheetPaths, sheetWanted, styleParts, unesc} from './shinsei.ts';
 import type {Files, SheetLayout, ShinseiMap, ShinseiSheet, ShinseiTexts, ShinseiValues, StyleParts} from './shinsei.ts';
 import type {ShinseiMarks} from './types.ts';
 
@@ -98,6 +98,7 @@ export type PvPage = {
  */
 const FORM_LABEL: [RegExp, string][] = [
   [/支給申請兼施工承認/, '申請書'], // 大分市の支給申請兼施工承認申請書（「承認申請書」より先に見る）
+  [/委任状（提出用）/, '委任状（提出用）'], // 久留米市は受領委任払用の委任状のほかに、来庁する人への提出用の委任状（「委任状（1）（2）」にしない）
   [/委任状/, '委任状'],
   [/承諾書/, '承諾書'],
   [/請求書/, '請求書'],
@@ -161,7 +162,7 @@ export function shinseiPreview(template: Files, map: ShinseiMap, v: ShinseiValue
     const path = paths.get(sheet.sheet);
     if (path && files[path] && template[path]) pages.push({...buildPage(files, path, template[path], sheet, links, kind, photo, range), ...(name ? {sheet: name} : {})});
   };
-  for (const sheet of map.sheets.filter(isFormSheet)) {
+  for (const sheet of map.sheets.filter((x) => isFormSheet(x) && sheetWanted(x, v))) {
     // 1枚のシートに2ページある様式（理由書）は、ページごとに1枚（名前は「住宅改修理由書（1ページ）」）
     if (sheet.pages) sheet.pages.forEach((r, i) => add(sheet, 'form', 0, rangeOf(r), `${sheet.sheet}（${i + 1}ページ）`));
     else add(sheet, 'form');
@@ -250,6 +251,12 @@ const TEXT_FIELD: Record<keyof ShinseiTexts, ShinseiField> = {
   excludedYen: 'cost',
   reasonTel: 'reason',
   builderShort: 'builder',
+  // 久留米市の委任状（提出用）の来庁する人（担当）・請求書の金額のマス（保険給付額）・〒のマス（施工業者）
+  staff: 'builder',
+  claimYen: 'burden',
+  builderZipDigits: 'builder',
+  selfYen: 'burden', // 行橋市の請求書の個人負担額・総合計
+  totalYen: 'cost',
 };
 const MARK_FIELD: Record<keyof ShinseiMarks, ShinseiField> = {gender: 'gender', era: 'birth', care: 'care', renovated: 'renovated'};
 
@@ -270,6 +277,7 @@ function fieldRefs(sheet: ShinseiSheet): {field: ShinseiField; ref: string}[] {
     if (key) out.push({field: TEXT_FIELD[key], ref: t.cell});
   }
   for (const ref of sheet.providerNo ?? []) out.push({field: 'builder', ref}); // 事業所番号のマス
+  for (const d of sheet.digits ?? []) for (const ref of d.cells) out.push({field: TEXT_FIELD[d.key], ref}); // 1字ずつのマス（久留米市の請求書の金額・〒）
   // 北九州市の事前届出書の改修の種類と箇所の□：改修の内容へ。大分市の改修の内容の行の着工予定・完成予定は着工日・完成日へ（施工者は設定の会社なので押せない）
   for (const k of sheet.kindRows ?? []) {
     for (const ref of [k.kind, ...(k.places ?? []), k.other, k.detail]) if (ref) out.push({field: 'works', ref});

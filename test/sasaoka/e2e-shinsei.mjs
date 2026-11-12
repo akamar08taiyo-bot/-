@@ -156,7 +156,7 @@ await shinseiTab.click();
 await form.waitFor();
 await preview.waitFor();
 // 申請書の様式・平面図・写真番号の箇所（玄関①・トイレ②）の写真貼付用紙
-assert.deepEqual(await pageNames(), ['住改・受領委任払', '委任状', '平面図  (2)', '住改・写真 ①', '住改・写真②']); // 委任状は特定福祉用具と同じ（2026-10-27）
+assert.deepEqual(await pageNames(), ['住改・受領委任払', '委任状', '請求書', '平面図  (2)', '住改・写真 ①', '住改・写真②']); // 委任状は特定福祉用具と同じ（2026-10-27）。請求書（事業所が請求する）は 2026-11-12 に足した
 // 一覧とプレビューは横に並ぶ（見ながら入れる）。入れ方の切り替え・欄の下に出る入れる所はない
 const formBox = await form.boundingBox();
 const previewBox = await preview.boundingBox();
@@ -266,7 +266,7 @@ assert.equal(await form.getByRole('group', {name: '性別'}).getByRole('button',
 assert.equal(await pageOf('住改・受領委任払').locator('svg ellipse').count(), 3); // 画面にも丸
 assert.equal(yk.name, '（サンプル）山田様住宅改修申請書.xlsx');
 const y = sheetsOf(yk.bytes);
-assert.equal(y.sheets.size, 14);
+assert.equal(y.sheets.size, 15); // 請求書（2026-11-12）も
 const main = y.sheets.get('住改・受領委任払');
 assert.equal(text(main, 'F5'), '（サンプル）山田');
 assert.equal(text(main, 'F11'), '福岡県行橋市中央1-1');
@@ -1224,7 +1224,7 @@ const boxes = (col, n, row) =>
   });
 await page.getByRole('combobox', {name: '保険者', exact: true}).selectOption('miyako');
 await pageOf('住宅改修承認届出書').waitFor();
-assert.deepEqual(await pageNames(), ['住宅改修承認届出書', '住宅改修費支給申請書(受領委任払用)', '住宅改修内訳明細書', '平面図', '写真 (1)', '写真 (2)']);
+assert.deepEqual(await pageNames(), ['住宅改修承認届出書', '住宅改修費支給申請書(受領委任払用)', '住宅改修内訳明細書', '委任状', '平面図', '写真 (1)', '写真 (2)']); // 委任状は 2026-11-12 に足した
 // 内訳明細書の氏名（式で承認届出書と同じ）を押しても、一覧の氏名の欄へ
 await spot('被保険者氏名', pageOf('住宅改修内訳明細書'));
 assert.equal(await focused(), '被保険者氏名');
@@ -1232,7 +1232,7 @@ assert.ok((await pageOf('住宅改修内訳明細書').innerText()).includes('�
 const my = await make(['無']);
 assert.equal(my.name, '（サンプル）山田様住宅改修申請書.xlsx');
 const m = sheetsOf(my.bytes);
-assert.equal(m.sheets.size, 12);
+assert.equal(m.sheets.size, 13); // 委任状（2026-11-12）も
 // 撮影日：みやこ町の写真の用紙は原本の「撮影日」のうしろに日付（①玄関の改修後は写真を消したので、②の改修後と同じ日）
 assert.deepEqual(
   [1, 2].flatMap((n) => [text(m.sheets.get(`写真 (${n})`), 'D7'), text(m.sheets.get(`写真 (${n})`), 'D32')]),
