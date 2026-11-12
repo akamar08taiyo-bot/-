@@ -20,8 +20,8 @@ import {bboxOf, closedShape, nearOrthoNext, pointRemoved, roomPts, shapeOf, snap
 import {shapeDef, shapeIcon, SHAPES_SHOWN, shapeToPts} from './shapes.ts';
 import type {Handle, P, Tool} from './edit.ts';
 import {MadoriPrint} from './MadoriPrint.tsx';
-import {bounds, circled, emptyMadori, NUM_SIZE, hasMadori, joLabel, lineLength, mid, MODULES, normRot, numberItems, railPts, railSegs, roomAreaOf, snapStep, withFloor} from './model.ts';
-import type {Madori, MFloor, MItem, Module} from './model.ts';
+import {bounds, circled, emptyMadori, NUM_SIZE, hasMadori, joLabel, lineLength, mid, normRot, numberItems, railPts, railSegs, roomAreaOf, snapStep, withFloor} from './model.ts';
+import type {Madori, MFloor, MItem} from './model.ts';
 import {floorSvg, patternDefs, thumbSvg, viewOf} from './render.ts';
 import {linkPlan, placeLookup, planLinked, sheetTitle} from './sheet.ts';
 
@@ -1759,22 +1759,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
             </button>
           )}
         </div>
-        <label className="flex items-center gap-1">
-          方眼
-          <select
-            value={m.module}
-            onChange={(e) => change((mm) => ({...mm, module: Number(e.target.value) as Module, updatedAt: Date.now()}))}
-            className="h-8 rounded-md border border-slate-300 bg-white px-1"
-            aria-label="方眼の1マス"
-          >
-            {MODULES.map((x) => (
-              <option key={x} value={x}>
-                {/* 1000mm の「（メーター）」は外した（上の段のまん中に「全て削除」を足したぶん、左の欄を短くして戻す・進むを段のど真ん中のままに） */}
-                {x}mm{x === 910 ? '（尺）' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/* 方眼の 910・900・1000mm を選ぶ欄は外して、右の「方眼（尺）」のオン・オフに（ユーザーの指示「尺はオンオフで良い。デフォルトは表示しない」2026-11-12） */}
         {/* 「そろえる（1マス・1/2マス・1/4マス）」の欄は外した（ユーザーの指示「2分の1なんとかかんとかって書いてあるやつ、意味がわからないので、なくして」2026-11-11）。
             そろえる幅は前に選んだまま（初めは 1/2マス。model.ts の snap） */}
         </div>
@@ -1822,6 +1807,11 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           </Btn>
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 lg:justify-self-end">
+          {/* 方眼（尺）：編集の画面のマス目を出すか（初めは出さない。そろえる幅は同じ） */}
+          <label className="flex items-center gap-1">
+            <input type="checkbox" checked={!!m.showGrid} onChange={(e) => change((mm) => ({...mm, showGrid: e.target.checked, updatedAt: Date.now()}))} className="h-4 w-4" />
+            方眼（尺）
+          </label>
           <label className="flex items-center gap-1">
             <input type="checkbox" checked={m.showDims} onChange={(e) => change((mm) => ({...mm, showDims: e.target.checked, updatedAt: Date.now()}))} className="h-4 w-4" />
             寸法
@@ -1895,8 +1885,13 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
             role="img"
           >
             <defs dangerouslySetInnerHTML={{__html: patternDefs('ed') + gridDefs}} />
-            <rect x={v.x} y={v.y} width={vw} height={vh} fill="url(#ed-g1)" />
-            <rect x={v.x} y={v.y} width={vw} height={vh} fill="url(#ed-g2)" />
+            {/* 方眼は「方眼（尺）」にチェックを入れたときだけ（初めは出さない。2026-11-12） */}
+            {m.showGrid && (
+              <>
+                <rect x={v.x} y={v.y} width={vw} height={vh} fill="url(#ed-g1)" data-grid />
+                <rect x={v.x} y={v.y} width={vw} height={vh} fill="url(#ed-g2)" data-grid />
+              </>
+            )}
             {floor.underlay && !floor.underlay.hidden && underUrl && (
               <image href={underUrl} x={floor.underlay.x} y={floor.underlay.y} width={floor.underlay.w} height={floor.underlay.h} opacity={floor.underlay.opacity} preserveAspectRatio="none" />
             )}

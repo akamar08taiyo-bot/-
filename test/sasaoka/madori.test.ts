@@ -73,6 +73,11 @@ test('読み込み：壊れた部品・知らない種類は捨て、方眼・�
   })!;
   assert.equal(m.module, 910);
   assert.equal(m.snap, 2);
+  // 方眼（尺）は初めは出さない・チェックを入れた平面図は覚える（ユーザーの指示「尺はオンオフで良い。デフォルトは表示しない」2026-11-12）
+  assert.equal(m.showGrid, undefined);
+  assert.equal(emptyMadori().showGrid, undefined);
+  assert.equal(cleanMadori({floors: [{items: []}], showGrid: true})!.showGrid, true);
+  assert.equal(cleanMadori({floors: [{items: []}], showGrid: 'yes'})!.showGrid, undefined);
   assert.equal(m.showDims, false);
   assert.equal(m.showArea, false); // 前の版の平面図（optRev なし）は、寸法・広さとも初めはオフで読む
   const kept = cleanMadori({optRev: 2, showDims: true, showArea: true, floors: [{items: []}]})!;
