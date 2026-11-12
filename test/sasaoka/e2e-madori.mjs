@@ -96,6 +96,14 @@ assert.deepEqual(roomNames, [
 // 白紙の平面図は、開いたときから洋室が選ばれている（なぞればすぐ描ける）。同じ道具をもう一度押しても外れない
 const pressed = (name) => page.getByRole('button', {name, exact: true}).first().getAttribute('aria-pressed');
 assert.equal(await pressed('洋室'), 'true');
+// 選んでいる部屋のボタンも、見た目はほかの部屋と同じ（太い枠にしない。ユーザーの指示「洋室のところだけふと丸になっているが、普通で良い」2026-11-12）
+{
+  const look = (name) => page.locator(`[data-madori-palette] button[title="${name}"]`).evaluate((e) => {
+    const c = getComputedStyle(e);
+    return [c.borderTopWidth, c.boxShadow];
+  });
+  assert.deepEqual(await look('洋室'), await look('仏間'));
+}
 await tool('和室');
 await tool('和室');
 assert.equal(await pressed('和室'), 'true');

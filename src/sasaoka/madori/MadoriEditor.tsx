@@ -39,7 +39,7 @@ const CATS: [Cat, string][] = [
   ['draw', '作図'],
 ];
 
-/** 絵のボタン（階段・間口・住設・家具。マイホームクラウドの一覧と同じく、絵の下に名前） */
+/** 絵のボタン（階段・間口・住設・家具。マイホームクラウドの一覧と同じく、絵の下に名前）。選んでいても見た目は同じ（部屋のボタンと同じ。2026-11-12） */
 function PicBtn({on, onClick, svg, label}: {on: boolean; onClick: () => void; svg: string; label: string}) {
   return (
     <button
@@ -48,7 +48,7 @@ function PicBtn({on, onClick, svg, label}: {on: boolean; onClick: () => void; sv
       aria-label={label}
       title={label}
       onClick={onClick}
-      className={`flex min-w-0 flex-col items-stretch rounded-md border bg-white p-1 text-[11px] leading-tight transition ${on ? 'border-emerald-700 ring-2 ring-emerald-500' : 'border-slate-300 hover:bg-slate-50'}`}
+      className="flex min-w-0 flex-col items-stretch rounded-md border border-slate-300 bg-white p-1 text-[11px] leading-tight transition hover:bg-slate-50"
     >
       <span className="block h-14 max-lg:h-11 [&>svg]:h-full [&>svg]:w-full" aria-hidden dangerouslySetInnerHTML={{__html: svg}} />
       <span className="mt-0.5 truncate rounded bg-slate-100 px-0.5 py-0.5 text-center text-slate-700">{label}</span>
@@ -117,15 +117,18 @@ const KIND_LABEL: Record<MItem['kind'], string> = {
   shape: '図形',
 };
 
-/** 道具のボタン（選んでいる道具は濃い枠） */
-function ToolBtn({on, onClick, children, className = '', title}: {on: boolean; onClick: () => void; children: ReactNode; className?: string; title?: string}) {
+/**
+ * 道具のボタン。左の一覧の部屋・作図の道具は、選んでいても見た目はほかと同じ（ユーザーの指示「洋室のところだけふと丸になっているが、普通で良い」2026-11-12。
+ * 選んでいる道具は方眼の左上の「洋室：ドラッグで四角…」で分かる）。濃い枠は strong（「↖ 選ぶ・動かす」）だけ
+ */
+function ToolBtn({on, onClick, children, className = '', title, strong}: {on: boolean; onClick: () => void; children: ReactNode; className?: string; title?: string; strong?: boolean}) {
   return (
     <button
       type="button"
       title={title}
       aria-pressed={on}
       onClick={onClick}
-      className={`min-h-10 rounded-md border px-1.5 py-1 text-center text-[13px] leading-tight whitespace-pre-line transition ${on ? 'border-emerald-700 ring-2 ring-emerald-500' : 'hover:brightness-95'} ${className}`}
+      className={`min-h-10 rounded-md border px-1.5 py-1 text-center text-[13px] leading-tight whitespace-pre-line transition ${on && strong ? 'border-emerald-700 ring-2 ring-emerald-500' : 'hover:brightness-95'} ${className}`}
     >
       {children}
     </button>
@@ -983,6 +986,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     // 携帯・タブレット（方眼の上に出すとき）は気持ち小さく・低く（ユーザーの指示「和室、洋室などの部分を気持ち小さくして、上にコンパクトに寄せる」2026-11-11）
     <div className="flex min-h-0 flex-col gap-2 max-lg:gap-1">
       <ToolBtn
+        strong
         on={tool.t === 'select' && !delMode}
         onClick={() => {
           setDelMode(false);
