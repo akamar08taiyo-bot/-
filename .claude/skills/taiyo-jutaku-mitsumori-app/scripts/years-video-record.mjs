@@ -308,7 +308,7 @@ await typeIn(cost, '100000', 150);
 await page.keyboard.press('Tab');
 await wait(1000);
 // 施工業者（元請け）：イヤーズは下請けなので、申請書の施工業者は元請け（ユーザーの指示「元請けの業者の名前をリストから選んで、入れる…
-// リストも1回登録したら、もうあとはプルダウンから選べるだけ」2026-11-12）。見本は言われたとおり「太陽シルバーサービス・行橋営業所」（電話は 0 だけ・所在地は町名まで）
+// リストも1回登録したら、もうあとはプルダウンから選べるだけ」2026-11-12）。見本はユーザーの答え「見本は太陽シルバーサービス、福岡西営業所でよいです」（所在地は郵便番号から出る町名まで・電話は入れない＝092 の 0 だけは 0920 の形になる）
 {
   const row = form.locator('[data-field="builder"]');
   await row.scrollIntoViewIfNeeded();
@@ -316,11 +316,11 @@ await wait(1000);
   await cap('', '施工業者（元請け）：イヤーズは下請けなので、申請書には元請けの会社を書きます', '「＋ 元請けを追加」で1回だけ登録します');
   await tap(row.getByRole('button', {name: '＋ 元請けを追加'}), 800);
   await typeIn(row.getByLabel('元請けの会社名'), '太陽シルバーサービス株式会社', 110);
-  await typeIn(row.getByLabel('元請けの営業所名'), '行橋営業所', 130);
+  await typeIn(row.getByLabel('元請けの営業所名'), '福岡西営業所', 130);
   await cap('', '郵便番号を入れると、所在地も自動で入ります', '', 3200);
-  await typeIn(row.getByLabel('元請けの郵便番号'), '8240043', 150);
+  await typeIn(row.getByLabel('元請けの郵便番号'), '8140032', 150);
   await wait(900);
-  await typeIn(row.getByLabel('元請けの電話番号'), '0930000000', 110);
+  await mark(row.getByLabel('元請けの所在地'), 1600);
   await tap(row.getByRole('button', {name: '追加する'}), 1500);
   // プレビューの「改修施工者」の欄（様式第21号）
   await page.evaluate(() => {
