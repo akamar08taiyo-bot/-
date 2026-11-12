@@ -34,13 +34,15 @@ export const TONE: Record<ToneKey, {key: ToneKey; cls: string; fill: string; lin
   out: {key: 'out', cls: 'bg-slate-50 border-slate-300', fill: '#f2f4f7', line: '#b3bfcd'},
 };
 
-export type RoomType = {name: string; finish: Finish; size: [number, number]; tone: (typeof TONE)[ToneKey]; row?: number; hidden?: boolean};
+export type RoomType = {name: string; finish: Finish; size: [number, number]; tone: (typeof TONE)[ToneKey]; row?: number; hidden?: boolean; full?: string}; // full＝略称（K など）の言葉（ボタンにマウスを乗せると出す）
 
 /**
  * 部屋の種類（size は方眼の何マス×何マス。0.5 は半マス）。row は一覧の段（ユーザーの指示「和室、洋室、仏間、寝室、床の間、広縁／
  * 廊下、リビング、キッチン、ダイニングキッチン、リビングダイニングキッチン／トイレ、浴室、洗面脱衣室、洗面所、脱衣室／
  * ポーチ、玄関、土間、ベランダ、駐車場、テラス の順番に並べる」2026-11-10。そのうしろに道路＝「箇所の中に道路もいれる」2026-11-11）。一覧になかった応接間・収納は1段目、リビングダイニング・ダイニングは
- * 2段目の終わりに残した（「応接間をいれる」「LDもつくる」と言われたもの）。前の LDK・LD・D・K・L は名前を言葉にした（前に描いた部屋は hidden の種類でそのまま出る）。
+ * 2段目の終わりに残した（「応接間をいれる」「LDもつくる」と言われたもの）。
+ * リビング・キッチン…は英語の略称（L・K・DK・LDK・LD・D）に戻した（ユーザーの指示「キッチン、リビングダイニングキッチンは K、L、D、DK、LDK みたいな形で、略称、英語の略称で、に戻してください」
+ * 2026-11-12。11-10 の並べ替えで言葉にしていた。DK は新しく足した）。言葉の名前で描いた部屋は、読み込むときに略称にする（`ROOM_ABBR`・model.ts の cleanMadori）。
  * hidden は一覧に出さない前の種類（前に描いた部屋の色・柄はそのまま）
  */
 export const ROOM_TYPES: RoomType[] = [
@@ -53,12 +55,12 @@ export const ROOM_TYPES: RoomType[] = [
   {name: '応接間', finish: 'floor', size: [3, 4], tone: TONE.live, row: 1}, // ユーザーの指示「応接間をいれる」2026-11-10
   {name: '収納', finish: 'plain', size: [1, 1], tone: TONE.store, row: 1},
   {name: '廊下', finish: 'floor', size: [1, 3], tone: TONE.hall, row: 2},
-  {name: 'リビング', finish: 'floor', size: [3, 3], tone: TONE.live, row: 2},
-  {name: 'キッチン', finish: 'floor', size: [2, 3], tone: TONE.live, row: 2},
-  {name: 'ダイニングキッチン', finish: 'floor', size: [3, 3], tone: TONE.live, row: 2},
-  {name: 'リビングダイニングキッチン', finish: 'floor', size: [4, 4], tone: TONE.live, row: 2},
-  {name: 'リビングダイニング', finish: 'floor', size: [4, 3], tone: TONE.live, row: 2}, // 前の LD（ユーザーの指示「LDもつくる」2026-11-10）
-  {name: 'ダイニング', finish: 'floor', size: [3, 3], tone: TONE.live, row: 2},
+  {name: 'L', full: 'リビング', finish: 'floor', size: [3, 3], tone: TONE.live, row: 2},
+  {name: 'K', full: 'キッチン', finish: 'floor', size: [2, 3], tone: TONE.live, row: 2},
+  {name: 'DK', full: 'ダイニングキッチン', finish: 'floor', size: [3, 3], tone: TONE.live, row: 2},
+  {name: 'LDK', full: 'リビングダイニングキッチン', finish: 'floor', size: [4, 4], tone: TONE.live, row: 2},
+  {name: 'LD', full: 'リビングダイニング', finish: 'floor', size: [4, 3], tone: TONE.live, row: 2}, // ユーザーの指示「LDもつくる」2026-11-10
+  {name: 'D', full: 'ダイニング', finish: 'floor', size: [3, 3], tone: TONE.live, row: 2},
   {name: 'トイレ', finish: 'floor', size: [1, 1.5], tone: TONE.water, row: 3},
   {name: '浴室', finish: 'tile', size: [2, 2], tone: TONE.water, row: 3},
   {name: '洗面脱衣室', finish: 'floor', size: [2, 2], tone: TONE.water, row: 3},
@@ -71,12 +73,6 @@ export const ROOM_TYPES: RoomType[] = [
   {name: '駐車場', finish: 'doma', size: [3, 6], tone: TONE.out, row: 4},
   {name: 'テラス', finish: 'tile', size: [3, 1], tone: TONE.out, row: 4},
   {name: '道路', finish: 'doma', size: [8, 4], tone: TONE.out, row: 4}, // ユーザーの指示「箇所の中に道路もいれる」2026-11-11（玄関～道路の手すり・スロープの位置を描くため。幅4マス＝約3.6m）
-  // 一覧に出さない前の種類（2026-11-10 の朝の一覧の LDK・LD・D・K・L。前に描いた部屋のため）
-  {name: 'LDK', finish: 'floor', size: [4, 4], tone: TONE.live, hidden: true},
-  {name: 'LD', finish: 'floor', size: [4, 3], tone: TONE.live, hidden: true},
-  {name: 'D', finish: 'floor', size: [3, 3], tone: TONE.live, hidden: true},
-  {name: 'K', finish: 'floor', size: [2, 3], tone: TONE.live, hidden: true},
-  {name: 'L', finish: 'floor', size: [3, 3], tone: TONE.live, hidden: true},
   // 一覧に出さない前の種類（2026-11-09 の一覧。前に描いた部屋のため）
   {name: 'シューズクローク', finish: 'floor', size: [1, 1], tone: TONE.entry, hidden: true},
   {name: '主寝室', finish: 'floor', size: [4, 4], tone: TONE.live, hidden: true},
@@ -95,6 +91,8 @@ export const ROOM_TYPES: RoomType[] = [
   {name: '屋外', finish: 'outside', size: [3, 2], tone: TONE.out, hidden: true},
 ];
 /** 一覧に出す部屋（段ごと） */
+/** 11-10〜11-12 に言葉の名前で描いた部屋の種類 → 略称（読み込むときに直す。model.ts の cleanMadori） */
+export const ROOM_ABBR: Record<string, string> = Object.fromEntries(ROOM_TYPES.filter((t) => t.full).map((t) => [t.full!, t.name]));
 export const ROOM_ROWS: RoomType[][] = [...new Set(ROOM_TYPES.map((t) => t.row).filter((r): r is number => !!r))].sort((a, b) => a - b).map((r) => ROOM_TYPES.filter((t) => t.row === r));
 export const roomType = (name?: string) => ROOM_TYPES.find((r) => r.name === name);
 /** 種類のない部屋（名前だけ打った部屋）は柄なし。前の版の名前（風呂）も読む */
@@ -106,7 +104,7 @@ export const roomColor = (type?: string): {key: ToneKey | 'base'; fill: string; 
 };
 
 /** 一覧のボタンに出す短い名前（マイホームクラウドと同じく、長い名前は小さく2行） */
-export const ROOM_SHORT: Record<string, string> = {ダイニングキッチン: 'ダイニング\nキッチン', リビングダイニングキッチン: 'リビング\nダイニング\nキッチン', リビングダイニング: 'リビング\nダイニング', シューズクローク: 'シューズ\nクローク', ファミリールーム: 'ファミリー\nルーム', 洗面脱衣室: '洗面\n脱衣室', シャワールーム: 'シャワー\nルーム', ユーティリティ: 'ユーティ\nリティ', ウォークインクローゼット: 'ウォークイン\nクローゼット', 小屋裏収納: '小屋裏\n収納'};
+export const ROOM_SHORT: Record<string, string> = {シューズクローク: 'シューズ\nクローク', ファミリールーム: 'ファミリー\nルーム', 洗面脱衣室: '洗面\n脱衣室', シャワールーム: 'シャワー\nルーム', ユーティリティ: 'ユーティ\nリティ', ウォークインクローゼット: 'ウォークイン\nクローゼット', 小屋裏収納: '小屋裏\n収納'};
 
 /** 間口の建具（w＝開口の幅 mm。マイホームクラウドの「開口」と同じ並び。ユーザーの指示「間口を選択したら」2026-11-10） */
 export const DOOR_TYPES: {name: string; w: number}[] = [

@@ -9,6 +9,7 @@ import {copied, fixInRoom, floorArea, hitTest, makeItem, moved, nudged, placeFix
 import {bounds, cleanMadori, emptyMadori, hasMadori, legendLines, legendText, numberItems, roomArea} from '../../src/sasaoka/madori/model.ts';
 import type {Madori, MItem} from '../../src/sasaoka/madori/model.ts';
 import {floorSvg} from '../../src/sasaoka/madori/render.ts';
+import {ROOM_ROWS, ROOM_TYPES} from '../../src/sasaoka/madori/catalog.ts';
 import {floorLegend, pageSvg, planSvg, sheetLayout, sheetLegend, sheetText, sheetTitle, sheetWorks} from '../../src/sasaoka/madori/sheet.ts';
 import {madoriXlsx} from '../../src/sasaoka/madori/xlsx.ts';
 import type {Job} from '../../src/sasaoka/types.ts';
@@ -276,6 +277,18 @@ test('向きを 360° 自由に：↻ をドラッグした角度（0・90・180
   const b1 = bounds(big);
   assert.ok(big.w > 400 && big.h > 700, JSON.stringify(big));
   assert.ok(Math.abs(b1.w - (b0.w + 100)) < 15 && Math.abs(b1.h - (b0.h + 100)) < 15, JSON.stringify([b0, b1]));
+});
+
+test('部屋の一覧の2段目は英語の略称（廊下・L・K・DK・LDK・LD・D）。言葉の名前で描いた部屋は読み込むと略称に（名前を打った部屋の名前はそのまま）', () => {
+  // ユーザーの指示「キッチン、リビングダイニングキッチンは K、L、D、DK、LDK みたいな形で、略称、英語の略称で、に戻してください」2026-11-12
+  assert.deepEqual(ROOM_ROWS[1].map((r) => r.name), ['廊下', 'L', 'K', 'DK', 'LDK', 'LD', 'D']);
+  assert.equal(ROOM_TYPES.find((r) => r.name === 'LDK')?.full, 'リビングダイニングキッチン');
+  const old = cleanMadori({module: 910, floors: [{id: 'f', name: '1階', items: [
+    {id: 'a', kind: 'room', type: 'リビングダイニングキッチン', x: 0, y: 0, w: 3640, h: 3640},
+    {id: 'b', kind: 'room', type: 'キッチン', label: '台所', x: 0, y: 0, w: 1820, h: 2730},
+    {id: 'c', kind: 'fix', type: 'I型キッチン', x: 0, y: 0, w: 2550, h: 650},
+  ]}]})!;
+  assert.deepEqual(old.floors[0].items.map((it) => [it.type, it.label]), [['LDK', undefined], ['K', '台所'], ['I型キッチン', undefined]]);
 });
 
 test('床面積：屋外・バルコニーと、ほかの部屋の中に描いた部屋は数えない', () => {

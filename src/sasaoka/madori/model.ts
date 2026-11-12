@@ -3,6 +3,7 @@
 // 赤い手すりの線と①②・右の「① L＝600mm」の一覧）と同じものを、方眼の上で部品を置いて作る。
 // 長さはすべて mm。位置は図の左上を 0。部品は階（1階・2階…）ごとに持つ。
 
+import {ROOM_ABBR} from './catalog.ts';
 import {polyArea, shapeOf} from './poly.ts';
 import {isLineShapeType} from './shapes.ts';
 import type {Pt} from './poly.ts';
@@ -333,6 +334,7 @@ export function cleanMadori(raw: unknown): Madori | undefined {
       const free = it.kind === 'fix' || it.kind === 'step' || it.kind === 'stair' || it.kind === 'shape';
       if (free ? normRot(num(it.rot)) !== 0 : [90, 180, 270].includes(num(it.rot))) o.rot = free ? normRot(num(it.rot)) : num(it.rot);
       for (const k of ['type', 'label', 'place', 'note'] as const) if (str(it[k])) o[k] = str(it[k]);
+      if (o.kind === 'room' && o.type && ROOM_ABBR[o.type]) o.type = ROOM_ABBR[o.type]; // リビング → L など（2026-11-12 に略称へ戻した）
       for (const k of ['n', 'len', 'size'] as const) if (num(it[k]) > 0) o[k] = num(it[k]);
       if (it.flip === true) o.flip = true;
       if (it.turn === 1 || it.turn === -1) o.turn = it.turn;

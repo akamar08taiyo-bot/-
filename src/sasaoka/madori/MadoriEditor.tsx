@@ -1047,7 +1047,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
                 onClick={() => pick({t: 'room', type: r.name})}
                 // 1行が5字をこえる名前（ウォークイン・クローゼット）は字を小さく（ボタンの中で折れて3行になった）
                 className={`${r.tone.cls} max-lg:min-h-8 max-lg:py-0.5 max-lg:text-[12px] ${Math.max(...(ROOM_SHORT[r.name] ?? r.name).split('\n').map((l) => l.length)) > 4 ? '!px-0.5 !text-[11px]' : ''}`}
-                title={r.name}
+                title={r.full ? `${r.name}（${r.full}）` : r.name}
               >
                 {ROOM_SHORT[r.name] ?? r.name}
               </ToolBtn>
@@ -1204,7 +1204,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
             <select value={it.type ?? ''} onChange={(e) => setItem(it.id, {type: e.target.value})} className="mt-0.5 h-9 w-full rounded-md border border-slate-300 bg-white px-2" aria-label="部屋の種類">
               {ROOM_TYPES.map((r) => (
                 <option key={r.name} value={r.name}>
-                  {r.name}
+                  {r.full ? `${r.name}（${r.full}）` : r.name}
                 </option>
               ))}
             </select>
