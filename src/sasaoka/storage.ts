@@ -467,11 +467,12 @@ function cleanShinsei(raw: unknown, legacyMarks: unknown): ShinseiInfo {
   return out;
 }
 
-/** 売上伝票の顧客区分・請求区分（uriage.ts）。知らない値は捨てる */
+/** 売上伝票の顧客区分・請求区分・手で入れた仕切り金額（uriage.ts）。知らない値は捨てる */
 function cleanUriage(u: Record<string, unknown>): NonNullable<Job['uriage']> {
   return {
     ...(u.customer === 'new' || u.customer === 'existing' ? {customer: u.customer} : {}),
     ...(u.billing === 'receipt' || u.billing === 'reimbursement' ? {billing: u.billing} : {}),
+    ...(typeof u.cost === 'number' && Number.isFinite(u.cost) && u.cost > 0 ? {cost: Math.round(u.cost)} : {}),
   };
 }
 

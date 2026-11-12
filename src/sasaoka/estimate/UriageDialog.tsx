@@ -99,6 +99,26 @@ export function UriageDialog({job, s, setJob, onClose}: {job: Job; s: Settings; 
           ),
           a.total <= 0,
         )}
+        {/* 仕切り金額（工務店に払う額・税込）は手で入れる。自動では入れない（ユーザーの指示「ここは自動で入れない」
+            「工事金額の仕切り金額を入力できる部分も作成する」2026-11-12）。空なら売上伝票の仕切りの欄も空 */}
+        {row(
+          '仕切り金額',
+          <label className="flex items-center gap-1.5">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={job.uriage?.cost ? String(job.uriage.cost) : ''}
+              onChange={(e) => {
+                const n = Number(e.target.value.normalize('NFKC').replace(/[^0-9]/g, ''));
+                setUriage({cost: n > 0 ? n : undefined});
+              }}
+              placeholder="仕切り（税込）"
+              aria-label="伝票の仕切り金額"
+              className="h-9 w-36 rounded-md border border-slate-300 bg-white px-2 text-right text-sm tabular-nums"
+            />
+            円（税込）
+          </label>,
+        )}
         {row(
           '負担割合',
           <Circles label="伝票の負担割合" options={['1割', '2割', '3割']} value={si.burden ? `${si.burden}割` : ''} onPick={(v) => setInfo({burden: (v ? v[0] : '') as ShinseiInfo['burden']})} />,

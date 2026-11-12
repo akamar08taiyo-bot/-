@@ -227,7 +227,9 @@ export type Job = {
   // 売上見込みの月 'YYYY-MM'（「📈 売上見込みを確認する」で次月に回したとき。なければ請求する月 month。salesPlan.ts）
   salesMonth?: string;
   // 売上伝票発行依頼書（「🧾 売上伝票依頼書」の窓。uriage.ts）で選んだ顧客区分・請求区分。次に出すときに選び直さなくてよいように覚える。複製では引き継がない
-  uriage?: {customer?: 'new' | 'existing'; billing?: 'receipt' | 'reimbursement'};
+  // cost は窓で手で入れる仕切り金額（工務店に払う額・税込）。自動では入れない（ユーザーの指示「ここは自動で入れない」
+  // 「工事金額の仕切り金額を入力できる部分も作成する」2026-11-12）。売上伝票の仕切りの欄に入る
+  uriage?: {customer?: 'new' | 'existing'; billing?: 'receipt' | 'reimbursement'; cost?: number};
   // 見積書の明細の下に介護保険の内訳（介護保険の対象・利用者負担＝赤字・保険者負担）を書くか（「自己負担額を表示」。careLines.ts）。
   // 空なら書く・false なら書かない（特定福祉用具の販売見積書と同じ。ユーザーの指示「工事見積書にも販売見積書と同様に記載する」2026-10-28）。複製では引き継ぐ
   showSelfPay?: boolean;

@@ -62,7 +62,8 @@ try {
     // サンプル：見積書の合計 26,950円（e2e-estimate.mjs）
     const detail = await dialog.getByRole('group', {name: '売上伝票に入れる内容'}).innerText();
     assert.match(detail, /住宅改修工事 [\d,]+円（税込）/); // 金額は売上伝票の欄で確かめる
-    assert.doesNotMatch(detail, /仕切り/); // 仕切りは売上伝票に入れない（ユーザーの指示「ここは自動で入れない」2026-11-12）
+    assert.doesNotMatch(detail, /仕切り [\d,]+円/); // 仕切りは自動で入れない（ユーザーの指示「ここは自動で入れない」2026-11-12）
+    assert.equal(await dialog.getByLabel('伝票の仕切り金額').inputValue(), '');
     await page.screenshot({path: `${outDir}/uriage-01-dialog-missing-${tag}.png`});
     await dialog.getByRole('group', {name: '伝票の負担割合'}).getByRole('button', {name: '1割'}).click();
     await dialog.getByLabel('伝票の介護度').selectOption('要介護1');
@@ -109,13 +110,25 @@ try {
     assert.equal(await dialog.getByRole('group', {name: '伝票の負担割合'}).getByRole('button', {name: '1割'}).getAttribute('aria-pressed'), 'true');
     await dialog.getByLabel('生活保護（自己負担は出さない）').check();
     await dialog.getByText('利用者負担（生活保護・1割）2,695円').waitFor(); // 「介護扶助」とは書かない（ユーザーの指示 2026-10-28）
+    // 仕切り金額は窓で手で入れる（全角で打っても数字に。ユーザーの指示「工事金額の仕切り金額を入力できる部分も作成する」2026-11-12）
+    const costBox = dialog.getByLabel('伝票の仕切り金額');
+    assert.equal(await costBox.inputValue(), '');
+    await costBox.fill('１８０００');
+    assert.equal(await costBox.inputValue(), '18000');
+    await page.screenshot({path: `${outDir}/uriage-04-dialog-cost-${tag}.png`});
     const [slip2] = await Promise.all([ctx.waitForEvent('page'), dialog.getByRole('link', {name: '🧾 売上伝票発行依頼書を開く'}).click()]);
     await slip2.getByText('申請書・見積書作成から読み込みました。').waitFor();
     const text2 = await slip2.locator('main').innerText();
     assert.ok(!text2.includes('介護扶助'), text2);
     assert.match(text2, /対象内利用者負担額（生活保護・1割・切り上げ）\s*¥2,695/);
     assert.match(text2, /ご利用者お支払い合計\s*¥0/);
+    assert.deepEqual(await slip2.getByPlaceholder('仕切り(税込)').evaluateAll((l) => l.map((x) => x.value)), ['18000']);
     await slip2.close();
+    // 入れた仕切り金額は様邸に覚える（次に窓を開いたときも入っている）
+    await (await openMore(page)).getByRole('button', {name: '🧾 売上伝票を作成', exact: true}).click();
+    assert.equal(await dialog.getByLabel('伝票の仕切り金額').inputValue(), '18000');
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({state: 'detached'});
     // 窓で選んだ負担割合・介護度は申請書の項目にも入っている（住宅改修申請書のタブの一覧）
     await page.getByRole('tab', {name: /住宅改修申請書/}).click();
     await page.getByRole('group', {name: '要介護状態区分'}).getByRole('button', {name: '要介護1'}).waitFor();

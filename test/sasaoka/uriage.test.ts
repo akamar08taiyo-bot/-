@@ -1,4 +1,4 @@
-// 売上伝票発行依頼書へ渡す内容（src/sasaoka/uriage.ts）。住宅改修は「住宅改修工事」の1行（見積書の合計と、工務店に払う仕切り）。
+// 売上伝票発行依頼書へ渡す内容（src/sasaoka/uriage.ts）。住宅改修は「住宅改修工事」の1行（見積書の合計と、窓で手で入れた仕切り）。
 // ユーザーと決めたこと（2026-10-27）：置き場所は工事見積書のタブの上の段・明細は1行・生活保護にチェックしたら自己負担は出さない。値・名前はすべて架空
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -63,6 +63,12 @@ test('足りないもの：窓で入れるもの（負担割合・介護度・�
   assert.deepEqual(uriageMissing(job([mat(50000, 30000)]), s, choice), {fix: [], elsewhere: []});
 });
 
+test('仕切り金額は窓で手で入れたときだけ渡す（2026-11-12）', () => {
+  const j = job([mat(50000, 30000)], {uriage: {customer: 'existing', cost: 20000}});
+  const sales = uriageRequest(j, s, choice).sales as Record<string, unknown>;
+  assert.deepEqual(sales.items, [{amount: estimateTotals(j, s).all.total, cost: 20000, productName: '住宅改修工事', color: ''}]);
+});
+
 test('生活保護・償還払い・2割を渡す', () => {
   const j = job([mat(50000, 30000)], {shinsei: {...NO_SHINSEI, care: '要支援2', burden: '2', welfare: true}});
   const sales = uriageRequest(j, s, {...choice, billing: 'reimbursement'}).sales as Record<string, unknown>;
@@ -71,9 +77,9 @@ test('生活保護・償還払い・2割を渡す', () => {
 
 test('窓で選んだ顧客区分・請求区分は読み込みで残し、知らない値は捨てる', () => {
   const [a, b] = cleanJobs([
-    {...job([]), uriage: {customer: 'existing', billing: 'reimbursement'}},
-    {...job([]), id: 'k', uriage: {customer: 'x', billing: 1}},
+    {...job([]), uriage: {customer: 'existing', billing: 'reimbursement', cost: 20000.4}},
+    {...job([]), id: 'k', uriage: {customer: 'x', billing: 1, cost: -5}},
   ]);
-  assert.deepEqual(a.uriage, {customer: 'existing', billing: 'reimbursement'});
+  assert.deepEqual(a.uriage, {customer: 'existing', billing: 'reimbursement', cost: 20000});
   assert.deepEqual(b.uriage, {});
 });
