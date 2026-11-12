@@ -609,7 +609,8 @@ export function cleanSettings(raw: unknown): Settings {
       if (!name || seen.has(name)) return [];
       seen.add(name);
       const company = str(b.company).trim();
-      return [{name, ...(company ? {company} : {}), jigyoshoNo: str(b.jigyoshoNo).normalize('NFKC').replace(/\D/g, ''), postal: str(b.postal).trim(), address: str(b.address).trim(), tel: str(b.tel).trim(), manager: str(b.manager).trim()}];
+      // office はイヤーズのデモの元請けの営業所名（空でも持つ＝元請けの印。今までのアプリの営業所にはない）
+      return [{name, ...(company ? {company} : {}), ...(typeof b.office === 'string' ? {office: b.office.trim()} : {}), jigyoshoNo: str(b.jigyoshoNo).normalize('NFKC').replace(/\D/g, ''), postal: str(b.postal).trim(), address: str(b.address).trim(), tel: str(b.tel).trim(), manager: str(b.manager).trim()}];
     });
   }
   s.tokuteiSalesMonths = isObj(raw.tokuteiSalesMonths)

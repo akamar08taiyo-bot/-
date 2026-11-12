@@ -69,7 +69,7 @@ await ctx.addInitScript(() => {
   #ov-card.on~#ov-ptr{opacity:0}
   #ov-card .t1{font-size:30px;padding:6px 18px;border-radius:10px;background:#fff;color:#14532d;margin-bottom:22px}
   #ov-card .t2{font-size:52px;letter-spacing:.06em;margin-bottom:26px}
-  #ov-card ul{list-style:none;margin:0;padding:0;font-size:27px;line-height:1.9}
+  #ov-card ul{list-style:none;margin:0;padding:0 40px;max-width:1180px;font-size:26px;line-height:1.85}
   #ov-card li::before{content:'✓ ';color:#facc15}
   #ov-chap{position:fixed;right:14px;top:12px;z-index:2147483646;pointer-events:none;padding:6px 16px;border-radius:999px;
     background:#facc15;color:#14532d;font:600 19px/1.3 'BIZ UDPGothic','Noto Sans JP',sans-serif;box-shadow:0 4px 14px rgb(0 0 0 / .25);opacity:0;transition:opacity .3s}
@@ -256,7 +256,7 @@ async function typeIn(loc, text, delay = 110) {
 }
 
 // ---------------- 撮る（太陽シルバーサービス 申請書・見積書作成。お客様は架空＝見本 花子。部材の金額は見本＝架空）
-const CHAPTERS = ['はじめに（部材リスト・新規作成）', '住宅改修申請書', '工事見積書', '理由書', '平面図の作り方', '特定福祉用具（カタログ→見積書→受注簿・売上伝票）', 'Excelで保存・印刷・メール'];
+const CHAPTERS = ['はじめに（部材リスト・新規作成）', '住宅改修申請書', '工事見積書', '理由書', '平面図の作り方', '特定福祉用具と受注簿・売上伝票', 'Excelで保存・印刷・メール'];
 const card = (html) => page.evaluate((h) => window.__ov.card(h), html);
 const chapLabel = (t) => ((chapNow = t), page.evaluate((t) => window.__ov.chap(t), t));
 const capOff = () => page.evaluate(() => window.__ov.capOff());
@@ -853,11 +853,12 @@ await capOff();
 await chapLabel(null);
 await wait(500);
 await card(`<div class="t1">まとめ</div>
-  <ul><li>住宅改修申請書に入れた内容は、工事見積書・理由書・平面図・特定福祉用具申請書に自動で入ります</li>
+  <ul><li>住宅改修申請書に入れた内容は、平面図・理由書・特定福祉用具などに自動で入ります</li>
   <li>見積書の部材は部材リストから。長さから本数・金額を自動で計算します</li>
   <li>平面図は、部屋をなぞって、戸・窓・便器・手すり・番号を置くだけ</li>
-  <li>特定福祉用具は、種目・品目で絞ったカタログから選ぶと、定価の2割引きで見積書へ。販売受注簿・売上伝票にもつながります</li>
-  <li>分からない所は空欄のままで大丈夫。入力した内容はこの端末に自動で保存</li>
+  <li>特定福祉用具は、絞ったカタログから選ぶと定価の2割引きで見積書へ</li>
+  <li>見積書から、販売受注簿・売上伝票の発行依頼書にもつながります</li>
+  <li>分からない所は空欄のままで大丈夫。この端末に自動で保存されます</li>
   <li>「📗 Excelで保存」で、役所の様式のまま保存・印刷</li></ul>`);
 await wait(12000);
 if (!FAST) {

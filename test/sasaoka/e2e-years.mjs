@@ -134,6 +134,42 @@ async function open(status, viewport = {width: 1366, height: 900}) {
     assert.equal(hits, 0, `${d.suggestedFilename()} に社内の字`);
   }
   void xlsxText;
+  // 施工業者は元請け（イヤーズは下請けの施工業者。ユーザーの指示「元請けの業者の名前をリストから選んで、入れる…リストも1回登録したら、もうあとは
+  // プルダウンから選べるだけ」2026-11-12）：初めは元請けがなく、自社（イヤーズ）の名前を施工業者に書かない。「＋ 元請けを追加」で1回入れると、
+  // 次の申請書（福岡市）からはプルダウンで選ぶだけ
+  {
+    const pvHas = (t) => page.waitForFunction((x) => document.querySelector('[aria-label="申請書のプレビュー"]')?.innerText.includes(x), t, {timeout: 8000});
+    const pvText = () => page.getByLabel('申請書のプレビュー').innerText();
+    const builderRow = form.locator('[data-field="builder"]');
+    await builderRow.scrollIntoViewIfNeeded();
+    assert.match(await builderRow.innerText(), /施工業者（元請け）[\s\S]*元請けを追加してください/);
+    assert.ok(!(await pvText()).includes('イヤーズ'), '元請けがないうちは自社の名前を施工業者に書かない');
+    await builderRow.getByRole('button', {name: '＋ 元請けを追加'}).click();
+    await page.keyboard.type('見本建設株式会社'); // 開くと会社名の欄
+    await builderRow.getByLabel('元請けの営業所名').fill('見本営業所');
+    await builderRow.getByLabel('元請けの郵便番号').fill('8100001');
+    assert.equal(await builderRow.getByLabel('元請けの所在地').inputValue(), '福岡県福岡市中央区天神'); // 郵便番号から所在地
+    await builderRow.getByLabel('元請けの電話番号').fill('0920000000');
+    await builderRow.getByRole('button', {name: '追加する'}).click();
+    assert.equal(await builderRow.getByRole('combobox', {name: '元請け'}).inputValue(), '見本建設株式会社　見本営業所');
+    await pvHas('見本建設株式会社');
+    assert.ok(!(await pvText()).includes('イヤーズ'));
+    await page.screenshot({path: path.join(outDir, 'years-prime-kanda.png')});
+    // 福岡市の新しい申請書：元請けはもう入っている（選ぶだけ）
+    await page.getByRole('button', {name: '← 一覧へ戻る'}).click();
+    await page.getByRole('region', {name: '新規作成'}).getByRole('button', {name: '＋ 福岡市', exact: true}).click();
+    await form.getByLabel('被保険者氏名').fill('見本 花子');
+    await form.getByLabel('住所', {exact: true}).fill('福岡県福岡市中央区天神');
+    const row2 = form.locator('[data-field="builder"]');
+    await row2.scrollIntoViewIfNeeded();
+    assert.equal(await row2.getByRole('combobox', {name: '元請け'}).inputValue(), '見本建設株式会社　見本営業所');
+    assert.equal(await row2.getByLabel('元請けの会社名').count(), 0, '2回目は入れ直さない');
+    await pvHas('見本建設株式会社');
+    assert.ok(!(await pvText()).includes('イヤーズ'));
+    await page.waitForTimeout(1200);
+    await page.screenshot({path: path.join(outDir, 'years-prime-fukuoka.png'), fullPage: true});
+  }
+  log('施工業者は元請け：1回追加すれば次の申請書（福岡市）はプルダウンで選ぶだけ・自社の名前は書かない OK');
   // 設定：営業所の一覧（社内）は出さない
   await page.goto(`${site}/years-demo/index.html#tab=settings`);
   await page.locator('[data-demo-name]').waitFor();

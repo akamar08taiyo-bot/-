@@ -24,10 +24,10 @@ import {riyuOf, shinseiBookValues} from '../riyu.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
 import type {AppData, BuilderOffice, Insurer, Job, Material, PhotoEdit, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
-import {builderChoices, builderOffice} from '../shinseiOffice.ts';
+import {builderChoices, builderOffice, primeKey, primeName} from '../shinseiOffice.ts';
 import type {Update} from '../useStore.ts';
 import {yen} from '../util.ts';
-import {zipCandidates} from '../zip.ts';
+import {addressOfZip, zipCandidates, zipLabel} from '../zip.ts';
 import {PhotoBoard, PhotoOrderDialog, photoPlaces, SLOT_LABEL, usePhotoActions, usePlanActions} from './PhotoBoard.tsx';
 import {MadoriEditor} from '../madori/MadoriEditor.tsx';
 import {hasMadori} from '../madori/model.ts';
@@ -102,7 +102,7 @@ function label(f: Field, i: Insurer): string {
     renovated: '現在までの改修状況',
     photoDates: '改修前日付・改修後日付',
     careTerm: '認定有効期間',
-    builder: '施工業者',
+    builder: DEMO ? '施工業者（元請け）' : '施工業者',
   }[f as string] ?? '理由書のタブで入れます'; // 理由書だけの欄（大分市の理由書（表））
 }
 
@@ -186,7 +186,8 @@ export function ShinseiEditor({
     careTerm: !info.careFrom || !info.careTo,
     dates: false,
     photoDates: false, // 改修前は当日、改修後は空でよい
-    builder: false, // 選んでいなければ保険者・区から決まる営業所
+    // 選んでいなければ保険者・区から決まる営業所。イヤーズのデモは元請けを1つも入れていなければ、まだ入っていない
+    builder: DEMO && !(s.builders ?? []).length,
   };
   const fields = insurer ? FIELDS[insurer] : [];
 
@@ -447,7 +448,7 @@ export function ShinseiEditor({
       case 'works':
         return <WorksEditor job={job} setJob={setJob} s={s} insurer={i} materials={data.materials} />;
       case 'builder':
-        return <BuilderPick job={job} info={info} setInfo={setInfo} s={s} update={update} />;
+        return DEMO ? <PrimePick info={info} setInfo={setInfo} s={s} update={update} /> : <BuilderPick job={job} info={info} setInfo={setInfo} s={s} update={update} />;
       case 'cost':
         return (
           <>
@@ -1010,6 +1011,119 @@ function BuilderPick({job, info, setInfo, s, update}: {job: Job; info: ShinseiIn
           {field('address', '所在地', 'w-72')}
           {field('tel', '電話番号', 'w-36', {type: 'tel'})}
           {field('manager', '所長', 'w-32')}
+          <Btn small color="softBlue" onClick={save}>
+            追加する
+          </Btn>
+          <Btn small color="white" onClick={() => setDraft(null)}>
+            やめる
+          </Btn>
+        </div>
+      )}
+    </>
+  );
+}
+
+const NO_PRIME: BuilderOffice = {name: '', company: '', office: '', jigyoshoNo: '', postal: '', address: '', tel: '', manager: ''};
+
+/**
+ * （株）イヤーズ デモアプリの施工業者＝元請け（ユーザーの指示「イヤーズは施工業者ではありますが、下請けの施工業者になりますので、基本的には例えば
+ * 太陽シルバーサービス、行橋営業所、みたいな感じで、元請けの業者の名前をリストから選んで、入れるような感じになります。で、リストも1回登録したら、
+ * もうあとはプルダウンから選べるだけ」2026-11-12）。「＋ 元請けを追加」で1回入れると設定の builders に残り、次の申請書からはプルダウンで選ぶだけ。
+ * 選んでいなければ一覧の初めの元請け（shinseiOffice.ts の primeKey）。申請書の施工業者の欄（名称・所在地・電話・代表者・事業者番号）に元請けが入る
+ */
+function PrimePick({info, setInfo, s, update}: {info: ShinseiInfo; setInfo: (patch: Partial<ShinseiInfo>) => void; s: Settings; update: Update}) {
+  const list = s.builders ?? [];
+  const cur = primeKey(info.builderOffice ?? '', list);
+  const prime = list.find((b) => b.name === cur);
+  const [draft, setDraft] = useState<BuilderOffice | null>(null);
+  const companyRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (draft && !draft.company) companyRef.current?.focus();
+  }, [draft]);
+  const save = () => {
+    if (!draft) return;
+    const company = (draft.company ?? '').trim();
+    const office = (draft.office ?? '').trim();
+    if (!company) return companyRef.current?.focus();
+    const name = primeName(company, office);
+    const b: BuilderOffice = {
+      name,
+      company,
+      office,
+      jigyoshoNo: draft.jigyoshoNo.normalize('NFKC').replace(/\D/g, ''),
+      postal: zipLabel(draft.postal),
+      address: draft.address.trim(),
+      tel: telWithHyphens(draft.tel.trim()),
+      manager: draft.manager.trim(),
+    };
+    update('settings', (prev) => ({...prev, builders: [...(prev.builders ?? []).filter((x) => x.name !== name), b]}));
+    setInfo({builderOffice: name});
+    setDraft(null);
+  };
+  const field = (key: keyof BuilderOffice, label: string, cls: string, extra: Record<string, unknown> = {}) => (
+    <label className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-slate-600">
+      {label}
+      <TextInput value={draft?.[key] ?? ''} onChange={(v) => setDraft((d) => (d ? {...d, [key]: v} : d))} className={cls} aria-label={`元請けの${label}`} {...extra} />
+    </label>
+  );
+  return (
+    <>
+      {list.length > 0 ? (
+        <select value={cur} onChange={(e) => setInfo({builderOffice: e.target.value})} className="h-9 min-w-[14rem] max-w-full rounded-md border border-slate-300 px-2 text-sm text-slate-800" aria-label="元請け" data-nav>
+          {list.map((b) => (
+            <option key={b.name} value={b.name}>
+              {b.name}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <span className="text-sm text-slate-500">元請けを追加してください</span>
+      )}
+      {prime && (
+        <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-slate-600" data-builder-no>
+          事業者番号
+          <span className={`font-mono text-sm ${prime.jigyoshoNo ? 'text-slate-800' : 'text-slate-400'}`}>{prime.jigyoshoNo || '（なし）'}</span>
+        </span>
+      )}
+      <Btn small color="white" onClick={() => setDraft(draft ? null : {...NO_PRIME})}>
+        ＋ 元請けを追加
+      </Btn>
+      {prime && (
+        <Btn
+          small
+          color="white"
+          onClick={() => {
+            if (!confirm(`「${prime.name}」を元請けの一覧から外しますか？`)) return;
+            update('settings', (prev) => ({...prev, builders: (prev.builders ?? []).filter((x) => x.name !== prime.name)}));
+            setInfo({builderOffice: ''});
+          }}
+        >
+          一覧から外す
+        </Btn>
+      )}
+      {draft && (
+        <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border border-dashed border-slate-300 bg-slate-50 p-2" data-builder-add>
+          <label className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-slate-600">
+            会社名
+            <TextInput ref={companyRef} value={draft.company ?? ''} onChange={(company) => setDraft({...draft, company})} className="w-56" placeholder="○○株式会社" aria-label="元請けの会社名" />
+          </label>
+          {field('office', '営業所名', 'w-40', {placeholder: '○○営業所'})}
+          {field('jigyoshoNo', '事業者番号', 'w-40 font-mono', {inputMode: 'numeric', placeholder: '10けた'})}
+          {/* 郵便番号を入れると所在地も（所在地が空のとき。住所の欄と同じ zip.ts） */}
+          <label className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-slate-600">
+            郵便番号
+            <TextInput
+              value={draft.postal}
+              onChange={(postal) => setDraft((d) => (d ? {...d, postal, ...(!d.address.trim() && addressOfZip(postal) ? {address: addressOfZip(postal)} : {})} : d))}
+              inputMode="numeric"
+              className="w-24"
+              placeholder="8000000"
+              aria-label="元請けの郵便番号"
+            />
+          </label>
+          {field('address', '所在地', 'w-72')}
+          {field('tel', '電話番号', 'w-36', {type: 'tel'})}
+          {field('manager', '代表者', 'w-32')}
           <Btn small color="softBlue" onClick={save}>
             追加する
           </Btn>

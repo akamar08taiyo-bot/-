@@ -109,8 +109,9 @@ export function SettingsPage({data, update, cloud}: {data: AppData; update: Upda
       )}
 
       <Section
-        title={DEMO ? '自社の情報（申請書の施工業者）' : '自社の情報（請求書の発行元・見積書の施工業者）'}
-        note={DEMO ? '会社名・営業所名・住所などは、申請書の施工業者に出ます。' : '営業所を選ぶと住所・電話番号・所長名が入ります。太陽ポータルから開くと、ポータルで選んだ営業所が最初から入ります。'}
+        // イヤーズは下請けなので、申請書の施工業者は元請け（申請書の画面の「施工業者（元請け）」で選ぶ。ユーザーの指示 2026-11-12）。自社の情報は申請書に出ない
+        title={DEMO ? '自社の情報' : '自社の情報（請求書の発行元・見積書の施工業者）'}
+        note={DEMO ? '申請書の施工業者は元請けです（申請書の画面の「施工業者（元請け）」で選びます）。' : '営業所を選ぶと住所・電話番号・所長名が入ります。太陽ポータルから開くと、ポータルで選んだ営業所が最初から入ります。'}
       >
         {!DEMO && (
         <Field label="営業所">
@@ -129,7 +130,7 @@ export function SettingsPage({data, update, cloud}: {data: AppData; update: Upda
         </Field>
         )}
         <Field label="会社名">{text('company')}</Field>
-        <Field label={DEMO ? '営業所名（申請書の施工業者名に出る名前）' : '営業所名（請求書・見積書の施工業者名に出る名前）'}>{text('officeName')}</Field>
+        <Field label={DEMO ? '営業所名' : '営業所名（請求書・見積書の施工業者名に出る名前）'}>{text('officeName')}</Field>
         <Field label={DEMO ? '代表者名' : '所長名（請求書に「○○営業所所長　氏名」、見積書の代表者名に出ます）'}>
           {text('manager', DEMO ? '例：山田 太郎' : '例：久保 匠史')}
         </Field>

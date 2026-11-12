@@ -293,8 +293,12 @@ export type ShinseiInfo = ShinseiMarks & {
   builderOffice?: string;
 };
 
-/** 申請書の施工業者に足した営業所（申請書の画面の「＋ 追加」。設定に残る）。会社名は設定の会社とちがうときだけ */
-export type BuilderOffice = {name: string; company?: string; jigyoshoNo: string; postal: string; address: string; tel: string; manager: string};
+/**
+ * 申請書の施工業者に足した営業所（申請書の画面の「＋ 追加」。設定に残る）。会社名は設定の会社とちがうときだけ。
+ * office：（株）イヤーズ デモアプリの元請け（下請けの施工業者なので、申請書の施工業者は元請けの会社・営業所。2026-11-12）の営業所名。
+ * 元請けの name は「会社名　営業所名」（一覧の見出し・選んだ元請けの印）。今までのアプリの営業所には office はない（name が営業所名）
+ */
+export type BuilderOffice = {name: string; company?: string; office?: string; jigyoshoNo: string; postal: string; address: string; tel: string; manager: string};
 
 /** 理由書の「活動」（P2 の4つの段）。① 改善をしようとしている生活動作・② 困難な状況・③ 改修目的と改修の方針 */
 export type RiyuAct = {

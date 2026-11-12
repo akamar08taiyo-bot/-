@@ -74,8 +74,8 @@ export function builderOffice(name: string, added: readonly BuilderOffice[] = []
   return added.find((b) => b.name === n) ?? OFFICES.find((o) => o.name === n);
 }
 
-/** 施工業者の欄に書く会社・営業所の値（設定の一部） */
-type BuilderLike = {company?: string; officeName?: string; manager?: string; postal?: string; address?: string; tel?: string; builders?: BuilderOffice[]};
+/** 施工業者の欄に書く会社・営業所の値（設定の一部）。builderKey＝選んだ施工業者の一覧の名前（事業者番号を引く。元請けは営業所名と別） */
+type BuilderLike = {company?: string; officeName?: string; manager?: string; postal?: string; address?: string; tel?: string; builders?: BuilderOffice[]; builderKey?: string};
 
 /**
  * 施工業者の営業所を設定に重ねる（会社名は足した営業所に入れてあるときだけ）。設定の営業所と同じ名前・一覧にない名前は設定のまま
@@ -86,5 +86,31 @@ export function withBuilder<T extends BuilderLike>(s: T, name: string): T {
   if (!n || n === (s.officeName ?? '').trim()) return s;
   const o = builderOffice(n, s.builders);
   if (!o) return s;
-  return {...s, ...('company' in o && o.company ? {company: o.company} : {}), officeName: o.name, manager: o.manager, postal: o.postal, address: o.address, tel: o.tel};
+  return {...s, ...('company' in o && o.company ? {company: o.company} : {}), officeName: o.name, manager: o.manager, postal: o.postal, address: o.address, tel: o.tel, builderKey: o.name};
+}
+
+/**
+ * （株）イヤーズ デモアプリの申請書の施工業者＝元請け（ユーザーの指示「イヤーズは施工業者ではありますが、下請けの施工業者になりますので、基本的には
+ * 例えば太陽シルバーサービス、行橋営業所、みたいな感じで、元請けの業者の名前をリストから選んで、入れる…リストも1回登録したら、もうあとはプルダウンから
+ * 選べるだけ」2026-11-12）。元請けは設定の builders（name＝「会社名　営業所名」・office＝営業所名）。選んでいない・一覧から外した元請けなら一覧の初めの元請け
+ */
+export function primeKey(chosen: string, added: readonly BuilderOffice[] = []): string {
+  const n = chosen.trim();
+  return n && added.some((b) => b.name === n) ? n : (added[0]?.name ?? '');
+}
+
+/** 元請けの一覧の名前（「太陽シルバーサービス㈱　行橋営業所」。営業所がなければ会社名だけ） */
+export function primeName(company: string, office: string): string {
+  return [company.trim(), office.trim()].filter(Boolean).join('　');
+}
+
+/**
+ * 元請けを申請書の施工業者の欄（会社名・営業所・所在地・電話・代表者）に重ねる。元請けがなければ空ける（下請けの自社の名前は書かない。
+ * 設定の自社の情報は申請書に出さない）
+ */
+export function withPrime<T extends BuilderLike>(s: T, chosen: string): T & {builderKey: string} {
+  const key = primeKey(chosen, s.builders);
+  const o = (s.builders ?? []).find((b) => b.name === key);
+  if (!o) return {...s, company: '', officeName: '', manager: '', postal: '', address: '', tel: '', builderKey: ''};
+  return {...s, company: o.company ?? '', officeName: o.office ?? '', manager: o.manager, postal: o.postal, address: o.address, tel: o.tel, builderKey: o.name};
 }

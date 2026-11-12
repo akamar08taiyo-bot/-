@@ -137,7 +137,10 @@ cdp.on('Page.screencastFrame', async ({data, metadata, sessionId}) => {
   await writeFile(path.join(frames, `f${String(i).padStart(6, '0')}.jpg`), Buffer.from(data, 'base64'));
 });
 
-const wait = (ms) => page.waitForTimeout(ms);
+// FAST=1 で下見（待ちを短く・撮らない・章の終わりに画面写真 dry-*.png）
+const FAST = process.env.FAST === '1';
+const wait = (ms) => page.waitForTimeout(FAST ? Math.min(ms, 250) : ms);
+const snap = async (name) => FAST && (await page.screenshot({path: path.join(out, `dry-${name}.png`)}));
 const read = (t) => Math.min(9000, Math.max(3400, 2200 + [...t].length * 125)); // 字の数で読む時間（v2 は長め）
 async function cap(step, text, sub = '', ms) {
   await page.evaluate(([s, t, b]) => window.__ov.cap(s, t, b), [step, text, sub]);
@@ -173,7 +176,7 @@ async function typeIn(loc, text, delay = 110) {
 }
 
 // ---------------- 撮る（v2：目次・章の扉・右上に章の名前。申請書と平面図だけ。見積書・理由書は出さない）
-const CHAPTERS = ['はじめに（新規作成・設定）', 'お客様の情報を入れる', '改修の内容を入れる', '写真を入れる', '平面図を描く', '印刷・Excelで保存'];
+const CHAPTERS = ['はじめに（新規作成）', 'お客様の情報を入れる', '改修の内容を入れる', '写真を入れる', '平面図を描く', '印刷・Excelで保存'];
 const card = (html) => page.evaluate((h) => window.__ov.card(h), html);
 const chapLabel = (t) => page.evaluate((t) => window.__ov.chap(t), t);
 const capOff = () => page.evaluate(() => window.__ov.capOff());
@@ -197,7 +200,7 @@ await card(`<div class="t1">（株）イヤーズ デモアプリ</div><div clas
 // 撮り始めるのは題名のカードが出きってから（前は撮り始めてからカードを出したので、初めの 0.5秒ほどアプリの画面と
 // 薄いカードが重なった変な画面が映った。ユーザーの指摘「動画開始5秒で変な部分がある、一瞬へんな画面がうつる」2026-11-12）
 await wait(800);
-await cdp.send('Page.startScreencast', {format: 'jpeg', quality: 85, maxWidth: 1920, maxHeight: 1080, everyNthFrame: 1});
+if (!FAST) await cdp.send('Page.startScreencast', {format: 'jpeg', quality: 85, maxWidth: 1920, maxHeight: 1080, everyNthFrame: 1});
 await wait(5500);
 await card(`<div class="t1">目次</div><ol>${CHAPTERS.map((c) => `<li>${c}</li>`).join('')}</ol>`);
 await wait(9000);
@@ -208,24 +211,17 @@ await wait(600);
 await chapter(0);
 await cap('', 'これが最初の画面です。左が「新規作成」、右が「申請書の一覧」です');
 await mark(page.getByRole('region', {name: '新規作成'}), 2200);
-await cap('', '最初に一度だけ、⚙ 設定で自社の情報（住所・電話番号など）を入れておきます', '申請書の「施工業者」の欄に自動で入ります');
-await tap(page.getByRole('button', {name: /☰ メニュー/}), 700);
-await tap(page.getByRole('menu').getByRole('button', {name: /⚙ 設定/}).or(page.getByRole('menuitem', {name: /設定/})).first(), 1200);
-await mark(page.getByText('自社の情報（申請書の施工業者）').first(), 1200);
-await cap('', '会社名・営業所名・住所・電話番号を入れます（入れた内容は自動で保存されます）');
-await typeIn(page.getByLabel(/^営業所名/), '本社', 140);
-await wait(800);
-await cap('', '「☰ メニュー」→「申請書を作成する」で、最初の画面に戻ります', '', 3600);
-await tap(page.getByRole('button', {name: /☰ メニュー/}), 700);
-await tap(page.getByRole('menu').getByRole('button', {name: /申請書を作成する/}).or(page.getByRole('menuitem', {name: /申請書を作成する/})).first(), 1200);
-await cap('', '「＋ 新規作成」で、申請する保険者（市町村）のボタンを押します（例：苅田町）');
-await tap(page.getByRole('region', {name: '新規作成'}).getByRole('button', {name: '＋ 苅田町', exact: true}), 1400);
+// 入力の見本は福岡市（ユーザーの指示「デモ入力に関しては福岡市で、一度入力する様子を見せてください」2026-11-12。前は苅田町と ⚙ 設定の自社の情報。
+// イヤーズは下請けなので施工業者は元請け＝第3章で「＋ 元請けを追加」。自社の情報は申請書に出ないので設定の場面は外した）
+await cap('', '「＋ 新規作成」で、申請する保険者（市町村）のボタンを押します（例：福岡市）');
+await tap(page.getByRole('region', {name: '新規作成'}).getByRole('button', {name: '＋ 福岡市', exact: true}), 1400);
 const form = page.getByRole('form', {name: '申請書'});
 await form.waitFor();
 await point(page.locator('[data-job-tabs]'));
 await cap('', '上のタブは「住宅改修申請書」と「平面図」の2つ。押すと切り替わります');
 await ring(null);
 
+await snap('1-new');
 // ---------------- 2. お客様の情報
 await chapter(1);
 await cap('', '左の一覧に入れると、右の申請書（役所の様式のまま）に、そのまま入ります');
@@ -248,17 +244,22 @@ await cap('', '生年月日は数字を打つだけ。元号は初めから「�
 await typeIn(form.getByLabel('生年月日の年', {exact: true}), '15', 160);
 await typeIn(form.getByLabel('生年月日の月', {exact: true}), '4', 160);
 await typeIn(form.getByLabel('生年月日の日', {exact: true}), '1', 160);
-await cap('', '性別・要介護状態区分・負担割合は、ボタンを押して選びます', '右の申請書の文字に丸が付きます', 3800);
-await tap(form.getByRole('button', {name: '女', exact: true}), 700);
-await tap(form.getByRole('group', {name: '要介護状態区分'}).getByRole('button', {name: '要介護2'}), 700);
-await tap(form.getByRole('button', {name: '1割', exact: true}), 900);
-await cap('', '郵便番号を入れると、住所が自動で入ります（ハイフンなしで入力）', '', 3800);
-await typeIn(form.getByLabel('郵便番号', {exact: true}), '8000344', 150);
+await cap('', '住所を入れると、福岡市の区（保険者番号）も自動で選ばれます', '', 3800);
+await typeIn(form.getByLabel('住所', {exact: true}), '福岡県福岡市中央区天神', 120);
+await page.keyboard.press('Tab');
 await wait(1400);
-await mark(form.getByLabel('住所', {exact: true}), 2400);
-await cap('', '番地などは、住所の欄のうしろに打ち足せます', '', 3400);
-await cap('', '電話番号もハイフンなしで打てば、自動でハイフンが付きます', '', 3800);
-await typeIn(form.getByLabel('電話番号', {exact: true}), '0930000000', 120);
+{
+  // 上の段の「区」（保険者番号）。見つからなければ住所の欄を指す
+  const ward = page.getByLabel('区', {exact: true}).first();
+  await mark((await ward.count()) ? ward : form.getByLabel('住所', {exact: true}), 2600);
+}
+await cap('', '電話番号はハイフンなしで打てば、自動でハイフンが付きます', '', 3800);
+// 0 だけの番号（092 で始めると 0920（壱岐）の4けたの市外局番と区別できないので携帯の形）
+await typeIn(form.getByLabel('電話番号', {exact: true}), '09000000000', 120);
+await page.keyboard.press('Tab');
+await wait(900);
+await cap('', '負担割合などは、ボタンを押して選びます', '', 3400);
+await tap(form.getByRole('button', {name: '1割', exact: true}), 900);
 await page.keyboard.press('Tab');
 await wait(1200);
 await cap('', '住宅の所有者は「本人の家」を押すと、本人の名前が入ります', '', 3800);
@@ -267,6 +268,7 @@ await point(form.getByLabel('被保険者番号', {exact: true}));
 await cap('', '被保険者番号など、まだ分からない所は空欄のままで大丈夫です', 'あとから、いつでも入れられます（入れた内容はこの端末に自動で保存）');
 await ring(null);
 
+await snap('2-customer');
 // ---------------- 3. 改修の内容
 await chapter(2);
 const works = form.locator('[data-field="works"]');
@@ -293,7 +295,8 @@ await wait(800);
 await page.keyboard.type('800', {delay: 180});
 await page.keyboard.press('Tab');
 await wait(1100);
-const worksCell = page.getByText(/①玄関\s*手すりの取り付け/).last();
+// 福岡市の様式第21号は改修の種類ごとの行（「手すりの取付け」の行に ①玄関…）なので、①玄関 の字で探す（苅田町は「①玄関　手すりの取り付け」）
+const worksCell = page.getByLabel('申請書のプレビュー').getByText(/①玄関/).first();
 await point(worksCell);
 await cap('', '右の申請書の「改修の内容」に、①玄関・②トイレの行が自動で書かれます', '①②の番号は、写真の用紙・平面図の番号と同じです');
 await ring(null);
@@ -304,10 +307,37 @@ const cost = form.getByLabel('改修予定費用', {exact: true});
 await typeIn(cost, '100000', 150);
 await page.keyboard.press('Tab');
 await wait(1000);
-await mark(form.locator('[data-field="builder"]').or(page.getByText('株式会社イヤーズ').first()).first(), 600);
-await cap('', '施工業者の欄には、⚙ 設定で入れた自社の情報が入ります');
-await ring(null);
+// 施工業者（元請け）：イヤーズは下請けなので、申請書の施工業者は元請け（ユーザーの指示「元請けの業者の名前をリストから選んで、入れる…
+// リストも1回登録したら、もうあとはプルダウンから選べるだけ」2026-11-12）。見本は言われたとおり「太陽シルバーサービス・行橋営業所」（電話は 0 だけ・所在地は町名まで）
+{
+  const row = form.locator('[data-field="builder"]');
+  await row.scrollIntoViewIfNeeded();
+  await mark(row, 800);
+  await cap('', '施工業者（元請け）：イヤーズは下請けなので、申請書には元請けの会社を書きます', '「＋ 元請けを追加」で1回だけ登録します');
+  await tap(row.getByRole('button', {name: '＋ 元請けを追加'}), 800);
+  await typeIn(row.getByLabel('元請けの会社名'), '太陽シルバーサービス株式会社', 110);
+  await typeIn(row.getByLabel('元請けの営業所名'), '行橋営業所', 130);
+  await cap('', '郵便番号を入れると、所在地も自動で入ります', '', 3200);
+  await typeIn(row.getByLabel('元請けの郵便番号'), '8240043', 150);
+  await wait(900);
+  await typeIn(row.getByLabel('元請けの電話番号'), '0930000000', 110);
+  await tap(row.getByRole('button', {name: '追加する'}), 1500);
+  // プレビューの「改修施工者」の欄（様式第21号）
+  await page.evaluate(() => {
+    const pg = document.querySelector('div.origin-top-left[role="group"]');
+    const el = [...(pg?.querySelectorAll('*') ?? [])].find((e) => e.children.length === 0 && e.textContent.includes('太陽シルバーサービス'));
+    el?.setAttribute('data-ov', 'prime');
+  });
+  const prime = page.locator('[data-ov="prime"]');
+  if (await prime.count()) await point(prime);
+  await cap('', '右の申請書の「改修施工者」に、元請けが入りました');
+  await ring(null);
+  await mark(row.getByRole('combobox', {name: '元請け'}), 800);
+  await cap('', '次の申請書からは、プルダウンで元請けを選ぶだけです', '元請けが1つなら、初めから入っています');
+  await ring(null);
+}
 
+await snap('3-works');
 // ---------------- 4. 写真
 await chapter(3);
 const board = page.locator('[aria-label="写真"]').or(page.getByRole('region', {name: /写真/})).first();
@@ -346,17 +376,18 @@ const photo = await page.evaluate(async () => {
 }
 await wait(2500);
 const pvImg = page.locator('img').filter({has: page.locator('xpath=self::*')});
-const sheetImg = page.locator('[aria-label*="改修前"] img').last();
+const sheetImg = page.locator('[aria-label*="改修前"] img, [aria-label="写真貼付台紙（事前）"] img').last();
 await sheetImg.scrollIntoViewIfNeeded().catch(() => {});
 await wait(1200);
 await point(sheetImg).catch(() => {});
-await cap('', '右の写真の用紙に、その写真が入りました', '改修前の写真には、改修の内容（①玄関 手すりの取り付け L=600mm）も書かれます');
+await cap('', '右の写真の用紙（写真貼付台紙）に、その写真が入りました', '');
 await ring(null);
 await cap('', '改修前日付は今日の日付が入っています。日付入りの写真なら、写っている日付を読みます', '', 4800);
 await mark(form.getByLabel('改修前日付', {exact: true}).or(page.getByLabel('改修前日付').first()).first(), 2200);
 void pvImg;
 void board;
 
+await snap('4-photo');
 // ---------------- 5. 平面図
 await chapter(4);
 await cap('', '上の「📐 平面図」のタブで、平面図を描きます', '', 3200);
@@ -428,6 +459,7 @@ await tap(page.locator('[data-job-tabs] [role="tab"]', {hasText: '住宅改修�
   await ring(null);
 }
 
+await snap('5-madori');
 // ---------------- 6. 印刷・Excel
 await chapter(5);
 await page.evaluate(() => window.scrollTo({top: 0, behavior: 'smooth'}));
@@ -459,12 +491,15 @@ await wait(500);
 await card(`<div class="t1">まとめ</div>
   <ul><li>左の一覧に入れると、右の申請書（役所の様式）にそのまま入ります</li>
   <li>分からない所は空欄のままで大丈夫（あとから入れられます）</li>
+  <li>施工業者（元請け）は1回登録すれば、次からはプルダウンで選ぶだけ</li>
   <li>改修の内容・写真・平面図の ①② の番号は、みな同じ箇所です</li>
   <li>平面図のタブで描いた図は、申請書の平面図にも入ります</li>
   <li>入力した内容はこの端末に自動で保存。「📗 Excelで保存」で役所の様式のまま保存・印刷</li></ul>`);
 await wait(11000);
-await cdp.send('Page.stopScreencast');
-await wait(500);
-await writeFile(path.join(out, 'times.json'), JSON.stringify(times));
+if (!FAST) {
+  await cdp.send('Page.stopScreencast');
+  await wait(500);
+  await writeFile(path.join(out, 'times.json'), JSON.stringify(times));
+}
 console.log('frames', n, 'seconds', (times.at(-1) - times[0]).toFixed(1));
 await browser.close();

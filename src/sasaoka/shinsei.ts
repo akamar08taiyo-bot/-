@@ -15,7 +15,8 @@ import {BASE_PLATE} from './cutLink.ts';
 import {circled, eraOf, formLines, INSURER_INFO, jobInsurer, KINDS, lineNote, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa, shinseiKindNames} from './estimateForms.ts';
 import {ORIGINAL_OFFICE_TEXTS} from './company.ts';
 import {insurerAreaName, insurerNoOf} from './insurerNumbers.ts';
-import {builderOffice, shinseiOfficeName, withBuilder} from './shinseiOffice.ts';
+import {DEMO} from './demo/flag.ts';
+import {builderOffice, shinseiOfficeName, withBuilder, withPrime} from './shinseiOffice.ts';
 import {readyLengths} from './railSlots.ts';
 import {clampOff, clampScale, normRot} from './photoEdit.ts';
 import {BOARD_PTS, frontOrder, lineEnds, MARK_INSET, photoBounds, shapeBox} from './photoMarks.ts';
@@ -1048,7 +1049,7 @@ export type ShinseiValues = {
 };
 
 /** 申請書の営業所の名前・所在地（県を除く）・電話・所長（原本の行橋営業所の字を書きかえる） */
-export type OfficeTexts = {name: string; address: string; tel: string; manager: string};
+export type OfficeTexts = {name: string; address: string; tel: string; manager: string; company?: string};
 /** 原本（苅田町・行橋市・みやこ町）にそのまま書いてある営業所の字（company.ts。デモのビルドは空＝原本の字も消してある） */
 const ORIGINAL_OFFICE: OfficeTexts = ORIGINAL_OFFICE_TEXTS;
 
@@ -1057,6 +1058,8 @@ const ORIGINAL_OFFICE: OfficeTexts = ORIGINAL_OFFICE_TEXTS;
  * 欄の中のほかの字・空白（委任状の受任者の並び）はそのまま。行橋営業所のまま・設定が空の項目は原本の字のまま
  */
 function officeCells(files: Files, sheet: ShinseiSheet, office: OfficeTexts): [string, string][] {
+  // （株）イヤーズ デモアプリ：原本の営業所の字は消してあるので、置きかえではなく元請けの会社・営業所で書く（primeOfficeCells）
+  if (DEMO) return primeOfficeCells(sheet, office);
   const path = sheetPaths(files).get(sheet.sheet);
   if (!sheet.office || !path || !files[path]) return [];
   const xml = strFromU8(files[path]);
@@ -1071,6 +1074,35 @@ function officeCells(files: Files, sheet: ShinseiSheet, office: OfficeTexts): [s
     if (text !== before) out.push([ref, text]);
   }
   return out;
+}
+
+/**
+ * （株）イヤーズ デモアプリの、原本に印字してある施工業者（受任者・事業者）の欄の書き方（苅田町・行橋市の委任状、行橋市の受領委任払、みやこ町の承認届出書）。
+ * イヤーズは下請けなので、ここに書くのは選んだ元請けの会社・営業所・所在地・電話・代表者（ユーザーの指示 2026-11-12。shinseiOffice.ts の withPrime）。
+ * 並びは原本の字の並びのまま（会社と営業所の改行・「電話番号」の見出し・㊞）
+ */
+const PRIME_CELLS: Record<string, Record<string, string>> = {
+  委任状: {C10: '　{address}', C12: '　電話番号　{tel}', C14: '　{company}\n　　　　　　　　　　{name}\n　　　　　　　　{manager}　㊞'},
+  '住改・受領委任払': {AB14: '{company}\n{name}', H28: '{address}', H29: '{company}\n{name}　{manager}', H30: '{tel}'},
+  住宅改修承認届出書: {N17: '{company}　{name}', N18: '{address}', N19: '{tel}', N35: '（本人との関係：事業者）電話番号　{tel}'},
+};
+
+/** 元請けで書く施工業者の欄（元請けがなければ書かない＝原本の空白のまま）。行の終わりの空白は詰める（営業所のない元請け） */
+export function primeOfficeCells(sheet: Pick<ShinseiSheet, 'sheet' | 'office'>, office: OfficeTexts): [string, string][] {
+  const tpl = PRIME_CELLS[sheet.sheet];
+  if (!tpl || !sheet.office || !(office.company ?? '').trim()) return [];
+  const value = (k: string) => String(office[k as keyof OfficeTexts] ?? '').trim();
+  return sheet.office.flatMap((ref): [string, string][] => {
+    const t = tpl[ref];
+    if (t === undefined) return [];
+    const text = t
+      .replace(/\{(\w+)\}/g, (_, k: string) => value(k))
+      .split('\n')
+      .map((l) => l.replace(/[ 　]+$/, ''))
+      .join('\n')
+      .replace(/\n+$/, '');
+    return [[ref, text]];
+  });
 }
 
 /** 写真貼付用紙に貼る写真（JPEG のバイト列と、縦横の画素） */
@@ -1465,7 +1497,7 @@ function proxyAmount(benefit: number): string {
 }
 
 /** 改修施工者（受任者。福岡市の申請書）に書く会社・営業所（住宅改修のアプリの設定。請求書の発行元と同じ） */
-export type BuilderSettings = Partial<Pick<Settings, 'company' | 'officeName' | 'manager' | 'postal' | 'address' | 'tel' | 'entrustRegNo' | 'builders'>>;
+export type BuilderSettings = Partial<Pick<Settings, 'company' | 'officeName' | 'manager' | 'postal' | 'address' | 'tel' | 'entrustRegNo' | 'builders'>> & {builderKey?: string};
 
 /**
  * 番号を様式の「－」で分けた欄に分ける（北九州市の郵便番号「〒802－0001」・電話番号「093－000－0000」）：「-」で区切られていればその区切り、
@@ -1493,6 +1525,8 @@ function reiwaParts(iso: string): [string, string, string] {
  * こちらの該当営業所と所長にする」2026-11-05）。決まりのない保険者は設定のまま。見積書・請求書の発行元は変えない
  */
 export function shinseiSettings<T extends BuilderSettings>(job: Job, s: T): T {
+  // （株）イヤーズ デモアプリは下請けなので、施工業者は選んだ元請け（shinseiOffice.ts の withPrime。2026-11-12）
+  if (DEMO) return withPrime(s, job.shinsei?.builderOffice ?? '');
   const current = (s.officeName ?? '').trim();
   // 申請書の画面で施工業者を選んでいれば、その営業所（ユーザーの指示「施工業者名は…行橋、小倉南、小倉、八幡東、八幡西にする。それぞれリストから選択、
   // 追加もできる」2026-11-11）。足した営業所は会社名も（入れていれば）
@@ -1543,8 +1577,8 @@ export function shinseiValues(job: Job, settings: EstimateSettings & BuilderSett
     insurerNo: insurerNoOf(jobInsurer(job), job.address, cardInsurer),
     entrustRegNo: t(s.entrustRegNo ?? '').replace(/\D/g, ''),
     // 施工業者の営業所の事業所番号・受領委任契約番号（申請書の画面で足した営業所は、そこで入れた事業所番号）
-    providerNo: builderOffice(s.officeName ?? '', s.builders)?.jigyoshoNo ?? '',
-    juryoNo: builderOffice(s.officeName ?? '', s.builders)?.juryoNo ?? '',
+    providerNo: builderOffice(s.builderKey ?? s.officeName ?? '', s.builders)?.jigyoshoNo ?? '',
+    juryoNo: builderOffice(s.builderKey ?? s.officeName ?? '', s.builders)?.juryoNo ?? '',
     works: shinseiWorks(job, s),
     kinds,
     kindNames: KINDS.map((_, i) => [...new Set(workItems(job, s).filter((w) => w.kind === i + 1 && w.line).map((w) => w.name).filter(Boolean))]),
@@ -1601,7 +1635,7 @@ export function shinseiValues(job: Job, settings: EstimateSettings & BuilderSett
       builderTelB,
       builderTelC,
       manager: job.staff.trim() || (s.manager ?? '').trim(), // 施工業者の担当者名：様邸の担当（なければ設定の所長）
-      bizNo: builderOffice(s.officeName ?? '', s.builders)?.jigyoshoNo ?? '',
+      bizNo: builderOffice(s.builderKey ?? s.officeName ?? '', s.builders)?.jigyoshoNo ?? '',
       insured: padInsuredNo(job.insuredNo),
       benefitYen: benefit > 0 ? benefit.toLocaleString('en-US') : '',
       age: ((a) => (a ? `（${a}歳）` : ''))(ageOn(eraOf(info), info.birthY, info.birthM, info.birthD, today)), // 生年月日がなければ「（　歳）」ごと書かない
@@ -1626,6 +1660,7 @@ export function shinseiValues(job: Job, settings: EstimateSettings & BuilderSett
     end: info.end,
     ...(jobInsurer(job) === 'iizuka' ? {lines: sheetLines(job, s)} : {}),
     office: {
+      company: (s.company ?? '').trim(),
       name: (s.officeName ?? '').trim(),
       address: (s.address ?? '').trim().replace(/^福岡県/, ''), // 原本は県を書いていない
       tel: t(s.tel ?? ''),
