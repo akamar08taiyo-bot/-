@@ -975,6 +975,8 @@ log('申請書の平面図の枠から描いて入れる OK');
     await page.mouse.click(hb2.x + hb2.width / 2, hb2.y + hb2.height / 2);
   }
   assert.equal((await toilet()).rot, 120);
+  // 向きの欄は描き直したあとに変わる（すぐ読むと前の 30 のことがあった）
+  for (let i = 0; i < 20 && (await deg.inputValue()) !== '120'; i++) await page.waitForTimeout(100);
   assert.equal(await deg.inputValue(), '120');
   // もう便器の入っているトイレしかないときは、今までどおり押した所に置く（すぐには入れない）
   await tool('洋式便器');

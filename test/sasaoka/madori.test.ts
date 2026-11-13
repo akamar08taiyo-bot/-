@@ -382,9 +382,10 @@ test('見取図のいちばん上の「〇〇様邸」：名前＋様邸（呼�
   assert.ok(lay.title && lay.area.y > plain.area.y && lay.title.y < lay.area.y);
   assert.ok(lay.plan && lay.legend && lay.legend.y >= lay.plan.y + lay.plan.h && lay.legend.y + lay.legend.h <= lay.h - 10 + 0.01);
   const page = pageSvg(tall, tall.floors, lay, ['①玄関　手すりの取り付け　L=600mm'], none, 'p', {}, '見本花子様邸');
-  // 「〇〇様邸」は大きく（9mm）、下の改修の内容は少し小さく（3.4mm から）（ユーザーの指示「〇〇様邸の部分を大きくする」「申請書の内容の部分はもう少し小さくする」2026-11-12）
+  // 「〇〇様邸」は大きく（9mm）、下の改修の内容は申請書の平面図の様式と同じ 12pt（4.2mm）から（ユーザーの指示「〇〇様邸の部分を大きくする」2026-11-12、
+  // 「申請書の内容の部分はもう少し小さくする」2026-11-12 で 3.4mm にしたら「申請書の内容の部分の文字が小さい」2026-11-13）
   assert.match(page, /<text x="105" y="[\d.]+" font-size="9" font-weight="700" text-anchor="middle"[^>]*>見本花子様邸<\/text>/);
-  assert.equal(lay.legend.fs, 3.4);
+  assert.equal(lay.legend.fs, 4.2);
   assert.ok(!/見取図|平面図|年|株式会社|担当者/.test(page.replace(/<pattern[\s\S]*?<\/pattern>/g, '')), '「見取図」・日付・会社の名前は書かない');
 });
 
@@ -493,6 +494,9 @@ test('Excel：見取図を1シート（縦が基本）・一覧は赤い字・�
   assert.match(s1, /<mergeCell ref="A1:D1"\/>/);
   assert.ok(!/見取図|株式会社/.test(s1));
   assert.match(strFromU8(z['xl/styles.xml']), /FFE01B24/);
+  // 下の枠の赤い字は、申請書の平面図の様式の下の欄と同じ 12pt（ユーザーの指摘「申請書の内容の部分の文字が小さい」2026-11-13。前は 9.5pt）
+  const red = [...strFromU8(z['xl/styles.xml']).matchAll(/<font>((?:(?!<\/font>)[\s\S])*)<\/font>/g)].map((x) => x[1]).filter((f) => f.includes('FFE01B24'));
+  assert.ok(red.length > 0 && red.every((f) => /<sz val="12"\/>/.test(f)), red.join(' | '));
   assert.deepEqual([...z['xl/media/image1.png']], [...png]);
   assert.match(strFromU8(z['[Content_Types].xml']), /Extension="png"/);
 });
