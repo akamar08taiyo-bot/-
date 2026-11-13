@@ -1,6 +1,6 @@
 // 福祉用具が必要な理由の改行（ユーザーの指摘「申請書の理由が変になっている」2026-11-13。北九州市の支給申請書で「ひじ掛／けの／…立ち座りで／き、介」と行が割れた）：
 // アプリで改行を入れる欄（北九州市・みやこ町・福岡市の理由のかたまり、大分市の1行ずつの欄）は、プレビューで折り返し直さない（行の数がアプリの改行と同じ）・
-// 欄からはみ出さない。Windows の ＭＳ 明朝の小さい字は字の幅が数%広く出るので、字を 8% 広くしたまね（letter-spacing）でも同じになるかを見る。
+// 欄からはみ出さない。Windows の ＭＳ 明朝の小さい字は字の幅が数%広く出るので、字を 12% 広くしたまね（letter-spacing）でも同じになるかを見る。
 // 改行を入れない保険者（行橋市・苅田町・広域連合）は、画面で欄の幅に折り返すだけ（欄に入る）。
 // 使い方：npm run -s build:tokutei のあと  node test/tokutei/e2e-reason.mjs [出力フォルダ]
 import {createServer} from 'node:http';
@@ -81,7 +81,7 @@ try {
       if (w)
         document.addEventListener('DOMContentLoaded', () => {
           const s = document.createElement('style');
-          s.textContent = '[data-fit-inner], [data-fit-inner] * { letter-spacing: 0.08em; }';
+          s.textContent = '[data-fit-inner], [data-fit-inner] * { letter-spacing: 0.12em; }';
           document.head.append(s);
         });
     }, wide);
@@ -113,7 +113,7 @@ try {
       const shot = page.locator('[data-fit], [aria-label="申請書のプレビュー"] div:has(> .sr-only)').filter({hasText: '浴室での立ち座り'}).first();
       await shot.scrollIntoViewIfNeeded();
       await shot.screenshot({path: `${out}/reason-${ins}${wide ? '-wide' : ''}.png`}).catch(() => {});
-      log(`${ins}${wide ? '（字を 8% 広く）' : ''}：${boxes.map((x) => `${x.rows} 行（改行 ${x.appLines}）`).join('・')} 欄に入る OK`);
+      log(`${ins}${wide ? '（字を 12% 広く）' : ''}：${boxes.map((x) => `${x.rows} 行（改行 ${x.appLines}）`).join('・')} 欄に入る OK`);
     }
     await ctx.close();
   }
