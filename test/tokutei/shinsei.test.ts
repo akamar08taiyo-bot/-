@@ -458,6 +458,19 @@ test('北九州市：支給申請書（受領委任払用）。申請内容は�
   for (const sh of [KITAKYUSHU_SHEETS.back, KITAKYUSHU_SHEETS.gaiyoBack]) assert.equal(strFromU8(f[sheetPath(f, sh)]), strFromU8(template('kitakyushu')[sheetPath(f, sh)]), sh);
 });
 
+test('福祉用具が必要な理由：アプリで改行を入れる欄（北九州市）は、1行を欄の幅より 5% 以上短くする（Windows の字の幅で Excel・画面が折り返し直さない。「ひじ掛／けの」2026-11-13）', () => {
+  // 架空の文例（ユーザーのスクリーンショットと同じくらいの長さ）
+  const reason = '浴室での立ち座りに介助が必要で、介助者の負担が大きくなっている。ひじ掛けのあるシャワーチェアを使用することで、本人がひじ掛けを支えに立ち座りでき、介助者の負担を減らしながら入浴を続けられる。';
+  const f = fillKK({items: kkSale().items.map((i) => ({...i, reason}))});
+  const sheet = KITAKYUSHU_SHEETS.shikyu;
+  const lines = readCell(f, sheet, KS.reason).split('\n');
+  assert.ok(lines.length >= 3, lines.join('|'));
+  assert.equal(lines.join(''), reason);
+  const {box, style} = cellBox(f, sheet, KS.reason);
+  const px = (style.size * 4) / 3;
+  for (const l of lines) assert.ok(emOf(l) * px <= (box.w - 6) * 0.95, `${l}：${(emOf(l) * px).toFixed(1)}px／欄 ${(box.w - 6).toFixed(1)}px`);
+});
+
 test('北九州市：概要書は商品ごとに 種目・品目、形式等（商品名と品番）・金額（税抜）。合計・消費税・総合計・業者名（連絡先）・担当者', () => {
   const f = fillKK();
   const g = (ref: string) => readCell(f, KITAKYUSHU_SHEETS.gaiyo, ref);

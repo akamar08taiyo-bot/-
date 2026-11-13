@@ -435,7 +435,12 @@ export function shinseiPreview(template: Files, form: ShinseiForm, v: ShinseiVal
     const own = sheetLinks.find((s) => s.sheet === w.sheet)?.links ?? [];
     const marked = w.marks?.length ? markLayouts(files, w.sheet, w.marks) : [];
     const page = buildPage(files, path, template[path], w.sheet, own, links, marked);
-    const one = new Set(writes.filter((x) => x.sheet === w.sheet).flatMap((x) => x.oneLine ?? []));
+    // 理由のかたまり（block）・1行ずつの欄（lines）は、アプリで決めた改行のまま描き、画面で折り返し直さない（入らなければ全体を縮める）。
+    // 前は折り返す欄のまま描いたので、画面の字が見積もりより少し広いと（Windows の ＭＳ 明朝の小さい字）、改行した行がもう一度折り返して
+    // 「ひじ掛／けの／…立ち座りで／き、介／助者の」のように割れた（ユーザーの指摘「申請書の理由が変になっている」2026-11-13。北九州市）
+    const one = new Set(
+      writes.filter((x) => x.sheet === w.sheet).flatMap((x) => [...(x.oneLine ?? []), ...(x.block ? [x.block.cell] : []), ...(x.lines?.cells ?? [])]),
+    );
     if (one.size) page.texts = page.texts.map((t) => (one.has(t.ref) ? {...t, oneLine: true} : t));
     pages.push(page);
   }

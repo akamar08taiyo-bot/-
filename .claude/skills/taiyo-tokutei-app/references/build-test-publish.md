@@ -39,6 +39,7 @@ E2E_PORT=5194 PLAYWRIGHT=/opt/node-tools/node_modules/playwright/index.mjs timeo
 - カタログの全商品（2026-11-09）：`PLAYWRIGHT=… node test/tokutei/e2e-catalog-all.mjs <出力フォルダ>`（長くかかるので run_in_background で）。dist の text.json・rules.json から読み取りを作り、全ページの見出し・品番の位置を
   カタログの窓で押して、その商品の枠か・色を選ぶ一覧が読み取りと同じか・押した商品（色まで）がそのまま見積もりに入るか（IndexedDB の `sales`）を見る。`e2e-items.mjs` は、カタログを読み終わってから（品目のプルダウンが出てから）ボタンの位置を測る
   （読んでいるあいだは上の段が低く、ボタンが 60px ほど上にある。2026-11-09 にこれで1回落ちた）。
+- 理由の改行（2026-11-13）：`E2E_PORT=5194 node test/tokutei/e2e-reason.mjs <出力フォルダ>`。理由のある7つの保険者で、長い理由（架空）がプレビューで行が割れず欄に入るか（字を 8% 広くしたまねでも）。画像 `reason-<保険者>[-wide].png`。
 - 文字のはみ出し（2026-11-03）：`E2E_PORT=5301 node test/tokutei/e2e-overflow.mjs <出力フォルダ>`。6つの保険者で、長い値（架空）の3商品の申請書・販売見積書のプレビューの欄（`data-fit`）の字が
   欄の外に出ていないかを、1366px・390px・最小フォントサイズ 12px のまねで数える（0 で合格）。字は1字ずつ Range で測り、空白は数えない（行の終わりの全角の空白は欄の外にぶら下がるが描かれない。
   前は事業所名・福岡市の原本の見出しがこれで「はみ出し」に出た）。パソコンの回では申請書・見積書の Excel も保存するので、taiyo-excel-export スキルの render.sh で画像にして目で見る。

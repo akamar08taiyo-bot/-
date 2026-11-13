@@ -1108,6 +1108,13 @@ export const shinseiForm = (insurer: string): ShinseiForm | null => SHINSEI[insu
 // ---------------------------------------------------------------- 書き込む
 
 /**
+ * アプリで改行を入れる欄（理由のかたまり・1行ずつの欄）で、1行に使う幅（欄の幅の何倍まで）。Windows の ＭＳ 明朝・ゴシックは小さい字で
+ * 1字の幅が文字の大きさより数%広く出ることがあり、0.97 では Excel・画面がもう一度折り返して行が割れた（北九州市の理由「ひじ掛／けの」2026-11-13）。
+ * 8% の余りを見る
+ */
+const WRAP_ROOM = 0.92;
+
+/**
  * 理由のかたまり（みやこ町の I20）：届出の行（head）・理由（body。欄の幅で折り返す）・署名の行（tail）。
  * 全部が入る文字の大きさにする（折り返しはアプリで決めて改行を入れる）
  */
@@ -1116,7 +1123,7 @@ function writeBlock(files: Files, sheet: string, block: NonNullable<SheetWrite['
   let pt = style.size;
   let lines: string[] = [];
   for (; pt > 4.5; pt -= 0.5) {
-    lines = [...block.head, ...(block.body ? wrapText(block.body, box.w * 0.97, pt) : []), ...block.tail];
+    lines = [...block.head, ...(block.body ? wrapText(block.body, box.w * WRAP_ROOM, pt) : []), ...block.tail];
     if (lines.length * ((pt * 4) / 3) * LINE_K <= box.h - 4) break;
   }
   writeCells(files, sheet, new Map([[block.cell, lines.join('\n')]]));
@@ -1131,8 +1138,8 @@ function writeLines(files: Files, sheet: string, spec: NonNullable<SheetWrite['l
   if (!spec.text) return;
   const {box, style} = cellBox(files, sheet, spec.cells[0]);
   let pt = style.size;
-  let lines = wrapText(spec.text, box.w * 0.97, pt);
-  for (; pt > 4.5 && (lines.length > spec.cells.length || (pt * 4) / 3 > box.h - 2); pt -= 0.5) lines = wrapText(spec.text, box.w * 0.97, pt - 0.5);
+  let lines = wrapText(spec.text, box.w * WRAP_ROOM, pt);
+  for (; pt > 4.5 && (lines.length > spec.cells.length || (pt * 4) / 3 > box.h - 2); pt -= 0.5) lines = wrapText(spec.text, box.w * WRAP_ROOM, pt - 0.5);
   writeCells(files, sheet, new Map(spec.cells.map((ref, i): [string, CellValue] => [ref, lines[i] ?? ''])));
   if (pt < style.size) for (const ref of spec.cells) sizeCell(files, sheet, ref, Math.max(4.5, pt));
 }
