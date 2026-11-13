@@ -127,14 +127,16 @@ assert.doesNotMatch(await art(), /㎡/);
 await page.getByRole('checkbox', {name: '寸法'}).check();
 assert.match(await art(), />2730</);
 await page.getByRole('checkbox', {name: '寸法'}).uncheck();
-// 方眼（尺）：初めは出さない・チェックで出す・外すと消える（ユーザーの指示「尺はオンオフで良い。デフォルトは表示しない」2026-11-12。前は 910・900・1000mm を選ぶ欄）
-assert.equal(await page.locator('[data-madori-canvas] [data-grid]').count(), 0);
-assert.equal(await page.getByLabel('方眼の1マス').count(), 0);
-await page.getByRole('checkbox', {name: '方眼（尺）'}).check();
+// 方眼（尺）：初めは出す・外すと消える・入れ直すと出る（ユーザーの指示「ほうがんしのデフォルトはonにする」2026-11-13。
+// その前は「尺はオンオフで良い。デフォルトは表示しない」2026-11-12。前は 910・900・1000mm を選ぶ欄）
+assert.equal(await page.getByRole('checkbox', {name: '方眼（尺）'}).isChecked(), true);
 assert.equal(await page.locator('[data-madori-canvas] [data-grid]').count(), 2);
+assert.equal(await page.getByLabel('方眼の1マス').count(), 0);
 await page.getByRole('checkbox', {name: '方眼（尺）'}).uncheck();
 assert.equal(await page.locator('[data-madori-canvas] [data-grid]').count(), 0);
-log('部屋：ドラッグで方眼に・帖・色・寸法線なし・方眼（尺）は初めは出さない OK');
+await page.getByRole('checkbox', {name: '方眼（尺）'}).check();
+assert.equal(await page.locator('[data-madori-canvas] [data-grid]').count(), 2);
+log('部屋：ドラッグで方眼に・帖・色・寸法線なし・方眼（尺）は初めは出す OK');
 
 // ---------------- 戻す・進むは上の段のまん中、ホイールで拡大・縮小（下へ回すと遠く）
 {

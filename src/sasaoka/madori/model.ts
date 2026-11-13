@@ -88,8 +88,9 @@ export type Madori = {
   // 寸法線・広さは、機能は残して初めはオフ（ユーザーの指示「ここの長さとヘーベーは不要」「この機能はあってもいいが、デフォルトはオフ」2026-11-10）
   showDims: boolean; // 部屋の外まわりの寸法線を自動で出す
   showArea: boolean; // 部屋の名前の下に広さ（帖）
-  // 方眼（尺＝910mm のマス目）を編集の画面に出すか。初めは出さない（ユーザーの指示「尺はオンオフで良い。デフォルトは表示しない」2026-11-12。
-  // 前は 910・900・1000mm を選ぶ欄で、方眼はいつも出していた）。部品をそろえる幅（module・snap）は出さなくても同じ。印刷・Excel には前から方眼を描かない
+  // 方眼（尺＝910mm のマス目）を編集の画面に出すか。初めは出す（ユーザーの指示「ほうがんしのデフォルトはonにする」2026-11-13。
+  // その前は「尺はオンオフで良い。デフォルトは表示しない」2026-11-12 で初めは出さなかった）。チェックを外した平面図だけ false を覚える（ないときは出す）。
+  // 部品をそろえる幅（module・snap）は出さなくても同じ。印刷・Excel には前から方眼を描かない
   showGrid?: boolean;
   optRev?: 2; // 寸法・広さの初めの値をオフにしたあとの平面図（これがない前の平面図は、両方オフで読む。前の版は初めの値「出す」のまま保存していたので）
   legend?: string; // 右の一覧を手で直したもの（空なら自動。1行ずつ）
@@ -378,7 +379,8 @@ export function cleanMadori(raw: unknown): Madori | undefined {
     floors,
     showDims: rev2 && r.showDims === true,
     showArea: rev2 && r.showArea === true,
-    ...(r.showGrid === true ? {showGrid: true} : {}),
+    // 外した平面図だけ覚える。前の版（初めは出さない）で保存した平面図は、外したかどうかが残っていないので、初めの値（出す）で読む
+    ...(r.showGrid === false ? {showGrid: false} : {}),
     optRev: 2,
     ...(str(r.legend) ? {legend: str(r.legend)} : {}),
     updatedAt: num(r.updatedAt, Date.now()),

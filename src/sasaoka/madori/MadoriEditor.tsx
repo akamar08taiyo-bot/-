@@ -1809,9 +1809,9 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           </Btn>
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 lg:justify-self-end">
-          {/* 方眼（尺）：編集の画面のマス目を出すか（初めは出さない。そろえる幅は同じ） */}
+          {/* 方眼（尺）：編集の画面のマス目を出すか（初めは出す。外したら false を覚える。そろえる幅は同じ） */}
           <label className="flex items-center gap-1">
-            <input type="checkbox" checked={!!m.showGrid} onChange={(e) => change((mm) => ({...mm, showGrid: e.target.checked, updatedAt: Date.now()}))} className="h-4 w-4" />
+            <input type="checkbox" checked={m.showGrid !== false} onChange={(e) => change((mm) => ({...mm, showGrid: e.target.checked, updatedAt: Date.now()}))} className="h-4 w-4" />
             方眼（尺）
           </label>
           <label className="flex items-center gap-1">
@@ -1887,8 +1887,8 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
             role="img"
           >
             <defs dangerouslySetInnerHTML={{__html: patternDefs('ed') + gridDefs}} />
-            {/* 方眼は「方眼（尺）」にチェックを入れたときだけ（初めは出さない。2026-11-12） */}
-            {m.showGrid && (
+            {/* 方眼は「方眼（尺）」のチェックを外していなければ出す（初めは出す。ユーザーの指示「ほうがんしのデフォルトはonにする」2026-11-13） */}
+            {m.showGrid !== false && (
               <>
                 <rect x={v.x} y={v.y} width={vw} height={vh} fill="url(#ed-g1)" data-grid />
                 <rect x={v.x} y={v.y} width={vw} height={vh} fill="url(#ed-g2)" data-grid />
