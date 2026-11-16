@@ -110,6 +110,8 @@ for (const [name, viewport, where] of [
     await page.getByRole('group', {name: '保存・印刷'}).waitFor();
     await page.waitForTimeout(600);
     await page.evaluate(() => window.scrollTo(0, 0));
+    // 平面図のタブは狭い画面（1024px 未満）で開くと方眼の所まで自動でスクロールするので、右下の「📷 写真へ」が消えるまで待つ（次の描き直しで消える）
+    await page.waitForFunction(() => !document.querySelector('[data-photo-fab]'));
     const jump = page.getByRole('button', {name: '写真の欄へ'});
     assert.equal(await jump.count(), 1, `${name} ${t}`);
     const m = await page.evaluate(() => {

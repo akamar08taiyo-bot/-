@@ -211,7 +211,6 @@ log('複合機・FAX のスキャンの PDF（白黒の CCITT・270° 回した�
 // ---------------- 3. 「🪪 介護保険証から入れる」は申請書のタブのどれでも、様邸の画面の上の段の右の端（前は1段目のタブのすぐ右。ユーザーの指示「上のタブの近辺に」）。
 //   画面をクリックしてから Ctrl+V で貼り付けても読む（「クリックしてから挿入で貼り付け」）。字を打つ欄での Ctrl+V は、ふつうの貼り付けのまま
 const cardBtn = page.getByRole('button', {name: '🪪 介護保険証から自動入力', exact: true});
-const tablist = page.getByRole('tablist', {name: '住宅改修申請書・工事見積書・特定福祉用具申請書・販売見積書・理由書'});
 /** 見えている間の位置（タブを替えている途中＝前の画面が消えて次の画面が出る間は待つ） */
 const boxOf = async (loc) => {
   for (let i = 0; i < 50; i++) {
@@ -225,7 +224,8 @@ const lefts = [];
 for (const name of ['📝 住宅改修申請書', '📋 工事見積書', '🛁 特定福祉用具申請書', '🏷 販売見積書', '📄 理由書']) {
   await page.getByRole('tab', {name}).click();
   // 特定福祉用具申請書のタブを離れるときは、中のアプリの保存を待ってから替わる（flushTokutei）ので、選ばれるまで待つ
-  await page.waitForFunction((n) => [...document.querySelectorAll('[role="tab"]')].some((x) => x.textContent === n && x.getAttribute('aria-selected') === 'true'), name);
+  // タブの字は携帯用の2行の短い名前（📝住宅改修⏎申請書）とふつうの名前の両方を持つので、ふつうの名前で終わるかで見る（2026-11-12 の作りから）
+  await page.waitForFunction((n) => [...document.querySelectorAll('[role="tab"]')].some((x) => (x.textContent ?? '').endsWith(n) && x.getAttribute('aria-selected') === 'true'), name);
   // 工事見積書・理由書のタブには出さない（ユーザーの指示「工事費見積書作成のときは、このカタログ部分や介護保険証貼り付け部分は不要なのでなくす」「理由書作成のときも同様に」2026-10-27）
   if (name === '📋 工事見積書' || name === '📄 理由書') {
     await page.waitForTimeout(300);
