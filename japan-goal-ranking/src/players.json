@@ -1,0 +1,17 @@
+{
+  "asOf": "2026.11.14",
+  "asOfLabel": "2026年11月14日時点",
+  "source": "出典：JFA公式記録・各社報道（国際Aマッチ通算）",
+  "players": [
+    { "name": "釜本 邦茂", "roman": "KUNISHIGE KAMAMOTO", "goals": 75, "caps": 76, "years": "1964–1977" },
+    { "name": "三浦 知良", "roman": "KAZUYOSHI MIURA", "goals": 55, "caps": 89, "years": "1990–2000" },
+    { "name": "岡崎 慎司", "roman": "SHINJI OKAZAKI", "goals": 50, "caps": 119, "years": "2008–2019" },
+    { "name": "原 博実", "roman": "HIROMI HARA", "goals": 37, "caps": 75, "years": "1978–1988" },
+    { "name": "本田 圭佑", "roman": "KEISUKE HONDA", "goals": 37, "caps": 98, "years": "2008–2018" },
+    { "name": "香川 真司", "roman": "SHINJI KAGAWA", "goals": 31, "caps": 97, "years": "2008–2019" },
+    { "name": "高木 琢也", "roman": "TAKUYA TAKAGI", "goals": 27, "caps": 44, "years": "1992–1997" },
+    { "name": "木村 和司", "roman": "KAZUSHI KIMURA", "goals": 26, "caps": 54, "years": "1979–1986" },
+    { "name": "南野 拓実", "roman": "TAKUMI MINAMINO", "goals": 26, "caps": 73, "years": "2015–", "active": true },
+    { "name": "大迫 勇也", "roman": "YUYA OSAKO", "goals": 25, "caps": 57, "years": "2013–2022" }
+  ]
+}
