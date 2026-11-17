@@ -77,6 +77,10 @@ export function tatami(x: number, y: number, w: number, h: number, module: Modul
   return lines.length ? `<path d="${lines.join('')}" stroke="${color}" stroke-width="22" fill="none"/>` : '';
 }
 
+/** 部屋の名前・広さの字の大きさ（mm）。ユーザーの指示「仏間・LDK などの文字が小さいため、２周りぐらい大きくする」2026-11-17（前は 260・170） */
+export const ROOM_NAME_SIZE = 420;
+export const ROOM_AREA_SIZE = 260;
+
 /** 部屋の名前と広さ（部屋の大きさに入るように字を小さくする） */
 function roomLabel(it: MItem, module: Module, showArea: boolean, inner: MItem[] = []): string {
   const name = (it.label?.trim() || it.type || '').trim();
@@ -91,11 +95,17 @@ function roomLabel(it: MItem, module: Module, showArea: boolean, inner: MItem[] 
   const cx = spot.x;
   const cy = spot.y;
   const maxW = Math.max(100, spot.maxW - 120);
-  const fit = (s: string, size: number) => (s ? Math.min(size, (maxW / textWidth(s, 1)) * 0.95) : size);
-  const ns = fit(name, 260);
-  const as = fit(areaText, 170);
+  const fit = (s: string, size: number) => (s ? Math.min(size, (maxW / textWidth(s, 1)) * 0.95, Math.max(120, spot.maxH * 0.7)) : size);
+  let ns = fit(name, ROOM_NAME_SIZE);
+  let as = fit(areaText, ROOM_AREA_SIZE);
+  // 名前と広さが2行で入らない細い部屋は、2つとも同じ割合で小さくして2行に（前の大きさ 260・170 より小さくはしない）
+  const k = name && areaText ? Math.min(1, (spot.maxH - 80) / (ns + as)) : 1;
+  const both = Boolean(name && areaText) && (k >= 1 || ns * k >= Math.min(ns, 260));
+  if (both && k < 1) {
+    ns *= k;
+    as *= k;
+  }
   const rows: string[] = [];
-  const both = name && areaText && spot.maxH > ns + as + 80;
   if (name) rows.push(`<text x="${r1(cx)}" y="${r1(both ? cy - as * 0.35 : cy + ns * 0.35)}" font-size="${r1(ns)}" text-anchor="middle" fill="#1f2937">${esc(name)}</text>`);
   if (areaText && (both || !name)) rows.push(`<text x="${r1(cx)}" y="${r1(both ? cy + ns * 0.55 + as * 0.3 : cy + as * 0.35)}" font-size="${r1(as)}" text-anchor="middle" fill="#475569">${esc(areaText)}</text>`);
   return rows.join('');

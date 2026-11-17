@@ -140,7 +140,7 @@ log('部屋：ドラッグで方眼に・帖・色・寸法線なし・方眼（
 
 // ---------------- 戻す・進むは上の段のまん中、ホイールで拡大・縮小（下へ回すと遠く）
 {
-  const bar = await page.getByRole('toolbar', {name: '平面図の設定'}).boundingBox();
+  const bar = await page.getByRole('toolbar', {name: '描く道具'}).boundingBox();
   const undoBox = await page.getByRole('button', {name: '↶ 戻す'}).boundingBox();
   const mid = undoBox.x + undoBox.width / 2;
   assert.ok(mid > bar.x + bar.width * 0.35 && mid < bar.x + bar.width * 0.65, `戻すが上の段のまん中 ${mid} / ${bar.x}..${bar.x + bar.width}`);
@@ -390,9 +390,12 @@ log('図の上で文字を打つ・回すつまみ・L字の手すり・頂点�
   const cg = await bar.locator('[data-draw-center]').boundingBox();
   assert.ok(Math.abs(mid(cg) - mid(bb)) < 3, `描く道具のど真ん中 ${JSON.stringify([bb, cg])}`);
   assert.deepEqual(await bar.locator('[data-draw-center] button').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label'))), ['丸（塗りつぶし）', '横四角（塗りつぶし）', '横棒', '自在棒', '文字']);
-  const sb = await page.getByRole('toolbar', {name: '平面図の設定'}).boundingBox();
+  // 戻す・進む・削除・全て削除・頂点の編集は2行目の、左（部屋の描き方・住設）と右（方眼・拡大縮小）の間のまん中（ユーザーの矢印 2026-11-17。13インチで1行に収める）
   const ub = await page.locator('[data-undo-center]').boundingBox();
-  assert.ok(Math.abs(mid(ub) - mid(sb)) < 3 && Math.abs(mid(sb) - mid(bb)) < 3, `戻す・進むのど真ん中 ${JSON.stringify([sb, ub])}`);
+  const lb = await bar.locator('[data-fix-row] > div').first().boundingBox();
+  const vb = await bar.locator('[data-fix-row] > div').last().boundingBox();
+  const gapMid = (lb.x + lb.width + vb.x) / 2;
+  assert.ok(ub.x > lb.x + lb.width && ub.x + ub.width < vb.x && Math.abs(mid(ub) - gapMid) < 3 && Math.abs(ub.y + ub.height / 2 - (vb.y + vb.height / 2)) < 3, `戻す・進むは左と右の間のまん中 ${JSON.stringify([lb, ub, vb])}`);
   // 住設（トイレ・浴槽・キッチン・ベッド・下駄箱）は番号の右（ユーザーの指示「住設も選べるように」2026-11-10）
   assert.deepEqual(await bar.locator('[data-quick-fix]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label'))), ['トイレ（便器）', '浴槽', 'キッチン', 'ベッド', '下駄箱']);
   {
@@ -405,7 +408,7 @@ log('図の上で文字を打つ・回すつまみ・L字の手すり・頂点�
     assert.equal((await art()).length, n0);
   }
   const dimBox = await page.getByRole('checkbox', {name: '寸法'}).boundingBox();
-  assert.ok(dimBox.x > mid(sb), '寸法は右');
+  assert.ok(dimBox.x > mid(bb), '寸法は右');
   // 描く道具の段は方眼のすぐ上（間は「〇〇様邸」の行だけ。ユーザーの指示「平面図の一番上に〇〇様邸と表示しておく」2026-11-11）
   const tb = await page.locator('[data-plan-title]').boundingBox();
   assert.ok(bb.y + bb.height <= tb.y + 1 && tb.y + tb.height <= cb.y + 1 && cb.y - (bb.y + bb.height) < 16 + tb.height + 8, `方眼のすぐ上 ${JSON.stringify([bb, tb, cb])}`);
@@ -491,7 +494,21 @@ log('図の上で文字を打つ・回すつまみ・L字の手すり・頂点�
     assert.ok(db.x > nb.x + nb.width - 2 && db.x - (nb.x + nb.width) < 12 && Math.abs(db.y + db.height / 2 - (nb.y + nb.height / 2)) < 3, `確定は番号のすぐ右 ${JSON.stringify([nb, db])}`);
     const cg2 = await bar.locator('[data-draw-center]').boundingBox();
     assert.ok(Math.abs(mid(cg2) - mid(cg)) < 1, `確定が出てもど真ん中の道具は動かない ${JSON.stringify([cg, cg2])}`);
+    // 確定のすぐ右に「↶ 戻す」（番号を置いている間だけ。押すと置いた番号を1つ戻し、番号を置くのは続ける。ユーザーの指示「番号を振っていった際には、戻るボタンを横に設置する」2026-11-17）
+    {
+      const back = bar.getByRole('button', {name: '番号を1つ戻す'});
+      const bb2 = await back.boundingBox();
+      assert.ok(bb2.x > db.x + db.width - 2 && bb2.x - (db.x + db.width) < 12 && Math.abs(bb2.y + bb2.height / 2 - (db.y + db.height / 2)) < 3, `戻すは確定のすぐ右 ${JSON.stringify([db, bb2])}`);
+      await back.click();
+      assert.equal(await numBtn.getAttribute('aria-pressed'), 'true', '戻しても番号を置くのは続ける');
+      assert.ok(!(await art()).includes(`>${circled(n0 + 2)}<`), '置いた番号が1つ戻る');
+      assert.ok((await numBtn.innerText()).includes(circled(n0 + 2)), await numBtn.innerText());
+      await click(7 * M, 8.3 * M); // もう一度置く（戻した番号から）
+      assert.ok((await art()).includes(`>${circled(n0 + 2)}<`));
+      assert.ok((await numBtn.innerText()).includes(circled(n0 + 3)));
+    }
     await done.click();
+    assert.equal(await bar.locator('[data-num-undo]').isVisible(), false, '番号を置いていないときは戻すを出さない');
     assert.equal(await numBtn.getAttribute('aria-pressed'), 'false');
     assert.equal(await done.isDisabled(), true); // 確定はいつも番号の右にあり、番号を置いていないときは押せない
     // 確定で止めたあと、ほかの道具（和室など）に替えて描ける（ユーザーの指示「一旦ストップして、また新たに（例えば和室）など入力できる」）
@@ -724,9 +741,10 @@ log('削除を押してなぞる・押すと部屋も消える（赤く見せる
   const del = page.locator('[data-del-center]');
   assert.equal(await del.getAttribute('aria-label'), 'なぞって削除'); // 何も選んでいないときは、なぞって消す
   {
+    // 削除は戻す・進むと同じまとまり（2行目の左と右の間のまん中）
     const ub = await page.locator('[data-undo-center]').boundingBox();
-    const sb = await page.getByRole('toolbar', {name: '平面図の設定'}).boundingBox();
-    assert.ok(Math.abs(mid(ub) - mid(sb)) < 3, `削除もまん中 ${JSON.stringify([ub, sb])}`);
+    const db = await del.boundingBox();
+    assert.ok(db.x >= ub.x && db.x + db.width <= ub.x + ub.width + 0.5, `削除は戻す・進むと同じまとまり ${JSON.stringify([ub, db])}`);
   }
   await click(8 * M, 1 * M);
   assert.equal(await del.getAttribute('aria-label'), '選んだ部品を削除');

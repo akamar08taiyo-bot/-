@@ -572,7 +572,9 @@ export default function App({start}: {start: MainTab}) {
           </nav>
         </header>
 
-        <main className={`no-print mx-auto min-w-0 px-3 py-4 sm:px-4 touch:pb-20 ${PAGE_WIDTH}`}>
+        {/* 平面図のタブは、パソコンでも左右の余白をなくして画面の幅いっぱいに描く欄を広げる（ユーザーの指示「パソコンで入力する際、13インチでもめいいっぱい余白をなくす、
+            平面図を書ける欄を広くする」2026-11-17）。ほかのタブは今までどおり 1600px まで（上のタブの段も同じ幅のまま） */}
+        <main className={`no-print mx-auto min-w-0 py-4 touch:pb-20 ${tab === 'estimate' && estimateJob && jobView === 'madori' ? 'max-w-none px-2 sm:px-3' : `px-3 sm:px-4 ${PAGE_WIDTH}`}`}>
             {tab === 'estimate' &&
               (estimateJob && jobView === 'order' && hasEstimateRows(estimateJob) ? (
                 <OrderPage key={estimateJob.id} job={estimateJob} data={data} update={store.update} onBack={() => setJobView('estimate')} onPrint={setPrint} />

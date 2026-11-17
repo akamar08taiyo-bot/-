@@ -22,7 +22,7 @@ import type {Handle, P, Tool} from './edit.ts';
 import {MadoriPrint} from './MadoriPrint.tsx';
 import {bounds, circled, emptyMadori, NUM_SIZE, hasMadori, joLabel, lineLength, mid, normRot, numberItems, railPts, railSegs, roomAreaOf, snapStep, withFloor} from './model.ts';
 import type {Madori, MFloor, MItem} from './model.ts';
-import {floorSvg, patternDefs, thumbSvg, viewOf} from './render.ts';
+import {floorSvg, patternDefs, ROOM_NAME_SIZE, thumbSvg, viewOf} from './render.ts';
 import {linkPlan, placeLookup, planLinked, sheetTitle} from './sheet.ts';
 
 type Cat = 'room' | 'stair' | 'door' | 'fix' | 'furn' | 'draw';
@@ -954,13 +954,13 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     setPoly(null);
     setPolyHover(null);
   };
-  // 番号を置いているときに方眼の外を押すと確定（ユーザーの指示「平面図内以外をタップしても確定とする」2026-11-10）。番号のボタン（もう一度押すと確定）は除く
+  // 番号を置いているときに方眼の外を押すと確定（ユーザーの指示「平面図内以外をタップしても確定とする」2026-11-10）。番号のボタン（もう一度押すと確定）と、確定の右の戻す（続けて番号を置く）は除く
   const numMode = tool.t === 'num';
   useEffect(() => {
     if (!numMode) return;
     const onDown = (e: PointerEvent) => {
       const t = e.target as Element | null;
-      if (!t?.closest || t.closest('[data-madori-canvas]') || t.closest('[data-num-tool]')) return;
+      if (!t?.closest || t.closest('[data-madori-canvas]') || t.closest('[data-num-tool]') || t.closest('[data-num-undo]')) return;
       endTool();
     };
     document.addEventListener('pointerdown', onDown, true);
@@ -1050,15 +1050,24 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       >
         ↖ 選ぶ・動かす
       </ToolBtn>
-      <div role="tablist" aria-label="道具の種類" className="grid grid-cols-3 gap-1 max-lg:grid-cols-6">
+      {/* 道具の種類（部屋・階段…）は、灰色の地の帯にまとめた切り替え（ユーザーの指示「この部分が和室、洋室などと一体化しているため、しっかりと分かれてみえるように工夫する」
+          2026-11-17。前は和室・洋室などのボタンと同じ形・同じ大きさで並び、続きに見えた）。下の一覧とは線で分ける */}
+      <div role="tablist" aria-label="道具の種類" className="grid grid-cols-3 gap-0.5 rounded-lg bg-slate-200 p-1 ring-1 ring-slate-300 max-lg:grid-cols-6" data-cat-tabs>
         {CATS.map(([c, label]) => (
-          <button key={c} type="button" role="tab" aria-selected={cat === c} onClick={() => setCat(c)} className={`rounded-md px-1 py-1.5 text-xs font-bold max-lg:py-1 ${cat === c ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+          <button
+            key={c}
+            type="button"
+            role="tab"
+            aria-selected={cat === c}
+            onClick={() => setCat(c)}
+            className={`rounded-md px-1 py-1 text-xs font-bold max-lg:py-0.5 ${cat === c ? 'bg-emerald-700 text-white shadow' : 'text-slate-600 hover:bg-white/80'}`}
+          >
             {label}
           </button>
         ))}
       </div>
       {/* スマホ・タブレットは方眼の上に出すので、低い箱の中でスクロール（部屋の一覧が長く、方眼が下に行きすぎた） */}
-      <div className="min-h-0 overflow-y-auto pr-0.5 max-lg:max-h-36 lg:max-h-[calc(100vh-17rem)]">
+      <div className="min-h-0 overflow-y-auto border-t-2 border-slate-200 pr-0.5 pt-2 max-lg:max-h-36 max-lg:pt-1 lg:max-h-[calc(100vh-17rem)]">
         {cat === 'room' &&
           ROOM_ROWS.map((row, ri) => (
           <div key={ri} className="mb-1.5 grid grid-cols-3 gap-1 max-lg:mb-1 max-lg:grid-cols-4">
@@ -1577,13 +1586,117 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     },
     {tool: {t: 'text'}, label: '文字', name: '文字', title: '文字：押した所にそのまま打つ', icon: <span className="text-base font-bold leading-none">A</span>},
   ];
+  // 上の段（階・戻す・削除・方眼・寸法）は、描く道具の2行の空いた所へ移した（ユーザーの指示「ボタンの位置を移動して、なるべく、入力スペースをなるべく広く取る」2026-11-17。
+  // 1行目の左に階、2行目のまん中に戻す・進む・削除・全て削除・頂点の編集、右に方眼・寸法・広さ・拡大縮小。そのぶん方眼が1段ぶん上に来る）
+  const floorTabs = (
+    <div role="tablist" aria-label="階" className="flex flex-wrap items-center gap-1">
+      {m.floors.map((f) => (
+        <button
+          key={f.id}
+          type="button"
+          role="tab"
+          aria-selected={f.id === floor.id}
+          onClick={() => {
+            setFloorId(f.id);
+            setSel(null);
+          }}
+          className={`rounded-md px-3 py-1.5 font-bold ${f.id === floor.id ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+        >
+          {f.name}
+        </button>
+      ))}
+      <button type="button" onClick={addFloor} className="rounded-md border border-dashed border-slate-400 px-2 py-1.5 text-slate-600 hover:bg-slate-50" title="階を足す">
+        ＋ 階
+      </button>
+      {m.floors.length > 1 && (
+        <button type="button" onClick={removeFloor} className="rounded-md px-2 py-1.5 text-slate-500 hover:bg-slate-100" title={`${floor.name}を消す`}>
+          ✕
+        </button>
+      )}
+    </div>
+  );
+  // 戻す・進むはど真ん中（ユーザーの指示「戻るボタンの位置は中央にもってくる」「戻る進むもど真ん中」2026-11-10）。いまは描く道具の2行目の、左（部屋の描き方・住設）と右（方眼・拡大縮小）の間のまん中（ユーザーの矢印 2026-11-17。13インチでも1行に収まるように）
+  const undoGroup = (
+    <div className="flex flex-wrap items-center justify-center gap-1 lg:justify-self-center" data-undo-center>
+      <Btn color="white" small onClick={undo} disabled={!hist.current.past.length} title="Ctrl+Z">
+        ↶ 戻す
+      </Btn>
+      <Btn color="white" small onClick={redo} disabled={!hist.current.future.length} title="Ctrl+Y">
+        ↷ 進む
+      </Btn>
+      {/* 削除もまん中（ユーザーの指示「削除ボタンも中央におく」2026-11-10）。選んでいる部品を消す（Delete と同じ。戻すで戻る）。
+          何も選んでいないときは消すモード（押すたびに入る・やめる。なぞった部品を消す。ユーザーの指示「削除をタップして、グジャグジャってなぞると、消せるように」） */}
+      <Btn
+        color="white"
+        small
+        onClick={() => {
+          if (vtx && vtxPick !== null) removeVertex(vtxPick);
+          else if (selItem) remove(selItem.id);
+          else toggleDel();
+        }}
+        disabled={!selItem && !delMode && !items.length}
+        aria-pressed={selItem ? undefined : delMode}
+        className={!selItem && delMode ? '!border-rose-400 !bg-rose-50 ring-2 ring-rose-200' : ''}
+        title={vtx && vtxPick !== null ? '選んだ頂点を消す（Delete・ダブルタップ）' : selItem ? '選んでいる部品を消す（Delete）' : '押してから、消したい所をなぞる（押す）と消える。もう一度押すとやめる'}
+        aria-label={vtx && vtxPick !== null ? '選んだ頂点を削除' : selItem ? '選んだ部品を削除' : 'なぞって削除'}
+        data-del-center
+      >
+        🗑 {vtx && vtxPick !== null ? '頂点を削除' : '削除'}
+      </Btn>
+      <Btn color="white" small onClick={removeAll} disabled={!items.length} title="この階の図をすべて消す（確かめてから。戻すで戻せます）" aria-label="この階の図をすべて削除">
+        🗑 全て削除
+      </Btn>
+      {/* 頂点の編集（部屋・図形を選んだとき。もう一度押すと終わる）。変わった形の部屋を描くのは、描く道具の段の「部屋の描き方」 */}
+      <Btn
+        color="white"
+        small
+        onClick={toggleVtx}
+        disabled={!canVertexEdit(selItem)}
+        aria-pressed={vtx}
+        className={vtx ? '!border-emerald-600 !bg-emerald-50 ring-2 ring-emerald-200' : ''}
+        title="頂点の編集：角（■）を動かす・辺のまん中（□）をつまむと角が増える・角をダブルタップで消す"
+      >
+        ◇ 頂点の編集
+      </Btn>
+    </div>
+  );
+  const viewGroup = (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 lg:justify-self-end">
+      {/* 方眼（尺）：編集の画面のマス目を出すか（初めは出す。外したら false を覚える。そろえる幅は同じ） */}
+      <label className="flex items-center gap-1">
+        <input type="checkbox" checked={m.showGrid !== false} onChange={(e) => change((mm) => ({...mm, showGrid: e.target.checked, updatedAt: Date.now()}))} className="h-4 w-4" />
+        方眼（尺）
+      </label>
+      <label className="flex items-center gap-1">
+        <input type="checkbox" checked={m.showDims} onChange={(e) => change((mm) => ({...mm, showDims: e.target.checked, updatedAt: Date.now()}))} className="h-4 w-4" />
+        寸法
+      </label>
+      <label className="flex items-center gap-1">
+        <input type="checkbox" checked={m.showArea} onChange={(e) => change((mm) => ({...mm, showArea: e.target.checked, updatedAt: Date.now()}))} className="h-4 w-4" />
+        広さ（帖）
+      </label>
+      <div className="flex items-center gap-1">
+      <Btn color="white" small onClick={() => zoomAt(1 / 1.25)} aria-label="縮小">
+        −
+      </Btn>
+      <Btn color="white" small onClick={() => zoomAt(1.25)} aria-label="拡大">
+        ＋
+      </Btn>
+      <Btn color="white" small onClick={() => fitTo(items)}>
+        全体
+      </Btn>
+      </div>
+    </div>
+  );
   const shapeBar = (
     <div
       role="toolbar"
       aria-label="描く道具"
       className="flex flex-wrap items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 shadow-sm max-lg:order-2 lg:col-span-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:gap-1.5"
     >
-      {/* 左右の列は中身が多いと折り返す（いつも出す図形・住設を増やしても、まん中の道具は段のど真ん中のまま） */}
+      {/* 左右の列は中身が多いと折り返す（いつも出す図形・住設を増やしても、まん中の道具は段のど真ん中のまま）。1行目の左の端に階（1階・＋階） */}
+      <div className="flex flex-wrap items-center justify-center gap-1 lg:justify-between">
+      {floorTabs}
       <div ref={shapeBarRef} className="relative flex flex-wrap items-center justify-center gap-1 lg:justify-end">
         <button
           type="button"
@@ -1632,6 +1745,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           </div>
         )}
       </div>
+      </div>
       <div className="flex items-center gap-1 lg:border-x lg:border-slate-200 lg:px-1.5" data-draw-center>
         {centerTools.map((c) => (
           <button key={c.name} type="button" aria-pressed={isTool(c.tool)} onClick={() => pick(c.tool)} className={barBtn(isTool(c.tool))} aria-label={c.name} title={c.title}>
@@ -1670,16 +1784,38 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
         >
           ✓ 確定
         </button>
+        {/* 戻す：番号を置いている間だけ確定のすぐ右に出す（ユーザーの指示「番号を振っていった際には、戻るボタンを横に設置する」2026-11-17）。
+            置いた番号を1つずつ戻し、番号を置くのは続ける（次はまた戻した番号から）。置いていないときも場所は取っておく（段の幅・ほかのボタンを動かさない）。
+            携帯は段が1行増えて方眼が下がるので出さない（方眼の右下の「← 戻す｜進む →」をすべらせる） */}
+        <button
+          type="button"
+          onClick={undo}
+          disabled={!numOn || !hist.current.past.length}
+          aria-hidden={!numOn}
+          tabIndex={numOn ? 0 : -1}
+          className={`flex h-11 items-center gap-1 rounded-md border border-slate-300 bg-white px-3 text-base text-slate-700 hover:bg-slate-50 disabled:text-slate-300 max-sm:hidden ${numOn ? '' : 'invisible'}`}
+          aria-label="番号を1つ戻す"
+          title="置いた番号を1つ戻す（Ctrl+Z）"
+          data-num-undo
+        >
+          ↶ 戻す
+        </button>
       </div>
-      {/* 2行目：左に「部屋の描き方」、まん中に住設 ▼ と、いつも出す住設。数が増えても1行目（図形・まん中の道具・番号）は崩れない */}
+      {/* 2行目：左に「部屋の描き方」と住設 ▼・いつも出す住設、まん中に戻す・進む・削除・全て削除・頂点の編集、右に方眼・寸法・広さ・拡大縮小
+          （前は上に別の段があった。ユーザーの指示「ボタンの位置を移動して、なるべく、入力スペースをなるべく広く取る」2026-11-17） */}
       <div
-        className="flex flex-wrap items-center justify-center gap-1 lg:col-span-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:border-t lg:border-slate-100 lg:pt-1"
+        className="flex flex-wrap items-center justify-center gap-1 lg:col-span-3 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:gap-x-3 lg:border-t lg:border-slate-100 lg:pt-1"
         data-fix-row
       >
         {/* 部屋の描き方（初めは枠込み。ユーザーの指示「この辺に枠がこみか頂点で図を書くかの選択をできるようにする。デフォルトは枠が込み」2026-11-17）。
             広い画面は段の左の空いた所、狭い画面は住設の段の頭 */}
-        <div role="radiogroup" aria-label="部屋の描き方" className="flex items-center gap-1 max-lg:w-full max-lg:justify-center lg:justify-self-start" data-room-mode>
-          <span className="text-xs text-slate-500">部屋の描き方</span>
+        <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 max-lg:w-full lg:justify-start">
+        <div className="flex items-center gap-1 max-lg:w-full max-lg:justify-center">
+          {/* 13インチ（1366px）は段を1行に収めるため名前を出さない（押す所は2つ並びの切り替えで、名前は読み上げ・マウスを乗せたときの説明に） */}
+          <span className="text-xs text-slate-500 lg:max-2xl:hidden" aria-hidden>
+            部屋の描き方
+          </span>
+          <div role="radiogroup" aria-label="部屋の描き方" className="flex items-center gap-0.5 rounded-lg bg-slate-100 p-0.5 ring-1 ring-slate-300" data-room-mode>
           {(
             [
               [false, '□ 枠込み', '部屋の種類を選んで方眼をドラッグすると、その大きさの四角の部屋を枠ごと置く'],
@@ -1693,11 +1829,12 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
               aria-checked={polyMode === on}
               onClick={() => pickRoomMode(on)}
               title={title}
-              className={`h-9 rounded-md border px-2.5 text-sm max-sm:px-1.5 ${polyMode === on ? 'border-emerald-600 bg-emerald-50 font-bold text-emerald-800 ring-1 ring-emerald-300' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+              className={`h-8 rounded-md border px-2.5 text-sm max-sm:px-1.5 ${polyMode === on ? 'border-emerald-600 bg-white font-bold text-emerald-800 shadow-sm' : 'border-transparent text-slate-600 hover:bg-white/70'}`}
             >
               {label}
             </button>
           ))}
+          </div>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-1">
         {/* 住設 ▼：左の一覧と同じ住設・家具・福祉用具を選ぶ。☆ で段にいつも出す */}
@@ -1735,6 +1872,9 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
         {/* いつも出す住設（初めはトイレ・浴槽・キッチン・ベッド・下駄箱。ユーザーの指示「住設も選べるように」2026-11-10）：押してから方眼を押すと、壁ぎわに置く */}
         {pins.fix.map((type) => fixBarBtn(type))}
         </div>
+        </div>
+        {undoGroup}
+        {viewGroup}
       </div>
     </div>
   );
@@ -1782,108 +1922,6 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       {/* 上の段：階・方眼・表示・元に戻す・拡大 */}
       {/* 左（階・方眼・そろえる）・ど真ん中（戻す・進む）・右（寸法・広さ・拡大）の3つ。広い画面は左右の列を同じ幅にして、戻す・進むを段のちょうどまん中に
           （ユーザーの指示「戻る進むもど真ん中」「寸法、広さのチェックマークは右にもってくる」2026-11-10） */}
-      <div role="toolbar" aria-label="平面図の設定" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm lg:grid lg:grid-cols-[minmax(max-content,1fr)_auto_minmax(max-content,1fr)]">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <div role="tablist" aria-label="階" className="flex flex-wrap items-center gap-1">
-          {m.floors.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              role="tab"
-              aria-selected={f.id === floor.id}
-              onClick={() => {
-                setFloorId(f.id);
-                setSel(null);
-              }}
-              className={`rounded-md px-3 py-1.5 font-bold ${f.id === floor.id ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-            >
-              {f.name}
-            </button>
-          ))}
-          <button type="button" onClick={addFloor} className="rounded-md border border-dashed border-slate-400 px-2 py-1.5 text-slate-600 hover:bg-slate-50" title="階を足す">
-            ＋ 階
-          </button>
-          {m.floors.length > 1 && (
-            <button type="button" onClick={removeFloor} className="rounded-md px-2 py-1.5 text-slate-500 hover:bg-slate-100" title={`${floor.name}を消す`}>
-              ✕
-            </button>
-          )}
-        </div>
-        {/* 方眼の 910・900・1000mm を選ぶ欄は外して、右の「方眼（尺）」のオン・オフに（ユーザーの指示「尺はオンオフで良い。デフォルトは表示しない」2026-11-12） */}
-        {/* 「そろえる（1マス・1/2マス・1/4マス）」の欄は外した（ユーザーの指示「2分の1なんとかかんとかって書いてあるやつ、意味がわからないので、なくして」2026-11-11）。
-            そろえる幅は前に選んだまま（初めは 1/2マス。model.ts の snap） */}
-        </div>
-        {/* 戻す・進むは上の段のど真ん中（ユーザーの指示「戻るボタンの位置は中央にもってくる」「戻る進むもど真ん中」2026-11-10） */}
-        <div className="flex flex-wrap items-center gap-1 lg:justify-self-center" data-undo-center>
-          <Btn color="white" small onClick={undo} disabled={!hist.current.past.length} title="Ctrl+Z">
-            ↶ 戻す
-          </Btn>
-          <Btn color="white" small onClick={redo} disabled={!hist.current.future.length} title="Ctrl+Y">
-            ↷ 進む
-          </Btn>
-          {/* 削除もまん中（ユーザーの指示「削除ボタンも中央におく」2026-11-10）。選んでいる部品を消す（Delete と同じ。戻すで戻る）。
-              何も選んでいないときは消すモード（押すたびに入る・やめる。なぞった部品を消す。ユーザーの指示「削除をタップして、グジャグジャってなぞると、消せるように」） */}
-          <Btn
-            color="white"
-            small
-            onClick={() => {
-              if (vtx && vtxPick !== null) removeVertex(vtxPick);
-              else if (selItem) remove(selItem.id);
-              else toggleDel();
-            }}
-            disabled={!selItem && !delMode && !items.length}
-            aria-pressed={selItem ? undefined : delMode}
-            className={!selItem && delMode ? '!border-rose-400 !bg-rose-50 ring-2 ring-rose-200' : ''}
-            title={vtx && vtxPick !== null ? '選んだ頂点を消す（Delete・ダブルタップ）' : selItem ? '選んでいる部品を消す（Delete）' : '押してから、消したい所をなぞる（押す）と消える。もう一度押すとやめる'}
-            aria-label={vtx && vtxPick !== null ? '選んだ頂点を削除' : selItem ? '選んだ部品を削除' : 'なぞって削除'}
-            data-del-center
-          >
-            🗑 {vtx && vtxPick !== null ? '頂点を削除' : '削除'}
-          </Btn>
-          <Btn color="white" small onClick={removeAll} disabled={!items.length} title="この階の図をすべて消す（確かめてから。戻すで戻せます）" aria-label="この階の図をすべて削除">
-            🗑 全て削除
-          </Btn>
-          {/* 頂点の編集（部屋・図形を選んだとき。もう一度押すと終わる）。変わった形の部屋を描くのは、描く道具の段の「部屋の描き方」 */}
-          <Btn
-            color="white"
-            small
-            onClick={toggleVtx}
-            disabled={!canVertexEdit(selItem)}
-            aria-pressed={vtx}
-            className={vtx ? '!border-emerald-600 !bg-emerald-50 ring-2 ring-emerald-200' : ''}
-            title="頂点の編集：角（■）を動かす・辺のまん中（□）をつまむと角が増える・角をダブルタップで消す"
-          >
-            ◇ 頂点の編集
-          </Btn>
-        </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 lg:justify-self-end">
-          {/* 方眼（尺）：編集の画面のマス目を出すか（初めは出す。外したら false を覚える。そろえる幅は同じ） */}
-          <label className="flex items-center gap-1">
-            <input type="checkbox" checked={m.showGrid !== false} onChange={(e) => change((mm) => ({...mm, showGrid: e.target.checked, updatedAt: Date.now()}))} className="h-4 w-4" />
-            方眼（尺）
-          </label>
-          <label className="flex items-center gap-1">
-            <input type="checkbox" checked={m.showDims} onChange={(e) => change((mm) => ({...mm, showDims: e.target.checked, updatedAt: Date.now()}))} className="h-4 w-4" />
-            寸法
-          </label>
-          <label className="flex items-center gap-1">
-            <input type="checkbox" checked={m.showArea} onChange={(e) => change((mm) => ({...mm, showArea: e.target.checked, updatedAt: Date.now()}))} className="h-4 w-4" />
-            広さ（帖）
-          </label>
-          <div className="flex items-center gap-1">
-          <Btn color="white" small onClick={() => zoomAt(1 / 1.25)} aria-label="縮小">
-            −
-          </Btn>
-          <Btn color="white" small onClick={() => zoomAt(1.25)} aria-label="拡大">
-            ＋
-          </Btn>
-          <Btn color="white" small onClick={() => fitTo(items)}>
-            全体
-          </Btn>
-          </div>
-        </div>
-      </div>
-
       <div className="grid items-start gap-3 lg:grid-cols-[15rem_minmax(0,1fr)_19rem]">
         {shapeBar}
         <div ref={paletteRef} className="scroll-mt-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm max-lg:order-1 max-lg:p-1.5" data-madori-palette>
@@ -2065,7 +2103,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
             const target = editItem ?? selItem;
             if (!target) return null;
             const room = target.kind === 'room';
-            const size = room ? 260 : (target.size ?? 220);
+            const size = room ? ROOM_NAME_SIZE : (target.size ?? 220);
             const fs = Math.max(14, size * v.k);
             const value = editing ? editing.value : '';
             const lines = value.split('\n');
