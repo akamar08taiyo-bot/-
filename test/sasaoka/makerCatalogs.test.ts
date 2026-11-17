@@ -90,6 +90,17 @@ test('カタログのページ：p.12〜81 の 70 ページ。どのページの
     assert.ok(on(page).includes(code), `p.${page} ${code}`);
   for (const [page, code] of [[24, 'CYA-1300'], [38, 'EBT-55'], [49, 'AA-355-1 GLD'], [58, 'AA-35FWC SED'], [70, 'EBT-55'], [76, 'SBD-2000T'], [78, 'EBT-4D']] as const)
     assert.ok(!on(page).includes(code), `p.${page} ${code}（読み違い）`);
+  // 2026-11-17 の検品（2回目）：説明の囲み・写真や図の札・注意の文・参照の一覧の枠は外し、表の行の枠だけ（手引きの21）。施工例の図の札は残す
+  const count = (page: number, code: string) => on(page).filter((c) => c === code).length;
+  for (const [page, code] of [[12, 'ECA-5032 USL'], [12, 'EC-5033 USL'], [79, 'CFA-1A W']] as const) assert.equal(count(page, code), 1, `p.${page} ${code}`);
+  for (const [page, code] of [[16, 'ECL-5006H'], [24, 'ECA-5032'], [24, 'EC-5033'], [29, 'PL-5006D SET'], [29, 'PL-5006E SET'], [49, 'AA-35S-1'], [53, 'AA-35CGS'], [53, 'AA-35G SET'], [53, 'ED-5036GH'], [53, 'AA-35GT'], [79, 'CFA-5A W'], [40, 'AC-5013C'], [40, 'AC-35W'], [41, 'AC-35J'], [47, 'AA-35CBB']] as const)
+    assert.equal(count(page, code), 0, `p.${page} ${code}`);
+  assert.equal(count(33, 'EC-5006C'), 1); // 注意の文の中は外し、施工例の図の札だけ
+  assert.equal(count(59, 'AA-35EBB'), 2); // スタンドの寸法の注記は外し、図の札だけ
+  assert.ok(on(53).includes('EB-5036GT') && on(49).includes('ED-5024-1')); // このページの表にない札は残す
+  assert.deepEqual(on(65).filter((c) => !/ (GLD|MB|SL)$/.test(c)), []); // 「以下のφ35手すり部材には使用できません」の一覧・代用の注記
+  const eca5044a = yazakiPages.find((p) => p.page === 19)!.codes.find((c) => c.code === 'ECA-5044A' && c.x > 0.5)!;
+  assert.ok(eca5044a.x + eca5044a.w >= 0.689, String(eca5044a.x + eca5044a.w)); // 施工例4 の枠が末尾の A まで（前は A の途中で切れていた）
   // 同じ所に二重の枠がない（2つの読み取りを合わせたときの残り）：となりの枠との重なりは小さいほうの枠の半分まで
   const area = (c: {w: number; h: number}) => c.w * c.h;
   for (const p of yazakiPages)
@@ -177,6 +188,19 @@ test('TOTO のカタログ：76 ページ。品番の形・位置が 0〜1 の�
   assert.ok(on(52).includes('TS139CE2') && on(64).includes('T112H6R') && on(71).includes('EWC730') && on(36).includes('EWT10BE35LA'));
   // 便器・洗浄弁・便座の対応一覧の品番（手すりの部材ではない）は押す枠にしない
   assert.ok(!on(73).includes('CS20AB') && !on(79).includes('TEFV70UA') && !on(81).includes('CS310B') && on(68).length === 0);
+  // 2026-11-17 の検品（2回目）：説明の文・注記・参照の表・図の見出しの品番は押す枠にしない（手引きの21。押すと色の記号のない品番が入っていた）
+  assert.deepEqual(on(13), ['T110D28']); // 取付位置の見出し・※1※2 の注記・ねじの本数の表。樹脂プラグ（売り物）だけ残す
+  assert.ok(!['TS134GY3S', 'TS134GFY12S', 'TS135GY12RR'].some((c) => on(23).includes(c)));
+  assert.ok(!on(25).includes('TS136GY12') && on(25).filter((c) => c.startsWith('TS136GFY12')).join() === 'TS136GFY12#SY');
+  assert.deepEqual(on(33), []); // ご購入前に の文の中だけ。ページは見られるように残す
+  assert.equal(on(37).filter((c) => c === 'EWT10BC35R').length, 1); // 「取り付けられる品番」の一覧の枠を外し、表の行の枠だけ
+  assert.ok(on(37).includes('EWT10CH35R#AG') && !on(37).includes('EWT13BE35R'));
+  assert.ok(!on(44).some((c) => ['EWT13BU', 'EWT15BU35R', 'EWT16BU35S'].includes(c))); // 「…でも対応できます」の注記（p.51〜53 の同じ注記も枠なし）
+  // p.78 背もたれ：品番の表の行「EWC392R＃NW1 注2週」（全角の＃・受注生産の札）に枠。#NW1 のない寸法の表・対応一覧の見出しには枠なし
+  for (const c of ['EWC392R#NW1', 'EWC393R#NW1', 'EWC395S#NW1', 'EWC292#NW1', 'EWC293#NW1', 'EWC295S#NW1']) assert.equal(on(78).filter((x) => x === c).length, 1, c);
+  assert.ok(!on(78).some((c) => /^EWC(39[235]|29[235])S?R?$/.test(c)));
+  for (const c of ['EWC382CR', 'EWC383CR', 'EWC385CS', 'EWC282CR', 'EWC283CR', 'EWC285CS']) assert.equal(on(78).filter((x) => x === c).length, 1, c);
+  for (const [x0, x1] of edge(78, 'EWC392R#NW1')) assert.ok(x0 <= 0.292 && x1 >= 0.395 && x1 < 0.40, `p.78 EWC392R#NW1 ${x0} ${x1}`); // 1 まで囲み、注2週 の札は入れない
 });
 
 test('マツ六のカタログ（Vol.8）：64 ページ。表の「商品コード｜品番」に枠・部材の載っているページ・初めに開くカタログ', () => {
