@@ -21,7 +21,8 @@ export const CATALOG_FIXES: CatalogFix[] = [
   // p.137 Mg ウォーカー：品番はなく、S と M で TAIS が分かれている（各¥）
   {page: 137, order: '261-W2981', expect: ['261-W2981'], variants: [{from: 0, label: 'S', tais: '01105-000035'}, {from: 0, label: 'M', tais: '01105-000036'}]},
   {page: 137, order: '261-W1394', expect: ['261-W1394'], variants: [{from: 0, label: 'S', tais: '01105-000011'}, {from: 0, label: 'M', tais: '01105-000030'}]},
-  {page: 137, order: '261-W1791', expect: ['261-W1791'], variants: [{from: 0, label: 'S', tais: '01105-000014'}, {from: 0, label: 'M', tais: '01105-000015'}]},
+  // III型だけ、写真の横に色の名前「黒鳶」がある（2026-11-17 の検品で、A班・B班とも S・M の両方に黒鳶と書き取った）
+  {page: 137, order: '261-W1791', expect: ['261-W1791'], variants: [{from: 0, label: 'S 黒鳶', tais: '01105-000014'}, {from: 0, label: 'M 黒鳶', tais: '01105-000015'}]},
   // p.154 テイコブアルミ製 4点杖：品番は1つ（「EA4-」「102」の2行に割れている）。ブラックと、ほかの3色（各¥）で金額がちがう
   {
     page: 154,
