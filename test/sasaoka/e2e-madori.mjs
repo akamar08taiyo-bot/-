@@ -284,26 +284,37 @@ await page.keyboard.press('Escape');
 assert.ok((await railPaths()).some((d) => /l9\d0 0L[\d.]+ [\d.]+$/.test(d)), `一筆の L 字 ${JSON.stringify(await railPaths())}`);
 await page.keyboard.press('Control+z');
 for (let i = 0; i < 7; i++) await page.keyboard.press('Control+z'); // 文字・通路・WC・階段・回す・左右反転・らせん階段
-// ---------------- 部屋のふだんの作り方（ユーザーの指示「通常は、和室、洋室などを選んだら枠が込みでつくっていく。
-// 頂点で編集ボタンを押して和室などを選んだら、変形した廊下や形などを作っていけるようにする」2026-11-17）：
-// 部屋の種類を選んで方眼を押すと、決まった大きさの部屋を枠ごと置く（角を置く＝頂点で描くにはならない）
+// ---------------- 部屋の描き方（描く道具の段の左。ユーザーの指示「この辺に枠がこみか頂点で図を書くかの選択をできるようにする。デフォルトは枠が込み。
+// はじめから開いた状態ではなく、自分で□のサイズを編集できるようにする（以前の使い方と同様）」2026-11-17）：
+// 初めは「□ 枠込み」。押しただけでは部屋を置かず（角も置かない）、ドラッグした大きさの四角を枠ごと置く
+const roomMode = (name) => page.getByRole('radiogroup', {name: '部屋の描き方'}).getByRole('radio', {name});
 await cat('部屋');
 await tool('洋室');
 {
-  const rooms = async () => (await art()).split('fill="#fff6d6"').length;
-  const n0 = await rooms();
+  assert.equal(await roomMode('□ 枠込み').getAttribute('aria-checked'), 'true', '初めは枠込み');
+  const rg = await page.getByRole('radiogroup', {name: '部屋の描き方'}).boundingBox();
+  const fix = await page.getByRole('button', {name: '住設 ▼'}).boundingBox();
+  assert.ok(rg.x + rg.width < fix.x, `部屋の描き方は住設の段の左 ${JSON.stringify([rg, fix])}`);
+  const before = await art();
   await click(9.5 * M, 1.5 * M);
   assert.equal(await page.locator('[data-poly-draft]').count(), 0, '押しただけで角を置かない');
-  assert.ok((await rooms()) > n0, '押すと洋室が枠ごと入る');
+  assert.equal(await art(), before, '押しただけでは決まった大きさの部屋を置かない');
+  // 押して少し動かしたところは小さい四角（決まった大きさ＝6帖が初めから開かない）
+  await toTools();
+  const a = await toPx(9 * M, 1 * M);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(a.x + 8, a.y + 8, {steps: 2});
+  // 置く前の点線の四角（bounds(preview)）の幅
+  const pre = await canvas.evaluate((s) => Number(s.querySelector('[data-preview-box]')?.getAttribute('width') ?? -1));
+  assert.ok(pre > 0 && pre < 2 * M, `押した所から広がる ${pre}`);
+  await page.mouse.up();
   await page.keyboard.press('Control+z');
   await page.keyboard.press('Escape');
 }
-// ---------------- 頂点で描く（上の段の「◇ 頂点の編集」を押してから部屋を選び、角を順に押す・はじめの点で閉じる）・頂点（■）で形を変える
-{
-  const vb = page.getByRole('button', {name: '◇ 頂点の編集'});
-  await vb.click();
-  assert.equal(await vb.getAttribute('aria-pressed'), 'true');
-}
+// ---------------- 頂点で描く（「部屋の描き方」の「◇ 頂点で描く」・部屋を選んで角を順に押す・はじめの点で閉じる）・頂点（■）で形を変える
+await roomMode('◇ 頂点で描く').click();
+assert.equal(await roomMode('◇ 頂点で描く').getAttribute('aria-checked'), 'true');
 await cat('部屋');
 await tool('洋室');
 for (const [x, y] of [[8, 0], [11, 0], [11, 1], [9, 1], [9, 3], [8, 3]]) await click(x * M, y * M);
@@ -333,6 +344,7 @@ assert.match(await art(), /<path d="M7280 0L10010 0L10010 910L8190 910L8190 2730
   assert.ok(x % 10 === 0 && y % 10 === 0 && x % 455 !== 0 && y % 455 !== 0, `10mm 刻み（半マスではない）${x} ${y}`);
 }
 await page.keyboard.press('Escape');
+await roomMode('□ 枠込み').click(); // 部屋の描き方を初めに戻す
 // ---------------- Excel のような図形（上の段の「図形」）
 await page.getByRole('toolbar', {name: '描く道具'}).getByRole('button', {name: '四角', exact: true}).click();
 await drag([1 * M, 6 * M], [3 * M, 7 * M]);
@@ -522,12 +534,7 @@ log('方眼の上のまん中の描く道具・曲げた手すり（□で曲げ
   const bar = page.getByRole('toolbar', {name: '描く道具'});
   const vbtn = page.getByRole('button', {name: '◇ 頂点の編集'});
   await page.keyboard.press('Escape');
-  // 何も選んでいないときに押すと「頂点で描く」（部屋の種類を選んで角を押す）。もう一度押すと終わる
-  await vbtn.click();
-  assert.equal(await vbtn.getAttribute('aria-pressed'), 'true');
-  assert.equal(await page.locator('[data-poly-hint]').count(), 1);
-  await vbtn.click();
-  assert.equal(await vbtn.getAttribute('aria-pressed'), 'false');
+  assert.equal(await vbtn.isDisabled(), true); // 何も選んでいなければ押せない（変わった形の部屋を描くのは「部屋の描き方」）
   const vb = await vbtn.boundingBox();
   const ub = await page.locator('[data-undo-center]').boundingBox();
   assert.ok(vb.y >= ub.y - 1 && vb.y + vb.height <= ub.y + ub.height + 1, '頂点の編集は上の段のまん中（戻す・進む・削除の右）');
@@ -594,12 +601,13 @@ log('頂点の編集：角を動かす・辺で角を足す・ダブルタップ
   await cat('部屋');
   assert.equal(await page.locator('[data-madori-palette] button[title="応接間"]').count(), 1);
   await page.keyboard.press('Escape');
-  await page.getByRole('button', {name: '◇ 頂点の編集'}).click(); // 頂点で描く
+  await roomMode('◇ 頂点で描く').click();
   await tool('洋室');
   for (const [x, y] of [[6, 6], [10, 6], [9, 8], [5, 8]]) await click(x * M, y * M);
   await click(6 * M, 6 * M); // はじめの点で閉じる
   assert.match(await art(), new RegExp(`d="M${6 * M} ${6 * M}L${10 * M} ${6 * M}L${9 * M} ${8 * M}L${5 * M} ${8 * M}Z"`), '平行四辺形のまま');
   await page.keyboard.press('Escape');
+  await roomMode('□ 枠込み').click();
   // 全て削除：確かめのあとにこの階の図がみな消える。戻すで戻る
   const all = page.getByRole('button', {name: 'この階の図をすべて削除'});
   const ab = await all.boundingBox();

@@ -468,17 +468,21 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     return {x: b.x + b.w / 2, y: b.y - 28 / v.k};
   };
 
-  // ---------------------------------------------------------------- 部屋の作り方（ユーザーの指示「通常は、和室、洋室などを選んだら枠が込みでつくっていく。
-  // 頂点で編集ボタンを押して和室などを選んだら、変形した廊下や形などを作っていけるようにする」2026-11-17）：
-  //  ふだん：部屋の種類を選んで方眼を押すと、決まった大きさの部屋を枠（壁）ごと置く。ドラッグすると、その大きさの四角
-  //  頂点で描く（上の段の「◇ 頂点の編集」を、部屋を選んでいないときに押す＝polyMode）：部屋の種類を選んで角を順に押す（マイホームクラウドの「部屋入力」と同じ。
-  //  横・縦に近い辺はそろう。傾けて押せばななめの辺＝平行四辺形・台形も）。はじめの点を押す・ダブルクリック・Enter で閉じる、Backspace で1つ戻す、Esc でやめる。
-  //  閉じると、その部屋を選んだところ（すぐ角を直せる）。頂点で描くは続いていて、部屋の種類を選べば次の形も描ける。
-  //  もう一度「◇ 頂点の編集」・「選ぶ・動かす」・Esc・部屋でない道具を選ぶと終わる
+  // ---------------------------------------------------------------- 部屋の描き方（描く道具の段の左の「部屋の描き方」。ユーザーの指示「通常は、和室、洋室などを選んだら枠が込みでつくっていく。
+  // 頂点で…選んだら、変形した廊下や形などを作っていけるようにする」「この辺に枠がこみか頂点で図を書くかの選択をできるようにする。デフォルトは枠が込み。
+  // はじめから開いた状態ではなく、自分で□のサイズを編集できるようにする（以前の使い方と同様）」2026-11-17）：
+  //  □ 枠込み（初め）：部屋の種類を選んで方眼をドラッグすると、その大きさの四角の部屋を枠（壁）ごと置く。押しただけでは置かない
+  //    （決まった大きさの部屋が初めから開かないように、押した所から大きさが広がる）
+  //  ◇ 頂点で描く（polyMode）：部屋の種類を選んで角を順に押す（マイホームクラウドの「部屋入力」と同じ。横・縦に近い辺はそろう。
+  //    傾けて押せばななめの辺＝平行四辺形・台形も）。はじめの点を押す・ダブルクリック・Enter で閉じる、Backspace で1つ戻す、Esc で描きかけをやめる。
+  //    閉じるとその部屋を選んだところ（すぐ角を直せる）。選んだ描き方は、切り替えるまでそのまま
   const [polyMode, setPolyMode] = useState(false);
-  useEffect(() => {
-    if (tool.t !== 'room' && tool.t !== 'select') setPolyMode(false);
-  }, [tool]);
+  const pickRoomMode = (on: boolean) => {
+    setPolyMode(on);
+    setPoly(null);
+    setPolyHover(null);
+    setPreview(null);
+  };
   const [poly, setPoly] = useState<P[] | null>(null);
   const [polyHover, setPolyHover] = useState<P | null>(null);
   const finishPoly = (pts: P[] | null = poly) => {
@@ -490,7 +494,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     const it: MItem = {id: mid(), kind: 'room', type: tool.type, ...sh};
     editItems((list) => [...list, it]);
     setSel(it.id);
-    setTool({t: 'select'}); // 頂点で描く（polyMode）はそのまま。部屋の種類を選べば次の形を描ける
+    setTool({t: 'select'}); // 部屋の描き方（頂点で描く）はそのまま。部屋の種類を選べば次の形を描ける
   };
   const polyClick = (p: P) => {
     const q = snapPt(p, step);
@@ -507,21 +511,6 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     }
     if (r.x === last.x && r.y === last.y) return;
     setPoly([...poly, r]);
-  };
-
-  // 上の段の「◇ 頂点の編集」：部屋・図形を選んでいる（選ぶ・動かす）ときは、その頂点の編集。
-  // 選んでいないとき・部屋の道具のときは「頂点で描く」の入る・やめる（入ったら部屋の種類を選んで角を順に押す）
-  const onVtxButton = () => {
-    if (!polyMode && (vtx || (tool.t === 'select' && canVertexEdit(selItem)))) {
-      toggleVtx();
-      return;
-    }
-    setPolyMode(!polyMode);
-    setPoly(null);
-    setPolyHover(null);
-    setPreview(null);
-    setDelMode(false);
-    setSel(null);
   };
 
   // ---------------------------------------------------------------- 押す・ドラッグ
@@ -570,7 +559,10 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     }
     if (tool.t !== 'select') {
       drag.current = {mode: 'create', a: p, sx: e.clientX, sy: e.clientY, path: [p], sp};
-      if (!(tool.t === 'room' && polyMode)) setPreview(makeItem(tool, p, p, true, ctx));
+      // 部屋（枠込み）は押した所から大きさが広がる（決まった大きさの部屋を初めから出さない）。頂点で描くは角だけ
+      if (tool.t === 'room') {
+        if (!polyMode) setPreview(makeItem(tool, p, p, false, ctx));
+      } else setPreview(makeItem(tool, p, p, true, ctx));
       return;
     }
     const tol = 10 / v.k;
@@ -657,14 +649,13 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
     if (d?.mode === 'create' && tool.t === 'room' && poly) return;
     if (!d) {
       // 押す前：置く道具は、置く所（壁に吸い付いた所）を薄く見せる
-      // 部屋（ふだん）も、押すと置く部屋を枠ごと薄く見せる（頂点で描くときは出さない）
-      if (tool.t !== 'select' && (!DRAG_TOOLS.includes(tool.t) || (tool.t === 'room' && !polyMode)) && e.pointerType === 'mouse') setPreview(makeItem(tool, p, p, true, ctx));
+      if (tool.t !== 'select' && !DRAG_TOOLS.includes(tool.t) && e.pointerType === 'mouse') setPreview(makeItem(tool, p, p, true, ctx));
       return;
     }
     if (d.mode === 'create') {
       const click = Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 6;
       d.path.push(p);
-      setPreview(makeItem(tool, d.a, p, DRAG_TOOLS.includes(tool.t) ? click : true, {...ctx, path: d.path}));
+      setPreview(makeItem(tool, d.a, p, tool.t === 'room' ? false : DRAG_TOOLS.includes(tool.t) ? click : true, {...ctx, path: d.path}));
       if (tool.t === 'rail' && !click) setTrail({pts: [...d.path], erase: false}); // なぞった道を薄く（曲げた所が分かるように）
     } else if (d.mode === 'move') {
       if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) return;
@@ -717,9 +708,13 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
       const p = toMm(e.clientX, e.clientY);
       const click = Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 6;
       if (tool.t === 'room' && polyMode && (click || poly)) {
-        // 頂点で描く：押しただけ（ドラッグでない）は、角を1つ置く。ふだんは下の makeItem で決まった大きさの部屋を枠ごと置く
+        // 頂点で描く：押しただけ（ドラッグでない）は、角を1つ置く
         setPreview(null);
         polyClick(poly ? p : d.a);
+        return;
+      }
+      if (tool.t === 'room' && click) {
+        setPreview(null); // 枠込み：押しただけでは置かない（ドラッグで大きさを決める）
         return;
       }
       const it = makeItem(tool, d.a, p, DRAG_TOOLS.includes(tool.t) ? click : true, {...ctx, path: [...d.path, p]});
@@ -945,7 +940,6 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
   // 道具をやめて「選ぶ・動かす」に戻す（Esc・番号の「✓ 確定」・番号を置いているときの Enter）。選んでいる部品も外す
   const endTool = () => {
     setDelMode(false);
-    setPolyMode(false);
     setTool({t: 'select'});
     setPreview(null);
     setSel(null);
@@ -954,7 +948,6 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
   // 消すモードに入る・やめる（描きかけ・選んでいる部品はやめる）
   const toggleDel = () => {
     setDelMode(!delMode);
-    setPolyMode(false);
     setTool({t: 'select'});
     setSel(null);
     setPreview(null);
@@ -1051,7 +1044,6 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
         on={tool.t === 'select' && !delMode}
         onClick={() => {
           setDelMode(false);
-          setPolyMode(false);
           setTool({t: 'select'});
         }}
         className="bg-white text-sm font-bold max-lg:min-h-8 max-lg:py-0.5"
@@ -1679,8 +1671,35 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           ✓ 確定
         </button>
       </div>
-      {/* 2行目（まん中ぞろえ）：住設 ▼ と、いつも出す住設。数が増えても1行目（図形・まん中の道具・番号）は崩れない */}
-      <div className="flex flex-wrap items-center justify-center gap-1 lg:col-span-3 lg:border-t lg:border-slate-100 lg:pt-1" data-fix-row>
+      {/* 2行目：左に「部屋の描き方」、まん中に住設 ▼ と、いつも出す住設。数が増えても1行目（図形・まん中の道具・番号）は崩れない */}
+      <div
+        className="flex flex-wrap items-center justify-center gap-1 lg:col-span-3 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:border-t lg:border-slate-100 lg:pt-1"
+        data-fix-row
+      >
+        {/* 部屋の描き方（初めは枠込み。ユーザーの指示「この辺に枠がこみか頂点で図を書くかの選択をできるようにする。デフォルトは枠が込み」2026-11-17）。
+            広い画面は段の左の空いた所、狭い画面は住設の段の頭 */}
+        <div role="radiogroup" aria-label="部屋の描き方" className="flex items-center gap-1 max-lg:w-full max-lg:justify-center lg:justify-self-start" data-room-mode>
+          <span className="text-xs text-slate-500">部屋の描き方</span>
+          {(
+            [
+              [false, '□ 枠込み', '部屋の種類を選んで方眼をドラッグすると、その大きさの四角の部屋を枠ごと置く'],
+              [true, '◇ 頂点で描く', '部屋の種類を選んで角を順に押すと、L字の廊下などの形の部屋になる（はじめの点で閉じる）'],
+            ] as const
+          ).map(([on, label, title]) => (
+            <button
+              key={label}
+              type="button"
+              role="radio"
+              aria-checked={polyMode === on}
+              onClick={() => pickRoomMode(on)}
+              title={title}
+              className={`h-9 rounded-md border px-2.5 text-sm max-sm:px-1.5 ${polyMode === on ? 'border-emerald-600 bg-emerald-50 font-bold text-emerald-800 ring-1 ring-emerald-300' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-1">
         {/* 住設 ▼：左の一覧と同じ住設・家具・福祉用具を選ぶ。☆ で段にいつも出す */}
         <div ref={fixBarRef} className="relative">
           <button
@@ -1715,6 +1734,7 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
         </div>
         {/* いつも出す住設（初めはトイレ・浴槽・キッチン・ベッド・下駄箱。ユーザーの指示「住設も選べるように」2026-11-10）：押してから方眼を押すと、壁ぎわに置く */}
         {pins.fix.map((type) => fixBarBtn(type))}
+        </div>
       </div>
     </div>
   );
@@ -1823,20 +1843,15 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           <Btn color="white" small onClick={removeAll} disabled={!items.length} title="この階の図をすべて消す（確かめてから。戻すで戻せます）" aria-label="この階の図をすべて削除">
             🗑 全て削除
           </Btn>
-          {/* 頂点の編集（部屋・図形を選んだとき＝その角を直す。選んでいないとき＝頂点で描く。もう一度押すと終わる） */}
+          {/* 頂点の編集（部屋・図形を選んだとき。もう一度押すと終わる）。変わった形の部屋を描くのは、描く道具の段の「部屋の描き方」 */}
           <Btn
             color="white"
             small
-            onClick={onVtxButton}
-            aria-pressed={vtx || polyMode}
-            className={vtx || polyMode ? '!border-emerald-600 !bg-emerald-50 ring-2 ring-emerald-200' : ''}
-            title={
-              polyMode
-                ? '頂点で描く：部屋の種類を選んで角を順に押す（もう一度押すと終わる）'
-                : tool.t === 'select' && canVertexEdit(selItem)
-                ? '頂点の編集：角（■）を動かす・辺のまん中（□）をつまむと角が増える・角をダブルタップで消す'
-                : '頂点で描く：押してから部屋の種類を選び、角を順に押す（変わった形の部屋・廊下など。はじめの点で閉じる）'
-            }
+            onClick={toggleVtx}
+            disabled={!canVertexEdit(selItem)}
+            aria-pressed={vtx}
+            className={vtx ? '!border-emerald-600 !bg-emerald-50 ring-2 ring-emerald-200' : ''}
+            title="頂点の編集：角（■）を動かす・辺のまん中（□）をつまむと角が増える・角をダブルタップで消す"
           >
             ◇ 頂点の編集
           </Btn>
@@ -1976,7 +1991,12 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
             {preview && preview.kind === 'rail' ? (
               <polyline points={railPts(preview).map((q) => `${q.x},${q.y}`).join(' ')} fill="none" stroke="#059669" strokeWidth={3 / v.k} strokeDasharray={`${6 / v.k} ${4 / v.k}`} strokeLinejoin="round" pointerEvents="none" data-rail-preview />
             ) : (
-              preview && <rect {...bounds(preview)} fill="#10b98114" stroke="#059669" strokeWidth={1.5 / v.k} strokeDasharray={`${6 / v.k} ${4 / v.k}`} pointerEvents="none" />
+              // 置く前・作っている途中の部品の点線の四角（前は bounds の w・h をそのまま渡していて、width・height がなく見えていなかった）
+              preview &&
+              (() => {
+                const b = bounds(preview);
+                return <rect x={b.x} y={b.y} width={b.w} height={b.h} fill="#10b98114" stroke="#059669" strokeWidth={1.5 / v.k} strokeDasharray={`${6 / v.k} ${4 / v.k}`} pointerEvents="none" data-preview-box />;
+              })()
             )}
             {selBox && (
               <g pointerEvents="none">
@@ -2090,18 +2110,13 @@ export function MadoriEditor({job, data, update, onBack, docs, embed}: {job: Job
           })()}
           {!items.length && !preview && (
             <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center text-sm text-slate-400">
-              {tool.t === 'select' ? '部屋を選んで、方眼の上を押す・ドラッグ' : '方眼の上を押す・ドラッグ（指でなぞる）'}
-            </div>
-          )}
-          {tool.t === 'select' && polyMode && (
-            <div className="pointer-events-none absolute left-2 top-2 rounded bg-emerald-700/90 px-2 py-1 text-xs text-white" data-poly-hint>
-              頂点で描く：左の部屋の種類を選ぶ
+              {tool.t === 'select' ? '部屋を選んで、方眼の上をドラッグ' : '方眼の上をドラッグ（指でなぞる）'}
             </div>
           )}
           {tool.t !== 'select' && (
             <div className="pointer-events-none absolute left-2 top-2 rounded bg-emerald-700/90 px-2 py-1 text-xs text-white">
               {tool.t === 'step' && tool.fill ? '横四角' : tool.t === 'room' || tool.t === 'stair' || tool.t === 'fix' || tool.t === 'door' || tool.t === 'window' || tool.t === 'step' ? tool.type : tool.t === 'rail' ? (tool.lshape ? 'L型手すり' : tool.straight ? '横棒' : '自在棒') : tool.t === 'vrail' ? '丸（縦手すり）' : tool.t === 'num' ? '番号' : tool.t === 'text' ? '文字' : tool.t === 'line' || tool.t === 'shape' ? tool.type : '寸法線'}
-              {tool.t === 'room' ? (polyMode ? (poly ? '：角を押していく（はじめの点で閉じる・Enter）' : '：角を順に押す（頂点で描く）') : '：押して置く（枠ごと）・ドラッグで大きさ') : tool.t === 'rail' && !tool.lshape && !tool.straight ? '：なぞる（曲げたい所で曲げる）' : tool.t === 'vrail' || tool.t === 'step' ? '：押して置く・なぞって大きさ' : tool.t === 'num' ? `：押すたびに${circled(Math.min(nextNo, NUM_MAX))}から順に（終わりは ✓ 確定・方眼の外を押す）` : DRAG_TOOLS.includes(tool.t) ? '：ドラッグ' : '：押して置く'}
+              {tool.t === 'room' ? (polyMode ? (poly ? '：角を押していく（はじめの点で閉じる・Enter）' : '：角を順に押す（頂点で描く）') : '：ドラッグで四角（枠込み）') : tool.t === 'rail' && !tool.lshape && !tool.straight ? '：なぞる（曲げたい所で曲げる）' : tool.t === 'vrail' || tool.t === 'step' ? '：押して置く・なぞって大きさ' : tool.t === 'num' ? `：押すたびに${circled(Math.min(nextNo, NUM_MAX))}から順に（終わりは ✓ 確定・方眼の外を押す）` : DRAG_TOOLS.includes(tool.t) ? '：ドラッグ' : '：押して置く'}
             </div>
           )}
         </div>
