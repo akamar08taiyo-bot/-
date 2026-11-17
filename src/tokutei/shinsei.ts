@@ -397,6 +397,8 @@ function dateRow(iso: string, cells: {era: string; y: string; m: string; d: stri
 
 const MIYAKO_ROWS = [12, 14, 16, 18];
 const MIYAKO_PHOTOS = ['納品確認写真用紙', '納品確認写真用紙 (2)', '納品確認写真用紙 (3)', '納品確認写真用紙 (4)'];
+/** みやこ町の委任状（様式第6号）の欄：住宅改修の原本の「委任状」と同じ番地（受任者の所在地・電話・名称と代表者、保険給付額、委任者の住所） */
+export const MIYAKO_PROXY = {sheet: '委任状', sellerAddress: 'Z8', sellerTel: 'AF10', seller: 'Z17', benefit: 'M29', address: 'V39'} as const;
 
 /**
  * 広域連合（福岡県介護保険広域連合の福祉用具購入申請関係様式集。築上町・豊前市・上毛町・吉富町）：事前の申請はなく、購入のあとの支給申請書だけ。
@@ -1075,6 +1077,23 @@ export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
           fit: ['I4', 'I5', 'I9', 'Z9', ...rowsOf('V', MIYAKO_ROWS)],
           oneLine: [...rowsOf('B', MIYAKO_ROWS), ...rowsOf('I', MIYAKO_ROWS)],
           marks: [GENDER('AA7', v)],
+        },
+        // 委任状（様式第6号（第9条関係）。介護保険福祉用具購入費及び住宅改修費に係る受領委任払い用。町のホームページの inin9.docx。
+        // ユーザーがくださった様式 2026-11-17。前は住宅改修の一式にだけ入っていた）：住宅改修の原本の「委任状」のシートを写した。
+        // 受任者（事業所）の所在地・電話番号・事業所名称及び代表者氏名は設定の営業所、保険給付額、委任者（被保険者）の住所を書く。
+        // 日付・委任者の氏名は自署（ほかの保険者の委任状と同じ）
+        {
+          sheet: MIYAKO_PROXY.sheet,
+          cells: [
+            ...when(v.seller.address, [[MIYAKO_PROXY.sellerAddress, [v.seller.zip && `〒${v.seller.zip}`, v.seller.address].filter(Boolean).join('　')]]),
+            ...when(v.seller.tel, [[MIYAKO_PROXY.sellerTel, v.seller.tel]]),
+            ...when(v.seller.name, [[MIYAKO_PROXY.seller, [v.seller.name, v.seller.rep].filter(Boolean).join('\n')]]),
+            ...when(v.benefit > 0 ? v.benefit : 0, [[MIYAKO_PROXY.benefit, v.benefit]]),
+            ...when(v.address, [[MIYAKO_PROXY.address, v.address]]),
+          ],
+          formats: v.benefit > 0 ? [[MIYAKO_PROXY.benefit, {numFmt: 3}]] : [],
+          fit: [MIYAKO_PROXY.sellerAddress, MIYAKO_PROXY.seller, MIYAKO_PROXY.address],
+          fitWidth: [MIYAKO_PROXY.sellerTel],
         },
         // 納品確認写真用紙：1枚に1つの商品（使わない用紙は空のまま）
         ...v.items.slice(0, MIYAKO_PHOTOS.length).map(

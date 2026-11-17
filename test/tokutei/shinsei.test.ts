@@ -17,6 +17,7 @@ import {
   KURUME_KIND_TEXT,
   KURUME_RATIO_TEXT,
   KURUME_SHEETS,
+  MIYAKO_PROXY,
   kurumeAddress,
   kurumePays,
   OITA_REASON_CELLS,
@@ -230,6 +231,22 @@ test('みやこ町：承認申請書・支給申請書・写真の用紙（1枚�
   assert.equal(readCell(f, '納品確認写真用紙', 'J7'), 'シャワーチェア 見本A / SC-01');
   assert.equal(readCell(f, '納品確認写真用紙 (2)', 'Y5'), '0001234567');
   assert.equal(readCell(f, '納品確認写真用紙 (3)', 'J5'), '');
+});
+
+test('みやこ町：委任状（様式第6号。受領委任払い用）は設定の営業所・保険給付額・委任者の住所。日付・氏名は自署', () => {
+  const f = fill('miyako');
+  const p = (ref: string) => readCell(f, MIYAKO_PROXY.sheet, ref) ?? '';
+  // 受任者（事業所）は設定の営業所：〒と所在地は1つの欄、名称と代表者は2行
+  assert.match(p(MIYAKO_PROXY.sellerAddress), /^〒\d{3}-\d{4}　\S/);
+  assert.match(p(MIYAKO_PROXY.sellerTel), /^\d{2,4}-\d{2,4}-\d{4}$/);
+  assert.match(p(MIYAKO_PROXY.seller), /^太陽シルバーサービス㈱　\S+営業所\n\S/);
+  assert.equal(p(MIYAKO_PROXY.benefit), String(28160 + 27808 - Math.ceil((28160 + 27808) / 10))); // 保険給付額（1割負担）
+  assert.equal(p(MIYAKO_PROXY.address), '行橋市中央1丁目2-3');
+  // 委任者の氏名・日付は自署（お客様名は書かない）
+  assert.doesNotMatch(strFromU8(f[sheetPath(f, MIYAKO_PROXY.sheet)]), /見本 花子/);
+  assert.equal(printOverflow(f, MIYAKO_PROXY.sheet), null);
+  // シートの並び：支給申請書のうしろ（住宅改修の一式と同じ様式）
+  assert.match(strFromU8(f['xl/workbook.xml']), /name="福祉用具支給申請\(受領委任）"[^>]*\/><sheet name="委任状"/);
 });
 
 test('広域連合：支払方法が受領委任払いなら受領委任払用（支給申請書と委任状）・写真貼付用紙に書く', () => {

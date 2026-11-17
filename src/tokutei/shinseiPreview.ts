@@ -6,7 +6,7 @@
 // あわせて、押すと案件の画面のその入れる所へ行く欄（お客様名・商品・理由…）の位置も返す（式で同じ値を出している欄＝支給申請書の氏名なども押せる）
 
 import {strFromU8} from 'fflate';
-import {FUKUOKA_ROWS, FUKUOKA_SHEET, fillShinseiFiles, KITAKYUSHU_GAIYO_ROWS, KITAKYUSHU_SHEETS, KOUIKI_SHEETS, KURUME_ROWS, KURUME_SHEETS, OITA_REASON_CELLS, OITA_ROWS, OITA_SHEETS, pairBoxes} from './shinsei.ts';
+import {FUKUOKA_ROWS, FUKUOKA_SHEET, fillShinseiFiles, KITAKYUSHU_GAIYO_ROWS, KITAKYUSHU_SHEETS, KOUIKI_SHEETS, KURUME_ROWS, KURUME_SHEETS, MIYAKO_PROXY, OITA_REASON_CELLS, OITA_ROWS, OITA_SHEETS, pairBoxes} from './shinsei.ts';
 import {KK_CELLS} from './shinsei/kitakyushuCells.ts';
 import {KU_CELLS} from './shinsei/kurumeCells.ts';
 import type {ShinseiForm, ShinseiKey, ShinseiValues} from './shinsei.ts';
@@ -146,6 +146,15 @@ export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
       links: [
         ['gender', ['AA7']],
         ['items', rows(['B', 'I', 'P'], MIYAKO_ROWS)],
+      ],
+    },
+    // 委任状（様式第6号）：受任者の欄は設定の営業所、保険給付額は負担割合、委任者の住所は住所へ
+    {
+      sheet: MIYAKO_PROXY.sheet,
+      links: [
+        ['seller', [MIYAKO_PROXY.sellerAddress, MIYAKO_PROXY.sellerTel, MIYAKO_PROXY.seller]],
+        ['burdenRatio', [MIYAKO_PROXY.benefit]],
+        ['address', [MIYAKO_PROXY.address]],
       ],
     },
     ...MIYAKO_PHOTOS.map((sheet) => ({
