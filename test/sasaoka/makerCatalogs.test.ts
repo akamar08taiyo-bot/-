@@ -101,6 +101,12 @@ test('カタログのページ：p.12〜81 の 70 ページ。どのページの
   assert.deepEqual(on(65).filter((c) => !/ (GLD|MB|SL)$/.test(c)), []); // 「以下のφ35手すり部材には使用できません」の一覧・代用の注記
   const eca5044a = yazakiPages.find((p) => p.page === 19)!.codes.find((c) => c.code === 'ECA-5044A' && c.x > 0.5)!;
   assert.ok(eca5044a.x + eca5044a.w >= 0.689, String(eca5044a.x + eca5044a.w)); // 施工例4 の枠が末尾の A まで（前は A の途中で切れていた）
+  // 同じ日の再検品：p.59 の注意の文の AA-35TSC は枠なし・p.24 CYA-1300 3ﾎﾞﾝｲﾘ MGR は末尾の R まで・p.33 (EC-5014B) はかっこの内側だけ
+  assert.ok(!yazakiPages.find((p) => p.page === 59)!.codes.some((c) => c.code === 'AA-35TSC' && c.y < 0.15)); // 上の注意の文の中（施工例の図の札の AA-35TSC は残す）
+  const cya = yazakiPages.find((p) => p.page === 24)!.codes.find((c) => c.code === 'CYA-1300 3ﾎﾞﾝｲﾘ MGR')!;
+  assert.ok(cya.x + cya.w >= 0.9125, String(cya.x + cya.w));
+  const ec5014b = yazakiPages.find((p) => p.page === 33)!.codes.find((c) => c.code === 'EC-5014B')!;
+  assert.ok(ec5014b.x > 0.7735 && ec5014b.x + ec5014b.w < 0.8195, JSON.stringify(ec5014b));
   // 同じ所に二重の枠がない（2つの読み取りを合わせたときの残り）：となりの枠との重なりは小さいほうの枠の半分まで
   const area = (c: {w: number; h: number}) => c.w * c.h;
   for (const p of yazakiPages)
@@ -191,6 +197,10 @@ test('TOTO のカタログ：76 ページ。品番の形・位置が 0〜1 の�
   // 2026-11-17 の検品（2回目）：説明の文・注記・参照の表・図の見出しの品番は押す枠にしない（手引きの21。押すと色の記号のない品番が入っていた）
   assert.deepEqual(on(13), ['T110D28']); // 取付位置の見出し・※1※2 の注記・ねじの本数の表。樹脂プラグ（売り物）だけ残す
   assert.ok(!['TS134GY3S', 'TS134GFY12S', 'TS135GY12RR'].some((c) => on(23).includes(c)));
+  // 設置条件の文「3. コンクリート下地の場合 樹脂プラグ使用:T110D28」の中は枠なし。樹脂プラグの見出しの枠だけ（再検品 2026-11-17）
+  assert.equal(on(23).filter((c) => c === 'T110D28').length, 1);
+  assert.equal(on(25).filter((c) => c === 'T110D28').length, 1);
+  assert.ok(!on(73).includes('EWC773') && !on(73).includes('EWC774') && on(72).includes('EWC773')); // ※16 の注記の文の中は枠なし（表の行は p.72）
   assert.ok(!on(25).includes('TS136GY12') && on(25).filter((c) => c.startsWith('TS136GFY12')).join() === 'TS136GFY12#SY');
   assert.deepEqual(on(33), []); // ご購入前に の文の中だけ。ページは見られるように残す
   assert.equal(on(37).filter((c) => c === 'EWT10BC35R').length, 1); // 「取り付けられる品番」の一覧の枠を外し、表の行の枠だけ
