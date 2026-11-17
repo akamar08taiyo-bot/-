@@ -4,7 +4,7 @@
 // 長さはすべて mm。位置は図の左上を 0。部品は階（1階・2階…）ごとに持つ。
 
 import {ROOM_ABBR} from './catalog.ts';
-import {polyArea, shapeOf} from './poly.ts';
+import {bboxOf, polyArea, shapeOf} from './poly.ts';
 import {isLineShapeType} from './shapes.ts';
 import type {Pt} from './poly.ts';
 
@@ -348,6 +348,15 @@ export function cleanMadori(raw: unknown): Madori | undefined {
       if (o.kind === 'room' && Array.isArray(it.pts)) {
         const pts = (it.pts as unknown[]).filter((q): q is {x: number; y: number} => !!q && typeof q === 'object' && Number.isFinite((q as Pt).x) && Number.isFinite((q as Pt).y)).map((q) => ({x: q.x, y: q.y}));
         if (pts.length >= 3) Object.assign(o, shapeOf(pts));
+      }
+      // 頂点の編集にした図形（四角・丸など）の頂点となめらかな線の印。囲む四角も頂点にそろえる（前は部屋と手すりだけ残していて、
+      // 開き直す・様邸のファイルを取り込むと元の箱の図形に戻っていた。2026-11-17 のコードの読み直し）。頂点にしたときに向き（rot）は外してある
+      if (o.kind === 'shape' && Array.isArray(it.pts)) {
+        const pts = (it.pts as unknown[]).filter((q): q is Pt => !!q && typeof q === 'object' && Number.isFinite((q as Pt).x) && Number.isFinite((q as Pt).y)).map((q) => ({x: q.x, y: q.y}));
+        if (pts.length >= 2) {
+          delete o.rot;
+          Object.assign(o, bboxOf(pts), {pts}, it.curve === true ? {curve: true} : {});
+        }
       }
       // 曲げた手すりの点（3つ以上。x・y・w・h は1本目にそろえる）
       if (o.kind === 'rail' && Array.isArray(it.pts)) {

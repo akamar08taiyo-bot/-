@@ -436,6 +436,9 @@ test('見取図の下の枠：申請書の改修の内容（方眼の下の欄�
     '⑤',
     '⑨L＝900mm',
   ]);
+  // 同じ写真番号の箇所が2つ（玄関で手すりと段差の解消）でも、申請書と同じく両方の行（前は1つ目だけ。2026-11-17 のコードの読み直し）
+  const two = [...list, {id: 'p3', photo: 1, name: '屋外', line: '①屋外　段差の解消　H150mm'}];
+  assert.deepEqual(sheetWorks(m, m.floors, {...look, list: two}).slice(0, 2), ['①屋外　手すりの取り付け　L=600mm', '①屋外　段差の解消　H150mm']);
   // 申請書の箇所がなく、平面図にも番号がなければ枠は出さない
   const empty = {no: none, line: none, byNo: none, list: []};
   const plain: Madori = {...emptyMadori(), floors: [{id: 'f1', name: '1階', items: [room('a', 0, 0, M, M)]}]};

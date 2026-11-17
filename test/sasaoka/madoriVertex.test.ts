@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {canVertexEdit, handlesOf, moved, resized, turnedItem, walls} from '../../src/sasaoka/madori/edit.ts';
 import type {MItem} from '../../src/sasaoka/madori/model.ts';
-import {bounds} from '../../src/sasaoka/madori/model.ts';
+import {bounds, cleanMadori} from '../../src/sasaoka/madori/model.ts';
 import {closedShape, isOrtho, labelSpot, inPoly, nearOrthoNext, pointRemoved, polyEdges, shapeOf} from '../../src/sasaoka/madori/poly.ts';
 import {floorSvg} from '../../src/sasaoka/madori/render.ts';
 import {shapeToPts} from '../../src/sasaoka/madori/shapes.ts';
@@ -86,4 +86,20 @@ test('角を押して描く部屋：横・縦に近い辺はそろえ、傾け�
   // 辺がみな横・縦なら、今までどおりはじめの点へ横・縦で戻る角を足す（L 字の最後の角を押さなくても閉じる）
   const l = [{x: 0, y: 0}, {x: 2730, y: 0}, {x: 2730, y: 910}, {x: 910, y: 910}, {x: 910, y: 1820}];
   assert.deepEqual(closedShape(l).at(-1), {x: 0, y: 1820});
+});
+
+test('頂点の編集にした図形（丸・四角）は、開き直しても（cleanMadori を通しても）頂点・なめらかな線のまま（2026-11-17 のコードの読み直し）', () => {
+  // 前は頂点を残すのが部屋と手すりだけで、図形は開き直すと元の箱の図形（回した向きも消えた）に戻っていた
+  const {pts, curve} = shapeToPts({type: '丸', x: 1000, y: 1000, w: 1575, h: 1170, rot: 30});
+  pts[0] = {x: pts[0].x + 200, y: pts[0].y - 100};
+  const m = cleanMadori(JSON.parse(JSON.stringify({floors: [{items: [{id: 's1', kind: 'shape', type: '丸', x: 0, y: 0, w: 10, h: 10, pts, curve}]}]})))!;
+  const it = m.floors[0].items[0];
+  assert.deepEqual(it.pts, pts);
+  assert.equal(it.curve, true);
+  assert.equal(it.rot, undefined);
+  assert.equal(it.x, Math.min(...pts.map((q) => q.x)));
+  assert.equal(it.w, Math.max(...pts.map((q) => q.x)) - it.x);
+  // 頂点のない図形は今までどおり
+  const plain = cleanMadori({floors: [{items: [{id: 's2', kind: 'shape', type: '四角', x: 0, y: 0, w: 900, h: 600, rot: 30, curve: true}]}]})!.floors[0].items[0];
+  assert.deepEqual([plain.pts, plain.curve, plain.rot], [undefined, undefined, 30]);
 });

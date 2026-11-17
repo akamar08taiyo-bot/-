@@ -936,6 +936,17 @@ test('空の部材の行が部材と同上施工費のあいだにあっても�
   assert.deepEqual(deleteLine(j, blank.id).places[0].rows.map((r) => r.id), [barRow.id, work.id]);
 });
 
+test('箇所のはじめに続いた施工費の間に空の行を挿入しても、施工費ごとに介護保険の対象外を切り替えられる（2026-11-17 のコードの読み直し）', () => {
+  // 前は空の行の下の施工費が上の施工費のまとまりの値を使い、下で切り替えても変わらず、上を切り替えると下まで対象外になった
+  const w1 = manualRow('labor', {name: '施工費 見本1', qty: 1, estPrice: 1500});
+  const w2 = manualRow('labor', {name: '施工費 見本2', qty: 1, estPrice: 2000});
+  const blank = manualRow('material', {qty: 1});
+  const base = emptyJob();
+  const job: Job = {...base, places: [newPlace('玄関', [w1, blank, w2])]};
+  assert.equal(estimateTotals(toggleExcluded(job, w2.id), S).excluded, 2000);
+  assert.equal(estimateTotals(toggleExcluded(job, w1.id), S).excluded, 1500);
+});
+
 test('貼り付けた施工費がすぐ上の施工費につながるとき、上の金額を手で直してあれば、貼り付けた分を足した金額にする', () => {
   const {job} = type(emptyJob(), [
     ['new:text', 'インテリアバー', bar],

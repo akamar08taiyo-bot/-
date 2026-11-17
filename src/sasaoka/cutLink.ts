@@ -8,6 +8,7 @@
 // 手すりの長さが変わったら、中間のブラケット（BD-01G）の数も入れ直す（`withBrackets`）
 
 import {isBlankRow} from './calc.ts';
+import {lengthParts} from './lengthText.ts';
 import {codeKey} from './rows.ts';
 import type {Material, Place, Row} from './types.ts';
 
@@ -17,24 +18,13 @@ export const BASE_PLATE = /ベースプレート|補強板|取付板/;
 const isPlate = (r: Row) => BASE_PLATE.test(`${r.estText ?? ''} ${r.name}`);
 
 /**
- * 申請書の長さ（「600×1800」「600, 1800」「600+1800」「2400mm」）を mm の数に。「1,600」のような3けた区切りは1つの数。読めなければ []。
- * 「600×2」「600mm×2本」の × のうしろの小さい数（100 より小さい整数）は本数：[600, 600]（前は 602mm と読んでいた）
+ * 申請書の長さ（「600×1800」「600, 1800」「600+1800」「2400mm」「60cm」「0.6m」「L=600」）を mm の数に。「1,600」のような3けた区切りは1つの数。読めなければ []。
+ * 「600×2」「600mm×2本」の × のうしろの小さい数（100 より小さい整数）は本数：[600, 600]。読み方は申請書に書く L= と同じ（`lengthText.ts`）
  */
 export function dimsLengths(l: string | undefined): number[] {
-  const t = (l ?? '')
-    .normalize('NFKC')
-    .replace(/mm|本/gi, '')
-    .replace(/(^|\D)(\d{1,2}),(\d{3})(?!\d)/g, '$1$2$3');
-  const parts = t.split(/([,、xX*×+\s]+)/); // 区切りも残す（奇数番目）
-  const out: number[] = [];
-  for (let i = 0; i < parts.length; i += 2) {
-    const n = Number(parts[i]);
-    if (parts[i] === '' || !Number.isFinite(n) || n <= 0) continue;
-    const prev = out[out.length - 1];
-    if (prev !== undefined && Number.isInteger(n) && n < 100 && /[xX*×]/.test(parts[i - 1])) for (let k = 1; k < n; k++) out.push(prev);
-    else out.push(n);
-  }
-  return out;
+  return lengthParts(l)
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n > 0);
 }
 
 /**

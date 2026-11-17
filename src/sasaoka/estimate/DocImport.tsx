@@ -187,6 +187,15 @@ export function useDocImport(data: AppData, update: Update, onImported: (month: 
           photos += 1;
         }
         update('jobs', (jobs) => mergeById(jobs, [p.job]));
+        // 送った端末の設定にだけある値：申請書の施工業者に足した営業所（同じ名前がなければ足す）・特定福祉用具の売上月
+        if (p.builders?.length || p.tokuteiMonth) {
+          const {builders = [], tokuteiMonth} = p;
+          update('settings', (st) => ({
+            ...st,
+            ...(builders.length ? {builders: [...(st.builders ?? []), ...builders.filter((b) => !(st.builders ?? []).some((x) => x.name === b.name))]} : {}),
+            ...(tokuteiMonth ? {tokuteiSalesMonths: {...st.tokuteiSalesMonths, [tokuteiMonth.id]: tokuteiMonth.month}} : {}),
+          }));
+        }
         if (p.tokutei) {
           try {
             if (!(await putTokuteiCase(p.job, p.tokutei))) throw new Error('保存できませんでした');

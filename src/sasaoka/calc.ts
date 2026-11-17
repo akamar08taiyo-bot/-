@@ -292,7 +292,9 @@ export function estimatePlaceLines(place: Pick<Place, 'rows'>, rates: EstimateRa
     if (last && last.kind === 'material' && isBlankRow(last.row)) {
       const prev = [...out].reverse().find((l) => !(l.kind === 'material' && isBlankRow(l.row)));
       const owner = prev ? (prev.kind === 'material' ? prev.row : prev.owner) : null;
-      const excluded = prev ? prev.excluded : r.excluded;
+      // 対象外かは上の部材に合わせる（同上施工費）。上が箇所のはじめの施工費（部材の下でない）なら、この行で切り替えたとおり
+      // （前は上の施工費のまとまりの値を使い、この行で切り替えても変わらず、上を切り替えるとこの行まで変わった。2026-11-17 のコードの読み直し）
+      const excluded = owner && prev ? prev.excluded : r.excluded;
       out.push({kind: 'work', rows: [r], amount, sum: amount, afterMaterial: !!owner, excluded, owner});
       continue;
     }

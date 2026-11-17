@@ -2327,6 +2327,8 @@ test('長さの書き方：1本ずつ mm を付ける「L=400mm×600mm」・「6
   assert.equal(workText(place('400×600')), '手すりの取り付け　L=400mm×600mm');
   assert.equal(workText(place('400mm×600mm')), '手すりの取り付け　L=400mm×600mm'); // 欄に mm 付きで入っていても同じ
   assert.equal(workText(place('600×2')), '手すりの取り付け　L=600mm×600mm'); // 前は「L=600mm×2mm」
+  assert.equal(workText(place('600mm×2本')), '手すりの取り付け　L=600mm×600mm'); // 前は「L=600mm×2本mm」（見積書は前から 600mm を2本と読んでいた）
+  assert.equal(workText(place('600+1800')), '手すりの取り付け　L=600mm×1800mm'); // 見積書と同じく「+」も区切り
   assert.equal(workText(place('60cm')), '手すりの取り付け　L=600mm');
   assert.equal(workText(place('600', '800×800')), '手すりの取り付け　L=600mm'); // ベースプレートは申請書に書かない（2026-11-05）
   assert.equal(lengthsShown('400×600'), '400mm×600mm');

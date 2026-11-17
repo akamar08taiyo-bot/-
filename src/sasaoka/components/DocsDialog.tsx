@@ -15,7 +15,7 @@ import {XLSX_TYPE, estimateXlsx} from '../estimateXlsx.ts';
 import {canMakeShinsei, riyuBook, shinseiBook} from '../estimate/shinseiFiles.ts';
 import {DATA_LABEL, docsMail, isAppleMobile, isMobileDevice, openMailto, share, shareData, stillActive} from '../mailDraft.ts';
 import type {Attachment, Mail} from '../mailDraft.ts';
-import {JOB_SHARE_TYPE, jobPackageJson, jobPackageName} from '../jobShare.ts';
+import {JOB_SHARE_TYPE, jobPackageExtra, jobPackageJson, jobPackageName} from '../jobShare.ts';
 import {getPhotos, photoIdsInUse} from '../photos.ts';
 import {hasMadori} from '../madori/model.ts';
 import {estimateDateOf} from '../print/docMeta.ts';
@@ -149,7 +149,7 @@ export function DocsButton({mode, job, s, view, onBeforeSave}: {mode: Mode; job:
       } catch {
         notes.push('特定福祉用具の案件は入れられませんでした');
       }
-      files.push({name: jobPackageName(job), type: JOB_SHARE_TYPE, bytes: new TextEncoder().encode(jobPackageJson(job, photos, tokutei))});
+      files.push({name: jobPackageName(job), type: JOB_SHARE_TYPE, bytes: new TextEncoder().encode(jobPackageJson(job, photos, tokutei, new Date(), jobPackageExtra(job, s, tokutei)))});
     }
     return {files, notes};
   };

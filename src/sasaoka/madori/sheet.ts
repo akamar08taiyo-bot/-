@@ -59,8 +59,9 @@ export function sheetTitle(job: Pick<Job, 'customer'>): string {
  * （前は平面図に置いた番号の行だけ。画面の右の枠の一覧は「この部分は不要」で外したので、手で直した一覧＝Madori.legend も使わない）
  */
 export function sheetWorks(m: Madori, floors: MFloor[], look: Pick<ReturnType<typeof placeLookup>, 'no' | 'line' | 'byNo' | 'list'>): string[] {
+  // 同じ写真番号の箇所が2つ（玄関で手すりの取り付けと段差の解消など）でも、申請書と同じく両方の行を書く（前は1つ目だけ。2026-11-17 のコードの読み直し）
   const rows = new Map<number, string>();
-  for (const w of look.list) if (!rows.has(w.photo)) rows.set(w.photo, w.line);
+  for (const w of look.list) rows.set(w.photo, rows.has(w.photo) ? `${rows.get(w.photo)}\n${w.line}` : w.line);
   const nums = numberItems(m.floors, look.no);
   const here = new Set(floors.flatMap((f) => f.items.map((it) => nums.get(it.id))).filter((n): n is number => !!n));
   for (const row of legendLines({floors: m.floors}, look.no, look.line, look.byNo)) {
