@@ -18,7 +18,9 @@ for f, toks in T.items():
     page = int(f[-7:-4])
     im = Image.open(f'{pages_dir}/kaientai-p{page:03d}.png').convert('L')
     for s, x, y, w, h in toks:
-        lab = s.strip()
+        # 「ひじ掛け跳ね上げ※」のように「※」（品番ごとにちがう＝※は各々）の付いたアイコンもある（p.172〜174 のトイレ。
+        # 2026-11-17 の検品：前は字がぴったり同じものだけ読み、※付きを読み落としていた）
+        lab = s.strip().rstrip('※').strip()
         if lab not in LABELS:
             continue
         px = list(im.crop((int(x * K), int((y - h) * K), int((x + w) * K), int(y * K))).getdata())

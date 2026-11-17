@@ -550,4 +550,15 @@ test('検品部隊の直し（2026-11-09）：表に色の欄がなく写真の�
   assert.ok(!featureBadges(izumi, v('8252')).some((b) => b.text.startsWith('ひじ掛け跳ね上げ')), '8252 は自在タイプ');
   assert.ok(featureBadges(izumi, v('8253')).some((b) => b.text === 'ひじ掛け跳ね上げ'), '8253 ははね上げタイプ');
   assert.ok(featureBadges(izumi).some((b) => b.text.startsWith('ひじ掛け跳ね上げ（')), '商品の行では「…の品番のみ」');
+  // 「ひじ掛け跳ね上げ※」のように ※（※は各々）の付いたアイコンも読む（2026-11-17 の検品：p.172〜174 のトイレ4商品で読み落としていた）
+  const byCode = (code: string) => {
+    const p = all.find((x) => x.variants.some((y) => y.code === code))!;
+    return featureBadges(p, p.variants.find((y) => y.code === code)!).map((b) => b.text);
+  };
+  assert.ok(byCode('534-026').includes('ひじ掛け跳ね上げ'), 'セレクトS はねあげ');
+  assert.ok(!byCode('534-020').includes('ひじ掛け跳ね上げ'), 'セレクトS ノーマルは跳ね上げではない');
+  assert.ok(byCode('533-953').includes('ひじ掛け跳ね上げ'), 'セレクトR はねあげタイプ');
+  assert.ok(!byCode('533-950').includes('ひじ掛け跳ね上げ'), 'セレクトR ノーマルタイプは跳ね上げではない');
+  assert.ok(byCode('8080').includes('ひじ掛け跳ね上げ'), 'たため～るA（肘はね上げ）');
+  assert.ok(byCode('B2SE0003JH').includes('ひじ掛け高さ調整'), 'ラップポン・ブリオ2');
 });
