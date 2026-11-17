@@ -152,6 +152,24 @@ export function queueHacchu(sale: Sale, s: Pick<Settings, 'markupRate' | 'limit'
   return true;
 }
 
+/**
+ * 「📤 販売受注簿に転記」で受け取り口に置いたとき、列（承認で自動で入れた分）の同じ案件を消す。
+ * 前は列に残り、受注簿に入れたあとも、次に受注簿ツールを開くと同じ案件の「受注簿に入れる」がもう一度出た（2026-11-17 のコードの読み直し）
+ */
+export function unqueueHacchu(saleId: string, store: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> = localStorage): void {
+  let list: unknown;
+  try {
+    list = JSON.parse(store.getItem(HACCHU_QUEUE_KEY) || '[]');
+  } catch {
+    return;
+  }
+  if (!Array.isArray(list)) return;
+  const keep = list.filter((x) => !(typeof x === 'object' && x !== null && (x as HacchuQueued).saleId === saleId));
+  if (keep.length === list.length) return;
+  if (keep.length) store.setItem(HACCHU_QUEUE_KEY, JSON.stringify(keep));
+  else store.removeItem(HACCHU_QUEUE_KEY);
+}
+
 /** 受注簿を開く URL（受け取り口は ?from=tokutei で、リンクから開いたことを知る） */
 export function hacchuUrl(): string {
   return new URL(`${HACCHU_PATH}?from=tokutei`, location.origin).href;

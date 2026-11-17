@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {saleTotals} from '../../src/tokutei/calc.ts';
-import {benefitSplit, HACCHU_IMPORT_KEY, HACCHU_PATH, HACCHU_QUEUE_KEY, hacchuImport, queueHacchu} from '../../src/tokutei/handoff.ts';
+import {benefitSplit, HACCHU_IMPORT_KEY, HACCHU_PATH, HACCHU_QUEUE_KEY, hacchuImport, queueHacchu, unqueueHacchu} from '../../src/tokutei/handoff.ts';
 import type {Sale, SaleItem, TaxType} from '../../src/tokutei/types.ts';
 import {newSale} from '../../src/tokutei/sales.ts';
 import {defaultSettings} from '../../src/tokutei/defaults.ts';
@@ -228,4 +228,19 @@ test('承認にした見積もりを販売受注簿へ自動で送る列（同�
   store.set(HACCHU_QUEUE_KEY, '{');
   assert.equal(queueHacchu(a, S, ls, 5), true);
   assert.equal(JSON.parse(store.get(HACCHU_QUEUE_KEY) ?? '[]').length, 1);
+});
+
+test('「📤 販売受注簿に転記」で送った案件は、承認で入れた列から消す（受注簿に同じ案件を2回出さない）', () => {
+  const store = new Map<string, string>();
+  const ls = {getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k)};
+  const a = sale([item({name: '見本の杖', listPrice: 10000})], {id: 'a', customer: '見本 花子'});
+  const b = sale([item({name: '見本の台', listPrice: 20000})], {id: 'b', customer: '見本 太郎'});
+  queueHacchu(a, S, ls, 1);
+  queueHacchu(b, S, ls, 2);
+  unqueueHacchu('a', ls);
+  assert.deepEqual(JSON.parse(store.get(HACCHU_QUEUE_KEY) ?? '[]').map((x: {saleId: string}) => x.saleId), ['b']);
+  unqueueHacchu('x', ls); // 列にない案件はそのまま
+  assert.equal(JSON.parse(store.get(HACCHU_QUEUE_KEY) ?? '[]').length, 1);
+  unqueueHacchu('b', ls); // 空になったら列ごと消す
+  assert.equal(store.has(HACCHU_QUEUE_KEY), false);
 });

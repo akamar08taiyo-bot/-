@@ -2,7 +2,7 @@ import {useCallback, useDeferredValue, useEffect, useMemo, useRef, useState} fro
 import type {FocusEvent, MouseEvent} from 'react';
 import {saleTotals} from '../calc.ts';
 import {insurerLabel} from '../defaults.ts';
-import {HACCHU_IMPORT_KEY, hacchuImport, hacchuUrl, queueHacchu} from '../handoff.ts';
+import {HACCHU_IMPORT_KEY, hacchuImport, hacchuUrl, queueHacchu, unqueueHacchu} from '../handoff.ts';
 import {blankItem, rememberFavorites, copySale, customerLabel, customerPatch, itemFromProduct, makerChoices, markUsed, sameYearSales, saleWarnings, unregisteredItems, withoutBlankItems} from '../sales.ts';
 import {shinseiForm, shinseiValues} from '../shinsei.ts';
 import {saveShinsei, useTemplate} from '../shinseiFiles.ts';
@@ -327,7 +327,9 @@ export function SaleEditor({
       return false;
     }
     try {
-      localStorage.setItem(HACCHU_IMPORT_KEY, JSON.stringify(hacchuImport(sale, s)));
+      // saleId：受注簿ツールが、列（承認で自動で入れた分）の同じ案件も消せるように
+      localStorage.setItem(HACCHU_IMPORT_KEY, JSON.stringify({...hacchuImport(sale, s), saleId: sale.id}));
+      unqueueHacchu(sale.id); // 承認で列に入っていたら消す（同じ案件を2回出さない）
       change({hacchuSentAt: Date.now()}); // 承認にしたときに、もう一度自動で送らない
     } catch {
       toast('販売受注簿へ渡せませんでした（この端末のブラウザに保存できません）', 'error');
