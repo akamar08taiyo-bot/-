@@ -399,6 +399,35 @@ const MIYAKO_ROWS = [12, 14, 16, 18];
 const MIYAKO_PHOTOS = ['納品確認写真用紙', '納品確認写真用紙 (2)', '納品確認写真用紙 (3)', '納品確認写真用紙 (4)'];
 /** みやこ町の委任状（様式第6号）の欄：住宅改修の原本の「委任状」と同じ番地（受任者の所在地・電話・名称と代表者、保険給付額、委任者の住所） */
 export const MIYAKO_PROXY = {sheet: '委任状', sellerAddress: 'Z8', sellerTel: 'AF10', seller: 'Z17', benefit: 'M29', address: 'V39'} as const;
+/** 行橋市の請求書（市の Excel の「請求書  (委任)」＝事業所が請求するもの）の欄：住宅改修の原本の「請求書」と同じ番地 */
+export const YUKU_CLAIM = {sheet: '請求書', seller: 'T8', sellerAddress: 'T9', sellerRep: 'T10', staff: 'T11', content: 'I21', benefit: 'I23', self: 'I25', total: 'I27'} as const;
+/**
+ * 行橋市の請求書（ユーザーがくださった市の 16392.xlsx。2026-11-17。前は住宅改修の一式にだけ入っていた）：住宅改修の原本の「請求書」のシートを写した。
+ * 事業所名・住所・代表者名（所長）・担当は設定の営業所と見積もりの担当、請求内容は介護保険福祉用具購入費と被保険者氏名、
+ * 公費負担額＝保険給付額・個人負担額＝購入金額−保険給付額・総合計＝購入金額。日付は手で。償還払い・負担割合を選んでいないときは金額を書かない
+ */
+function yukuhashiClaim(v: ShinseiValues): SheetWrite {
+  const total = v.items.reduce((n, i) => n + i.total, 0);
+  const benefit = v.payMethod !== '償還払い' && v.benefit > 0 && total > 0 ? v.benefit : 0;
+  const c = YUKU_CLAIM;
+  return {
+    sheet: c.sheet,
+    cells: [
+      ...when(v.seller.name, [[c.seller, v.seller.name]]),
+      ...when(v.seller.address, [[c.sellerAddress, v.seller.address]]),
+      ...when(v.seller.rep, [[c.sellerRep, v.seller.rep]]),
+      ...when(v.staff, [[c.staff, v.staff]]),
+      ...when(v.name, [[c.content, `介護保険福祉用具購入費（${v.name}　様）`]]),
+      ...(benefit ? ([[c.benefit, benefit], [c.self, Math.max(0, total - benefit)], [c.total, total]] as [string, CellValue][]) : []),
+    ],
+    formats: benefit ? [c.benefit, c.self, c.total].map((ref): [string, {numFmt: number}] => [ref, {numFmt: 3}]) : [],
+    // 宛名の「行橋市長　工　藤　政　宏　様」（市の原本の字。A5:O5）も欄より1割ほど長く、両はしが切れるので、入る大きさに
+    fitWidth: [c.sellerRep, c.staff, 'A5'],
+    // 事業所名・住所の欄（T8:AF8・T9:AF9）は印刷の範囲（A:AE）より1列広いので、印刷される所（AE まで）に入る大きさに。
+    // 請求内容（I21）は結合していない欄で、下線（I21:AD21）まで右へはみ出して書く
+    fitIn: [[c.seller, 'T8:AE8'], [c.sellerAddress, 'T9:AE9'], [c.content, 'I21:AD21']],
+  };
+}
 
 /**
  * 広域連合（福岡県介護保険広域連合の福祉用具購入申請関係様式集。築上町・豊前市・上毛町・吉富町）：事前の申請はなく、購入のあとの支給申請書だけ。
@@ -1008,6 +1037,7 @@ export const SHINSEI: Record<ShinseiKey, ShinseiForm> = {
         office: ['G28', 'G29', 'G30'], // 受任者の所在地・名称と所長・電話
       },
       {sheet: '委任状', cells: proxyCells(v), fitIn: PROXY_FIT, ...(v.benefit > 0 ? {sizes: [['B23', PROXY_AMOUNT_PT]], heights: PROXY_AMOUNT_ROWS} : {}), office: PROXY_OFFICE},
+      yukuhashiClaim(v),
       {sheet: '完了写真', cells: photoCells(v), fit: ['B3'], hideZeros: true},
     ],
   },

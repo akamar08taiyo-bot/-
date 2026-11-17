@@ -6,7 +6,7 @@
 // あわせて、押すと案件の画面のその入れる所へ行く欄（お客様名・商品・理由…）の位置も返す（式で同じ値を出している欄＝支給申請書の氏名なども押せる）
 
 import {strFromU8} from 'fflate';
-import {FUKUOKA_ROWS, FUKUOKA_SHEET, fillShinseiFiles, KITAKYUSHU_GAIYO_ROWS, KITAKYUSHU_SHEETS, KOUIKI_SHEETS, KURUME_ROWS, KURUME_SHEETS, MIYAKO_PROXY, OITA_REASON_CELLS, OITA_ROWS, OITA_SHEETS, pairBoxes} from './shinsei.ts';
+import {FUKUOKA_ROWS, FUKUOKA_SHEET, fillShinseiFiles, KITAKYUSHU_GAIYO_ROWS, KITAKYUSHU_SHEETS, KOUIKI_SHEETS, KURUME_ROWS, KURUME_SHEETS, MIYAKO_PROXY, OITA_REASON_CELLS, OITA_ROWS, OITA_SHEETS, pairBoxes, YUKU_CLAIM} from './shinsei.ts';
 import {KK_CELLS} from './shinsei/kitakyushuCells.ts';
 import {KU_CELLS} from './shinsei/kurumeCells.ts';
 import type {ShinseiForm, ShinseiKey, ShinseiValues} from './shinsei.ts';
@@ -109,7 +109,21 @@ const KUC: Record<string, string> = KU_CELLS.claim;
 const KUT: Record<string, string> = KU_CELLS.teisyutu;
 
 export const SHINSEI_LINKS: Record<ShinseiKey, SheetLinks[]> = {
-  yukuhashi: [{sheet: '用具・受領委任払', links: [...preLinks(7), ['seller', boxes('Z', 10, 4)]]}, PROXY, PHOTO], // 事業者番号のマス（2026-11-05）
+  yukuhashi: [
+    {sheet: '用具・受領委任払', links: [...preLinks(7), ['seller', boxes('Z', 10, 4)]]}, // 事業者番号のマス（2026-11-05）
+    PROXY,
+    // 請求書（2026-11-17）：事業所の欄は設定の営業所、担当は担当、請求内容は氏名、金額は負担割合へ
+    {
+      sheet: YUKU_CLAIM.sheet,
+      links: [
+        ['seller', [YUKU_CLAIM.seller, YUKU_CLAIM.sellerAddress, YUKU_CLAIM.sellerRep]],
+        ['staff', [YUKU_CLAIM.staff]],
+        ['customer', [YUKU_CLAIM.content]],
+        ['burdenRatio', [YUKU_CLAIM.benefit, YUKU_CLAIM.self, YUKU_CLAIM.total]],
+      ],
+    },
+    PHOTO,
+  ],
   kanda: [
     {sheet: '用具・受領委任払', links: [...preLinks(4), ['tel', ['Y10', 'K30']]]},
     // 支給申請書：ほとんどの欄は事前申請書を参照する式（式からつなぐ）。性別・生年月日・要介護度の丸、購入日・申請日

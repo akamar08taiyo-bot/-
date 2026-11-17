@@ -86,7 +86,7 @@ const textOf = (p: ReturnType<typeof shinseiPreview>[number]) => p.texts.map((t)
 
 test('プレビュー：書き込むシートごとに1枚（行橋市・苅田町・みやこ町・広域連合）。書いた値が出る', () => {
   const sheets: Record<ShinseiKey, string[]> = {
-    yukuhashi: ['用具・受領委任払', '委任状', '完了写真'],
+    yukuhashi: ['用具・受領委任払', '委任状', '請求書', '完了写真'], // 請求書（市の 16392.xlsx）は 2026-11-17 から
     kanda: ['用具・受領委任払', '用具・支給申請　受領委任払 (2)', '委任状', '完了写真'],
     miyako: ['福祉用具購入受領委任払申請書', '福祉用具支給申請(受領委任）', '委任状', '納品確認写真用紙', '納品確認写真用紙 (2)'], // 委任状（様式第6号）は 2026-11-17 から
     kouiki: [KOUIKI_SHEETS.juryo, KOUIKI_SHEETS.photo],
@@ -104,8 +104,8 @@ test('プレビュー：書き込むシートごとに1枚（行橋市・苅田�
       sheets[key],
       key,
     );
-    // 北九州市の支給申請書の裏（委任状）は、用紙の上半分だけの印刷範囲
-    for (const p of pages) assert.ok(p.width > 400 && (p.height > 600 || p.sheet === '支給申請書（裏）') && p.texts.length > 5 && p.lines.length > 5, `${key} ${p.sheet} ${p.width}×${p.height}`);
+    // 北九州市の支給申請書の裏（委任状）は、用紙の上半分だけの印刷範囲。行橋市の請求書は表の枠がなく、下線が4本だけ
+    for (const p of pages) assert.ok(p.width > 400 && (p.height > 600 || p.sheet === '支給申請書（裏）') && p.texts.length > 5 && p.lines.length > (p.sheet === '請求書' ? 3 : 5), `${key} ${p.sheet} ${p.width}×${p.height}`);
     const first = textOf(pages[0]);
     assert.ok(first.includes('見本 花子') && first.includes('ミホン ハナコ'), key);
     assert.ok((key === 'kitakyushu' ? textOf(pages[2]) : first).includes('シャワーチェア 見本A'), key);

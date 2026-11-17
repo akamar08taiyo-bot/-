@@ -18,6 +18,7 @@ import {
   KURUME_RATIO_TEXT,
   KURUME_SHEETS,
   MIYAKO_PROXY,
+  YUKU_CLAIM,
   kurumeAddress,
   kurumePays,
   OITA_REASON_CELLS,
@@ -140,6 +141,34 @@ test('申請書に書く値：福祉用具名・製造事業者名及び販売�
   assert.equal(carePlanOf({carePlan: '', careOffice: ''}), '');
 });
 
+test('行橋市：請求書（委任。市の 16392.xlsx）は設定の営業所・担当・請求内容・公費負担額＝保険給付額・個人負担額・総合計。日付は手で', () => {
+  const f = fill('yukuhashi');
+  const c = (ref: string) => readCell(f, YUKU_CLAIM.sheet, ref) ?? '';
+  const total = 28160 + 27808;
+  const benefit = total - Math.ceil(total / 10);
+  assert.match(c(YUKU_CLAIM.seller), /^太陽シルバーサービス㈱　\S+営業所$/);
+  assert.match(c(YUKU_CLAIM.sellerAddress), /^福岡県\S+/);
+  assert.match(c(YUKU_CLAIM.sellerRep), /^所長　\S/);
+  assert.equal(c(YUKU_CLAIM.staff), '土居 翔太');
+  assert.equal(c(YUKU_CLAIM.content), '介護保険福祉用具購入費（見本 花子　様）');
+  assert.deepEqual([c(YUKU_CLAIM.benefit), c(YUKU_CLAIM.self), c(YUKU_CLAIM.total)], [String(benefit), String(total - benefit), String(total)]);
+  assert.equal(printOverflow(f, YUKU_CLAIM.sheet), null);
+  // 字の大きさ：請求内容は下線（I21:AD21）まで使えるので原本の大きさのまま。事業所名・住所は印刷の範囲（AE まで）に、宛名（市の原本の字）は欄に入る
+  const fits = (ref: string, range: string) => {
+    const text = String(readCell(f, YUKU_CLAIM.sheet, ref) ?? '');
+    const pt = cellBox(f, YUKU_CLAIM.sheet, ref).style.size;
+    return emOf(text) * ((pt * 4) / 3) <= rangeBox(sheetLayout(strFromU8(f[sheetPath(f, YUKU_CLAIM.sheet)])), range).w - 6;
+  };
+  assert.equal(cellBox(f, YUKU_CLAIM.sheet, YUKU_CLAIM.content).style.size, cellBox(template('yukuhashi'), YUKU_CLAIM.sheet, YUKU_CLAIM.content).style.size);
+  for (const [ref, range] of [[YUKU_CLAIM.content, 'I21:AD21'], [YUKU_CLAIM.seller, 'T8:AE8'], [YUKU_CLAIM.sellerAddress, 'T9:AE9'], ['A5', 'A5:O5']]) assert.ok(fits(ref, range), ref);
+  assert.match(strFromU8(f['xl/workbook.xml']), /name="委任状"[^>]*\/><sheet name="請求書"/); // 委任状のうしろ
+  // 償還払い・負担割合を選んでいないときは金額を書かない
+  for (const over of [{payMethod: '償還払い' as const}, {burdenRatio: null}]) {
+    const g = fill('yukuhashi', over);
+    assert.deepEqual([YUKU_CLAIM.benefit, YUKU_CLAIM.self, YUKU_CLAIM.total].map((r) => readCell(g, YUKU_CLAIM.sheet, r) ?? ''), ['', '', ''], JSON.stringify(over));
+  }
+});
+
 test('行橋市：事前申請書・委任状・完了写真に書く', () => {
   const f = fill('yukuhashi');
   const sh = '用具・受領委任払';
@@ -184,7 +213,7 @@ test('行橋市：事前申請書・委任状・完了写真に書く', () => {
   assert.match(strFromU8(f['[Content_Types].xml']), /spreadsheetml\.sheet\.main\+xml/);
   assert.match(strFromU8(f['xl/workbook.xml']), /fullCalcOnLoad="1"/);
   assert.equal(f['xl/calcChain.xml'], undefined);
-  assert.equal(sheetPaths(f).size, 3); // シートは消さない
+  assert.equal(sheetPaths(f).size, 4); // シートは消さない（申請書・委任状・請求書・完了写真）
 });
 
 test('苅田町：支給申請書は事前申請書を参照する式。丸は両方に', () => {
