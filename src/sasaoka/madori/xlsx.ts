@@ -1,5 +1,5 @@
 // 見取図の Excel（.xlsx）：印刷（MadoriPrint.tsx）と同じ A4 の1枚（縦が基本、横に広い図は横。階をみな1枚に）を1つのシートにする。
-// いちばん上の「〇〇様邸」と、下の改修の内容（①玄関　手すりの取り付け　L=600mm…赤い字）はマスの文字（Excel で打ち直せる）、平面図は画像（PNG）。
+// いちばん上の「〇〇様邸」と、下の改修の内容（①玄関　手すりの取り付け　L=600mm…黒い字）はマスの文字（Excel で打ち直せる）、平面図は画像（PNG）。
 // 列の幅・行の高さは sheet.ts の sheetLayout の mm のまま（印刷と同じ位置）
 
 import type {Job, Settings} from '../types.ts';
@@ -11,7 +11,8 @@ import {A4, placeLookup, planSvg, sheetFloors, sheetLayout, sheetText, sheetTitl
 import type {SheetLayout} from './sheet.ts';
 
 const PT_PER_MM = 72 / 25.4;
-const RED = 'E01B24';
+// 下の改修の内容の字は黒（ユーザーの指示「文字色は赤字ではなく、黒字にする」2026-11-17。前は手すりと同じ赤）
+const INK = '000000';
 
 /** 見取図のシート。png は平面図の画像（なければ図なし）。title はいちばん上の「〇〇様邸」 */
 export function madoriSheet(o: {lay: SheetLayout; legend: string[]; name: string; png?: Uint8Array; title?: string}): XSheet {
@@ -34,7 +35,7 @@ export function madoriSheet(o: {lay: SheetLayout; legend: string[]; name: string
   if (L) {
     b.row(L.y - lay.area.y - lay.area.h); // 平面図と一覧のすき間
     const lineH = L.fs * 1.55;
-    const style = {font, size: Math.round(L.fs * PT_PER_MM * 2) / 2, color: RED, v: 'center' as const, shrink: true};
+    const style = {font, size: Math.round(L.fs * PT_PER_MM * 2) / 2, color: INK, v: 'center' as const, shrink: true};
     const span = N / L.cols;
     const groups = Array.from({length: L.cols}, (_, g) => g * span);
     // 枠の線：上の段に上の線・下の段に下の線、左の列に左の線・右の列に右の線

@@ -284,7 +284,26 @@ await page.keyboard.press('Escape');
 assert.ok((await railPaths()).some((d) => /l9\d0 0L[\d.]+ [\d.]+$/.test(d)), `一筆の L 字 ${JSON.stringify(await railPaths())}`);
 await page.keyboard.press('Control+z');
 for (let i = 0; i < 7; i++) await page.keyboard.press('Control+z'); // 文字・通路・WC・階段・回す・左右反転・らせん階段
-// ---------------- 部屋を頂点で描く（角を順に押す・はじめの点で閉じる）・頂点（■）で形を変える
+// ---------------- 部屋のふだんの作り方（ユーザーの指示「通常は、和室、洋室などを選んだら枠が込みでつくっていく。
+// 頂点で編集ボタンを押して和室などを選んだら、変形した廊下や形などを作っていけるようにする」2026-11-17）：
+// 部屋の種類を選んで方眼を押すと、決まった大きさの部屋を枠ごと置く（角を置く＝頂点で描くにはならない）
+await cat('部屋');
+await tool('洋室');
+{
+  const rooms = async () => (await art()).split('fill="#fff6d6"').length;
+  const n0 = await rooms();
+  await click(9.5 * M, 1.5 * M);
+  assert.equal(await page.locator('[data-poly-draft]').count(), 0, '押しただけで角を置かない');
+  assert.ok((await rooms()) > n0, '押すと洋室が枠ごと入る');
+  await page.keyboard.press('Control+z');
+  await page.keyboard.press('Escape');
+}
+// ---------------- 頂点で描く（上の段の「◇ 頂点の編集」を押してから部屋を選び、角を順に押す・はじめの点で閉じる）・頂点（■）で形を変える
+{
+  const vb = page.getByRole('button', {name: '◇ 頂点の編集'});
+  await vb.click();
+  assert.equal(await vb.getAttribute('aria-pressed'), 'true');
+}
 await cat('部屋');
 await tool('洋室');
 for (const [x, y] of [[8, 0], [11, 0], [11, 1], [9, 1], [9, 3], [8, 3]]) await click(x * M, y * M);
@@ -503,7 +522,12 @@ log('方眼の上のまん中の描く道具・曲げた手すり（□で曲げ
   const bar = page.getByRole('toolbar', {name: '描く道具'});
   const vbtn = page.getByRole('button', {name: '◇ 頂点の編集'});
   await page.keyboard.press('Escape');
-  assert.equal(await vbtn.isDisabled(), true); // 何も選んでいなければ押せない
+  // 何も選んでいないときに押すと「頂点で描く」（部屋の種類を選んで角を押す）。もう一度押すと終わる
+  await vbtn.click();
+  assert.equal(await vbtn.getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.locator('[data-poly-hint]').count(), 1);
+  await vbtn.click();
+  assert.equal(await vbtn.getAttribute('aria-pressed'), 'false');
   const vb = await vbtn.boundingBox();
   const ub = await page.locator('[data-undo-center]').boundingBox();
   assert.ok(vb.y >= ub.y - 1 && vb.y + vb.height <= ub.y + ub.height + 1, '頂点の編集は上の段のまん中（戻す・進む・削除の右）');
@@ -569,6 +593,8 @@ log('頂点の編集：角を動かす・辺で角を足す・ダブルタップ
 {
   await cat('部屋');
   assert.equal(await page.locator('[data-madori-palette] button[title="応接間"]').count(), 1);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', {name: '◇ 頂点の編集'}).click(); // 頂点で描く
   await tool('洋室');
   for (const [x, y] of [[6, 6], [10, 6], [9, 8], [5, 8]]) await click(x * M, y * M);
   await click(6 * M, 6 * M); // はじめの点で閉じる

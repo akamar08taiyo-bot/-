@@ -357,6 +357,8 @@ test('見取図の紙：題名（〇〇様邸　見取図）・日付・会社�
   const page = pageSvg(tall, tall.floors, lay, ['①　L＝600mm'], none, 'p');
   assert.match(page, /viewBox="0 0 210 297"/);
   assert.match(page, /①　L＝600mm/);
+  // 下の改修の内容の字は黒（ユーザーの指示「文字色は赤字ではなく、黒字にする」2026-11-17）
+  assert.match(page, /<text [^>]*fill="#000000"[^>]*>①　L＝600mm</);
   assert.ok(!/見取図|様邸|年|株式会社|担当者/.test(page.replace(/<pattern[\s\S]*?<\/pattern>/g, '')));
   // 横に広い図（7マス×2マス）は横
   const wide: Madori = {...emptyMadori(), floors: [{id: 'f1', name: '1階', items: [room('a', 0, 0, 7 * M, 2 * M)]}]};
@@ -462,7 +464,7 @@ test('2階建て：1枚に1階・2階を並べる（見出し「1階」「2階�
   assert.equal(lf.dir, 'col');
 });
 
-test('Excel：見取図を1シート（縦が基本）・一覧は赤い字・平面図は1つの画像（PNG。階をみな）', async () => {
+test('Excel：見取図を1シート（縦が基本）・一覧は黒い字・平面図は1つの画像（PNG。階をみな）', async () => {
   const m: Madori = {
     ...emptyMadori(),
     floors: [
@@ -495,10 +497,20 @@ test('Excel：見取図を1シート（縦が基本）・一覧は赤い字・�
   assert.match(s1, /<row r="1" [^>]*><c r="A1" s="\d+" t="inlineStr"><is><t xml:space="preserve">見本 花子様邸<\/t>/);
   assert.match(s1, /<mergeCell ref="A1:D1"\/>/);
   assert.ok(!/見取図|株式会社/.test(s1));
-  assert.match(strFromU8(z['xl/styles.xml']), /FFE01B24/);
-  // 下の枠の赤い字は、申請書の平面図の様式の下の欄と同じ 12pt（ユーザーの指摘「申請書の内容の部分の文字が小さい」2026-11-13。前は 9.5pt）
-  const red = [...strFromU8(z['xl/styles.xml']).matchAll(/<font>((?:(?!<\/font>)[\s\S])*)<\/font>/g)].map((x) => x[1]).filter((f) => f.includes('FFE01B24'));
-  assert.ok(red.length > 0 && red.every((f) => /<sz val="12"\/>/.test(f)), red.join(' | '));
+  // 下の枠の字は黒（ユーザーの指示「文字色は赤字ではなく、黒字にする」2026-11-17。前は赤）で、申請書の平面図の様式の下の欄と同じ 12pt
+  // （ユーザーの指摘「申請書の内容の部分の文字が小さい」2026-11-13。前は 9.5pt）
+  const styles = strFromU8(z['xl/styles.xml']);
+  assert.ok(!/FFE01B24/.test(styles), '赤い字が残っている');
+  const xfs = [...styles.match(/<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/)![1].matchAll(/<xf [^>]*fontId="(\d+)"/g)].map((x) => Number(x[1]));
+  const fonts = [...styles.matchAll(/<font>((?:(?!<\/font>)[\s\S])*)<\/font>/g)].map((x) => x[1]);
+  const cellFont = (txt: string) => {
+    const c = s1.match(new RegExp(`<c r="[A-Z]+\\d+" s="(\\d+)" t="inlineStr"><is><t[^>]*>\\s*${txt}`));
+    assert.ok(c, txt);
+    return fonts[xfs[Number(c![1])]];
+  };
+  const leg = cellFont('①L＝600mm');
+  assert.match(leg, /<sz val="12"\/>/);
+  assert.match(leg, /<color rgb="FF000000"\/>/);
   assert.deepEqual([...z['xl/media/image1.png']], [...png]);
   assert.match(strFromU8(z['[Content_Types].xml']), /Extension="png"/);
 });

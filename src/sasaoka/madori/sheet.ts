@@ -10,7 +10,7 @@ import type {Job, Settings} from '../types.ts';
 import {customerFilePart} from '../util.ts';
 import {emptyMadori, legendLines, numberItems} from './model.ts';
 import type {Madori, MFloor, Underlay} from './model.ts';
-import {floorSvg, patternDefs, RED, viewOf} from './render.ts';
+import {floorSvg, patternDefs, viewOf} from './render.ts';
 
 /** 紙（A4）の短い辺・長い辺と余白（mm） */
 export const A4 = {short: 210, long: 297, margin: 10};
@@ -340,8 +340,9 @@ export function pageSvg(m: Madori, floors: MFloor[], lay: SheetLayout, legend: s
         legendSpots(L, legend.length)
           .map((q, i) => {
             const tooLong = textEm(legend[i]) * L.fs > L.colW;
+            // 字は黒（ユーザーの指示「文字色は赤字ではなく、黒字にする」2026-11-17。前は手すりと同じ赤）。
             // そのほかの行（申請書の改修の内容の2行目）は、全角・半角のすき間で1行目の改修の種類の頭まで下げてある。半角のすき間がつぶれないように xml:space
-            return `<text x="${r2(L.x + q.x)}" y="${r2(L.y + q.y)}" font-size="${L.fs}" fill="${RED}" xml:space="preserve"${tooLong ? ` textLength="${r2(L.colW)}" lengthAdjust="spacingAndGlyphs"` : ''}>${escText(legend[i])}</text>`;
+            return `<text x="${r2(L.x + q.x)}" y="${r2(L.y + q.y)}" font-size="${L.fs}" fill="#000000" xml:space="preserve"${tooLong ? ` textLength="${r2(L.colW)}" lengthAdjust="spacingAndGlyphs"` : ''}>${escText(legend[i])}</text>`;
           })
           .join('') +
         `</g>`
